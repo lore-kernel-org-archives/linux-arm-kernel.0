@@ -1,42 +1,97 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 23 Apr 2014 18:02:51 +0200
-Subject: [PATCH 5/5] ARM: sunxi: Remove sun4i and sun7i machine definitions
-In-Reply-To: <1398265476-29373-6-git-send-email-maxime.ripard@free-electrons.com>
-References: <1398265476-29373-1-git-send-email-maxime.ripard@free-electrons.com>
- <1398265476-29373-6-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1401022774.yKcHJAmPtb@wuerfel>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 23 Apr 2014 17:13:25 +0100
+Subject: [PATCH v2 2/3] arm: exynos: Add MCPM call-back functions
+In-Reply-To: <alpine.LFD.2.11.1404221540540.980@knanqh.ubzr>
+References: <1397239311-27717-6-git-send-email-a.kesavan@samsung.com>
+ <1398147435-3122-1-git-send-email-a.kesavan@samsung.com>
+ <535650AE.90501@linaro.org>
+ <alpine.LFD.2.11.1404221129150.980@knanqh.ubzr>
+ <5356C134.8070707@linaro.org>
+ <alpine.LFD.2.11.1404221540540.980@knanqh.ubzr>
+Message-ID: <20140423161325.GB1243@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 23 April 2014 17:04:36 Maxime Ripard wrote:
->  
-> -static void __init sunxi_dt_init(void)
-> -{
-> -       of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> -}
-> -
-> -static const char * const sunxi_board_dt_compat[] = {
-> -       "allwinner,sun4i-a10",
-> -       "allwinner,sun5i-a10s",
-> -       "allwinner,sun5i-a13",
-> -       NULL,
-> -};
-> -
-> -DT_MACHINE_START(SUNXI_DT, "Allwinner A1X (Device Tree)")
-> -       .init_machine   = sunxi_dt_init,
-> -       .dt_compat      = sunxi_board_dt_compat,
-> -MACHINE_END
-> -
->  static const char * const sun6i_board_dt_compat[] = {
->         "allwinner,sun6i-a31",
->         NULL,
+On Tue, Apr 22, 2014 at 08:56:23PM +0100, Nicolas Pitre wrote:
+> 
+> [ Moved Lorenzo up in the addressee list to get his attention ]
 
-I'd like to hear more opinions on this. We could either rely
-on the generic code, or we could keep the entry with just
-the .dt_compat line and the name, so /proc/cpuinfo contains
-a meaningful platform name.
+Sorry for the delay in replying.
 
-Either approach works for me, but I think we should do this
-consistent across platforms. Olof, do you have an opinion?
+> On Tue, 22 Apr 2014, Daniel Lezcano wrote:
+> 
+> > On 04/22/2014 05:40 PM, Nicolas Pitre wrote:
+> > > On Tue, 22 Apr 2014, Daniel Lezcano wrote:
+> > >
+> > > > On 04/22/2014 08:17 AM, Abhilash Kesavan wrote:
+> > > > > +/*
+> > > > > + * The common v7_exit_coherency_flush API could not be used because of the
+> > > > > + * Erratum 799270 workaround. This macro is the same as the common one (in
+> > > > > + * arch/arm/include/asm/cacheflush.h) except for the erratum handling.
+> > > > > + */
+> > > > > +#define exynos_v7_exit_coherency_flush(level) \
+> > > > > +	asm volatile( \
+> > > > > +	"stmfd	sp!, {fp, ip}\n\t"\
+> > > > > +	"mrc	p15, 0, r0, c1, c0, 0	@ get SCTLR\n\t" \
+> > > > > +	"bic	r0, r0, #"__stringify(CR_C)"\n\t" \
+> > > > > +	"mcr	p15, 0, r0, c1, c0, 0	@ set SCTLR\n\t" \
+> > > > > +	"isb\n\t"\
+> > > > > +	"bl	v7_flush_dcache_"__stringify(level)"\n\t" \
+> > > > > +	"clrex\n\t"\
+> > > > > +	"mrc	p15, 0, r0, c1, c0, 1	@ get ACTLR\n\t" \
+> > > > > +	"bic	r0, r0, #(1 << 6)	@ disable local coherency\n\t" \
+> > > > > +	/* Dummy Load of a device register to avoid Erratum 799270 */ \
+> > > >
+> > > > Wouldn't make sense to add the erratum in the Kconfig and re-use it in the
+> > > > generic v7_exit_coherency_flush macro instead of redefining it ?
+> > >
+> > > The implementation of the erratum (the dummy device register load) is
+> > > platform specific I'm afraid.
+> > >
+> > > Is TC2 also concerned by this erratum, or is this Samsung specific?
+> > 
+> > Sounds like it is ARM Cortex-A15MP specific:
+> > 
+> > http://infocenter.arm.com/help/topic/com.arm.doc.epm028090/cortex_a15_mpcore_software_developers_errata_notice_r2_v12.pdf
+> > 
+> > Page 31.
+> 
+> The condition for hitting the erratum is: "The L2 cache block has been 
+> idle for 256 or more cycles with no memory requests from any core, no 
+> external snoops, and no ACP requests".
+> 
+> Given that the operation that almost immediately precedes the 
+> problematic mcr is a call to v7_flush_dcache_louis or 
+> v7_flush_dcache_all, is this possible that the condition for the erratum 
+> could ever be met?
 
-	Arnd
+Yes, if we execute out of the I-cache (no-data accesses) I think this might be
+triggered.
+
+On a side note, the errata affects also the setting of SMP bit
+(__v7_ca15mp_setup and cpu_v7_do_resume) but we do nothing there (it
+is a different situation though, MMU there is off and D-cache off...but
+I-cache is allowed to be on, so I am actually checking if we should be doing
+something there too).
+
+> If no then we should document that v7_exit_coherency_flush(() is safe 
+> against erratum 799270 and use it here.
+
+Eh, I wish we could use it safely, I am currently investigating and will get
+back to you asap.
+
+Lorenzo
+
+> > > > > +	"ldr	r4, [%0]\n\t" \
+> > > > > +	"and	r4, r4, #0\n\t" \
+> > > > > +	"orr	r0, r0, r4\n\t" \
+> > > > > +	"mcr	p15, 0, r0, c1, c0, 1	@ set ACTLR\n\t" \
+> > > > > +	"isb\n\t" \
+> > > > > +	"dsb\n\t" \
+> > > > > +	"ldmfd	sp!, {fp, ip}" \
+> > > > > +	: \
+> > > > > +	: "Ir" (S5P_INFORM0) \
+> > > > > +	: "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", \
+> > > > > +	  "r9", "r10", "lr", "memory")
+> > > >
+> 
