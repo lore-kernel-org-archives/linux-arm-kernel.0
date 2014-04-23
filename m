@@ -1,40 +1,30 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 23 Apr 2014 09:09:49 +0200
-Subject: [PATCH 22/33] ARM: shmobile: Use r8a7740 suffix for i2c, mmcif,
- fsi2 compat strings
-In-Reply-To: <5c53f50c50badff499568a703467c3c9f23f9bfd.1398216022.git.horms+renesas@verge.net.au>
-References: <cover.1398216022.git.horms+renesas@verge.net.au>
- <5c53f50c50badff499568a703467c3c9f23f9bfd.1398216022.git.horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdUA+wJmgn0P_q38ri7_TAq7zha-ekSUrvdpntG5gFv56Q@mail.gmail.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Wed, 23 Apr 2014 09:14:33 +0200
+Subject: BUG: spinlock trylock failure on UP, i.MX28 3.12.15-rt25
+In-Reply-To: <20140422141650.7f43d5ba@gandalf.local.home>
+References: <534C3606.7010206@meduna.org>	<534C731F.1050406@meduna.org>	<534DADF1.6060608@meduna.org>	<20140422115439.GA20669@linutronix.de>	<20140422094657.5b6ca1e2@gandalf.local.home>	<53569E05.8010600@linutronix.de>	<20140422134802.73fc1fa4@gandalf.local.home>
+ <20140422141650.7f43d5ba@gandalf.local.home>
+Message-ID: <53576859.8060706@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 23, 2014 at 3:25 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> From: Ulrich Hecht <ulrich.hecht@gmail.com>
->
-> Add "renesas,*-r8a7740" to the compatible strings for consistency with other
-> devices.
+On 04/22/2014 08:16 PM, Steven Rostedt wrote:
+> --- a/kernel/timer.c
+> +++ b/kernel/timer.c
+> @@ -1447,6 +1447,12 @@ static void run_timer_softirq(struct softirq_action *h)
+>  		__run_timers(base);
+>  }
+>  
+> +#ifdef CONFIG_SMP
+> +#define timer_should_raise_softirq(lock)	!spin_do_trylock(lock)
+> +#else
+> +#define timer_should_raise_softirq(lock)	1
+> +#endif
+> +
 
-> diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
-> index 8280884..9f65986 100644
-> --- a/arch/arm/boot/dts/r8a7740.dtsi
-> +++ b/arch/arm/boot/dts/r8a7740.dtsi
-> @@ -126,7 +126,7 @@
+No. The lock may be taken but it also may be available no matter if UP
+or not. With this patch applied the lockdep splat will go away but the
+FULL_NO_HZ people will come back because the timer softirq is scheduled
+even if no timer has expired.
 
-> -               compatible = "renesas,rmobile-iic";
-> +               compatible = "renesas,iic-r8a7740", "renesas,rmobile-iic";
-
-I see an opportunity for improvement here: this driver doesn't seem to have
-any bindings documented under Documentation/devicetree/bindings/?
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Sebastian
