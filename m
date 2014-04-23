@@ -1,72 +1,161 @@
 From: nathan_lynch@mentor.com (Nathan Lynch)
-Date: Tue, 22 Apr 2014 19:48:56 -0500
-Subject: [PATCH v6 5/6] ARM: vdso initialization, mapping, and synchronization
+Date: Tue, 22 Apr 2014 19:48:54 -0500
+Subject: [PATCH v6 3/6] ARM: miscellaneous vdso infrastructure, preparation
 In-Reply-To: <cover.1398213562.git.nathan_lynch@mentor.com>
 References: <cover.1398213562.git.nathan_lynch@mentor.com>
-Message-ID: <793f7c3c7189155910c6ab9496ca0679c48479fc.1398213562.git.nathan_lynch@mentor.com>
+Message-ID: <d4a35add9d030865d2c1896e7328765072627ca8.1398213562.git.nathan_lynch@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initialize the vdso page list at boot, install the vdso mapping at
-exec time, and update the data page during timer ticks.  This code is
-not built if CONFIG_VDSO is not enabled.
+Define the layout of the data structure shared between kernel and
+userspace.
 
-Account for the vdso length when randomizing the offset from the
-stack.  The vdso is placed immediately following the sigpage with a
-separate install_special_mapping call in arm_install_vdso.
+Track the vdso address in the mm_context; needed for reporting [vdso]
+via /proc/pid/maps and communicating AT_SYSINFO_EHDR to the ELF
+loader.
+
+Add declarations for vma_is_vdso, arm_install_vdso, and !CONFIG_VDSO
+implementations of same.  The CONFIG_VDSO=y implementations of these
+come later.
+
+Make arch_vma_name recognize a vdso VMA, using vma_is_vdso to return
+"[vdso]" when appropriate.
+
+Define AT_SYSINFO_EHDR, and, if CONFIG_VDSO=y, report the vdso shared
+object address via the ELF auxiliary vector.
+
+Note - this adds the AT_SYSINFO_EHDR in a new user-visible header
+asm/auxvec.h; this is consistent with other architectures.
 
 Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
 ---
- arch/arm/kernel/process.c |  13 +++-
- arch/arm/kernel/vdso.c    | 168 ++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 179 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/kernel/vdso.c
+ arch/arm/include/asm/Kbuild          |  1 -
+ arch/arm/include/asm/elf.h           | 11 +++++++
+ arch/arm/include/asm/mmu.h           |  3 ++
+ arch/arm/include/asm/vdso.h          | 47 ++++++++++++++++++++++++++++
+ arch/arm/include/asm/vdso_datapage.h | 60 ++++++++++++++++++++++++++++++++++++
+ arch/arm/include/uapi/asm/Kbuild     |  1 +
+ arch/arm/include/uapi/asm/auxvec.h   |  7 +++++
+ arch/arm/kernel/process.c            | 14 +++++++--
+ 8 files changed, 140 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm/include/asm/vdso.h
+ create mode 100644 arch/arm/include/asm/vdso_datapage.h
+ create mode 100644 arch/arm/include/uapi/asm/auxvec.h
 
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index 40445fb71ac9..39b0d68aa068 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -520,6 +520,7 @@ extern struct page *get_signal_page(void);
- int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
- {
- 	struct mm_struct *mm = current->mm;
-+	unsigned long npages;
- 	unsigned long addr;
- 	unsigned long hint;
- 	int ret;
-@@ -529,9 +530,11 @@ int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
- 	if (!signal_page)
- 		return -ENOMEM;
+diff --git a/arch/arm/include/asm/Kbuild b/arch/arm/include/asm/Kbuild
+index 23e728ecf8ab..a0b3a7486488 100644
+--- a/arch/arm/include/asm/Kbuild
++++ b/arch/arm/include/asm/Kbuild
+@@ -1,6 +1,5 @@
  
-+	npages = (vdso_mapping_len >> PAGE_SHIFT) + 1;
-+
- 	down_write(&mm->mmap_sem);
--	hint = vdso_addr(mm, 1);
--	addr = get_unmapped_area(NULL, hint, PAGE_SIZE, 0, 0);
-+	hint = vdso_addr(mm, npages);
-+	addr = get_unmapped_area(NULL, hint, npages, 0, 0);
- 	if (IS_ERR_VALUE(addr)) {
- 		ret = addr;
- 		goto up_fail;
-@@ -544,6 +547,12 @@ int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
- 	if (ret == 0)
- 		mm->context.sigpage = addr;
  
-+	/* Unlike the sigpage, failure to install the vdso is unlikely
-+	 * to be fatal to the process, so no error check needed
-+	 * here.
-+	 */
-+	arm_install_vdso(mm, addr + PAGE_SIZE);
-+
-  up_fail:
- 	up_write(&mm->mmap_sem);
- 	return ret;
-diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
+-generic-y += auxvec.h
+ generic-y += bitsperlong.h
+ generic-y += cputime.h
+ generic-y += current.h
+diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
+index f4b46d39b9cf..45d2ddff662a 100644
+--- a/arch/arm/include/asm/elf.h
++++ b/arch/arm/include/asm/elf.h
+@@ -1,7 +1,9 @@
+ #ifndef __ASMARM_ELF_H
+ #define __ASMARM_ELF_H
+ 
++#include <asm/auxvec.h>
+ #include <asm/hwcap.h>
++#include <asm/vdso_datapage.h>
+ 
+ /*
+  * ELF register definitions..
+@@ -129,6 +131,15 @@ extern unsigned long arch_randomize_brk(struct mm_struct *mm);
+ #define arch_randomize_brk arch_randomize_brk
+ 
+ #ifdef CONFIG_MMU
++#ifdef CONFIG_VDSO
++#define ARCH_DLINFO								\
++do {										\
++	/* Account for the data page at the beginning of the [vdso] VMA. */	\
++	NEW_AUX_ENT(AT_SYSINFO_EHDR,						\
++		    (elf_addr_t)current->mm->context.vdso +			\
++		    sizeof(union vdso_data_store));				\
++} while (0)
++#endif
+ #define ARCH_HAS_SETUP_ADDITIONAL_PAGES 1
+ struct linux_binprm;
+ int arch_setup_additional_pages(struct linux_binprm *, int);
+diff --git a/arch/arm/include/asm/mmu.h b/arch/arm/include/asm/mmu.h
+index 64fd15159b7d..a5b47421059d 100644
+--- a/arch/arm/include/asm/mmu.h
++++ b/arch/arm/include/asm/mmu.h
+@@ -11,6 +11,9 @@ typedef struct {
+ #endif
+ 	unsigned int	vmalloc_seq;
+ 	unsigned long	sigpage;
++#ifdef CONFIG_VDSO
++	unsigned long	vdso;
++#endif
+ } mm_context_t;
+ 
+ #ifdef CONFIG_CPU_HAS_ASID
+diff --git a/arch/arm/include/asm/vdso.h b/arch/arm/include/asm/vdso.h
 new file mode 100644
-index 000000000000..0cfd25f09adf
+index 000000000000..0e2a6154eceb
 --- /dev/null
-+++ b/arch/arm/kernel/vdso.c
-@@ -0,0 +1,168 @@
++++ b/arch/arm/include/asm/vdso.h
+@@ -0,0 +1,47 @@
++#ifndef __ASM_VDSO_H
++#define __ASM_VDSO_H
++
++#ifdef __KERNEL__
++
++#ifndef __ASSEMBLY__
++
++#include <linux/mm_types.h>
++#include <asm/mmu.h>
++
++#ifdef CONFIG_VDSO
++
++static inline bool vma_is_vdso(struct vm_area_struct *vma)
++{
++	if (vma->vm_mm && vma->vm_start == vma->vm_mm->context.vdso)
++		return true;
++	return false;
++}
++
++void arm_install_vdso(struct mm_struct *mm, unsigned long addr);
++
++extern char vdso_start, vdso_end;
++
++extern unsigned long vdso_mapping_len;
++
++#else /* CONFIG_VDSO */
++
++static inline bool vma_is_vdso(struct vm_area_struct *vma)
++{
++	return false;
++}
++
++static inline void arm_install_vdso(struct mm_struct *mm, unsigned long addr)
++{
++}
++
++#define vdso_mapping_len 0
++
++#endif /* CONFIG_VDSO */
++
++#endif /* __ASSEMBLY__ */
++
++#define VDSO_LBASE	0x0
++
++#endif /* __KERNEL__ */
++
++#endif /* __ASM_VDSO_H */
+diff --git a/arch/arm/include/asm/vdso_datapage.h b/arch/arm/include/asm/vdso_datapage.h
+new file mode 100644
+index 000000000000..f08bdb73d3f4
+--- /dev/null
++++ b/arch/arm/include/asm/vdso_datapage.h
+@@ -0,0 +1,60 @@
 +/*
 + * Adapted from arm64 version.
 + *
@@ -84,156 +173,105 @@ index 000000000000..0cfd25f09adf
 + * You should have received a copy of the GNU General Public License
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
++#ifndef __ASM_VDSO_DATAPAGE_H
++#define __ASM_VDSO_DATAPAGE_H
 +
-+#include <linux/err.h>
-+#include <linux/kernel.h>
-+#include <linux/mm.h>
-+#include <linux/slab.h>
-+#include <linux/timekeeper_internal.h>
-+#include <linux/vmalloc.h>
++#ifdef __KERNEL__
 +
-+#include <asm/barrier.h>
-+#include <asm/cacheflush.h>
++#ifndef __ASSEMBLY__
++
 +#include <asm/page.h>
++
++/* Try to be cache-friendly on systems that don't implement the
++ * generic timer: fit the unconditionally updated fields in the first
++ * 32 bytes.
++ */
++struct vdso_data {
++	u32 seq_count;		/* sequence count - odd during updates */
++	u16 use_syscall;	/* whether to fall back to syscalls */
++	u16 cs_shift;		/* clocksource shift */
++	u32 xtime_coarse_sec;	/* coarse time */
++	u32 xtime_coarse_nsec;
++
++	u32 wtm_clock_sec;	/* wall to monotonic offset */
++	u32 wtm_clock_nsec;
++	u32 xtime_clock_sec;	/* CLOCK_REALTIME - seconds */
++	u32 cs_mult;		/* clocksource multiplier */
++
++	u64 cs_cycle_last;	/* last cycle value */
++	u64 cs_mask;		/* clocksource mask */
++
++	u64 xtime_clock_snsec;	/* CLOCK_REALTIME sub-ns base */
++	u32 tz_minuteswest;	/* timezone info for gettimeofday(2) */
++	u32 tz_dsttime;
++};
++
++union vdso_data_store {
++	struct vdso_data data;
++	u8 page[PAGE_SIZE];
++};
++
++#endif /* !__ASSEMBLY__ */
++
++#endif /* __KERNEL__ */
++
++#endif /* __ASM_VDSO_DATAPAGE_H */
+diff --git a/arch/arm/include/uapi/asm/Kbuild b/arch/arm/include/uapi/asm/Kbuild
+index 70a1c9da30ca..a1c05f93d920 100644
+--- a/arch/arm/include/uapi/asm/Kbuild
++++ b/arch/arm/include/uapi/asm/Kbuild
+@@ -1,6 +1,7 @@
+ # UAPI Header export list
+ include include/uapi/asm-generic/Kbuild.asm
+ 
++header-y += auxvec.h
+ header-y += byteorder.h
+ header-y += fcntl.h
+ header-y += hwcap.h
+diff --git a/arch/arm/include/uapi/asm/auxvec.h b/arch/arm/include/uapi/asm/auxvec.h
+new file mode 100644
+index 000000000000..f56936b97ec2
+--- /dev/null
++++ b/arch/arm/include/uapi/asm/auxvec.h
+@@ -0,0 +1,7 @@
++#ifndef __ASM_AUXVEC_H
++#define __ASM_AUXVEC_H
++
++/* vDSO location */
++#define AT_SYSINFO_EHDR	33
++
++#endif
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 219a0d1d10fc..40445fb71ac9 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -41,6 +41,7 @@
+ #include <asm/system_misc.h>
+ #include <asm/mach/time.h>
+ #include <asm/tls.h>
 +#include <asm/vdso.h>
-+#include <asm/vdso_datapage.h>
+ 
+ #ifdef CONFIG_CC_STACKPROTECTOR
+ #include <linux/stackprotector.h>
+@@ -472,9 +473,16 @@ int in_gate_area_no_mm(unsigned long addr)
+ 
+ const char *arch_vma_name(struct vm_area_struct *vma)
+ {
+-	return is_gate_vma(vma) ? "[vectors]" :
+-		(vma->vm_mm && vma->vm_start == vma->vm_mm->context.sigpage) ?
+-		 "[sigpage]" : NULL;
++	if (is_gate_vma(vma))
++		return "[vectors]";
 +
-+static struct page **vdso_pagelist;
++	if (vma->vm_mm && vma->vm_start == vma->vm_mm->context.sigpage)
++		return "[sigpage]";
 +
-+unsigned long vdso_mapping_len __read_mostly;
++	if (vma_is_vdso(vma))
++		return "[vdso]";
 +
-+/*
-+ * The vDSO data page.
-+ */
-+static union vdso_data_store vdso_data_store __page_aligned_data;
-+static struct vdso_data *vdso_data = &vdso_data_store.data;
-+
-+static int __init vdso_init(void)
-+{
-+	unsigned long vdso_pages;
-+	int i;
-+
-+	if (memcmp(&vdso_start, "\177ELF", 4)) {
-+		pr_err("vDSO is not a valid ELF object!\n");
-+		return -ENOEXEC;
-+	}
-+
-+	vdso_pages = (&vdso_end - &vdso_start) >> PAGE_SHIFT;
-+	pr_debug("vdso: %ld code pages at base %p\n", vdso_pages, &vdso_start);
-+
-+	/* Allocate the vDSO pagelist, plus a page for the data. */
-+	vdso_pagelist = kcalloc(vdso_pages + 1, sizeof(struct page *),
-+				GFP_KERNEL);
-+	if (vdso_pagelist == NULL)
-+		return -ENOMEM;
-+
-+	/* Grab the vDSO data page. */
-+	vdso_pagelist[0] = virt_to_page(vdso_data);
-+
-+	/* Grab the vDSO code pages. */
-+	for (i = 0; i < vdso_pages; i++)
-+		vdso_pagelist[i + 1] = virt_to_page(&vdso_start + i * PAGE_SIZE);
-+
-+	/* Precompute the mapping size */
-+	vdso_mapping_len = (vdso_pages + 1) << PAGE_SHIFT;
-+
-+	return 0;
-+}
-+arch_initcall(vdso_init);
-+
-+/* assumes mmap_sem is write-locked */
-+void arm_install_vdso(struct mm_struct *mm, unsigned long addr)
-+{
-+	int ret;
-+
-+	mm->context.vdso = ~0UL;
-+
-+	if (vdso_pagelist == NULL)
-+		return;
-+
-+	/*
-+	 * Put vDSO base into mm struct before calling
-+	 * install_special_mapping so the perf counter mmap tracking
-+	 * code will recognise it as a vDSO.
-+	 */
-+	mm->context.vdso = addr;
-+
-+	ret = install_special_mapping(mm, addr, vdso_mapping_len,
-+				      VM_READ|VM_EXEC|
-+				      VM_MAYREAD|VM_MAYWRITE|VM_MAYEXEC,
-+				      vdso_pagelist);
-+	if (ret) {
-+		pr_notice_once("%s: install_special_mapping failed (%d)\n",
-+			       __func__, ret);
-+		mm->context.vdso = ~0UL;
-+		return;
-+	}
-+}
-+
-+static void vdso_write_begin(struct vdso_data *vdata)
-+{
-+	++vdso_data->seq_count;
-+	smp_wmb();
-+}
-+
-+static void vdso_write_end(struct vdso_data *vdata)
-+{
-+	smp_wmb();
-+	++vdso_data->seq_count;
-+}
-+
-+/**
-+ * update_vsyscall - update the vdso data page
-+ *
-+ * Increment the sequence counter, making it odd, indicating to
-+ * userspace that an update is in progress.  Update the fields used
-+ * for coarse clocks and, if the architected system timer is in use,
-+ * the fields used for high precision clocks.  Increment the sequence
-+ * counter again, making it even, indicating to userspace that the
-+ * update is finished.
-+ *
-+ * Userspace is expected to sample seq_count before reading any other
-+ * fields from the data page.  If seq_count is odd, userspace is
-+ * expected to wait until it becomes even.  After copying data from
-+ * the page, userspace must sample seq_count again; if it has changed
-+ * from its previous value, userspace must retry the whole sequence.
-+ *
-+ * Calls to update_vsyscall are serialized by the timekeeping core.
-+ */
-+void update_vsyscall(struct timekeeper *tk)
-+{
-+	struct timespec xtime_coarse;
-+	struct timespec *wtm = &tk->wall_to_monotonic;
-+	bool use_syscall = strcmp(tk->clock->name, "arch_sys_counter");
-+
-+	vdso_write_begin(vdso_data);
-+
-+	xtime_coarse = __current_kernel_time();
-+	vdso_data->use_syscall			= use_syscall;
-+	vdso_data->xtime_coarse_sec		= xtime_coarse.tv_sec;
-+	vdso_data->xtime_coarse_nsec		= xtime_coarse.tv_nsec;
-+	vdso_data->wtm_clock_sec		= wtm->tv_sec;
-+	vdso_data->wtm_clock_nsec		= wtm->tv_nsec;
-+
-+	if (!use_syscall) {
-+		vdso_data->cs_cycle_last	= tk->cycle_last;
-+		vdso_data->xtime_clock_sec	= tk->xtime_sec;
-+		vdso_data->xtime_clock_snsec	= tk->xtime_nsec;
-+		vdso_data->cs_mult		= tk->mult;
-+		vdso_data->cs_shift		= tk->shift;
-+		vdso_data->cs_mask		= tk->clock->mask;
-+	}
-+
-+	vdso_write_end(vdso_data);
-+
-+	flush_dcache_page(virt_to_page(vdso_data));
-+}
-+
-+void update_vsyscall_tz(void)
-+{
-+	vdso_data->tz_minuteswest	= sys_tz.tz_minuteswest;
-+	vdso_data->tz_dsttime		= sys_tz.tz_dsttime;
-+	flush_dcache_page(virt_to_page(vdso_data));
-+}
++	return NULL;
+ }
+ 
+ static unsigned long vdso_addr(const struct mm_struct *mm, unsigned int npages)
 -- 
 1.8.3.1
