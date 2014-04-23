@@ -1,59 +1,51 @@
-From: james.hogan@imgtec.com (James Hogan)
-Date: Wed, 23 Apr 2014 11:08:04 +0100
-Subject: [PATCH 0/3] asm-generic: Add renameat2, drop renameat by default
-Message-ID: <1398247687-13453-1-git-send-email-james.hogan@imgtec.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 23 Apr 2014 12:11:10 +0200
+Subject: [PATCH v8 11/17] ARM: dts: sun6i: Add mmc controller nodes
+In-Reply-To: <20140423095029.GM24905@lukather>
+References: <1398164497-14212-1-git-send-email-hdegoede@redhat.com>
+ <1398164497-14212-12-git-send-email-hdegoede@redhat.com>
+ <20140423095029.GM24905@lukather>
+Message-ID: <535791BE.80804@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A few patches relating to the renameat2 syscall added for v3.15 and the
-asm-generic syscall list.
+Hi,
 
-The first adds it to the generic syscall list. I'll send this upstream
-for v3.15 (but acks still welcome).
+On 04/23/2014 11:50 AM, Maxime Ripard wrote:
+> On Tue, Apr 22, 2014 at 01:01:31PM +0200, Hans de Goede wrote:
+>> Add nodes for the 4 mmc controllers found on A31 SoCs to
+>> arch/arm/boot/dts/sun6i-a31.dtsi.
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>>  arch/arm/boot/dts/sun6i-a31.dtsi | 52 ++++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 52 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+>> index 12bcc17..a27afc8 100644
+>> --- a/arch/arm/boot/dts/sun6i-a31.dtsi
+>> +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+>> @@ -269,6 +269,58 @@
+>>  		#size-cells = <1>;
+>>  		ranges;
+>>  
+>> +		mmc0: mmc at 01c0f000 {
+>> +			compatible = "allwinner,sun5i-a13-mmc";
+>> +			reg = <0x01c0f000 0x1000>;
+>> +			clocks = <&ahb1_gates 8>, <&mmc0_clk>;
+>> +			clock-names = "ahb", "mod";
+>> +			resets = <&ahb1_rst 8>;
+>> +			reset-names = "ahb";
+>> +			interrupts = <0 60 4>;
+>> +			bus-width = <4>;
+>> +			cd-inverted;
+> 
+> The two last items should be in the DTS.
 
-The second and third patches make the renameat syscall optional, since
-renameat2 provides a superset of its functionality, and removes renameat
-from the generic syscall list by default. All existing users now define
-__ARCH_WANT_RENAMEAT so that nothing breaks, but new architectures are
-expected not to define it. Unless anybody requests otherwise I'll await
-an Ack from Arnd for these two and queue them for v3.16.
+Ah, I had fixed sun4i / sun5i & sun7i but forgot about this one,
+fixed in my local tree now. I've also squashed the m9 mmc enablement
+patch into the m9 addition patch as you've requested.
 
-James Hogan (3):
-  asm-generic: Add renameat2 syscall
-  scripts/checksyscalls.sh: Make renameat optional
-  asm-generic: Drop renameat syscall from default list
+Regards,
 
- arch/arc/include/uapi/asm/unistd.h       | 1 +
- arch/arm64/include/uapi/asm/unistd.h     | 3 +++
- arch/c6x/include/uapi/asm/unistd.h       | 1 +
- arch/hexagon/include/uapi/asm/unistd.h   | 1 +
- arch/metag/include/uapi/asm/unistd.h     | 2 ++
- arch/openrisc/include/uapi/asm/unistd.h  | 1 +
- arch/score/include/uapi/asm/unistd.h     | 1 +
- arch/tile/include/uapi/asm/unistd.h      | 1 +
- arch/unicore32/include/uapi/asm/unistd.h | 2 ++
- include/uapi/asm-generic/unistd.h        | 7 ++++++-
- scripts/checksyscalls.sh                 | 5 ++++-
- 11 files changed, 23 insertions(+), 2 deletions(-)
-
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: linux-arch at vger.kernel.org
-Cc: Vineet Gupta <vgupta@synopsys.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Mark Salter <msalter@redhat.com>
-Cc: Aurelien Jacquiot <a-jacquiot@ti.com>
-Cc: linux-c6x-dev at linux-c6x.org
-Cc: Richard Kuo <rkuo@codeaurora.org>
-Cc: linux-hexagon at vger.kernel.org
-Cc: linux-metag at vger.kernel.org
-Cc: Jonas Bonn <jonas@southpole.se>
-Cc: linux at lists.openrisc.net
-Cc: Chen Liqin <liqin.linux@gmail.com>
-Cc: Lennox Wu <lennox.wu@gmail.com>
-Cc: Chris Metcalf <cmetcalf@tilera.com>
-Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
-
--- 
-1.8.1.2
+Hans
