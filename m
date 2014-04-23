@@ -1,76 +1,91 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 23 Apr 2014 13:33:48 +0200
-Subject: [PATCH v2 37/38] ARM: orion: remove no longer needed DT IRQ code
-In-Reply-To: <1398202002-28530-38-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Wed, 23 Apr 2014 13:34:02 +0200
+Subject: [PATCH v2 38/38] ARM: orion: remove no longer needed gpio DT code
+In-Reply-To: <1398202002-28530-39-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1398202002-28530-38-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <5357A51C.2000104@gmail.com>
+ <1398202002-28530-39-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <5357A52A.7010000@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 04/22/2014 11:26 PM, Thomas Petazzoni wrote:
-> Following the move of the Orion5x Device Tree support to use
-> irqchip_init() for the interrupt controller probing, the
-> plat-orion/irq.c code for DT-probing of the interrupt controller is no
-> longer necessary, so we can get rid of it.
+> Following the move to pure DT-based probing of the GPIO controllers on
+> Orion5x, some code in plat-orion/orion-gpio.c can be removed as it is
+> no longer used.
 >
 > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
 Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 
 > ---
->   arch/arm/plat-orion/include/plat/irq.h |  1 -
->   arch/arm/plat-orion/irq.c              | 32 --------------------------------
->   2 files changed, 33 deletions(-)
+>   arch/arm/plat-orion/gpio.c                    | 48 ---------------------------
+>   arch/arm/plat-orion/include/plat/orion-gpio.h |  1 -
+>   2 files changed, 49 deletions(-)
 >
-> diff --git a/arch/arm/plat-orion/include/plat/irq.h b/arch/arm/plat-orion/include/plat/irq.h
-> index 50547e4..96be19e 100644
-> --- a/arch/arm/plat-orion/include/plat/irq.h
-> +++ b/arch/arm/plat-orion/include/plat/irq.h
-> @@ -12,5 +12,4 @@
->   #define __PLAT_IRQ_H
+> diff --git a/arch/arm/plat-orion/gpio.c b/arch/arm/plat-orion/gpio.c
+> index 6816192..b61a3bc 100644
+> --- a/arch/arm/plat-orion/gpio.c
+> +++ b/arch/arm/plat-orion/gpio.c
+> @@ -597,51 +597,3 @@ void __init orion_gpio_init(struct device_node *np,
 >
->   void orion_irq_init(unsigned int irq_start, void __iomem *maskaddr);
-> -void __init orion_dt_init_irq(void);
->   #endif
-> diff --git a/arch/arm/plat-orion/irq.c b/arch/arm/plat-orion/irq.c
-> index 27ec18b..8c1fc06 100644
-> --- a/arch/arm/plat-orion/irq.c
-> +++ b/arch/arm/plat-orion/irq.c
-> @@ -38,35 +38,3 @@ void __init orion_irq_init(unsigned int irq_start, void __iomem *maskaddr)
->   	irq_setup_generic_chip(gc, IRQ_MSK(32), IRQ_GC_INIT_MASK_CACHE,
->   			       IRQ_NOREQUEST, IRQ_LEVEL | IRQ_NOPROBE);
+>   	orion_gpio_chip_count++;
 >   }
 > -
 > -#ifdef CONFIG_OF
-> -static int __init orion_add_irq_domain(struct device_node *np,
-> -				       struct device_node *interrupt_parent)
+> -static void __init orion_gpio_of_init_one(struct device_node *np,
+> -					  int irq_gpio_base)
 > -{
-> -	int i = 0;
+> -	int ngpio, gpio_base, mask_offset;
 > -	void __iomem *base;
+> -	int ret, i;
+> -	int irqs[4];
+> -	int secondary_irq_base;
 > -
-> -	do {
-> -		base = of_iomap(np, i);
-> -		if (base) {
-> -			orion_irq_init(i * 32, base + 0x04);
-> -			i++;
-> -		}
-> -	} while (base);
+> -	ret = of_property_read_u32(np, "ngpio", &ngpio);
+> -	if (ret)
+> -		goto out;
+> -	ret = of_property_read_u32(np, "mask-offset", &mask_offset);
+> -	if (ret == -EINVAL)
+> -		mask_offset = 0;
+> -	else
+> -		goto out;
+> -	base = of_iomap(np, 0);
+> -	if (!base)
+> -		goto out;
 > -
-> -	irq_domain_add_legacy(np, i * 32, 0, 0,
-> -			      &irq_domain_simple_ops, NULL);
-> -	return 0;
+> -	secondary_irq_base = irq_gpio_base + (32 * orion_gpio_chip_count);
+> -	gpio_base = 32 * orion_gpio_chip_count;
+> -
+> -	/* Get the interrupt numbers. Each chip can have up to 4
+> -	 * interrupt handlers, with each handler dealing with 8 GPIO
+> -	 * pins. */
+> -
+> -	for (i = 0; i < 4; i++)
+> -		irqs[i] = irq_of_parse_and_map(np, i);
+> -
+> -	orion_gpio_init(np, gpio_base, ngpio, base, mask_offset,
+> -			secondary_irq_base, irqs);
+> -	return;
+> -out:
+> -	pr_err("%s: %s: missing mandatory property\n", __func__, np->name);
 > -}
 > -
-> -static const struct of_device_id orion_irq_match[] = {
-> -	{ .compatible = "marvell,orion-intc",
-> -	  .data = orion_add_irq_domain, },
-> -	{},
-> -};
-> -
-> -void __init orion_dt_init_irq(void)
+> -void __init orion_gpio_of_init(int irq_gpio_base)
 > -{
-> -	of_irq_init(orion_irq_match);
+> -	struct device_node *np;
+> -
+> -	for_each_compatible_node(np, NULL, "marvell,orion-gpio")
+> -		orion_gpio_of_init_one(np, irq_gpio_base);
 > -}
 > -#endif
+> diff --git a/arch/arm/plat-orion/include/plat/orion-gpio.h b/arch/arm/plat-orion/include/plat/orion-gpio.h
+> index 614dcac..e763988 100644
+> --- a/arch/arm/plat-orion/include/plat/orion-gpio.h
+> +++ b/arch/arm/plat-orion/include/plat/orion-gpio.h
+> @@ -33,5 +33,4 @@ void __init orion_gpio_init(struct device_node *np,
+>   			    int secondary_irq_base,
+>   			    int irq[4]);
+>
+> -void __init orion_gpio_of_init(int irq_gpio_base);
+>   #endif
 >
