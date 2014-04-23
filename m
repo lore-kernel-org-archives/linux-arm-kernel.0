@@ -1,31 +1,51 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 22 Apr 2014 19:56:19 -0400
-Subject: [PATCH 0/2] net: Add Keystone NetCP ethernet driver support
-In-Reply-To: <20140422150231.2e87b7eb@nehalam.linuxnetplumber.net>
-References: <1398201675-17379-1-git-send-email-santosh.shilimkar@ti.com>
- <20140422150231.2e87b7eb@nehalam.linuxnetplumber.net>
-Message-ID: <535701A3.5050309@ti.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 22 Apr 2014 17:01:45 -0700
+Subject: [PATCH 2/3] ARM: at91: at91sam9g45: change at91_adc name
+In-Reply-To: <5356E406.40507@atmel.com>
+References: <1394038675-15809-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1394038675-15809-3-git-send-email-alexandre.belloni@free-electrons.com>
+ <5318C98C.1070702@kernel.org> <531DBD71.8040905@atmel.com>
+ <532472B8.4090802@kernel.org> <5356E406.40507@atmel.com>
+Message-ID: <20140423000145.GA31342@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 22 April 2014 06:02 PM, Stephen Hemminger wrote:
-> On Tue, 22 Apr 2014 17:21:13 -0400
-> Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
+On Tue, Apr 22, 2014 at 11:49:58PM +0200, Nicolas Ferre wrote:
+> On 15/03/2014 16:33, Jonathan Cameron :
+> > On 10/03/14 13:26, Nicolas Ferre wrote:
+> >> On 06/03/2014 20:16, Jonathan Cameron :
+> >>> On 05/03/14 16:57, Alexandre Belloni wrote:
+> >>>> We can't use "at91_adc" to refer to the at91_adc driver anymore as the name is
+> >>>> used to match an id_table.
+> >>>>
+> >>>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> >>> As stated in previous email, I'll take this along with the fix that 'broke'
+> >>> this, if I get an Ack from one of the at91 maintainers.
+> >>
+> >> Jonathan,
+> >>
+> >> It is maybe more clear if I answer here:
+> >> - so, yes, you can take the 3 patches yourself (if you do not mind)
+> >> - you have, for the whole series::
+> >>
+> >> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > Applied to the fixes-togreg branch of iio.git
+> > 
+> > Timing wise, these will now hit immediately after the merge window closes.
 > 
->> NetCP driver has a plug-in module architecture where each of the NetCP
->> sub-modules exist as a loadable kernel module which plug in to the netcp
->> core. These sub-modules are represented as "netcp-devices" in the dts
->> bindings. It is mandatory to have the ethernet switch sub-module for
->> the ethernet interface to be operational. Any other sub-module like the
->> PA is optional.
+> Greg, Jonathan,
 > 
-> Where is the implementation of these modules. You need to include
-> this as separate patch set. Also the hooks for these modules should all
-> be EXPORT_SYMBOL_GPL() to disallow proprietary modules.
-> 
-There is no proprietary issue and all the hooks will be GPL. The plan is
-to add them in another patch-set once the core driver gets merged. They need
-some work to make them upstream ready.
+> I saw the IIO pull request a week ago ([PULL] IIO fixes for 3.15 round
+> 1) but I do not see it in Linus' tree for the moment:
+> http://article.gmane.org/gmane.linux.kernel.iio/11764
 
-Regards,
-Santosh
+I don't have a copy of that pull request anywhere in my inboxes.  Was it
+sent to me?  Did I loose it somewhere?
+
+Oh crap, it ended up in my spam folder, very odd.  Gotta love gmail at
+times...
+
+I'll pull these in this week and get this to Linus for -rc3, sorry about
+that.
+
+greg k-h
