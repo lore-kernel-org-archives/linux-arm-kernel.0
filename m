@@ -1,43 +1,168 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 23 Apr 2014 16:01:04 +0200
-Subject: [PATCH 2/5] clk: berlin: add berlin clocks DT bindings documentation
+Date: Wed, 23 Apr 2014 16:01:03 +0200
+Subject: [PATCH 1/5] clk: berlin: add support for clocks
 In-Reply-To: <1398261667-12621-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1398261667-12621-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1398261667-12621-3-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1398261667-12621-2-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the newly added berlin clock driver
+Add support for clocks having their own register set.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
-Cc: devicetree at vger.kernel.org
- Documentation/devicetree/bindings/clock/berlin-clock.txt | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ drivers/clk/berlin/Makefile |   2 +-
+ drivers/clk/berlin/clk.c    | 132 ++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 133 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/clk/berlin/clk.c
 
-diff --git a/Documentation/devicetree/bindings/clock/berlin-clock.txt b/Documentation/devicetree/bindings/clock/berlin-clock.txt
-index 49b7860bffb8..00f0053ef587 100644
---- a/Documentation/devicetree/bindings/clock/berlin-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/berlin-clock.txt
-@@ -9,6 +9,8 @@ Required properties:
- 	"marvell,berlin2-pll",
- 	"marvell,berlin2q-pll":
- 		CPU PLL and System PLL
-+	"marvell,berlin2-clk":
-+		simple clocks
- - reg: Address and length of the clock register set.
- - #clock-cells: from common clock binding; shall be set to 0.
- - clocks: from common clock binding
-@@ -26,4 +28,9 @@ cpupll: cpupll at ea003c {
- 	reg = <0xea003c 0x8>;
- };
- 
--
-+sdio0xinclk: sdio0xinclk at ea023c {
-+	compatible = "marvell,berlin-clk";
-+	clocks = <&syspll>;
-+	#clock-cells = <0>;
-+	reg = <0xea023c 4>;
+diff --git a/drivers/clk/berlin/Makefile b/drivers/clk/berlin/Makefile
+index 94859513de90..9bfa58eaf25a 100644
+--- a/drivers/clk/berlin/Makefile
++++ b/drivers/clk/berlin/Makefile
+@@ -1,4 +1,4 @@
+-obj-y += pll.o
++obj-y += pll.o clk.o
+ obj-$(CONFIG_MACH_BERLIN_BG2)   += pll-berlin2.o
+ obj-$(CONFIG_MACH_BERLIN_BG2CD) += pll-berlin2.o
+ obj-$(CONFIG_MACH_BERLIN_BG2Q)  += pll-berlin2q.o
+diff --git a/drivers/clk/berlin/clk.c b/drivers/clk/berlin/clk.c
+new file mode 100644
+index 000000000000..a0e688e5bead
+--- /dev/null
++++ b/drivers/clk/berlin/clk.c
+@@ -0,0 +1,132 @@
++/*
++ * Copyright (c) 2014 Marvell Technology Group Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#include <linux/bitops.h>
++#include <linux/clk-provider.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/slab.h>
++
++#include "common.h"
++
++#define CLKEN		(1 << 0)
++#define CLKPLLSEL_MASK	7
++#define CLKPLLSEL_SHIFT	1
++#define CLKPLLSWITCH	(1 << 4)
++#define CLKSWITCH	(1 << 5)
++#define CLKD3SWITCH	(1 << 6)
++#define CLKSEL_MASK	7
++#define CLKSEL_SHIFT	7
++
++struct berlin_clk {
++	struct clk_hw hw;
++	void __iomem *base;
 +};
++
++#define to_berlin_clk(hw)	container_of(hw, struct berlin_clk, hw)
++
++static u8 clk_div[] = {1, 2, 4, 6, 8, 12, 1, 1};
++
++static unsigned long berlin_clk_recalc_rate(struct clk_hw *hw,
++					unsigned long parent_rate)
++{
++	u32 val, divider;
++	struct berlin_clk *clk = to_berlin_clk(hw);
++
++	val = readl_relaxed(clk->base);
++	if (val & CLKD3SWITCH)
++		divider = 3;
++	else {
++		if (val & CLKSWITCH) {
++			val >>= CLKSEL_SHIFT;
++			val &= CLKSEL_MASK;
++			divider = clk_div[val];
++		} else
++			divider = 1;
++	}
++
++	return parent_rate / divider;
++}
++
++static u8 berlin_clk_get_parent(struct clk_hw *hw)
++{
++	u32 val;
++	struct berlin_clk *clk = to_berlin_clk(hw);
++
++	val = readl_relaxed(clk->base);
++	if (val & CLKPLLSWITCH) {
++		val >>= CLKPLLSEL_SHIFT;
++		val &= CLKPLLSEL_MASK;
++		return val;
++	}
++
++	return 0;
++}
++
++static const struct clk_ops berlin_clk_ops = {
++	.recalc_rate	= berlin_clk_recalc_rate,
++	.get_parent	= berlin_clk_get_parent,
++};
++
++static void __init berlin_clk_setup(struct device_node *np)
++{
++	struct clk_init_data init;
++	struct berlin_clk *bclk;
++	struct clk *clk;
++	const char **parent_names;
++	int nparents, i, ret;
++
++	bclk = kzalloc(sizeof(*bclk), GFP_KERNEL);
++	if (WARN_ON(!bclk))
++		return;
++
++	bclk->base = of_iomap(np, 0);
++	if (WARN_ON(!bclk->base))
++		goto exit;
++
++	nparents = of_clk_get_parent_count(np);
++	if (WARN_ON(!nparents))
++		goto exit;
++
++	parent_names = kzalloc((sizeof(char *) * nparents), GFP_KERNEL);
++	if (WARN_ON(!parent_names))
++		goto exit;
++
++	init.name = np->name;
++	init.ops = &berlin_clk_ops;
++	for (i = 0; i < nparents; i++) {
++		parent_names[i] = of_clk_get_parent_name(np, i);
++		if (!parent_names[i])
++			break;
++	}
++	init.parent_names = parent_names;
++	init.num_parents = i;
++
++	bclk->hw.init = &init;
++
++	clk = clk_register(NULL, &bclk->hw);
++	kfree(parent_names);
++	if (WARN_ON(IS_ERR(clk)))
++		goto exit;
++
++	ret = of_clk_add_provider(np, of_clk_src_simple_get, clk);
++	WARN_ON(ret);
++
++	return;
++exit:
++	kfree(bclk);
++}
++
++CLK_OF_DECLARE(berlin_clk, "marvell,berlin-clk", berlin_clk_setup);
 -- 
 1.9.1
