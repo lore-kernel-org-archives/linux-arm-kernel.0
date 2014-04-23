@@ -1,60 +1,40 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 23 Apr 2014 15:09:28 +0800
-Subject: [PATCH] ARM: dts: imx6qdl-wandboard: Add HDMI support
-In-Reply-To: <1398176782-22794-1-git-send-email-fabio.estevam@freescale.com>
-References: <1398176782-22794-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20140423070926.GD2523@dragon>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 23 Apr 2014 09:09:49 +0200
+Subject: [PATCH 22/33] ARM: shmobile: Use r8a7740 suffix for i2c, mmcif,
+ fsi2 compat strings
+In-Reply-To: <5c53f50c50badff499568a703467c3c9f23f9bfd.1398216022.git.horms+renesas@verge.net.au>
+References: <cover.1398216022.git.horms+renesas@verge.net.au>
+ <5c53f50c50badff499568a703467c3c9f23f9bfd.1398216022.git.horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdUA+wJmgn0P_q38ri7_TAq7zha-ekSUrvdpntG5gFv56Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 22, 2014 at 11:26:22AM -0300, Fabio Estevam wrote:
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+On Wed, Apr 23, 2014 at 3:25 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> From: Ulrich Hecht <ulrich.hecht@gmail.com>
+>
+> Add "renesas,*-r8a7740" to the compatible strings for consistency with other
+> devices.
 
-Applied, thanks.
+> diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
+> index 8280884..9f65986 100644
+> --- a/arch/arm/boot/dts/r8a7740.dtsi
+> +++ b/arch/arm/boot/dts/r8a7740.dtsi
+> @@ -126,7 +126,7 @@
 
-Shawn
+> -               compatible = "renesas,rmobile-iic";
+> +               compatible = "renesas,iic-r8a7740", "renesas,rmobile-iic";
 
-> ---
->  arch/arm/boot/dts/imx6qdl-wandboard.dtsi | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-> index bdfdf89..5c6f10c 100644
-> --- a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-> @@ -62,6 +62,18 @@
->  	status = "okay";
->  };
->  
-> +&hdmi {
-> +	ddc-i2c-bus = <&i2c1>;
-> +	status = "okay";
-> +};
-> +
-> +&i2c1 {
-> +	clock-frequency = <100000>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_i2c1>;
-> +	status = "okay";
-> +};
-> +
->  &i2c2 {
->  	clock-frequency = <100000>;
->  	pinctrl-names = "default";
-> @@ -127,6 +139,13 @@
->  			>;
->  		};
->  
-> +		pinctrl_i2c1: i2c1grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_EIM_D21__I2C1_SCL 		0x4001b8b1
-> +				MX6QDL_PAD_EIM_D28__I2C1_SDA 		0x4001b8b1
-> +			>;
-> +		};
-> +
->  		pinctrl_i2c2: i2c2grp {
->  			fsl,pins = <
->  				MX6QDL_PAD_KEY_COL3__I2C2_SCL		0x4001b8b1
-> -- 
-> 1.8.3.2
-> 
+I see an opportunity for improvement here: this driver doesn't seem to have
+any bindings documented under Documentation/devicetree/bindings/?
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
