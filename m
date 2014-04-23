@@ -1,56 +1,38 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 23 Apr 2014 21:52:04 +0200
-Subject: [PATCH 4/4] dma: ste_dma40: Fixup system suspend/resume
-In-Reply-To: <1398282724-2607-1-git-send-email-ulf.hansson@linaro.org>
-References: <1398282724-2607-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1398282724-2607-4-git-send-email-ulf.hansson@linaro.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 23 Apr 2014 21:57:33 +0200
+Subject: [PATCH 05/14] ARM: shmobile: koelsch-reference: Work around core
+ clock issues
+In-Reply-To: <53580C69.20602@cogentembedded.com>
+References: <cover.1397774190.git.horms+renesas@verge.net.au>
+ <53cf0cf7ba2ef785b339826a0765bb6b1756adeb.1397774191.git.horms+renesas@verge.net.au>
+ <5356D0B8.5010406@cogentembedded.com>
+ <20140423002254.GD5738@verge.net.au>
+ <53580C69.20602@cogentembedded.com>
+Message-ID: <CAMuHMdXWp=BqtWQ9zY2MgHrWukN0YbSHQRr-XXjGWQCKkxxZsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make sure to handle register context save/restore when needed from
-system PM callbacks.
+i Sergei,
 
-Previously we solely trusted the device to reside in in-active state
-while the system suspend callback were invoked, which is just too
-optimistic.
+On Wed, Apr 23, 2014 at 8:54 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+>>> fixing series by Ben/Geert helps with booting further. I therefore
+>>> would like to have it merged by Simon the sooner the better...
+>
+>> For my reference, specifically which patches are you referring to?
+>
+>    Here the link to the cover letter of the 17 patch series:
+> http://marc.info/?l=linux-sh&m=139756526122104
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/dma/ste_dma40.c |   13 ++++++++++---
- 1 file changed, 10 insertions(+), 3 deletions(-)
+I'm working on a solution using a different approach. Please stay tuned.
 
-diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-index 0b29af3..b539fc9 100644
---- a/drivers/dma/ste_dma40.c
-+++ b/drivers/dma/ste_dma40.c
-@@ -2945,7 +2945,11 @@ static int dma40_suspend(struct device *dev)
- {
- 	struct platform_device *pdev = to_platform_device(dev);
- 	struct d40_base *base = platform_get_drvdata(pdev);
--	int ret = 0;
-+	int ret;
-+
-+	ret = pm_runtime_force_suspend(dev);
-+	if (ret)
-+		return ret;
- 
- 	if (base->lcpa_regulator)
- 		ret = regulator_disable(base->lcpa_regulator);
-@@ -2958,10 +2962,13 @@ static int dma40_resume(struct device *dev)
- 	struct d40_base *base = platform_get_drvdata(pdev);
- 	int ret = 0;
- 
--	if (base->lcpa_regulator)
-+	if (base->lcpa_regulator) {
- 		ret = regulator_enable(base->lcpa_regulator);
-+		if (ret)
-+			return ret;
-+	}
- 
--	return ret;
-+	return pm_runtime_force_resume(dev);
- }
- #endif
- 
--- 
-1.7.9.5
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
