@@ -1,66 +1,88 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 23 Apr 2014 08:16:33 -0500
-Subject: [PATCH v6 1/3] PSCI: Add initial support for PSCIv0.2 functions
-In-Reply-To: <CAJ5Y-eZ=ugeav++ysMCbAUFnPMr5=WaCdrEdYojwLi1HTYX6rw@mail.gmail.com>
-References: <1397762146-8337-1-git-send-email-ashwin.chaugule@linaro.org>
- <1397762146-8337-2-git-send-email-ashwin.chaugule@linaro.org>
- <CALrVBkuSsi=2J1YT7w2bGtcL7CL6_xheZceaRtqETyC9mUqhTw@mail.gmail.com>
- <CAJ5Y-eZ=ugeav++ysMCbAUFnPMr5=WaCdrEdYojwLi1HTYX6rw@mail.gmail.com>
-Message-ID: <CAL_JsqKkmfWaDkc_DHh5ZWc=E13qii4U4g_bfiDzJ+N3e0Az8Q@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 23 Apr 2014 15:17:43 +0200
+Subject: [PATCH] arm: dma-mapping: Fix mapping size value
+In-Reply-To: <CAD15agYETzLJZ26wh8c=+PCSoQ9dR9vLgg7VmZTnQquXxoW+2Q@mail.gmail.com>
+References: <1398062847-5770-1-git-send-email-ritesh.harjani@gmail.com>
+ <20140422085307.GB5747@arm.com> <53577F84.1080101@samsung.com>
+ <4662711.Ubz0jaKMvq@avalon>
+ <CAD15agYETzLJZ26wh8c=+PCSoQ9dR9vLgg7VmZTnQquXxoW+2Q@mail.gmail.com>
+Message-ID: <5357BD77.3060908@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 22, 2014 at 12:32 PM, Ashwin Chaugule
-<ashwin.chaugule@linaro.org> wrote:
-> On 21 April 2014 02:23, Anup Patel <anup.patel@linaro.org> wrote:
->> Hi Ashwin,
->>
->> Please include system reboot & shutdown implementation
->> in this patch using PSCI v0.2 SYSTEM_OFF and
->> SYSTEM_RESET functions.
->
-> hm, I had thought these relied on having the (optional) MIGRATE
-> function. But thats not the case.
->
-> So, how about this..
->
-> ---------------------8<---------------------
->
-> diff --git a/arch/arm/kernel/psci.c b/arch/arm/kernel/psci.c
-> index ead8cdb..5a54f2f 100644
-> --- a/arch/arm/kernel/psci.c
-> +++ b/arch/arm/kernel/psci.c
-> @@ -17,6 +17,8 @@
->
->  #include <linux/init.h>
->  #include <linux/of.h>
-> +#include <linux/reboot.h>
-> +#include <linux/pm.h>
->  #include <uapi/linux/psci.h>
->
->  #include <asm/compiler.h>
-> @@ -24,6 +26,7 @@
->  #include <asm/opcodes-sec.h>
->  #include <asm/opcodes-virt.h>
->  #include <asm/psci.h>
-> +#include <asm/system_misc.h>
->
->  struct psci_operations psci_ops;
->
-> @@ -196,6 +199,16 @@ static int get_set_conduit_method(struct device_node *np)
->   return 0;
->  }
->
-> +static void psci_sys_reset(enum reboot_mode reboot_mode, const char *cmd)
-> +{
-> + invoke_psci_fn(PSCI_0_2_FN_SYSTEM_RESET, 0, 0, 0);
-> +}
-> +
-> +static void psci_sys_off(void)
+Hello,
 
-This is a bit terse. I would spell out system or use sys_poweroff
-here. Otherwise,
+On 2014-04-23 12:04, Ritesh Harjani wrote:
+> Hi Marek/Will
+>
+> On Wed, Apr 23, 2014 at 3:00 PM, Laurent Pinchart
+> <laurent.pinchart@ideasonboard.com> wrote:
+> > Hi Marek,
+> >
+> > On Wednesday 23 April 2014 10:53:24 Marek Szyprowski wrote:
+> >> On 2014-04-22 10:53, Will Deacon wrote:
+> >> > On Mon, Apr 21, 2014 at 07:47:27AM +0100, Ritesh Harjani wrote:
+> >> > > 68efd7d2fb("arm: dma-mapping: remove order parameter from
+> >> > > arm_iommu_create_mapping()") is causing kernel panic
+> >> > > because it wrongly sets the value of mapping->size:
+> >> > >
+> >> > > Unable to handle kernel NULL pointer dereference at virtual
+> >> > > address 000000a0
+> >> > > pgd = e7a84000
+> >> > > [000000a0] *pgd=00000000
+> >> > > ...
+> >> > > PC is at bitmap_clear+0x48/0xd0
+> >> > > LR is at __iommu_remove_mapping+0x130/0x164
+> >> > >
+> >> > > Fix it by correcting mapping->size value.
+> >> > >
+> >> > > Signed-off-by: Ritesh Harjani <ritesh.harjani@gmail.com>
+> >> > > Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> >> > > ---
+> >> > >
+> >> > >  arch/arm/mm/dma-mapping.c | 2 +-
+> >> > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >> > >
+> >> > > diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> >> > > index f62aa06..6b00be1 100644
+> >> > > --- a/arch/arm/mm/dma-mapping.c
+> >> > > +++ b/arch/arm/mm/dma-mapping.c
+> >> > > @@ -1963,8 +1963,8 @@ arm_iommu_create_mapping(struct bus_type *bus,
+> >> > > dma_addr_t base, size_t size)> >
+> >> > >   mapping->nr_bitmaps = 1;
+> >> > >   mapping->extensions = extensions;
+> >> > >   mapping->base = base;
+> >> > >
+> >> > > - mapping->size = bitmap_size << PAGE_SHIFT;
+> >> > >
+> >> > >   mapping->bits = BITS_PER_BYTE * bitmap_size;
+> >> > >
+> >> > > + mapping->size = mapping->bits << PAGE_SHIFT;
+> >> >
+> >> > Ok, but given that mapping->size is derived from mapping->bits, do we
+> >> > really need both of these fields in struct dma_iommu_mapping?
+> >>
+> >> You are right. I didn't notice this while I was refactoring the code.
+> >> Ritesh, could you update your patch and simply replace all references of
+> >> mapping->size with (mapping->bits << PAGE_SHIFT), probably with some
+> >> temporary variable to make the code easier to understand? I've didn't apply
+> >> your patch yet.
+> >
+> > As this patch fixes a v3.15 regression, shouldn't it be applied as-is and
+> > ASAP, with the cleanup that removes mapping->size coming in a later, less
+> > urgent patch ?
+>
+> I agree with Laurent. Anyway this cleanup can be taken care when we will be
+> doing refactoring of common code to lib/iommu-helper.c.
+>
+> Anyways, if you still insist I can prepare and submit the patch. Let me know
+> again on this.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Ok, I've merged the patch as is and I will send pull request soon.
+Please include the above discussed cleanup while refactoring common code 
+to lib.
 
-Rob
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
