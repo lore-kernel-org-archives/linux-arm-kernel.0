@@ -1,41 +1,38 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 23 Apr 2014 10:25:56 +0900
-Subject: [PATCH 28/33] ARM: shmobile: r8a7790: add IIC0-2 clock macros
+Date: Wed, 23 Apr 2014 10:26:01 +0900
+Subject: [PATCH 33/33] ARM: shmobile: armadillo-reference dts: Seiko
+ Instruments, Inc is "sii"
 In-Reply-To: <cover.1398216022.git.horms+renesas@verge.net.au>
 References: <cover.1398216022.git.horms+renesas@verge.net.au>
-Message-ID: <01d968e905968602c4958c416cfed7ad84b7489f.1398216022.git.horms+renesas@verge.net.au>
+Message-ID: <dd485ab9a88267f4db0d58ace23b19e876ebf8ac.1398216022.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wolfram Sang <wsa@sang-engineering.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Use "sii,s35390a" instead of "seiko,s35390a", cfr.
+Documentation/devicetree/bindings/i2c/trivial-devices.txt and
+Documentation/devicetree/bindings/vendor-prefixes.txt.
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- include/dt-bindings/clock/r8a7790-clock.h | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/include/dt-bindings/clock/r8a7790-clock.h b/include/dt-bindings/clock/r8a7790-clock.h
-index 6548a5f..4d3e935 100644
---- a/include/dt-bindings/clock/r8a7790-clock.h
-+++ b/include/dt-bindings/clock/r8a7790-clock.h
-@@ -50,6 +50,7 @@
- #define R8A7790_CLK_SYS_DMAC0		19
- 
- /* MSTP3 */
-+#define R8A7790_CLK_IIC2		0
- #define R8A7790_CLK_TPU0		4
- #define R8A7790_CLK_MMCIF1		5
- #define R8A7790_CLK_SDHI3		11
-@@ -57,6 +58,8 @@
- #define R8A7790_CLK_SDHI1		13
- #define R8A7790_CLK_SDHI0		14
- #define R8A7790_CLK_MMCIF0		15
-+#define R8A7790_CLK_IIC0		18
-+#define R8A7790_CLK_IIC1		23
- #define R8A7790_CLK_SSUSB		28
- #define R8A7790_CLK_CMT1		29
- #define R8A7790_CLK_USBDMAC0		30
+diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
+index 0cb235a..10344e6 100644
+--- a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
++++ b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
+@@ -180,7 +180,7 @@
+ &i2c2 {
+ 	status = "okay";
+ 	rtc at 30 {
+-		compatible = "seiko,s35390a";
++		compatible = "sii,s35390a";
+ 		reg = <0x30>;
+ 	};
+ };
 -- 
 1.8.5.2
