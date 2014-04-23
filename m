@@ -1,91 +1,52 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 23 Apr 2014 10:51:10 +0300
-Subject: [PATCH 02/11] ARM: OMAP3: Fix idle mode signaling for sys_clkreq
- and sys_off_mode
-In-Reply-To: <20140412150205.GB32292@atomide.com>
-References: <1397173639-29587-1-git-send-email-tony@atomide.com>
- <1397173639-29587-3-git-send-email-tony@atomide.com>
- <5348FFFA.5040207@ti.com> <20140412150205.GB32292@atomide.com>
-Message-ID: <535770EE.8060603@ti.com>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Wed, 23 Apr 2014 09:55:47 +0200
+Subject: [PATCH 1/2] ARM: imx6q: clk: Parent DI clocks to video PLL via
+ di_pre_sel
+In-Reply-To: <1397485240-29163-1-git-send-email-p.zabel@pengutronix.de>
+References: <1397485240-29163-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <53577203.6070700@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/12/2014 06:02 PM, Tony Lindgren wrote:
-> * Tero Kristo <t-kristo@ti.com> [140412 02:01]:
->> On 04/11/2014 02:47 AM, Tony Lindgren wrote:>
->>> @@ -282,6 +283,7 @@ void omap_sram_idle(void)
->>>
->>>    	/* CORE */
->>>    	if (core_next_state < PWRDM_POWER_ON) {
->>> +		omap3_vc_set_pmic_signaling(core_next_state);
->>>    		if (core_next_state == PWRDM_POWER_OFF) {
->>>    			omap3_core_save_context();
->>>    			omap3_cm_save_context();
->>
->> I think this implementation is sub-optimal, as it only scales
->> voltages if core is entering idle state. MPU only idle is possible,
->> however you do not scale voltages in this case.
+On 14.04.2014 16:20, Philipp Zabel wrote:
+> From: Sascha Hauer <s.hauer@pengutronix.de>
 >
-> Hmm that's same as PWRDM_POWER_RET? That's working too.
-> Or do you have something else in mind that I'm not aware
-> of?
-
-No, I mean the case where core_next_state == PWRDM_POWER_ON, but 
-mpu_next_state <= PWRDM_POWER_RET. You could scale MPU voltage in this 
-case but you don't with this implementation.
-
+> Route the video PLL to the display interface clocks via the di_pre_sel
+> and di_sel muxes by default.
 >
->>> @@ -220,6 +220,78 @@ static inline u32 omap_usec_to_32k(u32 usec)
->>>    	return DIV_ROUND_UP_ULL(32768ULL * (u64)usec, 1000000ULL);
->>>    }
->>>
->>> +void omap3_vc_set_pmic_signaling(int core_next_state)
->>> +{
->>> +	u32 voltctrl;
->>> +
->>> +	voltctrl = omap2_prm_read_mod_reg(OMAP3430_GR_MOD,
->>> +					  OMAP3_PRM_VOLTCTRL_OFFSET);
->>
->> Just a note here, I am currently working on trying to get rid of all
->> the direct prm_read/write calls outside PRCM drivers, this and rest
->> should use voltdm->read/write.
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> ---
+>   arch/arm/mach-imx/clk-imx6q.c | 9 +++++++++
+>   1 file changed, 9 insertions(+)
 >
-> OK, sounds like you already have a patch for that in your
-> 3.14-rc4-cm-prm-driver-wip branch?
-
-Yes, there is a patch for that.
-
+> diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+> index a3a69ab..ba17299 100644
+> --- a/arch/arm/mach-imx/clk-imx6q.c
+> +++ b/arch/arm/mach-imx/clk-imx6q.c
+> @@ -445,6 +445,15 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+>   		clk_set_parent(clk[ldb_di1_sel], clk[pll5_video_div]);
+>   	}
 >
-> Let's do the fixes first, then it's going to be a lot easier for
-> us to test the rest of the PRMC changes.
->
->>> +	/*
->>> +	 * By default let's use I2C4 signaling for retention idle
->>> +	 * and sys_off_mode pin signaling for off idle. This way we
->>> +	 * have sys_clk_req pin go down for retention and both
->>> +	 * sys_clk_req and sys_off_mode pins will go down for off
->>> +	 * idle. And we can also scale voltages to zero for off-idle.
->>> +	 * Note that no actual voltage scaling will happen unless the
->>> +	 * board specific twl4030 PMIC scripts are loaded.
->>> +	 */
->>> +	val = omap2_prm_read_mod_reg(OMAP3430_GR_MOD,
->>> +				     OMAP3_PRM_VOLTCTRL_OFFSET);
->>
->> Why not use the I2C4 signalling for off-mode? This way the voltages
->> can be scaled to 0.6V even without any board specific scripts.
->
-> Using I2C4 works too, we're just missing a place to set
-> and clear OMAP3430_PRM_VOLTCTRL_SEL_OFF bit currently. Sounds
-> like eventually we should allow changing it dynamically somewhere.
+> +	clk_set_parent(clk[ipu1_di0_pre_sel], clk[pll5_video_div]);
+> +	clk_set_parent(clk[ipu1_di1_pre_sel], clk[pll5_video_div]);
+> +	clk_set_parent(clk[ipu2_di0_pre_sel], clk[pll5_video_div]);
+> +	clk_set_parent(clk[ipu2_di1_pre_sel], clk[pll5_video_div]);
+> +	clk_set_parent(clk[ipu1_di0_sel], clk[ipu1_di0_pre]);
+> +	clk_set_parent(clk[ipu1_di1_sel], clk[ipu1_di1_pre]);
+> +	clk_set_parent(clk[ipu2_di0_sel], clk[ipu2_di0_pre]);
+> +	clk_set_parent(clk[ipu2_di1_sel], clk[ipu2_di1_pre]);
+> +
+>   	/*
+>   	 * The gpmi needs 100MHz frequency in the EDO/Sync mode,
+>   	 * We can not get the 100MHz from the pll2_pfd0_352m.
 
-You can't check the presence of the scripts here?
+I'm no expert on this, so just a question from an internal review:
 
-> But for now, SEL_OFF should be enabled as it allows debugging PM
-> by looking at the sys_clkreq and sys_off_mode pins no matter if
-> there are board specific scripts or not. The sys_off_mode won't
-> toggle if things are configured to use I2C4, which is confusing.
+With this, having both ldb_di0_sel and ipu1_di0_sel driven by 
+pll5_video, what will happen if both lvds and hdmi are trying to set the 
+rate of pll5_video_div?
 
-You can always measure the voltage rails directly also, but yea, it is 
-more convenient to just look at the led.
+Best regards
 
--Tero
+Dirk
