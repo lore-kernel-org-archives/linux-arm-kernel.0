@@ -1,62 +1,58 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 23 Apr 2014 10:25:51 +0900
-Subject: [PATCH 23/33] ARM: shmobile: r8a7791: Add EHCI MSTP clock
+Date: Wed, 23 Apr 2014 10:25:52 +0900
+Subject: [PATCH 24/33] ARM: shmobile: armadillo-reference dts: enable RTC
 In-Reply-To: <cover.1398216022.git.horms+renesas@verge.net.au>
 References: <cover.1398216022.git.horms+renesas@verge.net.au>
-Message-ID: <6225b99aa620d6e260228a30cc5d24cde60cb1e7.1398216022.git.horms+renesas@verge.net.au>
+Message-ID: <584b23db5beb3bd3a3c0767248a4843cac848a58.1398216022.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Ulrich Hecht <ulrich.hecht@gmail.com>
 
-Add support for EHCI clock gating via the MSTP703 bit on r8a7791.
+This enables the Seiko real-time clock that is attached to a couple of
+GPIO pins.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Ulrich Hecht <ulrich.hecht@gmail.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791.dtsi            | 6 +++---
- include/dt-bindings/clock/r8a7791-clock.h | 1 +
- 2 files changed, 4 insertions(+), 3 deletions(-)
+ .../arm/boot/dts/r8a7740-armadillo800eva-reference.dts | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 1004355..3b28c8f 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -774,19 +774,19 @@
- 		mstp7_clks: mstp7_clks at e615014c {
- 			compatible = "renesas,r8a7791-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe615014c 0 4>, <0 0xe61501c4 0 4>;
--			clocks = <&mp_clk>, <&zs_clk>, <&p_clk>, <&p_clk>, <&zs_clk>,
-+			clocks = <&mp_clk>,  <&mp_clk>, <&zs_clk>, <&p_clk>, <&p_clk>, <&zs_clk>,
- 				 <&zs_clk>, <&p_clk>, <&p_clk>, <&p_clk>, <&p_clk>,
- 				 <&zx_clk>, <&zx_clk>, <&zx_clk>;
- 			#clock-cells = <1>;
- 			renesas,clock-indices = <
--				R8A7791_CLK_HSUSB R8A7791_CLK_HSCIF2 R8A7791_CLK_SCIF5
-+				R8A7791_CLK_EHCI R8A7791_CLK_HSUSB R8A7791_CLK_HSCIF2 R8A7791_CLK_SCIF5
- 				R8A7791_CLK_SCIF4 R8A7791_CLK_HSCIF1 R8A7791_CLK_HSCIF0
- 				R8A7791_CLK_SCIF3 R8A7791_CLK_SCIF2 R8A7791_CLK_SCIF1
- 				R8A7791_CLK_SCIF0 R8A7791_CLK_DU1 R8A7791_CLK_DU0
- 				R8A7791_CLK_LVDS0
- 			>;
- 			clock-output-names =
--				"hsusb", "hscif2", "scif5", "scif4", "hscif1", "hscif0",
-+				"ehci", "hsusb", "hscif2", "scif5", "scif4", "hscif1", "hscif0",
- 				"scif3", "scif2", "scif1", "scif0", "du1", "du0", "lvds0";
+diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
+index 97342a4..0cb235a 100644
+--- a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
++++ b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
+@@ -118,6 +118,16 @@
  		};
- 		mstp8_clks: mstp8_clks at e6150990 {
-diff --git a/include/dt-bindings/clock/r8a7791-clock.h b/include/dt-bindings/clock/r8a7791-clock.h
-index 2df1a11f..6023543 100644
---- a/include/dt-bindings/clock/r8a7791-clock.h
-+++ b/include/dt-bindings/clock/r8a7791-clock.h
-@@ -63,6 +63,7 @@
- #define R8A7791_CLK_PWM			23
+ 	};
  
- /* MSTP7 */
-+#define R8A7791_CLK_EHCI		3
- #define R8A7791_CLK_HSUSB		4
- #define R8A7791_CLK_HSCIF2		13
- #define R8A7791_CLK_SCIF5		14
++	i2c2: i2c at 2 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "i2c-gpio";
++		gpios = <&pfc 208 GPIO_ACTIVE_HIGH /* sda */
++			 &pfc 91 GPIO_ACTIVE_HIGH /* scl */
++			>;
++		i2c-gpio,delay-us = <5>;
++	};
++
+ 	backlight {
+ 		compatible = "pwm-backlight";
+ 		pwms = <&tpu 2 33333 PWM_POLARITY_INVERTED>;
+@@ -167,6 +177,14 @@
+ 	};
+ };
+ 
++&i2c2 {
++	status = "okay";
++	rtc at 30 {
++		compatible = "seiko,s35390a";
++		reg = <0x30>;
++	};
++};
++
+ &pfc {
+ 	pinctrl-0 = <&scifa1_pins>;
+ 	pinctrl-names = "default";
 -- 
 1.8.5.2
