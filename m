@@ -1,63 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 23 Apr 2014 20:58:05 +0200
-Subject: [PATCH] ARM: mm: dma: Update coherent streaming apis with missing
- memory barrier
-In-Reply-To: <20140423183742.GK24070@n2100.arm.linux.org.uk>
-References: <1398103390-31968-1-git-send-email-santosh.shilimkar@ti.com>
- <20140423171727.GK5649@arm.com>
- <20140423183742.GK24070@n2100.arm.linux.org.uk>
-Message-ID: <6414220.SShvCHLvZQ@wuerfel>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 23 Apr 2014 12:03:21 -0700
+Subject: [PATCH 1/3] ARM: dts: Fix bad OTG muxing for cm-t boards
+In-Reply-To: <1398279803-5655-1-git-send-email-tony@atomide.com>
+References: <1398279803-5655-1-git-send-email-tony@atomide.com>
+Message-ID: <1398279803-5655-2-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 23 April 2014 19:37:42 Russell King - ARM Linux wrote:
-> On Wed, Apr 23, 2014 at 06:17:27PM +0100, Will Deacon wrote:
-> > On Wed, Apr 23, 2014 at 05:02:16PM +0100, Catalin Marinas wrote:
-> > > In the I/O coherency case, I would say it is the responsibility of the
-> > > device/hardware to ensure that the data is visible to all observers
-> > > (CPUs) prior to issuing a interrupt for DMA-ready. Looking at the mvebu
-> > > code, I think it covers such scenario from-device or bidirectional
-> > > scenarios.
-> > > 
-> > > Maybe Santosh still has a point  but I don't know what the right
-> > > barrier would be here. And I really *hate* per-SoC/snoop unit barriers
-> > > (I still hope a dsb would do the trick on newer/ARMv8 systems).
-> > 
-> > If you have device interrupts which are asynchronous to memory coherency,
-> > then you're in a world of pain. I can't think of a generic (architected)
-> > solution to this problem, unfortunately -- it's going to be both device
-> > and interconnect specific. Adding dsbs doesn't necessarily help at all.
-> 
-> Think, network devices with NAPI handling.  There, we explicitly turn
-> off the device's interrupt, and switch to software polling for received
-> packets.
->
-> The memory for the packets has already been mapped, and we're unmapping
-> the buffer, and then reading from it (to locate the ether type, and/or
-> vlan headers) before passing it up the network stack.
-> 
-> So in this case, we need to ensure that the cache operations are ordered
-> before the subsequent loads read from the DMA'd data.  It's purely an
-> ordering thing, it's not a completion thing.
+Looks like the OTG pins are off by 2 and we get this:
 
-PCI guarantees this, but I have seen systems in the past (on PowerPC) that
-would violate them on the internal interconnect: You could sometimes see the
-completion DMA data in the descriptor ring before the actual user data
-is there. We only ever observed it in combination with an IOMMU, when the
-descriptor address had a valid IOTLB but the data address did not.
+pinctrl-single 48002030.pinmux: pin 480021a0.0 already requested by 49020000.serial; cannot claim for 480ab000.usb_otg_hs
+pinctrl-single 48002030.pinmux: pin-184 (480ab000.usb_otg_hs) status -22
+pinctrl-single 48002030.pinmux: could not request pin 184 (480021a0.0) from group pinmux_hsusb0_pins  on device pinctrl-single
+musb-omap2430 480ab000.usb_otg_hs: Error applying setting, reverse things back
 
-I would hope that the ARM SMMU gets this right, but there are also
-a number of other IOMMU implementations.
+That's probably because the TRM lists the values as
+32-bit registers so every second needs 2 added to the
+address. The OTG pin start range must start from
+0x21a2, not 0x21a0.
 
-The x-gene SATA driver apparently suffers from a related problem, and
-they have to flush outstanding DMAs at the interconnect whenever they
-get a completion interrupt.
+Cc: Dmitry Lifshitz <lifshitz@compulab.co.il>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/boot/dts/omap3-cm-t3x30.dtsi | 24 ++++++++++++------------
+ 1 file changed, 12 insertions(+), 12 deletions(-)
 
-Another problem is MSI processing. MSI was specifically invented to avoid
-having to check an MMIO register for a DMA completion that as a side-effect
-flushes pending DMAs from the same device. This breaks down if the MSI
-packet gets turned into a level interrupt before it reaches the CPU's
-coherency domain, which is likely the case on the dw-pcie controller that
-comes with its own MSI block.
-
-	Arnd
+diff --git a/arch/arm/boot/dts/omap3-cm-t3x30.dtsi b/arch/arm/boot/dts/omap3-cm-t3x30.dtsi
+index d000558..75e0a1f 100644
+--- a/arch/arm/boot/dts/omap3-cm-t3x30.dtsi
++++ b/arch/arm/boot/dts/omap3-cm-t3x30.dtsi
+@@ -35,18 +35,18 @@
+ 
+  	hsusb0_pins: pinmux_hsusb0_pins {
+ 		pinctrl-single,pins = <
+-			OMAP3_CORE1_IOPAD(0x21a0, PIN_OUTPUT | MUX_MODE0)		/* hsusb0_clk.hsusb0_clk */
+-			OMAP3_CORE1_IOPAD(0x21a2, PIN_OUTPUT | MUX_MODE0)		/* hsusb0_stp.hsusb0_stp */
+-			OMAP3_CORE1_IOPAD(0x21a4, PIN_INPUT_PULLDOWN | MUX_MODE0)	/* hsusb0_dir.hsusb0_dir */
+-			OMAP3_CORE1_IOPAD(0x21a6, PIN_INPUT_PULLDOWN | MUX_MODE0)	/* hsusb0_nxt.hsusb0_nxt */
+-			OMAP3_CORE1_IOPAD(0x21a8, PIN_INPUT_PULLDOWN | MUX_MODE0)	/* hsusb0_data0.hsusb2_data0 */
+-			OMAP3_CORE1_IOPAD(0x21aa, PIN_INPUT_PULLDOWN | MUX_MODE0)	/* hsusb0_data1.hsusb0_data1 */
+-			OMAP3_CORE1_IOPAD(0x21ac, PIN_INPUT_PULLDOWN | MUX_MODE0)	/* hsusb0_data2.hsusb0_data2 */
+-			OMAP3_CORE1_IOPAD(0x21ae, PIN_INPUT_PULLDOWN | MUX_MODE0)	/* hsusb0_data7.hsusb0_data3 */
+-			OMAP3_CORE1_IOPAD(0x21b0, PIN_INPUT_PULLDOWN | MUX_MODE0)	/* hsusb0_data7.hsusb0_data4 */
+-			OMAP3_CORE1_IOPAD(0x21b2, PIN_INPUT_PULLDOWN | MUX_MODE0)	/* hsusb0_data7.hsusb0_data5 */
+-			OMAP3_CORE1_IOPAD(0x21b4, PIN_INPUT_PULLDOWN | MUX_MODE0)	/* hsusb0_data7.hsusb0_data6 */
+-			OMAP3_CORE1_IOPAD(0x21b6, PIN_INPUT_PULLDOWN | MUX_MODE0)	/* hsusb0_data7.hsusb0_data7 */
++			OMAP3_CORE1_IOPAD(0x21a2, PIN_OUTPUT | MUX_MODE0)		/* hsusb0_clk.hsusb0_clk */
++			OMAP3_CORE1_IOPAD(0x21a4, PIN_OUTPUT | MUX_MODE0)		/* hsusb0_stp.hsusb0_stp */
++			OMAP3_CORE1_IOPAD(0x21a6, PIN_INPUT_PULLDOWN | MUX_MODE0)	/* hsusb0_dir.hsusb0_dir */
++			OMAP3_CORE1_IOPAD(0x21a8, PIN_INPUT_PULLDOWN | MUX_MODE0)	/* hsusb0_nxt.hsusb0_nxt */
++			OMAP3_CORE1_IOPAD(0x21aa, PIN_INPUT_PULLDOWN | MUX_MODE0)	/* hsusb0_data0.hsusb2_data0 */
++			OMAP3_CORE1_IOPAD(0x21ac, PIN_INPUT_PULLDOWN | MUX_MODE0)	/* hsusb0_data1.hsusb0_data1 */
++			OMAP3_CORE1_IOPAD(0x21ae, PIN_INPUT_PULLDOWN | MUX_MODE0)	/* hsusb0_data2.hsusb0_data2 */
++			OMAP3_CORE1_IOPAD(0x21b0, PIN_INPUT_PULLDOWN | MUX_MODE0)	/* hsusb0_data7.hsusb0_data3 */
++			OMAP3_CORE1_IOPAD(0x21b2, PIN_INPUT_PULLDOWN | MUX_MODE0)	/* hsusb0_data7.hsusb0_data4 */
++			OMAP3_CORE1_IOPAD(0x21b4, PIN_INPUT_PULLDOWN | MUX_MODE0)	/* hsusb0_data7.hsusb0_data5 */
++			OMAP3_CORE1_IOPAD(0x21b6, PIN_INPUT_PULLDOWN | MUX_MODE0)	/* hsusb0_data7.hsusb0_data6 */
++			OMAP3_CORE1_IOPAD(0x21b8, PIN_INPUT_PULLDOWN | MUX_MODE0)	/* hsusb0_data7.hsusb0_data7 */
+ 		>;
+ 	};
+ };
+-- 
+1.8.1.1
