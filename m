@@ -1,41 +1,34 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 22 Apr 2014 20:18:05 -0500
-Subject: [PATCH v2 05/21] ARM: dt: use default early_init_dt_alloc_memory_arch
-In-Reply-To: <1398215901-25609-1-git-send-email-robherring2@gmail.com>
-References: <1398215901-25609-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1398215901-25609-6-git-send-email-robherring2@gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed, 23 Apr 2014 10:25:40 +0900
+Subject: [PATCH 1/4] ARM: shmobile: armadillo800eva: Spelling and grammar
+In-Reply-To: <cover.1398216284.git.horms+renesas@verge.net.au>
+References: <cover.1398216284.git.horms+renesas@verge.net.au>
+Message-ID: <1668a7a699f8c96bc99a50e94aadfe328adf9b76.1398216284.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <robh@kernel.org>
+From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 
-Now that ARM is using memblock instead of bootmem, the default version
-of early_init_dt_alloc_memory_arch can be used.
-
-Signed-off-by: Rob Herring <robh@kernel.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
-v2: no change
+ arch/arm/mach-shmobile/Kconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
- arch/arm/kernel/devtree.c | 5 -----
- 1 file changed, 5 deletions(-)
-
-diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-index c7419a5..dff9cc0 100644
---- a/arch/arm/kernel/devtree.c
-+++ b/arch/arm/kernel/devtree.c
-@@ -32,11 +32,6 @@ void __init early_init_dt_add_memory_arch(u64 base, u64 size)
- 	arm_add_memory(base, size);
- }
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 0f92ba8..edb1a91 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -205,8 +205,8 @@ config MACH_ARMADILLO800EVA_REFERENCE
+ 	select SND_SOC_WM8978 if SND_SIMPLE_CARD
+ 	select USE_OF
+ 	---help---
+-	   Use reference implementation of Aramdillo800 EVA board support
+-	   which makes a greater use of device tree at the expense
++	   Use reference implementation of Armadillo800 EVA board support
++	   which makes greater use of device tree at the expense
+ 	   of not supporting a number of devices.
  
--void * __init early_init_dt_alloc_memory_arch(u64 size, u64 align)
--{
--	return memblock_virt_alloc(size, align);
--}
--
- void __init arm_dt_memblock_reserve(void)
- {
- 	u64 *reserve_map, base, size;
+ 	   This is intended to aid developers
 -- 
-1.9.1
+1.8.5.2
