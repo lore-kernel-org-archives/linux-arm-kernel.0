@@ -1,59 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 23 Apr 2014 19:55:34 +0100
-Subject: [PATCH 00/38] MMC updates, plus CuBox-i WiFi support
-Message-ID: <20140423185534.GA26756@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 23 Apr 2014 20:58:05 +0200
+Subject: [PATCH] ARM: mm: dma: Update coherent streaming apis with missing
+ memory barrier
+In-Reply-To: <20140423183742.GK24070@n2100.arm.linux.org.uk>
+References: <1398103390-31968-1-git-send-email-santosh.shilimkar@ti.com>
+ <20140423171727.GK5649@arm.com>
+ <20140423183742.GK24070@n2100.arm.linux.org.uk>
+Message-ID: <6414220.SShvCHLvZQ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All,
+On Wednesday 23 April 2014 19:37:42 Russell King - ARM Linux wrote:
+> On Wed, Apr 23, 2014 at 06:17:27PM +0100, Will Deacon wrote:
+> > On Wed, Apr 23, 2014 at 05:02:16PM +0100, Catalin Marinas wrote:
+> > > In the I/O coherency case, I would say it is the responsibility of the
+> > > device/hardware to ensure that the data is visible to all observers
+> > > (CPUs) prior to issuing a interrupt for DMA-ready. Looking at the mvebu
+> > > code, I think it covers such scenario from-device or bidirectional
+> > > scenarios.
+> > > 
+> > > Maybe Santosh still has a point  but I don't know what the right
+> > > barrier would be here. And I really *hate* per-SoC/snoop unit barriers
+> > > (I still hope a dsb would do the trick on newer/ARMv8 systems).
+> > 
+> > If you have device interrupts which are asynchronous to memory coherency,
+> > then you're in a world of pain. I can't think of a generic (architected)
+> > solution to this problem, unfortunately -- it's going to be both device
+> > and interconnect specific. Adding dsbs doesn't necessarily help at all.
+> 
+> Think, network devices with NAPI handling.  There, we explicitly turn
+> off the device's interrupt, and switch to software polling for received
+> packets.
+>
+> The memory for the packets has already been mapped, and we're unmapping
+> the buffer, and then reading from it (to locate the ether type, and/or
+> vlan headers) before passing it up the network stack.
+> 
+> So in this case, we need to ensure that the cache operations are ordered
+> before the subsequent loads read from the DMA'd data.  It's purely an
+> ordering thing, it's not a completion thing.
 
-This is where I'm at with trying to clean up the SDHCI mess, and sort out
-issues I've noticed when trying to get UHS support working on CuBoxes.
-This is my full patch set, but I recommend not applying patch 37 as there
-appears to be a hardware issue preventing it working reliably.
+PCI guarantees this, but I have seen systems in the past (on PowerPC) that
+would violate them on the internal interconnect: You could sometimes see the
+completion DMA data in the descriptor ring before the actual user data
+is there. We only ever observed it in combination with an IOMMU, when the
+descriptor address had a valid IOTLB but the data address did not.
 
-In any case, patches 0-33 inclusive are the SDHCI clean up, based against
-v3.15-rc1.  Patches 34 and 35 are Olof's Wifi support, 36 is my fix against
-those, and 38 adds the Broadcom Wifi and BT support for CuBox.
+I would hope that the ARM SMMU gets this right, but there are also
+a number of other IOMMU implementations.
 
-The questions over how to handle these devices were never properly settled,
-so I recommend against merging patch 34 onwards.  As for the rest, I'm not
-planning on any further work, so it may be a good idea for people to
-consider testing them with a view to getting them merged.
+The x-gene SATA driver apparently suffers from a related problem, and
+they have to flush outstanding DMAs at the interconnect whenever they
+get a completion interrupt.
 
- Documentation/devicetree/bindings/mmc/mmc.txt |  11 +
- arch/arm/boot/dts/imx6qdl-cubox-i.dtsi        |  34 +-
- arch/arm/boot/dts/imx6qdl-microsom.dtsi       |  98 ++++
- drivers/mmc/core/core.c                       |  42 ++
- drivers/mmc/core/host.c                       |  68 +++
- drivers/mmc/core/sdio_irq.c                   |  41 +-
- drivers/mmc/host/Kconfig                      |  63 +--
- drivers/mmc/host/dw_mmc.c                     |   2 +
- drivers/mmc/host/sdhci-acpi.c                 |   8 +
- drivers/mmc/host/sdhci-bcm-kona.c             |   4 +
- drivers/mmc/host/sdhci-bcm2835.c              |   4 +
- drivers/mmc/host/sdhci-cns3xxx.c              |  13 +-
- drivers/mmc/host/sdhci-dove.c                 |   4 +
- drivers/mmc/host/sdhci-esdhc-imx.c            |  82 +--
- drivers/mmc/host/sdhci-esdhc.h                |   4 +-
- drivers/mmc/host/sdhci-of-arasan.c            |   4 +
- drivers/mmc/host/sdhci-of-esdhc.c             |  70 ++-
- drivers/mmc/host/sdhci-of-hlwd.c              |   4 +
- drivers/mmc/host/sdhci-pci.c                  |   9 +-
- drivers/mmc/host/sdhci-pltfm.c                |   4 +
- drivers/mmc/host/sdhci-pxav2.c                |  14 +-
- drivers/mmc/host/sdhci-pxav3.c                |  13 +-
- drivers/mmc/host/sdhci-s3c.c                  |  36 +-
- drivers/mmc/host/sdhci-sirf.c                 |   4 +
- drivers/mmc/host/sdhci-spear.c                |   5 +-
- drivers/mmc/host/sdhci-tegra.c                |  27 +-
- drivers/mmc/host/sdhci.c                      | 728 +++++++++++++-------------
- drivers/mmc/host/sdhci.h                      |  20 +-
- include/linux/mmc/host.h                      |   8 +
- include/linux/mmc/sdhci.h                     |  15 +-
- 30 files changed, 885 insertions(+), 554 deletions(-)
+Another problem is MSI processing. MSI was specifically invented to avoid
+having to check an MMIO register for a DMA completion that as a side-effect
+flushes pending DMAs from the same device. This breaks down if the MSI
+packet gets turned into a level interrupt before it reaches the CPU's
+coherency domain, which is likely the case on the dw-pcie controller that
+comes with its own MSI block.
 
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+	Arnd
