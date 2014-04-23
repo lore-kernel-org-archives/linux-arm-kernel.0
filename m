@@ -1,84 +1,64 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 23 Apr 2014 13:23:38 +0200
-Subject: [PATCH v2 17/38] ARM: orion5x: use node labels for UART and SATA
- on edmini_v2
-In-Reply-To: <1398202002-28530-18-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Wed, 23 Apr 2014 13:24:01 +0200
+Subject: [PATCH v2 21/38] ARM: orion5x: convert to use 'clocks' property
+ for UART controllers
+In-Reply-To: <1398202002-28530-22-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1398202002-28530-18-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <5357A2BA.1050900@gmail.com>
+ <1398202002-28530-22-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <5357A2D1.70706@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 04/22/2014 11:26 PM, Thomas Petazzoni wrote:
-> This commit converts the existing devices described in the edmini_v2
-> Device Tree to use node labels: the UART and SATA device. Also, it
-> reorders the eth and mdio node label references to be sorted
-> alphabetically.
+> Until the previous commit, the Orion5x clocks were not described in
+> the Device Tree. Now that they are described in the Device Tree, we
+> can replace the manual 'clock-frequency' property in the UART nodes
+> by a nicer 'clocks' reference in those UART nodes.
+>
+> This commit consequently removes the 'clock-frequency' property from
+> the LaCie edmini_v2 board, which is at this point the only Orion5x
+> board converted to the Device Tree.
 >
 > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-
-Does this also mean, we agree on the "using node label references" topic
-for Kirkwood?
 
 Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 
 > ---
->   .../dts/orion5x-lacie-ethernet-disk-mini-v2.dts    | 30 ++++++++++------------
->   1 file changed, 14 insertions(+), 16 deletions(-)
+>   arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts | 1 -
+>   arch/arm/boot/dts/orion5x.dtsi                            | 4 ++--
+>   2 files changed, 2 insertions(+), 3 deletions(-)
 >
 > diff --git a/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
-> index df53d256..83f45a7 100644
+> index 83f45a7..ba43197 100644
 > --- a/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
 > +++ b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
-> @@ -28,18 +28,6 @@
->   	soc {
->   		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000>,
->   			 <MBUS_ID(0x09, 0x00) 0 0xf2200000 0x800>;
-> -
-> -		internal-regs {
-> -			serial at 12000 {
-> -				clock-frequency = <166666667>;
-> -				status = "okay";
-> -			};
-> -
-> -			sata at 80000 {
-> -				status = "okay";
-> -				nr-ports = <2>;
-> -			};
-> -		};
->   	};
->
->   	gpio-keys {
-> @@ -63,6 +51,14 @@
->   	};
+> @@ -73,6 +73,5 @@
 >   };
 >
-> +&eth {
-> +	status = "okay";
-> +
-> +	ethernet-port at 0 {
-> +		phy-handle = <&ethphy>;
-> +	};
-> +};
-> +
->   &mdio {
+>   &uart0 {
+> -	clock-frequency = <166666667>;
 >   	status = "okay";
->
-> @@ -71,10 +67,12 @@
->   	};
 >   };
+> diff --git a/arch/arm/boot/dts/orion5x.dtsi b/arch/arm/boot/dts/orion5x.dtsi
+> index ad23ff4..88df8a8 100644
+> --- a/arch/arm/boot/dts/orion5x.dtsi
+> +++ b/arch/arm/boot/dts/orion5x.dtsi
+> @@ -65,7 +65,7 @@
+>   				reg = <0x12000 0x100>;
+>   				reg-shift = <2>;
+>   				interrupts = <3>;
+> -				/* set clock-frequency in board dts */
+> +				clocks = <&core_clk 0>;
+>   				status = "disabled";
+>   			};
 >
-> -&eth {
-> +&sata {
->   	status = "okay";
-> +	nr-ports = <2>;
-> +};
+> @@ -74,7 +74,7 @@
+>   				reg = <0x12100 0x100>;
+>   				reg-shift = <2>;
+>   				interrupts = <4>;
+> -				/* set clock-frequency in board dts */
+> +				clocks = <&core_clk 0>;
+>   				status = "disabled";
+>   			};
 >
-> -	ethernet-port at 0 {
-> -		phy-handle = <&ethphy>;
-> -	};
-> +&uart0 {
-> +	clock-frequency = <166666667>;
-> +	status = "okay";
->   };
 >
