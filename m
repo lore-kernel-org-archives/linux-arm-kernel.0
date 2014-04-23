@@ -1,113 +1,96 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Wed, 23 Apr 2014 20:06:15 +0100
-Subject: [PATCH 01/38] mmc: sdio_irq: rework sdio irq handling
+Date: Wed, 23 Apr 2014 20:08:12 +0100
+Subject: [PATCH 24/38] mmc: sdhci: cache timing information locally
 In-Reply-To: <20140423185534.GA26756@n2100.arm.linux.org.uk>
 References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
-Message-ID: <E1Wd2Up-0003uJ-7k@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Wd2Wi-0003vt-VY@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rather than the SDIO support spawning it's own thread for handling card
-interrupts, use the generic IRQ infrastructure for this, triggering it
-from the host interface's interrupt handling directly.
-
-This avoids a race between the parent thread waiting to receive an
-interrupt response from the card, and the slow startup from the sdio
-irq thread, which can occur as a result of high system load (eg, while
-udev is running.)
+Rather than reading back the timing information from the registers,
+cache it locally.  This allows implementations to translate the UHS
+timing by overriding the set_uhs_signaling() method as required
+without also having to emulate the SDHCI_HOST_CONTROL2 register.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/mmc/core/sdio_irq.c | 41 +++++++++++++++++++++++++++++++----------
- include/linux/mmc/host.h    |  3 +++
- 2 files changed, 34 insertions(+), 10 deletions(-)
+ drivers/mmc/host/sdhci.c  | 23 ++++++++++++-----------
+ include/linux/mmc/sdhci.h |  2 ++
+ 2 files changed, 14 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/mmc/core/sdio_irq.c b/drivers/mmc/core/sdio_irq.c
-index aaa90460ed23..f23d73993dc6 100644
---- a/drivers/mmc/core/sdio_irq.c
-+++ b/drivers/mmc/core/sdio_irq.c
-@@ -90,6 +90,15 @@ static int process_sdio_pending_irqs(struct mmc_host *host)
- 	return ret;
- }
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index 1afed0ab338c..5f067a040ec4 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -1083,24 +1083,23 @@ static void sdhci_finish_command(struct sdhci_host *host)
  
-+void sdio_run_irqs(struct mmc_host *host)
-+{
-+	mmc_claim_host(host);
-+	host->sdio_irq_pending = true;
-+	process_sdio_pending_irqs(host);
-+	mmc_release_host(host);
-+}
-+EXPORT_SYMBOL_GPL(sdio_run_irqs);
-+
- static int sdio_irq_thread(void *_host)
+ static u16 sdhci_get_preset_value(struct sdhci_host *host)
  {
- 	struct mmc_host *host = _host;
-@@ -189,14 +198,20 @@ static int sdio_card_irq_get(struct mmc_card *card)
- 	WARN_ON(!host->claimed);
+-	u16 ctrl, preset = 0;
++	u16 preset = 0;
  
- 	if (!host->sdio_irqs++) {
--		atomic_set(&host->sdio_irq_thread_abort, 0);
--		host->sdio_irq_thread =
--			kthread_run(sdio_irq_thread, host, "ksdioirqd/%s",
--				mmc_hostname(host));
--		if (IS_ERR(host->sdio_irq_thread)) {
--			int err = PTR_ERR(host->sdio_irq_thread);
--			host->sdio_irqs--;
--			return err;
-+		if (!(host->caps2 & MMC_CAP2_SDIO_NOTHREAD)) {
-+			atomic_set(&host->sdio_irq_thread_abort, 0);
-+			host->sdio_irq_thread =
-+				kthread_run(sdio_irq_thread, host,
-+					    "ksdioirqd/%s", mmc_hostname(host));
-+			if (IS_ERR(host->sdio_irq_thread)) {
-+				int err = PTR_ERR(host->sdio_irq_thread);
-+				host->sdio_irqs--;
-+				return err;
-+			}
-+		} else {
-+			mmc_host_clk_hold(host);
-+			host->ops->enable_sdio_irq(host, 1);
-+			mmc_host_clk_release(host);
+-	ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
+-
+-	switch (ctrl & SDHCI_CTRL_UHS_MASK) {
+-	case SDHCI_CTRL_UHS_SDR12:
++	switch (host->timing) {
++	case MMC_TIMING_UHS_SDR12:
+ 		preset = sdhci_readw(host, SDHCI_PRESET_FOR_SDR12);
+ 		break;
+-	case SDHCI_CTRL_UHS_SDR25:
++	case MMC_TIMING_UHS_SDR25:
+ 		preset = sdhci_readw(host, SDHCI_PRESET_FOR_SDR25);
+ 		break;
+-	case SDHCI_CTRL_UHS_SDR50:
++	case MMC_TIMING_UHS_SDR50:
+ 		preset = sdhci_readw(host, SDHCI_PRESET_FOR_SDR50);
+ 		break;
+-	case SDHCI_CTRL_UHS_SDR104:
++	case MMC_TIMING_UHS_SDR104:
++	case MMC_TIMING_MMC_HS200:
+ 		preset = sdhci_readw(host, SDHCI_PRESET_FOR_SDR104);
+ 		break;
+-	case SDHCI_CTRL_UHS_DDR50:
++	case MMC_TIMING_UHS_DDR50:
+ 		preset = sdhci_readw(host, SDHCI_PRESET_FOR_DDR50);
+ 		break;
+ 	default:
+@@ -1530,6 +1529,7 @@ static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
  		}
- 	}
  
-@@ -211,8 +226,14 @@ static int sdio_card_irq_put(struct mmc_card *card)
- 	BUG_ON(host->sdio_irqs < 1);
+ 		host->ops->set_uhs_signaling(host, ios->timing);
++		host->timing = ios->timing;
  
- 	if (!--host->sdio_irqs) {
--		atomic_set(&host->sdio_irq_thread_abort, 1);
--		kthread_stop(host->sdio_irq_thread);
-+		if (!(host->caps2 & MMC_CAP2_SDIO_NOTHREAD)) {
-+			atomic_set(&host->sdio_irq_thread_abort, 1);
-+			kthread_stop(host->sdio_irq_thread);
-+		} else {
-+			mmc_host_clk_hold(host);
-+			host->ops->enable_sdio_irq(host, 0);
-+			mmc_host_clk_release(host);
-+		}
- 	}
+ 		if (!(host->quirks2 & SDHCI_QUIRK2_PRESET_VALUE_BROKEN) &&
+ 				((ios->timing == MMC_TIMING_UHS_SDR12) ||
+@@ -1828,12 +1828,13 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
+ 	 * If the Host Controller supports the HS200 mode then the
+ 	 * tuning function has to be executed.
+ 	 */
+-	if (((ctrl & SDHCI_CTRL_UHS_MASK) == SDHCI_CTRL_UHS_SDR50) &&
++	if (host->timing == MMC_TIMING_UHS_SDR50 &&
+ 	    (host->flags & SDHCI_SDR50_NEEDS_TUNING ||
+ 	     host->flags & SDHCI_SDR104_NEEDS_TUNING))
+ 		requires_tuning_nonuhs = true;
  
- 	return 0;
-diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
-index cb61ea4d6945..28c5e796292f 100644
---- a/include/linux/mmc/host.h
-+++ b/include/linux/mmc/host.h
-@@ -278,6 +278,7 @@ struct mmc_host {
- #define MMC_CAP2_PACKED_CMD	(MMC_CAP2_PACKED_RD | \
- 				 MMC_CAP2_PACKED_WR)
- #define MMC_CAP2_NO_PRESCAN_POWERUP (1 << 14)	/* Don't power up before scan */
-+#define MMC_CAP2_SDIO_NOTHREAD	(1 << 15)
+-	if (((ctrl & SDHCI_CTRL_UHS_MASK) == SDHCI_CTRL_UHS_SDR104) ||
++	if (host->timing == MMC_TIMING_MMC_HS200 ||
++	    host->timing == MMC_TIMING_UHS_SDR104 ||
+ 	    requires_tuning_nonuhs)
+ 		ctrl |= SDHCI_CTRL_EXEC_TUNING;
+ 	else {
+diff --git a/include/linux/mmc/sdhci.h b/include/linux/mmc/sdhci.h
+index 72a90baf111f..7f3efbab8732 100644
+--- a/include/linux/mmc/sdhci.h
++++ b/include/linux/mmc/sdhci.h
+@@ -172,6 +172,8 @@ struct sdhci_host {
+ 	unsigned int            ocr_avail_mmc;
+ 	u32 ocr_mask;		/* available voltages */
  
- 	mmc_pm_flag_t		pm_caps;	/* supported pm features */
- 
-@@ -391,6 +392,8 @@ static inline void mmc_signal_sdio_irq(struct mmc_host *host)
- 	wake_up_process(host->sdio_irq_thread);
- }
- 
-+void sdio_run_irqs(struct mmc_host *host);
++	unsigned		timing;		/* Current timing */
 +
- #ifdef CONFIG_REGULATOR
- int mmc_regulator_get_ocrmask(struct regulator *supply);
- int mmc_regulator_set_ocr(struct mmc_host *mmc,
+ 	u32			thread_isr;
+ 
+ 	/* cached registers */
 -- 
 1.8.3.1
