@@ -1,31 +1,26 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Wed, 23 Apr 2014 16:06:10 +0200
-Subject: [PATCH] ARM: sunxi: dt: list all pinctrl compatible strings
-In-Reply-To: <CACRpkdaQZ2VABWpbwEZ1eeMUZuf8SkGermKhiOPPHLQudJ4iqg@mail.gmail.com>
-References: <1398173886-9376-1-git-send-email-boris.brezillon@free-electrons.com>
- <CACRpkdaQZ2VABWpbwEZ1eeMUZuf8SkGermKhiOPPHLQudJ4iqg@mail.gmail.com>
-Message-ID: <5357C8D2.3030109@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 23 Apr 2014 16:17:03 +0200
+Subject: [PATCH v2 03/38] pinctrl: mvebu: new driver for Orion platforms
+In-Reply-To: <1398202002-28530-4-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1398202002-28530-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <CACRpkdaDLJitKqrYrbnEdiSqM1XQoAwT2AffRX0z+o70gmPTYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Apr 22, 2014 at 11:26 PM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
 
-On 23/04/2014 15:48, Linus Walleij wrote:
-> On Tue, Apr 22, 2014 at 3:38 PM, Boris BREZILLON
-> <boris.brezillon@free-electrons.com> wrote:
+> This commit extends the pinctrl mvebu logic with a new driver to cover
+> Orion5x SoC. It supports the definitions for the 5181l, 5182 and 5281
+> variants of Orion5x, which are the three ones supported by the old
+> style MPP code in arch/arm/mach-orion5x/.
 >
->> List all sunxi pinctrl compatible strings in order to be able to grep for
->> those values.
->>
->> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> Patch applied, but I edited the subject to pinctrl:
-> as this is arch neutral and has nothing to do with ARM really.
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
 
-Thanks.
+Nothing very controversial about this, shall I just apply it or do you need
+it to be kept together with other stuff?
 
-> Yours,
-> Linus Walleij
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Yours,
+Linus Walleij
