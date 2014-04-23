@@ -1,41 +1,38 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 23 Apr 2014 09:26:46 +0200
-Subject: [PATCH 22/33] ARM: shmobile: Use r8a7740 suffix for i2c, mmcif,
- fsi2 compat strings
-In-Reply-To: <20140423071813.GA2777@katana>
-References: <cover.1398216022.git.horms+renesas@verge.net.au>
- <5c53f50c50badff499568a703467c3c9f23f9bfd.1398216022.git.horms+renesas@verge.net.au>
- <CAMuHMdUA+wJmgn0P_q38ri7_TAq7zha-ekSUrvdpntG5gFv56Q@mail.gmail.com>
- <20140423071813.GA2777@katana>
-Message-ID: <CAMuHMdUBf4ATws9+P6EOvjG2V8povMMWL6xOQeFESC9Wm5xz8g@mail.gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 23 Apr 2014 16:30:31 +0900
+Subject: [PATCHv2] pinctrl: exynos: Add driver data for Exynos3250
+In-Reply-To: <CACRpkdaycY=Mba1pYQMv-Yq87JGfyJEnwmrT+qwDhrZ_4Rqs+g@mail.gmail.com>
+References: <1397439947-31592-1-git-send-email-cw00.choi@samsung.com>
+ <CACRpkdaycY=Mba1pYQMv-Yq87JGfyJEnwmrT+qwDhrZ_4Rqs+g@mail.gmail.com>
+Message-ID: <53576C17.5000601@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
-
-On Wed, Apr 23, 2014 at 9:18 AM, Wolfram Sang <wsa@the-dreams.de> wrote:
->> > -               compatible = "renesas,rmobile-iic";
->> > +               compatible = "renesas,iic-r8a7740", "renesas,rmobile-iic";
+On 04/23/2014 04:01 PM, Linus Walleij wrote:
+> On Mon, Apr 14, 2014 at 3:45 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+> 
+>> From: Tomasz Figa <t.figa@samsung.com>
 >>
->> I see an opportunity for improvement here: this driver doesn't seem to have
->> any bindings documented under Documentation/devicetree/bindings/?
->
-> I am brushing up this driver currently, so consider it done. Just
+>> This patch adds driver data (bank list and EINT layout) for Exynos3250
+>> to pinctrl-exynos driver. Exynos3250 includes 158 multi-functional input/output
+>> ports. There are 23 general port groups.
+>>
+>> Changes from v1:
+>> - Add signed-off of sender
+>> - Post only separated patch for pinctrl from following patchset(v1)
+>>   : https://lkml.org/lkml/2014/4/10/286
+>>
+>> Cc: Thomas Abraham <thomas.abraham@linaro.org>
+>> Cc: Linus Walleij <linus.walleij@linaro.org>
+>> Cc: Kukjin Kim <kgene.kim@samsung.com>
+>> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> 
+> This v2 patch applied.
+> 
 
-That's great to hear, thanks!
+Thanks for your apply.
 
-> waiting for a minor email issue to be solved before I can send out
-> patches.
-
-Good luck!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Best regards,
+Chanwoo Choi
