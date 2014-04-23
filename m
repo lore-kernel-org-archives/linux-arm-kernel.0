@@ -1,53 +1,63 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 23 Apr 2014 19:21:46 +0200
-Subject: [PATCH 2/5] clk: berlin: add berlin clocks DT bindings
- documentation
-In-Reply-To: <1398261667-12621-3-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1398261667-12621-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1398261667-12621-3-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <5357F6AA.1010406@gmail.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Wed, 23 Apr 2014 12:25:30 -0500
+Subject: [PATCH] ARM: dts: am437x-gp-evm: Boot fixes
+In-Reply-To: <20140423145904.GB4833@atomide.com>
+References: <1398192739-8901-1-git-send-email-d-gerlach@ti.com>
+ <20140422190132.GA12204@atomide.com> <5356C8AE.3090907@ti.com>
+ <20140423145904.GB4833@atomide.com>
+Message-ID: <5357F78A.5000406@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/23/2014 04:01 PM, Alexandre Belloni wrote:
-> Document the newly added berlin clock driver
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
-> Cc: devicetree at vger.kernel.org
->  Documentation/devicetree/bindings/clock/berlin-clock.txt | 9 ++++++++-
->  1 file changed, 8 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/berlin-clock.txt b/Documentation/devicetree/bindings/clock/berlin-clock.txt
-> index 49b7860bffb8..00f0053ef587 100644
-> --- a/Documentation/devicetree/bindings/clock/berlin-clock.txt
-> +++ b/Documentation/devicetree/bindings/clock/berlin-clock.txt
-> @@ -9,6 +9,8 @@ Required properties:
->  	"marvell,berlin2-pll",
->  	"marvell,berlin2q-pll":
->  		CPU PLL and System PLL
-> +	"marvell,berlin2-clk":
-> +		simple clocks
->  - reg: Address and length of the clock register set.
->  - #clock-cells: from common clock binding; shall be set to 0.
->  - clocks: from common clock binding
-> @@ -26,4 +28,9 @@ cpupll: cpupll at ea003c {
->  	reg = <0xea003c 0x8>;
->  };
->  
-> -
-> +sdio0xinclk: sdio0xinclk at ea023c {
+On 04/23/2014 09:59 AM, Tony Lindgren wrote:
+> * Dave Gerlach <d-gerlach@ti.com> [140422 12:53]:
+>> On 04/22/2014 02:01 PM, Tony Lindgren wrote:
+>>> * Dave Gerlach <d-gerlach@ti.com> [140422 11:52]:
+>>>> This patch, along with patch here [1], fixes boot for am437x-gp-evm. The
+>>>> bootloader configures gpio5_7 to control the DDR3 termination regulator,
+>>>> the linked patch prevents that gpio bank from being reset and losing
+>>>> the previously configured state, and this patch binds the gpio to a
+>>>> regulator so the kernel is aware of the state of the gpio.
+>>>>
+>>>> [1] https://www.mail-archive.com/linux-omap at vger.kernel.org/msg102941.html
+>>>
+>>> Setting up the GPIO regulator makes sense to me. But the hack in the
+>>> link above is potentially a nasty time bomb for anybody trying to
+>>> use GPIO bank 5 on that board.
+>>>
+>>> What tests have been done that the GPIO bank behaves properly when
+>>> it's not reset?
+>>
+>> We've been using this configuration on this board for a while without any
+>> apparent issues. Also, am335x-evmsk already uses the same idea for the VTT
+>> regulator on board from commit 6046adb6ad701026c10adeac8d6a4138895f12e5
+>> [ARM: dts: am335x-evmsk: Do not reset gpio0] and I am unaware of any issues
+>> with that either.
+>
+> OK. Do you have other GPIOs in use as interrupts for devices in these
+> banks and do they work fine?
 
-Yuck! ;)
+I dont see any interrupts in use from gpio5 bank but as a quick test if 
+I add ti,no-reset-on-init to gpio3 and gpio4 I see no issue with 
+matrix-keypad operation which uses gpios from each of those banks.
 
-Can't we just simply use "clock@<addr>" for the node name and
-have the driver compute the name like simple-bus does?
+>
+> Also, can you please test to make sure this works with the most recent
+> Javier's GPIO patches that had the issue of not booting on am335x-evmsk?
+>
 
-Sebastian
+Yes, when using Javier's patches in addition to this patch [1], which 
+was found to be necessary through this discussion [2], the AM437x GP EVM 
+boots fine with linux-next with my regulator patch and gpio5 no reset 
+patch applied.
 
-> +	compatible = "marvell,berlin-clk";
-> +	clocks = <&syspll>;
-> +	#clock-cells = <0>;
-> +	reg = <0xea023c 4>;
-> +};
-> 
+Regards,
+Dave
+
+[1] https://patchwork.kernel.org/patch/4041881/
+[2] http://marc.info/?t=139817273800014&r=1&w=2
+
+> Regards,
+>
+> Tony
+>
