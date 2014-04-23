@@ -1,42 +1,52 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 23 Apr 2014 16:18:55 +0200
-Subject: [PATCH v2 03/38] pinctrl: mvebu: new driver for Orion platforms
-In-Reply-To: <CACRpkdaDLJitKqrYrbnEdiSqM1XQoAwT2AffRX0z+o70gmPTYA@mail.gmail.com>
-References: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1398202002-28530-4-git-send-email-thomas.petazzoni@free-electrons.com>
- <CACRpkdaDLJitKqrYrbnEdiSqM1XQoAwT2AffRX0z+o70gmPTYA@mail.gmail.com>
-Message-ID: <20140423161855.09e95323@skate>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 23 Apr 2014 09:20:16 -0500
+Subject: [PATCH] ARM: sunxi: dt: list all pinctrl compatible strings
+In-Reply-To: <1398173886-9376-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1398173886-9376-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <CAL_JsqLcTk4yUc9geDHNwxcELo=6JKTHy-6PoHNa2BpYmc3VXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Linus Walleij,
+On Tue, Apr 22, 2014 at 8:38 AM, Boris BREZILLON
+<boris.brezillon@free-electrons.com> wrote:
+> List all sunxi pinctrl compatible strings in order to be able to grep for
+> those values.
 
-On Wed, 23 Apr 2014 16:17:03 +0200, Linus Walleij wrote:
-> On Tue, Apr 22, 2014 at 11:26 PM, Thomas Petazzoni
-> <thomas.petazzoni@free-electrons.com> wrote:
-> 
-> > This commit extends the pinctrl mvebu logic with a new driver to cover
-> > Orion5x SoC. It supports the definitions for the 5181l, 5182 and 5281
-> > variants of Orion5x, which are the three ones supported by the old
-> > style MPP code in arch/arm/mach-orion5x/.
-> >
-> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > Cc: Linus Walleij <linus.walleij@linaro.org>
-> 
-> Nothing very controversial about this,
+If you were fixing this to please checkpatch.pl, that issue has been
+fixed in checkpatch. I think it is only in linux-next ATM.
 
-Yeah, just a boring list of pins and functions :-)
+Rob
 
-> shall I just apply it or do you need it to be kept together with other stuff?
-
-I'll let the mvebu maintainers answer this. Since there is no build
-dependency with the rest of the series, I guess it could go through
-your tree, but I leave the decision to the mvebu maintainers.
-
-Thanks!
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+>
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> ---
+>  .../devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt      | 9 +++++++--
+>  1 file changed, 7 insertions(+), 2 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
+> index dff0e5f..d8d0656 100644
+> --- a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
+> +++ b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
+> @@ -6,8 +6,13 @@ the first two functions being GPIO in and out. The configuration on
+>  the pins includes drive strength and pull-up.
+>
+>  Required properties:
+> -- compatible: "allwinner,<soc>-pinctrl". Supported SoCs for now are:
+> -  sun5i-a13.
+> +- compatible: Should be one of the followings (depending on you SoC):
+> +  "allwinner,sun4i-a10-pinctrl"
+> +  "allwinner,sun5i-a10s-pinctrl"
+> +  "allwinner,sun5i-a13-pinctrl"
+> +  "allwinner,sun6i-a31-pinctrl"
+> +  "allwinner,sun6i-a31-r-pinctrl"
+> +  "allwinner,sun7i-a20-pinctrl"
+>  - reg: Should contain the register physical address and length for the
+>    pin controller.
+>
+> --
+> 1.8.3.2
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
