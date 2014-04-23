@@ -1,26 +1,26 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 23 Apr 2014 15:55:52 +0200
-Subject: [PATCH 2/7] gpiolib: Support purely name based gpiod lookup in
- device trees
-In-Reply-To: <20140422151840.GH24905@lukather>
-References: <1397544101-18135-1-git-send-email-wens@csie.org>
- <1397544101-18135-3-git-send-email-wens@csie.org>
- <CACRpkdZ+3dnhoj1TS4KSVUP8iFHsjjwop-FG2Nf07YtH6aSO_Q@mail.gmail.com>
- <20140422151840.GH24905@lukather>
-Message-ID: <CACRpkdbdgkYEGWpQiX0WuvS3iivfAyz0r+oK=5D8WB_e=0js2A@mail.gmail.com>
+Date: Wed, 23 Apr 2014 15:57:31 +0200
+Subject: [PATCH 11/11] pinctrl: single: Clear pin interrupts enabled by
+ bootloader
+In-Reply-To: <20140422161033.GC19317@atomide.com>
+References: <1397173639-29587-1-git-send-email-tony@atomide.com>
+ <1397173639-29587-12-git-send-email-tony@atomide.com>
+ <CACRpkdYu2Obo8kuA2D9a33K_KCF-LPza=+reEpFnq8JFK6jOCg@mail.gmail.com>
+ <20140422161033.GC19317@atomide.com>
+Message-ID: <CACRpkdZeUTugwxaxCUBDVE3b+ak21m8C2Ff4N5rZ3+i5OdQXyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 22, 2014 at 5:18 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
+On Tue, Apr 22, 2014 at 6:10 PM, Tony Lindgren <tony@atomide.com> wrote:
 
-> This patch has a dependency on the first patch of this serie, since it
-> uses a binding that was documented there.
+>> Shall I apply this patch or will you funnel it through ARM SoC
+>> due to deps?
 >
-> Maybe you'll want to wait for the ACK from the DT maintainers to merge
-> this one.
+> No deps except boards hanging without it.. Please feel free to
+> take this one, prererrably as a fix for the -rc series if no
+> objections.
 
-Yeah I realized this a bit later, sorry for being a bit confused :-/
+Yes this is -rc material. Queued for fixes. Thanks!
 
 Yours,
 Linus Walleij
