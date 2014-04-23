@@ -1,70 +1,80 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 23 Apr 2014 22:55:51 +0200
-Subject: [PATCH v2 1/9] ARM: S3C24XX: cpufreq-utils: don't write raw values
- to MPLLCON when using ccf
-In-Reply-To: <535825AB.8060802@cogentembedded.com>
-References: <2104342.rkElQpXtvM@phil> <5855371.5GIoOu8EnE@phil>
- <535825AB.8060802@cogentembedded.com>
-Message-ID: <535828D7.3080301@gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 23 Apr 2014 22:56:57 +0200
+Subject: [PATCH v2 2/3] arm: exynos: Add MCPM call-back functions
+In-Reply-To: <CAM4voa=WJiF-9wZB29JOFhz2kEE-TC0y6h-8GVwk3_JoXxpK+A@mail.gmail.com>
+References: <1397239311-27717-6-git-send-email-a.kesavan@samsung.com>	<1398147435-3122-1-git-send-email-a.kesavan@samsung.com>	<535650AE.90501@linaro.org>
+ <CAM4voa=WJiF-9wZB29JOFhz2kEE-TC0y6h-8GVwk3_JoXxpK+A@mail.gmail.com>
+Message-ID: <53582919.1040905@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 04/23/2014 05:31 PM, Abhilash Kesavan wrote:
+> Hi Daniel,
+> On Tue, Apr 22, 2014 at 4:51 PM, Daniel Lezcano
+> <daniel.lezcano@linaro.org> wrote:
+>> On 04/22/2014 08:17 AM, Abhilash Kesavan wrote:
+>>>
+>>> Add machine-dependent MCPM call-backs for Exynos5420. These are used
+>>> to power up/down the secondary CPUs during boot, shutdown, s2r and
+>>> switching.
+>>>
+>>> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+>>> Signed-off-by: Inderpal Singh <inderpal.s@samsung.com>
+>>> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+>>> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+>>> ---
 
-On 23.04.2014 22:42, Sergei Shtylyov wrote:
-> Hello.
->
-> On 04/23/2014 11:34 PM, Heiko St?bner wrote:
->
->> The s3c24xx cpufreq driver needs to change the mpll speed and was doing
->> this by writing raw values from a translation table into the MPLLCON
->> register.
->
->> Change this to use a regular clk_set_rate call when using the common
->> clock framework and only write the raw value in the samsung_clock case.
->
->> To not needing to create additional infrastructure for this, the mpll
->> clock
->> is requested at the first call to s3c2410_set_fvco().
->
->> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
->> ---
->>   arch/arm/mach-s3c24xx/cpufreq-utils.c | 14 ++++++++++++++
->>   1 file changed, 14 insertions(+)
->
->> diff --git a/arch/arm/mach-s3c24xx/cpufreq-utils.c
->> b/arch/arm/mach-s3c24xx/cpufreq-utils.c
->> index 2a0aa56..d5e797b 100644
->> --- a/arch/arm/mach-s3c24xx/cpufreq-utils.c
->> +++ b/arch/arm/mach-s3c24xx/cpufreq-utils.c
-> [...]
->> @@ -60,5 +61,18 @@ void s3c2410_cpufreq_setrefresh(struct
->> s3c_cpufreq_config *cfg)
->>    */
->>   void s3c2410_set_fvco(struct s3c_cpufreq_config *cfg)
->>   {
->> +#ifdef CONFIG_SAMSUNG_CLOCK
->>       __raw_writel(cfg->pll.driver_data, S3C2410_MPLLCON);
->> +#endif
->> +
->> +#ifdef CONFIG_COMMON_CLK
->> +    static struct clk *mpll;
->> +
->> +    if (!mpll)
->
->     You are testing uninitialized variable. This check wouldn't make
-> much sense even if the variable was initialized.
+[ ... ]
 
-I should probably add that NULL is considered a valid clock handle by 
-Common Clock Framework.
+>>> +#include <plat/cpu.h>
+>>> +#include "regs-pmu.h"
+>>> +
+>>> +#define EXYNOS5420_CPUS_PER_CLUSTER    4
+>>> +#define EXYNOS5420_NR_CLUSTERS         2
+>>> +
+>>> +/* Secondary CPU entry point */
+>>> +#define REG_ENTRY_ADDR         (S5P_VA_SYSRAM_NS + 0x1C)
+>>> +
+>>> +#define EXYNOS_CORE_LOCAL_PWR_EN               0x3
+>>> +#define EXYNOS_CORE_LOCAL_PWR_DIS              0x0
+>>>
+>>> +#define EXYNOS_ARM_COMMON_CONFIGURATION                S5P_PMUREG(0x2500)
+>>> +#define EXYNOS_ARM_L2_CONFIGURATION            S5P_PMUREG(0x2600)
+>>> +
+>>> +#define EXYNOS_ARM_CORE_CONFIGURATION(_nr)     \
+>>> +                       (S5P_ARM_CORE0_CONFIGURATION + ((_nr) * 0x80))
+>>> +#define EXYNOS_ARM_CORE_STATUS(_nr)            \
+>>> +                       (S5P_ARM_CORE0_STATUS + ((_nr) * 0x80))
+>>> +
+>>> +#define EXYNOS_COMMON_CONFIGURATION(_nr)       \
+>>> +                       (EXYNOS_ARM_COMMON_CONFIGURATION + ((_nr) * 0x80))
+>>> +#define EXYNOS_COMMON_STATUS(_nr)              \
+>>> +                       (EXYNOS_COMMON_CONFIGURATION(_nr) + 0x4)
+>>> +
+>>> +#define EXYNOS_L2_CONFIGURATION(_nr)           \
+>>> +                       (EXYNOS_ARM_L2_CONFIGURATION + ((_nr) * 0x80))
+>>> +#define EXYNOS_L2_STATUS(_nr)                  \
+>>> +                       (EXYNOS_L2_CONFIGURATION(_nr) + 0x4)
+>>> +
+>>
+>>
+>> Is it possible to share the definition of those macros with the rest of the
+>> code via functions, so they can be re-used for the other sub-systems ? eg:
+>> https://patches.linaro.org/27798/
+> OK..I will work on making wrapper functions for these. Would these new
+> functions be better placed in the mcpm code or the pm code ?
 
-If there is really no way to pass the clock to this function then 
-probably a global variable initialized by some code running earlier than 
-this function could be called would be a better choice.
+Hi Abhilash,
 
-Anyway, Heiko, thanks for working on this. I'll try to review rest of 
-the series soon. (I'm attending the ELC next week, though, so I'm not 
-sure if I find some time then, though.)
+yes, in the pm code. That would make more sense.
 
-Best regards,
-Tomasz
+Thanks
+   -- Daniel
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
