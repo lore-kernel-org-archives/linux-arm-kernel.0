@@ -1,43 +1,49 @@
-From: bcousson@baylibre.com (Benoit Cousson)
-Date: Wed, 23 Apr 2014 17:40:32 +0200
-Subject: [PATCH RFC] ARM: dts: am335x: update USB DT references
-In-Reply-To: <20140423151734.GA5867@arch.cereza>
-References: <1397647595-10927-1-git-send-email-leigh@solinno.co.uk>
- <5356794C.7070707@baylibre.com> <20140423144822.GA4833@atomide.com>
- <20140423151734.GA5867@arch.cereza>
-Message-ID: <5357DEF0.7030000@baylibre.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 24 Apr 2014 00:42:11 +0900
+Subject: [Patch v2 0/4] add cpuidle support for Exynos5420
+In-Reply-To: <4517423.BmCv8cudjC@vostro.rjw.lan>
+References: <1398080958-21677-5-git-send-email-chander.kashyap@linaro.org>
+ <1398245154-18771-1-git-send-email-chander.kashyap@linaro.org>
+ <4517423.BmCv8cudjC@vostro.rjw.lan>
+Message-ID: <5357DF53.4010806@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ezequiel,
-
-On 23/04/2014 17:17, Ezequiel Garcia wrote:
-> On Apr 23, Tony Lindgren wrote:
->> * Benoit Cousson <bcousson@baylibre.com> [140422 07:14]:
->>> Hi Leigh,
->>>
->>> On 16/04/2014 13:26, Leigh Brown wrote:
->>>> In "ARM: dts: am33xx: correcting dt node unit address for usb", the
->>>> usb_ctrl_mod and cppi41dma nodes were updated with the correct register
->>>> addresses.  However, the dts files that reference these nodes were not
->>>> updated, and those devices are no longer being enabled.
->>>>
->>>> This patch corrects the references for the affected dts files.
+On 04/23/14 19:18, Rafael J. Wysocki wrote:
+> On Wednesday, April 23, 2014 02:55:50 PM Chander Kashyap wrote:
+>> Exynos5420 is a big-little Soc from Samsung. It has 4 A15 and 4 A7 cores.
+>>
+>> This patchset adds cpuidle support for Exynos5420 SoC based on
+>> generic big.little cpuidle driver.
+>>
+>> Tested on SMDK5420.
+>>
+>> This patch set depends on:
+>> 	1. [PATCH 0/5] MCPM backend for Exynos5420
+>> 	   http://www.spinics.net/lists/arm-kernel/msg321666.html
+>>
+>> 	2. [PATCH v4] arm: exynos: generalize power register address calculation
+>> 	   http://www.spinics.net/lists/arm-kernel/msg324024.html
+>> 		
+>> Changelog is in respective patches.
+>> Chander Kashyap (4):
+>>    cpuidle: config: Add SOC_EXYNOS5420 entry to select
+>>      cpuidle-big-little driver
+>>    driver: cpuidle: cpuidle-big-little: init driver for Exynos5420
+>>    exynos: cpuidle: do not allow cpuidle registration for Exynos5420
+>>    mcpm: exynos: populate suspend and powered_up callbacks
+>>
+>>   arch/arm/mach-exynos/cpuidle.c       |    3 ++
+>>   arch/arm/mach-exynos/mcpm-exynos.c   |   53 ++++++++++++++++++++++++++++++++++
+>>   drivers/cpuidle/Kconfig.arm          |    2 +-
+>>   drivers/cpuidle/cpuidle-big_little.c |    3 +-
+>>   4 files changed, 59 insertions(+), 2 deletions(-)
 >
-> Maybe someone can take care of using phandles instead?
+> I'm assuming that the Exynos maintainers will take care of this, correct?
 >
-> This way, the board's dts files would be immune to such .dtsi changes.
 
-Indeed, that will avoid such issues.
+Yeah, I will if you have any objection :-)
 
-Are you volunteer for that cleanup ? :-)
+BTW, I need to look at the dependent patches.
 
-Thanks,
-Benoit
-
-
--- 
-Beno?t Cousson
-BayLibre
-Embedded Linux Technology Lab
-www.baylibre.com
+- Kukjin
