@@ -1,104 +1,51 @@
-From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Wed, 23 Apr 2014 19:51:35 +0800
-Subject: [PATCH 2/2] ARM: dts: hip04: add gpio pieces
-Message-ID: <5357A947.2010506@hisilicon.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 23 Apr 2014 09:06:09 -0300
+Subject: [PATCH] ARM: dts: imx53-qsb-common: Add TVE support
+Message-ID: <1398254769-10513-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hisilicon Soc hip04 has four gpio controllers, each one has 32
-gpios and can be configured to be an interrupt controller.
-The gpio controllers are compatible with the snps,dw-apb-gpio
-driver. This patch add the corresponding device tree nodes.
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/boot/dts/hip04.dtsi |   76 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 76 insertions(+)
+ arch/arm/boot/dts/imx53-qsb-common.dtsi | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-diff --git a/arch/arm/boot/dts/hip04.dtsi b/arch/arm/boot/dts/hip04.dtsi
-index 7e909ee..c7c1f8c 100644
---- a/arch/arm/boot/dts/hip04.dtsi
-+++ b/arch/arm/boot/dts/hip04.dtsi
-@@ -235,5 +235,81 @@
- 			reg-shift = <2>;
- 			status = "disabled";
+diff --git a/arch/arm/boot/dts/imx53-qsb-common.dtsi b/arch/arm/boot/dts/imx53-qsb-common.dtsi
+index ede04fa..a491bde 100644
+--- a/arch/arm/boot/dts/imx53-qsb-common.dtsi
++++ b/arch/arm/boot/dts/imx53-qsb-common.dtsi
+@@ -272,6 +272,14 @@
+ 			>;
  		};
-+
-+		gpio at 4003000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "snps,dw-apb-gpio";
-+			reg = <0x4003000 0x1000>;
-+
-+			gpio3: gpio-controller at 0 {
-+				compatible = "snps,dw-apb-gpio-port";
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				snps,nr-gpios = <32>;
-+				reg = <0>;
-+				interrupt-parent = <&gic>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				interrupts = <0 392 4>;
-+			};
+ 
++		pinctrl_vga_sync_1: vgasync-grp1 {
++			fsl,pins = <
++				/* VGA_HSYNC, VSYNC with max drive strength */
++				MX53_PAD_EIM_OE__IPU_DI1_PIN7 0xe6
++				MX53_PAD_EIM_RW__IPU_DI1_PIN8 0xe6
++			>;
 +		};
 +
-+		gpio at 4002000 {
-+ 			#address-cells = <1>;
-+ 			#size-cells = <0>;
-+ 			compatible = "snps,dw-apb-gpio";
-+ 			reg = <0x4002000 0x1000>;
-+
-+ 			gpio2: gpio-controller at 0 {
-+ 				compatible = "snps,dw-apb-gpio-port";
-+ 				gpio-controller;
-+ 				#gpio-cells = <2>;
-+ 				snps,nr-gpios = <32>;
-+ 				reg = <0>;
-+				interrupt-parent = <&gic>;
-+ 				interrupt-controller;
-+ 				#interrupt-cells = <2>;
-+ 				interrupts = <0 391 4>;
-+ 			};
-+ 		};
-+
-+		gpio at 4001000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "snps,dw-apb-gpio";
-+			reg = <0x4001000 0x1000>;
-+
-+			gpio1: gpio-controller at 0 {
-+				compatible = "snps,dw-apb-gpio-port";
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				snps,nr-gpios = <32>;
-+				reg = <0>;
-+				interrupt-parent = <&gic>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				interrupts = <0 390 4>;
-+			};
-+		};
-+
-+		gpio at 4000000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "snps,dw-apb-gpio";
-+			reg = <0x4000000 0x1000>;
-+
-+			gpio0: gpio-controller at 0 {
-+				compatible = "snps,dw-apb-gpio-port";
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				snps,nr-gpios = <32>;
-+				reg = <0>;
-+				interrupt-parent = <&gic>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				interrupts = <0 389 4>;
-+			};
-+		};
+ 		pinctrl_uart1: uart1grp {
+ 			fsl,pins = <
+ 				MX53_PAD_CSI0_DAT10__UART1_TXD_MUX	0x1e4
+@@ -281,6 +289,15 @@
  	};
  };
--- 1.7.9.5
+ 
++&tve {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_vga_sync_1>;
++	fsl,tve-mode = "vga";
++	fsl,hsync-pin = <4>;
++	fsl,vsync-pin = <6>;
++	status = "okay";
++};
++
+ &uart1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_uart1>;
+-- 
+1.8.3.2
