@@ -1,63 +1,60 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 24 Apr 2014 01:09:01 +0200
-Subject: [PATCH 3/4] gpio: make handler_data configurable while using
- gpiolib_irqchip
-In-Reply-To: <CAGsJ_4wmd-ejfHF+MXbO3JSppUDYcEVKeO1WxRM16FtSFEBxpA@mail.gmail.com>
-References: <1397544229-20545-1-git-send-email-21cnbao@gmail.com>
- <1397544229-20545-4-git-send-email-21cnbao@gmail.com>
- <CACRpkdb8rmMDXS1kfcq7wgOnG2XsPm_bxb15z9_9d3E+trBfQA@mail.gmail.com>
- <CAGsJ_4wmd-ejfHF+MXbO3JSppUDYcEVKeO1WxRM16FtSFEBxpA@mail.gmail.com>
-Message-ID: <CACRpkdYcbngMDPRnuQjPHwo-USHdtK26T_6VM=PFnkT71Dg8Ng@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 23 Apr 2014 18:10:50 -0500
+Subject: [RESEND PATCH] regulator: core: Disable unused regulators after
+ deferred probing is done
+Message-ID: <1398294650-24821-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 24, 2014 at 12:55 AM, Barry Song <21cnbao@gmail.com> wrote:
+From: Saravana Kannan <skannan@codeaurora.org>
 
->> NAK, the whole idea with the function gpiochip_set_chained_irqchip()
->> is that its sets things up so that the gpiochip is passed as handler
->> data on the parent IRQ, akin to how the gpiochip is passed as
->> chip data on the cascaded IRQs.
->
-> i think it is a really bad idea as the parent handler might not want
-> the whole chip if the chip has several parents and each parent want a
-> separate handler_data.
-> this patch doesn't break your way as the parameter is void *, drivers
-> which use your way don't need any change. but for drivers which want
-> more special handler_data, it supports better.
+regulator_init_complete does a scan of regulators which dont have
+always-on or consumers are automatically disabled as being unused.
+However, with deferred probing, late_initcall() is too soon to
+declare a regulator as unused as the regulator itself might not
+have registered due to defferal - Example: A regulator deffered due
+to i2bus not available which in turn is deffered due to pinctrl
+availability.
 
-This is perfectly possible, just don't use
-gpiochip_set_chained_irqchip() which has this semantic
-effect.
+Since deferred probing is done in late_initcall(), do the cleanup of
+unused regulators by regulator_init_complete in late_initcall_sync
+instead of late_initcall.
 
-Use irq_set_chained_handler() and irq_set_handler_data()
-directly instead.
+Cc: Liam Girdwood <lgirdwood@gmail.com>
+Cc: Mark Brown <broonie@kernel.org>
+Cc: Markus Pargmann <mpa@pengutronix.de>
+Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
+[nm at ti.com: minor rewording]
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+Applies on v3.15-rc2 and on next-20140423
+Original post: https://patchwork.kernel.org/patch/2545061/
 
-I do see that this is maybe easier for the handler to get the bank
-passed in.
+I rediscovered this patch many times now :(:
+Latest Example: https://patchwork.kernel.org/patch/4044811/
+http://slexy.org/raw/s21MCHgeJo shows none of the unused regulators are disabled
+and with this fix:
+http://slexy.org/raw/s2TH36cThR (which auto disables unused regulators).
 
-However when I in the RFT patches change the driver to allocate
-and pass a struct for the gpio chip, it all looks a bit different.
-You would have to get the sgpio from the bank instead, which
-may require to introduce a special pointer for that.
+Ccying Markus as author of 66fda75f47dc (regulator: core: Replace
+direct ops->disable usage) he might be interested as well.
 
-What we want to get rid of is this:
+Btw, this might open up a lot of broken boards - like we discovered
+for DRA7 - so it might be a good idea for next instead of current rc
+cyle giving it some time to cook and get platforms fixed.
 
-for (i = 0; i < SIRFSOC_GPIO_BANK_SIZE; i++) {
-                bank = &sgpio->sgpio_bank[i];
-                if (bank->parent_irq == irq)
-                        break;
-}
-BUG_ON (i == SIRFSOC_GPIO_BANK_SIZE);
+ drivers/regulator/core.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-So what about passing something like that to the handler:
-
-struct sirf_irq_handler_data {
-    struct sirfsoc_gpio_chip *sgpio;
-    struct sirfsoc_gpio_bank *bank;
-};
-
-Then the irq handler instantly have pointers to all it needs.
-But maybe it's better to just pass the bank, whatdoIknow.
-
-Yours,
-Linus Walleij
+diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
+index 9a09f3c..5a05de3 100644
+--- a/drivers/regulator/core.c
++++ b/drivers/regulator/core.c
+@@ -3867,4 +3867,4 @@ unlock:
+ 
+ 	return 0;
+ }
+-late_initcall(regulator_init_complete);
++late_initcall_sync(regulator_init_complete);
+-- 
+1.7.9.5
