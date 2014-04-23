@@ -1,29 +1,22 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 23 Apr 2014 12:17:34 -0300
-Subject: [PATCH RFC] ARM: dts: am335x: update USB DT references
-In-Reply-To: <20140423144822.GA4833@atomide.com>
-References: <1397647595-10927-1-git-send-email-leigh@solinno.co.uk>
- <5356794C.7070707@baylibre.com> <20140423144822.GA4833@atomide.com>
-Message-ID: <20140423151734.GA5867@arch.cereza>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 23 Apr 2014 12:21:39 -0300
+Subject: SD CRC error on mx27pdk
+In-Reply-To: <CAOMZO5AZ4gJZMo-DZRPffaF+NdzmzMf32YwPu2gEp9AH8gDk4Q@mail.gmail.com>
+References: <CAOMZO5AZ4gJZMo-DZRPffaF+NdzmzMf32YwPu2gEp9AH8gDk4Q@mail.gmail.com>
+Message-ID: <CAOMZO5CWLH=ZbUd9dyTqtNVqu0RTSMeBGReBYetO-wzxayS7qw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Apr 23, Tony Lindgren wrote:
-> * Benoit Cousson <bcousson@baylibre.com> [140422 07:14]:
-> > Hi Leigh,
-> > 
-> > On 16/04/2014 13:26, Leigh Brown wrote:
-> > >In "ARM: dts: am33xx: correcting dt node unit address for usb", the
-> > >usb_ctrl_mod and cppi41dma nodes were updated with the correct register
-> > >addresses.  However, the dts files that reference these nodes were not
-> > >updated, and those devices are no longer being enabled.
-> > >
-> > >This patch corrects the references for the affected dts files.
+On Wed, Apr 23, 2014 at 12:10 PM, Fabio Estevam <festevam@gmail.com> wrote:
 
-Maybe someone can take care of using phandles instead?
+> ,but I get this error:
+>
+> mxc-mmc 10013000.sdhci: mxcmci_finish_data: -EILSEQ
+> mmc0: error -84 whilst initialising SD card
+> mmc0: host does not support reading read-only switch. assuming write-enable.
+> mmc0: new SDHC card at address b5a1
+> mmcblk0: mmc0:b5a1 SD04G 3.69 GiB
+>  mmcblk0: unknown partition table
 
-This way, the board's dts files would be immune to such .dtsi changes.
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+I forgot to mention that this error does not happen if I boot the
+non-dt kernel, so it seems to be related to dt only.
