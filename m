@@ -1,86 +1,107 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Wed, 23 Apr 2014 20:08:18 +0100
-Subject: [PATCH 25/38] mmc: sdhci: clean up sdhci_execute_tuning() decision
+Date: Wed, 23 Apr 2014 20:08:28 +0100
+Subject: [PATCH 27/38] mmc: sdhci-of-esdhc: remove
+ platform_suspend/platform_resume callbacks
 In-Reply-To: <20140423185534.GA26756@n2100.arm.linux.org.uk>
 References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
-Message-ID: <E1Wd2Wo-0003vx-2y@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Wd2Wy-0003w6-9y@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clean up the code in sdhci_execute_tuning() so the decision whether
-to execute tuning is clearer - and despite this reflecting what the
-original code was doing, it shows that it may not be what the author
-actually intended.
+We don't need these hooks in order to insert code in these paths, we
+can just provide our own handlers and call the main sdhci handlers as
+appropriate.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/mmc/host/sdhci.c | 31 +++++++++++++++----------------
- 1 file changed, 15 insertions(+), 16 deletions(-)
+ drivers/mmc/host/sdhci-of-esdhc.c | 55 +++++++++++++++++++++++++--------------
+ 1 file changed, 36 insertions(+), 19 deletions(-)
 
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index 5f067a040ec4..c1bd77e17458 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -1806,21 +1806,16 @@ static int sdhci_card_busy(struct mmc_host *mmc)
+diff --git a/drivers/mmc/host/sdhci-of-esdhc.c b/drivers/mmc/host/sdhci-of-esdhc.c
+index fcaeae5f55b8..605815e52f5f 100644
+--- a/drivers/mmc/host/sdhci-of-esdhc.c
++++ b/drivers/mmc/host/sdhci-of-esdhc.c
+@@ -241,20 +241,6 @@ static void esdhc_of_set_clock(struct sdhci_host *host, unsigned int clock)
+ 	mdelay(1);
+ }
  
- static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
+-#ifdef CONFIG_PM
+-static u32 esdhc_proctl;
+-static void esdhc_of_suspend(struct sdhci_host *host)
+-{
+-	esdhc_proctl = sdhci_be32bs_readl(host, SDHCI_HOST_CONTROL);
+-}
+-
+-static void esdhc_of_resume(struct sdhci_host *host)
+-{
+-	esdhc_of_enable_dma(host);
+-	sdhci_be32bs_writel(host, esdhc_proctl, SDHCI_HOST_CONTROL);
+-}
+-#endif
+-
+ static void esdhc_of_platform_init(struct sdhci_host *host)
  {
--	struct sdhci_host *host;
-+	struct sdhci_host *host = mmc_priv(mmc);
- 	u16 ctrl;
- 	int tuning_loop_counter = MAX_TUNING_LOOP;
- 	unsigned long timeout;
- 	int err = 0;
--	bool requires_tuning_nonuhs = false;
- 	unsigned long flags;
+ 	u32 vvn;
+@@ -302,16 +288,47 @@ static const struct sdhci_ops sdhci_esdhc_ops = {
+ 	.get_max_clock = esdhc_of_get_max_clock,
+ 	.get_min_clock = esdhc_of_get_min_clock,
+ 	.platform_init = esdhc_of_platform_init,
+-#ifdef CONFIG_PM
+-	.platform_suspend = esdhc_of_suspend,
+-	.platform_resume = esdhc_of_resume,
+-#endif
+ 	.adma_workaround = esdhci_of_adma_workaround,
+ 	.set_bus_width = esdhc_pltfm_set_bus_width,
+ 	.reset = sdhci_reset,
+ 	.set_uhs_signaling = sdhci_set_uhs_signaling,
+ };
  
--	host = mmc_priv(mmc);
--
- 	sdhci_runtime_pm_get(host);
- 	spin_lock_irqsave(&host->lock, flags);
- 
--	ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
--
- 	/*
- 	 * The Host Controller needs tuning only in case of SDR104 mode
- 	 * and for SDR50 mode when Use Tuning for SDR50 is set in the
-@@ -1828,16 +1823,18 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
- 	 * If the Host Controller supports the HS200 mode then the
- 	 * tuning function has to be executed.
- 	 */
--	if (host->timing == MMC_TIMING_UHS_SDR50 &&
--	    (host->flags & SDHCI_SDR50_NEEDS_TUNING ||
--	     host->flags & SDHCI_SDR104_NEEDS_TUNING))
--		requires_tuning_nonuhs = true;
--
--	if (host->timing == MMC_TIMING_MMC_HS200 ||
--	    host->timing == MMC_TIMING_UHS_SDR104 ||
--	    requires_tuning_nonuhs)
--		ctrl |= SDHCI_CTRL_EXEC_TUNING;
--	else {
-+	switch (host->timing) {
-+	case MMC_TIMING_MMC_HS200:
-+	case MMC_TIMING_UHS_SDR104:
-+		break;
++#ifdef CONFIG_PM
 +
-+	case MMC_TIMING_UHS_SDR50:
-+		if (host->flags & SDHCI_SDR50_NEEDS_TUNING ||
-+		    host->flags & SDHCI_SDR104_NEEDS_TUNING)
-+			break;
-+		/* FALLTHROUGH */
++static u32 esdhc_proctl;
++static int esdhc_of_suspend(struct device *dev)
++{
++	struct sdhci_host *host = dev_get_drvdata(dev);
 +
-+	default:
- 		spin_unlock_irqrestore(&host->lock, flags);
- 		sdhci_runtime_pm_put(host);
- 		return 0;
-@@ -1850,6 +1847,8 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
- 		return err;
- 	}
- 
-+	ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
-+	ctrl |= SDHCI_CTRL_EXEC_TUNING;
- 	sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
- 
++	esdhc_proctl = sdhci_be32bs_readl(host, SDHCI_HOST_CONTROL);
++
++	return sdhci_suspend_host(host);
++}
++
++static void esdhc_of_resume(device *dev)
++{
++	struct sdhci_host *host = dev_get_drvdata(dev);
++	int ret = sdhci_resume_host(host);
++
++	if (ret == 0) {
++		/* Isn't this already done by sdhci_resume_host() ? --rmk */
++		esdhc_of_enable_dma(host);
++		sdhci_be32bs_writel(host, esdhc_proctl, SDHCI_HOST_CONTROL);
++	}
++
++	return ret;
++}
++
++static const struct dev_pm_ops esdhc_pmops = {
++	.suspend	= esdhci_of_suspend,
++	.resume		= esdhci_of_resume,
++};
++#define ESDHC_PMOPS (&esdhc_pmops)
++#else
++#define ESDHC_PMOPS NULL
++#endif
++
+ static const struct sdhci_pltfm_data sdhci_esdhc_pdata = {
  	/*
+ 	 * card detection could be handled via GPIO
+@@ -373,7 +390,7 @@ static struct platform_driver sdhci_esdhc_driver = {
+ 		.name = "sdhci-esdhc",
+ 		.owner = THIS_MODULE,
+ 		.of_match_table = sdhci_esdhc_of_match,
+-		.pm = SDHCI_PLTFM_PMOPS,
++		.pm = ESDHC_PMOPS,
+ 	},
+ 	.probe = sdhci_esdhc_probe,
+ 	.remove = sdhci_esdhc_remove,
 -- 
 1.8.3.1
