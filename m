@@ -1,67 +1,88 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 23 Apr 2014 16:31:19 +0800
-Subject: [PATCH 1/2] ARM: imx6q: clk: Parent DI clocks to video PLL via
- di_pre_sel
-In-Reply-To: <53577203.6070700@de.bosch.com>
-References: <1397485240-29163-1-git-send-email-p.zabel@pengutronix.de>
- <53577203.6070700@de.bosch.com>
-Message-ID: <20140423083116.GF2523@dragon>
+From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
+Date: Wed, 23 Apr 2014 10:33:26 +0200
+Subject: [PATCH 1/6] ata: ahci: add AHCI support for Berlin SoCs
+In-Reply-To: <CAL_JsqKE_Z3kBhS1VaQADV5ob8x6AKHhbHaQEGoVSwkwdd50zA@mail.gmail.com>
+References: <1398181105-19714-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1398181105-19714-2-git-send-email-antoine.tenart@free-electrons.com>
+ <CAL_JsqKE_Z3kBhS1VaQADV5ob8x6AKHhbHaQEGoVSwkwdd50zA@mail.gmail.com>
+Message-ID: <20140423083326.GD24355@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 23, 2014 at 09:55:47AM +0200, Dirk Behme wrote:
-> On 14.04.2014 16:20, Philipp Zabel wrote:
-> >From: Sascha Hauer <s.hauer@pengutronix.de>
-> >
-> >Route the video PLL to the display interface clocks via the di_pre_sel
-> >and di_sel muxes by default.
-> >
-> >Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> >Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> >---
-> >  arch/arm/mach-imx/clk-imx6q.c | 9 +++++++++
-> >  1 file changed, 9 insertions(+)
-> >
-> >diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-> >index a3a69ab..ba17299 100644
-> >--- a/arch/arm/mach-imx/clk-imx6q.c
-> >+++ b/arch/arm/mach-imx/clk-imx6q.c
-> >@@ -445,6 +445,15 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
-> >  		clk_set_parent(clk[ldb_di1_sel], clk[pll5_video_div]);
-> >  	}
-> >
-> >+	clk_set_parent(clk[ipu1_di0_pre_sel], clk[pll5_video_div]);
-> >+	clk_set_parent(clk[ipu1_di1_pre_sel], clk[pll5_video_div]);
-> >+	clk_set_parent(clk[ipu2_di0_pre_sel], clk[pll5_video_div]);
-> >+	clk_set_parent(clk[ipu2_di1_pre_sel], clk[pll5_video_div]);
-> >+	clk_set_parent(clk[ipu1_di0_sel], clk[ipu1_di0_pre]);
-> >+	clk_set_parent(clk[ipu1_di1_sel], clk[ipu1_di1_pre]);
-> >+	clk_set_parent(clk[ipu2_di0_sel], clk[ipu2_di0_pre]);
-> >+	clk_set_parent(clk[ipu2_di1_sel], clk[ipu2_di1_pre]);
-> >+
-> >  	/*
-> >  	 * The gpmi needs 100MHz frequency in the EDO/Sync mode,
-> >  	 * We can not get the 100MHz from the pll2_pfd0_352m.
+Rob,
+
+On Tue, Apr 22, 2014 at 01:47:43PM -0500, Rob Herring wrote:
+> On Tue, Apr 22, 2014 at 10:38 AM, Antoine T?nart
+> <antoine.tenart@free-electrons.com> wrote:
+
+[?]
+
+> > +static inline void ahci_berlin_reg_clear_set(void __iomem *reg, u32 clear_val,
+> > +                                            u32 set_val)
+> > +{
+> > +       u32 regval;
+> > +
+> > +       regval = readl(reg);
+> > +       regval &= ~(clear_val);
+> > +       regval |= set_val;
+> > +       writel(regval, reg);
+> > +}
+> > +
+> > +static void ahci_berlin_init(void __iomem *mmio)
 > 
-> I'm no expert on this, so just a question from an internal review:
+> I don't really see the point of a function to do 2 register writes of
+> magic values especially when the function name doesn't provide any
+> indication of what you are doing really.
 > 
-> With this, having both ldb_di0_sel and ipu1_di0_sel driven by
-> pll5_video, what will happen if both lvds and hdmi are trying to set
-> the rate of pll5_video_div?
+> > +{
+> > +       /* interface select */
+> > +       ahci_berlin_reg_set(mmio + HOST_VSA_ADDR, BIT(2));
+> > +       ahci_berlin_reg_set(mmio + HOST_VSA_ADDR,
+> 
+> 2 writes to the same reg? Is this supposed to be the VSA_DATA register?
 
-It's indeed a good question.
+You're right it's VSA_DATA.
 
-Very likely, one or the other will be broken, depending which one calls
-clk_set_rate() first.  The one calling clk_set_rate() later will work
-fine.
+> 
+> > +                           BIT(21) | BIT(18) | BIT(5) | BIT(4) | BIT(2));
+> 
+> Use of BIT is only helpful to people that don't understand hex. Can
+> you define what these bits are. Otherwise, just use 0x00240034 and
+> note that it is magic value which you have no idea what the bits are.
 
-It's a result of that there is no negotiation between rate change
-requests from different clients on the same clock.  Such negotiation
-can be done with clk rate change notifier.  It will make these client
-driver quite complex on clk set rate operation though.  Also, if none
-of the possible rate of the source clock can meet the different
-requests from these clients at the same time, we're stuck anyway.
+This is magic. I'll update and add a comment.
 
-That said, for now we have limitation to support both lvds and hdmi.
+> > +static void ahci_berlin_port_init(void __iomem *mmio, unsigned int ports)
+> > +{
+> > +       int p;
+> > +
+> > +       /* power down pll */
+> > +       ahci_berlin_reg_set(mmio + HOST_VSA_ADDR, 0x0);
+> > +       ahci_berlin_reg_setbits(mmio + HOST_VSA_DATA, BIT(6));
+> > +
+> > +       for (p = 0; p < ports; p++) {
+> > +               /* port control register */
+> > +               void __iomem *ctrl_reg = mmio + 0x100 + (p * 0x80);
+> > +
+> > +               /* set PHY mode to SATA, ref freq to 25 MHz */
+> > +               ahci_berlin_reg_set(ctrl_reg + PORT_VSR_ADDR, 0x201);
+> > +               ahci_berlin_reg_clear_set(ctrl_reg + PORT_VSR_DATA,
+> > +                                         0xff, BIT(0));
+> 
+> So you have registers hidden behind an address and data register.
+> Perhaps a read and write function to provide that access rather than
+> all these set/clear bit functions.
 
-Shawn
+I'd like to do so if I could name 0x201, 0x225 ...
+I can also merge the two functions if you think it's better for
+readability.
+
+Thanks!
+
+Antoine
+
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
