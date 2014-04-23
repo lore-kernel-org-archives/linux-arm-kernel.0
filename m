@@ -1,99 +1,42 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 23 Apr 2014 17:02:56 +0100
-Subject: [Patch v2 4/4] mcpm: exynos: populate suspend and powered_up
- callbacks
-In-Reply-To: <1398245154-18771-5-git-send-email-chander.kashyap@linaro.org>
-References: <1398080958-21677-5-git-send-email-chander.kashyap@linaro.org>
- <1398245154-18771-1-git-send-email-chander.kashyap@linaro.org>
- <1398245154-18771-5-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <20140423160256.GA1243@e102568-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 23 Apr 2014 18:02:51 +0200
+Subject: [PATCH 5/5] ARM: sunxi: Remove sun4i and sun7i machine definitions
+In-Reply-To: <1398265476-29373-6-git-send-email-maxime.ripard@free-electrons.com>
+References: <1398265476-29373-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1398265476-29373-6-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1401022774.yKcHJAmPtb@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[added Nico in CC]
-
-On Wed, Apr 23, 2014 at 10:25:54AM +0100, Chander Kashyap wrote:
-> In order to support cpuidle through mcpm, suspend and powered-up
-> callbacks are required in mcpm platform code.
-> Hence populate the same callbacks.
-> 
-> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
-> Signed-off-by: Chander Kashyap <k.chander@samsung.com>
-> ---
-> changes in v2:
-> 	1. Fixed typo: enynos_pmu_cpunr to exynos_pmu_cpunr
-> 
->  arch/arm/mach-exynos/mcpm-exynos.c |   53 ++++++++++++++++++++++++++++++++++++
->  1 file changed, 53 insertions(+)
-> 
-> diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
-> index 6c74c82..d53f597 100644
-> --- a/arch/arm/mach-exynos/mcpm-exynos.c
-> +++ b/arch/arm/mach-exynos/mcpm-exynos.c
-> @@ -272,10 +272,63 @@ static int exynos_power_down_finish(unsigned int cpu, unsigned int cluster)
->  	return 0; /* success: the CPU is halted */
->  }
+On Wednesday 23 April 2014 17:04:36 Maxime Ripard wrote:
 >  
-> +static void enable_coherency(void)
-> +{
-> +	unsigned long v, u;
-> +
-> +	asm volatile(
-> +		"mrc	p15, 0, %0, c1, c0, 1\n"
-> +		"orr	%0, %0, %2\n"
-> +		"ldr	%1, [%3]\n"
-> +		"and	%1, %1, #0\n"
-> +		"orr	%0, %0, %1\n"
-> +		"mcr	p15, 0, %0, c1, c0, 1\n"
-> +		: "=&r" (v), "=&r" (u)
-> +		: "Ir" (0x40), "Ir" (S5P_INFORM0)
-> +		: "cc");
-> +}
-> +
-> +void exynos_powered_up(void)
-> +{
-> +	unsigned int mpidr, cpu, cluster;
-> +
-> +	mpidr = read_cpuid_mpidr();
-> +	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-> +	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-> +
-> +	arch_spin_lock(&exynos_mcpm_lock);
-> +	if (cpu_use_count[cpu][cluster] == 0)
-> +		cpu_use_count[cpu][cluster] = 1;
-> +	arch_spin_unlock(&exynos_mcpm_lock);
-> +}
-> +
-> +static void exynos_suspend(u64 residency)
-> +{
-> +	unsigned int mpidr, cpunr;
-> +
-> +	mpidr = read_cpuid_mpidr();
-> +	cpunr = exynos_pmu_cpunr(mpidr);
-> +
-> +	__raw_writel(virt_to_phys(mcpm_entry_point), REG_ENTRY_ADDR);
-> +
-> +	exynos_power_down();
-> +
-> +	/*
-> +	 * Execution reaches here only if cpu did not power down.
-> +	 * Hence roll back the changes done in exynos_power_down function.
-> +	*/
-> +	__raw_writel(EXYNOS_CORE_LOCAL_PWR_EN,
-> +			EXYNOS_ARM_CORE_CONFIGURATION(cpunr));
-> +	set_cr(get_cr() | CR_C);
-> +	enable_coherency();
+> -static void __init sunxi_dt_init(void)
+> -{
+> -       of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> -}
+> -
+> -static const char * const sunxi_board_dt_compat[] = {
+> -       "allwinner,sun4i-a10",
+> -       "allwinner,sun5i-a10s",
+> -       "allwinner,sun5i-a13",
+> -       NULL,
+> -};
+> -
+> -DT_MACHINE_START(SUNXI_DT, "Allwinner A1X (Device Tree)")
+> -       .init_machine   = sunxi_dt_init,
+> -       .dt_compat      = sunxi_board_dt_compat,
+> -MACHINE_END
+> -
+>  static const char * const sun6i_board_dt_compat[] = {
+>         "allwinner,sun6i-a31",
+>         NULL,
 
-This is wrong:
+I'd like to hear more opinions on this. We could either rely
+on the generic code, or we could keep the entry with just
+the .dt_compat line and the name, so /proc/cpuinfo contains
+a meaningful platform name.
 
-1) MCPM would eventually reboot the CPU in question if the suspend call
-   returns (and restore SCTLR and ACTLR in cpu_resume), so there is 0 point
-   in doing that here.
-2) The core would have executed out of coherency for a "while" so the
-   tlbs could be stale and you do not invalidate them. But given (1), (2)
-   becomes just informational. The register write must be executed
-   though (I guess...). Now, on restoring the SMP bit in cpu_resume
-   (errata 799270) I need to verify this is safe and get back to you.
+Either approach works for me, but I think we should do this
+consistent across platforms. Olof, do you have an opinion?
 
-Cheers,
-Lorenzo
+	Arnd
