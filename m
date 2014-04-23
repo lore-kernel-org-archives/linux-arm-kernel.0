@@ -1,102 +1,94 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 23 Apr 2014 11:57:25 +0200
-Subject: [linux-sunxi] Re: [PATCH v8 07/17] ARM: dts: sun5i: Add mmc
- controller nodes
-In-Reply-To: <20140423094840.GL24905@lukather>
-References: <1398164497-14212-1-git-send-email-hdegoede@redhat.com>
- <1398164497-14212-8-git-send-email-hdegoede@redhat.com>
- <20140423094840.GL24905@lukather>
-Message-ID: <53578E85.9000906@redhat.com>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Wed, 23 Apr 2014 15:21:56 +0530
+Subject: [PATCH 3/3] usb: dwc3-exynos: Make provision for vdd regulators
+In-Reply-To: <00bf01cf5ed6$28de18d0$7a9a4a70$%tikhomirov@samsung.com>
+References: <1398082604-3013-1-git-send-email-gautam.vivek@samsung.com>
+ <1398082604-3013-3-git-send-email-gautam.vivek@samsung.com>
+ <00bf01cf5ed6$28de18d0$7a9a4a70$%tikhomirov@samsung.com>
+Message-ID: <CAFp+6iE2eWJPMmxSF9gbfwMmeO7k0bo=geo5SKmdgBRjiFq7mA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Anton,
 
-On 04/23/2014 11:48 AM, Maxime Ripard wrote:
-> On Tue, Apr 22, 2014 at 01:01:27PM +0200, Hans de Goede wrote:
->> From: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
+
+On Wed, Apr 23, 2014 at 2:56 PM, Anton Tikhomirov
+<av.tikhomirov@samsung.com> wrote:
+> Hello,
+>
+>> -----Original Message-----
+>> From: Vivek Gautam [mailto:gautamvivek1987 at gmail.com] On Behalf Of
+>> Vivek Gautam
+>> Sent: Monday, April 21, 2014 9:17 PM
+>> To: linux-usb at vger.kernel.org; linux-samsung-soc at vger.kernel.org
+>> Cc: linux-kernel at vger.kernel.org; linux-omap at vger.kernel.org; linux-
+>> arm-kernel at lists.infradead.org; gregkh at linuxfoundation.org;
+>> stern at rowland.harvard.edu; balbi at ti.com; kgene.kim at samsung.com; Vivek
+>> Gautam; Anton Tikhomirov
+>> Subject: [PATCH 3/3] usb: dwc3-exynos: Make provision for vdd
+>> regulators
 >>
->> Add nodes for the 3 mmc controllers found on A10s SoCs and for the 2 mmc
->> controllers found on A13 SoCs.
+>> Facilitate getting required 3.3V and 1.0V VDD supply for
+>> DWC3 controller on Exynos.
 >>
->> Signed-off-by: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> With patches for regulators' nodes merged in 3.15:
+>> c8c253f ARM: dts: Add regulator entries to smdk5420
+>> 275dcd2 ARM: dts: add max77686 pmic node for smdk5250,
+>>
+>> certain perripherals will now need to ensure that,
+>> they request VDD regulators in their drivers, and enable
+>> them so as to make them working.
+>>
+>> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+>> Cc: Anton Tikhomirov <av.tikhomirov@samsung.com>
 >> ---
->>  arch/arm/boot/dts/sun5i-a10s.dtsi | 27 +++++++++++++++++++++++++++
->>  arch/arm/boot/dts/sun5i-a13.dtsi  | 18 ++++++++++++++++++
->>  2 files changed, 45 insertions(+)
 >>
->> diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
->> index 79989ed..12113f9 100644
->> --- a/arch/arm/boot/dts/sun5i-a10s.dtsi
->> +++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
->> @@ -338,6 +338,33 @@
->>  			#size-cells = <0>;
->>  		};
->>  
->> +		mmc0: mmc at 01c0f000 {
->> +			compatible = "allwinner,sun5i-a13-mmc";
->> +			reg = <0x01c0f000 0x1000>;
->> +			clocks = <&ahb_gates 8>, <&mmc0_clk>;
->> +			clock-names = "ahb", "mod";
->> +			interrupts = <32>;
->> +			status = "disabled";
->> +		};
->> +
->> +		mmc1: mmc at 01c10000 {
->> +			compatible = "allwinner,sun5i-a13-mmc";
->> +			reg = <0x01c10000 0x1000>;
->> +			clocks = <&ahb_gates 9>, <&mmc1_clk>;
->> +			clock-names = "ahb", "mod";
->> +			interrupts = <33>;
->> +			status = "disabled";
->> +		};
->> +
->> +		mmc2: mmc at 01c11000 {
->> +			compatible = "allwinner,sun5i-a13-mmc";
->> +			reg = <0x01c11000 0x1000>;
->> +			clocks = <&ahb_gates 10>, <&mmc2_clk>;
->> +			clock-names = "ahb", "mod";
->> +			interrupts = <34>;
->> +			status = "disabled";
->> +		};
->> +
->>  		usbphy: phy at 01c13400 {
->>  			#phy-cells = <1>;
->>  			compatible = "allwinner,sun5i-a13-usb-phy";
->> diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
->> index f01c315..a0e55e8 100644
->> --- a/arch/arm/boot/dts/sun5i-a13.dtsi
->> +++ b/arch/arm/boot/dts/sun5i-a13.dtsi
->> @@ -320,6 +320,24 @@
->>  			#size-cells = <0>;
->>  		};
->>  
->> +		mmc0: mmc at 01c0f000 {
->> +			compatible = "allwinner,sun5i-a13-mmc";
->> +			reg = <0x01c0f000 0x1000>;
->> +			clocks = <&ahb_gates 8>, <&mmc0_clk>;
->> +			clock-names = "ahb", "mod";
->> +			interrupts = <32>;
->> +			status = "disabled";
->> +		};
->> +
->> +		mmc2: mmc at 01c11000 {
->> +			compatible = "allwinner,sun5i-a13-mmc";
->> +			reg = <0x01c11000 0x1000>;
->> +			clocks = <&ahb_gates 10>, <&mmc2_clk>;
->> +			clock-names = "ahb", "mod";
->> +			interrupts = <34>;
->> +			status = "disabled";
->> +		};
->> +
-> 
-> The A13 user manual reports that there is 3 of them in the A13, just
-> like on the A10s. Have you forgotten one?
+>> Based on 'usb-next' branch of Greg's USB tree.
+>> Also cleanly applies on 'next' branch of Balbi's USB tree.
+>>
+>>  drivers/usb/dwc3/dwc3-exynos.c |   51
+>> ++++++++++++++++++++++++++++++++++++++--
+>>  1 file changed, 49 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/usb/dwc3/dwc3-exynos.c b/drivers/usb/dwc3/dwc3-
+>> exynos.c
+>> index 28c8ad7..c9d9102 100644
+>> --- a/drivers/usb/dwc3/dwc3-exynos.c
+>> +++ b/drivers/usb/dwc3/dwc3-exynos.c
+>> @@ -27,6 +27,7 @@
+>>  #include <linux/usb/usb_phy_gen_xceiv.h>
+>>  #include <linux/of.h>
+>>  #include <linux/of_platform.h>
+>> +#include <linux/regulator/consumer.h>
+>>
+>>  struct dwc3_exynos {
+>>       struct platform_device  *usb2_phy;
+>> @@ -34,6 +35,8 @@ struct dwc3_exynos {
+>>       struct device           *dev;
+>>
+>>       struct clk              *clk;
+>> +     struct regulator        *vdd33;
+>> +     struct regulator        *vdd10;
+>>  };
+>>
+>>  static int dwc3_exynos_register_phys(struct dwc3_exynos *exynos)
+>> @@ -144,20 +147,46 @@ static int dwc3_exynos_probe(struct
+>> platform_device *pdev)
+>>
+>>       clk_prepare_enable(exynos->clk);
+>>
+>> +     exynos->vdd33 = devm_regulator_get(dev, "vdd33");
+>> +     if (IS_ERR(exynos->vdd33)) {
+>> +             ret = PTR_ERR(exynos->vdd33);
+>> +             goto err2;
+>
+> Is regulator property mandatory for dwc3-exynos? If it is not
+> and device tree doesn't provide it, dwc3-exynos driver probe shouldn't
+> fail here.
 
-mmc1 is likely there, but it is not usable as it is not routed to the outside,
-so I've left it out deliberately.
+These are the VDD regulators (from PMIC ldo supplies), in absence of
+which the controller will not be powered up.
+So doesn't it make sense to stop the probe when these are not supplied
+by device tree ?
 
-Regards,
-
-Hans
+[snip]
