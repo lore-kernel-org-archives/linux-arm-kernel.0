@@ -1,49 +1,91 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 23 Apr 2014 14:48:44 +0200
-Subject: [PATCH v2 17/38] ARM: orion5x: use node labels for UART and
- SATA on edmini_v2
-In-Reply-To: <20140423124626.GB1797@arch.cereza>
-References: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1398202002-28530-18-git-send-email-thomas.petazzoni@free-electrons.com>
- <5357A2BA.1050900@gmail.com> <20140423142334.286c57c0@skate>
- <20140423124626.GB1797@arch.cereza>
-Message-ID: <20140423144844.240eba8e@skate>
+From: linyongting@gmail.com (Lin Yongting)
+Date: Wed, 23 Apr 2014 20:52:21 +0800
+Subject: [PATCH] ftrace/arm: add save_stack_trace_regs() implementation
+Message-ID: <1398257541-18201-1-git-send-email-linyongting@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Ezequiel Garcia,
+When configure kprobe events of ftrace with "stacktrace" option enabled
+in arm, there is no stacktrace was recorded after the kprobe event was
+triggered. The root cause is no save_stack_trace_regs() function implemented.
 
-On Wed, 23 Apr 2014 09:46:26 -0300, Ezequiel Garcia wrote:
+Implement the save_stack_trace_regs() function in arm, then ftrace will
+call this architecture-related function to record the stacktrace into
+ring buffer.
 
-> > I continue to have mixed feelings about the usage of node labels. To
-> > me, it breaks the "tree" nature of the Device Tree, by turning it into
-> > just a bunch of &bleh { ... } long list of statements. But this is
-> > purely subjective (just like your opinion, I believe), and I wanted to
-> > move forward with this, so I just did what was necessary :-)
-> > 
-> 
-> Let me try to convince you a little :) Regressions like this would never
-> appear with proper usage of phandles:
-> 
-> http://www.spinics.net/lists/arm-kernel/msg322999.html
-> 
-> This may be a matter of taste, but when I'm on the devicetree "user" side,
-> I really don't care if the USB0 is part of some super complex tree, but just
-> want to enable it in my board. Writing:
-> 
-> &usb0 {
-> 	status = "okay";
-> };
-> 
-> seems to be just fine.
+After this fix, stacktrace can be recorded, for example:
 
-Yes, yes, for sure I do understand this argument. Quite certainly, if I
-decided to make the change to use phandles all over the place, it's
-probably because I thought that there were some valid arguments
-being given ;-)
+# mount -t debugfs nodev /sys/kernel/debug
+# echo "p:netrx net_rx_action" >> /sys/kernel/debug/tracing/kprobe_events
+# echo 1 > /sys/kernel/debug/tracing/events/kprobes/netrx/enable
+# echo 1 > /sys/kernel/debug/tracing/options/stacktrace
+# echo 1 > /sys/kernel/debug/tracing/tracing_on
+# ping 127.0.0.1 -c 1
+# echo 0 > /sys/kernel/debug/tracing/tracing_on
 
-Thomas
+# cat /sys/kernel/debug/tracing/trace
+# tracer: nop
+#
+# entries-in-buffer/entries-written: 12/12   #P:1
+#
+#                              _-----=> irqs-off
+#                             / _----=> need-resched
+#                            | / _---=> hardirq/softirq
+#                            || / _--=> preempt-depth
+#                            ||| /     delay
+#           TASK-PID   CPU#  ||||    TIMESTAMP  FUNCTION
+#              | |       |   ||||       |         |
+            <------ missing some entries ---------------->
+            ping-1200  [000] dNs1   667.603250: netrx: (net_rx_action+0x0/0x1f8)
+            ping-1200  [000] dNs1   667.604738: <stack trace>
+ => net_rx_action
+ => do_softirq
+ => local_bh_enable
+ => ip_finish_output
+ => ip_output
+ => ip_local_out
+ => ip_send_skb
+ => ip_push_pending_frames
+ => raw_sendmsg
+ => inet_sendmsg
+ => sock_sendmsg
+ => SyS_sendto
+ => ret_fast_syscall
+
+Signed-off-by: Lin Yongting <linyongting@gmail.com>
+---
+ arch/arm/kernel/stacktrace.c |   19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+
+diff --git a/arch/arm/kernel/stacktrace.c b/arch/arm/kernel/stacktrace.c
+index af4e8c8..c558db6 100644
+--- a/arch/arm/kernel/stacktrace.c
++++ b/arch/arm/kernel/stacktrace.c
+@@ -123,6 +123,25 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
+ 		trace->entries[trace->nr_entries++] = ULONG_MAX;
+ }
+ 
++void save_stack_trace_regs(struct pt_regs *regs, struct stack_trace *trace)
++{
++	struct stack_trace_data data;
++	struct stackframe frame;
++
++	data.trace = trace;
++	data.skip = trace->skip;
++	data.no_sched_functions = 0;
++
++	frame.fp = regs->ARM_fp;
++	frame.sp = regs->ARM_sp;
++	frame.lr = regs->ARM_lr;
++	frame.pc = regs->ARM_pc;
++
++	walk_stackframe(&frame, save_trace, &data);
++	if (trace->nr_entries < trace->max_entries)
++		trace->entries[trace->nr_entries++] = ULONG_MAX;
++}
++
+ void save_stack_trace(struct stack_trace *trace)
+ {
+ 	save_stack_trace_tsk(current, trace);
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.7.9.5
