@@ -1,210 +1,141 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Wed, 23 Apr 2014 16:46:38 +0200
-Subject: [PATCH v4 5/5] sched: ARM: create a dedicated scheduler topology
- table
-In-Reply-To: <5357A802.1030804@arm.com>
-References: <1397209481-28542-1-git-send-email-vincent.guittot@linaro.org>
- <1397209481-28542-6-git-send-email-vincent.guittot@linaro.org>
- <5357A802.1030804@arm.com>
-Message-ID: <CAKfTPtDnw-OZZekdE3oNGS11m6dfpS4veMNZ_Bezs-Lm7zn6QQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 23 Apr 2014 07:48:22 -0700
+Subject: [PATCH RFC] ARM: dts: am335x: update USB DT references
+In-Reply-To: <5356794C.7070707@baylibre.com>
+References: <1397647595-10927-1-git-send-email-leigh@solinno.co.uk>
+ <5356794C.7070707@baylibre.com>
+Message-ID: <20140423144822.GA4833@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 April 2014 13:46, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
-> Hi,
->
-> I'm trying to use this approach of specifying different per-cpu views on
-> sd flags on DIE level on a TC2 platform (cluster 0 w/ CPU0/1 and cluster
-> 1 w/ CPU2/3/4 w/o SMT). It doesn't work like in the case for the GMC/MC
-> sd level.
->
-> If I use the following patch (just to illustrate the issue) on top
-> (returning SD_SHARE_POWERDOMAIN in cpu_cpupower_flags() is bogus ... I
-> just needed a flag function for GDIE level):
->
-> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-> index 71e1fec6d31a..803330d89c09 100644
-> --- a/arch/arm/kernel/topology.c
-> +++ b/arch/arm/kernel/topology.c
-> @@ -194,6 +194,14 @@ const struct cpumask *cpu_corepower_mask(int cpu)
->         return &cpu_topology[cpu].thread_sibling;
->  }
->
-> +const struct cpumask *cpu_cpupower_mask(int cpu)
-> +{
-> +       return cpu_topology[cpu].socket_id ?
-> +                       cpumask_of_node(cpu_to_node(cpu)) :
-> +                       &cpu_topology[cpu].core_sibling;
-> +}
-> +
-> +
->  static void update_siblings_masks(unsigned int cpuid)
->  {
->         struct cputopo_arm *cpu_topo, *cpuid_topo = &cpu_topology[cpuid];
-> @@ -280,11 +288,18 @@ static inline const int cpu_corepower_flags(void)
->         return SD_SHARE_PKG_RESOURCES  | SD_SHARE_POWERDOMAIN;
->  }
->
-> +static inline const int cpu_cpupower_flags(void)
-> +{
-> +       return SD_SHARE_POWERDOMAIN;
-> +}
-> +
-> +
->  static struct sched_domain_topology_level arm_topology[] = {
->  #ifdef CONFIG_SCHED_MC
->         { cpu_corepower_mask, cpu_corepower_flags, SD_INIT_NAME(GMC) },
->         { cpu_coregroup_mask, cpu_core_flags, SD_INIT_NAME(MC) },
->  #endif
-> +       { cpu_cpupower_mask, cpu_cpupower_flags, SD_INIT_NAME(GDIE) },
->         { cpu_cpu_mask, SD_INIT_NAME(DIE) },
->         { NULL, },
->  };
->
-> so I get the following topology:
->
-> CPU0: cpu_corepower_mask=0   (GMC)
-> CPU0: cpu_coregroup_mask=0-1 (MC)
-> CPU0:  cpu_cpupower_mask=0-1 (GDIE)
-> CPU0:       cpu_cpu_mask=0-4 (DIE)
-> CPU1: cpu_corepower_mask=1    ...
-> CPU1: cpu_coregroup_mask=0-1
-> CPU1:  cpu_cpupower_mask=0-1
-> CPU1:       cpu_cpu_mask=0-4
-> CPU2: cpu_corepower_mask=2
-> CPU2: cpu_coregroup_mask=2-4
-> CPU2:  cpu_cpupower_mask=0-4
-> CPU2:       cpu_cpu_mask=0-4
-> CPU3: cpu_corepower_mask=3
-> CPU3: cpu_coregroup_mask=2-4
-> CPU3:  cpu_cpupower_mask=0-4
-> CPU3:       cpu_cpu_mask=0-4
-> CPU4: cpu_corepower_mask=4
-> CPU4: cpu_coregroup_mask=2-4
-> CPU4:  cpu_cpupower_mask=0-4
-> CPU4:       cpu_cpu_mask=0-4
+* Benoit Cousson <bcousson@baylibre.com> [140422 07:14]:
+> Hi Leigh,
+> 
+> On 16/04/2014 13:26, Leigh Brown wrote:
+> >In "ARM: dts: am33xx: correcting dt node unit address for usb", the
+> >usb_ctrl_mod and cppi41dma nodes were updated with the correct register
+> >addresses.  However, the dts files that reference these nodes were not
+> >updated, and those devices are no longer being enabled.
+> >
+> >This patch corrects the references for the affected dts files.
+> 
+> Thanks for the fix. BTW, why is it a RFC? Do you plan to send an updated
+> version?
+> 
+> FYI, even with this fix, the BBB still does not have a working MUSB on
+> 3.15-rc2. Have you observed that as well?
+> 
+> >Signed-off-by: Leigh Brown <leigh@solinno.co.uk>
+> 
+> If this is a final version, I'll apply it for -rc3.
 
-You  have an inconsistency in your topology description:
+Looks like I already have this in omap-for-v3.15/fixes-v2, sorry
+looks like I never replied to this one.
 
-At GDIE level:
-CPU1 cpu_cpupower_mask=0-1
-but
-CPU2 cpu_cpupower_mask=0-4
+Regards,
 
-so CPU2 says that it shares power domain with CPU0 but CPU1 says the opposite
-
-Regards
-Vincent
-
->
-> Firstly, I had to get rid of the cpumask_equal(cpu_map,
-> sched_domain_span(sd)) condition in build_sched_domains() to allow that
-> I can have two sd levels which span CPU 0-4 (for CPU2/3/4).
->
-> But it still doesn't work correctly:
->
-> dmesg snippet 2:
->
-> CPU0 attaching sched-domain:
->  domain 0: span 0-1 level MC
->   groups: 0 1
->   domain 1: span 0-4 level DIE     <-- error (there's only one group)
->    groups: 0-4 (cpu_power = 2048)
-> ...
-> CPU2 attaching sched-domain:
->  domain 0: span 2-4 level MC
->   groups: 2 3 4
->   domain 1: span 0-4 level GDIE
-> ERROR: domain->groups does not contain CPU2
->    groups:
-> ERROR: domain->cpu_power not set
->
-> ERROR: groups don't span domain->span
-> ...
->
-> It turns out that the function get_group() which is used a couple of
-> times in build_sched_groups() uses a reference to sd->child and even
-> though the degenerate functionality gets rid of GDIE for CPU0/1 and DIE
-> for CPU2/3/4 the group set-up doesn't work as expected since sd->child
-> for DIE is GDIE and not MC any more.
-> So it looks like GMC/MC level is somehow special (GMC has no sd->child
-> for TC2 or GMC/MC contains only one cpu per group?).
->
-> Although this problem does not effect the current patch-set, people
-> might think that they can apply this degenerate trick for other sd
-> levels as well.
->
-> I'm trying to fix get_group()/build_sched_groups() in such a way that my
-> example would work but so far I haven't succeeded. The question for me
-> remains ... is this application of the degenerate trick feasible at all
-> in all sd levels, i.e. does it scale? What about platforms w/ SMT sd
-> level which want to use this trick in GMC/MC level?
->
-> Any hints are highly appreciated here.
->
-> -- Dietmar
->
-> On 11/04/14 10:44, Vincent Guittot wrote:
->> Create a dedicated topology table for ARM which will create new level to
->> differentiate CPUs that can or not powergate independantly from others.
->>
->> The patch gives an example of how to add domain that will take advantage of
->> SD_SHARE_POWERDOMAIN.
->>
->> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
->> ---
->>  arch/arm/kernel/topology.c | 26 ++++++++++++++++++++++++++
->>  1 file changed, 26 insertions(+)
->>
->> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
->> index 0bc94b1..71e1fec 100644
->> --- a/arch/arm/kernel/topology.c
->> +++ b/arch/arm/kernel/topology.c
->> @@ -185,6 +185,15 @@ const struct cpumask *cpu_coregroup_mask(int cpu)
->>       return &cpu_topology[cpu].core_sibling;
->>  }
->>
->> +/*
->> + * The current assumption is that we can power gate each core independently.
->> + * This will be superseded by DT binding once available.
->> + */
->> +const struct cpumask *cpu_corepower_mask(int cpu)
->> +{
->> +     return &cpu_topology[cpu].thread_sibling;
->> +}
->> +
->>  static void update_siblings_masks(unsigned int cpuid)
->>  {
->>       struct cputopo_arm *cpu_topo, *cpuid_topo = &cpu_topology[cpuid];
->> @@ -266,6 +275,20 @@ void store_cpu_topology(unsigned int cpuid)
->>               cpu_topology[cpuid].socket_id, mpidr);
->>  }
->>
->> +static inline const int cpu_corepower_flags(void)
->> +{
->> +     return SD_SHARE_PKG_RESOURCES  | SD_SHARE_POWERDOMAIN;
->> +}
->> +
->> +static struct sched_domain_topology_level arm_topology[] = {
->> +#ifdef CONFIG_SCHED_MC
->> +     { cpu_corepower_mask, cpu_corepower_flags, SD_INIT_NAME(GMC) },
->> +     { cpu_coregroup_mask, cpu_core_flags, SD_INIT_NAME(MC) },
->> +#endif
->> +     { cpu_cpu_mask, SD_INIT_NAME(DIE) },
->> +     { NULL, },
->> +};
->> +
->>  /*
->>   * init_cpu_topology is called at boot when only one cpu is running
->>   * which prevent simultaneous write access to cpu_topology array
->> @@ -289,4 +312,7 @@ void __init init_cpu_topology(void)
->>       smp_wmb();
->>
->>       parse_dt_topology();
->> +
->> +     /* Set scheduler topology descriptor */
->> +     set_sched_topology(arm_topology);
->>  }
->>
->
->
+Tony 
+ 
+> >---
+> >  arch/arm/boot/dts/am335x-bone-common.dtsi | 4 ++--
+> >  arch/arm/boot/dts/am335x-evm.dts          | 4 ++--
+> >  arch/arm/boot/dts/am335x-evmsk.dts        | 4 ++--
+> >  arch/arm/boot/dts/am335x-igep0033.dtsi    | 4 ++--
+> >  4 files changed, 8 insertions(+), 8 deletions(-)
+> >
+> >diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
+> >index e3f27ec..2e7d932 100644
+> >--- a/arch/arm/boot/dts/am335x-bone-common.dtsi
+> >+++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
+> >@@ -183,7 +183,7 @@
+> >  &usb {
+> >  	status = "okay";
+> >
+> >-	control at 44e10000 {
+> >+	control at 44e10620 {
+> >  		status = "okay";
+> >  	};
+> >
+> >@@ -204,7 +204,7 @@
+> >  		dr_mode = "host";
+> >  	};
+> >
+> >-	dma-controller at 07402000  {
+> >+	dma-controller at 47402000  {
+> >  		status = "okay";
+> >  	};
+> >  };
+> >diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
+> >index 28ae040..77df10d 100644
+> >--- a/arch/arm/boot/dts/am335x-evm.dts
+> >+++ b/arch/arm/boot/dts/am335x-evm.dts
+> >@@ -331,7 +331,7 @@
+> >  &usb {
+> >  	status = "okay";
+> >
+> >-	control at 44e10000 {
+> >+	control at 44e10620 {
+> >  		status = "okay";
+> >  	};
+> >
+> >@@ -352,7 +352,7 @@
+> >  		dr_mode = "host";
+> >  	};
+> >
+> >-	dma-controller at 07402000  {
+> >+	dma-controller at 47402000  {
+> >  		status = "okay";
+> >  	};
+> >  };
+> >diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
+> >index ec08f6f..ab23885 100644
+> >--- a/arch/arm/boot/dts/am335x-evmsk.dts
+> >+++ b/arch/arm/boot/dts/am335x-evmsk.dts
+> >@@ -364,7 +364,7 @@
+> >  &usb {
+> >  	status = "okay";
+> >
+> >-	control at 44e10000 {
+> >+	control at 44e10620 {
+> >  		status = "okay";
+> >  	};
+> >
+> >@@ -385,7 +385,7 @@
+> >  		dr_mode = "host";
+> >  	};
+> >
+> >-	dma-controller at 07402000  {
+> >+	dma-controller at 47402000  {
+> >  		status = "okay";
+> >  	};
+> >  };
+> >diff --git a/arch/arm/boot/dts/am335x-igep0033.dtsi b/arch/arm/boot/dts/am335x-igep0033.dtsi
+> >index 7063311..5942e7d 100644
+> >--- a/arch/arm/boot/dts/am335x-igep0033.dtsi
+> >+++ b/arch/arm/boot/dts/am335x-igep0033.dtsi
+> >@@ -202,7 +202,7 @@
+> >  &usb {
+> >  	status = "okay";
+> >
+> >-	control at 44e10000 {
+> >+	control at 44e10620 {
+> >  		status = "okay";
+> >  	};
+> >
+> >@@ -223,7 +223,7 @@
+> >  		dr_mode = "host";
+> >  	};
+> >
+> >-	dma-controller at 07402000  {
+> >+	dma-controller at 47402000  {
+> >  		status = "okay";
+> >  	};
+> >  };
+> >
+> 
+> 
+> -- 
+> Beno?t Cousson
+> BayLibre
+> Embedded Linux Technology Lab
+> www.baylibre.com
