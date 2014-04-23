@@ -1,30 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 23 Apr 2014 10:37:01 +0100
-Subject: [PATCH] ARM: Fix double definition of virt_to_pfn()
-In-Reply-To: <1398238547-23065-1-git-send-email-peter.ujfalusi@ti.com>
-References: <20140422195514.GA13106@arch.cereza>
- <1398238547-23065-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20140423093700.GF24070@n2100.arm.linux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 23 Apr 2014 11:44:26 +0200
+Subject: [PATCH v8 10/17] ARM: dts: sun6i: Add mmc clocks
+In-Reply-To: <1398164497-14212-11-git-send-email-hdegoede@redhat.com>
+References: <1398164497-14212-1-git-send-email-hdegoede@redhat.com>
+ <1398164497-14212-11-git-send-email-hdegoede@redhat.com>
+Message-ID: <20140423094426.GK24905@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 23, 2014 at 10:35:47AM +0300, Peter Ujfalusi wrote:
-> One definition of virt_to_pfn() was outside of the #if #elif #else section
-> causing constant redefinition of the macro.
+On Tue, Apr 22, 2014 at 01:01:30PM +0200, Hans de Goede wrote:
+> Add clk-nodes for the mmc clocks.
 > 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 > ---
-> Hi,
+>  arch/arm/boot/dts/sun6i-a31.dtsi | 32 ++++++++++++++++++++++++++++++++
+>  1 file changed, 32 insertions(+)
 > 
-> the redefinition actually coming from different source. It is caused by the
-> leftover definition of virt_to_pfn() which would redefine the virt_to_pfn()
-> all the time.
-> 
-> The redefinition still exist in next-20140423.
+> diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+> index d45efa7..12bcc17 100644
+> --- a/arch/arm/boot/dts/sun6i-a31.dtsi
+> +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+> @@ -198,6 +198,38 @@
+>  					"apb2_uart4", "apb2_uart5";
+>  		};
+>  
+> +		mmc0_clk: clk at 01c20088 {
+> +			#clock-cells = <0>;
+> +			compatible = "allwinner,sun4i-a10-mod0-clk";
 
-Please see the thread "Re: [PATCH v7 2/2] ARM hibernation / suspend-to-disk"
-this month.  The fixed up commit will be pushed out shortly.
+This is simply not true.
+
+module0 clocks don't have any kind of phase control, while we do here.
+
+You should introduce a new compatible.
+
+(and change the clock-names content accordingly)
+
+Maxime
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140423/b770600c/attachment.sig>
