@@ -1,38 +1,37 @@
 From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Wed, 23 Apr 2014 14:55:51 +0530
-Subject: [Patch v2 1/4] cpuidle: config: Add SOC_EXYNOS5420 entry to select
- cpuidle-big-little driver
+Date: Wed, 23 Apr 2014 14:55:52 +0530
+Subject: [Patch v2 2/4] driver: cpuidle: cpuidle-big-little: init driver for
+ Exynos5420
 In-Reply-To: <1398245154-18771-1-git-send-email-chander.kashyap@linaro.org>
 References: <1398080958-21677-5-git-send-email-chander.kashyap@linaro.org>
  <1398245154-18771-1-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <1398245154-18771-2-git-send-email-chander.kashyap@linaro.org>
+Message-ID: <1398245154-18771-3-git-send-email-chander.kashyap@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos5420 is a big-little SoC from Samsung. It has 4 A15 and 4 A7 cores.
-In order to use generic cpuidle-big-little driver, this patch adds Exynos5420
-specific check to initialize generic cpuidle driver.
+Add "samsung,exynos5420" compatible string to initialize generic
+big-little cpuidle driver for Exynos5420.
 
 Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
 Signed-off-by: Chander Kashyap <k.chander@samsung.com>
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
-Changes in v2:
-	1. Changed config macro from SOC_EXYNOS5420 to SOC_EXYNOS5420
- drivers/cpuidle/Kconfig.arm |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/cpuidle/cpuidle-big_little.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
-index 97ccc31..d9596e7 100644
---- a/drivers/cpuidle/Kconfig.arm
-+++ b/drivers/cpuidle/Kconfig.arm
-@@ -4,7 +4,7 @@
- 
- config ARM_BIG_LITTLE_CPUIDLE
- 	bool "Support for ARM big.LITTLE processors"
--	depends on ARCH_VEXPRESS_TC2_PM
-+	depends on ARCH_VEXPRESS_TC2_PM || ARCH_EXYNOS
- 	select ARM_CPU_SUSPEND
- 	select CPU_IDLE_MULTIPLE_DRIVERS
- 	help
+diff --git a/drivers/cpuidle/cpuidle-big_little.c b/drivers/cpuidle/cpuidle-big_little.c
+index b45fc62..d0fac53 100644
+--- a/drivers/cpuidle/cpuidle-big_little.c
++++ b/drivers/cpuidle/cpuidle-big_little.c
+@@ -170,7 +170,8 @@ static int __init bl_idle_init(void)
+ 	/*
+ 	 * Initialize the driver just for a compliant set of machines
+ 	 */
+-	if (!of_machine_is_compatible("arm,vexpress,v2p-ca15_a7"))
++	if (!of_machine_is_compatible("arm,vexpress,v2p-ca15_a7") &&
++		(!of_machine_is_compatible("samsung,exynos5420")))
+ 		return -ENODEV;
+ 	/*
+ 	 * For now the differentiation between little and big cores
 -- 
 1.7.9.5
