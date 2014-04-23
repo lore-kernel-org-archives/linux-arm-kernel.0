@@ -1,63 +1,65 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 23 Apr 2014 13:30:45 +0200
-Subject: [PATCH v2 34/38] ARM: orion5x: convert RD-88F5182 to Device Tree
-In-Reply-To: <1398202002-28530-35-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Wed, 23 Apr 2014 13:32:02 +0200
+Subject: [PATCH v2 35/38] ARM: orion5x: convert d2net to Device Tree
+In-Reply-To: <1398202002-28530-36-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1398202002-28530-35-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <5357A465.7090600@gmail.com>
+ <1398202002-28530-36-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <5357A4B2.9060301@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 04/22/2014 11:26 PM, Thomas Petazzoni wrote:
-> This commit converts the RD-88F5182 platform to the Device Tree. All
-> devices except the PCI are converted to the Device Tree.
+> This commit converts the LaCie d2 Network platform to the Device Tree.
 >
-> It is worth noting that:
+> All devices except LEDs are converted, because the LED code needs a
+> non-LED GPIO to be set to a given value for the LEDs to work, and this
+> cannot yet be easily represented in DT.
 >
->   * The PCI description for the DT case is kept in board-rd88f5182.c.
->
->   * The existing non-DT support in rd88f5182-setup.c is kept as is, in
->     order to allow testing of a given platform in both DT and non-DT
->     cases. It will ultimately be removed, once we no longer care about
->     non-DT support for Orion5x.
+> Also, references to the LaCie Big Disk Network platform are lost,
+> because this platform apparently has exactly the same hardware support
+> as the LaCie d2 Network, so their Device Tree files would be
+> identical.
 >
 > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Ronen Shitrit <rshitrit@marvell.com>
+> Cc: Simon Guinot <sguinot@lacie.com>
 
 Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 
 > ---
->   arch/arm/boot/dts/Makefile                  |   3 +-
->   arch/arm/boot/dts/orion5x-rd88f5182-nas.dts | 177 ++++++++++++++++++++++++++++
->   arch/arm/mach-orion5x/Kconfig               |   8 ++
->   arch/arm/mach-orion5x/Makefile              |   1 +
->   arch/arm/mach-orion5x/board-rd88f5182.c     | 116 ++++++++++++++++++
->   5 files changed, 304 insertions(+), 1 deletion(-)
->   create mode 100644 arch/arm/boot/dts/orion5x-rd88f5182-nas.dts
->   create mode 100644 arch/arm/mach-orion5x/board-rd88f5182.c
+>   arch/arm/boot/dts/Makefile                     |   3 +-
+>   arch/arm/boot/dts/orion5x-lacie-d2-network.dts | 236 ++++++++++++++++
+>   arch/arm/mach-orion5x/Kconfig                  |  13 +-
+>   arch/arm/mach-orion5x/Makefile                 |   3 +-
+>   arch/arm/mach-orion5x/board-d2net.c            | 109 ++++++++
+>   arch/arm/mach-orion5x/d2net-setup.c            | 365 -------------------------
+>   6 files changed, 351 insertions(+), 378 deletions(-)
+>   create mode 100644 arch/arm/boot/dts/orion5x-lacie-d2-network.dts
+>   create mode 100644 arch/arm/mach-orion5x/board-d2net.c
+>   delete mode 100644 arch/arm/mach-orion5x/d2net-setup.c
 >
 > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 35c146f..f7943a8 100644
+> index f7943a8..59397c2 100644
 > --- a/arch/arm/boot/dts/Makefile
 > +++ b/arch/arm/boot/dts/Makefile
 > @@ -289,7 +289,8 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
 >   	am43x-epos-evm.dtb \
 >   	am437x-gp-evm.dtb \
 >   	dra7-evm.dtb
-> -dtb-$(CONFIG_ARCH_ORION5X) += orion5x-lacie-ethernet-disk-mini-v2.dtb
-> +dtb-$(CONFIG_ARCH_ORION5X) += orion5x-lacie-ethernet-disk-mini-v2.dtb \
-> +	orion5x-rd88f5182-nas.dtb
+> -dtb-$(CONFIG_ARCH_ORION5X) += orion5x-lacie-ethernet-disk-mini-v2.dtb \
+> +dtb-$(CONFIG_ARCH_ORION5X) += orion5x-lacie-d2-network.dtb \
+> +	orion5x-lacie-ethernet-disk-mini-v2.dtb \
+>   	orion5x-rd88f5182-nas.dtb
 >   dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
 >   dtb-$(CONFIG_ARCH_QCOM) += qcom-msm8660-surf.dtb \
->   	qcom-msm8960-cdp.dtb \
-> diff --git a/arch/arm/boot/dts/orion5x-rd88f5182-nas.dts b/arch/arm/boot/dts/orion5x-rd88f5182-nas.dts
+> diff --git a/arch/arm/boot/dts/orion5x-lacie-d2-network.dts b/arch/arm/boot/dts/orion5x-lacie-d2-network.dts
 > new file mode 100644
-> index 0000000..6fb0525
+> index 0000000..c701e8d
 > --- /dev/null
-> +++ b/arch/arm/boot/dts/orion5x-rd88f5182-nas.dts
-> @@ -0,0 +1,177 @@
+> +++ b/arch/arm/boot/dts/orion5x-lacie-d2-network.dts
+> @@ -0,0 +1,236 @@
 > +/*
 > + * Copyright (C) 2014 Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> + * Copyright (C) 2009 Simon Guinot <sguinot@lacie.com>
 > + *
 > + * This file is licensed under the terms of the GNU General Public
 > + * License version 2. This program is licensed "as is" without any
@@ -67,11 +69,13 @@ Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 > +/dts-v1/;
 > +
 > +#include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/input/input.h>
+> +#include <dt-bindings/interrupt-controller/irq.h>
 > +#include "orion5x-mv88f5182.dtsi"
 > +
 > +/ {
-> +	model = "Marvell Reference Design 88F5182 NAS";
-> +	compatible = "marvell,rd-88f5182-nas", "marvell,orion5x-88f5182", "marvell,orion5x";
+> +	model = "LaCie d2 Network";
+> +	compatible = "lacie,d2-network", "marvell,orion5x-88f5182", "marvell,orion5x";
 > +
 > +	memory {
 > +		reg = <0x00000000 0x4000000>; /* 64 MB */
@@ -84,20 +88,66 @@ Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 > +
 > +	soc {
 > +		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000>,
-> +		         <MBUS_ID(0x09, 0x00) 0 0xf2200000 0x800>,
-> +			 <MBUS_ID(0x01, 0x0f) 0 0xf4000000 0x80000>,
-> +			 <MBUS_ID(0x01, 0x1d) 0 0xfc000000 0x1000000>;
+> +			 <MBUS_ID(0x09, 0x00) 0 0xf2200000 0x800>,
+> +			 <MBUS_ID(0x01, 0x0f) 0 0xfff80000 0x80000>;
 > +	};
 > +
-> +	gpio-leds {
-> +		compatible = "gpio-leds";
-> +		pinctrl-0 = <&pmx_debug_led>;
+> +	gpio-keys {
+> +		compatible = "gpio-keys";
+> +		pinctrl-0 = <&pmx_buttons>;
+> +		pinctrl-names = "default";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		front_button {
+> +			label = "Front Push Button";
+> +			linux,code = <KEY_POWER>;
+> +			gpios = <&gpio0 18 GPIO_ACTIVE_HIGH>;
+> +		};
+> +
+> +		power_rocker_sw_on {
+> +			label = "Power rocker switch (on|auto)";
+> +			linux,input-type = <5>; /* EV_SW */
+> +			linux,code = <1>; /* D2NET_SWITCH_POWER_ON */
+> +			gpios = <&gpio0 8 GPIO_ACTIVE_HIGH>;
+> +		};
+> +
+> +		power_rocker_sw_off {
+> +			label = "Power rocker switch (auto|off)";
+> +			linux,input-type = <5>; /* EV_SW */
+> +			linux,code = <2>; /* D2NET_SWITCH_POWER_OFF */
+> +			gpios = <&gpio0 9 GPIO_ACTIVE_HIGH>;
+> +		};
+> +	};
+> +
+> +	regulators {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		pinctrl-0 = <&pmx_sata0_power &pmx_sata1_power>;
 > +		pinctrl-names = "default";
 > +
-> +		led at 0 {
-> +			label = "rd88f5182:cpu";
-> +			linux,default-trigger = "heartbeat";
-> +			gpios = <&gpio0 0 GPIO_ACTIVE_HIGH>;
+> +		sata0_power: regulator at 0 {
+> +			compatible = "regulator-fixed";
+> +			reg = <0>;
+> +			regulator-name = "SATA0 Power";
+> +			regulator-min-microvolt = <5000000>;
+> +			regulator-max-microvolt = <5000000>;
+> +			enable-active-high;
+> +			regulator-always-on;
+> +			regulator-boot-on;
+> +			gpio = <&gpio0 3 GPIO_ACTIVE_HIGH>;
+> +		};
+> +
+> +		sata1_power: regulator at 1 {
+> +			compatible = "regulator-fixed";
+> +			reg = <1>;
+> +			regulator-name = "SATA1 Power";
+> +			regulator-min-microvolt = <5000000>;
+> +			regulator-max-microvolt = <5000000>;
+> +			enable-active-high;
+> +			regulator-always-on;
+> +			regulator-boot-on;
+> +			gpio = <&gpio0 12 GPIO_ACTIVE_HIGH>;
 > +		};
 > +	};
 > +};
@@ -105,52 +155,42 @@ Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 > +&devbus_bootcs {
 > +	status = "okay";
 > +
-> +	/* Read parameters */
-> +	devbus,bus-width    = <8>;
-> +	devbus,turn-off-ps  = <90000>;
-> +	devbus,badr-skew-ps = <0>;
-> +	devbus,acc-first-ps = <186000>;
-> +	devbus,acc-next-ps  = <186000>;
+> +	devbus,keep-config;
 > +
-> +	/* Write parameters */
-> +	devbus,wr-high-ps  = <90000>;
-> +	devbus,wr-low-ps   = <90000>;
-> +	devbus,ale-wr-ps   = <90000>;
-> +
+> +	/*
+> +	 * Currently the MTD code does not recognize the MX29LV400CBCT
+> +	 * as a bottom-type device. This could cause risks of
+> +	 * accidentally erasing critical flash sectors. We thus define
+> +	 * a single, write-protected partition covering the whole
+> +	 * flash.  TODO: once the flash part TOP/BOTTOM detection
+> +	 * issue is sorted out in the MTD code, break this into at
+> +	 * least three partitions: 'u-boot code', 'u-boot environment'
+> +	 * and 'whatever is left'.
+> +	 */
 > +	flash at 0 {
 > +		compatible = "cfi-flash";
 > +		reg = <0 0x80000>;
 > +		bank-width = <1>;
+> +                #address-cells = <1>;
+> +		#size-cells = <1>;
+> +
+> +		partition at 0 {
+> +			label = "Full512Kb";
+> +			reg = <0 0x80000>;
+> +			read-only;
+> +		};
 > +	};
 > +};
 > +
-> +&devbus_cs1 {
+> +&mdio {
 > +	status = "okay";
 > +
-> +	/* Read parameters */
-> +	devbus,bus-width    = <8>;
-> +	devbus,turn-off-ps  = <90000>;
-> +	devbus,badr-skew-ps = <0>;
-> +	devbus,acc-first-ps = <186000>;
-> +	devbus,acc-next-ps  = <186000>;
-> +
-> +	/* Write parameters */
-> +	devbus,wr-high-ps  = <90000>;
-> +	devbus,wr-low-ps   = <90000>;
-> +	devbus,ale-wr-ps   = <90000>;
-> +
-> +	flash at 0 {
-> +		compatible = "cfi-flash";
-> +		reg = <0 0x1000000>;
-> +		bank-width = <1>;
+> +	ethphy: ethernet-phy {
+> +		reg = <8>;
 > +	};
 > +};
 > +
 > +&ehci0 {
-> +	status = "okay";
-> +};
-> +
-> +&ehci1 {
 > +	status = "okay";
 > +};
 > +
@@ -167,64 +207,84 @@ Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 > +	clock-frequency = <100000>;
 > +	#address-cells = <1>;
 > +
-> +	rtc at 68 {
-> +		pinctrl-0 = <&pmx_rtc>;
-> +		pinctrl-names = "default";
-> +		compatible = "dallas,ds1338";
-> +		reg = <0x68>;
+> +	rtc at 32 {
+> +		compatible = "ricoh,rs5c372b";
+> +		reg = <0x32>;
 > +	};
-> +};
 > +
-> +&mdio {
-> +	status = "okay";
+> +	fan at 3e {
+> +		compatible = "gmt,g762";
+> +		reg = <0x3e>;
 > +
-> +	ethphy: ethernet-phy {
-> +		reg = <8>;
+> +		/* Not enough HW info */
+> +		status = "disabled";
+> +	};
+> +
+> +	eeprom at 50 {
+> +		compatible = "atmel,24c08";
+> +		reg = <0x50>;
 > +	};
 > +};
 > +
 > +&pinctrl {
-> +	pinctrl-0 = <&pmx_reset_switch &pmx_misc_gpios
-> +		&pmx_pci_gpios>;
+> +	pinctrl-0 = <&pmx_leds &pmx_board_id &pmx_fan_fail>;
 > +	pinctrl-names = "default";
 > +
+> +	pmx_board_id: pmx-board-id {
+> +		marvell,pins = "mpp0", "mpp1", "mpp2";
+> +		marvell,function = "gpio";
+> +	};
+> +
+> +	pmx_buttons: pmx-buttons {
+> +		marvell,pins = "mpp8", "mpp9", "mpp18";
+> +		marvell,function = "gpio";
+> +	};
+> +
+> +	pmx_fan_fail: pmx-fan-fail {
+> +		marvell,pins = "mpp5";
+> +		marvell,function = "gpio";
+> +	};
+> +
 > +	/*
-> +	 * MPP[20] PCI Clock to MV88F5182
-> +	 * MPP[21] PCI Clock to mini PCI CON11
-> +	 * MPP[22] USB 0 over current indication
-> +	 * MPP[23] USB 1 over current indication
-> +	 * MPP[24] USB 1 over current enable
-> +	 * MPP[25] USB 0 over current enable
+> +	 * MPP6: Red front LED
+> +	 * MPP16: Blue front LED blink control
 > +	 */
-> +
-> +	pmx_debug_led: pmx-debug_led {
-> +		marvell,pins = "mpp0";
+> +	pmx_leds: pmx-leds {
+> +		marvell,pins = "mpp6", "mpp16";
 > +		marvell,function = "gpio";
 > +	};
 > +
-> +	pmx_reset_switch: pmx-reset-switch {
-> +		marvell,pins = "mpp1";
-> +		marvell,function = "gpio";
+> +	pmx_sata0_led_active: pmx-sata0-led-active {
+> +		marvell,pins = "mpp14";
+> +		marvell,function = "sata0";
 > +	};
 > +
-> +	pmx_rtc: pmx-rtc {
+> +	pmx_sata0_power: pmx-sata0-power {
 > +		marvell,pins = "mpp3";
 > +		marvell,function = "gpio";
 > +	};
 > +
-> +	pmx_misc_gpios: pmx-misc-gpios {
-> +		marvell,pins = "mpp4", "mpp5";
+> +	pmx_sata1_led_active: pmx-sata1-led-active {
+> +		marvell,pins = "mpp15";
+> +		marvell,function = "sata1";
+> +	};
+> +
+> +	pmx_sata1_power: pmx-sata1-power {
+> +		marvell,pins = "mpp12";
 > +		marvell,function = "gpio";
 > +	};
 > +
-> +	pmx_pci_gpios: pmx-pci-gpios {
-> +		marvell,pins = "mpp6", "mpp7";
-> +		marvell,function = "gpio";
-> +	};
+> +	/*
+> +	 * Non MPP GPIOs:
+> +	 *  GPIO 22: USB port 1 fuse (0 = Fail, 1 = Ok)
+> +	 *  GPIO 23: Blue front LED off
+> +	 *  GPIO 24: Inhibit board power off (0 = Disabled, 1 = Enabled)
+> +	 */
 > +};
 > +
 > +&sata {
-> +	pinctrl-0 = <&pmx_sata0 &pmx_sata1>;
+> +	pinctrl-0 = <&pmx_sata0_led_active
+> +		     &pmx_sata1_led_active>;
 > +	pinctrl-names = "default";
 > +	status = "okay";
 > +	nr-ports = <2>;
@@ -234,153 +294,536 @@ Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 > +	status = "okay";
 > +};
 > diff --git a/arch/arm/mach-orion5x/Kconfig b/arch/arm/mach-orion5x/Kconfig
-> index 928f4cb..11b0c7e 100644
+> index 11b0c7e..3c4ad83 100644
 > --- a/arch/arm/mach-orion5x/Kconfig
 > +++ b/arch/arm/mach-orion5x/Kconfig
-> @@ -28,6 +28,14 @@ config MACH_RD88F5182
+> @@ -115,20 +115,13 @@ config MACH_MV2120
 >   	  Say 'Y' here if you want your kernel to support the
->   	  Marvell Orion-NAS (88F5182) RD2
+>   	  HP Media Vault mv2120 or mv5100.
 >
-> +config MACH_RD88F5182_DT
-> +	bool "Marvell Orion-NAS Reference Design (Flattened Device Tree)"
+> -config MACH_D2NET
+> -	bool "LaCie d2 Network"
+> -	select I2C_BOARDINFO
+> +config MACH_D2NET_DT
+> +	bool "LaCie d2 Network / Big Disk Network (Flattened Device Tree)"
 > +	select ARCH_ORION5X_DT
-> +	select I2C_BOARDINFO
-> +	help
-> +	  Say 'Y' here if you want your kernel to support the Marvell
-> +	  Orion-NAS (88F5182) RD2, Flattened Device Tree.
-> +
->   config MACH_KUROBOX_PRO
->   	bool "KuroBox Pro"
+>   	help
+>   	  Say 'Y' here if you want your kernel to support the
+>   	  LaCie d2 Network NAS.
+>
+> -config MACH_BIGDISK
+> -	bool "LaCie Big Disk Network"
+> -	select I2C_BOARDINFO
+> -	help
+> -	  Say 'Y' here if you want your kernel to support the
+> -	  LaCie Big Disk Network NAS.
+> -
+>   config MACH_NET2BIG
+>   	bool "LaCie 2Big Network"
 >   	select I2C_BOARDINFO
 > diff --git a/arch/arm/mach-orion5x/Makefile b/arch/arm/mach-orion5x/Makefile
-> index e8fdbdd..f405894 100644
+> index f405894..787dcee 100644
 > --- a/arch/arm/mach-orion5x/Makefile
 > +++ b/arch/arm/mach-orion5x/Makefile
-> @@ -23,3 +23,4 @@ obj-$(CONFIG_MACH_RD88F6183AP_GE)	+= rd88f6183ap-ge-setup.o
+> @@ -12,8 +12,6 @@ obj-$(CONFIG_MACH_TS409)	+= ts409-setup.o tsx09-common.o
+>   obj-$(CONFIG_MACH_WRT350N_V2)	+= wrt350n-v2-setup.o
+>   obj-$(CONFIG_MACH_TS78XX)	+= ts78xx-setup.o
+>   obj-$(CONFIG_MACH_MV2120)	+= mv2120-setup.o
+> -obj-$(CONFIG_MACH_D2NET)	+= d2net-setup.o
+> -obj-$(CONFIG_MACH_BIGDISK)	+= d2net-setup.o
+>   obj-$(CONFIG_MACH_NET2BIG)	+= net2big-setup.o
+>   obj-$(CONFIG_MACH_MSS2)		+= mss2-setup.o
+>   obj-$(CONFIG_MACH_WNR854T)	+= wnr854t-setup.o
+> @@ -23,4 +21,5 @@ obj-$(CONFIG_MACH_RD88F6183AP_GE)	+= rd88f6183ap-ge-setup.o
 >   obj-$(CONFIG_MACH_LINKSTATION_LSCHL)	+= ls-chl-setup.o
 >
 >   obj-$(CONFIG_ARCH_ORION5X_DT)		+= board-dt.o
-> +obj-$(CONFIG_MACH_RD88F5182_DT)	+= board-rd88f5182.o
-> diff --git a/arch/arm/mach-orion5x/board-rd88f5182.c b/arch/arm/mach-orion5x/board-rd88f5182.c
+> +obj-$(CONFIG_MACH_D2NET_DT)	+= board-d2net.o
+>   obj-$(CONFIG_MACH_RD88F5182_DT)	+= board-rd88f5182.o
+> diff --git a/arch/arm/mach-orion5x/board-d2net.c b/arch/arm/mach-orion5x/board-d2net.c
 > new file mode 100644
-> index 0000000..270824b
+> index 0000000..8a72841
 > --- /dev/null
-> +++ b/arch/arm/mach-orion5x/board-rd88f5182.c
-> @@ -0,0 +1,116 @@
+> +++ b/arch/arm/mach-orion5x/board-d2net.c
+> @@ -0,0 +1,109 @@
 > +/*
-> + * arch/arm/mach-orion5x/rd88f5182-setup.c
+> + * arch/arm/mach-orion5x/board-d2net.c
 > + *
-> + * Marvell Orion-NAS Reference Design Setup
+> + * LaCie d2Network and Big Disk Network NAS setup
 > + *
-> + * Maintainer: Ronen Shitrit <rshitrit@marvell.com>
+> + * Copyright (C) 2009 Simon Guinot <sguinot@lacie.com>
 > + *
 > + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
+> + * License version 2. This program is licensed "as is" without any
 > + * warranty of any kind, whether express or implied.
 > + */
-> +#include <linux/gpio.h>
+> +
 > +#include <linux/kernel.h>
 > +#include <linux/init.h>
 > +#include <linux/platform_device.h>
 > +#include <linux/pci.h>
 > +#include <linux/irq.h>
+> +#include <linux/leds.h>
+> +#include <linux/gpio.h>
 > +#include <asm/mach-types.h>
 > +#include <asm/mach/arch.h>
 > +#include <asm/mach/pci.h>
 > +#include <mach/orion5x.h>
+> +#include <plat/orion-gpio.h>
 > +#include "common.h"
 > +
 > +/*****************************************************************************
-> + * RD-88F5182 Info
+> + * LaCie d2 Network Info
+> + ****************************************************************************/
+> +
+> +/*****************************************************************************
+> + * GPIO LED's
 > + ****************************************************************************/
 > +
 > +/*
-> + * PCI
+> + * The blue front LED is wired to the CPLD and can blink in relation with the
+> + * SATA activity.
+> + *
+> + * The following array detail the different LED registers and the combination
+> + * of their possible values:
+> + *
+> + * led_off   | blink_ctrl | SATA active | LED state
+> + *           |            |             |
+> + *    1      |     x      |      x      |  off
+> + *    0      |     0      |      0      |  off
+> + *    0      |     1      |      0      |  blink (rate 300ms)
+> + *    0      |     x      |      1      |  on
+> + *
+> + * Notes: The blue and the red front LED's can't be on at the same time.
+> + *        Red LED have priority.
 > + */
 > +
-> +#define RD88F5182_PCI_SLOT0_OFFS	7
-> +#define RD88F5182_PCI_SLOT0_IRQ_A_PIN	7
-> +#define RD88F5182_PCI_SLOT0_IRQ_B_PIN	6
+> +#define D2NET_GPIO_RED_LED		6
+> +#define D2NET_GPIO_BLUE_LED_BLINK_CTRL	16
+> +#define D2NET_GPIO_BLUE_LED_OFF		23
 > +
-> +/*****************************************************************************
-> + * PCI
-> + ****************************************************************************/
-> +
-> +static void __init rd88f5182_pci_preinit(void)
-> +{
-> +	int pin;
-> +
-> +	/*
-> +	 * Configure PCI GPIO IRQ pins
-> +	 */
-> +	pin = RD88F5182_PCI_SLOT0_IRQ_A_PIN;
-> +	if (gpio_request(pin, "PCI IntA") == 0) {
-> +		if (gpio_direction_input(pin) == 0) {
-> +			irq_set_irq_type(gpio_to_irq(pin), IRQ_TYPE_LEVEL_LOW);
-> +		} else {
-> +			printk(KERN_ERR "rd88f5182_pci_preinit failed to "
-> +					"set_irq_type pin %d\n", pin);
-> +			gpio_free(pin);
-> +		}
-> +	} else {
-> +		printk(KERN_ERR "rd88f5182_pci_preinit failed to request gpio %d\n", pin);
-> +	}
-> +
-> +	pin = RD88F5182_PCI_SLOT0_IRQ_B_PIN;
-> +	if (gpio_request(pin, "PCI IntB") == 0) {
-> +		if (gpio_direction_input(pin) == 0) {
-> +			irq_set_irq_type(gpio_to_irq(pin), IRQ_TYPE_LEVEL_LOW);
-> +		} else {
-> +			printk(KERN_ERR "rd88f5182_pci_preinit failed to "
-> +					"set_irq_type pin %d\n", pin);
-> +			gpio_free(pin);
-> +		}
-> +	} else {
-> +		printk(KERN_ERR "rd88f5182_pci_preinit failed to gpio_request %d\n", pin);
-> +	}
-> +}
-> +
-> +static int __init rd88f5182_pci_map_irq(const struct pci_dev *dev, u8 slot,
-> +	u8 pin)
-> +{
-> +	int irq;
-> +
-> +	/*
-> +	 * Check for devices with hard-wired IRQs.
-> +	 */
-> +	irq = orion5x_pci_map_irq(dev, slot, pin);
-> +	if (irq != -1)
-> +		return irq;
-> +
-> +	/*
-> +	 * PCI IRQs are connected via GPIOs
-> +	 */
-> +	switch (slot - RD88F5182_PCI_SLOT0_OFFS) {
-> +	case 0:
-> +		if (pin == 1)
-> +			return gpio_to_irq(RD88F5182_PCI_SLOT0_IRQ_A_PIN);
-> +		else
-> +			return gpio_to_irq(RD88F5182_PCI_SLOT0_IRQ_B_PIN);
-> +	default:
-> +		return -1;
-> +	}
-> +}
-> +
-> +static struct hw_pci rd88f5182_pci __initdata = {
-> +	.nr_controllers	= 2,
-> +	.preinit	= rd88f5182_pci_preinit,
-> +	.setup		= orion5x_pci_sys_setup,
-> +	.scan		= orion5x_pci_sys_scan_bus,
-> +	.map_irq	= rd88f5182_pci_map_irq,
+> +static struct gpio_led d2net_leds[] = {
+> +	{
+> +		.name = "d2net:blue:sata",
+> +		.default_trigger = "default-on",
+> +		.gpio = D2NET_GPIO_BLUE_LED_OFF,
+> +		.active_low = 1,
+> +	},
+> +	{
+> +		.name = "d2net:red:fail",
+> +		.gpio = D2NET_GPIO_RED_LED,
+> +	},
 > +};
 > +
-> +static int __init rd88f5182_pci_init(void)
-> +{
-> +	if (of_machine_is_compatible("marvell,rd-88f5182-nas"))
-> +		pci_common_init(&rd88f5182_pci);
+> +static struct gpio_led_platform_data d2net_led_data = {
+> +	.num_leds = ARRAY_SIZE(d2net_leds),
+> +	.leds = d2net_leds,
+> +};
 > +
-> +	return 0;
+> +static struct platform_device d2net_gpio_leds = {
+> +	.name           = "leds-gpio",
+> +	.id             = -1,
+> +	.dev            = {
+> +		.platform_data  = &d2net_led_data,
+> +	},
+> +};
+> +
+> +static void __init d2net_gpio_leds_init(void)
+> +{
+> +	int err;
+> +
+> +	/* Configure register blink_ctrl to allow SATA activity LED blinking. */
+> +	err = gpio_request(D2NET_GPIO_BLUE_LED_BLINK_CTRL, "blue LED blink");
+> +	if (err == 0) {
+> +		err = gpio_direction_output(D2NET_GPIO_BLUE_LED_BLINK_CTRL, 1);
+> +		if (err)
+> +			gpio_free(D2NET_GPIO_BLUE_LED_BLINK_CTRL);
+> +	}
+> +	if (err)
+> +		pr_err("d2net: failed to configure blue LED blink GPIO\n");
+> +
+> +	platform_device_register(&d2net_gpio_leds);
 > +}
 > +
-> +subsys_initcall(rd88f5182_pci_init);
+> +/*****************************************************************************
+> + * General Setup
+> + ****************************************************************************/
+> +
+> +void __init d2net_init(void)
+> +{
+> +	d2net_gpio_leds_init();
+> +
+> +	pr_notice("d2net: Flash write are not yet supported.\n");
+> +}
+> diff --git a/arch/arm/mach-orion5x/d2net-setup.c b/arch/arm/mach-orion5x/d2net-setup.c
+> deleted file mode 100644
+> index 8f68b74..0000000
+> --- a/arch/arm/mach-orion5x/d2net-setup.c
+> +++ /dev/null
+> @@ -1,365 +0,0 @@
+> -/*
+> - * arch/arm/mach-orion5x/d2net-setup.c
+> - *
+> - * LaCie d2Network and Big Disk Network NAS setup
+> - *
+> - * Copyright (C) 2009 Simon Guinot <sguinot@lacie.com>
+> - *
+> - * This file is licensed under the terms of the GNU General Public
+> - * License version 2. This program is licensed "as is" without any
+> - * warranty of any kind, whether express or implied.
+> - */
+> -
+> -#include <linux/kernel.h>
+> -#include <linux/init.h>
+> -#include <linux/platform_device.h>
+> -#include <linux/pci.h>
+> -#include <linux/irq.h>
+> -#include <linux/mtd/physmap.h>
+> -#include <linux/mv643xx_eth.h>
+> -#include <linux/leds.h>
+> -#include <linux/gpio_keys.h>
+> -#include <linux/input.h>
+> -#include <linux/i2c.h>
+> -#include <linux/ata_platform.h>
+> -#include <linux/gpio.h>
+> -#include <asm/mach-types.h>
+> -#include <asm/mach/arch.h>
+> -#include <asm/mach/pci.h>
+> -#include <mach/orion5x.h>
+> -#include <plat/orion-gpio.h>
+> -#include "common.h"
+> -#include "mpp.h"
+> -
+> -/*****************************************************************************
+> - * LaCie d2 Network Info
+> - ****************************************************************************/
+> -
+> -/*
+> - * 512KB NOR flash Device bus boot chip select
+> - */
+> -
+> -#define D2NET_NOR_BOOT_BASE		0xfff80000
+> -#define D2NET_NOR_BOOT_SIZE		SZ_512K
+> -
+> -/*****************************************************************************
+> - * 512KB NOR Flash on Boot Device
+> - ****************************************************************************/
+> -
+> -/*
+> - * TODO: Check write support on flash MX29LV400CBTC-70G
+> - */
+> -
+> -static struct mtd_partition d2net_partitions[] = {
+> -	{
+> -		.name		= "Full512kb",
+> -		.size		= MTDPART_SIZ_FULL,
+> -		.offset		= 0,
+> -		.mask_flags	= MTD_WRITEABLE,
+> -	},
+> -};
+> -
+> -static struct physmap_flash_data d2net_nor_flash_data = {
+> -	.width		= 1,
+> -	.parts		= d2net_partitions,
+> -	.nr_parts	= ARRAY_SIZE(d2net_partitions),
+> -};
+> -
+> -static struct resource d2net_nor_flash_resource = {
+> -	.flags			= IORESOURCE_MEM,
+> -	.start			= D2NET_NOR_BOOT_BASE,
+> -	.end			= D2NET_NOR_BOOT_BASE
+> -					+ D2NET_NOR_BOOT_SIZE - 1,
+> -};
+> -
+> -static struct platform_device d2net_nor_flash = {
+> -	.name			= "physmap-flash",
+> -	.id			= 0,
+> -	.dev		= {
+> -		.platform_data	= &d2net_nor_flash_data,
+> -	},
+> -	.num_resources		= 1,
+> -	.resource		= &d2net_nor_flash_resource,
+> -};
+> -
+> -/*****************************************************************************
+> - * Ethernet
+> - ****************************************************************************/
+> -
+> -static struct mv643xx_eth_platform_data d2net_eth_data = {
+> -	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
+> -};
+> -
+> -/*****************************************************************************
+> - * I2C devices
+> - ****************************************************************************/
+> -
+> -/*
+> - * i2c addr | chip         | description
+> - * 0x32     | Ricoh 5C372b | RTC
+> - * 0x3e     | GMT G762     | PWM fan controller
+> - * 0x50     | HT24LC08     | eeprom (1kB)
+> - *
+> - * TODO: Add G762 support to the g760a driver.
+> - */
+> -static struct i2c_board_info __initdata d2net_i2c_devices[] = {
+> -	{
+> -		I2C_BOARD_INFO("rs5c372b", 0x32),
+> -	}, {
+> -		I2C_BOARD_INFO("24c08", 0x50),
+> -	},
+> -};
+> -
+> -/*****************************************************************************
+> - * SATA
+> - ****************************************************************************/
+> -
+> -static struct mv_sata_platform_data d2net_sata_data = {
+> -	.n_ports	= 2,
+> -};
+> -
+> -#define D2NET_GPIO_SATA0_POWER	3
+> -#define D2NET_GPIO_SATA1_POWER	12
+> -
+> -static void __init d2net_sata_power_init(void)
+> -{
+> -	int err;
+> -
+> -	err = gpio_request(D2NET_GPIO_SATA0_POWER, "SATA0 power");
+> -	if (err == 0) {
+> -		err = gpio_direction_output(D2NET_GPIO_SATA0_POWER, 1);
+> -		if (err)
+> -			gpio_free(D2NET_GPIO_SATA0_POWER);
+> -	}
+> -	if (err)
+> -		pr_err("d2net: failed to configure SATA0 power GPIO\n");
+> -
+> -	err = gpio_request(D2NET_GPIO_SATA1_POWER, "SATA1 power");
+> -	if (err == 0) {
+> -		err = gpio_direction_output(D2NET_GPIO_SATA1_POWER, 1);
+> -		if (err)
+> -			gpio_free(D2NET_GPIO_SATA1_POWER);
+> -	}
+> -	if (err)
+> -		pr_err("d2net: failed to configure SATA1 power GPIO\n");
+> -}
+> -
+> -/*****************************************************************************
+> - * GPIO LED's
+> - ****************************************************************************/
+> -
+> -/*
+> - * The blue front LED is wired to the CPLD and can blink in relation with the
+> - * SATA activity.
+> - *
+> - * The following array detail the different LED registers and the combination
+> - * of their possible values:
+> - *
+> - * led_off   | blink_ctrl | SATA active | LED state
+> - *           |            |             |
+> - *    1      |     x      |      x      |  off
+> - *    0      |     0      |      0      |  off
+> - *    0      |     1      |      0      |  blink (rate 300ms)
+> - *    0      |     x      |      1      |  on
+> - *
+> - * Notes: The blue and the red front LED's can't be on at the same time.
+> - *        Red LED have priority.
+> - */
+> -
+> -#define D2NET_GPIO_RED_LED		6
+> -#define D2NET_GPIO_BLUE_LED_BLINK_CTRL	16
+> -#define D2NET_GPIO_BLUE_LED_OFF		23
+> -
+> -static struct gpio_led d2net_leds[] = {
+> -	{
+> -		.name = "d2net:blue:sata",
+> -		.default_trigger = "default-on",
+> -		.gpio = D2NET_GPIO_BLUE_LED_OFF,
+> -		.active_low = 1,
+> -	},
+> -	{
+> -		.name = "d2net:red:fail",
+> -		.gpio = D2NET_GPIO_RED_LED,
+> -	},
+> -};
+> -
+> -static struct gpio_led_platform_data d2net_led_data = {
+> -	.num_leds = ARRAY_SIZE(d2net_leds),
+> -	.leds = d2net_leds,
+> -};
+> -
+> -static struct platform_device d2net_gpio_leds = {
+> -	.name           = "leds-gpio",
+> -	.id             = -1,
+> -	.dev            = {
+> -		.platform_data  = &d2net_led_data,
+> -	},
+> -};
+> -
+> -static void __init d2net_gpio_leds_init(void)
+> -{
+> -	int err;
+> -
+> -	/* Configure GPIO over MPP max number. */
+> -	orion_gpio_set_valid(D2NET_GPIO_BLUE_LED_OFF, 1);
+> -
+> -	/* Configure register blink_ctrl to allow SATA activity LED blinking. */
+> -	err = gpio_request(D2NET_GPIO_BLUE_LED_BLINK_CTRL, "blue LED blink");
+> -	if (err == 0) {
+> -		err = gpio_direction_output(D2NET_GPIO_BLUE_LED_BLINK_CTRL, 1);
+> -		if (err)
+> -			gpio_free(D2NET_GPIO_BLUE_LED_BLINK_CTRL);
+> -	}
+> -	if (err)
+> -		pr_err("d2net: failed to configure blue LED blink GPIO\n");
+> -
+> -	platform_device_register(&d2net_gpio_leds);
+> -}
+> -
+> -/****************************************************************************
+> - * GPIO keys
+> - ****************************************************************************/
+> -
+> -#define D2NET_GPIO_PUSH_BUTTON		18
+> -#define D2NET_GPIO_POWER_SWITCH_ON	8
+> -#define D2NET_GPIO_POWER_SWITCH_OFF	9
+> -
+> -#define D2NET_SWITCH_POWER_ON		0x1
+> -#define D2NET_SWITCH_POWER_OFF		0x2
+> -
+> -static struct gpio_keys_button d2net_buttons[] = {
+> -	{
+> -		.type		= EV_SW,
+> -		.code		= D2NET_SWITCH_POWER_OFF,
+> -		.gpio		= D2NET_GPIO_POWER_SWITCH_OFF,
+> -		.desc		= "Power rocker switch (auto|off)",
+> -		.active_low	= 0,
+> -	},
+> -	{
+> -		.type		= EV_SW,
+> -		.code		= D2NET_SWITCH_POWER_ON,
+> -		.gpio		= D2NET_GPIO_POWER_SWITCH_ON,
+> -		.desc		= "Power rocker switch (on|auto)",
+> -		.active_low	= 0,
+> -	},
+> -	{
+> -		.type		= EV_KEY,
+> -		.code		= KEY_POWER,
+> -		.gpio		= D2NET_GPIO_PUSH_BUTTON,
+> -		.desc		= "Front Push Button",
+> -		.active_low	= 0,
+> -	},
+> -};
+> -
+> -static struct gpio_keys_platform_data d2net_button_data = {
+> -	.buttons	= d2net_buttons,
+> -	.nbuttons	= ARRAY_SIZE(d2net_buttons),
+> -};
+> -
+> -static struct platform_device d2net_gpio_buttons = {
+> -	.name		= "gpio-keys",
+> -	.id		= -1,
+> -	.dev		= {
+> -		.platform_data	= &d2net_button_data,
+> -	},
+> -};
+> -
+> -/*****************************************************************************
+> - * General Setup
+> - ****************************************************************************/
+> -
+> -static unsigned int d2net_mpp_modes[] __initdata = {
+> -	MPP0_GPIO,	/* Board ID (bit 0) */
+> -	MPP1_GPIO,	/* Board ID (bit 1) */
+> -	MPP2_GPIO,	/* Board ID (bit 2) */
+> -	MPP3_GPIO,	/* SATA 0 power */
+> -	MPP4_UNUSED,
+> -	MPP5_GPIO,	/* Fan fail detection */
+> -	MPP6_GPIO,	/* Red front LED */
+> -	MPP7_UNUSED,
+> -	MPP8_GPIO,	/* Rear power switch (on|auto) */
+> -	MPP9_GPIO,	/* Rear power switch (auto|off) */
+> -	MPP10_UNUSED,
+> -	MPP11_UNUSED,
+> -	MPP12_GPIO,	/* SATA 1 power */
+> -	MPP13_UNUSED,
+> -	MPP14_SATA_LED,	/* SATA 0 active */
+> -	MPP15_SATA_LED,	/* SATA 1 active */
+> -	MPP16_GPIO,	/* Blue front LED blink control */
+> -	MPP17_UNUSED,
+> -	MPP18_GPIO,	/* Front button (0 = Released, 1 = Pushed ) */
+> -	MPP19_UNUSED,
+> -	0,
+> -	/* 22: USB port 1 fuse (0 = Fail, 1 = Ok) */
+> -	/* 23: Blue front LED off */
+> -	/* 24: Inhibit board power off (0 = Disabled, 1 = Enabled) */
+> -};
+> -
+> -#define D2NET_GPIO_INHIBIT_POWER_OFF    24
+> -
+> -static void __init d2net_init(void)
+> -{
+> -	/*
+> -	 * Setup basic Orion functions. Need to be called early.
+> -	 */
+> -	orion5x_init();
+> -
+> -	orion5x_mpp_conf(d2net_mpp_modes);
+> -
+> -	/*
+> -	 * Configure peripherals.
+> -	 */
+> -	orion5x_ehci0_init();
+> -	orion5x_eth_init(&d2net_eth_data);
+> -	orion5x_i2c_init();
+> -	orion5x_uart0_init();
+> -
+> -	d2net_sata_power_init();
+> -	orion5x_sata_init(&d2net_sata_data);
+> -
+> -	mvebu_mbus_add_window_by_id(ORION_MBUS_DEVBUS_BOOT_TARGET,
+> -				    ORION_MBUS_DEVBUS_BOOT_ATTR,
+> -				    D2NET_NOR_BOOT_BASE,
+> -				    D2NET_NOR_BOOT_SIZE);
+> -	platform_device_register(&d2net_nor_flash);
+> -
+> -	platform_device_register(&d2net_gpio_buttons);
+> -
+> -	d2net_gpio_leds_init();
+> -
+> -	pr_notice("d2net: Flash write are not yet supported.\n");
+> -
+> -	i2c_register_board_info(0, d2net_i2c_devices,
+> -				ARRAY_SIZE(d2net_i2c_devices));
+> -
+> -	orion_gpio_set_valid(D2NET_GPIO_INHIBIT_POWER_OFF, 1);
+> -}
+> -
+> -/* Warning: LaCie use a wrong mach-type (0x20e=526) in their bootloader. */
+> -
+> -#ifdef CONFIG_MACH_D2NET
+> -MACHINE_START(D2NET, "LaCie d2 Network")
+> -	.atag_offset	= 0x100,
+> -	.init_machine	= d2net_init,
+> -	.map_io		= orion5x_map_io,
+> -	.init_early	= orion5x_init_early,
+> -	.init_irq	= orion5x_init_irq,
+> -	.init_time	= orion5x_timer_init,
+> -	.fixup		= tag_fixup_mem32,
+> -	.restart	= orion5x_restart,
+> -MACHINE_END
+> -#endif
+> -
+> -#ifdef CONFIG_MACH_BIGDISK
+> -MACHINE_START(BIGDISK, "LaCie Big Disk Network")
+> -	.atag_offset	= 0x100,
+> -	.init_machine	= d2net_init,
+> -	.map_io		= orion5x_map_io,
+> -	.init_early	= orion5x_init_early,
+> -	.init_irq	= orion5x_init_irq,
+> -	.init_time	= orion5x_timer_init,
+> -	.fixup		= tag_fixup_mem32,
+> -	.restart	= orion5x_restart,
+> -MACHINE_END
+> -#endif
+> -
 >
