@@ -1,36 +1,56 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 24 Apr 2014 00:39:53 +0400
-Subject: [PATCH 1/4] dma: ste_dma40: Maintain spinlock order while handling
- pause
-In-Reply-To: <1398282724-2607-1-git-send-email-ulf.hansson@linaro.org>
-References: <1398282724-2607-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <53582519.7020805@cogentembedded.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 23 Apr 2014 13:41:18 -0700
+Subject: [GIT PULL] arm: omap: Immutable branch between MFD and ARM OMAP
+ due for the v3.16 merge-window
+In-Reply-To: <20140423144644.GF6264@lee--X1>
+References: <1397173639-29587-1-git-send-email-tony@atomide.com>
+ <1397173639-29587-11-git-send-email-tony@atomide.com>
+ <20140417080051.GE28725@lee--X1>
+ <20140417153722.GA23385@atomide.com>
+ <20140423144644.GF6264@lee--X1>
+Message-ID: <20140423204118.GA6053@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/23/2014 11:52 PM, Ulf Hansson wrote:
+* Lee Jones <lee.jones@linaro.org> [140423 07:47]:
+> Hi Tony,
+> 
+> Sorry for the delay - I've been snowed under recently.
+> 
+> As requested, you patch based on v3.14 ( for some reason :) ).
 
-> The runtime PM resume callback needs to be executed while holding the
-> spinlock, make sure to maintain this for the pause operation as well.
+Thanks, I just got tired of chasing regressions with the
+-rc cycle while trying to work on some PM changes :)
 
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> ---
->   drivers/dma/ste_dma40.c |    2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
+Regards,
 
-> diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-> index bf18c78..6e97cf6 100644
-> --- a/drivers/dma/ste_dma40.c
-> +++ b/drivers/dma/ste_dma40.c
-> @@ -1495,8 +1495,8 @@ static int d40_pause(struct d40_chan *d40c)
->   	if (!d40c->busy)
->   		return 0;
->
-> -	pm_runtime_get_sync(d40c->base->dev);
->   	spin_lock_irqsave(&d40c->lock, flags);
-> +	pm_runtime_get_sync(d40c->base->dev);
-
-   That function may sleep AFAIK, so you can't really call it with a spinlock 
-held. Or do I miss something?
-
-WBR, Sergei
+Tony
+ 
+> The following changes since commit 455c6fdbd219161bd09b1165f11699d6d73de11c:
+> 
+>   Linux 3.14 (2014-03-30 20:40:15 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git tags/ib-mfd-omap-3.16
+> 
+> for you to fetch changes up to a613b739b8c08eab811e677810045cc0522fc3e6:
+> 
+>   mfd: twl-core: Fix idle mode signaling for omaps when booted with device tree (2014-04-23 15:31:05 +0100)
+> 
+> ----------------------------------------------------------------
+> Immutable branch between MFD and ARM OMAP due for v3.16 merge-window.
+> 
+> ----------------------------------------------------------------
+> Tony Lindgren (1):
+>       mfd: twl-core: Fix idle mode signaling for omaps when booted with device tree
+> 
+>  arch/arm/mach-omap2/omap_twl.c | 60 ------------------------------------------------------------
+>  drivers/mfd/twl-core.c         | 15 +++++++++++++++
+>  2 files changed, 15 insertions(+), 60 deletions(-)
+> 
+> -- 
+> Lee Jones
+> Linaro STMicroelectronics Landing Team Lead
+> Linaro.org ? Open source software for ARM SoCs
+> Follow Linaro: Facebook | Twitter | Blog
