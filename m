@@ -1,59 +1,123 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Wed, 23 Apr 2014 10:18:48 +0200
-Subject: [PATCH] tty/serial: atmel_serial: Fix device tree documentation
-In-Reply-To: <CACRpkdZdSCqgs7huAgp53V1T9+A_6ACgUXzCx4-nvgLP5VPxMg@mail.gmail.com>
-References: <1397487482-3816-1-git-send-email-richard.genoud@gmail.com>
- <20140414152212.GC2255@ldesroches-Latitude-E6320> <534CE24F.9020703@gmail.com>
- <20140415080006.GE2255@ldesroches-Latitude-E6320>
- <CACRpkdZdSCqgs7huAgp53V1T9+A_6ACgUXzCx4-nvgLP5VPxMg@mail.gmail.com>
-Message-ID: <CACQ1gAjEGFm9SEzRUCTVfO90XRPk3rnnC9cRRb+GgvMHnUsRTA@mail.gmail.com>
+From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
+Date: Wed, 23 Apr 2014 10:21:00 +0200
+Subject: [PATCH 1/6] ata: ahci: add AHCI support for Berlin SoCs
+In-Reply-To: <5356A4F4.6090107@gmail.com>
+References: <1398181105-19714-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1398181105-19714-2-git-send-email-antoine.tenart@free-electrons.com>
+ <5356A4F4.6090107@gmail.com>
+Message-ID: <20140423082100.GB24355@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-04-22 20:42 GMT+02:00 Linus Walleij <linus.walleij@linaro.org>:
-> On Tue, Apr 15, 2014 at 10:00 AM, Ludovic Desroches
-> <ludovic.desroches@atmel.com> wrote:
->> On Tue, Apr 15, 2014 at 09:39:59AM +0200, Richard Genoud wrote:
->>> On 14/04/2014 17:22, Ludovic Desroches wrote:
->>> > Hi Richard,
->>> >
->>> > On Mon, Apr 14, 2014 at 04:58:02PM +0200, Richard Genoud wrote:
->>> >> RTS pin is an active low pin.
->>> >> For now, this doesn't change anything as the ACTIVE_LOW flag is not
->>> >> handled in atmel_serial, but it will be in 3.16.
->>> >>
->>> >> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
->>> >> ---
->>> >>  Documentation/devicetree/bindings/serial/atmel-usart.txt | 2 +-
->>> >>  1 file changed, 1 insertion(+), 1 deletion(-)
->>> >>
->>> >> diff --git a/Documentation/devicetree/bindings/serial/atmel-usart.txt b/Documentation/devicetree/bindings/serial/atmel-usart.txt
->>> >> index 17c1042b2df8..2f7aad71b3c9 100644
->>> >> --- a/Documentation/devicetree/bindings/serial/atmel-usart.txt
->>> >> +++ b/Documentation/devicetree/bindings/serial/atmel-usart.txt
->>> >> @@ -35,7 +35,7 @@ Example:
->>> >>            clock-names = "usart";
->>> >>            atmel,use-dma-rx;
->>> >>            atmel,use-dma-tx;
->>> >> -          rts-gpios = <&pioD 15 0>;
->>> >> +          rts-gpios = <&pioD 15 GPIO_ACTIVE_LOW>;
->>> >
->>> > I was told we should not use macros here. If it is still the truth:
->>> >
->>> > rts-gpios = <&pioD 15 1>;
->>>
->>> But I'd really like to know if macros are forbidden in DT documentation and why...
->>> Because, IMHO, <&pioD 15 1> talks less that <&pioD 15 GPIO_ACTIVE_LOW>.
->>> Which is a shame in a documentation.
->>
->> I don't remember who told me that but the reason was that device tree
->> should not depend on Linux and macros are relative to Linux.
->
-> These macros are not Linux-specific.
->
-> They come from include/dt-bindings/* which is part of the OS-neutral
-> bindings, just in a machine-readable form.
+Sebastian,
 
-Thanks for this clarification !
+On Tue, Apr 22, 2014 at 07:20:52PM +0200, Sebastian Hesselbarth wrote:
+> On 04/22/2014 05:38 PM, Antoine T?nart wrote:
 
-Richard.
+[?]
+
+> > +static inline void ahci_berlin_reg_set(void __iomem *reg, u32 val)
+> > +{
+> > +	writel(val, reg);
+> > +}
+> 
+> Antoine,
+> 
+> if you really need to rename writel, the above function name should
+> end with _write.
+
+I renamed writel for consistency with ahci_berlin_reg_clear_set() and
+ahci_berlin_reg_setbits() but I can definitively drop it.
+
+> 
+> > +static inline void ahci_berlin_reg_clear_set(void __iomem *reg, u32 clear_val,
+> > +					     u32 set_val)
+> > +{
+> > +	u32 regval;
+> > +
+> > +	regval = readl(reg);
+> > +	regval &= ~(clear_val);
+> > +	regval |= set_val;
+> > +	writel(regval, reg);
+> > +}
+> 
+> ahci_berlin_reg_setbits(reg, val) == ahci_berlin_reg_clear_set(reg, 0, val);
+> 
+> Maybe get rid of the latter?
+
+Sure.
+
+> 
+> > +static void ahci_berlin_init(void __iomem *mmio)
+> > +{
+> > +	/* interface select */
+> > +	ahci_berlin_reg_set(mmio + HOST_VSA_ADDR, BIT(2));
+> > +	ahci_berlin_reg_set(mmio + HOST_VSA_ADDR,
+> > +			    BIT(21) | BIT(18) | BIT(5) | BIT(4) | BIT(2));
+> 
+> Any chance we get named #defines for the BIT()s above and below?
+
+I'm afraid I can't. I'd love to do so if someone has a clue on this matter.
+
+> > +	/* force_map is modified only if the property is found */
+> > +	of_property_read_u32(np, "marvell,force-port-map", &force_map);
+> > +	if (force_map)
+> > +		nports = force_map;
+> 
+> marvell,force-port-map is undocumented and its name does not reflect
+> what it is about. Before you just rename it to marvell,nr-ports or
+> something, how about having one sub-node per port:
+> 
+> sata_phy0: sata-phy at e90100 {
+> 	compatible = "marvell,berlin-sata-phy";
+> 	reg = <0xe90100 0x80>;
+> 	status = "disabled";
+> };
+> 
+> sata_phy1: sata-phy at e90180 {
+> 	compatible = "marvell,berlin-sata-phy";
+> 	reg = <0xe90180 0x80>;
+> 	status = "disabled";
+> };
+> 
+> ahci: sata at e90000 {
+> 	compatible = "marvell,berlin-ahci";
+> 	reg = <0xe90000 0x100>;
+> 	interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
+> 	#address-cells = <1>;
+> 	#size-cells = <0>;
+> 	status = "disabled";
+> 
+> 	sata-port at 0 {
+> 		reg = <0>;
+> 		sata-phy = <&sata_phy0>;
+> 		status = "disabled";
+> 	};
+> 
+> 	sata-port at 1 {
+> 		reg = <1>;
+> 		sata-phy = <&sata_phy1>;
+> 		status = "okay";
+> 	};
+> };
+> 
+> That way you can
+> (a) separate a PHY driver that has little code but is able to power-down
+>     the PHY even if there is no AHCI driver loaded.
+> (b) enable/disable each port individually.
+> (c) enable port1 while port0 is disabled.
+> (d) disable the PLL if there is no port enabled at all.
+
+That would be better, but as of now I'm not sure I have enough information on
+the PHY to do (a).
+
+I guess (b), (c) and (d) can still be done.
+
+Thanks for the review!
+
+Antoine
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
