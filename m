@@ -1,60 +1,85 @@
 From: zlim@broadcom.com (Zi Shen Lim)
-Date: Tue, 22 Apr 2014 18:40:12 -0700
-Subject: [PATCH 0/2] arm64 topology updates
-Message-ID: <1398217214-12204-1-git-send-email-zlim@broadcom.com>
+Date: Tue, 22 Apr 2014 18:40:14 -0700
+Subject: [PATCH 2/2] arm64: topology: add MPIDR-based detection
+In-Reply-To: <1398217214-12204-1-git-send-email-zlim@broadcom.com>
+References: <1398217214-12204-1-git-send-email-zlim@broadcom.com>
+Message-ID: <1398217214-12204-3-git-send-email-zlim@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-First patch in this series purges unused mc_capable() and smt_capable(),
-similar to what went into 3.15-rc1 for other architectures. [1]
+Create cpu topology based on MPIDR. When hardware sets MPIDR to sane
+values, this method will always work. Therefore it should also work well
+as the fallback method. [1]
 
-Since this is fairly straightforward, please pick this one up soon, so
-we're in line with other architectures.
+[1] http://www.spinics.net/lists/arm-kernel/msg317445.html
 
-Second patch in this series adds MPIDR-based detection of cpu topology.
-MPIDR support is independent of topology information from DT or ACPI.
-MPIDR should always work for hardware that sets those bits with sane values.
+Signed-off-by: Zi Shen Lim <zlim@broadcom.com>
+---
+ arch/arm64/include/asm/cputype.h |  2 ++
+ arch/arm64/kernel/topology.c     | 31 +++++++++++++++++++++++++++++++
+ 2 files changed, 33 insertions(+)
 
-For cpu topology, MPIDR can be used as default method or as fallback for
-DT or ACPI. I lean towards MPIDR as default (at least on host/hypervisor),
-but will leave it up to the maintainers on detection priority :)
-
-I've tested this on my model with MT and it works for me.
-The code should cover known use cases. I hope to get confirmation,
-or more discussions, from others.
-
-This series applies on 3.15-rc1.
-
-Note that this series is functionally orthogonal to the series Mark Brown
-just posted. In off-list discussion with Mark, he's currently focusing on
-DT-related bits. For reference, his patches are:
-
-  [PATCH 1/4] arm64: topology: Initialise default topology state immediately
-  [PATCH 2/4] arm64: topology: Add support for topology DT bindings
-  [PATCH 3/4] arm64: topology: Tell the scheduler about the relative power of cores
-  [PATCH 4/4] arm64: topology: Provide relative power numbers for cores
-
-Thanks,
-z
-
-References:
-[1] Clean up from Bjorn Helgaas 36fc5500bb19 ("sched: Remove unused
-    mc_capable() and smt_capable()"). Link: https://lkml.org/lkml/2014/3/11/463
-
-Links to Mark's series:
-[1/4] http://www.spinics.net/lists/arm-kernel/msg324508.html
-[2/4] http://www.spinics.net/lists/arm-kernel/msg324507.html
-[3/4] http://www.spinics.net/lists/arm-kernel/msg324505.html
-[4/4] http://www.spinics.net/lists/arm-kernel/msg324506.html
-
-Zi Shen Lim (2):
-  arm64, sched: Remove unused mc_capable() and smt_capable()
-  arm64: topology: add MPIDR-based detection
-
- arch/arm64/include/asm/cputype.h  |  2 ++
- arch/arm64/include/asm/topology.h |  3 ---
- arch/arm64/kernel/topology.c      | 31 +++++++++++++++++++++++++++++++
- 3 files changed, 33 insertions(+), 3 deletions(-)
-
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index c404fb0..7639e8b 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -18,6 +18,8 @@
+ 
+ #define INVALID_HWID		ULONG_MAX
+ 
++#define MPIDR_UP_BITMASK	(0x1 << 30)
++#define MPIDR_MT_BITMASK	(0x1 << 24)
+ #define MPIDR_HWID_BITMASK	0xff00ffffff
+ 
+ #define MPIDR_LEVEL_BITS_SHIFT	3
+diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+index 3e06b0b..ef3bb7e 100644
+--- a/arch/arm64/kernel/topology.c
++++ b/arch/arm64/kernel/topology.c
+@@ -19,6 +19,7 @@
+ #include <linux/nodemask.h>
+ #include <linux/sched.h>
+ 
++#include <asm/cputype.h>
+ #include <asm/topology.h>
+ 
+ /*
+@@ -71,6 +72,36 @@ static void update_siblings_masks(unsigned int cpuid)
+ 
+ void store_cpu_topology(unsigned int cpuid)
+ {
++	struct cpu_topology *cpuid_topo = &cpu_topology[cpuid];
++	u64 mpidr;
++
++	mpidr = read_cpuid_mpidr();
++
++	/* Create cpu topology mapping based on MPIDR. */
++	if (mpidr & MPIDR_UP_BITMASK) {
++		/* Uniprocessor system */
++		cpuid_topo->thread_id  = -1;
++		cpuid_topo->core_id    = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++		cpuid_topo->cluster_id = -1;
++	} else {
++		/* Multiprocessor system */
++		if (mpidr & MPIDR_MT_BITMASK) {
++			/* Multi-threads per core */
++			cpuid_topo->thread_id  = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++			cpuid_topo->core_id    = MPIDR_AFFINITY_LEVEL(mpidr, 1);
++			cpuid_topo->cluster_id = MPIDR_AFFINITY_LEVEL(mpidr, 2);
++		} else {
++			/* Single-thread per core */
++			cpuid_topo->thread_id  = -1;
++			cpuid_topo->core_id    = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++			cpuid_topo->cluster_id = MPIDR_AFFINITY_LEVEL(mpidr, 1);
++		}
++	}
++
++	pr_info("CPU%u: cluster %d core %d thread %d mpidr %llx\n",
++		cpuid, cpuid_topo->cluster_id, cpuid_topo->core_id,
++		cpuid_topo->thread_id, mpidr);
++
+ 	update_siblings_masks(cpuid);
+ }
+ 
 -- 
 1.8.4.3
