@@ -1,36 +1,80 @@
 From: joelf@ti.com (Joel Fernandes)
-Date: Tue, 22 Apr 2014 20:27:04 -0500
-Subject: [PATCH 3/8] ARM: OMAP2+: timer: Add comment on timer clk parenting
+Date: Tue, 22 Apr 2014 20:27:09 -0500
+Subject: [PATCH 8/8] ARM: OMAP2+: timer: Add legacy code for old way of
+ getting fclk
 In-Reply-To: <1398216429-4681-1-git-send-email-joelf@ti.com>
 References: <1398216429-4681-1-git-send-email-joelf@ti.com>
-Message-ID: <1398216429-4681-4-git-send-email-joelf@ti.com>
+Message-ID: <1398216429-4681-9-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a comment describing the state of system timer clock parenting.  The code
-following the comment should be deleted once all platforms can do DT boot, and
-specially should not be executed for DT platforms once we can specify default
-clock parents through DT.
+Separate out legacy code for getting timer->fclk and reuse it for
+the DT-case as a fallback. All DT users should ideally be specifying
+a clock property with a phandle of its clock node. Till the migration
+is complete, add a legacy function to keep things working.
 
 Signed-off-by: Joel Fernandes <joelf@ti.com>
 ---
- arch/arm/mach-omap2/timer.c |    4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/mach-omap2/timer.c |   32 ++++++++++++++++++++++++--------
+ 1 file changed, 24 insertions(+), 8 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index f192a41..9fdff5b 100644
+index b3db1da..81a29b1 100644
 --- a/arch/arm/mach-omap2/timer.c
 +++ b/arch/arm/mach-omap2/timer.c
-@@ -313,6 +313,10 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
- 	if (IS_ERR(timer->fclk))
- 		return PTR_ERR(timer->fclk);
+@@ -248,6 +248,19 @@ static u32 __init omap_dm_timer_get_errata(void)
+ 	return OMAP_TIMER_ERRATA_I103_I767;
+ }
  
-+	/*
-+	 * Clock reparenting code, goes away for DT-boot atleast,
-+	 * once clock layer can do it through DT.
-+	 */
- 	src = clk_get(NULL, fck_source);
- 	if (IS_ERR(src))
- 		return PTR_ERR(src);
++static int legacy_hwmod_clkget(struct omap_dm_timer *timer, const char *oh_name)
++{
++	struct omap_hwmod *oh;
++
++	oh = omap_hwmod_lookup(oh_name);
++	if (!oh)
++		return -ENODEV;
++
++	timer->fclk = clk_get(NULL, omap_hwmod_get_main_clk(oh));
++	if (IS_ERR(timer->fclk))
++		return PTR_ERR(timer->fclk);
++}
++
+ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
+ 					 const char *fck_source,
+ 					 const char *property,
+@@ -289,6 +302,14 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
+ 			 * fall back code is to be deleted and we're to return
+ 			 * PTR_ERR(timer->fclk) here.
+ 			 */
++			of_property_read_string_index(np, "ti,hwmods", 0,
++						      &oh_name);
++			if (!oh_name)
++				return -ENODEV;
++
++			r = legacy_hwmod_clkget(timer, oh_name);
++			if (r)
++				return r;
+ 		}
+ 	} else {
+ 		if (omap_dm_timer_reserve_systimer(timer->id))
+@@ -320,15 +341,10 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
+ 
+ 		omap_hwmod_setup_one(oh_name);
+ 		omap_hwmod_enable(oh);
+-	}
+ 
+-	if (!timer->fclk || IS_ERR(timer->fclk)) {
+-		oh = omap_hwmod_lookup(oh_name);
+-		if (!oh)
+-			return -ENODEV;
+-		timer->fclk = clk_get(NULL, omap_hwmod_get_main_clk(oh));
+-		if (IS_ERR(timer->fclk))
+-			return PTR_ERR(timer->fclk);
++		r = legacy_hwmod_clkget(timer, oh_name);
++		if (r)
++			return r;
+ 	}
+ 
+ 	/*
 -- 
 1.7.9.5
