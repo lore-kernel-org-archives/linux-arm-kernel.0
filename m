@@ -1,99 +1,32 @@
-From: lznuaa@gmail.com (Frank Li)
-Date: Wed, 23 Apr 2014 09:26:04 -0500
-Subject: Perf top always show 0.00
-In-Reply-To: <CAB4PhKdP_gXiB56DPLC3DxdjW2Epr_RTghW_VL1X84Ux1U+bLw@mail.gmail.com>
-References: <CAHrpEqQZ_0G-rmwfaeEzHOFVckyRRSUpYrPdMUgPjRZ1JYyy6g@mail.gmail.com>
- <CAB4PhKdP_gXiB56DPLC3DxdjW2Epr_RTghW_VL1X84Ux1U+bLw@mail.gmail.com>
-Message-ID: <CAHrpEqQO93d9Nh_4wO0fs_KLH3ofn43t-SySDRTNP9=ryTq=fQ@mail.gmail.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Wed, 23 Apr 2014 09:26:54 -0500
+Subject: [PATCH 3/3] ARM: qcom: Select PINCTRL by default for ARCH_QCOM
+In-Reply-To: <CACRpkdauApm8_3DGE3Q4k-xkEpcrb2nUn=UhS+xHnVn4t+g2CA@mail.gmail.com>
+References: <1397531437-9104-1-git-send-email-agross@codeaurora.org>
+ <1397531437-9104-4-git-send-email-agross@codeaurora.org>
+ <CACRpkdauApm8_3DGE3Q4k-xkEpcrb2nUn=UhS+xHnVn4t+g2CA@mail.gmail.com>
+Message-ID: <0B526586-54FE-45E7-BA23-C405AD39FABA@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 23, 2014 at 4:15 AM, Jason Liu <liu.h.jason@gmail.com> wrote:
-> Frank,
->
-> 2014-04-19 1:00 GMT+08:00 Frank Li <lznuaa@gmail.com>:
->> I use mx6dq platform. Found below problem.
->>
->> Run Perf top. First column always 0, but order look like correct.
->>
->>    0.00%  perf          [.] 0x00049420
->>      0.00%  [kernel]      [k] kallsyms_expand_symbol.constprop.5
->>      0.00%  [kernel]      [k] vsnprintf
->>      0.00%  [kernel]      [k] arch_cpu_idle
->>      0.00%  [kernel]      [k] format_decode
->>      0.00%  [kernel]      [k] number.isra.2
->>      0.00%  libc-2.19.so  [.] strstr
->>      0.00%  libc-2.19.so  [.] 0x00072498
->>      0.00%  libc-2.19.so  [.] memchr
->>      0.00%  [kernel]      [k] _raw_spin_unlock_irqrestore
->>      0.00%  [kernel]      [k] string.isra.4
->>      0.00%  [kernel]      [k] strnlen
->>      0.00%  libc-2.19.so  [.] getdelim
->>      0.00%  libc-2.19.so  [.] memcpy
->>      0.00%  [kernel]      [k] lock_acquire
->>      0.00%  libc-2.19.so  [.] strchr
->>      0.00%  libc-2.19.so  [.] strcmp
->>      0.00%  [kernel]      [k] _raw_spin_unlock_irq
->>      0.00%  libc-2.19.so  [.] __libc_calloc
->>      0.00%  libc-2.19.so  [.] _IO_feof
->>      0.00%  [kernel]      [k] pointer.isra.15
->
-> This issue has been resolved by the following commit:
->
-> commit 9dfd005a3f4e1c648cb4aa1dc70604bb370c5e7b
-> Author: Michael Hudson-Doyle <michael.hudson@linaro.org>
-> Date:   Thu Oct 31 16:47:45 2013 -0700
->
->     perf tools: Remove cast of non-variadic function to variadic
->
->     commit 53805eca3d89b095062c11a6798689bb0af09216 upstream.
->
->     The 4fb71074a570 (perf ui/hist: Consolidate hpp helpers) cset introduced
->     a cast of percent_color_snprintf to a function pointer type with
->     varargs.  Change percent_color_snprintf to be variadic and remove the
->     cast.
->
->     The symptom of this was all percentages being reported as 0.00% in perf
->     report --stdio output on the armhf arch.
->
->     Signed-off-by: Michael Hudson-Doyle <michael.hudson@linaro.org>
->     Acked-by: Namhyung Kim <namhyung@kernel.org>
->     Acked-by: Will Deacon <will.deacon@arm.com>
->     Cc: Jean Pihet <jean.pihet@linaro.org>
->     Cc: Jiri Olsa <jolsa@redhat.com>
->     Cc: Will Deacon <will.deacon@arm.com>
->     Link: http://lkml.kernel.org/r/87zjppvw7y.fsf at canonical.com
->     Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
->     Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->
->
-> Jason Liu
 
-I tested it. still 0.00%
-0.00%  perf          [.] 0x000494a0
-     0.00%  [kernel]      [k] cpuidle_enter_state
-     0.00%  [kernel]      [k] kallsyms_expand_symbol.constprop.7
-     0.00%  libc-2.19.so  [.] 0x0006f6a4
-     0.00%  [kernel]      [k] vsnprintf
-     0.00%  libc-2.19.so  [.] strstr
-     0.00%  [kernel]      [k] format_decode
-     0.00%  libc-2.19.so  [.] memchr
-     0.00%  [kernel]      [k] number.isra.2
-     0.00%  libc-2.19.so  [.] memcpy
-     0.00%  libc-2.19.so  [.] getdelim
-     0.00%  libc-2.19.so  [.] __libc_calloc
-     0.00%  [kernel]      [k] _raw_spin_unlock_irq
-     0.00%  libc-2.19.so  [.] strchr
-     0.00%  [kernel]      [k] strnlen
-     0.00%  [kernel]      [k] _raw_spin_unlock_irqrestore
-     0.00%  libc-2.19.so  [.] strcmp
-     0.00%  [kernel]      [k] __do_softirq
-     0.00%  [kernel]      [k] string.isra.4
-     0.00%  libc-2.19.so  [.] _IO_feof
-     0.00%  [kernel]      [k] tick_nohz_idle_enter
+On Apr 23, 2014, at 9:03 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
 
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> On Tue, Apr 15, 2014 at 5:10 AM, Andy Gross <agross@codeaurora.org> wrote:
+> 
+>> Add missing PINCTRL selection.  This enables selection of pinctrollers for
+>> Qualcomm processors.
+>> 
+>> Signed-off-by: Andy Gross <agross@codeaurora.org>
+> 
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> David are you picking this to the Qualcomm tree?
+
+I?ll pick it up
+
+- k
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
