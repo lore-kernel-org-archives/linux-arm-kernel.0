@@ -1,37 +1,37 @@
 From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Wed, 23 Apr 2014 14:55:52 +0530
-Subject: [Patch v2 2/4] driver: cpuidle: cpuidle-big-little: init driver for
+Date: Wed, 23 Apr 2014 14:55:53 +0530
+Subject: [Patch v2 3/4] exynos: cpuidle: do not allow cpuidle registration for
  Exynos5420
 In-Reply-To: <1398245154-18771-1-git-send-email-chander.kashyap@linaro.org>
 References: <1398080958-21677-5-git-send-email-chander.kashyap@linaro.org>
  <1398245154-18771-1-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <1398245154-18771-3-git-send-email-chander.kashyap@linaro.org>
+Message-ID: <1398245154-18771-4-git-send-email-chander.kashyap@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add "samsung,exynos5420" compatible string to initialize generic
-big-little cpuidle driver for Exynos5420.
+Exynos5420 is big.Little Soc. It uses cpuidle-big-litle generic cpuidle driver.
+Hence do not allow exynos cpuidle driver registration for Exynos5420.
 
 Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
 Signed-off-by: Chander Kashyap <k.chander@samsung.com>
 Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/cpuidle/cpuidle-big_little.c |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/mach-exynos/cpuidle.c |    3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/cpuidle/cpuidle-big_little.c b/drivers/cpuidle/cpuidle-big_little.c
-index b45fc62..d0fac53 100644
---- a/drivers/cpuidle/cpuidle-big_little.c
-+++ b/drivers/cpuidle/cpuidle-big_little.c
-@@ -170,7 +170,8 @@ static int __init bl_idle_init(void)
- 	/*
- 	 * Initialize the driver just for a compliant set of machines
- 	 */
--	if (!of_machine_is_compatible("arm,vexpress,v2p-ca15_a7"))
-+	if (!of_machine_is_compatible("arm,vexpress,v2p-ca15_a7") &&
-+		(!of_machine_is_compatible("samsung,exynos5420")))
- 		return -ENODEV;
- 	/*
- 	 * For now the differentiation between little and big cores
+diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
+index c57cae0..242f75d 100644
+--- a/arch/arm/mach-exynos/cpuidle.c
++++ b/arch/arm/mach-exynos/cpuidle.c
+@@ -219,6 +219,9 @@ static int exynos_cpuidle_probe(struct platform_device *pdev)
+ 	int cpu_id, ret;
+ 	struct cpuidle_device *device;
+ 
++	if (soc_is_exynos5420())
++		return -ENODEV;
++
+ 	if (soc_is_exynos5250())
+ 		exynos5_core_down_clk();
+ 
 -- 
 1.7.9.5
