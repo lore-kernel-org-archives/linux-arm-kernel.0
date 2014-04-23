@@ -1,154 +1,99 @@
-From: pullip.cho@samsung.com (Cho KyongHo)
-Date: Wed, 23 Apr 2014 10:15:24 +0900
-Subject: [PATCH v11 20/27] iommu/exynos: allow having multiple System MMUs
- for a master H/W
-In-Reply-To: <CAOD6ATobD8HCJWXeRgoXYaBBuKxy_TPj_AuWOfdPhJRF=Gxz5w@mail.gmail.com>
-References: <20140314141050.c8bedcb66532d277c496796d@samsung.com>
- <CAOD6ATobD8HCJWXeRgoXYaBBuKxy_TPj_AuWOfdPhJRF=Gxz5w@mail.gmail.com>
-Message-ID: <20140423101524.4145e9f88300293e0cea92c4@samsung.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 22 Apr 2014 20:18:00 -0500
+Subject: [PATCH v2 00/21] FDT clean-ups and libfdt support
+Message-ID: <1398215901-25609-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 22 Apr 2014 18:53:51 +0530, Shaik Ameer Basha wrote:
-> Hi KyongHo Cho,
-> 
-> 
-> 
-> On Fri, Mar 14, 2014 at 10:40 AM, Cho KyongHo <pullip.cho@samsung.com> wrote:
-> > Some master device descriptor like fimc-is which is an abstraction
-> > of very complex H/W may have multiple System MMUs. For those devices,
-> > the design of the link between System MMU and its master H/W is needed
-> > to be reconsidered.
-> >
-> > A link structure, sysmmu_list_data is introduced that provides a link
-> > to master H/W and that has a pointer to the device descriptor of a
-> > System MMU. Given a device descriptor of a master H/W, it is possible
-> > to traverse all System MMUs that must be controlled along with the
-> > master H/W.
-> >
-> > Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
-> > ---
-> >  drivers/iommu/exynos-iommu.c |  534 ++++++++++++++++++++++++++----------------
-> >  1 file changed, 333 insertions(+), 201 deletions(-)
-> >
-> > diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-> > index 84ba29a..7489343 100644
-> > --- a/drivers/iommu/exynos-iommu.c
-> > +++ b/drivers/iommu/exynos-iommu.c
-> > @@ -128,6 +128,10 @@
-> >  #define __master_clk_disable(data)     __clk_gate_ctrl(data, clk_master, dis)
-> >
-> 
-> [snip]
-> 
-> > +static int __init __sysmmu_init_master(struct device *dev)
-> > +{
-> > +       int ret;
-> > +       int i = 0;
-> > +       struct device_node *node;
-> > +
-> > +       while ((node = of_parse_phandle(dev->of_node, "mmu-masters", i++))) {
-> >                 struct platform_device *master = of_find_device_by_node(node);
-> > +               struct exynos_iommu_owner *owner;
-> > +               struct sysmmu_list_data *list_data;
-> >
-> >                 if (!master) {
-> >                         dev_err(dev, "%s: mmu-master '%s' not found\n",
-> >                                 __func__, node->name);
-> > -                       return -EINVAL;
-> > +                       ret = -EINVAL;
-> > +                       goto err;
-> >                 }
-> >
-> > -               if (master->dev.archdata.iommu != NULL) {
-> > -                       dev_err(dev, "%s: '%s' is master of other MMU\n",
-> > -                               __func__, node->name);
-> > -                       return -EINVAL;
-> > +               owner = master->dev.archdata.iommu;
-> > +               if (!owner) {
-> > +                       owner = devm_kzalloc(dev, sizeof(*owner), GFP_KERNEL);
-> > +                       if (!owner) {
-> > +                               dev_err(dev,
-> > +                               "%s: Failed to allocate owner structure\n",
-> > +                               __func__);
-> > +                               ret = -ENOMEM;
-> > +                               goto err;
-> > +                       }
-> > +
-> > +                       INIT_LIST_HEAD(&owner->mmu_list);
-> > +                       INIT_LIST_HEAD(&owner->client);
-> > +                       owner->dev = &master->dev;
-> > +                       spin_lock_init(&owner->lock);
-> > +
-> > +                       master->dev.archdata.iommu = owner;
-> >                 }
-> >
-> > +               list_data = devm_kzalloc(dev, sizeof(*list_data), GFP_KERNEL);
-> > +               if (!list_data) {
-> > +                       dev_err(dev,
-> > +                               "%s: Failed to allocate sysmmu_list_data\n",
-> > +                               __func__);
-> > +                       ret = -ENOMEM;
-> > +                       goto err;
-> > +               }
-> > +
-> > +               INIT_LIST_HEAD(&list_data->entry);
-> > +               list_data->sysmmu = dev;
-> > +
-> >                 /*
-> > -                * archdata.iommu will be initialized with exynos_iommu_client
-> > -                * in sysmmu_hook_driver_register().
-> > +                * System MMUs are attached in the order of the presence
-> > +                * in device tree
-> >                  */
-> > -               master->dev.archdata.iommu = dev;
-> > +               list_add_tail(&list_data->entry, &owner->mmu_list);
-> >         }
-> >
-> > -       data->sysmmu = dev;
-> > -       rwlock_init(&data->lock);
-> > +       return 0;
-> > +err:
-> > +       while ((node = of_parse_phandle(dev->of_node, "mmu-masters", i++))) {
-> 
-> Don't we need to reinitialize variable 'i' here before using?
-> i = 0;
-> 
+From: Rob Herring <robh@kernel.org>
 
-Oh. You are right.
+This is a series of clean-ups of architecture FDT code and converts the
+core FDT code over to using libfdt functions. This is in preparation
+to add FDT based address translation parsing functions for early
+console support. This series removes direct access to FDT data from all
+arches except powerpc.
 
-Thanks.
+The current MIPS lantiq and xlp DT code is buggy as built-in DTBs need
+to be copied out of init section. Patches 2 and 3 should be applied to
+3.15.
 
-> 
-> 
-> 
-> > +               struct platform_device *master = of_find_device_by_node(node);
-> > +               struct exynos_iommu_owner *owner;
-> > +               struct sysmmu_list_data *list_data;
-> >
-> > -       platform_set_drvdata(pdev, data);
-> > +               if (!master)
-> > +                       continue;
-> >
-> > -       pm_runtime_enable(dev);
-> > -       data->runtime_active = !pm_runtime_enabled(dev);
-> > +               owner = master->dev.archdata.iommu;
-> > +               if (!owner)
-> > +                       continue;
-> >
-> > -       dev_dbg(dev, "Probed and initialized\n");
-> > -       return 0;
-> > +               for_each_sysmmu_list(owner->dev, list_data) {
-> > +                       if (list_data->sysmmu == dev) {
-> > +                               list_del(&list_data->entry);
-> > +                               kfree(list_data);
-> > +                               break;
-> > +                       }
-> > +               }
-> > +       }
-> > +
-> > +       return ret;
-> >  }
-> >
-> 
-> [snip]
+Changes in v2 are relatively minor. There was a bug in the unflattening
+code where walking up the tree was not being handled correctly (thanks
+to Michal Simek). I re-worked things a bit to avoid globally adding
+libfdt include paths.
+
+A branch is available here[1], and I plan to put into linux-next in a few
+days. Please test! I've compiled on arm, arm64, mips, microblaze, xtensa,
+and powerpc and booted on arm and arm64.
+
+Rob
+
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git libfdt
+
+Rob Herring (21):
+  mips: octeon: convert to use unflatten_and_copy_device_tree
+  mips: lantiq: copy built-in DTB out of init section
+  mips: xlp: copy built-in DTB out of init section
+  mips: ralink: convert to use unflatten_and_copy_device_tree
+  ARM: dt: use default early_init_dt_alloc_memory_arch
+  c6x: convert fdt pointers to opaque pointers
+  mips: convert fdt pointers to opaque pointers
+  of/fdt: consolidate built-in dtb section variables
+  of/fdt: remove some unneeded includes
+  of/fdt: remove unused of_scan_flat_dt_by_path
+  of/fdt: update of_get_flat_dt_prop in prep for libfdt
+  of/fdt: Convert FDT functions to use libfdt
+  of/fdt: use libfdt accessors for header data
+  of/fdt: create common debugfs
+  of/fdt: move memreserve and dtb memory reservations into core
+  of/fdt: fix phys_addr_t related print size warnings
+  of/fdt: introduce of_get_flat_dt_size
+  powerpc: use libfdt accessors for header data
+  x86: use FDT accessors for FDT blob header data
+  of/fdt: convert initial_boot_params to opaque pointer
+  of: push struct boot_param_header and defines into powerpc
+
+ arch/arc/include/asm/sections.h             |   1 -
+ arch/arc/kernel/devtree.c                   |   2 +-
+ arch/arm/include/asm/prom.h                 |   2 -
+ arch/arm/kernel/devtree.c                   |  34 +--
+ arch/arm/mach-exynos/exynos.c               |   2 +-
+ arch/arm/mach-vexpress/platsmp.c            |   2 +-
+ arch/arm/mm/init.c                          |   1 -
+ arch/arm/plat-samsung/s5p-dev-mfc.c         |   4 +-
+ arch/arm64/mm/init.c                        |  21 --
+ arch/c6x/kernel/setup.c                     |   4 +-
+ arch/metag/kernel/setup.c                   |   4 -
+ arch/microblaze/kernel/prom.c               |  39 +--
+ arch/mips/cavium-octeon/setup.c             |  20 +-
+ arch/mips/include/asm/mips-boards/generic.h |   4 -
+ arch/mips/include/asm/prom.h                |   6 +-
+ arch/mips/kernel/prom.c                     |   2 +-
+ arch/mips/lantiq/prom.c                     |  15 +-
+ arch/mips/lantiq/prom.h                     |   2 -
+ arch/mips/mti-sead3/sead3-setup.c           |   8 +-
+ arch/mips/netlogic/xlp/dt.c                 |  19 +-
+ arch/mips/ralink/of.c                       |  29 +-
+ arch/openrisc/kernel/vmlinux.h              |   2 -
+ arch/powerpc/include/asm/prom.h             |  39 +++
+ arch/powerpc/kernel/Makefile                |   1 +
+ arch/powerpc/kernel/epapr_paravirt.c        |   2 +-
+ arch/powerpc/kernel/fadump.c                |   4 +-
+ arch/powerpc/kernel/prom.c                  |  78 ++----
+ arch/powerpc/kernel/rtas.c                  |   2 +-
+ arch/powerpc/mm/hash_utils_64.c             |  22 +-
+ arch/powerpc/platforms/52xx/efika.c         |   4 +-
+ arch/powerpc/platforms/chrp/setup.c         |   4 +-
+ arch/powerpc/platforms/powernv/opal.c       |  12 +-
+ arch/powerpc/platforms/pseries/setup.c      |   4 +-
+ arch/x86/kernel/devicetree.c                |  12 +-
+ arch/xtensa/kernel/setup.c                  |   3 +-
+ drivers/of/Kconfig                          |   1 +
+ drivers/of/Makefile                         |   2 +
+ drivers/of/fdt.c                            | 398 ++++++++++------------------
+ drivers/of/of_reserved_mem.c                |   4 +-
+ include/linux/of_fdt.h                      |  63 +----
+ 40 files changed, 280 insertions(+), 598 deletions(-)
+
+-- 
+1.9.1
