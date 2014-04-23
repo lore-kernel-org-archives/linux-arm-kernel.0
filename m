@@ -1,60 +1,70 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 23 Apr 2014 10:25:35 +0900
-Subject: [PATCH 07/33] ARM: shmobile: koelsch dts: Add MSIOF nodes
+Date: Wed, 23 Apr 2014 10:25:36 +0900
+Subject: [PATCH 08/33] ARM: shmobile: r8a7778 dtsi: Improve and correct HSPI
+ nodes
 In-Reply-To: <cover.1398216022.git.horms+renesas@verge.net.au>
 References: <cover.1398216022.git.horms+renesas@verge.net.au>
-Message-ID: <b16f05ab75571ec360f5b7298888fd6cdf06f586.1398216022.git.horms+renesas@verge.net.au>
+Message-ID: <a34c50d53dc7779b404baab61b290827cb898562.1398216022.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 
-Add pinctrl and SPI device for MSIOF on Koelsch.
-On this board, only MSIOF0 is in use. Its bus contains a single device
-(a Renesas R2A11302FT PMIC), for which no bindings are defined yet.
+  - Add "renesas,hspi-r8a7778" compatible value,
+  - Correct reference to parent interrupt controller
+    (use "interrupt-parent" instead of "interrupt-controller"),
+  - Add missing "#address-cells" and "#size-cells" properties, which are
+    needed when populating the SPI buses.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
-Acked-by: Magnus Damm <damm@opensource.se>
+Tested-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791-koelsch.dts | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+ arch/arm/boot/dts/r8a7778.dtsi | 18 ++++++++++++------
+ 1 file changed, 12 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index bf9555b..e24fed9 100644
---- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -248,6 +248,12 @@
- 		renesas,groups = "qspi_ctrl", "qspi_data4";
- 		renesas,function = "qspi";
+diff --git a/arch/arm/boot/dts/r8a7778.dtsi b/arch/arm/boot/dts/r8a7778.dtsi
+index 85c5b3b..3c6fab5 100644
+--- a/arch/arm/boot/dts/r8a7778.dtsi
++++ b/arch/arm/boot/dts/r8a7778.dtsi
+@@ -204,26 +204,32 @@
  	};
-+
-+	msiof0_pins: spi1 {
-+		renesas,groups = "msiof0_clk", "msiof0_sync", "msiof0_rx",
-+				 "msiof0_tx";
-+		renesas,function = "msiof0";
-+	};
- };
  
- &ether {
-@@ -331,3 +337,18 @@
- 		};
+ 	hspi0: spi at fffc7000 {
+-		compatible = "renesas,hspi";
++		compatible = "renesas,hspi-r8a7778", "renesas,hspi";
+ 		reg = <0xfffc7000 0x18>;
+-		interrupt-controller = <&gic>;
++		interrupt-parent = <&gic>;
+ 		interrupts = <0 63 IRQ_TYPE_LEVEL_HIGH>;
++		#address-cells = <1>;
++		#size-cells = <0>;
+ 		status = "disabled";
+ 	};
+ 
+ 	hspi1: spi at fffc8000 {
+-		compatible = "renesas,hspi";
++		compatible = "renesas,hspi-r8a7778", "renesas,hspi";
+ 		reg = <0xfffc8000 0x18>;
+-		interrupt-controller = <&gic>;
++		interrupt-parent = <&gic>;
+ 		interrupts = <0 84 IRQ_TYPE_LEVEL_HIGH>;
++		#address-cells = <1>;
++		#size-cells = <0>;
+ 		status = "disabled";
+ 	};
+ 
+ 	hspi2: spi at fffc6000 {
+-		compatible = "renesas,hspi";
++		compatible = "renesas,hspi-r8a7778", "renesas,hspi";
+ 		reg = <0xfffc6000 0x18>;
+-		interrupt-controller = <&gic>;
++		interrupt-parent = <&gic>;
+ 		interrupts = <0 85 IRQ_TYPE_LEVEL_HIGH>;
++		#address-cells = <1>;
++		#size-cells = <0>;
+ 		status = "disabled";
  	};
  };
-+
-+&msiof0 {
-+	pinctrl-0 = <&msiof0_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+
-+	pmic: pmic at 0 {
-+		compatible = "renesas,r2a11302ft";
-+		reg = <0>;
-+		spi-max-frequency = <6000000>;
-+		spi-cpol;
-+		spi-cpha;
-+	};
-+};
 -- 
 1.8.5.2
