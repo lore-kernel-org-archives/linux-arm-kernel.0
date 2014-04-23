@@ -1,47 +1,38 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Wed, 23 Apr 2014 14:09:46 +0530
-Subject: [PATCH 1/3] Documentation: dts: OMAP: Fix typos in DRA752 device
- name
-In-Reply-To: <1394788841-15112-2-git-send-email-rnayak@ti.com>
-References: <1394788841-15112-1-git-send-email-rnayak@ti.com>
- <1394788841-15112-2-git-send-email-rnayak@ti.com>
-Message-ID: <53577C52.1020809@ti.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Wed, 23 Apr 2014 10:49:37 +0200
+Subject: BUG: spinlock trylock failure on UP, i.MX28 3.12.15-rt25
+In-Reply-To: <53576859.8060706@linutronix.de>
+References: <534C3606.7010206@meduna.org> <534C731F.1050406@meduna.org>
+ <534DADF1.6060608@meduna.org>
+ <20140422115439.GA20669@linutronix.de>
+ <20140422094657.5b6ca1e2@gandalf.local.home>
+ <53569E05.8010600@linutronix.de>
+ <20140422134802.73fc1fa4@gandalf.local.home>
+ <20140422141650.7f43d5ba@gandalf.local.home>
+ <53576859.8060706@linutronix.de>
+Message-ID: <20140423084937.GH11096@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 14 March 2014 02:50 PM, Rajendra Nayak wrote:
-> DRA752 device is wrongly documented as DRA742 device. Fix the typo.
+On Wed, Apr 23, 2014 at 09:14:33AM +0200, Sebastian Andrzej Siewior wrote:
+> On 04/22/2014 08:16 PM, Steven Rostedt wrote:
+> > --- a/kernel/timer.c
+> > +++ b/kernel/timer.c
+> > @@ -1447,6 +1447,12 @@ static void run_timer_softirq(struct softirq_action *h)
+> >  		__run_timers(base);
+> >  }
+> >  
+> > +#ifdef CONFIG_SMP
+> > +#define timer_should_raise_softirq(lock)	!spin_do_trylock(lock)
+> > +#else
+> > +#define timer_should_raise_softirq(lock)	1
+> > +#endif
+> > +
+> 
+> No. The lock may be taken but it also may be available no matter if UP
+> or not. With this patch applied the lockdep splat will go away but the
+> FULL_NO_HZ people will come back because the timer softirq is scheduled
+> even if no timer has expired.
 
-Thanks to Nishanth for pointing out that the device part number is infact
-DRA742. The compatible sting infact seems to have a typo. I'll fix
-that up a post a v2 of this series soon.
-
-> 
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> ---
->  .../devicetree/bindings/arm/omap/omap.txt          |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
-> index af9b4a0..0491868 100644
-> --- a/Documentation/devicetree/bindings/arm/omap/omap.txt
-> +++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
-> @@ -48,7 +48,7 @@ SoC Families:
->    compatible = "ti,omap4"
->  - OMAP5 generic - defaults to OMAP5430
->    compatible = "ti,omap5"
-> -- DRA7 generic - defaults to DRA742
-> +- DRA7 generic - defaults to DRA752
->    compatible = "ti,dra7"
->  - AM43x generic - defaults to AM4372
->    compatible = "ti,am43"
-> @@ -79,7 +79,7 @@ SoCs:
->  - OMAP5432
->    compatible = "ti,omap5432", "ti,omap5"
->  
-> -- DRA742
-> +- DRA752
->    compatible = "ti,dra7xx", "ti,dra7"
->  
->  - AM4372
-> 
+You can do FULL_NO_HZ on UP ? That seems rather pointless, as there
+isn't a 'spare' CPU to do all the timekeeping on.
