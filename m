@@ -1,216 +1,84 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 23 Apr 2014 19:03:07 +0200
-Subject: [PATCH 1/5] clk: berlin: add support for clocks
-In-Reply-To: <1398261667-12621-2-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1398261667-12621-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1398261667-12621-2-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <5357F24B.8070405@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 23 Apr 2014 18:04:45 +0100
+Subject: [PATCH v3] arm64: enable EDAC on arm64
+In-Reply-To: <CAL_Jsq+pcK4XvSyahaK8zoxNMWrebqsU+funBqzR9MBfK2ABYA@mail.gmail.com>
+References: <1398096556-26799-1-git-send-email-robherring2@gmail.com>
+ <20140422102455.GD7484@arm.com>
+ <CAL_JsqKS_NZbxq_nFBnsQvj51TtraEeFm0aY=j=N3DwJ+bTL6g@mail.gmail.com>
+ <20140422132624.GC9820@arm.com>
+ <CAL_JsqJEwUu0ooEcL+hniD8vxjBW5571ea3u3JmPN3x1MfXW3w@mail.gmail.com>
+ <20140422160100.GH9820@arm.com>
+ <CAL_Jsq+pcK4XvSyahaK8zoxNMWrebqsU+funBqzR9MBfK2ABYA@mail.gmail.com>
+Message-ID: <20140423170445.GI5649@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/23/2014 04:01 PM, Alexandre Belloni wrote:
-> Add support for clocks having their own register set.
+On Tue, Apr 22, 2014 at 05:29:52PM +0100, Rob Herring wrote:
+> On Tue, Apr 22, 2014 at 11:01 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > Looking at the edac_mc_scrub_block code, atomic_scrub is always called with
+> > a normal, cacheable mapping (kmap_atomic) so that doesn't help us (although
+> > it means the exclusives will at least succeed).
+> >
+> > The problem of speculative reads by the CPU could be solved by unmapped the
+> > DMA buffer when we transfer the ownership over to the device (instead of
+> > invalidating it after the transfer). However, I'm now slightly confused as
+> > to how atomic_scrub fixes errors reported at any cache level higher than
+> > L1. Do we need cache-flushing to ensure that the exclusive-store propagates
+> > to the point of failure?
 > 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->  drivers/clk/berlin/Makefile |   2 +-
->  drivers/clk/berlin/clk.c    | 132 ++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 133 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/clk/berlin/clk.c
-> 
-> diff --git a/drivers/clk/berlin/Makefile b/drivers/clk/berlin/Makefile
-> index 94859513de90..9bfa58eaf25a 100644
-> --- a/drivers/clk/berlin/Makefile
-> +++ b/drivers/clk/berlin/Makefile
-> @@ -1,4 +1,4 @@
-> -obj-y += pll.o
-> +obj-y += pll.o clk.o
->  obj-$(CONFIG_MACH_BERLIN_BG2)   += pll-berlin2.o
->  obj-$(CONFIG_MACH_BERLIN_BG2CD) += pll-berlin2.o
->  obj-$(CONFIG_MACH_BERLIN_BG2Q)  += pll-berlin2q.o
-> diff --git a/drivers/clk/berlin/clk.c b/drivers/clk/berlin/clk.c
-> new file mode 100644
-> index 000000000000..a0e688e5bead
-> --- /dev/null
-> +++ b/drivers/clk/berlin/clk.c
-> @@ -0,0 +1,132 @@
-> +/*
-> + * Copyright (c) 2014 Marvell Technology Group Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along with
-> + * this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +#include <linux/bitops.h>
-> +#include <linux/clk-provider.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/slab.h>
-> +
-> +#include "common.h"
-> +
-> +#define CLKEN		(1 << 0)
+> The whole point of scrubbing is to stop repeated error reporting of
+> correctable errors. For example, you do a write to memory and the ECC
+> code is added to it. Suppose the data stored in the memory gets
+> corrupted either on the write or some time later you get a bit flip in
+> the memory cell. Then when the data is read from memory, the memory
+> controller will detect the error, correct it, and trigger and ECC
+> correctable error interrupt. It will do this every time you read that
+> memory location because the error occurred on the write. The only way
+> to clear the error is re-writing memory.
 
-Alexandre,
+Thanks for the explanation.
 
-please use BIT(n) instead of (1 << n).
+> As long as that cache line is dirty, no reads from that memory location
+> will occur as other readers will get the line from other cores, the L2, or
+> the line will get pushed out to memory first.
 
-> +#define CLKPLLSEL_MASK	7
-> +#define CLKPLLSEL_SHIFT	1
-> +#define CLKPLLSWITCH	(1 << 4)
-> +#define CLKSWITCH	(1 << 5)
-> +#define CLKD3SWITCH	(1 << 6)
-> +#define CLKSEL_MASK	7
-> +#define CLKSEL_SHIFT	7
+Agreed, if all of the readers are coherent.
 
-In general, I would change the above defines to CLK_SEL_MASK, i.e.
-add a _ after CLK. While at it (as it can be seen from the code
-below), also rename CLK_D3SWITCH to CLK_DIV3_SWITCH.
+> I guess you could see an invalidate on DMA memory causing the scrub to get
+> lost, but that doesn't really matter.  It would be harmless to get the
+> error again other than making your error rate seem higher (which is
+> something OEMs are very sensitive to). You are doing the invalidate so
+> that DMA can write new data anyway.
 
-> +
-> +struct berlin_clk {
-> +	struct clk_hw hw;
-> +	void __iomem *base;
-> +};
-> +
-> +#define to_berlin_clk(hw)	container_of(hw, struct berlin_clk, hw)
-> +
-> +static u8 clk_div[] = {1, 2, 4, 6, 8, 12, 1, 1};
-> +
-> +static unsigned long berlin_clk_recalc_rate(struct clk_hw *hw,
-> +					unsigned long parent_rate)
-> +{
-> +	u32 val, divider;
-> +	struct berlin_clk *clk = to_berlin_clk(hw);
-> +
-> +	val = readl_relaxed(clk->base);
-> +	if (val & CLKD3SWITCH)
-> +		divider = 3;
-> +	else {
-> +		if (val & CLKSWITCH) {
-> +			val >>= CLKSEL_SHIFT;
-> +			val &= CLKSEL_MASK;
-> +			divider = clk_div[val];
-> +		} else
-> +			divider = 1;
-> +	}
-> +
+Also agreed that the error-rate could be higher, but I still think there's
+a corruption issue here as well.
 
-There are stylistic issues:
+To be clear:
 
-if-else with one part being enclosed in {} requires both parts
-to be enclosed in those curly brackets, i.e.
+ (1) The CPU maps a non-coherent, streaming DMA buffer for a device to
+     populate (i.e. cache cleaning).
 
-if (foo)
-	bar;
-else {
-	foobar;
-	barfoo;
-}
+ (2) The device starts writing to the buffer
 
-has to become
+ (3) Whilst the device is writing, the CPU performs a speculative read
+     from the buffer and an ECC error occurs. The error is corrected and
+     the CPU gets a clean line, whilst an interrupt is pended at the GIC
+     to inform the CPU about the error.
 
-if (foo) {
-	bar;
-} else {
-	foobar;
-	barfoo;
-}
+ (4) The CPU takes the interrupt and starts scrubbing the line. It issues
+     the exclusive load but then...
 
-How about writing the above
+ (5) The device writes the location in question. The error is cleared (not
+     that we really care) and the memory location now contains new data
 
-> +	val = readl_relaxed(clk->base);
-> +	if (val & CLKD3SWITCH)
-> +		divider = 3;
-> +	else {
-> +		if (val & CLKSWITCH) {
-> +			val >>= CLKSEL_SHIFT;
-> +			val &= CLKSEL_MASK;
-> +			divider = clk_div[val];
-> +		} else
-> +			divider = 1;
-> +	}
+ (6) The CPU continues with its scrub, executing a successful
+     exclusive-store of *stale* data back to the memory location, but
+     allocating into L1.
 
+ (7) Before the DMA completes, the line gets evicted from L1 and back to
+     main memory, corrupting the DMA transfer.
 
-> +	return parent_rate / divider;
-> +}
-> +
-> +static u8 berlin_clk_get_parent(struct clk_hw *hw)
-> +{
-> +	u32 val;
-> +	struct berlin_clk *clk = to_berlin_clk(hw);
-> +
-> +	val = readl_relaxed(clk->base);
-> +	if (val & CLKPLLSWITCH) {
-> +		val >>= CLKPLLSEL_SHIFT;
-> +		val &= CLKPLLSEL_MASK;
-> +		return val;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct clk_ops berlin_clk_ops = {
-> +	.recalc_rate	= berlin_clk_recalc_rate,
-> +	.get_parent	= berlin_clk_get_parent,
-> +};
-> +
-> +static void __init berlin_clk_setup(struct device_node *np)
-> +{
-> +	struct clk_init_data init;
-> +	struct berlin_clk *bclk;
-> +	struct clk *clk;
-> +	const char **parent_names;
-> +	int nparents, i, ret;
-> +
-> +	bclk = kzalloc(sizeof(*bclk), GFP_KERNEL);
-> +	if (WARN_ON(!bclk))
-> +		return;
-> +
-> +	bclk->base = of_iomap(np, 0);
-> +	if (WARN_ON(!bclk->base))
-> +		goto exit;
-> +
-> +	nparents = of_clk_get_parent_count(np);
-> +	if (WARN_ON(!nparents))
-> +		goto exit;
-> +
-> +	parent_names = kzalloc((sizeof(char *) * nparents), GFP_KERNEL);
-> +	if (WARN_ON(!parent_names))
-> +		goto exit;
-> +
-> +	init.name = np->name;
-> +	init.ops = &berlin_clk_ops;
-> +	for (i = 0; i < nparents; i++) {
-> +		parent_names[i] = of_clk_get_parent_name(np, i);
-> +		if (!parent_names[i])
-> +			break;
-> +	}
-> +	init.parent_names = parent_names;
-> +	init.num_parents = i;
-> +
-> +	bclk->hw.init = &init;
-> +
-> +	clk = clk_register(NULL, &bclk->hw);
-> +	kfree(parent_names);
-> +	if (WARN_ON(IS_ERR(clk)))
-> +		goto exit;
-> +
-> +	ret = of_clk_add_provider(np, of_clk_src_simple_get, clk);
-> +	WARN_ON(ret);
-> +
-> +	return;
-> +exit:
-> +	kfree(bclk);
-> +}
-> +
-> +CLK_OF_DECLARE(berlin_clk, "marvell,berlin-clk", berlin_clk_setup);
-> 
+So that's more serious that inflated reports -- we're turning a corrected
+error into a data corruption.
+
+Will
