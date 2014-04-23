@@ -1,76 +1,60 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 22 Apr 2014 20:36:50 -0500
-Subject: kdump for ARM Linux?
-In-Reply-To: <132601cf5e89$94556a70$bd003f50$@gmail.com>
-References: <132601cf5e89$94556a70$bd003f50$@gmail.com>
-Message-ID: <CAL_JsqKRqyQUMdDBavh5vfQAq9bNZ7OCSdooqOKiPGX8eOGPSw@mail.gmail.com>
+From: zlim@broadcom.com (Zi Shen Lim)
+Date: Tue, 22 Apr 2014 18:40:12 -0700
+Subject: [PATCH 0/2] arm64 topology updates
+Message-ID: <1398217214-12204-1-git-send-email-zlim@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 22, 2014 at 7:18 PM, Andy Nicholas
-<andy.nicholas.work@gmail.com> wrote:
-> Hello, hopefully this is the correct mailing list for this question:
+First patch in this series purges unused mc_capable() and smt_capable(),
+similar to what went into 3.15-rc1 for other architectures. [1]
 
-Yes.
+Since this is fairly straightforward, please pick this one up soon, so
+we're in line with other architectures.
 
-> I'm working on a derivative of the mainline Linux 3.8 kernel and I'm trying
-> to enable ARM kdump functionality to collect crashdumps when we have kernel
-> problems. But, there's some kind of unresolved issue in
-> arch/arm/mm/ioremap.c which prevents /proc/vmcore from being able to
-> function properly. I checked and this appears to still be in kernel.org
-> Linux 3.13. The target platform is a regular, recent ARMv7 compatible chip.
+Second patch in this series adds MPIDR-based detection of cpu topology.
+MPIDR support is independent of topology information from DT or ACPI.
+MPIDR should always work for hardware that sets those bits with sane values.
 
-There are only irregular platforms.
+For cpu topology, MPIDR can be used as default method or as fallback for
+DT or ACPI. I lean towards MPIDR as default (at least on host/hypervisor),
+but will leave it up to the maintainers on detection priority :)
 
-> Has this issue been addressed in any version of an ARM Linux kernel? Or, is
-> there a work-around? If not, how does a crashdump file get generated when/if
-> the kernel crashes or a driver faults?
->
->>> WARNING: at arch/arm/mm/ioremap.c:244
-> __arm_ioremap_pfn_caller+0x1d8/0x1f0()
->>> Modules linked in:
->>> [<c0016660>] (unwind_backtrace+0x0/0x138) from [<c0020480>]
-> (warn_slowpath_common+0x4c/0x64)
->>> [<c0020480>] (warn_slowpath_common+0x4c/0x64) from [<c00204b4>]
-> (warn_slowpath_null+0x1c/0x24)
->>> [<c00204b4>] (warn_slowpath_null+0x1c/0x24) from [<c0018e9c>]
-> (__arm_ioremap_pfn_caller+0x1d8/0x1f0)
->>> [<c0018e9c>] (__arm_ioremap_pfn_caller+0x1d8/0x1f0) from [<c0018f20>]
-> (__arm_ioremap_caller+0x54/0x5c)
->>> [<c0018f20>] (__arm_ioremap_caller+0x54/0x5c) from [<c0018c58>]
-> (__arm_ioremap+0x18/0x1c)
->>> [<c0018c58>] (__arm_ioremap+0x18/0x1c) from [<c00168fc>]
-> (copy_oldmem_page+0x34/0xc0)
->>> [<c00168fc>] (copy_oldmem_page+0x34/0xc0) from [<c010350c>]
-> (read_from_oldmem+0xb8/0xe4)
->>> [<c010350c>] (read_from_oldmem+0xb8/0xe4) from [<c05c37e0>]
-> (parse_crash_elf32_headers+0x184/0x43c)
->>> [<c05c37e0>] (parse_crash_elf32_headers+0x184/0x43c) from [<c05c3b64>]
-> (vmcore_init+0xcc/0x198)
->>> [<c05c3b64>] (vmcore_init+0xcc/0x198) from [<c000863c>]
-> (do_one_initcall+0x34/0x184)
->>> [<c000863c>] (do_one_initcall+0x34/0x184) from [<c05b28dc>]
-> (kernel_init_freeable+0xfc/0x1c8)
->>> [<c05b28dc>] (kernel_init_freeable+0xfc/0x1c8) from [<c04326d4>]
-> (kernel_init+0x8/0xe4)
->>> [<c04326d4>] (kernel_init+0x8/0xe4) from [<c000ec58>]
-> (ret_from_fork+0x14/0x3c)
->>>
->>> arch/arm/mm/ioremap.c:244
->>>        /*
->>>          * Don't allow RAM to be mapped - this causes problems with
-> ARMv6+
->>>          */
->>>         if (WARN_ON(pfn_valid(pfn)))
->>>                 return NULL;
->
-> Thanks in advance for any help.
+I've tested this on my model with MT and it works for me.
+The code should cover known use cases. I hope to get confirmation,
+or more discussions, from others.
 
-This is on purpose as the comment says because 2 mappings of different
-types (of memory attributes) is undefined behavior on ARMv6+. RAM is
-normal memory type and mmio devices are device memory. This check
-could possibly be relaxed in the case the memory type is compatible
-with normal RAM mappings. Then perhaps ioremap_cache could be used on
-RAM for kdump.
+This series applies on 3.15-rc1.
 
-Rob
+Note that this series is functionally orthogonal to the series Mark Brown
+just posted. In off-list discussion with Mark, he's currently focusing on
+DT-related bits. For reference, his patches are:
+
+  [PATCH 1/4] arm64: topology: Initialise default topology state immediately
+  [PATCH 2/4] arm64: topology: Add support for topology DT bindings
+  [PATCH 3/4] arm64: topology: Tell the scheduler about the relative power of cores
+  [PATCH 4/4] arm64: topology: Provide relative power numbers for cores
+
+Thanks,
+z
+
+References:
+[1] Clean up from Bjorn Helgaas 36fc5500bb19 ("sched: Remove unused
+    mc_capable() and smt_capable()"). Link: https://lkml.org/lkml/2014/3/11/463
+
+Links to Mark's series:
+[1/4] http://www.spinics.net/lists/arm-kernel/msg324508.html
+[2/4] http://www.spinics.net/lists/arm-kernel/msg324507.html
+[3/4] http://www.spinics.net/lists/arm-kernel/msg324505.html
+[4/4] http://www.spinics.net/lists/arm-kernel/msg324506.html
+
+Zi Shen Lim (2):
+  arm64, sched: Remove unused mc_capable() and smt_capable()
+  arm64: topology: add MPIDR-based detection
+
+ arch/arm64/include/asm/cputype.h  |  2 ++
+ arch/arm64/include/asm/topology.h |  3 ---
+ arch/arm64/kernel/topology.c      | 31 +++++++++++++++++++++++++++++++
+ 3 files changed, 33 insertions(+), 3 deletions(-)
+
+-- 
+1.8.4.3
