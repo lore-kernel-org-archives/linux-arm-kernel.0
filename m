@@ -1,42 +1,42 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Wed, 23 Apr 2014 10:10:01 +0200
-Subject: BUG: spinlock trylock failure on UP, i.MX28 3.12.15-rt25
-In-Reply-To: <20140422140918.GE11096@twins.programming.kicks-ass.net>
-References: <534C3606.7010206@meduna.org> <534C731F.1050406@meduna.org>
- <534DADF1.6060608@meduna.org> <20140422115439.GA20669@linutronix.de>
- <20140422094657.5b6ca1e2@gandalf.local.home>
- <20140422140918.GE11096@twins.programming.kicks-ass.net>
-Message-ID: <53577559.9090501@linutronix.de>
+From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
+Date: Wed, 23 Apr 2014 10:13:05 +0200
+Subject: [PATCH 1/6] ata: ahci: add AHCI support for Berlin SoCs
+In-Reply-To: <4239617.ieu9uluV2B@amdc1032>
+References: <1398181105-19714-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1398181105-19714-2-git-send-email-antoine.tenart@free-electrons.com>
+ <4239617.ieu9uluV2B@amdc1032>
+Message-ID: <20140423081305.GA24355@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/22/2014 04:09 PM, Peter Zijlstra wrote:
-> On Tue, Apr 22, 2014 at 09:46:57AM -0400, Steven Rostedt wrote:
->>>  According to lockdep a trylock should not fail on UP.
+Hi,
+
+On Tue, Apr 22, 2014 at 06:54:27PM +0200, Bartlomiej Zolnierkiewicz wrote:
 > 
-> Oh!? Where does it say that? A trylock can fail at all times.
+> Hi,
+> 
+> On Tuesday, April 22, 2014 05:38:20 PM Antoine T?nart wrote:
 
-kernel/locking/spinlock_debug.c:
+[?]
 
-int do_raw_spin_trylock(raw_spinlock_t *lock)
- {
-         int ret = arch_spin_trylock(&lock->raw_lock);
+> > +static struct platform_driver ahci_berlin_driver = {
+> > +	.probe	= ahci_berlin_probe,
+> > +	.remove	= ata_platform_remove_one,
+> > +	.driver	= {
+> > +		.name		= "ahci-berlin",
+> > +		.owner		= THIS_MODULE,
+> > +		.of_match_table = ahci_berlin_of_match,
+> 
+> Please add a comment explaining lack of power management support
+> (i.e. that your platform doesn't have PM support implemented yet).
 
-         if (ret)
-                 debug_spin_lock_after(lock);
- #ifndef CONFIG_SMP
-         /*
-          * Must not happen on UP:
-          */
-         SPIN_BUG_ON(!ret, lock, "trylock failure on UP");
- #endif
-         return ret;
- }
+I can add the power management support in the v2.
 
-How can a trylock (spinlock, not mutex) fail on UP? That would mean the
-lock is not interrupt safe.
-Unless, you attempt to take the lock from interrupt context via trylock
-while in general you take the spinlock in process context with
-interrupts enabled.
+Thanks!
 
-Sebastian
+Antoine
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
