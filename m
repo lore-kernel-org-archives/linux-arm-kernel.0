@@ -1,40 +1,30 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 23 Apr 2014 17:13:22 -0300
-Subject: [PATCH] ARM: dts: imx6qdl-wandboard: Move FEC reset pin into the FEC
- pin group
-Message-ID: <1398284002-14396-1-git-send-email-festevam@gmail.com>
+From: marek@goldelico.com (Marek Belisko)
+Date: Wed, 23 Apr 2014 22:15:17 +0200
+Subject: [PATCH v2 0/3] Add display support for gta04 device
+Message-ID: <1398284120-4986-1-git-send-email-marek@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+This 3 patches adding display support for openmoko gta04 device.
+First patch add DT bindings for topolly td028 panel. Second add description for
+dss + panel and third fix panel probing when panel is compiled as module.
 
-Remove GPIO3_29 (FEC PHY reset pin) from the hog group and place it into
-pinctrl_enet pin group instead.
+Changes from v1:
+- extend panel compatible string by 'omapdss'
+- add tpo-td028 panel to dss_compat_conv_list
+- add MODULE_ALIAS macro to properly probe panel when is compiled as module
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx6qdl-wandboard.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Marek Belisko (3):
+  omapdss: panel-tpo-td028ec1: Add DT support.
+  ARM: dts: oma3-gta04: Add display support
+  omapdss: panel-tpo-td028ec1: Add module alias
 
-diff --git a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-index 5c6f10c..79498ca 100644
---- a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-@@ -104,7 +104,6 @@
- 				MX6QDL_PAD_ENET_RXD1__GPIO1_IO26 0x80000000 /* WL_REG_ON */
- 				MX6QDL_PAD_ENET_TXD1__GPIO1_IO29 0x80000000 /* WL_HOST_WAKE */
- 				MX6QDL_PAD_ENET_TXD0__GPIO1_IO30 0x80000000 /* WL_WAKE */
--				MX6QDL_PAD_EIM_D29__GPIO3_IO29   0x80000000
- 			>;
- 		};
- 
-@@ -136,6 +135,7 @@
- 				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x1b0b0
- 				MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0x4001b0a8
- 				MX6QDL_PAD_GPIO_6__ENET_IRQ		0x000b1
-+				MX6QDL_PAD_EIM_D29__GPIO3_IO29   	0x80000000
- 			>;
- 		};
- 
+ .../bindings/video/toppoly,td028ttec1.txt          | 30 ++++++++
+ arch/arm/boot/dts/omap3-gta04.dts                  | 86 ++++++++++++++++++++++
+ arch/arm/mach-omap2/display.c                      |  1 +
+ .../omap2/displays-new/panel-tpo-td028ttec1.c      | 33 ++++++++-
+ 4 files changed, 149 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/video/toppoly,td028ttec1.txt
+
 -- 
 1.8.3.2
