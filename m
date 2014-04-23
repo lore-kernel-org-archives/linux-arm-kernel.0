@@ -1,28 +1,83 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 22 Apr 2014 17:42:34 -0700
-Subject: [PATCH] Input: atkbd - fix keyboard LG Electronics
-In-Reply-To: <1398185970-16331-1-git-send-email-ssl@chromium.org>
-References: <1398185970-16331-1-git-send-email-ssl@chromium.org>
-Message-ID: <20140423004233.GC22547@core.coreip.homeip.net>
+From: nathan_lynch@mentor.com (Nathan Lynch)
+Date: Tue, 22 Apr 2014 19:48:52 -0500
+Subject: [PATCH v6 1/6] ARM: place sigpage at a random offset above stack
+In-Reply-To: <cover.1398213562.git.nathan_lynch@mentor.com>
+References: <cover.1398213562.git.nathan_lynch@mentor.com>
+Message-ID: <ba82d55b9da9dc6bae7530ccd87e09bc25997aff.1398213562.git.nathan_lynch@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sheng-Liang,
+The sigpage is currently placed alongside shared libraries etc in the
+address space.  Similar to what x86_64 does, place the sigpage at a
+randomized offset above the stack so that learning the base address of
+the sigpage doesn't help expose where shared libraries are loaded in
+the address space (and vice versa).
 
-On Tue, Apr 22, 2014 at 09:59:30AM -0700, Sheng-Liang Song wrote:
-> After issuing ATKBD_CMD_RESET_DIS, LG Keyboard stop working.
-> The workaround is to issue ATKBD_CMD_RESET_DEF after ATKBD_CMD_RESET_DIS.
+This code will be used for placing the vdso as well, hence the
+vdso_addr function name and npages argument.
 
-Hmm, if ATKBD_CMD_RESET_DIS causes keyboard not working should we
-simply not call it on LG devices?
+Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
+---
+ arch/arm/kernel/process.c | 33 ++++++++++++++++++++++++++++++++-
+ 1 file changed, 32 insertions(+), 1 deletion(-)
 
-The idea for using ATKBD_CMD_RESET_DIS was for keyboard to stop
-generating scan codes so they do not interfere with detection/resume and
-issuing ATKBD_CMD_RESET_DEF right after ATKBD_CMD_RESET_DIS keeps
-keyboard in exactly the same state as it was before (i.e. generating
-scancodes).
-
-Thanks.
-
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 81ef686a91ca..219a0d1d10fc 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -477,6 +477,35 @@ const char *arch_vma_name(struct vm_area_struct *vma)
+ 		 "[sigpage]" : NULL;
+ }
+ 
++static unsigned long vdso_addr(const struct mm_struct *mm, unsigned int npages)
++{
++	unsigned long offset;
++	unsigned long first;
++	unsigned long last;
++	unsigned long addr;
++	unsigned int slots;
++
++	first = PAGE_ALIGN(mm->start_stack);
++
++	last = TASK_SIZE - (npages << PAGE_SHIFT);
++
++	/* No room after stack? */
++	if (first > last)
++		return 0;
++
++	/* Just enough room? */
++	if (first == last)
++		return first;
++
++	slots = ((last - first) >> PAGE_SHIFT) + 1;
++
++	offset = get_random_int() % slots;
++
++	addr = first + (offset << PAGE_SHIFT);
++
++	return addr;
++}
++
+ static struct page *signal_page;
+ extern struct page *get_signal_page(void);
+ 
+@@ -484,6 +513,7 @@ int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
+ {
+ 	struct mm_struct *mm = current->mm;
+ 	unsigned long addr;
++	unsigned long hint;
+ 	int ret;
+ 
+ 	if (!signal_page)
+@@ -492,7 +522,8 @@ int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
+ 		return -ENOMEM;
+ 
+ 	down_write(&mm->mmap_sem);
+-	addr = get_unmapped_area(NULL, 0, PAGE_SIZE, 0, 0);
++	hint = vdso_addr(mm, 1);
++	addr = get_unmapped_area(NULL, hint, PAGE_SIZE, 0, 0);
+ 	if (IS_ERR_VALUE(addr)) {
+ 		ret = addr;
+ 		goto up_fail;
 -- 
-Dmitry
+1.8.3.1
