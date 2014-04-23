@@ -1,66 +1,22 @@
-From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Wed, 23 Apr 2014 09:22:22 -0700
-Subject: [PATCH] ARM64: disable DCACHE_WORD_ACCESS in big endian case
-In-Reply-To: <20140423123845.GB5649@arm.com>
-References: <1398119770-27817-1-git-send-email-victor.kamensky@linaro.org>
- <20140422094659.GB6979@arm.com>
- <CAA3XUr20eFyLshVM+7VBSMz4a4-cCA0PLrYGN5oyk-wOM2NLtg@mail.gmail.com>
- <20140423123845.GB5649@arm.com>
-Message-ID: <CAA3XUr1LLphqsumkbY8UJNVx2R9_okjGox9SqukZ8cZib-AZgw@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 23 Apr 2014 10:24:47 -0600
+Subject: [PATCH 2/3] clk: tegra: remove non-existent clocks
+In-Reply-To: <1396383197-5979-2-git-send-email-swarren@wwwdotorg.org>
+References: <1396383197-5979-1-git-send-email-swarren@wwwdotorg.org>
+ <1396383197-5979-2-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <5357E94F.7000408@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 April 2014 05:38, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Apr 23, 2014 at 07:37:11AM +0100, Victor Kamensky wrote:
->> Hi Will,
->
-> Hi Victor,
->
-> Thanks for investigating this!
->
->> On 22 April 2014 02:46, Will Deacon <will.deacon@arm.com> wrote:
->> > On Mon, Apr 21, 2014 at 11:36:10PM +0100, Victor Kamensky wrote:
->> The issue turned out to be in another commit: "word-at-a-time:
->> provide generic big-endian zero_bytemask implementation". Because
->> of the issue in zero_bytemask function full_name_hash and
->> hash_name were giving different hash results for the same path
->> name (without slash). The issue is that (~0ul << 64) gives
->> ~0ul not 0. I could not come up with more elegant solution other
->> than use inline function that check shift value against type maximum
->> width. Please take a look below.
->
-> Ah yes, we're in UNDEFINED territory here and AArch64 differs from AArch32
-> wrt LSL >= register width. Can you try the following instead of your patch
-> please? I think it should be more efficient.
+On 04/01/2014 02:13 PM, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
+> 
+> The Tegra124 clock driver currently provides 3 clocks that don't actually
+> exist; 2 for NAND and one for UART5/UARTE. Delete these.
 
-Yes, it works. Checked initramfs and nfs boot with FVP.
-I knew you could do it way more elegant :).
+Mike, are you OK with this patch? Can I get your ack so this patch can
+be taken into a branch with a couple other patches that it depends or or
+depend on it.
 
-How do we get it in? Do you want to commit/submit it yourself?
-
-Thanks,
-Victor
-
-> Cheers,
->
-> Will
->
-> --->8
->
-> diff --git a/include/asm-generic/word-at-a-time.h b/include/asm-generic/word-at-a-time.h
-> index d3909effd725..243ce8c84ee9 100644
-> --- a/include/asm-generic/word-at-a-time.h
-> +++ b/include/asm-generic/word-at-a-time.h
-> @@ -50,11 +50,7 @@ static inline bool has_zero(unsigned long val, unsigned long *data, const struct
->  }
->
->  #ifndef zero_bytemask
-> -#ifdef CONFIG_64BIT
-> -#define zero_bytemask(mask)    (~0ul << fls64(mask))
-> -#else
-> -#define zero_bytemask(mask)    (~0ul << fls(mask))
-> -#endif /* CONFIG_64BIT */
-> +#define zero_bytemask(mask)    (mask ? ~0ul << __fls(mask) << 1 : ~0ul)
->  #endif /* zero_bytemask */
->
->  #endif /* _ASM_WORD_AT_A_TIME_H */
+arm-soc, I was hoping this whole series would get applied for 3.15
+through the arm-soc tree. Is there any issue with that?
