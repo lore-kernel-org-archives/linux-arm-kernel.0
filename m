@@ -1,96 +1,88 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Wed, 23 Apr 2014 20:08:12 +0100
-Subject: [PATCH 24/38] mmc: sdhci: cache timing information locally
+Date: Wed, 23 Apr 2014 20:08:23 +0100
+Subject: [PATCH 26/38] mmc: sdhci-esdhc-imx: remove emulation of uhs_mode
 In-Reply-To: <20140423185534.GA26756@n2100.arm.linux.org.uk>
 References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
-Message-ID: <E1Wd2Wi-0003vt-VY@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Wd2Wt-0003w1-6P@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rather than reading back the timing information from the registers,
-cache it locally.  This allows implementations to translate the UHS
-timing by overriding the set_uhs_signaling() method as required
-without also having to emulate the SDHCI_HOST_CONTROL2 register.
+We no longer need to emulate the uhs_mode field of the host control2
+register - the main sdhci driver never reads this back to evaluate
+the current mode as it caches the current mode instead.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/mmc/host/sdhci.c  | 23 ++++++++++++-----------
- include/linux/mmc/sdhci.h |  2 ++
- 2 files changed, 14 insertions(+), 11 deletions(-)
+ drivers/mmc/host/sdhci-esdhc-imx.c | 17 +++--------------
+ 1 file changed, 3 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index 1afed0ab338c..5f067a040ec4 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -1083,24 +1083,23 @@ static void sdhci_finish_command(struct sdhci_host *host)
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index 72e0581e564f..4866d802f9e2 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -160,7 +160,6 @@ struct pltfm_imx_data {
+ 		MULTIBLK_IN_PROCESS, /* exact multiblock cmd in process */
+ 		WAIT_FOR_INT,        /* sent CMD12, waiting for response INT */
+ 	} multiblock_status;
+-	u32 uhs_mode;
+ 	u32 is_ddr;
+ };
  
- static u16 sdhci_get_preset_value(struct sdhci_host *host)
+@@ -382,7 +381,6 @@ static u16 esdhc_readw_le(struct sdhci_host *host, int reg)
+ 		if (val & ESDHC_MIX_CTRL_SMPCLK_SEL)
+ 			ret |= SDHCI_CTRL_TUNED_CLK;
+ 
+-		ret |= (imx_data->uhs_mode & SDHCI_CTRL_UHS_MASK);
+ 		ret &= ~SDHCI_CTRL_PRESET_VAL_ENABLE;
+ 
+ 		return ret;
+@@ -429,7 +427,6 @@ static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
+ 		else
+ 			new_val &= ~ESDHC_VENDOR_SPEC_VSELECT;
+ 		writel(new_val, host->ioaddr + ESDHC_VENDOR_SPEC);
+-		imx_data->uhs_mode = val & SDHCI_CTRL_UHS_MASK;
+ 		if (imx_data->socdata->flags & ESDHC_FLAG_MAN_TUNING) {
+ 			new_val = readl(host->ioaddr + ESDHC_MIX_CTRL);
+ 			if (val & SDHCI_CTRL_TUNED_CLK)
+@@ -841,28 +838,20 @@ static int esdhc_change_pinstate(struct sdhci_host *host,
+ 	return pinctrl_select_state(imx_data->pinctrl, pinctrl);
+ }
+ 
+-static void esdhc_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
++static void esdhc_set_uhs_signaling(struct sdhci_host *host, unsigned timing)
  {
--	u16 ctrl, preset = 0;
-+	u16 preset = 0;
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+ 	struct pltfm_imx_data *imx_data = pltfm_host->priv;
+ 	struct esdhc_platform_data *boarddata = &imx_data->boarddata;
  
--	ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
--
--	switch (ctrl & SDHCI_CTRL_UHS_MASK) {
--	case SDHCI_CTRL_UHS_SDR12:
-+	switch (host->timing) {
-+	case MMC_TIMING_UHS_SDR12:
- 		preset = sdhci_readw(host, SDHCI_PRESET_FOR_SDR12);
+-	switch (uhs) {
++	switch (timing) {
+ 	case MMC_TIMING_UHS_SDR12:
+-		imx_data->uhs_mode = SDHCI_CTRL_UHS_SDR12;
+-		break;
+ 	case MMC_TIMING_UHS_SDR25:
+-		imx_data->uhs_mode = SDHCI_CTRL_UHS_SDR25;
+-		break;
+ 	case MMC_TIMING_UHS_SDR50:
+-		imx_data->uhs_mode = SDHCI_CTRL_UHS_SDR50;
+-		break;
+ 	case MMC_TIMING_UHS_SDR104:
+ 	case MMC_TIMING_MMC_HS200:
+-		imx_data->uhs_mode = SDHCI_CTRL_UHS_SDR104;
  		break;
--	case SDHCI_CTRL_UHS_SDR25:
-+	case MMC_TIMING_UHS_SDR25:
- 		preset = sdhci_readw(host, SDHCI_PRESET_FOR_SDR25);
+ 	case MMC_TIMING_UHS_DDR50:
+-		imx_data->uhs_mode = SDHCI_CTRL_UHS_DDR50;
+ 		writel(readl(host->ioaddr + ESDHC_MIX_CTRL) |
+ 				ESDHC_MIX_CTRL_DDREN,
+ 				host->ioaddr + ESDHC_MIX_CTRL);
+@@ -879,7 +868,7 @@ static void esdhc_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
  		break;
--	case SDHCI_CTRL_UHS_SDR50:
-+	case MMC_TIMING_UHS_SDR50:
- 		preset = sdhci_readw(host, SDHCI_PRESET_FOR_SDR50);
- 		break;
--	case SDHCI_CTRL_UHS_SDR104:
-+	case MMC_TIMING_UHS_SDR104:
-+	case MMC_TIMING_MMC_HS200:
- 		preset = sdhci_readw(host, SDHCI_PRESET_FOR_SDR104);
- 		break;
--	case SDHCI_CTRL_UHS_DDR50:
-+	case MMC_TIMING_UHS_DDR50:
- 		preset = sdhci_readw(host, SDHCI_PRESET_FOR_DDR50);
- 		break;
- 	default:
-@@ -1530,6 +1529,7 @@ static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
- 		}
+ 	}
  
- 		host->ops->set_uhs_signaling(host, ios->timing);
-+		host->timing = ios->timing;
+-	esdhc_change_pinstate(host, uhs);
++	esdhc_change_pinstate(host, timing);
+ }
  
- 		if (!(host->quirks2 & SDHCI_QUIRK2_PRESET_VALUE_BROKEN) &&
- 				((ios->timing == MMC_TIMING_UHS_SDR12) ||
-@@ -1828,12 +1828,13 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
- 	 * If the Host Controller supports the HS200 mode then the
- 	 * tuning function has to be executed.
- 	 */
--	if (((ctrl & SDHCI_CTRL_UHS_MASK) == SDHCI_CTRL_UHS_SDR50) &&
-+	if (host->timing == MMC_TIMING_UHS_SDR50 &&
- 	    (host->flags & SDHCI_SDR50_NEEDS_TUNING ||
- 	     host->flags & SDHCI_SDR104_NEEDS_TUNING))
- 		requires_tuning_nonuhs = true;
- 
--	if (((ctrl & SDHCI_CTRL_UHS_MASK) == SDHCI_CTRL_UHS_SDR104) ||
-+	if (host->timing == MMC_TIMING_MMC_HS200 ||
-+	    host->timing == MMC_TIMING_UHS_SDR104 ||
- 	    requires_tuning_nonuhs)
- 		ctrl |= SDHCI_CTRL_EXEC_TUNING;
- 	else {
-diff --git a/include/linux/mmc/sdhci.h b/include/linux/mmc/sdhci.h
-index 72a90baf111f..7f3efbab8732 100644
---- a/include/linux/mmc/sdhci.h
-+++ b/include/linux/mmc/sdhci.h
-@@ -172,6 +172,8 @@ struct sdhci_host {
- 	unsigned int            ocr_avail_mmc;
- 	u32 ocr_mask;		/* available voltages */
- 
-+	unsigned		timing;		/* Current timing */
-+
- 	u32			thread_isr;
- 
- 	/* cached registers */
+ static void esdhc_reset(struct sdhci_host *host, u8 mask)
 -- 
 1.8.3.1
