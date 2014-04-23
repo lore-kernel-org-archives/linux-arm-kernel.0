@@ -1,22 +1,110 @@
-From: sebastian.capella@linaro.org (Sebastian Capella)
-Date: Wed, 23 Apr 2014 09:39:48 -0700
-Subject: [PATCH v7 2/2] ARM hibernation / suspend-to-disk
-In-Reply-To: <CADHgK6tg=7JpYgc0LBmpQzJS-TjK5v_0FQeKRxuFNTqy=QSQzA@mail.gmail.com>
-References: <1394016605-24120-1-git-send-email-sebastian.capella@linaro.org>
- <1394016605-24120-3-git-send-email-sebastian.capella@linaro.org>
- <20140416101243.GA6952@n2100.arm.linux.org.uk>
- <CADHgK6vyWU1HCueN=F5D0JxzknV==h-jOG9JmcXeOrH_RGV4JQ@mail.gmail.com>
- <CADHgK6v43=KSpe2FRG374nbHSMOt9hb+xEhO7z20vhEAQsx0tQ@mail.gmail.com>
- <CADHgK6tg=7JpYgc0LBmpQzJS-TjK5v_0FQeKRxuFNTqy=QSQzA@mail.gmail.com>
-Message-ID: <CADHgK6uCQT2iAfL+oQvwN7f65u4musKP-AX-E6j1i2OL6ZMJwA@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 23 Apr 2014 17:39:56 +0100
+Subject: [PATCH 6/8] tty/serial: pl011: add generic earlycon support
+In-Reply-To: <CAL_Jsq+rQA8p9oYk-Urh_z6MTqCy0RNr=k0nz7r0OTuMCPUNWA@mail.gmail.com>
+References: <1395436128-11244-1-git-send-email-robherring2@gmail.com>
+ <1395436128-11244-7-git-send-email-robherring2@gmail.com>
+ <20140324112821.GE3850@arm.com>
+ <CAL_Jsq+rQA8p9oYk-Urh_z6MTqCy0RNr=k0nz7r0OTuMCPUNWA@mail.gmail.com>
+Message-ID: <20140423163954.GA14426@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Wed, Apr 16, 2014 at 11:14:28PM +0100, Rob Herring wrote:
+> On Mon, Mar 24, 2014 at 6:28 AM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > On Fri, Mar 21, 2014 at 09:08:46PM +0000, Rob Herring wrote:
+> >> From: Rob Herring <robh@kernel.org>
+> >>
+> >> Add earlycon support for the pl011 serial port. This allows enabling
+> >> the pl011 for console when early_params are processed. This is based
+> >> on the arm64 earlyprintk support and is intended to replace it.
+> >>
+> >> Signed-off-by: Rob Herring <robh@kernel.org>
+> >> Cc: Russell King <linux@arm.linux.org.uk>
+> >> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> >> Cc: Jiri Slaby <jslaby@suse.cz>
+> >> ---
+> >>  Documentation/kernel-parameters.txt |  5 +++--
+> >>  drivers/tty/serial/amba-pl011.c     | 30 +++++++++++++++++++++++++++++-
+> >>  2 files changed, 32 insertions(+), 3 deletions(-)
+> >>
+> >> diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+> >> index 5ce8b7a..81bdd52 100644
+> >> --- a/Documentation/kernel-parameters.txt
+> >> +++ b/Documentation/kernel-parameters.txt
+> >> @@ -887,8 +887,9 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+> >>               uart[8250],io,<addr>[,options]
+> >>               uart[8250],mmio,<addr>[,options]
+> >>               uart[8250],mmio32,<addr>[,options]
+> >> -                     Start an early, polled-mode console on the 8250/16550
+> >> -                     UART at the specified I/O port or MMIO address.
+> >> +             pl011,<addr>
+> >> +                     Start an early, polled-mode console on a serial port
+> >> +                     at the specified I/O port or MMIO address. 8250
+> >>                       MMIO inter-register address stride is either 8-bit
+> >>                       (mmio) or 32-bit (mmio32).
+> >>                       The options are the same as for ttyS, above.
+> >
+> > I think the last line is a bit misleading. Or did you intend to leave it
+> > with the uart[8250] parameter? See below:
+> 
+> How about this (excuse the gmail lack of tabs):
+> 
+> earlycon= [KNL] Output early console device and options.
+> 
+>  uart[8250],io,<addr>[,options]
+>  uart[8250],mmio,<addr>[,options]
+>  uart[8250],mmio32,<addr>[,options]
+>   Start an early, polled-mode console on an 8250 serial
+>   port at the specified I/O port or MMIO address. 8250
+>   MMIO inter-register address stride is either 8-bit
+>   (mmio) or 32-bit (mmio32).
+> 
+>   The options are the same as for ttyS, above.
+> 
+>  pl011,<addr>
+>   Start an early, polled-mode console on a pl011 serial
+>   port at the specified address. The pl011 serial port
+>   must already be setup and configured. Options are not
+>   yet supported.
+> 
+>  smh Use ARM semihosting calls for early console.
 
-Ran this overnight and no failures on >1000 hibernations.
+It looks fine.
 
-Looks good.
-Thanks!
+> >> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+> >> index d4eda24..4227c0a 100644
+> >> --- a/drivers/tty/serial/amba-pl011.c
+> >> +++ b/drivers/tty/serial/amba-pl011.c
+> > [...]
+> >> +static int __init pl011_early_console_setup(struct earlycon_device *device,
+> >> +                                         const char *opt)
+> >> +{
+> >> +     if (!device->port.membase)
+> >> +             return -ENODEV;
+> >> +
+> >> +     device->con->write = pl011_early_write;
+> >> +     return 0;
+> >> +}
+> >> +EARLYCON_DECLARE(pl011, pl011_early_console_setup);
+> >
+> > Here we expect the PL011 to be already initialised by the boot loader
+> > and the kernel continues using the same settings. So maybe clarify this
+> > in the pl011 kernel parameter doc and we can add proper configuration
+> > using a separate patch.
+> 
+> Enabling and setup would not be too hard, but either baud rate will
+> always have to be configured or we'll have to specify the input clock
+> rate too. The 8250 driver basically does the former or assumes a fixed
+> clock.
+> 
+> Adding any setup will also break any non-pl011 based SBSA compliant
+> uart since the configuration registers are not standardized. I guess
+> we can add "sbsauart" when/if that happens.
 
-Sebastian
+I think for now we can assume that the pl011 is initialised at the
+right baud rate prior to starting the kernel.
+
+-- 
+Catalin
