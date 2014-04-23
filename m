@@ -1,110 +1,153 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 23 Apr 2014 17:39:56 +0100
-Subject: [PATCH 6/8] tty/serial: pl011: add generic earlycon support
-In-Reply-To: <CAL_Jsq+rQA8p9oYk-Urh_z6MTqCy0RNr=k0nz7r0OTuMCPUNWA@mail.gmail.com>
-References: <1395436128-11244-1-git-send-email-robherring2@gmail.com>
- <1395436128-11244-7-git-send-email-robherring2@gmail.com>
- <20140324112821.GE3850@arm.com>
- <CAL_Jsq+rQA8p9oYk-Urh_z6MTqCy0RNr=k0nz7r0OTuMCPUNWA@mail.gmail.com>
-Message-ID: <20140423163954.GA14426@localhost>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 23 Apr 2014 17:43:28 +0100
+Subject: [PATCH RFC 3/3] drm/exynos: use pending_components for
+ components tracking
+In-Reply-To: <5357D68E.8060605@samsung.com>
+References: <1397734130-21019-1-git-send-email-a.hajda@samsung.com>
+ <1397734130-21019-4-git-send-email-a.hajda@samsung.com>
+ <20140417220412.GZ24070@n2100.arm.linux.org.uk>
+ <5351145D.8070207@samsung.com>
+ <20140418124652.GE24070@n2100.arm.linux.org.uk>
+ <535652B2.7000607@samsung.com>
+ <20140422115145.GU24070@n2100.arm.linux.org.uk>
+ <5357D68E.8060605@samsung.com>
+Message-ID: <20140423164328.GG24070@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 16, 2014 at 11:14:28PM +0100, Rob Herring wrote:
-> On Mon, Mar 24, 2014 at 6:28 AM, Catalin Marinas
-> <catalin.marinas@arm.com> wrote:
-> > On Fri, Mar 21, 2014 at 09:08:46PM +0000, Rob Herring wrote:
-> >> From: Rob Herring <robh@kernel.org>
-> >>
-> >> Add earlycon support for the pl011 serial port. This allows enabling
-> >> the pl011 for console when early_params are processed. This is based
-> >> on the arm64 earlyprintk support and is intended to replace it.
-> >>
-> >> Signed-off-by: Rob Herring <robh@kernel.org>
-> >> Cc: Russell King <linux@arm.linux.org.uk>
-> >> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> >> Cc: Jiri Slaby <jslaby@suse.cz>
-> >> ---
-> >>  Documentation/kernel-parameters.txt |  5 +++--
-> >>  drivers/tty/serial/amba-pl011.c     | 30 +++++++++++++++++++++++++++++-
-> >>  2 files changed, 32 insertions(+), 3 deletions(-)
-> >>
-> >> diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
-> >> index 5ce8b7a..81bdd52 100644
-> >> --- a/Documentation/kernel-parameters.txt
-> >> +++ b/Documentation/kernel-parameters.txt
-> >> @@ -887,8 +887,9 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
-> >>               uart[8250],io,<addr>[,options]
-> >>               uart[8250],mmio,<addr>[,options]
-> >>               uart[8250],mmio32,<addr>[,options]
-> >> -                     Start an early, polled-mode console on the 8250/16550
-> >> -                     UART at the specified I/O port or MMIO address.
-> >> +             pl011,<addr>
-> >> +                     Start an early, polled-mode console on a serial port
-> >> +                     at the specified I/O port or MMIO address. 8250
-> >>                       MMIO inter-register address stride is either 8-bit
-> >>                       (mmio) or 32-bit (mmio32).
-> >>                       The options are the same as for ttyS, above.
+On Wed, Apr 23, 2014 at 05:04:46PM +0200, Andrzej Hajda wrote:
+> On 04/22/2014 01:51 PM, Russell King - ARM Linux wrote:
+> > Yes, I know that you're desperate to play that down, but you can't get
+> 
+> Not true. I only try to find the best solution and the approach with
+> multiple re-probing just to avoid potential bugs in drivers does not
+> look to me correct.
+> 
+> > away from this fact: your approach _forces_ a split up of the
+> > initialisation into dependent two stages and that fact _alone_ adds
+> > additional complexity, and along with that additional complexity comes
+> > more opportunity for bugs. 
+> 
+> This sound so funny, just look at componentize patches - every patch
+> adds two stage initialization for every component and the master,
+> with forced unwinding and two levels of devres management.
+
+*Sigh*.  Why am I bothering discussing this with you.
+
+*NO* it does not, for the VERY SIMPLE reason that NOTHING is done before
+the BIND.  NO structures are allocated.  NOTHING is setup.  The *only*
+thing that is done is the driver registers with the component helper.
+
+That's not two stage initialisation.  That's *single* stage.
+
+> 'My approach' adds only one call to probe and one call to remove of
+> components, and very simple and straightforward interface to the master.
+
+You're talking utter garbage there.
+
+> 'My approach' is very standard - during probe driver probes hardware,
+> and registers interfaces which can be used by other drivers, for example
+> by drm master. The only addition is reporting its readiness. Comparing to
+> 'your approach' it is bloody simple.
+
+More unbelievable crap.
+
+> >  Also with that additional complexity comes
+> > the need to perform more tests to find those bugs, and given that most
+> > people just say "okay, it boots and seems to work, that's good enough
+> > for me" there is a high possibility that these kinds of bugs will take
+> > a long time to find.
+> 
+> Volume of changes for each component and drm device management
+> dispersed on all components makes your argument very valid for
+> component subsystem.
+> 
+> Btw have you observed component framework when one of the components
+> during bind returns -EPROBE_DEFER ? In my tests it resulted in
+> deferred probing of master and unbind/bind of other components.
+> So lets say you have N components and the last component will be deferred
+> K times, it results in:
+> - K times deferring of the last component and the master,
+> - (N - 1) * K - unbinds and binds of other components.
+
+True, and you can't get away from that with proper behaviour.
+
+> >> As I wrote already, this framework was proposed for drivers which
+> >> are tied together anyway, and this is case of many drivers, not
+> >> only exynos.
+> > Please name them.
+
+You ignored this.  Therefore, I assume that you *can't* name them because
+there *aren't* any.  I called your bluff, I win.
+
+> > At the moment, I don't see a justification for your "simplified"
+> > and restrictive solution, which if used will lock drivers into that
+> > simplisitic method, and which can't ever be extended without lots of
+> > ifdeffery to having other components (such as TDA998x) attached.
 > >
-> > I think the last line is a bit misleading. Or did you intend to leave it
-> > with the uart[8250] parameter? See below:
-> 
-> How about this (excuse the gmail lack of tabs):
-> 
-> earlycon= [KNL] Output early console device and options.
-> 
->  uart[8250],io,<addr>[,options]
->  uart[8250],mmio,<addr>[,options]
->  uart[8250],mmio32,<addr>[,options]
->   Start an early, polled-mode console on an 8250 serial
->   port at the specified I/O port or MMIO address. 8250
->   MMIO inter-register address stride is either 8-bit
->   (mmio) or 32-bit (mmio32).
-> 
->   The options are the same as for ttyS, above.
-> 
->  pl011,<addr>
->   Start an early, polled-mode console on a pl011 serial
->   port at the specified address. The pl011 serial port
->   must already be setup and configured. Options are not
->   yet supported.
-> 
->  smh Use ARM semihosting calls for early console.
-
-It looks fine.
-
-> >> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-> >> index d4eda24..4227c0a 100644
-> >> --- a/drivers/tty/serial/amba-pl011.c
-> >> +++ b/drivers/tty/serial/amba-pl011.c
-> > [...]
-> >> +static int __init pl011_early_console_setup(struct earlycon_device *device,
-> >> +                                         const char *opt)
-> >> +{
-> >> +     if (!device->port.membase)
-> >> +             return -ENODEV;
-> >> +
-> >> +     device->con->write = pl011_early_write;
-> >> +     return 0;
-> >> +}
-> >> +EARLYCON_DECLARE(pl011, pl011_early_console_setup);
+> > My objections are entirely based on where imx-drm and armada DRM are
+> > going, neither of which could ever use your implementation.
 > >
-> > Here we expect the PL011 to be already initialised by the boot loader
-> > and the kernel continues using the same settings. So maybe clarify this
-> > in the pl011 kernel parameter doc and we can add proper configuration
-> > using a separate patch.
+> > Before you say that it isn't meant to deal with stuff like the TDA998x,
+> > take a moment to think about this - the Dove video subsystem was
+> > designed to support OLPC.  It was primerly designed to drive a LCD
+> > screen plus an on-board VGA DAC.  Everything for that is on-SoC.  With
+> > that, the hardware is well known, and your solution could be used.
+> >
+> > However, then SolidRun came along and dropped a TDA998x on the LCD output
+> > pins.  Suddenly, things aren't that simple, and your solution falls
+> > apart, because it can't cope with a generic component that has no knowledge
+> > of the rest of its "master".
+> >
+> > This kind of scenario can happen /any/ time, and any time it does happen,
+> > your simple solution falls apart.
 > 
-> Enabling and setup would not be too hard, but either baud rate will
-> always have to be configured or we'll have to specify the input clock
-> rate too. The 8250 driver basically does the former or assumes a fixed
-> clock.
-> 
-> Adding any setup will also break any non-pl011 based SBSA compliant
-> uart since the configuration registers are not standardized. I guess
-> we can add "sbsauart" when/if that happens.
+> I think I have answered you two or three times that it is not a problem
+> to remove
+> 'glued drivers' restriction. I desperately try to avoid accusing you for
+> 'desperately
+> playing down' on this subject, so I will not comment this anymore.
 
-I think for now we can assume that the pl011 is initialised at the
-right baud rate prior to starting the kernel.
+Right, so what I draw from this is that *you* again refuse to answer this
+point because despite your assertions that your solution can do it, you
+have no clue as to *how* it can be done.  I've looked at your solution
+with respect to this, and I *can't* see how it can be done either.  That's
+why I've been asking *you* the question, so that *you* can provide some
+technical input to it.
+
+> On the other hand you have not answered quite important question - how
+> do you plan to componentize drivers shared by different drms when
+> one of drms is not componentized???
+
+Read this, from a message I sent at the beginning of February:
+| Here's my changes to the TDA998x driver to add support for the component
+| helper.  The TDA998x driver retains support for the old way so that
+| drivers can be transitioned.  For any one DRM "card" the transition to
+| using the component layer must be all-in or all-out - partial transitions
+| are not permitted with the simple locking implementation currently in
+| the component helper due to the possibility of deadlock.  (Master
+| binds, holding the component lock, master declares i2c device, i2c
+| device is bound to tda998x, which tries to register with the component
+| layer, trying to take the held lock.)
+| 
+| http://ftp.arm.linux.org.uk/cgit/linux-cubox.git/log/?h=unstable/tda998x-devel
+
+It would appear that I've already converted a driver there into a
+structure where it can exist as either a componentised device, _or_
+it can exist as a DRM slave device.
+
+Ergo, your claim that I haven't answered this question is... interesting
+because I seem to have an implementation dated over two months ago.
+
+So, maybe you would like to finally address *my* point about TDA998x
+and your solution in a way that provides a satisfactory answer.  *Show*
+how it can be done, or *outline* how it can be done.
+
+If you can't or won't do either of those, I shall continue to regard your
+solution as highly sub-optimal and only suitable for exynos, and continue
+to request that it should live in drivers/gpu/drm/exynos and not
+drivers/base.
 
 -- 
-Catalin
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
