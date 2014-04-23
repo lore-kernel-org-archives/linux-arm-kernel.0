@@ -1,49 +1,216 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 23 Apr 2014 17:49:19 +0100
-Subject: [PATCH] ARM: head: fix virt/phys patching for big-endian systems
-In-Reply-To: <1398265448-13541-1-git-send-email-will.deacon@arm.com>
-References: <1398265448-13541-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20140423164919.GH5649@arm.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 23 Apr 2014 19:03:07 +0200
+Subject: [PATCH 1/5] clk: berlin: add support for clocks
+In-Reply-To: <1398261667-12621-2-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1398261667-12621-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1398261667-12621-2-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <5357F24B.8070405@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 23, 2014 at 04:04:08PM +0100, Will Deacon wrote:
-> Commit e26a9e00afc4 ("ARM: Better virt_to_page() handling") reworked the
-> dynamic virt/phys patching to store the physical offset of the start of
-> memory as a PFN (32-bit quantity) instead of a physical address (potentially
-> a 64-bit quantity). Unfortunately, some of the old code was left behind,
-> causing big-endian systems to store the calculated PFN to the next word
-> *after* __pv_phys_pfn_offset and causing the kernel to treat PHYS_OFFSET
-> as 0x0.
+On 04/23/2014 04:01 PM, Alexandre Belloni wrote:
+> Add support for clocks having their own register set.
 > 
-> This patch fixes the patching code, so that we store the 32-bit PFN offset
-> to the correct address, regardless of endianness.
-
-Aha, this was already fixed in 8033/1 which Russell has pushed out on his
-fixes branch.
-
-Sorry for the noise,
-
-Will
-
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 > ---
->  arch/arm/kernel/head.S | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/clk/berlin/Makefile |   2 +-
+>  drivers/clk/berlin/clk.c    | 132 ++++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 133 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/clk/berlin/clk.c
 > 
-> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-> index f8c08839edf3..591d6e4a6492 100644
-> --- a/arch/arm/kernel/head.S
-> +++ b/arch/arm/kernel/head.S
-> @@ -587,7 +587,7 @@ __fixup_pv_table:
->  	add	r6, r6, r3	@ adjust __pv_phys_pfn_offset address
->  	add	r7, r7, r3	@ adjust __pv_offset address
->  	mov	r0, r8, lsr #12	@ convert to PFN
-> -	str	r0, [r6, #LOW_OFFSET]	@ save computed PHYS_OFFSET to __pv_phys_pfn_offset
-> +	str	r0, [r6]	@ save computed PHYS_OFFSET to __pv_phys_pfn_offset
->  	strcc	ip, [r7, #HIGH_OFFSET]	@ save to __pv_offset high bits
->  	mov	r6, r3, lsr #24	@ constant for add/sub instructions
->  	teq	r3, r6, lsl #24 @ must be 16MiB aligned
-> -- 
-> 1.9.2
+> diff --git a/drivers/clk/berlin/Makefile b/drivers/clk/berlin/Makefile
+> index 94859513de90..9bfa58eaf25a 100644
+> --- a/drivers/clk/berlin/Makefile
+> +++ b/drivers/clk/berlin/Makefile
+> @@ -1,4 +1,4 @@
+> -obj-y += pll.o
+> +obj-y += pll.o clk.o
+>  obj-$(CONFIG_MACH_BERLIN_BG2)   += pll-berlin2.o
+>  obj-$(CONFIG_MACH_BERLIN_BG2CD) += pll-berlin2.o
+>  obj-$(CONFIG_MACH_BERLIN_BG2Q)  += pll-berlin2q.o
+> diff --git a/drivers/clk/berlin/clk.c b/drivers/clk/berlin/clk.c
+> new file mode 100644
+> index 000000000000..a0e688e5bead
+> --- /dev/null
+> +++ b/drivers/clk/berlin/clk.c
+> @@ -0,0 +1,132 @@
+> +/*
+> + * Copyright (c) 2014 Marvell Technology Group Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along with
+> + * this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +#include <linux/bitops.h>
+> +#include <linux/clk-provider.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/slab.h>
+> +
+> +#include "common.h"
+> +
+> +#define CLKEN		(1 << 0)
+
+Alexandre,
+
+please use BIT(n) instead of (1 << n).
+
+> +#define CLKPLLSEL_MASK	7
+> +#define CLKPLLSEL_SHIFT	1
+> +#define CLKPLLSWITCH	(1 << 4)
+> +#define CLKSWITCH	(1 << 5)
+> +#define CLKD3SWITCH	(1 << 6)
+> +#define CLKSEL_MASK	7
+> +#define CLKSEL_SHIFT	7
+
+In general, I would change the above defines to CLK_SEL_MASK, i.e.
+add a _ after CLK. While at it (as it can be seen from the code
+below), also rename CLK_D3SWITCH to CLK_DIV3_SWITCH.
+
+> +
+> +struct berlin_clk {
+> +	struct clk_hw hw;
+> +	void __iomem *base;
+> +};
+> +
+> +#define to_berlin_clk(hw)	container_of(hw, struct berlin_clk, hw)
+> +
+> +static u8 clk_div[] = {1, 2, 4, 6, 8, 12, 1, 1};
+> +
+> +static unsigned long berlin_clk_recalc_rate(struct clk_hw *hw,
+> +					unsigned long parent_rate)
+> +{
+> +	u32 val, divider;
+> +	struct berlin_clk *clk = to_berlin_clk(hw);
+> +
+> +	val = readl_relaxed(clk->base);
+> +	if (val & CLKD3SWITCH)
+> +		divider = 3;
+> +	else {
+> +		if (val & CLKSWITCH) {
+> +			val >>= CLKSEL_SHIFT;
+> +			val &= CLKSEL_MASK;
+> +			divider = clk_div[val];
+> +		} else
+> +			divider = 1;
+> +	}
+> +
+
+There are stylistic issues:
+
+if-else with one part being enclosed in {} requires both parts
+to be enclosed in those curly brackets, i.e.
+
+if (foo)
+	bar;
+else {
+	foobar;
+	barfoo;
+}
+
+has to become
+
+if (foo) {
+	bar;
+} else {
+	foobar;
+	barfoo;
+}
+
+How about writing the above
+
+> +	val = readl_relaxed(clk->base);
+> +	if (val & CLKD3SWITCH)
+> +		divider = 3;
+> +	else {
+> +		if (val & CLKSWITCH) {
+> +			val >>= CLKSEL_SHIFT;
+> +			val &= CLKSEL_MASK;
+> +			divider = clk_div[val];
+> +		} else
+> +			divider = 1;
+> +	}
+
+
+> +	return parent_rate / divider;
+> +}
+> +
+> +static u8 berlin_clk_get_parent(struct clk_hw *hw)
+> +{
+> +	u32 val;
+> +	struct berlin_clk *clk = to_berlin_clk(hw);
+> +
+> +	val = readl_relaxed(clk->base);
+> +	if (val & CLKPLLSWITCH) {
+> +		val >>= CLKPLLSEL_SHIFT;
+> +		val &= CLKPLLSEL_MASK;
+> +		return val;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct clk_ops berlin_clk_ops = {
+> +	.recalc_rate	= berlin_clk_recalc_rate,
+> +	.get_parent	= berlin_clk_get_parent,
+> +};
+> +
+> +static void __init berlin_clk_setup(struct device_node *np)
+> +{
+> +	struct clk_init_data init;
+> +	struct berlin_clk *bclk;
+> +	struct clk *clk;
+> +	const char **parent_names;
+> +	int nparents, i, ret;
+> +
+> +	bclk = kzalloc(sizeof(*bclk), GFP_KERNEL);
+> +	if (WARN_ON(!bclk))
+> +		return;
+> +
+> +	bclk->base = of_iomap(np, 0);
+> +	if (WARN_ON(!bclk->base))
+> +		goto exit;
+> +
+> +	nparents = of_clk_get_parent_count(np);
+> +	if (WARN_ON(!nparents))
+> +		goto exit;
+> +
+> +	parent_names = kzalloc((sizeof(char *) * nparents), GFP_KERNEL);
+> +	if (WARN_ON(!parent_names))
+> +		goto exit;
+> +
+> +	init.name = np->name;
+> +	init.ops = &berlin_clk_ops;
+> +	for (i = 0; i < nparents; i++) {
+> +		parent_names[i] = of_clk_get_parent_name(np, i);
+> +		if (!parent_names[i])
+> +			break;
+> +	}
+> +	init.parent_names = parent_names;
+> +	init.num_parents = i;
+> +
+> +	bclk->hw.init = &init;
+> +
+> +	clk = clk_register(NULL, &bclk->hw);
+> +	kfree(parent_names);
+> +	if (WARN_ON(IS_ERR(clk)))
+> +		goto exit;
+> +
+> +	ret = of_clk_add_provider(np, of_clk_src_simple_get, clk);
+> +	WARN_ON(ret);
+> +
+> +	return;
+> +exit:
+> +	kfree(bclk);
+> +}
+> +
+> +CLK_OF_DECLARE(berlin_clk, "marvell,berlin-clk", berlin_clk_setup);
 > 
