@@ -1,72 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 23 Apr 2014 11:08:44 -0700
-Subject: [PATCH 0/2] Fix few omap gpmc regressions when booted with
- device tree
-In-Reply-To: <20140423000012.GD12204@atomide.com>
-References: <1398128080-18903-1-git-send-email-tony@atomide.com>
- <CABxcv=nDAp=iDXxVrajELJzEG=hEV3ceMJkUaiFOpe79za+LKA@mail.gmail.com>
- <20140422152347.GB19317@atomide.com>
- <20140423000012.GD12204@atomide.com>
-Message-ID: <20140423180844.GC4833@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 23 Apr 2014 19:11:03 +0100
+Subject: [PATCH v3 0/3] ARM: OMAP2+: AM437x: L2 cache support
+In-Reply-To: <5356B2FB.5090205@ti.com>
+References: <cover.1398149526.git.nsekhar@ti.com> <5356B2FB.5090205@ti.com>
+Message-ID: <20140423181103.GO27282@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [140422 17:01]:
-> * Tony Lindgren <tony@atomide.com> [140422 08:24]:
-> > * Javier Martinez Canillas <javier@dowhile0.org> [140421 23:55]:
-> > > On Tue, Apr 22, 2014 at 2:54 AM, Tony Lindgren <tony@atomide.com> wrote:
-> > > >
-> > > > 2. There seems to be some timing issues with smc911x where
-> > > >    rsync of larger files and apt-get dist-upgrade can produce
-> > > >    strange errors. This seems to work reliably when booted in
-> > > >    legacy mode.
-> > > >
-> > > 
-> > > In what board are you having this issue? The smsc911x driver supports
-> > > both SMSC's LAN911x and LAN921x families and I see that we have two
-> > > .dtsi files with different timings
-> > > (arm/boot/dts/omap-gpmc-smsc{911x,9221}.dtsi).
-> > > 
-> > > This is only a wild guess, but maybe your board has a smsc LAN921x
-> > > chip but is including omap-gpmc-smsc911x.dtsi on its DTS?
+On Tue, Apr 22, 2014 at 02:20:43PM -0400, Santosh Shilimkar wrote:
+> On Tuesday 22 April 2014 04:28 AM, Sekhar Nori wrote:
+> > This patch series adds L2 cache support for AM437x
+> > and does some clean-ups for existing OMAP4 support
+> > along the way (no functional changes). On OMAP4 Panda,
+> > the Aux control value remains 0x7e470000 before and
+> > after the series.
 > > 
-> > Yes it seems to have two LAN9220s, so this could be the reason.
-> > I don't think we had the omap-gpmc-smsc9221.dtsi when I added the
-> > timings initially.
+> > Tested on OMAP4 Panda and AM437x EPOS EVMs.
 > > 
-> > This is on a sbc-t3730 that I'm using as a gateway that was behaving
-> > reliably before I upgraded it to DT based booting. It's currently
-> > at v3.13-rc3 something, but I don't think we've much GPMC changes
-> > since then.
+> > It is based on RMK's 75 patch series titled "l2c series" +
+> > the patch contained in https://www.mail-archive.com/linux-omap at vger.kernel.org/msg103439.html
 > > 
-> > I'll try upgrading the kernel today and running some tests with
-> > rsync. Looks like we can also remove quite a bit of duplicate
-> > timing data by using omap-gpmc-smsc9221.dtsi, I'll try something
-> > like the patch below.
+> > Sekhar Nori (3):
+> >   ARM: OMAP2+: L2 cache: get rid of init call
+> >   ARM: OMAP2+: L2 cache: git rid of redundant cache replacement policy
+> >     setting
+> >   ARM: OMAP2+: AM43x: L2 cache support
 > > 
-> > In any case, I suggest others run some tests on their GPMC Ethernet
-> > too.
-> >  
-> > +#include "omap-gpmc-smsc9221.dtsi"
-> > +
-> 
-> The 9221 timings won't work at all on 9220, it requires a 9221.
-> I'll post a better clean-up patch to use the 911x timings.
-> 
-> Upgraded the kernel and the occasional corruption is still
-> there. I guess I need to test also the same kernel in legacy
-> mode to try to narrow it down.
+> For the whole series,
+> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-OK hopefully got it figured out now. For legacy booting we were
-always using just the bootloader timings. With device tree, we
-started using the timings with your commit d72b4415 (ARM: dts:
-omap3-igep0020: Add SMSC911x LAN chip support) that was probably
-actually tested on a LAN9221 instead of LAN9220?
+Okay, as these depend on my series, I'll take them into my l2c branch,
+which I'll be pushing into linux-next from this evening.
 
-In any case, I've patched omap-gpmc-smsc911x.dtsi so the values
-match the u-boot values, and so far that seems to be working just
-fine. Will post few patches shortly.
-
-Regards,
-
-Tony
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
