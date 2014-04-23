@@ -1,34 +1,99 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 23 Apr 2014 15:47:57 -0300
-Subject: SD CRC error on mx27pdk
-In-Reply-To: <1398278554.472691404@f213.i.mail.ru>
-References: <CAOMZO5AZ4gJZMo-DZRPffaF+NdzmzMf32YwPu2gEp9AH8gDk4Q@mail.gmail.com>
- <CAOMZO5CWLH=ZbUd9dyTqtNVqu0RTSMeBGReBYetO-wzxayS7qw@mail.gmail.com>
- <1398278554.472691404@f213.i.mail.ru>
-Message-ID: <CAOMZO5CvwF2ALNHcpYRM6MyCuzFtXJyc9AJ6NHnHG1etpwHXkw@mail.gmail.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Wed, 23 Apr 2014 20:42:59 +0200
+Subject: [PATCH 0/2] Fix few omap gpmc regressions when booted with device
+ tree
+In-Reply-To: <20140423180844.GC4833@atomide.com>
+References: <1398128080-18903-1-git-send-email-tony@atomide.com>
+ <CABxcv=nDAp=iDXxVrajELJzEG=hEV3ceMJkUaiFOpe79za+LKA@mail.gmail.com>
+ <20140422152347.GB19317@atomide.com>
+ <20140423000012.GD12204@atomide.com>
+ <20140423180844.GC4833@atomide.com>
+Message-ID: <CABxcv=nUXPT_FZwPxyVD1OrxtqGmqD81vHKJSnNNYPOGzErWWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexander,
+Hello Tony,
 
-On Wed, Apr 23, 2014 at 3:42 PM, Alexander Shiyan <shc_work@mail.ru> wrote:
-> Wed, 23 Apr 2014 12:21:39 -0300 ?? Fabio Estevam <festevam@gmail.com>:
->> On Wed, Apr 23, 2014 at 12:10 PM, Fabio Estevam <festevam@gmail.com> wrote:
->>
->> > ,but I get this error:
+On Wed, Apr 23, 2014 at 8:08 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Tony Lindgren <tony@atomide.com> [140422 17:01]:
+>> * Tony Lindgren <tony@atomide.com> [140422 08:24]:
+>> > * Javier Martinez Canillas <javier@dowhile0.org> [140421 23:55]:
+>> > > On Tue, Apr 22, 2014 at 2:54 AM, Tony Lindgren <tony@atomide.com> wrote:
+>> > > >
+>> > > > 2. There seems to be some timing issues with smc911x where
+>> > > >    rsync of larger files and apt-get dist-upgrade can produce
+>> > > >    strange errors. This seems to work reliably when booted in
+>> > > >    legacy mode.
+>> > > >
+>> > >
+>> > > In what board are you having this issue? The smsc911x driver supports
+>> > > both SMSC's LAN911x and LAN921x families and I see that we have two
+>> > > .dtsi files with different timings
+>> > > (arm/boot/dts/omap-gpmc-smsc{911x,9221}.dtsi).
+>> > >
+>> > > This is only a wild guess, but maybe your board has a smsc LAN921x
+>> > > chip but is including omap-gpmc-smsc911x.dtsi on its DTS?
 >> >
->> > mxc-mmc 10013000.sdhci: mxcmci_finish_data: -EILSEQ
->> > mmc0: error -84 whilst initialising SD card
->> > mmc0: host does not support reading read-only switch. assuming write-enable.
->> > mmc0: new SDHC card at address b5a1
->> > mmcblk0: mmc0:b5a1 SD04G 3.69 GiB
->> >  mmcblk0: unknown partition table
+>> > Yes it seems to have two LAN9220s, so this could be the reason.
+>> > I don't think we had the omap-gpmc-smsc9221.dtsi when I added the
+>> > timings initially.
+>> >
+>> > This is on a sbc-t3730 that I'm using as a gateway that was behaving
+>> > reliably before I upgraded it to DT based booting. It's currently
+>> > at v3.13-rc3 something, but I don't think we've much GPMC changes
+>> > since then.
+>> >
+>> > I'll try upgrading the kernel today and running some tests with
+>> > rsync. Looks like we can also remove quite a bit of duplicate
+>> > timing data by using omap-gpmc-smsc9221.dtsi, I'll try something
+>> > like the patch below.
+>> >
+>> > In any case, I suggest others run some tests on their GPMC Ethernet
+>> > too.
+>> >
+>> > +#include "omap-gpmc-smsc9221.dtsi"
+>> > +
 >>
->> I forgot to mention that this error does not happen if I boot the
->> non-dt kernel, so it seems to be related to dt only.
+>> The 9221 timings won't work at all on 9220, it requires a 9221.
+>> I'll post a better clean-up patch to use the 911x timings.
+>>
+>> Upgraded the kernel and the occasional corruption is still
+>> there. I guess I need to test also the same kernel in legacy
+>> mode to try to narrow it down.
 >
-> Probably you should also use vmmc*_reg voltages from PMIC?
+> OK hopefully got it figured out now. For legacy booting we were
+> always using just the bootloader timings. With device tree, we
+> started using the timings with your commit d72b4415 (ARM: dts:
+> omap3-igep0020: Add SMSC911x LAN chip support) that was probably
+> actually tested on a LAN9221 instead of LAN9220?
+>
 
-On mx27pdk board the vmmc1_reg powers up the CMOS camera instead of mmc supply.
+Right, since the same driver (drivers/net/ethernet/smsc/smsc911x.c) is
+used for both SMSC families I assumed that the same timings could be
+used by both chips.
 
-Thanks
+So I took the timings from IGEP board support in u-boot but then you
+did the refactoring and later Florian added another .dtsi for SMSC
+9221 in commit aac9aa3 ("ARM: dts: omap: Add common file for
+SMSC9221").
+
+I didn't notice about this new .dtsi file until you reported your
+issue and the IGEPv2 does indeed have a SMSC LAN9221i ethernet chip so
+it is wrongly including omap-gpmc-smsc911x.dtsi and should include
+omap-gpmc-smsc9221.dtsi instead.
+
+> In any case, I've patched omap-gpmc-smsc911x.dtsi so the values
+> match the u-boot values, and so far that seems to be working just
+> fine. Will post few patches shortly.
+>
+
+Great, I'll patch the IGEPv2 DTS file too to use
+omap-gpmc-smsc9221.dtsi, do some testing and post a patch.
+
+> Regards,
+>
+> Tony
+>
+
+Thanks a lot and best regards,
+Javier
