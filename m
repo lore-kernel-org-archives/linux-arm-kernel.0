@@ -1,51 +1,102 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 23 Apr 2014 18:50:20 +0900
-Subject: [PATCH] i2c: s3c2410: resume race fix
-In-Reply-To: <1397254781-23833-1-git-send-email-dianders@chromium.org>
-References: <1397254781-23833-1-git-send-email-dianders@chromium.org>
-Message-ID: <038101cf5ed9$70b5a3a0$5220eae0$@samsung.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 23 Apr 2014 11:48:40 +0200
+Subject: [PATCH v8 07/17] ARM: dts: sun5i: Add mmc controller nodes
+In-Reply-To: <1398164497-14212-8-git-send-email-hdegoede@redhat.com>
+References: <1398164497-14212-1-git-send-email-hdegoede@redhat.com>
+ <1398164497-14212-8-git-send-email-hdegoede@redhat.com>
+Message-ID: <20140423094840.GL24905@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Doug Anderson wrote:
+On Tue, Apr 22, 2014 at 01:01:27PM +0200, Hans de Goede wrote:
+> From: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
 > 
-> From: Olof Johansson <olof@lixom.net>
+> Add nodes for the 3 mmc controllers found on A10s SoCs and for the 2 mmc
+> controllers found on A13 SoCs.
 > 
-> Don't unmark the device as suspended until after it's been re-setup.
-> 
-> The main race would be w.r.t. an i2c driver that gets resumed at the same
-> time (asyncronously), that is allowed to do a transfer since suspended
-> is set to 0 before reinit, but really should have seen the -EIO return
-> instead.
-> 
-> Signed-off-by: Olof Johansson <olof@lixom.net>
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-
-Thanks,
-Kukjin
-
+> Signed-off-by: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 > ---
->  drivers/i2c/busses/i2c-s3c2410.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  arch/arm/boot/dts/sun5i-a10s.dtsi | 27 +++++++++++++++++++++++++++
+>  arch/arm/boot/dts/sun5i-a13.dtsi  | 18 ++++++++++++++++++
+>  2 files changed, 45 insertions(+)
 > 
-> diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-
-> s3c2410.c
-> index ae44910..bb3a996 100644
-> --- a/drivers/i2c/busses/i2c-s3c2410.c
-> +++ b/drivers/i2c/busses/i2c-s3c2410.c
-> @@ -1276,10 +1276,10 @@ static int s3c24xx_i2c_resume(struct device *dev)
->  	struct platform_device *pdev = to_platform_device(dev);
->  	struct s3c24xx_i2c *i2c = platform_get_drvdata(pdev);
-> 
-> -	i2c->suspended = 0;
->  	clk_prepare_enable(i2c->clk);
->  	s3c24xx_i2c_init(i2c);
->  	clk_disable_unprepare(i2c->clk);
-> +	i2c->suspended = 0;
-> 
->  	return 0;
->  }
-> --
-> 1.9.1.423.g4596e3a
+> diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+> index 79989ed..12113f9 100644
+> --- a/arch/arm/boot/dts/sun5i-a10s.dtsi
+> +++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+> @@ -338,6 +338,33 @@
+>  			#size-cells = <0>;
+>  		};
+>  
+> +		mmc0: mmc at 01c0f000 {
+> +			compatible = "allwinner,sun5i-a13-mmc";
+> +			reg = <0x01c0f000 0x1000>;
+> +			clocks = <&ahb_gates 8>, <&mmc0_clk>;
+> +			clock-names = "ahb", "mod";
+> +			interrupts = <32>;
+> +			status = "disabled";
+> +		};
+> +
+> +		mmc1: mmc at 01c10000 {
+> +			compatible = "allwinner,sun5i-a13-mmc";
+> +			reg = <0x01c10000 0x1000>;
+> +			clocks = <&ahb_gates 9>, <&mmc1_clk>;
+> +			clock-names = "ahb", "mod";
+> +			interrupts = <33>;
+> +			status = "disabled";
+> +		};
+> +
+> +		mmc2: mmc at 01c11000 {
+> +			compatible = "allwinner,sun5i-a13-mmc";
+> +			reg = <0x01c11000 0x1000>;
+> +			clocks = <&ahb_gates 10>, <&mmc2_clk>;
+> +			clock-names = "ahb", "mod";
+> +			interrupts = <34>;
+> +			status = "disabled";
+> +		};
+> +
+>  		usbphy: phy at 01c13400 {
+>  			#phy-cells = <1>;
+>  			compatible = "allwinner,sun5i-a13-usb-phy";
+> diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
+> index f01c315..a0e55e8 100644
+> --- a/arch/arm/boot/dts/sun5i-a13.dtsi
+> +++ b/arch/arm/boot/dts/sun5i-a13.dtsi
+> @@ -320,6 +320,24 @@
+>  			#size-cells = <0>;
+>  		};
+>  
+> +		mmc0: mmc at 01c0f000 {
+> +			compatible = "allwinner,sun5i-a13-mmc";
+> +			reg = <0x01c0f000 0x1000>;
+> +			clocks = <&ahb_gates 8>, <&mmc0_clk>;
+> +			clock-names = "ahb", "mod";
+> +			interrupts = <32>;
+> +			status = "disabled";
+> +		};
+> +
+> +		mmc2: mmc at 01c11000 {
+> +			compatible = "allwinner,sun5i-a13-mmc";
+> +			reg = <0x01c11000 0x1000>;
+> +			clocks = <&ahb_gates 10>, <&mmc2_clk>;
+> +			clock-names = "ahb", "mod";
+> +			interrupts = <34>;
+> +			status = "disabled";
+> +		};
+> +
+
+The A13 user manual reports that there is 3 of them in the A13, just
+like on the A10s. Have you forgotten one?
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140423/adabe2e0/attachment.sig>
