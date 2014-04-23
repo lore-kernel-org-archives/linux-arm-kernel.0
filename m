@@ -1,69 +1,30 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 23 Apr 2014 11:30:53 +0200
-Subject: [PATCH] arm: dma-mapping: Fix mapping size value
-In-Reply-To: <53577F84.1080101@samsung.com>
-References: <1398062847-5770-1-git-send-email-ritesh.harjani@gmail.com>
- <20140422085307.GB5747@arm.com> <53577F84.1080101@samsung.com>
-Message-ID: <4662711.Ubz0jaKMvq@avalon>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 23 Apr 2014 10:37:01 +0100
+Subject: [PATCH] ARM: Fix double definition of virt_to_pfn()
+In-Reply-To: <1398238547-23065-1-git-send-email-peter.ujfalusi@ti.com>
+References: <20140422195514.GA13106@arch.cereza>
+ <1398238547-23065-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20140423093700.GF24070@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
-
-On Wednesday 23 April 2014 10:53:24 Marek Szyprowski wrote:
-> On 2014-04-22 10:53, Will Deacon wrote:
-> > On Mon, Apr 21, 2014 at 07:47:27AM +0100, Ritesh Harjani wrote:
-> > > 68efd7d2fb("arm: dma-mapping: remove order parameter from
-> > > arm_iommu_create_mapping()") is causing kernel panic
-> > > because it wrongly sets the value of mapping->size:
-> > > 
-> > > Unable to handle kernel NULL pointer dereference at virtual
-> > > address 000000a0
-> > > pgd = e7a84000
-> > > [000000a0] *pgd=00000000
-> > > ...
-> > > PC is at bitmap_clear+0x48/0xd0
-> > > LR is at __iommu_remove_mapping+0x130/0x164
-> > > 
-> > > Fix it by correcting mapping->size value.
-> > > 
-> > > Signed-off-by: Ritesh Harjani <ritesh.harjani@gmail.com>
-> > > Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> > > ---
-> > > 
-> > >  arch/arm/mm/dma-mapping.c | 2 +-
-> > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > 
-> > > diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> > > index f62aa06..6b00be1 100644
-> > > --- a/arch/arm/mm/dma-mapping.c
-> > > +++ b/arch/arm/mm/dma-mapping.c
-> > > @@ -1963,8 +1963,8 @@ arm_iommu_create_mapping(struct bus_type *bus,
-> > > dma_addr_t base, size_t size)> > 
-> > >  	mapping->nr_bitmaps = 1;
-> > >  	mapping->extensions = extensions;
-> > >  	mapping->base = base;
-> > > 
-> > > -	mapping->size = bitmap_size << PAGE_SHIFT;
-> > > 
-> > >  	mapping->bits = BITS_PER_BYTE * bitmap_size;
-> > > 
-> > > +	mapping->size = mapping->bits << PAGE_SHIFT;
-> > 
-> > Ok, but given that mapping->size is derived from mapping->bits, do we
-> > really need both of these fields in struct dma_iommu_mapping?
+On Wed, Apr 23, 2014 at 10:35:47AM +0300, Peter Ujfalusi wrote:
+> One definition of virt_to_pfn() was outside of the #if #elif #else section
+> causing constant redefinition of the macro.
 > 
-> You are right. I didn't notice this while I was refactoring the code.
-> Ritesh, could you update your patch and simply replace all references of
-> mapping->size with (mapping->bits << PAGE_SHIFT), probably with some
-> temporary variable to make the code easier to understand? I've didn't apply
-> your patch yet.
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> ---
+> Hi,
+> 
+> the redefinition actually coming from different source. It is caused by the
+> leftover definition of virt_to_pfn() which would redefine the virt_to_pfn()
+> all the time.
+> 
+> The redefinition still exist in next-20140423.
 
-As this patch fixes a v3.15 regression, shouldn't it be applied as-is and 
-ASAP, with the cleanup that removes mapping->size coming in a later, less 
-urgent patch ?
+Please see the thread "Re: [PATCH v7 2/2] ARM hibernation / suspend-to-disk"
+this month.  The fixed up commit will be pushed out shortly.
 
 -- 
-Regards,
-
-Laurent Pinchart
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
