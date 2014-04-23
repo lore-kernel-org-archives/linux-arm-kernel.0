@@ -1,121 +1,101 @@
-From: sajjan.linux@gmail.com (Vikas Sajjan)
-Date: Wed, 23 Apr 2014 18:32:56 +0530
-Subject: [PATCH 06/10] ARM: EXYNOS: Add support for mapping PMU base
- address via DT
-In-Reply-To: <1396425058-4012-7-git-send-email-pankaj.dubey@samsung.com>
-References: <1396425058-4012-1-git-send-email-pankaj.dubey@samsung.com>
- <1396425058-4012-7-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <CAGm_ybgEfqYfKJch58_svA5GAbkFXfXb1FyOiMSrX12PzBHxyA@mail.gmail.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Wed, 23 Apr 2014 09:03:55 -0400
+Subject: [PATCH] ftrace/arm: add save_stack_trace_regs() implementation
+In-Reply-To: <1398257541-18201-1-git-send-email-linyongting@gmail.com>
+References: <1398257541-18201-1-git-send-email-linyongting@gmail.com>
+Message-ID: <20140423090355.5a0a98cd@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, 23 Apr 2014 20:52:21 +0800
+Lin Yongting <linyongting@gmail.com> wrote:
 
-On Wed, Apr 2, 2014 at 1:20 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
-> From: Young-Gun Jang <yg1004.jang@samsung.com>
->
-> Add support for mapping Exynos Power Management Unit (PMU) base address
-> from device tree. Code will use existing samsung pmu binding information.
-> This patch also adds "get_exynos_pmubase" a helper function to return mapped base
-> address to various other files under "mach-exynos".
->
-> Signed-off-by: Young-Gun Jang <yg1004.jang@samsung.com>
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> When configure kprobe events of ftrace with "stacktrace" option enabled
+> in arm, there is no stacktrace was recorded after the kprobe event was
+> triggered. The root cause is no save_stack_trace_regs() function implemented.
+> 
+> Implement the save_stack_trace_regs() function in arm, then ftrace will
+> call this architecture-related function to record the stacktrace into
+> ring buffer.
+> 
+> After this fix, stacktrace can be recorded, for example:
+> 
+> # mount -t debugfs nodev /sys/kernel/debug
+> # echo "p:netrx net_rx_action" >> /sys/kernel/debug/tracing/kprobe_events
+> # echo 1 > /sys/kernel/debug/tracing/events/kprobes/netrx/enable
+> # echo 1 > /sys/kernel/debug/tracing/options/stacktrace
+> # echo 1 > /sys/kernel/debug/tracing/tracing_on
+> # ping 127.0.0.1 -c 1
+> # echo 0 > /sys/kernel/debug/tracing/tracing_on
+> 
+> # cat /sys/kernel/debug/tracing/trace
+> # tracer: nop
+> #
+> # entries-in-buffer/entries-written: 12/12   #P:1
+> #
+> #                              _-----=> irqs-off
+> #                             / _----=> need-resched
+> #                            | / _---=> hardirq/softirq
+> #                            || / _--=> preempt-depth
+> #                            ||| /     delay
+> #           TASK-PID   CPU#  ||||    TIMESTAMP  FUNCTION
+> #              | |       |   ||||       |         |
+>             <------ missing some entries ---------------->
+>             ping-1200  [000] dNs1   667.603250: netrx: (net_rx_action+0x0/0x1f8)
+>             ping-1200  [000] dNs1   667.604738: <stack trace>
+>  => net_rx_action
+>  => do_softirq
+>  => local_bh_enable
+>  => ip_finish_output
+>  => ip_output
+>  => ip_local_out
+>  => ip_send_skb
+>  => ip_push_pending_frames
+>  => raw_sendmsg
+>  => inet_sendmsg
+>  => sock_sendmsg
+>  => SyS_sendto
+>  => ret_fast_syscall
+> 
+> Signed-off-by: Lin Yongting <linyongting@gmail.com>
 > ---
->  arch/arm/mach-exynos/common.h |    2 ++
->  arch/arm/mach-exynos/exynos.c |   44 +++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 46 insertions(+)
->
-> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-> index ff28334..9a55cf6 100644
-> --- a/arch/arm/mach-exynos/common.h
-> +++ b/arch/arm/mach-exynos/common.h
-> @@ -61,4 +61,6 @@ struct exynos_pmu_conf {
->
->  extern void exynos_sys_powerdown_conf(enum sys_powerdown mode);
->
-> +extern void __iomem *get_exynos_pmubase(void);
-> +
->  #endif /* __ARCH_ARM_MACH_EXYNOS_COMMON_H */
-> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-> index a5e1349..a5127fb 100644
-> --- a/arch/arm/mach-exynos/exynos.c
-> +++ b/arch/arm/mach-exynos/exynos.c
-> @@ -35,6 +35,8 @@
->  #define L2_AUX_VAL 0x7C470001
->  #define L2_AUX_MASK 0xC200ffff
->
-> +static void __iomem *exynos_pmu_base __initdata;
 
-Are you sure you want to keep exynos_pmu_base in .init section.
-I am seeing a crash in platform_do_lowpower()
-I think you should remove __initdata.
+As this affects ftrace for ARM...
 
-> +
->  static struct map_desc exynos4_iodesc[] __initdata = {
->         {
->                 .virtual        = (unsigned long)S3C_VA_SYS,
-> @@ -245,6 +247,47 @@ void __init exynos_init_late(void)
->         exynos_pm_init();
+Acked-by: Steven Rostedt <rostedt@goodmis.org>
+
+-- Steve
+
+>  arch/arm/kernel/stacktrace.c |   19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+> 
+> diff --git a/arch/arm/kernel/stacktrace.c b/arch/arm/kernel/stacktrace.c
+> index af4e8c8..c558db6 100644
+> --- a/arch/arm/kernel/stacktrace.c
+> +++ b/arch/arm/kernel/stacktrace.c
+> @@ -123,6 +123,25 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
+>  		trace->entries[trace->nr_entries++] = ULONG_MAX;
 >  }
->
-> +static char const *exynos_dt_pmu_match[] __initconst = {
-> +       "samsung,exynos4210-pmu",
-> +       "samsung,exynos4212-pmu",
-> +       "samsung,exynos4412-pmu",
-> +       "samsung,exynos5250-pmu",
-> +       NULL
-> +};
-> +
-> +static int __init exynos_fdt_map_pmu(unsigned long node,
-> +               const char *uname, int depth, void *data)
+>  
+> +void save_stack_trace_regs(struct pt_regs *regs, struct stack_trace *trace)
 > +{
-> +       struct map_desc iodesc;
-> +       __be32 *reg;
-> +       unsigned long len;
+> +	struct stack_trace_data data;
+> +	struct stackframe frame;
 > +
-> +       if (of_flat_dt_match(node, exynos_dt_pmu_match)) {
-> +               phys_addr_t phys_addr;
-> +               reg = of_get_flat_dt_prop(node, "reg", &len);
-> +               if (reg == NULL || len != (sizeof(unsigned long) * 2))
-> +                       return 0;
+> +	data.trace = trace;
+> +	data.skip = trace->skip;
+> +	data.no_sched_functions = 0;
 > +
-> +               phys_addr = be32_to_cpu(reg[0]);
-> +               iodesc.pfn = __phys_to_pfn(phys_addr);
-> +               iodesc.length = be32_to_cpu(reg[1]) - 1;
-> +               iodesc.virtual = (unsigned long)S5P_VA_PMU;
-> +               iodesc.type = MT_DEVICE;
-> +               iotable_init(&iodesc, 1);
+> +	frame.fp = regs->ARM_fp;
+> +	frame.sp = regs->ARM_sp;
+> +	frame.lr = regs->ARM_lr;
+> +	frame.pc = regs->ARM_pc;
 > +
-> +               exynos_pmu_base = ioremap(phys_addr, be32_to_cpu(reg[1]));
-> +               if (WARN_ON(!exynos_pmu_base))
-> +                       return -EFAULT;
-> +       }
-> +
-> +       return 0;
+> +	walk_stackframe(&frame, save_trace, &data);
+> +	if (trace->nr_entries < trace->max_entries)
+> +		trace->entries[trace->nr_entries++] = ULONG_MAX;
 > +}
 > +
-> +inline void __iomem *get_exynos_pmubase()
-> +{
-> +       return exynos_pmu_base;
-> +}
-> +
->  static int __init exynos_fdt_map_chipid(unsigned long node, const char *uname,
->                                         int depth, void *data)
+>  void save_stack_trace(struct stack_trace *trace)
 >  {
-> @@ -301,6 +344,7 @@ void __init exynos_init_io(void)
->         debug_ll_io_init();
->
->         of_scan_flat_dt(exynos_fdt_map_chipid, NULL);
-> +       of_scan_flat_dt(exynos_fdt_map_pmu, NULL);
->
->         /* detect cpu id and rev. */
->         s5p_init_cpu(S5P_VA_CHIPID);
-> --
-> 1.7.10.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+>  	save_stack_trace_tsk(current, trace);
