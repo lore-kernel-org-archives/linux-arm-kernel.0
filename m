@@ -1,60 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 23 Apr 2014 14:18:04 +0200
-Subject: [RFC 3/3] asm-generic: Drop renameat syscall from default list
-In-Reply-To: <1398247687-13453-4-git-send-email-james.hogan@imgtec.com>
-References: <1398247687-13453-1-git-send-email-james.hogan@imgtec.com>
- <1398247687-13453-4-git-send-email-james.hogan@imgtec.com>
-Message-ID: <201404231418.05174.arnd@arndb.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 23 Apr 2014 14:23:34 +0200
+Subject: [PATCH v2 17/38] ARM: orion5x: use node labels for UART and
+ SATA on edmini_v2
+In-Reply-To: <5357A2BA.1050900@gmail.com>
+References: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1398202002-28530-18-git-send-email-thomas.petazzoni@free-electrons.com>
+ <5357A2BA.1050900@gmail.com>
+Message-ID: <20140423142334.286c57c0@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 23 April 2014, James Hogan wrote:
-> The new renameat2 syscall provides all the functionality provided by the
-> renameat syscall and adds flags, so future architectures won't need to
-> include renameat.
+Dear Sebastian Hesselbarth,
+
+On Wed, 23 Apr 2014 13:23:38 +0200, Sebastian Hesselbarth wrote:
+> On 04/22/2014 11:26 PM, Thomas Petazzoni wrote:
+> > This commit converts the existing devices described in the edmini_v2
+> > Device Tree to use node labels: the UART and SATA device. Also, it
+> > reorders the eth and mdio node label references to be sorted
+> > alphabetically.
+> >
+> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > 
-> Therefore drop the renameat syscall from the generic syscall list unless
-> __ARCH_WANT_RENAMEAT is defined by the architecture's unistd.h prior to
-> including asm-generic/unistd.h, and adjust all architectures using the
-> generic syscall list to define it so that no in-tree architectures are
-> affected.
+> Does this also mean, we agree on the "using node label references" topic
+> for Kirkwood?
 
-I should have read this one before replying to patch 2 ;-)
+Well, for Kirkwood I don't know, I'm not the one who has done most of
+the Kirkwood conversions.
 
-> Signed-off-by: James Hogan <james.hogan@imgtec.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: linux-arch at vger.kernel.org
-> Cc: Vineet Gupta <vgupta@synopsys.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Mark Salter <msalter@redhat.com>
-> Cc: Aurelien Jacquiot <a-jacquiot@ti.com>
-> Cc: linux-c6x-dev at linux-c6x.org
-> Cc: Richard Kuo <rkuo@codeaurora.org>
-> Cc: linux-hexagon at vger.kernel.org
-> Cc: linux-metag at vger.kernel.org
-> Cc: Jonas Bonn <jonas@southpole.se>
-> Cc: linux at lists.openrisc.net
-> Cc: Chen Liqin <liqin.linux@gmail.com>
-> Cc: Lennox Wu <lennox.wu@gmail.com>
-> Cc: Chris Metcalf <cmetcalf@tilera.com>
-> Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
-> ---
-> Is this the approach we want to take to keep the default syscall list
-> minimal? We could for example have made renameat2 use the renameat
-> syscall number for new arches, but it seemed best to leave a gap for new
-> arches to improve consistency of numbering.
+I continue to have mixed feelings about the usage of node labels. To
+me, it breaks the "tree" nature of the Device Tree, by turning it into
+just a bunch of &bleh { ... } long list of statements. But this is
+purely subjective (just like your opinion, I believe), and I wanted to
+move forward with this, so I just did what was necessary :-)
 
-I think leaving the hole is best.
-
-> This patch is a no-op for arches in tree, so there's no harm for this to
-> wait for the v3.16 merge window.
-
-Sounds good. I guess I'll have to put this into my asm-generic tree
-then, unless I can get the nios2 maintainers to pick it up.
-
-If you don't mind, can you submit the first two patches to Linus
-directly?
-
-	Arnd
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
