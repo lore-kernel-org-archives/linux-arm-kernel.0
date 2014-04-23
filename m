@@ -1,71 +1,74 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Wed, 23 Apr 2014 11:50:01 +0530
-Subject: [PATCH 1/4] cpuidle: config: Add SOC_EXYNOS5420 entry to select
- cpuidle-big-little driver
-In-Reply-To: <5356477C.1070403@linaro.org>
-References: <1398080958-21677-1-git-send-email-chander.kashyap@linaro.org>
- <1398080958-21677-2-git-send-email-chander.kashyap@linaro.org>
- <5356477C.1070403@linaro.org>
-Message-ID: <CANuQgHHx+EyPXK0joYU-Af4dj+=ikW0SWE6g2-N0=K-dK3nMRw@mail.gmail.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Wed, 23 Apr 2014 08:29:14 +0200
+Subject: [RESEND PATCH v3 8/9] tty: cadence: Document DT binding
+In-Reply-To: <1396657425-31029-8-git-send-email-soren.brinkmann@xilinx.com>
+References: <1396657425-31029-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1396657425-31029-8-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <53575DBA.9070704@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On 04/05/2014 02:23 AM, Soren Brinkmann wrote:
+> Add binding documentation for the Cadence UART.
+> 
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> Acked-by: Peter Crosthwaite <peter.crosthwaite@xilinx.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> Tested-by: Michal Simek <michal.simek@xilinx.com>
+> ---
+> 
+> Changes in v3: None
+> Changes in v2: None
+> 
+>  .../devicetree/bindings/serial/cdns,uart.txt         | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/serial/cdns,uart.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/serial/cdns,uart.txt b/Documentation/devicetree/bindings/serial/cdns,uart.txt
+> new file mode 100644
+> index 000000000000..a3eb154c32ca
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/serial/cdns,uart.txt
+> @@ -0,0 +1,20 @@
+> +Binding for Cadence UART Controller
+> +
+> +Required properties:
+> +- compatible : should be "cdns,uart-r1p8", or "xlnx,xuartps"
+> +- reg: Should contain UART controller registers location and length.
+> +- interrupts: Should contain UART controller interrupts.
+> +- clocks: Must contain phandles to the UART clocks
+> +  See ../clocks/clock-bindings.txt for details.
+> +- clock-names: Tuple to identify input clocks, must contain "uart_clk" and "pclk"
+> +  See ../clocks/clock-bindings.txt for details.
+> +
+> +
+> +Example:
+> +	uart at e0000000 {
+> +		compatible = "cdns,uart-r1p8";
+> +		clocks = <&clkc 23>, <&clkc 40>;
+> +		clock-names = "uart_clk", "pclk";
+> +		reg = <0xE0000000 0x1000>;
+> +		interrupts = <0 27 4>;
+> +	};
+> 
 
-On 22 April 2014 16:12, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
-> On 04/21/2014 01:49 PM, Chander Kashyap wrote:
->>
->> Exynos5420 is a big-little SoC from Samsung. It has 4 A15 and 4 A7 cores.
->> In order to use generic cpuidle-big-little driver, this patch adds
->> Exynos5420
->> specific check to initialize generic cpuidle driver.
->>
->> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
->> Signed-off-by: Chander Kashyap <k.chander@samsung.com>
->> ---
->>   drivers/cpuidle/Kconfig.arm |    2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
->> index 97ccc31..5244d87 100644
->> --- a/drivers/cpuidle/Kconfig.arm
->> +++ b/drivers/cpuidle/Kconfig.arm
->> @@ -4,7 +4,7 @@
->>
->>   config ARM_BIG_LITTLE_CPUIDLE
->>         bool "Support for ARM big.LITTLE processors"
->> -       depends on ARCH_VEXPRESS_TC2_PM
->> +       depends on ARCH_VEXPRESS_TC2_PM || SOC_EXYNOS5420
->
->
-> For the sake of consistency, I would prefer:
->
-> depends on ARCH_VEXPRESS_TC2_PM || ARCH_EXYNOS
+Applied to zynq/dt2 branch.
 
-Yes i will change it.
-
-Thanks
->
-> and let the current code (and future platform driver) to handle the loading
-> of the driver.
->
->
->>         select ARM_CPU_SUSPEND
->>         select CPU_IDLE_MULTIPLE_DRIVERS
->>         help
->>
->
->
-> --
->  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
->
-> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-> <http://twitter.com/#!/linaroorg> Twitter |
-> <http://www.linaro.org/linaro-blog/> Blog
->
-
-
+Thanks,
+Michal
 
 -- 
-with warm regards,
-Chander Kashyap
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140423/0896ffc5/attachment.sig>
