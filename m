@@ -1,43 +1,69 @@
 From: marex@denx.de (Marek Vasut)
-Date: Wed, 23 Apr 2014 21:41:26 +0200
-Subject: [PATCH v1 1/7] mtd: spi-nor: fix the wrong dummy value
-In-Reply-To: <1398248215-26768-2-git-send-email-b32955@freescale.com>
-References: <a> <1398248215-26768-2-git-send-email-b32955@freescale.com>
-Message-ID: <201404232141.27005.marex@denx.de>
+Date: Wed, 23 Apr 2014 21:45:57 +0200
+Subject: [PATCH v1 2/7] mtd: spi-nor: add DDR quad read support
+In-Reply-To: <1398248215-26768-3-git-send-email-b32955@freescale.com>
+References: <a> <1398248215-26768-3-git-send-email-b32955@freescale.com>
+Message-ID: <201404232145.57404.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, April 23, 2014 at 12:16:49 PM, Huang Shijie wrote:
-> For the DDR Quad read, the dummy cycles maybe 3 or 6 which is less then 8.
-> The dummy cycles is actually 8 for SPI fast/dual/quad read.
+On Wednesday, April 23, 2014 at 12:16:50 PM, Huang Shijie wrote:
+> This patch adds the DDR quad read support by the following:
 > 
-> This patch makes preparations for the DDR quad read, it fixes the wrong
-> dummy value for both the spi-nor.c and m25p80.c.
+>   [1] add SPI_NOR_DDR_QUAD read mode.
+> 
+>   [2] add DDR Quad read opcodes:
+>        SPINOR_OP_READ_1_4_4_D / SPINOR_OP_READ4_1_4_4_D
+> 
+>   [3] add set_ddr_quad_mode() to initialize for the DDR quad read.
+>       Currently it only works for Spansion NOR.
+> 
+>   [3] set the dummy with 8 for DDR quad read.
+>       The m25p80.c can not support the DDR quad read, the SPI NOR
+> controller can set the dummy value in its driver, such as fsl-quadspi.c.
+> 
+> Test this patch for Spansion s25fl128s NOR flash.
 > 
 > Signed-off-by: Huang Shijie <b32955@freescale.com>
-
-This patch is actually V2, right ?
-
 > ---
->  drivers/mtd/devices/m25p80.c  |    5 ++++-
->  drivers/mtd/spi-nor/spi-nor.c |    2 +-
->  2 files changed, 5 insertions(+), 2 deletions(-)
+>  drivers/mtd/spi-nor/spi-nor.c |   50
+> +++++++++++++++++++++++++++++++++++++++- include/linux/mtd/spi-nor.h   |  
+>  8 +++++-
+>  2 files changed, 54 insertions(+), 4 deletions(-)
 > 
-> diff --git a/drivers/mtd/devices/m25p80.c b/drivers/mtd/devices/m25p80.c
-> index 1557d8f..693e25f 100644
-> --- a/drivers/mtd/devices/m25p80.c
-> +++ b/drivers/mtd/devices/m25p80.c
-> @@ -128,9 +128,12 @@ static int m25p80_read(struct spi_nor *nor, loff_t
-> from, size_t len, struct spi_device *spi = flash->spi;
->  	struct spi_transfer t[2];
->  	struct spi_message m;
-> -	int dummy = nor->read_dummy;
-> +	unsigned int dummy = nor->read_dummy;
->  	int ret;
-> 
-> +	/* convert the dummy cycles to the number of byte */
+> diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
+> index 1a12f81..e2f69db 100644
+> --- a/drivers/mtd/spi-nor/spi-nor.c
+> +++ b/drivers/mtd/spi-nor/spi-nor.c
+> @@ -74,6 +74,15 @@ static int read_cr(struct spi_nor *nor)
+>  static inline int spi_nor_read_dummy_cycles(struct spi_nor *nor)
+>  {
+>  	switch (nor->flash_read) {
+> +	case SPI_NOR_DDR_QUAD:
+> +		/*
+> +		 * The m25p80.c can not support the DDR quad read.
+> +		 * We set the dummy cycles to 8 by default. If the SPI NOR
+> +		 * controller driver has already set it before call the
+> +		 * spi_nor_scan(), we just keep it as it is.
+> +		 */
+> +		if (nor->read_dummy)
+> +			return nor->read_dummy;
 
-'bytes', plural ...
+Can the controller set this variable to zero ?
+
 [...]
-Best regards,
-Marek Vasut
+
+> +static int set_ddr_quad_mode(struct spi_nor *nor, u32 jedec_id)
+> +{
+> +	int status;
+> +
+> +	switch (JEDEC_MFR(jedec_id)) {
+> +	case CFI_MFR_AMD: /* Spansion, actually */
+> +		status = spansion_quad_enable(nor);
+> +		if (status) {
+> +			dev_err(nor->dev,
+> +				"Spansion DDR quad-read not enabled\n");
+> +			return -EINVAL;
+
+Can't you just return status here as well to propagate the failure?
+[...]
