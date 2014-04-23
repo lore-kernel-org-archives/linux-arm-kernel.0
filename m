@@ -1,65 +1,23 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 23 Apr 2014 16:01:07 +0200
-Subject: [PATCH 5/5] ARM: berlin/dt: add sdio clocks to BG2Q
-In-Reply-To: <1398261667-12621-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1398261667-12621-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1398261667-12621-6-git-send-email-alexandre.belloni@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 23 Apr 2014 16:03:23 +0200
+Subject: [PATCH 3/3] ARM: qcom: Select PINCTRL by default for ARCH_QCOM
+In-Reply-To: <1397531437-9104-4-git-send-email-agross@codeaurora.org>
+References: <1397531437-9104-1-git-send-email-agross@codeaurora.org>
+ <1397531437-9104-4-git-send-email-agross@codeaurora.org>
+Message-ID: <CACRpkdauApm8_3DGE3Q4k-xkEpcrb2nUn=UhS+xHnVn4t+g2CA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add sdio clocks to the berlin2q.dtsi
-Also reorder the syspll node
+On Tue, Apr 15, 2014 at 5:10 AM, Andy Gross <agross@codeaurora.org> wrote:
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/boot/dts/berlin2q.dtsi | 28 +++++++++++++++++++++-------
- 1 file changed, 21 insertions(+), 7 deletions(-)
+> Add missing PINCTRL selection.  This enables selection of pinctrollers for
+> Qualcomm processors.
+>
+> Signed-off-by: Andy Gross <agross@codeaurora.org>
 
-diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-index 5925e6a16749..0fc826305614 100644
---- a/arch/arm/boot/dts/berlin2q.dtsi
-+++ b/arch/arm/boot/dts/berlin2q.dtsi
-@@ -102,13 +102,6 @@
- 			reg = <0xdd0170 0x8>;
- 		};
- 
--		syspll: syspll at ea0030 {
--			compatible = "marvell,berlin2q-pll";
--			clocks = <&smclk>;
--			#clock-cells = <0>;
--			reg = <0xea0030 0x8>;
--		};
--
- 		apb at e80000 {
- 			compatible = "simple-bus";
- 			#address-cells = <1>;
-@@ -191,6 +184,27 @@
- 			};
- 		};
- 
-+		syspll: syspll at ea0030 {
-+			compatible = "marvell,berlin2q-pll";
-+			clocks = <&smclk>;
-+			#clock-cells = <0>;
-+			reg = <0xea0030 0x8>;
-+		};
-+
-+		sdio0xinclk: sdio0xinclk at ea0158 {
-+			compatible = "marvell,berlin-clk";
-+			clocks = <&syspll>;
-+			#clock-cells = <0>;
-+			reg = <0xea0158 4>;
-+		};
-+
-+		sdio1xinclk: sdio1xinclk at ea015c {
-+			compatible = "marvell,berlin-clk";
-+			clocks = <&syspll>;
-+			#clock-cells = <0>;
-+			reg = <0xea015c 4>;
-+		};
-+
- 		apb at fc0000 {
- 			compatible = "simple-bus";
- 			#address-cells = <1>;
--- 
-1.9.1
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+David are you picking this to the Qualcomm tree?
+
+Yours,
+Linus Walleij
