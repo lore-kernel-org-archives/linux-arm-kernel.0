@@ -1,80 +1,211 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 23 Apr 2014 21:52:02 +0200
-Subject: [PATCH 2/4] dma: ste_dma40: Don't require CONFIG_PM_RUNTIME
+Date: Wed, 23 Apr 2014 21:52:03 +0200
+Subject: [PATCH 3/4] dma: ste_dma40: Convert to PM macros while providing the
+ PM callbacks
 In-Reply-To: <1398282724-2607-1-git-send-email-ulf.hansson@linaro.org>
 References: <1398282724-2607-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1398282724-2607-2-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1398282724-2607-3-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While probing, don't rely on CONFIG_PM_RUNTIME to be configured.
-Instead, let's power up the device and make it fully operational.
-Update the runtime PM status to reflect the active state.
+Converting to the PM macros makes us simplify and remove some code.
 
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/dma/ste_dma40.c |   21 ++++++++++-----------
- 1 file changed, 10 insertions(+), 11 deletions(-)
+ drivers/dma/ste_dma40.c |  150 ++++++++++++++++++++++-------------------------
+ 1 file changed, 71 insertions(+), 79 deletions(-)
 
 diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-index 6e97cf6..45e809f 100644
+index 45e809f..0b29af3 100644
 --- a/drivers/dma/ste_dma40.c
 +++ b/drivers/dma/ste_dma40.c
-@@ -556,7 +556,6 @@ struct d40_gen_dmac {
-  * later
-  * @reg_val_backup_chan: Backup data for standard channel parameter registers.
-  * @gcc_pwr_off_mask: Mask to maintain the channels that can be turned off.
-- * @initialized: true if the dma has been initialized
-  * @gen_dmac: the struct for generic registers values to represent u8500/8540
-  * DMA controller
-  */
-@@ -594,7 +593,6 @@ struct d40_base {
- 	u32				  reg_val_backup_v4[BACKUP_REGS_SZ_MAX];
- 	u32				 *reg_val_backup_chan;
- 	u16				  gcc_pwr_off_mask;
--	bool				  initialized;
- 	struct d40_gen_dmac		  gen_dmac;
- };
+@@ -1054,62 +1054,6 @@ static int d40_sg_2_dmalen(struct scatterlist *sgl, int sg_len,
+ 	return len;
+ }
  
-@@ -3030,8 +3028,7 @@ static int dma40_runtime_resume(struct device *dev)
+-
+-#ifdef CONFIG_PM
+-static void dma40_backup(void __iomem *baseaddr, u32 *backup,
+-			 u32 *regaddr, int num, bool save)
+-{
+-	int i;
+-
+-	for (i = 0; i < num; i++) {
+-		void __iomem *addr = baseaddr + regaddr[i];
+-
+-		if (save)
+-			backup[i] = readl_relaxed(addr);
+-		else
+-			writel_relaxed(backup[i], addr);
+-	}
+-}
+-
+-static void d40_save_restore_registers(struct d40_base *base, bool save)
+-{
+-	int i;
+-
+-	/* Save/Restore channel specific registers */
+-	for (i = 0; i < base->num_phy_chans; i++) {
+-		void __iomem *addr;
+-		int idx;
+-
+-		if (base->phy_res[i].reserved)
+-			continue;
+-
+-		addr = base->virtbase + D40_DREG_PCBASE + i * D40_DREG_PCDELTA;
+-		idx = i * ARRAY_SIZE(d40_backup_regs_chan);
+-
+-		dma40_backup(addr, &base->reg_val_backup_chan[idx],
+-			     d40_backup_regs_chan,
+-			     ARRAY_SIZE(d40_backup_regs_chan),
+-			     save);
+-	}
+-
+-	/* Save/Restore global registers */
+-	dma40_backup(base->virtbase, base->reg_val_backup,
+-		     d40_backup_regs, ARRAY_SIZE(d40_backup_regs),
+-		     save);
+-
+-	/* Save/Restore registers only existing on dma40 v3 and later */
+-	if (base->gen_dmac.backup)
+-		dma40_backup(base->virtbase, base->reg_val_backup_v4,
+-			     base->gen_dmac.backup,
+-			base->gen_dmac.backup_size,
+-			save);
+-}
+-#else
+-static void d40_save_restore_registers(struct d40_base *base, bool save)
+-{
+-}
+-#endif
+-
+ static int __d40_execute_command_phy(struct d40_chan *d40c,
+ 				     enum d40_command command)
+ {
+@@ -2996,8 +2940,8 @@ failure1:
+ }
+ 
+ /* Suspend resume functionality */
+-#ifdef CONFIG_PM
+-static int dma40_pm_suspend(struct device *dev)
++#ifdef CONFIG_PM_SLEEP
++static int dma40_suspend(struct device *dev)
+ {
  	struct platform_device *pdev = to_platform_device(dev);
  	struct d40_base *base = platform_get_drvdata(pdev);
+@@ -3008,6 +2952,69 @@ static int dma40_pm_suspend(struct device *dev)
+ 	return ret;
+ }
  
--	if (base->initialized)
--		d40_save_restore_registers(base, false);
-+	d40_save_restore_registers(base, false);
- 
- 	writel_relaxed(D40_DREG_GCC_ENABLE_ALL,
++static int dma40_resume(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct d40_base *base = platform_get_drvdata(pdev);
++	int ret = 0;
++
++	if (base->lcpa_regulator)
++		ret = regulator_enable(base->lcpa_regulator);
++
++	return ret;
++}
++#endif
++
++#ifdef CONFIG_PM
++static void dma40_backup(void __iomem *baseaddr, u32 *backup,
++			 u32 *regaddr, int num, bool save)
++{
++	int i;
++
++	for (i = 0; i < num; i++) {
++		void __iomem *addr = baseaddr + regaddr[i];
++
++		if (save)
++			backup[i] = readl_relaxed(addr);
++		else
++			writel_relaxed(backup[i], addr);
++	}
++}
++
++static void d40_save_restore_registers(struct d40_base *base, bool save)
++{
++	int i;
++
++	/* Save/Restore channel specific registers */
++	for (i = 0; i < base->num_phy_chans; i++) {
++		void __iomem *addr;
++		int idx;
++
++		if (base->phy_res[i].reserved)
++			continue;
++
++		addr = base->virtbase + D40_DREG_PCBASE + i * D40_DREG_PCDELTA;
++		idx = i * ARRAY_SIZE(d40_backup_regs_chan);
++
++		dma40_backup(addr, &base->reg_val_backup_chan[idx],
++			     d40_backup_regs_chan,
++			     ARRAY_SIZE(d40_backup_regs_chan),
++			     save);
++	}
++
++	/* Save/Restore global registers */
++	dma40_backup(base->virtbase, base->reg_val_backup,
++		     d40_backup_regs, ARRAY_SIZE(d40_backup_regs),
++		     save);
++
++	/* Save/Restore registers only existing on dma40 v3 and later */
++	if (base->gen_dmac.backup)
++		dma40_backup(base->virtbase, base->reg_val_backup_v4,
++			     base->gen_dmac.backup,
++			base->gen_dmac.backup_size,
++			save);
++}
++
+ static int dma40_runtime_suspend(struct device *dev)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+@@ -3034,29 +3041,14 @@ static int dma40_runtime_resume(struct device *dev)
  		       base->virtbase + D40_DREG_GCC);
-@@ -3645,12 +3642,6 @@ static int __init d40_probe(struct platform_device *pdev)
- 		goto failure;
- 	}
- 
--	pm_runtime_irq_safe(base->dev);
--	pm_runtime_set_autosuspend_delay(base->dev, DMA40_AUTOSUSPEND_DELAY);
--	pm_runtime_use_autosuspend(base->dev);
--	pm_runtime_enable(base->dev);
--	pm_runtime_resume(base->dev);
+ 	return 0;
+ }
 -
- 	if (base->plat_data->use_esram_lcla) {
+-static int dma40_resume(struct device *dev)
+-{
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct d40_base *base = platform_get_drvdata(pdev);
+-	int ret = 0;
+-
+-	if (base->lcpa_regulator)
+-		ret = regulator_enable(base->lcpa_regulator);
+-
+-	return ret;
+-}
++#endif
  
- 		base->lcpa_regulator = regulator_get(base->dev, "lcla_esram");
-@@ -3671,7 +3662,15 @@ static int __init d40_probe(struct platform_device *pdev)
- 		}
- 	}
+ static const struct dev_pm_ops dma40_pm_ops = {
+-	.suspend		= dma40_pm_suspend,
+-	.runtime_suspend	= dma40_runtime_suspend,
+-	.runtime_resume		= dma40_runtime_resume,
+-	.resume			= dma40_resume,
++	SET_SYSTEM_SLEEP_PM_OPS(dma40_suspend, dma40_resume)
++	SET_PM_RUNTIME_PM_OPS(dma40_runtime_suspend,
++				dma40_runtime_resume,
++				NULL)
+ };
+-#define DMA40_PM_OPS	(&dma40_pm_ops)
+-#else
+-#define DMA40_PM_OPS	NULL
+-#endif
  
--	base->initialized = true;
-+	writel_relaxed(D40_DREG_GCC_ENABLE_ALL, base->virtbase + D40_DREG_GCC);
-+
-+	pm_runtime_irq_safe(base->dev);
-+	pm_runtime_set_autosuspend_delay(base->dev, DMA40_AUTOSUSPEND_DELAY);
-+	pm_runtime_use_autosuspend(base->dev);
-+	pm_runtime_mark_last_busy(base->dev);
-+	pm_runtime_set_active(base->dev);
-+	pm_runtime_enable(base->dev);
-+
- 	ret = d40_dmaengine_init(base, num_reserved_chans);
- 	if (ret)
- 		goto failure;
+ /* Initialization functions. */
+ 
+@@ -3753,7 +3745,7 @@ static struct platform_driver d40_driver = {
+ 	.driver = {
+ 		.owner = THIS_MODULE,
+ 		.name  = D40_NAME,
+-		.pm = DMA40_PM_OPS,
++		.pm = &dma40_pm_ops,
+ 		.of_match_table = d40_match,
+ 	},
+ };
 -- 
 1.7.9.5
