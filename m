@@ -1,62 +1,67 @@
-From: alexanders83@web.de (Alexander Stein)
-Date: Thu, 24 Apr 2014 00:34:56 +0200
-Subject: [PATCH] pinctrl/at91: Fix lockup when IRQ on PIOC and PIOD occurs
-In-Reply-To: <1398289203-2407-1-git-send-email-alexanders83@web.de>
-References: <1398289203-2407-1-git-send-email-alexanders83@web.de>
-Message-ID: <7797320.MSqOMXU9Wd@kongar>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 23 Apr 2014 23:38:12 +0100
+Subject: [PATCH 2/2] arm64: topology: add MPIDR-based detection
+In-Reply-To: <20140423192228.GA21142@lc-sj1-5012.sj.broadcom.com>
+References: <1398217214-12204-1-git-send-email-zlim@broadcom.com>
+ <1398217214-12204-3-git-send-email-zlim@broadcom.com>
+ <20140423103648.GM12304@sirena.org.uk>
+ <20140423172720.GA18588@lc-sj1-5012.sj.broadcom.com>
+ <20140423182611.GF12304@sirena.org.uk>
+ <20140423192228.GA21142@lc-sj1-5012.sj.broadcom.com>
+Message-ID: <20140423223812.GG12304@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry,
+On Wed, Apr 23, 2014 at 12:22:28PM -0700, Zi Shen Lim wrote:
+> On Wed, Apr 23, 2014 at 07:26:11PM +0100, Mark Brown wrote:
 
-drop that. This one creates another issue with that linear IRQ mapping. The correct bits from the correct register is read (which is what I checked), but unfortunatly irq_find_mapping now only returns mappings for PIOC :(
-I will rework that.
+> > When I was looking at this it wasn't sufficiently clear to me that the
+> > cluster clustering would be well modelled by sockets as the scheduler
+> > currently assumes them, nor what to do with additional levels of that
+> > (the DT binding allows for infinite levels).  Punting and just putting
+> > all clusters at the same level avoids active bugs and seems fairly
+> > conservative.
 
-Alexander
+> Sounds like you prefer "cluster of clusters" over "socket", correct?
 
-On Wednesday 23 April 2014, 23:40:03 wrote Alexander Stein:
-> With commit 8d56dfcc (pinctrl/at91: convert driver to use gpiolib irqchip)
-> gpiochip_set_chained_irqchip is called for PIOC, PIOD and PIOE. The
-> associated GPIO chip for the IRQ chip is overwritten each time, because
-> they share the same hard IRQ line.
-> Thus if an IRQ occurs on PIOC or PIOD, gpio_irq_handler will only check on
-> PIOE (the assigned GPIO chip) where no event occured. Thus the IRQ will
-> not be cleared, retriggering the ISR.
-> Fix that (like done before) by only set the PIOC GPIO chip to the IRQ chip.
-> 
-> Signed-off-by: Alexander Stein <alexanders83@web.de>
-> ---
->  drivers/pinctrl/pinctrl-at91.c | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-> index 64a8f8f..dd7d3e4 100644
-> --- a/drivers/pinctrl/pinctrl-at91.c
-> +++ b/drivers/pinctrl/pinctrl-at91.c
-> @@ -1468,6 +1468,7 @@ static void gpio_irq_handler(unsigned irq, struct irq_desc *desc)
->  static int at91_gpio_of_irq_setup(struct device_node *node,
->  				  struct at91_gpio_chip *at91_gpio)
->  {
-> +	struct at91_gpio_chip   *prev = NULL;
->  	struct irq_data		*d = irq_get_irq_data(at91_gpio->pioc_virq);
->  	int ret;
->  
-> @@ -1493,6 +1494,17 @@ static int at91_gpio_of_irq_setup(struct device_node *node,
->  		panic("at91_gpio.%d: couldn't allocate irq domain (DT).\n",
->  			at91_gpio->pioc_idx);
->  
-> +	/* Setup chained handler */
-> +	if (at91_gpio->pioc_idx)
-> +		prev = gpio_chips[at91_gpio->pioc_idx - 1];
-> +
-> +	/* The top level handler handles one bank of GPIOs, except
-> +	 * on some SoC it can handle up to three...
-> +	 * We only set up the handler for the first of the list.
-> +	 */
-> +	if (prev && prev->next == at91_gpio)
-> +		return 0;
-> +
->  	/* Then register the chain on the parent IRQ */
->  	gpiochip_set_chained_irqchip(&at91_gpio->chip,
->  				     &gpio_irqchip,
-> 
+I don't actually care that much, I guess I was using the hardware
+terminology because I'm not sure how well it will map onto the current
+Linux software model of what a socket is but if we decide it maps well
+onto a socket that's fine also.
+
+> In any case, with only 4 affinity levels defined in the arch, as long as
+> we also have 4 variables to capture that information, we should be good,
+> right?
+
+> Anything more exotic not expressable by these 4 affinity levels in MPIDR
+> will require additional information from other sources such as DT or ACPI.
+
+Yes.  I'd really only thought it through properly for the DT case since
+at the time Catalin was saying that it would not be possible to use
+MPIDR.
+
+> > > Perhaps we should just add a new 'socket_id' and that will accommodate
+> > > all cases (up to aff3).
+
+> > Not in the non-MT case where we've got two levels above the cluster ID
+> > in affinity level 1 unless we just combine 2 and 3 (which would be
+> > reasonable enough of course).
+
+> Is the following an accurate description of your proposal for non-MT?
+
+> 	thread_id   = -1
+> 	core_id     = aff0
+> 	cluster_id  = aff1
+> 	clusters_id = combine(aff2,aff3)
+
+Yes, exactly in the combining case - probably just shift one of them
+left and or them together.  Otherwise just only have the cluster_id and
+combine everything else into one (that's what the DT code does
+effectively).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140423/4dcff290/attachment.sig>
