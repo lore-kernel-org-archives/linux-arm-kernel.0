@@ -1,56 +1,59 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 23 Apr 2014 13:41:18 -0700
-Subject: [GIT PULL] arm: omap: Immutable branch between MFD and ARM OMAP
- due for the v3.16 merge-window
-In-Reply-To: <20140423144644.GF6264@lee--X1>
-References: <1397173639-29587-1-git-send-email-tony@atomide.com>
- <1397173639-29587-11-git-send-email-tony@atomide.com>
- <20140417080051.GE28725@lee--X1>
- <20140417153722.GA23385@atomide.com>
- <20140423144644.GF6264@lee--X1>
-Message-ID: <20140423204118.GA6053@atomide.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 24 Apr 2014 00:42:19 +0400
+Subject: [PATCH v2 1/9] ARM: S3C24XX: cpufreq-utils: don't write raw values
+ to MPLLCON when using ccf
+In-Reply-To: <5855371.5GIoOu8EnE@phil>
+References: <2104342.rkElQpXtvM@phil> <5855371.5GIoOu8EnE@phil>
+Message-ID: <535825AB.8060802@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Lee Jones <lee.jones@linaro.org> [140423 07:47]:
-> Hi Tony,
-> 
-> Sorry for the delay - I've been snowed under recently.
-> 
-> As requested, you patch based on v3.14 ( for some reason :) ).
+Hello.
 
-Thanks, I just got tired of chasing regressions with the
--rc cycle while trying to work on some PM changes :)
+On 04/23/2014 11:34 PM, Heiko St?bner wrote:
 
-Regards,
+> The s3c24xx cpufreq driver needs to change the mpll speed and was doing
+> this by writing raw values from a translation table into the MPLLCON
+> register.
 
-Tony
- 
-> The following changes since commit 455c6fdbd219161bd09b1165f11699d6d73de11c:
-> 
->   Linux 3.14 (2014-03-30 20:40:15 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git tags/ib-mfd-omap-3.16
-> 
-> for you to fetch changes up to a613b739b8c08eab811e677810045cc0522fc3e6:
-> 
->   mfd: twl-core: Fix idle mode signaling for omaps when booted with device tree (2014-04-23 15:31:05 +0100)
-> 
-> ----------------------------------------------------------------
-> Immutable branch between MFD and ARM OMAP due for v3.16 merge-window.
-> 
-> ----------------------------------------------------------------
-> Tony Lindgren (1):
->       mfd: twl-core: Fix idle mode signaling for omaps when booted with device tree
-> 
->  arch/arm/mach-omap2/omap_twl.c | 60 ------------------------------------------------------------
->  drivers/mfd/twl-core.c         | 15 +++++++++++++++
->  2 files changed, 15 insertions(+), 60 deletions(-)
-> 
-> -- 
-> Lee Jones
-> Linaro STMicroelectronics Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
+> Change this to use a regular clk_set_rate call when using the common
+> clock framework and only write the raw value in the samsung_clock case.
+
+> To not needing to create additional infrastructure for this, the mpll clock
+> is requested at the first call to s3c2410_set_fvco().
+
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>   arch/arm/mach-s3c24xx/cpufreq-utils.c | 14 ++++++++++++++
+>   1 file changed, 14 insertions(+)
+
+> diff --git a/arch/arm/mach-s3c24xx/cpufreq-utils.c b/arch/arm/mach-s3c24xx/cpufreq-utils.c
+> index 2a0aa56..d5e797b 100644
+> --- a/arch/arm/mach-s3c24xx/cpufreq-utils.c
+> +++ b/arch/arm/mach-s3c24xx/cpufreq-utils.c
+[...]
+> @@ -60,5 +61,18 @@ void s3c2410_cpufreq_setrefresh(struct s3c_cpufreq_config *cfg)
+>    */
+>   void s3c2410_set_fvco(struct s3c_cpufreq_config *cfg)
+>   {
+> +#ifdef CONFIG_SAMSUNG_CLOCK
+>   	__raw_writel(cfg->pll.driver_data, S3C2410_MPLLCON);
+> +#endif
+> +
+> +#ifdef CONFIG_COMMON_CLK
+> +	static struct clk *mpll;
+> +
+> +	if (!mpll)
+
+    You are testing uninitialized variable. This check wouldn't make much 
+sense even if the variable was initialized.
+
+> +		mpll = clk_get(NULL, "mpll")
+> +	if (IS_ERR(mpll))
+> +		return;
+> +
+> +	clk_set_rate(mpll, cfg->pll.frequency);
+> +#endif
+>   }
+
+WBR, Sergei
