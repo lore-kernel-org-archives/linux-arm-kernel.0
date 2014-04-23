@@ -1,43 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 23 Apr 2014 22:50:40 +0100
-Subject: [PATCH v6 0/6] ARM: vdso gettimeofday using generic timer
- architecture
-In-Reply-To: <cover.1398213562.git.nathan_lynch@mentor.com>
-References: <cover.1398213562.git.nathan_lynch@mentor.com>
-Message-ID: <20140423215040.GC26756@n2100.arm.linux.org.uk>
+From: mporter@linaro.org (Matt Porter)
+Date: Wed, 23 Apr 2014 18:01:26 -0400
+Subject: [PATCH 2/4] mfd: bcm590xx: add support for second i2c slave
+ address space
+In-Reply-To: <20140422082139.GF17657@lee--X1>
+References: <1397501428-8857-1-git-send-email-mporter@linaro.org>
+ <1397501428-8857-3-git-send-email-mporter@linaro.org>
+ <20140416110603.GA19671@lee--X1>
+ <20140416213141.GD12304@sirena.org.uk>
+ <20140417065753.GC28725@lee--X1> <20140417222616.GK23695@beef>
+ <20140422082139.GF17657@lee--X1>
+Message-ID: <20140423220126.GC4164@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 22, 2014 at 07:48:51PM -0500, Nathan Lynch wrote:
-> - Build vdso.so with -lgcc: calls to __lshrdi3, __divsi3 sometimes
->   emitted (especially with -Os).  Override certain libgcc functions to
->   prevent undefined symbols.
+On Tue, Apr 22, 2014 at 09:21:39AM +0100, Lee Jones wrote:
+> > > > > s/regmap/Regmap
+> > > > 
+> > > > It's consistently written regmap in all the documentation and so on :)
+> > > 
+> > > Furry muff; but the comments still stand for the acronyms.
+> > > 
+> > > > > addmap{0,1} doesn't quite sit right with me.
+> > > > 
+> > > > > REVISIT: Ah, it's address-map, rather than add map. Okay, not as bad
+> > > > > as I first thought, but still, is there a better naming convention you
+> > > > > could use?
+> > > > 
+> > > > addrmap or something?
+> > > 
+> > > Right, that was what I was thinking. However, I prefer something along
+> > > the lines of 'i2c' and 'i2c_sec' or 'client' and 'client_slv' etc.
+> > 
+> > FWIW, the reason it's addmap{0,1} is that the datasheet has documents
+> > ADDMAP=0 and the first bank of registers and ADDMAP=1 as the second bank
+> > of registers. I adopted that to match the docs for the part.
+> > 
+> > I guess we could do i2c and i2c_sec, I'll just have to put a comment
+> > correlating it to the h/w. Calling it 'slv' implies something else
+> > so we should avoid that here. The notion of a "secondary" i2c device
+> > is completely a Linux I2C subsystem fabrication which wouldn't exist
+> > if it allowed multiple slave addresses per device. From a h/w
+> > perspective there is really no primary and secondary relationship.
+> > 
+> > I'm fine with i2c/i2c_sec or addrmap0/1 and I will just comment to
+> > correlate with the datasheet..pick one.
+> 
+> Let's stick method fabricated by the I2C subsystem. It may seem strange
+> from a h/w perspective, but it is the way we (you) have coded it, as
+> the first parameter of i2c_new_dummy() is the 'managing' (primary,
+> parent, master, whatever) device, so '_sec' would suit as an
+> identifying appendage for the resultant device.
 
-This rather worries me.
+That works, I'll also switch to addrmap_[pri|sec] which touches the
+regulator driver as well. That will keep the relationship between device
+and regmap clear.
 
-For a start, the toolchain I use for cross-building kernels (which I
-build myself from gnu.org source) never has a libgcc with it - that's
-because in order to build libgcc, I need a libc, and I don't want to
-have a full cross environment on my machine just to build the soddin
-compiler.
-
-So, I want to be able to build kernels without having a libgcc sitting
-around.
-
-Second point here is that we have multiple different versions of
-userspace crap with multiple different ABIs.  Think about armel vs
-armhf for starters.  There's at least *three* different ELF formats -
-OABI, EABI armel, EABI armhf.  Okay, we can forget about OABI, but
-what about the other two?  What about single zImage where you may
-want a single kernel image which can run on either flavour?
-
-It is not possible to build a single .so which is compatible with
-both - an armhf dynamic linker rejects armel outright, and vice versa.
-
-This, to me, sounds like one big fail... and as far as I'm aware, the
-kernel has no idea itself which flavour of userspace is running, so it
-has no idea which flavour of VDSO to offer (if it even had both.)
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+-Matt
