@@ -1,48 +1,38 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 23 Apr 2014 10:25:38 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC Cleanup Updates for v3.16
-Message-ID: <cover.1398216284.git.horms+renesas@verge.net.au>
+Date: Wed, 23 Apr 2014 10:25:42 +0900
+Subject: [PATCH 3/4] ARM: shmobile: sh7372: Call sh7372_add_early_devices()
+ instead of open coding
+In-Reply-To: <cover.1398216284.git.horms+renesas@verge.net.au>
+References: <cover.1398216284.git.horms+renesas@verge.net.au>
+Message-ID: <1fba31f047639a6c7accf4f6d075a6cf9eacecc0.1398216284.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please consider these Renesas ARM based SoC cleanup updates for v3.16.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/setup-sh7372.c | 6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
 
-
-The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
-
-  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-cleanup-for-v3.16
-
-for you to fetch changes up to bb6c3d58c36adb205b4bf233fd1c4079e02a6811:
-
-  ARM: shmobile: r8a7740: Make r8a7740_meram_workaround() __init (2014-04-16 10:01:49 +0900)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC Cleanup Updates for v3.16
-
-r8a7740 (R-Mobile A1) SoC
-* Make r8a7740_meram_workaround() __init
-* Remove unused r8a7740_add_early_devices_dt()
-
-r8a7740 (R-Mobile A1) based Armadillo800 EVA board
-* Spelling and grammar fixes
-
-sh7372 (SH-Mobile AP4) SoC
-* Call sh7372_add_early_devices() instead of open coding
-
-----------------------------------------------------------------
-Geert Uytterhoeven (4):
-      ARM: shmobile: armadillo800eva: Spelling and grammar
-      ARM: shmobile: r8a7740: Remove unused r8a7740_add_early_devices_dt()
-      ARM: shmobile: sh7372: Call sh7372_add_early_devices() instead of open coding
-      ARM: shmobile: r8a7740: Make r8a7740_meram_workaround() __init
-
- arch/arm/mach-shmobile/Kconfig         |  4 ++--
- arch/arm/mach-shmobile/setup-r8a7740.c | 13 +------------
- arch/arm/mach-shmobile/setup-sh7372.c  |  6 +-----
- 3 files changed, 4 insertions(+), 19 deletions(-)
+diff --git a/arch/arm/mach-shmobile/setup-sh7372.c b/arch/arm/mach-shmobile/setup-sh7372.c
+index 2730127..f8176b0 100644
+--- a/arch/arm/mach-shmobile/setup-sh7372.c
++++ b/arch/arm/mach-shmobile/setup-sh7372.c
+@@ -1037,11 +1037,7 @@ void __init sh7372_add_early_devices_dt(void)
+ {
+ 	shmobile_setup_delay(800, 1, 3); /* Cortex-A8 @ 800MHz */
+ 
+-	early_platform_add_devices(sh7372_early_devices,
+-				   ARRAY_SIZE(sh7372_early_devices));
+-
+-	/* setup early console here as well */
+-	shmobile_setup_console();
++	sh7372_add_early_devices();
+ }
+ 
+ void __init sh7372_add_standard_devices_dt(void)
+-- 
+1.8.5.2
