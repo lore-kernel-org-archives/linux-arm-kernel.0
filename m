@@ -1,192 +1,86 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 23 Apr 2014 14:09:16 -0700
-Subject: [PATCH 2/2] arm: use fixmap for text patching when text is RO
-In-Reply-To: <1396646870-29695-2-git-send-email-rabin@rab.in>
-References: <1396646870-29695-1-git-send-email-rabin@rab.in>
- <1396646870-29695-2-git-send-email-rabin@rab.in>
-Message-ID: <CAGXu5jJFRapP6EA_T6fCK1po_4sf=34mpC13t9L0SCo1COB5gQ@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 23 Apr 2014 23:11:35 +0200
+Subject: [PATCH v2 1/9] ARM: S3C24XX: cpufreq-utils: don't write raw
+ values to MPLLCON when using ccf
+In-Reply-To: <535828D7.3080301@gmail.com>
+References: <2104342.rkElQpXtvM@phil> <535825AB.8060802@cogentembedded.com>
+ <535828D7.3080301@gmail.com>
+Message-ID: <1538030.0aVnFA3MgQ@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 4, 2014 at 2:27 PM, Rabin Vincent <rabin@rab.in> wrote:
-> Use fixmaps for text patching when the kernel text is read-only,
-> inspired by x86.  This makes jump labels and kprobes work with the
-> currently available CONFIG_DEBUG_SET_MODULE_RONX and the upcoming
-> CONFIG_DEBUG_RODATA options.
->
-> Signed-off-by: Rabin Vincent <rabin@rab.in>
-> ---
->  arch/arm/include/asm/fixmap.h |  3 ++
->  arch/arm/kernel/jump_label.c  |  2 +-
->  arch/arm/kernel/patch.c       | 66 ++++++++++++++++++++++++++++++++++++++-----
->  arch/arm/kernel/patch.h       | 12 +++++++-
->  4 files changed, 74 insertions(+), 9 deletions(-)
->
-> diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
-> index 55ed076..79c1719 100644
-> --- a/arch/arm/include/asm/fixmap.h
-> +++ b/arch/arm/include/asm/fixmap.h
-> @@ -18,6 +18,9 @@
->  #define FIXADDR_TOP            (FIXADDR_END - PAGE_SIZE)
->
->  enum fixed_addresses {
-> +       FIX_TEXT_POKE0,
-> +       FIX_TEXT_POKE1,
-> +
->         FIX_KMAP_BEGIN,
->         FIX_KMAP_END = (FIXADDR_TOP - FIXADDR_START) >> PAGE_SHIFT,
->         __end_of_fixed_addresses
-> diff --git a/arch/arm/kernel/jump_label.c b/arch/arm/kernel/jump_label.c
-> index 4ce4f78..afeeb9e 100644
-> --- a/arch/arm/kernel/jump_label.c
-> +++ b/arch/arm/kernel/jump_label.c
-> @@ -19,7 +19,7 @@ static void __arch_jump_label_transform(struct jump_entry *entry,
->                 insn = arm_gen_nop();
->
->         if (is_static)
-> -               __patch_text(addr, insn);
-> +               __patch_text_early(addr, insn);
->         else
->                 patch_text(addr, insn);
->  }
-> diff --git a/arch/arm/kernel/patch.c b/arch/arm/kernel/patch.c
-> index 07314af..761c5b6 100644
-> --- a/arch/arm/kernel/patch.c
-> +++ b/arch/arm/kernel/patch.c
-> @@ -1,8 +1,11 @@
->  #include <linux/kernel.h>
-> +#include <linux/spinlock.h>
->  #include <linux/kprobes.h>
-> +#include <linux/mm.h>
->  #include <linux/stop_machine.h>
->
->  #include <asm/cacheflush.h>
-> +#include <asm/fixmap.h>
->  #include <asm/smp_plat.h>
->  #include <asm/opcodes.h>
->
-> @@ -13,21 +16,67 @@ struct patch {
->         unsigned int insn;
->  };
->
-> -void __kprobes __patch_text(void *addr, unsigned int insn)
-> +static DEFINE_SPINLOCK(patch_lock);
-> +
-> +static void __kprobes *patch_map(void *addr, int fixmap, unsigned long *flags)
-> +{
-> +       unsigned int uintaddr = (uintptr_t) addr;
-> +       bool module = !core_kernel_text(uintaddr);
-> +       struct page *page;
-> +
-> +       if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX)) {
-> +               page = vmalloc_to_page(addr);
-> +       } else if (!module && IS_ENABLED(CONFIG_ARM_KERNMEM_PERMS)) {
-> +               page = virt_to_page(addr);
-> +       } else {
-> +               return addr;
-> +       }
-> +
-> +       if (flags)
-> +               spin_lock_irqsave(&patch_lock, *flags);
-> +
-> +       set_fixmap(fixmap, page_to_phys(page));
-> +
-> +       return (void *) (__fix_to_virt(fixmap) + (uintaddr & ~PAGE_MASK));
-> +}
-> +
-> +static void __kprobes patch_unmap(int fixmap, unsigned long *flags)
-> +{
-> +       clear_fixmap(fixmap);
-> +
-> +       if (flags)
-> +               spin_unlock_irqrestore(&patch_lock, *flags);
-> +}
-> +
-> +void __kprobes __patch_text_real(void *addr, unsigned int insn, bool remap)
->  {
->         bool thumb2 = IS_ENABLED(CONFIG_THUMB2_KERNEL);
-> +       unsigned int uintaddr = (uintptr_t) addr;
-> +       unsigned long flags;
-> +       void *waddr = addr;
->         int size;
->
-> +       if (remap)
-> +               waddr = patch_map(addr, FIX_TEXT_POKE0, &flags);
-> +
->         if (thumb2 && __opcode_is_thumb16(insn)) {
-> -               *(u16 *)addr = __opcode_to_mem_thumb16(insn);
-> +               *(u16 *)waddr = __opcode_to_mem_thumb16(insn);
->                 size = sizeof(u16);
-> -       } else if (thumb2 && ((uintptr_t)addr & 2)) {
-> +       } else if (thumb2 && (uintaddr & 2)) {
-> +               bool twopage = (uintaddr & ~PAGE_MASK) == PAGE_SIZE - 2;
->                 u16 first = __opcode_thumb32_first(insn);
->                 u16 second = __opcode_thumb32_second(insn);
-> -               u16 *addrh = addr;
-> +               u16 *addrh0 = waddr;
-> +               u16 *addrh1 = waddr + 2;
-> +
-> +               if (remap && twopage)
-> +                       addrh1 = patch_map(addr + 2, FIX_TEXT_POKE1, NULL);
->
-> -               addrh[0] = __opcode_to_mem_thumb16(first);
-> -               addrh[1] = __opcode_to_mem_thumb16(second);
-> +               *addrh0 = __opcode_to_mem_thumb16(first);
-> +               *addrh1 = __opcode_to_mem_thumb16(second);
-> +
-> +               if (twopage && addrh1 != addr + 2)
-> +                       patch_unmap(FIX_TEXT_POKE1, NULL);
->
->                 size = sizeof(u32);
->         } else {
-> @@ -36,10 +85,13 @@ void __kprobes __patch_text(void *addr, unsigned int insn)
->                 else
->                         insn = __opcode_to_mem_arm(insn);
->
-> -               *(u32 *)addr = insn;
-> +               *(u32 *)waddr = insn;
->                 size = sizeof(u32);
->         }
->
-> +       if (waddr != addr)
-> +               patch_unmap(FIX_TEXT_POKE0, &flags);
-> +
->         flush_icache_range((uintptr_t)(addr),
->                            (uintptr_t)(addr) + size);
->  }
-> diff --git a/arch/arm/kernel/patch.h b/arch/arm/kernel/patch.h
-> index b4731f2..77e054c 100644
-> --- a/arch/arm/kernel/patch.h
-> +++ b/arch/arm/kernel/patch.h
-> @@ -2,6 +2,16 @@
->  #define _ARM_KERNEL_PATCH_H
->
->  void patch_text(void *addr, unsigned int insn);
-> -void __patch_text(void *addr, unsigned int insn);
-> +void __patch_text_real(void *addr, unsigned int insn, bool remap);
-> +
-> +static inline void __patch_text(void *addr, unsigned int insn)
-> +{
-> +       __patch_text_real(addr, insn, true);
-> +}
-> +
-> +static inline void __patch_text_early(void *addr, unsigned int insn)
-> +{
-> +       __patch_text_real(addr, insn, false);
-> +}
->
->  #endif
-> --
-> 1.9.1
->
+Am Mittwoch, 23. April 2014, 22:55:51 schrieb Tomasz Figa:
+> Hi,
+> 
+> On 23.04.2014 22:42, Sergei Shtylyov wrote:
+> > Hello.
+> > 
+> > On 04/23/2014 11:34 PM, Heiko St?bner wrote:
+> >> The s3c24xx cpufreq driver needs to change the mpll speed and was doing
+> >> this by writing raw values from a translation table into the MPLLCON
+> >> register.
+> >> 
+> >> Change this to use a regular clk_set_rate call when using the common
+> >> clock framework and only write the raw value in the samsung_clock case.
+> >> 
+> >> To not needing to create additional infrastructure for this, the mpll
+> >> clock
+> >> is requested at the first call to s3c2410_set_fvco().
+> >> 
+> >> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> >> ---
+> >> 
+> >>   arch/arm/mach-s3c24xx/cpufreq-utils.c | 14 ++++++++++++++
+> >>   1 file changed, 14 insertions(+)
+> >> 
+> >> diff --git a/arch/arm/mach-s3c24xx/cpufreq-utils.c
+> >> b/arch/arm/mach-s3c24xx/cpufreq-utils.c
+> >> index 2a0aa56..d5e797b 100644
+> >> --- a/arch/arm/mach-s3c24xx/cpufreq-utils.c
+> >> +++ b/arch/arm/mach-s3c24xx/cpufreq-utils.c
+> > 
+> > [...]
+> > 
+> >> @@ -60,5 +61,18 @@ void s3c2410_cpufreq_setrefresh(struct
+> >> s3c_cpufreq_config *cfg)
+> >> 
+> >>    */
+> >>   
+> >>   void s3c2410_set_fvco(struct s3c_cpufreq_config *cfg)
+> >>   {
+> >> 
+> >> +#ifdef CONFIG_SAMSUNG_CLOCK
+> >> 
+> >>       __raw_writel(cfg->pll.driver_data, S3C2410_MPLLCON);
+> >> 
+> >> +#endif
+> >> +
+> >> +#ifdef CONFIG_COMMON_CLK
+> >> +    static struct clk *mpll;
+> >> +
+> >> +    if (!mpll)
+> >> 
+> >     You are testing uninitialized variable. This check wouldn't make
+> > 
+> > much sense even if the variable was initialized.
+> 
+> I should probably add that NULL is considered a valid clock handle by
+> Common Clock Framework.
+> 
+> If there is really no way to pass the clock to this function then
+> probably a global variable initialized by some code running earlier than
+> this function could be called would be a better choice.
 
-I think we can use this for the kgdb case too. Has anyone tried that
-yet? Perhaps implementing text_poke() in terms of patch_map/unmap
-calls would be best? Then the arm-specific kgdb hooks can use that,
-since it does the icache flushing separately.
+*grrr* :-) ... ok I'll try to find another way (again) to do this
 
--Kees
 
--- 
-Kees Cook
-Chrome OS Security
+> Anyway, Heiko, thanks for working on this. I'll try to review rest of
+> the series soon. (I'm attending the ELC next week, though, so I'm not
+> sure if I find some time then, though.)
+
+Just as a reminder, there isn't this much to still review, as you 
+Acked/Reviewed most of the series in v1 and only this patch as well as 2 and 5 
+still need a review/ack - and the only changes are fixes for your comments ;-)
+
+
+Heiko
