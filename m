@@ -1,91 +1,69 @@
-From: lig.fnst@cn.fujitsu.com (lig.fnst at cn.fujitsu.com)
-Date: Wed, 23 Apr 2014 02:47:37 +0000
-Subject: =?utf-8?B?562U5aSNOiBbUWVtdS1kZXZlbF0gW1BBVENIXSBRRU1VOiBBUk06IGJvb3Q6?=
- =?utf-8?Q?_Load_kernel_at_an_Image_friendly_address?=
-In-Reply-To: <CAEgOgz6hQBCD694PL_euJMngDkc7QGPZJuNr+KqTEoG_cHfVSA@mail.gmail.com>
-References: <1395718484-20424-1-git-send-email-joelf@ti.com>
- <CAFEAcA9Dc5bN_JdMNWODB9Puj9HLoEBm4mDo7ZcaJj97qBbAdw@mail.gmail.com>
- <CAEgOgz6Tou7aOOKsWO2cOaPjWJrkWBFyU-_bApf+ks=qzSKDdA@mail.gmail.com>
- <CAFEAcA-1hWT69JzSv2zJta_PCCuJ-9fH7muBGPD=u+WOLHmvXQ@mail.gmail.com>
- <CAFEAcA96XGvwPM=OpqW8EU5nFksiEruGgncwqUPEWeU2ryCoJg@mail.gmail.com>
- <534FD87C.4090708@codeaurora.org>
- <CAEgOgz6hQBCD694PL_euJMngDkc7QGPZJuNr+KqTEoG_cHfVSA@mail.gmail.com>
-Message-ID: <534C5107B281854290643468BBAAD41F0FCD0D@G08CNEXMBPEKD01.g08.fujitsu.local>
+From: alim.akhtar@gmail.com (Alim Akhtar)
+Date: Wed, 23 Apr 2014 09:42:47 +0530
+Subject: [PATCH V2] mmc: dw_mmc: exynos: Turn SDIO interrupts on
+In-Reply-To: <CAKuRcOKOBebW157R16_KtSR541MwwZ4pyynBRnbvOLm9RK4SAg@mail.gmail.com>
+References: <1395635037-24081-1-git-send-email-yuvaraj.cd@samsung.com>
+ <532FB4A7.7020700@samsung.com>
+ <CAKuRcOKOBebW157R16_KtSR541MwwZ4pyynBRnbvOLm9RK4SAg@mail.gmail.com>
+Message-ID: <CAGOxZ53urGaOmezRi35fGpz_sR+E8Ukq3s9v08pAGLL6ChOWKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----????-----
-> ???: qemu-devel-bounces+lig.fnst=cn.fujitsu.com at nongnu.org
-> [mailto:qemu-devel-bounces+lig.fnst=cn.fujitsu.com at nongnu.org] ?? Peter
-> Crosthwaite
-> ????: 2014?4?23? 10:20
-> ???: Christopher Covington
-> ??: Joel Fernandes; Peter Maydell; QEMU Developers; Linux ARM Kernel List
-> ??: Re: [Qemu-devel] [PATCH] QEMU: ARM: boot: Load kernel at an Image
-> friendly address
-> 
-> On Thu, Apr 17, 2014 at 11:34 PM, Christopher Covington
-> <cov@codeaurora.org> wrote:
-> > On 04/17/2014 06:02 AM, Peter Maydell wrote:
-> >> On 2 April 2014 13:47, Peter Maydell <peter.maydell@linaro.org> wrote:
-> >>> On 2 April 2014 13:11, Peter Crosthwaite <peter.crosthwaite@xilinx.com>
-> wrote:
-> >>>> Like others, I have been carrying this change locally. Good to see it up!
-> >>>
-> >>> Why are you all booting raw Images anyway (just out of curiosity)?
-> >>
-> >> Given the recent feedback from the kernel mailing list (viz "don't
-> >> boot Image unless you really know what you're doing, the correct load
-> >> image may change randomly depending what other board support is in a
-> >> multikernel image, etc") maybe we should just remove the Image
-> >> booting support instead? Clearly nobody who hasn't locally patched
-> >> QEMU is using it at the moment...
-> >
-> > An opportunity for a fresh start at low-level loading facilities,
-> > should anyone be inclined to pursue it, sounds good to me.
-> >
-> 
-> FWIW, im already using my own bootloader out of tree that cuts in on this
-> lower level. I'm getting close to be able to throw away -kernel and friends
-> completely. 
+Hi Yuvaraj,
 
-Me too :-)
+On Mon, Mar 24, 2014 at 10:12 AM, Yuvaraj Kumar <yuvaraj.cd@gmail.com> wrote:
+> On Mon, Mar 24, 2014 at 9:59 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+>> Hi, Yuvaraj.
+>>
+>> NACK. we can use "mmc_of_parese()".
+> Thanks Jaehoon for the pointer.I will use "mmc_of_parse()".
+Are you planning to re-spin this patch? Now Jaehoon's changes for
+using mmc_of_parse() is landed in mmc-next.
+Thanks!!
+>>
+>> I have sent the patch that use "mmc_of_parse()".
+>> https://patchwork.kernel.org/patch/3750681/
+>>
+>> Best Regards,
+>> Jaehoon Chung
+>>
+>> On 03/24/2014 01:23 PM, Yuvaraj Kumar C D wrote:
+>>> The mmc part in exynos supports SDIO interrupts and they work fine, so
+>>> turn the capability on.  With this I see download speeds increase
+>>> about 10x.
+>>>
+>>> This V1 of this patch is posted to LKML at
+>>> https://patchwork.kernel.org/patch/2429661/) by Doug Anderson.
+>>>
+>>> Signed-off-by: Doug Anderson <dianders@chromium.org>
+>>> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+>>> ---
+>>>  drivers/mmc/host/dw_mmc.c |    3 +++
+>>>  1 file changed, 3 insertions(+)
+>>>
+>>> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+>>> index 0c56faa..240949d 100644
+>>> --- a/drivers/mmc/host/dw_mmc.c
+>>> +++ b/drivers/mmc/host/dw_mmc.c
+>>> @@ -2417,6 +2417,9 @@ static struct dw_mci_board *dw_mci_parse_dt(struct dw_mci *host)
+>>>       if (of_get_property(np, "cd-inverted", NULL))
+>>>               pdata->caps2 |= MMC_CAP2_CD_ACTIVE_HIGH;
+>>>
+>>> +     if (of_find_property(np, "cap-sdio-irq", NULL))
+>>> +             pdata->caps |= MMC_CAP_SDIO_IRQ;
+>>> +
+>>>       return pdata;
+>>>  }
+>>>
+>>>
+>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-To implement I have it as a QOMified device so you just add it on
-> the command line:
-> 
-> qemu-system-foo -device
-> loader,image=/path/to/file[,addr=0xdeadbeef][,cpunr=X] 
-> To load a particular image to a particular CPU (and it is repeatable).
 
-Why in to a particular CPU?
-The motivation is ?
 
-Thanks!
-
-> 
-> You can:
-> 
-> 1: Load elfs and uImages (addr= is ignored)
-> 2: Load raw or zImages
-> 3: Load data files at arbitrary addresses (cpunr= is ignored)
-> 
-> With this, you can BYO secondary bootloops or even run multiple guests of
-> different CPUs. You can also boot on a non-zeroth CPU. You can place raw
-> images wherever you want (the issue in this thread). You can also load in
-> firmware to ROMs.
-> 
-> I then have a tiny hack to make -kernel optional for all ARM.
-> Bootloader works for at least ARM and Microblaze, haven't tested for others
-> yet.
-> 
-> Regards,
-> Peter
-> 
-> > Christopher
-> >
-> > --
-> > Employee of Qualcomm Innovation Center, Inc.
-> > Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> > hosted by the Linux Foundation.
-> >
+-- 
+Regards,
+Alim
