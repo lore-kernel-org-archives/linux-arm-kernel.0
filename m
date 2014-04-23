@@ -1,44 +1,85 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Wed, 23 Apr 2014 20:59:27 +0530
-Subject: [PATCH 1/3] dts: exynos5250: Add required VDD regulator supplies for
- usb
-In-Reply-To: <1398266969-26000-1-git-send-email-gautam.vivek@samsung.com>
-References: <1398266969-26000-1-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <1398266969-26000-2-git-send-email-gautam.vivek@samsung.com>
+From: tim.niemeyer@corscience.de (Tim Niemeyer)
+Date: Wed, 23 Apr 2014 17:36:36 +0200
+Subject: [RFC 0/3] DRM driver for the ATMEL High end LCD controller
+In-Reply-To: <1397814309-32160-1-git-send-email-jjhiblot@traphandler.com>
+References: <1397814309-32160-1-git-send-email-jjhiblot@traphandler.com>
+Message-ID: <1398267396.4295.59.camel@herbert.er.corscience.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add required VDD 3.3V and VDD 1.0V regulator supplies to usb nodes.
+Hi Jean-Jacques,
 
-Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
----
- arch/arm/boot/dts/exynos5250-smdk5250.dts |   12 ++++++++++++
- 1 file changed, 12 insertions(+)
+Am Freitag, den 18.04.2014, 11:45 +0200 schrieb Jean-Jacques Hiblot:
+> Hi,
+> 
+> this patch serie implements a simple DRM driver for the ATMEL High end LCD
+> controller found in the SAMA5 familly. It's based on the tilcdc driver.
+> It uses the cma_helper for memory and fbdev stuff.
+> Your comments are welcome !
+I applied your and Robert's patches on a 3.15-rc2 kernel and tried the
+framebuffer device on the sama5d31-ek. Seems to work.
 
-diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-index a794a70..2f183b8 100644
---- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-+++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-@@ -363,8 +363,20 @@
- 		samsung,audio-codec = <&wm8994>;
- 	};
- 
-+	usb at 12000000 {
-+		vdd33-supply = <&ldo12_reg>;
-+		vdd10-supply = <&ldo15_reg>;
-+	};
-+
- 	usb at 12110000 {
- 		samsung,vbus-gpio = <&gpx2 6 0>;
-+		vdd33-supply = <&ldo12_reg>;
-+		vdd10-supply = <&ldo15_reg>;
-+	};
-+
-+	usb at 12120000 {
-+		vdd33-supply = <&ldo12_reg>;
-+		vdd10-supply = <&ldo15_reg>;
- 	};
- 
- 	dp-controller at 145B0000 {
--- 
-1.7.10.4
+> Supported features:
+> * the base layer (the main framebuffer)
+Tested to show a little tux png, but it's appearing only after 
+'echo 0 > /sys/devices/ahb.1/apb.2/f0030000.hlcdc/graphics/fb0/rotate'
+is there missing some initializing?
+
+> * a simple panel
+> * a backlight driver
+Tested to set brightness to 0, 20 and 255. Works.
+
+Thanks for your work.
+
+Best Regards
+Tim
+
+> * structure to 'easily' add other connectors (it comes from the tilcdc)
+> 
+> On the todo list:
+> * support overlays as drm_planes
+> * support for the hardware cursor
+> * support for the SiI9022 HDMI connector (present on sama5d36ek)
+> 
+> 
+> Jean-Jacques Hiblot (3):
+>   atmel: drm: added drm driver for the atmel hlcd controller
+>   atmel: drm: dt: Added DT entry for the atmel hlcdc found in the sama5
+>   atmel: dt: Add supports for the lcdc support on the sama5d36ek
+> 
+>  arch/arm/boot/dts/sama5d36ek.dts                   |  27 +-
+>  arch/arm/boot/dts/sama5d3_lcd.dtsi                 |  11 +
+>  drivers/gpu/drm/Kconfig                            |   2 +
+>  drivers/gpu/drm/Makefile                           |   1 +
+>  drivers/gpu/drm/atmel_hlcdc/Kconfig                |  13 +
+>  drivers/gpu/drm/atmel_hlcdc/Makefile               |  12 +
+>  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc.h          | 771 +++++++++++++++++++++
+>  .../gpu/drm/atmel_hlcdc/atmel_hlcdc_backlight.c    |  92 +++
+>  .../gpu/drm/atmel_hlcdc/atmel_hlcdc_backlight.h    |  25 +
+>  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_crtc.c     | 702 +++++++++++++++++++
+>  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_drv.c      | 586 ++++++++++++++++
+>  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_drv.h      | 124 ++++
+>  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_ovl.h      | 190 +++++
+>  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_panel.c    | 459 ++++++++++++
+>  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_panel.h    |  28 +
+>  15 files changed, 3042 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/Kconfig
+>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/Makefile
+>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc.h
+>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_backlight.c
+>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_backlight.h
+>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_crtc.c
+>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_drv.c
+>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_drv.h
+>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_ovl.h
+>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_panel.c
+>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_panel.h
+> 
+> --
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
