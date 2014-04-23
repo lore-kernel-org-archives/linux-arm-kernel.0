@@ -1,72 +1,99 @@
-From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
-Date: Wed, 23 Apr 2014 10:19:56 -0400
-Subject: [PATCH v6 1/3] PSCI: Add initial support for PSCIv0.2 functions
-In-Reply-To: <CAL_JsqKkmfWaDkc_DHh5ZWc=E13qii4U4g_bfiDzJ+N3e0Az8Q@mail.gmail.com>
-References: <1397762146-8337-1-git-send-email-ashwin.chaugule@linaro.org>
- <1397762146-8337-2-git-send-email-ashwin.chaugule@linaro.org>
- <CALrVBkuSsi=2J1YT7w2bGtcL7CL6_xheZceaRtqETyC9mUqhTw@mail.gmail.com>
- <CAJ5Y-eZ=ugeav++ysMCbAUFnPMr5=WaCdrEdYojwLi1HTYX6rw@mail.gmail.com>
- <CAL_JsqKkmfWaDkc_DHh5ZWc=E13qii4U4g_bfiDzJ+N3e0Az8Q@mail.gmail.com>
-Message-ID: <CAJ5Y-eagfKcS65uHWEeUZjr=C+7Zpb-S3QHxRzahuM=2pstU8Q@mail.gmail.com>
+From: lznuaa@gmail.com (Frank Li)
+Date: Wed, 23 Apr 2014 09:26:04 -0500
+Subject: Perf top always show 0.00
+In-Reply-To: <CAB4PhKdP_gXiB56DPLC3DxdjW2Epr_RTghW_VL1X84Ux1U+bLw@mail.gmail.com>
+References: <CAHrpEqQZ_0G-rmwfaeEzHOFVckyRRSUpYrPdMUgPjRZ1JYyy6g@mail.gmail.com>
+ <CAB4PhKdP_gXiB56DPLC3DxdjW2Epr_RTghW_VL1X84Ux1U+bLw@mail.gmail.com>
+Message-ID: <CAHrpEqQO93d9Nh_4wO0fs_KLH3ofn43t-SySDRTNP9=ryTq=fQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 April 2014 09:16, Rob Herring <robherring2@gmail.com> wrote:
-> On Tue, Apr 22, 2014 at 12:32 PM, Ashwin Chaugule
-> <ashwin.chaugule@linaro.org> wrote:
->> On 21 April 2014 02:23, Anup Patel <anup.patel@linaro.org> wrote:
->>> Hi Ashwin,
->>>
->>> Please include system reboot & shutdown implementation
->>> in this patch using PSCI v0.2 SYSTEM_OFF and
->>> SYSTEM_RESET functions.
->>
->> hm, I had thought these relied on having the (optional) MIGRATE
->> function. But thats not the case.
->>
->> So, how about this..
->>
->> ---------------------8<---------------------
->>
->> diff --git a/arch/arm/kernel/psci.c b/arch/arm/kernel/psci.c
->> index ead8cdb..5a54f2f 100644
->> --- a/arch/arm/kernel/psci.c
->> +++ b/arch/arm/kernel/psci.c
->> @@ -17,6 +17,8 @@
->>
->>  #include <linux/init.h>
->>  #include <linux/of.h>
->> +#include <linux/reboot.h>
->> +#include <linux/pm.h>
->>  #include <uapi/linux/psci.h>
->>
->>  #include <asm/compiler.h>
->> @@ -24,6 +26,7 @@
->>  #include <asm/opcodes-sec.h>
->>  #include <asm/opcodes-virt.h>
->>  #include <asm/psci.h>
->> +#include <asm/system_misc.h>
->>
->>  struct psci_operations psci_ops;
->>
->> @@ -196,6 +199,16 @@ static int get_set_conduit_method(struct device_node *np)
->>   return 0;
->>  }
->>
->> +static void psci_sys_reset(enum reboot_mode reboot_mode, const char *cmd)
->> +{
->> + invoke_psci_fn(PSCI_0_2_FN_SYSTEM_RESET, 0, 0, 0);
->> +}
->> +
->> +static void psci_sys_off(void)
+On Wed, Apr 23, 2014 at 4:15 AM, Jason Liu <liu.h.jason@gmail.com> wrote:
+> Frank,
 >
-> This is a bit terse. I would spell out system or use sys_poweroff
-> here. Otherwise,
+> 2014-04-19 1:00 GMT+08:00 Frank Li <lznuaa@gmail.com>:
+>> I use mx6dq platform. Found below problem.
+>>
+>> Run Perf top. First column always 0, but order look like correct.
+>>
+>>    0.00%  perf          [.] 0x00049420
+>>      0.00%  [kernel]      [k] kallsyms_expand_symbol.constprop.5
+>>      0.00%  [kernel]      [k] vsnprintf
+>>      0.00%  [kernel]      [k] arch_cpu_idle
+>>      0.00%  [kernel]      [k] format_decode
+>>      0.00%  [kernel]      [k] number.isra.2
+>>      0.00%  libc-2.19.so  [.] strstr
+>>      0.00%  libc-2.19.so  [.] 0x00072498
+>>      0.00%  libc-2.19.so  [.] memchr
+>>      0.00%  [kernel]      [k] _raw_spin_unlock_irqrestore
+>>      0.00%  [kernel]      [k] string.isra.4
+>>      0.00%  [kernel]      [k] strnlen
+>>      0.00%  libc-2.19.so  [.] getdelim
+>>      0.00%  libc-2.19.so  [.] memcpy
+>>      0.00%  [kernel]      [k] lock_acquire
+>>      0.00%  libc-2.19.so  [.] strchr
+>>      0.00%  libc-2.19.so  [.] strcmp
+>>      0.00%  [kernel]      [k] _raw_spin_unlock_irq
+>>      0.00%  libc-2.19.so  [.] __libc_calloc
+>>      0.00%  libc-2.19.so  [.] _IO_feof
+>>      0.00%  [kernel]      [k] pointer.isra.15
 >
-> Acked-by: Rob Herring <robh@kernel.org>
+> This issue has been resolved by the following commit:
 >
+> commit 9dfd005a3f4e1c648cb4aa1dc70604bb370c5e7b
+> Author: Michael Hudson-Doyle <michael.hudson@linaro.org>
+> Date:   Thu Oct 31 16:47:45 2013 -0700
+>
+>     perf tools: Remove cast of non-variadic function to variadic
+>
+>     commit 53805eca3d89b095062c11a6798689bb0af09216 upstream.
+>
+>     The 4fb71074a570 (perf ui/hist: Consolidate hpp helpers) cset introduced
+>     a cast of percent_color_snprintf to a function pointer type with
+>     varargs.  Change percent_color_snprintf to be variadic and remove the
+>     cast.
+>
+>     The symptom of this was all percentages being reported as 0.00% in perf
+>     report --stdio output on the armhf arch.
+>
+>     Signed-off-by: Michael Hudson-Doyle <michael.hudson@linaro.org>
+>     Acked-by: Namhyung Kim <namhyung@kernel.org>
+>     Acked-by: Will Deacon <will.deacon@arm.com>
+>     Cc: Jean Pihet <jean.pihet@linaro.org>
+>     Cc: Jiri Olsa <jolsa@redhat.com>
+>     Cc: Will Deacon <will.deacon@arm.com>
+>     Link: http://lkml.kernel.org/r/87zjppvw7y.fsf at canonical.com
+>     Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
+>     Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>
+>
+> Jason Liu
 
-Thanks Rob. Are you okay with adding this Acked-by for this complete
-patch [1/3]?
+I tested it. still 0.00%
+0.00%  perf          [.] 0x000494a0
+     0.00%  [kernel]      [k] cpuidle_enter_state
+     0.00%  [kernel]      [k] kallsyms_expand_symbol.constprop.7
+     0.00%  libc-2.19.so  [.] 0x0006f6a4
+     0.00%  [kernel]      [k] vsnprintf
+     0.00%  libc-2.19.so  [.] strstr
+     0.00%  [kernel]      [k] format_decode
+     0.00%  libc-2.19.so  [.] memchr
+     0.00%  [kernel]      [k] number.isra.2
+     0.00%  libc-2.19.so  [.] memcpy
+     0.00%  libc-2.19.so  [.] getdelim
+     0.00%  libc-2.19.so  [.] __libc_calloc
+     0.00%  [kernel]      [k] _raw_spin_unlock_irq
+     0.00%  libc-2.19.so  [.] strchr
+     0.00%  [kernel]      [k] strnlen
+     0.00%  [kernel]      [k] _raw_spin_unlock_irqrestore
+     0.00%  libc-2.19.so  [.] strcmp
+     0.00%  [kernel]      [k] __do_softirq
+     0.00%  [kernel]      [k] string.isra.4
+     0.00%  libc-2.19.so  [.] _IO_feof
+     0.00%  [kernel]      [k] tick_nohz_idle_enter
 
-> Rob
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
