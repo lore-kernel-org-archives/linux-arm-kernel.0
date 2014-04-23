@@ -1,61 +1,39 @@
-From: andy.nicholas.work@gmail.com (Andy Nicholas)
-Date: Tue, 22 Apr 2014 17:18:39 -0700
-Subject: kdump for ARM Linux?
-Message-ID: <132601cf5e89$94556a70$bd003f50$@gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 23 Apr 2014 09:22:54 +0900
+Subject: [PATCH 05/14] ARM: shmobile: koelsch-reference: Work around core
+ clock issues
+In-Reply-To: <5356D0B8.5010406@cogentembedded.com>
+References: <cover.1397774190.git.horms+renesas@verge.net.au>
+ <53cf0cf7ba2ef785b339826a0765bb6b1756adeb.1397774191.git.horms+renesas@verge.net.au>
+ <5356D0B8.5010406@cogentembedded.com>
+Message-ID: <20140423002254.GD5738@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, hopefully this is the correct mailing list for this question:
+On Wed, Apr 23, 2014 at 12:27:36AM +0400, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 04/18/2014 02:44 AM, Simon Horman wrote:
+> 
+> >From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+> 
+> >Due to issues with runtime PM clock management, clocks not explicitly
+> >managed by their drivers may not be enabled at all, or be inadvertently
+> >disabled by the clk_disable_unused() late initcall.
+> 
+> >Until this is fixed, add a temporary workaround, calling
+> >shmobile_clk_workaround() with enable == true.
+> 
+> >For now this enables the clocks for: ether, i2c2, msiof0, qspi_mod, and
+> >thermal. More clocks can be added if needed.
+> 
+> >Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+> >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+>    It is strange but this workaround doesn't seem to help me booting Koelsch
+> reference kernel with NFS root: it still crashes due to imprecise
+> external abort once the userland starts. Only the actual drivers/sh/
+> fixing series by Ben/Geert helps with booting further. I therefore
+> would like to have it merged by Simon the sooner the better...
 
-I'm working on a derivative of the mainline Linux 3.8 kernel and I'm trying
-to enable ARM kdump functionality to collect crashdumps when we have kernel
-problems. But, there's some kind of unresolved issue in
-arch/arm/mm/ioremap.c which prevents /proc/vmcore from being able to
-function properly. I checked and this appears to still be in kernel.org
-Linux 3.13. The target platform is a regular, recent ARMv7 compatible chip. 
-
-Has this issue been addressed in any version of an ARM Linux kernel? Or, is
-there a work-around? If not, how does a crashdump file get generated when/if
-the kernel crashes or a driver faults?
-
->> WARNING: at arch/arm/mm/ioremap.c:244
-__arm_ioremap_pfn_caller+0x1d8/0x1f0()
->> Modules linked in:
->> [<c0016660>] (unwind_backtrace+0x0/0x138) from [<c0020480>]
-(warn_slowpath_common+0x4c/0x64)
->> [<c0020480>] (warn_slowpath_common+0x4c/0x64) from [<c00204b4>]
-(warn_slowpath_null+0x1c/0x24)
->> [<c00204b4>] (warn_slowpath_null+0x1c/0x24) from [<c0018e9c>]
-(__arm_ioremap_pfn_caller+0x1d8/0x1f0)
->> [<c0018e9c>] (__arm_ioremap_pfn_caller+0x1d8/0x1f0) from [<c0018f20>]
-(__arm_ioremap_caller+0x54/0x5c)
->> [<c0018f20>] (__arm_ioremap_caller+0x54/0x5c) from [<c0018c58>]
-(__arm_ioremap+0x18/0x1c)
->> [<c0018c58>] (__arm_ioremap+0x18/0x1c) from [<c00168fc>]
-(copy_oldmem_page+0x34/0xc0)
->> [<c00168fc>] (copy_oldmem_page+0x34/0xc0) from [<c010350c>]
-(read_from_oldmem+0xb8/0xe4)
->> [<c010350c>] (read_from_oldmem+0xb8/0xe4) from [<c05c37e0>]
-(parse_crash_elf32_headers+0x184/0x43c)
->> [<c05c37e0>] (parse_crash_elf32_headers+0x184/0x43c) from [<c05c3b64>]
-(vmcore_init+0xcc/0x198)
->> [<c05c3b64>] (vmcore_init+0xcc/0x198) from [<c000863c>]
-(do_one_initcall+0x34/0x184)
->> [<c000863c>] (do_one_initcall+0x34/0x184) from [<c05b28dc>]
-(kernel_init_freeable+0xfc/0x1c8)
->> [<c05b28dc>] (kernel_init_freeable+0xfc/0x1c8) from [<c04326d4>]
-(kernel_init+0x8/0xe4)
->> [<c04326d4>] (kernel_init+0x8/0xe4) from [<c000ec58>]
-(ret_from_fork+0x14/0x3c)
->>
->> arch/arm/mm/ioremap.c:244
->>??????? /*
->>????????? * Don't allow RAM to be mapped - this causes problems with
-ARMv6+
->>????????? */
->>???????? if (WARN_ON(pfn_valid(pfn)))
->>???????????????? return NULL;
-
-Thanks in advance for any help.
-
--andy
+For my reference, specifically which patches are you referring to?
