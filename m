@@ -1,44 +1,70 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 23 Apr 2014 12:48:43 -0300
-Subject: [PATCH RFC] ARM: dts: am335x: update USB DT references
-In-Reply-To: <5357DEF0.7030000@baylibre.com>
-References: <1397647595-10927-1-git-send-email-leigh@solinno.co.uk>
- <5356794C.7070707@baylibre.com> <20140423144822.GA4833@atomide.com>
- <20140423151734.GA5867@arch.cereza> <5357DEF0.7030000@baylibre.com>
-Message-ID: <20140423154842.GA6969@arch.cereza>
+From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
+Date: Wed, 23 Apr 2014 17:51:09 +0200
+Subject: [PATCH v2 0/7] ARM: berlin: add pinctrl support
+Message-ID: <1398268276-9696-1-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Apr 23, Benoit Cousson wrote:
-> Hi Ezequiel,
-> 
-> On 23/04/2014 17:17, Ezequiel Garcia wrote:
-> >On Apr 23, Tony Lindgren wrote:
-> >>* Benoit Cousson <bcousson@baylibre.com> [140422 07:14]:
-> >>>Hi Leigh,
-> >>>
-> >>>On 16/04/2014 13:26, Leigh Brown wrote:
-> >>>>In "ARM: dts: am33xx: correcting dt node unit address for usb", the
-> >>>>usb_ctrl_mod and cppi41dma nodes were updated with the correct register
-> >>>>addresses.  However, the dts files that reference these nodes were not
-> >>>>updated, and those devices are no longer being enabled.
-> >>>>
-> >>>>This patch corrects the references for the affected dts files.
-> >
-> >Maybe someone can take care of using phandles instead?
-> >
-> >This way, the board's dts files would be immune to such .dtsi changes.
-> 
-> Indeed, that will avoid such issues.
-> 
-> Are you volunteer for that cleanup ? :-)
-> 
+This series adds support for the Marvell Berlin pin-controller, allowing
+to configure the pin muxing from the device tree.
 
-Sure, I've already done that for my custom dts. It's a simple change.
+The Berlin pin-controller support is divided into 3 drivers, each
+driving one Berlin SoC. These drivers use a Berlin common part.
 
-If someone feels like doing this before I get to send the patches,
-be my guest :-)
+This series applies on top of patches introducing the Marvell Berlin
+BG2Q you can find on Sebastian's berlin/for-next branch[1] and the patch
+allowing not to define the get_group_pins() function[2].
+
+Tested on the Berlin BG2Q.
+
+[1] https://github.com/shesselba/linux-berlin/commits/berlin/for-next
+[2] https://patchwork.kernel.org/patch/3964491/
+
+Changes since v1:
+        - moved the driver to a specific berlin/ directory
+        - divided the pin-controller driver into three (one per SoC) and
+          reworked the driver dependencies accordingly
+        - reworked the device tree bindings
+        - removed the reg-names and reworked the driver to allow
+          splitting the two pin-controllers into two separate nodes in
+          the device tree
+        - updated the documentation
+        - removed unnecessary checks
+        - added support to mux multiple groups with the same function
+        - added BG2, BG2 and BG2CD function definitions
+
+Antoine T?nart (7):
+  pinctrl: berlin: add the core pinctrl driver for Marvell Berlin SoCs
+  pinctrl: berlin: add the BG2Q pinctrl driver
+  pinctrl: berlin: add the BG2 pinctrl driver
+  pinctrl: berlin: add the BG2CD pinctrl driver
+  ARM: berlin: add the pinctrl dependency for the Marvell Berlin SoCs
+  Documentation: add the Marvell Berlin pinctrl documentation
+  ARM: dts: berlin: add the pinctrl node and muxing setup for uarts
+
+ .../bindings/pinctrl/marvell,berlin-pinctrl.txt    |  44 +++
+ arch/arm/boot/dts/berlin2.dtsi                     |  24 ++
+ arch/arm/boot/dts/berlin2cd.dtsi                   |  17 +
+ arch/arm/boot/dts/berlin2q.dtsi                    |  24 ++
+ arch/arm/mach-berlin/Kconfig                       |   4 +
+ drivers/pinctrl/Kconfig                            |   1 +
+ drivers/pinctrl/Makefile                           |   1 +
+ drivers/pinctrl/berlin/Kconfig                     |  19 +
+ drivers/pinctrl/berlin/Makefile                    |   4 +
+ drivers/pinctrl/berlin/berlin-bg2.c                | 251 +++++++++++++
+ drivers/pinctrl/berlin/berlin-bg2cd.c              | 194 ++++++++++
+ drivers/pinctrl/berlin/berlin-bg2q.c               | 413 +++++++++++++++++++++
+ drivers/pinctrl/berlin/berlin.c                    | 347 +++++++++++++++++
+ drivers/pinctrl/berlin/berlin.h                    |  71 ++++
+ 14 files changed, 1414 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,berlin-pinctrl.txt
+ create mode 100644 drivers/pinctrl/berlin/Kconfig
+ create mode 100644 drivers/pinctrl/berlin/Makefile
+ create mode 100644 drivers/pinctrl/berlin/berlin-bg2.c
+ create mode 100644 drivers/pinctrl/berlin/berlin-bg2cd.c
+ create mode 100644 drivers/pinctrl/berlin/berlin-bg2q.c
+ create mode 100644 drivers/pinctrl/berlin/berlin.c
+ create mode 100644 drivers/pinctrl/berlin/berlin.h
+
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+1.8.3.2
