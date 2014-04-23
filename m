@@ -1,141 +1,121 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 23 Apr 2014 07:48:22 -0700
-Subject: [PATCH RFC] ARM: dts: am335x: update USB DT references
-In-Reply-To: <5356794C.7070707@baylibre.com>
-References: <1397647595-10927-1-git-send-email-leigh@solinno.co.uk>
- <5356794C.7070707@baylibre.com>
-Message-ID: <20140423144822.GA4833@atomide.com>
+From: sthokal@xilinx.com (Srikanth Thokala)
+Date: Wed, 23 Apr 2014 20:23:25 +0530
+Subject: [PATCH v8 1/2] dma: Add Xilinx Video DMA DT Binding Documentation
+Message-ID: <1398264806-2082-1-git-send-email-sthokal@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Benoit Cousson <bcousson@baylibre.com> [140422 07:14]:
-> Hi Leigh,
-> 
-> On 16/04/2014 13:26, Leigh Brown wrote:
-> >In "ARM: dts: am33xx: correcting dt node unit address for usb", the
-> >usb_ctrl_mod and cppi41dma nodes were updated with the correct register
-> >addresses.  However, the dts files that reference these nodes were not
-> >updated, and those devices are no longer being enabled.
-> >
-> >This patch corrects the references for the affected dts files.
-> 
-> Thanks for the fix. BTW, why is it a RFC? Do you plan to send an updated
-> version?
-> 
-> FYI, even with this fix, the BBB still does not have a working MUSB on
-> 3.15-rc2. Have you observed that as well?
-> 
-> >Signed-off-by: Leigh Brown <leigh@solinno.co.uk>
-> 
-> If this is a final version, I'll apply it for -rc3.
+Device-tree binding documentation of Xilinx Video DMA Engine
 
-Looks like I already have this in omap-for-v3.15/fixes-v2, sorry
-looks like I never replied to this one.
+Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+Changes in v8:
+Fixed typos as suggested by Rob, Thanks.
 
-Regards,
+Changes in v7:
+None
 
-Tony 
- 
-> >---
-> >  arch/arm/boot/dts/am335x-bone-common.dtsi | 4 ++--
-> >  arch/arm/boot/dts/am335x-evm.dts          | 4 ++--
-> >  arch/arm/boot/dts/am335x-evmsk.dts        | 4 ++--
-> >  arch/arm/boot/dts/am335x-igep0033.dtsi    | 4 ++--
-> >  4 files changed, 8 insertions(+), 8 deletions(-)
-> >
-> >diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
-> >index e3f27ec..2e7d932 100644
-> >--- a/arch/arm/boot/dts/am335x-bone-common.dtsi
-> >+++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
-> >@@ -183,7 +183,7 @@
-> >  &usb {
-> >  	status = "okay";
-> >
-> >-	control at 44e10000 {
-> >+	control at 44e10620 {
-> >  		status = "okay";
-> >  	};
-> >
-> >@@ -204,7 +204,7 @@
-> >  		dr_mode = "host";
-> >  	};
-> >
-> >-	dma-controller at 07402000  {
-> >+	dma-controller at 47402000  {
-> >  		status = "okay";
-> >  	};
-> >  };
-> >diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-> >index 28ae040..77df10d 100644
-> >--- a/arch/arm/boot/dts/am335x-evm.dts
-> >+++ b/arch/arm/boot/dts/am335x-evm.dts
-> >@@ -331,7 +331,7 @@
-> >  &usb {
-> >  	status = "okay";
-> >
-> >-	control at 44e10000 {
-> >+	control at 44e10620 {
-> >  		status = "okay";
-> >  	};
-> >
-> >@@ -352,7 +352,7 @@
-> >  		dr_mode = "host";
-> >  	};
-> >
-> >-	dma-controller at 07402000  {
-> >+	dma-controller at 47402000  {
-> >  		status = "okay";
-> >  	};
-> >  };
-> >diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
-> >index ec08f6f..ab23885 100644
-> >--- a/arch/arm/boot/dts/am335x-evmsk.dts
-> >+++ b/arch/arm/boot/dts/am335x-evmsk.dts
-> >@@ -364,7 +364,7 @@
-> >  &usb {
-> >  	status = "okay";
-> >
-> >-	control at 44e10000 {
-> >+	control at 44e10620 {
-> >  		status = "okay";
-> >  	};
-> >
-> >@@ -385,7 +385,7 @@
-> >  		dr_mode = "host";
-> >  	};
-> >
-> >-	dma-controller at 07402000  {
-> >+	dma-controller at 47402000  {
-> >  		status = "okay";
-> >  	};
-> >  };
-> >diff --git a/arch/arm/boot/dts/am335x-igep0033.dtsi b/arch/arm/boot/dts/am335x-igep0033.dtsi
-> >index 7063311..5942e7d 100644
-> >--- a/arch/arm/boot/dts/am335x-igep0033.dtsi
-> >+++ b/arch/arm/boot/dts/am335x-igep0033.dtsi
-> >@@ -202,7 +202,7 @@
-> >  &usb {
-> >  	status = "okay";
-> >
-> >-	control at 44e10000 {
-> >+	control at 44e10620 {
-> >  		status = "okay";
-> >  	};
-> >
-> >@@ -223,7 +223,7 @@
-> >  		dr_mode = "host";
-> >  	};
-> >
-> >-	dma-controller at 07402000  {
-> >+	dma-controller at 47402000  {
-> >  		status = "okay";
-> >  	};
-> >  };
-> >
-> 
-> 
-> -- 
-> Beno?t Cousson
-> BayLibre
-> Embedded Linux Technology Lab
-> www.baylibre.com
+Changes in v6:
+None
+
+Changes in v5:
+None
+
+Changes in v4:
+None
+
+Changes in v3:
+None
+
+Changes in v2:
+- Removed device-id DT property, as suggested by Arnd Bergmann
+- Properly documented DT bindings as suggested by Arnd Bergmann
+---
+ .../devicetree/bindings/dma/xilinx/xilinx_vdma.txt |   75 ++++++++++++++++++++
+ 1 file changed, 75 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+
+diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+new file mode 100644
+index 0000000..264100c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+@@ -0,0 +1,75 @@
++Xilinx AXI VDMA engine, it does transfers between memory and video devices.
++It can be configured to have one channel or two channels. If configured
++as two channels, one is to transmit to the video device and another is
++to receive from the video device.
++
++Required properties:
++- compatible: Should be "xlnx,axi-vdma-1.00.a"
++- #dma-cells: Should be <1>, see "dmas" property below
++- reg: Should contain VDMA registers location and length.
++- xlnx,num-fstores: Should be the number of framebuffers as configured in h/w.
++- dma-channel child node: Should have at least one channel and can have up to
++	two channels per device. This node specifies the properties of each
++	DMA channel (see child node properties below).
++
++Optional properties:
++- xlnx,include-sg: Tells configured for Scatter-mode in
++	the hardware.
++- xlnx,flush-fsync: Tells which channel to Flush on Frame sync.
++	It takes following values:
++	{1}, flush both channels
++	{2}, flush mm2s channel
++	{3}, flush s2mm channel
++
++Required child node properties:
++- compatible: It should be either "xlnx,axi-vdma-mm2s-channel" or
++	"xlnx,axi-vdma-s2mm-channel".
++- interrupts: Should contain per channel VDMA interrupts.
++- xlnx,data-width: Should contain the stream data width, take values
++	{32,64...1024}.
++
++Optional child node properties:
++- xlnx,include-dre: Tells hardware is configured for Data
++	Realignment Engine.
++- xlnx,genlock-mode: Tells Genlock synchronization is
++	enabled/disabled in hardware.
++
++Example:
++++++++++
++
++axi_vdma_0: axivdma at 40030000 {
++	compatible = "xlnx,axi-vdma-1.00.a";
++	#dma_cells = <1>;
++	reg = < 0x40030000 0x10000 >;
++	xlnx,num-fstores = <0x8>;
++	xlnx,flush-fsync = <0x1>;
++	dma-channel at 40030000 {
++		compatible = "xlnx,axi-vdma-mm2s-channel";
++		interrupts = < 0 54 4 >;
++		xlnx,datawidth = <0x40>;
++	} ;
++	dma-channel at 40030030 {
++		compatible = "xlnx,axi-vdma-s2mm-channel";
++		interrupts = < 0 53 4 >;
++		xlnx,datawidth = <0x40>;
++	} ;
++} ;
++
++
++* DMA client
++
++Required properties:
++- dmas: a list of <[Video DMA device phandle] [Channel ID]> pairs,
++	where Channel ID is '0' for write/tx and '1' for read/rx
++	channel.
++- dma-names: a list of DMA channel names, one per "dmas" entry
++
++Example:
++++++++++
++
++vdmatest_0: vdmatest at 0 {
++	compatible ="xlnx,axi-vdma-test-1.00.a";
++	dmas = <&axi_vdma_0 0
++		&axi_vdma_0 1>;
++	dma-names = "vdma0", "vdma1";
++} ;
+-- 
+1.7.9.5
