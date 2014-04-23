@@ -1,52 +1,93 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 23 Apr 2014 18:13:52 +0100
-Subject: [PATCH RFC 3/3] drm/exynos: use pending_components for
- components tracking
-In-Reply-To: <20140423164328.GG24070@n2100.arm.linux.org.uk>
-References: <1397734130-21019-1-git-send-email-a.hajda@samsung.com>
- <1397734130-21019-4-git-send-email-a.hajda@samsung.com>
- <20140417220412.GZ24070@n2100.arm.linux.org.uk>
- <5351145D.8070207@samsung.com>
- <20140418124652.GE24070@n2100.arm.linux.org.uk>
- <535652B2.7000607@samsung.com>
- <20140422115145.GU24070@n2100.arm.linux.org.uk>
- <5357D68E.8060605@samsung.com>
- <20140423164328.GG24070@n2100.arm.linux.org.uk>
-Message-ID: <20140423171351.GH24070@n2100.arm.linux.org.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 23 Apr 2014 12:09:00 -0500
+Subject: kdump for ARM Linux?
+In-Reply-To: <CAGT-Hga-0zMCaSfj0PuLfX0dBTzEf8ONBKAeJrDoy4i0B1nDEQ@mail.gmail.com>
+References: <132601cf5e89$94556a70$bd003f50$@gmail.com>
+ <CAL_JsqKRqyQUMdDBavh5vfQAq9bNZ7OCSdooqOKiPGX8eOGPSw@mail.gmail.com>
+ <CAGT-Hga-0zMCaSfj0PuLfX0dBTzEf8ONBKAeJrDoy4i0B1nDEQ@mail.gmail.com>
+Message-ID: <CAL_JsqJ9i+8k3Mpq1rBK99tbCZ+b8ND3QJwnoPj6Jf1zuC2zsw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 23, 2014 at 05:43:28PM +0100, Russell King - ARM Linux wrote:
-> So, maybe you would like to finally address *my* point about TDA998x
-> and your solution in a way that provides a satisfactory answer.  *Show*
-> how it can be done, or *outline* how it can be done.
+On Wed, Apr 23, 2014 at 11:51 AM, Andrew Nicholas
+<andy.nicholas.work@gmail.com> wrote:
+>
+>
+>
+> On Tue, Apr 22, 2014 at 6:36 PM, Rob Herring <robherring2@gmail.com> wrote:
+>>
+>> On Tue, Apr 22, 2014 at 7:18 PM, Andy Nicholas
+>> <andy.nicholas.work@gmail.com> wrote:
+>
+>
+>>
+>> > Has this issue been addressed in any version of an ARM Linux kernel? Or,
+>> > is
+>> > there a work-around? If not, how does a crashdump file get generated
+>> > when/if
+>> > the kernel crashes or a driver faults?
+>> >
+>> >>> arch/arm/mm/ioremap.c:244
+>> >>>        /*
+>> >>>          * Don't allow RAM to be mapped - this causes problems with
+>> > ARMv6+
+>> >>>          */
+>> >>>         if (WARN_ON(pfn_valid(pfn)))
+>> >>>                 return NULL;
+>> >
+>> > Thanks in advance for any help.
+>>
+>> This is on purpose as the comment says because 2 mappings of different
+>> types (of memory attributes) is undefined behavior on ARMv6+. RAM is
+>> normal memory type and mmio devices are device memory. This check
+>> could possibly be relaxed in the case the memory type is compatible
+>> with normal RAM mappings. Then perhaps ioremap_cache could be used on
+>> RAM for kdump.
+>
+>
+> Thanks. I'm not very familiar with this code-path and looking at the code it
+> seems one possibility is that pfn_valid() is returning false due to
+> misconfiguration
+> of the kernel.
+>
+> Considering that the -normal- kdump path to create the /proc/vmcore dumpfile
+> via
+> parse_crash_elf32_headers appears to use __arm_ioremap in order to copy the
+> old memory from the old (presumably crashed) kernel -- this means that no
+> one
+> with an ARMv7 platform has ever gotten a dumpfile via kdump?
 
-Let me be absolutely clear *why* I'm very interested in this - and that
-is because I'm presently converting TDA998x and Armada DRM to use the
-component helpers.  If your solution is better, then I'd want to convert
-to that instead, and let's retire the component helpers.
+Why v7? I don't think kdump would work on any ARM platform since the
+pfn_valid check was added. I'm not too surprised as kexec/kdump seem
+to be rarely used in practice and frequently broken.
 
-At the moment, my belief is that your solution is *very* substandard and
-suboptimal precisely for the reasons I've outlined, especially when it
-comes to sharing a component between several drivers.
+Something like this is what I had in mind. Alternatively, avoiding
+ioremap entirely might be a better solution. I think kmap_atomic could
+be used instead of ioremap.
 
-So, if you *really* care, you'll stop fobbing me off on this point and
-provide some real technical input how you'd see your solution being used
-in exactly the scenario that I've been outlining several times in this
-thread.
+diff --git a/arch/arm/kernel/crash_dump.c b/arch/arm/kernel/crash_dump.c
+index 5d1286d..1adca4e 100644
+--- a/arch/arm/kernel/crash_dump.c
++++ b/arch/arm/kernel/crash_dump.c
+@@ -39,7 +39,7 @@ ssize_t copy_oldmem_page(unsigned long pfn, char *buf,
+        if (!csize)
+                return 0;
 
-For example, you could show what kind of modifications you expect would
-be required to the _existing_ TDA998x driver to allow it to participate
-as a device declared in DT as an entirely separate entity, probed via the
-standard I2C probing methods, and then hook itself into the appropriate
-DRM driver.  Remembering, of course, that the TDA998x device is used by
-more than _just_ Armada DRM.
+-       vaddr = ioremap(__pfn_to_phys(pfn), PAGE_SIZE);
++       vaddr = ioremap_cache(__pfn_to_phys(pfn), PAGE_SIZE);
+        if (!vaddr)
+                return -ENOMEM;
 
-I don't care if you show it via pseudo-code or by real patch.  I just
-want to know _how_ your solution could be used.  And I won't want some
-silly remark like "trivially" or "I've already answered that."  I want
-_you_ to _show_ _how_ it can be done.
+diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
+index f9c32ba..0cd30d6 100644
+--- a/arch/arm/mm/ioremap.c
++++ b/arch/arm/mm/ioremap.c
+@@ -298,7 +298,7 @@ void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
+        /*
+         * Don't allow RAM to be mapped - this causes problems with ARMv6+
+         */
+-       if (WARN_ON(pfn_valid(pfn)))
++       if (WARN_ON(pfn_valid(pfn) && mtype != MT_DEVICE_CACHED))
+                return NULL;
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+        area = get_vm_area_caller(size, VM_IOREMAP, caller);
