@@ -1,72 +1,46 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 23 Apr 2014 15:17:20 +0200
-Subject: [PATCH v6 3/8] ARM: sunxi: Move the clock protection to machine
- hooks
-In-Reply-To: <201404231439.02913.arnd@arndb.de>
-References: <1397724379-15398-1-git-send-email-maxime.ripard@free-electrons.com>
- <1397724379-15398-4-git-send-email-maxime.ripard@free-electrons.com>
- <201404231439.02913.arnd@arndb.de>
-Message-ID: <20140423131720.GS24905@lukather>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 23 Apr 2014 14:20:33 +0100
+Subject: [PATCH v3] ARM: mm: support big-endian page tables
+In-Reply-To: <87ob00wau2.fsf@approximate.cambridge.arm.com>
+References: <534F9F79.9050503@huawei.com>
+ <87ob00wau2.fsf@approximate.cambridge.arm.com>
+Message-ID: <20140423132033.GE5649@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 23, 2014 at 02:39:02PM +0200, Arnd Bergmann wrote:
-> On Thursday 17 April 2014, Maxime Ripard wrote:
-> > Since we start to have a lot of clocks to protect, some of them in a few boards
-> > only, it becomes difficult to handle the clock protection without having to add
-> > per machine exceptions.
-> > 
-> > Move these where they belong, in the machine definition code.
-> > 
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> 
-> I don't like the fact that these are required to be hardcoded
-> anywhere in source code.
+Hi Jianguo,
 
-I agree, but that would also mean having a driver for everything that
-would need a clock: a CPU, the RAM. I'm not sure we want that either.
+On Thu, Apr 17, 2014 at 10:43:01AM +0100, Marc Zyngier wrote:
+> On Thu, Apr 17 2014 at 10:31:37 am BST, Jianguo Wu <wujianguo@huawei.com> wrote:
+> > When enable LPAE and big-endian in a hisilicon board, while specify
+> > mem=384M mem=512M at 7680M, will get bad page state:
+> >
+> > Freeing unused kernel memory: 180K (c0466000 - c0493000)
+> > BUG: Bad page state in process init  pfn:fa442
+> > page:c7749840 count:0 mapcount:-1 mapping:  (null) index:0x0
+> > page flags: 0x40000400(reserved)
+> > Modules linked in:
+> > CPU: 0 PID: 1 Comm: init Not tainted 3.10.27+ #66
+> > [<c000f5f0>] (unwind_backtrace+0x0/0x11c) from [<c000cbc4>] (show_stack+0x10/0x14)
+> > [<c000cbc4>] (show_stack+0x10/0x14) from [<c009e448>] (bad_page+0xd4/0x104)
+> > [<c009e448>] (bad_page+0xd4/0x104) from [<c009e520>] (free_pages_prepare+0xa8/0x14c)
+> > [<c009e520>] (free_pages_prepare+0xa8/0x14c) from [<c009f8ec>] (free_hot_cold_page+0x18/0xf0)
+> > [<c009f8ec>] (free_hot_cold_page+0x18/0xf0) from [<c00b5444>] (handle_pte_fault+0xcf4/0xdc8)
+> > [<c00b5444>] (handle_pte_fault+0xcf4/0xdc8) from [<c00b6458>] (handle_mm_fault+0xf4/0x120)
+> > [<c00b6458>] (handle_mm_fault+0xf4/0x120) from [<c0013754>] (do_page_fault+0xfc/0x354)
+> > [<c0013754>] (do_page_fault+0xfc/0x354) from [<c0008400>] (do_DataAbort+0x2c/0x90)
+> > [<c0008400>] (do_DataAbort+0x2c/0x90) from [<c0008fb4>] (__dabt_usr+0x34/0x40)
 
-> > +#include <linux/clk.h>
-> >  #include <linux/init.h>
-> >  #include <linux/of_platform.h>
-> >  
-> > @@ -19,9 +20,17 @@
-> >  
-> >  static void __init sun4i_dt_init(void)
-> >  {
-> > +       struct clk *clk;
-> > +
-> >         sunxi_setup_restart();
-> >  
-> >         of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> > +
-> > +       /* Make sure the clocks we absolutely need are enabled */
-> > +       /* DDR clock */
-> > +       clk = clk_get(NULL, "pll5_ddr");
-> > +       if (!IS_ERR(clk))
-> > +               clk_prepare_enable(clk);
-> >  }
-> 
-> Isn't there already DT syntax to do the same? If not, should there be?
 
-I don't think there is, and I gave some thought about it too. But
-something a la regulator-always-on wouldn't work with clocks with
-multiple outputs (like pll5), because you might need to leave only one
-of the output enabled, but not the others, and I couldn't think of a
-nice way to do so.
+[...]
 
-If you have one, I'd be happy to implement it.
+Please can you put this into Russell's patch system? You can also add my
+ack:
 
-Maxime
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140423/683b2315/attachment-0001.sig>
+You should also CC stable <stable@vger.kernel.org> in the commit log.
+
+Cheers,
+
+Will
