@@ -1,51 +1,172 @@
 From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Wed, 23 Apr 2014 17:51:14 +0200
-Subject: [PATCH v2 5/7] ARM: berlin: add the pinctrl dependency for the
- Marvell Berlin SoCs
+Date: Wed, 23 Apr 2014 17:51:16 +0200
+Subject: [PATCH v2 7/7] ARM: dts: berlin: add the pinctrl node and muxing
+ setup for uarts
 In-Reply-To: <1398268276-9696-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1398268276-9696-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1398268276-9696-6-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1398268276-9696-8-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The uart0 pinmux configuration is in the dtsi because uart0 will always
+use uart0-pmux to work, no other possibility. Same thing for uart1.
+
 Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
 ---
- arch/arm/mach-berlin/Kconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/boot/dts/berlin2.dtsi   | 24 ++++++++++++++++++++++++
+ arch/arm/boot/dts/berlin2cd.dtsi | 17 +++++++++++++++++
+ arch/arm/boot/dts/berlin2q.dtsi  | 24 ++++++++++++++++++++++++
+ 3 files changed, 65 insertions(+)
 
-diff --git a/arch/arm/mach-berlin/Kconfig b/arch/arm/mach-berlin/Kconfig
-index d3c5f14dc142..9c2b569e54ba 100644
---- a/arch/arm/mach-berlin/Kconfig
-+++ b/arch/arm/mach-berlin/Kconfig
-@@ -4,6 +4,7 @@ config ARCH_BERLIN
- 	select GENERIC_IRQ_CHIP
- 	select DW_APB_ICTL
- 	select DW_APB_TIMER_OF
-+	select PINCTRL
+diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
+index 56a1af2f1052..9a13891c38a3 100644
+--- a/arch/arm/boot/dts/berlin2.dtsi
++++ b/arch/arm/boot/dts/berlin2.dtsi
+@@ -176,6 +176,11 @@
+ 			};
+ 		};
  
- if ARCH_BERLIN
++		soc_pinctrl: pin-controller at ea0000 {
++			compatible = "marvell,berlin2-soc-pinctrl";
++			reg = <0xea0000 0x4c>;
++		};
++
+ 		apb at fc0000 {
+ 			compatible = "simple-bus";
+ 			#address-cells = <1>;
+@@ -184,6 +189,21 @@
+ 			ranges = <0 0xfc0000 0x10000>;
+ 			interrupt-parent = <&sic>;
  
-@@ -14,11 +15,13 @@ config MACH_BERLIN_BG2
- 	select CACHE_L2X0
- 	select CPU_PJ4B
- 	select HAVE_ARM_TWD if SMP
-+	select PINCTRL_BERLIN_BG2
++			sm_pinctrl: pin-controller at 0000 {
++				compatible = "marvell,berlin2-sysmgr-pinctrl";
++				reg = <0x0000 0x44>;
++
++				uart0_pmux: uart0-pmux {
++					marvell,groups = "GSM4";
++					marvell,function = "uart0";
++				};
++
++				uart1_pmux: uart1-pmux {
++					marvell,groups = "GSM5";
++					marvell,function = "uart1";
++				};
++			};
++
+ 			uart0: serial at 9000 {
+ 				compatible = "snps,dw-apb-uart";
+ 				reg = <0x9000 0x100>;
+@@ -191,6 +211,8 @@
+ 				reg-io-width = <1>;
+ 				interrupts = <8>;
+ 				clocks = <&smclk>;
++				pinctrl-0 = <&uart0_pmux>;
++				pinctrl-names = "default";
+ 				status = "disabled";
+ 			};
  
- config MACH_BERLIN_BG2CD
- 	bool "Marvell Armada 1500-mini (BG2CD)"
- 	select CACHE_L2X0
- 	select HAVE_ARM_TWD if SMP
-+	select PINCTRL_BERLIN_BG2CD
+@@ -201,6 +223,8 @@
+ 				reg-io-width = <1>;
+ 				interrupts = <9>;
+ 				clocks = <&smclk>;
++				pinctrl-0 = <&uart1_pmux>;
++				pinctrl-names = "default";
+ 				status = "disabled";
+ 			};
  
- config MACH_BERLIN_BG2Q
- 	bool "Marvell Armada 1500 Pro (BG2-Q)"
-@@ -26,6 +29,7 @@ config MACH_BERLIN_BG2Q
- 	select CPU_V7
- 	select HAVE_ARM_TWD if SMP
- 	select HAVE_SMP
-+	select PINCTRL_BERLIN_BG2Q
+diff --git a/arch/arm/boot/dts/berlin2cd.dtsi b/arch/arm/boot/dts/berlin2cd.dtsi
+index 094968c27533..a802d3fe5da6 100644
+--- a/arch/arm/boot/dts/berlin2cd.dtsi
++++ b/arch/arm/boot/dts/berlin2cd.dtsi
+@@ -169,6 +169,11 @@
+ 			};
+ 		};
  
- endmenu
++		soc_pinctrl: pin-controller at ae0000 {
++			compatible = "marvell,berlin2cd-soc-pinctrl";
++			reg = <0xea0000 0x4c>;
++		};
++
+ 		apb at fc0000 {
+ 			compatible = "simple-bus";
+ 			#address-cells = <1>;
+@@ -177,6 +182,16 @@
+ 			ranges = <0 0xfc0000 0x10000>;
+ 			interrupt-parent = <&sic>;
  
++			sm_pinctrl: pin-controller at 0000 {
++				compatible = "marvell,berlin2cd-sysmgr-pinctrl";
++				reg = <0x0000 0x44>;
++
++				uart0_pmux: uart0-pmux {
++					marvell,groups = "G6";
++					marvell,function = "uart0";
++				};
++			};
++
+ 			uart0: serial at 9000 {
+ 				compatible = "snps,dw-apb-uart";
+ 				reg = <0x9000 0x100>;
+@@ -184,6 +199,8 @@
+ 				reg-io-width = <1>;
+ 				interrupts = <8>;
+ 				clocks = <&smclk>;
++				pinctrl-0 = <&uart0_pmux>;
++				pinctrl-names = "default";
+ 				status = "disabled";
+ 			};
+ 
+diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+index 07452a7483fa..734debbf072f 100644
+--- a/arch/arm/boot/dts/berlin2q.dtsi
++++ b/arch/arm/boot/dts/berlin2q.dtsi
+@@ -183,6 +183,11 @@
+ 			};
+ 		};
+ 
++		soc_pinctrl: pin-controller at ea0000 {
++			compatible = "marvell,berlin2q-soc-pinctrl";
++			reg = <0xea0000 0x4c>;
++		};
++
+ 		apb at fc0000 {
+ 			compatible = "simple-bus";
+ 			#address-cells = <1>;
+@@ -198,6 +203,8 @@
+ 				interrupts = <8>;
+ 				clocks = <&smclk>;
+ 				reg-shift = <2>;
++				pinctrl-0 = <&uart0_pmux>;
++				pinctrl-names = "default";
+ 				status = "disabled";
+ 			};
+ 
+@@ -208,9 +215,26 @@
+ 				interrupts = <9>;
+ 				clocks = <&smclk>;
+ 				reg-shift = <2>;
++				pinctrl-0 = <&uart1_pmux>;
++				pinctrl-names = "default";
+ 				status = "disabled";
+ 			};
+ 
++			sm_pinctrl: pin-controller at d000 {
++				compatible = "marvell,berlin2q-sysmgr-pinctrl";
++				reg = <0xd000 0x44>;
++
++				uart0_pmux: uart0-pmux {
++					marvell,groups = "GSM12";
++					marvell,function = "uart0";
++				};
++
++				uart1_pmux: uart1-pmux {
++					marvell,groups = "GSM14";
++					marvell,function = "uart1";
++				};
++			};
++
+ 			sic: interrupt-controller at e000 {
+ 				compatible = "snps,dw-apb-ictl";
+ 				reg = <0xe000 0x30>;
 -- 
 1.8.3.2
