@@ -1,113 +1,87 @@
-From: ritesh.harjani@gmail.com (Ritesh Harjani)
-Date: Wed, 23 Apr 2014 18:52:26 +0530
-Subject: [PATCH] arm: dma-mapping: Fix mapping size value
-In-Reply-To: <5357BD77.3060908@samsung.com>
-References: <1398062847-5770-1-git-send-email-ritesh.harjani@gmail.com>
- <20140422085307.GB5747@arm.com> <53577F84.1080101@samsung.com>
- <4662711.Ubz0jaKMvq@avalon>
- <CAD15agYETzLJZ26wh8c=+PCSoQ9dR9vLgg7VmZTnQquXxoW+2Q@mail.gmail.com>
- <5357BD77.3060908@samsung.com>
-Message-ID: <CAD15agb+82CdM2UGde5UZT7KWHc1oXjjmYktmHT49t03xHOa3w@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 23 Apr 2014 15:28:29 +0200
+Subject: [PATCH v6 2/8] ARM: sunxi: Split out the various machines into
+ separate files
+In-Reply-To: <201404231433.51129.arnd@arndb.de>
+References: <1397724379-15398-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1397724379-15398-3-git-send-email-maxime.ripard@free-electrons.com>
+ <201404231433.51129.arnd@arndb.de>
+Message-ID: <20140423132829.GT24905@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ok thanks Marek,
+On Wed, Apr 23, 2014 at 02:33:50PM +0200, Arnd Bergmann wrote:
+> On Thursday 17 April 2014, Maxime Ripard wrote:
+> > This will allow to add per-SoC hooks more easily.
+> > 
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  arch/arm/mach-sunxi/Makefile  |   6 +-
+> >  arch/arm/mach-sunxi/restart.c | 104 +++++++++++++++++++++++++++
+> >  arch/arm/mach-sunxi/restart.h |  20 ++++++
+> >  arch/arm/mach-sunxi/sun4i.c   |  36 ++++++++++
+> >  arch/arm/mach-sunxi/sun5i.c   |  37 ++++++++++
+> >  arch/arm/mach-sunxi/sun6i.c   |  49 +++++++++++++
+> >  arch/arm/mach-sunxi/sun7i.c   |  36 ++++++++++
+> >  arch/arm/mach-sunxi/sunxi.c   | 164 ------------------------------------------
+> >  8 files changed, 287 insertions(+), 165 deletions(-)
+> 
+> This doesn't look like a move in the right direction, and I don't see
+> the connection with the DMA driver.
 
-I was about to send a new patch (as I had now got hold of my system).
-Anyways, I will add this discussion of cleaning up this variable in my
-to-do list.
+This is actually not adding any code at all, just reorganizing it.
 
+This was also something that would allow to have per-family
+configuration options, and hence not select drivers like the pinctrl
+one that are pretty huge if they're not needed.
 
-Thanks
-Ritesh
+> 
+> > diff --git a/arch/arm/mach-sunxi/restart.c b/arch/arm/mach-sunxi/restart.c
+> > new file mode 100644
+> > index 000000000000..3b89727ee943
+> > --- /dev/null
+> > +++ b/arch/arm/mach-sunxi/restart.c
+> 
+> Splitting out the restart code is good, but please complete this by
+> moving it into a driver directory. My preferred location would be
+> within the watchdog driver, since it's really the same registers.
+> You can turn on the watchdog driver as built-in in the defconfig.
+> While it's not ideal that you can end up without a restart function
+> if the driver does not get loaded, I would still prefer that over
+> having the driver in the mach-sunxi directory.
 
-On Wed, Apr 23, 2014 at 6:47 PM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> Hello,
->
->
-> On 2014-04-23 12:04, Ritesh Harjani wrote:
->>
->> Hi Marek/Will
->>
->> On Wed, Apr 23, 2014 at 3:00 PM, Laurent Pinchart
->> <laurent.pinchart@ideasonboard.com> wrote:
->> > Hi Marek,
->> >
->> > On Wednesday 23 April 2014 10:53:24 Marek Szyprowski wrote:
->> >> On 2014-04-22 10:53, Will Deacon wrote:
->> >> > On Mon, Apr 21, 2014 at 07:47:27AM +0100, Ritesh Harjani wrote:
->> >> > > 68efd7d2fb("arm: dma-mapping: remove order parameter from
->> >> > > arm_iommu_create_mapping()") is causing kernel panic
->> >> > > because it wrongly sets the value of mapping->size:
->> >> > >
->> >> > > Unable to handle kernel NULL pointer dereference at virtual
->> >> > > address 000000a0
->> >> > > pgd = e7a84000
->> >> > > [000000a0] *pgd=00000000
->> >> > > ...
->> >> > > PC is at bitmap_clear+0x48/0xd0
->> >> > > LR is at __iommu_remove_mapping+0x130/0x164
->> >> > >
->> >> > > Fix it by correcting mapping->size value.
->> >> > >
->> >> > > Signed-off-by: Ritesh Harjani <ritesh.harjani@gmail.com>
->> >> > > Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
->> >> > > ---
->> >> > >
->> >> > >  arch/arm/mm/dma-mapping.c | 2 +-
->> >> > >  1 file changed, 1 insertion(+), 1 deletion(-)
->> >> > >
->> >> > > diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
->> >> > > index f62aa06..6b00be1 100644
->> >> > > --- a/arch/arm/mm/dma-mapping.c
->> >> > > +++ b/arch/arm/mm/dma-mapping.c
->> >> > > @@ -1963,8 +1963,8 @@ arm_iommu_create_mapping(struct bus_type
->> >> > > *bus,
->> >> > > dma_addr_t base, size_t size)> >
->> >> > >   mapping->nr_bitmaps = 1;
->> >> > >   mapping->extensions = extensions;
->> >> > >   mapping->base = base;
->> >> > >
->> >> > > - mapping->size = bitmap_size << PAGE_SHIFT;
->> >> > >
->> >> > >   mapping->bits = BITS_PER_BYTE * bitmap_size;
->> >> > >
->> >> > > + mapping->size = mapping->bits << PAGE_SHIFT;
->> >> >
->> >> > Ok, but given that mapping->size is derived from mapping->bits, do we
->> >> > really need both of these fields in struct dma_iommu_mapping?
->> >>
->> >> You are right. I didn't notice this while I was refactoring the code.
->> >> Ritesh, could you update your patch and simply replace all references
->> >> of
->> >> mapping->size with (mapping->bits << PAGE_SHIFT), probably with some
->> >> temporary variable to make the code easier to understand? I've didn't
->> >> apply
->> >> your patch yet.
->> >
->> > As this patch fixes a v3.15 regression, shouldn't it be applied as-is
->> > and
->> > ASAP, with the cleanup that removes mapping->size coming in a later,
->> > less
->> > urgent patch ?
->>
->> I agree with Laurent. Anyway this cleanup can be taken care when we will
->> be
->> doing refactoring of common code to lib/iommu-helper.c.
->>
->> Anyways, if you still insist I can prepare and submit the patch. Let me
->> know
->> again on this.
->
->
-> Ok, I've merged the patch as is and I will send pull request soon.
-> Please include the above discussed cleanup while refactoring common code to
-> lib.
->
->
-> Best regards
-> --
-> Marek Szyprowski, PhD
-> Samsung R&D Institute Poland
->
+Ok. The thing is, we don't have any watchdog driver for the A31 for
+the moment, so the restart code will have to stay there. But I can
+totally do that for the A10/A20.
+
+> An alternative would be to move the restart code into
+> drivers/power/reset.
+
+That would be a good place for the A31 code then.
+
+> > diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+> > deleted file mode 100644
+> > index 460b5a4962ef..000000000000
+> > --- a/arch/arm/mach-sunxi/sunxi.c
+> 
+> Instead of splitting up this file, I think it would be better to
+> reduce the number of special hacks required per machine. Note that
+> for arm64 we require platforms not to have any code outside of
+> the drivers directory, and I'd like to get to the same situation
+> for much of arch/arm/mach-* as well.
+
+I think it's fair.
+
+How would you enforce default clock parenting and/or rate then?
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140423/0ca70f55/attachment.sig>
