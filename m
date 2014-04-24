@@ -1,36 +1,47 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Thu, 24 Apr 2014 17:40:15 +0100
-Subject: [PATCH 1/4] clk: vexpress: NULL dereference on error path
+Date: Thu, 24 Apr 2014 17:40:18 +0100
+Subject: [PATCH 4/4] ARM: vexpress/TC2: Convert OPP voltage to uV before
+ storing
 In-Reply-To: <1398357618-11050-1-git-send-email-pawel.moll@arm.com>
 References: <1398357618-11050-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <1398357618-11050-2-git-send-email-pawel.moll@arm.com>
+Message-ID: <1398357618-11050-5-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dan Carpenter <dan.carpenter@oracle.com>
+From: Punit Agrawal <punit.agrawal@arm.com>
 
-If the allocation fails then we dereference the NULL in the error path.
-Just return directly.
+The SPC stores voltage in mV while the code assumes it was returning
+uV. Convert the returned voltage to uV before storing. Also fix the
+comment depicting voltage to uV.
 
-Fixes: ed27ff1db869 ('clk: Versatile Express clock generators ("osc") driver')
-Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+Reviewed-by: Sudeep Holla <sudeep.holla@arm.com>
 Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 ---
- drivers/clk/versatile/clk-vexpress-osc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-vexpress/spc.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/versatile/clk-vexpress-osc.c b/drivers/clk/versatile/clk-vexpress-osc.c
-index 2dc8b41..a535c7b 100644
---- a/drivers/clk/versatile/clk-vexpress-osc.c
-+++ b/drivers/clk/versatile/clk-vexpress-osc.c
-@@ -102,7 +102,7 @@ void __init vexpress_osc_of_setup(struct device_node *node)
- 
- 	osc = kzalloc(sizeof(*osc), GFP_KERNEL);
- 	if (!osc)
--		goto error;
-+		return;
- 
- 	osc->func = vexpress_config_func_get_by_node(node);
- 	if (!osc->func) {
+diff --git a/arch/arm/mach-vexpress/spc.c b/arch/arm/mach-vexpress/spc.c
+index c26ef5b..2c2754e 100644
+--- a/arch/arm/mach-vexpress/spc.c
++++ b/arch/arm/mach-vexpress/spc.c
+@@ -392,7 +392,7 @@ static irqreturn_t ve_spc_irq_handler(int irq, void *data)
+  *  +--------------------------+
+  *  | 31      20 | 19        0 |
+  *  +--------------------------+
+- *  |   u_volt   |  freq(kHz)  |
++ *  |   m_volt   |  freq(kHz)  |
+  *  +--------------------------+
+  */
+ #define MULT_FACTOR	20
+@@ -414,7 +414,7 @@ static int ve_spc_populate_opps(uint32_t cluster)
+ 		ret = ve_spc_read_sys_cfg(SYSCFG_SCC, off, &data);
+ 		if (!ret) {
+ 			opps->freq = (data & FREQ_MASK) * MULT_FACTOR;
+-			opps->u_volt = data >> VOLT_SHIFT;
++			opps->u_volt = (data >> VOLT_SHIFT) * 1000;
+ 		} else {
+ 			break;
+ 		}
 -- 
 1.8.3.2
