@@ -1,73 +1,68 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 24 Apr 2014 13:13:05 +0200
-Subject: [PATCH 00/38] MMC updates, plus CuBox-i WiFi support
-In-Reply-To: <20140424105745.GM26756@n2100.arm.linux.org.uk>
-References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
- <CAPDyKFozP69yngKAkdwHYyyvi+pdLEm05udOmBiVshQFi4hnLQ@mail.gmail.com>
- <20140424101726.GH26756@n2100.arm.linux.org.uk>
- <CAPDyKFrGReKF0ucer7D195boEoQW26=4vDXT+=Wn6BO-p_B1gQ@mail.gmail.com>
- <20140424105745.GM26756@n2100.arm.linux.org.uk>
-Message-ID: <CAPDyKFr=2=dg1NTYb1_EAgxXZq2Rd+o2Q2B5TE+GZwr8MUU1_Q@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 24 Apr 2014 12:13:39 +0100
+Subject: [PATCH] ARM: mm: dma: Update coherent streaming apis with
+ missing memory barrier
+In-Reply-To: <20140424095422.GC8521@arm.com>
+References: <1398103390-31968-1-git-send-email-santosh.shilimkar@ti.com>
+ <201404222153.41786.arnd@arndb.de> <5356C9D1.2060001@ti.com>
+ <5895821.PvurJ8TWz2@wuerfel> <5356D163.1070304@ti.com>
+ <20140423090251.GA5281@arm.com> <20140423160216.GC2208@arm.com>
+ <20140423171727.GK5649@arm.com>
+ <20140423183742.GK24070@n2100.arm.linux.org.uk>
+ <20140424095422.GC8521@arm.com>
+Message-ID: <20140424111339.GO26756@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 April 2014 12:57, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> On Thu, Apr 24, 2014 at 12:52:11PM +0200, Ulf Hansson wrote:
->> On 24 April 2014 12:17, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
->> > On Thu, Apr 24, 2014 at 10:25:42AM +0200, Ulf Hansson wrote:
->> >> I have looked though the patches up until patch 33 and this is clearly
->> >> a nice piece of clean-up /fixes work for sdhci. Besides my minor
->> >> comments per patch, I don't have any objections code-review wise to
->> >> proceed merging them.
->> >>
->> >> I have also tried to applied them on Chris' mmc-next branch,
->> >> unfortunate it fails at patch 23, so it would be nice to get a
->> >> re-based patchset for the mmc-next branch.
->> >
->> > I /could/ rebase it but then I wouldn't be able to produce the patch
->> > sets/patches for others [*] (such as the Novena project) to derive
->> > their kernel tree from my iMX6 patch set.
->> >
->> > What I'd prefer is to keep the patch set intact, and provide Chris
->> > with a pull request for it up to patch 33, which would need a
->> > conflict fixed - and this would mean that I can be sure that what
->> > I'm testing, and what I'm distributing is what Chris will also be
->> > submitting.
->>
->> Whether there are more than one conflict, I don't know. I just stopped
->> at patch 23.
->>
->> Moreover, there are other patches for sdhci that have been posted and
->> being discussed. In principle, we then need to put all these on hold
->> to prevent further conflicts. I guess that doable, as long as we don't
->> to that for too long. Maybe Chris have some more thoughts how to
->> handle this!?
->
-> This is nothing new or unexpected - it was last posted back in February,
-> and I elected that it should be held off until after the last merge
-> window.
->
-> Unfortunately, I didn't have time to post it immediately after the merge
-> window closed, partly because it needed to be rebased on top of tglx's
-> IRQ changes on which it depends.  I was carrying those as separate commits
-> to the ones Thomas was carrying in his tree - and in the event, Thomas had
-> modified his patches slightly between sending me copies of them and the
-> versions he sent during the merge window.
+On Thu, Apr 24, 2014 at 10:54:23AM +0100, Catalin Marinas wrote:
+> On Wed, Apr 23, 2014 at 07:37:42PM +0100, Russell King - ARM Linux wrote:
+> > However, what must not happen is that the unmap must not be re-ordered
+> > before reading the descriptor and deciding whether there's a packet
+> > present to be unmapped.  That probabily imples that code _should_ be
+> > doing this:
+> > 
+> > 	status = desc->status;
+> > 	if (!(status & CPU_OWNS_THIS_DESCRIPTOR))
+> > 		no_packet;
+> > 
+> > 	rmb();
+> > 
+> > 	addr = desc->buf;
+> > 	len = desc->length;
+> > 
+> > 	dma_unmap_single(dev, addr, len, DMA_FROM_DEVICE);
+> 
+> Indeed.
+> 
+> > 	...receive skb...reading buffer...
+> 
+> The point Will and myself were trying to make is about ordering as
+> observed by the CPU (rather than ordering of CPU actions). Independently
+> of whether the DMA is coherent or not, the ordering between device write
+> to the buffer and status update (in-memory descriptor or IRQ) *must* be
+> ordered by the device and interconnects. The rmb() as per your example
+> above only solves the relative CPU loads and cache maintenance but they
+> don't have any effect on the transactions done by the device.
 
-Okay, so let's keep up the frequency here then. I only had some minor
-comments, please fix them and send a v2.
+If the hardware does not ensure proper ordering of the writes to the
+buffer vs writes to the descriptor indicating that the packet has been
+received, then the hardware is quite simply broken.
 
-How about if I resolve the conflicts and send the pull request to
-Chris? I suppose it makes life a bit easier for Chris.
+> The mvebu SoC has exactly this problem. mvebu_hwcc_sync_io_barrier() is
+> something that should be handled by the hardware automatically,
+> especially in a system which claims cache coherency.
 
-Kind regards
-Ulf Hansson
+So what if the descriptor also contains other data, such as a received
+timestamp, or separate error bits that need checking before DMA unmap?
+(There are implementations where this is true - for example the freescale
+FEC driver, but that currently omits the rmb()...)
 
->
-> --
-> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-> improving, and getting towards what was expected from it.
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Stuffing this into the DMA API may not be the best place for it, but
+the alternative is to stuff it into drivers, and that's just not
+acceptable for any generic driver - plus we want to keep stuff as simple
+as possible for driver authors who probably don't want to understand any
+of these details.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
