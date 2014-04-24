@@ -1,40 +1,36 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 24 Apr 2014 15:21:48 +0200
-Subject: [PATCH v2 0/4] ARM: S3C24XX: cleanup debug macro/earlyprintk
-Message-ID: <1856986.kkQFKFg1L2@phil>
+Date: Thu, 24 Apr 2014 15:22:31 +0200
+Subject: [PATCH v2 1/4] ARM: compressed/head.S: remove s3c24xx special case
+In-Reply-To: <1856986.kkQFKFg1L2@phil>
+References: <1856986.kkQFKFg1L2@phil>
+Message-ID: <3518304.CqzePmxmiW@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series tries to simplify the s3c24xx debug macro, removing dependencies
-on mach/ includes, static mappings and finally moving it into include/debug.
+addruart from the generic debug macro is doing exactly the same using
+the common lowlevel uart definition, so there is no cause for this
+special casing for s3c24xx.
 
-The one slightly invasive change is the need for the developer to select
-the uart type by himself, which gets rid of the debug macro trying to
-determine the uart type itself.
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/boot/compressed/head.S | 5 -----
+ 1 file changed, 5 deletions(-)
 
-But as usage of the debug-uart is not the common case - especially in a
-multiplatform scenario - I didn't worry to much.
-
-Based on 3.15-rc1 and tested on a S3C2442 Openmoko Freerunner (GTA02)
-
-changes since v1:
-- do not introduce a secondary choice option, instead implement the
-  s3c2410 debug uarts as separate options
-
-Heiko Stuebner (4):
-  ARM: compressed/head.S: remove s3c24xx special case
-  ARM: S3C24XX: trim down debug uart handling
-  ARM: S3C24XX: use generic DEBUG_UART_PHY/_VIRT in debug macro
-  ARM: S3C24XX: move debug-macro.S into the common space
-
- arch/arm/Kconfig.debug                           |  54 +++++++++++-
- arch/arm/boot/compressed/head.S                  |   5 --
- arch/arm/include/debug/s3c24xx.S                 |  46 +++++++++++
- arch/arm/mach-s3c24xx/Kconfig                    |  28 -------
- arch/arm/mach-s3c24xx/include/mach/debug-macro.S | 101 -----------------------
- 5 files changed, 98 insertions(+), 136 deletions(-)
- create mode 100644 arch/arm/include/debug/s3c24xx.S
- delete mode 100644 arch/arm/mach-s3c24xx/include/mach/debug-macro.S
-
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index 066b034..3a8b32d 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -60,11 +60,6 @@
+ 		add	\rb, \rb, #0x00010000	@ Ser1
+ #endif
+ 		.endm
+-#elif defined(CONFIG_ARCH_S3C24XX)
+-		.macro loadsp, rb, tmp
+-		mov	\rb, #0x50000000
+-		add	\rb, \rb, #0x4000 * CONFIG_S3C_LOWLEVEL_UART_PORT
+-		.endm
+ #else
+ 		.macro	loadsp,	rb, tmp
+ 		addruart \rb, \tmp
 -- 
 1.9.0
