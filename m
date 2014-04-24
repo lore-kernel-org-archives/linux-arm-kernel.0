@@ -1,124 +1,79 @@
-From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
-Date: Thu, 24 Apr 2014 18:59:03 +0200
-Subject: [RFC 0/3] DRM driver for the ATMEL High end LCD controller
-In-Reply-To: <1398343612.4295.66.camel@herbert.er.corscience.de>
-References: <1397814309-32160-1-git-send-email-jjhiblot@traphandler.com>	
- <1398267396.4295.59.camel@herbert.er.corscience.de>	
- <5359000C.50005@free-electrons.com>
- <1398343612.4295.66.camel@herbert.er.corscience.de>
-Message-ID: <535942D7.7020106@traphandler.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 24 Apr 2014 19:04:22 +0200
+Subject: [PATCH] ARM: dts: exynos4: clean up arm-pmu node
+In-Reply-To: <1397480584-16195-1-git-send-email-chanho61.park@samsung.com>
+References: <1397480584-16195-1-git-send-email-chanho61.park@samsung.com>
+Message-ID: <53594416.4070601@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tim,
+Hi Chanho,
 
-I'll look a this issue soon. It looks like the scanout is not started in
-your test case.
-Thanks for reporting this.
+On 14.04.2014 15:03, Chanho Park wrote:
+> This patch cleans a arm-pmu node up for exynos4. Only exynos4412 series
+> boards have four pmu interrupts. Rest of exynos4 boards, except 4412, have only
+> two pmu interrupts. Thus, we can define two interrupts in the
+> exynos4.dtsi and extends the interrupts only exynos4412.dtsi.
+>
+> Cc: Chanwoo Choi <cw00.choi@samsung.com>
+> Signed-off-by: Chanho Park <chanho61.park@samsung.com>
+> ---
+>   arch/arm/boot/dts/exynos4.dtsi    | 6 ++++++
+>   arch/arm/boot/dts/exynos4210.dtsi | 6 ------
+>   arch/arm/boot/dts/exynos4412.dtsi | 6 ++++++
+>   arch/arm/boot/dts/exynos4x12.dtsi | 6 ------
+>   4 files changed, 12 insertions(+), 12 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+> index e541ecb..6de978c 100644
+> --- a/arch/arm/boot/dts/exynos4.dtsi
+> +++ b/arch/arm/boot/dts/exynos4.dtsi
+> @@ -105,6 +105,12 @@
+>   		reg = <0x10440000 0x1000>;
+>   	};
+>
+> +	pmu {
+> +		compatible = "arm,cortex-a9-pmu";
+> +		interrupt-parent = <&combiner>;
+> +		interrupts = <2 2>, <3 2>;
+> +	};
+> +
+>   	sys_reg: syscon at 10010000 {
+>   		compatible = "samsung,exynos4-sysreg", "syscon";
+>   		reg = <0x10010000 0x400>;
+> diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
+> index cacf614..4e7610f 100644
+> --- a/arch/arm/boot/dts/exynos4210.dtsi
+> +++ b/arch/arm/boot/dts/exynos4210.dtsi
+> @@ -75,12 +75,6 @@
+>   		#clock-cells = <1>;
+>   	};
+>
+> -	pmu {
+> -		compatible = "arm,cortex-a9-pmu";
+> -		interrupt-parent = <&combiner>;
+> -		interrupts = <2 2>, <3 2>;
+> -	};
+> -
+>   	pinctrl_0: pinctrl at 11400000 {
+>   		compatible = "samsung,exynos4210-pinctrl";
+>   		reg = <0x11400000 0x1000>;
+> diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
+> index 15d3c0a..e6af870 100644
+> --- a/arch/arm/boot/dts/exynos4412.dtsi
+> +++ b/arch/arm/boot/dts/exynos4412.dtsi
+> @@ -26,6 +26,12 @@
+>   		samsung,combiner-nr = <20>;
+>   	};
+>
+> +	pmu {
+> +		compatible = "arm,cortex-a9-pmu";
+> +		interrupt-parent = <&combiner>;
 
-JJ
+I guess you could omit the two properties above and let them be 
+inherited from exynos4.dtsi.
 
-On 04/24/2014 02:46 PM, Tim Niemeyer wrote:
-> 
-> Hi Boris
-> 
-> Am Donnerstag, den 24.04.2014, 14:14 +0200 schrieb Boris BREZILLON:
->> Hi Tim,
->>
->> On 23/04/2014 17:36, Tim Niemeyer wrote:
->>> Hi Jean-Jacques,
->>>
->>> Am Freitag, den 18.04.2014, 11:45 +0200 schrieb Jean-Jacques Hiblot:
->>>> Hi,
->>>>
->>>> this patch serie implements a simple DRM driver for the ATMEL High end LCD
->>>> controller found in the SAMA5 familly. It's based on the tilcdc driver.
->>>> It uses the cma_helper for memory and fbdev stuff.
->>>> Your comments are welcome !
->>> I applied your and Robert's patches on a 3.15-rc2 kernel and tried the
->>> framebuffer device on the sama5d31-ek. Seems to work.
->>>
->>>> Supported features:
->>>> * the base layer (the main framebuffer)
->>> Tested to show a little tux png, but it's appearing only after 
->>> 'echo 0 > /sys/devices/ahb.1/apb.2/f0030000.hlcdc/graphics/fb0/rotate'
->>> is there missing some initializing?
->>
->> Could you try to apply this http://code.bulix.org/f01kvh-86117 ?
-> I can't see any difference with that.
-> 
-> I used fbv to display the tux. With CONFIG_FRAMEBUFFER_CONSOLE=n the
-> display stays with a small atmel logo and u-Boot version information. If
-> i set CONFIG_FRAMEBUFFER_CONSOLE=y, the display is black after kernel
-> start and fbv just works as expected.
-> 
-> Best Regards,
-> Tim
-> 
->> Best Regards,
->>
->> Boris
->>
->>>
->>>> * a simple panel
->>>> * a backlight driver
->>> Tested to set brightness to 0, 20 and 255. Works.
->>>
->>> Thanks for your work.
->>>
->>> Best Regards
->>> Tim
->>>
->>>> * structure to 'easily' add other connectors (it comes from the tilcdc)
->>>>
->>>> On the todo list:
->>>> * support overlays as drm_planes
->>>> * support for the hardware cursor
->>>> * support for the SiI9022 HDMI connector (present on sama5d36ek)
->>>>
->>>>
->>>> Jean-Jacques Hiblot (3):
->>>>   atmel: drm: added drm driver for the atmel hlcd controller
->>>>   atmel: drm: dt: Added DT entry for the atmel hlcdc found in the sama5
->>>>   atmel: dt: Add supports for the lcdc support on the sama5d36ek
->>>>
->>>>  arch/arm/boot/dts/sama5d36ek.dts                   |  27 +-
->>>>  arch/arm/boot/dts/sama5d3_lcd.dtsi                 |  11 +
->>>>  drivers/gpu/drm/Kconfig                            |   2 +
->>>>  drivers/gpu/drm/Makefile                           |   1 +
->>>>  drivers/gpu/drm/atmel_hlcdc/Kconfig                |  13 +
->>>>  drivers/gpu/drm/atmel_hlcdc/Makefile               |  12 +
->>>>  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc.h          | 771 +++++++++++++++++++++
->>>>  .../gpu/drm/atmel_hlcdc/atmel_hlcdc_backlight.c    |  92 +++
->>>>  .../gpu/drm/atmel_hlcdc/atmel_hlcdc_backlight.h    |  25 +
->>>>  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_crtc.c     | 702 +++++++++++++++++++
->>>>  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_drv.c      | 586 ++++++++++++++++
->>>>  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_drv.h      | 124 ++++
->>>>  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_ovl.h      | 190 +++++
->>>>  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_panel.c    | 459 ++++++++++++
->>>>  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_panel.h    |  28 +
->>>>  15 files changed, 3042 insertions(+), 1 deletion(-)
->>>>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/Kconfig
->>>>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/Makefile
->>>>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc.h
->>>>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_backlight.c
->>>>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_backlight.h
->>>>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_crtc.c
->>>>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_drv.c
->>>>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_drv.h
->>>>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_ovl.h
->>>>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_panel.c
->>>>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_panel.h
->>>>
->>>> --
->>>> 1.9.1
->>>>
->>>>
->>>> _______________________________________________
->>>> linux-arm-kernel mailing list
->>>> linux-arm-kernel at lists.infradead.org
->>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>>
->>
-> 
-> 
+Otherwise looks fine.
+
+Best regards,
+Tomasz
