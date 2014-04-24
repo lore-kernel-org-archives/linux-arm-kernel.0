@@ -1,22 +1,27 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 24 Apr 2014 00:34:05 -0400
-Subject: [PATCH 1/2] ARM: mvebu: Enable nfsroot in the defconfig
-In-Reply-To: <1396539014-8673-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1396539014-8673-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20140424043405.GS28159@titan.lakedaemon.net>
+Date: Thu, 24 Apr 2014 00:44:11 -0400
+Subject: [PATCH 0/3] ARM: kirkwood: Add device tree for NSA320
+In-Reply-To: <5341C91D.4060007@baker-net.org.uk>
+References: <5341C91D.4060007@baker-net.org.uk>
+Message-ID: <20140424044411.GT28159@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 03, 2014 at 12:30:13PM -0300, Ezequiel Garcia wrote:
-> NFSroot is very frequently used by developers to boot, so let's make
-> our lives simpler and enable it by default.
+On Sun, Apr 06, 2014 at 10:37:33PM +0100, Adam Baker wrote:
+> As promised here are my sequence of patches to add support for the
+> Zyxel NSA 320
 > 
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->  arch/arm/configs/mvebu_v7_defconfig | 5 +++++
->  1 file changed, 5 insertions(+)
+> The three patches are as previously discussed
+> 
+> 1 - Move some things that are common to both nsa310, nsa310a and nsa320 into
+>     kirkwood-nsa310-common.dtsi
+> 2 - add the dts for nsa320
+> 3 - rename kirkwood-nsa310-common.dtsi to kirkwood-nsa3x0-common.dtsi (I suspect
+>     the nsa325 is sufficiently different to not share this file). I suggest
+>     making this change last as it can easily be dropped till later if it causes
+>     conflicts.
 
-Both applied to mvebu/defconfig
+Whole series applied to mvebu/dt with Andrew's Ack.
 
 thx,
 
