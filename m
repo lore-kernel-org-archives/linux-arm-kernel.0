@@ -1,114 +1,57 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 24 Apr 2014 17:20:00 -0600
-Subject: [PATCH 1/3] ARM: hackup pcibios support for commmon bridge code
-In-Reply-To: <1395960398-4238-2-git-send-email-robherring2@gmail.com>
-References: <1395960398-4238-1-git-send-email-robherring2@gmail.com>
- <1395960398-4238-2-git-send-email-robherring2@gmail.com>
-Message-ID: <20140424232000.GN29593@google.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 24 Apr 2014 16:23:32 -0700
+Subject: [GIT PULL] serial: Cadence
+In-Reply-To: <5358A188.4080404@monstr.eu>
+References: <53575983.3030508@monstr.eu> <20140423234832.GB17827@kroah.com>
+ <5358A188.4080404@monstr.eu>
+Message-ID: <20140424232332.GB10457@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 27, 2014 at 05:46:36PM -0500, Rob Herring wrote:
-> From: Rob Herring <robh@kernel.org>
+On Thu, Apr 24, 2014 at 07:30:48AM +0200, Michal Simek wrote:
+> On 04/24/2014 01:48 AM, Greg Kroah-Hartman wrote:
+> > On Wed, Apr 23, 2014 at 08:11:15AM +0200, Michal Simek wrote:
+> >> Hi Greg,
+> >>
+> >> this is around for a while and I would like to close it.
+> >> I have applied patches 1-7 from v3.
+> >> Patches 8 and 9 should go through arm-soc tree and I will add them
+> >> to my zynq/dt branch.
+> >>
+> >> Please apply these patches to your tree.
+> >> If this should go through different tree please let me know.
+> >>
+> >> Thanks,
+> >> Michal
+> >>
+> >>
+> >> The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+> >>
+> >>   Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+> >>
+> >> are available in the git repository at:
+> >>
+> >>   git://git.monstr.eu/linux-2.6-microblaze.git tags/cadence-uart-for-3.16
+> > 
+> > I can't take git pulles from random internet sites, sorry.  Just send
+> > these as email and I will queue them up.
 > 
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> ---
->  arch/arm/kernel/bios32.c | 63 ++++++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 63 insertions(+)
+> I wouldn't say random. This repo is listed in my Microblaze maintainer fragment
+> and I used signed tag and you have sign my key that's why you can easily
+> check it.
+
+If you have a signed key, why aren't you using git.kernel.org?  Again, I
+can't pull from any non-kernel.org sites, sorry.
+
+> Anyway we have sent v3 patches via email twice.
+> Origin v3:
+> https://lkml.org/lkml/2014/3/12/499
 > 
-> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-> index 317da88..31ec14a 100644
-> --- a/arch/arm/kernel/bios32.c
-> +++ b/arch/arm/kernel/bios32.c
-> @@ -11,6 +11,7 @@
->  #include <linux/slab.h>
->  #include <linux/init.h>
->  #include <linux/io.h>
-> +#include <linux/of_pci.h>
->  
->  #include <asm/mach-types.h>
->  #include <asm/mach/map.h>
-> @@ -337,6 +338,15 @@ void pcibios_fixup_bus(struct pci_bus *bus)
->  	list_for_each_entry(dev, &bus->devices, bus_list) {
->  		u16 cmd;
->  
-> +		/* Ignore fully discovered devices */
-> +		if (dev->is_added)
-> +			continue;
-> +
-> +		set_dev_node(&dev->dev, pcibus_to_node(dev->bus));
+> Resent v3:
+> https://lkml.org/lkml/2014/4/4/523
+> 
+> Patches 1-7 should go through your tree.
 
-We already do this in pci_device_add(); why do we need it here, too?
+I've now applied these, sorry for the delay.
 
-> +		/* Read default IRQs and fixup if necessary */
-> +		dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
-
-Could this be done in pcibios_enable_device() or some other per-device
-interface()?  I'd like to get rid of pcibios_fixup_bus() eventually.
-
->  		pci_read_config_word(dev, PCI_COMMAND, &cmd);
->  		cmd |= features;
->  		pci_write_config_word(dev, PCI_COMMAND, cmd);
-> @@ -681,3 +691,56 @@ void __init pci_map_io_early(unsigned long pfn)
->  	pci_io_desc.pfn = pfn;
->  	iotable_init(&pci_io_desc, 1);
->  }
-> +
-> +struct ioresource {
-> +	struct list_head list;
-> +	phys_addr_t start;
-> +	resource_size_t size;
-> +};
-> +
-> +static LIST_HEAD(io_list);
-> +
-> +int pci_register_io_range(phys_addr_t address, resource_size_t size)
-> +{
-> +	struct ioresource *res;
-> +	resource_size_t allocated_size = 0;
-> +
-> +	/* find if the range has not been already allocated */
-> +	list_for_each_entry(res, &io_list, list) {
-> +		if (address >= res->start &&
-> +			address + size <= res->start + size)
-> +			return 0;
-> +		allocated_size += res->size;
-> +	}
-> +
-> +	/* range not already registered, check for space */
-> +	if (allocated_size + size > IO_SPACE_LIMIT)
-> +		return -E2BIG;
-> +
-> +	/* add the range in the list */
-> +	res = kzalloc(sizeof(*res), GFP_KERNEL);
-> +	if (!res)
-> +		return -ENOMEM;
-> +	res->start = address;
-> +	res->size = size;
-> +
-> +	list_add_tail(&res->list, &io_list);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(pci_register_io_range);
-> +
-> +unsigned long pci_address_to_pio(phys_addr_t address)
-> +{
-> +	struct ioresource *res;
-> +
-> +	list_for_each_entry(res, &io_list, list) {
-> +		if (address >= res->start &&
-> +			address < res->start + res->size) {
-> +			return res->start - address;
-> +		}
-> +	}
-> +
-> +	return (unsigned long)-1;
-> +}
-> +EXPORT_SYMBOL_GPL(pci_address_to_pio);
-
-ISTR some discussion about this, so maybe this has already been addressed,
-but it doesn't seem right to export generically-named symbols like these
-from the ARM arch code.  And they don't look very ARM-specific.
-
-Bjorn
+greg k-h
