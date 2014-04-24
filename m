@@ -1,36 +1,30 @@
 From: dinguyen@altera.com (Dinh Nguyen)
-Date: Thu, 24 Apr 2014 17:47:49 -0500
-Subject: [PATCH] clk: socfpga: fix clock driver for 3.15
-In-Reply-To: <20140424152133.GA23032@amd.pavel.ucw.cz>
-References: <1397481336-5592-1-git-send-email-dinguyen@altera.com>
- <20140424152133.GA23032@amd.pavel.ucw.cz>
-Message-ID: <1398379669.14881.2.camel@linux-builds1>
+Date: Thu, 24 Apr 2014 17:49:06 -0500
+Subject: socfpga in 3.15-rc2
+In-Reply-To: <20140424152156.GA22540@amd.pavel.ucw.cz>
+References: <20140424125421.GA19526@amd.pavel.ucw.cz>
+ <734n1i25ad.fsf@unicorn.hi.pengutronix.de>
+ <20140424152156.GA22540@amd.pavel.ucw.cz>
+Message-ID: <1398379746.14881.3.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
-
-On Thu, 2014-04-24 at 17:21 +0200, ZY - pavel wrote:
+On Thu, 2014-04-24 at 17:21 +0200, Pavel Machek wrote:
 > Hi!
 > 
-> > commit [1771b10d6 clk: respect the clock dependencies in of_clk_init]
-> > exposed a flaw in the socfpga clock driver and prevents the platform
-> > from booting on 3.15-rc1.
+> > > Does socfpga boot for you on 3.15-rc2? Mainline worked on 3.14 pretty
+> > > well, but I get no output from serial from 3.15-rc2. Any ideas?
+> > >
 > > 
-> > Because the "altr,clk-mgr" is not really a clock, it should not be using
-> > CLK_OF_DECLARE, instead we should be mapping the clk-mgr's base address
-> > one of the functional clock init function. Use the socfpga_pll_init function
-> > to map the clk_mgr_base_addr as this clock should always be initialized first.
+> > You need:
 > > 
-> > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> > [PATCH] clk: socfpga: fix clock driver for 3.15
+> > Message-Id: 1397481336-5592-1-git-send-email-dinguyen at altera.com
 > 
-> Works for me, thanks!
-> 									Pavel
-> 
-> Tested-by: Pavel Machek <pavel@denx.de>
-> 
+> Thanks a lot, with that patch, I'm back to working system.
 
-I'm hoping you can queued this up for one of the 3.15-rc.
+Glad you found it. Who's dinh at amd.pavel.ucw.cz?
 
-Thanks,
 Dinh
+> 
+> 									Pavel
