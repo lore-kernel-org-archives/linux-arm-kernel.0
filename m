@@ -1,52 +1,76 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 24 Apr 2014 11:13:56 +0100
-Subject: [PATCH] ARM: mm: dma: Update coherent streaming apis with
- missing memory barrier
-In-Reply-To: <20140424091624.GG26756@n2100.arm.linux.org.uk>
-References: <1398103390-31968-1-git-send-email-santosh.shilimkar@ti.com>
- <201404222153.41786.arnd@arndb.de> <5356C9D1.2060001@ti.com>
- <5895821.PvurJ8TWz2@wuerfel> <5356D163.1070304@ti.com>
- <20140423090251.GA5281@arm.com> <20140423160216.GC2208@arm.com>
- <20140423171727.GK5649@arm.com> <20140424090927.GB8521@arm.com>
- <20140424091624.GG26756@n2100.arm.linux.org.uk>
-Message-ID: <20140424101355.GD8521@arm.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Thu, 24 Apr 2014 13:16:56 +0300
+Subject: [PATCH 00/23] OMAPDSS: OMAP5 display support
+Message-ID: <1398334639-14172-1-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 24, 2014 at 10:16:24AM +0100, Russell King - ARM Linux wrote:
-> On Thu, Apr 24, 2014 at 10:09:27AM +0100, Catalin Marinas wrote:
-> > If we only do D-cache maintenance by MVA, the ARM ARM (both v7 and v8)
-> > claims that these are ordered relative to any explicit load/stores to
-> > the same address. So in theory we don't even need a DMB for unmapping
-> > with DMA_FROM_DEVICE. But in practice, we may have the outer cache,
-> > hence a DSB is required before the outer_sync() (we could move it there
-> > though).
-> 
-> The general usecase for outer_sync() is: dsb(); outer_sync();  Why would
-> we want to change this to dsb(); dmb(); outer_sync(); (where the dmb is
-> in outer_sync itself?)
-> 
-> Seems more sensible for it to stay at the outer_sync() call site where
-> it's needed.
+Hi,
 
-You are right, it gets worse for the wmb() case if we change
-outer_sync(), I was thinking about cache maintenance.
+This series implements OMAP5 display support. The series is based on -rc2.
 
-An optimisation would be for functions like v7_dma_inv_range() to no
-longer have the dsb but move it to the __dma_page_cpu_to_dev() before
-the outer_*_range() ops. If we assume that a streaming DMA is started by
-a writel() access which has a dsb already, in the absence of outer cache
-we wouldn't need any dsb at all, hence something like a conditional
-sync_for_outer() barrier (dsb if outer cache or no-op otherwise) in
-__dma_page_cpu_to_dev().
+Tested on OMAP5 uEVM with HDMI output, and OMAP5 uEVM with a custom DSI panel
+(patches for the panel are not included here).
 
-In the __dma_page_dev_to_cpu() we wouldn't need any dsb at all for cache
-maintenance since subsequent accesses to the same address are ordered by
-the hardware (and outer cache maintenance is done before the inner
-anyway).
+Tomi
 
-(that's from an ARMv7 perspective, we need to check ordering on earlier
-architectures)
+Archit Taneja (4):
+  ARM: OMAP: hwmod: OMAP5 DSS hwmod data
+  OMAPDSS: HDMI: support larger register offsets for OMAP5 HDMI core
+  OMAPDSS: HDMI: PHY changes for OMAP5
+  OMAPDSS: HDMI: PLL changes for OMAP5
+
+Tomi Valkeinen (19):
+  OMAPDSS: HDMI: lane config support
+  Doc/DT: ti,omap4-dss: hdmi lanes
+  OMAPDSS: HDMI4: set regulator voltage to 1.8V
+  OMAPDSS: DSI: set regulator voltage to 1.8V
+  ARM: OMAP: add OMAP5 DSI muxing
+  ARM: OMAP: add detection of omap5-dss
+  ARM: dts: omap5-clocks.dtsi: add dss iclk
+  ARM: dts: omap5-clocks.dtsi: add ti,set-rate-parent to dss_dss_clk
+  ARM: dts: omap5.dtsi: add DSS nodes
+  ARM: dts: omap5-uevm.dts: add tca6424a
+  ARM: dts: omap5-uevm.dts: add display nodes
+  OMAPDSS: DSS & DISPC DT support for OMAP5
+  OMAPDSS: features: fix OMAP5 features
+  OMAPDSS: DPI: fix LCD3 DSI source
+  OMAPDSS: DSI: Add OMAP5 DSI module IDs
+  OMAPDSS: HDMI: improve Makefile
+  OMAPDSS: HDMI: move irq & phy pwr handling
+  OMAPDSS: HDMI: Add OMAP5 HDMI support
+  Doc/DT: Add OMAP5 DSS DT bindings
+
+ .../devicetree/bindings/video/ti,omap4-dss.txt     |   4 +
+ .../devicetree/bindings/video/ti,omap5-dss.txt     |  96 +++
+ arch/arm/boot/dts/omap5-uevm.dts                   |  89 ++
+ arch/arm/boot/dts/omap5.dtsi                       |  70 ++
+ arch/arm/boot/dts/omap54xx-clocks.dtsi             |   9 +
+ arch/arm/mach-omap2/display.c                      |  39 +-
+ arch/arm/mach-omap2/omap_hwmod_54xx_data.c         | 283 +++++++
+ drivers/video/fbdev/omap2/dss/Kconfig              |  22 +-
+ drivers/video/fbdev/omap2/dss/Makefile             |   6 +-
+ drivers/video/fbdev/omap2/dss/core.c               |   6 +
+ drivers/video/fbdev/omap2/dss/dispc.c              |   1 +
+ drivers/video/fbdev/omap2/dss/dpi.c                |   2 +
+ drivers/video/fbdev/omap2/dss/dsi.c                |  17 +
+ drivers/video/fbdev/omap2/dss/dss.c                |   1 +
+ drivers/video/fbdev/omap2/dss/dss.h                |   3 +
+ drivers/video/fbdev/omap2/dss/dss_features.c       |   3 +-
+ drivers/video/fbdev/omap2/dss/hdmi.h               |  17 +-
+ drivers/video/fbdev/omap2/dss/hdmi4.c              | 113 ++-
+ drivers/video/fbdev/omap2/dss/hdmi5.c              | 829 ++++++++++++++++++
+ drivers/video/fbdev/omap2/dss/hdmi5_core.c         | 922 +++++++++++++++++++++
+ drivers/video/fbdev/omap2/dss/hdmi5_core.h         | 306 +++++++
+ drivers/video/fbdev/omap2/dss/hdmi_common.c        |  41 +
+ drivers/video/fbdev/omap2/dss/hdmi_phy.c           | 231 ++++--
+ drivers/video/fbdev/omap2/dss/hdmi_pll.c           |  81 +-
+ drivers/video/fbdev/omap2/dss/hdmi_wp.c            |   2 +-
+ 25 files changed, 3111 insertions(+), 82 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/video/ti,omap5-dss.txt
+ create mode 100644 drivers/video/fbdev/omap2/dss/hdmi5.c
+ create mode 100644 drivers/video/fbdev/omap2/dss/hdmi5_core.c
+ create mode 100644 drivers/video/fbdev/omap2/dss/hdmi5_core.h
 
 -- 
-Catalin
+1.9.1
