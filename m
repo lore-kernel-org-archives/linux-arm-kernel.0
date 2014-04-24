@@ -1,31 +1,50 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Thu, 24 Apr 2014 13:16:58 +0300
-Subject: [PATCH 02/23] Doc/DT: ti,omap4-dss: hdmi lanes
+Date: Thu, 24 Apr 2014 13:17:00 +0300
+Subject: [PATCH 04/23] OMAPDSS: DSI: set regulator voltage to 1.8V
 In-Reply-To: <1398334639-14172-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1398334639-14172-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1398334639-14172-3-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1398334639-14172-5-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add documentation for defining HDMI lane functions and polarities.
+Set the DSI vdd regulator voltage to the required 1.8V.
+
+This is required for the case when the regulator in the DT data defines
+a range of allowed voltages. In this case it's required to set the
+voltage, as otherwise enabling the voltage fails.
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Cc: devicetree at vger.kernel.org
 ---
- Documentation/devicetree/bindings/video/ti,omap4-dss.txt | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/video/fbdev/omap2/dss/dsi.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/video/ti,omap4-dss.txt b/Documentation/devicetree/bindings/video/ti,omap4-dss.txt
-index f85d6fcfa705..b8c29fbd1fbb 100644
---- a/Documentation/devicetree/bindings/video/ti,omap4-dss.txt
-+++ b/Documentation/devicetree/bindings/video/ti,omap4-dss.txt
-@@ -109,3 +109,7 @@ Required properties:
+diff --git a/drivers/video/fbdev/omap2/dss/dsi.c b/drivers/video/fbdev/omap2/dss/dsi.c
+index 8be9b04d8849..57f120896b43 100644
+--- a/drivers/video/fbdev/omap2/dss/dsi.c
++++ b/drivers/video/fbdev/omap2/dss/dsi.c
+@@ -1161,6 +1161,7 @@ static int dsi_regulator_init(struct platform_device *dsidev)
+ {
+ 	struct dsi_data *dsi = dsi_get_dsidrv_data(dsidev);
+ 	struct regulator *vdds_dsi;
++	int r;
  
- Optional nodes:
- - Video port for HDMI output
+ 	if (dsi->vdds_dsi_reg != NULL)
+ 		return 0;
+@@ -1173,6 +1174,15 @@ static int dsi_regulator_init(struct platform_device *dsidev)
+ 		return PTR_ERR(vdds_dsi);
+ 	}
+ 
++	if (regulator_can_change_voltage(vdds_dsi)) {
++		r = regulator_set_voltage(vdds_dsi, 1800000, 1800000);
++		if (r) {
++			devm_regulator_put(vdds_dsi);
++			DSSERR("can't set the DSI regulator voltage\n");
++			return r;
++		}
++	}
 +
-+HDMI Endpoint optional properties:
-+- lanes: list of 8 pin numbers for the HDMI lanes: CLK+, CLK-, D0+, D0-,
-+  D1+, D1-, D2+, D2-. (default: 0,1,2,3,4,5,6,7)
+ 	dsi->vdds_dsi_reg = vdds_dsi;
+ 
+ 	return 0;
 -- 
 1.9.1
