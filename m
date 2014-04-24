@@ -1,52 +1,64 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 24 Apr 2014 11:11:28 +0200
-Subject: [PATCH 1/4] dma: ste_dma40: Maintain spinlock order while
- handling pause
-In-Reply-To: <53582519.7020805@cogentembedded.com>
-References: <1398282724-2607-1-git-send-email-ulf.hansson@linaro.org>
- <53582519.7020805@cogentembedded.com>
-Message-ID: <CAPDyKFphEP93WhLpodfzH-QL4Rw5tGiXkkebWM+dbUcVnxaN+Q@mail.gmail.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 24 Apr 2014 12:14:32 +0300
+Subject: [PATCH 0/3] clk: Add clock driver for DRA7 ATL (Audio Tracking
+ Logic)
+In-Reply-To: <1396446907-20383-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1396446907-20383-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <5358D5F8.3010401@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 April 2014 22:39, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> On 04/23/2014 11:52 PM, Ulf Hansson wrote:
->
->> The runtime PM resume callback needs to be executed while holding the
->> spinlock, make sure to maintain this for the pause operation as well.
->
->
->> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->> ---
->>   drivers/dma/ste_dma40.c |    2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
->
->
->> diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
->> index bf18c78..6e97cf6 100644
->> --- a/drivers/dma/ste_dma40.c
->> +++ b/drivers/dma/ste_dma40.c
->> @@ -1495,8 +1495,8 @@ static int d40_pause(struct d40_chan *d40c)
->>         if (!d40c->busy)
->>                 return 0;
->>
->> -       pm_runtime_get_sync(d40c->base->dev);
->>         spin_lock_irqsave(&d40c->lock, flags);
->> +       pm_runtime_get_sync(d40c->base->dev);
->
->
->   That function may sleep AFAIK, so you can't really call it with a spinlock
-> held. Or do I miss something?
+Hi Mike,
 
-That's the default behaviour from the runtime PM core.
+On 04/02/2014 04:55 PM, Peter Ujfalusi wrote:
+> Hi,
+> 
+> Audio Tracking Logic is designed to be used by HD Radio
+> applications to synchronize the audio output clocks to the
+> baseband clock. ATL can be also used to track errors between
+> two reference clocks (BWS, AWS) and generate a modulated
+> clock output which averages to some desired frequency.
+> 
+> To be able to integrate the ATL provided clocks to the clock tree we need
+> two types of DT binding:
+> - DT clock nodes to represent the ATL clocks towards the CCF
+> - binding for the ATL IP itself which is going to handle the hw
+>   configuration
+> 
+> The reason for this type of setup is that ATL itself is a separate device
+> in the SoC, it has it's own address space and clock domain. Other IPs can
+> use the ATL generated clock as their functional clock (McASPs for example)
+> and external components like audio codecs can also use the very same clock
+> as their MCLK.
+> 
+> With setup pm_runtime can handle the ATL clock on demand of it's use and
+> all the IP which needs ATL clock can be sure that it is enabled for them.
+> 
+> The first patch fixes the name of atl clkin3 node in dtsi file.
 
-But, since we have invoked "pm_runtime_irq_safe()" at ->probe(), that
-means the pm_runtime_get_sync() function won't sleep.
+Can you take a look at this series?
 
-Kind regards
-Ulf Hansson
+Thanks,
+P?ter
 
->
-> WBR, Sergei
->
+> 
+> Regards,
+> Peter
+> ---
+> Peter Ujfalusi (3):
+>   ARM: dts: dra7xx-clocks: Correct name for atl clkin3 clock
+>   clk: Driver for DRA7 ATL (Audio Tracking Logic)
+>   ARM: DTS: dra7/dra7xx-clocks: ATL related changes
+> 
+>  .../devicetree/bindings/clock/ti/dra7-atl.txt      |  97 +++++++
+>  arch/arm/boot/dts/dra7.dtsi                        |  11 +
+>  arch/arm/boot/dts/dra7xx-clocks.dtsi               |  38 +--
+>  drivers/clk/ti/Makefile                            |   3 +-
+>  drivers/clk/ti/clk-7xx.c                           |   2 +-
+>  drivers/clk/ti/clk-dra7-atl.c                      | 313 +++++++++++++++++++++
+>  include/dt-bindings/clk/ti-dra7-atl.h              |  40 +++
+>  7 files changed, 483 insertions(+), 21 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/ti/dra7-atl.txt
+>  create mode 100644 drivers/clk/ti/clk-dra7-atl.c
+>  create mode 100644 include/dt-bindings/clk/ti-dra7-atl.h
+> 
