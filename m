@@ -1,44 +1,87 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Thu, 24 Apr 2014 11:55:56 +0100
-Subject: [PATCH V2 0/5] Huge pages for short descriptors on ARM
-In-Reply-To: <20140424104232.GK26756@n2100.arm.linux.org.uk>
-References: <1397648803-15961-1-git-send-email-steve.capper@linaro.org>
- <20140424102229.GA28014@linaro.org>
- <20140424103639.GC19564@arm.com>
- <20140424104232.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <CAPvkgC3P8iZp5nECiGHdeGzRwmdh=ouiAREqKwk1tYzZxHTWvg@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 24 Apr 2014 12:57:01 +0200
+Subject: [GIT PULL] ARM: Updates for mmci driver for 3.16, take 1
+In-Reply-To: <CAPDyKFp0K=cijuAZox7_BsTk2UCyC7Dp9HQoO6eJzaHikRMVUw@mail.gmail.com>
+References: <CAPDyKFp0K=cijuAZox7_BsTk2UCyC7Dp9HQoO6eJzaHikRMVUw@mail.gmail.com>
+Message-ID: <CAPDyKFo07dqfqTtrGp3sHwf1ghzCj4BaBqJffRAs=cA1-HP2Tw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 April 2014 11:42, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> On Thu, Apr 24, 2014 at 11:36:39AM +0100, Will Deacon wrote:
->> I guess I'm after some commitment that this is (a) useful to somebody and
->> (b) going to be tested regularly, otherwise it will go the way of things
->> like big-endian, where we end up carrying around code which is broken more
->> often than not (although big-endian is more self-contained).
+On 14 April 2014 16:17, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> Hi Russell,
 >
-> It may be something worth considering adding to my nightly builder/boot
-> testing, but I suspect that's impractical as it probably requires a BE
-> userspace, which would then mean that the platform can't boot LE.
+> I have collected some patches which all relates to changes to the mmci driver.
 >
-> I suspect that we will just have to rely on BE users staying around and
-> reporting problems when they occur.
+> The SOC specific patches has been acked by the SOC maintainer Linus
+> Walleij and the DT patches has been iterated a few times, due to
+> comments from Rob Herring.
+>
+> Unless you have some concern with any of the patches, please pull them
+> into your ARM tree.
 
-The huge page support is for standard LE, I think Will was saying that
-this will be like BE if no-one uses it.
-I would appreciate any extra testing a *lot*. :-).
+Ping. :-)
 
-It's somewhat unfair to compare huge pages on short descriptors with
-BE. For a start, the userspace that works with LPAE will work on the
-short-descriptor kernel too. Great care has been taken to ensure that
-programmers can just port their huge page code over to ARM from other
-architectures without any issues. As things like libhugetlbfs (which
-fully supports ARM) get incorporated into distros on ARM, huge pages
-become the norm as opposed to the exception.
+Please, let me know if you prefer another setup than a pull request.
 
-Some devices have very few TLBs and I believe this series will be very
-beneficial for people using those devices.
+Kind regards
+Ulf Hansson
 
-Cheers,
--- 
-Steve
+>
+> Kind regards
+> Ulf Hansson
+>
+>
+> The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+>
+>   Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.linaro.org/people/ulf.hansson/linux-2.6.git
+> mmci_for_russell_3.16_take1
+>
+> for you to fetch changes up to 724404ce84cbc3cb9a16dcc593bc4d07aa5b8b2e:
+>
+>   mmc: mmci: Enforce max frequency configuration through DT
+> (2014-04-14 15:55:09 +0200)
+>
+> ----------------------------------------------------------------
+> Ulf Hansson (22):
+>       mmc: mmci: Mask IRQs for all variants during runtime suspend
+>       mmc: mmci: Let runtime PM callbacks be available for CONFIG_PM
+>       mmc: mmci: Put the device into low power state at system suspend
+>       mmc: mmci: Convert to the mmc gpio API
+>       mmc: mmci: Convert to devm functions
+>       mmc: mmci: Update DT documentation
+>       mmc: mmci: Add DT bindings for signal direction
+>       mmc: mmci: Add DT bindings for feedback clock pin
+>       mmc: mmci: Use the common mmc DT parser
+>       ARM: ux500: Add mmci signal directions and feeback clock in DT for href
+>       ARM: ux500: Convert to the common mmc DT bindings for highspeed mode
+>       ARM: nomadik: Convert to the common mmc DT bindings for highspeed mode
+>       ARM: u300: Convert to the common mmc DT bindings for highspeed mode
+>       mmc: mmci: Mark the DT bindings for highspeed mode as deprecated
+>       mmc: mmci: Enable MMC_CAP_CMD23
+>       ARM: ux500: Add the mmc capabilities flags to DT
+>       ARM: ux500: Add a vmmc regulator through DT for the poped eMMC for href
+>       ARM: ux500: Remove redundant board file for mmci platform data
+>       mmc: mmci: Enforce DT for signal direction and feedback clock
+>       mmc: mmci: Enforce mmc capabilities through DT
+>       mmc: mmci: Enforce DMA configuration through DT
+>       mmc: mmci: Enforce max frequency configuration through DT
+>
+>  Documentation/devicetree/bindings/mmc/mmci.txt |   54 +++-
+>  arch/arm/boot/dts/ste-ccu9540.dts              |    6 +-
+>  arch/arm/boot/dts/ste-href.dtsi                |   19 +-
+>  arch/arm/boot/dts/ste-nomadik-stn8815.dtsi     |    4 +-
+>  arch/arm/boot/dts/ste-snowball.dts             |    4 +-
+>  arch/arm/boot/dts/ste-u300.dts                 |    4 +-
+>  arch/arm/mach-ux500/Makefile                   |    3 +-
+>  arch/arm/mach-ux500/board-mop500-sdi.c         |  166 ------------
+>  arch/arm/mach-ux500/board-mop500.h             |    5 -
+>  arch/arm/mach-ux500/cpu-db8500.c               |    4 -
+>  drivers/mmc/host/mmci.c                        |  324 ++++++------------------
+>  drivers/mmc/host/mmci.h                        |   14 +-
+>  include/linux/amba/mmci.h                      |   42 ---
+>  13 files changed, 169 insertions(+), 480 deletions(-)
+>  delete mode 100644 arch/arm/mach-ux500/board-mop500-sdi.c
