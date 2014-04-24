@@ -1,89 +1,44 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Thu, 24 Apr 2014 13:03:38 +0100
-Subject: [PATCH V2 0/5] Huge pages for short descriptors on ARM
-In-Reply-To: <20140424110321.GN26756@n2100.arm.linux.org.uk>
-References: <1397648803-15961-1-git-send-email-steve.capper@linaro.org>
- <20140424102229.GA28014@linaro.org>
- <20140424103639.GC19564@arm.com>
- <20140424104232.GK26756@n2100.arm.linux.org.uk>
- <CAPvkgC3P8iZp5nECiGHdeGzRwmdh=ouiAREqKwk1tYzZxHTWvg@mail.gmail.com>
- <20140424110321.GN26756@n2100.arm.linux.org.uk>
-Message-ID: <CAPvkgC36fLVJJtZumFO=f4eMEQvh_SjN7QDRpxT=ThfnGa1rog@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 24 Apr 2014 14:12:16 +0200
+Subject: [PATCH] ARM: mm: dma: Update coherent streaming apis with missing
+ memory barrier
+In-Reply-To: <20140424105846.GE19564@arm.com>
+References: <1398103390-31968-1-git-send-email-santosh.shilimkar@ti.com>
+ <6414220.SShvCHLvZQ@wuerfel> <20140424105846.GE19564@arm.com>
+Message-ID: <5427496.9FZVDz0Wjn@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 April 2014 12:03, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> On Thu, Apr 24, 2014 at 11:55:56AM +0100, Steve Capper wrote:
->> On 24 April 2014 11:42, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
->> > On Thu, Apr 24, 2014 at 11:36:39AM +0100, Will Deacon wrote:
->> >> I guess I'm after some commitment that this is (a) useful to somebody and
->> >> (b) going to be tested regularly, otherwise it will go the way of things
->> >> like big-endian, where we end up carrying around code which is broken more
->> >> often than not (although big-endian is more self-contained).
->> >
->> > It may be something worth considering adding to my nightly builder/boot
->> > testing, but I suspect that's impractical as it probably requires a BE
->> > userspace, which would then mean that the platform can't boot LE.
->> >
->> > I suspect that we will just have to rely on BE users staying around and
->> > reporting problems when they occur.
->>
->> The huge page support is for standard LE, I think Will was saying that
->> this will be like BE if no-one uses it.
->
-> We're not saying that.
->
+On Thursday 24 April 2014 11:58:46 Will Deacon wrote:
+> 
+> On Wed, Apr 23, 2014 at 07:58:05PM +0100, Arnd Bergmann wrote:
+> > Another problem is MSI processing. MSI was specifically invented to avoid
+> > having to check an MMIO register for a DMA completion that as a side-effect
+> > flushes pending DMAs from the same device. This breaks down if the MSI
+> > packet gets turned into a level interrupt before it reaches the CPU's
+> > coherency domain, which is likely the case on the dw-pcie controller that
+> > comes with its own MSI block.
+> 
+> I'm not sure there's anything special about MSI which helps with this
+> problem. For GICv3, the MSI write will target the ITS (a slave device),
+> whereas the data produced is assumedly targetting main memory. That still
+> requires careful ordering by the producer, in the same way as if it was
+> signalling a legacy interrupt.
 
-Apologies, I was talking at cross-purposes.
+With legacy interrupts a PCI bus master has no way to order the transactions:
+It initiates the DMA to memory, but does not wait for the DMA to complete.
+It raises the interrupt line, which causes the interrupt handler of the
+driver to start. The driver then reads a status register from the bus master
+device, and this read is ordered with respect to the DMA that may still
+be in progress at the time. Any PCI driver that works with legacy interrupts
+and DMA has to do this, and the PCI host controller has to ensure that these
+ordering semantics are maintained on the upstream buses.
 
-> What we're asking is this: *Who* is using hugepages today?
+The difference with MSI is that the driver does not have to do an MMIO read
+transaction, and that the host controller has to ensure ordering between
+the (possibly weakly ordered) data DMA and the MSI transaction, rather than
+between the DMA and the MMIO read. These two are not the same, and it's
+totally possible for a broken implementation to get one of them right
+but not the other.
 
-I've asked the people who have been in touch with me to jump in to
-this discussion.
-People working on phones and servers have expressed an interest.
-
->
-> What we're then doing is comparing it to the situation we have today with
-> BE, where BE support is *always* getting broken because no one in the main
-> community tests it - not even a build test, nor a boot test which would
-> be required to find the problems that (for example) cropped up in the
-> last merge window.
-
-I can appreciate that concern.
-
->
->> It's somewhat unfair to compare huge pages on short descriptors with
->> BE. For a start, the userspace that works with LPAE will work on the
->> short-descriptor kernel too.
->
-> That sounds good, but the question is how does this get tested by
-> facilities such as my build/boot system, or Olof/Kevin's system?
-> Without that, it will find itself in exactly the same situation that
-> BE is in, where problems aren't found until after updates are merged
-> into Linus' tree.
->
-
-For minimal build/boot testing, I would recommend enabling:
-CONFIG_HUGETLBFS=y
-CONFIG_TRANSPARENT_HUGEPAGE=y
-CONFIG_TRANSPARENT_HUGEPAGE_MADVISE=y
-
-That should not have any significant effect on the running system (one
-has to opt-in to use HugeTLB or THP in this case), so could be put in
-a defconfig.
-
-For actual usage testing, typically one would use the upstream
-libhugelbfs test suite as it is very good at finding problems, is kept
-up to date, and is easy to automate and interpret the results. For
-THP, I usually run a kernel build repeatedly with
-/sys/kernel/mm/transparent_hugepage/enabled set to always along with
-LTP's mm tests.
-
-We also run continuous integration tests within Linaro against Linaro
-kernels, and the libhugetlbfs test suite is one of our tests. If it
-helps things, I can set up automated huge page tests within Linaro and
-pull in another branch?
-
-Cheers,
---
-Steve
+	Arnd
