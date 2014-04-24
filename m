@@ -1,55 +1,86 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 24 Apr 2014 15:34:07 -0700
-Subject: [PATCH] ARM: dts: Add support for the BeagleBoard xM A/B
-In-Reply-To: <20140422140316.GA19317@atomide.com> (Tony Lindgren's message of
- "Tue, 22 Apr 2014 07:03:16 -0700")
-References: <1397574599-29573-1-git-send-email-robertcnelson@gmail.com>
- <CAOCHtYg5_Lvi3SWuWaRTDDNhLJ32jiXsKYQmrsKaShVWpM+xWQ@mail.gmail.com>
- <534D51C1.3010007@ti.com>
- <CAOCHtYhygGFbUunY9abEkjKfpQ1hh-DfRfhm160NehSYhWJSRw@mail.gmail.com>
- <20140418225111.GP21823@atomide.com>
- <CAOCHtYjdC-OGkdaBt74xMqi5eDc1eVbU6O7VyWMEYN-U50-Abw@mail.gmail.com>
- <20140418235119.GS21823@atomide.com>
- <20980858CB6D3A4BAE95CA194937D5E73EAC458C@DBDE04.ent.ti.com>
- <20140422140316.GA19317@atomide.com>
-Message-ID: <7h7g6enyqo.fsf@paris.lan>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 25 Apr 2014 02:42:41 +0400
+Subject: [PATCH 1/2] ARM: shmobile: henninger: initial device tree
+In-Reply-To: <201404250239.39150.sergei.shtylyov@cogentembedded.com>
+References: <201404250239.39150.sergei.shtylyov@cogentembedded.com>
+Message-ID: <201404250242.42725.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren <tony@atomide.com> writes:
+Add the initial device tree for the R8A7791 SoC based Henninger board. SCIF0
+serial port support is included, so that the serial console can work. 
 
-> * Gupta, Pekon <pekon@ti.com> [140421 23:49]:
->> Tony,
->> 
->> >From: Tony Lindgren
->> >* Robert Nelson <robertcnelson@gmail.com> [140418 16:42]:
->> >> On Fri, Apr 18, 2014 at 5:51 PM, Tony Lindgren <tony@atomide.com> wrote:
->> >> > * Robert Nelson <robertcnelson@gmail.com> [140415 08:46]:
->> >> >>
->> >> >> Background: i also tried getting this having this fixed in u-boot:
->> >> >
->> >> > Do we still need to apply this patch then?
->> >>
->> >> Yeah, Tom want's it done in the kernel:
->> >>
->> >> Here's my proposed u-boot patch:
->> >> http://lists.denx.de/pipermail/u-boot/2014-January/172154.html
->> >>
->> >> and Tom's recommendation:
->> >> http://lists.denx.de/pipermail/u-boot/2014-January/172274.html
->> >>
->> >> Once this hits mainline, i'll submit a patch to u-boot to check for
->> >> the presence of this version and drop to the old dtb if not found.
->> >
->> >OK applying into omap-for-v3.15/fixes thanks.
->> >
->> >Tony
->> 
->> You probably missed fixing below typo before applying this patch.
->> omap3-beagle-xm-ab.dts breaks without this.
->
-> Yeah pushed out omap-for-v3.15/fixes-v2 with the missing bracket.
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Your master branch still has the one that doesn't compile.
+---
+ arch/arm/boot/dts/Makefile              |    1 
+ arch/arm/boot/dts/r8a7791-henninger.dts |   50 ++++++++++++++++++++++++++++++++
+ 2 files changed, 51 insertions(+)
 
-Kevin
+Index: renesas/arch/arm/boot/dts/Makefile
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/Makefile
++++ renesas/arch/arm/boot/dts/Makefile
+@@ -321,6 +321,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE_LEGACY) += r7
+ 	sh7372-mackerel.dtb
+ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += emev2-kzm9d.dtb \
+ 	r7s72100-genmai-reference.dtb \
++	r8a7791-henninger.dtb \
+ 	r8a7791-koelsch.dtb \
+ 	r8a7790-lager.dtb
+ dtb-$(CONFIG_ARCH_SOCFPGA) += socfpga_arria5_socdk.dtb \
+Index: renesas/arch/arm/boot/dts/r8a7791-henninger.dts
+===================================================================
+--- /dev/null
++++ renesas/arch/arm/boot/dts/r8a7791-henninger.dts
+@@ -0,0 +1,50 @@
++/*
++ * Device Tree Source for the Henninger board
++ *
++ * Copyright (C) 2014 Renesas Solutions Corp.
++ * Copyright (C) 2014 Cogent Embedded, Inc.
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
++
++/dts-v1/;
++#include "r8a7791.dtsi"
++
++/ {
++	model = "Henninger";
++	compatible = "renesas,henninger", "renesas,r8a7791";
++
++	aliases {
++		serial0 = &scif0;
++	};
++
++	chosen {
++		bootargs = "console=ttySC0,38400 ignore_loglevel";
++	};
++
++	memory at 40000000 {
++		device_type = "memory";
++		reg = <0 0x40000000 0 0x40000000>;
++	};
++
++	memory at 200000000 {
++		device_type = "memory";
++		reg = <2 0x00000000 0 0x40000000>;
++	};
++};
++
++&pfc {
++	scif0_pins: serial0 {
++		renesas,groups = "scif0_data_d";
++		renesas,function = "scif0";
++	};
++};
++
++&scif0 {
++	pinctrl-0 = <&scif0_pins>;
++	pinctrl-names = "default";
++
++	status = "okay";
++};
