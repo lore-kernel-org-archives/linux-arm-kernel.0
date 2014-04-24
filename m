@@ -1,43 +1,59 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 23 Apr 2014 22:51:23 -0400
-Subject: [PATCH 4/7] pci: mvebu: fix off-by-one in the computed size of
- the mbus windows
-In-Reply-To: <20140421164754.GA17260@google.com>
-References: <1397823593-1932-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1397823593-1932-5-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140421164754.GA17260@google.com>
-Message-ID: <20140424025123.GN28159@titan.lakedaemon.net>
+From: wujianguo@huawei.com (Jianguo Wu)
+Date: Thu, 24 Apr 2014 10:51:52 +0800
+Subject: [PATCH v3] ARM: mm: support big-endian page tables
+In-Reply-To: <20140423132033.GE5649@arm.com>
+References: <534F9F79.9050503@huawei.com>
+ <87ob00wau2.fsf@approximate.cambridge.arm.com>
+ <20140423132033.GE5649@arm.com>
+Message-ID: <53587C48.8080103@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 21, 2014 at 10:47:54AM -0600, Bjorn Helgaas wrote:
-> On Fri, Apr 18, 2014 at 02:19:50PM +0200, Thomas Petazzoni wrote:
-> > From: Willy Tarreau <w@1wt.eu>
-> > 
-> > mvebu_pcie_handle_membase_change() and
-> > mvebu_pcie_handle_iobase_change() do not correctly compute the window
-> > size. PCI uses an inclusive start/end address pair, which requires a
-> > +1 when converting to size.
-> > 
-> > This only worked because a bug in the mbus driver allowed it to
-> > silently accept and round up bogus sizes.
-> > 
-> > Fix this by adding one to the computed size.
-> > 
-> > Fixes: 45361a4fe4464180815157654aabbd2afb4848ad ('PCIe driver for Marvell Armada 370/XP systems')
-> > Cc: <stable@vger.kernel.org> # v3.11+
-> > Signed-off-by: Willy Tarreau <w@1wt.eu>
-> > Reviewed-By: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > Tested-by: Neil Greatorex <neil@fatboyfat.co.uk>
+On 2014/4/23 21:20, Will Deacon wrote:
+
+> Hi Jianguo,
 > 
-> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+> On Thu, Apr 17, 2014 at 10:43:01AM +0100, Marc Zyngier wrote:
+>> On Thu, Apr 17 2014 at 10:31:37 am BST, Jianguo Wu <wujianguo@huawei.com> wrote:
+>>> When enable LPAE and big-endian in a hisilicon board, while specify
+>>> mem=384M mem=512M at 7680M, will get bad page state:
+>>>
+>>> Freeing unused kernel memory: 180K (c0466000 - c0493000)
+>>> BUG: Bad page state in process init  pfn:fa442
+>>> page:c7749840 count:0 mapcount:-1 mapping:  (null) index:0x0
+>>> page flags: 0x40000400(reserved)
+>>> Modules linked in:
+>>> CPU: 0 PID: 1 Comm: init Not tainted 3.10.27+ #66
+>>> [<c000f5f0>] (unwind_backtrace+0x0/0x11c) from [<c000cbc4>] (show_stack+0x10/0x14)
+>>> [<c000cbc4>] (show_stack+0x10/0x14) from [<c009e448>] (bad_page+0xd4/0x104)
+>>> [<c009e448>] (bad_page+0xd4/0x104) from [<c009e520>] (free_pages_prepare+0xa8/0x14c)
+>>> [<c009e520>] (free_pages_prepare+0xa8/0x14c) from [<c009f8ec>] (free_hot_cold_page+0x18/0xf0)
+>>> [<c009f8ec>] (free_hot_cold_page+0x18/0xf0) from [<c00b5444>] (handle_pte_fault+0xcf4/0xdc8)
+>>> [<c00b5444>] (handle_pte_fault+0xcf4/0xdc8) from [<c00b6458>] (handle_mm_fault+0xf4/0x120)
+>>> [<c00b6458>] (handle_mm_fault+0xf4/0x120) from [<c0013754>] (do_page_fault+0xfc/0x354)
+>>> [<c0013754>] (do_page_fault+0xfc/0x354) from [<c0008400>] (do_DataAbort+0x2c/0x90)
+>>> [<c0008400>] (do_DataAbort+0x2c/0x90) from [<c0008fb4>] (__dabt_usr+0x34/0x40)
 > 
-> If I were merging via my tree, I would tweak the subject capitalization
-> so "git log --oneline drivers/pci/host/pci-mvebu.c" looks consistent.
+> 
+> [...]
+> 
+> Please can you put this into Russell's patch system? You can also add my
+> ack:
+> 
+>   Acked-by: Will Deacon <will.deacon@arm.com>
+> 
+> You should also CC stable <stable@vger.kernel.org> in the commit log.
+> 
 
-Will do, thanks for the reminder.
+Hi Will,
+I have submit to http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8037/1.
 
-thx,
+Thanks,
+Jianguo Wu.
 
-Jason.
+> Cheers,
+> 
+> Will
+> 
+> .
+> 
