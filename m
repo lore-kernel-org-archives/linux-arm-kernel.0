@@ -1,53 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 24 Apr 2014 12:03:21 +0100
-Subject: [PATCH V2 0/5] Huge pages for short descriptors on ARM
-In-Reply-To: <CAPvkgC3P8iZp5nECiGHdeGzRwmdh=ouiAREqKwk1tYzZxHTWvg@mail.gmail.com>
-References: <1397648803-15961-1-git-send-email-steve.capper@linaro.org>
- <20140424102229.GA28014@linaro.org> <20140424103639.GC19564@arm.com>
- <20140424104232.GK26756@n2100.arm.linux.org.uk>
- <CAPvkgC3P8iZp5nECiGHdeGzRwmdh=ouiAREqKwk1tYzZxHTWvg@mail.gmail.com>
-Message-ID: <20140424110321.GN26756@n2100.arm.linux.org.uk>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 24 Apr 2014 08:06:36 -0300
+Subject: [RESEND/PATCH v4 0/9] Watchdog support for Armada 375/38x SoC
+In-Reply-To: <20140424045153.GU28159@titan.lakedaemon.net>
+References: <1397481813-4962-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20140424045153.GU28159@titan.lakedaemon.net>
+Message-ID: <20140424110636.GA1735@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 24, 2014 at 11:55:56AM +0100, Steve Capper wrote:
-> On 24 April 2014 11:42, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> > On Thu, Apr 24, 2014 at 11:36:39AM +0100, Will Deacon wrote:
-> >> I guess I'm after some commitment that this is (a) useful to somebody and
-> >> (b) going to be tested regularly, otherwise it will go the way of things
-> >> like big-endian, where we end up carrying around code which is broken more
-> >> often than not (although big-endian is more self-contained).
-> >
-> > It may be something worth considering adding to my nightly builder/boot
-> > testing, but I suspect that's impractical as it probably requires a BE
-> > userspace, which would then mean that the platform can't boot LE.
-> >
-> > I suspect that we will just have to rely on BE users staying around and
-> > reporting problems when they occur.
+On Apr 24, Jason Cooper wrote:
+> On Mon, Apr 14, 2014 at 10:23:24AM -0300, Ezequiel Garcia wrote:
+> > 
+> > Tested on A375-DB, A385-DB, A370-RD and Dove Cubox. Sebastian did more tests
+> > on Dove, and Jason Gunthorpe on Kirkwood.
 > 
-> The huge page support is for standard LE, I think Will was saying that
-> this will be like BE if no-one uses it.
+> Applied patches 7 and 8 to mvebu/dt.  For the rest,
+> 
+> Acked-by: Jason Cooper <jason@lakedaemon.net>
+> 
 
-We're not saying that.
+Wim,
 
-What we're asking is this: *Who* is using hugepages today?
+Can you take the rest of the patches throught your tree, with Jason's ack?
 
-What we're then doing is comparing it to the situation we have today with
-BE, where BE support is *always* getting broken because no one in the main
-community tests it - not even a build test, nor a boot test which would
-be required to find the problems that (for example) cropped up in the
-last merge window.
-
-> It's somewhat unfair to compare huge pages on short descriptors with
-> BE. For a start, the userspace that works with LPAE will work on the
-> short-descriptor kernel too.
-
-That sounds good, but the question is how does this get tested by
-facilities such as my build/boot system, or Olof/Kevin's system?
-Without that, it will find itself in exactly the same situation that
-BE is in, where problems aren't found until after updates are merged
-into Linus' tree.
-
+Thanks!
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
