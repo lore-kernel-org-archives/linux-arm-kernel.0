@@ -1,55 +1,79 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 24 Apr 2014 16:09:00 +0200
-Subject: [PATCH/RFC 3/4] of/clk: Register clocks suitable for Runtime PM
- with the PM core
-In-Reply-To: <CAPDyKFr02yyhGNncYX2AgBXTA3Sc0AGQcExjtLvQ5QU0_=YJwg@mail.gmail.com>
-References: <1398334403-26181-1-git-send-email-geert+renesas@glider.be>
- <1398334403-26181-4-git-send-email-geert+renesas@glider.be>
- <CAPDyKFr02yyhGNncYX2AgBXTA3Sc0AGQcExjtLvQ5QU0_=YJwg@mail.gmail.com>
-Message-ID: <CAMuHMdV=g13MnhhUDk9CFT+J5QPEryzO9HRSJFALJMfKi1Dn8w@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 24 Apr 2014 15:09:13 +0100
+Subject: [PATCH] ARM: mm: dma: Update coherent streaming apis with
+ missing memory barrier
+In-Reply-To: <535913D4.6020401@ti.com>
+References: <1398103390-31968-1-git-send-email-santosh.shilimkar@ti.com>
+ <20140423171727.GK5649@arm.com>
+ <20140423183742.GK24070@n2100.arm.linux.org.uk>
+ <6414220.SShvCHLvZQ@wuerfel>
+ <20140423190448.GB26756@n2100.arm.linux.org.uk>
+ <20140424104737.GE8521@arm.com>
+ <20140424111547.GP26756@n2100.arm.linux.org.uk>
+ <20140424112152.GF19564@arm.com> <535913D4.6020401@ti.com>
+Message-ID: <20140424140913.GB14110@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+On Thu, Apr 24, 2014 at 02:38:28PM +0100, Santosh Shilimkar wrote:
+> On Thursday 24 April 2014 07:21 AM, Will Deacon wrote:
+> > On Thu, Apr 24, 2014 at 12:15:47PM +0100, Russell King - ARM Linux wrote:
+> >> Yes, the hardware /is/ broken, but if you want to get it working in a
+> >> way that's acceptable in upstream kernels, adding that barrier to rmb()
+> >> is probably the only acceptable solution - especially if you have other
+> >> stuff going in between the rmb() and the DMA unmap.
+> > 
+> > The problem then is that the additional barrier may well require
+> > bus-specific knowledge and access to parts of bus driver code which we can't
+> > use inside the rmb() macro. To solve this properly, the bus topology topic
+> > once again rears its ugly head, as I think you'd need a callback from the
+> > device driver to the bus on which it resides in order to provide the
+> > appropriate barrier (which isn't something that can be done sanely for
+> > the platform_bus).
+> > 
+> Not exactly against the bus notifier point but we can't afford to have such
+> notifier calls in hot paths. Especially gigabit network drivers per packet
+> processing paths where even 10 cycle cost makes huge impact on the throughput.
 
-On Thu, Apr 24, 2014 at 3:11 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> +static int of_clk_register(struct device *dev, struct clk *clk)
->> +{
->> +       int error;
->> +
->> +       if (!dev->pm_domain) {
->> +               error = pm_clk_create(dev);
->> +               if (error)
->> +                       return error;
->> +
->> +               dev->pm_domain = &of_clk_pm_domain;
->
-> I am concerned about how this will work in conjunction with the
-> generic power domain.
->
-> A device can't reside in more than one pm_domain; thus I think it
-> would be better to always use the generic power domain and not have a
-> specific one for clocks. Typically the genpd should invoke
-> pm_clk_resume|suspend from it's runtime PM callbacks.
+I don't think anybody is suggesting that you do this per-packet. This is a
+per-DMA-transfer barrier, which is required anyway. The details of the
+barrier are what varies, and are likely bus-specific.
 
-On shmobile SoCs supporting power domains, the power domain is
-overridden later by calling rmobile_add_devices_to_domains() and friends.
+> Interconnect barriers are really needed for completion. I think CPUs within at
+> least same clusters will be ordered with rmb(). But same is not true when you
+> have multiple clusters and then further down coherent interconnect comes into
+> picture where all other non-CPU coherent masters are participating.
 
-My patch doesn't change that: the code behaved the same in the
-non-multi-platform case before: dev->pm_domain as set from
-drivers/sh/pm_runtime.c was overridden later.
+You're making a lot of rash generalisations here. The architected barrier
+instructions as used by Linux will work perfectly well within the
+inner-shareable domain. That means you don't need to worry about
+multiple-clusters of CPUs.
 
-I'll have a deeper look into the power domain code later anyway.
+However, you can't read *anything* into how a barrier instruction executed
+on the CPU affects writes from another master; there is inherently a race
+there which must be dealt with by either the external master or some
+implementation-specific action by the CPU. This is the real problem.
 
-Thanks!
+> If rmb() has to reach all the way to coherent masters(non-CPU), then I suspect
+> most of the ARM coherent architectures are broken. If you take any typical SOC,
+> ARM CPUs are bolted with other coherent masters at AXI boundary or may be with
+> ACP interfaces. At this level rmb() isn't good enough and you at least
+> need a dsb() for completion.
 
-Gr{oetje,eeting}s,
+An rmb() expands to dsb, neither of which give you anything in this scenario
+as described by the architecture.
 
-                        Geert
+> So in my view unless and until you have features like DVM in hardware, dsb() is
+> needed to guarantee even the ordering within CPUs sitting across clusters.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Firstly, you can only have multiple clusters of CPUs running with a single
+Linux image if hardware coherency is supported between them. In this case,
+all the CPUs will live in the same inner-shareable domain and dmb ish is
+sufficient to enforce ordering between them.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Secondly, a dsb executed by a CPU is irrelevant to ordering of accesses by
+an external peripheral, regardless of whether that peripheral is cache
+coherent. If you think about this as a producer/consumer problem, you need
+ordering at *both* ends to make any guarantees.
+
+Will
