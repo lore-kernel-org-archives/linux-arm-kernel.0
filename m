@@ -1,139 +1,21 @@
-From: liu.h.jason@gmail.com (Jason Liu)
-Date: Thu, 24 Apr 2014 12:58:59 +0800
-Subject: Perf top always show 0.00
-In-Reply-To: <CAHrpEqQO93d9Nh_4wO0fs_KLH3ofn43t-SySDRTNP9=ryTq=fQ@mail.gmail.com>
-References: <CAHrpEqQZ_0G-rmwfaeEzHOFVckyRRSUpYrPdMUgPjRZ1JYyy6g@mail.gmail.com>
- <CAB4PhKdP_gXiB56DPLC3DxdjW2Epr_RTghW_VL1X84Ux1U+bLw@mail.gmail.com>
- <CAHrpEqQO93d9Nh_4wO0fs_KLH3ofn43t-SySDRTNP9=ryTq=fQ@mail.gmail.com>
-Message-ID: <CAB4PhKf9mp6hV_KjJ-Sd=O0bacE-dUT3k__qdfApJxhfgm652A@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 24 Apr 2014 01:08:28 -0400
+Subject: [PATCH v3 00/10] ARM: mvebu: Hardware coherency support for
+ Armada 375 and 38x
+In-Reply-To: <1397483228-25625-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1397483228-25625-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140424050828.GV28159@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-04-23 22:26 GMT+08:00 Frank Li <lznuaa@gmail.com>:
-> On Wed, Apr 23, 2014 at 4:15 AM, Jason Liu <liu.h.jason@gmail.com> wrote:
->> Frank,
->>
->> 2014-04-19 1:00 GMT+08:00 Frank Li <lznuaa@gmail.com>:
->>> I use mx6dq platform. Found below problem.
->>>
->>> Run Perf top. First column always 0, but order look like correct.
->>>
->>>    0.00%  perf          [.] 0x00049420
->>>      0.00%  [kernel]      [k] kallsyms_expand_symbol.constprop.5
->>>      0.00%  [kernel]      [k] vsnprintf
->>>      0.00%  [kernel]      [k] arch_cpu_idle
->>>      0.00%  [kernel]      [k] format_decode
->>>      0.00%  [kernel]      [k] number.isra.2
->>>      0.00%  libc-2.19.so  [.] strstr
->>>      0.00%  libc-2.19.so  [.] 0x00072498
->>>      0.00%  libc-2.19.so  [.] memchr
->>>      0.00%  [kernel]      [k] _raw_spin_unlock_irqrestore
->>>      0.00%  [kernel]      [k] string.isra.4
->>>      0.00%  [kernel]      [k] strnlen
->>>      0.00%  libc-2.19.so  [.] getdelim
->>>      0.00%  libc-2.19.so  [.] memcpy
->>>      0.00%  [kernel]      [k] lock_acquire
->>>      0.00%  libc-2.19.so  [.] strchr
->>>      0.00%  libc-2.19.so  [.] strcmp
->>>      0.00%  [kernel]      [k] _raw_spin_unlock_irq
->>>      0.00%  libc-2.19.so  [.] __libc_calloc
->>>      0.00%  libc-2.19.so  [.] _IO_feof
->>>      0.00%  [kernel]      [k] pointer.isra.15
->>
->> This issue has been resolved by the following commit:
->>
->> commit 9dfd005a3f4e1c648cb4aa1dc70604bb370c5e7b
->> Author: Michael Hudson-Doyle <michael.hudson@linaro.org>
->> Date:   Thu Oct 31 16:47:45 2013 -0700
->>
->>     perf tools: Remove cast of non-variadic function to variadic
->>
->>     commit 53805eca3d89b095062c11a6798689bb0af09216 upstream.
->>
->>     The 4fb71074a570 (perf ui/hist: Consolidate hpp helpers) cset introduced
->>     a cast of percent_color_snprintf to a function pointer type with
->>     varargs.  Change percent_color_snprintf to be variadic and remove the
->>     cast.
->>
->>     The symptom of this was all percentages being reported as 0.00% in perf
->>     report --stdio output on the armhf arch.
->>
->>     Signed-off-by: Michael Hudson-Doyle <michael.hudson@linaro.org>
->>     Acked-by: Namhyung Kim <namhyung@kernel.org>
->>     Acked-by: Will Deacon <will.deacon@arm.com>
->>     Cc: Jean Pihet <jean.pihet@linaro.org>
->>     Cc: Jiri Olsa <jolsa@redhat.com>
->>     Cc: Will Deacon <will.deacon@arm.com>
->>     Link: http://lkml.kernel.org/r/87zjppvw7y.fsf at canonical.com
->>     Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
->>     Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->>
->>
->> Jason Liu
->
-> I tested it. still 0.00%
-> 0.00%  perf          [.] 0x000494a0
->      0.00%  [kernel]      [k] cpuidle_enter_state
->      0.00%  [kernel]      [k] kallsyms_expand_symbol.constprop.7
->      0.00%  libc-2.19.so  [.] 0x0006f6a4
->      0.00%  [kernel]      [k] vsnprintf
->      0.00%  libc-2.19.so  [.] strstr
->      0.00%  [kernel]      [k] format_decode
->      0.00%  libc-2.19.so  [.] memchr
->      0.00%  [kernel]      [k] number.isra.2
->      0.00%  libc-2.19.so  [.] memcpy
->      0.00%  libc-2.19.so  [.] getdelim
->      0.00%  libc-2.19.so  [.] __libc_calloc
->      0.00%  [kernel]      [k] _raw_spin_unlock_irq
->      0.00%  libc-2.19.so  [.] strchr
->      0.00%  [kernel]      [k] strnlen
->      0.00%  [kernel]      [k] _raw_spin_unlock_irqrestore
->      0.00%  libc-2.19.so  [.] strcmp
->      0.00%  [kernel]      [k] __do_softirq
->      0.00%  [kernel]      [k] string.isra.4
->      0.00%  libc-2.19.so  [.] _IO_feof
->      0.00%  [kernel]      [k] tick_nohz_idle_enter
->
+On Mon, Apr 14, 2014 at 03:46:58PM +0200, Thomas Petazzoni wrote:
+> Jason, Gregory, Andrew, Sebastian,
+> 
+> This set of patches add hardware coherency support for the new Armada
+> 375 and Armada 38x SoCs.
 
-Here is my log:
+Patches 1 - 8 applied to mvebu/soc and 9 and 10 to mvebu/dt
 
-root at imx6qdlsolo:/# perf --version
-perf version 3.10.31
+thx,
 
-root at imx6qdlsolo:/# perf top
-
-   PerfTop:      66 irqs/sec  kernel:78.8%  exact:  0.0% [4000Hz
-cycles],  (all, 1 CPU)
--------------------------------------------------------------------------------
-
-    21.95%  perf            [.] 0x00025b44
-    13.73%  [kernel]        [k] cpuidle_enter_state
-     5.32%  libc-2.19.so    [.] strstr
-     4.64%  libc-2.19.so    [.] 0x000725d0
-     3.61%  [kernel]        [k] _raw_spin_unlock_irqrestore
-     2.78%  libc-2.19.so    [.] __libc_calloc
-     2.41%  libc-2.19.so    [.] strcmp
-     2.29%  libbfd-2.24.so  [.] 0x000819d0
-     2.17%  libc-2.19.so    [.] memchr
-     2.11%  libc-2.19.so    [.] strchr
-     1.94%  [kernel]        [k] finish_task_switch
-     1.81%  [kernel]        [k] kallsyms_expand_symbol.constprop.7
-     1.57%  [kernel]        [k] vsnprintf
-     1.46%  [kernel]        [k] __do_softirq
-     1.43%  libc-2.19.so    [.] strlen
-     1.35%  libc-2.19.so    [.] vfprintf
-     1.26%  libc-2.19.so    [.] strncmp
-     1.22%  [kernel]        [k] format_decode
-     1.21%  [kernel]        [k] number.isra.2
-     1.12%  libc-2.19.so    [.] memset
-     1.07%  libc-2.19.so    [.] memcpy
-
-You can try 3.10.31 release branch.
-
-Jason Liu
-
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Jason.
