@@ -1,78 +1,63 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 24 Apr 2014 15:23:29 +0200
-Subject: [PATCH v2 0/7] ARM: berlin: add pinctrl support
-In-Reply-To: <CACRpkdbT94HqVroM_0gSJJ8Q2+YaKXLwjFGMn+4SCa_PYiF19Q@mail.gmail.com>
-References: <1398268276-9696-1-git-send-email-antoine.tenart@free-electrons.com>
- <CACRpkdbT94HqVroM_0gSJJ8Q2+YaKXLwjFGMn+4SCa_PYiF19Q@mail.gmail.com>
-Message-ID: <53591051.9030804@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 24 Apr 2014 15:24:14 +0200
+Subject: [PATCH v2 3/6] ARM: dts: Device tree for AXM55xx.
+In-Reply-To: <2386bd1367aa44741979461358a72dec89608597.1398335771.git.anders.berg@lsi.com>
+References: <cover.1398335771.git.anders.berg@lsi.com>
+ <2386bd1367aa44741979461358a72dec89608597.1398335771.git.anders.berg@lsi.com>
+Message-ID: <CACRpkdbU6UashxCuPMDjEB_nbB=mXicGpjJy=HGC6r3qfxCtVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/24/2014 02:52 PM, Linus Walleij wrote:
-> On Wed, Apr 23, 2014 at 5:51 PM, Antoine T?nart
-> <antoine.tenart@free-electrons.com> wrote:
+On Thu, Apr 24, 2014 at 12:44 PM, Anders Berg <anders.berg@lsi.com> wrote:
+
+> Add device tree for the Amarillo validation board with an AXM5516 SoC.
 >
->> This series adds support for the Marvell Berlin pin-controller, allowing
->> to configure the pin muxing from the device tree.
->>
->> The Berlin pin-controller support is divided into 3 drivers, each
->> driving one Berlin SoC. These drivers use a Berlin common part.
->>
->> This series applies on top of patches introducing the Marvell Berlin
->> BG2Q you can find on Sebastian's berlin/for-next branch[1] and the patch
->> allowing not to define the get_group_pins() function[2].
->>
->> Tested on the Berlin BG2Q.
->
-> So now I need some advice from the mvebu pinctrl maintainers
-> (Thomas, Sebastian etc):
->
-> - Is this a totally different pin controller so that drivers/pinctrl/mvebu
->   can not be used?
+> Signed-off-by: Anders Berg <anders.berg@lsi.com>
+(...)
 
-Unfortunately, yes. Well actually, it _can_ be seen as a subset of
-the mvebu pinctrl:
+> +                       timer0: timer at 2010091000 {
+> +                               compatible = "arm,sp804", "arm,primecell";
+> +                               reg = <0x20 0x10091000 0 0x1000>;
+> +                               interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>,
+> +                                            <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>,
+> +                                            <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>,
+> +                                            <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>,
+> +                                            <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>,
+> +                                            <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>,
+> +                                            <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>,
+> +                                            <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>,
+> +                                            <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>;
+> +                               clocks = <&clk_per>;
+> +                               clock-names = "apb_pclk";
+> +                               status = "okay";
+> +                       };
+> +
+> +                       gpio0: gpio at 2010092000 {
+> +                               #gpio-cells = <2>;
+> +                               compatible = "arm,pl061", "arm,primecell";
+> +                               gpio-controller;
+> +                               reg = <0x20 0x10092000 0x00 0x1000>;
+> +                               interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>,
+> +                                            <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>,
+> +                                            <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
+> +                                            <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
+> +                                            <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>,
+> +                                            <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
+> +                                            <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>,
+> +                                            <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
+> +                               clocks = <&clk_per>;
+> +                               clock-names = "apb_pclk";
+> +                               status = "disabled";
+> +                       };
 
-- mvebu (usually) uses 4bit per mux function with 8 functions/register
-- berlin uses 1-4bit per mux function with as many functions/register
-   as there fit in 32b.
+One interrupt per CPU core?
 
-This great feature saves _at least_ one additional address decoding!
-It doesn't save registers, because they will never be synthesized, but
-at least each SoC has a very different pinmux layout. *sigh*
+The drivers for these blocks will really just grab the first IRQ and
+then I guess they
+will only be able to execute on CPU0.
 
-> - Really?
+It's definately correct to list all the IRQs here, but how do you envision
+the drivers making use of them in the long run?
 
-Yep.
-
-> - OK can you help me review this thing?
-
-Sure thing!
-
-> - Should the base folder really be named "berlin" or is this going to
->    be part of a bigger family of pin controllers so a more neutral name
->    should be sought?
-
-Well, Marvell basically has two groups of SoCs, MVEBU and PXA/MMP. Don't
-ask me why but sometimes they share IP, sometimes they don't.
-
-Berlin names Marvell SoCs prefixed 88DExxxx, I *think* it may be derived 
-from the PXA/MMP line of SoCs. To make it more confuse,
-it also got the marketing name "Armada".
-
-> - Why do hardware engineers seek to reinvent wheels like pin
->    controllers, GPIO and DMA engines all the time :-/
-
-I guess it is: "Look what we found in our IP archives".
-
-Honestly, I can think of making pinctrl/mvebu and pinctrl/berlin
-compatible but I don't know if it is worth the pain :P
-
-We have "custom" set/get_function() callbacks in pinctrl/mvebu
-so that should fit. Each "group" of pins has a name and a bunch
-of "functions", that fits too.
-
-I need some time to think about it, but if you insist on it, I
-can possibly make it work.
-
-Sebastian
+Yours,
+Linus Walleij
