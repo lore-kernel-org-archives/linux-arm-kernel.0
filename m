@@ -1,48 +1,89 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 23 Apr 2014 17:40:26 -0700
-Subject: [PATCH 0/4] mfd: twl4030-power: Enable off-idle configuration when
- booted with device tree
-Message-ID: <1398300030-7386-1-git-send-email-tony@atomide.com>
+Date: Wed, 23 Apr 2014 17:40:29 -0700
+Subject: [PATCH 3/4] mfd: twl4030power: Add a configuration to turn off
+ oscillator during off-idle
+In-Reply-To: <1398300030-7386-1-git-send-email-tony@atomide.com>
+References: <1398300030-7386-1-git-send-email-tony@atomide.com>
+Message-ID: <1398300030-7386-4-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Some oscillators can be turned off during off-idle saving few
+a little bit power at the cost of the oscillator start up
+latency.
 
-One of the major blockers for making omap3 to boot in device tree
-mode has been the fact that power management has not been working
-as well as when booted in legacy mode.
+If you board can do this, you can now enable it by using the
+ti,twl4030-power-idle-osc-off compatible flag.
 
-This series when applied on top of the patches in tread
-"[PATCH 00/11] Fixes for omap PM for making omap3 DT only".
+Cc: Peter De Schrijver <pdeschrijver@nvidia.com>
+Cc: Samuel Ortiz <sameo@linux.intel.com>
+Cc: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ .../devicetree/bindings/mfd/twl4030-power.txt         |  6 ++++++
+ drivers/mfd/twl4030-power.c                           | 19 +++++++++++++++++++
+ 2 files changed, 25 insertions(+)
 
-This series makes the twl4030 PMIC configurations generic
-so that most boards can just use one of the configurations
-based on the compatible flag alone. This allows us to drop
-all the related platform data once omap3 boots in device
-tree only mode.
-
-Lee, if these patches look OK to you, please feel free to
-pick them, preferrably to the immutable branch you already
-have set up so I can also merge them in to be able to have
-things working in my branch properly for PM.
-
-Regards,
-
-Tony
-
-Tony Lindgren (4):
-  mfd: twl4030-power: Add recommended idle configuration
-  mfd: twl4030-power: Add support for board specific configuration
-  mfd: twl4030power: Add a configuration to turn off oscillator during
-    off-idle
-  ARM: dts: Enable twl4030 off-idle configuration for selected omaps
-
- .../devicetree/bindings/mfd/twl4030-power.txt      |  10 +
- arch/arm/boot/dts/omap3-evm-common.dtsi            |   7 +
- arch/arm/boot/dts/omap3-n900.dts                   |   5 +
- drivers/mfd/twl4030-power.c                        | 205 +++++++++++++++++++++
- include/linux/i2c/twl.h                            |   1 +
- 5 files changed, 228 insertions(+)
-
+diff --git a/Documentation/devicetree/bindings/mfd/twl4030-power.txt b/Documentation/devicetree/bindings/mfd/twl4030-power.txt
+index bbd6603..b9ee7b9 100644
+--- a/Documentation/devicetree/bindings/mfd/twl4030-power.txt
++++ b/Documentation/devicetree/bindings/mfd/twl4030-power.txt
+@@ -9,6 +9,7 @@ Required properties:
+ 	"ti,twl4030-power"
+ 	"ti,twl4030-power-reset"
+ 	"ti,twl4030-power-idle"
++	"ti,twl4030-power-idle-osc-off"
+ 
+ The use of ti,twl4030-power-reset is recommended at least on
+ 3530 that needs a special configuration for warm reset to work.
+@@ -16,6 +17,11 @@ The use of ti,twl4030-power-reset is recommended at least on
+ When using ti,twl4030-power-idle, the TI recommended configuration
+ for idle modes is loaded to the tlw4030 PMIC.
+ 
++When using ti,twl4030-power-idle-osc-off, the TI recommended
++configuration is used with the external oscillator being shut
++down during off-idle. Note that this does not work on all boards
++depending on how the external oscillator is wired.
++
+ Optional properties:
+ - ti,use_poweroff: With this flag, the chip will initiates an ACTIVE-to-OFF or
+ 		   SLEEP-to-OFF transition when the system poweroffs.
+diff --git a/drivers/mfd/twl4030-power.c b/drivers/mfd/twl4030-power.c
+index 89c6b1a..12e4abe 100644
+--- a/drivers/mfd/twl4030-power.c
++++ b/drivers/mfd/twl4030-power.c
+@@ -777,6 +777,21 @@ static struct twl4030_power_data omap3_idle = {
+ 	.resource_config	= omap3_idle_rconfig,
+ };
+ 
++/* Disable 32 KiHz oscillator during idle */
++static struct twl4030_resconfig osc_off_rconfig[] = {
++	{ .resource = RES_CLKEN, .devgroup = DEV_GRP_P1 | DEV_GRP_P3,
++	  .type = 3, .type2 = 2, .remap_off = TWL_REMAP_OFF,
++	  .remap_sleep = TWL_REMAP_SLEEP, },
++	{ /* Terminator */ },
++};
++
++static struct twl4030_power_data osc_off_idle = {
++	.scripts		= omap3_idle_scripts,
++	.num			= ARRAY_SIZE(omap3_idle_scripts),
++	.resource_config	= omap3_idle_rconfig,
++	.board_config		= osc_off_rconfig,
++};
++
+ static struct of_device_id twl4030_power_of_match[] = {
+ 	{
+ 		.compatible = "ti,twl4030-power-reset",
+@@ -786,6 +801,10 @@ static struct of_device_id twl4030_power_of_match[] = {
+ 		.compatible = "ti,twl4030-power-idle",
+ 		.data = &omap3_idle,
+ 	},
++	{
++		.compatible = "ti,twl4030-power-idle-osc-off",
++		.data = &osc_off_idle,
++	},
+ 	{ },
+ };
+ MODULE_DEVICE_TABLE(of, twl4030_power_of_match);
 -- 
 1.8.1.1
