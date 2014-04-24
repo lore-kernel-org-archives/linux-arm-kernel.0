@@ -1,30 +1,73 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 24 Apr 2014 08:06:36 -0300
-Subject: [RESEND/PATCH v4 0/9] Watchdog support for Armada 375/38x SoC
-In-Reply-To: <20140424045153.GU28159@titan.lakedaemon.net>
-References: <1397481813-4962-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20140424045153.GU28159@titan.lakedaemon.net>
-Message-ID: <20140424110636.GA1735@arch.cereza>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 24 Apr 2014 13:13:05 +0200
+Subject: [PATCH 00/38] MMC updates, plus CuBox-i WiFi support
+In-Reply-To: <20140424105745.GM26756@n2100.arm.linux.org.uk>
+References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
+ <CAPDyKFozP69yngKAkdwHYyyvi+pdLEm05udOmBiVshQFi4hnLQ@mail.gmail.com>
+ <20140424101726.GH26756@n2100.arm.linux.org.uk>
+ <CAPDyKFrGReKF0ucer7D195boEoQW26=4vDXT+=Wn6BO-p_B1gQ@mail.gmail.com>
+ <20140424105745.GM26756@n2100.arm.linux.org.uk>
+Message-ID: <CAPDyKFr=2=dg1NTYb1_EAgxXZq2Rd+o2Q2B5TE+GZwr8MUU1_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Apr 24, Jason Cooper wrote:
-> On Mon, Apr 14, 2014 at 10:23:24AM -0300, Ezequiel Garcia wrote:
-> > 
-> > Tested on A375-DB, A385-DB, A370-RD and Dove Cubox. Sebastian did more tests
-> > on Dove, and Jason Gunthorpe on Kirkwood.
-> 
-> Applied patches 7 and 8 to mvebu/dt.  For the rest,
-> 
-> Acked-by: Jason Cooper <jason@lakedaemon.net>
-> 
+On 24 April 2014 12:57, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> On Thu, Apr 24, 2014 at 12:52:11PM +0200, Ulf Hansson wrote:
+>> On 24 April 2014 12:17, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+>> > On Thu, Apr 24, 2014 at 10:25:42AM +0200, Ulf Hansson wrote:
+>> >> I have looked though the patches up until patch 33 and this is clearly
+>> >> a nice piece of clean-up /fixes work for sdhci. Besides my minor
+>> >> comments per patch, I don't have any objections code-review wise to
+>> >> proceed merging them.
+>> >>
+>> >> I have also tried to applied them on Chris' mmc-next branch,
+>> >> unfortunate it fails at patch 23, so it would be nice to get a
+>> >> re-based patchset for the mmc-next branch.
+>> >
+>> > I /could/ rebase it but then I wouldn't be able to produce the patch
+>> > sets/patches for others [*] (such as the Novena project) to derive
+>> > their kernel tree from my iMX6 patch set.
+>> >
+>> > What I'd prefer is to keep the patch set intact, and provide Chris
+>> > with a pull request for it up to patch 33, which would need a
+>> > conflict fixed - and this would mean that I can be sure that what
+>> > I'm testing, and what I'm distributing is what Chris will also be
+>> > submitting.
+>>
+>> Whether there are more than one conflict, I don't know. I just stopped
+>> at patch 23.
+>>
+>> Moreover, there are other patches for sdhci that have been posted and
+>> being discussed. In principle, we then need to put all these on hold
+>> to prevent further conflicts. I guess that doable, as long as we don't
+>> to that for too long. Maybe Chris have some more thoughts how to
+>> handle this!?
+>
+> This is nothing new or unexpected - it was last posted back in February,
+> and I elected that it should be held off until after the last merge
+> window.
+>
+> Unfortunately, I didn't have time to post it immediately after the merge
+> window closed, partly because it needed to be rebased on top of tglx's
+> IRQ changes on which it depends.  I was carrying those as separate commits
+> to the ones Thomas was carrying in his tree - and in the event, Thomas had
+> modified his patches slightly between sending me copies of them and the
+> versions he sent during the merge window.
 
-Wim,
+Okay, so let's keep up the frequency here then. I only had some minor
+comments, please fix them and send a v2.
 
-Can you take the rest of the patches throught your tree, with Jason's ack?
+How about if I resolve the conflicts and send the pull request to
+Chris? I suppose it makes life a bit easier for Chris.
 
-Thanks!
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Kind regards
+Ulf Hansson
+
+>
+> --
+> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+> improving, and getting towards what was expected from it.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
