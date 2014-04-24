@@ -1,34 +1,78 @@
 From: joelf@ti.com (Joel Fernandes)
-Date: Thu, 24 Apr 2014 16:43:59 -0500
-Subject: [PATCH 16/26] ARM: OMAP2+: timer: Fix error message to not use hwmod
- structure
+Date: Thu, 24 Apr 2014 16:43:47 -0500
+Subject: [PATCH 04/26] ARM: OMAP: dmtimer: Add function to check if timer is
+ running
 In-Reply-To: <1398375849-6017-1-git-send-email-joelf@ti.com>
 References: <1398375849-6017-1-git-send-email-joelf@ti.com>
-Message-ID: <1398375849-6017-17-git-send-email-joelf@ti.com>
+Message-ID: <1398375849-6017-5-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-oh->name is no longer used, correct the error message.
+Inorder to move non-DM timer specific code that modifies the "idlect"
+mask on OMAP1, from dmtimer code, to OMAP1 specific timer initialization code,
+we introduce a new function that can possibly be reused for other purposes in
+the future. The function just checks if a timer is running based on the timer ID
+which should be same as pdev->id. This allows us to cleanly separate the timer vs
+non-timer bits and keep the timer bits in the dmtimer code.
 
 Signed-off-by: Joel Fernandes <joelf@ti.com>
 ---
- arch/arm/mach-omap2/timer.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/plat-omap/dmtimer.c              |   29 +++++++++++++++++++++++++++++
+ arch/arm/plat-omap/include/plat/dmtimer.h |    2 ++
+ 2 files changed, 31 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index 4fcfd7a..519ccfd 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -331,8 +331,8 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
- 	if (clk_get_parent(timer->fclk) != src) {
- 		r = clk_set_parent(timer->fclk, src);
- 		if (r < 0) {
--			pr_warn("%s: %s cannot set source\n", __func__,
--				oh->name);
-+			pr_warn("%s: cannot set timer's source\n", __func__);
-+			WARN_ON(1);
- 			clk_put(src);
- 			return r;
- 		}
+diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
+index 4debb3d..86b2641 100644
+--- a/arch/arm/plat-omap/dmtimer.c
++++ b/arch/arm/plat-omap/dmtimer.c
+@@ -187,6 +187,35 @@ int omap_dm_timer_reserve_systimer(int id)
+ 	return 0;
+ }
+ 
++/*
++ * Check if a timer is running based on timer_id, used for OMAP1 currently.
++ */
++int omap_dm_timer_is_running(int timer_id)
++{
++	int i = 1, ret = 0;
++	struct omap_dm_timer *timer = NULL;
++	unsigned long flags;
++
++	spin_lock_irqsave(&dm_timer_lock, flags);
++	list_for_each_entry(timer, &omap_timer_list, node) {
++		if (i == timer_id) {
++			u32 l;
++			l = omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
++			if (l & OMAP_TIMER_CTRL_ST) {
++				ret = 1;
++				goto done;
++			} else {
++				goto done;
++			}
++		}
++		i++;
++	}
++done:
++	spin_unlock_irqrestore(&dm_timer_lock, flags);
++	return ret;
++}
++EXPORT_SYMBOL_GPL(omap_dm_timer_is_running);
++
+ static struct omap_dm_timer *_omap_dm_timer_request(int req_type, void *data)
+ {
+ 	struct omap_dm_timer *timer = NULL, *t;
+diff --git a/arch/arm/plat-omap/include/plat/dmtimer.h b/arch/arm/plat-omap/include/plat/dmtimer.h
+index 2861b15..41df0a6 100644
+--- a/arch/arm/plat-omap/include/plat/dmtimer.h
++++ b/arch/arm/plat-omap/include/plat/dmtimer.h
+@@ -135,6 +135,8 @@ void omap_dm_timer_disable(struct omap_dm_timer *timer);
+ 
+ int omap_dm_timer_get_irq(struct omap_dm_timer *timer);
+ 
++int omap_dm_timer_is_running(int timer_id);
++
+ u32 omap_dm_timer_modify_idlect_mask(u32 inputmask);
+ struct clk *omap_dm_timer_get_fclk(struct omap_dm_timer *timer);
+ 
 -- 
 1.7.9.5
