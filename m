@@ -1,20 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 24 Apr 2014 14:08:23 +0100
-Subject: [PATCH v2 0/7] ARM: berlin: add pinctrl support
-In-Reply-To: <CACRpkdbT94HqVroM_0gSJJ8Q2+YaKXLwjFGMn+4SCa_PYiF19Q@mail.gmail.com>
-References: <1398268276-9696-1-git-send-email-antoine.tenart@free-electrons.com>
- <CACRpkdbT94HqVroM_0gSJJ8Q2+YaKXLwjFGMn+4SCa_PYiF19Q@mail.gmail.com>
-Message-ID: <20140424130823.GT26756@n2100.arm.linux.org.uk>
+From: shaik.ameer@samsung.com (Shaik Ameer Basha)
+Date: Thu, 24 Apr 2014 18:33:47 +0530
+Subject: [PATCH v3 11/16] clk: exynos5420: correct sysmmu-mfc parent clocks
+In-Reply-To: <1398344632-18623-1-git-send-email-shaik.ameer@samsung.com>
+References: <1398344632-18623-1-git-send-email-shaik.ameer@samsung.com>
+Message-ID: <1398344632-18623-12-git-send-email-shaik.ameer@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 24, 2014 at 02:52:20PM +0200, Linus Walleij wrote:
-> - Why do hardware engineers seek to reinvent wheels like pin
->   controllers, GPIO and DMA engines all the time :-/
+This patch corrects the wrong parent-child relationship
+between sysmmu-mfc clocks.
 
-They think they have a rectangular pin cross-section which needs special
-treatment to fit into the round hole in a turned-pin socket. :)
+Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
+---
+ drivers/clk/samsung/clk-exynos5420.c |    9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
+diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+index d8fe6d8..6daf739 100755
+--- a/drivers/clk/samsung/clk-exynos5420.c
++++ b/drivers/clk/samsung/clk-exynos5420.c
+@@ -82,6 +82,7 @@
+ #define SCLK_DIV_ISP0		0x10580
+ #define SCLK_DIV_ISP1		0x10584
+ #define DIV2_RATIO0		0x10590
++#define DIV4_RATIO		0x105a0
+ #define GATE_BUS_TOP		0x10700
+ #define GATE_BUS_GEN		0x1073c
+ #define GATE_BUS_FSYS0		0x10740
+@@ -176,6 +177,7 @@ static unsigned long exynos5420_clk_regs[] __initdata = {
+ 	SCLK_DIV_ISP0,
+ 	SCLK_DIV_ISP1,
+ 	DIV2_RATIO0,
++	DIV4_RATIO,
+ 	GATE_BUS_TOP,
+ 	GATE_BUS_GEN,
+ 	GATE_BUS_FSYS0,
+@@ -636,6 +638,9 @@ static struct samsung_div_clock exynos5420_div_clks[] __initdata = {
+ 	DIV(0, "dout_spi1_pre", "dout_spi1", DIV_PERIC4, 16, 8),
+ 	DIV(0, "dout_spi2_pre", "dout_spi2", DIV_PERIC4, 24, 8),
+ 
++	/* Mfc Blk */
++	DIV(0, "dout_mfc_blk", "mout_user_aclk333", DIV4_RATIO, 0, 2),
++
+ 	/* GSCL Block */
+ 	DIV(0, "dout_gscl_blk_300", "mout_user_aclk300_gscl",
+ 		DIV2_RATIO0, 4, 2),
+@@ -873,8 +878,8 @@ static struct samsung_gate_clock exynos5420_gate_clks[] __initdata = {
+ 			GATE_IP_DISP1, 8, 0, 0),
+ 
+ 	GATE(CLK_MFC, "mfc", "aclk333", GATE_IP_MFC, 0, 0, 0),
+-	GATE(CLK_SMMU_MFCL, "smmu_mfcl", "aclk333", GATE_IP_MFC, 1, 0, 0),
+-	GATE(CLK_SMMU_MFCR, "smmu_mfcr", "aclk333", GATE_IP_MFC, 2, 0, 0),
++	GATE(CLK_SMMU_MFCL, "smmu_mfcl", "dout_mfc_blk", GATE_IP_MFC, 1, 0, 0),
++	GATE(CLK_SMMU_MFCR, "smmu_mfcr", "dout_mfc_blk", GATE_IP_MFC, 2, 0, 0),
+ 
+ 	GATE(CLK_G3D, "g3d", "aclkg3d", GATE_IP_G3D, 9, 0, 0),
+ 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.7.9.5
