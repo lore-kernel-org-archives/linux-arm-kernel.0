@@ -1,74 +1,35 @@
-From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
-Date: Thu, 24 Apr 2014 14:07:20 -0400
-Subject: [PATCH v6 3/3] ARM: Check if a CPU has gone offline
-In-Reply-To: <CAL_Jsq+LUNY4O5mRi5+kNV74H--PpVAMxJxjEnKbtxTYBHG-=A@mail.gmail.com>
-References: <1397762146-8337-1-git-send-email-ashwin.chaugule@linaro.org>
- <1397762146-8337-4-git-send-email-ashwin.chaugule@linaro.org>
- <20140417195009.GC24195@e106331-lin.cambridge.arm.com>
- <CAJ5Y-eZMKZYOaQnFPu31Vzg6KXDy7J5gFKh3hAy+GuLz66Wgwg@mail.gmail.com>
- <CAJ5Y-ebZ9M9GM5R40-Yrbx=iNhB4_j-vw=8mBA=1cwZGnhixLw@mail.gmail.com>
- <CAL_Jsq+LUNY4O5mRi5+kNV74H--PpVAMxJxjEnKbtxTYBHG-=A@mail.gmail.com>
-Message-ID: <CAJ5Y-eb0eD-8bgNUaRypStNMa0VEy0L=0qZ=cSrmPLZv5fg9FA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 24 Apr 2014 19:13:36 +0100
+Subject: L2C boot crash on BCM Capri
+In-Reply-To: <20140424174456.GV26756@n2100.arm.linux.org.uk>
+References: <CAGa+x84pQLkD5_-xZKaEq67ETAtAaCB4Ryt_F-ocwX_wmh=tTA@mail.gmail.com>
+ <7hlhuuprkc.fsf@paris.lan> <20140424174456.GV26756@n2100.arm.linux.org.uk>
+Message-ID: <20140424181336.GW26756@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 April 2014 11:11, Rob Herring <robherring2@gmail.com> wrote:
->>
->> Hi Rob, I've already got your Reviewed-by on this patch without this
->> "retry" thing. Are you okay with this as well? I can then roll it up
->> in one patch.
->
-> Yes. My only comment is I would perhaps add a sleep (or delay if this
-> context cannot sleep) on the retry. I'm not sure what I reasonable
-> time would be, but at least then you are waiting a defined amount of
-> time versus how long it takes this code to execute.
+On Thu, Apr 24, 2014 at 06:44:56PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Apr 24, 2014 at 10:26:11AM -0700, Kevin Hilman wrote:
+> > [    0.100000] L2C-310 enabling early BRESP for Cortex-A9
+> > [    0.110000] L2C-310 full line of zeros enabled for Cortex-A9
+> > [    0.110000] L2C-310 dynamic clock gating enabled, standby mode enabled
+> > [    0.120000] Unhandled fault: imprecise external abort (0xc06) at 0x44a42d67
+> 
+> The unfortunate thing about imprecise external aborts is that they don't
+> tell us what went wrong - we have to guess.
+> 
+> My guess would be that something isn't wired up correctly between the
+> Cortex-A9 and L2 controller in Broadcom SoCs.  You could try disabling
+> the clock gating/standby mode - I doubt it's the FLZ feature as that
+> also requires the Cortex-A9 configuration to be changed as well, which
+> wouldn't have happened at the point this fault occurred.
+> 
+> Also, it's possible that BRESP could cause it.  Try disabling each in
+> turn and see what effect they have...
 
+BTW, this is something _you_ will have to do, because _I_ don't have
+access to the failing hardware.
 
-Yea, its tricky to get the delay right. Does this look better? The
-caller has a wait_for_completion (which waits for 5secs max) in it, so
-this context should be sleepable.
-
-"100 msecs ought to be enough for anyone". ;)
-
-diff --git a/arch/arm/kernel/psci_smp.c b/arch/arm/kernel/psci_smp.c
-index 3a83dcf..94485e0 100644
---- a/arch/arm/kernel/psci_smp.c
-+++ b/arch/arm/kernel/psci_smp.c
-@@ -16,6 +16,7 @@
- #include <linux/init.h>
- #include <linux/smp.h>
- #include <linux/of.h>
-+#include <linux/delay.h>
- #include <uapi/linux/psci.h>
-
- #include <asm/psci.h>
-@@ -70,22 +71,23 @@ void __ref psci_cpu_die(unsigned int cpu)
-
- int __ref psci_cpu_kill(unsigned int cpu)
- {
-- int err, retries;
-+ int err, retry = 0;
-
-  if (!psci_ops.affinity_info)
-  return 1;
-  /*
-  * cpu_kill could race with cpu_die and we can
-  * potentially end up declaring this cpu undead
-- * while it is dying. So retry a couple of times.
-+ * while it is dying. So, try once more if it fails.
-  */
--retry:
-+retry_once:
-  err = psci_ops.affinity_info(cpu_logical_map(cpu), 0);
-
-  if (err != PSCI_AFFINITY_INFO_RET_OFF) {
-- if (++retries < 3) {
-- pr_info("Retrying check for CPU kill: %d\n", retries);
-- goto retry;
-+ if (!retry++) {
-+ msleep(100);
-+ pr_info("Retrying once more to check for CPU kill\n");
-+ goto retry_once;
-  }
-  pr_err("psci: Cannot kill CPU:%d, psci ret val: %d\n",
-  cpu, err);
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
