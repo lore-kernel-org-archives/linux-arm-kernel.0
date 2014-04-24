@@ -1,57 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 24 Apr 2014 11:57:45 +0100
-Subject: [PATCH 00/38] MMC updates, plus CuBox-i WiFi support
-In-Reply-To: <CAPDyKFrGReKF0ucer7D195boEoQW26=4vDXT+=Wn6BO-p_B1gQ@mail.gmail.com>
-References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
- <CAPDyKFozP69yngKAkdwHYyyvi+pdLEm05udOmBiVshQFi4hnLQ@mail.gmail.com>
- <20140424101726.GH26756@n2100.arm.linux.org.uk>
- <CAPDyKFrGReKF0ucer7D195boEoQW26=4vDXT+=Wn6BO-p_B1gQ@mail.gmail.com>
-Message-ID: <20140424105745.GM26756@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 24 Apr 2014 11:58:46 +0100
+Subject: [PATCH] ARM: mm: dma: Update coherent streaming apis with
+ missing memory barrier
+In-Reply-To: <6414220.SShvCHLvZQ@wuerfel>
+References: <1398103390-31968-1-git-send-email-santosh.shilimkar@ti.com>
+ <20140423171727.GK5649@arm.com>
+ <20140423183742.GK24070@n2100.arm.linux.org.uk>
+ <6414220.SShvCHLvZQ@wuerfel>
+Message-ID: <20140424105846.GE19564@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 24, 2014 at 12:52:11PM +0200, Ulf Hansson wrote:
-> On 24 April 2014 12:17, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> > On Thu, Apr 24, 2014 at 10:25:42AM +0200, Ulf Hansson wrote:
-> >> I have looked though the patches up until patch 33 and this is clearly
-> >> a nice piece of clean-up /fixes work for sdhci. Besides my minor
-> >> comments per patch, I don't have any objections code-review wise to
-> >> proceed merging them.
-> >>
-> >> I have also tried to applied them on Chris' mmc-next branch,
-> >> unfortunate it fails at patch 23, so it would be nice to get a
-> >> re-based patchset for the mmc-next branch.
-> >
-> > I /could/ rebase it but then I wouldn't be able to produce the patch
-> > sets/patches for others [*] (such as the Novena project) to derive
-> > their kernel tree from my iMX6 patch set.
-> >
-> > What I'd prefer is to keep the patch set intact, and provide Chris
-> > with a pull request for it up to patch 33, which would need a
-> > conflict fixed - and this would mean that I can be sure that what
-> > I'm testing, and what I'm distributing is what Chris will also be
-> > submitting.
-> 
-> Whether there are more than one conflict, I don't know. I just stopped
-> at patch 23.
-> 
-> Moreover, there are other patches for sdhci that have been posted and
-> being discussed. In principle, we then need to put all these on hold
-> to prevent further conflicts. I guess that doable, as long as we don't
-> to that for too long. Maybe Chris have some more thoughts how to
-> handle this!?
+Hi Arnd,
 
-This is nothing new or unexpected - it was last posted back in February,
-and I elected that it should be held off until after the last merge
-window.
+On Wed, Apr 23, 2014 at 07:58:05PM +0100, Arnd Bergmann wrote:
+> Another problem is MSI processing. MSI was specifically invented to avoid
+> having to check an MMIO register for a DMA completion that as a side-effect
+> flushes pending DMAs from the same device. This breaks down if the MSI
+> packet gets turned into a level interrupt before it reaches the CPU's
+> coherency domain, which is likely the case on the dw-pcie controller that
+> comes with its own MSI block.
 
-Unfortunately, I didn't have time to post it immediately after the merge
-window closed, partly because it needed to be rebased on top of tglx's
-IRQ changes on which it depends.  I was carrying those as separate commits
-to the ones Thomas was carrying in his tree - and in the event, Thomas had
-modified his patches slightly between sending me copies of them and the
-versions he sent during the merge window.
+I'm not sure there's anything special about MSI which helps with this
+problem. For GICv3, the MSI write will target the ITS (a slave device),
+whereas the data produced is assumedly targetting main memory. That still
+requires careful ordering by the producer, in the same way as if it was
+signalling a legacy interrupt.
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Will
