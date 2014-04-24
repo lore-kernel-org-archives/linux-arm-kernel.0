@@ -1,64 +1,32 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 24 Apr 2014 12:14:32 +0300
-Subject: [PATCH 0/3] clk: Add clock driver for DRA7 ATL (Audio Tracking
- Logic)
-In-Reply-To: <1396446907-20383-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1396446907-20383-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <5358D5F8.3010401@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 24 Apr 2014 10:16:24 +0100
+Subject: [PATCH] ARM: mm: dma: Update coherent streaming apis with
+ missing memory barrier
+In-Reply-To: <20140424090927.GB8521@arm.com>
+References: <1398103390-31968-1-git-send-email-santosh.shilimkar@ti.com>
+ <201404222153.41786.arnd@arndb.de> <5356C9D1.2060001@ti.com>
+ <5895821.PvurJ8TWz2@wuerfel> <5356D163.1070304@ti.com>
+ <20140423090251.GA5281@arm.com> <20140423160216.GC2208@arm.com>
+ <20140423171727.GK5649@arm.com> <20140424090927.GB8521@arm.com>
+Message-ID: <20140424091624.GG26756@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On Thu, Apr 24, 2014 at 10:09:27AM +0100, Catalin Marinas wrote:
+> If we only do D-cache maintenance by MVA, the ARM ARM (both v7 and v8)
+> claims that these are ordered relative to any explicit load/stores to
+> the same address. So in theory we don't even need a DMB for unmapping
+> with DMA_FROM_DEVICE. But in practice, we may have the outer cache,
+> hence a DSB is required before the outer_sync() (we could move it there
+> though).
 
-On 04/02/2014 04:55 PM, Peter Ujfalusi wrote:
-> Hi,
-> 
-> Audio Tracking Logic is designed to be used by HD Radio
-> applications to synchronize the audio output clocks to the
-> baseband clock. ATL can be also used to track errors between
-> two reference clocks (BWS, AWS) and generate a modulated
-> clock output which averages to some desired frequency.
-> 
-> To be able to integrate the ATL provided clocks to the clock tree we need
-> two types of DT binding:
-> - DT clock nodes to represent the ATL clocks towards the CCF
-> - binding for the ATL IP itself which is going to handle the hw
->   configuration
-> 
-> The reason for this type of setup is that ATL itself is a separate device
-> in the SoC, it has it's own address space and clock domain. Other IPs can
-> use the ATL generated clock as their functional clock (McASPs for example)
-> and external components like audio codecs can also use the very same clock
-> as their MCLK.
-> 
-> With setup pm_runtime can handle the ATL clock on demand of it's use and
-> all the IP which needs ATL clock can be sure that it is enabled for them.
-> 
-> The first patch fixes the name of atl clkin3 node in dtsi file.
+The general usecase for outer_sync() is: dsb(); outer_sync();  Why would
+we want to change this to dsb(); dmb(); outer_sync(); (where the dmb is
+in outer_sync itself?)
 
-Can you take a look at this series?
+Seems more sensible for it to stay at the outer_sync() call site where
+it's needed.
 
-Thanks,
-P?ter
-
-> 
-> Regards,
-> Peter
-> ---
-> Peter Ujfalusi (3):
->   ARM: dts: dra7xx-clocks: Correct name for atl clkin3 clock
->   clk: Driver for DRA7 ATL (Audio Tracking Logic)
->   ARM: DTS: dra7/dra7xx-clocks: ATL related changes
-> 
->  .../devicetree/bindings/clock/ti/dra7-atl.txt      |  97 +++++++
->  arch/arm/boot/dts/dra7.dtsi                        |  11 +
->  arch/arm/boot/dts/dra7xx-clocks.dtsi               |  38 +--
->  drivers/clk/ti/Makefile                            |   3 +-
->  drivers/clk/ti/clk-7xx.c                           |   2 +-
->  drivers/clk/ti/clk-dra7-atl.c                      | 313 +++++++++++++++++++++
->  include/dt-bindings/clk/ti-dra7-atl.h              |  40 +++
->  7 files changed, 483 insertions(+), 21 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/clock/ti/dra7-atl.txt
->  create mode 100644 drivers/clk/ti/clk-dra7-atl.c
->  create mode 100644 include/dt-bindings/clk/ti-dra7-atl.h
-> 
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
