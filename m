@@ -1,65 +1,52 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu, 24 Apr 2014 12:13:19 +0200
-Subject: [PATCH/RFC 0/4] of: Register clocks for Runtime PM with PM core
-Message-ID: <1398334403-26181-1-git-send-email-geert+renesas@glider.be>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 24 Apr 2014 11:13:56 +0100
+Subject: [PATCH] ARM: mm: dma: Update coherent streaming apis with
+ missing memory barrier
+In-Reply-To: <20140424091624.GG26756@n2100.arm.linux.org.uk>
+References: <1398103390-31968-1-git-send-email-santosh.shilimkar@ti.com>
+ <201404222153.41786.arnd@arndb.de> <5356C9D1.2060001@ti.com>
+ <5895821.PvurJ8TWz2@wuerfel> <5356D163.1070304@ti.com>
+ <20140423090251.GA5281@arm.com> <20140423160216.GC2208@arm.com>
+ <20140423171727.GK5649@arm.com> <20140424090927.GB8521@arm.com>
+ <20140424091624.GG26756@n2100.arm.linux.org.uk>
+Message-ID: <20140424101355.GD8521@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On SoCs like ARM/SH-mobile, gate clocks are available for modules, allowing
-Runtime PM for a device controlled by a gate clock.
+On Thu, Apr 24, 2014 at 10:16:24AM +0100, Russell King - ARM Linux wrote:
+> On Thu, Apr 24, 2014 at 10:09:27AM +0100, Catalin Marinas wrote:
+> > If we only do D-cache maintenance by MVA, the ARM ARM (both v7 and v8)
+> > claims that these are ordered relative to any explicit load/stores to
+> > the same address. So in theory we don't even need a DMB for unmapping
+> > with DMA_FROM_DEVICE. But in practice, we may have the outer cache,
+> > hence a DSB is required before the outer_sync() (we could move it there
+> > though).
+> 
+> The general usecase for outer_sync() is: dsb(); outer_sync();  Why would
+> we want to change this to dsb(); dmb(); outer_sync(); (where the dmb is
+> in outer_sync itself?)
+> 
+> Seems more sensible for it to stay at the outer_sync() call site where
+> it's needed.
 
-On legacy shmobile kernels, this is handled by the PM runtime code in
-drivers/sh/pm_runtime.c, which installs a clock notifier for the platform
-bus, registering the "NULL" clock of each platform device with the PM core.
-This approach is also used on davinci, keystone, and omap1.
+You are right, it gets worse for the wmb() case if we change
+outer_sync(), I was thinking about cache maintenance.
 
-On multi-platform shmobile kernels, this was not handled at all, leading
-to spurious disabled clocks on drivers relying on Runtime PM, depending on
-implicit reset state, or on the bootloader.
+An optimisation would be for functions like v7_dma_inv_range() to no
+longer have the dsb but move it to the __dma_page_cpu_to_dev() before
+the outer_*_range() ops. If we assume that a streaming DMA is started by
+a writel() access which has a dsb already, in the absence of outer cache
+we wouldn't need any dsb at all, hence something like a conditional
+sync_for_outer() barrier (dsb if outer cache or no-op otherwise) in
+__dma_page_cpu_to_dev().
 
-A first solution, enabling the PM runtime code in drivers/sh/pm_runtime.c
-in a multi-platform-safe way, was provided by the patch series
-"[PATCH v2 00/17] ARM: shmobile: Enable drivers/sh/pm_runtime.c on
-multi-platform" (http://www.spinics.net/lists/linux-sh/msg30887.html).
+In the __dma_page_dev_to_cpu() we wouldn't need any dsb at all for cache
+maintenance since subsequent accesses to the same address are ordered by
+the hardware (and outer cache maintenance is done before the inner
+anyway).
 
-Here is an alternative approach, avoiding the reliance on C board files,
-which are being phased out.
+(that's from an ARMv7 perspective, we need to check ordering on earlier
+architectures)
 
-This is also related to a patch series by Felipe Balbi ("[RFC/PATCH] base:
-platform: add generic clock handling for platform-bus",
-https://lkml.org/lkml/2014/1/31/290)
-
-This series:
-  1. Lets the MSTP clock driver indicate that its clocks are suitable for
-     Runtime PM, 
-  2. Lets the DT code retrieve clock information when adding a device
-     (it already retrieves information for resources (registers, irq) ---
-     unfortunately clocks are not resources), and registering clocks
-     suitable for Runtime PM with the PM core.
-     If Runtime PM is disabled, the clocks are just enabled.
-
-Note that this works for devices instantiated from DT only.
-Fortunately the drivers for the remaining platform devices (SCI and CMT)
-handle clocks theirselves, without Runtime PM, so they get properly enabled.
-
-Patches:
-  - [1/4] clk: Add CLK_RUNTIME_PM and clk_may_runtime_pm()
-  - [2/4] PM / clock_ops: Add pm_clk_add_clk()
-  - [3/4] of/clk: Register clocks suitable for Runtime PM with the
-  - [4/4] clk: shmobile: mstp: Set CLK_RUNTIME_PM flag
-
-This series was tested on Renesas r8a7791, using the Koelsch development
-board.
-
-Thanks for your comments!
-
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
+-- 
+Catalin
