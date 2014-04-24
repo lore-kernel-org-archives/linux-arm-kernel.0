@@ -1,56 +1,37 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Thu, 24 Apr 2014 15:11:27 +0100
-Subject: [PATCH] arm/xen: Remove definiition of virt_to_pfn in
- asm/xen/page.h
-In-Reply-To: <53590845.1090405@linaro.org>
-References: <1397836474-10478-1-git-send-email-julien.grall@linaro.org>
- <535901F0.3010908@citrix.com> <53590845.1090405@linaro.org>
-Message-ID: <53591B8F.8070300@citrix.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 24 Apr 2014 09:18:22 -0500
+Subject: [RESEND PATCH] regulator: core: Disable unused regulators after
+ deferred probing is done
+In-Reply-To: <20140424133451.GZ12304@sirena.org.uk>
+References: <1398294650-24821-1-git-send-email-nm@ti.com>
+ <20140424133451.GZ12304@sirena.org.uk>
+Message-ID: <53591D2E.8020505@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/04/14 13:49, Julien Grall wrote:
-> Hi David,
+On 04/24/2014 08:34 AM, Mark Brown wrote:
+> On Wed, Apr 23, 2014 at 06:10:50PM -0500, Nishanth Menon wrote:
+>> From: Saravana Kannan <skannan@codeaurora.org>
+>>
+>> regulator_init_complete does a scan of regulators which dont have
+>> always-on or consumers are automatically disabled as being unused.
+>> However, with deferred probing, late_initcall() is too soon to
+>> declare a regulator as unused as the regulator itself might not
+>> have registered due to defferal - Example: A regulator deffered due
+>> to i2bus not available which in turn is deffered due to pinctrl
+>> availability.
+>>
+>> Since deferred probing is done in late_initcall(), do the cleanup of
+>> unused regulators by regulator_init_complete in late_initcall_sync
+>> instead of late_initcall.
 > 
-> On 04/24/2014 01:22 PM, David Vrabel wrote:
->> On 18/04/14 16:54, Julien Grall wrote:
->>> virt_to_pfn has been defined in asm/memory.h by the commit e26a9e0 "ARM: Better
->>> virt_to_page() handling"
->>>
->>> This will result of a compilation warning when CONFIG_XEN is enabled.
->>>
->>> arch/arm/include/asm/xen/page.h:80:0: warning: "virt_to_pfn" redefined [enabled by default]
->>>  #define virt_to_pfn(v)          (PFN_DOWN(__pa(v)))
->>>  ^
->>> In file included from arch/arm/include/asm/page.h:163:0,
->>>                  from arch/arm/include/asm/xen/page.h:4,
->>>                  from include/xen/page.h:4,
->>>                  from arch/arm/xen/grant-table.c:33:
->>>
->>> The definition in memory.h is nearly the same (it directly expand PFN_DOWN),
->>> so we can safely drop virt_to_pfn in xen include.
->>
->>
->> This breaks the arm build for me.
->>
->> /local/davidvr/work/k.org/tip/drivers/block/xen-blkfront.c: In function
->> ?setup_blkring?:
->> /local/davidvr/work/k.org/tip/drivers/block/xen-blkfront.c:1236:2:
->> error: implicit declaration of function ?virt_to_pfn?
->> [-Werror=implicit-function-declaration]
->>   err = xenbus_grant_ring(dev, virt_to_mfn(info->ring.sring));
->>   ^
+> I'll apply this however since as we discussed on IRC last night it's
+> going to make the issues with unconfigured regulators getting powered
+> off more severe before I do so I'll change things so that regulators
+> with no configuration at all don't get touched by the core.
 > 
-> I don't have any issue to build the following branch with this patch on:
-> 	- v3.15-rc2
-> 	- xentip master
-> 	- xentip for-linus-3.16
+Thanks Mark.
 
-Applied to devel/for-linus-3.16.
-
-If something else turns up for 3.15 (and I remember) I'll take it for
-3.15 instead.
-
-Thanks.
-
-David
+-- 
+Regards,
+Nishanth Menon
