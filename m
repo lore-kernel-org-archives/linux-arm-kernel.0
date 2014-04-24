@@ -1,67 +1,34 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 24 Apr 2014 20:42:08 +0200
-Subject: [PATCH 2/2] of/irq: do irq resolution in platform_get_irq
-In-Reply-To: <1398293861-7682-3-git-send-email-robherring2@gmail.com>
-References: <1398293861-7682-1-git-send-email-robherring2@gmail.com>
- <1398293861-7682-3-git-send-email-robherring2@gmail.com>
-Message-ID: <20140424184207.GC27443@ulmo>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 24 Apr 2014 11:44:58 -0700
+Subject: [PATCH 2/2] ARM: OMAP2+: fix dpll round_rate() to actually round
+In-Reply-To: <20140424182914.GD4659@saruman.home>
+References: <1389944699-27962-1-git-send-email-tomi.valkeinen@ti.com>
+ <1389944699-27962-3-git-send-email-tomi.valkeinen@ti.com>
+ <20140424182914.GD4659@saruman.home>
+Message-ID: <20140424184457.GH22987@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 23, 2014 at 05:57:41PM -0500, Rob Herring wrote:
-> From: Rob Herring <robh@kernel.org>
+* Felipe Balbi <balbi@ti.com> [140424 11:29]:
+> Hi,
 > 
-> Currently we get the following kind of errors if we try to use interrupt
-> phandles to irqchips that have not yet initialized:
+> On Fri, Jan 17, 2014 at 09:44:59AM +0200, Tomi Valkeinen wrote:
+> > omap2_dpll_round_rate() doesn't actually round the given rate, even if
+> > the name and the description so hints. Instead it only tries to find an
+> > exact rate match, or if that fails, return ~0 as an error.
+> > 
+> > What this basically means is that the user of the clock needs to know
+> > what rates the dpll can support, which obviously isn't right.
+> > 
+> > This patch adds a simple method of rounding: during the iteration, the
+> > code keeps track of the closest rate match. If no exact match is found,
+> > the closest is returned.
+> > 
+> > Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 > 
-> irq: no irq domain found for /ocp/pinmux at 48002030 !
-> ------------[ cut here ]------------
-> WARNING: CPU: 0 PID: 1 at drivers/of/platform.c:171 of_device_alloc+0x144/0x184()
-> Modules linked in:
-> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.12.0-00038-g42a9708 #1012
-> (show_stack+0x14/0x1c)
-> (dump_stack+0x6c/0xa0)
-> (warn_slowpath_common+0x64/0x84)
-> (warn_slowpath_null+0x1c/0x24)
-> (of_device_alloc+0x144/0x184)
-> (of_platform_device_create_pdata+0x44/0x9c)
-> (of_platform_bus_create+0xd0/0x170)
-> (of_platform_bus_create+0x12c/0x170)
-> (of_platform_populate+0x60/0x98)
-> 
-> This is because we're wrongly trying to populate resources that are not
-> yet available. It's perfectly valid to create irqchips dynamically, so
-> let's fix up the issue by resolving the interrupt resources when
-> platform_get_irq is called.
-> 
-> And then we also need to accept the fact that some irqdomains do not
-> exist that early on, and only get initialized later on. So we can
-> make the current WARN_ON into just into a pr_debug().
-> 
-> We still attempt to populate irq resources when we create the devices.
-> This allows current drivers which don't use platform_get_irq to continue
-> to function. Once all drivers are fixed, this code can be removed.
-> 
-> Suggested-by: Russell King <linux@arm.linux.org.uk>
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
->  drivers/base/platform.c |  7 ++++++-
->  drivers/of/irq.c        | 26 ++++++++++++++++++++++++++
->  drivers/of/platform.c   |  4 +++-
->  include/linux/of_irq.h  |  7 ++++++-
->  4 files changed, 41 insertions(+), 3 deletions(-)
+> Tony, looks like this patch was lost. Are you taking it during the -rc ?
 
-Hehe... that's largely what we already had back in January[0]. Glad to
-see that people could finally agree on what to do about this.
+Would like to hear what Paul thinks of the updated patch suggested
+by Tomi first.
 
-Thierry
-
-[0]: https://lkml.org/lkml/2014/1/8/240
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140424/c83b02f7/attachment.sig>
+Tony
