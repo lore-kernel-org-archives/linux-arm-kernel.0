@@ -1,92 +1,131 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Thu, 24 Apr 2014 11:22:29 +0100
-Subject: [PATCH V2 0/5] Huge pages for short descriptors on ARM
-In-Reply-To: <1397648803-15961-1-git-send-email-steve.capper@linaro.org>
-References: <1397648803-15961-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <20140424102229.GA28014@linaro.org>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 24 Apr 2014 12:25:03 +0200
+Subject: [PATCH 3/4] ARM: S3C24XX: use generic DEBUG_UART_PHY/_VIRT in debug
+ macro
+In-Reply-To: <1544889.hRy2JpKRQe@phil>
+References: <1544889.hRy2JpKRQe@phil>
+Message-ID: <1612154.L11uIYqJMc@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 16, 2014 at 12:46:38PM +0100, Steve Capper wrote:
-> Hello,
-> This series brings HugeTLB pages and Transparent Huge Pages (THP) to
-> ARM on short descriptors.
-> 
-> Russell, Andrew,
-> I would like to get this in next (and hopefully 3.16 if no problems
-> arise) if that sounds reasonable?
-> 
-> There's one patch at the beginning of the series for mm:
->   mm: hugetlb: Introduce huge_pte_{page,present,young}
-> This has been tested on ARM and s390 and should compile out for other
-> architectures.
-> 
-> The rest of the series targets arch/arm.
-> 
-> I've bumped the series to V2 as it was rebased (and tested against)
-> v3.15-rc1. On ARM the libhugetlbfs test suite, some THP PROT_NONE
-> tests and the recursive execve test all passed successfully.
-> 
-> Thanks,
-> --
-> Steve
+This removes the need for mach/-headers in the debug macro.
 
-Hello,
-Just a ping on this...
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/Kconfig.debug                           | 19 +++++++++++++++++--
+ arch/arm/mach-s3c24xx/include/mach/debug-macro.S |  9 ++-------
+ 2 files changed, 19 insertions(+), 9 deletions(-)
 
-I would really like to get huge page support for short descriptors on
-ARM merged as I've been carrying around these patches for a long time.
-
-Recently I've had no issues raised about the code. The patches have
-been tested and found to be both beneficial to system performance and
-stable.
-
-There are two parts to the series, the first patch is a core mm/ patch
-that introduces some huge_pte_ helper functions that allows for a much
-simpler ARM (without LPAE) implementation. The second part is the
-actual arch/arm code.
-
-I'm not sure how to proceed with these patches. I was thinking that
-they could be picked up into linux-next? If that sounds reasonable;
-Andrew, would you like to take the mm/ patch and Russell could you
-please take the arch/arm patches?
-
-Also, I was hoping to get these into 3.16. Are there any objections to
-that?
-
-Thank you,
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 43b94a9..2476f84 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -625,6 +625,7 @@ choice
+ 	config DEBUG_S3C_UART0
+ 		depends on PLAT_SAMSUNG
+ 		select DEBUG_EXYNOS_UART if ARCH_EXYNOS
++		select DEBUG_S3C24XX_UART if ARCH_S3C24XX
+ 		bool "Use S3C UART 0 for low-level debug"
+ 		help
+ 		  Say Y here if you want the debug print routines to direct
+@@ -637,6 +638,7 @@ choice
+ 	config DEBUG_S3C_UART1
+ 		depends on PLAT_SAMSUNG
+ 		select DEBUG_EXYNOS_UART if ARCH_EXYNOS
++		select DEBUG_S3C24XX_UART if ARCH_S3C24XX
+ 		bool "Use S3C UART 1 for low-level debug"
+ 		help
+ 		  Say Y here if you want the debug print routines to direct
+@@ -649,6 +651,7 @@ choice
+ 	config DEBUG_S3C_UART2
+ 		depends on PLAT_SAMSUNG
+ 		select DEBUG_EXYNOS_UART if ARCH_EXYNOS
++		select DEBUG_S3C24XX_UART if ARCH_S3C24XX
+ 		bool "Use S3C UART 2 for low-level debug"
+ 		help
+ 		  Say Y here if you want the debug print routines to direct
+@@ -661,6 +664,7 @@ choice
+ 	config DEBUG_S3C_UART3
+ 		depends on PLAT_SAMSUNG && ARCH_EXYNOS
+ 		select DEBUG_EXYNOS_UART
++		select DEBUG_S3C24XX_UART if ARCH_S3C24XX
+ 		bool "Use S3C UART 3 for low-level debug"
+ 		help
+ 		  Say Y here if you want the debug print routines to direct
+@@ -937,6 +941,9 @@ endchoice
+ config DEBUG_EXYNOS_UART
+ 	bool
+ 
++config DEBUG_S3C24XX_UART
++	bool
++
+ config DEBUG_OMAP2PLUS_UART
+ 	bool
+ 	depends on ARCH_OMAP2PLUS
+@@ -1045,6 +1052,10 @@ config DEBUG_UART_PHYS
+ 	default 0x40090000 if ARCH_LPC32XX
+ 	default 0x40100000 if DEBUG_PXA_UART1
+ 	default 0x42000000 if ARCH_GEMINI
++	default 0x50000000 if DEBUG_S3C24XX_UART && DEBUG_S3C_UART0
++	default 0x50004000 if DEBUG_S3C24XX_UART && DEBUG_S3C_UART1
++	default 0x50008000 if DEBUG_S3C24XX_UART && DEBUG_S3C_UART2
++	default 0x5000C000 if DEBUG_S3C24XX_UART && DEBUG_S3C_UART3
+ 	default 0x7c0003f8 if FOOTBRIDGE
+ 	default 0x80230000 if DEBUG_PICOXCELL_UART
+ 	default 0x80070000 if DEBUG_IMX23_UART
+@@ -1074,7 +1085,7 @@ config DEBUG_UART_PHYS
+ 	default 0xfffff700 if ARCH_IOP33X
+ 	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
+ 		DEBUG_LL_UART_EFM32 || \
+-		DEBUG_UART_8250 || DEBUG_UART_PL01X
++		DEBUG_UART_8250 || DEBUG_UART_PL01X || DEBUG_S3C24XX_UART
+ 
+ config DEBUG_UART_VIRT
+ 	hex "Virtual base address of debug UART"
+@@ -1091,6 +1102,10 @@ config DEBUG_UART_VIRT
+ 	default 0xf2100000 if DEBUG_PXA_UART1
+ 	default 0xf4090000 if ARCH_LPC32XX
+ 	default 0xf4200000 if ARCH_GEMINI
++	default 0xf7000000 if DEBUG_S3C24XX_UART && DEBUG_S3C_UART0
++	default 0xf7004000 if DEBUG_S3C24XX_UART && DEBUG_S3C_UART1
++	default 0xf7008000 if DEBUG_S3C24XX_UART && DEBUG_S3C_UART2
++	default 0xf700c000 if DEBUG_S3C24XX_UART && DEBUG_S3C_UART3
+ 	default 0xf7fc9000 if DEBUG_BERLIN_UART
+ 	default 0xf8009000 if DEBUG_VEXPRESS_UART0_CA9
+ 	default 0xf8090000 if DEBUG_VEXPRESS_UART0_RS1
+@@ -1132,7 +1147,7 @@ config DEBUG_UART_VIRT
+ 	default 0xff003000 if DEBUG_U300_UART
+ 	default DEBUG_UART_PHYS if !MMU
+ 	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
+-		DEBUG_UART_8250 || DEBUG_UART_PL01X
++		DEBUG_UART_8250 || DEBUG_UART_PL01X || DEBUG_S3C24XX_UART
+ 
+ config DEBUG_UART_8250_SHIFT
+ 	int "Register offset shift for the 8250 debug UART"
+diff --git a/arch/arm/mach-s3c24xx/include/mach/debug-macro.S b/arch/arm/mach-s3c24xx/include/mach/debug-macro.S
+index 3077a5f..5b165d8 100644
+--- a/arch/arm/mach-s3c24xx/include/mach/debug-macro.S
++++ b/arch/arm/mach-s3c24xx/include/mach/debug-macro.S
+@@ -12,18 +12,13 @@
+  * published by the Free Software Foundation.
+ */
+ 
+-#include <mach/map.h>
+ #include <linux/serial_s3c.h>
+ 
+ #define S3C2410_UART1_OFF (0x4000)
+ 
+ 	.macro addruart, rp, rv, tmp
+-		ldr	\rp, = S3C24XX_PA_UART
+-		ldr	\rv, = S3C24XX_VA_UART
+-#if CONFIG_DEBUG_S3C_UART != 0
+-		add	\rp, \rp, #(S3C2410_UART1_OFF * CONFIG_DEBUG_S3C_UART)
+-		add	\rv, \rv, #(S3C2410_UART1_OFF * CONFIG_DEBUG_S3C_UART)
+-#endif
++		ldr	\rp, = CONFIG_DEBUG_UART_PHYS
++		ldr	\rv, = CONFIG_DEBUG_UART_VIRT
+ 	.endm
+ 
+ 	.macro  fifo_full_s3c2410 rd, rx
 -- 
-Steve
-
-> 
-> 
-> Steve Capper (5):
->   mm: hugetlb: Introduce huge_pte_{page,present,young}
->   arm: mm: Adjust the parameters for __sync_icache_dcache
->   arm: mm: Make mmu_gather aware of huge pages
->   arm: mm: HugeTLB support for non-LPAE systems
->   arm: mm: Add Transparent HugePage support for non-LPAE
-> 
->  arch/arm/Kconfig                      |   4 +-
->  arch/arm/include/asm/hugetlb-2level.h | 136 ++++++++++++++++++++++++++++++++++
->  arch/arm/include/asm/hugetlb-3level.h |   6 ++
->  arch/arm/include/asm/hugetlb.h        |  10 +--
->  arch/arm/include/asm/pgtable-2level.h | 129 +++++++++++++++++++++++++++++++-
->  arch/arm/include/asm/pgtable-3level.h |   3 +-
->  arch/arm/include/asm/pgtable.h        |   9 +--
->  arch/arm/include/asm/tlb.h            |  14 +++-
->  arch/arm/kernel/head.S                |  10 ++-
->  arch/arm/mm/fault.c                   |  13 ----
->  arch/arm/mm/flush.c                   |   9 +--
->  arch/arm/mm/fsr-2level.c              |   4 +-
->  arch/arm/mm/hugetlbpage.c             |   2 +-
->  arch/arm/mm/mmu.c                     |  51 +++++++++++++
->  arch/s390/include/asm/hugetlb.h       |  15 ++++
->  include/asm-generic/hugetlb.h         |  15 ++++
->  mm/hugetlb.c                          |  22 +++---
->  17 files changed, 399 insertions(+), 53 deletions(-)
->  create mode 100644 arch/arm/include/asm/hugetlb-2level.h
-> 
-> -- 
-> 1.8.1.4
-> 
+1.9.0
