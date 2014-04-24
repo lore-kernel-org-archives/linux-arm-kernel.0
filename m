@@ -1,72 +1,34 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu, 24 Apr 2014 12:13:20 +0200
-Subject: [PATCH/RFC 1/4] clk: Add CLK_RUNTIME_PM and clk_may_runtime_pm()
+Date: Thu, 24 Apr 2014 12:13:23 +0200
+Subject: [PATCH/RFC 4/4] clk: shmobile: mstp: Set CLK_RUNTIME_PM flag
 In-Reply-To: <1398334403-26181-1-git-send-email-geert+renesas@glider.be>
 References: <1398334403-26181-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1398334403-26181-2-git-send-email-geert+renesas@glider.be>
+Message-ID: <1398334403-26181-5-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a flag CLK_RUNTIME_PM, to let low-level clock drivers indicate that
-a clock is suitable for Runtime PM.
-Add clk_may_runtime_pm(), to get the status of the flag.
+Renesas MSTP (Module Stop) clocks are suitable for Runtime PM.
 
-This will allow the device core to enable automatic Runtime PM management
-for devices tied to clocks that are suitable for Runtime PM.
+Hence set the CLK_RUNTIME_PM flag, to make of_clk enable automatic Runtime
+PM management for DT devices that are tied to an MSTP clock.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- drivers/clk/clk.c            |   12 ++++++++++++
- include/linux/clk-provider.h |    1 +
- include/linux/clk.h          |    1 +
- 3 files changed, 14 insertions(+)
+ drivers/clk/shmobile/clk-mstp.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 0b2819551756..a83a2cc0af67 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -1115,6 +1115,18 @@ long clk_get_accuracy(struct clk *clk)
- EXPORT_SYMBOL_GPL(clk_get_accuracy);
+diff --git a/drivers/clk/shmobile/clk-mstp.c b/drivers/clk/shmobile/clk-mstp.c
+index 2e3c08fff173..6f860bad551e 100644
+--- a/drivers/clk/shmobile/clk-mstp.c
++++ b/drivers/clk/shmobile/clk-mstp.c
+@@ -139,7 +139,7 @@ cpg_mstp_clock_register(const char *name, const char *parent_name,
  
- /**
-+ * clk_may_runtime_pm - check if the clock is suitable for Runtime PM
-+ * @clk: the clock to check
-+ *
-+ * Return true if the clock is suitable for Runtime PM
-+ * Return false if clk is NULL, or if the clock is not suitable for Runtime PM.
-+ */
-+bool clk_may_runtime_pm(const struct clk *clk)
-+{
-+	return clk && clk->flags & CLK_RUNTIME_PM;
-+}
-+
-+/**
-  * __clk_recalc_rates
-  * @clk: first clk in the subtree
-  * @msg: notification type (see include/linux/clk.h)
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 24c8ba4fa6ae..3ca9a7c1f02d 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -30,6 +30,7 @@
- #define CLK_GET_RATE_NOCACHE	BIT(6) /* do not use the cached clk rate */
- #define CLK_SET_RATE_NO_REPARENT BIT(7) /* don't re-parent on rate change */
- #define CLK_GET_ACCURACY_NOCACHE BIT(8) /* do not use the cached clk accuracy */
-+#define CLK_RUNTIME_PM		BIT(9) /* clock is suitable for Runtime PM */
+ 	init.name = name;
+ 	init.ops = &cpg_mstp_clock_ops;
+-	init.flags = CLK_IS_BASIC | CLK_SET_RATE_PARENT;
++	init.flags = CLK_IS_BASIC | CLK_SET_RATE_PARENT | CLK_RUNTIME_PM;
+ 	init.parent_names = &parent_name;
+ 	init.num_parents = 1;
  
- struct clk_hw;
- struct dentry;
-diff --git a/include/linux/clk.h b/include/linux/clk.h
-index d030fce1d77e..07f156580064 100644
---- a/include/linux/clk.h
-+++ b/include/linux/clk.h
-@@ -106,6 +106,7 @@ int clk_notifier_unregister(struct clk *clk, struct notifier_block *nb);
-  */
- long clk_get_accuracy(struct clk *clk);
- 
-+bool clk_may_runtime_pm(const struct clk *clk);
- #else /* !CONFIG_COMMON_CLK */
- 
- static inline long clk_get_accuracy(struct clk *clk)
 -- 
 1.7.9.5
