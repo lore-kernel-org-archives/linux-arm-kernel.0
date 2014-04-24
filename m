@@ -1,58 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 24 Apr 2014 11:52:35 +0100
-Subject: [PATCH v2 1/6] ARM: Add platform support for LSI AXM55xx SoC
-In-Reply-To: <6486d374332f66a0b8e00178cd5a58dc5996f18a.1398335771.git.anders.berg@lsi.com>
-References: <cover.1398335771.git.anders.berg@lsi.com>
- <6486d374332f66a0b8e00178cd5a58dc5996f18a.1398335771.git.anders.berg@lsi.com>
-Message-ID: <20140424105235.GL26756@n2100.arm.linux.org.uk>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Thu, 24 Apr 2014 11:55:56 +0100
+Subject: [PATCH V2 0/5] Huge pages for short descriptors on ARM
+In-Reply-To: <20140424104232.GK26756@n2100.arm.linux.org.uk>
+References: <1397648803-15961-1-git-send-email-steve.capper@linaro.org>
+ <20140424102229.GA28014@linaro.org>
+ <20140424103639.GC19564@arm.com>
+ <20140424104232.GK26756@n2100.arm.linux.org.uk>
+Message-ID: <CAPvkgC3P8iZp5nECiGHdeGzRwmdh=ouiAREqKwk1tYzZxHTWvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 24, 2014 at 12:44:04PM +0200, Anders Berg wrote:
-> diff --git a/arch/arm/mach-axxia/Kconfig b/arch/arm/mach-axxia/Kconfig
-> new file mode 100644
-> index 0000000..8c308fd
-> --- /dev/null
-> +++ b/arch/arm/mach-axxia/Kconfig
-> @@ -0,0 +1,16 @@
-> +config ARCH_AXXIA
-> +	bool "LSI Axxia platforms" if (ARCH_MULTI_V7 && ARM_LPAE)
-> +	select ARM_GIC
-> +	select MFD_SYSCON
-> +	select ARM_AMBA
-> +	select HAVE_ARM_ARCH_TIMER
-> +	select ARM_TIMER_SP804
-> +	select ZONE_DMA
-> +	select ARCH_DMA_ADDR_T_64BIT
-> +	select MIGHT_HAVE_PCI
-> +	select PCI_DOMAINS if PCI
+On 24 April 2014 11:42, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> On Thu, Apr 24, 2014 at 11:36:39AM +0100, Will Deacon wrote:
+>> I guess I'm after some commitment that this is (a) useful to somebody and
+>> (b) going to be tested regularly, otherwise it will go the way of things
+>> like big-endian, where we end up carrying around code which is broken more
+>> often than not (although big-endian is more self-contained).
+>
+> It may be something worth considering adding to my nightly builder/boot
+> testing, but I suspect that's impractical as it probably requires a BE
+> userspace, which would then mean that the platform can't boot LE.
+>
+> I suspect that we will just have to rely on BE users staying around and
+> reporting problems when they occur.
 
-Please sort alphabetically.
+The huge page support is for standard LE, I think Will was saying that
+this will be like BE if no-one uses it.
+I would appreciate any extra testing a *lot*. :-).
 
-> +static int axxia_boot_secondary(unsigned int cpu, struct task_struct *idle)
-> +{
-> +	struct device_node *syscon_np;
-> +	void __iomem *syscon;
-> +	u32 tmp;
-> +
-> +	syscon_np = of_find_compatible_node(NULL, NULL, "lsi,axxia-syscon");
-> +	if (!syscon_np)
-> +		return -ENOENT;
-> +
-> +	syscon = of_iomap(syscon_np, 0);
-> +	if (!syscon)
-> +		return -ENOMEM;
-> +
-> +	tmp = readl(syscon + SC_RST_CPU_HOLD);
-> +	writel(0xab, syscon + SC_CRIT_WRITE_KEY);
-> +	tmp &= ~(1 << cpu);
-> +	writel(tmp, syscon + SC_RST_CPU_HOLD);
-> +
-> +	return 0;
-> +}
+It's somewhat unfair to compare huge pages on short descriptors with
+BE. For a start, the userspace that works with LPAE will work on the
+short-descriptor kernel too. Great care has been taken to ensure that
+programmers can just port their huge page code over to ARM from other
+architectures without any issues. As things like libhugetlbfs (which
+fully supports ARM) get incorporated into distros on ARM, huge pages
+become the norm as opposed to the exception.
 
-This is much better, thanks.
+Some devices have very few TLBs and I believe this series will be very
+beneficial for people using those devices.
 
+Cheers,
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Steve
