@@ -1,78 +1,45 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 24 Apr 2014 10:11:20 -0500
-Subject: [PATCH v6 3/3] ARM: Check if a CPU has gone offline
-In-Reply-To: <CAJ5Y-ebZ9M9GM5R40-Yrbx=iNhB4_j-vw=8mBA=1cwZGnhixLw@mail.gmail.com>
-References: <1397762146-8337-1-git-send-email-ashwin.chaugule@linaro.org>
- <1397762146-8337-4-git-send-email-ashwin.chaugule@linaro.org>
- <20140417195009.GC24195@e106331-lin.cambridge.arm.com>
- <CAJ5Y-eZMKZYOaQnFPu31Vzg6KXDy7J5gFKh3hAy+GuLz66Wgwg@mail.gmail.com>
- <CAJ5Y-ebZ9M9GM5R40-Yrbx=iNhB4_j-vw=8mBA=1cwZGnhixLw@mail.gmail.com>
-Message-ID: <CAL_Jsq+LUNY4O5mRi5+kNV74H--PpVAMxJxjEnKbtxTYBHG-=A@mail.gmail.com>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Thu, 24 Apr 2014 10:15:15 -0500
+Subject: [PATCH v6 0/6] ARM: vdso gettimeofday using generic timer
+ architecture
+In-Reply-To: <CAKv+Gu-jFAo8JKqz3XHx348pSUBWaDy48RryKwgsxdM15jeAVw@mail.gmail.com>
+References: <cover.1398213562.git.nathan_lynch@mentor.com>	<20140423215040.GC26756@n2100.arm.linux.org.uk>
+ <CAKv+Gu-jFAo8JKqz3XHx348pSUBWaDy48RryKwgsxdM15jeAVw@mail.gmail.com>
+Message-ID: <53592A83.2040401@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 24, 2014 at 9:33 AM, Ashwin Chaugule
-<ashwin.chaugule@linaro.org> wrote:
-> On 18 April 2014 11:21, Ashwin Chaugule <ashwin.chaugule@linaro.org> wrote:
->> Hi Mark,
->>
->>
->> On 17 April 2014 15:50, Mark Rutland <mark.rutland@arm.com> wrote:
->>> On Thu, Apr 17, 2014 at 08:15:46PM +0100, Ashwin Chaugule wrote:
->>>> PSCIv0.2 adds a new function called AFFINITY_INFO, which
->>>> can be used to query if a specified CPU has actually gone
->>>> offline. Calling this function via cpu_kill ensures that
->>>> a CPU has quiesced after a call to cpu_die.
+On 04/24/2014 02:37 AM, Ard Biesheuvel wrote:
+> On 23 April 2014 23:50, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+>> On Tue, Apr 22, 2014 at 07:48:51PM -0500, Nathan Lynch wrote:
+>>> - Build vdso.so with -lgcc: calls to __lshrdi3, __divsi3 sometimes
+>>>   emitted (especially with -Os).  Override certain libgcc functions to
+>>>   prevent undefined symbols.
+> 
+> After reading Russell's concerns below, I had a quick play with these
+> patches, and I noticed that the libgcc dependencies are actually only
+> present when compiling -Os. However, with normal optimization enabled
+> (which most people are using anyway), you don't need libgcc at all. So
+> why not override -O2 optimization for vdso.so, and be done with it?
+> 
+> WIth -Os:
+> 
+> Archive member included because of file (symbol)
+> 
+> /usr/lib/gcc-cross/arm-linux-gnueabihf/4.8/sf/libgcc.a(_divsi3.o)
+>                               arch/arm/kernel/vdso/vgettimeofday.o
+> (__aeabi_idiv)
+> /usr/lib/gcc-cross/arm-linux-gnueabihf/4.8/sf/libgcc.a(_lshrdi3.o)
+>                               arch/arm/kernel/vdso/vgettimeofday.o
+> (__aeabi_llsr)
+> 
+> Without CONFIG_OPTIMIZE_FOR_SIZE, no archive members are included at all.
 
-[...]
+Thanks.  I had thought about forcing -O2 in the past but just wasn't
+confident that it would prevent calls to __divsi3 etc in all situations.
+ I mean, that's not really a documented or guaranteed behavior of -O2,
+is it?
 
->>> We can race with the dying CPU here -- if we call AFFINITY_INFO before
->>> the dying cpu is sufficiently far through its CPU_OFF call it won't
->>> register as OFF.
->>>
->>> Could we poll here instead (with a reasonable limit on the number of
->>> iterations)? That would enable us to not spuriously declare a CPU to be
->>> dead when it happened to take slightly longer than we expect to turn
->>> off.
->>
->> True. How about something like this?
->>
->>  int __ref psci_cpu_kill(unsigned int cpu)
->>  {
->> -       int err;
->> +       int err, retries;
->>
->>         if (!psci_ops.affinity_info)
->>                 return 1;
->> -
->> +       /*
->> +        * cpu_kill could race with cpu_die and we can
->> +        * potentially end up declaring this cpu undead
->> +        * while it is dying. So retry a couple of times.
->> +        */
->> +retry:
->>         err = psci_ops.affinity_info(cpu_logical_map(cpu), 0);
->>
->>         if (err != PSCI_AFFINITY_INFO_RET_OFF) {
->> +               if (++retries < 3) {
->> +                       pr_info("Retrying check for CPU kill: %d\n", retries);
->> +                       goto retry;
->> +               }
->>                 pr_err("psci: Cannot kill CPU:%d, psci ret val: %d\n",
->>                                 cpu, err);
->>                 /* Make platform_cpu_kill() fail. */
->>
->>
->>
->
->
-> Hi Rob, I've already got your Reviewed-by on this patch without this
-> "retry" thing. Are you okay with this as well? I can then roll it up
-> in one patch.
-
-Yes. My only comment is I would perhaps add a sleep (or delay if this
-context cannot sleep) on the retry. I'm not sure what I reasonable
-time would be, but at least then you are waiting a defined amount of
-time versus how long it takes this code to execute.
-
-Rob
+I've now built vdso.so with your suggested change with GCC 4.[4-8]
+without getting any unresolved symbols, so here's hoping this is a
+viable option.
