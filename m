@@ -1,64 +1,37 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu, 24 Apr 2014 12:26:38 +0200
-Subject: [PATCH 6/6] of/clk: Use generic runtime and clock helpers
-In-Reply-To: <1398335198-26555-1-git-send-email-geert+renesas@glider.be>
-References: <1398335198-26555-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1398335198-26555-7-git-send-email-geert+renesas@glider.be>
+Date: Thu, 24 Apr 2014 12:26:32 +0200
+Subject: [PATCH 0/6] PM / clock_ops: Add helpers combining generic runtime and
+ generic clock PM
+Message-ID: <1398335198-26555-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-This depends on "of/clk: Register clocks suitable for Runtime PM with the
-PM core"
----
- drivers/of/of_clk.c |   28 ++--------------------------
- 1 file changed, 2 insertions(+), 26 deletions(-)
+Several platform support codes combine pm_generic_runtime_suspend() and
+pm_clk_suspend(), resp. pm_clk_resume() and pm_generic_runtime_resume() in
+their .runtime_suspend resp. .runtime_resume callbacks.
 
-diff --git a/drivers/of/of_clk.c b/drivers/of/of_clk.c
-index 35f5e9f3dd42..3e8561dce998 100644
---- a/drivers/of/of_clk.c
-+++ b/drivers/of/of_clk.c
-@@ -8,38 +8,14 @@
- #include <linux/of_clk.h>
- #include <linux/platform_device.h>
- #include <linux/pm_clock.h>
--#include <linux/pm_runtime.h>
- 
- 
- #ifdef CONFIG_PM_RUNTIME
- 
--static int of_clk_pm_runtime_suspend(struct device *dev)
--{
--	int ret;
--
--	ret = pm_generic_runtime_suspend(dev);
--	if (ret)
--		return ret;
--
--	ret = pm_clk_suspend(dev);
--	if (ret) {
--		pm_generic_runtime_resume(dev);
--		return ret;
--	}
--
--	return 0;
--}
--
--static int of_clk_pm_runtime_resume(struct device *dev)
--{
--	pm_clk_resume(dev);
--	return pm_generic_runtime_resume(dev);
--}
--
- static struct dev_pm_domain of_clk_pm_domain = {
- 	.ops = {
--		.runtime_suspend = of_clk_pm_runtime_suspend,
--		.runtime_resume = of_clk_pm_runtime_resume,
-+		.runtime_suspend = pm_generic_runtime_clk_suspend,
-+		.runtime_resume = pm_generic_clk_runtime_resume,
- 		USE_PLATFORM_PM_SLEEP_OPS
- 	},
- };
--- 
-1.7.9.5
+Create helpers to consolidate.
+
+  - [1/6] PM / clock_ops: Add helpers combining generic runtime and generic
+	  clock PM
+  - [2/6] ARM: davinci: Use generic runtime and clock helpers
+  - [3/6] ARM: keystone: Use generic runtime and clock helpers
+  - [4/6] ARM: omap: Use generic runtime and clock helpers
+  - [5/6] drivers: sh: Use generic runtime and clock helpers
+  - [6/6] of/clk: Use generic runtime and clock helpers
+
+Patches 5 and 6 have dependencies (listed in the individual patches),
+but they can be postponed and handled later.
+
+Thanks!
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
