@@ -1,102 +1,39 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Thu, 24 Apr 2014 14:14:04 +0200
-Subject: [RFC 0/3] DRM driver for the ATMEL High end LCD controller
-In-Reply-To: <1398267396.4295.59.camel@herbert.er.corscience.de>
-References: <1397814309-32160-1-git-send-email-jjhiblot@traphandler.com>
- <1398267396.4295.59.camel@herbert.er.corscience.de>
-Message-ID: <5359000C.50005@free-electrons.com>
+From: david.vrabel@citrix.com (David Vrabel)
+Date: Thu, 24 Apr 2014 13:22:08 +0100
+Subject: [PATCH] arm/xen: Remove definiition of virt_to_pfn in
+ asm/xen/page.h
+In-Reply-To: <1397836474-10478-1-git-send-email-julien.grall@linaro.org>
+References: <1397836474-10478-1-git-send-email-julien.grall@linaro.org>
+Message-ID: <535901F0.3010908@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tim,
+On 18/04/14 16:54, Julien Grall wrote:
+> virt_to_pfn has been defined in asm/memory.h by the commit e26a9e0 "ARM: Better
+> virt_to_page() handling"
+> 
+> This will result of a compilation warning when CONFIG_XEN is enabled.
+> 
+> arch/arm/include/asm/xen/page.h:80:0: warning: "virt_to_pfn" redefined [enabled by default]
+>  #define virt_to_pfn(v)          (PFN_DOWN(__pa(v)))
+>  ^
+> In file included from arch/arm/include/asm/page.h:163:0,
+>                  from arch/arm/include/asm/xen/page.h:4,
+>                  from include/xen/page.h:4,
+>                  from arch/arm/xen/grant-table.c:33:
+> 
+> The definition in memory.h is nearly the same (it directly expand PFN_DOWN),
+> so we can safely drop virt_to_pfn in xen include.
 
-On 23/04/2014 17:36, Tim Niemeyer wrote:
-> Hi Jean-Jacques,
->
-> Am Freitag, den 18.04.2014, 11:45 +0200 schrieb Jean-Jacques Hiblot:
->> Hi,
->>
->> this patch serie implements a simple DRM driver for the ATMEL High end LCD
->> controller found in the SAMA5 familly. It's based on the tilcdc driver.
->> It uses the cma_helper for memory and fbdev stuff.
->> Your comments are welcome !
-> I applied your and Robert's patches on a 3.15-rc2 kernel and tried the
-> framebuffer device on the sama5d31-ek. Seems to work.
->
->> Supported features:
->> * the base layer (the main framebuffer)
-> Tested to show a little tux png, but it's appearing only after 
-> 'echo 0 > /sys/devices/ahb.1/apb.2/f0030000.hlcdc/graphics/fb0/rotate'
-> is there missing some initializing?
 
-Could you try to apply this http://code.bulix.org/f01kvh-86117 ?
+This breaks the arm build for me.
 
-Best Regards,
+/local/davidvr/work/k.org/tip/drivers/block/xen-blkfront.c: In function
+?setup_blkring?:
+/local/davidvr/work/k.org/tip/drivers/block/xen-blkfront.c:1236:2:
+error: implicit declaration of function ?virt_to_pfn?
+[-Werror=implicit-function-declaration]
+  err = xenbus_grant_ring(dev, virt_to_mfn(info->ring.sring));
+  ^
 
-Boris
-
->
->> * a simple panel
->> * a backlight driver
-> Tested to set brightness to 0, 20 and 255. Works.
->
-> Thanks for your work.
->
-> Best Regards
-> Tim
->
->> * structure to 'easily' add other connectors (it comes from the tilcdc)
->>
->> On the todo list:
->> * support overlays as drm_planes
->> * support for the hardware cursor
->> * support for the SiI9022 HDMI connector (present on sama5d36ek)
->>
->>
->> Jean-Jacques Hiblot (3):
->>   atmel: drm: added drm driver for the atmel hlcd controller
->>   atmel: drm: dt: Added DT entry for the atmel hlcdc found in the sama5
->>   atmel: dt: Add supports for the lcdc support on the sama5d36ek
->>
->>  arch/arm/boot/dts/sama5d36ek.dts                   |  27 +-
->>  arch/arm/boot/dts/sama5d3_lcd.dtsi                 |  11 +
->>  drivers/gpu/drm/Kconfig                            |   2 +
->>  drivers/gpu/drm/Makefile                           |   1 +
->>  drivers/gpu/drm/atmel_hlcdc/Kconfig                |  13 +
->>  drivers/gpu/drm/atmel_hlcdc/Makefile               |  12 +
->>  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc.h          | 771 +++++++++++++++++++++
->>  .../gpu/drm/atmel_hlcdc/atmel_hlcdc_backlight.c    |  92 +++
->>  .../gpu/drm/atmel_hlcdc/atmel_hlcdc_backlight.h    |  25 +
->>  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_crtc.c     | 702 +++++++++++++++++++
->>  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_drv.c      | 586 ++++++++++++++++
->>  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_drv.h      | 124 ++++
->>  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_ovl.h      | 190 +++++
->>  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_panel.c    | 459 ++++++++++++
->>  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_panel.h    |  28 +
->>  15 files changed, 3042 insertions(+), 1 deletion(-)
->>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/Kconfig
->>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/Makefile
->>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc.h
->>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_backlight.c
->>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_backlight.h
->>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_crtc.c
->>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_drv.c
->>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_drv.h
->>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_ovl.h
->>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_panel.c
->>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_panel.h
->>
->> --
->> 1.9.1
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+David
