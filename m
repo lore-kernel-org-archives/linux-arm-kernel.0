@@ -1,54 +1,36 @@
-From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Wed, 23 Apr 2014 17:51:38 -0700
-Subject: [PATCH v3 1/4] MAINTAINERS: Add entry for APM X-Gene SoC ethernet
- driver
-In-Reply-To: <CABxcv=mj+phHmyg2U2jW51mLTwBN9Au791m-GtqU5BXDPy7Gtg@mail.gmail.com>
-References: <1397702368-4846-1-git-send-email-isubramanian@apm.com>
- <1397702368-4846-2-git-send-email-isubramanian@apm.com>
- <1397704685.14062.14.camel@joe-AO725>
- <CABxcv=mj+phHmyg2U2jW51mLTwBN9Au791m-GtqU5BXDPy7Gtg@mail.gmail.com>
-Message-ID: <CAKh23F=Ukhufm3XMmSmaTU3AvmeoDDMeFwodgU-B_XH09sdbOQ@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 24 Apr 2014 10:00:19 +0900
+Subject: [PATCH 22/33] ARM: shmobile: Use r8a7740 suffix for i2c, mmcif,
+ fsi2 compat strings
+In-Reply-To: <CAL_JsqKOi-mQ=xDDyP72RB1kN3_Ak114kMrbntsizxEehwVXuQ@mail.gmail.com>
+References: <cover.1398216022.git.horms+renesas@verge.net.au>
+ <5c53f50c50badff499568a703467c3c9f23f9bfd.1398216022.git.horms+renesas@verge.net.au>
+ <CAL_JsqKOi-mQ=xDDyP72RB1kN3_Ak114kMrbntsizxEehwVXuQ@mail.gmail.com>
+Message-ID: <20140424010019.GC5064@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
+On Wed, Apr 23, 2014 at 08:12:50AM -0500, Rob Herring wrote:
+> On Tue, Apr 22, 2014 at 8:25 PM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > From: Ulrich Hecht <ulrich.hecht@gmail.com>
+> >
+> > Add "renesas,*-r8a7740" to the compatible strings for consistency with other
+> > devices.
+> 
+> Generally, it is <vendor>,<chip>-<device> as the preferred ordering
+> which is also consistent with your more generic name.
 
-On Sun, Apr 20, 2014 at 5:56 PM, Javier Martinez Canillas
-<javier@dowhile0.org> wrote:
-> Hello Lyappan,
->
-> On Thu, Apr 17, 2014 at 5:18 AM, Joe Perches <joe@perches.com> wrote:
->> On Wed, 2014-04-16 at 19:39 -0700, Iyappan Subramanian wrote:
->>> This patch adds a MAINTAINERS entry for APM X-Gene SoC
->>> ethernet driver.
->> []
->>> diff --git a/MAINTAINERS b/MAINTAINERS
->> []
->>> @@ -686,6 +686,14 @@ S:       Maintained
->>>  F:   drivers/net/appletalk/
->>>  F:   net/appletalk/
->>>
->>> +APPLIED MICRO (APM) X-GENE SOC ETHERNET DRIVER
->>> +M:   Iyappan Subramanian <isubramanian@apm.com>
->>> +M:   Keyur Chudgar <kchudgar@apm.com>
->>> +M:   Ravi Patel <rapatel@apm.com>
->>> +S:   Maintained
->>> +F:   drivers/net/ethernet/apm/xgene
->>
->> Please add a terminating slash to show this is a directory.
->>
->> F:      drivers/net/ethernet/apm/xgene/
->>
->
-> Also if you are maintaining this driver as a part of your daily work
-> (i.e: actually being paid for it by your company) the status should be
-> "Supported" instead.
->
-> If you are doing it on your own time but still using your company
-> email address then "Maintained" is correct.
+I believe that the naming used by this patch is consistent
+with the naming used by other shmobile-related bindings.
 
-Thanks.  I will change this to Supported.
+In particular, the scheme that has been adopted for
+hardware where we do not have documented version (numbers) is:
 
->
-> Best regards,
-> Javier
+<vendor>,<ip>-<version>
+
+Where the SoC name as a version.
+
+
+My understanding is that Olof is comfortable with this as per our discussion
+of this topic last August: "[GIT 00/19 v2] Renesas ARM based SoC pinmux"
