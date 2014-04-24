@@ -1,341 +1,64 @@
-From: anders.berg@lsi.com (Anders Berg)
-Date: Thu, 24 Apr 2014 10:58:58 +0200
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 24 Apr 2014 10:04:44 +0100
 Subject: [PATCH 1/5] ARM: Add platform support for LSI AXM55xx SoC
-In-Reply-To: <6049946.vOU2aBg9qY@wuerfel>
+In-Reply-To: <80a2523d3e266ed12d5b70ac5518e963e47b27f4.1397552154.git.anders.berg@lsi.com>
 References: <cover.1397552154.git.anders.berg@lsi.com>
  <80a2523d3e266ed12d5b70ac5518e963e47b27f4.1397552154.git.anders.berg@lsi.com>
- <6049946.vOU2aBg9qY@wuerfel>
-Message-ID: <20140424085858.GA32357@swsaberg01>
+Message-ID: <20140424090444.GF26756@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15, 2014 at 02:30:55PM +0200, Arnd Bergmann wrote:
-> On Tuesday 15 April 2014 14:06:10 Anders Berg wrote:
-> 
-> > diff --git a/arch/arm/mach-axxia/Kconfig b/arch/arm/mach-axxia/Kconfig
-> > new file mode 100644
-> > index 0000000..336426a
-> > --- /dev/null
-> > +++ b/arch/arm/mach-axxia/Kconfig
-> > @@ -0,0 +1,19 @@
-> > +config ARCH_AXXIA
-> > +	bool "LSI Axxia platforms" if (ARCH_MULTI_V7 && ARM_LPAE)
-> > +	select ARM_GIC
-> > +	select HAVE_SMP
-> > +	select MFD_SYSCON
-> > +	select ARM_AMBA
-> > +	select ARCH_WANT_OPTIONAL_GPIOLIB
-> > +	select HAVE_ARM_ARCH_TIMER
-> > +	select ARM_TIMER_SP804
-> > +	select ZONE_DMA
-> > +	select ARCH_DMA_ADDR_T_64BIT
-> > +	select ARCH_SUPPORTS_BIG_ENDIAN
-> > +	select MIGHT_HAVE_PCI
-> > +	select PCI_DOMAINS if PCI
-> 
-> No need to select HAVE_SMP or ARCH_WANT_OPTIONAL_GPIOLIB any more.
+On Tue, Apr 15, 2014 at 02:06:10PM +0200, Anders Berg wrote:
+> +	adr	r4, 2f
+> +	ldmia	r4, {r5, r6}
+> +	sub	r4, r4, r5
+> +	add	r6, r6, r4
+> +1:	ldr	r7, [r6]
+> +	cmp	r7, r0
+> +	wfene
+> +	bne	1b
+...
+> +2:	.long	.
+> +	.long	pen_release
+> diff --git a/arch/arm/mach-axxia/platsmp.c b/arch/arm/mach-axxia/platsmp.c
+...
+> +/*
+> + * Write pen_release in a way that is guaranteed to be visible to all
+> + * observers, irrespective of whether they're taking part in coherency
+> + * or not.  This is necessary for the hotplug code to work reliably.
+> + */
+> +static void write_pen_release(int val)
+> +{
+> +	pen_release = val;
+> +	/* Make sure this store is visible to other CPUs */
+> +	smp_wmb();
+> +	__cpuc_flush_dcache_area((void *)&pen_release, sizeof(pen_release));
+> +}
 
-OK.
+Do you /really/ need to do this pen_release thing on your platform?
 
-> 
-> We should rethink the ARCH_SUPPORTS_BIG_ENDIAN option I guess. It makes
-> little sense to select that from one platform in a multiplatform build
-> if other platforms don't support it.
-> 
-> > --- /dev/null
-> > +++ b/arch/arm/mach-axxia/Makefile.boot
-> > @@ -0,0 +1,2 @@
-> > +   zreladdr-y	+= 0x00308000
-> > +params_phys-y	:= 0x00300100
-> 
-> This won't be used, since AUTO_ZRELADDR is set by ARCH_MULTIPLATFORM.
+> +static void __init axxia_smp_prepare_cpus(unsigned int max_cpus)
+> +{
+...
+> +		/*
+> +		 * Release all physical cpus when not in hyp mode since we
+> +		 * might want to bring them online later.
+> +		 *
+> +		 * Also we need to get the execution into kernel code (it's
+> +		 * currently executing in u-boot).  u-boot releases the cores
+> +		 * from reset in hyp mode.
+> +		 */
+> +		if (!is_hyp_mode_available()) {
+> +			if (cpu != 0) {
+> +				u32 tmp = readl(syscon + 0x1010);
+> +				writel(0xab, syscon + 0x1000);
+> +				tmp &= ~(1 << cpu);
+> +				writel(tmp, syscon + 0x1010);
+> +			}
 
-OK.
+As this implies that you can control the release of each CPU from u-boot
+individually.
 
-> 
-> > diff --git a/arch/arm/mach-axxia/axxia.c b/arch/arm/mach-axxia/axxia.c
-> > new file mode 100644
-> > index 0000000..8d85926
-> > --- /dev/null
-> > +++ b/arch/arm/mach-axxia/axxia.c
-> > @@ -0,0 +1,117 @@
-> > +/*
-> > + * Support for the LSI Axxia SoC devices based on ARM cores.
-> > + *
-> > + * Copyright (C) 2012 LSI
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License as published by
-> > + * the Free Software Foundation; either version 2 of the License, or
-> > + * (at your option) any later version.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + *
-> > + * You should have received a copy of the GNU General Public License
-> > + * along with this program; if not, see <http://www.gnu.org/licenses/>.
-> > + */
-> > +
-> > +#include <linux/amba/bus.h>
-> > +#include <linux/device.h>
-> > +#include <linux/dma-mapping.h>
-> > +#include <linux/init.h>
-> > +#include <linux/io.h>
-> > +#include <linux/interrupt.h>
-> > +#include <linux/kernel.h>
-> > +#include <linux/of_platform.h>
-> > +#include <linux/sizes.h>
-> > +#include <asm/mach/arch.h>
-> > +#include <asm/pmu.h>
-> > +#include "axxia.h"
-> > +
-> > +/*
-> > + * The PMU IRQ lines of four cores are wired together into a single interrupt.
-> > + * Bounce the interrupt to other cores if it's not ours.
-> > + */
-> > +static irqreturn_t axxia_pmu_handler(int irq, void *dev, irq_handler_t handler)
-> > +{
-> > +	irqreturn_t ret = handler(irq, dev);
-> > +
-> > +	if (ret == IRQ_NONE) {
-> > +		int cpu = smp_processor_id();
-> > +		int cluster = cpu / CORES_PER_CLUSTER;
-> > +		int other;
-> > +
-> > +		/* Look until we find another cpu that's online. */
-> > +		do {
-> > +			other = (++cpu % CORES_PER_CLUSTER) +
-> > +				(cluster * CORES_PER_CLUSTER);
-> > +		} while (!cpu_online(other));
-> > +
-> > +		irq_set_affinity(irq, cpumask_of(other));
-> > +	}
-> > +
-> > +	/*
-> > +	 * We should be able to get away with the amount of IRQ_NONEs we give,
-> > +	 * while still having the spurious IRQ detection code kick in if the
-> > +	 * interrupt really starts hitting spuriously.
-> > +	 */
-> > +	return ret;
-> > +}
-> > +
-> > +static struct arm_pmu_platdata pmu_pdata = {
-> > +	.handle_irq = axxia_pmu_handler,
-> > +};
-> > +
-> > +static struct of_dev_auxdata axxia_auxdata_lookup[] __initdata = {
-> > +	OF_DEV_AUXDATA("arm,cortex-a15-pmu", 0, "pmu", &pmu_pdata),
-> > +	{}
-> > +};
-> 
-> This looks similar to what we have in mach-ux500 as db8500_pmu_handler.
-> 
-> To avoid duplication, I'd prefer moving support for this into the
-> perf_event code itself, and get rid of the auxdata.
-> 
-
-I'll drop it fow now.
-
-> > +static int
-> > +axxia_bus_notifier(struct notifier_block *nb, unsigned long event, void *obj)
-> > +{
-> > +	struct device *dev = obj;
-> > +
-> > +	if (event != BUS_NOTIFY_ADD_DEVICE)
-> > +		return NOTIFY_DONE;
-> > +
-> > +	if (!of_property_read_bool(dev->of_node, "dma-coherent"))
-> > +		return NOTIFY_DONE;
-> > +
-> > +	set_dma_ops(dev, &arm_coherent_dma_ops);
-> > +
-> > +	return NOTIFY_OK;
-> > +}
-> > +
-> > +static struct notifier_block axxia_platform_nb = {
-> > +	.notifier_call = axxia_bus_notifier,
-> > +};
-> > +
-> > +static struct notifier_block axxia_amba_nb = {
-> > +	.notifier_call = axxia_bus_notifier,
-> > +};
-> 
-> And we definitely want to do this in a generic fashion. That should not be in
-> platform specific code.
-
-I'll drop this too. I saw there was some work in progress on this.
-
-> 
-> > +static const char *axxia_dt_match[] __initconst = {
-> > +	"lsi,axm55xx",
-> > +	"lsi,axm55xx-sim",
-> > +	"lsi,axm55xx-emu",
-> > +	NULL
-> > +};
-> 
-> Please no 'xx' in compatible strings. You can list all the relevant
-> model numbers here, or require that machines list a specific model
-> as compatible, e.g.
-> 
-> 	compatible = "lsi,axm5510-sim", "lsi,axm5510", "lsi,axm5502";
-> 
-
-Got that. I'll use lsi,axm5516 as the complatible model number.
-
-> > +
-> > +DT_MACHINE_START(AXXIA_DT, "LSI Axxia AXM55XX")
-> > +	.dt_compat	= axxia_dt_match,
-> > +	.smp		= smp_ops(axxia_smp_ops),
-> > +	.init_machine	= axxia_dt_init,
-> > +MACHINE_END
-> 
-> Please have a look at how smp ops are hooked up in mach-qcom and see
-> if you can do it that way as well.
-> 
-
-Yes, that will work nicely.
-
-> > diff --git a/arch/arm/mach-axxia/axxia.h b/arch/arm/mach-axxia/axxia.h
-> > new file mode 100644
-> > index 0000000..594dd97
-> > --- /dev/null
-> > +++ b/arch/arm/mach-axxia/axxia.h
-> > @@ -0,0 +1,42 @@
-> > +/*
-> > + * Prototypes for platform functions.
-> > + *
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License as published by
-> > + * the Free Software Foundation; either version 2 of the License, or
-> > + * (at your option) any later version.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + *
-> > + * You should have received a copy of the GNU General Public License
-> > + * along with this program; if not, see <http://www.gnu.org/licenses/>.
-> > + */
-> > +#ifndef __AXXIA_H
-> > +#define __AXXIA_H
-> > +
-> > +#define CORES_PER_CLUSTER      4
-> > +
-> > +#define AXXIA_PERIPH_PHYS      0x2000000000ULL
-> > +#define AXXIA_SYSCON_PHYS      0x2010030000ULL
-> 
-> Remove these -- they have to come from DT.
-> 
-> > +#if 0
-> > +#define AXXIA_UART0_PHYS       0x2010080000ULL
-> > +#define AXXIA_UART1_PHYS       0x2010081000ULL
-> > +#define AXXIA_UART2_PHYS       0x2010082000ULL
-> > +#define AXXIA_UART3_PHYS       0x2010083000ULL
-> > +
-> > +#ifdef CONFIG_DEBUG_LL
-> > +#define AXXIA_DEBUG_UART_VIRT  0xf0080000
-> > +#define AXXIA_DEBUG_UART_PHYS  AXXIA_UART0_PHYS
-> > +#endif
-> > +#endif
-> 
-> You can put these constants directly into debug code.
-> 
-
-Ok.
-
-> 
-> > diff --git a/arch/arm/mach-axxia/platsmp.c b/arch/arm/mach-axxia/platsmp.c
-> > new file mode 100644
-> > index 0000000..fd7f507
-> > --- /dev/null
-> > +++ b/arch/arm/mach-axxia/platsmp.c
-> > @@ -0,0 +1,183 @@
-> > +/*
-> > + *  linux/arch/arm/mach-axxia/platsmp.c
-> > + *
-> > + *  Copyright (C) 2012 LSI Corporation
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> 
-> Have you considered using PSCI to bring up the secondary CPUs?
-> 
-
-The current u-boot is a bit dated... But I agree. I'll push for an update to this.
-
-> > +static int axxia_boot_secondary(unsigned int cpu,
-> > +					  struct task_struct *idle)
-> > +{
-> > +	unsigned long timeout;
-> > +
-> > +	/* Release the specified core */
-> > +	write_pen_release(cpu_logical_map(cpu));
-> > +
-> > +	/* Send a wakeup event to get the idled cpu out of WFE state */
-> > +	dsb_sev();
-> > +
-> > +	/* Wait for so long, then give up if nothing happens ... */
-> > +	timeout = jiffies + (1 * HZ);
-> > +	while (time_before(jiffies, timeout)) {
-> > +		/* Make sure stores to pen_release have completed */
-> > +		smp_rmb();
-> > +		if (pen_release == -1)
-> > +			break;
-> > +		udelay(1);
-> > +	}
-> > +
-> > +	return pen_release != -1 ? -ENOSYS : 0;
-> > +}
-> 
-> This is pretty sad. No hardware support for waking up CPUs?
-> 
-
-I'll rework this. There are sw control of the resets to individual cores. And
-the holding pen is not needed (too much other platsmp implementations), I will
-have the secondary cores released directly into secondary_startup.
-
-> > +static void __init axxia_smp_prepare_cpus(unsigned int max_cpus)
-> > +{
-> > +	void __iomem *syscon;
-> > +	int cpu_count = 0;
-> > +	int cpu;
-> > +
-> > +	syscon = ioremap(AXXIA_SYSCON_PHYS, SZ_64K);
-> > +	if (WARN_ON(!syscon))
-> > +		return;
-> > +
-> > +	check_fixup_sev(syscon);
-> 
-> Please use the syscon driver and regmap. That driver might need a little
-> help to get syscon_node_to_regmap() to work before driver initialization,
-> but other people need the same thing, and we should just implement it.
-
-Ok, until then... I'll drop the hardcoded address and get the address from the
-syscon node.
-
-> 
-> > diff --git a/drivers/clk/clk-axxia.c b/drivers/clk/clk-axxia.c
-> > new file mode 100644
-> > index 0000000..996b8f2
-> > --- /dev/null
-> > +++ b/drivers/clk/clk-axxia.c
-> > @@ -0,0 +1,281 @@
-> > +/*
-> > + * arch/arm/mach-axxia/clock.c
-> 
-> This should be a separate patch, and get merged by the clk maintainer.
-Ok.
-
-I'll submit a v2 with the corrections.
-
-/Anders
-
-> 
-> 	Arnd
-> 
-> 
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
