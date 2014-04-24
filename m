@@ -1,83 +1,51 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Thu, 24 Apr 2014 21:57:33 +0900
-Subject: [PATCH 1/3] ARM: dts: Add PMU reg node to exynos4210
-In-Reply-To: <CAGm_ybjfxprtLUX6Vs8QVvXoMOaHez4-Og8a9n3UevibvmzbZA@mail.gmail.com>
-References: <1396425778-4379-1-git-send-email-pankaj.dubey@samsung.com>
- <1396425778-4379-2-git-send-email-pankaj.dubey@samsung.com>
- <CAGm_ybjfxprtLUX6Vs8QVvXoMOaHez4-Og8a9n3UevibvmzbZA@mail.gmail.com>
-Message-ID: <53590A3D.1020308@samsung.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 24 Apr 2014 14:44:10 +0200
+Subject: [PATCHv3 19/41] OMAPDSS: panel-dpi: Add DT support
+In-Reply-To: <5358DEEA.1000506@ti.com>
+References: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
+ <20140418155107.GB5354@atomide.com> <5358DEEA.1000506@ti.com>
+Message-ID: <3615191.vG5AEQORWJ@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vikas,
+Hi Tomi,
 
-On 04/24/2014 08:59 PM, Vikas Sajjan wrote:
-> +Tomasz
->
->
-> On Wed, Apr 2, 2014 at 1:32 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
->> This patch adds pmu regnode to exynos4210 dtsi to handle
->> PMU register access via DT.
->>
->> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->> ---
->>   arch/arm/boot/dts/exynos4210.dtsi |    5 +++++
->>   1 file changed, 5 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
->> index cacf614..0a2c0fe 100644
->> --- a/arch/arm/boot/dts/exynos4210.dtsi
->> +++ b/arch/arm/boot/dts/exynos4210.dtsi
->> @@ -81,6 +81,11 @@
->>                  interrupts = <2 2>, <3 2>;
->>          };
->>
->> +       pmu_system_controller: system-controller at 10020000 {
->> +               compatible = "samsung,exynos4210-pmu", "syscon";
->> +               reg = <0x10020000 0x5000>;
-> Can we have 2 strings as "compatible" and these 2 strings are used by
-> 2 different driver?
->
-> Because once syscon driver gets probed, exynos-pmu.c [1] driver will
-> never be probed.
->
-> The new PMU driver [1] completely relies on this. With just
-> exynos_defconfig, you will not notice this issue, since syscon is NOT
-> enabled by exynos_defconfig. When I enabled "System Controller
-> Register R/W Based on Regmap" in menuconfig, I could see PMU driver
-> [1] is NEVER probed.
->
-> Let me know, if I am missing something.
->
->   [1] http://www.spinics.net/lists/arm-kernel/msg319750.html
+On Thursday 24 April 2014 12:52:42 Tomi Valkeinen wrote:
+> On 18/04/14 18:51, Tony Lindgren wrote:
+> >> +	gpio = of_get_gpio(node, 0);
+> >> +	if (gpio_is_valid(gpio) || gpio == -ENOENT) {
+> >> +		ddata->enable_gpio = gpio;
+> >> +	} else {
+> >> +		dev_err(&pdev->dev, "failed to parse enable gpio\n");
+> >> +		return gpio;
+> >> +	}
+> > 
+> > We should set the GPIO polarity based on the OF_GPIO_ACTIVE_LOW like
+> > gpio_backlight_probe_dt is doing.
+> 
+> Instead of doing it with the old gpio API, and checking the 'active'
+> flag everywhere, I think we can use the new gpiod API which handles the
+> polarity automatically.
+> 
+> I attached prototype patches (based on -rc2) for panel dpi using that
+> approach. It's a bit messier than I'd like, because for non-DT boot we
+> need to request the gpio using the old API, and then convert it to
+> gpio_desc. We can remove that code when all the boards use DT.
 
-You are correct. We also missed this because "SYSCON" option was
-not enabled in exynos_defconfig.
-I noticed this during preparation of V2 when I planned to use
-"early_syscon_init" [1] as suggested by Sylwester here [2].
+Just FYI, you can use the gpiod API with non-DT platforms if you register GPIO 
+lookup entries in board code with gpiod_add_lookup_table().
 
-In V2 I will take care of this. I hope soon I will be able to post second
-version of this series, just waiting for testing and internal code review.
-
-[1] https://lkml.org/lkml/2014/4/8/239
-[2] https://lkml.org/lkml/2014/4/2/171
->
->
->> +       };
->> +
->>          pinctrl_0: pinctrl at 11400000 {
->>                  compatible = "samsung,exynos4210-pinctrl";
->>                  reg = <0x11400000 0x1000>;
->> --
->> 1.7.10.4
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
+> I've compiled tested this only, as I don't have DPI panels I could use.
+> I did try similar approach for TFP410, and it seemed to work fine.
 
 -- 
-Best Regards,
-Pankaj Dubey
+Regards,
+
+Laurent Pinchart
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140424/d48b2c9b/attachment.sig>
