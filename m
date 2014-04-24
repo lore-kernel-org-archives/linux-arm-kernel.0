@@ -1,278 +1,47 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 24 Apr 2014 15:48:46 +0100
-Subject: [PATCH 2/4] arm64: topology: Add support for topology DT bindings
-In-Reply-To: <1398198078-7473-2-git-send-email-broonie@kernel.org>
-References: <1398198078-7473-1-git-send-email-broonie@kernel.org>
- <1398198078-7473-2-git-send-email-broonie@kernel.org>
-Message-ID: <20140424144846.GB8191@red-moon>
+From: ch.naveen@samsung.com (Naveen Krishna Chatradhi)
+Date: Thu, 24 Apr 2014 20:18:36 +0530
+Subject: [PATCH] i2c: exynos5: Initialise Samsung High Speed I2C controller
+ early
+Message-ID: <1398350916-885-1-git-send-email-ch.naveen@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 22, 2014 at 09:21:16PM +0100, Mark Brown wrote:
-> From: Mark Brown <broonie@linaro.org>
-> 
-> Add support for parsing the explicit topology bindings to discover the
-> topology of the system.
-> 
-> Since it is not currently clear how to map multi-level clusters for the
-> scheduler all leaf clusters are presented to the scheduler at the same
-> level. This should be enough to provide good support for current systems.
-> 
-> Signed-off-by: Mark Brown <broonie@linaro.org>
-> ---
->  arch/arm64/kernel/topology.c | 203 +++++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 195 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-> index ff662b23af5f..a326f5b37546 100644
-> --- a/arch/arm64/kernel/topology.c
-> +++ b/arch/arm64/kernel/topology.c
-> @@ -17,10 +17,191 @@
->  #include <linux/percpu.h>
->  #include <linux/node.h>
->  #include <linux/nodemask.h>
-> +#include <linux/of.h>
->  #include <linux/sched.h>
->  
->  #include <asm/topology.h>
->  
-> +static int __init get_cpu_for_node(struct device_node *node)
-> +{
-> +	struct device_node *cpu_node;
-> +	int cpu;
-> +
-> +	cpu_node = of_parse_phandle(node, "cpu", 0);
-> +	if (!cpu_node)
-> +		return -1;
-> +
-> +	for_each_possible_cpu(cpu)
-> +		if (of_get_cpu_node(cpu, NULL) == cpu_node) {
-> +			of_node_put(cpu_node);
-> +			return cpu;
-> +		}
-> +
-> +	pr_crit("Unable to find CPU node for %s\n", cpu_node->full_name);
-> +
-> +	of_node_put(cpu_node);
-> +	return -1;
-> +}
-> +
-> +static int __init parse_core(struct device_node *core, int cluster_id,
-> +			     int core_id)
-> +{
-> +	char name[10];
-> +	bool leaf = true;
-> +	int i = 0;
-> +	int cpu;
-> +	struct device_node *t;
-> +
-> +	do {
-> +		snprintf(name, sizeof(name), "thread%d", i);
-> +		t = of_get_child_by_name(core, name);
-> +		if (t) {
-> +			leaf = false;
-> +			cpu = get_cpu_for_node(t);
-> +			if (cpu >= 0) {
-> +				cpu_topology[cpu].cluster_id = cluster_id;
-> +				cpu_topology[cpu].core_id = core_id;
-> +				cpu_topology[cpu].thread_id = i;
-> +			} else {
-> +				pr_err("%s: Can't get CPU for thread\n",
-> +				       t->full_name);
-> +				of_node_put(t);
-> +				return -EINVAL;
-> +			}
-> +			of_node_put(t);
-> +		}
-> +		i++;
-> +	} while (t);
-> +
-> +	cpu = get_cpu_for_node(core);
-> +	if (cpu >= 0) {
-> +		if (!leaf) {
-> +			pr_err("%s: Core has both threads and CPU\n",
-> +			       core->full_name);
-> +			return -EINVAL;
-> +		}
-> +
-> +		cpu_topology[cpu].cluster_id = cluster_id;
-> +		cpu_topology[cpu].core_id = core_id;
-> +	} else if (leaf) {
-> +		pr_err("%s: Can't get CPU for leaf core\n", core->full_name);
-> +		return -EINVAL;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int __init parse_cluster(struct device_node *cluster, int depth)
-> +{
-> +	char name[10];
-> +	bool leaf = true;
-> +	bool has_cores = false;
-> +	struct device_node *c;
-> +	static int cluster_id __initdata;
-> +	int core_id = 0;
-> +	int i, ret;
-> +
-> +	/*
-> +	 * First check for child clusters; we currently ignore any
-> +	 * information about the nesting of clusters and present the
-> +	 * scheduler with a flat list of them.
-> +	 */
-> +	i = 0;
-> +	do {
-> +		snprintf(name, sizeof(name), "cluster%d", i);
-> +		c = of_get_child_by_name(cluster, name);
-> +		if (c) {
-> +			leaf = false;
-> +			ret = parse_cluster(c, depth + 1);
-> +			of_node_put(c);
-> +			if (ret != 0)
-> +				return ret;
-> +		}
-> +		i++;
-> +	} while (c);
-> +
-> +	/* Now check for cores */
-> +	i = 0;
-> +	do {
-> +		snprintf(name, sizeof(name), "core%d", i);
-> +		c = of_get_child_by_name(cluster, name);
-> +		if (c) {
-> +			has_cores = true;
-> +
-> +			if (depth == 0) {
-> +				pr_err("%s: cpu-map children should be clusters\n",
-> +				       c->full_name);
-> +				of_node_put(c);
-> +				return -EINVAL;
-> +			}
-> +
-> +			if (leaf) {
-> +				ret = parse_core(c, cluster_id, core_id++);
-> +			} else {
-> +				pr_err("%s: Non-leaf cluster with core %s\n",
-> +				       cluster->full_name, name);
-> +				ret = -EINVAL;
-> +			}
-> +
-> +			of_node_put(c);
-> +			if (ret != 0)
-> +				return ret;
-> +		}
-> +		i++;
-> +	} while (c);
-> +
-> +	if (leaf && !has_cores)
-> +		pr_warn("%s: empty cluster\n", cluster->full_name);
-> +
-> +	if (leaf)
-> +		cluster_id++;
-> +
-> +	return 0;
-> +}
-> +
-> +static int __init parse_dt_topology(void)
-> +{
-> +	struct device_node *cn, *map;
-> +	int ret = 0;
-> +	int cpu;
-> +
-> +	cn = of_find_node_by_path("/cpus");
-> +	if (!cn) {
-> +		pr_err("No CPU information found in DT\n");
-> +		return 0;
-> +	}
-> +
-> +	/*
-> +	 * When topology is provided cpu-map is essentially a root
-> +	 * cluster with restricted subnodes.
-> +	 */
-> +	map = of_get_child_by_name(cn, "cpu-map");
-> +	if (!map)
-> +		goto out;
-> +
-> +	ret = parse_cluster(map, 0);
-> +	if (ret != 0)
-> +		goto out_map;
-> +
-> +	/*
-> +	 * Check that all cores are in the topology; the SMP code will
-> +	 * only mark cores described in the DT as possible.
-> +	 */
-> +	for_each_possible_cpu(cpu) {
-> +		if (cpu_topology[cpu].cluster_id == -1) {
-> +			pr_err("CPU%d: No topology information specified\n",
-> +			       cpu);
-> +			ret = -EINVAL;
-> +		}
-> +	}
-> +
-> +out_map:
-> +	of_node_put(map);
-> +out:
-> +	of_node_put(cn);
-> +	return ret;
-> +}
-> +
->  /*
->   * cpu topology table
->   */
-> @@ -39,8 +220,7 @@ static void update_siblings_masks(unsigned int cpuid)
->  
->  	if (cpuid_topo->cluster_id == -1) {
->  		/*
-> -		 * DT does not contain topology information for this cpu
-> -		 * reset it to default behaviour
-> +		 * DT does not contain topology information for this cpu.
->  		 */
->  		pr_debug("CPU%u: No topology information configured\n", cpuid);
->  		return;
-> @@ -71,15 +251,10 @@ void store_cpu_topology(unsigned int cpuid)
->  	update_siblings_masks(cpuid);
->  }
->  
-> -/*
-> - * init_cpu_topology is called at boot when only one cpu is running
-> - * which prevent simultaneous write access to cpu_topology array
-> - */
-> -void __init init_cpu_topology(void)
-> +static void __init reset_cpu_topology(void)
->  {
->  	unsigned int cpu;
->  
-> -	/* init core mask and power*/
->  	for_each_possible_cpu(cpu) {
->  		struct cpu_topology *cpu_topo = &cpu_topology[cpu];
->  
-> @@ -93,3 +268,15 @@ void __init init_cpu_topology(void)
->  		cpumask_set_cpu(cpu, &cpu_topo->thread_sibling);
->  	}
->  }
-> +
-> +void __init init_cpu_topology(void)
-> +{
-> +	reset_cpu_topology();
-> +
-> +	/*
-> +	 * Discard anything that was parsed if we hit an error so we
-> +	 * don't use partial information.
-> +	 */
-> +	if (parse_dt_topology())
-> +		reset_cpu_topology();
-> +}
+This patch moves initialization code to subsys_initcall() to ensure
+that the i2c bus is available early so the regulators can be quickly
+probed and available for other devices on their probe() call.
 
-I tested it and tried to clobber it a bit with some DT changes, it seems
-fine.
+Such solution has been proposed by Mark Brown to fix the problem of
+the regulators not beeing available on the peripheral device probe():
+http://lists.infradead.org/pipermail/linux-arm-kernel/2010-March/011971.html
 
-Apart from an ultra-minor decoration change (attached):
+Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+---
+ drivers/i2c/busses/i2c-exynos5.c |   12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
-Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-arm64-kernel-topology-minor-cosmetic-changes.patch
-Type: text/x-diff
-Size: 1008 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140424/75fec107/attachment.bin>
+diff --git a/drivers/i2c/busses/i2c-exynos5.c b/drivers/i2c/busses/i2c-exynos5.c
+index 00af0a0..20e3077 100644
+--- a/drivers/i2c/busses/i2c-exynos5.c
++++ b/drivers/i2c/busses/i2c-exynos5.c
+@@ -762,8 +762,18 @@ static struct platform_driver exynos5_i2c_driver = {
+ 	},
+ };
+ 
+-module_platform_driver(exynos5_i2c_driver);
++static int __init i2c_adap_exynos5_init(void)
++{
++	return platform_driver_register(&exynos5_i2c_driver);
++}
++subsys_initcall(i2c_adap_exynos5_init);
++
++static void __exit i2c_adap_exynos5_exit(void)
++{
++	platform_driver_unregister(&exynos5_i2c_driver);
++}
+ 
++module_exit(i2c_adap_exynos5_exit);
+ MODULE_DESCRIPTION("Exynos5 HS-I2C Bus driver");
+ MODULE_AUTHOR("Naveen Krishna Chatradhi, <ch.naveen@samsung.com>");
+ MODULE_AUTHOR("Taekgyun Ko, <taeggyun.ko@samsung.com>");
+-- 
+1.7.9.5
