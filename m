@@ -1,118 +1,278 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 24 Apr 2014 10:44:58 -0400
-Subject: [PATCH] ARM: mm: dma: Update coherent streaming apis with missing
- memory barrier
-In-Reply-To: <20140424140913.GB14110@arm.com>
-References: <1398103390-31968-1-git-send-email-santosh.shilimkar@ti.com>
- <20140423171727.GK5649@arm.com>
- <20140423183742.GK24070@n2100.arm.linux.org.uk> <6414220.SShvCHLvZQ@wuerfel>
- <20140423190448.GB26756@n2100.arm.linux.org.uk>
- <20140424104737.GE8521@arm.com>
- <20140424111547.GP26756@n2100.arm.linux.org.uk>
- <20140424112152.GF19564@arm.com> <535913D4.6020401@ti.com>
- <20140424140913.GB14110@arm.com>
-Message-ID: <5359236A.4000707@ti.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 24 Apr 2014 15:48:46 +0100
+Subject: [PATCH 2/4] arm64: topology: Add support for topology DT bindings
+In-Reply-To: <1398198078-7473-2-git-send-email-broonie@kernel.org>
+References: <1398198078-7473-1-git-send-email-broonie@kernel.org>
+ <1398198078-7473-2-git-send-email-broonie@kernel.org>
+Message-ID: <20140424144846.GB8191@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 24 April 2014 10:09 AM, Will Deacon wrote:
-> On Thu, Apr 24, 2014 at 02:38:28PM +0100, Santosh Shilimkar wrote:
->> On Thursday 24 April 2014 07:21 AM, Will Deacon wrote:
->>> On Thu, Apr 24, 2014 at 12:15:47PM +0100, Russell King - ARM Linux wrote:
->>>> Yes, the hardware /is/ broken, but if you want to get it working in a
->>>> way that's acceptable in upstream kernels, adding that barrier to rmb()
->>>> is probably the only acceptable solution - especially if you have other
->>>> stuff going in between the rmb() and the DMA unmap.
->>>
->>> The problem then is that the additional barrier may well require
->>> bus-specific knowledge and access to parts of bus driver code which we can't
->>> use inside the rmb() macro. To solve this properly, the bus topology topic
->>> once again rears its ugly head, as I think you'd need a callback from the
->>> device driver to the bus on which it resides in order to provide the
->>> appropriate barrier (which isn't something that can be done sanely for
->>> the platform_bus).
->>>
->> Not exactly against the bus notifier point but we can't afford to have such
->> notifier calls in hot paths. Especially gigabit network drivers per packet
->> processing paths where even 10 cycle cost makes huge impact on the throughput.
+On Tue, Apr 22, 2014 at 09:21:16PM +0100, Mark Brown wrote:
+> From: Mark Brown <broonie@linaro.org>
 > 
-> I don't think anybody is suggesting that you do this per-packet. This is a
-> per-DMA-transfer barrier, which is required anyway. The details of the
-> barrier are what varies, and are likely bus-specific.
->
-fair enough
- 
->> Interconnect barriers are really needed for completion. I think CPUs within at
->> least same clusters will be ordered with rmb(). But same is not true when you
->> have multiple clusters and then further down coherent interconnect comes into
->> picture where all other non-CPU coherent masters are participating.
+> Add support for parsing the explicit topology bindings to discover the
+> topology of the system.
 > 
-> You're making a lot of rash generalisations here. The architected barrier
-> instructions as used by Linux will work perfectly well within the
-> inner-shareable domain. That means you don't need to worry about
-> multiple-clusters of CPUs.
+> Since it is not currently clear how to map multi-level clusters for the
+> scheduler all leaf clusters are presented to the scheduler at the same
+> level. This should be enough to provide good support for current systems.
 > 
-> However, you can't read *anything* into how a barrier instruction executed
-> on the CPU affects writes from another master; there is inherently a race
-> there which must be dealt with by either the external master or some
-> implementation-specific action by the CPU. This is the real problem.
+> Signed-off-by: Mark Brown <broonie@linaro.org>
+> ---
+>  arch/arm64/kernel/topology.c | 203 +++++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 195 insertions(+), 8 deletions(-)
 > 
->> If rmb() has to reach all the way to coherent masters(non-CPU), then I suspect
->> most of the ARM coherent architectures are broken. If you take any typical SOC,
->> ARM CPUs are bolted with other coherent masters at AXI boundary or may be with
->> ACP interfaces. At this level rmb() isn't good enough and you at least
->> need a dsb() for completion.
-> 
-> An rmb() expands to dsb, neither of which give you anything in this scenario
-> as described by the architecture.
->
-My bad... I don't for what reason I though rmb() just expands to dmb(). Just
-ignore that point.
- 
->> So in my view unless and until you have features like DVM in hardware, dsb() is
->> needed to guarantee even the ordering within CPUs sitting across clusters.
-> 
-> Firstly, you can only have multiple clusters of CPUs running with a single
-> Linux image if hardware coherency is supported between them. In this case,
-> all the CPUs will live in the same inner-shareable domain and dmb ish is
-> sufficient to enforce ordering between them.
-> 
-Thanks for expanding and correcting me. Inner sharable domain if implemented
-correctly should take care of it.
+> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+> index ff662b23af5f..a326f5b37546 100644
+> --- a/arch/arm64/kernel/topology.c
+> +++ b/arch/arm64/kernel/topology.c
+> @@ -17,10 +17,191 @@
+>  #include <linux/percpu.h>
+>  #include <linux/node.h>
+>  #include <linux/nodemask.h>
+> +#include <linux/of.h>
+>  #include <linux/sched.h>
+>  
+>  #include <asm/topology.h>
+>  
+> +static int __init get_cpu_for_node(struct device_node *node)
+> +{
+> +	struct device_node *cpu_node;
+> +	int cpu;
+> +
+> +	cpu_node = of_parse_phandle(node, "cpu", 0);
+> +	if (!cpu_node)
+> +		return -1;
+> +
+> +	for_each_possible_cpu(cpu)
+> +		if (of_get_cpu_node(cpu, NULL) == cpu_node) {
+> +			of_node_put(cpu_node);
+> +			return cpu;
+> +		}
+> +
+> +	pr_crit("Unable to find CPU node for %s\n", cpu_node->full_name);
+> +
+> +	of_node_put(cpu_node);
+> +	return -1;
+> +}
+> +
+> +static int __init parse_core(struct device_node *core, int cluster_id,
+> +			     int core_id)
+> +{
+> +	char name[10];
+> +	bool leaf = true;
+> +	int i = 0;
+> +	int cpu;
+> +	struct device_node *t;
+> +
+> +	do {
+> +		snprintf(name, sizeof(name), "thread%d", i);
+> +		t = of_get_child_by_name(core, name);
+> +		if (t) {
+> +			leaf = false;
+> +			cpu = get_cpu_for_node(t);
+> +			if (cpu >= 0) {
+> +				cpu_topology[cpu].cluster_id = cluster_id;
+> +				cpu_topology[cpu].core_id = core_id;
+> +				cpu_topology[cpu].thread_id = i;
+> +			} else {
+> +				pr_err("%s: Can't get CPU for thread\n",
+> +				       t->full_name);
+> +				of_node_put(t);
+> +				return -EINVAL;
+> +			}
+> +			of_node_put(t);
+> +		}
+> +		i++;
+> +	} while (t);
+> +
+> +	cpu = get_cpu_for_node(core);
+> +	if (cpu >= 0) {
+> +		if (!leaf) {
+> +			pr_err("%s: Core has both threads and CPU\n",
+> +			       core->full_name);
+> +			return -EINVAL;
+> +		}
+> +
+> +		cpu_topology[cpu].cluster_id = cluster_id;
+> +		cpu_topology[cpu].core_id = core_id;
+> +	} else if (leaf) {
+> +		pr_err("%s: Can't get CPU for leaf core\n", core->full_name);
+> +		return -EINVAL;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int __init parse_cluster(struct device_node *cluster, int depth)
+> +{
+> +	char name[10];
+> +	bool leaf = true;
+> +	bool has_cores = false;
+> +	struct device_node *c;
+> +	static int cluster_id __initdata;
+> +	int core_id = 0;
+> +	int i, ret;
+> +
+> +	/*
+> +	 * First check for child clusters; we currently ignore any
+> +	 * information about the nesting of clusters and present the
+> +	 * scheduler with a flat list of them.
+> +	 */
+> +	i = 0;
+> +	do {
+> +		snprintf(name, sizeof(name), "cluster%d", i);
+> +		c = of_get_child_by_name(cluster, name);
+> +		if (c) {
+> +			leaf = false;
+> +			ret = parse_cluster(c, depth + 1);
+> +			of_node_put(c);
+> +			if (ret != 0)
+> +				return ret;
+> +		}
+> +		i++;
+> +	} while (c);
+> +
+> +	/* Now check for cores */
+> +	i = 0;
+> +	do {
+> +		snprintf(name, sizeof(name), "core%d", i);
+> +		c = of_get_child_by_name(cluster, name);
+> +		if (c) {
+> +			has_cores = true;
+> +
+> +			if (depth == 0) {
+> +				pr_err("%s: cpu-map children should be clusters\n",
+> +				       c->full_name);
+> +				of_node_put(c);
+> +				return -EINVAL;
+> +			}
+> +
+> +			if (leaf) {
+> +				ret = parse_core(c, cluster_id, core_id++);
+> +			} else {
+> +				pr_err("%s: Non-leaf cluster with core %s\n",
+> +				       cluster->full_name, name);
+> +				ret = -EINVAL;
+> +			}
+> +
+> +			of_node_put(c);
+> +			if (ret != 0)
+> +				return ret;
+> +		}
+> +		i++;
+> +	} while (c);
+> +
+> +	if (leaf && !has_cores)
+> +		pr_warn("%s: empty cluster\n", cluster->full_name);
+> +
+> +	if (leaf)
+> +		cluster_id++;
+> +
+> +	return 0;
+> +}
+> +
+> +static int __init parse_dt_topology(void)
+> +{
+> +	struct device_node *cn, *map;
+> +	int ret = 0;
+> +	int cpu;
+> +
+> +	cn = of_find_node_by_path("/cpus");
+> +	if (!cn) {
+> +		pr_err("No CPU information found in DT\n");
+> +		return 0;
+> +	}
+> +
+> +	/*
+> +	 * When topology is provided cpu-map is essentially a root
+> +	 * cluster with restricted subnodes.
+> +	 */
+> +	map = of_get_child_by_name(cn, "cpu-map");
+> +	if (!map)
+> +		goto out;
+> +
+> +	ret = parse_cluster(map, 0);
+> +	if (ret != 0)
+> +		goto out_map;
+> +
+> +	/*
+> +	 * Check that all cores are in the topology; the SMP code will
+> +	 * only mark cores described in the DT as possible.
+> +	 */
+> +	for_each_possible_cpu(cpu) {
+> +		if (cpu_topology[cpu].cluster_id == -1) {
+> +			pr_err("CPU%d: No topology information specified\n",
+> +			       cpu);
+> +			ret = -EINVAL;
+> +		}
+> +	}
+> +
+> +out_map:
+> +	of_node_put(map);
+> +out:
+> +	of_node_put(cn);
+> +	return ret;
+> +}
+> +
+>  /*
+>   * cpu topology table
+>   */
+> @@ -39,8 +220,7 @@ static void update_siblings_masks(unsigned int cpuid)
+>  
+>  	if (cpuid_topo->cluster_id == -1) {
+>  		/*
+> -		 * DT does not contain topology information for this cpu
+> -		 * reset it to default behaviour
+> +		 * DT does not contain topology information for this cpu.
+>  		 */
+>  		pr_debug("CPU%u: No topology information configured\n", cpuid);
+>  		return;
+> @@ -71,15 +251,10 @@ void store_cpu_topology(unsigned int cpuid)
+>  	update_siblings_masks(cpuid);
+>  }
+>  
+> -/*
+> - * init_cpu_topology is called at boot when only one cpu is running
+> - * which prevent simultaneous write access to cpu_topology array
+> - */
+> -void __init init_cpu_topology(void)
+> +static void __init reset_cpu_topology(void)
+>  {
+>  	unsigned int cpu;
+>  
+> -	/* init core mask and power*/
+>  	for_each_possible_cpu(cpu) {
+>  		struct cpu_topology *cpu_topo = &cpu_topology[cpu];
+>  
+> @@ -93,3 +268,15 @@ void __init init_cpu_topology(void)
+>  		cpumask_set_cpu(cpu, &cpu_topo->thread_sibling);
+>  	}
+>  }
+> +
+> +void __init init_cpu_topology(void)
+> +{
+> +	reset_cpu_topology();
+> +
+> +	/*
+> +	 * Discard anything that was parsed if we hit an error so we
+> +	 * don't use partial information.
+> +	 */
+> +	if (parse_dt_topology())
+> +		reset_cpu_topology();
+> +}
 
-> Secondly, a dsb executed by a CPU is irrelevant to ordering of accesses by
-> an external peripheral, regardless of whether that peripheral is cache
-> coherent. If you think about this as a producer/consumer problem, you need
-> ordering at *both* ends to make any guarantees.
-> 
-Agreed. Isn't this an assumption we are doing on coherent DMA streaming case ?
-Ofcourse we are talking about io*mb() in that case which could be more than
-dsb() if needed but its actually a dsb() for A15 class of devices.
+I tested it and tried to clobber it a bit with some DT changes, it seems
+fine.
 
-May be I was not clear, but if we are saying that only ordering needs to
-be guaranteed and not completion then we have all the expected behaviour.
-And converting existing non-coherent dma_ops barriers to dmb() is
-right. My concern is completion is important for external master
-cases. So whats the expectation in those cases from
-producer and consumer
+Apart from an ultra-minor decoration change (attached):
 
-DMA_FROM_DEVICE case ... DMA-> producer, CPU->consumer
-1. DMA updates the main memory with correct descriptors and buffers.
-2. CPU perfroms the dma_ops() to take over the buffer ownership. In coherent
-DMA case this is NOP.
-** At this point of time DMA has guaranteed the ordering as well completion.
-3. CPU operates on the buffer/descriptor which is correct.
-
-DMA_TO_DEVICE: CPU->producer and DMA->consumer
-1. CPU fills a descriptor/buffer in memory for DMA to pick it up.
-2. Performs necessary dma_op() which on coherent case is NOP...
-** Here I agree the ordering from all CPUs within the cluster is guaranteed
-as per as the descriptor memory view is concerned.
-But what is produced by CPU is not visible to DMA yet. So completion
-isn't guaranteed.
-3. If DMA kicks the transfer assuming the producer(CPU) completion then
-that doesn't work.
-
-
-Regards,
-Santosh
+Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-arm64-kernel-topology-minor-cosmetic-changes.patch
+Type: text/x-diff
+Size: 1008 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140424/75fec107/attachment.bin>
