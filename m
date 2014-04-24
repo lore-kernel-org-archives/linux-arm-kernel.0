@@ -1,44 +1,102 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 24 Apr 2014 14:12:16 +0200
-Subject: [PATCH] ARM: mm: dma: Update coherent streaming apis with missing
- memory barrier
-In-Reply-To: <20140424105846.GE19564@arm.com>
-References: <1398103390-31968-1-git-send-email-santosh.shilimkar@ti.com>
- <6414220.SShvCHLvZQ@wuerfel> <20140424105846.GE19564@arm.com>
-Message-ID: <5427496.9FZVDz0Wjn@wuerfel>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Thu, 24 Apr 2014 14:14:04 +0200
+Subject: [RFC 0/3] DRM driver for the ATMEL High end LCD controller
+In-Reply-To: <1398267396.4295.59.camel@herbert.er.corscience.de>
+References: <1397814309-32160-1-git-send-email-jjhiblot@traphandler.com>
+ <1398267396.4295.59.camel@herbert.er.corscience.de>
+Message-ID: <5359000C.50005@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 24 April 2014 11:58:46 Will Deacon wrote:
-> 
-> On Wed, Apr 23, 2014 at 07:58:05PM +0100, Arnd Bergmann wrote:
-> > Another problem is MSI processing. MSI was specifically invented to avoid
-> > having to check an MMIO register for a DMA completion that as a side-effect
-> > flushes pending DMAs from the same device. This breaks down if the MSI
-> > packet gets turned into a level interrupt before it reaches the CPU's
-> > coherency domain, which is likely the case on the dw-pcie controller that
-> > comes with its own MSI block.
-> 
-> I'm not sure there's anything special about MSI which helps with this
-> problem. For GICv3, the MSI write will target the ITS (a slave device),
-> whereas the data produced is assumedly targetting main memory. That still
-> requires careful ordering by the producer, in the same way as if it was
-> signalling a legacy interrupt.
+Hi Tim,
 
-With legacy interrupts a PCI bus master has no way to order the transactions:
-It initiates the DMA to memory, but does not wait for the DMA to complete.
-It raises the interrupt line, which causes the interrupt handler of the
-driver to start. The driver then reads a status register from the bus master
-device, and this read is ordered with respect to the DMA that may still
-be in progress at the time. Any PCI driver that works with legacy interrupts
-and DMA has to do this, and the PCI host controller has to ensure that these
-ordering semantics are maintained on the upstream buses.
+On 23/04/2014 17:36, Tim Niemeyer wrote:
+> Hi Jean-Jacques,
+>
+> Am Freitag, den 18.04.2014, 11:45 +0200 schrieb Jean-Jacques Hiblot:
+>> Hi,
+>>
+>> this patch serie implements a simple DRM driver for the ATMEL High end LCD
+>> controller found in the SAMA5 familly. It's based on the tilcdc driver.
+>> It uses the cma_helper for memory and fbdev stuff.
+>> Your comments are welcome !
+> I applied your and Robert's patches on a 3.15-rc2 kernel and tried the
+> framebuffer device on the sama5d31-ek. Seems to work.
+>
+>> Supported features:
+>> * the base layer (the main framebuffer)
+> Tested to show a little tux png, but it's appearing only after 
+> 'echo 0 > /sys/devices/ahb.1/apb.2/f0030000.hlcdc/graphics/fb0/rotate'
+> is there missing some initializing?
 
-The difference with MSI is that the driver does not have to do an MMIO read
-transaction, and that the host controller has to ensure ordering between
-the (possibly weakly ordered) data DMA and the MSI transaction, rather than
-between the DMA and the MMIO read. These two are not the same, and it's
-totally possible for a broken implementation to get one of them right
-but not the other.
+Could you try to apply this http://code.bulix.org/f01kvh-86117 ?
 
-	Arnd
+Best Regards,
+
+Boris
+
+>
+>> * a simple panel
+>> * a backlight driver
+> Tested to set brightness to 0, 20 and 255. Works.
+>
+> Thanks for your work.
+>
+> Best Regards
+> Tim
+>
+>> * structure to 'easily' add other connectors (it comes from the tilcdc)
+>>
+>> On the todo list:
+>> * support overlays as drm_planes
+>> * support for the hardware cursor
+>> * support for the SiI9022 HDMI connector (present on sama5d36ek)
+>>
+>>
+>> Jean-Jacques Hiblot (3):
+>>   atmel: drm: added drm driver for the atmel hlcd controller
+>>   atmel: drm: dt: Added DT entry for the atmel hlcdc found in the sama5
+>>   atmel: dt: Add supports for the lcdc support on the sama5d36ek
+>>
+>>  arch/arm/boot/dts/sama5d36ek.dts                   |  27 +-
+>>  arch/arm/boot/dts/sama5d3_lcd.dtsi                 |  11 +
+>>  drivers/gpu/drm/Kconfig                            |   2 +
+>>  drivers/gpu/drm/Makefile                           |   1 +
+>>  drivers/gpu/drm/atmel_hlcdc/Kconfig                |  13 +
+>>  drivers/gpu/drm/atmel_hlcdc/Makefile               |  12 +
+>>  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc.h          | 771 +++++++++++++++++++++
+>>  .../gpu/drm/atmel_hlcdc/atmel_hlcdc_backlight.c    |  92 +++
+>>  .../gpu/drm/atmel_hlcdc/atmel_hlcdc_backlight.h    |  25 +
+>>  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_crtc.c     | 702 +++++++++++++++++++
+>>  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_drv.c      | 586 ++++++++++++++++
+>>  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_drv.h      | 124 ++++
+>>  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_ovl.h      | 190 +++++
+>>  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_panel.c    | 459 ++++++++++++
+>>  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_panel.h    |  28 +
+>>  15 files changed, 3042 insertions(+), 1 deletion(-)
+>>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/Kconfig
+>>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/Makefile
+>>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc.h
+>>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_backlight.c
+>>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_backlight.h
+>>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_crtc.c
+>>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_drv.c
+>>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_drv.h
+>>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_ovl.h
+>>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_panel.c
+>>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_panel.h
+>>
+>> --
+>> 1.9.1
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
