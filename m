@@ -1,32 +1,91 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 24 Apr 2014 15:13:54 +0200
-Subject: [PATCH v3 2/4] ARM: dts: Add support for DRA72x family of devices
-In-Reply-To: <1398333987-19454-3-git-send-email-rnayak@ti.com>
-References: <1398333987-19454-1-git-send-email-rnayak@ti.com>
- <1398333987-19454-3-git-send-email-rnayak@ti.com>
-Message-ID: <201404241513.54380.arnd@arndb.de>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 24 Apr 2014 15:15:34 +0200
+Subject: [PATCH 27/38] mmc: sdhci-of-esdhc: remove
+ platform_suspend/platform_resume callbacks
+In-Reply-To: <20140424122714.GR26756@n2100.arm.linux.org.uk>
+References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
+ <E1Wd2Wy-0003w6-9y@rmk-PC.arm.linux.org.uk>
+ <CAPDyKFrNpxFPfKQNWZ9iwzh=NKZpCzkA8gYnrqnPb-683QcgwA@mail.gmail.com>
+ <20140424111825.GQ26756@n2100.arm.linux.org.uk>
+ <CAPDyKFpXn7m4+gqBp+FVaUxA3xaGq7OJS3edPFTL015W03CdBA@mail.gmail.com>
+ <20140424122714.GR26756@n2100.arm.linux.org.uk>
+Message-ID: <CAPDyKFoLx4nxaD7vUaO+yRFKGr2FGb0k4vcF0XchtBV9e_rxsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 24 April 2014, Rajendra Nayak wrote:
-> 
-> -- DRA742
-> -  compatible = "ti,dra7xx", "ti,dra7"
-> +- DRA74x
-> +  compatible = "ti,dra74", "ti,dra7"
-> +
-> +- DRA72x
-> +  compatible = "ti,dra72", "ti,dra7"
+On 24 April 2014 14:27, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> On Thu, Apr 24, 2014 at 01:32:02PM +0200, Ulf Hansson wrote:
+>> On 24 April 2014 13:18, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+>> > That may be the case, but that would be an additional modification, and so
+>> > should be a separate patch.
+>>
+>> I just thought it make sense to include it here - it's really a simple
+>> fix, touching the same code as this patch.
+>>
+>> Additionally, it would simplify this patch since you would be able to
+>> use the PM macro.
+>
+> No, I'm not going to make this change after looking deeper at the existing
+> code.
+>
+> The existing code does this:
+>
+> sdhci-pltfm.c:
+> #ifdef CONFIG_PM
+> int sdhci_pltfm_suspend(struct device *dev)
+> {
+>         struct sdhci_host *host = dev_get_drvdata(dev);
+>
+>         return sdhci_suspend_host(host);
+> }
+> EXPORT_SYMBOL_GPL(sdhci_pltfm_suspend);
+>
+> int sdhci_pltfm_resume(struct device *dev)
+> {
+>         struct sdhci_host *host = dev_get_drvdata(dev);
+>
+>         return sdhci_resume_host(host);
+> }
+> EXPORT_SYMBOL_GPL(sdhci_pltfm_resume);
+>
+> const struct dev_pm_ops sdhci_pltfm_pmops = {
+>         .suspend        = sdhci_pltfm_suspend,
+>         .resume         = sdhci_pltfm_resume,
+> };
+> EXPORT_SYMBOL_GPL(sdhci_pltfm_pmops);
+> #endif  /* CONFIG_PM */
+>
+> sdhci-pltfm.h:
+> #ifdef CONFIG_PM
+> extern int sdhci_pltfm_suspend(struct device *dev);
+> extern int sdhci_pltfm_resume(struct device *dev);
+> extern const struct dev_pm_ops sdhci_pltfm_pmops;
+> #define SDHCI_PLTFM_PMOPS (&sdhci_pltfm_pmops)
+> #else
+> #define SDHCI_PLTFM_PMOPS NULL
+> #endif
+>
+> sdhci-of-esdhc.c:
+> static struct platform_driver sdhci_esdhc_driver = {
+>         .driver = {
+>                 .pm = SDHCI_PLTFM_PMOPS,
+>
+> Changing this to use SIMPLE_DEV_PM_OPS changes the behaviour of this by
+> placing the callbacks into the other methods.
+>
+> Is that change correct?
+> Who's going to test that that change doesn't break anything (I don't have
+> the hardware, and it's not a transformational change like the rest of the
+> patch set, but a functional change)?
+> Should this change be made for other SDHCI platforms as well?
+>
+> Frankly, I'm not happy to make such a change in a series which is supposed
+> to be mainly about cleaning up and _not_ introducing functional changes.
 
-Actually, what I meant was that you should list the fill name of the SoC,
-e.g. "ti,dra742", not just "ti,dra74". Leaving out the 'x' is not going
-to prevent this from breaking when you have a new dra745 that is incompatible.
+Fair enough, let's keep it as is then and let's handle functional
+changes separate.
 
-You can always list more strings, e.g.
-
-	compatible = "ti,dra745", "ti,dra742", "ti,dra74", "ti,dra7";
-
-if you have a dra745 product that is fully compatible with dra742, but the
-important part here is that the first string must be the full name.
-
-	Arnd
+>
+> --
+> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+> improving, and getting towards what was expected from it.
