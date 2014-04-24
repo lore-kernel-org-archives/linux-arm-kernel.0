@@ -1,68 +1,75 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 24 Apr 2014 09:33:40 +0200
-Subject: [PATCH 28/38] mmc: sdhci: remove platform_suspend/platform_resume
- callbacks
-In-Reply-To: <E1Wd2X3-0003wA-Dv@rmk-PC.arm.linux.org.uk>
-References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
- <E1Wd2X3-0003wA-Dv@rmk-PC.arm.linux.org.uk>
-Message-ID: <CAPDyKFqLEqsFGWXOenT--_D4hmUhVauJoUYHjsKF2KwCvvSt1Q@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 24 Apr 2014 09:37:03 +0200
+Subject: [PATCH v6 0/6] ARM: vdso gettimeofday using generic timer
+ architecture
+In-Reply-To: <20140423215040.GC26756@n2100.arm.linux.org.uk>
+References: <cover.1398213562.git.nathan_lynch@mentor.com>
+ <20140423215040.GC26756@n2100.arm.linux.org.uk>
+Message-ID: <CAKv+Gu-jFAo8JKqz3XHx348pSUBWaDy48RryKwgsxdM15jeAVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 April 2014 21:08, Russell King <rmk+kernel@arm.linux.org.uk> wrote:
-> The only user (sdhci-of-esdhc) no longer uses these callbacks, so lets
-> remove them to discourage any further use.
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+On 23 April 2014 23:50, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> On Tue, Apr 22, 2014 at 07:48:51PM -0500, Nathan Lynch wrote:
+>> - Build vdso.so with -lgcc: calls to __lshrdi3, __divsi3 sometimes
+>>   emitted (especially with -Os).  Override certain libgcc functions to
+>>   prevent undefined symbols.
 
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+After reading Russell's concerns below, I had a quick play with these
+patches, and I noticed that the libgcc dependencies are actually only
+present when compiling -Os. However, with normal optimization enabled
+(which most people are using anyway), you don't need libgcc at all. So
+why not override -O2 optimization for vdso.so, and be done with it?
 
-> ---
->  drivers/mmc/host/sdhci.c | 6 ------
->  drivers/mmc/host/sdhci.h | 2 --
->  2 files changed, 8 deletions(-)
+WIth -Os:
+
+Archive member included because of file (symbol)
+
+/usr/lib/gcc-cross/arm-linux-gnueabihf/4.8/sf/libgcc.a(_divsi3.o)
+                              arch/arm/kernel/vdso/vgettimeofday.o
+(__aeabi_idiv)
+/usr/lib/gcc-cross/arm-linux-gnueabihf/4.8/sf/libgcc.a(_lshrdi3.o)
+                              arch/arm/kernel/vdso/vgettimeofday.o
+(__aeabi_llsr)
+
+Without CONFIG_OPTIMIZE_FOR_SIZE, no archive members are included at all.
+
+-- 
+Ard.
+
+
+
 >
-> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-> index c1bd77e17458..f9bca1e7da25 100644
-> --- a/drivers/mmc/host/sdhci.c
-> +++ b/drivers/mmc/host/sdhci.c
-> @@ -2530,9 +2530,6 @@ EXPORT_SYMBOL_GPL(sdhci_disable_irq_wakeups);
+> This rather worries me.
 >
->  int sdhci_suspend_host(struct sdhci_host *host)
->  {
-> -       if (host->ops->platform_suspend)
-> -               host->ops->platform_suspend(host);
-> -
->         sdhci_disable_card_detection(host);
+> For a start, the toolchain I use for cross-building kernels (which I
+> build myself from gnu.org source) never has a libgcc with it - that's
+> because in order to build libgcc, I need a libc, and I don't want to
+> have a full cross environment on my machine just to build the soddin
+> compiler.
 >
->         /* Disable tuning since we are suspending */
-> @@ -2589,9 +2586,6 @@ int sdhci_resume_host(struct sdhci_host *host)
+> So, I want to be able to build kernels without having a libgcc sitting
+> around.
 >
->         sdhci_enable_card_detection(host);
+> Second point here is that we have multiple different versions of
+> userspace crap with multiple different ABIs.  Think about armel vs
+> armhf for starters.  There's at least *three* different ELF formats -
+> OABI, EABI armel, EABI armhf.  Okay, we can forget about OABI, but
+> what about the other two?  What about single zImage where you may
+> want a single kernel image which can run on either flavour?
 >
-> -       if (host->ops->platform_resume)
-> -               host->ops->platform_resume(host);
-> -
->         /* Set the re-tuning expiration flag */
->         if (host->flags & SDHCI_USING_RETUNING_TIMER)
->                 host->flags |= SDHCI_NEEDS_RETUNING;
-> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
-> index 7a35395e5f56..4a5cd5e3fa3e 100644
-> --- a/drivers/mmc/host/sdhci.h
-> +++ b/drivers/mmc/host/sdhci.h
-> @@ -289,8 +289,6 @@ struct sdhci_ops {
->         int     (*platform_execute_tuning)(struct sdhci_host *host, u32 opcode);
->         void    (*set_uhs_signaling)(struct sdhci_host *host, unsigned int uhs);
->         void    (*hw_reset)(struct sdhci_host *host);
-> -       void    (*platform_suspend)(struct sdhci_host *host);
-> -       void    (*platform_resume)(struct sdhci_host *host);
->         void    (*adma_workaround)(struct sdhci_host *host, u32 intmask);
->         void    (*platform_init)(struct sdhci_host *host);
->         void    (*card_event)(struct sdhci_host *host);
+> It is not possible to build a single .so which is compatible with
+> both - an armhf dynamic linker rejects armel outright, and vice versa.
+>
+> This, to me, sounds like one big fail... and as far as I'm aware, the
+> kernel has no idea itself which flavour of userspace is running, so it
+> has no idea which flavour of VDSO to offer (if it even had both.)
+>
 > --
-> 1.8.3.1
+> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+> improving, and getting towards what was expected from it.
 >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
