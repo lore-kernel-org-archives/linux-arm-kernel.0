@@ -1,36 +1,79 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 24 Apr 2014 21:04:07 +0200
-Subject: [PATCHv2 0/5] Berlin: add clock support
-Message-ID: <1398366252-19582-1-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Thu, 24 Apr 2014 21:04:11 +0200
+Subject: [PATCHv2 4/5] ARM: berlin/dt: add sdio clocks to BG2CD
+In-Reply-To: <1398366252-19582-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1398366252-19582-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1398366252-19582-5-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set adds support for the clocks having their own register set. Other
-clocks are available but they are sharing a common register in addition of their
-own registers. They will be supported in a following series.
+Add sdio clocks to the berlin2cd.dtsi
+Also reorder the PLLs nodes by address
 
-Also, I realized that when moving the pll nodes out of the clocks container,
-they didn't get reorder.
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/boot/dts/berlin2cd.dtsi | 42 ++++++++++++++++++++++++++--------------
+ 1 file changed, 28 insertions(+), 14 deletions(-)
 
-Changes in v2:
- - reworked berlin_clk_recalc_rate() as suggested by Sebastian
- - some dts tweaks, as suggested by Antoine
-
-Alexandre Belloni (5):
-  clk: berlin: add support for clocks
-  clk: berlin: add berlin clocks DT bindings documentation
-  ARM: berlin/dt: add sdio clocks to BG2
-  ARM: berlin/dt: add sdio clocks to BG2CD
-  ARM: berlin/dt: add sdio clocks to BG2Q
-
- .../devicetree/bindings/clock/berlin-clock.txt     |   9 +-
- arch/arm/boot/dts/berlin2.dtsi                     |  42 ++++---
- arch/arm/boot/dts/berlin2cd.dtsi                   |  42 ++++---
- arch/arm/boot/dts/berlin2q.dtsi                    |  28 +++--
- drivers/clk/berlin/Makefile                        |   2 +-
- drivers/clk/berlin/clk.c                           | 134 +++++++++++++++++++++
- 6 files changed, 220 insertions(+), 37 deletions(-)
- create mode 100644 drivers/clk/berlin/clk.c
-
+diff --git a/arch/arm/boot/dts/berlin2cd.dtsi b/arch/arm/boot/dts/berlin2cd.dtsi
+index bd4e9dd4867e..b05d32bf70e0 100644
+--- a/arch/arm/boot/dts/berlin2cd.dtsi
++++ b/arch/arm/boot/dts/berlin2cd.dtsi
+@@ -79,20 +79,6 @@
+ 			clocks = <&twdclk>;
+ 		};
+ 
+-		syspll: syspll at ea0014 {
+-			compatible = "marvell,berlin2-pll";
+-			clocks = <&smclk>;
+-			#clock-cells = <0>;
+-			reg = <0xf7ea0014 8>;
+-		};
+-
+-		cpupll: cpupll at ea003c {
+-			compatible = "marvell,berlin2-pll";
+-			clocks = <&smclk>;
+-			#clock-cells = <0>;
+-			reg = <0xf7ea003c 8>;
+-		};
+-
+ 		apb at e80000 {
+ 			compatible = "simple-bus";
+ 			#address-cells = <1>;
+@@ -183,6 +169,34 @@
+ 			};
+ 		};
+ 
++		syspll: syspll at ea0014 {
++			compatible = "marvell,berlin2-pll";
++			clocks = <&smclk>;
++			#clock-cells = <0>;
++			reg = <0xea0014 0x8>;
++		};
++
++		cpupll: cpupll at ea003c {
++			compatible = "marvell,berlin2-pll";
++			clocks = <&smclk>;
++			#clock-cells = <0>;
++			reg = <0xea003c 0x8>;
++		};
++
++		sdio0xinclk: sdio0xinclk at ea023c {
++			compatible = "marvell,berlin-clk";
++			clocks = <&syspll>;
++			#clock-cells = <0>;
++			reg = <0xea023c 0x4>;
++		};
++
++		sdio1xinclk: sdio1xinclk at ea0240 {
++			compatible = "marvell,berlin-clk";
++			clocks = <&syspll>;
++			#clock-cells = <0>;
++			reg = <0xea0240 0x4>;
++		};
++
+ 		apb at fc0000 {
+ 			compatible = "simple-bus";
+ 			#address-cells = <1>;
 -- 
 1.9.1
