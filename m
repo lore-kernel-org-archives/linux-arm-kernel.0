@@ -1,36 +1,41 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Thu, 24 Apr 2014 09:18:22 -0500
-Subject: [RESEND PATCH] regulator: core: Disable unused regulators after
- deferred probing is done
-In-Reply-To: <20140424133451.GZ12304@sirena.org.uk>
-References: <1398294650-24821-1-git-send-email-nm@ti.com>
- <20140424133451.GZ12304@sirena.org.uk>
-Message-ID: <53591D2E.8020505@ti.com>
+Date: Thu, 24 Apr 2014 09:19:25 -0500
+Subject: [PATCH V2 00/19] bus: omap_l3_noc: driver cleanups and support
+ for DRA7/AM4372
+In-Reply-To: <5358D16A.9000500@ti.com>
+References: <1397492726-17203-1-git-send-email-nm@ti.com>
+ <1397767775-10965-1-git-send-email-nm@ti.com> <53504041.7090906@ti.com>
+ <5350410B.5010507@ti.com> <5358D16A.9000500@ti.com>
+Message-ID: <53591D6D.3060507@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/24/2014 08:34 AM, Mark Brown wrote:
-> On Wed, Apr 23, 2014 at 06:10:50PM -0500, Nishanth Menon wrote:
->> From: Saravana Kannan <skannan@codeaurora.org>
+On 04/24/2014 03:55 AM, Peter Ujfalusi wrote:
+> On 04/18/2014 12:00 AM, Nishanth Menon wrote:
+>> On 04/17/2014 03:57 PM, Santosh Shilimkar wrote:
+>>> I looked at the series and its looks pretty good. Thanks for fixups, updates.
+>>> For whole series,
+>>> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>>
 >>
->> regulator_init_complete does a scan of regulators which dont have
->> always-on or consumers are automatically disabled as being unused.
->> However, with deferred probing, late_initcall() is too soon to
->> declare a regulator as unused as the regulator itself might not
->> have registered due to defferal - Example: A regulator deffered due
->> to i2bus not available which in turn is deffered due to pinctrl
->> availability.
+>> Thanks.
 >>
->> Since deferred probing is done in late_initcall(), do the cleanup of
->> unused regulators by regulator_init_complete in late_initcall_sync
->> instead of late_initcall.
+>>>> Patches(including Peter's) is available here:
+>>>> https://github.com/nmenon/linux-2.6-playground/commits/l3noc/driver-fixes-v2
+>>>>
+>>> Can Tony pull this branch for 3.16 then which includes Peter's series as well ?
+>>
+>> there is just an empty commit with information about peter's patches
+>> that i lined up to differentiate the series.. I can drop it if Tony
+>> would like me to.
 > 
-> I'll apply this however since as we discussed on IRC last night it's
-> going to make the issues with unconfigured regulators getting powered
-> off more severe before I do so I'll change things so that regulators
-> with no configuration at all don't get touched by the core.
+> Looking at the branch I see my patches underneath so they are in the branch.
+> It would be great if Tony pulls this... Will be a great present to my patches
+> (omap_l3 patches in the branch) for their 1 year anniversary of being out on
+> the mailing list ;)
 > 
-Thanks Mark.
+Peter, can I take this as an Ack for this series? if yes, I can repost
+a v3 with all the acks, updates together.
 
 -- 
 Regards,
