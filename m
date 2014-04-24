@@ -1,138 +1,154 @@
 From: agross@codeaurora.org (Andy Gross)
-Date: Thu, 24 Apr 2014 11:31:20 -0500
-Subject: [Patch v2 2/4] soc: qcom: Add device tree binding for GSBI
+Date: Thu, 24 Apr 2014 11:31:22 -0500
+Subject: [Patch v2 4/4] tty: serial: msm: Remove direct access to GSBI
 In-Reply-To: <1398357082-5102-1-git-send-email-agross@codeaurora.org>
 References: <1398357082-5102-1-git-send-email-agross@codeaurora.org>
-Message-ID: <1398357082-5102-3-git-send-email-agross@codeaurora.org>
+Message-ID: <1398357082-5102-5-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree binding support for the QCOM GSBI driver.
+This patch removes direct access of the GSBI registers.  GSBI configuration
+should be done through the GSBI driver directly.
 
 Signed-off-by: Andy Gross <agross@codeaurora.org>
 ---
- .../devicetree/bindings/soc/qcom/qcom,gsbi.txt     |   78 ++++++++++++++++++++
- include/dt-bindings/soc/qcom,gsbi.h                |   26 +++++++
- 2 files changed, 104 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,gsbi.txt
- create mode 100644 include/dt-bindings/soc/qcom,gsbi.h
+ drivers/tty/serial/msm_serial.c |   48 ++-------------------------------------
+ drivers/tty/serial/msm_serial.h |    5 ----
+ 2 files changed, 2 insertions(+), 51 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,gsbi.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,gsbi.txt
-new file mode 100644
-index 0000000..4ce24d4
---- /dev/null
-+++ b/Documentation/devicetree/bindings/soc/qcom/qcom,gsbi.txt
-@@ -0,0 +1,78 @@
-+QCOM GSBI (General Serial Bus Interface) Driver
-+
-+The GSBI controller is modeled as a node with zero or more child nodes, each
-+representing a serial sub-node device that is mux'd as part of the GSBI
-+configuration settings.  The mode setting will govern the input/output mode of
-+the 4 GSBI IOs.
-+
-+Required properties:
-+- compatible: must contain "qcom,gsbi-v1.0.0" for APQ8064/IPQ8064
-+- reg: Address range for GSBI registers
-+- clocks: required clock
-+- clock-names: must contain "iface" entry
-+- qcom,mode : indicates MUX value for configuration of the serial interface.
-+  Please reference dt-bindings/soc/qcom,gsbi.h for valid mux values.
-+
-+Optional properties:
-+- qcom,crci : indicates CRCI MUX value for QUP CRCI ports.  Please reference
-+  dt-bindings/soc/qcom,gsbi.h for valid CRCI mux values.
-+
-+Required properties if child node exists:
-+- #address-cells: Must be 1
-+- #size-cells: Must be 1
-+- ranges: Must be present
-+
-+Properties for children:
-+
-+A GSBI controller node can contain 0 or more child nodes representing serial
-+devices.  These serial devices can be a QCOM UART, I2C controller, spi
-+controller, or some combination of aforementioned devices.
-+
-+See the following for child node definitions:
-+Documentation/devicetree/bindings/i2c/qcom,i2c-qup.txt
-+Documentation/devicetree/bindings/spi/qcom,spi-qup.txt
-+Documentation/devicetree/bindings/serial/qcom,msm-uartdm.txt
-+
-+Example for APQ8064:
-+
-+#include <dt-bindings/soc/qcom,gsbi.h>
-+
-+	gsbi4 at 16300000 {
-+		compatible = "qcom,gsbi-v1.0.0";
-+		reg = <0x16300000 0x100>;
-+		clocks = <&gcc GSBI4_H_CLK>;
-+		clock-names = "iface";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+		qcom,mode = <GSBI_PROT_I2C_UART>;
-+		qcom,crci = <GSBI_CRCI_QUP>;
-+
-+		/* child nodes go under here */
-+
-+		i2c_qup4: i2c at 16380000 {
-+		        compatible = "qcom,i2c-qup-v1.1.1";
-+		        reg = <0x16380000 0x1000>;
-+		        interrupts = <0 153 0>;
-+
-+		        clocks = <&gcc GSBI4_QUP_CLK>, <&gcc GSBI4_H_CLK>;
-+		        clock-names = "core", "iface";
-+
-+		        clock-frequency = <200000>;
-+
-+		        #address-cells = <1>;
-+		        #size-cells = <0>;
-+
-+		 };
-+
-+		uart4:	serial at 16340000 {
-+			compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
-+			reg = <0x16340000 0x1000>,
-+				<0x16300000 0x1000>;
-+			interrupts = <0 152 0x0>;
-+			clocks = <&gcc GSBI4_UART_CLK>, <&gcc GSBI4_H_CLK>;
-+			clock-names = "core", "iface";
-+			status = "ok";
-+		};
-+	};
-+
-diff --git a/include/dt-bindings/soc/qcom,gsbi.h b/include/dt-bindings/soc/qcom,gsbi.h
-new file mode 100644
-index 0000000..7ac4292
---- /dev/null
-+++ b/include/dt-bindings/soc/qcom,gsbi.h
-@@ -0,0 +1,26 @@
-+/* Copyright (c) 2013, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+#ifndef __DT_BINDINGS_QCOM_GSBI_H
-+#define __DT_BINDINGS_QCOM_GSBI_H
-+
-+#define GSBI_PROT_IDLE		0
-+#define GSBI_PROT_I2C_UIM	1
-+#define GSBI_PROT_I2C		2
-+#define GSBI_PROT_SPI		3
-+#define GSBI_PROT_UART_W_FC	4
-+#define GSBI_PROT_UIM		5
-+#define GSBI_PROT_I2C_UART	6
-+
-+#define GSBI_CRCI_QUP		0
-+#define GSBI_CRCI_UART		1
-+
-+#endif
+diff --git a/drivers/tty/serial/msm_serial.c b/drivers/tty/serial/msm_serial.c
+index b5d779c..8901114 100644
+--- a/drivers/tty/serial/msm_serial.c
++++ b/drivers/tty/serial/msm_serial.c
+@@ -45,7 +45,6 @@ struct msm_port {
+ 	struct clk		*clk;
+ 	struct clk		*pclk;
+ 	unsigned int		imr;
+-	void __iomem		*gsbi_base;
+ 	int			is_uartdm;
+ 	unsigned int		old_snap_state;
+ };
+@@ -586,9 +585,7 @@ static const char *msm_type(struct uart_port *port)
+ static void msm_release_port(struct uart_port *port)
+ {
+ 	struct platform_device *pdev = to_platform_device(port->dev);
+-	struct msm_port *msm_port = UART_TO_MSM(port);
+ 	struct resource *uart_resource;
+-	struct resource *gsbi_resource;
+ 	resource_size_t size;
+ 
+ 	uart_resource = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+@@ -599,28 +596,12 @@ static void msm_release_port(struct uart_port *port)
+ 	release_mem_region(port->mapbase, size);
+ 	iounmap(port->membase);
+ 	port->membase = NULL;
+-
+-	if (msm_port->gsbi_base) {
+-		writel_relaxed(GSBI_PROTOCOL_IDLE,
+-				msm_port->gsbi_base + GSBI_CONTROL);
+-
+-		gsbi_resource = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+-		if (unlikely(!gsbi_resource))
+-			return;
+-
+-		size = resource_size(gsbi_resource);
+-		release_mem_region(gsbi_resource->start, size);
+-		iounmap(msm_port->gsbi_base);
+-		msm_port->gsbi_base = NULL;
+-	}
+ }
+ 
+ static int msm_request_port(struct uart_port *port)
+ {
+-	struct msm_port *msm_port = UART_TO_MSM(port);
+ 	struct platform_device *pdev = to_platform_device(port->dev);
+ 	struct resource *uart_resource;
+-	struct resource *gsbi_resource;
+ 	resource_size_t size;
+ 	int ret;
+ 
+@@ -639,30 +620,8 @@ static int msm_request_port(struct uart_port *port)
+ 		goto fail_release_port;
+ 	}
+ 
+-	gsbi_resource = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+-	/* Is this a GSBI-based port? */
+-	if (gsbi_resource) {
+-		size = resource_size(gsbi_resource);
+-
+-		if (!request_mem_region(gsbi_resource->start, size,
+-						 "msm_serial")) {
+-			ret = -EBUSY;
+-			goto fail_release_port_membase;
+-		}
+-
+-		msm_port->gsbi_base = ioremap(gsbi_resource->start, size);
+-		if (!msm_port->gsbi_base) {
+-			ret = -EBUSY;
+-			goto fail_release_gsbi;
+-		}
+-	}
+-
+ 	return 0;
+ 
+-fail_release_gsbi:
+-	release_mem_region(gsbi_resource->start, size);
+-fail_release_port_membase:
+-	iounmap(port->membase);
+ fail_release_port:
+ 	release_mem_region(port->mapbase, size);
+ 	return ret;
+@@ -670,7 +629,6 @@ fail_release_port:
+ 
+ static void msm_config_port(struct uart_port *port, int flags)
+ {
+-	struct msm_port *msm_port = UART_TO_MSM(port);
+ 	int ret;
+ 	if (flags & UART_CONFIG_TYPE) {
+ 		port->type = PORT_MSM;
+@@ -678,9 +636,6 @@ static void msm_config_port(struct uart_port *port, int flags)
+ 		if (ret)
+ 			return;
+ 	}
+-	if (msm_port->gsbi_base)
+-		writel_relaxed(GSBI_PROTOCOL_UART,
+-				msm_port->gsbi_base + GSBI_CONTROL);
+ }
+ 
+ static int msm_verify_port(struct uart_port *port, struct serial_struct *ser)
+@@ -976,6 +931,7 @@ static struct of_device_id msm_match_table[] = {
+ 
+ static struct platform_driver msm_platform_driver = {
+ 	.remove = msm_serial_remove,
++	.probe = msm_serial_probe,
+ 	.driver = {
+ 		.name = "msm_serial",
+ 		.owner = THIS_MODULE,
+@@ -991,7 +947,7 @@ static int __init msm_serial_init(void)
+ 	if (unlikely(ret))
+ 		return ret;
+ 
+-	ret = platform_driver_probe(&msm_platform_driver, msm_serial_probe);
++	ret = platform_driver_register(&msm_platform_driver);
+ 	if (unlikely(ret))
+ 		uart_unregister_driver(&msm_uart_driver);
+ 
+diff --git a/drivers/tty/serial/msm_serial.h b/drivers/tty/serial/msm_serial.h
+index 469fda5..a77cc76 100644
+--- a/drivers/tty/serial/msm_serial.h
++++ b/drivers/tty/serial/msm_serial.h
+@@ -108,11 +108,6 @@
+ #define UART_ISR		0x0014
+ #define UART_ISR_TX_READY	(1 << 7)
+ 
+-#define GSBI_CONTROL		0x0
+-#define GSBI_PROTOCOL_CODE	0x30
+-#define GSBI_PROTOCOL_UART	0x40
+-#define GSBI_PROTOCOL_IDLE	0x0
+-
+ #define UARTDM_DMRX		0x34
+ #define UARTDM_NCF_TX		0x40
+ #define UARTDM_RX_TOTAL_SNAP	0x38
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
