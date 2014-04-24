@@ -1,42 +1,77 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 24 Apr 2014 09:19:25 -0500
-Subject: [PATCH V2 00/19] bus: omap_l3_noc: driver cleanups and support
- for DRA7/AM4372
-In-Reply-To: <5358D16A.9000500@ti.com>
-References: <1397492726-17203-1-git-send-email-nm@ti.com>
- <1397767775-10965-1-git-send-email-nm@ti.com> <53504041.7090906@ti.com>
- <5350410B.5010507@ti.com> <5358D16A.9000500@ti.com>
-Message-ID: <53591D6D.3060507@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 24 Apr 2014 16:22:43 +0200
+Subject: [PATCH v7] Add support for the Allwinner A31 DMA Controller
+Message-ID: <1398349364-10726-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/24/2014 03:55 AM, Peter Ujfalusi wrote:
-> On 04/18/2014 12:00 AM, Nishanth Menon wrote:
->> On 04/17/2014 03:57 PM, Santosh Shilimkar wrote:
->>> I looked at the series and its looks pretty good. Thanks for fixups, updates.
->>> For whole series,
->>> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>
->>
->> Thanks.
->>
->>>> Patches(including Peter's) is available here:
->>>> https://github.com/nmenon/linux-2.6-playground/commits/l3noc/driver-fixes-v2
->>>>
->>> Can Tony pull this branch for 3.16 then which includes Peter's series as well ?
->>
->> there is just an empty commit with information about peter's patches
->> that i lined up to differentiate the series.. I can drop it if Tony
->> would like me to.
-> 
-> Looking at the branch I see my patches underneath so they are in the branch.
-> It would be great if Tony pulls this... Will be a great present to my patches
-> (omap_l3 patches in the branch) for their 1 year anniversary of being out on
-> the mailing list ;)
-> 
-Peter, can I take this as an Ack for this series? if yes, I can repost
-a v3 with all the acks, updates together.
+Hi,
+
+This patchset adds support for the DMA controller found in the
+Allwinner A31 and A23 SoCs.
+
+This has been tested using the newly introduced SPI driver on an A31
+EVK. Support for DMA-driven SPI transfers will be the subject of
+another patch serie.
+
+Since this serie has been sent for the first time about 2 monthes ago,
+and I never got any comments from the DMA maintainer, yet gathering
+some Acked-by, I expect this to be merged quite quickly.
+
+Thanks,
+Maxime
+
+Changes from v6:
+  - Dropped the merged patches and the clock patches that are pretty
+    orthogonal to this driver
+
+Changes from v5:
+  - Rebased on top of 3.15-rc1
+
+Changes from v4:
+  - Removed the packed attribute on the LLI
+  - Switched to using a NULL device pointer in clk_get on PLL6 and
+    AHB1 mux to make explicit that we are getting global clocks
+  - Switched from spin_lock_irqsave to spin_lock in the interrupt
+    handler
+  - Various nitpicks from Andy Shevchenko:
+    + Switched to using %p printk formats for pointers
+    + Inverted some tests to lose a level of indentation
+    + Dropped ifdef DEBUG protecting calls to dev_dbg
+
+Changes from v3:
+  - A few other comments made by Andy Shevchenko were fixed:
+    + Used references in %pa* printk formats
+    + Used is_slave_direction in prep_slave_sg to make sure we were
+      actually called for something, and to avoid making assumptions
+      that we were actually called with the expected directions
+    + A few others minor fixes: s/pr_err/dev_err/, etc.
+
+Changes from v2:
+  - Removed the clk_put calls in the clock protection functions
+  - Splitted out the sunxi machines into several files
+  - Moved the clock protection code into these new machine files
+  - Moved the PLL6 reparenting to the DMA driver
+  - Addressed various comments from Andy Shevchenko: switched to using
+    devm_kcalloc, used correct printk formats for physical and DMA
+    addresses, etc.
+
+Changes from v1:
+  - Removed the clk_put call in the clocks protecting patches
+  - Minor fixes here and there as suggested by Andy Shevchenko: switch
+    to dmam_pool_create, switch to dev_dbg instead of pr_debug, etc.
+
+
+Maxime Ripard (1):
+  DMA: sun6i: Add driver for the Allwinner A31 DMA controller
+
+ .../devicetree/bindings/dma/sun6i-dma.txt          |  45 +
+ drivers/dma/Kconfig                                |   8 +
+ drivers/dma/Makefile                               |   1 +
+ drivers/dma/sun6i-dma.c                            | 987 +++++++++++++++++++++
+ 4 files changed, 1041 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/sun6i-dma.txt
+ create mode 100644 drivers/dma/sun6i-dma.c
 
 -- 
-Regards,
-Nishanth Menon
+1.9.1
