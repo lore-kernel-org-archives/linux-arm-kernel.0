@@ -1,73 +1,117 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 24 Apr 2014 15:54:44 +0900
-Subject: [PATCH/RFC] serial: sh-sci: Add device tree support for r8a7779
-Message-ID: <1398322484-3630-1-git-send-email-horms+renesas@verge.net.au>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Thu, 24 Apr 2014 15:57:31 +0900
+Subject: [PATCH 1/3] usb: ohci-exynos: Make provision for vdd regulators
+In-Reply-To: <CAFp+6iGo-Rk8d28=dosVW63f-ZrZjmxj9fsm7D7Vn4-HdhSgjw@mail.gmail.com>
+References: <1398082604-3013-1-git-send-email-gautam.vivek@samsung.com>
+ <002b01cf5f52$a7bc0d70$f7342850$%tikhomirov@samsung.com>
+ <001a01cf5f54$af090810$0d1b1830$%han@samsung.com>
+ <000001cf5f5c$2f6c2440$8e446cc0$%han@samsung.com>
+ <CAFp+6iGo-Rk8d28=dosVW63f-ZrZjmxj9fsm7D7Vn4-HdhSgjw@mail.gmail.com>
+Message-ID: <000201cf5f8a$76c7b9c0$64572d40$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the platform data for the legacy-C initialisation of sh-sci
-for the r8a7779 SoC and my own testing the SCIx_SH4_SCIF_REGTYPE bit of
-scscr needs to be set.
+On Thursday, April 24, 2014 3:40 PM, Vivek Gautam wrote:
+> On Thu, Apr 24, 2014 at 6:56 AM, Jingoo Han <jg1.han@samsung.com> wrote:
+> > On Thursday, April 24, 2014 9:33 AM, Jingoo Han wrote:
+> >> On Thursday, April 24, 2014 9:18 AM, Anton Tikhomirov wrote:
+> >> > On Monday, April 21, 2014 9:17 PM, Vivek Gautam wrote:
+> >> > >
+> >> > > Facilitate getting required 3.3V and 1.0V VDD supply for
+> >> > > OHCI controller on Exynos.
+> >> > >
+> >> > > With patches for regulators' nodes merged in 3.15:
+> >> > > c8c253f ARM: dts: Add regulator entries to smdk5420
+> >> > > 275dcd2 ARM: dts: add max77686 pmic node for smdk5250,
+> >> > >
+> >> > > certain perripherals will now need to ensure that,
+> >> > > they request VDD regulators in their drivers, and enable
+> >> > > them so as to make them working.
+> >> > >
+> >> > > Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+> >> > > Cc: Jingoo Han <jg1.han@samsung.com>
+> >> > > ---
+> >> > >
+> >> > > Based on 'usb-next' branch of Greg's usb tree.
+> >> > >
+> >> > >  drivers/usb/host/ohci-exynos.c |   47
+> >> > > ++++++++++++++++++++++++++++++++++++++++
+> >> > >  1 file changed, 47 insertions(+)
+> >> > >
+> >> > > diff --git a/drivers/usb/host/ohci-exynos.c b/drivers/usb/host/ohci-
+> >> > > exynos.c
+> >> > > index 68588d8..e2e72a8 100644
+> >> > > --- a/drivers/usb/host/ohci-exynos.c
+> >> > > +++ b/drivers/usb/host/ohci-exynos.c
+> 
+> [snip]
+> 
+> >> > > @@ -98,6 +101,28 @@ static int exynos_ohci_probe(struct platform_device
+> >> > > *pdev)
+> >> > >           exynos_ohci->otg = phy->otg;
+> >> > >   }
+> >> > >
+> >> > > + exynos_ohci->vdd33 = devm_regulator_get(&pdev->dev, "vdd33");
+> >> > > + if (IS_ERR(exynos_ohci->vdd33)) {
+> >> > > +         err = PTR_ERR(exynos_ohci->vdd33);
+> >> > > +         goto fail_regulator1;
+> >> > > + }
+> >> > > + err = regulator_enable(exynos_ohci->vdd33);
+> >> > > + if (err) {
+> >> > > +         dev_err(&pdev->dev, "Failed to enable VDD33 supply\n");
+> >> > > +         goto fail_regulator1;
+> >> > > + }
+> >> > > +
+> >> > > + exynos_ohci->vdd10 = devm_regulator_get(&pdev->dev, "vdd10");
+> >> > > + if (IS_ERR(exynos_ohci->vdd10)) {
+> >> > > +         err = PTR_ERR(exynos_ohci->vdd10);
+> >> > > +         goto fail_regulator2;
+> >> > > + }
+> >> > > + err = regulator_enable(exynos_ohci->vdd10);
+> >> > > + if (err) {
+> >> > > +         dev_err(&pdev->dev, "Failed to enable VDD10 supply\n");
+> >> > > +         goto fail_regulator2;
+> >> > > + }
+> >> > > +
+> >> >
+> >> > Do we need to skip regulator settings together with PHY configuration
+> >> > in case of exynos5440?
+> >>
+> >> Oh, right. In the case of exynos5440, regulator settings is not
+> >> necessary. Vivek, would you fix it in order skip regulator settings
+> >> in exynos5440? It also applies to ehci-exynos.
+> >
+> > Sorry, in the case of exynos5440, this patch already skips
+> > regulator settings.
+> >
+> > In the case of exynos5440, there is no need to set PHY setting
+> > and regulator setting.
+> 
+> Right, in case of exynos5440, we are skipping PHY setting and regulator setting.
+> Actually i had missed taking into account 5440, so just curious. Do we
+> really not need a regulator
+> settings for Exynos5440 ?
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+To be more specific, there is no regulator on ssdk5440 board
+which is the Exynos5440-based board.
 
----
+Best regards,
+Jingoo Han
 
-With the approach taken by this patch sh-sci may be initialised using the
-"renesas,scif-r8a7779" compat string but not the generic "renesas,scif"
-compat string.  An alternate approach would be to add a binding to allow
-setting of this bit to be controlled directly from DT.
----
- .../devicetree/bindings/serial/renesas,sci-serial.txt          |  1 +
- drivers/tty/serial/sh-sci.c                                    | 10 +++++++++-
- 2 files changed, 10 insertions(+), 1 deletion(-)
+> > How about making regulator setting "optional"?
+> > Then, regulator setting can be done, only when regulator
+> > is supported.
+> 
+> True, so with Exynos5440 not needing the regulator, we should make the
+> regulator settings optional.
 
-diff --git a/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt b/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt
-index 53e6c17..bba86de 100644
---- a/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt
-+++ b/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt
-@@ -12,6 +12,7 @@ Required properties:
-     - "renesas,scifa-r8a7791" for R8A7791 (R-Car M2) SCIFA compatible UART.
-     - "renesas,scifb-r8a7791" for R8A7791 (R-Car M2) SCIFB compatible UART.
-     - "renesas,hscif-r8a7791" for R8A7791 (R-Car M2) HSCIF compatible UART.
-+    - "renesas,scif-r8a7779" for R8A7779 (R-Car H1) SCIF compatible UART.
-     - "renesas,scif" for generic SCIF compatible UART.
-     - "renesas,scifa" for generic SCIFA compatible UART.
-     - "renesas,scifb" for generic SCIFB compatible UART.
-diff --git a/drivers/tty/serial/sh-sci.c b/drivers/tty/serial/sh-sci.c
-index 88236da..3b5d2f6 100644
---- a/drivers/tty/serial/sh-sci.c
-+++ b/drivers/tty/serial/sh-sci.c
-@@ -2419,6 +2419,7 @@ static int sci_remove(struct platform_device *dev)
- struct sci_port_info {
- 	unsigned int type;
- 	unsigned int regtype;
-+	unsigned int scscr_extra;
- };
- 
- static const struct of_device_id of_sci_match[] = {
-@@ -2429,6 +2430,13 @@ static const struct of_device_id of_sci_match[] = {
- 			.regtype = SCIx_SH4_SCIF_REGTYPE,
- 		},
- 	}, {
-+		.compatible = "renesas,scif-r8a7779",
-+		.data = (void *)&(const struct sci_port_info) {
-+			.type = PORT_SCIF,
-+			.regtype = SCIx_SH4_SCIF_REGTYPE,
-+			.scscr_extra = SCSCR_CKE1,
-+		},
-+	}, {
- 		.compatible = "renesas,scifa",
- 		.data = &(const struct sci_port_info) {
- 			.type = PORT_SCIFA,
-@@ -2488,7 +2496,7 @@ sci_parse_dt(struct platform_device *pdev, unsigned int *dev_id)
- 	p->flags = UPF_IOREMAP | UPF_BOOT_AUTOCONF;
- 	p->type = info->type;
- 	p->regtype = info->regtype;
--	p->scscr = SCSCR_RE | SCSCR_TE;
-+	p->scscr = SCSCR_RE | SCSCR_TE | info->scscr_extra;
- 
- 	return p;
- }
--- 
-1.8.5.2
+[.....]
+
+> Thanks for the suggestion.
+> I will make the required changes, and post the patchset again.
+
+OK, I see.
+Thank you for accepting my suggestion.
+
+Best regards,
+Jingoo Han
