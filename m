@@ -1,94 +1,69 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu, 24 Apr 2014 22:23:49 +0200
-Subject: [PATCH] ARM: imx6q: work around faulty PMU irq routing
-Message-ID: <1398371029-21176-1-git-send-email-l.stach@pengutronix.de>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 24 Apr 2014 17:23:14 -0300
+Subject: [PATCH v2 00/10] thermal: Armada 375/380 SoC support
+Message-ID: <1398371004-15807-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i.MX6 PMU has a design errata where the interrupts of all cores are
-wired together into a single irq line. To work around this we have to
-bounce the interrupt around all cores until we find the one where the PMU
-counter overflow has happened.
+This patchset adds the support for the thermal sensor in the recently
+introduced Armada 375 and 38x SoC. Compared to the previous patchset
+version, this v2 introduces the A380 SoC support.
 
-This causes the perf measurements to be less accurate and we can't really
-handle the case where two cores fire a PMU irq at the same time. The
-implemented woraround makes perf at least somewhat useable on imx6 SoCs
-with more than one core.
+The first five patches are preparation work. They add a generic
+infrastructure that allows to support similar thermal sensors in
+a non-intrusive way.
 
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
----
- arch/arm/mach-imx/mach-imx6q.c | 38 +++++++++++++++++++++++++++++++++++++-
- 1 file changed, 37 insertions(+), 1 deletion(-)
+Patches six and seven uses this infrastructure to support the 
+Armada 375 and 380 SoC thermal sensor.
 
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index e60456d85c9d..73976c484826 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -16,6 +16,7 @@
- #include <linux/delay.h>
- #include <linux/export.h>
- #include <linux/init.h>
-+#include "linux/interrupt.h"
- #include <linux/io.h>
- #include <linux/irq.h>
- #include <linux/irqchip.h>
-@@ -33,6 +34,7 @@
- #include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-+#include "asm/pmu.h"
- #include <asm/system_misc.h>
- 
- #include "common.h"
-@@ -261,6 +263,39 @@ static void __init imx6q_axi_init(void)
- 	}
- }
- 
-+/*
-+ * The i.MX6 PMU has a design errata where the interrupts of all cores are
-+ * wired together into a single irq line. To work around this we have to
-+ * bounce the interrupt around all cores until we find the one where the PMU
-+ * counter overflow has happened.
-+ */
-+static irqreturn_t imx6q_pmu_handler(int irq, void *dev, irq_handler_t handler)
-+{
-+	irqreturn_t ret = handler(irq, dev);
-+	int next;
-+
-+	if (ret == IRQ_NONE) {
-+		/*
-+		 * Kick the irq over to the next cpu, regardless of it's
-+		 * online status (it might have gone offline while we were busy
-+		 * bouncing the irq).
-+		 */
-+		next = (smp_processor_id() + 1) % num_present_cpus();
-+		irq_set_affinity(irq, cpumask_of(next));
-+	}
-+
-+	return ret;
-+}
-+
-+struct arm_pmu_platdata imx6q_pmu_platdata = {
-+	.handle_irq		= imx6q_pmu_handler,
-+};
-+
-+static struct of_dev_auxdata imx6q_auxdata_lookup[] __initdata = {
-+	OF_DEV_AUXDATA("arm,cortex-a9-pmu", 0, "arm-pmu", &imx6q_pmu_platdata),
-+	{}
-+};
-+
- static void __init imx6q_init_machine(void)
- {
- 	struct device *parent;
-@@ -276,7 +311,8 @@ static void __init imx6q_init_machine(void)
- 
- 	imx6q_enet_phy_init();
- 
--	of_platform_populate(NULL, of_default_bus_match_table, NULL, parent);
-+	of_platform_populate(NULL, of_default_bus_match_table,
-+			imx6q_auxdata_lookup, parent);
- 
- 	imx_anatop_init();
- 	cpu_is_imx6q() ?  imx6q_pm_init() : imx6dl_pm_init();
+Since there are some issues in the Armada 375 Z1 SoC thermal sensor,
+patch eight adds a quirk to workaround such issues. The Z1 silicon stepping
+is detected and the compatible string is updated, so the driver can apply
+sensor initialization workarounds.
+
+In addition, the quirk moves the offset of the thermal control register,
+and allows to specifiy the correct (A0 stepping) offset in the devicetree.
+This quirk is applied only for the A375-DB board, being the only board known
+to have the problematic Z1 SoC.
+
+Finally, the last two patches enables the thermal sensor in the devicetree.
+for the Armada 375 A0 stepping SoC, and the Armada 380/385 SoCs.
+
+The series applies on v3.15-rc1, and has been tested on A375-DB board
+and A385-DB board.
+
+Feedback and comments are welcome!
+
+Changes from v1:
+
+  * Introduced the Armada 380 support. In order to support this in a clean
+    way, the 'inverted' field was added.
+
+  * Cleaned the A375 workaround in the thermal driver, by detecting the
+    device compatible string, as suggested by Jason Cooper.
+
+  * Added details about the register offset in the Z1 stepping to the
+    binding documentation as requested by Jason Cooper.
+
+Ezequiel Garcia (10):
+  thermal: armada: Rename armada_thermal_ops struct
+  thermal: armada: Add infrastructure to support generic formulas
+  thermal: armada: Add generic infrastructure to handle the sensor
+  thermal: armada: Pass the platform_device to init_sensor()
+  thermal: armada: Allow to specify an 'inverted readout' sensor
+  thermal: armada: Support Armada 375 SoC
+  thermal: armada: Support Armada 380 SoC
+  ARM: mvebu: Add thermal quirk for the Armada 375 DB board
+  ARM: mvebu: Enable the thermal sensor in Armada 375 SoC
+  ARM: mvebu: Enable the thermal sensor in Armada 380/385 SoC
+
+ .../devicetree/bindings/thermal/armada-thermal.txt |  12 +-
+ arch/arm/boot/dts/armada-375.dtsi                  |   6 +
+ arch/arm/boot/dts/armada-38x.dtsi                  |   6 +
+ arch/arm/mach-mvebu/board-v7.c                     |  57 ++++++++
+ arch/arm/mach-mvebu/mvebu-soc-id.h                 |   3 +
+ drivers/thermal/armada_thermal.c                   | 158 ++++++++++++++++++---
+ 6 files changed, 222 insertions(+), 20 deletions(-)
+
 -- 
 1.9.1
