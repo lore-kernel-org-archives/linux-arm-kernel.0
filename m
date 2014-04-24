@@ -1,39 +1,50 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Thu, 24 Apr 2014 13:22:08 +0100
-Subject: [PATCH] arm/xen: Remove definiition of virt_to_pfn in
- asm/xen/page.h
-In-Reply-To: <1397836474-10478-1-git-send-email-julien.grall@linaro.org>
-References: <1397836474-10478-1-git-send-email-julien.grall@linaro.org>
-Message-ID: <535901F0.3010908@citrix.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Thu, 24 Apr 2014 13:23:38 +0100
+Subject: [PATCH] arm64: mm: Add THP TLB entries to general mmu_gather
+Message-ID: <1398342218-31830-1-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/04/14 16:54, Julien Grall wrote:
-> virt_to_pfn has been defined in asm/memory.h by the commit e26a9e0 "ARM: Better
-> virt_to_page() handling"
-> 
-> This will result of a compilation warning when CONFIG_XEN is enabled.
-> 
-> arch/arm/include/asm/xen/page.h:80:0: warning: "virt_to_pfn" redefined [enabled by default]
->  #define virt_to_pfn(v)          (PFN_DOWN(__pa(v)))
->  ^
-> In file included from arch/arm/include/asm/page.h:163:0,
->                  from arch/arm/include/asm/xen/page.h:4,
->                  from include/xen/page.h:4,
->                  from arch/arm/xen/grant-table.c:33:
-> 
-> The definition in memory.h is nearly the same (it directly expand PFN_DOWN),
-> so we can safely drop virt_to_pfn in xen include.
+When arm64 moved over to the core mmu_gather, it lost the logic to
+flush THP TLB entries (tlb_remove_pmd_tlb_entry was removed and the
+core implementation only signals that the mmu_gather needs a flush).
 
+This patch ensures that tlb_add_flush is called for THP TLB entries.
 
-This breaks the arm build for me.
+Signed-off-by: Steve Capper <steve.capper@linaro.org>
+Acked-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/pgtable.h | 2 ++
+ arch/arm64/include/asm/tlb.h     | 5 +++++
+ 2 files changed, 7 insertions(+)
 
-/local/davidvr/work/k.org/tip/drivers/block/xen-blkfront.c: In function
-?setup_blkring?:
-/local/davidvr/work/k.org/tip/drivers/block/xen-blkfront.c:1236:2:
-error: implicit declaration of function ?virt_to_pfn?
-[-Werror=implicit-function-declaration]
-  err = xenbus_grant_ring(dev, virt_to_mfn(info->ring.sring));
-  ^
-
-David
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index aa3917c..9886368 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -434,6 +434,8 @@ extern int kern_addr_valid(unsigned long addr);
+ 
+ #define pgtable_cache_init() do { } while (0)
+ 
++#define  __tlb_remove_pmd_tlb_entry __tlb_remove_pmd_tlb_entry
++
+ #endif /* !__ASSEMBLY__ */
+ 
+ #endif /* __ASM_PGTABLE_H */
+diff --git a/arch/arm64/include/asm/tlb.h b/arch/arm64/include/asm/tlb.h
+index 72cadf5..fa2255e 100644
+--- a/arch/arm64/include/asm/tlb.h
++++ b/arch/arm64/include/asm/tlb.h
+@@ -99,5 +99,10 @@ static inline void __pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmdp,
+ }
+ #endif
+ 
++static inline void __tlb_remove_pmd_tlb_entry(struct mmu_gather *tlb, pmd_t *pmdp,
++						unsigned long address)
++{
++	tlb_add_flush(tlb, address);
++}
+ 
+ #endif
+-- 
+1.8.1.4
