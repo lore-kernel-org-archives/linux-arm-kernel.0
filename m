@@ -1,66 +1,44 @@
-From: yegorslists@googlemail.com (yegorslists at googlemail.com)
-Date: Thu, 24 Apr 2014 08:57:39 +0200
-Subject: [PATCH v3] gpio: omap: implement get_direction
-Message-ID: <1398322659-20008-1-git-send-email-yegorslists@googlemail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 24 Apr 2014 15:59:46 +0900
+Subject: [PATCH v6 0/2] clk: shmobile: r8a7779: Add clocks support
+In-Reply-To: <1397775951-30992-1-git-send-email-horms+renesas@verge.net.au>
+References: <1397775951-30992-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20140424065946.GC3925@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yegor Yefremov <yegorslists@googlemail.com>
+On Fri, Apr 18, 2014 at 08:05:49AM +0900, Simon Horman wrote:
+> Hi Mike,
+> 
+> please consider applying this series.
+> 
+> It is the first step on the way towards using the common clock framework
+> and in turn multi-platform on the r8a7779 (R-Car H1) SoC.
+> 
+> It has been acked by Laurent Pinchart who did similar work
+> for the R-Car Gen-2 family of SoCs. This work is based on that work.
+> 
+> The bindings added in this series have not been changed since
+> v4 was posted with devicetree at vger.kernel.org CCed on the 13th of March.
 
-This patch implements gpio_chip's get_direction() routine, that
-lets other drivers get particular GPIOs direction using
-struct gpio_desc.
+Hi Mike,
 
-Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
-Acked-by: Javier Martinez Canillas <javier@dowhile0.org>
----
-Changes:
-	v3: get rid of _get_gpio_direction() (Linus Walleij)
-	v2: rework return value calculation
- drivers/gpio/gpio-omap.c |   17 +++++++++++++++++
- 1 files changed, 17 insertions(+), 0 deletions(-)
+if you could take a look at this I would be most grateful.
 
-diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 19b886c..62c12e4 100644
---- a/drivers/gpio/gpio-omap.c
-+++ b/drivers/gpio/gpio-omap.c
-@@ -27,6 +27,7 @@
- #include <linux/irqdomain.h>
- #include <linux/irqchip/chained_irq.h>
- #include <linux/gpio.h>
-+#include <linux/bitops.h>
- #include <linux/platform_data/gpio-omap.h>
- 
- #define OFF_MODE	1
-@@ -936,6 +937,21 @@ static inline void mpuio_init(struct gpio_bank *bank)
- 
- /*---------------------------------------------------------------------*/
- 
-+static int gpio_get_direction(struct gpio_chip *chip, unsigned offset)
-+{
-+	struct gpio_bank *bank;
-+	unsigned long flags;
-+	void __iomem *reg;
-+	int dir;
-+
-+	bank = container_of(chip, struct gpio_bank, chip);
-+	reg = bank->base + bank->regs->direction;
-+	spin_lock_irqsave(&bank->lock, flags);
-+	dir = !!(readl_relaxed(reg) & BIT(offset));
-+	spin_unlock_irqrestore(&bank->lock, flags);
-+	return dir;
-+}
-+
- static int gpio_input(struct gpio_chip *chip, unsigned offset)
- {
- 	struct gpio_bank *bank;
-@@ -1092,6 +1108,7 @@ static void omap_gpio_chip_init(struct gpio_bank *bank)
- 	 */
- 	bank->chip.request = omap_gpio_request;
- 	bank->chip.free = omap_gpio_free;
-+	bank->chip.get_direction = gpio_get_direction;
- 	bank->chip.direction_input = gpio_input;
- 	bank->chip.get = gpio_get;
- 	bank->chip.direction_output = gpio_output;
--- 
-1.7.7
+> 
+> Simon Horman (2):
+>   clk: shmobile: r8a7779: Add clocks support
+>   clk: shmobile: r8a7779: Add MSTP clock support
+> 
+>  .../bindings/clock/renesas,cpg-mstp-clocks.txt     |   1 +
+>  .../bindings/clock/renesas,r8a7779-cpg-clocks.txt  |  27 ++++
+>  drivers/clk/shmobile/Makefile                      |   1 +
+>  drivers/clk/shmobile/clk-r8a7779.c                 | 180 +++++++++++++++++++++
+>  include/linux/clk/shmobile.h                       |   3 +
+>  5 files changed, 212 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/renesas,r8a7779-cpg-clocks.txt
+>  create mode 100644 drivers/clk/shmobile/clk-r8a7779.c
+> 
+> -- 
+> 1.8.4
+> 
