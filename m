@@ -1,62 +1,57 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 24 Apr 2014 12:47:44 -0400 (EDT)
-Subject: [PATCH 2/2] net: Add Keystone NetCP ethernet driver
-In-Reply-To: <1398201675-17379-3-git-send-email-santosh.shilimkar@ti.com>
-References: <1398201675-17379-1-git-send-email-santosh.shilimkar@ti.com>
- <1398201675-17379-3-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20140424.124744.1296959126932595844.davem@davemloft.net>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 24 Apr 2014 20:53:29 +0400
+Subject: [PATCH 11/23] ARM: dts: omap5-uevm.dts: add tca6424a
+In-Reply-To: <5359209F.7000308@ti.com>
+References: <1398334639-14172-1-git-send-email-tomi.valkeinen@ti.com>
+ <1398334639-14172-12-git-send-email-tomi.valkeinen@ti.com>
+ <53591669.7060502@cogentembedded.com> <5359209F.7000308@ti.com>
+Message-ID: <53594189.1090508@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Date: Tue, 22 Apr 2014 17:21:15 -0400
+Hello.
 
-> +struct netcp_tx_pipe {
-> +	struct netcp_device	*netcp_device;
-> +	void	*dma_queue;
+On 04/24/2014 06:33 PM, Tomi Valkeinen wrote:
 
-Indent *dma_queue the same as the other struct members.
+>>> omap5-uevm has a tca6424a I/O expander. Add it to the .dts file.
 
-> +	unsigned		dma_queue_id;
+>>> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+>>> Cc: Tony Lindgren <tony@atomide.com>
+>>> ---
+>>>    arch/arm/boot/dts/omap5-uevm.dts | 7 +++++++
+>>>    1 file changed, 7 insertions(+)
 
-Use explicit "unsigned int".
+>>> diff --git a/arch/arm/boot/dts/omap5-uevm.dts
+>>> b/arch/arm/boot/dts/omap5-uevm.dts
+>>> index 3b99ec25b748..9e7581eaeb23 100644
+>>> --- a/arch/arm/boot/dts/omap5-uevm.dts
+>>> +++ b/arch/arm/boot/dts/omap5-uevm.dts
+>>> @@ -434,6 +434,13 @@
+>>>        pinctrl-0 = <&i2c5_pins>;
+>>>
+>>>        clock-frequency = <400000>;
+>>> +
+>>> +    tca6424a: tca6424a at 22 {
 
-> +	unsigned		dma_chan_id;
+>>     The ePAPR standard [1] says: "The name of a node should be somewhat
+>> generic,
+>> reflecting the function of the device and not its precise programming
+>> model.
+>> If appropriate, the name should be one of the following choices:
+>> [...]
+>>     - gpio;"
 
-Likewise.
+> Right. I wonder what the name should be... "gpio" is out, as the name
+> should be more specific.
 
-> +struct netcp_addr {
-> +	struct netcp_intf	*netcp;
-> +	unsigned char		addr[MAX_ADDR_LEN];
+    No, it's not out. The name should be "gpio at 22", I think it would be unique.
 
-If this is just an ethernet driver, ETH_ALEN is more appropriate here.
+> We already have gpio1-8, which are the gpio
+> banks from the SoC.
 
-> +	unsigned		tx_compl_qid;
+    I don't understand why you are indexing the names while you probably have 
+the address part after @ that makes them unique already.
 
-Explicit "unsigned int" please.  I'm not going to point out all of the other
-instances, audit your entire submission for this problem please.
+>   Tomi
 
-> +static inline u32 *netcp_push_psdata(struct netcp_packet *p_info,
-> +				     unsigned bytes)
-> +{
-> +	u32		*buf;
-> +	unsigned	 words;
-
-Do not use tabs between the type and the variable name in local variable
-declarations.
-
-Please audit for and fix this in your entire submission.
-
-> +static inline u32 hwval_to_host(bool big_endian, u32 hwval)
-> +{
-> +	if (big_endian)
-> +		return be32_to_cpu(hwval);
-> +	else
-> +		return le32_to_cpu(hwval);
-> +}
-
-You're much better off having a set of methods, one for big endian and
-one for little endian, that just straight line codes the appropriate endian
-accesses.
-
-These conditionals peppered all over the place are just ugly.
+WBR, Sergei
