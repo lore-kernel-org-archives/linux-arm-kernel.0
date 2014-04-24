@@ -1,87 +1,57 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 24 Apr 2014 12:57:01 +0200
-Subject: [GIT PULL] ARM: Updates for mmci driver for 3.16, take 1
-In-Reply-To: <CAPDyKFp0K=cijuAZox7_BsTk2UCyC7Dp9HQoO6eJzaHikRMVUw@mail.gmail.com>
-References: <CAPDyKFp0K=cijuAZox7_BsTk2UCyC7Dp9HQoO6eJzaHikRMVUw@mail.gmail.com>
-Message-ID: <CAPDyKFo07dqfqTtrGp3sHwf1ghzCj4BaBqJffRAs=cA1-HP2Tw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 24 Apr 2014 11:57:45 +0100
+Subject: [PATCH 00/38] MMC updates, plus CuBox-i WiFi support
+In-Reply-To: <CAPDyKFrGReKF0ucer7D195boEoQW26=4vDXT+=Wn6BO-p_B1gQ@mail.gmail.com>
+References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
+ <CAPDyKFozP69yngKAkdwHYyyvi+pdLEm05udOmBiVshQFi4hnLQ@mail.gmail.com>
+ <20140424101726.GH26756@n2100.arm.linux.org.uk>
+ <CAPDyKFrGReKF0ucer7D195boEoQW26=4vDXT+=Wn6BO-p_B1gQ@mail.gmail.com>
+Message-ID: <20140424105745.GM26756@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 April 2014 16:17, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> Hi Russell,
->
-> I have collected some patches which all relates to changes to the mmci driver.
->
-> The SOC specific patches has been acked by the SOC maintainer Linus
-> Walleij and the DT patches has been iterated a few times, due to
-> comments from Rob Herring.
->
-> Unless you have some concern with any of the patches, please pull them
-> into your ARM tree.
+On Thu, Apr 24, 2014 at 12:52:11PM +0200, Ulf Hansson wrote:
+> On 24 April 2014 12:17, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> > On Thu, Apr 24, 2014 at 10:25:42AM +0200, Ulf Hansson wrote:
+> >> I have looked though the patches up until patch 33 and this is clearly
+> >> a nice piece of clean-up /fixes work for sdhci. Besides my minor
+> >> comments per patch, I don't have any objections code-review wise to
+> >> proceed merging them.
+> >>
+> >> I have also tried to applied them on Chris' mmc-next branch,
+> >> unfortunate it fails at patch 23, so it would be nice to get a
+> >> re-based patchset for the mmc-next branch.
+> >
+> > I /could/ rebase it but then I wouldn't be able to produce the patch
+> > sets/patches for others [*] (such as the Novena project) to derive
+> > their kernel tree from my iMX6 patch set.
+> >
+> > What I'd prefer is to keep the patch set intact, and provide Chris
+> > with a pull request for it up to patch 33, which would need a
+> > conflict fixed - and this would mean that I can be sure that what
+> > I'm testing, and what I'm distributing is what Chris will also be
+> > submitting.
+> 
+> Whether there are more than one conflict, I don't know. I just stopped
+> at patch 23.
+> 
+> Moreover, there are other patches for sdhci that have been posted and
+> being discussed. In principle, we then need to put all these on hold
+> to prevent further conflicts. I guess that doable, as long as we don't
+> to that for too long. Maybe Chris have some more thoughts how to
+> handle this!?
 
-Ping. :-)
+This is nothing new or unexpected - it was last posted back in February,
+and I elected that it should be held off until after the last merge
+window.
 
-Please, let me know if you prefer another setup than a pull request.
+Unfortunately, I didn't have time to post it immediately after the merge
+window closed, partly because it needed to be rebased on top of tglx's
+IRQ changes on which it depends.  I was carrying those as separate commits
+to the ones Thomas was carrying in his tree - and in the event, Thomas had
+modified his patches slightly between sending me copies of them and the
+versions he sent during the merge window.
 
-Kind regards
-Ulf Hansson
-
->
-> Kind regards
-> Ulf Hansson
->
->
-> The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
->
->   Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
->
-> are available in the git repository at:
->
->   git://git.linaro.org/people/ulf.hansson/linux-2.6.git
-> mmci_for_russell_3.16_take1
->
-> for you to fetch changes up to 724404ce84cbc3cb9a16dcc593bc4d07aa5b8b2e:
->
->   mmc: mmci: Enforce max frequency configuration through DT
-> (2014-04-14 15:55:09 +0200)
->
-> ----------------------------------------------------------------
-> Ulf Hansson (22):
->       mmc: mmci: Mask IRQs for all variants during runtime suspend
->       mmc: mmci: Let runtime PM callbacks be available for CONFIG_PM
->       mmc: mmci: Put the device into low power state at system suspend
->       mmc: mmci: Convert to the mmc gpio API
->       mmc: mmci: Convert to devm functions
->       mmc: mmci: Update DT documentation
->       mmc: mmci: Add DT bindings for signal direction
->       mmc: mmci: Add DT bindings for feedback clock pin
->       mmc: mmci: Use the common mmc DT parser
->       ARM: ux500: Add mmci signal directions and feeback clock in DT for href
->       ARM: ux500: Convert to the common mmc DT bindings for highspeed mode
->       ARM: nomadik: Convert to the common mmc DT bindings for highspeed mode
->       ARM: u300: Convert to the common mmc DT bindings for highspeed mode
->       mmc: mmci: Mark the DT bindings for highspeed mode as deprecated
->       mmc: mmci: Enable MMC_CAP_CMD23
->       ARM: ux500: Add the mmc capabilities flags to DT
->       ARM: ux500: Add a vmmc regulator through DT for the poped eMMC for href
->       ARM: ux500: Remove redundant board file for mmci platform data
->       mmc: mmci: Enforce DT for signal direction and feedback clock
->       mmc: mmci: Enforce mmc capabilities through DT
->       mmc: mmci: Enforce DMA configuration through DT
->       mmc: mmci: Enforce max frequency configuration through DT
->
->  Documentation/devicetree/bindings/mmc/mmci.txt |   54 +++-
->  arch/arm/boot/dts/ste-ccu9540.dts              |    6 +-
->  arch/arm/boot/dts/ste-href.dtsi                |   19 +-
->  arch/arm/boot/dts/ste-nomadik-stn8815.dtsi     |    4 +-
->  arch/arm/boot/dts/ste-snowball.dts             |    4 +-
->  arch/arm/boot/dts/ste-u300.dts                 |    4 +-
->  arch/arm/mach-ux500/Makefile                   |    3 +-
->  arch/arm/mach-ux500/board-mop500-sdi.c         |  166 ------------
->  arch/arm/mach-ux500/board-mop500.h             |    5 -
->  arch/arm/mach-ux500/cpu-db8500.c               |    4 -
->  drivers/mmc/host/mmci.c                        |  324 ++++++------------------
->  drivers/mmc/host/mmci.h                        |   14 +-
->  include/linux/amba/mmci.h                      |   42 ---
->  13 files changed, 169 insertions(+), 480 deletions(-)
->  delete mode 100644 arch/arm/mach-ux500/board-mop500-sdi.c
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
