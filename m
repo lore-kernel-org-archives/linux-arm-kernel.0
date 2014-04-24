@@ -1,117 +1,66 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Thu, 24 Apr 2014 15:57:31 +0900
-Subject: [PATCH 1/3] usb: ohci-exynos: Make provision for vdd regulators
-In-Reply-To: <CAFp+6iGo-Rk8d28=dosVW63f-ZrZjmxj9fsm7D7Vn4-HdhSgjw@mail.gmail.com>
-References: <1398082604-3013-1-git-send-email-gautam.vivek@samsung.com>
- <002b01cf5f52$a7bc0d70$f7342850$%tikhomirov@samsung.com>
- <001a01cf5f54$af090810$0d1b1830$%han@samsung.com>
- <000001cf5f5c$2f6c2440$8e446cc0$%han@samsung.com>
- <CAFp+6iGo-Rk8d28=dosVW63f-ZrZjmxj9fsm7D7Vn4-HdhSgjw@mail.gmail.com>
-Message-ID: <000201cf5f8a$76c7b9c0$64572d40$%han@samsung.com>
+From: yegorslists@googlemail.com (yegorslists at googlemail.com)
+Date: Thu, 24 Apr 2014 08:57:39 +0200
+Subject: [PATCH v3] gpio: omap: implement get_direction
+Message-ID: <1398322659-20008-1-git-send-email-yegorslists@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, April 24, 2014 3:40 PM, Vivek Gautam wrote:
-> On Thu, Apr 24, 2014 at 6:56 AM, Jingoo Han <jg1.han@samsung.com> wrote:
-> > On Thursday, April 24, 2014 9:33 AM, Jingoo Han wrote:
-> >> On Thursday, April 24, 2014 9:18 AM, Anton Tikhomirov wrote:
-> >> > On Monday, April 21, 2014 9:17 PM, Vivek Gautam wrote:
-> >> > >
-> >> > > Facilitate getting required 3.3V and 1.0V VDD supply for
-> >> > > OHCI controller on Exynos.
-> >> > >
-> >> > > With patches for regulators' nodes merged in 3.15:
-> >> > > c8c253f ARM: dts: Add regulator entries to smdk5420
-> >> > > 275dcd2 ARM: dts: add max77686 pmic node for smdk5250,
-> >> > >
-> >> > > certain perripherals will now need to ensure that,
-> >> > > they request VDD regulators in their drivers, and enable
-> >> > > them so as to make them working.
-> >> > >
-> >> > > Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
-> >> > > Cc: Jingoo Han <jg1.han@samsung.com>
-> >> > > ---
-> >> > >
-> >> > > Based on 'usb-next' branch of Greg's usb tree.
-> >> > >
-> >> > >  drivers/usb/host/ohci-exynos.c |   47
-> >> > > ++++++++++++++++++++++++++++++++++++++++
-> >> > >  1 file changed, 47 insertions(+)
-> >> > >
-> >> > > diff --git a/drivers/usb/host/ohci-exynos.c b/drivers/usb/host/ohci-
-> >> > > exynos.c
-> >> > > index 68588d8..e2e72a8 100644
-> >> > > --- a/drivers/usb/host/ohci-exynos.c
-> >> > > +++ b/drivers/usb/host/ohci-exynos.c
-> 
-> [snip]
-> 
-> >> > > @@ -98,6 +101,28 @@ static int exynos_ohci_probe(struct platform_device
-> >> > > *pdev)
-> >> > >           exynos_ohci->otg = phy->otg;
-> >> > >   }
-> >> > >
-> >> > > + exynos_ohci->vdd33 = devm_regulator_get(&pdev->dev, "vdd33");
-> >> > > + if (IS_ERR(exynos_ohci->vdd33)) {
-> >> > > +         err = PTR_ERR(exynos_ohci->vdd33);
-> >> > > +         goto fail_regulator1;
-> >> > > + }
-> >> > > + err = regulator_enable(exynos_ohci->vdd33);
-> >> > > + if (err) {
-> >> > > +         dev_err(&pdev->dev, "Failed to enable VDD33 supply\n");
-> >> > > +         goto fail_regulator1;
-> >> > > + }
-> >> > > +
-> >> > > + exynos_ohci->vdd10 = devm_regulator_get(&pdev->dev, "vdd10");
-> >> > > + if (IS_ERR(exynos_ohci->vdd10)) {
-> >> > > +         err = PTR_ERR(exynos_ohci->vdd10);
-> >> > > +         goto fail_regulator2;
-> >> > > + }
-> >> > > + err = regulator_enable(exynos_ohci->vdd10);
-> >> > > + if (err) {
-> >> > > +         dev_err(&pdev->dev, "Failed to enable VDD10 supply\n");
-> >> > > +         goto fail_regulator2;
-> >> > > + }
-> >> > > +
-> >> >
-> >> > Do we need to skip regulator settings together with PHY configuration
-> >> > in case of exynos5440?
-> >>
-> >> Oh, right. In the case of exynos5440, regulator settings is not
-> >> necessary. Vivek, would you fix it in order skip regulator settings
-> >> in exynos5440? It also applies to ehci-exynos.
-> >
-> > Sorry, in the case of exynos5440, this patch already skips
-> > regulator settings.
-> >
-> > In the case of exynos5440, there is no need to set PHY setting
-> > and regulator setting.
-> 
-> Right, in case of exynos5440, we are skipping PHY setting and regulator setting.
-> Actually i had missed taking into account 5440, so just curious. Do we
-> really not need a regulator
-> settings for Exynos5440 ?
+From: Yegor Yefremov <yegorslists@googlemail.com>
 
-To be more specific, there is no regulator on ssdk5440 board
-which is the Exynos5440-based board.
+This patch implements gpio_chip's get_direction() routine, that
+lets other drivers get particular GPIOs direction using
+struct gpio_desc.
 
-Best regards,
-Jingoo Han
+Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
+Acked-by: Javier Martinez Canillas <javier@dowhile0.org>
+---
+Changes:
+	v3: get rid of _get_gpio_direction() (Linus Walleij)
+	v2: rework return value calculation
+ drivers/gpio/gpio-omap.c |   17 +++++++++++++++++
+ 1 files changed, 17 insertions(+), 0 deletions(-)
 
-> > How about making regulator setting "optional"?
-> > Then, regulator setting can be done, only when regulator
-> > is supported.
-> 
-> True, so with Exynos5440 not needing the regulator, we should make the
-> regulator settings optional.
-
-[.....]
-
-> Thanks for the suggestion.
-> I will make the required changes, and post the patchset again.
-
-OK, I see.
-Thank you for accepting my suggestion.
-
-Best regards,
-Jingoo Han
+diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+index 19b886c..62c12e4 100644
+--- a/drivers/gpio/gpio-omap.c
++++ b/drivers/gpio/gpio-omap.c
+@@ -27,6 +27,7 @@
+ #include <linux/irqdomain.h>
+ #include <linux/irqchip/chained_irq.h>
+ #include <linux/gpio.h>
++#include <linux/bitops.h>
+ #include <linux/platform_data/gpio-omap.h>
+ 
+ #define OFF_MODE	1
+@@ -936,6 +937,21 @@ static inline void mpuio_init(struct gpio_bank *bank)
+ 
+ /*---------------------------------------------------------------------*/
+ 
++static int gpio_get_direction(struct gpio_chip *chip, unsigned offset)
++{
++	struct gpio_bank *bank;
++	unsigned long flags;
++	void __iomem *reg;
++	int dir;
++
++	bank = container_of(chip, struct gpio_bank, chip);
++	reg = bank->base + bank->regs->direction;
++	spin_lock_irqsave(&bank->lock, flags);
++	dir = !!(readl_relaxed(reg) & BIT(offset));
++	spin_unlock_irqrestore(&bank->lock, flags);
++	return dir;
++}
++
+ static int gpio_input(struct gpio_chip *chip, unsigned offset)
+ {
+ 	struct gpio_bank *bank;
+@@ -1092,6 +1108,7 @@ static void omap_gpio_chip_init(struct gpio_bank *bank)
+ 	 */
+ 	bank->chip.request = omap_gpio_request;
+ 	bank->chip.free = omap_gpio_free;
++	bank->chip.get_direction = gpio_get_direction;
+ 	bank->chip.direction_input = gpio_input;
+ 	bank->chip.get = gpio_get;
+ 	bank->chip.direction_output = gpio_output;
+-- 
+1.7.7
