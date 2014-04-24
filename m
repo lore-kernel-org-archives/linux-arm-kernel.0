@@ -1,81 +1,29 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 24 Apr 2014 11:30:05 -0400
-Subject: [PATCH v3 5/7] ARM: dma: Use dma_pfn_offset for dma address
- translation
-In-Reply-To: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1398353407-2345-6-git-send-email-santosh.shilimkar@ti.com>
+Date: Thu, 24 Apr 2014 11:42:18 -0400
+Subject: [PATCH 0/4] ARM: keystone: Use coherent higher memory address space
+Message-ID: <1398354142-2767-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Grygorii Strashko <grygorii.strashko@ti.com>
+Some of theses have been already posted in past as part of different series.
+The late code patching is already merged which means no dependency for patch 1
+to be merged and the ongoing dma-ranges series makes it complete for me to
+enable coherency on Keystone SOCs.
 
-In most of cases DMA addresses can be performed using offset value of
- Bus address space relatively to physical address space as following:
+Grygorii Strashko (1):
+  ARM: dts: keystone: Use dma-ranges property
 
-PFN->DMA:
- __pfn_to_phys(pfn + [-]dma_pfn_offset)
+Santosh Shilimkar (3):
+  ARM: keystone: Switch over to coherent memory address space
+  ARM: keystone: Update the dma offset for non-dt platform devices
+  ARM: dts: keystone: Update USB node for dma properties
 
-DMA->PFN:
- __phys_to_pfn(dma_addr) + [-]dma_pfn_offset
+ arch/arm/boot/dts/keystone.dtsi   |    3 ++
+ arch/arm/mach-keystone/keystone.c |   74 +++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-keystone/memory.h   |   24 ++++++++++++
+ arch/arm/mach-keystone/platsmp.c  |   18 ++++++++-
+ 4 files changed, 118 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/mach-keystone/memory.h
 
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Olof Johansson <olof@lixom.net>
-Cc: Grant Likely <grant.likely@linaro.org>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/include/asm/dma-mapping.h |   21 +++++++++++++++++----
- 1 file changed, 17 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-index e701a4d..424fda9 100644
---- a/arch/arm/include/asm/dma-mapping.h
-+++ b/arch/arm/include/asm/dma-mapping.h
-@@ -58,22 +58,35 @@ static inline int dma_set_mask(struct device *dev, u64 mask)
- #ifndef __arch_pfn_to_dma
- static inline dma_addr_t pfn_to_dma(struct device *dev, unsigned long pfn)
- {
--	return (dma_addr_t)__pfn_to_bus(pfn);
-+	if (!dev)
-+		return (dma_addr_t)__pfn_to_bus(pfn);
-+	else
-+		return (dma_addr_t)__pfn_to_bus(pfn - dev->dma_pfn_offset);
- }
- 
- static inline unsigned long dma_to_pfn(struct device *dev, dma_addr_t addr)
- {
--	return __bus_to_pfn(addr);
-+	if (!dev)
-+		return __bus_to_pfn(addr);
-+	else
-+		return __bus_to_pfn(addr) + dev->dma_pfn_offset;
- }
- 
- static inline void *dma_to_virt(struct device *dev, dma_addr_t addr)
- {
--	return (void *)__bus_to_virt((unsigned long)addr);
-+	if (!dev)
-+		return (void *)__bus_to_virt((unsigned long)addr);
-+	else
-+		return (void *)__bus_to_virt(__pfn_to_bus(dma_to_pfn(dev, addr)));
- }
- 
- static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
- {
--	return (dma_addr_t)__virt_to_bus((unsigned long)(addr));
-+	if (!dev)
-+		return (dma_addr_t)__virt_to_bus((unsigned long)(addr));
-+	else
-+		return pfn_to_dma(dev,
-+				__bus_to_pfn(__virt_to_bus((unsigned long)(addr))));
- }
- 
- #else
 -- 
 1.7.9.5
