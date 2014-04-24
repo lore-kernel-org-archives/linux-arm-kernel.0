@@ -1,28 +1,26 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 24 Apr 2014 00:13:08 -0400
-Subject: [PATCH] ARM: Kirkwood: T5325: Fix double probe of Codec
-In-Reply-To: <1397565608-1830-1-git-send-email-andrew@lunn.ch>
-References: <1397565608-1830-1-git-send-email-andrew@lunn.ch>
-Message-ID: <20140424041308.GQ28159@titan.lakedaemon.net>
+Date: Thu, 24 Apr 2014 00:27:17 -0400
+Subject: [PATCH] ARM: mvebu: Add a SOC bus device entry
+In-Reply-To: <1393955507-26436-1-git-send-email-andrew@lunn.ch>
+References: <1393955507-26436-1-git-send-email-andrew@lunn.ch>
+Message-ID: <20140424042717.GR28159@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15, 2014 at 02:40:08PM +0200, Andrew Lunn wrote:
-> The codec is defined both in DT and the board file. The board file
-> however contains platform data which is required in order that the
-> codec works. When the DT instantiates the codec before the board files
-> does, it is missing the platform data and so fails. Remove the DT node
-> until we have a binding which can pass the additional data.
+On Tue, Mar 04, 2014 at 06:51:47PM +0100, Andrew Lunn wrote:
+> Add the SoC Family, device ID and revision to /sys/bus/soc.
 > 
 > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 > ---
-> 
-> It would be good to get this into -rc2.
+>  arch/arm/mach-mvebu/Kconfig        |  1 +
+>  arch/arm/mach-mvebu/mvebu-soc-id.c | 28 ++++++++++++++++++++++++++++
+>  2 files changed, 29 insertions(+)
 
-oops, sorry.  This was accidentally placed in my -next queue, not my
--fixes.
+Applied to mvebu/soc
 
-Applied to mvebu/dt-fixes.
+Please make sure to run make with -q to catch newly introduced warnings.
+I added 'return 0;' to the end of the function, and explicitly 'return
+0;' for !is_id_valid.
 
 thx,
 
