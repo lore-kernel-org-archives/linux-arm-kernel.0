@@ -1,62 +1,157 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Thu, 24 Apr 2014 09:31:54 +0900
-Subject: [PATCH 35/38] mmc: dw_mmc: call mmc_of_parse to fill in common
- options
-In-Reply-To: <E1Wd2Xd-0003we-7P@rmk-PC.arm.linux.org.uk>
-References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
- <E1Wd2Xd-0003we-7P@rmk-PC.arm.linux.org.uk>
-Message-ID: <53585B7A.3@samsung.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Thu, 24 Apr 2014 09:32:33 +0900
+Subject: [PATCH 1/3] usb: ohci-exynos: Make provision for vdd regulators
+In-Reply-To: <002b01cf5f52$a7bc0d70$f7342850$%tikhomirov@samsung.com>
+References: <1398082604-3013-1-git-send-email-gautam.vivek@samsung.com>
+ <002b01cf5f52$a7bc0d70$f7342850$%tikhomirov@samsung.com>
+Message-ID: <001a01cf5f54$af090810$0d1b1830$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear, Russell.
-
-I didn't know which version you have checked.
-But I have known that mmc_of_parse() have already included at mmc-next repository.
-
-commit 6ca5c60605dde3420ce7fee6f93ec4a7c7924848
-Author: Jaehoon Chung <jh80.chung@gmail.com>
-Date:   Mon Mar 3 11:36:41 2014 +0900
-
-    mmc: dw_mmc: use the mmc_of_parse() instead of local parser
-
-    mmc_of_parse() have been already parsed the general capability.
-    Didn't need to use the local parser.
-
-    Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
-    Acked-by: Seungwon Jeon <tgih.jun@samsung.com>
-    Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-    Signed-off-by: Chris Ball <chris@printf.net>
-
-Could you check it, plz?
-
-Best Regards,
-Jaehoon Chung
-
-On 04/24/2014 04:09 AM, Russell King wrote:
-> From: Olof Johansson <olof@lixom.net>
+On Thursday, April 24, 2014 9:18 AM, Anton Tikhomirov wrote:
+> On Monday, April 21, 2014 9:17 PM, Vivek Gautam wrote:
+> >
+> > Facilitate getting required 3.3V and 1.0V VDD supply for
+> > OHCI controller on Exynos.
+> >
+> > With patches for regulators' nodes merged in 3.15:
+> > c8c253f ARM: dts: Add regulator entries to smdk5420
+> > 275dcd2 ARM: dts: add max77686 pmic node for smdk5250,
+> >
+> > certain perripherals will now need to ensure that,
+> > they request VDD regulators in their drivers, and enable
+> > them so as to make them working.
+> >
+> > Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+> > Cc: Jingoo Han <jg1.han@samsung.com>
+> > ---
+> >
+> > Based on 'usb-next' branch of Greg's usb tree.
+> >
+> >  drivers/usb/host/ohci-exynos.c |   47
+> > ++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 47 insertions(+)
+> >
+> > diff --git a/drivers/usb/host/ohci-exynos.c b/drivers/usb/host/ohci-
+> > exynos.c
+> > index 68588d8..e2e72a8 100644
+> > --- a/drivers/usb/host/ohci-exynos.c
+> > +++ b/drivers/usb/host/ohci-exynos.c
+> > @@ -18,6 +18,7 @@
+> >  #include <linux/module.h>
+> >  #include <linux/of.h>
+> >  #include <linux/platform_device.h>
+> > +#include <linux/regulator/consumer.h>
+> >  #include <linux/usb/phy.h>
+> >  #include <linux/usb/samsung_usb_phy.h>
+> >  #include <linux/usb.h>
+> > @@ -37,6 +38,8 @@ struct exynos_ohci_hcd {
+> >  	struct clk *clk;
+> >  	struct usb_phy *phy;
+> >  	struct usb_otg *otg;
+> > +	struct regulator *vdd33;
+> > +	struct regulator *vdd10;
+> >  };
+> >
+> >  static void exynos_ohci_phy_enable(struct platform_device *pdev)
+> > @@ -98,6 +101,28 @@ static int exynos_ohci_probe(struct platform_device
+> > *pdev)
+> >  		exynos_ohci->otg = phy->otg;
+> >  	}
+> >
+> > +	exynos_ohci->vdd33 = devm_regulator_get(&pdev->dev, "vdd33");
+> > +	if (IS_ERR(exynos_ohci->vdd33)) {
+> > +		err = PTR_ERR(exynos_ohci->vdd33);
+> > +		goto fail_regulator1;
+> > +	}
+> > +	err = regulator_enable(exynos_ohci->vdd33);
+> > +	if (err) {
+> > +		dev_err(&pdev->dev, "Failed to enable VDD33 supply\n");
+> > +		goto fail_regulator1;
+> > +	}
+> > +
+> > +	exynos_ohci->vdd10 = devm_regulator_get(&pdev->dev, "vdd10");
+> > +	if (IS_ERR(exynos_ohci->vdd10)) {
+> > +		err = PTR_ERR(exynos_ohci->vdd10);
+> > +		goto fail_regulator2;
+> > +	}
+> > +	err = regulator_enable(exynos_ohci->vdd10);
+> > +	if (err) {
+> > +		dev_err(&pdev->dev, "Failed to enable VDD10 supply\n");
+> > +		goto fail_regulator2;
+> > +	}
+> > +
 > 
-> The shared of parse function fills in common options for capabilities,
-> etc, but it needs to be called from each driver that wants to make use
-> of it. dw_mmc was missing the call.
+> Do we need to skip regulator settings together with PHY configuration
+> in case of exynos5440?
+
+Oh, right. In the case of exynos5440, regulator settings is not 
+necessary. Vivek, would you fix it in order skip regulator settings
+in exynos5440? It also applies to ehci-exynos.
+
+Best regards,
+Jingoo Han
+
 > 
-> Signed-off-by: Olof Johansson <olof@lixom.net>
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  drivers/mmc/host/dw_mmc.c | 2 ++
->  1 file changed, 2 insertions(+)
+> >  skip_phy:
+> >  	exynos_ohci->clk = devm_clk_get(&pdev->dev, "usbhost");
+> >
+> > @@ -154,6 +179,10 @@ fail_add_hcd:
+> >  fail_io:
+> >  	clk_disable_unprepare(exynos_ohci->clk);
+> >  fail_clk:
+> > +	regulator_disable(exynos_ohci->vdd10);
+> > +fail_regulator2:
+> > +	regulator_disable(exynos_ohci->vdd33);
+> > +fail_regulator1:
+> >  	usb_put_hcd(hcd);
+> >  	return err;
+> >  }
+> > @@ -172,6 +201,9 @@ static int exynos_ohci_remove(struct
+> > platform_device *pdev)
+> >
+> >  	clk_disable_unprepare(exynos_ohci->clk);
+> >
+> > +	regulator_disable(exynos_ohci->vdd10);
+> > +	regulator_disable(exynos_ohci->vdd33);
+> > +
+> >  	usb_put_hcd(hcd);
+> >
+> >  	return 0;
+> > @@ -208,6 +240,9 @@ static int exynos_ohci_suspend(struct device *dev)
+> >
+> >  	clk_disable_unprepare(exynos_ohci->clk);
+> >
+> > +	regulator_disable(exynos_ohci->vdd10);
+> > +	regulator_disable(exynos_ohci->vdd33);
+> > +
+> >  	spin_unlock_irqrestore(&ohci->lock, flags);
+> >
+> >  	return 0;
+> > @@ -218,6 +253,18 @@ static int exynos_ohci_resume(struct device *dev)
+> >  	struct usb_hcd *hcd			= dev_get_drvdata(dev);
+> >  	struct exynos_ohci_hcd *exynos_ohci	= to_exynos_ohci(hcd);
+> >  	struct platform_device *pdev		= to_platform_device(dev);
+> > +	int ret;
+> > +
+> > +	ret = regulator_enable(exynos_ohci->vdd33);
+> > +	if (ret) {
+> > +		dev_err(dev, "Failed to enable VDD33 supply\n");
+> > +		return ret;
 > 
-> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-> index cced599d5aeb..a2c12ebb376e 100644
-> --- a/drivers/mmc/host/dw_mmc.c
-> +++ b/drivers/mmc/host/dw_mmc.c
-> @@ -2140,6 +2140,8 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
->  	if (!mmc)
->  		return -ENOMEM;
->  
-> +	mmc_of_parse(mmc);
-> +
->  	slot = mmc_priv(mmc);
->  	slot->id = id;
->  	slot->mmc = mmc;
+> Not sure, but shall we continue resuming and do everything
+> we can in case of error? At least it will avoid
+> WARN_ON(clk->enable_count == 0) on next system suspend.
 > 
+> > +	}
+> > +	ret = regulator_enable(exynos_ohci->vdd10);
+> > +	if (ret) {
+> > +		dev_err(dev, "Failed to enable VDD10 supply\n");
+> > +		return ret;
+> > +	}
+> >
+> >  	clk_prepare_enable(exynos_ohci->clk);
+> >
+> > --
+> 
+> Thanks
