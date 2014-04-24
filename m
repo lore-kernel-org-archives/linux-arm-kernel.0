@@ -1,41 +1,34 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 24 Apr 2014 15:36:23 +0530
-Subject: [PATCH v3 0/4] ARM: DRA7: Add support for DRA72x devices
-Message-ID: <1398333987-19454-1-git-send-email-rnayak@ti.com>
+Date: Thu, 24 Apr 2014 15:36:24 +0530
+Subject: [PATCH v3 1/4] ARM: dts: dra7-evm: Remove the wrong and undocumented
+ compatible
+In-Reply-To: <1398333987-19454-1-git-send-email-rnayak@ti.com>
+References: <1398333987-19454-1-git-send-email-rnayak@ti.com>
+Message-ID: <1398333987-19454-2-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-changes in v3:
-Removed wildcards from compatible strings and duplicates from
-.dt_compat strings as suggested by Arnd
+"ti,dra752" is neither documented nor correct, since the device is actually a
+dra742 device as rightly documented in dt bindings.
 
-DRA72x devices are single core Cortex A15 devices belonging to the
-DRA7 family (Similar to the DRA74x devices which are dual core Cortex
-A15 based)
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+Cc: devicetree at vger.kernel.org
+---
+ arch/arm/boot/dts/dra7-evm.dts |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-The patches (based off 3.15-rc2) add minimal DT/kernel modifications to add
-boot support for DRA72x devices reusing all the kernel data for DRA74x devices.
-
-Rajendra Nayak (4):
-  ARM: dts: dra7-evm: Remove the wrong and undocumented compatible
-  ARM: dts: Add support for DRA72x family of devices
-  ARM: OMAP2+: Add machine entry for dra72x devices
-  ARM: DRA7: Add support for soc_is_dra74x() and soc_is_dra72x()
-    varients
-
- .../devicetree/bindings/arm/omap/omap.txt          |   14 ++++--
- arch/arm/boot/dts/Makefile                         |    3 +-
- arch/arm/boot/dts/dra7-evm.dts                     |    6 +--
- arch/arm/boot/dts/dra7.dtsi                        |   27 ------------
- arch/arm/boot/dts/dra72-evm.dts                    |   24 +++++++++++
- arch/arm/boot/dts/dra72x.dtsi                      |   25 +++++++++++
- arch/arm/boot/dts/dra74x.dtsi                      |   41 ++++++++++++++++++
- arch/arm/mach-omap2/board-generic.c                |   45 ++++++++++++++------
- arch/arm/mach-omap2/soc.h                          |    7 +++
- 9 files changed, 143 insertions(+), 49 deletions(-)
- create mode 100644 arch/arm/boot/dts/dra72-evm.dts
- create mode 100644 arch/arm/boot/dts/dra72x.dtsi
- create mode 100644 arch/arm/boot/dts/dra74x.dtsi
-
+diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
+index 5babba0..7807429 100644
+--- a/arch/arm/boot/dts/dra7-evm.dts
++++ b/arch/arm/boot/dts/dra7-evm.dts
+@@ -11,7 +11,7 @@
+ 
+ / {
+ 	model = "TI DRA7";
+-	compatible = "ti,dra7-evm", "ti,dra752", "ti,dra7";
++	compatible = "ti,dra7-evm", "ti,dra7";
+ 
+ 	memory {
+ 		device_type = "memory";
 -- 
 1.7.9.5
