@@ -1,65 +1,55 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 24 Apr 2014 11:47:37 +0100
-Subject: [PATCH] ARM: mm: dma: Update coherent streaming apis with
- missing memory barrier
-In-Reply-To: <20140423190448.GB26756@n2100.arm.linux.org.uk>
-References: <1398103390-31968-1-git-send-email-santosh.shilimkar@ti.com>
- <20140423171727.GK5649@arm.com>
- <20140423183742.GK24070@n2100.arm.linux.org.uk>
- <6414220.SShvCHLvZQ@wuerfel>
- <20140423190448.GB26756@n2100.arm.linux.org.uk>
-Message-ID: <20140424104737.GE8521@arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 24 Apr 2014 12:52:11 +0200
+Subject: [PATCH 00/38] MMC updates, plus CuBox-i WiFi support
+In-Reply-To: <20140424101726.GH26756@n2100.arm.linux.org.uk>
+References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
+ <CAPDyKFozP69yngKAkdwHYyyvi+pdLEm05udOmBiVshQFi4hnLQ@mail.gmail.com>
+ <20140424101726.GH26756@n2100.arm.linux.org.uk>
+Message-ID: <CAPDyKFrGReKF0ucer7D195boEoQW26=4vDXT+=Wn6BO-p_B1gQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 23, 2014 at 08:04:48PM +0100, Russell King - ARM Linux wrote:
-> On Wed, Apr 23, 2014 at 08:58:05PM +0200, Arnd Bergmann wrote:
-> > On Wednesday 23 April 2014 19:37:42 Russell King - ARM Linux wrote:
-> > > On Wed, Apr 23, 2014 at 06:17:27PM +0100, Will Deacon wrote:
-> > > > On Wed, Apr 23, 2014 at 05:02:16PM +0100, Catalin Marinas wrote:
-> > > > > In the I/O coherency case, I would say it is the responsibility of the
-> > > > > device/hardware to ensure that the data is visible to all observers
-> > > > > (CPUs) prior to issuing a interrupt for DMA-ready. Looking at the mvebu
-> > > > > code, I think it covers such scenario from-device or bidirectional
-> > > > > scenarios.
-> > > > > 
-> > > > > Maybe Santosh still has a point  but I don't know what the right
-> > > > > barrier would be here. And I really *hate* per-SoC/snoop unit barriers
-> > > > > (I still hope a dsb would do the trick on newer/ARMv8 systems).
-> > > > 
-> > > > If you have device interrupts which are asynchronous to memory coherency,
-> > > > then you're in a world of pain. I can't think of a generic (architected)
-> > > > solution to this problem, unfortunately -- it's going to be both device
-> > > > and interconnect specific. Adding dsbs doesn't necessarily help at all.
-> > > 
-> > > Think, network devices with NAPI handling.  There, we explicitly turn
-> > > off the device's interrupt, and switch to software polling for received
-> > > packets.
-> > >
-> > > The memory for the packets has already been mapped, and we're unmapping
-> > > the buffer, and then reading from it (to locate the ether type, and/or
-> > > vlan headers) before passing it up the network stack.
-> > > 
-> > > So in this case, we need to ensure that the cache operations are ordered
-> > > before the subsequent loads read from the DMA'd data.  It's purely an
-> > > ordering thing, it's not a completion thing.
-> > 
-> > PCI guarantees this, but I have seen systems in the past (on PowerPC) that
-> > would violate them on the internal interconnect: You could sometimes see the
-> > completion DMA data in the descriptor ring before the actual user data
-> > is there. We only ever observed it in combination with an IOMMU, when the
-> > descriptor address had a valid IOTLB but the data address did not.
-> 
-> What is done on down-stream buses is of no concern to the behaviour of
-> the CPU, which is what's being discussed here (in terms of barriers.)
-> and the correct CPU ordering of various read/writes to memory and
-> devices vs the streaming cache operations.
+On 24 April 2014 12:17, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> On Thu, Apr 24, 2014 at 10:25:42AM +0200, Ulf Hansson wrote:
+>> I have looked though the patches up until patch 33 and this is clearly
+>> a nice piece of clean-up /fixes work for sdhci. Besides my minor
+>> comments per patch, I don't have any objections code-review wise to
+>> proceed merging them.
+>>
+>> I have also tried to applied them on Chris' mmc-next branch,
+>> unfortunate it fails at patch 23, so it would be nice to get a
+>> re-based patchset for the mmc-next branch.
+>
+> I /could/ rebase it but then I wouldn't be able to produce the patch
+> sets/patches for others [*] (such as the Novena project) to derive
+> their kernel tree from my iMX6 patch set.
+>
+> What I'd prefer is to keep the patch set intact, and provide Chris
+> with a pull request for it up to patch 33, which would need a
+> conflict fixed - and this would mean that I can be sure that what
+> I'm testing, and what I'm distributing is what Chris will also be
+> submitting.
 
-It is still of concern because for cases like NAPI an rmb() on the CPU
-side is no longer enough. If you use a common network driver, written
-correctly with rmb(), but you have some weird interconnect which doesn't
-ensure ordering, you have to add interconnect specific barrier to the
-rmb() (or hack the dma ops like mvebu). I consider such hardware broken.
+Whether there are more than one conflict, I don't know. I just stopped
+at patch 23.
 
--- 
-Catalin
+Moreover, there are other patches for sdhci that have been posted and
+being discussed. In principle, we then need to put all these on hold
+to prevent further conflicts. I guess that doable, as long as we don't
+to that for too long. Maybe Chris have some more thoughts how to
+handle this!?
+
+Kind regards
+Ulf Hansson
+
+>
+> * - this currently stands at 230 patches in all - mmc + l2c + fec +
+>     imx-drm + other iMX6 changes.
+>
+> --
+> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+> improving, and getting towards what was expected from it.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
