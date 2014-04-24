@@ -1,71 +1,41 @@
-From: alexanders83@web.de (Alexander Stein)
-Date: Thu, 24 Apr 2014 19:55:39 +0200
-Subject: [PATCH v2] pinctrl/at91: Fix lockup when IRQ on PIOC and PIOD occurs
-In-Reply-To: <1398289203-2407-1-git-send-email-alexanders83@web.de>
-References: <1398289203-2407-1-git-send-email-alexanders83@web.de>
-Message-ID: <1398362139-25551-1-git-send-email-alexanders83@web.de>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 24 Apr 2014 11:58:44 -0600
+Subject: [PATCH 0/8] i.MX6 PCIe binding change and MSI support
+In-Reply-To: <1396025579-14344-1-git-send-email-l.stach@pengutronix.de>
+References: <1396025579-14344-1-git-send-email-l.stach@pengutronix.de>
+Message-ID: <20140424175844.GD29593@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With commit 80cc3732 (pinctrl/at91: convert driver to use gpiolib irqchip)
-gpiochip_set_chained_irqchip is called for PIOC, PIOD and PIOE. The
-associated GPIO chip for the IRQ chip is overwritten each time, because
-they share the same hard IRQ line.
-Thus if an IRQ occurs on PIOC or PIOD, gpio_irq_handler will only check on
-PIOE (the assigned GPIO chip) where no event occured. Thus the IRQ will
-not be cleared, retriggering the ISR.
-Fix that (like done before) by only set the PIOC GPIO chip to the IRQ chip
-and walk the list in the irq handler.
+On Fri, Mar 28, 2014 at 05:52:51PM +0100, Lucas Stach wrote:
+> While working on MSI support for the i.MX6 PCIe host driver
+> it has been discovered that the binding for this host controller
+> is broken in many ways (refer to the patch descriptions for more
+> info) and was introduced without proper discussion about what
+> should/should not be in the binding.
+> 
+> This series fixes this and minimizes the difference of the
+> i.MX6 binding to the common designware PCIe binding. I'm aware
+> that this is a quite radical change, but I think it's justified
+> to do this as long as there aren't many user of the old binding
+> (most of the optional properties in the binding aren't even
+> implemented).
+> 
+> Looking forward to your feedback.
+> 
+> Lucas Stach (8):
+>   ARM: imx6q-clk: parent lvds_gate from lvds_sel
+>   PCI: designware: split Exynos and i.MX bindings
+>   ARM: dts: imx6: update pcie to bring in line with new binding
+>   PCI: imx6: use new clock names
+>   PCI: imx6: drop old irq mapping
+>   PCI: imx6: rip out optional (and unused) irqs
+>   PCI: designware: make MSI isr shared irq aware
+>   PCI: imx6: add support for MSI
 
-Signed-off-by: Alexander Stein <alexanders83@web.de>
----
-Changes in v2:
-* Fix git SHA1 in commit message (used local one)
-* Switch to the next gpio_chip when walking the list
+What's the status of all these?  I would normally apply patches 4-8 of this
+series through my tree, given the appropriate acks, but I haven't seen
+those yet.  And I'm not sure what dependencies there are between the
+non-PCI patches and the PCI ones.
 
-Now really tested with evtest on inputs with IRQ on PIO A, B, D and E!
-I don't have any useable GPIO on PIO C though.
-
- drivers/pinctrl/pinctrl-at91.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
-
-diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-index 64a8f8f..d90ae02 100644
---- a/drivers/pinctrl/pinctrl-at91.c
-+++ b/drivers/pinctrl/pinctrl-at91.c
-@@ -1453,6 +1453,7 @@ static void gpio_irq_handler(unsigned irq, struct irq_desc *desc)
- 				break;
- 			at91_gpio = at91_gpio->next;
- 			pio = at91_gpio->regbase;
-+			gpio_chip = &at91_gpio->chip;
- 			continue;
- 		}
- 
-@@ -1468,6 +1469,7 @@ static void gpio_irq_handler(unsigned irq, struct irq_desc *desc)
- static int at91_gpio_of_irq_setup(struct device_node *node,
- 				  struct at91_gpio_chip *at91_gpio)
- {
-+	struct at91_gpio_chip   *prev = NULL;
- 	struct irq_data		*d = irq_get_irq_data(at91_gpio->pioc_virq);
- 	int ret;
- 
-@@ -1493,6 +1495,17 @@ static int at91_gpio_of_irq_setup(struct device_node *node,
- 		panic("at91_gpio.%d: couldn't allocate irq domain (DT).\n",
- 			at91_gpio->pioc_idx);
- 
-+	/* Setup chained handler */
-+	if (at91_gpio->pioc_idx)
-+		prev = gpio_chips[at91_gpio->pioc_idx - 1];
-+
-+	/* The top level handler handles one bank of GPIOs, except
-+	 * on some SoC it can handle up to three...
-+	 * We only set up the handler for the first of the list.
-+	 */
-+	if (prev && prev->next == at91_gpio)
-+		return 0;
-+
- 	/* Then register the chain on the parent IRQ */
- 	gpiochip_set_chained_irqchip(&at91_gpio->chip,
- 				     &gpio_irqchip,
--- 
-1.9.2
+Bjorn
