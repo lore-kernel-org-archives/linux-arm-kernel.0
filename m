@@ -1,238 +1,128 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 24 Apr 2014 15:23:10 +0200
-Subject: [PATCH v2 2/4] ARM: S3C24XX: trim down debug uart handling
+Date: Thu, 24 Apr 2014 15:23:45 +0200
+Subject: [PATCH v2 3/4] ARM: S3C24XX: use generic DEBUG_UART_PHY/_VIRT in
+ debug macro
 In-Reply-To: <1856986.kkQFKFg1L2@phil>
 References: <1856986.kkQFKFg1L2@phil>
-Message-ID: <199768557.KA84zMPfE3@phil>
+Message-ID: <1407426.Blop7O5hnW@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using the lowlevel debug uart is a corner case - even more so in a
-multiplatform environment. So it seems reasonable to simply let the
-developer set the appropriate uart type for the debugged SoC.
+This removes the need for mach/-headers in the debug macro.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- arch/arm/Kconfig.debug                           | 30 ++++++++++++++
- arch/arm/mach-s3c24xx/Kconfig                    | 28 -------------
- arch/arm/mach-s3c24xx/include/mach/debug-macro.S | 52 +-----------------------
- 3 files changed, 31 insertions(+), 79 deletions(-)
+ arch/arm/Kconfig.debug                           | 23 +++++++++++++++++++++--
+ arch/arm/mach-s3c24xx/include/mach/debug-macro.S |  9 ++-------
+ 2 files changed, 23 insertions(+), 9 deletions(-)
 
 diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 4a2fc0b..cb5751f 100644
+index cb5751f..9755e63 100644
 --- a/arch/arm/Kconfig.debug
 +++ b/arch/arm/Kconfig.debug
-@@ -670,6 +670,33 @@ choice
- 		  The uncompressor code port configuration is now handled
- 		  by CONFIG_S3C_LOWLEVEL_UART_PORT.
+@@ -625,6 +625,7 @@ choice
+ 	config DEBUG_S3C_UART0
+ 		depends on PLAT_SAMSUNG
+ 		select DEBUG_EXYNOS_UART if ARCH_EXYNOS
++		select DEBUG_S3C24XX_UART if ARCH_S3C24XX
+ 		bool "Use S3C UART 0 for low-level debug"
+ 		help
+ 		  Say Y here if you want the debug print routines to direct
+@@ -637,6 +638,7 @@ choice
+ 	config DEBUG_S3C_UART1
+ 		depends on PLAT_SAMSUNG
+ 		select DEBUG_EXYNOS_UART if ARCH_EXYNOS
++		select DEBUG_S3C24XX_UART if ARCH_S3C24XX
+ 		bool "Use S3C UART 1 for low-level debug"
+ 		help
+ 		  Say Y here if you want the debug print routines to direct
+@@ -649,6 +651,7 @@ choice
+ 	config DEBUG_S3C_UART2
+ 		depends on PLAT_SAMSUNG
+ 		select DEBUG_EXYNOS_UART if ARCH_EXYNOS
++		select DEBUG_S3C24XX_UART if ARCH_S3C24XX
+ 		bool "Use S3C UART 2 for low-level debug"
+ 		help
+ 		  Say Y here if you want the debug print routines to direct
+@@ -950,6 +953,10 @@ config DEBUG_EXYNOS_UART
  
-+	config DEBUG_S3C2410_UART0
-+		depends on ARCH_S3C24XX
-+		select DEBUG_S3C2410_UART
-+		bool "Use S3C2410/S3C2412 UART 0 for low-level debug"
-+		help
-+		  Say Y here if you want the debug print routines to direct
-+		  their output to UART 0. The port must have been initialised
-+		  by the boot-loader before use.
-+
-+	config DEBUG_S3C2410_UART1
-+		depends on ARCH_S3C24XX
-+		select DEBUG_S3C2410_UART
-+		bool "Use S3C2410/S3C2412 UART 1 for low-level debug"
-+		help
-+		  Say Y here if you want the debug print routines to direct
-+		  their output to UART 1. The port must have been initialised
-+		  by the boot-loader before use.
-+
-+	config DEBUG_S3C2410_UART2
-+		depends on ARCH_S3C24XX
-+		select DEBUG_S3C2410_UART
-+		bool "Use S3C2410/S3C2412 UART 2 for low-level debug"
-+		help
-+		  Say Y here if you want the debug print routines to direct
-+		  their output to UART 2. The port must have been initialised
-+		  by the boot-loader before use.
-+
- 	config DEBUG_SOCFPGA_UART
- 		depends on ARCH_SOCFPGA
- 		bool "Use SOCFPGA UART for low-level debug"
-@@ -921,6 +948,9 @@ endchoice
- config DEBUG_EXYNOS_UART
+ config DEBUG_S3C2410_UART
  	bool
- 
-+config DEBUG_S3C2410_UART
-+	bool
++	select DEBUG_S3C24XX_UART
 +
++config DEBUG_S3C24XX_UART
++	bool
+ 
  config DEBUG_OMAP2PLUS_UART
  	bool
- 	depends on ARCH_OMAP2PLUS
-diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
-index 40cf50b..98d17af 100644
---- a/arch/arm/mach-s3c24xx/Kconfig
-+++ b/arch/arm/mach-s3c24xx/Kconfig
-@@ -26,7 +26,6 @@ config CPU_S3C2410
- 	bool "SAMSUNG S3C2410"
- 	default y
- 	select CPU_ARM920T
--	select CPU_LLSERIAL_S3C2410
- 	select S3C2410_CLOCK
- 	select S3C2410_DMA if S3C24XX_DMA
- 	select ARM_S3C2410_CPUFREQ if ARM_S3C24XX_CPUFREQ
-@@ -39,7 +38,6 @@ config CPU_S3C2410
- config CPU_S3C2412
- 	bool "SAMSUNG S3C2412"
- 	select CPU_ARM926T
--	select CPU_LLSERIAL_S3C2440
- 	select S3C2412_DMA if S3C24XX_DMA
- 	select S3C2412_PM if PM
- 	help
-@@ -48,7 +46,6 @@ config CPU_S3C2412
- config CPU_S3C2416
- 	bool "SAMSUNG S3C2416/S3C2450"
- 	select CPU_ARM926T
--	select CPU_LLSERIAL_S3C2440
- 	select S3C2416_PM if PM
- 	select S3C2443_COMMON
- 	select S3C2443_DMA if S3C24XX_DMA
-@@ -59,7 +56,6 @@ config CPU_S3C2416
- config CPU_S3C2440
- 	bool "SAMSUNG S3C2440"
- 	select CPU_ARM920T
--	select CPU_LLSERIAL_S3C2440
- 	select S3C2410_CLOCK
- 	select S3C2410_PM if PM
- 	select S3C2440_DMA if S3C24XX_DMA
-@@ -69,7 +65,6 @@ config CPU_S3C2440
- config CPU_S3C2442
- 	bool "SAMSUNG S3C2442"
- 	select CPU_ARM920T
--	select CPU_LLSERIAL_S3C2440
- 	select S3C2410_CLOCK
- 	select S3C2410_DMA if S3C24XX_DMA
- 	select S3C2410_PM if PM
-@@ -84,7 +79,6 @@ config CPU_S3C244X
- config CPU_S3C2443
- 	bool "SAMSUNG S3C2443"
- 	select CPU_ARM920T
--	select CPU_LLSERIAL_S3C2440
- 	select S3C2443_COMMON
- 	select S3C2443_DMA if S3C24XX_DMA
- 	select SAMSUNG_CLKSRC
-@@ -158,28 +152,6 @@ config S3C2410_PM
- 	help
- 	  Power Management code common to S3C2410 and better
+@@ -1059,6 +1066,12 @@ config DEBUG_UART_PHYS
+ 	default 0x40090000 if ARCH_LPC32XX
+ 	default 0x40100000 if DEBUG_PXA_UART1
+ 	default 0x42000000 if ARCH_GEMINI
++	default 0x50000000 if DEBUG_S3C24XX_UART && (DEBUG_S3C_UART0 || \
++				DEBUG_S3C2410_UART0)
++	default 0x50004000 if DEBUG_S3C24XX_UART && (DEBUG_S3C_UART1 || \
++				DEBUG_S3C2410_UART1)
++	default 0x50008000 if DEBUG_S3C24XX_UART && (DEBUG_S3C_UART2 || \
++				DEBUG_S3C2410_UART2)
+ 	default 0x7c0003f8 if FOOTBRIDGE
+ 	default 0x80230000 if DEBUG_PICOXCELL_UART
+ 	default 0x80070000 if DEBUG_IMX23_UART
+@@ -1088,7 +1101,7 @@ config DEBUG_UART_PHYS
+ 	default 0xfffff700 if ARCH_IOP33X
+ 	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
+ 		DEBUG_LL_UART_EFM32 || \
+-		DEBUG_UART_8250 || DEBUG_UART_PL01X
++		DEBUG_UART_8250 || DEBUG_UART_PL01X || DEBUG_S3C24XX_UART
  
--# low-level serial option nodes
--
--config CPU_LLSERIAL_S3C2410_ONLY
--	bool
--	default y if CPU_LLSERIAL_S3C2410 && !CPU_LLSERIAL_S3C2440
--
--config CPU_LLSERIAL_S3C2440_ONLY
--	bool
--	default y if CPU_LLSERIAL_S3C2440 && !CPU_LLSERIAL_S3C2410
--
--config CPU_LLSERIAL_S3C2410
--	bool
--	help
--	  Selected if there is an S3C2410 (or register compatible) serial
--	  low-level implementation needed
--
--config CPU_LLSERIAL_S3C2440
--	bool
--	help
--	  Selected if there is an S3C2440 (or register compatible) serial
--	  low-level implementation needed
--
- config S3C24XX_PLL
- 	bool "Support CPUfreq changing of PLL frequency (EXPERIMENTAL)"
- 	depends on ARM_S3C24XX_CPUFREQ
+ config DEBUG_UART_VIRT
+ 	hex "Virtual base address of debug UART"
+@@ -1105,6 +1118,12 @@ config DEBUG_UART_VIRT
+ 	default 0xf2100000 if DEBUG_PXA_UART1
+ 	default 0xf4090000 if ARCH_LPC32XX
+ 	default 0xf4200000 if ARCH_GEMINI
++	default 0xf7000000 if DEBUG_S3C24XX_UART && (DEBUG_S3C_UART0 || \
++				DEBUG_S3C2410_UART0)
++	default 0xf7004000 if DEBUG_S3C24XX_UART && (DEBUG_S3C_UART1 || \
++				DEBUG_S3C2410_UART1)
++	default 0xf7008000 if DEBUG_S3C24XX_UART && (DEBUG_S3C_UART2 || \
++				DEBUG_S3C2410_UART2)
+ 	default 0xf7fc9000 if DEBUG_BERLIN_UART
+ 	default 0xf8009000 if DEBUG_VEXPRESS_UART0_CA9
+ 	default 0xf8090000 if DEBUG_VEXPRESS_UART0_RS1
+@@ -1146,7 +1165,7 @@ config DEBUG_UART_VIRT
+ 	default 0xff003000 if DEBUG_U300_UART
+ 	default DEBUG_UART_PHYS if !MMU
+ 	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
+-		DEBUG_UART_8250 || DEBUG_UART_PL01X
++		DEBUG_UART_8250 || DEBUG_UART_PL01X || DEBUG_S3C24XX_UART
+ 
+ config DEBUG_UART_8250_SHIFT
+ 	int "Register offset shift for the 8250 debug UART"
 diff --git a/arch/arm/mach-s3c24xx/include/mach/debug-macro.S b/arch/arm/mach-s3c24xx/include/mach/debug-macro.S
-index 2f39737..fbe3e71 100644
+index fbe3e71..b1f54dc 100644
 --- a/arch/arm/mach-s3c24xx/include/mach/debug-macro.S
 +++ b/arch/arm/mach-s3c24xx/include/mach/debug-macro.S
-@@ -13,11 +13,9 @@
+@@ -12,18 +12,13 @@
+  * published by the Free Software Foundation.
  */
  
- #include <mach/map.h>
--#include <mach/regs-gpio.h>
+-#include <mach/map.h>
  #include <linux/serial_s3c.h>
  
  #define S3C2410_UART1_OFF (0x4000)
--#define SHIFT_2440TXF (14-9)
  
  	.macro addruart, rp, rv, tmp
- 		ldr	\rp, = S3C24XX_PA_UART
-@@ -28,56 +26,11 @@
- #endif
+-		ldr	\rp, = S3C24XX_PA_UART
+-		ldr	\rv, = S3C24XX_VA_UART
+-#if CONFIG_DEBUG_S3C_UART != 0
+-		add	\rp, \rp, #(S3C2410_UART1_OFF * CONFIG_DEBUG_S3C_UART)
+-		add	\rv, \rv, #(S3C2410_UART1_OFF * CONFIG_DEBUG_S3C_UART)
+-#endif
++		ldr	\rp, = CONFIG_DEBUG_UART_PHYS
++		ldr	\rv, = CONFIG_DEBUG_UART_VIRT
  	.endm
  
--	.macro fifo_full_s3c24xx rd, rx
--		@ check for arm920 vs arm926. currently assume all arm926
--		@ devices have an 64 byte FIFO identical to the s3c2440
--		mrc	p15, 0, \rd, c0, c0
--		and	\rd, \rd, #0xff0
--		teq	\rd, #0x260
--		beq	1004f
--		mrc	p15, 0, \rd, c1, c0
--		tst	\rd, #1
--		addeq	\rd, \rx, #(S3C24XX_PA_GPIO - S3C24XX_PA_UART)
--		addne	\rd, \rx, #(S3C24XX_VA_GPIO - S3C24XX_VA_UART)
--		bic	\rd, \rd, #0xff000
--		ldr	\rd, [\rd, # S3C2410_GSTATUS1 - S3C2410_GPIOREG(0)]
--		and	\rd, \rd, #0x00ff0000
--		teq	\rd, #0x00440000		@ is it 2440?
--1004:
--		ldr	\rd, [\rx, # S3C2410_UFSTAT]
--		moveq	\rd, \rd, lsr #SHIFT_2440TXF
--		tst	\rd, #S3C2410_UFSTAT_TXFULL
--	.endm
--
  	.macro  fifo_full_s3c2410 rd, rx
- 		ldr	\rd, [\rx, # S3C2410_UFSTAT]
- 		tst	\rd, #S3C2410_UFSTAT_TXFULL
- 	.endm
- 
--/* fifo level reading */
--
--	.macro fifo_level_s3c24xx rd, rx
--		@ check for arm920 vs arm926. currently assume all arm926
--		@ devices have an 64 byte FIFO identical to the s3c2440
--		mrc	p15, 0, \rd, c0, c0
--		and	\rd, \rd, #0xff0
--		teq	\rd, #0x260
--		beq	10000f
--		mrc	p15, 0, \rd, c1, c0
--		tst	\rd, #1
--		addeq	\rd, \rx, #(S3C24XX_PA_GPIO - S3C24XX_PA_UART)
--		addne	\rd, \rx, #(S3C24XX_VA_GPIO - S3C24XX_VA_UART)
--		bic	\rd, \rd, #0xff000
--		ldr	\rd, [\rd, # S3C2410_GSTATUS1 - S3C2410_GPIOREG(0)]
--		and	\rd, \rd, #0x00ff0000
--		teq	\rd, #0x00440000		@ is it 2440?
--
--10000:
--		ldr	\rd, [\rx, # S3C2410_UFSTAT]
--		andne	\rd, \rd, #S3C2410_UFSTAT_TXMASK
--		andeq	\rd, \rd, #S3C2440_UFSTAT_TXMASK
--	.endm
--
- 	.macro fifo_level_s3c2410 rd, rx
- 		ldr	\rd, [\rx, # S3C2410_UFSTAT]
- 		and	\rd, \rd, #S3C2410_UFSTAT_TXMASK
-@@ -88,12 +41,9 @@
-  * used variants of these
- */
- 
--#if defined(CONFIG_CPU_LLSERIAL_S3C2410_ONLY)
-+#if defined(CONFIG_DEBUG_S3C2410_UART)
- #define fifo_full  fifo_full_s3c2410
- #define fifo_level fifo_level_s3c2410
--#elif !defined(CONFIG_CPU_LLSERIAL_S3C2440_ONLY)
--#define fifo_full  fifo_full_s3c24xx
--#define fifo_level fifo_level_s3c24xx
- #endif
- 
- /* include the reset of the code which will do the work */
 -- 
 1.9.0
