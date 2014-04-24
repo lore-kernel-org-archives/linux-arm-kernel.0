@@ -1,100 +1,37 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Thu, 24 Apr 2014 13:17:06 +0300
-Subject: [PATCH 10/23] ARM: dts: omap5.dtsi: add DSS nodes
+Date: Thu, 24 Apr 2014 13:17:07 +0300
+Subject: [PATCH 11/23] ARM: dts: omap5-uevm.dts: add tca6424a
 In-Reply-To: <1398334639-14172-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1398334639-14172-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1398334639-14172-11-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1398334639-14172-12-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add OMAP5 DSS nodes to omap5.dtsi.
+omap5-uevm has a tca6424a I/O expander. Add it to the .dts file.
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 Cc: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/boot/dts/omap5.dtsi | 70 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 70 insertions(+)
+ arch/arm/boot/dts/omap5-uevm.dts | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index 6f3de22fb266..b2a28e6575df 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -863,6 +863,76 @@
+diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
+index 3b99ec25b748..9e7581eaeb23 100644
+--- a/arch/arm/boot/dts/omap5-uevm.dts
++++ b/arch/arm/boot/dts/omap5-uevm.dts
+@@ -434,6 +434,13 @@
+ 	pinctrl-0 = <&i2c5_pins>;
  
- 			#thermal-sensor-cells = <1>;
- 		};
+ 	clock-frequency = <400000>;
 +
-+		dss: dss at 58000000 {
-+			compatible = "ti,omap5-dss";
-+			reg = <0x58000000 0x80>;
-+			status = "disabled";
-+			ti,hwmods = "dss_core";
-+			clocks = <&dss_dss_clk>;
-+			clock-names = "fck";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+
-+			dispc at 58001000 {
-+				compatible = "ti,omap5-dispc";
-+				reg = <0x58001000 0x1000>;
-+				interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
-+				ti,hwmods = "dss_dispc";
-+				clocks = <&dss_dss_clk>;
-+				clock-names = "fck";
-+			};
-+
-+			rfbi: encoder at 58002000  {
-+				compatible = "ti,omap5-rfbi";
-+				reg = <0x58002000 0x100>;
-+				status = "disabled";
-+				ti,hwmods = "dss_rfbi";
-+				clocks = <&dss_dss_clk>, <&dss_l3_iclk>;
-+				clock-names = "fck", "ick";
-+			};
-+
-+			dsi1: encoder at 58004000 {
-+				compatible = "ti,omap5-dsi";
-+				reg = <0x58004000 0x200>,
-+				      <0x58004200 0x40>,
-+				      <0x58004300 0x40>;
-+				reg-names = "proto", "phy", "pll";
-+				interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>;
-+				status = "disabled";
-+				ti,hwmods = "dss_dsi1";
-+				clocks = <&dss_dss_clk>, <&dss_sys_clk>;
-+				clock-names = "fck", "sys_clk";
-+			};
-+
-+			dsi2: encoder at 58005000 {
-+				compatible = "ti,omap5-dsi";
-+				reg = <0x58009000 0x200>,
-+				      <0x58009200 0x40>,
-+				      <0x58009300 0x40>;
-+				reg-names = "proto", "phy", "pll";
-+				interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;
-+				status = "disabled";
-+				ti,hwmods = "dss_dsi2";
-+				clocks = <&dss_dss_clk>, <&dss_sys_clk>;
-+				clock-names = "fck", "sys_clk";
-+			};
-+
-+			hdmi: encoder at 58060000 {
-+				compatible = "ti,omap5-hdmi";
-+				reg = <0x58040000 0x400>,
-+				      <0x58040200 0x80>,
-+				      <0x58040300 0x80>,
-+				      <0x58060000 0x19000>;
-+				reg-names = "wp", "pll", "phy", "core";
-+				interrupts = <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
-+				status = "disabled";
-+				ti,hwmods = "dss_hdmi";
-+				clocks = <&dss_48mhz_clk>, <&dss_sys_clk>;
-+				clock-names = "fck", "sys_clk";
-+			};
-+		};
- 	};
++	tca6424a: tca6424a at 22 {
++		compatible = "ti,tca6424";
++		reg = <0x22>;
++		gpio-controller;
++		#gpio-cells = <2>;
++	};
  };
  
+ &mcbsp3 {
 -- 
 1.9.1
