@@ -1,56 +1,56 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Thu, 24 Apr 2014 21:00:49 +0800
-Subject: [PATCH v8 2/3] net: hisilicon: new hip04 MDIO driver
-In-Reply-To: <201404241428.10248.arnd@arndb.de>
-References: <1397869980-21187-1-git-send-email-zhangfei.gao@linaro.org>
- <201404221630.07865.arnd@arndb.de> <53568398.2030800@linaro.org>
- <201404241428.10248.arnd@arndb.de>
-Message-ID: <53590B01.8070105@linaro.org>
+From: shaik.ameer@samsung.com (Shaik Ameer Basha)
+Date: Thu, 24 Apr 2014 18:33:36 +0530
+Subject: [PATCH v3 00/16] exynos5420: clock file cleanup
+Message-ID: <1398344632-18623-1-git-send-email-shaik.ameer@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Many changes/fixes have been identified for clock file for exynos5420.
+These include correct parents, bit fields, new clocks etc. Existing
+files needs some correction in terms of names of the clock and
+indentation. These issues are addressed in this patch series. It also
+replaces the usage of enums with macro as clock ids.
 
+This patch series is rebased on,
+git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git:master
 
-On 04/24/2014 08:28 PM, Arnd Bergmann wrote:
-> On Tuesday 22 April 2014, zhangfei wrote:
->> On 04/22/2014 10:30 PM, Arnd Bergmann wrote:
->>> On Tuesday 22 April 2014, zhangfei wrote:
->>>> On 04/22/2014 04:22 PM, Arnd Bergmann wrote:
->
->>> But it means that the hip04_mdio driver potentially won't work if connected
->>> to something other than a Marvell PHY.
->>>
->>> I noticed that the marvell_of_reg_init() does this at init time:
->>>
->>> saved_page = phy_read(phydev, MII_MARVELL_PHY_PAGE);
->>> ... /* perform init */
->>> if (page_changed)
->>>        phy_write(phydev, MII_MARVELL_PHY_PAGE, saved_page);
->>>
->>> Is this a bug? Maybe it should always set page 0 when leaving
->>> this function.
->>>
->> It is correct behavior return to the original page.
->>
->> First get_phy_id, then match driver according to the id, then operation
->> in the specific driver have the chance to run, including
->> marvell_of_reg_init etc.
->>
->> Just unlucky the default value of PHY_PAGE after power on is not 0.
->
-> Ok, so it's actually not possible to detect this case prior to having
-> to work around it.
->
-> How about adding a DT property as a flag to tell the driver whether
-> to set the page to zero or not? That would let the driver work
-> with different types of PHY implementations, or skip the code if
-> there is firmware that can already set it up to page zero.
->
+This patch is also dependent on the following patch.
+ARM: dts: add dt node for sss module for exynos5250/5420
 
-Currently we suspect it maybe caused by bootloader (uefi) has accessed 
-page register and forgot to recover, still in double confirm.
-Even it not caused by uefi, we can set to page 0 in uefi, and let mdio 
-driver common to other phy.
-So we may remove the bus->reset, and let uefi do the preparation.
+Changes since v2:
+-----------------
+1] Addressed review comments from Gerhard Sittig and Tomasz Figa.
 
-Thanks
+Changes since v1:
+-----------------
+1] Addressed review comments from Tomasz Figa.
+    http://www.spinics.net/lists/devicetree/msg16759.html
+    http://www.spinics.net/lists/devicetree/msg16760.html
+
+Shaik Ameer Basha (16):
+  clk: exynos5420: rename parent clocks
+  clk: exynos5420: add clocks for ISP block
+  clk: exynos5420: update clocks for GSCL and MSCL blocks
+  clk: exynos5420: correct clock parents for mscl sysmmu
+  clk: exynos5420: update clocks for G2D block
+  clk: exynos5420: update clocks for DISP1 block
+  clk: exynos5420: update clocks for PERIC block
+  clk: exynos5420: update clocks for PERIS and GEN blocks
+  clk: exynos5420: update clocks for WCORE block
+  clk: exynos5420: update clocks for FSYS and FSYS2 blocks
+  clk: exynos5420: correct sysmmu-mfc parent clocks
+  clk: exynos5420: fix register offset for sclk_bpll
+  clk: exynos5420: cleanup core and misc clocks
+  clk: exynos5420: correct g3d parent clock
+  clk: exynos5420: create clock ID for mout_sclk_vpll
+  clk: exynos5420: add more registers to restore list
+
+ arch/arm/boot/dts/exynos5420.dtsi      |   14 +-
+ drivers/clk/samsung/clk-exynos5420.c   |  808 ++++++++++++++++++++------------
+ include/dt-bindings/clock/exynos5420.h |   33 +-
+ 3 files changed, 550 insertions(+), 305 deletions(-)
+ mode change 100644 => 100755 drivers/clk/samsung/clk-exynos5420.c
+ mode change 100644 => 100755 include/dt-bindings/clock/exynos5420.h
+
+-- 
+1.7.9.5
