@@ -1,25 +1,25 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 24 Apr 2014 11:30:00 -0400
-Subject: [PATCH v3 0/7] of: setup dma parameters using dma-ranges and
- dma-coherent
-Message-ID: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
+Date: Thu, 24 Apr 2014 11:30:01 -0400
+Subject: [PATCH v3 1/7] device: introduce per device dma_pfn_offset
+In-Reply-To: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1398353407-2345-2-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here is an updated v3 of the series. Series introduces support for setting up
-dma parameters based on device tree properties like 'dma-ranges' and
-'dma-coherent' and also update to ARM 32 bit port. Earlier version of the
-series can be found here [3], [2] and [1].
+On few architectures, there are few restrictions on DMAble area of system
+RAM. That also means that devices needs to know about this restrictions so
+that the dma_masks can be updated accordingly and dma address translation
+helpers can add/subtract the dma offset.
 
-The 'dma-ranges' helps to take care of few DMAable system memory restrictions
-by use of dma_pfn_offset which we maintain now per device. Arch code then
-uses it for dma address translations for such cases. We update the
-dma_pfn_offset accordingly during DT the device creation process.The
-'dma-coherent' property is used to setup arch's coherent dma_ops.
+In most of cases DMA addresses can be performed using offset value of
+Bus address space relatively to physical address space as following:
 
-Hopefully with acks, tested-by this version can get into 3.16 queue. I will
-post a followup series for Keystone SOC which will use this infrastructure.
-Linus W also wants to use this for ARM integrator platform dma offset issue.
+PFN->DMA:  __pfn_to_phys(pfn + [-]dma_pfn_offset)
+DMA->PFN:  __phys_to_pfn(dma_addr) + [-]dma_pfn_offset
+
+So we introduce per device dma_pfn_offset which can be popullated
+by architecture init code while creating the devices.
 
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: Russell King <linux@arm.linux.org.uk>
@@ -29,34 +29,31 @@ Cc: Grant Likely <grant.likely@linaro.org>
 Cc: Rob Herring <robh+dt@kernel.org>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Grygorii Strashko <grygorii.strashko@ti.com>
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ include/linux/device.h |    2 ++
+ 1 file changed, 2 insertions(+)
 
-Grygorii Strashko (2):
-  of: introduce of_dma_get_range() helper
-  ARM: dma: Use dma_pfn_offset for dma address translation
-
-Santosh Shilimkar (5):
-  device: introduce per device dma_pfn_offset
-  of: introduce of_dma_is_coherent() helper
-  of: configure the platform device dma parameters
-  ARM: dma: implement set_arch_dma_coherent_ops()
-  ARM: dma: use phys_addr_t in __dma_page_[cpu_to_dev/dev_to_cpu]
-
- arch/arm/include/asm/dma-mapping.h |   28 ++++++++++--
- arch/arm/mm/dma-mapping.c          |    4 +-
- drivers/of/address.c               |   87 ++++++++++++++++++++++++++++++++++++
- drivers/of/platform.c              |   71 +++++++++++++++++++++++++++--
- include/linux/device.h             |    2 +
- include/linux/dma-mapping.h        |    7 +++
- include/linux/of_address.h         |    8 ++++
- include/linux/of_platform.h        |    6 +++
- 8 files changed, 204 insertions(+), 9 deletions(-)
-
-Regards,
-Santosh
-
-[1] http://www.spinics.net/lists/arm-kernel/msg311678.html
-[2] https://lkml.org/lkml/2014/3/6/186
-[3] https://lkml.org/lkml/2014/4/19/80
+diff --git a/include/linux/device.h b/include/linux/device.h
+index 233bbbe..85a52d6 100644
+--- a/include/linux/device.h
++++ b/include/linux/device.h
+@@ -691,6 +691,7 @@ struct acpi_dev_node {
+  * @coherent_dma_mask: Like dma_mask, but for alloc_coherent mapping as not all
+  * 		hardware supports 64-bit addresses for consistent allocations
+  * 		such descriptors.
++ * @dma_pfn_offset: offset of DMA memory range relatively of RAM
+  * @dma_parms:	A low level driver may set these to teach IOMMU code about
+  * 		segment limitations.
+  * @dma_pools:	Dma pools (if dma'ble device).
+@@ -756,6 +757,7 @@ struct device {
+ 					     not all hardware supports
+ 					     64 bit addresses for consistent
+ 					     allocations such descriptors. */
++	unsigned long	dma_pfn_offset;
+ 
+ 	struct device_dma_parameters *dma_parms;
+ 
 -- 
 1.7.9.5
