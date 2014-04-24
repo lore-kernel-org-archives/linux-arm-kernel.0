@@ -1,37 +1,43 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 24 Apr 2014 11:55:06 +0300
-Subject: [PATCH V2 00/19] bus: omap_l3_noc: driver cleanups and support
- for DRA7/AM4372
-In-Reply-To: <5350410B.5010507@ti.com>
-References: <1397492726-17203-1-git-send-email-nm@ti.com>
- <1397767775-10965-1-git-send-email-nm@ti.com> <53504041.7090906@ti.com>
- <5350410B.5010507@ti.com>
-Message-ID: <5358D16A.9000500@ti.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 24 Apr 2014 10:58:59 +0200
+Subject: [PATCH 01/38] mmc: sdio_irq: rework sdio irq handling
+In-Reply-To: <20140424084616.GE26756@n2100.arm.linux.org.uk>
+References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
+ <E1Wd2Up-0003uJ-7k@rmk-PC.arm.linux.org.uk>
+ <CAPDyKFpqJQ4pA6JEWjBwxbuoZ9HkiUAz89O_5YVVBaVh13XeMQ@mail.gmail.com>
+ <20140424084616.GE26756@n2100.arm.linux.org.uk>
+Message-ID: <CAPDyKFrPSvtvGgKX+ZgF0kPvr=m1rsUYUcHjyC_=UL5PUhYX2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/18/2014 12:00 AM, Nishanth Menon wrote:
-> On 04/17/2014 03:57 PM, Santosh Shilimkar wrote:
->> I looked at the series and its looks pretty good. Thanks for fixups, updates.
->> For whole series,
->> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+On 24 April 2014 10:46, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> On Thu, Apr 24, 2014 at 09:58:55AM +0200, Ulf Hansson wrote:
+>> On 23 April 2014 21:06, Russell King <rmk+kernel@arm.linux.org.uk> wrote:
+>> > +               if (!(host->caps2 & MMC_CAP2_SDIO_NOTHREAD)) {
+>> > +                       atomic_set(&host->sdio_irq_thread_abort, 0);
+>> > +                       host->sdio_irq_thread =
+>> > +                               kthread_run(sdio_irq_thread, host,
+>> > +                                           "ksdioirqd/%s", mmc_hostname(host));
+>> > +                       if (IS_ERR(host->sdio_irq_thread)) {
+>> > +                               int err = PTR_ERR(host->sdio_irq_thread);
+>> > +                               host->sdio_irqs--;
+>> > +                               return err;
+>> > +                       }
+>> > +               } else {
 >>
-> 
-> Thanks.
-> 
->>> Patches(including Peter's) is available here:
->>> https://github.com/nmenon/linux-2.6-playground/commits/l3noc/driver-fixes-v2
->>>
->> Can Tony pull this branch for 3.16 then which includes Peter's series as well ?
-> 
-> there is just an empty commit with information about peter's patches
-> that i lined up to differentiate the series.. I can drop it if Tony
-> would like me to.
+>> I suppose you need to check for MMC_CAP_SDIO_IRQ here?
+>
+> Why would you set MMC_CAP2_SDIO_NOTHREAD if you didn't have MMC_CAP_SDIO_IRQ ?
 
-Looking at the branch I see my patches underneath so they are in the branch.
-It would be great if Tony pulls this... Will be a great present to my patches
-(omap_l3 patches in the branch) for their 1 year anniversary of being out on
-the mailing list ;)
+You are right!
 
--- 
-P?ter
+Maybe change the name to "MMC_CAP2_SDIO_IRQ_NOTHREAD", unless we think
+it becomes too long :-). Additionally, there are actually still some
+bits available in the MMC_CAP_* bits, instead of the MMC_CAP2_*.
+
+No strong opinion though, feel free to keep as is.
+
+>
+> --
+> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+> improving, and getting towards what was expected from it.
