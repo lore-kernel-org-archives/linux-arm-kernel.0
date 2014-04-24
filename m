@@ -1,79 +1,50 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 24 Apr 2014 19:04:22 +0200
-Subject: [PATCH] ARM: dts: exynos4: clean up arm-pmu node
-In-Reply-To: <1397480584-16195-1-git-send-email-chanho61.park@samsung.com>
-References: <1397480584-16195-1-git-send-email-chanho61.park@samsung.com>
-Message-ID: <53594416.4070601@samsung.com>
+Date: Thu, 24 Apr 2014 19:06:30 +0200
+Subject: [PATCH] arm: dts: exynos4412-trats2: rename alias for i2c_ak8975
+ label
+In-Reply-To: <534D4143.3050801@samsung.com>
+References: <534D4143.3050801@samsung.com>
+Message-ID: <53594496.4010607@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chanho,
+Hi Tomasz,
 
-On 14.04.2014 15:03, Chanho Park wrote:
-> This patch cleans a arm-pmu node up for exynos4. Only exynos4412 series
-> boards have four pmu interrupts. Rest of exynos4 boards, except 4412, have only
-> two pmu interrupts. Thus, we can define two interrupts in the
-> exynos4.dtsi and extends the interrupts only exynos4412.dtsi.
+On 15.04.2014 16:25, Tomasz Stanislawski wrote:
+> The i2c_ak8975 controler uses label i2c8.
+> This alias is already used for I2C controller 8 defined
+> in file arch/arm/boot/dts/exynos4.dtsi.
 >
-> Cc: Chanwoo Choi <cw00.choi@samsung.com>
-> Signed-off-by: Chanho Park <chanho61.park@samsung.com>
+> This patch renames a label for i2c_ak8975 to i2c9.
+>
+> Signed-off-by: Tomasz Stanislawski <t.stanislaws@samsung.com>
 > ---
->   arch/arm/boot/dts/exynos4.dtsi    | 6 ++++++
->   arch/arm/boot/dts/exynos4210.dtsi | 6 ------
->   arch/arm/boot/dts/exynos4412.dtsi | 6 ++++++
->   arch/arm/boot/dts/exynos4x12.dtsi | 6 ------
->   4 files changed, 12 insertions(+), 12 deletions(-)
+>   arch/arm/boot/dts/exynos4412-trats2.dts |    2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
 >
-> diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-> index e541ecb..6de978c 100644
-> --- a/arch/arm/boot/dts/exynos4.dtsi
-> +++ b/arch/arm/boot/dts/exynos4.dtsi
-> @@ -105,6 +105,12 @@
->   		reg = <0x10440000 0x1000>;
+> diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+> index c16b315..5add765 100644
+> --- a/arch/arm/boot/dts/exynos4412-trats2.dts
+> +++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+> @@ -20,7 +20,7 @@
+>   	compatible = "samsung,trats2", "samsung,exynos4412", "samsung,exynos4";
+>
+>   	aliases {
+> -		i2c8 = &i2c_ak8975;
+> +		i2c9 = &i2c_ak8975;
 >   	};
 >
-> +	pmu {
-> +		compatible = "arm,cortex-a9-pmu";
-> +		interrupt-parent = <&combiner>;
-> +		interrupts = <2 2>, <3 2>;
-> +	};
-> +
->   	sys_reg: syscon at 10010000 {
->   		compatible = "samsung,exynos4-sysreg", "syscon";
->   		reg = <0x10010000 0x400>;
-> diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-> index cacf614..4e7610f 100644
-> --- a/arch/arm/boot/dts/exynos4210.dtsi
-> +++ b/arch/arm/boot/dts/exynos4210.dtsi
-> @@ -75,12 +75,6 @@
->   		#clock-cells = <1>;
->   	};
+>   	memory {
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 >
-> -	pmu {
-> -		compatible = "arm,cortex-a9-pmu";
-> -		interrupt-parent = <&combiner>;
-> -		interrupts = <2 2>, <3 2>;
-> -	};
-> -
->   	pinctrl_0: pinctrl at 11400000 {
->   		compatible = "samsung,exynos4210-pinctrl";
->   		reg = <0x11400000 0x1000>;
-> diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
-> index 15d3c0a..e6af870 100644
-> --- a/arch/arm/boot/dts/exynos4412.dtsi
-> +++ b/arch/arm/boot/dts/exynos4412.dtsi
-> @@ -26,6 +26,12 @@
->   		samsung,combiner-nr = <20>;
->   	};
->
-> +	pmu {
-> +		compatible = "arm,cortex-a9-pmu";
-> +		interrupt-parent = <&combiner>;
 
-I guess you could omit the two properties above and let them be 
-inherited from exynos4.dtsi.
+Seems reasonable.
 
-Otherwise looks fine.
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 
+--
 Best regards,
 Tomasz
