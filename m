@@ -1,344 +1,81 @@
-From: yegorslists@googlemail.com (yegorslists at googlemail.com)
-Date: Thu, 24 Apr 2014 11:24:31 +0200
-Subject: [RFC] tty: serial: omap: use mctrl_gpio helpers
-In-Reply-To: <1398331471-16745-1-git-send-email-yegorslists@googlemail.com>
-References: <1398331471-16745-1-git-send-email-yegorslists@googlemail.com>
-Message-ID: <1398331471-16745-2-git-send-email-yegorslists@googlemail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 24 Apr 2014 10:54:23 +0100
+Subject: [PATCH] ARM: mm: dma: Update coherent streaming apis with
+ missing memory barrier
+In-Reply-To: <20140423183742.GK24070@n2100.arm.linux.org.uk>
+References: <1398103390-31968-1-git-send-email-santosh.shilimkar@ti.com>
+ <201404222153.41786.arnd@arndb.de> <5356C9D1.2060001@ti.com>
+ <5895821.PvurJ8TWz2@wuerfel> <5356D163.1070304@ti.com>
+ <20140423090251.GA5281@arm.com> <20140423160216.GC2208@arm.com>
+ <20140423171727.GK5649@arm.com>
+ <20140423183742.GK24070@n2100.arm.linux.org.uk>
+Message-ID: <20140424095422.GC8521@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yegor Yefremov <yegorslists@googlemail.com>
+On Wed, Apr 23, 2014 at 07:37:42PM +0100, Russell King - ARM Linux wrote:
+> On Wed, Apr 23, 2014 at 06:17:27PM +0100, Will Deacon wrote:
+> > On Wed, Apr 23, 2014 at 05:02:16PM +0100, Catalin Marinas wrote:
+> > > In the I/O coherency case, I would say it is the responsibility of the
+> > > device/hardware to ensure that the data is visible to all observers
+> > > (CPUs) prior to issuing a interrupt for DMA-ready. Looking at the mvebu
+> > > code, I think it covers such scenario from-device or bidirectional
+> > > scenarios.
+> > > 
+> > > Maybe Santosh still has a point ;) but I don't know what the right
+> > > barrier would be here. And I really *hate* per-SoC/snoop unit barriers
+> > > (I still hope a dsb would do the trick on newer/ARMv8 systems).
+> > 
+> > If you have device interrupts which are asynchronous to memory coherency,
+> > then you're in a world of pain. I can't think of a generic (architected)
+> > solution to this problem, unfortunately -- it's going to be both device
+> > and interconnect specific. Adding dsbs doesn't necessarily help at all.
+> 
+> Think, network devices with NAPI handling.  There, we explicitly turn
+> off the device's interrupt, and switch to software polling for received
+> packets.
+> 
+> The memory for the packets has already been mapped, and we're unmapping
+> the buffer, and then reading from it (to locate the ether type, and/or
+> vlan headers) before passing it up the network stack.
+> 
+> So in this case, we need to ensure that the cache operations are ordered
+> before the subsequent loads read from the DMA'd data.  It's purely an
+> ordering thing, it's not a completion thing.
 
-This patch permits to use GPIOs to control the CTS/RTS/DTR/DSR/DCD/RI
-signals.
+Well, ordering of completed cache operations ;).
 
-Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
----
- drivers/tty/serial/Kconfig       |    1 +
- drivers/tty/serial/omap-serial.c |  168 ++++++++++++++++++++++++++++++++++++--
- 2 files changed, 162 insertions(+), 7 deletions(-)
+> However, what must not happen is that the unmap must not be re-ordered
+> before reading the descriptor and deciding whether there's a packet
+> present to be unmapped.  That probabily imples that code _should_ be
+> doing this:
+> 
+> 	status = desc->status;
+> 	if (!(status & CPU_OWNS_THIS_DESCRIPTOR))
+> 		no_packet;
+> 
+> 	rmb();
+> 
+> 	addr = desc->buf;
+> 	len = desc->length;
+> 
+> 	dma_unmap_single(dev, addr, len, DMA_FROM_DEVICE);
 
-diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-index 6e748dc..3eeaa09 100644
---- a/drivers/tty/serial/Kconfig
-+++ b/drivers/tty/serial/Kconfig
-@@ -1088,6 +1088,7 @@ config SERIAL_OMAP
- 	tristate "OMAP serial port support"
- 	depends on ARCH_OMAP2PLUS
- 	select SERIAL_CORE
-+	select SERIAL_MCTRL_GPIO
- 	help
- 	  If you have a machine based on an Texas Instruments OMAP CPU you
- 	  can enable its onboard serial ports by enabling this option.
-diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index 08b6b94..87dcad7 100644
---- a/drivers/tty/serial/omap-serial.c
-+++ b/drivers/tty/serial/omap-serial.c
-@@ -43,9 +43,13 @@
- #include <linux/gpio.h>
- #include <linux/of_gpio.h>
- #include <linux/platform_data/serial-omap.h>
-+#include <linux/gpio/consumer.h>
-+#include <linux/err.h>
- 
- #include <dt-bindings/gpio/gpio.h>
- 
-+#include "serial_mctrl_gpio.h"
-+
- #define OMAP_MAX_HSUART_PORTS	6
- 
- #define UART_BUILD_REVISION(x, y)	(((x) << 8) | (y))
-@@ -169,6 +173,9 @@ struct uart_omap_port {
- 
- 	struct serial_rs485	rs485;
- 	int			rts_gpio;
-+	struct mctrl_gpios	*gpios;
-+	int			gpio_irq[UART_GPIO_MAX];
-+	bool			ms_irq_enabled;
- 
- 	struct pm_qos_request	pm_qos_request;
- 	u32			latency;
-@@ -294,6 +301,27 @@ static void serial_omap_enable_ms(struct uart_port *port)
- 	dev_dbg(up->port.dev, "serial_omap_enable_ms+%d\n", up->port.line);
- 
- 	pm_runtime_get_sync(up->dev);
-+
-+	/*
-+	* Interrupt should not be enabled twice
-+	*/
-+	if (up->ms_irq_enabled)
-+		return;
-+
-+	up->ms_irq_enabled = true;
-+
-+	if (up->gpio_irq[UART_GPIO_CTS] >= 0)
-+		enable_irq(up->gpio_irq[UART_GPIO_CTS]);
-+
-+	if (up->gpio_irq[UART_GPIO_DSR] >= 0)
-+		enable_irq(up->gpio_irq[UART_GPIO_DSR]);
-+
-+	if (up->gpio_irq[UART_GPIO_RI] >= 0)
-+		enable_irq(up->gpio_irq[UART_GPIO_RI]);
-+
-+	if (up->gpio_irq[UART_GPIO_DCD] >= 0)
-+		enable_irq(up->gpio_irq[UART_GPIO_DCD]);
-+
- 	up->ier |= UART_IER_MSI;
- 	serial_out(up, UART_IER, up->ier);
- 	pm_runtime_mark_last_busy(up->dev);
-@@ -310,6 +338,10 @@ static void serial_omap_stop_tx(struct uart_port *port)
- 	/* Handle RS-485 */
- 	if (up->rs485.flags & SER_RS485_ENABLED) {
- 		if (up->scr & OMAP_UART_SCR_TX_EMPTY) {
-+			struct gpio_desc *rts_gpiod;
-+
-+			rts_gpiod = mctrl_gpio_to_gpiod(up->gpios, UART_GPIO_RTS);
-+
- 			/* THR interrupt is fired when both TX FIFO and TX
- 			 * shift register are empty. This means there's nothing
- 			 * left to transmit now, so make sure the THR interrupt
-@@ -320,10 +352,10 @@ static void serial_omap_stop_tx(struct uart_port *port)
- 			up->scr &= ~OMAP_UART_SCR_TX_EMPTY;
- 			serial_out(up, UART_OMAP_SCR, up->scr);
- 			res = (up->rs485.flags & SER_RS485_RTS_AFTER_SEND) ? 1 : 0;
--			if (gpio_get_value(up->rts_gpio) != res) {
-+			if (gpiod_get_value(rts_gpiod) != res) {
- 				if (up->rs485.delay_rts_after_send > 0)
- 					mdelay(up->rs485.delay_rts_after_send);
--				gpio_set_value(up->rts_gpio, res);
-+				gpiod_set_value(rts_gpiod, res);
- 			}
- 		} else {
- 			/* We're asked to stop, but there's still stuff in the
-@@ -425,14 +457,18 @@ static void serial_omap_start_tx(struct uart_port *port)
- 
- 	/* Handle RS-485 */
- 	if (up->rs485.flags & SER_RS485_ENABLED) {
-+		struct gpio_desc *rts_gpiod;
-+
-+		rts_gpiod = mctrl_gpio_to_gpiod(up->gpios, UART_GPIO_RTS);
-+
- 		/* Fire THR interrupts when FIFO is below trigger level */
- 		up->scr &= ~OMAP_UART_SCR_TX_EMPTY;
- 		serial_out(up, UART_OMAP_SCR, up->scr);
- 
- 		/* if rts not already enabled */
- 		res = (up->rs485.flags & SER_RS485_RTS_ON_SEND) ? 1 : 0;
--		if (gpio_get_value(up->rts_gpio) != res) {
--			gpio_set_value(up->rts_gpio, res);
-+		if (gpiod_get_value(rts_gpiod) != res) {
-+			gpiod_set_value(rts_gpiod, res);
- 			if (up->rs485.delay_rts_before_send > 0)
- 				mdelay(up->rs485.delay_rts_before_send);
- 		}
-@@ -581,10 +617,45 @@ static irqreturn_t serial_omap_irq(int irq, void *dev_id)
- 	unsigned int type;
- 	irqreturn_t ret = IRQ_NONE;
- 	int max_count = 256;
-+	bool gpio_handled = false;
-+	bool gpio_any_delta = false;
- 
- 	spin_lock(&up->port.lock);
- 	pm_runtime_get_sync(up->dev);
- 
-+	if (!gpio_handled) {
-+		/*
-+		* Dealing with GPIO interrupt
-+		*/
-+		if (irq == up->gpio_irq[UART_GPIO_RI]) {
-+			up->port.icount.rng++;
-+			gpio_any_delta = true;
-+		}
-+
-+		if (irq == up->gpio_irq[UART_GPIO_DSR]) {
-+			up->port.icount.dsr++;
-+			gpio_any_delta = true;
-+		}
-+
-+		if (irq == up->gpio_irq[UART_GPIO_DCD]) {
-+			uart_handle_dcd_change
-+				(&up->port, UART_MSR_DCD);
-+			gpio_any_delta = true;
-+		}
-+
-+		if (irq == up->gpio_irq[UART_GPIO_CTS]) {
-+			uart_handle_cts_change
-+				(&up->port, UART_MSR_CTS);
-+			gpio_any_delta = true;
-+		}
-+
-+		if (gpio_any_delta) {
-+			wake_up_interruptible(&up->port.state->port.delta_msr_wait);
-+		}
-+
-+		gpio_handled = true;
-+	}
-+
- 	do {
- 		iir = serial_in(up, UART_IIR);
- 		if (iir & UART_IIR_NO_INT)
-@@ -632,6 +703,45 @@ static irqreturn_t serial_omap_irq(int irq, void *dev_id)
- 	return ret;
- }
- 
-+static void serial_omap_free_gpio_irq(struct uart_port *port)
-+{
-+	struct uart_omap_port *up = to_uart_omap_port(port);
-+	enum mctrl_gpio_idx i;
-+
-+	for (i = 0; i < UART_GPIO_MAX; i++)
-+		if (up->gpio_irq[i] >= 0)
-+			free_irq(up->gpio_irq[i], port);
-+}
-+
-+static int serial_omap_request_gpio_irq(struct uart_port *port)
-+{
-+	struct uart_omap_port *up = to_uart_omap_port(port);
-+	int *irq = up->gpio_irq;
-+	enum mctrl_gpio_idx i;
-+	int err = 0;
-+
-+	for (i = 0; (i < UART_GPIO_MAX) && !err; i++) {
-+		if (irq[i] < 0)
-+			continue;
-+
-+		irq_set_status_flags(irq[i], IRQ_NOAUTOEN);
-+		err = request_irq(irq[i], serial_omap_irq, IRQ_TYPE_EDGE_BOTH,
-+				"omap_serial", port);
-+		if (err)
-+			dev_err(port->dev, "omap_startup - Can't get %d irq\n",
-+				irq[i]);
-+	}
-+
-+	/*
-+	 * If something went wrong, rollback.
-+	 */
-+	while (err && (--i >= 0))
-+		if (irq[i] >= 0)
-+			free_irq(irq[i], port);
-+
-+	return err;
-+}
-+
- static unsigned int serial_omap_tx_empty(struct uart_port *port)
- {
- 	struct uart_omap_port *up = to_uart_omap_port(port);
-@@ -669,7 +779,8 @@ static unsigned int serial_omap_get_mctrl(struct uart_port *port)
- 		ret |= TIOCM_DSR;
- 	if (status & UART_MSR_CTS)
- 		ret |= TIOCM_CTS;
--	return ret;
-+
-+	return mctrl_gpio_get(up->gpios, &ret);
- }
- 
- static void serial_omap_set_mctrl(struct uart_port *port, unsigned int mctrl)
-@@ -698,6 +809,8 @@ static void serial_omap_set_mctrl(struct uart_port *port, unsigned int mctrl)
- 	pm_runtime_mark_last_busy(up->dev);
- 	pm_runtime_put_autosuspend(up->dev);
- 
-+	mctrl_gpio_set(up->gpios, mctrl);
-+
- 	if (gpio_is_valid(up->DTR_gpio) &&
- 	    !!(mctrl & TIOCM_DTR) != up->DTR_active) {
- 		up->DTR_active = !up->DTR_active;
-@@ -733,6 +846,8 @@ static int serial_omap_startup(struct uart_port *port)
- 	unsigned long flags = 0;
- 	int retval;
- 
-+	up->ms_irq_enabled = false;
-+
- 	/*
- 	 * Allocate the IRQ
- 	 */
-@@ -752,6 +867,15 @@ static int serial_omap_startup(struct uart_port *port)
- 		disable_irq(up->wakeirq);
- 	}
- 
-+	retval = serial_omap_request_gpio_irq(port);
-+	if (retval) {
-+		free_irq(up->port.irq, up);
-+		if (up->wakeirq) {
-+			free_irq(up->wakeirq, up);
-+		}
-+		return retval;
-+	}
-+
- 	dev_dbg(up->port.dev, "serial_omap_startup+%d\n", up->port.line);
- 
- 	pm_runtime_get_sync(up->dev);
-@@ -842,6 +966,8 @@ static void serial_omap_shutdown(struct uart_port *port)
- 	free_irq(up->port.irq, up);
- 	if (up->wakeirq)
- 		free_irq(up->wakeirq, up);
-+	serial_omap_free_gpio_irq(port);
-+	up->ms_irq_enabled = false;
- }
- 
- static void serial_omap_uart_qos_work(struct work_struct *work)
-@@ -1370,6 +1496,9 @@ serial_omap_config_rs485(struct uart_port *port, struct serial_rs485 *rs485conf)
- 	unsigned long flags;
- 	unsigned int mode;
- 	int val;
-+	struct gpio_desc *rts_gpiod;
-+
-+	rts_gpiod = mctrl_gpio_to_gpiod(up->gpios, UART_GPIO_RTS);
- 
- 	pm_runtime_get_sync(up->dev);
- 	spin_lock_irqsave(&up->port.lock, flags);
-@@ -1386,12 +1515,12 @@ serial_omap_config_rs485(struct uart_port *port, struct serial_rs485 *rs485conf)
- 	 * Just as a precaution, only allow rs485
- 	 * to be enabled if the gpio pin is valid
- 	 */
--	if (gpio_is_valid(up->rts_gpio)) {
-+	if (!IS_ERR_OR_NULL(rts_gpiod)) {
- 		/* enable / disable rts */
- 		val = (up->rs485.flags & SER_RS485_ENABLED) ?
- 			SER_RS485_RTS_AFTER_SEND : SER_RS485_RTS_ON_SEND;
- 		val = (up->rs485.flags & val) ? 1 : 0;
--		gpio_set_value(up->rts_gpio, val);
-+		gpiod_set_value(rts_gpiod, val);
- 	} else
- 		up->rs485.flags &= ~SER_RS485_ENABLED;
- 
-@@ -1642,6 +1771,26 @@ static int serial_omap_probe_rs485(struct uart_omap_port *up,
- 	return 0;
- }
- 
-+static int serial_omap_init_gpios(struct uart_omap_port *up, struct device *dev)
-+{
-+	enum mctrl_gpio_idx i;
-+	struct gpio_desc *gpiod;
-+
-+	up->gpios = mctrl_gpio_init(dev, 0);
-+	if (IS_ERR_OR_NULL(up->gpios))
-+		return -1;
-+
-+	for (i = 0; i < UART_GPIO_MAX; i++) {
-+		gpiod = mctrl_gpio_to_gpiod(up->gpios, i);
-+		if (gpiod && (gpiod_get_direction(gpiod) == GPIOF_DIR_IN))
-+			up->gpio_irq[i] = gpiod_to_irq(gpiod);
-+		else
-+			up->gpio_irq[i] = -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
- static int serial_omap_probe(struct platform_device *pdev)
- {
- 	struct uart_omap_port	*up;
-@@ -1727,6 +1876,11 @@ static int serial_omap_probe(struct platform_device *pdev)
- 		goto err_port_line;
- 	}
- 
-+	ret = serial_omap_init_gpios(up, &pdev->dev);
-+	if (ret < 0)
-+		dev_err(&pdev->dev, "%s",
-+			"Failed to initialize GPIOs. The serial port may not work as expected");
-+
- 	ret = serial_omap_probe_rs485(up, pdev->dev.of_node);
- 	if (ret < 0)
- 		goto err_rs485;
+Indeed.
+
+> 	...receive skb...reading buffer...
+
+The point Will and myself were trying to make is about ordering as
+observed by the CPU (rather than ordering of CPU actions). Independently
+of whether the DMA is coherent or not, the ordering between device write
+to the buffer and status update (in-memory descriptor or IRQ) *must* be
+ordered by the device and interconnects. The rmb() as per your example
+above only solves the relative CPU loads and cache maintenance but they
+don't have any effect on the transactions done by the device.
+
+The mvebu SoC has exactly this problem. mvebu_hwcc_sync_io_barrier() is
+something that should be handled by the hardware automatically,
+especially in a system which claims cache coherency.
+
 -- 
-1.7.7
+Catalin
