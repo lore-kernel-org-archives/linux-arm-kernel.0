@@ -1,26 +1,22 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 24 Apr 2014 00:27:17 -0400
-Subject: [PATCH] ARM: mvebu: Add a SOC bus device entry
-In-Reply-To: <1393955507-26436-1-git-send-email-andrew@lunn.ch>
-References: <1393955507-26436-1-git-send-email-andrew@lunn.ch>
-Message-ID: <20140424042717.GR28159@titan.lakedaemon.net>
+Date: Thu, 24 Apr 2014 00:34:05 -0400
+Subject: [PATCH 1/2] ARM: mvebu: Enable nfsroot in the defconfig
+In-Reply-To: <1396539014-8673-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1396539014-8673-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20140424043405.GS28159@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 04, 2014 at 06:51:47PM +0100, Andrew Lunn wrote:
-> Add the SoC Family, device ID and revision to /sys/bus/soc.
+On Thu, Apr 03, 2014 at 12:30:13PM -0300, Ezequiel Garcia wrote:
+> NFSroot is very frequently used by developers to boot, so let's make
+> our lives simpler and enable it by default.
 > 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 > ---
->  arch/arm/mach-mvebu/Kconfig        |  1 +
->  arch/arm/mach-mvebu/mvebu-soc-id.c | 28 ++++++++++++++++++++++++++++
->  2 files changed, 29 insertions(+)
+>  arch/arm/configs/mvebu_v7_defconfig | 5 +++++
+>  1 file changed, 5 insertions(+)
 
-Applied to mvebu/soc
-
-Please make sure to run make with -q to catch newly introduced warnings.
-I added 'return 0;' to the end of the function, and explicitly 'return
-0;' for !is_id_valid.
+Both applied to mvebu/defconfig
 
 thx,
 
