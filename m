@@ -1,242 +1,72 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 24 Apr 2014 15:36:25 +0530
-Subject: [PATCH v3 2/4] ARM: dts: Add support for DRA72x family of devices
-In-Reply-To: <1398333987-19454-1-git-send-email-rnayak@ti.com>
-References: <1398333987-19454-1-git-send-email-rnayak@ti.com>
-Message-ID: <1398333987-19454-3-git-send-email-rnayak@ti.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Thu, 24 Apr 2014 12:13:20 +0200
+Subject: [PATCH/RFC 1/4] clk: Add CLK_RUNTIME_PM and clk_may_runtime_pm()
+In-Reply-To: <1398334403-26181-1-git-send-email-geert+renesas@glider.be>
+References: <1398334403-26181-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1398334403-26181-2-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DRA72x is a single core cortex A15 device with most infrastructure IPs otherwise
-same as whats on the DRA74x devices.
+Add a flag CLK_RUNTIME_PM, to let low-level clock drivers indicate that
+a clock is suitable for Runtime PM.
+Add clk_may_runtime_pm(), to get the status of the flag.
 
-So move the cpu nodes into dra74x.dtsi and dra72x.dtsi respectively.
+This will allow the device core to enable automatic Runtime PM management
+for devices tied to clocks that are suitable for Runtime PM.
 
-Also add a minimal dra72-evm dts file.
-
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-Cc: linux-doc at vger.kernel.org
-Cc: devicetree at vger.kernel.org
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- .../devicetree/bindings/arm/omap/omap.txt          |   14 +++++--
- arch/arm/boot/dts/Makefile                         |    3 +-
- arch/arm/boot/dts/dra7-evm.dts                     |    6 +--
- arch/arm/boot/dts/dra7.dtsi                        |   27 -------------
- arch/arm/boot/dts/dra72-evm.dts                    |   24 ++++++++++++
- arch/arm/boot/dts/dra72x.dtsi                      |   25 ++++++++++++
- arch/arm/boot/dts/dra74x.dtsi                      |   41 ++++++++++++++++++++
- 7 files changed, 105 insertions(+), 35 deletions(-)
- create mode 100644 arch/arm/boot/dts/dra72-evm.dts
- create mode 100644 arch/arm/boot/dts/dra72x.dtsi
- create mode 100644 arch/arm/boot/dts/dra74x.dtsi
+ drivers/clk/clk.c            |   12 ++++++++++++
+ include/linux/clk-provider.h |    1 +
+ include/linux/clk.h          |    1 +
+ 3 files changed, 14 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
-index 36ede19..1bc2338 100644
---- a/Documentation/devicetree/bindings/arm/omap/omap.txt
-+++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
-@@ -79,8 +79,11 @@ SoCs:
- - OMAP5432
-   compatible = "ti,omap5432", "ti,omap5"
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 0b2819551756..a83a2cc0af67 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -1115,6 +1115,18 @@ long clk_get_accuracy(struct clk *clk)
+ EXPORT_SYMBOL_GPL(clk_get_accuracy);
  
--- DRA742
--  compatible = "ti,dra7xx", "ti,dra7"
-+- DRA74x
-+  compatible = "ti,dra74", "ti,dra7"
+ /**
++ * clk_may_runtime_pm - check if the clock is suitable for Runtime PM
++ * @clk: the clock to check
++ *
++ * Return true if the clock is suitable for Runtime PM
++ * Return false if clk is NULL, or if the clock is not suitable for Runtime PM.
++ */
++bool clk_may_runtime_pm(const struct clk *clk)
++{
++	return clk && clk->flags & CLK_RUNTIME_PM;
++}
 +
-+- DRA72x
-+  compatible = "ti,dra72", "ti,dra7"
++/**
+  * __clk_recalc_rates
+  * @clk: first clk in the subtree
+  * @msg: notification type (see include/linux/clk.h)
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 24c8ba4fa6ae..3ca9a7c1f02d 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -30,6 +30,7 @@
+ #define CLK_GET_RATE_NOCACHE	BIT(6) /* do not use the cached clk rate */
+ #define CLK_SET_RATE_NO_REPARENT BIT(7) /* don't re-parent on rate change */
+ #define CLK_GET_ACCURACY_NOCACHE BIT(8) /* do not use the cached clk accuracy */
++#define CLK_RUNTIME_PM		BIT(9) /* clock is suitable for Runtime PM */
  
- - AM4372
-   compatible = "ti,am4372", "ti,am43"
-@@ -120,5 +123,8 @@ Boards:
- - AM437x GP EVM
-   compatible = "ti,am437x-gp-evm", "ti,am4372", "ti,am43"
- 
--- DRA7 EVM:  Software Developement Board for DRA7XX
--  compatible = "ti,dra7-evm", "ti,dra7"
-+- DRA74 EVM:  Software Developement Board for DRA74x
-+  compatible = "ti,dra7-evm", "ti,dra74", "ti,dra7"
-+
-+- DRA72 EVM: Software Development Board for DRA72x
-+  compatible = "ti,dra72-evm", "ti,dra72", "ti,dra7"
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 35c146f..ff98a97 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -288,7 +288,8 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
- 	am3517_mt_ventoux.dtb \
- 	am43x-epos-evm.dtb \
- 	am437x-gp-evm.dtb \
--	dra7-evm.dtb
-+	dra7-evm.dtb \
-+	dra72-evm.dtb
- dtb-$(CONFIG_ARCH_ORION5X) += orion5x-lacie-ethernet-disk-mini-v2.dtb
- dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
- dtb-$(CONFIG_ARCH_QCOM) += qcom-msm8660-surf.dtb \
-diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
-index 7807429..df6a6db 100644
---- a/arch/arm/boot/dts/dra7-evm.dts
-+++ b/arch/arm/boot/dts/dra7-evm.dts
-@@ -7,11 +7,11 @@
+ struct clk_hw;
+ struct dentry;
+diff --git a/include/linux/clk.h b/include/linux/clk.h
+index d030fce1d77e..07f156580064 100644
+--- a/include/linux/clk.h
++++ b/include/linux/clk.h
+@@ -106,6 +106,7 @@ int clk_notifier_unregister(struct clk *clk, struct notifier_block *nb);
   */
- /dts-v1/;
+ long clk_get_accuracy(struct clk *clk);
  
--#include "dra7.dtsi"
-+#include "dra74x.dtsi"
++bool clk_may_runtime_pm(const struct clk *clk);
+ #else /* !CONFIG_COMMON_CLK */
  
- / {
--	model = "TI DRA7";
--	compatible = "ti,dra7-evm", "ti,dra7";
-+	model = "TI DRA74x";
-+	compatible = "ti,dra7-evm", "ti,dra74", "ti,dra7";
- 
- 	memory {
- 		device_type = "memory";
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 1c0f8e1..e27fec7 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -33,33 +33,6 @@
- 		serial5 = &uart6;
- 	};
- 
--	cpus {
--		#address-cells = <1>;
--		#size-cells = <0>;
--
--		cpu0: cpu at 0 {
--			device_type = "cpu";
--			compatible = "arm,cortex-a15";
--			reg = <0>;
--
--			operating-points = <
--				/* kHz    uV */
--				1000000	1060000
--				1176000	1160000
--				>;
--
--			clocks = <&dpll_mpu_ck>;
--			clock-names = "cpu";
--
--			clock-latency = <300000>; /* From omap-cpufreq driver */
--		};
--		cpu at 1 {
--			device_type = "cpu";
--			compatible = "arm,cortex-a15";
--			reg = <1>;
--		};
--	};
--
- 	timer {
- 		compatible = "arm,armv7-timer";
- 		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-diff --git a/arch/arm/boot/dts/dra72-evm.dts b/arch/arm/boot/dts/dra72-evm.dts
-new file mode 100644
-index 0000000..ead6440
---- /dev/null
-+++ b/arch/arm/boot/dts/dra72-evm.dts
-@@ -0,0 +1,24 @@
-+/*
-+ * Copyright (C) 2014 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+/dts-v1/;
-+
-+#include "dra72x.dtsi"
-+
-+/ {
-+	model = "TI DRA72x";
-+	compatible = "ti,dra72-evm", "ti,dra72", "ti,dra7";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x40000000>; /* 1024 MB */
-+	};
-+};
-+
-+&uart1 {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/dra72x.dtsi b/arch/arm/boot/dts/dra72x.dtsi
-new file mode 100644
-index 0000000..236e5e3
---- /dev/null
-+++ b/arch/arm/boot/dts/dra72x.dtsi
-@@ -0,0 +1,25 @@
-+/*
-+ * Copyright (C) 2014 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ * Based on "omap4.dtsi"
-+ */
-+
-+#include "dra7.dtsi"
-+
-+/ {
-+	compatible = "ti,dra72", "ti,dra7";
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/dra74x.dtsi b/arch/arm/boot/dts/dra74x.dtsi
-new file mode 100644
-index 0000000..493deab
---- /dev/null
-+++ b/arch/arm/boot/dts/dra74x.dtsi
-@@ -0,0 +1,41 @@
-+/*
-+ * Copyright (C) 2014 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ * Based on "omap4.dtsi"
-+ */
-+
-+#include "dra7.dtsi"
-+
-+/ {
-+	compatible = "ti,dra74", "ti,dra7";
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0>;
-+
-+			operating-points = <
-+				/* kHz    uV */
-+				1000000	1060000
-+				1176000	1160000
-+				>;
-+
-+			clocks = <&dpll_mpu_ck>;
-+			clock-names = "cpu";
-+
-+			clock-latency = <300000>; /* From omap-cpufreq driver */
-+		};
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <1>;
-+		};
-+	};
-+};
+ static inline long clk_get_accuracy(struct clk *clk)
 -- 
 1.7.9.5
