@@ -1,91 +1,78 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 24 Apr 2014 15:15:34 +0200
-Subject: [PATCH 27/38] mmc: sdhci-of-esdhc: remove
- platform_suspend/platform_resume callbacks
-In-Reply-To: <20140424122714.GR26756@n2100.arm.linux.org.uk>
-References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
- <E1Wd2Wy-0003w6-9y@rmk-PC.arm.linux.org.uk>
- <CAPDyKFrNpxFPfKQNWZ9iwzh=NKZpCzkA8gYnrqnPb-683QcgwA@mail.gmail.com>
- <20140424111825.GQ26756@n2100.arm.linux.org.uk>
- <CAPDyKFpXn7m4+gqBp+FVaUxA3xaGq7OJS3edPFTL015W03CdBA@mail.gmail.com>
- <20140424122714.GR26756@n2100.arm.linux.org.uk>
-Message-ID: <CAPDyKFoLx4nxaD7vUaO+yRFKGr2FGb0k4vcF0XchtBV9e_rxsQ@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 24 Apr 2014 09:18:43 -0400
+Subject: [PATCH v2 4/6] soc: ti: add Keystone Navigator QMSS driver
+In-Reply-To: <20140424013053.GC13374@saruman.home>
+References: <1398296783-1176-1-git-send-email-santosh.shilimkar@ti.com>
+ <1398296783-1176-5-git-send-email-santosh.shilimkar@ti.com>
+ <20140424013053.GC13374@saruman.home>
+Message-ID: <53590F33.6070508@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 April 2014 14:27, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> On Thu, Apr 24, 2014 at 01:32:02PM +0200, Ulf Hansson wrote:
->> On 24 April 2014 13:18, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
->> > That may be the case, but that would be an additional modification, and so
->> > should be a separate patch.
+On Wednesday 23 April 2014 09:30 PM, Felipe Balbi wrote:
+> Hi,
+> 
+> On Wed, Apr 23, 2014 at 07:46:20PM -0400, Santosh Shilimkar wrote:
+>> From: Sandeep Nair <sandeep_n@ti.com>
 >>
->> I just thought it make sense to include it here - it's really a simple
->> fix, touching the same code as this patch.
+>> The QMSS (Queue Manager Sub System) found on Keystone SOCs is one of
+>> the main hardware sub system which forms the backbone of the Keystone
+>> Multi-core Navigator. QMSS consist of queue managers, packed-data structure
+>> processors(PDSP), linking RAM, descriptor pools and infrastructure
+>> Packet DMA.
 >>
->> Additionally, it would simplify this patch since you would be able to
->> use the PM macro.
->
-> No, I'm not going to make this change after looking deeper at the existing
-> code.
->
-> The existing code does this:
->
-> sdhci-pltfm.c:
-> #ifdef CONFIG_PM
-> int sdhci_pltfm_suspend(struct device *dev)
-> {
->         struct sdhci_host *host = dev_get_drvdata(dev);
->
->         return sdhci_suspend_host(host);
-> }
-> EXPORT_SYMBOL_GPL(sdhci_pltfm_suspend);
->
-> int sdhci_pltfm_resume(struct device *dev)
-> {
->         struct sdhci_host *host = dev_get_drvdata(dev);
->
->         return sdhci_resume_host(host);
-> }
-> EXPORT_SYMBOL_GPL(sdhci_pltfm_resume);
->
-> const struct dev_pm_ops sdhci_pltfm_pmops = {
->         .suspend        = sdhci_pltfm_suspend,
->         .resume         = sdhci_pltfm_resume,
-> };
-> EXPORT_SYMBOL_GPL(sdhci_pltfm_pmops);
-> #endif  /* CONFIG_PM */
->
-> sdhci-pltfm.h:
-> #ifdef CONFIG_PM
-> extern int sdhci_pltfm_suspend(struct device *dev);
-> extern int sdhci_pltfm_resume(struct device *dev);
-> extern const struct dev_pm_ops sdhci_pltfm_pmops;
-> #define SDHCI_PLTFM_PMOPS (&sdhci_pltfm_pmops)
-> #else
-> #define SDHCI_PLTFM_PMOPS NULL
-> #endif
->
-> sdhci-of-esdhc.c:
-> static struct platform_driver sdhci_esdhc_driver = {
->         .driver = {
->                 .pm = SDHCI_PLTFM_PMOPS,
->
-> Changing this to use SIMPLE_DEV_PM_OPS changes the behaviour of this by
-> placing the callbacks into the other methods.
->
-> Is that change correct?
-> Who's going to test that that change doesn't break anything (I don't have
-> the hardware, and it's not a transformational change like the rest of the
-> patch set, but a functional change)?
-> Should this change be made for other SDHCI platforms as well?
->
-> Frankly, I'm not happy to make such a change in a series which is supposed
-> to be mainly about cleaning up and _not_ introducing functional changes.
-
-Fair enough, let's keep it as is then and let's handle functional
-changes separate.
-
->
-> --
-> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-> improving, and getting towards what was expected from it.
+>> The Queue Manager is a hardware module that is responsible for accelerating
+>> management of the packet queues. Packets are queued/de-queued by writing or
+>> reading descriptor address to a particular memory mapped location. The PDSPs
+>> perform QMSS related functions like accumulation, QoS, or event management.
+>> Linking RAM registers are used to link the descriptors which are stored in
+>> descriptor RAM. Descriptor RAM is configurable as internal or external memory.
+>>
+>> The QMSS driver manages the PDSP setups, linking RAM regions,
+>> queue pool management (allocation, push, pop and notify) and descriptor
+>> pool management. The specifics on the device tree bindings for
+>> QMSS can be found in:
+>> 	Documentation/devicetree/bindings/soc/keystone-navigator-qmss.txt
+>>
+>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>> Cc: Kumar Gala <galak@codeaurora.org>
+>> Cc: Olof Johansson <olof@lixom.net>
+>> Cc: Arnd Bergmann <arnd@arndb.de>
+>> Cc: Grant Likely <grant.likely@linaro.org>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Signed-off-by: Sandeep Nair <sandeep_n@ti.com>
+>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> ---
+>>  drivers/Kconfig                  |    2 +
+>>  drivers/soc/Kconfig              |    2 +
+>>  drivers/soc/Makefile             |    5 +
+>>  drivers/soc/ti/Kconfig           |   21 +
+>>  drivers/soc/ti/Makefile          |    4 +
+>>  drivers/soc/ti/knav_qmss.h       |  386 ++++++++
+>>  drivers/soc/ti/knav_qmss_acc.c   |  591 +++++++++++++
+>>  drivers/soc/ti/knav_qmss_queue.c | 1814 ++++++++++++++++++++++++++++++++++++++
+>>  include/linux/soc/ti/knav_qmss.h |   90 ++
+>>  9 files changed, 2915 insertions(+)
+>>  create mode 100644 drivers/soc/Makefile
+>>  create mode 100644 drivers/soc/ti/Kconfig
+>>  create mode 100644 drivers/soc/ti/Makefile
+>>  create mode 100644 drivers/soc/ti/knav_qmss.h
+>>  create mode 100644 drivers/soc/ti/knav_qmss_acc.c
+>>  create mode 100644 drivers/soc/ti/knav_qmss_queue.c
+>>  create mode 100644 include/linux/soc/ti/knav_qmss.h
+>>
+>> diff --git a/drivers/Kconfig b/drivers/Kconfig
+>> index 0e87a34..8993913 100644
+>> --- a/drivers/Kconfig
+>> +++ b/drivers/Kconfig
+>> @@ -148,6 +148,8 @@ source "drivers/remoteproc/Kconfig"
+>>  
+>>  source "drivers/rpmsg/Kconfig"
+>>  
+>> +source "drivers/soc/Kconfig"
+> 
+> This hunk was already in patch one but in a different offset in this
+> file.
+> 
+right.. I will drop this one... Thanks for spotting it
