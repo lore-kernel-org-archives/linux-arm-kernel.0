@@ -1,85 +1,139 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 24 Apr 2014 13:53:47 +0900
-Subject: [RFC PATCH 2/2] PCI: exynos: Add PCIe support for Samsung GH7 SoC
-In-Reply-To: <14215032.8jhN17iHj5@wuerfel>
-References: <000801cf592e$30b7bff0$92273fd0$%han@samsung.com>
- <4565008.ZECF3eWqge@wuerfel>
- <20140423142315.GO865@e106497-lin.cambridge.arm.com>
- <14215032.8jhN17iHj5@wuerfel>
-Message-ID: <01ff01cf5f79$30f926b0$92eb7410$@samsung.com>
+From: liu.h.jason@gmail.com (Jason Liu)
+Date: Thu, 24 Apr 2014 12:58:59 +0800
+Subject: Perf top always show 0.00
+In-Reply-To: <CAHrpEqQO93d9Nh_4wO0fs_KLH3ofn43t-SySDRTNP9=ryTq=fQ@mail.gmail.com>
+References: <CAHrpEqQZ_0G-rmwfaeEzHOFVckyRRSUpYrPdMUgPjRZ1JYyy6g@mail.gmail.com>
+ <CAB4PhKdP_gXiB56DPLC3DxdjW2Epr_RTghW_VL1X84Ux1U+bLw@mail.gmail.com>
+ <CAHrpEqQO93d9Nh_4wO0fs_KLH3ofn43t-SySDRTNP9=ryTq=fQ@mail.gmail.com>
+Message-ID: <CAB4PhKf9mp6hV_KjJ-Sd=O0bacE-dUT3k__qdfApJxhfgm652A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann wrote:
-> 
-> On Wednesday 23 April 2014 15:23:16 Liviu Dudau wrote:
-> > > Unfortunately we are in a tricky situation on arm64 because we have
-> > > to support both server-type SoCs and embedded-type SoCs. In an
-> > > embedded system, you can't trust the boot loader to do a proper
-> > > setup of all the hardware, so the kernel needs full control over
-> > > all the initialization. In a server, the initialization is the
-> > > responsibility of the firmware, and we don't want the kernel to
-> > > even know about those registers.
+2014-04-23 22:26 GMT+08:00 Frank Li <lznuaa@gmail.com>:
+> On Wed, Apr 23, 2014 at 4:15 AM, Jason Liu <liu.h.jason@gmail.com> wrote:
+>> Frank,
+>>
+>> 2014-04-19 1:00 GMT+08:00 Frank Li <lznuaa@gmail.com>:
+>>> I use mx6dq platform. Found below problem.
+>>>
+>>> Run Perf top. First column always 0, but order look like correct.
+>>>
+>>>    0.00%  perf          [.] 0x00049420
+>>>      0.00%  [kernel]      [k] kallsyms_expand_symbol.constprop.5
+>>>      0.00%  [kernel]      [k] vsnprintf
+>>>      0.00%  [kernel]      [k] arch_cpu_idle
+>>>      0.00%  [kernel]      [k] format_decode
+>>>      0.00%  [kernel]      [k] number.isra.2
+>>>      0.00%  libc-2.19.so  [.] strstr
+>>>      0.00%  libc-2.19.so  [.] 0x00072498
+>>>      0.00%  libc-2.19.so  [.] memchr
+>>>      0.00%  [kernel]      [k] _raw_spin_unlock_irqrestore
+>>>      0.00%  [kernel]      [k] string.isra.4
+>>>      0.00%  [kernel]      [k] strnlen
+>>>      0.00%  libc-2.19.so  [.] getdelim
+>>>      0.00%  libc-2.19.so  [.] memcpy
+>>>      0.00%  [kernel]      [k] lock_acquire
+>>>      0.00%  libc-2.19.so  [.] strchr
+>>>      0.00%  libc-2.19.so  [.] strcmp
+>>>      0.00%  [kernel]      [k] _raw_spin_unlock_irq
+>>>      0.00%  libc-2.19.so  [.] __libc_calloc
+>>>      0.00%  libc-2.19.so  [.] _IO_feof
+>>>      0.00%  [kernel]      [k] pointer.isra.15
+>>
+>> This issue has been resolved by the following commit:
+>>
+>> commit 9dfd005a3f4e1c648cb4aa1dc70604bb370c5e7b
+>> Author: Michael Hudson-Doyle <michael.hudson@linaro.org>
+>> Date:   Thu Oct 31 16:47:45 2013 -0700
+>>
+>>     perf tools: Remove cast of non-variadic function to variadic
+>>
+>>     commit 53805eca3d89b095062c11a6798689bb0af09216 upstream.
+>>
+>>     The 4fb71074a570 (perf ui/hist: Consolidate hpp helpers) cset introduced
+>>     a cast of percent_color_snprintf to a function pointer type with
+>>     varargs.  Change percent_color_snprintf to be variadic and remove the
+>>     cast.
+>>
+>>     The symptom of this was all percentages being reported as 0.00% in perf
+>>     report --stdio output on the armhf arch.
+>>
+>>     Signed-off-by: Michael Hudson-Doyle <michael.hudson@linaro.org>
+>>     Acked-by: Namhyung Kim <namhyung@kernel.org>
+>>     Acked-by: Will Deacon <will.deacon@arm.com>
+>>     Cc: Jean Pihet <jean.pihet@linaro.org>
+>>     Cc: Jiri Olsa <jolsa@redhat.com>
+>>     Cc: Will Deacon <will.deacon@arm.com>
+>>     Link: http://lkml.kernel.org/r/87zjppvw7y.fsf at canonical.com
+>>     Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
+>>     Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>>
+>>
+>> Jason Liu
+>
+> I tested it. still 0.00%
+> 0.00%  perf          [.] 0x000494a0
+>      0.00%  [kernel]      [k] cpuidle_enter_state
+>      0.00%  [kernel]      [k] kallsyms_expand_symbol.constprop.7
+>      0.00%  libc-2.19.so  [.] 0x0006f6a4
+>      0.00%  [kernel]      [k] vsnprintf
+>      0.00%  libc-2.19.so  [.] strstr
+>      0.00%  [kernel]      [k] format_decode
+>      0.00%  libc-2.19.so  [.] memchr
+>      0.00%  [kernel]      [k] number.isra.2
+>      0.00%  libc-2.19.so  [.] memcpy
+>      0.00%  libc-2.19.so  [.] getdelim
+>      0.00%  libc-2.19.so  [.] __libc_calloc
+>      0.00%  [kernel]      [k] _raw_spin_unlock_irq
+>      0.00%  libc-2.19.so  [.] strchr
+>      0.00%  [kernel]      [k] strnlen
+>      0.00%  [kernel]      [k] _raw_spin_unlock_irqrestore
+>      0.00%  libc-2.19.so  [.] strcmp
+>      0.00%  [kernel]      [k] __do_softirq
+>      0.00%  [kernel]      [k] string.isra.4
+>      0.00%  libc-2.19.so  [.] _IO_feof
+>      0.00%  [kernel]      [k] tick_nohz_idle_enter
+>
 
-BTW, actually we can trust boot-loader to do required things in mobile also ;-)
+Here is my log:
 
-> > >
-> > > My hope is that all server chips use an SBSA compliant PCIe
-> > > implementation, but we already have X-Gene, which is doing server
-> > > workloads with a nonstandard PCIe, and it's possible that there
-> > > will also be server-like systems with a DesignWare PCIe block
-> > > instead of an SBSA compliant one. We can still support those, but
-> > > I don't want to see more than one implementation of dw-pcie
-> > > on servers. Just like we have the generic PCIe support that Will
-> > > is doing for virtual machines and SBSA compliant systems, we
-> > > would do one dw-pcie variant for all systems that come with a
-> > > host firmware and rely on it being set up already.
+root at imx6qdlsolo:/# perf --version
+perf version 3.10.31
 
-OK and I think, just one device driver would be nice for whatever embedded or
-server.
+root at imx6qdlsolo:/# perf top
 
-> >
-> > There is nothing in the SBSA that mandates firmware setup. All it requires
+   PerfTop:      66 irqs/sec  kernel:78.8%  exact:  0.0% [4000Hz
+cycles],  (all, 1 CPU)
+-------------------------------------------------------------------------------
 
-Yeah, I couldn't look at that in the SBSA...
+    21.95%  perf            [.] 0x00025b44
+    13.73%  [kernel]        [k] cpuidle_enter_state
+     5.32%  libc-2.19.so    [.] strstr
+     4.64%  libc-2.19.so    [.] 0x000725d0
+     3.61%  [kernel]        [k] _raw_spin_unlock_irqrestore
+     2.78%  libc-2.19.so    [.] __libc_calloc
+     2.41%  libc-2.19.so    [.] strcmp
+     2.29%  libbfd-2.24.so  [.] 0x000819d0
+     2.17%  libc-2.19.so    [.] memchr
+     2.11%  libc-2.19.so    [.] strchr
+     1.94%  [kernel]        [k] finish_task_switch
+     1.81%  [kernel]        [k] kallsyms_expand_symbol.constprop.7
+     1.57%  [kernel]        [k] vsnprintf
+     1.46%  [kernel]        [k] __do_softirq
+     1.43%  libc-2.19.so    [.] strlen
+     1.35%  libc-2.19.so    [.] vfprintf
+     1.26%  libc-2.19.so    [.] strncmp
+     1.22%  [kernel]        [k] format_decode
+     1.21%  [kernel]        [k] number.isra.2
+     1.12%  libc-2.19.so    [.] memset
+     1.07%  libc-2.19.so    [.] memcpy
 
-> > is that hardware is setup in a way that is not specific to a board
-> > or a particular OEM. Surely if the setup being done for GH7 is always
-> > the same it should fit the bill?
-> 
-But Arnd's comments are about firmware based on each SoC not board?...
+You can try 3.10.31 release branch.
 
-> GH7 is already not SBSA compliant because it uses a nonstandard config
-> space access method, and it uses its own MSI controller rather than GIC.
-> This means it violates at least two out of the four clauses in SBSA
-> describing PCIe.
-> 
-OK, I see. Honestly, we just focused on how to support PCI on both exynos5440
-and GH7 SoCs.
+Jason Liu
 
-> Regardless of this, the level of detail describing config space and
-> MSI handling in SBSA can only make sense if the purpose is to handle
-> all compliant implementations without platform specific code. If you
-> require platform specific setup code in the OS, this underlying assumption
-> no longer holds true and there is no point in having a spec in the
-> first place.
-> 
-OK, your assumption makes sense to us.
-
-> I think we should treat DW-PCIe in the same way if anyone attempts
-> to use that in a server, e.g. in SBSA level 0. As you can see here,
-
-Agreed. BTW, how about GICv2m for level 1? It can be supported with the same
-way in one DW-PCIe driver?
-
-> even when reusing hardware between Exynos and GH7, you can't just
-> use the same init code, so it has to be in firmware to be any good.
-> On a real server platform, you can't require a kernel upgrade every
-> time a new SoC comes out, any basic functionality like PCI just has to
-> work with existing OS images.
-> 
-OK, when Will's driver is ready, we will test it on GH7 with the setup for PCIe
-included in firmware. Anyway I hope we can use the driver in 3.16 :-)
-
-Thanks,
-Kukjin
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
