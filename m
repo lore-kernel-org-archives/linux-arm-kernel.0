@@ -1,80 +1,35 @@
 From: joelf@ti.com (Joel Fernandes)
-Date: Thu, 24 Apr 2014 16:44:01 -0500
-Subject: [PATCH 18/26] ARM: OMAP2+: timer: Add legacy code for old way of
- getting fclk
+Date: Thu, 24 Apr 2014 16:43:52 -0500
+Subject: [PATCH 09/26] ARM: OMAP: dmtimer: Get rid of check for mem resource
+ error
 In-Reply-To: <1398375849-6017-1-git-send-email-joelf@ti.com>
 References: <1398375849-6017-1-git-send-email-joelf@ti.com>
-Message-ID: <1398375849-6017-19-git-send-email-joelf@ti.com>
+Message-ID: <1398375849-6017-10-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Separate out legacy code for getting timer->fclk and reuse it for
-the DT-case as a fallback. All DT users should ideally be specifying
-a clock property with a phandle of its clock node. Till the migration
-is complete, add a legacy function to keep things working.
+The subsequent devm_ioremap_resource will catch it and print an error, let it
+be checked there.
 
 Signed-off-by: Joel Fernandes <joelf@ti.com>
 ---
- arch/arm/mach-omap2/timer.c |   32 ++++++++++++++++++++++++--------
- 1 file changed, 24 insertions(+), 8 deletions(-)
+ arch/arm/plat-omap/dmtimer.c |    4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index b3db1da..81a29b1 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -248,6 +248,19 @@ static u32 __init omap_dm_timer_get_errata(void)
- 	return OMAP_TIMER_ERRATA_I103_I767;
- }
- 
-+static int legacy_hwmod_clkget(struct omap_dm_timer *timer, const char *oh_name)
-+{
-+	struct omap_hwmod *oh;
-+
-+	oh = omap_hwmod_lookup(oh_name);
-+	if (!oh)
-+		return -ENODEV;
-+
-+	timer->fclk = clk_get(NULL, omap_hwmod_get_main_clk(oh));
-+	if (IS_ERR(timer->fclk))
-+		return PTR_ERR(timer->fclk);
-+}
-+
- static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
- 					 const char *fck_source,
- 					 const char *property,
-@@ -289,6 +302,14 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
- 			 * fall back code is to be deleted and we're to return
- 			 * PTR_ERR(timer->fclk) here.
- 			 */
-+			of_property_read_string_index(np, "ti,hwmods", 0,
-+						      &oh_name);
-+			if (!oh_name)
-+				return -ENODEV;
-+
-+			r = legacy_hwmod_clkget(timer, oh_name);
-+			if (r)
-+				return r;
- 		}
- 	} else {
- 		if (omap_dm_timer_reserve_systimer(timer->id))
-@@ -320,15 +341,10 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
- 
- 		omap_hwmod_setup_one(oh_name);
- 		omap_hwmod_enable(oh);
--	}
- 
--	if (!timer->fclk || IS_ERR(timer->fclk)) {
--		oh = omap_hwmod_lookup(oh_name);
--		if (!oh)
--			return -ENODEV;
--		timer->fclk = clk_get(NULL, omap_hwmod_get_main_clk(oh));
--		if (IS_ERR(timer->fclk))
--			return PTR_ERR(timer->fclk);
-+		r = legacy_hwmod_clkget(timer, oh_name);
-+		if (r)
-+			return r;
+diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
+index 7e806f9..1fd30fa 100644
+--- a/arch/arm/plat-omap/dmtimer.c
++++ b/arch/arm/plat-omap/dmtimer.c
+@@ -810,10 +810,6 @@ static int omap_dm_timer_probe(struct platform_device *pdev)
  	}
  
- 	/*
+ 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (unlikely(!mem)) {
+-		dev_err(dev, "%s: no memory resource.\n", __func__);
+-		return -ENODEV;
+-	}
+ 
+ 	timer = devm_kzalloc(dev, sizeof(struct omap_dm_timer), GFP_KERNEL);
+ 	if (!timer) {
 -- 
 1.7.9.5
