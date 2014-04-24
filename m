@@ -1,13 +1,18 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 24 Apr 2014 11:30:06 -0400
-Subject: [PATCH v3 6/7] ARM: dma: implement set_arch_dma_coherent_ops()
+Date: Thu, 24 Apr 2014 11:30:03 -0400
+Subject: [PATCH v3 3/7] of: introduce of_dma_is_coherent() helper
 In-Reply-To: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1398353407-2345-7-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1398353407-2345-4-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement the set_arch_dma_coherent_ops() for ARM architecture.
+The of_dma_is_coherent() helper parses the given DT device
+node to see if the "dma-coherent" property is supported and
+returns true or false accordingly.
+
+If the arch is always coherent or always noncoherent, then the default
+DMA ops has to be specified accordingly.
 
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: Russell King <linux@arm.linux.org.uk>
@@ -17,29 +22,68 @@ Cc: Grant Likely <grant.likely@linaro.org>
 Cc: Rob Herring <robh+dt@kernel.org>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 ---
- arch/arm/include/asm/dma-mapping.h |    7 +++++++
- 1 file changed, 7 insertions(+)
+ drivers/of/platform.c       |   23 +++++++++++++++++++++++
+ include/linux/of_platform.h |    6 ++++++
+ 2 files changed, 29 insertions(+)
 
-diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-index 424fda9..1965cd8 100644
---- a/arch/arm/include/asm/dma-mapping.h
-+++ b/arch/arm/include/asm/dma-mapping.h
-@@ -118,6 +118,13 @@ static inline unsigned long dma_max_pfn(struct device *dev)
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index 404d1da..48de98f 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -485,4 +485,27 @@ int of_platform_populate(struct device_node *root,
+ 	return rc;
  }
- #define dma_max_pfn(dev) dma_max_pfn(dev)
- 
-+static inline int set_arch_dma_coherent_ops(struct device *dev)
-+{
-+	set_dma_ops(dev, &arm_coherent_dma_ops);
-+	return 0;
-+}
-+#define set_arch_dma_coherent_ops(dev)	set_arch_dma_coherent_ops(dev)
+ EXPORT_SYMBOL_GPL(of_platform_populate);
 +
- static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
++/**
++ * of_dma_is_coherent - Check if device is coherent
++ * @np:	device node
++ *
++ * It returns true if "dma-coherent" property was found
++ * for this device in DT.
++ */
++bool of_dma_is_coherent(struct device_node *np)
++{
++	struct device_node *node = of_node_get(np);
++
++	while (node) {
++		if (of_property_read_bool(node, "dma-coherent")) {
++			of_node_put(node);
++			return true;
++		}
++		node = of_get_next_parent(node);
++	}
++	of_node_put(node);
++	return false;
++}
++EXPORT_SYMBOL_GPL(of_dma_is_coherent);
+ #endif /* CONFIG_OF_ADDRESS */
+diff --git a/include/linux/of_platform.h b/include/linux/of_platform.h
+index 05cb4a9..b9a3cb2 100644
+--- a/include/linux/of_platform.h
++++ b/include/linux/of_platform.h
+@@ -72,6 +72,7 @@ extern int of_platform_populate(struct device_node *root,
+ 				const struct of_device_id *matches,
+ 				const struct of_dev_auxdata *lookup,
+ 				struct device *parent);
++extern bool of_dma_is_coherent(struct device_node *np);
+ #else
+ static inline int of_platform_populate(struct device_node *root,
+ 					const struct of_device_id *matches,
+@@ -80,6 +81,11 @@ static inline int of_platform_populate(struct device_node *root,
  {
- 	unsigned int offset = paddr & ~PAGE_MASK;
+ 	return -ENODEV;
+ }
++
++static inline bool of_dma_is_coherent(struct device_node *np)
++{
++	return false;
++}
+ #endif
+ 
+ #endif	/* _LINUX_OF_PLATFORM_H */
 -- 
 1.7.9.5
