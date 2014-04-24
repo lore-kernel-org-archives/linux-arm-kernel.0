@@ -1,41 +1,42 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 24 Apr 2014 11:42:21 -0400
-Subject: [PATCH 3/4] ARM: dts: keystone: Use dma-ranges property
-In-Reply-To: <1398354142-2767-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1398354142-2767-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1398354142-2767-4-git-send-email-santosh.shilimkar@ti.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 24 Apr 2014 23:43:04 +0800
+Subject: [PATCH 3/4] gpio: make handler_data configurable while using
+ gpiolib_irqchip
+In-Reply-To: <CACRpkdYgzrVHgkc6xJKUebSDxnf1FbdzWXj-f2w-u+A2QY58Cg@mail.gmail.com>
+References: <1397544229-20545-1-git-send-email-21cnbao@gmail.com>
+ <1397544229-20545-4-git-send-email-21cnbao@gmail.com>
+ <CACRpkdb8rmMDXS1kfcq7wgOnG2XsPm_bxb15z9_9d3E+trBfQA@mail.gmail.com>
+ <CAGsJ_4wmd-ejfHF+MXbO3JSppUDYcEVKeO1WxRM16FtSFEBxpA@mail.gmail.com>
+ <CACRpkdYcbngMDPRnuQjPHwo-USHdtK26T_6VM=PFnkT71Dg8Ng@mail.gmail.com>
+ <CAGsJ_4y4H63KxJLF1hKaBwHVYb2b_2wTzjO_kGhKUOzScYpKqA@mail.gmail.com>
+ <CACRpkdYgzrVHgkc6xJKUebSDxnf1FbdzWXj-f2w-u+A2QY58Cg@mail.gmail.com>
+Message-ID: <CAGsJ_4xXLvzRV0k7LK2HCHRqkreRMUsnT3qtUbg0s+y8feD-QA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Grygorii Strashko <grygorii.strashko@ti.com>
+2014-04-24 21:06 GMT+08:00, Linus Walleij <linus.walleij@linaro.org>:
+> On Thu, Apr 24, 2014 at 1:23 AM, Barry Song <21cnbao@gmail.com> wrote:
+>
+>> my point is that will we make the gpiochip_set_chained_irqchip() more
+>> general for this kind of cases too since you have had a good API to
+>> wrap things?
+>
+> As it only wraps two function calls I'm leaning toward deleting it as it
+> might create more complexity than it removes. Not sure.
 
-The dma-ranges property has to be specified per bus and has format:
- < DMA addr > - Base DMA address for Bus (Bus format 32-bits)
- < CPU addr > - Corresponding base CPU address (CPU format 64-bits)
- < DMA range size > - Size of supported DMA range
+i do agree that we can remove it if it doesn't really support general
+gpiochip. i think it is popular that some gpiochip has several irq
+parents. so people might get confused by this API as it actually
+doesn't really help many.
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Olof Johansson <olof@lixom.net>
-Cc: Grant Likely <grant.likely@linaro.org>
-Cc: Rob Herring <robh+dt@kernel.org>
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/boot/dts/keystone.dtsi |    1 +
- 1 file changed, 1 insertion(+)
+>
+> We don't have a similar handler for registering nested threaded
+> irq handlers so it's not really helpful.
+>
+> Yours,
+> Linus Walleij
+>
 
-diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
-index 90823eb..404ff1f 100644
---- a/arch/arm/boot/dts/keystone.dtsi
-+++ b/arch/arm/boot/dts/keystone.dtsi
-@@ -66,6 +66,7 @@
- 		compatible = "ti,keystone","simple-bus";
- 		interrupt-parent = <&gic>;
- 		ranges = <0x0 0x0 0x0 0xc0000000>;
-+		dma-ranges = <0x80000000 0x8 0x00000000 0x80000000>;
- 
- 		rstctrl: reset-controller {
- 			compatible = "ti,keystone-reset";
--- 
-1.7.9.5
+-barry
+
+-barry
