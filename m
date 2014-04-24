@@ -1,63 +1,60 @@
 From: agross@codeaurora.org (Andy Gross)
-Date: Thu, 24 Apr 2014 11:31:19 -0500
-Subject: [Patch v2 1/4] soc: Placeholder files for drivers/soc
-In-Reply-To: <1398357082-5102-1-git-send-email-agross@codeaurora.org>
-References: <1398357082-5102-1-git-send-email-agross@codeaurora.org>
-Message-ID: <1398357082-5102-2-git-send-email-agross@codeaurora.org>
+Date: Thu, 24 Apr 2014 11:31:18 -0500
+Subject: [Patch v2 0/4] Introduce drivers/soc and add QCOM GSBI driver
+Message-ID: <1398357082-5102-1-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add placeholder Kconfig and linkage for driver/soc.
+The first patch in this set adds the drivers/soc directory and all the necessary
+plumbing.  These changes were discussed at the kernel summit and also were
+introduced in an earlier patch set from Santosh Shilimkar.
 
-The first patch set that implemented this was authored by Santosh Shilimkar:
+Reference the following set of patches:
 https://lkml.org/lkml/2014/2/28/567
 
-Signed-off-by: Andy Gross <agross@codeaurora.org>
----
- drivers/Kconfig     |    2 ++
- drivers/Makefile    |    4 ++++
- drivers/soc/Kconfig |    4 ++++
- 3 files changed, 10 insertions(+)
- create mode 100644 drivers/soc/Kconfig
+The remaining patches add the QCOM GSBI (General Serial Bus Interface) driver,
+device tree binding information for both the GSBI and child node interaction,
+and lastly a patch to fix the current MSM serial driver to work correctly with
+the GSBI changes.
 
-diff --git a/drivers/Kconfig b/drivers/Kconfig
-index b3138fb..37f955f 100644
---- a/drivers/Kconfig
-+++ b/drivers/Kconfig
-@@ -130,6 +130,8 @@ source "drivers/staging/Kconfig"
- 
- source "drivers/platform/Kconfig"
- 
-+source "drivers/soc/Kconfig"
-+
- source "drivers/clk/Kconfig"
- 
- source "drivers/hwspinlock/Kconfig"
-diff --git a/drivers/Makefile b/drivers/Makefile
-index 8e3b8b0..ba77e7b 100644
---- a/drivers/Makefile
-+++ b/drivers/Makefile
-@@ -132,6 +132,10 @@ obj-$(CONFIG_VHOST_RING)	+= vhost/
- obj-$(CONFIG_VLYNQ)		+= vlynq/
- obj-$(CONFIG_STAGING)		+= staging/
- obj-y				+= platform/
-+
-+# soc specific drivers
-+obj-y				+= soc/
-+
- #common clk code
- obj-y				+= clk/
- 
-diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
-new file mode 100644
-index 0000000..58bd962
---- /dev/null
-+++ b/drivers/soc/Kconfig
-@@ -0,0 +1,4 @@
-+menu "SOC specific Drivers"
-+
-+endmenu
-+`
+Before this patch series, serial drivers (UART, I2C, and SPI) were all directly
+accessing the overarching mux control settings for the parent GSBI device.  This
+leads to unfortunate interactions when you want a UART and I2C device which
+share the same GSBI interface.  By moving the serial devices to child nodes of
+the GSBI, we can get the right mode setting for the ports and keep the children
+from accessing the GSBI directly.
+
+Changes from v1:
+	- Add dt-bindings file containing definitions for MUX values
+	- Fix code comments
+	- Removed unnecessary code
+
+Andy Gross (4):
+  soc: Placeholder files for drivers/soc
+  soc: qcom: Add device tree binding for GSBI
+  soc: qcom: Add GSBI driver
+  tty: serial: msm: Remove direct access to GSBI
+
+ .../devicetree/bindings/soc/qcom/qcom,gsbi.txt     |   78 ++++++++++++++++++
+ drivers/Kconfig                                    |    2 +
+ drivers/Makefile                                   |    4 +
+ drivers/soc/Kconfig                                |    5 ++
+ drivers/soc/Makefile                               |    5 ++
+ drivers/soc/qcom/Kconfig                           |   11 +++
+ drivers/soc/qcom/Makefile                          |    1 +
+ drivers/soc/qcom/qcom_gsbi.c                       |   84 ++++++++++++++++++++
+ drivers/tty/serial/msm_serial.c                    |   48 +----------
+ drivers/tty/serial/msm_serial.h                    |    5 --
+ include/dt-bindings/soc/qcom,gsbi.h                |   26 ++++++
+ 11 files changed, 218 insertions(+), 51 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,gsbi.txt
+ create mode 100644 drivers/soc/Kconfig
+ create mode 100644 drivers/soc/Makefile
+ create mode 100644 drivers/soc/qcom/Kconfig
+ create mode 100644 drivers/soc/qcom/Makefile
+ create mode 100644 drivers/soc/qcom/qcom_gsbi.c
+ create mode 100644 include/dt-bindings/soc/qcom,gsbi.h
+
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
