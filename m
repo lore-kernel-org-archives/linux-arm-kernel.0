@@ -1,35 +1,20 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Thu, 24 Apr 2014 16:43:52 -0500
-Subject: [PATCH 09/26] ARM: OMAP: dmtimer: Get rid of check for mem resource
- error
-In-Reply-To: <1398375849-6017-1-git-send-email-joelf@ti.com>
-References: <1398375849-6017-1-git-send-email-joelf@ti.com>
-Message-ID: <1398375849-6017-10-git-send-email-joelf@ti.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Thu, 24 Apr 2014 15:10:14 -0700
+Subject: omap-serial: use mctrl_gpio helpers
+In-Reply-To: <1398331471-16745-1-git-send-email-yegorslists@googlemail.com>
+References: <1398331471-16745-1-git-send-email-yegorslists@googlemail.com>
+Message-ID: <20140424221014.GA29114@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The subsequent devm_ioremap_resource will catch it and print an error, let it
-be checked there.
+On Thu, Apr 24, 2014 at 11:24:30AM +0200, yegorslists at googlemail.com wrote:
+> This patch is based on Richard Genoud' patch adding generic GPIO support [1]
+> and my patch adding get_direction() functionality to OMAP's GPIO driver [2].
+> 
+> So far RTS/DTR are working both as modem control outputs and RTS as RS-485 2-wire controller.
+> 
+> CTS/DSR/DSR/RI are generating interrupts.
+> 
+> Richard, Greg, what is the status of [1]? It seems like it will be available in 3.16 first?
 
-Signed-off-by: Joel Fernandes <joelf@ti.com>
----
- arch/arm/plat-omap/dmtimer.c |    4 ----
- 1 file changed, 4 deletions(-)
-
-diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
-index 7e806f9..1fd30fa 100644
---- a/arch/arm/plat-omap/dmtimer.c
-+++ b/arch/arm/plat-omap/dmtimer.c
-@@ -810,10 +810,6 @@ static int omap_dm_timer_probe(struct platform_device *pdev)
- 	}
- 
- 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	if (unlikely(!mem)) {
--		dev_err(dev, "%s: no memory resource.\n", __func__);
--		return -ENODEV;
--	}
- 
- 	timer = devm_kzalloc(dev, sizeof(struct omap_dm_timer), GFP_KERNEL);
- 	if (!timer) {
--- 
-1.7.9.5
+Probably.
