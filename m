@@ -1,112 +1,123 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Thu, 24 Apr 2014 09:30:07 +0200
-Subject: [PATCH v4 5/5] sched: ARM: create a dedicated scheduler topology
- table
-In-Reply-To: <5357DBA5.1010106@arm.com>
-References: <1397209481-28542-1-git-send-email-vincent.guittot@linaro.org>
- <1397209481-28542-6-git-send-email-vincent.guittot@linaro.org>
- <5357A802.1030804@arm.com>
- <CAKfTPtDnw-OZZekdE3oNGS11m6dfpS4veMNZ_Bezs-Lm7zn6QQ@mail.gmail.com>
- <5357DBA5.1010106@arm.com>
-Message-ID: <CAKfTPtAOZqnP=sWeJuqFAqrGT8vLQZKj+tpqiwOTG37paXoGjg@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 24 Apr 2014 09:32:30 +0200
+Subject: [PATCH 27/38] mmc: sdhci-of-esdhc: remove
+ platform_suspend/platform_resume callbacks
+In-Reply-To: <E1Wd2Wy-0003w6-9y@rmk-PC.arm.linux.org.uk>
+References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
+ <E1Wd2Wy-0003w6-9y@rmk-PC.arm.linux.org.uk>
+Message-ID: <CAPDyKFrNpxFPfKQNWZ9iwzh=NKZpCzkA8gYnrqnPb-683QcgwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 April 2014 17:26, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
-> On 23/04/14 15:46, Vincent Guittot wrote:
->> On 23 April 2014 13:46, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
->>> Hi,
->>>
-
-[snip]
-
->> You  have an inconsistency in your topology description:
+On 23 April 2014 21:08, Russell King <rmk+kernel@arm.linux.org.uk> wrote:
+> We don't need these hooks in order to insert code in these paths, we
+> can just provide our own handlers and call the main sdhci handlers as
+> appropriate.
 >
-> That's true functional-wise but I think that this is not the reason why
-> the code in get_group()/build_sched_groups() isn't working correctly any
-> more with this set-up.
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  drivers/mmc/host/sdhci-of-esdhc.c | 55 +++++++++++++++++++++++++--------------
+>  1 file changed, 36 insertions(+), 19 deletions(-)
 >
-> Like I said above the cpu_cpupower_flags() is just bogus and I only
-> added it to illustrate the issue (Shouldn't have used
-> SD_SHARE_POWERDOMAIN in the first place).
+> diff --git a/drivers/mmc/host/sdhci-of-esdhc.c b/drivers/mmc/host/sdhci-of-esdhc.c
+> index fcaeae5f55b8..605815e52f5f 100644
+> --- a/drivers/mmc/host/sdhci-of-esdhc.c
+> +++ b/drivers/mmc/host/sdhci-of-esdhc.c
+> @@ -241,20 +241,6 @@ static void esdhc_of_set_clock(struct sdhci_host *host, unsigned int clock)
+>         mdelay(1);
+>  }
+>
+> -#ifdef CONFIG_PM
+> -static u32 esdhc_proctl;
+> -static void esdhc_of_suspend(struct sdhci_host *host)
+> -{
+> -       esdhc_proctl = sdhci_be32bs_readl(host, SDHCI_HOST_CONTROL);
+> -}
+> -
+> -static void esdhc_of_resume(struct sdhci_host *host)
+> -{
+> -       esdhc_of_enable_dma(host);
+> -       sdhci_be32bs_writel(host, esdhc_proctl, SDHCI_HOST_CONTROL);
+> -}
+> -#endif
+> -
+>  static void esdhc_of_platform_init(struct sdhci_host *host)
+>  {
+>         u32 vvn;
+> @@ -302,16 +288,47 @@ static const struct sdhci_ops sdhci_esdhc_ops = {
+>         .get_max_clock = esdhc_of_get_max_clock,
+>         .get_min_clock = esdhc_of_get_min_clock,
+>         .platform_init = esdhc_of_platform_init,
+> -#ifdef CONFIG_PM
+> -       .platform_suspend = esdhc_of_suspend,
+> -       .platform_resume = esdhc_of_resume,
+> -#endif
+>         .adma_workaround = esdhci_of_adma_workaround,
+>         .set_bus_width = esdhc_pltfm_set_bus_width,
+>         .reset = sdhci_reset,
+>         .set_uhs_signaling = sdhci_set_uhs_signaling,
+>  };
+>
+> +#ifdef CONFIG_PM
 
-More than the flag that is used for the example, it's about the
-cpumask which are inconsistent across CPUs for the same level and the
-build_sched_domain sequence rely on this consistency to build
-sched_group
+This should be CONFIG_PM_SLEEP
 
-> Essentially what I want to do is bind an SD_SHARE_*FOO* flag to the GDIE
-> related sd's of CPU2/3/4 and not to the DIE related sd's of CPU0/1.
->
-> I thought so far that I can achieve that by getting rid of GDIE sd level
-> for CPU0/1 simply by choosing the cpu_foo_mask() function in such a way
-> that it returns the same cpu mask as its child sd level (MC) and of DIE
-> sd level for CPU2/3/4 because it returns the same cpu mask as its child
-> sd level (GDIE) related cpu mask function. This will let sd degenerate
-> do it's job of folding sd levels which it does. The only problem I have
-> is that the groups are not created correctly any more.
->
-> I don't see right now how the flag SD_SHARE_FOO affects the code in
-> get_group()/build_sched_groups().
->
-> Think of SD_SHARE_FOO of something I would like to have for all sd's of
-> CPU's of cluster 1 (CPU2/3/4) and not on cluster 0 (CPU0/1) in the sd
-> level where each CPU sees two groups (group0 containing CPU0/1 and
-> group1 containing CPU2/3/4 or vice versa) (GDIE/DIE) .
+> +
+> +static u32 esdhc_proctl;
+> +static int esdhc_of_suspend(struct device *dev)
+> +{
+> +       struct sdhci_host *host = dev_get_drvdata(dev);
+> +
+> +       esdhc_proctl = sdhci_be32bs_readl(host, SDHCI_HOST_CONTROL);
+> +
+> +       return sdhci_suspend_host(host);
+> +}
+> +
+> +static void esdhc_of_resume(device *dev)
+> +{
+> +       struct sdhci_host *host = dev_get_drvdata(dev);
+> +       int ret = sdhci_resume_host(host);
+> +
+> +       if (ret == 0) {
+> +               /* Isn't this already done by sdhci_resume_host() ? --rmk */
+> +               esdhc_of_enable_dma(host);
+> +               sdhci_be32bs_writel(host, esdhc_proctl, SDHCI_HOST_CONTROL);
+> +       }
+> +
+> +       return ret;
+> +}
+> +
+> +static const struct dev_pm_ops esdhc_pmops = {
+> +       .suspend        = esdhci_of_suspend,
+> +       .resume         = esdhci_of_resume,
+> +};
+> +#define ESDHC_PMOPS (&esdhc_pmops)
+> +#else
+> +#define ESDHC_PMOPS NULL
+> +#endif
+> +
 
-I'm not sure that's it's feasible because it's not possible from a
-topology pov to have different flags if the span include all cpus.
-Could you give us more details about what you want to achieve with
-this flag ?
+I would suggest to use the SIMPLE_DEV_PM_OPS macro to simplify code a bit.
 
-Vincent
+>  static const struct sdhci_pltfm_data sdhci_esdhc_pdata = {
+>         /*
+>          * card detection could be handled via GPIO
+> @@ -373,7 +390,7 @@ static struct platform_driver sdhci_esdhc_driver = {
+>                 .name = "sdhci-esdhc",
+>                 .owner = THIS_MODULE,
+>                 .of_match_table = sdhci_esdhc_of_match,
+> -               .pm = SDHCI_PLTFM_PMOPS,
+> +               .pm = ESDHC_PMOPS,
+>         },
+>         .probe = sdhci_esdhc_probe,
+>         .remove = sdhci_esdhc_remove,
+> --
+> 1.8.3.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
->
-> -- Dietmar
->
->>
->> At GDIE level:
->> CPU1 cpu_cpupower_mask=0-1
->> but
->> CPU2 cpu_cpupower_mask=0-4
->>
->> so CPU2 says that it shares power domain with CPU0 but CPU1 says the opposite
->>
->> Regards
->> Vincent
->>
->>>
->>> Firstly, I had to get rid of the cpumask_equal(cpu_map,
->>> sched_domain_span(sd)) condition in build_sched_domains() to allow that
->>> I can have two sd levels which span CPU 0-4 (for CPU2/3/4).
->>>
->>> But it still doesn't work correctly:
->>>
->>> dmesg snippet 2:
->>>
->>> CPU0 attaching sched-domain:
->>>  domain 0: span 0-1 level MC
->>>   groups: 0 1
->>>   domain 1: span 0-4 level DIE     <-- error (there's only one group)
->>>    groups: 0-4 (cpu_power = 2048)
->>> ...
->>> CPU2 attaching sched-domain:
->>>  domain 0: span 2-4 level MC
->>>   groups: 2 3 4
->>>   domain 1: span 0-4 level GDIE
->>> ERROR: domain->groups does not contain CPU2
->>>    groups:
->>> ERROR: domain->cpu_power not set
->>>
->>> ERROR: groups don't span domain->span
->>> ...
->>>
-
-[snip]
-
->>>>
->>>
->>>
->>
->
->
+Kind regards
+Ulf Hansson
