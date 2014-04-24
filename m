@@ -1,36 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 24 Apr 2014 11:17:26 +0100
-Subject: [PATCH 00/38] MMC updates, plus CuBox-i WiFi support
-In-Reply-To: <CAPDyKFozP69yngKAkdwHYyyvi+pdLEm05udOmBiVshQFi4hnLQ@mail.gmail.com>
-References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
- <CAPDyKFozP69yngKAkdwHYyyvi+pdLEm05udOmBiVshQFi4hnLQ@mail.gmail.com>
-Message-ID: <20140424101726.GH26756@n2100.arm.linux.org.uk>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Thu, 24 Apr 2014 13:16:59 +0300
+Subject: [PATCH 03/23] OMAPDSS: HDMI4: set regulator voltage to 1.8V
+In-Reply-To: <1398334639-14172-1-git-send-email-tomi.valkeinen@ti.com>
+References: <1398334639-14172-1-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1398334639-14172-4-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 24, 2014 at 10:25:42AM +0200, Ulf Hansson wrote:
-> I have looked though the patches up until patch 33 and this is clearly
-> a nice piece of clean-up /fixes work for sdhci. Besides my minor
-> comments per patch, I don't have any objections code-review wise to
-> proceed merging them.
-> 
-> I have also tried to applied them on Chris' mmc-next branch,
-> unfortunate it fails at patch 23, so it would be nice to get a
-> re-based patchset for the mmc-next branch.
+Set the HDMI vdda regulator voltage to the required 1.8V.
 
-I /could/ rebase it but then I wouldn't be able to produce the patch
-sets/patches for others [*] (such as the Novena project) to derive
-their kernel tree from my iMX6 patch set.
+This is required for the case when the regulator in the DT data defines
+a range of allowed voltages. In this case it's required to set the
+voltage, as otherwise enabling the voltage fails.
 
-What I'd prefer is to keep the patch set intact, and provide Chris
-with a pull request for it up to patch 33, which would need a
-conflict fixed - and this would mean that I can be sure that what
-I'm testing, and what I'm distributing is what Chris will also be
-submitting.
+Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+---
+ drivers/video/fbdev/omap2/dss/hdmi4.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-* - this currently stands at 230 patches in all - mmc + l2c + fec +
-    imx-drm + other iMX6 changes.
-
+diff --git a/drivers/video/fbdev/omap2/dss/hdmi4.c b/drivers/video/fbdev/omap2/dss/hdmi4.c
+index e15b89d49c28..5c7dd5c06593 100644
+--- a/drivers/video/fbdev/omap2/dss/hdmi4.c
++++ b/drivers/video/fbdev/omap2/dss/hdmi4.c
+@@ -83,6 +83,7 @@ static void hdmi_runtime_put(void)
+ 
+ static int hdmi_init_regulator(void)
+ {
++	int r;
+ 	struct regulator *reg;
+ 
+ 	if (hdmi.vdda_hdmi_dac_reg != NULL)
+@@ -96,6 +97,15 @@ static int hdmi_init_regulator(void)
+ 		return PTR_ERR(reg);
+ 	}
+ 
++	if (regulator_can_change_voltage(reg)) {
++		r = regulator_set_voltage(reg, 1800000, 1800000);
++		if (r) {
++			devm_regulator_put(reg);
++			DSSWARN("can't set the regulator voltage\n");
++			return r;
++		}
++	}
++
+ 	hdmi.vdda_hdmi_dac_reg = reg;
+ 
+ 	return 0;
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.9.1
