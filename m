@@ -1,31 +1,72 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 24 Apr 2014 18:44:56 +0100
-Subject: L2C boot crash on BCM Capri
-In-Reply-To: <7hlhuuprkc.fsf@paris.lan>
-References: <CAGa+x84pQLkD5_-xZKaEq67ETAtAaCB4Ryt_F-ocwX_wmh=tTA@mail.gmail.com>
- <7hlhuuprkc.fsf@paris.lan>
-Message-ID: <20140424174456.GV26756@n2100.arm.linux.org.uk>
+From: anders.berg@lsi.com (Anders Berg)
+Date: Thu, 24 Apr 2014 19:47:41 +0200
+Subject: [PATCH v2 3/6] ARM: dts: Device tree for AXM55xx.
+In-Reply-To: <CACRpkdbU6UashxCuPMDjEB_nbB=mXicGpjJy=HGC6r3qfxCtVQ@mail.gmail.com>
+References: <cover.1398335771.git.anders.berg@lsi.com>
+ <2386bd1367aa44741979461358a72dec89608597.1398335771.git.anders.berg@lsi.com>
+ <CACRpkdbU6UashxCuPMDjEB_nbB=mXicGpjJy=HGC6r3qfxCtVQ@mail.gmail.com>
+Message-ID: <20140424174741.GA23444@swsaberg01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 24, 2014 at 10:26:11AM -0700, Kevin Hilman wrote:
-> [    0.100000] L2C-310 enabling early BRESP for Cortex-A9
-> [    0.110000] L2C-310 full line of zeros enabled for Cortex-A9
-> [    0.110000] L2C-310 dynamic clock gating enabled, standby mode enabled
-> [    0.120000] Unhandled fault: imprecise external abort (0xc06) at 0x44a42d67
+On Thu, Apr 24, 2014 at 03:24:14PM +0200, Linus Walleij wrote:
+> On Thu, Apr 24, 2014 at 12:44 PM, Anders Berg <anders.berg@lsi.com> wrote:
+> 
+> > Add device tree for the Amarillo validation board with an AXM5516 SoC.
+> >
+> > Signed-off-by: Anders Berg <anders.berg@lsi.com>
+> (...)
+> 
+> > +                       timer0: timer at 2010091000 {
+> > +                               compatible = "arm,sp804", "arm,primecell";
+> > +                               reg = <0x20 0x10091000 0 0x1000>;
+> > +                               interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>,
+> > +                                            <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>,
+> > +                                            <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>,
+> > +                                            <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>,
+> > +                                            <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>,
+> > +                                            <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>,
+> > +                                            <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>,
+> > +                                            <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>,
+> > +                                            <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>;
+> > +                               clocks = <&clk_per>;
+> > +                               clock-names = "apb_pclk";
+> > +                               status = "okay";
+> > +                       };
+> > +
+> > +                       gpio0: gpio at 2010092000 {
+> > +                               #gpio-cells = <2>;
+> > +                               compatible = "arm,pl061", "arm,primecell";
+> > +                               gpio-controller;
+> > +                               reg = <0x20 0x10092000 0x00 0x1000>;
+> > +                               interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>,
+> > +                                            <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>,
+> > +                                            <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
+> > +                                            <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
+> > +                                            <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>,
+> > +                                            <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
+> > +                                            <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>,
+> > +                                            <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
+> > +                               clocks = <&clk_per>;
+> > +                               clock-names = "apb_pclk";
+> > +                               status = "disabled";
+> > +                       };
+> 
+> One interrupt per CPU core?
+> 
+> The drivers for these blocks will really just grab the first IRQ and
+> then I guess they
+> will only be able to execute on CPU0.
+> 
+> It's definately correct to list all the IRQs here, but how do you envision
+> the drivers making use of them in the long run?
 
-The unfortunate thing about imprecise external aborts is that they don't
-tell us what went wrong - we have to guess.
+It's one interrupt line per input pin (so with the current driver only the first pin
+is usable as interrupt source).
 
-My guess would be that something isn't wired up correctly between the
-Cortex-A9 and L2 controller in Broadcom SoCs.  You could try disabling
-the clock gating/standby mode - I doubt it's the FLZ feature as that
-also requires the Cortex-A9 configuration to be changed as well, which
-wouldn't have happened at the point this fault occurred.
+/Anders
 
-Also, it's possible that BRESP could cause it.  Try disabling each in
-turn and see what effect they have...
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+> 
+> Yours,
+> Linus Walleij
+> 
