@@ -1,59 +1,40 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Thu, 24 Apr 2014 12:52:42 +0300
-Subject: [PATCHv3 19/41] OMAPDSS: panel-dpi: Add DT support
-In-Reply-To: <20140418155107.GB5354@atomide.com>
-References: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
- <1390301833-24944-20-git-send-email-tomi.valkeinen@ti.com>
- <20140418155107.GB5354@atomide.com>
-Message-ID: <5358DEEA.1000506@ti.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 24 Apr 2014 11:54:24 +0200
+Subject: [PATCH 0/2] Add generic cpu power control functions for exynos
+In-Reply-To: <1398331919-28321-1-git-send-email-leela.krishna@linaro.org>
+References: <1398331919-28321-1-git-send-email-leela.krishna@linaro.org>
+Message-ID: <5358DF50.9010106@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/04/14 18:51, Tony Lindgren wrote:
 
->> +	gpio = of_get_gpio(node, 0);
->> +	if (gpio_is_valid(gpio) || gpio == -ENOENT) {
->> +		ddata->enable_gpio = gpio;
->> +	} else {
->> +		dev_err(&pdev->dev, "failed to parse enable gpio\n");
->> +		return gpio;
->> +	}
-> 
-> We should set the GPIO polarity based on the OF_GPIO_ACTIVE_LOW like
-> gpio_backlight_probe_dt is doing. 
+Hi Abhilash and Leela,
 
-Instead of doing it with the old gpio API, and checking the 'active'
-flag everywhere, I think we can use the new gpiod API which handles the
-polarity automatically.
+FYI I think you are working on similar patches.
 
-I attached prototype patches (based on -rc2) for panel dpi using that
-approach. It's a bit messier than I'd like, because for non-DT boot we
-need to request the gpio using the old API, and then convert it to
-gpio_desc. We can remove that code when all the boards use DT.
+On 04/24/2014 11:31 AM, Leela Krishna Amudala wrote:
+ > This patchset adds the generic cpu power control functions for
+> exynos based SoCs to power up/down and to know the status of the cpu.
+>
+> Note: This series has been rebased on 3.15-rc1 and tested on
+> Exynos based Origen(Cortex-A9) and Arndale-octa(Cortex A7,A15) boards.
+>
+> Leela Krishna Amudala (2):
+>    ARM: EXYNOS: Add generic cpu power control functions for all exynos
+>      based SoCs
+>    ARM: EXYNOS: use generic exynos cpu power control functions
+>
+>   arch/arm/mach-exynos/common.h   |    3 +++
+>   arch/arm/mach-exynos/platsmp.c  |    9 +++------
+>   arch/arm/mach-exynos/pm.c       |   36 ++++++++++++++++++++++++++++++++++++
+>   arch/arm/mach-exynos/regs-pmu.h |    6 ++++++
+>   4 files changed, 48 insertions(+), 6 deletions(-)
+>
 
-I've compiled tested this only, as I don't have DPI panels I could use.
-I did try similar approach for TFP410, and it seemed to work fine.
 
- Tomi
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-panel-dpi-use-gpiod-for-enable-gpio.patch
-Type: text/x-patch
-Size: 2954 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140424/be49b8c6/attachment.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0002-OMAPDSS-panel-dpi-Add-DT-support.patch
-Type: text/x-patch
-Size: 3338 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140424/be49b8c6/attachment-0001.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140424/be49b8c6/attachment.sig>
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
