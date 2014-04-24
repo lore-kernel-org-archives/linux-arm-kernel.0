@@ -1,115 +1,192 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu, 24 Apr 2014 12:13:21 +0200
-Subject: [PATCH/RFC 2/4] PM / clock_ops: Add pm_clk_add_clk()
+Date: Thu, 24 Apr 2014 12:13:22 +0200
+Subject: [PATCH/RFC 3/4] of/clk: Register clocks suitable for Runtime PM with
+ the PM core
 In-Reply-To: <1398334403-26181-1-git-send-email-geert+renesas@glider.be>
 References: <1398334403-26181-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1398334403-26181-3-git-send-email-geert+renesas@glider.be>
+Message-ID: <1398334403-26181-4-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The existing pm_clk_add() allows to pass a clock by con_id. However,
-when referring to a specific clock from DT, no con_id is available.
+When adding a device from DT, check if its clocks are suitable for Runtime
+PM, and register them with the PM core.
+If Runtime PM is disabled, just enable the clock.
 
-Add pm_clk_add_clk(), which allows to specify the struct clk * directly.
+This allows the PM core to automatically manage gate clocks of devices for
+Runtime PM.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- drivers/base/power/clock_ops.c |   40 ++++++++++++++++++++++++++++++----------
- include/linux/pm_clock.h       |    3 +++
- 2 files changed, 33 insertions(+), 10 deletions(-)
+ drivers/of/Makefile    |    1 +
+ drivers/of/of_clk.c    |  103 ++++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/of/platform.c  |    3 ++
+ include/linux/of_clk.h |   18 +++++++++
+ 4 files changed, 125 insertions(+)
+ create mode 100644 drivers/of/of_clk.c
+ create mode 100644 include/linux/of_clk.h
 
-diff --git a/drivers/base/power/clock_ops.c b/drivers/base/power/clock_ops.c
-index b99e6c06ee67..2d5c9c1eceb1 100644
---- a/drivers/base/power/clock_ops.c
-+++ b/drivers/base/power/clock_ops.c
-@@ -53,7 +53,8 @@ static inline int __pm_clk_enable(struct device *dev, struct clk *clk)
-  */
- static void pm_clk_acquire(struct device *dev, struct pm_clock_entry *ce)
- {
--	ce->clk = clk_get(dev, ce->con_id);
-+	if (!ce->clk)
-+		ce->clk = clk_get(dev, ce->con_id);
- 	if (IS_ERR(ce->clk)) {
- 		ce->status = PCE_STATUS_ERROR;
- 	} else {
-@@ -63,15 +64,8 @@ static void pm_clk_acquire(struct device *dev, struct pm_clock_entry *ce)
- 	}
- }
- 
--/**
-- * pm_clk_add - Start using a device clock for power management.
-- * @dev: Device whose clock is going to be used for power management.
-- * @con_id: Connection ID of the clock.
-- *
-- * Add the clock represented by @con_id to the list of clocks used for
-- * the power management of @dev.
-- */
--int pm_clk_add(struct device *dev, const char *con_id)
-+static int __pm_clk_add(struct device *dev, const char *con_id,
-+			struct clk *clk)
- {
- 	struct pm_subsys_data *psd = dev_to_psd(dev);
- 	struct pm_clock_entry *ce;
-@@ -93,6 +87,8 @@ int pm_clk_add(struct device *dev, const char *con_id)
- 			kfree(ce);
- 			return -ENOMEM;
- 		}
-+	} else {
-+		ce->clk = clk;
- 	}
- 
- 	pm_clk_acquire(dev, ce);
-@@ -102,6 +98,30 @@ int pm_clk_add(struct device *dev, const char *con_id)
- 	spin_unlock_irq(&psd->lock);
- 	return 0;
- }
-+/**
-+ * pm_clk_add - Start using a device clock for power management.
-+ * @dev: Device whose clock is going to be used for power management.
-+ * @con_id: Connection ID of the clock.
-+ *
-+ * Add the clock represented by @con_id to the list of clocks used for
-+ * the power management of @dev.
+diff --git a/drivers/of/Makefile b/drivers/of/Makefile
+index ed9660adad77..49bcd413906f 100644
+--- a/drivers/of/Makefile
++++ b/drivers/of/Makefile
+@@ -10,3 +10,4 @@ obj-$(CONFIG_OF_PCI)	+= of_pci.o
+ obj-$(CONFIG_OF_PCI_IRQ)  += of_pci_irq.o
+ obj-$(CONFIG_OF_MTD)	+= of_mtd.o
+ obj-$(CONFIG_OF_RESERVED_MEM) += of_reserved_mem.o
++obj-$(CONFIG_COMMON_CLK) += of_clk.o
+diff --git a/drivers/of/of_clk.c b/drivers/of/of_clk.c
+new file mode 100644
+index 000000000000..35f5e9f3dd42
+--- /dev/null
++++ b/drivers/of/of_clk.c
+@@ -0,0 +1,103 @@
++/*
++ *  Copyright (C) 2014 Glider bvba
 + */
-+int pm_clk_add(struct device *dev, const char *con_id)
++
++#include <linux/clk.h>
++#include <linux/err.h>
++#include <linux/of.h>
++#include <linux/of_clk.h>
++#include <linux/platform_device.h>
++#include <linux/pm_clock.h>
++#include <linux/pm_runtime.h>
++
++
++#ifdef CONFIG_PM_RUNTIME
++
++static int of_clk_pm_runtime_suspend(struct device *dev)
 +{
-+	return __pm_clk_add(dev, con_id, NULL);
++	int ret;
++
++	ret = pm_generic_runtime_suspend(dev);
++	if (ret)
++		return ret;
++
++	ret = pm_clk_suspend(dev);
++	if (ret) {
++		pm_generic_runtime_resume(dev);
++		return ret;
++	}
++
++	return 0;
 +}
 +
-+/**
-+ * pm_clk_add_clk - Start using a device clock for power management.
-+ * @dev: Device whose clock is going to be used for power management.
-+ * @clk: Clock pointer
-+ *
-+ * Add the clock to the list of clocks used for the power management of @dev.
-+ */
-+int pm_clk_add_clk(struct device *dev, struct clk *clk)
++static int of_clk_pm_runtime_resume(struct device *dev)
 +{
-+	return __pm_clk_add(dev, NULL, clk);
++	pm_clk_resume(dev);
++	return pm_generic_runtime_resume(dev);
 +}
- 
- /**
-  * __pm_clk_remove - Destroy PM clock entry.
-diff --git a/include/linux/pm_clock.h b/include/linux/pm_clock.h
-index 8348866e7b05..6981aa288c45 100644
---- a/include/linux/pm_clock.h
-+++ b/include/linux/pm_clock.h
-@@ -18,6 +18,8 @@ struct pm_clk_notifier_block {
- 	char *con_ids[];
- };
- 
-+struct clk;
 +
- #ifdef CONFIG_PM_CLK
- static inline bool pm_clk_no_clocks(struct device *dev)
- {
-@@ -29,6 +31,7 @@ extern void pm_clk_init(struct device *dev);
- extern int pm_clk_create(struct device *dev);
- extern void pm_clk_destroy(struct device *dev);
- extern int pm_clk_add(struct device *dev, const char *con_id);
-+extern int pm_clk_add_clk(struct device *dev, struct clk *clk);
- extern void pm_clk_remove(struct device *dev, const char *con_id);
- extern int pm_clk_suspend(struct device *dev);
- extern int pm_clk_resume(struct device *dev);
++static struct dev_pm_domain of_clk_pm_domain = {
++	.ops = {
++		.runtime_suspend = of_clk_pm_runtime_suspend,
++		.runtime_resume = of_clk_pm_runtime_resume,
++		USE_PLATFORM_PM_SLEEP_OPS
++	},
++};
++
++static int of_clk_register(struct device *dev, struct clk *clk)
++{
++	int error;
++
++	if (!dev->pm_domain) {
++		error = pm_clk_create(dev);
++		if (error)
++			return error;
++
++		dev->pm_domain = &of_clk_pm_domain;
++	}
++
++	dev_dbg(dev, "Setting up clock for runtime PM management\n");
++	return pm_clk_add_clk(dev, clk);
++}
++
++#else /* !CONFIG_PM_RUNTIME */
++
++static int of_clk_register(struct device *dev, struct clk *clk)
++{
++	dev_dbg(dev, "Runtime PM disabled, enabling clock\n");
++	return clk_prepare_enable(clk);
++}
++
++#endif /* !CONFIG_PM_RUNTIME */
++
++
++/**
++ * of_clk_register_runtime_pm_clocks - Register clocks suitable for Runtime PM
++ *                                     with the PM core
++ * @np: pointer to device tree node
++ * @pdev: pointer to corresponding device to register suitable clocks for
++ *
++ * Returns an error code
++ */
++int of_clk_register_runtime_pm_clocks(struct device_node *np,
++				      struct device *dev)
++{
++	unsigned int i;
++	struct clk *clk;
++	int error;
++
++	for (i = 0; (clk = of_clk_get(np, i)) && !IS_ERR(clk); i++) {
++		if (!clk_may_runtime_pm(clk)) {
++			clk_put(clk);
++			continue;
++		}
++
++		error = of_clk_register(dev, clk);
++		if (error) {
++			clk_put(clk);
++			return error;
++		}
++	}
++
++	return 0;
++}
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index 404d1daebefa..29145302b6f8 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -18,6 +18,7 @@
+ #include <linux/dma-mapping.h>
+ #include <linux/slab.h>
+ #include <linux/of_address.h>
++#include <linux/of_clk.h>
+ #include <linux/of_device.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+@@ -182,6 +183,8 @@ struct platform_device *of_device_alloc(struct device_node *np,
+ 	else
+ 		of_device_make_bus_id(&dev->dev);
+ 
++	of_clk_register_runtime_pm_clocks(np, &dev->dev);
++
+ 	return dev;
+ }
+ EXPORT_SYMBOL(of_device_alloc);
+diff --git a/include/linux/of_clk.h b/include/linux/of_clk.h
+new file mode 100644
+index 000000000000..b9b15614e39b
+--- /dev/null
++++ b/include/linux/of_clk.h
+@@ -0,0 +1,18 @@
++#ifndef _LINUX_OF_CLK_H
++#define _LINUX_OF_CLK_H
++
++struct device_node;
++struct device;
++
++#if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
++int of_clk_register_runtime_pm_clocks(struct device_node *np,
++				      struct device *dev);
++#else
++static inline int of_clk_register_runtime_pm_clocks(struct device_node *np,
++						    struct device *dev)
++{
++	return 0;
++}
++#endif /* CONFIG_OF && CONFIG_COMMON_CLK */
++
++#endif /* _LINUX_OF_CLK_H */
 -- 
 1.7.9.5
