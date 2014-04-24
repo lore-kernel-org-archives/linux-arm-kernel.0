@@ -1,133 +1,43 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Thu, 24 Apr 2014 11:45:46 +0900
-Subject: [PATCH 06/10] ARM: EXYNOS: Add support for mapping PMU base
- address via DT
-In-Reply-To: <CAGm_ybgEfqYfKJch58_svA5GAbkFXfXb1FyOiMSrX12PzBHxyA@mail.gmail.com>
-References: <1396425058-4012-1-git-send-email-pankaj.dubey@samsung.com>
- <1396425058-4012-7-git-send-email-pankaj.dubey@samsung.com>
- <CAGm_ybgEfqYfKJch58_svA5GAbkFXfXb1FyOiMSrX12PzBHxyA@mail.gmail.com>
-Message-ID: <53587ADA.1090003@samsung.com>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Wed, 23 Apr 2014 21:28:33 -0500
+Subject: [PATCH v6 0/6] ARM: vdso gettimeofday using generic timer
+ architecture
+In-Reply-To: <53581865.2020601@codeaurora.org>
+References: <cover.1398213562.git.nathan_lynch@mentor.com>
+ <53581865.2020601@codeaurora.org>
+Message-ID: <535876D1.8040609@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vikas,
+On 04/23/2014 02:45 PM, Stephen Boyd wrote:
+> On 04/22/14 17:48, Nathan Lynch wrote:
+>> Provide fast userspace implementations of gettimeofday and
+>> clock_gettime on systems that implement the generic timers extension
+>> defined in ARMv7.  This follows the example of arm64 in conception but
+>> significantly differs in some aspects of the implementation (C vs
+>> assembly, mainly).
+>>
+>> Clocks supported:
+>> - CLOCK_REALTIME
+>> - CLOCK_MONOTONIC
+>> - CLOCK_REALTIME_COARSE
+>> - CLOCK_MONOTONIC_COARSE
+>>
+>> This also provides clock_getres (as arm64 does).
+>>
+>> Note that while the high-precision realtime and monotonic clock
+>> support depends on the generic timers extension, support for
+>> clock_getres and coarse clocks is independent of the timer
+>> implementation and is provided unconditionally.
+> 
+> I think we'll need to rename the clocksource in arch_timer.c if we only
+> have an mmio architected timer to something like arch_mem_counter.
 
-On 04/23/2014 10:02 PM, Vikas Sajjan wrote:
-> Hi,
->
-> On Wed, Apr 2, 2014 at 1:20 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
->> From: Young-Gun Jang <yg1004.jang@samsung.com>
->>
->> Add support for mapping Exynos Power Management Unit (PMU) base address
->> from device tree. Code will use existing samsung pmu binding information.
->> This patch also adds "get_exynos_pmubase" a helper function to return mapped base
->> address to various other files under "mach-exynos".
->>
->> Signed-off-by: Young-Gun Jang <yg1004.jang@samsung.com>
->> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->> ---
->>   arch/arm/mach-exynos/common.h |    2 ++
->>   arch/arm/mach-exynos/exynos.c |   44 +++++++++++++++++++++++++++++++++++++++++
->>   2 files changed, 46 insertions(+)
->>
->> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
->> index ff28334..9a55cf6 100644
->> --- a/arch/arm/mach-exynos/common.h
->> +++ b/arch/arm/mach-exynos/common.h
->> @@ -61,4 +61,6 @@ struct exynos_pmu_conf {
->>
->>   extern void exynos_sys_powerdown_conf(enum sys_powerdown mode);
->>
->> +extern void __iomem *get_exynos_pmubase(void);
->> +
->>   #endif /* __ARCH_ARM_MACH_EXYNOS_COMMON_H */
->> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
->> index a5e1349..a5127fb 100644
->> --- a/arch/arm/mach-exynos/exynos.c
->> +++ b/arch/arm/mach-exynos/exynos.c
->> @@ -35,6 +35,8 @@
->>   #define L2_AUX_VAL 0x7C470001
->>   #define L2_AUX_MASK 0xC200ffff
->>
->> +static void __iomem *exynos_pmu_base __initdata;
-> Are you sure you want to keep exynos_pmu_base in .init section.
-> I am seeing a crash in platform_do_lowpower()
-> I think you should remove __initdata.
+I guess ARMv7 would allow you to have mmio without cp15 (AFAIK ARMv8
+does not).  I don't see any dts in arch/arm that contains an
+arm,armv7-timer-mem node without an arm,armv7-timer node, though.
 
-Thanks for review and testing.
-You are right we do not need __initdata here.
-I will take care of this in V2.
-
->> +
->>   static struct map_desc exynos4_iodesc[] __initdata = {
->>          {
->>                  .virtual        = (unsigned long)S3C_VA_SYS,
->> @@ -245,6 +247,47 @@ void __init exynos_init_late(void)
->>          exynos_pm_init();
->>   }
->>
->> +static char const *exynos_dt_pmu_match[] __initconst = {
->> +       "samsung,exynos4210-pmu",
->> +       "samsung,exynos4212-pmu",
->> +       "samsung,exynos4412-pmu",
->> +       "samsung,exynos5250-pmu",
->> +       NULL
->> +};
->> +
->> +static int __init exynos_fdt_map_pmu(unsigned long node,
->> +               const char *uname, int depth, void *data)
->> +{
->> +       struct map_desc iodesc;
->> +       __be32 *reg;
->> +       unsigned long len;
->> +
->> +       if (of_flat_dt_match(node, exynos_dt_pmu_match)) {
->> +               phys_addr_t phys_addr;
->> +               reg = of_get_flat_dt_prop(node, "reg", &len);
->> +               if (reg == NULL || len != (sizeof(unsigned long) * 2))
->> +                       return 0;
->> +
->> +               phys_addr = be32_to_cpu(reg[0]);
->> +               iodesc.pfn = __phys_to_pfn(phys_addr);
->> +               iodesc.length = be32_to_cpu(reg[1]) - 1;
->> +               iodesc.virtual = (unsigned long)S5P_VA_PMU;
->> +               iodesc.type = MT_DEVICE;
->> +               iotable_init(&iodesc, 1);
->> +
->> +               exynos_pmu_base = ioremap(phys_addr, be32_to_cpu(reg[1]));
->> +               if (WARN_ON(!exynos_pmu_base))
->> +                       return -EFAULT;
->> +       }
->> +
->> +       return 0;
->> +}
->> +
->> +inline void __iomem *get_exynos_pmubase()
->> +{
->> +       return exynos_pmu_base;
->> +}
->> +
->>   static int __init exynos_fdt_map_chipid(unsigned long node, const char *uname,
->>                                          int depth, void *data)
->>   {
->> @@ -301,6 +344,7 @@ void __init exynos_init_io(void)
->>          debug_ll_io_init();
->>
->>          of_scan_flat_dt(exynos_fdt_map_chipid, NULL);
->> +       of_scan_flat_dt(exynos_fdt_map_pmu, NULL);
->>
->>          /* detect cpu id and rev. */
->>          s5p_init_cpu(S5P_VA_CHIPID);
->> --
->> 1.7.10.4
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->> Please read the FAQ at  http://www.tux.org/lkml/
-
-
--- 
-Best Regards,
-Pankaj Dubey
+If this is a practical concern, I think using
+CONFIG_ARCH_CLOCKSOURCE_DATA is perhaps a better way to communicate
+whether cp15 access is available.  That's how the x86 vdso, for example,
+decides between using HPET vs TSC etc.
