@@ -1,50 +1,36 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Thu, 24 Apr 2014 13:17:00 +0300
-Subject: [PATCH 04/23] OMAPDSS: DSI: set regulator voltage to 1.8V
-In-Reply-To: <1398334639-14172-1-git-send-email-tomi.valkeinen@ti.com>
-References: <1398334639-14172-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1398334639-14172-5-git-send-email-tomi.valkeinen@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 24 Apr 2014 11:17:26 +0100
+Subject: [PATCH 00/38] MMC updates, plus CuBox-i WiFi support
+In-Reply-To: <CAPDyKFozP69yngKAkdwHYyyvi+pdLEm05udOmBiVshQFi4hnLQ@mail.gmail.com>
+References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
+ <CAPDyKFozP69yngKAkdwHYyyvi+pdLEm05udOmBiVshQFi4hnLQ@mail.gmail.com>
+Message-ID: <20140424101726.GH26756@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set the DSI vdd regulator voltage to the required 1.8V.
+On Thu, Apr 24, 2014 at 10:25:42AM +0200, Ulf Hansson wrote:
+> I have looked though the patches up until patch 33 and this is clearly
+> a nice piece of clean-up /fixes work for sdhci. Besides my minor
+> comments per patch, I don't have any objections code-review wise to
+> proceed merging them.
+> 
+> I have also tried to applied them on Chris' mmc-next branch,
+> unfortunate it fails at patch 23, so it would be nice to get a
+> re-based patchset for the mmc-next branch.
 
-This is required for the case when the regulator in the DT data defines
-a range of allowed voltages. In this case it's required to set the
-voltage, as otherwise enabling the voltage fails.
+I /could/ rebase it but then I wouldn't be able to produce the patch
+sets/patches for others [*] (such as the Novena project) to derive
+their kernel tree from my iMX6 patch set.
 
-Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
----
- drivers/video/fbdev/omap2/dss/dsi.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+What I'd prefer is to keep the patch set intact, and provide Chris
+with a pull request for it up to patch 33, which would need a
+conflict fixed - and this would mean that I can be sure that what
+I'm testing, and what I'm distributing is what Chris will also be
+submitting.
 
-diff --git a/drivers/video/fbdev/omap2/dss/dsi.c b/drivers/video/fbdev/omap2/dss/dsi.c
-index 8be9b04d8849..57f120896b43 100644
---- a/drivers/video/fbdev/omap2/dss/dsi.c
-+++ b/drivers/video/fbdev/omap2/dss/dsi.c
-@@ -1161,6 +1161,7 @@ static int dsi_regulator_init(struct platform_device *dsidev)
- {
- 	struct dsi_data *dsi = dsi_get_dsidrv_data(dsidev);
- 	struct regulator *vdds_dsi;
-+	int r;
- 
- 	if (dsi->vdds_dsi_reg != NULL)
- 		return 0;
-@@ -1173,6 +1174,15 @@ static int dsi_regulator_init(struct platform_device *dsidev)
- 		return PTR_ERR(vdds_dsi);
- 	}
- 
-+	if (regulator_can_change_voltage(vdds_dsi)) {
-+		r = regulator_set_voltage(vdds_dsi, 1800000, 1800000);
-+		if (r) {
-+			devm_regulator_put(vdds_dsi);
-+			DSSERR("can't set the DSI regulator voltage\n");
-+			return r;
-+		}
-+	}
-+
- 	dsi->vdds_dsi_reg = vdds_dsi;
- 
- 	return 0;
+* - this currently stands at 230 patches in all - mmc + l2c + fec +
+    imx-drm + other iMX6 changes.
+
 -- 
-1.9.1
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
