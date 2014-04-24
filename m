@@ -1,50 +1,50 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Thu, 24 Apr 2014 13:23:38 +0100
-Subject: [PATCH] arm64: mm: Add THP TLB entries to general mmu_gather
-Message-ID: <1398342218-31830-1-git-send-email-steve.capper@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 24 Apr 2014 14:25:30 +0200
+Subject: [RFC PATCH 2/2] PCI: exynos: Add PCIe support for Samsung GH7 SoC
+In-Reply-To: <20140423130012.GL865@e106497-lin.cambridge.arm.com>
+References: <000801cf592e$30b7bff0$92273fd0$%han@samsung.com>
+ <031b01cf5ed5$21d536a0$657fa3e0$@samsung.com>
+ <20140423130012.GL865@e106497-lin.cambridge.arm.com>
+Message-ID: <201404241425.31625.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When arm64 moved over to the core mmu_gather, it lost the logic to
-flush THP TLB entries (tlb_remove_pmd_tlb_entry was removed and the
-core implementation only signals that the mmu_gather needs a flush).
+On Wednesday 23 April 2014, Liviu Dudau wrote:
+> On Wed, Apr 23, 2014 at 10:19:30AM +0100, Kukjin Kim wrote:
+> > Arnd Bergmann wrote:
+> > > 
+> > > Can you explain how much the GH7 and Exynos front-ends actually have in
+> > > common? Would it make sense to have a separate driver for gh7?
+> > > 
+> > Basically, ARMv8 based GH7 has same PCIe hardware IP with previous ARMv7
+> > based exynos5440, several features in PCIe are different though. In other
+> > words, basic functionalities for PCIe are same. So I think, would be nice if
+> > we could use one PCIe device driver for both SoCs.
+> > 
+> > However, if we need to support the PCIe with each own device driver because
+> > of difference of 32bit and 64bit, please kindly let us know. Honestly, I'm
+> > not sure about that right now.
+> 
+> Hi Kukjin,
+> 
+> I will let Arnd offer his view as a maintainer of DT enabled platforms for 
+> arch/arm, but in my understanding the goal is to convert individual host
+> bridge drivers to use my patch series directly, as they intentionally don't
+> depend on any arch specific code and then leave the existing bios32 code
+> for the non-DT platforms and the ones that do not see the need to convert
+> to the framework.
+>
+> Rob Herring has posted an example on how he can add support for a host
+> bridge running under arm32 that uses my framework, so it is not an impossible
+> task and can be used as an example for future conversions.
 
-This patch ensures that tlb_add_flush is called for THP TLB entries.
+Yes, I agree that would be the best approach. I'm not sure if it
+makes sense to convert the various dw-pcie front-ends separately
+or if we have to do them all at once though. Doing them together
+may require some more coordination.
 
-Signed-off-by: Steve Capper <steve.capper@linaro.org>
-Acked-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/pgtable.h | 2 ++
- arch/arm64/include/asm/tlb.h     | 5 +++++
- 2 files changed, 7 insertions(+)
+Let's also make sure to keep Russell in the loop regarding arm32
+PCI support. He probably has some ideas as well on how we should
+proceed with the existing code.
 
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index aa3917c..9886368 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -434,6 +434,8 @@ extern int kern_addr_valid(unsigned long addr);
- 
- #define pgtable_cache_init() do { } while (0)
- 
-+#define  __tlb_remove_pmd_tlb_entry __tlb_remove_pmd_tlb_entry
-+
- #endif /* !__ASSEMBLY__ */
- 
- #endif /* __ASM_PGTABLE_H */
-diff --git a/arch/arm64/include/asm/tlb.h b/arch/arm64/include/asm/tlb.h
-index 72cadf5..fa2255e 100644
---- a/arch/arm64/include/asm/tlb.h
-+++ b/arch/arm64/include/asm/tlb.h
-@@ -99,5 +99,10 @@ static inline void __pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmdp,
- }
- #endif
- 
-+static inline void __tlb_remove_pmd_tlb_entry(struct mmu_gather *tlb, pmd_t *pmdp,
-+						unsigned long address)
-+{
-+	tlb_add_flush(tlb, address);
-+}
- 
- #endif
--- 
-1.8.1.4
+	Arnd
