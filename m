@@ -1,81 +1,41 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 24 Apr 2014 10:54:23 +0100
-Subject: [PATCH] ARM: mm: dma: Update coherent streaming apis with
- missing memory barrier
-In-Reply-To: <20140423183742.GK24070@n2100.arm.linux.org.uk>
-References: <1398103390-31968-1-git-send-email-santosh.shilimkar@ti.com>
- <201404222153.41786.arnd@arndb.de> <5356C9D1.2060001@ti.com>
- <5895821.PvurJ8TWz2@wuerfel> <5356D163.1070304@ti.com>
- <20140423090251.GA5281@arm.com> <20140423160216.GC2208@arm.com>
- <20140423171727.GK5649@arm.com>
- <20140423183742.GK24070@n2100.arm.linux.org.uk>
-Message-ID: <20140424095422.GC8521@arm.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 24 Apr 2014 15:36:23 +0530
+Subject: [PATCH v3 0/4] ARM: DRA7: Add support for DRA72x devices
+Message-ID: <1398333987-19454-1-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 23, 2014 at 07:37:42PM +0100, Russell King - ARM Linux wrote:
-> On Wed, Apr 23, 2014 at 06:17:27PM +0100, Will Deacon wrote:
-> > On Wed, Apr 23, 2014 at 05:02:16PM +0100, Catalin Marinas wrote:
-> > > In the I/O coherency case, I would say it is the responsibility of the
-> > > device/hardware to ensure that the data is visible to all observers
-> > > (CPUs) prior to issuing a interrupt for DMA-ready. Looking at the mvebu
-> > > code, I think it covers such scenario from-device or bidirectional
-> > > scenarios.
-> > > 
-> > > Maybe Santosh still has a point ;) but I don't know what the right
-> > > barrier would be here. And I really *hate* per-SoC/snoop unit barriers
-> > > (I still hope a dsb would do the trick on newer/ARMv8 systems).
-> > 
-> > If you have device interrupts which are asynchronous to memory coherency,
-> > then you're in a world of pain. I can't think of a generic (architected)
-> > solution to this problem, unfortunately -- it's going to be both device
-> > and interconnect specific. Adding dsbs doesn't necessarily help at all.
-> 
-> Think, network devices with NAPI handling.  There, we explicitly turn
-> off the device's interrupt, and switch to software polling for received
-> packets.
-> 
-> The memory for the packets has already been mapped, and we're unmapping
-> the buffer, and then reading from it (to locate the ether type, and/or
-> vlan headers) before passing it up the network stack.
-> 
-> So in this case, we need to ensure that the cache operations are ordered
-> before the subsequent loads read from the DMA'd data.  It's purely an
-> ordering thing, it's not a completion thing.
+changes in v3:
+Removed wildcards from compatible strings and duplicates from
+.dt_compat strings as suggested by Arnd
 
-Well, ordering of completed cache operations ;).
+DRA72x devices are single core Cortex A15 devices belonging to the
+DRA7 family (Similar to the DRA74x devices which are dual core Cortex
+A15 based)
 
-> However, what must not happen is that the unmap must not be re-ordered
-> before reading the descriptor and deciding whether there's a packet
-> present to be unmapped.  That probabily imples that code _should_ be
-> doing this:
-> 
-> 	status = desc->status;
-> 	if (!(status & CPU_OWNS_THIS_DESCRIPTOR))
-> 		no_packet;
-> 
-> 	rmb();
-> 
-> 	addr = desc->buf;
-> 	len = desc->length;
-> 
-> 	dma_unmap_single(dev, addr, len, DMA_FROM_DEVICE);
+The patches (based off 3.15-rc2) add minimal DT/kernel modifications to add
+boot support for DRA72x devices reusing all the kernel data for DRA74x devices.
 
-Indeed.
+Rajendra Nayak (4):
+  ARM: dts: dra7-evm: Remove the wrong and undocumented compatible
+  ARM: dts: Add support for DRA72x family of devices
+  ARM: OMAP2+: Add machine entry for dra72x devices
+  ARM: DRA7: Add support for soc_is_dra74x() and soc_is_dra72x()
+    varients
 
-> 	...receive skb...reading buffer...
-
-The point Will and myself were trying to make is about ordering as
-observed by the CPU (rather than ordering of CPU actions). Independently
-of whether the DMA is coherent or not, the ordering between device write
-to the buffer and status update (in-memory descriptor or IRQ) *must* be
-ordered by the device and interconnects. The rmb() as per your example
-above only solves the relative CPU loads and cache maintenance but they
-don't have any effect on the transactions done by the device.
-
-The mvebu SoC has exactly this problem. mvebu_hwcc_sync_io_barrier() is
-something that should be handled by the hardware automatically,
-especially in a system which claims cache coherency.
+ .../devicetree/bindings/arm/omap/omap.txt          |   14 ++++--
+ arch/arm/boot/dts/Makefile                         |    3 +-
+ arch/arm/boot/dts/dra7-evm.dts                     |    6 +--
+ arch/arm/boot/dts/dra7.dtsi                        |   27 ------------
+ arch/arm/boot/dts/dra72-evm.dts                    |   24 +++++++++++
+ arch/arm/boot/dts/dra72x.dtsi                      |   25 +++++++++++
+ arch/arm/boot/dts/dra74x.dtsi                      |   41 ++++++++++++++++++
+ arch/arm/mach-omap2/board-generic.c                |   45 ++++++++++++++------
+ arch/arm/mach-omap2/soc.h                          |    7 +++
+ 9 files changed, 143 insertions(+), 49 deletions(-)
+ create mode 100644 arch/arm/boot/dts/dra72-evm.dts
+ create mode 100644 arch/arm/boot/dts/dra72x.dtsi
+ create mode 100644 arch/arm/boot/dts/dra74x.dtsi
 
 -- 
-Catalin
+1.7.9.5
