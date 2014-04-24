@@ -1,49 +1,73 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 24 Apr 2014 17:49:29 +0400
-Subject: [PATCH 11/23] ARM: dts: omap5-uevm.dts: add tca6424a
-In-Reply-To: <1398334639-14172-12-git-send-email-tomi.valkeinen@ti.com>
-References: <1398334639-14172-1-git-send-email-tomi.valkeinen@ti.com>
- <1398334639-14172-12-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <53591669.7060502@cogentembedded.com>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 24 Apr 2014 15:43:51 +0200
+Subject: [PATCH v1 2/7] mtd: spi-nor: add DDR quad read support
+In-Reply-To: <20140424045332.GB29664@localhost>
+References: <a> <201404232145.57404.marex@denx.de>
+ <20140424045332.GB29664@localhost>
+Message-ID: <201404241543.51752.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Thursday, April 24, 2014 at 06:53:34 AM, Huang Shijie wrote:
+> On Wed, Apr 23, 2014 at 09:45:57PM +0200, Marek Vasut wrote:
+> > On Wednesday, April 23, 2014 at 12:16:50 PM, Huang Shijie wrote:
+> > > This patch adds the DDR quad read support by the following:
+> > >   [1] add SPI_NOR_DDR_QUAD read mode.
+> > >   
+> > >   [2] add DDR Quad read opcodes:
+> > >        SPINOR_OP_READ_1_4_4_D / SPINOR_OP_READ4_1_4_4_D
+> > >   
+> > >   [3] add set_ddr_quad_mode() to initialize for the DDR quad read.
+> > >   
+> > >       Currently it only works for Spansion NOR.
+> > >   
+> > >   [3] set the dummy with 8 for DDR quad read.
+> > >   
+> > >       The m25p80.c can not support the DDR quad read, the SPI NOR
+> > > 
+> > > controller can set the dummy value in its driver, such as
+> > > fsl-quadspi.c.
+> > > 
+> > > Test this patch for Spansion s25fl128s NOR flash.
+> > > 
+> > > Signed-off-by: Huang Shijie <b32955@freescale.com>
+> > > ---
+> > > 
+> > >  drivers/mtd/spi-nor/spi-nor.c |   50
+> > > 
+> > > +++++++++++++++++++++++++++++++++++++++- include/linux/mtd/spi-nor.h  
+> > > |
+> > > 
+> > >  8 +++++-
+> > >  2 files changed, 54 insertions(+), 4 deletions(-)
+> > > 
+> > > diff --git a/drivers/mtd/spi-nor/spi-nor.c
+> > > b/drivers/mtd/spi-nor/spi-nor.c index 1a12f81..e2f69db 100644
+> > > --- a/drivers/mtd/spi-nor/spi-nor.c
+> > > +++ b/drivers/mtd/spi-nor/spi-nor.c
+> > > @@ -74,6 +74,15 @@ static int read_cr(struct spi_nor *nor)
+> > > 
+> > >  static inline int spi_nor_read_dummy_cycles(struct spi_nor *nor)
+> > >  {
+> > >  
+> > >  	switch (nor->flash_read) {
+> > > 
+> > > +	case SPI_NOR_DDR_QUAD:
+> > > +		/*
+> > > +		 * The m25p80.c can not support the DDR quad read.
+> > > +		 * We set the dummy cycles to 8 by default. If the SPI NOR
+> > > +		 * controller driver has already set it before call the
+> > > +		 * spi_nor_scan(), we just keep it as it is.
+> > > +		 */
+> > > +		if (nor->read_dummy)
+> > > +			return nor->read_dummy;
+> > 
+> > Can the controller set this variable to zero ?
+> 
+> The default value of this variable is zero.  It it meaningless to set zero.
+> The DDR Quad read definitely will use a non-zero dummy.
 
-On 24-04-2014 14:17, Tomi Valkeinen wrote:
+Can you back this by some documentation please ?
 
-> omap5-uevm has a tca6424a I/O expander. Add it to the .dts file.
-
-> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> ---
->   arch/arm/boot/dts/omap5-uevm.dts | 7 +++++++
->   1 file changed, 7 insertions(+)
-
-> diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
-> index 3b99ec25b748..9e7581eaeb23 100644
-> --- a/arch/arm/boot/dts/omap5-uevm.dts
-> +++ b/arch/arm/boot/dts/omap5-uevm.dts
-> @@ -434,6 +434,13 @@
->   	pinctrl-0 = <&i2c5_pins>;
->
->   	clock-frequency = <400000>;
-> +
-> +	tca6424a: tca6424a at 22 {
-
-    The ePAPR standard [1] says: "The name of a node should be somewhat generic,
-reflecting the function of the device and not its precise programming model.
-If appropriate, the name should be one of the following choices:
-[...]
-    - gpio;"
-
-> +		compatible = "ti,tca6424";
-> +		reg = <0x22>;
-> +		gpio-controller;
-> +		#gpio-cells = <2>;
-> +	};
->   };
-
-[1] http://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.0.pdf
-
-WBR, Sergei
+I mean, I know I am a hardass here, but please understand I'd like to understand 
+the decisions that are being made.
