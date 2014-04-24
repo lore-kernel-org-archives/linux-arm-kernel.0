@@ -1,42 +1,65 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 24 Apr 2014 21:04:09 +0200
-Subject: [PATCHv2 2/5] clk: berlin: add berlin clocks DT bindings documentation
+Date: Thu, 24 Apr 2014 21:04:12 +0200
+Subject: [PATCHv2 5/5] ARM: berlin/dt: add sdio clocks to BG2Q
 In-Reply-To: <1398366252-19582-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1398366252-19582-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1398366252-19582-3-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1398366252-19582-6-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the newly added berlin clock driver
+Add sdio clocks to the berlin2q.dtsi
+Also reorder the syspll node
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- Documentation/devicetree/bindings/clock/berlin-clock.txt | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/berlin2q.dtsi | 28 +++++++++++++++++++++-------
+ 1 file changed, 21 insertions(+), 7 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/berlin-clock.txt b/Documentation/devicetree/bindings/clock/berlin-clock.txt
-index 49b7860bffb8..49bc229827a0 100644
---- a/Documentation/devicetree/bindings/clock/berlin-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/berlin-clock.txt
-@@ -9,6 +9,8 @@ Required properties:
- 	"marvell,berlin2-pll",
- 	"marvell,berlin2q-pll":
- 		CPU PLL and System PLL
-+	"marvell,berlin2-clk":
-+		simple clocks
- - reg: Address and length of the clock register set.
- - #clock-cells: from common clock binding; shall be set to 0.
- - clocks: from common clock binding
-@@ -26,4 +28,9 @@ cpupll: cpupll at ea003c {
- 	reg = <0xea003c 0x8>;
- };
+diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+index 5925e6a16749..559819b89ea1 100644
+--- a/arch/arm/boot/dts/berlin2q.dtsi
++++ b/arch/arm/boot/dts/berlin2q.dtsi
+@@ -102,13 +102,6 @@
+ 			reg = <0xdd0170 0x8>;
+ 		};
  
+-		syspll: syspll at ea0030 {
+-			compatible = "marvell,berlin2q-pll";
+-			clocks = <&smclk>;
+-			#clock-cells = <0>;
+-			reg = <0xea0030 0x8>;
+-		};
 -
-+sdio0xinclk: sdio0xinclk at ea023c {
-+	compatible = "marvell,berlin-clk";
-+	clocks = <&syspll>;
-+	#clock-cells = <0>;
-+	reg = <0xea023c 0x4>;
-+};
+ 		apb at e80000 {
+ 			compatible = "simple-bus";
+ 			#address-cells = <1>;
+@@ -191,6 +184,27 @@
+ 			};
+ 		};
+ 
++		syspll: syspll at ea0030 {
++			compatible = "marvell,berlin2q-pll";
++			clocks = <&smclk>;
++			#clock-cells = <0>;
++			reg = <0xea0030 0x8>;
++		};
++
++		sdio0xinclk: sdio0xinclk at ea0158 {
++			compatible = "marvell,berlin-clk";
++			clocks = <&syspll>;
++			#clock-cells = <0>;
++			reg = <0xea0158 0x4>;
++		};
++
++		sdio1xinclk: sdio1xinclk at ea015c {
++			compatible = "marvell,berlin-clk";
++			clocks = <&syspll>;
++			#clock-cells = <0>;
++			reg = <0xea015c 0x4>;
++		};
++
+ 		apb at fc0000 {
+ 			compatible = "simple-bus";
+ 			#address-cells = <1>;
 -- 
 1.9.1
