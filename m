@@ -1,45 +1,54 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 24 Apr 2014 14:30:36 +0100
-Subject: [PATCH v4 7/9] ARM: sun7i/sun4i: dt: Add AXP209 support to
- various boards
-In-Reply-To: <20140423202546.GA3890@nuc.fastwebnet.it>
-References: <1397209093-10077-8-git-send-email-carlo@caione.org>
- <20140411122901.GE28800@sirena.org.uk>
- <CAOQ7t2Y2B7f+eZApDHKiKm9=bOXo6oUA2RLY7ENn7qPLQEboMA@mail.gmail.com>
- <20140411161813.GF28800@sirena.org.uk>
- <CAOQ7t2YO_MjUZkkoEe1Grft+fVttWoOro85Sru2P3LXbx8Kjbg@mail.gmail.com>
- <20140418151551.GZ12304@sirena.org.uk>
- <20140423202546.GA3890@nuc.fastwebnet.it>
-Message-ID: <20140424133036.GY12304@sirena.org.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 24 Apr 2014 08:33:19 -0500
+Subject: [PATCH V2 0/5] Huge pages for short descriptors on ARM
+In-Reply-To: <20140424103639.GC19564@arm.com>
+References: <1397648803-15961-1-git-send-email-steve.capper@linaro.org>
+ <20140424102229.GA28014@linaro.org>
+ <20140424103639.GC19564@arm.com>
+Message-ID: <CAL_JsqLC4GzVXQ0ei26JEn5cL9JdmfYUr31_qGgUvU2HyezBWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 23, 2014 at 10:25:46PM +0200, Carlo Caione wrote:
+On Thu, Apr 24, 2014 at 5:36 AM, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Steve,
+>
+> On Thu, Apr 24, 2014 at 11:22:29AM +0100, Steve Capper wrote:
+>> On Wed, Apr 16, 2014 at 12:46:38PM +0100, Steve Capper wrote:
 
-> I'm having a really hard time with this problem, so any hint is welcome
-> :) The small modification I'm using on top of the patches in this series
-> is here: http://bpaste.net/show/228330/
+[...]
 
-> Unfortunately as I said I got this when booting:
-> http://bpaste.net/show/nUhUTzELT32v9HNPathL/
+>> I'm not sure how to proceed with these patches. I was thinking that
+>> they could be picked up into linux-next? If that sounds reasonable;
+>> Andrew, would you like to take the mm/ patch and Russell could you
+>> please take the arch/arm patches?
+>>
+>> Also, I was hoping to get these into 3.16. Are there any objections to
+>> that?
+>
+> Who is asking for this code? We already support hugepages for LPAE systems,
+> so this would be targetting what? A9? I'm reluctant to add ~400 lines of
+> subtle, low-level mm code to arch/arm/ if it doesn't have any active users.
 
-Huh, actually the arizona drivers do show this (it was being masked in
-my logs by another unrelated bug).  I guess the Wolfson guys aren't
-working with upstream much (though Charles did write the orignal code
-here...).
+I can't really speak to the who so much anymore. I can say on the
+server front, it was not only Calxeda asking for this.
 
-The issue is the MFD core, it shouldn't be using managed allocations
-here - the error reported by the assert is entirely correct.  If the
-CODEC driver is bound and unbound it'll not be possible to reload it
-as things stand.  
+Presumably there are also performance benefits on older systems even
+with 128MB-1GB of RAM. Given that KVM guests can only use 3GB of RAM,
+enabling LPAE in guest kernels has little benefit. So this may still
+be useful on LPAE capable systems. Also, Oracle Java will use
+hugetlbfs if available and Java performance needs all the help it can
+get.
 
-Your driver is correct but the implementation needs to be fixed -
-possibly with an API change on free since at the minute the cells to be
-freed don't get passed back into the MFD core when deallocating.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140424/f92224c1/attachment-0001.sig>
+> I guess I'm after some commitment that this is (a) useful to somebody and
+> (b) going to be tested regularly, otherwise it will go the way of things
+> like big-endian, where we end up carrying around code which is broken more
+> often than not (although big-endian is more self-contained).
+
+One key difference here is enabling THP is or should be transparent
+(to state the obvious) to users. While the BE code itself may be
+self-contained, using BE is very much not in that category.
+Potentially every driver on a platform could be broken for BE. Case in
+point, the Calxeda xgmac driver is broken on BE due to using __raw i/o
+accessors instead of relaxed variants.
+
+Rob
