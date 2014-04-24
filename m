@@ -1,51 +1,155 @@
 From: tharvey@gateworks.com (Tim Harvey)
-Date: Thu, 24 Apr 2014 15:07:27 -0700
-Subject: [PATCH 3/3] ARM: dts: imx: Fix LVDS mapping for Ventana GW52xx
+Date: Thu, 24 Apr 2014 15:07:26 -0700
+Subject: [PATCH 2/3] ARM: dts: imx: add LVDS backlight for Ventana
 In-Reply-To: <1398377247-3901-1-git-send-email-tharvey@gateworks.com>
 References: <1398377247-3901-1-git-send-email-tharvey@gateworks.com>
-Message-ID: <1398377247-3901-4-git-send-email-tharvey@gateworks.com>
+Message-ID: <1398377247-3901-3-git-send-email-tharvey@gateworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GW52xx supports LVDS on channel 0. Remove the obsolete crtcs node and
-add display timings for the HanStar HSD100PXN1 display.
+The GW54xx/GW53xx/GW52xx all support LVDS with a PWM controlled backlight.
 
 Signed-off-by: Tim Harvey <tharvey@gateworks.com>
 ---
- arch/arm/boot/dts/imx6qdl-gw52xx.dtsi | 20 +++++++++++++++++++-
- 1 file changed, 19 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/imx6qdl-gw52xx.dtsi | 20 ++++++++++++++++++++
+ arch/arm/boot/dts/imx6qdl-gw53xx.dtsi | 20 ++++++++++++++++++++
+ arch/arm/boot/dts/imx6qdl-gw54xx.dtsi | 20 ++++++++++++++++++++
+ 3 files changed, 60 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-index 9c9259b..735e8e3 100644
+index 607888c..9c9259b 100644
 --- a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
 +++ b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-@@ -455,8 +455,26 @@
+@@ -27,6 +27,14 @@
+ 		bootargs = "console=ttymxc1,115200";
+ 	};
  
- &ldb {
- 	status = "okay";
-+
- 	lvds-channel at 0 {
--		crtcs = <&ipu1 0>, <&ipu1 1>;
-+		fsl,data-mapping = "spwg";
-+		fsl,data-width = <18>;
++	backlight {
++		compatible = "pwm-backlight";
++		pwms = <&pwm4 0 5000000>;
++		brightness-levels = <0 4 8 16 32 64 128 255>;
++		default-brightness-level = <7>;
 +		status = "okay";
++	};
 +
-+		display-timings {
-+			native-mode = <&timing0>;
-+			timing0: hsd100pxn1 {
-+				clock-frequency = <65000000>;
-+				hactive = <1024>;
-+				vactive = <768>;
-+				hback-porch = <220>;
-+				hfront-porch = <40>;
-+				vback-porch = <21>;
-+				vfront-porch = <7>;
-+				hsync-len = <60>;
-+				vsync-len = <10>;
-+			};
+ 	leds {
+ 		compatible = "gpio-leds";
+ 
+@@ -399,6 +407,12 @@
+ 			>;
+ 		};
+ 
++		pinctrl_pwm4: pwm4grp {
++			fsl,pins = <
++				MX6QDL_PAD_SD1_CMD__PWM4_OUT		0x1b0b1
++			>;
 +		};
++
+ 		pinctrl_uart1: uart1grp {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_SD3_DAT7__UART1_TX_DATA	0x1b0b1
+@@ -451,6 +465,12 @@
+ 	status = "okay";
+ };
+ 
++&pwm4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm4>;
++	status = "okay";
++};
++
+ &ssi1 {
+ 	fsl,mode = "i2s-slave";
+ 	status = "okay";
+diff --git a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
+index ef7bd99..3e146d6 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
+@@ -30,6 +30,14 @@
+ 		bootargs = "console=ttymxc1,115200";
+ 	};
+ 
++	backlight {
++		compatible = "pwm-backlight";
++		pwms = <&pwm4 0 5000000>;
++		brightness-levels = <0 4 8 16 32 64 128 255>;
++		default-brightness-level = <7>;
++		status = "okay";
++	};
++
+ 	leds {
+ 		compatible = "gpio-leds";
+ 
+@@ -439,6 +447,12 @@
+ 			>;
+ 		};
+ 
++		pinctrl_pwm4: pwm4grp {
++			fsl,pins = <
++				MX6QDL_PAD_SD1_CMD__PWM4_OUT		0x1b0b1
++			>;
++		};
++
+ 		pinctrl_uart1: uart1grp {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_SD3_DAT7__UART1_TX_DATA	0x1b0b1
+@@ -513,6 +527,12 @@
  	};
  };
  
++&pwm4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm4>;
++	status = "okay";
++};
++
+ &ssi1 {
+ 	fsl,mode = "i2s-slave";
+ 	status = "okay";
+diff --git a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
+index 4ce8f68..d145f8c 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
+@@ -30,6 +30,14 @@
+ 		bootargs = "console=ttymxc1,115200";
+ 	};
+ 
++	backlight {
++		compatible = "pwm-backlight";
++		pwms = <&pwm4 0 5000000>;
++		brightness-levels = <0 4 8 16 32 64 128 255>;
++		default-brightness-level = <7>;
++		status = "okay";
++	};
++
+ 	leds {
+ 		compatible = "gpio-leds";
+ 
+@@ -461,6 +469,12 @@
+ 			>;
+ 		};
+ 
++		pinctrl_pwm4: pwm4grp {
++			fsl,pins = <
++				MX6QDL_PAD_SD1_CMD__PWM4_OUT		0x1b0b1
++			>;
++		};
++
+ 		pinctrl_uart1: uart1grp {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_SD3_DAT7__UART1_TX_DATA	0x1b0b1
+@@ -535,6 +549,12 @@
+ 	};
+ };
+ 
++&pwm4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm4>;
++	status = "okay";
++};
++
+ &ssi1 {
+ 	fsl,mode = "i2s-slave";
+ 	status = "okay";
 -- 
 1.8.3.2
