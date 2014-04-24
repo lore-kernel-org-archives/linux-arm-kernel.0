@@ -1,81 +1,32 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 24 Apr 2014 11:31:37 +0100
-Subject: set_fiq_handler: Bad mode in data abort handler detected
-In-Reply-To: <2527501.cXAbiV8bqS@dabox>
-References: <2527501.cXAbiV8bqS@dabox>
-Message-ID: <20140424103136.GI26756@n2100.arm.linux.org.uk>
+Date: Thu, 24 Apr 2014 11:34:55 +0100
+Subject: [PATCH 2/4] ARM: S3C24XX: trim down debug uart handling
+In-Reply-To: <1410234.AYxfyBcLWB@phil>
+References: <1544889.hRy2JpKRQe@phil> <1410234.AYxfyBcLWB@phil>
+Message-ID: <20140424103455.GJ26756@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please address kernel related problems to the linux-arm-kernel mailing
-list in preference to linux-arm.  Thanks.
+On Thu, Apr 24, 2014 at 12:24:31PM +0200, Heiko St?bner wrote:
+> +choice
+> +	prompt "S3C24XX low-level debugging port type"
+> +	depends on DEBUG_LL && ARCH_S3C24XX
+> +
+> +	config DEBUG_S3C24XX_UART_S3C2440
+> +		bool "S3C2440 uart type"
+> +		help
+> +		  Select this if you're debugging S3C2416, S3C2440, S3C2442,
+> +		  S3C2443 or S3C2450 SoCs.
+> +
+> +	config DEBUG_S3C24XX_UART_S3C2410
+> +		bool "S3C2410 uart type"
+> +		help
+> +		  Select this if you're debugging S3C2410 or S3C2412 SoCs.
+> +endchoice
 
-On Thu, Apr 24, 2014 at 11:46:15AM +0200, Tim Sander wrote:
-> I have installed a FIQ handler with set_fiq_handler on an Xilinx Zynq. 
-> I had to enable the the FIQ symbol in kconfig for the Zynq as its not enabled
-> by default. As i was not able to boot a mainline kernel i used the 3.12 kernel
-> of the xilinx repository at github. But as there are no changes in the FIQ handler
-> stuff i guess that does not matter. The Zynq is a dual ArmV7 Cortex A9.
-> The handler works for an random timespan and then i see:
-
-The first rule of FIQs is that they are not permitted to cause any
-aborts what so ever - any aborts can be fatal as they can cause
-deadlock.
-
-> Bad mode in data abort handler detected
-> Internal error: Oops - bad mode: 0 [#1] PREEMPT SMP ARM
-> Modules linked in: firq(O) ipv6
-> CPU: 0 PID: 0 Comm: swapper/0 Tainted: G           O 3.12.0-xilinx-dirty #54
-> task: c05bd420 ti: c05b2000 task.ti: c05b2000
-> PC is at 0xffff1224
-> LR is at arch_cpu_idle+0x20/0x2c
-> pc : [<ffff1224>]    lr : [<c000f344>]    psr: 600e01d1
-> sp : c05b3f70  ip : 00000000  fp : 00000000
-> r10: 00000000  r9 : 413fc090  r8 : c0a264c0
-> r7 : c05a7720  r6 : c04080c8  r5 : c05f2500  r4 : c05b2000
-> r3 : 00000000  r2 : 00000000  r1 : 00000000  r0 : c0a299f8
-> Flags: nZCv  IRQs off  FIQs off  Mode FIQ_32  ISA ARM  Segment kernel
-> Control: 18c5387d  Table: 1ec0404a  DAC: 00000015
-> Process swapper/0 (pid: 0, stack limit = 0xc05b2240)
-> Stack: (0xc05b3f70 to 0xc05b4000)
-> 3f60:                                     c0a299f8 00000000 00000000 00000000
-> 3f80: c05b2000 c05f2500 c04080c8 c05a7720 c0a264c0 413fc090 00000000 00000000
-> 3fa0: 00000000 c05b3f70 c000f344 ffff1224 600e01d1 ffffffff 00000000 c0055fb8
-> 3fc0: c040a7b0 c0584a5c ffffffff ffffffff c0584574 00000000 00000000 c05a7720
-> 3fe0: 18c5387d c05ba3cc c05a771c c05be440 0000406a 00008074 00000000 00000000
-> [<c000f344>] (arch_cpu_idle+0x20/0x2c) from [<00000000>] (  (null))
-> Code: e320f000 e320f000 e320f000 eafffffe (e5889000) 
-
-The faulting instruction was:
-
-	str r9, [r8]
-
-However, the register dump above does not include the FIQ banked registers,
-so we don't actually know what r8 was.
-
-> My first guess would be that i had a cache page miss in the fiq handler?
-
-Yes.
-
-> I guess the best way would be putting the fiq-handler on the On Chip
-> Memory but then i would still have the same problem that the code jumping
-> to the OCM would have a cache miss?
-
-I'm guessing that the address pointed to by r8 (the timer base) is
-ioremapped after other threads are already started?  The problem with
-that is other threads won't have the L1 page table pointers for these
-mappings - we populate these lazily because trying to do it at
-ioremap() time would be extremely painful.
-
-What might be possible is to have a function which can be called in
-these circumstances which ensures that a kernel address is accessible
-to all threads in the system, though while it's doing that, it would
-have to stop any fork() or exit() activity to be sure that it updated
-every thread.
-
-In years gone by, I'd have recommended that the kernel mappings for
-this stuff were done via static mappings, but with DT, that's no
-longer acceptable.  So I guess we have a problem...
+Why does this need to be a separate choice statement?  What's special
+about S3C24XX?  Is there something wrong with the main choice statement
+just above this where everyone else lists their debugging UART?
 
 -- 
 FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
