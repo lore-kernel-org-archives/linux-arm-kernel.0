@@ -1,34 +1,48 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Thu, 24 Apr 2014 16:12:20 +0300
-Subject: [PATCHv3 19/41] OMAPDSS: panel-dpi: Add DT support
-In-Reply-To: <3615191.vG5AEQORWJ@avalon>
-References: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
- <20140418155107.GB5354@atomide.com> <5358DEEA.1000506@ti.com>
- <3615191.vG5AEQORWJ@avalon>
-Message-ID: <53590DB4.8080609@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 24 Apr 2014 15:13:04 +0200
+Subject: [PATCH v3] gpio: omap: implement get_direction
+In-Reply-To: <1398322659-20008-1-git-send-email-yegorslists@googlemail.com>
+References: <1398322659-20008-1-git-send-email-yegorslists@googlemail.com>
+Message-ID: <CACRpkdZPNGHNQhqovDoaKTXZT3mJfN4pjKSBxW7m6wT5u-XEYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/04/14 15:44, Laurent Pinchart wrote:
+On Thu, Apr 24, 2014 at 8:57 AM,  <yegorslists@googlemail.com> wrote:
 
->> I attached prototype patches (based on -rc2) for panel dpi using that
->> approach. It's a bit messier than I'd like, because for non-DT boot we
->> need to request the gpio using the old API, and then convert it to
->> gpio_desc. We can remove that code when all the boards use DT.
-> 
-> Just FYI, you can use the gpiod API with non-DT platforms if you register GPIO 
-> lookup entries in board code with gpiod_add_lookup_table().
+> From: Yegor Yefremov <yegorslists@googlemail.com>
+>
+> This patch implements gpio_chip's get_direction() routine, that
+> lets other drivers get particular GPIOs direction using
+> struct gpio_desc.
+>
+> Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
+> Acked-by: Javier Martinez Canillas <javier@dowhile0.org>
+> ---
+> Changes:
+>         v3: get rid of _get_gpio_direction() (Linus Walleij)
+>         v2: rework return value calculation
 
-Right, but as the board files are going away, I'd rather not touch them
-at all if possible.
+Looks good to me, Kevin, Santosh?
 
- Tomi
+Part of me wants to list Javier as maintainer for this driver.
 
+> +static int gpio_get_direction(struct gpio_chip *chip, unsigned offset)
+> +{
+> +       struct gpio_bank *bank;
+> +       unsigned long flags;
+> +       void __iomem *reg;
+> +       int dir;
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140424/d09b0579/attachment-0001.sig>
+That is a bool, actually. But no big deal.
+
+> +
+> +       bank = container_of(chip, struct gpio_bank, chip);
+> +       reg = bank->base + bank->regs->direction;
+> +       spin_lock_irqsave(&bank->lock, flags);
+> +       dir = !!(readl_relaxed(reg) & BIT(offset));
+> +       spin_unlock_irqrestore(&bank->lock, flags);
+> +       return dir;
+> +}
+
+Yours,
+Linus Walleij
