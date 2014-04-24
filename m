@@ -1,185 +1,52 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Thu, 24 Apr 2014 23:28:57 +0200
-Subject: [PATCHv2 2/2] arm: use fixmap for text patching when text is RO
-In-Reply-To: <1396646870-29695-2-git-send-email-rabin@rab.in>
-References: <1396646870-29695-2-git-send-email-rabin@rab.in>
-Message-ID: <1398374937-18868-1-git-send-email-rabin@rab.in>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 24 Apr 2014 23:36:42 +0200
+Subject: [PATCH v2] staging: imx-drm-core: skip components whose parent
+ device is disabled
+In-Reply-To: <20140423090014.GE24070@n2100.arm.linux.org.uk>
+References: <1397440946-2303-1-git-send-email-shawn.guo@freescale.com>
+ <20140423074451.GE2523@dragon>
+ <20140423090014.GE24070@n2100.arm.linux.org.uk>
+Message-ID: <5096140.xI07lv1NXD@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use fixmaps for text patching when the kernel text is read-only,
-inspired by x86.  This makes jump labels and kprobes work with the
-currently available CONFIG_DEBUG_SET_MODULE_RONX and the upcoming
-CONFIG_DEBUG_RODATA options.
+On Wednesday 23 April 2014 10:00:14 Russell King - ARM Linux wrote:
+> 
+> Yes, those ones were trivial to sort out, and as you point out were well
+> known well before the merge window.  Those aren't the ones I'm actually
+> talking about - half way through the merge window, some major conflicts
+> cropped up which caused _me_ to drop arm-soc out of my autobuilder, and
+> caused Stephen to ignore arm-soc's version of the file(s):
+> 
+>    Today's linux-next merge of the arm-soc tree got conflicts in
+>    arch/arm/boot/dts/qcom-msm8960.dtsi, arch/arm/boot/dts/qcom-msm8974.dtsi,
+>    arch/arm/mach-omap2/pdata-quirks.c, arch/arm/mach-zynq/Kconfig,
+>    drivers/watchdog/Kconfig and sound/soc/kirkwood/Kconfig between various
+>    merge commits from Linus' tree and various merge commits from the arm-soc
+>    tree.
+> 
+>    I used the versions from Linus' tree.
+> 
 
-Signed-off-by: Rabin Vincent <rabin@rab.in>
----
-v2: flush the fixmap if necessary, with flush_kernel_vmap_range()
+That was the day after Linus had merged arm-soc and used a different
+set of resolutions than what I had put into for-next as examples
+for him to look at.
 
- arch/arm/include/asm/fixmap.h |  3 ++
- arch/arm/kernel/jump_label.c  |  2 +-
- arch/arm/kernel/patch.c       | 71 ++++++++++++++++++++++++++++++++++++++-----
- arch/arm/kernel/patch.h       | 12 +++++++-
- 4 files changed, 79 insertions(+), 9 deletions(-)
+The conflicts that Stephen saw were between Linus' resolution and mine,
+but at that point there were no more unmerged patches in arm-soc, just
+stale merge changesets.
 
-diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
-index 55ed076..79c1719 100644
---- a/arch/arm/include/asm/fixmap.h
-+++ b/arch/arm/include/asm/fixmap.h
-@@ -18,6 +18,9 @@
- #define FIXADDR_TOP		(FIXADDR_END - PAGE_SIZE)
- 
- enum fixed_addresses {
-+	FIX_TEXT_POKE0,
-+	FIX_TEXT_POKE1,
-+
- 	FIX_KMAP_BEGIN,
- 	FIX_KMAP_END = (FIXADDR_TOP - FIXADDR_START) >> PAGE_SHIFT,
- 	__end_of_fixed_addresses
-diff --git a/arch/arm/kernel/jump_label.c b/arch/arm/kernel/jump_label.c
-index 4ce4f78..afeeb9e 100644
---- a/arch/arm/kernel/jump_label.c
-+++ b/arch/arm/kernel/jump_label.c
-@@ -19,7 +19,7 @@ static void __arch_jump_label_transform(struct jump_entry *entry,
- 		insn = arm_gen_nop();
- 
- 	if (is_static)
--		__patch_text(addr, insn);
-+		__patch_text_early(addr, insn);
- 	else
- 		patch_text(addr, insn);
- }
-diff --git a/arch/arm/kernel/patch.c b/arch/arm/kernel/patch.c
-index 07314af..3515b8d 100644
---- a/arch/arm/kernel/patch.c
-+++ b/arch/arm/kernel/patch.c
-@@ -1,8 +1,11 @@
- #include <linux/kernel.h>
-+#include <linux/spinlock.h>
- #include <linux/kprobes.h>
-+#include <linux/mm.h>
- #include <linux/stop_machine.h>
- 
- #include <asm/cacheflush.h>
-+#include <asm/fixmap.h>
- #include <asm/smp_plat.h>
- #include <asm/opcodes.h>
- 
-@@ -13,21 +16,70 @@ struct patch {
- 	unsigned int insn;
- };
- 
--void __kprobes __patch_text(void *addr, unsigned int insn)
-+static DEFINE_SPINLOCK(patch_lock);
-+
-+static void __kprobes *patch_map(void *addr, int fixmap, unsigned long *flags)
-+{
-+	unsigned int uintaddr = (uintptr_t) addr;
-+	bool module = !core_kernel_text(uintaddr);
-+	struct page *page;
-+
-+	if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX)) {
-+		page = vmalloc_to_page(addr);
-+	} else if (!module && IS_ENABLED(CONFIG_ARM_KERNMEM_PERMS)) {
-+		page = virt_to_page(addr);
-+	} else {
-+		return addr;
-+	}
-+
-+	if (flags)
-+		spin_lock_irqsave(&patch_lock, *flags);
-+
-+	set_fixmap(fixmap, page_to_phys(page));
-+
-+	return (void *) (__fix_to_virt(fixmap) + (uintaddr & ~PAGE_MASK));
-+}
-+
-+static void __kprobes patch_unmap(int fixmap, unsigned long *flags)
-+{
-+	clear_fixmap(fixmap);
-+
-+	if (flags)
-+		spin_unlock_irqrestore(&patch_lock, *flags);
-+}
-+
-+void __kprobes __patch_text_real(void *addr, unsigned int insn, bool remap)
- {
- 	bool thumb2 = IS_ENABLED(CONFIG_THUMB2_KERNEL);
-+	unsigned int uintaddr = (uintptr_t) addr;
-+	bool twopage = false;
-+	unsigned long flags;
-+	void *waddr = addr;
- 	int size;
- 
-+	if (remap)
-+		waddr = patch_map(addr, FIX_TEXT_POKE0, &flags);
-+
- 	if (thumb2 && __opcode_is_thumb16(insn)) {
--		*(u16 *)addr = __opcode_to_mem_thumb16(insn);
-+		*(u16 *)waddr = __opcode_to_mem_thumb16(insn);
- 		size = sizeof(u16);
--	} else if (thumb2 && ((uintptr_t)addr & 2)) {
-+	} else if (thumb2 && (uintaddr & 2)) {
- 		u16 first = __opcode_thumb32_first(insn);
- 		u16 second = __opcode_thumb32_second(insn);
--		u16 *addrh = addr;
-+		u16 *addrh0 = waddr;
-+		u16 *addrh1 = waddr + 2;
- 
--		addrh[0] = __opcode_to_mem_thumb16(first);
--		addrh[1] = __opcode_to_mem_thumb16(second);
-+		twopage = (uintaddr & ~PAGE_MASK) == PAGE_SIZE - 2;
-+		if (twopage && remap)
-+			addrh1 = patch_map(addr + 2, FIX_TEXT_POKE1, NULL);
-+
-+		*addrh0 = __opcode_to_mem_thumb16(first);
-+		*addrh1 = __opcode_to_mem_thumb16(second);
-+
-+		if (twopage && addrh1 != addr + 2) {
-+			flush_kernel_vmap_range(addrh1, 2);
-+			patch_unmap(FIX_TEXT_POKE1, NULL);
-+		}
- 
- 		size = sizeof(u32);
- 	} else {
-@@ -36,10 +88,15 @@ void __kprobes __patch_text(void *addr, unsigned int insn)
- 		else
- 			insn = __opcode_to_mem_arm(insn);
- 
--		*(u32 *)addr = insn;
-+		*(u32 *)waddr = insn;
- 		size = sizeof(u32);
- 	}
- 
-+	if (waddr != addr) {
-+		flush_kernel_vmap_range(waddr, twopage ? size / 2 : size);
-+		patch_unmap(FIX_TEXT_POKE0, &flags);
-+	}
-+
- 	flush_icache_range((uintptr_t)(addr),
- 			   (uintptr_t)(addr) + size);
- }
-diff --git a/arch/arm/kernel/patch.h b/arch/arm/kernel/patch.h
-index b4731f2..77e054c 100644
---- a/arch/arm/kernel/patch.h
-+++ b/arch/arm/kernel/patch.h
-@@ -2,6 +2,16 @@
- #define _ARM_KERNEL_PATCH_H
- 
- void patch_text(void *addr, unsigned int insn);
--void __patch_text(void *addr, unsigned int insn);
-+void __patch_text_real(void *addr, unsigned int insn, bool remap);
-+
-+static inline void __patch_text(void *addr, unsigned int insn)
-+{
-+	__patch_text_real(addr, insn, true);
-+}
-+
-+static inline void __patch_text_early(void *addr, unsigned int insn)
-+{
-+	__patch_text_real(addr, insn, false);
-+}
- 
- #endif
--- 
-1.9.2
+> What is really interesting is that there are no acks from arm-soc people
+> for this patch.  If they want me to take it, they can damned well provide
+> an ack after having their moan at me during the merge window.  And I'm
+> not talking just about Arnd, but Olof as well.  I'm going to require *both*
+> to ack any changes to arch/arm/boot/dts in future so that I can be certain
+> that they are *both* aware of what's going on.
+
+Olof already gave an (informal) Ack. Here is mine as well:
+
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+One of should normally be enough really.
+
+	Arnd
