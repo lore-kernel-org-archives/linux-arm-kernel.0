@@ -1,23 +1,42 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 23 Apr 2014 22:49:48 -0400
-Subject: [PATCH 0/3] net: mvneta: fix usage as a module, and support
- QSGMII properly
-In-Reply-To: <20140421202840.789d0e24@skate>
-References: <1397569821-5530-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140421202840.789d0e24@skate>
-Message-ID: <20140424024948.GM28159@titan.lakedaemon.net>
+Date: Wed, 23 Apr 2014 22:51:23 -0400
+Subject: [PATCH 4/7] pci: mvebu: fix off-by-one in the computed size of
+ the mbus windows
+In-Reply-To: <20140421164754.GA17260@google.com>
+References: <1397823593-1932-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1397823593-1932-5-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140421164754.GA17260@google.com>
+Message-ID: <20140424025123.GN28159@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 21, 2014 at 08:28:40PM +0200, Thomas Petazzoni wrote:
-> Jason,
+On Mon, Apr 21, 2014 at 10:47:54AM -0600, Bjorn Helgaas wrote:
+> On Fri, Apr 18, 2014 at 02:19:50PM +0200, Thomas Petazzoni wrote:
+> > From: Willy Tarreau <w@1wt.eu>
+> > 
+> > mvebu_pcie_handle_membase_change() and
+> > mvebu_pcie_handle_iobase_change() do not correctly compute the window
+> > size. PCI uses an inclusive start/end address pair, which requires a
+> > +1 when converting to size.
+> > 
+> > This only worked because a bug in the mbus driver allowed it to
+> > silently accept and round up bogus sizes.
+> > 
+> > Fix this by adding one to the computed size.
+> > 
+> > Fixes: 45361a4fe4464180815157654aabbd2afb4848ad ('PCIe driver for Marvell Armada 370/XP systems')
+> > Cc: <stable@vger.kernel.org> # v3.11+
+> > Signed-off-by: Willy Tarreau <w@1wt.eu>
+> > Reviewed-By: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > Tested-by: Neil Greatorex <neil@fatboyfat.co.uk>
 > 
-> Would it be possible to get PATCH 3/3 merged into 3.15-rc in the not
-> too distant future? David Miller has already sent PATCH 1/3 and PATCH
-> 2/3, and they are part of the just released -rc2. However, the Device
-> Tree fix for Armada XP GP QSGMII usage is missing.
+> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+> 
+> If I were merging via my tree, I would tweak the subject capitalization
+> so "git log --oneline drivers/pci/host/pci-mvebu.c" looks consistent.
 
-oops, looks like I missed that one.  I'll queue it up.
+Will do, thanks for the reminder.
 
 thx,
 
