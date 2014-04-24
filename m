@@ -1,156 +1,48 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 24 Apr 2014 11:30:02 -0400
-Subject: [PATCH v3 2/7] of: introduce of_dma_get_range() helper
+Date: Thu, 24 Apr 2014 11:30:07 -0400
+Subject: [PATCH v3 7/7] ARM: dma: use phys_addr_t in
+ __dma_page_[cpu_to_dev/dev_to_cpu]
 In-Reply-To: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1398353407-2345-3-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1398353407-2345-8-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Grygorii Strashko <grygorii.strashko@ti.com>
+On a 32 bit ARM architecture with LPAE extension physical addresses
+cannot fit into unsigned long variable.
 
-The of_dma_get_range() allows to find "dma-range" property for
-the specified device and parse it.
- dma-ranges format:
-   DMA addr (dma_addr)          : naddr cells
-   CPU addr (phys_addr_t)       : pna cells
-   size                         : nsize cells
+So fix it by using phys_addr_t instead of unsigned long.
 
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Olof Johansson <olof@lixom.net>
-Cc: Grant Likely <grant.likely@linaro.org>
-Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+Cc: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- drivers/of/address.c       |   87 ++++++++++++++++++++++++++++++++++++++++++++
- include/linux/of_address.h |    8 ++++
- 2 files changed, 95 insertions(+)
+ arch/arm/mm/dma-mapping.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/of/address.c b/drivers/of/address.c
-index cb4242a..c54baee 100644
---- a/drivers/of/address.c
-+++ b/drivers/of/address.c
-@@ -721,3 +721,90 @@ void __iomem *of_iomap(struct device_node *np, int index)
- 	return ioremap(res.start, resource_size(&res));
- }
- EXPORT_SYMBOL(of_iomap);
-+
-+/**
-+ * of_dma_get_range - Get DMA range info
-+ * @np:		device node to get DMA range info
-+ * @dma_addr:	pointer to store initial DMA address of DMA range
-+ * @paddr:	pointer to store initial CPU address of DMA range
-+ * @size:	pointer to store size of DMA range
-+ *
-+ * Look in bottom up direction for the first "dma-ranges" property
-+ * and parse it.
-+ *  dma-ranges format:
-+ *	DMA addr (dma_addr)	: naddr cells
-+ *	CPU addr (phys_addr_t)	: pna cells
-+ *	size			: nsize cells
-+ *
-+ * It returns -ENODEV if "dma-ranges" property was not found
-+ * for this device in DT.
-+ */
-+int of_dma_get_range(struct device_node *np, u64 *dma_addr, u64 *paddr, u64 *size)
-+{
-+	struct device_node *node = of_node_get(np);
-+	const __be32 *ranges = NULL;
-+	int len, naddr, nsize, pna;
-+	int ret = 0;
-+	u64 dmaaddr;
-+
-+	if (!node)
-+		return -EINVAL;
-+
-+	while (1) {
-+		naddr = of_n_addr_cells(node);
-+		nsize = of_n_size_cells(node);
-+		node = of_get_next_parent(node);
-+		if (!node)
-+			break;
-+
-+		ranges = of_get_property(node, "dma-ranges", &len);
-+
-+		/* Ignore empty ranges, they imply no translation required */
-+		if (ranges && len > 0)
-+			break;
-+
-+		/*
-+		 * At least empty ranges has to be defined for parent node if
-+		 * DMA is supported
-+		 */
-+		if (!ranges)
-+			break;
-+	}
-+
-+	if (!ranges) {
-+		pr_debug("%s: no dma-ranges found for node(%s)\n",
-+			 __func__, np->full_name);
-+		ret = -ENODEV;
-+		goto out;
-+	}
-+
-+	len /= sizeof(u32);
-+
-+	pna = of_n_addr_cells(node);
-+
-+	/* dma-ranges format:
-+	 * DMA addr	: naddr cells
-+	 * CPU addr	: pna cells
-+	 * size		: nsize cells
-+	 */
-+	dmaaddr = of_read_number(ranges, naddr);
-+	*paddr = of_translate_dma_address(np, ranges);
-+	if (*paddr == OF_BAD_ADDR) {
-+		pr_err("%s: translation of DMA address(%pad) to CPU address failed node(%s)\n",
-+		       __func__, dma_addr, np->full_name);
-+		ret = -EINVAL;
-+		goto out;
-+	}
-+	*dma_addr = dmaaddr;
-+
-+	*size = of_read_number(ranges + naddr + pna, nsize);
-+
-+	pr_debug("dma_addr(%llx) cpu_addr(%llx) size(%llx)\n",
-+		 *dma_addr, *paddr, *size);
-+
-+out:
-+	of_node_put(node);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(of_dma_get_range);
-diff --git a/include/linux/of_address.h b/include/linux/of_address.h
-index 5f6ed6b..4d7b325 100644
---- a/include/linux/of_address.h
-+++ b/include/linux/of_address.h
-@@ -63,6 +63,8 @@ extern int of_pci_range_parser_init(struct of_pci_range_parser *parser,
- extern struct of_pci_range *of_pci_range_parser_one(
- 					struct of_pci_range_parser *parser,
- 					struct of_pci_range *range);
-+extern int of_dma_get_range(struct device_node *np, u64 *dma_addr,
-+				u64 *paddr, u64 *size);
- #else /* CONFIG_OF_ADDRESS */
- static inline struct device_node *of_find_matching_node_by_address(
- 					struct device_node *from,
-@@ -90,6 +92,12 @@ static inline struct of_pci_range *of_pci_range_parser_one(
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index f62aa06..5260f43 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -885,7 +885,7 @@ static void dma_cache_maint_page(struct page *page, unsigned long offset,
+ static void __dma_page_cpu_to_dev(struct page *page, unsigned long off,
+ 	size_t size, enum dma_data_direction dir)
  {
- 	return NULL;
- }
-+
-+static inline int of_dma_get_range(struct device_node *np, u64 *dma_addr,
-+				u64 *paddr, u64 *size)
-+{
-+	return -ENODEV;
-+}
- #endif /* CONFIG_OF_ADDRESS */
+-	unsigned long paddr;
++	phys_addr_t paddr;
  
- #ifdef CONFIG_OF
+ 	dma_cache_maint_page(page, off, size, dir, dmac_map_area);
+ 
+@@ -901,7 +901,7 @@ static void __dma_page_cpu_to_dev(struct page *page, unsigned long off,
+ static void __dma_page_dev_to_cpu(struct page *page, unsigned long off,
+ 	size_t size, enum dma_data_direction dir)
+ {
+-	unsigned long paddr = page_to_phys(page) + off;
++	phys_addr_t paddr = page_to_phys(page) + off;
+ 
+ 	/* FIXME: non-speculating: not required */
+ 	/* don't bother invalidating if DMA to device */
 -- 
 1.7.9.5
