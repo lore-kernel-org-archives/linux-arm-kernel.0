@@ -1,48 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 24 Apr 2014 15:13:04 +0200
-Subject: [PATCH v3] gpio: omap: implement get_direction
-In-Reply-To: <1398322659-20008-1-git-send-email-yegorslists@googlemail.com>
-References: <1398322659-20008-1-git-send-email-yegorslists@googlemail.com>
-Message-ID: <CACRpkdZPNGHNQhqovDoaKTXZT3mJfN4pjKSBxW7m6wT5u-XEYQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 24 Apr 2014 15:13:54 +0200
+Subject: [PATCH v3 2/4] ARM: dts: Add support for DRA72x family of devices
+In-Reply-To: <1398333987-19454-3-git-send-email-rnayak@ti.com>
+References: <1398333987-19454-1-git-send-email-rnayak@ti.com>
+ <1398333987-19454-3-git-send-email-rnayak@ti.com>
+Message-ID: <201404241513.54380.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 24, 2014 at 8:57 AM,  <yegorslists@googlemail.com> wrote:
-
-> From: Yegor Yefremov <yegorslists@googlemail.com>
->
-> This patch implements gpio_chip's get_direction() routine, that
-> lets other drivers get particular GPIOs direction using
-> struct gpio_desc.
->
-> Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
-> Acked-by: Javier Martinez Canillas <javier@dowhile0.org>
-> ---
-> Changes:
->         v3: get rid of _get_gpio_direction() (Linus Walleij)
->         v2: rework return value calculation
-
-Looks good to me, Kevin, Santosh?
-
-Part of me wants to list Javier as maintainer for this driver.
-
-> +static int gpio_get_direction(struct gpio_chip *chip, unsigned offset)
-> +{
-> +       struct gpio_bank *bank;
-> +       unsigned long flags;
-> +       void __iomem *reg;
-> +       int dir;
-
-That is a bool, actually. But no big deal.
-
+On Thursday 24 April 2014, Rajendra Nayak wrote:
+> 
+> -- DRA742
+> -  compatible = "ti,dra7xx", "ti,dra7"
+> +- DRA74x
+> +  compatible = "ti,dra74", "ti,dra7"
 > +
-> +       bank = container_of(chip, struct gpio_bank, chip);
-> +       reg = bank->base + bank->regs->direction;
-> +       spin_lock_irqsave(&bank->lock, flags);
-> +       dir = !!(readl_relaxed(reg) & BIT(offset));
-> +       spin_unlock_irqrestore(&bank->lock, flags);
-> +       return dir;
-> +}
+> +- DRA72x
+> +  compatible = "ti,dra72", "ti,dra7"
 
-Yours,
-Linus Walleij
+Actually, what I meant was that you should list the fill name of the SoC,
+e.g. "ti,dra742", not just "ti,dra74". Leaving out the 'x' is not going
+to prevent this from breaking when you have a new dra745 that is incompatible.
+
+You can always list more strings, e.g.
+
+	compatible = "ti,dra745", "ti,dra742", "ti,dra74", "ti,dra7";
+
+if you have a dra745 product that is fully compatible with dra742, but the
+important part here is that the first string must be the full name.
+
+	Arnd
