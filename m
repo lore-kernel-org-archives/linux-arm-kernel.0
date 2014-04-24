@@ -1,49 +1,83 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 24 Apr 2014 13:37:52 +0100
-Subject: [PATCH] ARM: mm: dma: Update coherent streaming apis with
- missing memory barrier
-In-Reply-To: <5427496.9FZVDz0Wjn@wuerfel>
-References: <1398103390-31968-1-git-send-email-santosh.shilimkar@ti.com>
- <6414220.SShvCHLvZQ@wuerfel> <20140424105846.GE19564@arm.com>
- <5427496.9FZVDz0Wjn@wuerfel>
-Message-ID: <20140424123752.GA14110@arm.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Thu, 24 Apr 2014 21:57:33 +0900
+Subject: [PATCH 1/3] ARM: dts: Add PMU reg node to exynos4210
+In-Reply-To: <CAGm_ybjfxprtLUX6Vs8QVvXoMOaHez4-Og8a9n3UevibvmzbZA@mail.gmail.com>
+References: <1396425778-4379-1-git-send-email-pankaj.dubey@samsung.com>
+ <1396425778-4379-2-git-send-email-pankaj.dubey@samsung.com>
+ <CAGm_ybjfxprtLUX6Vs8QVvXoMOaHez4-Og8a9n3UevibvmzbZA@mail.gmail.com>
+Message-ID: <53590A3D.1020308@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 24, 2014 at 01:12:16PM +0100, Arnd Bergmann wrote:
-> On Thursday 24 April 2014 11:58:46 Will Deacon wrote:
-> > On Wed, Apr 23, 2014 at 07:58:05PM +0100, Arnd Bergmann wrote:
-> > > Another problem is MSI processing. MSI was specifically invented to avoid
-> > > having to check an MMIO register for a DMA completion that as a side-effect
-> > > flushes pending DMAs from the same device. This breaks down if the MSI
-> > > packet gets turned into a level interrupt before it reaches the CPU's
-> > > coherency domain, which is likely the case on the dw-pcie controller that
-> > > comes with its own MSI block.
-> > 
-> > I'm not sure there's anything special about MSI which helps with this
-> > problem. For GICv3, the MSI write will target the ITS (a slave device),
-> > whereas the data produced is assumedly targetting main memory. That still
-> > requires careful ordering by the producer, in the same way as if it was
-> > signalling a legacy interrupt.
-> 
-> With legacy interrupts a PCI bus master has no way to order the transactions:
-> It initiates the DMA to memory, but does not wait for the DMA to complete.
-> It raises the interrupt line, which causes the interrupt handler of the
-> driver to start. The driver then reads a status register from the bus master
-> device, and this read is ordered with respect to the DMA that may still
-> be in progress at the time. Any PCI driver that works with legacy interrupts
-> and DMA has to do this, and the PCI host controller has to ensure that these
-> ordering semantics are maintained on the upstream buses.
-> 
-> The difference with MSI is that the driver does not have to do an MMIO read
-> transaction, and that the host controller has to ensure ordering between
-> the (possibly weakly ordered) data DMA and the MSI transaction, rather than
-> between the DMA and the MMIO read. These two are not the same, and it's
-> totally possible for a broken implementation to get one of them right
-> but not the other.
+Hi Vikas,
 
-Ok, so the problem of enforcing ordering (from the CPU's perspective) moves
-from the endpoint to the host controller. That's certainly an improvement,
-but it doesn't seem unlikely for the host controller to screw that up :(
+On 04/24/2014 08:59 PM, Vikas Sajjan wrote:
+> +Tomasz
+>
+>
+> On Wed, Apr 2, 2014 at 1:32 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
+>> This patch adds pmu regnode to exynos4210 dtsi to handle
+>> PMU register access via DT.
+>>
+>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+>> ---
+>>   arch/arm/boot/dts/exynos4210.dtsi |    5 +++++
+>>   1 file changed, 5 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
+>> index cacf614..0a2c0fe 100644
+>> --- a/arch/arm/boot/dts/exynos4210.dtsi
+>> +++ b/arch/arm/boot/dts/exynos4210.dtsi
+>> @@ -81,6 +81,11 @@
+>>                  interrupts = <2 2>, <3 2>;
+>>          };
+>>
+>> +       pmu_system_controller: system-controller at 10020000 {
+>> +               compatible = "samsung,exynos4210-pmu", "syscon";
+>> +               reg = <0x10020000 0x5000>;
+> Can we have 2 strings as "compatible" and these 2 strings are used by
+> 2 different driver?
+>
+> Because once syscon driver gets probed, exynos-pmu.c [1] driver will
+> never be probed.
+>
+> The new PMU driver [1] completely relies on this. With just
+> exynos_defconfig, you will not notice this issue, since syscon is NOT
+> enabled by exynos_defconfig. When I enabled "System Controller
+> Register R/W Based on Regmap" in menuconfig, I could see PMU driver
+> [1] is NEVER probed.
+>
+> Let me know, if I am missing something.
+>
+>   [1] http://www.spinics.net/lists/arm-kernel/msg319750.html
 
-Will
+You are correct. We also missed this because "SYSCON" option was
+not enabled in exynos_defconfig.
+I noticed this during preparation of V2 when I planned to use
+"early_syscon_init" [1] as suggested by Sylwester here [2].
+
+In V2 I will take care of this. I hope soon I will be able to post second
+version of this series, just waiting for testing and internal code review.
+
+[1] https://lkml.org/lkml/2014/4/8/239
+[2] https://lkml.org/lkml/2014/4/2/171
+>
+>
+>> +       };
+>> +
+>>          pinctrl_0: pinctrl at 11400000 {
+>>                  compatible = "samsung,exynos4210-pinctrl";
+>>                  reg = <0x11400000 0x1000>;
+>> --
+>> 1.7.10.4
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+-- 
+Best Regards,
+Pankaj Dubey
