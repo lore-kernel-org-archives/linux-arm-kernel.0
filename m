@@ -1,236 +1,224 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 23 Apr 2014 17:40:27 -0700
-Subject: [PATCH 1/4] mfd: twl4030-power: Add recommended idle configuration
-In-Reply-To: <1398300030-7386-1-git-send-email-tony@atomide.com>
-References: <1398300030-7386-1-git-send-email-tony@atomide.com>
-Message-ID: <1398300030-7386-2-git-send-email-tony@atomide.com>
+From: isubramanian@apm.com (Iyappan Subramanian)
+Date: Wed, 23 Apr 2014 17:46:01 -0700
+Subject: [PATCH v3 4/4] drivers: net: Add APM X-Gene SoC ethernet driver
+ support.
+In-Reply-To: <1397704613.14062.13.camel@joe-AO725>
+References: <1397702368-4846-1-git-send-email-isubramanian@apm.com>
+ <1397702368-4846-5-git-send-email-isubramanian@apm.com>
+ <1397704613.14062.13.camel@joe-AO725>
+Message-ID: <CAKh23FkZoWJk9L3VhvWmGqQfyjvSg=QJ9sRKzw4tr88DwQQ3zg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These settings are based on the "Recommended Sleep Sequences for
-the Zoom Platform" pdf at:
+On Wed, Apr 16, 2014 at 8:16 PM, Joe Perches <joe@perches.com> wrote:
+> On Wed, 2014-04-16 at 19:39 -0700, Iyappan Subramanian wrote:
+>> This patch adds network driver for APM X-Gene SoC ethernet.
+> []
+>> diff --git a/drivers/net/ethernet/apm/xgene/Kconfig b/drivers/net/ethernet/apm/xgene/Kconfig
+> []
+>> @@ -0,0 +1,10 @@
+>> +config NET_XGENE
+>> +     tristate "APM X-Gene SoC Ethernet Driver"
+>> +     select PHYLIB
+>> +     default y
+>
+> default y?
+>
+> Shouldn't this need a depends on too?
 
-http://omappedia.com/wiki/File:Recommended_Sleep_Sequences_Zoom.pdf
+I will remove the "default" entry.
 
-These settings assume most of the regulators are under control of
-Linux, and cuts off VDD1 and VDD2 during off-idle as Linux cannot
-do it.
+>
+>> diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
+>
+>> +static void xgene_enet_ring_set_type(u32 *ring_cfg, u8 is_bufpool)
+>> +{
+>
+> bool is_bufpool?
+>
 
-For any board specific changes to these, let's patch them in as
-changes to the generic data in the follow-up patches. This keeps
-the board specific changes small.
+Great suggestion.  I will replace with bool and try to use bool where
+ever possible.
 
-Note that this does not consider the twl5030 errata 27. That
-can be added later on after it has been tested.
+>> +static void xgene_enet_set_ring_id(struct xgene_enet_desc_ring *ring)
+>> +{
+>> +     u32 ring_id_val;
+>> +     u32 ring_id_buf;
+>> +     u8 is_bufpool = IS_FP(ring->id);
+>
+> bool?
+>
+>> +
+>> +     ring_id_val = ring->id & GENMASK(9, 0);
+>> +     ring_id_val |= (1 << 31) & GENMASK(31, 31);
+>
+> Setting a single bit and masking with the same
+> bit looks silly.
 
-Cc: Peter De Schrijver <pdeschrijver@nvidia.com>
-Cc: Samuel Ortiz <sameo@linux.intel.com>
-Cc: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- .../devicetree/bindings/mfd/twl4030-power.txt      |   4 +
- drivers/mfd/twl4030-power.c                        | 165 +++++++++++++++++++++
- 2 files changed, 169 insertions(+)
+I will use BIT macro in these circumstances.
 
-diff --git a/Documentation/devicetree/bindings/mfd/twl4030-power.txt b/Documentation/devicetree/bindings/mfd/twl4030-power.txt
-index b906116..bbd6603 100644
---- a/Documentation/devicetree/bindings/mfd/twl4030-power.txt
-+++ b/Documentation/devicetree/bindings/mfd/twl4030-power.txt
-@@ -8,10 +8,14 @@ Required properties:
- - compatible : must be one of the following
- 	"ti,twl4030-power"
- 	"ti,twl4030-power-reset"
-+	"ti,twl4030-power-idle"
- 
- The use of ti,twl4030-power-reset is recommended at least on
- 3530 that needs a special configuration for warm reset to work.
- 
-+When using ti,twl4030-power-idle, the TI recommended configuration
-+for idle modes is loaded to the tlw4030 PMIC.
-+
- Optional properties:
- - ti,use_poweroff: With this flag, the chip will initiates an ACTIVE-to-OFF or
- 		   SLEEP-to-OFF transition when the system poweroffs.
-diff --git a/drivers/mfd/twl4030-power.c b/drivers/mfd/twl4030-power.c
-index 1db0560..89a8528 100644
---- a/drivers/mfd/twl4030-power.c
-+++ b/drivers/mfd/twl4030-power.c
-@@ -595,11 +595,176 @@ static struct twl4030_power_data omap3_reset = {
- 	.resource_config	= omap3_rconfig,
- };
- 
-+/* Recommended generic default idle configuration for off-idle */
-+
-+/* Broadcast message to put res to sleep */
-+static struct twl4030_ins omap3_idle_sleep_on_seq[] = {
-+	{ MSG_BROADCAST(DEV_GRP_NULL, RES_GRP_ALL, RES_TYPE_ALL,
-+			0, RES_STATE_SLEEP), 2 },
-+};
-+
-+static struct twl4030_script omap3_idle_sleep_on_script = {
-+	.script	= omap3_idle_sleep_on_seq,
-+	.size	= ARRAY_SIZE(omap3_idle_sleep_on_seq),
-+	.flags	= TWL4030_SLEEP_SCRIPT,
-+};
-+
-+/* Broadcast message to put res to active */
-+static struct twl4030_ins omap3_idle_wakeup_p12_seq[] = {
-+	{ MSG_BROADCAST(DEV_GRP_NULL, RES_GRP_ALL, RES_TYPE_ALL,
-+			0, RES_STATE_ACTIVE), 2 },
-+	};
-+
-+static struct twl4030_script omap3_idle_wakeup_p12_script = {
-+	.script	= omap3_idle_wakeup_p12_seq,
-+	.size	= ARRAY_SIZE(omap3_idle_wakeup_p12_seq),
-+	.flags	= TWL4030_WAKEUP12_SCRIPT,
-+};
-+
-+/* Broadcast message to put res to active */
-+static struct twl4030_ins omap3_idle_wakeup_p3_seq[] = {
-+	{ MSG_SINGULAR(DEV_GRP_NULL, RES_CLKEN, RES_STATE_ACTIVE), 0x37 },
-+	{ MSG_BROADCAST(DEV_GRP_NULL, RES_GRP_ALL, RES_TYPE_ALL,
-+		       0, RES_STATE_ACTIVE), 2 },
-+};
-+
-+static struct twl4030_script omap3_idle_wakeup_p3_script = {
-+	.script	= omap3_idle_wakeup_p3_seq,
-+	.size	= ARRAY_SIZE(omap3_idle_wakeup_p3_seq),
-+	.flags	= TWL4030_WAKEUP3_SCRIPT,
-+};
-+
-+static struct twl4030_script omap3_idle_wrst_script = {
-+	.script	= omap3_wrst_seq,
-+	.size	= ARRAY_SIZE(omap3_wrst_seq),
-+	.flags	= TWL4030_WRST_SCRIPT,
-+};
-+
-+static struct twl4030_script *omap3_idle_scripts[] = {
-+	&omap3_idle_wakeup_p12_script,
-+	&omap3_idle_wakeup_p3_script,
-+	&omap3_idle_wrst_script,
-+	&omap3_idle_sleep_on_script,
-+};
-+
-+/*
-+ * Usable values for .remap_sleep and .remap_off
-+ * Based on table "5.3.3 Resource Operating modes"
-+ */
-+enum {
-+	TWL_REMAP_OFF = 0,
-+	TWL_REMAP_SLEEP = 8,
-+	TWL_REMAP_ACTIVE = 9,
-+};
-+
-+#define TWL_DEV_GRP_P123	(DEV_GRP_P1 | DEV_GRP_P2 | DEV_GRP_P3)
-+
-+/*
-+ * Recommended configuration based on "Recommended Sleep
-+ * Sequences for the Zoom Platform":
-+ * http://omappedia.com/wiki/File:Recommended_Sleep_Sequences_Zoom.pdf
-+ */
-+static struct twl4030_resconfig omap3_idle_rconfig[] = {
-+	{ .resource = RES_VAUX1, .devgroup = DEV_GRP_NULL,
-+	  .type = 0, .type2 = 0, .remap_off = TWL_REMAP_OFF,
-+	  .remap_sleep = TWL_REMAP_SLEEP, },
-+	{ .resource = RES_VAUX2, .devgroup =  DEV_GRP_NULL,
-+	  .type = 0, .type2 = 0, .remap_off = TWL_REMAP_OFF,
-+	  .remap_sleep = TWL_REMAP_SLEEP, },
-+	{ .resource = RES_VAUX3, .devgroup =  DEV_GRP_NULL,
-+	  .type = 0, .type2 = 0, .remap_off = TWL_REMAP_OFF,
-+	  .remap_sleep = TWL_REMAP_SLEEP, },
-+	{ .resource = RES_VAUX4, .devgroup =  DEV_GRP_NULL,
-+	  .type = 0, .type2 = 0, .remap_off = TWL_REMAP_OFF,
-+	  .remap_sleep = TWL_REMAP_SLEEP, },
-+	{ .resource = RES_VMMC1, .devgroup =  DEV_GRP_NULL,
-+	  .type = 0, .type2 = 0,  .remap_off = TWL_REMAP_OFF,
-+	  .remap_sleep = TWL_REMAP_SLEEP, },
-+	{ .resource = RES_VMMC2, .devgroup =  DEV_GRP_NULL,
-+	  .type = 0, .type2 = 0, .remap_off = TWL_REMAP_OFF,
-+	  .remap_sleep = TWL_REMAP_SLEEP, },
-+	{ .resource = RES_VPLL1, .devgroup = DEV_GRP_P1,
-+	  .type = 3, .type2 = 1, .remap_off = TWL_REMAP_OFF,
-+	  .remap_sleep = TWL_REMAP_OFF, },
-+	{ .resource = RES_VPLL2, .devgroup = DEV_GRP_P1,
-+	  .type = 0, .type2 = 0, .remap_off = TWL_REMAP_OFF,
-+	  .remap_sleep = TWL_REMAP_SLEEP, },
-+	{ .resource = RES_VSIM, .devgroup =  DEV_GRP_NULL,
-+	  .type = 0, .type2 = 0, .remap_off = TWL_REMAP_OFF,
-+	  .remap_sleep = TWL_REMAP_SLEEP, },
-+	{ .resource = RES_VDAC, .devgroup =  DEV_GRP_NULL,
-+	  .type = 0, .type2 = 0, .remap_off = TWL_REMAP_OFF,
-+	  .remap_sleep = TWL_REMAP_SLEEP, },
-+	{ .resource = RES_VINTANA1, .devgroup = TWL_DEV_GRP_P123,
-+	  .type = 1, .type2 = 2, .remap_off = TWL_REMAP_OFF,
-+	  .remap_sleep = TWL_REMAP_SLEEP, },
-+	{ .resource = RES_VINTANA2, .devgroup = TWL_DEV_GRP_P123,
-+	  .type = 0, .type2 = 2, .remap_off = TWL_REMAP_OFF,
-+	  .remap_sleep = TWL_REMAP_SLEEP, },
-+	{ .resource = RES_VINTDIG, .devgroup = TWL_DEV_GRP_P123,
-+	  .type = 1, .type2 = 2, .remap_off = TWL_REMAP_OFF,
-+	  .remap_sleep = TWL_REMAP_SLEEP, },
-+	{ .resource = RES_VIO, .devgroup = TWL_DEV_GRP_P123,
-+	  .type = 2, .type2 = 2, .remap_off = TWL_REMAP_OFF,
-+	  .remap_sleep = TWL_REMAP_SLEEP, },
-+	{ .resource = RES_VDD1, .devgroup = DEV_GRP_P1,
-+	  .type = 4, .type2 = 1, .remap_off = TWL_REMAP_OFF,
-+	  .remap_sleep = TWL_REMAP_OFF, },
-+	{ .resource = RES_VDD2, .devgroup = DEV_GRP_P1,
-+	  .type = 3, .type2 = 1, .remap_off = TWL_REMAP_OFF,
-+	  .remap_sleep = TWL_REMAP_OFF, },
-+	{ .resource = RES_VUSB_1V5, .devgroup =  DEV_GRP_NULL,
-+	  .type = 0, .type2 = 0, .remap_off = TWL_REMAP_OFF,
-+	  .remap_sleep = TWL_REMAP_SLEEP, },
-+	{ .resource = RES_VUSB_1V8, .devgroup =  DEV_GRP_NULL,
-+	  .type = 0, .type2 = 0, .remap_off = TWL_REMAP_OFF,
-+	  .remap_sleep = TWL_REMAP_SLEEP, },
-+	{ .resource = RES_VUSB_3V1, .devgroup = TWL_DEV_GRP_P123,
-+	  .type = 0, .type2 = 0, .remap_off = TWL_REMAP_OFF,
-+	  .remap_sleep = TWL_REMAP_SLEEP, },
-+	/* Resource #20 USB charge pump skipped */
-+	{ .resource = RES_REGEN, .devgroup = TWL_DEV_GRP_P123,
-+	  .type = 2, .type2 = 1, .remap_off = TWL_REMAP_OFF,
-+	  .remap_sleep = TWL_REMAP_SLEEP, },
-+	{ .resource = RES_NRES_PWRON, .devgroup = TWL_DEV_GRP_P123,
-+	  .type = 0, .type2 = 1, .remap_off = TWL_REMAP_OFF,
-+	  .remap_sleep = TWL_REMAP_SLEEP },
-+	{ .resource = RES_CLKEN, .devgroup = TWL_DEV_GRP_P123,
-+	  .type = 3, .type2 = 2, .remap_off = TWL_REMAP_OFF,
-+	  .remap_sleep = TWL_REMAP_SLEEP, },
-+	{ .resource = RES_SYSEN, .devgroup = TWL_DEV_GRP_P123,
-+	  .type = 6, .type2 = -1, .remap_off = TWL_REMAP_OFF,
-+	  .remap_sleep = TWL_REMAP_SLEEP, },
-+	{ .resource = RES_HFCLKOUT, .devgroup = DEV_GRP_P3,
-+	  .type = 0, .type2 = 2, .remap_off = TWL_REMAP_OFF,
-+	  .remap_sleep = TWL_REMAP_SLEEP, },
-+	{ .resource = RES_32KCLKOUT, .devgroup = TWL_DEV_GRP_P123,
-+	  .type = 0, .type2 = 0, .remap_off = TWL_REMAP_OFF,
-+	  .remap_sleep = TWL_REMAP_SLEEP, },
-+	{ .resource = RES_RESET, .devgroup = TWL_DEV_GRP_P123,
-+	  .type = 6, .type2 = 0, .remap_off = TWL_REMAP_OFF,
-+	  .remap_sleep = TWL_REMAP_SLEEP, },
-+	{ .resource = RES_MAIN_REF, .devgroup = TWL_DEV_GRP_P123,
-+	  .type = 0, .type2 = 0, .remap_off = TWL_REMAP_OFF,
-+	  .remap_sleep = TWL_REMAP_SLEEP, },
-+	{ /* Terminator */ },
-+};
-+
-+static struct twl4030_power_data omap3_idle = {
-+	.scripts		= omap3_idle_scripts,
-+	.num			= ARRAY_SIZE(omap3_idle_scripts),
-+	.resource_config	= omap3_idle_rconfig,
-+};
-+
- static struct of_device_id twl4030_power_of_match[] = {
- 	{
- 		.compatible = "ti,twl4030-power-reset",
- 		.data = &omap3_reset,
- 	},
-+	{
-+		.compatible = "ti,twl4030-power-idle",
-+		.data = &omap3_idle,
-+	},
- 	{ },
- };
- MODULE_DEVICE_TABLE(of, twl4030_power_of_match);
--- 
-1.8.1.1
+>
+>> +
+>> +     ring_id_buf = (ring->num << 9) & GENMASK(18, 9);
+>> +     ring_id_buf |= ((u32) is_bufpool << 20) & GENMASK(20, 20);
+>
+> And here.
+>
+>> +     ring_id_buf |= (1U << 21) & GENMASK(21, 21);
+>
+> This too.
+>
+> []
+>
+>> +static void xgene_enet_rd_mcx_stats(struct xgene_enet_pdata *pdata,
+>> +                                 u32 rd_addr, u32 *rd_data)
+>> +{
+> []
+>> +     if (!ret)
+>> +             netdev_err(pdata->ndev, "MCX stats read failed, addr: %04x",
+>> +                        rd_addr);
+>
+> Missing newline
+
+I will add newline to the print statements.
+
+>
+>> +/* Start Statistics related functions */
+>> +static void xgene_gmac_get_rx_stats(struct xgene_enet_pdata *pdata,
+>> +                                 struct xgene_enet_rx_stats *rx_stat)
+>> +{
+>> +     xgene_enet_rd_mcx_stats(pdata, RBYT_ADDR, &rx_stat->rx_byte_count);
+>> +     xgene_enet_rd_mcx_stats(pdata, RPKT_ADDR, &rx_stat->rx_packet_count);
+>> +     xgene_enet_rd_mcx_stats(pdata, RDRP_ADDR, &rx_stat->rx_drop_pkt_count);
+>> +     xgene_enet_rd_mcx_stats(pdata, RFCS_ADDR, &rx_stat->rx_fcs_err_count);
+>> +     xgene_enet_rd_mcx_stats(pdata, RFLR_ADDR,
+>> +                             &rx_stat->rx_frm_len_err_pkt_count);
+>> +     xgene_enet_rd_mcx_stats(pdata, RALN_ADDR,
+>> +                             &rx_stat->rx_alignment_err_pkt_count);
+>> +     xgene_enet_rd_mcx_stats(pdata, ROVR_ADDR,
+>> +                             &rx_stat->rx_oversize_pkt_count);
+>> +     xgene_enet_rd_mcx_stats(pdata, RUND_ADDR,
+>> +                             &rx_stat->rx_undersize_pkt_count);
+>> +
+>> +     rx_stat->rx_byte_count &= RX_BYTE_CNTR_MASK;
+>> +     rx_stat->rx_packet_count &= RX_PKT_CNTR_MASK;
+>> +     rx_stat->rx_drop_pkt_count &= RX_DROPPED_PKT_CNTR_MASK;
+>> +     rx_stat->rx_fcs_err_count &= RX_FCS_ERROR_CNTR_MASK;
+>> +     rx_stat->rx_frm_len_err_pkt_count &= RX_LEN_ERR_CNTR_MASK;
+>> +     rx_stat->rx_alignment_err_pkt_count &= RX_ALIGN_ERR_CNTR_MASK;
+>> +     rx_stat->rx_oversize_pkt_count &= RX_OVRSIZE_PKT_CNTR_MASK;
+>> +     rx_stat->rx_undersize_pkt_count &= RX_UNDRSIZE_PKT_CNTR_MASK;
+>> +}
+>> +
+>> +static void xgene_gmac_get_tx_stats(struct xgene_enet_pdata *pdata,
+>> +                                 struct xgene_enet_tx_stats *tx_stats)
+>> +{
+>> +     xgene_enet_rd_mcx_stats(pdata, TBYT_ADDR, &tx_stats->tx_byte_count);
+>> +     xgene_enet_rd_mcx_stats(pdata, TPKT_ADDR, &tx_stats->tx_pkt_count);
+>> +     xgene_enet_rd_mcx_stats(pdata, TDRP_ADDR, &tx_stats->tx_drop_frm_count);
+>> +     xgene_enet_rd_mcx_stats(pdata, TFCS_ADDR,
+>> +                             &tx_stats->tx_fcs_err_frm_count);
+>> +     xgene_enet_rd_mcx_stats(pdata, TUND_ADDR,
+>> +                             &tx_stats->tx_undersize_frm_count);
+>> +
+>> +     tx_stats->tx_byte_count &= TX_BYTE_CNTR_MASK;
+>> +     tx_stats->tx_pkt_count &= TX_PKT_CNTR_MASK;
+>> +     tx_stats->tx_drop_frm_count &= TX_DROP_FRAME_CNTR_MASK;
+>> +     tx_stats->tx_fcs_err_frm_count &= TX_FCS_ERROR_CNTR_MASK;
+>> +     tx_stats->tx_undersize_frm_count &= TX_UNDSIZE_FRAME_CNTR_MASK;
+>> +}
+>
+> Pity about the masks
+>
+>
+>> +#define RX_BYTE_CNTR_MASK            0x7fffffff
+>> +#define RX_PKT_CNTR_MASK             0x7fffffff
+>> +#define RX_FCS_ERROR_CNTR_MASK               0x0000ffff
+>> +#define RX_ALIGN_ERR_CNTR_MASK               0x0000ffff
+>> +#define RX_LEN_ERR_CNTR_MASK         0x0000ffff
+>> +#define RX_UNDRSIZE_PKT_CNTR_MASK    0x0000ffff
+>> +#define RX_OVRSIZE_PKT_CNTR_MASK     0x0000ffff
+>> +#define RX_DROPPED_PKT_CNTR_MASK     0x0000ffff
+>> +#define TX_BYTE_CNTR_MASK            0x7fffffff
+>> +#define TX_PKT_CNTR_MASK             0x7fffffff
+>> +#define TX_DROP_FRAME_CNTR_MASK              0x0000ffff
+>> +#define TX_FCS_ERROR_CNTR_MASK               0x00000fff
+>> +#define TX_UNDSIZE_FRAME_CNTR_MASK   0x00000fff
+>
+> Any of these going to possibly overrun their
+> counter size between polls?
+
+No.  These counters are not expected to overrun between polls and I
+will remove them.
+
+>
+> []
+>> +static struct xgene_enet_desc_ring *xgene_enet_create_desc_ring(
+>> +                     struct net_device *ndev, u32 ring_num,
+>> +                     enum xgene_enet_ring_cfgsize cfgsize, u32 ring_id)
+>> +{
+>> +     struct xgene_enet_desc_ring *ring;
+>> +     struct xgene_enet_pdata *pdata = netdev_priv(ndev);
+>> +     struct device *dev = &pdata->pdev->dev;
+>> +     u32 size;
+>> +
+>> +     ring = devm_kzalloc(dev, sizeof(struct xgene_enet_desc_ring),
+>> +                         GFP_KERNEL);
+>> +     if (!ring) {
+>> +             netdev_err(ndev, "Could not allocate ring\n");
+>
+> Unnecessary OOM.  alloc errors get a generic OOM and dump_stack()
+
+I will remove the print message.
+
+>
+>
+>> +static struct net_device_stats *xgene_enet_stats(struct net_device *ndev)
+>> +{
+>> +     struct xgene_enet_pdata *pdata = netdev_priv(ndev);
+>> +     struct net_device_stats *nst = &pdata->nstats;
+>> +     struct xgene_enet_detailed_stats detailed_stats;
+>> +     struct xgene_enet_rx_stats *rx_stats;
+>> +     struct xgene_enet_tx_stats *tx_stats;
+>> +     u32 pkt_bytes, crc_bytes = 4;
+>> +
+>> +     memset(&detailed_stats, 0, sizeof(struct xgene_enet_detailed_stats));
+>> +
+>> +     rx_stats = &detailed_stats.rx_stats;
+>> +     tx_stats = &detailed_stats.tx_stats;
+>> +
+>> +     local_irq_disable();
+>> +     xgene_gmac_get_detailed_stats(pdata, &detailed_stats);
+>> +
+>> +     pkt_bytes = rx_stats->rx_byte_count;
+>> +     pkt_bytes -= rx_stats->rx_packet_count * crc_bytes;
+>> +     nst->rx_packets += rx_stats->rx_packet_count;
+>> +     nst->rx_bytes += pkt_bytes;
+>> +
+>> +     pkt_bytes = tx_stats->tx_byte_count;
+>> +     pkt_bytes -= tx_stats->tx_pkt_count * crc_bytes;
+>> +     nst->tx_packets += tx_stats->tx_pkt_count;
+>> +     nst->tx_bytes += pkt_bytes;
+>> +
+>> +     nst->rx_dropped += rx_stats->rx_drop_pkt_count;
+>> +     nst->tx_dropped += tx_stats->tx_drop_frm_count;
+>> +
+>> +     nst->rx_crc_errors += rx_stats->rx_fcs_err_count;
+>> +     nst->rx_length_errors += rx_stats->rx_frm_len_err_pkt_count;
+>> +     nst->rx_frame_errors += rx_stats->rx_alignment_err_pkt_count;
+>> +     nst->rx_over_errors += rx_stats->rx_oversize_pkt_count;
+>> +
+>> +     nst->rx_errors += rx_stats->rx_fcs_err_count
+>> +         + rx_stats->rx_frm_len_err_pkt_count
+>> +         + rx_stats->rx_oversize_pkt_count
+>> +         + rx_stats->rx_undersize_pkt_count;
+>> +
+>> +     nst->tx_errors += tx_stats->tx_fcs_err_frm_count +
+>> +         tx_stats->tx_undersize_frm_count;
+>> +
+>> +     local_irq_enable();
+>> +
+>> +     return nst;
+>> +}
+>
+>
