@@ -1,59 +1,65 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Thu, 24 Apr 2014 17:40:16 +0100
-Subject: [PATCH 2/4] arm/mach-vexpress: array accessed out of bounds
-In-Reply-To: <1398357618-11050-1-git-send-email-pawel.moll@arm.com>
-References: <1398357618-11050-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <1398357618-11050-3-git-send-email-pawel.moll@arm.com>
+Date: Thu, 24 Apr 2014 17:40:14 +0100
+Subject: [PATCH 0/4] Versatile Express fixes for 3.15
+Message-ID: <1398357618-11050-1-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Heinrich Schuchardt <xypron.glpk@gmx.de>
+Hello Arnd, Kevin, Olof,
 
-dcscb_allcpus_mask is an array of size 2.
+This is a short set of Versatile Express fixes for 3.15. I've re-posted
+them, because the last one wasn't reviewed publicly yet.
 
-The index variable cluster has to be checked against this limit
-before accessing the array.
+It is pretty straight forward, so if you feel comfortable about it,
+please pull from the tag below. If not, I'll rebase the series on rc3
+next week and send a normal pull request.
 
-Signed-off-by: Heinrich Schuchardt <xypron.glpk@gmx.de>
-Acked-by: Nicolas Pitre <nico@linaro.org>
-Signed-off-by: Pawel Moll <pawel.moll@arm.com>
----
- arch/arm/mach-vexpress/dcscb.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+Thanks!
 
-diff --git a/arch/arm/mach-vexpress/dcscb.c b/arch/arm/mach-vexpress/dcscb.c
-index 788495d..30b9933 100644
---- a/arch/arm/mach-vexpress/dcscb.c
-+++ b/arch/arm/mach-vexpress/dcscb.c
-@@ -51,12 +51,14 @@ static int dcscb_allcpus_mask[2];
- static int dcscb_power_up(unsigned int cpu, unsigned int cluster)
- {
- 	unsigned int rst_hold, cpumask = (1 << cpu);
--	unsigned int all_mask = dcscb_allcpus_mask[cluster];
-+	unsigned int all_mask;
- 
- 	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
- 	if (cpu >= 4 || cluster >= 2)
- 		return -EINVAL;
- 
-+	all_mask = dcscb_allcpus_mask[cluster];
-+
- 	/*
- 	 * Since this is called with IRQs enabled, and no arch_spin_lock_irq
- 	 * variant exists, we need to disable IRQs manually here.
-@@ -101,11 +103,12 @@ static void dcscb_power_down(void)
- 	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
- 	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
- 	cpumask = (1 << cpu);
--	all_mask = dcscb_allcpus_mask[cluster];
- 
- 	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
- 	BUG_ON(cpu >= 4 || cluster >= 2);
- 
-+	all_mask = dcscb_allcpus_mask[cluster];
-+
- 	__mcpm_cpu_going_down(cpu, cluster);
- 
- 	arch_spin_lock(&dcscb_lock);
+Pawel
+
+
+The following changes since commit a798c10faf62a505d24e5f6213fbaf904a39623f:
+
+  Linux 3.15-rc2 (2014-04-20 11:08:50 -0700)
+
+are available in the git repository at:
+
+  git://git.linaro.org/people/pawel.moll/linux.git tags/vexpress/fixes-for-3.15
+
+for you to fetch changes up to cf2e0a73ca9ad376825c013ebaa145608abc27d7:
+
+  ARM: vexpress/TC2: Convert OPP voltage to uV before storing (2014-04-24 17:20:50 +0100)
+
+----------------------------------------------------------------
+ARM Versatile Express fixes for 3.15
+
+This series contains straight-forward fixes for different
+Versatile Express infrastructure drivers:
+
+- NULL pointer dereference on the error path in the clk driver
+- out of boundary array access in the dcscb driver
+- broken restart/power off implementation
+- mis-interpreted voltage unit in the spc driver
+
+----------------------------------------------------------------
+Dan Carpenter (1):
+      clk: vexpress: NULL dereference on error path
+
+Heinrich Schuchardt (1):
+      arm/mach-vexpress: array accessed out of bounds
+
+Pawel Moll (1):
+      power/reset: vexpress: Fix restart/power off operation
+
+Punit Agrawal (1):
+      ARM: vexpress/TC2: Convert OPP voltage to uV before storing
+
+ arch/arm/mach-vexpress/dcscb.c           |  7 +++++--
+ arch/arm/mach-vexpress/spc.c             |  4 ++--
+ drivers/clk/versatile/clk-vexpress-osc.c |  2 +-
+ drivers/power/reset/vexpress-poweroff.c  | 19 ++++++++++---------
+ 4 files changed, 18 insertions(+), 14 deletions(-)
+
 -- 
 1.8.3.2
