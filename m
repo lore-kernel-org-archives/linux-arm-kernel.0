@@ -1,57 +1,64 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 24 Apr 2014 16:23:32 -0700
-Subject: [GIT PULL] serial: Cadence
-In-Reply-To: <5358A188.4080404@monstr.eu>
-References: <53575983.3030508@monstr.eu> <20140423234832.GB17827@kroah.com>
- <5358A188.4080404@monstr.eu>
-Message-ID: <20140424232332.GB10457@kroah.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 24 Apr 2014 16:21:50 -0700
+Subject: [PATCH] ARM: dts: Add support for the BeagleBoard xM A/B
+In-Reply-To: <7hiopynyt5.fsf@paris.lan>
+References: <1397574599-29573-1-git-send-email-robertcnelson@gmail.com>
+ <7hiopynyt5.fsf@paris.lan>
+Message-ID: <CAGa+x84uPwuUC61S4Wi2ymSdxVMs14pb_kCv0RhQRi-KySxSAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 24, 2014 at 07:30:48AM +0200, Michal Simek wrote:
-> On 04/24/2014 01:48 AM, Greg Kroah-Hartman wrote:
-> > On Wed, Apr 23, 2014 at 08:11:15AM +0200, Michal Simek wrote:
-> >> Hi Greg,
-> >>
-> >> this is around for a while and I would like to close it.
-> >> I have applied patches 1-7 from v3.
-> >> Patches 8 and 9 should go through arm-soc tree and I will add them
-> >> to my zynq/dt branch.
-> >>
-> >> Please apply these patches to your tree.
-> >> If this should go through different tree please let me know.
-> >>
-> >> Thanks,
-> >> Michal
-> >>
-> >>
-> >> The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
-> >>
-> >>   Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
-> >>
-> >> are available in the git repository at:
-> >>
-> >>   git://git.monstr.eu/linux-2.6-microblaze.git tags/cadence-uart-for-3.16
-> > 
-> > I can't take git pulles from random internet sites, sorry.  Just send
-> > these as email and I will queue them up.
-> 
-> I wouldn't say random. This repo is listed in my Microblaze maintainer fragment
-> and I used signed tag and you have sign my key that's why you can easily
-> check it.
+On Thu, Apr 24, 2014 at 3:32 PM, Kevin Hilman <khilman@linaro.org> wrote:
+> Robert Nelson <robertcnelson@gmail.com> writes:
+>
+>> BeagleBoard xM A/B has an inverted usb hub enable line vs the xM C
+>>
+>> Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
+>> ---
+>>  arch/arm/boot/dts/Makefile               |  1 +
+>>  arch/arm/boot/dts/omap3-beagle-xm-ab.dts | 15 +++++++++++++++
+>>  2 files changed, 16 insertions(+)
+>>  create mode 100644 arch/arm/boot/dts/omap3-beagle-xm-ab.dts
+>>
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index 35c146f..0bdeba3 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -246,6 +246,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
+>>       omap3-sbc-t3730.dtb \
+>>       omap3-devkit8000.dtb \
+>>       omap3-beagle-xm.dtb \
+>> +     omap3-beagle-xm-ab.dtb \
+>>       omap3-evm.dtb \
+>>       omap3-evm-37xx.dtb \
+>>       omap3-ldp.dtb \
+>> diff --git a/arch/arm/boot/dts/omap3-beagle-xm-ab.dts b/arch/arm/boot/dts/omap3-beagle-xm-ab.dts
+>> new file mode 100644
+>> index 0000000..9d81123
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/omap3-beagle-xm-ab.dts
+>> @@ -0,0 +1,15 @@
+>> +/*
+>> + * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +
+>> +#include "omap3-beagle-xm.dts"
+>> +
+>> +/ {
+>> +     /* HS USB Port 2 Power enable was inverted with the xM C */
+>> +     hsusb2_power: hsusb2_power_reg {
+>> +             enable-active-high;
+>
+> Missing '};' here?
+>
+> This causes build breakage in linux-omap master, which now has this
+> applied.
 
-If you have a signed key, why aren't you using git.kernel.org?  Again, I
-can't pull from any non-kernel.org sites, sorry.
+ignore this.  It's already been fixed, but was still lingering in
+Tony's master branch.
 
-> Anyway we have sent v3 patches via email twice.
-> Origin v3:
-> https://lkml.org/lkml/2014/3/12/499
-> 
-> Resent v3:
-> https://lkml.org/lkml/2014/4/4/523
-> 
-> Patches 1-7 should go through your tree.
-
-I've now applied these, sorry for the delay.
-
-greg k-h
+Kevin
