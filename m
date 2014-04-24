@@ -1,37 +1,26 @@
-From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Thu, 24 Apr 2014 12:26:39 +0200
-Subject: [PATCH 1/6] ata: ahci: add AHCI support for Berlin SoCs
-In-Reply-To: <20140424175041.0bade2d6@xhacker>
-References: <1398181105-19714-1-git-send-email-antoine.tenart@free-electrons.com>
- <1398181105-19714-2-git-send-email-antoine.tenart@free-electrons.com>
- <20140424175041.0bade2d6@xhacker>
-Message-ID: <20140424102639.GA31101@kwain>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 24 Apr 2014 11:42:32 +0100
+Subject: [PATCH V2 0/5] Huge pages for short descriptors on ARM
+In-Reply-To: <20140424103639.GC19564@arm.com>
+References: <1397648803-15961-1-git-send-email-steve.capper@linaro.org>
+ <20140424102229.GA28014@linaro.org> <20140424103639.GC19564@arm.com>
+Message-ID: <20140424104232.GK26756@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jisheng,
+On Thu, Apr 24, 2014 at 11:36:39AM +0100, Will Deacon wrote:
+> I guess I'm after some commitment that this is (a) useful to somebody and
+> (b) going to be tested regularly, otherwise it will go the way of things
+> like big-endian, where we end up carrying around code which is broken more
+> often than not (although big-endian is more self-contained).
 
-On Thu, Apr 24, 2014 at 05:50:41PM +0800, Jisheng Zhang wrote:
-> Hi Antoine,
-> 
-> On Tue, 22 Apr 2014 08:38:20 -0700
-> Antoine T?nart <antoine.tenart@free-electrons.com> wrote:
-> 
-> > +		/* CT timing fix */
-> > +		ahci_berlin_reg_set(ctrl_reg + PORT_VSR_ADDR, BIT(6) |
-> > BIT(1));
-> > +		ahci_berlin_reg_set(ctrl_reg + PORT_VSR_ADDR,
-> > +				    BIT(15) | BIT(13) | BIT(12) | BIT(11) |
-> > +				    BIT(10) | BIT(2) | BIT(1));
-> 
-> Could you please remove these code? They are not used for BG2Q, I'm sorry there's
-> such mistake in the code I provided to you ;)
+It may be something worth considering adding to my nightly builder/boot
+testing, but I suspect that's impractical as it probably requires a BE
+userspace, which would then mean that the platform can't boot LE.
 
-OK, thanks for the update!
-
-Antoine
+I suspect that we will just have to rely on BE users staying around and
+reporting problems when they occur.
 
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
