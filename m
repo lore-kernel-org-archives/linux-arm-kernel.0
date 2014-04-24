@@ -1,64 +1,59 @@
-From: shijie8@gmail.com (Huang Shijie)
-Date: Thu, 24 Apr 2014 22:27:46 +0800
-Subject: [PATCH v1 5/7] mtd: fsl-quadspi: get the dummy cycles for DDR
- Quad read from the DT property
-In-Reply-To: <201404241541.54913.marex@denx.de>
-References: <a> <201404232148.51034.marex@denx.de>
- <20140424045838.GC29664@localhost>
- <201404241541.54913.marex@denx.de>
-Message-ID: <20140424142743.GB2426@localhost.localdomain>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Thu, 24 Apr 2014 17:33:03 +0300
+Subject: [PATCH 11/23] ARM: dts: omap5-uevm.dts: add tca6424a
+In-Reply-To: <53591669.7060502@cogentembedded.com>
+References: <1398334639-14172-1-git-send-email-tomi.valkeinen@ti.com>
+ <1398334639-14172-12-git-send-email-tomi.valkeinen@ti.com>
+ <53591669.7060502@cogentembedded.com>
+Message-ID: <5359209F.7000308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 24, 2014 at 03:41:54PM +0200, Marek Vasut wrote:
-> On Thursday, April 24, 2014 at 06:58:40 AM, Huang Shijie wrote:
-> > On Wed, Apr 23, 2014 at 09:48:50PM +0200, Marek Vasut wrote:
-> > > On Wednesday, April 23, 2014 at 12:16:53 PM, Huang Shijie wrote:
-> > > > Check the "spi-nor,ddr-quad-read-dummy" DT property to get the
-> > > > dummy cycles for DDR quad read.
-> > > > 
-> > > > Signed-off-by: Huang Shijie <b32955@freescale.com>
-> > > > ---
-> > > > 
-> > > >  drivers/mtd/spi-nor/fsl-quadspi.c |    7 +++++++
-> > > >  1 files changed, 7 insertions(+), 0 deletions(-)
-> > > > 
-> > > > diff --git a/drivers/mtd/spi-nor/fsl-quadspi.c
-> > > > b/drivers/mtd/spi-nor/fsl-quadspi.c index 8d659a2..15bdeb9 100644
-> > > > --- a/drivers/mtd/spi-nor/fsl-quadspi.c
-> > > > +++ b/drivers/mtd/spi-nor/fsl-quadspi.c
-> > > > @@ -883,6 +883,7 @@ static int fsl_qspi_probe(struct platform_device
-> > > > *pdev)
-> > > > 
-> > > >  	for_each_available_child_of_node(dev->of_node, np) {
-> > > >  	
-> > > >  		const struct spi_device_id *id;
-> > > >  		char modalias[40];
-> > > > 
-> > > > +		u32 dummy = 0;
-> > > > 
-> > > >  		/* skip the holes */
-> > > >  		if (!has_second_chip)
-> > > > 
-> > > > @@ -918,6 +919,12 @@ static int fsl_qspi_probe(struct platform_device
-> > > > *pdev) if (ret < 0)
-> > > > 
-> > > >  			goto map_failed;
-> > > > 
-> > > > +		/* Set the dummy cycles for the DDR Quad Read */
-> > > > +		ret = of_property_read_u32(np, "spi-nor,ddr-quad-read-dummy",
-> > > > +				&dummy);
-> > > > +		if (!ret && dummy > 0 && dummy < 8)
-> > > > +			nor->read_dummy = dummy;
-> > > 
-> > > Is there any reason for the upper limit on number of dummy cycles ?
-> > 
-> > I actually tested two kinds of NOR flash, the Spansion s25fl128s and Micron
-> > N25q256a. The dummy cycles are all less then 8.
+On 24/04/14 16:49, Sergei Shtylyov wrote:
+> Hello.
 > 
-> I'm all for having a limit if you can justify why number 8 is the upper limit. 
-> If there's no justification for it, let's remove it.
-ok.
+> On 24-04-2014 14:17, Tomi Valkeinen wrote:
+> 
+>> omap5-uevm has a tca6424a I/O expander. Add it to the .dts file.
+> 
+>> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+>> Cc: Tony Lindgren <tony@atomide.com>
+>> ---
+>>   arch/arm/boot/dts/omap5-uevm.dts | 7 +++++++
+>>   1 file changed, 7 insertions(+)
+> 
+>> diff --git a/arch/arm/boot/dts/omap5-uevm.dts
+>> b/arch/arm/boot/dts/omap5-uevm.dts
+>> index 3b99ec25b748..9e7581eaeb23 100644
+>> --- a/arch/arm/boot/dts/omap5-uevm.dts
+>> +++ b/arch/arm/boot/dts/omap5-uevm.dts
+>> @@ -434,6 +434,13 @@
+>>       pinctrl-0 = <&i2c5_pins>;
+>>
+>>       clock-frequency = <400000>;
+>> +
+>> +    tca6424a: tca6424a at 22 {
+> 
+>    The ePAPR standard [1] says: "The name of a node should be somewhat
+> generic,
+> reflecting the function of the device and not its precise programming
+> model.
+> If appropriate, the name should be one of the following choices:
+> [...]
+>    - gpio;"
 
-thanks
-Huang Shijie
+Right. I wonder what the name should be... "gpio" is out, as the name
+should be more specific. We already have gpio1-8, which are the gpio
+banks from the SoC. It could be 'gpio9', but that makes it sound it's
+just one more SoC gpio bank. 'gpio-expander1'?
+
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140424/3bf9345d/attachment.sig>
