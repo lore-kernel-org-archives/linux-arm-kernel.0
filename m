@@ -1,64 +1,89 @@
-From: sajjan.linux@gmail.com (Vikas Sajjan)
-Date: Thu, 24 Apr 2014 17:29:57 +0530
-Subject: [PATCH 1/3] ARM: dts: Add PMU reg node to exynos4210
-In-Reply-To: <1396425778-4379-2-git-send-email-pankaj.dubey@samsung.com>
-References: <1396425778-4379-1-git-send-email-pankaj.dubey@samsung.com>
- <1396425778-4379-2-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <CAGm_ybjfxprtLUX6Vs8QVvXoMOaHez4-Og8a9n3UevibvmzbZA@mail.gmail.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Thu, 24 Apr 2014 13:03:38 +0100
+Subject: [PATCH V2 0/5] Huge pages for short descriptors on ARM
+In-Reply-To: <20140424110321.GN26756@n2100.arm.linux.org.uk>
+References: <1397648803-15961-1-git-send-email-steve.capper@linaro.org>
+ <20140424102229.GA28014@linaro.org>
+ <20140424103639.GC19564@arm.com>
+ <20140424104232.GK26756@n2100.arm.linux.org.uk>
+ <CAPvkgC3P8iZp5nECiGHdeGzRwmdh=ouiAREqKwk1tYzZxHTWvg@mail.gmail.com>
+ <20140424110321.GN26756@n2100.arm.linux.org.uk>
+Message-ID: <CAPvkgC36fLVJJtZumFO=f4eMEQvh_SjN7QDRpxT=ThfnGa1rog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Tomasz
-
-
-On Wed, Apr 2, 2014 at 1:32 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
-> This patch adds pmu regnode to exynos4210 dtsi to handle
-> PMU register access via DT.
+On 24 April 2014 12:03, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> On Thu, Apr 24, 2014 at 11:55:56AM +0100, Steve Capper wrote:
+>> On 24 April 2014 11:42, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+>> > On Thu, Apr 24, 2014 at 11:36:39AM +0100, Will Deacon wrote:
+>> >> I guess I'm after some commitment that this is (a) useful to somebody and
+>> >> (b) going to be tested regularly, otherwise it will go the way of things
+>> >> like big-endian, where we end up carrying around code which is broken more
+>> >> often than not (although big-endian is more self-contained).
+>> >
+>> > It may be something worth considering adding to my nightly builder/boot
+>> > testing, but I suspect that's impractical as it probably requires a BE
+>> > userspace, which would then mean that the platform can't boot LE.
+>> >
+>> > I suspect that we will just have to rely on BE users staying around and
+>> > reporting problems when they occur.
+>>
+>> The huge page support is for standard LE, I think Will was saying that
+>> this will be like BE if no-one uses it.
 >
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos4210.dtsi |    5 +++++
->  1 file changed, 5 insertions(+)
+> We're not saying that.
 >
-> diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-> index cacf614..0a2c0fe 100644
-> --- a/arch/arm/boot/dts/exynos4210.dtsi
-> +++ b/arch/arm/boot/dts/exynos4210.dtsi
-> @@ -81,6 +81,11 @@
->                 interrupts = <2 2>, <3 2>;
->         };
+
+Apologies, I was talking at cross-purposes.
+
+> What we're asking is this: *Who* is using hugepages today?
+
+I've asked the people who have been in touch with me to jump in to
+this discussion.
+People working on phones and servers have expressed an interest.
+
 >
-> +       pmu_system_controller: system-controller at 10020000 {
-> +               compatible = "samsung,exynos4210-pmu", "syscon";
-> +               reg = <0x10020000 0x5000>;
+> What we're then doing is comparing it to the situation we have today with
+> BE, where BE support is *always* getting broken because no one in the main
+> community tests it - not even a build test, nor a boot test which would
+> be required to find the problems that (for example) cropped up in the
+> last merge window.
 
-Can we have 2 strings as "compatible" and these 2 strings are used by
-2 different driver?
+I can appreciate that concern.
 
-Because once syscon driver gets probed, exynos-pmu.c [1] driver will
-never be probed.
-
-The new PMU driver [1] completely relies on this. With just
-exynos_defconfig, you will not notice this issue, since syscon is NOT
-enabled by exynos_defconfig. When I enabled "System Controller
-Register R/W Based on Regmap" in menuconfig, I could see PMU driver
-[1] is NEVER probed.
-
-Let me know, if I am missing something.
-
- [1] http://www.spinics.net/lists/arm-kernel/msg319750.html
-
-
-> +       };
-> +
->         pinctrl_0: pinctrl at 11400000 {
->                 compatible = "samsung,exynos4210-pinctrl";
->                 reg = <0x11400000 0x1000>;
-> --
-> 1.7.10.4
 >
+>> It's somewhat unfair to compare huge pages on short descriptors with
+>> BE. For a start, the userspace that works with LPAE will work on the
+>> short-descriptor kernel too.
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> That sounds good, but the question is how does this get tested by
+> facilities such as my build/boot system, or Olof/Kevin's system?
+> Without that, it will find itself in exactly the same situation that
+> BE is in, where problems aren't found until after updates are merged
+> into Linus' tree.
+>
+
+For minimal build/boot testing, I would recommend enabling:
+CONFIG_HUGETLBFS=y
+CONFIG_TRANSPARENT_HUGEPAGE=y
+CONFIG_TRANSPARENT_HUGEPAGE_MADVISE=y
+
+That should not have any significant effect on the running system (one
+has to opt-in to use HugeTLB or THP in this case), so could be put in
+a defconfig.
+
+For actual usage testing, typically one would use the upstream
+libhugelbfs test suite as it is very good at finding problems, is kept
+up to date, and is easy to automate and interpret the results. For
+THP, I usually run a kernel build repeatedly with
+/sys/kernel/mm/transparent_hugepage/enabled set to always along with
+LTP's mm tests.
+
+We also run continuous integration tests within Linaro against Linaro
+kernels, and the libhugetlbfs test suite is one of our tests. If it
+helps things, I can set up automated huge page tests within Linaro and
+pull in another branch?
+
+Cheers,
+--
+Steve
