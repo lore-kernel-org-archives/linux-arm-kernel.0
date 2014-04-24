@@ -1,49 +1,42 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu, 24 Apr 2014 17:00:46 +0100
-Subject: [RESEND PATCH v5 5/5] arm: Fix DEBUG_LL for multi-platform kernels
- (without PL01X)
-In-Reply-To: <1398355246-29571-1-git-send-email-daniel.thompson@linaro.org>
-References: <1396886056-18132-1-git-send-email-daniel.thompson@linaro.org>
- <1398355246-29571-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1398355246-29571-6-git-send-email-daniel.thompson@linaro.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 24 Apr 2014 11:06:33 -0500
+Subject: [PATCH V2 00/19] bus: omap_l3_noc: driver cleanups and support
+ for DRA7/AM4372
+In-Reply-To: <20140424155403.GA29229@ti.com>
+References: <1397492726-17203-1-git-send-email-nm@ti.com>
+ <1397767775-10965-1-git-send-email-nm@ti.com> <20140424155403.GA29229@ti.com>
+Message-ID: <53593689.3060801@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When building a multi_v7_defconfig kernel it is not possible to configure
-DEBUG_LL to use any serial device except a ARM Primecell PL01X, or more
-accurately and worse, it is possible to configure a different serial
-device but KConfig does not honour this request. In fact this also
-overrides the user selection for some of the single platform kernels, for
-example I don't think DEBUG_LL can be targetted at ICE or semihosted
-supervisor for ARCH_VERSATILE.
+On 04/24/2014 10:54 AM, Darren Etheridge wrote:
+> Nishanth,
+> 
+> Nishanth Menon <nm@ti.com> wrote on Thu [2014-Apr-17 15:49:16 -0500]:
+>>
+>> V2 introduces the following changes:
+>> 	- Additional bug fix detected during additional testing (all tests complete now). patch #12
+>> 	- reordering of patches to order logical changes and reduce code churn.
+>> 	- interrupt handler split up and additional information now provided in log to aid debug when error occur
+>> 	- patches are marked where new (12,14,15,16).
+>> 	- DRA7 updated from master document for all DRA7 variants.
+>>
+>> This series cleansup omap_l3_noc driver and adds data to support DRA7
+>> and AM437x SoCs.
+>>
+> This L3 noc driver patch series is working great for me and has already
+> flagged a very difficult to detect problem in a driver I am working on
+> with a DMA access to an invalid memory address on DRA7.
 
-This happens because DEBUG_UART_PL01X is automatically enabled by
-some architectures and this means user decisions made regarding
-the DEBUG_LL backend will be overriden. Problem is fixed by removing the
-automatic enabling of this option.
+Glad it was of use. All the more reason why this should be in upstream
+kernel and not just in "evil vendor" kernel.
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
----
- arch/arm/Kconfig.debug | 7 +------
- 1 file changed, 1 insertion(+), 6 deletions(-)
+> 
+> Tested-by: Darren Etheridge <detheridge@ti.com>
+> 
+Thanks. will pick this up for v3 post.
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 2612dd0..ca9a01c 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -996,12 +996,7 @@ config DEBUG_LL_INCLUDE
- 
- # Compatibility options for PL01x
- config DEBUG_UART_PL01X
--	def_bool ARCH_EP93XX || \
--		ARCH_INTEGRATOR || \
--		ARCH_SPEAR3XX || \
--		ARCH_SPEAR6XX || \
--		ARCH_SPEAR13XX || \
--		ARCH_VERSATILE
-+	bool
- 
- # Compatibility options for 8250
- config DEBUG_UART_8250
+
 -- 
-1.9.0
+Regards,
+Nishanth Menon
