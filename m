@@ -1,75 +1,117 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 24 Apr 2014 09:37:03 +0200
-Subject: [PATCH v6 0/6] ARM: vdso gettimeofday using generic timer
- architecture
-In-Reply-To: <20140423215040.GC26756@n2100.arm.linux.org.uk>
-References: <cover.1398213562.git.nathan_lynch@mentor.com>
- <20140423215040.GC26756@n2100.arm.linux.org.uk>
-Message-ID: <CAKv+Gu-jFAo8JKqz3XHx348pSUBWaDy48RryKwgsxdM15jeAVw@mail.gmail.com>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Thu, 24 Apr 2014 13:14:44 +0530
+Subject: [Patch v2 4/4] mcpm: exynos: populate suspend and powered_up
+ callbacks
+In-Reply-To: <20140423160256.GA1243@e102568-lin.cambridge.arm.com>
+References: <1398080958-21677-5-git-send-email-chander.kashyap@linaro.org>
+ <1398245154-18771-1-git-send-email-chander.kashyap@linaro.org>
+ <1398245154-18771-5-git-send-email-chander.kashyap@linaro.org>
+ <20140423160256.GA1243@e102568-lin.cambridge.arm.com>
+Message-ID: <CANuQgHGiNqJHdB70fGeN_ueVDALM=aRPbku91XjO82Cw0uEYEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 April 2014 23:50, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> On Tue, Apr 22, 2014 at 07:48:51PM -0500, Nathan Lynch wrote:
->> - Build vdso.so with -lgcc: calls to __lshrdi3, __divsi3 sometimes
->>   emitted (especially with -Os).  Override certain libgcc functions to
->>   prevent undefined symbols.
+On 23 April 2014 21:32, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+> [added Nico in CC]
+>
+> On Wed, Apr 23, 2014 at 10:25:54AM +0100, Chander Kashyap wrote:
+>> In order to support cpuidle through mcpm, suspend and powered-up
+>> callbacks are required in mcpm platform code.
+>> Hence populate the same callbacks.
+>>
+>> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+>> Signed-off-by: Chander Kashyap <k.chander@samsung.com>
+>> ---
+>> changes in v2:
+>>       1. Fixed typo: enynos_pmu_cpunr to exynos_pmu_cpunr
+>>
+>>  arch/arm/mach-exynos/mcpm-exynos.c |   53 ++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 53 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
+>> index 6c74c82..d53f597 100644
+>> --- a/arch/arm/mach-exynos/mcpm-exynos.c
+>> +++ b/arch/arm/mach-exynos/mcpm-exynos.c
+>> @@ -272,10 +272,63 @@ static int exynos_power_down_finish(unsigned int cpu, unsigned int cluster)
+>>       return 0; /* success: the CPU is halted */
+>>  }
+>>
+>> +static void enable_coherency(void)
+>> +{
+>> +     unsigned long v, u;
+>> +
+>> +     asm volatile(
+>> +             "mrc    p15, 0, %0, c1, c0, 1\n"
+>> +             "orr    %0, %0, %2\n"
+>> +             "ldr    %1, [%3]\n"
+>> +             "and    %1, %1, #0\n"
+>> +             "orr    %0, %0, %1\n"
+>> +             "mcr    p15, 0, %0, c1, c0, 1\n"
+>> +             : "=&r" (v), "=&r" (u)
+>> +             : "Ir" (0x40), "Ir" (S5P_INFORM0)
+>> +             : "cc");
+>> +}
+>> +
+>> +void exynos_powered_up(void)
+>> +{
+>> +     unsigned int mpidr, cpu, cluster;
+>> +
+>> +     mpidr = read_cpuid_mpidr();
+>> +     cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+>> +     cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+>> +
+>> +     arch_spin_lock(&exynos_mcpm_lock);
+>> +     if (cpu_use_count[cpu][cluster] == 0)
+>> +             cpu_use_count[cpu][cluster] = 1;
+>> +     arch_spin_unlock(&exynos_mcpm_lock);
+>> +}
+>> +
+>> +static void exynos_suspend(u64 residency)
+>> +{
+>> +     unsigned int mpidr, cpunr;
+>> +
+>> +     mpidr = read_cpuid_mpidr();
+>> +     cpunr = exynos_pmu_cpunr(mpidr);
+>> +
+>> +     __raw_writel(virt_to_phys(mcpm_entry_point), REG_ENTRY_ADDR);
+>> +
+>> +     exynos_power_down();
+>> +
+>> +     /*
+>> +      * Execution reaches here only if cpu did not power down.
+>> +      * Hence roll back the changes done in exynos_power_down function.
+>> +     */
+>> +     __raw_writel(EXYNOS_CORE_LOCAL_PWR_EN,
+>> +                     EXYNOS_ARM_CORE_CONFIGURATION(cpunr));
+>> +     set_cr(get_cr() | CR_C);
+>> +     enable_coherency();
+>
+> This is wrong:
+>
+> 1) MCPM would eventually reboot the CPU in question if the suspend call
+>    returns (and restore SCTLR and ACTLR in cpu_resume), so there is 0 point
+>    in doing that here.
 
-After reading Russell's concerns below, I had a quick play with these
-patches, and I noticed that the libgcc dependencies are actually only
-present when compiling -Os. However, with normal optimization enabled
-(which most people are using anyway), you don't need libgcc at all. So
-why not override -O2 optimization for vdso.so, and be done with it?
+Yes i missed that. I will correct it.
 
-WIth -Os:
+> 2) The core would have executed out of coherency for a "while" so the
+>    tlbs could be stale and you do not invalidate them. But given (1), (2)
+>    becomes just informational. The register write must be executed
+>    though (I guess...). Now, on restoring the SMP bit in cpu_resume
+>    (errata 799270) I need to verify this is safe and get back to you.
 
-Archive member included because of file (symbol)
+Ok
 
-/usr/lib/gcc-cross/arm-linux-gnueabihf/4.8/sf/libgcc.a(_divsi3.o)
-                              arch/arm/kernel/vdso/vgettimeofday.o
-(__aeabi_idiv)
-/usr/lib/gcc-cross/arm-linux-gnueabihf/4.8/sf/libgcc.a(_lshrdi3.o)
-                              arch/arm/kernel/vdso/vgettimeofday.o
-(__aeabi_llsr)
+Thanks Lorenzo.
 
-Without CONFIG_OPTIMIZE_FOR_SIZE, no archive members are included at all.
+
+>
+> Cheers,
+> Lorenzo
+>
+
+
 
 -- 
-Ard.
-
-
-
->
-> This rather worries me.
->
-> For a start, the toolchain I use for cross-building kernels (which I
-> build myself from gnu.org source) never has a libgcc with it - that's
-> because in order to build libgcc, I need a libc, and I don't want to
-> have a full cross environment on my machine just to build the soddin
-> compiler.
->
-> So, I want to be able to build kernels without having a libgcc sitting
-> around.
->
-> Second point here is that we have multiple different versions of
-> userspace crap with multiple different ABIs.  Think about armel vs
-> armhf for starters.  There's at least *three* different ELF formats -
-> OABI, EABI armel, EABI armhf.  Okay, we can forget about OABI, but
-> what about the other two?  What about single zImage where you may
-> want a single kernel image which can run on either flavour?
->
-> It is not possible to build a single .so which is compatible with
-> both - an armhf dynamic linker rejects armel outright, and vice versa.
->
-> This, to me, sounds like one big fail... and as far as I'm aware, the
-> kernel has no idea itself which flavour of userspace is running, so it
-> has no idea which flavour of VDSO to offer (if it even had both.)
->
-> --
-> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-> improving, and getting towards what was expected from it.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+with warm regards,
+Chander Kashyap
