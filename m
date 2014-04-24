@@ -1,69 +1,129 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 24 Apr 2014 16:37:32 -0700
-Subject: [PATCH] ARM: dts: Add support for the BeagleBoard xM A/B
-In-Reply-To: <CAGa+x84uPwuUC61S4Wi2ymSdxVMs14pb_kCv0RhQRi-KySxSAw@mail.gmail.com>
-References: <1397574599-29573-1-git-send-email-robertcnelson@gmail.com>
- <7hiopynyt5.fsf@paris.lan>
- <CAGa+x84uPwuUC61S4Wi2ymSdxVMs14pb_kCv0RhQRi-KySxSAw@mail.gmail.com>
-Message-ID: <20140424233731.GA4811@atomide.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 24 Apr 2014 18:54:10 -0500
+Subject: [PATCH 1/3] ARM: hackup pcibios support for commmon bridge code
+In-Reply-To: <20140424232000.GN29593@google.com>
+References: <1395960398-4238-1-git-send-email-robherring2@gmail.com>
+ <1395960398-4238-2-git-send-email-robherring2@gmail.com>
+ <20140424232000.GN29593@google.com>
+Message-ID: <CAL_JsqKCdLa8N6J-z7GpKw3ffOdugTwiz-bJn4SxyWp7F2V0Kw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@linaro.org> [140424 16:22]:
-> On Thu, Apr 24, 2014 at 3:32 PM, Kevin Hilman <khilman@linaro.org> wrote:
-> > Robert Nelson <robertcnelson@gmail.com> writes:
-> >
-> >> BeagleBoard xM A/B has an inverted usb hub enable line vs the xM C
-> >>
-> >> Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
-> >> ---
-> >>  arch/arm/boot/dts/Makefile               |  1 +
-> >>  arch/arm/boot/dts/omap3-beagle-xm-ab.dts | 15 +++++++++++++++
-> >>  2 files changed, 16 insertions(+)
-> >>  create mode 100644 arch/arm/boot/dts/omap3-beagle-xm-ab.dts
-> >>
-> >> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> >> index 35c146f..0bdeba3 100644
-> >> --- a/arch/arm/boot/dts/Makefile
-> >> +++ b/arch/arm/boot/dts/Makefile
-> >> @@ -246,6 +246,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
-> >>       omap3-sbc-t3730.dtb \
-> >>       omap3-devkit8000.dtb \
-> >>       omap3-beagle-xm.dtb \
-> >> +     omap3-beagle-xm-ab.dtb \
-> >>       omap3-evm.dtb \
-> >>       omap3-evm-37xx.dtb \
-> >>       omap3-ldp.dtb \
-> >> diff --git a/arch/arm/boot/dts/omap3-beagle-xm-ab.dts b/arch/arm/boot/dts/omap3-beagle-xm-ab.dts
-> >> new file mode 100644
-> >> index 0000000..9d81123
-> >> --- /dev/null
-> >> +++ b/arch/arm/boot/dts/omap3-beagle-xm-ab.dts
-> >> @@ -0,0 +1,15 @@
-> >> +/*
-> >> + * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
-> >> + *
-> >> + * This program is free software; you can redistribute it and/or modify
-> >> + * it under the terms of the GNU General Public License version 2 as
-> >> + * published by the Free Software Foundation.
-> >> + */
-> >> +
-> >> +#include "omap3-beagle-xm.dts"
-> >> +
-> >> +/ {
-> >> +     /* HS USB Port 2 Power enable was inverted with the xM C */
-> >> +     hsusb2_power: hsusb2_power_reg {
-> >> +             enable-active-high;
-> >
-> > Missing '};' here?
-> >
-> > This causes build breakage in linux-omap master, which now has this
-> > applied.
-> 
-> ignore this.  It's already been fixed, but was still lingering in
-> Tony's master branch.
+On Thu, Apr 24, 2014 at 6:20 PM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+> On Thu, Mar 27, 2014 at 05:46:36PM -0500, Rob Herring wrote:
+>> From: Rob Herring <robh@kernel.org>
+>>
+>> Signed-off-by: Rob Herring <robh@kernel.org>
+>> ---
+>>  arch/arm/kernel/bios32.c | 63 ++++++++++++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 63 insertions(+)
+>>
+>> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+>> index 317da88..31ec14a 100644
+>> --- a/arch/arm/kernel/bios32.c
+>> +++ b/arch/arm/kernel/bios32.c
+>> @@ -11,6 +11,7 @@
+>>  #include <linux/slab.h>
+>>  #include <linux/init.h>
+>>  #include <linux/io.h>
+>> +#include <linux/of_pci.h>
+>>
+>>  #include <asm/mach-types.h>
+>>  #include <asm/mach/map.h>
+>> @@ -337,6 +338,15 @@ void pcibios_fixup_bus(struct pci_bus *bus)
+>>       list_for_each_entry(dev, &bus->devices, bus_list) {
+>>               u16 cmd;
+>>
+>> +             /* Ignore fully discovered devices */
+>> +             if (dev->is_added)
+>> +                     continue;
+>> +
+>> +             set_dev_node(&dev->dev, pcibus_to_node(dev->bus));
+>
+> We already do this in pci_device_add(); why do we need it here, too?
 
-Oops, sorry yeah looks like I forgot to remerge the updated fixes
-branch. Will update it today.
+Because it was in the arm64 code. I'm not really sure.
 
-Tony
+>> +             /* Read default IRQs and fixup if necessary */
+>> +             dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+>
+> Could this be done in pcibios_enable_device() or some other per-device
+> interface()?  I'd like to get rid of pcibios_fixup_bus() eventually.
+
+Probably. This should return NO_IRQ in the !OF case. We'd need to make
+sure that works.
+
+I had a loop at pcibios_fixup_bus across architectures and could make
+no sense of why things were done in here. It all seemed a bit random
+and left me with questions like shouldn't something always be needed.
+Probably a lot of pieces are redundant now that didn't use to be. It
+needs someone that knows more about PCI than me to look at.
+
+>>               pci_read_config_word(dev, PCI_COMMAND, &cmd);
+>>               cmd |= features;
+>>               pci_write_config_word(dev, PCI_COMMAND, cmd);
+>> @@ -681,3 +691,56 @@ void __init pci_map_io_early(unsigned long pfn)
+>>       pci_io_desc.pfn = pfn;
+>>       iotable_init(&pci_io_desc, 1);
+>>  }
+>> +
+>> +struct ioresource {
+>> +     struct list_head list;
+>> +     phys_addr_t start;
+>> +     resource_size_t size;
+>> +};
+>> +
+>> +static LIST_HEAD(io_list);
+>> +
+>> +int pci_register_io_range(phys_addr_t address, resource_size_t size)
+>> +{
+>> +     struct ioresource *res;
+>> +     resource_size_t allocated_size = 0;
+>> +
+>> +     /* find if the range has not been already allocated */
+>> +     list_for_each_entry(res, &io_list, list) {
+>> +             if (address >= res->start &&
+>> +                     address + size <= res->start + size)
+>> +                     return 0;
+>> +             allocated_size += res->size;
+>> +     }
+>> +
+>> +     /* range not already registered, check for space */
+>> +     if (allocated_size + size > IO_SPACE_LIMIT)
+>> +             return -E2BIG;
+>> +
+>> +     /* add the range in the list */
+>> +     res = kzalloc(sizeof(*res), GFP_KERNEL);
+>> +     if (!res)
+>> +             return -ENOMEM;
+>> +     res->start = address;
+>> +     res->size = size;
+>> +
+>> +     list_add_tail(&res->list, &io_list);
+>> +
+>> +     return 0;
+>> +}
+>> +EXPORT_SYMBOL_GPL(pci_register_io_range);
+>> +
+>> +unsigned long pci_address_to_pio(phys_addr_t address)
+>> +{
+>> +     struct ioresource *res;
+>> +
+>> +     list_for_each_entry(res, &io_list, list) {
+>> +             if (address >= res->start &&
+>> +                     address < res->start + res->size) {
+>> +                     return res->start - address;
+>> +             }
+>> +     }
+>> +
+>> +     return (unsigned long)-1;
+>> +}
+>> +EXPORT_SYMBOL_GPL(pci_address_to_pio);
+>
+> ISTR some discussion about this, so maybe this has already been addressed,
+> but it doesn't seem right to export generically-named symbols like these
+> from the ARM arch code.  And they don't look very ARM-specific.
+
+Right, I expect these to go away with Liviu's the next version.
+
+Rob
