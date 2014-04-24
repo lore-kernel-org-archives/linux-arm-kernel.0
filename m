@@ -1,39 +1,35 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Thu, 24 Apr 2014 13:17:12 +0300
-Subject: [PATCH 16/23] OMAPDSS: DSI: Add OMAP5 DSI module IDs
+Date: Thu, 24 Apr 2014 13:17:03 +0300
+Subject: [PATCH 07/23] ARM: OMAP: add detection of omap5-dss
 In-Reply-To: <1398334639-14172-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1398334639-14172-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1398334639-14172-17-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1398334639-14172-8-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add OMAP5 DSI module ID support to the OMAP DSI driver.
+Add detection of omap5-dss nodes so that the related devices get
+initialized.
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
 ---
- drivers/video/fbdev/omap2/dss/dsi.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/mach-omap2/display.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/video/fbdev/omap2/dss/dsi.c b/drivers/video/fbdev/omap2/dss/dsi.c
-index 57f120896b43..a888d28fd055 100644
---- a/drivers/video/fbdev/omap2/dss/dsi.c
-+++ b/drivers/video/fbdev/omap2/dss/dsi.c
-@@ -5733,9 +5733,16 @@ static const struct dsi_module_id_data dsi_of_data_omap4[] = {
- 	{ },
- };
+diff --git a/arch/arm/mach-omap2/display.c b/arch/arm/mach-omap2/display.c
+index 974461441fc3..74869326dadc 100644
+--- a/arch/arm/mach-omap2/display.c
++++ b/arch/arm/mach-omap2/display.c
+@@ -665,6 +665,10 @@ struct device_node * __init omapdss_find_dss_of_node(void)
+ 	if (node)
+ 		return node;
  
-+static const struct dsi_module_id_data dsi_of_data_omap5[] = {
-+	{ .address = 0x58004000, .id = 0, },
-+	{ .address = 0x58009000, .id = 1, },
-+	{ },
-+};
++	node = of_find_compatible_node(NULL, NULL, "ti,omap5-dss");
++	if (node)
++		return node;
 +
- static const struct of_device_id dsi_of_match[] = {
- 	{ .compatible = "ti,omap3-dsi", .data = dsi_of_data_omap3, },
- 	{ .compatible = "ti,omap4-dsi", .data = dsi_of_data_omap4, },
-+	{ .compatible = "ti,omap5-dsi", .data = dsi_of_data_omap5, },
- 	{},
- };
+ 	return NULL;
+ }
  
 -- 
 1.9.1
