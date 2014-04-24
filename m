@@ -1,83 +1,51 @@
-From: dietmar.eggemann@arm.com (Dietmar Eggemann)
-Date: Thu, 24 Apr 2014 13:48:53 +0100
-Subject: [PATCH v4 5/5] sched: ARM: create a dedicated scheduler topology
- table
-In-Reply-To: <CAKfTPtAOZqnP=sWeJuqFAqrGT8vLQZKj+tpqiwOTG37paXoGjg@mail.gmail.com>
-References: <1397209481-28542-1-git-send-email-vincent.guittot@linaro.org>
- <1397209481-28542-6-git-send-email-vincent.guittot@linaro.org>
- <5357A802.1030804@arm.com>
- <CAKfTPtDnw-OZZekdE3oNGS11m6dfpS4veMNZ_Bezs-Lm7zn6QQ@mail.gmail.com>
- <5357DBA5.1010106@arm.com>
- <CAKfTPtAOZqnP=sWeJuqFAqrGT8vLQZKj+tpqiwOTG37paXoGjg@mail.gmail.com>
-Message-ID: <53590835.9090803@arm.com>
+From: julien.grall@linaro.org (Julien Grall)
+Date: Thu, 24 Apr 2014 13:49:09 +0100
+Subject: [PATCH] arm/xen: Remove definiition of virt_to_pfn in
+ asm/xen/page.h
+In-Reply-To: <535901F0.3010908@citrix.com>
+References: <1397836474-10478-1-git-send-email-julien.grall@linaro.org>
+ <535901F0.3010908@citrix.com>
+Message-ID: <53590845.1090405@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/04/14 08:30, Vincent Guittot wrote:
-> On 23 April 2014 17:26, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
->> On 23/04/14 15:46, Vincent Guittot wrote:
->>> On 23 April 2014 13:46, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
->>>> Hi,
+Hi David,
 
-[...]
-
-> 
-> More than the flag that is used for the example, it's about the
-> cpumask which are inconsistent across CPUs for the same level and the
-> build_sched_domain sequence rely on this consistency to build
-> sched_group
-
-Now I'm lost here. I thought so far that by specifying different cpu
-masks per CPU in an sd level, we get the sd level folding functionality
-in sd degenerate?
-
-We discussed this here for an example on TC2 for the GMC level:
-https://lkml.org/lkml/2014/3/21/126
-
-Back than I had
-  CPU0: cpu_corepower_mask=0-1
-  CPU2: cpu_corepower_mask=2
-so for GMC level the cpumasks are inconsistent across CPUs and it worked.
-
-The header of '[PATCH v4 1/5] sched: rework of sched_domain topology
-definition' mentions only the requirement "Then, each level must be a
-subset on the next one" and this one I haven't broken w/ my
-GMC/MC/GDIE/DIE set-up.
-
-Do I miss something else here?
-
-> 
->> Essentially what I want to do is bind an SD_SHARE_*FOO* flag to the GDIE
->> related sd's of CPU2/3/4 and not to the DIE related sd's of CPU0/1.
+On 04/24/2014 01:22 PM, David Vrabel wrote:
+> On 18/04/14 16:54, Julien Grall wrote:
+>> virt_to_pfn has been defined in asm/memory.h by the commit e26a9e0 "ARM: Better
+>> virt_to_page() handling"
 >>
->> I thought so far that I can achieve that by getting rid of GDIE sd level
->> for CPU0/1 simply by choosing the cpu_foo_mask() function in such a way
->> that it returns the same cpu mask as its child sd level (MC) and of DIE
->> sd level for CPU2/3/4 because it returns the same cpu mask as its child
->> sd level (GDIE) related cpu mask function. This will let sd degenerate
->> do it's job of folding sd levels which it does. The only problem I have
->> is that the groups are not created correctly any more.
+>> This will result of a compilation warning when CONFIG_XEN is enabled.
 >>
->> I don't see right now how the flag SD_SHARE_FOO affects the code in
->> get_group()/build_sched_groups().
+>> arch/arm/include/asm/xen/page.h:80:0: warning: "virt_to_pfn" redefined [enabled by default]
+>>  #define virt_to_pfn(v)          (PFN_DOWN(__pa(v)))
+>>  ^
+>> In file included from arch/arm/include/asm/page.h:163:0,
+>>                  from arch/arm/include/asm/xen/page.h:4,
+>>                  from include/xen/page.h:4,
+>>                  from arch/arm/xen/grant-table.c:33:
 >>
->> Think of SD_SHARE_FOO of something I would like to have for all sd's of
->> CPU's of cluster 1 (CPU2/3/4) and not on cluster 0 (CPU0/1) in the sd
->> level where each CPU sees two groups (group0 containing CPU0/1 and
->> group1 containing CPU2/3/4 or vice versa) (GDIE/DIE) .
+>> The definition in memory.h is nearly the same (it directly expand PFN_DOWN),
+>> so we can safely drop virt_to_pfn in xen include.
 > 
-> I'm not sure that's it's feasible because it's not possible from a
-> topology pov to have different flags if the span include all cpus.
-> Could you give us more details about what you want to achieve with
-> this flag ?
+> 
+> This breaks the arm build for me.
+> 
+> /local/davidvr/work/k.org/tip/drivers/block/xen-blkfront.c: In function
+> ?setup_blkring?:
+> /local/davidvr/work/k.org/tip/drivers/block/xen-blkfront.c:1236:2:
+> error: implicit declaration of function ?virt_to_pfn?
+> [-Werror=implicit-function-declaration]
+>   err = xenbus_grant_ring(dev, virt_to_mfn(info->ring.sring));
+>   ^
 
-IMHO, the flag is not important for this discussion.  OTHA, information
-like you can't use sd degenerate functionality to fold adjacent sd
-levels (GFOO/FOO) on sd level which span all CPUs would be.  I want to
-make sure we understand what are the limitations to use folding of
-adjacent sd levels based on per-cpu differences in the return value of
-cpu_mask functions.
+I don't have any issue to build the following branch with this patch on:
+	- v3.15-rc2
+	- xentip master
+	- xentip for-linus-3.16
 
--- Dietmar
+Regards,
 
-[...]
+-- 
+Julien Grall
