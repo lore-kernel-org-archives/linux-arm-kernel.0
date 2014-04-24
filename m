@@ -1,93 +1,27 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 24 Apr 2014 13:34:21 -0500
-Subject: [PATCH 2/2] ARM: OMAP2+: fix dpll round_rate() to actually round
-In-Reply-To: <530DD33A.20005@ti.com>
-References: <1389944699-27962-1-git-send-email-tomi.valkeinen@ti.com>
- <1389944699-27962-3-git-send-email-tomi.valkeinen@ti.com>
- <alpine.DEB.2.02.1402191928480.8777@utopia.booyaka.com>
- <530DD33A.20005@ti.com>
-Message-ID: <20140424183420.GE4659@saruman.home>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Thu, 24 Apr 2014 13:41:45 -0500
+Subject: [PATCH v6 0/6] ARM: vdso gettimeofday using generic timer
+ architecture
+In-Reply-To: <20140424162229.GU26756@n2100.arm.linux.org.uk>
+References: <cover.1398213562.git.nathan_lynch@mentor.com>
+ <20140423215040.GC26756@n2100.arm.linux.org.uk> <535926EF.20805@mentor.com>
+ <20140424162229.GU26756@n2100.arm.linux.org.uk>
+Message-ID: <53595AE9.5000506@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 26, 2014 at 01:42:50PM +0200, Tomi Valkeinen wrote:
-> On 19/02/14 21:49, Paul Walmsley wrote:
-> > On Fri, 17 Jan 2014, Tomi Valkeinen wrote:
-> > 
-> >> omap2_dpll_round_rate() doesn't actually round the given rate, even if
-> >> the name and the description so hints. Instead it only tries to find an
-> >> exact rate match, or if that fails, return ~0 as an error.
-> > 
-> > In the past, we had "rate tolerance" code, which allowed the clock code to 
-> > return an approximate rate within some margin.  See for example commit 
-> > 241d3a8dca239610d3d991bf58d4fe38c2d86fd5 ("OMAP2+: clock: remove the DPLL 
-> > rate tolerance code").  The rate tolerance was set at compile-time, but it 
-> > was set on a per-PLL basis, which in theory allowed PLLs responsible for 
-> > audio, etc. to have a very low rate tolerance, but PLLs that only drove 
-> > internal functional blocks to have a high rate tolerance.  
-> > 
-> > Part of the reason why this was removed is because some of the TI hardware 
-> > guys didn't want any PLL rates used that were not explicitly 
-> > characterized.
+On 04/24/2014 11:22 AM, Russell King - ARM Linux wrote:
 > 
-> Ok.
-> 
-> >> What this basically means is that the user of the clock needs to know
-> >> what rates the dpll can support, which obviously isn't right.
-> > 
-> > In principle I agree with you, but I'm not sure that this rate rounding 
-> > function is the solution.
-> > 
-> >> This patch adds a simple method of rounding: during the iteration, the 
-> >> code keeps track of the closest rate match. If no exact match is found, 
-> >> the closest is returned.
-> > 
-> > So that's one possible rounding policy; maybe it works fine for a display 
-> > interface PLL, at least for some values of "closest rate".  But another 
-> > might be "only allow a selection from a set of pre-determined rates 
-> > characterized by the silicon validation team".  Or another rounding 
-> > function might need to select a more distant rate that minimizes jitter, 
-> > EMI, or power consumption.  
-> > 
-> > Seems to me that there needs to be some way for a clock user to 
-> > communicate its requirements along these lines to the clock framework for 
-> > use by the rate rounding code.  At the very least, some kind of [min, max] 
-> > interval seems appropriate.
-> > 
-> > Also I've often thought that it would be useful for your purposes to be 
-> > able to query a clock to return a list or some other parametric 
-> > description of the rates that it can provide.
-> 
-> I fully agree with all you said above.
-> 
-> However, I'm not trying to fix the omap clock framework here =). I just
-> want the displays to work properly in mainline kernel.
-> 
-> So, presuming this was merged, and gets display working, how would it
-> affect other users compared to the current state? The patched version
-> returns the same rate than before, if an exact match is found. Rounded
-> rate is only returned as a last option, instead of an error.
-> 
-> Do we have drivers that handle that error somehow, and then do something
-> (what?) to get some other rate?
-> 
-> If the clock path in question also has a divider component after the
-> pll, using clk-divider.c (which I guess is used in all/most of the
-> DPLLs?), things would go badly wrong if there's an error, as
-> clk-divider.c doesn't handle it.
-> 
-> So I can make no guarantees, but I have a hunch that all current users
-> ask for an exact clock, in which case this patch doesn't change their
-> behavior, except for display which it fixes.
+> The obvious question therefore is, if the dynamic linker throws its toys
+> out if it encounters a wrong-float-ABI library during a standard library
+> search, why would it _not_ throw its toys out on dlsym.  The difference
+> in behaviour would to me seem to be a bug - both should behave the same,
+> though of course not throwing its toys out, but instead producing an error
+> _or_ accepting the difference.  Given that it's an ABI difference,
+> rejecting the library is the only sane approach.
 
-no further updates here ? Display is still broken on BBB :-(
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140424/cc3d490e/attachment.sig>
+The VDSO would appear to not be subject to the same validation that a
+file-based DSO is.  I'll dig deeper into this to understand exactly
+what's going on, but I have a guess as to why the VDSO happens to work
+with armhf userspace: the calling convention is different only for
+floating point arguments, and there are none in the VDSO routines.
