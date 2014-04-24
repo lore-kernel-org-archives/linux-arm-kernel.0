@@ -1,46 +1,65 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 24 Apr 2014 12:48:41 +0200
-Subject: [PATCH 2/4] ARM: S3C24XX: trim down debug uart handling
-In-Reply-To: <20140424103455.GJ26756@n2100.arm.linux.org.uk>
-References: <1544889.hRy2JpKRQe@phil> <1410234.AYxfyBcLWB@phil>
- <20140424103455.GJ26756@n2100.arm.linux.org.uk>
-Message-ID: <24114123.4LqcQi8gAH@phil>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 24 Apr 2014 11:47:37 +0100
+Subject: [PATCH] ARM: mm: dma: Update coherent streaming apis with
+ missing memory barrier
+In-Reply-To: <20140423190448.GB26756@n2100.arm.linux.org.uk>
+References: <1398103390-31968-1-git-send-email-santosh.shilimkar@ti.com>
+ <20140423171727.GK5649@arm.com>
+ <20140423183742.GK24070@n2100.arm.linux.org.uk>
+ <6414220.SShvCHLvZQ@wuerfel>
+ <20140423190448.GB26756@n2100.arm.linux.org.uk>
+Message-ID: <20140424104737.GE8521@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 24. April 2014, 11:34:55 schrieb Russell King - ARM Linux:
-> On Thu, Apr 24, 2014 at 12:24:31PM +0200, Heiko St?bner wrote:
-> > +choice
-> > +	prompt "S3C24XX low-level debugging port type"
-> > +	depends on DEBUG_LL && ARCH_S3C24XX
-> > +
-> > +	config DEBUG_S3C24XX_UART_S3C2440
-> > +		bool "S3C2440 uart type"
-> > +		help
-> > +		  Select this if you're debugging S3C2416, S3C2440, S3C2442,
-> > +		  S3C2443 or S3C2450 SoCs.
-> > +
-> > +	config DEBUG_S3C24XX_UART_S3C2410
-> > +		bool "S3C2410 uart type"
-> > +		help
-> > +		  Select this if you're debugging S3C2410 or S3C2412 SoCs.
-> > +endchoice
+On Wed, Apr 23, 2014 at 08:04:48PM +0100, Russell King - ARM Linux wrote:
+> On Wed, Apr 23, 2014 at 08:58:05PM +0200, Arnd Bergmann wrote:
+> > On Wednesday 23 April 2014 19:37:42 Russell King - ARM Linux wrote:
+> > > On Wed, Apr 23, 2014 at 06:17:27PM +0100, Will Deacon wrote:
+> > > > On Wed, Apr 23, 2014 at 05:02:16PM +0100, Catalin Marinas wrote:
+> > > > > In the I/O coherency case, I would say it is the responsibility of the
+> > > > > device/hardware to ensure that the data is visible to all observers
+> > > > > (CPUs) prior to issuing a interrupt for DMA-ready. Looking at the mvebu
+> > > > > code, I think it covers such scenario from-device or bidirectional
+> > > > > scenarios.
+> > > > > 
+> > > > > Maybe Santosh still has a point  but I don't know what the right
+> > > > > barrier would be here. And I really *hate* per-SoC/snoop unit barriers
+> > > > > (I still hope a dsb would do the trick on newer/ARMv8 systems).
+> > > > 
+> > > > If you have device interrupts which are asynchronous to memory coherency,
+> > > > then you're in a world of pain. I can't think of a generic (architected)
+> > > > solution to this problem, unfortunately -- it's going to be both device
+> > > > and interconnect specific. Adding dsbs doesn't necessarily help at all.
+> > > 
+> > > Think, network devices with NAPI handling.  There, we explicitly turn
+> > > off the device's interrupt, and switch to software polling for received
+> > > packets.
+> > >
+> > > The memory for the packets has already been mapped, and we're unmapping
+> > > the buffer, and then reading from it (to locate the ether type, and/or
+> > > vlan headers) before passing it up the network stack.
+> > > 
+> > > So in this case, we need to ensure that the cache operations are ordered
+> > > before the subsequent loads read from the DMA'd data.  It's purely an
+> > > ordering thing, it's not a completion thing.
+> > 
+> > PCI guarantees this, but I have seen systems in the past (on PowerPC) that
+> > would violate them on the internal interconnect: You could sometimes see the
+> > completion DMA data in the descriptor ring before the actual user data
+> > is there. We only ever observed it in combination with an IOMMU, when the
+> > descriptor address had a valid IOTLB but the data address did not.
 > 
-> Why does this need to be a separate choice statement?  What's special
-> about S3C24XX?  Is there something wrong with the main choice statement
-> just above this where everyone else lists their debugging UART?
+> What is done on down-stream buses is of no concern to the behaviour of
+> the CPU, which is what's being discussed here (in terms of barriers.)
+> and the correct CPU ordering of various read/writes to memory and
+> devices vs the streaming cache operations.
 
-The special case is that s3c24xx as architecture has two different uart types. 
-Everything else is the same so I didn't want to duplicate the s3c_debug_uartX 
-entries.
+It is still of concern because for cases like NAPI an rmb() on the CPU
+side is no longer enough. If you use a common network driver, written
+correctly with rmb(), but you have some weird interconnect which doesn't
+ensure ordering, you have to add interconnect specific barrier to the
+rmb() (or hack the dma ops like mvebu). I consider such hardware broken.
 
-The other option would have been to duplicate these, like having
-
-- s3c_debug_uart[0-3] for the more common s3c2440 type and
-- s3c2410_debug_uart[0-3] for the named type
-
-I guess, judging from your comment this would be better?
-[or I'm just overlooking the obvious third way :-) ]
-
-
-Heiko
+-- 
+Catalin
