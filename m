@@ -1,30 +1,44 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Thu, 24 Apr 2014 17:49:06 -0500
-Subject: socfpga in 3.15-rc2
-In-Reply-To: <20140424152156.GA22540@amd.pavel.ucw.cz>
-References: <20140424125421.GA19526@amd.pavel.ucw.cz>
- <734n1i25ad.fsf@unicorn.hi.pengutronix.de>
- <20140424152156.GA22540@amd.pavel.ucw.cz>
-Message-ID: <1398379746.14881.3.camel@linux-builds1>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Thu, 24 Apr 2014 15:57:27 -0700
+Subject: [PATCH] imx-drm: fix hdmi hotplug detection initial state
+In-Reply-To: <20140424220732.GE26756@n2100.arm.linux.org.uk>
+References: <E1Wb5Nd-0002Ef-Es@rmk-PC.arm.linux.org.uk>
+ <CAJ+vNU23SE7ZumL34+6Wsv9c6rvcLx6jYQ_ed4uUY6yyGBnRBw@mail.gmail.com>
+ <20140424220732.GE26756@n2100.arm.linux.org.uk>
+Message-ID: <CAJ+vNU0Tf6WnrRE-6FbJTFPrP6chfbaT5GTw5QbSWE2Hkemp8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-04-24 at 17:21 +0200, Pavel Machek wrote:
-> Hi!
-> 
-> > > Does socfpga boot for you on 3.15-rc2? Mainline worked on 3.14 pretty
-> > > well, but I get no output from serial from 3.15-rc2. Any ideas?
-> > >
-> > 
-> > You need:
-> > 
-> > [PATCH] clk: socfpga: fix clock driver for 3.15
-> > Message-Id: 1397481336-5592-1-git-send-email-dinguyen at altera.com
-> 
-> Thanks a lot, with that patch, I'm back to working system.
+On Thu, Apr 24, 2014 at 3:07 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Apr 24, 2014 at 02:00:49PM -0700, Tim Harvey wrote:
+>> I'm still seeing issues with HDMI detect on powerup, at least on my
+>> Gateworks Ventana boards (which have no voltage devider or anything
+>> else on the HPD line to the IMX6 other than a TVS). I'm currently
+>> using your latest imx-drm-staging branch and have applied this patch
+>> on top of it. When I enable debug in imx-hdmi.c I see the following:
+>
+> So it's a similar setup to the Cubox-i.
+>
+<snip>
+>
+> which is only with imx-hdmi bound, no ldb.  The difference you will
+> notice is that there's the "Console: switching ..." line, which is
+> there because I have fbcon enabled.
+>
+> Therefore, I suspect that it is working as it should - if you enable
+> fbcon, it should automatically initialise.  If you don't have fbcon
+> enabled, then it'll probably wait for a userspace DRM driver to bring
+> it up.
+>
 
-Glad you found it. Who's dinh at amd.pavel.ucw.cz?
+Russell,
 
-Dinh
-> 
-> 									Pavel
+Yes, your correct. If I enable fbcon it comes up at boot. But what if
+I don't want fbcon? I have CONFIG_LOGO=y and I would expect that to
+come up without needing to hotswap. Something must still be missing
+that is getting taken care of by fbcon.
+
+Thanks,
+
+Tim
