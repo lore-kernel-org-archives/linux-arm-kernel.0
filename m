@@ -1,51 +1,83 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 24 Apr 2014 14:44:10 +0200
-Subject: [PATCHv3 19/41] OMAPDSS: panel-dpi: Add DT support
-In-Reply-To: <5358DEEA.1000506@ti.com>
-References: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
- <20140418155107.GB5354@atomide.com> <5358DEEA.1000506@ti.com>
-Message-ID: <3615191.vG5AEQORWJ@avalon>
+From: dietmar.eggemann@arm.com (Dietmar Eggemann)
+Date: Thu, 24 Apr 2014 13:48:53 +0100
+Subject: [PATCH v4 5/5] sched: ARM: create a dedicated scheduler topology
+ table
+In-Reply-To: <CAKfTPtAOZqnP=sWeJuqFAqrGT8vLQZKj+tpqiwOTG37paXoGjg@mail.gmail.com>
+References: <1397209481-28542-1-git-send-email-vincent.guittot@linaro.org>
+ <1397209481-28542-6-git-send-email-vincent.guittot@linaro.org>
+ <5357A802.1030804@arm.com>
+ <CAKfTPtDnw-OZZekdE3oNGS11m6dfpS4veMNZ_Bezs-Lm7zn6QQ@mail.gmail.com>
+ <5357DBA5.1010106@arm.com>
+ <CAKfTPtAOZqnP=sWeJuqFAqrGT8vLQZKj+tpqiwOTG37paXoGjg@mail.gmail.com>
+Message-ID: <53590835.9090803@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomi,
+On 24/04/14 08:30, Vincent Guittot wrote:
+> On 23 April 2014 17:26, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
+>> On 23/04/14 15:46, Vincent Guittot wrote:
+>>> On 23 April 2014 13:46, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
+>>>> Hi,
 
-On Thursday 24 April 2014 12:52:42 Tomi Valkeinen wrote:
-> On 18/04/14 18:51, Tony Lindgren wrote:
-> >> +	gpio = of_get_gpio(node, 0);
-> >> +	if (gpio_is_valid(gpio) || gpio == -ENOENT) {
-> >> +		ddata->enable_gpio = gpio;
-> >> +	} else {
-> >> +		dev_err(&pdev->dev, "failed to parse enable gpio\n");
-> >> +		return gpio;
-> >> +	}
-> > 
-> > We should set the GPIO polarity based on the OF_GPIO_ACTIVE_LOW like
-> > gpio_backlight_probe_dt is doing.
+[...]
+
 > 
-> Instead of doing it with the old gpio API, and checking the 'active'
-> flag everywhere, I think we can use the new gpiod API which handles the
-> polarity automatically.
+> More than the flag that is used for the example, it's about the
+> cpumask which are inconsistent across CPUs for the same level and the
+> build_sched_domain sequence rely on this consistency to build
+> sched_group
+
+Now I'm lost here. I thought so far that by specifying different cpu
+masks per CPU in an sd level, we get the sd level folding functionality
+in sd degenerate?
+
+We discussed this here for an example on TC2 for the GMC level:
+https://lkml.org/lkml/2014/3/21/126
+
+Back than I had
+  CPU0: cpu_corepower_mask=0-1
+  CPU2: cpu_corepower_mask=2
+so for GMC level the cpumasks are inconsistent across CPUs and it worked.
+
+The header of '[PATCH v4 1/5] sched: rework of sched_domain topology
+definition' mentions only the requirement "Then, each level must be a
+subset on the next one" and this one I haven't broken w/ my
+GMC/MC/GDIE/DIE set-up.
+
+Do I miss something else here?
+
 > 
-> I attached prototype patches (based on -rc2) for panel dpi using that
-> approach. It's a bit messier than I'd like, because for non-DT boot we
-> need to request the gpio using the old API, and then convert it to
-> gpio_desc. We can remove that code when all the boards use DT.
+>> Essentially what I want to do is bind an SD_SHARE_*FOO* flag to the GDIE
+>> related sd's of CPU2/3/4 and not to the DIE related sd's of CPU0/1.
+>>
+>> I thought so far that I can achieve that by getting rid of GDIE sd level
+>> for CPU0/1 simply by choosing the cpu_foo_mask() function in such a way
+>> that it returns the same cpu mask as its child sd level (MC) and of DIE
+>> sd level for CPU2/3/4 because it returns the same cpu mask as its child
+>> sd level (GDIE) related cpu mask function. This will let sd degenerate
+>> do it's job of folding sd levels which it does. The only problem I have
+>> is that the groups are not created correctly any more.
+>>
+>> I don't see right now how the flag SD_SHARE_FOO affects the code in
+>> get_group()/build_sched_groups().
+>>
+>> Think of SD_SHARE_FOO of something I would like to have for all sd's of
+>> CPU's of cluster 1 (CPU2/3/4) and not on cluster 0 (CPU0/1) in the sd
+>> level where each CPU sees two groups (group0 containing CPU0/1 and
+>> group1 containing CPU2/3/4 or vice versa) (GDIE/DIE) .
+> 
+> I'm not sure that's it's feasible because it's not possible from a
+> topology pov to have different flags if the span include all cpus.
+> Could you give us more details about what you want to achieve with
+> this flag ?
 
-Just FYI, you can use the gpiod API with non-DT platforms if you register GPIO 
-lookup entries in board code with gpiod_add_lookup_table().
+IMHO, the flag is not important for this discussion.  OTHA, information
+like you can't use sd degenerate functionality to fold adjacent sd
+levels (GFOO/FOO) on sd level which span all CPUs would be.  I want to
+make sure we understand what are the limitations to use folding of
+adjacent sd levels based on per-cpu differences in the return value of
+cpu_mask functions.
 
-> I've compiled tested this only, as I don't have DPI panels I could use.
-> I did try similar approach for TFP410, and it seemed to work fine.
+-- Dietmar
 
--- 
-Regards,
-
-Laurent Pinchart
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140424/d48b2c9b/attachment.sig>
+[...]
