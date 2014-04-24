@@ -1,28 +1,26 @@
-From: yegorslists@googlemail.com (yegorslists at googlemail.com)
-Date: Thu, 24 Apr 2014 11:24:30 +0200
-Subject: omap-serial: use mctrl_gpio helpers
-Message-ID: <1398331471-16745-1-git-send-email-yegorslists@googlemail.com>
+From: leela.krishna@linaro.org (Leela Krishna Amudala)
+Date: Thu, 24 Apr 2014 15:01:57 +0530
+Subject: [PATCH 0/2] Add generic cpu power control functions for exynos
+Message-ID: <1398331919-28321-1-git-send-email-leela.krishna@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is based on Richard Genoud' patch adding generic GPIO support [1]
-and my patch adding get_direction() functionality to OMAP's GPIO driver [2].
+This patchset adds the generic cpu power control functions for
+exynos based SoCs to power up/down and to know the status of the cpu.
 
-So far RTS/DTR are working both as modem control outputs and RTS as RS-485 2-wire controller.
+Note: This series has been rebased on 3.15-rc1 and tested on 
+Exynos based Origen(Cortex-A9) and Arndale-octa(Cortex A7,A15) boards.
 
-CTS/DSR/DSR/RI are generating interrupts.
+Leela Krishna Amudala (2):
+  ARM: EXYNOS: Add generic cpu power control functions for all exynos
+    based SoCs
+  ARM: EXYNOS: use generic exynos cpu power control functions
 
-Richard, Greg, what is the status of [1]? It seems like it will be available in 3.16 first?
+ arch/arm/mach-exynos/common.h   |    3 +++
+ arch/arm/mach-exynos/platsmp.c  |    9 +++------
+ arch/arm/mach-exynos/pm.c       |   36 ++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-exynos/regs-pmu.h |    6 ++++++
+ 4 files changed, 48 insertions(+), 6 deletions(-)
 
-TODO:
-
-1. remove rts_gpio from uart_omap_port
-2. perhaps add rts_gpiod to uart_omap_port to avoid numerous invocations of
-
-rts_gpiod = mctrl_gpio_to_gpiod(up->gpios, UART_GPIO_RTS);
-3. add device tree documentation 
-
-Yegor
-
-[1] http://comments.gmane.org/gmane.linux.serial/13967
-[2] http://www.spinics.net/lists/arm-kernel/msg325162.html
+-- 
+1.7.9.5
