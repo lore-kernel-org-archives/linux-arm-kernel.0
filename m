@@ -1,41 +1,61 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 24 Apr 2014 09:18:25 +0200
-Subject: [PATCH 08/28] nios2: MMU Fault handling
-In-Reply-To: <20140422143036.GD15745@arch.cereza>
-References: <1397824031-4892-1-git-send-email-lftan@altera.com>
- <1397824031-4892-6-git-send-email-lftan@altera.com>
- <20140422143036.GD15745@arch.cereza>
-Message-ID: <CAMuHMdXMbGS6xFyW80Cv1xOSF=e76G16vVrboQUkgC7Q_mgZtw@mail.gmail.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 24 Apr 2014 10:29:50 +0300
+Subject: [RESEND] dmaengine: edma: Add channel number to debug prints
+Message-ID: <1398324590-31752-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 22, 2014 at 4:30 PM, Ezequiel Garcia
-<ezequiel.garcia@free-electrons.com> wrote:
-> On Apr 18, Ley Foon Tan wrote:
->> +
->> +bad_area_nosemaphore:
->> +     /* User mode accesses just cause a SIGSEGV */
->> +     if (user_mode(regs)) {
->
-> I found that it's useful to add some printing here, just as ARM
-> does. I carry this patch on my kernel:
->
-> +               printk(KERN_INFO "%s: unhandled page fault (%d) at 0x%08lx, cause %ld\n",
-> +                      current->comm, SIGSEGV, address, cause);
-> +               show_regs(regs);
->
-> Do you think we could do something like it? Maybe with a compile time option?
+It helps to identify issues if we have some information regarding to the
+channel which the event is associated.
 
-Can this easily be triggered from userspace? If yes, please use
-pr_info_ratelimited().
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Acked-by: Joel Fernandes <joelf@ti.com>
+---
+Hi Vinod,
 
-Gr{oetje,eeting}s,
+rebased on:
+git://git.infradead.org/users/vkoul/slave-dma.git next
 
-                        Geert
+On top of:
+406efb1a745c dmaengine: edma: No need save/restore interrupt flags during...
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Regards,
+Peter
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+ drivers/dma/edma.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+index fa87fd52b0ad..473155d34d7b 100644
+--- a/drivers/dma/edma.c
++++ b/drivers/dma/edma.c
+@@ -183,7 +183,8 @@ static void edma_execute(struct edma_chan *echan)
+ 	}
+ 
+ 	if (edesc->processed <= MAX_NR_SG) {
+-		dev_dbg(dev, "first transfer starting %d\n", echan->ch_num);
++		dev_dbg(dev, "first transfer starting on channel %d\n",
++			echan->ch_num);
+ 		edma_start(echan->ch_num);
+ 	} else {
+ 		dev_dbg(dev, "chan: %d: completed %d elements, resuming\n",
+@@ -197,7 +198,7 @@ static void edma_execute(struct edma_chan *echan)
+ 	 * MAX_NR_SG
+ 	 */
+ 	if (echan->missed) {
+-		dev_dbg(dev, "missed event in execute detected\n");
++		dev_dbg(dev, "missed event on channel %d\n", echan->ch_num);
+ 		edma_clean_channel(echan->ch_num);
+ 		edma_stop(echan->ch_num);
+ 		edma_start(echan->ch_num);
+@@ -779,7 +780,7 @@ static int edma_alloc_chan_resources(struct dma_chan *chan)
+ 	echan->alloced = true;
+ 	echan->slot[0] = echan->ch_num;
+ 
+-	dev_dbg(dev, "allocated channel for %u:%u\n",
++	dev_dbg(dev, "allocated channel %d for %u:%u\n", echan->ch_num,
+ 		EDMA_CTLR(echan->ch_num), EDMA_CHAN_SLOT(echan->ch_num));
+ 
+ 	return 0;
+-- 
+1.9.2
