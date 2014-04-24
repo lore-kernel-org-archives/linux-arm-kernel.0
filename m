@@ -1,64 +1,49 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 24 Apr 2014 09:38:28 -0400
-Subject: [PATCH] ARM: mm: dma: Update coherent streaming apis with missing
- memory barrier
-In-Reply-To: <20140424112152.GF19564@arm.com>
-References: <1398103390-31968-1-git-send-email-santosh.shilimkar@ti.com>
- <20140423171727.GK5649@arm.com>
- <20140423183742.GK24070@n2100.arm.linux.org.uk> <6414220.SShvCHLvZQ@wuerfel>
- <20140423190448.GB26756@n2100.arm.linux.org.uk>
- <20140424104737.GE8521@arm.com>
- <20140424111547.GP26756@n2100.arm.linux.org.uk>
- <20140424112152.GF19564@arm.com>
-Message-ID: <535913D4.6020401@ti.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 24 Apr 2014 17:49:29 +0400
+Subject: [PATCH 11/23] ARM: dts: omap5-uevm.dts: add tca6424a
+In-Reply-To: <1398334639-14172-12-git-send-email-tomi.valkeinen@ti.com>
+References: <1398334639-14172-1-git-send-email-tomi.valkeinen@ti.com>
+ <1398334639-14172-12-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <53591669.7060502@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 24 April 2014 07:21 AM, Will Deacon wrote:
-> On Thu, Apr 24, 2014 at 12:15:47PM +0100, Russell King - ARM Linux wrote:
->> On Thu, Apr 24, 2014 at 11:47:37AM +0100, Catalin Marinas wrote:
->>> On Wed, Apr 23, 2014 at 08:04:48PM +0100, Russell King - ARM Linux wrote:
->>>> What is done on down-stream buses is of no concern to the behaviour of
->>>> the CPU, which is what's being discussed here (in terms of barriers.)
->>>> and the correct CPU ordering of various read/writes to memory and
->>>> devices vs the streaming cache operations.
->>>
->>> It is still of concern because for cases like NAPI an rmb() on the CPU
->>> side is no longer enough. If you use a common network driver, written
->>> correctly with rmb(), but you have some weird interconnect which doesn't
->>> ensure ordering, you have to add interconnect specific barrier to the
->>> rmb() (or hack the dma ops like mvebu). I consider such hardware broken.
->>
->> Yes, the hardware /is/ broken, but if you want to get it working in a
->> way that's acceptable in upstream kernels, adding that barrier to rmb()
->> is probably the only acceptable solution - especially if you have other
->> stuff going in between the rmb() and the DMA unmap.
-> 
-> The problem then is that the additional barrier may well require
-> bus-specific knowledge and access to parts of bus driver code which we can't
-> use inside the rmb() macro. To solve this properly, the bus topology topic
-> once again rears its ugly head, as I think you'd need a callback from the
-> device driver to the bus on which it resides in order to provide the
-> appropriate barrier (which isn't something that can be done sanely for
-> the platform_bus).
-> 
-Not exactly against the bus notifier point but we can't afford to have such
-notifier calls in hot paths. Especially gigabit network drivers per packet
-processing paths where even 10 cycle cost makes huge impact on the throughput.
+Hello.
 
-Interconnect barriers are really needed for completion. I think CPUs within at
-least same clusters will be ordered with rmb(). But same is not true when you
-have multiple clusters and then further down coherent interconnect comes into
-picture where all other non-CPU coherent masters are participating.
+On 24-04-2014 14:17, Tomi Valkeinen wrote:
 
-If rmb() has to reach all the way to coherent masters(non-CPU), then I suspect
-most of the ARM coherent architectures are broken. If you take any typical SOC,
-ARM CPUs are bolted with other coherent masters at AXI boundary or may be with
-ACP interfaces. At this level rmb() isn't good enough and you at least
-need a dsb() for completion.
+> omap5-uevm has a tca6424a I/O expander. Add it to the .dts file.
 
-So in my view unless and until you have features like DVM in hardware, dsb() is
-needed to guarantee even the ordering within CPUs sitting across clusters.
+> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> ---
+>   arch/arm/boot/dts/omap5-uevm.dts | 7 +++++++
+>   1 file changed, 7 insertions(+)
 
-Regards,
-Santosh 
+> diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
+> index 3b99ec25b748..9e7581eaeb23 100644
+> --- a/arch/arm/boot/dts/omap5-uevm.dts
+> +++ b/arch/arm/boot/dts/omap5-uevm.dts
+> @@ -434,6 +434,13 @@
+>   	pinctrl-0 = <&i2c5_pins>;
+>
+>   	clock-frequency = <400000>;
+> +
+> +	tca6424a: tca6424a at 22 {
+
+    The ePAPR standard [1] says: "The name of a node should be somewhat generic,
+reflecting the function of the device and not its precise programming model.
+If appropriate, the name should be one of the following choices:
+[...]
+    - gpio;"
+
+> +		compatible = "ti,tca6424";
+> +		reg = <0x22>;
+> +		gpio-controller;
+> +		#gpio-cells = <2>;
+> +	};
+>   };
+
+[1] http://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.0.pdf
+
+WBR, Sergei
