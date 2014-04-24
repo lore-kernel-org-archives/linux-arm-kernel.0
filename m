@@ -1,85 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 24 Apr 2014 13:27:14 +0100
-Subject: [PATCH 27/38] mmc: sdhci-of-esdhc: remove
- platform_suspend/platform_resume callbacks
-In-Reply-To: <CAPDyKFpXn7m4+gqBp+FVaUxA3xaGq7OJS3edPFTL015W03CdBA@mail.gmail.com>
-References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
- <E1Wd2Wy-0003w6-9y@rmk-PC.arm.linux.org.uk>
- <CAPDyKFrNpxFPfKQNWZ9iwzh=NKZpCzkA8gYnrqnPb-683QcgwA@mail.gmail.com>
- <20140424111825.GQ26756@n2100.arm.linux.org.uk>
- <CAPDyKFpXn7m4+gqBp+FVaUxA3xaGq7OJS3edPFTL015W03CdBA@mail.gmail.com>
-Message-ID: <20140424122714.GR26756@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 24 Apr 2014 14:28:09 +0200
+Subject: [PATCH v8 2/3] net: hisilicon: new hip04 MDIO driver
+In-Reply-To: <53568398.2030800@linaro.org>
+References: <1397869980-21187-1-git-send-email-zhangfei.gao@linaro.org>
+ <201404221630.07865.arnd@arndb.de> <53568398.2030800@linaro.org>
+Message-ID: <201404241428.10248.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 24, 2014 at 01:32:02PM +0200, Ulf Hansson wrote:
-> On 24 April 2014 13:18, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> > That may be the case, but that would be an additional modification, and so
-> > should be a separate patch.
+On Tuesday 22 April 2014, zhangfei wrote:
+> On 04/22/2014 10:30 PM, Arnd Bergmann wrote:
+> > On Tuesday 22 April 2014, zhangfei wrote:
+> >> On 04/22/2014 04:22 PM, Arnd Bergmann wrote:
+
+> > But it means that the hip04_mdio driver potentially won't work if connected
+> > to something other than a Marvell PHY.
+> >
+> > I noticed that the marvell_of_reg_init() does this at init time:
+> >
+> > saved_page = phy_read(phydev, MII_MARVELL_PHY_PAGE);
+> > ... /* perform init */
+> > if (page_changed)
+> >       phy_write(phydev, MII_MARVELL_PHY_PAGE, saved_page);
+> >
+> > Is this a bug? Maybe it should always set page 0 when leaving
+> > this function.
+> >
+> It is correct behavior return to the original page.
 > 
-> I just thought it make sense to include it here - it's really a simple
-> fix, touching the same code as this patch.
+> First get_phy_id, then match driver according to the id, then operation 
+> in the specific driver have the chance to run, including 
+> marvell_of_reg_init etc.
 > 
-> Additionally, it would simplify this patch since you would be able to
-> use the PM macro.
+> Just unlucky the default value of PHY_PAGE after power on is not 0.
 
-No, I'm not going to make this change after looking deeper at the existing
-code.
+Ok, so it's actually not possible to detect this case prior to having
+to work around it.
 
-The existing code does this:
+How about adding a DT property as a flag to tell the driver whether
+to set the page to zero or not? That would let the driver work
+with different types of PHY implementations, or skip the code if
+there is firmware that can already set it up to page zero.
 
-sdhci-pltfm.c:
-#ifdef CONFIG_PM
-int sdhci_pltfm_suspend(struct device *dev)
-{
-        struct sdhci_host *host = dev_get_drvdata(dev);
-
-        return sdhci_suspend_host(host);
-}
-EXPORT_SYMBOL_GPL(sdhci_pltfm_suspend);
-
-int sdhci_pltfm_resume(struct device *dev)
-{
-        struct sdhci_host *host = dev_get_drvdata(dev);
-
-        return sdhci_resume_host(host);
-}
-EXPORT_SYMBOL_GPL(sdhci_pltfm_resume);
-
-const struct dev_pm_ops sdhci_pltfm_pmops = {
-        .suspend        = sdhci_pltfm_suspend,
-        .resume         = sdhci_pltfm_resume,
-};
-EXPORT_SYMBOL_GPL(sdhci_pltfm_pmops);
-#endif  /* CONFIG_PM */
-
-sdhci-pltfm.h:
-#ifdef CONFIG_PM
-extern int sdhci_pltfm_suspend(struct device *dev);
-extern int sdhci_pltfm_resume(struct device *dev);
-extern const struct dev_pm_ops sdhci_pltfm_pmops;
-#define SDHCI_PLTFM_PMOPS (&sdhci_pltfm_pmops)
-#else
-#define SDHCI_PLTFM_PMOPS NULL
-#endif
-
-sdhci-of-esdhc.c:
-static struct platform_driver sdhci_esdhc_driver = {
-        .driver = {
-                .pm = SDHCI_PLTFM_PMOPS,
-
-Changing this to use SIMPLE_DEV_PM_OPS changes the behaviour of this by
-placing the callbacks into the other methods.
-
-Is that change correct?
-Who's going to test that that change doesn't break anything (I don't have
-the hardware, and it's not a transformational change like the rest of the
-patch set, but a functional change)?
-Should this change be made for other SDHCI platforms as well?
-
-Frankly, I'm not happy to make such a change in a series which is supposed
-to be mainly about cleaning up and _not_ introducing functional changes.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+	Arnd
