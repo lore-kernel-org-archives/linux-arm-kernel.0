@@ -1,50 +1,85 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 24 Apr 2014 14:25:30 +0200
-Subject: [RFC PATCH 2/2] PCI: exynos: Add PCIe support for Samsung GH7 SoC
-In-Reply-To: <20140423130012.GL865@e106497-lin.cambridge.arm.com>
-References: <000801cf592e$30b7bff0$92273fd0$%han@samsung.com>
- <031b01cf5ed5$21d536a0$657fa3e0$@samsung.com>
- <20140423130012.GL865@e106497-lin.cambridge.arm.com>
-Message-ID: <201404241425.31625.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 24 Apr 2014 13:27:14 +0100
+Subject: [PATCH 27/38] mmc: sdhci-of-esdhc: remove
+ platform_suspend/platform_resume callbacks
+In-Reply-To: <CAPDyKFpXn7m4+gqBp+FVaUxA3xaGq7OJS3edPFTL015W03CdBA@mail.gmail.com>
+References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
+ <E1Wd2Wy-0003w6-9y@rmk-PC.arm.linux.org.uk>
+ <CAPDyKFrNpxFPfKQNWZ9iwzh=NKZpCzkA8gYnrqnPb-683QcgwA@mail.gmail.com>
+ <20140424111825.GQ26756@n2100.arm.linux.org.uk>
+ <CAPDyKFpXn7m4+gqBp+FVaUxA3xaGq7OJS3edPFTL015W03CdBA@mail.gmail.com>
+Message-ID: <20140424122714.GR26756@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 23 April 2014, Liviu Dudau wrote:
-> On Wed, Apr 23, 2014 at 10:19:30AM +0100, Kukjin Kim wrote:
-> > Arnd Bergmann wrote:
-> > > 
-> > > Can you explain how much the GH7 and Exynos front-ends actually have in
-> > > common? Would it make sense to have a separate driver for gh7?
-> > > 
-> > Basically, ARMv8 based GH7 has same PCIe hardware IP with previous ARMv7
-> > based exynos5440, several features in PCIe are different though. In other
-> > words, basic functionalities for PCIe are same. So I think, would be nice if
-> > we could use one PCIe device driver for both SoCs.
-> > 
-> > However, if we need to support the PCIe with each own device driver because
-> > of difference of 32bit and 64bit, please kindly let us know. Honestly, I'm
-> > not sure about that right now.
+On Thu, Apr 24, 2014 at 01:32:02PM +0200, Ulf Hansson wrote:
+> On 24 April 2014 13:18, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> > That may be the case, but that would be an additional modification, and so
+> > should be a separate patch.
 > 
-> Hi Kukjin,
+> I just thought it make sense to include it here - it's really a simple
+> fix, touching the same code as this patch.
 > 
-> I will let Arnd offer his view as a maintainer of DT enabled platforms for 
-> arch/arm, but in my understanding the goal is to convert individual host
-> bridge drivers to use my patch series directly, as they intentionally don't
-> depend on any arch specific code and then leave the existing bios32 code
-> for the non-DT platforms and the ones that do not see the need to convert
-> to the framework.
->
-> Rob Herring has posted an example on how he can add support for a host
-> bridge running under arm32 that uses my framework, so it is not an impossible
-> task and can be used as an example for future conversions.
+> Additionally, it would simplify this patch since you would be able to
+> use the PM macro.
 
-Yes, I agree that would be the best approach. I'm not sure if it
-makes sense to convert the various dw-pcie front-ends separately
-or if we have to do them all at once though. Doing them together
-may require some more coordination.
+No, I'm not going to make this change after looking deeper at the existing
+code.
 
-Let's also make sure to keep Russell in the loop regarding arm32
-PCI support. He probably has some ideas as well on how we should
-proceed with the existing code.
+The existing code does this:
 
-	Arnd
+sdhci-pltfm.c:
+#ifdef CONFIG_PM
+int sdhci_pltfm_suspend(struct device *dev)
+{
+        struct sdhci_host *host = dev_get_drvdata(dev);
+
+        return sdhci_suspend_host(host);
+}
+EXPORT_SYMBOL_GPL(sdhci_pltfm_suspend);
+
+int sdhci_pltfm_resume(struct device *dev)
+{
+        struct sdhci_host *host = dev_get_drvdata(dev);
+
+        return sdhci_resume_host(host);
+}
+EXPORT_SYMBOL_GPL(sdhci_pltfm_resume);
+
+const struct dev_pm_ops sdhci_pltfm_pmops = {
+        .suspend        = sdhci_pltfm_suspend,
+        .resume         = sdhci_pltfm_resume,
+};
+EXPORT_SYMBOL_GPL(sdhci_pltfm_pmops);
+#endif  /* CONFIG_PM */
+
+sdhci-pltfm.h:
+#ifdef CONFIG_PM
+extern int sdhci_pltfm_suspend(struct device *dev);
+extern int sdhci_pltfm_resume(struct device *dev);
+extern const struct dev_pm_ops sdhci_pltfm_pmops;
+#define SDHCI_PLTFM_PMOPS (&sdhci_pltfm_pmops)
+#else
+#define SDHCI_PLTFM_PMOPS NULL
+#endif
+
+sdhci-of-esdhc.c:
+static struct platform_driver sdhci_esdhc_driver = {
+        .driver = {
+                .pm = SDHCI_PLTFM_PMOPS,
+
+Changing this to use SIMPLE_DEV_PM_OPS changes the behaviour of this by
+placing the callbacks into the other methods.
+
+Is that change correct?
+Who's going to test that that change doesn't break anything (I don't have
+the hardware, and it's not a transformational change like the rest of the
+patch set, but a functional change)?
+Should this change be made for other SDHCI platforms as well?
+
+Frankly, I'm not happy to make such a change in a series which is supposed
+to be mainly about cleaning up and _not_ introducing functional changes.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
