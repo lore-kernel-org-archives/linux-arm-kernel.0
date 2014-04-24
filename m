@@ -1,50 +1,19 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 24 Apr 2014 17:10:03 -0600
-Subject: [PATCH 0/3] Versatile PCI DT support
-In-Reply-To: <1395960398-4238-1-git-send-email-robherring2@gmail.com>
-References: <1395960398-4238-1-git-send-email-robherring2@gmail.com>
-Message-ID: <20140424231003.GM29593@google.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 24 Apr 2014 16:22:47 -0700
+Subject: [RESEND PATCH v3 1/9] tty: xuartps: Fix kernel-doc errors in the
+ driver
+In-Reply-To: <c1835108-0033-4219-89e9-2f02c82b1e27@VA3EHSMHS026.ehs.local>
+References: <1396657425-31029-1-git-send-email-soren.brinkmann@xilinx.com>
+ <c1835108-0033-4219-89e9-2f02c82b1e27@VA3EHSMHS026.ehs.local>
+Message-ID: <20140424232247.GA10457@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 27, 2014 at 05:46:35PM -0500, Rob Herring wrote:
-> From: Rob Herring <robh@kernel.org>
+On Fri, Apr 18, 2014 at 09:11:28AM -0700, S?ren Brinkmann wrote:
+> Hi Greg,
 > 
-> This series adds a platform driver for Versatile PB's PCI host using
-> Liviu's recent patch series[1] for DT parsing and setup.
-> 
-> The first patch is a hack to get Liviu's current patches to work on ARM.
-> It at least shows we are not that far off from being able to use the
-> series on ARM.
+> did you have a chance to look at this yet?
 
-Since this depends on Liviu's work that is not yet upstream, I guess I
-can't do anything with this yet, right?  Poke me again when I can.
+Patches 1-7 now applied, thanks.
 
-I assume you would want a MAINTAINERS update, too (at least, *I* do :))
-
-> I've tested PCI under QEMU, but need someone with actual h/w to test.
-> A branch with this series and which includes full conversion of
-> Versatile to DT is available here[2].
-> 
-> Rob
-> 
-> [1] https://lkml.org/lkml/2014/3/14/279
-> [2] git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git versatile
-> 
-> Rob Herring (3):
->   ARM: hackup pcibios support for commmon bridge code
->   dt/bindings: add versatile PCI binding
->   pci: add DT based ARM Versatile PCI host driver
-> 
->  .../devicetree/bindings/pci/versatile.txt          |  59 +++++
->  arch/arm/kernel/bios32.c                           |  63 +++++
->  drivers/pci/host/Kconfig                           |   4 +
->  drivers/pci/host/Makefile                          |   1 +
->  drivers/pci/host/pci-versatile.c                   | 275 +++++++++++++++++++++
->  5 files changed, 402 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pci/versatile.txt
->  create mode 100644 drivers/pci/host/pci-versatile.c
-> 
-> -- 
-> 1.8.3.2
-> 
+greg k-h
