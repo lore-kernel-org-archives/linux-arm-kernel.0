@@ -1,22 +1,20 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 24 Apr 2014 11:30:04 -0400
-Subject: [PATCH v3 4/7] of: configure the platform device dma parameters
+Date: Thu, 24 Apr 2014 11:30:02 -0400
+Subject: [PATCH v3 2/7] of: introduce of_dma_get_range() helper
 In-Reply-To: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1398353407-2345-5-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1398353407-2345-3-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Retrieve DMA configuration from DT and setup platform device's DMA
-parameters. The DMA configuration in DT has to be specified using
-"dma-ranges" and "dma-coherent" properties if supported.
+From: Grygorii Strashko <grygorii.strashko@ti.com>
 
-We setup dma_pfn_offset using "dma-ranges" and dma_coherent_ops
-using "dma-coherent" device tree properties.
-
-The set_arch_dma_coherent_ops macro has to be defined by arch if
-it supports coherent dma_ops. Otherwise, set_arch_dma_coherent_ops() is
-declared as nop.
+The of_dma_get_range() allows to find "dma-range" property for
+the specified device and parse it.
+ dma-ranges format:
+   DMA addr (dma_addr)          : naddr cells
+   CPU addr (phys_addr_t)       : pna cells
+   size                         : nsize cells
 
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: Russell King <linux@arm.linux.org.uk>
@@ -29,93 +27,130 @@ Cc: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- drivers/of/platform.c       |   48 ++++++++++++++++++++++++++++++++++++++++---
- include/linux/dma-mapping.h |    7 +++++++
- 2 files changed, 52 insertions(+), 3 deletions(-)
+ drivers/of/address.c       |   87 ++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/of_address.h |    8 ++++
+ 2 files changed, 95 insertions(+)
 
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index 48de98f..270c0b9 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -187,6 +187,50 @@ struct platform_device *of_device_alloc(struct device_node *np,
- EXPORT_SYMBOL(of_device_alloc);
- 
- /**
-+ * of_dma_configure - Setup DMA configuration
-+ * @dev:	Device to apply DMA configuration
-+ *
-+ * Try to get devices's DMA configuration from DT and update it
-+ * accordingly.
-+ *
-+ * In case if platform code need to use own special DMA configuration,it
-+ * can use Platform bus notifier and handle BUS_NOTIFY_ADD_DEVICE event
-+ * to fix up DMA configuration.
-+ */
-+static void of_dma_configure(struct device *dev)
-+{
-+	u64 dma_addr, paddr, size;
-+	int ret;
-+
-+	dev->coherent_dma_mask = DMA_BIT_MASK(32);
-+	if (!dev->dma_mask)
-+		dev->dma_mask = &dev->coherent_dma_mask;
-+
-+	/*
-+	 * if dma-coherent property exist, call arch hook to setup
-+	 * dma coherent operations.
-+	 */
-+	if (of_dma_is_coherent(dev->of_node)) {
-+		set_arch_dma_coherent_ops(dev);
-+		dev_dbg(dev, "device is dma coherent\n");
-+	}
-+
-+	/*
-+	 * if dma-ranges property doesn't exist - just return else
-+	 * setup the dma offset
-+	 */
-+	ret = of_dma_get_range(dev->of_node, &dma_addr, &paddr, &size);
-+	if ((ret == -ENODEV) || (ret < 0)) {
-+		dev_dbg(dev, "no dma range information to setup\n");
-+		return;
-+	}
-+
-+	/* DMA ranges found. Calculate and set dma_pfn_offset */
-+	dev->dma_pfn_offset = PFN_DOWN(paddr - dma_addr);
-+	dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", dev->dma_pfn_offset);
-+}
+diff --git a/drivers/of/address.c b/drivers/of/address.c
+index cb4242a..c54baee 100644
+--- a/drivers/of/address.c
++++ b/drivers/of/address.c
+@@ -721,3 +721,90 @@ void __iomem *of_iomap(struct device_node *np, int index)
+ 	return ioremap(res.start, resource_size(&res));
+ }
+ EXPORT_SYMBOL(of_iomap);
 +
 +/**
-  * of_platform_device_create_pdata - Alloc, initialize and register an of_device
-  * @np: pointer to node to create device for
-  * @bus_id: name to assign device
-@@ -214,9 +258,7 @@ static struct platform_device *of_platform_device_create_pdata(
- #if defined(CONFIG_MICROBLAZE)
- 	dev->archdata.dma_mask = 0xffffffffUL;
- #endif
--	dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
--	if (!dev->dev.dma_mask)
--		dev->dev.dma_mask = &dev->dev.coherent_dma_mask;
-+	of_dma_configure(&dev->dev);
- 	dev->dev.bus = &platform_bus_type;
- 	dev->dev.platform_data = platform_data;
- 
-diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-index fd4aee2..c7d9b1b 100644
---- a/include/linux/dma-mapping.h
-+++ b/include/linux/dma-mapping.h
-@@ -123,6 +123,13 @@ static inline int dma_coerce_mask_and_coherent(struct device *dev, u64 mask)
- 
- extern u64 dma_get_required_mask(struct device *dev);
- 
-+#ifndef set_arch_dma_coherent_ops
-+static inline int set_arch_dma_coherent_ops(struct device *dev)
++ * of_dma_get_range - Get DMA range info
++ * @np:		device node to get DMA range info
++ * @dma_addr:	pointer to store initial DMA address of DMA range
++ * @paddr:	pointer to store initial CPU address of DMA range
++ * @size:	pointer to store size of DMA range
++ *
++ * Look in bottom up direction for the first "dma-ranges" property
++ * and parse it.
++ *  dma-ranges format:
++ *	DMA addr (dma_addr)	: naddr cells
++ *	CPU addr (phys_addr_t)	: pna cells
++ *	size			: nsize cells
++ *
++ * It returns -ENODEV if "dma-ranges" property was not found
++ * for this device in DT.
++ */
++int of_dma_get_range(struct device_node *np, u64 *dma_addr, u64 *paddr, u64 *size)
 +{
-+	return 0;
-+}
-+#endif
++	struct device_node *node = of_node_get(np);
++	const __be32 *ranges = NULL;
++	int len, naddr, nsize, pna;
++	int ret = 0;
++	u64 dmaaddr;
 +
- static inline unsigned int dma_get_max_seg_size(struct device *dev)
++	if (!node)
++		return -EINVAL;
++
++	while (1) {
++		naddr = of_n_addr_cells(node);
++		nsize = of_n_size_cells(node);
++		node = of_get_next_parent(node);
++		if (!node)
++			break;
++
++		ranges = of_get_property(node, "dma-ranges", &len);
++
++		/* Ignore empty ranges, they imply no translation required */
++		if (ranges && len > 0)
++			break;
++
++		/*
++		 * At least empty ranges has to be defined for parent node if
++		 * DMA is supported
++		 */
++		if (!ranges)
++			break;
++	}
++
++	if (!ranges) {
++		pr_debug("%s: no dma-ranges found for node(%s)\n",
++			 __func__, np->full_name);
++		ret = -ENODEV;
++		goto out;
++	}
++
++	len /= sizeof(u32);
++
++	pna = of_n_addr_cells(node);
++
++	/* dma-ranges format:
++	 * DMA addr	: naddr cells
++	 * CPU addr	: pna cells
++	 * size		: nsize cells
++	 */
++	dmaaddr = of_read_number(ranges, naddr);
++	*paddr = of_translate_dma_address(np, ranges);
++	if (*paddr == OF_BAD_ADDR) {
++		pr_err("%s: translation of DMA address(%pad) to CPU address failed node(%s)\n",
++		       __func__, dma_addr, np->full_name);
++		ret = -EINVAL;
++		goto out;
++	}
++	*dma_addr = dmaaddr;
++
++	*size = of_read_number(ranges + naddr + pna, nsize);
++
++	pr_debug("dma_addr(%llx) cpu_addr(%llx) size(%llx)\n",
++		 *dma_addr, *paddr, *size);
++
++out:
++	of_node_put(node);
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(of_dma_get_range);
+diff --git a/include/linux/of_address.h b/include/linux/of_address.h
+index 5f6ed6b..4d7b325 100644
+--- a/include/linux/of_address.h
++++ b/include/linux/of_address.h
+@@ -63,6 +63,8 @@ extern int of_pci_range_parser_init(struct of_pci_range_parser *parser,
+ extern struct of_pci_range *of_pci_range_parser_one(
+ 					struct of_pci_range_parser *parser,
+ 					struct of_pci_range *range);
++extern int of_dma_get_range(struct device_node *np, u64 *dma_addr,
++				u64 *paddr, u64 *size);
+ #else /* CONFIG_OF_ADDRESS */
+ static inline struct device_node *of_find_matching_node_by_address(
+ 					struct device_node *from,
+@@ -90,6 +92,12 @@ static inline struct of_pci_range *of_pci_range_parser_one(
  {
- 	return dev->dma_parms ? dev->dma_parms->max_segment_size : 65536;
+ 	return NULL;
+ }
++
++static inline int of_dma_get_range(struct device_node *np, u64 *dma_addr,
++				u64 *paddr, u64 *size)
++{
++	return -ENODEV;
++}
+ #endif /* CONFIG_OF_ADDRESS */
+ 
+ #ifdef CONFIG_OF
 -- 
 1.7.9.5
