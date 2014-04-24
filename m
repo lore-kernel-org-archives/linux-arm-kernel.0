@@ -1,42 +1,45 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 24 Apr 2014 11:06:33 -0500
-Subject: [PATCH V2 00/19] bus: omap_l3_noc: driver cleanups and support
- for DRA7/AM4372
-In-Reply-To: <20140424155403.GA29229@ti.com>
-References: <1397492726-17203-1-git-send-email-nm@ti.com>
- <1397767775-10965-1-git-send-email-nm@ti.com> <20140424155403.GA29229@ti.com>
-Message-ID: <53593689.3060801@ti.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 24 Apr 2014 18:07:03 +0200
+Subject: [PATCH 1/4] ARM: dts: exynos4: add PMU syscon node
+In-Reply-To: <1397479700-15864-2-git-send-email-chanho61.park@samsung.com>
+References: <1397479700-15864-1-git-send-email-chanho61.park@samsung.com>
+ <1397479700-15864-2-git-send-email-chanho61.park@samsung.com>
+Message-ID: <535936A7.9050003@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/24/2014 10:54 AM, Darren Etheridge wrote:
-> Nishanth,
-> 
-> Nishanth Menon <nm@ti.com> wrote on Thu [2014-Apr-17 15:49:16 -0500]:
->>
->> V2 introduces the following changes:
->> 	- Additional bug fix detected during additional testing (all tests complete now). patch #12
->> 	- reordering of patches to order logical changes and reduce code churn.
->> 	- interrupt handler split up and additional information now provided in log to aid debug when error occur
->> 	- patches are marked where new (12,14,15,16).
->> 	- DRA7 updated from master document for all DRA7 variants.
->>
->> This series cleansup omap_l3_noc driver and adds data to support DRA7
->> and AM437x SoCs.
->>
-> This L3 noc driver patch series is working great for me and has already
-> flagged a very difficult to detect problem in a driver I am working on
-> with a DMA access to an invalid memory address on DRA7.
+Hi Chanho,
 
-Glad it was of use. All the more reason why this should be in upstream
-kernel and not just in "evil vendor" kernel.
+On 14.04.2014 14:48, Chanho Park wrote:
+> This patch adds a PMU(Power Management Unit) syscon node. This
+> should be required for USB Phy syscon regmap I/F.
+>
+> Cc: Tomasz Figa <t.figa@samsung.com>
+> Cc: Kamil Debski <k.debski@samsung.com>
+> Signed-off-by: Chanho Park <chanho61.park@samsung.com>
+> ---
+>   arch/arm/boot/dts/exynos4.dtsi | 5 +++++
+>   1 file changed, 5 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+> index 2f8bcd0..e565b86 100644
+> --- a/arch/arm/boot/dts/exynos4.dtsi
+> +++ b/arch/arm/boot/dts/exynos4.dtsi
+> @@ -110,6 +110,11 @@
+>   		reg = <0x10010000 0x400>;
+>   	};
+>
+> +	pmu_reg: syscon at 10020000 {
+> +		compatible = "samsung,exynos4-pmureg", "syscon";
 
-> 
-> Tested-by: Darren Etheridge <detheridge@ti.com>
-> 
-Thanks. will pick this up for v3 post.
+This compatible string doesn't seem to be defined in [1], please add it 
+there,
 
+[1] Documentation/devicetree/bindings/arm/samsung/pmu.txt
 
--- 
-Regards,
-Nishanth Menon
+Otherwise looks good, so after fixing that you may add my
+
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+
+Best regards,
+Tomasz
