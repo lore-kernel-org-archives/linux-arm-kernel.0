@@ -1,56 +1,43 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 24 Apr 2014 16:45:19 +0100
-Subject: [PATCH v3 7/7] ARM: dma: use phys_addr_t in
- __dma_page_[cpu_to_dev/dev_to_cpu]
-In-Reply-To: <1398353407-2345-8-git-send-email-santosh.shilimkar@ti.com>
-References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
- <1398353407-2345-8-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20140424154519.GE14110@arm.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 24 Apr 2014 23:45:44 +0800
+Subject: [PATCH 4/4] pinctrl: sirf: move to use irq_get_handler_data
+In-Reply-To: <CACRpkdYz+JdAbhdR_s9h4m_3JNcpLo-2VzoXYoEd21myB4yZtg@mail.gmail.com>
+References: <1397544229-20545-1-git-send-email-21cnbao@gmail.com>
+ <1397544229-20545-5-git-send-email-21cnbao@gmail.com>
+ <CACRpkdbDeF5gBVv=hQSdX1i9fw=7Or+=qN=g4OXHvHkZKr7vcQ@mail.gmail.com>
+ <CAGsJ_4y=zNNWAvVOK6zGaY-bufUCbOcZtwE=SuWJ=QpF9rBNHg@mail.gmail.com>
+ <CACRpkdYz+JdAbhdR_s9h4m_3JNcpLo-2VzoXYoEd21myB4yZtg@mail.gmail.com>
+Message-ID: <CAGsJ_4zBC6wkRVwLWs4i3Vav-+CXJmVNp4cRbeLm-5KtzqohDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 24, 2014 at 04:30:07PM +0100, Santosh Shilimkar wrote:
-> On a 32 bit ARM architecture with LPAE extension physical addresses
-> cannot fit into unsigned long variable.
-> 
-> So fix it by using phys_addr_t instead of unsigned long.
-> 
-> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
->  arch/arm/mm/dma-mapping.c |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+2014-04-24 20:59 GMT+08:00, Linus Walleij <linus.walleij@linaro.org>:
+> On Thu, Apr 24, 2014 at 12:59 AM, Barry Song <21cnbao@gmail.com> wrote:
+>
+>>> If you want to use some other handler data than the gpiochip,
+>>> you should just use irq_set_chained_handler() and
+>>> irq_set_handler_data() directly.
+>>
+>> i think this should be fixed in the general API but not use one more
+>> function call to over-write the handler_data which has been filled in
+>> the API.
+>> since we have the chance for drivers to set either the whole chip for
+>> a simple chip,  or bank-specific data for a chip which has multiple
+>> parent IRQs.
+>
+> I don't think it's worth it for saving one line. The helper is intended
+> for the simple case, i.e. where it's enough to just get the gpio_chip
+> as handler data. Other alternatives need to be open coded.
+>
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+gpiochip_set_chained_irqchip() only save one line for simple gpiochip too.
+it is not worth as well. people can realize what he should set as irq_handler.
 
-Will
+> I'm even considering removing this helper if it's confusing, it doesn't
+> really add much, gpiochip_irqchip_add() is the important function
+> to use, not gpiochip_set_chained_irqchip().
+>
+> Yours,
+> Linus Walleij
 
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index f62aa06..5260f43 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -885,7 +885,7 @@ static void dma_cache_maint_page(struct page *page, unsigned long offset,
->  static void __dma_page_cpu_to_dev(struct page *page, unsigned long off,
->  	size_t size, enum dma_data_direction dir)
->  {
-> -	unsigned long paddr;
-> +	phys_addr_t paddr;
->  
->  	dma_cache_maint_page(page, off, size, dir, dmac_map_area);
->  
-> @@ -901,7 +901,7 @@ static void __dma_page_cpu_to_dev(struct page *page, unsigned long off,
->  static void __dma_page_dev_to_cpu(struct page *page, unsigned long off,
->  	size_t size, enum dma_data_direction dir)
->  {
-> -	unsigned long paddr = page_to_phys(page) + off;
-> +	phys_addr_t paddr = page_to_phys(page) + off;
->  
->  	/* FIXME: non-speculating: not required */
->  	/* don't bother invalidating if DMA to device */
-> -- 
-> 1.7.9.5
-> 
-> 
+-barry
