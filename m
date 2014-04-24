@@ -1,29 +1,51 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 24 Apr 2014 17:25:58 +0100
-Subject: [PATCH] i2c: exynos5: Initialise Samsung High Speed I2C
- controller early
-In-Reply-To: <1398350916-885-1-git-send-email-ch.naveen@samsung.com>
-References: <1398350916-885-1-git-send-email-ch.naveen@samsung.com>
-Message-ID: <20140424162558.GB12304@sirena.org.uk>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 24 Apr 2014 11:31:27 -0500
+Subject: [PATCH V2 00/19] bus: omap_l3_noc: driver cleanups and support
+ for DRA7/AM4372
+In-Reply-To: <20140424162536.GD22987@atomide.com>
+References: <1397492726-17203-1-git-send-email-nm@ti.com>
+ <1397767775-10965-1-git-send-email-nm@ti.com>
+ <53504041.7090906@ti.com> <5350410B.5010507@ti.com>
+ <5358D16A.9000500@ti.com> <20140424162536.GD22987@atomide.com>
+Message-ID: <CAGo_u6p8wivmN-S8V2dyk7ZcoDbkkTiEJGJON4+9NYXqYFA2YQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 24, 2014 at 08:18:36PM +0530, Naveen Krishna Chatradhi wrote:
-> This patch moves initialization code to subsys_initcall() to ensure
-> that the i2c bus is available early so the regulators can be quickly
-> probed and available for other devices on their probe() call.
+On Thu, Apr 24, 2014 at 11:25 AM, Tony Lindgren <tony@atomide.com> wrote:
+> * Peter Ujfalusi <peter.ujfalusi@ti.com> [140424 01:55]:
+>> On 04/18/2014 12:00 AM, Nishanth Menon wrote:
+>> > On 04/17/2014 03:57 PM, Santosh Shilimkar wrote:
+>> >> I looked at the series and its looks pretty good. Thanks for fixups, updates.
+>> >> For whole series,
+>> >> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> >>
+>> >
+>> > Thanks.
+>> >
+>> >>> Patches(including Peter's) is available here:
+>> >>> https://github.com/nmenon/linux-2.6-playground/commits/l3noc/driver-fixes-v2
+>> >>>
+>> >> Can Tony pull this branch for 3.16 then which includes Peter's series as well ?
+>> >
+>> > there is just an empty commit with information about peter's patches
+>> > that i lined up to differentiate the series.. I can drop it if Tony
+>> > would like me to.
+>>
+>> Looking at the branch I see my patches underneath so they are in the branch.
+>> It would be great if Tony pulls this... Will be a great present to my patches
+>> (omap_l3 patches in the branch) for their 1 year anniversary of being out on
+>> the mailing list ;)
+>
+> If you insist :) Maybe we should have some cake or something with it?
+> Seriously, I always thought that's a nice clean-up set, but never thought
+> I'm supposed to merge it. Will merge it as soon as I'm out of the fixes
+> and regressions land as that way I can easier test for any kind of
+> new regressions that might occur related to PM at least.
 
-> Such solution has been proposed by Mark Brown to fix the problem of
-> the regulators not beeing available on the peripheral device probe():
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-March/011971.html
+Thanks Tony. I will try and post a v3 tomorrow as a clean set of
+patches and a v3.15-rc1 based branch to ease integration.
 
-What specifically is this needed for?  We *should* be able to use
-deferred probe for most things, but I know that not all subsystems are
-able to yet.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140424/ef89e6fa/attachment-0001.sig>
+This should also give additional time for any further comments as well.
+
+Regards,
+Nishanth Menon
