@@ -1,57 +1,65 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 24 Apr 2014 20:53:29 +0400
-Subject: [PATCH 11/23] ARM: dts: omap5-uevm.dts: add tca6424a
-In-Reply-To: <5359209F.7000308@ti.com>
-References: <1398334639-14172-1-git-send-email-tomi.valkeinen@ti.com>
- <1398334639-14172-12-git-send-email-tomi.valkeinen@ti.com>
- <53591669.7060502@cogentembedded.com> <5359209F.7000308@ti.com>
-Message-ID: <53594189.1090508@cogentembedded.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Thu, 24 Apr 2014 18:53:50 +0200
+Subject: [PATCH 1/1] ARM: dts: omap3-igep0020: use SMSC9221 timings
+Message-ID: <1398358430-13570-1-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+The IGEPv2 board has a SMSC LAN9221i ethernet chip and not a
+SMSC LAN911x connected to the GPMC. Each chip needs different
+timings in order to operate correctly so is wrong to include
+omap-gpmc-smsc911x.dtsi instead of omap-gpmc-smsc9221.dtsi.
 
-On 04/24/2014 06:33 PM, Tomi Valkeinen wrote:
+Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+---
 
->>> omap5-uevm has a tca6424a I/O expander. Add it to the .dts file.
+Hi Tony,
 
->>> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
->>> Cc: Tony Lindgren <tony@atomide.com>
->>> ---
->>>    arch/arm/boot/dts/omap5-uevm.dts | 7 +++++++
->>>    1 file changed, 7 insertions(+)
+I see no performance difference when measuring network throughput using
+iperf(1) but this change is the correct one nonetheless since if we later
+better adjust the timings it will already include the right dtsi.
 
->>> diff --git a/arch/arm/boot/dts/omap5-uevm.dts
->>> b/arch/arm/boot/dts/omap5-uevm.dts
->>> index 3b99ec25b748..9e7581eaeb23 100644
->>> --- a/arch/arm/boot/dts/omap5-uevm.dts
->>> +++ b/arch/arm/boot/dts/omap5-uevm.dts
->>> @@ -434,6 +434,13 @@
->>>        pinctrl-0 = <&i2c5_pins>;
->>>
->>>        clock-frequency = <400000>;
->>> +
->>> +    tca6424a: tca6424a at 22 {
+Best regards,
+Javier
 
->>     The ePAPR standard [1] says: "The name of a node should be somewhat
->> generic,
->> reflecting the function of the device and not its precise programming
->> model.
->> If appropriate, the name should be one of the following choices:
->> [...]
->>     - gpio;"
+ arch/arm/boot/dts/omap3-igep.dtsi    | 2 +-
+ arch/arm/boot/dts/omap3-igep0020.dts | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-> Right. I wonder what the name should be... "gpio" is out, as the name
-> should be more specific.
-
-    No, it's not out. The name should be "gpio at 22", I think it would be unique.
-
-> We already have gpio1-8, which are the gpio
-> banks from the SoC.
-
-    I don't understand why you are indexing the names while you probably have 
-the address part after @ that makes them unique already.
-
->   Tomi
-
-WBR, Sergei
+diff --git a/arch/arm/boot/dts/omap3-igep.dtsi b/arch/arm/boot/dts/omap3-igep.dtsi
+index b97736d..e2d163b 100644
+--- a/arch/arm/boot/dts/omap3-igep.dtsi
++++ b/arch/arm/boot/dts/omap3-igep.dtsi
+@@ -107,7 +107,7 @@
+ 		>;
+ 	};
+ 
+-	smsc911x_pins: pinmux_smsc911x_pins {
++	smsc9221_pins: pinmux_smsc9221_pins {
+ 		pinctrl-single,pins = <
+ 			0x1a2 (PIN_INPUT | MUX_MODE4)		/* mcspi1_cs2.gpio_176 */
+ 		>;
+diff --git a/arch/arm/boot/dts/omap3-igep0020.dts b/arch/arm/boot/dts/omap3-igep0020.dts
+index 7abd64f..b22caaa 100644
+--- a/arch/arm/boot/dts/omap3-igep0020.dts
++++ b/arch/arm/boot/dts/omap3-igep0020.dts
+@@ -10,7 +10,7 @@
+  */
+ 
+ #include "omap3-igep.dtsi"
+-#include "omap-gpmc-smsc911x.dtsi"
++#include "omap-gpmc-smsc9221.dtsi"
+ 
+ / {
+ 	model = "IGEPv2 (TI OMAP AM/DM37x)";
+@@ -248,7 +248,7 @@
+ 
+ 	ethernet at gpmc {
+ 		pinctrl-names = "default";
+-		pinctrl-0 = <&smsc911x_pins>;
++		pinctrl-0 = <&smsc9221_pins>;
+ 		reg = <5 0 0xff>;
+ 		interrupt-parent = <&gpio6>;
+ 		interrupts = <16 IRQ_TYPE_LEVEL_LOW>;
+-- 
+1.9.1
