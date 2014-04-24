@@ -1,26 +1,99 @@
 From: leela.krishna@linaro.org (Leela Krishna Amudala)
-Date: Thu, 24 Apr 2014 15:01:57 +0530
-Subject: [PATCH 0/2] Add generic cpu power control functions for exynos
-Message-ID: <1398331919-28321-1-git-send-email-leela.krishna@linaro.org>
+Date: Thu, 24 Apr 2014 15:01:58 +0530
+Subject: [PATCH 1/2] ARM: EXYNOS: Add generic cpu power control functions for
+ all exynos based SoCs
+In-Reply-To: <1398331919-28321-1-git-send-email-leela.krishna@linaro.org>
+References: <1398331919-28321-1-git-send-email-leela.krishna@linaro.org>
+Message-ID: <1398331919-28321-2-git-send-email-leela.krishna@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds the generic cpu power control functions for
-exynos based SoCs to power up/down and to know the status of the cpu.
+Add generic cpu power control functions for exynos based SoCS
+for cpu power up/down and to know the cpu status.
 
-Note: This series has been rebased on 3.15-rc1 and tested on 
-Exynos based Origen(Cortex-A9) and Arndale-octa(Cortex A7,A15) boards.
-
-Leela Krishna Amudala (2):
-  ARM: EXYNOS: Add generic cpu power control functions for all exynos
-    based SoCs
-  ARM: EXYNOS: use generic exynos cpu power control functions
-
+Signed-off-by: Leela Krishna Amudala <leela.krishna@linaro.org>
+---
  arch/arm/mach-exynos/common.h   |    3 +++
- arch/arm/mach-exynos/platsmp.c  |    9 +++------
  arch/arm/mach-exynos/pm.c       |   36 ++++++++++++++++++++++++++++++++++++
  arch/arm/mach-exynos/regs-pmu.h |    6 ++++++
- 4 files changed, 48 insertions(+), 6 deletions(-)
+ 3 files changed, 45 insertions(+)
 
+diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+index 9ef3f83..566f222 100644
+--- a/arch/arm/mach-exynos/common.h
++++ b/arch/arm/mach-exynos/common.h
+@@ -62,5 +62,8 @@ struct exynos_pmu_conf {
+ };
+ 
+ extern void exynos_sys_powerdown_conf(enum sys_powerdown mode);
++extern void exynos_cpu_powerdown(int cpu);
++extern void exynos_cpu_powerup(int cpu);
++extern int  exynos_cpu_power_state(int cpu);
+ 
+ #endif /* __ARCH_ARM_MACH_EXYNOS_COMMON_H */
+diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+index 15af0ce..6651028 100644
+--- a/arch/arm/mach-exynos/pm.c
++++ b/arch/arm/mach-exynos/pm.c
+@@ -100,6 +100,42 @@ static int exynos_irq_set_wake(struct irq_data *data, unsigned int state)
+ 	return -ENOENT;
+ }
+ 
++/**
++ * exynos_cpu_powerdown : power down the specified cpu
++ * @cpu : the cpu to power down
++ *
++ * Power downs the specified cpu. The sequence must be finished by a
++ * call to cpu_do_idle()
++ *
++ */
++void exynos_cpu_powerdown(int cpu)
++{
++	__raw_writel(0, EXYNOS_ARM_CORE_CONFIGURATION(cpu));
++}
++
++/**
++ * exynos_cpu_powerup : power up the specified cpu
++ * @cpu : the cpu to power up
++ *
++ * Power up the specified cpu
++ */
++void exynos_cpu_powerup(int cpu)
++{
++	__raw_writel(S5P_CORE_LOCAL_PWR_EN,
++		     EXYNOS_ARM_CORE_CONFIGURATION(cpu));
++}
++
++/**
++ * exynos_cpu_power_state : returns the power state of the cpu
++ * @cpu : the cpu to retrieve the power state from
++ *
++ */
++int exynos_cpu_power_state(int cpu)
++{
++	return (__raw_readl(EXYNOS_ARM_CORE_STATUS(cpu)) &
++			S5P_CORE_LOCAL_PWR_EN);
++}
++
+ /* For Cortex-A9 Diagnostic and Power control register */
+ static unsigned int save_arm_register[2];
+ 
+diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
+index 4f6a256..0bdfcbc 100644
+--- a/arch/arm/mach-exynos/regs-pmu.h
++++ b/arch/arm/mach-exynos/regs-pmu.h
+@@ -121,6 +121,12 @@
+ 
+ #define S5P_CHECK_SLEEP				0x00000BAD
+ 
++#define EXYNOS_ARM_CORE0_CONFIGURATION		S5P_PMUREG(0x2000)
++#define EXYNOS_ARM_CORE_CONFIGURATION(_nr)	\
++			(EXYNOS_ARM_CORE0_CONFIGURATION + (0x80 * (_nr)))
++#define EXYNOS_ARM_CORE_STATUS(_nr)		\
++			(EXYNOS_ARM_CORE_CONFIGURATION(_nr) + 0x4)
++
+ /* Only for EXYNOS4210 */
+ #define S5P_CMU_CLKSTOP_LCD1_LOWPWR	S5P_PMUREG(0x1154)
+ #define S5P_CMU_RESET_LCD1_LOWPWR	S5P_PMUREG(0x1174)
 -- 
 1.7.9.5
