@@ -1,24 +1,70 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 24 Apr 2014 01:30:38 -0400
-Subject: [PATCH v3 0/6] ARM: mvebu: prepare PMSU code for cpuidle and
- Armada 375/38x SMP
-In-Reply-To: <1397483433-25836-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1397483433-25836-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140424053038.GW28159@titan.lakedaemon.net>
+From: monstr@monstr.eu (Michal Simek)
+Date: Thu, 24 Apr 2014 07:30:48 +0200
+Subject: [GIT PULL] serial: Cadence
+In-Reply-To: <20140423234832.GB17827@kroah.com>
+References: <53575983.3030508@monstr.eu> <20140423234832.GB17827@kroah.com>
+Message-ID: <5358A188.4080404@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 14, 2014 at 03:50:27PM +0200, Thomas Petazzoni wrote:
-> Hello,
+On 04/24/2014 01:48 AM, Greg Kroah-Hartman wrote:
+> On Wed, Apr 23, 2014 at 08:11:15AM +0200, Michal Simek wrote:
+>> Hi Greg,
+>>
+>> this is around for a while and I would like to close it.
+>> I have applied patches 1-7 from v3.
+>> Patches 8 and 9 should go through arm-soc tree and I will add them
+>> to my zynq/dt branch.
+>>
+>> Please apply these patches to your tree.
+>> If this should go through different tree please let me know.
+>>
+>> Thanks,
+>> Michal
+>>
+>>
+>> The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+>>
+>>   Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.monstr.eu/linux-2.6-microblaze.git tags/cadence-uart-for-3.16
 > 
-> This is the third version of the PMSU rework. See at the bottom of
-> this e-mail for details about this patch series.
+> I can't take git pulles from random internet sites, sorry.  Just send
+> these as email and I will queue them up.
 
-Patches 1 to 4, and 6 applied to mvebu/soc-pmsu (for cpuidle to pull if
-needed)
+I wouldn't say random. This repo is listed in my Microblaze maintainer fragment
+and I used signed tag and you have sign my key that's why you can easily
+check it.
 
-Patch 5 applied to mvebu/dt
+Anyway we have sent v3 patches via email twice.
+Origin v3:
+https://lkml.org/lkml/2014/3/12/499
 
-thx,
+Resent v3:
+https://lkml.org/lkml/2014/4/4/523
 
-Jason.
+Patches 1-7 should go through your tree.
+That's why please apply these 7 patches to your tree. If you want
+to get just these 7 patches as v4, please let us know we can easily
+resent it.
+
+Thanks,
+Michal
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140424/1154ea19/attachment.sig>
