@@ -1,42 +1,50 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 24 Apr 2014 19:45:16 +0100
-Subject: [PATCH v6 0/6] ARM: vdso gettimeofday using generic timer
- architecture
-In-Reply-To: <53595AE9.5000506@mentor.com>
-References: <cover.1398213562.git.nathan_lynch@mentor.com>
- <20140423215040.GC26756@n2100.arm.linux.org.uk> <535926EF.20805@mentor.com>
- <20140424162229.GU26756@n2100.arm.linux.org.uk> <53595AE9.5000506@mentor.com>
-Message-ID: <20140424184516.GY26756@n2100.arm.linux.org.uk>
+Date: Thu, 24 Apr 2014 20:01:56 +0100
+Subject: set_fiq_handler: Bad mode in data abort handler detected
+In-Reply-To: <2181550.Duxpmd4GvD@dabox>
+References: <2527501.cXAbiV8bqS@dabox>
+ <20140424103136.GI26756@n2100.arm.linux.org.uk> <2181550.Duxpmd4GvD@dabox>
+Message-ID: <20140424190156.GZ26756@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 24, 2014 at 01:41:45PM -0500, Nathan Lynch wrote:
-> On 04/24/2014 11:22 AM, Russell King - ARM Linux wrote:
-> > 
-> > The obvious question therefore is, if the dynamic linker throws its toys
-> > out if it encounters a wrong-float-ABI library during a standard library
-> > search, why would it _not_ throw its toys out on dlsym.  The difference
-> > in behaviour would to me seem to be a bug - both should behave the same,
-> > though of course not throwing its toys out, but instead producing an error
-> > _or_ accepting the difference.  Given that it's an ABI difference,
-> > rejecting the library is the only sane approach.
+On Thu, Apr 24, 2014 at 04:33:38PM +0200, Tim Sander wrote:
+> Hi Russell and List
+> <snip>
+> > In years gone by, I'd have recommended that the kernel mappings for
+> > this stuff were done via static mappings, but with DT, that's no
+> > longer acceptable.  So I guess we have a problem...
 > 
-> The VDSO would appear to not be subject to the same validation that a
-> file-based DSO is.  I'll dig deeper into this to understand exactly
-> what's going on, but I have a guess as to why the VDSO happens to work
-> with armhf userspace: the calling convention is different only for
-> floating point arguments, and there are none in the VDSO routines.
+> To verify that your very plausible hypothesis is right i tried:
+> timer_memory = __arm_ioremap(0x4280000>>PAGE_SHIFT,0x1000,MT_MEMORY); //also tried MT_DEVICE
 
-I don't believe the dynamic linker has the necessary information to
-know whether any functions take FP arguments.  I have some armel
-libraries which definitely make no use of FP, and the linker refuses
-to use them with armhf.
+This isn't going to help.  Any dynamically initialised mapping via any
+of the ioremap functions is going to fail for the reason I outlined,
+and it doesn't matter what type of mapping you use.  *All* dynamically
+created mappings are populated to other threads lazily.
 
-It's something that the linker doesn't take account of either - we've
-had issues in the kernel with differing float ABIs which cause hard
-errors when two dissimilar objects are tried to be linked, even though
-they make no use of FP.  They just seem to need to be marked differently
-for stuff to complain/reject them.
+The reason for that is because it's _very_ expensive/racy to walk over
+every single thread and update its page tables - Linux years ago used
+to do that as standard with ioremap() and similar, and the code was
+ripped out after it became too much of a burden.
+
+When I talk about static mappings above, I'm talking about those which
+are setup very early in boot via iotable_init().  However, these aren't
+permitted with DT anymore.
+
+> the memory at early boot in "zynq_init_late".
+
+My kernel doesn't have zynq_init_late()... I'm guessing that it's hooked
+into the .init_late callback, which is certainly too late - this is called
+towards the end of driver initialisation, after many threads have already
+been spawned.
+
+The places where you are called before any threads have been spawned are
+unfortunately places where you can't use ioremap().
+
+At the moment, I don't have an answer to this - the answers I have are
+incompatible with the direction that arm-soc people want to go (which is
+to have zero static mappings.)
 
 -- 
 FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
