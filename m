@@ -1,64 +1,62 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 24 Apr 2014 09:42:04 -0700
-Subject: [PATCH v3] gpio: omap: implement get_direction
-In-Reply-To: <535911D0.3020907@ti.com>
-References: <1398322659-20008-1-git-send-email-yegorslists@googlemail.com>
- <CACRpkdZPNGHNQhqovDoaKTXZT3mJfN4pjKSBxW7m6wT5u-XEYQ@mail.gmail.com>
- <535911D0.3020907@ti.com>
-Message-ID: <20140424164204.GE22987@atomide.com>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 24 Apr 2014 12:47:44 -0400 (EDT)
+Subject: [PATCH 2/2] net: Add Keystone NetCP ethernet driver
+In-Reply-To: <1398201675-17379-3-git-send-email-santosh.shilimkar@ti.com>
+References: <1398201675-17379-1-git-send-email-santosh.shilimkar@ti.com>
+ <1398201675-17379-3-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20140424.124744.1296959126932595844.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Santosh Shilimkar <santosh.shilimkar@ti.com> [140424 06:30]:
-> On Thursday 24 April 2014 09:13 AM, Linus Walleij wrote:
-> > On Thu, Apr 24, 2014 at 8:57 AM,  <yegorslists@googlemail.com> wrote:
-> > 
-> >> From: Yegor Yefremov <yegorslists@googlemail.com>
-> >>
-> >> This patch implements gpio_chip's get_direction() routine, that
-> >> lets other drivers get particular GPIOs direction using
-> >> struct gpio_desc.
-> >>
-> >> Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
-> >> Acked-by: Javier Martinez Canillas <javier@dowhile0.org>
-> >> ---
-> >> Changes:
-> >>         v3: get rid of _get_gpio_direction() (Linus Walleij)
-> >>         v2: rework return value calculation
-> > 
-> > Looks good to me, Kevin, Santosh?
-> > 
-> Looks fine to me as well.
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Date: Tue, 22 Apr 2014 17:21:15 -0400
 
-OK finally got around testing gpio/for-next here. Could not use
-todays linux next as it's broken again for whatever reasons and
-does not even compile for me.
+> +struct netcp_tx_pipe {
+> +	struct netcp_device	*netcp_device;
+> +	void	*dma_queue;
 
-Boot tested gpio/next on few omap1 boards: h2, osk and 770 and
-things behave the same way as earlier for me on these boards.
-Also made sure the PM does not break as tested on n900 with the
-GPIO changes. So for the following patches, feel free to add:
+Indent *dma_queue the same as the other struct members.
 
-cb2a5fb059b5 gpio: do not set up hardware for IRQ_TYPE_NONE
-da09ceae78f7 gpio: omap: implement get_direction
-d04b76626e94 gpio: omap: convert driver to use gpiolib irqchip
-d4094cd7577c gpio: omap: check gpiochip_add() return value
-820eade1b7f3 gpio: omap: convert to use irq_domain_add_simple()
-717f70e39a98 gpio: omap: Use devm_ioremap_resource()
+> +	unsigned		dma_queue_id;
 
-Tested-by: Tony Lindgren <tony@atomide.com>
+Use explicit "unsigned int".
 
-Naturally no need to go back to edit the commits for my acks
-unless there are other reasons to redo the branches.
+> +	unsigned		dma_chan_id;
 
-> > Part of me wants to list Javier as maintainer for this driver.
-> > 
-> Am ok with it as well.
+Likewise.
 
-That sounds good to me too, looks like Javier is doing a good job
-on that already :)
+> +struct netcp_addr {
+> +	struct netcp_intf	*netcp;
+> +	unsigned char		addr[MAX_ADDR_LEN];
 
-Regards,
+If this is just an ethernet driver, ETH_ALEN is more appropriate here.
 
-Tony 
+> +	unsigned		tx_compl_qid;
+
+Explicit "unsigned int" please.  I'm not going to point out all of the other
+instances, audit your entire submission for this problem please.
+
+> +static inline u32 *netcp_push_psdata(struct netcp_packet *p_info,
+> +				     unsigned bytes)
+> +{
+> +	u32		*buf;
+> +	unsigned	 words;
+
+Do not use tabs between the type and the variable name in local variable
+declarations.
+
+Please audit for and fix this in your entire submission.
+
+> +static inline u32 hwval_to_host(bool big_endian, u32 hwval)
+> +{
+> +	if (big_endian)
+> +		return be32_to_cpu(hwval);
+> +	else
+> +		return le32_to_cpu(hwval);
+> +}
+
+You're much better off having a set of methods, one for big endian and
+one for little endian, that just straight line codes the appropriate endian
+accesses.
+
+These conditionals peppered all over the place are just ugly.
