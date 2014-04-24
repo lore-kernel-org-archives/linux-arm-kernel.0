@@ -1,155 +1,23 @@
 From: tharvey@gateworks.com (Tim Harvey)
-Date: Thu, 24 Apr 2014 15:07:26 -0700
-Subject: [PATCH 2/3] ARM: dts: imx: add LVDS backlight for Ventana
-In-Reply-To: <1398377247-3901-1-git-send-email-tharvey@gateworks.com>
-References: <1398377247-3901-1-git-send-email-tharvey@gateworks.com>
-Message-ID: <1398377247-3901-3-git-send-email-tharvey@gateworks.com>
+Date: Thu, 24 Apr 2014 15:07:24 -0700
+Subject: [PATCH 0/3] ARM: dts: imx: various fixes for LVDS on Ventana
+Message-ID: <1398377247-3901-1-git-send-email-tharvey@gateworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GW54xx/GW53xx/GW52xx all support LVDS with a PWM controlled backlight.
+This series adds support for the LVDS display on GW54xx/GW53xx/GW52xx.
 
 Signed-off-by: Tim Harvey <tharvey@gateworks.com>
----
- arch/arm/boot/dts/imx6qdl-gw52xx.dtsi | 20 ++++++++++++++++++++
- arch/arm/boot/dts/imx6qdl-gw53xx.dtsi | 20 ++++++++++++++++++++
- arch/arm/boot/dts/imx6qdl-gw54xx.dtsi | 20 ++++++++++++++++++++
- 3 files changed, 60 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-index 607888c..9c9259b 100644
---- a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-@@ -27,6 +27,14 @@
- 		bootargs = "console=ttymxc1,115200";
- 	};
- 
-+	backlight {
-+		compatible = "pwm-backlight";
-+		pwms = <&pwm4 0 5000000>;
-+		brightness-levels = <0 4 8 16 32 64 128 255>;
-+		default-brightness-level = <7>;
-+		status = "okay";
-+	};
-+
- 	leds {
- 		compatible = "gpio-leds";
- 
-@@ -399,6 +407,12 @@
- 			>;
- 		};
- 
-+		pinctrl_pwm4: pwm4grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_SD1_CMD__PWM4_OUT		0x1b0b1
-+			>;
-+		};
-+
- 		pinctrl_uart1: uart1grp {
- 			fsl,pins = <
- 				MX6QDL_PAD_SD3_DAT7__UART1_TX_DATA	0x1b0b1
-@@ -451,6 +465,12 @@
- 	status = "okay";
- };
- 
-+&pwm4 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pwm4>;
-+	status = "okay";
-+};
-+
- &ssi1 {
- 	fsl,mode = "i2s-slave";
- 	status = "okay";
-diff --git a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
-index ef7bd99..3e146d6 100644
---- a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
-@@ -30,6 +30,14 @@
- 		bootargs = "console=ttymxc1,115200";
- 	};
- 
-+	backlight {
-+		compatible = "pwm-backlight";
-+		pwms = <&pwm4 0 5000000>;
-+		brightness-levels = <0 4 8 16 32 64 128 255>;
-+		default-brightness-level = <7>;
-+		status = "okay";
-+	};
-+
- 	leds {
- 		compatible = "gpio-leds";
- 
-@@ -439,6 +447,12 @@
- 			>;
- 		};
- 
-+		pinctrl_pwm4: pwm4grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_SD1_CMD__PWM4_OUT		0x1b0b1
-+			>;
-+		};
-+
- 		pinctrl_uart1: uart1grp {
- 			fsl,pins = <
- 				MX6QDL_PAD_SD3_DAT7__UART1_TX_DATA	0x1b0b1
-@@ -513,6 +527,12 @@
- 	};
- };
- 
-+&pwm4 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pwm4>;
-+	status = "okay";
-+};
-+
- &ssi1 {
- 	fsl,mode = "i2s-slave";
- 	status = "okay";
-diff --git a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-index 4ce8f68..d145f8c 100644
---- a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-@@ -30,6 +30,14 @@
- 		bootargs = "console=ttymxc1,115200";
- 	};
- 
-+	backlight {
-+		compatible = "pwm-backlight";
-+		pwms = <&pwm4 0 5000000>;
-+		brightness-levels = <0 4 8 16 32 64 128 255>;
-+		default-brightness-level = <7>;
-+		status = "okay";
-+	};
-+
- 	leds {
- 		compatible = "gpio-leds";
- 
-@@ -461,6 +469,12 @@
- 			>;
- 		};
- 
-+		pinctrl_pwm4: pwm4grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_SD1_CMD__PWM4_OUT		0x1b0b1
-+			>;
-+		};
-+
- 		pinctrl_uart1: uart1grp {
- 			fsl,pins = <
- 				MX6QDL_PAD_SD3_DAT7__UART1_TX_DATA	0x1b0b1
-@@ -535,6 +549,12 @@
- 	};
- };
- 
-+&pwm4 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pwm4>;
-+	status = "okay";
-+};
-+
- &ssi1 {
- 	fsl,mode = "i2s-slave";
- 	status = "okay";
+Tim Harvey (3):
+  ARM: dts: imx: Fix LVDS mapping for Ventana GW53xx/GW54xx
+  ARM: dts: imx: add LVDS backlight for Ventana
+  ARM: dts: imx: Fix LVDS mapping for Ventana GW52xx
+
+ arch/arm/boot/dts/imx6qdl-gw52xx.dtsi | 40 ++++++++++++++++++++++++++++++++++-
+ arch/arm/boot/dts/imx6qdl-gw53xx.dtsi | 22 ++++++++++++++++++-
+ arch/arm/boot/dts/imx6qdl-gw54xx.dtsi | 22 ++++++++++++++++++-
+ 3 files changed, 81 insertions(+), 3 deletions(-)
+
 -- 
 1.8.3.2
