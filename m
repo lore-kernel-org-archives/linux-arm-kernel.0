@@ -1,76 +1,268 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Thu, 24 Apr 2014 13:16:56 +0300
-Subject: [PATCH 00/23] OMAPDSS: OMAP5 display support
-Message-ID: <1398334639-14172-1-git-send-email-tomi.valkeinen@ti.com>
+Date: Thu, 24 Apr 2014 13:16:57 +0300
+Subject: [PATCH 01/23] OMAPDSS: HDMI: lane config support
+In-Reply-To: <1398334639-14172-1-git-send-email-tomi.valkeinen@ti.com>
+References: <1398334639-14172-1-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1398334639-14172-2-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add support to configure the pins used for the HDMI lanes. The order and
+polarity of the lanes can be defined in the DT data.
 
-This series implements OMAP5 display support. The series is based on -rc2.
+Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+---
+ drivers/video/fbdev/omap2/dss/hdmi.h        |  6 ++
+ drivers/video/fbdev/omap2/dss/hdmi4.c       | 28 +++++++++
+ drivers/video/fbdev/omap2/dss/hdmi_common.c | 41 +++++++++++++
+ drivers/video/fbdev/omap2/dss/hdmi_phy.c    | 94 ++++++++++++++++++++++++++++-
+ 4 files changed, 167 insertions(+), 2 deletions(-)
 
-Tested on OMAP5 uEVM with HDMI output, and OMAP5 uEVM with a custom DSI panel
-(patches for the panel are not included here).
-
-Tomi
-
-Archit Taneja (4):
-  ARM: OMAP: hwmod: OMAP5 DSS hwmod data
-  OMAPDSS: HDMI: support larger register offsets for OMAP5 HDMI core
-  OMAPDSS: HDMI: PHY changes for OMAP5
-  OMAPDSS: HDMI: PLL changes for OMAP5
-
-Tomi Valkeinen (19):
-  OMAPDSS: HDMI: lane config support
-  Doc/DT: ti,omap4-dss: hdmi lanes
-  OMAPDSS: HDMI4: set regulator voltage to 1.8V
-  OMAPDSS: DSI: set regulator voltage to 1.8V
-  ARM: OMAP: add OMAP5 DSI muxing
-  ARM: OMAP: add detection of omap5-dss
-  ARM: dts: omap5-clocks.dtsi: add dss iclk
-  ARM: dts: omap5-clocks.dtsi: add ti,set-rate-parent to dss_dss_clk
-  ARM: dts: omap5.dtsi: add DSS nodes
-  ARM: dts: omap5-uevm.dts: add tca6424a
-  ARM: dts: omap5-uevm.dts: add display nodes
-  OMAPDSS: DSS & DISPC DT support for OMAP5
-  OMAPDSS: features: fix OMAP5 features
-  OMAPDSS: DPI: fix LCD3 DSI source
-  OMAPDSS: DSI: Add OMAP5 DSI module IDs
-  OMAPDSS: HDMI: improve Makefile
-  OMAPDSS: HDMI: move irq & phy pwr handling
-  OMAPDSS: HDMI: Add OMAP5 HDMI support
-  Doc/DT: Add OMAP5 DSS DT bindings
-
- .../devicetree/bindings/video/ti,omap4-dss.txt     |   4 +
- .../devicetree/bindings/video/ti,omap5-dss.txt     |  96 +++
- arch/arm/boot/dts/omap5-uevm.dts                   |  89 ++
- arch/arm/boot/dts/omap5.dtsi                       |  70 ++
- arch/arm/boot/dts/omap54xx-clocks.dtsi             |   9 +
- arch/arm/mach-omap2/display.c                      |  39 +-
- arch/arm/mach-omap2/omap_hwmod_54xx_data.c         | 283 +++++++
- drivers/video/fbdev/omap2/dss/Kconfig              |  22 +-
- drivers/video/fbdev/omap2/dss/Makefile             |   6 +-
- drivers/video/fbdev/omap2/dss/core.c               |   6 +
- drivers/video/fbdev/omap2/dss/dispc.c              |   1 +
- drivers/video/fbdev/omap2/dss/dpi.c                |   2 +
- drivers/video/fbdev/omap2/dss/dsi.c                |  17 +
- drivers/video/fbdev/omap2/dss/dss.c                |   1 +
- drivers/video/fbdev/omap2/dss/dss.h                |   3 +
- drivers/video/fbdev/omap2/dss/dss_features.c       |   3 +-
- drivers/video/fbdev/omap2/dss/hdmi.h               |  17 +-
- drivers/video/fbdev/omap2/dss/hdmi4.c              | 113 ++-
- drivers/video/fbdev/omap2/dss/hdmi5.c              | 829 ++++++++++++++++++
- drivers/video/fbdev/omap2/dss/hdmi5_core.c         | 922 +++++++++++++++++++++
- drivers/video/fbdev/omap2/dss/hdmi5_core.h         | 306 +++++++
- drivers/video/fbdev/omap2/dss/hdmi_common.c        |  41 +
- drivers/video/fbdev/omap2/dss/hdmi_phy.c           | 231 ++++--
- drivers/video/fbdev/omap2/dss/hdmi_pll.c           |  81 +-
- drivers/video/fbdev/omap2/dss/hdmi_wp.c            |   2 +-
- 25 files changed, 3111 insertions(+), 82 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/video/ti,omap5-dss.txt
- create mode 100644 drivers/video/fbdev/omap2/dss/hdmi5.c
- create mode 100644 drivers/video/fbdev/omap2/dss/hdmi5_core.c
- create mode 100644 drivers/video/fbdev/omap2/dss/hdmi5_core.h
-
+diff --git a/drivers/video/fbdev/omap2/dss/hdmi.h b/drivers/video/fbdev/omap2/dss/hdmi.h
+index e25681ff5a70..4e5c44e7eeb3 100644
+--- a/drivers/video/fbdev/omap2/dss/hdmi.h
++++ b/drivers/video/fbdev/omap2/dss/hdmi.h
+@@ -352,6 +352,9 @@ struct hdmi_phy_data {
+ 	void __iomem *base;
+ 
+ 	int irq;
++
++	u8 lane_function[4];
++	u8 lane_polarity[4];
+ };
+ 
+ struct hdmi_core_data {
+@@ -422,11 +425,14 @@ int hdmi_phy_enable(struct hdmi_phy_data *phy, struct hdmi_wp_data *wp,
+ void hdmi_phy_disable(struct hdmi_phy_data *phy, struct hdmi_wp_data *wp);
+ void hdmi_phy_dump(struct hdmi_phy_data *phy, struct seq_file *s);
+ int hdmi_phy_init(struct platform_device *pdev, struct hdmi_phy_data *phy);
++int hdmi_phy_parse_lanes(struct hdmi_phy_data *phy, const u32 *lanes);
+ 
+ /* HDMI common funcs */
+ const struct hdmi_config *hdmi_default_timing(void);
+ const struct hdmi_config *hdmi_get_timings(int mode, int code);
+ struct hdmi_cm hdmi_get_code(struct omap_video_timings *timing);
++int hdmi_parse_lanes_of(struct platform_device *pdev, struct device_node *ep,
++	struct hdmi_phy_data *phy);
+ 
+ #if defined(CONFIG_OMAP4_DSS_HDMI_AUDIO)
+ int hdmi_compute_acr(u32 pclk, u32 sample_freq, u32 *n, u32 *cts);
+diff --git a/drivers/video/fbdev/omap2/dss/hdmi4.c b/drivers/video/fbdev/omap2/dss/hdmi4.c
+index f5f7944a1fd1..e15b89d49c28 100644
+--- a/drivers/video/fbdev/omap2/dss/hdmi4.c
++++ b/drivers/video/fbdev/omap2/dss/hdmi4.c
+@@ -600,6 +600,28 @@ static void __exit hdmi_uninit_output(struct platform_device *pdev)
+ 	omapdss_unregister_output(out);
+ }
+ 
++static int hdmi_probe_of(struct platform_device *pdev)
++{
++	struct device_node *node = pdev->dev.of_node;
++	struct device_node *ep;
++	int r;
++
++	ep = omapdss_of_get_first_endpoint(node);
++	if (!ep)
++		return 0;
++
++	r = hdmi_parse_lanes_of(pdev, ep, &hdmi.phy);
++	if (r)
++		goto err;
++
++	of_node_put(ep);
++	return 0;
++
++err:
++	of_node_put(ep);
++	return r;
++}
++
+ /* HDMI HW IP initialisation */
+ static int omapdss_hdmihw_probe(struct platform_device *pdev)
+ {
+@@ -609,6 +631,12 @@ static int omapdss_hdmihw_probe(struct platform_device *pdev)
+ 
+ 	mutex_init(&hdmi.lock);
+ 
++	if (pdev->dev.of_node) {
++		r = hdmi_probe_of(pdev);
++		if (r)
++			return r;
++	}
++
+ 	r = hdmi_wp_init(pdev, &hdmi.wp);
+ 	if (r)
+ 		return r;
+diff --git a/drivers/video/fbdev/omap2/dss/hdmi_common.c b/drivers/video/fbdev/omap2/dss/hdmi_common.c
+index 0b12a3f62fe1..9a2c39cf297f 100644
+--- a/drivers/video/fbdev/omap2/dss/hdmi_common.c
++++ b/drivers/video/fbdev/omap2/dss/hdmi_common.c
+@@ -17,6 +17,7 @@
+ 
+ #include <linux/kernel.h>
+ #include <linux/err.h>
++#include <linux/of.h>
+ #include <video/omapdss.h>
+ 
+ #include "hdmi.h"
+@@ -323,6 +324,46 @@ end:
+ 	return cm;
+ }
+ 
++int hdmi_parse_lanes_of(struct platform_device *pdev, struct device_node *ep,
++	struct hdmi_phy_data *phy)
++{
++	struct property *prop;
++	int r, len;
++
++	prop = of_find_property(ep, "lanes", &len);
++	if (prop) {
++		u32 lanes[8];
++
++		if (len / sizeof(u32) != ARRAY_SIZE(lanes)) {
++			dev_err(&pdev->dev, "bad number of lanes\n");
++			return -EINVAL;
++		}
++
++		r = of_property_read_u32_array(ep, "lanes", lanes,
++			ARRAY_SIZE(lanes));
++		if (r) {
++			dev_err(&pdev->dev, "failed to read lane data\n");
++			return r;
++		}
++
++		r = hdmi_phy_parse_lanes(phy, lanes);
++		if (r) {
++			dev_err(&pdev->dev, "failed to parse lane data\n");
++			return r;
++		}
++	} else {
++		static const u32 default_lanes[] = { 0, 1, 2, 3, 4, 5, 6, 7 };
++
++		r = hdmi_phy_parse_lanes(phy, default_lanes);
++		if (WARN_ON(r)) {
++			dev_err(&pdev->dev, "failed to parse lane data\n");
++			return r;
++		}
++	}
++
++	return 0;
++}
++
+ #if defined(CONFIG_OMAP4_DSS_HDMI_AUDIO)
+ int hdmi_compute_acr(u32 pclk, u32 sample_freq, u32 *n, u32 *cts)
+ {
+diff --git a/drivers/video/fbdev/omap2/dss/hdmi_phy.c b/drivers/video/fbdev/omap2/dss/hdmi_phy.c
+index dd376ce8da01..c1c65624fd5d 100644
+--- a/drivers/video/fbdev/omap2/dss/hdmi_phy.c
++++ b/drivers/video/fbdev/omap2/dss/hdmi_phy.c
+@@ -59,6 +59,97 @@ static irqreturn_t hdmi_irq_handler(int irq, void *data)
+ 	return IRQ_HANDLED;
+ }
+ 
++int hdmi_phy_parse_lanes(struct hdmi_phy_data *phy, const u32 *lanes)
++{
++	int i;
++
++	for (i = 0; i < 8; i += 2) {
++		u8 lane, pol;
++		int dx, dy;
++
++		dx = lanes[i];
++		dy = lanes[i + 1];
++
++		if (dx < 0 || dx >= 8)
++			return -EINVAL;
++
++		if (dy < 0 || dy >= 8)
++			return -EINVAL;
++
++		if (dx & 1) {
++			if (dy != dx - 1)
++				return -EINVAL;
++			pol = 1;
++		} else {
++			if (dy != dx + 1)
++				return -EINVAL;
++			pol = 0;
++		}
++
++		lane = dx / 2;
++
++		phy->lane_function[lane] = i / 2;
++		phy->lane_polarity[lane] = pol;
++	}
++
++	return 0;
++}
++
++static void hdmi_phy_configure_lanes(struct hdmi_phy_data *phy)
++{
++	static const u16 pad_cfg_list[] = {
++		0x0123,
++		0x0132,
++		0x0312,
++		0x0321,
++		0x0231,
++		0x0213,
++		0x1023,
++		0x1032,
++		0x3012,
++		0x3021,
++		0x2031,
++		0x2013,
++		0x1203,
++		0x1302,
++		0x3102,
++		0x3201,
++		0x2301,
++		0x2103,
++		0x1230,
++		0x1320,
++		0x3120,
++		0x3210,
++		0x2310,
++		0x2130,
++	};
++
++	u16 lane_cfg = 0;
++	int i;
++	unsigned lane_cfg_val;
++	u16 pol_val = 0;
++
++	for (i = 0; i < 4; ++i)
++		lane_cfg |= phy->lane_function[i] << ((3 - i) * 4);
++
++	pol_val |= phy->lane_polarity[0] << 0;
++	pol_val |= phy->lane_polarity[1] << 3;
++	pol_val |= phy->lane_polarity[2] << 2;
++	pol_val |= phy->lane_polarity[3] << 1;
++
++	for (i = 0; i < ARRAY_SIZE(pad_cfg_list); ++i)
++		if (pad_cfg_list[i] == lane_cfg)
++			break;
++
++	if (WARN_ON(i == ARRAY_SIZE(pad_cfg_list)))
++		i = 0;
++
++	lane_cfg_val = i;
++
++	REG_FLD_MOD(phy->base, HDMI_TXPHY_PAD_CFG_CTRL, lane_cfg_val, 26, 22);
++	REG_FLD_MOD(phy->base, HDMI_TXPHY_PAD_CFG_CTRL, pol_val, 30, 27);
++}
++
+ int hdmi_phy_enable(struct hdmi_phy_data *phy, struct hdmi_wp_data *wp,
+ 			struct hdmi_config *cfg)
+ {
+@@ -92,8 +183,7 @@ int hdmi_phy_enable(struct hdmi_phy_data *phy, struct hdmi_wp_data *wp,
+ 	/* Setup max LDO voltage */
+ 	REG_FLD_MOD(phy->base, HDMI_TXPHY_POWER_CTRL, 0xB, 3, 0);
+ 
+-	/* Write to phy address 3 to change the polarity control */
+-	REG_FLD_MOD(phy->base, HDMI_TXPHY_PAD_CFG_CTRL, 0x1, 27, 27);
++	hdmi_phy_configure_lanes(phy);
+ 
+ 	r = request_threaded_irq(phy->irq, NULL, hdmi_irq_handler,
+ 				IRQF_ONESHOT, "OMAP HDMI", wp);
 -- 
 1.9.1
