@@ -1,59 +1,55 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 24 Apr 2014 12:07:09 +0300
-Subject: [PATCH v2 05/14] arm: common: edma: Select event queue 1 as
- default when booted with DT
-In-Reply-To: <534EAA49.7030702@ti.com>
-References: <1396357575-30585-1-git-send-email-peter.ujfalusi@ti.com>
- <1396357575-30585-6-git-send-email-peter.ujfalusi@ti.com>
- <5347A4FD.1030803@ti.com> <5347ACDE.7040407@ti.com> <5347AE49.5020109@ti.com>
- <5347B7F8.2000508@ti.com> <20140411094217.GA32284@intel.com>
- <5347D2CC.4030407@ti.com> <20140411113154.GB32284@intel.com>
- <5347DEDA.2060008@ti.com> <20140411124641.GC32284@intel.com>
- <534BCCD3.9060805@ti.com> <534BD0B5.5000004@ti.com> <534BD788.3050406@ti.com>
- <534BF181.6060503@ti.com> <534E7EB0.9000601@ti.com> <534EAA49.7030702@ti.com>
-Message-ID: <5358D43D.20600@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 24 Apr 2014 10:09:27 +0100
+Subject: [PATCH] ARM: mm: dma: Update coherent streaming apis with
+ missing memory barrier
+In-Reply-To: <20140423171727.GK5649@arm.com>
+References: <1398103390-31968-1-git-send-email-santosh.shilimkar@ti.com>
+ <201404222153.41786.arnd@arndb.de> <5356C9D1.2060001@ti.com>
+ <5895821.PvurJ8TWz2@wuerfel> <5356D163.1070304@ti.com>
+ <20140423090251.GA5281@arm.com> <20140423160216.GC2208@arm.com>
+ <20140423171727.GK5649@arm.com>
+Message-ID: <20140424090927.GB8521@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/16/2014 07:05 PM, Joel Fernandes wrote:
-> On 04/16/2014 07:59 AM, Peter Ujfalusi wrote:
-> [..]
->>>>>> If the dma-priority is missing we should assume lowest priority (0).
->>>>>> The highest priority depends on the platform. For eDMA3 in AM335x it is three
->>>>>> level. For designware controller you might have the range 0-8 as valid.
->>>>>>
->>>>>> The question is how to get this information into use?
->>>>>> We can take the priority number in the core when the dma channel is requested
->>>>>> and add field to "struct dma_chan" in order to store it and the DMA drivers
->>>>>> could have access to it.
->>>
->>> How about Vinod's idea of extending dma_slave_config? Priority is
->>> similar to rest of the runtime setup dmaengine_slave_config() is meant
->>> to do.
->>
->> The dma_slave_config is prepared by the client drivers, so they would need to
->> be updated to handle the priority for the DMA. This would lead to duplicated
->> code - unless we have a small function in dmaengine core to fetch this
->> information, but still all dmaengine clients would need to call that.
->> IMHO it would be better to let the dmaengine core to take the priority for the
->> channel when it has been asked so client drivers does not need to know about it.
->>
+On Wed, Apr 23, 2014 at 06:17:27PM +0100, Will Deacon wrote:
+> On Wed, Apr 23, 2014 at 05:02:16PM +0100, Catalin Marinas wrote:
+> > On Wed, Apr 23, 2014 at 10:02:51AM +0100, Will Deacon wrote:
+> > > On Tue, Apr 22, 2014 at 09:30:27PM +0100, Santosh Shilimkar wrote:
+> > > > writel() or an explcit barrier in the driver will do the job. I was
+> > > > just thinking that we are trying to work around the short comings
+> > > > of streaming API by adding barriers in the driver. For example
+> > > > on a non-coherent system, i don't need that barrier because
+> > > > dma_ops does take care of that.
+> > > 
+> > > I wonder whether we can remove those barriers altogether then (from the DMA
+> > > cache operations). For the coherent case, the driver must provide the
+> > > barrier (probably via writel) so the non-coherent case shouldn't be any
+> > > different.
+> > 
+> > For the DMA_TO_DEVICE case the effect should be the same as wmb()
+> > implies dsb (and outer_sync() for write). But the reason we have
+> > barriers in the DMA ops is slightly different - the completion of the
+> > cache maintenance operation rather than ordering with any previous
+> > writes to the DMA buffer.
+> > 
+> > In the DMA_FROM_DEVICE scenario for example, the CPU gets an interrupt
+> > for a finished DMA transfer and executes dma_unmap_single() prior to
+> > accessing the page. However the CPU access after unmapping is done using
+> > normal LDR/STR which do not imply any barrier. So we need to ensure the
+> > completion of the cache invalidation in the dma operation.
 > 
-> I still feel it is much cleaner to keep this out of DT and have audio
-> driver configure the channel manually for higher priority. Because,
-> AFAIK audio is the only device that uses slave DMA and needs higher
-> priority. I'd imagine everyone else who needs high priority, have their
-> own dedicated DMAC, so from that sense I don't see the priority
-> mechanism being used a lot anywhere else but audio, so atleast we can
-> rule out things like code duplication in other drivers. Priority can be
-> set to a default of low for those drivers that don't configure the
-> channel for priority. I'm also OK with EDMA driver configuring channel
-> for higher priority manually for the Cyclic case like you did initially.
+> I don't think we necessarily need completion, we just need ordering. That
+> is, the normal LDR/STR instructions must be observed after the cache
+> maintenance. I'll have to revisit the ARM ARM to be sure of this, but a dmb
+> should be sufficient for that guarantee.
 
-So how should we go about this?
-I'm fine to select higher priority in the eDMA driver for now when a cyclic
-channel is configured and later when we have (if we ever have) generic way to
-handle DMA channel/transaction priority we can switch eDMA as well to use it.
+If we only do D-cache maintenance by MVA, the ARM ARM (both v7 and v8)
+claims that these are ordered relative to any explicit load/stores to
+the same address. So in theory we don't even need a DMB for unmapping
+with DMA_FROM_DEVICE. But in practice, we may have the outer cache,
+hence a DSB is required before the outer_sync() (we could move it there
+though).
 
 -- 
-P?ter
+Catalin
