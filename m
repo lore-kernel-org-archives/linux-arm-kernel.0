@@ -1,163 +1,76 @@
 From: joelf@ti.com (Joel Fernandes)
-Date: Thu, 24 Apr 2014 16:43:49 -0500
-Subject: [PATCH 06/26] ARM: OMAP: dmtimer: Add a write_ctrl function to
- simplify bit setting
+Date: Thu, 24 Apr 2014 16:43:44 -0500
+Subject: [PATCH 01/26] ARM: OMAP: dmtimer: Remove setting of clk parent
+ indirectly through platform hook
 In-Reply-To: <1398375849-6017-1-git-send-email-joelf@ti.com>
 References: <1398375849-6017-1-git-send-email-joelf@ti.com>
-Message-ID: <1398375849-6017-7-git-send-email-joelf@ti.com>
+Message-ID: <1398375849-6017-2-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A common pattern in dmtimer code is to read the control reg, set and reset
-certain bits, and write it back. We abstract this pattern and introduce a
-new function to do so.
+There is a platform specific hook just for OMAP1 to set its clk parent.  Remove
+this hook and have OMAP1 set its parent in omap1_dm_timer_init.  If OMAP1 is
+ever migrated to clock framework, the correct way to do this would be through
+clk_set_parent like other platforms.
 
 Signed-off-by: Joel Fernandes <joelf@ti.com>
 ---
- arch/arm/plat-omap/dmtimer.c |   63 ++++++++++++++++++++++++------------------
- 1 file changed, 36 insertions(+), 27 deletions(-)
+ arch/arm/mach-omap1/timer.c                |    8 +++++++-
+ arch/arm/plat-omap/dmtimer.c               |    8 +++-----
+ include/linux/platform_data/dmtimer-omap.h |    2 --
+ 3 files changed, 10 insertions(+), 8 deletions(-)
 
+diff --git a/arch/arm/mach-omap1/timer.c b/arch/arm/mach-omap1/timer.c
+index bde7a35..4b9c604 100644
+--- a/arch/arm/mach-omap1/timer.c
++++ b/arch/arm/mach-omap1/timer.c
+@@ -140,7 +140,13 @@ static int __init omap1_dm_timer_init(void)
+ 			goto err_free_pdata;
+ 		}
+ 
+-		pdata->set_timer_src = omap1_dm_timer_set_src;
++		/*
++		 * Since OMAP1 doesn't support clock framework, set timer clock
++		 * source to 32KHz here instead of expecting it to be set by
++		 * dmtimer code.
++		 */
++		omap1_dm_timer_set_src(pdev, 0x01);
++
+ 		pdata->timer_capability = OMAP_TIMER_ALWON |
+ 				OMAP_TIMER_NEEDS_RESET | OMAP_TIMER_HAS_DSP_IRQ;
+ 
 diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
-index 0e96ad2..782ff10 100644
+index 869254c..ecd3f97 100644
 --- a/arch/arm/plat-omap/dmtimer.c
 +++ b/arch/arm/plat-omap/dmtimer.c
-@@ -91,6 +91,18 @@ static void omap_dm_timer_write_reg(struct omap_dm_timer *timer, u32 reg,
- 	__omap_dm_timer_write(timer, reg, value, timer->posted);
- }
- 
-+static u32 omap_dm_timer_write_ctrl(struct omap_dm_timer *timer, u32 mask,
-+		u32 value)
-+{
-+	u32 l;
-+
-+	l = omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
-+	l &= mask;
-+	l |= value;
-+	omap_dm_timer_write_reg(timer, OMAP_TIMER_CTRL_REG, l);
-+	return l;
-+}
-+
- static void omap_timer_restore_context(struct omap_dm_timer *timer)
- {
- 	omap_dm_timer_write_reg(timer, OMAP_TIMER_WAKEUP_EN_REG,
-@@ -521,23 +533,22 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_set_source);
- int omap_dm_timer_set_load(struct omap_dm_timer *timer, int autoreload,
- 			    unsigned int load)
- {
--	u32 l;
-+	u32 mask = ~0, val = 0;
- 
- 	if (unlikely(!timer))
+@@ -494,12 +494,10 @@ int omap_dm_timer_set_source(struct omap_dm_timer *timer, int source)
  		return -EINVAL;
  
- 	omap_dm_timer_enable(timer);
--	l = omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
- 	if (autoreload)
--		l |= OMAP_TIMER_CTRL_AR;
-+		val |= OMAP_TIMER_CTRL_AR;
- 	else
--		l &= ~OMAP_TIMER_CTRL_AR;
--	omap_dm_timer_write_reg(timer, OMAP_TIMER_CTRL_REG, l);
-+		mask &= ~OMAP_TIMER_CTRL_AR;
-+	val = omap_dm_timer_write_ctrl(timer, mask, val);
- 	omap_dm_timer_write_reg(timer, OMAP_TIMER_LOAD_REG, load);
+ 	/*
+-	 * FIXME: Used for OMAP1 devices only because they do not currently
+-	 * use the clock framework to set the parent clock. To be removed
+-	 * once OMAP1 migrated to using clock framework for dmtimers
++	 * For OMAP1, timer source is already set during omap1_dm_timer_init.
+ 	 */
+-	if (pdata && pdata->set_timer_src)
+-		return pdata->set_timer_src(timer->pdev, source);
++	if (timer->capability & OMAP_TIMER_NEEDS_RESET)
++		return 0;
  
- 	omap_dm_timer_write_reg(timer, OMAP_TIMER_TRIGGER_REG, 0);
- 	/* Save the context */
--	timer->context.tclr = l;
-+	timer->context.tclr = val;
- 	timer->context.tldr = load;
- 	omap_dm_timer_disable(timer);
- 	return 0;
-@@ -577,22 +588,22 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_set_load_start);
- int omap_dm_timer_set_match(struct omap_dm_timer *timer, int enable,
- 			     unsigned int match)
- {
--	u32 l;
-+	u32 mask = ~0, val = 0;
- 
- 	if (unlikely(!timer))
+ 	if (IS_ERR(timer->fclk))
  		return -EINVAL;
+diff --git a/include/linux/platform_data/dmtimer-omap.h b/include/linux/platform_data/dmtimer-omap.h
+index a19b78d..9f42b06 100644
+--- a/include/linux/platform_data/dmtimer-omap.h
++++ b/include/linux/platform_data/dmtimer-omap.h
+@@ -21,8 +21,6 @@
+ #define __PLATFORM_DATA_DMTIMER_OMAP_H__
  
- 	omap_dm_timer_enable(timer);
--	l = omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
- 	if (enable)
--		l |= OMAP_TIMER_CTRL_CE;
-+		val |= OMAP_TIMER_CTRL_CE;
- 	else
--		l &= ~OMAP_TIMER_CTRL_CE;
-+		mask &= ~OMAP_TIMER_CTRL_CE;
-+
- 	omap_dm_timer_write_reg(timer, OMAP_TIMER_MATCH_REG, match);
--	omap_dm_timer_write_reg(timer, OMAP_TIMER_CTRL_REG, l);
-+	val = omap_dm_timer_write_ctrl(timer, mask, val);
- 
- 	/* Save the context */
--	timer->context.tclr = l;
-+	timer->context.tclr = val;
- 	timer->context.tmar = match;
- 	omap_dm_timer_disable(timer);
- 	return 0;
-@@ -602,24 +613,23 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_set_match);
- int omap_dm_timer_set_pwm(struct omap_dm_timer *timer, int def_on,
- 			   int toggle, int trigger)
- {
--	u32 l;
-+	u32 mask = ~0, val = 0;
- 
- 	if (unlikely(!timer))
- 		return -EINVAL;
- 
- 	omap_dm_timer_enable(timer);
--	l = omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
--	l &= ~(OMAP_TIMER_CTRL_GPOCFG | OMAP_TIMER_CTRL_SCPWM |
-+	mask &= ~(OMAP_TIMER_CTRL_GPOCFG | OMAP_TIMER_CTRL_SCPWM |
- 	       OMAP_TIMER_CTRL_PT | (0x03 << 10));
- 	if (def_on)
--		l |= OMAP_TIMER_CTRL_SCPWM;
-+		val |= OMAP_TIMER_CTRL_SCPWM;
- 	if (toggle)
--		l |= OMAP_TIMER_CTRL_PT;
--	l |= trigger << 10;
--	omap_dm_timer_write_reg(timer, OMAP_TIMER_CTRL_REG, l);
-+		val |= OMAP_TIMER_CTRL_PT;
-+	val |= trigger << 10;
-+	val = omap_dm_timer_write_ctrl(timer, mask, val);
- 
- 	/* Save the context */
--	timer->context.tclr = l;
-+	timer->context.tclr = val;
- 	omap_dm_timer_disable(timer);
- 	return 0;
- }
-@@ -627,22 +637,21 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_set_pwm);
- 
- int omap_dm_timer_set_prescaler(struct omap_dm_timer *timer, int prescaler)
- {
--	u32 l;
-+	u32 mask = ~0, val = 0;
- 
- 	if (unlikely(!timer))
- 		return -EINVAL;
- 
- 	omap_dm_timer_enable(timer);
--	l = omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
--	l &= ~(OMAP_TIMER_CTRL_PRE | (0x07 << 2));
-+	mask &= ~(OMAP_TIMER_CTRL_PRE | (0x07 << 2));
- 	if (prescaler >= 0x00 && prescaler <= 0x07) {
--		l |= OMAP_TIMER_CTRL_PRE;
--		l |= prescaler << 2;
-+		val |= OMAP_TIMER_CTRL_PRE;
-+		val |= prescaler << 2;
- 	}
--	omap_dm_timer_write_reg(timer, OMAP_TIMER_CTRL_REG, l);
-+	val = omap_dm_timer_write_ctrl(timer, mask, val);
- 
- 	/* Save the context */
--	timer->context.tclr = l;
-+	timer->context.tclr = val;
- 	omap_dm_timer_disable(timer);
- 	return 0;
- }
+ struct dmtimer_platform_data {
+-	/* set_timer_src - Only used for OMAP1 devices */
+-	int (*set_timer_src)(struct platform_device *pdev, int source);
+ 	u32 timer_capability;
+ 	u32 timer_errata;
+ 	int (*get_context_loss_count)(struct device *);
 -- 
 1.7.9.5
