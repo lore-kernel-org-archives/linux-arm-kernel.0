@@ -1,242 +1,615 @@
 From: anders.berg@lsi.com (Anders Berg)
-Date: Thu, 24 Apr 2014 12:44:04 +0200
-Subject: [PATCH v2 1/6] ARM: Add platform support for LSI AXM55xx SoC
+Date: Thu, 24 Apr 2014 12:44:06 +0200
+Subject: [PATCH v2 3/6] ARM: dts: Device tree for AXM55xx.
 In-Reply-To: <cover.1398335771.git.anders.berg@lsi.com>
 References: <cover.1398335771.git.anders.berg@lsi.com>
-Message-ID: <6486d374332f66a0b8e00178cd5a58dc5996f18a.1398335771.git.anders.berg@lsi.com>
+Message-ID: <2386bd1367aa44741979461358a72dec89608597.1398335771.git.anders.berg@lsi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AXM55xx family consists of devices that may contain up to 16 ARM Cortex-A15
-cores (in a 4x4 cluster configuration). The cores within each cluster share an
-L2 cache, and the clusters are connected to each other via a CCN-504 cache
-coherent interconnect.
-
-This machine requires CONFIG_ARM_LPAE enabled as all peripherals are located
-above 4GB in the memory map.
+Add device tree for the Amarillo validation board with an AXM5516 SoC.
 
 Signed-off-by: Anders Berg <anders.berg@lsi.com>
 ---
- Documentation/devicetree/bindings/arm/axxia.txt | 12 ++++
- arch/arm/Kconfig                                |  2 +
- arch/arm/Makefile                               |  2 +
- arch/arm/mach-axxia/Kconfig                     | 16 +++++
- arch/arm/mach-axxia/Makefile                    |  2 +
- arch/arm/mach-axxia/axxia.c                     | 28 ++++++++
- arch/arm/mach-axxia/platsmp.c                   | 89 +++++++++++++++++++++++++
- 7 files changed, 151 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/axxia.txt
- create mode 100644 arch/arm/mach-axxia/Kconfig
- create mode 100644 arch/arm/mach-axxia/Makefile
- create mode 100644 arch/arm/mach-axxia/axxia.c
- create mode 100644 arch/arm/mach-axxia/platsmp.c
+ arch/arm/boot/dts/Makefile             |   1 +
+ arch/arm/boot/dts/axm5516-amarillo.dts |  51 ++++++
+ arch/arm/boot/dts/axm5516-cpus.dtsi    | 204 ++++++++++++++++++++++
+ arch/arm/boot/dts/axm55xx.dtsi         | 306 +++++++++++++++++++++++++++++++++
+ 4 files changed, 562 insertions(+)
+ create mode 100644 arch/arm/boot/dts/axm5516-amarillo.dts
+ create mode 100644 arch/arm/boot/dts/axm5516-cpus.dtsi
+ create mode 100644 arch/arm/boot/dts/axm55xx.dtsi
 
-diff --git a/Documentation/devicetree/bindings/arm/axxia.txt b/Documentation/devicetree/bindings/arm/axxia.txt
-new file mode 100644
-index 0000000..7b4ef9c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/axxia.txt
-@@ -0,0 +1,12 @@
-+Axxia AXM55xx device tree bindings
-+
-+Boards using the AXM55xx SoC need to have the following properties:
-+
-+Required root node property:
-+
-+  - compatible = "lsi,axm5516"
-+
-+Boards:
-+
-+  LSI AXM5516 Validation board (Amarillo)
-+	compatible = "lsi,axm5516-amarillo", "lsi,axm5516"
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index b4935db..cc90841 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -953,6 +953,8 @@ source "arch/arm/mach-mvebu/Kconfig"
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 35c146f..f73797f 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -50,6 +50,7 @@ dtb-$(CONFIG_ARCH_AT91)	+= sama5d35ek.dtb
+ dtb-$(CONFIG_ARCH_AT91)	+= sama5d36ek.dtb
  
- source "arch/arm/mach-at91/Kconfig"
- 
-+source "arch/arm/mach-axxia/Kconfig"
-+
- source "arch/arm/mach-bcm/Kconfig"
- 
- source "arch/arm/mach-berlin/Kconfig"
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 41c1931..6721fab 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -138,10 +138,12 @@ endif
- textofs-$(CONFIG_ARCH_MSM7X30) := 0x00208000
- textofs-$(CONFIG_ARCH_MSM8X60) := 0x00208000
- textofs-$(CONFIG_ARCH_MSM8960) := 0x00208000
-+textofs-$(CONFIG_ARCH_AXXIA) := 0x00308000
- 
- # Machine directory name.  This list is sorted alphanumerically
- # by CONFIG_* macro name.
- machine-$(CONFIG_ARCH_AT91)		+= at91
-+machine-$(CONFIG_ARCH_AXXIA)		+= axxia
- machine-$(CONFIG_ARCH_BCM)		+= bcm
- machine-$(CONFIG_ARCH_BERLIN)		+= berlin
- machine-$(CONFIG_ARCH_CLPS711X)		+= clps711x
-diff --git a/arch/arm/mach-axxia/Kconfig b/arch/arm/mach-axxia/Kconfig
+ dtb-$(CONFIG_ARCH_ATLAS6) += atlas6-evb.dtb
++dtb-$(CONFIG_ARCH_AXXIA) += axm5516-amarillo.dtb
+ dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b.dtb
+ dtb-$(CONFIG_ARCH_BCM_MOBILE) += bcm28155-ap.dtb \
+ 	bcm21664-garnet.dtb
+diff --git a/arch/arm/boot/dts/axm5516-amarillo.dts b/arch/arm/boot/dts/axm5516-amarillo.dts
 new file mode 100644
-index 0000000..8c308fd
+index 0000000..a9d6047
 --- /dev/null
-+++ b/arch/arm/mach-axxia/Kconfig
-@@ -0,0 +1,16 @@
-+config ARCH_AXXIA
-+	bool "LSI Axxia platforms" if (ARCH_MULTI_V7 && ARM_LPAE)
-+	select ARM_GIC
-+	select MFD_SYSCON
-+	select ARM_AMBA
-+	select HAVE_ARM_ARCH_TIMER
-+	select ARM_TIMER_SP804
-+	select ZONE_DMA
-+	select ARCH_DMA_ADDR_T_64BIT
-+	select MIGHT_HAVE_PCI
-+	select PCI_DOMAINS if PCI
-+	help
-+	  This enables support for the LSI Axxia devices.
-+
-+	  The LSI Axxia platforms require a Flattened Device Tree to be passed
-+	  to the kernel.
-diff --git a/arch/arm/mach-axxia/Makefile b/arch/arm/mach-axxia/Makefile
-new file mode 100644
-index 0000000..ec4f68b
---- /dev/null
-+++ b/arch/arm/mach-axxia/Makefile
-@@ -0,0 +1,2 @@
-+obj-y				+= axxia.o
-+obj-$(CONFIG_SMP)		+= platsmp.o
-diff --git a/arch/arm/mach-axxia/axxia.c b/arch/arm/mach-axxia/axxia.c
-new file mode 100644
-index 0000000..19e5a1d
---- /dev/null
-+++ b/arch/arm/mach-axxia/axxia.c
-@@ -0,0 +1,28 @@
++++ b/arch/arm/boot/dts/axm5516-amarillo.dts
+@@ -0,0 +1,51 @@
 +/*
-+ * Support for the LSI Axxia SoC devices based on ARM cores.
++ * arch/arm/boot/dts/axm5516-amarillo.dts
 + *
-+ * Copyright (C) 2012 LSI
++ * Copyright (C) 2013 LSI
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
 + * the Free Software Foundation; either version 2 of the License, or
 + * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
 + */
-+#include <linux/init.h>
-+#include <asm/mach/arch.h>
 +
-+static const char *axxia_dt_match[] __initconst = {
-+	"lsi,axm5516",
-+	"lsi,axm5516-sim",
-+	"lsi,axm5516-emu",
-+	NULL
++/dts-v1/;
++
++/memreserve/ 0x00000000 0x00400000;
++
++#include "axm55xx.dtsi"
++#include "axm5516-cpus.dtsi"
++
++/ {
++	model = "Amarillo AXM5516";
++	compatible = "lsi,axm5516-amarillo", "lsi,axm5516";
++
++	memory {
++		device_type = "memory";
++		reg = <0 0x00000000 0x02 0x00000000>;
++	};
 +};
 +
-+DT_MACHINE_START(AXXIA_DT, "LSI Axxia AXM55XX")
-+	.dt_compat = axxia_dt_match,
-+MACHINE_END
-diff --git a/arch/arm/mach-axxia/platsmp.c b/arch/arm/mach-axxia/platsmp.c
++&serial0 {
++	status = "okay";
++};
++
++&serial1 {
++	status = "okay";
++};
++
++&serial2 {
++	status = "okay";
++};
++
++&serial3 {
++	status = "okay";
++};
++
++&gpio0 {
++	status = "okay";
++};
++
++&gpio1 {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/axm5516-cpus.dtsi b/arch/arm/boot/dts/axm5516-cpus.dtsi
 new file mode 100644
-index 0000000..959d4df
+index 0000000..b85f360
 --- /dev/null
-+++ b/arch/arm/mach-axxia/platsmp.c
-@@ -0,0 +1,89 @@
++++ b/arch/arm/boot/dts/axm5516-cpus.dtsi
+@@ -0,0 +1,204 @@
 +/*
-+ * linux/arch/arm/mach-axxia/platsmp.c
++ * arch/arm/boot/dts/axm5516-cpus.dtsi
 + *
-+ * Copyright (C) 2012 LSI Corporation
++ * Copyright (C) 2013 LSI
 + *
 + * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
 + */
 +
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/smp.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <asm/cacheflush.h>
++/ {
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
-+/* Syscon register offsets for releasing cores from reset */
-+#define SC_CRIT_WRITE_KEY	0x1000
-+#define SC_RST_CPU_HOLD		0x1010
++		cpu-map {
++			cluster0 {
++				core0 {
++					cpu = <&CPU0>;
++				};
++				core1 {
++					cpu = <&CPU1>;
++				};
++				core2 {
++					cpu = <&CPU2>;
++				};
++				core3 {
++					cpu = <&CPU3>;
++				};
++			};
++			cluster1 {
++				core0 {
++					cpu = <&CPU4>;
++				};
++				core1 {
++					cpu = <&CPU5>;
++				};
++				core2 {
++					cpu = <&CPU6>;
++				};
++				core3 {
++					cpu = <&CPU7>;
++				};
++			};
++			cluster2 {
++				core0 {
++					cpu = <&CPU8>;
++				};
++				core1 {
++					cpu = <&CPU9>;
++				};
++				core2 {
++					cpu = <&CPU10>;
++				};
++				core3 {
++					cpu = <&CPU11>;
++				};
++			};
++			cluster3 {
++				core0 {
++					cpu = <&CPU12>;
++				};
++				core1 {
++					cpu = <&CPU13>;
++				};
++				core2 {
++					cpu = <&CPU14>;
++				};
++				core3 {
++					cpu = <&CPU15>;
++				};
++			};
++		};
++
++		CPU0: cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0x00>;
++			clock-frequency= <1400000000>;
++			cpu-release-addr = <0>; // Fixed by the boot loader
++		};
++
++		CPU1: cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0x01>;
++			clock-frequency= <1400000000>;
++			cpu-release-addr = <0>; // Fixed by the boot loader
++		};
++
++		CPU2: cpu at 2 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0x02>;
++			clock-frequency= <1400000000>;
++			cpu-release-addr = <0>; // Fixed by the boot loader
++		};
++
++		CPU3: cpu at 3 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0x03>;
++			clock-frequency= <1400000000>;
++			cpu-release-addr = <0>; // Fixed by the boot loader
++		};
++
++		CPU4: cpu at 100 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0x100>;
++			clock-frequency= <1400000000>;
++			cpu-release-addr = <0>; // Fixed by the boot loader
++		};
++
++		CPU5: cpu at 101 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0x101>;
++			clock-frequency= <1400000000>;
++			cpu-release-addr = <0>; // Fixed by the boot loader
++		};
++
++		CPU6: cpu at 102 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0x102>;
++			clock-frequency= <1400000000>;
++			cpu-release-addr = <0>; // Fixed by the boot loader
++		};
++
++		CPU7: cpu at 103 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0x103>;
++			clock-frequency= <1400000000>;
++			cpu-release-addr = <0>; // Fixed by the boot loader
++		};
++
++		CPU8: cpu at 200 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0x200>;
++			clock-frequency= <1400000000>;
++			cpu-release-addr = <0>; // Fixed by the boot loader
++		};
++
++		CPU9: cpu at 201 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0x201>;
++			clock-frequency= <1400000000>;
++			cpu-release-addr = <0>; // Fixed by the boot loader
++		};
++
++		CPU10: cpu at 202 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0x202>;
++			clock-frequency= <1400000000>;
++			cpu-release-addr = <0>; // Fixed by the boot loader
++		};
++
++		CPU11: cpu at 203 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0x203>;
++			clock-frequency= <1400000000>;
++			cpu-release-addr = <0>; // Fixed by the boot loader
++		};
++
++		CPU12: cpu at 300 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0x300>;
++			clock-frequency= <1400000000>;
++			cpu-release-addr = <0>; // Fixed by the boot loader
++		};
++
++		CPU13: cpu at 301 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0x301>;
++			clock-frequency= <1400000000>;
++			cpu-release-addr = <0>; // Fixed by the boot loader
++		};
++
++		CPU14: cpu at 302 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0x302>;
++			clock-frequency= <1400000000>;
++			cpu-release-addr = <0>; // Fixed by the boot loader
++		};
++
++		CPU15: cpu at 303 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0x303>;
++			clock-frequency= <1400000000>;
++			cpu-release-addr = <0>; // Fixed by the boot loader
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/axm55xx.dtsi b/arch/arm/boot/dts/axm55xx.dtsi
+new file mode 100644
+index 0000000..5d63887
+--- /dev/null
++++ b/arch/arm/boot/dts/axm55xx.dtsi
+@@ -0,0 +1,306 @@
++/*
++ * arch/arm/boot/dts/axm55xx.dtsi
++ *
++ * Copyright (C) 2013 LSI
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++
++#include "skeleton64.dtsi"
++
++/ {
++	interrupt-parent = <&gic>;
++
++	aliases {
++		serial0	  = &serial0;
++		serial1   = &serial1;
++		serial2	  = &serial2;
++		serial3	  = &serial3;
++		timer	  = &timer0;
++	};
++
++	clocks {
++		compatible = "simple-bus";
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		/* Reference clocks */
++
++		clk_ref0: clk_ref0 {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <125000000>;
++		};
++
++		clk_ref1: clk_ref1 {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <125000000>;
++		};
++
++		clk_ref2: clk_ref2 {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <125000000>;
++		};
++
++		/* PLLs */
++
++		clk_fab_pll: clk_fab_pll at 2010021800 {
++			compatible = "lsi,axxia-pll-clock";
++			#clock-cells = <0>;
++			clocks = <&clk_ref0>;
++			clock-output-names = "clk_fab_pll";
++			reg = <0x20 0x10021800 0 0x2c>;
++		};
++
++		clk_cpu_pll: clk_cpu_pll at 2010022000 {
++			compatible = "lsi,axxia-pll-clock";
++			#clock-cells = <0>;
++			clocks = <&clk_ref0>;
++			clock-output-names = "clk_cpu_pll";
++			reg = <0x20 0x10022000 0 0x2c>;
++		};
++
++		clk_sys_pll: clk_sys_pll at 2010022800 {
++			compatible = "lsi,axxia-pll-clock";
++			#clock-cells = <0>;
++			clocks = <&clk_ref0>;
++			clock-output-names = "clk_sys_pll";
++			reg = <0x20 0x10022800 0 0x2c>;
++		};
++
++		clk_sm0_pll: sm0_pll at 2010023000 {
++			compatible = "lsi,axxia-pll-clock";
++			#clock-cells = <0>;
++			clocks = <&clk_ref2>;
++			clock-output-names = "clk_sm0_pll";
++			reg = <0x20 0x10023000 0 0x2c>;
++		};
++
++		clk_sm1_pll: sm1_pll at 2010023800 {
++			compatible = "lsi,axxia-pll-clock";
++			#clock-cells = <0>;
++			clocks = <&clk_ref1>;
++			clock-output-names = "clk_sm1_pll";
++			reg = <0x20 0x10023800 0 0x2c>;
++		};
++
++		/* CPU clock */
++
++		clk_cpu_div: cpu {
++			compatible = "lsi,axxia-div-clock";
++			#clock-cells = <0>;
++			clocks = <&clk_cpu_pll>;
++			clock-output-names = "clk_cpu_div";
++			reg = <0x20 0x10030008 0 0x4>;
++			lsi,bit-shift = <0>;
++			lsi,bit-width = <4>;
++		};
++
++		clk_cpu: clk_cpu0 at 2010030000 {
++			compatible = "lsi,axxia-mux-clock";
++			#clock-cells = <0>;
++			clocks = <&clk_ref0>,
++			         <&clk_cpu_pll>,
++				 <&clk_cpu_div>,
++				 <&clk_cpu_div>;
++			clock-output-names = "clk_cpu";
++			reg = <0x20 0x10030000 0 0x4>;
++			lsi,bit-shift = <0>;
++			lsi,bit-width = <2>;
++		};
++
++		/* Peripheral clock */
++
++		clk_per_div: peripheral {
++			compatible = "lsi,axxia-div-clock";
++			#clock-cells = <0>;
++			clocks = <&clk_sm1_pll>;
++			clock-output-names = "clk_per_div";
++			reg = <0x20 0x1003000c 0 0x4>;
++			lsi,bit-shift = <12>;
++			lsi,bit-width = <4>;
++		};
++
++		clk_per: clk_per at 2010030004 {
++			compatible = "lsi,axxia-mux-clock";
++			#clock-cells = <0>;
++			clocks = <&clk_ref1>, <&clk_per_div>;
++			clock-output-names = "clk_per";
++			reg = <0x20 0x10030004 0 0x4>;
++			lsi,bit-shift = <6>;
++			lsi,bit-width = <1>;
++		};
++
++		/* MMC clock */
++
++		clk_mmc_div: emmc {
++			compatible = "lsi,axxia-div-clock";
++			#clock-cells = <0>;
++			clocks = <&clk_sm1_pll>;
++			clock-output-names = "clk_mmc_div";
++			reg = <0x20 0x1003000c 0 0x4>;
++			lsi,bit-shift = <16>;
++			lsi,bit-width = <4>;
++		};
++
++		clk_mmc: clk_mmc at 2010030004 {
++			compatible = "lsi,axxia-mux-clock";
++			#clock-cells = <0>;
++			clocks = <&clk_ref1>, <&clk_mmc_div>;
++			clock-output-names = "clk_mmc";
++			reg = <0x20 0x10030004 0 0x4>;
++			lsi,bit-shift = <9>;
++			lsi,bit-width = <1>;
++		};
++
++	};
++
++	gic: interrupt-controller at 2001001000 {
++		compatible = "arm,cortex-a15-gic";
++		#interrupt-cells = <3>;
++		#address-cells = <0>;
++		interrupt-controller;
++		reg = <0x20 0x01001000 0 0x1000>,
++		      <0x20 0x01002000 0 0x1000>,
++		      <0x20 0x01004000 0 0x2000>,
++		      <0x20 0x01006000 0 0x2000>;
++		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) |
++				IRQ_TYPE_LEVEL_HIGH)>;
++	};
++
++	timer {
++		compatible = "arm,armv7-timer";
++		interrupts =
++			<GIC_PPI 13
++				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++			<GIC_PPI 14
++				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++			<GIC_PPI 11
++				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++			<GIC_PPI 10
++				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
++	};
++
++
++	pmu {
++		compatible = "arm,cortex-a15-pmu";
++		interrupts = <GIC_SPI 190 IRQ_TYPE_LEVEL_HIGH>;
++	};
++
++	soc {
++		compatible = "simple-bus";
++		device_type = "soc";
++		#address-cells = <2>;
++		#size-cells = <2>;
++		interrupt-parent = <&gic>;
++		ranges;
++
++		syscon: syscon at 2010030000 {
++			compatible = "lsi,axxia-syscon", "syscon";
++			reg = <0x20 0x10030000 0 0x2000>;
++		};
++
++		amba {
++			compatible = "arm,amba-bus";
++			#address-cells = <2>;
++			#size-cells = <2>;
++			ranges;
++
++			serial0: uart at 2010080000 {
++				compatible = "arm,pl011", "arm,primecell";
++				reg = <0x20 0x10080000 0 0x1000>;
++				interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clk_per>;
++				clock-names = "apb_pclk";
++				status = "disabled";
++			};
++
++			serial1: uart at 2010081000 {
++				compatible = "arm,pl011", "arm,primecell";
++				reg = <0x20 0x10081000 0 0x1000>;
++				interrupts = <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clk_per>;
++				clock-names = "apb_pclk";
++				status = "disabled";
++			};
++
++			serial2: uart at 2010082000 {
++				compatible = "arm,pl011", "arm,primecell";
++				reg = <0x20 0x10082000 0 0x1000>;
++				interrupts = <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clk_per>;
++				clock-names = "apb_pclk";
++				status = "disabled";
++			};
++
++			serial3: uart at 2010083000 {
++				compatible = "arm,pl011", "arm,primecell";
++				reg = <0x20 0x10083000 0 0x1000>;
++				interrupts = <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clk_per>;
++				clock-names = "apb_pclk";
++				status = "disabled";
++			};
++
++			timer0: timer at 2010091000 {
++				compatible = "arm,sp804", "arm,primecell";
++				reg = <0x20 0x10091000 0 0x1000>;
++				interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clk_per>;
++				clock-names = "apb_pclk";
++				status = "okay";
++			};
++
++			gpio0: gpio at 2010092000 {
++				#gpio-cells = <2>;
++				compatible = "arm,pl061", "arm,primecell";
++				gpio-controller;
++				reg = <0x20 0x10092000 0x00 0x1000>;
++				interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clk_per>;
++				clock-names = "apb_pclk";
++				status = "disabled";
++			};
++
++			gpio1: gpio at 2010093000 {
++				#gpio-cells = <2>;
++				compatible = "arm,pl061", "arm,primecell";
++				gpio-controller;
++				reg = <0x20 0x10093000 0x00 0x1000>;
++				interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clk_per>;
++				clock-names = "apb_pclk";
++				status = "disabled";
++			};
++		};
++	};
++};
 +
 +/*
-+ * Write the kernel entry point for secondary CPUs to the specified address
-+ */
-+static void write_release_addr(u32 release_phys)
-+{
-+	u32 *virt = (u32 *) phys_to_virt(release_phys);
-+	writel_relaxed(virt_to_phys(secondary_startup), virt);
-+	/* Make sure this store is visible to other CPUs */
-+	smp_wmb();
-+	__cpuc_flush_dcache_area(virt, sizeof(u32));
-+}
-+
-+static int axxia_boot_secondary(unsigned int cpu, struct task_struct *idle)
-+{
-+	struct device_node *syscon_np;
-+	void __iomem *syscon;
-+	u32 tmp;
-+
-+	syscon_np = of_find_compatible_node(NULL, NULL, "lsi,axxia-syscon");
-+	if (!syscon_np)
-+		return -ENOENT;
-+
-+	syscon = of_iomap(syscon_np, 0);
-+	if (!syscon)
-+		return -ENOMEM;
-+
-+	tmp = readl(syscon + SC_RST_CPU_HOLD);
-+	writel(0xab, syscon + SC_CRIT_WRITE_KEY);
-+	tmp &= ~(1 << cpu);
-+	writel(tmp, syscon + SC_RST_CPU_HOLD);
-+
-+	return 0;
-+}
-+
-+static void __init axxia_smp_prepare_cpus(unsigned int max_cpus)
-+{
-+	int cpu_count = 0;
-+	int cpu;
-+
-+	/*
-+	 * Initialise the present map, which describes the set of CPUs actually
-+	 * populated@the present time.
-+	 */
-+	for_each_possible_cpu(cpu) {
-+		struct device_node *np;
-+		u32 release_phys;
-+
-+		np = of_get_cpu_node(cpu, NULL);
-+		if (!np)
-+			continue;
-+		if (of_property_read_u32(np, "cpu-release-addr", &release_phys))
-+			continue;
-+
-+		if (cpu_count < max_cpus) {
-+			set_cpu_present(cpu, true);
-+			cpu_count++;
-+		}
-+
-+		if (release_phys != 0)
-+			write_release_addr(release_phys);
-+	}
-+}
-+
-+static struct smp_operations axxia_smp_ops __initdata = {
-+	.smp_prepare_cpus	= axxia_smp_prepare_cpus,
-+	.smp_boot_secondary	= axxia_boot_secondary,
-+};
-+CPU_METHOD_OF_DECLARE(axxia_smp, "lsi,syscon-release", &axxia_smp_ops);
++  Local Variables:
++  mode: C
++  End:
++*/
 -- 
 1.8.3.2
