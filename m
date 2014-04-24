@@ -1,161 +1,56 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 24 Apr 2014 08:37:42 -0700
-Subject: [PATCH 2/3] clk: divider: Add round to closest divider
-In-Reply-To: <1391012648-12481-3-git-send-email-maxime.coquelin@st.com>
-References: <1391012648-12481-1-git-send-email-maxime.coquelin@st.com>
- <1391012648-12481-3-git-send-email-maxime.coquelin@st.com>
-Message-ID: <20140424153742.23156.29975@quantum>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 24 Apr 2014 16:45:19 +0100
+Subject: [PATCH v3 7/7] ARM: dma: use phys_addr_t in
+ __dma_page_[cpu_to_dev/dev_to_cpu]
+In-Reply-To: <1398353407-2345-8-git-send-email-santosh.shilimkar@ti.com>
+References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
+ <1398353407-2345-8-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20140424154519.GE14110@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Maxime COQUELIN (2014-01-29 08:24:07)
-> In some cases, we want to be able to round the divider to the closest one,
-> instead than rounding up.
+On Thu, Apr 24, 2014 at 04:30:07PM +0100, Santosh Shilimkar wrote:
+> On a 32 bit ARM architecture with LPAE extension physical addresses
+> cannot fit into unsigned long variable.
 > 
-> This patch adds a new CLK_DIVIDER_ROUND_CLOSEST flag to specify the divider
-> has to round to closest div, keeping rounding up as de default behaviour.
-
-I've taken patch #2 and #3 into clk-next for 3.16.
-
-Thanks!
-Mike
-
+> So fix it by using phys_addr_t instead of unsigned long.
 > 
-> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
+> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 > ---
->  drivers/clk/clk-divider.c    |   69 ++++++++++++++++++++++++++++++++++++++++--
->  include/linux/clk-provider.h |    3 ++
->  2 files changed, 70 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-> index 2137d58..1eaa5d8 100644
-> --- a/drivers/clk/clk-divider.c
-> +++ b/drivers/clk/clk-divider.c
-> @@ -43,6 +43,17 @@ static unsigned int _get_table_maxdiv(const struct clk_div_table *table)
->         return maxdiv;
->  }
->  
-> +static unsigned int _get_table_mindiv(const struct clk_div_table *table)
-> +{
-> +       unsigned int mindiv = UINT_MAX;
-> +       const struct clk_div_table *clkt;
-> +
-> +       for (clkt = table; clkt->div; clkt++)
-> +               if (clkt->div < mindiv)
-> +                       mindiv = clkt->div;
-> +       return mindiv;
-> +}
-> +
->  static unsigned int _get_maxdiv(struct clk_divider *divider)
+>  arch/arm/mm/dma-mapping.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+
+Acked-by: Will Deacon <will.deacon@arm.com>
+
+Will
+
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index f62aa06..5260f43 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -885,7 +885,7 @@ static void dma_cache_maint_page(struct page *page, unsigned long offset,
+>  static void __dma_page_cpu_to_dev(struct page *page, unsigned long off,
+>  	size_t size, enum dma_data_direction dir)
 >  {
->         if (divider->flags & CLK_DIVIDER_ONE_BASED)
-> @@ -162,6 +173,24 @@ static int _round_up_table(const struct clk_div_table *table, int div)
->         return up;
->  }
+> -	unsigned long paddr;
+> +	phys_addr_t paddr;
 >  
-> +static int _round_down_table(const struct clk_div_table *table, int div)
-> +{
-> +       const struct clk_div_table *clkt;
-> +       int down = _get_table_mindiv(table);
-> +
-> +       for (clkt = table; clkt->div; clkt++) {
-> +               if (clkt->div == div)
-> +                       return clkt->div;
-> +               else if (clkt->div > div)
-> +                       continue;
-> +
-> +               if ((div - clkt->div) < (div - down))
-> +                       down = clkt->div;
-> +       }
-> +
-> +       return down;
-> +}
-> +
->  static int _div_round_up(struct clk_divider *divider,
->                 unsigned long parent_rate, unsigned long rate)
+>  	dma_cache_maint_page(page, off, size, dir, dmac_map_area);
+>  
+> @@ -901,7 +901,7 @@ static void __dma_page_cpu_to_dev(struct page *page, unsigned long off,
+>  static void __dma_page_dev_to_cpu(struct page *page, unsigned long off,
+>  	size_t size, enum dma_data_direction dir)
 >  {
-> @@ -175,6 +204,42 @@ static int _div_round_up(struct clk_divider *divider,
->         return div;
->  }
+> -	unsigned long paddr = page_to_phys(page) + off;
+> +	phys_addr_t paddr = page_to_phys(page) + off;
 >  
-> +static int _div_round_closest(struct clk_divider *divider,
-> +               unsigned long parent_rate, unsigned long rate)
-> +{
-> +       int up, down, div;
-> +
-> +       up = down = div = DIV_ROUND_CLOSEST(parent_rate, rate);
-> +
-> +       if (divider->flags & CLK_DIVIDER_POWER_OF_TWO) {
-> +               up = __roundup_pow_of_two(div);
-> +               down = __rounddown_pow_of_two(div);
-> +       } else if (divider->table) {
-> +               up = _round_up_table(divider->table, div);
-> +               down = _round_down_table(divider->table, div);
-> +       }
-> +
-> +       return (up - div) <= (div - down) ? up : down;
-> +}
-> +
-> +static int _div_round(struct clk_divider *divider, unsigned long parent_rate,
-> +               unsigned long rate)
-> +{
-> +       if (divider->flags & CLK_DIVIDER_ROUND_CLOSEST)
-> +               return _div_round_closest(divider, parent_rate, rate);
-> +
-> +       return _div_round_up(divider, parent_rate, rate);
-> +}
-> +
-> +static bool _is_best_div(struct clk_divider *divider,
-> +               int rate, int now, int best)
-> +{
-> +       if (divider->flags & CLK_DIVIDER_ROUND_CLOSEST)
-> +               return abs(rate - now) < abs(rate - best);
-> +
-> +       return now <= rate && now > best;
-> +}
-> +
->  static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
->                 unsigned long *best_parent_rate)
->  {
-> @@ -190,7 +255,7 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
->  
->         if (!(__clk_get_flags(hw->clk) & CLK_SET_RATE_PARENT)) {
->                 parent_rate = *best_parent_rate;
-> -               bestdiv = _div_round_up(divider, parent_rate, rate);
-> +               bestdiv = _div_round(divider, parent_rate, rate);
->                 bestdiv = bestdiv == 0 ? 1 : bestdiv;
->                 bestdiv = bestdiv > maxdiv ? maxdiv : bestdiv;
->                 return bestdiv;
-> @@ -217,7 +282,7 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
->                 parent_rate = __clk_round_rate(__clk_get_parent(hw->clk),
->                                 MULT_ROUND_UP(rate, i));
->                 now = parent_rate / i;
-> -               if (now <= rate && now > best) {
-> +               if (_is_best_div(divider, rate, now, best)) {
->                         bestdiv = i;
->                         best = now;
->                         *best_parent_rate = parent_rate;
-> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> index 7e59253..595f0ba 100644
-> --- a/include/linux/clk-provider.h
-> +++ b/include/linux/clk-provider.h
-> @@ -275,6 +275,8 @@ struct clk_div_table {
->   *   of this register, and mask of divider bits are in higher 16-bit of this
->   *   register.  While setting the divider bits, higher 16-bit should also be
->   *   updated to indicate changing divider bits.
-> + * CLK_DIVIDER_ROUND_CLOSEST - Makes the best calculated divider to be rounded
-> + *     to the closest integer instead of the up one.
->   */
->  struct clk_divider {
->         struct clk_hw   hw;
-> @@ -290,6 +292,7 @@ struct clk_divider {
->  #define CLK_DIVIDER_POWER_OF_TWO       BIT(1)
->  #define CLK_DIVIDER_ALLOW_ZERO         BIT(2)
->  #define CLK_DIVIDER_HIWORD_MASK                BIT(3)
-> +#define CLK_DIVIDER_ROUND_CLOSEST      BIT(4)
->  
->  extern const struct clk_ops clk_divider_ops;
->  struct clk *clk_register_divider(struct device *dev, const char *name,
+>  	/* FIXME: non-speculating: not required */
+>  	/* don't bother invalidating if DMA to device */
 > -- 
 > 1.7.9.5
+> 
 > 
