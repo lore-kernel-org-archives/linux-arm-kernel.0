@@ -1,60 +1,62 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 24 Apr 2014 17:25:06 +0200
-Subject: [PATCH v6 0/6] ARM: vdso gettimeofday using generic timer
- architecture
-In-Reply-To: <53592A83.2040401@mentor.com>
-References: <cover.1398213562.git.nathan_lynch@mentor.com>
- <20140423215040.GC26756@n2100.arm.linux.org.uk>
- <CAKv+Gu-jFAo8JKqz3XHx348pSUBWaDy48RryKwgsxdM15jeAVw@mail.gmail.com>
- <53592A83.2040401@mentor.com>
-Message-ID: <CAKv+Gu-Ob4h-4bDhW_9pZEK0ZsSpqyEEShqAokaku5cBsids=Q@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 24 Apr 2014 11:30:00 -0400
+Subject: [PATCH v3 0/7] of: setup dma parameters using dma-ranges and
+ dma-coherent
+Message-ID: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 April 2014 17:15, Nathan Lynch <Nathan_Lynch@mentor.com> wrote:
-> On 04/24/2014 02:37 AM, Ard Biesheuvel wrote:
->> On 23 April 2014 23:50, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
->>> On Tue, Apr 22, 2014 at 07:48:51PM -0500, Nathan Lynch wrote:
->>>> - Build vdso.so with -lgcc: calls to __lshrdi3, __divsi3 sometimes
->>>>   emitted (especially with -Os).  Override certain libgcc functions to
->>>>   prevent undefined symbols.
->>
->> After reading Russell's concerns below, I had a quick play with these
->> patches, and I noticed that the libgcc dependencies are actually only
->> present when compiling -Os. However, with normal optimization enabled
->> (which most people are using anyway), you don't need libgcc at all. So
->> why not override -O2 optimization for vdso.so, and be done with it?
->>
->> WIth -Os:
->>
->> Archive member included because of file (symbol)
->>
->> /usr/lib/gcc-cross/arm-linux-gnueabihf/4.8/sf/libgcc.a(_divsi3.o)
->>                               arch/arm/kernel/vdso/vgettimeofday.o
->> (__aeabi_idiv)
->> /usr/lib/gcc-cross/arm-linux-gnueabihf/4.8/sf/libgcc.a(_lshrdi3.o)
->>                               arch/arm/kernel/vdso/vgettimeofday.o
->> (__aeabi_llsr)
->>
->> Without CONFIG_OPTIMIZE_FOR_SIZE, no archive members are included at all.
->
-> Thanks.  I had thought about forcing -O2 in the past but just wasn't
-> confident that it would prevent calls to __divsi3 etc in all situations.
->  I mean, that's not really a documented or guaranteed behavior of -O2,
-> is it?
->
+Here is an updated v3 of the series. Series introduces support for setting up
+dma parameters based on device tree properties like 'dma-ranges' and
+'dma-coherent' and also update to ARM 32 bit port. Earlier version of the
+series can be found here [3], [2] and [1].
 
-No it is not, unfortunately. But I agree with Russell that pulling in
-bits of libgcc.a into your vdso is a bad idea.
-It would be interesting to find out why exactly these dependencies are
-there, so you can work around them.
-And if that is not an option, it would be preferable IMO to duplicate
-__aeabi_idiv under vdso/ somewhere if you really depend on it.
+The 'dma-ranges' helps to take care of few DMAable system memory restrictions
+by use of dma_pfn_offset which we maintain now per device. Arch code then
+uses it for dma address translations for such cases. We update the
+dma_pfn_offset accordingly during DT the device creation process.The
+'dma-coherent' property is used to setup arch's coherent dma_ops.
 
-> I've now built vdso.so with your suggested change with GCC 4.[4-8]
-> without getting any unresolved symbols, so here's hoping this is a
-> viable option.
->
+Hopefully with acks, tested-by this version can get into 3.16 queue. I will
+post a followup series for Keystone SOC which will use this infrastructure.
+Linus W also wants to use this for ARM integrator platform dma offset issue.
 
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Olof Johansson <olof@lixom.net>
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Grygorii Strashko <grygorii.strashko@ti.com>
+
+Grygorii Strashko (2):
+  of: introduce of_dma_get_range() helper
+  ARM: dma: Use dma_pfn_offset for dma address translation
+
+Santosh Shilimkar (5):
+  device: introduce per device dma_pfn_offset
+  of: introduce of_dma_is_coherent() helper
+  of: configure the platform device dma parameters
+  ARM: dma: implement set_arch_dma_coherent_ops()
+  ARM: dma: use phys_addr_t in __dma_page_[cpu_to_dev/dev_to_cpu]
+
+ arch/arm/include/asm/dma-mapping.h |   28 ++++++++++--
+ arch/arm/mm/dma-mapping.c          |    4 +-
+ drivers/of/address.c               |   87 ++++++++++++++++++++++++++++++++++++
+ drivers/of/platform.c              |   71 +++++++++++++++++++++++++++--
+ include/linux/device.h             |    2 +
+ include/linux/dma-mapping.h        |    7 +++
+ include/linux/of_address.h         |    8 ++++
+ include/linux/of_platform.h        |    6 +++
+ 8 files changed, 204 insertions(+), 9 deletions(-)
+
+Regards,
+Santosh
+
+[1] http://www.spinics.net/lists/arm-kernel/msg311678.html
+[2] https://lkml.org/lkml/2014/3/6/186
+[3] https://lkml.org/lkml/2014/4/19/80
 -- 
-Ard.
+1.7.9.5
