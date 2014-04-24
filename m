@@ -1,37 +1,39 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Thu, 24 Apr 2014 13:17:07 +0300
-Subject: [PATCH 11/23] ARM: dts: omap5-uevm.dts: add tca6424a
+Date: Thu, 24 Apr 2014 13:17:12 +0300
+Subject: [PATCH 16/23] OMAPDSS: DSI: Add OMAP5 DSI module IDs
 In-Reply-To: <1398334639-14172-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1398334639-14172-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1398334639-14172-12-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1398334639-14172-17-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-omap5-uevm has a tca6424a I/O expander. Add it to the .dts file.
+Add OMAP5 DSI module ID support to the OMAP DSI driver.
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/boot/dts/omap5-uevm.dts | 7 +++++++
+ drivers/video/fbdev/omap2/dss/dsi.c | 7 +++++++
  1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
-index 3b99ec25b748..9e7581eaeb23 100644
---- a/arch/arm/boot/dts/omap5-uevm.dts
-+++ b/arch/arm/boot/dts/omap5-uevm.dts
-@@ -434,6 +434,13 @@
- 	pinctrl-0 = <&i2c5_pins>;
- 
- 	clock-frequency = <400000>;
-+
-+	tca6424a: tca6424a at 22 {
-+		compatible = "ti,tca6424";
-+		reg = <0x22>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+	};
+diff --git a/drivers/video/fbdev/omap2/dss/dsi.c b/drivers/video/fbdev/omap2/dss/dsi.c
+index 57f120896b43..a888d28fd055 100644
+--- a/drivers/video/fbdev/omap2/dss/dsi.c
++++ b/drivers/video/fbdev/omap2/dss/dsi.c
+@@ -5733,9 +5733,16 @@ static const struct dsi_module_id_data dsi_of_data_omap4[] = {
+ 	{ },
  };
  
- &mcbsp3 {
++static const struct dsi_module_id_data dsi_of_data_omap5[] = {
++	{ .address = 0x58004000, .id = 0, },
++	{ .address = 0x58009000, .id = 1, },
++	{ },
++};
++
+ static const struct of_device_id dsi_of_match[] = {
+ 	{ .compatible = "ti,omap3-dsi", .data = dsi_of_data_omap3, },
+ 	{ .compatible = "ti,omap4-dsi", .data = dsi_of_data_omap4, },
++	{ .compatible = "ti,omap5-dsi", .data = dsi_of_data_omap5, },
+ 	{},
+ };
+ 
 -- 
 1.9.1
