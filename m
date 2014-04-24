@@ -1,31 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 24 Apr 2014 11:46:24 +0100
-Subject: [PATCH V2 0/5] Huge pages for short descriptors on ARM
-In-Reply-To: <20140424104232.GK26756@n2100.arm.linux.org.uk>
-References: <1397648803-15961-1-git-send-email-steve.capper@linaro.org>
- <20140424102229.GA28014@linaro.org>
- <20140424103639.GC19564@arm.com>
- <20140424104232.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <20140424104624.GD19564@arm.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 24 Apr 2014 12:48:41 +0200
+Subject: [PATCH 2/4] ARM: S3C24XX: trim down debug uart handling
+In-Reply-To: <20140424103455.GJ26756@n2100.arm.linux.org.uk>
+References: <1544889.hRy2JpKRQe@phil> <1410234.AYxfyBcLWB@phil>
+ <20140424103455.GJ26756@n2100.arm.linux.org.uk>
+Message-ID: <24114123.4LqcQi8gAH@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 24, 2014 at 11:42:32AM +0100, Russell King - ARM Linux wrote:
-> On Thu, Apr 24, 2014 at 11:36:39AM +0100, Will Deacon wrote:
-> > I guess I'm after some commitment that this is (a) useful to somebody and
-> > (b) going to be tested regularly, otherwise it will go the way of things
-> > like big-endian, where we end up carrying around code which is broken more
-> > often than not (although big-endian is more self-contained).
+Am Donnerstag, 24. April 2014, 11:34:55 schrieb Russell King - ARM Linux:
+> On Thu, Apr 24, 2014 at 12:24:31PM +0200, Heiko St?bner wrote:
+> > +choice
+> > +	prompt "S3C24XX low-level debugging port type"
+> > +	depends on DEBUG_LL && ARCH_S3C24XX
+> > +
+> > +	config DEBUG_S3C24XX_UART_S3C2440
+> > +		bool "S3C2440 uart type"
+> > +		help
+> > +		  Select this if you're debugging S3C2416, S3C2440, S3C2442,
+> > +		  S3C2443 or S3C2450 SoCs.
+> > +
+> > +	config DEBUG_S3C24XX_UART_S3C2410
+> > +		bool "S3C2410 uart type"
+> > +		help
+> > +		  Select this if you're debugging S3C2410 or S3C2412 SoCs.
+> > +endchoice
 > 
-> It may be something worth considering adding to my nightly builder/boot
-> testing, but I suspect that's impractical as it probably requires a BE
-> userspace, which would then mean that the platform can't boot LE.
-> 
-> I suspect that we will just have to rely on BE users staying around and
-> reporting problems when they occur.
+> Why does this need to be a separate choice statement?  What's special
+> about S3C24XX?  Is there something wrong with the main choice statement
+> just above this where everyone else lists their debugging UART?
 
-Indeed. Marc and I have BE guests running under kvmtool on an LE host, so
-that's what I've been using (then a BE busybox can sit in the host
-filesystem and be passed via something like 9pfs).
+The special case is that s3c24xx as architecture has two different uart types. 
+Everything else is the same so I didn't want to duplicate the s3c_debug_uartX 
+entries.
 
-Will
+The other option would have been to duplicate these, like having
+
+- s3c_debug_uart[0-3] for the more common s3c2440 type and
+- s3c2410_debug_uart[0-3] for the named type
+
+I guess, judging from your comment this would be better?
+[or I'm just overlooking the obvious third way :-) ]
+
+
+Heiko
