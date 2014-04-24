@@ -1,44 +1,41 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 24 Apr 2014 15:59:46 +0900
-Subject: [PATCH v6 0/2] clk: shmobile: r8a7779: Add clocks support
-In-Reply-To: <1397775951-30992-1-git-send-email-horms+renesas@verge.net.au>
-References: <1397775951-30992-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20140424065946.GC3925@verge.net.au>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 24 Apr 2014 09:18:25 +0200
+Subject: [PATCH 08/28] nios2: MMU Fault handling
+In-Reply-To: <20140422143036.GD15745@arch.cereza>
+References: <1397824031-4892-1-git-send-email-lftan@altera.com>
+ <1397824031-4892-6-git-send-email-lftan@altera.com>
+ <20140422143036.GD15745@arch.cereza>
+Message-ID: <CAMuHMdXMbGS6xFyW80Cv1xOSF=e76G16vVrboQUkgC7Q_mgZtw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 18, 2014 at 08:05:49AM +0900, Simon Horman wrote:
-> Hi Mike,
-> 
-> please consider applying this series.
-> 
-> It is the first step on the way towards using the common clock framework
-> and in turn multi-platform on the r8a7779 (R-Car H1) SoC.
-> 
-> It has been acked by Laurent Pinchart who did similar work
-> for the R-Car Gen-2 family of SoCs. This work is based on that work.
-> 
-> The bindings added in this series have not been changed since
-> v4 was posted with devicetree at vger.kernel.org CCed on the 13th of March.
+On Tue, Apr 22, 2014 at 4:30 PM, Ezequiel Garcia
+<ezequiel.garcia@free-electrons.com> wrote:
+> On Apr 18, Ley Foon Tan wrote:
+>> +
+>> +bad_area_nosemaphore:
+>> +     /* User mode accesses just cause a SIGSEGV */
+>> +     if (user_mode(regs)) {
+>
+> I found that it's useful to add some printing here, just as ARM
+> does. I carry this patch on my kernel:
+>
+> +               printk(KERN_INFO "%s: unhandled page fault (%d) at 0x%08lx, cause %ld\n",
+> +                      current->comm, SIGSEGV, address, cause);
+> +               show_regs(regs);
+>
+> Do you think we could do something like it? Maybe with a compile time option?
 
-Hi Mike,
+Can this easily be triggered from userspace? If yes, please use
+pr_info_ratelimited().
 
-if you could take a look at this I would be most grateful.
+Gr{oetje,eeting}s,
 
-> 
-> Simon Horman (2):
->   clk: shmobile: r8a7779: Add clocks support
->   clk: shmobile: r8a7779: Add MSTP clock support
-> 
->  .../bindings/clock/renesas,cpg-mstp-clocks.txt     |   1 +
->  .../bindings/clock/renesas,r8a7779-cpg-clocks.txt  |  27 ++++
->  drivers/clk/shmobile/Makefile                      |   1 +
->  drivers/clk/shmobile/clk-r8a7779.c                 | 180 +++++++++++++++++++++
->  include/linux/clk/shmobile.h                       |   3 +
->  5 files changed, 212 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/renesas,r8a7779-cpg-clocks.txt
->  create mode 100644 drivers/clk/shmobile/clk-r8a7779.c
-> 
-> -- 
-> 1.8.4
-> 
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
