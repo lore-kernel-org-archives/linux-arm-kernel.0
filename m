@@ -1,52 +1,83 @@
 From: joelf@ti.com (Joel Fernandes)
-Date: Thu, 24 Apr 2014 16:43:58 -0500
-Subject: [PATCH 15/26] ARM: OMAP2+: timer: Use of_clk_get for DT platforms
+Date: Thu, 24 Apr 2014 16:43:51 -0500
+Subject: [PATCH 08/26] ARM: OMAP: dmtimer: Add function to check for timer
+ availability
 In-Reply-To: <1398375849-6017-1-git-send-email-joelf@ti.com>
 References: <1398375849-6017-1-git-send-email-joelf@ti.com>
-Message-ID: <1398375849-6017-16-git-send-email-joelf@ti.com>
+Message-ID: <1398375849-6017-9-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For DT-booting platforms, use of_clk_get to get the fclk for system timers.
-Separate out the legacy code for non-DT platform use.
+Simplify the check for a timer availability in atleast 4 places by providing a
+function to do the same.
 
 Signed-off-by: Joel Fernandes <joelf@ti.com>
 ---
- arch/arm/mach-omap2/timer.c |   11 +++++++----
- 1 file changed, 7 insertions(+), 4 deletions(-)
+ arch/arm/plat-omap/dmtimer.c |   24 ++++++++++++++----------
+ 1 file changed, 14 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index ea91ef9..4fcfd7a 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -277,6 +277,10 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
- 		if (!timer->io_base)
- 			return -ENXIO;
+diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
+index 8a4a97c..7e806f9 100644
+--- a/arch/arm/plat-omap/dmtimer.c
++++ b/arch/arm/plat-omap/dmtimer.c
+@@ -704,14 +704,22 @@ int omap_dm_timer_set_int_disable(struct omap_dm_timer *timer, u32 mask)
+ }
+ EXPORT_SYMBOL_GPL(omap_dm_timer_set_int_disable);
  
-+		timer->fclk = of_clk_get(np, 0);
-+		if (IS_ERR(timer->fclk))
-+			return PTR_ERR(timer->fclk);
++static int is_timer_available(struct omap_dm_timer *timer)
++{
++	if (unlikely(!timer || pm_runtime_suspended(&timer->pdev->dev))) {
++		pr_err("Timer not available or enabled.\n");
++		WARN_ON(1);
++		return 0;
++	}
++	return 1;
++}
 +
- 		r = omap_dmtimer_powerup(np);
- 		if (r)
- 			return r;
-@@ -308,14 +312,13 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
- 		if (!timer->io_base)
- 			return -ENXIO;
+ unsigned int omap_dm_timer_read_status(struct omap_dm_timer *timer)
+ {
+ 	unsigned int l;
  
-+		timer->fclk = clk_get(NULL, omap_hwmod_get_main_clk(oh));
-+		if (IS_ERR(timer->fclk))
-+			return PTR_ERR(timer->fclk);
+-	if (unlikely(!timer || pm_runtime_suspended(&timer->pdev->dev))) {
+-		pr_err("%s: timer not available or enabled.\n", __func__);
++	if (!is_timer_available(timer))
+ 		return 0;
+-	}
  
- 		omap_hwmod_setup_one(oh_name);
- 		omap_hwmod_enable(oh);
- 	}
--	/* After the dmtimer is using hwmod these clocks won't be needed */
--	timer->fclk = clk_get(NULL, omap_hwmod_get_main_clk(oh));
--	if (IS_ERR(timer->fclk))
--		return PTR_ERR(timer->fclk);
+ 	l = __raw_readl(timer->irq_stat);
  
- 	/*
- 	 * Clock reparenting code, goes away for DT-boot atleast,
+@@ -721,7 +729,7 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_read_status);
+ 
+ int omap_dm_timer_write_status(struct omap_dm_timer *timer, unsigned int value)
+ {
+-	if (unlikely(!timer || pm_runtime_suspended(&timer->pdev->dev)))
++	if (!is_timer_available(timer))
+ 		return -EINVAL;
+ 
+ 	__omap_dm_timer_write_status(timer, value);
+@@ -732,10 +740,8 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_write_status);
+ 
+ unsigned int omap_dm_timer_read_counter(struct omap_dm_timer *timer)
+ {
+-	if (unlikely(!timer || pm_runtime_suspended(&timer->pdev->dev))) {
+-		pr_err("%s: timer not iavailable or enabled.\n", __func__);
++	if (!is_timer_available(timer))
+ 		return 0;
+-	}
+ 
+ 	return __omap_dm_timer_read_counter(timer, timer->posted);
+ }
+@@ -743,10 +749,8 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_read_counter);
+ 
+ int omap_dm_timer_write_counter(struct omap_dm_timer *timer, unsigned int value)
+ {
+-	if (unlikely(!timer || pm_runtime_suspended(&timer->pdev->dev))) {
+-		pr_err("%s: timer not available or enabled.\n", __func__);
++	if (!is_timer_available(timer))
+ 		return -EINVAL;
+-	}
+ 
+ 	omap_dm_timer_write_reg(timer, OMAP_TIMER_COUNTER_REG, value);
+ 
 -- 
 1.7.9.5
