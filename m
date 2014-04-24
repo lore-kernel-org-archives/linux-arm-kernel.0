@@ -1,35 +1,59 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 24 Apr 2014 14:59:54 +0200
-Subject: [PATCH 4/4] pinctrl: sirf: move to use irq_get_handler_data
-In-Reply-To: <CAGsJ_4y=zNNWAvVOK6zGaY-bufUCbOcZtwE=SuWJ=QpF9rBNHg@mail.gmail.com>
-References: <1397544229-20545-1-git-send-email-21cnbao@gmail.com>
- <1397544229-20545-5-git-send-email-21cnbao@gmail.com>
- <CACRpkdbDeF5gBVv=hQSdX1i9fw=7Or+=qN=g4OXHvHkZKr7vcQ@mail.gmail.com>
- <CAGsJ_4y=zNNWAvVOK6zGaY-bufUCbOcZtwE=SuWJ=QpF9rBNHg@mail.gmail.com>
-Message-ID: <CACRpkdYz+JdAbhdR_s9h4m_3JNcpLo-2VzoXYoEd21myB4yZtg@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 24 Apr 2014 14:59:04 +0200
+Subject: [PATCH 5/5] ARM: sunxi: Remove sun4i and sun7i machine definitions
+In-Reply-To: <1401022774.yKcHJAmPtb@wuerfel>
+References: <1398265476-29373-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1398265476-29373-6-git-send-email-maxime.ripard@free-electrons.com>
+ <1401022774.yKcHJAmPtb@wuerfel>
+Message-ID: <20140424125904.GY24905@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 24, 2014 at 12:59 AM, Barry Song <21cnbao@gmail.com> wrote:
+On Wed, Apr 23, 2014 at 06:02:51PM +0200, Arnd Bergmann wrote:
+> On Wednesday 23 April 2014 17:04:36 Maxime Ripard wrote:
+> >  
+> > -static void __init sunxi_dt_init(void)
+> > -{
+> > -       of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> > -}
+> > -
+> > -static const char * const sunxi_board_dt_compat[] = {
+> > -       "allwinner,sun4i-a10",
+> > -       "allwinner,sun5i-a10s",
+> > -       "allwinner,sun5i-a13",
+> > -       NULL,
+> > -};
+> > -
+> > -DT_MACHINE_START(SUNXI_DT, "Allwinner A1X (Device Tree)")
+> > -       .init_machine   = sunxi_dt_init,
+> > -       .dt_compat      = sunxi_board_dt_compat,
+> > -MACHINE_END
+> > -
+> >  static const char * const sun6i_board_dt_compat[] = {
+> >         "allwinner,sun6i-a31",
+> >         NULL,
+> 
+> I'd like to hear more opinions on this. We could either rely
+> on the generic code, or we could keep the entry with just
+> the .dt_compat line and the name, so /proc/cpuinfo contains
+> a meaningful platform name.
 
->> If you want to use some other handler data than the gpiochip,
->> you should just use irq_set_chained_handler() and
->> irq_set_handler_data() directly.
->
-> i think this should be fixed in the general API but not use one more
-> function call to over-write the handler_data which has been filled in
-> the API.
-> since we have the chance for drivers to set either the whole chip for
-> a simple chip,  or bank-specific data for a chip which has multiple
-> parent IRQs.
+Ah! I haven't thought of /proc/cpuinfo. I agree that having something
+meaningful in there would be much better.
 
-I don't think it's worth it for saving one line. The helper is intended
-for the simple case, i.e. where it's enough to just get the gpio_chip
-as handler data. Other alternatives need to be open coded.
+I'll respin the patch if Olof agrees.
 
-I'm even considering removing this helper if it's confusing, it doesn't
-really add much, gpiochip_irqchip_add() is the important function
-to use, not gpiochip_set_chained_irqchip().
+Thanks!
+Maxime
 
-Yours,
-Linus Walleij
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140424/2ab2595a/attachment.sig>
