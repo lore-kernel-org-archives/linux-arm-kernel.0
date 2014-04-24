@@ -1,77 +1,185 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Thu, 24 Apr 2014 18:11:21 -0300
-Subject: [PATCH v2] ARM: dts: am33xx: Move the cppi41dma node so it's probed
- early
-Message-ID: <1398373881-23369-1-git-send-email-ezequiel@vanguardiasur.com.ar>
+From: rabin@rab.in (Rabin Vincent)
+Date: Thu, 24 Apr 2014 23:28:57 +0200
+Subject: [PATCHv2 2/2] arm: use fixmap for text patching when text is RO
+In-Reply-To: <1396646870-29695-2-git-send-email-rabin@rab.in>
+References: <1396646870-29695-2-git-send-email-rabin@rab.in>
+Message-ID: <1398374937-18868-1-git-send-email-rabin@rab.in>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DMA controller is needed for the USB controller to be correctly
-registered. Therefore, if the DMA node is located at the end an unecessary
-probe deferral is produced systematically.
+Use fixmaps for text patching when the kernel text is read-only,
+inspired by x86.  This makes jump labels and kprobes work with the
+currently available CONFIG_DEBUG_SET_MODULE_RONX and the upcoming
+CONFIG_DEBUG_RODATA options.
 
-This is easily fixed by moving the node at the beggining of the child list,
-so it's probed first.
+Signed-off-by: Rabin Vincent <rabin@rab.in>
+---
+v2: flush the fixmap if necessary, with flush_kernel_vmap_range()
 
-Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
---
-v1->v2:
-  * Added a comment to prevent a future clean-up based on the memory offset.
+ arch/arm/include/asm/fixmap.h |  3 ++
+ arch/arm/kernel/jump_label.c  |  2 +-
+ arch/arm/kernel/patch.c       | 71 ++++++++++++++++++++++++++++++++++++++-----
+ arch/arm/kernel/patch.h       | 12 +++++++-
+ 4 files changed, 79 insertions(+), 9 deletions(-)
 
- arch/arm/boot/dts/am33xx.dtsi | 34 ++++++++++++++++++++--------------
- 1 file changed, 20 insertions(+), 14 deletions(-)
-
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 9770e35..02e1eb6 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -453,6 +453,26 @@
- 			ti,hwmods = "usb_otg_hs";
- 			status = "disabled";
+diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
+index 55ed076..79c1719 100644
+--- a/arch/arm/include/asm/fixmap.h
++++ b/arch/arm/include/asm/fixmap.h
+@@ -18,6 +18,9 @@
+ #define FIXADDR_TOP		(FIXADDR_END - PAGE_SIZE)
  
-+			/*
-+			 * The probe order matches the child ordering so the
-+			 * dma-controller node must be the first one to prevent
-+			 * spurious probe deferrals.
-+			 */
-+			cppi41dma: dma-controller at 47402000 {
-+				compatible = "ti,am3359-cppi41";
-+				reg =  <0x47400000 0x1000
-+					0x47402000 0x1000
-+					0x47403000 0x1000
-+					0x47404000 0x4000>;
-+				reg-names = "glue", "controller", "scheduler", "queuemgr";
-+				interrupts = <17>;
-+				interrupt-names = "glue";
-+				#dma-cells = <2>;
-+				#dma-channels = <30>;
-+				#dma-requests = <256>;
-+				status = "disabled";
-+			};
+ enum fixed_addresses {
++	FIX_TEXT_POKE0,
++	FIX_TEXT_POKE1,
 +
- 			usb_ctrl_mod: control at 44e10620 {
- 				compatible = "ti,am335x-usb-ctrl-module";
- 				reg = <0x44e10620 0x10
-@@ -556,20 +576,6 @@
- 					"tx14", "tx15";
- 			};
+ 	FIX_KMAP_BEGIN,
+ 	FIX_KMAP_END = (FIXADDR_TOP - FIXADDR_START) >> PAGE_SHIFT,
+ 	__end_of_fixed_addresses
+diff --git a/arch/arm/kernel/jump_label.c b/arch/arm/kernel/jump_label.c
+index 4ce4f78..afeeb9e 100644
+--- a/arch/arm/kernel/jump_label.c
++++ b/arch/arm/kernel/jump_label.c
+@@ -19,7 +19,7 @@ static void __arch_jump_label_transform(struct jump_entry *entry,
+ 		insn = arm_gen_nop();
  
--			cppi41dma: dma-controller@47402000 {
--				compatible = "ti,am3359-cppi41";
--				reg =  <0x47400000 0x1000
--					0x47402000 0x1000
--					0x47403000 0x1000
--					0x47404000 0x4000>;
--				reg-names = "glue", "controller", "scheduler", "queuemgr";
--				interrupts = <17>;
--				interrupt-names = "glue";
--				#dma-cells = <2>;
--				#dma-channels = <30>;
--				#dma-requests = <256>;
--				status = "disabled";
--			};
- 		};
+ 	if (is_static)
+-		__patch_text(addr, insn);
++		__patch_text_early(addr, insn);
+ 	else
+ 		patch_text(addr, insn);
+ }
+diff --git a/arch/arm/kernel/patch.c b/arch/arm/kernel/patch.c
+index 07314af..3515b8d 100644
+--- a/arch/arm/kernel/patch.c
++++ b/arch/arm/kernel/patch.c
+@@ -1,8 +1,11 @@
+ #include <linux/kernel.h>
++#include <linux/spinlock.h>
+ #include <linux/kprobes.h>
++#include <linux/mm.h>
+ #include <linux/stop_machine.h>
  
- 		epwmss0: epwmss at 48300000 {
+ #include <asm/cacheflush.h>
++#include <asm/fixmap.h>
+ #include <asm/smp_plat.h>
+ #include <asm/opcodes.h>
+ 
+@@ -13,21 +16,70 @@ struct patch {
+ 	unsigned int insn;
+ };
+ 
+-void __kprobes __patch_text(void *addr, unsigned int insn)
++static DEFINE_SPINLOCK(patch_lock);
++
++static void __kprobes *patch_map(void *addr, int fixmap, unsigned long *flags)
++{
++	unsigned int uintaddr = (uintptr_t) addr;
++	bool module = !core_kernel_text(uintaddr);
++	struct page *page;
++
++	if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX)) {
++		page = vmalloc_to_page(addr);
++	} else if (!module && IS_ENABLED(CONFIG_ARM_KERNMEM_PERMS)) {
++		page = virt_to_page(addr);
++	} else {
++		return addr;
++	}
++
++	if (flags)
++		spin_lock_irqsave(&patch_lock, *flags);
++
++	set_fixmap(fixmap, page_to_phys(page));
++
++	return (void *) (__fix_to_virt(fixmap) + (uintaddr & ~PAGE_MASK));
++}
++
++static void __kprobes patch_unmap(int fixmap, unsigned long *flags)
++{
++	clear_fixmap(fixmap);
++
++	if (flags)
++		spin_unlock_irqrestore(&patch_lock, *flags);
++}
++
++void __kprobes __patch_text_real(void *addr, unsigned int insn, bool remap)
+ {
+ 	bool thumb2 = IS_ENABLED(CONFIG_THUMB2_KERNEL);
++	unsigned int uintaddr = (uintptr_t) addr;
++	bool twopage = false;
++	unsigned long flags;
++	void *waddr = addr;
+ 	int size;
+ 
++	if (remap)
++		waddr = patch_map(addr, FIX_TEXT_POKE0, &flags);
++
+ 	if (thumb2 && __opcode_is_thumb16(insn)) {
+-		*(u16 *)addr = __opcode_to_mem_thumb16(insn);
++		*(u16 *)waddr = __opcode_to_mem_thumb16(insn);
+ 		size = sizeof(u16);
+-	} else if (thumb2 && ((uintptr_t)addr & 2)) {
++	} else if (thumb2 && (uintaddr & 2)) {
+ 		u16 first = __opcode_thumb32_first(insn);
+ 		u16 second = __opcode_thumb32_second(insn);
+-		u16 *addrh = addr;
++		u16 *addrh0 = waddr;
++		u16 *addrh1 = waddr + 2;
+ 
+-		addrh[0] = __opcode_to_mem_thumb16(first);
+-		addrh[1] = __opcode_to_mem_thumb16(second);
++		twopage = (uintaddr & ~PAGE_MASK) == PAGE_SIZE - 2;
++		if (twopage && remap)
++			addrh1 = patch_map(addr + 2, FIX_TEXT_POKE1, NULL);
++
++		*addrh0 = __opcode_to_mem_thumb16(first);
++		*addrh1 = __opcode_to_mem_thumb16(second);
++
++		if (twopage && addrh1 != addr + 2) {
++			flush_kernel_vmap_range(addrh1, 2);
++			patch_unmap(FIX_TEXT_POKE1, NULL);
++		}
+ 
+ 		size = sizeof(u32);
+ 	} else {
+@@ -36,10 +88,15 @@ void __kprobes __patch_text(void *addr, unsigned int insn)
+ 		else
+ 			insn = __opcode_to_mem_arm(insn);
+ 
+-		*(u32 *)addr = insn;
++		*(u32 *)waddr = insn;
+ 		size = sizeof(u32);
+ 	}
+ 
++	if (waddr != addr) {
++		flush_kernel_vmap_range(waddr, twopage ? size / 2 : size);
++		patch_unmap(FIX_TEXT_POKE0, &flags);
++	}
++
+ 	flush_icache_range((uintptr_t)(addr),
+ 			   (uintptr_t)(addr) + size);
+ }
+diff --git a/arch/arm/kernel/patch.h b/arch/arm/kernel/patch.h
+index b4731f2..77e054c 100644
+--- a/arch/arm/kernel/patch.h
++++ b/arch/arm/kernel/patch.h
+@@ -2,6 +2,16 @@
+ #define _ARM_KERNEL_PATCH_H
+ 
+ void patch_text(void *addr, unsigned int insn);
+-void __patch_text(void *addr, unsigned int insn);
++void __patch_text_real(void *addr, unsigned int insn, bool remap);
++
++static inline void __patch_text(void *addr, unsigned int insn)
++{
++	__patch_text_real(addr, insn, true);
++}
++
++static inline void __patch_text_early(void *addr, unsigned int insn)
++{
++	__patch_text_real(addr, insn, false);
++}
+ 
+ #endif
 -- 
-1.9.1
+1.9.2
