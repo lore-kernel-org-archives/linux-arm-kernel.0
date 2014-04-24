@@ -1,30 +1,53 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 24 Apr 2014 11:58:46 +0100
-Subject: [PATCH] ARM: mm: dma: Update coherent streaming apis with
- missing memory barrier
-In-Reply-To: <6414220.SShvCHLvZQ@wuerfel>
-References: <1398103390-31968-1-git-send-email-santosh.shilimkar@ti.com>
- <20140423171727.GK5649@arm.com>
- <20140423183742.GK24070@n2100.arm.linux.org.uk>
- <6414220.SShvCHLvZQ@wuerfel>
-Message-ID: <20140424105846.GE19564@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 24 Apr 2014 12:03:21 +0100
+Subject: [PATCH V2 0/5] Huge pages for short descriptors on ARM
+In-Reply-To: <CAPvkgC3P8iZp5nECiGHdeGzRwmdh=ouiAREqKwk1tYzZxHTWvg@mail.gmail.com>
+References: <1397648803-15961-1-git-send-email-steve.capper@linaro.org>
+ <20140424102229.GA28014@linaro.org> <20140424103639.GC19564@arm.com>
+ <20140424104232.GK26756@n2100.arm.linux.org.uk>
+ <CAPvkgC3P8iZp5nECiGHdeGzRwmdh=ouiAREqKwk1tYzZxHTWvg@mail.gmail.com>
+Message-ID: <20140424110321.GN26756@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Thu, Apr 24, 2014 at 11:55:56AM +0100, Steve Capper wrote:
+> On 24 April 2014 11:42, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> > On Thu, Apr 24, 2014 at 11:36:39AM +0100, Will Deacon wrote:
+> >> I guess I'm after some commitment that this is (a) useful to somebody and
+> >> (b) going to be tested regularly, otherwise it will go the way of things
+> >> like big-endian, where we end up carrying around code which is broken more
+> >> often than not (although big-endian is more self-contained).
+> >
+> > It may be something worth considering adding to my nightly builder/boot
+> > testing, but I suspect that's impractical as it probably requires a BE
+> > userspace, which would then mean that the platform can't boot LE.
+> >
+> > I suspect that we will just have to rely on BE users staying around and
+> > reporting problems when they occur.
+> 
+> The huge page support is for standard LE, I think Will was saying that
+> this will be like BE if no-one uses it.
 
-On Wed, Apr 23, 2014 at 07:58:05PM +0100, Arnd Bergmann wrote:
-> Another problem is MSI processing. MSI was specifically invented to avoid
-> having to check an MMIO register for a DMA completion that as a side-effect
-> flushes pending DMAs from the same device. This breaks down if the MSI
-> packet gets turned into a level interrupt before it reaches the CPU's
-> coherency domain, which is likely the case on the dw-pcie controller that
-> comes with its own MSI block.
+We're not saying that.
 
-I'm not sure there's anything special about MSI which helps with this
-problem. For GICv3, the MSI write will target the ITS (a slave device),
-whereas the data produced is assumedly targetting main memory. That still
-requires careful ordering by the producer, in the same way as if it was
-signalling a legacy interrupt.
+What we're asking is this: *Who* is using hugepages today?
 
-Will
+What we're then doing is comparing it to the situation we have today with
+BE, where BE support is *always* getting broken because no one in the main
+community tests it - not even a build test, nor a boot test which would
+be required to find the problems that (for example) cropped up in the
+last merge window.
+
+> It's somewhat unfair to compare huge pages on short descriptors with
+> BE. For a start, the userspace that works with LPAE will work on the
+> short-descriptor kernel too.
+
+That sounds good, but the question is how does this get tested by
+facilities such as my build/boot system, or Olof/Kevin's system?
+Without that, it will find itself in exactly the same situation that
+BE is in, where problems aren't found until after updates are merged
+into Linus' tree.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
