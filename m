@@ -1,43 +1,43 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Wed, 23 Apr 2014 21:28:33 -0500
-Subject: [PATCH v6 0/6] ARM: vdso gettimeofday using generic timer
- architecture
-In-Reply-To: <53581865.2020601@codeaurora.org>
-References: <cover.1398213562.git.nathan_lynch@mentor.com>
- <53581865.2020601@codeaurora.org>
-Message-ID: <535876D1.8040609@mentor.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 23 Apr 2014 22:37:45 -0400
+Subject: [PATCH v2 03/38] pinctrl: mvebu: new driver for Orion platforms
+In-Reply-To: <20140423161855.09e95323@skate>
+References: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1398202002-28530-4-git-send-email-thomas.petazzoni@free-electrons.com>
+ <CACRpkdaDLJitKqrYrbnEdiSqM1XQoAwT2AffRX0z+o70gmPTYA@mail.gmail.com>
+ <20140423161855.09e95323@skate>
+Message-ID: <20140424023745.GK28159@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/23/2014 02:45 PM, Stephen Boyd wrote:
-> On 04/22/14 17:48, Nathan Lynch wrote:
->> Provide fast userspace implementations of gettimeofday and
->> clock_gettime on systems that implement the generic timers extension
->> defined in ARMv7.  This follows the example of arm64 in conception but
->> significantly differs in some aspects of the implementation (C vs
->> assembly, mainly).
->>
->> Clocks supported:
->> - CLOCK_REALTIME
->> - CLOCK_MONOTONIC
->> - CLOCK_REALTIME_COARSE
->> - CLOCK_MONOTONIC_COARSE
->>
->> This also provides clock_getres (as arm64 does).
->>
->> Note that while the high-precision realtime and monotonic clock
->> support depends on the generic timers extension, support for
->> clock_getres and coarse clocks is independent of the timer
->> implementation and is provided unconditionally.
+On Wed, Apr 23, 2014 at 04:18:55PM +0200, Thomas Petazzoni wrote:
+> Dear Linus Walleij,
 > 
-> I think we'll need to rename the clocksource in arch_timer.c if we only
-> have an mmio architected timer to something like arch_mem_counter.
+> On Wed, 23 Apr 2014 16:17:03 +0200, Linus Walleij wrote:
+> > On Tue, Apr 22, 2014 at 11:26 PM, Thomas Petazzoni
+> > <thomas.petazzoni@free-electrons.com> wrote:
+> > 
+> > > This commit extends the pinctrl mvebu logic with a new driver to cover
+> > > Orion5x SoC. It supports the definitions for the 5181l, 5182 and 5281
+> > > variants of Orion5x, which are the three ones supported by the old
+> > > style MPP code in arch/arm/mach-orion5x/.
+> > >
+> > > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > > Cc: Linus Walleij <linus.walleij@linaro.org>
+> > 
+> > Nothing very controversial about this,
+> 
+> Yeah, just a boring list of pins and functions :-)
+> 
+> > shall I just apply it or do you need it to be kept together with other stuff?
+> 
+> I'll let the mvebu maintainers answer this. Since there is no build
+> dependency with the rest of the series, I guess it could go through
+> your tree, but I leave the decision to the mvebu maintainers.
 
-I guess ARMv7 would allow you to have mmio without cp15 (AFAIK ARMv8
-does not).  I don't see any dts in arch/arm that contains an
-arm,armv7-timer-mem node without an arm,armv7-timer node, though.
+Yep, take it.  orion5x isn't in the boot farm, so I'm not worried about
+booting this through the merge cycle.
 
-If this is a practical concern, I think using
-CONFIG_ARCH_CLOCKSOURCE_DATA is perhaps a better way to communicate
-whether cp15 access is available.  That's how the x86 vdso, for example,
-decides between using HPET vs TSC etc.
+thx,
+
+Jason.
