@@ -1,192 +1,54 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 23 Apr 2014 17:49:56 -0700
-Subject: [PATCH 1a/4] mfd: twl4030-power: Add generic reset configuration
-In-Reply-To: <1398300030-7386-1-git-send-email-tony@atomide.com>
-References: <1398300030-7386-1-git-send-email-tony@atomide.com>
-Message-ID: <20140424004955.GG6053@atomide.com>
+From: isubramanian@apm.com (Iyappan Subramanian)
+Date: Wed, 23 Apr 2014 17:51:38 -0700
+Subject: [PATCH v3 1/4] MAINTAINERS: Add entry for APM X-Gene SoC ethernet
+ driver
+In-Reply-To: <CABxcv=mj+phHmyg2U2jW51mLTwBN9Au791m-GtqU5BXDPy7Gtg@mail.gmail.com>
+References: <1397702368-4846-1-git-send-email-isubramanian@apm.com>
+ <1397702368-4846-2-git-send-email-isubramanian@apm.com>
+ <1397704685.14062.14.camel@joe-AO725>
+ <CABxcv=mj+phHmyg2U2jW51mLTwBN9Au791m-GtqU5BXDPy7Gtg@mail.gmail.com>
+Message-ID: <CAKh23F=Ukhufm3XMmSmaTU3AvmeoDDMeFwodgU-B_XH09sdbOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The twl4030 PMIC needs to be configured properly for things like
-warm reset and deeper idle states so the PMIC manages the regulators
-properly based on the hardware triggers from the SoC.
+Hi Javier,
 
-For example, when rebooting an OMAP3530 at 125 MHz, it hangs.
-With this patch, TWL4030 will be reset when a warm reset occures.
-This way the OMAP3530 does not hang on reboot.
+On Sun, Apr 20, 2014 at 5:56 PM, Javier Martinez Canillas
+<javier@dowhile0.org> wrote:
+> Hello Lyappan,
+>
+> On Thu, Apr 17, 2014 at 5:18 AM, Joe Perches <joe@perches.com> wrote:
+>> On Wed, 2014-04-16 at 19:39 -0700, Iyappan Subramanian wrote:
+>>> This patch adds a MAINTAINERS entry for APM X-Gene SoC
+>>> ethernet driver.
+>> []
+>>> diff --git a/MAINTAINERS b/MAINTAINERS
+>> []
+>>> @@ -686,6 +686,14 @@ S:       Maintained
+>>>  F:   drivers/net/appletalk/
+>>>  F:   net/appletalk/
+>>>
+>>> +APPLIED MICRO (APM) X-GENE SOC ETHERNET DRIVER
+>>> +M:   Iyappan Subramanian <isubramanian@apm.com>
+>>> +M:   Keyur Chudgar <kchudgar@apm.com>
+>>> +M:   Ravi Patel <rapatel@apm.com>
+>>> +S:   Maintained
+>>> +F:   drivers/net/ethernet/apm/xgene
+>>
+>> Please add a terminating slash to show this is a directory.
+>>
+>> F:      drivers/net/ethernet/apm/xgene/
+>>
+>
+> Also if you are maintaining this driver as a part of your daily work
+> (i.e: actually being paid for it by your company) the status should be
+> "Supported" instead.
+>
+> If you are doing it on your own time but still using your company
+> email address then "Maintained" is correct.
 
-Let's use this as the default when compatible = "ti,twl4030-power".
-Other more complicated configurations can be added to the driver
-based on other compatible flags.
+Thanks.  I will change this to Supported.
 
-Based on earlier patch by Matthias Brugger <matthias.bgg@gmail.com>:
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/144161.html
-
-For more information about twl4030 configuration for the
-"power scripts" see:
-
-http://www.omappedia.com/wiki/TWL4030_power_scripts
-
-Cc: Matthias Brugger <matthias.bgg@gmail.com>
-Cc: Robert Nelson <robertcnelson@gmail.com>
-Cc: Peter De Schrijver <pdeschrijver@nvidia.com>
-Cc: Samuel Ortiz <sameo@linux.intel.com>
-Cc: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
----
-
-Sorry this got accidentally left out, should be the first patch
-in the series.
-
-diff --git a/Documentation/devicetree/bindings/mfd/twl4030-power.txt b/Documentation/devicetree/bindings/mfd/twl4030-power.txt
-index 8e15ec3..b906116 100644
---- a/Documentation/devicetree/bindings/mfd/twl4030-power.txt
-+++ b/Documentation/devicetree/bindings/mfd/twl4030-power.txt
-@@ -5,7 +5,12 @@ to control the power resources, including power scripts. For now, the
- binding only supports the complete shutdown of the system after poweroff.
- 
- Required properties:
--- compatible : must be "ti,twl4030-power"
-+- compatible : must be one of the following
-+	"ti,twl4030-power"
-+	"ti,twl4030-power-reset"
-+
-+The use of ti,twl4030-power-reset is recommended at least on
-+3530 that needs a special configuration for warm reset to work.
- 
- Optional properties:
- - ti,use_poweroff: With this flag, the chip will initiates an ACTIVE-to-OFF or
-diff --git a/drivers/mfd/twl4030-power.c b/drivers/mfd/twl4030-power.c
-index 96162b6..1db0560 100644
---- a/drivers/mfd/twl4030-power.c
-+++ b/drivers/mfd/twl4030-power.c
-@@ -29,6 +29,7 @@
- #include <linux/i2c/twl.h>
- #include <linux/platform_device.h>
- #include <linux/of.h>
-+#include <linux/of_device.h>
- 
- #include <asm/mach-types.h>
- 
-@@ -493,7 +494,8 @@ int twl4030_remove_script(u8 flags)
- 	return err;
- }
- 
--static int twl4030_power_configure_scripts(struct twl4030_power_data *pdata)
-+static int
-+twl4030_power_configure_scripts(const struct twl4030_power_data *pdata)
- {
- 	int err;
- 	int i;
-@@ -509,7 +511,8 @@ static int twl4030_power_configure_scripts(struct twl4030_power_data *pdata)
- 	return 0;
- }
- 
--static int twl4030_power_configure_resources(struct twl4030_power_data *pdata)
-+static int
-+twl4030_power_configure_resources(const struct twl4030_power_data *pdata)
- {
- 	struct twl4030_resconfig *resconfig = pdata->resource_config;
- 	int err;
-@@ -541,7 +544,7 @@ void twl4030_power_off(void)
- 		pr_err("TWL4030 Unable to power off\n");
- }
- 
--static bool twl4030_power_use_poweroff(struct twl4030_power_data *pdata,
-+static bool twl4030_power_use_poweroff(const struct twl4030_power_data *pdata,
- 					struct device_node *node)
- {
- 	if (pdata && pdata->use_poweroff)
-@@ -553,10 +556,60 @@ static bool twl4030_power_use_poweroff(struct twl4030_power_data *pdata,
- 	return false;
- }
- 
-+#ifdef CONFIG_OF
-+
-+/* Generic warm reset configuration for omap3 */
-+
-+static struct twl4030_ins omap3_wrst_seq[] = {
-+	{ MSG_SINGULAR(DEV_GRP_NULL, 0x1b, RES_STATE_OFF), 2 },
-+	{ MSG_SINGULAR(DEV_GRP_P1, 0xf, RES_STATE_WRST), 15 },
-+	{ MSG_SINGULAR(DEV_GRP_P1, 0x10, RES_STATE_WRST), 15 },
-+	{ MSG_SINGULAR(DEV_GRP_P1, 0x7, RES_STATE_WRST), 0x60 },
-+	{ MSG_SINGULAR(DEV_GRP_P1, 0x19, RES_STATE_ACTIVE), 2 },
-+	{ MSG_SINGULAR(DEV_GRP_NULL, 0x1b, RES_STATE_ACTIVE), 2 },
-+};
-+
-+static struct twl4030_script omap3_wrst_script = {
-+	.script	= omap3_wrst_seq,
-+	.size	= ARRAY_SIZE(omap3_wrst_seq),
-+	.flags	= TWL4030_WRST_SCRIPT,
-+};
-+
-+static struct twl4030_script *omap3_reset_scripts[] = {
-+	&omap3_wrst_script,
-+};
-+
-+static struct twl4030_resconfig omap3_rconfig[] = {
-+	{ .resource = RES_HFCLKOUT, .devgroup = DEV_GRP_P3, .type = -1,
-+	  .type2 = -1 },
-+	{ .resource = RES_VDD1, .devgroup = DEV_GRP_P1, .type = -1,
-+	  .type2 = -1 },
-+	{ .resource = RES_VDD2, .devgroup = DEV_GRP_P1, .type = -1,
-+	  .type2 = -1 },
-+	{ 0, 0},
-+};
-+
-+static struct twl4030_power_data omap3_reset = {
-+	.scripts		= omap3_reset_scripts,
-+	.num			= ARRAY_SIZE(omap3_reset_scripts),
-+	.resource_config	= omap3_rconfig,
-+};
-+
-+static struct of_device_id twl4030_power_of_match[] = {
-+	{
-+		.compatible = "ti,twl4030-power-reset",
-+		.data = &omap3_reset,
-+	},
-+	{ },
-+};
-+MODULE_DEVICE_TABLE(of, twl4030_power_of_match);
-+#endif	/* CONFIG_OF */
-+
- static int twl4030_power_probe(struct platform_device *pdev)
- {
--	struct twl4030_power_data *pdata = dev_get_platdata(&pdev->dev);
-+	const struct twl4030_power_data *pdata = dev_get_platdata(&pdev->dev);
- 	struct device_node *node = pdev->dev.of_node;
-+	const struct of_device_id *match;
- 	int err = 0;
- 	int err2 = 0;
- 	u8 val;
-@@ -577,8 +630,12 @@ static int twl4030_power_probe(struct platform_device *pdev)
- 		return err;
- 	}
- 
-+	match = of_match_device(of_match_ptr(twl4030_power_of_match),
-+				&pdev->dev);
-+	if (match && match->data)
-+		pdata = match->data;
-+
- 	if (pdata) {
--		/* TODO: convert to device tree */
- 		err = twl4030_power_configure_scripts(pdata);
- 		if (err) {
- 			pr_err("TWL4030 failed to load scripts\n");
-@@ -628,14 +685,6 @@ static int twl4030_power_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
--#ifdef CONFIG_OF
--static const struct of_device_id twl4030_power_of_match[] = {
--	{.compatible = "ti,twl4030-power", },
--	{ },
--};
--MODULE_DEVICE_TABLE(of, twl4030_power_of_match);
--#endif
--
- static struct platform_driver twl4030_power_driver = {
- 	.driver = {
- 		.name	= "twl4030_power",
+>
+> Best regards,
+> Javier
