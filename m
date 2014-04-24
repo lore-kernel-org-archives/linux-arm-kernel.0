@@ -1,154 +1,52 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Thu, 24 Apr 2014 11:31:22 -0500
-Subject: [Patch v2 4/4] tty: serial: msm: Remove direct access to GSBI
-In-Reply-To: <1398357082-5102-1-git-send-email-agross@codeaurora.org>
-References: <1398357082-5102-1-git-send-email-agross@codeaurora.org>
-Message-ID: <1398357082-5102-5-git-send-email-agross@codeaurora.org>
+From: ckeepax@opensource.wolfsonmicro.com (Charles Keepax)
+Date: Thu, 24 Apr 2014 17:35:23 +0100
+Subject: [PATCH v4 7/9] ARM: sun7i/sun4i: dt: Add AXP209 support to
+ various boards
+In-Reply-To: <20140424133036.GY12304@sirena.org.uk>
+References: <1397209093-10077-8-git-send-email-carlo@caione.org>
+ <20140411122901.GE28800@sirena.org.uk>
+ <CAOQ7t2Y2B7f+eZApDHKiKm9=bOXo6oUA2RLY7ENn7qPLQEboMA@mail.gmail.com>
+ <20140411161813.GF28800@sirena.org.uk>
+ <CAOQ7t2YO_MjUZkkoEe1Grft+fVttWoOro85Sru2P3LXbx8Kjbg@mail.gmail.com>
+ <20140418151551.GZ12304@sirena.org.uk>
+ <20140423202546.GA3890@nuc.fastwebnet.it>
+ <20140424133036.GY12304@sirena.org.uk>
+Message-ID: <20140424163523.GB25663@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes direct access of the GSBI registers.  GSBI configuration
-should be done through the GSBI driver directly.
+On Thu, Apr 24, 2014 at 02:30:36PM +0100, Mark Brown wrote:
+> On Wed, Apr 23, 2014 at 10:25:46PM +0200, Carlo Caione wrote:
+> 
+> > I'm having a really hard time with this problem, so any hint is welcome
+> > :) The small modification I'm using on top of the patches in this series
+> > is here: http://bpaste.net/show/228330/
+> 
+> > Unfortunately as I said I got this when booting:
+> > http://bpaste.net/show/nUhUTzELT32v9HNPathL/
+> 
+> Huh, actually the arizona drivers do show this (it was being masked in
+> my logs by another unrelated bug).  I guess the Wolfson guys aren't
+> working with upstream much (though Charles did write the orignal code
+> here...).
 
-Signed-off-by: Andy Gross <agross@codeaurora.org>
----
- drivers/tty/serial/msm_serial.c |   48 ++-------------------------------------
- drivers/tty/serial/msm_serial.h |    5 ----
- 2 files changed, 2 insertions(+), 51 deletions(-)
+I run upstream fairly regularly here (although mostly on Arndale
+rather than Speyside). On closer inspection of my kernel log
+don't seem to have anything related to it, which is odd.
 
-diff --git a/drivers/tty/serial/msm_serial.c b/drivers/tty/serial/msm_serial.c
-index b5d779c..8901114 100644
---- a/drivers/tty/serial/msm_serial.c
-+++ b/drivers/tty/serial/msm_serial.c
-@@ -45,7 +45,6 @@ struct msm_port {
- 	struct clk		*clk;
- 	struct clk		*pclk;
- 	unsigned int		imr;
--	void __iomem		*gsbi_base;
- 	int			is_uartdm;
- 	unsigned int		old_snap_state;
- };
-@@ -586,9 +585,7 @@ static const char *msm_type(struct uart_port *port)
- static void msm_release_port(struct uart_port *port)
- {
- 	struct platform_device *pdev = to_platform_device(port->dev);
--	struct msm_port *msm_port = UART_TO_MSM(port);
- 	struct resource *uart_resource;
--	struct resource *gsbi_resource;
- 	resource_size_t size;
- 
- 	uart_resource = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-@@ -599,28 +596,12 @@ static void msm_release_port(struct uart_port *port)
- 	release_mem_region(port->mapbase, size);
- 	iounmap(port->membase);
- 	port->membase = NULL;
--
--	if (msm_port->gsbi_base) {
--		writel_relaxed(GSBI_PROTOCOL_IDLE,
--				msm_port->gsbi_base + GSBI_CONTROL);
--
--		gsbi_resource = platform_get_resource(pdev, IORESOURCE_MEM, 1);
--		if (unlikely(!gsbi_resource))
--			return;
--
--		size = resource_size(gsbi_resource);
--		release_mem_region(gsbi_resource->start, size);
--		iounmap(msm_port->gsbi_base);
--		msm_port->gsbi_base = NULL;
--	}
- }
- 
- static int msm_request_port(struct uart_port *port)
- {
--	struct msm_port *msm_port = UART_TO_MSM(port);
- 	struct platform_device *pdev = to_platform_device(port->dev);
- 	struct resource *uart_resource;
--	struct resource *gsbi_resource;
- 	resource_size_t size;
- 	int ret;
- 
-@@ -639,30 +620,8 @@ static int msm_request_port(struct uart_port *port)
- 		goto fail_release_port;
- 	}
- 
--	gsbi_resource = platform_get_resource(pdev, IORESOURCE_MEM, 1);
--	/* Is this a GSBI-based port? */
--	if (gsbi_resource) {
--		size = resource_size(gsbi_resource);
--
--		if (!request_mem_region(gsbi_resource->start, size,
--						 "msm_serial")) {
--			ret = -EBUSY;
--			goto fail_release_port_membase;
--		}
--
--		msm_port->gsbi_base = ioremap(gsbi_resource->start, size);
--		if (!msm_port->gsbi_base) {
--			ret = -EBUSY;
--			goto fail_release_gsbi;
--		}
--	}
--
- 	return 0;
- 
--fail_release_gsbi:
--	release_mem_region(gsbi_resource->start, size);
--fail_release_port_membase:
--	iounmap(port->membase);
- fail_release_port:
- 	release_mem_region(port->mapbase, size);
- 	return ret;
-@@ -670,7 +629,6 @@ fail_release_port:
- 
- static void msm_config_port(struct uart_port *port, int flags)
- {
--	struct msm_port *msm_port = UART_TO_MSM(port);
- 	int ret;
- 	if (flags & UART_CONFIG_TYPE) {
- 		port->type = PORT_MSM;
-@@ -678,9 +636,6 @@ static void msm_config_port(struct uart_port *port, int flags)
- 		if (ret)
- 			return;
- 	}
--	if (msm_port->gsbi_base)
--		writel_relaxed(GSBI_PROTOCOL_UART,
--				msm_port->gsbi_base + GSBI_CONTROL);
- }
- 
- static int msm_verify_port(struct uart_port *port, struct serial_struct *ser)
-@@ -976,6 +931,7 @@ static struct of_device_id msm_match_table[] = {
- 
- static struct platform_driver msm_platform_driver = {
- 	.remove = msm_serial_remove,
-+	.probe = msm_serial_probe,
- 	.driver = {
- 		.name = "msm_serial",
- 		.owner = THIS_MODULE,
-@@ -991,7 +947,7 @@ static int __init msm_serial_init(void)
- 	if (unlikely(ret))
- 		return ret;
- 
--	ret = platform_driver_probe(&msm_platform_driver, msm_serial_probe);
-+	ret = platform_driver_register(&msm_platform_driver);
- 	if (unlikely(ret))
- 		uart_unregister_driver(&msm_uart_driver);
- 
-diff --git a/drivers/tty/serial/msm_serial.h b/drivers/tty/serial/msm_serial.h
-index 469fda5..a77cc76 100644
---- a/drivers/tty/serial/msm_serial.h
-+++ b/drivers/tty/serial/msm_serial.h
-@@ -108,11 +108,6 @@
- #define UART_ISR		0x0014
- #define UART_ISR_TX_READY	(1 << 7)
- 
--#define GSBI_CONTROL		0x0
--#define GSBI_PROTOCOL_CODE	0x30
--#define GSBI_PROTOCOL_UART	0x40
--#define GSBI_PROTOCOL_IDLE	0x0
--
- #define UARTDM_DMRX		0x34
- #define UARTDM_NCF_TX		0x40
- #define UARTDM_RX_TOTAL_SNAP	0x38
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+> The issue is the MFD core, it shouldn't be using managed allocations
+> here - the error reported by the assert is entirely correct.  If the
+> CODEC driver is bound and unbound it'll not be possible to reload it
+> as things stand.  
+> 
+> Your driver is correct but the implementation needs to be fixed -
+> possibly with an API change on free since at the minute the cells to be
+> freed don't get passed back into the MFD core when deallocating.
+
+This does indeed look broken, I will have a look and think about it.
+Unfortunately I am travelling most of next week, so if I don't
+manage to get something out over the weekend there may be a slight
+delay on me getting a fix out.
+
+Thanks,
+Charles
