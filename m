@@ -1,51 +1,72 @@
 From: shaik.ameer@samsung.com (Shaik Ameer Basha)
-Date: Thu, 24 Apr 2014 18:33:40 +0530
-Subject: [PATCH v3 04/16] clk: exynos5420: correct clock parents for mscl
- sysmmu
+Date: Thu, 24 Apr 2014 18:33:41 +0530
+Subject: [PATCH v3 05/16] clk: exynos5420: update clocks for G2D block
 In-Reply-To: <1398344632-18623-1-git-send-email-shaik.ameer@samsung.com>
 References: <1398344632-18623-1-git-send-email-shaik.ameer@samsung.com>
-Message-ID: <1398344632-18623-5-git-send-email-shaik.ameer@samsung.com>
+Message-ID: <1398344632-18623-6-git-send-email-shaik.ameer@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Addign more G2D block clocks.
 
 Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
 Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
 ---
- drivers/clk/samsung/clk-exynos5420.c |   15 +++++++++------
- 1 file changed, 9 insertions(+), 6 deletions(-)
+ drivers/clk/samsung/clk-exynos5420.c   |   10 ++++++++++
+ include/dt-bindings/clock/exynos5420.h |    3 +++
+ 2 files changed, 13 insertions(+)
+ mode change 100644 => 100755 include/dt-bindings/clock/exynos5420.h
 
 diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
-index c3c8ceb..9da85ac 100755
+index 9da85ac..ab07299 100755
 --- a/drivers/clk/samsung/clk-exynos5420.c
 +++ b/drivers/clk/samsung/clk-exynos5420.c
-@@ -579,6 +579,9 @@ static struct samsung_div_clock exynos5420_div_clks[] __initdata = {
- 		DIV2_RATIO0, 4, 2),
- 	DIV(0, "dout_gscl_blk_333", "aclk333_432_gscl", DIV2_RATIO0, 6, 2),
+@@ -815,6 +815,10 @@ static struct samsung_gate_clock exynos5420_gate_clks[] __initdata = {
+ 	GATE(CLK_ROTATOR, "rotator", "aclk266", GATE_IP_GEN, 1, 0, 0),
+ 	GATE(CLK_JPEG, "jpeg", "aclk300_jpeg", GATE_IP_GEN, 2, 0, 0),
+ 	GATE(CLK_JPEG2, "jpeg2", "aclk300_jpeg", GATE_IP_GEN, 3, 0, 0),
++	GATE(CLK_MDMA0, "mdma0", "aclk266_g2d",
++			GATE_IP_G2D, 1, CLK_IGNORE_UNUSED, 0),
++	GATE(CLK_SMMU_MDMA0, "smmu_mdma0", "aclk266_g2d",
++			GATE_IP_G2D, 5, CLK_IGNORE_UNUSED, 0),
+ 	GATE(CLK_MDMA1, "mdma1", "aclk266", GATE_IP_GEN, 4, 0, 0),
+ 	GATE(CLK_SMMU_ROTATOR, "smmu_rotator", "aclk266", GATE_IP_GEN, 6, 0, 0),
+ 	GATE(CLK_SMMU_JPEG, "smmu_jpeg", "aclk300_jpeg", GATE_IP_GEN, 7, 0, 0),
+@@ -842,6 +846,11 @@ static struct samsung_gate_clock exynos5420_gate_clks[] __initdata = {
+ 			"mout_user_aclk333_432_isp0", GATE_BUS_TOP, 5, 0, 0),
+ 	GATE(0, "aclk333_432_isp",
+ 			"mout_user_aclk333_432_isp", GATE_BUS_TOP, 8, 0, 0),
++	/* G2D */
++	GATE(CLK_G2D, "g2d", "aclk333_g2d",
++			GATE_IP_G2D, 3, CLK_IGNORE_UNUSED, 0),
++	GATE(CLK_SMMU_G2D, "smmu_g2d", "aclk333_g2d",
++			GATE_IP_G2D, 7, CLK_IGNORE_UNUSED, 0),
+ 	/* ISP */
+ 	GATE(0, "sclk_pwm_isp", "dout_pwm_isp", GATE_TOP_SCLK_ISP, 3, 0, 0),
+ 	GATE(0, "sclk_uart_isp", "dout_uart_isp", GATE_TOP_SCLK_ISP, 0, 0, 0),
+@@ -858,6 +867,7 @@ static struct samsung_gate_clock exynos5420_gate_clks[] __initdata = {
  
-+	/* MSCL Blk */
-+	DIV(0, "dout_mscl_blk", "aclk400_mscl", DIV2_RATIO0, 28, 2),
-+
- 	/* ISP Block */
- 	DIV(0, "dout_aclk400_isp", "mout_aclk400_isp", DIV_TOP0, 0, 3),
- 	DIV(0, "dout_aclk333_432_isp0", "mout_aclk333_432_isp0",
-@@ -820,12 +823,12 @@ static struct samsung_gate_clock exynos5420_gate_clks[] __initdata = {
- 	GATE(CLK_MSCL0, "mscl0", "aclk400_mscl", GATE_IP_MSCL, 0, 0, 0),
- 	GATE(CLK_MSCL1, "mscl1", "aclk400_mscl", GATE_IP_MSCL, 1, 0, 0),
- 	GATE(CLK_MSCL2, "mscl2", "aclk400_mscl", GATE_IP_MSCL, 2, 0, 0),
--	GATE(CLK_SMMU_MSCL0, "smmu_mscl0", "aclk400_mscl", GATE_IP_MSCL, 8, 0,
--		0),
--	GATE(CLK_SMMU_MSCL1, "smmu_mscl1", "aclk400_mscl", GATE_IP_MSCL, 9, 0,
--		0),
--	GATE(CLK_SMMU_MSCL2, "smmu_mscl2", "aclk400_mscl", GATE_IP_MSCL, 10, 0,
--		0),
-+	GATE(CLK_SMMU_MSCL0, "smmu_mscl0", "dout_mscl_blk",
-+			GATE_IP_MSCL, 8, 0, 0),
-+	GATE(CLK_SMMU_MSCL1, "smmu_mscl1", "dout_mscl_blk",
-+			GATE_IP_MSCL, 9, 0, 0),
-+	GATE(CLK_SMMU_MSCL2, "smmu_mscl2", "dout_mscl_blk",
-+			GATE_IP_MSCL, 10, 0, 0),
- 	GATE(CLK_SMMU_MIXER, "smmu_mixer", "aclk200_disp1", GATE_IP_DISP1, 9, 0,
- 		0),
- 	/* gating of aclk300_gscl causes system hang. It should not be gated. */
+ 	/* SSS */
+ 	GATE(CLK_SSS, "sss", "aclk266_g2d", GATE_IP_G2D, 2, 0, 0),
++	GATE(CLK_SMMU_SSS, "smmu_sss", "aclk266_g2d", GATE_IP_G2D, 6, 0, 0),
+ };
+ 
+ static struct samsung_pll_clock exynos5420_plls[nr_plls] __initdata = {
+diff --git a/include/dt-bindings/clock/exynos5420.h b/include/dt-bindings/clock/exynos5420.h
+old mode 100644
+new mode 100755
+index 223925f..6631dc1
+--- a/include/dt-bindings/clock/exynos5420.h
++++ b/include/dt-bindings/clock/exynos5420.h
+@@ -175,6 +175,9 @@
+ #define CLK_ACLK_G3D		500
+ #define CLK_G3D			501
+ #define CLK_SMMU_MIXER		502
++#define CLK_SMMU_G2D		503
++#define CLK_SMMU_MDMA0		504
++#define CLK_SMMU_SSS		505
+ 
+ /* mux clocks */
+ #define CLK_MOUT_HDMI		640
 -- 
 1.7.9.5
