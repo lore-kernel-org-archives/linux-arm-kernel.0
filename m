@@ -1,25 +1,35 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 24 Apr 2014 14:55:52 +0200
-Subject: [PATCH 4/4] dma: ste_dma40: Fixup system suspend/resume
-In-Reply-To: <1398282724-2607-4-git-send-email-ulf.hansson@linaro.org>
-References: <1398282724-2607-1-git-send-email-ulf.hansson@linaro.org>
- <1398282724-2607-4-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <CACRpkdZ=herUXtkDfsVD0xTNUG3f272eGw=o_nWpi-GyCsWJPw@mail.gmail.com>
+Date: Thu, 24 Apr 2014 14:59:54 +0200
+Subject: [PATCH 4/4] pinctrl: sirf: move to use irq_get_handler_data
+In-Reply-To: <CAGsJ_4y=zNNWAvVOK6zGaY-bufUCbOcZtwE=SuWJ=QpF9rBNHg@mail.gmail.com>
+References: <1397544229-20545-1-git-send-email-21cnbao@gmail.com>
+ <1397544229-20545-5-git-send-email-21cnbao@gmail.com>
+ <CACRpkdbDeF5gBVv=hQSdX1i9fw=7Or+=qN=g4OXHvHkZKr7vcQ@mail.gmail.com>
+ <CAGsJ_4y=zNNWAvVOK6zGaY-bufUCbOcZtwE=SuWJ=QpF9rBNHg@mail.gmail.com>
+Message-ID: <CACRpkdYz+JdAbhdR_s9h4m_3JNcpLo-2VzoXYoEd21myB4yZtg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 23, 2014 at 9:52 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+On Thu, Apr 24, 2014 at 12:59 AM, Barry Song <21cnbao@gmail.com> wrote:
 
-> Make sure to handle register context save/restore when needed from
-> system PM callbacks.
+>> If you want to use some other handler data than the gpiochip,
+>> you should just use irq_set_chained_handler() and
+>> irq_set_handler_data() directly.
 >
-> Previously we solely trusted the device to reside in in-active state
-> while the system suspend callback were invoked, which is just too
-> optimistic.
->
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> i think this should be fixed in the general API but not use one more
+> function call to over-write the handler_data which has been filled in
+> the API.
+> since we have the chance for drivers to set either the whole chip for
+> a simple chip,  or bank-specific data for a chip which has multiple
+> parent IRQs.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+I don't think it's worth it for saving one line. The helper is intended
+for the simple case, i.e. where it's enough to just get the gpio_chip
+as handler data. Other alternatives need to be open coded.
+
+I'm even considering removing this helper if it's confusing, it doesn't
+really add much, gpiochip_irqchip_add() is the important function
+to use, not gpiochip_set_chained_irqchip().
 
 Yours,
 Linus Walleij
