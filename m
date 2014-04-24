@@ -1,38 +1,85 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 24 Apr 2014 00:51:53 -0400
-Subject: [RESEND/PATCH v4 0/9] Watchdog support for Armada 375/38x SoC
-In-Reply-To: <1397481813-4962-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1397481813-4962-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20140424045153.GU28159@titan.lakedaemon.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 24 Apr 2014 13:53:47 +0900
+Subject: [RFC PATCH 2/2] PCI: exynos: Add PCIe support for Samsung GH7 SoC
+In-Reply-To: <14215032.8jhN17iHj5@wuerfel>
+References: <000801cf592e$30b7bff0$92273fd0$%han@samsung.com>
+ <4565008.ZECF3eWqge@wuerfel>
+ <20140423142315.GO865@e106497-lin.cambridge.arm.com>
+ <14215032.8jhN17iHj5@wuerfel>
+Message-ID: <01ff01cf5f79$30f926b0$92eb7410$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 14, 2014 at 10:23:24AM -0300, Ezequiel Garcia wrote:
-> Here's the fourth round of the patchset adding support for watchdog
-> on Armada 375 and Armada 38x SoCs, rebased on v3.15-rc1 and with
-> collected Tested-by's.
+Arnd Bergmann wrote:
 > 
-> The new Armada 375/385 SoCs have two registers for the watchdog RSTOUT:
-> 
->  1. It has a dedicated register (similar to the one in A370/XP)
->  2. Also has a bit in a shared RSTOUT register.
-> 
-> Therefore, in order to support this two-folded RSTOUT, we extend the 'reg'
-> property in the watchdog devicetree and require a new pair of cells to specify
-> the shared RSTOUT.
-> 
-> On the driver side, we need to implement per-SoC stop() and enabled()
-> functions. Such somewhat complex infrastructure is needed to ensure the driver
-> performs proper reset of the watchdog timer, by masking and disabling the
-> RSTOUT before the interrupt is enabled.
-> 
-> Tested on A375-DB, A385-DB, A370-RD and Dove Cubox. Sebastian did more tests
-> on Dove, and Jason Gunthorpe on Kirkwood.
+> On Wednesday 23 April 2014 15:23:16 Liviu Dudau wrote:
+> > > Unfortunately we are in a tricky situation on arm64 because we have
+> > > to support both server-type SoCs and embedded-type SoCs. In an
+> > > embedded system, you can't trust the boot loader to do a proper
+> > > setup of all the hardware, so the kernel needs full control over
+> > > all the initialization. In a server, the initialization is the
+> > > responsibility of the firmware, and we don't want the kernel to
+> > > even know about those registers.
 
-Applied patches 7 and 8 to mvebu/dt.  For the rest,
+BTW, actually we can trust boot-loader to do required things in mobile also ;-)
 
-Acked-by: Jason Cooper <jason@lakedaemon.net>
+> > >
+> > > My hope is that all server chips use an SBSA compliant PCIe
+> > > implementation, but we already have X-Gene, which is doing server
+> > > workloads with a nonstandard PCIe, and it's possible that there
+> > > will also be server-like systems with a DesignWare PCIe block
+> > > instead of an SBSA compliant one. We can still support those, but
+> > > I don't want to see more than one implementation of dw-pcie
+> > > on servers. Just like we have the generic PCIe support that Will
+> > > is doing for virtual machines and SBSA compliant systems, we
+> > > would do one dw-pcie variant for all systems that come with a
+> > > host firmware and rely on it being set up already.
 
-thx,
+OK and I think, just one device driver would be nice for whatever embedded or
+server.
 
-Jason.
+> >
+> > There is nothing in the SBSA that mandates firmware setup. All it requires
+
+Yeah, I couldn't look at that in the SBSA...
+
+> > is that hardware is setup in a way that is not specific to a board
+> > or a particular OEM. Surely if the setup being done for GH7 is always
+> > the same it should fit the bill?
+> 
+But Arnd's comments are about firmware based on each SoC not board?...
+
+> GH7 is already not SBSA compliant because it uses a nonstandard config
+> space access method, and it uses its own MSI controller rather than GIC.
+> This means it violates at least two out of the four clauses in SBSA
+> describing PCIe.
+> 
+OK, I see. Honestly, we just focused on how to support PCI on both exynos5440
+and GH7 SoCs.
+
+> Regardless of this, the level of detail describing config space and
+> MSI handling in SBSA can only make sense if the purpose is to handle
+> all compliant implementations without platform specific code. If you
+> require platform specific setup code in the OS, this underlying assumption
+> no longer holds true and there is no point in having a spec in the
+> first place.
+> 
+OK, your assumption makes sense to us.
+
+> I think we should treat DW-PCIe in the same way if anyone attempts
+> to use that in a server, e.g. in SBSA level 0. As you can see here,
+
+Agreed. BTW, how about GICv2m for level 1? It can be supported with the same
+way in one DW-PCIe driver?
+
+> even when reusing hardware between Exynos and GH7, you can't just
+> use the same init code, so it has to be in firmware to be any good.
+> On a real server platform, you can't require a kernel upgrade every
+> time a new SoC comes out, any basic functionality like PCI just has to
+> work with existing OS images.
+> 
+OK, when Will's driver is ready, we will test it on GH7 with the setup for PCIe
+included in firmware. Anyway I hope we can use the driver in 3.16 :-)
+
+Thanks,
+Kukjin
