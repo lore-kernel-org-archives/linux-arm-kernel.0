@@ -1,32 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 24 Apr 2014 10:16:24 +0100
-Subject: [PATCH] ARM: mm: dma: Update coherent streaming apis with
- missing memory barrier
-In-Reply-To: <20140424090927.GB8521@arm.com>
-References: <1398103390-31968-1-git-send-email-santosh.shilimkar@ti.com>
- <201404222153.41786.arnd@arndb.de> <5356C9D1.2060001@ti.com>
- <5895821.PvurJ8TWz2@wuerfel> <5356D163.1070304@ti.com>
- <20140423090251.GA5281@arm.com> <20140423160216.GC2208@arm.com>
- <20140423171727.GK5649@arm.com> <20140424090927.GB8521@arm.com>
-Message-ID: <20140424091624.GG26756@n2100.arm.linux.org.uk>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Thu, 24 Apr 2014 11:21:26 +0200
+Subject: [PATCH] ARM: exynos: register sched_clock callback
+Message-ID: <1398331286-2020-1-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 24, 2014 at 10:09:27AM +0100, Catalin Marinas wrote:
-> If we only do D-cache maintenance by MVA, the ARM ARM (both v7 and v8)
-> claims that these are ordered relative to any explicit load/stores to
-> the same address. So in theory we don't even need a DMB for unmapping
-> with DMA_FROM_DEVICE. But in practice, we may have the outer cache,
-> hence a DSB is required before the outer_sync() (we could move it there
-> though).
+Use the clocksource mct-frc for sched_clock
 
-The general usecase for outer_sync() is: dsb(); outer_sync();  Why would
-we want to change this to dsb(); dmb(); outer_sync(); (where the dmb is
-in outer_sync itself?)
+Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+---
+ drivers/clocksource/exynos_mct.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Seems more sensible for it to stay at the outer_sync() call site where
-it's needed.
-
+diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+index a6ee6d7..61b0577 100644
+--- a/drivers/clocksource/exynos_mct.c
++++ b/drivers/clocksource/exynos_mct.c
+@@ -24,6 +24,7 @@
+ #include <linux/of_irq.h>
+ #include <linux/of_address.h>
+ #include <linux/clocksource.h>
++#include <linux/sched_clock.h>
+ 
+ #define EXYNOS4_MCTREG(x)		(x)
+ #define EXYNOS4_MCT_G_CNT_L		EXYNOS4_MCTREG(0x100)
+@@ -192,12 +193,19 @@ struct clocksource mct_frc = {
+ 	.resume		= exynos4_frc_resume,
+ };
+ 
++static u64 notrace exynos4_read_sched_clock(void)
++{
++	return exynos4_frc_read(&mct_frc);
++}
++
+ static void __init exynos4_clocksource_init(void)
+ {
+ 	exynos4_mct_frc_start(0, 0);
+ 
+ 	if (clocksource_register_hz(&mct_frc, clk_rate))
+ 		panic("%s: can't register clocksource\n", mct_frc.name);
++
++	sched_clock_register(exynos4_read_sched_clock, 64, clk_rate);
+ }
+ 
+ static void exynos4_mct_comp0_stop(void)
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.9.1
