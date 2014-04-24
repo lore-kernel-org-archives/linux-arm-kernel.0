@@ -1,102 +1,123 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 24 Apr 2014 17:23:21 -0300
-Subject: [PATCH v2 07/10] thermal: armada: Support Armada 380 SoC
+Date: Thu, 24 Apr 2014 17:23:22 -0300
+Subject: [PATCH v2 08/10] ARM: mvebu: Add thermal quirk for the Armada 375 DB
+ board
 In-Reply-To: <1398371004-15807-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1398371004-15807-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1398371004-15807-8-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1398371004-15807-9-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that a generic infrastructure is in place, it's possible to support
-the Armada 380 SoC thermal sensor. This sensor is similar to the one
-available in the already supported SoCs, with its specific temperature formula
-and specific sensor initialization.
+The initial release of the Armada 375 DB board has an Armada 375
+Z1 stepping silicon. This commit introduces a quirk that allows
+to workaround a series of issues with the thermal sensor in this
+stepping, but updating the devicetree:
+
+  * Updates the compatible string for the thermal, so the driver
+    can perform a specific initialization of the sensor.
+
+  * Moves the offset of the thermal control register. This quirk
+    allows to specifiy the correct (A0 stepping) offset in the
+    devicetree.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- .../devicetree/bindings/thermal/armada-thermal.txt |  3 ++-
- drivers/thermal/armada_thermal.c                   | 30 ++++++++++++++++++++++
- 2 files changed, 32 insertions(+), 1 deletion(-)
+ arch/arm/mach-mvebu/board-v7.c     | 57 ++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-mvebu/mvebu-soc-id.h |  3 ++
+ 2 files changed, 60 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/thermal/armada-thermal.txt b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-index 2a67e51..4cf0249 100644
---- a/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-+++ b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-@@ -1,4 +1,4 @@
--* Marvell Armada 370/375/XP thermal management
-+* Marvell Armada 370/375/380/XP thermal management
- 
- Required properties:
- 
-@@ -6,6 +6,7 @@ Required properties:
- 		marvell,armada370-thermal
- 		marvell,armada375-thermal
- 		marvell,armada375-z1-thermal
-+		marvell,armada380-thermal
- 		marvell,armadaxp-thermal
- 
- 		Note: As the name suggests, "marvell,armada375-z1-thermal"
-diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
-index e40cc6e..a48d0ca 100644
---- a/drivers/thermal/armada_thermal.c
-+++ b/drivers/thermal/armada_thermal.c
-@@ -43,6 +43,7 @@
- #define A375_UNIT_CONTROL_MASK		0x7
- #define A375_READOUT_INVERT		BIT(15)
- #define A375_HW_RESETn			BIT(8)
-+#define A380_HW_RESET			BIT(8)
- 
- struct armada_thermal_data;
- 
-@@ -149,6 +150,19 @@ static void armada375_init_sensor(struct platform_device *pdev,
- 	mdelay(50);
+diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
+index 333fca8..93f50f2 100644
+--- a/arch/arm/mach-mvebu/board-v7.c
++++ b/arch/arm/mach-mvebu/board-v7.c
+@@ -96,10 +96,66 @@ static void __init i2c_quirk(void)
+ 	return;
  }
  
-+static void armada380_init_sensor(struct platform_device *pdev,
-+				  struct armada_thermal_priv *priv)
-+{
-+	unsigned long reg = readl_relaxed(priv->control);
++#define A375_Z1_THERMAL_FIXUP_OFFSET 0xc
 +
-+	/* Reset hardware once */
-+	if (reg & A380_HW_RESET) {
-+		reg |= A380_HW_RESET;
-+		writel(reg, priv->control);
-+		mdelay(10);
++static void __init thermal_quirk(void)
++{
++	struct device_node *np;
++	u32 dev, rev;
++
++	if (mvebu_get_soc_id(&dev, &rev) && rev > ARMADA_375_Z1_REV)
++		return;
++
++	for_each_compatible_node(np, NULL, "marvell,armada375-thermal") {
++		struct property *prop;
++		__be32 newval, *newprop, *oldprop;
++		int len;
++
++		/*
++		 * The register offset is at a wrong location. This quirk
++		 * creates a new reg property as a clone of the previous
++		 * one and corrects the offset.
++		 */
++		oldprop = (__be32 *)of_get_property(np, "reg", &len);
++		if (!oldprop)
++			continue;
++
++		/* Create a duplicate of the 'reg' property */
++		prop = kzalloc(sizeof(*prop), GFP_KERNEL);
++		prop->length = len;
++		prop->name = kstrdup("reg", GFP_KERNEL);
++		prop->value = kzalloc(len, GFP_KERNEL);
++		memcpy(prop->value, oldprop, len);
++
++		/* Fixup the register offset of the second entry */
++		oldprop += 2;
++		newprop = (__be32 *)prop->value + 2;
++		newval = cpu_to_be32(be32_to_cpu(*oldprop) -
++				     A375_Z1_THERMAL_FIXUP_OFFSET);
++		*newprop = newval;
++		of_update_property(np, prop);
++
++		/*
++		 * The thermal controller needs some quirk too, so let's change
++		 * the compatible string to reflect this.
++		 */
++		prop = kzalloc(sizeof(*prop), GFP_KERNEL);
++		prop->name = kstrdup("compatible", GFP_KERNEL);
++		prop->length = sizeof("marvell,armada375-z1-thermal");
++		prop->value = kstrdup("marvell,armada375-z1-thermal",
++						GFP_KERNEL);
++		of_update_property(np, prop);
 +	}
++	return;
 +}
 +
- static bool armada_is_valid(struct armada_thermal_priv *priv)
+ static void __init mvebu_dt_init(void)
  {
- 	unsigned long reg = readl_relaxed(priv->sensor);
-@@ -220,6 +234,18 @@ static const struct armada_thermal_data armada375_data = {
- 	.coef_div = 13616,
- };
- 
-+static const struct armada_thermal_data armada380_data = {
-+	.is_valid = armada_is_valid,
-+	.init_sensor = armada380_init_sensor,
-+	.is_valid_offset = 10,
-+	.temp_offset = 0,
-+	.temp_mask = 0x3ff,
-+	.coef_b = 1169498786UL,
-+	.coef_m = 2000000UL,
-+	.coef_div = 4289,
-+	.inverted = true,
-+};
+ 	if (of_machine_is_compatible("plathome,openblocks-ax3-4"))
+ 		i2c_quirk();
++	if (of_machine_is_compatible("marvell,a375-db"))
++		thermal_quirk();
 +
- static const struct of_device_id armada_thermal_id_table[] = {
- 	{
- 		.compatible = "marvell,armadaxp-thermal",
-@@ -238,6 +264,10 @@ static const struct of_device_id armada_thermal_id_table[] = {
- 		.data       = &armada375_data,
- 	},
- 	{
-+		.compatible = "marvell,armada380-thermal",
-+		.data       = &armada380_data,
-+	},
-+	{
- 		/* sentinel */
- 	},
- };
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
+@@ -123,6 +179,7 @@ static const char * const armada_375_dt_compat[] = {
+ 
+ DT_MACHINE_START(ARMADA_375_DT, "Marvell Armada 375 (Device Tree)")
+ 	.init_time	= mvebu_timer_and_clk_init,
++	.init_machine	= mvebu_dt_init,
+ 	.restart	= mvebu_restart,
+ 	.dt_compat	= armada_375_dt_compat,
+ MACHINE_END
+diff --git a/arch/arm/mach-mvebu/mvebu-soc-id.h b/arch/arm/mach-mvebu/mvebu-soc-id.h
+index 3165425..294a443 100644
+--- a/arch/arm/mach-mvebu/mvebu-soc-id.h
++++ b/arch/arm/mach-mvebu/mvebu-soc-id.h
+@@ -20,6 +20,9 @@
+ #define MV78XX0_A0_REV	    0x1
+ #define MV78XX0_B0_REV	    0x2
+ 
++/* Armada 375 */
++#define ARMADA_375_Z1_REV   0x0
++
+ #ifdef CONFIG_ARCH_MVEBU
+ int mvebu_get_soc_id(u32 *dev, u32 *rev);
+ #else
 -- 
 1.9.1
