@@ -1,75 +1,40 @@
-From: stratosk@semaphore.gr (Stratos Karafotis)
-Date: Fri, 25 Apr 2014 23:16:11 +0300
-Subject: [PATCH v5 5/8] mfd: db8500-prcmu: Use cpufreq_for_each_entry macro
- for iteration
-Message-ID: <535AC28B.3030500@semaphore.gr>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 25 Apr 2014 22:16:30 +0200
+Subject: [PATCH] ARM: dts: Remove vmmc-supply for mmc@12220000 on
+ arndale-octa board
+In-Reply-To: <1398456672-3936-1-git-send-email-javi.merino@arm.com>
+References: <1398456672-3936-1-git-send-email-javi.merino@arm.com>
+Message-ID: <535AC29E.8010905@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cpufreq core now supports the cpufreq_for_each_entry macro helper
-for iteration over the cpufreq_frequency_table, so use it.
+Hi Javi,
 
-It should have no functional changes.
+On 25.04.2014 22:11, Javi Merino wrote:
+> d726ca2d3316 (ARM: dts: Add vmmc-supply to MMC on arndale-octa board)
+> added the vmmc-supply to nodes mmc at 12200000 and mmc at 12220000 of the
+> DT.  However, this makes the kernel fail to boot on the arndale-octa
+> spews:
+>
+> [    5.060000] dwmmc_exynos 12200000.mmc: num-slots property not found, assuming 1 slot is available
+> [    5.065000] platform 12200000.mmc: Driver dwmmc_exynos requests probe deferral
+> [    5.075000] dwmmc_exynos 12220000.mmc: num-slots property not found, assuming 1 slot is available
+> [    5.085000] platform 12220000.mmc: Driver dwmmc_exynos requests probe deferral
+>
+> And eventually hangs.  Without the vmmc-supply property in the
+> mmc at 12220000 node, the kernel boots again.
+>
+> Signed-off-by: Javi Merino <javi.merino@arm.com>
+> ---
+>
+> Hi,
+>
+> Note that I don't know *why* removing the property works, all I know
+> is that 3.15-rc2 fails to boot on my Arndale Octa unless I apply this
+> patch.
 
-Signed-off-by: Stratos Karafotis <stratosk@semaphore.gr>
----
- drivers/mfd/db8500-prcmu.c | 19 ++++++++-----------
- 1 file changed, 8 insertions(+), 11 deletions(-)
+Are you sure you have the required PMIC driver enabled in your kernel 
+config?
 
-diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
-index 7694e07..b11fdd6 100644
---- a/drivers/mfd/db8500-prcmu.c
-+++ b/drivers/mfd/db8500-prcmu.c
-@@ -1734,18 +1734,17 @@ static struct cpufreq_frequency_table db8500_cpufreq_table[] = {
- 
- static long round_armss_rate(unsigned long rate)
- {
-+	struct cpufreq_frequency_table *pos;
- 	long freq = 0;
--	int i = 0;
- 
- 	/* cpufreq table frequencies is in KHz. */
- 	rate = rate / 1000;
- 
- 	/* Find the corresponding arm opp from the cpufreq table. */
--	while (db8500_cpufreq_table[i].frequency != CPUFREQ_TABLE_END) {
--		freq = db8500_cpufreq_table[i].frequency;
-+	cpufreq_for_each_entry(pos, db8500_cpufreq_table) {
-+		freq = pos->frequency;
- 		if (freq == rate)
- 			break;
--		i++;
- 	}
- 
- 	/* Return the last valid value, even if a match was not found. */
-@@ -1886,23 +1885,21 @@ static void set_clock_rate(u8 clock, unsigned long rate)
- 
- static int set_armss_rate(unsigned long rate)
- {
--	int i = 0;
-+	struct cpufreq_frequency_table *pos;
- 
- 	/* cpufreq table frequencies is in KHz. */
- 	rate = rate / 1000;
- 
- 	/* Find the corresponding arm opp from the cpufreq table. */
--	while (db8500_cpufreq_table[i].frequency != CPUFREQ_TABLE_END) {
--		if (db8500_cpufreq_table[i].frequency == rate)
-+	cpufreq_for_each_entry(pos, db8500_cpufreq_table)
-+		if (pos->frequency == rate)
- 			break;
--		i++;
--	}
- 
--	if (db8500_cpufreq_table[i].frequency != rate)
-+	if (pos->frequency != rate)
- 		return -EINVAL;
- 
- 	/* Set the new arm opp. */
--	return db8500_prcmu_set_arm_opp(db8500_cpufreq_table[i].driver_data);
-+	return db8500_prcmu_set_arm_opp(pos->driver_data);
- }
- 
- static int set_plldsi_rate(unsigned long rate)
--- 
-1.9.0
+Best regards,
+Tomasz
