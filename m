@@ -1,51 +1,77 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Fri, 25 Apr 2014 20:54:15 +0900
-Subject: [PATCH v2 3/5] ARM: dts: Add PMU node to exynos4212 and exynos4412
-In-Reply-To: <1398426857-5097-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1396425778-4379-1-git-send-email-pankaj.dubey@samsung.com>
- <1398426857-5097-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1398426857-5097-4-git-send-email-pankaj.dubey@samsung.com>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Fri, 25 Apr 2014 12:36:39 +0100
+Subject: [PATCH 067/222] ARM: l2c: vexpress ca9x4: move L2 cache
+ initialisation earlier
+In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
+References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
+Message-ID: <E1WdeQp-0007Hd-8g@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds pmu regnode to exynos4212 and exynos4412 dtsi to
-handle PMU register access via DT.
+It is beneficial to have the L2 cache up and running earlier in the
+system boot.  Not only will this allow for simpler code when we come to
+enable some features, but it also means that we get a more accurate
+bogomips value for the udelay() loop.  Calibrating the loop with the
+L2 cache off, and then running with the L2 cache on is not the best
+idea.
 
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/boot/dts/exynos4212.dtsi |    6 ++++++
- arch/arm/boot/dts/exynos4412.dtsi |    6 ++++++
- 2 files changed, 12 insertions(+)
+ arch/arm/mach-vexpress/ct-ca9x4.c | 28 ++++++++++++++++++----------
+ 1 file changed, 18 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos4212.dtsi b/arch/arm/boot/dts/exynos4212.dtsi
-index 3c00e6e..b1d4768 100644
---- a/arch/arm/boot/dts/exynos4212.dtsi
-+++ b/arch/arm/boot/dts/exynos4212.dtsi
-@@ -29,4 +29,10 @@
- 	gic: interrupt-controller at 10490000 {
- 		cpu-offset = <0x8000>;
- 	};
+diff --git a/arch/arm/mach-vexpress/ct-ca9x4.c b/arch/arm/mach-vexpress/ct-ca9x4.c
+index 6c4ffb6c5ad8..204038ef3795 100644
+--- a/arch/arm/mach-vexpress/ct-ca9x4.c
++++ b/arch/arm/mach-vexpress/ct-ca9x4.c
+@@ -45,6 +45,23 @@ static void __init ct_ca9x4_map_io(void)
+ 	iotable_init(ct_ca9x4_io_desc, ARRAY_SIZE(ct_ca9x4_io_desc));
+ }
+ 
++static void __init ca9x4_l2_init(void)
++{
++#ifdef CONFIG_CACHE_L2X0
++	void __iomem *l2x0_base = ioremap(CT_CA9X4_L2CC, SZ_4K);
 +
-+	pmu_system_controller: system-controller at 10020000 {
-+		compatible = "samsung,exynos4212-pmu", "syscon";
-+		reg = <0x10020000 0x5000>;
-+		samsung,syscon-phandle = <&pmu_system_controller>;
-+	};
- };
-diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
-index 15d3c0a..6152e70 100644
---- a/arch/arm/boot/dts/exynos4412.dtsi
-+++ b/arch/arm/boot/dts/exynos4412.dtsi
-@@ -29,4 +29,10 @@
- 	gic: interrupt-controller at 10490000 {
- 		cpu-offset = <0x4000>;
- 	};
++	if (l2x0_base) {
++		/* set RAM latencies to 1 cycle for this core tile. */
++		writel(0, l2x0_base + L310_TAG_LATENCY_CTRL);
++		writel(0, l2x0_base + L310_DATA_LATENCY_CTRL);
 +
-+	pmu_system_controller: system-controller at 10020000 {
-+		compatible = "samsung,exynos4412-pmu", "syscon";
-+		reg = <0x10020000 0x5000>;
-+		samsung,syscon-phandle = <&pmu_system_controller>;
-+	};
- };
++		l2x0_init(l2x0_base, 0x00400000, 0xfe0fffff);
++	} else {
++		pr_err("L2C: unable to map L2 cache controller\n");
++	}
++#endif
++}
++
+ #ifdef CONFIG_HAVE_ARM_TWD
+ static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, A9_MPCORE_TWD, IRQ_LOCALTIMER);
+ 
+@@ -63,6 +80,7 @@ static void __init ct_ca9x4_init_irq(void)
+ 	gic_init(0, 29, ioremap(A9_MPCORE_GIC_DIST, SZ_4K),
+ 		 ioremap(A9_MPCORE_GIC_CPU, SZ_256));
+ 	ca9x4_twd_init();
++	ca9x4_l2_init();
+ }
+ 
+ static int ct_ca9x4_clcd_setup(struct clcd_fb *fb)
+@@ -141,16 +159,6 @@ static void __init ct_ca9x4_init(void)
+ {
+ 	int i;
+ 
+-#ifdef CONFIG_CACHE_L2X0
+-	void __iomem *l2x0_base = ioremap(CT_CA9X4_L2CC, SZ_4K);
+-
+-	/* set RAM latencies to 1 cycle for this core tile. */
+-	writel(0, l2x0_base + L310_TAG_LATENCY_CTRL);
+-	writel(0, l2x0_base + L310_DATA_LATENCY_CTRL);
+-
+-	l2x0_init(l2x0_base, 0x00400000, 0xfe0fffff);
+-#endif
+-
+ 	for (i = 0; i < ARRAY_SIZE(ct_ca9x4_amba_devs); i++)
+ 		amba_device_register(ct_ca9x4_amba_devs[i], &iomem_resource);
+ 
 -- 
-1.7.10.4
+1.8.3.1
