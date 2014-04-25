@@ -1,52 +1,56 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 25 Apr 2014 13:49:45 +0100
-Subject: [PATCH 21/38] mmc: sdhci: hack up driver to make it more
- compliant with UHS-1
-In-Reply-To: <20140425123820.GA15179@pengutronix.de>
-References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
- <E1Wd2WT-0003vg-Ke@rmk-PC.arm.linux.org.uk>
- <20140425123820.GA15179@pengutronix.de>
-Message-ID: <20140425124945.GM26756@n2100.arm.linux.org.uk>
+From: archit@ti.com (Archit Taneja)
+Date: Fri, 25 Apr 2014 18:28:50 +0530
+Subject: [PATCH 06/23] ARM: OMAP: add OMAP5 DSI muxing
+In-Reply-To: <535A4470.2000509@ti.com>
+References: <1398334639-14172-1-git-send-email-tomi.valkeinen@ti.com>
+ <1398334639-14172-7-git-send-email-tomi.valkeinen@ti.com>
+ <535A42D6.5090107@ti.com> <535A4470.2000509@ti.com>
+Message-ID: <535A5C0A.7040808@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 25, 2014 at 02:38:20PM +0200, Markus Pargmann wrote:
-> Hi,
-> 
-> On Wed, Apr 23, 2014 at 08:07:57PM +0100, Russell King wrote:
-> > Patch suggested by Dong Aisheng <dongas86@gmail.com>, this avoids
-> > additional clock start/stop cycles during the transition to 1.8V
-> > signalling mode.
-> > 
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> 
-> I tested the series on imx6s with a RIoT board. With this patch applied
-> the RIoT board emmc does not work. Here is the output of the board:
+On Friday 25 April 2014 04:48 PM, Tomi Valkeinen wrote:
+> On 25/04/14 14:11, Archit Taneja wrote:
+>> Hi,
+>>
+>> On Thursday 24 April 2014 03:47 PM, Tomi Valkeinen wrote:
+>>> Add support to set OMAP5 DSI pin muxing.
+>>>
+>>> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+>>> Cc: Tony Lindgren <tony@atomide.com>
+>>> ---
+>>>    arch/arm/mach-omap2/display.c | 35 ++++++++++++++++++++++++++++++++++-
+>>>    1 file changed, 34 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm/mach-omap2/display.c
+>>> b/arch/arm/mach-omap2/display.c
+>>> index 16d33d831287..974461441fc3 100644
+>>> --- a/arch/arm/mach-omap2/display.c
+>>> +++ b/arch/arm/mach-omap2/display.c
+>>> @@ -137,11 +137,42 @@ static int omap4_dsi_mux_pads(int dsi_id,
+>>> unsigned lanes)
+>>>        return 0;
+>>>    }
+>>>
+>>> +#define CONTROL_PAD_BASE    0x4A002800
+>>> +#define CONTROL_DSIPHY        0x614
+>>> +
+>>
+>> I guess this is something we can move to our driver, and use sysconf to
+>> get the register from DT.
+>
+> I just copied the same method as used for OMAP4.
+>
+> I guess sysconf is an option. But I really dislike the idea of moving
+> omap control module code to a display driver... I'm not sure what other
+> options we have, though. Maybe an OMAP DSI specific pinctrl driver?
 
-Unfortunately, I don't have any emmc sdhci using devices, so this is
-a combination I can't test myself.
+OMAP4 has CONTROL_DSIPHY for configuring both lane enable/disbale, and 
+pull up/down, but OMAP5 has normal PAD_CONF registers for DSI lines(2 
+pins per register) for configuring pull up/down, and CONTROL_DSIPHY for 
+lane enable/disable.
 
-What would be useful is to find out which of the two changes in there
-is the cause - can you try with just the change to
-sdhci_do_start_signal_voltage_switch applied, iow just this change:
+We would have a very messed up pinctrl driver, but it would probably be 
+better than doing all this stuff in the driver.
 
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index 748333ba6e96..0bcef2d42da4 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -1757,9 +1748,6 @@ static int sdhci_do_start_signal_voltage_switch(struct sdhci_host *host,
- 		ctrl |= SDHCI_CTRL_VDD_180;
- 		sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
- 
--		/* Wait for 5ms */
--		usleep_range(5000, 5500);
--
- 		/* 1.8V regulator output should be stable within 5 ms */
- 		ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
- 		if (ctrl & SDHCI_CTRL_VDD_180)
-
-Thanks.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Archit
