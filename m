@@ -1,38 +1,34 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:39:38 +0100
-Subject: [PATCH 102/222] net:fec: clear receive interrupts before processing a
- packet
+Date: Fri, 25 Apr 2014 12:39:43 +0100
+Subject: [PATCH 103/222] net:fec: remove useless status check in tx reap path
 In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
 References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WdeTi-0007K1-9I@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WdeTn-0007K5-CX@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clear any pending receive interrupt before we process a pending packet.
-This helps to avoid any spurious interrupts being raised after we have
-fully cleaned the receive ring, while still allowing an interrupt to be
-raised if we receive another packet.
-
-The timing of this is critical: we must do this prior to reading the
-next packet status to avoid delaying a pending packet.
+Remove a useless status check in the transmit reap path - we have
+already checked that the DB_ENET_TX_READY bit is clear, so there is
+no way this test can ever be true.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/net/ethernet/freescale/fec_main.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/net/ethernet/freescale/fec_main.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
 diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index 0d1580ebaede..51b00c77bf00 100644
+index 51b00c77bf00..c7fe6eb8be12 100644
 --- a/drivers/net/ethernet/freescale/fec_main.c
 +++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -904,6 +904,8 @@ fec_enet_rx(struct net_device *ndev, int budget)
- 		if ((status & BD_ENET_RX_LAST) == 0)
- 			netdev_err(ndev, "rcv is not +last\n");
+@@ -827,9 +827,6 @@ fec_enet_tx(struct net_device *ndev)
+ 			skb_tstamp_tx(skb, &shhwtstamps);
+ 		}
  
-+		writel(FEC_ENET_RXF, fep->hwp + FEC_IEVENT);
-+
- 		/* Check for errors. */
- 		if (status & (BD_ENET_RX_LG | BD_ENET_RX_SH | BD_ENET_RX_NO |
- 			   BD_ENET_RX_CR | BD_ENET_RX_OV)) {
+-		if (status & BD_ENET_TX_READY)
+-			netdev_err(ndev, "HEY! Enet xmit interrupt and TX_READY\n");
+-
+ 		/* Deferred means some collisions occurred during transmit,
+ 		 * but we eventually sent the packet OK.
+ 		 */
 -- 
 1.8.3.1
