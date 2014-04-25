@@ -1,62 +1,48 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:37:20 +0100
-Subject: [PATCH 075/222] net:fec: add support for dumping transmit ring on
- timeout
+Date: Fri, 25 Apr 2014 12:37:25 +0100
+Subject: [PATCH 076/222] net:fec: use netif_tx_disable() rather than
+ netif_stop_queue()
 In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
 References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WdeRU-0007IB-BB@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WdeRZ-0007IF-ES@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we timeout on transmit, it would be useful to dump the transmit
-ring, so we can see the ring state.  This can be helpful to diagnose
-the cause of transmit timeouts.
+We use netif_stop_queue() in several places where we want to ensure that
+the start_xmit function is not running.  netif_stop_queue() is not
+sufficient to achieve that - it merely sets a flag to indicate that the
+transmit queue(s) should not be run.
+
+netif_tx_disable() gives this guarantee, since it takes the transmit
+queue lock while marking the queue stopped.  This will wait for the
+transmit function to complete before returning.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/net/ethernet/freescale/fec_main.c | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+ drivers/net/ethernet/freescale/fec_main.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index 9de899eb9f8e..7d506ae2dbba 100644
+index 7d506ae2dbba..1c84f3a6f3a7 100644
 --- a/drivers/net/ethernet/freescale/fec_main.c
 +++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -291,6 +291,27 @@ static void *swap_buffer(void *bufaddr, int len)
- 	return bufaddr;
- }
+@@ -522,7 +522,7 @@ fec_restart(struct net_device *ndev, int duplex)
+ 	if (netif_running(ndev)) {
+ 		netif_device_detach(ndev);
+ 		napi_disable(&fep->napi);
+-		netif_stop_queue(ndev);
++		netif_tx_disable(ndev);
+ 		netif_tx_lock_bh(ndev);
+ 	}
  
-+static void fec_dump(struct net_device *ndev)
-+{
-+	struct fec_enet_private *fep = netdev_priv(ndev);
-+	struct bufdesc *bdp = fep->tx_bd_base;
-+	unsigned index = 0;
-+
-+	netdev_info(ndev, "TX ring dump\n");
-+	pr_info("Nr     SC     addr       len  SKB\n");
-+
-+	do {
-+		pr_info("%3u %c%c 0x%04x 0x%08lx %4u %p\n",
-+			index,
-+			bdp == fep->cur_tx ? 'S' : ' ',
-+			bdp == fep->dirty_tx ? 'H' : ' ',
-+			bdp->cbd_sc, bdp->cbd_bufaddr, bdp->cbd_datlen,
-+			fep->tx_skbuff[index]);
-+		bdp = fec_enet_get_nextdesc(bdp, fep);
-+		index++;
-+	} while (bdp != fep->tx_bd_base);
-+}
-+
- static int
- fec_enet_clear_csum(struct sk_buff *skb, struct net_device *ndev)
- {
-@@ -717,6 +738,8 @@ fec_timeout(struct net_device *ndev)
- {
- 	struct fec_enet_private *fep = netdev_priv(ndev);
+@@ -1821,7 +1821,7 @@ fec_enet_close(struct net_device *ndev)
+ 	/* Don't know what to do yet. */
+ 	napi_disable(&fep->napi);
+ 	fep->opened = 0;
+-	netif_stop_queue(ndev);
++	netif_tx_disable(ndev);
+ 	fec_stop(ndev);
  
-+	fec_dump(ndev);
-+
- 	ndev->stats.tx_errors++;
- 
- 	fep->delay_work.timeout = true;
+ 	phy_stop(fep->phy_dev);
 -- 
 1.8.3.1
