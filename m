@@ -1,55 +1,48 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 25 Apr 2014 13:28:07 +0300
-Subject: [PATCH 01/23] OMAPDSS: HDMI: lane config support
-In-Reply-To: <535A3395.4050106@ti.com>
-References: <1398334639-14172-1-git-send-email-tomi.valkeinen@ti.com>
- <1398334639-14172-2-git-send-email-tomi.valkeinen@ti.com>
- <535A3395.4050106@ti.com>
-Message-ID: <535A38B7.9050009@ti.com>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Fri, 25 Apr 2014 11:44:50 +0100
+Subject: "magic" handling of memory nodes
+In-Reply-To: <5359425F.9090200@wwwdotorg.org>
+References: <20140424113311.GR5904@bivouac.eciton.net>
+ <5359425F.9090200@wwwdotorg.org>
+Message-ID: <20140425104450.GS5904@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/04/14 13:06, Archit Taneja wrote:
-
-> I spent some time to see if we could get create lane_cfg_val without
-> having the table above, looks like there is no pattern at all in the
-> register field.
-
-There is a pattern, but I wasn't able to figure out a formula to model
-it. And as the array was not very long, and was easy to create with copy
-paste and search-replace from the TRM, I thought it's just simplest way
-to do it.
-
->> +
->> +    REG_FLD_MOD(phy->base, HDMI_TXPHY_PAD_CFG_CTRL, lane_cfg_val, 26,
->> 22);
->> +    REG_FLD_MOD(phy->base, HDMI_TXPHY_PAD_CFG_CTRL, pol_val, 30, 27);
->> +}
->> +
->>   int hdmi_phy_enable(struct hdmi_phy_data *phy, struct hdmi_wp_data *wp,
->>               struct hdmi_config *cfg)
->>   {
->> @@ -92,8 +183,7 @@ int hdmi_phy_enable(struct hdmi_phy_data *phy,
->> struct hdmi_wp_data *wp,
->>       /* Setup max LDO voltage */
->>       REG_FLD_MOD(phy->base, HDMI_TXPHY_POWER_CTRL, 0xB, 3, 0);
->>
->> -    /* Write to phy address 3 to change the polarity control */
->> -    REG_FLD_MOD(phy->base, HDMI_TXPHY_PAD_CFG_CTRL, 0x1, 27, 27);
+On Thu, Apr 24, 2014 at 10:57:03AM -0600, Stephen Warren wrote:
+> > Secondly, the only reason these platforms could ever have worked is
+> > because they include .dtsi files that define a memory node with a
+> > type explicitly set. Since this node already exists, its contents get
+> > overridden, but the type tag remains. Of course, this only happens
+> > with nodes called explicitly "memory" - but it happens regardless of
+> > what other things they contain.
 > 
-> wow, didn't realize it was hardcoded like this.
+> That's precisely how DT includes/overrides are supposed to work, and is
+> entirely expected and normal.
+
+Understood.
+
+> Since skeleton.dtsi already says:
 > 
-> Reviewed-by: Archit Taneja <archit@ti.com?
+>         memory { device_type = "memory"; reg = <0 0>; };
+> 
+> ... then any .dts which includes that already has the device_type
+> property set, so there's no need to repeat that property. Subsequent
+> changes to /memory/reg have no impact on /memory/device_type; any new
+> node definitions simply over-write any previous definitions of a
+> redefined property, but leave unmentioned properties unchanged (unless
+> you /delete-property/).
+> 
+> If skeleton.dtsi were changed to remove that property then yes a lot of
+> files would then need to set it, but why would it be removed?
 
-Thanks!
+Thank you for the explanation.
 
- Tomi
+All of the device trees with memory@ nodes do explicitly specify the
+device_type.
 
+I do still find the setup (as opposed to the mechanism) somewhat
+counterintuituve. The effect is pretty much that of a potentially
+architecture-specific magic keyword.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140425/78769b28/attachment.sig>
+/
+    Leif
