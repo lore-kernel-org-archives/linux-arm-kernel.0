@@ -1,31 +1,34 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Fri, 25 Apr 2014 10:28:06 +0530
-Subject: [PATCH] i2c: exynos5: Initialise Samsung High Speed I2C controller
- early
-In-Reply-To: <20140424162558.GB12304@sirena.org.uk>
-References: <1398350916-885-1-git-send-email-ch.naveen@samsung.com>
- <20140424162558.GB12304@sirena.org.uk>
-Message-ID: <5359EB5E.7010800@linaro.org>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Fri, 25 Apr 2014 14:03:21 +0900
+Subject: [PATCHv4 7/7] ARM: dts: Add device tree sources for Exynos3250
+In-Reply-To: <5359E6DD.6000608@linaro.org>
+References: <1398388572-30239-1-git-send-email-cw00.choi@samsung.com>
+ <1398388572-30239-8-git-send-email-cw00.choi@samsung.com>
+ <5359E6DD.6000608@linaro.org>
+Message-ID: <5359EC99.2010107@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/24/2014 09:55 PM, Mark Brown wrote:
-> On Thu, Apr 24, 2014 at 08:18:36PM +0530, Naveen Krishna Chatradhi wrote:
->> This patch moves initialization code to subsys_initcall() to ensure
->> that the i2c bus is available early so the regulators can be quickly
->> probed and available for other devices on their probe() call.
+On 04/25/2014 01:38 PM, Tushar Behera wrote:
+> On 04/25/2014 06:46 AM, Chanwoo Choi wrote:
+>> From: Tomasz Figa <t.figa@samsung.com>
+>>
+>> This patch add new exynos3250.dtsi to support Exynos3250 SoC based on Cortex-A7
+>> dual core and includes following dt nodes:
+>>
 > 
->> Such solution has been proposed by Mark Brown to fix the problem of
->> the regulators not beeing available on the peripheral device probe():
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-March/011971.html
+> [ ... ]
 > 
-> What specifically is this needed for?  We *should* be able to use
-> deferred probe for most things, but I know that not all subsystems are
-> able to yet.
+>> ---
+>>  arch/arm/boot/dts/exynos3250-pinctrl.dtsi | 477 +++++++++++++++
+>>  arch/arm/boot/dts/exynos3250.dtsi         | 405 +++++++++++++
+>>  arch/arm/boot/dts/exynos4212-tizenw.dts   | 926 ++++++++++++++++++++++++++++++
 > 
+> exynos4412-tizenw.dts related changes are unrelated.
 
-DRM-Exynos is one such sub-system right now that doesn't handle deferred
-probe well. That is one of the reasons for this patch.
 
--- 
-Tushar Behera
+Right, It is may mistake.
+I'll resend this patch.
+
+Thanks,
+Chanwoo Choi
