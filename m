@@ -1,50 +1,23 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Fri, 25 Apr 2014 12:01:01 +0530
-Subject: [PATCH v5 3/9] dt: exynos5250: Enable support for generic USB
- DRD phy
-In-Reply-To: <1398263451-18023-4-git-send-email-gautam.vivek@samsung.com>
-References: <1398263451-18023-1-git-send-email-gautam.vivek@samsung.com>
- <1398263451-18023-4-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <535A0125.9020207@linaro.org>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Thu, 24 Apr 2014 23:35:09 -0700
+Subject: [PATCH] Input: atkbd - fix keyboard LG Electronics
+In-Reply-To: <1398351432-5361-1-git-send-email-ssl@chromium.org>
+References: <1398351432-5361-1-git-send-email-ssl@chromium.org>
+Message-ID: <20140425063509.GA10433@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/23/2014 08:00 PM, Vivek Gautam wrote:
-> Add device tree node for new usbdrd-phy driver, which
-> is based on generic phy framework.
+On Thu, Apr 24, 2014 at 07:57:12AM -0700, Sheng-Liang Song wrote:
+> After issuing ATKBD_CMD_RESET_DIS, LG Keyboard stop working.  The
+> workaround is to remove ATKBD_CMD_RESET_DIS for LG Keyboards.
 > 
-> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos5250.dtsi |   10 ++++++++++
->  1 file changed, 10 insertions(+)
+> In order to keep the minimum changes to the current atkbd driver, I add
+> logic to apply the patch if and only if the device is LG LW25-B7HV or
+> P1-J273B.
 > 
-> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-> index 3742331..d4254c0 100644
-> --- a/arch/arm/boot/dts/exynos5250.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> @@ -551,6 +551,16 @@
->  		};
->  	};
->  
-> +	usbdrd_phy: phy at 12100000 {
-> +		compatible = "samsung,exynos5250-usbdrd-phy";
-> +		reg = <0x12100000 0x100>;
-> +		clocks = <&clock CLK_USB3>, <&clock CLK_FIN_PLL>;
-> +		clock-names = "phy", "ref";
-> +		samsung,pmu-syscon = <&pmu_system_controller>;
+> Signed-off-by: Sheng-Liang Song <ssl@chromium.org>
 
-Replace samsung,pmu-syscon by samsung,syscon-phandle ?
-
-> +		samsung,pmu-offset = <0x704>;
-> +		#phy-cells = <1>;
-> +	};
-> +
->  	usb at 12110000 {
->  		compatible = "samsung,exynos4210-ehci";
->  		reg = <0x12110000 0x100>;
-> 
-
+Applied, thank you.
 
 -- 
-Tushar Behera
+Dmitry
