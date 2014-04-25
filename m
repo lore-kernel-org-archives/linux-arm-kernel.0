@@ -1,102 +1,251 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:55:56 +0100
-Subject: [PATCH 190/222] mmc: sdhci: allow sdio interrupts while sdhci runtime
- suspended
+Date: Fri, 25 Apr 2014 12:56:01 +0100
+Subject: [PATCH 191/222] mmc: sdhci: more efficient interrupt enable register
+ handling
 In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
 References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WdejU-0007QN-He@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WdejZ-0007QR-LU@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow SDIO interrupts to be received while the SDHCI host is runtime
-suspended.  We do this by leaving the AHB clock enabled while the
-host is runtime suspended so we can access the SDHCI registers, and
-so read and raise the SDIO card interrupt.
+Rather than wasting cycles read-modify-writing the interrupt enable
+registers, cache the value locally instead.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/mmc/host/sdhci-esdhc-imx.c | 12 ++++++++----
- drivers/mmc/host/sdhci.c           |  7 +++----
- drivers/mmc/host/sdhci.h           |  5 +++++
- 3 files changed, 16 insertions(+), 8 deletions(-)
+ drivers/mmc/host/sdhci.c  | 98 +++++++++++++++++++++++------------------------
+ include/linux/mmc/sdhci.h |  3 ++
+ 2 files changed, 50 insertions(+), 51 deletions(-)
 
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index b841bb7cd371..b0b4eea8d232 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -1170,8 +1170,10 @@ static int sdhci_esdhc_runtime_suspend(struct device *dev)
- 
- 	ret = sdhci_runtime_suspend_host(host);
- 
--	clk_disable_unprepare(imx_data->clk_per);
--	clk_disable_unprepare(imx_data->clk_ipg);
-+	if (!sdhci_sdio_irq_enabled(host)) {
-+		clk_disable_unprepare(imx_data->clk_per);
-+		clk_disable_unprepare(imx_data->clk_ipg);
-+	}
- 	clk_disable_unprepare(imx_data->clk_ahb);
- 
- 	return ret;
-@@ -1183,8 +1185,10 @@ static int sdhci_esdhc_runtime_resume(struct device *dev)
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
- 	struct pltfm_imx_data *imx_data = pltfm_host->priv;
- 
--	clk_prepare_enable(imx_data->clk_per);
--	clk_prepare_enable(imx_data->clk_ipg);
-+	if (!sdhci_sdio_irq_enabled(host)) {
-+		clk_prepare_enable(imx_data->clk_per);
-+		clk_prepare_enable(imx_data->clk_ipg);
-+	}
- 	clk_prepare_enable(imx_data->clk_ahb);
- 
- 	return sdhci_runtime_resume_host(host);
 diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index 9090329847f8..0f67d8dc2100 100644
+index 0f67d8dc2100..02a59b051343 100644
 --- a/drivers/mmc/host/sdhci.c
 +++ b/drivers/mmc/host/sdhci.c
-@@ -1709,8 +1709,7 @@ static int sdhci_get_ro(struct mmc_host *mmc)
+@@ -131,27 +131,6 @@ static void sdhci_dumpregs(struct sdhci_host *host)
+  *                                                                           *
+ \*****************************************************************************/
  
- static void sdhci_enable_sdio_irq_nolock(struct sdhci_host *host, int enable)
+-static void sdhci_clear_set_irqs(struct sdhci_host *host, u32 clear, u32 set)
+-{
+-	u32 ier;
+-
+-	ier = sdhci_readl(host, SDHCI_INT_ENABLE);
+-	ier &= ~clear;
+-	ier |= set;
+-	sdhci_writel(host, ier, SDHCI_INT_ENABLE);
+-	sdhci_writel(host, ier, SDHCI_SIGNAL_ENABLE);
+-}
+-
+-static void sdhci_unmask_irqs(struct sdhci_host *host, u32 irqs)
+-{
+-	sdhci_clear_set_irqs(host, 0, irqs);
+-}
+-
+-static void sdhci_mask_irqs(struct sdhci_host *host, u32 irqs)
+-{
+-	sdhci_clear_set_irqs(host, irqs, 0);
+-}
+-
+ static void sdhci_set_card_detection(struct sdhci_host *host, bool enable)
  {
--	/* SDIO IRQ will be enabled as appropriate in runtime resume */
--	if (!(host->flags & SDHCI_DEVICE_DEAD) || host->runtime_suspended) {
-+	if (!(host->flags & SDHCI_DEVICE_DEAD)) {
- 		if (enable)
- 			sdhci_unmask_irqs(host, SDHCI_INT_CARD_INT);
- 		else
-@@ -2421,7 +2420,7 @@ static irqreturn_t sdhci_irq(int irq, void *dev_id)
+ 	u32 present, irqs;
+@@ -165,9 +144,12 @@ static void sdhci_set_card_detection(struct sdhci_host *host, bool enable)
+ 	irqs = present ? SDHCI_INT_CARD_REMOVE : SDHCI_INT_CARD_INSERT;
  
- 	spin_lock(&host->lock);
+ 	if (enable)
+-		sdhci_unmask_irqs(host, irqs);
++		host->ier |= irqs;
+ 	else
+-		sdhci_mask_irqs(host, irqs);
++		host->ier &= ~irqs;
++
++	sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
++	sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
+ }
  
--	if (host->runtime_suspended) {
-+	if (host->runtime_suspended && !sdhci_sdio_irq_enabled(host)) {
- 		spin_unlock(&host->lock);
- 		return IRQ_NONE;
+ static void sdhci_enable_card_detection(struct sdhci_host *host)
+@@ -183,17 +165,12 @@ static void sdhci_disable_card_detection(struct sdhci_host *host)
+ static void sdhci_reset(struct sdhci_host *host, u8 mask)
+ {
+ 	unsigned long timeout;
+-	u32 uninitialized_var(ier);
+-
+ 	if (host->quirks & SDHCI_QUIRK_NO_CARD_NO_RESET) {
+ 		if (!(sdhci_readl(host, SDHCI_PRESENT_STATE) &
+ 			SDHCI_CARD_PRESENT))
+ 			return;
  	}
-@@ -2687,7 +2686,7 @@ int sdhci_runtime_suspend_host(struct sdhci_host *host)
+ 
+-	if (host->quirks & SDHCI_QUIRK_RESTORE_IRQS_AFTER_RESET)
+-		ier = sdhci_readl(host, SDHCI_INT_ENABLE);
+-
+ 	if (host->ops->platform_reset_enter)
+ 		host->ops->platform_reset_enter(host, mask);
+ 
+@@ -224,8 +201,10 @@ static void sdhci_reset(struct sdhci_host *host, u8 mask)
+ 	if (host->ops->platform_reset_exit)
+ 		host->ops->platform_reset_exit(host, mask);
+ 
+-	if (host->quirks & SDHCI_QUIRK_RESTORE_IRQS_AFTER_RESET)
+-		sdhci_clear_set_irqs(host, SDHCI_INT_ALL_MASK, ier);
++	if (host->quirks & SDHCI_QUIRK_RESTORE_IRQS_AFTER_RESET) {
++		sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
++		sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
++	}
+ 
+ 	if (host->flags & (SDHCI_USE_SDMA | SDHCI_USE_ADMA)) {
+ 		if ((host->ops->enable_dma) && (mask & SDHCI_RESET_ALL))
+@@ -242,11 +221,14 @@ static void sdhci_init(struct sdhci_host *host, int soft)
+ 	else
+ 		sdhci_reset(host, SDHCI_RESET_ALL);
+ 
+-	sdhci_clear_set_irqs(host, SDHCI_INT_ALL_MASK,
+-		SDHCI_INT_BUS_POWER | SDHCI_INT_DATA_END_BIT |
+-		SDHCI_INT_DATA_CRC | SDHCI_INT_DATA_TIMEOUT | SDHCI_INT_INDEX |
+-		SDHCI_INT_END_BIT | SDHCI_INT_CRC | SDHCI_INT_TIMEOUT |
+-		SDHCI_INT_DATA_END | SDHCI_INT_RESPONSE);
++	host->ier = SDHCI_INT_BUS_POWER | SDHCI_INT_DATA_END_BIT |
++		    SDHCI_INT_DATA_CRC | SDHCI_INT_DATA_TIMEOUT |
++		    SDHCI_INT_INDEX | SDHCI_INT_END_BIT | SDHCI_INT_CRC |
++		    SDHCI_INT_TIMEOUT | SDHCI_INT_DATA_END |
++		    SDHCI_INT_RESPONSE;
++
++	sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
++	sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
+ 
+ 	if (soft) {
+ 		/* force clock reconfiguration */
+@@ -721,9 +703,12 @@ static void sdhci_set_transfer_irqs(struct sdhci_host *host)
+ 	u32 dma_irqs = SDHCI_INT_DMA_END | SDHCI_INT_ADMA_ERROR;
+ 
+ 	if (host->flags & SDHCI_REQ_USE_DMA)
+-		sdhci_clear_set_irqs(host, pio_irqs, dma_irqs);
++		host->ier = (host->ier & ~pio_irqs) | dma_irqs;
+ 	else
+-		sdhci_clear_set_irqs(host, dma_irqs, pio_irqs);
++		host->ier = (host->ier & ~dma_irqs) | pio_irqs;
++
++	sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
++	sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
+ }
+ 
+ static void sdhci_prepare_data(struct sdhci_host *host, struct mmc_command *cmd)
+@@ -1711,9 +1696,12 @@ static void sdhci_enable_sdio_irq_nolock(struct sdhci_host *host, int enable)
+ {
+ 	if (!(host->flags & SDHCI_DEVICE_DEAD)) {
+ 		if (enable)
+-			sdhci_unmask_irqs(host, SDHCI_INT_CARD_INT);
++			host->ier |= SDHCI_INT_CARD_INT;
+ 		else
+-			sdhci_mask_irqs(host, SDHCI_INT_CARD_INT);
++			host->ier &= ~SDHCI_INT_CARD_INT;
++
++		sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
++		sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
+ 		mmiowb();
+ 	}
+ }
+@@ -1855,7 +1843,6 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
+ {
+ 	struct sdhci_host *host;
+ 	u16 ctrl;
+-	u32 ier;
+ 	int tuning_loop_counter = MAX_TUNING_LOOP;
+ 	unsigned long timeout;
+ 	int err = 0;
+@@ -1909,8 +1896,8 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
+ 	 * to make sure we don't hit a controller bug, we _only_
+ 	 * enable Buffer Read Ready interrupt here.
+ 	 */
+-	ier = sdhci_readl(host, SDHCI_INT_ENABLE);
+-	sdhci_clear_set_irqs(host, ier, SDHCI_INT_DATA_AVAIL);
++	sdhci_writel(host, SDHCI_INT_DATA_AVAIL, SDHCI_INT_ENABLE);
++	sdhci_writel(host, SDHCI_INT_DATA_AVAIL, SDHCI_SIGNAL_ENABLE);
+ 
+ 	/*
+ 	 * Issue CMD19 repeatedly till Execute Tuning is set to 0 or the number
+@@ -2042,7 +2029,8 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
+ 	if (err && (host->flags & SDHCI_USING_RETUNING_TIMER))
+ 		err = 0;
+ 
+-	sdhci_clear_set_irqs(host, SDHCI_INT_DATA_AVAIL, ier);
++	sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
++	sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
+ 	spin_unlock_irqrestore(&host->lock, flags);
+ 	sdhci_runtime_pm_put(host);
+ 
+@@ -2455,10 +2443,12 @@ static irqreturn_t sdhci_irq(int irq, void *dev_id)
+ 			 * More testing are needed here to ensure it works
+ 			 * for other platforms though.
+ 			 */
+-			sdhci_mask_irqs(host, present ? SDHCI_INT_CARD_INSERT :
+-							SDHCI_INT_CARD_REMOVE);
+-			sdhci_unmask_irqs(host, present ? SDHCI_INT_CARD_REMOVE :
+-							  SDHCI_INT_CARD_INSERT);
++			host->ier &= ~(SDHCI_INT_CARD_INSERT |
++				       SDHCI_INT_CARD_REMOVE);
++			host->ier |= present ? SDHCI_INT_CARD_REMOVE :
++					       SDHCI_INT_CARD_INSERT;
++			sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
++			sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
+ 
+ 			sdhci_writel(host, intmask & (SDHCI_INT_CARD_INSERT |
+ 				     SDHCI_INT_CARD_REMOVE), SDHCI_INT_STATUS);
+@@ -2587,7 +2577,9 @@ int sdhci_suspend_host(struct sdhci_host *host)
+ 	}
+ 
+ 	if (!device_may_wakeup(mmc_dev(host->mmc))) {
+-		sdhci_mask_irqs(host, SDHCI_INT_ALL_MASK);
++		host->ier = 0;
++		sdhci_writel(host, 0, SDHCI_INT_ENABLE);
++		sdhci_writel(host, 0, SDHCI_SIGNAL_ENABLE);
+ 		free_irq(host->irq, host);
+ 	} else {
+ 		sdhci_enable_irq_wakeups(host);
+@@ -2686,7 +2678,9 @@ int sdhci_runtime_suspend_host(struct sdhci_host *host)
  	}
  
  	spin_lock_irqsave(&host->lock, flags);
--	sdhci_mask_irqs(host, SDHCI_INT_ALL_MASK);
-+	sdhci_mask_irqs(host, SDHCI_INT_ALL_MASK & ~SDHCI_INT_CARD_INT);
+-	sdhci_mask_irqs(host, SDHCI_INT_ALL_MASK & ~SDHCI_INT_CARD_INT);
++	host->ier &= SDHCI_INT_CARD_INT;
++	sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
++	sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
  	spin_unlock_irqrestore(&host->lock, flags);
  
  	synchronize_hardirq(host->irq);
-diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
-index 0a3ed01887db..fc6f81d2f377 100644
---- a/drivers/mmc/host/sdhci.h
-+++ b/drivers/mmc/host/sdhci.h
-@@ -397,6 +397,11 @@ extern void sdhci_remove_host(struct sdhci_host *host, int dead);
- extern void sdhci_send_command(struct sdhci_host *host,
- 				struct mmc_command *cmd);
+@@ -3277,7 +3271,8 @@ int sdhci_add_host(struct sdhci_host *host)
+ #ifdef SDHCI_USE_LEDS_CLASS
+ reset:
+ 	sdhci_reset(host, SDHCI_RESET_ALL);
+-	sdhci_mask_irqs(host, SDHCI_INT_ALL_MASK);
++	sdhci_writel(host, 0, SDHCI_INT_ENABLE);
++	sdhci_writel(host, 0, SDHCI_SIGNAL_ENABLE);
+ 	free_irq(host->irq, host);
+ #endif
+ untasklet:
+@@ -3319,7 +3314,8 @@ void sdhci_remove_host(struct sdhci_host *host, int dead)
+ 	if (!dead)
+ 		sdhci_reset(host, SDHCI_RESET_ALL);
  
-+static inline bool sdhci_sdio_irq_enabled(struct sdhci_host *host)
-+{
-+	return !!(host->flags & SDHCI_SDIO_IRQ_ENABLED);
-+}
+-	sdhci_mask_irqs(host, SDHCI_INT_ALL_MASK);
++	sdhci_writel(host, 0, SDHCI_INT_ENABLE);
++	sdhci_writel(host, 0, SDHCI_SIGNAL_ENABLE);
+ 	free_irq(host->irq, host);
+ 
+ 	del_timer_sync(&host->timer);
+diff --git a/include/linux/mmc/sdhci.h b/include/linux/mmc/sdhci.h
+index f1c8e14e8751..9361d8ef509d 100644
+--- a/include/linux/mmc/sdhci.h
++++ b/include/linux/mmc/sdhci.h
+@@ -178,6 +178,9 @@ struct sdhci_host {
+ 
+ 	u32			thread_isr;
+ 
++	/* cached registers */
++	u32			ier;
 +
- #ifdef CONFIG_PM
- extern int sdhci_suspend_host(struct sdhci_host *host);
- extern int sdhci_resume_host(struct sdhci_host *host);
+ 	wait_queue_head_t	buf_ready_int;	/* Waitqueue for Buffer Read Ready interrupt */
+ 	unsigned int		tuning_done;	/* Condition flag set when CMD19 succeeds */
+ 
 -- 
 1.8.3.1
