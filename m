@@ -1,77 +1,48 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:36:39 +0100
-Subject: [PATCH 067/222] ARM: l2c: vexpress ca9x4: move L2 cache
- initialisation earlier
-In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WdeQp-0007Hd-8g@rmk-PC.arm.linux.org.uk>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Fri, 25 Apr 2014 20:54:17 +0900
+Subject: [PATCH v2 5/5] Documentation: update samsung pmu binding information
+In-Reply-To: <1398426857-5097-1-git-send-email-pankaj.dubey@samsung.com>
+References: <1396425778-4379-1-git-send-email-pankaj.dubey@samsung.com>
+ <1398426857-5097-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1398426857-5097-6-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is beneficial to have the L2 cache up and running earlier in the
-system boot.  Not only will this allow for simpler code when we come to
-enable some features, but it also means that we get a more accurate
-bogomips value for the udelay() loop.  Calibrating the loop with the
-L2 cache off, and then running with the L2 cache on is not the best
-idea.
+This patch updates samsung pmu (power management unit) binding information.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+CC: Leela Krishna Amudala <l.krishna@samsung.com>
+CC: Guenter Roeck <linux@roeck-us.net>
+CC: Rob Landley <rob@landley.net>
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 ---
- arch/arm/mach-vexpress/ct-ca9x4.c | 28 ++++++++++++++++++----------
- 1 file changed, 18 insertions(+), 10 deletions(-)
+ Documentation/devicetree/bindings/arm/samsung/pmu.txt |    7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/mach-vexpress/ct-ca9x4.c b/arch/arm/mach-vexpress/ct-ca9x4.c
-index 6c4ffb6c5ad8..204038ef3795 100644
---- a/arch/arm/mach-vexpress/ct-ca9x4.c
-+++ b/arch/arm/mach-vexpress/ct-ca9x4.c
-@@ -45,6 +45,23 @@ static void __init ct_ca9x4_map_io(void)
- 	iotable_init(ct_ca9x4_io_desc, ARRAY_SIZE(ct_ca9x4_io_desc));
- }
+diff --git a/Documentation/devicetree/bindings/arm/samsung/pmu.txt b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
+index f1f1552..ac9b45c 100644
+--- a/Documentation/devicetree/bindings/arm/samsung/pmu.txt
++++ b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
+@@ -2,14 +2,21 @@ SAMSUNG Exynos SoC series PMU Registers
  
-+static void __init ca9x4_l2_init(void)
-+{
-+#ifdef CONFIG_CACHE_L2X0
-+	void __iomem *l2x0_base = ioremap(CT_CA9X4_L2CC, SZ_4K);
+ Properties:
+  - compatible : should contain two values. First value must be one from following list:
++		   - "samsung,exynos4210-pmu" - for Exynos4210 SoC,
++		   - "samsung,exynos4212-pmu" - for Exynos4212 SoC,
++		   - "samsung,exynos4412-pmu" - for Exynos4412 SoC,
+ 		   - "samsung,exynos5250-pmu" - for Exynos5250 SoC,
+ 		   - "samsung,exynos5420-pmu" - for Exynos5420 SoC.
+ 		second value must be always "syscon".
+ 
+  - reg : offset and length of the register set.
+ 
++ - samsung,syscon-phandle : reference to syscon node. This property points to syscon node
++		holding the PMU base address.
 +
-+	if (l2x0_base) {
-+		/* set RAM latencies to 1 cycle for this core tile. */
-+		writel(0, l2x0_base + L310_TAG_LATENCY_CTRL);
-+		writel(0, l2x0_base + L310_DATA_LATENCY_CTRL);
-+
-+		l2x0_init(l2x0_base, 0x00400000, 0xfe0fffff);
-+	} else {
-+		pr_err("L2C: unable to map L2 cache controller\n");
-+	}
-+#endif
-+}
-+
- #ifdef CONFIG_HAVE_ARM_TWD
- static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, A9_MPCORE_TWD, IRQ_LOCALTIMER);
- 
-@@ -63,6 +80,7 @@ static void __init ct_ca9x4_init_irq(void)
- 	gic_init(0, 29, ioremap(A9_MPCORE_GIC_DIST, SZ_4K),
- 		 ioremap(A9_MPCORE_GIC_CPU, SZ_256));
- 	ca9x4_twd_init();
-+	ca9x4_l2_init();
- }
- 
- static int ct_ca9x4_clcd_setup(struct clcd_fb *fb)
-@@ -141,16 +159,6 @@ static void __init ct_ca9x4_init(void)
- {
- 	int i;
- 
--#ifdef CONFIG_CACHE_L2X0
--	void __iomem *l2x0_base = ioremap(CT_CA9X4_L2CC, SZ_4K);
--
--	/* set RAM latencies to 1 cycle for this core tile. */
--	writel(0, l2x0_base + L310_TAG_LATENCY_CTRL);
--	writel(0, l2x0_base + L310_DATA_LATENCY_CTRL);
--
--	l2x0_init(l2x0_base, 0x00400000, 0xfe0fffff);
--#endif
--
- 	for (i = 0; i < ARRAY_SIZE(ct_ca9x4_amba_devs); i++)
- 		amba_device_register(ct_ca9x4_amba_devs[i], &iomem_resource);
- 
+ Example :
+ pmu_system_controller: system-controller at 10040000 {
+ 	compatible = "samsung,exynos5250-pmu", "syscon";
+ 	reg = <0x10040000 0x5000>;
++	samsung,syscon-phandle = <&pmu_system_controller>;
+ };
 -- 
-1.8.3.1
+1.7.10.4
