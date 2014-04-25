@@ -1,63 +1,106 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:34:51 +0100
-Subject: [PATCH 046/222] ARM: l2c: ux500: implement dummy write_sec method
+Date: Fri, 25 Apr 2014 12:34:57 +0100
+Subject: [PATCH 047/222] ARM: l2c: remove old .set_debug method
 In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
 References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WdeP5-0007GE-Ve@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WdePB-0007GJ-3C@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ux500 can't write to any of the secure registers on the L2C controllers,
-so provide a dummy handler which ignores all writes.
+We no longer need or require the .set_debug method; we handle everything
+it used to do via the .write_sec method instead.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-ux500/cache-l2x0.c | 19 ++++++++++---------
- 1 file changed, 10 insertions(+), 9 deletions(-)
+ arch/arm/include/asm/outercache.h |  1 -
+ arch/arm/mm/cache-l2x0.c          | 21 ++-------------------
+ 2 files changed, 2 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/cache-l2x0.c b/arch/arm/mach-ux500/cache-l2x0.c
-index 264f894c0e3d..5cc7e3625d8c 100644
---- a/arch/arm/mach-ux500/cache-l2x0.c
-+++ b/arch/arm/mach-ux500/cache-l2x0.c
-@@ -35,6 +35,14 @@ static int __init ux500_l2x0_unlock(void)
- 	return 0;
- }
+diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
+index 5066fa2f73ab..eaa8a28c6871 100644
+--- a/arch/arm/include/asm/outercache.h
++++ b/arch/arm/include/asm/outercache.h
+@@ -36,7 +36,6 @@ struct outer_cache_fns {
+ 	void (*resume)(void);
  
-+static void ux500_l2c310_write_sec(unsigned long val, unsigned reg)
-+{
-+	/*
-+	 * We can't write to secure registers as we are in non-secure
-+	 * mode, until we have some SMI service available.
-+	 */
-+}
-+
- static int __init ux500_l2x0_init(void)
+ 	/* This is an ARM L2C thing */
+-	void (*set_debug)(unsigned long);
+ 	void (*write_sec)(unsigned long, unsigned);
+ };
+ 
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 369a9d01d94f..b13276c9971b 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -80,10 +80,7 @@ static void l2c_write_sec(unsigned long val, void __iomem *base, unsigned reg)
+  */
+ static inline void l2c_set_debug(void __iomem *base, unsigned long val)
  {
- 	u32 aux_val = 0x3e000000;
-@@ -56,21 +64,14 @@ static int __init ux500_l2x0_init(void)
- 		/* 64KB way size */
- 		aux_val |= (0x3 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT);
- 
-+	outer_cache.write_sec = ux500_l2c310_write_sec;
-+
- 	/* 64KB way size, 8 way associativity, force WA */
- 	if (of_have_populated_dt())
- 		l2x0_of_init(aux_val, 0xc0000fff);
- 	else
- 		l2x0_init(l2x0_base, aux_val, 0xc0000fff);
- 
--	/*
--	 * We can't disable l2 as we are in non secure mode, currently
--	 * this seems be called only during kexec path. So let's
--	 * override outer.disable with nasty assignment until we have
--	 * some SMI service available.
--	 */
--	outer_cache.disable = NULL;
--	outer_cache.set_debug = NULL;
--
- 	return 0;
+-	if (outer_cache.set_debug)
+-		outer_cache.set_debug(val);
+-	else
+-		l2c_write_sec(val, base, L2X0_DEBUG_CTRL);
++	l2c_write_sec(val, base, L2X0_DEBUG_CTRL);
  }
  
+ static void __l2c_op_way(void __iomem *reg)
+@@ -154,8 +151,7 @@ static inline void cache_sync(void)
+ #if defined(CONFIG_PL310_ERRATA_588369) || defined(CONFIG_PL310_ERRATA_727915)
+ static inline void debug_writel(unsigned long val)
+ {
+-	if (outer_cache.set_debug || outer_cache.write_sec)
+-		l2c_set_debug(l2x0_base, val);
++	l2c_set_debug(l2x0_base, val);
+ }
+ #else
+ /* Optimised out for non-errata case */
+@@ -489,11 +485,6 @@ static const struct l2c_init_data l2c220_data = {
+  *	Affects: store buffer
+  *	store buffer is not automatically drained.
+  */
+-static void l2c310_set_debug(unsigned long val)
+-{
+-	writel_relaxed(val, l2x0_base + L2X0_DEBUG_CTRL);
+-}
+-
+ static void l2c310_inv_range_erratum(unsigned long start, unsigned long end)
+ {
+ 	void __iomem *base = l2x0_base;
+@@ -631,10 +622,6 @@ static void __init l2c310_fixup(void __iomem *base, u32 cache_id,
+ 	const char *errata[4];
+ 	unsigned n = 0;
+ 
+-	/* For compatibility */
+-	if (revision <= L310_CACHE_ID_RTL_R3P0)
+-		fns->set_debug = l2c310_set_debug;
+-
+ 	if (IS_ENABLED(CONFIG_PL310_ERRATA_588369) &&
+ 	    revision < L310_CACHE_ID_RTL_R2P0 &&
+ 	    /* For bcm compatibility */
+@@ -684,7 +671,6 @@ static const struct l2c_init_data l2c310_init_fns __initconst = {
+ 		.flush_all = l2c210_flush_all,
+ 		.disable = l2c_disable,
+ 		.sync = l2c210_sync,
+-		.set_debug = l2c310_set_debug,
+ 		.resume = l2c310_resume,
+ 	},
+ };
+@@ -750,8 +736,6 @@ static void __init __l2c_init(const struct l2c_init_data *data,
+ 	fns.write_sec = outer_cache.write_sec;
+ 	if (data->fixup)
+ 		data->fixup(l2x0_base, cache_id, &fns);
+-	if (fns.write_sec)
+-		fns.set_debug = NULL;
+ 
+ 	/*
+ 	 * Check if l2x0 controller is already enabled.  If we are booting
+@@ -925,7 +909,6 @@ static const struct l2c_init_data of_l2c310_data __initconst = {
+ 		.flush_all   = l2c210_flush_all,
+ 		.disable     = l2c_disable,
+ 		.sync        = l2c210_sync,
+-		.set_debug   = l2c310_set_debug,
+ 		.resume      = l2c310_resume,
+ 	},
+ };
 -- 
 1.8.3.1
