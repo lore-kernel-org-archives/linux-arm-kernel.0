@@ -1,42 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 25 Apr 2014 12:54:13 +0100
-Subject: [PATCH v2 3/6] ARM: dts: Device tree for AXM55xx.
-In-Reply-To: <CACRpkdaqPx3=qvUtsg44rBk+ZiscUg54HmNgETcei0LzfE9uOQ@mail.gmail.com>
-References: <cover.1398335771.git.anders.berg@lsi.com>
- <2386bd1367aa44741979461358a72dec89608597.1398335771.git.anders.berg@lsi.com>
- <CACRpkdbU6UashxCuPMDjEB_nbB=mXicGpjJy=HGC6r3qfxCtVQ@mail.gmail.com>
- <20140424174741.GA23444@swsaberg01>
- <CACRpkdZ1CA4mqcd5MA5HFmXSeGp-wspA0M6wnPbAsgL_gX76Fw@mail.gmail.com>
- <20140425094343.GA3160@swsaberg01>
- <CACRpkdaqPx3=qvUtsg44rBk+ZiscUg54HmNgETcei0LzfE9uOQ@mail.gmail.com>
-Message-ID: <20140425115413.GL26756@n2100.arm.linux.org.uk>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Fri, 25 Apr 2014 12:55:10 +0100
+Subject: [PATCH 181/222] ARM: l2c: omap2+: get rid of redundant cache
+ replacement policy setting
+In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
+References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
+Message-ID: <E1Wdeik-0007Pm-HL@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 25, 2014 at 01:50:25PM +0200, Linus Walleij wrote:
-> This means that you can only get a proper, working IRQ from the
-> first line on gpio0 right? All other IRQs will be ignored.
-> 
-> I see no problem in augmenting the driver to handle this
-> if #irqs == 8, the big change needs to happen in drivers/amba/bus.c
-> that has no way to pass any more than two IRQs atm.
-> 
-> I guess the best is to augment struct amba_device with a field
-> struct resource *resource and num_resources like platform_device
-> instead of the hard-coded single resource for iomem and two
-> hardcoded IRQ placeholders, so that an arbitrary amount of
-> resources can be added to an amba_device as well. But that
-> may be quite a lot of work. (Russell will know which direction to
-> take here.)
+From: Sekhar Nori <nsekhar@ti.com>
+To: linux-arm-kernel at lists.infradead.org
 
-I definitely don't want to go down that route - I believe that the
-resource arrays are more pain than they're really worth - it requires
-a great amount of support to make that stuff work (just look at the
-amount of code there is to search the arrays, create them, etc.)
+L2 cache initialization for OMAP4 redundantly sets the cache policy to
+Round-Robin. This is not needed since thats the PL310 default anyway.
 
-We already have support for up to 9 IRQs, so 8 for GPIOs is already
-catered for.
+Removing this reduces the number of platform specific aux control
+settings.
 
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/mach-omap2/omap4-common.c | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+index df3f53195c57..6927d5b120fe 100644
+--- a/arch/arm/mach-omap2/omap4-common.c
++++ b/arch/arm/mach-omap2/omap4-common.c
+@@ -213,16 +213,15 @@ static int __init omap_l2_cache_init(void)
+ 		return -ENOMEM;
+ 
+ 	/* 16-way associativity, parity disabled, way size - 64KB (es2.0 +) */
+-	aux_ctrl = L310_AUX_CTRL_CACHE_REPLACE_RR |
+-		   L2C_AUX_CTRL_SHARED_OVERRIDE |
++	aux_ctrl = L2C_AUX_CTRL_SHARED_OVERRIDE |
+ 		   L310_AUX_CTRL_DATA_PREFETCH |
+ 		   L310_AUX_CTRL_INSTR_PREFETCH;
+ 
+ 	outer_cache.write_sec = omap4_l2c310_write_sec;
+ 	if (of_have_populated_dt())
+-		l2x0_of_init(aux_ctrl, 0xcd9fffff);
++		l2x0_of_init(aux_ctrl, 0xcf9fffff);
+ 	else
+-		l2x0_init(l2cache_base, aux_ctrl, 0xcd9fffff);
++		l2x0_init(l2cache_base, aux_ctrl, 0xcf9fffff);
+ 
+ 	return 0;
+ }
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.8.3.1
