@@ -1,129 +1,100 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:50:31 +0100
-Subject: [PATCH 178/222] ARM: l2c: tegra: convert to common l2c310 early
- resume functionality
+Date: Fri, 25 Apr 2014 12:50:41 +0100
+Subject: [PATCH 180/222] ARM: l2c: always enable non-secure access to lockdown
+ registers
 In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
 References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WdeeF-0007PJ-9T@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WdeeP-0007PR-GJ@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Since we always write to these during the cache initialisation, it is
+a good idea to always have the non-secure access bit set.  Set it in
+core code and remove it from OMAP4.  Remove the NS access bit for the
+interrupt registers from OMAP4 as well - nothing in the kernel accesses
+that yet, and we can add it in core code when we have the need.
+
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-tegra/pm.h            |  2 --
- arch/arm/mach-tegra/reset-handler.S | 11 +++--------
- arch/arm/mach-tegra/sleep.h         | 31 -------------------------------
- arch/arm/mach-tegra/tegra.c         |  6 +-----
- 4 files changed, 4 insertions(+), 46 deletions(-)
+ arch/arm/mach-omap2/omap4-common.c |  6 ++----
+ arch/arm/mm/cache-l2x0.c           | 23 +++++++++++++++++++++--
+ 2 files changed, 23 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/pm.h b/arch/arm/mach-tegra/pm.h
-index 6e92a7c2ecbd..f4a89698e5b0 100644
---- a/arch/arm/mach-tegra/pm.h
-+++ b/arch/arm/mach-tegra/pm.h
-@@ -35,8 +35,6 @@ void tegra20_sleep_core_init(void);
- void tegra30_lp1_iram_hook(void);
- void tegra30_sleep_core_init(void);
+diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+index 06c6a181d6ad..df3f53195c57 100644
+--- a/arch/arm/mach-omap2/omap4-common.c
++++ b/arch/arm/mach-omap2/omap4-common.c
+@@ -214,17 +214,15 @@ static int __init omap_l2_cache_init(void)
  
--extern unsigned long l2x0_saved_regs_addr;
--
- void tegra_clear_cpu_in_lp2(void);
- bool tegra_set_cpu_in_lp2(void);
+ 	/* 16-way associativity, parity disabled, way size - 64KB (es2.0 +) */
+ 	aux_ctrl = L310_AUX_CTRL_CACHE_REPLACE_RR |
+-		   L310_AUX_CTRL_NS_LOCKDOWN |
+-		   L310_AUX_CTRL_NS_INT_CTRL |
+ 		   L2C_AUX_CTRL_SHARED_OVERRIDE |
+ 		   L310_AUX_CTRL_DATA_PREFETCH |
+ 		   L310_AUX_CTRL_INSTR_PREFETCH;
  
-diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
-index 8c1ba4fea384..578d4d1ad648 100644
---- a/arch/arm/mach-tegra/reset-handler.S
-+++ b/arch/arm/mach-tegra/reset-handler.S
-@@ -19,7 +19,6 @@
+ 	outer_cache.write_sec = omap4_l2c310_write_sec;
+ 	if (of_have_populated_dt())
+-		l2x0_of_init(aux_ctrl, 0xc19fffff);
++		l2x0_of_init(aux_ctrl, 0xcd9fffff);
+ 	else
+-		l2x0_init(l2cache_base, aux_ctrl, 0xc19fffff);
++		l2x0_init(l2cache_base, aux_ctrl, 0xcd9fffff);
  
- #include <asm/cache.h>
- #include <asm/asm-offsets.h>
--#include <asm/hardware/cache-l2x0.h>
- 
- #include "flowctrl.h"
- #include "fuse.h"
-@@ -78,8 +77,10 @@ ENTRY(tegra_resume)
- 	str	r1, [r0]
- #endif
- 
-+#ifdef CONFIG_CACHE_L2X0
- 	/* L2 cache resume & re-enable */
--	l2_cache_resume r0, r1, r2, l2x0_saved_regs_addr
-+	bl	l2c310_early_resume
-+#endif
- end_ca9_scu_l2_resume:
- 	mov32	r9, 0xc0f
- 	cmp	r8, r9
-@@ -89,12 +90,6 @@ end_ca9_scu_l2_resume:
- ENDPROC(tegra_resume)
- #endif
- 
--#ifdef CONFIG_CACHE_L2X0
--	.globl	l2x0_saved_regs_addr
--l2x0_saved_regs_addr:
--	.long	0
--#endif
--
- 	.align L1_CACHE_SHIFT
- ENTRY(__tegra_cpu_reset_handler_start)
- 
-diff --git a/arch/arm/mach-tegra/sleep.h b/arch/arm/mach-tegra/sleep.h
-index a032820d2fac..339fe42cd6fb 100644
---- a/arch/arm/mach-tegra/sleep.h
-+++ b/arch/arm/mach-tegra/sleep.h
-@@ -120,37 +120,6 @@
- 	mov	\tmp1, \tmp1, lsr #8
- .endm
- 
--/* Macro to resume & re-enable L2 cache */
--#ifndef L2X0_CTRL_EN
--#define L2X0_CTRL_EN	1
--#endif
--
--#ifdef CONFIG_CACHE_L2X0
--.macro l2_cache_resume, tmp1, tmp2, tmp3, phys_l2x0_saved_regs
--	W(adr)	\tmp1, \phys_l2x0_saved_regs
--	ldr	\tmp1, [\tmp1]
--	ldr	\tmp2, [\tmp1, #L2X0_R_PHY_BASE]
--	ldr	\tmp3, [\tmp2, #L2X0_CTRL]
--	tst	\tmp3, #L2X0_CTRL_EN
--	bne	exit_l2_resume
--	ldr	\tmp3, [\tmp1, #L2X0_R_TAG_LATENCY]
--	str	\tmp3, [\tmp2, #L310_TAG_LATENCY_CTRL]
--	ldr	\tmp3, [\tmp1, #L2X0_R_DATA_LATENCY]
--	str	\tmp3, [\tmp2, #L310_DATA_LATENCY_CTRL]
--	ldr	\tmp3, [\tmp1, #L2X0_R_PREFETCH_CTRL]
--	str	\tmp3, [\tmp2, #L310_PREFETCH_CTRL]
--	ldr	\tmp3, [\tmp1, #L2X0_R_PWR_CTRL]
--	str	\tmp3, [\tmp2, #L310_POWER_CTRL]
--	ldr	\tmp3, [\tmp1, #L2X0_R_AUX_CTRL]
--	str	\tmp3, [\tmp2, #L2X0_AUX_CTRL]
--	mov	\tmp3, #L2X0_CTRL_EN
--	str	\tmp3, [\tmp2, #L2X0_CTRL]
--exit_l2_resume:
--.endm
--#else /* CONFIG_CACHE_L2X0 */
--.macro l2_cache_resume, tmp1, tmp2, tmp3, phys_l2x0_saved_regs
--.endm
--#endif /* CONFIG_CACHE_L2X0 */
- #else
- void tegra_pen_lock(void);
- void tegra_pen_unlock(void);
-diff --git a/arch/arm/mach-tegra/tegra.c b/arch/arm/mach-tegra/tegra.c
-index fb802e24b647..1bc49f9db015 100644
---- a/arch/arm/mach-tegra/tegra.c
-+++ b/arch/arm/mach-tegra/tegra.c
-@@ -73,11 +73,7 @@ u32 tegra_uart_config[3] = {
- static void __init tegra_init_cache(void)
- {
- #ifdef CONFIG_CACHE_L2X0
--	int ret;
--
--	ret = l2x0_of_init(0x3c400001, 0xc20fc3fe);
--	if (!ret)
--		l2x0_saved_regs_addr = virt_to_phys(&l2x0_saved_regs);
-+	l2x0_of_init(0x3c400001, 0xc20fc3fe);
- #endif
+ 	return 0;
+ }
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 333ef64873f9..efc5cabf70e0 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -440,11 +440,23 @@ static void l2c220_sync(void)
+ 	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
  }
  
++static void l2c220_enable(void __iomem *base, u32 aux, unsigned num_lock)
++{
++	/*
++	 * Always enable non-secure access to the lockdown registers -
++	 * we write to them as part of the L2C enable sequence so they
++	 * need to be accessible.
++	 */
++	aux |= L220_AUX_CTRL_NS_LOCKDOWN;
++
++	l2c_enable(base, aux, num_lock);
++}
++
+ static const struct l2c_init_data l2c220_data = {
+ 	.type = "L2C-220",
+ 	.way_size_0 = SZ_8K,
+ 	.num_lock = 1,
+-	.enable = l2c_enable,
++	.enable = l2c220_enable,
+ 	.save = l2c_save,
+ 	.outer_cache = {
+ 		.inv_range = l2c220_inv_range,
+@@ -707,6 +719,13 @@ static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
+ 			power_ctrl & L310_STNDBY_MODE_EN ? "en" : "dis");
+ 	}
+ 
++	/*
++	 * Always enable non-secure access to the lockdown registers -
++	 * we write to them as part of the L2C enable sequence so they
++	 * need to be accessible.
++	 */
++	aux |= L310_AUX_CTRL_NS_LOCKDOWN;
++
+ 	l2c_enable(base, aux, num_lock);
+ 
+ 	if (aux & L310_AUX_CTRL_FULL_LINE_ZERO) {
+@@ -983,7 +1002,7 @@ static const struct l2c_init_data of_l2c220_data __initconst = {
+ 	.way_size_0 = SZ_8K,
+ 	.num_lock = 1,
+ 	.of_parse = l2x0_of_parse,
+-	.enable = l2c_enable,
++	.enable = l2c220_enable,
+ 	.save = l2c_save,
+ 	.outer_cache = {
+ 		.inv_range   = l2c220_inv_range,
 -- 
 1.8.3.1
