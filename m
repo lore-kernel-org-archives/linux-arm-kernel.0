@@ -1,48 +1,79 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Fri, 25 Apr 2014 20:45:10 +0200
-Subject: [PATCH] ARM: fix string functions on !MMU
-In-Reply-To: <20140425091224.GA24499@arm.com>
-References: <1398103808-24380-1-git-send-email-rabin@rab.in>
- <20140422094424.GA6979@arm.com> <20140424154320.GA4129@debian>
- <20140425091224.GA24499@arm.com>
-Message-ID: <20140425184510.GA17229@debian>
+From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
+Date: Fri, 25 Apr 2014 15:48:48 -0400
+Subject: [PATCH v8 2/3] Documentation: devicetree: Add new binding for PSCIv0.2
+In-Reply-To: <1398455329-18136-1-git-send-email-ashwin.chaugule@linaro.org>
+References: <1398455329-18136-1-git-send-email-ashwin.chaugule@linaro.org>
+Message-ID: <1398455329-18136-3-git-send-email-ashwin.chaugule@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 25, 2014 at 10:12:24AM +0100, Will Deacon wrote:
-> On Thu, Apr 24, 2014 at 04:43:20PM +0100, Rabin Vincent wrote:
-> > On Tue, Apr 22, 2014 at 10:44:24AM +0100, Will Deacon wrote:
-> > > On Mon, Apr 21, 2014 at 07:10:08PM +0100, Rabin Vincent wrote:
-> > > > 8c56cc8be5b38e ("ARM: 7449/1: use generic strnlen_user and
-> > > > strncpy_from_user functions") apparently broken those string operations
-> > > > for !MMU.  USER_DS == KERNEL_DS on !MMU, so user_addr_max() always
-> > > > restricts the addresses to TASK_SIZE.
-> > > > 
-> > > > TASK_SIZE has anyway no meaning on !MMU, so make user_addr_max() not
-> > > > restrict anything.
-> > > 
-> > > Might be worth mentioning that this is an issue because KERNEL_DS is 0x0
-> > > (since it's a 32-bit quantity), so checks like addr < user_addr_max() will
-> > > fail.
-> > 
-> > Thanks for the ack, but I don't quite understand what you mean here.
-> > You describe the state before this patch, right?  Why does it matter
-> > that KERNEL_DS is 0x0?
-> 
-> Apologies, I misread the code that you're patching so I guess I'll have to
-> revoke my ack, sorry! That's not to say I think the patch is bad, I'd just
-> like to discuss it with you a bit more.
-> 
-> Having re-read the code, the issue is because TASK_SIZE is defined as
-> CONFIG_DRAM_SIZE, right? Since CONFIG_DRAM_BASE may be non-zero, it means
-> TASK_SIZE is truly a size -- not a limit (as it would be in virtual space).
-> What we actually want for !MMU is END_MEM instead of TASK_SIZE.
+The PSCI v0.2+ spec defines standard values for PSCI function IDs.
+Add a new binding entry so that pre v0.2 implementations can
+use DT entries for function IDs and v0.2+ implementations use
+standard entries as defined by the PSCIv0.2 specification.
 
-I guess you mean I should #define user_addr_max() to END_MEM for !MMU?
-That won't work.  For example, on a !MMU boot, the first thing that
-fails because of this bug is devtmpsfs_mount() -> sys_mount() ->
-copy_mount_string() -> strndup_user(), which is run in a kernel thread.
-The type argument of sys_mount() points to a string in flash since we
-run an XIP kernel.  This flash address has no relation to END_MEM (which
-is nothing but CONFIG_DRAM_BASE + CONFIG_DRAM_SIZE) and could be higher
-than END_MEM.
+Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/arm/psci.txt | 35 +++++++++++++++++++++++++-
+ 1 file changed, 34 insertions(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
+index 433afe9..d01a90b 100644
+--- a/Documentation/devicetree/bindings/arm/psci.txt
++++ b/Documentation/devicetree/bindings/arm/psci.txt
+@@ -21,7 +21,15 @@ to #0.
+ 
+ Main node required properties:
+ 
+- - compatible    : Must be "arm,psci"
++ - compatible    : should contain at least one of:
++
++				 * "arm,psci" : for implementations complying to PSCI versions prior to
++					0.2. For these cases function IDs must be provided.
++
++				 * "arm,psci-0.2" : for implementations complying to PSCI 0.2. Function
++					IDs are not required and should be ignored by an OS with PSCI 0.2
++					support, but are permitted to be present for compatibility with
++					existing software when "arm,psci" is later in the compatible list.
+ 
+  - method        : The method of calling the PSCI firmware. Permitted
+                    values are:
+@@ -45,6 +53,8 @@ Main node optional properties:
+ 
+ Example:
+ 
++Case 1: PSCI v0.1 only.
++
+ 	psci {
+ 		compatible	= "arm,psci";
+ 		method		= "smc";
+@@ -53,3 +63,26 @@ Example:
+ 		cpu_on		= <0x95c10002>;
+ 		migrate		= <0x95c10003>;
+ 	};
++
++
++Case 2: PSCI v0.2 only
++
++	psci {
++		compatible	= "arm,psci-0.2";
++		method		= "smc";
++	};
++
++Case 3: PSCI v0.2 and PSCI v0.1.
++
++	As described above, for compatibility with existing kernels, the
++	hypervisor will likely want to provide IDs, e.g.
++
++	psci {
++		compatible = "arm,psci-0.2", "arm,psci";
++		method = "hvc";
++
++		cpu_on = < arbitrary value >;
++		cpu_off = < arbitrary value >;
++
++		...
++	};
+-- 
+1.8.3.2
