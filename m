@@ -1,74 +1,71 @@
-From: sajjan.linux@gmail.com (Vikas Sajjan)
-Date: Fri, 25 Apr 2014 13:35:06 +0530
-Subject: [PATCH 1/4] ARM: dts: exynos4: add PMU syscon node
-In-Reply-To: <535936A7.9050003@samsung.com>
-References: <1397479700-15864-1-git-send-email-chanho61.park@samsung.com>
- <1397479700-15864-2-git-send-email-chanho61.park@samsung.com>
- <535936A7.9050003@samsung.com>
-Message-ID: <CAGm_ybjhcAqX7biOvqLMgzHPQK=-EtaHtXpCtcJ1rcdRsxN_Og@mail.gmail.com>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Fri, 25 Apr 2014 13:38:30 +0530
+Subject: [PATCH V4 1/5] phy: Add new Exynos5 USB 3.0 PHY driver
+In-Reply-To: <535A156F.6060004@linaro.org>
+References: <1396967803-28868-1-git-send-email-gautam.vivek@samsung.com>
+ <1396967803-28868-2-git-send-email-gautam.vivek@samsung.com>
+ <534BF28E.7040906@samsung.com> <535A156F.6060004@linaro.org>
+Message-ID: <CAFp+6iHg=oDXqcR+d1N0FqBaiEAsy2eL-E7J9Xho8nSErp9MeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
 
-On Thu, Apr 24, 2014 at 9:37 PM, Tomasz Figa <t.figa@samsung.com> wrote:
-> Hi Chanho,
+On Fri, Apr 25, 2014 at 1:27 PM, Tushar Behera <tushar.behera@linaro.org> wrote:
+> On 04/14/2014 08:07 PM, Sylwester Nawrocki wrote:
+>> On 08/04/14 16:36, Vivek Gautam wrote:
+>>> diff --git a/Documentation/devicetree/bindings/phy/samsung-phy.txt b/Documentation/devicetree/bindings/phy/samsung-phy.txt
+>>> index 28f9edb..6d99ba9 100644
+>>> --- a/Documentation/devicetree/bindings/phy/samsung-phy.txt
+>>> +++ b/Documentation/devicetree/bindings/phy/samsung-phy.txt
+>>> @@ -74,3 +74,45 @@ phy-consumer at 12340000 {
+>>>
+>>>  Refer to DT bindings documentation of particular PHY consumer devices for more
+>>>  information about required PHYs and the way of specification.
+>>> +
+>>> +Samsung Exynos5 SoC series USB DRD PHY controller
+>>> +--------------------------------------------------
+>>> +
+>>> +Required properties:
+>>> +- compatible : Should be set to one of the following supported values:
+>>> +    - "samsung,exynos5250-usbdrd-phy" - for exynos5250 SoC,
+>>> +    - "samsung,exynos5420-usbdrd-phy" - for exynos5420 SoC.
+>>> +- reg : Register offset and length of USB DRD PHY register set;
+>>> +- clocks: Clock IDs array as required by the controller
+>>> +- clock-names: names of clocks correseponding to IDs in the clock property;
+>>> +           Required clocks:
+>>> +    - phy: main PHY clock (same as USB DRD controller i.e. DWC3 IP clock),
+>>> +           used for register access.
+>>> +    - ref: PHY's reference clock (usually crystal clock), associated by
+>>> +           phy name, used to determine bit values for clock settings
+>>> +           register.
+>>> +    Additional clock required for Exynos5420:
+>>> +    - usb30_sclk_100m: Additional special clock used for PHY operation
+>>> +                       depicted as 'sclk_usbphy30' in CMU of Exynos5420.
+>>> +- samsung,syscon-phandle: phandle for syscon interface, which is used to
+>>> +                      control pmu registers for power isolation.
+>>
+>> Why to append "-phandle" to the property's name ? If this is for PMU
+>> perhaps make it more explicit and name it: samsung,pmu-syscon or
+>> samsung,pmureg ?
+>>
 >
->
-> On 14.04.2014 14:48, Chanho Park wrote:
->>
->> This patch adds a PMU(Power Management Unit) syscon node. This
->> should be required for USB Phy syscon regmap I/F.
->>
->> Cc: Tomasz Figa <t.figa@samsung.com>
->> Cc: Kamil Debski <k.debski@samsung.com>
->> Signed-off-by: Chanho Park <chanho61.park@samsung.com>
->> ---
->>   arch/arm/boot/dts/exynos4.dtsi | 5 +++++
->>   1 file changed, 5 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/exynos4.dtsi
->> b/arch/arm/boot/dts/exynos4.dtsi
->> index 2f8bcd0..e565b86 100644
->> --- a/arch/arm/boot/dts/exynos4.dtsi
->> +++ b/arch/arm/boot/dts/exynos4.dtsi
->> @@ -110,6 +110,11 @@
->>                 reg = <0x10010000 0x400>;
->>         };
->>
->> +       pmu_reg: syscon at 10020000 {
->> +               compatible = "samsung,exynos4-pmureg", "syscon";
->
+> There are already a couple of nodes (watchdog and sata) using
+> samsung,syscon-phandle. IMHO, we should keep only property string for
+> syscon node. Either we keep syscon-phandle here or change sata/watchdog
+> driver to use the modified property name.
 
- Assume a case where exynos PMU is made as platform driver [1] and we
-need use the compatible  "samsung,exynos4-pmureg" in the driver.
-But since syscon driver uses compatible "syscon" and once the syscon
-driver is probed, the  exynos PMU platform driver [1] will NEVER be
-probed.
-So my question is, can we have 2 compatible strings for a DT node, and
-both the compatible strings are used for probing purpose?
-Recently I faced this issue on exynos5250, where i was testing PMU
-driver [1] and I noticed that  PMU driver [1] was NEVER probed, if I
-enable syscon driver in menuconfig.
+IMHO samsung,pmu-syscon make more sense rather than appending a
+'-phandle' to the property name.
+This is a 'phandle' and that is in fact understood, isn't it ?
+We can change in the watchdog, sata drivers to use use the modified name.
+I can send a patch for the same if we are OK with this, so that we
+maintain the consistency in the device tree.
 
-[1] http://www.spinics.net/lists/linux-samsung-soc/msg28038.html
 
->
-> This compatible string doesn't seem to be defined in [1], please add it
-> there,
->
-> [1] Documentation/devicetree/bindings/arm/samsung/pmu.txt
->
-> Otherwise looks good, so after fixing that you may add my
->
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
->
-> Best regards,
-> Tomasz
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
-> in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+Best Regards
+Vivek Gautam
+Samsung R&D Institute, Bangalore
+India
