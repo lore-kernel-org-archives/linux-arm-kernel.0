@@ -1,154 +1,129 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:38:26 +0100
-Subject: [PATCH 088/222] net:fec: move calls to quiesce/resume packet
- processing out of fec_restart()
+Date: Fri, 25 Apr 2014 12:38:31 +0100
+Subject: [PATCH 089/222] net:fec: remove inappropriate calls around
+ fec_restart()
 In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
 References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WdeSY-0007J4-O8@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WdeSd-0007J9-Rg@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the calls to quiesce and resume packet processing out of
-fec_restart() to its call sites.  This is the first step in a two stage
-clean up of this code, where we just move the calls out of fec_restart()
-without changing them.  Not everywhere needs to issue these calls, and
-not everywhere needs all of these calls to be issued.
+This is the second stage to "move calls to quiesce/resume packet
+processing out of fec_restart()", where we remove calls which are not
+appropriate to the call site.
+
+In the majority of cases, there is no need to detach and reattach the
+interface as we are holding the queue xmit lock across the reset.  The
+exception to that is in fec_resume(), where we are already detached by
+the suspend function.  Here, we can remove the call to detach the
+interface.
+
+We also do not need to stop the transmit queue.  Holding the xmit lock
+is enough to ensure that the transmit packet processing is not running
+while we perform our task.  However, since fec_restart() always cleans
+the rings, we call netif_wake_queue() (or netif_device_attach() in the
+case of resume) just before dropping the xmit lock.  This prevents the
+watchdog firing.
+
+Lastly, always call napi_enable() after the device has been reattached
+in the resume path so that we know that the transmit packet processing
+is already in an enabled state, so we don't call netif_wake_queue()
+while detached.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/net/ethernet/freescale/fec_main.c | 64 ++++++++++++++++++++++---------
- 1 file changed, 45 insertions(+), 19 deletions(-)
+ drivers/net/ethernet/freescale/fec_main.c | 26 ++++++--------------------
+ 1 file changed, 6 insertions(+), 20 deletions(-)
 
 diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index 723a645dfeb3..1da67d4fdd0a 100644
+index 1da67d4fdd0a..02e121a19d87 100644
 --- a/drivers/net/ethernet/freescale/fec_main.c
 +++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -515,9 +515,10 @@ static void fec_enet_bd_init(struct net_device *dev)
- 	fep->dirty_tx = bdp;
- }
- 
--/* This function is called to start or restart the FEC during a link
-- * change.  This only happens when switching between half and full
-- * duplex.
-+/*
-+ * This function is called to start or restart the FEC during a link
-+ * change, transmit timeout, or to reconfigure the FEC.  The network
-+ * packet processing for this device must be stopped before this call.
-  */
- static void
- fec_restart(struct net_device *ndev, int duplex)
-@@ -531,13 +532,6 @@ fec_restart(struct net_device *ndev, int duplex)
- 	u32 rcntl = OPT_FRAME_SIZE | 0x04;
- 	u32 ecntl = 0x2; /* ETHEREN */
- 
--	if (netif_running(ndev)) {
--		netif_device_detach(ndev);
--		napi_disable(&fep->napi);
--		netif_tx_disable(ndev);
--		netif_tx_lock_bh(ndev);
--	}
--
- 	/* Whack a reset.  We should wait for this. */
- 	writel(1, fep->hwp + FEC_ECNTRL);
- 	udelay(10);
-@@ -706,13 +700,6 @@ fec_restart(struct net_device *ndev, int duplex)
- 
- 	/* Enable interrupts we wish to service */
- 	writel(FEC_DEFAULT_IMASK, fep->hwp + FEC_IMASK);
--
--	if (netif_running(ndev)) {
--		netif_tx_unlock_bh(ndev);
--		netif_wake_queue(ndev);
--		napi_enable(&fep->napi);
--		netif_device_attach(ndev);
--	}
- }
- 
- static void
-@@ -770,8 +757,15 @@ static void fec_enet_work(struct work_struct *work)
+@@ -757,15 +757,12 @@ static void fec_enet_work(struct work_struct *work)
  		fep->delay_work.timeout = false;
  		rtnl_lock();
  		if (netif_device_present(ndev) || netif_running(ndev)) {
-+			netif_device_detach(ndev);
-+			napi_disable(&fep->napi);
-+			netif_tx_disable(ndev);
-+			netif_tx_lock_bh(ndev);
+-			netif_device_detach(ndev);
+ 			napi_disable(&fep->napi);
+-			netif_tx_disable(ndev);
+ 			netif_tx_lock_bh(ndev);
  			fec_restart(ndev, fep->full_duplex);
-+			netif_tx_unlock_bh(ndev);
+-			netif_tx_unlock_bh(ndev);
  			netif_wake_queue(ndev);
-+			napi_enable(&fep->napi);
-+			netif_device_attach(ndev);
++			netif_tx_unlock_bh(ndev);
+ 			napi_enable(&fep->napi);
+-			netif_device_attach(ndev);
  		}
  		rtnl_unlock();
  	}
-@@ -1225,8 +1219,17 @@ static void fec_enet_adjust_link(struct net_device *ndev)
- 		}
+@@ -1220,15 +1217,12 @@ static void fec_enet_adjust_link(struct net_device *ndev)
  
  		/* if any of the above changed restart the FEC */
--		if (status_change)
-+		if (status_change) {
-+			netif_device_detach(ndev);
-+			napi_disable(&fep->napi);
-+			netif_tx_disable(ndev);
-+			netif_tx_lock_bh(ndev);
+ 		if (status_change) {
+-			netif_device_detach(ndev);
+ 			napi_disable(&fep->napi);
+-			netif_tx_disable(ndev);
+ 			netif_tx_lock_bh(ndev);
  			fec_restart(ndev, phy_dev->duplex);
+-			netif_tx_unlock_bh(ndev);
+ 			netif_wake_queue(ndev);
 +			netif_tx_unlock_bh(ndev);
-+			netif_wake_queue(ndev);
-+			napi_enable(&fep->napi);
-+			netif_device_attach(ndev);
-+		}
+ 			napi_enable(&fep->napi);
+-			netif_device_attach(ndev);
+ 		}
  	} else {
  		if (fep->link) {
- 			fec_stop(ndev);
-@@ -1568,8 +1571,17 @@ static int fec_enet_set_pauseparam(struct net_device *ndev,
- 			fec_stop(ndev);
+@@ -1572,15 +1566,12 @@ static int fec_enet_set_pauseparam(struct net_device *ndev,
  		phy_start_aneg(fep->phy_dev);
  	}
--	if (netif_running(ndev))
-+	if (netif_running(ndev)) {
-+		netif_device_detach(ndev);
-+		napi_disable(&fep->napi);
-+		netif_tx_disable(ndev);
-+		netif_tx_lock_bh(ndev);
+ 	if (netif_running(ndev)) {
+-		netif_device_detach(ndev);
+ 		napi_disable(&fep->napi);
+-		netif_tx_disable(ndev);
+ 		netif_tx_lock_bh(ndev);
  		fec_restart(ndev, 0);
+-		netif_tx_unlock_bh(ndev);
+ 		netif_wake_queue(ndev);
 +		netif_tx_unlock_bh(ndev);
-+		netif_wake_queue(ndev);
-+		napi_enable(&fep->napi);
-+		netif_device_attach(ndev);
-+	}
+ 		napi_enable(&fep->napi);
+-		netif_device_attach(ndev);
+ 	}
  
  	return 0;
- }
-@@ -2006,8 +2018,15 @@ static int fec_set_features(struct net_device *netdev,
+@@ -2018,15 +2009,12 @@ static int fec_set_features(struct net_device *netdev,
  
  		if (netif_running(netdev)) {
  			fec_stop(netdev);
-+			netif_device_detach(netdev);
-+			napi_disable(&fep->napi);
-+			netif_tx_disable(netdev);
-+			netif_tx_lock_bh(netdev);
+-			netif_device_detach(netdev);
+ 			napi_disable(&fep->napi);
+-			netif_tx_disable(netdev);
+ 			netif_tx_lock_bh(netdev);
  			fec_restart(netdev, fep->phy_dev->duplex);
-+			netif_tx_unlock_bh(netdev);
+-			netif_tx_unlock_bh(netdev);
  			netif_wake_queue(netdev);
-+			napi_enable(&fep->napi);
-+			netif_device_attach(netdev);
++			netif_tx_unlock_bh(netdev);
+ 			napi_enable(&fep->napi);
+-			netif_device_attach(netdev);
  		}
  	}
  
-@@ -2400,7 +2419,14 @@ fec_resume(struct device *dev)
+@@ -2419,15 +2407,13 @@ fec_resume(struct device *dev)
  
  	rtnl_lock();
  	if (netif_running(ndev)) {
-+		netif_device_detach(ndev);
-+		napi_disable(&fep->napi);
-+		netif_tx_disable(ndev);
-+		netif_tx_lock_bh(ndev);
+-		netif_device_detach(ndev);
+ 		napi_disable(&fep->napi);
+-		netif_tx_disable(ndev);
+ 		netif_tx_lock_bh(ndev);
  		fec_restart(ndev, fep->full_duplex);
-+		netif_tx_unlock_bh(ndev);
-+		netif_wake_queue(ndev);
-+		napi_enable(&fep->napi);
++		netif_device_attach(ndev);
+ 		netif_tx_unlock_bh(ndev);
+-		netif_wake_queue(ndev);
+-		napi_enable(&fep->napi);
  		netif_device_attach(ndev);
++		napi_enable(&fep->napi);
  		phy_start(fep->phy_dev);
  	}
+ 	rtnl_unlock();
 -- 
 1.8.3.1
