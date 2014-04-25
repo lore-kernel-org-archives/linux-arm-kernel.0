@@ -1,61 +1,45 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:43:07 +0100
-Subject: [PATCH 137/222] ARM: dt: microsom: don't set bit 7 for ethernet mux
- settings
+Date: Fri, 25 Apr 2014 12:43:12 +0100
+Subject: [PATCH 138/222] ARM: imx6q: clk: Parent DI clocks to video PLL via
+ di_pre_sel
 In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
 References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WdeX5-0007MP-9i@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WdeXA-0007MT-DN@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bit 6,7 are marked as reserved for the ethernet RGMII pins, so avoid
-setting these bits.
+From: Sascha Hauer <s.hauer@pengutronix.de>
+To: linux-arm-kernel at lists.infradead.org
 
+Route the video PLL to the display interface clocks via the di_pre_sel
+and di_sel muxes by default.
+
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi | 22 +++++++++++-----------
- 1 file changed, 11 insertions(+), 11 deletions(-)
+ arch/arm/mach-imx/clk-imx6q.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi b/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi
-index a3cb2fff8f61..d16066608e21 100644
---- a/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi
-@@ -26,25 +26,25 @@
- 				/* GPIO16 -> AR8035 25MHz */
- 				MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0xc0000000
- 				MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x80000000
--				MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x1b0b0
--				MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x1b0b0
--				MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x1b0b0
--				MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x1b0b0
--				MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x1b0b0
-+				MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x1b030
-+				MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x1b030
-+				MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x1b030
-+				MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x1b030
-+				MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x1b030
- 				/* AR8035 CLK_25M --> ENET_REF_CLK (V22) */
- 				MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x0a0b1
- 				/* AR8035 pin strapping: IO voltage: pull up */
--				MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b0b0
-+				MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b030
- 				/* AR8035 pin strapping: PHYADDR#0: pull down */
--				MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x130b0
-+				MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x13030
- 				/* AR8035 pin strapping: PHYADDR#1: pull down */
--				MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x130b0
-+				MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x13030
- 				/* AR8035 pin strapping: MODE#1: pull up */
--				MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b0b0
-+				MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b030
- 				/* AR8035 pin strapping: MODE#3: pull up */
--				MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b0b0
-+				MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b030
- 				/* AR8035 pin strapping: MODE#0: pull down */
--				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x130b0
-+				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x13030
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index f4d0b0e3e041..7d2b652497d2 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -449,6 +449,15 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 		clk_set_parent(clk[ipu1_sel], clk[pll3_pfd1_540m]);
+ 	}
  
- 				/*
- 				 * As the RMII pins are also connected to RGMII
++	clk_set_parent(clk[ipu1_di0_pre_sel], clk[pll5_video_div]);
++	clk_set_parent(clk[ipu1_di1_pre_sel], clk[pll5_video_div]);
++	clk_set_parent(clk[ipu2_di0_pre_sel], clk[pll5_video_div]);
++	clk_set_parent(clk[ipu2_di1_pre_sel], clk[pll5_video_div]);
++	clk_set_parent(clk[ipu1_di0_sel], clk[ipu1_di0_pre]);
++	clk_set_parent(clk[ipu1_di1_sel], clk[ipu1_di1_pre]);
++	clk_set_parent(clk[ipu2_di0_sel], clk[ipu2_di0_pre]);
++	clk_set_parent(clk[ipu2_di1_sel], clk[ipu2_di1_pre]);
++
+ 	/*
+ 	 * The gpmi needs 100MHz frequency in the EDO/Sync mode,
+ 	 * We can not get the 100MHz from the pll2_pfd0_352m.
 -- 
 1.8.3.1
