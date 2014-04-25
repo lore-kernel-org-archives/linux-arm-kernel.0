@@ -1,71 +1,61 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 26 Apr 2014 01:52:15 +0200
-Subject: [PATCH 1/4] ARM: dts: exynos4: add PMU syscon node
-In-Reply-To: <CAGm_ybjhcAqX7biOvqLMgzHPQK=-EtaHtXpCtcJ1rcdRsxN_Og@mail.gmail.com>
-References: <1397479700-15864-1-git-send-email-chanho61.park@samsung.com>
- <1397479700-15864-2-git-send-email-chanho61.park@samsung.com>
- <535936A7.9050003@samsung.com>
- <CAGm_ybjhcAqX7biOvqLMgzHPQK=-EtaHtXpCtcJ1rcdRsxN_Og@mail.gmail.com>
-Message-ID: <535AF52F.4090906@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 25 Apr 2014 16:53:49 -0700
+Subject: [PATCHv3 19/41] OMAPDSS: panel-dpi: Add DT support
+In-Reply-To: <5358DEEA.1000506@ti.com>
+References: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
+ <1390301833-24944-20-git-send-email-tomi.valkeinen@ti.com>
+ <20140418155107.GB5354@atomide.com> <5358DEEA.1000506@ti.com>
+Message-ID: <20140425235348.GH20807@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vikas,
+* Tomi Valkeinen <tomi.valkeinen@ti.com> [140424 02:53]:
+> On 18/04/14 18:51, Tony Lindgren wrote:
+> 
+> >> +	gpio = of_get_gpio(node, 0);
+> >> +	if (gpio_is_valid(gpio) || gpio == -ENOENT) {
+> >> +		ddata->enable_gpio = gpio;
+> >> +	} else {
+> >> +		dev_err(&pdev->dev, "failed to parse enable gpio\n");
+> >> +		return gpio;
+> >> +	}
+> > 
+> > We should set the GPIO polarity based on the OF_GPIO_ACTIVE_LOW like
+> > gpio_backlight_probe_dt is doing. 
+> 
+> Instead of doing it with the old gpio API, and checking the 'active'
+> flag everywhere, I think we can use the new gpiod API which handles the
+> polarity automatically.
+> 
+> I attached prototype patches (based on -rc2) for panel dpi using that
+> approach. It's a bit messier than I'd like, because for non-DT boot we
+> need to request the gpio using the old API, and then convert it to
+> gpio_desc. We can remove that code when all the boards use DT.
+> 
+> I've compiled tested this only, as I don't have DPI panels I could use.
+> I did try similar approach for TFP410, and it seemed to work fine.
 
-On 25.04.2014 10:05, Vikas Sajjan wrote:
-> Hi,
->
->
-> On Thu, Apr 24, 2014 at 9:37 PM, Tomasz Figa <t.figa@samsung.com> wrote:
->> Hi Chanho,
->>
->>
->> On 14.04.2014 14:48, Chanho Park wrote:
->>>
->>> This patch adds a PMU(Power Management Unit) syscon node. This
->>> should be required for USB Phy syscon regmap I/F.
->>>
->>> Cc: Tomasz Figa <t.figa@samsung.com>
->>> Cc: Kamil Debski <k.debski@samsung.com>
->>> Signed-off-by: Chanho Park <chanho61.park@samsung.com>
->>> ---
->>>    arch/arm/boot/dts/exynos4.dtsi | 5 +++++
->>>    1 file changed, 5 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/exynos4.dtsi
->>> b/arch/arm/boot/dts/exynos4.dtsi
->>> index 2f8bcd0..e565b86 100644
->>> --- a/arch/arm/boot/dts/exynos4.dtsi
->>> +++ b/arch/arm/boot/dts/exynos4.dtsi
->>> @@ -110,6 +110,11 @@
->>>                  reg = <0x10010000 0x400>;
->>>          };
->>>
->>> +       pmu_reg: syscon at 10020000 {
->>> +               compatible = "samsung,exynos4-pmureg", "syscon";
->>
->
->   Assume a case where exynos PMU is made as platform driver [1] and we
-> need use the compatible  "samsung,exynos4-pmureg" in the driver.
-> But since syscon driver uses compatible "syscon" and once the syscon
-> driver is probed, the  exynos PMU platform driver [1] will NEVER be
-> probed.
-> So my question is, can we have 2 compatible strings for a DT node, and
-> both the compatible strings are used for probing purpose?
-> Recently I faced this issue on exynos5250, where i was testing PMU
-> driver [1] and I noticed that  PMU driver [1] was NEVER probed, if I
-> enable syscon driver in menuconfig.
+Got these working by updating my test patch to use enable-gpios instead
+of gpios, and had to change from GPIO_ACTIVE_LOW to GPIO_ACTIVE_HIGH.
+Are we now also breaking legacy booting by reversing the polarity?
 
-No, it is not possible to bind two drivers with different compatible 
-strings to the same node. Basically this is because only one platform 
-driver can be bound to particular platform device.
+In any case, looks like we have some duplicate panel code.. Turns
+out most panel dpi users for omap3 board-*.c files are just
+sharp-ls037v7dw01 panels but configured in QVGA mode. At least for
+EVM and and LDP based on looking at the pictures and the configuration
+pins (using the names kernel):
 
-The rule is that the most specific compatible string (e.g. the first 
-from the left) that matches should be used, but I'm not sure if this is 
-implemented this way in Linux kernel, especially considering that a 
-platform driver usually probes when it is being registered. So we might 
-have a race here, which you can work around by making sure that your PMU 
-driver is always registered first (e.g. by lowering its initcall level).
+QVGA = lcd MO
+reset = lcd RESB
+...
 
-Best regards,
-Tomasz
+Then the enable_gpio should be just a GPIO controlled 3.3V regulator
+in most cases. I suggest we move them over to ls037v7dw01 and allow
+configuring them both for VGA and QVGA depending on the orientation.
+
+I guess you do have some device with ls037v7dw01 since you've been
+patching it?
+
+Regards,
+
+Tony
