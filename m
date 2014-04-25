@@ -1,9 +1,9 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 25 Apr 2014 17:44:46 +0200
-Subject: [PATCH 2/7] ARM: tegra: venice2 - Enable HDMI
+Date: Fri, 25 Apr 2014 17:44:47 +0200
+Subject: [PATCH 3/7] ARM: tegra: jetson-tk1 - Enable HDMI support
 In-Reply-To: <1398440691-23366-1-git-send-email-thierry.reding@gmail.com>
 References: <1398440691-23366-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1398440691-23366-3-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1398440691-23366-4-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,46 +11,48 @@ From: Thierry Reding <treding@nvidia.com>
 
 Add HDMI +5V, VDD and PLL regulators and enable the DDC I2C controller.
 Enable the HDMI device, provide the power supplies as well as the DDC
-adapter and use the standard pin (PN7) for hotplug detection.
+adapter and use pin the standard pin (PN7) for hotplug detection.
 
 Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
- arch/arm/boot/dts/tegra124-venice2.dts | 37 ++++++++++++++++++++++++++++++++--
- 1 file changed, 35 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/tegra124-jetson-tk1.dts | 39 +++++++++++++++++++++++++++++--
+ 1 file changed, 37 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/tegra124-venice2.dts b/arch/arm/boot/dts/tegra124-venice2.dts
-index 6770e2bdf226..84a6ec039e1d 100644
---- a/arch/arm/boot/dts/tegra124-venice2.dts
-+++ b/arch/arm/boot/dts/tegra124-venice2.dts
-@@ -17,6 +17,18 @@
+diff --git a/arch/arm/boot/dts/tegra124-jetson-tk1.dts b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+index dd3076d94727..e30a5778f675 100644
+--- a/arch/arm/boot/dts/tegra124-jetson-tk1.dts
++++ b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+@@ -16,6 +16,20 @@
+ 		reg = <0x0 0x80000000 0x0 0x80000000>;
  	};
  
- 	host1x at 0,50000000 {
++	host1x at 0,50000000 {
 +		hdmi at 0,54280000 {
 +			status = "okay";
 +
-+			vdd-supply = <&vdd_3v3_hdmi>;
-+			pll-supply = <&vdd_hdmi_pll>;
 +			hdmi-supply = <&vdd_5v0_hdmi>;
++			pll-supply = <&vdd_hdmi_pll>;
++			vdd-supply = <&vdd_3v3_hdmi>;
 +
 +			nvidia,ddc-i2c-bus = <&hdmi_ddc>;
 +			nvidia,hpd-gpio =
 +				<&gpio TEGRA_GPIO(N, 7) GPIO_ACTIVE_HIGH>;
 +		};
++	};
 +
- 		sor at 0,54540000 {
- 			status = "okay";
- 
-@@ -601,7 +613,7 @@
- 		clock-frequency = <100000>;
+ 	pinmux: pinmux at 0,70000868 {
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&state_default>;
+@@ -1382,7 +1396,7 @@
  	};
  
+ 	/* HDMI DDC */
 -	i2c at 0,7000c700 {
 +	hdmi_ddc: i2c at 0,7000c700 {
  		status = "okay";
  		clock-frequency = <100000>;
  	};
-@@ -700,7 +712,7 @@
+@@ -1477,7 +1491,7 @@
  					regulator-boot-on;
  				};
  
@@ -59,7 +61,7 @@ index 6770e2bdf226..84a6ec039e1d 100644
  					regulator-name = "+1.05V_RUN";
  					regulator-min-microvolt = <1050000>;
  					regulator-max-microvolt = <1050000>;
-@@ -1147,6 +1159,27 @@
+@@ -1765,6 +1779,27 @@
  			enable-active-high;
  			vin-supply = <&vdd_3v3_sys>;
  		};
