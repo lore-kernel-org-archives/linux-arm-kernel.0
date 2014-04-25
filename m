@@ -1,320 +1,115 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 26 Apr 2014 00:40:47 +0200
-Subject: [PATCH v2 10/10] ARM: EXYNOS: Add device tree based initialization
- support for PMU.
-In-Reply-To: <1398429166-5539-11-git-send-email-pankaj.dubey@samsung.com>
+Date: Sat, 26 Apr 2014 00:43:55 +0200
+Subject: [PATCH v2 00/10] ARM: Exynos: PMU cleanup and refactoring for
+ using DT
+In-Reply-To: <1398429166-5539-1-git-send-email-pankaj.dubey@samsung.com>
 References: <1396425058-4012-1-git-send-email-pankaj.dubey@samsung.com>
  <1398429166-5539-1-git-send-email-pankaj.dubey@samsung.com>
- <1398429166-5539-11-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <535AE46F.5080000@gmail.com>
+Message-ID: <535AE52B.4010104@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Pankaj,
 
-On 25.04.2014 14:32, Pankaj Dubey wrote:
-> This patch adds device tree based initialization for PMU and modifies
-> PMU initialization implementation in following way:
->
-> 1: Let's initialize PMU based on device tree compatibility string.
-> 2: Obtain PMU regmap handle using "syscon_early_regmap_lookup_by_phandle"
-> so that we can reduce dependency over machine header files.
-> 3: Separate each SoC's PMU initialization function and bind this initialization
-> function with PMU compatibility string.
-> 4 : It also removes uses of soc_is_exynosXXXX() thus making PMU implementation
-> independent of "plat/cpu.h".
->
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> Signed-off-by: Young-Gun Jang <yg1004.jang@samsung.com>
-> ---
->   arch/arm/mach-exynos/pmu.c |  182 +++++++++++++++++++++++++++++++++-----------
->   1 file changed, 138 insertions(+), 44 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
-> index 67116a5..abcf753 100644
-> --- a/arch/arm/mach-exynos/pmu.c
-> +++ b/arch/arm/mach-exynos/pmu.c
-> @@ -9,17 +9,31 @@
->    * published by the Free Software Foundation.
->    */
->
-> -#include <linux/io.h>
->   #include <linux/kernel.h>
->   #include <linux/regmap.h>
-> -
-> -#include <plat/cpu.h>
-> +#include <linux/of.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/slab.h>
-> +#include <linux/mfd/syscon.h>
->
->   #include "common.h"
->   #include "regs-pmu.h"
->
-> +enum exynos_pmu_id {
-> +	PMU_EXYNOS4210,
-> +	PMU_EXYNOS4X12,
-> +	PMU_EXYNOS4412,
-> +	PMU_EXYNOS5250,
-> +};
-> +
-> +struct exynos_pmu_data {
-> +	enum exynos_pmu_id	pmu_id;
-> +	struct regmap		*pmu_regmap;
-
-Again, since this uses the PMU node directly and doesn't seem to access 
-any registers shared with other drivers (or at least not at the time 
-most the functions from this file are called) I don't think there is any 
-reason why not to use of_iomap() and access the registers directly.
-
-What about adding more fields to this struct? For example .pmu_config, 
-.pmu_config_extra (for model-specific settings, like for Exynos4412, see 
-my comment below) and (*pmu_init)? Of course the regmap (or base 
-address) would have to be moved outside, as it isn't const data.
-
-Then for each PMU variant there would be a static const struct will all 
-those fields already filled in and entries in OF match table would 
-already point to appropriate structure.
-
-> +};
-> +
-> +struct exynos_pmu_data		*pmu_data;
->   static const struct exynos_pmu_conf *exynos_pmu_config;
-> -static struct regmap *pmu_regmap;
-> +typedef void (*exynos_pmu_init_t)(void);
->
->   static const struct exynos_pmu_conf exynos4210_pmu_config[] = {
->   	/* { .reg = address, .val = { AFTR, LPA, SLEEP } */
-> @@ -348,28 +362,31 @@ static void exynos5_init_pmu(void)
->   	 * Enable both SC_FEEDBACK and SC_COUNTER
->   	 */
->   	for (i = 0 ; i < ARRAY_SIZE(exynos5_list_both_cnt_feed) ; i++) {
-> -		regmap_read(pmu_regmap, exynos5_list_both_cnt_feed[i], &tmp);
-> +		regmap_read(pmu_data->pmu_regmap,
-> +				exynos5_list_both_cnt_feed[i], &tmp);
->   		tmp |= (EXYNOS5_USE_SC_FEEDBACK |
->   			EXYNOS5_USE_SC_COUNTER);
-> -		regmap_write(pmu_regmap, exynos5_list_both_cnt_feed[i], tmp);
-> +		regmap_write(pmu_data->pmu_regmap,
-> +				exynos5_list_both_cnt_feed[i], tmp);
->   	}
->
->   	/*
->   	 * SKIP_DEACTIVATE_ACEACP_IN_PWDN_BITFIELD Enable
->   	 */
-> -	regmap_read(pmu_regmap, EXYNOS5_ARM_COMMON_OPTION, &tmp);
-> +	regmap_read(pmu_data->pmu_regmap, EXYNOS5_ARM_COMMON_OPTION, &tmp);
->   	tmp |= EXYNOS5_SKIP_DEACTIVATE_ACEACP_IN_PWDN;
-> -	regmap_write(pmu_regmap, EXYNOS5_ARM_COMMON_OPTION, tmp);
-> +	regmap_write(pmu_data->pmu_regmap, EXYNOS5_ARM_COMMON_OPTION, tmp);
->
->   	/*
->   	 * Disable WFI/WFE on XXX_OPTION
->   	 */
->   	for (i = 0 ; i < ARRAY_SIZE(exynos5_list_diable_wfi_wfe) ; i++) {
-> -		tmp = regmap_read(pmu_regmap, exynos5_list_diable_wfi_wfe[i],
-> -				&tmp);
-> +		tmp = regmap_read(pmu_data->pmu_regmap,
-> +				exynos5_list_diable_wfi_wfe[i], &tmp);
->   		tmp &= ~(EXYNOS5_OPTION_USE_STANDBYWFE |
->   			 EXYNOS5_OPTION_USE_STANDBYWFI);
-> -		regmap_write(pmu_regmap, exynos5_list_diable_wfi_wfe[i], tmp);
-> +		regmap_write(pmu_data->pmu_regmap,
-> +				exynos5_list_diable_wfi_wfe[i], tmp);
->   	}
->   }
->
-> @@ -377,52 +394,129 @@ void exynos_sys_powerdown_conf(enum sys_powerdown mode)
->   {
->   	unsigned int i;
->
-> -	if (soc_is_exynos5250())
-> +	if (pmu_data->pmu_id == PMU_EXYNOS5250)
->   		exynos5_init_pmu();
-
-Next field could be added to exynos_pmu_data struct, called 
-(*powerdown_conf) and then the code above replaced with:
-
-	if (pmu_data->powerdown_conf)
-		pmu_data->powerdown_conf(mode);
-
->
->   	for (i = 0; (exynos_pmu_config[i].offset != PMU_TABLE_END) ; i++)
-> -		regmap_write(pmu_regmap, exynos_pmu_config[i].offset,
-> +		regmap_write(pmu_data->pmu_regmap, exynos_pmu_config[i].offset,
->   				exynos_pmu_config[i].val[mode]);
->
-> -	if (soc_is_exynos4412()) {
-> +	if (pmu_data->pmu_id == PMU_EXYNOS4412) {
->   		for (i = 0; exynos4412_pmu_config[i].offset != PMU_TABLE_END; i++)
-> -			regmap_write(pmu_regmap, exynos4412_pmu_config[i].offset,
-> +			regmap_write(pmu_data->pmu_regmap,
-> +					exynos4412_pmu_config[i].offset,
->   					exynos4412_pmu_config[i].val[mode]);
->   	}
-
-As I mentioned above, the pmu_data struct could have a field called 
-pmu_config_extra that would be non-NULL for Exynos4412 and then the code 
-above could be replaced with:
-
-	if (pmu_data->pmu_config_extra) {
-		// iterate over pmu_config_extra
-		// ...
-	}
-
-This way you could completely remove the pmu_id field and checks for 
-particular SoCs from the code.
-
->   }
->
-> -static int __init exynos_pmu_init(void)
-> +static void exynos4210_pmu_init(void)
->   {
-> -	unsigned int value;
-> -
->   	exynos_pmu_config = exynos4210_pmu_config;
-> -	pmu_regmap = get_exynos_pmuregmap();
-> -
-> -	if (soc_is_exynos4210()) {
-> -		exynos_pmu_config = exynos4210_pmu_config;
-> -		pr_info("EXYNOS4210 PMU Initialize\n");
-> -	} else if (soc_is_exynos4212() || soc_is_exynos4412()) {
-> -		exynos_pmu_config = exynos4x12_pmu_config;
-> -		pr_info("EXYNOS4x12 PMU Initialize\n");
-> -	} else if (soc_is_exynos5250()) {
-> -		/*
-> -		 * When SYS_WDTRESET is set, watchdog timer reset request
-> -		 * is ignored by power management unit.
-> -		 */
-> -		regmap_read(pmu_regmap, EXYNOS5_AUTO_WDTRESET_DISABLE, &value);
-> -		value &= ~EXYNOS5_SYS_WDTRESET;
-> -		regmap_write(pmu_regmap, EXYNOS5_AUTO_WDTRESET_DISABLE, value);
-> -
-> -		regmap_read(pmu_regmap, EXYNOS5_MASK_WDTRESET_REQUEST, &value);
-> -		value &= ~EXYNOS5_SYS_WDTRESET;
-> -		regmap_write(pmu_regmap, EXYNOS5_MASK_WDTRESET_REQUEST, value);
-> -
-> -		exynos_pmu_config = exynos5250_pmu_config;
-> -		pr_info("EXYNOS5250 PMU Initialize\n");
-> -	} else {
-> -		pr_info("EXYNOS: PMU not supported\n");
-> +	pmu_data->pmu_id = PMU_EXYNOS4210;
-> +
-> +	pr_info("EXYNOS4210 PMU Initialize\n");
-> +}
-> +
-> +static void exynos4x12_pmu_init(void)
-> +{
-> +	exynos_pmu_config = exynos4x12_pmu_config;
-> +	pmu_data->pmu_id = PMU_EXYNOS4X12;
-> +
-> +	pr_info("EXYNOS4x12 PMU Initialize\n");
-> +}
-> +
-> +static void exynos4412_pmu_init(void)
-> +{
-> +	exynos_pmu_config = exynos4x12_pmu_config;
-> +	pmu_data->pmu_id = PMU_EXYNOS4412;
-> +
-> +	pr_info("EXYNOS4412 PMU Initialize\n");
-> +}
-> +
-> +static void exynos5250_pmu_init(void)
-> +{
-> +	unsigned int tmp;
-> +
-> +	/*
-> +	 * When SYS_WDTRESET is set, watchdog timer reset request
-> +	 * is ignored by power management unit.
-> +	 */
-> +	regmap_read(pmu_data->pmu_regmap, EXYNOS5_AUTO_WDTRESET_DISABLE, &tmp);
-> +	tmp &= ~EXYNOS5_SYS_WDTRESET;
-> +	regmap_write(pmu_data->pmu_regmap, EXYNOS5_AUTO_WDTRESET_DISABLE, tmp);
-> +
-> +	regmap_read(pmu_data->pmu_regmap, EXYNOS5_MASK_WDTRESET_REQUEST, &tmp);
-> +	tmp &= ~EXYNOS5_SYS_WDTRESET;
-> +	regmap_write(pmu_data->pmu_regmap, EXYNOS5_MASK_WDTRESET_REQUEST, tmp);
-> +
-> +	exynos_pmu_config = exynos5250_pmu_config;
-> +	pmu_data->pmu_id = PMU_EXYNOS5250;
-> +
-> +	pr_info("EXYNOS5250 PMU Initialize\n");
-> +}
-
-This part is very nice. Finally there is no huge if with else if clause 
-for every SoC. Thanks.
-
-> +
-> +/*
-> + * PMU platform driver and devicetree bindings.
-> + */
-> +static struct of_device_id exynos_pmu_of_device_ids[] = {
-> +	{
-> +		.compatible = "samsung,exynos4210-pmu",
-> +		.data = (void *)exynos4210_pmu_init
-> +	},
-> +	{
-> +		.compatible = "samsung,exynos4212-pmu",
-> +		.data = (void *)exynos4x12_pmu_init
-> +	},
-> +	{
-> +		.compatible = "samsung,exynos4412-pmu",
-> +		.data = (void *)exynos4412_pmu_init
-> +	},
-> +	{
-> +		.compatible = "samsung,exynos5250-pmu",
-> +		.data = (void *)exynos5250_pmu_init
-> +	},
-> +	{},
-> +};
-> +
-> +static int exynos_pmu_probe(struct device_node *np)
-> +{
-> +	const struct of_device_id *match;
-> +	exynos_pmu_init_t exynos_pmu_init;
-> +
-> +	pmu_data = kzalloc(sizeof(struct exynos_pmu_data), GFP_KERNEL);
-> +	if (!pmu_data) {
-> +		pr_err("exynos_pmu driver probe failed\n");
-> +		return -ENOMEM;
->   	}
->
-> +	match = of_match_node(exynos_pmu_of_device_ids, np);
-> +	if (!match) {
-> +		pr_err("fail to get matching of_match struct\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	exynos_pmu_init = match->data;
-> +
-> +	pmu_data->pmu_regmap = syscon_early_regmap_lookup_by_phandle(np,
-> +			"samsung,syscon-phandle");
-> +	if (IS_ERR(pmu_data->pmu_regmap)) {
-> +		pr_err("failed to find exynos_pmu_regmap\n");
-> +		return PTR_ERR(pmu_data->pmu_regmap);
-> +	}
-> +
-> +	exynos_pmu_init();
-> +
->   	return 0;
-> +};
-> +
-> +static int __init exynos_pmu_of_init(void)
-> +{
-> +	int ret = 0;
-> +	struct device_node *np;
-> +
-> +	for_each_matching_node_and_match(np, exynos_pmu_of_device_ids, NULL)
-> +		ret = exynos_pmu_probe(np);
-
-I wouldn't expect more than one PMU in the system, so probably a simple
-
-	for_each_matching_node_and_match(np, exynos_pmu_of_device_ids...
-		return exynos_pmu_probe(np);
-
-	return -ENODEV;
-
-would be enough here.
+Just a small note - please refrain from sending next versions of series 
+in reply to previous version. With threading applied, it gets hard to 
+notice that a new version was posted, because the first message of the 
+thread is always v1. Also it makes threads unnecessarily long.
 
 Best regards,
 Tomasz
+
+On 25.04.2014 14:32, Pankaj Dubey wrote:
+> This patch series, does some minor cleanup and modifies Exynos PMU related
+> code for mapping and initialization of Exynos Power Management Unit (PMU)
+> base address from device tree. This is also preparation for moving PMU
+> related code out of machine folder and moving into a "drivers/mfd", so that
+> ARM64 based SoC can utilize common piece of code. These patches require change
+> in Exynos4210, Exynos4212 and Exynos4412 dtsi files, which has been posted
+> as separate patch series [2]
+>
+> These patches are created on top of Kukjin Kim's for-next (v3.15-rc1 tag)
+> branch.
+>
+> These patches depends on following two patch series:
+> 1) mfd: syscon: Support early initialization
+>     https://lkml.org/lkml/2014/4/8/239
+> 2) Add PMU node for Exynos SoCs
+>     http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg29329.html
+>
+> We have tested these patches on SMDK5250 and Arndale (Exynos5250) boards for
+> System boot and PMU initialization and S2R.
+>
+> For testing on Arndale (Exynos5250) board:
+> Tested-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+>
+> Changes Since v1:
+>   - Rebased on latest for-next of Kukjin Kim's tree.
+>   - Added patch: "Make exynos machine_ops as static".
+> 	For making more cleanup in "mach-exynos/common.h"
+> 	as suggested by Tomasz Figa.
+>   - Addressed comments of Tomasz Figa for cleaning "mach-exynos/common.h".
+>   - Updated patch: Remove file path from comment section
+> 	As suggested by Michel Simek, instead of updating file path
+> 	lets remove them from each file under "mach-exynos".
+> 	Even though Kukjin pointed out that there is similar patch pending from
+> 	Sachin/Tushar but since I could not find I have included this here. If
+> 	I have missed something please point to any existing such patch.
+>   - Updated patch: Add support for mapping PMU base address via DT
+> 	- Removed __initdata from declaration of "exynos_pmu_base", as it caused
+> 	kernel crash as pointed out by Vikas Sajjan.
+> 	- Added support for Syscon initialization and getting PMU regmap handle
+> 	as suggested by Sylwester. Since current implementation of early
+> 	intialization [1] has limitation that "early_syscon_init" requires
+> 	DT to be unflattened and system should be able to allocate memory,
+> 	we can't use regmap handles for platsmp.c file as "smp_secondary_init"
+> 	will be called before DT unflattening. So I have kept both method for
+> 	accessing PMU base address. platsmp.c will use ioremmaped address where
+> 	as rest other files can use regmap handle.
+>   - Added patch: Remove "linux/bug.h" from pmu.c.
+>   - Updated patch: Refactored code for PMU register mapping via DT
+> 	- Modified to use regmap_read/write when using regmap handle.
+>   - Added patch: Move "mach/map.h" inclusion from regs-pmu.h to platsmp.c
+>   - Added patch: Add device tree based initialization support for PMU.
+> 	- Convert existing PMU implementation to be a device tree based
+> 	 before moving it to "drivers/mfd" folder. As suggested by Bartlomiej.
+> 	- Dropped making a platform_driver for PMU, as currently PMU binding
+> 	has two compatibility strings as "samsung, exynosxxx-pmu", "syscon",
+> 	once we	enable MFD_SYSCON config option, current "syscon" driver probe
+> 	gets called and PMU probe never gets called. So modified PMU
+> 	initialization code to scan DT and match against supported compatiblity
+> 	string in driver code, and once we get matching node use that for
+> 	accessing PMU regmap handle using "syscon_early_regmap_lookup_by_phandle".
+> 	If there is any better solution please suggest.
+>
+> Pankaj Dubey (6):
+>    ARM: EXYNOS: Make exynos machine_ops as static
+>    ARM: EXYNOS: Cleanup "mach-exynos/common.h" file
+>    ARM: EXYNOS: Remove file path from comment section
+>    ARM: EXYNOS: Refactored code for using PMU address via DT
+>    ARM: EXYNOS: Move "mach/map.h" inclusion from regs-pmu.h to platsmp.c
+>    ARM: EXYNOS: Add device tree based initialization support for PMU.
+>
+> Young-Gun Jang (4):
+>    ARM: EXYNOS: Move SYSREG definition into sys-reg specific file.
+>    ARM: EXYNOS: Remove regs-pmu.h header dependency from pm_domain
+>    ARM: EXYNOS: Add support for mapping PMU base address via DT
+>    ARM: EXYNOS: Remove "linux/bug.h" from pmu.c
+>
+>   arch/arm/mach-exynos/Kconfig               |    2 +
+>   arch/arm/mach-exynos/common.h              |   13 +-
+>   arch/arm/mach-exynos/cpuidle.c             |   37 +-
+>   arch/arm/mach-exynos/exynos.c              |  104 +++++-
+>   arch/arm/mach-exynos/headsmp.S             |    2 -
+>   arch/arm/mach-exynos/hotplug.c             |    7 +-
+>   arch/arm/mach-exynos/include/mach/map.h    |    3 -
+>   arch/arm/mach-exynos/include/mach/memory.h |    3 +-
+>   arch/arm/mach-exynos/platsmp.c             |   17 +-
+>   arch/arm/mach-exynos/pm.c                  |   61 ++--
+>   arch/arm/mach-exynos/pm_domains.c          |    2 +-
+>   arch/arm/mach-exynos/pmu.c                 |  191 ++++++++---
+>   arch/arm/mach-exynos/regs-pmu.h            |  512 ++++++++++++++--------------
+>   arch/arm/mach-exynos/regs-sys.h            |   22 ++
+>   14 files changed, 585 insertions(+), 391 deletions(-)
+>   create mode 100644 arch/arm/mach-exynos/regs-sys.h
+>
