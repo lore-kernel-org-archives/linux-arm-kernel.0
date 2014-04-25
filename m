@@ -1,40 +1,47 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 25 Apr 2014 16:18:49 +0200
-Subject: [PATCH v2 03/18] usb: host: xhci-plat: Add support for the
- Armada 38x
-In-Reply-To: <1398434836-18908-4-git-send-email-gregory.clement@free-electrons.com>
-References: <1398434836-18908-1-git-send-email-gregory.clement@free-electrons.com>
- <1398434836-18908-4-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140425161849.5616821e@skate>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 25 Apr 2014 17:20:19 +0300
+Subject: [PATCH 11/23] ARM: dts: omap5-uevm.dts: add tca6424a
+In-Reply-To: <53594189.1090508@cogentembedded.com>
+References: <1398334639-14172-1-git-send-email-tomi.valkeinen@ti.com>
+ <1398334639-14172-12-git-send-email-tomi.valkeinen@ti.com>
+ <53591669.7060502@cogentembedded.com> <5359209F.7000308@ti.com>
+ <53594189.1090508@cogentembedded.com>
+Message-ID: <535A6F23.1070409@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gregory CLEMENT,
+On 24/04/14 19:53, Sergei Shtylyov wrote:
 
-On Fri, 25 Apr 2014 16:07:01 +0200, Gregory CLEMENT wrote:
+>> Right. I wonder what the name should be... "gpio" is out, as the name
+>> should be more specific.
+> 
+>    No, it's not out. The name should be "gpio at 22", I think it would be
+> unique.
+> 
+>> We already have gpio1-8, which are the gpio
+>> banks from the SoC.
+> 
+>    I don't understand why you are indexing the names while you probably
+> have the address part after @ that makes them unique already.
 
-> +#define USB3_MAX_WINDOWS	4
-> +#define USB3_WIN_CTRL(w)	(0x0 + ((w) * 8))
-> +#define USB3_WIN_BASE(w)	(0x4 + ((w) * 8))
-> +
-> +static void __init mv_usb3_conf_mbus_windows(void __iomem *base,
-> +			const struct mbus_dram_target_info *dram)
+Ah sorry for the confusion, I misunderstood. I was talking about the
+label, not the name, of the node.
 
-That's a nitpick, but the name of this function looks like it was
-copy/pasted from the Marvell LSP, and isn't very consistent with the
-other function name. What about:
+So the labels for the gpio banks are 'gpio2' etc. The names are
+'gpio at 123456' etc. And yes, here the name should be 'gpio at 22' as you said.
 
-	xhci_mvebu_mbus_config()
+I didn't see any rules about the labels in the ePARP doc, so I guess
+'tca6424a' would be a valid one. Maybe not a good one, though,
+especially if there are multiple tca6424a chips on the board (I need to
+check).
 
-instead, or something like that?
+ Tomi
 
-> +int xhci_mvebu_mbus_init_quirk(struct platform_device *pdev)
 
-I believe this should give you a warning about section mismatch: you
-have a non-init function calling an __init function, no?
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140425/48f2728c/attachment.sig>
