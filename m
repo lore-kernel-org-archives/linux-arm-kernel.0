@@ -1,142 +1,61 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 13:00:32 +0100
-Subject: [PATCH 220/222] mmc: fix power-on sequencing for esdhc-imx driver
+Date: Fri, 25 Apr 2014 13:00:37 +0100
+Subject: [PATCH 221/222] ARM: cubox-i: add support for SD UHS-1 cards
 In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
 References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1Wdenw-0007ST-EL@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Wdeo1-0007SX-I0@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's no reason that this can't be applied to all MMC interfaces as
-it's all core code, so tie this into the core rather than it being
-optional for each host.
-
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/mmc/core/host.c | 90 +++++++++++++++++++++++++++++++++++--------------
- 1 file changed, 65 insertions(+), 25 deletions(-)
+ arch/arm/boot/dts/imx6qdl-cubox-i.dtsi | 26 +++++++++++++++++++++++++-
+ 1 file changed, 25 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
-index abc60f39aa7e..c523f55b317c 100644
---- a/drivers/mmc/core/host.c
-+++ b/drivers/mmc/core/host.c
-@@ -316,7 +316,7 @@ int mmc_of_parse(struct mmc_host *host)
- 	u32 bus_width;
- 	bool explicit_inv_wp, gpio_inv_wp = false;
- 	enum of_gpio_flags flags;
--	int i, len, ret, gpio;
-+	int len, ret, gpio;
+diff --git a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
+index c2a24888a276..c928c0a5e3cc 100644
+--- a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
+@@ -111,6 +111,28 @@
+ 				MX6QDL_PAD_SD2_DAT3__SD2_DATA3 0x13059
+ 			>;
+ 		};
++
++		pinctrl_cubox_i_usdhc2_100mhz: cubox-i-usdhc2-100mhz {
++			fsl,pins = <
++				MX6QDL_PAD_SD2_CMD__SD2_CMD    0x170b9
++				MX6QDL_PAD_SD2_CLK__SD2_CLK    0x100b9
++				MX6QDL_PAD_SD2_DAT0__SD2_DATA0 0x170b9
++				MX6QDL_PAD_SD2_DAT1__SD2_DATA1 0x170b9
++				MX6QDL_PAD_SD2_DAT2__SD2_DATA2 0x170b9
++				MX6QDL_PAD_SD2_DAT3__SD2_DATA3 0x130b9
++			>;
++		};
++
++		pinctrl_cubox_i_usdhc2_200mhz: cubox-i-usdhc2-200mhz {
++			fsl,pins = <
++				MX6QDL_PAD_SD2_CMD__SD2_CMD    0x170f9
++				MX6QDL_PAD_SD2_CLK__SD2_CLK    0x100f9
++				MX6QDL_PAD_SD2_DAT0__SD2_DATA0 0x170f9
++				MX6QDL_PAD_SD2_DAT1__SD2_DATA1 0x170f9
++				MX6QDL_PAD_SD2_DAT2__SD2_DATA2 0x170f9
++				MX6QDL_PAD_SD2_DAT3__SD2_DATA3 0x130f9
++			>;
++		};
+ 	};
+ };
  
- 	if (!host->parent || !host->parent->of_node)
- 		return 0;
-@@ -419,30 +419,6 @@ int mmc_of_parse(struct mmc_host *host)
- 	if (explicit_inv_wp ^ gpio_inv_wp)
- 		host->caps2 |= MMC_CAP2_RO_ACTIVE_HIGH;
+@@ -131,8 +153,10 @@
+ };
  
--	/* Parse card power/reset/clock control */
--	if (of_find_property(np, "card-reset-gpios", NULL)) {
--		struct gpio_desc *gpd;
--		for (i = 0; i < ARRAY_SIZE(host->card_reset_gpios); i++) {
--			gpd = devm_gpiod_get_index(host->parent, "card-reset", i);
--			if (IS_ERR(gpd))
--				break;
--			gpiod_direction_output(gpd, 0);
--			host->card_reset_gpios[i] = gpd;
--		}
--
--		gpd = devm_gpiod_get_index(host->parent, "card-reset", ARRAY_SIZE(host->card_reset_gpios));
--		if (!IS_ERR(gpd)) {
--			dev_warn(host->parent, "More reset gpios than we can handle");
--			gpiod_put(gpd);
--		}
--	}
--
--	host->card_clk = of_clk_get_by_name(np, "card_ext_clock");
--	if (IS_ERR(host->card_clk))
--		host->card_clk = NULL;
--
--	host->card_regulator = regulator_get(host->parent, "card-external-vcc");
--
- 	if (of_find_property(np, "cap-sd-highspeed", &len))
- 		host->caps |= MMC_CAP_SD_HIGHSPEED;
- 	if (of_find_property(np, "cap-mmc-highspeed", &len))
-@@ -485,6 +461,66 @@ int mmc_of_parse(struct mmc_host *host)
- 
- EXPORT_SYMBOL(mmc_of_parse);
- 
-+static int mmc_of_parse_child(struct mmc_host *host)
-+{
-+	struct device_node *np;
-+	struct clk *clk;
-+	int i;
-+
-+	if (!host->parent || !host->parent->of_node)
-+		return 0;
-+
-+	np = host->parent->of_node;
-+
-+	host->card_regulator = regulator_get(host->parent, "card-external-vcc");
-+	if (IS_ERR(host->card_regulator)) {
-+		if (PTR_ERR(host->card_regulator) == -EPROBE_DEFER)
-+			return PTR_ERR(host->card_regulator);
-+		host->card_regulator = NULL;
-+	}
-+
-+	/* Parse card power/reset/clock control */
-+	if (of_find_property(np, "card-reset-gpios", NULL)) {
-+		struct gpio_desc *gpd;
-+		int level = 0;
-+
-+		/*
-+		 * If the regulator is enabled, then we can hold the
-+		 * card in reset with an active high resets.  Otherwise,
-+		 * hold the resets low.
-+		 */
-+		if (host->card_regulator && regulator_is_enabled(host->card_regulator))
-+			level = 1;
-+
-+		for (i = 0; i < ARRAY_SIZE(host->card_reset_gpios); i++) {
-+			gpd = devm_gpiod_get_index(host->parent, "card-reset", i);
-+			if (IS_ERR(gpd)) {
-+				if (PTR_ERR(gpd) == -EPROBE_DEFER)
-+					return PTR_ERR(gpd);
-+				break;
-+			}
-+			gpiod_direction_output(gpd, gpiod_is_active_low(gpd) | level);
-+			host->card_reset_gpios[i] = gpd;
-+		}
-+
-+		gpd = devm_gpiod_get_index(host->parent, "card-reset", ARRAY_SIZE(host->card_reset_gpios));
-+		if (!IS_ERR(gpd)) {
-+			dev_warn(host->parent, "More reset gpios than we can handle");
-+			gpiod_put(gpd);
-+		}
-+	}
-+
-+	clk = of_clk_get_by_name(np, "card_ext_clock");
-+	if (IS_ERR(clk)) {
-+		if (PTR_ERR(clk) == -EPROBE_DEFER)
-+			return PTR_ERR(clk);
-+		clk = NULL;
-+	}
-+	host->card_clk = clk;
-+
-+	return 0;
-+}
-+
- /**
-  *	mmc_alloc_host - initialise the per-host structure.
-  *	@extra: sizeof private data structure
-@@ -564,6 +600,10 @@ int mmc_add_host(struct mmc_host *host)
- {
- 	int err;
- 
-+	err = mmc_of_parse_child(host);
-+	if (err)
-+		return err;
-+
- 	WARN_ON((host->caps & MMC_CAP_SDIO_IRQ) &&
- 		!host->ops->enable_sdio_irq);
- 
+ &usdhc2 {
+-	pinctrl-names = "default";
++	pinctrl-names = "default", "state_100mhz", "state_200mhz";
+ 	pinctrl-0 = <&pinctrl_cubox_i_usdhc2_aux &pinctrl_cubox_i_usdhc2>;
++	pinctrl-1 = <&pinctrl_cubox_i_usdhc2_aux &pinctrl_cubox_i_usdhc2_100mhz>;
++	pinctrl-2 = <&pinctrl_cubox_i_usdhc2_aux &pinctrl_cubox_i_usdhc2_200mhz>;
+ 	vmmc-supply = <&reg_3p3v>;
+ 	cd-gpios = <&gpio1 4 0>;
+ 	status = "okay";
 -- 
 1.8.3.1
