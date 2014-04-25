@@ -1,137 +1,94 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Fri, 25 Apr 2014 11:49:07 +0200
-Subject: [GIT PULL v3] Xilinx Zynq changes for v3.15
-In-Reply-To: <201404251100.51068.arnd@arndb.de>
-References: <53061EBA.1080002@monstr.eu> <201403270228.19976.arnd@arndb.de>
- <53340E87.60004@monstr.eu> <201404251100.51068.arnd@arndb.de>
-Message-ID: <535A2F93.3010304@monstr.eu>
+From: archit@ti.com (Archit Taneja)
+Date: Fri, 25 Apr 2014 15:36:13 +0530
+Subject: [PATCH 01/23] OMAPDSS: HDMI: lane config support
+In-Reply-To: <1398334639-14172-2-git-send-email-tomi.valkeinen@ti.com>
+References: <1398334639-14172-1-git-send-email-tomi.valkeinen@ti.com>
+ <1398334639-14172-2-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <535A3395.4050106@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/25/2014 11:00 AM, Arnd Bergmann wrote:
-> On Thursday 27 March 2014, Michal Simek wrote:
->>> The problem I noticed is the soc-bus support: I noticed that you
->>> are populating the entire device tree under the soc node, including
->>> any top-level devices, and that the "xlnx,zynq-devcfg-1.00.a"
->>> node is part of that.
->>>
->>> I think what you should try instead is to have only the
->>> amba bus and its children as part of the soc-bus, but other
->>> top-level devices (e.g. board clocks) outside of the soc
->>> node. Also, it would make sense to merge the devcfg stuff
->>> with the amba node, since it's really what makes up the
->>> soc. Does that make sense to you, or do you have reason to
->>> believe it won't work?
->>
->> No problem to postpone to the next release and discuss it more.
->>
->> Currently all devices listed in dts/dtsi are all hard IPs
->> inside PS silicon that's why I think they should be the part of SoC.
->> (zynq-devcfg is also hard IP present all the time in SoC
->> I will use different compatible string in the next version
->> xlnx,zynq-devcfg-1.0).
->>
->> For devices in PL is situation different because only axi-axi bridge
->> is present in PS that's why I think that new bus type should
->> be used. Also this bridge provides some resets which can be
->> provided through this bus bridge driver.
->>
->> Current code do this:
->>
->> root at zynq:~# cat /sys/bus/soc/devices/soc0/revision
->> 0x0
->> root at zynq:~# cat /sys/bus/soc/devices/soc0/soc_id
->> 0x7
->> root at zynq:~# cat /sys/bus/soc/devices/soc0/family
->> Xilinx Zynq
->> root at zynq:~# ls /sys/bus/soc/devices/soc0/
->> amba.0        f8891000.pmu  power         soc_id        uevent
->> amba.1        family        revision      subsystem
->>
->> amba.0 is the bus present in zynq-7000.dtsi
->> amba.1 is bus I have added myself just locally which is
->> axi2axi bridge mentioned above.
->>
->> All devices which will be in PL will be connected to this amba.1
->> bus.
->>
->> Regarding clk driver in slcr node is not listed there.
->>
->> root at zynq:~# ls /sys/bus/soc/devices/soc0/amba.0/f8000000.slcr/
->> driver/    modalias   power/     subsystem/ uevent
->>
->>
->> Then we have also ACP (accelerator coherency port) which is the
->> same case as axi2axi bridge. It means it is fixed hardware in SoC
->> part and devices can be connect to it
->> (It looks like arm-cci bus type).
->>
->> I know that others SoC are using soc {} node for adding
->> soc IPs but that's not our case at least for now.
->>
->> If you think that SOC bus should just contain SoC specific
->> things then we can call of_platform_populate without SoC bus
->> parent to ensure that these devices are not listed there.
->>
->> Please correct me if something doesn't fit.
-> 
-> I don't have a strong opinion on things that are defined in FPGA
-> logic, they could be below soc0, in a separate soc1 node or
-> in some other top-level bus.
+Hi,
 
-ok.
+On Thursday 24 April 2014 03:46 PM, Tomi Valkeinen wrote:
+> Add support to configure the pins used for the HDMI lanes. The order and
+> polarity of the lanes can be defined in the DT data.
+>
+> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> ---
 
+> +static void hdmi_phy_configure_lanes(struct hdmi_phy_data *phy)
+> +{
+> +	static const u16 pad_cfg_list[] = {
+> +		0x0123,
+> +		0x0132,
+> +		0x0312,
+> +		0x0321,
+> +		0x0231,
+> +		0x0213,
+> +		0x1023,
+> +		0x1032,
+> +		0x3012,
+> +		0x3021,
+> +		0x2031,
+> +		0x2013,
+> +		0x1203,
+> +		0x1302,
+> +		0x3102,
+> +		0x3201,
+> +		0x2301,
+> +		0x2103,
+> +		0x1230,
+> +		0x1320,
+> +		0x3120,
+> +		0x3210,
+> +		0x2310,
+> +		0x2130,
+> +	};
+> +
+> +	u16 lane_cfg = 0;
+> +	int i;
+> +	unsigned lane_cfg_val;
+> +	u16 pol_val = 0;
+> +
+> +	for (i = 0; i < 4; ++i)
+> +		lane_cfg |= phy->lane_function[i] << ((3 - i) * 4);
+> +
+> +	pol_val |= phy->lane_polarity[0] << 0;
+> +	pol_val |= phy->lane_polarity[1] << 3;
+> +	pol_val |= phy->lane_polarity[2] << 2;
+> +	pol_val |= phy->lane_polarity[3] << 1;
+> +
+> +	for (i = 0; i < ARRAY_SIZE(pad_cfg_list); ++i)
+> +		if (pad_cfg_list[i] == lane_cfg)
+> +			break;
+> +
+> +	if (WARN_ON(i == ARRAY_SIZE(pad_cfg_list)))
+> +		i = 0;
+> +
+> +	lane_cfg_val = i;
 
-> What I was mostly thinking of is board-level devices that are
-> not part of the soc address hierarchy, such as external clocks
-> or leds that just use GPIO lines.
+I spent some time to see if we could get create lane_cfg_val without 
+having the table above, looks like there is no pattern at all in the 
+register field.
 
-Then let's discuss this based on our zynq dtsi.
-GIC, PL310, (OCM controller - we will discuss this later), UARTS, CADENCE GEM,
-ARASAN MMC, A9 global timer, TTC timer, SCUTIMER
-- all of these are just the part of the soc address hierarchy and shouldn't
-be any problem with them to be under soc0 - all of them are in silicon.
+> +
+> +	REG_FLD_MOD(phy->base, HDMI_TXPHY_PAD_CFG_CTRL, lane_cfg_val, 26, 22);
+> +	REG_FLD_MOD(phy->base, HDMI_TXPHY_PAD_CFG_CTRL, pol_val, 30, 27);
+> +}
+> +
+>   int hdmi_phy_enable(struct hdmi_phy_data *phy, struct hdmi_wp_data *wp,
+>   			struct hdmi_config *cfg)
+>   {
+> @@ -92,8 +183,7 @@ int hdmi_phy_enable(struct hdmi_phy_data *phy, struct hdmi_wp_data *wp,
+>   	/* Setup max LDO voltage */
+>   	REG_FLD_MOD(phy->base, HDMI_TXPHY_POWER_CTRL, 0xB, 3, 0);
+>
+> -	/* Write to phy address 3 to change the polarity control */
+> -	REG_FLD_MOD(phy->base, HDMI_TXPHY_PAD_CFG_CTRL, 0x1, 27, 27);
 
-DEVCFG - it is the part of first group - it is hard IP which can program
-programmable logic. Address is FIXED just wanted to list it separately.
+wow, didn't realize it was hardcoded like this.
 
-I2C - I have just sent pull request for adding it there.
-i2c childs/devices are added to the i2c node based on binding that's why
-this should be fine.
+Reviewed-by: Archit Taneja <archit@ti.com?
 
-PMU - Currently I have it in root but maybe better location should be used.
-
-SLCR - which is our system controller where everything is together.
-There is just ps-clk-frequency which is user setup and come externally.
-The part of this is clock driver which is probably that problematic one
-but on the other hand it is targetting exact register addresses which
-are used by this driver to describe internal clk description.
-
-I have looked at ux500 platform which has also SOC_BUS and
-based your thinking for example cpufreq-cooling, regulator-gpio shouldn't
-be there and probably more than this. Regarding clock description there
-is even not register range specified that's why it should be easily moved
-out of soc bus.
-Linus: It is not a complain just want it to get it right.
-
-If you have any example how this should be done, please send it to me.
-I would like to have this in good shape.
-
-Thanks,
-Michal
-
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140425/3334d28d/attachment.sig>
+Archit
