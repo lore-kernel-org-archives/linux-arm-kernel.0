@@ -1,66 +1,62 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 25 Apr 2014 18:05:41 +0100
-Subject: [PATCH] arm/xen: Remove definiition of virt_to_pfn in
- asm/xen/page.h
-In-Reply-To: <53591B8F.8070300@citrix.com>
-References: <1397836474-10478-1-git-send-email-julien.grall@linaro.org>
- <535901F0.3010908@citrix.com> <53590845.1090405@linaro.org>
- <53591B8F.8070300@citrix.com>
-Message-ID: <alpine.DEB.2.02.1404251801060.8072@kaball.uk.xensource.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Fri, 25 Apr 2014 12:14:48 -0500
+Subject: [PATCH 0/3] Minor OMAP DTS fixes
+In-Reply-To: <20140425165739.GF20807@atomide.com>
+References: <1398205417-1575-1-git-send-email-s-anna@ti.com>
+ <20140425165739.GF20807@atomide.com>
+Message-ID: <535A9808.70204@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 24 Apr 2014, David Vrabel wrote:
-> On 24/04/14 13:49, Julien Grall wrote:
-> > Hi David,
-> > 
-> > On 04/24/2014 01:22 PM, David Vrabel wrote:
-> >> On 18/04/14 16:54, Julien Grall wrote:
-> >>> virt_to_pfn has been defined in asm/memory.h by the commit e26a9e0 "ARM: Better
-> >>> virt_to_page() handling"
-> >>>
-> >>> This will result of a compilation warning when CONFIG_XEN is enabled.
-> >>>
-> >>> arch/arm/include/asm/xen/page.h:80:0: warning: "virt_to_pfn" redefined [enabled by default]
-> >>>  #define virt_to_pfn(v)          (PFN_DOWN(__pa(v)))
-> >>>  ^
-> >>> In file included from arch/arm/include/asm/page.h:163:0,
-> >>>                  from arch/arm/include/asm/xen/page.h:4,
-> >>>                  from include/xen/page.h:4,
-> >>>                  from arch/arm/xen/grant-table.c:33:
-> >>>
-> >>> The definition in memory.h is nearly the same (it directly expand PFN_DOWN),
-> >>> so we can safely drop virt_to_pfn in xen include.
-> >>
-> >>
-> >> This breaks the arm build for me.
-> >>
-> >> /local/davidvr/work/k.org/tip/drivers/block/xen-blkfront.c: In function
-> >> ?setup_blkring?:
-> >> /local/davidvr/work/k.org/tip/drivers/block/xen-blkfront.c:1236:2:
-> >> error: implicit declaration of function ?virt_to_pfn?
-> >> [-Werror=implicit-function-declaration]
-> >>   err = xenbus_grant_ring(dev, virt_to_mfn(info->ring.sring));
-> >>   ^
-> > 
-> > I don't have any issue to build the following branch with this patch on:
-> > 	- v3.15-rc2
-> > 	- xentip master
-> > 	- xentip for-linus-3.16
+Tony,
+
+On 04/25/2014 11:57 AM, Tony Lindgren wrote:
+> * Suman Anna <s-anna@ti.com> [140422 15:24]:
+>> Hi Tony, Benoit,
+>>
+>> This series includes couple of minor fixes in the OMAP DTS files. The patches
+>> are based on 3.15-rc2.
+>>
+>> The first patch fixes the only WARN_ON trace present during kernel boot on
+>> OMAP5 uEVM, and this has been present since some time now. 
+>> [    0.045578] ------------[ cut here ]------------
+>> [    0.045598] WARNING: CPU: 0 PID: 1 at arch/arm/mach-omap2/omap_hwmod.c:2538 _init+0x1c0/0x3dc()
+>> [    0.045605] omap_hwmod: mailbox: doesn't have mpu register target base
+>> [    0.045611] Modules linked in:
+>> [    0.045625] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.15.0-rc2-00001-gb5e85a0 #45
+>> [    0.045653] [<c0015724>] (unwind_backtrace) from [<c00120f4>] (show_stack+0x10/0x14)
+>> [    0.045672] [<c00120f4>] (show_stack) from [<c05a1ccc>] (dump_stack+0x78/0x94)
+>> [    0.045686] [<c05a1ccc>] (dump_stack) from [<c0042a74>] (warn_slowpath_common+0x6c/0x8c)
+>> [    0.045698] [<c0042a74>] (warn_slowpath_common) from [<c0042b28>] (warn_slowpath_fmt+0x30/0x40)
+>> [    0.045710] [<c0042b28>] (warn_slowpath_fmt) from [<c0803b40>] (_init+0x1c0/0x3dc)
+>> [    0.045724] [<c0803b40>] (_init) from [<c0029c8c>] (omap_hwmod_for_each+0x34/0x5c)
+>> [    0.045736] [<c0029c8c>] (omap_hwmod_for_each) from [<c08042b0>] (__omap_hwmod_setup_all+0x24/0x40)
+>> [    0.045748] [<c08042b0>] (__omap_hwmod_setup_all) from [<c00088b8>] (do_one_initcall+0x34/0x160)
+>> [    0.045761] [<c00088b8>] (do_one_initcall) from [<c07f7bf4>] (kernel_init_freeable+0xfc/0x1c8)
+>> [    0.045772] [<c07f7bf4>] (kernel_init_freeable) from [<c059c4f4>] (kernel_init+0x8/0xe4)
+>> [    0.045784] [<c059c4f4>] (kernel_init) from [<c000eaa8>] (ret_from_fork+0x14/0x2c)
+>> [    0.045826] ---[ end trace c25fc521f2569d3c ]---
+>>
+>> The last patch eliminates the following traces on AM3517 based boards.
+>> [    0.418496] platform iva.2: Cannot lookup hwmod 'iva'
+>> [    0.454352] platform 48094000.mailbox: Cannot lookup hwmod 'mailbox'
+>> [    0.460610] platform 480bd400.mmu: Cannot lookup hwmod 'mmu_isp'
+>> [    0.464065] platform 480c9000.smartreflex: Cannot lookup hwmod 'smartreflex_mpu_iva'
+>>
+>> There are a few other such traces remaining, but these are all on valid nodes.
+>> [    0.420275] platform 480c5000.aes: Cannot lookup hwmod 'aes'
+>> [    0.462403] platform 480c3000.sham: Cannot lookup hwmod 'sham'
+>> [    0.463246] platform 480cb000.smartreflex: Cannot lookup hwmod 'smartreflex_core'
+>> [    0.477243] platform 480ab000.usb_otg_hs: Cannot lookup hwmod 'usb_otg_hs'
 > 
-> Applied to devel/for-linus-3.16.
-> 
-> If something else turns up for 3.15 (and I remember) I'll take it for
-> 3.15 instead.
+> Thanks applying all three into omap-for-v3.15/fixes-v2 with patch
+> updated with the above warnings. Next time, please include the
+> warnings into the patch description, just leave out the time
+> stamps.
 
-David,
-thank you very much for taking the patch in my absence.
+Thanks. I have mentioned the warning for the OMAP5 one very briefly, and
+wasn't sure if I needed to copy the entire backtrace, but will remember
+to include them in the future.
 
-Considering that the problem is affecting everybody enabling CONFIG_XEN
-on ARM on v3.15, I don't think we can wait for the next merge window to
-send this fix upstream.
-Too many warnings for too many people.
-
-Cheers,
-
-Stefano
+regards
+Suman
