@@ -1,51 +1,55 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:42:31 +0100
-Subject: [PATCH 130/222] leds: leds-pwm: add DT support for LEDs wired to
- supply
+Date: Fri, 25 Apr 2014 12:42:36 +0100
+Subject: [PATCH 131/222] ARM: add support for Cubox-i PWM-driven front panel
+ LED
 In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
 References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WdeWV-0007Lw-HK@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WdeWa-0007M0-L5@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The non-DT driver allowed an active low property to be specified, but DT
-is missing this in its description.  Add the property to the DT binding
-document, making it optional.  It defaults to active high, which retains
-compatibility with existing descriptions.
-
-This should only be used for causes where the LED is wired to supply,
-and the PWM does not sensibly support its own inversion.
+The front panel LED on the Cubox-i is driven by one of the iMX6 PWM
+channels, and is wired between the PWM output and supply.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- Documentation/devicetree/bindings/leds/leds-pwm.txt | 2 ++
- drivers/leds/leds-pwm.c                             | 1 +
- 2 files changed, 3 insertions(+)
+ arch/arm/boot/dts/imx6qdl-cubox-i.dtsi | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/leds/leds-pwm.txt b/Documentation/devicetree/bindings/leds/leds-pwm.txt
-index 7297107cf832..6c6583c35f2f 100644
---- a/Documentation/devicetree/bindings/leds/leds-pwm.txt
-+++ b/Documentation/devicetree/bindings/leds/leds-pwm.txt
-@@ -13,6 +13,8 @@ node's name represents the name of the corresponding LED.
-   For the pwms and pwm-names property please refer to:
-   Documentation/devicetree/bindings/pwm/pwm.txt
- - max-brightness : Maximum brightness possible for the LED
-+- active-low : (optional) For PWMs where the LED is wired to supply
-+  rather than ground.
- - label :  (optional)
-   see Documentation/devicetree/bindings/leds/common.txt
- - linux,default-trigger :  (optional)
-diff --git a/drivers/leds/leds-pwm.c b/drivers/leds/leds-pwm.c
-index 8bd225df14de..f5cf1b0f2748 100644
---- a/drivers/leds/leds-pwm.c
-+++ b/drivers/leds/leds-pwm.c
-@@ -154,6 +154,7 @@ static int led_pwm_create_of(struct device *dev, struct led_pwm_priv *priv)
+diff --git a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
+index c2a24888a276..c17602d4e4aa 100644
+--- a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
+@@ -12,6 +12,19 @@
+ 		pinctrl-0 = <&pinctrl_cubox_i_ir>;
+ 	};
  
- 		led.default_trigger = of_get_property(child,
- 						"linux,default-trigger", NULL);
-+		led.active_low = of_property_read_bool(child, "active-low");
- 		of_property_read_u32(child, "max-brightness",
- 				     &led.max_brightness);
++	pwmleds {
++		compatible = "pwm-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_cubox_i_pwm1>;
++
++		front {
++			active-low;
++			label = "imx6:red:front";
++			max-brightness = <248>;
++			pwms = <&pwm1 0 50000>;
++		};
++	};
++
+ 	regulators {
+ 		compatible = "simple-bus";
  
+@@ -82,6 +95,10 @@
+ 			>;
+ 		};
+ 
++		pinctrl_cubox_i_pwm1: cubox-i-pwm1-front-led {
++			fsl,pins = <MX6QDL_PAD_DISP0_DAT8__PWM1_OUT 0x1b0b0>;
++		};
++
+ 		pinctrl_cubox_i_spdif: cubox-i-spdif {
+ 			fsl,pins = <MX6QDL_PAD_GPIO_17__SPDIF_OUT 0x13091>;
+ 		};
 -- 
 1.8.3.1
