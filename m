@@ -1,141 +1,110 @@
-From: zlim@broadcom.com (Zi Shen Lim)
-Date: Fri, 25 Apr 2014 11:37:11 -0700
-Subject: [PATCHv2 2/2] arm64: topology: add MPIDR-based detection
-In-Reply-To: <20140425111842.GB23464@e102568-lin.cambridge.arm.com>
-References: <1398395922-7482-1-git-send-email-zlim@broadcom.com>
- <1398395922-7482-3-git-send-email-zlim@broadcom.com>
- <20140425111842.GB23464@e102568-lin.cambridge.arm.com>
-Message-ID: <20140425183711.GA2161@lc-sj1-5012.sj.broadcom.com>
+From: yegorslists@googlemail.com (Yegor Yefremov)
+Date: Fri, 25 Apr 2014 20:37:10 +0200
+Subject: [PATCH v6 1/3] tty/serial: Add GPIOLIB helpers for controlling
+ modem lines
+In-Reply-To: <CACQ1gAiDw3XcspRwSEEX9e9rH=qFMvyW2ic+SmugMDi8kNKEaQ@mail.gmail.com>
+References: <1394469951-21192-1-git-send-email-richard.genoud@gmail.com>
+ <1394469951-21192-2-git-send-email-richard.genoud@gmail.com>
+ <535669DB.8010109@visionsystems.de>
+ <CACQ1gAiDw3XcspRwSEEX9e9rH=qFMvyW2ic+SmugMDi8kNKEaQ@mail.gmail.com>
+Message-ID: <CAGm1_kvd7G0HthX1dRqRK52nDSPfDqHwAZ2EDn+CUbSpzJv-Mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+On Fri, Apr 25, 2014 at 4:56 PM, Richard Genoud
+<richard.genoud@gmail.com> wrote:
+> 2014-04-22 15:08 GMT+02:00 Yegor Yefremov <yegor_sub1@visionsystems.de>:
+>> On 10.03.2014 17:45, Richard Genoud wrote:
+>>> This patch add some helpers to control modem lines (CTS/RTS/DSR...) via
+>>> GPIO.
+>>> This will be useful for many boards which have a serial controller that
+>>> only handle CTS/RTS pins (or even just RX/TX).
+>>>
+>>> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+>>
+>> ....
+>>
+>>> +
+>>> +struct mctrl_gpios {
+>>> +     struct gpio_desc *gpio[UART_GPIO_MAX];
+>>> +};
+>>> +
+>>> +static const struct {
+>>> +     const char *name;
+>>> +     unsigned int mctrl;
+>>> +     bool dir_out;
+>>> +} mctrl_gpios_desc[UART_GPIO_MAX] = {
+>>> +     { "cts", TIOCM_CTS, false, },
+>>> +     { "dsr", TIOCM_DSR, false, },
+>>> +     { "dcd", TIOCM_CD, false, },
+>>> +     { "rng", TIOCM_RNG, false, },
+>>> +     { "rts", TIOCM_RTS, true, },
+>>> +     { "dtr", TIOCM_DTR, true, },
+>>> +     { "out1", TIOCM_OUT1, true, },
+>>> +     { "out2", TIOCM_OUT2, true, },
+>>> +};
+>>> +
+>>> +void mctrl_gpio_set(struct mctrl_gpios *gpios, unsigned int mctrl)
+>>> +{
+>>> +     enum mctrl_gpio_idx i;
+>>> +
+>>> +     if (IS_ERR_OR_NULL(gpios))
+>>> +             return;
+>>> +
+>>> +     for (i = 0; i < UART_GPIO_MAX; i++)
+>>> +             if (!IS_ERR_OR_NULL(gpios->gpio[i]) &&
+>>> +                 mctrl_gpios_desc[i].dir_out)
+>>> +                     gpiod_set_value(gpios->gpio[i],
+>>> +                                     !!(mctrl & mctrl_gpios_desc[i].mctrl));
+>>> +}
+>>> +EXPORT_SYMBOL_GPL(mctrl_gpio_set);
+>>> +
+>>> +struct gpio_desc *mctrl_gpio_to_gpiod(struct mctrl_gpios *gpios,
+>>> +                                   enum mctrl_gpio_idx gidx)
+>>> +{
+>>> +     if (!IS_ERR_OR_NULL(gpios) && !IS_ERR_OR_NULL(gpios->gpio[gidx]))
+>>> +             return gpios->gpio[gidx];
+>>> +     else
+>>> +             return NULL;
+>>> +}
+>>> +EXPORT_SYMBOL_GPL(mctrl_gpio_to_gpiod);
+>>> +
+>>> +unsigned int mctrl_gpio_get(struct mctrl_gpios *gpios, unsigned int *mctrl)
+>>> +{
+>>> +     enum mctrl_gpio_idx i;
+>>> +
+>>> +     /*
+>>> +      * return it unchanged if the structure is not allocated
+>>> +      */
+>>> +     if (IS_ERR_OR_NULL(gpios))
+>>> +             return *mctrl;
+>>> +
+>>> +     for (i = 0; i < UART_GPIO_MAX; i++) {
+>>> +             if (!IS_ERR_OR_NULL(gpios->gpio[i]) &&
+>>> +                 !mctrl_gpios_desc[i].dir_out) {
+>>> +                     if (gpiod_get_value(gpios->gpio[i]))
+>>> +                             *mctrl |= mctrl_gpios_desc[i].mctrl;
+>>> +                     else
+>>> +                             *mctrl &= ~mctrl_gpios_desc[i].mctrl;
+>>> +             }
+>>> +     }
+>>> +
+>>> +     return *mctrl;
+>>> +}
+>>> +EXPORT_SYMBOL_GPL(mctrl_gpio_get);
+>>
+>> Should this routine be renamed to msr_gpio_get() or perhaps better to give all values (inputs and outputs)?
+>>
+>> I'm trying to port this approach to omap-serial to implement RS485 switching. I need to know if RTS is already on or not and set it accordingly.
+>>
+>> What would be the best solution for this task using this new API?
+> Sorry, but I don't really get what you're trying to do.
+> Could you explain a little bit more ?
 
-On Fri, Apr 25, 2014 at 12:18:43PM +0100, Lorenzo Pieralisi wrote:
-> On Fri, Apr 25, 2014 at 04:18:42AM +0100, Zi Shen Lim wrote:
-> > Create cpu topology based on MPIDR. When hardware sets MPIDR to sane
-> > values, this method will always work. Therefore it should also work well
-> > as the fallback method. [1]
-> 
-> It has to be implemented as fallback, so you have to rebase this patch
-> on top of Mark's series.
+Never mind, I've solved this in this patch:
+http://www.spinics.net/lists/arm-kernel/msg325197.html via using
 
-Ok, I'll rebase this patch :)
+gpiod_set_value() and gpiod_get_value() directly.
 
-> 
-> > When we have multiple processing elements in the system, we create
-> > the cpu topology by mapping each affinity level (from lowest to highest)
-> > to threads (if they exist), cores, and clusters.
-> > 
-> > We combine data from all higher affinity levels into cluster_id
-> > so we don't lose any information from MPIDR. [2]
-> > 
-> > [1] http://www.spinics.net/lists/arm-kernel/msg317445.html
-> > [2] https://lkml.org/lkml/2014/4/23/703
-> > 
-> > Signed-off-by: Zi Shen Lim <zlim@broadcom.com>
-> > ---
-> > v1->v2: Addressed comments from Mark Brown.
-> >  - Reduce noise. Use pr_debug instead of pr_info.
-> >  - Don't ignore higher affinity levels.
-> > 
-> >  arch/arm64/include/asm/cputype.h |  2 ++
-> >  arch/arm64/kernel/topology.c     | 34 ++++++++++++++++++++++++++++++++++
-> >  2 files changed, 36 insertions(+)
-> > 
-> > diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
-> > index c404fb0..7639e8b 100644
-> > --- a/arch/arm64/include/asm/cputype.h
-> > +++ b/arch/arm64/include/asm/cputype.h
-> > @@ -18,6 +18,8 @@
-> >  
-> >  #define INVALID_HWID		ULONG_MAX
-> >  
-> > +#define MPIDR_UP_BITMASK	(0x1 << 30)
-> > +#define MPIDR_MT_BITMASK	(0x1 << 24)
-> >  #define MPIDR_HWID_BITMASK	0xff00ffffff
-> >  
-> >  #define MPIDR_LEVEL_BITS_SHIFT	3
-> > diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-> > index 3e06b0b..7dbf981 100644
-> > --- a/arch/arm64/kernel/topology.c
-> > +++ b/arch/arm64/kernel/topology.c
-> > @@ -19,6 +19,8 @@
-> >  #include <linux/nodemask.h>
-> >  #include <linux/sched.h>
-> >  
-> > +#include <asm/cputype.h>
-> > +#include <asm/smp_plat.h>
-> >  #include <asm/topology.h>
-> >  
-> >  /*
-> > @@ -71,6 +73,38 @@ static void update_siblings_masks(unsigned int cpuid)
-> >  
-> >  void store_cpu_topology(unsigned int cpuid)
-> >  {
-> > +	struct cpu_topology *cpuid_topo = &cpu_topology[cpuid];
-> > +	u64 mpidr;
-> > +
-> > +	mpidr = read_cpuid_mpidr();
-> > +
-> > +	/* Create cpu topology mapping based on MPIDR. */
-> > +	if (mpidr & MPIDR_UP_BITMASK) {
-> > +		/* Uniprocessor system */
-> > +		cpuid_topo->thread_id  = -1;
-> > +		cpuid_topo->core_id    = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-> > +		cpuid_topo->cluster_id = -1;
-> > +	} else if (mpidr & MPIDR_MT_BITMASK) {
-> > +		/* Multiprocessor system : Multi-threads per core */
-> > +		cpuid_topo->thread_id  = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-> > +		cpuid_topo->core_id    = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-> > +		cpuid_topo->cluster_id =
-> > +			MPIDR_AFFINITY_LEVEL(mpidr, 2) |
-> > +			MPIDR_AFFINITY_LEVEL(mpidr, 3) << mpidr_hash.shift_aff[3];
-> 
-> That's probably not what you want, even though you still end up with a
-> unique cluster identifier (but insanely large) if you get lucky and it
-> does not overflow an int. The shift is the amount of bits the level must be
-> shift _right_ to create the hash value.
 
-Oh oops, I should read the mpidr_hash code more carefully.
-My intention of using your mpidr_hash values is to achieve something better than
-the naive solution of (aff2 | (aff3 << 8)).
-
-> 
-> I am wondering whether it is time for me to add those as macros.
-
-Sure :)
-
-> 
-> > +	} else {
-> > +		/* Multiprocessor system : Single-thread per core */
-> > +		cpuid_topo->thread_id  = -1;
-> > +		cpuid_topo->core_id    = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-> > +		cpuid_topo->cluster_id =
-> > +			MPIDR_AFFINITY_LEVEL(mpidr, 1) |
-> > +			MPIDR_AFFINITY_LEVEL(mpidr, 2) << mpidr_hash.shift_aff[2] |
-> > +			MPIDR_AFFINITY_LEVEL(mpidr, 3) << mpidr_hash.shift_aff[3];
-> 
-> Ditto.
-> 
-> > +	}
-> > +
-> > +	pr_debug("CPU%u: cluster %d core %d thread %d mpidr %llx\n",
-> > +		 cpuid, cpuid_topo->cluster_id, cpuid_topo->core_id,
-> > +		 cpuid_topo->thread_id, mpidr);
-> > +
-> >  	update_siblings_masks(cpuid);
-> 
-> That's why I object. With this implementation MPIDR_EL1 takes over DT,
-> and we do not want that. It has to work the other way around.
-> 
-> What you should do, in update_sibling_masks(), check if the topology has
-> been reset (ie it is not set-up), and parse the MPIDR if that's the case.
-
-Ok, point taken. MPIDR as fallback.
-In the rebased patch, I'll take care of it.
-
-> 
-> Thanks,
-> Lorenzo
-> 
+Yegor
