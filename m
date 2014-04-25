@@ -1,53 +1,81 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Fri, 25 Apr 2014 21:53:19 +0200
-Subject: can problems on socfpga [was Re: [PATCH v2 4/6] ARM: socfpga: dts:
- add can0+1]
-In-Reply-To: <20140404102815.GA9242@amd.pavel.ucw.cz>
-References: <1396422700-3962-1-git-send-email-s.trumtrar@pengutronix.de>
- <1396422700-3962-4-git-send-email-s.trumtrar@pengutronix.de>
- <20140404102815.GA9242@amd.pavel.ucw.cz>
-Message-ID: <20140425195319.GA3677@amd.pavel.ucw.cz>
+From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
+Date: Fri, 25 Apr 2014 15:48:46 -0400
+Subject: [PATCH v8 0/3] PSCI v0.2 support and DT bindings
+Message-ID: <1398455329-18136-1-git-send-email-ashwin.chaugule@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+This patchset introduces some functions as defined in the PSCI v0.2 spec
+and a corresponding DT binding to differentiate it from previous PSCI versions.
+Since PSCIv0.2 has standard function IDs, it is possible to statically assign them
+rather than depend on values from DT.
 
-> > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> 
-> I have had similar patch here, except that it only listed 2 interrupts
-> for each d_can controller.
-> 
-> Otherwise it looks identical.
-> 
-> Reviewed-by: Pavel Machek <pavel@denx.de>
+This patchset depends on the PSCI header (/uapi/linux/psci.h) introduced by
+http://www.spinics.net/lists/arm-kernel/msg319712.html
 
-Actually, does it work for you? Here it produces warnings during boot
 
-c_can_platform ffc00000.d_can: invalid resource
-c_can_platform ffc00000.d_can: control memory is not used for raminit
-c_can_platform ffc00000.d_can: c_can_platform device registered
-(regs=9085c000, irq=163)
-...
-can: controller area network core (rev 20120528 abi 9)
-NET: Registered protocol family 29
-can: raw protocol (rev 20120528)
-can: broadcast manager protocol (rev 20120528 t)
-can: netlink gateway (rev 20130117) max_hops=1
+Changes in v8:
+		-	Replace msleep(100) with 10 x msleep(10)
 
-. Then can0 is correctly registered, and seems to even receive
-packets, but only when enter is pressed on serial console... which is
-kind of weird. I suspected irq problems, but same symptomps with
-"irqpoll" -- it leads to generate 2000 irqs/second, but still waits
-for enter.
+Changes in v7:
+                -       Add two new functions: SYSTEM_OFF and SYSTEM_RESET as defined in PSCIv0.2.
+                -       Added a delay before calling cpu_kill to avoid race with cpu_die.
 
-[Aha, and we have just two interrupts listed, but I don't think that
-explains all the problems. Unfortunately, that particular target uses
-human for remote power switch...].
+Changes in v6:
+                -       rebase on top of uapi/linux/psci.h introduced by Anups patch
+http://www.spinics.net/lists/arm-kernel/msg319712.html
+                -       rebase on top of Catalins tree tip.
 
-Any ideas?
+Changes in v5:
+        -       Add uapi/linux/psci.h to kbuild
+        -       ret with err if PSCI_ID_VERSION is not implemented.
 
-Thanks,
-									Pavel
+Changes in v4:
+        -       Correct copyright banner format.
+        -       Check if PSCI Version ID is supported.
+        -       Add all PSCI RET codes in uapi header.
+        -       Explicitely ret 1 from psci_cpu_kill()
+
+Changes in v3:
+        -       Roll up common functionality for getting conduit method.
+        -       Remove #defines for ARM32 and ARM64 in uapi/linux/psci.h
+        -       Remove functions not supported by PSCI v0.1
+        -       Misc cleanups.
+        -       Add PSCI_AFFINITY_INFO return types in uapi header.
+        -       Changed function names for PSCI v0.1 and PSCI v0.2
+        -       Added copyright info to uapi header.
+        -       Fixed args to affinity_info call.
+        -       Fix typo in psci_init definition when PSCI is not defined.
+
+Changes in v2:
+
+        -       Add AFFINITY_INFO and MIGRATE_INFO_TYPE functions.
+        -       Add binding Documentation.
+        -       Add function to get PSCI version.
+        -       Add common #defines in uapi/linux/psci.h
+        -       Implement cpu_kill and check if CPU is dead via AFFINITY_INFO.
+        -       Misc cleanups.
+
+Changes in v1:
+
+        -       Add new binding "arm, psci-0.2"
+        -       Separate conduit and PSCI function assignment methods.
+
+
+
+Ashwin Chaugule (3):
+  PSCI: Add initial support for PSCIv0.2 functions
+  Documentation: devicetree: Add new binding for PSCIv0.2
+  ARM: Check if a CPU has gone offline
+
+ Documentation/devicetree/bindings/arm/psci.txt |  35 ++++-
+ arch/arm/include/asm/psci.h                    |   7 +-
+ arch/arm/kernel/psci.c                         | 196 +++++++++++++++++++-----
+ arch/arm/kernel/psci_smp.c                     |  32 ++++
+ arch/arm64/include/asm/psci.h                  |   2 +-
+ arch/arm64/kernel/psci.c                       | 200 ++++++++++++++++++++-----
+ include/uapi/linux/psci.h                      |   5 +
+ 7 files changed, 399 insertions(+), 78 deletions(-)
+
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+1.8.3.2
