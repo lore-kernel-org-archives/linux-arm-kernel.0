@@ -1,80 +1,68 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:37:56 +0100
-Subject: [PATCH 082/222] net:fec: ensure that we dma unmap the transmit
- descriptors
+Date: Fri, 25 Apr 2014 12:37:50 +0100
+Subject: [PATCH 081/222] net:fec: fix missing kmalloc() failure check in
+ fec_enet_alloc_buffers()
 In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
 References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WdeS4-0007If-2r@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WdeRy-0007Ib-Vr@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On transmit timeout or close, dirty transmit descriptors were not being
-correctly cleaned: the only time that DMA mappings are cleaned is when
-scanning the TX ring after a transmit interrupt.  Fix this.
+fec_enet_alloc_buffers() appears to assume that kmalloc() will never
+fail.  This is an unreasonable assumption.  Add a proper check and
+failure cleanup path.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/net/ethernet/freescale/fec_main.c | 21 +++++++++++++++++----
- 1 file changed, 17 insertions(+), 4 deletions(-)
+ drivers/net/ethernet/freescale/fec_main.c | 15 +++++++++------
+ 1 file changed, 9 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index 7f7d9dcb485e..94861870e741 100644
+index 08a5004970c9..7f7d9dcb485e 100644
 --- a/drivers/net/ethernet/freescale/fec_main.c
 +++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -327,6 +327,17 @@ fec_enet_clear_csum(struct sk_buff *skb, struct net_device *ndev)
- 	return 0;
- }
+@@ -1744,19 +1744,16 @@ static int fec_enet_alloc_buffers(struct net_device *ndev)
+ 		dma_addr_t addr;
  
-+static void
-+fec_enet_tx_unmap(struct bufdesc *bdp, struct fec_enet_private *fep)
-+{
-+	dma_addr_t addr = bdp->cbd_bufaddr;
-+	unsigned length = bdp->cbd_datlen;
-+
-+	bdp->cbd_bufaddr = 0;
-+
-+	dma_unmap_single(&fep->pdev->dev, addr, length, DMA_TO_DEVICE);
-+}
-+
- static netdev_tx_t
- fec_enet_start_xmit(struct sk_buff *skb, struct net_device *ndev)
- {
-@@ -489,11 +500,12 @@ static void fec_enet_bd_init(struct net_device *dev)
+ 		skb = netdev_alloc_skb(ndev, FEC_ENET_RX_FRSIZE);
+-		if (!skb) {
+-			fec_enet_free_buffers(ndev);
+-			return -ENOMEM;
+-		}
++		if (!skb)
++			goto err_alloc;
  
- 		/* Initialize the BD for every fragment in the page. */
- 		bdp->cbd_sc = 0;
-+		if (bdp->cbd_bufaddr)
-+			fec_enet_tx_unmap(bdp, fep);
- 		if (fep->tx_skbuff[i]) {
- 			dev_kfree_skb_any(fep->tx_skbuff[i]);
- 			fep->tx_skbuff[i] = NULL;
+ 		addr = dma_map_single(&fep->pdev->dev, skb->data,
+ 				FEC_ENET_RX_FRSIZE, DMA_FROM_DEVICE);
+ 		if (dma_mapping_error(&fep->pdev->dev, addr)) {
+ 			dev_kfree_skb(skb);
+-			fec_enet_free_buffers(ndev);
+ 			if (net_ratelimit())
+ 				netdev_err(ndev, "Rx DMA memory map failed\n");
+-			return -ENOMEM;
++			goto err_alloc;
  		}
--		bdp->cbd_bufaddr = 0;
- 		bdp = fec_enet_get_nextdesc(bdp, fep);
- 	}
  
-@@ -792,11 +804,10 @@ fec_enet_tx(struct net_device *ndev)
- 		else
- 			index = bdp - fep->tx_bd_base;
- 
-+		fec_enet_tx_unmap(bdp, fep);
-+
- 		skb = fep->tx_skbuff[index];
- 		fep->tx_skbuff[index] = NULL;
--		dma_unmap_single(&fep->pdev->dev, bdp->cbd_bufaddr, skb->len,
--				DMA_TO_DEVICE);
--		bdp->cbd_bufaddr = 0;
- 
- 		/* Check for errors. */
- 		if (status & (BD_ENET_TX_HB | BD_ENET_TX_LC |
-@@ -1723,6 +1734,8 @@ static void fec_enet_free_buffers(struct net_device *ndev)
- 
+ 		fep->rx_skbuff[i] = skb;
+@@ -1778,6 +1775,8 @@ static int fec_enet_alloc_buffers(struct net_device *ndev)
  	bdp = fep->tx_bd_base;
  	for (i = 0; i < fep->tx_ring_size; i++) {
-+		if (bdp->cbd_bufaddr)
-+			fec_enet_tx_unmap(bdp, fep);
- 		kfree(fep->tx_bounce[i]);
- 		fep->tx_bounce[i] = NULL;
- 		skb = fep->tx_skbuff[i];
+ 		fep->tx_bounce[i] = kmalloc(FEC_ENET_TX_FRSIZE, GFP_KERNEL);
++		if (!fep->tx_bounce[i])
++			goto err_alloc;
+ 
+ 		bdp->cbd_sc = 0;
+ 		bdp->cbd_bufaddr = 0;
+@@ -1795,6 +1794,10 @@ static int fec_enet_alloc_buffers(struct net_device *ndev)
+ 	bdp->cbd_sc |= BD_SC_WRAP;
+ 
+ 	return 0;
++
++ err_alloc:
++	fec_enet_free_buffers(ndev);
++	return -ENOMEM;
+ }
+ 
+ static int
 -- 
 1.8.3.1
