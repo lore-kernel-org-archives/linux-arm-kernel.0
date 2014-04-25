@@ -1,62 +1,30 @@
 From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 25 Apr 2014 15:52:54 -0700
-Subject: [PATCH v8 1/3] ARM: EXYNOS: Add support for EXYNOS5410 SoC
-In-Reply-To: <1397459860-21869-2-git-send-email-t.dakhran@samsung.com> (Tarek
- Dakhran's message of "Mon, 14 Apr 2014 11:17:38 +0400")
+Date: Fri, 25 Apr 2014 15:56:55 -0700
+Subject: [PATCH v8 0/3] Exynos 5410 support
+In-Reply-To: <1397459860-21869-1-git-send-email-t.dakhran@samsung.com> (Tarek
+ Dakhran's message of "Mon, 14 Apr 2014 11:17:37 +0400")
 References: <1397459860-21869-1-git-send-email-t.dakhran@samsung.com>
- <1397459860-21869-2-git-send-email-t.dakhran@samsung.com>
-Message-ID: <7hwqedf2d5.fsf@paris.lan>
+Message-ID: <7hppk5f26g.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Tarek Dakhran <t.dakhran@samsung.com> writes:
 
-> EXYNOS5410 is SoC in Samsung's Exynos5 SoC series.
-> Add initial support for this SoC.
+> The series of patches represent support of Exynos 5410 SoC
 >
-> Signed-off-by: Tarek Dakhran <t.dakhran@samsung.com>
-> Signed-off-by: Vyacheslav Tyrtov <v.tyrtov@samsung.com>
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> The Exynos 5410 is the first Samsung SoC based on bigLITTLE architecture
+>
+> Patches add new platform description, support of clock controller and device
+> tree for Exynos 5410.
+>
+> Has been build on Linux Kernel v3.15-rc1
+> Has been tested on: 1) Exynos 5410 reference board (exynos_defconfig)
+> 		    2) Odroid-XU board (exynos_defconfig)
 
-[...]
+Tested-by: Kevin Hilman <khilman@linaro.org>
 
-> diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
-> index 5eead53..83ae5fb 100644
-> --- a/arch/arm/mach-exynos/hotplug.c
-> +++ b/arch/arm/mach-exynos/hotplug.c
-> @@ -95,8 +95,8 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
->  	for (;;) {
->  
->  		/* make cpu1 to be turned off at next WFI command */
-> -		if (cpu == 1)
-> -			__raw_writel(0, S5P_ARM_CORE1_CONFIGURATION);
-> +		if (cpu > 0)
-> +			__raw_writel(0, S5P_ARM_CORE_CONFIGURATION(cpu));
-
-This looks like a fix that's probably not specific to the 5410 and maybe
-deserves it's own patch?
-
-[...]
-
-> @@ -107,14 +111,14 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
->  	 */
->  	write_pen_release(phys_cpu);
->  
-> -	if (!(__raw_readl(S5P_ARM_CORE1_STATUS) & S5P_CORE_LOCAL_PWR_EN)) {
-> +	if (!(__raw_readl(S5P_ARM_CORE_STATUS(cpu)) & S5P_CORE_LOCAL_PWR_EN)) {
->  		__raw_writel(S5P_CORE_LOCAL_PWR_EN,
-> -			     S5P_ARM_CORE1_CONFIGURATION);
-> +			     S5P_ARM_CORE_CONFIGURATION(cpu));
->  
->  		timeout = 10;
->  
->  		/* wait max 10 ms until cpu1 is on */
-> -		while ((__raw_readl(S5P_ARM_CORE1_STATUS)
-> +		while ((__raw_readl(S5P_ARM_CORE_STATUS(cpu))
->  			& S5P_CORE_LOCAL_PWR_EN) != S5P_CORE_LOCAL_PWR_EN) {
->  			if (timeout-- == 0)
->  				break;
-
-...and this hunk too?
+I also boot tested (to initramfs) on my odroid-XU and see the 4 "big"
+cores booted.  Presumably I'm still missing the u-boot/firmware magic
+for the little cores.
 
 Kevin
