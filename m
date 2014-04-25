@@ -1,86 +1,40 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Fri, 25 Apr 2014 09:13:43 -0400
-Subject: [PATCH v3 4/4] drivers: net: Add APM X-Gene SoC ethernet driver
- support.
-In-Reply-To: <1397702368-4846-5-git-send-email-isubramanian@apm.com>
-References: <1397702368-4846-1-git-send-email-isubramanian@apm.com>
- <1397702368-4846-5-git-send-email-isubramanian@apm.com>
-Message-ID: <1398431623.3010.76.camel@deneb.redhat.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 25 Apr 2014 14:15:30 +0100
+Subject: [PATCH 21/38] mmc: sdhci: hack up driver to make it more
+ compliant with UHS-1
+In-Reply-To: <20140425130849.GB15179@pengutronix.de>
+References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
+ <E1Wd2WT-0003vg-Ke@rmk-PC.arm.linux.org.uk>
+ <20140425123820.GA15179@pengutronix.de>
+ <20140425124945.GM26756@n2100.arm.linux.org.uk>
+ <20140425130849.GB15179@pengutronix.de>
+Message-ID: <20140425131529.GN26756@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-04-16 at 19:39 -0700, Iyappan Subramanian wrote:
-> +static int xgene_enet_refill_bufpool(struct xgene_enet_desc_ring *buf_pool,
-> +                                    u32 nbuf)
-> +{
-> +       struct sk_buff *skb;
-> +       struct xgene_enet_desc16 *desc;
-> +       struct net_device *ndev;
-> +       struct device *dev;
-> +       dma_addr_t dma_addr;
-> +       u32 tail = buf_pool->tail;
-> +       u32 slots = buf_pool->slots - 1;
-> +       int i, ret = 0;
-> +       u16 bufdatalen = BUF_LEN_CODE_2K | (SKB_BUFFER_SIZE & GENMASK(11, 0));
-> +
-> +       ndev = buf_pool->ndev;
-> +       dev = ndev_to_dev(buf_pool->ndev);
-> +
-> +       for (i = 0; i < nbuf; i++) {
-> +               desc = &buf_pool->desc16[tail];
-> +
-> +               skb = netdev_alloc_skb_ip_align(ndev, XGENE_ENET_MAX_MTU);
-> +               if (unlikely(!skb)) {
-> +                       netdev_err(ndev, "Could not allocate skb");
-> +                       ret = -ENOMEM;
-> +                       goto out;
-> +               }
-> +               buf_pool->rx_skb[tail] = skb;
-> +
-> +               dma_addr = dma_map_single(dev, skb->data, skb->len,
-> +                                         DMA_TO_DEVICE);
+On Fri, Apr 25, 2014 at 03:08:49PM +0200, Markus Pargmann wrote:
+> I just tried the different parts of the patch. Without the following
+> change, emmc works:
+> 
+> --- a/drivers/mmc/host/sdhci.c
+> +++ b/drivers/mmc/host/sdhci.c
+> @@ -1507,12 +1507,6 @@ static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
+>  			host->ops->set_clock(host, host->clock);
+>  		}
+>  
+> -
+> -		/* Reset SD Clock Enable */
+> -		clk = sdhci_readw(host, SDHCI_CLOCK_CONTROL);
+> -		clk &= ~SDHCI_CLOCK_CARD_EN;
+> -		sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
+> -
 
-Shouldn't this be:
+So the bit which stops us violating the SD spec stops eMMC from working...
+that's... just great.
 
-               dma_addr = dma_map_single(dev, skb->data, XGENE_ENET_MAX_MTU,
-                                         DMA_TO_DEVICE);
+Okay, I'll look deeper at this and see what can be done, but I suspect it
+will turn out to require more patches and be more invasive.
 
-You just allocated the skb and nothing is in it, so ->len is zero.
-
-> +
-> +static int xgene_enet_rx_frame(struct xgene_enet_desc_ring *rx_ring,
-> +                               struct xgene_enet_desc *desc)
-> +{
-> +       struct net_device *ndev = rx_ring->ndev;
-> +       struct device *dev = ndev_to_dev(rx_ring->ndev);
-> +       struct xgene_enet_desc_ring *buf_pool = rx_ring->buf_pool;
-> +       u32 datalen, skb_index;
-> +       struct sk_buff *skb;
-> +       dma_addr_t pa;
-> +       size_t len;
-> +       int ret = 0;
-> +
-> +       skb_index = get_desc(desc, USERINFO);
-> +       skb = buf_pool->rx_skb[skb_index];
-> +       prefetch(skb->data - NET_IP_ALIGN);
-> +
-> +       /* Strip off CRC as HW isn't doing this */
-> +       datalen = get_desc(desc, BUFDATALEN);
-> +       datalen -= 4;
-> +       skb_put(skb, datalen);
-> +
-> +       pa = (dma_addr_t)get_desc(desc, DATAADDR);
-> +       len = get_desc(desc, BUFDATALEN);
-> +       dma_unmap_single(dev, pa, len, DMA_TO_DEVICE);
-> +
-
-And here, should be:
-
-	dma_unmap_single(dev, pa, XGENE_ENET_MAX_MTU, DMA_TO_DEVICE);
-
-You want to unmap the whole buffer, not just the part actually used.
-
-The underlying code works with pages, so the existing code may work by
-chance, but you get err_printks is you turn on dma debug.
-
---Mark
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
