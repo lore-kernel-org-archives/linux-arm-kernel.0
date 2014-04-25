@@ -1,56 +1,61 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Fri, 25 Apr 2014 15:24:06 -0500
-Subject: can problems on socfpga [was Re: [PATCH v2 4/6] ARM: socfpga:
- dts: add can0+1]
-In-Reply-To: <20140425195319.GA3677@amd.pavel.ucw.cz>
-References: <1396422700-3962-1-git-send-email-s.trumtrar@pengutronix.de>
- <1396422700-3962-4-git-send-email-s.trumtrar@pengutronix.de>
- <20140404102815.GA9242@amd.pavel.ucw.cz>
- <20140425195319.GA3677@amd.pavel.ucw.cz>
-Message-ID: <1398457446.26387.0.camel@linux-builds1>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 25 Apr 2014 13:30:48 -0700
+Subject: [GIT PULL] somewhat urgent omap fixes against v3.15-rc1, fixes gpmc
+Message-ID: <20140425203047.GG20807@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-04-25 at 21:53 +0200, ZY - pavel wrote:
-> Hi!
-> 
-> > > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> > 
-> > I have had similar patch here, except that it only listed 2 interrupts
-> > for each d_can controller.
-> > 
-> > Otherwise it looks identical.
-> > 
-> > Reviewed-by: Pavel Machek <pavel@denx.de>
-> 
-> Actually, does it work for you? Here it produces warnings during boot
-> 
-> c_can_platform ffc00000.d_can: invalid resource
-> c_can_platform ffc00000.d_can: control memory is not used for raminit
-> c_can_platform ffc00000.d_can: c_can_platform device registered
-> (regs=9085c000, irq=163)
-> ...
-> can: controller area network core (rev 20120528 abi 9)
-> NET: Registered protocol family 29
-> can: raw protocol (rev 20120528)
-> can: broadcast manager protocol (rev 20120528 t)
-> can: netlink gateway (rev 20130117) max_hops=1
-> 
-> . Then can0 is correctly registered, and seems to even receive
-> packets, but only when enter is pressed on serial console... which is
-> kind of weird. I suspected irq problems, but same symptomps with
-> "irqpoll" -- it leads to generate 2000 irqs/second, but still waits
-> for enter.
-> 
-> [Aha, and we have just two interrupts listed, but I don't think that
-> explains all the problems. Unfortunately, that particular target uses
-> human for remote power switch...].
-> 
-> Any ideas?
+The following changes since commit fb677ef70b65e22cd4401d31b700a8b4041efae1:
 
-CC'ing Thor Thayer. He's done the CAN testing on the SOCFPGA platform.
+  ARM: OMAP2+: Fix GPMC remap for devices using an offset (2014-04-23 11:09:22 -0700)
 
-Dinh
-> 
-> Thanks,
-> 									Pavel
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.15/fixes-gpmc
+
+for you to fetch changes up to 4c05160342f16361fc37ae34dcae9210306a83e9:
+
+  ARM: dts: AM3517: Disable absent IPs inherited from OMAP3 (2014-04-25 09:55:00 -0700)
+
+----------------------------------------------------------------
+Mostly fixes for occasional memory corruption caused by bad
+timings for smc911x LAN9220 (and potentially LAN9221) devices
+that were noted on a cm-t3730 system. Also fix THUMB mode
+for SMP, and mailbox related warnings when booted with device
+tree.
+
+----------------------------------------------------------------
+Dave Gerlach (1):
+      ARM: dts: am437x-gp-evm: Do not reset gpio5
+
+Javier Martinez Canillas (1):
+      ARM: dts: omap3-igep0020: use SMSC9221 timings
+
+Joel Fernandes (1):
+      ARM: OMAP5: Switch to THUMB mode if needed on secondary CPU
+
+Suman Anna (3):
+      ARM: dts: OMAP5: Add mailbox dt node to fix boot warning
+      ARM: dts: OMAP2: Fix interrupts for OMAP2420 mailbox
+      ARM: dts: AM3517: Disable absent IPs inherited from OMAP3
+
+Tony Lindgren (3):
+      ARM: dts: Fix bad OTG muxing for cm-t boards
+      ARM: dts: Fix GPMC Ethernet timings for omap cm-t sbc-t boards for device tree
+      ARM: dts: Fix GPMC timings for LAN9220
+
+ arch/arm/boot/dts/am3517.dtsi             | 16 ++++++++
+ arch/arm/boot/dts/am437x-gp-evm.dts       |  5 +++
+ arch/arm/boot/dts/omap-gpmc-smsc911x.dtsi | 19 ++++-----
+ arch/arm/boot/dts/omap2.dtsi              |  7 ----
+ arch/arm/boot/dts/omap2420.dtsi           |  8 ++++
+ arch/arm/boot/dts/omap2430.dtsi           |  7 ++++
+ arch/arm/boot/dts/omap3-cm-t3x30.dtsi     | 66 +++++++------------------------
+ arch/arm/boot/dts/omap3-igep.dtsi         |  2 +-
+ arch/arm/boot/dts/omap3-igep0020.dts      |  4 +-
+ arch/arm/boot/dts/omap3-sb-t35.dtsi       | 37 +++++------------
+ arch/arm/boot/dts/omap3-sbc-t3517.dts     | 13 ++++++
+ arch/arm/boot/dts/omap3.dtsi              |  2 +-
+ arch/arm/boot/dts/omap5.dtsi              |  7 ++++
+ arch/arm/mach-omap2/omap-headsmp.S        |  8 +++-
+ 14 files changed, 99 insertions(+), 102 deletions(-)
