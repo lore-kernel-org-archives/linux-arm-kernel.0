@@ -1,51 +1,96 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 25 Apr 2014 16:00:36 -0500
-Subject: [PATCH] power: twl4030_charger: clear IRQs after handling them
-In-Reply-To: <535ACC62.102@ti.com>
-References: <1397661299-31342-1-git-send-email-balbi@ti.com>
- <20140416163526.GA3049@atomide.com> <535ACC62.102@ti.com>
-Message-ID: <20140425210036.GO29632@saruman.home>
+From: isubramanian@apm.com (Iyappan Subramanian)
+Date: Fri, 25 Apr 2014 14:04:41 -0700
+Subject: [PATCH v3 4/4] drivers: net: Add APM X-Gene SoC ethernet driver
+ support.
+In-Reply-To: <1398431623.3010.76.camel@deneb.redhat.com>
+References: <1397702368-4846-1-git-send-email-isubramanian@apm.com>
+ <1397702368-4846-5-git-send-email-isubramanian@apm.com>
+ <1398431623.3010.76.camel@deneb.redhat.com>
+Message-ID: <CAKh23Fn2LvhNt_ZMQcDwu3W5Gw_ZJ1NUAcjDexDCKtkR1Ww-YQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 25, 2014 at 03:58:10PM -0500, Nishanth Menon wrote:
-> On 04/16/2014 11:35 AM, Tony Lindgren wrote:
-> > * Felipe Balbi <balbi@ti.com> [140416 08:18]:
-> >> TRM says we *must* write 1 to each bit we're handling
-> >> in order to clear the IRQ status and bring IRQ line
-> >> low. This patch implements that.
-> >>
-> >> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> >> ---
-> >>
-> >> Russell, I don't have HW to test, but this should
-> >> solve the problem you saw when not using battery
-> >> with Zoom board. Let me know if it doesn't.
-> > 
-> > BTW, looks like we're enabling BCI automatically in twl4030.dtsi
-> > while the legacy booting does not have TWL_COMMON_PDATA_BCI
-> > enabled for LDP. Anyways, for LDP BCI should be enabled for
-> > sure, that's the only way to power at least the earlier LDP
-> > revisions.
-> > 
-> I picked up https://patchwork.kernel.org/patch/4002371/ for testing.
-> 
-> Unfortunately, it does not seem to work in my tests:
+On Fri, Apr 25, 2014 at 6:13 AM, Mark Salter <msalter@redhat.com> wrote:
+> On Wed, 2014-04-16 at 19:39 -0700, Iyappan Subramanian wrote:
+>> +static int xgene_enet_refill_bufpool(struct xgene_enet_desc_ring *buf_pool,
+>> +                                    u32 nbuf)
+>> +{
+>> +       struct sk_buff *skb;
+>> +       struct xgene_enet_desc16 *desc;
+>> +       struct net_device *ndev;
+>> +       struct device *dev;
+>> +       dma_addr_t dma_addr;
+>> +       u32 tail = buf_pool->tail;
+>> +       u32 slots = buf_pool->slots - 1;
+>> +       int i, ret = 0;
+>> +       u16 bufdatalen = BUF_LEN_CODE_2K | (SKB_BUFFER_SIZE & GENMASK(11, 0));
+>> +
+>> +       ndev = buf_pool->ndev;
+>> +       dev = ndev_to_dev(buf_pool->ndev);
+>> +
+>> +       for (i = 0; i < nbuf; i++) {
+>> +               desc = &buf_pool->desc16[tail];
+>> +
+>> +               skb = netdev_alloc_skb_ip_align(ndev, XGENE_ENET_MAX_MTU);
+>> +               if (unlikely(!skb)) {
+>> +                       netdev_err(ndev, "Could not allocate skb");
+>> +                       ret = -ENOMEM;
+>> +                       goto out;
+>> +               }
+>> +               buf_pool->rx_skb[tail] = skb;
+>> +
+>> +               dma_addr = dma_map_single(dev, skb->data, skb->len,
+>> +                                         DMA_TO_DEVICE);
+>
+> Shouldn't this be:
+>
+>                dma_addr = dma_map_single(dev, skb->data, XGENE_ENET_MAX_MTU,
+>                                          DMA_TO_DEVICE);
+>
+> You just allocated the skb and nothing is in it, so ->len is zero.
 
-alright, I'll have a look after I get this other issue out of the way.
-Probably not until next week.
+Thanks Mark.  I will fix the code.
 
-> This patch should probably also acknowledge that Russell reported this
-> issue.
+>
+>> +
+>> +static int xgene_enet_rx_frame(struct xgene_enet_desc_ring *rx_ring,
+>> +                               struct xgene_enet_desc *desc)
+>> +{
+>> +       struct net_device *ndev = rx_ring->ndev;
+>> +       struct device *dev = ndev_to_dev(rx_ring->ndev);
+>> +       struct xgene_enet_desc_ring *buf_pool = rx_ring->buf_pool;
+>> +       u32 datalen, skb_index;
+>> +       struct sk_buff *skb;
+>> +       dma_addr_t pa;
+>> +       size_t len;
+>> +       int ret = 0;
+>> +
+>> +       skb_index = get_desc(desc, USERINFO);
+>> +       skb = buf_pool->rx_skb[skb_index];
+>> +       prefetch(skb->data - NET_IP_ALIGN);
+>> +
+>> +       /* Strip off CRC as HW isn't doing this */
+>> +       datalen = get_desc(desc, BUFDATALEN);
+>> +       datalen -= 4;
+>> +       skb_put(skb, datalen);
+>> +
+>> +       pa = (dma_addr_t)get_desc(desc, DATAADDR);
+>> +       len = get_desc(desc, BUFDATALEN);
+>> +       dma_unmap_single(dev, pa, len, DMA_TO_DEVICE);
+>> +
+>
+> And here, should be:
+>
+>         dma_unmap_single(dev, pa, XGENE_ENET_MAX_MTU, DMA_TO_DEVICE);
+>
+> You want to unmap the whole buffer, not just the part actually used.
+>
+> The underlying code works with pages, so the existing code may work by
+> chance, but you get err_printks is you turn on dma debug.
 
-sure I can add that, although it doesn't solve anything as it is ...
+I will fix the code.  DMA_API_DEBUG option is very handy.  Thanks.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140425/57d54cb0/attachment.sig>
+>
+> --Mark
+>
+>
