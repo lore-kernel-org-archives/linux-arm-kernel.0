@@ -1,28 +1,27 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 25 Apr 2014 09:30:33 -0700
-Subject: [PATCH 1/1] ARM: dts: omap3-igep0020: use SMSC9221 timings
-In-Reply-To: <1398358430-13570-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1398358430-13570-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <20140425163033.GC20807@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 25 Apr 2014 10:39:37 -0600
+Subject: [PATCH 1/5] ARM: defconfigs: add MTD_SPI_NOR (new dependency
+ for M25P80)
+In-Reply-To: <1397719309-2022-2-git-send-email-computersforpeace@gmail.com>
+References: <1397719309-2022-1-git-send-email-computersforpeace@gmail.com>
+ <1397719309-2022-2-git-send-email-computersforpeace@gmail.com>
+Message-ID: <535A8FC9.8040707@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Javier Martinez Canillas <javier.martinez@collabora.co.uk> [140424 09:54]:
-> The IGEPv2 board has a SMSC LAN9221i ethernet chip and not a
-> SMSC LAN911x connected to the GPMC. Each chip needs different
-> timings in order to operate correctly so is wrong to include
-> omap-gpmc-smsc911x.dtsi instead of omap-gpmc-smsc9221.dtsi.
+On 04/17/2014 01:21 AM, Brian Norris wrote:
+> These defconfigs contain the CONFIG_M25P80 symbol, which is now
+> dependent on the MTD_SPI_NOR symbol. Add CONFIG_MTD_SPI_NOR to the
+> relevant defconfigs.
 > 
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> ---
-> 
-> Hi Tony,
-> 
-> I see no performance difference when measuring network throughput using
-> iperf(1) but this change is the correct one nonetheless since if we later
-> better adjust the timings it will already include the right dtsi.
+> At the same time, drop the now-nonexistent CONFIG_MTD_CHAR symbol.
 
-Yes, let's fix this as wrong timings can cause memory corruption.
-Applying into omap-for-v3.15/fixes-v2.
+I hadn't realized that the problem this patch solves was already present
+in the code, so this patch is simply catching up the defconfigs rather
+than part of a series which changed the code to cause the problem.
 
-Tony
+So, this needs to be applied ASAP.
+
+I think this should be split it up so that each defconfig can go through
+the tree that owns it to avoid conflicts. If you repost split up, I can
+apply the tegra_defconfig change to the Tegra tree.
