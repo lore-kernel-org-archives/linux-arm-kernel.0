@@ -1,56 +1,39 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 25 Apr 2014 14:18:08 +0300
-Subject: [PATCH 06/23] ARM: OMAP: add OMAP5 DSI muxing
-In-Reply-To: <535A42D6.5090107@ti.com>
-References: <1398334639-14172-1-git-send-email-tomi.valkeinen@ti.com>
- <1398334639-14172-7-git-send-email-tomi.valkeinen@ti.com>
- <535A42D6.5090107@ti.com>
-Message-ID: <535A4470.2000509@ti.com>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Fri, 25 Apr 2014 16:48:01 +0530
+Subject: [PATCH 0/2] usb: ehci/ohci-exynos: Move to generic phy framework
+Message-ID: <1398424683-20168-1-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/04/14 14:11, Archit Taneja wrote:
-> Hi,
-> 
-> On Thursday 24 April 2014 03:47 PM, Tomi Valkeinen wrote:
->> Add support to set OMAP5 DSI pin muxing.
->>
->> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
->> Cc: Tony Lindgren <tony@atomide.com>
->> ---
->>   arch/arm/mach-omap2/display.c | 35 ++++++++++++++++++++++++++++++++++-
->>   1 file changed, 34 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/mach-omap2/display.c
->> b/arch/arm/mach-omap2/display.c
->> index 16d33d831287..974461441fc3 100644
->> --- a/arch/arm/mach-omap2/display.c
->> +++ b/arch/arm/mach-omap2/display.c
->> @@ -137,11 +137,42 @@ static int omap4_dsi_mux_pads(int dsi_id,
->> unsigned lanes)
->>       return 0;
->>   }
->>
->> +#define CONTROL_PAD_BASE    0x4A002800
->> +#define CONTROL_DSIPHY        0x614
->> +
-> 
-> I guess this is something we can move to our driver, and use sysconf to
-> get the register from DT.
+Added required support for getting phy-provider from generic phy framework
 
-I just copied the same method as used for OMAP4.
+Based and tested on 'usb-next' branch of Greg's usb tree, with relevant
+device tree patches (which i will sending soon).
 
-I guess sysconf is an option. But I really dislike the idea of moving
-omap control module code to a display driver... I'm not sure what other
-options we have, though. Maybe an OMAP DSI specific pinctrl driver?
+Patch:
+usb: ehci-exynos: Change to use phy provided by the generic phy framework
+is the patch from Kamil's usb phy patch-series:
+[PATCH v6 8/8] usb: ehci-exynos: Change to use phy provided by the generic phy framework
+This is reworked for addressing review comments received in mailing list.
 
- Tomi
+Patch:
+usb: ohci-exynos: Add facility to use phy provided by the generic phy framework
+is also reworked for addressing review comments.
 
+Corresponding changelog for patches mentioned in each patch.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140425/ef09216a/attachment.sig>
+Kamil Debski (1):
+  usb: ehci-exynos: Change to use phy provided by the generic phy
+    framework
+
+Vivek Gautam (1):
+  usb: ohci-exynos: Add facility to use phy provided by the generic phy
+    framework
+
+ .../devicetree/bindings/usb/exynos-usb.txt         |   37 ++++++
+ drivers/usb/host/ehci-exynos.c                     |  123 ++++++++++++++++++--
+ drivers/usb/host/ohci-exynos.c                     |  123 ++++++++++++++++++--
+ 3 files changed, 263 insertions(+), 20 deletions(-)
+
+-- 
+1.7.10.4
