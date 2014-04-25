@@ -1,44 +1,53 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 25 Apr 2014 12:50:30 -0700
-Subject: [PATCH 000/222] The *Full* Cubox-i series
-In-Reply-To: <20140425141550.GQ26756@n2100.arm.linux.org.uk> (Russell King's
- message of "Fri, 25 Apr 2014 15:15:50 +0100")
-References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
- <20140425135048.GA7388@ulmo>
- <20140425141550.GQ26756@n2100.arm.linux.org.uk>
-Message-ID: <7hwqedjiih.fsf@paris.lan>
+From: pavel@denx.de (Pavel Machek)
+Date: Fri, 25 Apr 2014 21:53:19 +0200
+Subject: can problems on socfpga [was Re: [PATCH v2 4/6] ARM: socfpga: dts:
+ add can0+1]
+In-Reply-To: <20140404102815.GA9242@amd.pavel.ucw.cz>
+References: <1396422700-3962-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1396422700-3962-4-git-send-email-s.trumtrar@pengutronix.de>
+ <20140404102815.GA9242@amd.pavel.ucw.cz>
+Message-ID: <20140425195319.GA3677@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+Hi!
 
-> On Fri, Apr 25, 2014 at 03:50:49PM +0200, Thierry Reding wrote:
->> On Fri, Apr 25, 2014 at 12:29:51PM +0100, Russell King - ARM Linux wrote:
->> > So that people can see what kind of a patch nightmare I'm in, and
->> > hopefully start being more co-operative towards getting patches into
->> > mainline, here is the *full* patch set for CuBox-i support that I'm
->> > presently sitting on.
->> > 
->> > Anything that can be done to make this easier would be very helpful,
->> > so I'm not spending lots of time tweaking some random patch and then
->> > having to remerge all these different sub-series.
->> 
->> Do you happen to have a branch that I can pull to test this on Tegra? Is
->> there anything that I should be paying special attention to when
->> testing?
->
-> One of the issues I'm _most_ concerned about is the L2C code.  I only
-> have a very limited number of platforms I can test that stuff out on.
->
-> The L2C code that I've now dumped into linux-next is there in an attempt
-> to get more testing coverage, and it has resulted in that - Kevin's
-> boot test revealed that it breaks on a Broadcom platform.  I'm hoping
-> Kevin will investigate further as per my emails, but I've no idea at the
-> moment whether that's going to happen or not.  
+> > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> 
+> I have had similar patch here, except that it only listed 2 interrupts
+> for each d_can controller.
+> 
+> Otherwise it looks identical.
+> 
+> Reviewed-by: Pavel Machek <pavel@denx.de>
 
-Yes, it is happening.  Actually Matt Porter (co-maintainer of BCM SoC
-support) has reproduced it and is looking into it since he has access to
-HW details/docs that I do not.  However, both of us will be at ELC next
-week, so there might not be much progress immediately.
+Actually, does it work for you? Here it produces warnings during boot
 
-Kevin
+c_can_platform ffc00000.d_can: invalid resource
+c_can_platform ffc00000.d_can: control memory is not used for raminit
+c_can_platform ffc00000.d_can: c_can_platform device registered
+(regs=9085c000, irq=163)
+...
+can: controller area network core (rev 20120528 abi 9)
+NET: Registered protocol family 29
+can: raw protocol (rev 20120528)
+can: broadcast manager protocol (rev 20120528 t)
+can: netlink gateway (rev 20130117) max_hops=1
+
+. Then can0 is correctly registered, and seems to even receive
+packets, but only when enter is pressed on serial console... which is
+kind of weird. I suspected irq problems, but same symptomps with
+"irqpoll" -- it leads to generate 2000 irqs/second, but still waits
+for enter.
+
+[Aha, and we have just two interrupts listed, but I don't think that
+explains all the problems. Unfortunately, that particular target uses
+human for remote power switch...].
+
+Any ideas?
+
+Thanks,
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
