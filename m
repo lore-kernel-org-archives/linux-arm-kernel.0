@@ -1,70 +1,71 @@
 From: joelf@ti.com (Joel Fernandes)
-Date: Fri, 25 Apr 2014 18:02:39 -0500
-Subject: [PATCH 01/10] ARM: OMAP: hwmod: Add SYSC offsets for AES IP
+Date: Fri, 25 Apr 2014 18:02:44 -0500
+Subject: [PATCH 06/10] ARM: OMAP4: hwmod: add hwmod data for DES IP
 In-Reply-To: <1398466968-29506-1-git-send-email-joelf@ti.com>
 References: <1398466968-29506-1-git-send-email-joelf@ti.com>
-Message-ID: <1398466968-29506-2-git-send-email-joelf@ti.com>
+Message-ID: <1398466968-29506-7-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AES IP has the SIDLE offset by 2 and not 3, to allow SIDLE modes
-to work for AES, we add a new SYSC type to HWMOD code.
+OMAP4 has a DES IP for DES and 3DES encryption, Add hwmod data for the same.
 
 Signed-off-by: Joel Fernandes <joelf@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.h             |   11 +++++++++++
- arch/arm/mach-omap2/omap_hwmod_common_data.c |   10 ++++++++++
- 2 files changed, 21 insertions(+)
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   35 ++++++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.h b/arch/arm/mach-omap2/omap_hwmod.h
-index 0f97d63..b2efcc8 100644
---- a/arch/arm/mach-omap2/omap_hwmod.h
-+++ b/arch/arm/mach-omap2/omap_hwmod.h
-@@ -41,6 +41,7 @@ struct omap_device;
- extern struct omap_hwmod_sysc_fields omap_hwmod_sysc_type1;
- extern struct omap_hwmod_sysc_fields omap_hwmod_sysc_type2;
- extern struct omap_hwmod_sysc_fields omap_hwmod_sysc_type3;
-+extern struct omap_hwmod_sysc_fields omap_hwmod_sysc_type4;
- 
- /*
-  * OCP SYSCONFIG bit shifts/masks TYPE1. These are for IPs compliant
-@@ -81,6 +82,16 @@ extern struct omap_hwmod_sysc_fields omap_hwmod_sysc_type3;
- #define SYSC_TYPE3_MIDLEMODE_SHIFT	2
- #define SYSC_TYPE3_MIDLEMODE_MASK	(0x3 << SYSC_TYPE3_MIDLEMODE_SHIFT)
- 
-+/*
-+ * OCP SYSCONFIG bit shifts/masks TYPE4.
-+ */
-+#define SYSC_TYPE4_SIDLEMODE_SHIFT	2
-+#define SYSC_TYPE4_SIDLEMODE_MASK	(0x3 << SYSC_TYPE4_SIDLEMODE_SHIFT)
-+#define SYSC_TYPE4_SOFTRESET_SHIFT	1
-+#define SYSC_TYPE4_SOFTRESET_MASK	(1 << SYSC_TYPE4_SOFTRESET_SHIFT)
-+#define SYSC_TYPE4_AUTOIDLE_SHIFT	0
-+#define SYSC_TYPE4_AUTOIDLE_MASK	(1 << SYSC_TYPE4_AUTOIDLE_SHIFT)
-+
- /* OCP SYSSTATUS bit shifts/masks */
- #define SYSS_RESETDONE_SHIFT		0
- #define SYSS_RESETDONE_MASK		(1 << SYSS_RESETDONE_SHIFT)
-diff --git a/arch/arm/mach-omap2/omap_hwmod_common_data.c b/arch/arm/mach-omap2/omap_hwmod_common_data.c
-index 79d623b..7443dc0 100644
---- a/arch/arm/mach-omap2/omap_hwmod_common_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_common_data.c
-@@ -59,6 +59,16 @@ struct omap_hwmod_sysc_fields omap_hwmod_sysc_type3 = {
- 	.sidle_shift	= SYSC_TYPE3_SIDLEMODE_SHIFT,
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index 3b12244..8bf6083 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -4824,6 +4824,40 @@ static struct omap_hwmod_ocp_if omap4_l3_main_2__aes1 = {
+ 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
  };
  
-+/**
-+ * struct omap_hwmod_sysc_type4 - TYPE4 sysconfig scheme.
-+ * Used by some IPs on AM33xx
-+ */
-+struct omap_hwmod_sysc_fields omap_hwmod_sysc_type4 = {
-+	.sidle_shift	= SYSC_TYPE4_SIDLEMODE_SHIFT,
-+	.srst_shift	= SYSC_TYPE4_SOFTRESET_SHIFT,
-+	.autoidle_shift	= SYSC_TYPE4_AUTOIDLE_SHIFT,
++/* DES3DES */
++static struct omap_hwmod_class_sysconfig omap4_des_sysc = {
++	.rev_offs	= 0x30,
++	.sysc_offs	= 0x34,
++	.syss_offs	= 0x38,
++	.sysc_flags	= SYSS_HAS_RESET_STATUS,
++	.sysc_fields	= &omap_hwmod_sysc_type4,
 +};
 +
- struct omap_dss_dispc_dev_attr omap2_3_dss_dispc_dev_attr = {
- 	.manager_count		= 2,
- 	.has_framedonetv_irq	= 0
++static struct omap_hwmod_class omap4_des_hwmod_class = {
++	.name		= "des",
++	.sysc		= &omap4_des_sysc,
++};
++
++static struct omap_hwmod omap4_des_hwmod = {
++	.name		= "des",
++	.class		= &omap4_des_hwmod_class,
++	.clkdm_name	= "l4_secure_clkdm",
++	.prcm = {
++		.omap4 = {
++			.clkctrl_offs = OMAP4_CM_L4SEC_DES3DES_CLKCTRL_OFFSET,
++			.context_offs = OMAP4_RM_L4SEC_DES3DES_CONTEXT_OFFSET,
++			.modulemode   = MODULEMODE_SWCTRL,
++		},
++	},
++};
++
++static struct omap_hwmod_ocp_if omap4_l4_per__des = {
++	.master		= &omap44xx_l4_per_hwmod,
++	.slave		= &omap4_des_hwmod,
++	.clk		= "des_fck",
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
+ static struct omap_hwmod_ocp_if *omap44xx_hwmod_ocp_ifs[] __initdata = {
+ 	&omap44xx_l3_main_1__dmm,
+ 	&omap44xx_mpu__dmm,
+@@ -4979,6 +5013,7 @@ static struct omap_hwmod_ocp_if *omap44xx_hwmod_ocp_ifs[] __initdata = {
+ 	&omap44xx_mpu__emif1,
+ 	&omap44xx_mpu__emif2,
+ 	&omap4_l3_main_2__aes1,
++	&omap4_l4_per__des,
+ 	NULL,
+ };
+ 
 -- 
 1.7.9.5
