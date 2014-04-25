@@ -1,113 +1,273 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:42:05 +0100
-Subject: [PATCH 125/222] net:fec: even larger rings
+Date: Fri, 25 Apr 2014 12:42:11 +0100
+Subject: [PATCH 126/222] net:fec: unsorted hacks
 In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
 References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WdeW5-0007LZ-UM@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WdeWB-0007Ld-3b@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/net/ethernet/freescale/fec.h      |  4 +--
- drivers/net/ethernet/freescale/fec_main.c | 45 ++++++++++++++++---------------
- 2 files changed, 26 insertions(+), 23 deletions(-)
+ drivers/net/ethernet/freescale/fec.h      |  16 +++-
+ drivers/net/ethernet/freescale/fec_main.c | 126 +++++++++++++++++-------------
+ 2 files changed, 85 insertions(+), 57 deletions(-)
 
 diff --git a/drivers/net/ethernet/freescale/fec.h b/drivers/net/ethernet/freescale/fec.h
-index aaf5aaaf9e56..bfcab01131cc 100644
+index bfcab01131cc..09bdf6fea8ea 100644
 --- a/drivers/net/ethernet/freescale/fec.h
 +++ b/drivers/net/ethernet/freescale/fec.h
-@@ -246,13 +246,13 @@ union bufdesc_u {
-  * the skbuffer directly.
-  */
+@@ -208,6 +208,7 @@ union bufdesc_u {
+ #define BD_ENET_RX_OV           ((ushort)0x0002)
+ #define BD_ENET_RX_CL           ((ushort)0x0001)
+ #define BD_ENET_RX_STATS        ((ushort)0x013f)        /* All status bits */
++#define BD_ENET_RX_ERROR	((ushort)0x003f)
  
--#define FEC_ENET_RX_PAGES	32
-+#define FEC_ENET_RX_PAGES	64
- #define FEC_ENET_RX_FRSIZE	2048
- #define FEC_ENET_RX_FRPPG	(PAGE_SIZE / FEC_ENET_RX_FRSIZE)
- #define RX_RING_SIZE		(FEC_ENET_RX_FRPPG * FEC_ENET_RX_PAGES)
- #define FEC_ENET_TX_FRSIZE	2048
- #define FEC_ENET_TX_FRPPG	(PAGE_SIZE / FEC_ENET_TX_FRSIZE)
--#define TX_RING_SIZE		64	/* Must be power of two */
-+#define TX_RING_SIZE		128	/* Must be power of two */
+ /* Enhanced buffer descriptor control/status used by Ethernet receive */
+ #define BD_ENET_RX_VLAN         0x00000004
+@@ -230,10 +231,17 @@ union bufdesc_u {
+ #define BD_ENET_TX_STATS        ((ushort)0x03ff)        /* All status bits */
  
- #define BD_ENET_RX_INT          0x00800000
- #define BD_ENET_RX_PTP          ((ushort)0x0400)
+ /*enhanced buffer descriptor control/status used by Ethernet transmit*/
+-#define BD_ENET_TX_INT          0x40000000
+-#define BD_ENET_TX_TS           0x20000000
+-#define BD_ENET_TX_PINS         0x10000000
+-#define BD_ENET_TX_IINS         0x08000000
++#define BD_ENET_TX_INT          BIT(30)
++#define BD_ENET_TX_TS           BIT(29)
++#define BD_ENET_TX_PINS         BIT(28)
++#define BD_ENET_TX_IINS         BIT(27)
++#define BD_ENET_TX_TXE		BIT(15)
++#define BD_ENET_TX_UE		BIT(13)
++#define BD_ENET_TX_EE		BIT(12)
++#define BD_ENET_TX_FE		BIT(11)
++#define BD_ENET_TX_LCE		BIT(10)
++#define BD_ENET_TX_OE		BIT(9)
++#define BD_ENET_TX_TSE		BIT(8)
+ 
+ 
+ /* This device has up to three irqs on some platforms */
 diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index 12d48b997744..441e472f7779 100644
+index 441e472f7779..7330bc5c64e0 100644
 --- a/drivers/net/ethernet/freescale/fec_main.c
 +++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -166,8 +166,11 @@ MODULE_PARM_DESC(macaddr, "FEC Ethernet MAC address");
- #endif
- #endif /* CONFIG_M5272 */
+@@ -85,16 +85,6 @@ static void set_multicast_list(struct net_device *ndev);
+ #define FEC_QUIRK_HAS_CSUM		(1 << 5)
+ /* Controller has hardware vlan support */
+ #define FEC_QUIRK_HAS_VLAN		(1 << 6)
+-/* ENET IP errata ERR006358
+- *
+- * If the ready bit in the transmit buffer descriptor (TxBD[R]) is previously
+- * detected as not set during a prior frame transmission, then the
+- * ENET_TDAR[TDAR] bit is cleared@a later time, even if additional TxBDs
+- * were added to the ring and the ENET_TDAR[TDAR] bit is set. This results in
+- * frames not being transmitted until there is a 0-to-1 transition on
+- * ENET_TDAR[TDAR].
+- */
+-#define FEC_QUIRK_ERR006358            (1 << 7)
  
--#if (((RX_RING_SIZE + TX_RING_SIZE) * 32) > PAGE_SIZE)
--#error "FEC: descriptor ring size constants too large"
-+#if RX_RING_SIZE * 32 > PAGE_SIZE
-+#error "FEC: receive descriptor ring size too large"
-+#endif
-+#if TX_RING_SIZE * 32 > PAGE_SIZE
-+#error "FEC: transmit descriptor ring size too large"
- #endif
+ static struct platform_device_id fec_devtype[] = {
+ 	{
+@@ -114,7 +104,7 @@ static struct platform_device_id fec_devtype[] = {
+ 		.name = "imx6q-fec",
+ 		.driver_data = FEC_QUIRK_ENET_MAC | FEC_QUIRK_HAS_GBIT |
+ 				FEC_QUIRK_HAS_BUFDESC_EX | FEC_QUIRK_HAS_CSUM |
+-				FEC_QUIRK_HAS_VLAN | FEC_QUIRK_ERR006358,
++				FEC_QUIRK_HAS_VLAN,
+ 	}, {
+ 		.name = "mvf600-fec",
+ 		.driver_data = FEC_QUIRK_ENET_MAC,
+@@ -293,13 +283,16 @@ static void fec_dump(struct net_device *ndev)
+ 	for (index = 0; index < fep->tx_ring_size; index++) {
+ 		bdp = fec_enet_tx_get(index, fep);
  
- /* Minimum TX ring size when using NETIF_F_SG */
-@@ -828,7 +831,7 @@ fec_enet_hwtstamp(struct fec_enet_private *fep, unsigned ts,
- 	hwtstamps->hwtstamp = ns_to_ktime(ns);
+-		pr_info("%3u %c%c 0x%04x 0x%08lx %4u %p\n",
++		pr_info("%3u %c%c 0x%04x 0x%08lx %4u %p",
+ 			index,
+ 			index == fep->tx_next ? 'S' : ' ',
+ 			index == fep->tx_dirty ? 'H' : ' ',
+ 			bdp->bd.cbd_sc, bdp->bd.cbd_bufaddr,
+ 			bdp->bd.cbd_datlen,
+ 			fep->tx_skbuff[index]);
++		if (fep->flags & FEC_FLAG_BUFDESC_EX)
++			pr_cont(" %08lx", bdp->ebd.cbd_esc);
++		pr_cont("\n");
+ 	}
  }
  
--static void
-+static void noinline
- fec_enet_tx(struct net_device *ndev)
+@@ -836,13 +829,14 @@ fec_enet_tx(struct net_device *ndev)
  {
  	struct fec_enet_private *fep = netdev_priv(ndev);
-@@ -1953,30 +1956,30 @@ static int fec_enet_alloc_buffers(struct net_device *ndev)
- 	unsigned int i;
- 	struct sk_buff *skb;
  	union bufdesc_u *bdp;
--	union bufdesc_u *cbd_base;
--	dma_addr_t cbd_dma;
-+	union bufdesc_u *rx_cbd_cpu, *tx_cbd_cpu;
-+	dma_addr_t rx_cbd_dma, tx_cbd_dma;
+-	unsigned short status;
+ 	struct	sk_buff	*skb;
+ 	unsigned index = fep->tx_dirty;
+ 	unsigned pkts_compl, bytes_compl;
  
- 	/* Allocate memory for buffer descriptors. */
--	cbd_base = dma_alloc_coherent(NULL, PAGE_SIZE, &cbd_dma, GFP_KERNEL);
--	if (!cbd_base)
-+	rx_cbd_cpu = dma_alloc_coherent(NULL, PAGE_SIZE, &rx_cbd_dma,
-+					GFP_KERNEL);
-+	tx_cbd_cpu = dma_alloc_coherent(NULL, PAGE_SIZE, &tx_cbd_dma,
-+					GFP_KERNEL);
-+	if (!rx_cbd_cpu || !tx_cbd_cpu) {
-+		if (rx_cbd_cpu)
-+			dma_free_coherent(NULL, PAGE_SIZE, rx_cbd_cpu, rx_cbd_dma);
-+		if (tx_cbd_cpu)
-+			dma_free_coherent(NULL, PAGE_SIZE, tx_cbd_cpu, tx_cbd_dma);
- 		return -ENOMEM;
-+	}
+ 	pkts_compl = bytes_compl = 0;
+ 	do {
++		unsigned status, cbd_esc;
++
+ 		if (++index >= fep->tx_ring_size)
+ 			index = 0;
  
--	memset(cbd_base, 0, PAGE_SIZE);
-+	memset(rx_cbd_cpu, 0, PAGE_SIZE);
-+	memset(tx_cbd_cpu, 0, PAGE_SIZE);
+@@ -862,21 +856,40 @@ fec_enet_tx(struct net_device *ndev)
+ 		fep->tx_skbuff[index] = NULL;
  
- 	/* Set receive and transmit descriptor base. */
--	fep->rx_bd_base = cbd_base;
--	fep->rx_bd_dma = cbd_dma;
--	if (fep->flags & FEC_FLAG_BUFDESC_EX) {
--		fep->tx_bd_base = (union bufdesc_u *)
--			(&cbd_base->ebd + fep->rx_ring_size);
--		fep->tx_bd_dma = cbd_dma + sizeof(struct bufdesc_ex) *
--			fep->rx_ring_size;
--	} else {
--		fep->tx_bd_base = (union bufdesc_u *)
--			(&cbd_base->bd + fep->rx_ring_size);
--		fep->tx_bd_dma = cbd_dma + sizeof(struct bufdesc) *
--			fep->rx_ring_size;
--	}
-+	fep->rx_bd_base = rx_cbd_cpu;
-+	fep->rx_bd_dma = rx_cbd_dma;
-+	fep->tx_bd_base = tx_cbd_cpu;
-+	fep->tx_bd_dma = tx_cbd_dma;
+ 		/* Check for errors. */
+-		if (status & (BD_ENET_TX_HB | BD_ENET_TX_LC |
+-				   BD_ENET_TX_RL | BD_ENET_TX_UN |
+-				   BD_ENET_TX_CSL)) {
+-			ndev->stats.tx_errors++;
+-			if (status & BD_ENET_TX_HB)  /* No heartbeat */
+-				ndev->stats.tx_heartbeat_errors++;
+-			if (status & BD_ENET_TX_LC)  /* Late collision */
+-				ndev->stats.tx_window_errors++;
+-			if (status & BD_ENET_TX_RL)  /* Retrans limit */
+-				ndev->stats.tx_aborted_errors++;
+-			if (status & BD_ENET_TX_UN)  /* Underrun */
+-				ndev->stats.tx_fifo_errors++;
+-			if (status & BD_ENET_TX_CSL) /* Carrier lost */
+-				ndev->stats.tx_carrier_errors++;
+-		} else if (skb) {
++		if (fep->flags & FEC_FLAG_BUFDESC_EX) {
++			cbd_esc = bdp->ebd.cbd_esc;
++			if (cbd_esc & BD_ENET_TX_TXE) {
++				ndev->stats.tx_errors++;
++				if (cbd_esc & BD_ENET_TX_EE) { /* excess collision */
++					ndev->stats.collisions += 16;
++					ndev->stats.tx_aborted_errors++;
++				}
++				if (cbd_esc & BD_ENET_TX_LCE) /* late collision error */
++					ndev->stats.tx_window_errors++;
++				if (cbd_esc & (BD_ENET_TX_UE | BD_ENET_TX_FE | BD_ENET_TX_OE))
++					ndev->stats.tx_fifo_errors++;
++				goto next;
++			}
++		} else {
++			if (status & (BD_ENET_TX_HB | BD_ENET_TX_LC |
++					   BD_ENET_TX_RL | BD_ENET_TX_UN |
++					   BD_ENET_TX_CSL)) {
++				ndev->stats.tx_errors++;
++				if (status & BD_ENET_TX_HB)  /* No heartbeat */
++					ndev->stats.tx_heartbeat_errors++;
++				if (status & BD_ENET_TX_LC)  /* Late collision */
++					ndev->stats.tx_window_errors++;
++				if (status & BD_ENET_TX_RL)  /* Retrans limit */
++					ndev->stats.tx_aborted_errors++;
++				if (status & BD_ENET_TX_UN)  /* Underrun */
++					ndev->stats.tx_fifo_errors++;
++				if (status & BD_ENET_TX_CSL) /* Carrier lost */
++					ndev->stats.tx_carrier_errors++;
++				goto next;
++			}
++		}
++
++		if (skb) {
+ 			ndev->stats.tx_packets++;
+ 			ndev->stats.tx_bytes += skb->len;
+ 		}
+@@ -886,7 +899,7 @@ fec_enet_tx(struct net_device *ndev)
+ 		 */
+ 		if (status & BD_ENET_TX_DEF)
+ 			ndev->stats.collisions++;
+-
++ next:
+ 		if (skb) {
+ 			if (fep->flags & FEC_FLAG_BUFDESC_EX &&
+ 			    unlikely(skb_shinfo(skb)->tx_flags & SKBTX_IN_PROGRESS)) {
+@@ -930,7 +943,6 @@ fec_enet_rx(struct net_device *ndev, int budget)
+ 	struct fec_enet_private *fep = netdev_priv(ndev);
+ 	const struct platform_device_id *id_entry =
+ 				platform_get_device_id(fep->pdev);
+-	unsigned short status;
+ 	struct	sk_buff	*skb;
+ 	ushort	pkt_len;
+ 	__u8 *data;
+@@ -948,6 +960,7 @@ fec_enet_rx(struct net_device *ndev, int budget)
+ 	 */
+ 	do {
+ 		union bufdesc_u *bdp = fec_enet_rx_get(index, fep);
++		unsigned status, cbd_esc;
  
- 	for (i = 0; i < fep->rx_ring_size; i++) {
- 		dma_addr_t addr;
+ 		status = bdp->bd.cbd_sc;
+ 		if (status & BD_ENET_RX_EMPTY)
+@@ -966,29 +979,37 @@ fec_enet_rx(struct net_device *ndev, int budget)
+ 
+ 		writel(FEC_ENET_RXF, fep->hwp + FEC_IEVENT);
+ 
+-		/* Check for errors. */
+-		if (status & (BD_ENET_RX_LG | BD_ENET_RX_SH | BD_ENET_RX_NO |
+-			   BD_ENET_RX_CR | BD_ENET_RX_OV)) {
+-			ndev->stats.rx_errors++;
+-			if (status & (BD_ENET_RX_LG | BD_ENET_RX_SH)) {
+-				/* Frame too long or too short. */
+-				ndev->stats.rx_length_errors++;
+-			}
+-			if (status & BD_ENET_RX_NO)	/* Frame alignment */
+-				ndev->stats.rx_frame_errors++;
+-			if (status & BD_ENET_RX_CR)	/* CRC Error */
+-				ndev->stats.rx_crc_errors++;
+-			if (status & BD_ENET_RX_OV)	/* FIFO overrun */
+-				ndev->stats.rx_fifo_errors++;
++		if (fep->flags & FEC_FLAG_BUFDESC_EX) {
++			cbd_esc = bdp->ebd.cbd_esc;
++			if (!(fep->flags & FEC_FLAG_RX_VLAN))
++				cbd_esc &= ~BD_ENET_RX_VLAN;
++		} else {
++			cbd_esc = 0;
+ 		}
+ 
+-		/* Report late collisions as a frame error.
+-		 * On this error, the BD is closed, but we don't know what we
+-		 * have in the buffer.  So, just drop this frame on the floor.
+-		 */
+-		if (status & BD_ENET_RX_CL) {
++		/* Check for errors. */
++		if (status & BD_ENET_RX_ERROR) {
+ 			ndev->stats.rx_errors++;
+-			ndev->stats.rx_frame_errors++;
++
++			/*
++			 * Report late collisions as a frame error.  On this
++			 * error, the BD is closed, but we don't know what we
++			 * have in the buffer.  So, just drop this frame on
++			 * the floor.
++			 */
++			if (status & BD_ENET_RX_CL) {
++				ndev->stats.rx_frame_errors++;
++			} else {
++				if (status & (BD_ENET_RX_LG | BD_ENET_RX_SH))
++					/* Frame too long or too short. */
++					ndev->stats.rx_length_errors++;
++				if (status & BD_ENET_RX_NO)	/* Frame alignment */
++					ndev->stats.rx_frame_errors++;
++				if (status & BD_ENET_RX_CR)	/* CRC Error */
++					ndev->stats.rx_crc_errors++;
++				if (status & BD_ENET_RX_OV)	/* FIFO overrun */
++					ndev->stats.rx_fifo_errors++;
++			}
+ 			goto rx_processing_done;
+ 		}
+ 
+@@ -1006,8 +1027,7 @@ fec_enet_rx(struct net_device *ndev, int budget)
+ 
+ 		/* If this is a VLAN packet remove the VLAN Tag */
+ 		vlan_packet_rcvd = false;
+-		if (fep->flags & FEC_FLAG_RX_VLAN &&
+-		    bdp->ebd.cbd_esc & BD_ENET_RX_VLAN) {
++		if (cbd_esc & BD_ENET_RX_VLAN) {
+ 			/* Push and remove the vlan tag */
+ 			struct vlan_hdr *vlan_header =
+ 					(struct vlan_hdr *) (data + ETH_HLEN);
+@@ -1047,7 +1067,7 @@ fec_enet_rx(struct net_device *ndev, int budget)
+ 						  skb_hwtstamps(skb));
+ 
+ 			if (fep->flags & FEC_FLAG_RX_CSUM) {
+-				if (!(bdp->ebd.cbd_esc & FLAG_RX_CSUM_ERROR)) {
++				if (!(cbd_esc & FLAG_RX_CSUM_ERROR)) {
+ 					/* don't check it */
+ 					skb->ip_summed = CHECKSUM_UNNECESSARY;
+ 				} else {
 -- 
 1.8.3.1
