@@ -1,61 +1,50 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 25 Apr 2014 15:10:42 -0500
-Subject: [PATCH v2 03/18] usb: host: xhci-plat: Add support for the
- Armada 38x
-In-Reply-To: <5392399.GiPjM0CIZ0@wuerfel>
-References: <1398434836-18908-1-git-send-email-gregory.clement@free-electrons.com>
- <1398434836-18908-4-git-send-email-gregory.clement@free-electrons.com>
- <5392399.GiPjM0CIZ0@wuerfel>
-Message-ID: <20140425201042.GK29632@saruman.home>
+From: javi.merino@arm.com (Javi Merino)
+Date: Fri, 25 Apr 2014 21:11:12 +0100
+Subject: [PATCH] ARM: dts: Remove vmmc-supply for mmc@12220000 on arndale-octa
+ board
+Message-ID: <1398456672-3936-1-git-send-email-javi.merino@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+d726ca2d3316 (ARM: dts: Add vmmc-supply to MMC on arndale-octa board)
+added the vmmc-supply to nodes mmc at 12200000 and mmc at 12220000 of the
+DT.  However, this makes the kernel fail to boot on the arndale-octa
+spews:
+
+[    5.060000] dwmmc_exynos 12200000.mmc: num-slots property not found, assuming 1 slot is available
+[    5.065000] platform 12200000.mmc: Driver dwmmc_exynos requests probe deferral
+[    5.075000] dwmmc_exynos 12220000.mmc: num-slots property not found, assuming 1 slot is available
+[    5.085000] platform 12220000.mmc: Driver dwmmc_exynos requests probe deferral
+
+And eventually hangs.  Without the vmmc-supply property in the
+mmc at 12220000 node, the kernel boots again.
+
+Signed-off-by: Javi Merino <javi.merino@arm.com>
+---
+
 Hi,
 
-On Fri, Apr 25, 2014 at 10:01:51PM +0200, Arnd Bergmann wrote:
-> On Friday 25 April 2014 16:07:01 Gregory CLEMENT wrote:
-> > @@ -148,6 +149,9 @@ static int xhci_plat_probe(struct platform_device *pdev)
-> >         if (ret)
-> >                 return ret;
-> >  
-> > +       if (of_device_is_compatible(pdev->dev.of_node, "marvell,armada-380-xhci"))
-> > +               xhci_mvebu_mbus_init_quirk(pdev);
-> > +
-> >         /* Initialize dma_mask and coherent_dma_mask to 32-bits */
-> >         ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
-> >         if (ret)
-> 
-> I think you're doing it the wrong way around: You have a specialized
+Note that I don't know *why* removing the property works, all I know
+is that 3.15-rc2 fails to boot on my Arndale Octa unless I apply this
+patch.
 
-no, it's the correct way around.
+Cheers,
+Javi
 
-> version of the generic xhci-plat driver. The normal way to handle this
-> is to have a loadable module that contains all the Armada specific
-> code and that registers a platform_driver. In the probe() function of
+ arch/arm/boot/dts/exynos5420-arndale-octa.dts |    1 -
+ 1 file changed, 1 deletion(-)
 
-no, that'll cause too much duplication of boilerplate code. I asked him
-to write it as a quirk because then we won't end up with and xhci
-platform_driver for each of the ARM licensees when all they have are
-small quirks here and there.
-
-Imagine if you had one PCI driver for each possible XHCI PCI controller
-out there.
-
-It's pointless maintainenance burden.
-
-> that driver, you can do the platform specific setup and then call
-> the generic xhci_plat_probe() function, which of course has to
-> be provided using EXPORT_SYMBOL_GPL.
-
-yeah, that sucks. Exposing a probe() function like that. I rather have
-probe() actually *probe* for the HW differences.
-
+diff --git a/arch/arm/boot/dts/exynos5420-arndale-octa.dts b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
+index 80a3bf4..722fb6c 100644
+--- a/arch/arm/boot/dts/exynos5420-arndale-octa.dts
++++ b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
+@@ -64,7 +64,6 @@
+ 		samsung,dw-mshc-ddr-timing = <1 2>;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
+-		vmmc-supply = <&ldo10_reg>;
+ 
+ 		slot at 0 {
+ 			reg = <0>;
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140425/b16b9ba2/attachment.sig>
+1.7.9.5
