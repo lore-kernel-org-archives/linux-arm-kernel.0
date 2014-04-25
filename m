@@ -1,91 +1,52 @@
-From: tim@krieglstein.org (Tim Sander)
-Date: Fri, 25 Apr 2014 15:36:48 +0200
-Subject: set_fiq_handler: Bad mode in data abort handler detected
-In-Reply-To: <20140424190156.GZ26756@n2100.arm.linux.org.uk>
-References: <2527501.cXAbiV8bqS@dabox> <2181550.Duxpmd4GvD@dabox>
- <20140424190156.GZ26756@n2100.arm.linux.org.uk>
-Message-ID: <7402473.jpZGckhttH@dabox>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 25 Apr 2014 08:44:53 -0500
+Subject: [PATCH V2 00/19] bus: omap_l3_noc: driver cleanups and support
+ for DRA7/AM4372
+In-Reply-To: <535A0047.5030807@ti.com>
+References: <1397492726-17203-1-git-send-email-nm@ti.com>
+ <1397767775-10965-1-git-send-email-nm@ti.com> <53504041.7090906@ti.com>
+ <5350410B.5010507@ti.com> <5358D16A.9000500@ti.com> <53591D6D.3060507@ti.com>
+ <535A0047.5030807@ti.com>
+Message-ID: <535A66D5.7010008@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell and List
-
-Thanks for your feedback!
-Am Donnerstag, 24. April 2014, 20:01:56 schrieb Russell King - ARM Linux:
-> > > In years gone by, I'd have recommended that the kernel mappings for
-> > > this stuff were done via static mappings, but with DT, that's no
-> > > longer acceptable.  So I guess we have a problem...
-> > 
-> > To verify that your very plausible hypothesis is right i tried:
-> > timer_memory = __arm_ioremap(0x4280000>>PAGE_SHIFT,0x1000,MT_MEMORY);
-> > //also tried MT_DEVICE
-> This isn't going to help.  Any dynamically initialised mapping via any
-> of the ioremap functions is going to fail for the reason I outlined,
-> and it doesn't matter what type of mapping you use.  *All* dynamically
-> created mappings are populated to other threads lazily.
-Ok, i tried mapping statically in bootup. Just to verify and understand the 
-problem. It seems to help somewhat (probably it does go into more threads), 
-but it doesn't remedy the problem completly:
-
-static struct map_desc zynq_axi_gp0 __initdata = {
-    .virtual   = 0xe4000000, //FIXME just arbitrary, which?
-    .pfn    = __phys_to_pfn(0x40000000),
-    .length = SZ_128M,
-    .type   = MT_DEVICE,
-};
-
-static void __init zynq_axi_gp_init(void)
-{
-    iotable_init(&zynq_axi_gp0,1);
-    zynq_axi_gp0_base = (void __iomem *) zynq_axi_gp0.virtual;
-    BUG_ON(!zynq_axi_gp0_base);
-}
-This was called in the .map_io callback. But it seems, even this is to late to
-propagate into all threads. Calling it earlier does not work (e.g. .init_early 
-,.init_timer or init_irq)...
-Thinking about it, if its truly lazy even an early initialization does not 
-help if mapping synchronisation is allways done lazy via data abort.
-
-> The reason for that is because it's _very_ expensive/racy to walk over
-> every single thread and update its page tables - Linux years ago used
-> to do that as standard with ioremap() and similar, and the code was
-> ripped out after it became too much of a burden.
-It seems as if this was before git times? At least it does not seem to be 
-in the git repository. Do you have an rough estimate in what year that was or 
-which kernel version?
-
-> When I talk about static mappings above, I'm talking about those which
-> are setup very early in boot via iotable_init().  However, these aren't
-> permitted with DT anymore.
-As pointed out above this call at least boots and works in a way that i see 
-the ioremapped virtual address used (0xe4000000).
-> > the memory at early boot in "zynq_init_late".
+On 04/25/2014 01:27 AM, Peter Ujfalusi wrote:
+> On 04/24/2014 05:19 PM, Nishanth Menon wrote:
+>> On 04/24/2014 03:55 AM, Peter Ujfalusi wrote:
+>>> On 04/18/2014 12:00 AM, Nishanth Menon wrote:
+>>>> On 04/17/2014 03:57 PM, Santosh Shilimkar wrote:
+>>>>> I looked at the series and its looks pretty good. Thanks for fixups, updates.
+>>>>> For whole series,
+>>>>> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>>>>
+>>>>
+>>>> Thanks.
+>>>>
+>>>>>> Patches(including Peter's) is available here:
+>>>>>> https://github.com/nmenon/linux-2.6-playground/commits/l3noc/driver-fixes-v2
+>>>>>>
+>>>>> Can Tony pull this branch for 3.16 then which includes Peter's series as well ?
+>>>>
+>>>> there is just an empty commit with information about peter's patches
+>>>> that i lined up to differentiate the series.. I can drop it if Tony
+>>>> would like me to.
+>>>
+>>> Looking at the branch I see my patches underneath so they are in the branch.
+>>> It would be great if Tony pulls this... Will be a great present to my patches
+>>> (omap_l3 patches in the branch) for their 1 year anniversary of being out on
+>>> the mailing list ;)
+>>>
+>> Peter, can I take this as an Ack for this series? if yes, I can repost
+>> a v3 with all the acks, updates together.
 > 
-> My kernel doesn't have zynq_init_late()... I'm guessing that it's hooked
-> into the .init_late callback, which is certainly too late - this is called
-> towards the end of driver initialisation, after many threads have already
-> been spawned.
-Is there an callback where iotable_init still works and that is early enough?
-
-> The places where you are called before any threads have been spawned are
-> unfortunately places where you can't use ioremap().
+> Nishanth, sure you can add my Ack or Reviewed-by.
 > 
-> At the moment, I don't have an answer to this - the answers I have are
-> incompatible with the direction that arm-soc people want to go (which is
-> to have zero static mappings.)
-Ok, your wrote in the earlier mail:
->What might be possible is to have a function which can be called in
->these circumstances which ensures that a kernel address is accessible
->to all threads in the system, though while it's doing that, it would
->have to stop any fork() or exit() activity to be sure that it updated
->every thread.
-Would a solution that works that way be acceptable for mainline? 
+Thanks Peter. i will pick up your ack. Seems that I have to respin the
+series given a few further updates for AM437x - some, ummm...
+variations in definition that we did not expect but Sekhar found when
+reviewing internal functional specs :(
 
-Besides that i currently don't understand why the FIQ worked on older pre 
-CortexA9 cores with Linux? There is an nice writeup at 
-http://free-electrons.com/blog/fiq-handlers-in-the-arm-linux-kernel/ 
-which is working with an armV5 (which has the caches on the "wrong" side) and 
-i think that it was also working on armV6 (aka arm1136).
-
-Best regards
-Tim
+-- 
+Regards,
+Nishanth Menon
