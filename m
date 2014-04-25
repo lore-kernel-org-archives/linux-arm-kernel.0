@@ -1,217 +1,113 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:55:25 +0100
-Subject: [PATCH 184/222] ARM: l2c: permit flush_all() on large flush_range()
- XXX Needs more thought XXX
+Date: Fri, 25 Apr 2014 12:55:30 +0100
+Subject: [PATCH 185/222] mmc: sdio_irq: rework sdio irq handling
 In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
 References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1Wdeiz-0007Py-SH@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Wdej4-0007Q2-Vq@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to allow flush_all() to be used in normal operation, we need
-some locking to prevent any other cache operations being issued while
-a background flush_all() operation is proceeding.  The read-write
-spinlock provides what's necessary here, but we must avoid bringing
-lockdep issues into this code.  Hence we continue to use the raw_*
-operations, and use the arch read/write spinlock implementation
-directly.
+Rather than the SDIO support spawning it's own thread for handling card
+interrupts, use the generic IRQ infrastructure for this, triggering it
+from the host interface's interrupt handling directly.
+
+This avoids a race between the parent thread waiting to receive an
+interrupt response from the card, and the slow startup from the sdio
+irq thread, which can occur as a result of high system load (eg, while
+udev is running.)
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mm/cache-l2x0.c | 90 ++++++++++++++++++++++++++++++++++++++++++------
- 1 file changed, 79 insertions(+), 11 deletions(-)
+ drivers/mmc/core/sdio_irq.c | 41 +++++++++++++++++++++++++++++++----------
+ include/linux/mmc/host.h    |  3 +++
+ 2 files changed, 34 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index efc5cabf70e0..40bc281f2463 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -56,6 +56,54 @@ struct l2x0_regs l2x0_saved_regs;
- /*
-  * Common code for all cache controllers.
-  */
-+#ifdef CONFIG_SMP
-+static arch_rwlock_t l2c_rw_lock = __ARCH_RW_LOCK_UNLOCKED;
-+
-+static unsigned long l2c_lock_exclusive(void)
+diff --git a/drivers/mmc/core/sdio_irq.c b/drivers/mmc/core/sdio_irq.c
+index aaa90460ed23..5cc13c8d35bb 100644
+--- a/drivers/mmc/core/sdio_irq.c
++++ b/drivers/mmc/core/sdio_irq.c
+@@ -90,6 +90,15 @@ static int process_sdio_pending_irqs(struct mmc_host *host)
+ 	return ret;
+ }
+ 
++void sdio_run_irqs(struct mmc_host *host)
 +{
-+	unsigned long flags;
-+	raw_local_irq_save(flags);
-+	arch_write_lock(&l2c_rw_lock);
-+	return flags;
++	mmc_claim_host(host);
++	host->sdio_irq_pending = true;
++	process_sdio_pending_irqs(host);
++	mmc_release_host(host);
 +}
++EXPORT_SYMBOL_GPL(sdio_run_irqs);
 +
-+static void l2c_unlock_exclusive(unsigned long flags)
-+{
-+	arch_write_unlock(&l2c_rw_lock);
-+	raw_local_irq_restore(flags);
-+}
-+
-+static void l2c_lock_shared(void)
-+{
-+	arch_read_lock(&l2c_rw_lock);
-+}
-+
-+static void l2c_unlock_shared(void)
-+{
-+	arch_read_unlock(&l2c_rw_lock);
-+}
-+#else
-+static unsigned long l2c_lock_exclusive(void)
-+{
-+	unsigned long flags;
-+	raw_local_irq_save(flags);
-+	return flags;
-+}
-+
-+static void l2c_unlock_exclusive(unsigned long flags)
-+{
-+	raw_local_irq_restore(flags);
-+}
-+
-+static void l2c_lock_shared(void)
-+{
-+}
-+
-+static void l2c_unlock_shared(void)
-+{
-+}
-+#endif
-+
- static inline void l2c_wait_mask(void __iomem *reg, unsigned long mask)
+ static int sdio_irq_thread(void *_host)
  {
- 	/* wait for cache operation by line or way to complete */
-@@ -239,6 +287,7 @@ static void l2c210_inv_range(unsigned long start, unsigned long end)
- {
- 	void __iomem *base = l2x0_base;
+ 	struct mmc_host *host = _host;
+@@ -189,14 +198,20 @@ static int sdio_card_irq_get(struct mmc_card *card)
+ 	WARN_ON(!host->claimed);
  
-+	l2c_lock_shared();
- 	if (start & (CACHE_LINE_SIZE - 1)) {
- 		start &= ~(CACHE_LINE_SIZE - 1);
- 		writel_relaxed(start, base + L2X0_CLEAN_INV_LINE_PA);
-@@ -252,6 +301,7 @@ static void l2c210_inv_range(unsigned long start, unsigned long end)
- 
- 	__l2c210_op_pa_range(base + L2X0_INV_LINE_PA, start, end);
- 	__l2c210_cache_sync(base);
-+	l2c_unlock_shared();
- }
- 
- static void l2c210_clean_range(unsigned long start, unsigned long end)
-@@ -259,8 +309,10 @@ static void l2c210_clean_range(unsigned long start, unsigned long end)
- 	void __iomem *base = l2x0_base;
- 
- 	start &= ~(CACHE_LINE_SIZE - 1);
-+	l2c_lock_shared();
- 	__l2c210_op_pa_range(base + L2X0_CLEAN_LINE_PA, start, end);
- 	__l2c210_cache_sync(base);
-+	l2c_unlock_shared();
- }
- 
- static void l2c210_flush_range(unsigned long start, unsigned long end)
-@@ -268,23 +320,33 @@ static void l2c210_flush_range(unsigned long start, unsigned long end)
- 	void __iomem *base = l2x0_base;
- 
- 	start &= ~(CACHE_LINE_SIZE - 1);
-+	if ((end - start) >= l2x0_size) {
-+		outer_cache.flush_all();
-+		return;
-+	}
-+
-+	l2c_lock_shared();
- 	__l2c210_op_pa_range(base + L2X0_CLEAN_INV_LINE_PA, start, end);
- 	__l2c210_cache_sync(base);
-+	l2c_unlock_shared();
- }
- 
- static void l2c210_flush_all(void)
- {
- 	void __iomem *base = l2x0_base;
-+	unsigned long flags;
- 
--	BUG_ON(!irqs_disabled());
--
-+	flags = l2c_lock_exclusive();
- 	__l2c_op_way(base + L2X0_CLEAN_INV_WAY);
- 	__l2c210_cache_sync(base);
-+	l2c_unlock_exclusive(flags);
- }
- 
- static void l2c210_sync(void)
- {
-+	l2c_lock_shared();
- 	__l2c210_cache_sync(l2x0_base);
-+	l2c_unlock_shared();
- }
- 
- static void l2c210_resume(void)
-@@ -521,7 +583,7 @@ static void l2c310_inv_range_erratum(unsigned long start, unsigned long end)
- 		unsigned long flags;
- 
- 		/* Erratum 588369 for both clean+invalidate operations */
--		raw_spin_lock_irqsave(&l2x0_lock, flags);
-+		flags = l2c_lock_exclusive();
- 		l2c_set_debug(base, 0x03);
- 
- 		if (start & (CACHE_LINE_SIZE - 1)) {
-@@ -538,20 +600,26 @@ static void l2c310_inv_range_erratum(unsigned long start, unsigned long end)
- 		}
- 
- 		l2c_set_debug(base, 0x00);
--		raw_spin_unlock_irqrestore(&l2x0_lock, flags);
-+		l2c_unlock_exclusive(flags);
- 	}
- 
-+	l2c_lock_shared();
- 	__l2c210_op_pa_range(base + L2X0_INV_LINE_PA, start, end);
- 	__l2c210_cache_sync(base);
-+	l2c_unlock_shared();
- }
- 
- static void l2c310_flush_range_erratum(unsigned long start, unsigned long end)
- {
--	raw_spinlock_t *lock = &l2x0_lock;
- 	unsigned long flags;
- 	void __iomem *base = l2x0_base;
- 
--	raw_spin_lock_irqsave(lock, flags);
-+	if ((end - start) >= l2x0_size) {
-+		outer_cache.flush_all();
-+		return;
-+	}
-+
-+	flags = l2c_lock_exclusive();
- 	while (start < end) {
- 		unsigned long blk_end = start + min(end - start, 4096UL);
- 
-@@ -564,12 +632,12 @@ static void l2c310_flush_range_erratum(unsigned long start, unsigned long end)
- 		l2c_set_debug(base, 0x00);
- 
- 		if (blk_end < end) {
--			raw_spin_unlock_irqrestore(lock, flags);
--			raw_spin_lock_irqsave(lock, flags);
-+			l2c_unlock_exclusive(flags);
-+			flags = l2c_lock_exclusive();
+ 	if (!host->sdio_irqs++) {
+-		atomic_set(&host->sdio_irq_thread_abort, 0);
+-		host->sdio_irq_thread =
+-			kthread_run(sdio_irq_thread, host, "ksdioirqd/%s",
+-				mmc_hostname(host));
+-		if (IS_ERR(host->sdio_irq_thread)) {
+-			int err = PTR_ERR(host->sdio_irq_thread);
+-			host->sdio_irqs--;
+-			return err;
++		if (!(host->caps2 & MMC_CAP2_SDIO_IRQ_NOTHREAD)) {
++			atomic_set(&host->sdio_irq_thread_abort, 0);
++			host->sdio_irq_thread =
++				kthread_run(sdio_irq_thread, host,
++					    "ksdioirqd/%s", mmc_hostname(host));
++			if (IS_ERR(host->sdio_irq_thread)) {
++				int err = PTR_ERR(host->sdio_irq_thread);
++				host->sdio_irqs--;
++				return err;
++			}
++		} else {
++			mmc_host_clk_hold(host);
++			host->ops->enable_sdio_irq(host, 1);
++			mmc_host_clk_release(host);
  		}
  	}
--	raw_spin_unlock_irqrestore(lock, flags);
- 	__l2c210_cache_sync(base);
-+	l2c_unlock_exclusive(flags);
+ 
+@@ -211,8 +226,14 @@ static int sdio_card_irq_put(struct mmc_card *card)
+ 	BUG_ON(host->sdio_irqs < 1);
+ 
+ 	if (!--host->sdio_irqs) {
+-		atomic_set(&host->sdio_irq_thread_abort, 1);
+-		kthread_stop(host->sdio_irq_thread);
++		if (!(host->caps2 & MMC_CAP2_SDIO_IRQ_NOTHREAD)) {
++			atomic_set(&host->sdio_irq_thread_abort, 1);
++			kthread_stop(host->sdio_irq_thread);
++		} else {
++			mmc_host_clk_hold(host);
++			host->ops->enable_sdio_irq(host, 0);
++			mmc_host_clk_release(host);
++		}
+ 	}
+ 
+ 	return 0;
+diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
+index cb61ea4d6945..4c0f94679898 100644
+--- a/include/linux/mmc/host.h
++++ b/include/linux/mmc/host.h
+@@ -278,6 +278,7 @@ struct mmc_host {
+ #define MMC_CAP2_PACKED_CMD	(MMC_CAP2_PACKED_RD | \
+ 				 MMC_CAP2_PACKED_WR)
+ #define MMC_CAP2_NO_PRESCAN_POWERUP (1 << 14)	/* Don't power up before scan */
++#define MMC_CAP2_SDIO_IRQ_NOTHREAD (1 << 15)
+ 
+ 	mmc_pm_flag_t		pm_caps;	/* supported pm features */
+ 
+@@ -391,6 +392,8 @@ static inline void mmc_signal_sdio_irq(struct mmc_host *host)
+ 	wake_up_process(host->sdio_irq_thread);
  }
  
- static void l2c310_flush_all_erratum(void)
-@@ -577,12 +645,12 @@ static void l2c310_flush_all_erratum(void)
- 	void __iomem *base = l2x0_base;
- 	unsigned long flags;
- 
--	raw_spin_lock_irqsave(&l2x0_lock, flags);
-+	flags = l2c_lock_exclusive();
- 	l2c_set_debug(base, 0x03);
- 	__l2c_op_way(base + L2X0_CLEAN_INV_WAY);
- 	l2c_set_debug(base, 0x00);
- 	__l2c210_cache_sync(base);
--	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
-+	l2c_unlock_exclusive(flags);
- }
- 
- static void __init l2c310_save(void __iomem *base)
++void sdio_run_irqs(struct mmc_host *host);
++
+ #ifdef CONFIG_REGULATOR
+ int mmc_regulator_get_ocrmask(struct regulator *supply);
+ int mmc_regulator_set_ocr(struct mmc_host *mmc,
 -- 
 1.8.3.1
