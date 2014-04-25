@@ -1,116 +1,72 @@
 From: mporter@linaro.org (Matt Porter)
-Date: Fri, 25 Apr 2014 09:49:57 -0400
-Subject: [PATCH v4] mach-bcm: clean up config and build targets
-In-Reply-To: <1397565439-29735-1-git-send-email-elder@linaro.org>
-References: <1397565439-29735-1-git-send-email-elder@linaro.org>
-Message-ID: <20140425134957.GD1127@beef>
+Date: Fri, 25 Apr 2014 09:51:41 -0400
+Subject: [PATCH v2 00/10] ARM: bcm: SCM and L2 cache code cleanup
+In-Reply-To: <1398117191-2433-1-git-send-email-elder@linaro.org>
+References: <1398117191-2433-1-git-send-email-elder@linaro.org>
+Message-ID: <20140425135141.GE1127@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15, 2014 at 07:37:19AM -0500, Alex Elder wrote:
-> Currently CONFIG_ARCH_BCM_MOBILE is used to select all (both)
-> Broadcom mobile SoC families.  Instead, use that only as a config
-> menu switch, and define specific symbols like ARCH_BCM_281XX to
-> select a particular SoC family.  If ARCH_BCM_MOBILE is selected, all
-> of the SoCs will be selected by default, but this way each can be
-> disabled individually as well.
+On Mon, Apr 21, 2014 at 04:53:01PM -0500, Alex Elder wrote:
+> This series cleans up a number of things in the code that issues
+> secure monitor ("smc") requests for the bcm281xx and bcm21664 SoC
+> families.  This code is currently used only for enabling the level-2
+> cache.
 > 
-> Note that BCM281xx and BCM21664 both require the SMC and L2 cache
-> control code, so that code will be built based on ARCH_BCM_MOBILE.
-> 
-> Signed-off-by: Alex Elder <elder@linaro.org>
+> There are some bug fixes and other improvements.  An assembly
+> language file containing a single function has been eliminated by
+> re-implementing the code using inline assembly.  Some comments have
+> been expanded and clarified.  Kernel configuration options allow
+> finer-grained control over how this code gets built.  Finally, the
+> "kona.c" and "kona.h" files are renamed to reflect the fact that
+> only contain code related to level-2 cache support.
 
-Applied to mach-bcm for-3.16/cleanup [added ARM: to patch title].
+Applied the series to mach-bcm for-3.16/cleanup
 
 Thanks,
 Matt
 
-> ---
-> v4:  Rebased on to of v3.15-rc1.  Small tweak in Makefile.
-> v3:  SMC and L2 cache code is needed by both SoC families.
-> v2:  No longer uses Kbuild's $(<modulename>-y) variable mechanism.
 > 
-> The patch is available here:
+> This series is based on v3.15-rc2, and depends on one patch posted
+> previously:
+>     [PATCH v4] mach-bcm: clean up config and build targets
+>     https://lkml.org/lkml/2014/4/15/303
+> 
+> It is available here:
 >     http://git.linaro.org/landing-teams/working/broadcom/kernel.git
->     Branch review/mach-bcm-cleanup-v4
+>     Branch review/bcm-smc-cleanup-v2
 > 
->  arch/arm/mach-bcm/Kconfig  |   28 ++++++++++++++++++++++++----
->  arch/arm/mach-bcm/Makefile |   15 ++++++++++++---
->  2 files changed, 36 insertions(+), 7 deletions(-)
+> 					-Alex
 > 
-> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-> index 49c914c..5f5740f 100644
-> --- a/arch/arm/mach-bcm/Kconfig
-> +++ b/arch/arm/mach-bcm/Kconfig
-> @@ -10,7 +10,7 @@ if ARCH_BCM
->  menu "Broadcom SoC Selection"
->  
->  config ARCH_BCM_MOBILE
-> -	bool "Broadcom Mobile SoC" if ARCH_MULTI_V7
-> +	bool "Broadcom Mobile SoC Support" if ARCH_MULTI_V7
->  	depends on MMU
->  	select ARCH_REQUIRE_GPIOLIB
->  	select ARM_ERRATA_754322
-> @@ -23,9 +23,29 @@ config ARCH_BCM_MOBILE
->  	select PINCTRL
->  	help
->  	  This enables support for systems based on Broadcom mobile SoCs.
-> -	  It currently supports the 'BCM281XX' family, which includes
-> -	  BCM11130, BCM11140, BCM11351, BCM28145 and
-> -	  BCM28155 variants.
-> +
-> +if ARCH_BCM_MOBILE
-> +
-> +menu "Broadcom Mobile SoC Selection"
-> +
-> +config ARCH_BCM_281XX
-> +	bool "Broadcom BCM281XX SoC family"
-> +	default y
-> +	help
-> +	  Enable support for the the BCM281XX family, which includes
-> +	  BCM11130, BCM11140, BCM11351, BCM28145 and BCM28155
-> +	  variants.
-> +
-> +config ARCH_BCM_21664
-> +	bool "Broadcom BCM21664 SoC family"
-> +	default y
-> +	help
-> +	  Enable support for the the BCM21664 family, which includes
-> +	  BCM21663 and BCM21664 variants.
-> +
-> +endmenu
-> +
-> +endif
->  
->  config ARCH_BCM2835
->  	bool "Broadcom BCM2835 family" if ARCH_MULTI_V6
-> diff --git a/arch/arm/mach-bcm/Makefile b/arch/arm/mach-bcm/Makefile
-> index a326b28..7fb9b04 100644
-> --- a/arch/arm/mach-bcm/Makefile
-> +++ b/arch/arm/mach-bcm/Makefile
-> @@ -10,10 +10,19 @@
->  # of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->  # GNU General Public License for more details.
->  
-> -obj-$(CONFIG_ARCH_BCM_MOBILE)	:= board_bcm281xx.o board_bcm21664.o \
-> -				bcm_kona_smc.o bcm_kona_smc_asm.o kona.o
-> -obj-$(CONFIG_ARCH_BCM2835)	+= board_bcm2835.o
-> +# BCM281XX
-> +obj-$(CONFIG_ARCH_BCM_281XX)	+= board_bcm281xx.o
->  
-> +# BCM21664
-> +obj-$(CONFIG_ARCH_BCM_21664)	+= board_bcm21664.o
-> +
-> +# BCM281XX and BCM21664 L2 cache control
-> +obj-$(CONFIG_ARCH_BCM_MOBILE)	+= bcm_kona_smc.o bcm_kona_smc_asm.o kona.o
->  plus_sec := $(call as-instr,.arch_extension sec,+sec)
->  AFLAGS_bcm_kona_smc_asm.o	:=-Wa,-march=armv7-a$(plus_sec)
-> +
-> +# BCM2835
-> +obj-$(CONFIG_ARCH_BCM2835)	+= board_bcm2835.o
-> +
-> +# BCM5301X
->  obj-$(CONFIG_ARCH_BCM_5301X)	+= bcm_5301x.o
+> History:
+> v2: - Followed two suggestions from Russell King.  Rebased to v3.15-rc2
+> 
+> Alex Elder (10):
+>   ARM: bcm: use memory accessors for ioremapped area
+>   ARM: bcm: err, don't BUG() on SMC init failures
+>   ARM: bcm: clean up SMC code
+>   ARM: bcm: have bcm_kona_smc() return request result
+>   ARM: bcm: don't special-case CPU 0 in bcm_kona_smc()
+>   ARM: bcm: config option for l2 cache support
+>   ARM: bcm: tidy up a few includes
+>   ARM: bcm: use inline assembly for "smc" request
+>   ARM: bcm: rewrite commentary for bcm_kona_do_smc()
+>   ARM: bcm: rename "kona.h" and "kona.c"
+> 
+>  arch/arm/mach-bcm/Kconfig                     |  12 ++-
+>  arch/arm/mach-bcm/Makefile                    |  10 +-
+>  arch/arm/mach-bcm/bcm_kona_smc.c              | 136 +++++++++++++++++++-------
+>  arch/arm/mach-bcm/bcm_kona_smc.h              |  52 +---------
+>  arch/arm/mach-bcm/bcm_kona_smc_asm.S          |  41 --------
+>  arch/arm/mach-bcm/board_bcm21664.c            |   5 +-
+>  arch/arm/mach-bcm/board_bcm281xx.c            |   2 +-
+>  arch/arm/mach-bcm/{kona.c => kona_l2_cache.c} |  16 +--
+>  arch/arm/mach-bcm/{kona.h => kona_l2_cache.h} |   6 +-
+>  9 files changed, 136 insertions(+), 144 deletions(-)
+>  delete mode 100644 arch/arm/mach-bcm/bcm_kona_smc_asm.S
+>  rename arch/arm/mach-bcm/{kona.c => kona_l2_cache.c} (80%)
+>  rename arch/arm/mach-bcm/{kona.h => kona_l2_cache.h} (80%)
+> 
 > -- 
-> 1.7.9.5
+> 1.9.1
 > 
