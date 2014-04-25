@@ -1,29 +1,82 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:36:08 +0100
-Subject: [PATCH 061/222] ARM: l2c: spear13xx: remove cache size override
+Date: Fri, 25 Apr 2014 12:36:23 +0100
+Subject: [PATCH 064/222] ARM: l2c: realview: improve commentry about the L2
+ cache requirements
 In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
 References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WdeQK-0007HE-KC@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WdeQZ-0007HQ-Us@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add better commentry about the L2 cache requirements on these platforms.
+Unfortunately, the auxiliary control register is not pre-set to indicate
+the correct cache parameters, so we have to manually program these.
+
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-spear/spear13xx.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-realview/realview_eb.c     | 9 +++++++--
+ arch/arm/mach-realview/realview_pb1176.c | 8 +++++++-
+ arch/arm/mach-realview/realview_pb11mp.c | 9 +++++++--
+ 3 files changed, 21 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-spear/spear13xx.c b/arch/arm/mach-spear/spear13xx.c
-index dcb300443b66..c9897ea38980 100644
---- a/arch/arm/mach-spear/spear13xx.c
-+++ b/arch/arm/mach-spear/spear13xx.c
-@@ -46,7 +46,7 @@ void __init spear13xx_l2x0_init(void)
- 	 */
- 	writel_relaxed(0x221, VA_L2CC_BASE + L310_TAG_LATENCY_CTRL);
- 	writel_relaxed(0x441, VA_L2CC_BASE + L310_DATA_LATENCY_CTRL);
--	l2x0_init(VA_L2CC_BASE, 0x30a60001, 0xfe00ffff);
-+	l2x0_init(VA_L2CC_BASE, 0x30a00001, 0xfe0fffff);
- }
+diff --git a/arch/arm/mach-realview/realview_eb.c b/arch/arm/mach-realview/realview_eb.c
+index c85ddb2a0ad0..b575895037b8 100644
+--- a/arch/arm/mach-realview/realview_eb.c
++++ b/arch/arm/mach-realview/realview_eb.c
+@@ -442,8 +442,13 @@ static void __init realview_eb_init(void)
+ 		realview_eb11mp_fixup();
  
- /*
+ #ifdef CONFIG_CACHE_L2X0
+-		/* 1MB (128KB/way), 8-way associativity, evmon/parity/share enabled
+-		 * Bits:  .... ...0 0111 1001 0000 .... .... .... */
++		/*
++		 * The PL220 needs to be manually configured as the hardware
++		 * doesn't report the correct sizes.
++		 * 1MB (128KB/way), 8-way associativity, event monitor and
++		 * parity enabled, ignore share bit, no force write allocate
++		 * Bits:  .... ...0 0111 1001 0000 .... .... ....
++		 */
+ 		l2x0_init(__io_address(REALVIEW_EB11MP_L220_BASE), 0x00790000, 0xfe000fff);
+ #endif
+ 		platform_device_register(&pmu_device);
+diff --git a/arch/arm/mach-realview/realview_pb1176.c b/arch/arm/mach-realview/realview_pb1176.c
+index c5eade76461b..e3bddb5ab10f 100644
+--- a/arch/arm/mach-realview/realview_pb1176.c
++++ b/arch/arm/mach-realview/realview_pb1176.c
+@@ -355,7 +355,13 @@ static void __init realview_pb1176_init(void)
+ 	int i;
+ 
+ #ifdef CONFIG_CACHE_L2X0
+-	/* 128Kb (16Kb/way) 8-way associativity. evmon/parity/share enabled. */
++	/*
++	 * The PL220 needs to be manually configured as the hardware
++	 * doesn't report the correct sizes.
++	 * 128kB (16kB/way), 8-way associativity, event monitor and
++	 * parity enabled, ignore share bit, no force write allocate
++	 * Bits:  .... ...0 0111 0011 0000 .... .... ....
++	 */
+ 	l2x0_init(__io_address(REALVIEW_PB1176_L220_BASE), 0x00730000, 0xfe000fff);
+ #endif
+ 
+diff --git a/arch/arm/mach-realview/realview_pb11mp.c b/arch/arm/mach-realview/realview_pb11mp.c
+index f4b0962578fe..101deaf2630b 100644
+--- a/arch/arm/mach-realview/realview_pb11mp.c
++++ b/arch/arm/mach-realview/realview_pb11mp.c
+@@ -337,8 +337,13 @@ static void __init realview_pb11mp_init(void)
+ 	int i;
+ 
+ #ifdef CONFIG_CACHE_L2X0
+-	/* 1MB (128KB/way), 8-way associativity, evmon/parity/share enabled
+-	 * Bits:  .... ...0 0111 1001 0000 .... .... .... */
++	/*
++	 * The PL220 needs to be manually configured as the hardware
++	 * doesn't report the correct sizes.
++	 * 1MB (128KB/way), 8-way associativity, event monitor and
++	 * parity enabled, ignore share bit, no force write allocate
++	 * Bits:  .... ...0 0111 1001 0000 .... .... ....
++	 */
+ 	l2x0_init(__io_address(REALVIEW_TC11MP_L220_BASE), 0x00790000, 0xfe000fff);
+ #endif
+ 
 -- 
 1.8.3.1
