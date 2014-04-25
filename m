@@ -1,67 +1,55 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 25 Apr 2014 12:21:05 +0200
-Subject: [PATCH 0/8] i.MX6 PCIe binding change and MSI support
-In-Reply-To: <20140424175844.GD29593@google.com>
-References: <1396025579-14344-1-git-send-email-l.stach@pengutronix.de>
- <20140424175844.GD29593@google.com>
-Message-ID: <1398421265.4657.25.camel@weser.hi.pengutronix.de>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 25 Apr 2014 13:28:07 +0300
+Subject: [PATCH 01/23] OMAPDSS: HDMI: lane config support
+In-Reply-To: <535A3395.4050106@ti.com>
+References: <1398334639-14172-1-git-send-email-tomi.valkeinen@ti.com>
+ <1398334639-14172-2-git-send-email-tomi.valkeinen@ti.com>
+ <535A3395.4050106@ti.com>
+Message-ID: <535A38B7.9050009@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 24.04.2014, 11:58 -0600 schrieb Bjorn Helgaas:
-> On Fri, Mar 28, 2014 at 05:52:51PM +0100, Lucas Stach wrote:
-> > While working on MSI support for the i.MX6 PCIe host driver
-> > it has been discovered that the binding for this host controller
-> > is broken in many ways (refer to the patch descriptions for more
-> > info) and was introduced without proper discussion about what
-> > should/should not be in the binding.
-> > 
-> > This series fixes this and minimizes the difference of the
-> > i.MX6 binding to the common designware PCIe binding. I'm aware
-> > that this is a quite radical change, but I think it's justified
-> > to do this as long as there aren't many user of the old binding
-> > (most of the optional properties in the binding aren't even
-> > implemented).
-> > 
-> > Looking forward to your feedback.
-> > 
-> > Lucas Stach (8):
-> >   ARM: imx6q-clk: parent lvds_gate from lvds_sel
-This one is already applied.
+On 25/04/14 13:06, Archit Taneja wrote:
 
-> >   PCI: designware: split Exynos and i.MX bindings
-> >   ARM: dts: imx6: update pcie to bring in line with new binding
-> >   PCI: imx6: use new clock names
-> >   PCI: imx6: drop old irq mapping
-> >   PCI: imx6: rip out optional (and unused) irqs
-> >   PCI: designware: make MSI isr shared irq aware
-> >   PCI: imx6: add support for MSI
+> I spent some time to see if we could get create lane_cfg_val without
+> having the table above, looks like there is no pattern at all in the
+> register field.
+
+There is a pattern, but I wasn't able to figure out a formula to model
+it. And as the array was not very long, and was easy to create with copy
+paste and search-replace from the TRM, I thought it's just simplest way
+to do it.
+
+>> +
+>> +    REG_FLD_MOD(phy->base, HDMI_TXPHY_PAD_CFG_CTRL, lane_cfg_val, 26,
+>> 22);
+>> +    REG_FLD_MOD(phy->base, HDMI_TXPHY_PAD_CFG_CTRL, pol_val, 30, 27);
+>> +}
+>> +
+>>   int hdmi_phy_enable(struct hdmi_phy_data *phy, struct hdmi_wp_data *wp,
+>>               struct hdmi_config *cfg)
+>>   {
+>> @@ -92,8 +183,7 @@ int hdmi_phy_enable(struct hdmi_phy_data *phy,
+>> struct hdmi_wp_data *wp,
+>>       /* Setup max LDO voltage */
+>>       REG_FLD_MOD(phy->base, HDMI_TXPHY_POWER_CTRL, 0xB, 3, 0);
+>>
+>> -    /* Write to phy address 3 to change the polarity control */
+>> -    REG_FLD_MOD(phy->base, HDMI_TXPHY_PAD_CFG_CTRL, 0x1, 27, 27);
 > 
-> What's the status of all these?  I would normally apply patches 4-8 of this
-> series through my tree, given the appropriate acks, but I haven't seen
-> those yet.  And I'm not sure what dependencies there are between the
-> non-PCI patches and the PCI ones.
+> wow, didn't realize it was hardcoded like this.
 > 
-It's a complete binding change, so applying one part without the other
-is going to horribly break things.
+> Reviewed-by: Archit Taneja <archit@ti.com?
 
-So I would at least want to see an ack for the binding change on the
-i.MX side from Shawn and Richard. This will need some follow on patches,
-as some boards adding PCIe using the old binding have cropped up in
-linux-next, but I can do the patches on short notice if everyone agrees
-to merge this patchset.
+Thanks!
 
-The designware part is pretty simple and doesn't change anything for
-other users than i.MX. Though I would like to see an ack from Jingoo for
-those.
+ Tomi
 
-I have some more stuff in the pipes regarding multiple MSI irqs, that
-depend on this series and also the Keystone people are waiting for this
-to be applied in order to consolidate the clock handling of the
-designware core driver, so it would be nice to get this moving again.
 
-Regards,
-Lucas
--- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140425/78769b28/attachment.sig>
