@@ -1,29 +1,29 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:36:18 +0100
-Subject: [PATCH 063/222] ARM: l2c: zynq: remove cache size override
+Date: Fri, 25 Apr 2014 12:35:37 +0100
+Subject: [PATCH 055/222] ARM: l2c: cns3xxx: remove cache size override
 In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
 References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WdeQU-0007HM-RV@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WdePp-0007Gp-VG@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-zynq/common.c | 2 +-
+ arch/arm/mach-cns3xxx/core.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-index 6fcc584c1a11..1e617a6dedc3 100644
---- a/arch/arm/mach-zynq/common.c
-+++ b/arch/arm/mach-zynq/common.c
-@@ -70,7 +70,7 @@ static void __init zynq_init_machine(void)
- 	/*
- 	 * 64KB way size, 8-way associativity, parity disabled
- 	 */
--	l2x0_of_init(0x02060000, 0xF0F0FFFF);
-+	l2x0_of_init(0x02000000, 0xf0ffffff);
+diff --git a/arch/arm/mach-cns3xxx/core.c b/arch/arm/mach-cns3xxx/core.c
+index 5c31b2638c01..f85449a6accd 100644
+--- a/arch/arm/mach-cns3xxx/core.c
++++ b/arch/arm/mach-cns3xxx/core.c
+@@ -290,7 +290,7 @@ void __init cns3xxx_l2x0_init(void)
+ 	writel(val, base + L310_DATA_LATENCY_CTRL);
  
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ 	/* 32 KiB, 8-way, parity disable */
+-	l2x0_init(base, 0x00540000, 0xfe000fff);
++	l2x0_init(base, 0x00500000, 0xfe0f0fff);
+ }
  
+ #endif /* CONFIG_CACHE_L2X0 */
 -- 
 1.8.3.1
