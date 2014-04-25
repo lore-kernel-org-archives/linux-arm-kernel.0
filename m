@@ -1,85 +1,57 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:31:32 +0100
-Subject: [PATCH 007/222] ARM: outer cache: add WARN_ON() to outer_disable()
-In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WdeLs-0007DW-NT@rmk-PC.arm.linux.org.uk>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Fri, 25 Apr 2014 17:01:24 +0530
+Subject: [PATCH v7 1/2] ARM: dts: Add sysreg sytem controller node to
+ exynos5250 and exynos5420
+In-Reply-To: <1398425485-20574-1-git-send-email-gautam.vivek@samsung.com>
+References: <1398425485-20574-1-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <1398425485-20574-2-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add WARN_ON() conditions to outer_disable() to ensure that its
-requirements aren't violated.
+This patch adds sysreg-syscon node to exynos5250 and exynos5420 device
+tree, to access System Register's registers using syscon driver.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Kamil Debski <k.debski@samsung.com>
+[gautam.vivek at samsung.com: Split this syreg-syscon dts entry from
+dts: Add usb2phy to Exynos 5250 patch]
+[gautam.vivek at samsung.com: added similar syscon entry for exynos5420]
+Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
 ---
- arch/arm/include/asm/outercache.h |  7 ++-----
- arch/arm/mm/Makefile              |  1 +
- arch/arm/mm/l2c-common.c          | 20 ++++++++++++++++++++
- 3 files changed, 23 insertions(+), 5 deletions(-)
- create mode 100644 arch/arm/mm/l2c-common.c
+ arch/arm/boot/dts/exynos5250.dtsi |    5 +++++
+ arch/arm/boot/dts/exynos5420.dtsi |    5 +++++
+ 2 files changed, 10 insertions(+)
 
-diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
-index 2615b3d9e807..e9a0797fe188 100644
---- a/arch/arm/include/asm/outercache.h
-+++ b/arch/arm/include/asm/outercache.h
-@@ -21,6 +21,7 @@
- #ifndef __ASM_OUTERCACHE_H
- #define __ASM_OUTERCACHE_H
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index 3742331..70f0cd5 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -175,6 +175,11 @@
+ 		reg = <0x10040000 0x5000>;
+ 	};
  
-+#include <linux/bug.h>
- #include <linux/types.h>
- 
- struct outer_cache_fns {
-@@ -96,11 +97,7 @@ static inline void outer_flush_all(void)
-  * cache is pushed out to lower levels of system memory.  The note and
-  * conditions above concerning outer_flush_all() applies here.
-  */
--static inline void outer_disable(void)
--{
--	if (outer_cache.disable)
--		outer_cache.disable();
--}
-+extern void outer_disable(void);
- 
- /**
-  * outer_resume - restore the cache configuration and re-enable outer cache
-diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
-index 7f39ce2f841f..de5a6a27081b 100644
---- a/arch/arm/mm/Makefile
-+++ b/arch/arm/mm/Makefile
-@@ -95,6 +95,7 @@ obj-$(CONFIG_CPU_V7M)		+= proc-v7m.o
- AFLAGS_proc-v6.o	:=-Wa,-march=armv6
- AFLAGS_proc-v7.o	:=-Wa,-march=armv7-a
- 
-+obj-$(CONFIG_OUTER_CACHE)	+= l2c-common.o
- obj-$(CONFIG_CACHE_FEROCEON_L2)	+= cache-feroceon-l2.o
- obj-$(CONFIG_CACHE_L2X0)	+= cache-l2x0.o
- obj-$(CONFIG_CACHE_XSC3L2)	+= cache-xsc3l2.o
-diff --git a/arch/arm/mm/l2c-common.c b/arch/arm/mm/l2c-common.c
-new file mode 100644
-index 000000000000..10a3cf28c362
---- /dev/null
-+++ b/arch/arm/mm/l2c-common.c
-@@ -0,0 +1,20 @@
-+/*
-+ * Copyright (C) 2010 ARM Ltd.
-+ * Written by Catalin Marinas <catalin.marinas@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <linux/bug.h>
-+#include <linux/smp.h>
-+#include <asm/outercache.h>
++	sysreg_system_controller: syscon at 10050000 {
++		compatible = "samsung,exynos5250-sys", "syscon";
++		reg = <0x10050000 0x5000>;
++	};
 +
-+void outer_disable(void)
-+{
-+	WARN_ON(!irqs_disabled());
-+	WARN_ON(num_online_cpus() > 1);
+ 	watchdog at 101D0000 {
+ 		compatible = "samsung,exynos5250-wdt";
+ 		reg = <0x101D0000 0x100>;
+diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+index c3a9a66..cfa3755 100644
+--- a/arch/arm/boot/dts/exynos5420.dtsi
++++ b/arch/arm/boot/dts/exynos5420.dtsi
+@@ -675,6 +675,11 @@
+ 		reg = <0x10040000 0x5000>;
+ 	};
+ 
++	sysreg_system_controller: syscon at 10050000 {
++		compatible = "samsung,exynos5420-sys", "syscon";
++		reg = <0x10050000 0x5000>;
++	};
 +
-+	if (outer_cache.disable)
-+		outer_cache.disable();
-+}
+ 	tmu_cpu0: tmu at 10060000 {
+ 		compatible = "samsung,exynos5420-tmu";
+ 		reg = <0x10060000 0x100>;
 -- 
-1.8.3.1
+1.7.10.4
