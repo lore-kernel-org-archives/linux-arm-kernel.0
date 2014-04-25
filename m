@@ -1,38 +1,91 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Fri, 25 Apr 2014 10:22:02 -0500
-Subject: [GIT PULL] clk: socfpga: Clock fix for v3.15
-Message-ID: <1398439322-30616-1-git-send-email-dinguyen@altera.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 25 Apr 2014 08:31:26 -0700
+Subject: [PATCH 1/3] clk: divider: Fix best div calculation for
+ power-of-two and table dividers
+In-Reply-To: <1391012648-12481-2-git-send-email-maxime.coquelin@st.com>
+References: <1391012648-12481-1-git-send-email-maxime.coquelin@st.com>
+ <1391012648-12481-2-git-send-email-maxime.coquelin@st.com>
+Message-ID: <20140425153126.23156.76868@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Quoting Maxime COQUELIN (2014-01-29 08:24:06)
+> The divider returned by clk_divider_bestdiv() is likely to be invalid in case
+> of power-of-two and table dividers when CLK_SET_RATE_PARENT flag isn't set.
+> 
+> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
 
-Please consider pulling this patch for 3.15 fixes.
+I've taken this into clk-fixes for 3.15-rcX.
 
 Thanks,
+Mike
 
-The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
-
-  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
-
-are available in the git repository at:
-
-  git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga-clk-fix-for-3.15
-
-for you to fetch changes up to 812819daf3298040833b4902730821c3441bffc7:
-
-  clk: socfpga: fix clock driver for 3.15 (2014-04-25 10:06:14 -0500)
-
-----------------------------------------------------------------
-clk: socfpga: clock fix for v3.15
-
-Currently on 3.15-rc1, the SOCFPGA platform is unable to boot. This patch
-fixes the issue and allows the platform to boot.
-
-----------------------------------------------------------------
-Dinh Nguyen (1):
-      clk: socfpga: fix clock driver for 3.15
-
- drivers/clk/socfpga/clk-pll.c |    7 +++++++
- drivers/clk/socfpga/clk.c     |   23 +++--------------------
- 2 files changed, 10 insertions(+), 20 deletions(-)
+> ---
+>  drivers/clk/clk-divider.c |   37 ++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 36 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+> index 5543b7d..2137d58 100644
+> --- a/drivers/clk/clk-divider.c
+> +++ b/drivers/clk/clk-divider.c
+> @@ -144,6 +144,37 @@ static bool _is_valid_div(struct clk_divider *divider, unsigned int div)
+>         return true;
+>  }
+>  
+> +static int _round_up_table(const struct clk_div_table *table, int div)
+> +{
+> +       const struct clk_div_table *clkt;
+> +       int up = _get_table_maxdiv(table);
+> +
+> +       for (clkt = table; clkt->div; clkt++) {
+> +               if (clkt->div == div)
+> +                       return clkt->div;
+> +               else if (clkt->div < div)
+> +                       continue;
+> +
+> +               if ((clkt->div - div) < (up - div))
+> +                       up = clkt->div;
+> +       }
+> +
+> +       return up;
+> +}
+> +
+> +static int _div_round_up(struct clk_divider *divider,
+> +               unsigned long parent_rate, unsigned long rate)
+> +{
+> +       int div = DIV_ROUND_UP(parent_rate, rate);
+> +
+> +       if (divider->flags & CLK_DIVIDER_POWER_OF_TWO)
+> +               div = __roundup_pow_of_two(div);
+> +       if (divider->table)
+> +               div = _round_up_table(divider->table, div);
+> +
+> +       return div;
+> +}
+> +
+>  static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
+>                 unsigned long *best_parent_rate)
+>  {
+> @@ -159,7 +190,7 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
+>  
+>         if (!(__clk_get_flags(hw->clk) & CLK_SET_RATE_PARENT)) {
+>                 parent_rate = *best_parent_rate;
+> -               bestdiv = DIV_ROUND_UP(parent_rate, rate);
+> +               bestdiv = _div_round_up(divider, parent_rate, rate);
+>                 bestdiv = bestdiv == 0 ? 1 : bestdiv;
+>                 bestdiv = bestdiv > maxdiv ? maxdiv : bestdiv;
+>                 return bestdiv;
+> @@ -219,6 +250,10 @@ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
+>         u32 val;
+>  
+>         div = parent_rate / rate;
+> +
+> +       if (!_is_valid_div(divider, div))
+> +               return -EINVAL;
+> +
+>         value = _get_val(divider, div);
+>  
+>         if (value > div_mask(divider))
+> -- 
+> 1.7.9.5
+> 
