@@ -1,576 +1,188 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:32:34 +0100
-Subject: [PATCH 019/222] ARM: l2c: group implementation specific code together
+Date: Fri, 25 Apr 2014 12:32:39 +0100
+Subject: [PATCH 020/222] ARM: l2c: provide enable method
 In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
 References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WdeMs-0007EO-3a@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WdeMx-0007ES-74@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Back in the mists of time, someone decided that it would be a good idea
-to group like functions together - so all the save functions in one
-place, all the resume functions in another, all the OF parsing functions
-some place else.
-
-This makes it difficult to get an overview on what a particular
-implementation is doing - grouping an implementations specific functions
-together makes more sense, because you can see what it's doing without
-the clutter of other implementations.
-
-Organise it according to implementation.
+Providing an enable method gives L2 cache controllers a chance to do
+special handling at enable time.  This allows us to remove a hack in
+l2x0_unlock() for Marvell Aurora L2 caches.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mm/cache-l2x0.c | 502 +++++++++++++++++++++++------------------------
- 1 file changed, 251 insertions(+), 251 deletions(-)
+ arch/arm/mm/cache-l2x0.c | 80 +++++++++++++++++++++++++++++++++++++-----------
+ 1 file changed, 62 insertions(+), 18 deletions(-)
 
 diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 3b6213838054..09fe0f5eada5 100644
+index 09fe0f5eada5..2adb82e7f4b3 100644
 --- a/arch/arm/mm/cache-l2x0.c
 +++ b/arch/arm/mm/cache-l2x0.c
-@@ -464,6 +464,175 @@ static int l2_wt_override;
-  * pass it though the device tree */
- static u32 cache_id_part_number_from_dt;
+@@ -29,7 +29,9 @@
+ #include "cache-aurora-l2.h"
  
-+static void __init l2x0_of_parse(const struct device_node *np,
-+				 u32 *aux_val, u32 *aux_mask)
-+{
-+	u32 data[2] = { 0, 0 };
-+	u32 tag = 0;
-+	u32 dirty = 0;
-+	u32 val = 0, mask = 0;
-+
-+	of_property_read_u32(np, "arm,tag-latency", &tag);
-+	if (tag) {
-+		mask |= L2X0_AUX_CTRL_TAG_LATENCY_MASK;
-+		val |= (tag - 1) << L2X0_AUX_CTRL_TAG_LATENCY_SHIFT;
-+	}
-+
-+	of_property_read_u32_array(np, "arm,data-latency",
-+				   data, ARRAY_SIZE(data));
-+	if (data[0] && data[1]) {
-+		mask |= L2X0_AUX_CTRL_DATA_RD_LATENCY_MASK |
-+			L2X0_AUX_CTRL_DATA_WR_LATENCY_MASK;
-+		val |= ((data[0] - 1) << L2X0_AUX_CTRL_DATA_RD_LATENCY_SHIFT) |
-+		       ((data[1] - 1) << L2X0_AUX_CTRL_DATA_WR_LATENCY_SHIFT);
-+	}
-+
-+	of_property_read_u32(np, "arm,dirty-latency", &dirty);
-+	if (dirty) {
-+		mask |= L2X0_AUX_CTRL_DIRTY_LATENCY_MASK;
-+		val |= (dirty - 1) << L2X0_AUX_CTRL_DIRTY_LATENCY_SHIFT;
-+	}
-+
-+	*aux_val &= ~mask;
-+	*aux_val |= val;
-+	*aux_mask &= ~mask;
-+}
-+
-+static void l2x0_resume(void)
-+{
-+	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & L2X0_CTRL_EN)) {
-+		/* restore aux ctrl and enable l2 */
-+		l2x0_unlock(readl_relaxed(l2x0_base + L2X0_CACHE_ID));
-+
-+		writel_relaxed(l2x0_saved_regs.aux_ctrl, l2x0_base +
-+			L2X0_AUX_CTRL);
-+
-+		l2x0_inv_all();
-+
-+		writel_relaxed(L2X0_CTRL_EN, l2x0_base + L2X0_CTRL);
-+	}
-+}
-+
-+static const struct l2c_init_data of_l2x0_data __initconst = {
-+	.of_parse = l2x0_of_parse,
-+	.outer_cache = {
-+		.inv_range   = l2x0_inv_range,
-+		.clean_range = l2x0_clean_range,
-+		.flush_range = l2x0_flush_range,
-+		.flush_all   = l2x0_flush_all,
-+		.disable     = l2x0_disable,
-+		.sync        = l2x0_cache_sync,
-+		.resume      = l2x0_resume,
-+	},
-+};
-+
-+static void __init pl310_of_parse(const struct device_node *np,
-+				  u32 *aux_val, u32 *aux_mask)
-+{
-+	u32 data[3] = { 0, 0, 0 };
-+	u32 tag[3] = { 0, 0, 0 };
-+	u32 filter[2] = { 0, 0 };
-+
-+	of_property_read_u32_array(np, "arm,tag-latency", tag, ARRAY_SIZE(tag));
-+	if (tag[0] && tag[1] && tag[2])
-+		writel_relaxed(
-+			((tag[0] - 1) << L2X0_LATENCY_CTRL_RD_SHIFT) |
-+			((tag[1] - 1) << L2X0_LATENCY_CTRL_WR_SHIFT) |
-+			((tag[2] - 1) << L2X0_LATENCY_CTRL_SETUP_SHIFT),
-+			l2x0_base + L2X0_TAG_LATENCY_CTRL);
-+
-+	of_property_read_u32_array(np, "arm,data-latency",
-+				   data, ARRAY_SIZE(data));
-+	if (data[0] && data[1] && data[2])
-+		writel_relaxed(
-+			((data[0] - 1) << L2X0_LATENCY_CTRL_RD_SHIFT) |
-+			((data[1] - 1) << L2X0_LATENCY_CTRL_WR_SHIFT) |
-+			((data[2] - 1) << L2X0_LATENCY_CTRL_SETUP_SHIFT),
-+			l2x0_base + L2X0_DATA_LATENCY_CTRL);
-+
-+	of_property_read_u32_array(np, "arm,filter-ranges",
-+				   filter, ARRAY_SIZE(filter));
-+	if (filter[1]) {
-+		writel_relaxed(ALIGN(filter[0] + filter[1], SZ_1M),
-+			       l2x0_base + L2X0_ADDR_FILTER_END);
-+		writel_relaxed((filter[0] & ~(SZ_1M - 1)) | L2X0_ADDR_FILTER_EN,
-+			       l2x0_base + L2X0_ADDR_FILTER_START);
-+	}
-+}
-+
-+static void __init pl310_save(void __iomem *base)
-+{
-+	u32 l2x0_revision = readl_relaxed(base + L2X0_CACHE_ID) &
-+		L2X0_CACHE_ID_RTL_MASK;
-+
-+	l2x0_saved_regs.tag_latency = readl_relaxed(base +
-+		L2X0_TAG_LATENCY_CTRL);
-+	l2x0_saved_regs.data_latency = readl_relaxed(base +
-+		L2X0_DATA_LATENCY_CTRL);
-+	l2x0_saved_regs.filter_end = readl_relaxed(base +
-+		L2X0_ADDR_FILTER_END);
-+	l2x0_saved_regs.filter_start = readl_relaxed(base +
-+		L2X0_ADDR_FILTER_START);
-+
-+	if (l2x0_revision >= L310_CACHE_ID_RTL_R2P0) {
-+		/*
-+		 * From r2p0, there is Prefetch offset/control register
-+		 */
-+		l2x0_saved_regs.prefetch_ctrl = readl_relaxed(base +
-+			L2X0_PREFETCH_CTRL);
-+		/*
-+		 * From r3p0, there is Power control register
-+		 */
-+		if (l2x0_revision >= L310_CACHE_ID_RTL_R3P0)
-+			l2x0_saved_regs.pwr_ctrl = readl_relaxed(base +
-+				L2X0_POWER_CTRL);
-+	}
-+}
-+
-+static void pl310_resume(void)
-+{
-+	u32 l2x0_revision;
-+
-+	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & L2X0_CTRL_EN)) {
-+		/* restore pl310 setup */
-+		writel_relaxed(l2x0_saved_regs.tag_latency,
-+			l2x0_base + L2X0_TAG_LATENCY_CTRL);
-+		writel_relaxed(l2x0_saved_regs.data_latency,
-+			l2x0_base + L2X0_DATA_LATENCY_CTRL);
-+		writel_relaxed(l2x0_saved_regs.filter_end,
-+			l2x0_base + L2X0_ADDR_FILTER_END);
-+		writel_relaxed(l2x0_saved_regs.filter_start,
-+			l2x0_base + L2X0_ADDR_FILTER_START);
-+
-+		l2x0_revision = readl_relaxed(l2x0_base + L2X0_CACHE_ID) &
-+			L2X0_CACHE_ID_RTL_MASK;
-+
-+		if (l2x0_revision >= L310_CACHE_ID_RTL_R2P0) {
-+			writel_relaxed(l2x0_saved_regs.prefetch_ctrl,
-+				l2x0_base + L2X0_PREFETCH_CTRL);
-+			if (l2x0_revision >= L310_CACHE_ID_RTL_R3P0)
-+				writel_relaxed(l2x0_saved_regs.pwr_ctrl,
-+					l2x0_base + L2X0_POWER_CTRL);
-+		}
-+	}
-+
-+	l2x0_resume();
-+}
-+
-+static const struct l2c_init_data of_pl310_data __initconst = {
-+	.of_parse = pl310_of_parse,
-+	.save  = pl310_save,
-+	.outer_cache = {
-+		.inv_range   = l2x0_inv_range,
-+		.clean_range = l2x0_clean_range,
-+		.flush_range = l2x0_flush_range,
-+		.flush_all   = l2x0_flush_all,
-+		.disable     = l2x0_disable,
-+		.sync        = l2x0_cache_sync,
-+		.resume      = pl310_resume,
-+	},
-+};
-+
- /*
-  * Note that the end addresses passed to Linux primitives are
-  * noninclusive, while the hardware cache range operations use
-@@ -562,6 +731,75 @@ static void aurora_flush_range(unsigned long start, unsigned long end)
+ struct l2c_init_data {
++	unsigned num_lock;
+ 	void (*of_parse)(const struct device_node *, u32 *, u32 *);
++	void (*enable)(void __iomem *, u32, unsigned);
+ 	void (*save)(void __iomem *);
+ 	struct outer_cache_fns outer_cache;
+ };
+@@ -82,6 +84,36 @@ static inline void l2c_unlock(void __iomem *base, unsigned num)
  	}
  }
  
-+static void aurora_save(void __iomem *base)
++/*
++ * Enable the L2 cache controller.  This function must only be
++ * called when the cache controller is known to be disabled.
++ */
++static void l2c_enable(void __iomem *base, u32 aux, unsigned num_lock)
 +{
-+	l2x0_saved_regs.ctrl = readl_relaxed(base + L2X0_CTRL);
-+	l2x0_saved_regs.aux_ctrl = readl_relaxed(base + L2X0_AUX_CTRL);
++	unsigned long flags;
++
++	l2c_unlock(base, num_lock);
++
++	writel_relaxed(aux, base + L2X0_AUX_CTRL);
++
++	local_irq_save(flags);
++	__l2c_op_way(base + L2X0_INV_WAY);
++	writel_relaxed(0, base + sync_reg_offset);
++	l2c_wait_mask(base + sync_reg_offset, 1);
++	local_irq_restore(flags);
++
++	writel_relaxed(L2X0_CTRL_EN, base + L2X0_CTRL);
 +}
 +
-+static void aurora_resume(void)
++static void l2c_disable(void)
 +{
-+	if (!(readl(l2x0_base + L2X0_CTRL) & L2X0_CTRL_EN)) {
-+		writel_relaxed(l2x0_saved_regs.aux_ctrl,
-+				l2x0_base + L2X0_AUX_CTRL);
-+		writel_relaxed(l2x0_saved_regs.ctrl, l2x0_base + L2X0_CTRL);
-+	}
++	void __iomem *base = l2x0_base;
++
++	outer_cache.flush_all();
++	writel_relaxed(0, base + L2X0_CTRL);
++	dsb(st);
 +}
 +
-+static void __init aurora_broadcast_l2_commands(void)
-+{
-+	__u32 u;
-+	/* Enable Broadcasting of cache commands to L2*/
-+	__asm__ __volatile__("mrc p15, 1, %0, c15, c2, 0" : "=r"(u));
-+	u |= AURORA_CTRL_FW;		/* Set the FW bit */
-+	__asm__ __volatile__("mcr p15, 1, %0, c15, c2, 0\n" : : "r"(u));
-+	isb();
-+}
-+
-+static void __init aurora_of_parse(const struct device_node *np,
-+				u32 *aux_val, u32 *aux_mask)
-+{
-+	u32 val = AURORA_ACR_REPLACEMENT_TYPE_SEMIPLRU;
-+	u32 mask =  AURORA_ACR_REPLACEMENT_MASK;
-+
-+	of_property_read_u32(np, "cache-id-part",
-+			&cache_id_part_number_from_dt);
-+
-+	/* Determine and save the write policy */
-+	l2_wt_override = of_property_read_bool(np, "wt-override");
-+
-+	if (l2_wt_override) {
-+		val |= AURORA_ACR_FORCE_WRITE_THRO_POLICY;
-+		mask |= AURORA_ACR_FORCE_WRITE_POLICY_MASK;
-+	}
-+
-+	*aux_val &= ~mask;
-+	*aux_val |= val;
-+	*aux_mask &= ~mask;
-+}
-+
-+static const struct l2c_init_data of_aurora_with_outer_data __initconst = {
-+	.of_parse = aurora_of_parse,
-+	.save  = aurora_save,
-+	.outer_cache = {
-+		.inv_range   = aurora_inv_range,
-+		.clean_range = aurora_clean_range,
-+		.flush_range = aurora_flush_range,
-+		.flush_all   = l2x0_flush_all,
-+		.disable     = l2x0_disable,
-+		.sync        = l2x0_cache_sync,
-+		.resume      = aurora_resume,
-+	},
-+};
-+
-+static const struct l2c_init_data of_aurora_no_outer_data __initconst = {
-+	.of_parse = aurora_of_parse,
-+	.save  = aurora_save,
-+	.outer_cache = {
-+		.resume      = aurora_resume,
-+	},
-+};
-+
- /*
-  * For certain Broadcom SoCs, depending on the address range, different offsets
-  * need to be added to the address before passing it to L2 for
-@@ -703,108 +941,19 @@ static void bcm_flush_range(unsigned long start, unsigned long end)
- 		new_end);
- }
- 
--static void __init l2x0_of_parse(const struct device_node *np,
--				 u32 *aux_val, u32 *aux_mask)
--{
--	u32 data[2] = { 0, 0 };
--	u32 tag = 0;
--	u32 dirty = 0;
--	u32 val = 0, mask = 0;
--
--	of_property_read_u32(np, "arm,tag-latency", &tag);
--	if (tag) {
--		mask |= L2X0_AUX_CTRL_TAG_LATENCY_MASK;
--		val |= (tag - 1) << L2X0_AUX_CTRL_TAG_LATENCY_SHIFT;
--	}
--
--	of_property_read_u32_array(np, "arm,data-latency",
--				   data, ARRAY_SIZE(data));
--	if (data[0] && data[1]) {
--		mask |= L2X0_AUX_CTRL_DATA_RD_LATENCY_MASK |
--			L2X0_AUX_CTRL_DATA_WR_LATENCY_MASK;
--		val |= ((data[0] - 1) << L2X0_AUX_CTRL_DATA_RD_LATENCY_SHIFT) |
--		       ((data[1] - 1) << L2X0_AUX_CTRL_DATA_WR_LATENCY_SHIFT);
--	}
--
--	of_property_read_u32(np, "arm,dirty-latency", &dirty);
--	if (dirty) {
--		mask |= L2X0_AUX_CTRL_DIRTY_LATENCY_MASK;
--		val |= (dirty - 1) << L2X0_AUX_CTRL_DIRTY_LATENCY_SHIFT;
--	}
--
--	*aux_val &= ~mask;
--	*aux_val |= val;
--	*aux_mask &= ~mask;
--}
--
--static void __init pl310_of_parse(const struct device_node *np,
--				  u32 *aux_val, u32 *aux_mask)
--{
--	u32 data[3] = { 0, 0, 0 };
--	u32 tag[3] = { 0, 0, 0 };
--	u32 filter[2] = { 0, 0 };
--
--	of_property_read_u32_array(np, "arm,tag-latency", tag, ARRAY_SIZE(tag));
--	if (tag[0] && tag[1] && tag[2])
--		writel_relaxed(
--			((tag[0] - 1) << L2X0_LATENCY_CTRL_RD_SHIFT) |
--			((tag[1] - 1) << L2X0_LATENCY_CTRL_WR_SHIFT) |
--			((tag[2] - 1) << L2X0_LATENCY_CTRL_SETUP_SHIFT),
--			l2x0_base + L2X0_TAG_LATENCY_CTRL);
--
--	of_property_read_u32_array(np, "arm,data-latency",
--				   data, ARRAY_SIZE(data));
--	if (data[0] && data[1] && data[2])
--		writel_relaxed(
--			((data[0] - 1) << L2X0_LATENCY_CTRL_RD_SHIFT) |
--			((data[1] - 1) << L2X0_LATENCY_CTRL_WR_SHIFT) |
--			((data[2] - 1) << L2X0_LATENCY_CTRL_SETUP_SHIFT),
--			l2x0_base + L2X0_DATA_LATENCY_CTRL);
--
--	of_property_read_u32_array(np, "arm,filter-ranges",
--				   filter, ARRAY_SIZE(filter));
--	if (filter[1]) {
--		writel_relaxed(ALIGN(filter[0] + filter[1], SZ_1M),
--			       l2x0_base + L2X0_ADDR_FILTER_END);
--		writel_relaxed((filter[0] & ~(SZ_1M - 1)) | L2X0_ADDR_FILTER_EN,
--			       l2x0_base + L2X0_ADDR_FILTER_START);
--	}
--}
--
--static void __init pl310_save(void __iomem *base)
--{
--	u32 l2x0_revision = readl_relaxed(base + L2X0_CACHE_ID) &
--		L2X0_CACHE_ID_RTL_MASK;
--
--	l2x0_saved_regs.tag_latency = readl_relaxed(base +
--		L2X0_TAG_LATENCY_CTRL);
--	l2x0_saved_regs.data_latency = readl_relaxed(base +
--		L2X0_DATA_LATENCY_CTRL);
--	l2x0_saved_regs.filter_end = readl_relaxed(base +
--		L2X0_ADDR_FILTER_END);
--	l2x0_saved_regs.filter_start = readl_relaxed(base +
--		L2X0_ADDR_FILTER_START);
--
--	if (l2x0_revision >= L310_CACHE_ID_RTL_R2P0) {
--		/*
--		 * From r2p0, there is Prefetch offset/control register
--		 */
--		l2x0_saved_regs.prefetch_ctrl = readl_relaxed(base +
--			L2X0_PREFETCH_CTRL);
--		/*
--		 * From r3p0, there is Power control register
--		 */
--		if (l2x0_revision >= L310_CACHE_ID_RTL_R3P0)
--			l2x0_saved_regs.pwr_ctrl = readl_relaxed(base +
--				L2X0_POWER_CTRL);
--	}
--}
--
--static void aurora_save(void __iomem *base)
--{
--	l2x0_saved_regs.ctrl = readl_relaxed(base + L2X0_CTRL);
--	l2x0_saved_regs.aux_ctrl = readl_relaxed(base + L2X0_AUX_CTRL);
--}
-+static const struct l2c_init_data of_bcm_l2x0_data __initconst = {
-+	.of_parse = pl310_of_parse,
-+	.save  = pl310_save,
-+	.outer_cache = {
-+		.inv_range   = bcm_inv_range,
-+		.clean_range = bcm_clean_range,
-+		.flush_range = bcm_flush_range,
-+		.flush_all   = l2x0_flush_all,
-+		.disable     = l2x0_disable,
-+		.sync        = l2x0_cache_sync,
-+		.resume      = pl310_resume,
-+	},
-+};
- 
- static void __init tauros3_save(void __iomem *base)
+ #ifdef CONFIG_CACHE_PL310
+ static inline void cache_wait(void __iomem *reg, unsigned long mask)
  {
-@@ -814,60 +963,6 @@ static void __init tauros3_save(void __iomem *base)
- 		readl_relaxed(base + L2X0_PREFETCH_CTRL);
+@@ -325,9 +357,6 @@ static void l2x0_unlock(u32 cache_id)
+ 	case L2X0_CACHE_ID_PART_L310:
+ 		lockregs = 8;
+ 		break;
+-	case AURORA_CACHE_ID:
+-		lockregs = 4;
+-		break;
+ 	default:
+ 		/* L210 and unknown types */
+ 		lockregs = 1;
+@@ -337,7 +366,22 @@ static void l2x0_unlock(u32 cache_id)
+ 	l2c_unlock(l2x0_base, lockregs);
  }
  
--static void l2x0_resume(void)
--{
++static void l2x0_enable(void __iomem *base, u32 aux, unsigned num_lock)
++{
++	/* Make sure that I&D is not locked down when starting */
++	l2x0_unlock(readl_relaxed(base + L2X0_CACHE_ID));
++
++	/* l2x0 controller is disabled */
++	writel_relaxed(aux, base + L2X0_AUX_CTRL);
++
++	l2x0_inv_all();
++
++	/* enable L2X0 */
++	writel_relaxed(L2X0_CTRL_EN, base + L2X0_CTRL);
++}
++
+ static const struct l2c_init_data l2x0_init_fns __initconst = {
++	.enable = l2x0_enable,
+ 	.outer_cache = {
+ 		.inv_range = l2x0_inv_range,
+ 		.clean_range = l2x0_clean_range,
+@@ -412,22 +456,11 @@ static void __init __l2c_init(const struct l2c_init_data *data,
+ 	l2x0_size = ways * way_size * SZ_1K;
+ 
+ 	/*
+-	 * Check if l2x0 controller is already enabled.
+-	 * If you are booting from non-secure mode
+-	 * accessing the below registers will fault.
++	 * Check if l2x0 controller is already enabled.  If we are booting
++	 * in non-secure mode accessing the below registers will fault.
+ 	 */
 -	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & L2X0_CTRL_EN)) {
--		/* restore aux ctrl and enable l2 */
--		l2x0_unlock(readl_relaxed(l2x0_base + L2X0_CACHE_ID));
+-		/* Make sure that I&D is not locked down when starting */
+-		l2x0_unlock(cache_id);
 -
--		writel_relaxed(l2x0_saved_regs.aux_ctrl, l2x0_base +
--			L2X0_AUX_CTRL);
+-		/* l2x0 controller is disabled */
+-		writel_relaxed(aux, l2x0_base + L2X0_AUX_CTRL);
 -
 -		l2x0_inv_all();
 -
+-		/* enable L2X0 */
 -		writel_relaxed(L2X0_CTRL_EN, l2x0_base + L2X0_CTRL);
 -	}
--}
--
--static void pl310_resume(void)
--{
--	u32 l2x0_revision;
--
--	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & L2X0_CTRL_EN)) {
--		/* restore pl310 setup */
--		writel_relaxed(l2x0_saved_regs.tag_latency,
--			l2x0_base + L2X0_TAG_LATENCY_CTRL);
--		writel_relaxed(l2x0_saved_regs.data_latency,
--			l2x0_base + L2X0_DATA_LATENCY_CTRL);
--		writel_relaxed(l2x0_saved_regs.filter_end,
--			l2x0_base + L2X0_ADDR_FILTER_END);
--		writel_relaxed(l2x0_saved_regs.filter_start,
--			l2x0_base + L2X0_ADDR_FILTER_START);
--
--		l2x0_revision = readl_relaxed(l2x0_base + L2X0_CACHE_ID) &
--			L2X0_CACHE_ID_RTL_MASK;
--
--		if (l2x0_revision >= L310_CACHE_ID_RTL_R2P0) {
--			writel_relaxed(l2x0_saved_regs.prefetch_ctrl,
--				l2x0_base + L2X0_PREFETCH_CTRL);
--			if (l2x0_revision >= L310_CACHE_ID_RTL_R3P0)
--				writel_relaxed(l2x0_saved_regs.pwr_ctrl,
--					l2x0_base + L2X0_POWER_CTRL);
--		}
--	}
--
--	l2x0_resume();
--}
--
--static void aurora_resume(void)
--{
--	if (!(readl(l2x0_base + L2X0_CTRL) & L2X0_CTRL_EN)) {
--		writel_relaxed(l2x0_saved_regs.aux_ctrl,
--				l2x0_base + L2X0_AUX_CTRL);
--		writel_relaxed(l2x0_saved_regs.ctrl, l2x0_base + L2X0_CTRL);
--	}
--}
--
- static void tauros3_resume(void)
- {
- 	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & L2X0_CTRL_EN)) {
-@@ -880,87 +975,6 @@ static void tauros3_resume(void)
- 	l2x0_resume();
++	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & L2X0_CTRL_EN))
++		data->enable(l2x0_base, aux, data->num_lock);
+ 
+ 	/* Re-read it in case some bits are reserved. */
+ 	aux = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
+@@ -515,6 +548,7 @@ static void l2x0_resume(void)
+ 
+ static const struct l2c_init_data of_l2x0_data __initconst = {
+ 	.of_parse = l2x0_of_parse,
++	.enable = l2x0_enable,
+ 	.outer_cache = {
+ 		.inv_range   = l2x0_inv_range,
+ 		.clean_range = l2x0_clean_range,
+@@ -620,7 +654,9 @@ static void pl310_resume(void)
  }
  
--static void __init aurora_broadcast_l2_commands(void)
--{
--	__u32 u;
--	/* Enable Broadcasting of cache commands to L2*/
--	__asm__ __volatile__("mrc p15, 1, %0, c15, c2, 0" : "=r"(u));
--	u |= AURORA_CTRL_FW;		/* Set the FW bit */
--	__asm__ __volatile__("mcr p15, 1, %0, c15, c2, 0\n" : : "r"(u));
--	isb();
--}
--
--static void __init aurora_of_parse(const struct device_node *np,
--				u32 *aux_val, u32 *aux_mask)
--{
--	u32 val = AURORA_ACR_REPLACEMENT_TYPE_SEMIPLRU;
--	u32 mask =  AURORA_ACR_REPLACEMENT_MASK;
--
--	of_property_read_u32(np, "cache-id-part",
--			&cache_id_part_number_from_dt);
--
--	/* Determine and save the write policy */
--	l2_wt_override = of_property_read_bool(np, "wt-override");
--
--	if (l2_wt_override) {
--		val |= AURORA_ACR_FORCE_WRITE_THRO_POLICY;
--		mask |= AURORA_ACR_FORCE_WRITE_POLICY_MASK;
--	}
--
--	*aux_val &= ~mask;
--	*aux_val |= val;
--	*aux_mask &= ~mask;
--}
--
--static const struct l2c_init_data of_pl310_data __initconst = {
--	.of_parse = pl310_of_parse,
--	.save  = pl310_save,
--	.outer_cache = {
--		.inv_range   = l2x0_inv_range,
--		.clean_range = l2x0_clean_range,
--		.flush_range = l2x0_flush_range,
--		.flush_all   = l2x0_flush_all,
--		.disable     = l2x0_disable,
--		.sync        = l2x0_cache_sync,
--		.resume      = pl310_resume,
--	},
--};
--
--static const struct l2c_init_data of_l2x0_data __initconst = {
--	.of_parse = l2x0_of_parse,
--	.outer_cache = {
--		.inv_range   = l2x0_inv_range,
--		.clean_range = l2x0_clean_range,
--		.flush_range = l2x0_flush_range,
--		.flush_all   = l2x0_flush_all,
--		.disable     = l2x0_disable,
--		.sync        = l2x0_cache_sync,
--		.resume      = l2x0_resume,
--	},
--};
--
--static const struct l2c_init_data of_aurora_with_outer_data __initconst = {
--	.of_parse = aurora_of_parse,
--	.save  = aurora_save,
--	.outer_cache = {
--		.inv_range   = aurora_inv_range,
--		.clean_range = aurora_clean_range,
--		.flush_range = aurora_flush_range,
--		.flush_all   = l2x0_flush_all,
--		.disable     = l2x0_disable,
--		.sync        = l2x0_cache_sync,
--		.resume      = aurora_resume,
--	},
--};
--
--static const struct l2c_init_data of_aurora_no_outer_data __initconst = {
--	.of_parse = aurora_of_parse,
--	.save  = aurora_save,
--	.outer_cache = {
--		.resume      = aurora_resume,
--	},
--};
--
- static const struct l2c_init_data of_tauros3_data __initconst = {
- 	.save  = tauros3_save,
- 	/* Tauros3 broadcasts L1 cache operations to L2 */
-@@ -969,20 +983,6 @@ static const struct l2c_init_data of_tauros3_data __initconst = {
- 	},
+ static const struct l2c_init_data of_pl310_data __initconst = {
++	.num_lock = 8,
+ 	.of_parse = pl310_of_parse,
++	.enable = l2c_enable,
+ 	.save  = pl310_save,
+ 	.outer_cache = {
+ 		.inv_range   = l2x0_inv_range,
+@@ -779,7 +815,9 @@ static void __init aurora_of_parse(const struct device_node *np,
+ }
+ 
+ static const struct l2c_init_data of_aurora_with_outer_data __initconst = {
++	.num_lock = 4,
+ 	.of_parse = aurora_of_parse,
++	.enable = l2c_enable,
+ 	.save  = aurora_save,
+ 	.outer_cache = {
+ 		.inv_range   = aurora_inv_range,
+@@ -793,7 +831,9 @@ static const struct l2c_init_data of_aurora_with_outer_data __initconst = {
  };
  
--static const struct l2c_init_data of_bcm_l2x0_data __initconst = {
--	.of_parse = pl310_of_parse,
--	.save  = pl310_save,
--	.outer_cache = {
--		.inv_range   = bcm_inv_range,
--		.clean_range = bcm_clean_range,
--		.flush_range = bcm_flush_range,
--		.flush_all   = l2x0_flush_all,
--		.disable     = l2x0_disable,
--		.sync        = l2x0_cache_sync,
--		.resume      = pl310_resume,
--	},
--};
--
- #define L2C_ID(name, fns) { .compatible = name, .data = (void *)&fns }
- static const struct of_device_id l2x0_ids[] __initconst = {
- 	L2C_ID("arm,l210-cache", of_l2x0_data),
+ static const struct l2c_init_data of_aurora_no_outer_data __initconst = {
++	.num_lock = 4,
+ 	.of_parse = aurora_of_parse,
++	.enable = l2c_enable,
+ 	.save  = aurora_save,
+ 	.outer_cache = {
+ 		.resume      = aurora_resume,
+@@ -942,7 +982,9 @@ static void bcm_flush_range(unsigned long start, unsigned long end)
+ }
+ 
+ static const struct l2c_init_data of_bcm_l2x0_data __initconst = {
++	.num_lock = 8,
+ 	.of_parse = pl310_of_parse,
++	.enable = l2c_enable,
+ 	.save  = pl310_save,
+ 	.outer_cache = {
+ 		.inv_range   = bcm_inv_range,
+@@ -976,6 +1018,8 @@ static void tauros3_resume(void)
+ }
+ 
+ static const struct l2c_init_data of_tauros3_data __initconst = {
++	.num_lock = 8,
++	.enable = l2c_enable,
+ 	.save  = tauros3_save,
+ 	/* Tauros3 broadcasts L1 cache operations to L2 */
+ 	.outer_cache = {
 -- 
 1.8.3.1
