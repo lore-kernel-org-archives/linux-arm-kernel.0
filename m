@@ -1,56 +1,48 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 25 Apr 2014 15:44:44 -0700
-Subject: [RFC/PATCH 0/4] Use wound/wait mutexes in the common clock framework
-Message-ID: <1398465888-12610-1-git-send-email-sboyd@codeaurora.org>
+Date: Fri, 25 Apr 2014 15:44:47 -0700
+Subject: [RFC/PATCH 3/4] clk: Use lockless functions for debug printing
+In-Reply-To: <1398465888-12610-1-git-send-email-sboyd@codeaurora.org>
+References: <1398465888-12610-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1398465888-12610-4-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The prepare mutex in the common clock framework can lead to tasks waiting a
-long time for other tasks to finish a frequency switch or prepare/unprepare
-step. In my particular case I have a clock controlled by a co-processor that
-can take 10s of millliseconds to change rate. I've seen scenarios where it can
-take more than 20ms for another thread to acquire the prepare mutex because
-it's waiting on the co-processor to finish changing the rate. Pair this with a
-display driver that wants to scale it's clock up before drawing a frame and you
-may start dropping frames at 60FPS (one frame is budgeted 16ms). Similar
-scenarios exist like CPUfreq scaling getting blocked for large amounts of time.
+In the near future we're going to move the prepare lock to a
+per-clock ww_mutex. Use the lockless functions here for printing
+the rate and accuracy so that we don't run into AA deadlocks in
+the future.
 
-This patchset attempts to remedy this problem by introducing a per-clock
-wwmutex. This allows multiple threads to be traversing and updating the tree at
-the same time granted they don't touch the same subtree. In my testcase
-this removes the contention on the co-processor clocks and allows the display
-driver to scale the clock up and down in parallel.
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/clk/clk.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-There is a drawback though, we lose the recursive mutex property. I don't have
-a good solution for this besides "don't do that" and I believe we actually have
-usecases for such a thing? Technically a thread recursing into the clock
-framework probably wouldn't be acquiring the same locks (and even if it was we
-could recognize that this is the same thread acquiring it again) but due to the
-way wound/wait mutexes work we may need to release all locks and try again the
-second time we're in the clock framework and that sounds really annoying to
-handle. We'd need to have some list of threads and acquire contexts and then we
-would need to rely on drivers returning -EDEADLK through the ops, etc. At least
-lockdep will complain loudly when you try this so it isn't a silent failure.
-
-Due to the loss of recursion we can't allow clock drivers to call the
-non-underscore versions of the clock APIs either. I don't see too many users
-right now under drivers/clk but those would need to be updated before these
-patches could be applied.
-
-Please note these patches are based on some cleanup patches I sent already[1]
-
-Stephen Boyd (4):
-  clk: Recalc rate and accuracy in underscore functions if not caching
-  clk: Make __clk_lookup() use a list instead of tree search
-  clk: Use lockless functions for debug printing
-  clk: Use ww_mutexes for clk_prepare_{lock/unlock}
-
- drivers/clk/clk.c           | 598 +++++++++++++++++++++++++++++++++++---------
- include/linux/clk-private.h |   4 +
- 2 files changed, 478 insertions(+), 124 deletions(-)
-
-[1] https://lkml.org/lkml/2014/3/26/423
-
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index fd22a4583013..48b3a5594839 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -111,8 +111,8 @@ static void clk_summary_show_one(struct seq_file *s, struct clk *c, int level)
+ 	seq_printf(s, "%*s%-*s %-11d %-12d %-10lu %-11lu",
+ 		   level * 3 + 1, "",
+ 		   30 - level * 3, c->name,
+-		   c->enable_count, c->prepare_count, clk_get_rate(c),
+-		   clk_get_accuracy(c));
++		   c->enable_count, c->prepare_count, __clk_get_rate(c),
++		   __clk_get_accuracy(c));
+ 	seq_printf(s, "\n");
+ }
+ 
+@@ -171,8 +171,8 @@ static void clk_dump_one(struct seq_file *s, struct clk *c, int level)
+ 	seq_printf(s, "\"%s\": { ", c->name);
+ 	seq_printf(s, "\"enable_count\": %d,", c->enable_count);
+ 	seq_printf(s, "\"prepare_count\": %d,", c->prepare_count);
+-	seq_printf(s, "\"rate\": %lu", clk_get_rate(c));
+-	seq_printf(s, "\"accuracy\": %lu", clk_get_accuracy(c));
++	seq_printf(s, "\"rate\": %lu", __clk_get_rate(c));
++	seq_printf(s, "\"accuracy\": %lu", __clk_get_accuracy(c));
+ }
+ 
+ static void clk_dump_subtree(struct seq_file *s, struct clk *c, int level)
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
