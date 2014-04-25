@@ -1,62 +1,79 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Fri, 25 Apr 2014 12:14:48 -0500
-Subject: [PATCH 0/3] Minor OMAP DTS fixes
-In-Reply-To: <20140425165739.GF20807@atomide.com>
-References: <1398205417-1575-1-git-send-email-s-anna@ti.com>
- <20140425165739.GF20807@atomide.com>
-Message-ID: <535A9808.70204@ti.com>
+From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
+Date: Fri, 25 Apr 2014 13:27:14 -0400
+Subject: [PATCH v7 2/3] Documentation: devicetree: Add new binding for PSCIv0.2
+In-Reply-To: <1398446835-5532-1-git-send-email-ashwin.chaugule@linaro.org>
+References: <1398446835-5532-1-git-send-email-ashwin.chaugule@linaro.org>
+Message-ID: <1398446835-5532-3-git-send-email-ashwin.chaugule@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
+The PSCI v0.2+ spec defines standard values for PSCI function IDs.
+Add a new binding entry so that pre v0.2 implementations can
+use DT entries for function IDs and v0.2+ implementations use
+standard entries as defined by the PSCIv0.2 specification.
 
-On 04/25/2014 11:57 AM, Tony Lindgren wrote:
-> * Suman Anna <s-anna@ti.com> [140422 15:24]:
->> Hi Tony, Benoit,
->>
->> This series includes couple of minor fixes in the OMAP DTS files. The patches
->> are based on 3.15-rc2.
->>
->> The first patch fixes the only WARN_ON trace present during kernel boot on
->> OMAP5 uEVM, and this has been present since some time now. 
->> [    0.045578] ------------[ cut here ]------------
->> [    0.045598] WARNING: CPU: 0 PID: 1 at arch/arm/mach-omap2/omap_hwmod.c:2538 _init+0x1c0/0x3dc()
->> [    0.045605] omap_hwmod: mailbox: doesn't have mpu register target base
->> [    0.045611] Modules linked in:
->> [    0.045625] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.15.0-rc2-00001-gb5e85a0 #45
->> [    0.045653] [<c0015724>] (unwind_backtrace) from [<c00120f4>] (show_stack+0x10/0x14)
->> [    0.045672] [<c00120f4>] (show_stack) from [<c05a1ccc>] (dump_stack+0x78/0x94)
->> [    0.045686] [<c05a1ccc>] (dump_stack) from [<c0042a74>] (warn_slowpath_common+0x6c/0x8c)
->> [    0.045698] [<c0042a74>] (warn_slowpath_common) from [<c0042b28>] (warn_slowpath_fmt+0x30/0x40)
->> [    0.045710] [<c0042b28>] (warn_slowpath_fmt) from [<c0803b40>] (_init+0x1c0/0x3dc)
->> [    0.045724] [<c0803b40>] (_init) from [<c0029c8c>] (omap_hwmod_for_each+0x34/0x5c)
->> [    0.045736] [<c0029c8c>] (omap_hwmod_for_each) from [<c08042b0>] (__omap_hwmod_setup_all+0x24/0x40)
->> [    0.045748] [<c08042b0>] (__omap_hwmod_setup_all) from [<c00088b8>] (do_one_initcall+0x34/0x160)
->> [    0.045761] [<c00088b8>] (do_one_initcall) from [<c07f7bf4>] (kernel_init_freeable+0xfc/0x1c8)
->> [    0.045772] [<c07f7bf4>] (kernel_init_freeable) from [<c059c4f4>] (kernel_init+0x8/0xe4)
->> [    0.045784] [<c059c4f4>] (kernel_init) from [<c000eaa8>] (ret_from_fork+0x14/0x2c)
->> [    0.045826] ---[ end trace c25fc521f2569d3c ]---
->>
->> The last patch eliminates the following traces on AM3517 based boards.
->> [    0.418496] platform iva.2: Cannot lookup hwmod 'iva'
->> [    0.454352] platform 48094000.mailbox: Cannot lookup hwmod 'mailbox'
->> [    0.460610] platform 480bd400.mmu: Cannot lookup hwmod 'mmu_isp'
->> [    0.464065] platform 480c9000.smartreflex: Cannot lookup hwmod 'smartreflex_mpu_iva'
->>
->> There are a few other such traces remaining, but these are all on valid nodes.
->> [    0.420275] platform 480c5000.aes: Cannot lookup hwmod 'aes'
->> [    0.462403] platform 480c3000.sham: Cannot lookup hwmod 'sham'
->> [    0.463246] platform 480cb000.smartreflex: Cannot lookup hwmod 'smartreflex_core'
->> [    0.477243] platform 480ab000.usb_otg_hs: Cannot lookup hwmod 'usb_otg_hs'
-> 
-> Thanks applying all three into omap-for-v3.15/fixes-v2 with patch
-> updated with the above warnings. Next time, please include the
-> warnings into the patch description, just leave out the time
-> stamps.
+Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/arm/psci.txt | 35 +++++++++++++++++++++++++-
+ 1 file changed, 34 insertions(+), 1 deletion(-)
 
-Thanks. I have mentioned the warning for the OMAP5 one very briefly, and
-wasn't sure if I needed to copy the entire backtrace, but will remember
-to include them in the future.
-
-regards
-Suman
+diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
+index 433afe9..d01a90b 100644
+--- a/Documentation/devicetree/bindings/arm/psci.txt
++++ b/Documentation/devicetree/bindings/arm/psci.txt
+@@ -21,7 +21,15 @@ to #0.
+ 
+ Main node required properties:
+ 
+- - compatible    : Must be "arm,psci"
++ - compatible    : should contain at least one of:
++
++				 * "arm,psci" : for implementations complying to PSCI versions prior to
++					0.2. For these cases function IDs must be provided.
++
++				 * "arm,psci-0.2" : for implementations complying to PSCI 0.2. Function
++					IDs are not required and should be ignored by an OS with PSCI 0.2
++					support, but are permitted to be present for compatibility with
++					existing software when "arm,psci" is later in the compatible list.
+ 
+  - method        : The method of calling the PSCI firmware. Permitted
+                    values are:
+@@ -45,6 +53,8 @@ Main node optional properties:
+ 
+ Example:
+ 
++Case 1: PSCI v0.1 only.
++
+ 	psci {
+ 		compatible	= "arm,psci";
+ 		method		= "smc";
+@@ -53,3 +63,26 @@ Example:
+ 		cpu_on		= <0x95c10002>;
+ 		migrate		= <0x95c10003>;
+ 	};
++
++
++Case 2: PSCI v0.2 only
++
++	psci {
++		compatible	= "arm,psci-0.2";
++		method		= "smc";
++	};
++
++Case 3: PSCI v0.2 and PSCI v0.1.
++
++	As described above, for compatibility with existing kernels, the
++	hypervisor will likely want to provide IDs, e.g.
++
++	psci {
++		compatible = "arm,psci-0.2", "arm,psci";
++		method = "hvc";
++
++		cpu_on = < arbitrary value >;
++		cpu_off = < arbitrary value >;
++
++		...
++	};
+-- 
+1.8.3.2
