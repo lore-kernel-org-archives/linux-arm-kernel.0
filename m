@@ -1,100 +1,42 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:50:41 +0100
-Subject: [PATCH 180/222] ARM: l2c: always enable non-secure access to lockdown
- registers
-In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WdeeP-0007PR-GJ@rmk-PC.arm.linux.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 25 Apr 2014 12:54:13 +0100
+Subject: [PATCH v2 3/6] ARM: dts: Device tree for AXM55xx.
+In-Reply-To: <CACRpkdaqPx3=qvUtsg44rBk+ZiscUg54HmNgETcei0LzfE9uOQ@mail.gmail.com>
+References: <cover.1398335771.git.anders.berg@lsi.com>
+ <2386bd1367aa44741979461358a72dec89608597.1398335771.git.anders.berg@lsi.com>
+ <CACRpkdbU6UashxCuPMDjEB_nbB=mXicGpjJy=HGC6r3qfxCtVQ@mail.gmail.com>
+ <20140424174741.GA23444@swsaberg01>
+ <CACRpkdZ1CA4mqcd5MA5HFmXSeGp-wspA0M6wnPbAsgL_gX76Fw@mail.gmail.com>
+ <20140425094343.GA3160@swsaberg01>
+ <CACRpkdaqPx3=qvUtsg44rBk+ZiscUg54HmNgETcei0LzfE9uOQ@mail.gmail.com>
+Message-ID: <20140425115413.GL26756@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we always write to these during the cache initialisation, it is
-a good idea to always have the non-secure access bit set.  Set it in
-core code and remove it from OMAP4.  Remove the NS access bit for the
-interrupt registers from OMAP4 as well - nothing in the kernel accesses
-that yet, and we can add it in core code when we have the need.
+On Fri, Apr 25, 2014 at 01:50:25PM +0200, Linus Walleij wrote:
+> This means that you can only get a proper, working IRQ from the
+> first line on gpio0 right? All other IRQs will be ignored.
+> 
+> I see no problem in augmenting the driver to handle this
+> if #irqs == 8, the big change needs to happen in drivers/amba/bus.c
+> that has no way to pass any more than two IRQs atm.
+> 
+> I guess the best is to augment struct amba_device with a field
+> struct resource *resource and num_resources like platform_device
+> instead of the hard-coded single resource for iomem and two
+> hardcoded IRQ placeholders, so that an arbitrary amount of
+> resources can be added to an amba_device as well. But that
+> may be quite a lot of work. (Russell will know which direction to
+> take here.)
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/mach-omap2/omap4-common.c |  6 ++----
- arch/arm/mm/cache-l2x0.c           | 23 +++++++++++++++++++++--
- 2 files changed, 23 insertions(+), 6 deletions(-)
+I definitely don't want to go down that route - I believe that the
+resource arrays are more pain than they're really worth - it requires
+a great amount of support to make that stuff work (just look at the
+amount of code there is to search the arrays, create them, etc.)
 
-diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-index 06c6a181d6ad..df3f53195c57 100644
---- a/arch/arm/mach-omap2/omap4-common.c
-+++ b/arch/arm/mach-omap2/omap4-common.c
-@@ -214,17 +214,15 @@ static int __init omap_l2_cache_init(void)
- 
- 	/* 16-way associativity, parity disabled, way size - 64KB (es2.0 +) */
- 	aux_ctrl = L310_AUX_CTRL_CACHE_REPLACE_RR |
--		   L310_AUX_CTRL_NS_LOCKDOWN |
--		   L310_AUX_CTRL_NS_INT_CTRL |
- 		   L2C_AUX_CTRL_SHARED_OVERRIDE |
- 		   L310_AUX_CTRL_DATA_PREFETCH |
- 		   L310_AUX_CTRL_INSTR_PREFETCH;
- 
- 	outer_cache.write_sec = omap4_l2c310_write_sec;
- 	if (of_have_populated_dt())
--		l2x0_of_init(aux_ctrl, 0xc19fffff);
-+		l2x0_of_init(aux_ctrl, 0xcd9fffff);
- 	else
--		l2x0_init(l2cache_base, aux_ctrl, 0xc19fffff);
-+		l2x0_init(l2cache_base, aux_ctrl, 0xcd9fffff);
- 
- 	return 0;
- }
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 333ef64873f9..efc5cabf70e0 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -440,11 +440,23 @@ static void l2c220_sync(void)
- 	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
- }
- 
-+static void l2c220_enable(void __iomem *base, u32 aux, unsigned num_lock)
-+{
-+	/*
-+	 * Always enable non-secure access to the lockdown registers -
-+	 * we write to them as part of the L2C enable sequence so they
-+	 * need to be accessible.
-+	 */
-+	aux |= L220_AUX_CTRL_NS_LOCKDOWN;
-+
-+	l2c_enable(base, aux, num_lock);
-+}
-+
- static const struct l2c_init_data l2c220_data = {
- 	.type = "L2C-220",
- 	.way_size_0 = SZ_8K,
- 	.num_lock = 1,
--	.enable = l2c_enable,
-+	.enable = l2c220_enable,
- 	.save = l2c_save,
- 	.outer_cache = {
- 		.inv_range = l2c220_inv_range,
-@@ -707,6 +719,13 @@ static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
- 			power_ctrl & L310_STNDBY_MODE_EN ? "en" : "dis");
- 	}
- 
-+	/*
-+	 * Always enable non-secure access to the lockdown registers -
-+	 * we write to them as part of the L2C enable sequence so they
-+	 * need to be accessible.
-+	 */
-+	aux |= L310_AUX_CTRL_NS_LOCKDOWN;
-+
- 	l2c_enable(base, aux, num_lock);
- 
- 	if (aux & L310_AUX_CTRL_FULL_LINE_ZERO) {
-@@ -983,7 +1002,7 @@ static const struct l2c_init_data of_l2c220_data __initconst = {
- 	.way_size_0 = SZ_8K,
- 	.num_lock = 1,
- 	.of_parse = l2x0_of_parse,
--	.enable = l2c_enable,
-+	.enable = l2c220_enable,
- 	.save = l2c_save,
- 	.outer_cache = {
- 		.inv_range   = l2c220_inv_range,
+We already have support for up to 9 IRQs, so 8 for GPIOs is already
+catered for.
+
 -- 
-1.8.3.1
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
