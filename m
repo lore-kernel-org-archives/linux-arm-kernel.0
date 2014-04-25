@@ -1,36 +1,33 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 25 Apr 2014 16:07:10 +0200
-Subject: [PATCH v2 12/18] ARM: mvebu: Add Device Tree description of USB
- cluster controller on Armada 375
+Date: Fri, 25 Apr 2014 16:07:07 +0200
+Subject: [PATCH v2 09/18] ARM: configs: Add usb_xhci_mvebu to
+ multi_v7_defconfig
 In-Reply-To: <1398434836-18908-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1398434836-18908-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1398434836-18908-13-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1398434836-18908-10-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Armada 375, the USB cluster allows to control the cluster composed
-of the USB2 and USB3 host controllers.
+The Marvell Armada 38x platform needs the xhci_mvebu driver enabled
+for the xHCI USB hosts, so this commit enables the corresponding
+Kconfig option in multi_v7_defconfig.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-375.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
-index 3877693fb2d8..0e0036800071 100644
---- a/arch/arm/boot/dts/armada-375.dtsi
-+++ b/arch/arm/boot/dts/armada-375.dtsi
-@@ -320,6 +320,11 @@
- 				clocks = <&coreclk 0>;
- 			};
- 
-+			usb-cluster at 18400 {
-+				compatible = "marvell,armada-375-usb-cluster";
-+				reg = <0x18400 0x4>;
-+			};
-+
- 			xor at 60800 {
- 				compatible = "marvell,orion-xor";
- 				reg = <0x60800 0x100
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index d4e8a47a2f7c..820cc35d40cf 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -254,6 +254,7 @@ CONFIG_SND_SOC_TEGRA_ALC5632=y
+ CONFIG_SND_SOC_TEGRA_MAX98090=y
+ CONFIG_USB=y
+ CONFIG_USB_XHCI_HCD=y
++CONFIG_USB_XHCI_MVEBU=y
+ CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_EHCI_TEGRA=y
+ CONFIG_USB_EHCI_HCD_PLATFORM=y
 -- 
 1.8.1.2
