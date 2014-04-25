@@ -1,51 +1,53 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Fri, 25 Apr 2014 21:32:37 +0900
-Subject: [PATCH v2 01/10] ARM: EXYNOS: Make exynos machine_ops as static
+Date: Fri, 25 Apr 2014 21:32:41 +0900
+Subject: [PATCH v2 05/10] ARM: EXYNOS: Remove regs-pmu.h header dependency from
+ pm_domain
 In-Reply-To: <1398429166-5539-1-git-send-email-pankaj.dubey@samsung.com>
 References: <1396425058-4012-1-git-send-email-pankaj.dubey@samsung.com>
  <1398429166-5539-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1398429166-5539-2-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1398429166-5539-6-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As machine function ops are used only in this file let's make
-them static.
+From: Young-Gun Jang <yg1004.jang@samsung.com>
 
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+Current "pm_domain.c" file uses "S5P_INT_LOCAL_PWR_EN" definition from
+"regs-pmu.h" and hence needs to include this header file. As there is
+no other user of "S5P_INT_LOCAL_PWR_EN" definition other than pm_domain,
+to remove "regs-pmu.h" header file dependency from "pm_domain.c"  it's
+better we define this definition in "pm_domain.c" file itself and thus it
+will help in removing header file inclusion from "pm_domain.c".
+
+Signed-off-by: Young-Gun Jang <yg1004.jang@samsung.com>
 ---
- arch/arm/mach-exynos/exynos.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-exynos/pm_domains.c |    2 +-
+ arch/arm/mach-exynos/regs-pmu.h   |    1 -
+ 2 files changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-index b32a907..2388ee4 100644
---- a/arch/arm/mach-exynos/exynos.c
-+++ b/arch/arm/mach-exynos/exynos.c
-@@ -198,7 +198,7 @@ static struct map_desc exynos5_iodesc[] __initdata = {
- 	},
- };
+diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
+index fe6570e..f676b0a 100644
+--- a/arch/arm/mach-exynos/pm_domains.c
++++ b/arch/arm/mach-exynos/pm_domains.c
+@@ -22,7 +22,7 @@
+ #include <linux/of_platform.h>
+ #include <linux/sched.h>
  
--void exynos_restart(enum reboot_mode mode, const char *cmd)
-+static void exynos_restart(enum reboot_mode mode, const char *cmd)
- {
- 	struct device_node *np;
- 	u32 val = 0x1;
-@@ -235,7 +235,7 @@ void __init exynos_cpufreq_init(void)
- 	platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
- }
+-#include "regs-pmu.h"
++#define S5P_INT_LOCAL_PWR_EN 0x7
  
--void __init exynos_init_late(void)
-+static void __init exynos_init_late(void)
- {
- 	if (of_machine_is_compatible("samsung,exynos5440"))
- 		/* to be supported later */
-@@ -296,7 +296,7 @@ static void __init exynos_map_io(void)
- 		iotable_init(exynos5250_iodesc, ARRAY_SIZE(exynos5250_iodesc));
- }
+ /*
+  * Exynos specific wrapper around the generic power domain
+diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
+index 4ee706d..bfebe84 100644
+--- a/arch/arm/mach-exynos/regs-pmu.h
++++ b/arch/arm/mach-exynos/regs-pmu.h
+@@ -116,7 +116,6 @@
+ #define S5P_PAD_RET_EBIB_OPTION			S5P_PMUREG(0x31A8)
  
--void __init exynos_init_io(void)
-+static void __init exynos_init_io(void)
- {
- 	debug_ll_io_init();
+ #define S5P_CORE_LOCAL_PWR_EN			0x3
+-#define S5P_INT_LOCAL_PWR_EN			0x7
+ 
+ #define S5P_CHECK_SLEEP				0x00000BAD
  
 -- 
 1.7.10.4
