@@ -1,71 +1,101 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:31:17 +0100
-Subject: [PATCH 004/222] ARM: l2c: omap2: remove ES1.0 support
+Date: Fri, 25 Apr 2014 12:31:22 +0100
+Subject: [PATCH 005/222] ARM: l2c: remove unnecessary UL-suffix to mask values
 In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
 References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WdeLd-0007DK-CO@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WdeLi-0007DO-G3@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh says:
-> But we should kill all of that since we long back decided to remove
-> ES1.0 related code. The mach-omap code alreasy has removed the ES1.0
-> compatibility so feel free to remove any specific ES1.0
-> related stuff. That silicon is long dead.
+They're u32, they're not unsigned long.  The UL suffix is not required
+here.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-omap2/omap4-common.c | 25 ++++++++-----------------
- 1 file changed, 8 insertions(+), 17 deletions(-)
+ arch/arm/mach-highbank/highbank.c | 2 +-
+ arch/arm/mach-imx/mach-vf610.c    | 2 +-
+ arch/arm/mach-imx/system.c        | 2 +-
+ arch/arm/mach-mvebu/board-v7.c    | 2 +-
+ arch/arm/mach-rockchip/rockchip.c | 2 +-
+ arch/arm/mach-socfpga/socfpga.c   | 2 +-
+ 6 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-index 95e171a055f3..48cf74d284ec 100644
---- a/arch/arm/mach-omap2/omap4-common.c
-+++ b/arch/arm/mach-omap2/omap4-common.c
-@@ -182,7 +182,7 @@ static void omap4_l2x0_set_debug(unsigned long val)
+diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
+index c7de89b263dd..38e1dc3b4c6e 100644
+--- a/arch/arm/mach-highbank/highbank.c
++++ b/arch/arm/mach-highbank/highbank.c
+@@ -69,7 +69,7 @@ static void __init highbank_init_irq(void)
+ 	if (IS_ENABLED(CONFIG_CACHE_L2X0) &&
+ 	    of_find_compatible_node(NULL, NULL, "arm,pl310-cache")) {
+ 		highbank_smc1(0x102, 0x1);
+-		l2x0_of_init(0, ~0UL);
++		l2x0_of_init(0, ~0);
+ 		outer_cache.disable = highbank_l2x0_disable;
+ 	}
+ }
+diff --git a/arch/arm/mach-imx/mach-vf610.c b/arch/arm/mach-imx/mach-vf610.c
+index 2d8aef5a6efa..6288a9690e78 100644
+--- a/arch/arm/mach-imx/mach-vf610.c
++++ b/arch/arm/mach-imx/mach-vf610.c
+@@ -22,7 +22,7 @@ static void __init vf610_init_machine(void)
  
- static int __init omap_l2_cache_init(void)
+ static void __init vf610_init_irq(void)
  {
--	u32 aux_ctrl = 0;
-+	u32 aux_ctrl;
+-	l2x0_of_init(0, ~0UL);
++	l2x0_of_init(0, ~0);
+ 	irqchip_init();
+ }
  
- 	/*
- 	 * To avoid code running on other OMAPs in
-@@ -196,27 +196,18 @@ static int __init omap_l2_cache_init(void)
- 	if (WARN_ON(!l2cache_base))
- 		return -ENOMEM;
+diff --git a/arch/arm/mach-imx/system.c b/arch/arm/mach-imx/system.c
+index 5e3027d3692f..c6571f1de9fd 100644
+--- a/arch/arm/mach-imx/system.c
++++ b/arch/arm/mach-imx/system.c
+@@ -145,6 +145,6 @@ void __init imx_init_l2cache(void)
+ 	of_node_put(np);
  
--	/*
--	 * 16-way associativity, parity disabled
--	 * Way size - 32KB (es1.0)
--	 * Way size - 64KB (es2.0 +)
--	 */
--	aux_ctrl = ((1 << L2X0_AUX_CTRL_ASSOCIATIVITY_SHIFT) |
-+	/* 16-way associativity, parity disabled, way size - 64KB (es2.0 +) */
-+	aux_ctrl = (1 << L2X0_AUX_CTRL_ASSOCIATIVITY_SHIFT) |
- 			(0x1 << 25) |
- 			(0x1 << L2X0_AUX_CTRL_NS_LOCKDOWN_SHIFT) |
--			(0x1 << L2X0_AUX_CTRL_NS_INT_CTRL_SHIFT));
--
--	if (omap_rev() == OMAP4430_REV_ES1_0) {
--		aux_ctrl |= 0x2 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT;
--	} else {
--		aux_ctrl |= ((0x3 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT) |
-+			(0x1 << L2X0_AUX_CTRL_NS_INT_CTRL_SHIFT)) |
-+			(0x3 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT) |
- 			(1 << L2X0_AUX_CTRL_SHARE_OVERRIDE_SHIFT) |
- 			(1 << L2X0_AUX_CTRL_DATA_PREFETCH_SHIFT) |
- 			(1 << L2X0_AUX_CTRL_INSTR_PREFETCH_SHIFT) |
--			(1 << L2X0_AUX_CTRL_EARLY_BRESP_SHIFT));
--	}
--	if (omap_rev() != OMAP4430_REV_ES1_0)
--		omap_smc1(0x109, aux_ctrl);
-+			(1 << L2X0_AUX_CTRL_EARLY_BRESP_SHIFT);
-+
-+	omap_smc1(0x109, aux_ctrl);
+ out:
+-	l2x0_of_init(0, ~0UL);
++	l2x0_of_init(0, ~0);
+ }
+ #endif
+diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
+index 333fca8fdc41..c6bd79f64744 100644
+--- a/arch/arm/mach-mvebu/board-v7.c
++++ b/arch/arm/mach-mvebu/board-v7.c
+@@ -60,7 +60,7 @@ static void __init mvebu_timer_and_clk_init(void)
+ 	coherency_init();
+ 	BUG_ON(mvebu_mbus_dt_init());
+ #ifdef CONFIG_CACHE_L2X0
+-	l2x0_of_init(0, ~0UL);
++	l2x0_of_init(0, ~0);
+ #endif
  
- 	/* Enable PL310 L2 Cache controller */
- 	omap_smc1(0x102, 0x1);
+ 	if (of_machine_is_compatible("marvell,armada375"))
+diff --git a/arch/arm/mach-rockchip/rockchip.c b/arch/arm/mach-rockchip/rockchip.c
+index d211d6fa0d98..d252efe3747b 100644
+--- a/arch/arm/mach-rockchip/rockchip.c
++++ b/arch/arm/mach-rockchip/rockchip.c
+@@ -26,7 +26,7 @@
+ 
+ static void __init rockchip_dt_init(void)
+ {
+-	l2x0_of_init(0, ~0UL);
++	l2x0_of_init(0, ~0);
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
+diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
+index d86231e11b34..9bbb8177f247 100644
+--- a/arch/arm/mach-socfpga/socfpga.c
++++ b/arch/arm/mach-socfpga/socfpga.c
+@@ -100,7 +100,7 @@ static void socfpga_cyclone5_restart(enum reboot_mode mode, const char *cmd)
+ 
+ static void __init socfpga_cyclone5_init(void)
+ {
+-	l2x0_of_init(0, ~0UL);
++	l2x0_of_init(0, ~0);
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
 -- 
 1.8.3.1
