@@ -1,64 +1,65 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:38:06 +0100
-Subject: [PATCH 084/222] net:fec: stop the phy before shutting down the MAC
+Date: Fri, 25 Apr 2014 12:38:11 +0100
+Subject: [PATCH 085/222] net:fec: improve safety of suspend/resume/transmit
+ timeout paths
 In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
 References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WdeSE-0007In-A2@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WdeSJ-0007Ir-DW@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the network interface goes down, stop the phy to prevent further
-link up status changes before taking the MAC or netif sections down.
-This prevents further reception of link up events which could
-potentially call fec_restart().
-
-Since phy_stop() takes the mutex which adjust_link() runs under, we
-also ensure that adjust_link() will not already be processing a link
-up event.
-
-We also need to do this when suspending as well - we don't want a
-mis-timed phy state change to restart the MAC after we have stopped
-it for suspend, and thus need to restart the phy when resuming.
+We need to hold the rtnl lock while suspending, resuming or processing
+the transmit timeout to ensure that netif_running() will not change
+state beneath us while we bring up, take down or restart the hardware.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/net/ethernet/freescale/fec_main.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ drivers/net/ethernet/freescale/fec_main.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
 diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index 634046c73734..765ea90b99ed 100644
+index 765ea90b99ed..843721aa44bd 100644
 --- a/drivers/net/ethernet/freescale/fec_main.c
 +++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -1842,12 +1842,13 @@ fec_enet_close(struct net_device *ndev)
- {
+@@ -767,8 +767,10 @@ static void fec_enet_work(struct work_struct *work)
+ 
+ 	if (fep->delay_work.timeout) {
+ 		fep->delay_work.timeout = false;
++		rtnl_lock();
+ 		fec_restart(fep->netdev, fep->full_duplex);
+ 		netif_wake_queue(fep->netdev);
++		rtnl_unlock();
+ 	}
+ 
+ 	if (fep->delay_work.trig_tx) {
+@@ -2333,11 +2335,14 @@ fec_suspend(struct device *dev)
+ 	struct net_device *ndev = dev_get_drvdata(dev);
  	struct fec_enet_private *fep = netdev_priv(ndev);
  
-+	phy_stop(fep->phy_dev);
-+
- 	/* Don't know what to do yet. */
- 	napi_disable(&fep->napi);
- 	netif_tx_disable(ndev);
- 	fec_stop(ndev);
- 
--	phy_stop(fep->phy_dev);
- 	phy_disconnect(fep->phy_dev);
- 	fep->phy_dev = NULL;
- 
-@@ -2333,6 +2334,7 @@ fec_suspend(struct device *dev)
- 	struct fec_enet_private *fep = netdev_priv(ndev);
- 
++	rtnl_lock();
  	if (netif_running(ndev)) {
-+		phy_stop(fep->phy_dev);
+ 		phy_stop(fep->phy_dev);
  		fec_stop(ndev);
  		netif_device_detach(ndev);
  	}
-@@ -2385,6 +2387,7 @@ fec_resume(struct device *dev)
++	rtnl_unlock();
++
+ 	if (fep->clk_ptp)
+ 		clk_disable_unprepare(fep->clk_ptp);
+ 	if (fep->clk_enet_out)
+@@ -2384,11 +2389,13 @@ fec_resume(struct device *dev)
+ 			goto failed_clk_ptp;
+ 	}
+ 
++	rtnl_lock();
  	if (netif_running(ndev)) {
  		fec_restart(ndev, fep->full_duplex);
  		netif_device_attach(ndev);
-+		phy_start(fep->phy_dev);
+ 		phy_start(fep->phy_dev);
  	}
++	rtnl_unlock();
  
  	return 0;
+ 
 -- 
 1.8.3.1
