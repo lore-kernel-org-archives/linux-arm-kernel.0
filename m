@@ -1,35 +1,34 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 25 Apr 2014 18:37:59 -0300
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 25 Apr 2014 17:42:55 -0400
 Subject: [PATCH] ARM: mvebu: Select HAVE_ARM_TWD only if SMP is enabled
-In-Reply-To: <20140425212658.GD28159@titan.lakedaemon.net>
+In-Reply-To: <20140425213759.GA1173@arch.cereza>
 References: <1398339276-5754-1-git-send-email-ezequiel.garcia@free-electrons.com>
  <20140425212658.GD28159@titan.lakedaemon.net>
-Message-ID: <20140425213759.GA1173@arch.cereza>
+ <20140425213759.GA1173@arch.cereza>
+Message-ID: <20140425214255.GG28159@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Apr 25, Jason Cooper wrote:
-> On Thu, Apr 24, 2014 at 08:34:36AM -0300, Ezequiel Garcia wrote:
-> > HAVE_ARM_TWD depends on SMP, so we should only select it if
-> > SMP is enabled, as the others platforms do.
+On Fri, Apr 25, 2014 at 06:37:59PM -0300, Ezequiel Garcia wrote:
+> On Apr 25, Jason Cooper wrote:
+> > On Thu, Apr 24, 2014 at 08:34:36AM -0300, Ezequiel Garcia wrote:
+> > > HAVE_ARM_TWD depends on SMP, so we should only select it if
+> > > SMP is enabled, as the others platforms do.
+> > > 
+> > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > > ---
+> > >  arch/arm/mach-mvebu/Kconfig | 4 ++--
+> > >  1 file changed, 2 insertions(+), 2 deletions(-)
 > > 
-> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > ---
-> >  arch/arm/mach-mvebu/Kconfig | 4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > I just tried to apply this against mvebu/fixes.  It failed.  What did
+> > you base this against?
+> > 
 > 
-> I just tried to apply this against mvebu/fixes.  It failed.  What did
-> you base this against?
-> 
+> This is a fix for the recent SMP support that you've merged in mvebu/soc.
 
-This is a fix for the recent SMP support that you've merged in mvebu/soc.
+duh.  Sorry, I was moving fast and just recalled that you wanted this in
+'soon'  which I thought meant for v3.15.  No problem then.
 
-In particular, it fixes:
+thx,
 
-[PATCH v3 08/11] ARM: mvebu: add SMP support for Armada 375 and Armada 38x
-
-Yeah, I know: I wasn't really clear in the commit log. Sorry about that.
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Jason.
