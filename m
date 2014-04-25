@@ -1,51 +1,125 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:46:21 +0100
-Subject: [PATCH 159/222] dw-hdmi-audio: better hardware position tracking
+Date: Fri, 25 Apr 2014 12:46:26 +0100
+Subject: [PATCH 160/222] dw-hdmi-audio: parse ELD from HDMI driver
 In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
 References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WdeaD-0007Nu-P3@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WdeaI-0007Ny-Se@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Parse the ELD (EDID like data) stored from the HDMI driver to restrict
+the sample rates and channels which are available to ALSA.  This causes
+the ALSA device to reflect the capabilities of the overall audio path,
+not just what is supported at the HDMI source interface level.
+
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/staging/imx-drm/dw-hdmi-audio.c | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+ drivers/staging/imx-drm/dw-hdmi-audio.c | 51 +++++++++++++++++++++++++++++++++
+ drivers/staging/imx-drm/dw-hdmi-audio.h |  1 +
+ drivers/staging/imx-drm/imx-hdmi.c      |  3 ++
+ 3 files changed, 55 insertions(+)
 
 diff --git a/drivers/staging/imx-drm/dw-hdmi-audio.c b/drivers/staging/imx-drm/dw-hdmi-audio.c
-index e7d41249c817..9c27df0112d2 100644
+index 9c27df0112d2..b2595b0a82ce 100644
 --- a/drivers/staging/imx-drm/dw-hdmi-audio.c
 +++ b/drivers/staging/imx-drm/dw-hdmi-audio.c
-@@ -238,6 +238,11 @@ static void dw_hdmi_start_dma(struct snd_dw_hdmi *dw)
+@@ -300,6 +300,56 @@ static struct snd_pcm_hardware dw_hdmi_hw = {
+ 	.fifo_size = 0,
+ };
  
- 	writeb_relaxed((u8)~HDMI_AHB_DMA_MASK_DONE, base + HDMI_AHB_DMA_MASK);
- 	writeb(HDMI_AHB_DMA_START_START, base + HDMI_AHB_DMA_START);
++static unsigned rates_mask[] = {
++	SNDRV_PCM_RATE_32000,
++	SNDRV_PCM_RATE_44100,
++	SNDRV_PCM_RATE_48000,
++	SNDRV_PCM_RATE_88200,
++	SNDRV_PCM_RATE_96000,
++	SNDRV_PCM_RATE_176400,
++	SNDRV_PCM_RATE_192000,
++};
 +
-+	offset += period;
-+	if (offset >= dw->buf_size)
-+		offset = 0;
-+	dw->buf_offset = offset;
- }
++static void dw_hdmi_parse_eld(struct snd_dw_hdmi *dw,
++	struct snd_pcm_runtime *runtime)
++{
++	u8 *sad, *eld = dw->data.eld;
++	unsigned eld_ver,  mnl, sad_count, rates, rate_mask, i;
++	unsigned max_channels;
++
++	eld_ver = eld[0] >> 3;
++	if (eld_ver != 2 && eld_ver != 31)
++		return;
++
++	mnl = eld[4] & 0x1f;
++	if (mnl > 16)
++		return;
++
++	sad_count = eld[5] >> 4;
++	sad = eld + 20 + mnl;
++
++	/* Start from the basic audio settings */
++	max_channels = 2;
++	rates = 7;
++	while (sad_count > 0) {
++		switch (sad[0] & 0x78) {
++		case 0x08: /* PCM */
++			max_channels = max(max_channels, (sad[0] & 7) + 1u);
++			rates |= sad[1];
++			break;
++		}
++		sad += 3;
++		sad_count -= 1;
++	}
++
++	for (rate_mask = i = 0; i < ARRAY_SIZE(rates_mask); i++)
++		if (rates & 1 << i)
++			rate_mask |= rates_mask[i];
++
++	runtime->hw.rates &= rate_mask;
++	runtime->hw.channels_max = min(runtime->hw.channels_max, max_channels);
++}
++
+ static int dw_hdmi_open(struct snd_pcm_substream *substream)
+ {
+ 	struct snd_pcm_runtime *runtime = substream->runtime;
+@@ -330,6 +380,7 @@ static int dw_hdmi_open(struct snd_pcm_substream *substream)
+ 		       base + HDMI_IH_MUTE_AHBDMAAUD_STAT0);
  
- static void dw_hdmi_stop_dma(struct snd_dw_hdmi *dw)
-@@ -263,10 +268,6 @@ static irqreturn_t snd_dw_hdmi_irq(int irq, void *data)
+ 	runtime->hw = dw_hdmi_hw;
++	dw_hdmi_parse_eld(dw, runtime);
+ 	snd_pcm_limit_hw_rates(runtime);
  
- 	substream = dw->substream;
- 	if (stat & HDMI_IH_AHBDMAAUD_STAT0_DONE && substream) {
--		dw->buf_offset += dw->buf_period;
--		if (dw->buf_offset >= dw->buf_size)
--			dw->buf_offset = 0;
--
- 		snd_pcm_period_elapsed(substream);
- 		if (dw->substream)
- 			dw_hdmi_start_dma(dw);
-@@ -427,6 +428,7 @@ static int dw_hdmi_trigger(struct snd_pcm_substream *substream, int cmd)
- 		dw->buf_offset = 0;
- 		dw->substream = substream;
- 		dw_hdmi_start_dma(dw);
-+		substream->runtime->delay = substream->runtime->period_size;
- 		break;
+ 	return 0;
+diff --git a/drivers/staging/imx-drm/dw-hdmi-audio.h b/drivers/staging/imx-drm/dw-hdmi-audio.h
+index f01979d49efd..2d91d709381d 100644
+--- a/drivers/staging/imx-drm/dw-hdmi-audio.h
++++ b/drivers/staging/imx-drm/dw-hdmi-audio.h
+@@ -8,6 +8,7 @@ struct dw_hdmi_audio_data {
+ 	void __iomem *base;
+ 	int irq;
+ 	struct imx_hdmi *hdmi;
++	u8 *eld;
+ 	void (*set_sample_rate)(struct imx_hdmi *, unsigned);
+ };
  
- 	case SNDRV_PCM_TRIGGER_STOP:
+diff --git a/drivers/staging/imx-drm/imx-hdmi.c b/drivers/staging/imx-drm/imx-hdmi.c
+index af4cba51e255..ac72649448a8 100644
+--- a/drivers/staging/imx-drm/imx-hdmi.c
++++ b/drivers/staging/imx-drm/imx-hdmi.c
+@@ -1410,6 +1410,8 @@ static int imx_hdmi_connector_get_modes(struct drm_connector *connector)
+ 
+ 		drm_mode_connector_update_edid_property(connector, edid);
+ 		ret = drm_add_edid_modes(connector, edid);
++		/* Store the ELD */
++		drm_edid_to_eld(connector, edid);
+ 		kfree(edid);
+ 	} else {
+ 		dev_dbg(hdmi->dev, "failed to get edid\n");
+@@ -1726,6 +1728,7 @@ static int imx_hdmi_bind(struct device *dev, struct device *master, void *data)
+ 	audio.base = hdmi->regs;
+ 	audio.irq = irq;
+ 	audio.hdmi = hdmi;
++	audio.eld = hdmi->connector.eld;
+ 	audio.set_sample_rate = imx_hdmi_set_sample_rate;
+ 
+ 	pdevinfo.name = "dw-hdmi-audio";
 -- 
 1.8.3.1
