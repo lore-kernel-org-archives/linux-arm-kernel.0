@@ -1,80 +1,41 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Fri, 25 Apr 2014 18:08:13 +0900
-Subject: [PATCH 4/5] devfreq: exynos4: Use devm_devfreq_* function using device
- resource management
-In-Reply-To: <1398416894-6782-1-git-send-email-cw00.choi@samsung.com>
-References: <1398416894-6782-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1398416894-6782-5-git-send-email-cw00.choi@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 25 Apr 2014 10:12:24 +0100
+Subject: [PATCH] ARM: fix string functions on !MMU
+In-Reply-To: <20140424154320.GA4129@debian>
+References: <1398103808-24380-1-git-send-email-rabin@rab.in>
+ <20140422094424.GA6979@arm.com> <20140424154320.GA4129@debian>
+Message-ID: <20140425091224.GA24499@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch uses devm_devfreq_add_device()/devm_devfreq_register_opp_notifier()
-to control automatically the resource of devfreq.
+Hi Rabin,
 
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-Cc: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-samsung-soc at vger.kernel.org
----
- drivers/devfreq/exynos/exynos4_bus.c | 19 ++++---------------
- 1 file changed, 4 insertions(+), 15 deletions(-)
+On Thu, Apr 24, 2014 at 04:43:20PM +0100, Rabin Vincent wrote:
+> On Tue, Apr 22, 2014 at 10:44:24AM +0100, Will Deacon wrote:
+> > On Mon, Apr 21, 2014 at 07:10:08PM +0100, Rabin Vincent wrote:
+> > > 8c56cc8be5b38e ("ARM: 7449/1: use generic strnlen_user and
+> > > strncpy_from_user functions") apparently broken those string operations
+> > > for !MMU.  USER_DS == KERNEL_DS on !MMU, so user_addr_max() always
+> > > restricts the addresses to TASK_SIZE.
+> > > 
+> > > TASK_SIZE has anyway no meaning on !MMU, so make user_addr_max() not
+> > > restrict anything.
+> > 
+> > Might be worth mentioning that this is an issue because KERNEL_DS is 0x0
+> > (since it's a 32-bit quantity), so checks like addr < user_addr_max() will
+> > fail.
+> 
+> Thanks for the ack, but I don't quite understand what you mean here.
+> You describe the state before this patch, right?  Why does it matter
+> that KERNEL_DS is 0x0?
 
-diff --git a/drivers/devfreq/exynos/exynos4_bus.c b/drivers/devfreq/exynos/exynos4_bus.c
-index d257f1f..bebb0a4 100644
---- a/drivers/devfreq/exynos/exynos4_bus.c
-+++ b/drivers/devfreq/exynos/exynos4_bus.c
-@@ -979,7 +979,7 @@ static int exynos4_busfreq_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, data);
- 
--	data->devfreq = devfreq_add_device(dev, &exynos4_devfreq_profile,
-+	data->devfreq = devm_devfreq_add_device(dev, &exynos4_devfreq_profile,
- 					   "simple_ondemand", NULL);
- 	if (IS_ERR(data->devfreq))
- 		return PTR_ERR(data->devfreq);
-@@ -991,27 +991,20 @@ static int exynos4_busfreq_probe(struct platform_device *pdev)
- 	busfreq_mon_reset(ppmu_data);
- 
- 	/* Register opp_notifier for Exynos4 busfreq */
--	err = devfreq_register_opp_notifier(dev, data->devfreq);
-+	err = devm_devfreq_register_opp_notifier(dev, data->devfreq);
- 	if (err < 0) {
- 		dev_err(dev, "Failed to register opp notifier\n");
--		goto err_notifier_opp;
-+		return err;
- 	}
- 
- 	/* Register pm_notifier for Exynos4 busfreq */
- 	err = register_pm_notifier(&data->pm_notifier);
- 	if (err) {
- 		dev_err(dev, "Failed to setup pm notifier\n");
--		goto err_notifier_pm;
-+		return err;
- 	}
- 
- 	return 0;
--
--err_notifier_pm:
--	devfreq_unregister_opp_notifier(dev, data->devfreq);
--err_notifier_opp:
--	devfreq_remove_device(data->devfreq);
--
--	return err;
- }
- 
- static int exynos4_busfreq_remove(struct platform_device *pdev)
-@@ -1020,10 +1013,6 @@ static int exynos4_busfreq_remove(struct platform_device *pdev)
- 
- 	/* Unregister all of notifier chain */
- 	unregister_pm_notifier(&data->pm_notifier);
--	devfreq_unregister_opp_notifier(data->dev, data->devfreq);
--
--	/* Remove devfreq instance */
--	devfreq_remove_device(data->devfreq);
- 
- 	return 0;
- }
--- 
-1.8.0
+Apologies, I misread the code that you're patching so I guess I'll have to
+revoke my ack, sorry! That's not to say I think the patch is bad, I'd just
+like to discuss it with you a bit more.
+
+Having re-read the code, the issue is because TASK_SIZE is defined as
+CONFIG_DRAM_SIZE, right? Since CONFIG_DRAM_BASE may be non-zero, it means
+TASK_SIZE is truly a size -- not a limit (as it would be in virtual space).
+What we actually want for !MMU is END_MEM instead of TASK_SIZE.
+
+Will
