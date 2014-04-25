@@ -1,58 +1,63 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 25 Apr 2014 21:20:12 +0800
-Subject: [PATCH v3 part1 06/11] ARM64 / ACPI: Introduce lowlevel suspend
- function
+Date: Fri, 25 Apr 2014 21:20:13 +0800
+Subject: [PATCH v3 part1 07/11] ARM64 / ACPI: Introduce
+ arch_fix_phys_package_id() for cpu topology
 In-Reply-To: <1398432017-8506-1-git-send-email-hanjun.guo@linaro.org>
 References: <1398432017-8506-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1398432017-8506-7-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1398432017-8506-8-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-acpi_wakeup_address is used on x86 as the address bios jumps into
-when machine wakes up from suspend. As arm64 does not have such a
-bios this mechanism will be provided by other means. But the define
-is still required inside the acpi core.
+arch_fix_phys_package_id() will be called in ACPI core to use
+the slot number provided by ACPI to update the physical package
+id, then we can get the right value in the "physical id" field
+of /proc/cpuinfo.
 
-Introduce a null stub for acpi_suspend_lowlevel as this is also
-required by core. This will be filled in when standards are
-defined for arm64 ACPI global power states.
-
-Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
- arch/arm64/include/asm/acpi.h |    4 ++++
- drivers/acpi/plat/arm-core.c  |    7 +++++++
- 2 files changed, 11 insertions(+)
+ arch/arm64/include/asm/topology.h |    2 ++
+ arch/arm64/kernel/topology.c      |   14 ++++++++++++++
+ 2 files changed, 16 insertions(+)
 
-diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-index 3ac9dfb..60e3a72 100644
---- a/arch/arm64/include/asm/acpi.h
-+++ b/arch/arm64/include/asm/acpi.h
-@@ -85,6 +85,10 @@ static inline void acpi_disable_pci(void)
-  */ 
- #define cpu_physical_id(cpu) -1
+diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
+index 0172e6d..0b0e24f 100644
+--- a/arch/arm64/include/asm/topology.h
++++ b/arch/arm64/include/asm/topology.h
+@@ -26,11 +26,13 @@ extern struct cpu_topology cpu_topology[NR_CPUS];
+ void init_cpu_topology(void);
+ void store_cpu_topology(unsigned int cpuid);
+ const struct cpumask *cpu_coregroup_mask(int cpu);
++void arch_fix_phys_package_id(int num, u32 slot);
  
-+/* Low-level suspend routine. */
-+extern int (*acpi_suspend_lowlevel)(void);
-+#define acpi_wakeup_address (0)
-+
- #endif /* CONFIG_ACPI */
+ #else
  
- #endif /*_ASM_ACPI_H*/
-diff --git a/drivers/acpi/plat/arm-core.c b/drivers/acpi/plat/arm-core.c
-index e4846fd..aeea64e 100644
---- a/drivers/acpi/plat/arm-core.c
-+++ b/drivers/acpi/plat/arm-core.c
-@@ -129,3 +129,10 @@ static int __init parse_acpi(char *arg)
- 	return 0;
+ static inline void init_cpu_topology(void) { }
+ static inline void store_cpu_topology(unsigned int cpuid) { }
++static inline void arch_fix_phys_package_id(int num, u32 slot) { }
+ 
+ #endif
+ 
+diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+index 3e06b0b..51ea4a1 100644
+--- a/arch/arm64/kernel/topology.c
++++ b/arch/arm64/kernel/topology.c
+@@ -93,3 +93,17 @@ void __init init_cpu_topology(void)
+ 		cpumask_clear(&cpu_topo->thread_sibling);
+ 	}
  }
- early_param("acpi", parse_acpi);
 +
 +/*
-+ * acpi_suspend_lowlevel() - save kernel state and suspend.
-+ *
-+ * TBD when ARM/ARM64 starts to support suspend...
++ * Use the CPU slot number provided by ACPI to update the physical
++ * package id, then we can get the right value in the "physical id"
++ * field of /proc/cpuinfo.
 + */
-+int (*acpi_suspend_lowlevel)(void);
++void arch_fix_phys_package_id(int num, u32 slot)
++{
++	struct cpu_topology *cpuid_topo = &cpu_topology[num];
++
++	if (cpuid_topo->cluster_id == -1)
++		cpuid_topo->cluster_id = slot;
++}
++EXPORT_SYMBOL_GPL(arch_fix_phys_package_id);
 -- 
 1.7.9.5
