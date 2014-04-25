@@ -1,37 +1,53 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Fri, 25 Apr 2014 17:01:23 +0530
-Subject: [PATCH v7 0/2] dts: Add usb2phy to Exynos 5250
-Message-ID: <1398425485-20574-1-git-send-email-gautam.vivek@samsung.com>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Fri, 25 Apr 2014 12:31:37 +0100
+Subject: [PATCH 008/222] ARM: l2c: add helper for L2 cache controller DT IDs
+In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
+References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
+Message-ID: <E1WdeLx-0007Db-R1@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Next version of patch for Kamil's patch:
-[PATCH v6 4/8] dts: Add usb2phy to Exynos 5250
-https://lkml.org/lkml/2014/1/29/302
+Make it easier to declare L2 cache controller DT IDs by using a macro.
 
-Based on 'for-next' branch of Kgene's linux-samsung tree.
-Tested with driver side patches:
-[PATCH 0/2] usb: ehci/ohci-exynos: Move to generic phy framework
-https://www.mail-archive.com/linux-usb at vger.kernel.org/msg41246.html
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/mm/cache-l2x0.c | 23 ++++++++++-------------
+ 1 file changed, 10 insertions(+), 13 deletions(-)
 
-Changes from v6:
- - Splitted the patch into two:
-    adding syscon nodes to Exynos5250 and Exynos5420 in first;
-    and phy entry change in the second.
- - Changed the name of phandle for usb2phy from 'usb2_phy_new'
-   to 'usb2_phy_gen' indicating generic phy.
- - Using clock macros in dt entries.
-
-Kamil Debski (1):
-  ARM: dts: Add usb2phy to Exynos 5250
-
-Vivek Gautam (1):
-  ARM: dts: Add sysreg sytem controller node to exynos5250 and
-    exynos5420
-
- arch/arm/boot/dts/exynos5250.dtsi |   31 +++++++++++++++++++++++++++++++
- arch/arm/boot/dts/exynos5420.dtsi |    5 +++++
- 2 files changed, 36 insertions(+)
-
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index f9985e5a208c..ac410b21edfb 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -946,20 +946,17 @@ static const struct l2x0_of_data bcm_l2x0_data = {
+ 	},
+ };
+ 
++#define L2C_ID(name, fns) { .compatible = name, .data = (void *)&fns }
+ static const struct of_device_id l2x0_ids[] __initconst = {
+-	{ .compatible = "arm,l210-cache", .data = (void *)&l2x0_data },
+-	{ .compatible = "arm,l220-cache", .data = (void *)&l2x0_data },
+-	{ .compatible = "arm,pl310-cache", .data = (void *)&pl310_data },
+-	{ .compatible = "bcm,bcm11351-a2-pl310-cache", /* deprecated name */
+-	  .data = (void *)&bcm_l2x0_data},
+-	{ .compatible = "brcm,bcm11351-a2-pl310-cache",
+-	  .data = (void *)&bcm_l2x0_data},
+-	{ .compatible = "marvell,aurora-outer-cache",
+-	  .data = (void *)&aurora_with_outer_data},
+-	{ .compatible = "marvell,aurora-system-cache",
+-	  .data = (void *)&aurora_no_outer_data},
+-	{ .compatible = "marvell,tauros3-cache",
+-	  .data = (void *)&tauros3_data },
++	L2C_ID("arm,l210-cache", l2x0_data),
++	L2C_ID("arm,l220-cache", l2x0_data),
++	L2C_ID("arm,pl310-cache", pl310_data),
++	L2C_ID("brcm,bcm11351-a2-pl310-cache", bcm_l2x0_data),
++	L2C_ID("marvell,aurora-outer-cache", aurora_with_outer_data),
++	L2C_ID("marvell,aurora-system-cache", aurora_no_outer_data),
++	L2C_ID("marvell,tauros3-cache", tauros3_data),
++	/* Deprecated IDs */
++	L2C_ID("bcm,bcm11351-a2-pl310-cache", bcm_l2x0_data),
+ 	{}
+ };
+ 
 -- 
-1.7.10.4
+1.8.3.1
