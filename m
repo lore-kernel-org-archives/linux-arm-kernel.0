@@ -1,103 +1,155 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Fri, 25 Apr 2014 07:37:47 +0200
-Subject: [PATCH] ARM: imx6q: work around faulty PMU irq routing
-In-Reply-To: <1398371029-21176-1-git-send-email-l.stach@pengutronix.de>
-References: <1398371029-21176-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <5359F4AB.9090502@de.bosch.com>
+From: sourav.poddar@ti.com (sourav)
+Date: Fri, 25 Apr 2014 11:12:39 +0530
+Subject: [PATCH] arm: dts: am43x-clock: add tbclk data for ehrpwm.
+In-Reply-To: <53566374.3070609@ti.com>
+References: <1398162345-3163-1-git-send-email-sourav.poddar@ti.com>
+ <53566374.3070609@ti.com>
+Message-ID: <5359F5CF.6020408@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24.04.2014 22:23, Lucas Stach wrote:
-> The i.MX6 PMU has a design errata where the interrupts of all cores are
-> wired together into a single irq line. To work around this we have to
-> bounce the interrupt around all cores until we find the one where the PMU
-> counter overflow has happened.
->
-> This causes the perf measurements to be less accurate and we can't really
-> handle the case where two cores fire a PMU irq at the same time. The
-> implemented woraround makes perf at least somewhat useable on imx6 SoCs
-> with more than one core.
->
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> ---
->   arch/arm/mach-imx/mach-imx6q.c | 38 +++++++++++++++++++++++++++++++++++++-
->   1 file changed, 37 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-> index e60456d85c9d..73976c484826 100644
-> --- a/arch/arm/mach-imx/mach-imx6q.c
-> +++ b/arch/arm/mach-imx/mach-imx6q.c
-> @@ -16,6 +16,7 @@
->   #include <linux/delay.h>
->   #include <linux/export.h>
->   #include <linux/init.h>
-> +#include "linux/interrupt.h"
->   #include <linux/io.h>
->   #include <linux/irq.h>
->   #include <linux/irqchip.h>
-> @@ -33,6 +34,7 @@
->   #include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
->   #include <asm/mach/arch.h>
->   #include <asm/mach/map.h>
-> +#include "asm/pmu.h"
->   #include <asm/system_misc.h>
->
->   #include "common.h"
-> @@ -261,6 +263,39 @@ static void __init imx6q_axi_init(void)
->   	}
->   }
->
-> +/*
-> + * The i.MX6 PMU has a design errata where the interrupts of all cores are
-> + * wired together into a single irq line. To work around this we have to
-> + * bounce the interrupt around all cores until we find the one where the PMU
-> + * counter overflow has happened.
-> + */
-> +static irqreturn_t imx6q_pmu_handler(int irq, void *dev, irq_handler_t handler)
-> +{
-> +	irqreturn_t ret = handler(irq, dev);
-> +	int next;
-> +
-> +	if (ret == IRQ_NONE) {
-> +		/*
-> +		 * Kick the irq over to the next cpu, regardless of it's
-> +		 * online status (it might have gone offline while we were busy
-> +		 * bouncing the irq).
-> +		 */
-> +		next = (smp_processor_id() + 1) % num_present_cpus();
-> +		irq_set_affinity(irq, cpumask_of(next));
-> +	}
-> +
-> +	return ret;
-> +}
-> +
-> +struct arm_pmu_platdata imx6q_pmu_platdata = {
-> +	.handle_irq		= imx6q_pmu_handler,
-> +};
-> +
-> +static struct of_dev_auxdata imx6q_auxdata_lookup[] __initdata = {
-> +	OF_DEV_AUXDATA("arm,cortex-a9-pmu", 0, "arm-pmu", &imx6q_pmu_platdata),
-> +	{}
-> +};
-> +
->   static void __init imx6q_init_machine(void)
->   {
->   	struct device *parent;
-> @@ -276,7 +311,8 @@ static void __init imx6q_init_machine(void)
->
->   	imx6q_enet_phy_init();
->
-> -	of_platform_populate(NULL, of_default_bus_match_table, NULL, parent);
-> +	of_platform_populate(NULL, of_default_bus_match_table,
-> +			imx6q_auxdata_lookup, parent);
->
->   	imx_anatop_init();
->   	cpu_is_imx6q() ?  imx6q_pm_init() : imx6dl_pm_init();
+Hi Tero,
 
-Do you have anything like a test case which shows that it works (at 
-least better) on a !single core with this patch? Compared to a 
-non-patched system?
+On Tuesday 22 April 2014 06:11 PM, Tero Kristo wrote:
+> On 04/22/2014 01:25 PM, Sourav Poddar wrote:
+>> We need "tblclk" clock data for the functioning of ehrpwm
+>> module. Hence, populating the required clock information
+>> in clock dts file.
+>>
+>> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+>> ---
+>>   arch/arm/boot/dts/am43xx-clocks.dtsi |   84 
+>> ++++++++++++++++++++++++++++++++++
+>>   drivers/clk/ti/clk-43xx.c            |    6 +++
+>>   2 files changed, 90 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/am43xx-clocks.dtsi 
+>> b/arch/arm/boot/dts/am43xx-clocks.dtsi
+>> index 142009c..869f9a5 100644
+>> --- a/arch/arm/boot/dts/am43xx-clocks.dtsi
+>> +++ b/arch/arm/boot/dts/am43xx-clocks.dtsi
+>> @@ -87,6 +87,90 @@
+>>           clock-mult = <1>;
+>>           clock-div = <1>;
+>>       };
+>> +
+>> +    ehrpwm0_gate_tbclk: ehrpwm0_gate_tbclk {
+>> +        #clock-cells = <0>;
+>> +        compatible = "ti,composite-no-wait-gate-clock";
+>> +        clocks = <&dpll_per_m2_ck>;
+>> +        ti,bit-shift = <0>;
+>> +        reg = <0x0664>;
+>> +    };
+>> +
+>> +    ehrpwm0_tbclk: ehrpwm0_tbclk {
+>> +        #clock-cells = <0>;
+>> +        compatible = "ti,composite-clock";
+>> +        clocks = <&ehrpwm0_gate_tbclk>;
+>> +    };
+>
+> Why do you use composite-clock type here? I see only add one sub-clock 
+> to the composite, thus the composite part is unused. How about using a 
+> gate-clock type only? Same question applies for the rest of the patch 
+> also.
+>
 
-Many thanks
+Yes, I though of doing so and I think it should be fine to use 
+gate-clock only. I did this following the ehrpwm clock data in
+"am33xx-clock.dtsi" file, where we use composite clock for ehrpwm. I 
+think it needs to be changed there also.?
 
-Dirk
+-Sourav
+> -Tero
+>
+>> +
+>> +    ehrpwm1_gate_tbclk: ehrpwm1_gate_tbclk {
+>> +        #clock-cells = <0>;
+>> +        compatible = "ti,composite-no-wait-gate-clock";
+>> +        clocks = <&dpll_per_m2_ck>;
+>> +        ti,bit-shift = <1>;
+>> +        reg = <0x0664>;
+>> +    };
+>> +
+>> +    ehrpwm1_tbclk: ehrpwm1_tbclk {
+>> +        #clock-cells = <0>;
+>> +        compatible = "ti,composite-clock";
+>> +        clocks = <&ehrpwm1_gate_tbclk>;
+>> +    };
+>> +
+>> +    ehrpwm2_gate_tbclk: ehrpwm2_gate_tbclk {
+>> +        #clock-cells = <0>;
+>> +        compatible = "ti,composite-no-wait-gate-clock";
+>> +        clocks = <&dpll_per_m2_ck>;
+>> +        ti,bit-shift = <2>;
+>> +        reg = <0x0664>;
+>> +    };
+>> +
+>> +    ehrpwm2_tbclk: ehrpwm2_tbclk {
+>> +        #clock-cells = <0>;
+>> +        compatible = "ti,composite-clock";
+>> +        clocks = <&ehrpwm2_gate_tbclk>;
+>> +    };
+>> +
+>> +    ehrpwm3_gate_tbclk: ehrpwm3_gate_tbclk {
+>> +        #clock-cells = <0>;
+>> +        compatible = "ti,composite-no-wait-gate-clock";
+>> +        clocks = <&dpll_per_m2_ck>;
+>> +        ti,bit-shift = <2>;
+>> +        reg = <0x0664>;
+>> +    };
+>> +
+>> +    ehrpwm3_tbclk: ehrpwm3_tbclk {
+>> +        #clock-cells = <0>;
+>> +        compatible = "ti,composite-clock";
+>> +        clocks = <&ehrpwm3_gate_tbclk>;
+>> +    };
+>> +
+>> +    ehrpwm4_gate_tbclk: ehrpwm4_gate_tbclk {
+>> +        #clock-cells = <0>;
+>> +        compatible = "ti,composite-no-wait-gate-clock";
+>> +        clocks = <&dpll_per_m2_ck>;
+>> +        ti,bit-shift = <2>;
+>> +        reg = <0x0664>;
+>> +    };
+>> +
+>> +    ehrpwm4_tbclk: ehrpwm4_tbclk {
+>> +        #clock-cells = <0>;
+>> +        compatible = "ti,composite-clock";
+>> +        clocks = <&ehrpwm4_gate_tbclk>;
+>> +    };
+>> +
+>> +    ehrpwm5_gate_tbclk: ehrpwm5_gate_tbclk {
+>> +        #clock-cells = <0>;
+>> +        compatible = "ti,composite-no-wait-gate-clock";
+>> +        clocks = <&dpll_per_m2_ck>;
+>> +        ti,bit-shift = <2>;
+>> +        reg = <0x0664>;
+>> +    };
+>> +
+>> +    ehrpwm5_tbclk: ehrpwm5_tbclk {
+>> +        #clock-cells = <0>;
+>> +        compatible = "ti,composite-clock";
+>> +        clocks = <&ehrpwm5_gate_tbclk>;
+>> +    };
+>>   };
+>> &prcm_clocks {
+>>       clk_32768_ck: clk_32768_ck {
+>> diff --git a/drivers/clk/ti/clk-43xx.c b/drivers/clk/ti/clk-43xx.c
+>> index 67c8de5..5413a6a 100644
+>> --- a/drivers/clk/ti/clk-43xx.c
+>> +++ b/drivers/clk/ti/clk-43xx.c
+>> @@ -105,6 +105,12 @@ static struct ti_dt_clk am43xx_clks[] = {
+>>       DT_CLK(NULL, "func_12m_clk", "func_12m_clk"),
+>>       DT_CLK(NULL, "vtp_clk_div", "vtp_clk_div"),
+>>       DT_CLK(NULL, "usbphy_32khz_clkmux", "usbphy_32khz_clkmux"),
+>> +    DT_CLK("48300200.ehrpwm", "tbclk", "ehrpwm0_tbclk"),
+>> +    DT_CLK("48302200.ehrpwm", "tbclk", "ehrpwm1_tbclk"),
+>> +    DT_CLK("48304200.ehrpwm", "tbclk", "ehrpwm2_tbclk"),
+>> +    DT_CLK("48306200.ehrpwm", "tbclk", "ehrpwm0_tbclk"),
+>> +    DT_CLK("48308200.ehrpwm", "tbclk", "ehrpwm1_tbclk"),
+>> +    DT_CLK("4830a200.ehrpwm", "tbclk", "ehrpwm2_tbclk"),
+>>       { .node_name = NULL },
+>>   };
+>>
+>>
+>
