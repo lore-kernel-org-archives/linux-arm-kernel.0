@@ -1,41 +1,124 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 24 Apr 2014 18:06:17 -0600
-Subject: [PATCH 3/3] pci: add DT based ARM Versatile PCI host driver
-In-Reply-To: <CAL_JsqLsDge54k5v_R9rvaGTrPu2qhC5shgg3dNAqV3re+ZPxQ@mail.gmail.com>
-References: <1395960398-4238-1-git-send-email-robherring2@gmail.com>
- <1395960398-4238-4-git-send-email-robherring2@gmail.com>
- <20140424232431.GO29593@google.com>
- <CAL_JsqLsDge54k5v_R9rvaGTrPu2qhC5shgg3dNAqV3re+ZPxQ@mail.gmail.com>
-Message-ID: <CAErSpo6GjhhForKPbH9A34DvV9HuOH1oqA2EBNpDFWiQPd0PXA@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 25 Apr 2014 09:26:42 +0900
+Subject: [PATCH/RFC] serial: sh-sci: Add device tree support for r8a7779
+In-Reply-To: <1418731.YSFS18bIMD@avalon>
+References: <1398322484-3630-1-git-send-email-horms+renesas@verge.net.au>
+ <1418731.YSFS18bIMD@avalon>
+Message-ID: <20140425002641.GB31164@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 24, 2014 at 5:37 PM, Rob Herring <robherring2@gmail.com> wrote:
-> On Thu, Apr 24, 2014 at 6:24 PM, Bjorn Helgaas <bhelgaas@google.com> wrote:
->> On Thu, Mar 27, 2014 at 05:46:38PM -0500, Rob Herring wrote:
->>> From: Rob Herring <robh@kernel.org>
->>>
->>> This converts the Versatile PCI host code to a platform driver using
->>> of_create_pci_host_bridge for parsing DT and setup.
->>>
->>> I think more of this setup could be done by the core code. There are
->>> accesses to the host's config space (accesses using local_pci_cfg_base)
->>> which seem like they could be done by the core code or using standard
->>> config space accessors. The problem is bridge->bus->self is needed, but
->>> it does not get setup. I'm not exactly sure how that should work.
->>>
->>> Signed-off-by: Rob Herring <robh@kernel.org>
->>> Cc: Bjorn Helgaas <bhelgaas@google.com>
->>> ...
->
->>> +     bridge = of_create_pci_host_bridge(&pdev->dev, &pci_versatile_ops, &sys);
->>
->> Are we still relying on the PCI core to default to a bus number range of
->> 00-ff?  Can we not do that?
->
-> No, that comes from DT.
+On Fri, Apr 25, 2014 at 01:33:29AM +0200, Laurent Pinchart wrote:
+> Hi Simon,
+> 
+> Thank you for the patch.
+> 
+> On Thursday 24 April 2014 15:54:44 Simon Horman wrote:
+> > According to the platform data for the legacy-C initialisation of sh-sci
+> > for the r8a7779 SoC and my own testing the SCIx_SH4_SCIF_REGTYPE bit of
+> > scscr needs to be set.
+> > 
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > 
+> > ---
+> > 
+> > With the approach taken by this patch sh-sci may be initialised using the
+> > "renesas,scif-r8a7779" compat string but not the generic "renesas,scif"
+> > compat string.  An alternate approach would be to add a binding to allow
+> > setting of this bit to be controlled directly from DT.
+> 
+> Handling the SCSCR bits properly with DT has been on my to-do list for some 
+> time. Thank you for volunteering to implement that :-D
+> 
+> The CKE bits control both the behaviour of the SCK pin and the SCIF input 
+> clock selection. The SCIF can use various internal and external clocks, with 
+> up to two baud rate generators (programmable dividers) chained. Whether the 
+> SoC is provided with an external clock for its serial ports is a board 
+> property, not an SoC property. I would thus like to implement support for this 
+> feature properly and avoid hardcoding the CKE bits like done below.
+> 
+> The Marzen board has an external clock generator connected to the SCIF_SCK pin 
+> that can be used as a clock source, but I don't really see a reason why we 
+> couldn't use the internal P clock instead. I don't want to delay integration 
+> of SCIF DT support until we have a proper solution to handle clock 
+> configuration, but couldn't we use the internal P clock on the Marzen board in 
+> the meantime ?
 
-Oh, good.  That's done inside of_create_pci_host_bridge(), then?  (I
-haven't looked at that code.)
+I think that approach sounds reasonable and I seem to have it working
+without any driver changes. Could you confirm that the following
+DT snippet is what you have in mind? (I intend to update it as per any
+relevant changes you make when reposting your DT sci patch for the
+r8a7791.)
 
-Bjorn
+
+diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
+index e924f96..3e9cca4 100644
+--- a/arch/arm/boot/dts/r8a7779.dtsi
++++ b/arch/arm/boot/dts/r8a7779.dtsi
+@@ -203,6 +203,66 @@
+ 		status = "disabled";
+ 	};
+ 
++	scif0: serial at ffe40000 {
++		compatible = "renesas,scif", "renesas,scif-r8a7779";
++		reg = <0xffe40000 265>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 88 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cpg_clocks R8A7779_CLK_P>;
++		clock-names = "sci_ick";
++		status = "disabled";
++	};
++
++	scif1: serial at ffe41000 {
++		compatible = "renesas,scif", "renesas,scif-r8a7779";
++		reg = <0xffe41000 265>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 89 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cpg_clocks R8A7779_CLK_P>;
++		clock-names = "sci_ick";
++		status = "disabled";
++	};
++
++	scif2: serial at ffe42000 {
++		compatible = "renesas,scif", "renesas,scif-r8a7779";
++		reg = <0xffe42000 265>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 90 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cpg_clocks R8A7779_CLK_P>;
++		clock-names = "sci_ick";
++		status = "disabled";
++	};
++
++	scif3: serial at ffe43000 {
++		compatible = "renesas,scif", "renesas,scif-r8a7779";
++		reg = <0xffe43000 265>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 91 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cpg_clocks R8A7779_CLK_P>;
++		clock-names = "sci_ick";
++		status = "disabled";
++	};
++
++	scif4: serial at ffe44000 {
++		compatible = "renesas,scif", "renesas,scif-r8a7779";
++		reg = <0xffe44000 265>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 92 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cpg_clocks R8A7779_CLK_P>;
++		clock-names = "sci_ick";
++		status = "disabled";
++	};
++
++	scif5: serial at ffe45000 {
++		compatible = "renesas,scif", "renesas,scif-r8a7779";
++		reg = <0xffe45000 265>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 93 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cpg_clocks R8A7779_CLK_P>;
++		clock-names = "sci_ick";
++		status = "disabled";
++	};
++
+ 	pfc: pfc at fffc0000 {
+ 		compatible = "renesas,pfc-r8a7779";
+ 		reg = <0xfffc0000 0x23c>;
