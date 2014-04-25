@@ -1,94 +1,67 @@
-From: archit@ti.com (Archit Taneja)
-Date: Fri, 25 Apr 2014 15:36:13 +0530
-Subject: [PATCH 01/23] OMAPDSS: HDMI: lane config support
-In-Reply-To: <1398334639-14172-2-git-send-email-tomi.valkeinen@ti.com>
-References: <1398334639-14172-1-git-send-email-tomi.valkeinen@ti.com>
- <1398334639-14172-2-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <535A3395.4050106@ti.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri, 25 Apr 2014 12:21:05 +0200
+Subject: [PATCH 0/8] i.MX6 PCIe binding change and MSI support
+In-Reply-To: <20140424175844.GD29593@google.com>
+References: <1396025579-14344-1-git-send-email-l.stach@pengutronix.de>
+ <20140424175844.GD29593@google.com>
+Message-ID: <1398421265.4657.25.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Am Donnerstag, den 24.04.2014, 11:58 -0600 schrieb Bjorn Helgaas:
+> On Fri, Mar 28, 2014 at 05:52:51PM +0100, Lucas Stach wrote:
+> > While working on MSI support for the i.MX6 PCIe host driver
+> > it has been discovered that the binding for this host controller
+> > is broken in many ways (refer to the patch descriptions for more
+> > info) and was introduced without proper discussion about what
+> > should/should not be in the binding.
+> > 
+> > This series fixes this and minimizes the difference of the
+> > i.MX6 binding to the common designware PCIe binding. I'm aware
+> > that this is a quite radical change, but I think it's justified
+> > to do this as long as there aren't many user of the old binding
+> > (most of the optional properties in the binding aren't even
+> > implemented).
+> > 
+> > Looking forward to your feedback.
+> > 
+> > Lucas Stach (8):
+> >   ARM: imx6q-clk: parent lvds_gate from lvds_sel
+This one is already applied.
 
-On Thursday 24 April 2014 03:46 PM, Tomi Valkeinen wrote:
-> Add support to configure the pins used for the HDMI lanes. The order and
-> polarity of the lanes can be defined in the DT data.
->
-> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> ---
+> >   PCI: designware: split Exynos and i.MX bindings
+> >   ARM: dts: imx6: update pcie to bring in line with new binding
+> >   PCI: imx6: use new clock names
+> >   PCI: imx6: drop old irq mapping
+> >   PCI: imx6: rip out optional (and unused) irqs
+> >   PCI: designware: make MSI isr shared irq aware
+> >   PCI: imx6: add support for MSI
+> 
+> What's the status of all these?  I would normally apply patches 4-8 of this
+> series through my tree, given the appropriate acks, but I haven't seen
+> those yet.  And I'm not sure what dependencies there are between the
+> non-PCI patches and the PCI ones.
+> 
+It's a complete binding change, so applying one part without the other
+is going to horribly break things.
 
-> +static void hdmi_phy_configure_lanes(struct hdmi_phy_data *phy)
-> +{
-> +	static const u16 pad_cfg_list[] = {
-> +		0x0123,
-> +		0x0132,
-> +		0x0312,
-> +		0x0321,
-> +		0x0231,
-> +		0x0213,
-> +		0x1023,
-> +		0x1032,
-> +		0x3012,
-> +		0x3021,
-> +		0x2031,
-> +		0x2013,
-> +		0x1203,
-> +		0x1302,
-> +		0x3102,
-> +		0x3201,
-> +		0x2301,
-> +		0x2103,
-> +		0x1230,
-> +		0x1320,
-> +		0x3120,
-> +		0x3210,
-> +		0x2310,
-> +		0x2130,
-> +	};
-> +
-> +	u16 lane_cfg = 0;
-> +	int i;
-> +	unsigned lane_cfg_val;
-> +	u16 pol_val = 0;
-> +
-> +	for (i = 0; i < 4; ++i)
-> +		lane_cfg |= phy->lane_function[i] << ((3 - i) * 4);
-> +
-> +	pol_val |= phy->lane_polarity[0] << 0;
-> +	pol_val |= phy->lane_polarity[1] << 3;
-> +	pol_val |= phy->lane_polarity[2] << 2;
-> +	pol_val |= phy->lane_polarity[3] << 1;
-> +
-> +	for (i = 0; i < ARRAY_SIZE(pad_cfg_list); ++i)
-> +		if (pad_cfg_list[i] == lane_cfg)
-> +			break;
-> +
-> +	if (WARN_ON(i == ARRAY_SIZE(pad_cfg_list)))
-> +		i = 0;
-> +
-> +	lane_cfg_val = i;
+So I would at least want to see an ack for the binding change on the
+i.MX side from Shawn and Richard. This will need some follow on patches,
+as some boards adding PCIe using the old binding have cropped up in
+linux-next, but I can do the patches on short notice if everyone agrees
+to merge this patchset.
 
-I spent some time to see if we could get create lane_cfg_val without 
-having the table above, looks like there is no pattern at all in the 
-register field.
+The designware part is pretty simple and doesn't change anything for
+other users than i.MX. Though I would like to see an ack from Jingoo for
+those.
 
-> +
-> +	REG_FLD_MOD(phy->base, HDMI_TXPHY_PAD_CFG_CTRL, lane_cfg_val, 26, 22);
-> +	REG_FLD_MOD(phy->base, HDMI_TXPHY_PAD_CFG_CTRL, pol_val, 30, 27);
-> +}
-> +
->   int hdmi_phy_enable(struct hdmi_phy_data *phy, struct hdmi_wp_data *wp,
->   			struct hdmi_config *cfg)
->   {
-> @@ -92,8 +183,7 @@ int hdmi_phy_enable(struct hdmi_phy_data *phy, struct hdmi_wp_data *wp,
->   	/* Setup max LDO voltage */
->   	REG_FLD_MOD(phy->base, HDMI_TXPHY_POWER_CTRL, 0xB, 3, 0);
->
-> -	/* Write to phy address 3 to change the polarity control */
-> -	REG_FLD_MOD(phy->base, HDMI_TXPHY_PAD_CFG_CTRL, 0x1, 27, 27);
+I have some more stuff in the pipes regarding multiple MSI irqs, that
+depend on this series and also the Keystone people are waiting for this
+to be applied in order to consolidate the clock handling of the
+designware core driver, so it would be nice to get this moving again.
 
-wow, didn't realize it was hardcoded like this.
-
-Reviewed-by: Archit Taneja <archit@ti.com?
-
-Archit
+Regards,
+Lucas
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
