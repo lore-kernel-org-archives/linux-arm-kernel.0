@@ -1,36 +1,80 @@
-From: murzin.v@gmail.com (Vladimir Murzin)
-Date: Fri, 25 Apr 2014 09:43:55 +0100
-Subject: [Xen-devel] [PATCH RFC] arm64: 32-bit tolerant sync bitops
-In-Reply-To: <1398410237.23380.37.camel@dagon.hellion.org.uk>
-References: <1397723881-31648-1-git-send-email-murzin.v@gmail.com>
- <534FB009.5030904@citrix.com>
- <1398241889.4880.96.camel@kazak.uk.xensource.com>
- <20140422205656.GA4467@hp530>
- <1398410237.23380.37.camel@dagon.hellion.org.uk>
-Message-ID: <CABV+yWtZWcmxTawAVurL4Ua0iCF3FK0x+xqzm4zeEv_d2xqgkw@mail.gmail.com>
+From: sourav.poddar@ti.com (Sourav Poddar)
+Date: Fri, 25 Apr 2014 14:25:25 +0530
+Subject: [PATCH] arm: dts: am33xx-clock: Fix ehrpwm tbclk data.
+Message-ID: <1398416125-7139-1-git-send-email-sourav.poddar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 25, 2014 at 8:17 AM, Ian Campbell <Ian.Campbell@citrix.com> wrote:
-> On Tue, 2014-04-22 at 21:56 +0100, Vladimir Murzin wrote:
->> Might be dealing with it on Xen side is only way unless arm64 folks say what
->> they think...
->
->
-> I don't expect the arm64 guys will have any interesting in changing the
-> bitops in this way. So please can you fix this on the Xen side, perhaps
-> in the way I suggested.
->
-> If at some point arm64 does gain 32-bit capable bitops we can always
-> switch back to using them directly again.
->
-> In the meantime we need to get this Xen regression fixed before 3.15. If
-> you don't have time to work on this please let us know.
->
-> Ian.
->
-Hi Ian
+tbclk does not need to be a composite clock, we can simply
+use gate clock for this purpose.
 
-I'll try to cook some patches for that.
+Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+---
+ arch/arm/boot/dts/am33xx-clocks.dtsi |   42 ++++++++++------------------------
+ 1 file changed, 12 insertions(+), 30 deletions(-)
 
-Vladimir
+diff --git a/arch/arm/boot/dts/am33xx-clocks.dtsi b/arch/arm/boot/dts/am33xx-clocks.dtsi
+index 9ccfe50..a45d27f 100644
+--- a/arch/arm/boot/dts/am33xx-clocks.dtsi
++++ b/arch/arm/boot/dts/am33xx-clocks.dtsi
+@@ -96,46 +96,28 @@
+ 		clock-div = <1>;
+ 	};
+ 
+-	ehrpwm0_gate_tbclk: ehrpwm0_gate_tbclk {
++	ehrpwm0_tbclk: ehrpwm0_tbclk at 44e10664 {
+ 		#clock-cells = <0>;
+-		compatible = "ti,composite-no-wait-gate-clock";
++		compatible = "gate-clock";
+ 		clocks = <&dpll_per_m2_ck>;
+-		ti,bit-shift = <0>;
+-		reg = <0x0664>;
++		bit-shift = <0>;
++		reg = <0x44e10664 0x4>;
+ 	};
+ 
+-	ehrpwm0_tbclk: ehrpwm0_tbclk {
++	ehrpwm1_tbclk: ehrpwm1_tbclk at 44e10664 {
+ 		#clock-cells = <0>;
+-		compatible = "ti,composite-clock";
+-		clocks = <&ehrpwm0_gate_tbclk>;
+-	};
+-
+-	ehrpwm1_gate_tbclk: ehrpwm1_gate_tbclk {
+-		#clock-cells = <0>;
+-		compatible = "ti,composite-no-wait-gate-clock";
++		compatible = "gate-clock";
+ 		clocks = <&dpll_per_m2_ck>;
+-		ti,bit-shift = <1>;
+-		reg = <0x0664>;
+-	};
+-
+-	ehrpwm1_tbclk: ehrpwm1_tbclk {
+-		#clock-cells = <0>;
+-		compatible = "ti,composite-clock";
+-		clocks = <&ehrpwm1_gate_tbclk>;
++		bit-shift = <1>;
++		reg = <0x44e10664 0x4>;
+ 	};
+ 
+-	ehrpwm2_gate_tbclk: ehrpwm2_gate_tbclk {
++	ehrpwm2_tbclk: ehrpwm2_tbclk at 44e10664 {
+ 		#clock-cells = <0>;
+-		compatible = "ti,composite-no-wait-gate-clock";
++		compatible = "gate-clock";
+ 		clocks = <&dpll_per_m2_ck>;
+-		ti,bit-shift = <2>;
+-		reg = <0x0664>;
+-	};
+-
+-	ehrpwm2_tbclk: ehrpwm2_tbclk {
+-		#clock-cells = <0>;
+-		compatible = "ti,composite-clock";
+-		clocks = <&ehrpwm2_gate_tbclk>;
++		bit-shift = <2>;
++		reg = <0x44e10664 0x4>;
+ 	};
+ };
+ &prcm_clocks {
+-- 
+1.7.9.5
