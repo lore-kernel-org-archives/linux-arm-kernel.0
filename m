@@ -1,63 +1,45 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 25 Apr 2014 21:20:13 +0800
-Subject: [PATCH v3 part1 07/11] ARM64 / ACPI: Introduce
- arch_fix_phys_package_id() for cpu topology
-In-Reply-To: <1398432017-8506-1-git-send-email-hanjun.guo@linaro.org>
-References: <1398432017-8506-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1398432017-8506-8-git-send-email-hanjun.guo@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 25 Apr 2014 14:22:45 +0100
+Subject: [PATCH 21/38] mmc: sdhci: hack up driver to make it more
+ compliant with UHS-1
+In-Reply-To: <20140425131529.GN26756@n2100.arm.linux.org.uk>
+References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
+ <E1Wd2WT-0003vg-Ke@rmk-PC.arm.linux.org.uk>
+ <20140425123820.GA15179@pengutronix.de>
+ <20140425124945.GM26756@n2100.arm.linux.org.uk>
+ <20140425130849.GB15179@pengutronix.de>
+ <20140425131529.GN26756@n2100.arm.linux.org.uk>
+Message-ID: <20140425132245.GO26756@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arch_fix_phys_package_id() will be called in ACPI core to use
-the slot number provided by ACPI to update the physical package
-id, then we can get the right value in the "physical id" field
-of /proc/cpuinfo.
+On Fri, Apr 25, 2014 at 02:15:30PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Apr 25, 2014 at 03:08:49PM +0200, Markus Pargmann wrote:
+> > I just tried the different parts of the patch. Without the following
+> > change, emmc works:
+> > 
+> > --- a/drivers/mmc/host/sdhci.c
+> > +++ b/drivers/mmc/host/sdhci.c
+> > @@ -1507,12 +1507,6 @@ static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
+> >  			host->ops->set_clock(host, host->clock);
+> >  		}
+> >  
+> > -
+> > -		/* Reset SD Clock Enable */
+> > -		clk = sdhci_readw(host, SDHCI_CLOCK_CONTROL);
+> > -		clk &= ~SDHCI_CLOCK_CARD_EN;
+> > -		sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
+> > -
+> 
+> So the bit which stops us violating the SD spec stops eMMC from working...
+> that's... just great.
+> 
+> Okay, I'll look deeper at this and see what can be done, but I suspect it
+> will turn out to require more patches and be more invasive.
 
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
----
- arch/arm64/include/asm/topology.h |    2 ++
- arch/arm64/kernel/topology.c      |   14 ++++++++++++++
- 2 files changed, 16 insertions(+)
+In the mean time, here's the remainder (to patch 33) of the series with
+this commit omitted.
 
-diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
-index 0172e6d..0b0e24f 100644
---- a/arch/arm64/include/asm/topology.h
-+++ b/arch/arm64/include/asm/topology.h
-@@ -26,11 +26,13 @@ extern struct cpu_topology cpu_topology[NR_CPUS];
- void init_cpu_topology(void);
- void store_cpu_topology(unsigned int cpuid);
- const struct cpumask *cpu_coregroup_mask(int cpu);
-+void arch_fix_phys_package_id(int num, u32 slot);
- 
- #else
- 
- static inline void init_cpu_topology(void) { }
- static inline void store_cpu_topology(unsigned int cpuid) { }
-+static inline void arch_fix_phys_package_id(int num, u32 slot) { }
- 
- #endif
- 
-diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-index 3e06b0b..51ea4a1 100644
---- a/arch/arm64/kernel/topology.c
-+++ b/arch/arm64/kernel/topology.c
-@@ -93,3 +93,17 @@ void __init init_cpu_topology(void)
- 		cpumask_clear(&cpu_topo->thread_sibling);
- 	}
- }
-+
-+/*
-+ * Use the CPU slot number provided by ACPI to update the physical
-+ * package id, then we can get the right value in the "physical id"
-+ * field of /proc/cpuinfo.
-+ */
-+void arch_fix_phys_package_id(int num, u32 slot)
-+{
-+	struct cpu_topology *cpuid_topo = &cpu_topology[num];
-+
-+	if (cpuid_topo->cluster_id == -1)
-+		cpuid_topo->cluster_id = slot;
-+}
-+EXPORT_SYMBOL_GPL(arch_fix_phys_package_id);
 -- 
-1.7.9.5
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
