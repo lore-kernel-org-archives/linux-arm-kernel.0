@@ -1,41 +1,117 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 24 Apr 2014 17:52:51 -0700
-Subject: [PATCH 1/2] arm: fixmap: implement __set_fixmap()
-In-Reply-To: <1396646870-29695-1-git-send-email-rabin@rab.in>
-References: <1396646870-29695-1-git-send-email-rabin@rab.in>
-Message-ID: <CAD=FV=UuYpc-kFMymy7P_mL+iYziKqJii8=32P6kMELDFnC1pQ@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 25 Apr 2014 10:06:51 +0900
+Subject: [PATCH 1/4] ARM: shmobile: Ignore callbacks for subsys
+ generic_pm_domain_data
+In-Reply-To: <CAPDyKFpbX3cdAgvUx=4FbmNxFLH4VO8JqrQqRB3nxXMxZDyXJQ@mail.gmail.com>
+References: <1397230004-22306-1-git-send-email-ulf.hansson@linaro.org>
+ <1397230004-22306-2-git-send-email-ulf.hansson@linaro.org>
+ <20140414012013.GB22411@verge.net.au>
+ <CAPDyKFp76Z93tNhd5vBpTUVzF0Km9oMAmBbg0RCT+91V5J-jzw@mail.gmail.com>
+ <CAPDyKFpbX3cdAgvUx=4FbmNxFLH4VO8JqrQqRB3nxXMxZDyXJQ@mail.gmail.com>
+Message-ID: <20140425010651.GC12641@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rabin,
+On Thu, Apr 24, 2014 at 01:25:14PM +0200, Ulf Hansson wrote:
+> On 14 April 2014 11:22, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> > On 14 April 2014 03:20, Simon Horman <horms@verge.net.au> wrote:
+> >> On Fri, Apr 11, 2014 at 05:26:41PM +0200, Ulf Hansson wrote:
+> >>> There are no active users of these callbacks, thus there are no benefit
+> >>> of trying to invoke them.
+> >>>
+> >>> Cc: Simon Horman <horms@verge.net.au>
+> >>> Cc: Magnus Damm <magnus.damm@gmail.com>
+> >>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> >>> ---
+> >>>
+> >>> I am seeking ack from the SOC maintainers since this needs to go with the other
+> >>> patches in this patchset on the PM core.
+> >>
+> >> In order to reduce the possibility of conflicts I would prefer
+> >> to take this patch through my tree.
+> >
+> > Okay, go ahead!
+> >
+> 
+> Hi Simon,
+> 
+> Just wanted to know, if you decided to queue this patch in your tree.
+> Or were there anything else you needed me to fix here?
 
-On Fri, Apr 4, 2014 at 2:27 PM, Rabin Vincent <rabin@rab.in> wrote:
-> This is used from set_fixmap() and clear_fixmap() via
-> asm-generic/fixmap.h.
->
-> Signed-off-by: Rabin Vincent <rabin@rab.in>
-> ---
-> Needs "arm: use generic fixmap.h", available in linux-next.
->
->  arch/arm/include/asm/fixmap.h | 2 ++
->  arch/arm/mm/mmu.c             | 7 +++++++
->  2 files changed, 9 insertions(+)
->
-> diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
-> index 68ea615..55ed076 100644
-> --- a/arch/arm/include/asm/fixmap.h
-> +++ b/arch/arm/include/asm/fixmap.h
-> @@ -23,6 +23,8 @@ enum fixed_addresses {
->         __end_of_fixed_addresses
->  };
->
-> +void __set_fixmap(enum fixed_addresses idx, unsigned long phys, pgprot_t prot);
+Sorry for dropping the ball. I will queue-up this patch.
 
-nit: I think you should use phys_addr_t for the physical address, right?
-
-void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot);
-
-
-...I'm no expert at fixmap, but otherwise this looks pretty reasonable to me.
-
--Doug
+> 
+> > Kind regards
+> > Ulf Hansson
+> >
+> >>
+> >>> ---
+> >>>  arch/arm/mach-shmobile/pm-rmobile.c |   38 +++--------------------------------
+> >>>  1 file changed, 3 insertions(+), 35 deletions(-)
+> >>>
+> >>> diff --git a/arch/arm/mach-shmobile/pm-rmobile.c b/arch/arm/mach-shmobile/pm-rmobile.c
+> >>> index 1fc05d9..f710235 100644
+> >>> --- a/arch/arm/mach-shmobile/pm-rmobile.c
+> >>> +++ b/arch/arm/mach-shmobile/pm-rmobile.c
+> >>> @@ -99,39 +99,7 @@ static int rmobile_pd_power_up(struct generic_pm_domain *genpd)
+> >>>
+> >>>  static bool rmobile_pd_active_wakeup(struct device *dev)
+> >>>  {
+> >>> -     bool (*active_wakeup)(struct device *dev);
+> >>> -
+> >>> -     active_wakeup = dev_gpd_data(dev)->ops.active_wakeup;
+> >>> -     return active_wakeup ? active_wakeup(dev) : true;
+> >>> -}
+> >>> -
+> >>> -static int rmobile_pd_stop_dev(struct device *dev)
+> >>> -{
+> >>> -     int (*stop)(struct device *dev);
+> >>> -
+> >>> -     stop = dev_gpd_data(dev)->ops.stop;
+> >>> -     if (stop) {
+> >>> -             int ret = stop(dev);
+> >>> -             if (ret)
+> >>> -                     return ret;
+> >>> -     }
+> >>> -     return pm_clk_suspend(dev);
+> >>> -}
+> >>> -
+> >>> -static int rmobile_pd_start_dev(struct device *dev)
+> >>> -{
+> >>> -     int (*start)(struct device *dev);
+> >>> -     int ret;
+> >>> -
+> >>> -     ret = pm_clk_resume(dev);
+> >>> -     if (ret)
+> >>> -             return ret;
+> >>> -
+> >>> -     start = dev_gpd_data(dev)->ops.start;
+> >>> -     if (start)
+> >>> -             ret = start(dev);
+> >>> -
+> >>> -     return ret;
+> >>> +     return true;
+> >>>  }
+> >>>
+> >>>  static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
+> >>> @@ -140,8 +108,8 @@ static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
+> >>>       struct dev_power_governor *gov = rmobile_pd->gov;
+> >>>
+> >>>       pm_genpd_init(genpd, gov ? : &simple_qos_governor, false);
+> >>> -     genpd->dev_ops.stop             = rmobile_pd_stop_dev;
+> >>> -     genpd->dev_ops.start            = rmobile_pd_start_dev;
+> >>> +     genpd->dev_ops.stop             = pm_clk_suspend;
+> >>> +     genpd->dev_ops.start            = pm_clk_resume;
+> >>>       genpd->dev_ops.active_wakeup    = rmobile_pd_active_wakeup;
+> >>>       genpd->dev_irq_safe             = true;
+> >>>       genpd->power_off                = rmobile_pd_power_down;
+> >>> --
+> >>> 1.7.9.5
+> >>>
+> >>>
+> >>> _______________________________________________
+> >>> linux-arm-kernel mailing list
+> >>> linux-arm-kernel at lists.infradead.org
+> >>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >>>
+> 
