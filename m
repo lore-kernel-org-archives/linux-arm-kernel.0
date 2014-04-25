@@ -1,79 +1,55 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:50:05 +0100
-Subject: [PATCH 173/222] ARM: l2c: always enable low power modes
+Date: Fri, 25 Apr 2014 12:50:15 +0100
+Subject: [PATCH 175/222] ARM: l2c: omap2: avoid reading directly from the L2
+ registers in platform code
 In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
 References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1Wdedp-0007Oz-O7@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Wdedz-0007P7-Uv@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Always enable the L2C low power modes on L2C-310 R3P0 and newer parts.
+Avoid reading directly from the L2 registers in platform code.  The L2
+code will have already saved the register values itself into the
+l2x0_saved_regs structure, so platform code should just move these
+values to where they're required.
+
+This is safe because the L2x0 will have been initialised by an early
+initcall, whereas the OMAP4 PM code is initialised late.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- Documentation/devicetree/bindings/arm/l2cc.txt |  2 --
- arch/arm/mm/cache-l2x0.c                       | 22 ++++++++++++----------
- 2 files changed, 12 insertions(+), 12 deletions(-)
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c | 16 ++++++----------
+ 1 file changed, 6 insertions(+), 10 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
-index e0dd400ecea6..b513cb8196fe 100644
---- a/Documentation/devicetree/bindings/arm/l2cc.txt
-+++ b/Documentation/devicetree/bindings/arm/l2cc.txt
-@@ -40,8 +40,6 @@ implementations of the L2 cache controller with compatible programming models.
- - arm,filter-ranges : <start length> Starting address and length of window to
-   filter. Addresses in the filter window are directed to the M1 port. Other
-   addresses will go to the M0 port.
--- arm,dynamic-clk-gating : Enables dynamic clock gating (PL310)
--- arm,standby-mode : Enables standby mode (PL310)
- - interrupts : 1 combined interrupt.
- - cache-id-part: cache id part number to be used if it is not present
-   on hardware
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 8c5219f6c104..333ef64873f9 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -695,6 +695,18 @@ static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
- 			1 + (prefetch & L310_PREFETCH_CTRL_OFFSET_MASK));
- 	}
- 
-+	/* r3p0 or later has power control register */
-+	if (rev >= L310_CACHE_ID_RTL_R3P0) {
-+		u32 power_ctrl;
-+
-+		l2c_write_sec(L310_DYNAMIC_CLK_GATING_EN | L310_STNDBY_MODE_EN,
-+			      base, L310_POWER_CTRL);
-+		power_ctrl = readl_relaxed(base + L310_POWER_CTRL);
-+		pr_info("L2C-310 dynamic clock gating %sabled, standby mode %sabled\n",
-+			power_ctrl & L310_DYNAMIC_CLK_GATING_EN ? "en" : "dis",
-+			power_ctrl & L310_STNDBY_MODE_EN ? "en" : "dis");
-+	}
-+
- 	l2c_enable(base, aux, num_lock);
- 
- 	if (aux & L310_AUX_CTRL_FULL_LINE_ZERO) {
-@@ -990,7 +1002,6 @@ static void __init l2c310_of_parse(const struct device_node *np,
- 	u32 data[3] = { 0, 0, 0 };
- 	u32 tag[3] = { 0, 0, 0 };
- 	u32 filter[2] = { 0, 0 };
+diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+index ba43f49fbb59..61cb77f8cf12 100644
+--- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
++++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+@@ -187,19 +187,15 @@ static void l2x0_pwrst_prepare(unsigned int cpu_id, unsigned int save_state)
+  * in every restore MPUSS OFF path.
+  */
+ #ifdef CONFIG_CACHE_L2X0
+-static void save_l2x0_context(void)
++static void __init save_l2x0_context(void)
+ {
 -	u32 val;
- 
- 	of_property_read_u32_array(np, "arm,tag-latency", tag, ARRAY_SIZE(tag));
- 	if (tag[0] && tag[1] && tag[2])
-@@ -1017,15 +1028,6 @@ static void __init l2c310_of_parse(const struct device_node *np,
- 		writel_relaxed((filter[0] & ~(SZ_1M - 1)) | L310_ADDR_FILTER_EN,
- 			       l2x0_base + L310_ADDR_FILTER_START);
- 	}
--
--	val = 0;
--	if (of_property_read_bool(np, "arm,dynamic-clk-gating"))
--		val |= L310_DYNAMIC_CLK_GATING_EN;
--	if (of_property_read_bool(np, "arm,standby-mode"))
--		val |= L310_STNDBY_MODE_EN;
--
--	if (val)
--		l2c_write_sec(val, l2x0_base, L310_POWER_CTRL);
+-	void __iomem *l2x0_base = omap4_get_l2cache_base();
+-	if (l2x0_base) {
+-		val = __raw_readl(l2x0_base + L2X0_AUX_CTRL);
+-		__raw_writel(val, sar_base + L2X0_AUXCTRL_OFFSET);
+-		val = __raw_readl(l2x0_base + L310_PREFETCH_CTRL);
+-		__raw_writel(val, sar_base + L2X0_PREFETCH_CTRL_OFFSET);
+-	}
++	__raw_writel(l2x0_saved_regs.aux_ctrl,
++		     sar_base + L2X0_AUXCTRL_OFFSET);
++	__raw_writel(l2x0_saved_regs.prefetch_ctrl,
++		     sar_base + L2X0_PREFETCH_CTRL_OFFSET);
  }
+ #else
+-static void save_l2x0_context(void)
++static void __init save_l2x0_context(void)
+ {}
+ #endif
  
- static const struct l2c_init_data of_l2c310_data __initconst = {
 -- 
 1.8.3.1
