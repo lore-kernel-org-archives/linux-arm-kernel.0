@@ -1,94 +1,145 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Fri, 25 Apr 2014 17:09:14 +0100
-Subject: [PATCH v2 10/10] efi/arm64: ignore dtb= when UEFI SecureBoot is
- enabled
-In-Reply-To: <1398442154-19974-1-git-send-email-leif.lindholm@linaro.org>
-References: <1398442154-19974-1-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <1398442154-19974-11-git-send-email-leif.lindholm@linaro.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 25 Apr 2014 11:13:36 -0500
+Subject: [PATCH v2 14/18] ARM: mvebu: Add support for USB cluster on the
+ Armada 375 SoC
+In-Reply-To: <20140425160705.GE12472@lunn.ch>
+References: <1398434836-18908-1-git-send-email-gregory.clement@free-electrons.com>
+ <1398434836-18908-15-git-send-email-gregory.clement@free-electrons.com>
+ <20140425160705.GE12472@lunn.ch>
+Message-ID: <20140425161336.GR29632@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+On Fri, Apr 25, 2014 at 06:07:05PM +0200, Andrew Lunn wrote:
+> On Fri, Apr 25, 2014 at 04:07:12PM +0200, Gregory CLEMENT wrote:
+> > The Armada 375 SoC comes with an USB2 host and device controller and
+> > an USB3 controller. The USB cluster control register allows to manage
+> > common features of both USB controllers.
+> > 
+> > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> > ---
+> >  arch/arm/mach-mvebu/Makefile      |  2 +-
+> >  arch/arm/mach-mvebu/usb-cluster.c | 96 +++++++++++++++++++++++++++++++++++++++
+> >  2 files changed, 97 insertions(+), 1 deletion(-)
+> >  create mode 100644 arch/arm/mach-mvebu/usb-cluster.c
+> > 
+> > diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
+> > index a63e43b6b451..dec05e7e1802 100644
+> > --- a/arch/arm/mach-mvebu/Makefile
+> > +++ b/arch/arm/mach-mvebu/Makefile
+> > @@ -4,7 +4,7 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
+> >  AFLAGS_coherency_ll.o		:= -Wa,-march=armv7-a
+> >  
+> >  obj-y				 += system-controller.o mvebu-soc-id.o
+> > -obj-$(CONFIG_MACH_MVEBU_V7)      += board-v7.o
+> > +obj-$(CONFIG_MACH_MVEBU_V7)      += board-v7.o usb-cluster.o
+> >  obj-$(CONFIG_MACH_DOVE)		 += dove.o
+> >  obj-$(CONFIG_ARCH_MVEBU)	 += coherency.o coherency_ll.o pmsu.o
+> >  obj-$(CONFIG_SMP)                += platsmp.o headsmp.o
+> > diff --git a/arch/arm/mach-mvebu/usb-cluster.c b/arch/arm/mach-mvebu/usb-cluster.c
+> > new file mode 100644
+> > index 000000000000..4c15d282db23
+> > --- /dev/null
+> > +++ b/arch/arm/mach-mvebu/usb-cluster.c
+> > @@ -0,0 +1,96 @@
+> > +/*
+> > + * USB cluster support for Armada 375 platform.
+> > + *
+> > + * Copyright (C) 2014 Marvell
+> > + *
+> > + * Gregory CLEMENT <gregory.clement@free-electrons.com>
+> > + *
+> > + * This file is licensed under the terms of the GNU General Public
+> > + * License version 2.  This program is licensed "as is" without any
+> > + * warranty of any kind, whether express or implied.
+> > + *
+> > + * Armada 375 comes with an USB2 host and device controller and an
+> > + * USB3 controller. The USB cluster control register allows to manage
+> > + * common features of both USB controller.
+> > + */
+> > +
+> > +#include <linux/kernel.h>
+> > +#include <linux/init.h>
+> > +#include <linux/of_address.h>
+> > +#include <linux/io.h>
+> > +#include <linux/slab.h>
+> > +
+> > +#define USB2_PHY_CONFIG_ENABLE BIT(0) /* active low */
+> > +
+> > +static struct of_device_id of_usb_cluster_table[] = {
+> > +	{ .compatible = "marvell,armada-375-usb-cluster", },
+> > +	{ /* end of list */ },
+> > +};
+> > +
+> > +static int __init mvebu_usb_cluster_init(void)
+> > +{
+> > +	struct device_node *np;
+> > +
+> > +	np = of_find_matching_node(NULL, of_usb_cluster_table);
+> > +	if (np) {
+> > +		void __iomem *usb_cluster_base;
+> > +		u32 reg;
+> > +		struct device_node *ehci_node, *xhci_node;
+> > +		struct property *ehci_status;
+> > +		bool use_usb3 = false;
+> > +
+> > +		usb_cluster_base = of_iomap(np, 0);
+> > +		BUG_ON(!usb_cluster_base);
+> > +
+> > +		xhci_node = of_find_compatible_node(NULL, NULL,
+> > +						"marvell,armada-375-xhci");
+> > +
+> > +		if (xhci_node && of_device_is_available(xhci_node))
+> > +			use_usb3 = true;
+> > +
+> > +		ehci_node = of_find_compatible_node(NULL, NULL,
+> > +						"marvell,orion-ehci");
+> > +
+> > +		if (ehci_node && of_device_is_available(ehci_node)
+> > +			&& use_usb3) {
+> > +			/*
+> > +			 * We can't use usb2 and usb3 in the same time, so let's
+> > +			 * disbale usb2 and complain about it to the user askinf
+> > +			 * to fix the device tree.
+> > +			 */
+> > +
+> > +			ehci_status = kzalloc(sizeof(struct property),
+> > +					GFP_KERNEL);
+> > +			WARN_ON(!ehci_status);
+> > +
+> > +			ehci_status->value = kstrdup("disabled", GFP_KERNEL);
+> > +			WARN_ON(!ehci_status->value);
+> > +
+> > +			ehci_status->length = 8;
+> > +			ehci_status->name = kstrdup("status", GFP_KERNEL);
+> > +			WARN_ON(!ehci_status->name);
+> > +
+> > +			of_update_property(ehci_node, ehci_status);
+> > +			pr_err("%s: armada-375-xhci and orion-ehci are incompatible for this SoC.\n",
+> > +				__func__);
+> > +			pr_err("Please fix your dts!\n");
+> > +			pr_err("orion-ehci have been disabled by default...\n");
+> > +
+> > +		}
+> > +
+> > +		reg = readl(usb_cluster_base);
+> > +		if (use_usb3)
+> > +			reg |= USB2_PHY_CONFIG_ENABLE;
+> > +		else
+> > +			reg &= ~USB2_PHY_CONFIG_ENABLE;
+> > +		writel(reg, usb_cluster_base);
+> 
+> Am i right in saying this in the end is about enabling the USB2 phy or
+> a USB3 why? So why not just implement a phy driver?
 
-Loading unauthenticated FDT blobs directly from storage is a security hazard,
-so this should only be allowed when running with UEFI Secure Boot disabled.
++1 we have a generic phy layer (drivers/phy) for that.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
----
- drivers/firmware/efi/arm-stub.c |   39 +++++++++++++++++++++++++++++++++++----
- 1 file changed, 35 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/firmware/efi/arm-stub.c b/drivers/firmware/efi/arm-stub.c
-index 19239a9..41114ce 100644
---- a/drivers/firmware/efi/arm-stub.c
-+++ b/drivers/firmware/efi/arm-stub.c
-@@ -12,6 +12,30 @@
-  *
-  */
- 
-+static int __init efi_secureboot_enabled(efi_system_table_t *sys_table_arg)
-+{
-+	static efi_guid_t const var_guid __initconst = EFI_GLOBAL_VARIABLE_GUID;
-+	static efi_char16_t const var_name[] __initconst = {
-+		'S', 'e', 'c', 'u', 'r', 'e', 'B', 'o', 'o', 't', 0 };
-+
-+	efi_get_variable_t *f_getvar = sys_table_arg->runtime->get_variable;
-+	unsigned long size = sizeof(u8);
-+	efi_status_t status;
-+	u8 val;
-+
-+	status = f_getvar((efi_char16_t *)var_name, (efi_guid_t *)&var_guid,
-+			  NULL, &size, &val);
-+
-+	switch (status) {
-+	case EFI_SUCCESS:
-+		return val;
-+	case EFI_NOT_FOUND:
-+		return 0;
-+	default:
-+		return 1;
-+	}
-+}
-+
- static efi_status_t efi_open_volume(efi_system_table_t *sys_table_arg,
- 				    void *__image, void **__fh)
- {
-@@ -144,7 +168,7 @@ unsigned long __init efi_entry(void *handle, efi_system_table_t *sys_table,
- 	/* addr/point and size pairs for memory management*/
- 	unsigned long initrd_addr;
- 	u64 initrd_size = 0;
--	unsigned long fdt_addr;  /* Original DTB */
-+	unsigned long fdt_addr = 0;  /* Original DTB */
- 	u64 fdt_size = 0;  /* We don't get size from configuration table */
- 	char *cmdline_ptr = NULL;
- 	int cmdline_size = 0;
-@@ -196,9 +220,13 @@ unsigned long __init efi_entry(void *handle, efi_system_table_t *sys_table,
- 		goto fail_free_image;
- 	}
- 
--	/* Load a device tree from the configuration table, if present. */
--	fdt_addr = (uintptr_t)get_fdt(sys_table);
--	if (!fdt_addr) {
-+	/*
-+	 * Unauthenticated device tree data is a security hazard, so
-+	 * ignore 'dtb=' unless UEFI Secure Boot is disabled.
-+	 */
-+	if (efi_secureboot_enabled(sys_table)) {
-+		pr_efi(sys_table, "UEFI Secure Boot is enabled.\n");
-+	} else {
- 		status = handle_cmdline_files(sys_table, image, cmdline_ptr,
- 					      "dtb=",
- 					      ~0UL, (unsigned long *)&fdt_addr,
-@@ -209,6 +237,9 @@ unsigned long __init efi_entry(void *handle, efi_system_table_t *sys_table,
- 			goto fail_free_cmdline;
- 		}
- 	}
-+	if (!fdt_addr)
-+		/* Look for a device tree configuration table entry. */
-+		fdt_addr = (uintptr_t)get_fdt(sys_table);
- 
- 	status = handle_cmdline_files(sys_table, image, cmdline_ptr,
- 				      "initrd=", dram_base + SZ_512M,
 -- 
-1.7.10.4
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140425/1c7000ba/attachment.sig>
