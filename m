@@ -1,101 +1,116 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:31:22 +0100
-Subject: [PATCH 005/222] ARM: l2c: remove unnecessary UL-suffix to mask values
+Date: Fri, 25 Apr 2014 12:31:27 +0100
+Subject: [PATCH 006/222] ARM: outer cache: add documentation of outer cache
+ functions
 In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
 References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WdeLi-0007DO-G3@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WdeLn-0007DS-Jv@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-They're u32, they're not unsigned long.  The UL suffix is not required
-here.
+Add some documentation to cover the outer cache functions so that their
+requirements can be better understood.  Of particular note are the
+flush_all() and disable() methods which must not be called except in
+very specific circumstances.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-highbank/highbank.c | 2 +-
- arch/arm/mach-imx/mach-vf610.c    | 2 +-
- arch/arm/mach-imx/system.c        | 2 +-
- arch/arm/mach-mvebu/board-v7.c    | 2 +-
- arch/arm/mach-rockchip/rockchip.c | 2 +-
- arch/arm/mach-socfpga/socfpga.c   | 2 +-
- 6 files changed, 6 insertions(+), 6 deletions(-)
+ arch/arm/include/asm/outercache.h | 48 ++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 47 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
-index c7de89b263dd..38e1dc3b4c6e 100644
---- a/arch/arm/mach-highbank/highbank.c
-+++ b/arch/arm/mach-highbank/highbank.c
-@@ -69,7 +69,7 @@ static void __init highbank_init_irq(void)
- 	if (IS_ENABLED(CONFIG_CACHE_L2X0) &&
- 	    of_find_compatible_node(NULL, NULL, "arm,pl310-cache")) {
- 		highbank_smc1(0x102, 0x1);
--		l2x0_of_init(0, ~0UL);
-+		l2x0_of_init(0, ~0);
- 		outer_cache.disable = highbank_l2x0_disable;
- 	}
- }
-diff --git a/arch/arm/mach-imx/mach-vf610.c b/arch/arm/mach-imx/mach-vf610.c
-index 2d8aef5a6efa..6288a9690e78 100644
---- a/arch/arm/mach-imx/mach-vf610.c
-+++ b/arch/arm/mach-imx/mach-vf610.c
-@@ -22,7 +22,7 @@ static void __init vf610_init_machine(void)
+diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
+index 0e4420858990..2615b3d9e807 100644
+--- a/arch/arm/include/asm/outercache.h
++++ b/arch/arm/include/asm/outercache.h
+@@ -39,35 +39,75 @@ struct outer_cache_fns {
+ extern struct outer_cache_fns outer_cache;
  
- static void __init vf610_init_irq(void)
+ #ifdef CONFIG_OUTER_CACHE
+-
++/**
++ * outer_inv_range - invalidate range of outer cache lines
++ * @start: starting physical address, inclusive
++ * @end: end physical address, exclusive
++ */
+ static inline void outer_inv_range(phys_addr_t start, phys_addr_t end)
  {
--	l2x0_of_init(0, ~0UL);
-+	l2x0_of_init(0, ~0);
- 	irqchip_init();
+ 	if (outer_cache.inv_range)
+ 		outer_cache.inv_range(start, end);
+ }
++
++/**
++ * outer_clean_range - clean dirty outer cache lines
++ * @start: starting physical address, inclusive
++ * @end: end physical address, exclusive
++ */
+ static inline void outer_clean_range(phys_addr_t start, phys_addr_t end)
+ {
+ 	if (outer_cache.clean_range)
+ 		outer_cache.clean_range(start, end);
+ }
++
++/**
++ * outer_flush_range - clean and invalidate outer cache lines
++ * @start: starting physical address, inclusive
++ * @end: end physical address, exclusive
++ */
+ static inline void outer_flush_range(phys_addr_t start, phys_addr_t end)
+ {
+ 	if (outer_cache.flush_range)
+ 		outer_cache.flush_range(start, end);
  }
  
-diff --git a/arch/arm/mach-imx/system.c b/arch/arm/mach-imx/system.c
-index 5e3027d3692f..c6571f1de9fd 100644
---- a/arch/arm/mach-imx/system.c
-+++ b/arch/arm/mach-imx/system.c
-@@ -145,6 +145,6 @@ void __init imx_init_l2cache(void)
- 	of_node_put(np);
- 
- out:
--	l2x0_of_init(0, ~0UL);
-+	l2x0_of_init(0, ~0);
++/**
++ * outer_flush_all - clean and invalidate all cache lines in the outer cache
++ *
++ * Note: depending on implementation, this may not be atomic - it must
++ * only be called with interrupts disabled and no other active outer
++ * cache masters.
++ *
++ * It is intended that this function is only used by implementations
++ * needing to override the outer_cache.disable() method due to security.
++ * (Some implementations perform this as a clean followed by an invalidate.)
++ */
+ static inline void outer_flush_all(void)
+ {
+ 	if (outer_cache.flush_all)
+ 		outer_cache.flush_all();
  }
+ 
++/**
++ * outer_disable - clean, invalidate and disable the outer cache
++ *
++ * Disable the outer cache, ensuring that any data contained in the outer
++ * cache is pushed out to lower levels of system memory.  The note and
++ * conditions above concerning outer_flush_all() applies here.
++ */
+ static inline void outer_disable(void)
+ {
+ 	if (outer_cache.disable)
+ 		outer_cache.disable();
+ }
+ 
++/**
++ * outer_resume - restore the cache configuration and re-enable outer cache
++ *
++ * Restore any configuration that the cache had when previously enabled,
++ * and re-enable the outer cache.
++ */
+ static inline void outer_resume(void)
+ {
+ 	if (outer_cache.resume)
+@@ -89,6 +129,12 @@ static inline void outer_resume(void) { }
  #endif
-diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
-index 333fca8fdc41..c6bd79f64744 100644
---- a/arch/arm/mach-mvebu/board-v7.c
-+++ b/arch/arm/mach-mvebu/board-v7.c
-@@ -60,7 +60,7 @@ static void __init mvebu_timer_and_clk_init(void)
- 	coherency_init();
- 	BUG_ON(mvebu_mbus_dt_init());
- #ifdef CONFIG_CACHE_L2X0
--	l2x0_of_init(0, ~0UL);
-+	l2x0_of_init(0, ~0);
- #endif
  
- 	if (of_machine_is_compatible("marvell,armada375"))
-diff --git a/arch/arm/mach-rockchip/rockchip.c b/arch/arm/mach-rockchip/rockchip.c
-index d211d6fa0d98..d252efe3747b 100644
---- a/arch/arm/mach-rockchip/rockchip.c
-+++ b/arch/arm/mach-rockchip/rockchip.c
-@@ -26,7 +26,7 @@
- 
- static void __init rockchip_dt_init(void)
+ #ifdef CONFIG_OUTER_CACHE_SYNC
++/**
++ * outer_sync - perform a sync point for outer cache
++ *
++ * Ensure that all outer cache operations are complete and any store
++ * buffers are drained.
++ */
+ static inline void outer_sync(void)
  {
--	l2x0_of_init(0, ~0UL);
-+	l2x0_of_init(0, ~0);
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
-diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
-index d86231e11b34..9bbb8177f247 100644
---- a/arch/arm/mach-socfpga/socfpga.c
-+++ b/arch/arm/mach-socfpga/socfpga.c
-@@ -100,7 +100,7 @@ static void socfpga_cyclone5_restart(enum reboot_mode mode, const char *cmd)
- 
- static void __init socfpga_cyclone5_init(void)
- {
--	l2x0_of_init(0, ~0UL);
-+	l2x0_of_init(0, ~0);
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
+ 	if (outer_cache.sync)
 -- 
 1.8.3.1
