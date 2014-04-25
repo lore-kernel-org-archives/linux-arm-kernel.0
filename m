@@ -1,113 +1,71 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:37:35 +0100
-Subject: [PATCH 078/222] net:fec: clean up transmit descriptor setup
+Date: Fri, 25 Apr 2014 12:37:40 +0100
+Subject: [PATCH 079/222] net:fec: make rx skb allocation/map more robust
 In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
 References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WdeRj-0007IP-LG@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WdeRo-0007IT-Ob@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Avoid writing any state until we're certain we can proceed with the
-transmission: this avoids writing mapping error address values to the
-descriptors, or setting the skbuff pointer until we have successfully
-mapped the skb.
+Allocate, and then map the receive skb before writing any data to the
+ring descriptor or storing the skb.  This means we have ring data in
+one of two states: either fully setup, or not setup.  This simplifies
+the cleanup, which could end up calling dma_unmap_single() on a DMA
+error value.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/net/ethernet/freescale/fec_main.c | 32 +++++++++++++++----------------
- 1 file changed, 16 insertions(+), 16 deletions(-)
+ drivers/net/ethernet/freescale/fec_main.c | 16 ++++++++++------
+ 1 file changed, 10 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index d9109acc934d..45cb558bb227 100644
+index 45cb558bb227..f98ddb0923a3 100644
 --- a/drivers/net/ethernet/freescale/fec_main.c
 +++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -337,6 +337,8 @@ fec_enet_start_xmit(struct sk_buff *skb, struct net_device *ndev)
- 	void *bufaddr;
- 	unsigned short	status;
- 	unsigned int index;
-+	unsigned length;
-+	dma_addr_t addr;
- 
- 	/* Fill in a Tx ring entry */
- 	bdp = fep->cur_tx;
-@@ -362,7 +364,7 @@ fec_enet_start_xmit(struct sk_buff *skb, struct net_device *ndev)
- 
- 	/* Set buffer length and buffer pointer */
- 	bufaddr = skb->data;
--	bdp->cbd_datlen = skb->len;
-+	length = skb->len;
- 
- 	/*
- 	 * On some FEC implementations data must be aligned on
-@@ -376,7 +378,7 @@ fec_enet_start_xmit(struct sk_buff *skb, struct net_device *ndev)
- 		index = bdp - fep->tx_bd_base;
- 
- 	if (((unsigned long) bufaddr) & FEC_ALIGNMENT) {
--		memcpy(fep->tx_bounce[index], skb->data, skb->len);
-+		memcpy(fep->tx_bounce[index], skb->data, length);
- 		bufaddr = fep->tx_bounce[index];
- 	}
- 
-@@ -386,25 +388,23 @@ fec_enet_start_xmit(struct sk_buff *skb, struct net_device *ndev)
- 	 * swap every frame going to and coming from the controller.
- 	 */
- 	if (id_entry->driver_data & FEC_QUIRK_SWAP_FRAME)
--		swap_buffer(bufaddr, skb->len);
-+		swap_buffer(bufaddr, length);
- 
--	/* Save skb pointer */
--	fep->tx_skbuff[index] = skb;
+@@ -1712,12 +1712,11 @@ static void fec_enet_free_buffers(struct net_device *ndev)
+ 	bdp = fep->rx_bd_base;
+ 	for (i = 0; i < fep->rx_ring_size; i++) {
+ 		skb = fep->rx_skbuff[i];
 -
--	/* Push the data cache so the CPM does not get stale memory
--	 * data.
--	 */
--	bdp->cbd_bufaddr = dma_map_single(&fep->pdev->dev, bufaddr,
--			skb->len, DMA_TO_DEVICE);
--	if (dma_mapping_error(&fep->pdev->dev, bdp->cbd_bufaddr)) {
--		bdp->cbd_bufaddr = 0;
--		fep->tx_skbuff[index] = NULL;
-+	/* Push the data cache so the CPM does not get stale memory data. */
-+	addr = dma_map_single(&fep->pdev->dev, bufaddr, length, DMA_TO_DEVICE);
-+	if (dma_mapping_error(&fep->pdev->dev, addr)) {
- 		dev_kfree_skb_any(skb);
- 		if (net_ratelimit())
- 			netdev_err(ndev, "Tx DMA memory map failed\n");
- 		return NETDEV_TX_OK;
+-		if (bdp->cbd_bufaddr)
++		if (skb) {
+ 			dma_unmap_single(&fep->pdev->dev, bdp->cbd_bufaddr,
+ 					FEC_ENET_RX_FRSIZE, DMA_FROM_DEVICE);
+-		if (skb)
+ 			dev_kfree_skb(skb);
++		}
+ 		bdp = fec_enet_get_nextdesc(bdp, fep);
  	}
  
-+	/* Save skb pointer */
-+	fep->tx_skbuff[index] = skb;
-+
-+	bdp->cbd_datlen = length;
-+	bdp->cbd_bufaddr = addr;
-+
- 	if (fep->bufdesc_ex) {
+@@ -1735,21 +1734,26 @@ static int fec_enet_alloc_buffers(struct net_device *ndev)
  
- 		struct bufdesc_ex *ebdp = (struct bufdesc_ex *)bdp;
-@@ -489,7 +489,7 @@ static void fec_enet_bd_init(struct net_device *dev)
- 
- 		/* Initialize the BD for every fragment in the page. */
- 		bdp->cbd_sc = 0;
--		if (bdp->cbd_bufaddr && fep->tx_skbuff[i]) {
-+		if (fep->tx_skbuff[i]) {
- 			dev_kfree_skb_any(fep->tx_skbuff[i]);
- 			fep->tx_skbuff[i] = NULL;
+ 	bdp = fep->rx_bd_base;
+ 	for (i = 0; i < fep->rx_ring_size; i++) {
++		dma_addr_t addr;
++
+ 		skb = netdev_alloc_skb(ndev, FEC_ENET_RX_FRSIZE);
+ 		if (!skb) {
+ 			fec_enet_free_buffers(ndev);
+ 			return -ENOMEM;
  		}
-@@ -793,6 +793,7 @@ fec_enet_tx(struct net_device *ndev)
- 			index = bdp - fep->tx_bd_base;
+-		fep->rx_skbuff[i] = skb;
  
- 		skb = fep->tx_skbuff[index];
-+		fep->tx_skbuff[index] = NULL;
- 		dma_unmap_single(&fep->pdev->dev, bdp->cbd_bufaddr, skb->len,
- 				DMA_TO_DEVICE);
- 		bdp->cbd_bufaddr = 0;
-@@ -842,7 +843,6 @@ fec_enet_tx(struct net_device *ndev)
+-		bdp->cbd_bufaddr = dma_map_single(&fep->pdev->dev, skb->data,
++		addr = dma_map_single(&fep->pdev->dev, skb->data,
+ 				FEC_ENET_RX_FRSIZE, DMA_FROM_DEVICE);
+-		if (dma_mapping_error(&fep->pdev->dev, bdp->cbd_bufaddr)) {
++		if (dma_mapping_error(&fep->pdev->dev, addr)) {
++			dev_kfree_skb(skb);
+ 			fec_enet_free_buffers(ndev);
+ 			if (net_ratelimit())
+ 				netdev_err(ndev, "Rx DMA memory map failed\n");
+ 			return -ENOMEM;
+ 		}
++
++		fep->rx_skbuff[i] = skb;
++		bdp->cbd_bufaddr = addr;
+ 		bdp->cbd_sc = BD_ENET_RX_EMPTY;
  
- 		/* Free the sk buffer associated with this last transmit */
- 		dev_kfree_skb_any(skb);
--		fep->tx_skbuff[index] = NULL;
- 
- 		fep->dirty_tx = bdp;
- 
+ 		if (fep->bufdesc_ex) {
 -- 
 1.8.3.1
