@@ -1,29 +1,49 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 25 Apr 2014 23:14:01 +0200
-Subject: [PATCH v2 04/10] ARM: EXYNOS: Remove file path from comment
- section
-In-Reply-To: <1398429166-5539-5-git-send-email-pankaj.dubey@samsung.com>
+Date: Fri, 25 Apr 2014 23:19:51 +0200
+Subject: [PATCH v2 05/10] ARM: EXYNOS: Remove regs-pmu.h header dependency
+ from pm_domain
+In-Reply-To: <1398429166-5539-6-git-send-email-pankaj.dubey@samsung.com>
 References: <1396425058-4012-1-git-send-email-pankaj.dubey@samsung.com>
  <1398429166-5539-1-git-send-email-pankaj.dubey@samsung.com>
- <1398429166-5539-5-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <535AD019.8050207@gmail.com>
+ <1398429166-5539-6-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <535AD177.3030700@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pankaj,
+Hi,
 
 On 25.04.2014 14:32, Pankaj Dubey wrote:
-> Many files under "arm/mach-exynos" are having file path in file
-> comment section which is invalid now.
-> So for better code maintainability let's remove them.
+> From: Young-Gun Jang <yg1004.jang@samsung.com>
 >
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> Current "pm_domain.c" file uses "S5P_INT_LOCAL_PWR_EN" definition from
+> "regs-pmu.h" and hence needs to include this header file. As there is
+> no other user of "S5P_INT_LOCAL_PWR_EN" definition other than pm_domain,
+> to remove "regs-pmu.h" header file dependency from "pm_domain.c"  it's
+> better we define this definition in "pm_domain.c" file itself and thus it
+> will help in removing header file inclusion from "pm_domain.c".
+>
+> Signed-off-by: Young-Gun Jang <yg1004.jang@samsung.com>
 > ---
->   arch/arm/mach-exynos/headsmp.S             |    2 --
->   arch/arm/mach-exynos/hotplug.c             |    3 +--
->   arch/arm/mach-exynos/include/mach/memory.h |    3 +--
->   arch/arm/mach-exynos/platsmp.c             |    3 +--
->   4 files changed, 3 insertions(+), 8 deletions(-)
+>   arch/arm/mach-exynos/pm_domains.c |    2 +-
+>   arch/arm/mach-exynos/regs-pmu.h   |    1 -
+>   2 files changed, 1 insertion(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
+> index fe6570e..f676b0a 100644
+> --- a/arch/arm/mach-exynos/pm_domains.c
+> +++ b/arch/arm/mach-exynos/pm_domains.c
+> @@ -22,7 +22,7 @@
+>   #include <linux/of_platform.h>
+>   #include <linux/sched.h>
+>
+> -#include "regs-pmu.h"
+> +#define S5P_INT_LOCAL_PWR_EN 0x7
+
+nit: You could indent the value a bit more in case of adding any new 
+macros in future. While at it, you could probably also drop the S5P_ 
+prefix.
+
+With these fixed, feel free to add my
 
 Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 
