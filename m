@@ -1,94 +1,67 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:50:21 +0100
-Subject: [PATCH 176/222] ARM: l2c: provide common PL310 early resume code
-In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1Wdee5-0007PB-2Y@rmk-PC.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 25 Apr 2014 13:50:25 +0200
+Subject: [PATCH v2 3/6] ARM: dts: Device tree for AXM55xx.
+In-Reply-To: <20140425094343.GA3160@swsaberg01>
+References: <cover.1398335771.git.anders.berg@lsi.com>
+ <2386bd1367aa44741979461358a72dec89608597.1398335771.git.anders.berg@lsi.com>
+ <CACRpkdbU6UashxCuPMDjEB_nbB=mXicGpjJy=HGC6r3qfxCtVQ@mail.gmail.com>
+ <20140424174741.GA23444@swsaberg01>
+ <CACRpkdZ1CA4mqcd5MA5HFmXSeGp-wspA0M6wnPbAsgL_gX76Fw@mail.gmail.com>
+ <20140425094343.GA3160@swsaberg01>
+Message-ID: <CACRpkdaqPx3=qvUtsg44rBk+ZiscUg54HmNgETcei0LzfE9uOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/mm/Makefile          |  2 +-
- arch/arm/mm/l2c-l2x0-resume.S | 58 +++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 59 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mm/l2c-l2x0-resume.S
+On Fri, Apr 25, 2014 at 11:43 AM, Anders Berg <anders.berg@lsi.com> wrote:
+> On Fri, Apr 25, 2014 at 11:16:18AM +0200, Linus Walleij wrote:
+>> On Thu, Apr 24, 2014 at 7:47 PM, Anders Berg <anders.berg@lsi.com> wrote:
+>> > On Thu, Apr 24, 2014 at 03:24:14PM +0200, Linus Walleij wrote:
+>>
+>> >> One interrupt per CPU core?
+>> >>
+>> >> The drivers for these blocks will really just grab the first IRQ and
+>> >> then I guess they
+>> >> will only be able to execute on CPU0.
+>> >>
+>> >> It's definately correct to list all the IRQs here, but how do you envision
+>> >> the drivers making use of them in the long run?
+>> >
+>> > It's one interrupt line per input pin (so with the current driver only the first pin
+>> > is usable as interrupt source).
+>>
+>> Hm I'm not sure I understand what a "pin" is in this concept ...
+>> being maintainer of the pin control subsystem and all that really
+>> triggers my interest.
+>>
+>
+> Ok, maybe should replace "pin" with "GPIO" in my previous comment.
+>
+> So, a clarification. In one of the PL061 blocks (named gpio0 in the dts) there
+> is a separate interrupt per GPIO (I assume the motivation here is to enable to
+> control irq affinity per GPIO), where as the other block has a more standard
+> configuration with a single interrupt for all 8 GPIOs in that block.
 
-diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
-index de5a6a27081b..91da64de440f 100644
---- a/arch/arm/mm/Makefile
-+++ b/arch/arm/mm/Makefile
-@@ -97,6 +97,6 @@ AFLAGS_proc-v7.o	:=-Wa,-march=armv7-a
- 
- obj-$(CONFIG_OUTER_CACHE)	+= l2c-common.o
- obj-$(CONFIG_CACHE_FEROCEON_L2)	+= cache-feroceon-l2.o
--obj-$(CONFIG_CACHE_L2X0)	+= cache-l2x0.o
-+obj-$(CONFIG_CACHE_L2X0)	+= cache-l2x0.o l2c-l2x0-resume.o
- obj-$(CONFIG_CACHE_XSC3L2)	+= cache-xsc3l2.o
- obj-$(CONFIG_CACHE_TAUROS2)	+= cache-tauros2.o
-diff --git a/arch/arm/mm/l2c-l2x0-resume.S b/arch/arm/mm/l2c-l2x0-resume.S
-new file mode 100644
-index 000000000000..99b05f21a59a
---- /dev/null
-+++ b/arch/arm/mm/l2c-l2x0-resume.S
-@@ -0,0 +1,58 @@
-+/*
-+ * L2C-310 early resume code.  This can be used by platforms to restore
-+ * the settings of their L2 cache controller before restoring the
-+ * processor state.
-+ *
-+ * This code can only be used to if you are running in the secure world.
-+ */
-+#include <linux/linkage.h>
-+#include <asm/hardware/cache-l2x0.h>
-+
-+	.text
-+
-+ENTRY(l2c310_early_resume)
-+	adr	r0, 1f
-+	ldr	r2, [r0]
-+	add	r0, r2, r0
-+
-+	ldmia	r0, {r1, r2, r3, r4, r5, r6, r7, r8}
-+	@ r1 = phys address of L2C-310 controller
-+	@ r2 = aux_ctrl
-+	@ r3 = tag_latency
-+	@ r4 = data_latency
-+	@ r5 = filter_start
-+	@ r6 = filter_end
-+	@ r7 = prefetch_ctrl
-+	@ r8 = pwr_ctrl
-+
-+	@ Check that the address has been initialised
-+	teq	r1, #0
-+	moveq	pc, lr
-+
-+	@ The prefetch and power control registers are revision dependent
-+	@ and can be written whether or not the L2 cache is enabled
-+	ldr	r0, [r1, #L2X0_CACHE_ID]
-+	and	r0, r0, #L2X0_CACHE_ID_RTL_MASK
-+	cmp	r0, #L310_CACHE_ID_RTL_R2P0
-+	strcs	r7, [r1, #L310_PREFETCH_CTRL]
-+	cmp	r0, #L310_CACHE_ID_RTL_R3P0
-+	strcs	r8, [r1, #L310_POWER_CTRL]
-+
-+	@ Don't setup the L2 cache if it is already enabled
-+	ldr	r0, [r1, #L2X0_CTRL]
-+	tst	r0, #L2X0_CTRL_EN
-+	movne	pc, lr
-+
-+	str	r3, [r1, #L310_TAG_LATENCY_CTRL]
-+	str	r4, [r1, #L310_DATA_LATENCY_CTRL]
-+	str	r6, [r1, #L310_ADDR_FILTER_END]
-+	str	r5, [r1, #L310_ADDR_FILTER_START]
-+
-+	str	r2, [r1, #L2X0_AUX_CTRL]
-+	mov	r9, #L2X0_CTRL_EN
-+	str	r9, [r1, #L2X0_CTRL]
-+	mov	pc, lr
-+ENDPROC(l2c310_early_resume)
-+
-+	.align
-+1:	.long	l2x0_saved_regs - .
--- 
-1.8.3.1
+OK! I get it. Thus this is not a stock PL061, but a version modified to
+generate a separate IRQ line per GPIO line.
+
+This means that you can only get a proper, working IRQ from the
+first line on gpio0 right? All other IRQs will be ignored.
+
+I see no problem in augmenting the driver to handle this
+if #irqs == 8, the big change needs to happen in drivers/amba/bus.c
+that has no way to pass any more than two IRQs atm.
+
+I guess the best is to augment struct amba_device with a field
+struct resource *resource and num_resources like platform_device
+instead of the hard-coded single resource for iomem and two
+hardcoded IRQ placeholders, so that an arbitrary amount of
+resources can be added to an amba_device as well. But that
+may be quite a lot of work. (Russell will know which direction to
+take here.)
+
+A simpler, local approach is to add some custom DT parsing
+code to handle this in the pl061 driver, but that feels a bit
+hacky.
+
+Yours,
+Linus Walleij
