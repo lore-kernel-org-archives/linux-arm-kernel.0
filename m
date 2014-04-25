@@ -1,95 +1,32 @@
-From: sourav.poddar@ti.com (Sourav Poddar)
-Date: Fri, 25 Apr 2014 14:25:42 +0530
-Subject: [PATCH] arm: dts: am43x-clock: add tbclk data for ehrpwm.
-Message-ID: <1398416142-7174-1-git-send-email-sourav.poddar@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 25 Apr 2014 09:57:32 +0100
+Subject: do_undefinstr call sem down_read?
+In-Reply-To: <5358D051.5050306@linaro.org>
+References: <5358D051.5050306@linaro.org>
+Message-ID: <20140425085731.GG26756@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need "tbclk" clock data for the functioning of ehrpwm
-module. Hence, populating the required clock information
-in clock dts file.
+On Thu, Apr 24, 2014 at 04:50:25PM +0800, Alex Shi wrote:
+> I caught the following issue few times on my panda board on lsk. but I
+> track the code path, looks like the upstream kernel has the same problem
+> too.
+...
+> [   30.733612] [<c0008417>] (do_undefinstr+0x10b/0x13c) from [<c050cbe3>] (__und_svc_finish+0x1/0x3e)
+> [   30.743103] Exception stack(0xedd5fc50 to 0xedd5fc98)
+> [   30.748443] fc40:                                     c13c14e0 80000000 00000080 00000000
+> [   30.757141] fc60: c13c14e0 0000000c eac67284 c13c14e0 edc11518 c0df95c0 c0824410 eac67240
+> [   30.765808] fc80: 00000000 edd5fcd8 c00171f9 c00cf998 80000133 ffffffff
+> [   30.772827] [<c050cbe3>] (__und_svc_finish+0x1/0x3e) from [<c00cf998>] (page_mapping+0x20/0x38)
+> [   30.782073] [<c00cf998>] (page_mapping+0x20/0x38) from [<c00171f9>] (flush_dcache_page+0x1d/0x60)
 
-Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
----
- arch/arm/boot/dts/am43xx-clocks.dtsi |   48 ++++++++++++++++++++++++++++++++++
- drivers/clk/ti/clk-43xx.c            |    6 +++++
- 2 files changed, 54 insertions(+)
+The real question is why is page_mapping triggering an undefined
+instruction exception.  That I have no answer for.
 
-diff --git a/arch/arm/boot/dts/am43xx-clocks.dtsi b/arch/arm/boot/dts/am43xx-clocks.dtsi
-index 142009c..54f68e8 100644
---- a/arch/arm/boot/dts/am43xx-clocks.dtsi
-+++ b/arch/arm/boot/dts/am43xx-clocks.dtsi
-@@ -87,6 +87,54 @@
- 		clock-mult = <1>;
- 		clock-div = <1>;
- 	};
-+
-+	ehrpwm0_tbclk: ehrpwm0_tbclk at 44e10664 {
-+		#clock-cells = <0>;
-+		compatible = "gate-clock";
-+		clocks = <&dpll_per_m2_ck>;
-+		bit-shift = <0>;
-+		reg = <0x44e10664 0x4>;
-+	};
-+
-+	ehrpwm1_tbclk: ehrpwm1_tbclk at 44e10664 {
-+		#clock-cells = <0>;
-+		compatible = "gate-clock";
-+		clocks = <&dpll_per_m2_ck>;
-+		bit-shift = <1>;
-+		reg = <0x44e10664 0x4>;
-+	};
-+
-+	ehrpwm2_tbclk: ehrpwm2_tbclk at 44e10664 {
-+		#clock-cells = <0>;
-+		compatible = "gate-clock";
-+		clocks = <&dpll_per_m2_ck>;
-+		bit-shift = <2>;
-+		reg = <0x44e10664 0x4>;
-+	};
-+
-+	ehrpwm3_tbclk: ehrpwm3_tbclk at 44e10664 {
-+		#clock-cells = <0>;
-+		compatible = "gate-clock";
-+		clocks = <&dpll_per_m2_ck>;
-+		bit-shift = <3>;
-+		reg = <0x44e10664 0x4>;
-+	};
-+
-+	ehrpwm4_tbclk: ehrpwm4_tbclk at 44e10664 {
-+		#clock-cells = <0>;
-+		compatible = "gate-clock";
-+		clocks = <&dpll_per_m2_ck>;
-+		bit-shift = <4>;
-+		reg = <0x44e10664 0x4>;
-+	};
-+
-+	ehrpwm5_tbclk: ehrpwm5_tbclk at 44e10664 {
-+		#clock-cells = <0>;
-+		compatible = "gate-clock";
-+		clocks = <&dpll_per_m2_ck>;
-+		bit-shift = <5>;
-+		reg = <0x44e10664 0x4>;
-+	};
- };
- &prcm_clocks {
- 	clk_32768_ck: clk_32768_ck {
-diff --git a/drivers/clk/ti/clk-43xx.c b/drivers/clk/ti/clk-43xx.c
-index 67c8de5..527a43d 100644
---- a/drivers/clk/ti/clk-43xx.c
-+++ b/drivers/clk/ti/clk-43xx.c
-@@ -105,6 +105,12 @@ static struct ti_dt_clk am43xx_clks[] = {
- 	DT_CLK(NULL, "func_12m_clk", "func_12m_clk"),
- 	DT_CLK(NULL, "vtp_clk_div", "vtp_clk_div"),
- 	DT_CLK(NULL, "usbphy_32khz_clkmux", "usbphy_32khz_clkmux"),
-+	DT_CLK("48300200.ehrpwm", "tbclk", "ehrpwm0_tbclk"),
-+	DT_CLK("48302200.ehrpwm", "tbclk", "ehrpwm1_tbclk"),
-+	DT_CLK("48304200.ehrpwm", "tbclk", "ehrpwm2_tbclk"),
-+	DT_CLK("48306200.ehrpwm", "tbclk", "ehrpwm3_tbclk"),
-+	DT_CLK("48308200.ehrpwm", "tbclk", "ehrpwm4_tbclk"),
-+	DT_CLK("4830a200.ehrpwm", "tbclk", "ehrpwm5_tbclk"),
- 	{ .node_name = NULL },
- };
- 
+This function is a hot path, so I doubt that it really is an undefined
+instruction.  I suspect either your CPU has an erratum, or you have
+hardware problems.
+
 -- 
-1.7.9.5
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
