@@ -1,39 +1,38 @@
-From: stratosk@semaphore.gr (Stratos Karafotis)
-Date: Fri, 25 Apr 2014 18:11:20 +0300
-Subject: [PATCH v4 2/8] cpufreq: Use cpufreq_for_each_* macros for
- frequency table iteration
-In-Reply-To: <CA+V-a8swMCPkf=rwbLOjiqAgpaQ7TZPutTQTh_sSFmbJvHz-1Q@mail.gmail.com>
-References: <534DB1EB.1080401@semaphore.gr> <5355A327.3020308@semaphore.gr>
- <CA+V-a8swMCPkf=rwbLOjiqAgpaQ7TZPutTQTh_sSFmbJvHz-1Q@mail.gmail.com>
-Message-ID: <535A7B18.9070505@semaphore.gr>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Fri, 25 Apr 2014 10:22:02 -0500
+Subject: [GIT PULL] clk: socfpga: Clock fix for v3.15
+Message-ID: <1398439322-30616-1-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Prabhakar,
+Hi Mike,
 
-On 25/04/2014 03:31 ??, Prabhakar Lad wrote:
-> Hi Stratos,
-> 
-> Thanks for the patch.
-> 
-> On Tue, Apr 22, 2014 at 4:30 AM, Stratos Karafotis
-> <stratosk@semaphore.gr> wrote:
->> The cpufreq core now supports the cpufreq_for_each_entry and
->> cpufreq_for_each_valid_entry macros helpers for iteration over the
->> cpufreq_frequency_table, so use them.
->>
->> It should have no functional changes.
->>
-> This patch produces following build warning,
-> 
-> drivers/cpufreq/freq_table.c: In function 'cpufreq_frequency_table_cpuinfo':
-> drivers/cpufreq/freq_table.c:36:3: warning: format '%lu' expects
-> argument of type 'long unsigned int', but argument 2 has type 'int'
-> [-Wformat=]
->    pr_debug("table entry %lu: %u kHz\n", pos - table, freq);
+Please consider pulling this patch for 3.15 fixes.
 
-Thanks for this finding.
-I will fix it and resend the patch.
+Thanks,
 
+The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
 
-Stratos Karafotis
+  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+
+are available in the git repository at:
+
+  git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga-clk-fix-for-3.15
+
+for you to fetch changes up to 812819daf3298040833b4902730821c3441bffc7:
+
+  clk: socfpga: fix clock driver for 3.15 (2014-04-25 10:06:14 -0500)
+
+----------------------------------------------------------------
+clk: socfpga: clock fix for v3.15
+
+Currently on 3.15-rc1, the SOCFPGA platform is unable to boot. This patch
+fixes the issue and allows the platform to boot.
+
+----------------------------------------------------------------
+Dinh Nguyen (1):
+      clk: socfpga: fix clock driver for 3.15
+
+ drivers/clk/socfpga/clk-pll.c |    7 +++++++
+ drivers/clk/socfpga/clk.c     |   23 +++--------------------
+ 2 files changed, 10 insertions(+), 20 deletions(-)
