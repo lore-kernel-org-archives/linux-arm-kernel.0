@@ -1,191 +1,48 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 25 Apr 2014 19:38:48 +0100
-Subject: [PATCH v3 part1 04/11] ARM64 / ACPI: Introduce arm-core.c and
- its related head file
-In-Reply-To: <20140425165320.GD1186@xora-haswell>
-References: <1398432017-8506-1-git-send-email-hanjun.guo@linaro.org>
- <1398432017-8506-5-git-send-email-hanjun.guo@linaro.org>
- <20140425155147.GA28819@e106331-lin.cambridge.arm.com>
- <20140425165320.GD1186@xora-haswell>
-Message-ID: <20140425183848.GE28819@e106331-lin.cambridge.arm.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Fri, 25 Apr 2014 20:45:10 +0200
+Subject: [PATCH] ARM: fix string functions on !MMU
+In-Reply-To: <20140425091224.GA24499@arm.com>
+References: <1398103808-24380-1-git-send-email-rabin@rab.in>
+ <20140422094424.GA6979@arm.com> <20140424154320.GA4129@debian>
+ <20140425091224.GA24499@arm.com>
+Message-ID: <20140425184510.GA17229@debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 25, 2014 at 05:53:20PM +0100, Graeme Gregory wrote:
-> On Fri, Apr 25, 2014 at 04:51:47PM +0100, Mark Rutland wrote:
-> > Hi Hanjun,
-> > 
-> > On Fri, Apr 25, 2014 at 02:20:10PM +0100, Hanjun Guo wrote:
-> > > ACPI core need lots extern variables and functions which should
-> > > be provided by arch dependent code to make itself compilable. so
-> > > introduce arm_core.c and its related header file here.
+On Fri, Apr 25, 2014 at 10:12:24AM +0100, Will Deacon wrote:
+> On Thu, Apr 24, 2014 at 04:43:20PM +0100, Rabin Vincent wrote:
+> > On Tue, Apr 22, 2014 at 10:44:24AM +0100, Will Deacon wrote:
+> > > On Mon, Apr 21, 2014 at 07:10:08PM +0100, Rabin Vincent wrote:
+> > > > 8c56cc8be5b38e ("ARM: 7449/1: use generic strnlen_user and
+> > > > strncpy_from_user functions") apparently broken those string operations
+> > > > for !MMU.  USER_DS == KERNEL_DS on !MMU, so user_addr_max() always
+> > > > restricts the addresses to TASK_SIZE.
+> > > > 
+> > > > TASK_SIZE has anyway no meaning on !MMU, so make user_addr_max() not
+> > > > restrict anything.
 > > > 
-> > > acpi_boot_table_init() will be called in setup_arch() before
-> > > paging_init(), so we should use eary_ioremap() mechanism here
-> > > to get the RSDP and all the table pointers, with this patch,
-> > > we can get ACPI boot-time tables from firmware on ARM64.
-> > > 
-> > > Signed-off-by: Al Stone <al.stone@linaro.org>
-> > > Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
-> > > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> > > Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> > > ---
-> > >  arch/arm64/include/asm/acpi.h |   53 +++++++++++++++++++
-> > >  arch/arm64/kernel/setup.c     |    4 ++
-> > >  drivers/acpi/Makefile         |    2 +
-> > >  drivers/acpi/plat/Makefile    |    1 +
-> > >  drivers/acpi/plat/arm-core.c  |  113 +++++++++++++++++++++++++++++++++++++++++
-> > >  5 files changed, 173 insertions(+)
-> > >  create mode 100644 drivers/acpi/plat/Makefile
-> > >  create mode 100644 drivers/acpi/plat/arm-core.c
-> > > 
-> > > diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-> > > index e3e990e..3ac9dfb 100644
-> > > --- a/arch/arm64/include/asm/acpi.h
-> > > +++ b/arch/arm64/include/asm/acpi.h
-> > > @@ -19,6 +19,43 @@
-> > >  #ifndef _ASM_ACPI_H
-> > >  #define _ASM_ACPI_H
-> > >  
-> > > +#include <asm/cacheflush.h>
-> > > +
-> > > +#include <linux/init.h>
-> > > +
-> > > +#define COMPILER_DEPENDENT_INT64	s64
-> > > +#define COMPILER_DEPENDENT_UINT64	u64
+> > > Might be worth mentioning that this is an issue because KERNEL_DS is 0x0
+> > > (since it's a 32-bit quantity), so checks like addr < user_addr_max() will
+> > > fail.
 > > 
-> > Is there any reason this can't be in a common ACPI header shared be ia64
-> > and x86 too? Given we already have generic types for this it seems
-> > pointless to define this in each architecture.
-> > 
-> > It looks like include/acpi/actypes.h tries to do that already...
-> > 
-> Yes I think we can replace that with uint64_t and int64_t types.
+> > Thanks for the ack, but I don't quite understand what you mean here.
+> > You describe the state before this patch, right?  Why does it matter
+> > that KERNEL_DS is 0x0?
 > 
-> > > +
-> > > +/*
-> > > + * Calling conventions:
-> > > + *
-> > > + * ACPI_SYSTEM_XFACE        - Interfaces to host OS (handlers, threads)
-> > > + * ACPI_EXTERNAL_XFACE      - External ACPI interfaces
-> > > + * ACPI_INTERNAL_XFACE      - Internal ACPI interfaces
-> > > + * ACPI_INTERNAL_VAR_XFACE  - Internal variable-parameter list interfaces
-> > > + */
-> > > +#define ACPI_SYSTEM_XFACE
-> > > +#define ACPI_EXTERNAL_XFACE
-> > > +#define ACPI_INTERNAL_XFACE
-> > > +#define ACPI_INTERNAL_VAR_XFACE
-> > > +
-> > > +/* Asm macros */
-> > > +#define ACPI_FLUSH_CPU_CACHE() flush_cache_all()
-> > 
-> > This almost certainly does not do what you think it does.
-> > 
-> > flush_cache_all walks the architected levels of cache visible to the
-> > current CPU (i.e. those in CLIDR_EL1), and walks over each cache line at
-> > that level, cleaning and evicting it. It also flushes the I-cache (which
-> > I don't think you care about here).
-> > 
-> > This is NOT safe if the cache is enabled. Lines can migrate between
-> > levels in the middle of the sequence.
-> > 
-> > In an SMP system this does NOT guarantee that data is evicted to memory,
-> > even if the cache is disabled. Other CPUs with caches enabled can
-> > acquire a cacheline (even if dirty) and it can sit in their cache.
-> > 
-> > In a UP system or an SMP system where all other architected caches are
-> > disabled (and flushed) this does NOT guarantee that data hits memory. In
-> > the presence of a system-level cache this will simply flush the data out
-> > to said system-level rather than memory.
-> > 
-> > I believe the intent here is to have something analogous to WBINVD for
-> > use in idle. Unfortunately there simply isn't anything analogous.
-> > Luckily in the presence of PSCI, the PSCI implementation should do all
-> > of the cache maintenance required to prevent any data loss and/or
-> > corruption, and anything we need to have visible to noncacheable
-> > accesses (i.e. flushed out to memory) we should be able to flush by VA.
-> > 
-> > This maintenance is unsafe, and shouldn't be necessary on any sane
-> > system. Please get rid of it. I would very much like to get rid of
-> > flush_cache_all() before its misuse spreads further.
-> > 
-> Thanks for explanation Mark, you are correct on x86 it is defined as
-> wbinvd().
+> Apologies, I misread the code that you're patching so I guess I'll have to
+> revoke my ack, sorry! That's not to say I think the patch is bad, I'd just
+> like to discuss it with you a bit more.
 > 
-> I think looking at where it is actually used we can make this an empty
-> macro on arm64 for now. Where it used are areas we don't currently
-> execute and need arm64 replacements or refactorising to remove x86isms.
+> Having re-read the code, the issue is because TASK_SIZE is defined as
+> CONFIG_DRAM_SIZE, right? Since CONFIG_DRAM_BASE may be non-zero, it means
+> TASK_SIZE is truly a size -- not a limit (as it would be in virtual space).
+> What we actually want for !MMU is END_MEM instead of TASK_SIZE.
 
-That sounds good. Is it worth putting a warn or similar there just in
-case?
-
-> 
-> > > +/* Basic configuration for ACPI */
-> > > +#ifdef	CONFIG_ACPI
-> > > +extern int acpi_disabled;
-> > > +extern int acpi_noirq;
-> > > +extern int acpi_pci_disabled;
-> > > +extern int acpi_strict;
-> > 
-> > This looks very odd. Why are these prototypes not coming from a header?
-> > If they're defined in the same place, why not move the disable_acpi
-> > function there?
-> > 
-> 
-> This is a header :-)
-
-True; I must get my eyes tested. :)
-
-Are these variables expected to be used by needed by other code, or are
-they just for the benefit of the static inlines in this header?
-
-> I think this is a peculiarity of how acpica is incorporated into linux
-> but will check.
-
-Ok.
-
-> 
-> > > +static inline void disable_acpi(void)
-> > > +{
-> > > +	acpi_disabled = 1;
-> > > +	acpi_pci_disabled = 1;
-> > > +	acpi_noirq = 1;
-> > > +}
-> > 
-> > [...]
-> > 
-> > > +/*
-> > > + * __acpi_map_table() will be called before page_init(), so early_ioremap()
-> > > + * or early_memremap() should be called here.
-> > > + */
-> > > +char *__init __acpi_map_table(unsigned long phys, unsigned long size)
-> > > +{
-> > > +	if (!phys || !size)
-> > > +		return NULL;
-> > 
-> > Is there any reason that tables can't exist at physical address 0? It's
-> > entirely valid to have memory there.
-> > 
-> > [...]
-> > 
-> On ARM64 there is not, we can fix this.
-> 
-> > > +int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
-> > > +{
-> > > +	*irq = -1;
-> > > +
-> > > +	return 0;
-> > > +}
-> > > +EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
-> > 
-> > This appears to be missing a giant warning that it does nothing useful.
-> > 
-> > I was under the impression that we were meant to use 0 to represent the
-> > lack of an interrupt these days, too...
-> > 
-> We can fix this.
-
-Sounds good!
-
-Cheers,
-Mark.
+I guess you mean I should #define user_addr_max() to END_MEM for !MMU?
+That won't work.  For example, on a !MMU boot, the first thing that
+fails because of this bug is devtmpsfs_mount() -> sys_mount() ->
+copy_mount_string() -> strndup_user(), which is run in a kernel thread.
+The type argument of sys_mount() points to a string in flash since we
+run an XIP kernel.  This flash address has no relation to END_MEM (which
+is nothing but CONFIG_DRAM_BASE + CONFIG_DRAM_SIZE) and could be higher
+than END_MEM.
