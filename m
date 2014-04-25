@@ -1,34 +1,44 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 25 Apr 2014 16:07:09 +0200
-Subject: [PATCH v2 11/18] xhci-platform: Add a new controller using xhci:
- Armada 375
+Date: Fri, 25 Apr 2014 16:07:11 +0200
+Subject: [PATCH v2 13/18] dt: binding: Armada 375 USB cluster
 In-Reply-To: <1398434836-18908-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1398434836-18908-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1398434836-18908-12-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1398434836-18908-14-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Extend the compatible string list with armada-375-xhci. It is used to
-describe xhci controller which is in the Armada 375 SoC.
+Armada 375 comes with an USB2 host and device controller and an USB3
+controller. The USB cluster control register allows to manage common
+features of both USB controllers.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- Documentation/devicetree/bindings/usb/usb-xhci.txt | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ .../devicetree/bindings/arm/armada-375-usb-cluster.txt  | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/armada-375-usb-cluster.txt
 
-diff --git a/Documentation/devicetree/bindings/usb/usb-xhci.txt b/Documentation/devicetree/bindings/usb/usb-xhci.txt
-index cbc91414fd59..87d150ca58cc 100644
---- a/Documentation/devicetree/bindings/usb/usb-xhci.txt
-+++ b/Documentation/devicetree/bindings/usb/usb-xhci.txt
-@@ -2,7 +2,8 @@ USB xHCI controllers
- 
- Required properties:
-   - compatible: should be on of "generic-xhci",
--    "marvell,armada-380-xhci" (deprecated: "xhci-platform").
-+    "marvell,armada-375-xhci", "marvell,armada-380-xhci" (deprecated:
-+    "xhci-platform").
-   - reg: should contain address and length of the standard XHCI
-     register set for the device.
-   - interrupts: one XHCI interrupt should be described here.
+diff --git a/Documentation/devicetree/bindings/arm/armada-375-usb-cluster.txt b/Documentation/devicetree/bindings/arm/armada-375-usb-cluster.txt
+new file mode 100644
+index 000000000000..71feb8fb4434
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/armada-375-usb-cluster.txt
+@@ -0,0 +1,17 @@
++Armada 375 USB cluster
++----------------------
++
++Armada 375 comes with an USB2 host and device controller and an USB3
++controller. The USB cluster control register allows to manage common
++features of both USB controllers.
++
++Required properties:
++
++- compatible: "marvell,armada-375-usb-cluster"
++- reg: Should contain usb cluster register location and length.
++
++Example:
++	usb-cluster at 18400 {
++		compatible = "marvell,armada-375-usb-cluster";
++		reg = <0x18400 0x4>;
++	};
 -- 
 1.8.1.2
