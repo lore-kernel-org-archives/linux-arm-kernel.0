@@ -1,335 +1,608 @@
 From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Fri, 25 Apr 2014 17:09:09 +0100
-Subject: [PATCH v2 05/10] efi: Add shared FDT related functions for ARM/ARM64
+Date: Fri, 25 Apr 2014 17:09:10 +0100
+Subject: [PATCH v2 06/10] arm64: add EFI runtime services
 In-Reply-To: <1398442154-19974-1-git-send-email-leif.lindholm@linaro.org>
 References: <1398442154-19974-1-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <1398442154-19974-6-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <1398442154-19974-7-git-send-email-leif.lindholm@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Roy Franz <roy.franz@linaro.org>
+From: Mark Salter <msalter@redhat.com>
 
-Both ARM and ARM64 stubs will update the device tree that they pass to
-the kernel.  In both cases they primarily need to add the same UEFI
-related information, so the function can be shared.  Create a new FDT
-related file for this to avoid use of architecture #ifdefs in
-efi-stub-helper.c.
+This patch adds EFI runtime support for arm64. This runtime support allows
+the kernel to access various EFI runtime services provided by EFI firmware.
+Things like reboot, real time clock, EFI boot variables, and others.
 
-Signed-off-by: Roy Franz <roy.franz@linaro.org>
-[ Fixed memory node deletion code. ]
+This functionality is supported for little endian kernels only. The UEFI
+firmware standard specifies that the firmware be little endian. A future
+patch is expected to add support for big endian kernels running with
+little endian firmware.
+
+Signed-off-by: Mark Salter <msalter@redhat.com>
+[ Remove unnecessary cache/tlb maintenance. ]
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
-Acked-by: Grant Likely <grant.likely@linaro.org>
 ---
- drivers/firmware/efi/fdt.c |  285 ++++++++++++++++++++++++++++++++++++++++++++
- include/linux/efi.h        |    3 +
- 2 files changed, 288 insertions(+)
- create mode 100644 drivers/firmware/efi/fdt.c
+ arch/arm64/Kconfig           |   15 ++
+ arch/arm64/include/asm/efi.h |   14 ++
+ arch/arm64/kernel/Makefile   |    1 +
+ arch/arm64/kernel/efi.c      |  466 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/setup.c    |    5 +
+ 5 files changed, 501 insertions(+)
+ create mode 100644 arch/arm64/include/asm/efi.h
+ create mode 100644 arch/arm64/kernel/efi.c
 
-diff --git a/drivers/firmware/efi/fdt.c b/drivers/firmware/efi/fdt.c
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index e6e4d37..392a2d5 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -280,6 +280,19 @@ config CMDLINE_FORCE
+ 	  This is useful if you cannot or don't want to change the
+ 	  command-line options your boot loader passes to the kernel.
+ 
++config EFI
++	bool "UEFI runtime support"
++	depends on OF && !CPU_BIG_ENDIAN
++	select LIBFDT
++	select UCS2_STRING
++	select UEFI_PARAMS_FROM_FDT
++	default y
++	help
++	  This option provides support for runtime services provided
++	  by UEFI firmware (such as non-volatile variables, realtime
++          clock, and platform reset). This is only useful on systems
++	  that have UEFI firmware.
++
+ endmenu
+ 
+ menu "Userspace binary formats"
+@@ -333,6 +346,8 @@ source "net/Kconfig"
+ 
+ source "drivers/Kconfig"
+ 
++source "drivers/firmware/Kconfig"
++
+ source "fs/Kconfig"
+ 
+ source "arch/arm64/kvm/Kconfig"
+diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
 new file mode 100644
-index 0000000..5c6a8e8
+index 0000000..5a46c4e
 --- /dev/null
-+++ b/drivers/firmware/efi/fdt.c
-@@ -0,0 +1,285 @@
++++ b/arch/arm64/include/asm/efi.h
+@@ -0,0 +1,14 @@
++#ifndef _ASM_EFI_H
++#define _ASM_EFI_H
++
++#include <asm/io.h>
++
++#ifdef CONFIG_EFI
++extern void efi_init(void);
++extern void efi_idmap_init(void);
++#else
++#define efi_init()
++#define efi_idmap_init()
++#endif
++
++#endif /* _ASM_EFI_H */
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 7d811d9..f57ccd7 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -22,6 +22,7 @@ arm64-obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
+ arm64-obj-$(CONFIG_ARM64_CPU_SUSPEND)	+= sleep.o suspend.o
+ arm64-obj-$(CONFIG_JUMP_LABEL)		+= jump_label.o
+ arm64-obj-$(CONFIG_KGDB)		+= kgdb.o
++arm64-obj-$(CONFIG_EFI)			+= efi.o
+ 
+ obj-y					+= $(arm64-obj-y) vdso/
+ obj-m					+= $(arm64-obj-m)
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+new file mode 100644
+index 0000000..7bfd650
+--- /dev/null
++++ b/arch/arm64/kernel/efi.c
+@@ -0,0 +1,466 @@
 +/*
-+ * FDT related Helper functions used by the EFI stub on multiple
-+ * architectures. This should be #included by the EFI stub
-+ * implementation files.
++ * Extensible Firmware Interface
 + *
-+ * Copyright 2013 Linaro Limited; author Roy Franz
++ * Based on Extensible Firmware Interface Specification version 2.4
 + *
-+ * This file is part of the Linux kernel, and is made available
-+ * under the terms of the GNU General Public License version 2.
++ * Copyright (C) 2013, 2014 Linaro Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + *
 + */
 +
-+static efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
-+			       unsigned long orig_fdt_size,
-+			       void *fdt, int new_fdt_size, char *cmdline_ptr,
-+			       u64 initrd_addr, u64 initrd_size,
-+			       efi_memory_desc_t *memory_map,
-+			       unsigned long map_size, unsigned long desc_size,
-+			       u32 desc_ver)
++#include <linux/efi.h>
++#include <linux/export.h>
++#include <linux/memblock.h>
++#include <linux/bootmem.h>
++#include <linux/of.h>
++#include <linux/of_fdt.h>
++#include <linux/sched.h>
++#include <linux/slab.h>
++
++#include <asm/cacheflush.h>
++#include <asm/efi.h>
++#include <asm/tlbflush.h>
++#include <asm/mmu_context.h>
++
++struct efi_memory_map memmap;
++
++static efi_runtime_services_t *runtime;
++
++static u64 efi_system_table;
++
++static int uefi_debug __initdata;
++static int __init uefi_debug_setup(char *str)
 +{
-+	int node, prev;
-+	int status;
-+	u32 fdt_val32;
-+	u64 fdt_val64;
++	uefi_debug = 1;
 +
-+	/*
-+	 * Copy definition of linux_banner here.  Since this code is
-+	 * built as part of the decompressor for ARM v7, pulling
-+	 * in version.c where linux_banner is defined for the
-+	 * kernel brings other kernel dependencies with it.
-+	 */
-+	const char linux_banner[] =
-+	    "Linux version " UTS_RELEASE " (" LINUX_COMPILE_BY "@"
-+	    LINUX_COMPILE_HOST ") (" LINUX_COMPILER ") " UTS_VERSION "\n";
++	return 0;
++}
++early_param("uefi_debug", uefi_debug_setup);
 +
-+	/* Do some checks on provided FDT, if it exists*/
-+	if (orig_fdt) {
-+		if (fdt_check_header(orig_fdt)) {
-+			pr_efi_err(sys_table, "Device Tree header not valid!\n");
-+			return EFI_LOAD_ERROR;
-+		}
-+		/*
-+		 * We don't get the size of the FDT if we get if from a
-+		 * configuration table.
-+		 */
-+		if (orig_fdt_size && fdt_totalsize(orig_fdt) > orig_fdt_size) {
-+			pr_efi_err(sys_table, "Truncated device tree! foo!\n");
-+			return EFI_LOAD_ERROR;
-+		}
++static int __init is_normal_ram(efi_memory_desc_t *md)
++{
++	if (md->attribute & EFI_MEMORY_WB)
++		return 1;
++	return 0;
++}
++
++static void __init efi_setup_idmap(void)
++{
++	struct memblock_region *r;
++	efi_memory_desc_t *md;
++	u64 paddr, npages, size;
++
++	for_each_memblock(memory, r)
++		create_id_mapping(r->base, r->size, 0);
++
++	/* map runtime io spaces */
++	for_each_efi_memory_desc(&memmap, md) {
++		if (!(md->attribute & EFI_MEMORY_RUNTIME) || is_normal_ram(md))
++			continue;
++		paddr = md->phys_addr;
++		npages = md->num_pages;
++		memrange_efi_to_native(&paddr, &npages);
++		size = npages << PAGE_SHIFT;
++		create_id_mapping(paddr, size, 1);
++	}
++}
++
++static int __init uefi_init(void)
++{
++	efi_char16_t *c16;
++	char vendor[100] = "unknown";
++	int i, retval;
++
++	efi.systab = early_memremap(efi_system_table,
++				    sizeof(efi_system_table_t));
++	if (efi.systab == NULL) {
++		pr_warn("Unable to map EFI system table.\n");
++		return -ENOMEM;
 +	}
 +
-+	if (orig_fdt)
-+		status = fdt_open_into(orig_fdt, fdt, new_fdt_size);
-+	else
-+		status = fdt_create_empty_tree(fdt, new_fdt_size);
-+
-+	if (status != 0)
-+		goto fdt_set_fail;
++	set_bit(EFI_BOOT, &efi.flags);
++	set_bit(EFI_64BIT, &efi.flags);
 +
 +	/*
-+	 * Delete any memory nodes present. We must delete nodes which
-+	 * early_init_dt_scan_memory may try to use.
++	 * Verify the EFI Table
 +	 */
-+	prev = 0;
-+	for (;;) {
-+		const char *type, *name;
-+		int len;
++	if (efi.systab->hdr.signature != EFI_SYSTEM_TABLE_SIGNATURE) {
++		pr_err("System table signature incorrect\n");
++		return -EINVAL;
++	}
++	if ((efi.systab->hdr.revision >> 16) < 2)
++		pr_warn("Warning: EFI system table version %d.%02d, expected 2.00 or greater\n",
++			efi.systab->hdr.revision >> 16,
++			efi.systab->hdr.revision & 0xffff);
 +
-+		node = fdt_next_node(fdt, prev, NULL);
-+		if (node < 0)
-+			break;
++	/* Show what we know for posterity */
++	c16 = early_memremap(efi.systab->fw_vendor,
++			     sizeof(vendor));
++	if (c16) {
++		for (i = 0; i < (int) sizeof(vendor) - 1 && *c16; ++i)
++			vendor[i] = c16[i];
++		vendor[i] = '\0';
++	}
 +
-+		type = fdt_getprop(fdt, node, "device_type", &len);
-+		if (type && strncmp(type, "memory", len) == 0) {
-+			fdt_del_node(fdt, node);
++	pr_info("EFI v%u.%.02u by %s\n",
++		efi.systab->hdr.revision >> 16,
++		efi.systab->hdr.revision & 0xffff, vendor);
++
++	retval = efi_config_init(NULL);
++	if (retval == 0)
++		set_bit(EFI_CONFIG_TABLES, &efi.flags);
++
++	early_memunmap(c16, sizeof(vendor));
++	early_memunmap(efi.systab,  sizeof(efi_system_table_t));
++
++	return retval;
++}
++
++static __initdata char memory_type_name[][32] = {
++	{"Reserved"},
++	{"Loader Code"},
++	{"Loader Data"},
++	{"Boot Code"},
++	{"Boot Data"},
++	{"Runtime Code"},
++	{"Runtime Data"},
++	{"Conventional Memory"},
++	{"Unusable Memory"},
++	{"ACPI Reclaim Memory"},
++	{"ACPI Memory NVS"},
++	{"Memory Mapped I/O"},
++	{"MMIO Port Space"},
++	{"PAL Code"},
++};
++
++/*
++ * Return true for RAM regions we want to permanently reserve.
++ */
++static __init int is_reserve_region(efi_memory_desc_t *md)
++{
++	if (!is_normal_ram(md))
++		return 0;
++
++	if (md->attribute & EFI_MEMORY_RUNTIME)
++		return 1;
++
++	if (md->type == EFI_ACPI_RECLAIM_MEMORY ||
++	    md->type == EFI_RESERVED_TYPE)
++		return 1;
++
++	return 0;
++}
++
++static __init void reserve_regions(void)
++{
++	efi_memory_desc_t *md;
++	u64 paddr, npages, size;
++
++	if (uefi_debug)
++		pr_info("Processing EFI memory map:\n");
++
++	for_each_efi_memory_desc(&memmap, md) {
++		paddr = md->phys_addr;
++		npages = md->num_pages;
++
++		if (uefi_debug)
++			pr_info("  0x%012llx-0x%012llx [%s]",
++				paddr, paddr + (npages << EFI_PAGE_SHIFT) - 1,
++				memory_type_name[md->type]);
++
++		memrange_efi_to_native(&paddr, &npages);
++		size = npages << PAGE_SHIFT;
++
++		if (is_normal_ram(md))
++			early_init_dt_add_memory_arch(paddr, size);
++
++		if (is_reserve_region(md) ||
++		    md->type == EFI_BOOT_SERVICES_CODE ||
++		    md->type == EFI_BOOT_SERVICES_DATA) {
++			memblock_reserve(paddr, size);
++			if (uefi_debug)
++				pr_cont("*");
++		}
++
++		if (uefi_debug)
++			pr_cont("\n");
++	}
++}
++
++
++static u64 __init free_one_region(u64 start, u64 end)
++{
++	u64 size = end - start;
++
++	if (uefi_debug)
++		pr_info("  EFI freeing: 0x%012llx-0x%012llx\n",	start, end - 1);
++
++	free_bootmem_late(start, size);
++	return size;
++}
++
++static u64 __init free_region(u64 start, u64 end)
++{
++	u64 map_start, map_end, total = 0;
++
++	if (end <= start)
++		return total;
++
++	map_start = (u64)memmap.phys_map;
++	map_end = PAGE_ALIGN(map_start + (memmap.map_end - memmap.map));
++	map_start &= PAGE_MASK;
++
++	if (start < map_end && end > map_start) {
++		/* region overlaps UEFI memmap */
++		if (start < map_start)
++			total += free_one_region(start, map_start);
++
++		if (map_end < end)
++			total += free_one_region(map_end, end);
++	} else
++		total += free_one_region(start, end);
++
++	return total;
++}
++
++static void __init free_boot_services(void)
++{
++	u64 total_freed = 0;
++	u64 keep_end, free_start, free_end;
++	efi_memory_desc_t *md;
++
++	/*
++	 * If kernel uses larger pages than UEFI, we have to be careful
++	 * not to inadvertantly free memory we want to keep if there is
++	 * overlap@the kernel page size alignment. We do not want to
++	 * free is_reserve_region() memory nor the UEFI memmap itself.
++	 *
++	 * The memory map is sorted, so we keep track of the end of
++	 * any previous region we want to keep, remember any region
++	 * we want to free and defer freeing it until we encounter
++	 * the next region we want to keep. This way, before freeing
++	 * it, we can clip it as needed to avoid freeing memory we
++	 * want to keep for UEFI.
++	 */
++
++	keep_end = 0;
++	free_start = 0;
++
++	for_each_efi_memory_desc(&memmap, md) {
++		u64 paddr, npages, size;
++
++		if (is_reserve_region(md)) {
++			/*
++			 * We don't want to free any memory from this region.
++			 */
++			if (free_start) {
++				/* adjust free_end then free region */
++				if (free_end > md->phys_addr)
++					free_end -= PAGE_SIZE;
++				total_freed += free_region(free_start, free_end);
++				free_start = 0;
++			}
++			keep_end = md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT);
 +			continue;
 +		}
 +
-+		prev = node;
-+	}
-+
-+	node = fdt_subnode_offset(fdt, 0, "chosen");
-+	if (node < 0) {
-+		node = fdt_add_subnode(fdt, 0, "chosen");
-+		if (node < 0) {
-+			status = node; /* node is error code when negative */
-+			goto fdt_set_fail;
-+		}
-+	}
-+
-+	if ((cmdline_ptr != NULL) && (strlen(cmdline_ptr) > 0)) {
-+		status = fdt_setprop(fdt, node, "bootargs", cmdline_ptr,
-+				     strlen(cmdline_ptr) + 1);
-+		if (status)
-+			goto fdt_set_fail;
-+	}
-+
-+	/* Set initrd address/end in device tree, if present */
-+	if (initrd_size != 0) {
-+		u64 initrd_image_end;
-+		u64 initrd_image_start = cpu_to_fdt64(initrd_addr);
-+
-+		status = fdt_setprop(fdt, node, "linux,initrd-start",
-+				     &initrd_image_start, sizeof(u64));
-+		if (status)
-+			goto fdt_set_fail;
-+		initrd_image_end = cpu_to_fdt64(initrd_addr + initrd_size);
-+		status = fdt_setprop(fdt, node, "linux,initrd-end",
-+				     &initrd_image_end, sizeof(u64));
-+		if (status)
-+			goto fdt_set_fail;
-+	}
-+
-+	/* Add FDT entries for EFI runtime services in chosen node. */
-+	node = fdt_subnode_offset(fdt, 0, "chosen");
-+	fdt_val64 = cpu_to_fdt64((u64)(unsigned long)sys_table);
-+	status = fdt_setprop(fdt, node, "linux,uefi-system-table",
-+			     &fdt_val64, sizeof(fdt_val64));
-+	if (status)
-+		goto fdt_set_fail;
-+
-+	fdt_val64 = cpu_to_fdt64((u64)(unsigned long)memory_map);
-+	status = fdt_setprop(fdt, node, "linux,uefi-mmap-start",
-+			     &fdt_val64,  sizeof(fdt_val64));
-+	if (status)
-+		goto fdt_set_fail;
-+
-+	fdt_val32 = cpu_to_fdt32(map_size);
-+	status = fdt_setprop(fdt, node, "linux,uefi-mmap-size",
-+			     &fdt_val32,  sizeof(fdt_val32));
-+	if (status)
-+		goto fdt_set_fail;
-+
-+	fdt_val32 = cpu_to_fdt32(desc_size);
-+	status = fdt_setprop(fdt, node, "linux,uefi-mmap-desc-size",
-+			     &fdt_val32, sizeof(fdt_val32));
-+	if (status)
-+		goto fdt_set_fail;
-+
-+	fdt_val32 = cpu_to_fdt32(desc_ver);
-+	status = fdt_setprop(fdt, node, "linux,uefi-mmap-desc-ver",
-+			     &fdt_val32, sizeof(fdt_val32));
-+	if (status)
-+		goto fdt_set_fail;
-+
-+	/*
-+	 * Add kernel version banner so stub/kernel match can be
-+	 * verified.
-+	 */
-+	status = fdt_setprop_string(fdt, node, "linux,uefi-stub-kern-ver",
-+			     linux_banner);
-+	if (status)
-+		goto fdt_set_fail;
-+
-+	return EFI_SUCCESS;
-+
-+fdt_set_fail:
-+	if (status == -FDT_ERR_NOSPACE)
-+		return EFI_BUFFER_TOO_SMALL;
-+
-+	return EFI_LOAD_ERROR;
-+}
-+
-+#ifndef EFI_FDT_ALIGN
-+#define EFI_FDT_ALIGN EFI_PAGE_SIZE
-+#endif
-+
-+/*
-+ * Allocate memory for a new FDT, then add EFI, commandline, and
-+ * initrd related fields to the FDT.  This routine increases the
-+ * FDT allocation size until the allocated memory is large
-+ * enough.  EFI allocations are in EFI_PAGE_SIZE granules,
-+ * which are fixed at 4K bytes, so in most cases the first
-+ * allocation should succeed.
-+ * EFI boot services are exited at the end of this function.
-+ * There must be no allocations between the get_memory_map()
-+ * call and the exit_boot_services() call, so the exiting of
-+ * boot services is very tightly tied to the creation of the FDT
-+ * with the final memory map in it.
-+ */
-+
-+efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
-+					    void *handle,
-+					    unsigned long *new_fdt_addr,
-+					    unsigned long max_addr,
-+					    u64 initrd_addr, u64 initrd_size,
-+					    char *cmdline_ptr,
-+					    unsigned long fdt_addr,
-+					    unsigned long fdt_size)
-+{
-+	unsigned long map_size, desc_size;
-+	u32 desc_ver;
-+	unsigned long mmap_key;
-+	efi_memory_desc_t *memory_map;
-+	unsigned long new_fdt_size;
-+	efi_status_t status;
-+
-+	/*
-+	 * Estimate size of new FDT, and allocate memory for it. We
-+	 * will allocate a bigger buffer if this ends up being too
-+	 * small, so a rough guess is OK here.
-+	 */
-+	new_fdt_size = fdt_size + EFI_PAGE_SIZE;
-+	while (1) {
-+		status = efi_high_alloc(sys_table, new_fdt_size, EFI_FDT_ALIGN,
-+					new_fdt_addr, max_addr);
-+		if (status != EFI_SUCCESS) {
-+			pr_efi_err(sys_table, "Unable to allocate memory for new device tree.\n");
-+			goto fail;
++		if (md->type != EFI_BOOT_SERVICES_CODE &&
++		    md->type != EFI_BOOT_SERVICES_DATA) {
++			/* no need to free this region */
++			continue;
 +		}
 +
 +		/*
-+		 * Now that we have done our final memory allocation (and free)
-+		 * we can get the memory map key  needed for
-+		 * exit_boot_services().
++		 * We want to free memory from this region.
 +		 */
-+		status = efi_get_memory_map(sys_table, &memory_map, &map_size,
-+					    &desc_size, &desc_ver, &mmap_key);
-+		if (status != EFI_SUCCESS)
-+			goto fail_free_new_fdt;
++		paddr = md->phys_addr;
++		npages = md->num_pages;
++		memrange_efi_to_native(&paddr, &npages);
++		size = npages << PAGE_SHIFT;
 +
-+		status = update_fdt(sys_table,
-+				    (void *)fdt_addr, fdt_size,
-+				    (void *)*new_fdt_addr, new_fdt_size,
-+				    cmdline_ptr, initrd_addr, initrd_size,
-+				    memory_map, map_size, desc_size, desc_ver);
-+
-+		/* Succeeding the first time is the expected case. */
-+		if (status == EFI_SUCCESS)
-+			break;
-+
-+		if (status == EFI_BUFFER_TOO_SMALL) {
-+			/*
-+			 * We need to allocate more space for the new
-+			 * device tree, so free existing buffer that is
-+			 * too small.  Also free memory map, as we will need
-+			 * to get new one that reflects the free/alloc we do
-+			 * on the device tree buffer.
-+			 */
-+			efi_free(sys_table, new_fdt_size, *new_fdt_addr);
-+			sys_table->boottime->free_pool(memory_map);
-+			new_fdt_size += EFI_PAGE_SIZE;
++		if (free_start) {
++			if (paddr <= free_end)
++				free_end = paddr + size;
++			else {
++				total_freed += free_region(free_start, free_end);
++				free_start = paddr;
++				free_end = paddr + size;
++			}
 +		} else {
-+			pr_efi_err(sys_table, "Unable to constuct new device tree.\n");
-+			goto fail_free_mmap;
++			free_start = paddr;
++			free_end = paddr + size;
++		}
++		if (free_start < keep_end) {
++			free_start += PAGE_SIZE;
++			if (free_start >= free_end)
++				free_start = 0;
 +		}
 +	}
++	if (free_start)
++		total_freed += free_region(free_start, free_end);
 +
-+	/* Now we are ready to exit_boot_services.*/
-+	status = sys_table->boottime->exit_boot_services(handle, mmap_key);
-+
-+
-+	if (status == EFI_SUCCESS)
-+		return status;
-+
-+	pr_efi_err(sys_table, "Exit boot services failed.\n");
-+
-+fail_free_mmap:
-+	sys_table->boottime->free_pool(memory_map);
-+
-+fail_free_new_fdt:
-+	efi_free(sys_table, new_fdt_size, *new_fdt_addr);
-+
-+fail:
-+	return EFI_LOAD_ERROR;
++	if (total_freed)
++		pr_info("Freed 0x%llx bytes of EFI boot services memory",
++			total_freed);
 +}
 +
-+static void *get_fdt(efi_system_table_t *sys_table)
++void __init efi_init(void)
 +{
-+	efi_guid_t fdt_guid = DEVICE_TREE_GUID;
-+	efi_config_table_t *tables;
-+	void *fdt;
-+	int i;
++	struct efi_fdt_params params;
 +
-+	tables = (efi_config_table_t *) sys_table->tables;
-+	fdt = NULL;
++	/* Grab UEFI information placed in FDT by stub */
++	if (!efi_get_fdt_params(&params, uefi_debug))
++		return;
 +
-+	for (i = 0; i < sys_table->nr_tables; i++)
-+		if (efi_guidcmp(tables[i].guid, fdt_guid) == 0) {
-+			fdt = (void *) tables[i].table;
-+			break;
-+	 }
++	efi_system_table = params.system_table;
 +
-+	return fdt;
++	memblock_reserve(params.mmap & PAGE_MASK,
++			 PAGE_ALIGN(params.mmap_size + (params.mmap & ~PAGE_MASK)));
++	memmap.phys_map = (void *)params.mmap;
++	memmap.map = early_memremap(params.mmap, params.mmap_size);
++	memmap.map_end = memmap.map + params.mmap_size;
++	memmap.desc_size = params.desc_size;
++	memmap.desc_version = params.desc_ver;
++
++	if (uefi_init() < 0)
++		return;
++
++	reserve_regions();
 +}
-diff --git a/include/linux/efi.h b/include/linux/efi.h
-index 4f52ac6..ae3e2b2 100644
---- a/include/linux/efi.h
-+++ b/include/linux/efi.h
-@@ -575,6 +575,9 @@ typedef efi_status_t efi_query_variable_store_t(u32 attributes, unsigned long si
- #define EFI_FILE_SYSTEM_GUID \
-     EFI_GUID(  0x964e5b22, 0x6459, 0x11d2, 0x8e, 0x39, 0x00, 0xa0, 0xc9, 0x69, 0x72, 0x3b )
- 
-+#define DEVICE_TREE_GUID \
-+    EFI_GUID(  0xb1b621d5, 0xf19c, 0x41a5, 0x83, 0x0b, 0xd9, 0x15, 0x2c, 0x69, 0xaa, 0xe0 )
 +
- typedef struct {
- 	efi_guid_t guid;
- 	u64 table;
++void __init efi_idmap_init(void)
++{
++	/* boot time idmap_pg_dir is incomplete, so fill in missing parts */
++	efi_setup_idmap();
++}
++
++static int __init remap_region(efi_memory_desc_t *md, void **new)
++{
++	u64 paddr, vaddr, npages, size;
++
++	paddr = md->phys_addr;
++	npages = md->num_pages;
++	memrange_efi_to_native(&paddr, &npages);
++	size = npages << PAGE_SHIFT;
++
++	if (is_normal_ram(md))
++		vaddr = (__force u64)ioremap_cache(paddr, size);
++	else
++		vaddr = (__force u64)ioremap(paddr, size);
++
++	if (!vaddr) {
++		pr_err("Unable to remap 0x%llx pages @ %p\n",
++		       npages, (void *)paddr);
++		return 0;
++	}
++
++	/* adjust for any rounding when EFI and system pagesize differs */
++	md->virt_addr = vaddr + (md->phys_addr - paddr);
++
++	if (uefi_debug)
++		pr_info("  EFI remap 0x%012llx => %p\n",
++			md->phys_addr, (void *)md->virt_addr);
++
++	memcpy(*new, md, memmap.desc_size);
++	*new += memmap.desc_size;
++
++	return 1;
++}
++
++/*
++ * Switch UEFI from an identity map to a kernel virtual map
++ */
++static int __init arm64_enter_virtual_mode(void)
++{
++	efi_memory_desc_t *md;
++	phys_addr_t virtmap_phys;
++	void *virtmap, *virt_md;
++	efi_status_t status;
++	u64 mapsize;
++	int count = 0;
++	unsigned long flags;
++
++	if (!efi_enabled(EFI_BOOT)) {
++		pr_info("EFI services will not be available.\n");
++		return -1;
++	}
++
++	pr_info("Remapping and enabling EFI services.\n");
++
++	/* replace early memmap mapping with permanent mapping */
++	mapsize = memmap.map_end - memmap.map;
++	early_memunmap(memmap.map, mapsize);
++	memmap.map = (__force void *)ioremap_cache((phys_addr_t)memmap.phys_map,
++						   mapsize);
++	memmap.map_end = memmap.map + mapsize;
++
++	efi.memmap = &memmap;
++
++	/* Map the runtime regions */
++	virtmap = kmalloc(mapsize, GFP_KERNEL);
++	if (!virtmap) {
++		pr_err("Failed to allocate EFI virtual memmap\n");
++		return -1;
++	}
++	virtmap_phys = virt_to_phys(virtmap);
++	virt_md = virtmap;
++
++	for_each_efi_memory_desc(&memmap, md) {
++		if (!(md->attribute & EFI_MEMORY_RUNTIME))
++			continue;
++		if (remap_region(md, &virt_md))
++			++count;
++	}
++
++	efi.systab = (__force void *)efi_lookup_mapped_addr(efi_system_table);
++	if (efi.systab)
++		set_bit(EFI_SYSTEM_TABLES, &efi.flags);
++
++	local_irq_save(flags);
++	cpu_switch_mm(idmap_pg_dir, &init_mm);
++
++	/* Call SetVirtualAddressMap with the physical address of the map */
++	runtime = efi.systab->runtime;
++	efi.set_virtual_address_map = runtime->set_virtual_address_map;
++
++	status = efi.set_virtual_address_map(count * memmap.desc_size,
++					     memmap.desc_size,
++					     memmap.desc_version,
++					     (efi_memory_desc_t *)virtmap_phys);
++	cpu_set_reserved_ttbr0();
++	flush_tlb_all();
++	local_irq_restore(flags);
++
++	kfree(virtmap);
++
++	free_boot_services();
++
++	if (status != EFI_SUCCESS) {
++		pr_err("Failed to set EFI virtual address map! [%lx]\n",
++			status);
++		return -1;
++	}
++
++	/* Set up runtime services function pointers */
++	runtime = efi.systab->runtime;
++	efi.get_time = runtime->get_time;
++	efi.set_time = runtime->set_time;
++	efi.get_wakeup_time = runtime->get_wakeup_time;
++	efi.set_wakeup_time = runtime->set_wakeup_time;
++	efi.get_variable = runtime->get_variable;
++	efi.get_next_variable = runtime->get_next_variable;
++	efi.set_variable = runtime->set_variable;
++	efi.query_variable_info = runtime->query_variable_info;
++	efi.update_capsule = runtime->update_capsule;
++	efi.query_capsule_caps = runtime->query_capsule_caps;
++	efi.get_next_high_mono_count = runtime->get_next_high_mono_count;
++	efi.reset_system = runtime->reset_system;
++
++	set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
++
++	return 0;
++}
++early_initcall(arm64_enter_virtual_mode);
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 720853f..0a14aaf 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -41,6 +41,7 @@
+ #include <linux/memblock.h>
+ #include <linux/of_fdt.h>
+ #include <linux/of_platform.h>
++#include <linux/efi.h>
+ 
+ #include <asm/fixmap.h>
+ #include <asm/cputype.h>
+@@ -55,6 +56,7 @@
+ #include <asm/traps.h>
+ #include <asm/memblock.h>
+ #include <asm/psci.h>
++#include <asm/efi.h>
+ 
+ unsigned int processor_id;
+ EXPORT_SYMBOL(processor_id);
+@@ -366,11 +368,14 @@ void __init setup_arch(char **cmdline_p)
+ 
+ 	parse_early_param();
+ 
++	efi_init();
+ 	arm64_memblock_init();
+ 
+ 	paging_init();
+ 	request_standard_resources();
+ 
++	efi_idmap_init();
++
+ 	unflatten_device_tree();
+ 
+ 	psci_init();
 -- 
 1.7.10.4
