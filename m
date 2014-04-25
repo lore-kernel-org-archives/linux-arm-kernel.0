@@ -1,31 +1,37 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 25 Apr 2014 11:46:04 +0100
-Subject: [PATCH] ARM: KVM: disable KVM in Kconfig on big-endian systems
-Message-ID: <1398422764-29351-1-git-send-email-will.deacon@arm.com>
+From: archit@ti.com (Archit Taneja)
+Date: Fri, 25 Apr 2014 16:41:18 +0530
+Subject: [PATCH 06/23] ARM: OMAP: add OMAP5 DSI muxing
+In-Reply-To: <1398334639-14172-7-git-send-email-tomi.valkeinen@ti.com>
+References: <1398334639-14172-1-git-send-email-tomi.valkeinen@ti.com>
+ <1398334639-14172-7-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <535A42D6.5090107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KVM currently crashes and burns on big-endian hosts, so don't allow it
-to be selected until we've got that fixed.
+Hi,
 
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/kvm/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On Thursday 24 April 2014 03:47 PM, Tomi Valkeinen wrote:
+> Add support to set OMAP5 DSI pin muxing.
+>
+> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> ---
+>   arch/arm/mach-omap2/display.c | 35 ++++++++++++++++++++++++++++++++++-
+>   1 file changed, 34 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-omap2/display.c b/arch/arm/mach-omap2/display.c
+> index 16d33d831287..974461441fc3 100644
+> --- a/arch/arm/mach-omap2/display.c
+> +++ b/arch/arm/mach-omap2/display.c
+> @@ -137,11 +137,42 @@ static int omap4_dsi_mux_pads(int dsi_id, unsigned lanes)
+>   	return 0;
+>   }
+>
+> +#define CONTROL_PAD_BASE	0x4A002800
+> +#define CONTROL_DSIPHY		0x614
+> +
 
-diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
-index 466bd299b1a8..4be5bb150bdd 100644
---- a/arch/arm/kvm/Kconfig
-+++ b/arch/arm/kvm/Kconfig
-@@ -23,7 +23,7 @@ config KVM
- 	select HAVE_KVM_CPU_RELAX_INTERCEPT
- 	select KVM_MMIO
- 	select KVM_ARM_HOST
--	depends on ARM_VIRT_EXT && ARM_LPAE
-+	depends on ARM_VIRT_EXT && ARM_LPAE && !CPU_BIG_ENDIAN
- 	---help---
- 	  Support hosting virtualized guest machines. You will also
- 	  need to select one or more of the processor modules below.
--- 
-1.9.2
+I guess this is something we can move to our driver, and use sysconf to 
+get the register from DT.
+
+Archit
