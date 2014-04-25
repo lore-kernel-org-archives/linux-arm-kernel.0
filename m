@@ -1,25 +1,41 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 25 Apr 2014 13:19:48 -0500
-Subject: [PATCH 0/3] arm64: Default to non-coherent DMA ops
-In-Reply-To: <1398447254-18527-1-git-send-email-catalin.marinas@arm.com>
-References: <1398447254-18527-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <CAL_JsqLbZDq36kfayBnnXw3UYwu_02WNCS2bqKS8iEzrG_CJeg@mail.gmail.com>
+From: tim.kryger@linaro.org (Tim Kryger)
+Date: Fri, 25 Apr 2014 11:31:15 -0700
+Subject: [PATCH v6 RESEND 5/5] ARM: bcm_defconfig: Enable PWM and Backlight
+In-Reply-To: <1398450675-19609-1-git-send-email-tim.kryger@linaro.org>
+References: <1398450675-19609-1-git-send-email-tim.kryger@linaro.org>
+Message-ID: <1398450675-19609-6-git-send-email-tim.kryger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 25, 2014 at 12:34 PM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> Following recent discussions and patch from Ritesh, I'm planning to
-> align the default DMA ops with 32-bit arm and make them non-coherent. In
-> addition, we need to make sure that devices marked explicitly as
-> coherent use the correct dma ops. Until Santosh's DMA patches get
-> reviewed/merged, the temporary solution is bus notifiers which check the
-> "dma-coherent" property and set the right dma ops.
+Enable PWM drivers and the PWM-based backlight driver.
 
-Is this for 3.15? If not, don't you think Santosh's patches will be
-ready for 3.16. I need to take another look, but I'm pretty much happy
-with them. My only issue really is whether we want to spread the use
-of dma-coherent. Will did call my cute little property a hack, but I
-have yet to see anything better.
+Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
+Reviewed-by: Alex Elder <elder@linaro.org>
+Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+---
+ arch/arm/configs/bcm_defconfig |    3 +++
+ 1 file changed, 3 insertions(+)
 
-Rob
+diff --git a/arch/arm/configs/bcm_defconfig b/arch/arm/configs/bcm_defconfig
+index 0100464..f09f7c6 100644
+--- a/arch/arm/configs/bcm_defconfig
++++ b/arch/arm/configs/bcm_defconfig
+@@ -91,6 +91,7 @@ CONFIG_FB=y
+ CONFIG_BACKLIGHT_LCD_SUPPORT=y
+ CONFIG_LCD_CLASS_DEVICE=y
+ CONFIG_BACKLIGHT_CLASS_DEVICE=y
++CONFIG_BACKLIGHT_PWM=y
+ # CONFIG_USB_SUPPORT is not set
+ CONFIG_MMC=y
+ CONFIG_MMC_UNSAFE_RESUME=y
+@@ -104,6 +105,8 @@ CONFIG_LEDS_TRIGGERS=y
+ CONFIG_LEDS_TRIGGER_TIMER=y
+ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+ CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
++CONFIG_PWM=y
++CONFIG_PWM_BCM_KONA=y
+ CONFIG_EXT4_FS=y
+ CONFIG_EXT4_FS_POSIX_ACL=y
+ CONFIG_EXT4_FS_SECURITY=y
+-- 
+1.7.9.5
