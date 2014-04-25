@@ -1,48 +1,33 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:37:25 +0100
-Subject: [PATCH 076/222] net:fec: use netif_tx_disable() rather than
- netif_stop_queue()
+Date: Fri, 25 Apr 2014 12:37:30 +0100
+Subject: [PATCH 077/222] net:fec: iMX6 FEC does not support half-duplex gigabit
 In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
 References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WdeRZ-0007IF-ES@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WdeRe-0007IL-Hz@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We use netif_stop_queue() in several places where we want to ensure that
-the start_xmit function is not running.  netif_stop_queue() is not
-sufficient to achieve that - it merely sets a flag to indicate that the
-transmit queue(s) should not be run.
-
-netif_tx_disable() gives this guarantee, since it takes the transmit
-queue lock while marking the queue stopped.  This will wait for the
-transmit function to complete before returning.
+The iMX6 gigabit FEC does not support half-duplex gigabit operation.
+Phys attacked to the FEC may support this, and we currently do nothing
+to disable this feature.  This may result in an invalid configuration.
+Mask out phy support for gigabit half-duplex operation.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/net/ethernet/freescale/fec_main.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/net/ethernet/freescale/fec_main.c | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index 7d506ae2dbba..1c84f3a6f3a7 100644
+index 1c84f3a6f3a7..d9109acc934d 100644
 --- a/drivers/net/ethernet/freescale/fec_main.c
 +++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -522,7 +522,7 @@ fec_restart(struct net_device *ndev, int duplex)
- 	if (netif_running(ndev)) {
- 		netif_device_detach(ndev);
- 		napi_disable(&fep->napi);
--		netif_stop_queue(ndev);
-+		netif_tx_disable(ndev);
- 		netif_tx_lock_bh(ndev);
- 	}
- 
-@@ -1821,7 +1821,7 @@ fec_enet_close(struct net_device *ndev)
- 	/* Don't know what to do yet. */
- 	napi_disable(&fep->napi);
- 	fep->opened = 0;
--	netif_stop_queue(ndev);
-+	netif_tx_disable(ndev);
- 	fec_stop(ndev);
- 
- 	phy_stop(fep->phy_dev);
+@@ -1316,6 +1316,7 @@ static int fec_enet_mii_probe(struct net_device *ndev)
+ 	/* mask with MAC supported features */
+ 	if (id_entry->driver_data & FEC_QUIRK_HAS_GBIT) {
+ 		phy_dev->supported &= PHY_GBIT_FEATURES;
++		phy_dev->supported &= ~SUPPORTED_1000baseT_Half;
+ #if !defined(CONFIG_M5272)
+ 		phy_dev->supported |= SUPPORTED_Pause;
+ #endif
 -- 
 1.8.3.1
