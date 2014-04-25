@@ -1,65 +1,43 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:38:11 +0100
-Subject: [PATCH 085/222] net:fec: improve safety of suspend/resume/transmit
- timeout paths
+Date: Fri, 25 Apr 2014 12:38:16 +0100
+Subject: [PATCH 086/222] net:fec: ensure fec_enet_close() copes with resume
+ failure
 In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
 References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WdeSJ-0007Ir-DW@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WdeSO-0007Iv-HB@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to hold the rtnl lock while suspending, resuming or processing
-the transmit timeout to ensure that netif_running() will not change
-state beneath us while we bring up, take down or restart the hardware.
+When the FEC is suspended, the device is detached.  Upon resume failure,
+the device is left in detached mode, possibly with some of the required
+clocks not running.  We don't want to be poking the device in that state
+because as it may cause bus errors.
+
+If the device is marked detached, avoid calling fec_stop().
+
+This depends upon: "net:fec: improve safety of suspend/resume paths"
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/net/ethernet/freescale/fec_main.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ drivers/net/ethernet/freescale/fec_main.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index 765ea90b99ed..843721aa44bd 100644
+index 843721aa44bd..f65c1f1d8770 100644
 --- a/drivers/net/ethernet/freescale/fec_main.c
 +++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -767,8 +767,10 @@ static void fec_enet_work(struct work_struct *work)
+@@ -1846,10 +1846,10 @@ fec_enet_close(struct net_device *ndev)
  
- 	if (fep->delay_work.timeout) {
- 		fep->delay_work.timeout = false;
-+		rtnl_lock();
- 		fec_restart(fep->netdev, fep->full_duplex);
- 		netif_wake_queue(fep->netdev);
-+		rtnl_unlock();
- 	}
+ 	phy_stop(fep->phy_dev);
  
- 	if (fep->delay_work.trig_tx) {
-@@ -2333,11 +2335,14 @@ fec_suspend(struct device *dev)
- 	struct net_device *ndev = dev_get_drvdata(dev);
- 	struct fec_enet_private *fep = netdev_priv(ndev);
+-	/* Don't know what to do yet. */
+ 	napi_disable(&fep->napi);
+ 	netif_tx_disable(ndev);
+-	fec_stop(ndev);
++	if (netif_device_present(ndev))
++		fec_stop(ndev);
  
-+	rtnl_lock();
- 	if (netif_running(ndev)) {
- 		phy_stop(fep->phy_dev);
- 		fec_stop(ndev);
- 		netif_device_detach(ndev);
- 	}
-+	rtnl_unlock();
-+
- 	if (fep->clk_ptp)
- 		clk_disable_unprepare(fep->clk_ptp);
- 	if (fep->clk_enet_out)
-@@ -2384,11 +2389,13 @@ fec_resume(struct device *dev)
- 			goto failed_clk_ptp;
- 	}
- 
-+	rtnl_lock();
- 	if (netif_running(ndev)) {
- 		fec_restart(ndev, fep->full_duplex);
- 		netif_device_attach(ndev);
- 		phy_start(fep->phy_dev);
- 	}
-+	rtnl_unlock();
- 
- 	return 0;
- 
+ 	phy_disconnect(fep->phy_dev);
+ 	fep->phy_dev = NULL;
 -- 
 1.8.3.1
