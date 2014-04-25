@@ -1,91 +1,100 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 25 Apr 2014 08:31:26 -0700
-Subject: [PATCH 1/3] clk: divider: Fix best div calculation for
- power-of-two and table dividers
-In-Reply-To: <1391012648-12481-2-git-send-email-maxime.coquelin@st.com>
-References: <1391012648-12481-1-git-send-email-maxime.coquelin@st.com>
- <1391012648-12481-2-git-send-email-maxime.coquelin@st.com>
-Message-ID: <20140425153126.23156.76868@quantum>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 25 Apr 2014 08:31:50 -0700
+Subject: [PATCH 06/23] ARM: OMAP: add OMAP5 DSI muxing
+In-Reply-To: <535A6C40.10609@ti.com>
+References: <1398334639-14172-1-git-send-email-tomi.valkeinen@ti.com>
+ <1398334639-14172-7-git-send-email-tomi.valkeinen@ti.com>
+ <535A42D6.5090107@ti.com> <535A4470.2000509@ti.com>
+ <535A5C0A.7040808@ti.com> <535A6C40.10609@ti.com>
+Message-ID: <20140425153150.GA20807@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Maxime COQUELIN (2014-01-29 08:24:06)
-> The divider returned by clk_divider_bestdiv() is likely to be invalid in case
-> of power-of-two and table dividers when CLK_SET_RATE_PARENT flag isn't set.
+* Tomi Valkeinen <tomi.valkeinen@ti.com> [140425 07:08]:
+> On 25/04/14 15:58, Archit Taneja wrote:
+> > On Friday 25 April 2014 04:48 PM, Tomi Valkeinen wrote:
+> >> On 25/04/14 14:11, Archit Taneja wrote:
+> >>> Hi,
+> >>>
+> >>> On Thursday 24 April 2014 03:47 PM, Tomi Valkeinen wrote:
+> >>>> Add support to set OMAP5 DSI pin muxing.
+> >>>>
+> >>>> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> >>>> Cc: Tony Lindgren <tony@atomide.com>
+> >>>> ---
+> >>>>    arch/arm/mach-omap2/display.c | 35
+> >>>> ++++++++++++++++++++++++++++++++++-
+> >>>>    1 file changed, 34 insertions(+), 1 deletion(-)
+> >>>>
+> >>>> diff --git a/arch/arm/mach-omap2/display.c
+> >>>> b/arch/arm/mach-omap2/display.c
+> >>>> index 16d33d831287..974461441fc3 100644
+> >>>> --- a/arch/arm/mach-omap2/display.c
+> >>>> +++ b/arch/arm/mach-omap2/display.c
+> >>>> @@ -137,11 +137,42 @@ static int omap4_dsi_mux_pads(int dsi_id,
+> >>>> unsigned lanes)
+> >>>>        return 0;
+> >>>>    }
+> >>>>
+> >>>> +#define CONTROL_PAD_BASE    0x4A002800
+> >>>> +#define CONTROL_DSIPHY        0x614
+> >>>> +
+> >>>
+> >>> I guess this is something we can move to our driver, and use sysconf to
+> >>> get the register from DT.
+> >>
+> >> I just copied the same method as used for OMAP4.
+> >>
+> >> I guess sysconf is an option. But I really dislike the idea of moving
+> >> omap control module code to a display driver... I'm not sure what other
+> >> options we have, though. Maybe an OMAP DSI specific pinctrl driver?
+> > 
+> > OMAP4 has CONTROL_DSIPHY for configuring both lane enable/disbale, and
+> > pull up/down, but OMAP5 has normal PAD_CONF registers for DSI lines(2
+> > pins per register) for configuring pull up/down, and CONTROL_DSIPHY for
+> > lane enable/disable.
+> > 
+> > We would have a very messed up pinctrl driver, but it would probably be
+> > better than doing all this stuff in the driver.
 > 
-> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
-
-I've taken this into clk-fixes for 3.15-rcX.
-
-Thanks,
-Mike
-
-> ---
->  drivers/clk/clk-divider.c |   37 ++++++++++++++++++++++++++++++++++++-
->  1 file changed, 36 insertions(+), 1 deletion(-)
+> Actually, this patch is not good. I should've looked at the code more
+> carefully =).
 > 
-> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-> index 5543b7d..2137d58 100644
-> --- a/drivers/clk/clk-divider.c
-> +++ b/drivers/clk/clk-divider.c
-> @@ -144,6 +144,37 @@ static bool _is_valid_div(struct clk_divider *divider, unsigned int div)
->         return true;
->  }
->  
-> +static int _round_up_table(const struct clk_div_table *table, int div)
-> +{
-> +       const struct clk_div_table *clkt;
-> +       int up = _get_table_maxdiv(table);
-> +
-> +       for (clkt = table; clkt->div; clkt++) {
-> +               if (clkt->div == div)
-> +                       return clkt->div;
-> +               else if (clkt->div < div)
-> +                       continue;
-> +
-> +               if ((clkt->div - div) < (up - div))
-> +                       up = clkt->div;
-> +       }
-> +
-> +       return up;
-> +}
-> +
-> +static int _div_round_up(struct clk_divider *divider,
-> +               unsigned long parent_rate, unsigned long rate)
-> +{
-> +       int div = DIV_ROUND_UP(parent_rate, rate);
-> +
-> +       if (divider->flags & CLK_DIVIDER_POWER_OF_TWO)
-> +               div = __roundup_pow_of_two(div);
-> +       if (divider->table)
-> +               div = _round_up_table(divider->table, div);
-> +
-> +       return div;
-> +}
-> +
->  static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
->                 unsigned long *best_parent_rate)
->  {
-> @@ -159,7 +190,7 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
->  
->         if (!(__clk_get_flags(hw->clk) & CLK_SET_RATE_PARENT)) {
->                 parent_rate = *best_parent_rate;
-> -               bestdiv = DIV_ROUND_UP(parent_rate, rate);
-> +               bestdiv = _div_round_up(divider, parent_rate, rate);
->                 bestdiv = bestdiv == 0 ? 1 : bestdiv;
->                 bestdiv = bestdiv > maxdiv ? maxdiv : bestdiv;
->                 return bestdiv;
-> @@ -219,6 +250,10 @@ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
->         u32 val;
->  
->         div = parent_rate / rate;
-> +
-> +       if (!_is_valid_div(divider, div))
-> +               return -EINVAL;
-> +
->         value = _get_val(divider, div);
->  
->         if (value > div_mask(divider))
-> -- 
-> 1.7.9.5
+> This one does ioremap every time the function is called, which could be
+> done multiple times.
 > 
+> And I think omap4_ctrl_pad_readl() can be used to access the registers.
+> Like this (not tested):
+> 
+> #define OMAP5_CONTROL_DSIPHY		0x614
+> 
+> static int omap5_dsi_mux_pads(int dsi_id, unsigned lanes)
+> {
+> 	u32 enable_mask, enable_shift, reg;
+> 
+> 	if (dsi_id == 0) {
+> 		enable_mask = OMAP4_DSI1_LANEENABLE_MASK;
+> 		enable_shift = OMAP4_DSI1_LANEENABLE_SHIFT;
+> 	} else if (dsi_id == 1) {
+> 		enable_mask = OMAP4_DSI2_LANEENABLE_MASK;
+> 		enable_shift = OMAP4_DSI2_LANEENABLE_SHIFT;
+> 	} else {
+> 		return -ENODEV;
+> 	}
+> 
+> 	reg = omap4_ctrl_pad_readl(OMAP5_CONTROL_DSIPHY);
+> 	reg &= ~enable_mask;
+> 	reg |= (lanes << enable_shift) & enable_mask;
+> 	omap4_ctrl_pad_writel(reg, OMAP5_CONTROL_DSIPHY);
+> 
+> 	return 0;
+> }
+
+Chances are any mux register in the syscon area already works with
+pinctrl-single,pins or pinctrl-single,bits option. The ones in the
+padconf area should be already mapped so the driver just has to
+request them.
+
+Regards,
+
+Tony
