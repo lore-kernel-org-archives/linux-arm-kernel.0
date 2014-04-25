@@ -1,56 +1,151 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Fri, 25 Apr 2014 13:27:35 +0530
-Subject: [PATCH V4 1/5] phy: Add new Exynos5 USB 3.0 PHY driver
-In-Reply-To: <534BF28E.7040906@samsung.com>
-References: <1396967803-28868-1-git-send-email-gautam.vivek@samsung.com>
- <1396967803-28868-2-git-send-email-gautam.vivek@samsung.com>
- <534BF28E.7040906@samsung.com>
-Message-ID: <535A156F.6060004@linaro.org>
+From: murzin.v@gmail.com (Vladimir Murzin)
+Date: Fri, 25 Apr 2014 09:42:41 +0100
+Subject: [Xen-devel] [PATCH RFC] arm64: 32-bit tolerant sync bitops
+In-Reply-To: <20140422205656.GA4467@hp530>
+References: <1397723881-31648-1-git-send-email-murzin.v@gmail.com>
+ <534FB009.5030904@citrix.com>
+ <1398241889.4880.96.camel@kazak.uk.xensource.com>
+ <20140422205656.GA4467@hp530>
+Message-ID: <CABV+yWsMvKGvntTQmtkMytn_mmU9zhwr9Xq3jY956B7_d2Ad2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/14/2014 08:07 PM, Sylwester Nawrocki wrote:
-> On 08/04/14 16:36, Vivek Gautam wrote:
->> diff --git a/Documentation/devicetree/bindings/phy/samsung-phy.txt b/Documentation/devicetree/bindings/phy/samsung-phy.txt
->> index 28f9edb..6d99ba9 100644
->> --- a/Documentation/devicetree/bindings/phy/samsung-phy.txt
->> +++ b/Documentation/devicetree/bindings/phy/samsung-phy.txt
->> @@ -74,3 +74,45 @@ phy-consumer at 12340000 {
->>  
->>  Refer to DT bindings documentation of particular PHY consumer devices for more
->>  information about required PHYs and the way of specification.
->> +
->> +Samsung Exynos5 SoC series USB DRD PHY controller
->> +--------------------------------------------------
->> +
->> +Required properties:
->> +- compatible : Should be set to one of the following supported values:
->> +	- "samsung,exynos5250-usbdrd-phy" - for exynos5250 SoC,
->> +	- "samsung,exynos5420-usbdrd-phy" - for exynos5420 SoC.
->> +- reg : Register offset and length of USB DRD PHY register set;
->> +- clocks: Clock IDs array as required by the controller
->> +- clock-names: names of clocks correseponding to IDs in the clock property;
->> +	       Required clocks:
->> +	- phy: main PHY clock (same as USB DRD controller i.e. DWC3 IP clock),
->> +	       used for register access.
->> +	- ref: PHY's reference clock (usually crystal clock), associated by
->> +	       phy name, used to determine bit values for clock settings
->> +	       register.
->> +	Additional clock required for Exynos5420:
->> +	- usb30_sclk_100m: Additional special clock used for PHY operation
->> +			   depicted as 'sclk_usbphy30' in CMU of Exynos5420.
->> +- samsung,syscon-phandle: phandle for syscon interface, which is used to
->> +			  control pmu registers for power isolation.
-> 
-> Why to append "-phandle" to the property's name ? If this is for PMU
-> perhaps make it more explicit and name it: samsung,pmu-syscon or
-> samsung,pmureg ?
-> 
+On Tue, Apr 22, 2014 at 9:56 PM, Vladimir Murzin <murzin.v@gmail.com> wrote:
+> On Wed, Apr 23, 2014 at 09:31:29AM +0100, Ian Campbell wrote:
+>> On Thu, 2014-04-17 at 11:42 +0100, David Vrabel wrote:
+>> > On 17/04/14 09:38, Vladimir Murzin wrote:
+>> > > Xen assumes that bit operations are able to operate on 32-bit size and
+>> > > alignment [1]. For arm64 bitops are based on atomic exclusive load/store
+>> > > instructions to guarantee that changes are made atomically. However, these
+>> > > instructions require that address to be aligned to the data size. Because, by
+>> > > default, bitops operates on 64-bit size it implies that address should be
+>> > > aligned appropriately. All these lead to breakage of Xen assumption for bitops
+>> > > properties.
+>> > >
+>> > > With this patch 32-bit sized/aligned bitops is implemented.
+>> > >
+>> > > [1] http://www.gossamer-threads.com/lists/xen/devel/325613
+>> > >
+>> > > Signed-off-by: Vladimir Murzin <murzin.v@gmail.com>
+>> > > ---
+>> > >  Apart this patch other approaches were implemented:
+>> > >  1. turn bitops to be 32-bit size/align tolerant.
+>> > >     the changes are minimal, but I'm not sure how broad side effect might be
+>> > >  2. separate 32-bit size/aligned operations.
+>> > >     it exports new API, which might not be good
+>> >
+>> > I've never been particularly happy with the way the events_fifo.c uses
+>> > casts for the sync_*_bit() calls and I think we should do option 2.
+>> >
+>> > A generic implementation could be something like:
+>>
+>> It seems like there isn't currently much call for/interest in a generic
+>> 32-bit set of bitops. Since this is a regression on arm64 right now how
+>> about we simply fix it up in the Xen layer now and if in the future a
+>> common need is found we can rework to use it.
+>>
+>> We already have evtchn_fifo_{clear,set,is}_pending (although
+>> evtchn_fifo_unmask and consume_one_event need fixing to use is_pending)
+>> and evtchn_fifo_{test_and_set_,}mask, plus we would need
+>> evtchn_fifo_set_mask for consume_one_event to use instead of open
+>> coding.
+>>
+>> With that then those helpers can become something like:
+>>         #define BM(w) (unsigned long *)(w & ~0x7)
+>>         #define EVTCHN_FIFO_BIT(b, w) (BUG_ON(w&0x3), w & 0x4 ? EVTCHN_FIFO_#b + 32 : EVTCHN_FIFO_#b)
+>>         static void evtchn_fifo_clear_pending(unsigned port)
+>>         {
+>>               event_word_t *word = event_word_from_port(port);
+>>               sync_clear_bit(EVTCHN_FIFO_BIT(PENDING, word), BM(word));
+>>         }
+>> similarly for the others.
+>>
+>> If that is undesirable in the common code then wrap each existing helper
+>> in #ifndef evtchn_fifo_clean_pending and put something like the above in
+>> arch/arm64/include/asm/xen/events.h with a #define (and/or make the
+>> helpers themselves macros, or #define HAVE_XEN_FIFO_EVTCHN_ACCESSORS etc
+>> etc)
+>>
+>> We still need your patch from
+>> http://article.gmane.org/gmane.comp.emulators.xen.devel/196067 for the
+>> other unaligned bitmap case. Note that this also removes the use of BM
+>> for non-PENDING/MASKED bits, which is why it was safe for me to change
+>> it above (also it would be safe to & ~0x7 after that change anyway).
+>>
+>> Ian.
+>>
+>
+>
+> Might be dealing with it on Xen side is only way unless arm64 folks say what
+> they think... because reports related to unaligned access still appear I'll
+> put the minimally tested patch for making arm64 bitops 32-bits friendly ;)
+>
+> ---
+>  arch/arm64/lib/bitops.S | 20 ++++++++++----------
+>  1 file changed, 10 insertions(+), 10 deletions(-)
+>
+> diff --git a/arch/arm64/lib/bitops.S b/arch/arm64/lib/bitops.S
+> index 7dac371..7c3b058 100644
+> --- a/arch/arm64/lib/bitops.S
+> +++ b/arch/arm64/lib/bitops.S
+> @@ -26,14 +26,14 @@
+>   */
+>         .macro  bitop, name, instr
+>  ENTRY( \name   )
+> -       and     w3, w0, #63             // Get bit offset
+> +       and     w3, w0, #31             // Get bit offset
+>         eor     w0, w0, w3              // Clear low bits
+>         mov     x2, #1
+> -       add     x1, x1, x0, lsr #3      // Get word offset
+> +       add     x1, x1, x0, lsr #2      // Get word offset
+>         lsl     x3, x2, x3              // Create mask
+> -1:     ldxr    x2, [x1]
+> -       \instr  x2, x2, x3
+> -       stxr    w0, x2, [x1]
+> +1:     ldxr    w2, [x1]
+> +       \instr  w2, w2, w3
+> +       stxr    w0, w2, [x1]
+>         cbnz    w0, 1b
+>         ret
+>  ENDPROC(\name  )
+> @@ -41,15 +41,15 @@ ENDPROC(\name       )
+>
+>         .macro  testop, name, instr
+>  ENTRY( \name   )
+> -       and     w3, w0, #63             // Get bit offset
+> +       and     w3, w0, #31             // Get bit offset
+>         eor     w0, w0, w3              // Clear low bits
+>         mov     x2, #1
+> -       add     x1, x1, x0, lsr #3      // Get word offset
+> +       add     x1, x1, x0, lsr #2      // Get word offset
+>         lsl     x4, x2, x3              // Create mask
+> -1:     ldxr    x2, [x1]
+> +1:     ldxr    w2, [x1]
+>         lsr     x0, x2, x3              // Save old value of bit
+> -       \instr  x2, x2, x4              // toggle bit
+> -       stlxr   w5, x2, [x1]
+> +       \instr  w2, w2, w4              // toggle bit
+> +       stlxr   w5, w2, [x1]
+>         cbnz    w5, 1b
+>         dmb     ish
+>         and     x0, x0, #1
+> --
+> 1.8.3
+>
 
-There are already a couple of nodes (watchdog and sata) using
-samsung,syscon-phandle. IMHO, we should keep only property string for
-syscon node. Either we keep syscon-phandle here or change sata/watchdog
-driver to use the modified property name.
+After revisiting arm32 implementation I think there is a bug in
+proposed changes.. :(
+The changes like:
+-       add     x1, x1, x0, lsr #3      // Get word offset
++       add     x1, x1, x0, lsr #2      // Get word offset
 
--- 
-Tushar Behera
+are not necessary.
+
+arm32 implementation do
+
+        mov     r0, r0, lsr #5
+        add     r1, r1, r0, lsl #2      @ Get word offset
+
+for calculation of word offset what equivalent to r0, lsr #3
+
+I'll send v2 if someone provide feedback for that ;)
