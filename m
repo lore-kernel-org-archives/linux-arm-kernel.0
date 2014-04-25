@@ -1,30 +1,68 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Fri, 25 Apr 2014 15:41:55 -0500
-Subject: [PATCH] pinctrl: qcom: Correct name for pin 0
-Message-ID: <1398458515-15654-1-git-send-email-agross@codeaurora.org>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 25 Apr 2014 22:35:35 +0200
+Subject: [PATCH] ARM: dts: Remove vmmc-supply for mmc@12220000 on
+ arndale-octa board
+In-Reply-To: <20140425203051.GD3027@e102654-lin.cambridge.arm.com>
+References: <1398456672-3936-1-git-send-email-javi.merino@arm.com>
+ <535AC29E.8010905@gmail.com>
+ <20140425203051.GD3027@e102654-lin.cambridge.arm.com>
+Message-ID: <535AC717.40805@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix copy/paste error in pinctrl_pin_desc for pin 0.
 
-Signed-off-by: Andy Gross <agross@codeaurora.org>
----
- drivers/pinctrl/pinctrl-ipq8064.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/pinctrl/pinctrl-ipq8064.c b/drivers/pinctrl/pinctrl-ipq8064.c
-index 1700b49..54aba9f 100644
---- a/drivers/pinctrl/pinctrl-ipq8064.c
-+++ b/drivers/pinctrl/pinctrl-ipq8064.c
-@@ -20,7 +20,7 @@
- #include "pinctrl-msm.h"
- 
- static const struct pinctrl_pin_desc ipq8064_pins[] = {
--	PINCTRL_PIN(0, "GPIO_1"),
-+	PINCTRL_PIN(0, "GPIO_0"),
- 	PINCTRL_PIN(1, "GPIO_1"),
- 	PINCTRL_PIN(2, "GPIO_2"),
- 	PINCTRL_PIN(3, "GPIO_3"),
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+On 25.04.2014 22:30, Javi Merino wrote:
+> On Fri, Apr 25, 2014 at 09:16:30PM +0100, Tomasz Figa wrote:
+>> Hi Javi,
+>>
+>> On 25.04.2014 22:11, Javi Merino wrote:
+>>> d726ca2d3316 (ARM: dts: Add vmmc-supply to MMC on arndale-octa board)
+>>> added the vmmc-supply to nodes mmc at 12200000 and mmc at 12220000 of the
+>>> DT.  However, this makes the kernel fail to boot on the arndale-octa
+>>> spews:
+>>>
+>>> [    5.060000] dwmmc_exynos 12200000.mmc: num-slots property not found, assuming 1 slot is available
+>>> [    5.065000] platform 12200000.mmc: Driver dwmmc_exynos requests probe deferral
+>>> [    5.075000] dwmmc_exynos 12220000.mmc: num-slots property not found, assuming 1 slot is available
+>>> [    5.085000] platform 12220000.mmc: Driver dwmmc_exynos requests probe deferral
+>>>
+>>> And eventually hangs.  Without the vmmc-supply property in the
+>>> mmc at 12220000 node, the kernel boots again.
+>>>
+>>> Signed-off-by: Javi Merino <javi.merino@arm.com>
+>>> ---
+>>>
+>>> Hi,
+>>>
+>>> Note that I don't know *why* removing the property works, all I know
+>>> is that 3.15-rc2 fails to boot on my Arndale Octa unless I apply this
+>>> patch.
+>>
+>> Are you sure you have the required PMIC driver enabled in your kernel
+>> config?
+>
+> I configured the kernel using exynos_defconfig and that gives me:
+>
+> # CONFIG_PMIC_ADP5520 is not set
+> # CONFIG_PMIC_DA903X is not set
+>
+> Should I be using other defconfig for this board?  exynos_defconfig
+> used to work in 3.14.  Cheers,
+
+Well, unfortunately exynos_defconfig is known to be far from being 
+reasonable. Right now it should be considered just as a base to 
+configure the kernel for Exynos SoCs. Most of board specific options 
+(and many of SoC-wide ones) need to be selected manually.
+
+Anyway, with the number of Exynos boards supported in mainline, I don't 
+think we will be ever going to enable all options for all the supported 
+boards by default in defconfig, especially considering the fact that we 
+will be moving to generic multi_v7_defconfig and likely dropping 
+exynos_defconfig completely.
+
+As for now, I believe you should just make sure yourself that any 
+options relevant to your board are enabled.
+
+Best regards,
+Tomasz
