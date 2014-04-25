@@ -1,55 +1,101 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 25 Apr 2014 09:55:39 -0500
-Subject: [PATCH v2 01/18] usb: host: xhci-plat: Sort the headers in
- alphabetic order
-In-Reply-To: <1398434836-18908-2-git-send-email-gregory.clement@free-electrons.com>
-References: <1398434836-18908-1-git-send-email-gregory.clement@free-electrons.com>
- <1398434836-18908-2-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140425145539.GB29632@saruman.home>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Fri, 25 Apr 2014 16:56:31 +0200
+Subject: [PATCH v6 1/3] tty/serial: Add GPIOLIB helpers for controlling
+ modem lines
+In-Reply-To: <535669DB.8010109@visionsystems.de>
+References: <1394469951-21192-1-git-send-email-richard.genoud@gmail.com>
+ <1394469951-21192-2-git-send-email-richard.genoud@gmail.com>
+ <535669DB.8010109@visionsystems.de>
+Message-ID: <CACQ1gAiDw3XcspRwSEEX9e9rH=qFMvyW2ic+SmugMDi8kNKEaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 25, 2014 at 04:06:59PM +0200, Gregory CLEMENT wrote:
-> Sorting the headers in alphabetic order will help to reduce the conflict
-> when adding new headers later.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
+2014-04-22 15:08 GMT+02:00 Yegor Yefremov <yegor_sub1@visionsystems.de>:
+> On 10.03.2014 17:45, Richard Genoud wrote:
+>> This patch add some helpers to control modem lines (CTS/RTS/DSR...) via
+>> GPIO.
+>> This will be useful for many boards which have a serial controller that
+>> only handle CTS/RTS pins (or even just RX/TX).
+>>
+>> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+>
+> ....
+>
+>> +
+>> +struct mctrl_gpios {
+>> +     struct gpio_desc *gpio[UART_GPIO_MAX];
+>> +};
+>> +
+>> +static const struct {
+>> +     const char *name;
+>> +     unsigned int mctrl;
+>> +     bool dir_out;
+>> +} mctrl_gpios_desc[UART_GPIO_MAX] = {
+>> +     { "cts", TIOCM_CTS, false, },
+>> +     { "dsr", TIOCM_DSR, false, },
+>> +     { "dcd", TIOCM_CD, false, },
+>> +     { "rng", TIOCM_RNG, false, },
+>> +     { "rts", TIOCM_RTS, true, },
+>> +     { "dtr", TIOCM_DTR, true, },
+>> +     { "out1", TIOCM_OUT1, true, },
+>> +     { "out2", TIOCM_OUT2, true, },
+>> +};
+>> +
+>> +void mctrl_gpio_set(struct mctrl_gpios *gpios, unsigned int mctrl)
+>> +{
+>> +     enum mctrl_gpio_idx i;
+>> +
+>> +     if (IS_ERR_OR_NULL(gpios))
+>> +             return;
+>> +
+>> +     for (i = 0; i < UART_GPIO_MAX; i++)
+>> +             if (!IS_ERR_OR_NULL(gpios->gpio[i]) &&
+>> +                 mctrl_gpios_desc[i].dir_out)
+>> +                     gpiod_set_value(gpios->gpio[i],
+>> +                                     !!(mctrl & mctrl_gpios_desc[i].mctrl));
+>> +}
+>> +EXPORT_SYMBOL_GPL(mctrl_gpio_set);
+>> +
+>> +struct gpio_desc *mctrl_gpio_to_gpiod(struct mctrl_gpios *gpios,
+>> +                                   enum mctrl_gpio_idx gidx)
+>> +{
+>> +     if (!IS_ERR_OR_NULL(gpios) && !IS_ERR_OR_NULL(gpios->gpio[gidx]))
+>> +             return gpios->gpio[gidx];
+>> +     else
+>> +             return NULL;
+>> +}
+>> +EXPORT_SYMBOL_GPL(mctrl_gpio_to_gpiod);
+>> +
+>> +unsigned int mctrl_gpio_get(struct mctrl_gpios *gpios, unsigned int *mctrl)
+>> +{
+>> +     enum mctrl_gpio_idx i;
+>> +
+>> +     /*
+>> +      * return it unchanged if the structure is not allocated
+>> +      */
+>> +     if (IS_ERR_OR_NULL(gpios))
+>> +             return *mctrl;
+>> +
+>> +     for (i = 0; i < UART_GPIO_MAX; i++) {
+>> +             if (!IS_ERR_OR_NULL(gpios->gpio[i]) &&
+>> +                 !mctrl_gpios_desc[i].dir_out) {
+>> +                     if (gpiod_get_value(gpios->gpio[i]))
+>> +                             *mctrl |= mctrl_gpios_desc[i].mctrl;
+>> +                     else
+>> +                             *mctrl &= ~mctrl_gpios_desc[i].mctrl;
+>> +             }
+>> +     }
+>> +
+>> +     return *mctrl;
+>> +}
+>> +EXPORT_SYMBOL_GPL(mctrl_gpio_get);
+>
+> Should this routine be renamed to msr_gpio_get() or perhaps better to give all values (inputs and outputs)?
+>
+> I'm trying to port this approach to omap-serial to implement RS485 switching. I need to know if RTS is already on or not and set it accordingly.
+>
+> What would be the best solution for this task using this new API?
+Sorry, but I don't really get what you're trying to do.
+Could you explain a little bit more ?
 
-Acked-by: Felipe Balbi <balbi@ti.com>
-
->  drivers/usb/host/xhci-plat.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-> index 151901ce1ba9..f5351af4b2c5 100644
-> --- a/drivers/usb/host/xhci-plat.c
-> +++ b/drivers/usb/host/xhci-plat.c
-> @@ -11,11 +11,11 @@
->   * version 2 as published by the Free Software Foundation.
->   */
->  
-> -#include <linux/platform_device.h>
-> +#include <linux/dma-mapping.h>
->  #include <linux/module.h>
-> -#include <linux/slab.h>
->  #include <linux/of.h>
-> -#include <linux/dma-mapping.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/slab.h>
->  
->  #include "xhci.h"
->  
-> -- 
-> 1.8.1.2
-> 
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140425/13344dad/attachment-0001.sig>
+Richard.
