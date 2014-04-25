@@ -1,119 +1,120 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:39:28 +0100
-Subject: [PATCH 100/222] net:fec: remove delayed work
+Date: Fri, 25 Apr 2014 12:39:33 +0100
+Subject: [PATCH 101/222] net:fec: fix interrupt handling races
 In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
 References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WdeTY-0007Js-23@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WdeTd-0007Jx-5i@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We no longer need a delayed work in this driver, since we no longer have
-the requirement to delay any work - instead, use a work_struct directly.
+While running: while :; do iperf -c <HOST> -P 4; done, transmit timeouts
+are regularly reported.  With the tx ring dumping in place, we can see
+that all entries are in use, and the hardware has finished transmitting
+these packets.  However, the driver has not reclaimed these ring
+entries.
+
+This can occur if the interrupt handler is invoked at the wrong moment -
+eg:
+
+	CPU0				CPU1
+	fec_enet_tx()
+					interrupt, IEVENT = FEC_ENET_TXF
+					FEC_ENET_TXF cleared
+					napi_schedule_prep()
+	napi_complete()
+
+The result is that we clear the transmit interrupt, but we don't trigger
+any cleaning of the transmit ring.  Instead, use a different strategy:
+
+- When receiving a transmit or receive interrupt, disable both tx and rx
+  interrupts, but do not acknowledge them.  Schedule a napi poll.  Don't
+  loop.
+
+- When we are polled, read IEVENT, acknowledging the pending transmit
+  and receive interrupts, before then going on to process the
+  appropriate rings.
+
+This allows us to avoid the race, and has a number of other advantages:
+- we cut down on the number of transmit interrupts we have to process.
+- we only look at the rings which have pending events.
+- we gain additional throughput: the iperf total bandwidth increases
+  from about 180Mbps to 240Mbps:
+
+[  3]  0.0-10.0 sec  68.1 MBytes  57.0 Mbits/sec
+[  5]  0.0-10.0 sec  72.4 MBytes  60.5 Mbits/sec
+[  4]  0.0-10.1 sec  76.1 MBytes  63.5 Mbits/sec
+[  6]  0.0-10.1 sec  71.9 MBytes  59.9 Mbits/sec
+[SUM]  0.0-10.1 sec   288 MBytes   241 Mbits/sec
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/net/ethernet/freescale/fec.h      |  8 ++------
- drivers/net/ethernet/freescale/fec_main.c | 34 +++++++++++++------------------
- 2 files changed, 16 insertions(+), 26 deletions(-)
+ drivers/net/ethernet/freescale/fec_main.c | 40 +++++++++++++++++--------------
+ 1 file changed, 22 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/net/ethernet/freescale/fec.h b/drivers/net/ethernet/freescale/fec.h
-index d124a19e3fe8..aecc46c33a82 100644
---- a/drivers/net/ethernet/freescale/fec.h
-+++ b/drivers/net/ethernet/freescale/fec.h
-@@ -256,11 +256,6 @@ struct bufdesc_ex {
- #define FLAG_RX_CSUM_ENABLED	(BD_ENET_RX_ICE | BD_ENET_RX_PCR)
- #define FLAG_RX_CSUM_ERROR	(BD_ENET_RX_ICE | BD_ENET_RX_PCR)
- 
--struct fec_enet_delayed_work {
--	struct delayed_work delay_work;
--	bool timeout;
--};
--
- /* The FEC buffer descriptors track the ring buffers.  The rx_bd_base and
-  * tx_bd_base always point to the base of the buffer descriptors.  The
-  * cur_rx and cur_tx point to the currently available buffer.
-@@ -319,6 +314,8 @@ struct fec_enet_private {
- 	struct	napi_struct napi;
- 	int	csum_flags;
- 
-+	struct work_struct tx_timeout_work;
-+
- 	struct ptp_clock *ptp_clock;
- 	struct ptp_clock_info ptp_caps;
- 	unsigned long last_overflow_check;
-@@ -331,7 +328,6 @@ struct fec_enet_private {
- 	int hwts_rx_en;
- 	int hwts_tx_en;
- 	struct timer_list time_keep;
--	struct fec_enet_delayed_work delay_work;
- 	struct regulator *reg_phy;
- };
- 
 diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index bf186cc54891..3de6634867a6 100644
+index 3de6634867a6..0d1580ebaede 100644
 --- a/drivers/net/ethernet/freescale/fec_main.c
 +++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -740,31 +740,25 @@ fec_timeout(struct net_device *ndev)
- 
- 	ndev->stats.tx_errors++;
- 
--	fep->delay_work.timeout = true;
--	schedule_delayed_work(&(fep->delay_work.delay_work), 0);
-+	schedule_work(&fep->tx_timeout_work);
- }
- 
--static void fec_enet_work(struct work_struct *work)
-+static void fec_enet_timeout_work(struct work_struct *work)
+@@ -1065,29 +1065,25 @@ fec_enet_interrupt(int irq, void *dev_id)
  {
- 	struct fec_enet_private *fep =
--		container_of(work,
--			     struct fec_enet_private,
--			     delay_work.delay_work.work);
-+		container_of(work, struct fec_enet_private, tx_timeout_work);
- 	struct net_device *ndev = fep->netdev;
- 
--	if (fep->delay_work.timeout) {
--		fep->delay_work.timeout = false;
--		rtnl_lock();
--		if (netif_device_present(ndev) || netif_running(ndev)) {
--			napi_disable(&fep->napi);
--			netif_tx_lock_bh(ndev);
--			fec_restart(ndev);
--			netif_wake_queue(ndev);
--			netif_tx_unlock_bh(ndev);
--			napi_enable(&fep->napi);
--		}
--		rtnl_unlock();
-+	rtnl_lock();
-+	if (netif_device_present(ndev) || netif_running(ndev)) {
-+		napi_disable(&fep->napi);
-+		netif_tx_lock_bh(ndev);
-+		fec_restart(ndev);
-+		netif_wake_queue(ndev);
-+		netif_tx_unlock_bh(ndev);
-+		napi_enable(&fep->napi);
- 	}
-+	rtnl_unlock();
- }
- 
- static void
-@@ -2312,7 +2306,7 @@ fec_probe(struct platform_device *pdev)
- 	if (fep->bufdesc_ex && fep->ptp_clock)
- 		netdev_info(ndev, "registered PHC device %d\n", fep->dev_id);
- 
--	INIT_DELAYED_WORK(&(fep->delay_work.delay_work), fec_enet_work);
-+	INIT_WORK(&fep->tx_timeout_work, fec_enet_timeout_work);
- 	return 0;
- 
- failed_register:
-@@ -2345,7 +2339,7 @@ fec_drv_remove(struct platform_device *pdev)
- 	struct net_device *ndev = platform_get_drvdata(pdev);
+ 	struct net_device *ndev = dev_id;
  	struct fec_enet_private *fep = netdev_priv(ndev);
++	const unsigned napi_mask = FEC_ENET_RXF | FEC_ENET_TXF;
+ 	uint int_events;
+ 	irqreturn_t ret = IRQ_NONE;
  
--	cancel_delayed_work_sync(&(fep->delay_work.delay_work));
-+	cancel_work_sync(&fep->tx_timeout_work);
- 	unregister_netdev(ndev);
- 	fec_enet_mii_remove(fep);
- 	del_timer_sync(&fep->time_keep);
+-	do {
+-		int_events = readl(fep->hwp + FEC_IEVENT);
+-		writel(int_events, fep->hwp + FEC_IEVENT);
++	int_events = readl(fep->hwp + FEC_IEVENT);
++	writel(int_events & ~napi_mask, fep->hwp + FEC_IEVENT);
+ 
+-		if (int_events & (FEC_ENET_RXF | FEC_ENET_TXF)) {
+-			ret = IRQ_HANDLED;
++	if (int_events & napi_mask) {
++		ret = IRQ_HANDLED;
+ 
+-			/* Disable the RX interrupt */
+-			if (napi_schedule_prep(&fep->napi)) {
+-				writel(FEC_RX_DISABLED_IMASK,
+-					fep->hwp + FEC_IMASK);
+-				__napi_schedule(&fep->napi);
+-			}
+-		}
++		/* Disable the NAPI interrupts */
++		writel(FEC_ENET_MII, fep->hwp + FEC_IMASK);
++		napi_schedule(&fep->napi);
++	}
+ 
+-		if (int_events & FEC_ENET_MII) {
+-			ret = IRQ_HANDLED;
+-			complete(&fep->mdio_done);
+-		}
+-	} while (int_events);
++	if (int_events & FEC_ENET_MII) {
++		ret = IRQ_HANDLED;
++		complete(&fep->mdio_done);
++	}
+ 
+ 	return ret;
+ }
+@@ -1095,8 +1091,16 @@ fec_enet_interrupt(int irq, void *dev_id)
+ static int fec_enet_rx_napi(struct napi_struct *napi, int budget)
+ {
+ 	struct net_device *ndev = napi->dev;
+-	int pkts = fec_enet_rx(ndev, budget);
+ 	struct fec_enet_private *fep = netdev_priv(ndev);
++	int pkts;
++
++	/*
++	 * Clear any pending transmit or receive interrupts before
++	 * processing the rings to avoid racing with the hardware.
++	 */
++	writel(FEC_ENET_RXF | FEC_ENET_TXF, fep->hwp + FEC_IEVENT);
++
++	pkts = fec_enet_rx(ndev, budget);
+ 
+ 	fec_enet_tx(ndev);
+ 
 -- 
 1.8.3.1
