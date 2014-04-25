@@ -1,33 +1,56 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 25 Apr 2014 22:25:36 +0200
-Subject: [PATCH v2 03/18] usb: host: xhci-plat: Add support for the
- Armada 38x
-In-Reply-To: <5392399.GiPjM0CIZ0@wuerfel>
-References: <1398434836-18908-1-git-send-email-gregory.clement@free-electrons.com>
- <1398434836-18908-4-git-send-email-gregory.clement@free-electrons.com>
- <5392399.GiPjM0CIZ0@wuerfel>
-Message-ID: <20140425222536.430d5c4d@skate>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Fri, 25 Apr 2014 15:24:06 -0500
+Subject: can problems on socfpga [was Re: [PATCH v2 4/6] ARM: socfpga:
+ dts: add can0+1]
+In-Reply-To: <20140425195319.GA3677@amd.pavel.ucw.cz>
+References: <1396422700-3962-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1396422700-3962-4-git-send-email-s.trumtrar@pengutronix.de>
+ <20140404102815.GA9242@amd.pavel.ucw.cz>
+ <20140425195319.GA3677@amd.pavel.ucw.cz>
+Message-ID: <1398457446.26387.0.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd Bergmann,
+On Fri, 2014-04-25 at 21:53 +0200, ZY - pavel wrote:
+> Hi!
+> 
+> > > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> > 
+> > I have had similar patch here, except that it only listed 2 interrupts
+> > for each d_can controller.
+> > 
+> > Otherwise it looks identical.
+> > 
+> > Reviewed-by: Pavel Machek <pavel@denx.de>
+> 
+> Actually, does it work for you? Here it produces warnings during boot
+> 
+> c_can_platform ffc00000.d_can: invalid resource
+> c_can_platform ffc00000.d_can: control memory is not used for raminit
+> c_can_platform ffc00000.d_can: c_can_platform device registered
+> (regs=9085c000, irq=163)
+> ...
+> can: controller area network core (rev 20120528 abi 9)
+> NET: Registered protocol family 29
+> can: raw protocol (rev 20120528)
+> can: broadcast manager protocol (rev 20120528 t)
+> can: netlink gateway (rev 20130117) max_hops=1
+> 
+> . Then can0 is correctly registered, and seems to even receive
+> packets, but only when enter is pressed on serial console... which is
+> kind of weird. I suspected irq problems, but same symptomps with
+> "irqpoll" -- it leads to generate 2000 irqs/second, but still waits
+> for enter.
+> 
+> [Aha, and we have just two interrupts listed, but I don't think that
+> explains all the problems. Unfortunately, that particular target uses
+> human for remote power switch...].
+> 
+> Any ideas?
 
-On Fri, 25 Apr 2014 22:01:51 +0200, Arnd Bergmann wrote:
+CC'ing Thor Thayer. He's done the CAN testing on the SOCFPGA platform.
 
-> I think you're doing it the wrong way around: You have a specialized
-> version of the generic xhci-plat driver. The normal way to handle this
-> is to have a loadable module that contains all the Armada specific
-> code and that registers a platform_driver. In the probe() function of
-> that driver, you can do the platform specific setup and then call
-> the generic xhci_plat_probe() function, which of course has to
-> be provided using EXPORT_SYMBOL_GPL.
-
-You should have a look at the v1 Gregory sent: it was implementing
-exactly what you suggest here, but Felipe explicitly requested the
-patches to be changed like is now proposed in v2.
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Dinh
+> 
+> Thanks,
+> 									Pavel
