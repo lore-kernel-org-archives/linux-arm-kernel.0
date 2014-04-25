@@ -1,39 +1,30 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:35:43 +0100
-Subject: [PATCH 056/222] ARM: l2c: exynos: remove cache size override
+Date: Fri, 25 Apr 2014 12:35:48 +0100
+Subject: [PATCH 057/222] ARM: l2c: nomadik: remove cache size override
 In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
 References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WdePv-0007Gt-2o@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WdeQ0-0007Gy-62@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-exynos/exynos.c | 5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
+ arch/arm/mach-nomadik/cpu-8815.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-index e6828fb46034..a51bf25e7523 100644
---- a/arch/arm/mach-exynos/exynos.c
-+++ b/arch/arm/mach-exynos/exynos.c
-@@ -32,9 +32,6 @@
- #include "mfc.h"
- #include "regs-pmu.h"
- 
--#define L2_AUX_VAL 0x3c470001
--#define L2_AUX_MASK 0xc200ffff
--
- static struct map_desc exynos4_iodesc[] __initdata = {
- 	{
- 		.virtual	= (unsigned long)S3C_VA_SYS,
-@@ -323,7 +320,7 @@ static int __init exynos4_l2x0_cache_init(void)
+diff --git a/arch/arm/mach-nomadik/cpu-8815.c b/arch/arm/mach-nomadik/cpu-8815.c
+index 4a1065e41e9c..0f245bcc6b7e 100644
+--- a/arch/arm/mach-nomadik/cpu-8815.c
++++ b/arch/arm/mach-nomadik/cpu-8815.c
+@@ -147,7 +147,7 @@ static void __init cpu8815_init_of(void)
  {
- 	int ret;
- 
--	ret = l2x0_of_init(L2_AUX_VAL, L2_AUX_MASK);
-+	ret = l2x0_of_init(0x3c400001, 0xc20fffff);
- 	if (ret)
- 		return ret;
- 
+ #ifdef CONFIG_CACHE_L2X0
+ 	/* At full speed latency must be >=2, so 0x249 in low bits */
+-	l2x0_of_init(0x00730249, 0xfe000fff);
++	l2x0_of_init(0x00700249, 0xfe0fefff);
+ #endif
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
 -- 
 1.8.3.1
