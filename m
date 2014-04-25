@@ -1,67 +1,115 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 25 Apr 2014 13:50:25 +0200
-Subject: [PATCH v2 3/6] ARM: dts: Device tree for AXM55xx.
-In-Reply-To: <20140425094343.GA3160@swsaberg01>
-References: <cover.1398335771.git.anders.berg@lsi.com>
- <2386bd1367aa44741979461358a72dec89608597.1398335771.git.anders.berg@lsi.com>
- <CACRpkdbU6UashxCuPMDjEB_nbB=mXicGpjJy=HGC6r3qfxCtVQ@mail.gmail.com>
- <20140424174741.GA23444@swsaberg01>
- <CACRpkdZ1CA4mqcd5MA5HFmXSeGp-wspA0M6wnPbAsgL_gX76Fw@mail.gmail.com>
- <20140425094343.GA3160@swsaberg01>
-Message-ID: <CACRpkdaqPx3=qvUtsg44rBk+ZiscUg54HmNgETcei0LzfE9uOQ@mail.gmail.com>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Fri, 25 Apr 2014 12:50:26 +0100
+Subject: [PATCH 177/222] ARM: l2c: exynos: convert to common l2c310 early
+ resume functionality
+In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
+References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
+Message-ID: <E1WdeeA-0007PF-5m@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 25, 2014 at 11:43 AM, Anders Berg <anders.berg@lsi.com> wrote:
-> On Fri, Apr 25, 2014 at 11:16:18AM +0200, Linus Walleij wrote:
->> On Thu, Apr 24, 2014 at 7:47 PM, Anders Berg <anders.berg@lsi.com> wrote:
->> > On Thu, Apr 24, 2014 at 03:24:14PM +0200, Linus Walleij wrote:
->>
->> >> One interrupt per CPU core?
->> >>
->> >> The drivers for these blocks will really just grab the first IRQ and
->> >> then I guess they
->> >> will only be able to execute on CPU0.
->> >>
->> >> It's definately correct to list all the IRQs here, but how do you envision
->> >> the drivers making use of them in the long run?
->> >
->> > It's one interrupt line per input pin (so with the current driver only the first pin
->> > is usable as interrupt source).
->>
->> Hm I'm not sure I understand what a "pin" is in this concept ...
->> being maintainer of the pin control subsystem and all that really
->> triggers my interest.
->>
->
-> Ok, maybe should replace "pin" with "GPIO" in my previous comment.
->
-> So, a clarification. In one of the PL061 blocks (named gpio0 in the dts) there
-> is a separate interrupt per GPIO (I assume the motivation here is to enable to
-> control irq affinity per GPIO), where as the other block has a more standard
-> configuration with a single interrupt for all 8 GPIOs in that block.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/mach-exynos/common.h     |  1 -
+ arch/arm/mach-exynos/exynos.c     | 12 +-----------
+ arch/arm/mach-exynos/sleep.S      | 30 +-----------------------------
+ arch/arm/plat-samsung/s5p-sleep.S |  1 -
+ 4 files changed, 2 insertions(+), 42 deletions(-)
 
-OK! I get it. Thus this is not a stock PL061, but a version modified to
-generate a separate IRQ line per GPIO line.
-
-This means that you can only get a proper, working IRQ from the
-first line on gpio0 right? All other IRQs will be ignored.
-
-I see no problem in augmenting the driver to handle this
-if #irqs == 8, the big change needs to happen in drivers/amba/bus.c
-that has no way to pass any more than two IRQs atm.
-
-I guess the best is to augment struct amba_device with a field
-struct resource *resource and num_resources like platform_device
-instead of the hard-coded single resource for iomem and two
-hardcoded IRQ placeholders, so that an arbitrary amount of
-resources can be added to an amba_device as well. But that
-may be quite a lot of work. (Russell will know which direction to
-take here.)
-
-A simpler, local approach is to add some custom DT parsing
-code to handle this in the pl061 driver, but that feels a bit
-hacky.
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+index 9ef3f83efaff..88c619d1e145 100644
+--- a/arch/arm/mach-exynos/common.h
++++ b/arch/arm/mach-exynos/common.h
+@@ -55,7 +55,6 @@ enum sys_powerdown {
+ 	NUM_SYS_POWERDOWN,
+ };
+ 
+-extern unsigned long l2x0_regs_phys;
+ struct exynos_pmu_conf {
+ 	void __iomem *reg;
+ 	unsigned int val[NUM_SYS_POWERDOWN];
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index a51bf25e7523..fbfc29df3299 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -318,17 +318,7 @@ core_initcall(exynos_core_init);
+ 
+ static int __init exynos4_l2x0_cache_init(void)
+ {
+-	int ret;
+-
+-	ret = l2x0_of_init(0x3c400001, 0xc20fffff);
+-	if (ret)
+-		return ret;
+-
+-	if (IS_ENABLED(CONFIG_S5P_SLEEP)) {
+-		l2x0_regs_phys = virt_to_phys(&l2x0_saved_regs);
+-		clean_dcache_area(&l2x0_regs_phys, sizeof(unsigned long));
+-	}
+-	return 0;
++	return l2x0_of_init(0x3c400001, 0xc20fffff);
+ }
+ early_initcall(exynos4_l2x0_cache_init);
+ 
+diff --git a/arch/arm/mach-exynos/sleep.S b/arch/arm/mach-exynos/sleep.S
+index 7e0af530511e..108a45f4bb62 100644
+--- a/arch/arm/mach-exynos/sleep.S
++++ b/arch/arm/mach-exynos/sleep.S
+@@ -16,8 +16,6 @@
+  */
+ 
+ #include <linux/linkage.h>
+-#include <asm/asm-offsets.h>
+-#include <asm/hardware/cache-l2x0.h>
+ 
+ #define CPU_MASK	0xff0ffff0
+ #define CPU_CORTEX_A9	0x410fc090
+@@ -53,33 +51,7 @@ ENTRY(exynos_cpu_resume)
+ 	and	r0, r0, r1
+ 	ldr	r1, =CPU_CORTEX_A9
+ 	cmp	r0, r1
+-	bne	skip_l2_resume
+-	adr	r0, l2x0_regs_phys
+-	ldr	r0, [r0]
+-	cmp	r0, #0
+-	beq	skip_l2_resume
+-	ldr	r1, [r0, #L2X0_R_PHY_BASE]
+-	ldr	r2, [r1, #L2X0_CTRL]
+-	tst	r2, #0x1
+-	bne	skip_l2_resume
+-	ldr	r2, [r0, #L2X0_R_AUX_CTRL]
+-	str	r2, [r1, #L2X0_AUX_CTRL]
+-	ldr	r2, [r0, #L2X0_R_TAG_LATENCY]
+-	str	r2, [r1, #L310_TAG_LATENCY_CTRL]
+-	ldr	r2, [r0, #L2X0_R_DATA_LATENCY]
+-	str	r2, [r1, #L310_DATA_LATENCY_CTRL]
+-	ldr	r2, [r0, #L2X0_R_PREFETCH_CTRL]
+-	str	r2, [r1, #L310_PREFETCH_CTRL]
+-	ldr	r2, [r0, #L2X0_R_PWR_CTRL]
+-	str	r2, [r1, #L310_POWER_CTRL]
+-	mov	r2, #1
+-	str	r2, [r1, #L2X0_CTRL]
+-skip_l2_resume:
++	bleq	l2c310_early_resume
+ #endif
+ 	b	cpu_resume
+ ENDPROC(exynos_cpu_resume)
+-#ifdef CONFIG_CACHE_L2X0
+-	.globl l2x0_regs_phys
+-l2x0_regs_phys:
+-	.long	0
+-#endif
+diff --git a/arch/arm/plat-samsung/s5p-sleep.S b/arch/arm/plat-samsung/s5p-sleep.S
+index c5001659bdf8..25c68ceb9e2b 100644
+--- a/arch/arm/plat-samsung/s5p-sleep.S
++++ b/arch/arm/plat-samsung/s5p-sleep.S
+@@ -22,7 +22,6 @@
+ */
+ 
+ #include <linux/linkage.h>
+-#include <asm/asm-offsets.h>
+ 
+ 	.data
+ 	.align
+-- 
+1.8.3.1
