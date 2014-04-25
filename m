@@ -1,37 +1,25 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 25 Apr 2014 13:01:30 -0500
-Subject: [PATCH v7 3/3] ARM: Check if a CPU has gone offline
-In-Reply-To: <1398446835-5532-4-git-send-email-ashwin.chaugule@linaro.org>
-References: <1398446835-5532-1-git-send-email-ashwin.chaugule@linaro.org>
- <1398446835-5532-4-git-send-email-ashwin.chaugule@linaro.org>
-Message-ID: <CAL_JsqKYXL1Egp=hF1ykESjQiMdFBNa0GAQsvZXoSsmRtHr8Zw@mail.gmail.com>
+Date: Fri, 25 Apr 2014 13:19:48 -0500
+Subject: [PATCH 0/3] arm64: Default to non-coherent DMA ops
+In-Reply-To: <1398447254-18527-1-git-send-email-catalin.marinas@arm.com>
+References: <1398447254-18527-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <CAL_JsqLbZDq36kfayBnnXw3UYwu_02WNCS2bqKS8iEzrG_CJeg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 25, 2014 at 12:27 PM, Ashwin Chaugule
-<ashwin.chaugule@linaro.org> wrote:
-> PSCIv0.2 adds a new function called AFFINITY_INFO, which
-> can be used to query if a specified CPU has actually gone
-> offline. Calling this function via cpu_kill ensures that
-> a CPU has quiesced after a call to cpu_die.
->
-> Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
-> Reviewed-by: Rob Herring <robh@kernel.org>
-> ---
->  arch/arm/kernel/psci_smp.c | 32 ++++++++++++++++++++++++++++++++
->  include/uapi/linux/psci.h  |  5 +++++
->  2 files changed, 37 insertions(+)
+On Fri, Apr 25, 2014 at 12:34 PM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> Following recent discussions and patch from Ritesh, I'm planning to
+> align the default DMA ops with 32-bit arm and make them non-coherent. In
+> addition, we need to make sure that devices marked explicitly as
+> coherent use the correct dma ops. Until Santosh's DMA patches get
+> reviewed/merged, the temporary solution is bus notifiers which check the
+> "dma-coherent" property and set the right dma ops.
 
-[...]
-
-> +retry_once:
-> +       err = psci_ops.affinity_info(cpu_logical_map(cpu), 0);
-> +
-> +       if (err != PSCI_AFFINITY_INFO_RET_OFF) {
-> +               if (!retry++) {
-> +                       msleep(100);
-
-It would be better to sleep 10ms 10 times rather than a single 100ms
-sleep. And please do this with a loop rather than a goto.
+Is this for 3.15? If not, don't you think Santosh's patches will be
+ready for 3.16. I need to take another look, but I'm pretty much happy
+with them. My only issue really is whether we want to spread the use
+of dma-coherent. Will did call my cute little property a hack, but I
+have yet to see anything better.
 
 Rob
