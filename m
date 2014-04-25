@@ -1,50 +1,26 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Fri, 25 Apr 2014 10:52:16 +0200
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 25 Apr 2014 11:00:50 +0200
 Subject: [GIT PULL v3] Xilinx Zynq changes for v3.15
 In-Reply-To: <53340E87.60004@monstr.eu>
-References: <53061EBA.1080002@monstr.eu>
- <20140317044453.GA18210@quad.lixom.net> <532712D2.4020004@monstr.eu>
- <201403270228.19976.arnd@arndb.de> <53340E87.60004@monstr.eu>
-Message-ID: <535A2240.5060005@monstr.eu>
+References: <53061EBA.1080002@monstr.eu> <201403270228.19976.arnd@arndb.de>
+ <53340E87.60004@monstr.eu>
+Message-ID: <201404251100.51068.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-any response on this one?
-
-Thanks,
-Michal
-
-On 03/27/2014 12:41 PM, Michal Simek wrote:
-> On 03/27/2014 02:28 AM, Arnd Bergmann wrote:
->> On Monday 17 March 2014, Michal Simek wrote:
->>> please pull these changes to your arm-soc tree. This branch is based
->>> on zynq/dt branch.
->>> Based on my discussion with Olof I have removed zynq-ocm driver
->>> from this pull request and we will investigate different solution
->>>
->>> Changes in v3: Remove OCM driver from pull request
->>> Changes in v2: Fix incorrect git repo url
->>
->> I have pulled it into the next/cleanup2 branch now, sorry for the
->> delay. Unfortunately I noticed one more thing I didn't like and
->> did not pull the final patch of the branch, but only the other patches.
-> 
-> ok. thanks for pulling.
-> 
->> The problem I noticed is the soc-bus support: I noticed that you
->> are populating the entire device tree under the soc node, including
->> any top-level devices, and that the "xlnx,zynq-devcfg-1.00.a"
->> node is part of that.
->>
->> I think what you should try instead is to have only the
->> amba bus and its children as part of the soc-bus, but other
->> top-level devices (e.g. board clocks) outside of the soc
->> node. Also, it would make sense to merge the devcfg stuff
->> with the amba node, since it's really what makes up the
->> soc. Does that make sense to you, or do you have reason to
->> believe it won't work?
+On Thursday 27 March 2014, Michal Simek wrote:
+> > The problem I noticed is the soc-bus support: I noticed that you
+> > are populating the entire device tree under the soc node, including
+> > any top-level devices, and that the "xlnx,zynq-devcfg-1.00.a"
+> > node is part of that.
+> >
+> > I think what you should try instead is to have only the
+> > amba bus and its children as part of the soc-bus, but other
+> > top-level devices (e.g. board clocks) outside of the soc
+> > node. Also, it would make sense to merge the devcfg stuff
+> > with the amba node, since it's really what makes up the
+> > soc. Does that make sense to you, or do you have reason to
+> > believe it won't work?
 > 
 > No problem to postpone to the next release and discuss it more.
 > 
@@ -97,25 +73,13 @@ On 03/27/2014 12:41 PM, Michal Simek wrote:
 > parent to ensure that these devices are not listed there.
 > 
 > Please correct me if something doesn't fit.
-> 
-> Thanks,
-> Michal
-> 
-> 
 
+I don't have a strong opinion on things that are defined in FPGA
+logic, they could be below soc0, in a separate soc1 node or
+in some other top-level bus.
 
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+What I was mostly thinking of is board-level devices that are
+not part of the soc address hierarchy, such as external clocks
+or leds that just use GPIO lines.
 
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140425/57a8aa85/attachment-0001.sig>
+	Arnd
