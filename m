@@ -1,110 +1,191 @@
-From: yegorslists@googlemail.com (Yegor Yefremov)
-Date: Fri, 25 Apr 2014 20:37:10 +0200
-Subject: [PATCH v6 1/3] tty/serial: Add GPIOLIB helpers for controlling
- modem lines
-In-Reply-To: <CACQ1gAiDw3XcspRwSEEX9e9rH=qFMvyW2ic+SmugMDi8kNKEaQ@mail.gmail.com>
-References: <1394469951-21192-1-git-send-email-richard.genoud@gmail.com>
- <1394469951-21192-2-git-send-email-richard.genoud@gmail.com>
- <535669DB.8010109@visionsystems.de>
- <CACQ1gAiDw3XcspRwSEEX9e9rH=qFMvyW2ic+SmugMDi8kNKEaQ@mail.gmail.com>
-Message-ID: <CAGm1_kvd7G0HthX1dRqRK52nDSPfDqHwAZ2EDn+CUbSpzJv-Mw@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 25 Apr 2014 19:38:48 +0100
+Subject: [PATCH v3 part1 04/11] ARM64 / ACPI: Introduce arm-core.c and
+ its related head file
+In-Reply-To: <20140425165320.GD1186@xora-haswell>
+References: <1398432017-8506-1-git-send-email-hanjun.guo@linaro.org>
+ <1398432017-8506-5-git-send-email-hanjun.guo@linaro.org>
+ <20140425155147.GA28819@e106331-lin.cambridge.arm.com>
+ <20140425165320.GD1186@xora-haswell>
+Message-ID: <20140425183848.GE28819@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 25, 2014 at 4:56 PM, Richard Genoud
-<richard.genoud@gmail.com> wrote:
-> 2014-04-22 15:08 GMT+02:00 Yegor Yefremov <yegor_sub1@visionsystems.de>:
->> On 10.03.2014 17:45, Richard Genoud wrote:
->>> This patch add some helpers to control modem lines (CTS/RTS/DSR...) via
->>> GPIO.
->>> This will be useful for many boards which have a serial controller that
->>> only handle CTS/RTS pins (or even just RX/TX).
->>>
->>> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
->>
->> ....
->>
->>> +
->>> +struct mctrl_gpios {
->>> +     struct gpio_desc *gpio[UART_GPIO_MAX];
->>> +};
->>> +
->>> +static const struct {
->>> +     const char *name;
->>> +     unsigned int mctrl;
->>> +     bool dir_out;
->>> +} mctrl_gpios_desc[UART_GPIO_MAX] = {
->>> +     { "cts", TIOCM_CTS, false, },
->>> +     { "dsr", TIOCM_DSR, false, },
->>> +     { "dcd", TIOCM_CD, false, },
->>> +     { "rng", TIOCM_RNG, false, },
->>> +     { "rts", TIOCM_RTS, true, },
->>> +     { "dtr", TIOCM_DTR, true, },
->>> +     { "out1", TIOCM_OUT1, true, },
->>> +     { "out2", TIOCM_OUT2, true, },
->>> +};
->>> +
->>> +void mctrl_gpio_set(struct mctrl_gpios *gpios, unsigned int mctrl)
->>> +{
->>> +     enum mctrl_gpio_idx i;
->>> +
->>> +     if (IS_ERR_OR_NULL(gpios))
->>> +             return;
->>> +
->>> +     for (i = 0; i < UART_GPIO_MAX; i++)
->>> +             if (!IS_ERR_OR_NULL(gpios->gpio[i]) &&
->>> +                 mctrl_gpios_desc[i].dir_out)
->>> +                     gpiod_set_value(gpios->gpio[i],
->>> +                                     !!(mctrl & mctrl_gpios_desc[i].mctrl));
->>> +}
->>> +EXPORT_SYMBOL_GPL(mctrl_gpio_set);
->>> +
->>> +struct gpio_desc *mctrl_gpio_to_gpiod(struct mctrl_gpios *gpios,
->>> +                                   enum mctrl_gpio_idx gidx)
->>> +{
->>> +     if (!IS_ERR_OR_NULL(gpios) && !IS_ERR_OR_NULL(gpios->gpio[gidx]))
->>> +             return gpios->gpio[gidx];
->>> +     else
->>> +             return NULL;
->>> +}
->>> +EXPORT_SYMBOL_GPL(mctrl_gpio_to_gpiod);
->>> +
->>> +unsigned int mctrl_gpio_get(struct mctrl_gpios *gpios, unsigned int *mctrl)
->>> +{
->>> +     enum mctrl_gpio_idx i;
->>> +
->>> +     /*
->>> +      * return it unchanged if the structure is not allocated
->>> +      */
->>> +     if (IS_ERR_OR_NULL(gpios))
->>> +             return *mctrl;
->>> +
->>> +     for (i = 0; i < UART_GPIO_MAX; i++) {
->>> +             if (!IS_ERR_OR_NULL(gpios->gpio[i]) &&
->>> +                 !mctrl_gpios_desc[i].dir_out) {
->>> +                     if (gpiod_get_value(gpios->gpio[i]))
->>> +                             *mctrl |= mctrl_gpios_desc[i].mctrl;
->>> +                     else
->>> +                             *mctrl &= ~mctrl_gpios_desc[i].mctrl;
->>> +             }
->>> +     }
->>> +
->>> +     return *mctrl;
->>> +}
->>> +EXPORT_SYMBOL_GPL(mctrl_gpio_get);
->>
->> Should this routine be renamed to msr_gpio_get() or perhaps better to give all values (inputs and outputs)?
->>
->> I'm trying to port this approach to omap-serial to implement RS485 switching. I need to know if RTS is already on or not and set it accordingly.
->>
->> What would be the best solution for this task using this new API?
-> Sorry, but I don't really get what you're trying to do.
-> Could you explain a little bit more ?
+On Fri, Apr 25, 2014 at 05:53:20PM +0100, Graeme Gregory wrote:
+> On Fri, Apr 25, 2014 at 04:51:47PM +0100, Mark Rutland wrote:
+> > Hi Hanjun,
+> > 
+> > On Fri, Apr 25, 2014 at 02:20:10PM +0100, Hanjun Guo wrote:
+> > > ACPI core need lots extern variables and functions which should
+> > > be provided by arch dependent code to make itself compilable. so
+> > > introduce arm_core.c and its related header file here.
+> > > 
+> > > acpi_boot_table_init() will be called in setup_arch() before
+> > > paging_init(), so we should use eary_ioremap() mechanism here
+> > > to get the RSDP and all the table pointers, with this patch,
+> > > we can get ACPI boot-time tables from firmware on ARM64.
+> > > 
+> > > Signed-off-by: Al Stone <al.stone@linaro.org>
+> > > Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+> > > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> > > Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> > > ---
+> > >  arch/arm64/include/asm/acpi.h |   53 +++++++++++++++++++
+> > >  arch/arm64/kernel/setup.c     |    4 ++
+> > >  drivers/acpi/Makefile         |    2 +
+> > >  drivers/acpi/plat/Makefile    |    1 +
+> > >  drivers/acpi/plat/arm-core.c  |  113 +++++++++++++++++++++++++++++++++++++++++
+> > >  5 files changed, 173 insertions(+)
+> > >  create mode 100644 drivers/acpi/plat/Makefile
+> > >  create mode 100644 drivers/acpi/plat/arm-core.c
+> > > 
+> > > diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> > > index e3e990e..3ac9dfb 100644
+> > > --- a/arch/arm64/include/asm/acpi.h
+> > > +++ b/arch/arm64/include/asm/acpi.h
+> > > @@ -19,6 +19,43 @@
+> > >  #ifndef _ASM_ACPI_H
+> > >  #define _ASM_ACPI_H
+> > >  
+> > > +#include <asm/cacheflush.h>
+> > > +
+> > > +#include <linux/init.h>
+> > > +
+> > > +#define COMPILER_DEPENDENT_INT64	s64
+> > > +#define COMPILER_DEPENDENT_UINT64	u64
+> > 
+> > Is there any reason this can't be in a common ACPI header shared be ia64
+> > and x86 too? Given we already have generic types for this it seems
+> > pointless to define this in each architecture.
+> > 
+> > It looks like include/acpi/actypes.h tries to do that already...
+> > 
+> Yes I think we can replace that with uint64_t and int64_t types.
+> 
+> > > +
+> > > +/*
+> > > + * Calling conventions:
+> > > + *
+> > > + * ACPI_SYSTEM_XFACE        - Interfaces to host OS (handlers, threads)
+> > > + * ACPI_EXTERNAL_XFACE      - External ACPI interfaces
+> > > + * ACPI_INTERNAL_XFACE      - Internal ACPI interfaces
+> > > + * ACPI_INTERNAL_VAR_XFACE  - Internal variable-parameter list interfaces
+> > > + */
+> > > +#define ACPI_SYSTEM_XFACE
+> > > +#define ACPI_EXTERNAL_XFACE
+> > > +#define ACPI_INTERNAL_XFACE
+> > > +#define ACPI_INTERNAL_VAR_XFACE
+> > > +
+> > > +/* Asm macros */
+> > > +#define ACPI_FLUSH_CPU_CACHE() flush_cache_all()
+> > 
+> > This almost certainly does not do what you think it does.
+> > 
+> > flush_cache_all walks the architected levels of cache visible to the
+> > current CPU (i.e. those in CLIDR_EL1), and walks over each cache line at
+> > that level, cleaning and evicting it. It also flushes the I-cache (which
+> > I don't think you care about here).
+> > 
+> > This is NOT safe if the cache is enabled. Lines can migrate between
+> > levels in the middle of the sequence.
+> > 
+> > In an SMP system this does NOT guarantee that data is evicted to memory,
+> > even if the cache is disabled. Other CPUs with caches enabled can
+> > acquire a cacheline (even if dirty) and it can sit in their cache.
+> > 
+> > In a UP system or an SMP system where all other architected caches are
+> > disabled (and flushed) this does NOT guarantee that data hits memory. In
+> > the presence of a system-level cache this will simply flush the data out
+> > to said system-level rather than memory.
+> > 
+> > I believe the intent here is to have something analogous to WBINVD for
+> > use in idle. Unfortunately there simply isn't anything analogous.
+> > Luckily in the presence of PSCI, the PSCI implementation should do all
+> > of the cache maintenance required to prevent any data loss and/or
+> > corruption, and anything we need to have visible to noncacheable
+> > accesses (i.e. flushed out to memory) we should be able to flush by VA.
+> > 
+> > This maintenance is unsafe, and shouldn't be necessary on any sane
+> > system. Please get rid of it. I would very much like to get rid of
+> > flush_cache_all() before its misuse spreads further.
+> > 
+> Thanks for explanation Mark, you are correct on x86 it is defined as
+> wbinvd().
+> 
+> I think looking at where it is actually used we can make this an empty
+> macro on arm64 for now. Where it used are areas we don't currently
+> execute and need arm64 replacements or refactorising to remove x86isms.
 
-Never mind, I've solved this in this patch:
-http://www.spinics.net/lists/arm-kernel/msg325197.html via using
+That sounds good. Is it worth putting a warn or similar there just in
+case?
 
-gpiod_set_value() and gpiod_get_value() directly.
+> 
+> > > +/* Basic configuration for ACPI */
+> > > +#ifdef	CONFIG_ACPI
+> > > +extern int acpi_disabled;
+> > > +extern int acpi_noirq;
+> > > +extern int acpi_pci_disabled;
+> > > +extern int acpi_strict;
+> > 
+> > This looks very odd. Why are these prototypes not coming from a header?
+> > If they're defined in the same place, why not move the disable_acpi
+> > function there?
+> > 
+> 
+> This is a header :-)
 
+True; I must get my eyes tested. :)
 
-Yegor
+Are these variables expected to be used by needed by other code, or are
+they just for the benefit of the static inlines in this header?
+
+> I think this is a peculiarity of how acpica is incorporated into linux
+> but will check.
+
+Ok.
+
+> 
+> > > +static inline void disable_acpi(void)
+> > > +{
+> > > +	acpi_disabled = 1;
+> > > +	acpi_pci_disabled = 1;
+> > > +	acpi_noirq = 1;
+> > > +}
+> > 
+> > [...]
+> > 
+> > > +/*
+> > > + * __acpi_map_table() will be called before page_init(), so early_ioremap()
+> > > + * or early_memremap() should be called here.
+> > > + */
+> > > +char *__init __acpi_map_table(unsigned long phys, unsigned long size)
+> > > +{
+> > > +	if (!phys || !size)
+> > > +		return NULL;
+> > 
+> > Is there any reason that tables can't exist at physical address 0? It's
+> > entirely valid to have memory there.
+> > 
+> > [...]
+> > 
+> On ARM64 there is not, we can fix this.
+> 
+> > > +int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
+> > > +{
+> > > +	*irq = -1;
+> > > +
+> > > +	return 0;
+> > > +}
+> > > +EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
+> > 
+> > This appears to be missing a giant warning that it does nothing useful.
+> > 
+> > I was under the impression that we were meant to use 0 to represent the
+> > lack of an interrupt these days, too...
+> > 
+> We can fix this.
+
+Sounds good!
+
+Cheers,
+Mark.
