@@ -1,78 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 25 Apr 2014 17:20:41 +0100
-Subject: [PATCH 21/38] mmc: sdhci: hack up driver to make it more
- compliant with UHS-1
-In-Reply-To: <20140425131529.GN26756@n2100.arm.linux.org.uk>
-References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
- <E1Wd2WT-0003vg-Ke@rmk-PC.arm.linux.org.uk>
- <20140425123820.GA15179@pengutronix.de>
- <20140425124945.GM26756@n2100.arm.linux.org.uk>
- <20140425130849.GB15179@pengutronix.de>
- <20140425131529.GN26756@n2100.arm.linux.org.uk>
-Message-ID: <20140425162041.GT26756@n2100.arm.linux.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 25 Apr 2014 10:23:32 -0600
+Subject: [PATCH] ARM: tegra: use correct audio CODEC on Jetson TK1
+Message-ID: <1398443012-17212-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 25, 2014 at 02:15:30PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Apr 25, 2014 at 03:08:49PM +0200, Markus Pargmann wrote:
-> > I just tried the different parts of the patch. Without the following
-> > change, emmc works:
-> > 
-> > --- a/drivers/mmc/host/sdhci.c
-> > +++ b/drivers/mmc/host/sdhci.c
-> > @@ -1507,12 +1507,6 @@ static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
-> >  			host->ops->set_clock(host, host->clock);
-> >  		}
-> >  
-> > -
-> > -		/* Reset SD Clock Enable */
-> > -		clk = sdhci_readw(host, SDHCI_CLOCK_CONTROL);
-> > -		clk &= ~SDHCI_CLOCK_CARD_EN;
-> > -		sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
-> > -
-> 
-> So the bit which stops us violating the SD spec stops eMMC from working...
-> that's... just great.
-> 
-> Okay, I'll look deeper at this and see what can be done, but I suspect it
-> will turn out to require more patches and be more invasive.
+From: Stephen Warren <swarren@nvidia.com>
 
-Well, I've given up trying to work out how to clean that mess up -
-sdhci will attempt to do all the high speed switching bollocks every
-time a set_ios call is made, turning the clock on and off multiple
-times in the process.
+Jetson TK1 contains an RT5639 not an RT5640. While the two are extremely
+similar and mostly compatible, we should still use the correct device
+name in the device tree. I had meant to fix this before applying the
+initial DT, but this issue slipped my mind.
 
-I've since replaced it with a patch covering just the last hunk of
-this patch and killed the other two changes there (and rewritten the
-description.)
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/boot/dts/tegra124-jetson-tk1.dts | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-I'm afraid that it looks like we're going to be stuck with turning the
-clock on and off multiple times during the transition to 1.8V signalling,
-which is technically against the SD spec.  The spec'd procedure is:
-
-- send command
-- check card reports busy
-- clock off
-- switch to 1.8v signalling
-- wait 5ms
-- clock on
-- wait 1ms
-- check card reports non-busy
-
-whereas what we end up doing is:
-
-- send command
-- check card reports busy
-- clock off
-- switch to 1.8v signalling, waiting 5 to 5.5ms
-- wait 5ms
-- clock on
-- clock off
-- tweak other settings
-- clock on again
-- wait 1ms
-- check card reports non-busy
-
+diff --git a/arch/arm/boot/dts/tegra124-jetson-tk1.dts b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+index dd3076d94727..b8931f0ee026 100644
+--- a/arch/arm/boot/dts/tegra124-jetson-tk1.dts
++++ b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+@@ -1346,8 +1346,8 @@
+ 		status = "okay";
+ 		clock-frequency = <100000>;
+ 
+-		rt5640: audio-codec at 1c {
+-			compatible = "realtek,rt5640";
++		rt5639: audio-codec at 1c {
++			compatible = "realtek,rt5639";
+ 			reg = <0x1c>;
+ 			interrupt-parent = <&gpio>;
+ 			interrupts = <TEGRA_GPIO(H, 4) GPIO_ACTIVE_HIGH>;
+@@ -1779,7 +1779,7 @@
+ 			"IN2P", "Mic Jack";
+ 
+ 		nvidia,i2s-controller = <&tegra_i2s1>;
+-		nvidia,audio-codec = <&rt5640>;
++		nvidia,audio-codec = <&rt5639>;
+ 
+ 		nvidia,hp-det-gpios = <&gpio TEGRA_GPIO(R, 7) GPIO_ACTIVE_LOW>;
+ 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.8.1.5
