@@ -1,48 +1,217 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:55:20 +0100
-Subject: [PATCH 183/222] ARM: l2c: AM43x: add L2 cache support
+Date: Fri, 25 Apr 2014 12:55:25 +0100
+Subject: [PATCH 184/222] ARM: l2c: permit flush_all() on large flush_range()
+ XXX Needs more thought XXX
 In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
 References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1Wdeiu-0007Pu-Om@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Wdeiz-0007Py-SH@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sekhar Nori <nsekhar@ti.com>
-To: linux-arm-kernel at lists.infradead.org
+In order to allow flush_all() to be used in normal operation, we need
+some locking to prevent any other cache operations being issued while
+a background flush_all() operation is proceeding.  The read-write
+spinlock provides what's necessary here, but we must avoid bringing
+lockdep issues into this code.  Hence we continue to use the raw_*
+operations, and use the arch read/write spinlock implementation
+directly.
 
-Add support for L2 cache controller (PL310) on AM437x SoC.
-
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-omap2/Kconfig | 1 +
- arch/arm/mach-omap2/io.c    | 1 +
- 2 files changed, 2 insertions(+)
+ arch/arm/mm/cache-l2x0.c | 90 ++++++++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 79 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index cb31d4390d52..0ba482638ebf 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -65,6 +65,7 @@ config SOC_AM43XX
- 	select ARCH_HAS_OPP
- 	select ARM_GIC
- 	select MACH_OMAP_GENERIC
-+	select MIGHT_HAVE_CACHE_L2X0
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index efc5cabf70e0..40bc281f2463 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -56,6 +56,54 @@ struct l2x0_regs l2x0_saved_regs;
+ /*
+  * Common code for all cache controllers.
+  */
++#ifdef CONFIG_SMP
++static arch_rwlock_t l2c_rw_lock = __ARCH_RW_LOCK_UNLOCKED;
++
++static unsigned long l2c_lock_exclusive(void)
++{
++	unsigned long flags;
++	raw_local_irq_save(flags);
++	arch_write_lock(&l2c_rw_lock);
++	return flags;
++}
++
++static void l2c_unlock_exclusive(unsigned long flags)
++{
++	arch_write_unlock(&l2c_rw_lock);
++	raw_local_irq_restore(flags);
++}
++
++static void l2c_lock_shared(void)
++{
++	arch_read_lock(&l2c_rw_lock);
++}
++
++static void l2c_unlock_shared(void)
++{
++	arch_read_unlock(&l2c_rw_lock);
++}
++#else
++static unsigned long l2c_lock_exclusive(void)
++{
++	unsigned long flags;
++	raw_local_irq_save(flags);
++	return flags;
++}
++
++static void l2c_unlock_exclusive(unsigned long flags)
++{
++	raw_local_irq_restore(flags);
++}
++
++static void l2c_lock_shared(void)
++{
++}
++
++static void l2c_unlock_shared(void)
++{
++}
++#endif
++
+ static inline void l2c_wait_mask(void __iomem *reg, unsigned long mask)
+ {
+ 	/* wait for cache operation by line or way to complete */
+@@ -239,6 +287,7 @@ static void l2c210_inv_range(unsigned long start, unsigned long end)
+ {
+ 	void __iomem *base = l2x0_base;
  
- config SOC_DRA7XX
- 	bool "TI DRA7XX"
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index b28299b5afd5..4e2df49991ad 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -609,6 +609,7 @@ void __init am43xx_init_early(void)
- 	am43xx_clockdomains_init();
- 	am43xx_hwmod_init();
- 	omap_hwmod_init_postsetup();
-+	omap_l2_cache_init();
- 	omap_clk_soc_init = am43xx_dt_clk_init;
++	l2c_lock_shared();
+ 	if (start & (CACHE_LINE_SIZE - 1)) {
+ 		start &= ~(CACHE_LINE_SIZE - 1);
+ 		writel_relaxed(start, base + L2X0_CLEAN_INV_LINE_PA);
+@@ -252,6 +301,7 @@ static void l2c210_inv_range(unsigned long start, unsigned long end)
+ 
+ 	__l2c210_op_pa_range(base + L2X0_INV_LINE_PA, start, end);
+ 	__l2c210_cache_sync(base);
++	l2c_unlock_shared();
  }
  
+ static void l2c210_clean_range(unsigned long start, unsigned long end)
+@@ -259,8 +309,10 @@ static void l2c210_clean_range(unsigned long start, unsigned long end)
+ 	void __iomem *base = l2x0_base;
+ 
+ 	start &= ~(CACHE_LINE_SIZE - 1);
++	l2c_lock_shared();
+ 	__l2c210_op_pa_range(base + L2X0_CLEAN_LINE_PA, start, end);
+ 	__l2c210_cache_sync(base);
++	l2c_unlock_shared();
+ }
+ 
+ static void l2c210_flush_range(unsigned long start, unsigned long end)
+@@ -268,23 +320,33 @@ static void l2c210_flush_range(unsigned long start, unsigned long end)
+ 	void __iomem *base = l2x0_base;
+ 
+ 	start &= ~(CACHE_LINE_SIZE - 1);
++	if ((end - start) >= l2x0_size) {
++		outer_cache.flush_all();
++		return;
++	}
++
++	l2c_lock_shared();
+ 	__l2c210_op_pa_range(base + L2X0_CLEAN_INV_LINE_PA, start, end);
+ 	__l2c210_cache_sync(base);
++	l2c_unlock_shared();
+ }
+ 
+ static void l2c210_flush_all(void)
+ {
+ 	void __iomem *base = l2x0_base;
++	unsigned long flags;
+ 
+-	BUG_ON(!irqs_disabled());
+-
++	flags = l2c_lock_exclusive();
+ 	__l2c_op_way(base + L2X0_CLEAN_INV_WAY);
+ 	__l2c210_cache_sync(base);
++	l2c_unlock_exclusive(flags);
+ }
+ 
+ static void l2c210_sync(void)
+ {
++	l2c_lock_shared();
+ 	__l2c210_cache_sync(l2x0_base);
++	l2c_unlock_shared();
+ }
+ 
+ static void l2c210_resume(void)
+@@ -521,7 +583,7 @@ static void l2c310_inv_range_erratum(unsigned long start, unsigned long end)
+ 		unsigned long flags;
+ 
+ 		/* Erratum 588369 for both clean+invalidate operations */
+-		raw_spin_lock_irqsave(&l2x0_lock, flags);
++		flags = l2c_lock_exclusive();
+ 		l2c_set_debug(base, 0x03);
+ 
+ 		if (start & (CACHE_LINE_SIZE - 1)) {
+@@ -538,20 +600,26 @@ static void l2c310_inv_range_erratum(unsigned long start, unsigned long end)
+ 		}
+ 
+ 		l2c_set_debug(base, 0x00);
+-		raw_spin_unlock_irqrestore(&l2x0_lock, flags);
++		l2c_unlock_exclusive(flags);
+ 	}
+ 
++	l2c_lock_shared();
+ 	__l2c210_op_pa_range(base + L2X0_INV_LINE_PA, start, end);
+ 	__l2c210_cache_sync(base);
++	l2c_unlock_shared();
+ }
+ 
+ static void l2c310_flush_range_erratum(unsigned long start, unsigned long end)
+ {
+-	raw_spinlock_t *lock = &l2x0_lock;
+ 	unsigned long flags;
+ 	void __iomem *base = l2x0_base;
+ 
+-	raw_spin_lock_irqsave(lock, flags);
++	if ((end - start) >= l2x0_size) {
++		outer_cache.flush_all();
++		return;
++	}
++
++	flags = l2c_lock_exclusive();
+ 	while (start < end) {
+ 		unsigned long blk_end = start + min(end - start, 4096UL);
+ 
+@@ -564,12 +632,12 @@ static void l2c310_flush_range_erratum(unsigned long start, unsigned long end)
+ 		l2c_set_debug(base, 0x00);
+ 
+ 		if (blk_end < end) {
+-			raw_spin_unlock_irqrestore(lock, flags);
+-			raw_spin_lock_irqsave(lock, flags);
++			l2c_unlock_exclusive(flags);
++			flags = l2c_lock_exclusive();
+ 		}
+ 	}
+-	raw_spin_unlock_irqrestore(lock, flags);
+ 	__l2c210_cache_sync(base);
++	l2c_unlock_exclusive(flags);
+ }
+ 
+ static void l2c310_flush_all_erratum(void)
+@@ -577,12 +645,12 @@ static void l2c310_flush_all_erratum(void)
+ 	void __iomem *base = l2x0_base;
+ 	unsigned long flags;
+ 
+-	raw_spin_lock_irqsave(&l2x0_lock, flags);
++	flags = l2c_lock_exclusive();
+ 	l2c_set_debug(base, 0x03);
+ 	__l2c_op_way(base + L2X0_CLEAN_INV_WAY);
+ 	l2c_set_debug(base, 0x00);
+ 	__l2c210_cache_sync(base);
+-	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
++	l2c_unlock_exclusive(flags);
+ }
+ 
+ static void __init l2c310_save(void __iomem *base)
 -- 
 1.8.3.1
