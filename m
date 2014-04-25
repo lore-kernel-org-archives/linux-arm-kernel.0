@@ -1,27 +1,71 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 25 Apr 2014 10:39:37 -0600
-Subject: [PATCH 1/5] ARM: defconfigs: add MTD_SPI_NOR (new dependency
- for M25P80)
-In-Reply-To: <1397719309-2022-2-git-send-email-computersforpeace@gmail.com>
-References: <1397719309-2022-1-git-send-email-computersforpeace@gmail.com>
- <1397719309-2022-2-git-send-email-computersforpeace@gmail.com>
-Message-ID: <535A8FC9.8040707@wwwdotorg.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 25 Apr 2014 09:41:41 -0700
+Subject: [PATCH] ARM: dts: am437x-gp-evm: Boot fixes
+In-Reply-To: <5357F78A.5000406@ti.com>
+References: <1398192739-8901-1-git-send-email-d-gerlach@ti.com>
+ <20140422190132.GA12204@atomide.com> <5356C8AE.3090907@ti.com>
+ <20140423145904.GB4833@atomide.com> <5357F78A.5000406@ti.com>
+Message-ID: <20140425164141.GD20807@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/17/2014 01:21 AM, Brian Norris wrote:
-> These defconfigs contain the CONFIG_M25P80 symbol, which is now
-> dependent on the MTD_SPI_NOR symbol. Add CONFIG_MTD_SPI_NOR to the
-> relevant defconfigs.
+* Dave Gerlach <d-gerlach@ti.com> [140423 10:25]:
+> On 04/23/2014 09:59 AM, Tony Lindgren wrote:
+> >* Dave Gerlach <d-gerlach@ti.com> [140422 12:53]:
+> >>On 04/22/2014 02:01 PM, Tony Lindgren wrote:
+> >>>* Dave Gerlach <d-gerlach@ti.com> [140422 11:52]:
+> >>>>This patch, along with patch here [1], fixes boot for am437x-gp-evm. The
+> >>>>bootloader configures gpio5_7 to control the DDR3 termination regulator,
+> >>>>the linked patch prevents that gpio bank from being reset and losing
+> >>>>the previously configured state, and this patch binds the gpio to a
+> >>>>regulator so the kernel is aware of the state of the gpio.
+> >>>>
+> >>>>[1] https://www.mail-archive.com/linux-omap at vger.kernel.org/msg102941.html
+> >>>
+> >>>Setting up the GPIO regulator makes sense to me. But the hack in the
+> >>>link above is potentially a nasty time bomb for anybody trying to
+> >>>use GPIO bank 5 on that board.
+> >>>
+> >>>What tests have been done that the GPIO bank behaves properly when
+> >>>it's not reset?
+> >>
+> >>We've been using this configuration on this board for a while without any
+> >>apparent issues. Also, am335x-evmsk already uses the same idea for the VTT
+> >>regulator on board from commit 6046adb6ad701026c10adeac8d6a4138895f12e5
+> >>[ARM: dts: am335x-evmsk: Do not reset gpio0] and I am unaware of any issues
+> >>with that either.
+> >
+> >OK. Do you have other GPIOs in use as interrupts for devices in these
+> >banks and do they work fine?
 > 
-> At the same time, drop the now-nonexistent CONFIG_MTD_CHAR symbol.
+> I dont see any interrupts in use from gpio5 bank but as a quick test if I
+> add ti,no-reset-on-init to gpio3 and gpio4 I see no issue with matrix-keypad
+> operation which uses gpios from each of those banks.
 
-I hadn't realized that the problem this patch solves was already present
-in the code, so this patch is simply catching up the defconfigs rather
-than part of a series which changed the code to cause the problem.
+OK thanks for testing. I'll apply the ti,no-reset-on-init patch from [1]
+above into omap-for-v3.15/fixes-v2.
 
-So, this needs to be applied ASAP.
+The regulator patch can wait for v3.16, and should be also implemented
+for the am335x-evmsk the same way, so maybe add that too to your patch?
 
-I think this should be split it up so that each defconfig can go through
-the tree that owns it to avoid conflicts. If you repost split up, I can
-apply the tegra_defconfig change to the Tegra tree.
+> >Also, can you please test to make sure this works with the most recent
+> >Javier's GPIO patches that had the issue of not booting on am335x-evmsk?
+> >
+> 
+> Yes, when using Javier's patches in addition to this patch [1], which was
+> found to be necessary through this discussion [2], the AM437x GP EVM boots
+> fine with linux-next with my regulator patch and gpio5 no reset patch
+> applied.
+
+OK good to hear.
+
+Tony
+ 
+> [1] https://patchwork.kernel.org/patch/4041881/
+> [2] http://marc.info/?t=139817273800014&r=1&w=2
+> 
+> >Regards,
+> >
+> >Tony
+> >
+> 
