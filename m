@@ -1,61 +1,48 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 25 Apr 2014 13:30:48 -0700
-Subject: [GIT PULL] somewhat urgent omap fixes against v3.15-rc1, fixes gpmc
-Message-ID: <20140425203047.GG20807@atomide.com>
+From: javi.merino@arm.com (Javi Merino)
+Date: Fri, 25 Apr 2014 21:30:51 +0100
+Subject: [PATCH] ARM: dts: Remove vmmc-supply for mmc@12220000 on
+ arndale-octa board
+In-Reply-To: <535AC29E.8010905@gmail.com>
+References: <1398456672-3936-1-git-send-email-javi.merino@arm.com>
+ <535AC29E.8010905@gmail.com>
+Message-ID: <20140425203051.GD3027@e102654-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit fb677ef70b65e22cd4401d31b700a8b4041efae1:
+On Fri, Apr 25, 2014 at 09:16:30PM +0100, Tomasz Figa wrote:
+> Hi Javi,
+> 
+> On 25.04.2014 22:11, Javi Merino wrote:
+> > d726ca2d3316 (ARM: dts: Add vmmc-supply to MMC on arndale-octa board)
+> > added the vmmc-supply to nodes mmc at 12200000 and mmc at 12220000 of the
+> > DT.  However, this makes the kernel fail to boot on the arndale-octa
+> > spews:
+> >
+> > [    5.060000] dwmmc_exynos 12200000.mmc: num-slots property not found, assuming 1 slot is available
+> > [    5.065000] platform 12200000.mmc: Driver dwmmc_exynos requests probe deferral
+> > [    5.075000] dwmmc_exynos 12220000.mmc: num-slots property not found, assuming 1 slot is available
+> > [    5.085000] platform 12220000.mmc: Driver dwmmc_exynos requests probe deferral
+> >
+> > And eventually hangs.  Without the vmmc-supply property in the
+> > mmc at 12220000 node, the kernel boots again.
+> >
+> > Signed-off-by: Javi Merino <javi.merino@arm.com>
+> > ---
+> >
+> > Hi,
+> >
+> > Note that I don't know *why* removing the property works, all I know
+> > is that 3.15-rc2 fails to boot on my Arndale Octa unless I apply this
+> > patch.
+> 
+> Are you sure you have the required PMIC driver enabled in your kernel 
+> config?
 
-  ARM: OMAP2+: Fix GPMC remap for devices using an offset (2014-04-23 11:09:22 -0700)
+I configured the kernel using exynos_defconfig and that gives me:
 
-are available in the git repository at:
+# CONFIG_PMIC_ADP5520 is not set
+# CONFIG_PMIC_DA903X is not set
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.15/fixes-gpmc
-
-for you to fetch changes up to 4c05160342f16361fc37ae34dcae9210306a83e9:
-
-  ARM: dts: AM3517: Disable absent IPs inherited from OMAP3 (2014-04-25 09:55:00 -0700)
-
-----------------------------------------------------------------
-Mostly fixes for occasional memory corruption caused by bad
-timings for smc911x LAN9220 (and potentially LAN9221) devices
-that were noted on a cm-t3730 system. Also fix THUMB mode
-for SMP, and mailbox related warnings when booted with device
-tree.
-
-----------------------------------------------------------------
-Dave Gerlach (1):
-      ARM: dts: am437x-gp-evm: Do not reset gpio5
-
-Javier Martinez Canillas (1):
-      ARM: dts: omap3-igep0020: use SMSC9221 timings
-
-Joel Fernandes (1):
-      ARM: OMAP5: Switch to THUMB mode if needed on secondary CPU
-
-Suman Anna (3):
-      ARM: dts: OMAP5: Add mailbox dt node to fix boot warning
-      ARM: dts: OMAP2: Fix interrupts for OMAP2420 mailbox
-      ARM: dts: AM3517: Disable absent IPs inherited from OMAP3
-
-Tony Lindgren (3):
-      ARM: dts: Fix bad OTG muxing for cm-t boards
-      ARM: dts: Fix GPMC Ethernet timings for omap cm-t sbc-t boards for device tree
-      ARM: dts: Fix GPMC timings for LAN9220
-
- arch/arm/boot/dts/am3517.dtsi             | 16 ++++++++
- arch/arm/boot/dts/am437x-gp-evm.dts       |  5 +++
- arch/arm/boot/dts/omap-gpmc-smsc911x.dtsi | 19 ++++-----
- arch/arm/boot/dts/omap2.dtsi              |  7 ----
- arch/arm/boot/dts/omap2420.dtsi           |  8 ++++
- arch/arm/boot/dts/omap2430.dtsi           |  7 ++++
- arch/arm/boot/dts/omap3-cm-t3x30.dtsi     | 66 +++++++------------------------
- arch/arm/boot/dts/omap3-igep.dtsi         |  2 +-
- arch/arm/boot/dts/omap3-igep0020.dts      |  4 +-
- arch/arm/boot/dts/omap3-sb-t35.dtsi       | 37 +++++------------
- arch/arm/boot/dts/omap3-sbc-t3517.dts     | 13 ++++++
- arch/arm/boot/dts/omap3.dtsi              |  2 +-
- arch/arm/boot/dts/omap5.dtsi              |  7 ++++
- arch/arm/mach-omap2/omap-headsmp.S        |  8 +++-
- 14 files changed, 99 insertions(+), 102 deletions(-)
+Should I be using other defconfig for this board?  exynos_defconfig
+used to work in 3.14.  Cheers,
+Javi
