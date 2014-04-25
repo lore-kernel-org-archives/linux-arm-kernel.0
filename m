@@ -1,65 +1,82 @@
-From: shaik.samsung@gmail.com (Shaik Ameer Basha)
-Date: Fri, 25 Apr 2014 11:23:23 +0530
-Subject: [PATCH v3 00/16] exynos5420: clock file cleanup
-In-Reply-To: <1398344632-18623-1-git-send-email-shaik.ameer@samsung.com>
-References: <1398344632-18623-1-git-send-email-shaik.ameer@samsung.com>
-Message-ID: <CAOD6ATq1FO_gKPU6jNWR_tBfoO5h4WECPp--pe8XZjWnJeMiOg@mail.gmail.com>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Fri, 25 Apr 2014 11:24:28 +0530
+Subject: [PATCHv4 3/7] ARM: EXYNOS: Support secondary CPU boot of
+ Exynos3250
+In-Reply-To: <5359F5F5.7030109@samsung.com>
+References: <1398388572-30239-1-git-send-email-cw00.choi@samsung.com>
+ <1398388572-30239-4-git-send-email-cw00.choi@samsung.com>
+ <5359E4E6.90102@linaro.org> <5359F5F5.7030109@samsung.com>
+Message-ID: <5359F894.4070205@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 24, 2014 at 6:33 PM, Shaik Ameer Basha
-<shaik.ameer@samsung.com> wrote:
-> Many changes/fixes have been identified for clock file for exynos5420.
-> These include correct parents, bit fields, new clocks etc. Existing
-> files needs some correction in terms of names of the clock and
-> indentation. These issues are addressed in this patch series. It also
-> replaces the usage of enums with macro as clock ids.
->
-> This patch series is rebased on,
-> git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git:master
->
-> This patch is also dependent on the following patch.
-> ARM: dts: add dt node for sss module for exynos5250/5420
+On 04/25/2014 11:13 AM, Chanwoo Choi wrote:
+> Hi,
+> 
+> On 04/25/2014 01:30 PM, Tushar Behera wrote:
+>> On 04/25/2014 06:46 AM, Chanwoo Choi wrote:
+>>> This patch fix the offset of CPU boot address and don't need to send smc call
+>>> of SMC_CMD_CPU1BOOT command for secondary CPU boot because Exynos3250 removes
+>>> WFE in secure mode.
+>>>
+>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>>> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+>>> ---
+>>>  arch/arm/mach-exynos/firmware.c | 10 ++++++++--
+>>>  1 file changed, 8 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
+>>> index aa01c42..386d01d 100644
+>>> --- a/arch/arm/mach-exynos/firmware.c
+>>> +++ b/arch/arm/mach-exynos/firmware.c
+>>> @@ -31,11 +31,17 @@ static int exynos_do_idle(void)
+>>>  static int exynos_cpu_boot(int cpu)
+>>>  {
+>>>  	/*
+>>> +	 * Exynos3250 doesn't need to send smc command for secondary CPU boot
+>>> +	 * because Exynos3250 removes WFE in secure mode.
+>>> +	 */
+>>> +	if (soc_is_exynos3250())
+>>> +		return 0;
+>>> +	/*
+>>>  	 * The second parameter of SMC_CMD_CPU1BOOT command means CPU id.
+>>>  	 * But, Exynos4212 has only one secondary CPU so second parameter
+>>>  	 * isn't used for informing secure firmware about CPU id.
+>>>  	 */
+>>> -	if (soc_is_exynos4212())
+>>> +	else if (soc_is_exynos4212())
+>>
+>> This changes is not required.
+> 
+> Do you mean it as following?
+> 
+> 	if (soc_is_exynos3250())
+> 		return 0
+> 
+> 	if (soc_is_exynos4212())
+> 		cpu = 0;
+> 
 
-Sorry, it depends on SSS clock patch. Not the dts one.
-clk: samsung exynos5250/5420: Add gate clock for SSS module
+Yes, logically the flow would be same and code would be more readable.
 
->
-> Changes since v2:
-> -----------------
-> 1] Addressed review comments from Gerhard Sittig and Tomasz Figa.
->
-> Changes since v1:
-> -----------------
-> 1] Addressed review comments from Tomasz Figa.
->     http://www.spinics.net/lists/devicetree/msg16759.html
->     http://www.spinics.net/lists/devicetree/msg16760.html
->
-> Shaik Ameer Basha (16):
->   clk: exynos5420: rename parent clocks
->   clk: exynos5420: add clocks for ISP block
->   clk: exynos5420: update clocks for GSCL and MSCL blocks
->   clk: exynos5420: correct clock parents for mscl sysmmu
->   clk: exynos5420: update clocks for G2D block
->   clk: exynos5420: update clocks for DISP1 block
->   clk: exynos5420: update clocks for PERIC block
->   clk: exynos5420: update clocks for PERIS and GEN blocks
->   clk: exynos5420: update clocks for WCORE block
->   clk: exynos5420: update clocks for FSYS and FSYS2 blocks
->   clk: exynos5420: correct sysmmu-mfc parent clocks
->   clk: exynos5420: fix register offset for sclk_bpll
->   clk: exynos5420: cleanup core and misc clocks
->   clk: exynos5420: correct g3d parent clock
->   clk: exynos5420: create clock ID for mout_sclk_vpll
->   clk: exynos5420: add more registers to restore list
->
->  arch/arm/boot/dts/exynos5420.dtsi      |   14 +-
->  drivers/clk/samsung/clk-exynos5420.c   |  808 ++++++++++++++++++++------------
->  include/dt-bindings/clock/exynos5420.h |   33 +-
->  3 files changed, 550 insertions(+), 305 deletions(-)
->  mode change 100644 => 100755 drivers/clk/samsung/clk-exynos5420.c
->  mode change 100644 => 100755 include/dt-bindings/clock/exynos5420.h
->
-> --
-> 1.7.9.5
->
+>>
+>>>  		cpu = 0;
+>>>  
+>>>  	exynos_smc(SMC_CMD_CPU1BOOT, cpu, 0, 0);
+>>> @@ -46,7 +52,7 @@ static int exynos_set_cpu_boot_addr(int cpu, unsigned long boot_addr)
+>>>  {
+>>>  	void __iomem *boot_reg = S5P_VA_SYSRAM_NS + 0x1c;
+>>>  
+>>> -	if (!soc_is_exynos4212())
+>>> +	if (!soc_is_exynos4212() && !soc_is_exynos3250())
+>>>  		boot_reg += 4*cpu;
+>>>  
+>>>  	__raw_writel(boot_addr, boot_reg);
+>>>
+>>
+>>
+> 
+
+
+-- 
+Tushar Behera
