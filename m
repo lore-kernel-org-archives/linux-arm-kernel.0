@@ -1,86 +1,215 @@
-From: Hong-Xing.Zhu@freescale.com (Hong-Xing.Zhu at freescale.com)
-Date: Fri, 25 Apr 2014 15:04:28 +0000
-Subject: [PATCH 0/8] i.MX6 PCIe binding change and MSI support
-In-Reply-To: <CAErSpo7Boi8d+apAUC3TmmE33LuRMYJ6J+TEPLRbeyZyU3O8RQ@mail.gmail.com>
-References: <1396025579-14344-1-git-send-email-l.stach@pengutronix.de>
- <20140424175844.GD29593@google.com>
- <1398421265.4657.25.camel@weser.hi.pengutronix.de>
- <CAErSpo7Boi8d+apAUC3TmmE33LuRMYJ6J+TEPLRbeyZyU3O8RQ@mail.gmail.com>
-Message-ID: <0e2b9e103e54467a9f0d0ee44d5763bf@BLUPR03MB136.namprd03.prod.outlook.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 25 Apr 2014 10:04:43 -0500
+Subject: [PATCH v2 03/18] usb: host: xhci-plat: Add support for the
+ Armada 38x
+In-Reply-To: <1398434836-18908-4-git-send-email-gregory.clement@free-electrons.com>
+References: <1398434836-18908-1-git-send-email-gregory.clement@free-electrons.com>
+ <1398434836-18908-4-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20140425150443.GD29632@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> -----Original Message-----
-> From: Bjorn Helgaas [mailto:bhelgaas at google.com]
-> Sent: Friday, April 25, 2014 10:40 PM
-> To: Lucas Stach
-> Cc: Zhu Richard-R65037; Jingoo Han; Shawn Guo; linux-pci at vger.kernel.org;
-> linux-arm; linux-samsung-soc at vger.kernel.org; devicetree at vger.kernel.org; Sean
-> Cross; Marek Vasut; Ian Campbell; Mark Rutland; Pawel Moll; Rob Herring; Arnd
-> Bergmann; Tim Harvey; kernel at pengutronix.de
-> Subject: Re: [PATCH 0/8] i.MX6 PCIe binding change and MSI support
+On Fri, Apr 25, 2014 at 04:07:01PM +0200, Gregory CLEMENT wrote:
+> For the Armada 38x SoCs which come with an xhci controller, specific
+> initialization must be done during probe related to the MBus windows
+> configuration. This patch adds the support of this quirk.
 > 
-> On Fri, Apr 25, 2014 at 4:21 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
-> > Am Donnerstag, den 24.04.2014, 11:58 -0600 schrieb Bjorn Helgaas:
-> >> On Fri, Mar 28, 2014 at 05:52:51PM +0100, Lucas Stach wrote:
-> >> > While working on MSI support for the i.MX6 PCIe host driver it has
-> >> > been discovered that the binding for this host controller is broken
-> >> > in many ways (refer to the patch descriptions for more
-> >> > info) and was introduced without proper discussion about what
-> >> > should/should not be in the binding.
-> >> >
-> >> > This series fixes this and minimizes the difference of the
-> >> > i.MX6 binding to the common designware PCIe binding. I'm aware that
-> >> > this is a quite radical change, but I think it's justified to do
-> >> > this as long as there aren't many user of the old binding (most of
-> >> > the optional properties in the binding aren't even implemented).
-> >> >
-> >> > Looking forward to your feedback.
-> >> >
-> >> > Lucas Stach (8):
-> >> >   ARM: imx6q-clk: parent lvds_gate from lvds_sel
-> > This one is already applied.
-> >
-> >> >   PCI: designware: split Exynos and i.MX bindings
-> >> >   ARM: dts: imx6: update pcie to bring in line with new binding
-> >> >   PCI: imx6: use new clock names
-> >> >   PCI: imx6: drop old irq mapping
-> >> >   PCI: imx6: rip out optional (and unused) irqs
-> >> >   PCI: designware: make MSI isr shared irq aware
-> >> >   PCI: imx6: add support for MSI
-> >>
-> >> What's the status of all these?  I would normally apply patches 4-8
-> >> of this series through my tree, given the appropriate acks, but I
-> >> haven't seen those yet.  And I'm not sure what dependencies there are
-> >> between the non-PCI patches and the PCI ones.
-> >>
-> > It's a complete binding change, so applying one part without the other
-> > is going to horribly break things.
-> >
-> > So I would at least want to see an ack for the binding change on the
-> > i.MX side from Shawn and Richard. This will need some follow on
-> > patches, as some boards adding PCIe using the old binding have cropped
-> > up in linux-next, but I can do the patches on short notice if everyone
-> > agrees to merge this patchset.
-> >
-> > The designware part is pretty simple and doesn't change anything for
-> > other users than i.MX. Though I would like to see an ack from Jingoo
-> > for those.
-> >
-> > I have some more stuff in the pipes regarding multiple MSI irqs, that
-> > depend on this series and also the Keystone people are waiting for
-> > this to be applied in order to consolidate the clock handling of the
-> > designware core driver, so it would be nice to get this moving again.
-[Richard] Hi Lucas, thanks. I'm ok for this patch-set.
-Acked-by: Richard Zhu <r65037@freescale.com>
-
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  drivers/usb/host/Kconfig      |  7 +++++
+>  drivers/usb/host/Makefile     |  1 +
+>  drivers/usb/host/xhci-mvebu.c | 71 +++++++++++++++++++++++++++++++++++++++++++
+>  drivers/usb/host/xhci-mvebu.h | 22 ++++++++++++++
+>  drivers/usb/host/xhci-plat.c  |  5 +++
+>  5 files changed, 106 insertions(+)
+>  create mode 100644 drivers/usb/host/xhci-mvebu.c
+>  create mode 100644 drivers/usb/host/xhci-mvebu.h
 > 
-> OK, just poke me again when you're ready for me to do something with these.
-> 
-> Bjorn
+> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+> index 3d9e54062d62..e70943fac4a1 100644
+> --- a/drivers/usb/host/Kconfig
+> +++ b/drivers/usb/host/Kconfig
+> @@ -29,6 +29,13 @@ if USB_XHCI_HCD
+>  config USB_XHCI_PLATFORM
+>  	tristate
+>  
+> +config USB_XHCI_MVEBU
+> +	tristate "xHCI support for Marvell Armada 38x"
+> +	select USB_XHCI_PLATFORM
+> +	---help---
+> +	  Say 'Y' to enable the support for the xHCI host controller
+> +	  found in Marvell Armada 38x ARM SOCs.
+> +
+>  endif # USB_XHCI_HCD
+>  
+>  config USB_EHCI_HCD
+> diff --git a/drivers/usb/host/Makefile b/drivers/usb/host/Makefile
+> index 7530468c9a4f..7a8db7f7dc01 100644
+> --- a/drivers/usb/host/Makefile
+> +++ b/drivers/usb/host/Makefile
+> @@ -19,6 +19,7 @@ xhci-hcd-$(CONFIG_PCI)	+= xhci-pci.o
+>  
+>  ifneq ($(CONFIG_USB_XHCI_PLATFORM), )
+>  	xhci-hcd-y		+= xhci-plat.o
+> +	xhci-hcd-$(CONFIG_USB_XHCI_MVEBU)	+= xhci-mvebu.o
+>  endif
+>  
+>  obj-$(CONFIG_USB_WHCI_HCD)	+= whci/
+> diff --git a/drivers/usb/host/xhci-mvebu.c b/drivers/usb/host/xhci-mvebu.c
+> new file mode 100644
+> index 000000000000..09cf437499fb
+> --- /dev/null
+> +++ b/drivers/usb/host/xhci-mvebu.c
+> @@ -0,0 +1,71 @@
+> +/*
+> + * Copyright (C) 2014 Marvell
+> + * Author: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License
+> + * version 2 as published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/io.h>
+> +#include <linux/mbus.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +
+> +#define USB3_MAX_WINDOWS	4
+> +#define USB3_WIN_CTRL(w)	(0x0 + ((w) * 8))
+> +#define USB3_WIN_BASE(w)	(0x4 + ((w) * 8))
+> +
+> +static void __init mv_usb3_conf_mbus_windows(void __iomem *base,
+> +			const struct mbus_dram_target_info *dram)
+> +{
+> +	int win;
+> +
+> +	/* Clear all existing windows */
+> +	for (win = 0; win < USB3_MAX_WINDOWS; win++) {
+> +		writel(0, base + USB3_WIN_CTRL(win));
+> +		writel(0, base + USB3_WIN_BASE(win));
+> +	}
+> +
+> +	/* Program each DRAM CS in a seperate window */
+> +	for (win = 0; win < dram->num_cs; win++) {
+> +		const struct mbus_dram_window *cs = dram->cs + win;
+> +
+> +		writel(((cs->size - 1) & 0xffff0000) | (cs->mbus_attr << 8) |
+> +		       (dram->mbus_dram_target_id << 4) | 1,
+> +		       base + USB3_WIN_CTRL(win));
+> +
+> +		writel((cs->base & 0xffff0000), base + USB3_WIN_BASE(win));
+> +	}
+> +}
+> +
+> +int xhci_mvebu_mbus_init_quirk(struct platform_device *pdev)
+> +{
+> +	struct resource	*res;
+> +	void __iomem	*base;
+> +	const struct mbus_dram_target_info *dram;
+> +	int ret = 0;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> +	if (!res)
+> +		return -ENODEV;
+> +
+> +	/*
+> +	 * We don't use devm_ioremap() because this mapping should
+> +	 * only exists for the duration of this probe function.
+> +	 */
+> +	base = ioremap(res->start, resource_size(res));
+> +	if (!base)
+> +		return -ENODEV;
+> +
+> +	dram = mv_mbus_dram_info();
+> +	mv_usb3_conf_mbus_windows(base, dram);
+> +
+> +	/*
+> +	 * This memory area was only needed to configure the MBus
+> +	 * windows, and is therefore no longer useful.
+> +	 */
+> +	iounmap(base);
+> +
+> +	return ret;
+> +}
+> diff --git a/drivers/usb/host/xhci-mvebu.h b/drivers/usb/host/xhci-mvebu.h
+> new file mode 100644
+> index 000000000000..5d7e647b3d27
+> --- /dev/null
+> +++ b/drivers/usb/host/xhci-mvebu.h
+> @@ -0,0 +1,22 @@
+> +/*
+> + * Copyright (C) 2014 Marvell
+> + *
+> + * Gregory Clement <gregory.clement@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#ifndef __LINUX_XHCI_MVEBU_H
+> +#define __LINUX_XHCI_MVEBU_H
+> +
+> +#ifdef CONFIG_USB_XHCI_MVEBU
+
+this is a tristate symbol, you're not treating the case where this is a
+module. Have you really build-tested this patch ? It would give you
+redefinition errors. Switch over to:
+
+#if IS_ENABLED(CONFIG_USB_XHCI_MVEBU)
+
+> +int xhci_mvebu_mbus_init_quirk(struct platform_device *pdev);
+> +#else
+> +static inline int xhci_mvebu_mbus_init_quirk(struct device dev)
+> +{
+> +	return 0;
+> +}
+> +#endif
+> +#endif /* __LINUX_XHCI_MVEBU_H */
+> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+> index bb5d563f729c..c0e835b49e0d 100644
+> --- a/drivers/usb/host/xhci-plat.c
+> +++ b/drivers/usb/host/xhci-plat.c
+> @@ -19,6 +19,7 @@
+>  #include <linux/slab.h>
+>  
+>  #include "xhci.h"
+> +#include "xhci-mvebu.h"
+>  
+>  static void xhci_plat_quirks(struct device *dev, struct xhci_hcd *xhci)
+>  {
+> @@ -148,6 +149,9 @@ static int xhci_plat_probe(struct platform_device *pdev)
+>  	if (ret)
+>  		return ret;
+>  
+> +	if (of_device_is_compatible(pdev->dev.of_node, "marvell,armada-380-xhci"))
+
+break the line at that , character
+
+> +		xhci_mvebu_mbus_init_quirk(pdev);
+> +
+>  	/* Initialize dma_mask and coherent_dma_mask to 32-bits */
+>  	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
+>  	if (ret)
+> @@ -279,6 +283,7 @@ static const struct dev_pm_ops xhci_plat_pm_ops = {
+>  static const struct of_device_id usb_xhci_of_match[] = {
+>  	{ .compatible = "generic-xhci" },
+>  	{ .compatible = "xhci-platform" },
+> +	{ .compatible = "marvell,armada-380-xhci"},
+>  	{ },
+>  };
+>  MODULE_DEVICE_TABLE(of, usb_xhci_of_match);
+> -- 
+> 1.8.1.2
 > 
 
-
-Best Regards
-Richard Zhu
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140425/869a5124/attachment-0001.sig>
