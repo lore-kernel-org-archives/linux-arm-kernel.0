@@ -1,116 +1,85 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:31:27 +0100
-Subject: [PATCH 006/222] ARM: outer cache: add documentation of outer cache
- functions
+Date: Fri, 25 Apr 2014 12:31:32 +0100
+Subject: [PATCH 007/222] ARM: outer cache: add WARN_ON() to outer_disable()
 In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
 References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WdeLn-0007DS-Jv@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WdeLs-0007DW-NT@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add some documentation to cover the outer cache functions so that their
-requirements can be better understood.  Of particular note are the
-flush_all() and disable() methods which must not be called except in
-very specific circumstances.
+Add WARN_ON() conditions to outer_disable() to ensure that its
+requirements aren't violated.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/include/asm/outercache.h | 48 ++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 47 insertions(+), 1 deletion(-)
+ arch/arm/include/asm/outercache.h |  7 ++-----
+ arch/arm/mm/Makefile              |  1 +
+ arch/arm/mm/l2c-common.c          | 20 ++++++++++++++++++++
+ 3 files changed, 23 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm/mm/l2c-common.c
 
 diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
-index 0e4420858990..2615b3d9e807 100644
+index 2615b3d9e807..e9a0797fe188 100644
 --- a/arch/arm/include/asm/outercache.h
 +++ b/arch/arm/include/asm/outercache.h
-@@ -39,35 +39,75 @@ struct outer_cache_fns {
- extern struct outer_cache_fns outer_cache;
+@@ -21,6 +21,7 @@
+ #ifndef __ASM_OUTERCACHE_H
+ #define __ASM_OUTERCACHE_H
  
- #ifdef CONFIG_OUTER_CACHE
--
-+/**
-+ * outer_inv_range - invalidate range of outer cache lines
-+ * @start: starting physical address, inclusive
-+ * @end: end physical address, exclusive
++#include <linux/bug.h>
+ #include <linux/types.h>
+ 
+ struct outer_cache_fns {
+@@ -96,11 +97,7 @@ static inline void outer_flush_all(void)
+  * cache is pushed out to lower levels of system memory.  The note and
+  * conditions above concerning outer_flush_all() applies here.
+  */
+-static inline void outer_disable(void)
+-{
+-	if (outer_cache.disable)
+-		outer_cache.disable();
+-}
++extern void outer_disable(void);
+ 
+ /**
+  * outer_resume - restore the cache configuration and re-enable outer cache
+diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
+index 7f39ce2f841f..de5a6a27081b 100644
+--- a/arch/arm/mm/Makefile
++++ b/arch/arm/mm/Makefile
+@@ -95,6 +95,7 @@ obj-$(CONFIG_CPU_V7M)		+= proc-v7m.o
+ AFLAGS_proc-v6.o	:=-Wa,-march=armv6
+ AFLAGS_proc-v7.o	:=-Wa,-march=armv7-a
+ 
++obj-$(CONFIG_OUTER_CACHE)	+= l2c-common.o
+ obj-$(CONFIG_CACHE_FEROCEON_L2)	+= cache-feroceon-l2.o
+ obj-$(CONFIG_CACHE_L2X0)	+= cache-l2x0.o
+ obj-$(CONFIG_CACHE_XSC3L2)	+= cache-xsc3l2.o
+diff --git a/arch/arm/mm/l2c-common.c b/arch/arm/mm/l2c-common.c
+new file mode 100644
+index 000000000000..10a3cf28c362
+--- /dev/null
++++ b/arch/arm/mm/l2c-common.c
+@@ -0,0 +1,20 @@
++/*
++ * Copyright (C) 2010 ARM Ltd.
++ * Written by Catalin Marinas <catalin.marinas@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + */
- static inline void outer_inv_range(phys_addr_t start, phys_addr_t end)
- {
- 	if (outer_cache.inv_range)
- 		outer_cache.inv_range(start, end);
- }
++#include <linux/bug.h>
++#include <linux/smp.h>
++#include <asm/outercache.h>
 +
-+/**
-+ * outer_clean_range - clean dirty outer cache lines
-+ * @start: starting physical address, inclusive
-+ * @end: end physical address, exclusive
-+ */
- static inline void outer_clean_range(phys_addr_t start, phys_addr_t end)
- {
- 	if (outer_cache.clean_range)
- 		outer_cache.clean_range(start, end);
- }
++void outer_disable(void)
++{
++	WARN_ON(!irqs_disabled());
++	WARN_ON(num_online_cpus() > 1);
 +
-+/**
-+ * outer_flush_range - clean and invalidate outer cache lines
-+ * @start: starting physical address, inclusive
-+ * @end: end physical address, exclusive
-+ */
- static inline void outer_flush_range(phys_addr_t start, phys_addr_t end)
- {
- 	if (outer_cache.flush_range)
- 		outer_cache.flush_range(start, end);
- }
- 
-+/**
-+ * outer_flush_all - clean and invalidate all cache lines in the outer cache
-+ *
-+ * Note: depending on implementation, this may not be atomic - it must
-+ * only be called with interrupts disabled and no other active outer
-+ * cache masters.
-+ *
-+ * It is intended that this function is only used by implementations
-+ * needing to override the outer_cache.disable() method due to security.
-+ * (Some implementations perform this as a clean followed by an invalidate.)
-+ */
- static inline void outer_flush_all(void)
- {
- 	if (outer_cache.flush_all)
- 		outer_cache.flush_all();
- }
- 
-+/**
-+ * outer_disable - clean, invalidate and disable the outer cache
-+ *
-+ * Disable the outer cache, ensuring that any data contained in the outer
-+ * cache is pushed out to lower levels of system memory.  The note and
-+ * conditions above concerning outer_flush_all() applies here.
-+ */
- static inline void outer_disable(void)
- {
- 	if (outer_cache.disable)
- 		outer_cache.disable();
- }
- 
-+/**
-+ * outer_resume - restore the cache configuration and re-enable outer cache
-+ *
-+ * Restore any configuration that the cache had when previously enabled,
-+ * and re-enable the outer cache.
-+ */
- static inline void outer_resume(void)
- {
- 	if (outer_cache.resume)
-@@ -89,6 +129,12 @@ static inline void outer_resume(void) { }
- #endif
- 
- #ifdef CONFIG_OUTER_CACHE_SYNC
-+/**
-+ * outer_sync - perform a sync point for outer cache
-+ *
-+ * Ensure that all outer cache operations are complete and any store
-+ * buffers are drained.
-+ */
- static inline void outer_sync(void)
- {
- 	if (outer_cache.sync)
++	if (outer_cache.disable)
++		outer_cache.disable();
++}
 -- 
 1.8.3.1
