@@ -1,76 +1,58 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 25 Apr 2014 22:55:36 +0200
-Subject: [PATCH v2 1/5] ARM: dts: Add syscon handle in pmu node for
- exynos5250
-In-Reply-To: <1398426857-5097-2-git-send-email-pankaj.dubey@samsung.com>
-References: <1396425778-4379-1-git-send-email-pankaj.dubey@samsung.com>
- <1398426857-5097-1-git-send-email-pankaj.dubey@samsung.com>
- <1398426857-5097-2-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <535ACBC8.5090703@gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 25 Apr 2014 15:58:10 -0500
+Subject: [PATCH] power: twl4030_charger: clear IRQs after handling them
+In-Reply-To: <20140416163526.GA3049@atomide.com>
+References: <1397661299-31342-1-git-send-email-balbi@ti.com>
+ <20140416163526.GA3049@atomide.com>
+Message-ID: <535ACC62.102@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pankaj,
+On 04/16/2014 11:35 AM, Tony Lindgren wrote:
+> * Felipe Balbi <balbi@ti.com> [140416 08:18]:
+>> TRM says we *must* write 1 to each bit we're handling
+>> in order to clear the IRQ status and bring IRQ line
+>> low. This patch implements that.
+>>
+>> Signed-off-by: Felipe Balbi <balbi@ti.com>
+>> ---
+>>
+>> Russell, I don't have HW to test, but this should
+>> solve the problem you saw when not using battery
+>> with Zoom board. Let me know if it doesn't.
+> 
+> BTW, looks like we're enabling BCI automatically in twl4030.dtsi
+> while the legacy booting does not have TWL_COMMON_PDATA_BCI
+> enabled for LDP. Anyways, for LDP BCI should be enabled for
+> sure, that's the only way to power at least the earlier LDP
+> revisions.
+> 
+I picked up https://patchwork.kernel.org/patch/4002371/ for testing.
 
-On 25.04.2014 13:54, Pankaj Dubey wrote:
-> Add "samsung,syscon-phandle" property pointing to PMU node
-> to access PMU register via PMU regmap handle.
->
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
->   arch/arm/boot/dts/exynos5250.dtsi |    1 +
->   1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-> index 3742331..52801af 100644
-> --- a/arch/arm/boot/dts/exynos5250.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> @@ -173,6 +173,7 @@
->   	pmu_system_controller: system-controller at 10040000 {
->   		compatible = "samsung,exynos5250-pmu", "syscon";
->   		reg = <0x10040000 0x5000>;
-> +		samsung,syscon-phandle = <&pmu_system_controller>;
->   	};
->
->   	watchdog at 101D0000 {
->
+Unfortunately, it does not seem to work in my tests:
 
-This looks strange. A node that refers back to itself. If I understand 
-correctly, you are relying on the fact that if you don't use 
-platform_driver model for the PMU driver, it won't bind to this node and 
-instead the generic syscon driver will. I'm afraid this is incorrect, 
-because the PMU driver should normally use the driver model.
+ldp-board-no-battery uses upstream u-boot in a chainloaded
+configuration + does not have battery plugged in, instead, just J58
+(charger) is connected - this is plugged on a remote farm setup for
+developers to work with.
 
-I see two possible options to solve this problem:
+ldp-board-with-battery uses legacy bootloader with a battery simulator.
 
-1) Instead, the PMU driver should bind to this node and become a syscon 
-provider. This will require a small change in the syscon API, which 
-would be reasonable anyway:
+omap2plus_defconfig + CONFIG_CHARGER_TWL4030 enabled.
 
-  a) instead of using driver_find_device() and dev_get_drvdata() in 
-syscon_node_to_regmap(), a local list of syscon structs should be kept 
-in this driver and then the look-up would just iterate over this list, 
-that could contain external syscon implementations as well,
+Result:
+ v3-15-rc2-ldp-board-no-battery:  Boot FAIL:
+http://slexy.org/raw/s20riTwu04
 
-  b) syscon_register() function should be provided to register an 
-external syscon provider from other drivers, like Exynos PMU driver.
+ v3-15-rc2-ldp-board-with-battery:  Boot PASS:
+http://slexy.org/raw/s2elKdJpI7
 
-Another solution would be:
+ v3-15-rc2-with-felipe-fix-ldp-board-no-battery:  Boot FAIL:
+http://slexy.org/raw/s20lKp2o0s
 
-2) Register a static platform device from Exynos PMU driver, with 
-.of_node set to PMU node and .name to "syscon" to instantiate the syscon 
-device and create a syscon provider, even though the PMU driver would be 
-bound to the node.
 
-The change mentioned in point 1.a) should be implemented regardless of 
-which solution is chosen, as iterating over all devices in the system 
-and relying on their driver_data is rather a poor practice. A local list 
-would be faster - all syscons to iterate over, instead of all devices in 
-the system, and more flexible - a single device could be a provider of 
-multiple resources.
-
-As for the solution for Exynos PMU itself, I tend to prefer 2), as it 
-wouldn't require additional functions exported from the syscon driver.
-
-Best regards,
-Tomasz
+This patch should probably also acknowledge that Russell reported this
+issue.
+-- 
+Regards,
+Nishanth Menon
