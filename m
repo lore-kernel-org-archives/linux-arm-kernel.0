@@ -1,38 +1,68 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Fri, 25 Apr 2014 21:32:38 +0900
-Subject: [PATCH v2 02/10] ARM: EXYNOS: Cleanup "mach-exynos/common.h" file
+Date: Fri, 25 Apr 2014 21:32:40 +0900
+Subject: [PATCH v2 04/10] ARM: EXYNOS: Remove file path from comment section
 In-Reply-To: <1398429166-5539-1-git-send-email-pankaj.dubey@samsung.com>
 References: <1396425058-4012-1-git-send-email-pankaj.dubey@samsung.com>
  <1398429166-5539-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1398429166-5539-3-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1398429166-5539-5-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove unused and unwanted declarations from "mach-exynos/common.h"
+Many files under "arm/mach-exynos" are having file path in file
+comment section which is invalid now.
+So for better code maintainability let's remove them.
 
 Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 ---
- arch/arm/mach-exynos/common.h |    6 ------
- 1 file changed, 6 deletions(-)
+ arch/arm/mach-exynos/headsmp.S             |    2 --
+ arch/arm/mach-exynos/hotplug.c             |    3 +--
+ arch/arm/mach-exynos/include/mach/memory.h |    3 +--
+ arch/arm/mach-exynos/platsmp.c             |    3 +--
+ 4 files changed, 3 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-index 9ef3f83..31c5964 100644
---- a/arch/arm/mach-exynos/common.h
-+++ b/arch/arm/mach-exynos/common.h
-@@ -15,14 +15,8 @@
- #include <linux/reboot.h>
- #include <linux/of.h>
- 
--void mct_init(void __iomem *base, int irq_g0, int irq_l0, int irq_l1);
--
--struct map_desc;
--void exynos_init_io(void);
--void exynos_restart(enum reboot_mode mode, const char *cmd);
- void exynos_cpuidle_init(void);
- void exynos_cpufreq_init(void);
--void exynos_init_late(void);
- 
- void exynos_firmware_init(void);
- 
+diff --git a/arch/arm/mach-exynos/headsmp.S b/arch/arm/mach-exynos/headsmp.S
+index cdd9d91..698c57f 100644
+--- a/arch/arm/mach-exynos/headsmp.S
++++ b/arch/arm/mach-exynos/headsmp.S
+@@ -1,6 +1,4 @@
+ /*
+- *  linux/arch/arm/mach-exynos4/headsmp.S
+- *
+  *  Cloned from linux/arch/arm/mach-realview/headsmp.S
+  *
+  *  Copyright (c) 2003 ARM Limited
+diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
+index 5eead53..73b0b5c 100644
+--- a/arch/arm/mach-exynos/hotplug.c
++++ b/arch/arm/mach-exynos/hotplug.c
+@@ -1,5 +1,4 @@
+-/* linux arch/arm/mach-exynos4/hotplug.c
+- *
++/*
+  *  Cloned from linux/arch/arm/mach-realview/hotplug.c
+  *
+  *  Copyright (C) 2002 ARM Ltd.
+diff --git a/arch/arm/mach-exynos/include/mach/memory.h b/arch/arm/mach-exynos/include/mach/memory.h
+index 2a4cdb7..e19df1f 100644
+--- a/arch/arm/mach-exynos/include/mach/memory.h
++++ b/arch/arm/mach-exynos/include/mach/memory.h
+@@ -1,5 +1,4 @@
+-/* linux/arch/arm/mach-exynos4/include/mach/memory.h
+- *
++/*
+  * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
+  *		http://www.samsung.com
+  *
+diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+index 03e5e9f..29c2286 100644
+--- a/arch/arm/mach-exynos/platsmp.c
++++ b/arch/arm/mach-exynos/platsmp.c
+@@ -1,5 +1,4 @@
+-/* linux/arch/arm/mach-exynos4/platsmp.c
+- *
++/*
+  * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
+  *		http://www.samsung.com
+  *
 -- 
 1.7.10.4
