@@ -1,34 +1,39 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 25 Apr 2014 16:07:02 +0200
-Subject: [PATCH v2 04/18] xhci-platform: Add a new controller using xhci:
- Armada 38x
+Date: Fri, 25 Apr 2014 16:06:59 +0200
+Subject: [PATCH v2 01/18] usb: host: xhci-plat: Sort the headers in alphabetic
+ order
 In-Reply-To: <1398434836-18908-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1398434836-18908-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1398434836-18908-5-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1398434836-18908-2-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Extend the compatible string list with armada-380-xhci. It is used to
-describe xhci controller which is in the Armada 38x SoCs.
+Sorting the headers in alphabetic order will help to reduce the conflict
+when adding new headers later.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- Documentation/devicetree/bindings/usb/usb-xhci.txt | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/usb/host/xhci-plat.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/usb/usb-xhci.txt b/Documentation/devicetree/bindings/usb/usb-xhci.txt
-index 90f8f607d125..cbc91414fd59 100644
---- a/Documentation/devicetree/bindings/usb/usb-xhci.txt
-+++ b/Documentation/devicetree/bindings/usb/usb-xhci.txt
-@@ -1,7 +1,8 @@
- USB xHCI controllers
+diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+index 151901ce1ba9..f5351af4b2c5 100644
+--- a/drivers/usb/host/xhci-plat.c
++++ b/drivers/usb/host/xhci-plat.c
+@@ -11,11 +11,11 @@
+  * version 2 as published by the Free Software Foundation.
+  */
  
- Required properties:
--  - compatible: should be "generic-xhci" (deprecated: "xhci-platform").
-+  - compatible: should be on of "generic-xhci",
-+    "marvell,armada-380-xhci" (deprecated: "xhci-platform").
-   - reg: should contain address and length of the standard XHCI
-     register set for the device.
-   - interrupts: one XHCI interrupt should be described here.
+-#include <linux/platform_device.h>
++#include <linux/dma-mapping.h>
+ #include <linux/module.h>
+-#include <linux/slab.h>
+ #include <linux/of.h>
+-#include <linux/dma-mapping.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
+ 
+ #include "xhci.h"
+ 
 -- 
 1.8.1.2
