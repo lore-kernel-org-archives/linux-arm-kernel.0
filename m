@@ -1,52 +1,116 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 25 Apr 2014 08:44:53 -0500
-Subject: [PATCH V2 00/19] bus: omap_l3_noc: driver cleanups and support
- for DRA7/AM4372
-In-Reply-To: <535A0047.5030807@ti.com>
-References: <1397492726-17203-1-git-send-email-nm@ti.com>
- <1397767775-10965-1-git-send-email-nm@ti.com> <53504041.7090906@ti.com>
- <5350410B.5010507@ti.com> <5358D16A.9000500@ti.com> <53591D6D.3060507@ti.com>
- <535A0047.5030807@ti.com>
-Message-ID: <535A66D5.7010008@ti.com>
+From: mporter@linaro.org (Matt Porter)
+Date: Fri, 25 Apr 2014 09:49:57 -0400
+Subject: [PATCH v4] mach-bcm: clean up config and build targets
+In-Reply-To: <1397565439-29735-1-git-send-email-elder@linaro.org>
+References: <1397565439-29735-1-git-send-email-elder@linaro.org>
+Message-ID: <20140425134957.GD1127@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/25/2014 01:27 AM, Peter Ujfalusi wrote:
-> On 04/24/2014 05:19 PM, Nishanth Menon wrote:
->> On 04/24/2014 03:55 AM, Peter Ujfalusi wrote:
->>> On 04/18/2014 12:00 AM, Nishanth Menon wrote:
->>>> On 04/17/2014 03:57 PM, Santosh Shilimkar wrote:
->>>>> I looked at the series and its looks pretty good. Thanks for fixups, updates.
->>>>> For whole series,
->>>>> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>>>
->>>>
->>>> Thanks.
->>>>
->>>>>> Patches(including Peter's) is available here:
->>>>>> https://github.com/nmenon/linux-2.6-playground/commits/l3noc/driver-fixes-v2
->>>>>>
->>>>> Can Tony pull this branch for 3.16 then which includes Peter's series as well ?
->>>>
->>>> there is just an empty commit with information about peter's patches
->>>> that i lined up to differentiate the series.. I can drop it if Tony
->>>> would like me to.
->>>
->>> Looking at the branch I see my patches underneath so they are in the branch.
->>> It would be great if Tony pulls this... Will be a great present to my patches
->>> (omap_l3 patches in the branch) for their 1 year anniversary of being out on
->>> the mailing list ;)
->>>
->> Peter, can I take this as an Ack for this series? if yes, I can repost
->> a v3 with all the acks, updates together.
+On Tue, Apr 15, 2014 at 07:37:19AM -0500, Alex Elder wrote:
+> Currently CONFIG_ARCH_BCM_MOBILE is used to select all (both)
+> Broadcom mobile SoC families.  Instead, use that only as a config
+> menu switch, and define specific symbols like ARCH_BCM_281XX to
+> select a particular SoC family.  If ARCH_BCM_MOBILE is selected, all
+> of the SoCs will be selected by default, but this way each can be
+> disabled individually as well.
 > 
-> Nishanth, sure you can add my Ack or Reviewed-by.
+> Note that BCM281xx and BCM21664 both require the SMC and L2 cache
+> control code, so that code will be built based on ARCH_BCM_MOBILE.
 > 
-Thanks Peter. i will pick up your ack. Seems that I have to respin the
-series given a few further updates for AM437x - some, ummm...
-variations in definition that we did not expect but Sekhar found when
-reviewing internal functional specs :(
+> Signed-off-by: Alex Elder <elder@linaro.org>
 
--- 
-Regards,
-Nishanth Menon
+Applied to mach-bcm for-3.16/cleanup [added ARM: to patch title].
+
+Thanks,
+Matt
+
+> ---
+> v4:  Rebased on to of v3.15-rc1.  Small tweak in Makefile.
+> v3:  SMC and L2 cache code is needed by both SoC families.
+> v2:  No longer uses Kbuild's $(<modulename>-y) variable mechanism.
+> 
+> The patch is available here:
+>     http://git.linaro.org/landing-teams/working/broadcom/kernel.git
+>     Branch review/mach-bcm-cleanup-v4
+> 
+>  arch/arm/mach-bcm/Kconfig  |   28 ++++++++++++++++++++++++----
+>  arch/arm/mach-bcm/Makefile |   15 ++++++++++++---
+>  2 files changed, 36 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+> index 49c914c..5f5740f 100644
+> --- a/arch/arm/mach-bcm/Kconfig
+> +++ b/arch/arm/mach-bcm/Kconfig
+> @@ -10,7 +10,7 @@ if ARCH_BCM
+>  menu "Broadcom SoC Selection"
+>  
+>  config ARCH_BCM_MOBILE
+> -	bool "Broadcom Mobile SoC" if ARCH_MULTI_V7
+> +	bool "Broadcom Mobile SoC Support" if ARCH_MULTI_V7
+>  	depends on MMU
+>  	select ARCH_REQUIRE_GPIOLIB
+>  	select ARM_ERRATA_754322
+> @@ -23,9 +23,29 @@ config ARCH_BCM_MOBILE
+>  	select PINCTRL
+>  	help
+>  	  This enables support for systems based on Broadcom mobile SoCs.
+> -	  It currently supports the 'BCM281XX' family, which includes
+> -	  BCM11130, BCM11140, BCM11351, BCM28145 and
+> -	  BCM28155 variants.
+> +
+> +if ARCH_BCM_MOBILE
+> +
+> +menu "Broadcom Mobile SoC Selection"
+> +
+> +config ARCH_BCM_281XX
+> +	bool "Broadcom BCM281XX SoC family"
+> +	default y
+> +	help
+> +	  Enable support for the the BCM281XX family, which includes
+> +	  BCM11130, BCM11140, BCM11351, BCM28145 and BCM28155
+> +	  variants.
+> +
+> +config ARCH_BCM_21664
+> +	bool "Broadcom BCM21664 SoC family"
+> +	default y
+> +	help
+> +	  Enable support for the the BCM21664 family, which includes
+> +	  BCM21663 and BCM21664 variants.
+> +
+> +endmenu
+> +
+> +endif
+>  
+>  config ARCH_BCM2835
+>  	bool "Broadcom BCM2835 family" if ARCH_MULTI_V6
+> diff --git a/arch/arm/mach-bcm/Makefile b/arch/arm/mach-bcm/Makefile
+> index a326b28..7fb9b04 100644
+> --- a/arch/arm/mach-bcm/Makefile
+> +++ b/arch/arm/mach-bcm/Makefile
+> @@ -10,10 +10,19 @@
+>  # of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>  # GNU General Public License for more details.
+>  
+> -obj-$(CONFIG_ARCH_BCM_MOBILE)	:= board_bcm281xx.o board_bcm21664.o \
+> -				bcm_kona_smc.o bcm_kona_smc_asm.o kona.o
+> -obj-$(CONFIG_ARCH_BCM2835)	+= board_bcm2835.o
+> +# BCM281XX
+> +obj-$(CONFIG_ARCH_BCM_281XX)	+= board_bcm281xx.o
+>  
+> +# BCM21664
+> +obj-$(CONFIG_ARCH_BCM_21664)	+= board_bcm21664.o
+> +
+> +# BCM281XX and BCM21664 L2 cache control
+> +obj-$(CONFIG_ARCH_BCM_MOBILE)	+= bcm_kona_smc.o bcm_kona_smc_asm.o kona.o
+>  plus_sec := $(call as-instr,.arch_extension sec,+sec)
+>  AFLAGS_bcm_kona_smc_asm.o	:=-Wa,-march=armv7-a$(plus_sec)
+> +
+> +# BCM2835
+> +obj-$(CONFIG_ARCH_BCM2835)	+= board_bcm2835.o
+> +
+> +# BCM5301X
+>  obj-$(CONFIG_ARCH_BCM_5301X)	+= bcm_5301x.o
+> -- 
+> 1.7.9.5
+> 
