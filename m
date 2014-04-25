@@ -1,188 +1,74 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 25 Apr 2014 21:20:07 +0800
-Subject: [PATCH v3 part1 01/11] ACPI / processor: Rework _PDC related stuff to
- make it more arch-independent
+Date: Fri, 25 Apr 2014 21:20:08 +0800
+Subject: [PATCH v3 part1 02/11] ARM64 / ACPI: Introduce the skeleton of _PDC
+ related for ARM64
 In-Reply-To: <1398432017-8506-1-git-send-email-hanjun.guo@linaro.org>
 References: <1398432017-8506-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1398432017-8506-2-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1398432017-8506-3-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-_PDC related stuff in processor_core.c is little bit X86/IA64
-dependent, macros of ACPI_PDC_* are _PDC bit definitions for
-Intel processors, if we use these macros in processor_core.c,
-we will meet compile error when ACPI is enabled on ARM64.
+The _PDC (Processor Driver Capabilities) object provides OSPM a
+mechanism to convey to the platform the capabilities supported
+by OSPM for processor power management.
 
-This patch reworks the code to make it more arch-independent,
-moving Intel related _PDC bits into architecture directory,
-no functional change.
+OSPM evaluates _PDC prior to evaluating any other processor
+power management objects returning configuration information.
 
-Cc: Tony Luck <tony.luck@intel.com>
-Cc: Fenghua Yu <fenghua.yu@intel.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: "H. Peter Anvin" <hpa@zytor.com>
-Cc: x86 at kernel.org
-Cc: linux-ia64 at vger.kernel.org
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+This patch introduces the skeleton of _PDC related file to make
+ACPI core can be compiled on ARM64, and should be revisited when
+implementing CPU power control.
+
+Signed-off-by: Al Stone <al.stone@linaro.org>
 Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
- arch/ia64/include/asm/acpi.h  |    5 +----
- arch/ia64/kernel/acpi.c       |   15 +++++++++++++++
- arch/x86/include/asm/acpi.h   |   19 +------------------
- arch/x86/kernel/acpi/cstate.c |   27 +++++++++++++++++++++++++++
- drivers/acpi/processor_core.c |   19 +------------------
- 5 files changed, 45 insertions(+), 40 deletions(-)
+ arch/arm64/include/asm/acpi.h |   37 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
+ create mode 100644 arch/arm64/include/asm/acpi.h
 
-diff --git a/arch/ia64/include/asm/acpi.h b/arch/ia64/include/asm/acpi.h
-index d651102..d2b8b9d 100644
---- a/arch/ia64/include/asm/acpi.h
-+++ b/arch/ia64/include/asm/acpi.h
-@@ -152,10 +152,7 @@ extern int __initdata nid_to_pxm_map[MAX_NUMNODES];
- #endif
- 
- static inline bool arch_has_acpi_pdc(void) { return true; }
--static inline void arch_acpi_set_pdc_bits(u32 *buf)
--{
--	buf[2] |= ACPI_PDC_EST_CAPABILITY_SMP;
--}
-+extern void arch_acpi_set_pdc_bits(u32 *buf);
- 
- #define acpi_unlazy_tlb(x)
- 
-diff --git a/arch/ia64/kernel/acpi.c b/arch/ia64/kernel/acpi.c
-index 0d407b3..23e9b40 100644
---- a/arch/ia64/kernel/acpi.c
-+++ b/arch/ia64/kernel/acpi.c
-@@ -996,3 +996,18 @@ EXPORT_SYMBOL(acpi_unregister_ioapic);
-  * TBD when when IA64 starts to support suspend...
-  */
- int acpi_suspend_lowlevel(void) { return 0; }
+diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+new file mode 100644
+index 0000000..e3e990e
+--- /dev/null
++++ b/arch/arm64/include/asm/acpi.h
+@@ -0,0 +1,37 @@
++/*
++ *  Copyright (C) 2013~2014, Al Stone <al.stone@linaro.org>
++ *
++ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License as published by
++ *  the Free Software Foundation; either version 2 of the License, or
++ *  (at your option) any later version.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  GNU General Public License for more details.
++ *
++ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++ */
 +
-+void arch_acpi_set_pdc_bits(u32 *buf)
++#ifndef _ASM_ACPI_H
++#define _ASM_ACPI_H
++
++static inline bool arch_has_acpi_pdc(void)
 +{
-+	/* Enable coordination with firmware's _TSD info */
-+	buf[2] |= ACPI_PDC_SMP_T_SWCOORD | ACPI_PDC_EST_CAPABILITY_SMP;
-+
-+	if (boot_option_idle_override == IDLE_NOMWAIT) {
-+		/*
-+		 * If mwait is disabled for CPU C-states, the C2C3_FFH access
-+		 * mode will be disabled in the parameter of _PDC object.
-+		 * Of course C1_FFH access mode will also be disabled.
-+		 */
-+		buf[2] &= ~(ACPI_PDC_C_C2C3_FFH | ACPI_PDC_C_C1_FFH);
-+	}
-+}
-diff --git a/arch/x86/include/asm/acpi.h b/arch/x86/include/asm/acpi.h
-index c8c1e70..e9f71bc 100644
---- a/arch/x86/include/asm/acpi.h
-+++ b/arch/x86/include/asm/acpi.h
-@@ -147,24 +147,7 @@ static inline bool arch_has_acpi_pdc(void)
- 		c->x86_vendor == X86_VENDOR_CENTAUR);
- }
- 
--static inline void arch_acpi_set_pdc_bits(u32 *buf)
--{
--	struct cpuinfo_x86 *c = &cpu_data(0);
--
--	buf[2] |= ACPI_PDC_C_CAPABILITY_SMP;
--
--	if (cpu_has(c, X86_FEATURE_EST))
--		buf[2] |= ACPI_PDC_EST_CAPABILITY_SWSMP;
--
--	if (cpu_has(c, X86_FEATURE_ACPI))
--		buf[2] |= ACPI_PDC_T_FFH;
--
--	/*
--	 * If mwait/monitor is unsupported, C2/C3_FFH will be disabled
--	 */
--	if (!cpu_has(c, X86_FEATURE_MWAIT))
--		buf[2] &= ~(ACPI_PDC_C_C2C3_FFH);
--}
-+extern void arch_acpi_set_pdc_bits(u32 *buf);
- 
- #else /* !CONFIG_ACPI */
- 
-diff --git a/arch/x86/kernel/acpi/cstate.c b/arch/x86/kernel/acpi/cstate.c
-index 4b28159..95127d0 100644
---- a/arch/x86/kernel/acpi/cstate.c
-+++ b/arch/x86/kernel/acpi/cstate.c
-@@ -16,6 +16,33 @@
- #include <asm/mwait.h>
- #include <asm/special_insns.h>
- 
-+void arch_acpi_set_pdc_bits(u32 *buf)
-+{
-+	struct cpuinfo_x86 *c = &cpu_data(0);
-+
-+	/* Enable coordination with firmware's _TSD info */
-+	buf[2] |= ACPI_PDC_SMP_T_SWCOORD | ACPI_PDC_C_CAPABILITY_SMP;
-+
-+	if (cpu_has(c, X86_FEATURE_EST))
-+		buf[2] |= ACPI_PDC_EST_CAPABILITY_SWSMP;
-+
-+	if (cpu_has(c, X86_FEATURE_ACPI))
-+		buf[2] |= ACPI_PDC_T_FFH;
-+
-+	/* If mwait/monitor is unsupported, C2/C3_FFH will be disabled */
-+	if (!cpu_has(c, X86_FEATURE_MWAIT))
-+		buf[2] &= ~(ACPI_PDC_C_C2C3_FFH);
-+
-+	if (boot_option_idle_override == IDLE_NOMWAIT) {
-+		/*
-+		 * If mwait is disabled for CPU C-states, the C2C3_FFH access
-+		 * mode will be disabled in the parameter of _PDC object.
-+		 * Of course C1_FFH access mode will also be disabled.
-+		 */
-+		buf[2] &= ~(ACPI_PDC_C_C2C3_FFH | ACPI_PDC_C_C1_FFH);
-+	}
++	/*
++	 * Always false for now, should be revisited when
++	 * implementing CPU power management
++	 */
++	return false;
 +}
 +
- /*
-  * Initialize bm_flags based on the CPU cache properties
-  * On SMP it depends on cache configuration
-diff --git a/drivers/acpi/processor_core.c b/drivers/acpi/processor_core.c
-index 71e2065..5250327 100644
---- a/drivers/acpi/processor_core.c
-+++ b/drivers/acpi/processor_core.c
-@@ -254,9 +254,6 @@ static void acpi_set_pdc_bits(u32 *buf)
- 	buf[0] = ACPI_PDC_REVISION_ID;
- 	buf[1] = 1;
- 
--	/* Enable coordination with firmware's _TSD info */
--	buf[2] = ACPI_PDC_SMP_T_SWCOORD;
--
- 	/* Twiddle arch-specific bits needed for _PDC */
- 	arch_acpi_set_pdc_bits(buf);
- }
-@@ -281,7 +278,7 @@ static struct acpi_object_list *acpi_processor_alloc_pdc(void)
- 		return NULL;
- 	}
- 
--	buf = kmalloc(12, GFP_KERNEL);
-+	buf = kzalloc(12, GFP_KERNEL);
- 	if (!buf) {
- 		printk(KERN_ERR "Memory allocation error\n");
- 		kfree(obj);
-@@ -309,20 +306,6 @@ acpi_processor_eval_pdc(acpi_handle handle, struct acpi_object_list *pdc_in)
- {
- 	acpi_status status = AE_OK;
- 
--	if (boot_option_idle_override == IDLE_NOMWAIT) {
--		/*
--		 * If mwait is disabled for CPU C-states, the C2C3_FFH access
--		 * mode will be disabled in the parameter of _PDC object.
--		 * Of course C1_FFH access mode will also be disabled.
--		 */
--		union acpi_object *obj;
--		u32 *buffer = NULL;
--
--		obj = pdc_in->pointer;
--		buffer = (u32 *)(obj->buffer.pointer);
--		buffer[2] &= ~(ACPI_PDC_C_C2C3_FFH | ACPI_PDC_C_C1_FFH);
--
--	}
- 	status = acpi_evaluate_object(handle, "_PDC", pdc_in, NULL);
- 
- 	if (ACPI_FAILURE(status))
++static inline void arch_acpi_set_pdc_bits(u32 *buf)
++{
++	/* Should be revisited when implementing CPU power management */
++	return;
++}
++
++#endif /*_ASM_ACPI_H*/
 -- 
 1.7.9.5
