@@ -1,124 +1,41 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 25 Apr 2014 09:26:42 +0900
-Subject: [PATCH/RFC] serial: sh-sci: Add device tree support for r8a7779
-In-Reply-To: <1418731.YSFS18bIMD@avalon>
-References: <1398322484-3630-1-git-send-email-horms+renesas@verge.net.au>
- <1418731.YSFS18bIMD@avalon>
-Message-ID: <20140425002641.GB31164@verge.net.au>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 24 Apr 2014 17:52:51 -0700
+Subject: [PATCH 1/2] arm: fixmap: implement __set_fixmap()
+In-Reply-To: <1396646870-29695-1-git-send-email-rabin@rab.in>
+References: <1396646870-29695-1-git-send-email-rabin@rab.in>
+Message-ID: <CAD=FV=UuYpc-kFMymy7P_mL+iYziKqJii8=32P6kMELDFnC1pQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 25, 2014 at 01:33:29AM +0200, Laurent Pinchart wrote:
-> Hi Simon,
-> 
-> Thank you for the patch.
-> 
-> On Thursday 24 April 2014 15:54:44 Simon Horman wrote:
-> > According to the platform data for the legacy-C initialisation of sh-sci
-> > for the r8a7779 SoC and my own testing the SCIx_SH4_SCIF_REGTYPE bit of
-> > scscr needs to be set.
-> > 
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > 
-> > ---
-> > 
-> > With the approach taken by this patch sh-sci may be initialised using the
-> > "renesas,scif-r8a7779" compat string but not the generic "renesas,scif"
-> > compat string.  An alternate approach would be to add a binding to allow
-> > setting of this bit to be controlled directly from DT.
-> 
-> Handling the SCSCR bits properly with DT has been on my to-do list for some 
-> time. Thank you for volunteering to implement that :-D
-> 
-> The CKE bits control both the behaviour of the SCK pin and the SCIF input 
-> clock selection. The SCIF can use various internal and external clocks, with 
-> up to two baud rate generators (programmable dividers) chained. Whether the 
-> SoC is provided with an external clock for its serial ports is a board 
-> property, not an SoC property. I would thus like to implement support for this 
-> feature properly and avoid hardcoding the CKE bits like done below.
-> 
-> The Marzen board has an external clock generator connected to the SCIF_SCK pin 
-> that can be used as a clock source, but I don't really see a reason why we 
-> couldn't use the internal P clock instead. I don't want to delay integration 
-> of SCIF DT support until we have a proper solution to handle clock 
-> configuration, but couldn't we use the internal P clock on the Marzen board in 
-> the meantime ?
+Rabin,
 
-I think that approach sounds reasonable and I seem to have it working
-without any driver changes. Could you confirm that the following
-DT snippet is what you have in mind? (I intend to update it as per any
-relevant changes you make when reposting your DT sci patch for the
-r8a7791.)
+On Fri, Apr 4, 2014 at 2:27 PM, Rabin Vincent <rabin@rab.in> wrote:
+> This is used from set_fixmap() and clear_fixmap() via
+> asm-generic/fixmap.h.
+>
+> Signed-off-by: Rabin Vincent <rabin@rab.in>
+> ---
+> Needs "arm: use generic fixmap.h", available in linux-next.
+>
+>  arch/arm/include/asm/fixmap.h | 2 ++
+>  arch/arm/mm/mmu.c             | 7 +++++++
+>  2 files changed, 9 insertions(+)
+>
+> diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
+> index 68ea615..55ed076 100644
+> --- a/arch/arm/include/asm/fixmap.h
+> +++ b/arch/arm/include/asm/fixmap.h
+> @@ -23,6 +23,8 @@ enum fixed_addresses {
+>         __end_of_fixed_addresses
+>  };
+>
+> +void __set_fixmap(enum fixed_addresses idx, unsigned long phys, pgprot_t prot);
+
+nit: I think you should use phys_addr_t for the physical address, right?
+
+void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot);
 
 
-diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
-index e924f96..3e9cca4 100644
---- a/arch/arm/boot/dts/r8a7779.dtsi
-+++ b/arch/arm/boot/dts/r8a7779.dtsi
-@@ -203,6 +203,66 @@
- 		status = "disabled";
- 	};
- 
-+	scif0: serial at ffe40000 {
-+		compatible = "renesas,scif", "renesas,scif-r8a7779";
-+		reg = <0xffe40000 265>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 88 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cpg_clocks R8A7779_CLK_P>;
-+		clock-names = "sci_ick";
-+		status = "disabled";
-+	};
-+
-+	scif1: serial at ffe41000 {
-+		compatible = "renesas,scif", "renesas,scif-r8a7779";
-+		reg = <0xffe41000 265>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 89 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cpg_clocks R8A7779_CLK_P>;
-+		clock-names = "sci_ick";
-+		status = "disabled";
-+	};
-+
-+	scif2: serial at ffe42000 {
-+		compatible = "renesas,scif", "renesas,scif-r8a7779";
-+		reg = <0xffe42000 265>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 90 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cpg_clocks R8A7779_CLK_P>;
-+		clock-names = "sci_ick";
-+		status = "disabled";
-+	};
-+
-+	scif3: serial at ffe43000 {
-+		compatible = "renesas,scif", "renesas,scif-r8a7779";
-+		reg = <0xffe43000 265>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 91 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cpg_clocks R8A7779_CLK_P>;
-+		clock-names = "sci_ick";
-+		status = "disabled";
-+	};
-+
-+	scif4: serial at ffe44000 {
-+		compatible = "renesas,scif", "renesas,scif-r8a7779";
-+		reg = <0xffe44000 265>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 92 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cpg_clocks R8A7779_CLK_P>;
-+		clock-names = "sci_ick";
-+		status = "disabled";
-+	};
-+
-+	scif5: serial at ffe45000 {
-+		compatible = "renesas,scif", "renesas,scif-r8a7779";
-+		reg = <0xffe45000 265>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 93 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cpg_clocks R8A7779_CLK_P>;
-+		clock-names = "sci_ick";
-+		status = "disabled";
-+	};
-+
- 	pfc: pfc at fffc0000 {
- 		compatible = "renesas,pfc-r8a7779";
- 		reg = <0xfffc0000 0x23c>;
+...I'm no expert at fixmap, but otherwise this looks pretty reasonable to me.
+
+-Doug
