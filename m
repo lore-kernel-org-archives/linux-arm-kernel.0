@@ -1,132 +1,80 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:39:02 +0100
-Subject: [PATCH 095/222] net:fec: clean up duplex mode handling
+Date: Fri, 25 Apr 2014 12:37:56 +0100
+Subject: [PATCH 082/222] net:fec: ensure that we dma unmap the transmit
+ descriptors
 In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
 References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WdeT8-0007JX-GQ@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WdeS4-0007If-2r@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Many places call fec_restart() with the second parameter being some kind
-of previously saved duplex value, but only two places call it with some
-other setting.  This is at odds with how the other link settings are
-handled, and used to be racy before the rtnl locks were added to
-fec_restart()'s various call paths.
-
-Clean this up so all link capabilities are handled in the same way -
-saved into the fec_enet_private structure, and then fec_restart() acts
-on those settings.
+On transmit timeout or close, dirty transmit descriptors were not being
+correctly cleaned: the only time that DMA mappings are cleaned is when
+scanning the TX ring after a transmit interrupt.  Fix this.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/net/ethernet/freescale/fec_main.c | 24 ++++++++++++------------
- 1 file changed, 12 insertions(+), 12 deletions(-)
+ drivers/net/ethernet/freescale/fec_main.c | 21 +++++++++++++++++----
+ 1 file changed, 17 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index c79d604372a4..d5ad0c70e6a0 100644
+index 7f7d9dcb485e..94861870e741 100644
 --- a/drivers/net/ethernet/freescale/fec_main.c
 +++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -521,7 +521,7 @@ static void fec_enet_bd_init(struct net_device *dev)
-  * packet processing for this device must be stopped before this call.
-  */
- static void
--fec_restart(struct net_device *ndev, int duplex)
-+fec_restart(struct net_device *ndev)
- {
- 	struct fec_enet_private *fep = netdev_priv(ndev);
- 	const struct platform_device_id *id_entry =
-@@ -572,7 +572,7 @@ fec_restart(struct net_device *ndev, int duplex)
- 	}
- 
- 	/* Enable MII mode */
--	if (duplex) {
-+	if (fep->full_duplex == DUPLEX_FULL) {
- 		/* FD enable */
- 		writel(0x04, fep->hwp + FEC_X_CNTRL);
- 	} else {
-@@ -581,8 +581,6 @@ fec_restart(struct net_device *ndev, int duplex)
- 		writel(0x0, fep->hwp + FEC_X_CNTRL);
- 	}
- 
--	fep->full_duplex = duplex;
--
- 	/* Set MII speed */
- 	writel(fep->phy_speed, fep->hwp + FEC_MII_SPEED);
- 
-@@ -759,7 +757,7 @@ static void fec_enet_work(struct work_struct *work)
- 		if (netif_device_present(ndev) || netif_running(ndev)) {
- 			napi_disable(&fep->napi);
- 			netif_tx_lock_bh(ndev);
--			fec_restart(ndev, fep->full_duplex);
-+			fec_restart(ndev);
- 			netif_wake_queue(ndev);
- 			netif_tx_unlock_bh(ndev);
- 			napi_enable(&fep->napi);
-@@ -1207,8 +1205,10 @@ static void fec_enet_adjust_link(struct net_device *ndev)
- 			status_change = 1;
- 		}
- 
--		if (fep->full_duplex != phy_dev->duplex)
-+		if (fep->full_duplex != phy_dev->duplex) {
-+			fep->full_duplex = phy_dev->duplex;
- 			status_change = 1;
-+		}
- 
- 		if (phy_dev->speed != fep->speed) {
- 			fep->speed = phy_dev->speed;
-@@ -1219,7 +1219,7 @@ static void fec_enet_adjust_link(struct net_device *ndev)
- 		if (status_change) {
- 			napi_disable(&fep->napi);
- 			netif_tx_lock_bh(ndev);
--			fec_restart(ndev, phy_dev->duplex);
-+			fec_restart(ndev);
- 			netif_wake_queue(ndev);
- 			netif_tx_unlock_bh(ndev);
- 			napi_enable(&fep->napi);
-@@ -1572,7 +1572,7 @@ static int fec_enet_set_pauseparam(struct net_device *ndev,
- 	if (netif_running(ndev)) {
- 		napi_disable(&fep->napi);
- 		netif_tx_lock_bh(ndev);
--		fec_restart(ndev, fep->full_duplex);
-+		fec_restart(ndev);
- 		netif_wake_queue(ndev);
- 		netif_tx_unlock_bh(ndev);
- 		napi_enable(&fep->napi);
-@@ -1850,7 +1850,7 @@ fec_enet_open(struct net_device *ndev)
- 		return ret;
- 	}
- 
--	fec_restart(ndev, fep->full_duplex);
-+	fec_restart(ndev);
- 	napi_enable(&fep->napi);
- 	phy_start(fep->phy_dev);
- 	netif_start_queue(ndev);
-@@ -2024,7 +2024,7 @@ static int fec_set_features(struct net_device *netdev,
- 
- 	/* Resume the device after updates */
- 	if (netif_running(netdev) && changed & FEATURES_NEED_QUIESCE) {
--		fec_restart(netdev, fep->phy_dev->duplex);
-+		fec_restart(netdev);
- 		netif_wake_queue(netdev);
- 		netif_tx_unlock_bh(netdev);
- 		napi_enable(&fep->napi);
-@@ -2110,7 +2110,7 @@ static int fec_enet_init(struct net_device *ndev)
- 		fep->csum_flags |= FLAG_RX_CSUM_ENABLED;
- 	}
- 
--	fec_restart(ndev, 0);
-+	fec_restart(ndev);
- 
+@@ -327,6 +327,17 @@ fec_enet_clear_csum(struct sk_buff *skb, struct net_device *ndev)
  	return 0;
  }
-@@ -2422,7 +2422,7 @@ fec_resume(struct device *dev)
  
- 	rtnl_lock();
- 	if (netif_running(ndev)) {
--		fec_restart(ndev, fep->full_duplex);
-+		fec_restart(ndev);
- 		netif_tx_lock_bh(ndev);
- 		netif_device_attach(ndev);
- 		netif_tx_unlock_bh(ndev);
++static void
++fec_enet_tx_unmap(struct bufdesc *bdp, struct fec_enet_private *fep)
++{
++	dma_addr_t addr = bdp->cbd_bufaddr;
++	unsigned length = bdp->cbd_datlen;
++
++	bdp->cbd_bufaddr = 0;
++
++	dma_unmap_single(&fep->pdev->dev, addr, length, DMA_TO_DEVICE);
++}
++
+ static netdev_tx_t
+ fec_enet_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+ {
+@@ -489,11 +500,12 @@ static void fec_enet_bd_init(struct net_device *dev)
+ 
+ 		/* Initialize the BD for every fragment in the page. */
+ 		bdp->cbd_sc = 0;
++		if (bdp->cbd_bufaddr)
++			fec_enet_tx_unmap(bdp, fep);
+ 		if (fep->tx_skbuff[i]) {
+ 			dev_kfree_skb_any(fep->tx_skbuff[i]);
+ 			fep->tx_skbuff[i] = NULL;
+ 		}
+-		bdp->cbd_bufaddr = 0;
+ 		bdp = fec_enet_get_nextdesc(bdp, fep);
+ 	}
+ 
+@@ -792,11 +804,10 @@ fec_enet_tx(struct net_device *ndev)
+ 		else
+ 			index = bdp - fep->tx_bd_base;
+ 
++		fec_enet_tx_unmap(bdp, fep);
++
+ 		skb = fep->tx_skbuff[index];
+ 		fep->tx_skbuff[index] = NULL;
+-		dma_unmap_single(&fep->pdev->dev, bdp->cbd_bufaddr, skb->len,
+-				DMA_TO_DEVICE);
+-		bdp->cbd_bufaddr = 0;
+ 
+ 		/* Check for errors. */
+ 		if (status & (BD_ENET_TX_HB | BD_ENET_TX_LC |
+@@ -1723,6 +1734,8 @@ static void fec_enet_free_buffers(struct net_device *ndev)
+ 
+ 	bdp = fep->tx_bd_base;
+ 	for (i = 0; i < fep->tx_ring_size; i++) {
++		if (bdp->cbd_bufaddr)
++			fec_enet_tx_unmap(bdp, fep);
+ 		kfree(fep->tx_bounce[i]);
+ 		fep->tx_bounce[i] = NULL;
+ 		skb = fep->tx_skbuff[i];
 -- 
 1.8.3.1
