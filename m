@@ -1,61 +1,40 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 25 Apr 2014 22:00:24 +0200
-Subject: [RFC 5/5] ARM: berlin/dt: add support for the clock group to BG2Q
-In-Reply-To: <1398456024-27876-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1398456024-27876-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1398456024-27876-7-git-send-email-alexandre.belloni@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 25 Apr 2014 22:01:51 +0200
+Subject: [PATCH v2 03/18] usb: host: xhci-plat: Add support for the Armada
+ 38x
+In-Reply-To: <1398434836-18908-4-git-send-email-gregory.clement@free-electrons.com>
+References: <1398434836-18908-1-git-send-email-gregory.clement@free-electrons.com>
+ <1398434836-18908-4-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <5392399.GiPjM0CIZ0@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the newly added marvell,berlin2-clkgrp driver, add real support for cfgclk
-and add the nfcecc clock.
+On Friday 25 April 2014 16:07:01 Gregory CLEMENT wrote:
+> @@ -148,6 +149,9 @@ static int xhci_plat_probe(struct platform_device *pdev)
+>         if (ret)
+>                 return ret;
+>  
+> +       if (of_device_is_compatible(pdev->dev.of_node, "marvell,armada-380-xhci"))
+> +               xhci_mvebu_mbus_init_quirk(pdev);
+> +
+>         /* Initialize dma_mask and coherent_dma_mask to 32-bits */
+>         ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
+>         if (ret)
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/boot/dts/berlin2q.dtsi | 24 ++++++++++++++++++------
- 1 file changed, 18 insertions(+), 6 deletions(-)
+I think you're doing it the wrong way around: You have a specialized
+version of the generic xhci-plat driver. The normal way to handle this
+is to have a loadable module that contains all the Armada specific
+code and that registers a platform_driver. In the probe() function of
+that driver, you can do the platform specific setup and then call
+the generic xhci_plat_probe() function, which of course has to
+be provided using EXPORT_SYMBOL_GPL.
 
-diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-index 559819b89ea1..169c783ef262 100644
---- a/arch/arm/boot/dts/berlin2q.dtsi
-+++ b/arch/arm/boot/dts/berlin2q.dtsi
-@@ -53,12 +53,6 @@
- 		clock-frequency = <25000000>;
- 	};
- 
--	cfgclk: config-clock {
--		compatible = "fixed-clock";
--		#clock-cells = <0>;
--		clock-frequency = <100000000>;
--	};
--
- 	twdclk: twdclk {
- 		compatible = "fixed-factor-clock";
- 		#clock-cells = <0>;
-@@ -191,6 +185,24 @@
- 			reg = <0xea0030 0x8>;
- 		};
- 
-+		grpclk: grpclk at ea00ec {
-+			compatible = "marvell,berlin2-clkgrp";
-+			clocks = <&syspll>;
-+			reg = <0xea00f8 0x4>, <0xea00ec 0xc>;
-+
-+			cfgclk: cfgclk {
-+				#clock-cells = <0>;
-+				marvell,clk-switch-offset = <9>;
-+				marvell,clk-select-offset = <12>;
-+			};
-+
-+			nfceccclk: nfceccclk {
-+				#clock-cells = <0>;
-+				marvell,clk-switch-offset = <27>;
-+				marvell,clk-select-offset = <50>;
-+			};
-+		};
-+
- 		sdio0xinclk: sdio0xinclk at ea0158 {
- 			compatible = "marvell,berlin-clk";
- 			clocks = <&syspll>;
--- 
-1.9.1
+We have just spent a lot of effort converting the EHCI and OHCI drivers
+to the more generic model, so we shouldn't do it the wrong way for
+xhci. I just noticed that we already have this creeping into the 
+xhci driver in the from of a common xhci_hcd_init() function calling
+xhci_register_pci() and xhci_register_plat(). It would be good to
+clean that up at the same time, it should only require exporting
+a few symbols from xhci.c for use by the two front-ends.
+
+	Arnd
