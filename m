@@ -1,331 +1,413 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Fri, 25 Apr 2014 09:50:06 +0200
-Subject: [PATCH 2/2] i2c: sunxi: add P2WI (Push/Pull 2 Wire Interface)
- controller support
-In-Reply-To: <20140424132912.GA24905@lukather>
-References: <1398340516-29547-1-git-send-email-boris.brezillon@free-electrons.com>
- <1398340516-29547-3-git-send-email-boris.brezillon@free-electrons.com>
- <20140424132912.GA24905@lukather>
-Message-ID: <535A13AE.4090103@free-electrons.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 25 Apr 2014 09:52:59 +0200
+Subject: [PATCH] Exynos4: cpuidle: support dual CPUs with AFTR state
+In-Reply-To: <53594D17.6020107@samsung.com>
+References: <1396604925-18383-1-git-send-email-daniel.lezcano@linaro.org>
+ <53594D17.6020107@samsung.com>
+Message-ID: <535A145B.5010801@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+On 04/24/2014 07:42 PM, Tomasz Figa wrote:
+> Hi Daniel,
+>
+> Please see my comments inline.
 
-On 24/04/2014 15:29, Maxime Ripard wrote:
-> On Thu, Apr 24, 2014 at 01:55:16PM +0200, Boris BREZILLON wrote:
->> The P2WI looks like an SMBus controller which only supports byte data
->> transfers. But, it differs from standard SMBus protocol on several
->> aspects:
->> - it supports only one slave device, and thus drop the address field
->> - it adds a parity bit every 8bits of data
->> - only one read access is required to read a byte (instead of a read
->>   followed by a write access in standard SMBus protocol)
->> - there's no Ack bit after each byte transfer
+Hi Tomasz,
+
+> Btw. Please fix your e-mail composer to properly wrap your messages
+> around 7xth column, as otherwise they're hard to read.
+
+Well it is already set to the 71th column.
+
+> On 04.04.2014 11:48, Daniel Lezcano wrote:
+>> The following driver is for exynos4210. I did not yet finished the
+>> other boards, so
+>> I created a specific driver for 4210 which could be merged later.
 >>
->> This means this bus cannot be used to interface with standard SMBus
->> devices (the only known device to support this interface is the AXP221
->> PMIC).
+>> The driver is based on Colin Cross's driver found at:
 >>
->> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+>> https://android.googlesource.com/kernel/exynos/+/e686b1ec67423c40b4fdf811f9a4dfa3b393a010%5E%5E!/
+>>
+>>
+>> This one was based on a 3.4 kernel and an old API.
+>>
+>> It has been refreshed, simplified and based on the recent code cleanup
+>> I sent
+>> today.
+>>
+>> The AFTR could be entered when all the cpus (except cpu0) are down. In
+>> order to
+>> reach this situation, the couple idle states are used.
+>>
+>> There is a sync barrier at the entry and the exit of the low power
+>> function. So
+>> all cpus will enter and exit the function at the same time.
+>>
+>> At this point, CPU0 knows the other cpu will power down itself. CPU0
+>> waits for
+>> the CPU1 to be powered down and then initiate the AFTR power down
+>> sequence.
+>>
+>> No interrupts are handled by CPU1, this is why we switch to the timer
+>> broadcast
+>> even if the local timer is not impacted by the idle state.
+>>
+>> When CPU0 wakes up, it powers up CPU1 and waits for it to boot. Then
+>> they both
+>> exit the idle function.
+>>
+>> This driver allows the exynos4210 to have the same power consumption
+>> at idle
+>> time than the one when we have to unplug CPU1 in order to let CPU0 to
+>> reach
+>> the AFTR state.
+>>
+>> This patch is a RFC because, we have to find a way to remove the macros
+>> definitions and cpu powerdown function without pulling the arch dependent
+>> headers.
+>>
+>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 >> ---
->>  drivers/i2c/busses/Kconfig          |  12 ++
->>  drivers/i2c/busses/Makefile         |   1 +
->>  drivers/i2c/busses/i2c-sunxi-p2wi.c | 317 ++++++++++++++++++++++++++++++++++++
->>  3 files changed, 330 insertions(+)
->>  create mode 100644 drivers/i2c/busses/i2c-sunxi-p2wi.c
+>>   arch/arm/mach-exynos/common.c        |   11 +-
+>>   drivers/cpuidle/Kconfig.arm          |    8 ++
+>>   drivers/cpuidle/Makefile             |    1 +
+>>   drivers/cpuidle/cpuidle-exynos4210.c |  226
+>> ++++++++++++++++++++++++++++++++++
+>>   4 files changed, 245 insertions(+), 1 deletion(-)
+>>   create mode 100644 drivers/cpuidle/cpuidle-exynos4210.c
 >>
->> diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
->> index c94db1c..37e53d6 100644
->> --- a/drivers/i2c/busses/Kconfig
->> +++ b/drivers/i2c/busses/Kconfig
->> @@ -771,6 +771,18 @@ config I2C_STU300
->>  	  This driver can also be built as a module. If so, the module
->>  	  will be called i2c-stu300.
->>  
->> +config I2C_SUNXI_P2WI
->> +	tristate "Allwinner sunxi internal P2WI controller"
-> Since the A31 is the only SoC that uses it, maybe you can drop the
-> sunxi and use either sun6i or A31 here?
-
-It makes sense, I'll change the config option into I2C_SUNXI_P2WI and
-the source file name into i2c-sun6i-p2wi.c.
-
->> +	depends on ARCH_SUNXI
->> +	help
->> +	  If you say yes to this option, support will be included for the
->> +	  P2WI (Push/Pull 2 Wire Interface) controller embedded in some sunxi
->> +	  SOCs.
->> +	  The P2WI looks like an SMBus controller (which supports only byte
->> +	  accesses), except that it only supports one slave device.
->> +	  This interface is used to connect to specific PMIC devices (like the
->> +	  AXP221).
+>> diff --git a/arch/arm/mach-exynos/common.c
+>> b/arch/arm/mach-exynos/common.c
+>> index d5fa21e..1765a98 100644
+>> --- a/arch/arm/mach-exynos/common.c
+>> +++ b/arch/arm/mach-exynos/common.c
+>> @@ -299,9 +299,18 @@ static struct platform_device exynos_cpuidle = {
+>>       .id                = -1,
+>>   };
+>>
+>> +static struct platform_device exynos4210_cpuidle = {
+>> +    .name              = "exynos4210-cpuidle",
+>> +    .dev.platform_data = exynos_sys_powerdown_aftr,
+>> +    .id                = -1,
+>> +};
 >> +
->>  config I2C_TEGRA
->>  	tristate "NVIDIA Tegra internal I2C controller"
->>  	depends on ARCH_TEGRA
->> diff --git a/drivers/i2c/busses/Makefile b/drivers/i2c/busses/Makefile
->> index 18d18ff..c63d2ec 100644
->> --- a/drivers/i2c/busses/Makefile
->> +++ b/drivers/i2c/busses/Makefile
->> @@ -75,6 +75,7 @@ obj-$(CONFIG_I2C_SIMTEC)	+= i2c-simtec.o
->>  obj-$(CONFIG_I2C_SIRF)		+= i2c-sirf.o
->>  obj-$(CONFIG_I2C_ST)		+= i2c-st.o
->>  obj-$(CONFIG_I2C_STU300)	+= i2c-stu300.o
->> +obj-$(CONFIG_I2C_SUNXI_P2WI)	+= i2c-sunxi-p2wi.o
->>  obj-$(CONFIG_I2C_TEGRA)		+= i2c-tegra.o
->>  obj-$(CONFIG_I2C_VERSATILE)	+= i2c-versatile.o
->>  obj-$(CONFIG_I2C_WMT)		+= i2c-wmt.o
->> diff --git a/drivers/i2c/busses/i2c-sunxi-p2wi.c b/drivers/i2c/busses/i2c-sunxi-p2wi.c
+>>   void __init exynos_cpuidle_init(void)
+>>   {
+>> -    platform_device_register(&exynos_cpuidle);
+>> +    if (soc_is_exynos4210())
+>> +        platform_device_register(&exynos4210_cpuidle);
+>> +    else
+>> +        platform_device_register(&exynos_cpuidle);
+>>   }
+>>
+>>   void __init exynos_cpufreq_init(void)
+>> diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
+>> index 92f0c12..2772130 100644
+>> --- a/drivers/cpuidle/Kconfig.arm
+>> +++ b/drivers/cpuidle/Kconfig.arm
+>> @@ -51,3 +51,11 @@ config ARM_EXYNOS_CPUIDLE
+>>       depends on ARCH_EXYNOS
+>>       help
+>>         Select this to enable cpuidle for Exynos processors
+>> +
+>> +config ARM_EXYNOS4210_CPUIDLE
+>> +    bool "Cpu Idle Driver for the Exynos 4210 processor"
+>> +    default y
+>> +    depends on ARCH_EXYNOS
+>> +    select ARCH_NEEDS_CPU_IDLE_COUPLED if SMP
+>> +    help
+>> +      Select this to enable cpuidle for the Exynos 4210 processors
+>> diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
+>> index 0d1540a..e0ec9bc 100644
+>> --- a/drivers/cpuidle/Makefile
+>> +++ b/drivers/cpuidle/Makefile
+>> @@ -14,6 +14,7 @@ obj-$(CONFIG_ARM_ZYNQ_CPUIDLE)        += cpuidle-zynq.o
+>>   obj-$(CONFIG_ARM_U8500_CPUIDLE)         += cpuidle-ux500.o
+>>   obj-$(CONFIG_ARM_AT91_CPUIDLE)          += cpuidle-at91.o
+>>   obj-$(CONFIG_ARM_EXYNOS_CPUIDLE)        += cpuidle-exynos.o
+>> +obj-$(CONFIG_ARM_EXYNOS4210_CPUIDLE)    += cpuidle-exynos4210.o
+>>
+>>
+>> ###############################################################################
+>>
+>>   # POWERPC drivers
+>> diff --git a/drivers/cpuidle/cpuidle-exynos4210.c
+>> b/drivers/cpuidle/cpuidle-exynos4210.c
 >> new file mode 100644
->> index 0000000..e3fdd76
+>> index 0000000..56f6d51
 >> --- /dev/null
->> +++ b/drivers/i2c/busses/i2c-sunxi-p2wi.c
->> @@ -0,0 +1,317 @@
+>> +++ b/drivers/cpuidle/cpuidle-exynos4210.c
+>> @@ -0,0 +1,226 @@
 >> +/*
->> + * P2WI (Push-Pull Two Wire Interface) bus driver.
+>> + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
+>> + *        http://www.samsung.com
 >> + *
->> + * Author: Boris BREZILLON <boris.brezillon@free-electrons.com>
+>> + * Copyright (c) 2014 Linaro : Daniel Lezcano
+>> <daniel.lezcano@linaro.org>
+>> + *        http://www.linaro.org
 >> + *
->> + * This file is licensed under the terms of the GNU General Public License
->> + * version 2.  This program is licensed "as is" without any warranty of any
->> + * kind, whether express or implied.
+>> + * Based on the work of Colin Cross <ccross@android.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
 >> + */
->> +#include <linux/kernel.h>
->> +#include <linux/slab.h>
->> +#include <linux/module.h>
->> +#include <linux/spinlock.h>
->> +#include <linux/i2c.h>
->> +#include <linux/interrupt.h>
->> +#include <linux/platform_device.h>
+>> +
+>> +#include <linux/cpuidle.h>
+>> +#include <linux/cpu_pm.h>
 >> +#include <linux/io.h>
->> +#include <linux/of.h>
->> +#include <linux/of_device.h>
->> +#include <linux/of_irq.h>
->> +#include <linux/clk.h>
->> +#include <linux/err.h>
->> +#include <linux/delay.h>
->> +#include <linux/clk.h>
->> +#include <linux/reset.h>
+>> +#include <linux/platform_device.h>
 >> +
+>> +#include <asm/proc-fns.h>
+>> +#include <asm/suspend.h>
+>> +#include <asm/cpuidle.h>
 >> +
->> +/* P2WI registers */
->> +#define P2WI_CTRL		0x0
->> +#define P2WI_CCR		0x4
->> +#define P2WI_INTE		0x8
->> +#define P2WI_INTS		0xc
->> +#define P2WI_DADDR0		0x10
->> +#define P2WI_DADDR1		0x14
->> +#define P2WI_DLEN		0x18
->> +#define P2WI_DATA0		0x1c
->> +#define P2WI_DATA1		0x20
->> +#define P2WI_LCR		0x24
->> +#define P2WI_PMCR		0x28
->> +
->> +/* CTRL fields */
->> +#define P2WI_START_TRANS	(1 << 7)
->> +#define P2WI_ABORT_TRANS	(1 << 6)
->> +#define P2WI_GLOBAL_INT_ENB	(1 << 1)
->> +#define P2WI_SOFT_RST		(1 << 0)
-> BIT() ?
-
-Sure, I'll make use of the BIT macro wherever possible.
-
+>> +#include <plat/pm.h>
+>> +#include <plat/cpu.h>
+>> +#include <plat/map-base.h>
+>> +#include <plat/map-s5p.h>
 >
->> +/* CLK CTRL fields */
->> +#define P2WI_SDA_OUT_DELAY(v)	(((v) & 0x7) << 8)
->> +#define P2WI_CLK_DIV(v)		((v) & 0xff)
+> This won't work with multiplatform.
+>
 >> +
->> +/* STATUS fields */
->> +#define P2WI_TRANS_ERR_ID(v)	(((v) >> 8) & 0xff)
->> +#define P2WI_LOAD_BSY		(1 << 2)
->> +#define P2WI_TRANS_ERR		(1 << 1)
->> +#define P2WI_TRANS_OVER		(1 << 0)
+>> +static atomic_t exynos_idle_barrier;
+>> +static atomic_t cpu1_wakeup = ATOMIC_INIT(0);
 >> +
->> +/* DATA LENGTH fields*/
->> +#define P2WI_READ		(1 << 4)
->> +#define P2WI_DATA_LENGTH(v)	((v - 1) & 0x7)
+>> +#define BOOT_VECTOR S5P_VA_SYSRAM
+>> +#define S5P_VA_PMU                  S3C_ADDR(0x02180000)
+>> +#define S5P_PMUREG(x)              (S5P_VA_PMU + (x))
+>> +#define S5P_ARM_CORE1_CONFIGURATION S5P_PMUREG(0x2080)
+>> +#define S5P_ARM_CORE1_STATUS        S5P_PMUREG(0x2084)
 >> +
->> +/* LINE CTRL fields*/
->> +#define P2WI_SCL_STATE		(1 << 5)
->> +#define P2WI_SDA_STATE		(1 << 4)
->> +#define P2WI_SCL_CTL		(1 << 3)
->> +#define P2WI_SCL_CTL_EN		(1 << 2)
->> +#define P2WI_SDA_CTL		(1 << 1)
->> +#define P2WI_SDA_CTL_EN		(1 << 0)
->> +
->> +/* PMU MODE CTRL fields */
->> +#define P2WI_PMU_INIT_SEND	(1 << 31)
->> +#define P2WI_PMU_INIT_DATA(v)	(((v) & 0xff) << 16)
->> +#define P2WI_PMU_MODE_REG(v)	(((v) & 0xff) << 8)
->> +#define P2WI_PMU_DEV_ADDR(v)	((v) & 0xff)
-> I'd very much prefer if your bits were prefixed by the register
-> name. That way, you directly know in which register that bit belong,
-> without having to scroll across the whole driver.
+>> +static void (*exynos_aftr)(void);
+>
+> Could we get rid of those global variables? I know that they won't break
+> anything, but they don't look good. A driver data struct would look much
+> better.
 
-Okay.
+Yeah, that is part of the plan. As mentioned before I want to kill those 
+variable/macro and define a cpuidle ops structure to be filled from pm.c.
 
->> +
->> +struct p2wi {
->> +	struct i2c_adapter adapter;
->> +	struct completion complete;
->> +	unsigned int irq;
->> +	unsigned int status;
->> +	void __iomem *regs;
->> +	struct clk *clk;
->> +	struct reset_control *rstc;
->> +};
->> +
->> +static irqreturn_t p2wi_interrupt(int irq, void *dev_id)
+But I would like to have this structure to be shared across the 
+different cpuidle drivers and defined in the common arm code. The 
+structure definition will depend on the different existing drivers, so I 
+would like to do it in a separate patchset and keep the exynos_aftr() 
+callback for the moment.
+
+Does your comment 'those global variables' includes 
+'exynos_idle_barrier' and 'cpu1_wakeup' ?
+
+>> +static int cpu_suspend_finish(unsigned long flags)
+>
+> Name of this function could be more meaningful. Something like
+> exynos_cpu_enter_lpm() could be better. Same goes for the argument.
+> Maybe it could be simply called enter_aftr?
+
+Agree, I can find something more meaningful.
+
 >> +{
->> +	struct p2wi *p2wi = dev_id;
->> +	unsigned long status;
+>> +    if (flags)
+>> +        exynos_aftr();
 >> +
->> +	status = readl(p2wi->regs + P2WI_INTS);
->> +	p2wi->status = status;
+>> +    cpu_do_idle();
 >> +
->> +	/* Clear interrupts */
->> +	status &= (P2WI_LOAD_BSY | P2WI_TRANS_ERR | P2WI_TRANS_OVER);
->> +	writel(status, p2wi->regs + P2WI_INTS);
->> +
->> +	complete(&p2wi->complete);
->> +
->> +	return IRQ_HANDLED;
+>> +    return -1;
 >> +}
 >> +
->> +static u32 p2wi_functionality(struct i2c_adapter *adap)
+>> +static int exynos_cpu0_enter_aftr(void)
 >> +{
->> +	return I2C_FUNC_SMBUS_BYTE_DATA;
+>> +    int ret = -1;
+>
+> Hmm, wouldn't a real error code be better here?
+
+Ok, what error ? -EAGAIN ?
+
+>> +
+>> +    /*
+>> +     * If the other cpu is powered on, we have to power it off, because
+>> +     * the AFTR state won't work otherwise
+>> +     */
+>> +    if (cpu_online(1)) {
+>> +
+>> +        /*
+>> +         * We reach a sync point with the coupled idle state, we know
+>> +         * the other cpu will power down itself or will abort the
+>> +         * sequence, let's wait for one of these to happen
+>> +         */
+>> +        while (__raw_readl(S5P_ARM_CORE1_STATUS) & 3) {
+>
+> nit: A macro could be used for 3.
+>
+>> +
+>> +            /*
+>> +             * The other cpu may skip idle and boot back
+>> +             * up again
+>> +             */
+>> +            if (atomic_read(&cpu1_wakeup))
+>> +                goto abort;
+>> +
+>> +            /*
+>> +             * The other cpu may bounce through idle and
+>> +             * boot back up again, getting stuck in the
+>> +             * boot rom code
+>> +             */
+>> +            if (__raw_readl(BOOT_VECTOR) == 0)
+>
+> Is this a reliable behavior? I mean, is this part of some specification
+> or rather a feature specific to a particular Android bootloader this was
+> used with in original kernel tree?
+>
+>> +                goto abort;
+>> +
+>> +            cpu_relax();
+>> +        }
+>> +    }
+>> +
+>> +    cpu_pm_enter();
+>> +
+>> +    ret = cpu_suspend(1, cpu_suspend_finish);
+>> +
+>> +    cpu_pm_exit();
+>> +
+>> +abort:
+>> +    if (cpu_online(1)) {
+>> +        /*
+>> +         * Set the boot vector to something non-zero
+>> +         */
+>> +        __raw_writel(virt_to_phys(s3c_cpu_resume),
+>> +                 BOOT_VECTOR);
+>
+> Resume address is quite a specific "something non-zero". :)
+
+Ok, this is resulting from reverse engineering. I don't have the 
+documentation. If you can briefly summarize how it works that may help 
+to simplify/clarify the result.
+
+>> +        dsb();
+>
+> Checkpatch would probably complain about missing comment on why dsb() is
+> needed here (or I'm confusing this with other barriers).
+
+Same comment than above. I guess this barrier is needed to ensure the 
+value is effectively written to BOOT_VECTOR before shutting down the core.
+
+>> +
+>> +        /*
+>> +         * Turn on cpu1 and wait for it to be on
+>> +         */
+>> +        __raw_writel(0x3, S5P_ARM_CORE1_CONFIGURATION);
+>> +        while ((__raw_readl(S5P_ARM_CORE1_STATUS) & 3) != 3)
+>> +            cpu_relax();
+>
+> nit: Here again 3 could be replaced with a macro.
+>
+>> +
+>> +        /*
+>> +         * Wait for cpu1 to get stuck in the boot rom
+>> +         */
+>> +        while ((__raw_readl(BOOT_VECTOR) != 0) &&
+>
+> Same comment about the assumption about BOOT_VECTOR changing to 0 as above.
+>
+>> +               !atomic_read(&cpu1_wakeup))
+>> +            cpu_relax();
+>> +
+>> +        if (!atomic_read(&cpu1_wakeup)) {
+>> +            /*
+>> +             * Poke cpu1 out of the boot rom
+>> +             */
+>> +            __raw_writel(virt_to_phys(s3c_cpu_resume),
+>> +                     BOOT_VECTOR);
+>> +            dsb_sev();
+>
+> Hmm, platsmp code seems to be using an IPI to do this. Again, I wonder
+> if this isn't a behavior implemented only in some specific Android
+> bootloader.
+
+Yeah, definitively that needs clarification.
+
+>> +        }
+>> +
+>> +        /*
+>> +         * Wait for cpu1 to finish booting
+>> +         */
+>> +        while (!atomic_read(&cpu1_wakeup))
+>> +            cpu_relax();
+>> +    }
+>> +
+>> +    return ret;
 >> +}
 >> +
->> +static int p2wi_smbus_xfer(struct i2c_adapter *adap, u16 addr,
->> +			   unsigned short flags, char read_write,
->> +			   u8 command, int size, union i2c_smbus_data *data)
+>> +static int exynos_powerdown_cpu1(void)
 >> +{
->> +	struct p2wi *p2wi = i2c_get_adapdata(adap);
->> +	unsigned long dlen = P2WI_DATA_LENGTH(1);
->> +
->> +	/*
->> +	 * TODO: check address consistency.
->> +	 * The P2WI bus only support one slave. As a result it does not use
->> +	 * the I2C address except when you're switching the slave device from
->> +	 * I2C to P2WI mode.
->> +	 * We should at least verify that the addr argument is consistent with
->> +	 * the slave device address.
->> +	 */
->> +
->> +	if (addr > 0xff) {
->> +		dev_err(&adap->dev, "invalid P2WI address\n");
->> +		return -EINVAL;
->> +	}
->> +
->> +	/*
->> +	 * TODO: handle switch to P2WI mode.
->> +	 * At the moment, we're considering the slave device as already
->> +	 * switchedto P2WI (which means the bootloader has to switch the slave
->                    ^ you need a space here
+>> +    int ret = -1;
 >
->> +	 * device from I2C to P2WI mode).
->> +	 * We need at least 3 informations to launch the switch process:
->> +	 * - the slave device address (addr argument)
->> +	 * - the mode register
->> +	 * - the P2WI mode value (to write in the mode register)
->> +	 */
+> Error code?
+
+Yep,
+
+	ret = cpu_pm_enter();
+	if (ret)
+		goto cpu1_aborted;
+
 >> +
->> +	if (!data)
->> +		return -EINVAL;
+>> +    /*
+>> +     * Idle sequence for cpu1
+>> +     */
+>> +    if (cpu_pm_enter())
+>> +        goto cpu1_aborted;
 >> +
->> +	writel(command, p2wi->regs + P2WI_DADDR0);
+>> +    /*
+>> +     * Turn off cpu 1
+>> +     */
+>> +    __raw_writel(0, S5P_ARM_CORE1_CONFIGURATION);
 >> +
->> +	if (read_write == I2C_SMBUS_READ)
->> +		dlen |= P2WI_READ;
->> +	else
->> +		writel(data->byte, p2wi->regs + P2WI_DATA0);
+>> +    ret = cpu_suspend(0, cpu_suspend_finish);
 >> +
->> +	writel(dlen, p2wi->regs + P2WI_DLEN);
+>> +    cpu_pm_exit();
 >> +
->> +	if (readl(p2wi->regs + P2WI_CTRL) & P2WI_START_TRANS) {
->> +		dev_err(&adap->dev, "P2WI bus busy\n");
->> +		return -EBUSY;
->> +	}
+>> +cpu1_aborted:
+>> +    dsb();
+>> +    /*
+>> +     * Notify cpu 0 that cpu 1 is awake
+>> +     */
+>> +    atomic_set(&cpu1_wakeup, 1);
 >> +
->> +	reinit_completion(&p2wi->complete);
->> +
->> +	writel(P2WI_LOAD_BSY | P2WI_TRANS_ERR | P2WI_TRANS_OVER,
->> +	       p2wi->regs + P2WI_INTE);
->> +
->> +	writel(P2WI_START_TRANS | P2WI_GLOBAL_INT_ENB, p2wi->regs + P2WI_CTRL);
->> +
->> +	wait_for_completion(&p2wi->complete);
->> +
->> +	if (p2wi->status & P2WI_LOAD_BSY) {
->> +		dev_err(&adap->dev, "P2WI bus busy\n");
->> +		return -EBUSY;
->> +	}
->> +
->> +
-> You can drop the extra line here.
->
->> +	if (p2wi->status & P2WI_TRANS_ERR) {
->> +		dev_err(&adap->dev, "P2WI bus xfer error\n");
->> +		return -ENXIO;
->> +	}
->> +
->> +	if (read_write == I2C_SMBUS_READ)
->> +		data->byte = readl(p2wi->regs + P2WI_DATA0);
->> +
->> +	return 0;
+>> +    return ret;
 >> +}
 >> +
->> +static const struct i2c_algorithm p2wi_algo = {
->> +	.smbus_xfer = p2wi_smbus_xfer,
->> +	.functionality = p2wi_functionality,
->> +};
->> +
->> +static const struct of_device_id p2wi_of_match_table[] = {
->> +	{ .compatible = "allwinner,sun6i-a31-p2wi" },
->> +	{}
->> +};
->> +MODULE_DEVICE_TABLE(of, p2wi_of_match_table);
->> +
->> +static int p2wi_probe(struct platform_device *pdev)
+>> +static int exynos_enter_aftr(struct cpuidle_device *dev,
+>> +                 struct cpuidle_driver *drv, int index)
 >> +{
->> +	struct device *dev = &pdev->dev;
->> +	struct resource *r;
->> +	struct p2wi *p2wi;
->> +	int ret;
+>> +    int ret;
 >> +
->> +	p2wi = devm_kzalloc(dev, sizeof(struct p2wi), GFP_KERNEL);
->> +	if (!p2wi) {
->> +		dev_err(dev, "failed to allocate p2wi struct\n");
->> +		return -ENOMEM;
->> +	}
->> +
->> +	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +	p2wi->regs = devm_request_and_ioremap(dev, r);
->> +	if (IS_ERR(p2wi->regs)) {
->> +		ret = PTR_ERR(p2wi->regs);
->> +		dev_err(dev, "failed to retrieve iomem resource: %d\n",
->> +			ret);
->> +		return ret;
->> +	}
-> I don't see how it can work, since, when it fails,
-> devm_request_and_ioremap returns NULL. You probably meant
-> devm_ioremap_resource.
-
-Oops, just forgot devm_request_and_ioremap is returning NULL when it fails.
-I'll fix it.
-
-Thanks.
-
-Best Regards,
-
-Boris
-> Thanks!
-> Maxime
+>> +    __raw_writel(virt_to_phys(s3c_cpu_resume), BOOT_VECTOR);
 >
+> Why this is being written here, instead of some of the low level
+> functions above?
+>
+> Otherwise, I quite like the whole idea. I need to play a bit with CPU
+> hotplug and PMU to verify that things couldn't really be simplified a
+> bit, but in general this looks reasonably.
+
+Yes, there is a nice improvement in term of power saving for dual 
+processor. If you can clarify the BOOT_VECTOR stuff that will be nice.
+
+I have a more recent version of the driver based on samsung-next and the 
+cleanups I previously sent:
+
+https://git.linaro.org/people/daniel.lezcano/linux.git/
+
+branch : cpuidle/samsung-next
+
+Thanks for the review.
+
+   -- Daniel
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
