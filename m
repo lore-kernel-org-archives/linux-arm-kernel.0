@@ -1,66 +1,65 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 25 Apr 2014 17:44:50 +0200
-Subject: [PATCH 6/7] ARM: tegra: dalmore - Add +5V HDMI supply
-In-Reply-To: <1398440691-23366-1-git-send-email-thierry.reding@gmail.com>
-References: <1398440691-23366-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1398440691-23366-7-git-send-email-thierry.reding@gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 25 Apr 2014 17:47:46 +0200
+Subject: [PATCH v2 02/18] usb: host: xhci-plat: Add clocks support
+In-Reply-To: <1398434836-18908-3-git-send-email-gregory.clement@free-electrons.com>
+References: <1398434836-18908-1-git-send-email-gregory.clement@free-electrons.com>
+ <1398434836-18908-3-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20140425154746.GB12472@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+On Fri, Apr 25, 2014 at 04:07:00PM +0200, Gregory CLEMENT wrote:
+> Some platform (such as the Armada 38x ones) can gate the clock of
+> their USB controller. This patch add the support for the clock, by
+> enabling them during probe and disabling them on remove.
+> 
+> As not all platforms have clock support then enabling and disabling
+> the clocks have been placed in separate functions. Then if the clocks
+> are not supported we still can use the same calls, and there is no
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  drivers/usb/host/xhci-plat.c | 52 ++++++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 50 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+> index f5351af4b2c5..bb5d563f729c 100644
+> --- a/drivers/usb/host/xhci-plat.c
+> +++ b/drivers/usb/host/xhci-plat.c
+> @@ -11,6 +11,7 @@
+>   * version 2 as published by the Free Software Foundation.
+>   */
+>  
+> +#include <linux/clk.h>
+>  #include <linux/dma-mapping.h>
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+> @@ -85,6 +86,42 @@ static const struct hc_driver xhci_plat_xhci_driver = {
+>  	.bus_resume =		xhci_bus_resume,
+>  };
+>  
+> +#if defined(CONFIG_HAVE_CLK)
 
-This supply controls the +5V pin on the HDMI connector, which in turn is
-used by attached sinks to return the hotplug detect signal.
+Hi Gregory
 
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
-Note: Unfortunately I do have an A05 Dalmore, and from what I can tell
-HDMI is actually one of the areas where there have been changes between
-A04 and A05. It'd be great if somebody could check that this actually
-works. Also note that it requires Tegra DRM patches that are currently
-in linux-next to enable the +5V regulator.
+You probably don't need to do this conditional on CONFIG_HAVE_CLK.
+There are stub functions in clk.h for when CONFIG_HAVE_CLK is not
+defined. So the compiler knows devm_clk_get() will return NULL, it can
+evaluate IS_ERR is false, clk_prepare() returns 0 and so the whole
+function collapses to "return 0;"
 
- arch/arm/boot/dts/tegra114-dalmore.dts | 14 ++++++++++++--
- 1 file changed, 12 insertions(+), 2 deletions(-)
+> +static int try_enable_clk(struct platform_device *pdev)
+> +{
+> +	struct clk *clk = devm_clk_get(&pdev->dev, NULL);
+> +
+> +	/* Not all platforms have a clk so it is not an error if the clock
+> +	   does not exists. */
+> +	if (!IS_ERR(clk))
+> +		if (clk_prepare_enable(clk))
+> +			return  -ENODEV;
 
-diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
-index df22dfad7db7..1309c75c821c 100644
---- a/arch/arm/boot/dts/tegra114-dalmore.dts
-+++ b/arch/arm/boot/dts/tegra114-dalmore.dts
-@@ -25,6 +25,7 @@
- 		hdmi at 54280000 {
- 			status = "okay";
- 
-+			hdmi-supply = <&vdd_5v0_hdmi>;
- 			vdd-supply = <&vdd_hdmi_reg>;
- 			pll-supply = <&palmas_smps3_reg>;
- 
-@@ -1231,8 +1232,6 @@
- 			regulator-name = "vdd_hdmi_5v0";
- 			regulator-min-microvolt = <5000000>;
- 			regulator-max-microvolt = <5000000>;
--			enable-active-high;
--			gpio = <&gpio TEGRA_GPIO(K, 1) GPIO_ACTIVE_HIGH>;
- 			vin-supply = <&tps65090_dcdc1_reg>;
- 		};
- 
-@@ -1245,6 +1244,17 @@
- 			enable-active-high;
- 			gpio = <&palmas_gpio 6 0>;
- 		};
-+
-+		vdd_5v0_hdmi: regulator at 7 {
-+			compatible = "regulator-fixed";
-+			reg = <7>;
-+			regulator-name = "VDD_5V0_HDMI_CON";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			gpio = <&gpio TEGRA_GPIO(K, 1) GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
-+			vin-supply = <&tps65090_dcdc1_reg>;
-+		};
- 	};
- 
- 	sound {
--- 
-1.9.2
+Is ENODEV the correct error code? It would probably be better to
+return the return value of clk_prepare_enable()
+
+> +	return 0;
+> +}
