@@ -1,68 +1,67 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:37:50 +0100
-Subject: [PATCH 081/222] net:fec: fix missing kmalloc() failure check in
- fec_enet_alloc_buffers()
+Date: Fri, 25 Apr 2014 12:38:01 +0100
+Subject: [PATCH 083/222] net:fec: remove useless fep->opened
 In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
 References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WdeRy-0007Ib-Vr@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WdeS9-0007Ij-6d@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-fec_enet_alloc_buffers() appears to assume that kmalloc() will never
-fail.  This is an unreasonable assumption.  Add a proper check and
-failure cleanup path.
+napi_disable() waits until the NAPI processing has completed, and then
+prevents any further polls.  At this point, the driver then clears
+fep->opened.  The NAPI poll function uses this to stop processing in
+the receive path.  Hence, it will never see this variable cleared,
+because the NAPI poll has to complete before it will be cleared.
+
+Therefore, this variable serves no purpose, so let's remove it.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/net/ethernet/freescale/fec_main.c | 15 +++++++++------
- 1 file changed, 9 insertions(+), 6 deletions(-)
+ drivers/net/ethernet/freescale/fec.h      | 1 -
+ drivers/net/ethernet/freescale/fec_main.c | 5 -----
+ 2 files changed, 6 deletions(-)
 
+diff --git a/drivers/net/ethernet/freescale/fec.h b/drivers/net/ethernet/freescale/fec.h
+index 3b8d6d19ff05..88ef53b18ae7 100644
+--- a/drivers/net/ethernet/freescale/fec.h
++++ b/drivers/net/ethernet/freescale/fec.h
+@@ -301,7 +301,6 @@ struct fec_enet_private {
+ 
+ 	struct	platform_device *pdev;
+ 
+-	int	opened;
+ 	int	dev_id;
+ 
+ 	/* Phylib and MDIO interface */
 diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index 08a5004970c9..7f7d9dcb485e 100644
+index 94861870e741..634046c73734 100644
 --- a/drivers/net/ethernet/freescale/fec_main.c
 +++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -1744,19 +1744,16 @@ static int fec_enet_alloc_buffers(struct net_device *ndev)
- 		dma_addr_t addr;
+@@ -914,9 +914,6 @@ fec_enet_rx(struct net_device *ndev, int budget)
+ 		if ((status & BD_ENET_RX_LAST) == 0)
+ 			netdev_err(ndev, "rcv is not +last\n");
  
- 		skb = netdev_alloc_skb(ndev, FEC_ENET_RX_FRSIZE);
--		if (!skb) {
--			fec_enet_free_buffers(ndev);
--			return -ENOMEM;
--		}
-+		if (!skb)
-+			goto err_alloc;
- 
- 		addr = dma_map_single(&fep->pdev->dev, skb->data,
- 				FEC_ENET_RX_FRSIZE, DMA_FROM_DEVICE);
- 		if (dma_mapping_error(&fep->pdev->dev, addr)) {
- 			dev_kfree_skb(skb);
--			fec_enet_free_buffers(ndev);
- 			if (net_ratelimit())
- 				netdev_err(ndev, "Rx DMA memory map failed\n");
--			return -ENOMEM;
-+			goto err_alloc;
- 		}
- 
- 		fep->rx_skbuff[i] = skb;
-@@ -1778,6 +1775,8 @@ static int fec_enet_alloc_buffers(struct net_device *ndev)
- 	bdp = fep->tx_bd_base;
- 	for (i = 0; i < fep->tx_ring_size; i++) {
- 		fep->tx_bounce[i] = kmalloc(FEC_ENET_TX_FRSIZE, GFP_KERNEL);
-+		if (!fep->tx_bounce[i])
-+			goto err_alloc;
- 
- 		bdp->cbd_sc = 0;
- 		bdp->cbd_bufaddr = 0;
-@@ -1795,6 +1794,10 @@ static int fec_enet_alloc_buffers(struct net_device *ndev)
- 	bdp->cbd_sc |= BD_SC_WRAP;
- 
+-		if (!fep->opened)
+-			goto rx_processing_done;
+-
+ 		/* Check for errors. */
+ 		if (status & (BD_ENET_RX_LG | BD_ENET_RX_SH | BD_ENET_RX_NO |
+ 			   BD_ENET_RX_CR | BD_ENET_RX_OV)) {
+@@ -1837,7 +1834,6 @@ fec_enet_open(struct net_device *ndev)
+ 	napi_enable(&fep->napi);
+ 	phy_start(fep->phy_dev);
+ 	netif_start_queue(ndev);
+-	fep->opened = 1;
  	return 0;
-+
-+ err_alloc:
-+	fec_enet_free_buffers(ndev);
-+	return -ENOMEM;
  }
  
- static int
+@@ -1848,7 +1844,6 @@ fec_enet_close(struct net_device *ndev)
+ 
+ 	/* Don't know what to do yet. */
+ 	napi_disable(&fep->napi);
+-	fep->opened = 0;
+ 	netif_tx_disable(ndev);
+ 	fec_stop(ndev);
+ 
 -- 
 1.8.3.1
