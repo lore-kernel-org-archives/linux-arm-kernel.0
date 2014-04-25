@@ -1,48 +1,86 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:37:45 +0100
-Subject: [PATCH 080/222] net:fec: ensure fec_enet_free_buffers() properly
- cleans the rings
+Date: Fri, 25 Apr 2014 12:38:47 +0100
+Subject: [PATCH 092/222] net:fec: quiesce packet processing before changing
+ features
 In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
 References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WdeRt-0007IX-SJ@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WdeSt-0007JL-6H@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ensure that we do not double-free any allocations, and that any transmit
-skbuffs are properly freed when we clean up the rings.
+Changing the features (receive checksumming) requires the hardware to be
+reprogrammed, and also changes the checks in the receive packet
+processing.
+
+The current implementation has a race - fec_set_features() changes the
+flags which alter the receive packet processing while we are active.
+Only afterwards do we shutdown and reconfigure the hardware.
+
+This can lead to packets being received and marked with a valid checksum
+(via CHECKSUM_UNNECESSARY) when the hardware checksum validation has not
+yet been enabled.
+
+We must quiesce the device, then change the software configuration for
+this feature, and then resume the device if it was previously running.
+
+The resulting code structure also allows us to add other configuration
+features in this path without having to quiesce and resume the network
+interface and device.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/net/ethernet/freescale/fec_main.c | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ drivers/net/ethernet/freescale/fec_main.c | 25 ++++++++++++++++---------
+ 1 file changed, 16 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index f98ddb0923a3..08a5004970c9 100644
+index 789678c6f6d4..c5a5a0aedf21 100644
 --- a/drivers/net/ethernet/freescale/fec_main.c
 +++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -1712,6 +1712,7 @@ static void fec_enet_free_buffers(struct net_device *ndev)
- 	bdp = fep->rx_bd_base;
- 	for (i = 0; i < fep->rx_ring_size; i++) {
- 		skb = fep->rx_skbuff[i];
-+		fep->rx_skbuff[i] = NULL;
- 		if (skb) {
- 			dma_unmap_single(&fep->pdev->dev, bdp->cbd_bufaddr,
- 					FEC_ENET_RX_FRSIZE, DMA_FROM_DEVICE);
-@@ -1721,8 +1722,14 @@ static void fec_enet_free_buffers(struct net_device *ndev)
+@@ -1993,12 +1993,21 @@ static void fec_poll_controller(struct net_device *dev)
+ }
+ #endif
+ 
++#define FEATURES_NEED_QUIESCE NETIF_F_RXCSUM
++
+ static int fec_set_features(struct net_device *netdev,
+ 	netdev_features_t features)
+ {
+ 	struct fec_enet_private *fep = netdev_priv(netdev);
+ 	netdev_features_t changed = features ^ netdev->features;
+ 
++	/* Quiesce the device if necessary */
++	if (netif_running(netdev) && changed & FEATURES_NEED_QUIESCE) {
++		napi_disable(&fep->napi);
++		netif_tx_lock_bh(netdev);
++		fec_stop(netdev);
++	}
++
+ 	netdev->features = features;
+ 
+ 	/* Receive checksum has been changed */
+@@ -2007,16 +2016,14 @@ static int fec_set_features(struct net_device *netdev,
+ 			fep->csum_flags |= FLAG_RX_CSUM_ENABLED;
+ 		else
+ 			fep->csum_flags &= ~FLAG_RX_CSUM_ENABLED;
++	}
+ 
+-		if (netif_running(netdev)) {
+-			napi_disable(&fep->napi);
+-			netif_tx_lock_bh(netdev);
+-			fec_stop(netdev);
+-			fec_restart(netdev, fep->phy_dev->duplex);
+-			netif_wake_queue(netdev);
+-			netif_tx_unlock_bh(netdev);
+-			napi_enable(&fep->napi);
+-		}
++	/* Resume the device after updates */
++	if (netif_running(netdev) && changed & FEATURES_NEED_QUIESCE) {
++		fec_restart(netdev, fep->phy_dev->duplex);
++		netif_wake_queue(netdev);
++		netif_tx_unlock_bh(netdev);
++		napi_enable(&fep->napi);
  	}
  
- 	bdp = fep->tx_bd_base;
--	for (i = 0; i < fep->tx_ring_size; i++)
-+	for (i = 0; i < fep->tx_ring_size; i++) {
- 		kfree(fep->tx_bounce[i]);
-+		fep->tx_bounce[i] = NULL;
-+		skb = fep->tx_skbuff[i];
-+		fep->tx_skbuff[i] = NULL;
-+		if (skb)
-+			dev_kfree_skb(skb);
-+	}
- }
- 
- static int fec_enet_alloc_buffers(struct net_device *ndev)
+ 	return 0;
 -- 
 1.8.3.1
