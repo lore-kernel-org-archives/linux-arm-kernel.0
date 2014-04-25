@@ -1,78 +1,58 @@
-From: tthayer@altera.com (Thor Thayer)
-Date: Fri, 25 Apr 2014 16:31:58 -0500
-Subject: can problems on socfpga [was Re: [PATCH v2 4/6] ARM: socfpga:
- dts: add can0+1]
-In-Reply-To: <1398457446.26387.0.camel@linux-builds1>
-References: <1396422700-3962-1-git-send-email-s.trumtrar@pengutronix.de>
- <1396422700-3962-4-git-send-email-s.trumtrar@pengutronix.de>
- <20140404102815.GA9242@amd.pavel.ucw.cz>
- <20140425195319.GA3677@amd.pavel.ucw.cz>
- <1398457446.26387.0.camel@linux-builds1>
-Message-ID: <1398461518.3587.11.camel@dinh-ubuntu>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 25 Apr 2014 17:26:58 -0400
+Subject: [PATCH] ARM: mvebu: Select HAVE_ARM_TWD only if SMP is enabled
+In-Reply-To: <1398339276-5754-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1398339276-5754-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20140425212658.GD28159@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-04-25 at 15:24 -0500, Dinh Nguyen wrote:
-> On Fri, 2014-04-25 at 21:53 +0200, ZY - pavel wrote:
-> > Hi!
-> > 
-> > > > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> > > 
-> > > I have had similar patch here, except that it only listed 2 interrupts
-> > > for each d_can controller.
-> > > 
-> > > Otherwise it looks identical.
-> > > 
-> > > Reviewed-by: Pavel Machek <pavel@denx.de>
-> > 
-> > Actually, does it work for you? Here it produces warnings during boot
-> > 
-> > c_can_platform ffc00000.d_can: invalid resource
-> > c_can_platform ffc00000.d_can: control memory is not used for raminit
-> > c_can_platform ffc00000.d_can: c_can_platform device registered
-> > (regs=9085c000, irq=163)
-
-Hi! Yes, these warnings are being addressed in a patch I submitted that
-is currently being reviewed.
-(http://article.gmane.org/gmane.linux.can/5620/match=tthayer)
-
-> > ...
-> > can: controller area network core (rev 20120528 abi 9)
-> > NET: Registered protocol family 29
-> > can: raw protocol (rev 20120528)
-> > can: broadcast manager protocol (rev 20120528 t)
-> > can: netlink gateway (rev 20130117) max_hops=1
-> > 
-> > . Then can0 is correctly registered, and seems to even receive
-> > packets, but only when enter is pressed on serial console... which is
-> > kind of weird. I suspected irq problems, but same symptomps with
-> > "irqpoll" -- it leads to generate 2000 irqs/second, but still waits
-> > for enter.
-> > 
-> > [Aha, and we have just two interrupts listed, but I don't think that
-> > explains all the problems. Unfortunately, that particular target uses
-> > human for remote power switch...].
-> > 
-> > Any ideas?
+On Thu, Apr 24, 2014 at 08:34:36AM -0300, Ezequiel Garcia wrote:
+> HAVE_ARM_TWD depends on SMP, so we should only select it if
+> SMP is enabled, as the others platforms do.
 > 
-> CC'ing Thor Thayer. He's done the CAN testing on the SOCFPGA platform.
-> 
-> Dinh
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  arch/arm/mach-mvebu/Kconfig | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 
-To get this working well, I had to install a few of the patches that
-Benedict Spranger submitted ([PATCH 05/16] c_can: use 32 bit access for
-D_CAN) on 9/9/2013.
+I just tried to apply this against mvebu/fixes.  It failed.  What did
+you base this against?
 
-I have the patches on our rocketboard branch
-(rocketboards.org/gitweb/?p=linux-socfpga-git;a=summary)
+Can you resubmit based against mvebu/fixes so I can queue it up for
+v3.15-rcX ?
 
-I planned to upstream these changes but there have been some major
-changes to CAN recently that may require some refactoring.
+thx,
 
-Thor
+Jason.
 
-> > 
-> > Thanks,
-> > 									Pavel
+> diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+> index 7bb92b1..8c9fd60 100644
+> --- a/arch/arm/mach-mvebu/Kconfig
+> +++ b/arch/arm/mach-mvebu/Kconfig
+> @@ -41,7 +41,7 @@ config MACH_ARMADA_375
+>  	select ARMADA_375_CLK
+>  	select CPU_V7
+>  	select HAVE_ARM_SCU
+> -	select HAVE_ARM_TWD
+> +	select HAVE_ARM_TWD if SMP
+>  	select HAVE_SMP
+>  	select MACH_MVEBU_V7
+>  	select PINCTRL_ARMADA_375
+> @@ -57,7 +57,7 @@ config MACH_ARMADA_38X
+>  	select ARMADA_38X_CLK
+>  	select CPU_V7
+>  	select HAVE_ARM_SCU
+> -	select HAVE_ARM_TWD
+> +	select HAVE_ARM_TWD if SMP
+>  	select HAVE_SMP
+>  	select MACH_MVEBU_V7
+>  	select PINCTRL_ARMADA_38X
+> -- 
+> 1.9.1
 > 
 > 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
