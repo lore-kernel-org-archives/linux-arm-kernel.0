@@ -1,37 +1,34 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Fri, 25 Apr 2014 20:54:14 +0900
-Subject: [PATCH v2 2/5] ARM: dts: Add PMU node to exynos4210
-In-Reply-To: <1398426857-5097-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1396425778-4379-1-git-send-email-pankaj.dubey@samsung.com>
- <1398426857-5097-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1398426857-5097-3-git-send-email-pankaj.dubey@samsung.com>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Fri, 25 Apr 2014 12:36:49 +0100
+Subject: [PATCH 069/222] ARM: l2c: check that DT files specify the required
+ "cache-unified" property
+In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
+References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
+Message-ID: <E1WdeQz-0007Hl-Fi@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds pmu regnode to exynos4210 dtsi to handle
-PMU register access via DT.
+This is a required property, and should always be specified.
 
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/boot/dts/exynos4210.dtsi |    6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/mm/cache-l2x0.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-index cacf614..042b6d9 100644
---- a/arch/arm/boot/dts/exynos4210.dtsi
-+++ b/arch/arm/boot/dts/exynos4210.dtsi
-@@ -81,6 +81,12 @@
- 		interrupts = <2 2>, <3 2>;
- 	};
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 8a5110deb657..96a1374127de 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -1378,6 +1378,10 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
  
-+	pmu_system_controller: system-controller at 10020000 {
-+		compatible = "samsung,exynos4210-pmu", "syscon";
-+		reg = <0x10020000 0x5000>;
-+		samsung,syscon-phandle = <&pmu_system_controller>;
-+	};
+ 	data = of_match_node(l2x0_ids, np)->data;
+ 
++	/* All L2 caches are unified, so this property should be specified */
++	if (!of_property_read_bool(np, "cache-unified"))
++		pr_err("L2C: device tree omits to specify unified cache\n");
 +
- 	pinctrl_0: pinctrl at 11400000 {
- 		compatible = "samsung,exynos4210-pinctrl";
- 		reg = <0x11400000 0x1000>;
+ 	/* L2 configuration can only be changed if the cache is disabled */
+ 	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & L2X0_CTRL_EN))
+ 		if (data->of_parse)
 -- 
-1.7.10.4
+1.8.3.1
