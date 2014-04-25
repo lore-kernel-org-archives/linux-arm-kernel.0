@@ -1,68 +1,47 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 25 Apr 2014 22:35:35 +0200
-Subject: [PATCH] ARM: dts: Remove vmmc-supply for mmc@12220000 on
- arndale-octa board
-In-Reply-To: <20140425203051.GD3027@e102654-lin.cambridge.arm.com>
-References: <1398456672-3936-1-git-send-email-javi.merino@arm.com>
- <535AC29E.8010905@gmail.com>
- <20140425203051.GD3027@e102654-lin.cambridge.arm.com>
-Message-ID: <535AC717.40805@gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 25 Apr 2014 13:54:03 -0700
+Subject: [GIT PULL] clk: socfpga: Clock fix for v3.15
+In-Reply-To: <1398439322-30616-1-git-send-email-dinguyen@altera.com>
+References: <1398439322-30616-1-git-send-email-dinguyen@altera.com>
+Message-ID: <20140425205403.23156.92535@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Quoting dinguyen at altera.com (2014-04-25 08:22:02)
+> Hi Mike,
+> 
+> Please consider pulling this patch for 3.15 fixes.
+> 
+> Thanks,
+> 
+> The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+> 
+>   Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga-clk-fix-for-3.15
+> 
+> for you to fetch changes up to 812819daf3298040833b4902730821c3441bffc7:
+> 
+>   clk: socfpga: fix clock driver for 3.15 (2014-04-25 10:06:14 -0500)
 
+Taken into clk-fixes.
 
-On 25.04.2014 22:30, Javi Merino wrote:
-> On Fri, Apr 25, 2014 at 09:16:30PM +0100, Tomasz Figa wrote:
->> Hi Javi,
->>
->> On 25.04.2014 22:11, Javi Merino wrote:
->>> d726ca2d3316 (ARM: dts: Add vmmc-supply to MMC on arndale-octa board)
->>> added the vmmc-supply to nodes mmc at 12200000 and mmc at 12220000 of the
->>> DT.  However, this makes the kernel fail to boot on the arndale-octa
->>> spews:
->>>
->>> [    5.060000] dwmmc_exynos 12200000.mmc: num-slots property not found, assuming 1 slot is available
->>> [    5.065000] platform 12200000.mmc: Driver dwmmc_exynos requests probe deferral
->>> [    5.075000] dwmmc_exynos 12220000.mmc: num-slots property not found, assuming 1 slot is available
->>> [    5.085000] platform 12220000.mmc: Driver dwmmc_exynos requests probe deferral
->>>
->>> And eventually hangs.  Without the vmmc-supply property in the
->>> mmc at 12220000 node, the kernel boots again.
->>>
->>> Signed-off-by: Javi Merino <javi.merino@arm.com>
->>> ---
->>>
->>> Hi,
->>>
->>> Note that I don't know *why* removing the property works, all I know
->>> is that 3.15-rc2 fails to boot on my Arndale Octa unless I apply this
->>> patch.
->>
->> Are you sure you have the required PMIC driver enabled in your kernel
->> config?
->
-> I configured the kernel using exynos_defconfig and that gives me:
->
-> # CONFIG_PMIC_ADP5520 is not set
-> # CONFIG_PMIC_DA903X is not set
->
-> Should I be using other defconfig for this board?  exynos_defconfig
-> used to work in 3.14.  Cheers,
+Thanks!
+Mike
 
-Well, unfortunately exynos_defconfig is known to be far from being 
-reasonable. Right now it should be considered just as a base to 
-configure the kernel for Exynos SoCs. Most of board specific options 
-(and many of SoC-wide ones) need to be selected manually.
-
-Anyway, with the number of Exynos boards supported in mainline, I don't 
-think we will be ever going to enable all options for all the supported 
-boards by default in defconfig, especially considering the fact that we 
-will be moving to generic multi_v7_defconfig and likely dropping 
-exynos_defconfig completely.
-
-As for now, I believe you should just make sure yourself that any 
-options relevant to your board are enabled.
-
-Best regards,
-Tomasz
+> 
+> ----------------------------------------------------------------
+> clk: socfpga: clock fix for v3.15
+> 
+> Currently on 3.15-rc1, the SOCFPGA platform is unable to boot. This patch
+> fixes the issue and allows the platform to boot.
+> 
+> ----------------------------------------------------------------
+> Dinh Nguyen (1):
+>       clk: socfpga: fix clock driver for 3.15
+> 
+>  drivers/clk/socfpga/clk-pll.c |    7 +++++++
+>  drivers/clk/socfpga/clk.c     |   23 +++--------------------
+>  2 files changed, 10 insertions(+), 20 deletions(-)
