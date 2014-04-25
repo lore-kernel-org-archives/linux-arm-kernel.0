@@ -1,105 +1,102 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:55:51 +0100
-Subject: [PATCH 189/222] mmc: sdhci: push card_tasklet into threaded irq
- handler
+Date: Fri, 25 Apr 2014 12:55:56 +0100
+Subject: [PATCH 190/222] mmc: sdhci: allow sdio interrupts while sdhci runtime
+ suspended
 In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
 References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WdejP-0007QJ-Dp@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WdejU-0007QN-He@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's no requirement to have the card tasklet separate now that we
-have a threaded interrupt handler, so kill this and move the called
-code into the threaded part of the handler.
+Allow SDIO interrupts to be received while the SDHCI host is runtime
+suspended.  We do this by leaving the AHB clock enabled while the
+host is runtime suspended so we can access the SDHCI registers, and
+so read and raise the SDIO card interrupt.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/mmc/host/sdhci.c  | 23 +++++++++--------------
- include/linux/mmc/sdhci.h |  3 +--
- 2 files changed, 10 insertions(+), 16 deletions(-)
+ drivers/mmc/host/sdhci-esdhc-imx.c | 12 ++++++++----
+ drivers/mmc/host/sdhci.c           |  7 +++----
+ drivers/mmc/host/sdhci.h           |  5 +++++
+ 3 files changed, 16 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index 3e10f96681f8..9090329847f8 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -2123,15 +2123,6 @@ static const struct mmc_host_ops sdhci_ops = {
-  *                                                                           *
- \*****************************************************************************/
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index b841bb7cd371..b0b4eea8d232 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -1170,8 +1170,10 @@ static int sdhci_esdhc_runtime_suspend(struct device *dev)
  
--static void sdhci_tasklet_card(unsigned long param)
--{
--	struct sdhci_host *host = (struct sdhci_host*)param;
--
--	sdhci_card_event(host->mmc);
--
--	mmc_detect_change(host->mmc, msecs_to_jiffies(200));
--}
--
- static void sdhci_tasklet_finish(unsigned long param)
- {
- 	struct sdhci_host *host;
-@@ -2472,7 +2463,10 @@ static irqreturn_t sdhci_irq(int irq, void *dev_id)
+ 	ret = sdhci_runtime_suspend_host(host);
  
- 			sdhci_writel(host, intmask & (SDHCI_INT_CARD_INSERT |
- 				     SDHCI_INT_CARD_REMOVE), SDHCI_INT_STATUS);
--			tasklet_schedule(&host->card_tasklet);
-+
-+			host->thread_isr |= intmask & (SDHCI_INT_CARD_INSERT |
-+						       SDHCI_INT_CARD_REMOVE);
-+			result = IRQ_WAKE_THREAD;
- 		}
- 
- 		if (intmask & SDHCI_INT_CMD_MASK)
-@@ -2529,6 +2523,11 @@ static irqreturn_t sdhci_thread_irq(int irq, void *dev_id)
- 	host->thread_isr = 0;
- 	spin_unlock_irqrestore(&host->lock, flags);
- 
-+	if (isr & (SDHCI_INT_CARD_INSERT | SDHCI_INT_CARD_REMOVE)) {
-+		sdhci_card_event(host->mmc);
-+		mmc_detect_change(host->mmc, msecs_to_jiffies(200));
+-	clk_disable_unprepare(imx_data->clk_per);
+-	clk_disable_unprepare(imx_data->clk_ipg);
++	if (!sdhci_sdio_irq_enabled(host)) {
++		clk_disable_unprepare(imx_data->clk_per);
++		clk_disable_unprepare(imx_data->clk_ipg);
 +	}
-+
- 	if (isr & SDHCI_INT_CARD_INT) {
- 		sdio_run_irqs(host->mmc);
- 
-@@ -3219,8 +3218,6 @@ int sdhci_add_host(struct sdhci_host *host)
- 	/*
- 	 * Init tasklets.
- 	 */
--	tasklet_init(&host->card_tasklet,
--		sdhci_tasklet_card, (unsigned long)host);
- 	tasklet_init(&host->finish_tasklet,
- 		sdhci_tasklet_finish, (unsigned long)host);
- 
-@@ -3285,7 +3282,6 @@ int sdhci_add_host(struct sdhci_host *host)
- 	free_irq(host->irq, host);
- #endif
- untasklet:
--	tasklet_kill(&host->card_tasklet);
- 	tasklet_kill(&host->finish_tasklet);
+ 	clk_disable_unprepare(imx_data->clk_ahb);
  
  	return ret;
-@@ -3329,7 +3325,6 @@ void sdhci_remove_host(struct sdhci_host *host, int dead)
+@@ -1183,8 +1185,10 @@ static int sdhci_esdhc_runtime_resume(struct device *dev)
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+ 	struct pltfm_imx_data *imx_data = pltfm_host->priv;
  
- 	del_timer_sync(&host->timer);
+-	clk_prepare_enable(imx_data->clk_per);
+-	clk_prepare_enable(imx_data->clk_ipg);
++	if (!sdhci_sdio_irq_enabled(host)) {
++		clk_prepare_enable(imx_data->clk_per);
++		clk_prepare_enable(imx_data->clk_ipg);
++	}
+ 	clk_prepare_enable(imx_data->clk_ahb);
  
--	tasklet_kill(&host->card_tasklet);
- 	tasklet_kill(&host->finish_tasklet);
+ 	return sdhci_runtime_resume_host(host);
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index 9090329847f8..0f67d8dc2100 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -1709,8 +1709,7 @@ static int sdhci_get_ro(struct mmc_host *mmc)
  
- 	if (host->vmmc) {
-diff --git a/include/linux/mmc/sdhci.h b/include/linux/mmc/sdhci.h
-index d1aa97b77dd9..f1c8e14e8751 100644
---- a/include/linux/mmc/sdhci.h
-+++ b/include/linux/mmc/sdhci.h
-@@ -164,8 +164,7 @@ struct sdhci_host {
- 	dma_addr_t adma_addr;	/* Mapped ADMA descr. table */
- 	dma_addr_t align_addr;	/* Mapped bounce buffer */
+ static void sdhci_enable_sdio_irq_nolock(struct sdhci_host *host, int enable)
+ {
+-	/* SDIO IRQ will be enabled as appropriate in runtime resume */
+-	if (!(host->flags & SDHCI_DEVICE_DEAD) || host->runtime_suspended) {
++	if (!(host->flags & SDHCI_DEVICE_DEAD)) {
+ 		if (enable)
+ 			sdhci_unmask_irqs(host, SDHCI_INT_CARD_INT);
+ 		else
+@@ -2421,7 +2420,7 @@ static irqreturn_t sdhci_irq(int irq, void *dev_id)
  
--	struct tasklet_struct card_tasklet;	/* Tasklet structures */
--	struct tasklet_struct finish_tasklet;
-+	struct tasklet_struct finish_tasklet;	/* Tasklet structures */
+ 	spin_lock(&host->lock);
  
- 	struct timer_list timer;	/* Timer for timeouts */
+-	if (host->runtime_suspended) {
++	if (host->runtime_suspended && !sdhci_sdio_irq_enabled(host)) {
+ 		spin_unlock(&host->lock);
+ 		return IRQ_NONE;
+ 	}
+@@ -2687,7 +2686,7 @@ int sdhci_runtime_suspend_host(struct sdhci_host *host)
+ 	}
  
+ 	spin_lock_irqsave(&host->lock, flags);
+-	sdhci_mask_irqs(host, SDHCI_INT_ALL_MASK);
++	sdhci_mask_irqs(host, SDHCI_INT_ALL_MASK & ~SDHCI_INT_CARD_INT);
+ 	spin_unlock_irqrestore(&host->lock, flags);
+ 
+ 	synchronize_hardirq(host->irq);
+diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+index 0a3ed01887db..fc6f81d2f377 100644
+--- a/drivers/mmc/host/sdhci.h
++++ b/drivers/mmc/host/sdhci.h
+@@ -397,6 +397,11 @@ extern void sdhci_remove_host(struct sdhci_host *host, int dead);
+ extern void sdhci_send_command(struct sdhci_host *host,
+ 				struct mmc_command *cmd);
+ 
++static inline bool sdhci_sdio_irq_enabled(struct sdhci_host *host)
++{
++	return !!(host->flags & SDHCI_SDIO_IRQ_ENABLED);
++}
++
+ #ifdef CONFIG_PM
+ extern int sdhci_suspend_host(struct sdhci_host *host);
+ extern int sdhci_resume_host(struct sdhci_host *host);
 -- 
 1.8.3.1
