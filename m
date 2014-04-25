@@ -1,113 +1,186 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:55:30 +0100
-Subject: [PATCH 185/222] mmc: sdio_irq: rework sdio irq handling
+Date: Fri, 25 Apr 2014 12:55:36 +0100
+Subject: [PATCH 186/222] mmc: sdhci: clean up interrupt handling
 In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
 References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1Wdej4-0007Q2-Vq@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WdejA-0007Q6-3T@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rather than the SDIO support spawning it's own thread for handling card
-interrupts, use the generic IRQ infrastructure for this, triggering it
-from the host interface's interrupt handling directly.
+sdhci interrupt handling is a mess; there is a lot of code doing very
+similar things.  Let's clean this up a bit:
 
-This avoids a race between the parent thread waiting to receive an
-interrupt response from the card, and the slow startup from the sdio
-irq thread, which can occur as a result of high system load (eg, while
-udev is running.)
+1. set's clear down cmd, data and bus power interrupts in one go - we're
+   always going to handle these.
+2. use a do { } while () loop for looping while there are pending
+   interrupts.
+3. group clearing of bits in intmask into one place.
+
+This results in the code becoming simpler and easier to read.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/mmc/core/sdio_irq.c | 41 +++++++++++++++++++++++++++++++----------
- include/linux/mmc/host.h    |  3 +++
- 2 files changed, 34 insertions(+), 10 deletions(-)
+ drivers/mmc/host/sdhci.c | 124 ++++++++++++++++++++++-------------------------
+ 1 file changed, 58 insertions(+), 66 deletions(-)
 
-diff --git a/drivers/mmc/core/sdio_irq.c b/drivers/mmc/core/sdio_irq.c
-index aaa90460ed23..5cc13c8d35bb 100644
---- a/drivers/mmc/core/sdio_irq.c
-+++ b/drivers/mmc/core/sdio_irq.c
-@@ -90,6 +90,15 @@ static int process_sdio_pending_irqs(struct mmc_host *host)
- 	return ret;
- }
- 
-+void sdio_run_irqs(struct mmc_host *host)
-+{
-+	mmc_claim_host(host);
-+	host->sdio_irq_pending = true;
-+	process_sdio_pending_irqs(host);
-+	mmc_release_host(host);
-+}
-+EXPORT_SYMBOL_GPL(sdio_run_irqs);
-+
- static int sdio_irq_thread(void *_host)
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index 9a79fc4b60ca..79838de6b278 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -2426,7 +2426,7 @@ static irqreturn_t sdhci_irq(int irq, void *dev_id)
  {
- 	struct mmc_host *host = _host;
-@@ -189,14 +198,20 @@ static int sdio_card_irq_get(struct mmc_card *card)
- 	WARN_ON(!host->claimed);
+ 	irqreturn_t result;
+ 	struct sdhci_host *host = dev_id;
+-	u32 intmask, unexpected = 0;
++	u32 intmask, mask, unexpected = 0;
+ 	int cardint = 0, max_loops = 16;
  
- 	if (!host->sdio_irqs++) {
--		atomic_set(&host->sdio_irq_thread_abort, 0);
--		host->sdio_irq_thread =
--			kthread_run(sdio_irq_thread, host, "ksdioirqd/%s",
--				mmc_hostname(host));
--		if (IS_ERR(host->sdio_irq_thread)) {
--			int err = PTR_ERR(host->sdio_irq_thread);
--			host->sdio_irqs--;
--			return err;
-+		if (!(host->caps2 & MMC_CAP2_SDIO_IRQ_NOTHREAD)) {
-+			atomic_set(&host->sdio_irq_thread_abort, 0);
-+			host->sdio_irq_thread =
-+				kthread_run(sdio_irq_thread, host,
-+					    "ksdioirqd/%s", mmc_hostname(host));
-+			if (IS_ERR(host->sdio_irq_thread)) {
-+				int err = PTR_ERR(host->sdio_irq_thread);
-+				host->sdio_irqs--;
-+				return err;
-+			}
-+		} else {
-+			mmc_host_clk_hold(host);
-+			host->ops->enable_sdio_irq(host, 1);
-+			mmc_host_clk_release(host);
- 		}
+ 	spin_lock(&host->lock);
+@@ -2437,88 +2437,80 @@ static irqreturn_t sdhci_irq(int irq, void *dev_id)
  	}
  
-@@ -211,8 +226,14 @@ static int sdio_card_irq_put(struct mmc_card *card)
- 	BUG_ON(host->sdio_irqs < 1);
- 
- 	if (!--host->sdio_irqs) {
--		atomic_set(&host->sdio_irq_thread_abort, 1);
--		kthread_stop(host->sdio_irq_thread);
-+		if (!(host->caps2 & MMC_CAP2_SDIO_IRQ_NOTHREAD)) {
-+			atomic_set(&host->sdio_irq_thread_abort, 1);
-+			kthread_stop(host->sdio_irq_thread);
-+		} else {
-+			mmc_host_clk_hold(host);
-+			host->ops->enable_sdio_irq(host, 0);
-+			mmc_host_clk_release(host);
-+		}
+ 	intmask = sdhci_readl(host, SDHCI_INT_STATUS);
+-
+ 	if (!intmask || intmask == 0xffffffff) {
+ 		result = IRQ_NONE;
+ 		goto out;
  	}
  
- 	return 0;
-diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
-index cb61ea4d6945..4c0f94679898 100644
---- a/include/linux/mmc/host.h
-+++ b/include/linux/mmc/host.h
-@@ -278,6 +278,7 @@ struct mmc_host {
- #define MMC_CAP2_PACKED_CMD	(MMC_CAP2_PACKED_RD | \
- 				 MMC_CAP2_PACKED_WR)
- #define MMC_CAP2_NO_PRESCAN_POWERUP (1 << 14)	/* Don't power up before scan */
-+#define MMC_CAP2_SDIO_IRQ_NOTHREAD (1 << 15)
+-again:
+-	DBG("*** %s got interrupt: 0x%08x\n",
+-		mmc_hostname(host->mmc), intmask);
+-
+-	if (intmask & (SDHCI_INT_CARD_INSERT | SDHCI_INT_CARD_REMOVE)) {
+-		u32 present = sdhci_readl(host, SDHCI_PRESENT_STATE) &
+-			      SDHCI_CARD_PRESENT;
+-
+-		/*
+-		 * There is a observation on i.mx esdhc.  INSERT bit will be
+-		 * immediately set again when it gets cleared, if a card is
+-		 * inserted.  We have to mask the irq to prevent interrupt
+-		 * storm which will freeze the system.  And the REMOVE gets
+-		 * the same situation.
+-		 *
+-		 * More testing are needed here to ensure it works for other
+-		 * platforms though.
+-		 */
+-		sdhci_mask_irqs(host, present ? SDHCI_INT_CARD_INSERT :
+-						SDHCI_INT_CARD_REMOVE);
+-		sdhci_unmask_irqs(host, present ? SDHCI_INT_CARD_REMOVE :
+-						  SDHCI_INT_CARD_INSERT);
+-
+-		sdhci_writel(host, intmask & (SDHCI_INT_CARD_INSERT |
+-			     SDHCI_INT_CARD_REMOVE), SDHCI_INT_STATUS);
+-		intmask &= ~(SDHCI_INT_CARD_INSERT | SDHCI_INT_CARD_REMOVE);
+-		tasklet_schedule(&host->card_tasklet);
+-	}
++	do {
++		/* Clear selected interrupts. */
++		mask = intmask & (SDHCI_INT_CMD_MASK | SDHCI_INT_DATA_MASK |
++				  SDHCI_INT_BUS_POWER);
++		sdhci_writel(host, mask, SDHCI_INT_STATUS);
  
- 	mmc_pm_flag_t		pm_caps;	/* supported pm features */
+-	if (intmask & SDHCI_INT_CMD_MASK) {
+-		sdhci_writel(host, intmask & SDHCI_INT_CMD_MASK,
+-			SDHCI_INT_STATUS);
+-		sdhci_cmd_irq(host, intmask & SDHCI_INT_CMD_MASK);
+-	}
++		DBG("*** %s got interrupt: 0x%08x\n",
++			mmc_hostname(host->mmc), intmask);
  
-@@ -391,6 +392,8 @@ static inline void mmc_signal_sdio_irq(struct mmc_host *host)
- 	wake_up_process(host->sdio_irq_thread);
- }
+-	if (intmask & SDHCI_INT_DATA_MASK) {
+-		sdhci_writel(host, intmask & SDHCI_INT_DATA_MASK,
+-			SDHCI_INT_STATUS);
+-		sdhci_data_irq(host, intmask & SDHCI_INT_DATA_MASK);
+-	}
++		if (intmask & (SDHCI_INT_CARD_INSERT | SDHCI_INT_CARD_REMOVE)) {
++			u32 present = sdhci_readl(host, SDHCI_PRESENT_STATE) &
++				      SDHCI_CARD_PRESENT;
  
-+void sdio_run_irqs(struct mmc_host *host);
+-	intmask &= ~(SDHCI_INT_CMD_MASK | SDHCI_INT_DATA_MASK);
++			/*
++			 * There is a observation on i.mx esdhc.  INSERT
++			 * bit will be immediately set again when it gets
++			 * cleared, if a card is inserted.  We have to mask
++			 * the irq to prevent interrupt storm which will
++			 * freeze the system.  And the REMOVE gets the
++			 * same situation.
++			 *
++			 * More testing are needed here to ensure it works
++			 * for other platforms though.
++			 */
++			sdhci_mask_irqs(host, present ? SDHCI_INT_CARD_INSERT :
++							SDHCI_INT_CARD_REMOVE);
++			sdhci_unmask_irqs(host, present ? SDHCI_INT_CARD_REMOVE :
++							  SDHCI_INT_CARD_INSERT);
 +
- #ifdef CONFIG_REGULATOR
- int mmc_regulator_get_ocrmask(struct regulator *supply);
- int mmc_regulator_set_ocr(struct mmc_host *mmc,
++			sdhci_writel(host, intmask & (SDHCI_INT_CARD_INSERT |
++				     SDHCI_INT_CARD_REMOVE), SDHCI_INT_STATUS);
++			tasklet_schedule(&host->card_tasklet);
++		}
+ 
+-	intmask &= ~SDHCI_INT_ERROR;
++		if (intmask & SDHCI_INT_CMD_MASK)
++			sdhci_cmd_irq(host, intmask & SDHCI_INT_CMD_MASK);
+ 
+-	if (intmask & SDHCI_INT_BUS_POWER) {
+-		pr_err("%s: Card is consuming too much power!\n",
+-			mmc_hostname(host->mmc));
+-		sdhci_writel(host, SDHCI_INT_BUS_POWER, SDHCI_INT_STATUS);
+-	}
++		if (intmask & SDHCI_INT_DATA_MASK)
++			sdhci_data_irq(host, intmask & SDHCI_INT_DATA_MASK);
+ 
+-	intmask &= ~SDHCI_INT_BUS_POWER;
++		if (intmask & SDHCI_INT_BUS_POWER)
++			pr_err("%s: Card is consuming too much power!\n",
++				mmc_hostname(host->mmc));
+ 
+-	if (intmask & SDHCI_INT_CARD_INT)
+-		cardint = 1;
++		if (intmask & SDHCI_INT_CARD_INT)
++			cardint = 1;
+ 
+-	intmask &= ~SDHCI_INT_CARD_INT;
++		intmask &= ~(SDHCI_INT_CARD_INSERT | SDHCI_INT_CARD_REMOVE |
++			     SDHCI_INT_CMD_MASK | SDHCI_INT_DATA_MASK |
++			     SDHCI_INT_ERROR | SDHCI_INT_BUS_POWER |
++			     SDHCI_INT_CARD_INT);
+ 
+-	if (intmask) {
+-		unexpected |= intmask;
+-		sdhci_writel(host, intmask, SDHCI_INT_STATUS);
+-	}
++		if (intmask) {
++			unexpected |= intmask;
++			sdhci_writel(host, intmask, SDHCI_INT_STATUS);
++		}
+ 
+-	result = IRQ_HANDLED;
++		result = IRQ_HANDLED;
+ 
+-	intmask = sdhci_readl(host, SDHCI_INT_STATUS);
++		intmask = sdhci_readl(host, SDHCI_INT_STATUS);
+ 
+-	/*
+-	 * If we know we'll call the driver to signal SDIO IRQ, disregard
+-	 * further indications of Card Interrupt in the status to avoid a
+-	 * needless loop.
+-	 */
+-	if (cardint)
+-		intmask &= ~SDHCI_INT_CARD_INT;
+-	if (intmask && --max_loops)
+-		goto again;
++		/*
++		 * If we know we'll call the driver to signal SDIO IRQ,
++		 * disregard further indications of Card Interrupt in
++		 * the status to avoid a needless loop.
++		 */
++		if (cardint)
++			intmask &= ~SDHCI_INT_CARD_INT;
++	} while (intmask && --max_loops);
+ out:
+ 	spin_unlock(&host->lock);
+ 
 -- 
 1.8.3.1
