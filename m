@@ -1,46 +1,36 @@
 From: richard.genoud@gmail.com (Richard Genoud)
-Date: Fri, 25 Apr 2014 16:52:36 +0200
-Subject: [PATCH 0/5] tty/serial: Add helpers to use GPIOs to control modem
- lines and implement atmel_serial.c
-Message-ID: <1398437561-4289-1-git-send-email-richard.genoud@gmail.com>
+Date: Fri, 25 Apr 2014 16:52:37 +0200
+Subject: [PATCH 1/5] tty/serial: atmel_serial: Fix device tree documetation
+In-Reply-To: <1398437561-4289-1-git-send-email-richard.genoud@gmail.com>
+References: <1398437561-4289-1-git-send-email-richard.genoud@gmail.com>
+Message-ID: <1398437561-4289-2-git-send-email-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series is a leftover of http://www.spinics.net/lists/arm-kernel/msg314242.html
-that missed 3.15 because it caused merge conflicts.
+RTS pin is an active low pin.
+For now, this doesn't change anything as the ACTIVE_LOW flag is not
+handled in atmel_serial, but it will be in 3.16.
 
-The 1st patch may be applied as a fix for 3.15-rc, since it correct a
-device tree binding documentation example.
+Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+---
+ Documentation/devicetree/bindings/serial/atmel-usart.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Greg, for you to decide if it's worth it or not !
+This may be applied as a fix on 3.15-rc, or on 3.16, like the other if
+this correction is not a big deal.
 
-It's based on v3.15-rc2.
-
-Richard Genoud (5):
-  tty/serial: atmel_serial: Fix device tree documetation
-  ARM: at91: gpio: implement get_direction
-  tty/serial: Add GPIOLIB helpers for controlling modem lines
-  tty/serial: at91: use mctrl_gpio helpers
-  tty/serial: at91: add interrupts for modem control lines
-
- .../devicetree/bindings/serial/atmel-usart.txt     |  12 +-
- Documentation/serial/driver                        |  25 +++
- arch/arm/mach-at91/at91rm9200_devices.c            |  16 +-
- arch/arm/mach-at91/at91sam9260_devices.c           |   7 -
- arch/arm/mach-at91/at91sam9261_devices.c           |   4 -
- arch/arm/mach-at91/at91sam9263_devices.c           |   4 -
- arch/arm/mach-at91/at91sam9g45_devices.c           |   5 -
- arch/arm/mach-at91/at91sam9rl_devices.c            |   5 -
- arch/arm/mach-at91/gpio.c                          |  13 ++
- drivers/tty/serial/Kconfig                         |   4 +
- drivers/tty/serial/Makefile                        |   3 +
- drivers/tty/serial/atmel_serial.c                  | 230 +++++++++++++++++----
- drivers/tty/serial/serial_mctrl_gpio.c             | 143 +++++++++++++
- drivers/tty/serial/serial_mctrl_gpio.h             | 110 ++++++++++
- include/linux/platform_data/atmel.h                |   1 -
- 15 files changed, 509 insertions(+), 73 deletions(-)
- create mode 100644 drivers/tty/serial/serial_mctrl_gpio.c
- create mode 100644 drivers/tty/serial/serial_mctrl_gpio.h
-
+diff --git a/Documentation/devicetree/bindings/serial/atmel-usart.txt b/Documentation/devicetree/bindings/serial/atmel-usart.txt
+index 17c1042b2df8..2f7aad71b3c9 100644
+--- a/Documentation/devicetree/bindings/serial/atmel-usart.txt
++++ b/Documentation/devicetree/bindings/serial/atmel-usart.txt
+@@ -35,7 +35,7 @@ Example:
+ 		clock-names = "usart";
+ 		atmel,use-dma-rx;
+ 		atmel,use-dma-tx;
+-		rts-gpios = <&pioD 15 0>;
++		rts-gpios = <&pioD 15 GPIO_ACTIVE_LOW>;
+ 	};
+ 
+ - use DMA:
 -- 
 1.8.5.5
