@@ -1,111 +1,38 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 25 Apr 2014 15:10:00 +0300
-Subject: [PATCH] arm: dts: am43x-clock: add tbclk data for ehrpwm.
-In-Reply-To: <1398416142-7174-1-git-send-email-sourav.poddar@ti.com>
-References: <1398416142-7174-1-git-send-email-sourav.poddar@ti.com>
-Message-ID: <535A5098.6040107@ti.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Fri, 25 Apr 2014 21:32:38 +0900
+Subject: [PATCH v2 02/10] ARM: EXYNOS: Cleanup "mach-exynos/common.h" file
+In-Reply-To: <1398429166-5539-1-git-send-email-pankaj.dubey@samsung.com>
+References: <1396425058-4012-1-git-send-email-pankaj.dubey@samsung.com>
+ <1398429166-5539-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1398429166-5539-3-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/25/2014 11:55 AM, Sourav Poddar wrote:
-> We need "tbclk" clock data for the functioning of ehrpwm
-> module. Hence, populating the required clock information
-> in clock dts file.
->
-> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
-> ---
->   arch/arm/boot/dts/am43xx-clocks.dtsi |   48 ++++++++++++++++++++++++++++++++++
->   drivers/clk/ti/clk-43xx.c            |    6 +++++
->   2 files changed, 54 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/am43xx-clocks.dtsi b/arch/arm/boot/dts/am43xx-clocks.dtsi
-> index 142009c..54f68e8 100644
-> --- a/arch/arm/boot/dts/am43xx-clocks.dtsi
-> +++ b/arch/arm/boot/dts/am43xx-clocks.dtsi
-> @@ -87,6 +87,54 @@
->   		clock-mult = <1>;
->   		clock-div = <1>;
->   	};
-> +
-> +	ehrpwm0_tbclk: ehrpwm0_tbclk at 44e10664 {
-> +		#clock-cells = <0>;
-> +		compatible = "gate-clock";
+Remove unused and unwanted declarations from "mach-exynos/common.h"
 
-Should be ti,gate-clock.
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+---
+ arch/arm/mach-exynos/common.h |    6 ------
+ 1 file changed, 6 deletions(-)
 
-> +		clocks = <&dpll_per_m2_ck>;
-> +		bit-shift = <0>;
-
-Should be ti,bit-shift.
-
-> +		reg = <0x44e10664 0x4>;
-
-Should be reg = <0x664>. Mainline kernel uses offsets for clock data, 
-not absolute register addresses.
-
-Similar comments for the rest of the patch.
-
--Tero
-
-> +	};
-> +
-> +	ehrpwm1_tbclk: ehrpwm1_tbclk at 44e10664 {
-> +		#clock-cells = <0>;
-> +		compatible = "gate-clock";
-> +		clocks = <&dpll_per_m2_ck>;
-> +		bit-shift = <1>;
-> +		reg = <0x44e10664 0x4>;
-> +	};
-> +
-> +	ehrpwm2_tbclk: ehrpwm2_tbclk at 44e10664 {
-> +		#clock-cells = <0>;
-> +		compatible = "gate-clock";
-> +		clocks = <&dpll_per_m2_ck>;
-> +		bit-shift = <2>;
-> +		reg = <0x44e10664 0x4>;
-> +	};
-> +
-> +	ehrpwm3_tbclk: ehrpwm3_tbclk at 44e10664 {
-> +		#clock-cells = <0>;
-> +		compatible = "gate-clock";
-> +		clocks = <&dpll_per_m2_ck>;
-> +		bit-shift = <3>;
-> +		reg = <0x44e10664 0x4>;
-> +	};
-> +
-> +	ehrpwm4_tbclk: ehrpwm4_tbclk at 44e10664 {
-> +		#clock-cells = <0>;
-> +		compatible = "gate-clock";
-> +		clocks = <&dpll_per_m2_ck>;
-> +		bit-shift = <4>;
-> +		reg = <0x44e10664 0x4>;
-> +	};
-> +
-> +	ehrpwm5_tbclk: ehrpwm5_tbclk at 44e10664 {
-> +		#clock-cells = <0>;
-> +		compatible = "gate-clock";
-> +		clocks = <&dpll_per_m2_ck>;
-> +		bit-shift = <5>;
-> +		reg = <0x44e10664 0x4>;
-> +	};
->   };
->   &prcm_clocks {
->   	clk_32768_ck: clk_32768_ck {
-> diff --git a/drivers/clk/ti/clk-43xx.c b/drivers/clk/ti/clk-43xx.c
-> index 67c8de5..527a43d 100644
-> --- a/drivers/clk/ti/clk-43xx.c
-> +++ b/drivers/clk/ti/clk-43xx.c
-> @@ -105,6 +105,12 @@ static struct ti_dt_clk am43xx_clks[] = {
->   	DT_CLK(NULL, "func_12m_clk", "func_12m_clk"),
->   	DT_CLK(NULL, "vtp_clk_div", "vtp_clk_div"),
->   	DT_CLK(NULL, "usbphy_32khz_clkmux", "usbphy_32khz_clkmux"),
-> +	DT_CLK("48300200.ehrpwm", "tbclk", "ehrpwm0_tbclk"),
-> +	DT_CLK("48302200.ehrpwm", "tbclk", "ehrpwm1_tbclk"),
-> +	DT_CLK("48304200.ehrpwm", "tbclk", "ehrpwm2_tbclk"),
-> +	DT_CLK("48306200.ehrpwm", "tbclk", "ehrpwm3_tbclk"),
-> +	DT_CLK("48308200.ehrpwm", "tbclk", "ehrpwm4_tbclk"),
-> +	DT_CLK("4830a200.ehrpwm", "tbclk", "ehrpwm5_tbclk"),
->   	{ .node_name = NULL },
->   };
->
->
+diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+index 9ef3f83..31c5964 100644
+--- a/arch/arm/mach-exynos/common.h
++++ b/arch/arm/mach-exynos/common.h
+@@ -15,14 +15,8 @@
+ #include <linux/reboot.h>
+ #include <linux/of.h>
+ 
+-void mct_init(void __iomem *base, int irq_g0, int irq_l0, int irq_l1);
+-
+-struct map_desc;
+-void exynos_init_io(void);
+-void exynos_restart(enum reboot_mode mode, const char *cmd);
+ void exynos_cpuidle_init(void);
+ void exynos_cpufreq_init(void);
+-void exynos_init_late(void);
+ 
+ void exynos_firmware_init(void);
+ 
+-- 
+1.7.10.4
