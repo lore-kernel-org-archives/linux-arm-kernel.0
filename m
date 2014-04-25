@@ -1,227 +1,196 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:43:22 +0100
-Subject: [PATCH 140/222] ata: ahci_imx: allow hardware parameters to be
- specified in DT
+Date: Fri, 25 Apr 2014 12:41:30 +0100
+Subject: [PATCH 118/222] net:fec: add locking for MDIO bus access
 In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
 References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WdeXK-0007Mc-KC@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WdeVW-0007L6-62@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Various SATA phy parameters are board specific, and therefore need to
-be configured.
+Both fec_restart() and fec_stop() both perform a reset of the FEC.  This
+reset can result in an in-process MDIO transfer being terminated, which
+can lead to the MDIO read/write functions timing out.  Add some locking
+to prevent this occuring.
+
+We can't use a spinlock for this as the MDIO accessor functions use
+wait_for_completion_timeout(), which sleeps.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/ata/ahci_imx.c | 168 ++++++++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 160 insertions(+), 8 deletions(-)
+ drivers/net/ethernet/freescale/fec.h      |  3 +++
+ drivers/net/ethernet/freescale/fec_main.c | 30 +++++++++++++++++++++++++++++-
+ 2 files changed, 32 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/ata/ahci_imx.c b/drivers/ata/ahci_imx.c
-index 6a56a561a80b..fa5755f8dff2 100644
---- a/drivers/ata/ahci_imx.c
-+++ b/drivers/ata/ahci_imx.c
-@@ -46,6 +46,7 @@ struct imx_ahci_priv {
- 	struct regmap *gpr;
- 	bool no_device;
- 	bool first_time;
-+	u32 phy_params;
- };
+diff --git a/drivers/net/ethernet/freescale/fec.h b/drivers/net/ethernet/freescale/fec.h
+index 70ef32c965e5..11717d2fd520 100644
+--- a/drivers/net/ethernet/freescale/fec.h
++++ b/drivers/net/ethernet/freescale/fec.h
+@@ -14,6 +14,7 @@
+ /****************************************************************************/
  
- static int ahci_imx_hotplug;
-@@ -90,14 +91,7 @@ static int imx_sata_enable(struct ahci_host_priv *hpriv)
- 				   IMX6Q_GPR13_SATA_TX_LVL_MASK |
- 				   IMX6Q_GPR13_SATA_MPLL_CLK_EN |
- 				   IMX6Q_GPR13_SATA_TX_EDGE_RATE,
--				   IMX6Q_GPR13_SATA_RX_EQ_VAL_3_0_DB |
--				   IMX6Q_GPR13_SATA_RX_LOS_LVL_SATA2M |
--				   IMX6Q_GPR13_SATA_RX_DPLL_MODE_2P_4F |
--				   IMX6Q_GPR13_SATA_SPD_MODE_3P0G |
--				   IMX6Q_GPR13_SATA_MPLL_SS_EN |
--				   IMX6Q_GPR13_SATA_TX_ATTEN_9_16 |
--				   IMX6Q_GPR13_SATA_TX_BOOST_3_33_DB |
--				   IMX6Q_GPR13_SATA_TX_LVL_1_025_V);
-+				   imxpriv->phy_params);
- 		regmap_update_bits(imxpriv->gpr, IOMUXC_GPR13,
- 				   IMX6Q_GPR13_SATA_MPLL_CLK_EN,
- 				   IMX6Q_GPR13_SATA_MPLL_CLK_EN);
-@@ -204,6 +198,152 @@ static const struct of_device_id imx_ahci_of_match[] = {
- };
- MODULE_DEVICE_TABLE(of, imx_ahci_of_match);
+ #include <linux/clocksource.h>
++#include <linux/mutex.h>
+ #include <linux/net_tstamp.h>
+ #include <linux/ptp_clock_kernel.h>
  
-+struct reg_value {
-+	u32 of_value;
-+	u32 reg_value;
-+};
+@@ -300,6 +301,8 @@ struct fec_enet_private {
+ 	unsigned short tx_ring_size;
+ 	unsigned short rx_ring_size;
+ 
++	struct mutex mutex;
 +
-+struct reg_property {
-+	const char *name;
-+	const struct reg_value *values;
-+	size_t num_values;
-+	u32 def_value;
-+};
-+
-+static const struct reg_value gpr13_tx_level[] = {
-+	{  937, IMX6Q_GPR13_SATA_TX_LVL_0_937_V },
-+	{  947, IMX6Q_GPR13_SATA_TX_LVL_0_947_V },
-+	{  957, IMX6Q_GPR13_SATA_TX_LVL_0_957_V },
-+	{  966, IMX6Q_GPR13_SATA_TX_LVL_0_966_V },
-+	{  976, IMX6Q_GPR13_SATA_TX_LVL_0_976_V },
-+	{  986, IMX6Q_GPR13_SATA_TX_LVL_0_986_V },
-+	{  996, IMX6Q_GPR13_SATA_TX_LVL_0_996_V },
-+	{ 1005, IMX6Q_GPR13_SATA_TX_LVL_1_005_V },
-+	{ 1015, IMX6Q_GPR13_SATA_TX_LVL_1_015_V },
-+	{ 1025, IMX6Q_GPR13_SATA_TX_LVL_1_025_V },
-+	{ 1035, IMX6Q_GPR13_SATA_TX_LVL_1_035_V },
-+	{ 1045, IMX6Q_GPR13_SATA_TX_LVL_1_045_V },
-+	{ 1054, IMX6Q_GPR13_SATA_TX_LVL_1_054_V },
-+	{ 1064, IMX6Q_GPR13_SATA_TX_LVL_1_064_V },
-+	{ 1074, IMX6Q_GPR13_SATA_TX_LVL_1_074_V },
-+	{ 1084, IMX6Q_GPR13_SATA_TX_LVL_1_084_V },
-+	{ 1094, IMX6Q_GPR13_SATA_TX_LVL_1_094_V },
-+	{ 1104, IMX6Q_GPR13_SATA_TX_LVL_1_104_V },
-+	{ 1113, IMX6Q_GPR13_SATA_TX_LVL_1_113_V },
-+	{ 1123, IMX6Q_GPR13_SATA_TX_LVL_1_123_V },
-+	{ 1133, IMX6Q_GPR13_SATA_TX_LVL_1_133_V },
-+	{ 1143, IMX6Q_GPR13_SATA_TX_LVL_1_143_V },
-+	{ 1152, IMX6Q_GPR13_SATA_TX_LVL_1_152_V },
-+	{ 1162, IMX6Q_GPR13_SATA_TX_LVL_1_162_V },
-+	{ 1172, IMX6Q_GPR13_SATA_TX_LVL_1_172_V },
-+	{ 1182, IMX6Q_GPR13_SATA_TX_LVL_1_182_V },
-+	{ 1191, IMX6Q_GPR13_SATA_TX_LVL_1_191_V },
-+	{ 1201, IMX6Q_GPR13_SATA_TX_LVL_1_201_V },
-+	{ 1211, IMX6Q_GPR13_SATA_TX_LVL_1_211_V },
-+	{ 1221, IMX6Q_GPR13_SATA_TX_LVL_1_221_V },
-+	{ 1230, IMX6Q_GPR13_SATA_TX_LVL_1_230_V },
-+	{ 1240, IMX6Q_GPR13_SATA_TX_LVL_1_240_V }
-+};
-+
-+static const struct reg_value gpr13_tx_boost[] = {
-+	{    0, IMX6Q_GPR13_SATA_TX_BOOST_0_00_DB },
-+	{  370, IMX6Q_GPR13_SATA_TX_BOOST_0_37_DB },
-+	{  740, IMX6Q_GPR13_SATA_TX_BOOST_0_74_DB },
-+	{  111, IMX6Q_GPR13_SATA_TX_BOOST_1_11_DB },
-+	{  148, IMX6Q_GPR13_SATA_TX_BOOST_1_48_DB },
-+	{  185, IMX6Q_GPR13_SATA_TX_BOOST_1_85_DB },
-+	{  222, IMX6Q_GPR13_SATA_TX_BOOST_2_22_DB },
-+	{  259, IMX6Q_GPR13_SATA_TX_BOOST_2_59_DB },
-+	{  296, IMX6Q_GPR13_SATA_TX_BOOST_2_96_DB },
-+	{  333, IMX6Q_GPR13_SATA_TX_BOOST_3_33_DB },
-+	{  370, IMX6Q_GPR13_SATA_TX_BOOST_3_70_DB },
-+	{  407, IMX6Q_GPR13_SATA_TX_BOOST_4_07_DB },
-+	{  444, IMX6Q_GPR13_SATA_TX_BOOST_4_44_DB },
-+	{  481, IMX6Q_GPR13_SATA_TX_BOOST_4_81_DB },
-+	{  528, IMX6Q_GPR13_SATA_TX_BOOST_5_28_DB },
-+	{  575, IMX6Q_GPR13_SATA_TX_BOOST_5_75_DB }
-+};
-+
-+static const struct reg_value gpr13_tx_atten[] = {
-+	{  8, IMX6Q_GPR13_SATA_TX_ATTEN_8_16 },
-+	{  9, IMX6Q_GPR13_SATA_TX_ATTEN_9_16 },
-+	{ 10, IMX6Q_GPR13_SATA_TX_ATTEN_10_16 },
-+	{ 12, IMX6Q_GPR13_SATA_TX_ATTEN_12_16 },
-+	{ 14, IMX6Q_GPR13_SATA_TX_ATTEN_14_16 },
-+	{ 16, IMX6Q_GPR13_SATA_TX_ATTEN_16_16 },
-+};
-+
-+static const struct reg_value gpr13_rx_eq[] = {
-+	{  500, IMX6Q_GPR13_SATA_RX_EQ_VAL_0_5_DB },
-+	{ 1000, IMX6Q_GPR13_SATA_RX_EQ_VAL_1_0_DB },
-+	{ 1500, IMX6Q_GPR13_SATA_RX_EQ_VAL_1_5_DB },
-+	{ 2000, IMX6Q_GPR13_SATA_RX_EQ_VAL_2_0_DB },
-+	{ 2500, IMX6Q_GPR13_SATA_RX_EQ_VAL_2_5_DB },
-+	{ 3000, IMX6Q_GPR13_SATA_RX_EQ_VAL_3_0_DB },
-+	{ 3500, IMX6Q_GPR13_SATA_RX_EQ_VAL_3_5_DB },
-+	{ 4000, IMX6Q_GPR13_SATA_RX_EQ_VAL_4_0_DB },
-+};
-+
-+static const struct reg_property gpr13_props[] = {
-+	{
-+		.name = "fsl,transmit-level-mV",
-+		.values = gpr13_tx_level,
-+		.num_values = ARRAY_SIZE(gpr13_tx_level),
-+		.def_value = IMX6Q_GPR13_SATA_TX_LVL_1_025_V,
-+	}, {
-+		.name = "fsl,transmit-boost-mdB",
-+		.values = gpr13_tx_boost,
-+		.num_values = ARRAY_SIZE(gpr13_tx_boost),
-+		.def_value = IMX6Q_GPR13_SATA_TX_BOOST_3_33_DB,
-+	}, {
-+		.name = "fsl,transmit-atten-16ths",
-+		.values = gpr13_tx_atten,
-+		.num_values = ARRAY_SIZE(gpr13_tx_atten),
-+		.def_value = IMX6Q_GPR13_SATA_TX_ATTEN_9_16,
-+	}, {
-+		.name = "fsl,receive-eq-mdB",
-+		.values = gpr13_rx_eq,
-+		.num_values = ARRAY_SIZE(gpr13_rx_eq),
-+		.def_value = IMX6Q_GPR13_SATA_RX_EQ_VAL_3_0_DB,
-+	},
-+};
-+
-+static u32 imx_ahci_parse_props(struct device *dev,
-+				const struct reg_property *prop, size_t num)
-+{
-+	struct device_node *np = dev->of_node;
-+	u32 reg_value = 0;
-+	int i, j;
-+
-+	for (i = 0; i < num; i++, prop++) {
-+		u32 of_val;
-+
-+		if (of_property_read_u32(np, prop->name, &of_val)) {
-+			dev_info(dev, "%s not specified, using %08x\n",
-+				prop->name, prop->def_value);
-+			reg_value |= prop->def_value;
-+			continue;
-+		}
-+
-+		for (j = 0; j < prop->num_values; j++) {
-+			if (prop->values[j].of_value == of_val) {
-+				dev_info(dev, "%s value %u, using %08x\n",
-+					prop->name, of_val, prop->values[j].reg_value);
-+				reg_value |= prop->values[j].reg_value;
-+				break;
-+			}
-+		}
-+
-+		if (j == prop->num_values) {
-+			dev_err(dev, "DT property %s is not a valid value\n",
-+				prop->name);
-+			reg_value |= prop->def_value;
-+		}
-+	}
-+
-+	return reg_value;
-+}
-+
- static int imx_ahci_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
-@@ -231,6 +371,8 @@ static int imx_ahci_probe(struct platform_device *pdev)
+ 	struct	platform_device *pdev;
+ 
+ 	int	dev_id;
+diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
+index f6763686d5a9..afbcd7f14951 100644
+--- a/drivers/net/ethernet/freescale/fec_main.c
++++ b/drivers/net/ethernet/freescale/fec_main.c
+@@ -795,12 +795,14 @@ static void fec_enet_timeout_work(struct work_struct *work)
+ 
+ 	rtnl_lock();
+ 	if (netif_device_present(ndev) || netif_running(ndev)) {
++		mutex_lock(&fep->mutex);
+ 		napi_disable(&fep->napi);
+ 		netif_tx_lock_bh(ndev);
+ 		fec_restart(ndev);
+ 		netif_wake_queue(ndev);
+ 		netif_tx_unlock_bh(ndev);
+ 		napi_enable(&fep->napi);
++		mutex_unlock(&fep->mutex);
  	}
+ 	rtnl_unlock();
+ }
+@@ -1282,20 +1284,24 @@ static void fec_enet_adjust_link(struct net_device *ndev)
  
- 	if (imxpriv->type == AHCI_IMX6Q) {
-+		u32 reg_value;
-+
- 		imxpriv->gpr = syscon_regmap_lookup_by_compatible(
- 							"fsl,imx6q-iomuxc-gpr");
- 		if (IS_ERR(imxpriv->gpr)) {
-@@ -238,6 +380,16 @@ static int imx_ahci_probe(struct platform_device *pdev)
- 				"failed to find fsl,imx6q-iomux-gpr regmap\n");
- 			return PTR_ERR(imxpriv->gpr);
+ 		/* if any of the above changed restart the FEC */
+ 		if (status_change) {
++			mutex_lock(&fep->mutex);
+ 			napi_disable(&fep->napi);
+ 			netif_tx_lock_bh(ndev);
+ 			fec_restart(ndev);
+ 			netif_wake_queue(ndev);
+ 			netif_tx_unlock_bh(ndev);
+ 			napi_enable(&fep->napi);
++			mutex_unlock(&fep->mutex);
  		}
+ 	} else {
+ 		if (fep->link) {
++			mutex_lock(&fep->mutex);
+ 			napi_disable(&fep->napi);
+ 			netif_tx_lock_bh(ndev);
+ 			fec_stop(ndev);
+ 			netif_tx_unlock_bh(ndev);
+ 			napi_enable(&fep->napi);
++			mutex_unlock(&fep->mutex);
+ 			fep->link = phy_dev->link;
+ 			status_change = 1;
+ 		}
+@@ -1308,15 +1314,23 @@ static void fec_enet_adjust_link(struct net_device *ndev)
+ static unsigned long fec_enet_mdio_op(struct fec_enet_private *fep,
+ 	unsigned data)
+ {
++	unsigned long time_left;
 +
-+		reg_value = imx_ahci_parse_props(dev, gpr13_props,
-+						 ARRAY_SIZE(gpr13_props));
+ 	fep->mii_timeout = 0;
+ 	init_completion(&fep->mdio_done);
+ 
++	mutex_lock(&fep->mutex);
 +
-+		imxpriv->phy_params =
-+				   IMX6Q_GPR13_SATA_RX_LOS_LVL_SATA2M |
-+				   IMX6Q_GPR13_SATA_RX_DPLL_MODE_2P_4F |
-+				   IMX6Q_GPR13_SATA_SPD_MODE_3P0G |
-+				   IMX6Q_GPR13_SATA_MPLL_SS_EN |
-+				   reg_value;
+ 	/* start operation */
+ 	writel(data, fep->hwp + FEC_MII_DATA);
+ 
+ 	/* wait for end of transfer */
+-	return wait_for_completion_timeout(&fep->mdio_done,
++	time_left = wait_for_completion_timeout(&fep->mdio_done,
+ 			usecs_to_jiffies(FEC_MII_TIMEOUT));
++
++	mutex_unlock(&fep->mutex);
++
++	return time_left;
+ }
+ 
+ static int fec_enet_mdio_read(struct mii_bus *bus, int mii_id, int regnum)
+@@ -1683,6 +1697,7 @@ static int fec_enet_set_pauseparam(struct net_device *ndev,
+ 			fep->pause_mode = fep->pause_flag;
+ 
+ 			if (netif_running(ndev)) {
++				mutex_lock(&fep->mutex);
+ 				napi_disable(&fep->napi);
+ 				netif_tx_lock_bh(ndev);
+ 				fec_stop(ndev);
+@@ -1690,6 +1705,7 @@ static int fec_enet_set_pauseparam(struct net_device *ndev,
+ 				netif_wake_queue(ndev);
+ 				netif_tx_unlock_bh(ndev);
+ 				napi_enable(&fep->napi);
++				mutex_unlock(&fep->mutex);
+ 			}
+ 		}
+ 	}
+@@ -1983,7 +1999,9 @@ fec_enet_open(struct net_device *ndev)
+ 		return ret;
  	}
  
- 	hpriv = ahci_platform_get_resources(pdev);
++	mutex_lock(&fep->mutex);
+ 	fec_restart(ndev);
++	mutex_unlock(&fep->mutex);
+ 	napi_enable(&fep->napi);
+ 	phy_start(fep->phy_dev);
+ 	netif_start_queue(ndev);
+@@ -2000,7 +2018,9 @@ fec_enet_close(struct net_device *ndev)
+ 	if (netif_device_present(ndev)) {
+ 		napi_disable(&fep->napi);
+ 		netif_tx_disable(ndev);
++		mutex_lock(&fep->mutex);
+ 		fec_stop(ndev);
++		mutex_unlock(&fep->mutex);
+ 	}
+ 
+ 	phy_disconnect(fep->phy_dev);
+@@ -2155,6 +2175,7 @@ static int fec_set_features(struct net_device *netdev,
+ 
+ 	/* Quiesce the device if necessary */
+ 	if (netif_running(netdev) && changed & FEATURES_NEED_QUIESCE) {
++		mutex_lock(&fep->mutex);
+ 		napi_disable(&fep->napi);
+ 		netif_tx_lock_bh(netdev);
+ 		fec_stop(netdev);
+@@ -2182,6 +2203,7 @@ static int fec_set_features(struct net_device *netdev,
+ 		netif_wake_queue(netdev);
+ 		netif_tx_unlock_bh(netdev);
+ 		napi_enable(&fep->napi);
++		mutex_unlock(&fep->mutex);
+ 	}
+ 
+ 	return 0;
+@@ -2324,6 +2346,8 @@ fec_probe(struct platform_device *pdev)
+ 	/* setup board info structure */
+ 	fep = netdev_priv(ndev);
+ 
++	mutex_init(&fep->mutex);
++
+ #if !defined(CONFIG_M5272)
+ 	/* default enable pause frame auto negotiation */
+ 	if (pdev->id_entry &&
+@@ -2515,7 +2539,9 @@ fec_suspend(struct device *dev)
+ 		netif_tx_lock_bh(ndev);
+ 		netif_device_detach(ndev);
+ 		netif_tx_unlock_bh(ndev);
++		mutex_lock(&fep->mutex);
+ 		fec_stop(ndev);
++		mutex_unlock(&fep->mutex);
+ 	}
+ 	rtnl_unlock();
+ 
+@@ -2567,7 +2593,9 @@ fec_resume(struct device *dev)
+ 
+ 	rtnl_lock();
+ 	if (netif_running(ndev)) {
++		mutex_lock(&fep->mutex);
+ 		fec_restart(ndev);
++		mutex_unlock(&fep->mutex);
+ 		netif_tx_lock_bh(ndev);
+ 		netif_device_attach(ndev);
+ 		netif_tx_unlock_bh(ndev);
 -- 
 1.8.3.1
