@@ -1,273 +1,141 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:42:11 +0100
-Subject: [PATCH 126/222] net:fec: unsorted hacks
+Date: Fri, 25 Apr 2014 12:42:16 +0100
+Subject: [PATCH 127/222] leds: leds-pwm: provide a common function to setup a
+ single led-pwm device
 In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
 References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WdeWB-0007Ld-3b@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WdeWG-0007Lh-74@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Provide a common function to setup a single led-pwm device, replacing
+the platform data initialisation path with this function.  This allows
+us to have a common method of creating these devices in a consistent
+manner, which then allows us to place the probe failure cleanup in one
+place.
+
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/net/ethernet/freescale/fec.h      |  16 +++-
- drivers/net/ethernet/freescale/fec_main.c | 126 +++++++++++++++++-------------
- 2 files changed, 85 insertions(+), 57 deletions(-)
+ drivers/leds/leds-pwm.c | 85 ++++++++++++++++++++++++++-----------------------
+ 1 file changed, 46 insertions(+), 39 deletions(-)
 
-diff --git a/drivers/net/ethernet/freescale/fec.h b/drivers/net/ethernet/freescale/fec.h
-index bfcab01131cc..09bdf6fea8ea 100644
---- a/drivers/net/ethernet/freescale/fec.h
-+++ b/drivers/net/ethernet/freescale/fec.h
-@@ -208,6 +208,7 @@ union bufdesc_u {
- #define BD_ENET_RX_OV           ((ushort)0x0002)
- #define BD_ENET_RX_CL           ((ushort)0x0001)
- #define BD_ENET_RX_STATS        ((ushort)0x013f)        /* All status bits */
-+#define BD_ENET_RX_ERROR	((ushort)0x003f)
- 
- /* Enhanced buffer descriptor control/status used by Ethernet receive */
- #define BD_ENET_RX_VLAN         0x00000004
-@@ -230,10 +231,17 @@ union bufdesc_u {
- #define BD_ENET_TX_STATS        ((ushort)0x03ff)        /* All status bits */
- 
- /*enhanced buffer descriptor control/status used by Ethernet transmit*/
--#define BD_ENET_TX_INT          0x40000000
--#define BD_ENET_TX_TS           0x20000000
--#define BD_ENET_TX_PINS         0x10000000
--#define BD_ENET_TX_IINS         0x08000000
-+#define BD_ENET_TX_INT          BIT(30)
-+#define BD_ENET_TX_TS           BIT(29)
-+#define BD_ENET_TX_PINS         BIT(28)
-+#define BD_ENET_TX_IINS         BIT(27)
-+#define BD_ENET_TX_TXE		BIT(15)
-+#define BD_ENET_TX_UE		BIT(13)
-+#define BD_ENET_TX_EE		BIT(12)
-+#define BD_ENET_TX_FE		BIT(11)
-+#define BD_ENET_TX_LCE		BIT(10)
-+#define BD_ENET_TX_OE		BIT(9)
-+#define BD_ENET_TX_TSE		BIT(8)
- 
- 
- /* This device has up to three irqs on some platforms */
-diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index 441e472f7779..7330bc5c64e0 100644
---- a/drivers/net/ethernet/freescale/fec_main.c
-+++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -85,16 +85,6 @@ static void set_multicast_list(struct net_device *ndev);
- #define FEC_QUIRK_HAS_CSUM		(1 << 5)
- /* Controller has hardware vlan support */
- #define FEC_QUIRK_HAS_VLAN		(1 << 6)
--/* ENET IP errata ERR006358
-- *
-- * If the ready bit in the transmit buffer descriptor (TxBD[R]) is previously
-- * detected as not set during a prior frame transmission, then the
-- * ENET_TDAR[TDAR] bit is cleared@a later time, even if additional TxBDs
-- * were added to the ring and the ENET_TDAR[TDAR] bit is set. This results in
-- * frames not being transmitted until there is a 0-to-1 transition on
-- * ENET_TDAR[TDAR].
-- */
--#define FEC_QUIRK_ERR006358            (1 << 7)
- 
- static struct platform_device_id fec_devtype[] = {
- 	{
-@@ -114,7 +104,7 @@ static struct platform_device_id fec_devtype[] = {
- 		.name = "imx6q-fec",
- 		.driver_data = FEC_QUIRK_ENET_MAC | FEC_QUIRK_HAS_GBIT |
- 				FEC_QUIRK_HAS_BUFDESC_EX | FEC_QUIRK_HAS_CSUM |
--				FEC_QUIRK_HAS_VLAN | FEC_QUIRK_ERR006358,
-+				FEC_QUIRK_HAS_VLAN,
- 	}, {
- 		.name = "mvf600-fec",
- 		.driver_data = FEC_QUIRK_ENET_MAC,
-@@ -293,13 +283,16 @@ static void fec_dump(struct net_device *ndev)
- 	for (index = 0; index < fep->tx_ring_size; index++) {
- 		bdp = fec_enet_tx_get(index, fep);
- 
--		pr_info("%3u %c%c 0x%04x 0x%08lx %4u %p\n",
-+		pr_info("%3u %c%c 0x%04x 0x%08lx %4u %p",
- 			index,
- 			index == fep->tx_next ? 'S' : ' ',
- 			index == fep->tx_dirty ? 'H' : ' ',
- 			bdp->bd.cbd_sc, bdp->bd.cbd_bufaddr,
- 			bdp->bd.cbd_datlen,
- 			fep->tx_skbuff[index]);
-+		if (fep->flags & FEC_FLAG_BUFDESC_EX)
-+			pr_cont(" %08lx", bdp->ebd.cbd_esc);
-+		pr_cont("\n");
+diff --git a/drivers/leds/leds-pwm.c b/drivers/leds/leds-pwm.c
+index 7d0aaed1e23a..203e332967b2 100644
+--- a/drivers/leds/leds-pwm.c
++++ b/drivers/leds/leds-pwm.c
+@@ -92,6 +92,44 @@ static void led_pwm_cleanup(struct led_pwm_priv *priv)
  	}
  }
  
-@@ -836,13 +829,14 @@ fec_enet_tx(struct net_device *ndev)
++static int led_pwm_add(struct device *dev, struct led_pwm_priv *priv,
++		       struct led_pwm *led)
++{
++	struct led_pwm_data *led_data = &priv->leds[priv->num_leds];
++	int ret;
++
++	led_data->active_low = led->active_low;
++	led_data->period = led->pwm_period_ns;
++	led_data->cdev.name = led->name;
++	led_data->cdev.default_trigger = led->default_trigger;
++	led_data->cdev.brightness_set = led_pwm_set;
++	led_data->cdev.brightness = LED_OFF;
++	led_data->cdev.max_brightness = led->max_brightness;
++	led_data->cdev.flags = LED_CORE_SUSPENDRESUME;
++
++	led_data->pwm = devm_pwm_get(dev, led->name);
++	if (IS_ERR(led_data->pwm)) {
++		ret = PTR_ERR(led_data->pwm);
++		dev_err(dev, "unable to request PWM for %s: %d\n",
++			led->name, ret);
++		return ret;
++	}
++
++	led_data->can_sleep = pwm_can_sleep(led_data->pwm);
++	if (led_data->can_sleep)
++		INIT_WORK(&led_data->work, led_pwm_work);
++
++	ret = led_classdev_register(dev, &led_data->cdev);
++	if (ret == 0) {
++		priv->num_leds++;
++	} else {
++		dev_err(dev, "failed to register PWM led for %s: %d\n",
++			led->name, ret);
++	}
++
++	return ret;
++}
++
+ static int led_pwm_create_of(struct platform_device *pdev,
+ 			     struct led_pwm_priv *priv)
  {
- 	struct fec_enet_private *fep = netdev_priv(ndev);
- 	union bufdesc_u *bdp;
--	unsigned short status;
- 	struct	sk_buff	*skb;
- 	unsigned index = fep->tx_dirty;
- 	unsigned pkts_compl, bytes_compl;
+@@ -139,8 +177,6 @@ static int led_pwm_create_of(struct platform_device *pdev,
  
- 	pkts_compl = bytes_compl = 0;
- 	do {
-+		unsigned status, cbd_esc;
-+
- 		if (++index >= fep->tx_ring_size)
- 			index = 0;
- 
-@@ -862,21 +856,40 @@ fec_enet_tx(struct net_device *ndev)
- 		fep->tx_skbuff[index] = NULL;
- 
- 		/* Check for errors. */
--		if (status & (BD_ENET_TX_HB | BD_ENET_TX_LC |
--				   BD_ENET_TX_RL | BD_ENET_TX_UN |
--				   BD_ENET_TX_CSL)) {
--			ndev->stats.tx_errors++;
--			if (status & BD_ENET_TX_HB)  /* No heartbeat */
--				ndev->stats.tx_heartbeat_errors++;
--			if (status & BD_ENET_TX_LC)  /* Late collision */
--				ndev->stats.tx_window_errors++;
--			if (status & BD_ENET_TX_RL)  /* Retrans limit */
--				ndev->stats.tx_aborted_errors++;
--			if (status & BD_ENET_TX_UN)  /* Underrun */
--				ndev->stats.tx_fifo_errors++;
--			if (status & BD_ENET_TX_CSL) /* Carrier lost */
--				ndev->stats.tx_carrier_errors++;
--		} else if (skb) {
-+		if (fep->flags & FEC_FLAG_BUFDESC_EX) {
-+			cbd_esc = bdp->ebd.cbd_esc;
-+			if (cbd_esc & BD_ENET_TX_TXE) {
-+				ndev->stats.tx_errors++;
-+				if (cbd_esc & BD_ENET_TX_EE) { /* excess collision */
-+					ndev->stats.collisions += 16;
-+					ndev->stats.tx_aborted_errors++;
-+				}
-+				if (cbd_esc & BD_ENET_TX_LCE) /* late collision error */
-+					ndev->stats.tx_window_errors++;
-+				if (cbd_esc & (BD_ENET_TX_UE | BD_ENET_TX_FE | BD_ENET_TX_OE))
-+					ndev->stats.tx_fifo_errors++;
-+				goto next;
-+			}
-+		} else {
-+			if (status & (BD_ENET_TX_HB | BD_ENET_TX_LC |
-+					   BD_ENET_TX_RL | BD_ENET_TX_UN |
-+					   BD_ENET_TX_CSL)) {
-+				ndev->stats.tx_errors++;
-+				if (status & BD_ENET_TX_HB)  /* No heartbeat */
-+					ndev->stats.tx_heartbeat_errors++;
-+				if (status & BD_ENET_TX_LC)  /* Late collision */
-+					ndev->stats.tx_window_errors++;
-+				if (status & BD_ENET_TX_RL)  /* Retrans limit */
-+					ndev->stats.tx_aborted_errors++;
-+				if (status & BD_ENET_TX_UN)  /* Underrun */
-+					ndev->stats.tx_fifo_errors++;
-+				if (status & BD_ENET_TX_CSL) /* Carrier lost */
-+					ndev->stats.tx_carrier_errors++;
-+				goto next;
-+			}
-+		}
-+
-+		if (skb) {
- 			ndev->stats.tx_packets++;
- 			ndev->stats.tx_bytes += skb->len;
- 		}
-@@ -886,7 +899,7 @@ fec_enet_tx(struct net_device *ndev)
- 		 */
- 		if (status & BD_ENET_TX_DEF)
- 			ndev->stats.collisions++;
+ 	return 0;
+ err:
+-	led_pwm_cleanup(priv);
 -
-+ next:
- 		if (skb) {
- 			if (fep->flags & FEC_FLAG_BUFDESC_EX &&
- 			    unlikely(skb_shinfo(skb)->tx_flags & SKBTX_IN_PROGRESS)) {
-@@ -930,7 +943,6 @@ fec_enet_rx(struct net_device *ndev, int budget)
- 	struct fec_enet_private *fep = netdev_priv(ndev);
- 	const struct platform_device_id *id_entry =
- 				platform_get_device_id(fep->pdev);
--	unsigned short status;
- 	struct	sk_buff	*skb;
- 	ushort	pkt_len;
- 	__u8 *data;
-@@ -948,6 +960,7 @@ fec_enet_rx(struct net_device *ndev, int budget)
- 	 */
- 	do {
- 		union bufdesc_u *bdp = fec_enet_rx_get(index, fep);
-+		unsigned status, cbd_esc;
+ 	return ret;
+ }
  
- 		status = bdp->bd.cbd_sc;
- 		if (status & BD_ENET_RX_EMPTY)
-@@ -966,29 +979,37 @@ fec_enet_rx(struct net_device *ndev, int budget)
+@@ -166,51 +202,22 @@ static int led_pwm_probe(struct platform_device *pdev)
  
- 		writel(FEC_ENET_RXF, fep->hwp + FEC_IEVENT);
- 
--		/* Check for errors. */
--		if (status & (BD_ENET_RX_LG | BD_ENET_RX_SH | BD_ENET_RX_NO |
--			   BD_ENET_RX_CR | BD_ENET_RX_OV)) {
--			ndev->stats.rx_errors++;
--			if (status & (BD_ENET_RX_LG | BD_ENET_RX_SH)) {
--				/* Frame too long or too short. */
--				ndev->stats.rx_length_errors++;
+ 	if (pdata) {
+ 		for (i = 0; i < count; i++) {
+-			struct led_pwm *cur_led = &pdata->leds[i];
+-			struct led_pwm_data *led_dat = &priv->leds[i];
+-
+-			led_dat->pwm = devm_pwm_get(&pdev->dev, cur_led->name);
+-			if (IS_ERR(led_dat->pwm)) {
+-				ret = PTR_ERR(led_dat->pwm);
+-				dev_err(&pdev->dev,
+-					"unable to request PWM for %s\n",
+-					cur_led->name);
+-				goto err;
 -			}
--			if (status & BD_ENET_RX_NO)	/* Frame alignment */
--				ndev->stats.rx_frame_errors++;
--			if (status & BD_ENET_RX_CR)	/* CRC Error */
--				ndev->stats.rx_crc_errors++;
--			if (status & BD_ENET_RX_OV)	/* FIFO overrun */
--				ndev->stats.rx_fifo_errors++;
-+		if (fep->flags & FEC_FLAG_BUFDESC_EX) {
-+			cbd_esc = bdp->ebd.cbd_esc;
-+			if (!(fep->flags & FEC_FLAG_RX_VLAN))
-+				cbd_esc &= ~BD_ENET_RX_VLAN;
-+		} else {
-+			cbd_esc = 0;
+-
+-			led_dat->cdev.name = cur_led->name;
+-			led_dat->cdev.default_trigger = cur_led->default_trigger;
+-			led_dat->active_low = cur_led->active_low;
+-			led_dat->period = cur_led->pwm_period_ns;
+-			led_dat->cdev.brightness_set = led_pwm_set;
+-			led_dat->cdev.brightness = LED_OFF;
+-			led_dat->cdev.max_brightness = cur_led->max_brightness;
+-			led_dat->cdev.flags |= LED_CORE_SUSPENDRESUME;
+-
+-			led_dat->can_sleep = pwm_can_sleep(led_dat->pwm);
+-			if (led_dat->can_sleep)
+-				INIT_WORK(&led_dat->work, led_pwm_work);
+-
+-			ret = led_classdev_register(&pdev->dev, &led_dat->cdev);
+-			if (ret < 0)
+-				goto err;
++			ret = led_pwm_add(&pdev->dev, priv, &pdata->leds[i]);
++			if (ret)
++				break;
  		}
- 
--		/* Report late collisions as a frame error.
--		 * On this error, the BD is closed, but we don't know what we
--		 * have in the buffer.  So, just drop this frame on the floor.
--		 */
--		if (status & BD_ENET_RX_CL) {
-+		/* Check for errors. */
-+		if (status & BD_ENET_RX_ERROR) {
- 			ndev->stats.rx_errors++;
--			ndev->stats.rx_frame_errors++;
+-		priv->num_leds = count;
+ 	} else {
+ 		ret = led_pwm_create_of(pdev, priv);
+-		if (ret)
+-			return ret;
++	}
 +
-+			/*
-+			 * Report late collisions as a frame error.  On this
-+			 * error, the BD is closed, but we don't know what we
-+			 * have in the buffer.  So, just drop this frame on
-+			 * the floor.
-+			 */
-+			if (status & BD_ENET_RX_CL) {
-+				ndev->stats.rx_frame_errors++;
-+			} else {
-+				if (status & (BD_ENET_RX_LG | BD_ENET_RX_SH))
-+					/* Frame too long or too short. */
-+					ndev->stats.rx_length_errors++;
-+				if (status & BD_ENET_RX_NO)	/* Frame alignment */
-+					ndev->stats.rx_frame_errors++;
-+				if (status & BD_ENET_RX_CR)	/* CRC Error */
-+					ndev->stats.rx_crc_errors++;
-+				if (status & BD_ENET_RX_OV)	/* FIFO overrun */
-+					ndev->stats.rx_fifo_errors++;
-+			}
- 			goto rx_processing_done;
- 		}
++	if (ret) {
++		led_pwm_cleanup(priv);
++		return ret;
+ 	}
  
-@@ -1006,8 +1027,7 @@ fec_enet_rx(struct net_device *ndev, int budget)
+ 	platform_set_drvdata(pdev, priv);
  
- 		/* If this is a VLAN packet remove the VLAN Tag */
- 		vlan_packet_rcvd = false;
--		if (fep->flags & FEC_FLAG_RX_VLAN &&
--		    bdp->ebd.cbd_esc & BD_ENET_RX_VLAN) {
-+		if (cbd_esc & BD_ENET_RX_VLAN) {
- 			/* Push and remove the vlan tag */
- 			struct vlan_hdr *vlan_header =
- 					(struct vlan_hdr *) (data + ETH_HLEN);
-@@ -1047,7 +1067,7 @@ fec_enet_rx(struct net_device *ndev, int budget)
- 						  skb_hwtstamps(skb));
+ 	return 0;
+-
+-err:
+-	priv->num_leds = i;
+-	led_pwm_cleanup(priv);
+-
+-	return ret;
+ }
  
- 			if (fep->flags & FEC_FLAG_RX_CSUM) {
--				if (!(bdp->ebd.cbd_esc & FLAG_RX_CSUM_ERROR)) {
-+				if (!(cbd_esc & FLAG_RX_CSUM_ERROR)) {
- 					/* don't check it */
- 					skb->ip_summed = CHECKSUM_UNNECESSARY;
- 				} else {
+ static int led_pwm_remove(struct platform_device *pdev)
 -- 
 1.8.3.1
