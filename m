@@ -1,40 +1,89 @@
 From: joelf@ti.com (Joel Fernandes)
-Date: Fri, 25 Apr 2014 18:02:45 -0500
-Subject: [PATCH 07/10] ARM: dts: DRA7: Add DT node for DES IP
+Date: Fri, 25 Apr 2014 18:02:40 -0500
+Subject: [PATCH 02/10] ARM: DRA7xx: hwmod: Add hwmod data for DES IP
 In-Reply-To: <1398466968-29506-1-git-send-email-joelf@ti.com>
 References: <1398466968-29506-1-git-send-email-joelf@ti.com>
-Message-ID: <1398466968-29506-8-git-send-email-joelf@ti.com>
+Message-ID: <1398466968-29506-3-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DRA7xx SoCs have a DES3DES IP. Add DT data for the same.
+dra7xx SoC has a DES module. Add the required data to hwmod.
 
 Signed-off-by: Joel Fernandes <joelf@ti.com>
 ---
- arch/arm/boot/dts/dra7.dtsi |   11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c |   39 +++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 1c0f8e1..0533b89 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -789,6 +789,17 @@
- 			dma-names = "tx0", "rx0";
- 			status = "disabled";
- 		};
-+
-+		des: des at 480a5000 {
-+			compatible = "ti,omap4-des";
-+			ti,hwmods = "des";
-+			reg = <0x480a5000 0xa0>;
-+			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
-+			dmas = <&sdma 117>, <&sdma 116>;
-+			dma-names = "tx", "rx";
-+			clocks = <&l3_iclk_div>;
-+			clock-names = "fck";
-+		};
- 	};
+diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+index 810c205..24ab160 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+@@ -561,6 +561,23 @@ static struct omap_hwmod_class dra7xx_gpio_hwmod_class = {
+ 	.rev	= 2,
  };
  
++static struct omap_hwmod_class_sysconfig dra7xx_des_sysc = {
++	.rev_offs	= 0x0030,
++	.sysc_offs	= 0x0034,
++	.syss_offs	= 0x0038,
++	.sysc_flags	= (SYSC_HAS_AUTOIDLE |
++			   SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET |
++			   SYSS_HAS_RESET_STATUS),
++	.idlemodes	= (SIDLE_FORCE | SIDLE_NO),
++	.sysc_fields	= &omap_hwmod_sysc_type4,
++};
++
++static struct omap_hwmod_class dra7xx_des_hwmod_class = {
++	.name	= "des",
++	.sysc	= &dra7xx_des_sysc,
++	.rev	= 2,
++};
++
+ /* gpio dev_attr */
+ static struct omap_gpio_dev_attr gpio_dev_attr = {
+ 	.bank_width	= 32,
+@@ -750,6 +767,19 @@ static struct omap_hwmod dra7xx_gpio8_hwmod = {
+ 	.dev_attr	= &gpio_dev_attr,
+ };
+ 
++static struct omap_hwmod dra7xx_des_hwmod = {
++	.name		= "des",
++	.class		= &dra7xx_des_hwmod_class,
++	.clkdm_name	= "l4sec_clkdm",
++	.prcm = {
++		.omap4 = {
++			.clkctrl_offs = DRA7XX_CM_L4SEC_DES3DES_CLKCTRL_OFFSET,
++			.context_offs = DRA7XX_RM_L4SEC_DES3DES_CONTEXT_OFFSET,
++			.modulemode   = MODULEMODE_HWCTRL,
++		},
++	},
++};
++
+ /*
+  * 'gpmc' class
+  *
+@@ -2170,6 +2200,14 @@ static struct omap_hwmod_ocp_if dra7xx_l4_per1__gpio8 = {
+ 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+ };
+ 
++/* l4_per1 -> des */
++static struct omap_hwmod_ocp_if dra7xx_l4_per1__des = {
++	.master		= &dra7xx_l4_per1_hwmod,
++	.slave		= &dra7xx_des_hwmod,
++	.clk		= "l3_iclk_div",
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
+ static struct omap_hwmod_addr_space dra7xx_gpmc_addrs[] = {
+ 	{
+ 		.pa_start	= 0x50000000,
+@@ -2704,6 +2742,7 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
+ 	&dra7xx_l4_per1__uart4,
+ 	&dra7xx_l4_per1__uart5,
+ 	&dra7xx_l4_per1__uart6,
++	&dra7xx_l4_per1__des,
+ 	&dra7xx_l4_per3__usb_otg_ss1,
+ 	&dra7xx_l4_per3__usb_otg_ss2,
+ 	&dra7xx_l4_per3__usb_otg_ss3,
 -- 
 1.7.9.5
