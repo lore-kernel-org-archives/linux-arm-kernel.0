@@ -1,40 +1,58 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 25 Apr 2014 15:52:49 +0100
-Subject: [PATCH v3 part1 07/11] ARM64 / ACPI: Introduce
- arch_fix_phys_package_id() for cpu topology
-In-Reply-To: <1398432017-8506-8-git-send-email-hanjun.guo@linaro.org>
-References: <1398432017-8506-1-git-send-email-hanjun.guo@linaro.org>
- <1398432017-8506-8-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20140425145249.GP12304@sirena.org.uk>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Fri, 25 Apr 2014 16:52:38 +0200
+Subject: [PATCH 2/5] ARM: at91: gpio: implement get_direction
+In-Reply-To: <1398437561-4289-1-git-send-email-richard.genoud@gmail.com>
+References: <1398437561-4289-1-git-send-email-richard.genoud@gmail.com>
+Message-ID: <1398437561-4289-3-git-send-email-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 25, 2014 at 09:20:13PM +0800, Hanjun Guo wrote:
+This is needed for gpiod_get_direction().
+Otherwise, it returns -EINVAL.
 
-> +/*
-> + * Use the CPU slot number provided by ACPI to update the physical
-> + * package id, then we can get the right value in the "physical id"
-> + * field of /proc/cpuinfo.
-> + */
-> +void arch_fix_phys_package_id(int num, u32 slot)
-> +{
-> +	struct cpu_topology *cpuid_topo = &cpu_topology[num];
-> +
-> +	if (cpuid_topo->cluster_id == -1)
-> +		cpuid_topo->cluster_id = slot;
-> +}
-> +EXPORT_SYMBOL_GPL(arch_fix_phys_package_id);
+Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-at91/gpio.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-This isn't going to work once we parse the MPIDR - we will always have a
-cluster ID from MPIDR unless the system is uniprocessor (which doesn't
-seem like it's going to be a common or useful case).  We'll either need
-to have something in the topology parsing path which goes out and
-queries ACPI before we try to parse MPIDR or this will need to just set
-whatever it's told to set unconditionally.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140425/79ab2016/attachment.sig>
+diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
+index a5afcf76550e..afbe34027e62 100644
+--- a/arch/arm/mach-at91/gpio.c
++++ b/arch/arm/mach-at91/gpio.c
+@@ -49,6 +49,7 @@ static int at91_gpiolib_request(struct gpio_chip *chip, unsigned offset);
+ static void at91_gpiolib_dbg_show(struct seq_file *s, struct gpio_chip *chip);
+ static void at91_gpiolib_set(struct gpio_chip *chip, unsigned offset, int val);
+ static int at91_gpiolib_get(struct gpio_chip *chip, unsigned offset);
++static int at91_gpiolib_get_direction(struct gpio_chip *chip, unsigned offset);
+ static int at91_gpiolib_direction_output(struct gpio_chip *chip,
+ 					 unsigned offset, int val);
+ static int at91_gpiolib_direction_input(struct gpio_chip *chip,
+@@ -60,6 +61,7 @@ static int at91_gpiolib_to_irq(struct gpio_chip *chip, unsigned offset);
+ 		.chip = {						\
+ 			.label		  = name,			\
+ 			.request	  = at91_gpiolib_request,	\
++			.get_direction    = at91_gpiolib_get_direction, \
+ 			.direction_input  = at91_gpiolib_direction_input, \
+ 			.direction_output = at91_gpiolib_direction_output, \
+ 			.get		  = at91_gpiolib_get,		\
+@@ -799,6 +801,17 @@ static int at91_gpiolib_request(struct gpio_chip *chip, unsigned offset)
+ 	return 0;
+ }
+ 
++static int at91_gpiolib_get_direction(struct gpio_chip *chip, unsigned offset)
++{
++	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
++	void __iomem *pio = at91_gpio->regbase;
++	unsigned mask = 1 << offset;
++	u32 osr;
++
++	osr = __raw_readl(pio + PIO_OSR);
++	return !(osr & mask);
++}
++
+ static int at91_gpiolib_direction_input(struct gpio_chip *chip,
+ 					unsigned offset)
+ {
+-- 
+1.8.5.5
