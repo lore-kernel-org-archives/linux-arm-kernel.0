@@ -1,75 +1,64 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Fri, 25 Apr 2014 17:57:49 -0500
-Subject: [GIT PULL] SOCFPGA DTS updates for 3.16
-Message-ID: <1398466670-8341-1-git-send-email-dinguyen@altera.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 25 Apr 2014 16:00:19 -0700
+Subject: [PATCH v4 RESEND 0/7] clk: bcm281xx: updates
+In-Reply-To: <1398114703-32410-1-git-send-email-elder@linaro.org>
+References: <1398114703-32410-1-git-send-email-elder@linaro.org>
+Message-ID: <20140425230019.7224.94561@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin and Olof,
+Quoting Alex Elder (2014-04-21 14:11:36)
+> This series includes updates for the bcm281xx clock code.  It is
+> dependent on the following patch, which has been taken into the
+> clk-fixes tree:
+>     clk: bcm281xx: don't use unnamed structs or unions
+>     https://lkml.org/lkml/2014/4/7/322
 
-Please consider pulling in these patches for v3.16. These consist mostly of
-DTS updates and a few DTS bindings documentation updates for SOCFPGA.
+Thanks for the resend. I've taken these into clk-next.
 
-Thanks,
+Regards,
+Mike
 
-The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
-
-  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
-
-are available in the git repository at:
-
-  git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga-dt-updates-for-3.16
-
-for you to fetch changes up to 2adecac3f50865b53c060949be4251a486547c48:
-
-  dt: bindings: Typo s/clocks-names/clock-names/g (2014-04-24 17:52:30 -0500)
-
-----------------------------------------------------------------
-dts: socfpga: general updates for the socfpga platform
-
-Mostly DTS additions to the SOCFPGA platform from Steffan Trumtrar, and a
-couple of device tree documentation updates/typo fix.
-
-----------------------------------------------------------------
-Dinh Nguyen (4):
-      ARM: socfpga: dts: add eeprom and rtc on i2c0
-      ARM: socfpga: dts: Remove hard coded clock-frequency property
-      ARM: socfpga: dts: Add DTS entries for USB
-      ARM: socfpga: dts: Add div-reg to the main_pll clocks
-
-Geert Uytterhoeven (1):
-      dt: bindings: Typo s/clocks-names/clock-names/g
-
-Sebastian Andrzej Siewior (1):
-      ARM: dts: socfpga: add gpio pieces
-
-Steffen Trumtrar (10):
-      ARM: socfpga: dts: fix pdma interrupt
-      ARM: socfpga: dts: add remaining interrupts for pdma
-      ARM: socfpga: dts: add i2c busses
-      ARM: socfpga: dts: add can0+1
-      ARM: socfpga: dts: add support for EBV SOCrates
-      ARM: socfpga: dts: add rtc on i2c0 to socrates
-      ARM: socfpga: dts: convert to preprocessor includes
-      Documentation: dt: socfpga: add reset-cells property
-      Documentation: dt: reset: move socfpga-reset
-      ARM: socfpga: dts: add reset-controller
-
- .../devicetree/bindings/clock/altr_socfpga.txt     |    4 +-
- .../devicetree/bindings/net/socfpga-dwmac.txt      |    2 +-
- Documentation/devicetree/bindings/net/stmmac.txt   |    2 +-
- .../{arm/altera => reset}/socfpga-reset.txt        |    2 +
- arch/arm/boot/dts/Makefile                         |    1 +
- arch/arm/boot/dts/socfpga.dtsi                     |  180 +++++++++++++++++++-
- arch/arm/boot/dts/socfpga_arria5.dtsi              |   26 +--
- arch/arm/boot/dts/socfpga_arria5_socdk.dts         |   21 ++-
- arch/arm/boot/dts/socfpga_cyclone5.dtsi            |   26 +--
- arch/arm/boot/dts/socfpga_cyclone5_socdk.dts       |   21 ++-
- arch/arm/boot/dts/socfpga_cyclone5_sockit.dts      |    6 +-
- arch/arm/boot/dts/socfpga_cyclone5_socrates.dts    |   50 ++++++
- arch/arm/boot/dts/socfpga_vt.dts                   |    2 +-
- include/dt-bindings/reset/altr,rst-mgr.h           |   90 ++++++++++
- 14 files changed, 369 insertions(+), 64 deletions(-)
- rename Documentation/devicetree/bindings/{arm/altera => reset}/socfpga-reset.txt (85%)
- create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_socrates.dts
- create mode 100644 include/dt-bindings/reset/altr,rst-mgr.h
+> 
+> There are three groups of patches:
+>     - Some straightforward code cleanups
+>     - Changing CCU and clock definitions so they're almost
+>       completely initialized statically (i.e., not at run-time)
+>     - Add two small features
+> 
+> Initially this series included support for "prerequisite clocks"
+> but that has been removed so it can be discussed independently.
+> 
+> The patches in this series--based on the current linus/master branch
+> plus the patch mentioned above--are available here:
+>     http://git.linaro.org/landing-teams/working/broadcom/kernel.git
+>     Branch review/bcm-clk-next-v4
+> 
+>                                         -Alex
+> 
+> History:
+>   - v4: Rebased on current linus/master and reworked to account
+>         for the no-longer-unnamed union and struct members.
+>   - v3: Dropped prerequisite clock support so resolving how
+>         best to handle that can be resolved separately.  As
+>         a result, bus clock support is no longer included.
+>   - v2: Removed one unrelated patch from the series.
+> 
+> Alex Elder (7):
+>   clk: bcm281xx: warn if ccu_wait_bit() fails
+>   clk: bcm281xx: use init_data.name for clock name
+>   clk: bcm281xx: change some symbol names
+>   clk: bcm281xx: initialize CCU structures statically
+>   clk: bcm281xx: define CCU clock data statically
+>   clk: bcm281xx: add clock policy support
+>   clk: bcm281xx: add clock hysteresis support
+> 
+>  drivers/clk/bcm/clk-bcm281xx.c   | 243 +++++++++++++++++----------------------
+>  drivers/clk/bcm/clk-kona-setup.c | 229 ++++++++++++++++++++++++++----------
+>  drivers/clk/bcm/clk-kona.c       | 212 ++++++++++++++++++++++++++++++++--
+>  drivers/clk/bcm/clk-kona.h       | 160 +++++++++++++++++++++-----
+>  4 files changed, 611 insertions(+), 233 deletions(-)
+> 
+> -- 
+> 1.9.1
+> 
