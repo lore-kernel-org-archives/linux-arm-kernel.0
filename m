@@ -1,86 +1,40 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:38:47 +0100
-Subject: [PATCH 092/222] net:fec: quiesce packet processing before changing
- features
+Date: Fri, 25 Apr 2014 12:38:52 +0100
+Subject: [PATCH 093/222] net:fec: quiesce packet processing when taking link
+ down in fec_enet_adjust_link()
 In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
 References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WdeSt-0007JL-6H@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WdeSy-0007JP-9a@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changing the features (receive checksumming) requires the hardware to be
-reprogrammed, and also changes the checks in the receive packet
-processing.
+When the link goes down, the adjust_link method will be called, but
+there is no synchronisation to ensure that we won't be processing some
+last remaining packets while performing a reset of the device.
 
-The current implementation has a race - fec_set_features() changes the
-flags which alter the receive packet processing while we are active.
-Only afterwards do we shutdown and reconfigure the hardware.
-
-This can lead to packets being received and marked with a valid checksum
-(via CHECKSUM_UNNECESSARY) when the hardware checksum validation has not
-yet been enabled.
-
-We must quiesce the device, then change the software configuration for
-this feature, and then resume the device if it was previously running.
-
-The resulting code structure also allows us to add other configuration
-features in this path without having to quiesce and resume the network
-interface and device.
+Add the necessary synchronisation to ensure that packet processing
+is complete before we stop and reset the FEC.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/net/ethernet/freescale/fec_main.c | 25 ++++++++++++++++---------
- 1 file changed, 16 insertions(+), 9 deletions(-)
+ drivers/net/ethernet/freescale/fec_main.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
 diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index 789678c6f6d4..c5a5a0aedf21 100644
+index c5a5a0aedf21..6156d423a6a9 100644
 --- a/drivers/net/ethernet/freescale/fec_main.c
 +++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -1993,12 +1993,21 @@ static void fec_poll_controller(struct net_device *dev)
- }
- #endif
- 
-+#define FEATURES_NEED_QUIESCE NETIF_F_RXCSUM
-+
- static int fec_set_features(struct net_device *netdev,
- 	netdev_features_t features)
- {
- 	struct fec_enet_private *fep = netdev_priv(netdev);
- 	netdev_features_t changed = features ^ netdev->features;
- 
-+	/* Quiesce the device if necessary */
-+	if (netif_running(netdev) && changed & FEATURES_NEED_QUIESCE) {
-+		napi_disable(&fep->napi);
-+		netif_tx_lock_bh(netdev);
-+		fec_stop(netdev);
-+	}
-+
- 	netdev->features = features;
- 
- 	/* Receive checksum has been changed */
-@@ -2007,16 +2016,14 @@ static int fec_set_features(struct net_device *netdev,
- 			fep->csum_flags |= FLAG_RX_CSUM_ENABLED;
- 		else
- 			fep->csum_flags &= ~FLAG_RX_CSUM_ENABLED;
-+	}
- 
--		if (netif_running(netdev)) {
--			napi_disable(&fep->napi);
--			netif_tx_lock_bh(netdev);
--			fec_stop(netdev);
--			fec_restart(netdev, fep->phy_dev->duplex);
--			netif_wake_queue(netdev);
--			netif_tx_unlock_bh(netdev);
--			napi_enable(&fep->napi);
--		}
-+	/* Resume the device after updates */
-+	if (netif_running(netdev) && changed & FEATURES_NEED_QUIESCE) {
-+		fec_restart(netdev, fep->phy_dev->duplex);
-+		netif_wake_queue(netdev);
-+		netif_tx_unlock_bh(netdev);
-+		napi_enable(&fep->napi);
- 	}
- 
- 	return 0;
+@@ -1226,7 +1226,11 @@ static void fec_enet_adjust_link(struct net_device *ndev)
+ 		}
+ 	} else {
+ 		if (fep->link) {
++			napi_disable(&fep->napi);
++			netif_tx_lock_bh(ndev);
+ 			fec_stop(ndev);
++			netif_tx_unlock_bh(ndev);
++			napi_enable(&fep->napi);
+ 			fep->link = phy_dev->link;
+ 			status_change = 1;
+ 		}
 -- 
 1.8.3.1
