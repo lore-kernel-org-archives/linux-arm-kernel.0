@@ -1,50 +1,30 @@
-From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Fri, 25 Apr 2014 13:37:01 -0700
-Subject: [RFC PATCH v3] ARM: uprobes need icache flush after xol write
-In-Reply-To: <535AC2B5.7070205@linaro.org>
-References: <20140416152946.GA13564@redhat.com>
- <20140416.114740.1805744923904673839.davem@davemloft.net>
- <20140416202243.GI24070@n2100.arm.linux.org.uk>
- <20140416.171354.2030799647571837439.davem@davemloft.net>
- <535AC2B5.7070205@linaro.org>
-Message-ID: <CAA3XUr3tRgBPTKx6cqNaBRMRVOeowBVp9Bb_TYmZFWhO7wR=ig@mail.gmail.com>
+From: agross@codeaurora.org (Andy Gross)
+Date: Fri, 25 Apr 2014 15:41:55 -0500
+Subject: [PATCH] pinctrl: qcom: Correct name for pin 0
+Message-ID: <1398458515-15654-1-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 April 2014 13:16, David Long <dave.long@linaro.org> wrote:
-> On 04/16/14 17:13, David Miller wrote:
->>
->> From: Russell King - ARM Linux <linux@arm.linux.org.uk>
->> Date: Wed, 16 Apr 2014 21:22:43 +0100
->>
->>> I'm thinking that both flush_icache_alias() and flush_pfn_alias() want
->>> at least a preemption disabled around each so that we don't end up with
->>> two threads being preempted here.
->>
->>
->> Yes, you would need to disable preemption to keep another thread of
->> control from potentially using the same flush slot.
->>
->
-> Sorry for the delay in replying.
->
-> I guess the above potential problem is largely independent of the uprobes
-> caching issue.
->
-> I spent a while reading up on ARM cache operations and MMFR3 register
-> contents.  I don't pretend to understand all the details but, based on what
-> I do, it looks to me like Victor's v3 patch addresses all the issues that we
-> think it needs to.  I also see now why the dcache_flush_page() is needed
-> rather than a call to the lower-level clean_dcache_line() function.
->
-> Victor, maybe you could remove the "#ifdef CONFIG_SMP"s from it and send it
-> out as an official (non-RFC) uprobes patch?  It would be really nice to get
-> this into V3.15, if at all possible.
+Fix copy/paste error in pinctrl_pin_desc for pin 0.
 
-I'll send it by the end of today (PST).
+Signed-off-by: Andy Gross <agross@codeaurora.org>
+---
+ drivers/pinctrl/pinctrl-ipq8064.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks,
-Victor
-
-> -dl
->
+diff --git a/drivers/pinctrl/pinctrl-ipq8064.c b/drivers/pinctrl/pinctrl-ipq8064.c
+index 1700b49..54aba9f 100644
+--- a/drivers/pinctrl/pinctrl-ipq8064.c
++++ b/drivers/pinctrl/pinctrl-ipq8064.c
+@@ -20,7 +20,7 @@
+ #include "pinctrl-msm.h"
+ 
+ static const struct pinctrl_pin_desc ipq8064_pins[] = {
+-	PINCTRL_PIN(0, "GPIO_1"),
++	PINCTRL_PIN(0, "GPIO_0"),
+ 	PINCTRL_PIN(1, "GPIO_1"),
+ 	PINCTRL_PIN(2, "GPIO_2"),
+ 	PINCTRL_PIN(3, "GPIO_3"),
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
