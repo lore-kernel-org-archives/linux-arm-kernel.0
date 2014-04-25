@@ -1,43 +1,121 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Fri, 25 Apr 2014 10:57:48 -0600
-Subject: [RFC 0/5] PCI: tegra: Overhaul regulator usage
-In-Reply-To: <53444C4D.2080800@wwwdotorg.org>
-References: <1396622969-17837-1-git-send-email-treding@nvidia.com>
- <53444C4D.2080800@wwwdotorg.org>
-Message-ID: <20140425165748.GA32246@google.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Fri, 25 Apr 2014 13:01:33 -0400
+Subject: [PATCH] arm: KVM: fix possible misalignment of PGDs and bounce
+ page
+In-Reply-To: <e44e99a81131febf3b97edd9b099b859@www.loen.fr>
+References: <1396016719-13807-1-git-send-email-msalter@redhat.com>
+ <20140328193733.GL25519@cbox>
+ <e44e99a81131febf3b97edd9b099b859@www.loen.fr>
+Message-ID: <1398445293.3010.77.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 08, 2014 at 01:21:49PM -0600, Stephen Warren wrote:
-> On 04/04/2014 08:49 AM, Thierry Reding wrote:
-> > The current device tree binding for the regulator setup on Tegra PCIe is
-> > not accurate. While it does work for current use-cases, that's likely by
-> > accident rather than design. This series replaces the existing set of
-> > power-supply properties with a new set that accurately describes the
-> > inputs of the IP block (depending on SoC generation).
-> > 
-> > As a heads-up, this breaks backwards compatibility with prior versions
-> > of the device tree bindings, but I don't see a reason why that should
-> > keep us from fixing this properly. Not many people are currently using
-> > these bindings and those who are are most likely tracking upstream
-> > development closely enough not to be impacted by this.
-> > 
-> > I've aimed to keep the series bisectible, which has the downside of
-> > interleaving patches to unrelated trees (ARM and PCI). I'm hoping that
-> > perhaps we can find a way to merge this as a whole to keep it possible
-> > to bisect across the series. Although again, I guess it wouldn't be all
-> > that bad if that wasn't the case, given how little PCIe is actually
-> > being used.
+Ping. Can we get this into 3.15rc as a bug fix? Anything I can help
+with?
+
+--Mark
+
+On Sat, 2014-03-29 at 14:01 +0000, Marc Zyngier wrote:
+> On 2014-03-28 19:37, Christoffer Dall wrote:
+> > On Fri, Mar 28, 2014 at 10:25:19AM -0400, Mark Salter wrote:
+> >> The kvm/mmu code shared by arm and arm64 uses kalloc() to allocate
+> >> a bounce page (if hypervisor init code crosses page boundary) and
+> >> hypervisor PGDs. The problem is that kalloc() does not guarantee
+> >> the proper alignment. In the case of the bounce page, the page sized
+> >> buffer allocated may also cross a page boundary negating the purpose
+> >> and leading to a hang during kvm initialization. Likewise the PGDs
+> >> allocated may not meet the minimum alignment requirements of the
+> >> underlying MMU. This patch uses __get_free_page() to guarantee the
+> >> worst case alignment needs of the bounce page and PGDs on both arm
+> >> and arm64.
+> >>
+> >> Signed-off-by: Mark Salter <msalter@redhat.com>
+> >> ---
+> >>  arch/arm/kvm/mmu.c | 15 +++++++++------
+> >>  1 file changed, 9 insertions(+), 6 deletions(-)
+> >>
+> >> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> >> index 7789857..575d790 100644
+> >> --- a/arch/arm/kvm/mmu.c
+> >> +++ b/arch/arm/kvm/mmu.c
+> >> @@ -42,6 +42,8 @@ static unsigned long hyp_idmap_start;
+> >>  static unsigned long hyp_idmap_end;
+> >>  static phys_addr_t hyp_idmap_vector;
+> >>
+> >> +#define pgd_order get_order(PTRS_PER_PGD * sizeof(pgd_t))
+> >> +
+> >>  #define kvm_pmd_huge(_x)	(pmd_huge(_x) || pmd_trans_huge(_x))
+> >>
+> >>  static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t 
+> >> ipa)
+> >> @@ -199,14 +201,14 @@ void free_boot_hyp_pgd(void)
+> >>  	if (boot_hyp_pgd) {
+> >>  		unmap_range(NULL, boot_hyp_pgd, hyp_idmap_start, PAGE_SIZE);
+> >>  		unmap_range(NULL, boot_hyp_pgd, TRAMPOLINE_VA, PAGE_SIZE);
+> >> -		kfree(boot_hyp_pgd);
+> >> +		free_pages((unsigned long)boot_hyp_pgd, pgd_order);
+> >>  		boot_hyp_pgd = NULL;
+> >>  	}
+> >>
+> >>  	if (hyp_pgd)
+> >>  		unmap_range(NULL, hyp_pgd, TRAMPOLINE_VA, PAGE_SIZE);
+> >>
+> >> -	kfree(init_bounce_page);
+> >> +	free_page((unsigned long)init_bounce_page);
+> >>  	init_bounce_page = NULL;
+> >>
+> >>  	mutex_unlock(&kvm_hyp_pgd_mutex);
+> >> @@ -236,7 +238,7 @@ void free_hyp_pgds(void)
+> >>  		for (addr = VMALLOC_START; is_vmalloc_addr((void*)addr); addr += 
+> >> PGDIR_SIZE)
+> >>  			unmap_range(NULL, hyp_pgd, KERN_TO_HYP(addr), PGDIR_SIZE);
+> >>
+> >> -		kfree(hyp_pgd);
+> >> +		free_pages((unsigned long)hyp_pgd, pgd_order);
+> >>  		hyp_pgd = NULL;
+> >>  	}
+> >>
+> >> @@ -930,7 +932,7 @@ int kvm_mmu_init(void)
+> >>  		size_t len = __hyp_idmap_text_end - __hyp_idmap_text_start;
+> >>  		phys_addr_t phys_base;
+> >>
+> >> -		init_bounce_page = kmalloc(PAGE_SIZE, GFP_KERNEL);
+> >> +		init_bounce_page = (void *)__get_free_page(GFP_KERNEL);
+> >>  		if (!init_bounce_page) {
+> >>  			kvm_err("Couldn't allocate HYP init bounce page\n");
+> >>  			err = -ENOMEM;
+> >> @@ -956,8 +958,9 @@ int kvm_mmu_init(void)
+> >>  			 (unsigned long)phys_base);
+> >>  	}
+> >>
+> >> -	hyp_pgd = kzalloc(PTRS_PER_PGD * sizeof(pgd_t), GFP_KERNEL);
+> >> -	boot_hyp_pgd = kzalloc(PTRS_PER_PGD * sizeof(pgd_t), GFP_KERNEL);
+> >> +	hyp_pgd = (pgd_t *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, 
+> >> pgd_order);
+> >> +	boot_hyp_pgd = (pgd_t *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, 
+> >> pgd_order);
+> >> +
+> >>  	if (!hyp_pgd || !boot_hyp_pgd) {
+> >>  		kvm_err("Hyp mode PGD not allocated\n");
+> >>  		err = -ENOMEM;
+> >> --
+> >> 1.8.5.3
+> >>
+> > This looks right to me.  Funnily enough I seem to remember a 
+> > discussion
+> > from when we originally merged this code where someone (maybe me) 
+> > argued
+> > that kmalloc() would align to the size of the allocation, but I don't
+> > see anything backing this up at this point.
+> >
+> > So:
+> >
+> > Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+> >
+> > If Marc agrees I can queue this for -rc1.
 > 
-> I'd be happy to put this series into a branch in the Tegra tree, given
-> suitable acks from Bjorn on the PCI changes.
-
-For 3/5 ("PCI: tegra: Implement accurate power supply scheme"),
-
-Acked-by: Bjorn Helgaas <bhelgaas@google.com>
-
-I do have the "PCI: tegra: Use new OF interrupt mapping when possible"
-change from Lucas on my pci/host-tegra branch, but it shouldn't conflict
-with this.
-
-Bjorn
+> Looks good to me indeed.
+> 
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> 
+>          M.
