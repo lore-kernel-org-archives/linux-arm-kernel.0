@@ -1,141 +1,42 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Fri, 25 Apr 2014 11:00:02 +0800
-Subject: [PATCH v3 07/13] ARM: hisi: add hip04 SoC support
-In-Reply-To: <alpine.LFD.2.11.1404212323440.980@knanqh.ubzr>
-References: <1397801156-25682-1-git-send-email-haojian.zhuang@linaro.org>
- <1397801156-25682-8-git-send-email-haojian.zhuang@linaro.org>
- <alpine.LFD.2.11.1404212323440.980@knanqh.ubzr>
-Message-ID: <CAD6h2NRZREHWaSGcJg4UgVWWfTGpgZFJyvCfF8X7octWLV8YDA@mail.gmail.com>
+From: zlim@broadcom.com (Zi Shen Lim)
+Date: Thu, 24 Apr 2014 20:18:41 -0700
+Subject: [PATCHv2 1/2] arm64,
+ sched: Remove unused mc_capable() and smt_capable()
+In-Reply-To: <1398395922-7482-1-git-send-email-zlim@broadcom.com>
+References: <1398395922-7482-1-git-send-email-zlim@broadcom.com>
+Message-ID: <1398395922-7482-2-git-send-email-zlim@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 April 2014 12:08, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Fri, 18 Apr 2014, Haojian Zhuang wrote:
->
->> +
->> +     data = CORE_RESET_BIT(cpu) | NEON_RESET_BIT(cpu) | \
->> +            CORE_DEBUG_RESET_BIT(cpu);
->> +     writel_relaxed(data, sysctrl + SC_CPU_RESET_DREQ(cluster));
->
-> It might be a good idea to reset and initialize things only if
-> hip04_cpu_table[cluster][cpu] was zero initially.  Please see the
-> comment in mcpm_cpu_power_down() discussing concurrent up/down
-> operations, and the way races are handled using dcscb_use_count in
-> dcscb_power_up() / dcscb_power_down() for example.
->
+Remove unused and deprecated mc_capable() and smt_capable().
 
-I'll use it as reference.
+Both were added recently by f6e763b93a6c ("arm64: topology:
+Implement basic CPU topology support"). Uses of both were removed
+by 8e7fbcbc22c1 ("sched: Remove stale power aware scheduling
+remnants and dysfunctional knobs").
 
->> +     spin_unlock(&boot_lock);
->> +     msleep(POLL_MSEC);
->
-> You don't have to wait here.  The MCPM up method should set things for
-> the CPU to come up eventually and that CPU to signal itself when it is
-> finally online.
->
+Reviewed-by: Mark Brown <broonie@linaro.org>
+Signed-off-by: Zi Shen Lim <zlim@broadcom.com>
+---
+v1->v2: No changes.
+ - Added Mark's review-by.
 
-I have to wait. Otherwise, I'll meet hang when make the CPU offline &
-online continuously.
+ arch/arm64/include/asm/topology.h | 3 ---
+ 1 file changed, 3 deletions(-)
 
->> +     return 0;
->> +}
->> +
->> +static void hip04_mcpm_power_down(void)
->> +{
->> +     unsigned int mpidr, cpu, cluster;
->> +     unsigned int v;
->> +
->> +     mpidr = read_cpuid_mpidr();
->> +     cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
->> +     cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
->> +
->> +     spin_lock(&boot_lock);
->> +     BUG_ON(__mcpm_cluster_state(cluster) != CLUSTER_UP);
->> +     __mcpm_cpu_going_down(cpu, cluster);
->> +
->> +     hip04_cpu_table[cluster][cpu]--;
->> +     if (hip04_cpu_table[cluster][cpu]) {
->> +             pr_err("Cluster %d CPU%d is still running\n", cluster, cpu);
->> +             goto out;
->> +     }
->
-> This is wrong.  Please see dcscb_power_down() or tc2_pm_down() for
-> examples of how to deal with this situation.
->
->> +     __mcpm_cpu_down(cpu, cluster);
->
-> That call should happen last i.e. after coherency has been disabled and
-> the CPU is about to call WFI.  Again, see the TC2 implementation for
-> example.  You may also read
-> Documentation/arm/cluster-pm-race-avoidance.txt for more details about
-> those calls and the algorithm behind them.
->
->> +     spin_unlock(&boot_lock);
->> +
->> +     asm volatile(
->> +     "       mrc     p15, 0, %0, c1, c0, 0\n"
->> +     "       bic     %0, %0, %1\n"
->> +     "       mcr     p15, 0, %0, c1, c0, 0\n"
->> +       : "=&r" (v)
->> +       : "Ir" (CR_C)
->> +       :);
->> +
->> +     flush_cache_louis();
->> +
->> +     asm volatile(
->> +     /* Turn off coherency, disable SMP bit in ACTLR */
->> +     "       mrc     p15, 0, %0, c1, c0, 1\n"
->> +     "       bic     %0, %0, %1\n"
->> +     "       mcr     p15, 0, %0, c1, c0, 1\n"
->> +     : "=&r" (v)
->> +     : "Ir" (0x40)
->> +     :);
->
-> The above code is not safe.
->
-> You should use v7_exit_coherency_flush() instead.
->
-
-OK.
-
->> +     isb();
->> +     dsb();
->> +
->> +     while (true)
->> +             wfi();
->
-> This is wrong.  By the time execution gets here, it is well possible
-> that another CPU decided that this CPU should not be down anymore, in
-> which case wfi() will return.  See what's expected in this case by
-> looking at mcpm_cpu_power_down() and what other backend implementations
-> do.
->
->> +     return;
->> +out:
->> +     spin_unlock(&boot_lock);
->> +}
->> +
->> +static int hip04_mcpm_wait_for_powerdown(unsigned int cpu, unsigned int cluster)
->> +{
->> +     unsigned int data, tries;
->> +
->> +     BUG_ON(cluster >= HIP04_MAX_CLUSTERS ||
->> +            cpu >= HIP04_MAX_CPUS_PER_CLUSTER);
->> +
->> +     for (tries = 0; tries < TIMEOUT_MSEC / POLL_MSEC; tries++) {
->> +             data = readl_relaxed(sysctrl + SC_CPU_RESET_STATUS(cluster));
->> +             if (!(data & CORE_WFI_STATUS(cpu))) {
->> +                     msleep(POLL_MSEC);
->> +                     continue;
->> +             }
->> +             data = CORE_RESET_BIT(cpu) | NEON_RESET_BIT(cpu) | \
->> +                    CORE_DEBUG_RESET_BIT(cpu);
->> +             writel_relaxed(data, sysctrl + SC_CPU_RESET_REQ(cluster));
->
-> Why are you resetting those here?
->
-
-Do you mean that I should move this reset code into hip04_mcpm_power_down()?
-
-Regards
-Haojian
+diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
+index 0172e6d..7ebcd31 100644
+--- a/arch/arm64/include/asm/topology.h
++++ b/arch/arm64/include/asm/topology.h
+@@ -20,9 +20,6 @@ extern struct cpu_topology cpu_topology[NR_CPUS];
+ #define topology_core_cpumask(cpu)	(&cpu_topology[cpu].core_sibling)
+ #define topology_thread_cpumask(cpu)	(&cpu_topology[cpu].thread_sibling)
+ 
+-#define mc_capable()	(cpu_topology[0].cluster_id != -1)
+-#define smt_capable()	(cpu_topology[0].thread_id != -1)
+-
+ void init_cpu_topology(void);
+ void store_cpu_topology(unsigned int cpuid);
+ const struct cpumask *cpu_coregroup_mask(int cpu);
+-- 
+1.8.4.3
