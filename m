@@ -1,55 +1,30 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:42:36 +0100
-Subject: [PATCH 131/222] ARM: add support for Cubox-i PWM-driven front panel
- LED
+Date: Fri, 25 Apr 2014 12:42:41 +0100
+Subject: [PATCH 132/222] ASoC: work around block transfer issues with
+ imx-pcm-dma
 In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
 References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WdeWa-0007M0-L5@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WdeWf-0007M5-Oj@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The front panel LED on the Cubox-i is driven by one of the iMX6 PWM
-channels, and is wired between the PWM output and supply.
-
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/boot/dts/imx6qdl-cubox-i.dtsi | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ sound/soc/fsl/imx-pcm-dma.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-index c2a24888a276..c17602d4e4aa 100644
---- a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-@@ -12,6 +12,19 @@
- 		pinctrl-0 = <&pinctrl_cubox_i_ir>;
- 	};
- 
-+	pwmleds {
-+		compatible = "pwm-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_cubox_i_pwm1>;
-+
-+		front {
-+			active-low;
-+			label = "imx6:red:front";
-+			max-brightness = <248>;
-+			pwms = <&pwm1 0 50000>;
-+		};
-+	};
-+
- 	regulators {
- 		compatible = "simple-bus";
- 
-@@ -82,6 +95,10 @@
- 			>;
- 		};
- 
-+		pinctrl_cubox_i_pwm1: cubox-i-pwm1-front-led {
-+			fsl,pins = <MX6QDL_PAD_DISP0_DAT8__PWM1_OUT 0x1b0b0>;
-+		};
-+
- 		pinctrl_cubox_i_spdif: cubox-i-spdif {
- 			fsl,pins = <MX6QDL_PAD_GPIO_17__SPDIF_OUT 0x13091>;
- 		};
+diff --git a/sound/soc/fsl/imx-pcm-dma.c b/sound/soc/fsl/imx-pcm-dma.c
+index 2585ae44e634..a86d84854c7f 100644
+--- a/sound/soc/fsl/imx-pcm-dma.c
++++ b/sound/soc/fsl/imx-pcm-dma.c
+@@ -44,7 +44,7 @@ static const struct snd_pcm_hardware imx_pcm_hardware = {
+ 	.buffer_bytes_max = IMX_SSI_DMABUF_SIZE,
+ 	.period_bytes_min = 128,
+ 	.period_bytes_max = 65535, /* Limited by SDMA engine */
+-	.periods_min = 2,
++	.periods_min = 4,
+ 	.periods_max = 255,
+ 	.fifo_size = 0,
+ };
 -- 
 1.8.3.1
