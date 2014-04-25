@@ -1,31 +1,43 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 25 Apr 2014 16:07:05 +0200
-Subject: [PATCH v2 07/18] ARM: mvebu: Add USB3 support for Armada 38x
+Date: Fri, 25 Apr 2014 16:07:08 +0200
+Subject: [PATCH v2 10/18] usb: host: xhci-plat: Add support for the Armada 375
 In-Reply-To: <1398434836-18908-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1398434836-18908-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1398434836-18908-8-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1398434836-18908-11-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add the selection of the config symbol to build the USB3
-support for Armada 38x.
+For the Armada 375 SoC which comes with an xhci controller. Currently
+the quirk is the same that the Armada 380/385 one, but by introducing
+a new compatible string it will allow to make the driver evolve
+seamless.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/mach-mvebu/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/usb/host/xhci-plat.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-index 3f73eecbcfb0..7960f218702b 100644
---- a/arch/arm/mach-mvebu/Kconfig
-+++ b/arch/arm/mach-mvebu/Kconfig
-@@ -54,6 +54,7 @@ config MACH_ARMADA_38X
- 	select CPU_V7
- 	select MACH_MVEBU_V7
- 	select PINCTRL_ARMADA_38X
-+	select USB_ARCH_HAS_XHCI
- 	help
- 	  Say 'Y' here if you want your kernel to support boards based
- 	  on the Marvell Armada 380/385 SoC with device tree.
+diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+index c0e835b49e0d..679b21f30458 100644
+--- a/drivers/usb/host/xhci-plat.c
++++ b/drivers/usb/host/xhci-plat.c
+@@ -152,6 +152,9 @@ static int xhci_plat_probe(struct platform_device *pdev)
+ 	if (of_device_is_compatible(pdev->dev.of_node, "marvell,armada-380-xhci"))
+ 		xhci_mvebu_mbus_init_quirk(pdev);
+ 
++	if (of_device_is_compatible(pdev->dev.of_node, "marvell,armada-375-xhci"))
++		xhci_mvebu_mbus_init_quirk(pdev);
++
+ 	/* Initialize dma_mask and coherent_dma_mask to 32-bits */
+ 	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
+ 	if (ret)
+@@ -284,6 +287,7 @@ static const struct of_device_id usb_xhci_of_match[] = {
+ 	{ .compatible = "generic-xhci" },
+ 	{ .compatible = "xhci-platform" },
+ 	{ .compatible = "marvell,armada-380-xhci"},
++	{ .compatible = "marvell,armada-375-xhci"},
+ 	{ },
+ };
+ MODULE_DEVICE_TABLE(of, usb_xhci_of_match);
 -- 
 1.8.1.2
