@@ -1,53 +1,68 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 25 Apr 2014 12:32:08 +0100
-Subject: [PATCH 014/222] ARM: l2c: rename cache_wait_way()
-In-Reply-To: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WdeMS-0007E1-FR@rmk-PC.arm.linux.org.uk>
+From: monstr@monstr.eu (Michal Simek)
+Date: Fri, 25 Apr 2014 13:31:54 +0200
+Subject: [GIT PULL v3] Xilinx Zynq changes for v3.15
+In-Reply-To: <5729174.EqI67ku3fz@wuerfel>
+References: <53061EBA.1080002@monstr.eu> <201404251100.51068.arnd@arndb.de>
+ <535A2F93.3010304@monstr.eu> <5729174.EqI67ku3fz@wuerfel>
+Message-ID: <535A47AA.7060804@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cache_wait_way() is actually used to wait for a particular mask to
-report clear; it's not really got much to do with cache ways at all.
-Indeed, it gets used to wait for the C bit to clear on older caches.
-Rename this with a more generic function name which better reflects
-its purpose: l2c_wait_mask().
+>> There is just ps-clk-frequency which is user setup and come externally.
+>> The part of this is clock driver which is probably that problematic one
+>> but on the other hand it is targetting exact register addresses which
+>> are used by this driver to describe internal clk description.
+> 
+> If you just have a 'ps-clk-frequency' property, that should still keep
+> the node inside of the SoC. If this had been modeled as a fixed-rate
+> clock node as the clock parent of the xlnx,ps7-clkc node, that one
+> should have been outside.
+> 
+> I don't think it's worth changing it now, just something to keep in
+> mind.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/mm/cache-l2x0.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ok.
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 1c3a23318f53..29ee7f692801 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -53,7 +53,7 @@ static bool of_init = false;
- /*
-  * Common code for all cache controllers.
-  */
--static inline void cache_wait_way(void __iomem *reg, unsigned long mask)
-+static inline void l2c_wait_mask(void __iomem *reg, unsigned long mask)
- {
- 	/* wait for cache operation by line or way to complete */
- 	while (readl_relaxed(reg) & mask)
-@@ -73,7 +73,7 @@ static inline void l2c_set_debug(void __iomem *base, unsigned long val)
- static void __l2c_op_way(void __iomem *reg)
- {
- 	writel_relaxed(l2x0_way_mask, reg);
--	cache_wait_way(reg, l2x0_way_mask);
-+	l2c_wait_mask(reg, l2x0_way_mask);
- }
- 
- static inline void l2c_unlock(void __iomem *base, unsigned num)
-@@ -94,7 +94,7 @@ static inline void cache_wait(void __iomem *reg, unsigned long mask)
- 	/* cache operations by line are atomic on PL310 */
- }
- #else
--#define cache_wait	cache_wait_way
-+#define cache_wait	l2c_wait_mask
- #endif
- 
- static inline void cache_sync(void)
+>> If you have any example how this should be done, please send it to me.
+>> I would like to have this in good shape.
+> 
+> From all I can tell, all the nodes you have today actually make sense being
+> part of the soc device hierarchy. The only problem is that there is no
+> way to add nodes outside of it if that becomes necessary.
+> 
+> Generally speaking, the hierarchy should reflect the actual hardware layout,
+> which usually has multiple levels of nested buses, starting with an AXI
+> bus that contains the high-speed devices along with bridges to lower-speed
+> buses. You probably have access to documentation that describes the
+> real layout, so try to match that to the degree that you can, and move the
+> pmu into whatever bus you need.
+> 
+> Then change the code to match the top-level bus node with the soc0 device.
+
+For static devices which we have now is axi bus for soft IPs just nested bus
+and should be added to soc0.
+
+That means not a problem with current layout at all and this SOC_BUS
+patch can be just added. And I will take care when we have something
+what it is out of SoC that it is also added to the proper location out
+of this soc node.
+Can I add you ACK to this SOC_BUS patch?
+
+Thanks,
+Michal
+
 -- 
-1.8.3.1
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140425/11119519/attachment-0001.sig>
