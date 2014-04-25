@@ -1,87 +1,191 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 25 Apr 2014 16:06:58 +0200
-Subject: [PATCH v2 00/18] USB support for Armada 38x and Armada 375
-Message-ID: <1398434836-18908-1-git-send-email-gregory.clement@free-electrons.com>
+Date: Fri, 25 Apr 2014 16:07:01 +0200
+Subject: [PATCH v2 03/18] usb: host: xhci-plat: Add support for the Armada 38x
+In-Reply-To: <1398434836-18908-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1398434836-18908-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1398434836-18908-4-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+For the Armada 38x SoCs which come with an xhci controller, specific
+initialization must be done during probe related to the MBus windows
+configuration. This patch adds the support of this quirk.
 
-This patch set adds the USB support for the Armada 38x Armada
-375. These SoCs use an xHCI but still need specific initialization,
-mainly to setup the windows memory on the mbus. They also use the same
-controller that the other mvebu SoC for EHCI.
-
-Since the 1st version this patch set add xHCI support for Armada 375
-but also EHCI support for Armada 375 and Armada 38x. For EHCI it was
-mainly a matter of updating the device tree.
-
-The first patch is just a small clean-up
-
-The second patch extend the xhci-plat driver to allow to use the
-clocks if they are available.
-
-The third patch add support the Armada 38x by introducing a quirk to
-setup the memory windows on the mbus for Armada 38x.
-
-Then the forth patch update the binding documentation.
-
-The 10th patch add support for the Armada 375 using what have been
-done for Armada 38x
-
-The 11th  patch update the binding documentation with Armada 375 binding.
-
-This patches 1 to 4 and 10 to 11 should go through the xhci subsystem.
-
-The rest of the series is more platform specific and should go through
-the mvebu tree, except the patch 9 that should be taken directly by
-the arm-soc maintainer.
-
-Thanks,
-
-Gregory CLEMENT (18):
-  usb: host: xhci-plat: Sort the headers in alphabetic order
-  usb: host: xhci-plat: Add clocks support
-  usb: host: xhci-plat: Add support for the Armada 38x
-  xhci-platform: Add a new controller using xhci: Armada 38x
-  ARM: mvebu: Add Device Tree description of xHCI hosts on Armada 38x
-  ARM: mvebu: Add Device Tree description of EHCI hosts on Armada 38x
-  ARM: mvebu: Add USB3 support for Armada 38x
-  ARM: configs: Add usb_xhci_mvebu to mvebu_v7_defconfig
-  ARM: configs: Add usb_xhci_mvebu to multi_v7_defconfig
-  usb: host: xhci-plat: Add support for the Armada 375
-  xhci-platform: Add a new controller using xhci: Armada 375
-  ARM: mvebu: Add Device Tree description of USB cluster controller on
-    Armada 375
-  dt: binding: Armada 375 USB cluster
-  ARM: mvebu: Add support for USB cluster on the Armada 375 SoC
-  ARM: mvebu: Add USB3 support for Armada 375
-  ARM: mvebu: add USB3 controller Device Tree details for Armada 375
-  ARM: mvebu: dts: Enable USB3 in Armada 375 DB
-  ARM: mvebu: Add Device Tree description of EHCI hosts on Armada 375
-
- .../bindings/arm/armada-375-usb-cluster.txt        | 17 ++++
- Documentation/devicetree/bindings/usb/usb-xhci.txt |  4 +-
- arch/arm/boot/dts/armada-375-db.dts                | 10 ++-
- arch/arm/boot/dts/armada-375.dtsi                  | 41 +++++++++
- arch/arm/boot/dts/armada-385-db.dts                | 12 +++
- arch/arm/boot/dts/armada-385-rd.dts                |  4 +
- arch/arm/boot/dts/armada-38x.dtsi                  | 25 ++++++
- arch/arm/configs/multi_v7_defconfig                |  1 +
- arch/arm/configs/mvebu_v7_defconfig                |  1 +
- arch/arm/mach-mvebu/Kconfig                        |  2 +
- arch/arm/mach-mvebu/Makefile                       |  2 +-
- arch/arm/mach-mvebu/usb-cluster.c                  | 96 ++++++++++++++++++++++
- drivers/usb/host/Kconfig                           |  7 ++
- drivers/usb/host/Makefile                          |  1 +
- drivers/usb/host/xhci-mvebu.c                      | 71 ++++++++++++++++
- drivers/usb/host/xhci-mvebu.h                      | 22 +++++
- drivers/usb/host/xhci-plat.c                       | 67 +++++++++++++--
- 17 files changed, 374 insertions(+), 9 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/armada-375-usb-cluster.txt
- create mode 100644 arch/arm/mach-mvebu/usb-cluster.c
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/usb/host/Kconfig      |  7 +++++
+ drivers/usb/host/Makefile     |  1 +
+ drivers/usb/host/xhci-mvebu.c | 71 +++++++++++++++++++++++++++++++++++++++++++
+ drivers/usb/host/xhci-mvebu.h | 22 ++++++++++++++
+ drivers/usb/host/xhci-plat.c  |  5 +++
+ 5 files changed, 106 insertions(+)
  create mode 100644 drivers/usb/host/xhci-mvebu.c
  create mode 100644 drivers/usb/host/xhci-mvebu.h
 
+diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+index 3d9e54062d62..e70943fac4a1 100644
+--- a/drivers/usb/host/Kconfig
++++ b/drivers/usb/host/Kconfig
+@@ -29,6 +29,13 @@ if USB_XHCI_HCD
+ config USB_XHCI_PLATFORM
+ 	tristate
+ 
++config USB_XHCI_MVEBU
++	tristate "xHCI support for Marvell Armada 38x"
++	select USB_XHCI_PLATFORM
++	---help---
++	  Say 'Y' to enable the support for the xHCI host controller
++	  found in Marvell Armada 38x ARM SOCs.
++
+ endif # USB_XHCI_HCD
+ 
+ config USB_EHCI_HCD
+diff --git a/drivers/usb/host/Makefile b/drivers/usb/host/Makefile
+index 7530468c9a4f..7a8db7f7dc01 100644
+--- a/drivers/usb/host/Makefile
++++ b/drivers/usb/host/Makefile
+@@ -19,6 +19,7 @@ xhci-hcd-$(CONFIG_PCI)	+= xhci-pci.o
+ 
+ ifneq ($(CONFIG_USB_XHCI_PLATFORM), )
+ 	xhci-hcd-y		+= xhci-plat.o
++	xhci-hcd-$(CONFIG_USB_XHCI_MVEBU)	+= xhci-mvebu.o
+ endif
+ 
+ obj-$(CONFIG_USB_WHCI_HCD)	+= whci/
+diff --git a/drivers/usb/host/xhci-mvebu.c b/drivers/usb/host/xhci-mvebu.c
+new file mode 100644
+index 000000000000..09cf437499fb
+--- /dev/null
++++ b/drivers/usb/host/xhci-mvebu.c
+@@ -0,0 +1,71 @@
++/*
++ * Copyright (C) 2014 Marvell
++ * Author: Gregory CLEMENT <gregory.clement@free-electrons.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * version 2 as published by the Free Software Foundation.
++ */
++
++#include <linux/io.h>
++#include <linux/mbus.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++
++#define USB3_MAX_WINDOWS	4
++#define USB3_WIN_CTRL(w)	(0x0 + ((w) * 8))
++#define USB3_WIN_BASE(w)	(0x4 + ((w) * 8))
++
++static void __init mv_usb3_conf_mbus_windows(void __iomem *base,
++			const struct mbus_dram_target_info *dram)
++{
++	int win;
++
++	/* Clear all existing windows */
++	for (win = 0; win < USB3_MAX_WINDOWS; win++) {
++		writel(0, base + USB3_WIN_CTRL(win));
++		writel(0, base + USB3_WIN_BASE(win));
++	}
++
++	/* Program each DRAM CS in a seperate window */
++	for (win = 0; win < dram->num_cs; win++) {
++		const struct mbus_dram_window *cs = dram->cs + win;
++
++		writel(((cs->size - 1) & 0xffff0000) | (cs->mbus_attr << 8) |
++		       (dram->mbus_dram_target_id << 4) | 1,
++		       base + USB3_WIN_CTRL(win));
++
++		writel((cs->base & 0xffff0000), base + USB3_WIN_BASE(win));
++	}
++}
++
++int xhci_mvebu_mbus_init_quirk(struct platform_device *pdev)
++{
++	struct resource	*res;
++	void __iomem	*base;
++	const struct mbus_dram_target_info *dram;
++	int ret = 0;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
++	if (!res)
++		return -ENODEV;
++
++	/*
++	 * We don't use devm_ioremap() because this mapping should
++	 * only exists for the duration of this probe function.
++	 */
++	base = ioremap(res->start, resource_size(res));
++	if (!base)
++		return -ENODEV;
++
++	dram = mv_mbus_dram_info();
++	mv_usb3_conf_mbus_windows(base, dram);
++
++	/*
++	 * This memory area was only needed to configure the MBus
++	 * windows, and is therefore no longer useful.
++	 */
++	iounmap(base);
++
++	return ret;
++}
+diff --git a/drivers/usb/host/xhci-mvebu.h b/drivers/usb/host/xhci-mvebu.h
+new file mode 100644
+index 000000000000..5d7e647b3d27
+--- /dev/null
++++ b/drivers/usb/host/xhci-mvebu.h
+@@ -0,0 +1,22 @@
++/*
++ * Copyright (C) 2014 Marvell
++ *
++ * Gregory Clement <gregory.clement@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifndef __LINUX_XHCI_MVEBU_H
++#define __LINUX_XHCI_MVEBU_H
++
++#ifdef CONFIG_USB_XHCI_MVEBU
++int xhci_mvebu_mbus_init_quirk(struct platform_device *pdev);
++#else
++static inline int xhci_mvebu_mbus_init_quirk(struct device dev)
++{
++	return 0;
++}
++#endif
++#endif /* __LINUX_XHCI_MVEBU_H */
+diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+index bb5d563f729c..c0e835b49e0d 100644
+--- a/drivers/usb/host/xhci-plat.c
++++ b/drivers/usb/host/xhci-plat.c
+@@ -19,6 +19,7 @@
+ #include <linux/slab.h>
+ 
+ #include "xhci.h"
++#include "xhci-mvebu.h"
+ 
+ static void xhci_plat_quirks(struct device *dev, struct xhci_hcd *xhci)
+ {
+@@ -148,6 +149,9 @@ static int xhci_plat_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		return ret;
+ 
++	if (of_device_is_compatible(pdev->dev.of_node, "marvell,armada-380-xhci"))
++		xhci_mvebu_mbus_init_quirk(pdev);
++
+ 	/* Initialize dma_mask and coherent_dma_mask to 32-bits */
+ 	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
+ 	if (ret)
+@@ -279,6 +283,7 @@ static const struct dev_pm_ops xhci_plat_pm_ops = {
+ static const struct of_device_id usb_xhci_of_match[] = {
+ 	{ .compatible = "generic-xhci" },
+ 	{ .compatible = "xhci-platform" },
++	{ .compatible = "marvell,armada-380-xhci"},
+ 	{ },
+ };
+ MODULE_DEVICE_TABLE(of, usb_xhci_of_match);
 -- 
 1.8.1.2
