@@ -1,118 +1,67 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sat, 26 Apr 2014 22:37:18 +0000 (UTC)
-Subject: OMAP baseline test results for v3.15-rc1
-Message-ID: <alpine.DEB.2.02.1404262232100.24168@utopia.booyaka.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Sat, 26 Apr 2014 23:37:57 +0100
+Subject: can problems on socfpga [was Re: [PATCH v2 4/6] ARM: socfpga:
+ dts: add can0+1]
+In-Reply-To: <20140426203131.GA21832@amd.pavel.ucw.cz>
+References: <1396422700-3962-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1396422700-3962-4-git-send-email-s.trumtrar@pengutronix.de>
+ <20140404102815.GA9242@amd.pavel.ucw.cz>
+ <20140425195319.GA3677@amd.pavel.ucw.cz>
+ <1398457446.26387.0.camel@linux-builds1>
+ <1398461518.3587.11.camel@dinh-ubuntu>
+ <20140426093646.GE8730@amd.pavel.ucw.cz>
+ <20140426203131.GA21832@amd.pavel.ucw.cz>
+Message-ID: <6bf951b6-51e7-4b90-b054-9ba5b6e93874@email.android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello,
 
-Here are some basic OMAP test results for Linux v3.15-rc1.
-Logs and other details at:
+I'm not in the office (and fighting with my phone's email client) until 5th of May, however please rebase all your patches against the latest net/master from David Miller, as this tree includes all c_can fixes by Thomas.
 
-    http://www.pwsan.com/omap/testlogs/test_v3.15-rc1/20140421113253/
+Marc
 
+(This probability end as a tofu)
 
-Test summary
-------------
-
-Build: uImage:
-    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only
-
-Build: zImage:
-    Pass (14/14): multi_v7_defconfig, omap2plus_defconfig,
-		  omap2plus_defconfig_am33xx_only,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_n800_only_a,
-		  omap2plus_defconfig_n800_multi_omap2xxx,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig,
-		  rmk_omap4430_sdp_oldconfig
-
-Build: uImage+dtb:
-    Pass ( 9/ 9): omap2plus_defconfig_am33xx_only/am335x-bone,
-		  omap2plus_defconfig/omap4-panda,
-		  omap2plus_defconfig/omap4-panda-es,
-		  omap2plus_defconfig/am3517-evm,
-		  omap2plus_defconfig/omap2430-sdp,
-		  omap2plus_defconfig/omap3-beagle,
-		  omap2plus_defconfig/omap3-beagle-xm,
-		  omap2plus_defconfig/omap3-evm-37xx,
-		  omap2plus_defconfig/omap4-var-som
-
-Boot to userspace:
-    FAIL ( 1/12): 2430sdp
-    skip ( 2/12): 5912osk, cmt3517
-    Pass ( 9/12): 3517evm, 3530es3beagle, 3730beaglexm, 37xxevm,
-		  4430es2panda, 4460pandaes, am335xbone, am335xbonelt,
-		  4460varsomom
-
-PM: chip retention via suspend:
-    FAIL ( 3/ 7): 2430sdp, 4430es2panda, 4460varsomom
-    Pass ( 4/ 7): 3530es3beagle, 3730beaglexm, 37xxevm, 4460pandaes
-
-PM: chip retention via dynamic idle:
-    FAIL ( 7/ 7): 2430sdp, 3530es3beagle, 3730beaglexm, 37xxevm,
-		  4430es2panda, 4460pandaes, 4460varsomom
-
-PM: chip off except CORE via suspend:
-    FAIL ( 1/ 1): 3730beaglexm
-
-PM: chip off except CORE via dynamic idle:
-    FAIL ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    FAIL ( 5/ 5): 3530es3beagle, 37xxevm, 4430es2panda, 4460pandaes,
-		  4460varsomom
-
-PM: chip off via dynamic idle:
-    FAIL ( 5/ 5): 3530es3beagle, 37xxevm, 4430es2panda, 4460pandaes,
-		  4460varsomom
-
-
-vmlinux object size
-(delta in bytes from test_v3.14 (455c6fdbd219161bd09b1165f11699d6d73de11c)):
-   text     data      bss    total  kernel
- +47540    +1904    +4120   +53564  omap1_defconfig
- +48760    +1232    +4152   +54144  omap1_defconfig_1510innovator_only
- +48556    +1328    +4120   +54004  omap1_defconfig_5912osk_only
-+336031  +133512    +6112  +475655  multi_v7_defconfig
- +30722   +11392    +4312   +46426  omap2plus_defconfig
- +83096    +9344    +7512   +99952  omap2plus_defconfig_2430sdp_only
-+317069   +13808   +29040  +359917  omap2plus_defconfig_am33xx_only
-+256147   +12688   +29040  +297875  omap2plus_defconfig_am43xx_only
- +31521   +11464    +4376   +47361  omap2plus_defconfig_cpupm
- +18233    +1520    +4440   +24193  omap2plus_defconfig_dra7xx_only
- +41982    -2880    +4532   +43634  omap2plus_defconfig_n800_multi_omap2xxx
- +45678    -2800    +4532   +47410  omap2plus_defconfig_n800_only_a
- +28802   +11856    +4312   +44970  omap2plus_defconfig_no_pm
- -53331   -86096     +664  -138763  omap2plus_defconfig_omap2_4_only
- -59700   -86624    +1112  -145212  omap2plus_defconfig_omap3_4_only
- +21025    +1536    +4376   +26937  omap2plus_defconfig_omap5_only
- +26068     -864    +7928   +33132  rmk_omap3430_ldp_allnoconfig
- +58468    -2968    +4584   +60084  rmk_omap3430_ldp_oldconfig
- +19892    -3092    +4664   +21464  rmk_omap4430_sdp_allnoconfig
- +61177    -3416    +4480   +62241  rmk_omap4430_sdp_oldconfig
-
-Boot-time memory difference
-(delta in bytes from test_v3.14 (455c6fdbd219161bd09b1165f11699d6d73de11c))
-  avail  rsrvd   high  freed  board          kconfig
-   -64k    64k      .     4k  2420n800       omap2plus_defconfig_n800_only_a
-   -64k    64k      .      .  2430sdp        omap2plus_defconfig
-  -148k   148k      .     4k  3517evm        omap2plus_defconfig
-  -172k   172k      .     4k  3530es3beagle  omap2plus_defconfig
-  -176k   176k      .     4k  3730beaglexm   omap2plus_defconfig
-  -168k   168k      .     4k  37xxevm        omap2plus_defconfig
-  -160k   160k      .     4k  4430es2panda   omap2plus_defconfig
-  -160k   160k      .     4k  4460pandaes    omap2plus_defconfig
-  -148k   148k      .     4k  4460varsomom   omap2plus_defconfig
-  -408k   408k      .    32k  am335xbone     omap2plus_defconfig_am33xx_only
-
-
-The ~400KB runtime memory bloat for AM335x is quite a bit beyond the usual 
-~150KB per-release bloat.  It's probably worth someone's time to figure 
-out what happened here. 
+On 26 April 2014 21:31:31 BST, Pavel Machek <pavel@denx.de> wrote:
+>On Sat 2014-04-26 11:36:46, Pavel Machek wrote:
+>> Hi!
+>> 
+>> > To get this working well, I had to install a few of the patches
+>that
+>> > Benedict Spranger submitted ([PATCH 05/16] c_can: use 32 bit access
+>for
+>> > D_CAN) on 9/9/2013.
+>> > 
+>> > I have the patches on our rocketboard branch
+>> > (rocketboards.org/gitweb/?p=linux-socfpga-git;a=summary)
+>> > 
+>> > I planned to upstream these changes but there have been some major
+>> > changes to CAN recently that may require some refactoring.
+>> 
+>> I ported those changes to 3.15-rc2 (but can't test them at the
+>> moment).
+>
+>Ok, it seems it is possible to test CAN without actual can hardware
+>using loopback:
+>
+>ip link set can0 up type can bitrate 125000 loopback on
+>ifconfig can0 up
+>candump can0 &
+>cansend can0 "123#DEADBEEF"
+>
+>Moreover, it seems that previous two patches do the trick. Packets are
+>now echoed as expected. (Ok, small question is "why twice", but I
+>guess that's just CAN...?)
+>
+>root at sockit:~# ip link set can0 up type can bitrate 125000 loopback on
+>c_can_platform ffc00000.d_can can0: setting BTR=1c31 BRPE=0000
+>root at sockit:~# ifconfig can0 up
+>root at sockit:~# candump can0 &
+>root at sockit:~# cansend can0 "123#DEADBEEF"
+>  can0  123   [4]  DE AD BE EF
+>  can0  123   [4]  DE AD BE EF
+>root at sockit:~# 
+>
+>Best regards,
+>								Pavel
