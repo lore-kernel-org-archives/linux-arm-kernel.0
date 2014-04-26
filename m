@@ -1,49 +1,86 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sat, 26 Apr 2014 16:49:52 +0100
-Subject: [PATCH] clkdev: only fall through to clk_get_sys() if DT indicates no
- entry
-Message-ID: <E1We4rQ-0001mv-Ps@rmk-PC.arm.linux.org.uk>
+From: a.kesavan@samsung.com (Abhilash Kesavan)
+Date: Sat, 26 Apr 2014 21:35:42 +0530
+Subject: [PATCH v3 0/6] MCPM backend for Exynos5420
+Message-ID: <1398528348-21214-1-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are two failures which DT can return when looking up a phandle:
--ENOENT - when DT finds that the desired property/index is not present
--EINVAL - when DT finds that the desired property/index is present, but
- there is a problem parsing it.
+This is v3 of the series adding MCPM backend support for SMP secondary boot
+and core switching on Samsung's Exynos5420. The patches are based on the mcpm
+support added for Exynos5420 in the Chromium kernel repository here:
+https://chromium.googlesource.com/chromiumos/third_party/kernel-next/+/chromeos-3.8
 
-We should only fall through to clk_get_sys() (the table driven clock
-lookup) when DT indicates that there was no entry in the OF tables
-for the clock.  Doing otherwise causes the clk API to always indicate
-that there is no entry for this clock, which is not correct behaviour.
+This patchset depends on:
+- ARM: EXYNOS: Map SYSRAM address through DT
+(http://www.spinics.net/lists/arm-kernel/msg323011.html)
 
-Cc: <stable@vger.kernel.org>
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
-Grant, Rob,
+The patches have been prepared on linux-next(20140424) and tested on SMDK5420
+EVT1 using the "/dev/b.L_switcher" user interface. Secondary core bring-up has
+also been tested on an Exynos5420-based chromebook.
 
-Please let me know ASAP if this gives you any cause for concern.  This
-looks to me like a long standing bug which really needs fixing.  Part
-of the motivation here is similar to Jean-Francois' patch to clkdev
-which allows a DT specified clock which isn't get present to have
-clk_get() and friends return -EPROBE_DEFER - again, something that I
-think really should happen.  Jean-Francois hasn't been able to get
-much traction for his patch, so let's start with fixing this bug first.
+Changes since v2:
+Addressed the following comments from Nicolas Pitre and Daniel Lezcano
+	- Added generic common (cluster) configuration functions to pm.c
+	  which may be used by other subsystems.
+	- Removed unused "cpumask" variable in mcpm code.
+	- Re-worked exynos_power_down_finish() referencing the tc2_pm code.
+	- Removed the status checks in core and cluster power functions. We
+	  just set the power control bit and do not check the previous state
+	  anymore.
+	- Removed incorrect jiffies timeout usage in path where IRQs are
+	  disabled.
 
- drivers/clk/clkdev.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Changes since v1:
+Addressed the following comments from Dave Martin and Nicolas Pitre:
+	- Fixed help text for EXYNOS5420_MCPM symbol.
+	- Removed mcpm-exynos-setup.S file and added similar code from tc2_pm.c.
+	- Changed the spinlock name from "bl_lock" to "exynos_mcpm_lock".
+	- Removed snoop enable/disable calls due to possible cpuidle issue and
+	  not having numbers proving a significant power savings. Dropped the
+	  "drivers/bus: arm-cci: Add common control interface for ACE ports"
+	  patch from v1 as it was no longer needed.
+	- Created a macro for exynos-specific v7_exit_coherency_flush which
+	  handles an erratum. This was done to prevent duplication of code.
+	- Removed "outer_flush_all" call.
+	- Removed redundant dsb in power_down function.
+	- Removed unnecessary initialization of global variables to zero.
+	- Split the /dev/bL_status debug interface into another patch.
+	- Fixed error handling in exynos_mcpm_init().
+	- Called mcpm_smp_set_ops directly from exynos_mcpm_init().
+	- Added a TODO for supporting cluster down on exynos5420.
 
-diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-index 48f67218247c..4e65d0e10b05 100644
---- a/drivers/clk/clkdev.c
-+++ b/drivers/clk/clkdev.c
-@@ -165,7 +165,7 @@ struct clk *clk_get(struct device *dev, const char *con_id)
- 
- 	if (dev) {
- 		clk = of_clk_get_by_name(dev->of_node, con_id);
--		if (!IS_ERR(clk))
-+		if (!IS_ERR(clk) || PTR_ERR(clk) != -ENOENT)
- 			return clk;
- 	}
- 
+NOTE:
+- Have added Leela Krishna's generic cpu power control function series
+  as part of this patchset.
+- There is no change in the patch "ARM: dts: exynos5420: add CCI node"
+  and "arm: exynos: Add /dev/bL_status user interface on Exynos5420"
+  from v2.
+- I have tested with and without the erratum 799270 workaround and both
+  work fine. I have kept the erratum fix for the time being.
+
+Abhilash Kesavan (3):
+  arm: exynos: Add generic cluster power control functions
+  arm: exynos: Add MCPM call-back functions
+  arm: exynos: Add /dev/bL_status user interface on Exynos5420
+
+Andrew Bresticker (1):
+  ARM: dts: exynos5420: add CCI node
+
+Leela Krishna Amudala (2):
+  ARM: EXYNOS: Add generic cpu power control functions for all exynos
+    based SoCs
+  ARM: EXYNOS: use generic exynos cpu power control functions
+
+ arch/arm/boot/dts/exynos5420.dtsi  |  27 +++
+ arch/arm/mach-exynos/Kconfig       |   8 +
+ arch/arm/mach-exynos/Makefile      |   2 +
+ arch/arm/mach-exynos/common.h      |   6 +
+ arch/arm/mach-exynos/mcpm-exynos.c | 385 +++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-exynos/platsmp.c     |   9 +-
+ arch/arm/mach-exynos/pm.c          |  66 +++++++
+ arch/arm/mach-exynos/regs-pmu.h    |  15 ++
+ 8 files changed, 512 insertions(+), 6 deletions(-)
+ create mode 100644 arch/arm/mach-exynos/mcpm-exynos.c
+
 -- 
-1.8.3.1
+1.8.3.2
