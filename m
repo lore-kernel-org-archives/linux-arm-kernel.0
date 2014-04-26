@@ -1,42 +1,35 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 26 Apr 2014 20:32:18 +0400
-Subject: [PATCH 7/8] ARM: dts: imx27: Trim node name for FEC
-In-Reply-To: <1398487933-5683-7-git-send-email-shc_work@mail.ru>
-References: <1398487933-5683-1-git-send-email-shc_work@mail.ru>
- <1398487933-5683-7-git-send-email-shc_work@mail.ru>
-Message-ID: <535BDF92.8010704@cogentembedded.com>
+Date: Sat, 26 Apr 2014 20:36:38 +0400
+Subject: [PATCH 07/10] ARM: dts: DRA7: Add DT node for DES IP
+In-Reply-To: <1398466968-29506-8-git-send-email-joelf@ti.com>
+References: <1398466968-29506-1-git-send-email-joelf@ti.com>
+ <1398466968-29506-8-git-send-email-joelf@ti.com>
+Message-ID: <535BE096.2060407@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello.
 
-On 26-04-2014 8:52, Alexander Shiyan wrote:
+On 26-04-2014 3:02, Joel Fernandes wrote:
 
-> This patch reduce node name for FEC. Otherwise, the name for PHY
-> is composed incorrectly.
+> DRA7xx SoCs have a DES3DES IP. Add DT data for the same.
 
-> Before:
-> fec 1002b000.ethernet eth0: Freescale FEC PHY driver [Generic PHY] (mii_bus:phy_addr=1002b000.etherne:00, irq=-1)
-
-> After:
-> fec 1002b000.fec eth0: Freescale FEC PHY driver [Generic PHY] (mii_bus:phy_addr=1002b000.fec-1:00, irq=-1)
-
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> Signed-off-by: Joel Fernandes <joelf@ti.com>
 > ---
->   arch/arm/boot/dts/imx27.dtsi | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
+>   arch/arm/boot/dts/dra7.dtsi |   11 +++++++++++
+>   1 file changed, 11 insertions(+)
 
-> diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-> index a75555c..377339e 100644
-> --- a/arch/arm/boot/dts/imx27.dtsi
-> +++ b/arch/arm/boot/dts/imx27.dtsi
-> @@ -497,7 +497,7 @@
->   				clocks = <&clks 38>;
->   			};
->
-> -			fec: ethernet at 1002b000 {
-> +			fec: fec at 1002b000 {
+> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+> index 1c0f8e1..0533b89 100644
+> --- a/arch/arm/boot/dts/dra7.dtsi
+> +++ b/arch/arm/boot/dts/dra7.dtsi
+> @@ -789,6 +789,17 @@
+>   			dma-names = "tx0", "rx0";
+>   			status = "disabled";
+>   		};
+> +
+> +		des: des at 480a5000 {
 
-    The "ethernet" name complies to the ePAPR standard. Don't change it, please.
+    Shouldn't the node name be "crypto at 480a5000", according to the ePAPR standard?
 
 WBR, Sergei
