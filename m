@@ -1,63 +1,67 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 26 Apr 2014 18:03:51 +0200
-Subject: [RFC 2/5] clk: berlin: add berlin clock groups DT bindings
- documentation
-In-Reply-To: <1398456024-27876-4-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1398456024-27876-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1398456024-27876-4-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20140426160351.GE24905@lukather>
+Date: Sat, 26 Apr 2014 18:16:53 +0200
+Subject: [PATCH 1/2] ARM: sunxi: Split the various SoCs support in Kconfig
+In-Reply-To: <1398529014-1152-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1398529014-1152-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1398529014-1152-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 25, 2014 at 10:00:21PM +0200, Alexandre Belloni wrote:
-> Document the device tree for the clocks sharing a common set of registers
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
-> Cc: devicetree at vger.kernel.org
->  .../devicetree/bindings/clock/berlin-clock.txt     | 29 ++++++++++++++++++++++
->  1 file changed, 29 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/berlin-clock.txt b/Documentation/devicetree/bindings/clock/berlin-clock.txt
-> index 49bc229827a0..6d374066d6b9 100644
-> --- a/Documentation/devicetree/bindings/clock/berlin-clock.txt
-> +++ b/Documentation/devicetree/bindings/clock/berlin-clock.txt
-> @@ -11,10 +11,18 @@ Required properties:
->  		CPU PLL and System PLL
->  	"marvell,berlin2-clk":
->  		simple clocks
-> +	"marvell,berlin2-clkgrp":
-> +		clocks sharing a common set of registers
->  - reg: Address and length of the clock register set.
+This will allow to better isolate various options, and reduce the overall
+kernel size if we're interested in only one of the SoCs.
 
-Judging from your code, you expect two arrays in reg. You should
-document it and in which order you expect them.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/mach-sunxi/Kconfig | 35 +++++++++++++++++++++++++++++------
+ 1 file changed, 29 insertions(+), 6 deletions(-)
 
-Also, you'd probably want to use reg-names, which is much more
-flexible from a DT point of view.
-
->  - #clock-cells: from common clock binding; shall be set to 0.
->  - clocks: from common clock binding
->  
-> +For the clock groups:
-> +- marvell,clk-switch-offset: offset in bits to the first bit related to the
-> +  clock in the switch registers
-> +- marvell,clk-select-offset: offset in bits to the first bit related to the
-> +  clock in the selection registers.
-
-Encoding bit offsets and/or register addresses in the DT is usually a
-bad idea. You should more likely use different compatibles here.
-
-Maxime
-
+diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+index b57d7d53b9d3..23575010ff49 100644
+--- a/arch/arm/mach-sunxi/Kconfig
++++ b/arch/arm/mach-sunxi/Kconfig
+@@ -1,14 +1,37 @@
+ config ARCH_SUNXI
+-	bool "Allwinner A1X SOCs" if ARCH_MULTI_V7
+-	select ARCH_HAS_RESET_CONTROLLER
++	bool "Allwinner SoCs" if ARCH_MULTI_V7
+ 	select ARCH_REQUIRE_GPIOLIB
+-	select ARM_GIC
+-	select ARM_PSCI
+ 	select CLKSRC_MMIO
+ 	select GENERIC_IRQ_CHIP
+-	select HAVE_ARM_ARCH_TIMER
+ 	select PINCTRL
+ 	select PINCTRL_SUNXI
+-	select RESET_CONTROLLER
+ 	select SUN4I_TIMER
++
++if ARCH_SUNXI
++
++menu "Allwinner SoCs variants"
++
++config MACH_SUN4I
++	bool "Allwinner A10 (sun4i) SoCs support"
++
++config MACH_SUN5I
++	bool "Allwinner A10s / A13 (sun5i) SoCs support"
++	select SUN5I_HSTIMER
++
++config MACH_SUN6I
++	bool "Allwinner A31 (sun6i) SoCs support"
++	select ARCH_HAS_RESET_CONTROLLER
++	select ARM_GIC
++	select RESET_CONTROLLER
++	select SUN5I_HSTIMER
++
++config MACH_SUN7I
++	bool "Allwinner A20 (sun7i) SoCs support"
++	select ARM_GIC
++	select ARM_PSCI
++	select HAVE_ARM_ARCH_TIMER
+ 	select SUN5I_HSTIMER
++
++endmenu
++
++endif
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140426/9c293463/attachment-0001.sig>
+1.9.1
