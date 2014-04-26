@@ -1,267 +1,205 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 26 Apr 2014 13:41:50 +0200
-Subject: [PATCH v8 3/3] ARM: dts: Add initial device tree support for
- EXYNOS5410
-In-Reply-To: <1397459860-21869-4-git-send-email-t.dakhran@samsung.com>
-References: <1397459860-21869-1-git-send-email-t.dakhran@samsung.com>
- <1397459860-21869-4-git-send-email-t.dakhran@samsung.com>
-Message-ID: <535B9B7E.4090802@gmail.com>
+From: graeme@xora.org.uk (Graeme Gregory)
+Date: Sat, 26 Apr 2014 13:09:39 +0100
+Subject: [PATCH v3 part1 04/11] ARM64 / ACPI: Introduce arm-core.c and
+ its related head file
+In-Reply-To: <20140425183848.GE28819@e106331-lin.cambridge.arm.com>
+References: <1398432017-8506-1-git-send-email-hanjun.guo@linaro.org>
+ <1398432017-8506-5-git-send-email-hanjun.guo@linaro.org>
+ <20140425155147.GA28819@e106331-lin.cambridge.arm.com>
+ <20140425165320.GD1186@xora-haswell>
+ <20140425183848.GE28819@e106331-lin.cambridge.arm.com>
+Message-ID: <20140426120939.GA9567@xora-haswell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Apr 25, 2014 at 07:38:48PM +0100, Mark Rutland wrote:
+> On Fri, Apr 25, 2014 at 05:53:20PM +0100, Graeme Gregory wrote:
+> > On Fri, Apr 25, 2014 at 04:51:47PM +0100, Mark Rutland wrote:
+> > > Hi Hanjun,
+> > > 
+> > > On Fri, Apr 25, 2014 at 02:20:10PM +0100, Hanjun Guo wrote:
+> > > > ACPI core need lots extern variables and functions which should
+> > > > be provided by arch dependent code to make itself compilable. so
+> > > > introduce arm_core.c and its related header file here.
+> > > > 
+> > > > acpi_boot_table_init() will be called in setup_arch() before
+> > > > paging_init(), so we should use eary_ioremap() mechanism here
+> > > > to get the RSDP and all the table pointers, with this patch,
+> > > > we can get ACPI boot-time tables from firmware on ARM64.
+> > > > 
+> > > > Signed-off-by: Al Stone <al.stone@linaro.org>
+> > > > Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+> > > > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> > > > Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> > > > ---
+> > > >  arch/arm64/include/asm/acpi.h |   53 +++++++++++++++++++
+> > > >  arch/arm64/kernel/setup.c     |    4 ++
+> > > >  drivers/acpi/Makefile         |    2 +
+> > > >  drivers/acpi/plat/Makefile    |    1 +
+> > > >  drivers/acpi/plat/arm-core.c  |  113 +++++++++++++++++++++++++++++++++++++++++
+> > > >  5 files changed, 173 insertions(+)
+> > > >  create mode 100644 drivers/acpi/plat/Makefile
+> > > >  create mode 100644 drivers/acpi/plat/arm-core.c
+> > > > 
+> > > > diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> > > > index e3e990e..3ac9dfb 100644
+> > > > --- a/arch/arm64/include/asm/acpi.h
+> > > > +++ b/arch/arm64/include/asm/acpi.h
+> > > > @@ -19,6 +19,43 @@
+> > > >  #ifndef _ASM_ACPI_H
+> > > >  #define _ASM_ACPI_H
+> > > >  
+> > > > +#include <asm/cacheflush.h>
+> > > > +
+> > > > +#include <linux/init.h>
+> > > > +
+> > > > +#define COMPILER_DEPENDENT_INT64	s64
+> > > > +#define COMPILER_DEPENDENT_UINT64	u64
+> > > 
+> > > Is there any reason this can't be in a common ACPI header shared be ia64
+> > > and x86 too? Given we already have generic types for this it seems
+> > > pointless to define this in each architecture.
+> > > 
+> > > It looks like include/acpi/actypes.h tries to do that already...
+> > > 
+> > Yes I think we can replace that with uint64_t and int64_t types.
+> > 
 
-Since I've started enforcing reference-based DT syntax due to multiple 
-advantages over the plain full-tree based one, you should do the same 
-for your dts/i files. You can take the series adding support for 
-Exynos5260 as an example:
+I have dug into this deeper and since include/acpi/platform/aclinux.h
+defines ACPI_USE_SYSTEM_INTTYPES then these defines should not be used
+at all and it should be safe for us to just not have them in arm64
 
-http://thread.gmane.org/gmane.linux.kernel.samsung-soc/29360
+I guess they are historic in x86/ia64
 
-Best regards,
-Tomasz
+> > > > +
+> > > > +/*
+> > > > + * Calling conventions:
+> > > > + *
+> > > > + * ACPI_SYSTEM_XFACE        - Interfaces to host OS (handlers, threads)
+> > > > + * ACPI_EXTERNAL_XFACE      - External ACPI interfaces
+> > > > + * ACPI_INTERNAL_XFACE      - Internal ACPI interfaces
+> > > > + * ACPI_INTERNAL_VAR_XFACE  - Internal variable-parameter list interfaces
+> > > > + */
+> > > > +#define ACPI_SYSTEM_XFACE
+> > > > +#define ACPI_EXTERNAL_XFACE
+> > > > +#define ACPI_INTERNAL_XFACE
+> > > > +#define ACPI_INTERNAL_VAR_XFACE
+> > > > +
+> > > > +/* Asm macros */
+> > > > +#define ACPI_FLUSH_CPU_CACHE() flush_cache_all()
+> > > 
+> > > This almost certainly does not do what you think it does.
+> > > 
+> > > flush_cache_all walks the architected levels of cache visible to the
+> > > current CPU (i.e. those in CLIDR_EL1), and walks over each cache line at
+> > > that level, cleaning and evicting it. It also flushes the I-cache (which
+> > > I don't think you care about here).
+> > > 
+> > > This is NOT safe if the cache is enabled. Lines can migrate between
+> > > levels in the middle of the sequence.
+> > > 
+> > > In an SMP system this does NOT guarantee that data is evicted to memory,
+> > > even if the cache is disabled. Other CPUs with caches enabled can
+> > > acquire a cacheline (even if dirty) and it can sit in their cache.
+> > > 
+> > > In a UP system or an SMP system where all other architected caches are
+> > > disabled (and flushed) this does NOT guarantee that data hits memory. In
+> > > the presence of a system-level cache this will simply flush the data out
+> > > to said system-level rather than memory.
+> > > 
+> > > I believe the intent here is to have something analogous to WBINVD for
+> > > use in idle. Unfortunately there simply isn't anything analogous.
+> > > Luckily in the presence of PSCI, the PSCI implementation should do all
+> > > of the cache maintenance required to prevent any data loss and/or
+> > > corruption, and anything we need to have visible to noncacheable
+> > > accesses (i.e. flushed out to memory) we should be able to flush by VA.
+> > > 
+> > > This maintenance is unsafe, and shouldn't be necessary on any sane
+> > > system. Please get rid of it. I would very much like to get rid of
+> > > flush_cache_all() before its misuse spreads further.
+> > > 
+> > Thanks for explanation Mark, you are correct on x86 it is defined as
+> > wbinvd().
+> > 
+> > I think looking at where it is actually used we can make this an empty
+> > macro on arm64 for now. Where it used are areas we don't currently
+> > execute and need arm64 replacements or refactorising to remove x86isms.
+> 
+> That sounds good. Is it worth putting a warn or similar there just in
+> case?
+> 
+> > 
+> > > > +/* Basic configuration for ACPI */
+> > > > +#ifdef	CONFIG_ACPI
+> > > > +extern int acpi_disabled;
+> > > > +extern int acpi_noirq;
+> > > > +extern int acpi_pci_disabled;
+> > > > +extern int acpi_strict;
+> > > 
+> > > This looks very odd. Why are these prototypes not coming from a header?
+> > > If they're defined in the same place, why not move the disable_acpi
+> > > function there?
+> > > 
+> > 
+> > This is a header :-)
+> 
+> True; I must get my eyes tested. :)
+> 
+> Are these variables expected to be used by needed by other code, or are
+> they just for the benefit of the static inlines in this header?
+> 
+> > I think this is a peculiarity of how acpica is incorporated into linux
+> > but will check.
+> 
+> Ok.
+> 
+> > 
+> > > > +static inline void disable_acpi(void)
+> > > > +{
+> > > > +	acpi_disabled = 1;
+> > > > +	acpi_pci_disabled = 1;
+> > > > +	acpi_noirq = 1;
+> > > > +}
+> > > 
+> > > [...]
+> > > 
+> > > > +/*
+> > > > + * __acpi_map_table() will be called before page_init(), so early_ioremap()
+> > > > + * or early_memremap() should be called here.
+> > > > + */
+> > > > +char *__init __acpi_map_table(unsigned long phys, unsigned long size)
+> > > > +{
+> > > > +	if (!phys || !size)
+> > > > +		return NULL;
+> > > 
+> > > Is there any reason that tables can't exist at physical address 0? It's
+> > > entirely valid to have memory there.
+> > > 
+> > > [...]
+> > > 
+> > On ARM64 there is not, we can fix this.
+> > 
+> > > > +int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
+> > > > +{
+> > > > +	*irq = -1;
+> > > > +
+> > > > +	return 0;
+> > > > +}
+> > > > +EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
+> > > 
+> > > This appears to be missing a giant warning that it does nothing useful.
+> > > 
+> > > I was under the impression that we were meant to use 0 to represent the
+> > > lack of an interrupt these days, too...
+> > > 
+> > We can fix this.
+> 
+> Sounds good!
+> 
+> Cheers,
+> Mark.
+> 
 
-On 14.04.2014 09:17, Tarek Dakhran wrote:
-> Add initial device tree nodes for EXYNOS5410 SoC and SMDK5410 board.
->
-> Signed-off-by: Tarek Dakhran <t.dakhran@samsung.com>
-> Signed-off-by: Vyacheslav Tyrtov <v.tyrtov@samsung.com>
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> ---
->   arch/arm/boot/dts/Makefile                |    1 +
->   arch/arm/boot/dts/exynos5410-smdk5410.dts |   65 ++++++++++++++
->   arch/arm/boot/dts/exynos5410.dtsi         |  140 +++++++++++++++++++++++++++++
->   3 files changed, 206 insertions(+)
->   create mode 100644 arch/arm/boot/dts/exynos5410-smdk5410.dts
->   create mode 100644 arch/arm/boot/dts/exynos5410.dtsi
->
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 35c146f..191dd19 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -74,6 +74,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
->   	exynos5250-smdk5250.dtb \
->   	exynos5250-snow.dtb \
->   	exynos5420-arndale-octa.dtb \
-> +	exynos5410-smdk5410.dtb \
->   	exynos5420-smdk5420.dtb \
->   	exynos5440-sd5v1.dtb \
->   	exynos5440-ssdk5440.dtb
-> diff --git a/arch/arm/boot/dts/exynos5410-smdk5410.dts b/arch/arm/boot/dts/exynos5410-smdk5410.dts
-> new file mode 100644
-> index 0000000..d69e152
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/exynos5410-smdk5410.dts
-> @@ -0,0 +1,65 @@
-> +/*
-> + * SAMSUNG SMDK5410 board device tree source
-> + *
-> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-> + *		http://www.samsung.com
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +/dts-v1/;
-> +#include "exynos5410.dtsi"
-> +/ {
-> +	model = "Samsung SMDK5410 board based on EXYNOS5410";
-> +	compatible = "samsung,smdk5410", "samsung,exynos5410";
-> +
-> +	memory {
-> +		reg = <0x40000000 0x80000000>;
-> +	};
-> +
-> +	chosen {
-> +		bootargs = "console=ttySAC2,115200";
-> +	};
-> +
-> +	fixed-rate-clocks {
-> +		oscclk {
-> +			compatible = "samsung,exynos5410-oscclk";
-> +			clock-frequency = <24000000>;
-> +		};
-> +	};
-> +
-> +	mmc at 12200000 {
-> +		status = "okay";
-> +		num-slots = <1>;
-> +		supports-highspeed;
-> +		broken-cd;
-> +		card-detect-delay = <200>;
-> +		samsung,dw-mshc-ciu-div = <3>;
-> +		samsung,dw-mshc-sdr-timing = <2 3>;
-> +		samsung,dw-mshc-ddr-timing = <1 2>;
-> +
-> +		slot at 0 {
-> +			reg = <0>;
-> +			bus-width = <8>;
-> +		};
-> +	};
-> +
-> +	mmc at 12220000 {
-> +		status = "okay";
-> +		num-slots = <1>;
-> +		supports-highspeed;
-> +		card-detect-delay = <200>;
-> +		samsung,dw-mshc-ciu-div = <3>;
-> +		samsung,dw-mshc-sdr-timing = <2 3>;
-> +		samsung,dw-mshc-ddr-timing = <1 2>;
-> +
-> +		slot at 0 {
-> +			reg = <0>;
-> +			bus-width = <4>;
-> +			disable-wp;
-> +		};
-> +	};
-> +
-> +};
-> diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
-> new file mode 100644
-> index 0000000..e7cc930
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/exynos5410.dtsi
-> @@ -0,0 +1,140 @@
-> +/*
-> + * SAMSUNG EXYNOS5410 SoC device tree source
-> + *
-> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-> + *		http://www.samsung.com
-> + *
-> + * SAMSUNG EXYNOS5410 SoC device nodes are listed in this file.
-> + * EXYNOS5410 based board files can include this file and provide
-> + * values for board specfic bindings.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <dt-bindings/clock/exynos5410.h>
-> +#include "exynos5.dtsi"
-> +/ {
-> +	compatible = "samsung,exynos5410", "samsung,exynos5";
-> +
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		CPU0: cpu at 0 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a15";
-> +			reg = <0>;
-> +			clock-frequency = <1600000000>;
-> +		};
-> +
-> +		CPU1: cpu at 1 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a15";
-> +			reg = <1>;
-> +			clock-frequency = <1600000000>;
-> +		};
-> +
-> +		CPU2: cpu at 2 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a15";
-> +			reg = <2>;
-> +			clock-frequency = <1600000000>;
-> +		};
-> +
-> +		CPU3: cpu at 3 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a15";
-> +			reg = <3>;
-> +			clock-frequency = <1600000000>;
-> +		};
-> +	};
-> +
-> +	clock: clock-controller at 10010000 {
-> +		compatible = "samsung,exynos5410-clock";
-> +		reg = <0x10010000 0x30000>;
-> +		#clock-cells = <1>;
-> +	};
-> +
-> +	timer at 101C0000 {
-> +		compatible = "samsung,exynos4210-mct";
-> +		reg = <0x101C0000 0xB00>;
-> +		interrupt-parent = <&interrupt_map>;
-> +		interrupts = <0>, <1>, <2>, <3>,
-> +			<4>, <5>, <6>, <7>,
-> +			<8>, <9>, <10>, <11>;
-> +		clocks = <&clock CLK_FIN_PLL>, <&clock CLK_MCT>;
-> +		clock-names = "fin_pll", "mct";
-> +
-> +		interrupt_map: interrupt-map {
-> +			#interrupt-cells = <1>;
-> +			#address-cells = <0>;
-> +			#size-cells = <0>;
-> +			interrupt-map = <0 &combiner 23 3>,
-> +					<1 &combiner 23 4>,
-> +					<2 &combiner 25 2>,
-> +					<3 &combiner 25 3>,
-> +					<4 &gic 0 120 0>,
-> +					<5 &gic 0 121 0>,
-> +					<6 &gic 0 122 0>,
-> +					<7 &gic 0 123 0>,
-> +					<8 &gic 0 128 0>,
-> +					<9 &gic 0 129 0>,
-> +					<10 &gic 0 130 0>,
-> +					<11 &gic 0 131 0>;
-> +		};
-> +	};
-> +
-> +	mmc_0: mmc at 12200000 {
-> +		compatible = "samsung,exynos5250-dw-mshc";
-> +		interrupts = <0 75 0>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		reg = <0x12200000 0x1000>;
-> +		clocks = <&clock CLK_MMC0>, <&clock CLK_SCLK_MMC0>;
-> +		clock-names = "biu", "ciu";
-> +		fifo-depth = <0x80>;
-> +		status = "disabled";
-> +	};
-> +
-> +	mmc_1: mmc at 12210000 {
-> +		compatible = "samsung,exynos5250-dw-mshc";
-> +		interrupts = <0 76 0>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		reg = <0x12210000 0x1000>;
-> +		clocks = <&clock CLK_MMC1>, <&clock CLK_SCLK_MMC1>;
-> +		clock-names = "biu", "ciu";
-> +		fifo-depth = <0x80>;
-> +		status = "disabled";
-> +	};
-> +
-> +	mmc_2: mmc at 12220000 {
-> +		compatible = "samsung,exynos5250-dw-mshc";
-> +		interrupts = <0 77 0>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		reg = <0x12220000 0x1000>;
-> +		clocks = <&clock CLK_MMC2>, <&clock CLK_SCLK_MMC2>;
-> +		clock-names = "biu", "ciu";
-> +		fifo-depth = <0x80>;
-> +		status = "disabled";
-> +	};
-> +
-> +	serial at 12C00000 {
-> +		clocks = <&clock CLK_UART0>, <&clock CLK_SCLK_UART0>;
-> +		clock-names = "uart", "clk_uart_baud0";
-> +	};
-> +
-> +	serial at 12C10000 {
-> +		clocks = <&clock CLK_UART1>, <&clock CLK_SCLK_UART1>;
-> +		clock-names = "uart", "clk_uart_baud0";
-> +	};
-> +
-> +	serial at 12C20000 {
-> +		clocks = <&clock CLK_UART2>, <&clock CLK_SCLK_UART2>;
-> +		clock-names = "uart", "clk_uart_baud0";
-> +	};
-> +
-> +};
->
+Thanks
+
+Graeme
