@@ -1,133 +1,129 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 26 Apr 2014 03:59:40 +0200
-Subject: [PATCH/RFC 3/4] of/clk: Register clocks suitable for Runtime
- PM with the PM core
-In-Reply-To: <CAPDyKFr02yyhGNncYX2AgBXTA3Sc0AGQcExjtLvQ5QU0_=YJwg@mail.gmail.com>
-References: <1398334403-26181-1-git-send-email-geert+renesas@glider.be>	<1398334403-26181-4-git-send-email-geert+renesas@glider.be>
- <CAPDyKFr02yyhGNncYX2AgBXTA3Sc0AGQcExjtLvQ5QU0_=YJwg@mail.gmail.com>
-Message-ID: <535B130C.1000007@gmail.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Sat, 26 Apr 2014 11:07:14 +0900
+Subject: [PATCH v2 00/10] ARM: Exynos: PMU cleanup and refactoring for
+ using DT
+In-Reply-To: <535AE52B.4010104@gmail.com>
+References: <1396425058-4012-1-git-send-email-pankaj.dubey@samsung.com>
+ <1398429166-5539-1-git-send-email-pankaj.dubey@samsung.com>
+ <535AE52B.4010104@gmail.com>
+Message-ID: <CAGcde9HNa0V+8it-=3xpJisDgWsb1YbC8-Twm5BGFtNJ+uEyDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Tomasz,
 
 
-On 24.04.2014 15:11, Ulf Hansson wrote:
-> On 24 April 2014 12:13, Geert Uytterhoeven <geert+renesas@glider.be> wrote:
->> When adding a device from DT, check if its clocks are suitable for Runtime
->> PM, and register them with the PM core.
->> If Runtime PM is disabled, just enable the clock.
+On Sat, Apr 26, 2014 at 7:43 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+>
+> Hi Pankaj,
+>
+> Just a small note - please refrain from sending next versions of series in reply to previous version. With threading applied, it gets hard to notice that a new version was posted, because the first message of the thread is always v1. Also it makes threads unnecessarily long.
+>
+
+OK. I will take care in future.
+
+
+>
+> Best regards,
+> Tomasz
+>
+>
+> On 25.04.2014 14:32, Pankaj Dubey wrote:
 >>
->> This allows the PM core to automatically manage gate clocks of devices for
->> Runtime PM.
->
-> Normally I don't think it's a good idea to "automatically" manage
-> clocks from PM core or any other place but from the driver (and
-> possibly the subsystem).
->
-> The reason is simply that we hide things that normally is supposed to
-> be handled by the driver. Typically a cross SOC driver should work
-> fine both with and without a pm_domain. It should also not rely on
-> CONFIG_PM_RUNTIME.
->
+>> This patch series, does some minor cleanup and modifies Exynos PMU related
+>> code for mapping and initialization of Exynos Power Management Unit (PMU)
+>> base address from device tree. This is also preparation for moving PMU
+>> related code out of machine folder and moving into a "drivers/mfd", so that
+>> ARM64 based SoC can utilize common piece of code. These patches require change
+>> in Exynos4210, Exynos4212 and Exynos4412 dtsi files, which has been posted
+>> as separate patch series [2]
 >>
->> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->> ---
->>   drivers/of/Makefile    |    1 +
->>   drivers/of/of_clk.c    |  103 ++++++++++++++++++++++++++++++++++++++++++++++++
->>   drivers/of/platform.c  |    3 ++
->>   include/linux/of_clk.h |   18 +++++++++
->>   4 files changed, 125 insertions(+)
->>   create mode 100644 drivers/of/of_clk.c
->>   create mode 100644 include/linux/of_clk.h
+>> These patches are created on top of Kukjin Kim's for-next (v3.15-rc1 tag)
+>> branch.
 >>
->> diff --git a/drivers/of/Makefile b/drivers/of/Makefile
->> index ed9660adad77..49bcd413906f 100644
->> --- a/drivers/of/Makefile
->> +++ b/drivers/of/Makefile
->> @@ -10,3 +10,4 @@ obj-$(CONFIG_OF_PCI)  += of_pci.o
->>   obj-$(CONFIG_OF_PCI_IRQ)  += of_pci_irq.o
->>   obj-$(CONFIG_OF_MTD)   += of_mtd.o
->>   obj-$(CONFIG_OF_RESERVED_MEM) += of_reserved_mem.o
->> +obj-$(CONFIG_COMMON_CLK) += of_clk.o
->> diff --git a/drivers/of/of_clk.c b/drivers/of/of_clk.c
->> new file mode 100644
->> index 000000000000..35f5e9f3dd42
->> --- /dev/null
->> +++ b/drivers/of/of_clk.c
->> @@ -0,0 +1,103 @@
->> +/*
->> + *  Copyright (C) 2014 Glider bvba
->> + */
->> +
->> +#include <linux/clk.h>
->> +#include <linux/err.h>
->> +#include <linux/of.h>
->> +#include <linux/of_clk.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/pm_clock.h>
->> +#include <linux/pm_runtime.h>
->> +
->> +
->> +#ifdef CONFIG_PM_RUNTIME
->> +
->> +static int of_clk_pm_runtime_suspend(struct device *dev)
->> +{
->> +       int ret;
->> +
->> +       ret = pm_generic_runtime_suspend(dev);
->> +       if (ret)
->> +               return ret;
->> +
->> +       ret = pm_clk_suspend(dev);
->> +       if (ret) {
->> +               pm_generic_runtime_resume(dev);
->> +               return ret;
->> +       }
->> +
->> +       return 0;
->> +}
->> +
->> +static int of_clk_pm_runtime_resume(struct device *dev)
->> +{
->> +       pm_clk_resume(dev);
->> +       return pm_generic_runtime_resume(dev);
->> +}
->> +
->> +static struct dev_pm_domain of_clk_pm_domain = {
->> +       .ops = {
->> +               .runtime_suspend = of_clk_pm_runtime_suspend,
->> +               .runtime_resume = of_clk_pm_runtime_resume,
->> +               USE_PLATFORM_PM_SLEEP_OPS
->> +       },
->> +};
->> +
->> +static int of_clk_register(struct device *dev, struct clk *clk)
->> +{
->> +       int error;
->> +
->> +       if (!dev->pm_domain) {
->> +               error = pm_clk_create(dev);
->> +               if (error)
->> +                       return error;
->> +
->> +               dev->pm_domain = &of_clk_pm_domain;
->
-> I am concerned about how this will work in conjunction with the
-> generic power domain.
->
-> A device can't reside in more than one pm_domain; thus I think it
-> would be better to always use the generic power domain and not have a
-> specific one for clocks. Typically the genpd should invoke
-> pm_clk_resume|suspend from it's runtime PM callbacks.
-
-I'm not sure about this. A typical use case would be to gate clocks ASAP 
-and then wait until device is idle long enough to consider turning off 
-the power domain worthwhile. Also sometimes we may want to gate the 
-clocks, but prevent power domain from being powered off to retain 
-hardware state (e.g. because there is no way to read it and restore later).
-
-I believe, though, that for devices that are not inside a controllable 
-power domain, this might be a good solution.
-
-Best regards,
-Tomasz
+>> These patches depends on following two patch series:
+>> 1) mfd: syscon: Support early initialization
+>>     https://lkml.org/lkml/2014/4/8/239
+>> 2) Add PMU node for Exynos SoCs
+>>     http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg29329.html
+>>
+>> We have tested these patches on SMDK5250 and Arndale (Exynos5250) boards for
+>> System boot and PMU initialization and S2R.
+>>
+>> For testing on Arndale (Exynos5250) board:
+>> Tested-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+>>
+>> Changes Since v1:
+>>   - Rebased on latest for-next of Kukjin Kim's tree.
+>>   - Added patch: "Make exynos machine_ops as static".
+>>         For making more cleanup in "mach-exynos/common.h"
+>>         as suggested by Tomasz Figa.
+>>   - Addressed comments of Tomasz Figa for cleaning "mach-exynos/common.h".
+>>   - Updated patch: Remove file path from comment section
+>>         As suggested by Michel Simek, instead of updating file path
+>>         lets remove them from each file under "mach-exynos".
+>>         Even though Kukjin pointed out that there is similar patch pending from
+>>         Sachin/Tushar but since I could not find I have included this here. If
+>>         I have missed something please point to any existing such patch.
+>>   - Updated patch: Add support for mapping PMU base address via DT
+>>         - Removed __initdata from declaration of "exynos_pmu_base", as it caused
+>>         kernel crash as pointed out by Vikas Sajjan.
+>>         - Added support for Syscon initialization and getting PMU regmap handle
+>>         as suggested by Sylwester. Since current implementation of early
+>>         intialization [1] has limitation that "early_syscon_init" requires
+>>         DT to be unflattened and system should be able to allocate memory,
+>>         we can't use regmap handles for platsmp.c file as "smp_secondary_init"
+>>         will be called before DT unflattening. So I have kept both method for
+>>         accessing PMU base address. platsmp.c will use ioremmaped address where
+>>         as rest other files can use regmap handle.
+>>   - Added patch: Remove "linux/bug.h" from pmu.c.
+>>   - Updated patch: Refactored code for PMU register mapping via DT
+>>         - Modified to use regmap_read/write when using regmap handle.
+>>   - Added patch: Move "mach/map.h" inclusion from regs-pmu.h to platsmp.c
+>>   - Added patch: Add device tree based initialization support for PMU.
+>>         - Convert existing PMU implementation to be a device tree based
+>>          before moving it to "drivers/mfd" folder. As suggested by Bartlomiej.
+>>         - Dropped making a platform_driver for PMU, as currently PMU binding
+>>         has two compatibility strings as "samsung, exynosxxx-pmu", "syscon",
+>>         once we enable MFD_SYSCON config option, current "syscon" driver probe
+>>         gets called and PMU probe never gets called. So modified PMU
+>>         initialization code to scan DT and match against supported compatiblity
+>>         string in driver code, and once we get matching node use that for
+>>         accessing PMU regmap handle using "syscon_early_regmap_lookup_by_phandle".
+>>         If there is any better solution please suggest.
+>>
+>> Pankaj Dubey (6):
+>>    ARM: EXYNOS: Make exynos machine_ops as static
+>>    ARM: EXYNOS: Cleanup "mach-exynos/common.h" file
+>>    ARM: EXYNOS: Remove file path from comment section
+>>    ARM: EXYNOS: Refactored code for using PMU address via DT
+>>    ARM: EXYNOS: Move "mach/map.h" inclusion from regs-pmu.h to platsmp.c
+>>    ARM: EXYNOS: Add device tree based initialization support for PMU.
+>>
+>> Young-Gun Jang (4):
+>>    ARM: EXYNOS: Move SYSREG definition into sys-reg specific file.
+>>    ARM: EXYNOS: Remove regs-pmu.h header dependency from pm_domain
+>>    ARM: EXYNOS: Add support for mapping PMU base address via DT
+>>    ARM: EXYNOS: Remove "linux/bug.h" from pmu.c
+>>
+>>   arch/arm/mach-exynos/Kconfig               |    2 +
+>>   arch/arm/mach-exynos/common.h              |   13 +-
+>>   arch/arm/mach-exynos/cpuidle.c             |   37 +-
+>>   arch/arm/mach-exynos/exynos.c              |  104 +++++-
+>>   arch/arm/mach-exynos/headsmp.S             |    2 -
+>>   arch/arm/mach-exynos/hotplug.c             |    7 +-
+>>   arch/arm/mach-exynos/include/mach/map.h    |    3 -
+>>   arch/arm/mach-exynos/include/mach/memory.h |    3 +-
+>>   arch/arm/mach-exynos/platsmp.c             |   17 +-
+>>   arch/arm/mach-exynos/pm.c                  |   61 ++--
+>>   arch/arm/mach-exynos/pm_domains.c          |    2 +-
+>>   arch/arm/mach-exynos/pmu.c                 |  191 ++++++++---
+>>   arch/arm/mach-exynos/regs-pmu.h            |  512 ++++++++++++++--------------
+>>   arch/arm/mach-exynos/regs-sys.h            |   22 ++
+>>   14 files changed, 585 insertions(+), 391 deletions(-)
+>>   create mode 100644 arch/arm/mach-exynos/regs-sys.h
+>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
