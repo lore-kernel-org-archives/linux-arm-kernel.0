@@ -1,23 +1,41 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sat, 26 Apr 2014 04:25:31 -0700
-Subject: [PATCH] ARM: KVM: disable KVM in Kconfig on big-endian systems
-In-Reply-To: <535A593C.6020408@arm.com>
-References: <1398422764-29351-1-git-send-email-will.deacon@arm.com>
- <535A593C.6020408@arm.com>
-Message-ID: <20140426112531.GB8221@lvm>
+From: stratosk@semaphore.gr (Stratos Karafotis)
+Date: Sat, 26 Apr 2014 14:35:37 +0300
+Subject: [PATCH v5 2/8] cpufreq: Use cpufreq_for_each_* macros for
+ frequency table iteration
+In-Reply-To: <CA+V-a8sg9sBi5mf9KoFWrCJjw6WN+tGrb=bgJwfV3VDZ2DGYig@mail.gmail.com>
+References: <535AC26A.1000006@semaphore.gr>
+ <CA+V-a8sg9sBi5mf9KoFWrCJjw6WN+tGrb=bgJwfV3VDZ2DGYig@mail.gmail.com>
+Message-ID: <535B9A09.9060902@semaphore.gr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 25, 2014 at 01:46:52PM +0100, Marc Zyngier wrote:
-> On 25/04/14 11:46, Will Deacon wrote:
-> > KVM currently crashes and burns on big-endian hosts, so don't allow it
-> > to be selected until we've got that fixed.
-> > 
-> > Cc: Marc Zyngier <marc.zyngier@arm.com>
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> 
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
-Thanks, applied to kvmarm/master.
+Hi Prabhakar,
 
--Christoffer
+On 26/04/2014 12:57 ??, Prabhakar Lad wrote:
+> Hi Stratos,
+> 
+> Thanks for the patch,
+> 
+> On Sat, Apr 26, 2014 at 1:45 AM, Stratos Karafotis
+> <stratosk@semaphore.gr> wrote:
+>> The cpufreq core now supports the cpufreq_for_each_entry and
+>> cpufreq_for_each_valid_entry macros helpers for iteration over the
+>> cpufreq_frequency_table, so use them.
+>>
+>> It should have no functional changes.
+>>
+>> Signed-off-by: Stratos Karafotis <stratosk@semaphore.gr>
+> 
+> For patches 1 & 2:  Acked-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+> 
+> and for patch 3: Acked-and-tested-by: Lad, Prabhakar
+> <prabhakar.csengg@gmail.com>
+> 
+> Thanks,
+> --Prabhakar lad
+> 
+
+Thank you very much!
+
+
+Stratos Karafotis
