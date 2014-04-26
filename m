@@ -1,220 +1,70 @@
-From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Fri, 25 Apr 2014 23:34:56 -0700
-Subject: [PATCH v5] ARM: uprobes need icache flush after xol write
-In-Reply-To: <1398494096-11311-1-git-send-email-victor.kamensky@linaro.org>
-References: <1398494096-11311-1-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <1398494096-11311-2-git-send-email-victor.kamensky@linaro.org>
+From: javi.merino@arm.com (Javi Merino)
+Date: Sat, 26 Apr 2014 09:13:40 +0100
+Subject: [PATCH] ARM: dts: Remove vmmc-supply for mmc@12220000 on
+ arndale-octa board
+In-Reply-To: <535AC717.40805@gmail.com>
+References: <1398456672-3936-1-git-send-email-javi.merino@arm.com>
+ <535AC29E.8010905@gmail.com>
+ <20140425203051.GD3027@e102654-lin.cambridge.arm.com>
+ <535AC717.40805@gmail.com>
+Message-ID: <20140425204135.GF3027@e102654-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After instruction write into xol area, on ARM V7
-architecture code need to flush dcache and icache to sync
-them up for given set of addresses. Having just
-'flush_dcache_page(page)' call is not enough - it is
-possible to have stale instruction sitting in icache
-for given xol area slot address.
+On Fri, Apr 25, 2014 at 09:35:35PM +0100, Tomasz Figa wrote:
+> On 25.04.2014 22:30, Javi Merino wrote:
+> > On Fri, Apr 25, 2014 at 09:16:30PM +0100, Tomasz Figa wrote:
+> >> On 25.04.2014 22:11, Javi Merino wrote:
+> >>> d726ca2d3316 (ARM: dts: Add vmmc-supply to MMC on arndale-octa board)
+> >>> added the vmmc-supply to nodes mmc at 12200000 and mmc at 12220000 of the
+> >>> DT.  However, this makes the kernel fail to boot on the arndale-octa
+> >>> spews:
+> >>>
+> >>> [    5.060000] dwmmc_exynos 12200000.mmc: num-slots property not found, assuming 1 slot is available
+> >>> [    5.065000] platform 12200000.mmc: Driver dwmmc_exynos requests probe deferral
+> >>> [    5.075000] dwmmc_exynos 12220000.mmc: num-slots property not found, assuming 1 slot is available
+> >>> [    5.085000] platform 12220000.mmc: Driver dwmmc_exynos requests probe deferral
+> >>>
+> >>> And eventually hangs.  Without the vmmc-supply property in the
+> >>> mmc at 12220000 node, the kernel boots again.
+> >>>
+> >>> Signed-off-by: Javi Merino <javi.merino@arm.com>
+> >>> ---
+> >>>
+> >>> Hi,
+> >>>
+> >>> Note that I don't know *why* removing the property works, all I know
+> >>> is that 3.15-rc2 fails to boot on my Arndale Octa unless I apply this
+> >>> patch.
+> >>
+> >> Are you sure you have the required PMIC driver enabled in your kernel
+> >> config?
+> >
+> > I configured the kernel using exynos_defconfig and that gives me:
+> >
+> > # CONFIG_PMIC_ADP5520 is not set
+> > # CONFIG_PMIC_DA903X is not set
+> >
+> > Should I be using other defconfig for this board?  exynos_defconfig
+> > used to work in 3.14.  Cheers,
+> 
+> Well, unfortunately exynos_defconfig is known to be far from being 
+> reasonable. Right now it should be considered just as a base to 
+> configure the kernel for Exynos SoCs. Most of board specific options 
+> (and many of SoC-wide ones) need to be selected manually.
+> 
+> Anyway, with the number of Exynos boards supported in mainline, I don't 
+> think we will be ever going to enable all options for all the supported 
+> boards by default in defconfig, especially considering the fact that we 
+> will be moving to generic multi_v7_defconfig and likely dropping 
+> exynos_defconfig completely.
+> 
+> As for now, I believe you should just make sure yourself that any 
+> options relevant to your board are enabled.
 
-Introduce arch_uprobe_ixol_copy weak function
-that by default calls uprobes copy_to_page function and
-than flush_dcache_page function and on ARM define new one
-that handles xol slot copy in ARM specific way
+Great.  And I assume that there isn't a list of those options in the
+web.  So how do I know what options are relevant to my board?  By
+sending emails to linux-samsung-soc whenever it fails to boot?
 
-flush_uprobe_xol_access function shares/reuses implementation
-with/of flush_ptrace_access function and takes care of writing
-instruction to user land address space on given variety of
-different cache types on ARM CPUs. Because
-flush_uprobe_xol_access does not have vma around
-flush_ptrace_access was split into two parts. First that
-retrieves set of condition from vma and common that receives
-those conditions as flags.
-
-Note ARM cache flush function need kernel address
-through which instruction write happened, so instead
-of using uprobes copy_to_page function changed
-code to explicitly map page and do memcpy.
-
-Note arch_uprobe_copy_ixol function, in similar way as
-copy_to_user_page function, has preempt_disable/preempt_enable.
-
-Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
----
- arch/arm/include/asm/cacheflush.h |  2 ++
- arch/arm/kernel/uprobes.c         | 20 ++++++++++++++++++++
- arch/arm/mm/flush.c               | 33 ++++++++++++++++++++++++++++-----
- include/linux/uprobes.h           |  3 +++
- kernel/events/uprobes.c           | 25 +++++++++++++++++--------
- 5 files changed, 70 insertions(+), 13 deletions(-)
-
-diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
-index 8b8b616..e02712a 100644
---- a/arch/arm/include/asm/cacheflush.h
-+++ b/arch/arm/include/asm/cacheflush.h
-@@ -487,4 +487,6 @@ int set_memory_rw(unsigned long addr, int numpages);
- int set_memory_x(unsigned long addr, int numpages);
- int set_memory_nx(unsigned long addr, int numpages);
- 
-+void flush_uprobe_xol_access(struct page *page, unsigned long uaddr,
-+			     void *kaddr, unsigned long len);
- #endif
-diff --git a/arch/arm/kernel/uprobes.c b/arch/arm/kernel/uprobes.c
-index f9bacee..56adf9c 100644
---- a/arch/arm/kernel/uprobes.c
-+++ b/arch/arm/kernel/uprobes.c
-@@ -113,6 +113,26 @@ int arch_uprobe_analyze_insn(struct arch_uprobe *auprobe, struct mm_struct *mm,
- 	return 0;
- }
- 
-+void arch_uprobe_copy_ixol(struct page *page, unsigned long vaddr,
-+			   void *src, unsigned long len)
-+{
-+	void *xol_page_kaddr = kmap_atomic(page);
-+	void *dst = xol_page_kaddr + (vaddr & ~PAGE_MASK);
-+
-+	preempt_disable();
-+
-+	/* Initialize the slot */
-+	memcpy(dst, src, len);
-+
-+	/* flush caches (dcache/icache) */
-+	flush_uprobe_xol_access(page, vaddr, dst, len);
-+
-+	preempt_enable();
-+
-+	kunmap_atomic(xol_page_kaddr);
-+}
-+
-+
- int arch_uprobe_pre_xol(struct arch_uprobe *auprobe, struct pt_regs *regs)
- {
- 	struct uprobe_task *utask = current->utask;
-diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
-index 3387e60..43d54f5 100644
---- a/arch/arm/mm/flush.c
-+++ b/arch/arm/mm/flush.c
-@@ -104,17 +104,20 @@ void flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr, unsig
- #define flush_icache_alias(pfn,vaddr,len)	do { } while (0)
- #endif
- 
-+#define FLAG_PA_IS_EXEC 1
-+#define FLAG_PA_CORE_IN_MM 2
-+
- static void flush_ptrace_access_other(void *args)
- {
- 	__flush_icache_all();
- }
- 
--static
--void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
--			 unsigned long uaddr, void *kaddr, unsigned long len)
-+static inline
-+void __flush_ptrace_access(struct page *page, unsigned long uaddr, void *kaddr,
-+			   unsigned long len, unsigned int flags)
- {
- 	if (cache_is_vivt()) {
--		if (cpumask_test_cpu(smp_processor_id(), mm_cpumask(vma->vm_mm))) {
-+		if (flags & FLAG_PA_CORE_IN_MM) {
- 			unsigned long addr = (unsigned long)kaddr;
- 			__cpuc_coherent_kern_range(addr, addr + len);
- 		}
-@@ -128,7 +131,7 @@ void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
- 	}
- 
- 	/* VIPT non-aliasing D-cache */
--	if (vma->vm_flags & VM_EXEC) {
-+	if (flags & FLAG_PA_IS_EXEC) {
- 		unsigned long addr = (unsigned long)kaddr;
- 		if (icache_is_vipt_aliasing())
- 			flush_icache_alias(page_to_pfn(page), uaddr, len);
-@@ -140,6 +143,26 @@ void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
- 	}
- }
- 
-+static
-+void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
-+			 unsigned long uaddr, void *kaddr, unsigned long len)
-+{
-+	unsigned int flags = 0;
-+	if (cpumask_test_cpu(smp_processor_id(), mm_cpumask(vma->vm_mm)))
-+		flags |= FLAG_PA_CORE_IN_MM;
-+	if (vma->vm_flags & VM_EXEC)
-+		flags |= FLAG_PA_IS_EXEC;
-+	__flush_ptrace_access(page, uaddr, kaddr, len, flags);
-+}
-+
-+void flush_uprobe_xol_access(struct page *page, unsigned long uaddr,
-+			     void *kaddr, unsigned long len)
-+{
-+	unsigned int flags = FLAG_PA_CORE_IN_MM|FLAG_PA_IS_EXEC;
-+
-+	__flush_ptrace_access(page, uaddr, kaddr, len, flags);
-+}
-+
- /*
-  * Copy user data from/to a page which is mapped into a different
-  * processes address space.  Really, we want to allow our "user
-diff --git a/include/linux/uprobes.h b/include/linux/uprobes.h
-index edff2b9..c52f827 100644
---- a/include/linux/uprobes.h
-+++ b/include/linux/uprobes.h
-@@ -32,6 +32,7 @@ struct vm_area_struct;
- struct mm_struct;
- struct inode;
- struct notifier_block;
-+struct page;
- 
- #define UPROBE_HANDLER_REMOVE		1
- #define UPROBE_HANDLER_MASK		1
-@@ -127,6 +128,8 @@ extern int  arch_uprobe_exception_notify(struct notifier_block *self, unsigned l
- extern void arch_uprobe_abort_xol(struct arch_uprobe *aup, struct pt_regs *regs);
- extern unsigned long arch_uretprobe_hijack_return_addr(unsigned long trampoline_vaddr, struct pt_regs *regs);
- extern bool __weak arch_uprobe_ignore(struct arch_uprobe *aup, struct pt_regs *regs);
-+extern void __weak arch_uprobe_copy_ixol(struct page *page, unsigned long vaddr,
-+					 void *src, unsigned long len);
- #else /* !CONFIG_UPROBES */
- struct uprobes_state {
- };
-diff --git a/kernel/events/uprobes.c b/kernel/events/uprobes.c
-index 04709b6..4968213 100644
---- a/kernel/events/uprobes.c
-+++ b/kernel/events/uprobes.c
-@@ -1296,14 +1296,8 @@ static unsigned long xol_get_insn_slot(struct uprobe *uprobe)
- 	if (unlikely(!xol_vaddr))
- 		return 0;
- 
--	/* Initialize the slot */
--	copy_to_page(area->page, xol_vaddr,
--			&uprobe->arch.ixol, sizeof(uprobe->arch.ixol));
--	/*
--	 * We probably need flush_icache_user_range() but it needs vma.
--	 * This should work on supported architectures too.
--	 */
--	flush_dcache_page(area->page);
-+	arch_uprobe_copy_ixol(area->page, xol_vaddr,
-+			      &uprobe->arch.ixol, sizeof(uprobe->arch.ixol));
- 
- 	return xol_vaddr;
- }
-@@ -1346,6 +1340,21 @@ static void xol_free_insn_slot(struct task_struct *tsk)
- 	}
- }
- 
-+void __weak arch_uprobe_copy_ixol(struct page *page, unsigned long vaddr,
-+				  void *src, unsigned long len)
-+{
-+	/* Initialize the slot */
-+	copy_to_page(page, vaddr, src, len);
-+
-+	/*
-+	 * We probably need flush_icache_user_range() but it needs vma.
-+	 * This should work on most of architectures by default. If
-+	 * architecture needs to do something different it can define
-+	 * its own version of the function.
-+	 */
-+	flush_dcache_page(page);
-+}
-+
- /**
-  * uprobe_get_swbp_addr - compute address of swbp given post-swbp regs
-  * @regs: Reflects the saved state of the task after it has hit a breakpoint
--- 
-1.8.1.4
+Cheers,
+Javi
