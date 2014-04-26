@@ -1,83 +1,59 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sat, 26 Apr 2014 21:34:12 +0200
-Subject: [PATCH RESEND 0/3] Orion irqchip and Kirkwood SDIO
-Message-ID: <1398540855-27367-1-git-send-email-sebastian.hesselbarth@gmail.com>
+From: pavel@denx.de (Pavel Machek)
+Date: Sat, 26 Apr 2014 22:31:31 +0200
+Subject: can problems on socfpga [was Re: [PATCH v2 4/6] ARM: socfpga:
+ dts: add can0+1]
+In-Reply-To: <20140426093646.GE8730@amd.pavel.ucw.cz>
+References: <1396422700-3962-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1396422700-3962-4-git-send-email-s.trumtrar@pengutronix.de>
+ <20140404102815.GA9242@amd.pavel.ucw.cz>
+ <20140425195319.GA3677@amd.pavel.ucw.cz>
+ <1398457446.26387.0.camel@linux-builds1>
+ <1398461518.3587.11.camel@dinh-ubuntu>
+ <20140426093646.GE8730@amd.pavel.ucw.cz>
+Message-ID: <20140426203131.GA21832@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guys,
+On Sat 2014-04-26 11:36:46, Pavel Machek wrote:
+> Hi!
+> 
+> > To get this working well, I had to install a few of the patches that
+> > Benedict Spranger submitted ([PATCH 05/16] c_can: use 32 bit access for
+> > D_CAN) on 9/9/2013.
+> > 
+> > I have the patches on our rocketboard branch
+> > (rocketboards.org/gitweb/?p=linux-socfpga-git;a=summary)
+> > 
+> > I planned to upstream these changes but there have been some major
+> > changes to CAN recently that may require some refactoring.
+> 
+> I ported those changes to 3.15-rc2 (but can't test them at the
+> moment).
 
-we somehow forgot this patch set, which was aimed for v3.12/v3.13
-and first sent and acked in November 2013 [1]. Now this is rebase on
-to v3.15-rc1 and should be taken for v3.16.
+Ok, it seems it is possible to test CAN without actual can hardware
+using loopback:
 
-In contrast to the original patch set, I reordered the individual
-patches by subsystem and made some cosmetic but no functional changes.
+ip link set can0 up type can bitrate 125000 loopback on
+ifconfig can0 up
+candump can0 &
+cansend can0 "123#DEADBEEF"
 
->From the original patch set:
+Moreover, it seems that previous two patches do the trick. Packets are
+now echoed as expected. (Ok, small question is "why twice", but I
+guess that's just CAN...?)
 
-This patch set tries to deal with a minor irq issue seen on Marvell
-Kirkwood SoCs with irqchip/irq-orion and mvsdio drivers. In contrast
-to non-DT irq handling, irqchip driver does handle irqs a little bit
-different. First of all, it reads irq cause register once and works
-through all bits set while non-DT irq handling read irq cause and
-handled only one irq. Second, irqchip reverses irq priorities by
-using ffs() instead of fls().
-This now, seems to trigger a minor ip design issue in sdio peripheral
-where sdio irq can occur upstream while sdio interrupts are all
-disabled in the ip registers. This extra, unexpected irq does neither
-harm correct function of HW nor SW driver but triggers a warning in
-mvsdio irq handler.
+root at sockit:~# ip link set can0 up type can bitrate 125000 loopback on
+c_can_platform ffc00000.d_can can0: setting BTR=1c31 BRPE=0000
+root at sockit:~# ifconfig can0 up
+root at sockit:~# candump can0 &
+root at sockit:~# cansend can0 "123#DEADBEEF"
+  can0  123   [4]  DE AD BE EF
+  can0  123   [4]  DE AD BE EF
+root at sockit:~# 
 
-I have tried to debug this and can say that the sequence of irq
-related events is:
-(a) sdio irq is set in upstream irq
-(b) generic-chip handler masks sdio irq
-(c) sdio irq handler deals with it,
-    acks and disables all peripheral irq registers
-(d) sdio irq cause is cleared
-(e) generic-chip handler unmasks sdio irq
-(f) sdio irq is set in upstream irq and cleared little later
-(g) sdio irq handler is upset about being called with no irq to handle
+Best regards,
+								Pavel
 
-This patch set is actually three independent patches in one as mvsdio
-irq workaround just motivates irqchip handling changes. The third just
-silences a noisy mvsdio dev_notice down to dev_dbg. I have chosen to
-keep them together anyway. Below is a more detailed description of the
-individual patches.
-
-First patch silences a card detect mechanism related dev_notice to
-dev_dbg to not bother users with that.
-
-Second patch works around the spurious irq issue in mvsdio by bailing
-out of the irq handler early, if peripheral irq registers indicate that
-none should have been fired.
-
-Third patch reverses irq handling priority for irqchip driver to what
-non-DT irq did before by using fls() instead of ffs(). The "read cause
-once, work through all irqs" handling is maintained.
-
-[1] https://lkml.org/lkml/2013/11/15/276
-
-Sebastian Hesselbarth (3):
-  mmc: mvsdio: silence card detect notice
-  mmc: mvsdio: workaround for spurious irqs
-  irqchip: orion: reverse irq handling priority
-
- drivers/irqchip/irq-orion.c |  4 ++--
- drivers/mmc/host/mvsdio.c   | 20 +++++++++++++++++---
- 2 files changed, 19 insertions(+), 5 deletions(-)
-
----
-Cc: Nicolas Pitre <nico@fluxnic.net>
-Cc: Chris Ball <chris@printf.net>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Gregory Clement <gregory.clement@free-electrons.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: linux-mmc at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
 -- 
-1.9.1
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
