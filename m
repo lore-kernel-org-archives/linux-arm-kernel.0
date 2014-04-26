@@ -1,129 +1,76 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Sat, 26 Apr 2014 11:07:14 +0900
-Subject: [PATCH v2 00/10] ARM: Exynos: PMU cleanup and refactoring for
- using DT
-In-Reply-To: <535AE52B.4010104@gmail.com>
-References: <1396425058-4012-1-git-send-email-pankaj.dubey@samsung.com>
- <1398429166-5539-1-git-send-email-pankaj.dubey@samsung.com>
- <535AE52B.4010104@gmail.com>
-Message-ID: <CAGcde9HNa0V+8it-=3xpJisDgWsb1YbC8-Twm5BGFtNJ+uEyDA@mail.gmail.com>
+From: wujianguo@huawei.com (Jianguo Wu)
+Date: Sat, 26 Apr 2014 10:12:40 +0800
+Subject: ARM: mm: Could I change module space size or place modules in
+ vmalloc area?
+In-Reply-To: <20140103004716.GG7383@n2100.arm.linux.org.uk>
+References: <002001cf07a1$fd4bdc10$f7e39430$@lge.com>
+ <20140102101359.GU6589@tarshish> <002e01cf081c$44a11e70$cde35b50$@lge.com>
+ <20140103004716.GG7383@n2100.arm.linux.org.uk>
+Message-ID: <535B1618.5030504@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+On 2014/1/3 8:47, Russell King - ARM Linux wrote:
 
+> On Fri, Jan 03, 2014 at 09:39:31AM +0900, Gioh Kim wrote:
+>> Thank you for reply.
+>>
+>>> -----Original Message-----
+>>> From: Baruch Siach [mailto:baruch at tkos.co.il]
+>>> Sent: Thursday, January 02, 2014 7:14 PM
+>>> To: Gioh Kim
+>>> Cc: Russell King; linux-mm at kvack.org; linux-arm-kernel; HyoJun Im
+>>> Subject: Re: ARM: mm: Could I change module space size or place modules in
+>>> vmalloc area?
+>>>
+>>> Hi Gioh,
+>>>
+>>> On Thu, Jan 02, 2014 at 07:04:13PM +0900, Gioh Kim wrote:
+>>>> I run out of module space because I have several big driver modules.
+>>>> I know I can strip the modules to decrease size but I need debug info
+>>> now.
+>>>
+>>> Are you sure you need the debug info in kernel memory? I don't think the
+>>> kernel is actually able to parse DWARF. You can load stripped binaries
+>>> into the kernel, and still use the debug info with whatever tool you have.
+>>
+>> I agree you but driver developers of another team don't agree.
+>> I don't know why but they say they will strip drivers later :-(
+>> So I need to increase modules space size.
+> 
+> ARM can only branch relatively within +/- 32MB.  Hence, with a module
+> space of 16MB, modules can reach up to a maximum 16MB into the direct-
+> mapped kernel image.  As module space increases in size, so that figure
+> decreases.  So, if module space were to be 40MB, the maximum size of the
+> kernel binary would be 8MB.
+> 
 
-On Sat, Apr 26, 2014 at 7:43 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->
-> Hi Pankaj,
->
-> Just a small note - please refrain from sending next versions of series in reply to previous version. With threading applied, it gets hard to notice that a new version was posted, because the first message of the thread is always v1. Also it makes threads unnecessarily long.
->
+Hi Russell ,Arnd or Will,
 
-OK. I will take care in future.
+I encountered the same situation in arm64, I loaded 80+ modules in arm64, and
+run out of module address space(64M). Why the module space is restricted to 64M,
+can it be expanded?  
 
+In commit 257cb2519(arm64: Loadable modules), it mentioned that " Loadable modules
+are loaded 64MB below the kernel image due to branch relocation restrictions",
+"branch relocation restrictions" is a AArch64 instruction set restrictions?
 
->
-> Best regards,
-> Tomasz
->
->
-> On 25.04.2014 14:32, Pankaj Dubey wrote:
->>
->> This patch series, does some minor cleanup and modifies Exynos PMU related
->> code for mapping and initialization of Exynos Power Management Unit (PMU)
->> base address from device tree. This is also preparation for moving PMU
->> related code out of machine folder and moving into a "drivers/mfd", so that
->> ARM64 based SoC can utilize common piece of code. These patches require change
->> in Exynos4210, Exynos4212 and Exynos4412 dtsi files, which has been posted
->> as separate patch series [2]
->>
->> These patches are created on top of Kukjin Kim's for-next (v3.15-rc1 tag)
->> branch.
->>
->> These patches depends on following two patch series:
->> 1) mfd: syscon: Support early initialization
->>     https://lkml.org/lkml/2014/4/8/239
->> 2) Add PMU node for Exynos SoCs
->>     http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg29329.html
->>
->> We have tested these patches on SMDK5250 and Arndale (Exynos5250) boards for
->> System boot and PMU initialization and S2R.
->>
->> For testing on Arndale (Exynos5250) board:
->> Tested-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->>
->> Changes Since v1:
->>   - Rebased on latest for-next of Kukjin Kim's tree.
->>   - Added patch: "Make exynos machine_ops as static".
->>         For making more cleanup in "mach-exynos/common.h"
->>         as suggested by Tomasz Figa.
->>   - Addressed comments of Tomasz Figa for cleaning "mach-exynos/common.h".
->>   - Updated patch: Remove file path from comment section
->>         As suggested by Michel Simek, instead of updating file path
->>         lets remove them from each file under "mach-exynos".
->>         Even though Kukjin pointed out that there is similar patch pending from
->>         Sachin/Tushar but since I could not find I have included this here. If
->>         I have missed something please point to any existing such patch.
->>   - Updated patch: Add support for mapping PMU base address via DT
->>         - Removed __initdata from declaration of "exynos_pmu_base", as it caused
->>         kernel crash as pointed out by Vikas Sajjan.
->>         - Added support for Syscon initialization and getting PMU regmap handle
->>         as suggested by Sylwester. Since current implementation of early
->>         intialization [1] has limitation that "early_syscon_init" requires
->>         DT to be unflattened and system should be able to allocate memory,
->>         we can't use regmap handles for platsmp.c file as "smp_secondary_init"
->>         will be called before DT unflattening. So I have kept both method for
->>         accessing PMU base address. platsmp.c will use ioremmaped address where
->>         as rest other files can use regmap handle.
->>   - Added patch: Remove "linux/bug.h" from pmu.c.
->>   - Updated patch: Refactored code for PMU register mapping via DT
->>         - Modified to use regmap_read/write when using regmap handle.
->>   - Added patch: Move "mach/map.h" inclusion from regs-pmu.h to platsmp.c
->>   - Added patch: Add device tree based initialization support for PMU.
->>         - Convert existing PMU implementation to be a device tree based
->>          before moving it to "drivers/mfd" folder. As suggested by Bartlomiej.
->>         - Dropped making a platform_driver for PMU, as currently PMU binding
->>         has two compatibility strings as "samsung, exynosxxx-pmu", "syscon",
->>         once we enable MFD_SYSCON config option, current "syscon" driver probe
->>         gets called and PMU probe never gets called. So modified PMU
->>         initialization code to scan DT and match against supported compatiblity
->>         string in driver code, and once we get matching node use that for
->>         accessing PMU regmap handle using "syscon_early_regmap_lookup_by_phandle".
->>         If there is any better solution please suggest.
->>
->> Pankaj Dubey (6):
->>    ARM: EXYNOS: Make exynos machine_ops as static
->>    ARM: EXYNOS: Cleanup "mach-exynos/common.h" file
->>    ARM: EXYNOS: Remove file path from comment section
->>    ARM: EXYNOS: Refactored code for using PMU address via DT
->>    ARM: EXYNOS: Move "mach/map.h" inclusion from regs-pmu.h to platsmp.c
->>    ARM: EXYNOS: Add device tree based initialization support for PMU.
->>
->> Young-Gun Jang (4):
->>    ARM: EXYNOS: Move SYSREG definition into sys-reg specific file.
->>    ARM: EXYNOS: Remove regs-pmu.h header dependency from pm_domain
->>    ARM: EXYNOS: Add support for mapping PMU base address via DT
->>    ARM: EXYNOS: Remove "linux/bug.h" from pmu.c
->>
->>   arch/arm/mach-exynos/Kconfig               |    2 +
->>   arch/arm/mach-exynos/common.h              |   13 +-
->>   arch/arm/mach-exynos/cpuidle.c             |   37 +-
->>   arch/arm/mach-exynos/exynos.c              |  104 +++++-
->>   arch/arm/mach-exynos/headsmp.S             |    2 -
->>   arch/arm/mach-exynos/hotplug.c             |    7 +-
->>   arch/arm/mach-exynos/include/mach/map.h    |    3 -
->>   arch/arm/mach-exynos/include/mach/memory.h |    3 +-
->>   arch/arm/mach-exynos/platsmp.c             |   17 +-
->>   arch/arm/mach-exynos/pm.c                  |   61 ++--
->>   arch/arm/mach-exynos/pm_domains.c          |    2 +-
->>   arch/arm/mach-exynos/pmu.c                 |  191 ++++++++---
->>   arch/arm/mach-exynos/regs-pmu.h            |  512 ++++++++++++++--------------
->>   arch/arm/mach-exynos/regs-sys.h            |   22 ++
->>   14 files changed, 585 insertions(+), 391 deletions(-)
->>   create mode 100644 arch/arm/mach-exynos/regs-sys.h
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Thanks,
+Jianguo Wu.
+
+> You want to look at a line similar to this:
+> 
+>       .text : 0xc0008000 - 0xc031eda0   (3164 kB)
+> 
+> Also, note this:
+> 
+>     modules : 0xbf000000 - 0xc0000000   (  16 MB)
+> 
+> If the difference between the lowest module address (0xbf000000) and the
+> highest of .text is greater than 32MB, it's impossible to load modules -
+> they will fail to link.
+> 
+> What is the size of your kernel text? (show us the line(s) like the above.)
+> 
+> Thanks.
+> 
