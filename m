@@ -1,70 +1,29 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 26 Apr 2014 02:25:03 +0200
-Subject: [PATCHv4 4/7] ARM: EXYNOS: Enter a15 lowpower mode for Exynos3250
- based on Cortex-a7
-In-Reply-To: <1398388572-30239-5-git-send-email-cw00.choi@samsung.com>
-References: <1398388572-30239-1-git-send-email-cw00.choi@samsung.com>
- <1398388572-30239-5-git-send-email-cw00.choi@samsung.com>
-Message-ID: <535AFCDF.20503@gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 25 Apr 2014 20:25:18 -0400
+Subject: [PATCHv3 5/5] ARM: configs: add ahci_mvebu to multi_v7_defconfig
+In-Reply-To: <1397574006-5868-6-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1397574006-5868-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1397574006-5868-6-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140426002518.GL28159@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chanwoo,
+Arnd, Olof, Kevin,
 
-On 25.04.2014 03:16, Chanwoo Choi wrote:
-> This patch decide proper lowpower mode of either a15 or a9 according to own ID
-> from Main ID register.
->
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Marc Zynigier <marc.zyngier@arm.com>
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+On Tue, Apr 15, 2014 at 05:00:06PM +0200, Thomas Petazzoni wrote:
+> The Marvell Armada 38x platform needs the ahci_mvebu driver enabled
+> for the AHCI interfaces, so this commit enables the corresponding
+> Kconfig option in multi_v7_defconfig.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > ---
->   arch/arm/mach-exynos/hotplug.c | 19 ++++++++++++-------
->   1 file changed, 12 insertions(+), 7 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
-> index 5eead53..acf3119 100644
-> --- a/arch/arm/mach-exynos/hotplug.c
-> +++ b/arch/arm/mach-exynos/hotplug.c
-> @@ -135,16 +135,21 @@ void __ref exynos_cpu_die(unsigned int cpu)
->   	int primary_part = 0;
->
->   	/*
-> -	 * we're ready for shutdown now, so do it.
-> -	 * Exynos4 is A9 based while Exynos5 is A15; check the CPU part
-> -	 * number by reading the Main ID register and then perform the
-> -	 * appropriate sequence for entering low power.
-> +	 * Prepare the CPU for shutting down. The required sequence of
-> +	 * operations depends on core type. CPUID part number can be used to
-> +	 * determine the right way.
->   	 */
-> -	asm("mrc p15, 0, %0, c0, c0, 0" : "=r"(primary_part) : : "cc");
-> -	if ((primary_part & 0xfff0) == 0xc0f0)
-> +	primary_part = read_cpuid_part_number();
-> +
-> +	switch (primary_part) {
-> +	case ARM_CPU_PART_CORTEX_A7:
-> +	case ARM_CPU_PART_CORTEX_A15:
->   		cpu_enter_lowpower_a15();
-> -	else
-> +		break;
-> +	default:
->   		cpu_enter_lowpower_a9();
-> +		break;
-> +	}
->
->   	platform_do_lowpower(cpu, &spurious);
->
->
+>  arch/arm/configs/multi_v7_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
 
-I have noticed Leela Krishna Amudala's patch [1] that removes this 
-distinction completely and simply uses generic code. Could you check if 
-this works on Exynos3250 as well? If yes, then this patch could be 
-dropped and Leela's one would be enough.
+Conflict-ridden file, please take directly.
 
-[1] 
-http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg29064.html
+Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-Best regards,
-Tomasz
+thx,
+
+Jason.
