@@ -1,36 +1,83 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 26 Apr 2014 20:05:58 +0900
-Subject: [PATCH V5 00/20] ARM: exynos: cpuidle: Move the driver to
- drivers/cpuidle
-In-Reply-To: <535943B2.8030308@samsung.com>
-References: <1397212815-16068-1-git-send-email-daniel.lezcano@linaro.org>
- <534BA3CF.6030701@linaro.org> <535943B2.8030308@samsung.com>
-Message-ID: <0b4201cf613f$80c91750$825b45f0$@samsung.com>
+Date: Sat, 26 Apr 2014 20:19:37 +0900
+Subject: [PATCH] ARM: dts: Remove vmmc-supply for mmc@12220000 on
+ arndale-octa board
+In-Reply-To: <20140425204135.GF3027@e102654-lin.cambridge.arm.com>
+References: <1398456672-3936-1-git-send-email-javi.merino@arm.com>
+ <535AC29E.8010905@gmail.com>
+ <20140425203051.GD3027@e102654-lin.cambridge.arm.com>
+ <535AC717.40805@gmail.com>
+ <20140425204135.GF3027@e102654-lin.cambridge.arm.com>
+Message-ID: <0b5c01cf6141$687f5ea0$397e1be0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa wrote:
+Javi Merino wrote:
 > 
-> On 14.04.2014 11:01, Daniel Lezcano wrote:
+> On Fri, Apr 25, 2014 at 09:35:35PM +0100, Tomasz Figa wrote:
+> > On 25.04.2014 22:30, Javi Merino wrote:
+> > > On Fri, Apr 25, 2014 at 09:16:30PM +0100, Tomasz Figa wrote:
+> > >> On 25.04.2014 22:11, Javi Merino wrote:
+> > >>> d726ca2d3316 (ARM: dts: Add vmmc-supply to MMC on arndale-octa board)
+> > >>> added the vmmc-supply to nodes mmc at 12200000 and mmc at 12220000 of the
+> > >>> DT.  However, this makes the kernel fail to boot on the arndale-octa
+> > >>> spews:
+> > >>>
+> > >>> [    5.060000] dwmmc_exynos 12200000.mmc: num-slots property not
+> found, assuming 1 slot is available
+> > >>> [    5.065000] platform 12200000.mmc: Driver dwmmc_exynos requests
+> probe deferral
+> > >>> [    5.075000] dwmmc_exynos 12220000.mmc: num-slots property not
+> found, assuming 1 slot is available
+> > >>> [    5.085000] platform 12220000.mmc: Driver dwmmc_exynos requests
+> probe deferral
+> > >>>
+> > >>> And eventually hangs.  Without the vmmc-supply property in the
+> > >>> mmc at 12220000 node, the kernel boots again.
+> > >>>
+> > >>> Signed-off-by: Javi Merino <javi.merino@arm.com>
+> > >>> ---
+> > >>>
+> > >>> Hi,
+> > >>>
+> > >>> Note that I don't know *why* removing the property works, all I know
+> > >>> is that 3.15-rc2 fails to boot on my Arndale Octa unless I apply
+> this
+> > >>> patch.
+> > >>
+> > >> Are you sure you have the required PMIC driver enabled in your kernel
+> > >> config?
+> > >
+> > > I configured the kernel using exynos_defconfig and that gives me:
+> > >
+> > > # CONFIG_PMIC_ADP5520 is not set
+> > > # CONFIG_PMIC_DA903X is not set
+> > >
+> > > Should I be using other defconfig for this board?  exynos_defconfig
+> > > used to work in 3.14.  Cheers,
 > >
-> > Hi Kukjin,
+> > Well, unfortunately exynos_defconfig is known to be far from being
+> > reasonable. Right now it should be considered just as a base to
+> > configure the kernel for Exynos SoCs. Most of board specific options
+> > (and many of SoC-wide ones) need to be selected manually.
 > >
-> > I believe I addressed all the comments. Is it possible to take this
-> > patchset for next ?
-> 
-Sure ;-)
+> > Anyway, with the number of Exynos boards supported in mainline, I don't
+> > think we will be ever going to enable all options for all the supported
+> > boards by default in defconfig, especially considering the fact that we
+> > will be moving to generic multi_v7_defconfig and likely dropping
+> > exynos_defconfig completely.
 
-> +1.
-> 
-> Also when applying you might add
-> 
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> 
-> to any patches that don't have it yet.
-> 
-Tomasz, thanks for your review.
+Well, keeping exynos_defconfig would be helpful even if exynos multiplatform is available. Please see the case of omap2plus_defconfig?
 
-I will take this series, "moving exynos-cpuidle into drivers/cpuidle" into samsung tree if Rafael is OK on that.
+> >
+> > As for now, I believe you should just make sure yourself that any
+> > options relevant to your board are enabled.
+> 
+> Great.  And I assume that there isn't a list of those options in the
+> web.  So how do I know what options are relevant to my board?  By
+> sending emails to linux-samsung-soc whenever it fails to boot?
+> 
+I think, we need to enable all of regarding configs for each exynos boards so that exynos_defconfig can cover whenever.
 
 Thanks,
 Kukjin
