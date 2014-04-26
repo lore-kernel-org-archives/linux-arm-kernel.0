@@ -1,61 +1,84 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 26 Apr 2014 11:20:24 +0100
-Subject: [PATCH v2] staging: imx-drm-core: skip components whose parent
- device is disabled
-In-Reply-To: <5096140.xI07lv1NXD@wuerfel>
-References: <1397440946-2303-1-git-send-email-shawn.guo@freescale.com>
- <20140423074451.GE2523@dragon>
- <20140423090014.GE24070@n2100.arm.linux.org.uk> <5096140.xI07lv1NXD@wuerfel>
-Message-ID: <20140426102023.GX26756@n2100.arm.linux.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 26 Apr 2014 19:49:13 +0900
+Subject: [PATCHv4 2/7] ARM: EXYNOS: Support secondary CPU boot of
+ Exynos4212
+In-Reply-To: <535B00E5.4060903@gmail.com>
+References: <1398388572-30239-1-git-send-email-cw00.choi@samsung.com>
+ <1398388572-30239-3-git-send-email-cw00.choi@samsung.com>
+ <535B00E5.4060903@gmail.com>
+Message-ID: <0b3601cf613d$29ae93c0$7d0bbb40$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 24, 2014 at 11:36:42PM +0200, Arnd Bergmann wrote:
-> On Wednesday 23 April 2014 10:00:14 Russell King - ARM Linux wrote:
-> > 
-> > Yes, those ones were trivial to sort out, and as you point out were well
-> > known well before the merge window.  Those aren't the ones I'm actually
-> > talking about - half way through the merge window, some major conflicts
-> > cropped up which caused _me_ to drop arm-soc out of my autobuilder, and
-> > caused Stephen to ignore arm-soc's version of the file(s):
-> > 
-> >    Today's linux-next merge of the arm-soc tree got conflicts in
-> >    arch/arm/boot/dts/qcom-msm8960.dtsi, arch/arm/boot/dts/qcom-msm8974.dtsi,
-> >    arch/arm/mach-omap2/pdata-quirks.c, arch/arm/mach-zynq/Kconfig,
-> >    drivers/watchdog/Kconfig and sound/soc/kirkwood/Kconfig between various
-> >    merge commits from Linus' tree and various merge commits from the arm-soc
-> >    tree.
-> > 
-> >    I used the versions from Linus' tree.
-> > 
+Tomasz Figa wrote:
 > 
-> That was the day after Linus had merged arm-soc and used a different
-> set of resolutions than what I had put into for-next as examples
-> for him to look at.
+> Hi,
 > 
-> The conflicts that Stephen saw were between Linus' resolution and mine,
-> but at that point there were no more unmerged patches in arm-soc, just
-> stale merge changesets.
-> 
-> > What is really interesting is that there are no acks from arm-soc people
-> > for this patch.  If they want me to take it, they can damned well provide
-> > an ack after having their moan at me during the merge window.  And I'm
-> > not talking just about Arnd, but Olof as well.  I'm going to require *both*
-> > to ack any changes to arch/arm/boot/dts in future so that I can be certain
-> > that they are *both* aware of what's going on.
-> 
-> Olof already gave an (informal) Ack. Here is mine as well:
-> 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+Hi,
 
-I'll take it with your ack now, but I'm not adding an ack for Olof given
-the vagueness of his reply in this thread.  To do so would be to invite
-accusations of adding acks where none was intended, and I decided right
-from the beginning of these attributations that they *must* be explicit
-to avoid any possibility of confusion and ambiguity (and I said as much.)
+> On 25.04.2014 03:16, Chanwoo Choi wrote:
+> > From: Kyungmin Park <kyungmin.park@samsung.com>
+> >
+> > This patch fix the offset of CPU boot address and change parameter of
+> smc call
+> > of SMC_CMD_CPU1BOOT command for Exynos4212.
+> >
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> > ---
+> >   arch/arm/mach-exynos/firmware.c | 15 ++++++++++++++-
+> >   1 file changed, 14 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-
+> exynos/firmware.c
+> > index 932129e..aa01c42 100644
+> > --- a/arch/arm/mach-exynos/firmware.c
+> > +++ b/arch/arm/mach-exynos/firmware.c
+> > @@ -18,6 +18,8 @@
+> >
+> >   #include <mach/map.h>
+> >
+> > +#include <plat/cpu.h>
+> > +
+> >   #include "smc.h"
+> >
+> >   static int exynos_do_idle(void)
+> > @@ -28,13 +30,24 @@ static int exynos_do_idle(void)
+> >
+> >   static int exynos_cpu_boot(int cpu)
+> >   {
+> > +	/*
+> > +	 * The second parameter of SMC_CMD_CPU1BOOT command means CPU id.
+> > +	 * But, Exynos4212 has only one secondary CPU so second parameter
+> > +	 * isn't used for informing secure firmware about CPU id.
+> > +	 */
+> > +	if (soc_is_exynos4212())
+> > +		cpu = 0;
+> > +
+> >   	exynos_smc(SMC_CMD_CPU1BOOT, cpu, 0, 0);
+> >   	return 0;
+> >   }
+> >
+> >   static int exynos_set_cpu_boot_addr(int cpu, unsigned long boot_addr)
+> >   {
+> > -	void __iomem *boot_reg = S5P_VA_SYSRAM_NS + 0x1c + 4*cpu;
+> > +	void __iomem *boot_reg = S5P_VA_SYSRAM_NS + 0x1c;
+> > +
+> > +	if (!soc_is_exynos4212())
+> > +		boot_reg += 4*cpu;
+> >
+> >   	__raw_writel(boot_addr, boot_reg);
+> >   	return 0;
+> >
+> 
+> This patch should be applied independently of Exynos3250 support.
+> Kukjin, what do you think?
+> 
+Yes, this should be separated. I will pick this into fixes.
 
-"informal" acks are not acks.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+> Anyway,
+> 
+> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> 
+Thanks,
+Kukjin
