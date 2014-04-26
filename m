@@ -1,135 +1,123 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sun, 27 Apr 2014 00:02:03 +0100
-Subject: [PATCH RFC 4/8] drm: msm: update to use component match support
+Date: Sun, 27 Apr 2014 00:02:08 +0100
+Subject: [PATCH RFC 5/8] imx-drm: update to use component match support
 In-Reply-To: <20140426230025.GZ26756@n2100.arm.linux.org.uk>
 References: <20140426230025.GZ26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WeBbf-0002Gi-DT@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WeBbk-0002Gn-Gw@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update MSM's DRM driver to use the component match support rather than
+Update the imx-drm driver to use the component match support rather than
 add_components.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/gpu/drm/msm/msm_drv.c | 81 ++++++++++++++++++-------------------------
- 1 file changed, 34 insertions(+), 47 deletions(-)
+ drivers/staging/imx-drm/imx-drm-core.c | 57 +++-------------------------------
+ 1 file changed, 4 insertions(+), 53 deletions(-)
 
-diff --git a/drivers/gpu/drm/msm/msm_drv.c b/drivers/gpu/drm/msm/msm_drv.c
-index f9de156b9e65..26be58bd611d 100644
---- a/drivers/gpu/drm/msm/msm_drv.c
-+++ b/drivers/gpu/drm/msm/msm_drv.c
-@@ -865,12 +865,41 @@ static int compare_of(struct device *dev, void *data)
- {
- 	return dev->of_node == data;
+diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
+index 4144a75e5f71..84cd915bba44 100644
+--- a/drivers/staging/imx-drm/imx-drm-core.c
++++ b/drivers/staging/imx-drm/imx-drm-core.c
+@@ -577,22 +577,6 @@ static int compare_of(struct device *dev, void *data)
+ 	return dev->of_node == np;
  }
-+#else
-+static int compare_dev(struct device *dev, void *data)
-+{
-+	return dev == data;
-+}
-+#endif
-+
-+static int msm_drm_bind(struct device *dev)
-+{
-+	return drm_platform_init(&msm_driver, to_platform_device(dev));
-+}
-+
-+static void msm_drm_unbind(struct device *dev)
-+{
-+	drm_put_dev(platform_get_drvdata(to_platform_device(dev)));
-+}
-+
-+static const struct component_master_ops msm_drm_ops = {
-+	.bind = msm_drm_bind,
-+	.unbind = msm_drm_unbind,
-+};
-+
-+/*
-+ * Platform driver:
-+ */
  
--static int msm_drm_add_components(struct device *master, struct master *m)
-+static int msm_pdev_probe(struct platform_device *pdev)
- {
-+	struct component_match *match = NULL;
-+#ifdef CONFIG_OF
-+	/* NOTE: the CONFIG_OF case duplicates the same code as exynos or imx
-+	 * (or probably any other).. so probably some room for some helpers
-+	 */
- 	struct device_node *np = master->of_node;
- 	unsigned i;
--	int ret;
- 
- 	for (i = 0; ; i++) {
- 		struct device_node *node;
-@@ -879,22 +908,9 @@ static int msm_drm_add_components(struct device *master, struct master *m)
- 		if (!node)
- 			break;
- 
--		ret = component_master_add_child(m, compare_of, node);
--		of_node_put(node);
+-static LIST_HEAD(imx_drm_components);
 -
+-static int imx_drm_add_components(struct device *master, struct master *m)
+-{
+-	struct imx_drm_component *component;
+-	int ret;
+-
+-	list_for_each_entry(component, &imx_drm_components, list) {
+-		ret = component_master_add_child(m, compare_of,
+-						 component->of_node);
 -		if (ret)
 -			return ret;
-+		component_match_add(&pdev->dev, &match, compare_of, node);
- 	}
+-	}
 -	return 0;
 -}
- #else
--static int compare_dev(struct device *dev, void *data)
--{
--	return dev == data;
--}
 -
--static int msm_drm_add_components(struct device *master, struct master *m)
--{
- 	/* For non-DT case, it kinda sucks.  We don't actually have a way
- 	 * to know whether or not we are waiting for certain devices (or if
- 	 * they are simply not present).  But for non-DT we only need to
-@@ -918,41 +934,12 @@ static int msm_drm_add_components(struct device *master, struct master *m)
- 			return -EPROBE_DEFER;
- 		}
- 
--		ret = component_master_add_child(m, compare_dev, dev);
--		if (ret) {
--			DBG("could not add child: %d", ret);
--			return ret;
--		}
-+		component_match_add(&pdev->dev, &match, compare_dev, dev);
- 	}
--
--	return 0;
--}
- #endif
- 
--static int msm_drm_bind(struct device *dev)
--{
--	return drm_platform_init(&msm_driver, to_platform_device(dev));
--}
--
--static void msm_drm_unbind(struct device *dev)
--{
--	drm_put_dev(platform_get_drvdata(to_platform_device(dev)));
--}
--
--static const struct component_master_ops msm_drm_ops = {
--		.add_components = msm_drm_add_components,
--		.bind = msm_drm_bind,
--		.unbind = msm_drm_unbind,
--};
--
--/*
-- * Platform driver:
-- */
--
--static int msm_pdev_probe(struct platform_device *pdev)
--{
- 	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
--	return component_master_add(&pdev->dev, &msm_drm_ops);
-+	return component_master_add_with_match(&pdev->dev, &msm_drm_ops, match);
+ static int imx_drm_bind(struct device *dev)
+ {
+ 	return drm_platform_init(&imx_drm_driver, to_platform_device(dev));
+@@ -604,43 +588,14 @@ static void imx_drm_unbind(struct device *dev)
  }
  
- static int msm_pdev_remove(struct platform_device *pdev)
+ static const struct component_master_ops imx_drm_ops = {
+-	.add_components = imx_drm_add_components,
+ 	.bind = imx_drm_bind,
+ 	.unbind = imx_drm_unbind,
+ };
+ 
+-static struct imx_drm_component *imx_drm_find_component(struct device *dev,
+-		struct device_node *node)
+-{
+-	struct imx_drm_component *component;
+-
+-	list_for_each_entry(component, &imx_drm_components, list)
+-		if (component->of_node == node)
+-			return component;
+-
+-	return NULL;
+-}
+-
+-static int imx_drm_add_component(struct device *dev, struct device_node *node)
+-{
+-	struct imx_drm_component *component;
+-
+-	if (imx_drm_find_component(dev, node))
+-		return 0;
+-
+-	component = devm_kzalloc(dev, sizeof(*component), GFP_KERNEL);
+-	if (!component)
+-		return -ENOMEM;
+-
+-	component->of_node = node;
+-	list_add_tail(&component->list, &imx_drm_components);
+-
+-	return 0;
+-}
+-
+ static int imx_drm_platform_probe(struct platform_device *pdev)
+ {
+ 	struct device_node *ep, *port, *remote;
++	struct component_match *match = NULL;
+ 	int ret;
+ 	int i;
+ 
+@@ -654,9 +609,7 @@ static int imx_drm_platform_probe(struct platform_device *pdev)
+ 		if (!port)
+ 			break;
+ 
+-		ret = imx_drm_add_component(&pdev->dev, port);
+-		if (ret < 0)
+-			return ret;
++		component_match_add(&pdev->dev, &match, compare_of, port);
+ 	}
+ 
+ 	if (i == 0) {
+@@ -677,10 +630,8 @@ static int imx_drm_platform_probe(struct platform_device *pdev)
+ 				continue;
+ 			}
+ 
+-			ret = imx_drm_add_component(&pdev->dev, remote);
++			component_match_add(&pdev->dev, &match, compare_of, remote);
+ 			of_node_put(remote);
+-			if (ret < 0)
+-				return ret;
+ 		}
+ 		of_node_put(port);
+ 	}
+@@ -689,7 +640,7 @@ static int imx_drm_platform_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		return ret;
+ 
+-	return component_master_add(&pdev->dev, &imx_drm_ops);
++	return component_master_add_with_match(&pdev->dev, &imx_drm_ops, match);
+ }
+ 
+ static int imx_drm_platform_remove(struct platform_device *pdev)
 -- 
 1.8.3.1
