@@ -1,29 +1,73 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 26 Apr 2014 02:40:39 +0200
-Subject: [PATCHv4 1/7] ARM: EXYNOS: Add Exynos3250 SoC ID
-In-Reply-To: <1398388572-30239-2-git-send-email-cw00.choi@samsung.com>
+Date: Sat, 26 Apr 2014 02:42:13 +0200
+Subject: [PATCHv4 2/7] ARM: EXYNOS: Support secondary CPU boot of
+ Exynos4212
+In-Reply-To: <1398388572-30239-3-git-send-email-cw00.choi@samsung.com>
 References: <1398388572-30239-1-git-send-email-cw00.choi@samsung.com>
- <1398388572-30239-2-git-send-email-cw00.choi@samsung.com>
-Message-ID: <535B0087.3000908@gmail.com>
+ <1398388572-30239-3-git-send-email-cw00.choi@samsung.com>
+Message-ID: <535B00E5.4060903@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chanwoo,
+Hi,
 
 On 25.04.2014 03:16, Chanwoo Choi wrote:
-> This patch add Exynos3250's SoC ID. Exynos 3250 is System-On-Chip(SoC) that
-> is based on the 32-bit RISC processor for Smartphone. Exynos3250 uses Cortex-A7
-> dual cores and has a target speed of 1.0GHz.
+> From: Kyungmin Park <kyungmin.park@samsung.com>
 >
+> This patch fix the offset of CPU boot address and change parameter of smc call
+> of SMC_CMD_CPU1BOOT command for Exynos4212.
+>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
->   arch/arm/mach-exynos/Kconfig             | 22 ++++++++++++++++++++++
->   arch/arm/mach-exynos/exynos.c            |  2 ++
->   arch/arm/plat-samsung/include/plat/cpu.h | 10 ++++++++++
->   3 files changed, 34 insertions(+)
+>   arch/arm/mach-exynos/firmware.c | 15 ++++++++++++++-
+>   1 file changed, 14 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
+> index 932129e..aa01c42 100644
+> --- a/arch/arm/mach-exynos/firmware.c
+> +++ b/arch/arm/mach-exynos/firmware.c
+> @@ -18,6 +18,8 @@
+>
+>   #include <mach/map.h>
+>
+> +#include <plat/cpu.h>
+> +
+>   #include "smc.h"
+>
+>   static int exynos_do_idle(void)
+> @@ -28,13 +30,24 @@ static int exynos_do_idle(void)
+>
+>   static int exynos_cpu_boot(int cpu)
+>   {
+> +	/*
+> +	 * The second parameter of SMC_CMD_CPU1BOOT command means CPU id.
+> +	 * But, Exynos4212 has only one secondary CPU so second parameter
+> +	 * isn't used for informing secure firmware about CPU id.
+> +	 */
+> +	if (soc_is_exynos4212())
+> +		cpu = 0;
+> +
+>   	exynos_smc(SMC_CMD_CPU1BOOT, cpu, 0, 0);
+>   	return 0;
+>   }
+>
+>   static int exynos_set_cpu_boot_addr(int cpu, unsigned long boot_addr)
+>   {
+> -	void __iomem *boot_reg = S5P_VA_SYSRAM_NS + 0x1c + 4*cpu;
+> +	void __iomem *boot_reg = S5P_VA_SYSRAM_NS + 0x1c;
+> +
+> +	if (!soc_is_exynos4212())
+> +		boot_reg += 4*cpu;
+>
+>   	__raw_writel(boot_addr, boot_reg);
+>   	return 0;
+>
 
-You can add my
+This patch should be applied independently of Exynos3250 support. 
+Kukjin, what do you think?
+
+Anyway,
 
 Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 
