@@ -1,300 +1,72 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sun, 27 Apr 2014 00:02:23 +0100
-Subject: [PATCH RFC 8/8] component: track components via array rather than list
-In-Reply-To: <20140426230025.GZ26756@n2100.arm.linux.org.uk>
-References: <20140426230025.GZ26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WeBbz-0002H2-QT@rmk-PC.arm.linux.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 26 Apr 2014 16:33:01 -0400
+Subject: [PATCH v2 22/38] ARM: orion: switch to a per-platform
+ handle_irq() function
+In-Reply-To: <535BD3F1.8000706@gmail.com>
+References: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1398202002-28530-23-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140426145457.GV28159@titan.lakedaemon.net> <535BD3F1.8000706@gmail.com>
+Message-ID: <B3DF11DE-D10F-41EB-BE40-2C26DA3BF719@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we now have an array which defines each component, maintain the
-components to be bound in the array rather than a separate list.  We
-also need duplicate tracking so we can eliminate multiple bind calls
-for the same component: we preserve the list-based component order in
-that the first match which adds the component determines its position.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/base/component.c | 140 +++++++++++++++++++++--------------------------
- 1 file changed, 62 insertions(+), 78 deletions(-)
 
-diff --git a/drivers/base/component.c b/drivers/base/component.c
-index 34e88e23d395..5ca32c60147a 100644
---- a/drivers/base/component.c
-+++ b/drivers/base/component.c
-@@ -18,18 +18,21 @@
- #include <linux/mutex.h>
- #include <linux/slab.h>
- 
-+struct component;
-+
- struct component_match {
- 	size_t alloc;
- 	size_t num;
- 	struct {
- 		void *data;
- 		int (*fn)(struct device *, void *);
-+		struct component *component;
-+		bool duplicate;
- 	} compare[0];
- };
- 
- struct master {
- 	struct list_head node;
--	struct list_head components;
- 	bool bound;
- 
- 	const struct component_master_ops *ops;
-@@ -39,7 +42,6 @@ struct master {
- 
- struct component {
- 	struct list_head node;
--	struct list_head master_node;
- 	struct master *master;
- 	bool bound;
- 
-@@ -63,46 +65,20 @@ static struct master *__master_find(struct device *dev,
- 	return NULL;
- }
- 
--/* Attach an unattached component to a master. */
--static void component_attach_master(struct master *master, struct component *c)
--{
--	c->master = master;
--
--	list_add_tail(&c->master_node, &master->components);
--}
--
--/* Detach a component from a master. */
--static void component_detach_master(struct master *master, struct component *c)
--{
--	list_del(&c->master_node);
--
--	c->master = NULL;
--}
--
--/*
-- * Add a component to a master, finding the component via the compare
-- * function and compare data.  This is safe to call for duplicate matches
-- * and will not result in the same component being added multiple times.
-- */
--static int component_master_add_child(struct master *master,
-+static struct component *find_component(struct master *master,
- 	int (*compare)(struct device *, void *), void *compare_data)
- {
- 	struct component *c;
--	int ret = -ENXIO;
- 
- 	list_for_each_entry(c, &component_list, node) {
- 		if (c->master && c->master != master)
- 			continue;
- 
--		if (compare(c->dev, compare_data)) {
--			if (!c->master)
--				component_attach_master(master, c);
--			ret = 0;
--			break;
--		}
-+		if (compare(c->dev, compare_data))
-+			return c;
- 	}
- 
--	return ret;
-+	return NULL;
- }
- 
- static int find_components(struct master *master)
-@@ -116,26 +92,35 @@ static int find_components(struct master *master)
- 	 * any components which are found to this master.
- 	 */
- 	for (i = 0; i < match->num; i++) {
--		ret = component_master_add_child(master,
--						 match->compare[i].fn,
--						 match->compare[i].data);
--		if (ret)
-+		struct component *c;
-+
-+		if (match->compare[i].component)
-+			continue;
-+
-+		c = find_component(master, match->compare[i].fn,
-+				   match->compare[i].data);
-+		if (!c) {
-+			ret = -ENXIO;
- 			break;
-+		}
-+
-+		/* Attach this component to the master */
-+		match->compare[i].duplicate = !!c->master;
-+		match->compare[i].component = c;
-+		c->master = master;
- 	}
- 	return ret;
- }
- 
--/* Detach all attached components from this master */
--static void master_remove_components(struct master *master)
-+/* Detach component from associated master */
-+static void remove_component(struct master *master, struct component *c)
- {
--	while (!list_empty(&master->components)) {
--		struct component *c = list_first_entry(&master->components,
--					struct component, master_node);
--
--		WARN_ON(c->master != master);
-+	size_t i;
- 
--		component_detach_master(master, c);
--	}
-+	/* Detach the component from this master. */
-+	for (i = 0; i < master->match->num; i++)
-+		if (master->match->compare[i].component == c)
-+			master->match->compare[i].component = NULL;
- }
- 
- /*
-@@ -150,37 +135,25 @@ static int try_to_bring_up_master(struct master *master,
- {
- 	int ret;
- 
--	if (find_components(master)) {
--		/* Failed to find all components */
--		ret = 0;
--		goto out;
--	}
-+	if (find_components(master))
-+		return 0;
- 
--	if (component && component->master != master) {
--		ret = 0;
--		goto out;
--	}
-+	if (component && component->master != master)
-+		return 0;
- 
--	if (!devres_open_group(master->dev, NULL, GFP_KERNEL)) {
--		ret = -ENOMEM;
--		goto out;
--	}
-+	if (!devres_open_group(master->dev, NULL, GFP_KERNEL))
-+		return -ENOMEM;
- 
- 	/* Found all components */
- 	ret = master->ops->bind(master->dev);
- 	if (ret < 0) {
- 		devres_release_group(master->dev, NULL);
- 		dev_info(master->dev, "master bind failed: %d\n", ret);
--		goto out;
-+		return ret;
- 	}
- 
- 	master->bound = true;
- 	return 1;
--
--out:
--	master_remove_components(master);
--
--	return ret;
- }
- 
- static int try_to_bring_up_masters(struct component *component)
-@@ -206,8 +179,6 @@ static void take_down_master(struct master *master)
- 		devres_release_group(master->dev, NULL);
- 		master->bound = false;
- 	}
--
--	master_remove_components(master);
- }
- 
- static size_t component_match_size(size_t num)
-@@ -265,6 +236,7 @@ void component_match_add(struct device *dev, struct component_match **matchptr,
- 
- 	match->compare[match->num].fn = compare;
- 	match->compare[match->num].data = compare_data;
-+	match->compare[match->num].component = NULL;
- }
- 
- int component_master_add_with_match(struct device *dev,
-@@ -286,7 +258,6 @@ int component_master_add_with_match(struct device *dev,
- 	master->dev = dev;
- 	master->ops = ops;
- 	master->match = match;
--	INIT_LIST_HEAD(&master->components);
- 
- 	/* Add to the list of available masters. */
- 	mutex_lock(&component_mutex);
-@@ -338,6 +309,7 @@ void component_unbind_all(struct device *master_dev, void *data)
- {
- 	struct master *master;
- 	struct component *c;
-+	size_t i;
- 
- 	WARN_ON(!mutex_is_locked(&component_mutex));
- 
-@@ -345,8 +317,12 @@ void component_unbind_all(struct device *master_dev, void *data)
- 	if (!master)
- 		return;
- 
--	list_for_each_entry_reverse(c, &master->components, master_node)
--		component_unbind(c, master, data);
-+	/* Unbind components in reverse order */
-+	for (i = master->match->num; i--; )
-+		if (!master->match->compare[i].duplicate) {
-+			c = master->match->compare[i].component;
-+			component_unbind(c, master, data);
-+		}
- }
- EXPORT_SYMBOL_GPL(component_unbind_all);
- 
-@@ -406,6 +382,7 @@ int component_bind_all(struct device *master_dev, void *data)
- {
- 	struct master *master;
- 	struct component *c;
-+	size_t i;
- 	int ret = 0;
- 
- 	WARN_ON(!mutex_is_locked(&component_mutex));
-@@ -414,16 +391,21 @@ int component_bind_all(struct device *master_dev, void *data)
- 	if (!master)
- 		return -EINVAL;
- 
--	list_for_each_entry(c, &master->components, master_node) {
--		ret = component_bind(c, master, data);
--		if (ret)
--			break;
--	}
-+	/* Bind components in match order */
-+	for (i = 0; i < master->match->num; i++)
-+		if (!master->match->compare[i].duplicate) {
-+			c = master->match->compare[i].component;
-+			ret = component_bind(c, master, data);
-+			if (ret)
-+				break;
-+		}
- 
- 	if (ret != 0) {
--		list_for_each_entry_continue_reverse(c, &master->components,
--						     master_node)
--			component_unbind(c, master, data);
-+		for (; i--; )
-+			if (!master->match->compare[i].duplicate) {
-+				c = master->match->compare[i].component;
-+				component_unbind(c, master, data);
-+			}
- 	}
- 
- 	return ret;
-@@ -471,8 +453,10 @@ void component_del(struct device *dev, const struct component_ops *ops)
- 			break;
- 		}
- 
--	if (component && component->master)
-+	if (component && component->master) {
- 		take_down_master(component->master);
-+		remove_component(component->master, component);
-+	}
- 
- 	mutex_unlock(&component_mutex);
- 
--- 
-1.8.3.1
+> On Apr 26, 2014, at 11:42 AM, Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+> 
+>> On 04/26/2014 04:54 PM, Jason Cooper wrote:
+>>> On Tue, Apr 22, 2014 at 11:26:26PM +0200, Thomas Petazzoni wrote:
+>>> Moving to the Device Tree implies having CONFIG_MULTI_IRQ_HANDLER
+>>> enabled, even for non-DT platforms (if we want both DT and non-DT
+>>> platforms to be supported in a single kernel).
+>>> 
+>>> However, the common CONFIG_MULTI_IRQ_HANDLER handler for non-DT
+>>> platforms in plat-orion/irq.c doesn't match the needs of
+>>> Orion5x. Also, it doesn't make much sense for orion_irq_init() to
+>>> register the multi-IRQ handler: orion_irq_init() is called once for
+>>> each IRQ cause/mask tuple, while the multi-IRQ handler only needs to
+>>> be registered once.
+>>> 
+>>> To solve this problem, we move the multi-IRQ handle in per-platform
+>>> code: mach-kirkwood/irq.c and mach-dove/irq.c. The Orion5x variant
+>>> will be introduced in a followup commit. Of course, this code will
+>>> ultimately be completely removed once all boards are converted to the
+>>> Device Tree.
+>>> 
+>>> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>>> ---
+>>> arch/arm/mach-dove/irq.c     | 36 +++++++++++++++++++++++++++++++++++
+>>> arch/arm/mach-kirkwood/irq.c | 36 +++++++++++++++++++++++++++++++++++
+>>> arch/arm/plat-orion/irq.c    | 45 --------------------------------------------
+>>> 3 files changed, 72 insertions(+), 45 deletions(-)
+>> 
+>> Dabbit!   So close...  I pulled in 10 - 38 into mvebu/soc-orion5x and it
+>> failed to build kirkwood_defconfig:
+>> 
+>> arch/arm/mach-kirkwood/irq.c:44:23: error: expected ?=?, ?,?, ?;?, ?asm? or ?__attribute__? before ?kirkwood_legacy_handle_irq?
+>> arch/arm/mach-kirkwood/irq.c: In function ?kirkwood_init_irq?:
+>> arch/arm/mach-kirkwood/irq.c:71:17: error:
+>> ?kirkwood_legacy_handle_irq? undeclared (first use in this function)
+>> arch/arm/mach-kirkwood/irq.c:71:17: note: each undeclared
+>> identifier is reported only once for each function it appears in
+>> arch/arm/mach-kirkwood/irq.c: At top level:
+>> arch/arm/mach-kirkwood/irq.c:41:22: warning: ?kirkwood_irq_base?
+>> defined but not used [-Wunused-variable]
+>> make[1]: *** [arch/arm/mach-kirkwood/irq.o] Error 1
+>> make[1]: *** Waiting for unfinished jobs....
+>> arch/arm/kernel/return_address.c:63:2: warning: #warning "TODO:
+>> return_address should use unwind tables" [-Wcpp]
+>> make: *** [arch/arm/mach-kirkwood] Error 2
+>> make: *** Waiting for unfinished jobs....
+> 
+> Jason,
+> 
+> adding a missing #include <asm/exception.h> fixes the build issue.
+> Can you squash adding it in?
+> 
+
+Yep, that fixed it.  Entire gamut of build tests have passed.  So I squashed it into this patch and push the series out to mvebu/soc-orion5x
+
+thx,
+
+Jason.
