@@ -1,140 +1,61 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 26 Apr 2014 12:16:13 +0200
-Subject: [PATCH v9 09/17] ARM: dts: sun5i: Enable mmc controller on various
- A10s and A13 boards
+Date: Sat, 26 Apr 2014 12:16:14 +0200
+Subject: [PATCH v9 10/17] ARM: dts: sun6i: Add mmc clocks
 In-Reply-To: <1398507381-5614-1-git-send-email-hdegoede@redhat.com>
 References: <1398507381-5614-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1398507381-5614-10-git-send-email-hdegoede@redhat.com>
+Message-ID: <1398507381-5614-11-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cd pin settings have been taken from the original firmware fex files,
-and have been confirmed to work on the actual boards.
+Add clk-nodes for the mmc clocks.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts | 32 ++++++++++++++++++++++++
- arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts  | 16 ++++++++++++
- arch/arm/boot/dts/sun5i-a13-olinuxino.dts        | 16 ++++++++++++
- 3 files changed, 64 insertions(+)
+ arch/arm/boot/dts/sun6i-a31.dtsi | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
-index 23611b7..de91308 100644
---- a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
-+++ b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
-@@ -35,6 +35,24 @@
- 			};
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index d45efa7..12bcc17 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -198,6 +198,38 @@
+ 					"apb2_uart4", "apb2_uart5";
  		};
  
-+		mmc0: mmc at 01c0f000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_olinuxino_micro>;
-+			bus-width = <4>;
-+			cd-gpios = <&pio 6 1 0>; /* PG1 */
-+			cd-inverted;
-+			status = "okay";
++		mmc0_clk: clk at 01c20088 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-a10-mod0-clk";
++			reg = <0x01c20088 0x4>;
++			clocks = <&osc24M>, <&pll6>;
++			clock-output-names = "mmc0";
 +		};
 +
-+		mmc1: mmc at 01c10000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&mmc1_pins_a>, <&mmc1_cd_pin_olinuxino_micro>;
-+			bus-width = <4>;
-+			cd-gpios = <&pio 6 13 0>; /* PG13 */
-+			cd-inverted;
-+			status = "okay";
++		mmc1_clk: clk at 01c2008c {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-a10-mod0-clk";
++			reg = <0x01c2008c 0x4>;
++			clocks = <&osc24M>, <&pll6>;
++			clock-output-names = "mmc1";
 +		};
 +
- 		usbphy: phy at 01c13400 {
- 			usb1_vbus-supply = <&reg_usb1_vbus>;
- 			status = "okay";
-@@ -49,6 +67,20 @@
- 		};
- 
- 		pinctrl at 01c20800 {
-+			mmc0_cd_pin_olinuxino_micro: mmc0_cd_pin at 0 {
-+				allwinner,pins = "PG1";
-+				allwinner,function = "gpio_in";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <1>;
-+			};
-+
-+			mmc1_cd_pin_olinuxino_micro: mmc1_cd_pin at 0 {
-+				allwinner,pins = "PG13";
-+				allwinner,function = "gpio_in";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <1>;
-+			};
-+
- 			led_pins_olinuxino: led_pins at 0 {
- 				allwinner,pins = "PE3";
- 				allwinner,function = "gpio_out";
-diff --git a/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts b/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts
-index 11169d5..8515f19 100644
---- a/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts
-+++ b/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts
-@@ -21,6 +21,15 @@
- 	compatible = "olimex,a13-olinuxino-micro", "allwinner,sun5i-a13";
- 
- 	soc at 01c00000 {
-+		mmc0: mmc at 01c0f000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_olinuxinom>;
-+			bus-width = <4>;
-+			cd-gpios = <&pio 6 0 0>; /* PG0 */
-+			cd-inverted;
-+			status = "okay";
++		mmc2_clk: clk at 01c20090 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-a10-mod0-clk";
++			reg = <0x01c20090 0x4>;
++			clocks = <&osc24M>, <&pll6>;
++			clock-output-names = "mmc2";
 +		};
 +
- 		usbphy: phy at 01c13400 {
- 			usb1_vbus-supply = <&reg_usb1_vbus>;
- 			status = "okay";
-@@ -35,6 +44,13 @@
- 		};
- 
- 		pinctrl at 01c20800 {
-+			mmc0_cd_pin_olinuxinom: mmc0_cd_pin at 0 {
-+				allwinner,pins = "PG0";
-+				allwinner,function = "gpio_in";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <1>;
-+			};
-+
- 			led_pins_olinuxinom: led_pins at 0 {
- 				allwinner,pins = "PG9";
- 				allwinner,function = "gpio_out";
-diff --git a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-index 7a9187b..51a9438 100644
---- a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-+++ b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-@@ -20,6 +20,15 @@
- 	compatible = "olimex,a13-olinuxino", "allwinner,sun5i-a13";
- 
- 	soc at 01c00000 {
-+		mmc0: mmc at 01c0f000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_olinuxino>;
-+			bus-width = <4>;
-+			cd-gpios = <&pio 6 0 0>; /* PG0 */
-+			cd-inverted;
-+			status = "okay";
++		mmc3_clk: clk at 01c20094 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-a10-mod0-clk";
++			reg = <0x01c20094 0x4>;
++			clocks = <&osc24M>, <&pll6>;
++			clock-output-names = "mmc3";
 +		};
 +
- 		usbphy: phy at 01c13400 {
- 			usb1_vbus-supply = <&reg_usb1_vbus>;
- 			status = "okay";
-@@ -34,6 +43,13 @@
- 		};
- 
- 		pinctrl at 01c20800 {
-+			mmc0_cd_pin_olinuxino: mmc0_cd_pin at 0 {
-+				allwinner,pins = "PG0";
-+				allwinner,function = "gpio_in";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <1>;
-+			};
-+
- 			led_pins_olinuxino: led_pins at 0 {
- 				allwinner,pins = "PG9";
- 				allwinner,function = "gpio_out";
+ 		spi0_clk: clk at 01c200a0 {
+ 			#clock-cells = <0>;
+ 			compatible = "allwinner,sun4i-a10-mod0-clk";
 -- 
 1.9.0
