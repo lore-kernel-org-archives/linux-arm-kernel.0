@@ -1,60 +1,32 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 26 Apr 2014 08:52:09 +0400
-Subject: [PATCH 4/8] ARM: dts: imx: Remove excess entries for PMIC
+Date: Sat, 26 Apr 2014 08:52:07 +0400
+Subject: [PATCH 2/8] ARM: dts: imx27-phytec-phycore-som: Fix active level for
+ FEC reset
 In-Reply-To: <1398487933-5683-1-git-send-email-shc_work@mail.ru>
 References: <1398487933-5683-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1398487933-5683-4-git-send-email-shc_work@mail.ru>
+Message-ID: <1398487933-5683-2-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes excess "#address-cells" and "#size-cells" entries
-for PMIC, since these entries is not used.
+FEC reset GPIO is active low. Fix this typo.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/boot/dts/imx27-pdk.dts                 | 2 --
- arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi | 2 --
- arch/arm/boot/dts/imx51-babbage.dts             | 2 --
- 3 files changed, 6 deletions(-)
+ arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx27-pdk.dts b/arch/arm/boot/dts/imx27-pdk.dts
-index 764cf79..4c31771 100644
---- a/arch/arm/boot/dts/imx27-pdk.dts
-+++ b/arch/arm/boot/dts/imx27-pdk.dts
-@@ -42,8 +42,6 @@
- 	status = "okay";
- 
- 	pmic: mc13783 at 0 {
--		#address-cells = <1>;
--		#size-cells = <0>;
- 		compatible = "fsl,mc13783";
- 		reg = <0>;
- 		spi-cs-high;
 diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
-index b81796c..31e9f70 100644
+index 32cc7dac9a..93482e9 100644
 --- a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
 +++ b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
-@@ -80,8 +80,6 @@
- 	status = "okay";
+@@ -182,7 +182,7 @@
  
- 	pmic: mc13783 at 0 {
--		#address-cells = <1>;
--		#size-cells = <0>;
- 		compatible = "fsl,mc13783";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_pmic>;
-diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-index e9ce0c0..89470bf 100644
---- a/arch/arm/boot/dts/imx51-babbage.dts
-+++ b/arch/arm/boot/dts/imx51-babbage.dts
-@@ -191,8 +191,6 @@
- 	status = "okay";
- 
- 	pmic: mc13892 at 0 {
--		#address-cells = <1>;
--		#size-cells = <0>;
- 		compatible = "fsl,mc13892";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_pmic>;
+ &fec {
+ 	phy-mode = "mii";
+-	phy-reset-gpios = <&gpio3 30 GPIO_ACTIVE_HIGH>;
++	phy-reset-gpios = <&gpio3 30 GPIO_ACTIVE_LOW>;
+ 	phy-supply = <&reg_3v3>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_fec1>;
 -- 
 1.8.3.2
