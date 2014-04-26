@@ -1,249 +1,49 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sat, 26 Apr 2014 17:42:41 +0200
-Subject: [PATCH v2 22/38] ARM: orion: switch to a per-platform handle_irq()
- function
-In-Reply-To: <20140426145457.GV28159@titan.lakedaemon.net>
-References: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1398202002-28530-23-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140426145457.GV28159@titan.lakedaemon.net>
-Message-ID: <535BD3F1.8000706@gmail.com>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Sat, 26 Apr 2014 16:49:52 +0100
+Subject: [PATCH] clkdev: only fall through to clk_get_sys() if DT indicates no
+ entry
+Message-ID: <E1We4rQ-0001mv-Ps@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/26/2014 04:54 PM, Jason Cooper wrote:
-> On Tue, Apr 22, 2014 at 11:26:26PM +0200, Thomas Petazzoni wrote:
->> Moving to the Device Tree implies having CONFIG_MULTI_IRQ_HANDLER
->> enabled, even for non-DT platforms (if we want both DT and non-DT
->> platforms to be supported in a single kernel).
->>
->> However, the common CONFIG_MULTI_IRQ_HANDLER handler for non-DT
->> platforms in plat-orion/irq.c doesn't match the needs of
->> Orion5x. Also, it doesn't make much sense for orion_irq_init() to
->> register the multi-IRQ handler: orion_irq_init() is called once for
->> each IRQ cause/mask tuple, while the multi-IRQ handler only needs to
->> be registered once.
->>
->> To solve this problem, we move the multi-IRQ handle in per-platform
->> code: mach-kirkwood/irq.c and mach-dove/irq.c. The Orion5x variant
->> will be introduced in a followup commit. Of course, this code will
->> ultimately be completely removed once all boards are converted to the
->> Device Tree.
->>
->> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->> ---
->>  arch/arm/mach-dove/irq.c     | 36 +++++++++++++++++++++++++++++++++++
->>  arch/arm/mach-kirkwood/irq.c | 36 +++++++++++++++++++++++++++++++++++
->>  arch/arm/plat-orion/irq.c    | 45 --------------------------------------------
->>  3 files changed, 72 insertions(+), 45 deletions(-)
-> 
-> Dabbit!   So close...  I pulled in 10 - 38 into mvebu/soc-orion5x and it
-> failed to build kirkwood_defconfig:
-> 
-> arch/arm/mach-kirkwood/irq.c:44:23: error: expected ?=?, ?,?, ?;?, ?asm? or ?__attribute__? before ?kirkwood_legacy_handle_irq?
-> arch/arm/mach-kirkwood/irq.c: In function ?kirkwood_init_irq?:
-> arch/arm/mach-kirkwood/irq.c:71:17: error:
-> ?kirkwood_legacy_handle_irq? undeclared (first use in this function)
-> arch/arm/mach-kirkwood/irq.c:71:17: note: each undeclared
-> identifier is reported only once for each function it appears in
-> arch/arm/mach-kirkwood/irq.c: At top level:
-> arch/arm/mach-kirkwood/irq.c:41:22: warning: ?kirkwood_irq_base?
-> defined but not used [-Wunused-variable]
-> make[1]: *** [arch/arm/mach-kirkwood/irq.o] Error 1
-> make[1]: *** Waiting for unfinished jobs....
-> arch/arm/kernel/return_address.c:63:2: warning: #warning "TODO:
-> return_address should use unwind tables" [-Wcpp]
-> make: *** [arch/arm/mach-kirkwood] Error 2
-> make: *** Waiting for unfinished jobs....
+There are two failures which DT can return when looking up a phandle:
+-ENOENT - when DT finds that the desired property/index is not present
+-EINVAL - when DT finds that the desired property/index is present, but
+ there is a problem parsing it.
 
-Jason,
+We should only fall through to clk_get_sys() (the table driven clock
+lookup) when DT indicates that there was no entry in the OF tables
+for the clock.  Doing otherwise causes the clk API to always indicate
+that there is no entry for this clock, which is not correct behaviour.
 
-adding a missing #include <asm/exception.h> fixes the build issue.
-Can you squash adding it in?
+Cc: <stable@vger.kernel.org>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+Grant, Rob,
 
-Sebastian
+Please let me know ASAP if this gives you any cause for concern.  This
+looks to me like a long standing bug which really needs fixing.  Part
+of the motivation here is similar to Jean-Francois' patch to clkdev
+which allows a DT specified clock which isn't get present to have
+clk_get() and friends return -EPROBE_DEFER - again, something that I
+think really should happen.  Jean-Francois hasn't been able to get
+much traction for his patch, so let's start with fixing this bug first.
 
-> orion5x_defconfig built fine of course.  I'm testing the others right
-> now.
-> 
-> thx,
-> 
-> Jason.
-> 
->>
->> diff --git a/arch/arm/mach-dove/irq.c b/arch/arm/mach-dove/irq.c
->> index bc4344a..4a5a7ae 100644
->> --- a/arch/arm/mach-dove/irq.c
->> +++ b/arch/arm/mach-dove/irq.c
->> @@ -108,6 +108,38 @@ static int __initdata gpio2_irqs[4] = {
->>  	0,
->>  };
->>  
->> +#ifdef CONFIG_MULTI_IRQ_HANDLER
->> +/*
->> + * Compiling with both non-DT and DT support enabled, will
->> + * break asm irq handler used by non-DT boards. Therefore,
->> + * we provide a C-style irq handler even for non-DT boards,
->> + * if MULTI_IRQ_HANDLER is set.
->> + */
->> +
->> +static void __iomem *dove_irq_base = IRQ_VIRT_BASE;
->> +
->> +static asmlinkage void
->> +__exception_irq_entry dove_legacy_handle_irq(struct pt_regs *regs)
->> +{
->> +	u32 stat;
->> +
->> +	stat = readl_relaxed(dove_irq_base + IRQ_CAUSE_LOW_OFF);
->> +	stat &= readl_relaxed(dove_irq_base + IRQ_MASK_LOW_OFF);
->> +	if (stat) {
->> +		unsigned int hwirq = __fls(stat);
->> +		handle_IRQ(hwirq, regs);
->> +		return;
->> +	}
->> +	stat = readl_relaxed(dove_irq_base + IRQ_CAUSE_HIGH_OFF);
->> +	stat &= readl_relaxed(dove_irq_base + IRQ_MASK_HIGH_OFF);
->> +	if (stat) {
->> +		unsigned int hwirq = 32 + __fls(stat);
->> +		handle_IRQ(hwirq, regs);
->> +		return;
->> +	}
->> +}
->> +#endif
->> +
->>  void __init dove_init_irq(void)
->>  {
->>  	int i;
->> @@ -115,6 +147,10 @@ void __init dove_init_irq(void)
->>  	orion_irq_init(0, IRQ_VIRT_BASE + IRQ_MASK_LOW_OFF);
->>  	orion_irq_init(32, IRQ_VIRT_BASE + IRQ_MASK_HIGH_OFF);
->>  
->> +#ifdef CONFIG_MULTI_IRQ_HANDLER
->> +	set_handle_irq(dove_legacy_handle_irq);
->> +#endif
->> +
->>  	/*
->>  	 * Initialize gpiolib for GPIOs 0-71.
->>  	 */
->> diff --git a/arch/arm/mach-kirkwood/irq.c b/arch/arm/mach-kirkwood/irq.c
->> index 2a97a2e..c9dd860 100644
->> --- a/arch/arm/mach-kirkwood/irq.c
->> +++ b/arch/arm/mach-kirkwood/irq.c
->> @@ -30,11 +30,47 @@ static int __initdata gpio1_irqs[4] = {
->>  	0,
->>  };
->>  
->> +#ifdef CONFIG_MULTI_IRQ_HANDLER
->> +/*
->> + * Compiling with both non-DT and DT support enabled, will
->> + * break asm irq handler used by non-DT boards. Therefore,
->> + * we provide a C-style irq handler even for non-DT boards,
->> + * if MULTI_IRQ_HANDLER is set.
->> + */
->> +
->> +static void __iomem *kirkwood_irq_base = IRQ_VIRT_BASE;
->> +
->> +asmlinkage void
->> +__exception_irq_entry kirkwood_legacy_handle_irq(struct pt_regs *regs)
->> +{
->> +	u32 stat;
->> +
->> +	stat = readl_relaxed(kirkwood_irq_base + IRQ_CAUSE_LOW_OFF);
->> +	stat &= readl_relaxed(kirkwood_irq_base + IRQ_MASK_LOW_OFF);
->> +	if (stat) {
->> +		unsigned int hwirq = __fls(stat);
->> +		handle_IRQ(hwirq, regs);
->> +		return;
->> +	}
->> +	stat = readl_relaxed(kirkwood_irq_base + IRQ_CAUSE_HIGH_OFF);
->> +	stat &= readl_relaxed(kirkwood_irq_base + IRQ_MASK_HIGH_OFF);
->> +	if (stat) {
->> +		unsigned int hwirq = 32 + __fls(stat);
->> +		handle_IRQ(hwirq, regs);
->> +		return;
->> +	}
->> +}
->> +#endif
->> +
->>  void __init kirkwood_init_irq(void)
->>  {
->>  	orion_irq_init(0, IRQ_VIRT_BASE + IRQ_MASK_LOW_OFF);
->>  	orion_irq_init(32, IRQ_VIRT_BASE + IRQ_MASK_HIGH_OFF);
->>  
->> +#ifdef CONFIG_MULTI_IRQ_HANDLER
->> +	set_handle_irq(kirkwood_legacy_handle_irq);
->> +#endif
->> +
->>  	/*
->>  	 * Initialize gpiolib for GPIOs 0-49.
->>  	 */
->> diff --git a/arch/arm/plat-orion/irq.c b/arch/arm/plat-orion/irq.c
->> index 807df14..27ec18b 100644
->> --- a/arch/arm/plat-orion/irq.c
->> +++ b/arch/arm/plat-orion/irq.c
->> @@ -20,47 +20,6 @@
->>  #include <plat/orion-gpio.h>
->>  #include <mach/bridge-regs.h>
->>  
->> -#ifdef CONFIG_MULTI_IRQ_HANDLER
->> -/*
->> - * Compiling with both non-DT and DT support enabled, will
->> - * break asm irq handler used by non-DT boards. Therefore,
->> - * we provide a C-style irq handler even for non-DT boards,
->> - * if MULTI_IRQ_HANDLER is set.
->> - *
->> - * Notes:
->> - * - this is prepared for Kirkwood and Dove only, update
->> - *   accordingly if you add Orion5x or MV78x00.
->> - * - Orion5x uses different macro names and has only one
->> - *   set of CAUSE/MASK registers.
->> - * - MV78x00 uses the same macro names but has a third
->> - *   set of CAUSE/MASK registers.
->> - *
->> - */
->> -
->> -static void __iomem *orion_irq_base = IRQ_VIRT_BASE;
->> -
->> -asmlinkage void
->> -__exception_irq_entry orion_legacy_handle_irq(struct pt_regs *regs)
->> -{
->> -	u32 stat;
->> -
->> -	stat = readl_relaxed(orion_irq_base + IRQ_CAUSE_LOW_OFF);
->> -	stat &= readl_relaxed(orion_irq_base + IRQ_MASK_LOW_OFF);
->> -	if (stat) {
->> -		unsigned int hwirq = __fls(stat);
->> -		handle_IRQ(hwirq, regs);
->> -		return;
->> -	}
->> -	stat = readl_relaxed(orion_irq_base + IRQ_CAUSE_HIGH_OFF);
->> -	stat &= readl_relaxed(orion_irq_base + IRQ_MASK_HIGH_OFF);
->> -	if (stat) {
->> -		unsigned int hwirq = 32 + __fls(stat);
->> -		handle_IRQ(hwirq, regs);
->> -		return;
->> -	}
->> -}
->> -#endif
->> -
->>  void __init orion_irq_init(unsigned int irq_start, void __iomem *maskaddr)
->>  {
->>  	struct irq_chip_generic *gc;
->> @@ -78,10 +37,6 @@ void __init orion_irq_init(unsigned int irq_start, void __iomem *maskaddr)
->>  	ct->chip.irq_unmask = irq_gc_mask_set_bit;
->>  	irq_setup_generic_chip(gc, IRQ_MSK(32), IRQ_GC_INIT_MASK_CACHE,
->>  			       IRQ_NOREQUEST, IRQ_LEVEL | IRQ_NOPROBE);
->> -
->> -#ifdef CONFIG_MULTI_IRQ_HANDLER
->> -	set_handle_irq(orion_legacy_handle_irq);
->> -#endif
->>  }
->>  
->>  #ifdef CONFIG_OF
->> -- 
->> 1.9.2
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+ drivers/clk/clkdev.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+index 48f67218247c..4e65d0e10b05 100644
+--- a/drivers/clk/clkdev.c
++++ b/drivers/clk/clkdev.c
+@@ -165,7 +165,7 @@ struct clk *clk_get(struct device *dev, const char *con_id)
+ 
+ 	if (dev) {
+ 		clk = of_clk_get_by_name(dev->of_node, con_id);
+-		if (!IS_ERR(clk))
++		if (!IS_ERR(clk) || PTR_ERR(clk) != -ENOENT)
+ 			return clk;
+ 	}
+ 
+-- 
+1.8.3.1
