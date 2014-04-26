@@ -1,52 +1,64 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Sat, 26 Apr 2014 21:04:32 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCA3LzhdIEFSTTogZHRzOiBpbXgyNzogVHJpbSBub2RlIG5h?=
- =?UTF-8?B?bWUgZm9yIEZFQw==?=
-In-Reply-To: <535BE4B3.8090009@cogentembedded.com>
-References: <1398487933-5683-1-git-send-email-shc_work@mail.ru>
- <1398530361.804335708@f372.i.mail.ru>
- <535BE4B3.8090009@cogentembedded.com>
-Message-ID: <1398531872.875446832@f372.i.mail.ru>
+From: James.Bottomley@HansenPartnership.com (James Bottomley)
+Date: Sat, 26 Apr 2014 10:21:03 -0700
+Subject: [PATCH v2 00/12] scsi/NCR5380: fix debugging macros and
+ #include structure
+In-Reply-To: <20140319123516.542623278@telegraphics.com.au>
+References: <20140319123516.542623278@telegraphics.com.au>
+Message-ID: <1398532863.24466.2.camel@dabdike.int.hansenpartnership.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sat, 26 Apr 2014 20:54:11 +0400 ?? Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>:
-> Hello.
+On Wed, 2014-03-19 at 23:35 +1100, Finn Thain wrote:
+> This patch series addresses several issues with NCR5380 drivers:
 > 
-> On 26-04-2014 20:39, Alexander Shiyan wrote:
+> 1. The complex network of #include directives.
 > 
-> >>> This patch reduce node name for FEC. Otherwise, the name for PHY
-> >>> is composed incorrectly.
+> 2. Three inconsistent implementations of the core driver all attempting
+>    to share the same macro definitions in NCR5380.h.
 > 
-> >>> Before:
-> >>> fec 1002b000.ethernet eth0: Freescale FEC PHY driver [Generic PHY] (mii_bus:phy_addr=1002b000.etherne:00, irq=-1)
+> 3. Broken debugging code.
 > 
-> >>> After:
-> >>> fec 1002b000.fec eth0: Freescale FEC PHY driver [Generic PHY] (mii_bus:phy_addr=1002b000.fec-1:00, irq=-1)
+> In the past these issues have led to compiler warnings and ugly hacks to
+> fix build failures.
 > 
-> >>> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> >>> ---
-> >>>    arch/arm/boot/dts/imx27.dtsi | 2 +-
-> >>>    1 file changed, 1 insertion(+), 1 deletion(-)
+> This patch series fixes the debugging code by reducing the divergence
+> between the various core driver implementations.
 > 
-> >>> diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-> >>> index a75555c..377339e 100644
-> >>> --- a/arch/arm/boot/dts/imx27.dtsi
-> >>> +++ b/arch/arm/boot/dts/imx27.dtsi
-> >>> @@ -497,7 +497,7 @@
-> >>>    				clocks = <&clks 38>;
-> >>>    			};
-> >>>
-> >>> -			fec: ethernet at 1002b000 {
-> >>> +			fec: fec at 1002b000 {
+> The final two patches in the series further reduce divergence by refactoring
+> sun3_scsi.c and sun3_scsi_vme.c so that they follow the same structure as
+> the other NCR5380 drivers.
 > 
-> >>      The "ethernet" name complies to the ePAPR standard. Don't change it, please.
+> By the end of this patch series over 800 net lines of code have been
+> removed. This is mostly duplicated code that's easily eliminated once the
+> debugging code is made consistent (and some dead code is removed).
 > 
-> > So this is ok?
-> > mii_bus:phy_addr=1002b000.etherne:00
+> Better uniformity and less duplication should assist future work such as
+> modernization and trivial clean-up.
 > 
->     Why not? :-)
+> To make code review easier I've tried to keep these patches succinct and
+> free of extraneous changes. Though I did run checkpatch.pl, I've ignored
+> whitespace issues in existing code. I will send separate patches for
+> whitespace clean-up of NCR5380 drivers.
+> 
+> All NCR5380 drivers have been compile-tested with this patch series:
+>   arm/cumana_1.c
+>   arm/oak.c
+>   atari_scsi.c
+>   dmx3191d.c
+>   dtc.c
+>   g_NCR5380.c
+>   g_NCR5380_mmio.c
+>   mac_scsi.c
+>   pas16.c
+>   sun3_scsi.c
+>   sun3_scsi_vme.c
+>   t128.c
+> 
+> I've successfully regression tested this patch series using mac_scsi on a 
+> PowerBook 180. The debugging macros are now usable again.
 
-OK if so. Shawn, please skip this one patch if all other looks OK.
+OK, so this is a pretty big change to an unmaintained driver.  I'll take
+it if you're willing to maintain the driver afterwards ... in which case
+I need another patch to add you to the MAINTAINERS file.
 
----
+James
