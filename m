@@ -1,76 +1,106 @@
-From: wujianguo@huawei.com (Jianguo Wu)
-Date: Sat, 26 Apr 2014 10:12:40 +0800
-Subject: ARM: mm: Could I change module space size or place modules in
- vmalloc area?
-In-Reply-To: <20140103004716.GG7383@n2100.arm.linux.org.uk>
-References: <002001cf07a1$fd4bdc10$f7e39430$@lge.com>
- <20140102101359.GU6589@tarshish> <002e01cf081c$44a11e70$cde35b50$@lge.com>
- <20140103004716.GG7383@n2100.arm.linux.org.uk>
-Message-ID: <535B1618.5030504@huawei.com>
+From: dubepankaj1980@gmail.com (Pankaj Dubey)
+Date: Sat, 26 Apr 2014 11:33:34 +0900
+Subject: [PATCH 1/4] ARM: dts: exynos4: add PMU syscon node
+In-Reply-To: <535AF52F.4090906@gmail.com>
+References: <1397479700-15864-1-git-send-email-chanho61.park@samsung.com>
+ <1397479700-15864-2-git-send-email-chanho61.park@samsung.com>
+ <535936A7.9050003@samsung.com>
+ <CAGm_ybjhcAqX7biOvqLMgzHPQK=-EtaHtXpCtcJ1rcdRsxN_Og@mail.gmail.com>
+ <535AF52F.4090906@gmail.com>
+Message-ID: <CAGcde9G1ynoOM9MqLbU05wzMGD=zC6NxqTY9EAOOFEa1Pr4fUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/1/3 8:47, Russell King - ARM Linux wrote:
+Hi Tomasz,
 
-> On Fri, Jan 03, 2014 at 09:39:31AM +0900, Gioh Kim wrote:
->> Thank you for reply.
+On Sat, Apr 26, 2014 at 8:52 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> Hi Vikas,
+>
+>
+> On 25.04.2014 10:05, Vikas Sajjan wrote:
 >>
->>> -----Original Message-----
->>> From: Baruch Siach [mailto:baruch at tkos.co.il]
->>> Sent: Thursday, January 02, 2014 7:14 PM
->>> To: Gioh Kim
->>> Cc: Russell King; linux-mm at kvack.org; linux-arm-kernel; HyoJun Im
->>> Subject: Re: ARM: mm: Could I change module space size or place modules in
->>> vmalloc area?
->>>
->>> Hi Gioh,
->>>
->>> On Thu, Jan 02, 2014 at 07:04:13PM +0900, Gioh Kim wrote:
->>>> I run out of module space because I have several big driver modules.
->>>> I know I can strip the modules to decrease size but I need debug info
->>> now.
->>>
->>> Are you sure you need the debug info in kernel memory? I don't think the
->>> kernel is actually able to parse DWARF. You can load stripped binaries
->>> into the kernel, and still use the debug info with whatever tool you have.
+>> Hi,
 >>
->> I agree you but driver developers of another team don't agree.
->> I don't know why but they say they will strip drivers later :-(
->> So I need to increase modules space size.
-> 
-> ARM can only branch relatively within +/- 32MB.  Hence, with a module
-> space of 16MB, modules can reach up to a maximum 16MB into the direct-
-> mapped kernel image.  As module space increases in size, so that figure
-> decreases.  So, if module space were to be 40MB, the maximum size of the
-> kernel binary would be 8MB.
-> 
+>>
+>> On Thu, Apr 24, 2014 at 9:37 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+>>>
+>>> Hi Chanho,
+>>>
+>>>
+>>> On 14.04.2014 14:48, Chanho Park wrote:
+>>>>
+>>>>
+>>>> This patch adds a PMU(Power Management Unit) syscon node. This
+>>>> should be required for USB Phy syscon regmap I/F.
+>>>>
+>>>> Cc: Tomasz Figa <t.figa@samsung.com>
+>>>> Cc: Kamil Debski <k.debski@samsung.com>
+>>>> Signed-off-by: Chanho Park <chanho61.park@samsung.com>
+>>>> ---
+>>>>    arch/arm/boot/dts/exynos4.dtsi | 5 +++++
+>>>>    1 file changed, 5 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/exynos4.dtsi
+>>>> b/arch/arm/boot/dts/exynos4.dtsi
+>>>> index 2f8bcd0..e565b86 100644
+>>>> --- a/arch/arm/boot/dts/exynos4.dtsi
+>>>> +++ b/arch/arm/boot/dts/exynos4.dtsi
+>>>> @@ -110,6 +110,11 @@
+>>>>                  reg = <0x10010000 0x400>;
+>>>>          };
+>>>>
+>>>> +       pmu_reg: syscon at 10020000 {
+>>>> +               compatible = "samsung,exynos4-pmureg", "syscon";
+>>>
+>>>
+>>
+>>   Assume a case where exynos PMU is made as platform driver [1] and we
+>> need use the compatible  "samsung,exynos4-pmureg" in the driver.
+>> But since syscon driver uses compatible "syscon" and once the syscon
+>> driver is probed, the  exynos PMU platform driver [1] will NEVER be
+>> probed.
+>> So my question is, can we have 2 compatible strings for a DT node, and
+>> both the compatible strings are used for probing purpose?
+>> Recently I faced this issue on exynos5250, where i was testing PMU
+>> driver [1] and I noticed that  PMU driver [1] was NEVER probed, if I
+>> enable syscon driver in menuconfig.
+>
+>
+> No, it is not possible to bind two drivers with different compatible strings
+> to the same node. Basically this is because only one platform driver can be
+> bound to particular platform device.
+>
 
-Hi Russell ,Arnd or Will,
+Yes, correct.
 
-I encountered the same situation in arm64, I loaded 80+ modules in arm64, and
-run out of module address space(64M). Why the module space is restricted to 64M,
-can it be expanded?  
+> The rule is that the most specific compatible string (e.g. the first from
+> the left) that matches should be used, but I'm not sure if this is
+> implemented this way in Linux kernel, especially considering that a platform
+> driver usually probes when it is being registered. So we might have a race
+> here, which you can work around by making sure that your PMU driver is
+> always registered first (e.g. by lowering its initcall level).
+>
 
-In commit 257cb2519(arm64: Loadable modules), it mentioned that " Loadable modules
-are loaded 64MB below the kernel image due to branch relocation restrictions",
-"branch relocation restrictions" is a AArch64 instruction set restrictions?
+I don't see it's using first compatible string from the left. I can
+see whichever driver registers platform driver first, it's probe is
+getting called. As in this particular case, PMU has two compatibility
+string as "samsung, exynosxxx-pmu", "syscon". But since "syscon"
+driver registers it's platform driver in postcore_initcall where as
+PMU platform driver [1], was registering as arch_initcall, only
+"syscon" probe got called.
 
-Thanks,
-Jianguo Wu.
+In my V2 patch for converting PMU as driver form, I dropped idea of
+converting into platform driver, because we can't remove "syscon" from
+binding as many other driver wants to access PMU register via regmap
+handle. By lowering it's initcall level may be I can make PMU probe
+gets called but then how other drivers will be able to access PMU
+regmap handles?
 
-> You want to look at a line similar to this:
-> 
->       .text : 0xc0008000 - 0xc031eda0   (3164 kB)
-> 
-> Also, note this:
-> 
->     modules : 0xbf000000 - 0xc0000000   (  16 MB)
-> 
-> If the difference between the lowest module address (0xbf000000) and the
-> highest of .text is greater than 32MB, it's impossible to load modules -
-> they will fail to link.
-> 
-> What is the size of your kernel text? (show us the line(s) like the above.)
-> 
-> Thanks.
-> 
+> Best regards,
+> Tomasz
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
