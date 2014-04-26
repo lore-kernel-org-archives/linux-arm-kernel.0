@@ -1,23 +1,58 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Sat, 26 Apr 2014 23:15:10 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCA4LzhdIEFSTTogZHRzOiBpbXgyNy1waHl0ZWMtcGh5Y29y?=
- =?UTF-8?B?ZS0qOiBNb3ZlICJpb211eCIgbm9kZSB0byB0aGUgYm90dG9tIG9mIGZpbGU=?=
-In-Reply-To: <20140426190935.GE5858@pengutronix.de>
-References: <1398487933-5683-1-git-send-email-shc_work@mail.ru>
- <1398487933-5683-8-git-send-email-shc_work@mail.ru>
- <20140426190935.GE5858@pengutronix.de>
-Message-ID: <1398539710.4978394@f317.i.mail.ru>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sat, 26 Apr 2014 21:34:14 +0200
+Subject: [PATCH RESEND 2/3] mmc: mvsdio: workaround for spurious irqs
+In-Reply-To: <1398540855-27367-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1398540855-27367-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1398540855-27367-3-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sat, 26 Apr 2014 21:09:35 +0200 ?? Sascha Hauer <s.hauer@pengutronix.de>:
-> On Sat, Apr 26, 2014 at 08:52:13AM +0400, Alexander Shiyan wrote:
-> > This patch moves "iomux" node to the bottom of file.
-> > No functional changes.
-> 
-> Why? The nodes are (at least should be) sorted alphabetically.
+SDIO controllers found on Marvell Kirkwood SoCs seem to cause a late,
+spurious irq although all interrupts have been disabled. This irq
+doesn't do any harm, neither to HW nor driver. To avoid some
+"unexpected irq" warning later, we workaround above issue by bailing
+out of irq handler early, if we didn't expect any.
 
-Pin definitions look better in one place, at the bottom.
-As far as I know, Shawn supported this position.
-
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Acked-by: Jason Cooper <jason@lakedaemon.net>
 ---
+Cc: Nicolas Pitre <nico@fluxnic.net>
+Cc: Chris Ball <chris@printf.net>
+Cc: Ulf Hansson <ulf.hansson@linaro.org>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: linux-mmc at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ drivers/mmc/host/mvsdio.c | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+
+diff --git a/drivers/mmc/host/mvsdio.c b/drivers/mmc/host/mvsdio.c
+index 41aca7f28c23..9377284f8544 100644
+--- a/drivers/mmc/host/mvsdio.c
++++ b/drivers/mmc/host/mvsdio.c
+@@ -354,6 +354,20 @@ static irqreturn_t mvsd_irq(int irq, void *dev)
+ 		intr_status, mvsd_read(MVSD_NOR_INTR_EN),
+ 		mvsd_read(MVSD_HW_STATE));
+ 
++	/*
++	 * It looks like, SDIO IP can issue one late, spurious irq
++	 * although all irqs should be disabled. To work around this,
++	 * bail out early, if we didn't expect any irqs to occur.
++	 */
++	if (!mvsd_read(MVSD_NOR_INTR_EN) && !mvsd_read(MVSD_ERR_INTR_EN)) {
++		dev_dbg(host->dev, "spurious irq detected intr 0x%04x intr_en 0x%04x erri 0x%04x erri_en 0x%04x\n",
++			mvsd_read(MVSD_NOR_INTR_STATUS),
++			mvsd_read(MVSD_NOR_INTR_EN),
++			mvsd_read(MVSD_ERR_INTR_STATUS),
++			mvsd_read(MVSD_ERR_INTR_EN));
++		return IRQ_HANDLED;
++	}
++
+ 	spin_lock(&host->lock);
+ 
+ 	/* PIO handling, if needed. Messy business... */
+-- 
+1.9.1
