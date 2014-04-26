@@ -1,108 +1,249 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sat, 26 Apr 2014 08:31:07 -0700
-Subject: [PATCH 1/5] wdt: sunxi: Move restart code to the watchdog driver
-In-Reply-To: <1398265476-29373-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1398265476-29373-1-git-send-email-maxime.ripard@free-electrons.com>
- <1398265476-29373-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <535BD13B.103@roeck-us.net>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sat, 26 Apr 2014 17:42:41 +0200
+Subject: [PATCH v2 22/38] ARM: orion: switch to a per-platform handle_irq()
+ function
+In-Reply-To: <20140426145457.GV28159@titan.lakedaemon.net>
+References: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1398202002-28530-23-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140426145457.GV28159@titan.lakedaemon.net>
+Message-ID: <535BD3F1.8000706@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/23/2014 08:04 AM, Maxime Ripard wrote:
-> Most of the watchdog code is duplicated between the machine restart code and
-> the watchdog driver. Add the restart hook to the watchdog driver, to be able to
-> remove it from the machine code eventually.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->   drivers/watchdog/sunxi_wdt.c | 33 +++++++++++++++++++++++++++++++++
->   1 file changed, 33 insertions(+)
->
-> diff --git a/drivers/watchdog/sunxi_wdt.c b/drivers/watchdog/sunxi_wdt.c
-> index cd00a7836cdc..0644c45d2b60 100644
-> --- a/drivers/watchdog/sunxi_wdt.c
-> +++ b/drivers/watchdog/sunxi_wdt.c
-> @@ -14,6 +14,7 @@
->    */
->
->   #include <linux/clk.h>
-> +#include <linux/delay.h>
->   #include <linux/err.h>
->   #include <linux/init.h>
->   #include <linux/io.h>
-> @@ -22,9 +23,12 @@
->   #include <linux/moduleparam.h>
->   #include <linux/of.h>
->   #include <linux/platform_device.h>
-> +#include <linux/reboot.h>
->   #include <linux/types.h>
->   #include <linux/watchdog.h>
->
-> +#include <asm/system_misc.h>
-> +
->   #define WDT_MAX_TIMEOUT         16
->   #define WDT_MIN_TIMEOUT         1
->   #define WDT_MODE_TIMEOUT(n)     ((n) << 3)
-> @@ -70,6 +74,30 @@ static const int wdt_timeout_map[] = {
->   	[16] = 0b1011, /* 16s */
->   };
->
-> +static struct sunxi_wdt_dev *sunxi_restart_ctx;
-> +
-> +static void sun4i_wdt_restart(enum reboot_mode mode, const char *cmd)
-> +{
-> +	if (!sunxi_restart_ctx)
-> +		return;
-> +
-The only condition where this can happen if is there is a race between the calling
-code and the remove function below. If that race really exists, it could as well
-happen after this check, so the check does not really provide any value and can
-be removed.
+On 04/26/2014 04:54 PM, Jason Cooper wrote:
+> On Tue, Apr 22, 2014 at 11:26:26PM +0200, Thomas Petazzoni wrote:
+>> Moving to the Device Tree implies having CONFIG_MULTI_IRQ_HANDLER
+>> enabled, even for non-DT platforms (if we want both DT and non-DT
+>> platforms to be supported in a single kernel).
+>>
+>> However, the common CONFIG_MULTI_IRQ_HANDLER handler for non-DT
+>> platforms in plat-orion/irq.c doesn't match the needs of
+>> Orion5x. Also, it doesn't make much sense for orion_irq_init() to
+>> register the multi-IRQ handler: orion_irq_init() is called once for
+>> each IRQ cause/mask tuple, while the multi-IRQ handler only needs to
+>> be registered once.
+>>
+>> To solve this problem, we move the multi-IRQ handle in per-platform
+>> code: mach-kirkwood/irq.c and mach-dove/irq.c. The Orion5x variant
+>> will be introduced in a followup commit. Of course, this code will
+>> ultimately be completely removed once all boards are converted to the
+>> Device Tree.
+>>
+>> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>> ---
+>>  arch/arm/mach-dove/irq.c     | 36 +++++++++++++++++++++++++++++++++++
+>>  arch/arm/mach-kirkwood/irq.c | 36 +++++++++++++++++++++++++++++++++++
+>>  arch/arm/plat-orion/irq.c    | 45 --------------------------------------------
+>>  3 files changed, 72 insertions(+), 45 deletions(-)
+> 
+> Dabbit!   So close...  I pulled in 10 - 38 into mvebu/soc-orion5x and it
+> failed to build kirkwood_defconfig:
+> 
+> arch/arm/mach-kirkwood/irq.c:44:23: error: expected ?=?, ?,?, ?;?, ?asm? or ?__attribute__? before ?kirkwood_legacy_handle_irq?
+> arch/arm/mach-kirkwood/irq.c: In function ?kirkwood_init_irq?:
+> arch/arm/mach-kirkwood/irq.c:71:17: error:
+> ?kirkwood_legacy_handle_irq? undeclared (first use in this function)
+> arch/arm/mach-kirkwood/irq.c:71:17: note: each undeclared
+> identifier is reported only once for each function it appears in
+> arch/arm/mach-kirkwood/irq.c: At top level:
+> arch/arm/mach-kirkwood/irq.c:41:22: warning: ?kirkwood_irq_base?
+> defined but not used [-Wunused-variable]
+> make[1]: *** [arch/arm/mach-kirkwood/irq.o] Error 1
+> make[1]: *** Waiting for unfinished jobs....
+> arch/arm/kernel/return_address.c:63:2: warning: #warning "TODO:
+> return_address should use unwind tables" [-Wcpp]
+> make: *** [arch/arm/mach-kirkwood] Error 2
+> make: *** Waiting for unfinished jobs....
 
-Note that I find the variable name a bit misleading. It isn't a context,
-it is the poitner to sunxi_wdt_dev. What is really needed is wdt_base,
-not this pointer. Would it make more sense to provide that pointer
-directly instead, like you did in the code for the A31 ?
+Jason,
 
-Guenter
+adding a missing #include <asm/exception.h> fixes the build issue.
+Can you squash adding it in?
 
-> +	/* Enable timer and set reset bit in the watchdog */
-> +	writel(WDT_MODE_EN | WDT_MODE_RST_EN,
-> +	       sunxi_restart_ctx->wdt_base + WDT_MODE);
-> +
-> +	/*
-> +	 * Restart the watchdog. The default (and lowest) interval
-> +	 * value for the watchdog is 0.5s.
-> +	 */
-> +	writel(WDT_CTRL_RELOAD, sunxi_restart_ctx->wdt_base + WDT_CTRL);
-> +
-> +	while (1) {
-> +		mdelay(5);
-> +		writel(WDT_MODE_EN | WDT_MODE_RST_EN,
-> +		       sunxi_restart_ctx->wdt_base + WDT_MODE);
-> +	}
-> +}
-> +
->   static int sunxi_wdt_ping(struct watchdog_device *wdt_dev)
->   {
->   	struct sunxi_wdt_dev *sunxi_wdt = watchdog_get_drvdata(wdt_dev);
-> @@ -181,6 +209,9 @@ static int sunxi_wdt_probe(struct platform_device *pdev)
->   	if (unlikely(err))
->   		return err;
->
-> +	sunxi_restart_ctx = sunxi_wdt;
-> +	arm_pm_restart = sun4i_wdt_restart;
-> +
->   	dev_info(&pdev->dev, "Watchdog enabled (timeout=%d sec, nowayout=%d)",
->   			sunxi_wdt->wdt_dev.timeout, nowayout);
->
-> @@ -191,6 +222,8 @@ static int sunxi_wdt_remove(struct platform_device *pdev)
->   {
->   	struct sunxi_wdt_dev *sunxi_wdt = platform_get_drvdata(pdev);
->
-> +	arm_pm_restart = NULL;
-> +
->   	watchdog_unregister_device(&sunxi_wdt->wdt_dev);
->   	watchdog_set_drvdata(&sunxi_wdt->wdt_dev, NULL);
->
->
+Sebastian
+
+> orion5x_defconfig built fine of course.  I'm testing the others right
+> now.
+> 
+> thx,
+> 
+> Jason.
+> 
+>>
+>> diff --git a/arch/arm/mach-dove/irq.c b/arch/arm/mach-dove/irq.c
+>> index bc4344a..4a5a7ae 100644
+>> --- a/arch/arm/mach-dove/irq.c
+>> +++ b/arch/arm/mach-dove/irq.c
+>> @@ -108,6 +108,38 @@ static int __initdata gpio2_irqs[4] = {
+>>  	0,
+>>  };
+>>  
+>> +#ifdef CONFIG_MULTI_IRQ_HANDLER
+>> +/*
+>> + * Compiling with both non-DT and DT support enabled, will
+>> + * break asm irq handler used by non-DT boards. Therefore,
+>> + * we provide a C-style irq handler even for non-DT boards,
+>> + * if MULTI_IRQ_HANDLER is set.
+>> + */
+>> +
+>> +static void __iomem *dove_irq_base = IRQ_VIRT_BASE;
+>> +
+>> +static asmlinkage void
+>> +__exception_irq_entry dove_legacy_handle_irq(struct pt_regs *regs)
+>> +{
+>> +	u32 stat;
+>> +
+>> +	stat = readl_relaxed(dove_irq_base + IRQ_CAUSE_LOW_OFF);
+>> +	stat &= readl_relaxed(dove_irq_base + IRQ_MASK_LOW_OFF);
+>> +	if (stat) {
+>> +		unsigned int hwirq = __fls(stat);
+>> +		handle_IRQ(hwirq, regs);
+>> +		return;
+>> +	}
+>> +	stat = readl_relaxed(dove_irq_base + IRQ_CAUSE_HIGH_OFF);
+>> +	stat &= readl_relaxed(dove_irq_base + IRQ_MASK_HIGH_OFF);
+>> +	if (stat) {
+>> +		unsigned int hwirq = 32 + __fls(stat);
+>> +		handle_IRQ(hwirq, regs);
+>> +		return;
+>> +	}
+>> +}
+>> +#endif
+>> +
+>>  void __init dove_init_irq(void)
+>>  {
+>>  	int i;
+>> @@ -115,6 +147,10 @@ void __init dove_init_irq(void)
+>>  	orion_irq_init(0, IRQ_VIRT_BASE + IRQ_MASK_LOW_OFF);
+>>  	orion_irq_init(32, IRQ_VIRT_BASE + IRQ_MASK_HIGH_OFF);
+>>  
+>> +#ifdef CONFIG_MULTI_IRQ_HANDLER
+>> +	set_handle_irq(dove_legacy_handle_irq);
+>> +#endif
+>> +
+>>  	/*
+>>  	 * Initialize gpiolib for GPIOs 0-71.
+>>  	 */
+>> diff --git a/arch/arm/mach-kirkwood/irq.c b/arch/arm/mach-kirkwood/irq.c
+>> index 2a97a2e..c9dd860 100644
+>> --- a/arch/arm/mach-kirkwood/irq.c
+>> +++ b/arch/arm/mach-kirkwood/irq.c
+>> @@ -30,11 +30,47 @@ static int __initdata gpio1_irqs[4] = {
+>>  	0,
+>>  };
+>>  
+>> +#ifdef CONFIG_MULTI_IRQ_HANDLER
+>> +/*
+>> + * Compiling with both non-DT and DT support enabled, will
+>> + * break asm irq handler used by non-DT boards. Therefore,
+>> + * we provide a C-style irq handler even for non-DT boards,
+>> + * if MULTI_IRQ_HANDLER is set.
+>> + */
+>> +
+>> +static void __iomem *kirkwood_irq_base = IRQ_VIRT_BASE;
+>> +
+>> +asmlinkage void
+>> +__exception_irq_entry kirkwood_legacy_handle_irq(struct pt_regs *regs)
+>> +{
+>> +	u32 stat;
+>> +
+>> +	stat = readl_relaxed(kirkwood_irq_base + IRQ_CAUSE_LOW_OFF);
+>> +	stat &= readl_relaxed(kirkwood_irq_base + IRQ_MASK_LOW_OFF);
+>> +	if (stat) {
+>> +		unsigned int hwirq = __fls(stat);
+>> +		handle_IRQ(hwirq, regs);
+>> +		return;
+>> +	}
+>> +	stat = readl_relaxed(kirkwood_irq_base + IRQ_CAUSE_HIGH_OFF);
+>> +	stat &= readl_relaxed(kirkwood_irq_base + IRQ_MASK_HIGH_OFF);
+>> +	if (stat) {
+>> +		unsigned int hwirq = 32 + __fls(stat);
+>> +		handle_IRQ(hwirq, regs);
+>> +		return;
+>> +	}
+>> +}
+>> +#endif
+>> +
+>>  void __init kirkwood_init_irq(void)
+>>  {
+>>  	orion_irq_init(0, IRQ_VIRT_BASE + IRQ_MASK_LOW_OFF);
+>>  	orion_irq_init(32, IRQ_VIRT_BASE + IRQ_MASK_HIGH_OFF);
+>>  
+>> +#ifdef CONFIG_MULTI_IRQ_HANDLER
+>> +	set_handle_irq(kirkwood_legacy_handle_irq);
+>> +#endif
+>> +
+>>  	/*
+>>  	 * Initialize gpiolib for GPIOs 0-49.
+>>  	 */
+>> diff --git a/arch/arm/plat-orion/irq.c b/arch/arm/plat-orion/irq.c
+>> index 807df14..27ec18b 100644
+>> --- a/arch/arm/plat-orion/irq.c
+>> +++ b/arch/arm/plat-orion/irq.c
+>> @@ -20,47 +20,6 @@
+>>  #include <plat/orion-gpio.h>
+>>  #include <mach/bridge-regs.h>
+>>  
+>> -#ifdef CONFIG_MULTI_IRQ_HANDLER
+>> -/*
+>> - * Compiling with both non-DT and DT support enabled, will
+>> - * break asm irq handler used by non-DT boards. Therefore,
+>> - * we provide a C-style irq handler even for non-DT boards,
+>> - * if MULTI_IRQ_HANDLER is set.
+>> - *
+>> - * Notes:
+>> - * - this is prepared for Kirkwood and Dove only, update
+>> - *   accordingly if you add Orion5x or MV78x00.
+>> - * - Orion5x uses different macro names and has only one
+>> - *   set of CAUSE/MASK registers.
+>> - * - MV78x00 uses the same macro names but has a third
+>> - *   set of CAUSE/MASK registers.
+>> - *
+>> - */
+>> -
+>> -static void __iomem *orion_irq_base = IRQ_VIRT_BASE;
+>> -
+>> -asmlinkage void
+>> -__exception_irq_entry orion_legacy_handle_irq(struct pt_regs *regs)
+>> -{
+>> -	u32 stat;
+>> -
+>> -	stat = readl_relaxed(orion_irq_base + IRQ_CAUSE_LOW_OFF);
+>> -	stat &= readl_relaxed(orion_irq_base + IRQ_MASK_LOW_OFF);
+>> -	if (stat) {
+>> -		unsigned int hwirq = __fls(stat);
+>> -		handle_IRQ(hwirq, regs);
+>> -		return;
+>> -	}
+>> -	stat = readl_relaxed(orion_irq_base + IRQ_CAUSE_HIGH_OFF);
+>> -	stat &= readl_relaxed(orion_irq_base + IRQ_MASK_HIGH_OFF);
+>> -	if (stat) {
+>> -		unsigned int hwirq = 32 + __fls(stat);
+>> -		handle_IRQ(hwirq, regs);
+>> -		return;
+>> -	}
+>> -}
+>> -#endif
+>> -
+>>  void __init orion_irq_init(unsigned int irq_start, void __iomem *maskaddr)
+>>  {
+>>  	struct irq_chip_generic *gc;
+>> @@ -78,10 +37,6 @@ void __init orion_irq_init(unsigned int irq_start, void __iomem *maskaddr)
+>>  	ct->chip.irq_unmask = irq_gc_mask_set_bit;
+>>  	irq_setup_generic_chip(gc, IRQ_MSK(32), IRQ_GC_INIT_MASK_CACHE,
+>>  			       IRQ_NOREQUEST, IRQ_LEVEL | IRQ_NOPROBE);
+>> -
+>> -#ifdef CONFIG_MULTI_IRQ_HANDLER
+>> -	set_handle_irq(orion_legacy_handle_irq);
+>> -#endif
+>>  }
+>>  
+>>  #ifdef CONFIG_OF
+>> -- 
+>> 1.9.2
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
