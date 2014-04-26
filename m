@@ -1,84 +1,98 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 26 Apr 2014 19:49:13 +0900
-Subject: [PATCHv4 2/7] ARM: EXYNOS: Support secondary CPU boot of
- Exynos4212
-In-Reply-To: <535B00E5.4060903@gmail.com>
-References: <1398388572-30239-1-git-send-email-cw00.choi@samsung.com>
- <1398388572-30239-3-git-send-email-cw00.choi@samsung.com>
- <535B00E5.4060903@gmail.com>
-Message-ID: <0b3601cf613d$29ae93c0$7d0bbb40$@samsung.com>
+Date: Sat, 26 Apr 2014 20:01:47 +0900
+Subject: [PATCH v8 1/3] ARM: EXYNOS: initial board support for exynos5260
+ SoC
+In-Reply-To: <CAPdUM4O3imVNv3A3K1uEkfohc-r668SC6mVZQRCO8N+waxyb4w@mail.gmail.com>
+References: <1397620738-14431-1-git-send-email-rahul.sharma@samsung.com>
+ <1397620738-14431-2-git-send-email-rahul.sharma@samsung.com>
+ <534E3803.5010404@gmail.com>
+ <CAK9yfHztqGWhUJ=PNc7L-epu48PkEM6=v6JFDZ1n52NBeOUB8w@mail.gmail.com>
+ <534E3AE7.10907@gmail.com> <00eb01cf5e7b$4eb9edf0$ec2dc9d0$@samsung.com>
+ <CAPdUM4O3imVNv3A3K1uEkfohc-r668SC6mVZQRCO8N+waxyb4w@mail.gmail.com>
+Message-ID: <0b4101cf613e$eb2d87d0$c1889770$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa wrote:
+Rahul Sharma wrote:
 > 
-> Hi,
+> Hi Kukjin,
 > 
 Hi,
 
-> On 25.04.2014 03:16, Chanwoo Choi wrote:
-> > From: Kyungmin Park <kyungmin.park@samsung.com>
-> >
-> > This patch fix the offset of CPU boot address and change parameter of
-> smc call
-> > of SMC_CMD_CPU1BOOT command for Exynos4212.
-> >
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> > ---
-> >   arch/arm/mach-exynos/firmware.c | 15 ++++++++++++++-
-> >   1 file changed, 14 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-
-> exynos/firmware.c
-> > index 932129e..aa01c42 100644
-> > --- a/arch/arm/mach-exynos/firmware.c
-> > +++ b/arch/arm/mach-exynos/firmware.c
-> > @@ -18,6 +18,8 @@
-> >
-> >   #include <mach/map.h>
-> >
-> > +#include <plat/cpu.h>
-> > +
-> >   #include "smc.h"
-> >
-> >   static int exynos_do_idle(void)
-> > @@ -28,13 +30,24 @@ static int exynos_do_idle(void)
-> >
-> >   static int exynos_cpu_boot(int cpu)
-> >   {
-> > +	/*
-> > +	 * The second parameter of SMC_CMD_CPU1BOOT command means CPU id.
-> > +	 * But, Exynos4212 has only one secondary CPU so second parameter
-> > +	 * isn't used for informing secure firmware about CPU id.
-> > +	 */
-> > +	if (soc_is_exynos4212())
-> > +		cpu = 0;
-> > +
-> >   	exynos_smc(SMC_CMD_CPU1BOOT, cpu, 0, 0);
-> >   	return 0;
-> >   }
-> >
-> >   static int exynos_set_cpu_boot_addr(int cpu, unsigned long boot_addr)
-> >   {
-> > -	void __iomem *boot_reg = S5P_VA_SYSRAM_NS + 0x1c + 4*cpu;
-> > +	void __iomem *boot_reg = S5P_VA_SYSRAM_NS + 0x1c;
-> > +
-> > +	if (!soc_is_exynos4212())
-> > +		boot_reg += 4*cpu;
-> >
-> >   	__raw_writel(boot_addr, boot_reg);
-> >   	return 0;
-> >
+> Need this macro to enable build for clock driver.
 > 
-> This patch should be applied independently of Exynos3250 support.
-> Kukjin, what do you think?
-> 
-Yes, this should be separated. I will pick this into fixes.
+I found it in your patch, "clk/exynos5260: add clock file for exynos5260".
+For consistency, I'm fine on this, if Tomasz has no objection me to pick
+this into samsung tree for the 5260 clock stuff
+"drivers/clk/samsung/Makefile".
 
-> Anyway,
-> 
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> 
 Thanks,
 Kukjin
+
+> Regards,
+> Rahul Sharma.
+> 
+> 
+> On 22 April 2014 15:36, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > Tomasz Figa wrote:
+> >>
+> >> On 16.04.2014 10:08, Sachin Kamat wrote:
+> >> > Hi Tomasz,
+> >> >
+> >> > On 16 April 2014 13:27, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> >> >> Hi Rahul,
+> >> >>
+> >> >>
+> >> >> On 16.04.2014 05:58, Rahul Sharma wrote:
+> >> >>>
+> >> >>> From: Pankaj Dubey <pankaj.dubey@samsung.com>
+> >> >>>
+> >> >>> This patch add basic arch side support for exynos5260 SoC.
+> >> >>>
+> >> >>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> >> >>> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+> >> >>> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> >> >>> ---
+> >> >>>    arch/arm/mach-exynos/Kconfig |    5 +++++
+> >> >>>    1 file changed, 5 insertions(+)
+> >> >>>
+> >> >>> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-
+> >> exynos/Kconfig
+> >> >>> index fc8bf18..bf4ed87 100644
+> >> >>> --- a/arch/arm/mach-exynos/Kconfig
+> >> >>> +++ b/arch/arm/mach-exynos/Kconfig
+> >> >>> @@ -84,6 +84,11 @@ config SOC_EXYNOS5250
+> >> >>>          help
+> >> >>>            Enable EXYNOS5250 SoC support
+> >> >>>
+> >> >>> +config SOC_EXYNOS5260
+> >> >>> +       bool "SAMSUNG EXYNOS5260"
+> >> >>> +       default y
+> >> >>> +       depends on ARCH_EXYNOS5
+> >> >>> +
+> >> >>>    config SOC_EXYNOS5420
+> >> >>>          bool "SAMSUNG EXYNOS5420"
+> >> >>>          default y
+> >> >>>
+> >> >>
+> >> >> Is this patch necessary now? After Sachin's consolidation series
+> there
+> >> are
+> >> >> no per SoC entries anymore.
+> >> >
+> >> > Kukjin still wanted individual SoCs to be selectable. Please refer
+> [1].
+> >> >
+> >> > [1] http://www.spinics.net/lists/devicetree/msg27040.html
+> >>
+> >> I don't think any valid reason was presented there. Features in code
+> >> should not be selected using #ifdef CONFIG_ anymore, so I don't really
+> >> see any reason to not proceed with this consolidation. Olof, Arnd?
+> >>
+> > Hi,
+> >
+> > Yeah, in this case, nothing happened with adding SOC_EXYNOS5260. So I
+> don't have any idea why this is required.
+> >
+> > - Kukjin
+> >
