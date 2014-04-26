@@ -1,42 +1,226 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sat, 26 Apr 2014 10:38:07 +0100
-Subject: [PATCH 0/3] arm64: Default to non-coherent DMA ops
-In-Reply-To: <CAL_JsqLbZDq36kfayBnnXw3UYwu_02WNCS2bqKS8iEzrG_CJeg@mail.gmail.com>
-References: <1398447254-18527-1-git-send-email-catalin.marinas@arm.com>
- <CAL_JsqLbZDq36kfayBnnXw3UYwu_02WNCS2bqKS8iEzrG_CJeg@mail.gmail.com>
-Message-ID: <5FB9595D-1647-45FE-A68C-F4E6DA7FB77A@arm.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sat, 26 Apr 2014 11:40:41 +0200
+Subject: [PATCH v2 4/7] pinctrl: berlin: add the BG2CD pinctrl driver
+In-Reply-To: <1398268276-9696-5-git-send-email-antoine.tenart@free-electrons.com>
+References: <1398268276-9696-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1398268276-9696-5-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <535B7F19.4070004@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 Apr 2014, at 19:19, Rob Herring <robherring2@gmail.com> wrote:
-> On Fri, Apr 25, 2014 at 12:34 PM, Catalin Marinas
-> <catalin.marinas@arm.com> wrote:
->> Following recent discussions and patch from Ritesh, I'm planning to
->> align the default DMA ops with 32-bit arm and make them non-coherent. In
->> addition, we need to make sure that devices marked explicitly as
->> coherent use the correct dma ops. Until Santosh's DMA patches get
->> reviewed/merged, the temporary solution is bus notifiers which check the
->> "dma-coherent" property and set the right dma ops.
+On 04/23/2014 05:51 PM, Antoine T?nart wrote:
+> Add the pin-controller driver for the Berlin BG2CD SoC, with definition
+> of its groups and functions. This uses the core Berlin pinctrl driver.
 > 
-> Is this for 3.15? If not, don't you think Santosh's patches will be
-> ready for 3.16.
+> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+> ---
+[...]
+> diff --git a/drivers/pinctrl/berlin/berlin-bg2cd.c b/drivers/pinctrl/berlin/berlin-bg2cd.c
+> new file mode 100644
+> index 000000000000..a12da1828bc9
+> --- /dev/null
+> +++ b/drivers/pinctrl/berlin/berlin-bg2cd.c
+> @@ -0,0 +1,194 @@
+> +/*
+> + * Marvell Berlin BG2CD pinctrl driver.
+> + *
+> + * Copyright (C) 2014 Marvell Technology Group Ltd.
+> + *
+> + * Antoine T?nart <antoine.tenart@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2. This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/of_device.h>
+> +#include <linux/platform_device.h>
+> +
+> +#include "berlin.h"
+> +
+> +static const struct berlin_desc_group berlin2cd_soc_pinctrl_groups[] = {
+> +	/* G */
+> +	BERLIN_PINCTRL_GROUP("G0", 0x00, 0x1, 0x00,
+> +		BERLIN_PINCTRL_FUNCTION(0x0, "jtag"),
+> +		BERLIN_PINCTRL_FUNCTION(0x1, "gpio"),
+> +		BERLIN_PINCTRL_FUNCTION(0x2, "led"),
+> +		BERLIN_PINCTRL_FUNCTION(0x3, "pwm")),
+> +	BERLIN_PINCTRL_GROUP("G1", 0x00, 0x2, 0x01,
+> +		BERLIN_PINCTRL_FUNCTION(0x0, "gpio"),
+> +		BERLIN_PINCTRL_FUNCTION(0x1, "sd0"),
+> +		BERLIN_PINCTRL_FUNCTION(0x6, "usb0_dbg"),
+> +		BERLIN_PINCTRL_FUNCTION(0x7, "usb1_dbg")),
+> +	BERLIN_PINCTRL_GROUP("G2", 0x00, 0x2, 0x02,
+> +		BERLIN_PINCTRL_FUNCTION(0x0, "gpio"),
+> +		BERLIN_PINCTRL_FUNCTION(0x1, "sd0"),
+> +		BERLIN_PINCTRL_FUNCTION(0x2, "fe"),
+> +		BERLIN_PINCTRL_FUNCTION(0x3, "pll"),
+> +		BERLIN_PINCTRL_FUNCTION(0x6, "usb0_dbg"),
+> +		BERLIN_PINCTRL_FUNCTION(0x7, "usb1_dbg")),
+> +	BERLIN_PINCTRL_GROUP("G3", 0x00, 0x2, 0x04,
+> +		BERLIN_PINCTRL_FUNCTION(0x0, "gpio"),
+> +		BERLIN_PINCTRL_FUNCTION(0x1, "sd0"),
+> +		BERLIN_PINCTRL_FUNCTION(0x2, "tw2"),
 
-I initially only wanted to push the default non-coherent patch in 3.15
-(first in this series) before more people assume the DMA is coherent.
-But since the xgene sata driver is already merged and expects coherent
-DMA, I came up with this workaround (inspired by highbank ;)). It?s
-not that the first patch breaks its functionality, it just makes it
-slower.
+s/tw/twsi/ and for all below.
 
-> I need to take another look, but I'm pretty much happy
-> with them. My only issue really is whether we want to spread the use
-> of dma-coherent. Will did call my cute little property a hack, but I
-> have yet to see anything better.
+> +		BERLIN_PINCTRL_FUNCTION(0x3, "pll"),
+> +		BERLIN_PINCTRL_FUNCTION(0x4, "fe"),
+> +		BERLIN_PINCTRL_FUNCTION(0x6, "usb0_dbg"),
+> +		BERLIN_PINCTRL_FUNCTION(0x7, "usb1_dbg")),
+> +	BERLIN_PINCTRL_GROUP("G4", 0x00, 0x2, 0x06,
+> +		BERLIN_PINCTRL_FUNCTION(0x0, "gpio"),
+> +		BERLIN_PINCTRL_FUNCTION(0x1, "sd0"),
+> +		BERLIN_PINCTRL_FUNCTION(0x2, "tw3"),
+> +		BERLIN_PINCTRL_FUNCTION(0x3, "pll"),
+> +		BERLIN_PINCTRL_FUNCTION(0x4, "pwm"),
+> +		BERLIN_PINCTRL_FUNCTION(0x6, "usb0_dbg"),
+> +		BERLIN_PINCTRL_FUNCTION(0x7, "usb1_dbg")),
+> +	BERLIN_PINCTRL_GROUP("G5", 0x00, 0x3, 0x08,
+> +		BERLIN_PINCTRL_FUNCTION(0x0, "gpio"),
+> +		BERLIN_PINCTRL_FUNCTION(0x1, "sd0"),
+> +		BERLIN_PINCTRL_FUNCTION(0x2, "tw3"),
+> +		BERLIN_PINCTRL_FUNCTION(0x3, "arc"),
+> +		BERLIN_PINCTRL_FUNCTION(0x4, "pwm"),
+> +		BERLIN_PINCTRL_FUNCTION(0x6, "usb0_dbg"),
+> +		BERLIN_PINCTRL_FUNCTION(0x7, "usb1_dbg")),
+> +	BERLIN_PINCTRL_GROUP("G6", 0x00, 0x2, 0x0b,
+> +		BERLIN_PINCTRL_FUNCTION(0x0, "uart0"),	/* RX/TX */
+> +		BERLIN_PINCTRL_FUNCTION(0x1, "gpio")),
+> +	BERLIN_PINCTRL_GROUP("G7", 0x00, 0x3, 0x0d,
+> +		BERLIN_PINCTRL_FUNCTION(0x0, "eddc"),
+> +		BERLIN_PINCTRL_FUNCTION(0x1, "tw1"),
+> +		BERLIN_PINCTRL_FUNCTION(0x2, "gpio")),
+> +	BERLIN_PINCTRL_GROUP("G8", 0x00, 0x3, 0x10,
+> +		BERLIN_PINCTRL_FUNCTION(0x0, "ss0"),
+> +		BERLIN_PINCTRL_FUNCTION(0x1, "gpio")),
+> +	BERLIN_PINCTRL_GROUP("G9", 0x00, 0x3, 0x13,
+> +		BERLIN_PINCTRL_FUNCTION(0x0, "gpio"),
+> +		BERLIN_PINCTRL_FUNCTION(0x1, "spi1"),
+> +		BERLIN_PINCTRL_FUNCTION(0x2, "tw0")),
+> +	BERLIN_PINCTRL_GROUP("G10", 0x00, 0x2, 0x16,
+> +		BERLIN_PINCTRL_FUNCTION(0x0, "spi1"),
+> +		BERLIN_PINCTRL_FUNCTION(0x1, "gpio")),
+> +	BERLIN_PINCTRL_GROUP("G11", 0x00, 0x2, 0x18,
+> +		BERLIN_PINCTRL_FUNCTION(0x0, "spi1"),
+> +		BERLIN_PINCTRL_FUNCTION(0x1, "gpio")),
+> +	BERLIN_PINCTRL_GROUP("G12", 0x00, 0x3, 0x1a,
+> +		BERLIN_PINCTRL_FUNCTION(0x0, "usb1"),
+> +		BERLIN_PINCTRL_FUNCTION(0x1, "gpio")),
+> +	BERLIN_PINCTRL_GROUP("G13", 0x04, 0x3, 0x00,
+> +		BERLIN_PINCTRL_FUNCTION(0x0, "nand"),
+> +		BERLIN_PINCTRL_FUNCTION(0x1, "usb0_dbg"),
+> +		BERLIN_PINCTRL_FUNCTION(0x2, "usb1_dbg")),
+> +	BERLIN_PINCTRL_GROUP("G14", 0x04, 0x1, 0x03,
+> +		BERLIN_PINCTRL_FUNCTION(0x0, "nand"),
+> +		BERLIN_PINCTRL_FUNCTION(0x1, "gpio")),
+> +	BERLIN_PINCTRL_GROUP("G15", 0x04, 0x2, 0x04,
+> +		BERLIN_PINCTRL_FUNCTION(0x0, "jtag"),
+> +		BERLIN_PINCTRL_FUNCTION(0x1, "gpio")),
+> +	BERLIN_PINCTRL_GROUP("G16", 0x04, 0x3, 0x06,
+> +		BERLIN_PINCTRL_FUNCTION_UNKNOW),
 
-I agree, it?s the best we have so far. Maybe at some point we get
-proper system topology description and we can treat ?dma-coherent?
-as legacy property (but still support it). For arm64 we?ll soon need
-to also describe whether iommu ops are needed and that?s no longer a
-simple property.
+Remember to s/UNKNOW/UNKNOWN/
 
-Catalin
+Sebastian
+
+> +	BERLIN_PINCTRL_GROUP("G17", 0x04, 0x3, 0x09,
+> +		BERLIN_PINCTRL_FUNCTION_UNKNOW),
+> +	BERLIN_PINCTRL_GROUP("G18", 0x04, 0x1, 0x0c,
+> +		BERLIN_PINCTRL_FUNCTION_UNKNOW),
+> +	BERLIN_PINCTRL_GROUP("G19", 0x04, 0x1, 0x0d,
+> +		BERLIN_PINCTRL_FUNCTION_UNKNOW),
+> +	BERLIN_PINCTRL_GROUP("G20", 0x04, 0x1, 0x0e,
+> +		BERLIN_PINCTRL_FUNCTION_UNKNOW),
+> +	BERLIN_PINCTRL_GROUP("G21", 0x04, 0x3, 0x0f,
+> +		BERLIN_PINCTRL_FUNCTION_UNKNOW),
+> +	BERLIN_PINCTRL_GROUP("G22", 0x04, 0x3, 0x12,
+> +		BERLIN_PINCTRL_FUNCTION_UNKNOW),
+> +	BERLIN_PINCTRL_GROUP("G23", 0x04, 0x3, 0x15,
+> +		BERLIN_PINCTRL_FUNCTION_UNKNOW),
+> +	BERLIN_PINCTRL_GROUP("G24", 0x04, 0x2, 0x18,
+> +		BERLIN_PINCTRL_FUNCTION_UNKNOW),
+> +	BERLIN_PINCTRL_GROUP("G25", 0x04, 0x2, 0x1a,
+> +		BERLIN_PINCTRL_FUNCTION_UNKNOW),
+> +	BERLIN_PINCTRL_GROUP("G26", 0x04, 0x1, 0x1c,
+> +		BERLIN_PINCTRL_FUNCTION_UNKNOW),
+> +	BERLIN_PINCTRL_GROUP("G27", 0x04, 0x1, 0x1d,
+> +		BERLIN_PINCTRL_FUNCTION_UNKNOW),
+> +	BERLIN_PINCTRL_GROUP("G28", 0x04, 0x2, 0x1e,
+> +		BERLIN_PINCTRL_FUNCTION_UNKNOW),
+> +};
+> +
+> +static const struct berlin_desc_group berlin2cd_sysmgr_pinctrl_groups[] = {
+> +	/* GSM */
+> +	BERLIN_PINCTRL_GROUP("GSM0", 0x40, 0x2, 0x00,
+> +		BERLIN_PINCTRL_FUNCTION_UNKNOW),
+> +	BERLIN_PINCTRL_GROUP("GSM1", 0x40, 0x2, 0x02,
+> +		BERLIN_PINCTRL_FUNCTION_UNKNOW),
+> +	BERLIN_PINCTRL_GROUP("GSM2", 0x40, 0x2, 0x04,
+> +		BERLIN_PINCTRL_FUNCTION_UNKNOW),
+> +	BERLIN_PINCTRL_GROUP("GSM3", 0x40, 0x2, 0x06,
+> +		BERLIN_PINCTRL_FUNCTION_UNKNOW),
+> +	BERLIN_PINCTRL_GROUP("GSM4", 0x40, 0x2, 0x08,
+> +		BERLIN_PINCTRL_FUNCTION_UNKNOW),
+> +	BERLIN_PINCTRL_GROUP("GSM5", 0x40, 0x2, 0x0a,
+> +		BERLIN_PINCTRL_FUNCTION_UNKNOW),
+> +	BERLIN_PINCTRL_GROUP("GSM6", 0x40, 0x2, 0x0c,
+> +		BERLIN_PINCTRL_FUNCTION_UNKNOW),
+> +	BERLIN_PINCTRL_GROUP("GSM7", 0x40, 0x1, 0x0e,
+> +		BERLIN_PINCTRL_FUNCTION_UNKNOW),
+> +	BERLIN_PINCTRL_GROUP("GSM8", 0x40, 0x1, 0x0f,
+> +		BERLIN_PINCTRL_FUNCTION_UNKNOW),
+> +	BERLIN_PINCTRL_GROUP("GSM9", 0x40, 0x1, 0x10,
+> +		BERLIN_PINCTRL_FUNCTION_UNKNOW),
+> +	BERLIN_PINCTRL_GROUP("GSM10", 0x40, 0x1, 0x11,
+> +		BERLIN_PINCTRL_FUNCTION_UNKNOW),
+> +	BERLIN_PINCTRL_GROUP("GSM11", 0x40, 0x1, 0x12,
+> +		BERLIN_PINCTRL_FUNCTION_UNKNOW),
+> +};
+> +
+> +static const struct berlin_pinctrl_desc berlin2cd_soc_pinctrl_data = {
+> +	.groups = berlin2cd_soc_pinctrl_groups,
+> +	.ngroups = ARRAY_SIZE(berlin2cd_soc_pinctrl_groups),
+> +};
+> +
+> +static const struct berlin_pinctrl_desc berlin2cd_sysmgr_pinctrl_data = {
+> +	.groups = berlin2cd_sysmgr_pinctrl_groups,
+> +	.ngroups = ARRAY_SIZE(berlin2cd_sysmgr_pinctrl_groups),
+> +};
+> +
+> +static const struct of_device_id berlin2cd_pinctrl_match[] = {
+> +	{
+> +		.compatible = "marvell,berlin2cd-soc-pinctrl",
+> +		.data = &berlin2cd_soc_pinctrl_data
+> +	},
+> +	{
+> +		.compatible = "marvell,berlin2cd-sysmgr-pinctrl",
+> +		.data = &berlin2cd_sysmgr_pinctrl_data
+> +	},
+> +	{}
+> +};
+> +MODULE_DEVICE_TABLE(of, berlin2cd_pinctrl_match);
+> +
+> +static int berlin2cd_pinctrl_probe(struct platform_device *pdev)
+> +{
+> +	const struct of_device_id
+> +		*device = of_match_device(berlin2cd_pinctrl_match, &pdev->dev);
+> +
+> +	return berlin_pinctrl_probe(pdev, device->data);
+> +}
+> +
+> +static struct platform_driver berlin2cd_pinctrl_driver = {
+> +	.probe	= berlin2cd_pinctrl_probe,
+> +	.driver	= {
+> +		.name = "berlin-bg2cd-pinctrl",
+> +		.owner = THIS_MODULE,
+> +		.of_match_table = berlin2cd_pinctrl_match,
+> +	},
+> +};
+> +module_platform_driver(berlin2cd_pinctrl_driver);
+> +
+> +MODULE_AUTHOR("Antoine T?nart <antoine.tenart@free-electrons.com>");
+> +MODULE_DESCRIPTION("Marvell Berlin BG2CD pinctrl driver");
+> +MODULE_LICENSE("GPL");
+> 
