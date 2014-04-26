@@ -1,205 +1,31 @@
-From: graeme@xora.org.uk (Graeme Gregory)
-Date: Sat, 26 Apr 2014 13:09:39 +0100
-Subject: [PATCH v3 part1 04/11] ARM64 / ACPI: Introduce arm-core.c and
- its related head file
-In-Reply-To: <20140425183848.GE28819@e106331-lin.cambridge.arm.com>
-References: <1398432017-8506-1-git-send-email-hanjun.guo@linaro.org>
- <1398432017-8506-5-git-send-email-hanjun.guo@linaro.org>
- <20140425155147.GA28819@e106331-lin.cambridge.arm.com>
- <20140425165320.GD1186@xora-haswell>
- <20140425183848.GE28819@e106331-lin.cambridge.arm.com>
-Message-ID: <20140426120939.GA9567@xora-haswell>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 26 Apr 2014 10:21:32 -0400
+Subject: [PATCH v2 05/38] memory: mvebu-devbus: use ARMADA_ prefix in
+ defines
+In-Reply-To: <1398202002-28530-6-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1398202002-28530-6-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140426142132.GU28159@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 25, 2014 at 07:38:48PM +0100, Mark Rutland wrote:
-> On Fri, Apr 25, 2014 at 05:53:20PM +0100, Graeme Gregory wrote:
-> > On Fri, Apr 25, 2014 at 04:51:47PM +0100, Mark Rutland wrote:
-> > > Hi Hanjun,
-> > > 
-> > > On Fri, Apr 25, 2014 at 02:20:10PM +0100, Hanjun Guo wrote:
-> > > > ACPI core need lots extern variables and functions which should
-> > > > be provided by arch dependent code to make itself compilable. so
-> > > > introduce arm_core.c and its related header file here.
-> > > > 
-> > > > acpi_boot_table_init() will be called in setup_arch() before
-> > > > paging_init(), so we should use eary_ioremap() mechanism here
-> > > > to get the RSDP and all the table pointers, with this patch,
-> > > > we can get ACPI boot-time tables from firmware on ARM64.
-> > > > 
-> > > > Signed-off-by: Al Stone <al.stone@linaro.org>
-> > > > Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
-> > > > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> > > > Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> > > > ---
-> > > >  arch/arm64/include/asm/acpi.h |   53 +++++++++++++++++++
-> > > >  arch/arm64/kernel/setup.c     |    4 ++
-> > > >  drivers/acpi/Makefile         |    2 +
-> > > >  drivers/acpi/plat/Makefile    |    1 +
-> > > >  drivers/acpi/plat/arm-core.c  |  113 +++++++++++++++++++++++++++++++++++++++++
-> > > >  5 files changed, 173 insertions(+)
-> > > >  create mode 100644 drivers/acpi/plat/Makefile
-> > > >  create mode 100644 drivers/acpi/plat/arm-core.c
-> > > > 
-> > > > diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-> > > > index e3e990e..3ac9dfb 100644
-> > > > --- a/arch/arm64/include/asm/acpi.h
-> > > > +++ b/arch/arm64/include/asm/acpi.h
-> > > > @@ -19,6 +19,43 @@
-> > > >  #ifndef _ASM_ACPI_H
-> > > >  #define _ASM_ACPI_H
-> > > >  
-> > > > +#include <asm/cacheflush.h>
-> > > > +
-> > > > +#include <linux/init.h>
-> > > > +
-> > > > +#define COMPILER_DEPENDENT_INT64	s64
-> > > > +#define COMPILER_DEPENDENT_UINT64	u64
-> > > 
-> > > Is there any reason this can't be in a common ACPI header shared be ia64
-> > > and x86 too? Given we already have generic types for this it seems
-> > > pointless to define this in each architecture.
-> > > 
-> > > It looks like include/acpi/actypes.h tries to do that already...
-> > > 
-> > Yes I think we can replace that with uint64_t and int64_t types.
-> > 
+Thomas,
 
-I have dug into this deeper and since include/acpi/platform/aclinux.h
-defines ACPI_USE_SYSTEM_INTTYPES then these defines should not be used
-at all and it should be safe for us to just not have them in arm64
+On Tue, Apr 22, 2014 at 11:26:09PM +0200, Thomas Petazzoni wrote:
+> The mvebu-devbus driver currently only supports the Armada 370/XP
+> family, but it can also cover the Orion5x family. However, the Orion5x
+> family has a different organization of the register. Therefore, in
+> preparation to the introduction of Orion5x support, we rename the
+> Armada 370/XP specific definitions to have an ARMADA_ prefix.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  drivers/memory/mvebu-devbus.c | 48 +++++++++++++++++++++----------------------
+>  1 file changed, 24 insertions(+), 24 deletions(-)
 
-I guess they are historic in x86/ia64
+Patches 5 through 9 (devbus) applied to mvebu/drivers With Sebastian's
+Acks and a dep on mvebu/fixes.
 
-> > > > +
-> > > > +/*
-> > > > + * Calling conventions:
-> > > > + *
-> > > > + * ACPI_SYSTEM_XFACE        - Interfaces to host OS (handlers, threads)
-> > > > + * ACPI_EXTERNAL_XFACE      - External ACPI interfaces
-> > > > + * ACPI_INTERNAL_XFACE      - Internal ACPI interfaces
-> > > > + * ACPI_INTERNAL_VAR_XFACE  - Internal variable-parameter list interfaces
-> > > > + */
-> > > > +#define ACPI_SYSTEM_XFACE
-> > > > +#define ACPI_EXTERNAL_XFACE
-> > > > +#define ACPI_INTERNAL_XFACE
-> > > > +#define ACPI_INTERNAL_VAR_XFACE
-> > > > +
-> > > > +/* Asm macros */
-> > > > +#define ACPI_FLUSH_CPU_CACHE() flush_cache_all()
-> > > 
-> > > This almost certainly does not do what you think it does.
-> > > 
-> > > flush_cache_all walks the architected levels of cache visible to the
-> > > current CPU (i.e. those in CLIDR_EL1), and walks over each cache line at
-> > > that level, cleaning and evicting it. It also flushes the I-cache (which
-> > > I don't think you care about here).
-> > > 
-> > > This is NOT safe if the cache is enabled. Lines can migrate between
-> > > levels in the middle of the sequence.
-> > > 
-> > > In an SMP system this does NOT guarantee that data is evicted to memory,
-> > > even if the cache is disabled. Other CPUs with caches enabled can
-> > > acquire a cacheline (even if dirty) and it can sit in their cache.
-> > > 
-> > > In a UP system or an SMP system where all other architected caches are
-> > > disabled (and flushed) this does NOT guarantee that data hits memory. In
-> > > the presence of a system-level cache this will simply flush the data out
-> > > to said system-level rather than memory.
-> > > 
-> > > I believe the intent here is to have something analogous to WBINVD for
-> > > use in idle. Unfortunately there simply isn't anything analogous.
-> > > Luckily in the presence of PSCI, the PSCI implementation should do all
-> > > of the cache maintenance required to prevent any data loss and/or
-> > > corruption, and anything we need to have visible to noncacheable
-> > > accesses (i.e. flushed out to memory) we should be able to flush by VA.
-> > > 
-> > > This maintenance is unsafe, and shouldn't be necessary on any sane
-> > > system. Please get rid of it. I would very much like to get rid of
-> > > flush_cache_all() before its misuse spreads further.
-> > > 
-> > Thanks for explanation Mark, you are correct on x86 it is defined as
-> > wbinvd().
-> > 
-> > I think looking at where it is actually used we can make this an empty
-> > macro on arm64 for now. Where it used are areas we don't currently
-> > execute and need arm64 replacements or refactorising to remove x86isms.
-> 
-> That sounds good. Is it worth putting a warn or similar there just in
-> case?
-> 
-> > 
-> > > > +/* Basic configuration for ACPI */
-> > > > +#ifdef	CONFIG_ACPI
-> > > > +extern int acpi_disabled;
-> > > > +extern int acpi_noirq;
-> > > > +extern int acpi_pci_disabled;
-> > > > +extern int acpi_strict;
-> > > 
-> > > This looks very odd. Why are these prototypes not coming from a header?
-> > > If they're defined in the same place, why not move the disable_acpi
-> > > function there?
-> > > 
-> > 
-> > This is a header :-)
-> 
-> True; I must get my eyes tested. :)
-> 
-> Are these variables expected to be used by needed by other code, or are
-> they just for the benefit of the static inlines in this header?
-> 
-> > I think this is a peculiarity of how acpica is incorporated into linux
-> > but will check.
-> 
-> Ok.
-> 
-> > 
-> > > > +static inline void disable_acpi(void)
-> > > > +{
-> > > > +	acpi_disabled = 1;
-> > > > +	acpi_pci_disabled = 1;
-> > > > +	acpi_noirq = 1;
-> > > > +}
-> > > 
-> > > [...]
-> > > 
-> > > > +/*
-> > > > + * __acpi_map_table() will be called before page_init(), so early_ioremap()
-> > > > + * or early_memremap() should be called here.
-> > > > + */
-> > > > +char *__init __acpi_map_table(unsigned long phys, unsigned long size)
-> > > > +{
-> > > > +	if (!phys || !size)
-> > > > +		return NULL;
-> > > 
-> > > Is there any reason that tables can't exist at physical address 0? It's
-> > > entirely valid to have memory there.
-> > > 
-> > > [...]
-> > > 
-> > On ARM64 there is not, we can fix this.
-> > 
-> > > > +int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
-> > > > +{
-> > > > +	*irq = -1;
-> > > > +
-> > > > +	return 0;
-> > > > +}
-> > > > +EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
-> > > 
-> > > This appears to be missing a giant warning that it does nothing useful.
-> > > 
-> > > I was under the impression that we were meant to use 0 to represent the
-> > > lack of an interrupt these days, too...
-> > > 
-> > We can fix this.
-> 
-> Sounds good!
-> 
-> Cheers,
-> Mark.
-> 
+thx,
 
-Thanks
-
-Graeme
+Jason.
