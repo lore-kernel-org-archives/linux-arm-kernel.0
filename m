@@ -1,57 +1,74 @@
-From: a.kesavan@samsung.com (Abhilash Kesavan)
-Date: Sun, 27 Apr 2014 02:08:40 +0530
-Subject: [PATCH RFC 0/8] Devfreq support for Exynos5250/5420
-Message-ID: <1398544728-2075-1-git-send-email-a.kesavan@samsung.com>
+From: socketcan@hartkopp.net (Oliver Hartkopp)
+Date: Sat, 26 Apr 2014 22:51:02 +0200
+Subject: can problems on socfpga [was Re: [PATCH v2 4/6] ARM: socfpga:
+ dts: add can0+1]
+In-Reply-To: <20140426203131.GA21832@amd.pavel.ucw.cz>
+References: <1396422700-3962-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1396422700-3962-4-git-send-email-s.trumtrar@pengutronix.de>
+ <20140404102815.GA9242@amd.pavel.ucw.cz>
+ <20140425195319.GA3677@amd.pavel.ucw.cz>
+ <1398457446.26387.0.camel@linux-builds1>
+ <1398461518.3587.11.camel@dinh-ubuntu>
+ <20140426093646.GE8730@amd.pavel.ucw.cz>
+ <20140426203131.GA21832@amd.pavel.ucw.cz>
+Message-ID: <535C1C36.40007@hartkopp.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds devfreq support on Exynos5250 and Exynos5420.
-The patches add the missing INT clock support for exynos5250 and
-also add a new 5420 driver. We also have patches which add the PPMU
-node and fix a typo in the exynos5250 driver.
 
-The patches have been tested on Exynos5250 based Snow board and SMDK5420
-EVT1 boards. They have been prepared on linux-next(20140424) with the
-devfreq for-next branch and Shaik Ameer Basha's clock cleanup patches
-merged (http://www.spinics.net/lists/arm-kernel/msg325313.html).
 
-There are a couple of concerns with these patches:
-1) The patches are using clock aliases to expose the required clocks to the
-devfreq driver.
-2) The patches are making use of different compatible strings for the PPMU
-node to differentiate between multiple SoCs even though the PPMU is the same.
+On 26.04.2014 22:31, Pavel Machek wrote:
+> On Sat 2014-04-26 11:36:46, Pavel Machek wrote:
+>> Hi!
+>>
+>>> To get this working well, I had to install a few of the patches that
+>>> Benedict Spranger submitted ([PATCH 05/16] c_can: use 32 bit access for
+>>> D_CAN) on 9/9/2013.
+>>>
+>>> I have the patches on our rocketboard branch
+>>> (rocketboards.org/gitweb/?p=linux-socfpga-git;a=summary)
+>>>
+>>> I planned to upstream these changes but there have been some major
+>>> changes to CAN recently that may require some refactoring.
+>>
+>> I ported those changes to 3.15-rc2 (but can't test them at the
+>> moment).
+> 
+> Ok, it seems it is possible to test CAN without actual can hardware
+> using loopback:
+> 
+> ip link set can0 up type can bitrate 125000 loopback on
+> ifconfig can0 up
+> candump can0 &
+> cansend can0 "123#DEADBEEF"
+> 
+> Moreover, it seems that previous two patches do the trick. Packets are
+> now echoed as expected. (Ok, small question is "why twice", but I
+> guess that's just CAN...?)
 
-Kindly suggest a way to move forward with respect to the above.
+Usually the CAN frame is echo'ed back when the CAN frame is successfully sent
+on the medium (tx ok interrupt, see: echo skb functionality in
+drivers/net/can/dev.c and in can.txt for multiuser capabilites).
 
-Abhilash Kesavan (4):
-  ARM: dts: Add PPMU device tree support for Exynos5250
-  ARM: dts: Add PPMU device tree support for Exynos5420
-  PM / devfreq: exynos: Fix typo in macro
-  PM / devfreq: Rename the exynos5250 devfreq driver
+The second CAN frame is obviouly created by some rx interrupt which occurs due
+to the loopback functionality inside the C_CAN controller - which is usually
+not enabled.
 
-Andrew Bresticker (2):
-  clk: exynos5250: add aliases for clocks used by devfreq
-  PM / devfreq: exynos5250: migrate to common-clock
+So it's a correct behaviour.
 
-Arjun.K.V (2):
-  clk: exynos5420: Add aliases for clocks used by devfreq
-  PM / devfreq: Add devfreq driver for Exynos5420
+Best regards,
+Oliver
 
- .../bindings/arm/exynos/ppmu-exynos5.txt           |  29 +
- arch/arm/boot/dts/exynos5250.dtsi                  |   9 +
- arch/arm/boot/dts/exynos5420.dtsi                  |   7 +
- drivers/clk/samsung/clk-exynos5250.c               |  30 +-
- drivers/clk/samsung/clk-exynos5420.c               |  77 ++-
- drivers/devfreq/Kconfig                            |  13 +-
- drivers/devfreq/Makefile                           |   3 +-
- drivers/devfreq/exynos/Makefile                    |   6 +-
- .../exynos/{exynos5_bus.c => exynos5250_bus.c}     | 131 +++-
- drivers/devfreq/exynos/exynos5420_bus.c            | 706 +++++++++++++++++++++
- drivers/devfreq/exynos/exynos_ppmu.h               |   2 +-
- 11 files changed, 961 insertions(+), 52 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/exynos/ppmu-exynos5.txt
- rename drivers/devfreq/exynos/{exynos5_bus.c => exynos5250_bus.c} (80%)
- create mode 100644 drivers/devfreq/exynos/exynos5420_bus.c
-
--- 
-1.8.3.2
+> 
+> root at sockit:~# ip link set can0 up type can bitrate 125000 loopback on
+> c_can_platform ffc00000.d_can can0: setting BTR=1c31 BRPE=0000
+> root at sockit:~# ifconfig can0 up
+> root at sockit:~# candump can0 &
+> root at sockit:~# cansend can0 "123#DEADBEEF"
+>   can0  123   [4]  DE AD BE EF
+>   can0  123   [4]  DE AD BE EF
+> root at sockit:~# 
+> 
+> Best regards,
+> 								Pavel
+> 
