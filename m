@@ -1,78 +1,75 @@
-From: elder@linaro.org (Alex Elder)
-Date: Fri, 25 Apr 2014 20:43:57 -0500
-Subject: [PATCH v2 RESEND 0/5] clk: bcm21664: add common clock support
-In-Reply-To: <20140426000915.7224.11265@quantum>
-References: <1398115587-32529-1-git-send-email-elder@linaro.org>
- <20140426000915.7224.11265@quantum>
-Message-ID: <535B0F5D.4020905@linaro.org>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Fri, 25 Apr 2014 22:45:09 -0300
+Subject: [PATCH v2 00/10] thermal: Armada 375/380 SoC support
+In-Reply-To: <20140426005516.GR28159@titan.lakedaemon.net>
+References: <1398371004-15807-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20140426005516.GR28159@titan.lakedaemon.net>
+Message-ID: <20140426014509.GA1043@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/25/2014 07:09 PM, Mike Turquette wrote:
-> Quoting Alex Elder (2014-04-21 14:26:22)
->> This is series has two parts.  The first two patches are changes
->> to the existing Broadcom Kona family clock code to prepare for the
->> addition of support for another SoC, bcm21664.
->>
->> The remaining three define the binding and code for bcm21664, and
->> replace the use of "fake" clocks in the device tree with the real
->> ones.  This ends up being a fairly straightforward definition of
->> the clocks on this SoC; the rest of the clock code is shared with
->> other SoCs that use the Kona style clock system.
+Hello Zhang,
+
+On Apr 25, Jason Cooper wrote:
+> On Thu, Apr 24, 2014 at 05:23:14PM -0300, Ezequiel Garcia wrote:
+> > This patchset adds the support for the thermal sensor in the recently
+> > introduced Armada 375 and 38x SoC. Compared to the previous patchset
+> > version, this v2 introduces the A380 SoC support.
+> > 
+> > The first five patches are preparation work. They add a generic
+> > infrastructure that allows to support similar thermal sensors in
+> > a non-intrusive way.
+> > 
+> > Patches six and seven uses this infrastructure to support the 
+> > Armada 375 and 380 SoC thermal sensor.
+> > 
+> > Since there are some issues in the Armada 375 Z1 SoC thermal sensor,
+> > patch eight adds a quirk to workaround such issues. The Z1 silicon stepping
+> > is detected and the compatible string is updated, so the driver can apply
+> > sensor initialization workarounds.
+> > 
+> > In addition, the quirk moves the offset of the thermal control register,
+> > and allows to specifiy the correct (A0 stepping) offset in the devicetree.
+> > This quirk is applied only for the A375-DB board, being the only board known
+> > to have the problematic Z1 SoC.
+> > 
+> > Finally, the last two patches enables the thermal sensor in the devicetree.
+> > for the Armada 375 A0 stepping SoC, and the Armada 380/385 SoCs.
+> > 
+> > The series applies on v3.15-rc1, and has been tested on A375-DB board
+> > and A385-DB board.
+> > 
+> > Feedback and comments are welcome!
+> > 
+> > Changes from v1:
+> > 
+> >   * Introduced the Armada 380 support. In order to support this in a clean
+> >     way, the 'inverted' field was added.
+> > 
+> >   * Cleaned the A375 workaround in the thermal driver, by detecting the
+> >     device compatible string, as suggested by Jason Cooper.
+> > 
+> >   * Added details about the register offset in the Z1 stepping to the
+> >     binding documentation as requested by Jason Cooper.
+> > 
+> > Ezequiel Garcia (10):
+> >   thermal: armada: Rename armada_thermal_ops struct
+> >   thermal: armada: Add infrastructure to support generic formulas
+> >   thermal: armada: Add generic infrastructure to handle the sensor
+> >   thermal: armada: Pass the platform_device to init_sensor()
+> >   thermal: armada: Allow to specify an 'inverted readout' sensor
+> >   thermal: armada: Support Armada 375 SoC
+> >   thermal: armada: Support Armada 380 SoC
 > 
-> Hi Alex,
+> Thermal series:
 > 
-> I'm happy to take only the clk patches or I can take the DT stuff as
-> well if it gets some Acks. Let me know how you want it handled.
-
-If all you need is an ack from Matt or Christian I'm
-sure they'll provide it.  I don't care much but if
-you'll take it all I can just consider it done, so
-that would be my slight preference.  The DT stuff has
-been out there for way past the requisite few weeks...
-
-Thanks Mike.
-
-					-Alex
-
-
-> Regards,
-> Mike
+> Acked-by: Jason Cooper <jason@lakedaemon.net>
 > 
->>
->> This series depends on the following patch, which has been taken
->> into the clk-fixes tree:
->>     clk: bcm281xx: don't use unnamed structs or unions
->>     https://lkml.org/lkml/2014/4/7/322
->>
->> In addition, it depends on the version 4 of the following series,
->> just (re)posted for review:
->>     clk: bcm281xx: updates
->>     https://lkml.org/lkml/2014/4/8/485
->>
->> The patches in this series--based on the current linus/master branch
->> plus the patches mentioned above--are available here:
->>     http://git.linaro.org/git/landing-teams/working/broadcom/kernel.git
->>     Branch review/bcm21664-clock-v2
->>
->> Alex Elder (5):
->>   clk: bcm281xx: move compatible string definitions
->>   ARM: dts: revise kona clock binding document
->>   ARM: dts: define clock binding for bcm21664
->>   clk: bcm21664: use common clock framework
->>   ARM: dts: use real clocks for bcm21664
->>
->>  .../devicetree/bindings/clock/bcm-kona-clock.txt   | 116 ++++++---
->>  arch/arm/boot/dts/bcm21664.dtsi                    | 190 +++++++++-----
->>  drivers/clk/bcm/Kconfig                            |   2 +-
->>  drivers/clk/bcm/Makefile                           |   1 +
->>  drivers/clk/bcm/clk-bcm21664.c                     | 290 +++++++++++++++++++++
->>  drivers/clk/bcm/clk-bcm281xx.c                     |  12 -
->>  include/dt-bindings/clock/bcm21664.h               |  62 +++++
->>  include/dt-bindings/clock/bcm281xx.h               |  12 +
->>  8 files changed, 565 insertions(+), 120 deletions(-)
->>  create mode 100644 drivers/clk/bcm/clk-bcm21664.c
->>  create mode 100644 include/dt-bindings/clock/bcm21664.h
->>
->> -- 
->> 1.9.1
+
+Do you have any comments about this?
+
+Thanks!
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
