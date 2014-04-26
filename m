@@ -1,46 +1,47 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 26 Apr 2014 20:23:42 +0200
-Subject: [linux-sunxi] [PATCH 1/2] ARM: sun7i: Add ARM PMU in A20 DTSI
-In-Reply-To: <1397847149-26501-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1397847149-26501-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <535BF9AE.9060904@redhat.com>
+Date: Sat, 26 Apr 2014 20:28:32 +0200
+Subject: [linux-sunxi] [PATCH] ARM: sun7i: Fix i2c4 base address
+In-Reply-To: <1397848511-30160-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1397848511-30160-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <535BFAD0.6030804@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 04/18/2014 08:52 PM, Maxime Ripard wrote:
-> Enable the performance monitoring unit found in the A20 SoCs.
+On 04/18/2014 09:15 PM, Maxime Ripard wrote:
+> For some reason, the base address of the fifth I2C adapter in the A20 was
+> incorrect. Change this to the actual base address.
 > 
+> Reported-by: Marcus Cooper <codekipper@gmail.com>
 > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Both patches look good and are:
+The datasheet agrees with this change:
 
-Reviewed-by: Hans de Goede <hdegoede@redhat.com>
+Acked-by: Hans de Goede <hdegoede@redhat.com>
 
 Regards,
 
 Hans
 
 > ---
->  arch/arm/boot/dts/sun7i-a20.dtsi | 6 ++++++
->  1 file changed, 6 insertions(+)
+>  arch/arm/boot/dts/sun7i-a20.dtsi | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
 > diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-> index 899fd0e2b749..cc0d37fe5ae1 100644
+> index 899fd0e2b749..9dd904d53bd3 100644
 > --- a/arch/arm/boot/dts/sun7i-a20.dtsi
 > +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-> @@ -57,6 +57,12 @@
->  			     <1 10 0xf08>;
->  	};
+> @@ -821,9 +821,9 @@
+>  			#size-cells = <0>;
+>  		};
 >  
-> +	pmu {
-> +		compatible = "arm,cortex-a7-pmu", "arm,cortex-a15-pmu";
-> +		interrupts = <0 120 4>,
-> +			     <0 121 4>;
-> +	};
-> +
->  	clocks {
->  		#address-cells = <1>;
->  		#size-cells = <1>;
+> -		i2c4: i2c at 01c2bc00 {
+> +		i2c4: i2c at 01c2c000 {
+>  			compatible = "allwinner,sun4i-i2c";
+> -			reg = <0x01c2bc00 0x400>;
+> +			reg = <0x01c2c000 0x400>;
+>  			interrupts = <0 89 4>;
+>  			clocks = <&apb1_gates 15>;
+>  			clock-frequency = <100000>;
 > 
