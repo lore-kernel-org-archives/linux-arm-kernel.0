@@ -1,106 +1,349 @@
-From: dubepankaj1980@gmail.com (Pankaj Dubey)
-Date: Sat, 26 Apr 2014 11:33:34 +0900
-Subject: [PATCH 1/4] ARM: dts: exynos4: add PMU syscon node
-In-Reply-To: <535AF52F.4090906@gmail.com>
-References: <1397479700-15864-1-git-send-email-chanho61.park@samsung.com>
- <1397479700-15864-2-git-send-email-chanho61.park@samsung.com>
- <535936A7.9050003@samsung.com>
- <CAGm_ybjhcAqX7biOvqLMgzHPQK=-EtaHtXpCtcJ1rcdRsxN_Og@mail.gmail.com>
- <535AF52F.4090906@gmail.com>
-Message-ID: <CAGcde9G1ynoOM9MqLbU05wzMGD=zC6NxqTY9EAOOFEa1Pr4fUg@mail.gmail.com>
+From: mporter@linaro.org (Matt Porter)
+Date: Fri, 25 Apr 2014 22:59:00 -0400
+Subject: [PATCH v2 RESEND 5/5] ARM: dts: use real clocks for bcm21664
+In-Reply-To: <1398115587-32529-6-git-send-email-elder@linaro.org>
+References: <1398115587-32529-1-git-send-email-elder@linaro.org>
+ <1398115587-32529-6-git-send-email-elder@linaro.org>
+Message-ID: <20140426025900.GH1127@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+On Mon, Apr 21, 2014 at 04:26:27PM -0500, Alex Elder wrote:
+> Replace the "fake" fixed-rate clocks used previously for the
+> bcm21664 family with "real" ones.
 
-On Sat, Apr 26, 2014 at 8:52 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> Hi Vikas,
->
->
-> On 25.04.2014 10:05, Vikas Sajjan wrote:
->>
->> Hi,
->>
->>
->> On Thu, Apr 24, 2014 at 9:37 PM, Tomasz Figa <t.figa@samsung.com> wrote:
->>>
->>> Hi Chanho,
->>>
->>>
->>> On 14.04.2014 14:48, Chanho Park wrote:
->>>>
->>>>
->>>> This patch adds a PMU(Power Management Unit) syscon node. This
->>>> should be required for USB Phy syscon regmap I/F.
->>>>
->>>> Cc: Tomasz Figa <t.figa@samsung.com>
->>>> Cc: Kamil Debski <k.debski@samsung.com>
->>>> Signed-off-by: Chanho Park <chanho61.park@samsung.com>
->>>> ---
->>>>    arch/arm/boot/dts/exynos4.dtsi | 5 +++++
->>>>    1 file changed, 5 insertions(+)
->>>>
->>>> diff --git a/arch/arm/boot/dts/exynos4.dtsi
->>>> b/arch/arm/boot/dts/exynos4.dtsi
->>>> index 2f8bcd0..e565b86 100644
->>>> --- a/arch/arm/boot/dts/exynos4.dtsi
->>>> +++ b/arch/arm/boot/dts/exynos4.dtsi
->>>> @@ -110,6 +110,11 @@
->>>>                  reg = <0x10010000 0x400>;
->>>>          };
->>>>
->>>> +       pmu_reg: syscon at 10020000 {
->>>> +               compatible = "samsung,exynos4-pmureg", "syscon";
->>>
->>>
->>
->>   Assume a case where exynos PMU is made as platform driver [1] and we
->> need use the compatible  "samsung,exynos4-pmureg" in the driver.
->> But since syscon driver uses compatible "syscon" and once the syscon
->> driver is probed, the  exynos PMU platform driver [1] will NEVER be
->> probed.
->> So my question is, can we have 2 compatible strings for a DT node, and
->> both the compatible strings are used for probing purpose?
->> Recently I faced this issue on exynos5250, where i was testing PMU
->> driver [1] and I noticed that  PMU driver [1] was NEVER probed, if I
->> enable syscon driver in menuconfig.
->
->
-> No, it is not possible to bind two drivers with different compatible strings
-> to the same node. Basically this is because only one platform driver can be
-> bound to particular platform device.
->
+> 
+> Signed-off-by: Alex Elder <elder@linaro.org>
 
-Yes, correct.
+Acked-by: Matt Porter <mporter@linaro.org>
 
-> The rule is that the most specific compatible string (e.g. the first from
-> the left) that matches should be used, but I'm not sure if this is
-> implemented this way in Linux kernel, especially considering that a platform
-> driver usually probes when it is being registered. So we might have a race
-> here, which you can work around by making sure that your PMU driver is
-> always registered first (e.g. by lowering its initcall level).
->
-
-I don't see it's using first compatible string from the left. I can
-see whichever driver registers platform driver first, it's probe is
-getting called. As in this particular case, PMU has two compatibility
-string as "samsung, exynosxxx-pmu", "syscon". But since "syscon"
-driver registers it's platform driver in postcore_initcall where as
-PMU platform driver [1], was registering as arch_initcall, only
-"syscon" probe got called.
-
-In my V2 patch for converting PMU as driver form, I dropped idea of
-converting into platform driver, because we can't remove "syscon" from
-binding as many other driver wants to access PMU register via regmap
-handle. By lowering it's initcall level may be I can make PMU probe
-gets called but then how other drivers will be able to access PMU
-regmap handles?
-
-> Best regards,
-> Tomasz
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> ---
+>  arch/arm/boot/dts/bcm21664.dtsi | 190 +++++++++++++++++++++++++---------------
+>  1 file changed, 118 insertions(+), 72 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/bcm21664.dtsi b/arch/arm/boot/dts/bcm21664.dtsi
+> index 08a44d4..8b36682 100644
+> --- a/arch/arm/boot/dts/bcm21664.dtsi
+> +++ b/arch/arm/boot/dts/bcm21664.dtsi
+> @@ -14,6 +14,8 @@
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+>  #include <dt-bindings/interrupt-controller/irq.h>
+>  
+> +#include "dt-bindings/clock/bcm21664.h"
+> +
+>  #include "skeleton.dtsi"
+>  
+>  / {
+> @@ -43,7 +45,7 @@
+>  		compatible = "brcm,bcm21664-dw-apb-uart", "snps,dw-apb-uart";
+>  		status = "disabled";
+>  		reg = <0x3e000000 0x118>;
+> -		clocks = <&uartb_clk>;
+> +		clocks = <&slave_ccu BCM21664_SLAVE_CCU_UARTB>;
+>  		interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
+>  		reg-shift = <2>;
+>  		reg-io-width = <4>;
+> @@ -53,7 +55,7 @@
+>  		compatible = "brcm,bcm21664-dw-apb-uart", "snps,dw-apb-uart";
+>  		status = "disabled";
+>  		reg = <0x3e001000 0x118>;
+> -		clocks = <&uartb2_clk>;
+> +		clocks = <&slave_ccu BCM21664_SLAVE_CCU_UARTB2>;
+>  		interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
+>  		reg-shift = <2>;
+>  		reg-io-width = <4>;
+> @@ -63,7 +65,7 @@
+>  		compatible = "brcm,bcm21664-dw-apb-uart", "snps,dw-apb-uart";
+>  		status = "disabled";
+>  		reg = <0x3e002000 0x118>;
+> -		clocks = <&uartb3_clk>;
+> +		clocks = <&slave_ccu BCM21664_SLAVE_CCU_UARTB3>;
+>  		interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
+>  		reg-shift = <2>;
+>  		reg-io-width = <4>;
+> @@ -85,7 +87,7 @@
+>  		compatible = "brcm,kona-timer";
+>  		reg = <0x35006000 0x1c>;
+>  		interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
+> -		clocks = <&hub_timer_clk>;
+> +		clocks = <&aon_ccu BCM21664_AON_CCU_HUB_TIMER>;
+>  	};
+>  
+>  	gpio: gpio at 35003000 {
+> @@ -106,7 +108,7 @@
+>  		compatible = "brcm,kona-sdhci";
+>  		reg = <0x3f180000 0x801c>;
+>  		interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
+> -		clocks = <&sdio1_clk>;
+> +		clocks = <&master_ccu BCM21664_MASTER_CCU_SDIO1>;
+>  		status = "disabled";
+>  	};
+>  
+> @@ -114,7 +116,7 @@
+>  		compatible = "brcm,kona-sdhci";
+>  		reg = <0x3f190000 0x801c>;
+>  		interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
+> -		clocks = <&sdio2_clk>;
+> +		clocks = <&master_ccu BCM21664_MASTER_CCU_SDIO2>;
+>  		status = "disabled";
+>  	};
+>  
+> @@ -122,7 +124,7 @@
+>  		compatible = "brcm,kona-sdhci";
+>  		reg = <0x3f1a0000 0x801c>;
+>  		interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
+> -		clocks = <&sdio3_clk>;
+> +		clocks = <&master_ccu BCM21664_MASTER_CCU_SDIO3>;
+>  		status = "disabled";
+>  	};
+>  
+> @@ -130,7 +132,7 @@
+>  		compatible = "brcm,kona-sdhci";
+>  		reg = <0x3f1b0000 0x801c>;
+>  		interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
+> -		clocks = <&sdio4_clk>;
+> +		clocks = <&master_ccu BCM21664_MASTER_CCU_SDIO4>;
+>  		status = "disabled";
+>  	};
+>  
+> @@ -140,7 +142,7 @@
+>  		interrupts = <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>;
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+> -		clocks = <&bsc1_clk>;
+> +		clocks = <&slave_ccu BCM21664_SLAVE_CCU_BSC1>;
+>  		status = "disabled";
+>  	};
+>  
+> @@ -150,7 +152,7 @@
+>  		interrupts = <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>;
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+> -		clocks = <&bsc2_clk>;
+> +		clocks = <&slave_ccu BCM21664_SLAVE_CCU_BSC2>;
+>  		status = "disabled";
+>  	};
+>  
+> @@ -160,7 +162,7 @@
+>  		interrupts = <GIC_SPI 169 IRQ_TYPE_LEVEL_HIGH>;
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+> -		clocks = <&bsc3_clk>;
+> +		clocks = <&slave_ccu BCM21664_SLAVE_CCU_BSC3>;
+>  		status = "disabled";
+>  	};
+>  
+> @@ -170,105 +172,149 @@
+>  		interrupts = <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>;
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+> -		clocks = <&bsc4_clk>;
+> +		clocks = <&slave_ccu BCM21664_SLAVE_CCU_BSC4>;
+>  		status = "disabled";
+>  	};
+>  
+>  	clocks {
+> -		bsc1_clk: bsc1 {
+> -			compatible = "fixed-clock";
+> -			clock-frequency = <13000000>;
+> -			#clock-cells = <0>;
+> -		};
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+>  
+> -		bsc2_clk: bsc2 {
+> -			compatible = "fixed-clock";
+> -			clock-frequency = <13000000>;
+> +		/*
+> +		 * Fixed clocks are defined before CCUs whose
+> +		 * clocks may depend on them.
+> +		 */
+> +
+> +		ref_32k_clk: ref_32k {
+>  			#clock-cells = <0>;
+> +			compatible = "fixed-clock";
+> +			clock-frequency = <32768>;
+>  		};
+>  
+> -		bsc3_clk: bsc3 {
+> -			compatible = "fixed-clock";
+> -			clock-frequency = <13000000>;
+> +		bbl_32k_clk: bbl_32k {
+>  			#clock-cells = <0>;
+> +			compatible = "fixed-clock";
+> +			clock-frequency = <32768>;
+>  		};
+>  
+> -		bsc4_clk: bsc4 {
+> +		ref_13m_clk: ref_13m {
+> +			#clock-cells = <0>;
+>  			compatible = "fixed-clock";
+>  			clock-frequency = <13000000>;
+> -			#clock-cells = <0>;
+>  		};
+>  
+> -		pmu_bsc_clk: pmu_bsc {
+> +		var_13m_clk: var_13m {
+> +			#clock-cells = <0>;
+>  			compatible = "fixed-clock";
+>  			clock-frequency = <13000000>;
+> -			#clock-cells = <0>;
+>  		};
+>  
+> -		hub_timer_clk: hub_timer {
+> -			compatible = "fixed-clock";
+> -			clock-frequency = <32768>;
+> +		dft_19_5m_clk: dft_19_5m {
+>  			#clock-cells = <0>;
+> +			compatible = "fixed-clock";
+> +			clock-frequency = <19500000>;
+>  		};
+>  
+> -		pwm_clk: pwm {
+> +		ref_crystal_clk: ref_crystal {
+> +			#clock-cells = <0>;
+>  			compatible = "fixed-clock";
+>  			clock-frequency = <26000000>;
+> -			#clock-cells = <0>;
+>  		};
+>  
+> -		sdio1_clk: sdio1 {
+> -			compatible = "fixed-clock";
+> -			clock-frequency = <48000000>;
+> +		ref_52m_clk: ref_52m {
+>  			#clock-cells = <0>;
+> -		};
+> -
+> -		sdio2_clk: sdio2 {
+>  			compatible = "fixed-clock";
+> -			clock-frequency = <48000000>;
+> -			#clock-cells = <0>;
+> +			clock-frequency = <52000000>;
+>  		};
+>  
+> -		sdio3_clk: sdio3 {
+> -			compatible = "fixed-clock";
+> -			clock-frequency = <48000000>;
+> +		var_52m_clk: var_52m {
+>  			#clock-cells = <0>;
+> -		};
+> -
+> -		sdio4_clk: sdio4 {
+> -			compatible = "fixed-clock";
+> -			clock-frequency = <48000000>;
+> -			#clock-cells = <0>;
+> -		};
+> -
+> -		tmon_1m_clk: tmon_1m {
+>  			compatible = "fixed-clock";
+> -			clock-frequency = <1000000>;
+> -			#clock-cells = <0>;
+> -		};
+> -
+> -		uartb_clk: uartb {
+> -			compatible = "fixed-clock";
+> -			clock-frequency = <13000000>;
+> -			#clock-cells = <0>;
+> -		};
+> -
+> -		uartb2_clk: uartb2 {
+> -			compatible = "fixed-clock";
+> -			clock-frequency = <13000000>;
+> -			#clock-cells = <0>;
+> -		};
+> -
+> -		uartb3_clk: uartb3 {
+> -			compatible = "fixed-clock";
+> -			clock-frequency = <13000000>;
+> -			#clock-cells = <0>;
+> +			clock-frequency = <52000000>;
+>  		};
+>  
+>  		usb_otg_ahb_clk: usb_otg_ahb {
+> +			#clock-cells = <0>;
+>  			compatible = "fixed-clock";
+>  			clock-frequency = <52000000>;
+> +		};
+> +
+> +		ref_96m_clk: ref_96m {
+>  			#clock-cells = <0>;
+> +			compatible = "fixed-clock";
+> +			clock-frequency = <96000000>;
+> +		};
+> +
+> +		var_96m_clk: var_96m {
+> +			#clock-cells = <0>;
+> +			compatible = "fixed-clock";
+> +			clock-frequency = <96000000>;
+> +		};
+> +
+> +		ref_104m_clk: ref_104m {
+> +			#clock-cells = <0>;
+> +			compatible = "fixed-clock";
+> +			clock-frequency = <104000000>;
+> +		};
+> +
+> +		var_104m_clk: var_104m {
+> +			#clock-cells = <0>;
+> +			compatible = "fixed-clock";
+> +			clock-frequency = <104000000>;
+> +		};
+> +
+> +		ref_156m_clk: ref_156m {
+> +			#clock-cells = <0>;
+> +			compatible = "fixed-clock";
+> +			clock-frequency = <156000000>;
+> +		};
+> +
+> +		var_156m_clk: var_156m {
+> +			#clock-cells = <0>;
+> +			compatible = "fixed-clock";
+> +			clock-frequency = <156000000>;
+> +		};
+> +
+> +		root_ccu: root_ccu {
+> +			compatible = BCM21664_DT_ROOT_CCU_COMPAT;
+> +			reg = <0x35001000 0x0f00>;
+> +			#clock-cells = <1>;
+> +			clock-output-names = "frac_1m";
+> +		};
+> +
+> +		aon_ccu: aon_ccu {
+> +			compatible = BCM21664_DT_AON_CCU_COMPAT;
+> +			reg = <0x35002000 0x0f00>;
+> +			#clock-cells = <1>;
+> +			clock-output-names = "hub_timer";
+> +		};
+> +
+> +		master_ccu: master_ccu {
+> +			compatible = BCM21664_DT_MASTER_CCU_COMPAT;
+> +			reg = <0x3f001000 0x0f00>;
+> +			#clock-cells = <1>;
+> +			clock-output-names = "sdio1",
+> +					     "sdio2",
+> +					     "sdio3",
+> +					     "sdio4",
+> +					     "sdio1_sleep",
+> +					     "sdio2_sleep",
+> +					     "sdio3_sleep",
+> +					     "sdio4_sleep";
+> +		};
+> +
+> +		slave_ccu: slave_ccu {
+> +			compatible = BCM21664_DT_SLAVE_CCU_COMPAT;
+> +			reg = <0x3e011000 0x0f00>;
+> +			#clock-cells = <1>;
+> +			clock-output-names = "uartb",
+> +					     "uartb2",
+> +					     "uartb3",
+> +					     "bsc1",
+> +					     "bsc2",
+> +					     "bsc3",
+> +					     "bsc4";
+>  		};
+>  	};
+>  
+> -- 
+> 1.9.1
+> 
