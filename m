@@ -1,53 +1,101 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sun, 27 Apr 2014 00:01:53 +0100
-Subject: [PATCH RFC 2/8] component: ignore multiple additions of the same
- component
+Date: Sun, 27 Apr 2014 00:01:48 +0100
+Subject: [PATCH RFC 1/8] component: fix missed cleanup in case of devres
+ failure
 In-Reply-To: <20140426230025.GZ26756@n2100.arm.linux.org.uk>
 References: <20140426230025.GZ26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WeBbV-0002GZ-6K@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WeBbQ-0002GV-25@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Permit masters to call component_master_add_child() and match the same
-child multiple times.  This may happen if there's multiple connections
-to a single component device from other devices.  In such scenarios,
-we should not return a failure, but instead ignore the attempt.
+In try_to_bring_up_master(), we tear down the master's component list
+for each error case, except for devres group failure.  Fix this
+oversight by making the code less prone to such mistakes.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/base/component.c | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+ drivers/base/component.c | 62 ++++++++++++++++++++++++------------------------
+ 1 file changed, 31 insertions(+), 31 deletions(-)
 
 diff --git a/drivers/base/component.c b/drivers/base/component.c
-index d0ebd4431736..55813e91bf0d 100644
+index c4778995cd72..d0ebd4431736 100644
 --- a/drivers/base/component.c
 +++ b/drivers/base/component.c
-@@ -69,6 +69,11 @@ static void component_detach_master(struct master *master, struct component *c)
- 	c->master = NULL;
- }
- 
-+/*
-+ * Add a component to a master, finding the component via the compare
-+ * function and compare data.  This is safe to call for duplicate matches
-+ * and will not result in the same component being added multiple times.
-+ */
- int component_master_add_child(struct master *master,
- 	int (*compare)(struct device *, void *), void *compare_data)
+@@ -113,44 +113,44 @@ static void master_remove_components(struct master *master)
+ static int try_to_bring_up_master(struct master *master,
+ 	struct component *component)
  {
-@@ -76,11 +81,12 @@ int component_master_add_child(struct master *master,
- 	int ret = -ENXIO;
+-	int ret = 0;
++	int ret;
  
- 	list_for_each_entry(c, &component_list, node) {
--		if (c->master)
-+		if (c->master && c->master != master)
- 			continue;
+-	if (!master->bound) {
+-		/*
+-		 * Search the list of components, looking for components that
+-		 * belong to this master, and attach them to the master.
+-		 */
+-		if (master->ops->add_components(master->dev, master)) {
+-			/* Failed to find all components */
+-			master_remove_components(master);
+-			ret = 0;
+-			goto out;
+-		}
++	if (master->bound)
++		return 0;
  
- 		if (compare(c->dev, compare_data)) {
--			component_attach_master(master, c);
-+			if (!c->master)
-+				component_attach_master(master, c);
- 			ret = 0;
- 			break;
- 		}
+-		if (component && component->master != master) {
+-			master_remove_components(master);
+-			ret = 0;
+-			goto out;
+-		}
++	/*
++	 * Search the list of components, looking for components that
++	 * belong to this master, and attach them to the master.
++	 */
++	if (master->ops->add_components(master->dev, master)) {
++		/* Failed to find all components */
++		ret = 0;
++		goto out;
++	}
+ 
+-		if (!devres_open_group(master->dev, NULL, GFP_KERNEL)) {
+-			ret = -ENOMEM;
+-			goto out;
+-		}
++	if (component && component->master != master) {
++		ret = 0;
++		goto out;
++	}
+ 
+-		/* Found all components */
+-		ret = master->ops->bind(master->dev);
+-		if (ret < 0) {
+-			devres_release_group(master->dev, NULL);
+-			dev_info(master->dev, "master bind failed: %d\n", ret);
+-			master_remove_components(master);
+-			goto out;
+-		}
++	if (!devres_open_group(master->dev, NULL, GFP_KERNEL)) {
++		ret = -ENOMEM;
++		goto out;
++	}
+ 
+-		master->bound = true;
+-		ret = 1;
++	/* Found all components */
++	ret = master->ops->bind(master->dev);
++	if (ret < 0) {
++		devres_release_group(master->dev, NULL);
++		dev_info(master->dev, "master bind failed: %d\n", ret);
++		goto out;
+ 	}
++
++	master->bound = true;
++	return 1;
++
+ out:
++	master_remove_components(master);
+ 
+ 	return ret;
+ }
 -- 
 1.8.3.1
