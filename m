@@ -1,75 +1,29 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 26 Apr 2014 02:42:13 +0200
-Subject: [PATCHv4 2/7] ARM: EXYNOS: Support secondary CPU boot of
- Exynos4212
-In-Reply-To: <1398388572-30239-3-git-send-email-cw00.choi@samsung.com>
-References: <1398388572-30239-1-git-send-email-cw00.choi@samsung.com>
- <1398388572-30239-3-git-send-email-cw00.choi@samsung.com>
-Message-ID: <535B00E5.4060903@gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 25 Apr 2014 20:43:01 -0400
+Subject: [PATCH 0/2] ARM: mvebu: board-v7 cleanup
+In-Reply-To: <1397925170-8202-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1397925170-8202-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20140426004301.GP28159@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, Apr 19, 2014 at 06:32:48PM +0200, Gregory CLEMENT wrote:
+> Hi,
+> 
+> These two patches doesn't really change the behaviour of the code, but
+> will help to make it more readable and maintainable.
+> 
+> Thanks
+> 
+> Gregory CLEMENT (2):
+>   ARM: mvebu: remove unnecessary ifdef around l2x0_of_init
+>   ARM: mvebu: fix the name of the parameter used in mvebu_get_soc_id
+> 
+>  arch/arm/mach-mvebu/board-v7.c | 4 +---
+>  1 file changed, 1 insertion(+), 3 deletions(-)
 
-On 25.04.2014 03:16, Chanwoo Choi wrote:
-> From: Kyungmin Park <kyungmin.park@samsung.com>
->
-> This patch fix the offset of CPU boot address and change parameter of smc call
-> of SMC_CMD_CPU1BOOT command for Exynos4212.
->
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> ---
->   arch/arm/mach-exynos/firmware.c | 15 ++++++++++++++-
->   1 file changed, 14 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
-> index 932129e..aa01c42 100644
-> --- a/arch/arm/mach-exynos/firmware.c
-> +++ b/arch/arm/mach-exynos/firmware.c
-> @@ -18,6 +18,8 @@
->
->   #include <mach/map.h>
->
-> +#include <plat/cpu.h>
-> +
->   #include "smc.h"
->
->   static int exynos_do_idle(void)
-> @@ -28,13 +30,24 @@ static int exynos_do_idle(void)
->
->   static int exynos_cpu_boot(int cpu)
->   {
-> +	/*
-> +	 * The second parameter of SMC_CMD_CPU1BOOT command means CPU id.
-> +	 * But, Exynos4212 has only one secondary CPU so second parameter
-> +	 * isn't used for informing secure firmware about CPU id.
-> +	 */
-> +	if (soc_is_exynos4212())
-> +		cpu = 0;
-> +
->   	exynos_smc(SMC_CMD_CPU1BOOT, cpu, 0, 0);
->   	return 0;
->   }
->
->   static int exynos_set_cpu_boot_addr(int cpu, unsigned long boot_addr)
->   {
-> -	void __iomem *boot_reg = S5P_VA_SYSRAM_NS + 0x1c + 4*cpu;
-> +	void __iomem *boot_reg = S5P_VA_SYSRAM_NS + 0x1c;
-> +
-> +	if (!soc_is_exynos4212())
-> +		boot_reg += 4*cpu;
->
->   	__raw_writel(boot_addr, boot_reg);
->   	return 0;
->
+Applied both to mvebu/soc with Thomas' Reviewed-by.
 
-This patch should be applied independently of Exynos3250 support. 
-Kukjin, what do you think?
+thx,
 
-Anyway,
-
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-
-Best regards,
-Tomasz
+Jason.
