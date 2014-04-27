@@ -1,78 +1,136 @@
 From: shaik.ameer@samsung.com (Shaik Ameer Basha)
-Date: Sun, 27 Apr 2014 13:07:55 +0530
-Subject: [PATCH v12 23/31] iommu/exynos: use simpler function to get MMU
- version
+Date: Sun, 27 Apr 2014 13:07:59 +0530
+Subject: [PATCH v12 27/31] ARM: dts: add System MMU nodes of exynos4 series
 In-Reply-To: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
 References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
-Message-ID: <1398584283-22846-24-git-send-email-shaik.ameer@samsung.com>
+Message-ID: <1398584283-22846-28-git-send-email-shaik.ameer@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Cho KyongHo <pullip.cho@samsung.com>
 
-This commit changes the function to get MMU version simpler.
+This patch adds System MMU nodes that are common to exynos4 series.
 
 Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
 ---
- drivers/iommu/exynos-iommu.c |   30 ++++++------------------------
- 1 file changed, 6 insertions(+), 24 deletions(-)
+ arch/arm/boot/dts/exynos4.dtsi |  107 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 107 insertions(+)
 
-diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 00915f2..54011e5 100755
---- a/drivers/iommu/exynos-iommu.c
-+++ b/drivers/iommu/exynos-iommu.c
-@@ -252,24 +252,6 @@ static unsigned int __raw_sysmmu_version(struct sysmmu_drvdata *data)
- 	return MMU_RAW_VER(__raw_readl(data->sfrbase + REG_MMU_VERSION));
- }
- 
--static unsigned int __sysmmu_version(struct sysmmu_drvdata *data,
--				     unsigned int *minor)
--{
--	unsigned int ver = 0;
--
--	ver = __raw_sysmmu_version(data);
--	if (ver > MAKE_MMU_VER(3, 3)) {
--		dev_err(data->sysmmu, "%s: version(%d.%d) is higher than 3.3\n",
--			__func__, MMU_MAJ_VER(ver), MMU_MIN_VER(ver));
--		BUG();
--	}
--
--	if (minor)
--		*minor = MMU_MIN_VER(ver);
--
--	return MMU_MAJ_VER(ver);
--}
--
- static bool sysmmu_block(void __iomem *sfrbase)
- {
- 	int i = 120;
-@@ -427,13 +409,13 @@ static bool __sysmmu_disable(struct sysmmu_drvdata *data)
- static void __sysmmu_init_config(struct sysmmu_drvdata *data)
- {
- 	unsigned int cfg = CFG_LRU | CFG_QOS(15);
--	int maj, min = 0;
-+	unsigned int ver;
- 
--	maj = __sysmmu_version(data, &min);
--	if (maj == 3) {
--		if (min >= 2) {
-+	ver = __raw_sysmmu_version(data);
-+	if (MMU_MAJ_VER(ver) == 3) {
-+		if (MMU_MIN_VER(ver) >= 2) {
- 			cfg |= CFG_FLPDCACHE;
--			if (min == 3) {
-+			if (MMU_MIN_VER(ver) == 3) {
- 				cfg |= CFG_ACGEN;
- 				cfg &= ~CFG_LRU;
- 			} else {
-@@ -591,7 +573,7 @@ static void sysmmu_tlb_invalidate_entry(struct device *dev, sysmmu_iova_t iova,
- 			 * 1MB page can be cached in one of all sets.
- 			 * 64KB page can be one of 16 consecutive sets.
- 			 */
--			if (__sysmmu_version(data, NULL) == 2)
-+			if (MMU_MAJ_VER(__raw_sysmmu_version(data)) == 2)
- 				num_inv = min_t(unsigned int,
- 						size / PAGE_SIZE, 64);
- 
+diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+index 2f8bcd0..229efee 100644
+--- a/arch/arm/boot/dts/exynos4.dtsi
++++ b/arch/arm/boot/dts/exynos4.dtsi
+@@ -536,4 +536,111 @@
+ 		samsung,power-domain = <&pd_lcd0>;
+ 		status = "disabled";
+ 	};
++
++	sysmmu_mfc_l: sysmmu at 13620000 {
++		compatible = "samsung,sysmmu-v2";
++		reg = <0x13620000 0x1000>;
++		interrupt-parent = <&combiner>;
++		interrupts = <5 5>;
++		clock-names = "sysmmu";
++		clocks = <&clock CLK_SMMU_MFCL>;
++		samsung,power-domain = <&pd_mfc>;
++		mmu-masters = <&mfc>;
++	};
++
++	sysmmu_mfc_r: sysmmu at 13630000 {
++		compatible = "samsung,sysmmu-v2";
++		reg = <0x13630000 0x1000>;
++		interrupt-parent = <&combiner>;
++		interrupts = <5 6>;
++		clock-names = "sysmmu";
++		clocks = <&clock CLK_SMMU_MFCR>;
++		samsung,power-domain = <&pd_mfc>;
++		mmu-masters = <&mfc>;
++	};
++
++	sysmmu_tv: sysmmu at 12E20000 {
++		compatible = "samsung,sysmmu-v1";
++		reg = <0x12E20000 0x1000>;
++		interrupt-parent = <&combiner>;
++		interrupts = <5 4>;
++		clock-names = "sysmmu";
++		clocks = <&clock CLK_SMMU_TV>;
++		samsung,power-domain = <&pd_tv>;
++	};
++
++	sysmmu_fimc0: sysmmu at 11A20000 {
++		compatible = "samsung,sysmmu-v1";
++		reg = <0x11A20000 0x1000>;
++		interrupt-parent = <&combiner>;
++		interrupts = <4 2>;
++		clock-names = "sysmmu";
++		clocks = <&clock CLK_SMMU_FIMC0>;
++		samsung,power-domain = <&pd_cam>;
++		mmu-masters = <&fimc_0>;
++	};
++
++	sysmmu_fimc1: sysmmu at 11A30000 {
++		compatible = "samsung,sysmmu-v1";
++		reg = <0x11A30000 0x1000>;
++		interrupt-parent = <&combiner>;
++		interrupts = <4 3>;
++		clock-names = "sysmmu";
++		clocks = <&clock CLK_SMMU_FIMC1>;
++		samsung,power-domain = <&pd_cam>;
++		mmu-masters = <&fimc_1>;
++	};
++
++	sysmmu_fimc2: sysmmu at 11A40000 {
++		compatible = "samsung,sysmmu-v1";
++		reg = <0x11A40000 0x1000>;
++		interrupt-parent = <&combiner>;
++		interrupts = <4 4>;
++		clock-names = "sysmmu";
++		clocks = <&clock CLK_SMMU_FIMC2>;
++		samsung,power-domain = <&pd_cam>;
++		mmu-masters = <&fimc_2>;
++	};
++
++	sysmmu_fimc3: sysmmu at 11A50000 {
++		compatible = "samsung,sysmmu-v1";
++		reg = <0x11A50000 0x1000>;
++		interrupt-parent = <&combiner>;
++		interrupts = <4 5>;
++		clock-names = "sysmmu";
++		clocks = <&clock CLK_SMMU_FIMC3>;
++		samsung,power-domain = <&pd_cam>;
++		mmu-masters = <&fimc_3>;
++	};
++
++	sysmmu_jpeg: sysmmu at 11A60000 {
++		compatible = "samsung,sysmmu-v1";
++		reg = <0x11A60000 0x1000>;
++		interrupt-parent = <&combiner>;
++		interrupts = <4 6>;
++		clock-names = "sysmmu";
++		clocks = <&clock CLK_SMMU_JPEG>;
++		samsung,power-domain = <&pd_cam>;
++	};
++
++	sysmmu_rotator: sysmmu at 12A30000 {
++		compatible = "samsung,sysmmu-v1";
++		reg = <0x12A30000 0x1000>;
++		interrupt-parent = <&combiner>;
++		interrupts = <5 0>;
++		clock-names = "sysmmu";
++		clocks = <&clock CLK_SMMU_ROTATOR>;
++		samsung,power-domain = <&pd_lcd0>;
++	};
++
++	sysmmu_fimd0: sysmmu at 11E20000 {
++		compatible = "samsung,sysmmu-v1";
++		reg = <0x11E20000 0x1000>;
++		interrupt-parent = <&combiner>;
++		interrupts = <5 2>;
++		clock-names = "sysmmu";
++		clocks = <&clock CLK_SMMU_FIMD0>;
++		samsung,power-domain = <&pd_lcd0>;
++		mmu-masters = <&fimd>;
++	};
+ };
 -- 
 1.7.9.5
