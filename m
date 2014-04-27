@@ -1,98 +1,98 @@
 From: shaik.ameer@samsung.com (Shaik Ameer Basha)
-Date: Sun, 27 Apr 2014 13:07:38 +0530
-Subject: [PATCH v12 06/31] iommu/exynos: allocate lv2 page table from own slab
+Date: Sun, 27 Apr 2014 13:07:36 +0530
+Subject: [PATCH v12 04/31] iommu/exynos: fix L2TLB invalidation
 In-Reply-To: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
 References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
-Message-ID: <1398584283-22846-7-git-send-email-shaik.ameer@samsung.com>
+Message-ID: <1398584283-22846-5-git-send-email-shaik.ameer@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Cho KyongHo <pullip.cho@samsung.com>
 
-Since kmalloc() does not guarantee that the allignment of 1KiB when it
-allocates 1KiB, it is required to allocate lv2 page table from own
-slab that guarantees alignment of 1KiB
+L2TLB is 8-way set-associative TLB with 512 entries. The number of
+sets is 64.
+A single 4KB(small page) translation information is cached
+only to a set whose index is the same with the lower 6 bits of the page
+frame number.
+A single 64KB(large page) translation information can be
+cached to any 16 sets whose top two bits of their indices are the same
+with the bit [5:4] of the page frame number.
+A single 1MB(section) or larger translation information can be cached to
+any set in the TLB.
+
+It is required to invalidate entire sets that may cache the target
+translation information to guarantee that the L2TLB has no stale data.
 
 Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
 ---
- drivers/iommu/exynos-iommu.c |   34 ++++++++++++++++++++++++++++------
- 1 file changed, 28 insertions(+), 6 deletions(-)
+ drivers/iommu/exynos-iommu.c |   31 ++++++++++++++++++++++++++-----
+ 1 file changed, 26 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 7556177..c7f831c 100644
+index 84fc3b4..7ce44a8 100644
 --- a/drivers/iommu/exynos-iommu.c
 +++ b/drivers/iommu/exynos-iommu.c
-@@ -99,6 +99,8 @@
- #define REG_PB1_SADDR		0x054
- #define REG_PB1_EADDR		0x058
- 
-+static struct kmem_cache *lv2table_kmem_cache;
-+
- static unsigned long *section_entry(unsigned long *pgtable, unsigned long iova)
- {
- 	return pgtable + lv1ent_offset(iova);
-@@ -725,7 +727,8 @@ static void exynos_iommu_domain_destroy(struct iommu_domain *domain)
- 
- 	for (i = 0; i < NUM_LV1ENTRIES; i++)
- 		if (lv1ent_page(priv->pgtable + i))
--			kfree(__va(lv2table_base(priv->pgtable + i)));
-+			kmem_cache_free(lv2table_kmem_cache,
-+					__va(lv2table_base(priv->pgtable + i)));
- 
- 	free_pages((unsigned long)priv->pgtable, 2);
- 	free_pages((unsigned long)priv->lv2entcnt, 1);
-@@ -824,7 +827,7 @@ static unsigned long *alloc_lv2entry(unsigned long *sent, unsigned long iova,
- 	if (lv1ent_fault(sent)) {
- 		unsigned long *pent;
- 
--		pent = kzalloc(LV2TABLE_SIZE, GFP_ATOMIC);
-+		pent = kmem_cache_zalloc(lv2table_kmem_cache, GFP_ATOMIC);
- 		BUG_ON((unsigned long)pent & (LV2TABLE_SIZE - 1));
- 		if (!pent)
- 			return ERR_PTR(-ENOMEM);
-@@ -854,8 +857,7 @@ static int lv1set_section(unsigned long *sent, unsigned long iova,
- 			return -EADDRINUSE;
- 		}
- 
--		kfree(page_entry(sent, 0));
--
-+		kmem_cache_free(lv2table_kmem_cache, page_entry(sent, 0));
- 		*pgcnt = 0;
- 	}
- 
-@@ -1060,11 +1062,31 @@ static int __init exynos_iommu_init(void)
- {
- 	int ret;
- 
-+	lv2table_kmem_cache = kmem_cache_create("exynos-iommu-lv2table",
-+				LV2TABLE_SIZE, LV2TABLE_SIZE, 0, NULL);
-+	if (!lv2table_kmem_cache) {
-+		pr_err("%s: Failed to create kmem cache\n", __func__);
-+		return -ENOMEM;
-+	}
-+
- 	ret = platform_driver_register(&exynos_sysmmu_driver);
-+	if (ret) {
-+		pr_err("%s: Failed to register driver\n", __func__);
-+		goto err_reg_driver;
-+	}
- 
--	if (ret == 0)
--		bus_set_iommu(&platform_bus_type, &exynos_iommu_ops);
-+	ret = bus_set_iommu(&platform_bus_type, &exynos_iommu_ops);
-+	if (ret) {
-+		pr_err("%s: Failed to register exynos-iommu driver.\n",
-+								__func__);
-+		goto err_set_iommu;
-+	}
- 
-+	return 0;
-+err_set_iommu:
-+	platform_driver_unregister(&exynos_sysmmu_driver);
-+err_reg_driver:
-+	kmem_cache_destroy(lv2table_kmem_cache);
- 	return ret;
+@@ -224,9 +224,14 @@ static void __sysmmu_tlb_invalidate(void __iomem *sfrbase)
  }
- subsys_initcall(exynos_iommu_init);
+ 
+ static void __sysmmu_tlb_invalidate_entry(void __iomem *sfrbase,
+-						unsigned long iova)
++				unsigned long iova, unsigned int num_inv)
+ {
+-	__raw_writel((iova & SPAGE_MASK) | 1, sfrbase + REG_MMU_FLUSH_ENTRY);
++	unsigned int i;
++	for (i = 0; i < num_inv; i++) {
++		__raw_writel((iova & SPAGE_MASK) | 1,
++				sfrbase + REG_MMU_FLUSH_ENTRY);
++		iova += SPAGE_SIZE;
++	}
+ }
+ 
+ static void __sysmmu_set_ptbase(void __iomem *sfrbase,
+@@ -476,7 +481,8 @@ static bool exynos_sysmmu_disable(struct device *dev)
+ 	return disabled;
+ }
+ 
+-static void sysmmu_tlb_invalidate_entry(struct device *dev, unsigned long iova)
++static void sysmmu_tlb_invalidate_entry(struct device *dev, unsigned long iova,
++					size_t size)
+ {
+ 	unsigned long flags;
+ 	struct sysmmu_drvdata *data = dev_get_drvdata(dev->archdata.iommu);
+@@ -486,9 +492,24 @@ static void sysmmu_tlb_invalidate_entry(struct device *dev, unsigned long iova)
+ 	if (is_sysmmu_active(data)) {
+ 		int i;
+ 		for (i = 0; i < data->nsfrs; i++) {
++			unsigned int maj;
++			unsigned int num_inv = 1;
++			maj = __raw_readl(data->sfrbases[i] + REG_MMU_VERSION);
++			/*
++			 * L2TLB invalidation required
++			 * 4KB page: 1 invalidation
++			 * 64KB page: 16 invalidation
++			 * 1MB page: 64 invalidation
++			 * because it is set-associative TLB
++			 * with 8-way and 64 sets.
++			 * 1MB page can be cached in one of all sets.
++			 * 64KB page can be one of 16 consecutive sets.
++			 */
++			if ((maj >> 28) == 2) /* major version number */
++				num_inv = min_t(unsigned int, size / PAGE_SIZE, 64);
+ 			if (sysmmu_block(data->sfrbases[i])) {
+ 				__sysmmu_tlb_invalidate_entry(
+-						data->sfrbases[i], iova);
++					data->sfrbases[i], iova, num_inv);
+ 				sysmmu_unblock(data->sfrbases[i]);
+ 			}
+ 		}
+@@ -998,7 +1019,7 @@ done:
+ 
+ 	spin_lock_irqsave(&priv->lock, flags);
+ 	list_for_each_entry(data, &priv->clients, node)
+-		sysmmu_tlb_invalidate_entry(data->dev, iova);
++		sysmmu_tlb_invalidate_entry(data->dev, iova, size);
+ 	spin_unlock_irqrestore(&priv->lock, flags);
+ 
+ 	return size;
 -- 
 1.7.9.5
