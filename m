@@ -1,139 +1,53 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sun, 27 Apr 2014 14:29:11 +0100
-Subject: [PATCH 5/5] ARM: dove: add non-DT PMU support
-In-Reply-To: <20140427132312.GC26756@n2100.arm.linux.org.uk>
-References: <20140427132312.GC26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WeP8p-0000Uw-7m@rmk-PC.arm.linux.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 27 Apr 2014 14:32:37 +0100
+Subject: [RFC PATCH 0/8] component helper improvements
+In-Reply-To: <CAKMK7uFE7NVTS8dgb7kmXtAcz2Q59WhxrZJWcktG98UegFW1zA@mail.gmail.com>
+References: <20140426230025.GZ26756@n2100.arm.linux.org.uk>
+ <CAKMK7uFE7NVTS8dgb7kmXtAcz2Q59WhxrZJWcktG98UegFW1zA@mail.gmail.com>
+Message-ID: <20140427133237.GD26756@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since Dove has non-DT support still, this patch adds the static data
-to the PMU driver in order to initialise PMU domains.
+On Sun, Apr 27, 2014 at 02:51:30PM +0200, Daniel Vetter wrote:
+> On Sun, Apr 27, 2014 at 1:00 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > A while back, Laurent raised some comments about the component helper,
+> > which this patch set starts to address.
+> >
+> > The first point it addresses is the repeated parsing inefficiency when
+> > deferred probing occurs.  When DT is used, the structure of the
+> > component helper today means that masters end up parsing the device
+> > tree for each attempt to re-bind the driver.
+> >
+> > We remove this inefficiency by creating an array of matching data and
+> > functions, which the component helper can use internally to match up
+> > components to their master.
+> >
+> > The second point was the inefficiency of destroying the list of
+> > components each time we saw a failure.  We did this to ensure that
+> > we kept things correctly ordered: component bind order matters.
+> > As we have an array instead, the array is already ordered, so we
+> > use this array to store the component pointers instead of a list,
+> > and remember which are duplicates (and thus should be avoided.)
+> > Avoiding the right duplicates matters as we walk the array in the
+> > opposite direction at tear down.
+> >
+> > I would like to see patches 1-5 scheduled for the next merge window,
+> > with 6-8 for the following window - this gives us grace of one kernel
+> > cycle to ensure that any new component helper users are properly
+> > converted.
+> 
+> Afaict the actual patches haven't made it to dri-devel, only to
+> linux-arm-kernel. Are they stuck somewhere?
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/mach-dove/pmu.c | 76 +++++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 75 insertions(+), 1 deletion(-)
+The patches themselves end up being Cc'd depending on their content and
+the contents of the MAINTAINERS file, unless I specifically tell my
+scripts that the patches are to be sent to/cc people - generally I do
+that for the primary recipients of the series.
 
-diff --git a/arch/arm/mach-dove/pmu.c b/arch/arm/mach-dove/pmu.c
-index 0b3201fa2d5c..9832044dbab9 100644
---- a/arch/arm/mach-dove/pmu.c
-+++ b/arch/arm/mach-dove/pmu.c
-@@ -226,6 +226,20 @@ static void __pmu_domain_register(struct pmu_domain *domain)
- 	pm_genpd_init(&domain->base, NULL, !(val & domain->pwr_mask));
- }
- 
-+static void pmu_domain_register(struct pmu_data *pmu,
-+	const struct pmu_domain *pmu_dom)
-+{
-+	struct pmu_domain *domain;
-+
-+	domain = kmemdup(pmu_dom, sizeof(*domain), GFP_KERNEL);
-+	if (!domain)
-+		return;
-+
-+	domain->pmu = pmu;
-+
-+	__pmu_domain_register(domain);
-+}
-+
- static void pmu_add_genpd_of(struct device *dev)
- {
- 	struct device_node *node;
-@@ -241,6 +255,15 @@ static void pmu_add_genpd_of(struct device *dev)
- 	}
- }
- 
-+static void pmu_add_genpd_name(const char *name, struct device *dev)
-+{
-+	while (1) {
-+		if (pm_genpd_name_add_device(name, dev) != -EAGAIN)
-+			break;
-+		cond_resched();
-+	}
-+}
-+
- static void pmu_remove_genpd(struct device *dev)
- {
- 	struct generic_pm_domain *genpd = dev_to_genpd(dev);
-@@ -256,11 +279,19 @@ static int pmu_platform_call(struct notifier_block *nb,
- 	unsigned long event, void *data)
- {
- 	struct device *dev = data;
-+	const char *name = NULL;
-+
-+	if (strcmp(dev_name(dev), "ap510-vmeta.0") == 0)
-+		name = "vpu";
-+	else if (strcmp(dev_name(dev), "galcore.0") == 0)
-+		name = "gpu";
- 
- 	switch (event) {
- 	case BUS_NOTIFY_ADD_DEVICE:
- 		if (dev->of_node)
- 			pmu_add_genpd_of(dev);
-+		else if (name)
-+			pmu_add_genpd_name(name, dev);
- 		break;
- 
- 	case BUS_NOTIFY_DEL_DEVICE:
-@@ -363,6 +394,49 @@ static int __init dove_init_pmu_irq(struct pmu_data *pmu, int irq)
- 	return 0;
- }
- 
-+static struct pmu_data pmu_data = {
-+	.lock = __SPIN_LOCK_UNLOCKED(&pmu.lock),
-+	.pmc_base = DOVE_PMU_VIRT_BASE,
-+	.pmu_base = DOVE_PMU_VIRT_BASE + 0x8000,
-+};
-+
-+static struct pmu_domain vpu_domain = {
-+	.pwr_mask = PMU_PWR_DOWN_VPU,
-+	.rst_mask = PMU_SW_RST_VIDEO_MASK,
-+	.iso_mask = PMU_ISO_VPU,
-+	.base = {
-+		.name = "vpu",
-+	},
-+};
-+
-+static struct pmu_domain gpu_domain = {
-+	.pwr_mask = PMU_PWR_DOWN_GPU,
-+	.rst_mask = PMU_SW_RST_GPU_MASK,
-+	.iso_mask = PMU_ISO_GPU,
-+	.base = {
-+		.name = "gpu",
-+	},
-+};
-+
-+static int __init dove_pmu_init_legacy(void)
-+{
-+	struct pmu_data *pmu = &pmu_data;
-+	int ret, parent_irq;
-+
-+	pmu_reset_init(pmu);
-+	pmu_domain_register(pmu, &vpu_domain);
-+	pmu_domain_register(pmu, &gpu_domain);
-+	pm_genpd_poweroff_unused();
-+
-+	ret = dove_init_pmu_irq(pmu, IRQ_DOVE_PMU);
-+	if (ret)
-+		pr_err("dove_init_pmu_irq() failed: %d\n", ret);
-+
-+	bus_register_notifier(&platform_bus_type, &platform_nb);
-+
-+	return 0;
-+}
-+
- /*
-  * pmu {
-  *	compatible = "marvell,pmu";
-@@ -390,7 +464,7 @@ int __init dove_init_pmu(void)
- 	/* Lookup the PMU node */
- 	np_pmu = of_find_compatible_node(NULL, NULL, "marvell,pmu");
- 	if (!np_pmu)
--		return 0;
-+		return dove_pmu_init_legacy();
- 
- 	pmu = kzalloc(sizeof(*pmu), GFP_KERNEL);
- 	if (!pmu)
+That means only the patch(es) which touch DRM stuff were copied to
+dri-devel, in this case, that being the MSM one.
+
 -- 
-1.8.3.1
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
