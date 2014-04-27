@@ -1,39 +1,112 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Sun, 27 Apr 2014 19:09:31 +0900
-Subject: randconfig failures - MMC + trusted foundations
-In-Reply-To: <20140427093250.GA26756@n2100.arm.linux.org.uk>
-References: <20140427093250.GA26756@n2100.arm.linux.org.uk>
-Message-ID: <CAAVeFuJ2=fWamF6xBAJLv1kEEhBVgWMj-PY0gxouo6-NOE9OfQ@mail.gmail.com>
+From: axel.lin@ingics.com (Axel Lin)
+Date: Sun, 27 Apr 2014 18:22:51 +0800
+Subject: [RESEND][PATCH] mmc: wmt-sdmmc: Fix settting BM_EIGHTBIT_MODE bit
+ in wmt_mci_set_ios()
+Message-ID: <1398594171.6291.2.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+For MMC_BUS_WIDTH_8 case, current code missed setting BM_EIGHTBIT_MODE bit.
+Also has a small refactor to make the code looks better in readability.
 
-On Sun, Apr 27, 2014 at 6:32 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> Last night's omap4430-sdp randconfig build:
->
-> In file included from arch/arm/mach-tegra/tegra.c:43:0:
-> arch/arm/include/asm/trusted_foundations.h: In function 'register_trusted_foundations':
-> arch/arm/include/asm/trusted_foundations.h:57:2: error: 'setup_max_cpus' undeclared (first use in this function)
+So the bit settings witch below logic:
 
-Just sent you a patch to fix this. Thanks for reporting.
+SDMMC_BUSMODE register:
+Set EIGHTBIT_MODE bit for 8 bit mode, Set FOURBIT_MODE bit for 4 bit mode.
+Clear both EIGHTBIT_MODE and FOURBIT_MODE bits for 1 bit mode.
 
-> Last night's versatile randconfig build:
->
-> drivers/mmc/core/core.c: In function 'mmc_card_power_up':
-> drivers/mmc/core/core.c:1517:4: error: implicit declaration of function 'gpiod_set_value'
->
-> This one appears to be a regular feature of failure, and is as I'm
-> carrying Olof's "mmc: add support for power-on sequencing through DT"
-> patch for CuBox wireless - see the 222 patch set.  It probably points
-> at something not being right with GPIO stuff.
+SDMMC_EXTCTRL register:
+Set EXT_EIGHTBIT bit for 8 bit mode, Clear EXT_EIGHTBIT bit for 1/4 bit mode.
 
-I had a quick look at the patch and I would say this is happening
-because drivers/mmc/core/core.c does not include
-<linux/gpio/consumer.h> despite using the gpiod_* functions. The error
-will only happen if CONFIG_GPIOLIB is not defined. Olof, if it is not
-too late can you fix this in your patch series?
+Add define for EXT_EIGHTBIT to avoid using magic number.
+BM_ONEBIT_MASK is no longer used, thus remove it.
 
-Cheers,
-Alex.
+This patch is untested due to lack of platform with 8-bit hardware.
+However since the code is there, it's good to make the code match the document.
+
+Signed-off-by: Axel Lin <axel.lin@ingics.com>
+---
+This patch was sent on:
+http://www.spinics.net/lists/linux-mmc/msg22926.html
+The document (wm8505 sdmmc controller suppliment.pdf) is available at:
+https://groups.google.com/group/vt8500-wm8505-linux-kernel/attach/ac3d5037e860a34/wm8505%20sdmmc%20controller%20suppliment.pdf?part=4&authuser=1
+
+Regards,
+Axel
+
+ drivers/mmc/host/wmt-sdmmc.c | 31 +++++++++++++++----------------
+ 1 file changed, 15 insertions(+), 16 deletions(-)
+
+diff --git a/drivers/mmc/host/wmt-sdmmc.c b/drivers/mmc/host/wmt-sdmmc.c
+index 8a48a50..6ed18f8 100644
+--- a/drivers/mmc/host/wmt-sdmmc.c
++++ b/drivers/mmc/host/wmt-sdmmc.c
+@@ -72,7 +72,6 @@
+ #define BM_SPI_CS			0x20
+ #define BM_SD_POWER			0x40
+ #define BM_SOFT_RESET			0x80
+-#define BM_ONEBIT_MASK			0xFD
+ 
+ /* SDMMC_BLKLEN bit fields */
+ #define BLKL_CRCERR_ABORT		0x0800
+@@ -120,6 +119,8 @@
+ #define STS2_DATARSP_BUSY		0x20
+ #define STS2_DIS_FORCECLK		0x80
+ 
++/* SDMMC_EXTCTRL bit fields */
++#define EXT_EIGHTBIT			0x04
+ 
+ /* MMC/SD DMA Controller Registers */
+ #define SDDMA_GCR			0x100
+@@ -672,7 +673,7 @@ static void wmt_mci_request(struct mmc_host *mmc, struct mmc_request *req)
+ static void wmt_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ {
+ 	struct wmt_mci_priv *priv;
+-	u32 reg_tmp;
++	u32 busmode, extctrl;
+ 
+ 	priv = mmc_priv(mmc);
+ 
+@@ -687,28 +688,26 @@ static void wmt_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 	if (ios->clock != 0)
+ 		clk_set_rate(priv->clk_sdmmc, ios->clock);
+ 
++	busmode = readb(priv->sdmmc_base + SDMMC_BUSMODE);
++	extctrl = readb(priv->sdmmc_base + SDMMC_EXTCTRL);
++
++	busmode &= ~(BM_EIGHTBIT_MODE | BM_FOURBIT_MODE);
++	extctrl &= ~EXT_EIGHTBIT;
++
+ 	switch (ios->bus_width) {
+ 	case MMC_BUS_WIDTH_8:
+-		reg_tmp = readb(priv->sdmmc_base + SDMMC_EXTCTRL);
+-		writeb(reg_tmp | 0x04, priv->sdmmc_base + SDMMC_EXTCTRL);
++		busmode |= BM_EIGHTBIT_MODE;
++		extctrl |= EXT_EIGHTBIT;
+ 		break;
+ 	case MMC_BUS_WIDTH_4:
+-		reg_tmp = readb(priv->sdmmc_base + SDMMC_BUSMODE);
+-		writeb(reg_tmp | BM_FOURBIT_MODE, priv->sdmmc_base +
+-		       SDMMC_BUSMODE);
+-
+-		reg_tmp = readb(priv->sdmmc_base + SDMMC_EXTCTRL);
+-		writeb(reg_tmp & 0xFB, priv->sdmmc_base + SDMMC_EXTCTRL);
++		busmode |= BM_FOURBIT_MODE;
+ 		break;
+ 	case MMC_BUS_WIDTH_1:
+-		reg_tmp = readb(priv->sdmmc_base + SDMMC_BUSMODE);
+-		writeb(reg_tmp & BM_ONEBIT_MASK, priv->sdmmc_base +
+-		       SDMMC_BUSMODE);
+-
+-		reg_tmp = readb(priv->sdmmc_base + SDMMC_EXTCTRL);
+-		writeb(reg_tmp & 0xFB, priv->sdmmc_base + SDMMC_EXTCTRL);
+ 		break;
+ 	}
++
++	writeb(busmode, priv->sdmmc_base + SDMMC_BUSMODE);
++	writeb(extctrl, priv->sdmmc_base + SDMMC_EXTCTRL);
+ }
+ 
+ static int wmt_mci_get_ro(struct mmc_host *mmc)
+-- 
+1.8.1.2
