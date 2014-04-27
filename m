@@ -1,36 +1,42 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Sun, 27 Apr 2014 11:58:45 +0200
-Subject: [PATCH 0/5] tty/serial: Add helpers to use GPIOs to control modem
- lines and implement atmel_serial.c
-In-Reply-To: <20140425155847.GC22879@kroah.com>
-References: <1398437561-4289-1-git-send-email-richard.genoud@gmail.com>
- <20140425155847.GC22879@kroah.com>
-Message-ID: <CACQ1gAiyonHpg5YP4nSd3B=iiVQoTKQvYoC_JxbzA6Dmzr8+tw@mail.gmail.com>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Sun, 27 Apr 2014 19:01:30 +0900
+Subject: [PATCH] ARM: trusted_foundations: only set setup_max_cpus if SMP set
+In-Reply-To: <20140427093250.GA26756@n2100.arm.linux.org.uk>
+References: <20140427093250.GA26756@n2100.arm.linux.org.uk>
+Message-ID: <1398592890-31301-1-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-04-25 17:58 GMT+02:00 Greg Kroah-Hartman <gregkh@linuxfoundation.org>:
-> On Fri, Apr 25, 2014 at 04:52:36PM +0200, Richard Genoud wrote:
->> This patch series is a leftover of http://www.spinics.net/lists/arm-kernel/msg314242.html
->> that missed 3.15 because it caused merge conflicts.
->>
->> The 1st patch may be applied as a fix for 3.15-rc, since it correct a
->> device tree binding documentation example.
->>
->> Greg, for you to decide if it's worth it or not !
->
-> Why am I the one tho decides if it is worth it?  If it's up to me, I'll
-> just say "no", as I sure don't need this for any of my machines...
+The setup_max_cpu variable is only defined if CONFIG_SMP is set. Add
+a preprocessor condition to avoid the following compilation error if
+CONFIG_SMP is not set:
 
-Ok, let me reformulate :) :
+    arch/arm/include/asm/trusted_foundations.h: In function 'register_trusted_foundations':
+    arch/arm/include/asm/trusted_foundations.h:57:2: error: 'setup_max_cpus' undeclared (first use in this function)
 
-This patch series is a leftover of
-http://www.spinics.net/lists/arm-kernel/msg314242.html
-that missed 3.15 because it caused merge conflicts (you acked the
-series and ask me to resend it during 3.15-rc cycle).
+Reported-by: Russell King <rmk@arm.linux.org.uk>
+Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+---
+Hi Russell,
 
-I think that "[PATCH 1/5] tty/serial: atmel_serial: Fix device tree
-documentation" should be applied on 3.15-rc,
-since it corrects a device tree binding documentation example.
+This should take care of the trusted foundations issue. Thanks for reporting this.
 
-The patches 2-5/5 are for 3.16.
+ arch/arm/include/asm/trusted_foundations.h | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/include/asm/trusted_foundations.h b/arch/arm/include/asm/trusted_foundations.h
+index b5f7705..624e1d4 100644
+--- a/arch/arm/include/asm/trusted_foundations.h
++++ b/arch/arm/include/asm/trusted_foundations.h
+@@ -54,7 +54,9 @@ static inline void register_trusted_foundations(
+ 	 */
+ 	pr_err("No support for Trusted Foundations, continuing in degraded mode.\n");
+ 	pr_err("Secondary processors as well as CPU PM will be disabled.\n");
++#if IS_ENABLED(CONFIG_SMP)
+ 	setup_max_cpus = 0;
++#endif
+ 	cpu_idle_poll_ctrl(true);
+ }
+ 
+-- 
+1.9.2
