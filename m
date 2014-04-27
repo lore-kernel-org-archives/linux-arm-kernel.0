@@ -1,114 +1,33 @@
-From: linyongting@gmail.com (ivan lin)
-Date: Sun, 27 Apr 2014 12:15:03 +0800
-Subject: [PATCH] ftrace/arm: add save_stack_trace_regs() implementation
-In-Reply-To: <20140423090355.5a0a98cd@gandalf.local.home>
-References: <1398257541-18201-1-git-send-email-linyongting@gmail.com>
- <20140423090355.5a0a98cd@gandalf.local.home>
-Message-ID: <CANWV4VnODgQ7xKk2X6vq=OVVANbsTBS1AxX-3UOdwoYbrxWjPA@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Sun, 27 Apr 2014 08:53:09 +0200
+Subject: [PATCH 8/8] ARM: dts: imx27-phytec-phycore-*: Move "iomux" node
+ to the bottom of file
+In-Reply-To: <1398539710.4978394@f317.i.mail.ru>
+References: <1398487933-5683-1-git-send-email-shc_work@mail.ru>
+ <1398487933-5683-8-git-send-email-shc_work@mail.ru>
+ <20140426190935.GE5858@pengutronix.de>
+ <1398539710.4978394@f317.i.mail.ru>
+Message-ID: <20140427065309.GJ5858@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-04-23 21:03 GMT+08:00 Steven Rostedt <rostedt@goodmis.org>:
-> On Wed, 23 Apr 2014 20:52:21 +0800
-> Lin Yongting <linyongting@gmail.com> wrote:
->
->> When configure kprobe events of ftrace with "stacktrace" option enabled
->> in arm, there is no stacktrace was recorded after the kprobe event was
->> triggered. The root cause is no save_stack_trace_regs() function implemented.
->>
->> Implement the save_stack_trace_regs() function in arm, then ftrace will
->> call this architecture-related function to record the stacktrace into
->> ring buffer.
->>
->> After this fix, stacktrace can be recorded, for example:
->>
->> # mount -t debugfs nodev /sys/kernel/debug
->> # echo "p:netrx net_rx_action" >> /sys/kernel/debug/tracing/kprobe_events
->> # echo 1 > /sys/kernel/debug/tracing/events/kprobes/netrx/enable
->> # echo 1 > /sys/kernel/debug/tracing/options/stacktrace
->> # echo 1 > /sys/kernel/debug/tracing/tracing_on
->> # ping 127.0.0.1 -c 1
->> # echo 0 > /sys/kernel/debug/tracing/tracing_on
->>
->> # cat /sys/kernel/debug/tracing/trace
->> # tracer: nop
->> #
->> # entries-in-buffer/entries-written: 12/12   #P:1
->> #
->> #                              _-----=> irqs-off
->> #                             / _----=> need-resched
->> #                            | / _---=> hardirq/softirq
->> #                            || / _--=> preempt-depth
->> #                            ||| /     delay
->> #           TASK-PID   CPU#  ||||    TIMESTAMP  FUNCTION
->> #              | |       |   ||||       |         |
->>             <------ missing some entries ---------------->
->>             ping-1200  [000] dNs1   667.603250: netrx: (net_rx_action+0x0/0x1f8)
->>             ping-1200  [000] dNs1   667.604738: <stack trace>
->>  => net_rx_action
->>  => do_softirq
->>  => local_bh_enable
->>  => ip_finish_output
->>  => ip_output
->>  => ip_local_out
->>  => ip_send_skb
->>  => ip_push_pending_frames
->>  => raw_sendmsg
->>  => inet_sendmsg
->>  => sock_sendmsg
->>  => SyS_sendto
->>  => ret_fast_syscall
->>
->> Signed-off-by: Lin Yongting <linyongting@gmail.com>
->> ---
->
-> As this affects ftrace for ARM...
->
-> Acked-by: Steven Rostedt <rostedt@goodmis.org>
->
-> -- Steve
->
+On Sat, Apr 26, 2014 at 11:15:10PM +0400, Alexander Shiyan wrote:
+> Sat, 26 Apr 2014 21:09:35 +0200 ?? Sascha Hauer <s.hauer@pengutronix.de>:
+> > On Sat, Apr 26, 2014 at 08:52:13AM +0400, Alexander Shiyan wrote:
+> > > This patch moves "iomux" node to the bottom of file.
+> > > No functional changes.
+> > 
+> > Why? The nodes are (at least should be) sorted alphabetically.
+> 
+> Pin definitions look better in one place, at the bottom.
+> As far as I know, Shawn supported this position.
 
-Hi Russell
+If that's the way we want to go then ok. I wasn't aware of this.
 
-  How about my Patch?  any advice is appreciate?
+Sascha
 
-  Best Regards!
-
-  -- Yongting.
-
-
->>  arch/arm/kernel/stacktrace.c |   19 +++++++++++++++++++
->>  1 file changed, 19 insertions(+)
->>
->> diff --git a/arch/arm/kernel/stacktrace.c b/arch/arm/kernel/stacktrace.c
->> index af4e8c8..c558db6 100644
->> --- a/arch/arm/kernel/stacktrace.c
->> +++ b/arch/arm/kernel/stacktrace.c
->> @@ -123,6 +123,25 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
->>               trace->entries[trace->nr_entries++] = ULONG_MAX;
->>  }
->>
->> +void save_stack_trace_regs(struct pt_regs *regs, struct stack_trace *trace)
->> +{
->> +     struct stack_trace_data data;
->> +     struct stackframe frame;
->> +
->> +     data.trace = trace;
->> +     data.skip = trace->skip;
->> +     data.no_sched_functions = 0;
->> +
->> +     frame.fp = regs->ARM_fp;
->> +     frame.sp = regs->ARM_sp;
->> +     frame.lr = regs->ARM_lr;
->> +     frame.pc = regs->ARM_pc;
->> +
->> +     walk_stackframe(&frame, save_trace, &data);
->> +     if (trace->nr_entries < trace->max_entries)
->> +             trace->entries[trace->nr_entries++] = ULONG_MAX;
->> +}
->> +
->>  void save_stack_trace(struct stack_trace *trace)
->>  {
->>       save_stack_trace_tsk(current, trace);
->
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
