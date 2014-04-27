@@ -1,116 +1,72 @@
 From: shaik.ameer@samsung.com (Shaik Ameer Basha)
-Date: Sun, 27 Apr 2014 13:07:53 +0530
-Subject: [PATCH v12 21/31] iommu/exynos: fix address handling
+Date: Sun, 27 Apr 2014 13:07:52 +0530
+Subject: [PATCH v12 20/31] iommu/exynos: add devices attached to the System MMU
+ to an IOMMU group
 In-Reply-To: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
 References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
-Message-ID: <1398584283-22846-22-git-send-email-shaik.ameer@samsung.com>
+Message-ID: <1398584283-22846-21-git-send-email-shaik.ameer@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Cho KyongHo <pullip.cho@samsung.com>
+From: Antonios Motakis <a.motakis@virtualopensystems.com>
 
-Use of __pa and __va macro is changed to virt_to_phys and phys_to_virt
-which are recommended in driver code. printk formatting of physical
-address is also fixed to %pa.
+Patch written by Antonios Motakis <a.motakis@virtualopensystems.com>:
 
-Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
+IOMMU groups are expected by certain users of the IOMMU API,
+e.g. VFIO. Since each device is behind its own System MMU, we
+can allocate a new IOMMU group for each device.
+
+Reviewd-by: Cho KyongHo <pullip.cho@samsung.com>
+Signed-off-by: Antonios Motakis <a.motakis@virtualopensystems.com>
 ---
- drivers/iommu/exynos-iommu.c |   33 +++++++++++++++++----------------
- 1 file changed, 17 insertions(+), 16 deletions(-)
+ drivers/iommu/exynos-iommu.c |   28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
 diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 5c7f4d2..08a7ce0 100755
+index c9076e1..5c7f4d2 100755
 --- a/drivers/iommu/exynos-iommu.c
 +++ b/drivers/iommu/exynos-iommu.c
-@@ -131,7 +131,8 @@ static unsigned long *section_entry(unsigned long *pgtable, unsigned long iova)
- 
- static unsigned long *page_entry(unsigned long *sent, unsigned long iova)
- {
--	return (unsigned long *)__va(lv2table_base(sent)) + lv2ent_offset(iova);
-+	return (unsigned long *)phys_to_virt(
-+				lv2table_base(sent)) + lv2ent_offset(iova);
+@@ -1208,6 +1208,32 @@ static phys_addr_t exynos_iommu_iova_to_phys(struct iommu_domain *domain,
+ 	return phys;
  }
  
- enum exynos_sysmmu_inttype {
-@@ -204,7 +205,7 @@ struct sysmmu_drvdata {
- 	struct iommu_domain *domain;
- 	bool powered_on;
- 	bool suspended;
--	unsigned long pgtable;
-+	phys_addr_t pgtable;
- };
- 
- static bool set_sysmmu_active(struct sysmmu_drvdata *data)
-@@ -296,17 +297,17 @@ static void __sysmmu_set_ptbase(void __iomem *sfrbase,
- 
- static void show_fault_information(const char *name,
- 		enum exynos_sysmmu_inttype itype,
--		unsigned long pgtable_base, unsigned long fault_addr)
-+		phys_addr_t pgtable_base, unsigned long fault_addr)
- {
- 	unsigned long *ent;
- 
- 	if ((itype >= SYSMMU_FAULTS_NUM) || (itype < SYSMMU_PAGEFAULT))
- 		itype = SYSMMU_FAULT_UNKNOWN;
- 
--	pr_err("%s occurred at 0x%lx by %s(Page table base: 0x%lx)\n",
--		sysmmu_fault_name[itype], fault_addr, name, pgtable_base);
-+	pr_err("%s occurred@%#lx by %s(Page table base: %pa)\n",
-+		sysmmu_fault_name[itype], fault_addr, name, &pgtable_base);
- 
--	ent = section_entry(__va(pgtable_base), fault_addr);
-+	ent = section_entry(phys_to_virt(pgtable_base), fault_addr);
- 	pr_err("\tLv1 entry: 0x%lx\n", *ent);
- 
- 	if (lv1ent_page(ent)) {
-@@ -909,7 +910,7 @@ static void exynos_iommu_domain_destroy(struct iommu_domain *domain)
- 	for (i = 0; i < NUM_LV1ENTRIES; i++)
- 		if (lv1ent_page(priv->pgtable + i))
- 			kmem_cache_free(lv2table_kmem_cache,
--					__va(lv2table_base(priv->pgtable + i)));
-+				phys_to_virt(lv2table_base(priv->pgtable + i)));
- 
- 	free_pages((unsigned long)priv->pgtable, 2);
- 	free_pages((unsigned long)priv->lv2entcnt, 1);
-@@ -928,8 +929,7 @@ static int exynos_iommu_attach_device(struct iommu_domain *domain,
- 
- 	spin_lock_irqsave(&priv->lock, flags);
- 
--
--	ret = __exynos_sysmmu_enable(dev, __pa(priv->pgtable), domain);
-+	ret = __exynos_sysmmu_enable(dev, pagetable, domain);
- 	if (ret == 0) {
- 		list_add_tail(&owner->client, &priv->clients);
- 		owner->domain = domain;
-@@ -937,13 +937,14 @@ static int exynos_iommu_attach_device(struct iommu_domain *domain,
- 
- 	spin_unlock_irqrestore(&priv->lock, flags);
- 
--	if (ret < 0)
-+	if (ret < 0) {
- 		dev_err(dev, "%s: Failed to attach IOMMU with pgtable %pa\n",
--					__func__, &pagetable);
--	else
--		dev_dbg(dev, "%s: Attached IOMMU with pgtable %pa%s\n",
--					__func__, &pagetable,
--					(ret == 0) ? "" : ", again");
-+				__func__, &pagetable);
-+		return ret;
++static int exynos_iommu_add_device(struct device *dev)
++{
++	struct iommu_group *group;
++	int ret;
++
++	group = iommu_group_get(dev);
++
++	if (!group) {
++		group = iommu_group_alloc();
++		if (IS_ERR(group)) {
++			dev_err(dev, "Failed to allocate IOMMU group\n");
++			return PTR_ERR(group);
++		}
 +	}
 +
-+	dev_dbg(dev, "%s: Attached IOMMU with pgtable %pa %s\n",
-+		__func__, &pagetable, (ret == 0) ? "" : ", again");
++	ret = iommu_group_add_device(group, dev);
++	iommu_group_put(group);
++
++	return ret;
++}
++
++static void exynos_iommu_remove_device(struct device *dev)
++{
++	iommu_group_remove_device(dev);
++}
++
+ static struct iommu_ops exynos_iommu_ops = {
+ 	.domain_init = &exynos_iommu_domain_init,
+ 	.domain_destroy = &exynos_iommu_domain_destroy,
+@@ -1216,6 +1242,8 @@ static struct iommu_ops exynos_iommu_ops = {
+ 	.map = &exynos_iommu_map,
+ 	.unmap = &exynos_iommu_unmap,
+ 	.iova_to_phys = &exynos_iommu_iova_to_phys,
++	.add_device = &exynos_iommu_add_device,
++	.remove_device = &exynos_iommu_remove_device,
+ 	.pgsize_bitmap = SECT_SIZE | LPAGE_SIZE | SPAGE_SIZE,
+ };
  
- 	return ret;
- }
-@@ -993,7 +994,7 @@ static unsigned long *alloc_lv2entry(unsigned long *sent, unsigned long iova,
- 		if (!pent)
- 			return ERR_PTR(-ENOMEM);
- 
--		*sent = mk_lv1ent_page(__pa(pent));
-+		*sent = mk_lv1ent_page(virt_to_phys(pent));
- 		*pgcounter = NUM_LV2ENTRIES;
- 		pgtable_flush(pent, pent + NUM_LV2ENTRIES);
- 		pgtable_flush(sent, sent + 1);
 -- 
 1.7.9.5
