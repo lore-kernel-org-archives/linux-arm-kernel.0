@@ -1,78 +1,27 @@
-From: murzin.v@gmail.com (Vladimir Murzin)
-Date: Sun, 27 Apr 2014 10:21:17 +0100
-Subject: [RFC PATCH] arm64: make bitops 32-bit tolerant
-Message-ID: <1398590477-15375-1-git-send-email-murzin.v@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 27 Apr 2014 10:32:51 +0100
+Subject: randconfig failures - MMC + trusted foundations
+Message-ID: <20140427093250.GA26756@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Xen assumes that bit operations are able to operate on 32-bit size and
-alignment [1]. For arm64 bitops are based on atomic exclusive load/store
-instructions to guarantee that changes are made atomically. However, these
-instructions require that address to be aligned to the data size. Because, by
-default, bitops operates on 64-bit size it implies that address should be
-aligned appropriately. All these lead to breakage of Xen assumption for bitops
-properties.
+Last night's omap4430-sdp randconfig build:
 
-This patch turns bitops to operate on 32-bit size/alignment.
+In file included from arch/arm/mach-tegra/tegra.c:43:0:
+arch/arm/include/asm/trusted_foundations.h: In function 'register_trusted_foundations':
+arch/arm/include/asm/trusted_foundations.h:57:2: error: 'setup_max_cpus' undeclared (first use in this function)
 
-[1] http://www.gossamer-threads.com/lists/xen/devel/325613
 
-Cc: catalin.marinas at arm.com
-Cc: will.deacon at arm.com
-Cc: david.vrabel at citrix.com
-Cc: Ian.Campbell at citrix.com
+Last night's versatile randconfig build:
 
-Signed-off-by: Vladimir Murzin <murzin.v@gmail.com>
----
- With this patch applied I was able to boot both Dom0 and DomU.
- 
- @Pranav: Could I have your Tested-by on this patch?
- 
- arch/arm64/lib/bitops.S          | 16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
+drivers/mmc/core/core.c: In function 'mmc_card_power_up':
+drivers/mmc/core/core.c:1517:4: error: implicit declaration of function 'gpiod_set_value'
 
-diff --git a/arch/arm64/lib/bitops.S b/arch/arm64/lib/bitops.S
-index 7dac371..a6acfff 100644
---- a/arch/arm64/lib/bitops.S
-+++ b/arch/arm64/lib/bitops.S
-@@ -26,14 +26,14 @@
-  */
- 	.macro	bitop, name, instr
- ENTRY(	\name	)
--	and	w3, w0, #63		// Get bit offset
-+	and	w3, w0, #31		// Get bit offset
- 	eor	w0, w0, w3		// Clear low bits
- 	mov	x2, #1
- 	add	x1, x1, x0, lsr #3	// Get word offset
- 	lsl	x3, x2, x3		// Create mask
--1:	ldxr	x2, [x1]
--	\instr	x2, x2, x3
--	stxr	w0, x2, [x1]
-+1:	ldxr	w2, [x1]
-+	\instr	w2, w2, w3
-+	stxr	w0, w2, [x1]
- 	cbnz	w0, 1b
- 	ret
- ENDPROC(\name	)
-@@ -41,15 +41,15 @@ ENDPROC(\name	)
- 
- 	.macro	testop, name, instr
- ENTRY(	\name	)
--	and	w3, w0, #63		// Get bit offset
-+	and	w3, w0, #31		// Get bit offset
- 	eor	w0, w0, w3		// Clear low bits
- 	mov	x2, #1
- 	add	x1, x1, x0, lsr #3	// Get word offset
- 	lsl	x4, x2, x3		// Create mask
--1:	ldxr	x2, [x1]
-+1:	ldxr	w2, [x1]
- 	lsr	x0, x2, x3		// Save old value of bit
--	\instr	x2, x2, x4		// toggle bit
--	stlxr	w5, x2, [x1]
-+	\instr	w2, w2, w4		// toggle bit
-+	stlxr	w5, w2, [x1]
- 	cbnz	w5, 1b
- 	dmb	ish
- 	and	x0, x0, #1
+This one appears to be a regular feature of failure, and is as I'm
+carrying Olof's "mmc: add support for power-on sequencing through DT"
+patch for CuBox wireless - see the 222 patch set.  It probably points
+at something not being right with GPIO stuff.
+
 -- 
-1.8.3.2
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
