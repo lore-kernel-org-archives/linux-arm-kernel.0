@@ -1,135 +1,62 @@
 From: shaik.ameer@samsung.com (Shaik Ameer Basha)
-Date: Sun, 27 Apr 2014 13:07:42 +0530
-Subject: [PATCH v12 10/31] iommu/exynos: use managed device helper functions
+Date: Sun, 27 Apr 2014 13:07:37 +0530
+Subject: [PATCH v12 05/31] iommu/exynos: remove prefetch buffer setting
 In-Reply-To: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
 References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
-Message-ID: <1398584283-22846-11-git-send-email-shaik.ameer@samsung.com>
+Message-ID: <1398584283-22846-6-git-send-email-shaik.ameer@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Cho KyongHo <pullip.cho@samsung.com>
 
-This patch uses managed device helper functions in the probe().
+Prefetch buffer is a cache of System MMU 3.x and caches a block of
+page table entries to make effect of larger page with small pages.
+However, how to control prefetch buffers and the specifications of
+prefetch buffers different from minor versions of System MMU v3.
+Prefetch buffers must be controled with care because there are some
+restrictions in H/W design.
+
+The interface and implementation to initiate prefetch buffers will
+be prepared later.
 
 Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
 ---
- drivers/iommu/exynos-iommu.c |   68 ++++++++++++++++--------------------------
- 1 file changed, 25 insertions(+), 43 deletions(-)
+ drivers/iommu/exynos-iommu.c |   16 ----------------
+ 1 file changed, 16 deletions(-)
 
 diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 1af2d23..0f1d3f0 100755
+index 7ce44a8..7556177 100644
 --- a/drivers/iommu/exynos-iommu.c
 +++ b/drivers/iommu/exynos-iommu.c
-@@ -342,8 +342,7 @@ static bool __exynos_sysmmu_disable(struct sysmmu_drvdata *data)
- 
- 	__raw_writel(CTRL_DISABLE, data->sfrbase + REG_MMU_CTRL);
- 
--	if (!IS_ERR(data->clk))
--		clk_disable(data->clk);
-+	clk_disable(data->clk);
- 
- 	disabled = true;
- 	data->pgtable = 0;
-@@ -386,8 +385,7 @@ static int __exynos_sysmmu_enable(struct sysmmu_drvdata *data,
- 		goto finish;
- 	}
- 
--	if (!IS_ERR(data->clk))
--		clk_enable(data->clk);
-+	clk_enable(data->clk);
- 
- 	data->pgtable = pgtable;
- 
-@@ -498,49 +496,43 @@ void exynos_sysmmu_tlb_invalidate(struct device *dev)
- 
- static int exynos_sysmmu_probe(struct platform_device *pdev)
- {
--	int ret;
-+	int irq, ret;
- 	struct device *dev = &pdev->dev;
- 	struct sysmmu_drvdata *data;
- 	struct resource *res;
- 
--	data = kzalloc(sizeof(*data), GFP_KERNEL);
--	if (!data) {
--		dev_dbg(dev, "Not enough memory\n");
--		ret = -ENOMEM;
--		goto err_alloc;
--	}
-+	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
-+	if (!data)
-+		return -ENOMEM;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	if (!res) {
--		dev_dbg(dev, "Unable to find IOMEM region\n");
--		ret = -ENOENT;
--		goto err_init;
--	}
-+	data->sfrbase = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(data->sfrbase))
-+		return PTR_ERR(data->sfrbase);
- 
--	data->sfrbase = ioremap(res->start, resource_size(res));
--	if (!data->sfrbase) {
--		dev_dbg(dev, "Unable to map IOMEM @ PA:%#x\n", res->start);
--		ret = -ENOENT;
--		goto err_res;
--	}
--
--	ret = platform_get_irq(pdev, 0);
--	if (ret <= 0) {
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq <= 0) {
- 		dev_dbg(dev, "Unable to find IRQ resource\n");
--		goto err_irq;
-+		return irq;
- 	}
- 
--	ret = request_irq(ret, exynos_sysmmu_irq, 0,
-+	ret = devm_request_irq(dev, irq, exynos_sysmmu_irq, 0,
- 				dev_name(dev), data);
- 	if (ret) {
--		dev_dbg(dev, "Unabled to register interrupt handler\n");
--		goto err_irq;
-+		dev_err(dev, "Unabled to register handler of irq %d\n", irq);
-+		return ret;
- 	}
- 
--	if (dev_get_platdata(dev)) {
--		data->clk = clk_get(dev, "sysmmu");
--		if (IS_ERR(data->clk))
--			dev_dbg(dev, "No clock descriptor registered\n");
-+	data->clk = devm_clk_get(dev, "sysmmu");
-+	if (IS_ERR(data->clk)) {
-+		dev_err(dev, "Failed to get clock!\n");
-+		return PTR_ERR(data->clk);
-+	} else  {
-+		ret = clk_prepare(data->clk);
-+		if (ret) {
-+			dev_err(dev, "Failed to prepare clk\n");
-+			return ret;
-+		}
- 	}
- 
- 	data->sysmmu = dev;
-@@ -553,17 +545,7 @@ static int exynos_sysmmu_probe(struct platform_device *pdev)
- 
- 	pm_runtime_enable(dev);
- 
--	dev_dbg(dev, "Initialized\n");
- 	return 0;
--err_irq:
--	free_irq(platform_get_irq(pdev, 0), data);
--err_res:
--	iounmap(data->sfrbase);
--err_init:
--	kfree(data);
--err_alloc:
--	dev_err(dev, "Failed to initialize\n");
--	return ret;
+@@ -243,13 +243,6 @@ static void __sysmmu_set_ptbase(void __iomem *sfrbase,
+ 	__sysmmu_tlb_invalidate(sfrbase);
  }
  
- static struct platform_driver exynos_sysmmu_driver = {
+-static void __sysmmu_set_prefbuf(void __iomem *sfrbase, unsigned long base,
+-						unsigned long size, int idx)
+-{
+-	__raw_writel(base, sfrbase + REG_PB0_SADDR + idx * 8);
+-	__raw_writel(size - 1 + base,  sfrbase + REG_PB0_EADDR + idx * 8);
+-}
+-
+ static void __set_fault_handler(struct sysmmu_drvdata *data,
+ 					sysmmu_fault_handler_t handler)
+ {
+@@ -423,15 +416,6 @@ static int __exynos_sysmmu_enable(struct sysmmu_drvdata *data,
+ 
+ 	for (i = 0; i < data->nsfrs; i++) {
+ 		__sysmmu_set_ptbase(data->sfrbases[i], pgtable);
+-
+-		if ((readl(data->sfrbases[i] + REG_MMU_VERSION) >> 28) == 3) {
+-			/* System MMU version is 3.x */
+-			__raw_writel((1 << 12) | (2 << 28),
+-					data->sfrbases[i] + REG_MMU_CFG);
+-			__sysmmu_set_prefbuf(data->sfrbases[i], 0, -1, 0);
+-			__sysmmu_set_prefbuf(data->sfrbases[i], 0, -1, 1);
+-		}
+-
+ 		__raw_writel(CTRL_ENABLE, data->sfrbases[i] + REG_MMU_CTRL);
+ 	}
+ 
 -- 
 1.7.9.5
