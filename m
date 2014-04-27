@@ -1,42 +1,39 @@
-From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Sun, 27 Apr 2014 19:01:30 +0900
-Subject: [PATCH] ARM: trusted_foundations: only set setup_max_cpus if SMP set
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Sun, 27 Apr 2014 19:09:31 +0900
+Subject: randconfig failures - MMC + trusted foundations
 In-Reply-To: <20140427093250.GA26756@n2100.arm.linux.org.uk>
 References: <20140427093250.GA26756@n2100.arm.linux.org.uk>
-Message-ID: <1398592890-31301-1-git-send-email-acourbot@nvidia.com>
+Message-ID: <CAAVeFuJ2=fWamF6xBAJLv1kEEhBVgWMj-PY0gxouo6-NOE9OfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The setup_max_cpu variable is only defined if CONFIG_SMP is set. Add
-a preprocessor condition to avoid the following compilation error if
-CONFIG_SMP is not set:
-
-    arch/arm/include/asm/trusted_foundations.h: In function 'register_trusted_foundations':
-    arch/arm/include/asm/trusted_foundations.h:57:2: error: 'setup_max_cpus' undeclared (first use in this function)
-
-Reported-by: Russell King <rmk@arm.linux.org.uk>
-Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
----
 Hi Russell,
 
-This should take care of the trusted foundations issue. Thanks for reporting this.
+On Sun, Apr 27, 2014 at 6:32 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> Last night's omap4430-sdp randconfig build:
+>
+> In file included from arch/arm/mach-tegra/tegra.c:43:0:
+> arch/arm/include/asm/trusted_foundations.h: In function 'register_trusted_foundations':
+> arch/arm/include/asm/trusted_foundations.h:57:2: error: 'setup_max_cpus' undeclared (first use in this function)
 
- arch/arm/include/asm/trusted_foundations.h | 2 ++
- 1 file changed, 2 insertions(+)
+Just sent you a patch to fix this. Thanks for reporting.
 
-diff --git a/arch/arm/include/asm/trusted_foundations.h b/arch/arm/include/asm/trusted_foundations.h
-index b5f7705..624e1d4 100644
---- a/arch/arm/include/asm/trusted_foundations.h
-+++ b/arch/arm/include/asm/trusted_foundations.h
-@@ -54,7 +54,9 @@ static inline void register_trusted_foundations(
- 	 */
- 	pr_err("No support for Trusted Foundations, continuing in degraded mode.\n");
- 	pr_err("Secondary processors as well as CPU PM will be disabled.\n");
-+#if IS_ENABLED(CONFIG_SMP)
- 	setup_max_cpus = 0;
-+#endif
- 	cpu_idle_poll_ctrl(true);
- }
- 
--- 
-1.9.2
+> Last night's versatile randconfig build:
+>
+> drivers/mmc/core/core.c: In function 'mmc_card_power_up':
+> drivers/mmc/core/core.c:1517:4: error: implicit declaration of function 'gpiod_set_value'
+>
+> This one appears to be a regular feature of failure, and is as I'm
+> carrying Olof's "mmc: add support for power-on sequencing through DT"
+> patch for CuBox wireless - see the 222 patch set.  It probably points
+> at something not being right with GPIO stuff.
+
+I had a quick look at the patch and I would say this is happening
+because drivers/mmc/core/core.c does not include
+<linux/gpio/consumer.h> despite using the gpiod_* functions. The error
+will only happen if CONFIG_GPIOLIB is not defined. Olof, if it is not
+too late can you fix this in your patch series?
+
+Cheers,
+Alex.
