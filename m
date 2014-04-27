@@ -1,53 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 27 Apr 2014 14:32:37 +0100
-Subject: [RFC PATCH 0/8] component helper improvements
-In-Reply-To: <CAKMK7uFE7NVTS8dgb7kmXtAcz2Q59WhxrZJWcktG98UegFW1zA@mail.gmail.com>
-References: <20140426230025.GZ26756@n2100.arm.linux.org.uk>
- <CAKMK7uFE7NVTS8dgb7kmXtAcz2Q59WhxrZJWcktG98UegFW1zA@mail.gmail.com>
-Message-ID: <20140427133237.GD26756@n2100.arm.linux.org.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Sun, 27 Apr 2014 06:59:15 -0700
+Subject: [PATCH 0/5] tty/serial: Add helpers to use GPIOs to control modem
+ lines and implement atmel_serial.c
+In-Reply-To: <CACQ1gAiyonHpg5YP4nSd3B=iiVQoTKQvYoC_JxbzA6Dmzr8+tw@mail.gmail.com>
+References: <1398437561-4289-1-git-send-email-richard.genoud@gmail.com>
+ <20140425155847.GC22879@kroah.com>
+ <CACQ1gAiyonHpg5YP4nSd3B=iiVQoTKQvYoC_JxbzA6Dmzr8+tw@mail.gmail.com>
+Message-ID: <535D0D33.4050401@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 27, 2014 at 02:51:30PM +0200, Daniel Vetter wrote:
-> On Sun, Apr 27, 2014 at 1:00 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > A while back, Laurent raised some comments about the component helper,
-> > which this patch set starts to address.
-> >
-> > The first point it addresses is the repeated parsing inefficiency when
-> > deferred probing occurs.  When DT is used, the structure of the
-> > component helper today means that masters end up parsing the device
-> > tree for each attempt to re-bind the driver.
-> >
-> > We remove this inefficiency by creating an array of matching data and
-> > functions, which the component helper can use internally to match up
-> > components to their master.
-> >
-> > The second point was the inefficiency of destroying the list of
-> > components each time we saw a failure.  We did this to ensure that
-> > we kept things correctly ordered: component bind order matters.
-> > As we have an array instead, the array is already ordered, so we
-> > use this array to store the component pointers instead of a list,
-> > and remember which are duplicates (and thus should be avoided.)
-> > Avoiding the right duplicates matters as we walk the array in the
-> > opposite direction at tear down.
-> >
-> > I would like to see patches 1-5 scheduled for the next merge window,
-> > with 6-8 for the following window - this gives us grace of one kernel
-> > cycle to ensure that any new component helper users are properly
-> > converted.
+On 27/04/2014 02:58, Richard Genoud :
+> 2014-04-25 17:58 GMT+02:00 Greg Kroah-Hartman <gregkh@linuxfoundation.org>:
+>> On Fri, Apr 25, 2014 at 04:52:36PM +0200, Richard Genoud wrote:
+>>> This patch series is a leftover of http://www.spinics.net/lists/arm-kernel/msg314242.html
+>>> that missed 3.15 because it caused merge conflicts.
+>>>
+>>> The 1st patch may be applied as a fix for 3.15-rc, since it correct a
+>>> device tree binding documentation example.
+>>>
+>>> Greg, for you to decide if it's worth it or not !
+>>
+>> Why am I the one tho decides if it is worth it?  If it's up to me, I'll
+>> just say "no", as I sure don't need this for any of my machines...
+
+Ok, so I need to speak up and say that the patch series is useful for me :-)
+
+> Ok, let me reformulate :) :
 > 
-> Afaict the actual patches haven't made it to dri-devel, only to
-> linux-arm-kernel. Are they stuck somewhere?
+> This patch series is a leftover of
+> http://www.spinics.net/lists/arm-kernel/msg314242.html
+> that missed 3.15 because it caused merge conflicts (you acked the
+> series and ask me to resend it during 3.15-rc cycle).
+> 
+> I think that "[PATCH 1/5] tty/serial: atmel_serial: Fix device tree
+> documentation" should be applied on 3.15-rc,
+> since it corrects a device tree binding documentation example.
+> 
+> The patches 2-5/5 are for 3.16.
 
-The patches themselves end up being Cc'd depending on their content and
-the contents of the MAINTAINERS file, unless I specifically tell my
-scripts that the patches are to be sent to/cc people - generally I do
-that for the primary recipients of the series.
+BTW, patches 4 and 5 were "Acked" by me in v6 revision of this series.
 
-That means only the patch(es) which touch DRM stuff were copied to
-dri-devel, in this case, that being the MSM one.
-
+Thanks, bye,
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Nicolas Ferre
