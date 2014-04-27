@@ -1,107 +1,147 @@
 From: shaik.ameer@samsung.com (Shaik Ameer Basha)
-Date: Sun, 27 Apr 2014 13:07:44 +0530
-Subject: [PATCH v12 12/31] iommu/exynos: support for device tree
+Date: Sun, 27 Apr 2014 13:07:45 +0530
+Subject: [PATCH v12 13/31] iommu/exynos: gating clocks of master H/W
 In-Reply-To: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
 References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
-Message-ID: <1398584283-22846-13-git-send-email-shaik.ameer@samsung.com>
+Message-ID: <1398584283-22846-14-git-send-email-shaik.ameer@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Cho KyongHo <pullip.cho@samsung.com>
 
-This commit adds device tree support for System MMU.
-It also enables iommu support for ARCH_EXYNOS.
+This patch gates clocks of master H/W as well as clocks of System MMU
+if master clocks are specified.
 
+Some Exynos SoCs (i.e. GScalers in Exynos5250) have dependencies in
+the gating clocks of master H/W and its System MMU. If a H/W is the
+case, accessing control registers of System MMU is prohibited unless
+both of the gating clocks of System MMU and its master H/W.
+
+CC: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
-Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
 ---
- arch/arm/Kconfig             |    2 ++
- drivers/iommu/Kconfig        |    8 +++-----
- drivers/iommu/exynos-iommu.c |   19 +++++++++++++++----
- 3 files changed, 20 insertions(+), 9 deletions(-)
+ drivers/iommu/exynos-iommu.c |   40 ++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 38 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index ab438cb..19689e4 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -834,6 +834,8 @@ config ARCH_EXYNOS
- 	select ARCH_HAS_HOLES_MEMORYMODEL
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARCH_SPARSEMEM_ENABLE
-+	select ARM_AMBA
-+	select ARM_DMA_USE_IOMMU
- 	select ARM_GIC
- 	select COMMON_CLK
- 	select CPU_V7
-diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-index df56e4c..5feadb8 100644
---- a/drivers/iommu/Kconfig
-+++ b/drivers/iommu/Kconfig
-@@ -178,16 +178,14 @@ config TEGRA_IOMMU_SMMU
- 
- config EXYNOS_IOMMU
- 	bool "Exynos IOMMU Support"
--	depends on ARCH_EXYNOS && EXYNOS_DEV_SYSMMU
-+	depends on ARCH_EXYNOS
- 	select IOMMU_API
- 	help
--	  Support for the IOMMU(System MMU) of Samsung Exynos application
--	  processor family. This enables H/W multimedia accellerators to see
-+	  Support for the IOMMU (System MMU) of Samsung Exynos application
-+	  processor family. This enables H/W multimedia accelerators to see
- 	  non-linear physical memory chunks as a linear memory in their
- 	  address spaces
- 
--	  If unsure, say N here.
--
- config EXYNOS_IOMMU_DEBUG
- 	bool "Debugging log for Exynos IOMMU"
- 	depends on EXYNOS_IOMMU
 diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 0f1d3f0..cbb9b67 100755
+index cbb9b67..ba477c4 100755
 --- a/drivers/iommu/exynos-iommu.c
 +++ b/drivers/iommu/exynos-iommu.c
-@@ -25,6 +25,7 @@
- #include <linux/list.h>
- #include <linux/memblock.h>
- #include <linux/export.h>
-+#include <linux/of.h>
+@@ -172,6 +172,7 @@ struct sysmmu_drvdata {
+ 	struct device *dev;	/* Owner of system MMU */
+ 	void __iomem *sfrbase;
+ 	struct clk *clk;
++	struct clk *clk_master;
+ 	int activations;
+ 	rwlock_t lock;
+ 	struct iommu_domain *domain;
+@@ -300,6 +301,8 @@ static irqreturn_t exynos_sysmmu_irq(int irq, void *dev_id)
  
- #include <asm/cacheflush.h>
- #include <asm/pgtable.h>
-@@ -494,7 +495,7 @@ void exynos_sysmmu_tlb_invalidate(struct device *dev)
- 	read_unlock_irqrestore(&data->lock, flags);
- }
+ 	WARN_ON(!is_sysmmu_active(data));
  
--static int exynos_sysmmu_probe(struct platform_device *pdev)
-+static int __init exynos_sysmmu_probe(struct platform_device *pdev)
- {
- 	int irq, ret;
- 	struct device *dev = &pdev->dev;
-@@ -548,11 +549,21 @@ static int exynos_sysmmu_probe(struct platform_device *pdev)
- 	return 0;
- }
++	if (!IS_ERR(data->clk_master))
++		clk_enable(data->clk_master);
+ 	itype = (enum exynos_sysmmu_inttype)
+ 		__ffs(__raw_readl(data->sfrbase + REG_INT_STATUS));
+ 	if (WARN_ON(!((itype >= 0) && (itype < SYSMMU_FAULT_UNKNOWN))))
+@@ -326,6 +329,9 @@ static irqreturn_t exynos_sysmmu_irq(int irq, void *dev_id)
+ 	if (itype != SYSMMU_FAULT_UNKNOWN)
+ 		sysmmu_unblock(data->sfrbase);
  
--static struct platform_driver exynos_sysmmu_driver = {
--	.probe		= exynos_sysmmu_probe,
--	.driver		= {
-+static const struct of_device_id sysmmu_of_match[] __initconst = {
-+	{ .compatible	= "samsung,sysmmu-v1", },
-+	{ .compatible	= "samsung,sysmmu-v2", },
-+	{ .compatible	= "samsung,sysmmu-v3.1", },
-+	{ .compatible	= "samsung,sysmmu-v3.2", },
-+	{ .compatible	= "samsung,sysmmu-v3.3", },
-+	{ },
-+};
++	if (!IS_ERR(data->clk_master))
++		clk_disable(data->clk_master);
 +
-+static struct platform_driver exynos_sysmmu_driver __refdata = {
-+	.probe	= exynos_sysmmu_probe,
-+	.driver	= {
- 		.owner		= THIS_MODULE,
- 		.name		= "exynos-sysmmu",
-+		.of_match_table	= sysmmu_of_match,
- 	}
- };
+ 	read_unlock(&data->lock);
  
+ 	return IRQ_HANDLED;
+@@ -341,9 +347,14 @@ static bool __exynos_sysmmu_disable(struct sysmmu_drvdata *data)
+ 	if (!set_sysmmu_inactive(data))
+ 		goto finish;
+ 
++	if (!IS_ERR(data->clk_master))
++		clk_enable(data->clk_master);
++
+ 	__raw_writel(CTRL_DISABLE, data->sfrbase + REG_MMU_CTRL);
+ 
+ 	clk_disable(data->clk);
++	if (!IS_ERR(data->clk_master))
++		clk_disable(data->clk_master);
+ 
+ 	disabled = true;
+ 	data->pgtable = 0;
+@@ -386,14 +397,19 @@ static int __exynos_sysmmu_enable(struct sysmmu_drvdata *data,
+ 		goto finish;
+ 	}
+ 
+-	clk_enable(data->clk);
+-
+ 	data->pgtable = pgtable;
+ 
++	if (!IS_ERR(data->clk_master))
++		clk_enable(data->clk_master);
++	clk_enable(data->clk);
++
+ 	__sysmmu_set_ptbase(data->sfrbase, pgtable);
+ 
+ 	__raw_writel(CTRL_ENABLE, data->sfrbase + REG_MMU_CTRL);
+ 
++	if (!IS_ERR(data->clk_master))
++		clk_disable(data->clk_master);
++
+ 	data->domain = domain;
+ 
+ 	dev_dbg(data->sysmmu, "Enabled\n");
+@@ -450,6 +466,10 @@ static void sysmmu_tlb_invalidate_entry(struct device *dev, unsigned long iova,
+ 	if (is_sysmmu_active(data)) {
+ 		unsigned int maj;
+ 		unsigned int num_inv = 1;
++
++		if (!IS_ERR(data->clk_master))
++			clk_enable(data->clk_master);
++
+ 		maj = __raw_readl(data->sfrbase + REG_MMU_VERSION);
+ 		/*
+ 		 * L2TLB invalidation required
+@@ -469,6 +489,8 @@ static void sysmmu_tlb_invalidate_entry(struct device *dev, unsigned long iova,
+ 							num_inv);
+ 			sysmmu_unblock(data->sfrbase);
+ 		}
++		if (!IS_ERR(data->clk_master))
++			clk_disable(data->clk_master);
+ 	} else {
+ 		dev_dbg(data->sysmmu, "Disabled. Skipping invalidating TLB.\n");
+ 	}
+@@ -484,10 +506,14 @@ void exynos_sysmmu_tlb_invalidate(struct device *dev)
+ 	read_lock_irqsave(&data->lock, flags);
+ 
+ 	if (is_sysmmu_active(data)) {
++		if (!IS_ERR(data->clk_master))
++			clk_enable(data->clk_master);
+ 		if (sysmmu_block(data->sfrbase)) {
+ 			__sysmmu_tlb_invalidate(data->sfrbase);
+ 			sysmmu_unblock(data->sfrbase);
+ 		}
++		if (!IS_ERR(data->clk_master))
++			clk_disable(data->clk_master);
+ 	} else {
+ 		dev_dbg(data->sysmmu, "Disabled. Skipping invalidating TLB.\n");
+ 	}
+@@ -536,6 +562,16 @@ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
++	data->clk_master = devm_clk_get(dev, "master");
++	if (!IS_ERR(data->clk_master)) {
++		ret = clk_prepare(data->clk_master);
++		if (ret) {
++			clk_unprepare(data->clk);
++			dev_err(dev, "Failed to prepare master's clk\n");
++			return ret;
++		}
++	}
++
+ 	data->sysmmu = dev;
+ 	rwlock_init(&data->lock);
+ 	INIT_LIST_HEAD(&data->node);
 -- 
 1.7.9.5
