@@ -1,27 +1,101 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 27 Apr 2014 10:32:51 +0100
-Subject: randconfig failures - MMC + trusted foundations
-Message-ID: <20140427093250.GA26756@n2100.arm.linux.org.uk>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Sun, 27 Apr 2014 10:43:05 +0100
+Subject: [PATCH RFC 1/8] component: fix missed cleanup in case of devres
+ failure
+In-Reply-To: <20140426230025.GZ26756@n2100.arm.linux.org.uk>
+References: <20140426230025.GZ26756@n2100.arm.linux.org.uk>
+Message-ID: <E1WeLc1-0001cA-5q@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Last night's omap4430-sdp randconfig build:
+In try_to_bring_up_master(), we tear down the master's component list
+for each error case, except for devres group failure.  Fix this
+oversight by making the code less prone to such mistakes.
 
-In file included from arch/arm/mach-tegra/tegra.c:43:0:
-arch/arm/include/asm/trusted_foundations.h: In function 'register_trusted_foundations':
-arch/arm/include/asm/trusted_foundations.h:57:2: error: 'setup_max_cpus' undeclared (first use in this function)
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/base/component.c | 62 ++++++++++++++++++++++++------------------------
+ 1 file changed, 31 insertions(+), 31 deletions(-)
 
-
-Last night's versatile randconfig build:
-
-drivers/mmc/core/core.c: In function 'mmc_card_power_up':
-drivers/mmc/core/core.c:1517:4: error: implicit declaration of function 'gpiod_set_value'
-
-This one appears to be a regular feature of failure, and is as I'm
-carrying Olof's "mmc: add support for power-on sequencing through DT"
-patch for CuBox wireless - see the 222 patch set.  It probably points
-at something not being right with GPIO stuff.
-
+diff --git a/drivers/base/component.c b/drivers/base/component.c
+index c4778995cd72..d0ebd4431736 100644
+--- a/drivers/base/component.c
++++ b/drivers/base/component.c
+@@ -113,44 +113,44 @@ static void master_remove_components(struct master *master)
+ static int try_to_bring_up_master(struct master *master,
+ 	struct component *component)
+ {
+-	int ret = 0;
++	int ret;
+ 
+-	if (!master->bound) {
+-		/*
+-		 * Search the list of components, looking for components that
+-		 * belong to this master, and attach them to the master.
+-		 */
+-		if (master->ops->add_components(master->dev, master)) {
+-			/* Failed to find all components */
+-			master_remove_components(master);
+-			ret = 0;
+-			goto out;
+-		}
++	if (master->bound)
++		return 0;
+ 
+-		if (component && component->master != master) {
+-			master_remove_components(master);
+-			ret = 0;
+-			goto out;
+-		}
++	/*
++	 * Search the list of components, looking for components that
++	 * belong to this master, and attach them to the master.
++	 */
++	if (master->ops->add_components(master->dev, master)) {
++		/* Failed to find all components */
++		ret = 0;
++		goto out;
++	}
+ 
+-		if (!devres_open_group(master->dev, NULL, GFP_KERNEL)) {
+-			ret = -ENOMEM;
+-			goto out;
+-		}
++	if (component && component->master != master) {
++		ret = 0;
++		goto out;
++	}
+ 
+-		/* Found all components */
+-		ret = master->ops->bind(master->dev);
+-		if (ret < 0) {
+-			devres_release_group(master->dev, NULL);
+-			dev_info(master->dev, "master bind failed: %d\n", ret);
+-			master_remove_components(master);
+-			goto out;
+-		}
++	if (!devres_open_group(master->dev, NULL, GFP_KERNEL)) {
++		ret = -ENOMEM;
++		goto out;
++	}
+ 
+-		master->bound = true;
+-		ret = 1;
++	/* Found all components */
++	ret = master->ops->bind(master->dev);
++	if (ret < 0) {
++		devres_release_group(master->dev, NULL);
++		dev_info(master->dev, "master bind failed: %d\n", ret);
++		goto out;
+ 	}
++
++	master->bound = true;
++	return 1;
++
+ out:
++	master_remove_components(master);
+ 
+ 	return ret;
+ }
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.8.3.1
