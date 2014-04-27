@@ -1,50 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 27 Apr 2014 14:23:12 +0100
-Subject: [PATCH RFC 0/5] Dove PMU support
-Message-ID: <20140427132312.GC26756@n2100.arm.linux.org.uk>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Sun, 27 Apr 2014 14:28:50 +0100
+Subject: [PATCH 1/5] pm: domains: quieten down generic pm domains
+In-Reply-To: <20140427132312.GC26756@n2100.arm.linux.org.uk>
+References: <20140427132312.GC26756@n2100.arm.linux.org.uk>
+Message-ID: <E1WeP8U-0000Ug-RQ@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following series of patches add better PMU support for Dove.  This
-has been developed on the Cubox, and tested in non-DT and DT modes.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/base/power/domain.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-This also improves the interrupt handling over the existing code: the
-existing code ends up calling the interrupt handlers twice for every
-interrupt raised, because the interrupt clear-down is done at the
-wrong point - we need to clear down the interrupt in the device first,
-then clear it down in the controller.
-
-The problem this gives is that it can be racy (see comments in the
-driver) so we're careful about how we do that to minimise the window.
-
-I've included all patches here - the initial set are targetted towards
-adding DT support, with the final adding the non-DT support.  There is
-a call to the initialisation function missing for DT mode - I'd like
-the mvebu people to comment on how that should be handled, as it needs
-to be done pretty early.
-
-Also included are two PM domain changes: the first I've discussed with
-Rafael who seems happy with it.  The second is necessary because we
-have no way to know if a generic PM domain is associated with a device
-or whether something else making use of the PM domain is installed in
-the dev->pm_domain pointer, so this allows that decision to be made by
-core PM code.
-
-This is more a "this is where I'm at" with this stuff than a real
-submission, nevertheless comments on how to get it ready for submission
-would be welcome.  I'd like to get this off my plate ASAP.
-
- arch/arm/Kconfig                     |   1 +
- arch/arm/boot/dts/dove.dtsi          |   7 +
- arch/arm/mach-dove/Makefile          |   1 +
- arch/arm/mach-dove/common.c          |   2 +
- arch/arm/mach-dove/common.h          |   1 +
- arch/arm/mach-dove/include/mach/pm.h |  17 --
- arch/arm/mach-dove/irq.c             |  87 ------
- arch/arm/mach-dove/pmu.c             | 531 +++++++++++++++++++++++++++++++++++
- drivers/base/power/domain.c          |   8 +-
- 9 files changed, 547 insertions(+), 108 deletions(-)
-
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index bfb8955c406c..ea91ea0e137b 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -42,7 +42,7 @@
+ 	struct gpd_timing_data *__td = &dev_gpd_data(dev)->td;			\
+ 	if (!__retval && __elapsed > __td->field) {				\
+ 		__td->field = __elapsed;					\
+-		dev_warn(dev, name " latency exceeded, new value %lld ns\n",	\
++		dev_dbg(dev, name " latency exceeded, new value %lld ns\n",	\
+ 			__elapsed);						\
+ 		genpd->max_off_time_changed = true;				\
+ 		__td->constraint_changed = true;				\
+@@ -242,7 +242,7 @@ static int __pm_genpd_poweron(struct generic_pm_domain *genpd)
+ 			genpd->max_off_time_changed = true;
+ 			genpd_recalc_cpu_exit_latency(genpd);
+ 			if (genpd->name)
+-				pr_warning("%s: Power-on latency exceeded, "
++				pr_debug("%s: Power-on latency exceeded, "
+ 					"new value %lld ns\n", genpd->name,
+ 					elapsed_ns);
+ 		}
+@@ -566,7 +566,7 @@ static int pm_genpd_poweroff(struct generic_pm_domain *genpd)
+ 			genpd->power_off_latency_ns = elapsed_ns;
+ 			genpd->max_off_time_changed = true;
+ 			if (genpd->name)
+-				pr_warning("%s: Power-off latency exceeded, "
++				pr_debug("%s: Power-off latency exceeded, "
+ 					"new value %lld ns\n", genpd->name,
+ 					elapsed_ns);
+ 		}
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.8.3.1
