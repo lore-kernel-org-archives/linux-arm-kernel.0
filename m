@@ -1,98 +1,188 @@
 From: shaik.ameer@samsung.com (Shaik Ameer Basha)
-Date: Sun, 27 Apr 2014 13:07:36 +0530
-Subject: [PATCH v12 04/31] iommu/exynos: fix L2TLB invalidation
+Date: Sun, 27 Apr 2014 13:07:41 +0530
+Subject: [PATCH v12 09/31] iommu/exynos: remove dbgname from drvdata of a
+ System MMU
 In-Reply-To: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
 References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
-Message-ID: <1398584283-22846-5-git-send-email-shaik.ameer@samsung.com>
+Message-ID: <1398584283-22846-10-git-send-email-shaik.ameer@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Cho KyongHo <pullip.cho@samsung.com>
 
-L2TLB is 8-way set-associative TLB with 512 entries. The number of
-sets is 64.
-A single 4KB(small page) translation information is cached
-only to a set whose index is the same with the lower 6 bits of the page
-frame number.
-A single 64KB(large page) translation information can be
-cached to any 16 sets whose top two bits of their indices are the same
-with the bit [5:4] of the page frame number.
-A single 1MB(section) or larger translation information can be cached to
-any set in the TLB.
-
-It is required to invalidate entire sets that may cache the target
-translation information to guarantee that the L2TLB has no stale data.
+This patch removes dbgname member from sysmmu_drvdata structure.
+Kernel message for debugging already has the name of a single
+System MMU node. It also removes some compilation warnings.
 
 Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
 ---
- drivers/iommu/exynos-iommu.c |   31 ++++++++++++++++++++++++++-----
- 1 file changed, 26 insertions(+), 5 deletions(-)
+ drivers/iommu/exynos-iommu.c |   54 +++++++++++++++++++-----------------------
+ 1 file changed, 25 insertions(+), 29 deletions(-)
+ mode change 100644 => 100755 drivers/iommu/exynos-iommu.c
 
 diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 84fc3b4..7ce44a8 100644
+old mode 100644
+new mode 100755
+index a15216f..1af2d23
 --- a/drivers/iommu/exynos-iommu.c
 +++ b/drivers/iommu/exynos-iommu.c
-@@ -224,9 +224,14 @@ static void __sysmmu_tlb_invalidate(void __iomem *sfrbase)
- }
+@@ -169,7 +169,6 @@ struct sysmmu_drvdata {
+ 	struct list_head node; /* entry of exynos_iommu_domain.clients */
+ 	struct device *sysmmu;	/* System MMU's device descriptor */
+ 	struct device *dev;	/* Owner of system MMU */
+-	char *dbgname;
+ 	void __iomem *sfrbase;
+ 	struct clk *clk;
+ 	int activations;
+@@ -320,8 +319,8 @@ static irqreturn_t exynos_sysmmu_irq(int irq, void *dev_id)
+ 	if (!ret && (itype != SYSMMU_FAULT_UNKNOWN))
+ 		__raw_writel(1 << itype, data->sfrbase + REG_INT_CLEAR);
+ 	else
+-		dev_dbg(data->sysmmu, "(%s) %s is not handled.\n",
+-				data->dbgname, sysmmu_fault_name[itype]);
++		dev_dbg(data->sysmmu, "%s is not handled.\n",
++				sysmmu_fault_name[itype]);
  
- static void __sysmmu_tlb_invalidate_entry(void __iomem *sfrbase,
--						unsigned long iova)
-+				unsigned long iova, unsigned int num_inv)
- {
--	__raw_writel((iova & SPAGE_MASK) | 1, sfrbase + REG_MMU_FLUSH_ENTRY);
-+	unsigned int i;
-+	for (i = 0; i < num_inv; i++) {
-+		__raw_writel((iova & SPAGE_MASK) | 1,
-+				sfrbase + REG_MMU_FLUSH_ENTRY);
-+		iova += SPAGE_SIZE;
-+	}
- }
+ 	if (itype != SYSMMU_FAULT_UNKNOWN)
+ 		sysmmu_unblock(data->sfrbase);
+@@ -353,10 +352,10 @@ finish:
+ 	write_unlock_irqrestore(&data->lock, flags);
  
- static void __sysmmu_set_ptbase(void __iomem *sfrbase,
-@@ -476,7 +481,8 @@ static bool exynos_sysmmu_disable(struct device *dev)
+ 	if (disabled)
+-		dev_dbg(data->sysmmu, "(%s) Disabled\n", data->dbgname);
++		dev_dbg(data->sysmmu, "Disabled\n");
+ 	else
+-		dev_dbg(data->sysmmu, "(%s) %d times left to be disabled\n",
+-					data->dbgname, data->activations);
++		dev_dbg(data->sysmmu, "%d times left to be disabled\n",
++					data->activations);
+ 
  	return disabled;
  }
- 
--static void sysmmu_tlb_invalidate_entry(struct device *dev, unsigned long iova)
-+static void sysmmu_tlb_invalidate_entry(struct device *dev, unsigned long iova,
-+					size_t size)
- {
- 	unsigned long flags;
- 	struct sysmmu_drvdata *data = dev_get_drvdata(dev->archdata.iommu);
-@@ -486,9 +492,24 @@ static void sysmmu_tlb_invalidate_entry(struct device *dev, unsigned long iova)
- 	if (is_sysmmu_active(data)) {
- 		int i;
- 		for (i = 0; i < data->nsfrs; i++) {
-+			unsigned int maj;
-+			unsigned int num_inv = 1;
-+			maj = __raw_readl(data->sfrbases[i] + REG_MMU_VERSION);
-+			/*
-+			 * L2TLB invalidation required
-+			 * 4KB page: 1 invalidation
-+			 * 64KB page: 16 invalidation
-+			 * 1MB page: 64 invalidation
-+			 * because it is set-associative TLB
-+			 * with 8-way and 64 sets.
-+			 * 1MB page can be cached in one of all sets.
-+			 * 64KB page can be one of 16 consecutive sets.
-+			 */
-+			if ((maj >> 28) == 2) /* major version number */
-+				num_inv = min_t(unsigned int, size / PAGE_SIZE, 64);
- 			if (sysmmu_block(data->sfrbases[i])) {
- 				__sysmmu_tlb_invalidate_entry(
--						data->sfrbases[i], iova);
-+					data->sfrbases[i], iova, num_inv);
- 				sysmmu_unblock(data->sfrbases[i]);
- 			}
+@@ -383,7 +382,7 @@ static int __exynos_sysmmu_enable(struct sysmmu_drvdata *data,
+ 			ret = 1;
  		}
-@@ -998,7 +1019,7 @@ done:
  
- 	spin_lock_irqsave(&priv->lock, flags);
- 	list_for_each_entry(data, &priv->clients, node)
--		sysmmu_tlb_invalidate_entry(data->dev, iova);
-+		sysmmu_tlb_invalidate_entry(data->dev, iova, size);
+-		dev_dbg(data->sysmmu, "(%s) Already enabled\n", data->dbgname);
++		dev_dbg(data->sysmmu, "Already enabled\n");
+ 		goto finish;
+ 	}
+ 
+@@ -398,7 +397,7 @@ static int __exynos_sysmmu_enable(struct sysmmu_drvdata *data,
+ 
+ 	data->domain = domain;
+ 
+-	dev_dbg(data->sysmmu, "(%s) Enabled\n", data->dbgname);
++	dev_dbg(data->sysmmu, "Enabled\n");
+ finish:
+ 	write_unlock_irqrestore(&data->lock, flags);
+ 
+@@ -414,16 +413,15 @@ int exynos_sysmmu_enable(struct device *dev, unsigned long pgtable)
+ 
+ 	ret = pm_runtime_get_sync(data->sysmmu);
+ 	if (ret < 0) {
+-		dev_dbg(data->sysmmu, "(%s) Failed to enable\n", data->dbgname);
++		dev_dbg(data->sysmmu, "Failed to enable\n");
+ 		return ret;
+ 	}
+ 
+ 	ret = __exynos_sysmmu_enable(data, pgtable, NULL);
+ 	if (WARN_ON(ret < 0)) {
+ 		pm_runtime_put(data->sysmmu);
+-		dev_err(data->sysmmu,
+-			"(%s) Already enabled with page table %#lx\n",
+-			data->dbgname, data->pgtable);
++		dev_err(data->sysmmu, "Already enabled with page table %#lx\n",
++			data->pgtable);
+ 	} else {
+ 		data->dev = dev;
+ 	}
+@@ -473,9 +471,7 @@ static void sysmmu_tlb_invalidate_entry(struct device *dev, unsigned long iova,
+ 			sysmmu_unblock(data->sfrbase);
+ 		}
+ 	} else {
+-		dev_dbg(data->sysmmu,
+-			"(%s) Disabled. Skipping invalidating TLB.\n",
+-			data->dbgname);
++		dev_dbg(data->sysmmu, "Disabled. Skipping invalidating TLB.\n");
+ 	}
+ 
+ 	read_unlock_irqrestore(&data->lock, flags);
+@@ -494,9 +490,7 @@ void exynos_sysmmu_tlb_invalidate(struct device *dev)
+ 			sysmmu_unblock(data->sfrbase);
+ 		}
+ 	} else {
+-		dev_dbg(data->sysmmu,
+-			"(%s) Disabled. Skipping invalidating TLB.\n",
+-			data->dbgname);
++		dev_dbg(data->sysmmu, "Disabled. Skipping invalidating TLB.\n");
+ 	}
+ 
+ 	read_unlock_irqrestore(&data->lock, flags);
+@@ -559,7 +553,7 @@ static int exynos_sysmmu_probe(struct platform_device *pdev)
+ 
+ 	pm_runtime_enable(dev);
+ 
+-	dev_dbg(dev, "(%s) Initialized\n", data->dbgname);
++	dev_dbg(dev, "Initialized\n");
+ 	return 0;
+ err_irq:
+ 	free_irq(platform_get_irq(pdev, 0), data);
+@@ -659,6 +653,7 @@ static int exynos_iommu_attach_device(struct iommu_domain *domain,
+ {
+ 	struct sysmmu_drvdata *data = dev_get_drvdata(dev->archdata.iommu);
+ 	struct exynos_iommu_domain *priv = domain->priv;
++	phys_addr_t pagetable = virt_to_phys(priv->pgtable);
+ 	unsigned long flags;
+ 	int ret;
+ 
+@@ -682,15 +677,15 @@ static int exynos_iommu_attach_device(struct iommu_domain *domain,
  	spin_unlock_irqrestore(&priv->lock, flags);
  
- 	return size;
+ 	if (ret < 0) {
+-		dev_err(dev, "%s: Failed to attach IOMMU with pgtable %#lx\n",
+-				__func__, __pa(priv->pgtable));
++		dev_err(dev, "%s: Failed to attach IOMMU with pgtable %pa\n",
++					__func__, &pagetable);
+ 		pm_runtime_put(data->sysmmu);
+ 	} else if (ret > 0) {
+-		dev_dbg(dev, "%s: IOMMU with pgtable 0x%lx already attached\n",
+-					__func__, __pa(priv->pgtable));
++		dev_dbg(dev, "%s: IOMMU with pgtable %pa already attached\n",
++					__func__, &pagetable);
+ 	} else {
+-		dev_dbg(dev, "%s: Attached new IOMMU with pgtable 0x%lx\n",
+-					__func__, __pa(priv->pgtable));
++		dev_dbg(dev, "%s: Attached new IOMMU with pgtable %pa\n",
++					__func__, &pagetable);
+ 	}
+ 
+ 	return ret;
+@@ -702,6 +697,7 @@ static void exynos_iommu_detach_device(struct iommu_domain *domain,
+ 	struct sysmmu_drvdata *data = dev_get_drvdata(dev->archdata.iommu);
+ 	struct exynos_iommu_domain *priv = domain->priv;
+ 	struct list_head *pos;
++	phys_addr_t pagetable = virt_to_phys(priv->pgtable);
+ 	unsigned long flags;
+ 	bool found = false;
+ 
+@@ -718,13 +714,13 @@ static void exynos_iommu_detach_device(struct iommu_domain *domain,
+ 		goto finish;
+ 
+ 	if (__exynos_sysmmu_disable(data)) {
+-		dev_dbg(dev, "%s: Detached IOMMU with pgtable %#lx\n",
+-					__func__, __pa(priv->pgtable));
++		dev_dbg(dev, "%s: Detached IOMMU with pgtable %pa\n",
++					__func__, &pagetable);
+ 		list_del_init(&data->node);
+ 
+ 	} else {
+-		dev_dbg(dev, "%s: Detaching IOMMU with pgtable %#lx delayed",
+-					__func__, __pa(priv->pgtable));
++		dev_dbg(dev, "%s: Detaching IOMMU with pgtable %pa delayed",
++					__func__, &pagetable);
+ 	}
+ 
+ finish:
 -- 
 1.7.9.5
