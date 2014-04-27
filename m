@@ -1,101 +1,36 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sun, 27 Apr 2014 10:43:05 +0100
-Subject: [PATCH RFC 1/8] component: fix missed cleanup in case of devres
- failure
-In-Reply-To: <20140426230025.GZ26756@n2100.arm.linux.org.uk>
-References: <20140426230025.GZ26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WeLc1-0001cA-5q@rmk-PC.arm.linux.org.uk>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Sun, 27 Apr 2014 11:58:45 +0200
+Subject: [PATCH 0/5] tty/serial: Add helpers to use GPIOs to control modem
+ lines and implement atmel_serial.c
+In-Reply-To: <20140425155847.GC22879@kroah.com>
+References: <1398437561-4289-1-git-send-email-richard.genoud@gmail.com>
+ <20140425155847.GC22879@kroah.com>
+Message-ID: <CACQ1gAiyonHpg5YP4nSd3B=iiVQoTKQvYoC_JxbzA6Dmzr8+tw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In try_to_bring_up_master(), we tear down the master's component list
-for each error case, except for devres group failure.  Fix this
-oversight by making the code less prone to such mistakes.
+2014-04-25 17:58 GMT+02:00 Greg Kroah-Hartman <gregkh@linuxfoundation.org>:
+> On Fri, Apr 25, 2014 at 04:52:36PM +0200, Richard Genoud wrote:
+>> This patch series is a leftover of http://www.spinics.net/lists/arm-kernel/msg314242.html
+>> that missed 3.15 because it caused merge conflicts.
+>>
+>> The 1st patch may be applied as a fix for 3.15-rc, since it correct a
+>> device tree binding documentation example.
+>>
+>> Greg, for you to decide if it's worth it or not !
+>
+> Why am I the one tho decides if it is worth it?  If it's up to me, I'll
+> just say "no", as I sure don't need this for any of my machines...
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/base/component.c | 62 ++++++++++++++++++++++++------------------------
- 1 file changed, 31 insertions(+), 31 deletions(-)
+Ok, let me reformulate :) :
 
-diff --git a/drivers/base/component.c b/drivers/base/component.c
-index c4778995cd72..d0ebd4431736 100644
---- a/drivers/base/component.c
-+++ b/drivers/base/component.c
-@@ -113,44 +113,44 @@ static void master_remove_components(struct master *master)
- static int try_to_bring_up_master(struct master *master,
- 	struct component *component)
- {
--	int ret = 0;
-+	int ret;
- 
--	if (!master->bound) {
--		/*
--		 * Search the list of components, looking for components that
--		 * belong to this master, and attach them to the master.
--		 */
--		if (master->ops->add_components(master->dev, master)) {
--			/* Failed to find all components */
--			master_remove_components(master);
--			ret = 0;
--			goto out;
--		}
-+	if (master->bound)
-+		return 0;
- 
--		if (component && component->master != master) {
--			master_remove_components(master);
--			ret = 0;
--			goto out;
--		}
-+	/*
-+	 * Search the list of components, looking for components that
-+	 * belong to this master, and attach them to the master.
-+	 */
-+	if (master->ops->add_components(master->dev, master)) {
-+		/* Failed to find all components */
-+		ret = 0;
-+		goto out;
-+	}
- 
--		if (!devres_open_group(master->dev, NULL, GFP_KERNEL)) {
--			ret = -ENOMEM;
--			goto out;
--		}
-+	if (component && component->master != master) {
-+		ret = 0;
-+		goto out;
-+	}
- 
--		/* Found all components */
--		ret = master->ops->bind(master->dev);
--		if (ret < 0) {
--			devres_release_group(master->dev, NULL);
--			dev_info(master->dev, "master bind failed: %d\n", ret);
--			master_remove_components(master);
--			goto out;
--		}
-+	if (!devres_open_group(master->dev, NULL, GFP_KERNEL)) {
-+		ret = -ENOMEM;
-+		goto out;
-+	}
- 
--		master->bound = true;
--		ret = 1;
-+	/* Found all components */
-+	ret = master->ops->bind(master->dev);
-+	if (ret < 0) {
-+		devres_release_group(master->dev, NULL);
-+		dev_info(master->dev, "master bind failed: %d\n", ret);
-+		goto out;
- 	}
-+
-+	master->bound = true;
-+	return 1;
-+
- out:
-+	master_remove_components(master);
- 
- 	return ret;
- }
--- 
-1.8.3.1
+This patch series is a leftover of
+http://www.spinics.net/lists/arm-kernel/msg314242.html
+that missed 3.15 because it caused merge conflicts (you acked the
+series and ask me to resend it during 3.15-rc cycle).
+
+I think that "[PATCH 1/5] tty/serial: atmel_serial: Fix device tree
+documentation" should be applied on 3.15-rc,
+since it corrects a device tree binding documentation example.
+
+The patches 2-5/5 are for 3.16.
