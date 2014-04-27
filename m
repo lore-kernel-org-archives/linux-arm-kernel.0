@@ -1,40 +1,174 @@
 From: shaik.ameer@samsung.com (Shaik Ameer Basha)
-Date: Sun, 27 Apr 2014 13:07:33 +0530
-Subject: [PATCH v12 01/31] iommu/exynos: do not include removed header
+Date: Sun, 27 Apr 2014 13:07:35 +0530
+Subject: [PATCH v12 03/31] iommu/exynos: change error handling when page table
+ update is failed
 In-Reply-To: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
 References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
-Message-ID: <1398584283-22846-2-git-send-email-shaik.ameer@samsung.com>
+Message-ID: <1398584283-22846-4-git-send-email-shaik.ameer@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Cho KyongHo <pullip.cho@samsung.com>
 
-Commit 25e9d28d92 (ARM: EXYNOS: remove system mmu initialization from
-exynos tree) removed arch/arm/mach-exynos/mach/sysmmu.h header without
-removing remaining use of it from exynos-iommu driver, thus causing a
-compilation error.
+This patch changes not to panic on any error when updating page table.
+Instead prints error messages with callstack.
 
-This patch fixes the error by removing respective include line
-from exynos-iommu.c.
-
-CC: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
 ---
- drivers/iommu/exynos-iommu.c |    2 --
- 1 file changed, 2 deletions(-)
+ drivers/iommu/exynos-iommu.c |   58 ++++++++++++++++++++++++++++++++----------
+ 1 file changed, 44 insertions(+), 14 deletions(-)
 
 diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 0740189..46f0ca1 100644
+index 34e4273..84fc3b4 100644
 --- a/drivers/iommu/exynos-iommu.c
 +++ b/drivers/iommu/exynos-iommu.c
-@@ -29,8 +29,6 @@
- #include <asm/cacheflush.h>
- #include <asm/pgtable.h>
+@@ -811,13 +811,18 @@ finish:
+ static unsigned long *alloc_lv2entry(unsigned long *sent, unsigned long iova,
+ 					short *pgcounter)
+ {
++	if (lv1ent_section(sent)) {
++		WARN(1, "Trying mapping on %#08lx mapped with 1MiB page", iova);
++		return ERR_PTR(-EADDRINUSE);
++	}
++
+ 	if (lv1ent_fault(sent)) {
+ 		unsigned long *pent;
  
--#include <mach/sysmmu.h>
+ 		pent = kzalloc(LV2TABLE_SIZE, GFP_ATOMIC);
+ 		BUG_ON((unsigned long)pent & (LV2TABLE_SIZE - 1));
+ 		if (!pent)
+-			return NULL;
++			return ERR_PTR(-ENOMEM);
+ 
+ 		*sent = mk_lv1ent_page(__pa(pent));
+ 		*pgcounter = NUM_LV2ENTRIES;
+@@ -828,14 +833,21 @@ static unsigned long *alloc_lv2entry(unsigned long *sent, unsigned long iova,
+ 	return page_entry(sent, iova);
+ }
+ 
+-static int lv1set_section(unsigned long *sent, phys_addr_t paddr, short *pgcnt)
++static int lv1set_section(unsigned long *sent, unsigned long iova,
++			  phys_addr_t paddr, short *pgcnt)
+ {
+-	if (lv1ent_section(sent))
++	if (lv1ent_section(sent)) {
++		WARN(1, "Trying mapping on 1MiB@%#08lx that is mapped",
++			iova);
+ 		return -EADDRINUSE;
++	}
+ 
+ 	if (lv1ent_page(sent)) {
+-		if (*pgcnt != NUM_LV2ENTRIES)
++		if (*pgcnt != NUM_LV2ENTRIES) {
++			WARN(1, "Trying mapping on 1MiB@%#08lx that is mapped",
++				iova);
+ 			return -EADDRINUSE;
++		}
+ 
+ 		kfree(page_entry(sent, 0));
+ 
+@@ -853,8 +865,10 @@ static int lv2set_page(unsigned long *pent, phys_addr_t paddr, size_t size,
+ 								short *pgcnt)
+ {
+ 	if (size == SPAGE_SIZE) {
+-		if (!lv2ent_fault(pent))
++		if (!lv2ent_fault(pent)) {
++			WARN(1, "Trying mapping on 4KiB where mapping exists");
+ 			return -EADDRINUSE;
++		}
+ 
+ 		*pent = mk_lv2ent_spage(paddr);
+ 		pgtable_flush(pent, pent + 1);
+@@ -863,7 +877,10 @@ static int lv2set_page(unsigned long *pent, phys_addr_t paddr, size_t size,
+ 		int i;
+ 		for (i = 0; i < SPAGES_PER_LPAGE; i++, pent++) {
+ 			if (!lv2ent_fault(pent)) {
+-				memset(pent, 0, sizeof(*pent) * i);
++				WARN(1,
++				"Trying mapping on 64KiB where mapping exists");
++				if (i > 0)
++					memset(pent - i, 0, sizeof(*pent) * i);
+ 				return -EADDRINUSE;
+ 			}
+ 
+@@ -891,7 +908,7 @@ static int exynos_iommu_map(struct iommu_domain *domain, unsigned long iova,
+ 	entry = section_entry(priv->pgtable, iova);
+ 
+ 	if (size == SECT_SIZE) {
+-		ret = lv1set_section(entry, paddr,
++		ret = lv1set_section(entry, iova, paddr,
+ 					&priv->lv2entcnt[lv1ent_offset(iova)]);
+ 	} else {
+ 		unsigned long *pent;
+@@ -899,17 +916,16 @@ static int exynos_iommu_map(struct iommu_domain *domain, unsigned long iova,
+ 		pent = alloc_lv2entry(entry, iova,
+ 					&priv->lv2entcnt[lv1ent_offset(iova)]);
+ 
+-		if (!pent)
+-			ret = -ENOMEM;
++		if (IS_ERR(pent))
++			ret = PTR_ERR(pent);
+ 		else
+ 			ret = lv2set_page(pent, paddr, size,
+ 					&priv->lv2entcnt[lv1ent_offset(iova)]);
+ 	}
+ 
+-	if (ret) {
++	if (ret)
+ 		pr_debug("%s: Failed to map iova 0x%lx/0x%x bytes\n",
+ 							__func__, iova, size);
+-	}
+ 
+ 	spin_unlock_irqrestore(&priv->pgtablelock, flags);
+ 
+@@ -923,6 +939,7 @@ static size_t exynos_iommu_unmap(struct iommu_domain *domain,
+ 	struct sysmmu_drvdata *data;
+ 	unsigned long flags;
+ 	unsigned long *ent;
++	size_t err_pgsize;
+ 
+ 	BUG_ON(priv->pgtable == NULL);
+ 
+@@ -931,7 +948,10 @@ static size_t exynos_iommu_unmap(struct iommu_domain *domain,
+ 	ent = section_entry(priv->pgtable, iova);
+ 
+ 	if (lv1ent_section(ent)) {
+-		BUG_ON(size < SECT_SIZE);
++		if (size < SECT_SIZE) {
++			err_pgsize = SECT_SIZE;
++			goto err;
++		}
+ 
+ 		*ent = 0;
+ 		pgtable_flush(ent, ent + 1);
+@@ -963,7 +983,10 @@ static size_t exynos_iommu_unmap(struct iommu_domain *domain,
+ 	}
+ 
+ 	/* lv1ent_large(ent) == true here */
+-	BUG_ON(size < LPAGE_SIZE);
++	if (size < LPAGE_SIZE) {
++		err_pgsize = LPAGE_SIZE;
++		goto err;
++	}
+ 
+ 	memset(ent, 0, sizeof(*ent) * SPAGES_PER_LPAGE);
+ 	pgtable_flush(ent, ent + SPAGES_PER_LPAGE);
+@@ -978,8 +1001,15 @@ done:
+ 		sysmmu_tlb_invalidate_entry(data->dev, iova);
+ 	spin_unlock_irqrestore(&priv->lock, flags);
+ 
 -
- /* We does not consider super section mapping (16MB) */
- #define SECT_ORDER 20
- #define LPAGE_ORDER 16
+ 	return size;
++err:
++	spin_unlock_irqrestore(&priv->pgtablelock, flags);
++
++	WARN(1,
++	"%s: Failed due to size(%#x) @ %#08lx is smaller than page size %#x\n",
++	__func__, size, iova, err_pgsize);
++
++	return 0;
+ }
+ 
+ static phys_addr_t exynos_iommu_iova_to_phys(struct iommu_domain *domain,
 -- 
 1.7.9.5
