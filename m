@@ -1,44 +1,50 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Sun, 27 Apr 2014 14:51:30 +0200
-Subject: [RFC PATCH 0/8] component helper improvements
-In-Reply-To: <20140426230025.GZ26756@n2100.arm.linux.org.uk>
-References: <20140426230025.GZ26756@n2100.arm.linux.org.uk>
-Message-ID: <CAKMK7uFE7NVTS8dgb7kmXtAcz2Q59WhxrZJWcktG98UegFW1zA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 27 Apr 2014 14:23:12 +0100
+Subject: [PATCH RFC 0/5] Dove PMU support
+Message-ID: <20140427132312.GC26756@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 27, 2014 at 1:00 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> A while back, Laurent raised some comments about the component helper,
-> which this patch set starts to address.
->
-> The first point it addresses is the repeated parsing inefficiency when
-> deferred probing occurs.  When DT is used, the structure of the
-> component helper today means that masters end up parsing the device
-> tree for each attempt to re-bind the driver.
->
-> We remove this inefficiency by creating an array of matching data and
-> functions, which the component helper can use internally to match up
-> components to their master.
->
-> The second point was the inefficiency of destroying the list of
-> components each time we saw a failure.  We did this to ensure that
-> we kept things correctly ordered: component bind order matters.
-> As we have an array instead, the array is already ordered, so we
-> use this array to store the component pointers instead of a list,
-> and remember which are duplicates (and thus should be avoided.)
-> Avoiding the right duplicates matters as we walk the array in the
-> opposite direction at tear down.
->
-> I would like to see patches 1-5 scheduled for the next merge window,
-> with 6-8 for the following window - this gives us grace of one kernel
-> cycle to ensure that any new component helper users are properly
-> converted.
+The following series of patches add better PMU support for Dove.  This
+has been developed on the Cubox, and tested in non-DT and DT modes.
 
-Afaict the actual patches haven't made it to dri-devel, only to
-linux-arm-kernel. Are they stuck somewhere?
--Daniel
+This also improves the interrupt handling over the existing code: the
+existing code ends up calling the interrupt handlers twice for every
+interrupt raised, because the interrupt clear-down is done at the
+wrong point - we need to clear down the interrupt in the device first,
+then clear it down in the controller.
+
+The problem this gives is that it can be racy (see comments in the
+driver) so we're careful about how we do that to minimise the window.
+
+I've included all patches here - the initial set are targetted towards
+adding DT support, with the final adding the non-DT support.  There is
+a call to the initialisation function missing for DT mode - I'd like
+the mvebu people to comment on how that should be handled, as it needs
+to be done pretty early.
+
+Also included are two PM domain changes: the first I've discussed with
+Rafael who seems happy with it.  The second is necessary because we
+have no way to know if a generic PM domain is associated with a device
+or whether something else making use of the PM domain is installed in
+the dev->pm_domain pointer, so this allows that decision to be made by
+core PM code.
+
+This is more a "this is where I'm at" with this stuff than a real
+submission, nevertheless comments on how to get it ready for submission
+would be welcome.  I'd like to get this off my plate ASAP.
+
+ arch/arm/Kconfig                     |   1 +
+ arch/arm/boot/dts/dove.dtsi          |   7 +
+ arch/arm/mach-dove/Makefile          |   1 +
+ arch/arm/mach-dove/common.c          |   2 +
+ arch/arm/mach-dove/common.h          |   1 +
+ arch/arm/mach-dove/include/mach/pm.h |  17 --
+ arch/arm/mach-dove/irq.c             |  87 ------
+ arch/arm/mach-dove/pmu.c             | 531 +++++++++++++++++++++++++++++++++++
+ drivers/base/power/domain.c          |   8 +-
+ 9 files changed, 547 insertions(+), 108 deletions(-)
+
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-+41 (0) 79 365 57 48 - http://blog.ffwll.ch
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
