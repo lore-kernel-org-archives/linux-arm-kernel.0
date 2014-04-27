@@ -1,34 +1,38 @@
-From: axel.lin@ingics.com (Axel Lin)
-Date: Sun, 27 Apr 2014 18:25:31 +0800
-Subject: [RESEND][PATCH] mmc: wmt-sdmmc: Remove deprecated IRQF_DISABLED
-Message-ID: <1398594331.6291.4.camel@phoenix>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 27 Apr 2014 11:33:02 +0100
+Subject: randconfig failures - MMC + trusted foundations
+In-Reply-To: <CAAVeFuJ2=fWamF6xBAJLv1kEEhBVgWMj-PY0gxouo6-NOE9OfQ@mail.gmail.com>
+References: <20140427093250.GA26756@n2100.arm.linux.org.uk>
+ <CAAVeFuJ2=fWamF6xBAJLv1kEEhBVgWMj-PY0gxouo6-NOE9OfQ@mail.gmail.com>
+Message-ID: <20140427103302.GB26756@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's a NOOP since 2.6.35 and it will be removed one day.
-This is not trivial because current code uses hard coded 32 instead of
-IRQF_DISABLED in the request_irq call.
+On Sun, Apr 27, 2014 at 07:09:31PM +0900, Alexandre Courbot wrote:
+> Hi Russell,
+> 
+> On Sun, Apr 27, 2014 at 6:32 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > Last night's versatile randconfig build:
+> >
+> > drivers/mmc/core/core.c: In function 'mmc_card_power_up':
+> > drivers/mmc/core/core.c:1517:4: error: implicit declaration of function 'gpiod_set_value'
+> >
+> > This one appears to be a regular feature of failure, and is as I'm
+> > carrying Olof's "mmc: add support for power-on sequencing through DT"
+> > patch for CuBox wireless - see the 222 patch set.  It probably points
+> > at something not being right with GPIO stuff.
+> 
+> I had a quick look at the patch and I would say this is happening
+> because drivers/mmc/core/core.c does not include
+> <linux/gpio/consumer.h> despite using the gpiod_* functions. The error
+> will only happen if CONFIG_GPIOLIB is not defined. Olof, if it is not
+> too late can you fix this in your patch series?
 
-Signed-off-by: Axel Lin <axel.lin@ingics.com>
----
-This patch was sent on:
-http://www.spinics.net/lists/linux-mmc/msg22644.html
+I received a report from someone else last week (in the mmc patch series
+I posted) that Chris has already merged this into his mmc tree, so I
+think it would need to be a follow on patch.
 
- drivers/mmc/host/wmt-sdmmc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/mmc/host/wmt-sdmmc.c b/drivers/mmc/host/wmt-sdmmc.c
-index 5501c9f..8a48a50 100644
---- a/drivers/mmc/host/wmt-sdmmc.c
-+++ b/drivers/mmc/host/wmt-sdmmc.c
-@@ -829,7 +829,7 @@ static int wmt_mci_probe(struct platform_device *pdev)
- 		goto fail3;
- 	}
- 
--	ret = request_irq(dma_irq, wmt_mci_dma_isr, 32, "sdmmc", priv);
-+	ret = request_irq(dma_irq, wmt_mci_dma_isr, 0, "sdmmc", priv);
- 	if (ret) {
- 		dev_err(&pdev->dev, "Register DMA IRQ fail\n");
- 		goto fail4;
 -- 
-1.8.1.2
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
