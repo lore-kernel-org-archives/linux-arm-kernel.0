@@ -1,38 +1,26 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 27 Apr 2014 11:33:02 +0100
-Subject: randconfig failures - MMC + trusted foundations
-In-Reply-To: <CAAVeFuJ2=fWamF6xBAJLv1kEEhBVgWMj-PY0gxouo6-NOE9OfQ@mail.gmail.com>
-References: <20140427093250.GA26756@n2100.arm.linux.org.uk>
- <CAAVeFuJ2=fWamF6xBAJLv1kEEhBVgWMj-PY0gxouo6-NOE9OfQ@mail.gmail.com>
-Message-ID: <20140427103302.GB26756@n2100.arm.linux.org.uk>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Sun, 27 Apr 2014 14:21:51 +0200
+Subject: [PATCH v5] ARM: uprobes need icache flush after xol write
+In-Reply-To: <1398494096-11311-2-git-send-email-victor.kamensky@linaro.org>
+References: <1398494096-11311-1-git-send-email-victor.kamensky@linaro.org>
+ <1398494096-11311-2-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <20140427122151.GA19545@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 27, 2014 at 07:09:31PM +0900, Alexandre Courbot wrote:
-> Hi Russell,
-> 
-> On Sun, Apr 27, 2014 at 6:32 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > Last night's versatile randconfig build:
-> >
-> > drivers/mmc/core/core.c: In function 'mmc_card_power_up':
-> > drivers/mmc/core/core.c:1517:4: error: implicit declaration of function 'gpiod_set_value'
-> >
-> > This one appears to be a regular feature of failure, and is as I'm
-> > carrying Olof's "mmc: add support for power-on sequencing through DT"
-> > patch for CuBox wireless - see the 222 patch set.  It probably points
-> > at something not being right with GPIO stuff.
-> 
-> I had a quick look at the patch and I would say this is happening
-> because drivers/mmc/core/core.c does not include
-> <linux/gpio/consumer.h> despite using the gpiod_* functions. The error
-> will only happen if CONFIG_GPIOLIB is not defined. Olof, if it is not
-> too late can you fix this in your patch series?
+On 04/25, Victor Kamensky wrote:
+>
+> Note ARM cache flush function need kernel address
+> through which instruction write happened, so instead
+> of using uprobes copy_to_page function changed
+> code to explicitly map page and do memcpy.
 
-I received a report from someone else last week (in the mmc patch series
-I posted) that Chris has already merged this into his mmc tree, so I
-think it would need to be a follow on patch.
+Again, I can't review the changes in arm/, although I think there are
+correct.
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+But personally I agree with this patch, we need something for v3.15,
+and unless Russell objects I'd vote for this change.
+
+FWIW,
+
+Acked-by: Oleg Nesterov <oleg@redhat.com>
