@@ -1,261 +1,78 @@
-From: shaik.ameer@samsung.com (Shaik Ameer Basha)
-Date: Sun, 27 Apr 2014 13:08:03 +0530
-Subject: [PATCH v12 31/31] ARM: dts: add System MMU nodes of exynos5420
-In-Reply-To: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
-References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
-Message-ID: <1398584283-22846-32-git-send-email-shaik.ameer@samsung.com>
+From: murzin.v@gmail.com (Vladimir Murzin)
+Date: Sun, 27 Apr 2014 10:21:17 +0100
+Subject: [RFC PATCH] arm64: make bitops 32-bit tolerant
+Message-ID: <1398590477-15375-1-git-send-email-murzin.v@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Cho KyongHo <pullip.cho@samsung.com>
+Xen assumes that bit operations are able to operate on 32-bit size and
+alignment [1]. For arm64 bitops are based on atomic exclusive load/store
+instructions to guarantee that changes are made atomically. However, these
+instructions require that address to be aligned to the data size. Because, by
+default, bitops operates on 64-bit size it implies that address should be
+aligned appropriately. All these lead to breakage of Xen assumption for bitops
+properties.
 
-This patch adds System MMU nodes of exynos5420 except
-System MMUs in Image Subsystem.
+This patch turns bitops to operate on 32-bit size/alignment.
 
-Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
-Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
+[1] http://www.gossamer-threads.com/lists/xen/devel/325613
+
+Cc: catalin.marinas at arm.com
+Cc: will.deacon at arm.com
+Cc: david.vrabel at citrix.com
+Cc: Ian.Campbell at citrix.com
+
+Signed-off-by: Vladimir Murzin <murzin.v@gmail.com>
 ---
- arch/arm/boot/dts/exynos5420.dtsi |  209 ++++++++++++++++++++++++++++++++++++-
- 1 file changed, 206 insertions(+), 3 deletions(-)
+ With this patch applied I was able to boot both Dom0 and DomU.
+ 
+ @Pranav: Could I have your Tested-by on this patch?
+ 
+ arch/arm64/lib/bitops.S          | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index c3a9a66..1fc0c9f 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -125,7 +125,7 @@
- 		clock-names = "pll_ref", "pll_in", "sclk_audio", "sclk_pcm_in";
- 	};
+diff --git a/arch/arm64/lib/bitops.S b/arch/arm64/lib/bitops.S
+index 7dac371..a6acfff 100644
+--- a/arch/arm64/lib/bitops.S
++++ b/arch/arm64/lib/bitops.S
+@@ -26,14 +26,14 @@
+  */
+ 	.macro	bitop, name, instr
+ ENTRY(	\name	)
+-	and	w3, w0, #63		// Get bit offset
++	and	w3, w0, #31		// Get bit offset
+ 	eor	w0, w0, w3		// Clear low bits
+ 	mov	x2, #1
+ 	add	x1, x1, x0, lsr #3	// Get word offset
+ 	lsl	x3, x2, x3		// Create mask
+-1:	ldxr	x2, [x1]
+-	\instr	x2, x2, x3
+-	stxr	w0, x2, [x1]
++1:	ldxr	w2, [x1]
++	\instr	w2, w2, w3
++	stxr	w0, w2, [x1]
+ 	cbnz	w0, 1b
+ 	ret
+ ENDPROC(\name	)
+@@ -41,15 +41,15 @@ ENDPROC(\name	)
  
--	codec at 11000000 {
-+	mfc: codec at 11000000 {
- 		compatible = "samsung,mfc-v7";
- 		reg = <0x11000000 0x10000>;
- 		interrupts = <0 96 0>;
-@@ -472,7 +472,7 @@
- 		phy-names = "dp";
- 	};
- 
--	fimd at 14400000 {
-+	fimd: fimd at 14400000 {
- 		samsung,power-domain = <&disp_pd>;
- 		clocks = <&clock CLK_SCLK_FIMD1>, <&clock CLK_FIMD1>;
- 		clock-names = "sclk_fimd", "fimd";
-@@ -644,7 +644,7 @@
- 		status = "disabled";
- 	};
- 
--	mixer at 14450000 {
-+	mixer: mixer at 14450000 {
- 		compatible = "samsung,exynos5420-mixer";
- 		reg = <0x14450000 0x10000>;
- 		interrupts = <0 94 0>;
-@@ -732,4 +732,207 @@
- 		clock-names = "secss";
- 		samsung,power-domain = <&g2d_pd>;
- 	};
-+
-+	sysmmu_g2dr: sysmmu at 10A60000 {
-+		compatible = "samsung,sysmmu-v3.2";
-+		reg = <0x10A60000 0x1000>;
-+		interrupt-parent = <&combiner>;
-+		interrupts = <24 5>;
-+		clock-names = "sysmmu", "master";
-+		clocks = <&clock CLK_SMMU_G2D>, <&clock CLK_G2D>;
-+	};
-+
-+	sysmmu_g2dw: sysmmu at 10A70000 {
-+		compatible = "samsung,sysmmu-v3.2";
-+		reg = <0x10A70000 0x1000>;
-+		interrupt-parent = <&combiner>;
-+		interrupts = <22 2>;
-+		clock-names = "sysmmu", "master";
-+		clocks = <&clock CLK_SMMU_G2D>, <&clock CLK_G2D>;
-+	};
-+
-+	sysmmu_scaler0r: sysmmu at 12880000 {
-+		compatible = "samsung,sysmmu-v3.2";
-+		reg = <0x12880000 0x1000>;
-+		interrupt-parent = <&combiner>;
-+		interrupts = <22 4>;
-+		clock-names = "sysmmu", "master";
-+		clocks = <&clock CLK_SMMU_MSCL0>, <&clock CLK_MSCL0>;
-+	};
-+
-+	sysmmu_scaler1r: sysmmu at 12890000 {
-+		compatible = "samsung,sysmmu-v3.2";
-+		reg = <0x12890000 0x1000>;
-+		interrupts = <0 186 0>;
-+		clock-names = "sysmmu", "master";
-+		clocks = <&clock CLK_SMMU_MSCL1>, <&clock CLK_MSCL1>;
-+	};
-+
-+	sysmmu_scaler2r: sysmmu at 128A0000 {
-+		compatible = "samsung,sysmmu-v3.2";
-+		reg = <0x128A0000 0x1000>;
-+		interrupts = <0 188 0>;
-+		clock-names = "sysmmu", "master";
-+		clocks = <&clock CLK_SMMU_MSCL2>, <&clock CLK_MSCL2>;
-+	};
-+
-+	sysmmu_scaler0w: sysmmu at 128C0000 {
-+		compatible = "samsung,sysmmu-v3.2";
-+		reg = <0x128C0000 0x1000>;
-+		interrupt-parent = <&combiner>;
-+		interrupts = <27 2>;
-+		clock-names = "sysmmu", "master";
-+		clocks = <&clock CLK_SMMU_MSCL0>, <&clock CLK_MSCL0>;
-+	};
-+
-+	sysmmu_scaler1w: sysmmu at 128D0000 {
-+		compatible = "samsung,sysmmu-v3.2";
-+		reg = <0x128D0000 0x1000>;
-+		interrupt-parent = <&combiner>;
-+		interrupts = <22 6>;
-+		clock-names = "sysmmu", "master";
-+		clocks = <&clock CLK_SMMU_MSCL1>, <&clock CLK_MSCL1>;
-+	};
-+
-+	sysmmu_scaler2w: sysmmu at 128E0000 {
-+		compatible = "samsung,sysmmu-v3.2";
-+		reg = <0x128E0000 0x1000>;
-+		interrupt-parent = <&combiner>;
-+		interrupts = <19 6>;
-+		clock-names = "sysmmu", "master";
-+		clocks = <&clock CLK_SMMU_MSCL2>, <&clock CLK_MSCL2>;
-+	};
-+
-+	sysmmu_mfc_l: sysmmu at 11200000 {
-+		compatible = "samsung,sysmmu-v2";
-+		reg = <0x11200000 0x1000>;
-+		interrupt-parent = <&combiner>;
-+		interrupts = <8 5>;
-+		clock-names = "sysmmu", "master";
-+		clocks = <&clock CLK_SMMU_MFCL>, <&clock CLK_MFC>;
-+		mmu-masters = <&mfc>;
-+		samsung,power-domain = <&mfc_pd>;
-+	};
-+
-+	sysmmu_mfc_r: sysmmu at 11210000 {
-+		compatible = "samsung,sysmmu-v2";
-+		reg = <0x11210000 0x1000>;
-+		interrupt-parent = <&combiner>;
-+		interrupts = <6 2>;
-+		clock-names = "sysmmu", "master";
-+		clocks = <&clock CLK_SMMU_MFCR>, <&clock CLK_MFC>;
-+		mmu-masters = <&mfc>;
-+		samsung,power-domain = <&mfc_pd>;
-+	};
-+
-+	sysmmu_rotator: sysmmu at 11D40000 {
-+		compatible = "samsung,sysmmu-v3.1";
-+		reg = <0x11D40000 0x1000>;
-+		interrupt-parent = <&combiner>;
-+		interrupts = <4 0>;
-+		clock-names = "sysmmu", "master";
-+		clocks = <&clock CLK_SMMU_ROTATOR>, <&clock CLK_ROTATOR>;
-+	};
-+
-+	sysmmu_fimc_lite0: sysmmu at 13C40000 {
-+		compatible = "samsung,sysmmu-v3.3";
-+		reg = <0x13C40000 0x1000>;
-+		interrupt-parent = <&combiner>;
-+		interrupts = <3 4>;
-+		clock-names = "sysmmu", "master";
-+		clocks = <&clock CLK_SMMU_FIMCL0>, <&clock CLK_FIMC_LITE0>;
-+		samsung,power-domain = <&gsc_pd>;
-+	};
-+
-+	sysmmu_fimc_lite1: sysmmu at 13C50000 {
-+		compatible = "samsung,sysmmu-v3.3";
-+		reg = <0x13C50000 0x1000>;
-+		interrupt-parent = <&combiner>;
-+		interrupts = <24 1>;
-+		clock-names = "sysmmu", "master";
-+		clocks = <&clock CLK_SMMU_FIMCL1>, <&clock CLK_FIMC_LITE1>;
-+		samsung,power-domain = <&gsc_pd>;
-+	};
-+
-+	sysmmu_fimc_lite3: sysmmu at 13D50000 {
-+		compatible = "samsung,sysmmu-v1";
-+		reg = <0x13D50000 0x1000>;
-+		interrupt-parent = <&combiner>;
-+		interrupts = <2 4>;
-+		clock-names = "sysmmu", "master";
-+		clocks = <&clock CLK_SMMU_FIMCL3>, <&clock CLK_FIMC_LITE3>;
-+		samsung,power-domain = <&gsc_pd>;
-+	};
-+
-+	sysmmu_gsc0: sysmmu at 13E80000 {
-+		compatible = "samsung,sysmmu-v3.3";
-+		reg = <0x13E80000 0x1000>;
-+		interrupt-parent = <&combiner>;
-+		interrupts = <2 0>;
-+		clock-names = "sysmmu", "master";
-+		clocks = <&clock CLK_SMMU_GSCL0>, <&clock CLK_GSCL0>;
-+		samsung,power-domain = <&gsc_pd>;
-+		mmu-masters = <&gsc_0>;
-+	};
-+
-+	sysmmu_gsc1: sysmmu at 13E90000 {
-+		compatible = "samsung,sysmmu-v3.3";
-+		reg = <0x13E90000 0x1000>;
-+		interrupt-parent = <&combiner>;
-+		interrupts = <2 2>;
-+		clock-names = "sysmmu", "master";
-+		clocks = <&clock CLK_SMMU_GSCL1>, <&clock CLK_GSCL1>;
-+		samsung,power-domain = <&gsc_pd>;
-+		mmu-masters = <&gsc_1>;
-+	};
-+
-+	sysmmu_fimd0w04: sysmmu at 14640000 {
-+		compatible = "samsung,sysmmu-v3.3";
-+		reg = <0x14640000 0x1000>;
-+		interrupt-parent = <&combiner>;
-+		interrupts = <3 2>;
-+		clock-names = "sysmmu", "master";
-+		clocks = <&clock CLK_SMMU_FIMD1M0>, <&clock CLK_FIMD1>;
-+		samsung,power-domain = <&disp_pd>;
-+		mmu-masters = <&fimd>;
-+	};
-+
-+	sysmmu_fimd0w123: sysmmu at 14680000 {
-+		compatible = "samsung,sysmmu-v3.3";
-+		reg = <0x14680000 0x1000>;
-+		interrupt-parent = <&combiner>;
-+		interrupts = <3 0>;
-+		clock-names = "sysmmu", "master";
-+		clocks = <&clock CLK_SMMU_FIMD1M1>, <&clock CLK_FIMD1>;
-+		samsung,power-domain = <&disp_pd>;
-+		mmu-masters = <&fimd>;
-+	};
-+
-+	sysmmu_tv: sysmmu at 14650000 {
-+		compatible = "samsung,sysmmu-v3.3";
-+		reg = <0x14650000 0x1000>;
-+		interrupt-parent = <&combiner>;
-+		interrupts = <7 4>;
-+		clock-names = "sysmmu", "master";
-+		clocks = <&clock CLK_SMMU_MIXER>, <&clock CLK_MIXER>;
-+		samsung,power-domain = <&disp_pd>;
-+		mmu-masters = <&mixer>;
-+	};
-+
-+	sysmmu_jpeg: sysmmu at 11F10000 {
-+		compatible = "samsung,sysmmu-v1";
-+		reg = <0x11F10000 0x1000>;
-+		interrupt-parent = <&combiner>;
-+		interrupts = <4 2>;
-+		clock-names = "sysmmu", "master";
-+		clocks = <&clock CLK_SMMU_JPEG>, <&clock CLK_JPEG>;
-+	};
-+
-+	sysmmu_jpeg2: sysmmu at 11F20000 {
-+		compatible = "samsung,sysmmu-v1";
-+		reg = <0x11F20000 0x1000>;
-+		interrupts = <0 169 0>;
-+		clock-names = "sysmmu", "master";
-+		clocks = <&clock CLK_SMMU_JPEG>, <&clock CLK_JPEG2>;
-+	};
- };
+ 	.macro	testop, name, instr
+ ENTRY(	\name	)
+-	and	w3, w0, #63		// Get bit offset
++	and	w3, w0, #31		// Get bit offset
+ 	eor	w0, w0, w3		// Clear low bits
+ 	mov	x2, #1
+ 	add	x1, x1, x0, lsr #3	// Get word offset
+ 	lsl	x4, x2, x3		// Create mask
+-1:	ldxr	x2, [x1]
++1:	ldxr	w2, [x1]
+ 	lsr	x0, x2, x3		// Save old value of bit
+-	\instr	x2, x2, x4		// toggle bit
+-	stlxr	w5, x2, [x1]
++	\instr	w2, w2, w4		// toggle bit
++	stlxr	w5, w2, [x1]
+ 	cbnz	w5, 1b
+ 	dmb	ish
+ 	and	x0, x0, #1
 -- 
-1.7.9.5
+1.8.3.2
