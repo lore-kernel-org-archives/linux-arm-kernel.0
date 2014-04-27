@@ -1,46 +1,145 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Sun, 27 Apr 2014 06:59:15 -0700
-Subject: [PATCH 0/5] tty/serial: Add helpers to use GPIOs to control modem
- lines and implement atmel_serial.c
-In-Reply-To: <CACQ1gAiyonHpg5YP4nSd3B=iiVQoTKQvYoC_JxbzA6Dmzr8+tw@mail.gmail.com>
-References: <1398437561-4289-1-git-send-email-richard.genoud@gmail.com>
- <20140425155847.GC22879@kroah.com>
- <CACQ1gAiyonHpg5YP4nSd3B=iiVQoTKQvYoC_JxbzA6Dmzr8+tw@mail.gmail.com>
-Message-ID: <535D0D33.4050401@atmel.com>
+From: robdclark@gmail.com (Rob Clark)
+Date: Sun, 27 Apr 2014 11:49:51 -0400
+Subject: [PATCH RFC 4/8] drm: msm: update to use component match support
+In-Reply-To: <E1WeBbf-0002Gi-DT@rmk-PC.arm.linux.org.uk>
+References: <20140426230025.GZ26756@n2100.arm.linux.org.uk>
+ <E1WeBbf-0002Gi-DT@rmk-PC.arm.linux.org.uk>
+Message-ID: <CAF6AEGtC1N+vUAcVbNc4yQ3WkzkoTx0nBQp-+rLuXJ9oWwH9rQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/04/2014 02:58, Richard Genoud :
-> 2014-04-25 17:58 GMT+02:00 Greg Kroah-Hartman <gregkh@linuxfoundation.org>:
->> On Fri, Apr 25, 2014 at 04:52:36PM +0200, Richard Genoud wrote:
->>> This patch series is a leftover of http://www.spinics.net/lists/arm-kernel/msg314242.html
->>> that missed 3.15 because it caused merge conflicts.
->>>
->>> The 1st patch may be applied as a fix for 3.15-rc, since it correct a
->>> device tree binding documentation example.
->>>
->>> Greg, for you to decide if it's worth it or not !
->>
->> Why am I the one tho decides if it is worth it?  If it's up to me, I'll
->> just say "no", as I sure don't need this for any of my machines...
+On Sat, Apr 26, 2014 at 7:02 PM, Russell King
+<rmk+kernel@arm.linux.org.uk> wrote:
+> Update MSM's DRM driver to use the component match support rather than
+> add_components.
 
-Ok, so I need to speak up and say that the patch series is useful for me :-)
+Looks like the component helper improvements make things nicer for the
+driver.  Let me know when you are ready to merge the set, if you want
+me to take this one via my tree or not.
 
-> Ok, let me reformulate :) :
-> 
-> This patch series is a leftover of
-> http://www.spinics.net/lists/arm-kernel/msg314242.html
-> that missed 3.15 because it caused merge conflicts (you acked the
-> series and ask me to resend it during 3.15-rc cycle).
-> 
-> I think that "[PATCH 1/5] tty/serial: atmel_serial: Fix device tree
-> documentation" should be applied on 3.15-rc,
-> since it corrects a device tree binding documentation example.
-> 
-> The patches 2-5/5 are for 3.16.
+Reviewed-by: Rob Clark <robdclark@gmail.com>
 
-BTW, patches 4 and 5 were "Acked" by me in v6 revision of this series.
-
-Thanks, bye,
--- 
-Nicolas Ferre
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  drivers/gpu/drm/msm/msm_drv.c | 81 ++++++++++++++++++-------------------------
+>  1 file changed, 34 insertions(+), 47 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/msm/msm_drv.c b/drivers/gpu/drm/msm/msm_drv.c
+> index f9de156b9e65..26be58bd611d 100644
+> --- a/drivers/gpu/drm/msm/msm_drv.c
+> +++ b/drivers/gpu/drm/msm/msm_drv.c
+> @@ -865,12 +865,41 @@ static int compare_of(struct device *dev, void *data)
+>  {
+>         return dev->of_node == data;
+>  }
+> +#else
+> +static int compare_dev(struct device *dev, void *data)
+> +{
+> +       return dev == data;
+> +}
+> +#endif
+> +
+> +static int msm_drm_bind(struct device *dev)
+> +{
+> +       return drm_platform_init(&msm_driver, to_platform_device(dev));
+> +}
+> +
+> +static void msm_drm_unbind(struct device *dev)
+> +{
+> +       drm_put_dev(platform_get_drvdata(to_platform_device(dev)));
+> +}
+> +
+> +static const struct component_master_ops msm_drm_ops = {
+> +       .bind = msm_drm_bind,
+> +       .unbind = msm_drm_unbind,
+> +};
+> +
+> +/*
+> + * Platform driver:
+> + */
+>
+> -static int msm_drm_add_components(struct device *master, struct master *m)
+> +static int msm_pdev_probe(struct platform_device *pdev)
+>  {
+> +       struct component_match *match = NULL;
+> +#ifdef CONFIG_OF
+> +       /* NOTE: the CONFIG_OF case duplicates the same code as exynos or imx
+> +        * (or probably any other).. so probably some room for some helpers
+> +        */
+>         struct device_node *np = master->of_node;
+>         unsigned i;
+> -       int ret;
+>
+>         for (i = 0; ; i++) {
+>                 struct device_node *node;
+> @@ -879,22 +908,9 @@ static int msm_drm_add_components(struct device *master, struct master *m)
+>                 if (!node)
+>                         break;
+>
+> -               ret = component_master_add_child(m, compare_of, node);
+> -               of_node_put(node);
+> -
+> -               if (ret)
+> -                       return ret;
+> +               component_match_add(&pdev->dev, &match, compare_of, node);
+>         }
+> -       return 0;
+> -}
+>  #else
+> -static int compare_dev(struct device *dev, void *data)
+> -{
+> -       return dev == data;
+> -}
+> -
+> -static int msm_drm_add_components(struct device *master, struct master *m)
+> -{
+>         /* For non-DT case, it kinda sucks.  We don't actually have a way
+>          * to know whether or not we are waiting for certain devices (or if
+>          * they are simply not present).  But for non-DT we only need to
+> @@ -918,41 +934,12 @@ static int msm_drm_add_components(struct device *master, struct master *m)
+>                         return -EPROBE_DEFER;
+>                 }
+>
+> -               ret = component_master_add_child(m, compare_dev, dev);
+> -               if (ret) {
+> -                       DBG("could not add child: %d", ret);
+> -                       return ret;
+> -               }
+> +               component_match_add(&pdev->dev, &match, compare_dev, dev);
+>         }
+> -
+> -       return 0;
+> -}
+>  #endif
+>
+> -static int msm_drm_bind(struct device *dev)
+> -{
+> -       return drm_platform_init(&msm_driver, to_platform_device(dev));
+> -}
+> -
+> -static void msm_drm_unbind(struct device *dev)
+> -{
+> -       drm_put_dev(platform_get_drvdata(to_platform_device(dev)));
+> -}
+> -
+> -static const struct component_master_ops msm_drm_ops = {
+> -               .add_components = msm_drm_add_components,
+> -               .bind = msm_drm_bind,
+> -               .unbind = msm_drm_unbind,
+> -};
+> -
+> -/*
+> - * Platform driver:
+> - */
+> -
+> -static int msm_pdev_probe(struct platform_device *pdev)
+> -{
+>         pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+> -       return component_master_add(&pdev->dev, &msm_drm_ops);
+> +       return component_master_add_with_match(&pdev->dev, &msm_drm_ops, match);
+>  }
+>
+>  static int msm_pdev_remove(struct platform_device *pdev)
+> --
+> 1.8.3.1
+>
