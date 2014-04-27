@@ -1,62 +1,108 @@
 From: shaik.ameer@samsung.com (Shaik Ameer Basha)
-Date: Sun, 27 Apr 2014 13:07:37 +0530
-Subject: [PATCH v12 05/31] iommu/exynos: remove prefetch buffer setting
+Date: Sun, 27 Apr 2014 13:07:43 +0530
+Subject: [PATCH v12 11/31] documentation: iommu: add binding document of Exynos
+ System MMU
 In-Reply-To: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
 References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
-Message-ID: <1398584283-22846-6-git-send-email-shaik.ameer@samsung.com>
+Message-ID: <1398584283-22846-12-git-send-email-shaik.ameer@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Cho KyongHo <pullip.cho@samsung.com>
 
-Prefetch buffer is a cache of System MMU 3.x and caches a block of
-page table entries to make effect of larger page with small pages.
-However, how to control prefetch buffers and the specifications of
-prefetch buffers different from minor versions of System MMU v3.
-Prefetch buffers must be controled with care because there are some
-restrictions in H/W design.
-
-The interface and implementation to initiate prefetch buffers will
-be prepared later.
+This patch adds a description of the device tree binding for the
+Samsung Exynos System MMU.
 
 Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
 ---
- drivers/iommu/exynos-iommu.c |   16 ----------------
- 1 file changed, 16 deletions(-)
+ .../devicetree/bindings/iommu/samsung,sysmmu.txt   |   79 ++++++++++++++++++++
+ 1 file changed, 79 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iommu/samsung,sysmmu.txt
 
-diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 7ce44a8..7556177 100644
---- a/drivers/iommu/exynos-iommu.c
-+++ b/drivers/iommu/exynos-iommu.c
-@@ -243,13 +243,6 @@ static void __sysmmu_set_ptbase(void __iomem *sfrbase,
- 	__sysmmu_tlb_invalidate(sfrbase);
- }
- 
--static void __sysmmu_set_prefbuf(void __iomem *sfrbase, unsigned long base,
--						unsigned long size, int idx)
--{
--	__raw_writel(base, sfrbase + REG_PB0_SADDR + idx * 8);
--	__raw_writel(size - 1 + base,  sfrbase + REG_PB0_EADDR + idx * 8);
--}
--
- static void __set_fault_handler(struct sysmmu_drvdata *data,
- 					sysmmu_fault_handler_t handler)
- {
-@@ -423,15 +416,6 @@ static int __exynos_sysmmu_enable(struct sysmmu_drvdata *data,
- 
- 	for (i = 0; i < data->nsfrs; i++) {
- 		__sysmmu_set_ptbase(data->sfrbases[i], pgtable);
--
--		if ((readl(data->sfrbases[i] + REG_MMU_VERSION) >> 28) == 3) {
--			/* System MMU version is 3.x */
--			__raw_writel((1 << 12) | (2 << 28),
--					data->sfrbases[i] + REG_MMU_CFG);
--			__sysmmu_set_prefbuf(data->sfrbases[i], 0, -1, 0);
--			__sysmmu_set_prefbuf(data->sfrbases[i], 0, -1, 1);
--		}
--
- 		__raw_writel(CTRL_ENABLE, data->sfrbases[i] + REG_MMU_CTRL);
- 	}
- 
+diff --git a/Documentation/devicetree/bindings/iommu/samsung,sysmmu.txt b/Documentation/devicetree/bindings/iommu/samsung,sysmmu.txt
+new file mode 100644
+index 0000000..16e13a2
+--- /dev/null
++++ b/Documentation/devicetree/bindings/iommu/samsung,sysmmu.txt
+@@ -0,0 +1,79 @@
++Samsung Exynos IOMMU H/W, System MMU (System Memory Management Unit)
++
++Samsung's Exynos architecture contains System MMUs that enables scattered
++physical memory chunks visible as a contiguous region to DMA-capable peripheral
++devices like MFC, FIMC, FIMD, GScaler, FIMC-IS and so forth.
++
++System MMU is an IOMMU and supports identical translation table format to
++ARMv7 translation tables with minimum set of page properties including access
++permissions, shareability and security protection. In addition, System MMU has
++another capabilities like L2 TLB or block-fetch buffers to minimize translation
++latency.
++
++System MMUs are in many to one relation with peripheral devices, i.e. single
++peripheral device might have multiple System MMUs (usually one for each bus
++master), but one System MMU can handle transactions from only one peripheral
++device. The relation between a System MMU and the peripheral device needs to be
++defined in device node of the peripheral device.
++
++MFC in all Exynos SoCs and FIMD, M2M Scalers and G2D in Exynos5420 has 2 System
++MMUs.
++* MFC has one System MMU on its left and right bus.
++* FIMD in Exynos5420 has one System MMU for window 0 and 4, the other system MMU
++  for window 1, 2 and 3.
++* M2M Scalers and G2D in Exynos5420 has one System MMU on the read channel and
++  the other System MMU on the write channel.
++The drivers must consider how to handle those System MMUs. One of the idea is
++to implement child devices or sub-devices which are the client devices of the
++System MMU.
++
++Required properties:
++- compatible: Should be one of:
++		"samsung,sysmmu-v1"
++		"samsung,sysmmu-v2"
++		"samsung,sysmmu-v3.1"
++		"samsung,sysmmu-v3.2"
++		"samsung,sysmmu-v3.3"
++
++- reg: A tuple of base address and size of System MMU registers.
++- interrupt-parent: The phandle of the interrupt controller of System MMU
++- interrupts: An interrupt specifier for interrupt signal of System MMU,
++	      according to the format defined by a particular interrupt
++	      controller.
++- clock-names: Should be "sysmmu" if the System MMU is needed to gate its clock.
++	       Optional "master" if the clock to the System MMU is gated by
++	       another gate clock other than "sysmmu".
++	       Exynos4 SoCs, there needs no "master" clock.
++	       Exynos5 SoCs, some System MMUs must have "master" clocks.
++- clocks: Required if the System MMU is needed to gate its clock.
++- samsung,power-domain: Required if the System MMU is needed to gate its power.
++	  Please refer to the following document:
++	  Documentation/devicetree/bindings/arm/exynos/power_domain.txt
++- mmu-masters: A phandle to device nodes representing the master for which
++               the System MMU can provide a translation. Any additional values
++	       after the phandle will be ignored because a System MMU never
++	       have two or more masters. "#stream-id-cells" specified in the
++	       master's node will be also ignored.
++	       If more than one phandle is specified, only the first phandle
++	       will be treated.
++
++Examples:
++	gsc_0: gsc at 13e00000 {
++		compatible = "samsung,exynos5-gsc";
++		reg = <0x13e00000 0x1000>;
++		interrupts = <0 85 0>;
++		samsung,power-domain = <&pd_gsc>;
++		clocks = <&clock CLK_GSCL0>;
++		clock-names = "gscl";
++	};
++
++	sysmmu_gsc0: sysmmu at 13E80000 {
++		compatible = "samsung,sysmmu-v3.2";
++		reg = <0x13E80000 0x1000>;
++		interrupt-parent = <&combiner>;
++		interrupts = <2 0>;
++		clock-names = "sysmmu", "master";
++		clocks = <&clock CLK_SMMU_GSCL0>, <&clock CLK_GSCL0>;
++		samsung,power-domain = <&pd_gsc>;
++		mmu-masters = <&gsc_0>;
++	};
 -- 
 1.7.9.5
