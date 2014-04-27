@@ -1,227 +1,60 @@
-From: dave.long@linaro.org (David Long)
-Date: Sun, 27 Apr 2014 17:01:24 -0400
-Subject: [PATCH v5] ARM: uprobes need icache flush after xol write
-In-Reply-To: <1398494096-11311-2-git-send-email-victor.kamensky@linaro.org>
-References: <1398494096-11311-1-git-send-email-victor.kamensky@linaro.org>
- <1398494096-11311-2-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <535D7024.6050002@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sun, 27 Apr 2014 16:37:06 -0500
+Subject: [PATCH] clkdev: only fall through to clk_get_sys() if DT
+ indicates no entry
+In-Reply-To: <E1We4rQ-0001mv-Ps@rmk-PC.arm.linux.org.uk>
+References: <E1We4rQ-0001mv-Ps@rmk-PC.arm.linux.org.uk>
+Message-ID: <CAL_JsqLLUQn9ESBwyJ4T3TL3CzZm7H6hTdYKbO8tdLpPDxrKYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/26/14 02:34, Victor Kamensky wrote:
-> After instruction write into xol area, on ARM V7
-> architecture code need to flush dcache and icache to sync
-> them up for given set of addresses. Having just
-> 'flush_dcache_page(page)' call is not enough - it is
-> possible to have stale instruction sitting in icache
-> for given xol area slot address.
+On Sat, Apr 26, 2014 at 10:49 AM, Russell King
+<rmk+kernel@arm.linux.org.uk> wrote:
+> There are two failures which DT can return when looking up a phandle:
+> -ENOENT - when DT finds that the desired property/index is not present
+> -EINVAL - when DT finds that the desired property/index is present, but
+>  there is a problem parsing it.
 >
-> Introduce arch_uprobe_ixol_copy weak function
-> that by default calls uprobes copy_to_page function and
-> than flush_dcache_page function and on ARM define new one
-> that handles xol slot copy in ARM specific way
+> We should only fall through to clk_get_sys() (the table driven clock
+> lookup) when DT indicates that there was no entry in the OF tables
+> for the clock.  Doing otherwise causes the clk API to always indicate
+> that there is no entry for this clock, which is not correct behaviour.
 >
-> flush_uprobe_xol_access function shares/reuses implementation
-> with/of flush_ptrace_access function and takes care of writing
-> instruction to user land address space on given variety of
-> different cache types on ARM CPUs. Because
-> flush_uprobe_xol_access does not have vma around
-> flush_ptrace_access was split into two parts. First that
-> retrieves set of condition from vma and common that receives
-> those conditions as flags.
->
-> Note ARM cache flush function need kernel address
-> through which instruction write happened, so instead
-> of using uprobes copy_to_page function changed
-> code to explicitly map page and do memcpy.
->
-> Note arch_uprobe_copy_ixol function, in similar way as
-> copy_to_user_page function, has preempt_disable/preempt_enable.
->
-> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+> Cc: <stable@vger.kernel.org>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 > ---
->   arch/arm/include/asm/cacheflush.h |  2 ++
->   arch/arm/kernel/uprobes.c         | 20 ++++++++++++++++++++
->   arch/arm/mm/flush.c               | 33 ++++++++++++++++++++++++++++-----
->   include/linux/uprobes.h           |  3 +++
->   kernel/events/uprobes.c           | 25 +++++++++++++++++--------
->   5 files changed, 70 insertions(+), 13 deletions(-)
+> Grant, Rob,
 >
-> diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
-> index 8b8b616..e02712a 100644
-> --- a/arch/arm/include/asm/cacheflush.h
-> +++ b/arch/arm/include/asm/cacheflush.h
-> @@ -487,4 +487,6 @@ int set_memory_rw(unsigned long addr, int numpages);
->   int set_memory_x(unsigned long addr, int numpages);
->   int set_memory_nx(unsigned long addr, int numpages);
->
-> +void flush_uprobe_xol_access(struct page *page, unsigned long uaddr,
-> +			     void *kaddr, unsigned long len);
->   #endif
-> diff --git a/arch/arm/kernel/uprobes.c b/arch/arm/kernel/uprobes.c
-> index f9bacee..56adf9c 100644
-> --- a/arch/arm/kernel/uprobes.c
-> +++ b/arch/arm/kernel/uprobes.c
-> @@ -113,6 +113,26 @@ int arch_uprobe_analyze_insn(struct arch_uprobe *auprobe, struct mm_struct *mm,
->   	return 0;
->   }
->
-> +void arch_uprobe_copy_ixol(struct page *page, unsigned long vaddr,
-> +			   void *src, unsigned long len)
-> +{
-> +	void *xol_page_kaddr = kmap_atomic(page);
-> +	void *dst = xol_page_kaddr + (vaddr & ~PAGE_MASK);
-> +
-> +	preempt_disable();
-> +
-> +	/* Initialize the slot */
-> +	memcpy(dst, src, len);
-> +
-> +	/* flush caches (dcache/icache) */
-> +	flush_uprobe_xol_access(page, vaddr, dst, len);
-> +
-> +	preempt_enable();
-> +
-> +	kunmap_atomic(xol_page_kaddr);
-> +}
-> +
-> +
->   int arch_uprobe_pre_xol(struct arch_uprobe *auprobe, struct pt_regs *regs)
->   {
->   	struct uprobe_task *utask = current->utask;
-> diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
-> index 3387e60..43d54f5 100644
-> --- a/arch/arm/mm/flush.c
-> +++ b/arch/arm/mm/flush.c
-> @@ -104,17 +104,20 @@ void flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr, unsig
->   #define flush_icache_alias(pfn,vaddr,len)	do { } while (0)
->   #endif
->
-> +#define FLAG_PA_IS_EXEC 1
-> +#define FLAG_PA_CORE_IN_MM 2
-> +
->   static void flush_ptrace_access_other(void *args)
->   {
->   	__flush_icache_all();
->   }
->
-> -static
-> -void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
-> -			 unsigned long uaddr, void *kaddr, unsigned long len)
-> +static inline
-> +void __flush_ptrace_access(struct page *page, unsigned long uaddr, void *kaddr,
-> +			   unsigned long len, unsigned int flags)
->   {
->   	if (cache_is_vivt()) {
-> -		if (cpumask_test_cpu(smp_processor_id(), mm_cpumask(vma->vm_mm))) {
-> +		if (flags & FLAG_PA_CORE_IN_MM) {
->   			unsigned long addr = (unsigned long)kaddr;
->   			__cpuc_coherent_kern_range(addr, addr + len);
->   		}
-> @@ -128,7 +131,7 @@ void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
->   	}
->
->   	/* VIPT non-aliasing D-cache */
-> -	if (vma->vm_flags & VM_EXEC) {
-> +	if (flags & FLAG_PA_IS_EXEC) {
->   		unsigned long addr = (unsigned long)kaddr;
->   		if (icache_is_vipt_aliasing())
->   			flush_icache_alias(page_to_pfn(page), uaddr, len);
-> @@ -140,6 +143,26 @@ void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
->   	}
->   }
->
-> +static
-> +void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
-> +			 unsigned long uaddr, void *kaddr, unsigned long len)
-> +{
-> +	unsigned int flags = 0;
-> +	if (cpumask_test_cpu(smp_processor_id(), mm_cpumask(vma->vm_mm)))
-> +		flags |= FLAG_PA_CORE_IN_MM;
-> +	if (vma->vm_flags & VM_EXEC)
-> +		flags |= FLAG_PA_IS_EXEC;
-> +	__flush_ptrace_access(page, uaddr, kaddr, len, flags);
-> +}
-> +
-> +void flush_uprobe_xol_access(struct page *page, unsigned long uaddr,
-> +			     void *kaddr, unsigned long len)
-> +{
-> +	unsigned int flags = FLAG_PA_CORE_IN_MM|FLAG_PA_IS_EXEC;
-> +
-> +	__flush_ptrace_access(page, uaddr, kaddr, len, flags);
-> +}
-> +
->   /*
->    * Copy user data from/to a page which is mapped into a different
->    * processes address space.  Really, we want to allow our "user
-> diff --git a/include/linux/uprobes.h b/include/linux/uprobes.h
-> index edff2b9..c52f827 100644
-> --- a/include/linux/uprobes.h
-> +++ b/include/linux/uprobes.h
-> @@ -32,6 +32,7 @@ struct vm_area_struct;
->   struct mm_struct;
->   struct inode;
->   struct notifier_block;
-> +struct page;
->
->   #define UPROBE_HANDLER_REMOVE		1
->   #define UPROBE_HANDLER_MASK		1
-> @@ -127,6 +128,8 @@ extern int  arch_uprobe_exception_notify(struct notifier_block *self, unsigned l
->   extern void arch_uprobe_abort_xol(struct arch_uprobe *aup, struct pt_regs *regs);
->   extern unsigned long arch_uretprobe_hijack_return_addr(unsigned long trampoline_vaddr, struct pt_regs *regs);
->   extern bool __weak arch_uprobe_ignore(struct arch_uprobe *aup, struct pt_regs *regs);
-> +extern void __weak arch_uprobe_copy_ixol(struct page *page, unsigned long vaddr,
-> +					 void *src, unsigned long len);
->   #else /* !CONFIG_UPROBES */
->   struct uprobes_state {
->   };
-> diff --git a/kernel/events/uprobes.c b/kernel/events/uprobes.c
-> index 04709b6..4968213 100644
-> --- a/kernel/events/uprobes.c
-> +++ b/kernel/events/uprobes.c
-> @@ -1296,14 +1296,8 @@ static unsigned long xol_get_insn_slot(struct uprobe *uprobe)
->   	if (unlikely(!xol_vaddr))
->   		return 0;
->
-> -	/* Initialize the slot */
-> -	copy_to_page(area->page, xol_vaddr,
-> -			&uprobe->arch.ixol, sizeof(uprobe->arch.ixol));
-> -	/*
-> -	 * We probably need flush_icache_user_range() but it needs vma.
-> -	 * This should work on supported architectures too.
-> -	 */
-> -	flush_dcache_page(area->page);
-> +	arch_uprobe_copy_ixol(area->page, xol_vaddr,
-> +			      &uprobe->arch.ixol, sizeof(uprobe->arch.ixol));
->
->   	return xol_vaddr;
->   }
-> @@ -1346,6 +1340,21 @@ static void xol_free_insn_slot(struct task_struct *tsk)
->   	}
->   }
->
-> +void __weak arch_uprobe_copy_ixol(struct page *page, unsigned long vaddr,
-> +				  void *src, unsigned long len)
-> +{
-> +	/* Initialize the slot */
-> +	copy_to_page(page, vaddr, src, len);
-> +
-> +	/*
-> +	 * We probably need flush_icache_user_range() but it needs vma.
-> +	 * This should work on most of architectures by default. If
-> +	 * architecture needs to do something different it can define
-> +	 * its own version of the function.
-> +	 */
-> +	flush_dcache_page(page);
-> +}
-> +
->   /**
->    * uprobe_get_swbp_addr - compute address of swbp given post-swbp regs
->    * @regs: Reflects the saved state of the task after it has hit a breakpoint
->
+> Please let me know ASAP if this gives you any cause for concern.  This
+> looks to me like a long standing bug which really needs fixing.  Part
+> of the motivation here is similar to Jean-Francois' patch to clkdev
+> which allows a DT specified clock which isn't get present to have
+> clk_get() and friends return -EPROBE_DEFER - again, something that I
+> think really should happen.  Jean-Francois hasn't been able to get
+> much traction for his patch, so let's start with fixing this bug first.
 
+I have no issues. A platform would have to be pretty broken to be
+relying on the current behavior.
 
-Reviewed-by: David A. Long <dave.long@linaro.org>
+Rob
 
-
--dl
+>
+>  drivers/clk/clkdev.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+> index 48f67218247c..4e65d0e10b05 100644
+> --- a/drivers/clk/clkdev.c
+> +++ b/drivers/clk/clkdev.c
+> @@ -165,7 +165,7 @@ struct clk *clk_get(struct device *dev, const char *con_id)
+>
+>         if (dev) {
+>                 clk = of_clk_get_by_name(dev->of_node, con_id);
+> -               if (!IS_ERR(clk))
+> +               if (!IS_ERR(clk) || PTR_ERR(clk) != -ENOENT)
+>                         return clk;
+>         }
+>
+> --
+> 1.8.3.1
+>
