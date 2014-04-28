@@ -1,25 +1,63 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 28 Apr 2014 16:30:44 -0700
-Subject: [PATCH] mfd: pm8921: Remove pm8xxx API now that sub-devices use
- regmap
-In-Reply-To: <1397002455-12854-1-git-send-email-sboyd@codeaurora.org>
-References: <1397002455-12854-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <535EE4A4.6040208@codeaurora.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 28 Apr 2014 18:24:07 -0500
+Subject: [PATCH v2 3/7] tty/serial: convert 8250 to generic earlycon
+In-Reply-To: <CAE9FiQVp5u-jF_xjCu68BgbZ=e0D508tn_-auoiT6cbkYtX8Og@mail.gmail.com>
+References: <1397859600-11507-1-git-send-email-robherring2@gmail.com>
+ <1397859600-11507-4-git-send-email-robherring2@gmail.com>
+ <CAE9FiQVp5u-jF_xjCu68BgbZ=e0D508tn_-auoiT6cbkYtX8Og@mail.gmail.com>
+Message-ID: <CAL_JsqKiYmCNGrkiwS7m-OAt3rHZBq_yNGycen-AojbV-7famg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/08/14 17:14, Stephen Boyd wrote:
-> The pm8xxx read/write wrappers are no longer necessary now that
-> all the sub-device drivers are using the regmap API. Remove it.
+On Sat, Apr 26, 2014 at 1:29 AM, Yinghai Lu <yinghai@kernel.org> wrote:
+> On Fri, Apr 18, 2014 at 3:19 PM, Rob Herring <robherring2@gmail.com> wrote:
+>> From: Rob Herring <robh@kernel.org>
+>>
+>> With the generic earlycon infrastructure in place, convert the 8250
+>> early console to use it.
+>>
+>> Signed-off-by: Rob Herring <robh@kernel.org>
+>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>> Cc: Jiri Slaby <jslaby@suse.cz>
+>> ---
+>>  drivers/tty/serial/8250/8250_early.c | 138 ++++-------------------------------
+>>  drivers/tty/serial/8250/Kconfig      |   1 +
+>>  2 files changed, 16 insertions(+), 123 deletions(-)
+>>
+>> diff --git a/drivers/tty/serial/8250/8250_early.c b/drivers/tty/serial/8250/8250_early.c
+>> index c100d63..e83c9db 100644
+>> --- a/drivers/tty/serial/8250/8250_early.c
+>> +++ b/drivers/tty/serial/8250/8250_early.c
+>> @@ -35,18 +35,8 @@
+> ...
+>> -
+>> -int __init setup_early_serial8250_console(char *cmdline)
 >
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
+> You removed global function, but still left declaration and calling...
 >
-> Based on Linus' tip as of a7963eb7f4c4 (Merge branch 'for_linus' of
-> git://git.kernel.org/pub/scm/linux/kernel/git/jack/linux-fs, 2014-04-07)
+> arch/mips/mti-malta/malta-init.c:
+> setup_early_serial8250_console(console_string);
+> drivers/firmware/pcdp.c:        return setup_early_serial8250_console(options);
+> include/linux/serial_8250.h:extern int
+> setup_early_serial8250_console(char *cmdline);
 
-ping?
+Thanks for finding these. I missed them in my build tests. This should fix them:
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+diff --git a/drivers/tty/serial/8250/8250_early.c
+b/drivers/tty/serial/8250/8250_early.c
+index e83c9db..2094c3b 100644
+--- a/drivers/tty/serial/8250/8250_early.c
++++ b/drivers/tty/serial/8250/8250_early.c
+@@ -156,6 +156,11 @@ static int __init early_serial8250_setup(struct
+earlycon_device *device,
+ EARLYCON_DECLARE(uart8250, early_serial8250_setup);
+ EARLYCON_DECLARE(uart, early_serial8250_setup);
+
++int __init setup_early_serial8250_console(char *cmdline)
++{
++       return setup_earlycon(cmdline, "uart8250", early_serial8250_setup);
++}
++
+ int serial8250_find_port_for_earlycon(void)
+ {
+        struct earlycon_device *device = early_device;
