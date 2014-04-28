@@ -1,36 +1,53 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 28 Apr 2014 20:28:17 +0100
-Subject: [PATCH 25/97] ARM: l2c: clean up L2 cache initialisation messages
+Date: Mon, 28 Apr 2014 20:27:53 +0100
+Subject: [PATCH 21/97] ARM: l2c: write auxctrl register before unlocking
 In-Reply-To: <20140428192419.GV26756@n2100.arm.linux.org.uk>
 References: <20140428192419.GV26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WerDt-0001V2-I9@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WerDV-0008Ms-Ht@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make one of them purely "English", and the other purely technical.
+We should write the auxillary control register before unlocking: the
+write may be necessary to enable non-secure access to the lock
+registers.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mm/cache-l2x0.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ arch/arm/mm/cache-l2x0.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
 diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index a544f19c448f..713cdcef25d1 100644
+index 2adb82e7f4b3..fc609550b7fa 100644
 --- a/arch/arm/mm/cache-l2x0.c
 +++ b/arch/arm/mm/cache-l2x0.c
-@@ -545,9 +545,10 @@ static void __init __l2c_init(const struct l2c_init_data *data,
+@@ -92,10 +92,10 @@ static void l2c_enable(void __iomem *base, u32 aux, unsigned num_lock)
+ {
+ 	unsigned long flags;
  
- 	outer_cache = fns;
+-	l2c_unlock(base, num_lock);
+-
+ 	writel_relaxed(aux, base + L2X0_AUX_CTRL);
  
--	pr_info("%s cache controller enabled\n", type);
--	pr_info("l2x0: %d ways, CACHE_ID 0x%08x, AUX_CTRL 0x%08x, Cache size: %d kB\n",
--		ways, cache_id, aux, l2x0_size >> 10);
-+	pr_info("%s cache controller enabled, %d ways, %d kB\n",
-+		type, ways, l2x0_size >> 10);
-+	pr_info("%s: CACHE_ID 0x%08x, AUX_CTRL 0x%08x\n",
-+		type, cache_id, aux);
- }
++	l2c_unlock(base, num_lock);
++
+ 	local_irq_save(flags);
+ 	__l2c_op_way(base + L2X0_INV_WAY);
+ 	writel_relaxed(0, base + sync_reg_offset);
+@@ -368,12 +368,12 @@ static void l2x0_unlock(u32 cache_id)
  
- void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
+ static void l2x0_enable(void __iomem *base, u32 aux, unsigned num_lock)
+ {
+-	/* Make sure that I&D is not locked down when starting */
+-	l2x0_unlock(readl_relaxed(base + L2X0_CACHE_ID));
+-
+ 	/* l2x0 controller is disabled */
+ 	writel_relaxed(aux, base + L2X0_AUX_CTRL);
+ 
++	/* Make sure that I&D is not locked down when starting */
++	l2x0_unlock(readl_relaxed(base + L2X0_CACHE_ID));
++
+ 	l2x0_inv_all();
+ 
+ 	/* enable L2X0 */
 -- 
 1.8.3.1
