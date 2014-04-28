@@ -1,39 +1,33 @@
-From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
-Date: Mon, 28 Apr 2014 12:05:02 +0530
-Subject: [PATCH 2/2 v4] i2c: exynos5: configure fifo_depth based on HSI2C
- module variant
-In-Reply-To: <20140312192037.GC28891@katana>
-References: <1385100851-32254-1-git-send-email-ch.naveen@samsung.com>
- <1391748195-12490-1-git-send-email-ch.naveen@samsung.com>
- <20140312192037.GC28891@katana>
-Message-ID: <CAHfPSqCg-BqezXCTfDjtKwvaD3G8Ej79OCFKAfshfO0uZvyewg@mail.gmail.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 28 Apr 2014 09:52:30 +0300
+Subject: [PATCH 06/23] ARM: OMAP: add OMAP5 DSI muxing
+In-Reply-To: <20140425153150.GA20807@atomide.com>
+References: <1398334639-14172-1-git-send-email-tomi.valkeinen@ti.com>
+ <1398334639-14172-7-git-send-email-tomi.valkeinen@ti.com>
+ <535A42D6.5090107@ti.com> <535A4470.2000509@ti.com> <535A5C0A.7040808@ti.com>
+ <535A6C40.10609@ti.com> <20140425153150.GA20807@atomide.com>
+Message-ID: <535DFAAE.1010606@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Wolfram,
+On 25/04/14 18:31, Tony Lindgren wrote:
 
-On 13 March 2014 00:50, Wolfram Sang <wsa@the-dreams.de> wrote:
-> On Fri, Feb 07, 2014 at 10:13:15AM +0530, Naveen Krishna Chatradhi wrote:
->> fifo_depth of the HSI2C is not constant
->> Exynos5420 and Exynos5250 supports fifo_depth of 64bytes
->> Exynos5260 supports fifo_depth of 16bytes.
->>
->> This patch configures the fifo_depth based on HSI2C modules version.
->>
->> Signed-off-by: Naveen Krishna Chatradhi <ich.naveen@samsung.com>
->> [For finding out the difference and initial contribution]
->> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->
-> I know Tomasz said differently, but I prefer the patches squashed (and
-> the commit message extended).
-Please accept my apologies for coming back late on this CL.
-Will squash and fix the compilation error and submit.
+> Chances are any mux register in the syscon area already works with
+> pinctrl-single,pins or pinctrl-single,bits option. The ones in the
+> padconf area should be already mapped so the driver just has to
+> request them.
 
-Thanks,
->
+If using the padconf (say omap4_padconf_global for omap4), doesn't that
+mean we need to have platform specific bits in the driver? Isn't that
+something we've been trying to remove all the time?
+
+ Tomi
 
 
-
--- 
-Shine bright,
-(: Nav :)
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140428/4bea3d89/attachment.sig>
