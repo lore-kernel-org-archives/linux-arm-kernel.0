@@ -1,111 +1,102 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Mon, 28 Apr 2014 10:14:57 -0500
-Subject: [PATCH V3 17/20] bus: omap_l3_noc: Add information about the context
- of operation
+Date: Mon, 28 Apr 2014 10:14:45 -0500
+Subject: [PATCH V3 05/20] bus: omap_l3_noc: switch over to relaxed variants of
+ readl/writel
 In-Reply-To: <1398698101-25513-1-git-send-email-nm@ti.com>
 References: <1397492726-17203-1-git-send-email-nm@ti.com>
  <1398698101-25513-1-git-send-email-nm@ti.com>
-Message-ID: <1398698101-25513-18-git-send-email-nm@ti.com>
+Message-ID: <1398698101-25513-6-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-L3 error may be triggered using Debug interface (example JTAG) or
-due to other errors, for example an opcode fetch (due to function
-pointer or stack corruption) or a data access (due to some other
-failure). NOC registers contain additional information to help aid
-debug information.
+Currently we use __raw_readl and writel in this driver. Considering
+there is no specific need for a memory barrier, replacing writel
+with endian-neutral writel_relaxed and replacing __raw_readls with
+the corresponding endian-neutral readl_relaxed allows us to have a
+standard set of register operations for the driver.
 
-With this, we can enhance the error information to more detailed form:
-"
-L3 Custom Error: MASTER MPU TARGET L4PER2 (Read): Data Access in User mode
-during Functional access
-"
+While at it, simplify address computation using variables for
+register.
 
 Signed-off-by: Nishanth Menon <nm@ti.com>
 Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Acked-by: Felipe Balbi <balbi@ti.com>
 Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 Tested-by: Darren Etheridge <detheridge@ti.com>
 ---
-V3: no change
- drivers/bus/omap_l3_noc.c |   18 ++++++++++++++----
- drivers/bus/omap_l3_noc.h |    2 ++
- 2 files changed, 16 insertions(+), 4 deletions(-)
+
+change in V3: commit message improvement based on Felipe's feedback.
+no change since V2 repost.
+
+ drivers/bus/omap_l3_noc.c |   26 ++++++++++++++------------
+ 1 file changed, 14 insertions(+), 12 deletions(-)
 
 diff --git a/drivers/bus/omap_l3_noc.c b/drivers/bus/omap_l3_noc.c
-index 9d021d0..08344b0 100644
+index 37d71b7..c8facb0 100644
 --- a/drivers/bus/omap_l3_noc.c
 +++ b/drivers/bus/omap_l3_noc.c
-@@ -60,15 +60,16 @@ static int l3_handle_target(struct omap_l3 *l3, void __iomem *base,
- {
- 	int k;
- 	u32 std_err_main, clear, masterid;
--	u8 op_code;
-+	u8 op_code, m_req_info;
- 	void __iomem *l3_targ_base;
- 	void __iomem *l3_targ_stderr, *l3_targ_slvofslsb, *l3_targ_mstaddr;
--	void __iomem *l3_targ_hdr;
-+	void __iomem *l3_targ_hdr, *l3_targ_info;
- 	struct l3_target_data *l3_targ_inst;
- 	struct l3_masters_data *master;
+@@ -55,6 +55,7 @@ static irqreturn_t l3_interrupt_handler(int irq, void *_l3)
+ 	int err_src = 0;
+ 	u32 std_err_main, err_reg, clear, masterid;
+ 	void __iomem *base, *l3_targ_base;
++	void __iomem *l3_targ_stderr, *l3_targ_slvofslsb, *l3_targ_mstaddr;
  	char *target_name, *master_name = "UN IDENTIFIED";
- 	char *err_description;
- 	char err_string[30] = { 0 };
-+	char info_string[60] = { 0 };
  
- 	/* We DONOT expect err_src to go out of bounds */
- 	BUG_ON(err_src > MAX_CLKDM_TARGETS);
-@@ -99,6 +100,7 @@ static int l3_handle_target(struct omap_l3 *l3, void __iomem *base,
+ 	/* Get the Type of interrupt */
+@@ -66,8 +67,8 @@ static irqreturn_t l3_interrupt_handler(int irq, void *_l3)
+ 		 * to determine the source
+ 		 */
+ 		base = l3->l3_base[i];
+-		err_reg = __raw_readl(base + l3_flagmux[i] +
+-					+ L3_FLAGMUX_REGERR0 + (inttype << 3));
++		err_reg = readl_relaxed(base + l3_flagmux[i] +
++					L3_FLAGMUX_REGERR0 + (inttype << 3));
  
- 		l3_targ_mstaddr = l3_targ_base + L3_TARG_STDERRLOG_MSTADDR;
- 		l3_targ_hdr = l3_targ_base + L3_TARG_STDERRLOG_HDR;
-+		l3_targ_info = l3_targ_base + L3_TARG_STDERRLOG_INFO;
- 		break;
+ 		/* Get the corresponding error and analyse */
+ 		if (err_reg) {
+@@ -76,10 +77,14 @@ static irqreturn_t l3_interrupt_handler(int irq, void *_l3)
  
- 	case CUSTOM_ERROR:
-@@ -107,6 +109,7 @@ static int l3_handle_target(struct omap_l3 *l3, void __iomem *base,
- 		l3_targ_mstaddr = l3_targ_base +
- 				  L3_TARG_STDERRLOG_CINFO_MSTADDR;
- 		l3_targ_hdr = l3_targ_base + L3_TARG_STDERRLOG_CINFO_OPCODE;
-+		l3_targ_info = l3_targ_base + L3_TARG_STDERRLOG_CINFO_INFO;
- 		break;
- 
- 	default:
-@@ -128,13 +131,20 @@ static int l3_handle_target(struct omap_l3 *l3, void __iomem *base,
- 
- 	op_code = readl_relaxed(l3_targ_hdr) & 0x7;
- 
-+	m_req_info = readl_relaxed(l3_targ_info) & 0xF;
-+	snprintf(info_string, sizeof(info_string),
-+		 ": %s in %s mode during %s access",
-+		 (m_req_info & BIT(0)) ? "Opcode Fetch" : "Data Access",
-+		 (m_req_info & BIT(1)) ? "Supervisor" : "User",
-+		 (m_req_info & BIT(3)) ? "Debug" : "Functional");
+ 			/* Read the stderrlog_main_source from clk domain */
+ 			l3_targ_base = base + *(l3_targ[i] + err_src);
+-			std_err_main =  __raw_readl(l3_targ_base +
+-					L3_TARG_STDERRLOG_MAIN);
+-			masterid = __raw_readl(l3_targ_base +
+-					L3_TARG_STDERRLOG_MSTADDR);
++			l3_targ_stderr = l3_targ_base + L3_TARG_STDERRLOG_MAIN;
++			l3_targ_slvofslsb = l3_targ_base +
++					    L3_TARG_STDERRLOG_SLVOFSLSB;
++			l3_targ_mstaddr = l3_targ_base +
++					  L3_TARG_STDERRLOG_MSTADDR;
 +
- 	WARN(true,
--	     "%s:L3 %s Error: MASTER %s TARGET %s (%s)%s\n",
-+	     "%s:L3 %s Error: MASTER %s TARGET %s (%s)%s%s\n",
- 	     dev_name(l3->dev),
- 	     err_description,
- 	     master_name, target_name,
- 	     l3_transaction_type[op_code],
--	     err_string);
-+	     err_string, info_string);
++			std_err_main = readl_relaxed(l3_targ_stderr);
++			masterid = readl_relaxed(l3_targ_mstaddr);
  
- 	/* clear the std error log*/
- 	clear = std_err_main | CLEAR_STDERR_LOG;
-diff --git a/drivers/bus/omap_l3_noc.h b/drivers/bus/omap_l3_noc.h
-index 6670fd9..36dc48b 100644
---- a/drivers/bus/omap_l3_noc.h
-+++ b/drivers/bus/omap_l3_noc.h
-@@ -31,7 +31,9 @@
- #define L3_TARG_STDERRLOG_MAIN		0x48
- #define L3_TARG_STDERRLOG_HDR		0x4c
- #define L3_TARG_STDERRLOG_MSTADDR	0x50
-+#define L3_TARG_STDERRLOG_INFO		0x58
- #define L3_TARG_STDERRLOG_SLVOFSLSB	0x5c
-+#define L3_TARG_STDERRLOG_CINFO_INFO	0x64
- #define L3_TARG_STDERRLOG_CINFO_MSTADDR	0x68
- #define L3_TARG_STDERRLOG_CINFO_OPCODE	0x6c
- #define L3_FLAGMUX_REGERR0		0xc
+ 			switch (std_err_main & CUSTOM_ERROR) {
+ 			case STANDARD_ERROR:
+@@ -87,12 +92,10 @@ static irqreturn_t l3_interrupt_handler(int irq, void *_l3)
+ 					l3_targ_inst_name[i][err_src];
+ 				WARN(true, "L3 standard error: TARGET:%s@address 0x%x\n",
+ 					target_name,
+-					__raw_readl(l3_targ_base +
+-						L3_TARG_STDERRLOG_SLVOFSLSB));
++					readl_relaxed(l3_targ_slvofslsb));
+ 				/* clear the std error log*/
+ 				clear = std_err_main | CLEAR_STDERR_LOG;
+-				writel(clear, l3_targ_base +
+-					L3_TARG_STDERRLOG_MAIN);
++				writel_relaxed(clear, l3_targ_stderr);
+ 				break;
+ 
+ 			case CUSTOM_ERROR:
+@@ -107,8 +110,7 @@ static irqreturn_t l3_interrupt_handler(int irq, void *_l3)
+ 					master_name, target_name);
+ 				/* clear the std error log*/
+ 				clear = std_err_main | CLEAR_STDERR_LOG;
+-				writel(clear, l3_targ_base +
+-					L3_TARG_STDERRLOG_MAIN);
++				writel_relaxed(clear, l3_targ_stderr);
+ 				break;
+ 
+ 			default:
 -- 
 1.7.9.5
