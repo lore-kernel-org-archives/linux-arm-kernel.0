@@ -1,298 +1,42 @@
 From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Mon, 28 Apr 2014 16:58:48 +0200
-Subject: [PATCH 5/7] clk: sunxi: add PRCM (Power/Reset/Clock Management) clks
- support
+Date: Mon, 28 Apr 2014 16:58:49 +0200
+Subject: [PATCH 6/7] clk: sunxi: document PRCM clock compatible strings
 In-Reply-To: <1398697130-8338-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1398697130-8338-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1398697130-8338-6-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1398697130-8338-7-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PRCM (Power/Reset/Clock Management) unit provides several clock
-devices:
-- AR100 clk: used to clock the Power Management co-processor
-- AHB0 clk: used to clock the AHB0 bus
-- APB0 clk and gates: used to clk
-
-Add support for these clks in a separate driver so that they can be probed
-as platform devices instead of registered during early init.
-We need this to be able to probe PRCM MFD subdevices.
+Document new compatible strings for clock provided by the PRCM
+(Power/Reset/Clock Management) unit.
 
 Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 ---
- drivers/clk/sunxi/Makefile         |   2 +
- drivers/clk/sunxi/clk-sun6i-prcm.c | 253 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 255 insertions(+)
- create mode 100644 drivers/clk/sunxi/clk-sun6i-prcm.c
+ Documentation/devicetree/bindings/clock/sunxi.txt | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-index b5bac91..ef8cdc9 100644
---- a/drivers/clk/sunxi/Makefile
-+++ b/drivers/clk/sunxi/Makefile
-@@ -3,3 +3,5 @@
- #
- 
- obj-y += clk-sunxi.o clk-factors.o
-+
-+obj-$(CONFIG_MFD_SUN6I_PRCM) += clk-sun6i-prcm.o
-diff --git a/drivers/clk/sunxi/clk-sun6i-prcm.c b/drivers/clk/sunxi/clk-sun6i-prcm.c
-new file mode 100644
-index 0000000..bb7b25a
---- /dev/null
-+++ b/drivers/clk/sunxi/clk-sun6i-prcm.c
-@@ -0,0 +1,253 @@
-+/*
-+ * Copyright (C) 2014 Free Electrons
-+ *
-+ * License Terms: GNU General Public License v2
-+ * Author: Boris BREZILLON <boris.brezillon@free-electrons.com>
-+ *
-+ * Allwinner PRCM (Power/Reset/Clock Management) driver
-+ *
-+ */
-+
-+#include <linux/clk-provider.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+
-+#define SUN6I_APB0_GATES_MAX_SIZE	32
-+#define SUN6I_AR100_MAX_PARENTS		4
-+
-+static int sun6i_a31_ar100_mux_clk_register(struct platform_device *pdev)
-+{
-+	const char *parents[SUN6I_AR100_MAX_PARENTS];
-+	struct device_node *np = pdev->dev.of_node;
-+	const char *clk_name = np->name;
-+	struct resource *r;
-+	void __iomem *reg;
-+	struct clk *clk;
-+	int nparents;
-+	int i;
-+
-+	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	reg = devm_ioremap(&pdev->dev, r->start, resource_size(r));
-+	if (IS_ERR(reg))
-+		return PTR_ERR(reg);
-+
-+	nparents = of_clk_get_parent_count(np);
-+	if (nparents > SUN6I_AR100_MAX_PARENTS)
-+		nparents = SUN6I_AR100_MAX_PARENTS;
-+
-+	for (i = 0; i < nparents; i++)
-+		parents[i] = of_clk_get_parent_name(np, i);
-+
-+	of_property_read_string(np, "clock-output-names", &clk_name);
-+
-+	clk = clk_register_mux(&pdev->dev, clk_name, parents, nparents,
-+			       CLK_SET_RATE_NO_REPARENT, reg,
-+			       16, 2, 0, NULL);
-+	if (IS_ERR(clk))
-+		return PTR_ERR(clk);
-+
-+	return of_clk_add_provider(np, of_clk_src_simple_get, clk);
-+}
-+
-+static int sun6i_a31_ar100_clk_register(struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	const char *clk_name = np->name;
-+	const char *clk_parent;
-+	struct resource *r;
-+	void __iomem *reg;
-+	struct clk *clk;
-+
-+	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	reg = devm_ioremap(&pdev->dev, r->start, resource_size(r));
-+	if (IS_ERR(reg))
-+		return PTR_ERR(reg);
-+
-+	clk_parent = of_clk_get_parent_name(np, 0);
-+	if (!clk_parent)
-+		return -EINVAL;
-+
-+	of_property_read_string(np, "clock-output-names", &clk_name);
-+
-+	clk = clk_register_divider(&pdev->dev, clk_name, clk_parent,
-+				   0, reg, 4, 2, CLK_DIVIDER_POWER_OF_TWO,
-+				   NULL);
-+	if (IS_ERR(clk))
-+		return PTR_ERR(clk);
-+
-+	return of_clk_add_provider(np, of_clk_src_simple_get, clk);
-+}
-+
-+static int sun6i_a31_ar100_div_clk_register(struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	const char *clk_name = np->name;
-+	const char *clk_parent;
-+	struct resource *r;
-+	void __iomem *reg;
-+	struct clk *clk;
-+
-+	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	reg = devm_ioremap(&pdev->dev, r->start, resource_size(r));
-+	if (IS_ERR(reg))
-+		return PTR_ERR(reg);
-+
-+	clk_parent = of_clk_get_parent_name(np, 0);
-+	if (!clk_parent)
-+		return -EINVAL;
-+
-+	of_property_read_string(np, "clock-output-names", &clk_name);
-+
-+	clk = clk_register_divider(&pdev->dev, clk_name, clk_parent,
-+				   0, reg, 8, 5, 0, NULL);
-+	if (IS_ERR(clk))
-+		return PTR_ERR(clk);
-+
-+	return of_clk_add_provider(np, of_clk_src_simple_get, clk);
-+}
-+
-+static int sun6i_a31_apb0_clk_register(struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	const char *clk_name = np->name;
-+	const char *clk_parent;
-+	struct resource *r;
-+	void __iomem *reg;
-+	struct clk *clk;
-+
-+	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	reg = devm_ioremap_resource(&pdev->dev, r);
-+	if (IS_ERR(reg))
-+		return PTR_ERR(reg);
-+
-+	clk_parent = of_clk_get_parent_name(np, 0);
-+	if (!clk_parent)
-+		return -EINVAL;
-+
-+	of_property_read_string(np, "clock-output-names", &clk_name);
-+
-+	clk = clk_register_divider(&pdev->dev, clk_name, clk_parent,
-+				   0, reg, 0, 2, CLK_DIVIDER_POWER_OF_TWO,
-+				   NULL);
-+	if (IS_ERR(clk))
-+		return PTR_ERR(clk);
-+
-+	return of_clk_add_provider(np, of_clk_src_simple_get, clk);
-+}
-+
-+static int sun6i_a31_apb0_gates_clk_register(struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	struct clk_onecell_data *clk_data;
-+	const char *clk_parent;
-+	const char *clk_name;
-+	struct resource *r;
-+	void __iomem *reg;
-+	int gate_id;
-+	int ngates;
-+	int i;
-+
-+	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	reg = devm_ioremap_resource(&pdev->dev, r);
-+	if (!reg)
-+		return PTR_ERR(reg);
-+
-+	clk_parent = of_clk_get_parent_name(np, 0);
-+	if (!clk_parent)
-+		return -EINVAL;
-+
-+	ngates = of_property_count_strings(np, "clock-output-names");
-+	if (ngates < 0)
-+		return ngates;
-+
-+	if (!ngates || ngates > SUN6I_APB0_GATES_MAX_SIZE)
-+		return -EINVAL;
-+
-+	clk_data = devm_kzalloc(&pdev->dev, sizeof(struct clk_onecell_data),
-+				GFP_KERNEL);
-+	if (!clk_data)
-+		return -ENOMEM;
-+
-+	clk_data->clks = devm_kzalloc(&pdev->dev,
-+				      SUN6I_APB0_GATES_MAX_SIZE *
-+				      sizeof(struct clk *),
-+				      GFP_KERNEL);
-+	if (!clk_data->clks)
-+		return -ENOMEM;
-+
-+	for (i = 0; i < ngates; i++) {
-+		of_property_read_string_index(np, "clock-output-names",
-+					      i, &clk_name);
-+
-+		gate_id = i;
-+		of_property_read_u32_index(np, "clock-indices", i, &gate_id);
-+
-+		WARN_ON(gate_id >= SUN6I_APB0_GATES_MAX_SIZE);
-+		if (gate_id >= SUN6I_APB0_GATES_MAX_SIZE)
-+			continue;
-+
-+		clk_data->clks[gate_id] = clk_register_gate(&pdev->dev,
-+							    clk_name,
-+							    clk_parent, 0,
-+							    reg, gate_id,
-+							    0, NULL);
-+		WARN_ON(IS_ERR(clk_data->clks[gate_id]));
-+	}
-+
-+	clk_data->clk_num = ngates;
-+
-+	return of_clk_add_provider(np, of_clk_src_onecell_get, clk_data);
-+}
-+
-+const struct of_device_id sun6i_a31_prcm_clk_dt_ids[] = {
-+	{
-+		.compatible = "allwinner,sun6i-a31-ar100-mux-clk",
-+		.data = sun6i_a31_ar100_mux_clk_register,
-+	},
-+	{
-+		.compatible = "allwinner,sun6i-a31-ar100-clk",
-+		.data = sun6i_a31_ar100_clk_register,
-+	},
-+	{
-+		.compatible = "allwinner,sun6i-a31-ar100-div-clk",
-+		.data = sun6i_a31_ar100_div_clk_register,
-+	},
-+	{
-+		.compatible = "allwinner,sun6i-a31-apb0-clk",
-+		.data = sun6i_a31_apb0_clk_register,
-+	},
-+	{
-+		.compatible = "allwinner,sun6i-a31-apb0-gates-clk",
-+		.data = sun6i_a31_apb0_gates_clk_register,
-+	},
-+	{ /* sentinel */ }
-+};
-+
-+static int sun6i_a31_prcm_clk_probe(struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	int (*register_func)(struct platform_device *pdev);
-+	const struct of_device_id *match;
-+
-+	match = of_match_node(sun6i_a31_prcm_clk_dt_ids, np);
-+	if (!match)
-+		return -EINVAL;
-+
-+	register_func = match->data;
-+	return register_func(pdev);
-+}
-+
-+static struct platform_driver sun6i_a31_prcm_clk_driver = {
-+	.driver = {
-+		.name = "sun6i-a31-prcm-clk",
-+		.owner = THIS_MODULE,
-+		.of_match_table = sun6i_a31_prcm_clk_dt_ids,
-+	},
-+	.probe = sun6i_a31_prcm_clk_probe,
-+};
-+module_platform_driver(sun6i_a31_prcm_clk_driver);
-+
-+MODULE_AUTHOR("Boris BREZILLON <boris.brezillon@free-electrons.com");
-+MODULE_DESCRIPTION("Allwinner Reset Controller Driver");
-+MODULE_LICENSE("GPL v2");
+diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+index a5160d8..0c9dd6a 100644
+--- a/Documentation/devicetree/bindings/clock/sunxi.txt
++++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+@@ -20,12 +20,18 @@ Required properties:
+ 	"allwinner,sun5i-a13-ahb-gates-clk" - for the AHB gates on A13
+ 	"allwinner,sun5i-a10s-ahb-gates-clk" - for the AHB gates on A10s
+ 	"allwinner,sun7i-a20-ahb-gates-clk" - for the AHB gates on A20
++	"allwinner,sun6i-a31-ar100-mux-clk" - for the AR100 multiplexer on A31
++	"allwinner,sun6i-a31-ar100-clk" - for the AR100 on A31
++	"allwinner,sun6i-a31-ar100-div-clk" - for the AR100 divided output clk on A31
++	"allwinner,sun6i-a31-ahb0-clk" - for the AHB0 multiplexer on A31
+ 	"allwinner,sun6i-a31-ahb1-mux-clk" - for the AHB1 multiplexer on A31
+ 	"allwinner,sun6i-a31-ahb1-gates-clk" - for the AHB1 gates on A31
+ 	"allwinner,sun4i-a10-apb0-clk" - for the APB0 clock
++	"allwinner,sun6i-a31-apb0-clk" - for the APB0 clock on A31
+ 	"allwinner,sun4i-a10-apb0-gates-clk" - for the APB0 gates on A10
+ 	"allwinner,sun5i-a13-apb0-gates-clk" - for the APB0 gates on A13
+ 	"allwinner,sun5i-a10s-apb0-gates-clk" - for the APB0 gates on A10s
++	"allwinner,sun6i-a31-apb0-gates-clk" - for the APB0 gates on A31
+ 	"allwinner,sun7i-a20-apb0-gates-clk" - for the APB0 gates on A20
+ 	"allwinner,sun4i-a10-apb1-clk" - for the APB1 clock
+ 	"allwinner,sun4i-a10-apb1-mux-clk" - for the APB1 clock muxing
 -- 
 1.8.3.2
