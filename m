@@ -1,47 +1,61 @@
 From: george.cherian@ti.com (George Cherian)
-Date: Mon, 28 Apr 2014 09:40:23 +0530
-Subject: [PATCH 4/6] drivers: net: cpsw: Enable Annexe F Time sync
+Date: Mon, 28 Apr 2014 09:40:24 +0530
+Subject: [PATCH 5/6] ARM: AM43xx: clk: Change the cpts ref clock source to
+ dpll_core_m5 clk
 In-Reply-To: <1398658225-25873-1-git-send-email-george.cherian@ti.com>
 References: <1398658225-25873-1-git-send-email-george.cherian@ti.com>
-Message-ID: <1398658225-25873-5-git-send-email-george.cherian@ti.com>
+Message-ID: <1398658225-25873-6-git-send-email-george.cherian@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the Annex F Time Sync explicitly for DRA7x and AM4372.
-With this enabled the L2 PTP is working.
+cpsw_cpts_rft_clk has got the choice of 3 clocksources
+ -dpll_core_m4_ck
+ -dpll_core_m5_ck
+ -dpll_disp_m2_ck
 
-while at that rename TS_BIT8 to TS_TTL_NONZERO
+By default dpll_core_m4_ck is selected, witn this as clock
+source the CPTS doesnot work properly. It gives clockcheck errors
+while running PTP.
+
+ clockcheck: clock jumped backward or running slower than expected!
+
+By selecting dpll_core_m5_ck as the clocksource fixes this issue.
+In AM335x dpll_core_m5_ck is the default clocksource.
 
 Signed-off-by: George Cherian <george.cherian@ti.com>
 ---
- drivers/net/ethernet/ti/cpsw.c | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+ drivers/clk/ti/clk-43xx.c | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
-index 085ffb5..af1423b 100644
---- a/drivers/net/ethernet/ti/cpsw.c
-+++ b/drivers/net/ethernet/ti/cpsw.c
-@@ -248,7 +248,8 @@ struct cpsw_ss_regs {
- #define TS_131              (1<<11) /* Time Sync Dest IP Addr 131 enable */
- #define TS_130              (1<<10) /* Time Sync Dest IP Addr 130 enable */
- #define TS_129              (1<<9)  /* Time Sync Dest IP Addr 129 enable */
--#define TS_BIT8             (1<<8)  /* ts_ttl_nonzero? */
-+#define TS_TTL_NONZERO      (1<<8)  /* Time Sync Time To Live Non-zero enable */
-+#define TS_ANNEX_F_EN       (1<<6)  /* Time Sync Annex F enable */
- #define TS_ANNEX_D_EN       (1<<4)  /* Time Sync Annex D enable */
- #define TS_LTYPE2_EN        (1<<3)  /* Time Sync LTYPE 2 enable */
- #define TS_LTYPE1_EN        (1<<2)  /* Time Sync LTYPE 1 enable */
-@@ -256,8 +257,9 @@ struct cpsw_ss_regs {
- #define TS_RX_EN            (1<<0)  /* Time Sync Receive Enable */
+diff --git a/drivers/clk/ti/clk-43xx.c b/drivers/clk/ti/clk-43xx.c
+index 67c8de5..b4877e0 100644
+--- a/drivers/clk/ti/clk-43xx.c
++++ b/drivers/clk/ti/clk-43xx.c
+@@ -110,9 +110,25 @@ static struct ti_dt_clk am43xx_clks[] = {
  
- #define CTRL_TS_BITS \
--	(TS_320 | TS_319 | TS_132 | TS_131 | TS_130 | TS_129 | TS_BIT8 | \
--	 TS_ANNEX_D_EN | TS_LTYPE1_EN)
-+	(TS_320 | TS_319 | TS_132 | TS_131 | TS_130 | TS_129 |\
-+	 TS_TTL_NONZERO | TS_ANNEX_F_EN | TS_ANNEX_D_EN |\
-+	 TS_LTYPE1_EN)
+ int __init am43xx_dt_clk_init(void)
+ {
++	struct clk *clk1, *clk2;
++
+ 	ti_dt_clocks_register(am43xx_clks);
  
- #define CTRL_ALL_TS_MASK (CTRL_TS_BITS | TS_TX_EN | TS_RX_EN)
- #define CTRL_TX_TS_BITS  (CTRL_TS_BITS | TS_TX_EN)
+ 	omap2_clk_disable_autoidle_all();
+ 
++	/*
++	 * cpsw_cpts_rft_clk  has got the choice of 3 clocksources
++	 * dpll_core_m4_ck, dpll_core_m5_ck and dpll_disp_m2_ck.
++	 * By default dpll_core_m4_ck is selected, witn this as clock
++	 * source the CPTS doesnot work properly. It gives clockcheck errors
++	 * while running PTP.
++	 * clockcheck: clock jumped backward or running slower than expected!
++	 * By selecting dpll_core_m5_ck as the clocksource fixes this issue.
++	 * In AM335x dpll_core_m5_ck is the default clocksource.
++	 */
++	clk1 = clk_get_sys(NULL, "cpsw_cpts_rft_clk");
++	clk2 = clk_get_sys(NULL, "dpll_core_m5_ck");
++	clk_set_parent(clk1, clk2);
++
+ 	return 0;
+ }
 -- 
 1.8.3.1
