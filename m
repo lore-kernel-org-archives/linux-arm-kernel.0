@@ -1,52 +1,51 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Mon, 28 Apr 2014 12:56:04 -0500
-Subject: [PATCH 15/16] ARM: l2c: convert socfpga to generic l2c
- initialisation
-In-Reply-To: <E1WeotT-0002QK-Em@rmk-PC.arm.linux.org.uk>
-References: <20140428165631.GM26756@n2100.arm.linux.org.uk>
- <E1WeotT-0002QK-Em@rmk-PC.arm.linux.org.uk>
-Message-ID: <1398707764.20739.1.camel@linux-builds1>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 28 Apr 2014 13:02:28 -0500
+Subject: [PATCH 01/10] of: Keep track of populated platform devices
+In-Reply-To: <1398707877-22596-2-git-send-email-pawel.moll@arm.com>
+References: <1398707877-22596-1-git-send-email-pawel.moll@arm.com>
+ <1398707877-22596-2-git-send-email-pawel.moll@arm.com>
+Message-ID: <CAL_JsqJxWoxNL=P0SJm+Q1rTRGTpMkzmzTJDbFq2P1vPH4XxZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-04-28 at 17:59 +0100, Russell King wrote:
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+On Mon, Apr 28, 2014 at 12:57 PM, Pawel Moll <pawel.moll@arm.com> wrote:
+> In "Device Tree powered" systems, platform devices are usually
+> massively populated with of_platform_populate() call, executed
+> at some level of initcalls, either by generic architecture
+> or by platform-specific code.
+>
+> There are situations though where certain devices must be
+> created (and bound with drivers) before all the others.
+> This presents a challenge, as devices created explicitly
+> would be created again by of_platform_populate().
+>
+> This patch tries to solve that issue in a generic way,
+> adding a "populated" flag for a DT node description.
+> Once set, this device will never be created again via
+> of_* API, so of_platform_populate() will skip such nodes
+> (and its children) in a similar way to the non-available
+> ones.
+>
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 > ---
->  arch/arm/mach-socfpga/socfpga.c | 9 ++-------
->  1 file changed, 2 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
-> index 9bbb8177f247..adbf38314ca8 100644
-> --- a/arch/arm/mach-socfpga/socfpga.c
-> +++ b/arch/arm/mach-socfpga/socfpga.c
-> @@ -98,22 +98,17 @@ static void socfpga_cyclone5_restart(enum reboot_mode mode, const char *cmd)
->  	writel(temp, rst_manager_base_addr + SOCFPGA_RSTMGR_CTRL);
->  }
->  
-> -static void __init socfpga_cyclone5_init(void)
-> -{
-> -	l2x0_of_init(0, ~0);
-> -	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> -}
-> -
->  static const char *altera_dt_match[] = {
->  	"altr,socfpga",
->  	NULL
->  };
->  
->  DT_MACHINE_START(SOCFPGA, "Altera SOCFPGA")
-> +	.l2c_aux_val	= 0,
-> +	.l2c_aux_mask	= ~0,
->  	.smp		= smp_ops(socfpga_smp_ops),
->  	.map_io		= socfpga_map_io,
->  	.init_irq	= socfpga_init_irq,
-> -	.init_machine	= socfpga_cyclone5_init,
->  	.restart	= socfpga_cyclone5_restart,
->  	.dt_compat	= altera_dt_match,
->  MACHINE_END
+>  drivers/of/platform.c | 10 ++++++++--
+>  include/linux/of.h    |  1 +
+>  2 files changed, 9 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> index 404d1da..0ae757a 100644
+> --- a/drivers/of/platform.c
+> +++ b/drivers/of/platform.c
+> @@ -204,7 +204,8 @@ static struct platform_device *of_platform_device_create_pdata(
+>  {
+>         struct platform_device *dev;
+>
+> -       if (!of_device_is_available(np))
+> +       if (!of_device_is_available(np) ||
+> +                       of_node_check_flag(np, OF_POPULATED))
 
-Thanks so much for doing this.
+This and the amba case should be a test_and_set operation to avoid a
+race condition.
 
-Tested-by: Dinh Nguyen <dinguyen@altera.com>
-
-Dinh
+Rob
