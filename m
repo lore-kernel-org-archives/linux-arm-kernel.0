@@ -1,19 +1,35 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Mon, 28 Apr 2014 08:55:29 +0200
-Subject: [PATCH 1/6] drivers: net: cpts: Remove hardcoded clock name for
- CPTS
-In-Reply-To: <1398658225-25873-2-git-send-email-george.cherian@ti.com>
-References: <1398658225-25873-1-git-send-email-george.cherian@ti.com>
- <1398658225-25873-2-git-send-email-george.cherian@ti.com>
-Message-ID: <20140428065529.GA4380@netboy>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Mon, 28 Apr 2014 14:53:50 +0800
+Subject: [PATCH v4 12/14] ARM: hisi: enable erratum 798181 of A15 on HiP04
+In-Reply-To: <1398668032-8335-1-git-send-email-haojian.zhuang@linaro.org>
+References: <1398668032-8335-1-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1398668032-8335-13-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 09:40:20AM +0530, George Cherian wrote:
-> CPTS refclk name is hardcoded, which makes it fail in case of DRA7x
-> Remove the hardcoded clock name for CPTS refclk and get the same from DT.
+From: Kefeng Wang <kefeng.wang@linaro.org>
 
-Patch ordering - doesn't this patch depend on patch #2?
+The commit 93dc688 (ARM: 7684/1: errata: Workaround for Cortex-A15
+erratum 798181 (TLBI/DSB operations)) introduced a workaround for
+Cortex-A15 erratum 798181. Enable it for HIP04(Cortex-a15 r3p2).
 
-Thanks,
-Richard
+Signed-off-by: Kefeng Wang <kefeng.wang@linaro.org>
+Singed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+---
+ arch/arm/mach-hisi/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/mach-hisi/Kconfig b/arch/arm/mach-hisi/Kconfig
+index 17af1d2..5c0602d 100644
+--- a/arch/arm/mach-hisi/Kconfig
++++ b/arch/arm/mach-hisi/Kconfig
+@@ -21,6 +21,7 @@ config ARCH_HI3xxx
+ 
+ config ARCH_HIP04
+ 	bool "Hisilicon HiP04 Cortex A15 family" if ARCH_MULTI_V7_LPAE
++	select ARM_ERRATA_798181 if SMP
+ 	select HAVE_ARM_ARCH_TIMER
+ 	select MCPM if SMP
+ 	select MCPM_QUAD_CLUSTER if SMP
+-- 
+1.9.1
