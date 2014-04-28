@@ -1,34 +1,55 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 28 Apr 2014 20:33:16 +0100
-Subject: [PATCH 83/97] ARM: l2c: imx: remove direct write to power control
- register
+Date: Mon, 28 Apr 2014 20:33:21 +0100
+Subject: [PATCH 84/97] ARM: l2c: omap2: avoid reading directly from the L2
+ registers in platform code
 In-Reply-To: <20140428192419.GV26756@n2100.arm.linux.org.uk>
 References: <20140428192419.GV26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WerIi-0001ZL-2w@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WerIn-0001ZP-6I@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we handle this in core code, we don't need platforms enabling
-the low power modes directly.
+Avoid reading directly from the L2 registers in platform code.  The L2
+code will have already saved the register values itself into the
+l2x0_saved_regs structure, so platform code should just move these
+values to where they're required.
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+This is safe because the L2x0 will have been initialised by an early
+initcall, whereas the OMAP4 PM code is initialised late.
+
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-imx/system.c | 2 --
- 1 file changed, 2 deletions(-)
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c | 16 ++++++----------
+ 1 file changed, 6 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mach-imx/system.c b/arch/arm/mach-imx/system.c
-index 59013a81107b..3b0733edb68c 100644
---- a/arch/arm/mach-imx/system.c
-+++ b/arch/arm/mach-imx/system.c
-@@ -138,8 +138,6 @@ void __init imx_init_l2cache(void)
- 	if (cpu_is_imx6q())
- 		val &= ~(1 << 30 | 1 << 23);
- 	writel_relaxed(val, l2x0_base + L310_PREFETCH_CTRL);
--	val = L310_DYNAMIC_CLK_GATING_EN | L310_STNDBY_MODE_EN;
--	writel_relaxed(val, l2x0_base + L310_POWER_CTRL);
+diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+index ba43f49fbb59..61cb77f8cf12 100644
+--- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
++++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+@@ -187,19 +187,15 @@ static void l2x0_pwrst_prepare(unsigned int cpu_id, unsigned int save_state)
+  * in every restore MPUSS OFF path.
+  */
+ #ifdef CONFIG_CACHE_L2X0
+-static void save_l2x0_context(void)
++static void __init save_l2x0_context(void)
+ {
+-	u32 val;
+-	void __iomem *l2x0_base = omap4_get_l2cache_base();
+-	if (l2x0_base) {
+-		val = __raw_readl(l2x0_base + L2X0_AUX_CTRL);
+-		__raw_writel(val, sar_base + L2X0_AUXCTRL_OFFSET);
+-		val = __raw_readl(l2x0_base + L310_PREFETCH_CTRL);
+-		__raw_writel(val, sar_base + L2X0_PREFETCH_CTRL_OFFSET);
+-	}
++	__raw_writel(l2x0_saved_regs.aux_ctrl,
++		     sar_base + L2X0_AUXCTRL_OFFSET);
++	__raw_writel(l2x0_saved_regs.prefetch_ctrl,
++		     sar_base + L2X0_PREFETCH_CTRL_OFFSET);
+ }
+ #else
+-static void save_l2x0_context(void)
++static void __init save_l2x0_context(void)
+ {}
+ #endif
  
- 	iounmap(l2x0_base);
- 	of_node_put(np);
 -- 
 1.8.3.1
