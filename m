@@ -1,24 +1,29 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 28 Apr 2014 11:28:00 -0600
-Subject: [PATCH 07/16] ARM: l2c: convert tegra to generic l2c
+From: mporter@linaro.org (Matt Porter)
+Date: Mon, 28 Apr 2014 13:34:35 -0400
+Subject: [PATCH 08/16] ARM: l2c: convert prima2 to generic l2c
  initialisation
-In-Reply-To: <E1Weoso-0002Pj-LE@rmk-PC.arm.linux.org.uk>
+In-Reply-To: <E1Weost-0002Pn-OT@rmk-PC.arm.linux.org.uk>
 References: <20140428165631.GM26756@n2100.arm.linux.org.uk>
- <E1Weoso-0002Pj-LE@rmk-PC.arm.linux.org.uk>
-Message-ID: <535E8FA0.6040205@wwwdotorg.org>
+ <E1Weost-0002Pn-OT@rmk-PC.arm.linux.org.uk>
+Message-ID: <20140428173435.GE7719@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/28/2014 10:58 AM, Russell King wrote:
+On Mon, Apr 28, 2014 at 05:58:27PM +0100, Russell King wrote:
+> Along with this change, we can delete l2x0.c from prima2.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  arch/arm/mach-prima2/Makefile |  1 -
+>  arch/arm/mach-prima2/common.c |  6 ++++++
+>  arch/arm/mach-prima2/l2x0.c   | 17 -----------------
+>  3 files changed, 6 insertions(+), 18 deletions(-)
+>  delete mode 100644 arch/arm/mach-prima2/l2x0.c
 
-> diff --git a/arch/arm/mach-tegra/tegra.c b/arch/arm/mach-tegra/tegra.c
+I can confirm that this approach fixes the boot failure on bcm281xx and
+bcm21664 against the previous set of l2c patches in -next.
 
->  DT_MACHINE_START(TEGRA_DT, "NVIDIA Tegra SoC (Flattened Device Tree)")
-> -	.map_io		= tegra_map_common_io,
->  	.smp		= smp_ops(tegra_smp_ops),
-> +	.l2c_aux_val	= 0x3c400001,
-> +	.l2c_aux_mask	= 0xc20fc3fe,
-> +	.map_io		= tegra_map_common_io,
+Tested-by: Matt Porter <mporter@linaro.org>
 
-I'm not sure why .map_io was moved. Was it to sort the entries in order
-of execution? If so, I assume that .smp should be moved too?
+Thanks,
+Matt
