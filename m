@@ -1,295 +1,67 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Mon, 28 Apr 2014 14:55:32 +0530
-Subject: [PATCH v9 4/4] usb: ehci-exynos: Change to use phy provided by the
- generic phy framework
-In-Reply-To: <1398677132-30600-1-git-send-email-gautam.vivek@samsung.com>
-References: <1398677132-30600-1-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <1398677132-30600-5-git-send-email-gautam.vivek@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 28 Apr 2014 10:29:48 +0100
+Subject: [PATCH 2/4] mfd: bcm590xx: add support for second i2c slave
+ address space
+In-Reply-To: <20140423220500.GA1127@beef>
+References: <1397501428-8857-1-git-send-email-mporter@linaro.org>
+ <1397501428-8857-3-git-send-email-mporter@linaro.org>
+ <20140416110603.GA19671@lee--X1>
+ <20140416213141.GD12304@sirena.org.uk>
+ <20140417065753.GC28725@lee--X1> <20140417222616.GK23695@beef>
+ <20140422082139.GF17657@lee--X1> <20140423220126.GC4164@beef>
+ <20140423220500.GA1127@beef>
+Message-ID: <20140428092947.GN6264@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kamil Debski <k.debski@samsung.com>
+> > > > > > > s/regmap/Regmap
+> > > > > > 
+> > > > > > It's consistently written regmap in all the documentation and so on :)
+> > > > > 
+> > > > > Furry muff; but the comments still stand for the acronyms.
+> > > > > 
+> > > > > > > addmap{0,1} doesn't quite sit right with me.
+> > > > > > 
+> > > > > > > REVISIT: Ah, it's address-map, rather than add map. Okay, not as bad
+> > > > > > > as I first thought, but still, is there a better naming convention you
+> > > > > > > could use?
+> > > > > > 
+> > > > > > addrmap or something?
+> > > > > 
+> > > > > Right, that was what I was thinking. However, I prefer something along
+> > > > > the lines of 'i2c' and 'i2c_sec' or 'client' and 'client_slv' etc.
+> > > > 
+> > > > FWIW, the reason it's addmap{0,1} is that the datasheet has documents
+> > > > ADDMAP=0 and the first bank of registers and ADDMAP=1 as the second bank
+> > > > of registers. I adopted that to match the docs for the part.
+> > > > 
+> > > > I guess we could do i2c and i2c_sec, I'll just have to put a comment
+> > > > correlating it to the h/w. Calling it 'slv' implies something else
+> > > > so we should avoid that here. The notion of a "secondary" i2c device
+> > > > is completely a Linux I2C subsystem fabrication which wouldn't exist
+> > > > if it allowed multiple slave addresses per device. From a h/w
+> > > > perspective there is really no primary and secondary relationship.
+> > > > 
+> > > > I'm fine with i2c/i2c_sec or addrmap0/1 and I will just comment to
+> > > > correlate with the datasheet..pick one.
+> > > 
+> > > Let's stick method fabricated by the I2C subsystem. It may seem strange
+> > > from a h/w perspective, but it is the way we (you) have coded it, as
+> > > the first parameter of i2c_new_dummy() is the 'managing' (primary,
+> > > parent, master, whatever) device, so '_sec' would suit as an
+> > > identifying appendage for the resultant device.
+> > 
+> > That works, I'll also switch to addrmap_[pri|sec] which touches the
+> > regulator driver as well. That will keep the relationship  between device
+> > and regmap clear.
+> 
+> Misspoke...I'm switching regmap[0|1] to regmap_[pri|sec] to keep that
+> synced with i2c_[pri|sec]
 
-Add the phy provider, supplied by new Exynos-usb2phy using
-Generic phy framework.
-Keeping the support for older USB phy intact right now, in order
-to prevent any functionality break in absence of relevant
-device tree side change for ehci-exynos.
-Once we move to new phy in the device nodes for ehci, we can
-remove the support for older phys.
+Sounds good, thanks Matt.
 
-Signed-off-by: Kamil Debski <k.debski@samsung.com>
-[gautam.vivek at samsung.com: Addressed review comments from mailing list]
-[gautam.vivek at samsung.com: Kept the code for old usb-phy, and just
-added support for new exynos5-usb2phy in generic phy framework]
-[gautam.vivek at samsung.com: Edited the commit message]
-Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
-Cc: Jingoo Han <jg1.han@samsung.com>
-Cc: Alan Stern <stern@rowland.harvard.edu>
----
- .../devicetree/bindings/usb/exynos-usb.txt         |   18 +++
- drivers/usb/host/ehci-exynos.c                     |  143 +++++++++++++++++---
- 2 files changed, 141 insertions(+), 20 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/usb/exynos-usb.txt b/Documentation/devicetree/bindings/usb/exynos-usb.txt
-index 03b7e43..4f368b0 100644
---- a/Documentation/devicetree/bindings/usb/exynos-usb.txt
-+++ b/Documentation/devicetree/bindings/usb/exynos-usb.txt
-@@ -12,6 +12,15 @@ Required properties:
-  - interrupts: interrupt number to the cpu.
-  - clocks: from common clock binding: handle to usb clock.
-  - clock-names: from common clock binding: Shall be "usbhost".
-+ - port: if in the SoC there are EHCI phys, they should be listed here.
-+   One phy per port. Each port should have its 'reg' entry.
-+	- reg: port number on EHCI controller, e.g
-+	       On Exynos5250, port 0 is USB2.0 otg phy
-+			      port 1 is HSIC phy0
-+			      port 2 is HSIC phy1
-+	- phys: from the *Generic PHY* bindings; specifying phy used by port.
-+	- phy-names: from the *Generic PHY* bindings; specifying name of phy
-+		     used by the port.
- 
- Optional properties:
-  - samsung,vbus-gpio:  if present, specifies the GPIO that
-@@ -27,6 +36,15 @@ Example:
- 
- 		clocks = <&clock 285>;
- 		clock-names = "usbhost";
-+
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		port at 0 {
-+		    reg = <0>;
-+		    phys = <&usb2phy 1>;
-+		    phy-names = "host";
-+		    status = "disabled";
-+		};
- 	};
- 
- OHCI
-diff --git a/drivers/usb/host/ehci-exynos.c b/drivers/usb/host/ehci-exynos.c
-index 4d763dc..caeadb4 100644
---- a/drivers/usb/host/ehci-exynos.c
-+++ b/drivers/usb/host/ehci-exynos.c
-@@ -19,6 +19,7 @@
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/of_gpio.h>
-+#include <linux/phy/phy.h>
- #include <linux/platform_device.h>
- #include <linux/usb/phy.h>
- #include <linux/usb/samsung_usb_phy.h>
-@@ -42,14 +43,119 @@
- static const char hcd_name[] = "ehci-exynos";
- static struct hc_driver __read_mostly exynos_ehci_hc_driver;
- 
-+#define PHY_NUMBER 3
- struct exynos_ehci_hcd {
- 	struct clk *clk;
- 	struct usb_phy *phy;
- 	struct usb_otg *otg;
-+	struct phy *phy_g[PHY_NUMBER];
- };
- 
- #define to_exynos_ehci(hcd) (struct exynos_ehci_hcd *)(hcd_to_ehci(hcd)->priv)
- 
-+static int exynos_ehci_get_phy(struct device *dev,
-+				struct exynos_ehci_hcd *exynos_ehci)
-+{
-+	struct device_node *child;
-+	struct phy *phy;
-+	int phy_number;
-+	int ret = 0;
-+
-+	exynos_ehci->phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
-+	if (IS_ERR(exynos_ehci->phy)) {
-+		ret = PTR_ERR(exynos_ehci->phy);
-+		/* This is the case when PHY config is disabled */
-+		if (ret == -ENXIO || ret == -ENODEV) {
-+			dev_dbg(dev, "Failed to get usb2 phy\n");
-+			exynos_ehci->phy = NULL;
-+			ret = 0;
-+		} else if (ret == -EPROBE_DEFER) {
-+			goto fail_phy;
-+		} else {
-+			dev_err(dev, "no usb2 phy configured\n");
-+			goto fail_phy;
-+		}
-+	} else {
-+		exynos_ehci->otg = exynos_ehci->phy->otg;
-+	}
-+
-+	for_each_available_child_of_node(dev->of_node, child) {
-+		ret = of_property_read_u32(child, "reg", &phy_number);
-+		if (ret) {
-+			dev_err(dev, "Failed to parse device tree\n");
-+			of_node_put(child);
-+			goto fail_phy;
-+		}
-+		if (phy_number >= PHY_NUMBER) {
-+			dev_err(dev, "Invalid number of PHYs\n");
-+			of_node_put(child);
-+			ret = -EINVAL;
-+			goto fail_phy;
-+		}
-+		phy = devm_of_phy_get(dev, child, 0);
-+		of_node_put(child);
-+		if (IS_ERR(phy)) {
-+			ret = PTR_ERR(phy);
-+			/* This is the case when PHY config is disabled */
-+			if (ret == -ENOSYS || ret == -ENODEV) {
-+				dev_dbg(dev, "Failed to get usb2 phy\n");
-+				phy = NULL;
-+				ret = 0;
-+			} else if (ret == -EPROBE_DEFER) {
-+				goto fail_phy;
-+			} else {
-+				dev_err(dev, "no usb2 phy configured\n");
-+				goto fail_phy;
-+			}
-+		}
-+		exynos_ehci->phy_g[phy_number] = phy;
-+	}
-+
-+fail_phy:
-+	return ret;
-+}
-+
-+static int exynos_ehci_phy_enable(struct device *dev)
-+{
-+	struct usb_hcd *hcd = dev_get_drvdata(dev);
-+	struct exynos_ehci_hcd *exynos_ehci = to_exynos_ehci(hcd);
-+	int i;
-+	int ret = 0;
-+
-+	if (exynos_ehci->phy) {
-+		ret = usb_phy_init(exynos_ehci->phy);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	for (i = 0; ret == 0 && i < PHY_NUMBER; i++)
-+		if (exynos_ehci->phy_g[i])
-+			ret = phy_power_on(exynos_ehci->phy_g[i]);
-+	if (ret)
-+		for (i--; i >= 0; i--)
-+			if (exynos_ehci->phy_g[i])
-+				phy_power_off(exynos_ehci->phy_g[i]);
-+
-+	return ret;
-+}
-+
-+static int exynos_ehci_phy_disable(struct device *dev)
-+{
-+	struct usb_hcd *hcd = dev_get_drvdata(dev);
-+	struct exynos_ehci_hcd *exynos_ehci = to_exynos_ehci(hcd);
-+	int i;
-+	int ret = 0;
-+
-+	if (exynos_ehci->phy)
-+		usb_phy_shutdown(exynos_ehci->phy);
-+
-+	for (i = 0; i < PHY_NUMBER; i++)
-+		if (exynos_ehci->phy_g[i])
-+			ret = phy_power_off(exynos_ehci->phy_g[i]);
-+
-+	return ret;
-+}
-+
- static void exynos_setup_vbus_gpio(struct device *dev)
- {
- 	int err;
-@@ -74,7 +180,6 @@ static int exynos_ehci_probe(struct platform_device *pdev)
- 	struct usb_hcd *hcd;
- 	struct ehci_hcd *ehci;
- 	struct resource *res;
--	struct usb_phy *phy;
- 	int irq;
- 	int err;
- 
-@@ -101,15 +206,9 @@ static int exynos_ehci_probe(struct platform_device *pdev)
- 					"samsung,exynos5440-ehci"))
- 		goto skip_phy;
- 
--	phy = devm_usb_get_phy(&pdev->dev, USB_PHY_TYPE_USB2);
--	if (IS_ERR(phy)) {
--		usb_put_hcd(hcd);
--		dev_warn(&pdev->dev, "no platform data or transceiver defined\n");
--		return -EPROBE_DEFER;
--	} else {
--		exynos_ehci->phy = phy;
--		exynos_ehci->otg = phy->otg;
--	}
-+	err = exynos_ehci_get_phy(&pdev->dev, exynos_ehci);
-+	if (err)
-+		goto fail_clk;
- 
- skip_phy:
- 
-@@ -151,8 +250,11 @@ skip_phy:
- 	if (exynos_ehci->otg)
- 		exynos_ehci->otg->set_host(exynos_ehci->otg, &hcd->self);
- 
--	if (exynos_ehci->phy)
--		usb_phy_init(exynos_ehci->phy);
-+	err = exynos_ehci_phy_enable(&pdev->dev);
-+	if (err) {
-+		dev_err(&pdev->dev, "Failed to enable USB phy\n");
-+		goto fail_io;
-+	}
- 
- 	ehci = hcd_to_ehci(hcd);
- 	ehci->caps = hcd->regs;
-@@ -172,8 +274,7 @@ skip_phy:
- 	return 0;
- 
- fail_add_hcd:
--	if (exynos_ehci->phy)
--		usb_phy_shutdown(exynos_ehci->phy);
-+	exynos_ehci_phy_disable(&pdev->dev);
- fail_io:
- 	clk_disable_unprepare(exynos_ehci->clk);
- fail_clk:
-@@ -191,8 +292,7 @@ static int exynos_ehci_remove(struct platform_device *pdev)
- 	if (exynos_ehci->otg)
- 		exynos_ehci->otg->set_host(exynos_ehci->otg, &hcd->self);
- 
--	if (exynos_ehci->phy)
--		usb_phy_shutdown(exynos_ehci->phy);
-+	exynos_ehci_phy_disable(&pdev->dev);
- 
- 	clk_disable_unprepare(exynos_ehci->clk);
- 
-@@ -217,8 +317,7 @@ static int exynos_ehci_suspend(struct device *dev)
- 	if (exynos_ehci->otg)
- 		exynos_ehci->otg->set_host(exynos_ehci->otg, &hcd->self);
- 
--	if (exynos_ehci->phy)
--		usb_phy_shutdown(exynos_ehci->phy);
-+	exynos_ehci_phy_disable(dev);
- 
- 	clk_disable_unprepare(exynos_ehci->clk);
- 
-@@ -229,14 +328,18 @@ static int exynos_ehci_resume(struct device *dev)
- {
- 	struct usb_hcd *hcd = dev_get_drvdata(dev);
- 	struct exynos_ehci_hcd *exynos_ehci = to_exynos_ehci(hcd);
-+	int ret;
- 
- 	clk_prepare_enable(exynos_ehci->clk);
- 
- 	if (exynos_ehci->otg)
- 		exynos_ehci->otg->set_host(exynos_ehci->otg, &hcd->self);
- 
--	if (exynos_ehci->phy)
--		usb_phy_init(exynos_ehci->phy);
-+	ret = exynos_ehci_phy_enable(dev);
-+	if (ret) {
-+		dev_err(dev, "Failed to enable USB phy\n");
-+		return ret;
-+	}
- 
- 	/* DMA burst Enable */
- 	writel(EHCI_INSNREG00_ENABLE_DMA_BURST, EHCI_INSNREG00(hcd->regs));
 -- 
-1.7.10.4
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
