@@ -1,88 +1,35 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Mon, 28 Apr 2014 09:36:12 +0530
-Subject: [PATCH v2 1/2] usb: ohci-exynos: Add facility to use phy provided
- by the generic phy framework
-In-Reply-To: <Pine.LNX.4.44L0.1404251031260.1140-100000@iolanthe.rowland.org>
-References: <1398424683-20168-2-git-send-email-gautam.vivek@samsung.com>
- <Pine.LNX.4.44L0.1404251031260.1140-100000@iolanthe.rowland.org>
-Message-ID: <CAFp+6iG2s5Ddj2F2Xfy3fm9VyW7_G-+YDpeL3iVhur3gng7KvA@mail.gmail.com>
+From: george.cherian@ti.com (George Cherian)
+Date: Mon, 28 Apr 2014 09:40:19 +0530
+Subject: [PATCH 0/6] Add CPTS support for AM437x
+Message-ID: <1398658225-25873-1-git-send-email-george.cherian@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The series adds CPTS support for AM4372.
 
+Patch 1 - CPTS clock name harcoding in the driver is removed. 
+	  Easier to pass the clock name from dt rather than hardcoding in driver.
+	  Also in prepration for DRA7x CPTS support.
+Patch 2 - DT changes w.r.t clock changes for AM33xx.
+Patch 3 - Enable the CPTS support for both DRA7x and AM4372 in the driver.
+Patch 4 - Enable the Annexe F for L2 PTP for AM437x and DRA7x.
+Patch 5 - Change the default clocksource to dpll_core_m5 
+Patch 6 - DT changes for AM4372.
+ 
+George Cherian (6):
+  drivers: net: cpts: Remove hardcoded clock name for CPTS
+  ARM: dts: am33xx: Add clock names for cpsw and cpts
+  drivers: net: cpsw: Enable CPTS for DRA7xx and AM4372
+  drivers: net: cpsw: Enable Annexe F Time sync
+  ARM: AM43xx: clk: Change the cpts ref clock source to dpll_core_m5 clk
+  ARM: dts: am4372: Add clock names for cpsw and cpts
 
-On Fri, Apr 25, 2014 at 8:06 PM, Alan Stern <stern@rowland.harvard.edu> wrote:
-> On Fri, 25 Apr 2014, Vivek Gautam wrote:
->
->> Add support to consume phy provided by Generic phy framework.
->> Keeping the support for older usb-phy intact right now, in order
->> to prevent any functionality break in absence of relevant
->> device tree side change for ohci-exynos.
->> Once we move to new phy in the device nodes for ohci, we can
->> remove the support for older phys.
->>
->> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
->> Cc: Jingoo Han <jg1.han@samsung.com>
->> Cc: Alan Stern <stern@rowland.harvard.edu>
->
->
->> +static int exynos_ohci_phyg_on(struct phy *phy[])
->> +{
->> +     int i;
->> +     int ret = 0;
->> +
->> +     for (i = 0; ret == 0 && i < PHY_NUMBER; i++)
->> +             if (phy[i])
->> +                     ret = phy_power_on(phy[i]);
->> +     if (ret)
->> +             for (i--; i >= 0; i--)
->> +                     if (phy[i])
->> +                             phy_power_off(phy[i]);
->> +
->> +     return ret;
->> +}
->> +
->> +static int exynos_ohci_phyg_off(struct phy *phy[])
->> +{
->> +     int i;
->> +     int ret = 0;
->> +
->> +     for (i = 0; ret == 0 && i < PHY_NUMBER; i++)
->> +             if (phy[i])
->> +                     ret = phy_power_off(phy[i]);
->> +
->> +     return ret;
->> +}
->
-> You probably shouldn't break out of this loop if ret is nonzero; you
-> should continue to power off the remaining phys.
-
-ok, will remove the 'ret' check in for loop.
-
->
-> I'd be inclined to put these two routines directly into
-> exynos_ohci_phy_enable() and exynos_ohci_phy_disable(), since they
-> aren't used anywhere else.
-
-Sure, will make these routines as a part of exynos_ohci_phy_enable()
-and exynos_ohci_phy_disable().
-
->
->> @@ -151,6 +253,7 @@ skip_phy:
->>
->>  fail_add_hcd:
->>       exynos_ohci_phy_disable(pdev);
->> +     exynos_ohci_phyg_off(exynos_ohci->phy_g);
->
-> Why did you add this line?  It doesn't do anything useful, because
-> exynos_ohci_phy_disable() already calls exynos_ohci_phyg_off().
-
-Ah ! my bad, will remove this.
-
+ arch/arm/boot/dts/am33xx.dtsi  |  2 ++
+ arch/arm/boot/dts/am4372.dtsi  |  2 ++
+ drivers/clk/ti/clk-43xx.c      | 16 ++++++++++++++++
+ drivers/net/ethernet/ti/cpsw.c | 15 ++++++++++-----
+ drivers/net/ethernet/ti/cpts.c | 11 ++++-------
+ 5 files changed, 34 insertions(+), 12 deletions(-)
 
 -- 
-Best Regards
-Vivek Gautam
-Samsung R&D Institute, Bangalore
-India
+1.8.3.1
