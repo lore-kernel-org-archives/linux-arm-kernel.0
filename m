@@ -1,35 +1,57 @@
 From: george.cherian@ti.com (George Cherian)
-Date: Mon, 28 Apr 2014 09:40:19 +0530
-Subject: [PATCH 0/6] Add CPTS support for AM437x
-Message-ID: <1398658225-25873-1-git-send-email-george.cherian@ti.com>
+Date: Mon, 28 Apr 2014 09:40:20 +0530
+Subject: [PATCH 1/6] drivers: net: cpts: Remove hardcoded clock name for CPTS
+In-Reply-To: <1398658225-25873-1-git-send-email-george.cherian@ti.com>
+References: <1398658225-25873-1-git-send-email-george.cherian@ti.com>
+Message-ID: <1398658225-25873-2-git-send-email-george.cherian@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The series adds CPTS support for AM4372.
+CPTS refclk name is hardcoded, which makes it fail in case of DRA7x
+Remove the hardcoded clock name for CPTS refclk and get the same from DT.
 
-Patch 1 - CPTS clock name harcoding in the driver is removed. 
-	  Easier to pass the clock name from dt rather than hardcoding in driver.
-	  Also in prepration for DRA7x CPTS support.
-Patch 2 - DT changes w.r.t clock changes for AM33xx.
-Patch 3 - Enable the CPTS support for both DRA7x and AM4372 in the driver.
-Patch 4 - Enable the Annexe F for L2 PTP for AM437x and DRA7x.
-Patch 5 - Change the default clocksource to dpll_core_m5 
-Patch 6 - DT changes for AM4372.
- 
-George Cherian (6):
-  drivers: net: cpts: Remove hardcoded clock name for CPTS
-  ARM: dts: am33xx: Add clock names for cpsw and cpts
-  drivers: net: cpsw: Enable CPTS for DRA7xx and AM4372
-  drivers: net: cpsw: Enable Annexe F Time sync
-  ARM: AM43xx: clk: Change the cpts ref clock source to dpll_core_m5 clk
-  ARM: dts: am4372: Add clock names for cpsw and cpts
-
- arch/arm/boot/dts/am33xx.dtsi  |  2 ++
- arch/arm/boot/dts/am4372.dtsi  |  2 ++
- drivers/clk/ti/clk-43xx.c      | 16 ++++++++++++++++
- drivers/net/ethernet/ti/cpsw.c | 15 ++++++++++-----
+Signed-off-by: George Cherian <george.cherian@ti.com>
+---
  drivers/net/ethernet/ti/cpts.c | 11 ++++-------
- 5 files changed, 34 insertions(+), 12 deletions(-)
+ 1 file changed, 4 insertions(+), 7 deletions(-)
 
+diff --git a/drivers/net/ethernet/ti/cpts.c b/drivers/net/ethernet/ti/cpts.c
+index 2435139..0b6f6f7 100644
+--- a/drivers/net/ethernet/ti/cpts.c
++++ b/drivers/net/ethernet/ti/cpts.c
+@@ -236,13 +236,11 @@ static void cpts_overflow_check(struct work_struct *work)
+ 	schedule_delayed_work(&cpts->overflow_work, CPTS_OVERFLOW_PERIOD);
+ }
+ 
+-#define CPTS_REF_CLOCK_NAME "cpsw_cpts_rft_clk"
+-
+-static void cpts_clk_init(struct cpts *cpts)
++static void cpts_clk_init(struct device *dev, struct cpts *cpts)
+ {
+-	cpts->refclk = clk_get(NULL, CPTS_REF_CLOCK_NAME);
++	cpts->refclk = devm_clk_get(dev, "cpts");
+ 	if (IS_ERR(cpts->refclk)) {
+-		pr_err("Failed to clk_get %s\n", CPTS_REF_CLOCK_NAME);
++		pr_err("Failed to get cpts refclk\n");
+ 		cpts->refclk = NULL;
+ 		return;
+ 	}
+@@ -252,7 +250,6 @@ static void cpts_clk_init(struct cpts *cpts)
+ static void cpts_clk_release(struct cpts *cpts)
+ {
+ 	clk_disable(cpts->refclk);
+-	clk_put(cpts->refclk);
+ }
+ 
+ static int cpts_match(struct sk_buff *skb, unsigned int ptp_class,
+@@ -390,7 +387,7 @@ int cpts_register(struct device *dev, struct cpts *cpts,
+ 	for (i = 0; i < CPTS_MAX_EVENTS; i++)
+ 		list_add(&cpts->pool_data[i].list, &cpts->pool);
+ 
+-	cpts_clk_init(cpts);
++	cpts_clk_init(dev, cpts);
+ 	cpts_write32(cpts, CPTS_EN, control);
+ 	cpts_write32(cpts, TS_PEND_EN, int_enable);
+ 
 -- 
 1.8.3.1
