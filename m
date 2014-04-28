@@ -1,69 +1,138 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 28 Apr 2014 16:41:48 +0200
-Subject: [RFC 1/5] =?UTF-8?Q?mtd=3Afsl=5Fnfc=3A=20Nand=20flash=20contr?=
- =?UTF-8?Q?oller=20for=20VF=36=31=30=2C=20MPC=35=31=32=35=2C=20etc=2E?=
-In-Reply-To: <1389222441-4322-2-git-send-email-bpringlemeir@nbsps.com>
-References: <87siupheou.fsf@nbsps.com>
- <1389222441-4322-1-git-send-email-bpringlemeir@nbsps.com>
- <1389222441-4322-2-git-send-email-bpringlemeir@nbsps.com>
-Message-ID: <708e6f84e177e1d02310358688b44c53@agner.ch>
+From: george.cherian@ti.com (George Cherian)
+Date: Mon, 28 Apr 2014 20:11:33 +0530
+Subject: [PATCH 1/4] ARM: dts: am335x-bone-common: use phandles for USB
+ and DMA refs
+In-Reply-To: <1398693512-5355-1-git-send-email-guido@vanguardiasur.com.ar>
+References: <1398693512-5355-1-git-send-email-guido@vanguardiasur.com.ar>
+Message-ID: <535E689D.7010204@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bill,
+On 4/28/2014 7:28 PM, Guido Mart?nez wrote:
+> Use phandles instead of unit adresses to reference usb and dma nodes.
+> This makes the DT more robust and readable.
+The series will give dtb build errors
+Error: arch/arm/boot/dts/am335x-bone-common.dtsi:186.2-15 syntax error
+FATAL ERROR: Unable to parse input tree
+Error: arch/arm/boot/dts/am335x-evmsk.dts:367.2-15 syntax error
+FATAL ERROR: Unable to parse input tree
+make[1]: *** [arch/arm/boot/dts/am335x-bone.dtb] Error 1
+make[1]: *** Waiting for unfinished jobs....
+Error: arch/arm/boot/dts/am335x-evm.dts:334.2-15 syntax error
+FATAL ERROR: Unable to parse input tree
+make[1]: *** [arch/arm/boot/dts/am335x-evmsk.dtb] Error 1
+make[1]: *** [arch/arm/boot/dts/am335x-evm.dtb] Error 1
+Error: arch/arm/boot/dts/am335x-igep0033.dtsi:204.2-15 syntax error
+FATAL ERROR: Unable to parse input tree
+make[1]: *** [arch/arm/boot/dts/am335x-base0033.dtb] Error 1
+Error: arch/arm/boot/dts/am335x-bone-common.dtsi:186.2-15 syntax error
+FATAL ERROR: Unable to parse input tree
+make[1]: *** [arch/arm/boot/dts/am335x-boneblack.dtb] Error 1
+make: *** [dtbs] Error 2
 
-The driver works fine for me using 3.14 on Colibri VF61 (8-Bit bus
-width, Samsung NAND, 2k page size). Also tested with the Hardware ECC.
-Do you plan to send an update patch of the driver?
+>
+> Signed-off-by: Guido Mart?nez <guido@vanguardiasur.com.ar>
+> ---
+>   arch/arm/boot/dts/am335x-bone-common.dtsi | 12 ++++++------
+>   1 file changed, 6 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
+> index 2e7d932..b95bc9a 100644
+> --- a/arch/arm/boot/dts/am335x-bone-common.dtsi
+> +++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
+> @@ -183,28 +183,28 @@
+>   &usb {
+>   	status = "okay";
+>   
+> -	control at 44e10620 {
+> +	&usb_ctrl_mod {
+>   		status = "okay";
+>   	};
+>   
+> -	usb-phy at 47401300 {
+> +	&usb0_phy {
+>   		status = "okay";
+>   	};
+>   
+> -	usb-phy at 47401b00 {
+> +	&usb1_phy {
+>   		status = "okay";
+>   	};
+>   
+> -	usb at 47401000 {
+> +	&usb0 {
+>   		status = "okay";
+>   	};
+>   
+> -	usb at 47401800 {
+> +	&usb1 {
+>   		status = "okay";
+>   		dr_mode = "host";
+>   	};
+>   
+> -	dma-controller at 47402000  {
+> +	&cppi41dma  {
+>   		status = "okay";
+>   	};
+>   };
+Instead the patch should be
 
-FYI, I ported the driver to U-Boot and will send a patch to the U-Boot
-mailing list soon.
+      diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi 
+b/arch/arm/boot/dts/am335x-bone-common.dtsi
+      index 2e7d932..06be20a 100644
+      --- a/arch/arm/boot/dts/am335x-bone-common.dtsi
+      +++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
+      @@ -182,31 +182,30 @@
 
-Some minor comments below:
+       &usb {
+              status = "okay";
+      +};
+      +&usb_ctrl_mod {
+      +       status = "okay";
+      +};
 
-Am 2014-01-09 00:07, schrieb Bill Pringlemeir:
-<snip>
-> +static u8 bbt_pattern[] = {'B', 'b', 't', '0' };
-> +static u8 mirror_pattern[] = {'1', 't', 'b', 'B' };
-> +
-> +static struct nand_bbt_descr bbt_main_descr = {
-> +	.options = NAND_BBT_LASTBLOCK | NAND_BBT_CREATE | NAND_BBT_WRITE |
-> +		   NAND_BBT_2BIT | NAND_BBT_VERSION,
-> +	.offs =	11,
-> +	.len = 4,
-> +	.veroffs = 15,
-> +	.maxblocks = 4,
-> +	.pattern = bbt_pattern,
-> +};
-> +
-> +static struct nand_bbt_descr bbt_mirror_descr = {
-> +	.options = NAND_BBT_LASTBLOCK | NAND_BBT_CREATE | NAND_BBT_WRITE |
-> +		   NAND_BBT_2BIT | NAND_BBT_VERSION,
-> +	.offs =	11,
-> +	.len = 4,
-> +	.veroffs = 15,
-> +	.maxblocks = 4,
-> +	.pattern = mirror_pattern,
-> +};
+      -       control at 44e10620 {
+      -               status = "okay";
+      -       };
+      -
+      -       usb-phy at 47401300 {
+      -               status = "okay";
+      -       };
+      +&usb0_phy {
+      +       status = "okay";
+      +};
 
-This is the same BBT descriptor as used on Timesys Vybrid BSP. Other
-than this "backward compatibility", is there another reason to use non
-default BBT descriptor? As far as I can tell, the ECC does not conflict
-with the default BBT description.
+      -       usb-phy at 47401b00 {
+      -               status = "okay";
+      -       };
+      +&usb1_phy {
+      +       status = "okay";
+      +};
 
-> +/* Write data to NFC buffers */
-> +static void nfc_write_buf(struct mtd_info *mtd, const u_char *buf, int len)
-> +{
-...
-IMHO this type of commands are not really required, the function name is
-descriptive enough.
+      -       usb at 47401000 {
+      -               status = "okay";
+      -       };
+      +&usb {
+      +       status = "okay";
+      +};
 
-> +/* Vybrid only.  MPC5125 has full RB and four CS. Assume boot loader
-> + * has set this register for now.
-> + */
+      -       usb at 47401800 {
+      -               status = "okay";
+      -               dr_mode = "host";
+      -       };
+      +&usb1 {
+      +       status = "okay";
+      +       dr_mode = "host";
+      +};
 
-Multi-line comment style (there are some malformed multi-line comments
-in the ECC patch as well)
+      -       dma-controller at 47402000  {
+      -               status = "okay";
+      -       };
+      +&cppi41dma  {
+      +       status = "okay";
+       };
 
---
-Stefan
+
+
+-- 
+-George
