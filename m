@@ -1,46 +1,63 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 28 Apr 2014 16:29:23 -0700
-Subject: [PATCH 3/7] mfd: add support for sun6i PRCM (Power/Reset/Clock
- Management) unit
-In-Reply-To: <1398697130-8338-4-git-send-email-boris.brezillon@free-electrons.com>
+Date: Mon, 28 Apr 2014 16:27:54 -0700
+Subject: [PATCH 2/7] reset: sunxi: allow MFD subdevices probe
+In-Reply-To: <1398697130-8338-3-git-send-email-boris.brezillon@free-electrons.com>
 References: <1398697130-8338-1-git-send-email-boris.brezillon@free-electrons.com>
- <1398697130-8338-4-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20140428232923.GR3134@lukather>
+ <1398697130-8338-3-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140428232754.GQ3134@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
-
-On Mon, Apr 28, 2014 at 04:58:46PM +0200, Boris BREZILLON wrote:
-> The PRCM (Power/Reset/Clock Management) block exposes several subdevices
-> in different subsystems (clk, reset ...)
+On Mon, Apr 28, 2014 at 04:58:45PM +0200, Boris BREZILLON wrote:
+> The current implementation uses sunxi_reset_init function for both early
+> init and platform device probe.
 > 
-> Add basic support for the PRCM unit with clk (AR100, AHB0, and APB0 clks)
-> and reset controller subdevices.
+> The sunxi_reset_init function uses DT to retrieve device resources, which
+> will be an issue if reset controllers are registered from an MFD device
+> that define resources from mfd_cell definition.
 > 
-> Other subdevices might be added later (if needed).
+> Moreover, we can make use of devm functions when we're in probe context.
 > 
 > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 > ---
->  drivers/mfd/Kconfig      |   8 +++
->  drivers/mfd/Makefile     |   1 +
->  drivers/mfd/sun6i-prcm.c | 163 +++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 172 insertions(+)
->  create mode 100644 drivers/mfd/sun6i-prcm.c
+>  drivers/reset/reset-sunxi.c | 19 ++++++++++++++++++-
+>  1 file changed, 18 insertions(+), 1 deletion(-)
 > 
-> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> index 2d347c9..0a9220d 100644
-> --- a/drivers/mfd/Kconfig
-> +++ b/drivers/mfd/Kconfig
-> @@ -731,6 +731,14 @@ config MFD_STA2X11
->  	select MFD_CORE
->  	select REGMAP_MMIO
+> diff --git a/drivers/reset/reset-sunxi.c b/drivers/reset/reset-sunxi.c
+> index 695bd34..115fbb1 100644
+> --- a/drivers/reset/reset-sunxi.c
+> +++ b/drivers/reset/reset-sunxi.c
+> @@ -145,7 +145,24 @@ MODULE_DEVICE_TABLE(of, sunxi_reset_dt_ids);
 >  
-> +config MFD_SUN6I_PRCM
-> +	bool "Allwinner PRCM controller"
+>  static int sunxi_reset_probe(struct platform_device *pdev)
+>  {
+> -	return sunxi_reset_init(pdev->dev.of_node);
+> +	struct sunxi_reset_data *data;
+> +	struct resource *res;
+> +
+> +	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+> +	if (!data)
+> +		return -ENOMEM;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	data->membase = devm_request_and_ioremap(&pdev->dev, res);
+> +	if (!data->membase)
+> +		return -ENOMEM;
+> +
+> +	data->rcdev.owner = THIS_MODULE;
+> +	data->rcdev.nr_resets = resource_size(res) * 32;
+> +	data->rcdev.ops = &sunxi_reset_ops;
+> +	data->rcdev.of_node = pdev->dev.of_node;
+> +
+> +	return reset_controller_register(&data->rcdev);
+>  }
+>  
+>  static int sunxi_reset_remove(struct platform_device *pdev)
 
-I'd mention the A31 in the prompt
+If you're switching to devm_ functions, you'll also have to remove the
+iounmap and kfree in the _remove.
 
+Thanks!
 Maxime
 
 -- 
@@ -53,4 +70,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140428/d27454ae/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140428/b94dd354/attachment.sig>
