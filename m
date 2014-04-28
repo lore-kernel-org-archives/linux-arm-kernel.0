@@ -1,115 +1,57 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 28 Apr 2014 12:50:54 +0200
-Subject: [PATCH 21/38] mmc: sdhci: hack up driver to make it more
- compliant with UHS-1
-In-Reply-To: <20140425123820.GA15179@pengutronix.de>
-References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
- <E1Wd2WT-0003vg-Ke@rmk-PC.arm.linux.org.uk>
- <20140425123820.GA15179@pengutronix.de>
-Message-ID: <CAPDyKFpja-dGwsEL6YP=Nn=YSRRgMzTTz6WVQ8DiUOMrkLJpBQ@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 28 Apr 2014 12:52:36 +0200
+Subject: [PATCH RFC 6/8] component: remove old add_components method
+In-Reply-To: <20140428102806.GH26756@n2100.arm.linux.org.uk>
+References: <20140426230025.GZ26756@n2100.arm.linux.org.uk>
+ <E1WeBbp-0002Gs-Ju@rmk-PC.arm.linux.org.uk>
+ <20140428070727.GC19455@ulmo>
+ <20140428102806.GH26756@n2100.arm.linux.org.uk>
+Message-ID: <20140428105235.GG19455@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 April 2014 14:38, Markus Pargmann <mpa@pengutronix.de> wrote:
-> Hi,
->
-> On Wed, Apr 23, 2014 at 08:07:57PM +0100, Russell King wrote:
->> Patch suggested by Dong Aisheng <dongas86@gmail.com>, this avoids
->> additional clock start/stop cycles during the transition to 1.8V
->> signalling mode.
->>
->> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
->
-> I tested the series on imx6s with a RIoT board. With this patch applied
-> the RIoT board emmc does not work. Here is the output of the board:
+On Mon, Apr 28, 2014 at 11:28:06AM +0100, Russell King - ARM Linux wrote:
+> On Mon, Apr 28, 2014 at 09:07:28AM +0200, Thierry Reding wrote:
+> > I'm wondering if there may be an advantage to keeping both interfaces.
+> > Even if currently what all implementations do is essentially creating
+> > the match table at probe time there may be use-cases where that doesn't
+> > work so well.
+> 
+> Keeping both interfaces makes this whole change is pointless, because
+> then there's no way to avoid having to rebuild the tracking of which
+> components belong to which master - and we might as well stick with
+> what we have.
+> 
+> Moreover, one of the other points Laurent raised is that we need to
+> be able to do partial binds for some subsystems, and for that to work
+> we need more information held within the component helpers and the
+> teardown/rebuild of the master/component relationships to be eliminated.
+> 
+> The last point is that the repeated teardown/rebuild is already being
+> used as a justification to go off and write a completely different
+> infrastructure instead... it seems some people deem this to be far
+> too wasteful of our billion cycles per second CPUs.
 
-Hi Markus,
+FWIW, I do like the simplicity of the ->add_components() variant, and I
+don't mind the few extra cycles wasted, but if this change makes sense
+for everybody else I'll go convert my Tegra patches on top of this.
 
-Thanks for helping out testing!
+By the way, any chance I could get you to look at two earlier patches[0]
+I did to make component/master work better for my use-case? The patches
+are part of a series to convert the Tegra DRM driver to use the
+component framework. The final patch[1] has the complete conversion with
+a diff that I really like, although it requires yet another patch to
+make it work (because Tegra has a somewhat unusual architecture).
 
-Does that mean patch 1->20 works fine for you? May I add your tested-by tag?
+Thierry
 
-Kind regards
-Ulf Hansson
-
->
-> # dmesg | grep mmc2
-> mmc2: no vqmmc regulator found
-> mmc2: no vmmc regulator found
-> mmc2: SDHCI controller on 219c000.usdhc [219c000.usdhc] using ADMA
-> mmc2: BKOPS_EN bit is not set
-> mmc2: Timeout waiting for hardware interrupt.
-> mmc2: Timeout waiting for hardware interrupt.
-> mmc2: Timeout waiting for hardware interrupt.
-> mmc2: Timeout waiting for hardware interrupt.
-> mmc2: error -110 whilst initialising MMC card
-> mmc2: BKOPS_EN bit is not set
-> mmc2: Timeout waiting for hardware interrupt.
-> mmc2: Timeout waiting for hardware interrupt.
-> mmc2: Timeout waiting for hardware interrupt.
-> mmc2: Timeout waiting for hardware interrupt.
-> mmc2: error -110 whilst initialising MMC card
-> mmc2: BKOPS_EN bit is not set
->
-> Any ideas?
->
-> Regards,
->
-> Markus
->
->> ---
->>  drivers/mmc/host/sdhci.c | 12 ------------
->>  1 file changed, 12 deletions(-)
->>
->> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
->> index 748333ba6e96..0bcef2d42da4 100644
->> --- a/drivers/mmc/host/sdhci.c
->> +++ b/drivers/mmc/host/sdhci.c
->> @@ -1507,12 +1507,6 @@ static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
->>                       host->ops->set_clock(host, host->clock);
->>               }
->>
->> -
->> -             /* Reset SD Clock Enable */
->> -             clk = sdhci_readw(host, SDHCI_CLOCK_CONTROL);
->> -             clk &= ~SDHCI_CLOCK_CARD_EN;
->> -             sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
->> -
->>               if (host->ops->set_uhs_signaling)
->>                       host->ops->set_uhs_signaling(host, ios->timing);
->>               else {
->> @@ -1546,9 +1540,6 @@ static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
->>                       ios->drv_type = (preset & SDHCI_PRESET_DRV_MASK)
->>                               >> SDHCI_PRESET_DRV_SHIFT;
->>               }
->> -
->> -             /* Re-enable SD Clock */
->> -             host->ops->set_clock(host, host->clock);
->>       } else
->>               sdhci_writeb(host, ctrl, SDHCI_HOST_CONTROL);
->>
->> @@ -1757,9 +1748,6 @@ static int sdhci_do_start_signal_voltage_switch(struct sdhci_host *host,
->>               ctrl |= SDHCI_CTRL_VDD_180;
->>               sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
->>
->> -             /* Wait for 5ms */
->> -             usleep_range(5000, 5500);
->> -
->>               /* 1.8V regulator output should be stable within 5 ms */
->>               ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
->>               if (ctrl & SDHCI_CTRL_VDD_180)
->> --
->> 1.8.3.1
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->
-> --
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+[0]: https://lkml.org/lkml/2014/4/22/535
+     https://lkml.org/lkml/2014/4/22/1123
+[1]: https://lkml.org/lkml/2014/4/22/1099
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140428/5ef864d2/attachment-0001.sig>
