@@ -1,43 +1,37 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 28 Apr 2014 18:17:10 +0200
-Subject: [PATCHv3 3/7] ARM: sun4i: dt: add pinmux configuration for the PWM
+Date: Mon, 28 Apr 2014 18:17:11 +0200
+Subject: [PATCHv3 4/7] ARM: sun4i: dt: add PWM support
 In-Reply-To: <1398701834-3719-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1398701834-3719-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1398701834-3719-4-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1398701834-3719-5-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the pinctrl descriptions for both PWM channels of the Allwinner A10.
+Add the PWM bindings for the Allwinner A10.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/sun4i-a10.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm/boot/dts/sun4i-a10.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
 diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index 9174724571e2..109e796e4a69 100644
+index 109e796e4a69..bb11c422526b 100644
 --- a/arch/arm/boot/dts/sun4i-a10.dtsi
 +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -477,6 +477,20 @@
- 			#size-cells = <0>;
- 			#gpio-cells = <3>;
+@@ -563,6 +563,14 @@
+ 			interrupts = <24>;
+ 		};
  
-+			pwm0_pins_a: pwm0 at 0 {
-+				allwinner,pins = "PB2";
-+				allwinner,function = "pwm";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
++		pwm: pwm at 01c20e00 {
++			compatible = "allwinner,sun4i-a10-pwm";
++			reg = <0x01c20e00 0xc>;
++			clocks = <&osc24M>;
++			#pwm-cells = <3>;
++			status = "disabled";
++		};
 +
-+			pwm1_pins_a: pwm1 at 0 {
-+				allwinner,pins = "PI3";
-+				allwinner,function = "pwm";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+
- 			uart0_pins_a: uart0 at 0 {
- 				allwinner,pins = "PB22", "PB23";
- 				allwinner,function = "uart0";
+ 		sid: eeprom at 01c23800 {
+ 			compatible = "allwinner,sun4i-a10-sid";
+ 			reg = <0x01c23800 0x10>;
 -- 
 1.9.1
