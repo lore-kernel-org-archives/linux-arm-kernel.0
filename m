@@ -1,46 +1,56 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 29 Apr 2014 01:28:06 +0200
-Subject: [PATCHv4 2/2] pwm: sunxi: document OF bindings
-In-Reply-To: <1398727686-14496-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1398727686-14496-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1398727686-14496-3-git-send-email-alexandre.belloni@free-electrons.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 28 Apr 2014 16:29:23 -0700
+Subject: [PATCH 3/7] mfd: add support for sun6i PRCM (Power/Reset/Clock
+ Management) unit
+In-Reply-To: <1398697130-8338-4-git-send-email-boris.brezillon@free-electrons.com>
+References: <1398697130-8338-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1398697130-8338-4-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140428232923.GR3134@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the documentation for the Allwinner Socs PWM bindings.
+Hi Boris,
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- Documentation/devicetree/bindings/pwm/pwm-sunxi.txt | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pwm/pwm-sunxi.txt
+On Mon, Apr 28, 2014 at 04:58:46PM +0200, Boris BREZILLON wrote:
+> The PRCM (Power/Reset/Clock Management) block exposes several subdevices
+> in different subsystems (clk, reset ...)
+> 
+> Add basic support for the PRCM unit with clk (AR100, AHB0, and APB0 clks)
+> and reset controller subdevices.
+> 
+> Other subdevices might be added later (if needed).
+> 
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> ---
+>  drivers/mfd/Kconfig      |   8 +++
+>  drivers/mfd/Makefile     |   1 +
+>  drivers/mfd/sun6i-prcm.c | 163 +++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 172 insertions(+)
+>  create mode 100644 drivers/mfd/sun6i-prcm.c
+> 
+> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> index 2d347c9..0a9220d 100644
+> --- a/drivers/mfd/Kconfig
+> +++ b/drivers/mfd/Kconfig
+> @@ -731,6 +731,14 @@ config MFD_STA2X11
+>  	select MFD_CORE
+>  	select REGMAP_MMIO
+>  
+> +config MFD_SUN6I_PRCM
+> +	bool "Allwinner PRCM controller"
 
-diff --git a/Documentation/devicetree/bindings/pwm/pwm-sunxi.txt b/Documentation/devicetree/bindings/pwm/pwm-sunxi.txt
-new file mode 100644
-index 000000000000..9eda87e7d233
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pwm/pwm-sunxi.txt
-@@ -0,0 +1,20 @@
-+Allwinner PWM controller
-+
-+Required properties:
-+  - compatible: should be one of:
-+    - "allwinner,sun4i-a10-pwm"
-+    - "allwinner,sun7i-a20-pwm"
-+  - reg: physical base address and length of the controller's registers
-+  - #pwm-cells: should be 3. See pwm.txt in this directory for a description of
-+    the cells format.
-+  - clocks: from common clock binding, handle to the parent clock.
-+
-+Example:
-+
-+	pwm: pwm at 01c20e00 {
-+		compatible = "allwinner,sun7i-a20-pwm";
-+		reg = <0x01c20e00 0xc>;
-+		clocks = <&osc24M>;
-+		#pwm-cells = <3>;
-+		status = "disabled";
-+	};
+I'd mention the A31 in the prompt
+
+Maxime
+
 -- 
-1.9.1
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140428/d27454ae/attachment-0001.sig>
