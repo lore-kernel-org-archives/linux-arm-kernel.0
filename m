@@ -1,48 +1,98 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 28 Apr 2014 11:33:59 +1000
-Subject: linux-next: manual merge of the mvebu tree with the arm tree
-Message-ID: <20140428113359.95298f9a895dda6fbbb06f12@canb.auug.org.au>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Mon, 28 Apr 2014 11:14:25 +0900
+Subject: [PATCH 7/8] PCI: designware: make MSI isr shared irq aware
+In-Reply-To: <1396025579-14344-8-git-send-email-l.stach@pengutronix.de>
+References: <1396025579-14344-1-git-send-email-l.stach@pengutronix.de>
+ <1396025579-14344-8-git-send-email-l.stach@pengutronix.de>
+Message-ID: <004601cf6287$93cf7f30$bb6e7d90$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Saturday, March 29, 2014 1:53 AM, Lucas Stach wrote:
+> 
+> On i.MX6 the host controller MSI irq is shared
+> with PCI legacy INTD. Make sure we don't bail too
+> early from the irq handler.
+> 
+> The issue is fairly theoretical as it would require
+> a system setup with a PCIe switch where one connected
+> device is using legacy INTD and another one using
+> MSI, but better fix it now.
+> 
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 
-Today's linux-next merge of the mvebu tree got a conflict in
-arch/arm/mach-mvebu/board-v7.c between commit b21770945fa2 ("ARM: l2c:
-remove unnecessary UL-suffix to mask values") from the arm tree and
-commit 2865b82e9e19 ("ARM: mvebu: remove unnecessary ifdef around
-l2x0_of_init") from the mvebu tree.
+(+cc Mohit KUMAR DCG, Pratyush ANAND)
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+Acked-by: Jingoo Han <jg1.han@samsung.com>
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+Best regards,
+Jingoo Han
 
-diff --cc arch/arm/mach-mvebu/board-v7.c
-index c6bd79f64744,bc0283f0dd88..000000000000
---- a/arch/arm/mach-mvebu/board-v7.c
-+++ b/arch/arm/mach-mvebu/board-v7.c
-@@@ -57,11 -75,10 +75,10 @@@ static void __init mvebu_timer_and_clk_
-  {
-  	of_clk_init(NULL);
-  	clocksource_of_init();
-+ 	mvebu_scu_enable();
-  	coherency_init();
-- 	BUG_ON(mvebu_mbus_dt_init());
-- #ifdef CONFIG_CACHE_L2X0
-+ 	BUG_ON(mvebu_mbus_dt_init(coherency_available()));
- -	l2x0_of_init(0, ~0UL);
- +	l2x0_of_init(0, ~0);
-- #endif
-  
-  	if (of_machine_is_compatible("marvell,armada375"))
-  		hook_fault_code(16 + 6, armada_375_external_abort_wa, SIGBUS, 0,
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140428/f75916de/attachment.sig>
+> ---
+>  drivers/pci/host/pci-exynos.c      | 4 +---
+>  drivers/pci/host/pcie-designware.c | 6 +++++-
+>  drivers/pci/host/pcie-designware.h | 2 +-
+>  3 files changed, 7 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/pci/host/pci-exynos.c b/drivers/pci/host/pci-exynos.c
+> index 3de6bfbbe8e9..b616d34922d8 100644
+> --- a/drivers/pci/host/pci-exynos.c
+> +++ b/drivers/pci/host/pci-exynos.c
+> @@ -415,9 +415,7 @@ static irqreturn_t exynos_pcie_msi_irq_handler(int irq, void *arg)
+>  {
+>  	struct pcie_port *pp = arg;
+> 
+> -	dw_handle_msi_irq(pp);
+> -
+> -	return IRQ_HANDLED;
+> +	return dw_handle_msi_irq(pp);
+>  }
+> 
+>  static void exynos_pcie_msi_init(struct pcie_port *pp)
+> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+> index 98c118e04dba..cbce9b04b13d 100644
+> --- a/drivers/pci/host/pcie-designware.c
+> +++ b/drivers/pci/host/pcie-designware.c
+> @@ -156,15 +156,17 @@ static struct irq_chip dw_msi_irq_chip = {
+>  };
+> 
+>  /* MSI int handler */
+> -void dw_handle_msi_irq(struct pcie_port *pp)
+> +irqreturn_t dw_handle_msi_irq(struct pcie_port *pp)
+>  {
+>  	unsigned long val;
+>  	int i, pos, irq;
+> +	irqreturn_t ret = IRQ_NONE;
+> 
+>  	for (i = 0; i < MAX_MSI_CTRLS; i++) {
+>  		dw_pcie_rd_own_conf(pp, PCIE_MSI_INTR0_STATUS + i * 12, 4,
+>  				(u32 *)&val);
+>  		if (val) {
+> +			ret = IRQ_HANDLED;
+>  			pos = 0;
+>  			while ((pos = find_next_bit(&val, 32, pos)) != 32) {
+>  				irq = irq_find_mapping(pp->irq_domain,
+> @@ -177,6 +179,8 @@ void dw_handle_msi_irq(struct pcie_port *pp)
+>  			}
+>  		}
+>  	}
+> +
+> +	return ret;
+>  }
+> 
+>  void dw_pcie_msi_init(struct pcie_port *pp)
+> diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
+> index 3063b3594d88..a169d22d517e 100644
+> --- a/drivers/pci/host/pcie-designware.h
+> +++ b/drivers/pci/host/pcie-designware.h
+> @@ -68,7 +68,7 @@ struct pcie_host_ops {
+> 
+>  int dw_pcie_cfg_read(void __iomem *addr, int where, int size, u32 *val);
+>  int dw_pcie_cfg_write(void __iomem *addr, int where, int size, u32 val);
+> -void dw_handle_msi_irq(struct pcie_port *pp);
+> +irqreturn_t dw_handle_msi_irq(struct pcie_port *pp);
+>  void dw_pcie_msi_init(struct pcie_port *pp);
+>  int dw_pcie_link_up(struct pcie_port *pp);
+>  void dw_pcie_setup_rc(struct pcie_port *pp);
+> --
+> 1.9.0
