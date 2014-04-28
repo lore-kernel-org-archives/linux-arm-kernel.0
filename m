@@ -1,8 +1,9 @@
 From: guido@vanguardiasur.com.ar (=?UTF-8?q?Guido=20Mart=C3=ADnez?=)
-Date: Mon, 28 Apr 2014 10:58:29 -0300
-Subject: [PATCH 1/4] ARM: dts: am335x-bone-common: use phandles for USB and
- DMA refs
-Message-ID: <1398693512-5355-1-git-send-email-guido@vanguardiasur.com.ar>
+Date: Mon, 28 Apr 2014 10:58:30 -0300
+Subject: [PATCH 2/4] ARM: dts: am335x-evm: use phandles for USB and DMA refs
+In-Reply-To: <1398693512-5355-1-git-send-email-guido@vanguardiasur.com.ar>
+References: <1398693512-5355-1-git-send-email-guido@vanguardiasur.com.ar>
+Message-ID: <1398693512-5355-2-git-send-email-guido@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,14 +12,14 @@ This makes the DT more robust and readable.
 
 Signed-off-by: Guido Mart?nez <guido@vanguardiasur.com.ar>
 ---
- arch/arm/boot/dts/am335x-bone-common.dtsi | 12 ++++++------
+ arch/arm/boot/dts/am335x-evm.dts | 12 ++++++------
  1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
-index 2e7d932..b95bc9a 100644
---- a/arch/arm/boot/dts/am335x-bone-common.dtsi
-+++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
-@@ -183,28 +183,28 @@
+diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
+index 6028217..e802627 100644
+--- a/arch/arm/boot/dts/am335x-evm.dts
++++ b/arch/arm/boot/dts/am335x-evm.dts
+@@ -331,28 +331,28 @@
  &usb {
  	status = "okay";
  
