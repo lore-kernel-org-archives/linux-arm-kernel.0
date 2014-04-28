@@ -1,71 +1,61 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 28 Apr 2014 17:57:57 +0100
-Subject: [PATCH 02/16] ARM: l2c: add platform independent core L2 cache
- initialisation
-In-Reply-To: <20140428165631.GM26756@n2100.arm.linux.org.uk>
-References: <20140428165631.GM26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WeosP-0002PO-5m@rmk-PC.arm.linux.org.uk>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 28 Apr 2014 19:01:55 +0200
+Subject: [PATCH v4 05/11] ARM: shmobile: r7s72100: genmai: add uart aliases
+ and activate scif2 as console
+In-Reply-To: <1398704521-23767-1-git-send-email-wsa@the-dreams.de>
+References: <1398704521-23767-1-git-send-email-wsa@the-dreams.de>
+Message-ID: <1398704521-23767-6-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a hook into the core ARM code to perform L2 cache initialisation
-in a platform independent manner.  Platforms still get to indicate
-their auxiliary control register values and mask, but the
-initialisation call will now be made from generic code.
+From: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+We keep the UART naming backwards compatible with the legacy version.
+
+Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 ---
- arch/arm/include/asm/mach/arch.h |  3 +++
- arch/arm/kernel/irq.c            | 12 ++++++++++++
- 2 files changed, 15 insertions(+)
+ arch/arm/boot/dts/r7s72100-genmai-reference.dts | 18 +++++++++++++++++-
+ 1 file changed, 17 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
-index 17a3fa2979e8..5249cc3c52f4 100644
---- a/arch/arm/include/asm/mach/arch.h
-+++ b/arch/arm/include/asm/mach/arch.h
-@@ -45,6 +45,9 @@ struct machine_desc {
- 	unsigned char		reserve_lp1 :1;	/* never has lp1	*/
- 	unsigned char		reserve_lp2 :1;	/* never has lp2	*/
- 	enum reboot_mode	reboot_mode;	/* default restart mode	*/
-+	unsigned		l2c_aux_val;	/* L2 cache aux value	*/
-+	unsigned		l2c_aux_mask;	/* L2 cache aux mask	*/
-+	void			(*l2c_write_sec)(unsigned long, unsigned);
- 	struct smp_operations	*smp;		/* SMP operations	*/
- 	bool			(*smp_init)(void);
- 	void			(*fixup)(struct tag *, char **,
-diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
-index 9723d17b8f38..2c4257604513 100644
---- a/arch/arm/kernel/irq.c
-+++ b/arch/arm/kernel/irq.c
-@@ -37,6 +37,7 @@
- #include <linux/proc_fs.h>
- #include <linux/export.h>
+diff --git a/arch/arm/boot/dts/r7s72100-genmai-reference.dts b/arch/arm/boot/dts/r7s72100-genmai-reference.dts
+index 941e72ce7c82..facff0271716 100644
+--- a/arch/arm/boot/dts/r7s72100-genmai-reference.dts
++++ b/arch/arm/boot/dts/r7s72100-genmai-reference.dts
+@@ -1,7 +1,8 @@
+ /*
+  * Device Tree Source for the Genmai board
+  *
+- * Copyright (C) 2013 Renesas Solutions Corp.
++ * Copyright (C) 2013-14 Renesas Solutions Corp.
++ * Copyright (C) 2014 Wolfram Sang, Sang Engineering <wsa@sang-engineering.com>
+  *
+  * This file is licensed under the terms of the GNU General Public License
+  * version 2.  This program is licensed "as is" without any warranty of any
+@@ -15,6 +16,17 @@
+ 	model = "Genmai";
+ 	compatible = "renesas,genmai-reference", "renesas,r7s72100";
  
-+#include <asm/hardware/cache-l2x0.h>
- #include <asm/exception.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/irq.h>
-@@ -115,10 +116,21 @@ EXPORT_SYMBOL_GPL(set_irq_flags);
- 
- void __init init_IRQ(void)
- {
-+	int ret;
++	aliases {
++		serial0 = &scif0;
++		serial1 = &scif1;
++		serial2 = &scif2;
++		serial3 = &scif3;
++		serial4 = &scif4;
++		serial5 = &scif5;
++		serial6 = &scif6;
++		serial7 = &scif7;
++	};
 +
- 	if (IS_ENABLED(CONFIG_OF) && !machine_desc->init_irq)
- 		irqchip_init();
- 	else
- 		machine_desc->init_irq();
+ 	chosen {
+ 		bootargs = "console=ttySC2,115200 ignore_loglevel rw root=/dev/nfs ip=dhcp";
+ 	};
+@@ -48,3 +60,7 @@
+ 		pagesize = <64>;
+ 	};
+ };
 +
-+	if (IS_ENABLED(CONFIG_OF) && IS_ENABLED(CONFIG_CACHE_L2X0) &&
-+	    (machine_desc->l2c_aux_mask || machine_desc->l2c_aux_val)) {
-+		outer_cache.write_sec = machine_desc->l2c_write_sec;
-+		ret = l2x0_of_init(machine_desc->l2c_aux_val,
-+				   machine_desc->l2c_aux_mask);
-+		if (ret)
-+			pr_err("L2C: failed to init: %d\n", ret);
-+	}
- }
- 
- #ifdef CONFIG_MULTI_IRQ_HANDLER
++&scif2 {
++	status = "okay";
++};
 -- 
-1.8.3.1
+1.9.2
