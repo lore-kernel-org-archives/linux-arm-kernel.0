@@ -1,64 +1,48 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Mon, 28 Apr 2014 14:35:01 -0600
-Subject: [PATCH v7 01/10] PCI: host: rcar: Add Renesas R-Car PCIe driver
-In-Reply-To: <CAErSpo6Autto4n4A4wHtXQNJzD3RKevkVcLZHUods-2-eiRDYQ@mail.gmail.com>
-References: <1396261856-22465-1-git-send-email-phil.edworthy@renesas.com>
- <1396261856-22465-2-git-send-email-phil.edworthy@renesas.com>
- <20140424191901.GE29593@google.com>
- <9b8bedae9d604383ac7ec22fd0f62fdb@HKXPR06MB168.apcprd06.prod.outlook.com>
- <CAErSpo6Autto4n4A4wHtXQNJzD3RKevkVcLZHUods-2-eiRDYQ@mail.gmail.com>
-Message-ID: <20140428203501.GA3016@obsidianresearch.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Tue, 29 Apr 2014 00:35:41 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSF0gQVNvQzogZnNsOiBzZWxlY3QgU05EX1NPQ19JTVhfUENN?=
+ =?UTF-8?B?X0RNQSB3aGVyZSBuZWVkZWQ=?=
+In-Reply-To: <7785150.X1QaggmPtm@wuerfel>
+References: <6606961.lAGLvkNsEj@wuerfel> <1398710770.235891074@f303.i.mail.ru>
+ <7785150.X1QaggmPtm@wuerfel>
+Message-ID: <1398717341.630093136@f319.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 01:11:08PM -0600, Bjorn Helgaas wrote:
+Mon, 28 Apr 2014 21:52:16 +0200 ?? Arnd Bergmann <arnd@arndb.de>:
+> On Monday 28 April 2014 22:46:10 Alexander Shiyan wrote:
+> > Mon, 28 Apr 2014 16:46:30 +0200 ?? Arnd Bergmann <arnd@arndb.de>:
+> > > Since commit 204dec93eaa "ASoC: fsl: Allow to select individual common
+> > > options", it is possible to enable SND_SOC_FSL_SSI and SND_SOC_FSL_SPDIF
+> > > manually. However, these two options are for drivers that both
+> > > require the imx-pcm-dma framework and result in a link error if that
+> > > is not provided.
+> > > 
+> > > This changes Kconfig to automatically select SND_SOC_IMX_PCM_DMA
+> > > to avoid the problem, as we do for other drivers that need the same
+> > > framework.
+> > > 
+> > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > 
+> > Can you give an exact error?
+> 
+> 
+> sound/built-in.o: In function `fsl_ssi_probe':
+> :(.text+0x51fb8): undefined reference to `imx_pcm_dma_init'
+> sound/built-in.o: In function `fsl_spdif_probe':
+> :(.text+0x52e20): undefined reference to `imx_pcm_dma_init'
 
-> >> That bus number should be a property of the host bridge, i.e.,
-> >> it's either hard-wired into the bridge, or it's programmable somewhere.
-> >> But root_bus_nr comes from sys->busnr, which is apparently from some
-> >> generic code that knows nothing about this particular host bridge.
+This call is defined in imx-pcm.h as:
+#if IS_ENABLED(CONFIG_SND_SOC_IMX_PCM_DMA)
+int imx_pcm_dma_init(struct platform_device *pdev);
+#else
+static inline int imx_pcm_dma_init(struct platform_device *pdev)
+{
+  return -ENODEV;
+}
+#endif
 
-> > The manual for this hardware says that the HW doesn't care what the bus number
-> > is set to. The only thing the HW needs to know is that when sending config
-> > accesses, we need to indicate whether it's a TYPE0 or TYPE1 header; so we use
-> > root_bus_nr to determine this. The generic code that sets up sys->busnr (ARM
-> > bios32 in this case), just increments bus number for each controller.
+So, I don't understand why this error happen, as well as I can not
+reproduce this...
 
-I went back and looked at the lspci posted for this hardware and this
-use of busnr is kinda sketch..
-
-You should use use bus 0 as the root complex integrated bus number and
-ensure every instance of your driver creates a new PCI domain, and
-generally use 0-> FF as the subordinate bus number range.
-
-FWIW, your HW does care, and does have a programmable field for
-this.
-
-You set the value of the integrated bus based on the bus number in the
-TYPE0 accesses the driver performs and it shows up in the PCI config
-space of the root port bridge:
-
-root at koelsch:~# lspci -vv
-00:00.0 PCI bridge: Renesas Technology Corp. Device 001f (prog-if 00
-[Normal decode])
-        Bus: primary=00, secondary=01, subordinate=01, sec-latency=0
-
-The value here will be also be exported on-the-wire in certain PCI-E
-TLPs.
-
-So it is important, and must be set properly.
-
-> Yeah, I guess.  If the HW really doesn't look at the bus number at
-> all, it sounds like the range is effectively 00-ff, and each host
-> bridge should be in its own domain.
-
-This is where some of the other implementations have used some SW to
-route config space in a single domain to the proper controller
-per-port register set.
-
-But, IMHO, that is mainly worth doing if the HW can implement the PCI
-bridge windows according to the spec, and it looks like rcar requires
-a 128MB alignment on the bridge windows, which makes it fairly
-pointless.
-
-Jason
+---
