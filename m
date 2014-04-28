@@ -1,52 +1,47 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 28 Apr 2014 16:22:32 -0700
-Subject: [PATCH 1/7] reset: sunxi: document sunxi's reset controllers
- bindings
-In-Reply-To: <1398697130-8338-2-git-send-email-boris.brezillon@free-electrons.com>
-References: <1398697130-8338-1-git-send-email-boris.brezillon@free-electrons.com>
- <1398697130-8338-2-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20140428232232.GP3134@lukather>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 29 Apr 2014 01:28:04 +0200
+Subject: [PATCHv4 0/2] Add Allwinner SoCs PWM support
+Message-ID: <1398727686-14496-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+Hi,
 
-On Mon, Apr 28, 2014 at 04:58:44PM +0200, Boris BREZILLON wrote:
-> Add DT bindings documentation for sunxi's reset controllers.
-> 
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> ---
->  .../bindings/reset/allwinner,sunxi-clock-reset.txt  | 21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/reset/allwinner,sunxi-clock-reset.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/reset/allwinner,sunxi-clock-reset.txt b/Documentation/devicetree/bindings/reset/allwinner,sunxi-clock-reset.txt
-> new file mode 100644
-> index 0000000..a582804
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/reset/allwinner,sunxi-clock-reset.txt
-> @@ -0,0 +1,21 @@
-> +Allwinner sunxi Peripheral Reset Controller
-> +===========================================
-> +
-> +Please also refer to reset.txt in this directory for common reset
-> +controller binding usage.
-> +
-> +Required properties:
-> +- compatible: Should be one of the following depending on your SoC:
+This patch set adds support for the PWM controller found on the Allwinner SoCs.
 
-It doesn't really depend on the SoC.
+The first patch adds the driver itself.
+The second patch adds the DT binding documentation
 
-Maxime
+Changes in v4:
+ - use the non relaxed versions of readl/writel
+ - dropped the DT patches that got applied
+
+Changes in v3:
+ - added COMPILE_TEST as a dependency
+ - fixed indentation
+ - modified the macros like suggested by Maxime
+
+Changes in v2:
+ - changed the compatible string
+ - documented the clocks property
+ - Added support in the A10 dtsi
+ - split the patch adding pinctrl
+ - a few cosmetic changes (removed empty lines, PWM_PRESCAL_MASK, ...)
+ - fixed the period register calculation (the period is actually N + 1 cycles)
+   so write prd - 1
+ - properly locked accesses to PWM_CTRL_REG with a mutex
+
+Alexandre Belloni (7):
+  pwm: Add Allwinner SoC support
+  pwm: sunxi: document OF bindings
+
+ .../devicetree/bindings/pwm/pwm-sunxi.txt          |  20 ++
+ drivers/pwm/Kconfig                                |   9 +
+ drivers/pwm/Makefile                               |   1 +
+ drivers/pwm/pwm-sunxi.c                            | 345 +++++++++++++++++++++
+ 4 files changed, 375 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pwm/pwm-sunxi.txt
+ create mode 100644 drivers/pwm/pwm-sunxi.c
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140428/fa8af110/attachment.sig>
+1.9.1
