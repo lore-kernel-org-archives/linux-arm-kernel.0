@@ -1,32 +1,23 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 28 Apr 2014 12:32:46 -0700
-Subject: [PATCH v9 08/17] ARM: dts: sun5i: Add pin-muxing info for the
- mmc controllers
-In-Reply-To: <1398507381-5614-9-git-send-email-hdegoede@redhat.com>
-References: <1398507381-5614-1-git-send-email-hdegoede@redhat.com>
- <1398507381-5614-9-git-send-email-hdegoede@redhat.com>
-Message-ID: <20140428193246.GG3134@lukather>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 28 Apr 2014 20:37:10 +0100
+Subject: [RFC PATCH v5 02/11] ARM SMMU: Add capability IOMMU_CAP_DMA_EXEC
+In-Reply-To: <1398700371-20096-3-git-send-email-a.motakis@virtualopensystems.com>
+References: <1398700371-20096-1-git-send-email-a.motakis@virtualopensystems.com>
+ <1398700371-20096-3-git-send-email-a.motakis@virtualopensystems.com>
+Message-ID: <20140428193709.GE22135@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 26, 2014 at 12:16:12PM +0200, Hans de Goede wrote:
-> This adds  pin-muxing info for the mmc controller / port combinations which
-> are known to be used on actual boards.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+On Mon, Apr 28, 2014 at 04:52:42PM +0100, Antonios Motakis wrote:
+> The ARM SMMU can take an IOMMU_EXEC protection flag in addition to
+> IOMMU_READ and IOMMU_WRITE. Expose this as an IOMMU capability.
 
-Applied, thanks!
+The other way of handling this would be to negate the capability and
+advertise a NOEXEC cap instead. That would need the IOMMU_EXEC flag to
+become IOMMU_NOEXEC and the ARM SMMU driver updating accordingly, but it
+might make more sense if people don't object to mixing positive and negative
+logic in the IOMMU_* flags.
 
-Maxime
+Any thoughts?
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140428/f086c012/attachment-0001.sig>
+Will
