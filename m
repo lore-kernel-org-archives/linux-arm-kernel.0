@@ -1,57 +1,59 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 28 Apr 2014 14:33:27 -0400
-Subject: [PATCH v2 10/10] ARM: mvebu: Enable the thermal sensor in
- Armada 380/385 SoC
-In-Reply-To: <20140428164403.GA17824@arch.cereza>
-References: <1398371004-15807-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1398371004-15807-11-git-send-email-ezequiel.garcia@free-electrons.com>
- <20140428164403.GA17824@arch.cereza>
-Message-ID: <20140428183327.GA28159@titan.lakedaemon.net>
+From: lznuaa@gmail.com (Frank Li)
+Date: Mon, 28 Apr 2014 13:36:44 -0500
+Subject: [PATCH 071/222] net:fec: remove unnecessary ip stack includes
+In-Reply-To: <E1WdeR9-0007Ht-Tb@rmk-PC.arm.linux.org.uk>
+References: <20140425112951.GK26756@n2100.arm.linux.org.uk>
+ <E1WdeR9-0007Ht-Tb@rmk-PC.arm.linux.org.uk>
+Message-ID: <CAHrpEqQ_7iWC_mSRPu7b8JmpBQw+NWO2AkMgBawKmhs9fTvZkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 01:44:03PM -0300, Ezequiel Garcia wrote:
-> On Apr 24, Ezequiel Garcia wrote:
-> > This commit enables the thermal sensor found in Armada 380/385 SoCs.
-> > 
-> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > ---
-> >  arch/arm/boot/dts/armada-38x.dtsi | 6 ++++++
-> >  1 file changed, 6 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-> > index a064f59..02c6139 100644
-> > --- a/arch/arm/boot/dts/armada-38x.dtsi
-> > +++ b/arch/arm/boot/dts/armada-38x.dtsi
-> > @@ -346,6 +346,12 @@
-> >  				clock-output-names = "nand";
-> >  			};
-> >  
-> > +			thermal at e8078 {
-> > +				compatible = "marvell,armada380-thermal";
-> > +				reg = <0xe4078 0x4>, <0xe404 0x4>;
-> 
-> Dammit, there's a stupid typo in the register offset. I never noticed this, because
-> the initialization sequence does not do much, and this register is not really used
-> (for now). The fix is this:
-> 
-> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-> index 02c6139..370220f 100644
-> --- a/arch/arm/boot/dts/armada-38x.dtsi
-> +++ b/arch/arm/boot/dts/armada-38x.dtsi
-> @@ -348,7 +348,7 @@
->  
->  			thermal at e8078 {
->  				compatible = "marvell,armada380-thermal";
-> -				reg = <0xe4078 0x4>, <0xe404 0x4>;
-> +				reg = <0xe4078 0x4>, <0xe4074 0x4>;
->  				status = "okay";
->  			};
->  
-> Want me to send a follow-up patch?
+On Fri, Apr 25, 2014 at 6:36 AM, Russell King
+<rmk+kernel@arm.linux.org.uk> wrote:
+> Commit 4c09eed9dc42 (net: fec: Enable imx6 enet checksum acceleration.)
+> added support for hardware checksum support, adding six new includes
+> for things like tcp, udp, ip, icmp, but never made use of anything
+> provided by those header files.  Let's remove this bloat.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Nope, I squashed it in and pushed it out.
+Russell
 
-thx,
+       I see patches from 71 to 126 are related with fec driver.
+       But maintainer David S. Miller is not in to list.
 
-Jason.
+       Do you need someone follow up this patches and resent to David
+S Miller till accepted by david? Or you will do it by yourself?
+
+Best regards
+Frank Li
+
+> ---
+>  drivers/net/ethernet/freescale/fec_main.c | 6 ------
+>  1 file changed, 6 deletions(-)
+>
+> diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
+> index 8d69e439f0c5..b151eaf3b500 100644
+> --- a/drivers/net/ethernet/freescale/fec_main.c
+> +++ b/drivers/net/ethernet/freescale/fec_main.c
+> @@ -33,12 +33,6 @@
+>  #include <linux/netdevice.h>
+>  #include <linux/etherdevice.h>
+>  #include <linux/skbuff.h>
+> -#include <linux/in.h>
+> -#include <linux/ip.h>
+> -#include <net/ip.h>
+> -#include <linux/tcp.h>
+> -#include <linux/udp.h>
+> -#include <linux/icmp.h>
+>  #include <linux/spinlock.h>
+>  #include <linux/workqueue.h>
+>  #include <linux/bitops.h>
+> --
+> 1.8.3.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
