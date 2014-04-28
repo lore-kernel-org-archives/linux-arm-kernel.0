@@ -1,48 +1,64 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 28 Apr 2014 20:30:01 +0100
-Subject: [PATCH 45/97] ARM: l2c: highbank: remove explicit SMI call in L2
- cache initialisation
+Date: Mon, 28 Apr 2014 20:30:17 +0100
+Subject: [PATCH 48/97] ARM: l2c: implement L2C-310 erratum 752271 in core L2C
+ code
 In-Reply-To: <20140428192419.GV26756@n2100.arm.linux.org.uk>
 References: <20140428192419.GV26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WerFZ-0001WS-Rt@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WerFp-0001Wl-7f@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that highbank uses the write_sec method, we don't need to enable
-the L2 cache in SoC specific code; this can be done via the normal
-mechanisms in the L2C code.
-
-Checking with Rob Herring:
-> > Can we kill the "highbank_smc1(0x102, 0x1);" here?	That means
-> > l2x0_of_init() will see the L2 cache disabled, and will try to enable
-> > it via the write_sec hook, so it should do the right thing.
->
-> Yes, that should work. You should be able to just call l2x0_of_init
-> unconditionally. The condition was really to just avoid the smc on
-> Midway which does get handled on h/w, but not if running virtualized.
-
-So also drop the DT check too.  I'm leaving the config check in place
-so that if L2 is disabled, the write_sec hook can be optimised away.
+Rather than having SoCs work around L2C erratum themselves, move them
+into core code.  This erratum affects the double linefill feature which
+needs to be disabled for r3p0 to r3p1-50rel0.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-highbank/highbank.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ arch/arm/mm/cache-l2x0.c | 18 +++++++++++++++++-
+ 1 file changed, 17 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
-index 4712aed3d9f6..245e588859ec 100644
---- a/arch/arm/mach-highbank/highbank.c
-+++ b/arch/arm/mach-highbank/highbank.c
-@@ -68,9 +68,7 @@ static void __init highbank_init_irq(void)
- 		highbank_scu_map_io();
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index b13276c9971b..b1fa825c133f 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -476,6 +476,11 @@ static const struct l2c_init_data l2c220_data = {
+  *	hit the line between the clean operation and invalidate operation,
+  *	resulting in the store being lost.
+  *
++ * 752271: PL310 R3P0->R3P1-50REL0, fixed R3P2.
++ *	Affects: 8x64-bit (double fill) line fetches
++ *	double fill line fetches can fail to cause dirty data to be evicted
++ *	from the cache before the new data overwrites the second line.
++ *
+  * 753970: PL310 R3P0, fixed R3P1.
+  *	Affects: sync
+  *	prevents merging writes after the sync operation, until another L2C
+@@ -619,7 +624,7 @@ static void __init l2c310_fixup(void __iomem *base, u32 cache_id,
+ 	struct outer_cache_fns *fns)
+ {
+ 	unsigned revision = cache_id & L2X0_CACHE_ID_RTL_MASK;
+-	const char *errata[4];
++	const char *errata[8];
+ 	unsigned n = 0;
  
- 	/* Enable PL310 L2 Cache controller */
--	if (IS_ENABLED(CONFIG_CACHE_L2X0) &&
--	    of_find_compatible_node(NULL, NULL, "arm,pl310-cache")) {
--		highbank_smc1(0x102, 0x1);
-+	if (IS_ENABLED(CONFIG_CACHE_L2X0)) {
- 		outer_cache.write_sec = highbank_l2c310_write_sec;
- 		l2x0_of_init(0, ~0);
+ 	if (IS_ENABLED(CONFIG_PL310_ERRATA_588369) &&
+@@ -638,6 +643,17 @@ static void __init l2c310_fixup(void __iomem *base, u32 cache_id,
+ 		errata[n++] = "727915";
  	}
+ 
++	if (revision >= L310_CACHE_ID_RTL_R3P0 &&
++	    revision < L310_CACHE_ID_RTL_R3P2) {
++		u32 val = readl_relaxed(base + L2X0_PREFETCH_CTRL);
++		/* I don't think bit23 is required here... but iMX6 does so */
++		if (val & (BIT(30) | BIT(23))) {
++			val &= ~(BIT(30) | BIT(23));
++			l2c_write_sec(val, base, L2X0_PREFETCH_CTRL);
++			errata[n++] = "752271";
++		}
++	}
++
+ 	if (IS_ENABLED(CONFIG_PL310_ERRATA_753970) &&
+ 	    revision == L310_CACHE_ID_RTL_R3P0) {
+ 		sync_reg_offset = L2X0_DUMMY_REG;
 -- 
 1.8.3.1
