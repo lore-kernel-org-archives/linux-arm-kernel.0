@@ -1,35 +1,48 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Mon, 28 Apr 2014 18:40:54 +0100
-Subject: [PATCH 1/3] driver core & of: Mark of_nodes of added device as
- populated
-In-Reply-To: <52FA5EB4.7080008@codeaurora.org>
-References: <1392137610-27842-1-git-send-email-pawel.moll@arm.com>
- <1392137610-27842-2-git-send-email-pawel.moll@arm.com>
- <52FA5EB4.7080008@codeaurora.org>
-Message-ID: <1398706854.20390.8.camel@hornet>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 28 Apr 2014 18:41:33 +0100
+Subject: [PATCH 07/16] ARM: l2c: convert tegra to generic l2c
+ initialisation
+In-Reply-To: <535E8FA0.6040205@wwwdotorg.org>
+References: <20140428165631.GM26756@n2100.arm.linux.org.uk>
+ <E1Weoso-0002Pj-LE@rmk-PC.arm.linux.org.uk> <535E8FA0.6040205@wwwdotorg.org>
+Message-ID: <20140428174133.GO26756@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-02-11 at 12:32 -0500, Christopher Covington wrote:
-> Hi Pawel,
+On Mon, Apr 28, 2014 at 11:28:00AM -0600, Stephen Warren wrote:
+> On 04/28/2014 10:58 AM, Russell King wrote:
 > 
-> On 02/11/2014 11:53 AM, Pawel Moll wrote:
-> > This patch tries to solve that issue in a generic way,
-> > adding a "populated" flag which is set in the device_node
-> > structure when a device is being created in the core.
-> > Later, of_platform_populate() skips such nodes (and
-> > its children) in a similar way to the non-available ones.
+> > diff --git a/arch/arm/mach-tegra/tegra.c b/arch/arm/mach-tegra/tegra.c
 > 
-> Will there never be a case where it is useful for a parent node to be created
-> early, but not necessarily the child nodes? Might only skipping nodes
-> explicitly marked as populated be a more universal solution?
+> >  DT_MACHINE_START(TEGRA_DT, "NVIDIA Tegra SoC (Flattened Device Tree)")
+> > -	.map_io		= tegra_map_common_io,
+> >  	.smp		= smp_ops(tegra_smp_ops),
+> > +	.l2c_aux_val	= 0x3c400001,
+> > +	.l2c_aux_mask	= 0xc20fc3fe,
+> > +	.map_io		= tegra_map_common_io,
+> 
+> I'm not sure why .map_io was moved. Was it to sort the entries in order
+> of execution? If so, I assume that .smp should be moved too?
 
-That's a good point. I've assumed one would either use
-of_platform_device_create() on leaf nodes only (or
-of_platform_populate() on subtree), and kept this approach in the
-refreshed patch I'm about to post, but I'm happy to do what you
-suggested.
+I moved it quite simply because I keep entries in order:
 
-Thanks!
+        unsigned                l2c_aux_val;    /* L2 cache aux value   */
+        unsigned                l2c_aux_mask;   /* L2 cache aux mask    */
+        void                    (*l2c_write_sec)(unsigned long, unsigned);
+        struct smp_operations   *smp;           /* SMP operations       */
+        bool                    (*smp_init)(void);
+        void                    (*fixup)(struct tag *, char **,
+                                         struct meminfo *);
+        void                    (*init_meminfo)(void);
+        void                    (*reserve)(void);/* reserve mem blocks  */
+        void                    (*map_io)(void);/* IO mapping function  */
+        void                    (*init_early)(void);
 
-Pawel
+And the order of declaration in there (for the functions after "smp")
+is the order in which they are called during kernel initialisation.
+Platforms randomising their declarations is... silly.  And yes, I'll
+move those l2c ones before .smp.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
