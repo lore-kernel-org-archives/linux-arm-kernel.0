@@ -1,48 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 28 Apr 2014 13:17:26 +0100
-Subject: [PATCH 3/5] ARM: dove: create a proper PMU driver for power
- domains, PMU IRQs and resets
-In-Reply-To: <CAPDyKFoboE4iKyom86+EwHHTQAGpgKxGq969yrjQVpqizk-SLA@mail.gmail.com>
-References: <20140427132312.GC26756@n2100.arm.linux.org.uk>
- <E1WeP8f-0000Uo-1q@rmk-PC.arm.linux.org.uk>
- <CAPDyKFoboE4iKyom86+EwHHTQAGpgKxGq969yrjQVpqizk-SLA@mail.gmail.com>
-Message-ID: <20140428121726.GK26756@n2100.arm.linux.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 28 Apr 2014 13:18:53 +0100
+Subject: [RESUBMIT RFC PATCH v2 3/3] drivers: mfd: Add support for Exynos
+ PMU driver
+In-Reply-To: <1398687607-4554-4-git-send-email-pankaj.dubey@samsung.com>
+References: <1398687607-4554-1-git-send-email-pankaj.dubey@samsung.com>
+ <1398687607-4554-4-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <20140428121853.GE21279@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 01:55:40PM +0200, Ulf Hansson wrote:
-> On 27 April 2014 15:29, Russell King <rmk+kernel@arm.linux.org.uk> wrote:
-> > The PMU device contains an interrupt controller, power control and
-> > resets.  The interrupt controller is a little sub-standard in that
-> > there is no race free way to clear down pending interrupts, so we try
-> > to avoid problems by reducing the window as much as possible, and
-> > clearing as infrequently as possible.
-> >
-> > The interrupt support is implemented using an IRQ domain, and the
-> > parent interrupt referenced in the standard DT way.
-> >
-> > The power domains and reset support is closely related - there is a
-> > defined sequence for powering down a domain which is tightly coupled
-> > with asserting the reset.  Hence, it makes sense to group these two
-> > together.
-> >
-> > This patch adds the core PMU driver: power domains must be defined in
-> > the DT file in order to make use of them.  The reset controller can
-> > be referenced in the standard way for reset controllers.
+> This patch moves Exynos PMU driver implementation from
+> "arm/mach-exynos" to "drivers/mfd".
+> This driver is mainly used for setting misc bits of register from PMU IP
+> of Exynos SoC which will be required to configure before Suspend/Resume.
+> Currently all these settings are done in "arch/arm/mach-exynos/pmu.c" but
+> moving ahead for ARM64 based SoC support, there is a need of DT based
+> implementation of PMU driver.
+> This driver uses already existing DT binding information.
 > 
-> Hi Russell,
-> 
-> This patch would be simplified if this was based upon the not yet
-> merged patchset from Tomasz Figa, "[PATCH v3 0/3] Generic Device Tree
-> based power domain look-up".
-> 
-> For example you would likely not need to add some of the marvel
-> specific DT bindings, and you wouldn?t need the bus_notifiers to add
-> devices to the power domain. I guess I just though it could be useful
-> input to consider while going forward, unless you already knew.
+> CC: Sangbeom Kim <sbkim73@samsung.com>
+> CC: Samuel Ortiz <sameo@linux.intel.com>
+> CC: Lee Jones <lee.jones@linaro.org>
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> ---
+>  arch/arm/mach-exynos/Kconfig                           |    2 ++
+>  arch/arm/mach-exynos/Makefile                          |    2 --
+>  drivers/mfd/Kconfig                                    |    9 +++++++++
+>  drivers/mfd/Makefile                                   |    1 +
+>  arch/arm/mach-exynos/pmu.c => drivers/mfd/exynos-pmu.c |    0
+>  5 files changed, 12 insertions(+), 2 deletions(-)
+>  rename arch/arm/mach-exynos/pmu.c => drivers/mfd/exynos-pmu.c (100%)
 
-Does that apply to 3.14?
+[...]
+
+> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> index 3383412..fd48870 100644
+> --- a/drivers/mfd/Kconfig
+> +++ b/drivers/mfd/Kconfig
+> @@ -1203,6 +1203,15 @@ config MFD_STW481X
+>  	  in various ST Microelectronics and ST-Ericsson embedded
+>  	  Nomadik series.
+>  
+> +config MFD_EXYNOS_PMU
+> +	tristate "Support Exynos Power Managment Unit"
+> +	depends on ARM || ARM64
+> +	help
+> +	Exynos SoC have Power Management Unit (PMU) which controls power and
+> +	operation state of Exynos SoC in two different ways. This driver
+> +	provides impmentation of PMU driver and provides basic functionality
+> +	required during these operation state.
+> +
+
+The help should be indented. Take a look at the other entries.
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
