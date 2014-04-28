@@ -1,77 +1,75 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 28 Apr 2014 14:18:20 -0700
-Subject: [PATCH v2 0/7] Add cros_ec changes for newer boards
-In-Reply-To: <20140428091914.GK6264@lee--X1>
-References: <1398185154-19404-1-git-send-email-dianders@chromium.org>
- <20140423123240.GA640@lee--X1> <5357E832.1000806@wwwdotorg.org>
- <CAD=FV=XbjeOR+A-ZVYgOT69gsdp-YrjbkGrjL2Vf4F31ZkGXTA@mail.gmail.com>
- <CAD=FV=UWnLLzqzmrt0z=38iDOBSRJJLNAG8PL0GSHt1758ACcg@mail.gmail.com>
- <20140428091914.GK6264@lee--X1>
-Message-ID: <CAD=FV=UEwfNX+uf70OV4LB39s=mJyxTkC63g4iYrE7hcvyEdgw@mail.gmail.com>
+From: mgr@pengutronix.de (Michael Grzeschik)
+Date: Mon, 28 Apr 2014 23:43:49 +0200
+Subject: [PATCH v4 00/17] ASoC: fsl-ssi: Driver cleanup
+In-Reply-To: <1398682498-24357-1-git-send-email-mpa@pengutronix.de>
+References: <1398682498-24357-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <20140428214349.GE12596@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lee,
+On Mon, Apr 28, 2014 at 12:54:41PM +0200, Markus Pargmann wrote:
+> Hi,
+> 
+> This series is a cleanup of the fsl-ssi driver.
+> 
+> v4 includes the changes I made to fix the baudclock handling. I moved the
+> baudclock enable/disable function calls into hw_params()/hw_free(). To avoid
+> inconsistent reference counters for the baudclock I use a variable
+> baudclk_streams which describes the active streams to be able to decide if
+> we have to enable/disable the clock and set the rate. I currently don't have a
+> board to test i2s-master, maybe I am able to test it next week. The new patch
+> which includes these changes is "ASoC: fsl-ssi: Fix baudclock handling".
+> 
+> Best regards,
+> 
+> Markus
+> 
+> 
+> Changes in v4:
+>  - New patch to fix baudclock handling (enable/disable/set_rate)
+> 
+> Changes in v3:
+>  - Some new patches to improve/fix i2s master mode by Sascha
+>  - baudclock is enabled/disabled in startup/shutdown now
+>  - bitclock setup moved to a seperate function (not set_dai_sysclk)
+>  - Regmap config changed to NATIVE now.
+> 
+> 
+> Markus Pargmann (12):
+>   ASoC: fsl-ssi: Fix register values when disabling
+>   ASoC: fsl-ssi: Move debugging to seperate file
+>   ASoC: fsl-ssi: Use dev_name for DAI driver struct
+>   ASoC: fsl-ssi: Move imx-specific probe to seperate function
+>   ASoC: fsl-ssi: Remove useless DMA code
+>   ASoC: fsl-ssi: Cleanup probe function
+>   ASoC: fsl-ssi: Remove unnecessary variables from ssi_private
+>   ASoC: fsl-ssi: make fsl,mode property optional
+>   ASoC: fsl-ssi: Transmit enable synchronization
+>   ASoC: fsl-ssi: Fix baudclock handling
+>   ASoC: fsl-ssi: reorder and document fsl_ssi_private
+>   ASoC: fsl-ssi: Use regmap
+> 
+> Sascha Hauer (5):
+>   ASoC: fsl-ssi: introduce SoC specific data
+>   ASoC: fsl-ssi: Move fsl_ssi_set_dai_sysclk above fsl_ssi_hw_params
+>   ASoC: fsl-ssi: set bitclock in master mode from hw_params
+>   ASoC: fsl-ssi: remove unnecessary spinlock
+>   ASoC: fsl-ssi: Set framerate divider correctly for i2s master mode
+> 
+>  sound/soc/fsl/Kconfig       |    1 +
+>  sound/soc/fsl/Makefile      |    3 +-
+>  sound/soc/fsl/fsl_ssi.c     | 1259 +++++++++++++++++++------------------------
+>  sound/soc/fsl/fsl_ssi.h     |  112 +++-
+>  sound/soc/fsl/fsl_ssi_dbg.c |  163 ++++++
+>  5 files changed, 815 insertions(+), 723 deletions(-)
+>  create mode 100644 sound/soc/fsl/fsl_ssi_dbg.c
 
-On Mon, Apr 28, 2014 at 2:19 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> [...]
->
->> >>> Need to wait for the ARM, DT and I2C guys to review, at which point
->> >>> I'll be happy to take in and supply a branch for them to pull from if
->> >>> required. If there are no _true_ dependencies and the MFD changes can
->> >>> be added independently without fear of build breakages, let me know
->> >>> and I'll apply them separately.
->> >>
->> >> I believe there aren't direct dependencies between the patches. So, the
->> >> MFD patches can be applied to the MFD tree and the DT patch applied to
->> >> the Tegra tree. I'm simply waiting for the MFD patches to be applied
->> >> before applying the DT patch so that I know the DT binding definition is
->> >> fully accepted before applying a patch that uses it.
->> >
->> > All of the MFD patches are safe to apply and in pretty much arbitrary
->> > order.  The strong dependencies in the chain are:
->> >
->> > * We need patch #5 (mfd: cros_ec: Sync to the latest
->> > cros_ec_commands.h from EC sources) before the i2c tunnel can compile.
->> >
->> > * As Stephen says, he shouldn't apply the device tree until we're
->> > confident that the bindings are right.  However there's no strong
->> > dependency otherwise.
->> >
->> > * Patches #1 #2 and #3 are simply reliability fixes.  Those could land
->> > at any point in time and will improve other users of cros_ec_spi (like
->> > the keyboard on tegra124-venice2).
->> >
->> > * Patch #4 can apply any time with no issues.  Without it large i2c
->> > tunnel transfers won't work, but that's not a terrible problem (all
->> > normal transfers are small).
->>
->> Patch #5 (latest ec commands) can also apply at any time with no
->> issues, but it's needed for patch #6 (the tunnel) to compile.
->>
->> All that being said, I'd request that you merge patches #1-#5 as soon
->> as you can and make sure you can provide a way that Wolfram can pull
->> them (or at least patch #5) into his i2c tree to keep them applying
->> when he is ready to land #6.
->
-> Very well. So if I can obtain Wolfram's Ack, I can apply the MFD
-> changes along with patch #6 and supply him with a branch.
+For the whole series:
 
-Can you explain the reason to wait for Wolfram's Ack before applying
-#1 - #5?  I would think:
+Tested-By: Michael Grzeschik <mgr@pengutronix.de>
 
-1. Create a topic branch.
-2. Apply patches 1-5 to the topic branch
-3. Merge the topic branch to your for-next branch
-
-When Wolfram wants to take patch #6, he can either:
-A. Pull your topic branch
-B. If it's been long enough, patches will already be in ToT and no extra work.
-
-If I understand correctly, using a topic branch and doing merges /
-pulls means that you can provide Wolfram with stable git hashes when
-he needs them and there will be no merge conflicts.
-
-Patches #1 - #5 are bonafide bugfixes irrespective of the i2c tunnel.
-
--Doug
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
