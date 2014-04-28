@@ -1,47 +1,95 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 28 Apr 2014 16:11:08 -0700
-Subject: [PATCH 2/5] power: reset: Add Allwinner A31 reset code
-In-Reply-To: <535BD18B.2070902@roeck-us.net>
-References: <1398265476-29373-1-git-send-email-maxime.ripard@free-electrons.com>
- <1398265476-29373-3-git-send-email-maxime.ripard@free-electrons.com>
- <535BD18B.2070902@roeck-us.net>
-Message-ID: <20140428231108.GO3134@lukather>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 28 Apr 2014 18:20:53 -0500
+Subject: [PATCH v2 3/7] tty/serial: convert 8250 to generic earlycon
+In-Reply-To: <CAE9FiQVrwypK4u5yTCt-AxMuBnOn7jv=V3d4Zb3cd9JDNEUVPw@mail.gmail.com>
+References: <1397859600-11507-1-git-send-email-robherring2@gmail.com>
+ <1397859600-11507-4-git-send-email-robherring2@gmail.com>
+ <CAE9FiQVrwypK4u5yTCt-AxMuBnOn7jv=V3d4Zb3cd9JDNEUVPw@mail.gmail.com>
+Message-ID: <CAL_JsqKux+BTHeYo6XEzzQMAFJZHVjbURM973oHT=t698GbJbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, Apr 26, 2014 at 1:19 AM, Yinghai Lu <yinghai@kernel.org> wrote:
+> On Fri, Apr 18, 2014 at 3:19 PM, Rob Herring <robherring2@gmail.com> wrote:
+>> From: Rob Herring <robh@kernel.org>
+>>
+>> With the generic earlycon infrastructure in place, convert the 8250
+>> early console to use it.
+>>
+>> Signed-off-by: Rob Herring <robh@kernel.org>
+>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>> Cc: Jiri Slaby <jslaby@suse.cz>
+>> ---
+>>  drivers/tty/serial/8250/8250_early.c | 138 ++++-------------------------------
+>>  drivers/tty/serial/8250/Kconfig      |   1 +
+>>  2 files changed, 16 insertions(+), 123 deletions(-)
+>
+> Hi Greg, Rob
+>
+> This one in tty-next breaks booting: "console=uart8250,io,0x3f8,115200".
+> No early console and regular console anymore.
+>
+> It should produce "early con and regular con".
 
-On Sat, Apr 26, 2014 at 08:32:27AM -0700, Guenter Roeck wrote:
-> On 04/23/2014 08:04 AM, Maxime Ripard wrote:
-> >That code used to be in the machine code, but it's more fit here with other
-> >restart hooks.
-> >
-> >That will allow to cleanup the machine directory, while waiting for a proper
-> >watchdog driver for the A31.
-> >
-> >Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> 
-> I am a bit lost here. Why is this a separate driver, accessing watchdog registers,
-> while the other reset functions are being moved into the watchdog code ?
-> 
-> Any chance to handle all platforms the same ? Seems to me that would be less messy.
+This is what I get for running checkpatch and converting
+simple_strtoul to kstrto* which are not so equivalent. kstrto* will
+not convert things such as 115200n8 to a number.
 
-The A31 watchdog is actually a different watchdog from the one in the
-other Allwinner SoCs, that probably needs a driver of its own, or at
-least, a significant refactoring.
+Greg, Do you want a fix or for me to respin the series? The fix looks like this:
 
-No one did this yet, but eventually this will probably happen.
+diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
+index 73bf1e2..c92e830 100644
+--- a/drivers/tty/serial/earlycon.c
++++ b/drivers/tty/serial/earlycon.c
+@@ -53,7 +53,7 @@ static int __init parse_options(struct
+earlycon_device *device,
+                                char *options)
+ {
+        struct uart_port *port = &device->port;
+-       int mmio, mmio32, length, ret;
++       int mmio, mmio32, length;
+        unsigned long addr;
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140428/155f63fb/attachment.sig>
+        if (!options)
+@@ -64,25 +64,19 @@ static int __init parse_options(struct
+earlycon_device *device,
+        if (mmio || mmio32) {
+                port->iotype = (mmio ? UPIO_MEM : UPIO_MEM32);
+                options += mmio ? 5 : 7;
+-               ret = kstrtoul(options, 0, &addr);
+-               if (ret)
+-                       return ret;
++               addr = simple_strtoul(options, NULL, 0);
+                port->mapbase = addr;
+                if (mmio32)
+                        port->regshift = 2;
+        } else if (!strncmp(options, "io,", 3)) {
+                port->iotype = UPIO_PORT;
+                options += 3;
+-               ret = kstrtoul(options, 0, &addr);
+-               if (ret)
+-                       return ret;
++               addr = simple_strtoul(options, NULL, 0);
+                port->iobase = addr;
+                mmio = 0;
+        } else if (!strncmp(options, "0x", 2)) {
+                port->iotype = UPIO_MEM;
+-               ret = kstrtoul(options, 0, &addr);
+-               if (ret)
+-                       return ret;
++               addr = simple_strtoul(options, NULL, 0);
+                port->mapbase = addr;
+        } else {
+                return -EINVAL;
+@@ -93,9 +87,7 @@ static int __init parse_options(struct
+earlycon_device *device,
+        options = strchr(options, ',');
+        if (options) {
+                options++;
+-               ret = kstrtouint(options, 0, &device->baud);
+-               if (ret)
+-                       return ret;
++               device->baud = simple_strtoul(options, NULL, 0);
+                length = min(strcspn(options, " ") + 1,
+                             (size_t)(sizeof(device->options)));
+                strlcpy(device->options, options, length);
