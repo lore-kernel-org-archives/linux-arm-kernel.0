@@ -1,49 +1,63 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 28 Apr 2014 20:34:27 +0100
-Subject: [PATCH 97/97] ARM: l2c: convert berlin to generic l2c initialisation
-In-Reply-To: <20140428192419.GV26756@n2100.arm.linux.org.uk>
-References: <20140428192419.GV26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WerJr-0001aG-Jk@rmk-PC.arm.linux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 28 Apr 2014 12:32:10 -0700
+Subject: [PATCH v9 05/17] ARM: dts: sun4i: Add pin-muxing info for the
+ mmc0 controller
+In-Reply-To: <1398507381-5614-6-git-send-email-hdegoede@redhat.com>
+References: <1398507381-5614-1-git-send-email-hdegoede@redhat.com>
+ <1398507381-5614-6-git-send-email-hdegoede@redhat.com>
+Message-ID: <20140428193210.GF3134@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/mach-berlin/berlin.c | 17 ++++++-----------
- 1 file changed, 6 insertions(+), 11 deletions(-)
+Hi Hans,
 
-diff --git a/arch/arm/mach-berlin/berlin.c b/arch/arm/mach-berlin/berlin.c
-index 6709d2a6bec8..ac181c6797ee 100644
---- a/arch/arm/mach-berlin/berlin.c
-+++ b/arch/arm/mach-berlin/berlin.c
-@@ -18,16 +18,6 @@
- #include <asm/hardware/cache-l2x0.h>
- #include <asm/mach/arch.h>
- 
--static void __init berlin_init_machine(void)
--{
--	/*
--	 * with DT probing for L2CCs, berlin_init_machine can be removed.
--	 * Note: 88DE3005 (Armada 1500-mini) uses pl310 l2cc
--	 */
--	l2x0_of_init(0x30c00000, 0xfeffffff);
--	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
--}
--
- static const char * const berlin_dt_compat[] = {
- 	"marvell,berlin",
- 	NULL,
-@@ -35,5 +25,10 @@ static const char * const berlin_dt_compat[] = {
- 
- DT_MACHINE_START(BERLIN_DT, "Marvell Berlin")
- 	.dt_compat	= berlin_dt_compat,
--	.init_machine	= berlin_init_machine,
-+	/*
-+	 * with DT probing for L2CCs, berlin_init_machine can be removed.
-+	 * Note: 88DE3005 (Armada 1500-mini) uses pl310 l2cc
-+	 */
-+	.l2c_aux_val	= 0x30c00000,
-+	.l2c_aux_mask	= 0xfeffffff,
- MACHINE_END
+On Sat, Apr 26, 2014 at 12:16:09PM +0200, Hans de Goede wrote:
+> mmc0 is the only controller actually being used on boards, so limit the
+> pin-muxing options to that.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  arch/arm/boot/dts/sun4i-a10.dtsi | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+> index dce074b..29fd4f5 100644
+> --- a/arch/arm/boot/dts/sun4i-a10.dtsi
+> +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+> @@ -565,6 +565,20 @@
+>  				allwinner,drive = <0>;
+>  				allwinner,pull = <0>;
+>  			};
+> +
+> +			mmc0_pins_a: mmc0 at 0 {
+> +				allwinner,pins = "PF0","PF1","PF2","PF3","PF4","PF5";
+> +				allwinner,function = "mmc0";
+> +				allwinner,drive = <2>;
+> +				allwinner,pull = <0>;
+> +			};
+> +
+> +			mmc0_cd_pin_a: mmc0_cd_pin at 0 {
+> +				allwinner,pins = "PH1";
+> +				allwinner,function = "gpio_in";
+> +				allwinner,drive = <0>;
+> +				allwinner,pull = <1>;
+> +			};
+
+Actually, I like very much the reference_pin mention you had in your
+bindings documentation. Could you use it for this and the other
+patches?
+
+Thanks,
+Maxime
+
 -- 
-1.8.3.1
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140428/acce3749/attachment-0001.sig>
