@@ -1,94 +1,69 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 28 Apr 2014 15:40:37 +0100
-Subject: [PATCH v10 11/12] ARM/ARM64: KVM: Emulate PSCI v0.2 CPU_SUSPEND
-In-Reply-To: <1398085206-30555-12-git-send-email-anup.patel@linaro.org> (Anup
- Patel's message of "Mon, 21 Apr 2014 14:00:05 +0100")
-References: <1398085206-30555-1-git-send-email-anup.patel@linaro.org>
- <1398085206-30555-12-git-send-email-anup.patel@linaro.org>
-Message-ID: <874n1dtt3u.fsf@approximate.cambridge.arm.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 28 Apr 2014 16:41:48 +0200
+Subject: [RFC 1/5] =?UTF-8?Q?mtd=3Afsl=5Fnfc=3A=20Nand=20flash=20contr?=
+ =?UTF-8?Q?oller=20for=20VF=36=31=30=2C=20MPC=35=31=32=35=2C=20etc=2E?=
+In-Reply-To: <1389222441-4322-2-git-send-email-bpringlemeir@nbsps.com>
+References: <87siupheou.fsf@nbsps.com>
+ <1389222441-4322-1-git-send-email-bpringlemeir@nbsps.com>
+ <1389222441-4322-2-git-send-email-bpringlemeir@nbsps.com>
+Message-ID: <708e6f84e177e1d02310358688b44c53@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 21 2014 at  2:00:05 pm BST, Anup Patel <anup.patel@linaro.org> wrote:
-> This patch adds emulation of PSCI v0.2 CPU_SUSPEND function call for
-> KVM ARM/ARM64. This is a CPU-level function call which can suspend
-> current CPU or current CPU cluster. We don't have VCPU clusters in
-> KVM so we only suspend the current VCPU.
->
-> The CPU_SUSPEND emulation is not tested much because currently there
-> is no CPUIDLE driver in Linux kernel that uses PSCI CPU_SUSPEND. The
-> PSCI CPU_SUSPEND implementation in ARM64 kernel was tested using a
-> Simple CPUIDLE driver which is not published due to unstable DT-bindings
-> for PSCI.
-> (For more info, http://lwn.net/Articles/574950/)
->
-> For simplicity, we implement CPU_SUSPEND emulation similar to WFI
-> (Wait-for-interrupt) emulation and we also treat power-down request
-> to be same as stand-by request. This is consistent with section
-> 5.4.1 and section 5.4.2 of PSCI v0.2 specification.
->
-> Signed-off-by: Anup Patel <anup.patel@linaro.org>
-> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-> ---
->  arch/arm/kvm/psci.c |   28 ++++++++++++++++++++++++----
->  1 file changed, 24 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-> index b582e99..757e506 100644
-> --- a/arch/arm/kvm/psci.c
-> +++ b/arch/arm/kvm/psci.c
-> @@ -37,6 +37,26 @@ static unsigned long psci_affinity_mask(unsigned long affinity_level)
->  	return 0;
->  }
->  
-> +static unsigned long kvm_psci_vcpu_suspend(struct kvm_vcpu *vcpu)
+Hi Bill,
+
+The driver works fine for me using 3.14 on Colibri VF61 (8-Bit bus
+width, Samsung NAND, 2k page size). Also tested with the Hardware ECC.
+Do you plan to send an update patch of the driver?
+
+FYI, I ported the driver to U-Boot and will send a patch to the U-Boot
+mailing list soon.
+
+Some minor comments below:
+
+Am 2014-01-09 00:07, schrieb Bill Pringlemeir:
+<snip>
+> +static u8 bbt_pattern[] = {'B', 'b', 't', '0' };
+> +static u8 mirror_pattern[] = {'1', 't', 'b', 'B' };
+> +
+> +static struct nand_bbt_descr bbt_main_descr = {
+> +	.options = NAND_BBT_LASTBLOCK | NAND_BBT_CREATE | NAND_BBT_WRITE |
+> +		   NAND_BBT_2BIT | NAND_BBT_VERSION,
+> +	.offs =	11,
+> +	.len = 4,
+> +	.veroffs = 15,
+> +	.maxblocks = 4,
+> +	.pattern = bbt_pattern,
+> +};
+> +
+> +static struct nand_bbt_descr bbt_mirror_descr = {
+> +	.options = NAND_BBT_LASTBLOCK | NAND_BBT_CREATE | NAND_BBT_WRITE |
+> +		   NAND_BBT_2BIT | NAND_BBT_VERSION,
+> +	.offs =	11,
+> +	.len = 4,
+> +	.veroffs = 15,
+> +	.maxblocks = 4,
+> +	.pattern = mirror_pattern,
+> +};
+
+This is the same BBT descriptor as used on Timesys Vybrid BSP. Other
+than this "backward compatibility", is there another reason to use non
+default BBT descriptor? As far as I can tell, the ECC does not conflict
+with the default BBT description.
+
+> +/* Write data to NFC buffers */
+> +static void nfc_write_buf(struct mtd_info *mtd, const u_char *buf, int len)
 > +{
-> +	/*
-> +	 * NOTE: For simplicity, we make VCPU suspend emulation to be
-> +	 * same-as WFI (Wait-for-interrupt) emulation.
-> +	 *
-> +	 * This means for KVM the wakeup events are interrupts and
-> +	 * this is consistent with intended use of StateID as described
-> +	 * in section 5.4.1 of PSCI v0.2 specification (ARM DEN 0022A).
-> +	 *
-> +	 * Further, we also treat power-down request to be same as
-> +	 * stand-by request as-per section 5.4.2 clause 3 of PSCI v0.2
-> +	 * specification (ARM DEN 0022A). This means all suspend states
-> +	 * for KVM will preserve the register state.
-> +	 */
-> +	kvm_vcpu_block(vcpu);
-> +
-> +	return PSCI_RET_SUCCESS;
-> +}
-> +
->  static void kvm_psci_vcpu_off(struct kvm_vcpu *vcpu)
->  {
->  	vcpu->arch.pause = true;
-> @@ -183,6 +203,10 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
->  		 */
->  		val = 2;
->  		break;
-> +	case PSCI_0_2_FN_CPU_SUSPEND:
-> +	case PSCI_0_2_FN64_CPU_SUSPEND:
-> +		val = kvm_psci_vcpu_suspend(vcpu);
-> +		break;
->  	case PSCI_0_2_FN_CPU_OFF:
->  		kvm_psci_vcpu_off(vcpu);
->  		val = PSCI_RET_SUCCESS;
-> @@ -221,10 +245,6 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
->  		val = PSCI_RET_INTERNAL_FAILURE;
->  		ret = 0;
->  		break;
-> -	case PSCI_0_2_FN_CPU_SUSPEND:
-> -	case PSCI_0_2_FN64_CPU_SUSPEND:
-> -		val = PSCI_RET_NOT_SUPPORTED;
-> -		break;
->  	default:
->  		return -EINVAL;
->  	}
+...
+IMHO this type of commands are not really required, the function name is
+descriptive enough.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> +/* Vybrid only.  MPC5125 has full RB and four CS. Assume boot loader
+> + * has set this register for now.
+> + */
 
-	M.
--- 
-Jazz is not dead. It just smells funny.
+Multi-line comment style (there are some malformed multi-line comments
+in the ECC patch as well)
+
+--
+Stefan
