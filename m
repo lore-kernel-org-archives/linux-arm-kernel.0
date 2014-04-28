@@ -1,42 +1,47 @@
-From: r.sh.open@gmail.com (Rahul Sharma)
-Date: Mon, 28 Apr 2014 11:57:35 +0530
-Subject: [PATCH v6 0/2] clk: exynos: add support for exynos5260 SoC
-In-Reply-To: <CAPdUM4NC+8Sw-gC2anb56oemOtqu9-Dy3PopGHY7oqcwmp-Jig@mail.gmail.com>
-References: <1395607554-21373-1-git-send-email-rahul.sharma@samsung.com>
- <532F5E29.3040507@gmail.com>
- <CAPdUM4NC+8Sw-gC2anb56oemOtqu9-Dy3PopGHY7oqcwmp-Jig@mail.gmail.com>
-Message-ID: <CAPdUM4Nxaa2DO3CEm61ti3ewE--5CkTF_uL_Cyf3oLd_r0TAeA@mail.gmail.com>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Mon, 28 Apr 2014 12:00:19 +0530
+Subject: [PATCH 5/7] ARM: dts: enable hdmi for exynos5250 based snow board
+In-Reply-To: <1397993044-14564-6-git-send-email-rahul.sharma@samsung.com>
+References: <1397993044-14564-1-git-send-email-rahul.sharma@samsung.com>
+ <1397993044-14564-6-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <535DF57B.5030301@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+On 04/20/2014 04:54 PM, Rahul Sharma wrote:
+> From: Rahul Sharma <Rahul.Sharma@samsung.com>
+> 
+> Enable support for HDMI for exynos5250 based Snow board.
+> 
+> Signed-off-by: Rahul Sharma <Rahul.Sharma@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos5250-cros-common.dtsi |   13 ++++++++++++-
+>  arch/arm/boot/dts/exynos5250-snow.dts         |    7 +++++++
+>  2 files changed, 19 insertions(+), 1 deletion(-)
 
-Is there anything pending with this patchset? Please consider this for 3.16.
+[ ... ]
 
-Regards,
-Rahul Sharma.
+> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+> index 52ae335..586cd38 100644
+> --- a/arch/arm/boot/dts/exynos5250-snow.dts
+> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
+> @@ -343,4 +343,11 @@
+>  			pinctrl-0 = <&ptn3460_gpios>;
+>  		};
+>  	};
+> +
+> +	hdmi {
+> +		hdmi-en-supply = <&tps65090_fet7>;
 
+Looks like tps65090_fet7 is not defined yet or might be not mentioned as
+dependency.
 
-On 24 March 2014 08:58, Rahul Sharma <r.sh.open@gmail.com> wrote:
-> Thanks Tomasz,
->
-> Please let me know if any concern.
-> Meanwhile I will post dt patches with "clock" and "clock-names" properties
-> added for each controller node.
->
-> Regards,
-> Rahul Sharma.
->
->
-> On 24 March 2014 03:50, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->> Hi Rahul,
->>
->>
+> +		vdd-supply = <&ldo8_reg>;
+> +		vdd_osc-supply = <&ldo10_reg>;
+> +		vdd_pll-supply = <&ldo8_reg>;
+> +	};
+>  };
+> 
 
-[snip]
-
->>
->> Looks good to me, will apply if no comments show up for few more days.
->>
->> Best regards,
->> Tomasz
+-- 
+Tushar Behera
