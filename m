@@ -1,159 +1,167 @@
-From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Mon, 28 Apr 2014 18:19:25 +0530
-Subject: [PATCH v3 6/6] arm: exynos: Add /dev/bL_status user interface on
- Exynos5420
-In-Reply-To: <535E3A8C.6070304@linaro.org>
-References: <1398528348-21214-1-git-send-email-a.kesavan@samsung.com>
- <1398528348-21214-7-git-send-email-a.kesavan@samsung.com>
- <535E3A8C.6070304@linaro.org>
-Message-ID: <CAM4voak-oXToBK=owO=jmpwk3rDkg71JS=8YOTz1HfiQvZa5Vw@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 28 Apr 2014 14:49:14 +0200
+Subject: [PATCH v12 11/31] documentation: iommu: add binding document of
+ Exynos System MMU
+In-Reply-To: <4780885.JaktFvJeC7@wuerfel>
+References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
+ <6544270.ddFBoY6LMm@wuerfel> <20140428111802.GI19455@ulmo>
+ <4780885.JaktFvJeC7@wuerfel>
+Message-ID: <20140428124912.GL19455@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 4:55 PM, Daniel Lezcano
-<daniel.lezcano@linaro.org> wrote:
-> On 04/26/2014 06:05 PM, Abhilash Kesavan wrote:
->>
->> Add a user interface to check the core and cluster status on
->> Exynos5420. This can be utilized while debugging mcpm issues.
->> cat /dev/bL_status will show the current power status of all
->> the 8 cores along with the cluster.
->>
->> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
->> Signed-off-by: Inderpal Singh <inderpal.s@samsung.com>
->> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
->> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
->> ---
->
->
-> Hi Abhilash,
+On Mon, Apr 28, 2014 at 02:05:30PM +0200, Arnd Bergmann wrote:
+> On Monday 28 April 2014 13:18:03 Thierry Reding wrote:
+> > On Mon, Apr 28, 2014 at 12:56:03PM +0200, Arnd Bergmann wrote:
+> > > On Monday 28 April 2014 12:39:20 Thierry Reding wrote:
+> > > > And possibly with a iommu-names property to go along with that. The idea
+> > > > being that a device can be a master on possibly multiple IOMMUs. Using
+> > > > the above it would also be possible to have one device be multiple
+> > > > masters on the same IOMMU.
+> > > 
+> > > Yes, that seems reasonable. Just one question: How would you represent a
+> > > device that has multiple masters, with at least one connected to an IOMMU
+> > > and another one connected to memory directly, without going to the IOMMU?
+> > 
+> > Heh, I don't think I've ever thought about that use-case. I guess I was
+> > always assuming that in the absence of an IOMMU the device would simply
+> > access memory directly. From what I can tell that's how Tegra works at
+> > least. If the IOMMU is not enabled for a given client, that client will
+> > access physical memory untranslated.
+> > 
+> > I suppose if that really must be represented then a global dummy IOMMU
+> > could be introduced to help with these cases.
+> 
+> It's actually not too uncommon: you can have e.g. the lower 2GB mapped
+> directly from the device address space into the host memory, but have
+> an iommu that translates accesses from some range in the upper 2GB of
+> the 32-bit address space into full 64-bit addresses.
+> 
+> This use case makes no sense if you use the IOMMU for isolation
+> or virtualization, but it gives better performance for lowmem access
+> when the only reason to have the IOMMU is to map highmem addresses.
 
-Hi Daniel,
->
-> I don't think you should add this file.
->
-> 1. big Little is not exynos specific
-But the core control/status bits that I am accessing are exynos
-specific and currently it is being enabled only on 5420.
-> 2. /dev is not for the purpose of your patch
-OK.
->
-> So I would recommend:
->
-> 1. create a generic infra-structure for all the big.Little
-> 2. and/or use debugfs
->
-> Furthermore, how is it usable ? Will you read the file every 2ms to check
-> the cluster status, knowing it will be woken up by the read operation ?
-This was just a quick way to check the power status of the
-cores/cluster during cpufreq controlled core switching. Maybe not as
-useful in case of cpuidle.
->
-> Frankly speaking, it would make sense to add traces in mcpm.c (if they
-> aren't already there - did not check).
-Fair enough, the core bL_switcher code does have code for trace
-events. I can check more on that.
+Thinking about this some more, isn't the non-IOMMU master something we
+can completely ignore in the DT? Or at least it shouldn't be handled by
+the IOMMU bindings because, well, it's not an IOMMU to begin with.
 
-Regards,
-Abhilash
->
->
->>   arch/arm/mach-exynos/mcpm-exynos.c | 64
->> ++++++++++++++++++++++++++++++++++++++
->>   1 file changed, 64 insertions(+)
->>
->> diff --git a/arch/arm/mach-exynos/mcpm-exynos.c
->> b/arch/arm/mach-exynos/mcpm-exynos.c
->> index f9977bf..83428b0 100644
->> --- a/arch/arm/mach-exynos/mcpm-exynos.c
->> +++ b/arch/arm/mach-exynos/mcpm-exynos.c
->> @@ -269,6 +269,53 @@ static void __init exynos_mcpm_usage_count_init(void)
->>         cpu_use_count[cpu][cluster] = 1;
->>   }
->>
->> +static size_t bL_check_status(char *info)
->> +{
->> +       size_t len = 0;
->> +       int i;
->> +
->> +       len += sprintf(&info[len], "\t0 1 2 3 L2\n");
->> +       len += sprintf(&info[len], "[A15]   ");
->> +       for (i = 0; i < 4; i++) {
->> +               len += sprintf(&info[len], "%d ",
->> +                       (readl(EXYNOS_ARM_CORE_STATUS(i)) & 0x3) == 3 ? 1
->> : 0);
->> +       }
->> +       len += sprintf(&info[len], "%d\n",
->> +                       (readl(EXYNOS_COMMON_STATUS(0)) & 0x3) == 3 ? 1 :
->> 0);
->> +
->> +       len += sprintf(&info[len], "[A7]    ");
->> +       for (i = 4; i < 8; i++)
->> +               len += sprintf(&info[len], "%d ",
->> +                       (readl(EXYNOS_ARM_CORE_STATUS(i)) & 0x3) == 3 ? 1
->> : 0);
->> +       len += sprintf(&info[len], "%d\n\n",
->> +                       (readl(EXYNOS_COMMON_STATUS(1)) & 0x3) == 3 ? 1 :
->> 0);
->> +
->> +       return len;
->> +}
->> +
->> +static ssize_t bL_status_read(struct file *file, char __user *buf,
->> +                       size_t len, loff_t *pos)
->> +{
->> +       size_t count = 0;
->> +       char info[100];
->> +
->> +       count = bL_check_status(info);
->> +       if (count < 0)
->> +               return -EINVAL;
->> +
->> +       return simple_read_from_buffer(buf, len, pos, info, count);
->> +}
->> +
->> +static const struct file_operations bL_status_fops = {
->> +       .read           = bL_status_read,
->> +};
->> +
->> +static struct miscdevice bL_status_device = {
->> +       MISC_DYNAMIC_MINOR,
->> +       "bL_status",
->> +       &bL_status_fops
->> +};
->> +
->>   /*
->>    * Enable cluster-level coherency, in preparation for turning on the
->> MMU.
->>    */
->> @@ -319,3 +366,20 @@ static int __init exynos_mcpm_init(void)
->>   }
->>
->>   early_initcall(exynos_mcpm_init);
->> +
->> +static int __init exynos_bl_status_init(void)
->> +{
->> +       int ret;
->> +
->> +       if (!soc_is_exynos5420())
->> +               return -ENODEV;
->> +
->> +       ret = misc_register(&bL_status_device);
->> +       if (ret) {
->> +               pr_info("bl_status not available\n");
->> +               return ret;
->> +       }
->> +       return 0;
->> +}
->> +
->> +late_initcall(exynos_bl_status_init);
->>
->
->
-> --
->  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
->
-> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-> <http://twitter.com/#!/linaroorg> Twitter |
-> <http://www.linaro.org/linaro-blog/> Blog
->
+Perhaps it's something that should be described using dma-ranges?
+
+> > > A lot of drivers probably only support one
+> > > master, so they can just set #iommu-cells=<0>, others might require
+> > > IDs that do not fit into one cell.
+> > 
+> > You mean "#iommu-cells = <1>" for devices that only require one master?
+> 
+> I meant an IOMMU device that acts as the slave for exactly one device,
+> even if that device has multiple master ports.
+
+Okay, makes sense. I guess depending on the nature of the IOMMU it might
+make sense not to expose it as an IOMMU at all. For example if it lives
+completely within the register space of its master device. In that case
+it could be directly programmed from the device's driver.
+
+> > There still has to be one cell to specify which master. Unless perhaps
+> > if they can be arbitrarily assigned. I guess even if there's a fixed
+> > mapping that applies to one SoC generation, it might be good to still
+> > employ a specifier and have the mapping in DT for flexibility.
+> 
+> let me clarify by example:
+> 
+> 	iommu at 1 {
+> 		compatible = "some,simple-iommu";
+> 		reg = <1>;
+> 		#iommu-cells = <0>; /* supports only one master */
+> 	};
+> 
+> 	iommu at 2 {
+> 		compatible = "some,other-iommu";
+> 		reg = <3>;
+> 		#iommu-cells = <1>; /* contains master ID */
+> 	};
+> 
+> 	iommu at 3 {
+> 		compatible = "some,windowed-iommu";
+> 		reg = <2>;
+> 		#iommu-cells = <2>; /* contains dma-window */
+> 	};
+> 
+> 	device at 4 {
+> 		compatible = "some,ethernet";
+> 		iommus = <&/iommu@1>;
+> 	};
+> 
+> 	device at 5 {
+> 		compatible = "some,dmaengine";
+> 		iommus = <&/iommu@2 0x40000000 0x1000000>,
+> 			 <&/iommu@3 0x101>;
+> 	};
+> 
+> The device at address 4 has a one-one relationship with iommu at 1, so there
+> is no need for any data. device at 5 has two master ports. One is connected to
+> an IOMMU that has a per-device aperture, device at 5 can only issue transfers
+> to the 256MB area at 0x40000000, and the IOMMU will have to put entries for
+> this device into that address. The second master port is connected to
+> iommu at 3, which uses a master ID that gets passed along with each transfer,
+> so that needs to be put into the IOTLBs.
+
+The above sounds reasonable to me with the exception of the DMA window
+specifier. Isn't that precisely the information that we currently
+describe using the dma-ranges property?
+
+> A variation would be to not use #iommu-cells at all, but provide a
+> #address-cells / #size-cells pair in the IOMMU, and have a translation
+> as we do for dma-ranges. This is probably most flexible.
+
+I'm not sure I follow. Wouldn't that require masters to be children of
+the IOMMU DT nodes for that to work out? Also how would that work for
+cases where more data than the address ranges (such as the master ID) is
+needed to operate the IOMMU?
+
+> One completely open question that I just noticed is how the kernel should
+> deal with the case of multiple IOMMUs attached to one master: the
+> data structures we have assume that we know exactly how to do DMA by
+> setting the per-device dma_map_ops (iommu or not, coherent or not),
+> and by setting a pointer to at most one IOMMU.
+
+Perhaps we need something more fine-grained than what we currently have.
+I can imagine that rather than having it all abstracted away and handled
+transparently (which undoubtedly has a lot of advantages), we need to
+expose a client API of sorts that drivers can use.
+
+I'm mostly brainstorming here and not thinking of any concrete use-case:
+
+	struct iommu_master *master = iommu_get(dev, "foo");
+
+	iommu_master_set_range(master, 0, SZ_256M);
+
+	pages = alloc_pages(...);
+
+	iova = iommu_master_map(master, pages);
+
+The above would essentially obtain a handle to the "foo" IOMMUs master,
+set the valid DMA range (hard-coded in the driver or obtained from a
+dma-ranges property), allocates some pages of memory and then maps them
+into the device's address space via the IOMMU.
+
+The reason why I think what we have isn't going to work is that it is
+assumed that either there is an IOMMU or there isn't. So memory gets
+either mapped through an IOMMU or it doesn't. Furthermore IOMMU usage is
+likely very use-case dependent and it's probably not easy to determine
+automatically which IOMMU is to be used for individual allocations.
+
+Allowing more fine-grained control of the IOMMU from drivers should
+increase the flexibility of users since they have more context to make
+the right decisions.
+
+But then again, I have only a very sketchy idea of what an IOMMU needs
+to be able to do, so maybe the above doesn't make sense at all.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140428/ae69f285/attachment-0001.sig>
