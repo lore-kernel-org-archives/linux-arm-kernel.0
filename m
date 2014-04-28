@@ -1,55 +1,134 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Mon, 28 Apr 2014 14:53:51 +0800
-Subject: [PATCH v4 13/14] ARM: dts: Add PMU support in HiP04
+Date: Mon, 28 Apr 2014 14:53:52 +0800
+Subject: [PATCH v4 14/14] virt: arm: support hip04 gic
 In-Reply-To: <1398668032-8335-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1398668032-8335-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1398668032-8335-14-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1398668032-8335-15-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kefeng Wang <kefeng.wang@linaro.org>
+In ARM standard GIC, GICH_APR offset is 0xf0 & GICH_LR0 offset is 0x100.
+In HiP04 GIC, GICH_APR offset is 0x70 & GICH_LR0 offset is 0x80.
+So add the support of HiP04 SoC in VGIC.
 
-ARM Performance Monitor Units are available on the HiP04.
-So add the support in the dtsi.
-
-Simply tested with perf.
-
-Signed-off-by: Kefeng Wang <kefeng.wang@linaro.org>
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- arch/arm/boot/dts/hip04.dtsi | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm/kvm/interrupts_head.S  | 24 ++++++++++++++++++++----
+ include/linux/irqchip/arm-gic.h |  3 +++
+ virt/kvm/arm/vgic.c             | 15 ++++++++++++++-
+ 3 files changed, 37 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/hip04.dtsi b/arch/arm/boot/dts/hip04.dtsi
-index 7e909ee..98aa9fd 100644
---- a/arch/arm/boot/dts/hip04.dtsi
-+++ b/arch/arm/boot/dts/hip04.dtsi
-@@ -218,6 +218,26 @@
- 			status = "ok";
- 		};
+diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
+index 76af9302..b27e43f 100644
+--- a/arch/arm/kvm/interrupts_head.S
++++ b/arch/arm/kvm/interrupts_head.S
+@@ -419,7 +419,9 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+ 	ldr	r7, [r2, #GICH_EISR1]
+ 	ldr	r8, [r2, #GICH_ELRSR0]
+ 	ldr	r9, [r2, #GICH_ELRSR1]
+-	ldr	r10, [r2, #GICH_APR]
++	ldr	r10, =gich_apr
++	ldr	r10, [r10]
++	ldr	r10, [r2, r10]
  
-+		arm-pmu {
-+			compatible = "arm,cortex-a15-pmu";
-+			interrupts = <0 64 4>,
-+				     <0 65 4>,
-+				     <0 66 4>,
-+				     <0 67 4>,
-+				     <0 68 4>,
-+				     <0 69 4>,
-+				     <0 70 4>,
-+				     <0 71 4>,
-+				     <0 72 4>,
-+				     <0 73 4>,
-+				     <0 74 4>,
-+				     <0 75 4>,
-+				     <0 76 4>,
-+				     <0 77 4>,
-+				     <0 78 4>,
-+				     <0 79 4>;
-+		};
+ 	str	r3, [r11, #VGIC_CPU_HCR]
+ 	str	r4, [r11, #VGIC_CPU_VMCR]
+@@ -435,7 +437,11 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+ 	str	r5, [r2, #GICH_HCR]
+ 
+ 	/* Save list registers */
+-	add	r2, r2, #GICH_LR0
++	ldr	r10, =gich_apr
++	ldr	r10, [r10]
++	/* the offset between GICH_APR & GICH_LR0 is 0x10 */
++	add	r10, r10, #0x10
++	add	r2, r2, r10
+ 	add	r3, r11, #VGIC_CPU_LR
+ 	ldr	r4, [r11, #VGIC_CPU_NR_LR]
+ 1:	ldr	r6, [r2], #4
+@@ -469,10 +475,16 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+ 
+ 	str	r3, [r2, #GICH_HCR]
+ 	str	r4, [r2, #GICH_VMCR]
+-	str	r8, [r2, #GICH_APR]
++	ldr	r6, =gich_apr
++	ldr	r6, [r6]
++	str	r8, [r2, r6]
+ 
+ 	/* Restore list registers */
+-	add	r2, r2, #GICH_LR0
++	ldr	r6, =gich_apr
++	ldr	r6, [r6]
++	/* the offset between GICH_APR & GICH_LR0 is 0x10 */
++	add	r6, r6, #0x10
++	add	r2, r2, r6
+ 	add	r3, r11, #VGIC_CPU_LR
+ 	ldr	r4, [r11, #VGIC_CPU_NR_LR]
+ 1:	ldr	r6, [r3], #4
+@@ -618,3 +630,7 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+ .macro load_vcpu
+ 	mrc	p15, 4, vcpu, c13, c0, 2	@ HTPIDR
+ .endm
 +
- 		timer {
- 			compatible = "arm,armv7-timer";
- 			interrupts = <1 13 0xf08>,
++	.global gich_apr
++gich_apr:
++	.long	GICH_APR
+diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+index 55933aa..dd0785a 100644
+--- a/include/linux/irqchip/arm-gic.h
++++ b/include/linux/irqchip/arm-gic.h
+@@ -49,6 +49,8 @@
+ #define GICH_ELRSR1 			0x34
+ #define GICH_APR			0xf0
+ #define GICH_LR0			0x100
++#define HIP04_GICH_APR			0x70
++/* GICH_LR0 offset in HiP04 is 0x80 */
+ 
+ #define GICH_HCR_EN			(1 << 0)
+ #define GICH_HCR_UIE			(1 << 1)
+@@ -78,6 +80,7 @@
+ struct device_node;
+ 
+ extern struct irq_chip gic_arch_extn;
++extern unsigned int gich_apr;
+ 
+ void gic_init_bases(unsigned int, int, void __iomem *, void __iomem *,
+ 		    u32 offset, struct device_node *);
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 47b2983..6bf31db 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1470,17 +1470,30 @@ static struct notifier_block vgic_cpu_nb = {
+ 	.notifier_call = vgic_cpu_notify,
+ };
+ 
++static const struct of_device_id of_vgic_ids[] = {
++	{
++		.compatible = "arm,cortex-a15-gic",
++		.data = (void *)GICH_APR,
++	}, {
++		.compatible = "hisilicon,hip04-gic",
++		.data = (void *)HIP04_GICH_APR,
++	}, {
++	},
++};
++
+ int kvm_vgic_hyp_init(void)
+ {
+ 	int ret;
+ 	struct resource vctrl_res;
+ 	struct resource vcpu_res;
++	const struct of_device_id *match;
+ 
+-	vgic_node = of_find_compatible_node(NULL, NULL, "arm,cortex-a15-gic");
++	vgic_node = of_find_matching_node_and_match(NULL, of_vgic_ids, &match);
+ 	if (!vgic_node) {
+ 		kvm_err("error: no compatible vgic node in DT\n");
+ 		return -ENODEV;
+ 	}
++	gich_apr = (unsigned int)match->data;
+ 
+ 	vgic_maint_irq = irq_of_parse_and_map(vgic_node, 0);
+ 	if (!vgic_maint_irq) {
 -- 
 1.9.1
