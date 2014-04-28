@@ -1,34 +1,118 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 28 Apr 2014 11:28:06 +0100
-Subject: [PATCH RFC 6/8] component: remove old add_components method
-In-Reply-To: <20140428070727.GC19455@ulmo>
-References: <20140426230025.GZ26756@n2100.arm.linux.org.uk>
- <E1WeBbp-0002Gs-Ju@rmk-PC.arm.linux.org.uk> <20140428070727.GC19455@ulmo>
-Message-ID: <20140428102806.GH26756@n2100.arm.linux.org.uk>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Mon, 28 Apr 2014 19:30:03 +0900
+Subject: [PATCH 1/4] usb: ohci-exynos: Use struct device instead of
+ platform_device
+In-Reply-To: <1398677132-30600-2-git-send-email-gautam.vivek@samsung.com>
+References: <1398677132-30600-1-git-send-email-gautam.vivek@samsung.com>
+ <1398677132-30600-2-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <001801cf62cc$d1286690$737933b0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 09:07:28AM +0200, Thierry Reding wrote:
-> I'm wondering if there may be an advantage to keeping both interfaces.
-> Even if currently what all implementations do is essentially creating
-> the match table at probe time there may be use-cases where that doesn't
-> work so well.
+On Monday, April 28, 2014 6:25 PM, Vivek Gautam wrote:
+> 
+> Change to use struct device instead of struct platform_device
+> for some static functions.
+> 
+> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+> Cc: Jingoo Han <jg1.han@samsung.com>
 
-Keeping both interfaces makes this whole change is pointless, because
-then there's no way to avoid having to rebuild the tracking of which
-components belong to which master - and we might as well stick with
-what we have.
+Acked-by: Jingoo Han <jg1.han@samsung.com>
 
-Moreover, one of the other points Laurent raised is that we need to
-be able to do partial binds for some subsystems, and for that to work
-we need more information held within the component helpers and the
-teardown/rebuild of the master/component relationships to be eliminated.
+Best regards,
+Jingoo Han
 
-The last point is that the repeated teardown/rebuild is already being
-used as a justification to go off and write a completely different
-infrastructure instead... it seems some people deem this to be far
-too wasteful of our billion cycles per second CPUs.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> ---
+>  drivers/usb/host/ohci-exynos.c |   20 +++++++++-----------
+>  1 file changed, 9 insertions(+), 11 deletions(-)
+> 
+> diff --git a/drivers/usb/host/ohci-exynos.c b/drivers/usb/host/ohci-exynos.c
+> index 9cf80cb..05f00e3 100644
+> --- a/drivers/usb/host/ohci-exynos.c
+> +++ b/drivers/usb/host/ohci-exynos.c
+> @@ -39,18 +39,18 @@ struct exynos_ohci_hcd {
+>  	struct usb_otg *otg;
+>  };
+> 
+> -static void exynos_ohci_phy_enable(struct platform_device *pdev)
+> +static void exynos_ohci_phy_enable(struct device *dev)
+>  {
+> -	struct usb_hcd *hcd = platform_get_drvdata(pdev);
+> +	struct usb_hcd *hcd = dev_get_drvdata(dev);
+>  	struct exynos_ohci_hcd *exynos_ohci = to_exynos_ohci(hcd);
+> 
+>  	if (exynos_ohci->phy)
+>  		usb_phy_init(exynos_ohci->phy);
+>  }
+> 
+> -static void exynos_ohci_phy_disable(struct platform_device *pdev)
+> +static void exynos_ohci_phy_disable(struct device *dev)
+>  {
+> -	struct usb_hcd *hcd = platform_get_drvdata(pdev);
+> +	struct usb_hcd *hcd = dev_get_drvdata(dev);
+>  	struct exynos_ohci_hcd *exynos_ohci = to_exynos_ohci(hcd);
+> 
+>  	if (exynos_ohci->phy)
+> @@ -139,7 +139,7 @@ skip_phy:
+> 
+>  	platform_set_drvdata(pdev, hcd);
+> 
+> -	exynos_ohci_phy_enable(pdev);
+> +	exynos_ohci_phy_enable(&pdev->dev);
+> 
+>  	err = usb_add_hcd(hcd, irq, IRQF_SHARED);
+>  	if (err) {
+> @@ -150,7 +150,7 @@ skip_phy:
+>  	return 0;
+> 
+>  fail_add_hcd:
+> -	exynos_ohci_phy_disable(pdev);
+> +	exynos_ohci_phy_disable(&pdev->dev);
+>  fail_io:
+>  	clk_disable_unprepare(exynos_ohci->clk);
+>  fail_clk:
+> @@ -168,7 +168,7 @@ static int exynos_ohci_remove(struct platform_device *pdev)
+>  	if (exynos_ohci->otg)
+>  		exynos_ohci->otg->set_host(exynos_ohci->otg, &hcd->self);
+> 
+> -	exynos_ohci_phy_disable(pdev);
+> +	exynos_ohci_phy_disable(&pdev->dev);
+> 
+>  	clk_disable_unprepare(exynos_ohci->clk);
+> 
+> @@ -190,7 +190,6 @@ static int exynos_ohci_suspend(struct device *dev)
+>  {
+>  	struct usb_hcd *hcd = dev_get_drvdata(dev);
+>  	struct exynos_ohci_hcd *exynos_ohci = to_exynos_ohci(hcd);
+> -	struct platform_device *pdev = to_platform_device(dev);
+>  	bool do_wakeup = device_may_wakeup(dev);
+>  	int rc = ohci_suspend(hcd, do_wakeup);
+> 
+> @@ -200,7 +199,7 @@ static int exynos_ohci_suspend(struct device *dev)
+>  	if (exynos_ohci->otg)
+>  		exynos_ohci->otg->set_host(exynos_ohci->otg, &hcd->self);
+> 
+> -	exynos_ohci_phy_disable(pdev);
+> +	exynos_ohci_phy_disable(dev);
+> 
+>  	clk_disable_unprepare(exynos_ohci->clk);
+> 
+> @@ -211,14 +210,13 @@ static int exynos_ohci_resume(struct device *dev)
+>  {
+>  	struct usb_hcd *hcd			= dev_get_drvdata(dev);
+>  	struct exynos_ohci_hcd *exynos_ohci	= to_exynos_ohci(hcd);
+> -	struct platform_device *pdev		= to_platform_device(dev);
+> 
+>  	clk_prepare_enable(exynos_ohci->clk);
+> 
+>  	if (exynos_ohci->otg)
+>  		exynos_ohci->otg->set_host(exynos_ohci->otg, &hcd->self);
+> 
+> -	exynos_ohci_phy_enable(pdev);
+> +	exynos_ohci_phy_enable(dev);
+> 
+>  	ohci_resume(hcd, false);
+> 
+> --
+> 1.7.10.4
