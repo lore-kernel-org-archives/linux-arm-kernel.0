@@ -1,41 +1,34 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 28 Apr 2014 20:33:10 +0100
-Subject: [PATCH 82/97] ARM: l2c: always enable low power modes
+Date: Mon, 28 Apr 2014 20:33:16 +0100
+Subject: [PATCH 83/97] ARM: l2c: imx: remove direct write to power control
+ register
 In-Reply-To: <20140428192419.GV26756@n2100.arm.linux.org.uk>
 References: <20140428192419.GV26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WerIc-0001ZH-VX@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WerIi-0001ZL-2w@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Always enable the L2C low power modes on L2C-310 R3P0 and newer parts.
+Now that we handle this in core code, we don't need platforms enabling
+the low power modes directly.
 
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mm/cache-l2x0.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/mach-imx/system.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 610fa25eff0c..333ef64873f9 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -695,6 +695,18 @@ static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
- 			1 + (prefetch & L310_PREFETCH_CTRL_OFFSET_MASK));
- 	}
+diff --git a/arch/arm/mach-imx/system.c b/arch/arm/mach-imx/system.c
+index 59013a81107b..3b0733edb68c 100644
+--- a/arch/arm/mach-imx/system.c
++++ b/arch/arm/mach-imx/system.c
+@@ -138,8 +138,6 @@ void __init imx_init_l2cache(void)
+ 	if (cpu_is_imx6q())
+ 		val &= ~(1 << 30 | 1 << 23);
+ 	writel_relaxed(val, l2x0_base + L310_PREFETCH_CTRL);
+-	val = L310_DYNAMIC_CLK_GATING_EN | L310_STNDBY_MODE_EN;
+-	writel_relaxed(val, l2x0_base + L310_POWER_CTRL);
  
-+	/* r3p0 or later has power control register */
-+	if (rev >= L310_CACHE_ID_RTL_R3P0) {
-+		u32 power_ctrl;
-+
-+		l2c_write_sec(L310_DYNAMIC_CLK_GATING_EN | L310_STNDBY_MODE_EN,
-+			      base, L310_POWER_CTRL);
-+		power_ctrl = readl_relaxed(base + L310_POWER_CTRL);
-+		pr_info("L2C-310 dynamic clock gating %sabled, standby mode %sabled\n",
-+			power_ctrl & L310_DYNAMIC_CLK_GATING_EN ? "en" : "dis",
-+			power_ctrl & L310_STNDBY_MODE_EN ? "en" : "dis");
-+	}
-+
- 	l2c_enable(base, aux, num_lock);
- 
- 	if (aux & L310_AUX_CTRL_FULL_LINE_ZERO) {
+ 	iounmap(l2x0_base);
+ 	of_node_put(np);
 -- 
 1.8.3.1
