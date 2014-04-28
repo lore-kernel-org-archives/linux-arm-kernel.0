@@ -1,31 +1,26 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 28 Apr 2014 11:07:26 -0600
-Subject: [PATCH] ARM: tegra: add SD wp-gpios to Jetson TK1 DT
-Message-ID: <1398704846-18262-1-git-send-email-swarren@wwwdotorg.org>
+Date: Mon, 28 Apr 2014 11:12:14 -0600
+Subject: [PATCH 00/16] Another 16 L2C patches
+In-Reply-To: <20140428165631.GM26756@n2100.arm.linux.org.uk>
+References: <20140428165631.GM26756@n2100.arm.linux.org.uk>
+Message-ID: <535E8BEE.1000100@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On 04/28/2014 10:56 AM, Russell King - ARM Linux wrote:
+> So, in response to Matt Porter's complaint about breaking prima2, here's
+> another 16 patches which changes the way the L2 cache is initialised on
+> many platforms.  This series moves towards a situation where the generic
+> code initialises the L2 cache itself, with as little help as possible
+> from board specific code.
+> 
+> A number of platforms are left alone because they're more complex -
+> these should still eventually be converted.
+> 
+> At some point in the near future, I will see about sorting out their
+> ordering wrt the previous patch set.  For the time being, they apply
+> on top of the existing l2c changes.
 
-Jetson TK1 can detect write-protect on the SD card. Add the required
-DT entries to allow this.
-
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/boot/dts/tegra124-jetson-tk1.dts | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/boot/dts/tegra124-jetson-tk1.dts b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
-index fbc34933cf69..e31fb61a81d3 100644
---- a/arch/arm/boot/dts/tegra124-jetson-tk1.dts
-+++ b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
-@@ -1624,6 +1624,7 @@
- 		status = "okay";
- 		cd-gpios = <&gpio TEGRA_GPIO(V, 2) GPIO_ACTIVE_LOW>;
- 		power-gpios = <&gpio TEGRA_GPIO(R, 0) GPIO_ACTIVE_HIGH>;
-+		wp-gpios = <&gpio TEGRA_GPIO(Q, 4) GPIO_ACTIVE_HIGH>;
- 		bus-width = <4>;
- 		vqmmc-supply = <&vddio_sdmmc3>;
- 	};
--- 
-1.8.1.5
+Are "the existing l2c changes" in next-20140428? If not, is there a git
+branch I can pull to test the whole thing, rather than tracking down and
+applying "the existing l2c changes" first?
