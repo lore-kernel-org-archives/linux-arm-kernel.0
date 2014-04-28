@@ -1,108 +1,91 @@
-From: anup.patel@linaro.org (Anup Patel)
-Date: Mon, 28 Apr 2014 11:48:57 +0530
-Subject: [PATCH v8 3/3] ARM: Check if a CPU has gone offline
-In-Reply-To: <1398455329-18136-4-git-send-email-ashwin.chaugule@linaro.org>
-References: <1398455329-18136-1-git-send-email-ashwin.chaugule@linaro.org>
- <1398455329-18136-4-git-send-email-ashwin.chaugule@linaro.org>
-Message-ID: <CALrVBkuV2kQmBScDSMUVG+hOMZ3FQ1tEOEwUEPHRoCo9si+ygA@mail.gmail.com>
+From: alim.akhtar@gmail.com (Alim Akhtar)
+Date: Mon, 28 Apr 2014 11:48:49 +0530
+Subject: [PATCH v3 05/16] clk: exynos5420: update clocks for G2D block
+In-Reply-To: <1398344632-18623-6-git-send-email-shaik.ameer@samsung.com>
+References: <1398344632-18623-1-git-send-email-shaik.ameer@samsung.com>
+ <1398344632-18623-6-git-send-email-shaik.ameer@samsung.com>
+Message-ID: <CAGOxZ50rLg-0ebkcgDUMzWENrZiVUjYFEy-T6OxjO8imXbiTCQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ashwin,
+Hi Shaik,
 
-On 26 April 2014 01:18, Ashwin Chaugule <ashwin.chaugule@linaro.org> wrote:
-> PSCIv0.2 adds a new function called AFFINITY_INFO, which
-> can be used to query if a specified CPU has actually gone
-> offline. Calling this function via cpu_kill ensures that
-> a CPU has quiesced after a call to cpu_die.
+On Thu, Apr 24, 2014 at 6:33 PM, Shaik Ameer Basha
+<shaik.ameer@samsung.com> wrote:
+> Addign more G2D block clocks.
 >
-> Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
-> Reviewed-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+> Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
 > ---
->  arch/arm/kernel/psci_smp.c | 32 ++++++++++++++++++++++++++++++++
->  include/uapi/linux/psci.h  |  5 +++++
->  2 files changed, 37 insertions(+)
+>  drivers/clk/samsung/clk-exynos5420.c   |   10 ++++++++++
+>  include/dt-bindings/clock/exynos5420.h |    3 +++
+>  2 files changed, 13 insertions(+)
+>  mode change 100644 => 100755 include/dt-bindings/clock/exynos5420.h
 >
-> diff --git a/arch/arm/kernel/psci_smp.c b/arch/arm/kernel/psci_smp.c
-> index 570a48c..94e230c 100644
-> --- a/arch/arm/kernel/psci_smp.c
-> +++ b/arch/arm/kernel/psci_smp.c
-> @@ -16,6 +16,8 @@
->  #include <linux/init.h>
->  #include <linux/smp.h>
->  #include <linux/of.h>
-> +#include <linux/delay.h>
-> +#include <uapi/linux/psci.h>
+> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+> index 9da85ac..ab07299 100755
+> --- a/drivers/clk/samsung/clk-exynos5420.c
+> +++ b/drivers/clk/samsung/clk-exynos5420.c
+> @@ -815,6 +815,10 @@ static struct samsung_gate_clock exynos5420_gate_clks[] __initdata = {
+>         GATE(CLK_ROTATOR, "rotator", "aclk266", GATE_IP_GEN, 1, 0, 0),
+>         GATE(CLK_JPEG, "jpeg", "aclk300_jpeg", GATE_IP_GEN, 2, 0, 0),
+>         GATE(CLK_JPEG2, "jpeg2", "aclk300_jpeg", GATE_IP_GEN, 3, 0, 0),
+> +       GATE(CLK_MDMA0, "mdma0", "aclk266_g2d",
+> +                       GATE_IP_G2D, 1, CLK_IGNORE_UNUSED, 0),
+> +       GATE(CLK_SMMU_MDMA0, "smmu_mdma0", "aclk266_g2d",
+> +                       GATE_IP_G2D, 5, CLK_IGNORE_UNUSED, 0),
+>         GATE(CLK_MDMA1, "mdma1", "aclk266", GATE_IP_GEN, 4, 0, 0),
+>         GATE(CLK_SMMU_ROTATOR, "smmu_rotator", "aclk266", GATE_IP_GEN, 6, 0, 0),
+>         GATE(CLK_SMMU_JPEG, "smmu_jpeg", "aclk300_jpeg", GATE_IP_GEN, 7, 0, 0),
+> @@ -842,6 +846,11 @@ static struct samsung_gate_clock exynos5420_gate_clks[] __initdata = {
+>                         "mout_user_aclk333_432_isp0", GATE_BUS_TOP, 5, 0, 0),
+>         GATE(0, "aclk333_432_isp",
+>                         "mout_user_aclk333_432_isp", GATE_BUS_TOP, 8, 0, 0),
+> +       /* G2D */
+> +       GATE(CLK_G2D, "g2d", "aclk333_g2d",
+> +                       GATE_IP_G2D, 3, CLK_IGNORE_UNUSED, 0),
+> +       GATE(CLK_SMMU_G2D, "smmu_g2d", "aclk333_g2d",
+> +                       GATE_IP_G2D, 7, CLK_IGNORE_UNUSED, 0),
+>         /* ISP */
+>         GATE(0, "sclk_pwm_isp", "dout_pwm_isp", GATE_TOP_SCLK_ISP, 3, 0, 0),
+>         GATE(0, "sclk_uart_isp", "dout_uart_isp", GATE_TOP_SCLK_ISP, 0, 0, 0),
+> @@ -858,6 +867,7 @@ static struct samsung_gate_clock exynos5420_gate_clks[] __initdata = {
 >
->  #include <asm/psci.h>
->  #include <asm/smp_plat.h>
-> @@ -66,6 +68,35 @@ void __ref psci_cpu_die(unsigned int cpu)
->         /* We should never return */
->         panic("psci: cpu %d failed to shutdown\n", cpu);
->  }
-> +
-> +int __ref psci_cpu_kill(unsigned int cpu)
-> +{
-> +       int err, i;
-> +
-> +       if (!psci_ops.affinity_info)
-> +               return 1;
-> +       /*
-> +        * cpu_kill could race with cpu_die and we can
-> +        * potentially end up declaring this cpu undead
-> +        * while it is dying. So, try again a few times.
-> +        */
-> +
-> +       for (i=0; i<10; i++) {
-> +               err = psci_ops.affinity_info(cpu_logical_map(cpu), 0);
-> +
-> +               if (err == PSCI_AFFINITY_INFO_RET_OFF)
-> +                       return 1;
-> +
-> +               msleep(10);
-> +               pr_info("Retrying again to check for CPU kill\n");
-> +       }
-> +
-> +       pr_err("psci: Cannot kill CPU:%d, psci ret val: %d\n",
-> +                       cpu, err);
-> +       /* Make platform_cpu_kill() fail. */
-> +       return 0;
-> +}
-> +
->  #endif
->
->  bool __init psci_smp_available(void)
-> @@ -78,5 +109,6 @@ struct smp_operations __initdata psci_smp_ops = {
->         .smp_boot_secondary     = psci_boot_secondary,
->  #ifdef CONFIG_HOTPLUG_CPU
->         .cpu_die                = psci_cpu_die,
-> +       .cpu_kill               = psci_cpu_kill,
->  #endif
+>         /* SSS */
+>         GATE(CLK_SSS, "sss", "aclk266_g2d", GATE_IP_G2D, 2, 0, 0),
+> +       GATE(CLK_SMMU_SSS, "smmu_sss", "aclk266_g2d", GATE_IP_G2D, 6, 0, 0),
+Probably couple of G2D block clocks are still missing, can you please
+take a look?
 >  };
-> diff --git a/include/uapi/linux/psci.h b/include/uapi/linux/psci.h
-> index a4136c3..857209b 100644
-> --- a/include/uapi/linux/psci.h
-> +++ b/include/uapi/linux/psci.h
-> @@ -74,4 +74,9 @@
->  #define PSCI_RET_NOT_PRESENT                   -7
->  #define PSCI_RET_DISABLED                      -8
 >
-> +/* Return values from the PSCI_ID_AFFINITY_INFO Function. */
-> +#define PSCI_AFFINITY_INFO_RET_ON                      0
-> +#define PSCI_AFFINITY_INFO_RET_OFF                     1
-> +#define PSCI_AFFINITY_INFO_RET_ON_PENDING      2
-
-I have already added this return values in v10 patchset for PSCI v0.2
-emulation for KVM ARM/ARM64.
-(http://www.spinics.net/lists/kvm-arm/msg09062.html)
-
-Please rebase your patch against that.
-
-> +
->  #endif /* _UAPI_LINUX_PSCI_H */
+>  static struct samsung_pll_clock exynos5420_plls[nr_plls] __initdata = {
+> diff --git a/include/dt-bindings/clock/exynos5420.h b/include/dt-bindings/clock/exynos5420.h
+> old mode 100644
+> new mode 100755
+> index 223925f..6631dc1
+> --- a/include/dt-bindings/clock/exynos5420.h
+> +++ b/include/dt-bindings/clock/exynos5420.h
+> @@ -175,6 +175,9 @@
+>  #define CLK_ACLK_G3D           500
+>  #define CLK_G3D                        501
+>  #define CLK_SMMU_MIXER         502
+> +#define CLK_SMMU_G2D           503
+> +#define CLK_SMMU_MDMA0         504
+> +#define CLK_SMMU_SSS           505
+>
+>  /* mux clocks */
+>  #define CLK_MOUT_HDMI          640
 > --
-> 1.8.3.2
+> 1.7.9.5
 >
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
+
+
+-- 
 Regards,
-Anup
+Alim
