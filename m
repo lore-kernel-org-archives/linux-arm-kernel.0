@@ -1,32 +1,26 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 28 Apr 2014 11:44:36 -0700
-Subject: [PATCH] ARM: sunxi: Enable GMAC in sunxi_defconfig
-Message-ID: <1398710676-9307-1-git-send-email-maxime.ripard@free-electrons.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Mon, 28 Apr 2014 22:46:10 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSF0gQVNvQzogZnNsOiBzZWxlY3QgU05EX1NPQ19JTVhfUENN?=
+ =?UTF-8?B?X0RNQSB3aGVyZSBuZWVkZWQ=?=
+In-Reply-To: <6606961.lAGLvkNsEj@wuerfel>
+References: <6606961.lAGLvkNsEj@wuerfel>
+Message-ID: <1398710770.235891074@f303.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the support of the GMAC has been merged, we're using it as the ethernet
-controller on the A20 devices.
+Mon, 28 Apr 2014 16:46:30 +0200 ?? Arnd Bergmann <arnd@arndb.de>:
+> Since commit 204dec93eaa "ASoC: fsl: Allow to select individual common
+> options", it is possible to enable SND_SOC_FSL_SSI and SND_SOC_FSL_SPDIF
+> manually. However, these two options are for drivers that both
+> require the imx-pcm-dma framework and result in a link error if that
+> is not provided.
+> 
+> This changes Kconfig to automatically select SND_SOC_IMX_PCM_DMA
+> to avoid the problem, as we do for other drivers that need the same
+> framework.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-However, sunxi_defconfig wasn't selecting it hence breaking the NFS boot.
+Can you give an exact error?
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/configs/sunxi_defconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
-index b5df4a511b0a..81ba78eaf54a 100644
---- a/arch/arm/configs/sunxi_defconfig
-+++ b/arch/arm/configs/sunxi_defconfig
-@@ -37,7 +37,7 @@ CONFIG_SUN4I_EMAC=y
- # CONFIG_NET_VENDOR_NATSEMI is not set
- # CONFIG_NET_VENDOR_SEEQ is not set
- # CONFIG_NET_VENDOR_SMSC is not set
--# CONFIG_NET_VENDOR_STMICRO is not set
-+CONFIG_STMMAC_ETH=y
- # CONFIG_NET_VENDOR_WIZNET is not set
- # CONFIG_WLAN is not set
- CONFIG_SERIAL_8250=y
--- 
-1.9.1
