@@ -1,58 +1,64 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 28 Apr 2014 12:58:19 +0100
-Subject: [PATCH v4 04/14] irq: gic: use mask field in GICC_IAR
-In-Reply-To: <1398668032-8335-5-git-send-email-haojian.zhuang@linaro.org>
- (Haojian Zhuang's message of "Mon, 28 Apr 2014 07:53:42 +0100")
-References: <1398668032-8335-1-git-send-email-haojian.zhuang@linaro.org>
- <1398668032-8335-5-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <87y4ypu0mc.fsf@approximate.cambridge.arm.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Mon, 28 Apr 2014 21:20:04 +0900
+Subject: [RESUBMIT RFC PATCH v2 0/3] Add support for Exynos PMU driver
+Message-ID: <1398687607-4554-1-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28 2014 at  7:53:42 am BST, Haojian Zhuang <haojian.zhuang@linaro.org> wrote:
-> Bit[9:0] is interrupt ID field in GICC_IAR. Bit[12:10] is CPU ID field,
-> and others are reserved.
->
-> So we should use GICC_IAR_INTID to get interrupt ID. It's not a good way
-> to use ~0x1c00 (CPU ID field) to get interrupt ID.
->
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
-> ---
->  drivers/irqchip/irq-gic.c       | 2 +-
->  include/linux/irqchip/arm-gic.h | 2 ++
->  2 files changed, 3 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index 4300b66..8fd27bf 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -287,7 +287,7 @@ static void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
->  
->  	do {
->  		irqstat = readl_relaxed(cpu_base + GIC_CPU_INTACK);
-> -		irqnr = irqstat & ~0x1c00;
-> +		irqnr = irqstat & GICC_IAR_INTID;
->  
->  		if (likely(irqnr > 15 && irqnr < 1021)) {
->  			irqnr = irq_find_mapping(gic->domain, irqnr);
-> diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-> index 7ed92d0..55933aa 100644
-> --- a/include/linux/irqchip/arm-gic.h
-> +++ b/include/linux/irqchip/arm-gic.h
-> @@ -21,6 +21,8 @@
->  #define GIC_CPU_ACTIVEPRIO		0xd0
->  #define GIC_CPU_IDENT			0xfc
->  
-> +#define GICC_IAR_INTID			0x3ff
+This patch series moves PMU implementation from "mach-exynos/pmu.c" to
+"drivers/mfd/exynos-pmu.c". Patch v1 was posted as RFC [1].
 
-This is actually a mask, so I'd suggest to reflect this in the name.
-GICC_IAR_INT_ID_MASK?
+In case of ARM32 we had machine folder such as "mach-exynos" but
+moving forward with ARM64 SoC support we can not have any more such
+machine folders, keeping that in mind we have planned to move PMU
+implementation out of machine folder, so that common piece of code
+can be reused.
 
-> +
->  #define GIC_DIST_CTRL			0x000
->  #define GIC_DIST_CTR			0x004
->  #define GIC_DIST_IGROUP			0x080
+This patch series is based on kgene for-next and depends on following
+patch series
+ a) [PATCH v2 0/5] Add PMU node for Exynos SoCs
+	https://lkml.org/lkml/2014/4/25/216
+ b) [PATCH v2 00/10] ARM: Exynos: PMU cleanup and refactoring for using DT
+	https://lkml.org/lkml/2014/4/25/252
 
-	M.
+
+1) [RFC PATCH 0/2] Add support for Exynos PMU driver
+	https://lkml.org/lkml/2014/4/2/69
+
+Changes since v1:
+ - Rebased on Kukjin Kim's for-next (3.15_rc1 tag)
+ - Added patch: Move PMU specific definitions from common.h
+ - Added patch: Move pmu specific header files under "linux/mfd/samsung"
+ - Removed patch: ARM: EXYNOS: remove arch specific PMU implementation
+	As suggested breaking down patches into smalled pieces for better review.
+	Also modified all changes in pmu.c under mach-exynos itself and then
+	prepared patches moving files from mach-exynos to "drivers/mfd"
+
+
+Pankaj Dubey (2):
+  ARM: EXYNOS: Move pmu specific header files under "linux/mfd/samsung"
+  drivers: mfd: Add support for Exynos PMU driver
+
+Younggun Jang (1):
+  ARM: EXYNOS: Move PMU specific definitions from common.h
+
+ arch/arm/mach-exynos/Kconfig                       |    2 ++
+ arch/arm/mach-exynos/Makefile                      |    2 --
+ arch/arm/mach-exynos/common.h                      |   17 -----------
+ arch/arm/mach-exynos/cpuidle.c                     |    3 +-
+ arch/arm/mach-exynos/exynos.c                      |    2 +-
+ arch/arm/mach-exynos/hotplug.c                     |    2 +-
+ arch/arm/mach-exynos/platsmp.c                     |    2 +-
+ arch/arm/mach-exynos/pm.c                          |    3 +-
+ drivers/mfd/Kconfig                                |    9 ++++++
+ drivers/mfd/Makefile                               |    1 +
+ .../mach-exynos/pmu.c => drivers/mfd/exynos-pmu.c  |    5 ++--
+ include/linux/mfd/samsung/exynos-pmu.h             |   31 ++++++++++++++++++++
+ .../linux/mfd/samsung/exynos-regs-pmu.h            |    0
+ 13 files changed, 52 insertions(+), 27 deletions(-)
+ rename arch/arm/mach-exynos/pmu.c => drivers/mfd/exynos-pmu.c (99%)
+ create mode 100644 include/linux/mfd/samsung/exynos-pmu.h
+ rename arch/arm/mach-exynos/regs-pmu.h => include/linux/mfd/samsung/exynos-regs-pmu.h (100%)
+
 -- 
-Jazz is not dead. It just smells funny.
+1.7.10.4
