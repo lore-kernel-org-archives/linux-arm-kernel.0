@@ -1,37 +1,28 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 28 Apr 2014 18:17:13 +0200
-Subject: [PATCHv3 6/7] ARM: sun7i: dt: add PWM support
-In-Reply-To: <1398701834-3719-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1398701834-3719-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1398701834-3719-7-git-send-email-alexandre.belloni@free-electrons.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Mon, 28 Apr 2014 18:18:56 +0200
+Subject: [PATCH 5/6] ARM: AM43xx: clk: Change the cpts ref clock source
+ to dpll_core_m5 clk
+In-Reply-To: <535E4FDC.70306@ti.com>
+References: <1398658225-25873-1-git-send-email-george.cherian@ti.com>
+ <1398658225-25873-6-git-send-email-george.cherian@ti.com>
+ <20140428071034.GB4380@netboy> <535E4FDC.70306@ti.com>
+Message-ID: <20140428161856.GB4266@netboy>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the PWM bindings for the Allwinner A20.
+On Mon, Apr 28, 2014 at 06:25:56PM +0530, George Cherian wrote:
+> In beagle bone white (AM335x)  CPTS has a choice of 2 clocksource
+> -dpll_core_m5_ck
+> -dpll_core_m4_ck
+> and by default  dpll_core_m5_ck is used. Where as in AM437x the
+> default clocksource used is dpll_core_m4_ck .
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/boot/dts/sun7i-a20.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+Is your patch changing the default clock for am335x?
 
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index c6eb881a3ced..19d1f60209c5 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -692,6 +692,14 @@
- 			interrupts = <0 24 4>;
- 		};
+If yes, it shouldn't.
+If no, then the patch description should say so.
+
+Thanks,
+Richard
+
  
-+		pwm: pwm at 01c20e00 {
-+			compatible = "allwinner,sun7i-a20-pwm";
-+			reg = <0x01c20e00 0xc>;
-+			clocks = <&osc24M>;
-+			#pwm-cells = <3>;
-+			status = "disabled";
-+		};
-+
- 		sid: eeprom at 01c23800 {
- 			compatible = "allwinner,sun7i-a20-sid";
- 			reg = <0x01c23800 0x200>;
--- 
-1.9.1
