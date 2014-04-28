@@ -1,164 +1,204 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Mon, 28 Apr 2014 18:57:56 +0100
-Subject: [PATCH 09/10] ARM: vexpress: move HBI check to sysreg driver
+Date: Mon, 28 Apr 2014 18:57:57 +0100
+Subject: [PATCH 10/10] hwmon: vexpress: Use devm helper for hwmon device
+ registration
 In-Reply-To: <1398707877-22596-1-git-send-email-pawel.moll@arm.com>
 References: <1398707877-22596-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <1398707877-22596-10-git-send-email-pawel.moll@arm.com>
+Message-ID: <1398707877-22596-11-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The last reason for static memory mapping is the HBI (board
-identification number) check early in the machine code.
+Use devm_hwmon_device_register_with_groups instead of
+the old-style manual attributes and hwmon device registration.
 
-Moving the check to the sysreg driver makes it possible to
-completely remove the early mapping and init functions.
+Also, unwind the attribute group macros for better code
+readability.
 
+Cc: Jean Delvare <jdelvare@suse.de>
+Cc: Guenter Roeck <linux@roeck-us.net>
+Cc: lm-sensors at lm-sensors.org
 Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 ---
- arch/arm/mach-vexpress/v2m.c  | 49 -------------------------------------------
- drivers/mfd/vexpress-sysreg.c | 30 ++++++++++----------------
- include/linux/vexpress.h      |  1 -
- 3 files changed, 11 insertions(+), 69 deletions(-)
+ drivers/hwmon/vexpress.c | 91 ++++++++++++++++--------------------------------
+ 1 file changed, 30 insertions(+), 61 deletions(-)
 
-diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
-index d8b419b..38f4f6f 100644
---- a/arch/arm/mach-vexpress/v2m.c
-+++ b/arch/arm/mach-vexpress/v2m.c
-@@ -370,53 +370,6 @@ MACHINE_START(VEXPRESS, "ARM-Versatile Express")
- 	.init_machine	= v2m_init,
- MACHINE_END
+diff --git a/drivers/hwmon/vexpress.c b/drivers/hwmon/vexpress.c
+index d853332..ed6bf0e 100644
+--- a/drivers/hwmon/vexpress.c
++++ b/drivers/hwmon/vexpress.c
+@@ -27,17 +27,8 @@
+ struct vexpress_hwmon_data {
+ 	struct device *hwmon_dev;
+ 	struct regmap *reg;
+-	const char *name;
+ };
  
--static struct map_desc v2m_rs1_io_desc __initdata = {
--	.virtual	= V2M_PERIPH,
--	.pfn		= __phys_to_pfn(0x1c000000),
--	.length		= SZ_2M,
--	.type		= MT_DEVICE,
--};
--
--static int __init v2m_dt_scan_memory_map(unsigned long node, const char *uname,
--		int depth, void *data)
+-static ssize_t vexpress_hwmon_name_show(struct device *dev,
+-		struct device_attribute *dev_attr, char *buffer)
 -{
--	const char **map = data;
+-	struct vexpress_hwmon_data *data = dev_get_drvdata(dev);
 -
--	if (strcmp(uname, "motherboard") != 0)
--		return 0;
--
--	*map = of_get_flat_dt_prop(node, "arm,v2m-memory-map", NULL);
--
--	return 1;
+-	return sprintf(buffer, "%s\n", data->name);
 -}
 -
--void __init v2m_dt_map_io(void)
--{
--	const char *map = NULL;
--
--	of_scan_flat_dt(v2m_dt_scan_memory_map, &map);
--
--	if (map && strcmp(map, "rs1") == 0)
--		iotable_init(&v2m_rs1_io_desc, 1);
--	else
--		iotable_init(v2m_io_desc, ARRAY_SIZE(v2m_io_desc));
--}
--
--void __init v2m_dt_init_early(void)
--{
--	u32 dt_hbi;
--
--	/* Confirm board type against DT property, if available */
--	if (of_property_read_u32(of_allnodes, "arm,hbi", &dt_hbi) == 0) {
--		u32 hbi = vexpress_get_hbi(VEXPRESS_SITE_MASTER);
--
--		if (WARN_ON(dt_hbi != hbi))
--			pr_warning("vexpress: DT HBI (%x) is not matching "
--					"hardware (%x)!\n", dt_hbi, hbi);
--	}
--}
--
--
- static void __init v2m_dt_init(void)
+ static ssize_t vexpress_hwmon_label_show(struct device *dev,
+ 		struct device_attribute *dev_attr, char *buffer)
  {
- 	l2x0_of_init(0x00400000, 0xfe0fffff);
-@@ -432,7 +385,5 @@ DT_MACHINE_START(VEXPRESS_DT, "ARM-Versatile Express")
- 	.dt_compat	= v2m_dt_match,
- 	.smp		= smp_ops(vexpress_smp_dt_ops),
- 	.smp_init	= smp_init_ops(vexpress_smp_init_ops),
--	.map_io		= v2m_dt_map_io,
--	.init_early	= v2m_dt_init_early,
- 	.init_machine	= v2m_dt_init,
- MACHINE_END
-diff --git a/drivers/mfd/vexpress-sysreg.c b/drivers/mfd/vexpress-sysreg.c
-index 952df84..9e21e4f 100644
---- a/drivers/mfd/vexpress-sysreg.c
-+++ b/drivers/mfd/vexpress-sysreg.c
-@@ -45,7 +45,6 @@
- #define SYS_CFGSTAT		0x0a8
- 
- #define SYS_HBI_MASK		0xfff
--#define SYS_ID_HBI_SHIFT	16
- #define SYS_PROCIDx_HBI_SHIFT	0
- 
- #define SYS_MCI_CARDIN		(1 << 0)
-@@ -99,24 +98,6 @@ u32 vexpress_get_procid(int site)
- 			SYS_PROCID0 : SYS_PROCID1));
+@@ -95,16 +86,6 @@ static umode_t vexpress_hwmon_attr_is_visible(struct kobject *kobj,
+ 	return attr->mode;
  }
  
--u32 vexpress_get_hbi(int site)
--{
--	u32 id;
+-static DEVICE_ATTR(name, S_IRUGO, vexpress_hwmon_name_show, NULL);
 -
--	switch (site) {
--	case VEXPRESS_SITE_MB:
--		id = readl(vexpress_sysreg_base() + SYS_ID);
--		return (id >> SYS_ID_HBI_SHIFT) & SYS_HBI_MASK;
--	case VEXPRESS_SITE_MASTER:
--	case VEXPRESS_SITE_DB1:
--	case VEXPRESS_SITE_DB2:
--		id = vexpress_get_procid(site);
--		return (id >> SYS_PROCIDx_HBI_SHIFT) & SYS_HBI_MASK;
--	}
--
--	return ~0;
+-#define VEXPRESS_HWMON_ATTRS(_name, _label_attr, _input_attr)	\
+-struct attribute *vexpress_hwmon_attrs_##_name[] = {		\
+-	&dev_attr_name.attr,					\
+-	&dev_attr_##_label_attr.attr,				\
+-	&sensor_dev_attr_##_input_attr.dev_attr.attr,		\
+-	NULL							\
 -}
 -
- void __iomem *vexpress_get_24mhz_clock_base(void)
+ struct vexpress_hwmon_type {
+ 	const char *name;
+ 	const struct attribute_group **attr_groups;
+@@ -114,10 +95,13 @@ struct vexpress_hwmon_type {
+ static DEVICE_ATTR(in1_label, S_IRUGO, vexpress_hwmon_label_show, NULL);
+ static SENSOR_DEVICE_ATTR(in1_input, S_IRUGO, vexpress_hwmon_u32_show,
+ 		NULL, 1000);
+-static VEXPRESS_HWMON_ATTRS(volt, in1_label, in1_input);
+ static struct attribute_group vexpress_hwmon_group_volt = {
+ 	.is_visible = vexpress_hwmon_attr_is_visible,
+-	.attrs = vexpress_hwmon_attrs_volt,
++	.attrs = (struct attribute *[]) {
++		&dev_attr_in1_label.attr,
++		&sensor_dev_attr_in1_input.dev_attr.attr,
++		NULL
++	},
+ };
+ static struct vexpress_hwmon_type vexpress_hwmon_volt = {
+ 	.name = "vexpress_volt",
+@@ -131,10 +115,13 @@ static struct vexpress_hwmon_type vexpress_hwmon_volt = {
+ static DEVICE_ATTR(curr1_label, S_IRUGO, vexpress_hwmon_label_show, NULL);
+ static SENSOR_DEVICE_ATTR(curr1_input, S_IRUGO, vexpress_hwmon_u32_show,
+ 		NULL, 1000);
+-static VEXPRESS_HWMON_ATTRS(amp, curr1_label, curr1_input);
+ static struct attribute_group vexpress_hwmon_group_amp = {
+ 	.is_visible = vexpress_hwmon_attr_is_visible,
+-	.attrs = vexpress_hwmon_attrs_amp,
++	.attrs = (struct attribute *[]) {
++		&dev_attr_curr1_label.attr,
++		&sensor_dev_attr_curr1_input.dev_attr.attr,
++		NULL
++	},
+ };
+ static struct vexpress_hwmon_type vexpress_hwmon_amp = {
+ 	.name = "vexpress_amp",
+@@ -147,10 +134,13 @@ static struct vexpress_hwmon_type vexpress_hwmon_amp = {
+ static DEVICE_ATTR(temp1_label, S_IRUGO, vexpress_hwmon_label_show, NULL);
+ static SENSOR_DEVICE_ATTR(temp1_input, S_IRUGO, vexpress_hwmon_u32_show,
+ 		NULL, 1000);
+-static VEXPRESS_HWMON_ATTRS(temp, temp1_label, temp1_input);
+ static struct attribute_group vexpress_hwmon_group_temp = {
+ 	.is_visible = vexpress_hwmon_attr_is_visible,
+-	.attrs = vexpress_hwmon_attrs_temp,
++	.attrs = (struct attribute *[]) {
++		&dev_attr_temp1_label.attr,
++		&sensor_dev_attr_temp1_input.dev_attr.attr,
++		NULL
++	},
+ };
+ static struct vexpress_hwmon_type vexpress_hwmon_temp = {
+ 	.name = "vexpress_temp",
+@@ -163,10 +153,13 @@ static struct vexpress_hwmon_type vexpress_hwmon_temp = {
+ static DEVICE_ATTR(power1_label, S_IRUGO, vexpress_hwmon_label_show, NULL);
+ static SENSOR_DEVICE_ATTR(power1_input, S_IRUGO, vexpress_hwmon_u32_show,
+ 		NULL, 1);
+-static VEXPRESS_HWMON_ATTRS(power, power1_label, power1_input);
+ static struct attribute_group vexpress_hwmon_group_power = {
+ 	.is_visible = vexpress_hwmon_attr_is_visible,
+-	.attrs = vexpress_hwmon_attrs_power,
++	.attrs = (struct attribute *[]) {
++		&dev_attr_power1_label.attr,
++		&sensor_dev_attr_power1_input.dev_attr.attr,
++		NULL
++	},
+ };
+ static struct vexpress_hwmon_type vexpress_hwmon_power = {
+ 	.name = "vexpress_power",
+@@ -179,10 +172,13 @@ static struct vexpress_hwmon_type vexpress_hwmon_power = {
+ static DEVICE_ATTR(energy1_label, S_IRUGO, vexpress_hwmon_label_show, NULL);
+ static SENSOR_DEVICE_ATTR(energy1_input, S_IRUGO, vexpress_hwmon_u64_show,
+ 		NULL, 1);
+-static VEXPRESS_HWMON_ATTRS(energy, energy1_label, energy1_input);
+ static struct attribute_group vexpress_hwmon_group_energy = {
+ 	.is_visible = vexpress_hwmon_attr_is_visible,
+-	.attrs = vexpress_hwmon_attrs_energy,
++	.attrs = (struct attribute *[]) {
++		&dev_attr_energy1_label.attr,
++		&sensor_dev_attr_energy1_input.dev_attr.attr,
++		NULL
++	},
+ };
+ static struct vexpress_hwmon_type vexpress_hwmon_energy = {
+ 	.name = "vexpress_energy",
+@@ -218,7 +214,6 @@ MODULE_DEVICE_TABLE(of, vexpress_hwmon_of_match);
+ 
+ static int vexpress_hwmon_probe(struct platform_device *pdev)
  {
- 	return vexpress_sysreg_base() + SYS_24MHZ;
-@@ -229,6 +210,7 @@ static int vexpress_sysreg_probe(struct platform_device *pdev)
- 	struct resource *mem;
- 	void __iomem *base;
- 	struct bgpio_chip *mmc_gpio_chip;
-+	u32 dt_hbi;
+-	int err;
+ 	const struct of_device_id *match;
+ 	struct vexpress_hwmon_data *data;
+ 	const struct vexpress_hwmon_type *type;
+@@ -232,45 +227,19 @@ static int vexpress_hwmon_probe(struct platform_device *pdev)
+ 	if (!match)
+ 		return -ENODEV;
+ 	type = match->data;
+-	data->name = type->name;
  
- 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!mem)
-@@ -240,6 +222,16 @@ static int vexpress_sysreg_probe(struct platform_device *pdev)
+ 	data->reg = devm_regmap_init_vexpress_config(&pdev->dev);
+-	if (!data->reg)
+-		return -ENODEV;
+-
+-	err = sysfs_create_groups(&pdev->dev.kobj, type->attr_groups);
+-	if (err)
+-		goto error;
+-
+-	data->hwmon_dev = hwmon_device_register(&pdev->dev);
+-	if (IS_ERR(data->hwmon_dev)) {
+-		err = PTR_ERR(data->hwmon_dev);
+-		goto error;
+-	}
++	if (IS_ERR(data->reg))
++		return PTR_ERR(data->reg);
  
- 	vexpress_config_set_master(vexpress_sysreg_get_master());
+-	return 0;
+-
+-error:
+-	sysfs_remove_group(&pdev->dev.kobj, match->data);
+-	return err;
+-}
+-
+-static int vexpress_hwmon_remove(struct platform_device *pdev)
+-{
+-	struct vexpress_hwmon_data *data = platform_get_drvdata(pdev);
+-	const struct of_device_id *match;
+-
+-	hwmon_device_unregister(data->hwmon_dev);
+-
+-	match = of_match_device(vexpress_hwmon_of_match, &pdev->dev);
+-	sysfs_remove_group(&pdev->dev.kobj, match->data);
++	data->hwmon_dev = devm_hwmon_device_register_with_groups(&pdev->dev,
++			type->name, data, type->attr_groups);
  
-+	/* Confirm board type against DT property, if available */
-+	if (of_property_read_u32(of_allnodes, "arm,hbi", &dt_hbi) == 0) {
-+		u32 id = vexpress_get_procid(VEXPRESS_SITE_MASTER);
-+		u32 hbi = (id >> SYS_PROCIDx_HBI_SHIFT) & SYS_HBI_MASK;
-+
-+		if (WARN_ON(dt_hbi != hbi))
-+			dev_warn(&pdev->dev, "DT HBI (%x) is not matching hardware (%x)!\n",
-+					dt_hbi, hbi);
-+	}
-+
- 	/*
- 	 * Duplicated SYS_MCI pseudo-GPIO controller for compatibility with
- 	 * older trees using sysreg node for MMC control lines.
-diff --git a/include/linux/vexpress.h b/include/linux/vexpress.h
-index 46636e3..a4c9547 100644
---- a/include/linux/vexpress.h
-+++ b/include/linux/vexpress.h
-@@ -60,7 +60,6 @@ struct regmap *devm_regmap_init_vexpress_config(struct device *dev);
+-	return 0;
++	return PTR_ERR_OR_ZERO(data->hwmon_dev);
+ }
  
- unsigned int vexpress_get_mci_cardin(struct device *dev);
- u32 vexpress_get_procid(int site);
--u32 vexpress_get_hbi(int site);
- void *vexpress_get_24mhz_clock_base(void);
- void vexpress_flags_set(u32 data);
- 
+ static struct platform_driver vexpress_hwmon_driver = {
+ 	.probe = vexpress_hwmon_probe,
+-	.remove = vexpress_hwmon_remove,
+ 	.driver	= {
+ 		.name = DRVNAME,
+ 		.owner = THIS_MODULE,
 -- 
 1.9.1
