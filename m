@@ -1,28 +1,36 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Mon, 28 Apr 2014 18:18:56 +0200
-Subject: [PATCH 5/6] ARM: AM43xx: clk: Change the cpts ref clock source
- to dpll_core_m5 clk
-In-Reply-To: <535E4FDC.70306@ti.com>
-References: <1398658225-25873-1-git-send-email-george.cherian@ti.com>
- <1398658225-25873-6-git-send-email-george.cherian@ti.com>
- <20140428071034.GB4380@netboy> <535E4FDC.70306@ti.com>
-Message-ID: <20140428161856.GB4266@netboy>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 28 Apr 2014 18:17:14 +0200
+Subject: [PATCHv3 7/7] ARM: sunxi: dt: add PWM support for the cubietruck
+In-Reply-To: <1398701834-3719-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1398701834-3719-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1398701834-3719-8-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 06:25:56PM +0530, George Cherian wrote:
-> In beagle bone white (AM335x)  CPTS has a choice of 2 clocksource
-> -dpll_core_m5_ck
-> -dpll_core_m4_ck
-> and by default  dpll_core_m5_ck is used. Where as in AM437x the
-> default clocksource used is dpll_core_m4_ck .
+Enable the PWM for both PWM channels on the cubietruck. They can be found on
+connector CN8.
 
-Is your patch changing the default clock for am335x?
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-If yes, it shouldn't.
-If no, then the patch description should say so.
-
-Thanks,
-Richard
-
+diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+index cb25d3c8da58..0c3bd127a5fd 100644
+--- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
++++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+@@ -63,6 +63,12 @@
+ 			};
+ 		};
  
++		pwm: pwm at 01c20e00 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&pwm0_pins_a>, <&pwm1_pins_a>;
++			status = "okay";
++		};
++
+ 		uart0: serial at 01c28000 {
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&uart0_pins_a>;
+-- 
+1.9.1
