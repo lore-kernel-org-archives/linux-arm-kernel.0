@@ -1,102 +1,69 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Mon, 28 Apr 2014 10:14:45 -0500
-Subject: [PATCH V3 05/20] bus: omap_l3_noc: switch over to relaxed variants of
- readl/writel
+Date: Mon, 28 Apr 2014 10:14:44 -0500
+Subject: [PATCH V3 04/20] bus: omap_l3_noc: populate l3->dev and use it
 In-Reply-To: <1398698101-25513-1-git-send-email-nm@ti.com>
 References: <1397492726-17203-1-git-send-email-nm@ti.com>
  <1398698101-25513-1-git-send-email-nm@ti.com>
-Message-ID: <1398698101-25513-6-git-send-email-nm@ti.com>
+Message-ID: <1398698101-25513-5-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we use __raw_readl and writel in this driver. Considering
-there is no specific need for a memory barrier, replacing writel
-with endian-neutral writel_relaxed and replacing __raw_readls with
-the corresponding endian-neutral readl_relaxed allows us to have a
-standard set of register operations for the driver.
-
-While at it, simplify address computation using variables for
-register.
+l3->dev is not populated, so populate it and use it to print information
+relevant to the device instead of using a generic pr_*.
 
 Signed-off-by: Nishanth Menon <nm@ti.com>
 Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Acked-by: Felipe Balbi <balbi@ti.com>
 Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 Tested-by: Darren Etheridge <detheridge@ti.com>
 ---
-
-change in V3: commit message improvement based on Felipe's feedback.
-no change since V2 repost.
-
- drivers/bus/omap_l3_noc.c |   26 ++++++++++++++------------
- 1 file changed, 14 insertions(+), 12 deletions(-)
+change in V3: none
+ drivers/bus/omap_l3_noc.c |   11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/bus/omap_l3_noc.c b/drivers/bus/omap_l3_noc.c
-index 37d71b7..c8facb0 100644
+index 800486c..37d71b7 100644
 --- a/drivers/bus/omap_l3_noc.c
 +++ b/drivers/bus/omap_l3_noc.c
-@@ -55,6 +55,7 @@ static irqreturn_t l3_interrupt_handler(int irq, void *_l3)
- 	int err_src = 0;
- 	u32 std_err_main, err_reg, clear, masterid;
- 	void __iomem *base, *l3_targ_base;
-+	void __iomem *l3_targ_stderr, *l3_targ_slvofslsb, *l3_targ_mstaddr;
- 	char *target_name, *master_name = "UN IDENTIFIED";
+@@ -131,6 +131,7 @@ static int omap_l3_probe(struct platform_device *pdev)
+ 	if (!l3)
+ 		return -ENOMEM;
  
- 	/* Get the Type of interrupt */
-@@ -66,8 +67,8 @@ static irqreturn_t l3_interrupt_handler(int irq, void *_l3)
- 		 * to determine the source
- 		 */
- 		base = l3->l3_base[i];
--		err_reg = __raw_readl(base + l3_flagmux[i] +
--					+ L3_FLAGMUX_REGERR0 + (inttype << 3));
-+		err_reg = readl_relaxed(base + l3_flagmux[i] +
-+					L3_FLAGMUX_REGERR0 + (inttype << 3));
++	l3->dev = &pdev->dev;
+ 	platform_set_drvdata(pdev, l3);
  
- 		/* Get the corresponding error and analyse */
- 		if (err_reg) {
-@@ -76,10 +77,14 @@ static irqreturn_t l3_interrupt_handler(int irq, void *_l3)
+ 	/* Get mem resources */
+@@ -140,7 +141,7 @@ static int omap_l3_probe(struct platform_device *pdev)
  
- 			/* Read the stderrlog_main_source from clk domain */
- 			l3_targ_base = base + *(l3_targ[i] + err_src);
--			std_err_main =  __raw_readl(l3_targ_base +
--					L3_TARG_STDERRLOG_MAIN);
--			masterid = __raw_readl(l3_targ_base +
--					L3_TARG_STDERRLOG_MSTADDR);
-+			l3_targ_stderr = l3_targ_base + L3_TARG_STDERRLOG_MAIN;
-+			l3_targ_slvofslsb = l3_targ_base +
-+					    L3_TARG_STDERRLOG_SLVOFSLSB;
-+			l3_targ_mstaddr = l3_targ_base +
-+					  L3_TARG_STDERRLOG_MSTADDR;
-+
-+			std_err_main = readl_relaxed(l3_targ_stderr);
-+			masterid = readl_relaxed(l3_targ_mstaddr);
+ 		l3->l3_base[i] = devm_ioremap_resource(&pdev->dev, res);
+ 		if (IS_ERR(l3->l3_base[i])) {
+-			dev_err(&pdev->dev, "ioremap %d failed\n", i);
++			dev_err(l3->dev, "ioremap %d failed\n", i);
+ 			return PTR_ERR(l3->l3_base[i]);
+ 		}
+ 	}
+@@ -149,19 +150,19 @@ static int omap_l3_probe(struct platform_device *pdev)
+ 	 * Setup interrupt Handlers
+ 	 */
+ 	l3->debug_irq = platform_get_irq(pdev, 0);
+-	ret = devm_request_irq(&pdev->dev, l3->debug_irq, l3_interrupt_handler,
++	ret = devm_request_irq(l3->dev, l3->debug_irq, l3_interrupt_handler,
+ 			       IRQF_DISABLED, "l3-dbg-irq", l3);
+ 	if (ret) {
+-		dev_err(&pdev->dev, "request_irq failed for %d\n",
++		dev_err(l3->dev, "request_irq failed for %d\n",
+ 			l3->debug_irq);
+ 		return ret;
+ 	}
  
- 			switch (std_err_main & CUSTOM_ERROR) {
- 			case STANDARD_ERROR:
-@@ -87,12 +92,10 @@ static irqreturn_t l3_interrupt_handler(int irq, void *_l3)
- 					l3_targ_inst_name[i][err_src];
- 				WARN(true, "L3 standard error: TARGET:%s@address 0x%x\n",
- 					target_name,
--					__raw_readl(l3_targ_base +
--						L3_TARG_STDERRLOG_SLVOFSLSB));
-+					readl_relaxed(l3_targ_slvofslsb));
- 				/* clear the std error log*/
- 				clear = std_err_main | CLEAR_STDERR_LOG;
--				writel(clear, l3_targ_base +
--					L3_TARG_STDERRLOG_MAIN);
-+				writel_relaxed(clear, l3_targ_stderr);
- 				break;
+ 	l3->app_irq = platform_get_irq(pdev, 1);
+-	ret = devm_request_irq(&pdev->dev, l3->app_irq, l3_interrupt_handler,
++	ret = devm_request_irq(l3->dev, l3->app_irq, l3_interrupt_handler,
+ 			       IRQF_DISABLED, "l3-app-irq", l3);
+ 	if (ret)
+-		dev_err(&pdev->dev, "request_irq failed for %d\n", l3->app_irq);
++		dev_err(l3->dev, "request_irq failed for %d\n", l3->app_irq);
  
- 			case CUSTOM_ERROR:
-@@ -107,8 +110,7 @@ static irqreturn_t l3_interrupt_handler(int irq, void *_l3)
- 					master_name, target_name);
- 				/* clear the std error log*/
- 				clear = std_err_main | CLEAR_STDERR_LOG;
--				writel(clear, l3_targ_base +
--					L3_TARG_STDERRLOG_MAIN);
-+				writel_relaxed(clear, l3_targ_stderr);
- 				break;
- 
- 			default:
+ 	return ret;
+ }
 -- 
 1.7.9.5
