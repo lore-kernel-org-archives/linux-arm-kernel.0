@@ -1,54 +1,42 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 28 Apr 2014 16:07:49 +0900
-Subject: [PATCH/RFC] serial: sh-sci: Add device tree support for r8a7779
-In-Reply-To: <20140428011354.GA13324@verge.net.au>
-References: <1398322484-3630-1-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdWB4ZnwyNFXMK_rdCKAMOXt+HRMZKG+j4O-tdfiP_-PLg@mail.gmail.com>
- <20140428000314.GK32087@verge.net.au> <2068512.62K6gPl1LN@avalon>
- <20140428011354.GA13324@verge.net.au>
-Message-ID: <20140428070748.GA24537@verge.net.au>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 28 Apr 2014 09:07:28 +0200
+Subject: [PATCH RFC 6/8] component: remove old add_components method
+In-Reply-To: <E1WeBbp-0002Gs-Ju@rmk-PC.arm.linux.org.uk>
+References: <20140426230025.GZ26756@n2100.arm.linux.org.uk>
+ <E1WeBbp-0002Gs-Ju@rmk-PC.arm.linux.org.uk>
+Message-ID: <20140428070727.GC19455@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 10:13:55AM +0900, Simon Horman wrote:
-> On Mon, Apr 28, 2014 at 02:08:16AM +0200, Laurent Pinchart wrote:
-> > Hi Simon,
-> > 
-> > On Monday 28 April 2014 09:03:14 Simon Horman wrote:
-> > > On Fri, Apr 25, 2014 at 09:11:06AM +0200, Geert Uytterhoeven wrote:
-> > > > On Fri, Apr 25, 2014 at 9:05 AM, Laurent Pinchart wrote:
-> > > > >> +     scif0: serial at ffe40000 {
-> > > > >> +             compatible = "renesas,scif", "renesas,scif-r8a7779";
-> > > > >> +             reg = <0xffe40000 265>;
-> > > > >> +             interrupt-parent = <&gic>;
-> > > > >> +             interrupts = <0 88 IRQ_TYPE_LEVEL_HIGH>;
-> > > > >> +             clocks = <&cpg_clocks R8A7779_CLK_P>;
-> > > > >> +             clock-names = "sci_ick";
-> > > > > 
-> > > > > Clock handling in the sh-sci driver should probably be improved. The
-> > > > > driver currently requires an "sci_ick" interface clock and supports an
-> > > > > optional "sci_fck" functional clock. In practice, as far as I can see,
-> > > > > platforms that provide both sci_ick and sci_fck set the two clocks to
-> > > > > the same source.
-> > >
-> > > > That's right. As a consequence, the clock's enable count is incremented
-> > > > 
-> > > > 3 times:
-> > > >   - once for fck,
-> > > >   - once for ick,
-> > > >   - once for generic Runtime PM using the "NULL" clock.
-> > > 
-> > > This approach is fine by me.
-> > > But I think you need to maintain compatibility with the old
-> > > binding ("sci_ick" required, "sci_fsk") as it seems that
-> > > was included in v3.14.
-> > 
-> > sci_fck isn't part of the DT bindings, so we can at least drop that one.
+On Sun, Apr 27, 2014 at 12:02:13AM +0100, Russell King wrote:
+> Now that drivers create an array of component matches at probe time, we
+> can retire the old methods.  This involves removing the add_components
+> master method, and removing component_master_add_child() from public
+> view.  We also remove component_add_master() as that interface is no
+> longer useful.
 > 
-> So long as its not used anywhere in-tree, which I believe is the case,
-> then that is fine by me.
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  drivers/base/component.c  | 21 +--------------------
+>  include/linux/component.h |  5 -----
+>  2 files changed, 1 insertion(+), 25 deletions(-)
 
-BTW, are you planning to make the above mentioned driver update
-before or after re-posting enablement patches for Koelsch and/or Lager?
-I ask because I would like to make such patches the basis for
-a patch for Marzen.
+I'm wondering if there may be an advantage to keeping both interfaces.
+Even if currently what all implementations do is essentially creating
+the match table at probe time there may be use-cases where that doesn't
+work so well.
+
+There's also some elegance to the .add_components() interface. I have a
+set of patches to convert Tegra DRM to use the component framework and
+it works out rather nicely. I'm sure I can get it to work with your
+proposed match array changes too, but it seems like it will require more
+code.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140428/ce62653f/attachment.sig>
