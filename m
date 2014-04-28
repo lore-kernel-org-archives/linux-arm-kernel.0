@@ -1,293 +1,65 @@
-From: lv.zheng@intel.com (Zheng, Lv)
-Date: Mon, 28 Apr 2014 04:54:41 +0000
-Subject: [PATCH v3 part1 04/11] ARM64 / ACPI: Introduce arm-core.c and
- its related head file
-In-Reply-To: <1398432017-8506-5-git-send-email-hanjun.guo@linaro.org>
-References: <1398432017-8506-1-git-send-email-hanjun.guo@linaro.org>
- <1398432017-8506-5-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1AE640813FDE7649BE1B193DEA596E88025586F4@SHSMSX101.ccr.corp.intel.com>
+From: alex.shi@linaro.org (Alex Shi)
+Date: Mon, 28 Apr 2014 13:01:56 +0800
+Subject: do_undefinstr call sem down_read?
+In-Reply-To: <20140425085731.GG26756@n2100.arm.linux.org.uk>
+References: <5358D051.5050306@linaro.org>
+ <20140425085731.GG26756@n2100.arm.linux.org.uk>
+Message-ID: <535DE0C4.2020404@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 04/25/2014 04:57 PM, Russell King - ARM Linux wrote:
+> On Thu, Apr 24, 2014 at 04:50:25PM +0800, Alex Shi wrote:
+>> I caught the following issue few times on my panda board on lsk. but I
+>> track the code path, looks like the upstream kernel has the same problem
+>> too.
+> ...
+>> [   30.733612] [<c0008417>] (do_undefinstr+0x10b/0x13c) from [<c050cbe3>] (__und_svc_finish+0x1/0x3e)
+>> [   30.743103] Exception stack(0xedd5fc50 to 0xedd5fc98)
+>> [   30.748443] fc40:                                     c13c14e0 80000000 00000080 00000000
+>> [   30.757141] fc60: c13c14e0 0000000c eac67284 c13c14e0 edc11518 c0df95c0 c0824410 eac67240
+>> [   30.765808] fc80: 00000000 edd5fcd8 c00171f9 c00cf998 80000133 ffffffff
+>> [   30.772827] [<c050cbe3>] (__und_svc_finish+0x1/0x3e) from [<c00cf998>] (page_mapping+0x20/0x38)
+>> [   30.782073] [<c00cf998>] (page_mapping+0x20/0x38) from [<c00171f9>] (flush_dcache_page+0x1d/0x60)
+> 
+> The real question is why is page_mapping triggering an undefined
+> instruction exception.  That I have no answer for.
+> 
+> This function is a hot path, so I doubt that it really is an undefined
+> instruction.  I suspect either your CPU has an erratum, or you have
+> hardware problems.
+> 
 
-> From: linux-acpi-owner at vger.kernel.org [mailto:linux-acpi-owner at vger.kernel.org] On Behalf Of Hanjun Guo
-> Sent: Friday, April 25, 2014 9:20 PM
-> 
-> ACPI core need lots extern variables and functions which should
-> be provided by arch dependent code to make itself compilable. so
-> introduce arm_core.c and its related header file here.
-> 
-> acpi_boot_table_init() will be called in setup_arch() before
-> paging_init(), so we should use eary_ioremap() mechanism here
-> to get the RSDP and all the table pointers, with this patch,
-> we can get ACPI boot-time tables from firmware on ARM64.
-> 
-> Signed-off-by: Al Stone <al.stone@linaro.org>
-> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> ---
->  arch/arm64/include/asm/acpi.h |   53 +++++++++++++++++++
->  arch/arm64/kernel/setup.c     |    4 ++
->  drivers/acpi/Makefile         |    2 +
->  drivers/acpi/plat/Makefile    |    1 +
->  drivers/acpi/plat/arm-core.c  |  113 +++++++++++++++++++++++++++++++++++++++++
->  5 files changed, 173 insertions(+)
->  create mode 100644 drivers/acpi/plat/Makefile
->  create mode 100644 drivers/acpi/plat/arm-core.c
-> 
-> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-> index e3e990e..3ac9dfb 100644
-> --- a/arch/arm64/include/asm/acpi.h
-> +++ b/arch/arm64/include/asm/acpi.h
-> @@ -19,6 +19,43 @@
->  #ifndef _ASM_ACPI_H
->  #define _ASM_ACPI_H
-> 
-> +#include <asm/cacheflush.h>
-> +
-> +#include <linux/init.h>
-> +
-> +#define COMPILER_DEPENDENT_INT64	s64
-> +#define COMPILER_DEPENDENT_UINT64	u64
-> +
-> +/*
-> + * Calling conventions:
-> + *
-> + * ACPI_SYSTEM_XFACE        - Interfaces to host OS (handlers, threads)
-> + * ACPI_EXTERNAL_XFACE      - External ACPI interfaces
-> + * ACPI_INTERNAL_XFACE      - Internal ACPI interfaces
-> + * ACPI_INTERNAL_VAR_XFACE  - Internal variable-parameter list interfaces
-> + */
-> +#define ACPI_SYSTEM_XFACE
-> +#define ACPI_EXTERNAL_XFACE
-> +#define ACPI_INTERNAL_XFACE
-> +#define ACPI_INTERNAL_VAR_XFACE
+Thanks for your response, Russell!
 
-Just a reminder.
-I'm going to sort such default definitions out.
-The story can be found here:
-https://lkml.org/lkml/2014/4/8/57
-The patch to achieve this can be found here:
-https://lkml.org/lkml/2014/4/23/71
+Maybe hardware is not stable.
+but even so, do you think using down_read rwsem is appropriate in interrupt handler?
 
-If your series is merged after the above series, you don't need the above lines.
+Another panic:
+[   30.390350] ------------[ cut here ]------------
+[   30.390350] WARNING: at kernel/exit.c:714 do_exit+0x43/0x870()
+[   30.400390] Modules linked in:
+[   30.405853] CPU: 0 PID: 809 Comm: jbd2/mmcblk0p2- Tainted: G      D      3.10.37+ #109
+[   30.414276] [<c001292d>] (unwind_backtrace+0x1/0xcc) from [<c0010279>] (show_stack+0x11/0x14)
+[   30.422729] [<c0010279>] (show_stack+0x11/0x14) from [<c0030819>] (warn_slowpath_common+0x45/0x5c)
+[   30.432739] [<c0030819>] (warn_slowpath_common+0x45/0x5c) from [<c003089f>] (warn_slowpath_null+0x17/0x1c)
+[   30.443084] [<c003089f>] (warn_slowpath_null+0x17/0x1c) from [<c003441b>] (do_exit+0x43/0x870)
+[   30.443084] [<c003441b>] (do_exit+0x43/0x870) from [<c00105af>] (die+0x333/0x350)
+[   30.458557] [<c00105af>] (die+0x333/0x350) from [<c0008417>] (do_undefinstr+0x10b/0x13c)
+[   30.468749] [<c0008417>] (do_undefinstr+0x10b/0x13c) from [<c050cbe3>] (__und_svc_finish+0x1/0x3e)
+[   30.476806] Exception stack(0xedd5fc50 to 0xedd5fc98)
+[   30.483612] fc40:                                     c13c14e0 80000000 00000080 00000000
+[   30.488555] fc60: c13c14e0 0000000c eac67284 c13c14e0 edc11518 c0df95c0 c0824410 eac67240
+[   30.498504] fc80: 00000000 edd5fcd8 c00171f9 c00cf998 80000133 ffffffff
+[   30.504699] [<c050cbe3>] (__und_svc_finish+0x1/0x3e) from [<c00cf998>] (page_mapping+0x20/0x38)
+[   30.508514] [<c00cf998>] (page_mapping+0x20/0x38) from [<c00171f9>] (flush_dcache_page+0x1d/0x60)
+[   30.518493] [<c00171f9>] (flush_dcache_page+0x1d/0x60) from [<c00e26c3>] (blk_queue_bounce+0x1a3/0x2a0)
+[   30.528533] [<c00e26c3>] (blk_queue_bounce+0x1a3/0x2a0) from [<c02ca5bb>] (blk_queue_bio+0x1f/0x364)
+[   30.538513] [<c02ca5bb>] (blk_queue_bio+0x1f/0x364) from [<c02c9661>] (generic_make_request+0x65/0x88)
+[   30.548522] [<c02c9661>] (generic_make_request+0x65/0x88) from [<c02c96e5>] (submit_bio+0x61/0x104)
+[   30.565826] [<c02c96e5>] (submit_bio+0x61/0x104) from [<c010f017>] (_submit_bh+0x127/0x19c)
+[   30.572967] [<c010f017>] (_submit_bh+0x127/0x19c) from [<c0194def>] (jbd2_journal_commit_transaction+0x70b/0x161c)
 
-> +
-> +/* Asm macros */
-> +#define ACPI_FLUSH_CPU_CACHE() flush_cache_all()
-> +
-
-Another reminder.
-I'm going to split this into <asm/acenv.h> in the same story.
-The patch to achieve this can be found here:
-https://lkml.org/lkml/2014/4/23/75
-If your series is merged after the above series, you need to put this line into arch/arm/include/asm/acenv.h.
-
-Thanks and best regards
--Lv
-
-> +/* Basic configuration for ACPI */
-> +#ifdef	CONFIG_ACPI
-> +extern int acpi_disabled;
-> +extern int acpi_noirq;
-> +extern int acpi_pci_disabled;
-> +extern int acpi_strict;
-> +
-> +static inline void disable_acpi(void)
-> +{
-> +	acpi_disabled = 1;
-> +	acpi_pci_disabled = 1;
-> +	acpi_noirq = 1;
-> +}
-> +
->  static inline bool arch_has_acpi_pdc(void)
->  {
->  	/*
-> @@ -34,4 +71,20 @@ static inline void arch_acpi_set_pdc_bits(u32 *buf)
->  	return;
->  }
-> 
-> +static inline void acpi_noirq_set(void) { acpi_noirq = 1; }
-> +static inline void acpi_disable_pci(void)
-> +{
-> +	acpi_pci_disabled = 1;
-> +	acpi_noirq_set();
-> +}
-> +
-> +/*
-> + * The ACPI processor driver for ACPI core code needs this macro.
-> + * Temporarily define it to -1 so that the ACPI core can compile,
-> + * but update it when we get the hardware ID from the MADT table.
-> + */
-> +#define cpu_physical_id(cpu) -1
-> +
-> +#endif /* CONFIG_ACPI */
-> +
->  #endif /*_ASM_ACPI_H*/
-> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> index 720853f..70658e1 100644
-> --- a/arch/arm64/kernel/setup.c
-> +++ b/arch/arm64/kernel/setup.c
-> @@ -41,6 +41,7 @@
->  #include <linux/memblock.h>
->  #include <linux/of_fdt.h>
->  #include <linux/of_platform.h>
-> +#include <linux/acpi.h>
-> 
->  #include <asm/fixmap.h>
->  #include <asm/cputype.h>
-> @@ -368,6 +369,9 @@ void __init setup_arch(char **cmdline_p)
-> 
->  	arm64_memblock_init();
-> 
-> +	/* Parse the ACPI tables for possible boot-time configuration */
-> +	acpi_boot_table_init();
-> +
->  	paging_init();
->  	request_standard_resources();
-> 
-> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-> index 0331f91..8521c97 100644
-> --- a/drivers/acpi/Makefile
-> +++ b/drivers/acpi/Makefile
-> @@ -83,3 +83,5 @@ obj-$(CONFIG_ACPI_PROCESSOR_AGGREGATOR) += acpi_pad.o
->  obj-$(CONFIG_ACPI_APEI)		+= apei/
-> 
->  obj-$(CONFIG_ACPI_EXTLOG)	+= acpi_extlog.o
-> +
-> +obj-y				+= plat/
-> diff --git a/drivers/acpi/plat/Makefile b/drivers/acpi/plat/Makefile
-> new file mode 100644
-> index 0000000..46bc65e
-> --- /dev/null
-> +++ b/drivers/acpi/plat/Makefile
-> @@ -0,0 +1 @@
-> +obj-$(CONFIG_ARM64)	+= arm-core.o
-> diff --git a/drivers/acpi/plat/arm-core.c b/drivers/acpi/plat/arm-core.c
-> new file mode 100644
-> index 0000000..47b5d9b
-> --- /dev/null
-> +++ b/drivers/acpi/plat/arm-core.c
-> @@ -0,0 +1,113 @@
-> +/*
-> + *  ARM/ARM64 Specific Low-Level ACPI Boot Support
-> + *
-> + *  Copyright (C) 2013~2014, Al Stone <al.stone@linaro.org>
-> + *  Copyright (C) 2013~2014, Graeme Gregory <graeme.gregory@linaro.org>
-> + *  Copyright (C) 2013~2014, Hanjun Guo <hanjun.guo@linaro.org>
-> + *
-> + * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-> + *
-> + *  This program is free software; you can redistribute it and/or modify
-> + *  it under the terms of the GNU General Public License as published by
-> + *  the Free Software Foundation; either version 2 of the License, or
-> + *  (at your option) any later version.
-> + *
-> + *  This program is distributed in the hope that it will be useful,
-> + *  but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *  GNU General Public License for more details.
-> + *
-> + * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-> + */
-> +
-> +#include <linux/init.h>
-> +#include <linux/acpi.h>
-> +#include <linux/cpumask.h>
-> +#include <linux/memblock.h>
-> +#include <linux/module.h>
-> +#include <linux/irq.h>
-> +#include <linux/irqdomain.h>
-> +#include <linux/bootmem.h>
-> +#include <linux/smp.h>
-> +
-> +#include <asm/pgtable.h>
-> +
-> +/*
-> + * We never plan to use RSDT on arm/arm64 as its deprecated in spec but this
-> + * variable is still required by the ACPI core
-> + */
-> +u32 acpi_rsdt_forced;
-> +
-> +int acpi_noirq;			/* skip ACPI IRQ initialization */
-> +int acpi_strict;
-> +int acpi_disabled;
-> +EXPORT_SYMBOL(acpi_disabled);
-> +
-> +int acpi_pci_disabled;		/* skip ACPI PCI scan and IRQ initialization */
-> +EXPORT_SYMBOL(acpi_pci_disabled);
-> +
-> +enum acpi_irq_model_id acpi_irq_model = ACPI_IRQ_MODEL_PLATFORM;
-> +
-> +/*
-> + * __acpi_map_table() will be called before page_init(), so early_ioremap()
-> + * or early_memremap() should be called here.
-> + */
-> +char *__init __acpi_map_table(unsigned long phys, unsigned long size)
-> +{
-> +	if (!phys || !size)
-> +		return NULL;
-> +
-> +	return early_ioremap(phys, size);
-> +}
-> +
-> +void __init __acpi_unmap_table(char *map, unsigned long size)
-> +{
-> +	if (!map || !size)
-> +		return;
-> +
-> +	early_iounmap(map, size);
-> +}
-> +
-> +int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
-> +{
-> +	*irq = -1;
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
-> +
-> +/*
-> + * success: return IRQ number (>0)
-> + * failure: return =< 0
-> + */
-> +int acpi_register_gsi(struct device *dev, u32 gsi, int trigger, int polarity)
-> +{
-> +	return -1;
-> +}
-> +EXPORT_SYMBOL_GPL(acpi_register_gsi);
-> +
-> +void acpi_unregister_gsi(u32 gsi)
-> +{
-> +}
-> +EXPORT_SYMBOL_GPL(acpi_unregister_gsi);
-> +
-> +/*
-> + * acpi_boot_table_init() called from setup_arch(), always.
-> + *	1. find RSDP and get its address, and then find XSDT
-> + *	2. extract all tables and checksums them all
-> + *
-> + * We can parse ACPI boot-time tables such as FADT, MADT after
-> + * this function is called.
-> + */
-> +void __init acpi_boot_table_init(void)
-> +{
-> +	/* If acpi_disabled, bail out */
-> +	if (acpi_disabled)
-> +		return;
-> +
-> +	/* Initialize the ACPI boot-time table parser. */
-> +	if (acpi_table_init()) {
-> +		disable_acpi();
-> +		return;
-> +	}
-> +}
-> --
-> 1.7.9.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+Thanks
+    Alex
