@@ -1,65 +1,91 @@
-From: alex.shi@linaro.org (Alex Shi)
-Date: Mon, 28 Apr 2014 13:01:56 +0800
-Subject: do_undefinstr call sem down_read?
-In-Reply-To: <20140425085731.GG26756@n2100.arm.linux.org.uk>
-References: <5358D051.5050306@linaro.org>
- <20140425085731.GG26756@n2100.arm.linux.org.uk>
-Message-ID: <535DE0C4.2020404@linaro.org>
+From: zhichang.yuan@linaro.org (zhichang.yuan at linaro.org)
+Date: Mon, 28 Apr 2014 13:11:28 +0800
+Subject: [PATCHv2 0/6] arm64:lib: the optimized string library routines for
+ armv8 processors
+Message-ID: <1398661895-5559-1-git-send-email-zhichang.yuan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/25/2014 04:57 PM, Russell King - ARM Linux wrote:
-> On Thu, Apr 24, 2014 at 04:50:25PM +0800, Alex Shi wrote:
->> I caught the following issue few times on my panda board on lsk. but I
->> track the code path, looks like the upstream kernel has the same problem
->> too.
-> ...
->> [   30.733612] [<c0008417>] (do_undefinstr+0x10b/0x13c) from [<c050cbe3>] (__und_svc_finish+0x1/0x3e)
->> [   30.743103] Exception stack(0xedd5fc50 to 0xedd5fc98)
->> [   30.748443] fc40:                                     c13c14e0 80000000 00000080 00000000
->> [   30.757141] fc60: c13c14e0 0000000c eac67284 c13c14e0 edc11518 c0df95c0 c0824410 eac67240
->> [   30.765808] fc80: 00000000 edd5fcd8 c00171f9 c00cf998 80000133 ffffffff
->> [   30.772827] [<c050cbe3>] (__und_svc_finish+0x1/0x3e) from [<c00cf998>] (page_mapping+0x20/0x38)
->> [   30.782073] [<c00cf998>] (page_mapping+0x20/0x38) from [<c00171f9>] (flush_dcache_page+0x1d/0x60)
-> 
-> The real question is why is page_mapping triggering an undefined
-> instruction exception.  That I have no answer for.
-> 
-> This function is a hot path, so I doubt that it really is an undefined
-> instruction.  I suspect either your CPU has an erratum, or you have
-> hardware problems.
-> 
+From: "zhichang.yuan" <zhichang.yuan@linaro.org>
 
-Thanks for your response, Russell!
+In current aarch64 kernel,there are a few string library routines
+implemented in arm64/lib,such as memcpy,memset, memmove,strchr.
+Most string routines frequently used are provided by the
+architecture-independent string library. Those routines are not so efficient.
 
-Maybe hardware is not stable.
-but even so, do you think using down_read rwsem is appropriate in interrupt handler?
+This patch set focus on improving the string routines' performance in ARMv8.
+It contains eight optimized functions.The work is based on the cortex-string
+project in Linaro toolchain.
+The original cortex-string code can be found in this website:
+	https://code.launchpad.net/cortex-strings
 
-Another panic:
-[   30.390350] ------------[ cut here ]------------
-[   30.390350] WARNING: at kernel/exit.c:714 do_exit+0x43/0x870()
-[   30.400390] Modules linked in:
-[   30.405853] CPU: 0 PID: 809 Comm: jbd2/mmcblk0p2- Tainted: G      D      3.10.37+ #109
-[   30.414276] [<c001292d>] (unwind_backtrace+0x1/0xcc) from [<c0010279>] (show_stack+0x11/0x14)
-[   30.422729] [<c0010279>] (show_stack+0x11/0x14) from [<c0030819>] (warn_slowpath_common+0x45/0x5c)
-[   30.432739] [<c0030819>] (warn_slowpath_common+0x45/0x5c) from [<c003089f>] (warn_slowpath_null+0x17/0x1c)
-[   30.443084] [<c003089f>] (warn_slowpath_null+0x17/0x1c) from [<c003441b>] (do_exit+0x43/0x870)
-[   30.443084] [<c003441b>] (do_exit+0x43/0x870) from [<c00105af>] (die+0x333/0x350)
-[   30.458557] [<c00105af>] (die+0x333/0x350) from [<c0008417>] (do_undefinstr+0x10b/0x13c)
-[   30.468749] [<c0008417>] (do_undefinstr+0x10b/0x13c) from [<c050cbe3>] (__und_svc_finish+0x1/0x3e)
-[   30.476806] Exception stack(0xedd5fc50 to 0xedd5fc98)
-[   30.483612] fc40:                                     c13c14e0 80000000 00000080 00000000
-[   30.488555] fc60: c13c14e0 0000000c eac67284 c13c14e0 edc11518 c0df95c0 c0824410 eac67240
-[   30.498504] fc80: 00000000 edd5fcd8 c00171f9 c00cf998 80000133 ffffffff
-[   30.504699] [<c050cbe3>] (__und_svc_finish+0x1/0x3e) from [<c00cf998>] (page_mapping+0x20/0x38)
-[   30.508514] [<c00cf998>] (page_mapping+0x20/0x38) from [<c00171f9>] (flush_dcache_page+0x1d/0x60)
-[   30.518493] [<c00171f9>] (flush_dcache_page+0x1d/0x60) from [<c00e26c3>] (blk_queue_bounce+0x1a3/0x2a0)
-[   30.528533] [<c00e26c3>] (blk_queue_bounce+0x1a3/0x2a0) from [<c02ca5bb>] (blk_queue_bio+0x1f/0x364)
-[   30.538513] [<c02ca5bb>] (blk_queue_bio+0x1f/0x364) from [<c02c9661>] (generic_make_request+0x65/0x88)
-[   30.548522] [<c02c9661>] (generic_make_request+0x65/0x88) from [<c02c96e5>] (submit_bio+0x61/0x104)
-[   30.565826] [<c02c96e5>] (submit_bio+0x61/0x104) from [<c010f017>] (_submit_bh+0x127/0x19c)
-[   30.572967] [<c010f017>] (_submit_bh+0x127/0x19c) from [<c0194def>] (jbd2_journal_commit_transaction+0x70b/0x161c)
+Changes since v1:
+
+* Use macro CPU_BE and CPU_LE to differentiate the instructions for different endianess.
+  Do not use the #ifdef.
+
+* Use .req instead of #define for aliases' definition.
+
+* In patch-3 for memset, use DC ZVA unconditionally.
+
+* Done LTP on big-endian and little-endian system according to maintianers' requirement.
+  The test results can be found at https://wiki.linaro.org/WorkingGroups/Kernel/ARMv8/CortexStringsTests.
+
+* Use macro L1_CAHCE_SHIFT to replace the constant number in .p2align.
+
+* Rearrange the numeric labels in order.
+
+* Modify the comments to be more readable.
+
+
+Detail of the patches:
+
+To obtain better performance,several ideas were utilized:
+* Memory burst access;
+	For the long memory data operation,adopted the armv8 instruction pairs,
+	ldp/stp,to transfer the bulk data.Try best to use continuous ldp/stp
+	to trigger the burst access.
+* Parallel processing
+	The current string routines mostly processed per-byte. This patch
+	processes the data in parallel.Such as strlen, it will process
+	eight string bytes each time.
+* Aligned memory access
+	Classfy the process into several categories according to the input
+	memory address parameters.For the non-alignment memory address,firstly
+	process the begginning short-length data to make the memory address
+	aligned,then start the remain processing on alignment address.
+
+After the optimization,those routines have better performance than the current ones.
+Please refer to this website to get the test results:
+	https://wiki.linaro.org/WorkingGroups/Kernel/ARMv8/cortex-strings
+
+--
+
+zhichang.yuan (6):
+  arm64: lib: Implement optimized memcpy routine
+  arm64: lib: Implement optimized memmove routine
+  arm64: lib: Implement optimized memset routine
+  arm64: lib: Implement optimized memcmp routine
+  arm64: lib: Implement optimized string compare routines
+  arm64: lib: Implement optimized string length routines
+
+ arch/arm64/include/asm/string.h |   15 ++
+ arch/arm64/kernel/arm64ksyms.c  |    5 +
+ arch/arm64/lib/Makefile         |    1 +
+ arch/arm64/lib/memcmp.S         |  258 ++++++++++++++++++++++++++++++++
+ arch/arm64/lib/memcpy.S         |  192 +++++++++++++++++++++---
+ arch/arm64/lib/memmove.S        |  190 ++++++++++++++++++++----
+ arch/arm64/lib/memset.S         |  207 +++++++++++++++++++++++---
+ arch/arm64/lib/strcmp.S         |  234 +++++++++++++++++++++++++++++
+ arch/arm64/lib/strlen.S         |  126 ++++++++++++++++
+ arch/arm64/lib/strncmp.S        |  310 +++++++++++++++++++++++++++++++++++++++
+ arch/arm64/lib/strnlen.S        |  171 +++++++++++++++++++++
+ 11 files changed, 1640 insertions(+), 69 deletions(-)
+ create mode 100644 arch/arm64/lib/memcmp.S
+ create mode 100644 arch/arm64/lib/strcmp.S
+ create mode 100644 arch/arm64/lib/strlen.S
+ create mode 100644 arch/arm64/lib/strncmp.S
+ create mode 100644 arch/arm64/lib/strnlen.S
 
 -- 
-Thanks
-    Alex
+1.7.9.5
