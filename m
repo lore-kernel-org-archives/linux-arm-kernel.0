@@ -1,48 +1,21 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Tue, 29 Apr 2014 00:35:41 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSF0gQVNvQzogZnNsOiBzZWxlY3QgU05EX1NPQ19JTVhfUENN?=
- =?UTF-8?B?X0RNQSB3aGVyZSBuZWVkZWQ=?=
-In-Reply-To: <7785150.X1QaggmPtm@wuerfel>
-References: <6606961.lAGLvkNsEj@wuerfel> <1398710770.235891074@f303.i.mail.ru>
- <7785150.X1QaggmPtm@wuerfel>
-Message-ID: <1398717341.630093136@f319.i.mail.ru>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 28 Apr 2014 14:42:01 -0600
+Subject: [PATCH 70/97] ARM: l2c: tegra: convert to common l2c310 early
+ resume functionality
+In-Reply-To: <E1WerHd-0001YS-LA@rmk-PC.arm.linux.org.uk>
+References: <20140428192419.GV26756@n2100.arm.linux.org.uk>
+ <E1WerHd-0001YS-LA@rmk-PC.arm.linux.org.uk>
+Message-ID: <535EBD19.4060304@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mon, 28 Apr 2014 21:52:16 +0200 ?? Arnd Bergmann <arnd@arndb.de>:
-> On Monday 28 April 2014 22:46:10 Alexander Shiyan wrote:
-> > Mon, 28 Apr 2014 16:46:30 +0200 ?? Arnd Bergmann <arnd@arndb.de>:
-> > > Since commit 204dec93eaa "ASoC: fsl: Allow to select individual common
-> > > options", it is possible to enable SND_SOC_FSL_SSI and SND_SOC_FSL_SPDIF
-> > > manually. However, these two options are for drivers that both
-> > > require the imx-pcm-dma framework and result in a link error if that
-> > > is not provided.
-> > > 
-> > > This changes Kconfig to automatically select SND_SOC_IMX_PCM_DMA
-> > > to avoid the problem, as we do for other drivers that need the same
-> > > framework.
-> > > 
-> > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > 
-> > Can you give an exact error?
-> 
-> 
-> sound/built-in.o: In function `fsl_ssi_probe':
-> :(.text+0x51fb8): undefined reference to `imx_pcm_dma_init'
-> sound/built-in.o: In function `fsl_spdif_probe':
-> :(.text+0x52e20): undefined reference to `imx_pcm_dma_init'
+On 04/28/2014 01:32 PM, Russell King wrote:
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-This call is defined in imx-pcm.h as:
-#if IS_ENABLED(CONFIG_SND_SOC_IMX_PCM_DMA)
-int imx_pcm_dma_init(struct platform_device *pdev);
-#else
-static inline int imx_pcm_dma_init(struct platform_device *pdev)
-{
-  return -ENODEV;
-}
-#endif
+Acked-by: Stephen Warren <swarren@nvidia.com>
+Tested-by: Stephen Warren <swarren@nvidia.com>
 
-So, I don't understand why this error happen, as well as I can not
-reproduce this...
+(On Springbank/Tegra20 and Beaver/Tegra30; tested suspend/resume via RTC
+wakealarm IRQ)
 
----
+Joseph, if you see any issue here, please respond. Thanks.
