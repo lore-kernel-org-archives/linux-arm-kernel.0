@@ -1,39 +1,105 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 28 Apr 2014 06:06:39 -0700
-Subject: [PATCH v8 3/3] ARM: Check if a CPU has gone offline
-In-Reply-To: <535E519B.7070101@redhat.com>
-References: <1398455329-18136-1-git-send-email-ashwin.chaugule@linaro.org>
- <1398455329-18136-4-git-send-email-ashwin.chaugule@linaro.org>
- <CALrVBkuV2kQmBScDSMUVG+hOMZ3FQ1tEOEwUEPHRoCo9si+ygA@mail.gmail.com>
- <CAJ5Y-eYFz0CQU4jWOnmiFNRJ+Q=12pvyTf72w7MUk3ebY75wgg@mail.gmail.com>
- <CAMJs5B9d+=kfJ=rnf=_9ywmjtXK4v=OQeVcDu53j0J89GWzfpA@mail.gmail.com>
- <535E519B.7070101@redhat.com>
-Message-ID: <20140428130639.GD2868@lvm>
+From: jean.pihet@linaro.org (Jean Pihet)
+Date: Mon, 28 Apr 2014 15:12:10 +0200
+Subject: [PATCH 1/3] perf tests: Introduce perf_regs_load function on ARM64
+In-Reply-To: <CAFrcx1nfkDWTu9vF+a7UGjd1fzHpXS44pzqKLZS9ej7KJwqkOg@mail.gmail.com>
+References: <CAFrcx1nfkDWTu9vF+a7UGjd1fzHpXS44pzqKLZS9ej7KJwqkOg@mail.gmail.com>
+Message-ID: <1398690730-5454-1-git-send-email-jean.pihet@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 03:03:23PM +0200, Paolo Bonzini wrote:
-> Il 28/04/2014 14:23, Christoffer Dall ha scritto:
-> >Are they inter-dependent?  I thought your patches depended on Anup's -
-> >not the other way around?
-> >
-> >If my assumption is correct, I think we can make sure to send the pull
-> >request to kvm/next early and ask Catalin to pull in kvm/next before
-> >pulling your changes.
-> >
-> >I'm cc'ing both Catalin and Paolo here for their advice.
-> 
-> Is Anup's patchset already on a branch?  If you send me a pointer to
-> it I can look at that branch history and see what's best.
-> 
-I didn't merge it yet - need to make one final pass over it (likely
-later tonight).
+Introducing perf_regs_load function, which is going
+to be used for dwarf unwind test in following patches.
 
-But this is the series:
-https://lists.cs.columbia.edu/pipermail/kvmarm/2014-April/009061.html
+It takes single argument as a pointer to the regs dump
+buffer and populates it with current registers values, as
+expected by the perf built-in unwinding test.
 
-I believe Ashwin's patch set depends only on "ARM/ARM64: KVM: Add common
-header for PSCI related defines".
+Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
+Cc: Steve Capper <steve.capper@linaro.org>
+Cc: Corey Ashford <cjashfor@linux.vnet.ibm.com>
+Cc: Frederic Weisbecker <fweisbec@gmail.com>
+Cc: Ingo Molnar <mingo@kernel.org>
+Cc: Namhyung Kim <namhyung@kernel.org>
+Cc: Paul Mackerras <paulus@samba.org>
+Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
+Cc: Arnaldo Carvalho de Melo <acme@ghostprotocols.net>
+Cc: David Ahern <dsahern@gmail.com>
+Cc: Jiri Olsa <jolsa@redhat.com>
+---
+ tools/perf/arch/arm64/Makefile            |  1 +
+ tools/perf/arch/arm64/include/perf_regs.h |  2 ++
+ tools/perf/arch/arm64/tests/regs_load.S   | 40 +++++++++++++++++++++++++++++++
+ 3 files changed, 43 insertions(+)
+ create mode 100644 tools/perf/arch/arm64/tests/regs_load.S
 
-Thanks,
--Christoffer
+diff --git a/tools/perf/arch/arm64/Makefile b/tools/perf/arch/arm64/Makefile
+index 67e9b3d..9b8f87e 100644
+--- a/tools/perf/arch/arm64/Makefile
++++ b/tools/perf/arch/arm64/Makefile
+@@ -4,4 +4,5 @@ LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/dwarf-regs.o
+ endif
+ ifndef NO_LIBUNWIND
+ LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/unwind-libunwind.o
++LIB_OBJS += $(OUTPUT)arch/$(ARCH)/tests/regs_load.o
+ endif
+diff --git a/tools/perf/arch/arm64/include/perf_regs.h b/tools/perf/arch/arm64/include/perf_regs.h
+index 2359546..1e052f1 100644
+--- a/tools/perf/arch/arm64/include/perf_regs.h
++++ b/tools/perf/arch/arm64/include/perf_regs.h
+@@ -9,6 +9,8 @@
+ #define PERF_REG_IP	PERF_REG_ARM64_PC
+ #define PERF_REG_SP	PERF_REG_ARM64_SP
+ 
++void perf_regs_load(u64 *regs);
++
+ static inline const char *perf_reg_name(int id)
+ {
+ 	switch (id) {
+diff --git a/tools/perf/arch/arm64/tests/regs_load.S b/tools/perf/arch/arm64/tests/regs_load.S
+new file mode 100644
+index 0000000..40b8b99
+--- /dev/null
++++ b/tools/perf/arch/arm64/tests/regs_load.S
+@@ -0,0 +1,40 @@
++#include <linux/linkage.h>
++
++/*
++ * Implementation of void perf_regs_load(u64 *regs);
++ *
++ * This functions fills in the 'regs' buffer from the actual registers values,
++ * in the way the perf built-in unwinding test expects them, e.g. an address
++ * within the caller:
++ * - the PC at the time at the call to this function. Since this function
++ *   is called using a bl instruction, the PC value is taken from LR,
++ * - the current SP (not touched by this function),
++ * - the current value of LR is merely retrieved and stored because the
++ *   value before the call to this function is unknown at this time; it will
++ *   be unwound from the dwarf information in unwind__get_entries.
++ */
++
++.text
++.type perf_regs_load,%function
++ENTRY(perf_regs_load)
++	stp x0,  x1,  [x0], #16	// store x0..x29
++	stp x2,  x3,  [x0], #16
++	stp x4,  x5,  [x0], #16
++	stp x6,  x7,  [x0], #16
++	stp x8,  x9,  [x0], #16
++	stp x10, x11, [x0], #16
++	stp x12, x13, [x0], #16
++	stp x14, x15, [x0], #16
++	stp x16, x17, [x0], #16
++	stp x18, x19, [x0], #16
++	stp x20, x21, [x0], #16
++	stp x22, x23, [x0], #16
++	stp x24, x25, [x0], #16
++	stp x26, x27, [x0], #16
++	stp x28, x29, [x0], #16
++	mov x1,  sp
++	stp x30, x1,  [x0], #16	// store lr and sp
++	str x30, [x0]		// store lr as the PC in order to skip the call
++				//  to this function
++	ret
++ENDPROC(perf_regs_load)
+-- 
+1.7.11.7
