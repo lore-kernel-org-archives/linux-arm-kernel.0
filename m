@@ -1,53 +1,34 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 28 Apr 2014 13:44:03 -0300
-Subject: [PATCH v2 10/10] ARM: mvebu: Enable the thermal sensor in Armada
- 380/385 SoC
-In-Reply-To: <1398371004-15807-11-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1398371004-15807-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1398371004-15807-11-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20140428164403.GA17824@arch.cereza>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 28 Apr 2014 09:45:28 -0700
+Subject: [PATCH 06/23] ARM: OMAP: add OMAP5 DSI muxing
+In-Reply-To: <535DFAAE.1010606@ti.com>
+References: <1398334639-14172-1-git-send-email-tomi.valkeinen@ti.com>
+ <1398334639-14172-7-git-send-email-tomi.valkeinen@ti.com>
+ <535A42D6.5090107@ti.com> <535A4470.2000509@ti.com>
+ <535A5C0A.7040808@ti.com> <535A6C40.10609@ti.com>
+ <20140425153150.GA20807@atomide.com> <535DFAAE.1010606@ti.com>
+Message-ID: <20140428164528.GM20807@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Apr 24, Ezequiel Garcia wrote:
-> This commit enables the thermal sensor found in Armada 380/385 SoCs.
+* Tomi Valkeinen <tomi.valkeinen@ti.com> [140427 23:53]:
+> On 25/04/14 18:31, Tony Lindgren wrote:
 > 
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->  arch/arm/boot/dts/armada-38x.dtsi | 6 ++++++
->  1 file changed, 6 insertions(+)
+> > Chances are any mux register in the syscon area already works with
+> > pinctrl-single,pins or pinctrl-single,bits option. The ones in the
+> > padconf area should be already mapped so the driver just has to
+> > request them.
 > 
-> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-> index a064f59..02c6139 100644
-> --- a/arch/arm/boot/dts/armada-38x.dtsi
-> +++ b/arch/arm/boot/dts/armada-38x.dtsi
-> @@ -346,6 +346,12 @@
->  				clock-output-names = "nand";
->  			};
->  
-> +			thermal at e8078 {
-> +				compatible = "marvell,armada380-thermal";
-> +				reg = <0xe4078 0x4>, <0xe404 0x4>;
+> If using the padconf (say omap4_padconf_global for omap4), doesn't that
+> mean we need to have platform specific bits in the driver? Isn't that
+> something we've been trying to remove all the time?
 
-Dammit, there's a stupid typo in the register offset. I never noticed this, because
-the initialization sequence does not do much, and this register is not really used
-(for now). The fix is this:
+No, it's all done in a Linux generic way during driver probe, see
+drivers/base/pinctrl.c. You just need to define the default pins
+in the .dts files. If you need dynamic remuxing in the driver,
+you can define other named states that the driver can then toggle
+with pinctrl_select_state().
 
-diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-index 02c6139..370220f 100644
---- a/arch/arm/boot/dts/armada-38x.dtsi
-+++ b/arch/arm/boot/dts/armada-38x.dtsi
-@@ -348,7 +348,7 @@
- 
- 			thermal at e8078 {
- 				compatible = "marvell,armada380-thermal";
--				reg = <0xe4078 0x4>, <0xe404 0x4>;
-+				reg = <0xe4078 0x4>, <0xe4074 0x4>;
- 				status = "okay";
- 			};
- 
-Want me to send a follow-up patch?
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Regards,
+
+Tony
