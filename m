@@ -1,24 +1,51 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 28 Apr 2014 10:04:13 -0600
-Subject: [PATCH 0/7] ARM: tegra: HDMI and DSI updates
-In-Reply-To: <1398440691-23366-1-git-send-email-thierry.reding@gmail.com>
-References: <1398440691-23366-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <535E7BFD.60708@wwwdotorg.org>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 28 Apr 2014 13:04:29 -0300
+Subject: [PATCH v2 05/38] memory: mvebu-devbus: use ARMADA_ prefix in
+ defines
+In-Reply-To: <20140428145632.GZ28159@titan.lakedaemon.net>
+References: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1398202002-28530-6-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140426142132.GU28159@titan.lakedaemon.net>
+ <20140428131949.GA11604@arch.cereza>
+ <20140428145632.GZ28159@titan.lakedaemon.net>
+Message-ID: <20140428160429.GA13813@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/25/2014 09:44 AM, Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
+On Apr 28, Jason Cooper wrote:
+> On Mon, Apr 28, 2014 at 10:19:49AM -0300, Ezequiel Garcia wrote:
+> > Hi guys,
+> > 
+> > On Apr 26, Jason Cooper wrote:
+> > > On Tue, Apr 22, 2014 at 11:26:09PM +0200, Thomas Petazzoni wrote:
+> > > > The mvebu-devbus driver currently only supports the Armada 370/XP
+> > > > family, but it can also cover the Orion5x family. However, the Orion5x
+> > > > family has a different organization of the register. Therefore, in
+> > > > preparation to the introduction of Orion5x support, we rename the
+> > > > Armada 370/XP specific definitions to have an ARMADA_ prefix.
+> > > > 
+> > > > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > > > ---
+> > > >  drivers/memory/mvebu-devbus.c | 48 +++++++++++++++++++++----------------------
+> > > >  1 file changed, 24 insertions(+), 24 deletions(-)
+> > > 
+> > > Patches 5 through 9 (devbus) applied to mvebu/drivers With Sebastian's
+> > > Acks and a dep on mvebu/fixes.
+> > > 
+> > 
+> > Tested the branch (plus some -next fixes) on the AXP-GP. The NOR works perfectly fine.
 > 
-> This series enables support for HDMI on Venice2 and Jetson TK1. It also
-> adds the missing +5V regulators for Harmony, Beaver and Dalmore. Other
-> boards may also need similar changes, but I don't have access to them.
-> That said existing boards should continue to work without modifications
-> since we were completely ignoring the +5V regulator before. So the only
-> change that this should introduce is that perhaps some additional power
-> can be saved because the +5V regulator now isn't always on.
+> Which fixes?
 > 
-> The final patch in this series hooks up the DSI power supply on Dalmore
-> so that it can also be switched of if not used.
 
-I've applied the series to Tegra's for-3.16/dt branch.
+Gah, nevermind. I took the mvneta -netdev fixes, but the XP-GP wasn't affected.
+So, no fixes required.
+
+> Does this count as a Tested-by?
+> 
+
+Sure: Tested-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
