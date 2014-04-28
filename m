@@ -1,65 +1,41 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 28 Apr 2014 13:02:42 +0200
-Subject: [PATCH RESEND 2/3] mmc: mvsdio: workaround for spurious irqs
-In-Reply-To: <1398540855-27367-3-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1398540855-27367-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1398540855-27367-3-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <CAPDyKFrd0zeUy-Umm6GQ0oVonFU4VRcwGL5zYqVYmMSPeEmogg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 28 Apr 2014 12:02:59 +0100
+Subject: [PATCH 21/38] mmc: sdhci: hack up driver to make it more
+ compliant with UHS-1
+In-Reply-To: <CAPDyKFpja-dGwsEL6YP=Nn=YSRRgMzTTz6WVQ8DiUOMrkLJpBQ@mail.gmail.com>
+References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
+ <E1Wd2WT-0003vg-Ke@rmk-PC.arm.linux.org.uk>
+ <20140425123820.GA15179@pengutronix.de>
+ <CAPDyKFpja-dGwsEL6YP=Nn=YSRRgMzTTz6WVQ8DiUOMrkLJpBQ@mail.gmail.com>
+Message-ID: <20140428110259.GI26756@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 April 2014 21:34, Sebastian Hesselbarth
-<sebastian.hesselbarth@gmail.com> wrote:
-> SDIO controllers found on Marvell Kirkwood SoCs seem to cause a late,
-> spurious irq although all interrupts have been disabled. This irq
-> doesn't do any harm, neither to HW nor driver. To avoid some
-> "unexpected irq" warning later, we workaround above issue by bailing
-> out of irq handler early, if we didn't expect any.
->
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Acked-by: Jason Cooper <jason@lakedaemon.net>
-> ---
-> Cc: Nicolas Pitre <nico@fluxnic.net>
-> Cc: Chris Ball <chris@printf.net>
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Cc: linux-mmc at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
+On Mon, Apr 28, 2014 at 12:50:54PM +0200, Ulf Hansson wrote:
+> On 25 April 2014 14:38, Markus Pargmann <mpa@pengutronix.de> wrote:
+> > Hi,
+> >
+> > On Wed, Apr 23, 2014 at 08:07:57PM +0100, Russell King wrote:
+> >> Patch suggested by Dong Aisheng <dongas86@gmail.com>, this avoids
+> >> additional clock start/stop cycles during the transition to 1.8V
+> >> signalling mode.
+> >>
+> >> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> >
+> > I tested the series on imx6s with a RIoT board. With this patch applied
+> > the RIoT board emmc does not work. Here is the output of the board:
+> 
+> Hi Markus,
+> 
+> Thanks for helping out testing!
+> 
+> Does that mean patch 1->20 works fine for you? May I add your tested-by tag?
 
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+Why should _you_ add someone elses tested-by tag to _my_ patches?
 
-> ---
->  drivers/mmc/host/mvsdio.c | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
->
-> diff --git a/drivers/mmc/host/mvsdio.c b/drivers/mmc/host/mvsdio.c
-> index 41aca7f28c23..9377284f8544 100644
-> --- a/drivers/mmc/host/mvsdio.c
-> +++ b/drivers/mmc/host/mvsdio.c
-> @@ -354,6 +354,20 @@ static irqreturn_t mvsd_irq(int irq, void *dev)
->                 intr_status, mvsd_read(MVSD_NOR_INTR_EN),
->                 mvsd_read(MVSD_HW_STATE));
->
-> +       /*
-> +        * It looks like, SDIO IP can issue one late, spurious irq
-> +        * although all irqs should be disabled. To work around this,
-> +        * bail out early, if we didn't expect any irqs to occur.
-> +        */
-> +       if (!mvsd_read(MVSD_NOR_INTR_EN) && !mvsd_read(MVSD_ERR_INTR_EN)) {
-> +               dev_dbg(host->dev, "spurious irq detected intr 0x%04x intr_en 0x%04x erri 0x%04x erri_en 0x%04x\n",
-> +                       mvsd_read(MVSD_NOR_INTR_STATUS),
-> +                       mvsd_read(MVSD_NOR_INTR_EN),
-> +                       mvsd_read(MVSD_ERR_INTR_STATUS),
-> +                       mvsd_read(MVSD_ERR_INTR_EN));
-> +               return IRQ_HANDLED;
-> +       }
-> +
->         spin_lock(&host->lock);
->
->         /* PIO handling, if needed. Messy business... */
-> --
-> 1.9.1
->
+I still wonder whether you understood anything that I've already said to
+you about the handling of this patch set.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
