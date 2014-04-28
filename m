@@ -1,9 +1,10 @@
 From: guido@vanguardiasur.com.ar (=?UTF-8?q?Guido=20Mart=C3=ADnez?=)
-Date: Mon, 28 Apr 2014 10:58:31 -0300
-Subject: [PATCH 3/4] ARM: dts: am335x-evmsk: use phandles for USB and DMA refs
+Date: Mon, 28 Apr 2014 10:58:32 -0300
+Subject: [PATCH 4/4] ARM: dts: am335x-igep0033: use phandles for USB and DMA
+ refs
 In-Reply-To: <1398693512-5355-1-git-send-email-guido@vanguardiasur.com.ar>
 References: <1398693512-5355-1-git-send-email-guido@vanguardiasur.com.ar>
-Message-ID: <1398693512-5355-3-git-send-email-guido@vanguardiasur.com.ar>
+Message-ID: <1398693512-5355-4-git-send-email-guido@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,14 +13,14 @@ This makes the DT more robust and readable.
 
 Signed-off-by: Guido Mart?nez <guido@vanguardiasur.com.ar>
 ---
- arch/arm/boot/dts/am335x-evmsk.dts | 12 ++++++------
+ arch/arm/boot/dts/am335x-igep0033.dtsi | 12 ++++++------
  1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
-index ab23885..44b8d75 100644
---- a/arch/arm/boot/dts/am335x-evmsk.dts
-+++ b/arch/arm/boot/dts/am335x-evmsk.dts
-@@ -364,28 +364,28 @@
+diff --git a/arch/arm/boot/dts/am335x-igep0033.dtsi b/arch/arm/boot/dts/am335x-igep0033.dtsi
+index 9f22c18..81cf68b 100644
+--- a/arch/arm/boot/dts/am335x-igep0033.dtsi
++++ b/arch/arm/boot/dts/am335x-igep0033.dtsi
+@@ -201,28 +201,28 @@
  &usb {
  	status = "okay";
  
