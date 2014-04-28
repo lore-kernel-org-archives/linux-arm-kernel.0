@@ -1,37 +1,86 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Mon, 28 Apr 2014 15:44:57 -0400
-Subject: [PATCH] arm64: fixmap: fix missing sub-page offset for earlyprintk
-In-Reply-To: <1398711006-14943-1-git-send-email-marc.zyngier@arm.com>
-References: <1398711006-14943-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1398714297.3010.79.camel@deneb.redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 28 Apr 2014 21:55 +0200
+Subject: [PATCH v12 11/31] documentation: iommu: add binding document of
+ Exynos System MMU
+In-Reply-To: <20140428193056.GD22135@arm.com>
+References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
+ <4780885.JaktFvJeC7@wuerfel> <20140428193056.GD22135@arm.com>
+Message-ID: <5242619.ZKgCdLW1L4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-04-28 at 19:50 +0100, Marc Zyngier wrote:
-> Commit d57c33c5daa4 (add generic fixmap.h) added (among other
-> similar things) set_fixmap_io to deal with early ioremap of devices.
+On Monday 28 April 2014 20:30:56 Will Deacon wrote:
+> Hi Arnd,
 > 
-> More recently, commit bf4b558eba92 (arm64: add early_ioremap support)
-> converted the arm64 earlyprintk to use set_fixmap_io. A side effect of
-> this conversion is that my virtual machines have stopped booting when
-> I pass "earlyprintk=uart8250-8bit,0x3f8" to the guest kernel.
+> [and thanks Thierry for CCing me -- I have been tangled up with this before
+> :)]
 > 
-> Turns out that the new earlyprintk code doesn't care at all about
-> sub-page offsets, and just assumes that the earlyprintk device will
-> be page-aligned. Obviously, that doesn't play well with the above example.
+> On Mon, Apr 28, 2014 at 01:05:30PM +0100, Arnd Bergmann wrote:
+> > On Monday 28 April 2014 13:18:03 Thierry Reding wrote:
+> > > There still has to be one cell to specify which master. Unless perhaps
+> > > if they can be arbitrarily assigned. I guess even if there's a fixed
+> > > mapping that applies to one SoC generation, it might be good to still
+> > > employ a specifier and have the mapping in DT for flexibility.
+> > 
+> > let me clarify by example:
+> > 
+> > 	iommu at 1 {
+> > 		compatible = "some,simple-iommu";
+> > 		reg = <1>;
+> > 		#iommu-cells = <0>; /* supports only one master */
+> > 	};
+> > 
+> > 	iommu at 2 {
+> > 		compatible = "some,other-iommu";
+> > 		reg = <3>;
+> > 		#iommu-cells = <1>; /* contains master ID */
+> > 	};
+> > 
+> > 	iommu at 3 {
+> > 		compatible = "some,windowed-iommu";
+> > 		reg = <2>;
+> > 		#iommu-cells = <2>; /* contains dma-window */
+> > 	};
+> > 
+> > 	device at 4 {
+> > 		compatible = "some,ethernet";
+> > 		iommus = <&/iommu@1>;
+> > 	};
+> > 
+> > 	device at 5 {
+> > 		compatible = "some,dmaengine";
+> > 		iommus = <&/iommu@2 0x40000000 0x1000000>,
+> > 			 <&/iommu@3 0x101>;
+> > 	};
+> > 
+> > The device at address 4 has a one-one relationship with iommu at 1, so there
+> > is no need for any data. device at 5 has two master ports. One is connected to
+> > an IOMMU that has a per-device aperture, device at 5 can only issue transfers
+> > to the 256MB area at 0x40000000, and the IOMMU will have to put entries for
+> > this device into that address. The second master port is connected to
+> > iommu at 3, which uses a master ID that gets passed along with each transfer,
+> > so that needs to be put into the IOTLBs.
 > 
-> Further investigation shows that set_fixmap_io uses __set_fixmap instead
-> of __set_fixmap_offset. A fix is to introduce a set_fixmap_offset_io that
-> uses the latter, and to remove the superflous call to fix_to_virt
-> (which only returns the value that set_fixmap_io has already given us).
-> 
-> With this applied, my VMs are back in business. Tested on a Cortex-A57
-> platform with kvmtool as platform emulation.
-> 
-> Cc: Mark Salter <msalter@redhat.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
+> I think this is definitely going in the right direction, but it's not clear
+> to me how the driver for device at 5 knows how to configure the two ports.
+> We're still lacking topology information (unless that's implicit in the
+> ordering of the properties) to say how the mastering capabilities of the
+> device are actually routed and configured.
 
-Acked-by: Mark Salter <msalter@redhat.com>
+It would be helpful to have a concrete example of a device that has multiple
+masters. I have heard people mention this multiple times, and I can understand
+how it might be wired up in hardware, but I don't know what it's good for,
+or who would actually do it.
+
+> > A variation would be to not use #iommu-cells at all, but provide a
+> > #address-cells / #size-cells pair in the IOMMU, and have a translation
+> > as we do for dma-ranges. This is probably most flexible.
+> 
+> That would also allow us to describe ranges of master IDs, which we need for
+> things like PCI RCs on the ARM SMMU. Furthermore, basic transformations of
+> these ranges could also be described like this, although I think Dave (CC'd)
+> has some similar ideas in this area.
+
+Good point.
+
+	ARnd
