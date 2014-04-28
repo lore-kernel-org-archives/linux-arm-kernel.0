@@ -1,64 +1,77 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Mon, 28 Apr 2014 23:15:05 +0200
-Subject: [patch] Fix CAN on socfpga, for net/master
-In-Reply-To: <1398716449.836.4.camel@dinh-ubuntu>
-References: <1396422700-3962-4-git-send-email-s.trumtrar@pengutronix.de>
- <20140404102815.GA9242@amd.pavel.ucw.cz>
- <20140425195319.GA3677@amd.pavel.ucw.cz>
- <1398457446.26387.0.camel@linux-builds1>
- <1398461518.3587.11.camel@dinh-ubuntu>
- <20140426093646.GE8730@amd.pavel.ucw.cz>
- <20140426203131.GA21832@amd.pavel.ucw.cz>
- <6bf951b6-51e7-4b90-b054-9ba5b6e93874@email.android.com>
- <20140427122510.GB12901@amd.pavel.ucw.cz>
- <1398716449.836.4.camel@dinh-ubuntu>
-Message-ID: <20140428211505.GA28242@amd.pavel.ucw.cz>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 28 Apr 2014 14:18:20 -0700
+Subject: [PATCH v2 0/7] Add cros_ec changes for newer boards
+In-Reply-To: <20140428091914.GK6264@lee--X1>
+References: <1398185154-19404-1-git-send-email-dianders@chromium.org>
+ <20140423123240.GA640@lee--X1> <5357E832.1000806@wwwdotorg.org>
+ <CAD=FV=XbjeOR+A-ZVYgOT69gsdp-YrjbkGrjL2Vf4F31ZkGXTA@mail.gmail.com>
+ <CAD=FV=UWnLLzqzmrt0z=38iDOBSRJJLNAG8PL0GSHt1758ACcg@mail.gmail.com>
+ <20140428091914.GK6264@lee--X1>
+Message-ID: <CAD=FV=UEwfNX+uf70OV4LB39s=mJyxTkC63g4iYrE7hcvyEdgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Lee,
 
-On Mon 2014-04-28 15:20:49, Thor Thayer wrote:
-> On Sun, 2014-04-27 at 14:25 +0200, ZY - pavel wrote:
-> > Apparently, socfpga CAN needs 32-bit accesses and different raminit
-> > sequence.
-> > 
-> > Signed-off-by: Pavel Machek <pavel@denx.de>
-> > 
-> > ---
-> > 
-> > > 
-> > > I'm not in the office (and fighting with my phone's email client) until 5th of May, however please rebase all your patches against the latest net/master from David Miller, as this tree includes all c_can fixes by Thomas.
-> > > 
-> > 
-> > Ok, combined patch is here. Lightly tested using loopback on Arrow
-> > SocKit.
-> 
-> Hi Pavel. 
-> 
-> Thanks for your help on the SOCFPGA support! I can test this on the
-> Altera Development Kit but I'm not able to cleanly apply to the latest
-> David Miller net-next branch. Is there a different branch I should
-> use?
+On Mon, Apr 28, 2014 at 2:19 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> [...]
+>
+>> >>> Need to wait for the ARM, DT and I2C guys to review, at which point
+>> >>> I'll be happy to take in and supply a branch for them to pull from if
+>> >>> required. If there are no _true_ dependencies and the MFD changes can
+>> >>> be added independently without fear of build breakages, let me know
+>> >>> and I'll apply them separately.
+>> >>
+>> >> I believe there aren't direct dependencies between the patches. So, the
+>> >> MFD patches can be applied to the MFD tree and the DT patch applied to
+>> >> the Tegra tree. I'm simply waiting for the MFD patches to be applied
+>> >> before applying the DT patch so that I know the DT binding definition is
+>> >> fully accepted before applying a patch that uses it.
+>> >
+>> > All of the MFD patches are safe to apply and in pretty much arbitrary
+>> > order.  The strong dependencies in the chain are:
+>> >
+>> > * We need patch #5 (mfd: cros_ec: Sync to the latest
+>> > cros_ec_commands.h from EC sources) before the i2c tunnel can compile.
+>> >
+>> > * As Stephen says, he shouldn't apply the device tree until we're
+>> > confident that the bindings are right.  However there's no strong
+>> > dependency otherwise.
+>> >
+>> > * Patches #1 #2 and #3 are simply reliability fixes.  Those could land
+>> > at any point in time and will improve other users of cros_ec_spi (like
+>> > the keyboard on tegra124-venice2).
+>> >
+>> > * Patch #4 can apply any time with no issues.  Without it large i2c
+>> > tunnel transfers won't work, but that's not a terrible problem (all
+>> > normal transfers are small).
+>>
+>> Patch #5 (latest ec commands) can also apply at any time with no
+>> issues, but it's needed for patch #6 (the tunnel) to compile.
+>>
+>> All that being said, I'd request that you merge patches #1-#5 as soon
+>> as you can and make sure you can provide a way that Wolfram can pull
+>> them (or at least patch #5) into his i2c tree to keep them applying
+>> when he is ready to land #6.
+>
+> Very well. So if I can obtain Wolfram's Ack, I can apply the MFD
+> changes along with patch #6 and supply him with a branch.
 
-It should have been against net-next branch... but perhaps I made a
-mistake somewhere. I should get some sleep now.
+Can you explain the reason to wait for Wolfram's Ack before applying
+#1 - #5?  I would think:
 
-Or ... let me upload my tree so that you can generate the diff.
+1. Create a topic branch.
+2. Apply patches 1-5 to the topic branch
+3. Merge the topic branch to your for-next branch
 
-You should be able to get it using:
+When Wolfram wants to take patch #6, he can either:
+A. Pull your topic branch
+B. If it's been long enough, patches will already be in ToT and no extra work.
 
-git pull git://git.denx.de/linux-denx-pavel.git my_net_master
+If I understand correctly, using a topic branch and doing merges /
+pulls means that you can provide Wolfram with stable git hashes when
+he needs them and there will be no merge conflicts.
 
-> I also like your updates to my patch as shown below - much cleaner.
+Patches #1 - #5 are bonafide bugfixes irrespective of the i2c tunnel.
 
-Thanks :-).
-
-Best regards,
-
-								Pavel
-
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-Doug
