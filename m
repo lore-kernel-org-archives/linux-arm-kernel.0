@@ -1,79 +1,172 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 28 Apr 2014 20:32:55 +0100
-Subject: [PATCH 79/97] ARM: l2c: add warnings for stuff modifying aux_ctrl
- register values
+Date: Mon, 28 Apr 2014 20:33:00 +0100
+Subject: [PATCH 80/97] ARM: l2c: trial at enabling some Cortex-A9 optimisations
 In-Reply-To: <20140428192419.GV26756@n2100.arm.linux.org.uk>
 References: <20140428192419.GV26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WerIN-0001Z2-Kv@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WerIS-0001Z6-Ol@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mm/cache-l2x0.c | 27 +++++++++++++++++++++++----
- 1 file changed, 23 insertions(+), 4 deletions(-)
+ arch/arm/include/asm/hardware/cache-l2x0.h |  8 ++++
+ arch/arm/mm/cache-l2x0.c                   | 73 ++++++++++++++++++++++++++++--
+ 2 files changed, 78 insertions(+), 3 deletions(-)
 
+diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
+index 84bbd31b8910..3a5ec1c25659 100644
+--- a/arch/arm/include/asm/hardware/cache-l2x0.h
++++ b/arch/arm/include/asm/hardware/cache-l2x0.h
+@@ -134,6 +134,14 @@
+ 
+ #define L310_ADDR_FILTER_EN		1
+ 
++#define L310_PREFETCH_CTRL_OFFSET_MASK		0x1f
++#define L310_PREFETCH_CTRL_DBL_LINEFILL_INCR	BIT(23)
++#define L310_PREFETCH_CTRL_PREFETCH_DROP	BIT(24)
++#define L310_PREFETCH_CTRL_DBL_LINEFILL_WRAP	BIT(27)
++#define L310_PREFETCH_CTRL_DATA_PREFETCH	BIT(28)
++#define L310_PREFETCH_CTRL_INSTR_PREFETCH	BIT(29)
++#define L310_PREFETCH_CTRL_DBL_LINEFILL		BIT(30)
++
+ #define L2X0_CTRL_EN			1
+ 
+ #define L2X0_WAY_SIZE_SHIFT		3
 diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index c6f9d6092d10..156d6f25ce45 100644
+index 156d6f25ce45..ad5b6b41b4be 100644
 --- a/arch/arm/mm/cache-l2x0.c
 +++ b/arch/arm/mm/cache-l2x0.c
-@@ -715,7 +715,15 @@ static void __init __l2c_init(const struct l2c_init_data *data,
- {
- 	struct outer_cache_fns fns;
- 	unsigned way_size_bits, ways;
--	u32 aux;
-+	u32 aux, old_aux;
+@@ -16,14 +16,17 @@
+  * along with this program; if not, write to the Free Software
+  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+  */
++#include <linux/cpu.h>
+ #include <linux/err.h>
+ #include <linux/init.h>
++#include <linux/smp.h>
+ #include <linux/spinlock.h>
+ #include <linux/io.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ 
+ #include <asm/cacheflush.h>
++#include <asm/cp15.h>
+ #include <asm/cputype.h>
+ #include <asm/hardware/cache-l2x0.h>
+ #include "cache-tauros3.h"
+@@ -618,7 +621,24 @@ static void l2c310_resume(void)
+ 				      L310_POWER_CTRL);
+ 
+ 		l2c_enable(base, l2x0_saved_regs.aux_ctrl, 8);
 +
-+	/*
-+	 * Sanity check the aux values.  aux_mask is the bits we preserve
-+	 * from reading the hardware register, and aux_val is the bits we
-+	 * set.
-+	 */
-+	if (aux_val & aux_mask)
-+		pr_alert("L2C: platform provided aux values permit register corruption.\n");
- 
- 	/*
- 	 * It is strange to save the register state before initialisation,
-@@ -724,11 +732,14 @@ static void __init __l2c_init(const struct l2c_init_data *data,
- 	if (data->save)
- 		data->save(l2x0_base);
- 
--	aux = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
--
-+	old_aux = aux = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
- 	aux &= aux_mask;
- 	aux |= aux_val;
- 
-+	if (old_aux != aux)
-+		pr_warn("L2C: DT/platform modifies aux control register: 0x%08x -> 0x%08x\n",
-+		        old_aux, aux);
++		/* Re-enable full-line-of-zeros for Cortex-A9 */
++		if (l2x0_saved_regs.aux_ctrl & L310_AUX_CTRL_FULL_LINE_ZERO)
++			set_auxcr(get_auxcr() | BIT(3) | BIT(2) | BIT(1));
++	}
++}
 +
- 	/* Determine the number of ways */
- 	switch (cache_id & L2X0_CACHE_ID_PART_MASK) {
- 	case L2X0_CACHE_ID_PART_L310:
-@@ -1351,7 +1362,7 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
- 	const struct l2c_init_data *data;
- 	struct device_node *np;
- 	struct resource res;
--	u32 cache_id;
-+	u32 cache_id, old_aux;
++static int l2c310_cpu_enable_flz(struct notifier_block *nb, unsigned long act, void *data)
++{
++	switch (act & ~CPU_TASKS_FROZEN) {
++	case CPU_STARTING:
++		set_auxcr(get_auxcr() | BIT(3) | BIT(2) | BIT(1));
++		break;
++	case CPU_DYING:
++		set_auxcr(get_auxcr() & ~(BIT(3) | BIT(2) | BIT(1)));
++		break;
+ 	}
++	return NOTIFY_OK;
+ }
  
- 	np = of_find_matching_node(NULL, l2x0_ids);
- 	if (!np)
-@@ -1368,6 +1379,14 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
+ static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
+@@ -636,7 +656,42 @@ static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
+ 		}
+ 	}
  
- 	data = of_match_node(l2x0_ids, np)->data;
- 
-+	old_aux = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
-+	if (old_aux != ((old_aux & aux_mask) | aux_val)) {
-+		pr_warn("L2C: platform modifies aux control register: 0x%08x -> 0x%08x\n",
-+		        old_aux, (old_aux & aux_mask) | aux_val);
-+	} else if (aux_mask != ~0U && aux_val != 0) {
-+		pr_alert("L2C: platform provided aux values match the hardware, so have no effect.  Please remove them.\n");
++	if (cortex_a9) {
++		u32 aux_cur = readl_relaxed(base + L2X0_AUX_CTRL);
++		u32 acr = get_auxcr();
++
++		pr_debug("Cortex-A9 ACR=0x%08x\n", acr);
++
++		if (acr & BIT(3) && !(aux_cur & L310_AUX_CTRL_FULL_LINE_ZERO))
++			pr_err("L2C-310: full line of zeros enabled in Cortex-A9 but not L2C-310 - invalid\n");
++
++		if (aux & L310_AUX_CTRL_FULL_LINE_ZERO && !(acr & BIT(3)))
++			pr_err("L2C-310: enabling full line of zeros but not enabled in Cortex-A9\n");
++
++		if (!(aux & L310_AUX_CTRL_FULL_LINE_ZERO) && !outer_cache.write_sec) {
++			aux |= L310_AUX_CTRL_FULL_LINE_ZERO;
++			pr_info("L2C-310 full line of zeros enabled for Cortex-A9\n");
++		}
++	} else if (aux & (L310_AUX_CTRL_FULL_LINE_ZERO | L310_AUX_CTRL_EARLY_BRESP)) {
++		pr_err("L2C-310: disabling Cortex-A9 specific feature bits\n");
++		aux &= ~(L310_AUX_CTRL_FULL_LINE_ZERO | L310_AUX_CTRL_EARLY_BRESP);
 +	}
 +
- 	/* All L2 caches are unified, so this property should be specified */
- 	if (!of_property_read_bool(np, "cache-unified"))
- 		pr_err("L2C: device tree omits to specify unified cache\n");
++	if (aux & (L310_AUX_CTRL_DATA_PREFETCH | L310_AUX_CTRL_INSTR_PREFETCH)) {
++		u32 prefetch = readl_relaxed(base + L310_PREFETCH_CTRL);
++
++		pr_info("L2C-310 %s%s prefetch enabled, offset %u lines\n",
++			aux & L310_AUX_CTRL_INSTR_PREFETCH ? "I" : "",
++			aux & L310_AUX_CTRL_DATA_PREFETCH ? "D" : "",
++			1 + (prefetch & L310_PREFETCH_CTRL_OFFSET_MASK));
++	}
++
+ 	l2c_enable(base, aux, num_lock);
++
++	if (aux & L310_AUX_CTRL_FULL_LINE_ZERO) {
++		set_auxcr(get_auxcr() | BIT(3) | BIT(2) | BIT(1));
++		cpu_notifier(l2c310_cpu_enable_flz, 0);
++	}
+ }
+ 
+ static void __init l2c310_fixup(void __iomem *base, u32 cache_id,
+@@ -692,6 +747,18 @@ static void __init l2c310_fixup(void __iomem *base, u32 cache_id,
+ 	}
+ }
+ 
++static void l2c310_disable(void)
++{
++	/*
++	 * If full-line-of-zeros is enabled, we must first disable it in the
++	 * Cortex-A9 auxiliary control register before disabling the L2 cache.
++	 */
++	if (l2x0_saved_regs.aux_ctrl & L310_AUX_CTRL_FULL_LINE_ZERO)
++		set_auxcr(get_auxcr() & ~(BIT(3) | BIT(2) | BIT(1)));
++
++	l2c_disable();
++}
++
+ static const struct l2c_init_data l2c310_init_fns __initconst = {
+ 	.type = "L2C-310",
+ 	.way_size_0 = SZ_8K,
+@@ -704,7 +771,7 @@ static const struct l2c_init_data l2c310_init_fns __initconst = {
+ 		.clean_range = l2c210_clean_range,
+ 		.flush_range = l2c210_flush_range,
+ 		.flush_all = l2c210_flush_all,
+-		.disable = l2c_disable,
++		.disable = l2c310_disable,
+ 		.sync = l2c210_sync,
+ 		.resume = l2c310_resume,
+ 	},
+@@ -956,7 +1023,7 @@ static const struct l2c_init_data of_l2c310_data __initconst = {
+ 		.clean_range = l2c210_clean_range,
+ 		.flush_range = l2c210_flush_range,
+ 		.flush_all   = l2c210_flush_all,
+-		.disable     = l2c_disable,
++		.disable     = l2c310_disable,
+ 		.sync        = l2c210_sync,
+ 		.resume      = l2c310_resume,
+ 	},
+@@ -1303,7 +1370,7 @@ static const struct l2c_init_data of_bcm_l2x0_data __initconst = {
+ 		.clean_range = bcm_clean_range,
+ 		.flush_range = bcm_flush_range,
+ 		.flush_all   = l2c210_flush_all,
+-		.disable     = l2c_disable,
++		.disable     = l2c310_disable,
+ 		.sync        = l2c210_sync,
+ 		.resume      = l2c310_resume,
+ 	},
 -- 
 1.8.3.1
