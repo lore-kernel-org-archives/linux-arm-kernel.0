@@ -1,28 +1,24 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 28 Apr 2014 15:43:37 -0700
-Subject: [linux-sunxi] [PATCH 1/2] ARM: sunxi: Split the various SoCs
- support in Kconfig
-In-Reply-To: <CAOesGMiYRwmBnynw8dg6hBWens4_ncbvE2wN5rnJoW5DV_YB5g@mail.gmail.com>
+Date: Mon, 28 Apr 2014 15:45:19 -0700
+Subject: [PATCH 1/2] ARM: sunxi: Split the various SoCs support in Kconfig
+In-Reply-To: <8970285.5xeG1588Q7@wuerfel>
 References: <1398529014-1152-1-git-send-email-maxime.ripard@free-electrons.com>
  <1398529014-1152-2-git-send-email-maxime.ripard@free-electrons.com>
- <CAOesGMiYRwmBnynw8dg6hBWens4_ncbvE2wN5rnJoW5DV_YB5g@mail.gmail.com>
-Message-ID: <20140428224337.GL3134@lukather>
+ <8970285.5xeG1588Q7@wuerfel>
+Message-ID: <20140428224519.GM3134@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 10:02:40AM -0700, Olof Johansson wrote:
-> Hi,
-> 
-> On Sat, Apr 26, 2014 at 9:16 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
+On Mon, Apr 28, 2014 at 08:07:38PM +0200, Arnd Bergmann wrote:
+> On Saturday 26 April 2014 18:16:53 Maxime Ripard wrote:
 > > This will allow to better isolate various options, and reduce the overall
 > > kernel size if we're interested in only one of the SoCs.
-> >
+> > 
 > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  arch/arm/mach-sunxi/Kconfig | 35 +++++++++++++++++++++++++++++------
-> >  1 file changed, 29 insertions(+), 6 deletions(-)
-> >
+> 
+> Looks good, just one small request:
+> 
+> 
 > > diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
 > > index b57d7d53b9d3..23575010ff49 100644
 > > --- a/arch/arm/mach-sunxi/Kconfig
@@ -42,19 +38,15 @@ On Mon, Apr 28, 2014 at 10:02:40AM -0700, Olof Johansson wrote:
 > >         select PINCTRL_SUNXI
 > > -       select RESET_CONTROLLER
 > >         select SUN4I_TIMER
-> > +
-> > +if ARCH_SUNXI
-> > +
-> > +menu "Allwinner SoCs variants"
-> > +
-> > +config MACH_SUN4I
-> > +       bool "Allwinner A10 (sun4i) SoCs support"
 > 
-> If you add "default MACH_SUNXI" then you don't have to churn the
-> defconfigs, but it'll still make it possible for people to turn it
-> off.
+> Please make this 'menuconfig' instead of 'config', so it shows up as
+> only one line in the main menu. I would like to do this for all platforms
+> that have sub-options eventually.
 
-Right, thanks!
+Ok, sure, I'll send a v2 with Olof comments as well.
+
+Thanks!
+Maxime
 
 -- 
 Maxime Ripard, Free Electrons
@@ -66,4 +58,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140428/7c83757b/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140428/b7df91d3/attachment.sig>
