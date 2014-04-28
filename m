@@ -1,30 +1,46 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 28 Apr 2014 10:00:41 +0200
-Subject: [PATCH] ARM: fix v7-M setup stack location
-In-Reply-To: <1398103637-22828-1-git-send-email-rabin@rab.in>
-References: <1398103637-22828-1-git-send-email-rabin@rab.in>
-Message-ID: <20140428080041.GC28564@pengutronix.de>
+From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
+Date: Mon, 28 Apr 2014 13:45:54 +0530
+Subject: [PATCH 1/2 v4] i2c: exynos5: add support for HSI2C on Exynos5260
+ SoC
+In-Reply-To: <20140312191851.GB28891@katana>
+References: <1385100726-32165-1-git-send-email-ch.naveen@samsung.com>
+ <1391748171-12451-1-git-send-email-ch.naveen@samsung.com>
+ <20140312191851.GB28891@katana>
+Message-ID: <CAHfPSqDAUpJWO3Udnjxim-LRY_hjW4+W2j5eTm+Xuk_Np+jhFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hello Wolfram,
 
-On Mon, Apr 21, 2014 at 08:07:17PM +0200, Rabin Vincent wrote:
-> __v7m_setup_stack currently sits in the .proc.info.init section, and
-> thus creates a bogus proc info entry (which by the way matches any
-> unknown CPU IDs, due to the entry's mask being 0).  Move it out of
-> there.
-> 
-> Signed-off-by: Rabin Vincent <rabin@rab.in>
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+On 13 March 2014 00:48, Wolfram Sang <wsa@the-dreams.de> wrote:
+> On Fri, Feb 07, 2014 at 10:12:51AM +0530, Naveen Krishna Chatradhi wrote:
+>> This patch adds a new compatible and uses variant struct to support
+>> HSI2C module on Exynos5260. Updates the Documentation dt bindings.
+>> Also resets the module as an init sequence (Needed by Exynos5260).
+>>
+>> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+>
+> This patch has clearly not been tested :( Build failure!
+comma was missing, Not sure, how i missed it.
+Will fix it.
+>
+>> +struct exynos_hsi2c_variant {
+>> +     unsigned int                fifo_depth;
+>> +};
+>
+> Why so many tabs? In general, I'd prefer one space.
+>
+>> -     exynos5_i2c_init(i2c);
+>> +     exynos5_i2c_reset(i2c);
+>
+> Is this a related change?
+Exynos5260 needs the HSI2C module to be reset during the init.
+As per Tomasz's comment on earlier version. We will reset the status
+during init for every SoC.
+>
 
-It seems the unpatched code didn't do any harm as long as you boot the
-resulting kernel on a v7-M machine. So I'd say it's not a very urgent
-fix and getting it in during the next merge window is just fine.
 
-Best regards
-Uwe
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Shine bright,
+(: Nav :)
