@@ -1,103 +1,94 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Mon, 28 Apr 2014 10:14:41 -0500
-Subject: [PATCH V3 01/20] bus: omap_l3_noc: Fix copyright information
+Date: Mon, 28 Apr 2014 10:14:55 -0500
+Subject: [PATCH V3 15/20] bus: omap_l3_noc: ignore masked out unclearable
+ targets
 In-Reply-To: <1398698101-25513-1-git-send-email-nm@ti.com>
 References: <1397492726-17203-1-git-send-email-nm@ti.com>
  <1398698101-25513-1-git-send-email-nm@ti.com>
-Message-ID: <1398698101-25513-2-git-send-email-nm@ti.com>
+Message-ID: <1398698101-25513-16-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is an embarrassing patch :(.
+From: Afzal Mohammed <afzal@ti.com>
 
-Texas Corporation does not make OMAP. Texas Instruments Inc does.
+Errors that cannot be cleared (determined by reading REGERR register)
+are currently handled by masking it. Documentation states that REGERR
+"Checks which application/debug error sources are active" - it does not
+indicate that this is "interrupt status" - masked out status represented
+eventually in the irq line to MPU.
+For example:
 
-For that matter I dont seem to be able to find a Texas Corporation on
-the internet either.
+Lets say module 0 bit 8(0x100) was unclearable, we do the mask it from
+generating further errors. However in the following cases:
+a) bit 9 of Module 0
+OR
+b) any bit of Module 1+
+occur, the interrupt handler wrongly assumes that the raw interrupt
+status of module 0 bit 8 is the root cause of the interrupt, and
+returns. This causes unhandled interrupt and resultant infinite
+interrupts.
 
-While at it, update coverage to the current year and update the template
-to remove redundant information and use the standard boiler plate
-licensing.
+Fix this scenario by storing the events we masked out and masking raw
+status with masked ones before identifying and handling the error.
 
+Reported-by: Vaibhav Hiremath <hvaibhav@ti.com>
+Signed-off-by: Afzal Mohammed <afzal@ti.com>
+Tested-by: Vaibhav Hiremath <hvaibhav@gmail.com>
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 Signed-off-by: Nishanth Menon <nm@ti.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Tested-by: Darren Etheridge <detheridge@ti.com>
 ---
-change in V3: none
- drivers/bus/omap_l3_noc.c |   18 ++++++------------
- drivers/bus/omap_l3_noc.h |   18 ++++++------------
- 2 files changed, 12 insertions(+), 24 deletions(-)
+V3: new patch
+
+ drivers/bus/omap_l3_noc.c |    9 +++++++++
+ drivers/bus/omap_l3_noc.h |    4 ++++
+ 2 files changed, 13 insertions(+)
 
 diff --git a/drivers/bus/omap_l3_noc.c b/drivers/bus/omap_l3_noc.c
-index 972691a..1eb6d85 100644
+index 0691e6d..00e4fed 100644
 --- a/drivers/bus/omap_l3_noc.c
 +++ b/drivers/bus/omap_l3_noc.c
-@@ -1,24 +1,18 @@
- /*
-  * OMAP4XXX L3 Interconnect error handling driver
-  *
-- * Copyright (C) 2011 Texas Corporation
-+ * Copyright (C) 2011-2014 Texas Instruments Incorporated - http://www.ti.com/
-  *	Santosh Shilimkar <santosh.shilimkar@ti.com>
-  *	Sricharan <r.sricharan@ti.com>
-  *
-  * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-  *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
-- * USA
-  */
- #include <linux/module.h>
- #include <linux/init.h>
+@@ -169,6 +169,9 @@ static irqreturn_t l3_interrupt_handler(int irq, void *_l3)
+ 		err_reg = readl_relaxed(base + flag_mux->offset +
+ 					L3_FLAGMUX_REGERR0 + (inttype << 3));
+ 
++		err_reg &= ~(inttype ? flag_mux->mask_app_bits :
++				flag_mux->mask_dbg_bits);
++
+ 		/* Get the corresponding error and analyse */
+ 		if (err_reg) {
+ 			/* Identify the source from control status register */
+@@ -193,6 +196,12 @@ static irqreturn_t l3_interrupt_handler(int irq, void *_l3)
+ 				mask_val = readl_relaxed(mask_reg);
+ 				mask_val &= ~(1 << err_src);
+ 				writel_relaxed(mask_val, mask_reg);
++
++				/* Mark these bits as to be ignored */
++				if (inttype)
++					flag_mux->mask_app_bits |= 1 << err_src;
++				else
++					flag_mux->mask_dbg_bits |= 1 << err_src;
+ 			}
+ 
+ 			/* Error found so break the for loop */
 diff --git a/drivers/bus/omap_l3_noc.h b/drivers/bus/omap_l3_noc.h
-index a6ce34d..cc4b1b1 100644
+index ea2f51c..4e18307 100644
 --- a/drivers/bus/omap_l3_noc.h
 +++ b/drivers/bus/omap_l3_noc.h
-@@ -1,24 +1,18 @@
- /*
-  * OMAP4XXX L3 Interconnect  error handling driver header
-  *
-- * Copyright (C) 2011 Texas Corporation
-+ * Copyright (C) 2011-2014 Texas Instruments Incorporated - http://www.ti.com/
-  *	Santosh Shilimkar <santosh.shilimkar@ti.com>
-  *	sricharan <r.sricharan@ti.com>
-  *
-  * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-  *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
-- * USA
+@@ -66,11 +66,15 @@ struct l3_target_data {
+  *		target data. unsupported ones are marked with
+  *		L3_TARGET_NOT_SUPPORTED
+  * @num_targ_data: number of entries in target data
++ * @mask_app_bits: ignore these from raw application irq status
++ * @mask_dbg_bits: ignore these from raw debug irq status
   */
- #ifndef __ARCH_ARM_MACH_OMAP2_L3_INTERCONNECT_3XXX_H
- #define __ARCH_ARM_MACH_OMAP2_L3_INTERCONNECT_3XXX_H
+ struct l3_flagmux_data {
+ 	u32 offset;
+ 	struct l3_target_data *l3_targ;
+ 	u8 num_targ_data;
++	u32 mask_app_bits;
++	u32 mask_dbg_bits;
+ };
+ 
+ 
 -- 
 1.7.9.5
