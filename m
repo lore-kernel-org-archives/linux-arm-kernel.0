@@ -1,27 +1,36 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 28 Apr 2014 10:31:44 +0200
-Subject: [PATCH RFC 0/5] Dove PMU support
-In-Reply-To: <535E079B.6010701@gmail.com>
-References: <20140427132312.GC26756@n2100.arm.linux.org.uk>
- <535E079B.6010701@gmail.com>
-Message-ID: <20140428083144.GB6650@lunn.ch>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 28 Apr 2014 10:34:41 +0200
+Subject: [PATCH v12 00/31] iommu/exynos: Fixes and Enhancements of System
+ MMU driver with DT
+In-Reply-To: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
+References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
+Message-ID: <26065037.GxQQuIURPg@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Russell,
+On Sunday 27 April 2014 13:07:32 Shaik Ameer Basha wrote:
+> The current exynos-iommu(System MMU) driver does not work autonomously
+> since it is lack of support for power management of peripheral blocks.
+> For example, MFC device driver must ensure that its System MMU is disabled
+> before MFC block is power-down not to invalidate IOTLB in the System MMU
+> when I/O memory mapping is changed. Because a System MMU resides in the
+> same H/W block, access to control registers of System MMU while the H/W
+> block is turned off must be prohibited.
 > 
-> thanks for dropping those patches. I know you are packed with a bunch
-> of other patch sets, so if you agree, I can pick up your Dove related
-> patches and finish them.
+> This set of changes solves the above problem with setting each System MMUs
+> as the parent of the device which owns the System MMU to receive the
+> information when the device is turned off or turned on.
 > 
-> One thing that comes into my mind is, that we moved Dove DT to
-> mach-mvebu starting with v3.15-rc1 so we need to find a better place
-> for the driver than mach-dove.
+> Another big change to the driver is the support for devicetree.
+> The bindings for System MMU is described in
+> Documentation/devicetree/bindings/arm/samsung/system-mmu.txt
 
-Create drivers/pmu ?
+Sorry I've been absent from the review so far. Most of the patches
+seem entirely reasonable to me, but I'm worried about the DT binding
+aspect. We are going to see more systems shipping with IOMMUs now,
+and we are seeing an increasing number of submissions for 64-bit
+systems. We really have to work out what the DT representation for
+IOMMUs should look like in general before adding another ad-hod
+implementation that is private to one driver.
 
-The cpufreq driver also needs access to registers within the pmu
-range. Should it be part of pmu.c, or should we export a regmap which
-cpufreq can use?
-
-	Andrew
+	Arnd
