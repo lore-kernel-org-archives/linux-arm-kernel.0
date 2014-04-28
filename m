@@ -1,20 +1,12 @@
 From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 28 Apr 2014 10:49:40 -0000
-Subject: [patch V2 0/6] dma: edma: Provide granular residue accounting
-Message-ID: <20140428104416.464002156@linutronix.de>
+Date: Mon, 28 Apr 2014 10:49:41 -0000
+Subject: [patch V2 2/6] dma: edma: Check the current decriptor first in
+ tx_status()
+References: <20140428104416.464002156@linutronix.de>
+Message-ID: <20140428104642.894862752@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A simpler version to provide granular residue accounting and readout
-for EDMA.
-
-Delta to V1:
-
-      - Removed the double read of the address in PaRAM
-
-      - Simplified the stats update in the interrupt callback for
-        intermediate transfers
-
-Thanks,
-
-	tglx
+An embedded and charset-unspecified text was scrubbed...
+Name: dma-edma-tx-status-check-current-desc-first.patch
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140428/4419ac4d/attachment.ksh>
