@@ -1,132 +1,100 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Mon, 28 Apr 2014 21:20:05 +0900
-Subject: [RESUBMIT RFC PATCH v2 1/3] ARM: EXYNOS: Move PMU specific definitions
- from common.h
+Date: Mon, 28 Apr 2014 21:20:07 +0900
+Subject: [RESUBMIT RFC PATCH v2 3/3] drivers: mfd: Add support for Exynos PMU
+ driver
 In-Reply-To: <1398687607-4554-1-git-send-email-pankaj.dubey@samsung.com>
 References: <1398687607-4554-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1398687607-4554-2-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1398687607-4554-4-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Younggun Jang <yg1004.jang@samsung.com>
+This patch moves Exynos PMU driver implementation from
+"arm/mach-exynos" to "drivers/mfd".
+This driver is mainly used for setting misc bits of register from PMU IP
+of Exynos SoC which will be required to configure before Suspend/Resume.
+Currently all these settings are done in "arch/arm/mach-exynos/pmu.c" but
+moving ahead for ARM64 based SoC support, there is a need of DT based
+implementation of PMU driver.
+This driver uses already existing DT binding information.
 
-This patch moves PMU specific definitions into a new file
-as exynos-pmu.h. This will help in making PMU implementation
-independent of common.h header.
-
-Signed-off-by: Young-Gun Jang <yg1004.jang@samsung.com>
+CC: Sangbeom Kim <sbkim73@samsung.com>
+CC: Samuel Ortiz <sameo@linux.intel.com>
+CC: Lee Jones <lee.jones@linaro.org>
 Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 ---
- arch/arm/mach-exynos/common.h     |   17 -----------------
- arch/arm/mach-exynos/cpuidle.c    |    1 +
- arch/arm/mach-exynos/exynos-pmu.h |   31 +++++++++++++++++++++++++++++++
- arch/arm/mach-exynos/pm.c         |    1 +
- arch/arm/mach-exynos/pmu.c        |    2 +-
- 5 files changed, 34 insertions(+), 18 deletions(-)
- create mode 100644 arch/arm/mach-exynos/exynos-pmu.h
+ arch/arm/mach-exynos/Kconfig                           |    2 ++
+ arch/arm/mach-exynos/Makefile                          |    2 --
+ drivers/mfd/Kconfig                                    |    9 +++++++++
+ drivers/mfd/Makefile                                   |    1 +
+ arch/arm/mach-exynos/pmu.c => drivers/mfd/exynos-pmu.c |    0
+ 5 files changed, 12 insertions(+), 2 deletions(-)
+ rename arch/arm/mach-exynos/pmu.c => drivers/mfd/exynos-pmu.c (100%)
 
-diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-index ad5128e..d848ede 100644
---- a/arch/arm/mach-exynos/common.h
-+++ b/arch/arm/mach-exynos/common.h
-@@ -38,24 +38,7 @@ extern struct smp_operations exynos_smp_ops;
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index 2f60c90..79559b4 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -27,6 +27,7 @@ config ARCH_EXYNOS4
+ 	select PM_GENERIC_DOMAINS if PM_RUNTIME
+ 	select S5P_DEV_MFC
+ 	select MFD_SYSCON
++	select MFD_EXYNOS_PMU
+ 	help
+ 	  Samsung EXYNOS4 SoCs based systems
  
- extern void exynos_cpu_die(unsigned int cpu);
+@@ -38,6 +39,7 @@ config ARCH_EXYNOS5
+ 	select HAVE_SMP
+ 	select PINCTRL
+ 	select MFD_SYSCON
++	select MFD_EXYNOS_PMU
+ 	help
+ 	  Samsung EXYNOS5 (Cortex-A15) SoC based systems
  
--/* PMU(Power Management Unit) support */
+diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
+index a656dbe..19fdf17 100644
+--- a/arch/arm/mach-exynos/Makefile
++++ b/arch/arm/mach-exynos/Makefile
+@@ -18,8 +18,6 @@ obj-$(CONFIG_PM_SLEEP)		+= pm.o sleep.o
+ obj-$(CONFIG_PM_GENERIC_DOMAINS) += pm_domains.o
+ obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
+ 
+-obj-$(CONFIG_ARCH_EXYNOS)	+= pmu.o
 -
--#define PMU_TABLE_END	0xFFFF
--
--enum sys_powerdown {
--	SYS_AFTR,
--	SYS_LPA,
--	SYS_SLEEP,
--	NUM_SYS_POWERDOWN,
--};
--
- extern unsigned long l2x0_regs_phys;
--struct exynos_pmu_conf {
--	unsigned int offset;
--	unsigned int val[NUM_SYS_POWERDOWN];
--};
--
--extern void exynos_sys_powerdown_conf(enum sys_powerdown mode);
+ obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
  
- extern struct regmap *get_exynos_pmuregmap(void);
- extern void __iomem *get_exynos_pmuaddr(void);
-diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
-index 5dcdd46..ff3be9c 100644
---- a/arch/arm/mach-exynos/cpuidle.c
-+++ b/arch/arm/mach-exynos/cpuidle.c
-@@ -32,6 +32,7 @@
+ obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index 3383412..fd48870 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -1203,6 +1203,15 @@ config MFD_STW481X
+ 	  in various ST Microelectronics and ST-Ericsson embedded
+ 	  Nomadik series.
  
- #include "common.h"
- #include "regs-pmu.h"
-+#include "exynos-pmu.h"
- 
- #define REG_DIRECTGO_ADDR	(samsung_rev() == EXYNOS4210_REV_1_1 ? \
- 			S5P_INFORM7 : (samsung_rev() == EXYNOS4210_REV_1_0 ? \
-diff --git a/arch/arm/mach-exynos/exynos-pmu.h b/arch/arm/mach-exynos/exynos-pmu.h
-new file mode 100644
-index 0000000..1cc857b
---- /dev/null
-+++ b/arch/arm/mach-exynos/exynos-pmu.h
-@@ -0,0 +1,31 @@
-+/*
-+ * Copyright (c) 2014 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * Header for EXYNOS PMU Driver support
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
++config MFD_EXYNOS_PMU
++	tristate "Support Exynos Power Managment Unit"
++	depends on ARM || ARM64
++	help
++	Exynos SoC have Power Management Unit (PMU) which controls power and
++	operation state of Exynos SoC in two different ways. This driver
++	provides impmentation of PMU driver and provides basic functionality
++	required during these operation state.
 +
-+#ifndef __EXYNOS_PMU_H
-+#define __EXYNOS_PMU_H
-+
-+#define PMU_TABLE_END	0xFFFF
-+
-+enum sys_powerdown {
-+	SYS_AFTR,
-+	SYS_LPA,
-+	SYS_SLEEP,
-+	NUM_SYS_POWERDOWN,
-+};
-+
-+struct exynos_pmu_conf {
-+	unsigned int offset;
-+	unsigned int val[NUM_SYS_POWERDOWN];
-+};
-+
-+extern void exynos_sys_powerdown_conf(enum sys_powerdown mode);
-+
-+#endif /* __EXYNOS_PMU_H */
-diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-index e4c10d4..103ab92 100644
---- a/arch/arm/mach-exynos/pm.c
-+++ b/arch/arm/mach-exynos/pm.c
-@@ -37,6 +37,7 @@
- #include "common.h"
- #include "regs-pmu.h"
- #include "regs-sys.h"
-+#include "exynos-pmu.h"
+ menu "Multimedia Capabilities Port drivers"
+ 	depends on ARCH_SA1100
  
- static struct regmap *pmu_regmap;
- 
-diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
-index abcf753..d020557 100644
---- a/arch/arm/mach-exynos/pmu.c
-+++ b/arch/arm/mach-exynos/pmu.c
-@@ -16,7 +16,7 @@
- #include <linux/slab.h>
- #include <linux/mfd/syscon.h>
- 
--#include "common.h"
-+#include "exynos-pmu.h"
- #include "regs-pmu.h"
- 
- enum exynos_pmu_id {
+diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+index 2851275..7c43d07 100644
+--- a/drivers/mfd/Makefile
++++ b/drivers/mfd/Makefile
+@@ -166,3 +166,4 @@ obj-$(CONFIG_MFD_RETU)		+= retu-mfd.o
+ obj-$(CONFIG_MFD_AS3711)	+= as3711.o
+ obj-$(CONFIG_MFD_AS3722)	+= as3722.o
+ obj-$(CONFIG_MFD_STW481X)	+= stw481x.o
++obj-$(CONFIG_MFD_EXYNOS_PMU)	+= exynos-pmu.o
+diff --git a/arch/arm/mach-exynos/pmu.c b/drivers/mfd/exynos-pmu.c
+similarity index 100%
+rename from arch/arm/mach-exynos/pmu.c
+rename to drivers/mfd/exynos-pmu.c
 -- 
 1.7.10.4
