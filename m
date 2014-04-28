@@ -1,47 +1,76 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Mon, 28 Apr 2014 21:08:21 +0900
-Subject: [RFC PATCH v2 3/3] drivers: mfd: Add support for Exynos PMU driver
-In-Reply-To: <20140428112153.GT21279@lee--X1>
-References: <1396427085-4696-1-git-send-email-pankaj.dubey@samsung.com>
- <1398431131-5946-1-git-send-email-pankaj.dubey@samsung.com>
- <1398431131-5946-4-git-send-email-pankaj.dubey@samsung.com>
- <20140428112153.GT21279@lee--X1>
-Message-ID: <535E44B5.7030202@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 28 Apr 2014 12:51:07 +0100
+Subject: [PATCH 21/38] mmc: sdhci: hack up driver to make it more
+ compliant with UHS-1
+In-Reply-To: <CAPDyKFpHoLbY4Li45UfPweJ0xKpa5E5d=YX+Sgz9pvRG4W2xiQ@mail.gmail.com>
+References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
+ <E1Wd2WT-0003vg-Ke@rmk-PC.arm.linux.org.uk>
+ <20140425123820.GA15179@pengutronix.de>
+ <CAPDyKFpja-dGwsEL6YP=Nn=YSRRgMzTTz6WVQ8DiUOMrkLJpBQ@mail.gmail.com>
+ <20140428110259.GI26756@n2100.arm.linux.org.uk>
+ <CAPDyKFpHoLbY4Li45UfPweJ0xKpa5E5d=YX+Sgz9pvRG4W2xiQ@mail.gmail.com>
+Message-ID: <20140428115107.GJ26756@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/28/2014 08:21 PM, Lee Jones wrote:
-> On Fri, 25 Apr 2014, Pankaj Dubey wrote:
->
->> This patch moves Exynos PMU driver implementation from
->> "arm/mach-exynos" to "drivers/mfd".
->> This driver is mainly used for setting misc bits of register from PMU IP
->> of Exynos SoC which will be required to configure before Suspend/Resume.
->> Currently all these settings are done in "arch/arm/mach-exynos/pmu.c" but
->> moving ahead for ARM64 based SoC support, there is a need of DT based
->> implementation of PMU driver.
->> This driver uses already existing DT binding information.
->>
->> CC: Sangbeom Kim <sbkim73@samsung.com>
->> CC: Samuel Ortiz <sameo@linux.intel.com>
->> CC: Lee Jones <lee.jones@linaro.org>
->> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->> ---
->>   arch/arm/mach-exynos/Kconfig  |    2 +
->>   arch/arm/mach-exynos/Makefile |    2 -
->>   arch/arm/mach-exynos/pmu.c    |  521 -----------------------------------------
->>   drivers/mfd/Kconfig           |    9 +
->>   drivers/mfd/Makefile          |    1 +
->>   drivers/mfd/exynos-pmu.c      |  521 +++++++++++++++++++++++++++++++++++++++++
->>   6 files changed, 533 insertions(+), 523 deletions(-)
->>   delete mode 100644 arch/arm/mach-exynos/pmu.c
->>   create mode 100644 drivers/mfd/exynos-pmu.c
-> Same with this patch, `git format-patch -M`.
+On Mon, Apr 28, 2014 at 01:11:20PM +0200, Ulf Hansson wrote:
+> On 28 April 2014 13:02, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> > On Mon, Apr 28, 2014 at 12:50:54PM +0200, Ulf Hansson wrote:
+> >> On 25 April 2014 14:38, Markus Pargmann <mpa@pengutronix.de> wrote:
+> >> > Hi,
+> >> >
+> >> > On Wed, Apr 23, 2014 at 08:07:57PM +0100, Russell King wrote:
+> >> >> Patch suggested by Dong Aisheng <dongas86@gmail.com>, this avoids
+> >> >> additional clock start/stop cycles during the transition to 1.8V
+> >> >> signalling mode.
+> >> >>
+> >> >> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> >> >
+> >> > I tested the series on imx6s with a RIoT board. With this patch applied
+> >> > the RIoT board emmc does not work. Here is the output of the board:
+> >>
+> >> Hi Markus,
+> >>
+> >> Thanks for helping out testing!
+> >>
+> >> Does that mean patch 1->20 works fine for you? May I add your tested-by tag?
+> >
+> > Why should _you_ add someone elses tested-by tag to _my_ patches?
+> >
+> > I still wonder whether you understood anything that I've already said to
+> > you about the handling of this patch set.
+> 
+> That was based upon that _I_ would help out in creating the pull
+> request to Chris, to minimize his effort in resolving conflicts.
+> 
+> All-right, I back off - I was just trying to help here. Please send
+> the pull request to Chris directly instead.
 
-OK, I will resubmit this series.
+I thought I clearly explained the logistics in a previous mail:
 
+| I /could/ rebase it but then I wouldn't be able to produce the patch
+| sets/patches for others [*] (such as the Novena project) to derive
+| their kernel tree from my iMX6 patch set.
+| 
+| What I'd prefer is to keep the patch set intact, and provide Chris
+| with a pull request for it up to patch 33, which would need a
+| conflict fixed - and this would mean that I can be sure that what
+| I'm testing, and what I'm distributing is what Chris will also be
+| submitting.
 
+One of the problems with your approaches is that the commit IDs for
+the patches I'm carrying become different from the commit IDs which
+will end up being merged, which then means I have to either silently
+drop _my_ commits and hope that they've been merged intact, or I have
+to manually diff each patch and compare it with what's merged, or
+I have to rebase my patch set on top of what's merged and hope that
+git spots that the patches are already applied (which it won't do if
+there's other changes on top of them which make it non-obvious to git
+that they're applied.)
+
+To put it another way, recommitting these changes makes /more/ work
+for me in the long run because of how git works.
 
 -- 
-Best Regards,
-Pankaj Dubey
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
