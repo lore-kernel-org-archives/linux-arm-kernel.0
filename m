@@ -1,36 +1,49 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 28 Apr 2014 18:17:14 +0200
-Subject: [PATCHv3 7/7] ARM: sunxi: dt: add PWM support for the cubietruck
-In-Reply-To: <1398701834-3719-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1398701834-3719-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1398701834-3719-8-git-send-email-alexandre.belloni@free-electrons.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 28 Apr 2014 18:19:32 +0200
+Subject: [PATCH] QEMU: ARM: boot: Load kernel at an Image friendly address
+In-Reply-To: <1395718484-20424-1-git-send-email-joelf@ti.com>
+References: <1395718484-20424-1-git-send-email-joelf@ti.com>
+Message-ID: <20140428161932.GG28564@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the PWM for both PWM channels on the cubietruck. They can be found on
-connector CN8.
+On Mon, Mar 24, 2014 at 10:34:44PM -0500, Joel Fernandes wrote:
+> Loading kernel at offset 0x10000 works only for zImage, but not for Image,
+> because the kernel expect the start of decompressed kernel (.head.text) to be
+> at an address that's a distance that's 16MB aligned from  PAGE_OFFSET +
+> TEXT_OFFSET (see vmlinux.lds.S). This check is enfornced in __fixup_pv_table in
+> arch/arm/kernel/head.S TEXT_OFFSET is 0x00008000, so a 16MB alignment needs to
+> have a "0x8000" in the lower 16 bits so that they cancel out. Currently the
+> offset Qemu loads it at is 0x10000.
+I'm not a native speaker, but I think the wording and logic is broken.
+I think what you mean is:
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 6 ++++++
- 1 file changed, 6 insertions(+)
+	An uncompressed ARM kernel Image must be loaded to the
+	(physical) address PHYS_OFFSET + TEXT_OFFSET. (If
+	CONFIG_ARM_PATCH_PHYS_VIRT=y the condition is more lax, but we
+	cannot assume this to be enabled.)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-index cb25d3c8da58..0c3bd127a5fd 100644
---- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-@@ -63,6 +63,12 @@
- 			};
- 		};
- 
-+		pwm: pwm at 01c20e00 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pwm0_pins_a>, <&pwm1_pins_a>;
-+			status = "okay";
-+		};
-+
- 		uart0: serial at 01c28000 {
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&uart0_pins_a>;
+Speaking about PAGE_OFFSET doesn't make sense here, because that's a
+virual address and the MMU is expected to be off (or loaded with a 1:1
+mapping). Also note that not all machines use TEXT_OFFSET == 0x8000, see
+
+	git grep textofs- arch/arm/Makefile
+
+.
+
+Additionally let me note, that for a zImage most addresses should work,
+but there are more and less sensible ones. Both PHYS_OFFSET + 0x8000 and
+PHYS_OFFSET + 0x10000 are in the latter group. That's because the
+compressed image and the then uncompressed image overlap, so you loose
+booting time by relocating one of them. Not sure if you care.
+
+As you cannot determine the actual value of TEXT_OFFSET for a given
+Image, I'd recommend to only support booting zImages and then place it
+somewhere at the end of RAM.
+
+Best regards
+Uwe
+
 -- 
-1.9.1
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
