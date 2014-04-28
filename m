@@ -1,30 +1,45 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 28 Apr 2014 17:57:52 +0100
-Subject: [PATCH 01/16] ARM: l2c: bcm - remove UL (needs folding into earlier
- patch)
+Date: Mon, 28 Apr 2014 17:58:02 +0100
+Subject: [PATCH 03/16] ARM: l2c: convert rockchip to generic l2c initialisation
 In-Reply-To: <20140428165631.GM26756@n2100.arm.linux.org.uk>
 References: <20140428165631.GM26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WeosK-0002PK-2q@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WeosU-0002PS-8x@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This also allows us to eliminate the .init_machine function.
+
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-bcm/bcm_5301x.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-rockchip/rockchip.c | 9 ++-------
+ 1 file changed, 2 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-bcm/bcm_5301x.c b/arch/arm/mach-bcm/bcm_5301x.c
-index edff69761e04..6bc9c31b1b0b 100644
---- a/arch/arm/mach-bcm/bcm_5301x.c
-+++ b/arch/arm/mach-bcm/bcm_5301x.c
-@@ -45,7 +45,7 @@ static void __init bcm5301x_init_early(void)
+diff --git a/arch/arm/mach-rockchip/rockchip.c b/arch/arm/mach-rockchip/rockchip.c
+index d252efe3747b..138b9975313a 100644
+--- a/arch/arm/mach-rockchip/rockchip.c
++++ b/arch/arm/mach-rockchip/rockchip.c
+@@ -24,12 +24,6 @@
+ #include <asm/hardware/cache-l2x0.h>
+ #include "core.h"
  
- static void __init bcm5301x_dt_init(void)
- {
--	l2x0_of_init(0, ~0UL);
-+	l2x0_of_init(0, ~0);
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
+-static void __init rockchip_dt_init(void)
+-{
+-	l2x0_of_init(0, ~0);
+-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+-}
+-
+ static const char * const rockchip_board_dt_compat[] = {
+ 	"rockchip,rk2928",
+ 	"rockchip,rk3066a",
+@@ -39,7 +33,8 @@ static const char * const rockchip_board_dt_compat[] = {
+ };
  
+ DT_MACHINE_START(ROCKCHIP_DT, "Rockchip Cortex-A9 (Device Tree)")
++	.l2c_aux_val	= 0,
++	.l2c_aux_mask	= ~0,
+ 	.smp		= smp_ops(rockchip_smp_ops),
+-	.init_machine	= rockchip_dt_init,
+ 	.dt_compat	= rockchip_board_dt_compat,
+ MACHINE_END
 -- 
 1.8.3.1
