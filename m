@@ -1,30 +1,31 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 28 Apr 2014 13:50:33 -0500
-Subject: [PATCH 02/16] ARM: l2c: add platform independent core L2 cache
- initialisation
-In-Reply-To: <20140428182312.GR26756@n2100.arm.linux.org.uk>
-References: <20140428165631.GM26756@n2100.arm.linux.org.uk>
- <E1WeosP-0002PO-5m@rmk-PC.arm.linux.org.uk>
- <CAL_JsqJDj_JZT_Mo5=Y1NqObX19v7WvuWSrmAZ4UXi9s6-prXA@mail.gmail.com>
- <20140428182312.GR26756@n2100.arm.linux.org.uk>
-Message-ID: <CAL_JsqJXQzrNxyLW68nEdu=QNr2FrYEDnT_JUzLcxJXBh2=dNQ@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 28 Apr 2014 12:51:46 -0600
+Subject: [PATCH] ARM: tegra: add SD wp-gpios to Dalmore DT
+Message-ID: <1398711106-22484-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 1:23 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Apr 28, 2014 at 12:54:58PM -0500, Rob Herring wrote:
->> This function should be a nop if there is no DT node matching, so we
->> don't really need to trigger calling it based on machine_desc values.
->> If we do that, then we can have aux_mask and aux_val values of 0 for
->> both also mean don't do any aux ctrl setup. That would help minimize
->> the machine_desc for many platforms.
->
-> Calling it with both set to zero results in the auxiliary control register
-> being cleared to zero.  We don't want that to happen.
+From: Stephen Warren <swarren@nvidia.com>
 
-Right, but we can make the core L2 init code only write aux ctrl if
-(aux_val && ~aux_mask). Then you don't have to add the values on a
-bunch of platforms.
+Dalmore can detect write-protect on the SD card. Add the required
+DT entries to allow this.
 
-Rob
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/boot/dts/tegra114-dalmore.dts | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
+index 35a2ee71a970..5c21d216515a 100644
+--- a/arch/arm/boot/dts/tegra114-dalmore.dts
++++ b/arch/arm/boot/dts/tegra114-dalmore.dts
+@@ -1106,6 +1106,7 @@
+ 
+ 	sdhci at 78000400 {
+ 		cd-gpios = <&gpio TEGRA_GPIO(V, 2) GPIO_ACTIVE_LOW>;
++		wp-gpios = <&gpio TEGRA_GPIO(Q, 4) GPIO_ACTIVE_HIGH>;
+ 		bus-width = <4>;
+ 		status = "okay";
+ 	};
+-- 
+1.8.1.5
