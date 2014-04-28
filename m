@@ -1,61 +1,101 @@
-From: jean.pihet@linaro.org (Jean Pihet)
-Date: Mon, 28 Apr 2014 11:15:43 +0200
-Subject: [PATCH] perf: ARM64: wire up perf_regs and unwind support
-In-Reply-To: <CAFrcx1mZg-kdBG2d4bwWdqJByYXLG2SJ5+GD7cSteqJj=A6Sxw@mail.gmail.com>
-References: <1392311193-21214-1-git-send-email-jean.pihet@linaro.org>
- <CAFrcx1=ZBWt1mak_6+=KbCFZEsaD3T_xZ8up4WBLSr6_JTkP1A@mail.gmail.com>
- <20140312174520.GB17308@arm.com>
- <20140313101202.GB11365@mudshark.cambridge.arm.com>
- <20140313102203.GC30339@arm.com>
- <CAFrcx1mZg-kdBG2d4bwWdqJByYXLG2SJ5+GD7cSteqJj=A6Sxw@mail.gmail.com>
-Message-ID: <CAFrcx1mvSMFea999FZCEVxMZsmyFw+b_fugdGSEsAJkqwzkXQw@mail.gmail.com>
+From: murzin.v@gmail.com (Vladimir Murzin)
+Date: Mon, 28 Apr 2014 10:15:51 +0100
+Subject: [RFC PATCH] arm64: make bitops 32-bit tolerant
+In-Reply-To: <20140428084556.GA12090@arm.com>
+References: <1398590477-15375-1-git-send-email-murzin.v@gmail.com>
+ <20140428084556.GA12090@arm.com>
+Message-ID: <CABV+yWtf5iVkbh6b20nnJfRzkLFa3dtYb8R3Pqwighaeog5Jzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnaldo,
-
-> This patch hooks in the perf_regs and libunwind code for ARM64.
-> The tools/perf/arch/arm64 is created; it contains the arch specific
-> code for DWARF unwinding.
->
-> Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
-> Acked-by: Will Deacon <will.deacon@arm.com>
-
-Ping on this patch. Can you take this patch in your tree?
-Please let me know if you need a rebased version of this one.
-
-Regards,
-Jean
-
-On 13 March 2014 13:01, Jean Pihet <jean.pihet@linaro.org> wrote:
-> On 13 March 2014 11:22, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> On Thu, Mar 13, 2014 at 10:12:02AM +0000, Will Deacon wrote:
->>> On Wed, Mar 12, 2014 at 05:45:20PM +0000, Catalin Marinas wrote:
->>> > On Wed, Mar 12, 2014 at 01:42:51PM +0100, Jean Pihet wrote:
->>> > > On 13 February 2014 18:06, Jean Pihet <jean.pihet@linaro.org> wrote:
->>> > > > This patch hooks in the perf_regs and libunwind code for ARM64.
->>> > > > The tools/perf/arch/arm64 is created; it contains the arch specific
->>> > > > code for DWARF unwinding.
->>> > > >
->>> > > > Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
->>> > > > Acked-by: Will Deacon <will.deacon@arm.com>
->>> > >
->>> > > Ping on this patch. Can this one go into the perf tree?
->>> >
->>> > I'm happy to take it as well if there are no objections from the perf
->>> > maintainers.
->>>
->>> I object :) Last time I took a patch for perf tools (via the arm tree) it
->>> ended in a conflict from hell and we vowed not to take tools patches via
->>> arch trees again.
+On Mon, Apr 28, 2014 at 9:45 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Sun, Apr 27, 2014 at 10:21:17AM +0100, Vladimir Murzin wrote:
+>> Xen assumes that bit operations are able to operate on 32-bit size and
+>> alignment [1]. For arm64 bitops are based on atomic exclusive load/store
+>> instructions to guarantee that changes are made atomically. However, these
+>> instructions require that address to be aligned to the data size. Because, by
+>> default, bitops operates on 64-bit size it implies that address should be
+>> aligned appropriately. All these lead to breakage of Xen assumption for bitops
+>> properties.
 >>
->> Works for me ;)
-> Ok thanks!
+>> This patch turns bitops to operate on 32-bit size/alignment.
 >
-> Arnaldo, can you take this patch in your tree?
+> Please stop sending this patch. I have _absolutely_ _no_ intention of
+> butchering our bitops in this way, and I don't think the Xen guys require
+> changing the core bitops like this either (certainly, Ian's last reply to
+> you suggested you should be doing this another way).
 >
-> Jean
+> NAK.
 >
+> Will
+>
+
+Hi Will
+
+Thanks for making your point clear!
+
+Vladimir
+
+>> [1] http://www.gossamer-threads.com/lists/xen/devel/325613
 >>
+>> Cc: catalin.marinas at arm.com
+>> Cc: will.deacon at arm.com
+>> Cc: david.vrabel at citrix.com
+>> Cc: Ian.Campbell at citrix.com
+>>
+>> Signed-off-by: Vladimir Murzin <murzin.v@gmail.com>
+>> ---
+>>  With this patch applied I was able to boot both Dom0 and DomU.
+>>
+>>  @Pranav: Could I have your Tested-by on this patch?
+>>
+>>  arch/arm64/lib/bitops.S          | 16 ++++++++--------
+>>  1 file changed, 8 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/arch/arm64/lib/bitops.S b/arch/arm64/lib/bitops.S
+>> index 7dac371..a6acfff 100644
+>> --- a/arch/arm64/lib/bitops.S
+>> +++ b/arch/arm64/lib/bitops.S
+>> @@ -26,14 +26,14 @@
+>>   */
+>>       .macro  bitop, name, instr
+>>  ENTRY(       \name   )
+>> -     and     w3, w0, #63             // Get bit offset
+>> +     and     w3, w0, #31             // Get bit offset
+>>       eor     w0, w0, w3              // Clear low bits
+>>       mov     x2, #1
+>>       add     x1, x1, x0, lsr #3      // Get word offset
+>>       lsl     x3, x2, x3              // Create mask
+>> -1:   ldxr    x2, [x1]
+>> -     \instr  x2, x2, x3
+>> -     stxr    w0, x2, [x1]
+>> +1:   ldxr    w2, [x1]
+>> +     \instr  w2, w2, w3
+>> +     stxr    w0, w2, [x1]
+>>       cbnz    w0, 1b
+>>       ret
+>>  ENDPROC(\name        )
+>> @@ -41,15 +41,15 @@ ENDPROC(\name     )
+>>
+>>       .macro  testop, name, instr
+>>  ENTRY(       \name   )
+>> -     and     w3, w0, #63             // Get bit offset
+>> +     and     w3, w0, #31             // Get bit offset
+>>       eor     w0, w0, w3              // Clear low bits
+>>       mov     x2, #1
+>>       add     x1, x1, x0, lsr #3      // Get word offset
+>>       lsl     x4, x2, x3              // Create mask
+>> -1:   ldxr    x2, [x1]
+>> +1:   ldxr    w2, [x1]
+>>       lsr     x0, x2, x3              // Save old value of bit
+>> -     \instr  x2, x2, x4              // toggle bit
+>> -     stlxr   w5, x2, [x1]
+>> +     \instr  w2, w2, w4              // toggle bit
+>> +     stlxr   w5, w2, [x1]
+>>       cbnz    w5, 1b
+>>       dmb     ish
+>>       and     x0, x0, #1
 >> --
->> Catalin
+>> 1.8.3.2
+>>
+>>
