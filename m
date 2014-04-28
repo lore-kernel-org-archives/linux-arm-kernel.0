@@ -1,98 +1,46 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Mon, 28 Apr 2014 11:14:25 +0900
-Subject: [PATCH 7/8] PCI: designware: make MSI isr shared irq aware
-In-Reply-To: <1396025579-14344-8-git-send-email-l.stach@pengutronix.de>
-References: <1396025579-14344-1-git-send-email-l.stach@pengutronix.de>
- <1396025579-14344-8-git-send-email-l.stach@pengutronix.de>
-Message-ID: <004601cf6287$93cf7f30$bb6e7d90$%han@samsung.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Mon, 28 Apr 2014 11:00:01 +0800
+Subject: [PATCH v3 part1 07/11] ARM64 / ACPI: Introduce
+ arch_fix_phys_package_id() for cpu topology
+In-Reply-To: <20140425145249.GP12304@sirena.org.uk>
+References: <1398432017-8506-1-git-send-email-hanjun.guo@linaro.org>
+ <1398432017-8506-8-git-send-email-hanjun.guo@linaro.org>
+ <20140425145249.GP12304@sirena.org.uk>
+Message-ID: <535DC431.4000900@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, March 29, 2014 1:53 AM, Lucas Stach wrote:
-> 
-> On i.MX6 the host controller MSI irq is shared
-> with PCI legacy INTD. Make sure we don't bail too
-> early from the irq handler.
-> 
-> The issue is fairly theoretical as it would require
-> a system setup with a PCIe switch where one connected
-> device is using legacy INTD and another one using
-> MSI, but better fix it now.
-> 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+Hi Mark,
 
-(+cc Mohit KUMAR DCG, Pratyush ANAND)
+On 2014-4-25 22:52, Mark Brown wrote:
+> On Fri, Apr 25, 2014 at 09:20:13PM +0800, Hanjun Guo wrote:
+> 
+>> +/*
+>> + * Use the CPU slot number provided by ACPI to update the physical
+>> + * package id, then we can get the right value in the "physical id"
+>> + * field of /proc/cpuinfo.
+>> + */
+>> +void arch_fix_phys_package_id(int num, u32 slot)
+>> +{
+>> +	struct cpu_topology *cpuid_topo = &cpu_topology[num];
+>> +
+>> +	if (cpuid_topo->cluster_id == -1)
+>> +		cpuid_topo->cluster_id = slot;
+>> +}
+>> +EXPORT_SYMBOL_GPL(arch_fix_phys_package_id);
+> 
+> This isn't going to work once we parse the MPIDR - we will always have a
+> cluster ID from MPIDR unless the system is uniprocessor (which doesn't
+> seem like it's going to be a common or useful case).  We'll either need
+> to have something in the topology parsing path which goes out and
+> queries ACPI before we try to parse MPIDR or this will need to just set
+> whatever it's told to set unconditionally.
 
-Acked-by: Jingoo Han <jg1.han@samsung.com>
+I prefer the latter way.
 
-Best regards,
-Jingoo Han
+Since platform software (firmware) knows the topology of the system, if
+ACPI describes a slot number for this CPU, I think we can use it
+unconditionally.
 
-> ---
->  drivers/pci/host/pci-exynos.c      | 4 +---
->  drivers/pci/host/pcie-designware.c | 6 +++++-
->  drivers/pci/host/pcie-designware.h | 2 +-
->  3 files changed, 7 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pci-exynos.c b/drivers/pci/host/pci-exynos.c
-> index 3de6bfbbe8e9..b616d34922d8 100644
-> --- a/drivers/pci/host/pci-exynos.c
-> +++ b/drivers/pci/host/pci-exynos.c
-> @@ -415,9 +415,7 @@ static irqreturn_t exynos_pcie_msi_irq_handler(int irq, void *arg)
->  {
->  	struct pcie_port *pp = arg;
-> 
-> -	dw_handle_msi_irq(pp);
-> -
-> -	return IRQ_HANDLED;
-> +	return dw_handle_msi_irq(pp);
->  }
-> 
->  static void exynos_pcie_msi_init(struct pcie_port *pp)
-> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-> index 98c118e04dba..cbce9b04b13d 100644
-> --- a/drivers/pci/host/pcie-designware.c
-> +++ b/drivers/pci/host/pcie-designware.c
-> @@ -156,15 +156,17 @@ static struct irq_chip dw_msi_irq_chip = {
->  };
-> 
->  /* MSI int handler */
-> -void dw_handle_msi_irq(struct pcie_port *pp)
-> +irqreturn_t dw_handle_msi_irq(struct pcie_port *pp)
->  {
->  	unsigned long val;
->  	int i, pos, irq;
-> +	irqreturn_t ret = IRQ_NONE;
-> 
->  	for (i = 0; i < MAX_MSI_CTRLS; i++) {
->  		dw_pcie_rd_own_conf(pp, PCIE_MSI_INTR0_STATUS + i * 12, 4,
->  				(u32 *)&val);
->  		if (val) {
-> +			ret = IRQ_HANDLED;
->  			pos = 0;
->  			while ((pos = find_next_bit(&val, 32, pos)) != 32) {
->  				irq = irq_find_mapping(pp->irq_domain,
-> @@ -177,6 +179,8 @@ void dw_handle_msi_irq(struct pcie_port *pp)
->  			}
->  		}
->  	}
-> +
-> +	return ret;
->  }
-> 
->  void dw_pcie_msi_init(struct pcie_port *pp)
-> diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
-> index 3063b3594d88..a169d22d517e 100644
-> --- a/drivers/pci/host/pcie-designware.h
-> +++ b/drivers/pci/host/pcie-designware.h
-> @@ -68,7 +68,7 @@ struct pcie_host_ops {
-> 
->  int dw_pcie_cfg_read(void __iomem *addr, int where, int size, u32 *val);
->  int dw_pcie_cfg_write(void __iomem *addr, int where, int size, u32 val);
-> -void dw_handle_msi_irq(struct pcie_port *pp);
-> +irqreturn_t dw_handle_msi_irq(struct pcie_port *pp);
->  void dw_pcie_msi_init(struct pcie_port *pp);
->  int dw_pcie_link_up(struct pcie_port *pp);
->  void dw_pcie_setup_rc(struct pcie_port *pp);
-> --
-> 1.9.0
+Thanks
+Hanjun
