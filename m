@@ -1,330 +1,140 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 28 Apr 2014 23:59:19 +0800
-Subject: [PATCH 5/7] clk: sunxi: add PRCM (Power/Reset/Clock Management)
- clks support
-In-Reply-To: <1398697130-8338-6-git-send-email-boris.brezillon@free-electrons.com>
-References: <1398697130-8338-1-git-send-email-boris.brezillon@free-electrons.com>
- <1398697130-8338-6-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <CAGb2v65aTQozFRVWU5QekK623i4-mLReaAiWC=4pFqWWPcC_Pw@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 28 Apr 2014 09:01:09 -0700
+Subject: [PATCH 1a/4] mfd: twl4030-power: Add generic reset configuration
+In-Reply-To: <20140428113721.GU21279@lee--X1>
+References: <1398300030-7386-1-git-send-email-tony@atomide.com>
+ <20140424004955.GG6053@atomide.com>
+ <20140428113721.GU21279@lee--X1>
+Message-ID: <20140428160108.GK20807@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+* Lee Jones <lee.jones@linaro.org> [140428 04:37]:
+> > The twl4030 PMIC needs to be configured properly for things like
+> > warm reset and deeper idle states so the PMIC manages the regulators
+> > properly based on the hardware triggers from the SoC.
+> > 
+> > For example, when rebooting an OMAP3530 at 125 MHz, it hangs.
+> > With this patch, TWL4030 will be reset when a warm reset occures.
+> > This way the OMAP3530 does not hang on reboot.
+> > 
+> > Let's use this as the default when compatible = "ti,twl4030-power".
+> > Other more complicated configurations can be added to the driver
+> > based on other compatible flags.
+> > 
+> > Based on earlier patch by Matthias Brugger <matthias.bgg@gmail.com>:
+> > 
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/144161.html
+> > 
+> > For more information about twl4030 configuration for the
+> > "power scripts" see:
+> > 
+> > http://www.omappedia.com/wiki/TWL4030_power_scripts
+> > 
+> > Cc: Matthias Brugger <matthias.bgg@gmail.com>
+> > Cc: Robert Nelson <robertcnelson@gmail.com>
+> > Cc: Peter De Schrijver <pdeschrijver@nvidia.com>
+> > Cc: Samuel Ortiz <sameo@linux.intel.com>
+> > Cc: Lee Jones <lee.jones@linaro.org>
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > 
+> > ---
+> > 
+> > Sorry this got accidentally left out, should be the first patch
+> > in the series.
+> > 
+> > diff --git a/Documentation/devicetree/bindings/mfd/twl4030-power.txt b/Documentation/devicetree/bindings/mfd/twl4030-power.txt
+> > index 8e15ec3..b906116 100644
+> > --- a/Documentation/devicetree/bindings/mfd/twl4030-power.txt
+> > +++ b/Documentation/devicetree/bindings/mfd/twl4030-power.txt
+> > @@ -5,7 +5,12 @@ to control the power resources, including power scripts. For now, the
+> >  binding only supports the complete shutdown of the system after poweroff.
+> >  
+> >  Required properties:
+> > -- compatible : must be "ti,twl4030-power"
+> > +- compatible : must be one of the following
+> > +	"ti,twl4030-power"
+> > +	"ti,twl4030-power-reset"
+> > +
+> 
+> I think it'll be sensible to wait for a DT Ack for this kind of
+> change.
 
-On Mon, Apr 28, 2014 at 10:58 PM, Boris BREZILLON
-<boris.brezillon@free-electrons.com> wrote:
-> The PRCM (Power/Reset/Clock Management) unit provides several clock
-> devices:
-> - AR100 clk: used to clock the Power Management co-processor
-> - AHB0 clk: used to clock the AHB0 bus
-> - APB0 clk and gates: used to clk
->
-> Add support for these clks in a separate driver so that they can be probed
-> as platform devices instead of registered during early init.
-> We need this to be able to probe PRCM MFD subdevices.
->
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> ---
->  drivers/clk/sunxi/Makefile         |   2 +
->  drivers/clk/sunxi/clk-sun6i-prcm.c | 253 +++++++++++++++++++++++++++++++++++++
->  2 files changed, 255 insertions(+)
->  create mode 100644 drivers/clk/sunxi/clk-sun6i-prcm.c
->
-> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-> index b5bac91..ef8cdc9 100644
-> --- a/drivers/clk/sunxi/Makefile
-> +++ b/drivers/clk/sunxi/Makefile
-> @@ -3,3 +3,5 @@
->  #
->
->  obj-y += clk-sunxi.o clk-factors.o
-> +
-> +obj-$(CONFIG_MFD_SUN6I_PRCM) += clk-sun6i-prcm.o
-> diff --git a/drivers/clk/sunxi/clk-sun6i-prcm.c b/drivers/clk/sunxi/clk-sun6i-prcm.c
-> new file mode 100644
-> index 0000000..bb7b25a
-> --- /dev/null
-> +++ b/drivers/clk/sunxi/clk-sun6i-prcm.c
-> @@ -0,0 +1,253 @@
-> +/*
-> + * Copyright (C) 2014 Free Electrons
-> + *
-> + * License Terms: GNU General Public License v2
-> + * Author: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> + *
-> + * Allwinner PRCM (Power/Reset/Clock Management) driver
-> + *
-> + */
-> +
-> +#include <linux/clk-provider.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/platform_device.h>
-> +
-> +#define SUN6I_APB0_GATES_MAX_SIZE      32
-> +#define SUN6I_AR100_MAX_PARENTS                4
-> +
-> +static int sun6i_a31_ar100_mux_clk_register(struct platform_device *pdev)
-> +{
-> +       const char *parents[SUN6I_AR100_MAX_PARENTS];
-> +       struct device_node *np = pdev->dev.of_node;
-> +       const char *clk_name = np->name;
-> +       struct resource *r;
-> +       void __iomem *reg;
-> +       struct clk *clk;
-> +       int nparents;
-> +       int i;
-> +
-> +       r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +       reg = devm_ioremap(&pdev->dev, r->start, resource_size(r));
-> +       if (IS_ERR(reg))
-> +               return PTR_ERR(reg);
-> +
-> +       nparents = of_clk_get_parent_count(np);
-> +       if (nparents > SUN6I_AR100_MAX_PARENTS)
-> +               nparents = SUN6I_AR100_MAX_PARENTS;
-> +
-> +       for (i = 0; i < nparents; i++)
-> +               parents[i] = of_clk_get_parent_name(np, i);
-> +
-> +       of_property_read_string(np, "clock-output-names", &clk_name);
-> +
-> +       clk = clk_register_mux(&pdev->dev, clk_name, parents, nparents,
-> +                              CLK_SET_RATE_NO_REPARENT, reg,
-> +                              16, 2, 0, NULL);
-> +       if (IS_ERR(clk))
-> +               return PTR_ERR(clk);
-> +
-> +       return of_clk_add_provider(np, of_clk_src_simple_get, clk);
-> +}
-> +
-> +static int sun6i_a31_ar100_clk_register(struct platform_device *pdev)
-> +{
-> +       struct device_node *np = pdev->dev.of_node;
-> +       const char *clk_name = np->name;
-> +       const char *clk_parent;
-> +       struct resource *r;
-> +       void __iomem *reg;
-> +       struct clk *clk;
-> +
-> +       r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +       reg = devm_ioremap(&pdev->dev, r->start, resource_size(r));
-> +       if (IS_ERR(reg))
-> +               return PTR_ERR(reg);
-> +
-> +       clk_parent = of_clk_get_parent_name(np, 0);
-> +       if (!clk_parent)
-> +               return -EINVAL;
-> +
-> +       of_property_read_string(np, "clock-output-names", &clk_name);
-> +
-> +       clk = clk_register_divider(&pdev->dev, clk_name, clk_parent,
-> +                                  0, reg, 4, 2, CLK_DIVIDER_POWER_OF_TWO,
-> +                                  NULL);
-> +       if (IS_ERR(clk))
-> +               return PTR_ERR(clk);
-> +
-> +       return of_clk_add_provider(np, of_clk_src_simple_get, clk);
-> +}
-> +
-> +static int sun6i_a31_ar100_div_clk_register(struct platform_device *pdev)
-> +{
-> +       struct device_node *np = pdev->dev.of_node;
-> +       const char *clk_name = np->name;
-> +       const char *clk_parent;
-> +       struct resource *r;
-> +       void __iomem *reg;
-> +       struct clk *clk;
-> +
-> +       r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +       reg = devm_ioremap(&pdev->dev, r->start, resource_size(r));
-> +       if (IS_ERR(reg))
-> +               return PTR_ERR(reg);
-> +
-> +       clk_parent = of_clk_get_parent_name(np, 0);
-> +       if (!clk_parent)
-> +               return -EINVAL;
-> +
-> +       of_property_read_string(np, "clock-output-names", &clk_name);
-> +
-> +       clk = clk_register_divider(&pdev->dev, clk_name, clk_parent,
-> +                                  0, reg, 8, 5, 0, NULL);
-> +       if (IS_ERR(clk))
-> +               return PTR_ERR(clk);
-> +
-> +       return of_clk_add_provider(np, of_clk_src_simple_get, clk);
-> +}
+Sure. This could also be board specific, for example something like
+ti,twl4030-power-n900, ti,twl4030-power-panda-es and so on. But
+I think we can get away with just a few generic configurations.
+ 
+> > +#ifdef CONFIG_OF
+> > +
+> > +/* Generic warm reset configuration for omap3 */
+> > +
+> > +static struct twl4030_ins omap3_wrst_seq[] = {
+> > +	{ MSG_SINGULAR(DEV_GRP_NULL, 0x1b, RES_STATE_OFF), 2 },
+> > +	{ MSG_SINGULAR(DEV_GRP_P1, 0xf, RES_STATE_WRST), 15 },
+> > +	{ MSG_SINGULAR(DEV_GRP_P1, 0x10, RES_STATE_WRST), 15 },
+> > +	{ MSG_SINGULAR(DEV_GRP_P1, 0x7, RES_STATE_WRST), 0x60 },
+> > +	{ MSG_SINGULAR(DEV_GRP_P1, 0x19, RES_STATE_ACTIVE), 2 },
+> > +	{ MSG_SINGULAR(DEV_GRP_NULL, 0x1b, RES_STATE_ACTIVE), 2 },
+> > +};
+> 
+> Nit: I'd prefer the number formatting to be unified here i.e. all in
+> the same base, all <0x10 with leading zero.
 
-Would it be possible to merge the 3 ar100 clocks into 1 composite clock?
-They do share the same register, and are related to each other.
+Thanks will check those.
+  
+> > +static struct twl4030_script omap3_wrst_script = {
+> > +	.script	= omap3_wrst_seq,
+> > +	.size	= ARRAY_SIZE(omap3_wrst_seq),
+> > +	.flags	= TWL4030_WRST_SCRIPT,
+> > +};
+> > +
+> > +static struct twl4030_script *omap3_reset_scripts[] = {
+> > +	&omap3_wrst_script,
+> > +};
+> > +
+> > +static struct twl4030_resconfig omap3_rconfig[] = {
+> > +	{ .resource = RES_HFCLKOUT, .devgroup = DEV_GRP_P3, .type = -1,
+> > +	  .type2 = -1 },
+> > +	{ .resource = RES_VDD1, .devgroup = DEV_GRP_P1, .type = -1,
+> > +	  .type2 = -1 },
+> > +	{ .resource = RES_VDD2, .devgroup = DEV_GRP_P1, .type = -1,
+> > +	  .type2 = -1 },
+> > +	{ 0, 0},
+> > +};
+> 
+> Nit: May be just my OCD, but this looks a little messy. Perhaps a
+> simple MACRO might tidy things up, although that seems a little
+> over-kill for such a small sturct[]. At the very least least please
+> even up the brackets in the sentinel.
 
-It might be possible to re-use some code from the sunxi clock driver
-for this, though I'm not sure if that's a good idea, sharing code
-between modules. Emilio?
+Yeah I was thinking about that too, but from configuring things
+point of view it's essential to see what each entry is doing.
+Having a macro with lots of parameters would make it a bit hard
+to read the actual configuration. The macro would be something
+like for the above:
 
-> +
-> +static int sun6i_a31_apb0_clk_register(struct platform_device *pdev)
-> +{
-> +       struct device_node *np = pdev->dev.of_node;
-> +       const char *clk_name = np->name;
-> +       const char *clk_parent;
-> +       struct resource *r;
-> +       void __iomem *reg;
-> +       struct clk *clk;
-> +
-> +       r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +       reg = devm_ioremap_resource(&pdev->dev, r);
-> +       if (IS_ERR(reg))
-> +               return PTR_ERR(reg);
-> +
-> +       clk_parent = of_clk_get_parent_name(np, 0);
-> +       if (!clk_parent)
-> +               return -EINVAL;
-> +
-> +       of_property_read_string(np, "clock-output-names", &clk_name);
-> +
-> +       clk = clk_register_divider(&pdev->dev, clk_name, clk_parent,
-> +                                  0, reg, 0, 2, CLK_DIVIDER_POWER_OF_TWO,
-> +                                  NULL);
+RCONFIG(RES_HFCLKOUT, DEV_GRP_P3, -1, -1, 0, 0);
+RCONFIG(RES_VDD1, DEV_GRP_P1, -1, -1, 0, 0);
+RCONFIG(RES_VDD2, DEV_GRP_P1, -1, -1, 0, 0);
 
-I just looked at the sun6i kernel code again.
+and something like this for other entries:
 
-  http://git.rhombus-tech.net/?p=linux.git;a=blob;f=arch/arm/mach-sun6i/clock/ccm_i.h;hb=refs/heads/allwinner-sunxi-a31#l376
+RCONFIG(RES_VAUX1, DEV_GRP_NULL, 0, 0, TWL_REMAP_OFF, TWL_REMAP_SLEEP); 
 
-and
+Personally I think it actually makes it harder to figure out what
+is getting configured for the twl4030 as then it does not relate
+to the documentation any longer, but I'm fine doing that if people
+prefer macros here. Using macros could also be done later without
+as it's all private to the driver.
+ 
+> /me goes to organise his soup tins into alphabetical order.
 
-  http://git.rhombus-tech.net/?p=linux.git;a=blob;f=arch/arm/mach-sun6i/clock/sys_clk.c;hb=refs/heads/allwinner-sunxi-a31#l882
+I think using macros is a good comment, I always found the twl4030
+configuration confusing. So if anybody has good macro ideas, I'm
+open to it for sure. In this it's more like adding custom labels
+to soup tins about their list of ingredients instead of sorting
+the tins :) And it does not make the contents taste much better..
 
-The divider on the A31 is /2, /2, /4, /8. You might need a table for that.
-This is different from the A23 manual I used to document most of the PRCM.
-I apologize for not catching this earlier. I have updated the wiki.
+Regards,
 
-> +       if (IS_ERR(clk))
-> +               return PTR_ERR(clk);
-> +
-> +       return of_clk_add_provider(np, of_clk_src_simple_get, clk);
-> +}
-> +
-> +static int sun6i_a31_apb0_gates_clk_register(struct platform_device *pdev)
-> +{
-> +       struct device_node *np = pdev->dev.of_node;
-> +       struct clk_onecell_data *clk_data;
-> +       const char *clk_parent;
-> +       const char *clk_name;
-> +       struct resource *r;
-> +       void __iomem *reg;
-> +       int gate_id;
-> +       int ngates;
-> +       int i;
-> +
-> +       r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +       reg = devm_ioremap_resource(&pdev->dev, r);
-> +       if (!reg)
-> +               return PTR_ERR(reg);
-> +
-> +       clk_parent = of_clk_get_parent_name(np, 0);
-> +       if (!clk_parent)
-> +               return -EINVAL;
-> +
-> +       ngates = of_property_count_strings(np, "clock-output-names");
-> +       if (ngates < 0)
-> +               return ngates;
-> +
-> +       if (!ngates || ngates > SUN6I_APB0_GATES_MAX_SIZE)
-> +               return -EINVAL;
-> +
-> +       clk_data = devm_kzalloc(&pdev->dev, sizeof(struct clk_onecell_data),
-> +                               GFP_KERNEL);
-> +       if (!clk_data)
-> +               return -ENOMEM;
-> +
-> +       clk_data->clks = devm_kzalloc(&pdev->dev,
-> +                                     SUN6I_APB0_GATES_MAX_SIZE *
-> +                                     sizeof(struct clk *),
-> +                                     GFP_KERNEL);
-> +       if (!clk_data->clks)
-> +               return -ENOMEM;
-> +
-> +       for (i = 0; i < ngates; i++) {
-> +               of_property_read_string_index(np, "clock-output-names",
-> +                                             i, &clk_name);
-> +
-> +               gate_id = i;
-> +               of_property_read_u32_index(np, "clock-indices", i, &gate_id);
-> +
-> +               WARN_ON(gate_id >= SUN6I_APB0_GATES_MAX_SIZE);
-> +               if (gate_id >= SUN6I_APB0_GATES_MAX_SIZE)
-> +                       continue;
-> +
-> +               clk_data->clks[gate_id] = clk_register_gate(&pdev->dev,
-> +                                                           clk_name,
-> +                                                           clk_parent, 0,
-> +                                                           reg, gate_id,
-> +                                                           0, NULL);
-> +               WARN_ON(IS_ERR(clk_data->clks[gate_id]));
-> +       }
-> +
-> +       clk_data->clk_num = ngates;
-> +
-> +       return of_clk_add_provider(np, of_clk_src_onecell_get, clk_data);
-> +}
-> +
-> +const struct of_device_id sun6i_a31_prcm_clk_dt_ids[] = {
-> +       {
-> +               .compatible = "allwinner,sun6i-a31-ar100-mux-clk",
-> +               .data = sun6i_a31_ar100_mux_clk_register,
-> +       },
-> +       {
-> +               .compatible = "allwinner,sun6i-a31-ar100-clk",
-> +               .data = sun6i_a31_ar100_clk_register,
-> +       },
-> +       {
-> +               .compatible = "allwinner,sun6i-a31-ar100-div-clk",
-> +               .data = sun6i_a31_ar100_div_clk_register,
-> +       },
-> +       {
-> +               .compatible = "allwinner,sun6i-a31-apb0-clk",
-> +               .data = sun6i_a31_apb0_clk_register,
-> +       },
-> +       {
-> +               .compatible = "allwinner,sun6i-a31-apb0-gates-clk",
-> +               .data = sun6i_a31_apb0_gates_clk_register,
-> +       },
-> +       { /* sentinel */ }
-> +};
-> +
-> +static int sun6i_a31_prcm_clk_probe(struct platform_device *pdev)
-> +{
-> +       struct device_node *np = pdev->dev.of_node;
-> +       int (*register_func)(struct platform_device *pdev);
-> +       const struct of_device_id *match;
-> +
-> +       match = of_match_node(sun6i_a31_prcm_clk_dt_ids, np);
-> +       if (!match)
-> +               return -EINVAL;
-> +
-> +       register_func = match->data;
-> +       return register_func(pdev);
-> +}
-> +
-> +static struct platform_driver sun6i_a31_prcm_clk_driver = {
-> +       .driver = {
-> +               .name = "sun6i-a31-prcm-clk",
-> +               .owner = THIS_MODULE,
-> +               .of_match_table = sun6i_a31_prcm_clk_dt_ids,
-> +       },
-> +       .probe = sun6i_a31_prcm_clk_probe,
-> +};
-> +module_platform_driver(sun6i_a31_prcm_clk_driver);
-> +
-> +MODULE_AUTHOR("Boris BREZILLON <boris.brezillon@free-electrons.com");
-> +MODULE_DESCRIPTION("Allwinner Reset Controller Driver");
-> +MODULE_LICENSE("GPL v2");
-
-The rest looks good to me, but Emilio should be able to give you more feedback.
-
-Thanks for all the sun6i support you've done!
-
-
-Cheers
-ChenYu
+Tony
