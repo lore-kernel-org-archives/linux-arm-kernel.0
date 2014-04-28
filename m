@@ -1,63 +1,61 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 28 Apr 2014 18:24:07 -0500
-Subject: [PATCH v2 3/7] tty/serial: convert 8250 to generic earlycon
-In-Reply-To: <CAE9FiQVp5u-jF_xjCu68BgbZ=e0D508tn_-auoiT6cbkYtX8Og@mail.gmail.com>
-References: <1397859600-11507-1-git-send-email-robherring2@gmail.com>
- <1397859600-11507-4-git-send-email-robherring2@gmail.com>
- <CAE9FiQVp5u-jF_xjCu68BgbZ=e0D508tn_-auoiT6cbkYtX8Og@mail.gmail.com>
-Message-ID: <CAL_JsqKiYmCNGrkiwS7m-OAt3rHZBq_yNGycen-AojbV-7famg@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 28 Apr 2014 16:31:03 -0700
+Subject: [PATCH 4/7] mfd: sun6i-prcm: document DT bindings
+In-Reply-To: <1398697130-8338-5-git-send-email-boris.brezillon@free-electrons.com>
+References: <1398697130-8338-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1398697130-8338-5-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140428233103.GS3134@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 26, 2014 at 1:29 AM, Yinghai Lu <yinghai@kernel.org> wrote:
-> On Fri, Apr 18, 2014 at 3:19 PM, Rob Herring <robherring2@gmail.com> wrote:
->> From: Rob Herring <robh@kernel.org>
->>
->> With the generic earlycon infrastructure in place, convert the 8250
->> early console to use it.
->>
->> Signed-off-by: Rob Herring <robh@kernel.org>
->> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->> Cc: Jiri Slaby <jslaby@suse.cz>
->> ---
->>  drivers/tty/serial/8250/8250_early.c | 138 ++++-------------------------------
->>  drivers/tty/serial/8250/Kconfig      |   1 +
->>  2 files changed, 16 insertions(+), 123 deletions(-)
->>
->> diff --git a/drivers/tty/serial/8250/8250_early.c b/drivers/tty/serial/8250/8250_early.c
->> index c100d63..e83c9db 100644
->> --- a/drivers/tty/serial/8250/8250_early.c
->> +++ b/drivers/tty/serial/8250/8250_early.c
->> @@ -35,18 +35,8 @@
-> ...
->> -
->> -int __init setup_early_serial8250_console(char *cmdline)
->
-> You removed global function, but still left declaration and calling...
->
-> arch/mips/mti-malta/malta-init.c:
-> setup_early_serial8250_console(console_string);
-> drivers/firmware/pcdp.c:        return setup_early_serial8250_console(options);
-> include/linux/serial_8250.h:extern int
-> setup_early_serial8250_console(char *cmdline);
+On Mon, Apr 28, 2014 at 04:58:47PM +0200, Boris BREZILLON wrote:
+> Document DT bindings of the PRCM (Power/Reset/Clock Management) unit.
+> 
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> ---
+>  .../devicetree/bindings/mfd/sun6i-prcm.txt         | 71 ++++++++++++++++++++++
+>  1 file changed, 71 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/sun6i-prcm.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mfd/sun6i-prcm.txt b/Documentation/devicetree/bindings/mfd/sun6i-prcm.txt
+> new file mode 100644
+> index 0000000..de92429
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/sun6i-prcm.txt
+> @@ -0,0 +1,71 @@
+> +* Allwinner PRCM (Power/Reset/Clock Management) Multi-Functional Device
+> +
+> +PRCM is an MFD device exposing several Power Management related devices
+> +(like clks and reset controllers).
+> +
+> +Required properties:
+> + - compatible: "allwinner,sun6i-a31-prcm"
+> + - reg: The PRCM registers range
+> +
+> +The prcm node may contain several subdevices definitions:
+> + - see Documentation/devicetree/clk/sunxi.txt for clock devices
+> + - see Documentation/devicetree/reset/allwinner,sunxi-clock-reset.txt for reset
+> +   controller devices
+> +
+> +
+> +Example:
+> +
+> +	prcm: prcm at 01f01400 {
+> +		compatible = "allwinner,sun6i-a31-prcm";
+> +		reg = <0x01f01400>;
 
-Thanks for finding these. I missed them in my build tests. This should fix them:
+You're missing the size of the address range here.
 
-diff --git a/drivers/tty/serial/8250/8250_early.c
-b/drivers/tty/serial/8250/8250_early.c
-index e83c9db..2094c3b 100644
---- a/drivers/tty/serial/8250/8250_early.c
-+++ b/drivers/tty/serial/8250/8250_early.c
-@@ -156,6 +156,11 @@ static int __init early_serial8250_setup(struct
-earlycon_device *device,
- EARLYCON_DECLARE(uart8250, early_serial8250_setup);
- EARLYCON_DECLARE(uart, early_serial8250_setup);
+Maxime
 
-+int __init setup_early_serial8250_console(char *cmdline)
-+{
-+       return setup_earlycon(cmdline, "uart8250", early_serial8250_setup);
-+}
-+
- int serial8250_find_port_for_earlycon(void)
- {
-        struct earlycon_device *device = early_device;
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140428/d08e5529/attachment.sig>
