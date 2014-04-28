@@ -1,91 +1,116 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Mon, 28 Apr 2014 18:57:52 +0100
-Subject: [PATCH 05/10] clk: versatile: Split config options for sp810 and
- vexpress_osc
+Date: Mon, 28 Apr 2014 18:57:53 +0100
+Subject: [PATCH 06/10] clocksource: Sched clock source for Versatile Express
 In-Reply-To: <1398707877-22596-1-git-send-email-pawel.moll@arm.com>
 References: <1398707877-22596-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <1398707877-22596-6-git-send-email-pawel.moll@arm.com>
+Message-ID: <1398707877-22596-7-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the Kconfig entry for Versatile (& Express) clock drivers
-into a separate file and add individual options for sp810
-and vexpress_osc drivers, as they are optional in some
-configurations and may have separate dependencies.
+This patch adds a trival sched clock source using free
+running, 24MHz clocked counter present in the ARM Ltd.
+reference platforms (Versatile, RealView, Versatile
+Express) System Registers block.
 
-Cc: Mike Turquette <mturquette@linaro.org> 
+This code replaces the call in the VE machine code.
+
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 ---
- drivers/clk/Kconfig            |  9 +--------
- drivers/clk/versatile/Kconfig  | 26 ++++++++++++++++++++++++++
- drivers/clk/versatile/Makefile |  5 +++--
- 3 files changed, 30 insertions(+), 10 deletions(-)
- create mode 100644 drivers/clk/versatile/Kconfig
+ arch/arm/mach-vexpress/v2m.c    |  2 --
+ drivers/clocksource/Kconfig     | 11 +++++++++++
+ drivers/clocksource/Makefile    |  1 +
+ drivers/clocksource/versatile.c | 40 ++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 52 insertions(+), 2 deletions(-)
+ create mode 100644 drivers/clocksource/versatile.c
 
-diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-index 6f56d3a..4fdfd6c 100644
---- a/drivers/clk/Kconfig
-+++ b/drivers/clk/Kconfig
-@@ -30,14 +30,7 @@ config COMMON_CLK_WM831X
-           Supports the clocking subsystem of the WM831x/2x series of
- 	  PMICs from Wolfson Microlectronics.
+diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
+index 90f04c9..d8a9fd7 100644
+--- a/arch/arm/mach-vexpress/v2m.c
++++ b/arch/arm/mach-vexpress/v2m.c
+@@ -418,8 +418,6 @@ void __init v2m_dt_init_early(void)
+ 			pr_warning("vexpress: DT HBI (%x) is not matching "
+ 					"hardware (%x)!\n", dt_hbi, hbi);
+ 	}
+-
+-	versatile_sched_clock_init(vexpress_get_24mhz_clock_base(), 24000000);
+ }
  
--config COMMON_CLK_VERSATILE
--	bool "Clock driver for ARM Reference designs"
--	depends on ARCH_INTEGRATOR || ARCH_REALVIEW || ARCH_VEXPRESS || ARM64
--	---help---
--          Supports clocking on ARM Reference designs:
--	  - Integrator/AP and Integrator/CP
--	  - RealView PB1176, EB, PB11MP and PBX
--	  - Versatile Express
-+source "drivers/clk/versatile/Kconfig"
  
- config COMMON_CLK_MAX77686
- 	tristate "Clock driver for Maxim 77686 MFD"
-diff --git a/drivers/clk/versatile/Kconfig b/drivers/clk/versatile/Kconfig
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index 96918e1..2c27b02 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -191,3 +191,14 @@ config EM_TIMER_STI
+ 
+ config CLKSRC_QCOM
+ 	bool
++
++config CLKSRC_VERSATILE
++	bool "ARM Versatile (Express) reference platforms clock source"
++	depends on GENERIC_SCHED_CLOCK
++	select CLKSRC_OF
++	default y if MFD_VEXPRESS_SYSREG
++	help
++	  This option enables clock source based on free running
++	  counter available in the "System Registers" block of
++	  ARM Versatile, RealView and Versatile Express reference
++	  platforms.
+diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+index 98cb6c5..6f25bdf 100644
+--- a/drivers/clocksource/Makefile
++++ b/drivers/clocksource/Makefile
+@@ -39,3 +39,4 @@ obj-$(CONFIG_ARM_GLOBAL_TIMER)		+= arm_global_timer.o
+ obj-$(CONFIG_CLKSRC_METAG_GENERIC)	+= metag_generic.o
+ obj-$(CONFIG_ARCH_HAS_TICK_BROADCAST)	+= dummy_timer.o
+ obj-$(CONFIG_ARCH_KEYSTONE)		+= timer-keystone.o
++obj-$(CONFIG_CLKSRC_VERSATILE)		+= versatile.o
+diff --git a/drivers/clocksource/versatile.c b/drivers/clocksource/versatile.c
 new file mode 100644
-index 0000000..1530c93
+index 0000000..e4c50ad
 --- /dev/null
-+++ b/drivers/clk/versatile/Kconfig
-@@ -0,0 +1,26 @@
-+config COMMON_CLK_VERSATILE
-+	bool "Clock driver for ARM Reference designs"
-+	depends on ARCH_INTEGRATOR || ARCH_REALVIEW || ARCH_VEXPRESS || ARM64
-+	---help---
-+          Supports clocking on ARM Reference designs:
-+	  - Integrator/AP and Integrator/CP
-+	  - RealView PB1176, EB, PB11MP and PBX
-+	  - Versatile Express
++++ b/drivers/clocksource/versatile.c
+@@ -0,0 +1,40 @@
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * Copyright (C) 2014 ARM Limited
++ */
 +
-+config CLK_SP810
-+	bool "Clock driver for ARM SP810 System Controller"
-+	depends on COMMON_CLK_VERSATILE
-+	default y if ARCH_VEXPRESS
-+	---help---
-+	  Supports clock muxing (REFCLK/TIMCLK to TIMERCLKEN0-3) capabilities
-+	  of the ARM SP810 System Controller cell.
++#include <linux/clocksource.h>
++#include <linux/io.h>
++#include <linux/of_address.h>
++#include <linux/sched_clock.h>
 +
-+config CLK_VEXPRESS_OSC
-+	bool "Clock driver for Versatile Express OSC clock generators"
-+	depends on COMMON_CLK_VERSATILE
-+	depends on VEXPRESS_CONFIG
-+	default y if ARCH_VEXPRESS
-+	---help---
-+	  Simple regmap-based driver driving clock generators on Versatile
-+	  Express platforms hidden behind its configuration infrastructure,
-+	  commonly known as OSCs.
-diff --git a/drivers/clk/versatile/Makefile b/drivers/clk/versatile/Makefile
-index c16ca78..fd449f9 100644
---- a/drivers/clk/versatile/Makefile
-+++ b/drivers/clk/versatile/Makefile
-@@ -3,5 +3,6 @@ obj-$(CONFIG_ICST)		+= clk-icst.o
- obj-$(CONFIG_ARCH_INTEGRATOR)	+= clk-integrator.o
- obj-$(CONFIG_INTEGRATOR_IMPD1)	+= clk-impd1.o
- obj-$(CONFIG_ARCH_REALVIEW)	+= clk-realview.o
--obj-$(CONFIG_ARCH_VEXPRESS)	+= clk-vexpress.o clk-sp810.o
--obj-$(CONFIG_VEXPRESS_CONFIG)	+= clk-vexpress-osc.o
-+obj-$(CONFIG_ARCH_VEXPRESS)	+= clk-vexpress.o
-+obj-$(CONFIG_CLK_SP810)		+= clk-sp810.o
-+obj-$(CONFIG_CLK_VEXPRESS_OSC)	+= clk-vexpress-osc.o
++#define SYS_24MHZ 0x05c
++
++static void __iomem *versatile_sys_24mhz;
++
++static u32 notrace versatile_sys_24mhz_read(void)
++{
++	return readl(versatile_sys_24mhz);
++}
++
++static void __init versatile_sched_clock_init(struct device_node *node)
++{
++	void __iomem *base = of_iomap(node, 0);
++
++	if (!base)
++		return;
++
++	versatile_sys_24mhz = base + SYS_24MHZ;
++
++	setup_sched_clock(versatile_sys_24mhz_read, 32, 24000000);
++}
++CLOCKSOURCE_OF_DECLARE(versatile, "arm,vexpress-sysreg",
++		versatile_sched_clock_init);
 -- 
 1.9.1
