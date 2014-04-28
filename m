@@ -1,55 +1,47 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 28 Apr 2014 17:58:53 +0100
-Subject: [PATCH 13/16] ARM: l2c: convert sti to generic l2c initialisation
+Date: Mon, 28 Apr 2014 17:58:58 +0100
+Subject: [PATCH 14/16] ARM: l2c: convert exynos to generic l2c initialisation
+ (and thereby fix it)
 In-Reply-To: <20140428165631.GM26756@n2100.arm.linux.org.uk>
 References: <20140428165631.GM26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WeotJ-0002QC-88@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WeotO-0002QG-B6@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can remove the .init_machine as it becomes the generic version.
+exynos was unconditionally calling the L2 cache initialisation from an
+early_initcall.  This breaks multiplatform kernels.  Thankfully,
+converting to generic l2c initialisation fixes this.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-sti/board-dt.c | 20 +++++---------------
- 1 file changed, 5 insertions(+), 15 deletions(-)
+ arch/arm/mach-exynos/exynos.c | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-sti/board-dt.c b/arch/arm/mach-sti/board-dt.c
-index cf716ae10726..4924d2214be6 100644
---- a/arch/arm/mach-sti/board-dt.c
-+++ b/arch/arm/mach-sti/board-dt.c
-@@ -14,19 +14,6 @@
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index fbfc29df3299..a763c0862da9 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -316,12 +316,6 @@ static int __init exynos_core_init(void)
+ }
+ core_initcall(exynos_core_init);
  
- #include "smp.h"
- 
--void __init stih41x_l2x0_init(void)
+-static int __init exynos4_l2x0_cache_init(void)
 -{
--	l2x0_of_init(L2C_AUX_CTRL_SHARED_OVERRIDE |
--		     L310_AUX_CTRL_DATA_PREFETCH |
--		     L310_AUX_CTRL_INSTR_PREFETCH, 0xc00f0fff);
+-	return l2x0_of_init(0x3c400001, 0xc20fffff);
 -}
+-early_initcall(exynos4_l2x0_cache_init);
 -
--static void __init stih41x_machine_init(void)
--{
--	stih41x_l2x0_init();
--	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
--}
--
- static const char *stih41x_dt_match[] __initdata = {
- 	"st,stih415",
- 	"st,stih416",
-@@ -34,7 +21,10 @@ static const char *stih41x_dt_match[] __initdata = {
- };
- 
- DT_MACHINE_START(STM, "STiH415/416 SoC with Flattened Device Tree")
--	.init_machine	= stih41x_machine_init,
--	.smp		= smp_ops(sti_smp_ops),
- 	.dt_compat	= stih41x_dt_match,
-+	.l2c_aux_val	= L2C_AUX_CTRL_SHARED_OVERRIDE |
-+			  L310_AUX_CTRL_DATA_PREFETCH |
-+			  L310_AUX_CTRL_INSTR_PREFETCH,
-+	.l2c_aux_mask	= 0xc00f0fff,
-+	.smp		= smp_ops(sti_smp_ops),
- MACHINE_END
+ static void __init exynos_dt_machine_init(void)
+ {
+ 	struct device_node *i2c_np;
+@@ -387,6 +381,8 @@ static void __init exynos_reserve(void)
+ DT_MACHINE_START(EXYNOS_DT, "SAMSUNG EXYNOS (Flattened Device Tree)")
+ 	/* Maintainer: Thomas Abraham <thomas.abraham@linaro.org> */
+ 	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
++	.l2c_aux_val	= 0x3c400001,
++	.l2c_aux_mask	= 0xc20fffff,
+ 	.smp		= smp_ops(exynos_smp_ops),
+ 	.map_io		= exynos_init_io,
+ 	.init_early	= exynos_firmware_init,
 -- 
 1.8.3.1
