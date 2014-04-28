@@ -1,60 +1,50 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 27 Apr 2014 16:37:06 -0500
-Subject: [PATCH] clkdev: only fall through to clk_get_sys() if DT
- indicates no entry
-In-Reply-To: <E1We4rQ-0001mv-Ps@rmk-PC.arm.linux.org.uk>
-References: <E1We4rQ-0001mv-Ps@rmk-PC.arm.linux.org.uk>
-Message-ID: <CAL_JsqLLUQn9ESBwyJ4T3TL3CzZm7H6hTdYKbO8tdLpPDxrKYg@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 28 Apr 2014 09:03:14 +0900
+Subject: [PATCH/RFC] serial: sh-sci: Add device tree support for r8a7779
+In-Reply-To: <CAMuHMdWB4ZnwyNFXMK_rdCKAMOXt+HRMZKG+j4O-tdfiP_-PLg@mail.gmail.com>
+References: <1398322484-3630-1-git-send-email-horms+renesas@verge.net.au>
+ <1418731.YSFS18bIMD@avalon> <20140425002641.GB31164@verge.net.au>
+ <1922942.7jvlviEDpf@avalon>
+ <CAMuHMdWB4ZnwyNFXMK_rdCKAMOXt+HRMZKG+j4O-tdfiP_-PLg@mail.gmail.com>
+Message-ID: <20140428000314.GK32087@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 26, 2014 at 10:49 AM, Russell King
-<rmk+kernel@arm.linux.org.uk> wrote:
-> There are two failures which DT can return when looking up a phandle:
-> -ENOENT - when DT finds that the desired property/index is not present
-> -EINVAL - when DT finds that the desired property/index is present, but
->  there is a problem parsing it.
->
-> We should only fall through to clk_get_sys() (the table driven clock
-> lookup) when DT indicates that there was no entry in the OF tables
-> for the clock.  Doing otherwise causes the clk API to always indicate
-> that there is no entry for this clock, which is not correct behaviour.
->
-> Cc: <stable@vger.kernel.org>
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
-> Grant, Rob,
->
-> Please let me know ASAP if this gives you any cause for concern.  This
-> looks to me like a long standing bug which really needs fixing.  Part
-> of the motivation here is similar to Jean-Francois' patch to clkdev
-> which allows a DT specified clock which isn't get present to have
-> clk_get() and friends return -EPROBE_DEFER - again, something that I
-> think really should happen.  Jean-Francois hasn't been able to get
-> much traction for his patch, so let's start with fixing this bug first.
+On Fri, Apr 25, 2014 at 09:11:06AM +0200, Geert Uytterhoeven wrote:
+> On Fri, Apr 25, 2014 at 9:05 AM, Laurent Pinchart
+> <laurent.pinchart@ideasonboard.com> wrote:
+> >> +     scif0: serial at ffe40000 {
+> >> +             compatible = "renesas,scif", "renesas,scif-r8a7779";
+> >> +             reg = <0xffe40000 265>;
+> >> +             interrupt-parent = <&gic>;
+> >> +             interrupts = <0 88 IRQ_TYPE_LEVEL_HIGH>;
+> >> +             clocks = <&cpg_clocks R8A7779_CLK_P>;
+> >> +             clock-names = "sci_ick";
+> >
+> > Clock handling in the sh-sci driver should probably be improved. The driver
+> > currently requires an "sci_ick" interface clock and supports an optional
+> > "sci_fck" functional clock. In practice, as far as I can see, platforms that
+> > provide both sci_ick and sci_fck set the two clocks to the same source.
+> 
+> That's right. As a consequence, the clock's enable count is incremented
+> 3 times:
+>   - once for fck,
+>   - once for ick,
+>   - once for generic Runtime PM using the "NULL" clock.
 
-I have no issues. A platform would have to be pretty broken to be
-relying on the current behavior.
+This approach is fine by me.
+But I think you need to maintain compatibility with the old
+binding ("sci_ick" required, "sci_fsk") as it seems that
+was included in v3.14.
 
-Rob
-
->
->  drivers/clk/clkdev.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-> index 48f67218247c..4e65d0e10b05 100644
-> --- a/drivers/clk/clkdev.c
-> +++ b/drivers/clk/clkdev.c
-> @@ -165,7 +165,7 @@ struct clk *clk_get(struct device *dev, const char *con_id)
->
->         if (dev) {
->                 clk = of_clk_get_by_name(dev->of_node, con_id);
-> -               if (!IS_ERR(clk))
-> +               if (!IS_ERR(clk) || PTR_ERR(clk) != -ENOENT)
->                         return clk;
->         }
->
+> Gr{oetje,eeting}s,
+> 
+>                         Geert
+> 
 > --
-> 1.8.3.1
->
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
+> 
