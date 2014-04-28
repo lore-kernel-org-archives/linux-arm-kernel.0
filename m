@@ -1,61 +1,56 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 28 Apr 2014 19:19:04 +0100
-Subject: [PATCH 00/16] Another 16 L2C patches
-In-Reply-To: <535E990B.2020405@wwwdotorg.org>
-References: <20140428165631.GM26756@n2100.arm.linux.org.uk>
- <535E8BEE.1000100@wwwdotorg.org> <535E8F6D.9000803@wwwdotorg.org>
- <20140428173943.GN26756@n2100.arm.linux.org.uk>
- <535E990B.2020405@wwwdotorg.org>
-Message-ID: <20140428181904.GP26756@n2100.arm.linux.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 28 Apr 2014 20:20:39 +0200
+Subject: [PATCH] ARM: mvebu: refine which files are build in mach-mvebu
+In-Reply-To: <20140427231044.GX28159@titan.lakedaemon.net>
+References: <20140427231044.GX28159@titan.lakedaemon.net>
+Message-ID: <1398709239-6126-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 12:08:11PM -0600, Stephen Warren wrote:
-> (Dropping most people from CC since this sub-thread is a Tegra-specific
-> discussion)
-> 
-> On 04/28/2014 11:39 AM, Russell King - ARM Linux wrote:
-> > On Mon, Apr 28, 2014 at 11:27:09AM -0600, Stephen Warren wrote:
-> ...
-> >> I do see one error in dmesg during boot, but it doesn't appear to
-> >> negatively affect operation in brief testing, and is present in
-> >> linux-next without this series anyway. Is this message a problem?
-> >>
-> >>> [    0.000000] L2C: platform modifies aux control register: 0x02080000 -> 0x3e480001
-> >>> [    0.000000] L2C: DT/platform modifies aux control register: 0x02080000 -> 0x3e480001
-> >>> [    0.000000] L2C-310 errata 727915 769419 enabled
-> >>> [    0.000000] L2C-310 enabling early BRESP for Cortex-A9
-> >>> [    0.000000] L2C-310: enabling full line of zeros but not enabled in Cortex-A9
-> >>                           ^^^^^^ this is logged at error level
-> > 
-> > Correct, it's an error because on Tegra you explicitly set bit 0 in the
-> > auxiliary control register, which is pointless unless the feature is
-> > also enabled in the Cortex-A9 control register as well.
-> 
-> Please forgive my almost complete lack of knowledge re: cache
-> controllers. Is the correct fix for this:
-> 
-> a) To remove bit 0 from the aux_val passed to l2x0_of_init()
-> 
-> b) To set some BIT(3) in the Cortex-A9 auxcr, so this feature is enabled
-> there too.
-> 
-> And if (b), I assume that's something that the bootloader should be
-> doing, not the kernel?
+Following the integration into mach-mvebu of the Kirkwood ARMv5
+support, we need to be more careful about which files get built. For
+example, the pmsu.c file now calls wfi(), which only exists on ARMv7
+platforms.
 
-See "Full line of zero write."
+Therefore, this commit changes mach-mvebu/Makefile to build the Armada
+370/XP/375/38x specific files only when CONFIG_MACH_MVEBU_V7 is
+enabled.
 
-http://infocenter.arm.com/help/topic/com.arm.doc.ddi0246h/CJACBHHB.html#CJADBCJJ
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+This commit applies on top of mvebu/soc, and has been built tested
+with mvebu_v7_defconfig, mvebu_v5_defconfig, multi_v7_defconfig and
+multi_v5_defconfig (on top of mvebu/for-next).
 
-which makes it (a).  The reverse steps are required when disabling the L2
-cache controller.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/mach-mvebu/Makefile | 13 ++++++++-----
+ 1 file changed, 8 insertions(+), 5 deletions(-)
 
-If we decide that we encounter a platform which needs this feature
-disabled, the correct way to deal with that is to add a L2C-310
-specific property to DT, and not to try to crowbar it in via the L2C
-aux control register masks (which should never have been exposed to
-platforms using DT.)
-
+diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
+index 02b5389..ec0b217 100644
+--- a/arch/arm/mach-mvebu/Makefile
++++ b/arch/arm/mach-mvebu/Makefile
+@@ -3,11 +3,14 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
+ 
+ AFLAGS_coherency_ll.o		:= -Wa,-march=armv7-a
+ 
+-obj-y				 += system-controller.o mvebu-soc-id.o cpu-reset.o
+-obj-$(CONFIG_MACH_MVEBU_V7)      += board-v7.o
++obj-y				 += system-controller.o mvebu-soc-id.o
++
++ifeq ($(CONFIG_MACH_MVEBU_V7),y)
++obj-y				 += cpu-reset.o board-v7.o coherency.o coherency_ll.o pmsu.o
++obj-$(CONFIG_SMP)		 += platsmp.o headsmp.o platsmp-a9.o headsmp-a9.o
++obj-$(CONFIG_HOTPLUG_CPU)	 += hotplug.o
++endif
++
+ obj-$(CONFIG_MACH_DOVE)		 += dove.o
+-obj-$(CONFIG_ARCH_MVEBU)	 += coherency.o coherency_ll.o pmsu.o
+-obj-$(CONFIG_SMP)                += platsmp.o headsmp.o platsmp-a9.o headsmp-a9.o
+-obj-$(CONFIG_HOTPLUG_CPU)        += hotplug.o
+ obj-$(CONFIG_MACH_KIRKWOOD)	 += kirkwood.o kirkwood-pm.o
+ obj-$(CONFIG_MACH_T5325)	 += board-t5325.o
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.9.2
