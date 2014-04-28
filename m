@@ -1,82 +1,54 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Mon, 28 Apr 2014 12:21:49 -0500
-Subject: [PATCH] ARM: OMAP5: Switch to THUMB mode if needed on secondary
- CPU
-In-Reply-To: <535E8DC2.4010504@ti.com>
-References: <1398191506-3741-1-git-send-email-joelf@ti.com>
- <20140428164348.GA14354@e103592.cambridge.arm.com> <535E8DC2.4010504@ti.com>
-Message-ID: <535E8E2D.1020708@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 28 Apr 2014 11:27:09 -0600
+Subject: [PATCH 00/16] Another 16 L2C patches
+In-Reply-To: <535E8BEE.1000100@wwwdotorg.org>
+References: <20140428165631.GM26756@n2100.arm.linux.org.uk>
+ <535E8BEE.1000100@wwwdotorg.org>
+Message-ID: <535E8F6D.9000803@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/28/2014 12:20 PM, Joel Fernandes wrote:
-> On 04/28/2014 11:43 AM, Dave Martin wrote:
->> On Tue, Apr 22, 2014 at 01:31:46PM -0500, Joel Fernandes wrote:
->>> On my DRA7 system, when the kernel is built in THUMB mode, the secondary CPU
->>> (Cortex A15) fails to come up causing SMP boot on second CPU to timeout. This
->>> seems to be because the CPU is in ARM mode once the ROM hands over control to
->>> the kernel.  Switch to THUMB mode if required once the kernel is control of
->>> secondary CPU. On OMAP4 on the other hand, it appears to be in THUMB mode on
->>> entry so this is not required and SMP boot works as is.
->>>
->>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>> Cc: Russell King <linux@arm.linux.org.uk>
->>> Cc: Nishanth Menon <nm@ti.com>
->>> Cc: Tony Lindgren <tony@atomide.com>
->>> Signed-off-by: Joel Fernandes <joelf@ti.com>
->>> ---
->>>  arch/arm/mach-omap2/omap-headsmp.S |    8 ++++++--
->>>  1 file changed, 6 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-omap2/omap-headsmp.S b/arch/arm/mach-omap2/omap-headsmp.S
->>> index 75e9295..1809dce 100644
->>> --- a/arch/arm/mach-omap2/omap-headsmp.S
->>> +++ b/arch/arm/mach-omap2/omap-headsmp.S
->>> @@ -1,7 +1,7 @@
->>>  /*
->>>   * Secondary CPU startup routine source file.
->>>   *
->>> - * Copyright (C) 2009 Texas Instruments, Inc.
->>> + * Copyright (C) 2014 Texas Instruments, Inc.
->>>   *
->>>   * Author:
->>>   *      Santosh Shilimkar <santosh.shilimkar@ti.com>
->>> @@ -28,9 +28,13 @@
->>>   * code.  This routine also provides a holding flag into which
->>>   * secondary core is held until we're ready for it to initialise.
->>>   * The primary core will update this flag using a hardware
->>> -+ * register AuxCoreBoot0.
->>> + * register AuxCoreBoot0.
->>>   */
->>>  ENTRY(omap5_secondary_startup)
+On 04/28/2014 11:12 AM, Stephen Warren wrote:
+> On 04/28/2014 10:56 AM, Russell King - ARM Linux wrote:
+>> So, in response to Matt Porter's complaint about breaking prima2, here's
+>> another 16 patches which changes the way the L2 cache is initialised on
+>> many platforms.  This series moves towards a situation where the generic
+>> code initialises the L2 cache itself, with as little help as possible
+>> from board specific code.
 >>
->> Are you sure this problem is not caused by the missing ENDPROC() for
->> omap5_secondary_startup?
+>> A number of platforms are left alone because they're more complex -
+>> these should still eventually be converted.
 >>
->> You have END() instead (which may have been accidental).
->>
->> Without ENDPROC(), the symbol is not marked as a function and so
->> the Thumb bit won't be set when taking a pointer -- so the kernel
->> is actually telling the firmware to enter in ARM state.
->>
->>
->> Try changing END() to ENDPROC() without this patch, and see if it
->> makes a difference.
->>
->> If it still doesn't work, then the firmware either doesn't support
->> entering in ARM, or is buggy.
+>> At some point in the near future, I will see about sorting out their
+>> ordering wrt the previous patch set.  For the time being, they apply
+>> on top of the existing l2c changes.
 > 
-> Thanks for the suggestion. I'm guessing what you mean is with ENDPROC,
-> interworking code uses bx instead of bl to set thumb mode.
-> 
-> But ROM/firmware doesn't have access to symbol table, how would it know
-> the type of the symbol to be ARM or THUMB before it branches?
-> 
-Sorry what I meant is, say its of Type function. What tells the firmware
-to switch to THUMB?
+> Are "the existing l2c changes" in next-20140428? If not, is there a git
+> branch I can pull to test the whole thing, rather than tracking down and
+> applying "the existing l2c changes" first?
 
-What's typically done is a boot address register is written by the
-kernel, and the firmware jumps to it after WFE.
+I guess they must be in linux-next, since this series applies cleanly on
+top of it.
 
-thanks,
--Joel
+So, patches 2/16 ("ARM: l2c: add platform independent core L2 cache
+initialisation") and 7/16 ("ARM: l2c: convert tegra to generic l2c
+initialisation"),
+
+Tested-by: Stephen Warren <swarren@nvidia.com>
+
+(On an NVIDIA Tegra20 Seaboard/Springbank board, on top of next-20140428)
+
+I do see one error in dmesg during boot, but it doesn't appear to
+negatively affect operation in brief testing, and is present in
+linux-next without this series anyway. Is this message a problem?
+
+> [    0.000000] L2C: platform modifies aux control register: 0x02080000 -> 0x3e480001
+> [    0.000000] L2C: DT/platform modifies aux control register: 0x02080000 -> 0x3e480001
+> [    0.000000] L2C-310 errata 727915 769419 enabled
+> [    0.000000] L2C-310 enabling early BRESP for Cortex-A9
+> [    0.000000] L2C-310: enabling full line of zeros but not enabled in Cortex-A9
+                          ^^^^^^ this is logged at error level
+> [    0.000000] L2C-310 ID prefetch enabled, offset 1 lines
+> [    0.000000] L2C-310 dynamic clock gating disabled, standby mode disabled
+> [    0.000000] L2C-310 cache controller enabled, 8 ways, 1024 kB
+> [    0.000000] L2C-310: CACHE_ID 0x410000c4, AUX_CTRL 0x7e480001
