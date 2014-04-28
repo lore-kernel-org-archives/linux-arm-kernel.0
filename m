@@ -1,41 +1,54 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 28 Apr 2014 09:15:58 +0900
-Subject: [PATCH] ARM: shmobile: henninger: enable SATA0
-In-Reply-To: <201404260251.28274.sergei.shtylyov@cogentembedded.com>
-References: <201404260251.28274.sergei.shtylyov@cogentembedded.com>
-Message-ID: <20140428001558.GN32087@verge.net.au>
+From: mporter@linaro.org (Matt Porter)
+Date: Sun, 27 Apr 2014 20:27:40 -0400
+Subject: [PATCH] ARM: l2c: prima2: only call l2x0_of_init() on matching nodes
+Message-ID: <1398644860-22973-1-git-send-email-mporter@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 26, 2014 at 02:51:27AM +0400, Sergei Shtylyov wrote:
-> Enable SATA0 device for the Henninger board. 
-> 
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+l2x0_of_init() is executed unconditionally within the sirfsoc_l2x0_init()
+early initcall. In a multi v7 kernel this causes bcm281xx and bcm21664
+platform to fail boot since they have their own pre l2x0 init sequence
+that is required. Fix this by checking that a matching OF ID is present
+before calling l2x0_of_init().
 
-Thanks, I have queued this up.
+Reported-by: Kevin Hilman <khilman@linaro.org>
+Signed-off-by: Matt Porter <mporter@linaro.org>
+---
+Applies against next-20140424 to fix the issue introduced in
+50655e6 ARM: l2c: prima2: remove cache size override
 
-> 
-> ---
-> This patch is against 'renesas-devel-v3.15-rc2-20140425v2' tag of Simon Horman's
-> 'renesas.git' repo.
-> 
->  arch/arm/boot/dts/r8a7791-henninger.dts |    4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> Index: renesas/arch/arm/boot/dts/r8a7791-henninger.dts
-> ===================================================================
-> --- renesas.orig/arch/arm/boot/dts/r8a7791-henninger.dts
-> +++ renesas/arch/arm/boot/dts/r8a7791-henninger.dts
-> @@ -74,3 +74,7 @@
->  		micrel,led-mode = <1>;
->  	};
->  };
-> +
-> +&sata0 {
-> +       status = "okay";
-> +};
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+ arch/arm/mach-prima2/l2x0.c | 16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-prima2/l2x0.c b/arch/arm/mach-prima2/l2x0.c
+index 09f68f0..1c2ed15 100644
+--- a/arch/arm/mach-prima2/l2x0.c
++++ b/arch/arm/mach-prima2/l2x0.c
+@@ -8,10 +8,24 @@
+ 
+ #include <linux/init.h>
+ #include <linux/kernel.h>
++#include <linux/of.h>
+ #include <asm/hardware/cache-l2x0.h>
+ 
++static const struct of_device_id sirf_l2x0_ids[] __initconst = {
++	{ .compatible = "sirf,prima2-pl310-cache" },
++	{ .compatible = "sirf,marco-pl310-cache" },
++	{},
++};
++
+ static int __init sirfsoc_l2x0_init(void)
+ {
+-	return l2x0_of_init(0, ~0);
++	struct device_node *np;
++	int ret = -EINVAL;
++
++	np = of_find_matching_node(NULL, sirf_l2x0_ids);
++	if (np)
++		ret = l2x0_of_init(0, ~0);
++
++	return ret;
+ }
+ early_initcall(sirfsoc_l2x0_init);
+-- 
+1.8.3.2
