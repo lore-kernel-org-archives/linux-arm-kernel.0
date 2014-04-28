@@ -1,35 +1,47 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 28 Apr 2014 16:12:36 +0200
-Subject: [PATCH 3/3] ARM: dts: imx6dl, fix i2c4 device node
+Date: Mon, 28 Apr 2014 16:12:34 +0200
+Subject: [PATCH 1/3] arm: dts: imx6qdl, remove fsl,ssi-dma-events
 In-Reply-To: <1398694356-22511-1-git-send-email-mpa@pengutronix.de>
 References: <1398694356-22511-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1398694356-22511-4-git-send-email-mpa@pengutronix.de>
+Message-ID: <1398694356-22511-2-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i2c4 is exactly the same hardware module as i2c 1 to 3. The compatible
-property is wrong and the appropriate clock was missing.
+All dtsi files where already moved to generic dma bindings. Remove the
+old non-generic DMA properties.
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- arch/arm/boot/dts/imx6dl.dtsi | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/imx6qdl.dtsi | 3 ---
+ 1 file changed, 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
-index 9c4942f..a48a542 100644
---- a/arch/arm/boot/dts/imx6dl.dtsi
-+++ b/arch/arm/boot/dts/imx6dl.dtsi
-@@ -84,9 +84,10 @@
- 			i2c4: i2c at 021f8000 {
- 				#address-cells = <1>;
- 				#size-cells = <0>;
--				compatible = "fsl,imx1-i2c";
-+				compatible = "fsl,imx6q-i2c", "fsl,imx21-i2c";
- 				reg = <0x021f8000 0x4000>;
- 				interrupts = <0 35 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks 209>;
- 				status = "disabled";
- 			};
- 		};
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 947e463..b230c09 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -261,7 +261,6 @@
+ 					       <&sdma 38 1 0>;
+ 					dma-names = "rx", "tx";
+ 					fsl,fifo-depth = <15>;
+-					fsl,ssi-dma-events = <38 37>;
+ 					status = "disabled";
+ 				};
+ 
+@@ -276,7 +275,6 @@
+ 					       <&sdma 42 1 0>;
+ 					dma-names = "rx", "tx";
+ 					fsl,fifo-depth = <15>;
+-					fsl,ssi-dma-events = <42 41>;
+ 					status = "disabled";
+ 				};
+ 
+@@ -291,7 +289,6 @@
+ 					       <&sdma 46 1 0>;
+ 					dma-names = "rx", "tx";
+ 					fsl,fifo-depth = <15>;
+-					fsl,ssi-dma-events = <46 45>;
+ 					status = "disabled";
+ 				};
+ 
 -- 
 1.9.1
