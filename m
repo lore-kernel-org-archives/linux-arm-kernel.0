@@ -1,64 +1,132 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Mon, 28 Apr 2014 21:20:04 +0900
-Subject: [RESUBMIT RFC PATCH v2 0/3] Add support for Exynos PMU driver
-Message-ID: <1398687607-4554-1-git-send-email-pankaj.dubey@samsung.com>
+Date: Mon, 28 Apr 2014 21:20:05 +0900
+Subject: [RESUBMIT RFC PATCH v2 1/3] ARM: EXYNOS: Move PMU specific definitions
+ from common.h
+In-Reply-To: <1398687607-4554-1-git-send-email-pankaj.dubey@samsung.com>
+References: <1398687607-4554-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1398687607-4554-2-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series moves PMU implementation from "mach-exynos/pmu.c" to
-"drivers/mfd/exynos-pmu.c". Patch v1 was posted as RFC [1].
+From: Younggun Jang <yg1004.jang@samsung.com>
 
-In case of ARM32 we had machine folder such as "mach-exynos" but
-moving forward with ARM64 SoC support we can not have any more such
-machine folders, keeping that in mind we have planned to move PMU
-implementation out of machine folder, so that common piece of code
-can be reused.
+This patch moves PMU specific definitions into a new file
+as exynos-pmu.h. This will help in making PMU implementation
+independent of common.h header.
 
-This patch series is based on kgene for-next and depends on following
-patch series
- a) [PATCH v2 0/5] Add PMU node for Exynos SoCs
-	https://lkml.org/lkml/2014/4/25/216
- b) [PATCH v2 00/10] ARM: Exynos: PMU cleanup and refactoring for using DT
-	https://lkml.org/lkml/2014/4/25/252
+Signed-off-by: Young-Gun Jang <yg1004.jang@samsung.com>
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+---
+ arch/arm/mach-exynos/common.h     |   17 -----------------
+ arch/arm/mach-exynos/cpuidle.c    |    1 +
+ arch/arm/mach-exynos/exynos-pmu.h |   31 +++++++++++++++++++++++++++++++
+ arch/arm/mach-exynos/pm.c         |    1 +
+ arch/arm/mach-exynos/pmu.c        |    2 +-
+ 5 files changed, 34 insertions(+), 18 deletions(-)
+ create mode 100644 arch/arm/mach-exynos/exynos-pmu.h
 
-
-1) [RFC PATCH 0/2] Add support for Exynos PMU driver
-	https://lkml.org/lkml/2014/4/2/69
-
-Changes since v1:
- - Rebased on Kukjin Kim's for-next (3.15_rc1 tag)
- - Added patch: Move PMU specific definitions from common.h
- - Added patch: Move pmu specific header files under "linux/mfd/samsung"
- - Removed patch: ARM: EXYNOS: remove arch specific PMU implementation
-	As suggested breaking down patches into smalled pieces for better review.
-	Also modified all changes in pmu.c under mach-exynos itself and then
-	prepared patches moving files from mach-exynos to "drivers/mfd"
-
-
-Pankaj Dubey (2):
-  ARM: EXYNOS: Move pmu specific header files under "linux/mfd/samsung"
-  drivers: mfd: Add support for Exynos PMU driver
-
-Younggun Jang (1):
-  ARM: EXYNOS: Move PMU specific definitions from common.h
-
- arch/arm/mach-exynos/Kconfig                       |    2 ++
- arch/arm/mach-exynos/Makefile                      |    2 --
- arch/arm/mach-exynos/common.h                      |   17 -----------
- arch/arm/mach-exynos/cpuidle.c                     |    3 +-
- arch/arm/mach-exynos/exynos.c                      |    2 +-
- arch/arm/mach-exynos/hotplug.c                     |    2 +-
- arch/arm/mach-exynos/platsmp.c                     |    2 +-
- arch/arm/mach-exynos/pm.c                          |    3 +-
- drivers/mfd/Kconfig                                |    9 ++++++
- drivers/mfd/Makefile                               |    1 +
- .../mach-exynos/pmu.c => drivers/mfd/exynos-pmu.c  |    5 ++--
- include/linux/mfd/samsung/exynos-pmu.h             |   31 ++++++++++++++++++++
- .../linux/mfd/samsung/exynos-regs-pmu.h            |    0
- 13 files changed, 52 insertions(+), 27 deletions(-)
- rename arch/arm/mach-exynos/pmu.c => drivers/mfd/exynos-pmu.c (99%)
- create mode 100644 include/linux/mfd/samsung/exynos-pmu.h
- rename arch/arm/mach-exynos/regs-pmu.h => include/linux/mfd/samsung/exynos-regs-pmu.h (100%)
-
+diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+index ad5128e..d848ede 100644
+--- a/arch/arm/mach-exynos/common.h
++++ b/arch/arm/mach-exynos/common.h
+@@ -38,24 +38,7 @@ extern struct smp_operations exynos_smp_ops;
+ 
+ extern void exynos_cpu_die(unsigned int cpu);
+ 
+-/* PMU(Power Management Unit) support */
+-
+-#define PMU_TABLE_END	0xFFFF
+-
+-enum sys_powerdown {
+-	SYS_AFTR,
+-	SYS_LPA,
+-	SYS_SLEEP,
+-	NUM_SYS_POWERDOWN,
+-};
+-
+ extern unsigned long l2x0_regs_phys;
+-struct exynos_pmu_conf {
+-	unsigned int offset;
+-	unsigned int val[NUM_SYS_POWERDOWN];
+-};
+-
+-extern void exynos_sys_powerdown_conf(enum sys_powerdown mode);
+ 
+ extern struct regmap *get_exynos_pmuregmap(void);
+ extern void __iomem *get_exynos_pmuaddr(void);
+diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
+index 5dcdd46..ff3be9c 100644
+--- a/arch/arm/mach-exynos/cpuidle.c
++++ b/arch/arm/mach-exynos/cpuidle.c
+@@ -32,6 +32,7 @@
+ 
+ #include "common.h"
+ #include "regs-pmu.h"
++#include "exynos-pmu.h"
+ 
+ #define REG_DIRECTGO_ADDR	(samsung_rev() == EXYNOS4210_REV_1_1 ? \
+ 			S5P_INFORM7 : (samsung_rev() == EXYNOS4210_REV_1_0 ? \
+diff --git a/arch/arm/mach-exynos/exynos-pmu.h b/arch/arm/mach-exynos/exynos-pmu.h
+new file mode 100644
+index 0000000..1cc857b
+--- /dev/null
++++ b/arch/arm/mach-exynos/exynos-pmu.h
+@@ -0,0 +1,31 @@
++/*
++ * Copyright (c) 2014 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
++ *
++ * Header for EXYNOS PMU Driver support
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __EXYNOS_PMU_H
++#define __EXYNOS_PMU_H
++
++#define PMU_TABLE_END	0xFFFF
++
++enum sys_powerdown {
++	SYS_AFTR,
++	SYS_LPA,
++	SYS_SLEEP,
++	NUM_SYS_POWERDOWN,
++};
++
++struct exynos_pmu_conf {
++	unsigned int offset;
++	unsigned int val[NUM_SYS_POWERDOWN];
++};
++
++extern void exynos_sys_powerdown_conf(enum sys_powerdown mode);
++
++#endif /* __EXYNOS_PMU_H */
+diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+index e4c10d4..103ab92 100644
+--- a/arch/arm/mach-exynos/pm.c
++++ b/arch/arm/mach-exynos/pm.c
+@@ -37,6 +37,7 @@
+ #include "common.h"
+ #include "regs-pmu.h"
+ #include "regs-sys.h"
++#include "exynos-pmu.h"
+ 
+ static struct regmap *pmu_regmap;
+ 
+diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
+index abcf753..d020557 100644
+--- a/arch/arm/mach-exynos/pmu.c
++++ b/arch/arm/mach-exynos/pmu.c
+@@ -16,7 +16,7 @@
+ #include <linux/slab.h>
+ #include <linux/mfd/syscon.h>
+ 
+-#include "common.h"
++#include "exynos-pmu.h"
+ #include "regs-pmu.h"
+ 
+ enum exynos_pmu_id {
 -- 
 1.7.10.4
