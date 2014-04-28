@@ -1,103 +1,99 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Mon, 28 Apr 2014 10:14:58 -0500
-Subject: [PATCH V3 18/20] bus: omap_l3_noc: introduce concept of submodule
-In-Reply-To: <1398698101-25513-1-git-send-email-nm@ti.com>
+Date: Mon, 28 Apr 2014 10:14:40 -0500
+Subject: [PATCH V3 00/20] bus: omap_l3_noc: driver cleanups and support for
+ DRA7/AM4372
+In-Reply-To: <1397492726-17203-1-git-send-email-nm@ti.com>
 References: <1397492726-17203-1-git-send-email-nm@ti.com>
- <1398698101-25513-1-git-send-email-nm@ti.com>
-Message-ID: <1398698101-25513-19-git-send-email-nm@ti.com>
+Message-ID: <1398698101-25513-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While OMAP4 and OMAP5 had 3 separate clock domains, DRA7 has only 2
-and the first one then is internally divided into 2 sub clock domains.
+The following V3 of the series is based on v3.15-rc1 + peter's patch series:
+	patch #1: https://patchwork.kernel.org/patch/3923141/
+	(drivers: bus: omap_l3: Convert to use devm_kzalloc)
 
-To better represent this in the driver, we use the concept of submodule.
+	patch #2: https://patchwork.kernel.org/patch/3923061/
+	(drivers: bus: omap_l3: Convert to use devm_ioremap_resource() )
 
-The address defintions in the devicetree is as per the high level
-clock domain(module) base, the sub clockdomain/subdomain which shares
-the same register space of a clockdomain is marked in the SoC data as
-L3_BASE_IS_SUBMODULE.
+	patch #3: https://patchwork.kernel.org/patch/3923101/
+	(drivers: bus: omap_l3: Convert to use devm_request_irq())
 
-L3_BASE_IS_SUBMODULE is used as an indication that it's base address is
-the same as the parent module and offsets are considered from the same
-base address as they are usually intermingled.
+	patch #4: https://patchwork.kernel.org/patch/3923081/
+	(drivers: bus: omap_l3: Remove the platform driver's remove function)
 
-Other than the base address, the submodule is same as a module as it is
-functionally so.
+	patch #5: https://patchwork.kernel.org/patch/3923121/
+	(drivers: bus: omap_l3: Change pr_crit() to dev_err() when IRQ request
+	fails)
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Tested-by: Darren Etheridge <detheridge@ti.com>
----
-V3: no change
- drivers/bus/omap_l3_noc.c |   17 ++++++++++++-----
- drivers/bus/omap_l3_noc.h |    6 +++++-
- 2 files changed, 17 insertions(+), 6 deletions(-)
+V1 was originally posted here: http://marc.info/?l=linux-omap&m=139749383932575&w=2
+V2 was originally posted here: http://marc.info/?l=linux-kernel&m=139776814925544&w=2
 
-diff --git a/drivers/bus/omap_l3_noc.c b/drivers/bus/omap_l3_noc.c
-index 08344b0..0eba07a 100644
---- a/drivers/bus/omap_l3_noc.c
-+++ b/drivers/bus/omap_l3_noc.c
-@@ -238,7 +238,7 @@ static int omap_l3_probe(struct platform_device *pdev)
- {
- 	const struct of_device_id *of_id;
- 	static struct omap_l3 *l3;
--	int ret, i;
-+	int ret, i, res_idx;
- 
- 	of_id = of_match_device(l3_noc_match, &pdev->dev);
- 	if (!of_id) {
-@@ -255,15 +255,22 @@ static int omap_l3_probe(struct platform_device *pdev)
- 	platform_set_drvdata(pdev, l3);
- 
- 	/* Get mem resources */
--	for (i = 0; i < l3->num_modules; i++) {
--		struct resource	*res = platform_get_resource(pdev,
--							     IORESOURCE_MEM, i);
--
-+	for (i = 0, res_idx = 0; i < l3->num_modules; i++) {
-+		struct resource	*res;
-+
-+		if (l3->l3_base[i] == L3_BASE_IS_SUBMODULE) {
-+			/* First entry cannot be submodule */
-+			BUG_ON(i == 0);
-+			l3->l3_base[i] = l3->l3_base[i - 1];
-+			continue;
-+		}
-+		res = platform_get_resource(pdev, IORESOURCE_MEM, res_idx);
- 		l3->l3_base[i] = devm_ioremap_resource(&pdev->dev, res);
- 		if (IS_ERR(l3->l3_base[i])) {
- 			dev_err(l3->dev, "ioremap %d failed\n", i);
- 			return PTR_ERR(l3->l3_base[i]);
- 		}
-+		res_idx++;
- 	}
- 
- 	/*
-diff --git a/drivers/bus/omap_l3_noc.h b/drivers/bus/omap_l3_noc.h
-index 36dc48b..aced4c5 100644
---- a/drivers/bus/omap_l3_noc.h
-+++ b/drivers/bus/omap_l3_noc.h
-@@ -41,6 +41,8 @@
- 
- #define L3_TARGET_NOT_SUPPORTED		NULL
- 
-+#define L3_BASE_IS_SUBMODULE		((void __iomem *)(1 << 0))
-+
- static const char * const l3_transaction_type[] = {
- 	/* 0 0 0 */ "Idle",
- 	/* 0 0 1 */ "Write",
-@@ -96,7 +98,9 @@ struct l3_flagmux_data {
- /**
-  * struct omap_l3 - Description of data relevant for L3 bus.
-  * @dev:	device representing the bus (populated runtime)
-- * @l3_base:	base addresses of modules (populated runtime)
-+ * @l3_base:	base addresses of modules (populated runtime if 0)
-+ *		if set to L3_BASE_IS_SUBMODULE, then uses previous
-+ *		module index as the base address
-  * @l3_flag_mux: array containing flag mux data per module
-  *		 offset from corresponding module base indexed per
-  *		 module.
+V3: has the following changes (w.r.t v2):
+	- fixed relaxed commit message and usage.
+	- AM437x internal documents showed that:
+		- new master information updated into the data
+		- masterid register definition is different from OMAP4-DRA7 - some
+		  additional parsing is done in hardware to "avoid s/w parsing"
+	- Additional testing information showed logic fail for masking "unclearable"
+		new patch added to series - patch #15
+	- Picked up previous acks and tested by - minor changes verified
+
+This series cleansup omap_l3_noc driver and adds data to support DRA7
+and AM437x SoCs.
+
+Patches(including Peter's) is available here:(based on v3.15-rc1):
+https://github.com/nmenon/linux-2.6-playground/commits/l3noc/driver-fixes-v3
+
+DTS patches (once this series is integrated and related DRA7 memory map fixes are done):
+https://github.com/nmenon/linux-2.6-playground/commits/l3noc/dts-fixes
+	(posted here: http://marc.info/?l=linux-omap&m=139750288003978&w=2)
+		- no change in dts.
+
+Testing branch: everything integrated:
+https://github.com/nmenon/linux-2.6-playground/commits/l3noc/testing-v3
+
+Test log (omap2plus_defconfig + CONFIG_CRYPTO_DEV_OMAP_DES=y):
+	am43xx-epos: http://slexy.org/raw/s28LkG186D
+	dra7xx-evm: http://slexy.org/raw/s2UV0v7fwn
+	pandaboard-es: http://slexy.org/raw/s213lc55PY
+	pandaboard-vanilla: http://slexy.org/raw/s20AvyGNrA
+	   sdp4430: http://slexy.org/raw/s2E0exblmN
+	OMAP5432uEVM: http://slexy.org/raw/s20TRRtKzf
+
+Afzal Mohammed (2):
+  bus: omap_l3_noc: ignore masked out unclearable targets
+  bus: omap_l3_noc: Add AM4372 interconnect error data
+
+Nishanth Menon (14):
+  bus: omap_l3_noc: Fix copyright information
+  bus: omap_l3_noc: remove iclk from omap_l3 struct
+  bus: omap_l3_noc: populate l3->dev and use it
+  bus: omap_l3_noc: switch over to relaxed variants of readl/writel
+  bus: omap_l3_noc: un-obfuscate l3_targ address computation
+  bus: omap_l3_noc: move L3 master data structure out
+  bus: omap_l3_noc: convert target information into a structure
+  bus: omap_l3_noc: convert flagmux information into a structure
+  bus: omap_l3_noc: fix masterid detection
+  bus: omap_l3_noc: make error reporting and handling common
+  bus: omap_l3_noc: improve readability by using helper for slave event
+    parsing
+  bus: omap_l3_noc: add information about the type of operation
+  bus: omap_l3_noc: Add information about the context of operation
+  bus: omap_l3_noc: introduce concept of submodule
+
+Rajendra Nayak (2):
+  bus: omap_l3_noc: Add support for discountinous flag mux input
+    numbers
+  bus: omap_l3_noc: Add DRA7 interconnect error data
+
+Sricharan R (2):
+  bus: omap_l3_noc: rename functions and data to omap_l3
+  bus: omap_l3_noc: use of_match_data to pick up SoC information
+
+ .../devicetree/bindings/arm/omap/l3-noc.txt        |    2 +
+ drivers/bus/omap_l3_noc.c                          |  322 ++++++++----
+ drivers/bus/omap_l3_noc.h                          |  545 +++++++++++++++-----
+ 3 files changed, 642 insertions(+), 227 deletions(-)
+
 -- 
 1.7.9.5
