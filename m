@@ -1,49 +1,71 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 28 Apr 2014 17:59:08 +0100
-Subject: [PATCH 16/16] ARM: l2c: convert berlin to generic l2c initialisation
+Date: Mon, 28 Apr 2014 17:57:57 +0100
+Subject: [PATCH 02/16] ARM: l2c: add platform independent core L2 cache
+ initialisation
 In-Reply-To: <20140428165631.GM26756@n2100.arm.linux.org.uk>
 References: <20140428165631.GM26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WeotY-0002QO-IC@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WeosP-0002PO-5m@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add a hook into the core ARM code to perform L2 cache initialisation
+in a platform independent manner.  Platforms still get to indicate
+their auxiliary control register values and mask, but the
+initialisation call will now be made from generic code.
+
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-berlin/berlin.c | 17 ++++++-----------
- 1 file changed, 6 insertions(+), 11 deletions(-)
+ arch/arm/include/asm/mach/arch.h |  3 +++
+ arch/arm/kernel/irq.c            | 12 ++++++++++++
+ 2 files changed, 15 insertions(+)
 
-diff --git a/arch/arm/mach-berlin/berlin.c b/arch/arm/mach-berlin/berlin.c
-index 6709d2a6bec8..ac181c6797ee 100644
---- a/arch/arm/mach-berlin/berlin.c
-+++ b/arch/arm/mach-berlin/berlin.c
-@@ -18,16 +18,6 @@
- #include <asm/hardware/cache-l2x0.h>
+diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+index 17a3fa2979e8..5249cc3c52f4 100644
+--- a/arch/arm/include/asm/mach/arch.h
++++ b/arch/arm/include/asm/mach/arch.h
+@@ -45,6 +45,9 @@ struct machine_desc {
+ 	unsigned char		reserve_lp1 :1;	/* never has lp1	*/
+ 	unsigned char		reserve_lp2 :1;	/* never has lp2	*/
+ 	enum reboot_mode	reboot_mode;	/* default restart mode	*/
++	unsigned		l2c_aux_val;	/* L2 cache aux value	*/
++	unsigned		l2c_aux_mask;	/* L2 cache aux mask	*/
++	void			(*l2c_write_sec)(unsigned long, unsigned);
+ 	struct smp_operations	*smp;		/* SMP operations	*/
+ 	bool			(*smp_init)(void);
+ 	void			(*fixup)(struct tag *, char **,
+diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+index 9723d17b8f38..2c4257604513 100644
+--- a/arch/arm/kernel/irq.c
++++ b/arch/arm/kernel/irq.c
+@@ -37,6 +37,7 @@
+ #include <linux/proc_fs.h>
+ #include <linux/export.h>
+ 
++#include <asm/hardware/cache-l2x0.h>
+ #include <asm/exception.h>
  #include <asm/mach/arch.h>
+ #include <asm/mach/irq.h>
+@@ -115,10 +116,21 @@ EXPORT_SYMBOL_GPL(set_irq_flags);
  
--static void __init berlin_init_machine(void)
--{
--	/*
--	 * with DT probing for L2CCs, berlin_init_machine can be removed.
--	 * Note: 88DE3005 (Armada 1500-mini) uses pl310 l2cc
--	 */
--	l2x0_of_init(0x30c00000, 0xfeffffff);
--	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
--}
--
- static const char * const berlin_dt_compat[] = {
- 	"marvell,berlin",
- 	NULL,
-@@ -35,5 +25,10 @@ static const char * const berlin_dt_compat[] = {
+ void __init init_IRQ(void)
+ {
++	int ret;
++
+ 	if (IS_ENABLED(CONFIG_OF) && !machine_desc->init_irq)
+ 		irqchip_init();
+ 	else
+ 		machine_desc->init_irq();
++
++	if (IS_ENABLED(CONFIG_OF) && IS_ENABLED(CONFIG_CACHE_L2X0) &&
++	    (machine_desc->l2c_aux_mask || machine_desc->l2c_aux_val)) {
++		outer_cache.write_sec = machine_desc->l2c_write_sec;
++		ret = l2x0_of_init(machine_desc->l2c_aux_val,
++				   machine_desc->l2c_aux_mask);
++		if (ret)
++			pr_err("L2C: failed to init: %d\n", ret);
++	}
+ }
  
- DT_MACHINE_START(BERLIN_DT, "Marvell Berlin")
- 	.dt_compat	= berlin_dt_compat,
--	.init_machine	= berlin_init_machine,
-+	/*
-+	 * with DT probing for L2CCs, berlin_init_machine can be removed.
-+	 * Note: 88DE3005 (Armada 1500-mini) uses pl310 l2cc
-+	 */
-+	.l2c_aux_val	= 0x30c00000,
-+	.l2c_aux_mask	= 0xfeffffff,
- MACHINE_END
+ #ifdef CONFIG_MULTI_IRQ_HANDLER
 -- 
 1.8.3.1
