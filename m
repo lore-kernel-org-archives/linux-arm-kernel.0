@@ -1,75 +1,53 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 28 Apr 2014 13:07:32 +0200
-Subject: [PATCH v6 RESEND 0/5] Add Broadcom Kona PWM Support
-In-Reply-To: <1398450675-19609-1-git-send-email-tim.kryger@linaro.org>
-References: <1398450675-19609-1-git-send-email-tim.kryger@linaro.org>
-Message-ID: <20140428110731.GH19455@ulmo>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 28 Apr 2014 13:11:20 +0200
+Subject: [PATCH 21/38] mmc: sdhci: hack up driver to make it more
+ compliant with UHS-1
+In-Reply-To: <20140428110259.GI26756@n2100.arm.linux.org.uk>
+References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
+ <E1Wd2WT-0003vg-Ke@rmk-PC.arm.linux.org.uk>
+ <20140425123820.GA15179@pengutronix.de>
+ <CAPDyKFpja-dGwsEL6YP=Nn=YSRRgMzTTz6WVQ8DiUOMrkLJpBQ@mail.gmail.com>
+ <20140428110259.GI26756@n2100.arm.linux.org.uk>
+Message-ID: <CAPDyKFpHoLbY4Li45UfPweJ0xKpa5E5d=YX+Sgz9pvRG4W2xiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 25, 2014 at 11:31:10AM -0700, Tim Kryger wrote:
-> This series introduces the driver for the Kona PWM controller found in
-> Broadcom mobile SoCs like bcm281xx and updates the device tree and the
-> defconfig to enable use of this hardware on the bcm28155 AP board.
-> 
-> Changes since v5:
->   - Rebased on v3.15-rc1
-> 
-> Changes since v4:
->   - Added in real polarity support
->   - Labeled trigger bits as such rather than use the name from hw docs
->   - Listed unsual hardware characteristics at the top of the file
->   - Removed default from Kconfig and update defconfig accordingly
->   - Always use unsigned int for temporary register values
-> 
-> Changes since v3:
->   - Removed polarity support for now
->   - Cleaned up whitespace issues, shortened some variable names
->   - Use container_of instead of dev_get_drvdata to get private data
->   - Removed workaround for PWM framework bug
->   - Reworded some binding documentation
-> 
-> Changes since v2:
->   - SoC DTS file updated to use real clock's phandle + specifier
->   - Toggle smooth mode off during apply so new settings take immediately
-> 
-> Changes since v1:
->   - Fixed up macros to be clearer and more complete
->   - Corrected spelling and punctuation mistakes
->   - Added support for polarity
->   - Made peripheral clock use more efficient
->   - Made prescale and duty computation clearer
->   - Moved Makefile addition to keep alphabetical
->   - Split complex lines into multiple steps
-> 
-> 
-> Tim Kryger (5):
->   Documentation: dt: Add Kona PWM binding
->   pwm: kona: Introduce Kona PWM controller support
->   ARM: dts: Declare the PWM for bcm11351 (bcm281xx)
->   ARM: dts: Enable the PWM for bcm28155 AP board
->   ARM: bcm_defconfig: Enable PWM and Backlight
-> 
->  .../devicetree/bindings/pwm/bcm-kona-pwm.txt       |   21 ++
->  arch/arm/boot/dts/bcm11351.dtsi                    |    8 +
->  arch/arm/boot/dts/bcm28155-ap.dts                  |    4 +
->  arch/arm/configs/bcm_defconfig                     |    3 +
->  drivers/pwm/Kconfig                                |    9 +
->  drivers/pwm/Makefile                               |    1 +
->  drivers/pwm/pwm-bcm-kona.c                         |  319 ++++++++++++++++++++
->  7 files changed, 365 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pwm/bcm-kona-pwm.txt
->  create mode 100644 drivers/pwm/pwm-bcm-kona.c
+On 28 April 2014 13:02, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> On Mon, Apr 28, 2014 at 12:50:54PM +0200, Ulf Hansson wrote:
+>> On 25 April 2014 14:38, Markus Pargmann <mpa@pengutronix.de> wrote:
+>> > Hi,
+>> >
+>> > On Wed, Apr 23, 2014 at 08:07:57PM +0100, Russell King wrote:
+>> >> Patch suggested by Dong Aisheng <dongas86@gmail.com>, this avoids
+>> >> additional clock start/stop cycles during the transition to 1.8V
+>> >> signalling mode.
+>> >>
+>> >> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>> >
+>> > I tested the series on imx6s with a RIoT board. With this patch applied
+>> > the RIoT board emmc does not work. Here is the output of the board:
+>>
+>> Hi Markus,
+>>
+>> Thanks for helping out testing!
+>>
+>> Does that mean patch 1->20 works fine for you? May I add your tested-by tag?
+>
+> Why should _you_ add someone elses tested-by tag to _my_ patches?
+>
+> I still wonder whether you understood anything that I've already said to
+> you about the handling of this patch set.
 
-I've applied patches 1 and 2 (with two tiny whitespace cleanups) to my
-for-next branch.
+That was based upon that _I_ would help out in creating the pull
+request to Chris, to minimize his effort in resolving conflicts.
 
-Thanks,
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140428/a51086e1/attachment.sig>
+All-right, I back off - I was just trying to help here. Please send
+the pull request to Chris directly instead.
+
+Kind regards
+Ulf Hansson
+
+>
+> --
+> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+> improving, and getting towards what was expected from it.
