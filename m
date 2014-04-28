@@ -1,52 +1,50 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 28 Apr 2014 15:26:41 +0200
-Subject: [PATCH] clk: shmobile: clk-mstp: change to using clock-indices
-In-Reply-To: <1397577994-12061-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1397577994-12061-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <20140428132641.GA9590@katana>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 28 Apr 2014 09:43:17 -0400
+Subject: [PATCH v2] mtd: davinci-nand: disable subpage write for
+ keystone-nand
+In-Reply-To: <534E51BF.9050508@ti.com>
+References: <1395346112-13350-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <532B4C36.8060405@ti.com> <5343F0D6.2010804@ti.com>
+ <20140416070833.GA5512@norris-Latitude-E6410> <534E51BF.9050508@ti.com>
+Message-ID: <535E5AF5.2020203@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15, 2014 at 05:06:34PM +0100, Ben Dooks wrote:
-> With the addition of clock-indices, we need to change the renesas
-> clock implementation to use these instead of the local definition
-> of "renesas,clock-indices".
+Brian,
+
+On Wednesday 16 April 2014 05:47 AM, Ivan Khoronzhuk wrote:
 > 
-> Since this will break booting with older device trees, we add a
-> simple auto-detection of which properties are present.
+> On 04/16/2014 10:08 AM, Brian Norris wrote:
+>> On Tue, Apr 08, 2014 at 03:51:34PM +0300, Ivan Khoronzhuk wrote:
+>>> On 03/20/2014 10:14 PM, Santosh Shilimkar wrote:
+>>>> On Thursday 20 March 2014 04:08 PM, Ivan Khoronzhuk wrote:
+>>>>> From: Murali Karicheri <m-karicheri2@ti.com>
+>>>>> Sub page write doesn't work because of hw issue in controller found on
+>>>>> Keystone SOCs. AEMIF controller is also used on DaVinci SOCs which
+>>>>> don't seems to have any issue. So add "ti,keysone-nand" compatible
+>>>>> to nand driver in order to set NAND_NO_SUBPAGE_WRITE option.
+>>>>>
+>>>>> Cc: Brian Norris <computersforpeace@gmail.com>
+>>>>> Cc: Warner Losh <imp@bsdimp.com>
+>>>>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>>>>
+>>>>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+>>>>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+>>>>> ---
+>>>>>
+>>>> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>> Brian,
+>>> Could you pick up subj patch?
+>> Pushed to l2-mtd.git. Is it critical this goes in for 3.15? It's
+>> currently queued for -next (3.16).
+>>
+
+[..]
+
 > 
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> ---
->  .../devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt        | 2 +-
->  drivers/clk/shmobile/clk-mstp.c                                  | 9 +++++++--
->  2 files changed, 8 insertions(+), 3 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt b/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
-> index 5992dce..02a25d9 100644
-> --- a/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
-> +++ b/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
+> This is a critical fix and it should be for 3.15.
+Ping. 3.15-rc3 is already out and I still see this fix merged
+yet.
 
-What about mentioning the old binding as deprecated in this file...
-
->  
-> +	if (of_find_property(np, "clock-indices", &i))
-> +		idxname = "clock-indices";
-> +	else
-> +		idxname = "renesas,clock-indices";
-
-...and here in the code? It might also be a tad more intuitive to check
-for the depracted binding, and if not found, use the new one as default,
-i.e. switch the logic of the if block. Very minor nit, though.
-
-But in general,
-
-Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140428/cc9f5c3c/attachment.sig>
+Regards,
+Santosh
