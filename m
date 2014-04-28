@@ -1,46 +1,55 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 28 Apr 2014 17:58:48 +0100
-Subject: [PATCH 12/16] ARM: l2c: convert imx vf610 to generic l2c
- initialisation
+Date: Mon, 28 Apr 2014 17:58:53 +0100
+Subject: [PATCH 13/16] ARM: l2c: convert sti to generic l2c initialisation
 In-Reply-To: <20140428165631.GM26756@n2100.arm.linux.org.uk>
 References: <20140428165631.GM26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WeotE-0002Q8-4p@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WeotJ-0002QC-88@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the .init_irq method only calls irqchip_init, we can remove that
-too.
+We can remove the .init_machine as it becomes the generic version.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-imx/mach-vf610.c | 9 ++-------
- 1 file changed, 2 insertions(+), 7 deletions(-)
+ arch/arm/mach-sti/board-dt.c | 20 +++++---------------
+ 1 file changed, 5 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/mach-imx/mach-vf610.c b/arch/arm/mach-imx/mach-vf610.c
-index 6288a9690e78..c44602758120 100644
---- a/arch/arm/mach-imx/mach-vf610.c
-+++ b/arch/arm/mach-imx/mach-vf610.c
-@@ -20,19 +20,14 @@ static void __init vf610_init_machine(void)
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
+diff --git a/arch/arm/mach-sti/board-dt.c b/arch/arm/mach-sti/board-dt.c
+index cf716ae10726..4924d2214be6 100644
+--- a/arch/arm/mach-sti/board-dt.c
++++ b/arch/arm/mach-sti/board-dt.c
+@@ -14,19 +14,6 @@
  
--static void __init vf610_init_irq(void)
+ #include "smp.h"
+ 
+-void __init stih41x_l2x0_init(void)
 -{
--	l2x0_of_init(0, ~0);
--	irqchip_init();
+-	l2x0_of_init(L2C_AUX_CTRL_SHARED_OVERRIDE |
+-		     L310_AUX_CTRL_DATA_PREFETCH |
+-		     L310_AUX_CTRL_INSTR_PREFETCH, 0xc00f0fff);
 -}
 -
- static const char *vf610_dt_compat[] __initconst = {
- 	"fsl,vf610",
- 	NULL,
+-static void __init stih41x_machine_init(void)
+-{
+-	stih41x_l2x0_init();
+-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+-}
+-
+ static const char *stih41x_dt_match[] __initdata = {
+ 	"st,stih415",
+ 	"st,stih416",
+@@ -34,7 +21,10 @@ static const char *stih41x_dt_match[] __initdata = {
  };
  
- DT_MACHINE_START(VYBRID_VF610, "Freescale Vybrid VF610 (Device Tree)")
--	.init_irq	= vf610_init_irq,
-+	.l2c_aux_val	= 0,
-+	.l2c_aux_mask	= ~0,
- 	.init_machine   = vf610_init_machine,
- 	.dt_compat	= vf610_dt_compat,
- 	.restart	= mxc_restart,
+ DT_MACHINE_START(STM, "STiH415/416 SoC with Flattened Device Tree")
+-	.init_machine	= stih41x_machine_init,
+-	.smp		= smp_ops(sti_smp_ops),
+ 	.dt_compat	= stih41x_dt_match,
++	.l2c_aux_val	= L2C_AUX_CTRL_SHARED_OVERRIDE |
++			  L310_AUX_CTRL_DATA_PREFETCH |
++			  L310_AUX_CTRL_INSTR_PREFETCH,
++	.l2c_aux_mask	= 0xc00f0fff,
++	.smp		= smp_ops(sti_smp_ops),
+ MACHINE_END
 -- 
 1.8.3.1
