@@ -1,54 +1,114 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 28 Apr 2014 11:27:09 -0600
-Subject: [PATCH 00/16] Another 16 L2C patches
-In-Reply-To: <535E8BEE.1000100@wwwdotorg.org>
-References: <20140428165631.GM26756@n2100.arm.linux.org.uk>
- <535E8BEE.1000100@wwwdotorg.org>
-Message-ID: <535E8F6D.9000803@wwwdotorg.org>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Mon, 28 Apr 2014 19:27:04 +0200
+Subject: [PATCH 7/7] ARM: sunxi: dt: add PRCM clk and reset controller
+ subdevices
+In-Reply-To: <CAGb2v67GnW_ziDMjg6zObCAHZrHppGzP=+-VhpWet-NaAzx-Fg@mail.gmail.com>
+References: <1398697130-8338-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1398697130-8338-8-git-send-email-boris.brezillon@free-electrons.com>
+ <CAGb2v67GnW_ziDMjg6zObCAHZrHppGzP=+-VhpWet-NaAzx-Fg@mail.gmail.com>
+Message-ID: <535E8F68.7040206@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/28/2014 11:12 AM, Stephen Warren wrote:
-> On 04/28/2014 10:56 AM, Russell King - ARM Linux wrote:
->> So, in response to Matt Porter's complaint about breaking prima2, here's
->> another 16 patches which changes the way the L2 cache is initialised on
->> many platforms.  This series moves towards a situation where the generic
->> code initialises the L2 cache itself, with as little help as possible
->> from board specific code.
+
+On 28/04/2014 18:02, Chen-Yu Tsai wrote:
+> Hi,
+>
+> On Mon, Apr 28, 2014 at 10:58 PM, Boris BREZILLON
+> <boris.brezillon@free-electrons.com> wrote:
+>> Add DT definitions for PRCM (Power/Reset/Clock Management) clock and reset
+>> controller subdevices.
 >>
->> A number of platforms are left alone because they're more complex -
->> these should still eventually be converted.
+>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+>> ---
+>>  arch/arm/boot/dts/sun6i-a31.dtsi | 49 ++++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 49 insertions(+)
 >>
->> At some point in the near future, I will see about sorting out their
->> ordering wrt the previous patch set.  For the time being, they apply
->> on top of the existing l2c changes.
-> 
-> Are "the existing l2c changes" in next-20140428? If not, is there a git
-> branch I can pull to test the whole thing, rather than tracking down and
-> applying "the existing l2c changes" first?
+>> diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+>> index ec3253a..83a1634 100644
+>> --- a/arch/arm/boot/dts/sun6i-a31.dtsi
+>> +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+>> @@ -501,6 +501,55 @@
+>>                 prcm at 01f01c00 {
+> Seems the address here was wrong to start with.
 
-I guess they must be in linux-next, since this series applies cleanly on
-top of it.
+Absolutely, I'll fix it.
 
-So, patches 2/16 ("ARM: l2c: add platform independent core L2 cache
-initialisation") and 7/16 ("ARM: l2c: convert tegra to generic l2c
-initialisation"),
+>
+>>                         compatible = "allwinner,sun6i-a31-prcm";
+>>                         reg = <0x01f01400 0x200>;
+>> +
+>> +                       ar100_mux: ar100_mux {
+> Might we use clk at 01f01XXX for the names of the clock nodes?
 
-Tested-by: Stephen Warren <swarren@nvidia.com>
+Actually, I had a discussion with Maxime, and we decided to remove the
+address suffix because the PRCM block is not a bus, and thus should not
+have child node with addresses.
+But I'm not a DT binding expert (it might be acceptable to define child
+nodes with addresses even when the parent is not a bus :-)).
+Advices from DT maintainers on that specific point would be great.
 
-(On an NVIDIA Tegra20 Seaboard/Springbank board, on top of next-20140428)
+Best Regards,
 
-I do see one error in dmesg during boot, but it doesn't appear to
-negatively affect operation in brief testing, and is present in
-linux-next without this series anyway. Is this message a problem?
+Boris
 
-> [    0.000000] L2C: platform modifies aux control register: 0x02080000 -> 0x3e480001
-> [    0.000000] L2C: DT/platform modifies aux control register: 0x02080000 -> 0x3e480001
-> [    0.000000] L2C-310 errata 727915 769419 enabled
-> [    0.000000] L2C-310 enabling early BRESP for Cortex-A9
-> [    0.000000] L2C-310: enabling full line of zeros but not enabled in Cortex-A9
-                          ^^^^^^ this is logged at error level
-> [    0.000000] L2C-310 ID prefetch enabled, offset 1 lines
-> [    0.000000] L2C-310 dynamic clock gating disabled, standby mode disabled
-> [    0.000000] L2C-310 cache controller enabled, 8 ways, 1024 kB
-> [    0.000000] L2C-310: CACHE_ID 0x410000c4, AUX_CTRL 0x7e480001
+>> +                               compatible = "allwinner,sun6i-a31-ar100-mux-clk";
+>> +                               #clock-cells = <0>;
+>> +                               clocks = <&osc32k>, <&osc24M>, <&pll6>, <&pll6>;
+>> +                       };
+>> +
+>> +                       ar100: ar100 {
+>> +                               compatible = "allwinner,sun6i-a31-ar100-clk";
+>> +                               #clock-cells = <0>;
+>> +                               clocks = <&ar100_mux>;
+>> +                       };
+>> +
+>> +                       ar100_div: ar100_div {
+>> +                               compatible = "allwinner,sun6i-a31-ar100-div-clk";
+>> +                               #clock-cells = <0>;
+>> +                               clocks = <&ar100>;
+>> +                       };
+>> +
+>> +                       ahb0: ahb0 {
+>> +                               compatible = "fixed-factor-clock";
+>> +                               #clock-cells = <0>;
+>> +                               clock-div = <1>;
+>> +                               clock-mult = <1>;
+>> +                               clocks = <&ar100_div>;
+>> +                               clock-output-names = "ahb0";
+>> +                       };
+>> +
+>> +                       apb0: apb0 {
+>> +                               compatible = "allwinner,sun6i-a31-apb0-clk";
+>> +                               #clock-cells = <0>;
+>> +                               clocks = <&ahb0>;
+>> +                               clock-output-names = "apb0";
+>> +                       };
+>> +
+>> +                       apb0_gates: apb0_gates {
+>> +                               compatible = "allwinner,sun6i-a31-apb0-gates-clk";
+>> +                               #clock-cells = <1>;
+>> +                               clocks = <&apb0>;
+>> +                               clock-output-names = "apb0_pio", "apb0_ir",
+>> +                                               "apb0_timer01", "apb0_p2wi",
+>> +                                               "apb0_uart", "apb0_1wire",
+>> +                                               "apb0_i2c";
+>> +                       };
+>> +
+>> +                       apb0_rst: apb0_rst {
+> Also use reset at 01f01XXX here?
+>
+>> +                               compatible = "allwinner,sun6i-a31-clock-reset";
+>> +                               #reset-cells = <1>;
+>> +                       };
+>>                 };
+>>         };
+>>  };
+> Thanks!
+>
+> ChenYu
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
