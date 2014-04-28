@@ -1,23 +1,30 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Mon, 28 Apr 2014 09:55:31 +0200
-Subject: [PATCH 4/6] drivers: net: cpsw: Enable Annexe F Time sync
-In-Reply-To: <1398658225-25873-5-git-send-email-george.cherian@ti.com>
-References: <1398658225-25873-1-git-send-email-george.cherian@ti.com>
- <1398658225-25873-5-git-send-email-george.cherian@ti.com>
-Message-ID: <20140428075530.GA8371@netboy>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 28 Apr 2014 10:00:41 +0200
+Subject: [PATCH] ARM: fix v7-M setup stack location
+In-Reply-To: <1398103637-22828-1-git-send-email-rabin@rab.in>
+References: <1398103637-22828-1-git-send-email-rabin@rab.in>
+Message-ID: <20140428080041.GC28564@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 09:40:23AM +0530, George Cherian wrote:
-> Enable the Annex F Time Sync explicitly for DRA7x and AM4372.
-> With this enabled the L2 PTP is working.
+Hello,
 
-L2 works fine without this bit. If this is needed for V3 hardware,
-then it should have its own code variant.
- 
-> while at that rename TS_BIT8 to TS_TTL_NONZERO
+On Mon, Apr 21, 2014 at 08:07:17PM +0200, Rabin Vincent wrote:
+> __v7m_setup_stack currently sits in the .proc.info.init section, and
+> thus creates a bogus proc info entry (which by the way matches any
+> unknown CPU IDs, due to the entry's mask being 0).  Move it out of
+> there.
+> 
+> Signed-off-by: Rabin Vincent <rabin@rab.in>
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Is this bit finally documented for am335x?
+It seems the unpatched code didn't do any harm as long as you boot the
+resulting kernel on a v7-M machine. So I'd say it's not a very urgent
+fix and getting it in during the next merge window is just fine.
 
-Thanks,
-Richard
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
