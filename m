@@ -1,46 +1,49 @@
-From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
-Date: Mon, 28 Apr 2014 13:45:54 +0530
-Subject: [PATCH 1/2 v4] i2c: exynos5: add support for HSI2C on Exynos5260
- SoC
-In-Reply-To: <20140312191851.GB28891@katana>
-References: <1385100726-32165-1-git-send-email-ch.naveen@samsung.com>
- <1391748171-12451-1-git-send-email-ch.naveen@samsung.com>
- <20140312191851.GB28891@katana>
-Message-ID: <CAHfPSqDAUpJWO3Udnjxim-LRY_hjW4+W2j5eTm+Xuk_Np+jhFA@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 28 Apr 2014 10:27:57 +0200
+Subject: [PATCH] ARM: fix v7-M signal return
+In-Reply-To: <1398103664-23078-1-git-send-email-rabin@rab.in>
+References: <1398103664-23078-1-git-send-email-rabin@rab.in>
+Message-ID: <20140428082757.GD28564@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Wolfram,
+On Mon, Apr 21, 2014 at 08:07:44PM +0200, Rabin Vincent wrote:
+> According to the ARM ARM, the behaviour is UNDPREDICTABLE if the PC read
+> from the exception return stack is not half word aligned.  See the
+> pseudo code for ExceptionReturn() and PopStack().
+> 
+> The signal handler's address has the bit 0 set, and setup_return()
+> directly writes this to regs->ARM_pc.  Mask out bit 0 before the
+> exception return to get predictable behaviour.
+> 
+> Signed-off-by: Rabin Vincent <rabin@rab.in>
+> ---
+>  arch/arm/kernel/entry-header.S | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
+> index 1420725..ef72f4b 100644
+> --- a/arch/arm/kernel/entry-header.S
+> +++ b/arch/arm/kernel/entry-header.S
+> @@ -133,6 +133,7 @@
+>  	biceq	r5, V7M_xPSR_FRAMEPTRALIGN
+>  
+>  	@ write basic exception frame
+> +	bic	r4, r4, #1
+>  	stmdb	r2!, {r1, r3-r5}
+>  	ldmia	sp, {r1, r3-r5}
+>  	.if	\ret_r0
+This is a valid fix, but it seems on my efm32 the unpredictable
+behaviour is to just discard the LSB. How did you find that? Is it an
+issue on your machine? Which cpu are you using?
 
-On 13 March 2014 00:48, Wolfram Sang <wsa@the-dreams.de> wrote:
-> On Fri, Feb 07, 2014 at 10:12:51AM +0530, Naveen Krishna Chatradhi wrote:
->> This patch adds a new compatible and uses variant struct to support
->> HSI2C module on Exynos5260. Updates the Documentation dt bindings.
->> Also resets the module as an init sequence (Needed by Exynos5260).
->>
->> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
->
-> This patch has clearly not been tested :( Build failure!
-comma was missing, Not sure, how i missed it.
-Will fix it.
->
->> +struct exynos_hsi2c_variant {
->> +     unsigned int                fifo_depth;
->> +};
->
-> Why so many tabs? In general, I'd prefer one space.
->
->> -     exynos5_i2c_init(i2c);
->> +     exynos5_i2c_reset(i2c);
->
-> Is this a related change?
-Exynos5260 needs the HSI2C module to be reset during the init.
-As per Tomasz's comment on earlier version. We will reset the status
-during init for every SoC.
->
+I'd like to have the instruction clearing the thumb bit above the
+comment about the basic exception frame and please add a comment for
+your instruction, too.
 
-
+Best regards
+Uwe
 
 -- 
-Shine bright,
-(: Nav :)
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
