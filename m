@@ -1,45 +1,45 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 28 Apr 2014 20:34:12 +0100
-Subject: [PATCH 94/97] ARM: l2c: convert bcm_5301x to generic l2c
- initialisation
+Date: Mon, 28 Apr 2014 20:34:22 +0100
+Subject: [PATCH 96/97] ARM: l2c: convert socfpga to generic l2c initialisation
 In-Reply-To: <20140428192419.GV26756@n2100.arm.linux.org.uk>
 References: <20140428192419.GV26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WerJc-0001a4-9d@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WerJm-0001aC-GM@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This also allows us to eliminate the .init_machine function.
-
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-bcm/bcm_5301x.c | 9 ++-------
+ arch/arm/mach-socfpga/socfpga.c | 9 ++-------
  1 file changed, 2 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-bcm/bcm_5301x.c b/arch/arm/mach-bcm/bcm_5301x.c
-index 6bc9c31b1b0b..e9bcbdbce555 100644
---- a/arch/arm/mach-bcm/bcm_5301x.c
-+++ b/arch/arm/mach-bcm/bcm_5301x.c
-@@ -43,19 +43,14 @@ static void __init bcm5301x_init_early(void)
- 			"imprecise external abort");
+diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
+index 9bbb8177f247..adbf38314ca8 100644
+--- a/arch/arm/mach-socfpga/socfpga.c
++++ b/arch/arm/mach-socfpga/socfpga.c
+@@ -98,22 +98,17 @@ static void socfpga_cyclone5_restart(enum reboot_mode mode, const char *cmd)
+ 	writel(temp, rst_manager_base_addr + SOCFPGA_RSTMGR_CTRL);
  }
  
--static void __init bcm5301x_dt_init(void)
+-static void __init socfpga_cyclone5_init(void)
 -{
 -	l2x0_of_init(0, ~0);
 -	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
 -}
 -
- static const char __initconst *bcm5301x_dt_compat[] = {
- 	"brcm,bcm4708",
- 	NULL,
+ static const char *altera_dt_match[] = {
+ 	"altr,socfpga",
+ 	NULL
  };
  
- DT_MACHINE_START(BCM5301X, "BCM5301X")
+ DT_MACHINE_START(SOCFPGA, "Altera SOCFPGA")
 +	.l2c_aux_val	= 0,
 +	.l2c_aux_mask	= ~0,
- 	.init_early	= bcm5301x_init_early,
--	.init_machine	= bcm5301x_dt_init,
- 	.dt_compat	= bcm5301x_dt_compat,
+ 	.smp		= smp_ops(socfpga_smp_ops),
+ 	.map_io		= socfpga_map_io,
+ 	.init_irq	= socfpga_init_irq,
+-	.init_machine	= socfpga_cyclone5_init,
+ 	.restart	= socfpga_cyclone5_restart,
+ 	.dt_compat	= altera_dt_match,
  MACHINE_END
 -- 
 1.8.3.1
