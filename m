@@ -1,47 +1,30 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 28 Apr 2014 20:31:18 +0100
-Subject: [PATCH 60/97] ARM: l2c: exynos: convert to generic l2c initialisation
- (and thereby fix it)
+Date: Mon, 28 Apr 2014 20:31:23 +0100
+Subject: [PATCH 61/97] ARM: l2c: nomadik: remove cache size override
 In-Reply-To: <20140428192419.GV26756@n2100.arm.linux.org.uk>
 References: <20140428192419.GV26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WerGo-0001Xo-Hr@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WerGt-0001Xs-LN@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-exynos was unconditionally calling the L2 cache initialisation from an
-early_initcall.  This breaks multiplatform kernels.  Thankfully,
-converting to generic l2c initialisation fixes this.
-
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-exynos/exynos.c | 8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
+ arch/arm/mach-nomadik/cpu-8815.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-index fbfc29df3299..a763c0862da9 100644
---- a/arch/arm/mach-exynos/exynos.c
-+++ b/arch/arm/mach-exynos/exynos.c
-@@ -316,12 +316,6 @@ static int __init exynos_core_init(void)
- }
- core_initcall(exynos_core_init);
- 
--static int __init exynos4_l2x0_cache_init(void)
--{
--	return l2x0_of_init(0x3c400001, 0xc20fffff);
--}
--early_initcall(exynos4_l2x0_cache_init);
--
- static void __init exynos_dt_machine_init(void)
+diff --git a/arch/arm/mach-nomadik/cpu-8815.c b/arch/arm/mach-nomadik/cpu-8815.c
+index 4a1065e41e9c..0f245bcc6b7e 100644
+--- a/arch/arm/mach-nomadik/cpu-8815.c
++++ b/arch/arm/mach-nomadik/cpu-8815.c
+@@ -147,7 +147,7 @@ static void __init cpu8815_init_of(void)
  {
- 	struct device_node *i2c_np;
-@@ -387,6 +381,8 @@ static void __init exynos_reserve(void)
- DT_MACHINE_START(EXYNOS_DT, "SAMSUNG EXYNOS (Flattened Device Tree)")
- 	/* Maintainer: Thomas Abraham <thomas.abraham@linaro.org> */
- 	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
-+	.l2c_aux_val	= 0x3c400001,
-+	.l2c_aux_mask	= 0xc20fffff,
- 	.smp		= smp_ops(exynos_smp_ops),
- 	.map_io		= exynos_init_io,
- 	.init_early	= exynos_firmware_init,
+ #ifdef CONFIG_CACHE_L2X0
+ 	/* At full speed latency must be >=2, so 0x249 in low bits */
+-	l2x0_of_init(0x00730249, 0xfe000fff);
++	l2x0_of_init(0x00700249, 0xfe0fefff);
+ #endif
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
 -- 
 1.8.3.1
