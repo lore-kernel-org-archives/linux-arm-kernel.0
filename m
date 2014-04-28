@@ -1,76 +1,111 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 28 Apr 2014 20:24:19 +0100
-Subject: [PATCH 00/98] Full L2C patch series
-Message-ID: <20140428192419.GV26756@n2100.arm.linux.org.uk>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Mon, 28 Apr 2014 20:26:00 +0100
+Subject: [PATCH 01/97] ARM: l2c: remove outer_inv_all() method
+In-Reply-To: <20140428192419.GV26756@n2100.arm.linux.org.uk>
+References: <20140428192419.GV26756@n2100.arm.linux.org.uk>
+Message-ID: <E1WerBg-0007Uy-Gn@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Not much to say which hasn't already been said... except I'm reaching
-the end of my teather with this series.
+No one ever calls this function anywhere in the kernel, so let's
+completely remove it from the outer cache API and turn it into an
+internal-only thing.
 
-I'll push it out shortly as my "to-build" branch - which is a branch
-which gets automatic separate build testing by Olof's system.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/include/asm/outercache.h | 8 --------
+ arch/arm/mm/cache-feroceon-l2.c   | 1 -
+ arch/arm/mm/cache-l2x0.c          | 5 -----
+ 3 files changed, 14 deletions(-)
 
- arch/arm/Kconfig                                   |   51 -
- arch/arm/boot/dts/marco.dtsi                       |    2 +-
- arch/arm/boot/dts/prima2.dtsi                      |    2 +-
- arch/arm/include/asm/hardware/cache-l2x0.h         |  104 +-
- arch/arm/include/asm/mach/arch.h                   |    3 +
- arch/arm/include/asm/outercache.h                  |   67 +-
- arch/arm/kernel/irq.c                              |   12 +
- arch/arm/mach-bcm/bcm_5301x.c                      |    9 +-
- arch/arm/mach-berlin/berlin.c                      |   17 +-
- arch/arm/mach-cns3xxx/core.c                       |   10 +-
- arch/arm/mach-exynos/common.h                      |    1 -
- arch/arm/mach-exynos/exynos.c                      |   21 +-
- arch/arm/mach-exynos/sleep.S                       |   30 +-
- arch/arm/mach-highbank/highbank.c                  |   21 +-
- arch/arm/mach-imx/mach-vf610.c                     |    9 +-
- arch/arm/mach-imx/suspend-imx6.S                   |   24 +-
- arch/arm/mach-imx/system.c                         |    8 +-
- arch/arm/mach-mvebu/board-v7.c                     |    9 +-
- arch/arm/mach-nomadik/cpu-8815.c                   |   13 +-
- arch/arm/mach-omap2/Kconfig                        |    1 +
- arch/arm/mach-omap2/common.h                       |    1 +
- arch/arm/mach-omap2/io.c                           |    2 +
- arch/arm/mach-omap2/omap-mpuss-lowpower.c          |   16 +-
- arch/arm/mach-omap2/omap4-common.c                 |   86 +-
- arch/arm/mach-prima2/Makefile                      |    1 -
- arch/arm/mach-prima2/common.c                      |    6 +
- arch/arm/mach-prima2/l2x0.c                        |   49 -
- arch/arm/mach-prima2/pm.c                          |    1 -
- arch/arm/mach-realview/realview_eb.c               |    9 +-
- arch/arm/mach-realview/realview_pb1176.c           |    8 +-
- arch/arm/mach-realview/realview_pb11mp.c           |    9 +-
- arch/arm/mach-realview/realview_pbx.c              |    4 +-
- arch/arm/mach-rockchip/rockchip.c                  |    9 +-
- .../board-armadillo800eva-reference.c              |    4 +-
- arch/arm/mach-shmobile/board-armadillo800eva.c     |    4 +-
- arch/arm/mach-shmobile/board-kzm9g-reference.c     |    4 +-
- arch/arm/mach-shmobile/board-kzm9g.c               |    4 +-
- arch/arm/mach-shmobile/setup-r8a7778.c             |    4 +-
- arch/arm/mach-shmobile/setup-r8a7779.c             |    4 +-
- arch/arm/mach-socfpga/socfpga.c                    |    9 +-
- arch/arm/mach-spear/platsmp.c                      |   19 +-
- arch/arm/mach-spear/spear13xx.c                    |    8 +-
- arch/arm/mach-sti/board-dt.c                       |   26 +-
- arch/arm/mach-tegra/pm.h                           |    2 -
- arch/arm/mach-tegra/reset-handler.S                |   11 +-
- arch/arm/mach-tegra/sleep.h                        |   31 -
- arch/arm/mach-tegra/tegra.c                        |   32 +-
- arch/arm/mach-ux500/cache-l2x0.c                   |   32 +-
- arch/arm/mach-vexpress/ct-ca9x4.c                  |   28 +-
- arch/arm/mach-vexpress/v2m.c                       |    3 +-
- arch/arm/mach-zynq/common.c                        |    8 +-
- arch/arm/mm/Kconfig                                |   51 +
- arch/arm/mm/Makefile                               |    3 +-
- arch/arm/mm/cache-feroceon-l2.c                    |    1 -
- arch/arm/mm/cache-l2x0.c                           | 1504 +++++++++++++-------
- arch/arm/mm/l2c-common.c                           |   20 +
- arch/arm/mm/l2c-l2x0-resume.S                      |   58 +
- arch/arm/plat-samsung/s5p-sleep.S                  |    1 -
- 58 files changed, 1470 insertions(+), 1016 deletions(-)
-
+diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
+index f94784f0e3a6..0e4420858990 100644
+--- a/arch/arm/include/asm/outercache.h
++++ b/arch/arm/include/asm/outercache.h
+@@ -28,7 +28,6 @@ struct outer_cache_fns {
+ 	void (*clean_range)(unsigned long, unsigned long);
+ 	void (*flush_range)(unsigned long, unsigned long);
+ 	void (*flush_all)(void);
+-	void (*inv_all)(void);
+ 	void (*disable)(void);
+ #ifdef CONFIG_OUTER_CACHE_SYNC
+ 	void (*sync)(void);
+@@ -63,12 +62,6 @@ static inline void outer_flush_all(void)
+ 		outer_cache.flush_all();
+ }
+ 
+-static inline void outer_inv_all(void)
+-{
+-	if (outer_cache.inv_all)
+-		outer_cache.inv_all();
+-}
+-
+ static inline void outer_disable(void)
+ {
+ 	if (outer_cache.disable)
+@@ -90,7 +83,6 @@ static inline void outer_clean_range(phys_addr_t start, phys_addr_t end)
+ static inline void outer_flush_range(phys_addr_t start, phys_addr_t end)
+ { }
+ static inline void outer_flush_all(void) { }
+-static inline void outer_inv_all(void) { }
+ static inline void outer_disable(void) { }
+ static inline void outer_resume(void) { }
+ 
+diff --git a/arch/arm/mm/cache-feroceon-l2.c b/arch/arm/mm/cache-feroceon-l2.c
+index dc814a548056..e028a7f2ebcc 100644
+--- a/arch/arm/mm/cache-feroceon-l2.c
++++ b/arch/arm/mm/cache-feroceon-l2.c
+@@ -350,7 +350,6 @@ void __init feroceon_l2_init(int __l2_wt_override)
+ 	outer_cache.inv_range = feroceon_l2_inv_range;
+ 	outer_cache.clean_range = feroceon_l2_clean_range;
+ 	outer_cache.flush_range = feroceon_l2_flush_range;
+-	outer_cache.inv_all = l2_inv_all;
+ 
+ 	enable_l2();
+ 
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 7abde2ce8973..f9985e5a208c 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -414,7 +414,6 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
+ 		outer_cache.flush_range = l2x0_flush_range;
+ 		outer_cache.sync = l2x0_cache_sync;
+ 		outer_cache.flush_all = l2x0_flush_all;
+-		outer_cache.inv_all = l2x0_inv_all;
+ 		outer_cache.disable = l2x0_disable;
+ 	}
+ 
+@@ -884,7 +883,6 @@ static const struct l2x0_of_data pl310_data = {
+ 		.flush_range = l2x0_flush_range,
+ 		.sync        = l2x0_cache_sync,
+ 		.flush_all   = l2x0_flush_all,
+-		.inv_all     = l2x0_inv_all,
+ 		.disable     = l2x0_disable,
+ 	},
+ };
+@@ -899,7 +897,6 @@ static const struct l2x0_of_data l2x0_data = {
+ 		.flush_range = l2x0_flush_range,
+ 		.sync        = l2x0_cache_sync,
+ 		.flush_all   = l2x0_flush_all,
+-		.inv_all     = l2x0_inv_all,
+ 		.disable     = l2x0_disable,
+ 	},
+ };
+@@ -914,7 +911,6 @@ static const struct l2x0_of_data aurora_with_outer_data = {
+ 		.flush_range = aurora_flush_range,
+ 		.sync        = l2x0_cache_sync,
+ 		.flush_all   = l2x0_flush_all,
+-		.inv_all     = l2x0_inv_all,
+ 		.disable     = l2x0_disable,
+ 	},
+ };
+@@ -946,7 +942,6 @@ static const struct l2x0_of_data bcm_l2x0_data = {
+ 		.flush_range = bcm_flush_range,
+ 		.sync        = l2x0_cache_sync,
+ 		.flush_all   = l2x0_flush_all,
+-		.inv_all     = l2x0_inv_all,
+ 		.disable     = l2x0_disable,
+ 	},
+ };
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.8.3.1
