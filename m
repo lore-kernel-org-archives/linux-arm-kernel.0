@@ -1,186 +1,359 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 28 Apr 2014 18:13:35 +0100
-Subject: [PATCH v4 09/14] ARM: dts: add hip04-d01 dts file
-In-Reply-To: <1398668032-8335-10-git-send-email-haojian.zhuang@linaro.org>
-References: <1398668032-8335-1-git-send-email-haojian.zhuang@linaro.org>
- <1398668032-8335-10-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <20140428171334.GA3169@flaeskesteg>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Mon, 28 Apr 2014 19:14:50 +0200
+Subject: [PATCH 5/7] clk: sunxi: add PRCM (Power/Reset/Clock Management)
+ clks support
+In-Reply-To: <CAGb2v65aTQozFRVWU5QekK623i4-mLReaAiWC=4pFqWWPcC_Pw@mail.gmail.com>
+References: <1398697130-8338-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1398697130-8338-6-git-send-email-boris.brezillon@free-electrons.com>
+ <CAGb2v65aTQozFRVWU5QekK623i4-mLReaAiWC=4pFqWWPcC_Pw@mail.gmail.com>
+Message-ID: <535E8C8A.6000702@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Chen-Yu,
 
-On Mon, Apr 28, 2014 at 07:53:47AM +0100, Haojian Zhuang wrote:
-> Add hip04.dtsi & hip04-d01.dts file to support HiP04 SoC platform.
+On 28/04/2014 17:59, Chen-Yu Tsai wrote:
+> Hi,
 >
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
-> ---
->  Documentation/devicetree/bindings/arm/gic.txt      |   1 +
->  .../bindings/arm/hisilicon/hisilicon.txt           |  10 +
->  .../devicetree/bindings/clock/hip04-clock.txt      |  20 ++
->  arch/arm/boot/dts/Makefile                         |   1 +
->  arch/arm/boot/dts/hip04-d01.dts                    |  74 +++++++
->  arch/arm/boot/dts/hip04.dtsi                       | 239 +++++++++++++++++++++
->  6 files changed, 345 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/hip04-clock.txt
->  create mode 100644 arch/arm/boot/dts/hip04-d01.dts
->  create mode 100644 arch/arm/boot/dts/hip04.dtsi
+> On Mon, Apr 28, 2014 at 10:58 PM, Boris BREZILLON
+> <boris.brezillon@free-electrons.com> wrote:
+>> The PRCM (Power/Reset/Clock Management) unit provides several clock
+>> devices:
+>> - AR100 clk: used to clock the Power Management co-processor
+>> - AHB0 clk: used to clock the AHB0 bus
+>> - APB0 clk and gates: used to clk
+>>
+>> Add support for these clks in a separate driver so that they can be probed
+>> as platform devices instead of registered during early init.
+>> We need this to be able to probe PRCM MFD subdevices.
+>>
+>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+>> ---
+>>  drivers/clk/sunxi/Makefile         |   2 +
+>>  drivers/clk/sunxi/clk-sun6i-prcm.c | 253 +++++++++++++++++++++++++++++++++++++
+>>  2 files changed, 255 insertions(+)
+>>  create mode 100644 drivers/clk/sunxi/clk-sun6i-prcm.c
+>>
+>> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
+>> index b5bac91..ef8cdc9 100644
+>> --- a/drivers/clk/sunxi/Makefile
+>> +++ b/drivers/clk/sunxi/Makefile
+>> @@ -3,3 +3,5 @@
+>>  #
+>>
+>>  obj-y += clk-sunxi.o clk-factors.o
+>> +
+>> +obj-$(CONFIG_MFD_SUN6I_PRCM) += clk-sun6i-prcm.o
+>> diff --git a/drivers/clk/sunxi/clk-sun6i-prcm.c b/drivers/clk/sunxi/clk-sun6i-prcm.c
+>> new file mode 100644
+>> index 0000000..bb7b25a
+>> --- /dev/null
+>> +++ b/drivers/clk/sunxi/clk-sun6i-prcm.c
+>> @@ -0,0 +1,253 @@
+>> +/*
+>> + * Copyright (C) 2014 Free Electrons
+>> + *
+>> + * License Terms: GNU General Public License v2
+>> + * Author: Boris BREZILLON <boris.brezillon@free-electrons.com>
+>> + *
+>> + * Allwinner PRCM (Power/Reset/Clock Management) driver
+>> + *
+>> + */
+>> +
+>> +#include <linux/clk-provider.h>
+>> +#include <linux/module.h>
+>> +#include <linux/of.h>
+>> +#include <linux/platform_device.h>
+>> +
+>> +#define SUN6I_APB0_GATES_MAX_SIZE      32
+>> +#define SUN6I_AR100_MAX_PARENTS                4
+>> +
+>> +static int sun6i_a31_ar100_mux_clk_register(struct platform_device *pdev)
+>> +{
+>> +       const char *parents[SUN6I_AR100_MAX_PARENTS];
+>> +       struct device_node *np = pdev->dev.of_node;
+>> +       const char *clk_name = np->name;
+>> +       struct resource *r;
+>> +       void __iomem *reg;
+>> +       struct clk *clk;
+>> +       int nparents;
+>> +       int i;
+>> +
+>> +       r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +       reg = devm_ioremap(&pdev->dev, r->start, resource_size(r));
+>> +       if (IS_ERR(reg))
+>> +               return PTR_ERR(reg);
+>> +
+>> +       nparents = of_clk_get_parent_count(np);
+>> +       if (nparents > SUN6I_AR100_MAX_PARENTS)
+>> +               nparents = SUN6I_AR100_MAX_PARENTS;
+>> +
+>> +       for (i = 0; i < nparents; i++)
+>> +               parents[i] = of_clk_get_parent_name(np, i);
+>> +
+>> +       of_property_read_string(np, "clock-output-names", &clk_name);
+>> +
+>> +       clk = clk_register_mux(&pdev->dev, clk_name, parents, nparents,
+>> +                              CLK_SET_RATE_NO_REPARENT, reg,
+>> +                              16, 2, 0, NULL);
+>> +       if (IS_ERR(clk))
+>> +               return PTR_ERR(clk);
+>> +
+>> +       return of_clk_add_provider(np, of_clk_src_simple_get, clk);
+>> +}
+>> +
+>> +static int sun6i_a31_ar100_clk_register(struct platform_device *pdev)
+>> +{
+>> +       struct device_node *np = pdev->dev.of_node;
+>> +       const char *clk_name = np->name;
+>> +       const char *clk_parent;
+>> +       struct resource *r;
+>> +       void __iomem *reg;
+>> +       struct clk *clk;
+>> +
+>> +       r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +       reg = devm_ioremap(&pdev->dev, r->start, resource_size(r));
+>> +       if (IS_ERR(reg))
+>> +               return PTR_ERR(reg);
+>> +
+>> +       clk_parent = of_clk_get_parent_name(np, 0);
+>> +       if (!clk_parent)
+>> +               return -EINVAL;
+>> +
+>> +       of_property_read_string(np, "clock-output-names", &clk_name);
+>> +
+>> +       clk = clk_register_divider(&pdev->dev, clk_name, clk_parent,
+>> +                                  0, reg, 4, 2, CLK_DIVIDER_POWER_OF_TWO,
+>> +                                  NULL);
+>> +       if (IS_ERR(clk))
+>> +               return PTR_ERR(clk);
+>> +
+>> +       return of_clk_add_provider(np, of_clk_src_simple_get, clk);
+>> +}
+>> +
+>> +static int sun6i_a31_ar100_div_clk_register(struct platform_device *pdev)
+>> +{
+>> +       struct device_node *np = pdev->dev.of_node;
+>> +       const char *clk_name = np->name;
+>> +       const char *clk_parent;
+>> +       struct resource *r;
+>> +       void __iomem *reg;
+>> +       struct clk *clk;
+>> +
+>> +       r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +       reg = devm_ioremap(&pdev->dev, r->start, resource_size(r));
+>> +       if (IS_ERR(reg))
+>> +               return PTR_ERR(reg);
+>> +
+>> +       clk_parent = of_clk_get_parent_name(np, 0);
+>> +       if (!clk_parent)
+>> +               return -EINVAL;
+>> +
+>> +       of_property_read_string(np, "clock-output-names", &clk_name);
+>> +
+>> +       clk = clk_register_divider(&pdev->dev, clk_name, clk_parent,
+>> +                                  0, reg, 8, 5, 0, NULL);
+>> +       if (IS_ERR(clk))
+>> +               return PTR_ERR(clk);
+>> +
+>> +       return of_clk_add_provider(np, of_clk_src_simple_get, clk);
+>> +}
+> Would it be possible to merge the 3 ar100 clocks into 1 composite clock?
+> They do share the same register, and are related to each other.
 
-I would appreciate if you could split the binding and the DTS updates. The
-binding updates would be better associated with the code which implements
-support for them.
+Okay, I'll take a look at composite clocks.
+
+> It might be possible to re-use some code from the sunxi clock driver
+> for this, though I'm not sure if that's a good idea, sharing code
+> between modules. Emilio?
+
+Actually, this is what I tried in the first place, but then I realized
+it would require exporting some functions declared as static in clk-sunxi.c.
+Moreover, these functions do not make use of devm functions (because all
+the clks declared in clk-sunxi.c are initiliazed during early), and I'd
+like to uses devm function when clks are declared as platform devices.
+
+Anyway, I'll wait for Emilio's review ;-).
 
 >
-> diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
-> index 5573c08..150f7d6 100644
-> --- a/Documentation/devicetree/bindings/arm/gic.txt
-> +++ b/Documentation/devicetree/bindings/arm/gic.txt
-> @@ -16,6 +16,7 @@ Main node required properties:
->         "arm,cortex-a9-gic"
->         "arm,cortex-a7-gic"
->         "arm,arm11mp-gic"
-> +       "hisilicon,hip04-gic"
->  - interrupt-controller : Identifies the node as an interrupt controller
->  - #interrupt-cells : Specifies the number of cells needed to encode an
->    interrupt source.  The type shall be a <u32> and the value shall be 3.
+>> +
+>> +static int sun6i_a31_apb0_clk_register(struct platform_device *pdev)
+>> +{
+>> +       struct device_node *np = pdev->dev.of_node;
+>> +       const char *clk_name = np->name;
+>> +       const char *clk_parent;
+>> +       struct resource *r;
+>> +       void __iomem *reg;
+>> +       struct clk *clk;
+>> +
+>> +       r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +       reg = devm_ioremap_resource(&pdev->dev, r);
+>> +       if (IS_ERR(reg))
+>> +               return PTR_ERR(reg);
+>> +
+>> +       clk_parent = of_clk_get_parent_name(np, 0);
+>> +       if (!clk_parent)
+>> +               return -EINVAL;
+>> +
+>> +       of_property_read_string(np, "clock-output-names", &clk_name);
+>> +
+>> +       clk = clk_register_divider(&pdev->dev, clk_name, clk_parent,
+>> +                                  0, reg, 0, 2, CLK_DIVIDER_POWER_OF_TWO,
+>> +                                  NULL);
+> I just looked at the sun6i kernel code again.
+>
+>   http://git.rhombus-tech.net/?p=linux.git;a=blob;f=arch/arm/mach-sun6i/clock/ccm_i.h;hb=refs/heads/allwinner-sunxi-a31#l376
+>
+> and
+>
+>   http://git.rhombus-tech.net/?p=linux.git;a=blob;f=arch/arm/mach-sun6i/clock/sys_clk.c;hb=refs/heads/allwinner-sunxi-a31#l882
+>
+> The divider on the A31 is /2, /2, /4, /8. You might need a table for that.
 
-This looks ok, but would be better associated with the GIC driver update.
+I saw that in the datasheet, but I just thought it was a mistake (that's
+weird to have 2 times the same divisor).
 
-[...]
+> This is different from the A23 manual I used to document most of the PRCM.
+> I apologize for not catching this earlier. I have updated the wiki.
 
-> diff --git a/arch/arm/boot/dts/hip04-d01.dts b/arch/arm/boot/dts/hip04-d01.dts
-> new file mode 100644
-> index 0000000..a10dcf3
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/hip04-d01.dts
-> @@ -0,0 +1,74 @@
-> +/*
-> + *  Copyright (C) 2013-2014 Linaro Ltd.
-> + *  Author: Haojian Zhuang <haojian.zhuang@linaro.org>
-> + *
-> + *  This program is free software; you can redistribute it and/or modify
-> + *  it under the terms of the GNU General Public License version 2 as
-> + *  publishhed by the Free Software Foundation.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "hip04.dtsi"
-> +
-> +/ {
-> +       /* memory bus is 64-bit */
-> +       #address-cells = <2>;
-> +       #size-cells = <1>;
-> +       model = "Hisilicon D01 Development Board";
-> +       compatible = "hisilicon,hip04-d01";
-> +
-> +       memory at 0 {
+No problem.
 
-This should be memory at 0,10000000 given the reg entry.
+>
+>> +       if (IS_ERR(clk))
+>> +               return PTR_ERR(clk);
+>> +
+>> +       return of_clk_add_provider(np, of_clk_src_simple_get, clk);
+>> +}
+>> +
+>> +static int sun6i_a31_apb0_gates_clk_register(struct platform_device *pdev)
+>> +{
+>> +       struct device_node *np = pdev->dev.of_node;
+>> +       struct clk_onecell_data *clk_data;
+>> +       const char *clk_parent;
+>> +       const char *clk_name;
+>> +       struct resource *r;
+>> +       void __iomem *reg;
+>> +       int gate_id;
+>> +       int ngates;
+>> +       int i;
+>> +
+>> +       r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +       reg = devm_ioremap_resource(&pdev->dev, r);
+>> +       if (!reg)
+>> +               return PTR_ERR(reg);
+>> +
+>> +       clk_parent = of_clk_get_parent_name(np, 0);
+>> +       if (!clk_parent)
+>> +               return -EINVAL;
+>> +
+>> +       ngates = of_property_count_strings(np, "clock-output-names");
+>> +       if (ngates < 0)
+>> +               return ngates;
+>> +
+>> +       if (!ngates || ngates > SUN6I_APB0_GATES_MAX_SIZE)
+>> +               return -EINVAL;
+>> +
+>> +       clk_data = devm_kzalloc(&pdev->dev, sizeof(struct clk_onecell_data),
+>> +                               GFP_KERNEL);
+>> +       if (!clk_data)
+>> +               return -ENOMEM;
+>> +
+>> +       clk_data->clks = devm_kzalloc(&pdev->dev,
+>> +                                     SUN6I_APB0_GATES_MAX_SIZE *
+>> +                                     sizeof(struct clk *),
+>> +                                     GFP_KERNEL);
+>> +       if (!clk_data->clks)
+>> +               return -ENOMEM;
+>> +
+>> +       for (i = 0; i < ngates; i++) {
+>> +               of_property_read_string_index(np, "clock-output-names",
+>> +                                             i, &clk_name);
+>> +
+>> +               gate_id = i;
+>> +               of_property_read_u32_index(np, "clock-indices", i, &gate_id);
+>> +
+>> +               WARN_ON(gate_id >= SUN6I_APB0_GATES_MAX_SIZE);
+>> +               if (gate_id >= SUN6I_APB0_GATES_MAX_SIZE)
+>> +                       continue;
+>> +
+>> +               clk_data->clks[gate_id] = clk_register_gate(&pdev->dev,
+>> +                                                           clk_name,
+>> +                                                           clk_parent, 0,
+>> +                                                           reg, gate_id,
+>> +                                                           0, NULL);
+>> +               WARN_ON(IS_ERR(clk_data->clks[gate_id]));
+>> +       }
+>> +
+>> +       clk_data->clk_num = ngates;
+>> +
+>> +       return of_clk_add_provider(np, of_clk_src_onecell_get, clk_data);
+>> +}
+>> +
+>> +const struct of_device_id sun6i_a31_prcm_clk_dt_ids[] = {
+>> +       {
+>> +               .compatible = "allwinner,sun6i-a31-ar100-mux-clk",
+>> +               .data = sun6i_a31_ar100_mux_clk_register,
+>> +       },
+>> +       {
+>> +               .compatible = "allwinner,sun6i-a31-ar100-clk",
+>> +               .data = sun6i_a31_ar100_clk_register,
+>> +       },
+>> +       {
+>> +               .compatible = "allwinner,sun6i-a31-ar100-div-clk",
+>> +               .data = sun6i_a31_ar100_div_clk_register,
+>> +       },
+>> +       {
+>> +               .compatible = "allwinner,sun6i-a31-apb0-clk",
+>> +               .data = sun6i_a31_apb0_clk_register,
+>> +       },
+>> +       {
+>> +               .compatible = "allwinner,sun6i-a31-apb0-gates-clk",
+>> +               .data = sun6i_a31_apb0_gates_clk_register,
+>> +       },
+>> +       { /* sentinel */ }
+>> +};
+>> +
+>> +static int sun6i_a31_prcm_clk_probe(struct platform_device *pdev)
+>> +{
+>> +       struct device_node *np = pdev->dev.of_node;
+>> +       int (*register_func)(struct platform_device *pdev);
+>> +       const struct of_device_id *match;
+>> +
+>> +       match = of_match_node(sun6i_a31_prcm_clk_dt_ids, np);
+>> +       if (!match)
+>> +               return -EINVAL;
+>> +
+>> +       register_func = match->data;
+>> +       return register_func(pdev);
+>> +}
+>> +
+>> +static struct platform_driver sun6i_a31_prcm_clk_driver = {
+>> +       .driver = {
+>> +               .name = "sun6i-a31-prcm-clk",
+>> +               .owner = THIS_MODULE,
+>> +               .of_match_table = sun6i_a31_prcm_clk_dt_ids,
+>> +       },
+>> +       .probe = sun6i_a31_prcm_clk_probe,
+>> +};
+>> +module_platform_driver(sun6i_a31_prcm_clk_driver);
+>> +
+>> +MODULE_AUTHOR("Boris BREZILLON <boris.brezillon@free-electrons.com");
+>> +MODULE_DESCRIPTION("Allwinner Reset Controller Driver");
+>> +MODULE_LICENSE("GPL v2");
+> The rest looks good to me, but Emilio should be able to give you more feedback.
+>
+> Thanks for all the sun6i support you've done!
 
-Please read my comments I posted back at v2 [1] regarding the dt, as far as I
-can see they all still apply. I've repeated a few below, but please refer to my
-original mail.
+Thanks for your review.
 
-> +               device_type = "memory";
-> +               /*
-> +                * Bootloader loads kernel image into 0x1000_0000 region,
-> +                * so disables the region between [0000_0000 - 1000_0000]
-> +                * temporarily.
-> +                * Because the PHYS_TO_VIRT_OFFSET is calculated based on
-> +                * the original region that kenrel is loaded.
-> +                * This workaround will be removed only after UEFI updated.
-> +                */
+Best Regards,
 
-Is it necessary to lie to the kernel here?
+Boris
+>
+> Cheers
+> ChenYu
 
-If this inaccessible memory causes an issue it sounds like a generic problem we
-should be able to solve without lying to the kernel about the physical memory.
-
-> +               reg = <0x00000000 0x10000000 0xc0000000>;
-> +       };
-> +
-> +       memory at 00000004c0000000 {
-
-Please place a comma between cells in unit-addresses, it makes them easer to
-read (e.g. this should be memory at 00000004,c0000000).
-
-> +               device_type = "memory";
-> +               reg = <0x00000004 0xc0000000 0x40000000>;
-> +       };
-> +
-> +       memory at 0000000500000000 {
-> +               device_type = "memory";
-> +               reg = <0x00000005 0x00000000 0x80000000>;
-> +       };
-> +
-> +       memory at 0000000580000000 {
-> +               device_type = "memory";
-> +               reg = <0x00000005 0x80000000 0x80000000>;
-> +       };
-> +
-> +       memory at 0000000600000000 {
-> +               device_type = "memory";
-> +               reg = <0x00000006 0x00000000 0x80000000>;
-> +       };
-> +
-> +       memory at 0000000680000000 {
-> +               device_type = "memory";
-> +               reg = <0x00000006 0x80000000 0x80000000>;
-> +       };
-> +
-> +       memory at 0000000700000000 {
-> +               device_type = "memory";
-> +               reg = <0x00000007 0x00000000 0x80000000>;
-> +       };
-> +
-> +       memory at 0000000780000000 {
-> +               device_type = "memory";
-> +               reg = <0x00000007 0x80000000 0x80000000>;
-> +       };
-
-Is there any reason for describing these in separate nodes? You can place
-multiple reg entries in a memory node.
-
-[...]
-
-> +       soc {
-> +               /* It's a 32-bit SoC. */
-> +               #address-cells = <1>;
-> +               #size-cells = <1>;
-> +               compatible = "arm,amba-bus", "simple-bus";
-
-This should be one either an AMBA bus or a simple bus, not both.
-
-> +               device_type = "soc";
-> +               interrupt-parent = <&gic>;
-> +               ranges = <0 0 0xe0000000 0x10000000>;
-> +
-> +               gic: interrupt-controller at c01000 {
-> +                       compatible = "hisilicon,hip04-gic";
-> +                       #interrupt-cells = <3>;
-> +                       #address-cells = <0>;
-> +                       interrupt-controller;
-> +                       interrupts = <1 9 0xf04>;
-> +
-> +                       /* gic dist base, gic cpu base */
-
-And hyp and virt, as there seem to be 4 entries?
-
-> +                       reg = <0xc01000 0x1000>, <0xc02000 0x1000>,
-> +                             <0xc04000 0x2000>, <0xc06000 0x2000>;
-> +               };
-
-[...]
-
-> +               clock: clock {
-> +                       compatible = "hisilicon,hip04-clock";
-> +                       /* dummy register */
-> +                       reg = <0 0x1000>;
-
-Huh?
-
-Cheers,
-Mark.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/246053.html
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
