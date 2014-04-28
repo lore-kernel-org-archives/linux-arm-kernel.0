@@ -1,73 +1,62 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 28 Apr 2014 09:51:49 +0200
-Subject: [PATCH] ARM: fix string functions on !MMU
-In-Reply-To: <1398103808-24380-1-git-send-email-rabin@rab.in>
-References: <1398103808-24380-1-git-send-email-rabin@rab.in>
-Message-ID: <20140428075149.GB28564@pengutronix.de>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 28 Apr 2014 09:47:39 +0200
+Subject: [PATCH RFC 0/5] Dove PMU support
+In-Reply-To: <20140427132312.GC26756@n2100.arm.linux.org.uk>
+References: <20140427132312.GC26756@n2100.arm.linux.org.uk>
+Message-ID: <535E079B.6010701@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Rabin,
+On 04/27/2014 03:23 PM, Russell King - ARM Linux wrote:
+> The following series of patches add better PMU support for Dove.  This
+> has been developed on the Cubox, and tested in non-DT and DT modes.
+>
+> This also improves the interrupt handling over the existing code: the
+> existing code ends up calling the interrupt handlers twice for every
+> interrupt raised, because the interrupt clear-down is done at the
+> wrong point - we need to clear down the interrupt in the device first,
+> then clear it down in the controller.
+>
+> The problem this gives is that it can be racy (see comments in the
+> driver) so we're careful about how we do that to minimise the window.
+>
+> I've included all patches here - the initial set are targetted towards
+> adding DT support, with the final adding the non-DT support.  There is
+> a call to the initialisation function missing for DT mode - I'd like
+> the mvebu people to comment on how that should be handled, as it needs
+> to be done pretty early.
+>
+> Also included are two PM domain changes: the first I've discussed with
+> Rafael who seems happy with it.  The second is necessary because we
+> have no way to know if a generic PM domain is associated with a device
+> or whether something else making use of the PM domain is installed in
+> the dev->pm_domain pointer, so this allows that decision to be made by
+> core PM code.
+>
+> This is more a "this is where I'm at" with this stuff than a real
+> submission, nevertheless comments on how to get it ready for submission
+> would be welcome.  I'd like to get this off my plate ASAP.
 
-On Mon, Apr 21, 2014 at 08:10:08PM +0200, Rabin Vincent wrote:
-> 8c56cc8be5b38e ("ARM: 7449/1: use generic strnlen_user and
-> strncpy_from_user functions") apparently broken those string operations
-> for !MMU.  USER_DS == KERNEL_DS on !MMU, so user_addr_max() always
-> restricts the addresses to TASK_SIZE.
-> 
-> TASK_SIZE has anyway no meaning on !MMU, so make user_addr_max() not
-> restrict anything.
-> 
-> Signed-off-by: Rabin Vincent <rabin@rab.in>
-I tested this on my efm32 machine and it booted just fine. Before I used
-a patch that did:
+Russell,
 
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index 02fa2558f662..f25c7f4c5a44 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -92,9 +92,12 @@
-  * It is difficult to define and perhaps will never meet the original meaning
-  * of this define that was meant to.
-  * Fortunately, there is no reference for this in noMMU mode, for now.
-+ *
-+ * HACK: copy_from_user must even handle copying from flash. So don't impose a
-+ * limit at all. Not sure this is correct ...
-  */
- #ifndef TASK_SIZE
--#define TASK_SIZE              (CONFIG_DRAM_SIZE)
-+#define TASK_SIZE              (~0UL)
- #endif
- 
- #ifndef TASK_UNMAPPED_BASE
+thanks for dropping those patches. I know you are packed with a bunch
+of other patch sets, so if you agree, I can pick up your Dove related
+patches and finish them.
 
-Regarding "TASK_SIZE has anyway no meaning on !MMU", there are a few
-more usages of TASK_SIZE for no-MMU (tested by removing its definition
-and compiling with my efm32 config, so I might have missed some usages):
+One thing that comes into my mind is, that we moved Dove DT to
+mach-mvebu starting with v3.15-rc1 so we need to find a better place
+for the driver than mach-dove.
 
-- mm/nommu.c uses TASK_SIZE in validate_mmap_request:
+Sebastian
 
-        /* Careful about overflows.. */
-        rlen = PAGE_ALIGN(len);
-        if (!rlen || rlen > TASK_SIZE)
-                return -ENOMEM;
-
-  Maybe this should better be explicitly:
-
-        if (!rlen || rlen > CONFIG_DRAM_SIZE)
-                return -ENOMEM;
-
-  ?
-- kernel/sys.c uses TASK_SIZE in prctl_set_mm
-  used for prctl syscall with option=PR_SET_MM. Maybe here it would be
-  nice to have TASK_SIZE == ~0UL?
-
-- fs/exec.c uses TASK_SIZE in setup_new_exec to assign
-  current->mm->task_size. I didn't check if/how this is used.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+>   arch/arm/Kconfig                     |   1 +
+>   arch/arm/boot/dts/dove.dtsi          |   7 +
+>   arch/arm/mach-dove/Makefile          |   1 +
+>   arch/arm/mach-dove/common.c          |   2 +
+>   arch/arm/mach-dove/common.h          |   1 +
+>   arch/arm/mach-dove/include/mach/pm.h |  17 --
+>   arch/arm/mach-dove/irq.c             |  87 ------
+>   arch/arm/mach-dove/pmu.c             | 531 +++++++++++++++++++++++++++++++++++
+>   drivers/base/power/domain.c          |   8 +-
+>   9 files changed, 547 insertions(+), 108 deletions(-)
+>
