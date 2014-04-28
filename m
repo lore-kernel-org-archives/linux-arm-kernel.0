@@ -1,23 +1,35 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 28 Apr 2014 18:28:45 +0000 (UTC)
-Subject: [PATCH 3/5] arm: omap2: skip device build from platform code
- for dt.
-In-Reply-To: <1397651532-31456-4-git-send-email-sourav.poddar@ti.com>
-References: <1397651532-31456-1-git-send-email-sourav.poddar@ti.com>
- <1397651532-31456-4-git-send-email-sourav.poddar@ti.com>
-Message-ID: <alpine.DEB.2.02.1404281827410.14616@utopia.booyaka.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 28 Apr 2014 20:32:55 +0200 (CEST)
+Subject: [PATCH] arm: edma: Fix xbar mapping
+In-Reply-To: <534BED36.2060907@ti.com>
+References: <alpine.DEB.2.02.1404132123100.22697@ionos.tec.linutronix.de>
+ <534BED36.2060907@ti.com>
+Message-ID: <alpine.DEB.2.02.1404282032150.6261@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 16 Apr 2014, Sourav Poddar wrote:
-
-> For SOCs with dt enabled, device should be build through device tree.
-> Prevent device build call from platform code, if device tree is
-> enabled.
+On Mon, 14 Apr 2014, Sekhar Nori wrote:
+> > Fix the issues by:
+> > 
+> > - annotating the device tree entry with "/bits/ 16" as documented in
+> >   the of_property_read_u16_array kernel doc
+> > 
+> > - make the size of the xbar register mapping correct
+> > 
+> > - invalidating the end of the array and not the start
+> > 
+> > This convoluted mess wants to be completely rewritten as there is no
+> > point to keep the xbar_chan array memory and the iomapping of the xbar
+> > regs around forever. Marking the xbar mapped channels as used should
+> > be done right there.
+> > 
+> > But that's a different issue and this patch is small enough to make it
+> > work and allows a simple backport for stable.
+> > 
+> > Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
 > 
-> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+> This time, I tested this patch and FWIW you can add:
+> 
+> Acked-by: Sekhar Nori <nsekhar@ti.com>
 
-Isn't OMAP2+ only supporting DT device enumeration now?
-
-
-- Paul
+Can someone pick this up please?
