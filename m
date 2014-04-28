@@ -1,67 +1,35 @@
-From: lho@apm.com (Loc Ho)
-Date: Mon, 28 Apr 2014 16:12:02 -0700
-Subject: [PATCH v18 3/4] ata: Add APM X-Gene SoC AHCI SATA host controller
- driver
-In-Reply-To: <CAPw-ZTksg3z8GY55jb7-yP1wfq2BF6apB9KBgbokpshKbiiAaw@mail.gmail.com>
-References: <1394841201-29495-1-git-send-email-lho@apm.com>
- <1394841201-29495-3-git-send-email-lho@apm.com>
- <1394841201-29495-4-git-send-email-lho@apm.com>
- <201403151019.49316.arnd@arndb.de>
- <CAPw-ZTksg3z8GY55jb7-yP1wfq2BF6apB9KBgbokpshKbiiAaw@mail.gmail.com>
-Message-ID: <CAPw-ZTmGA5rtVmHx5jZedkey2iJD7L+3-905W=4G4rAJ=BeWgA@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 28 Apr 2014 17:13:15 -0600
+Subject: [PATCH REPOST] ARM: multi_v7: enable AT24C EEPROM driver
+Message-ID: <1398726795-13454-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon/Felipe,
+From: Stephen Warren <swarren@nvidia.com>
 
-> >> This patch adds support for the APM X-Gene SoC AHCI SATA host controller
-> >> driver. It requires the corresponding APM X-Gene SoC PHY driver. This
-> >> initial version only supports Gen3 speed.
-> >
-> > This version seems workable, thanks for the quick follow-up.
-> >
-> > The comment about Gen3 speed above reminds me that you took some
-> > shortcuts to get here and you removed support for some features
-> > as well as some bug workarounds in the process. I'm guessing some
-> > of them won't be necessary because they are only for prototype
-> > hardware or for early boot loader versions that don't yet set up
-> > the hardware right, but others actually need to come back.
-> >
-> > That is usually a good approach, but I'd also like to make sure we can
-> > deal with them nicely when you have to add them back later, and don't
-> > have to add ugly extensions to the DT binding to support the old dtb
-> > files.
-> >
-> > Can you list (also in the changelog) the parts of the driver that you
-> > have taken out for now and that you expect to add back at later
-> > stage? I think that would be helpful for perspective.
-> >
->
-> Here is an list of patches that we will be preparing for once the
-> basic driver is completed. Do you want me to re-generate the patch
-> change log with this info?
->
-> 1. Support for Gen1/Gen2/Gen3
-> Solution: The simplest solution is to have the PHY framework support
-> setting the desire speed. I had argued with the TI folks but they are
-> reluctant to add this function to the framework. They argued that this
-> is still not generic enough. I will start the discussion again later
-> on. The other possibility (but not sure if this is doable) is to have
-> the PHY init function to be smarter and do the necessary operation
-> assuming the underlying PHY is capable in detecting the link up speed.
-> I will need to check the spec of this.
+This is used for the board ID EEPROM on Jetson TK1, as well as likely
+a whole slew of other NVIDIA reference boards; we simply haven't added
+enabled the EEPROM in the DT files until now.
 
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+I assume this should be applied directly in arm-soc, to prevent causing
+conflicts from changes to this file in lots of SoC-specific trees.
 
-In order for the X-Gene SATA PHY to support SATA Gen1 and Gen2 speed,
-we need an method to instruct the underlying PHY driver to switch to
-an specified setting after link up. For this errata, Suman Tripathi
-had submitted the patch [1]. It is not possible to hide this within
-the PHY driver. Each instance of the PHY driver controls two ports. By
-calling the exit function and then init function, it will affect the
-other ports - which is not the correct behavior. At this point, we
-don't see any solution besides introduce an PHY framework function
-set_rate. Can you let us know if this solution is acceptable?
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-[1] https://lkml.org/lkml/2014/4/18/491
-
--Loc
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index d4e8a47a2f7c..a692b7ae3bd1 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -112,6 +112,7 @@ CONFIG_BLK_DEV_LOOP=y
+ CONFIG_ICS932S401=y
+ CONFIG_APDS9802ALS=y
+ CONFIG_ISL29003=y
++CONFIG_EEPROM_AT24=y
+ CONFIG_BLK_DEV_SD=y
+ CONFIG_BLK_DEV_SR=y
+ CONFIG_SCSI_MULTI_LUN=y
+-- 
+1.8.1.5
