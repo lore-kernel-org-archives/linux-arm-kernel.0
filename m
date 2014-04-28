@@ -1,37 +1,50 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 28 Apr 2014 10:28:49 -0600
-Subject: [PATCH 33/38] mmc: sdhci: fix SDHCI dependencies
-In-Reply-To: <E1Wd2XT-0003wV-0H@rmk-PC.arm.linux.org.uk>
-References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
- <E1Wd2XT-0003wV-0H@rmk-PC.arm.linux.org.uk>
-Message-ID: <535E81C1.3020902@wwwdotorg.org>
+From: joelf@ti.com (Joel Fernandes)
+Date: Mon, 28 Apr 2014 11:38:33 -0500
+Subject: [PATCH 07/10] ARM: dts: DRA7: Add DT node for DES IP
+In-Reply-To: <535BE096.2060407@cogentembedded.com>
+References: <1398466968-29506-1-git-send-email-joelf@ti.com>
+ <1398466968-29506-8-git-send-email-joelf@ti.com>
+ <535BE096.2060407@cogentembedded.com>
+Message-ID: <535E8409.10905@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/23/2014 01:08 PM, Russell King wrote:
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+On 04/26/2014 11:36 AM, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 26-04-2014 3:02, Joel Fernandes wrote:
+> 
+>> DRA7xx SoCs have a DES3DES IP. Add DT data for the same.
+> 
+>> Signed-off-by: Joel Fernandes <joelf@ti.com>
+>> ---
+>>   arch/arm/boot/dts/dra7.dtsi |   11 +++++++++++
+>>   1 file changed, 11 insertions(+)
+> 
+>> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+>> index 1c0f8e1..0533b89 100644
+>> --- a/arch/arm/boot/dts/dra7.dtsi
+>> +++ b/arch/arm/boot/dts/dra7.dtsi
+>> @@ -789,6 +789,17 @@
+>>               dma-names = "tx0", "rx0";
+>>               status = "disabled";
+>>           };
+>> +
+>> +        des: des at 480a5000 {
+> 
+>    Shouldn't the node name be "crypto at 480a5000", according to the ePAPR
+> standard?
+> 
+Actually I'm not a big fan of the standard here in this regard.
+"crypto at 480a5000" doesn't mean anything and serves no purpose for
+anyone. There are quite a few crypto modules and such a name doesn't
+help and is confusing at best.
 
-A patch description would be useful so I can work out why...
+There's no property either in the device tree node itself to describe it
+as des, except for the phandle label which is used only at dt
+compile-time if I'm right. So makes sense to have the name be more specific.
 
-> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+This is how we have added dts nodes for other crypto modules in the past...
 
->  config MMC_SDHCI
-> -	tristate "Secure Digital Host Controller Interface support"
-> -	depends on HAS_DMA
-> +	tristate
->  	help
->  	  This selects the generic Secure Digital Host Controller Interface.
->  	  It is used by manufacturers such as Texas Instruments(R), Ricoh(R)
-
-... it's useful to remove that depends from here and ...
->  config MMC_SDHCI_TEGRA
->  	tristate "SDHCI platform support for the Tegra SD/MMC Controller"
-> -	depends on ARCH_TEGRA
-> -	depends on MMC_SDHCI_PLTFM
-> +	depends on ARCH_TEGRA && HAS_DMA
-
-... duplicate it in all the HW-specific drivers.
-
-On Tegra (and I believe at least any ARM system), I think HAS_DMA is
-always true, so is there a need for "&& HAS_DMA" at all, now that this
-statement is pushed into arch-/HW-specific options?
+thanks,
+ -Joel
