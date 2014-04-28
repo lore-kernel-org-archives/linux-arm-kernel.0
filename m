@@ -1,69 +1,37 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 28 Apr 2014 10:14:44 -0500
-Subject: [PATCH V3 04/20] bus: omap_l3_noc: populate l3->dev and use it
-In-Reply-To: <1398698101-25513-1-git-send-email-nm@ti.com>
-References: <1397492726-17203-1-git-send-email-nm@ti.com>
- <1398698101-25513-1-git-send-email-nm@ti.com>
-Message-ID: <1398698101-25513-5-git-send-email-nm@ti.com>
+From: mporter@linaro.org (Matt Porter)
+Date: Mon, 28 Apr 2014 11:19:49 -0400
+Subject: [PATCH v6 RESEND 0/5] Add Broadcom Kona PWM Support
+In-Reply-To: <CAAYSxhpOP78EQAM0cWM2RwLu29-0eRVgLCFX3Hob8q=J==5wUA@mail.gmail.com>
+References: <1398450675-19609-1-git-send-email-tim.kryger@linaro.org>
+ <20140428110731.GH19455@ulmo>
+ <CAAYSxhpOP78EQAM0cWM2RwLu29-0eRVgLCFX3Hob8q=J==5wUA@mail.gmail.com>
+Message-ID: <20140428151949.GD7719@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-l3->dev is not populated, so populate it and use it to print information
-relevant to the device instead of using a generic pr_*.
+On Mon, Apr 28, 2014 at 08:00:39AM -0700, Tim Kryger wrote:
+> On Mon, Apr 28, 2014 at 4:07 AM, Thierry Reding
+> <thierry.reding@gmail.com> wrote:
+> > On Fri, Apr 25, 2014 at 11:31:10AM -0700, Tim Kryger wrote:
+> >> This series introduces the driver for the Kona PWM controller found in
+> >> Broadcom mobile SoCs like bcm281xx and updates the device tree and the
+> >> defconfig to enable use of this hardware on the bcm28155 AP board.
+> >>
+> 
+> >> Tim Kryger (5):
+> >>   Documentation: dt: Add Kona PWM binding
+> >>   pwm: kona: Introduce Kona PWM controller support
+> >>   ARM: dts: Declare the PWM for bcm11351 (bcm281xx)
+> >>   ARM: dts: Enable the PWM for bcm28155 AP board
+> >>   ARM: bcm_defconfig: Enable PWM and Backlight
+> 
+> > I've applied patches 1 and 2 (with two tiny whitespace cleanups) to my
+> > for-next branch.
+> 
+> Sounds good.  Thank you.
+> 
+> Matt and Christian, are you okay taking patches 3-5 through your tree?
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Tested-by: Darren Etheridge <detheridge@ti.com>
----
-change in V3: none
- drivers/bus/omap_l3_noc.c |   11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+Yes, I've now applied them to the appropropriate mach-bcm 3.16 branches.
 
-diff --git a/drivers/bus/omap_l3_noc.c b/drivers/bus/omap_l3_noc.c
-index 800486c..37d71b7 100644
---- a/drivers/bus/omap_l3_noc.c
-+++ b/drivers/bus/omap_l3_noc.c
-@@ -131,6 +131,7 @@ static int omap_l3_probe(struct platform_device *pdev)
- 	if (!l3)
- 		return -ENOMEM;
- 
-+	l3->dev = &pdev->dev;
- 	platform_set_drvdata(pdev, l3);
- 
- 	/* Get mem resources */
-@@ -140,7 +141,7 @@ static int omap_l3_probe(struct platform_device *pdev)
- 
- 		l3->l3_base[i] = devm_ioremap_resource(&pdev->dev, res);
- 		if (IS_ERR(l3->l3_base[i])) {
--			dev_err(&pdev->dev, "ioremap %d failed\n", i);
-+			dev_err(l3->dev, "ioremap %d failed\n", i);
- 			return PTR_ERR(l3->l3_base[i]);
- 		}
- 	}
-@@ -149,19 +150,19 @@ static int omap_l3_probe(struct platform_device *pdev)
- 	 * Setup interrupt Handlers
- 	 */
- 	l3->debug_irq = platform_get_irq(pdev, 0);
--	ret = devm_request_irq(&pdev->dev, l3->debug_irq, l3_interrupt_handler,
-+	ret = devm_request_irq(l3->dev, l3->debug_irq, l3_interrupt_handler,
- 			       IRQF_DISABLED, "l3-dbg-irq", l3);
- 	if (ret) {
--		dev_err(&pdev->dev, "request_irq failed for %d\n",
-+		dev_err(l3->dev, "request_irq failed for %d\n",
- 			l3->debug_irq);
- 		return ret;
- 	}
- 
- 	l3->app_irq = platform_get_irq(pdev, 1);
--	ret = devm_request_irq(&pdev->dev, l3->app_irq, l3_interrupt_handler,
-+	ret = devm_request_irq(l3->dev, l3->app_irq, l3_interrupt_handler,
- 			       IRQF_DISABLED, "l3-app-irq", l3);
- 	if (ret)
--		dev_err(&pdev->dev, "request_irq failed for %d\n", l3->app_irq);
-+		dev_err(l3->dev, "request_irq failed for %d\n", l3->app_irq);
- 
- 	return ret;
- }
--- 
-1.7.9.5
+-Matt
