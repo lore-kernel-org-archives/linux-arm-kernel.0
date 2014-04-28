@@ -1,77 +1,64 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 28 Apr 2014 23:12:08 +0200
-Subject: [PATCH v2 3/3] irqchip: orion: reverse irq handling priority
-In-Reply-To: <1398540855-27367-4-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1398540855-27367-4-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1398719528-23607-1-git-send-email-sebastian.hesselbarth@gmail.com>
+From: pavel@denx.de (Pavel Machek)
+Date: Mon, 28 Apr 2014 23:15:05 +0200
+Subject: [patch] Fix CAN on socfpga, for net/master
+In-Reply-To: <1398716449.836.4.camel@dinh-ubuntu>
+References: <1396422700-3962-4-git-send-email-s.trumtrar@pengutronix.de>
+ <20140404102815.GA9242@amd.pavel.ucw.cz>
+ <20140425195319.GA3677@amd.pavel.ucw.cz>
+ <1398457446.26387.0.camel@linux-builds1>
+ <1398461518.3587.11.camel@dinh-ubuntu>
+ <20140426093646.GE8730@amd.pavel.ucw.cz>
+ <20140426203131.GA21832@amd.pavel.ucw.cz>
+ <6bf951b6-51e7-4b90-b054-9ba5b6e93874@email.android.com>
+ <20140427122510.GB12901@amd.pavel.ucw.cz>
+ <1398716449.836.4.camel@dinh-ubuntu>
+Message-ID: <20140428211505.GA28242@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Non-DT irq handlers were working through irq causes from most-significant
-to least-significant bit, while DT irqchip driver does it the other way
-round. This revealed some more HW issues on Kirkwood peripheral IP, where
-spurious sdio irqs can happen although irqs are masked.
+Hi!
 
-Also, the generated binaries show that original non-DT order compared
-to DT order save two instructions for each bit count check:
+On Mon 2014-04-28 15:20:49, Thor Thayer wrote:
+> On Sun, 2014-04-27 at 14:25 +0200, ZY - pavel wrote:
+> > Apparently, socfpga CAN needs 32-bit accesses and different raminit
+> > sequence.
+> > 
+> > Signed-off-by: Pavel Machek <pavel@denx.de>
+> > 
+> > ---
+> > 
+> > > 
+> > > I'm not in the office (and fighting with my phone's email client) until 5th of May, however please rebase all your patches against the latest net/master from David Miller, as this tree includes all c_can fixes by Thomas.
+> > > 
+> > 
+> > Ok, combined patch is here. Lightly tested using loopback on Arrow
+> > SocKit.
+> 
+> Hi Pavel. 
+> 
+> Thanks for your help on the SOCFPGA support! I can test this on the
+> Altera Development Kit but I'm not able to cleanly apply to the latest
+> David Miller net-next branch. Is there a different branch I should
+> use?
 
-irqchip DT order with ffs():
-  60:   e3a06001        mov     r6, #1
-  64:   e2643000        rsb     r3, r4, #0
-  68:   e0033004        and     r3, r3, r4
-  6c:   e16f3f13        clz     r3, r3
-  70:   e263301f        rsb     r3, r3, #31
-  74:   e1c44316        bic     r4, r4, r6, lsl r3
-  78:   e5971004        ldr     r1, [r7, #4]
+It should have been against net-next branch... but perhaps I made a
+mistake somewhere. I should get some sleep now.
 
-Original non-DT order with fls():
-  60:   e3a07001        mov     r7, #1
-  64:   e16f3f14        clz     r3, r4
-  68:   e263301f        rsb     r3, r3, #31
-  6c:   e1c44317        bic     r4, r4, r7, lsl r3
-  70:   e5951004        ldr     r1, [r5, #4]
+Or ... let me upload my tree so that you can generate the diff.
 
-Therefore, reverse irq bit handling back to original order by replacing
-ffs() with fls().
+You should be able to get it using:
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Acked-by: Jason Cooper <jason@lakedaemon.net>
----
-Changelog:
-v1->v2:
-- reword commit msg to state less number of instructions
+git pull git://git.denx.de/linux-denx-pavel.git my_net_master
 
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Gregory Clement <gregory.clement@free-electrons.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- drivers/irqchip/irq-orion.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+> I also like your updates to my patch as shown below - much cleaner.
 
-diff --git a/drivers/irqchip/irq-orion.c b/drivers/irqchip/irq-orion.c
-index e25f246cd2fb..34d18b48bb78 100644
---- a/drivers/irqchip/irq-orion.c
-+++ b/drivers/irqchip/irq-orion.c
-@@ -42,7 +42,7 @@ __exception_irq_entry orion_handle_irq(struct pt_regs *regs)
- 		u32 stat = readl_relaxed(gc->reg_base + ORION_IRQ_CAUSE) &
- 			gc->mask_cache;
- 		while (stat) {
--			u32 hwirq = ffs(stat) - 1;
-+			u32 hwirq = __fls(stat);
- 			u32 irq = irq_find_mapping(orion_irq_domain,
- 						   gc->irq_base + hwirq);
- 			handle_IRQ(irq, regs);
-@@ -117,7 +117,7 @@ static void orion_bridge_irq_handler(unsigned int irq, struct irq_desc *desc)
- 		   gc->mask_cache;
- 
- 	while (stat) {
--		u32 hwirq = ffs(stat) - 1;
-+		u32 hwirq = __fls(stat);
- 
- 		generic_handle_irq(irq_find_mapping(d, gc->irq_base + hwirq));
- 		stat &= ~(1 << hwirq);
+Thanks :-).
+
+Best regards,
+
+								Pavel
+
+
 -- 
-1.9.1
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
