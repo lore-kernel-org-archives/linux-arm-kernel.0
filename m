@@ -1,60 +1,112 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 28 Apr 2014 20:28:50 +0100
-Subject: [PATCH 31/97] ARM: l2c: implement L2C-310 erratum 727915 as a method
+Date: Mon, 28 Apr 2014 20:28:55 +0100
+Subject: [PATCH 32/97] ARM: l2c: implement L2C-310 erratum 588369 as a method
  override
 In-Reply-To: <20140428192419.GV26756@n2100.arm.linux.org.uk>
 References: <20140428192419.GV26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WerEQ-0001VR-7w@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WerEV-0001VV-Bk@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement L2C-310 erratum 727915 by overriding the flush_all method
-in the outer_cache operations structure.  This allows us to sensibly
-contain the erratum code in one place without affecting other
-locations or implementations.
+Implement L2C-310 erratum 588369 by overriding the invalidate range
+and flush range methods in the outer_cache operations structure.
+This allows us to sensibly contain the erratum code in one place
+without affecting other locations/implemetations.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mm/cache-l2x0.c | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm/mm/cache-l2x0.c | 69 ++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 69 insertions(+)
 
 diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index d07fa4fc95a3..6161232c8a85 100644
+index 6161232c8a85..79ff08db204d 100644
 --- a/arch/arm/mm/cache-l2x0.c
 +++ b/arch/arm/mm/cache-l2x0.c
-@@ -522,6 +522,19 @@ static void l2c310_set_debug(unsigned long val)
+@@ -522,6 +522,65 @@ static void l2c310_set_debug(unsigned long val)
  	writel_relaxed(val, l2x0_base + L2X0_DEBUG_CTRL);
  }
  
-+static void l2c310_flush_all_erratum(void)
++static void l2c310_inv_range_erratum(unsigned long start, unsigned long end)
 +{
 +	void __iomem *base = l2x0_base;
-+	unsigned long flags;
 +
-+	raw_spin_lock_irqsave(&l2x0_lock, flags);
-+	l2c_set_debug(base, 0x03);
-+	__l2c_op_way(base + L2X0_CLEAN_INV_WAY);
-+	l2c_set_debug(base, 0x00);
++	if ((start | end) & (CACHE_LINE_SIZE - 1)) {
++		unsigned long flags;
++
++		/* Erratum 588369 for both clean+invalidate operations */
++		raw_spin_lock_irqsave(&l2x0_lock, flags);
++		l2c_set_debug(base, 0x03);
++
++		if (start & (CACHE_LINE_SIZE - 1)) {
++			start &= ~(CACHE_LINE_SIZE - 1);
++			writel_relaxed(start, base + L2X0_CLEAN_LINE_PA);
++			writel_relaxed(start, base + L2X0_INV_LINE_PA);
++			start += CACHE_LINE_SIZE;
++		}
++
++		if (end & (CACHE_LINE_SIZE - 1)) {
++			end &= ~(CACHE_LINE_SIZE - 1);
++			writel_relaxed(end, base + L2X0_CLEAN_LINE_PA);
++			writel_relaxed(end, base + L2X0_INV_LINE_PA);
++		}
++
++		l2c_set_debug(base, 0x00);
++		raw_spin_unlock_irqrestore(&l2x0_lock, flags);
++	}
++
++	__l2c210_op_pa_range(base + L2X0_INV_LINE_PA, start, end);
 +	__l2c210_cache_sync(base);
-+	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
 +}
 +
- static void __init l2c310_save(void __iomem *base)
++static void l2c310_flush_range_erratum(unsigned long start, unsigned long end)
++{
++	raw_spinlock_t *lock = &l2x0_lock;
++	unsigned long flags;
++	void __iomem *base = l2x0_base;
++
++	raw_spin_lock_irqsave(lock, flags);
++	while (start < end) {
++		unsigned long blk_end = start + min(end - start, 4096UL);
++
++		l2c_set_debug(base, 0x03);
++		while (start < blk_end) {
++			writel_relaxed(start, base + L2X0_CLEAN_LINE_PA);
++			writel_relaxed(start, base + L2X0_INV_LINE_PA);
++			start += CACHE_LINE_SIZE;
++		}
++		l2c_set_debug(base, 0x00);
++
++		if (blk_end < end) {
++			raw_spin_unlock_irqrestore(lock, flags);
++			raw_spin_lock_irqsave(lock, flags);
++		}
++	}
++	raw_spin_unlock_irqrestore(lock, flags);
++	__l2c210_cache_sync(base);
++}
++
+ static void l2c310_flush_all_erratum(void)
  {
- 	unsigned revision;
-@@ -590,6 +603,13 @@ static void __init l2c310_fixup(void __iomem *base, u32 cache_id,
+ 	void __iomem *base = l2x0_base;
+@@ -600,9 +659,19 @@ static void __init l2c310_fixup(void __iomem *base, u32 cache_id,
+ 	const char *errata[4];
+ 	unsigned n = 0;
+ 
++	/* For compatibility */
  	if (revision <= L310_CACHE_ID_RTL_R3P0)
  		fns->set_debug = l2c310_set_debug;
  
-+	if (IS_ENABLED(CONFIG_PL310_ERRATA_727915) &&
-+	    revision >= L310_CACHE_ID_RTL_R2P0 &&
-+	    revision < L310_CACHE_ID_RTL_R3P1) {
-+		fns->flush_all = l2c310_flush_all_erratum;
-+		errata[n++] = "727915";
++	if (IS_ENABLED(CONFIG_PL310_ERRATA_588369) &&
++	    revision < L310_CACHE_ID_RTL_R2P0 &&
++	    /* For bcm compatibility */
++	    fns->inv_range == l2x0_inv_range) {
++		fns->inv_range = l2c310_inv_range_erratum;
++		fns->flush_range = l2c310_flush_range_erratum;
++		errata[n++] = "588369";
 +	}
 +
- 	if (IS_ENABLED(CONFIG_PL310_ERRATA_753970) &&
- 	    revision == L310_CACHE_ID_RTL_R3P0) {
- 		sync_reg_offset = L2X0_DUMMY_REG;
+ 	if (IS_ENABLED(CONFIG_PL310_ERRATA_727915) &&
+ 	    revision >= L310_CACHE_ID_RTL_R2P0 &&
+ 	    revision < L310_CACHE_ID_RTL_R3P1) {
 -- 
 1.8.3.1
