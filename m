@@ -1,89 +1,71 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 28 Apr 2014 20:30:27 +0100
-Subject: [PATCH 50/97] ARM: l2c: add automatic enable of early BRESP
+Date: Mon, 28 Apr 2014 20:30:37 +0100
+Subject: [PATCH 52/97] ARM: l2c: add platform independent core L2 cache
+ initialisation
 In-Reply-To: <20140428192419.GV26756@n2100.arm.linux.org.uk>
 References: <20140428192419.GV26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WerFz-0001Wu-F6@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WerG9-0001X9-M3@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AXI bus protocol requires that a write response should only be
-sent back to the master when the last write has been accepted.  Early
-BRESP allows the L2C-310 to send the write response as soon as the
-store buffer accepts the write address.
-
-Cortex-A9 processors can signal to the L2C-310 that they wish to be
-notified early, and if this optimisation is enabled, the L2C-310 can
-signal an early write response.
+Add a hook into the core ARM code to perform L2 cache initialisation
+in a platform independent manner.  Platforms still get to indicate
+their auxiliary control register values and mask, but the
+initialisation call will now be made from generic code.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mm/cache-l2x0.c | 25 ++++++++++++++++++++++---
- 1 file changed, 22 insertions(+), 3 deletions(-)
+ arch/arm/include/asm/mach/arch.h |  3 +++
+ arch/arm/kernel/irq.c            | 12 ++++++++++++
+ 2 files changed, 15 insertions(+)
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 3e2c22a12d87..db3f18a968b2 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -24,6 +24,7 @@
- #include <linux/of_address.h>
+diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+index 17a3fa2979e8..5249cc3c52f4 100644
+--- a/arch/arm/include/asm/mach/arch.h
++++ b/arch/arm/include/asm/mach/arch.h
+@@ -45,6 +45,9 @@ struct machine_desc {
+ 	unsigned char		reserve_lp1 :1;	/* never has lp1	*/
+ 	unsigned char		reserve_lp2 :1;	/* never has lp2	*/
+ 	enum reboot_mode	reboot_mode;	/* default restart mode	*/
++	unsigned		l2c_aux_val;	/* L2 cache aux value	*/
++	unsigned		l2c_aux_mask;	/* L2 cache aux mask	*/
++	void			(*l2c_write_sec)(unsigned long, unsigned);
+ 	struct smp_operations	*smp;		/* SMP operations	*/
+ 	bool			(*smp_init)(void);
+ 	void			(*fixup)(struct tag *, char **,
+diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+index 9723d17b8f38..2c4257604513 100644
+--- a/arch/arm/kernel/irq.c
++++ b/arch/arm/kernel/irq.c
+@@ -37,6 +37,7 @@
+ #include <linux/proc_fs.h>
+ #include <linux/export.h>
  
- #include <asm/cacheflush.h>
-+#include <asm/cputype.h>
- #include <asm/hardware/cache-l2x0.h>
- #include "cache-tauros3.h"
- #include "cache-aurora-l2.h"
-@@ -620,6 +621,24 @@ static void l2c310_resume(void)
- 	}
++#include <asm/hardware/cache-l2x0.h>
+ #include <asm/exception.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/irq.h>
+@@ -115,10 +116,21 @@ EXPORT_SYMBOL_GPL(set_irq_flags);
+ 
+ void __init init_IRQ(void)
+ {
++	int ret;
++
+ 	if (IS_ENABLED(CONFIG_OF) && !machine_desc->init_irq)
+ 		irqchip_init();
+ 	else
+ 		machine_desc->init_irq();
++
++	if (IS_ENABLED(CONFIG_OF) && IS_ENABLED(CONFIG_CACHE_L2X0) &&
++	    (machine_desc->l2c_aux_mask || machine_desc->l2c_aux_val)) {
++		outer_cache.write_sec = machine_desc->l2c_write_sec;
++		ret = l2x0_of_init(machine_desc->l2c_aux_val,
++				   machine_desc->l2c_aux_mask);
++		if (ret)
++			pr_err("L2C: failed to init: %d\n", ret);
++	}
  }
  
-+static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
-+{
-+	unsigned rev = readl_relaxed(base + L2X0_CACHE_ID) & L2X0_CACHE_ID_PART_MASK;
-+	bool cortex_a9 = read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9;
-+
-+	if (rev >= L310_CACHE_ID_RTL_R2P0) {
-+		if (cortex_a9) {
-+			aux |= L310_AUX_CTRL_EARLY_BRESP;
-+			pr_info("L2C-310 enabling early BRESP for Cortex-A9\n");
-+		} else if (aux & L310_AUX_CTRL_EARLY_BRESP) {
-+			pr_warn("L2C-310 early BRESP only supported with Cortex-A9\n");
-+			aux &= ~L310_AUX_CTRL_EARLY_BRESP;
-+		}
-+	}
-+
-+	l2c_enable(base, aux, num_lock);
-+}
-+
- static void __init l2c310_fixup(void __iomem *base, u32 cache_id,
- 	struct outer_cache_fns *fns)
- {
-@@ -677,7 +696,7 @@ static const struct l2c_init_data l2c310_init_fns __initconst = {
- 	.type = "L2C-310",
- 	.way_size_0 = SZ_8K,
- 	.num_lock = 8,
--	.enable = l2c_enable,
-+	.enable = l2c310_enable,
- 	.fixup = l2c310_fixup,
- 	.save = l2c310_save,
- 	.outer_cache = {
-@@ -916,7 +935,7 @@ static const struct l2c_init_data of_l2c310_data __initconst = {
- 	.way_size_0 = SZ_8K,
- 	.num_lock = 8,
- 	.of_parse = l2c310_of_parse,
--	.enable = l2c_enable,
-+	.enable = l2c310_enable,
- 	.fixup = l2c310_fixup,
- 	.save  = l2c310_save,
- 	.outer_cache = {
-@@ -1264,7 +1283,7 @@ static const struct l2c_init_data of_bcm_l2x0_data __initconst = {
- 	.way_size_0 = SZ_8K,
- 	.num_lock = 8,
- 	.of_parse = l2c310_of_parse,
--	.enable = l2c_enable,
-+	.enable = l2c310_enable,
- 	.save  = l2c310_save,
- 	.outer_cache = {
- 		.inv_range   = bcm_inv_range,
+ #ifdef CONFIG_MULTI_IRQ_HANDLER
 -- 
 1.8.3.1
