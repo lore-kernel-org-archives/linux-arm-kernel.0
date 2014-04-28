@@ -1,42 +1,37 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Mon, 28 Apr 2014 09:40:47 -0400
-Subject: [PATCH] ARM: l2c: prima2: only call l2x0_of_init() on matching
- nodes
-In-Reply-To: <20140428091532.GG26756@n2100.arm.linux.org.uk>
-References: <1398644860-22973-1-git-send-email-mporter@linaro.org>
- <20140428091532.GG26756@n2100.arm.linux.org.uk>
-Message-ID: <20140428134047.GA7719@beef>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Mon, 28 Apr 2014 15:48:29 +0200
+Subject: [PATCH v8 3/3] ARM: Check if a CPU has gone offline
+In-Reply-To: <20140428130639.GD2868@lvm>
+References: <1398455329-18136-1-git-send-email-ashwin.chaugule@linaro.org>
+ <1398455329-18136-4-git-send-email-ashwin.chaugule@linaro.org>
+ <CALrVBkuV2kQmBScDSMUVG+hOMZ3FQ1tEOEwUEPHRoCo9si+ygA@mail.gmail.com>
+ <CAJ5Y-eYFz0CQU4jWOnmiFNRJ+Q=12pvyTf72w7MUk3ebY75wgg@mail.gmail.com>
+ <CAMJs5B9d+=kfJ=rnf=_9ywmjtXK4v=OQeVcDu53j0J89GWzfpA@mail.gmail.com>
+ <535E519B.7070101@redhat.com> <20140428130639.GD2868@lvm>
+Message-ID: <535E5C2D.4090405@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 10:15:33AM +0100, Russell King wrote:
-> On Sun, Apr 27, 2014 at 08:27:40PM -0400, Matt Porter wrote:
-> > l2x0_of_init() is executed unconditionally within the sirfsoc_l2x0_init()
-> > early initcall. In a multi v7 kernel this causes bcm281xx and bcm21664
-> > platform to fail boot since they have their own pre l2x0 init sequence
-> > that is required. Fix this by checking that a matching OF ID is present
-> > before calling l2x0_of_init().
-> > 
-> > Reported-by: Kevin Hilman <khilman@linaro.org>
-> > Signed-off-by: Matt Porter <mporter@linaro.org>
-> > ---
-> > Applies against next-20140424 to fix the issue introduced in
-> > 50655e6 ARM: l2c: prima2: remove cache size override
-> 
-> Err, this only "fixes" it because it effectively disables the L2 cache
-> _entirely_ - in the above commit, I kill your private compatible strings.
+Il 28/04/2014 15:06, Christoffer Dall ha scritto:
+>> >
+>> > Is Anup's patchset already on a branch?  If you send me a pointer to
+>> > it I can look at that branch history and see what's best.
+>> >
+> I didn't merge it yet - need to make one final pass over it (likely
+> later tonight).
 >
-> This doesn't make sense.  If the cache is already enabled, then the L2C
-> code won't try to enable it again.
+> But this is the series:
+> https://lists.cs.columbia.edu/pipermail/kvmarm/2014-April/009061.html
 
-Ok, please suggest an alternative. You merged this commit..it looks like
-it had no ack from the platform maintainer..and I don't have hardware.
-The commit is wrong, we can't have every platform executing sirfsoc's
-l2x0_of_init() call/parameters by having this stuff in an early initcall
-like that.
+Even better. :)
 
-It would be pretty straightforward to add those private compatibles
-back so the approach works. If not, we need to move this to
-.init_machine where it's guaranteed to only run on sirfsoc.
+1) Catalin can apply "Add common header for PSCI related defines", or 
+Ashwin can resend his series with the patch at the beginning.  Duplicate 
+commits are fine, especially for seldom-modified files where they do not 
+cause conflicts.
 
--Matt
+2) Send Anup's patchset as a pull request to both me and Catalin, 
+relative to v3.16-rc1, both of us can apply it and Ashwin's series can 
+be commit on top.
+
+Paolo
