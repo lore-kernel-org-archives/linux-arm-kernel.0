@@ -1,58 +1,118 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 28 Apr 2014 12:54:58 -0500
-Subject: [PATCH 02/16] ARM: l2c: add platform independent core L2 cache
- initialisation
-In-Reply-To: <E1WeosP-0002PO-5m@rmk-PC.arm.linux.org.uk>
-References: <20140428165631.GM26756@n2100.arm.linux.org.uk>
- <E1WeosP-0002PO-5m@rmk-PC.arm.linux.org.uk>
-Message-ID: <CAL_JsqJDj_JZT_Mo5=Y1NqObX19v7WvuWSrmAZ4UXi9s6-prXA@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 29 Apr 2014 01:57:04 +0800
+Subject: [PATCH 7/7] ARM: sunxi: dt: add PRCM clk and reset controller
+ subdevices
+In-Reply-To: <535E8F68.7040206@free-electrons.com>
+References: <1398697130-8338-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1398697130-8338-8-git-send-email-boris.brezillon@free-electrons.com>
+ <CAGb2v67GnW_ziDMjg6zObCAHZrHppGzP=+-VhpWet-NaAzx-Fg@mail.gmail.com>
+ <535E8F68.7040206@free-electrons.com>
+Message-ID: <CAGb2v65Yt8n0j4WNnzRFjzKrbmEy28cpLcuvWvVFksZZFU5JMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 11:57 AM, Russell King
-<rmk+kernel@arm.linux.org.uk> wrote:
-> Add a hook into the core ARM code to perform L2 cache initialisation
-> in a platform independent manner.  Platforms still get to indicate
-> their auxiliary control register values and mask, but the
-> initialisation call will now be made from generic code.
+On Tue, Apr 29, 2014 at 1:27 AM, Boris BREZILLON
+<boris.brezillon@free-electrons.com> wrote:
 >
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-
-[...]
-
-> diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
-> index 9723d17b8f38..2c4257604513 100644
-> --- a/arch/arm/kernel/irq.c
-> +++ b/arch/arm/kernel/irq.c
-> @@ -37,6 +37,7 @@
->  #include <linux/proc_fs.h>
->  #include <linux/export.h>
+> On 28/04/2014 18:02, Chen-Yu Tsai wrote:
+>> Hi,
+>>
+>> On Mon, Apr 28, 2014 at 10:58 PM, Boris BREZILLON
+>> <boris.brezillon@free-electrons.com> wrote:
+>>> Add DT definitions for PRCM (Power/Reset/Clock Management) clock and reset
+>>> controller subdevices.
+>>>
+>>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+>>> ---
+>>>  arch/arm/boot/dts/sun6i-a31.dtsi | 49 ++++++++++++++++++++++++++++++++++++++++
+>>>  1 file changed, 49 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+>>> index ec3253a..83a1634 100644
+>>> --- a/arch/arm/boot/dts/sun6i-a31.dtsi
+>>> +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+>>> @@ -501,6 +501,55 @@
+>>>                 prcm at 01f01c00 {
+>> Seems the address here was wrong to start with.
 >
-> +#include <asm/hardware/cache-l2x0.h>
->  #include <asm/exception.h>
->  #include <asm/mach/arch.h>
->  #include <asm/mach/irq.h>
-> @@ -115,10 +116,21 @@ EXPORT_SYMBOL_GPL(set_irq_flags);
+> Absolutely, I'll fix it.
 >
->  void __init init_IRQ(void)
->  {
-> +       int ret;
-> +
->         if (IS_ENABLED(CONFIG_OF) && !machine_desc->init_irq)
->                 irqchip_init();
->         else
->                 machine_desc->init_irq();
-> +
-> +       if (IS_ENABLED(CONFIG_OF) && IS_ENABLED(CONFIG_CACHE_L2X0) &&
-> +           (machine_desc->l2c_aux_mask || machine_desc->l2c_aux_val)) {
-> +               outer_cache.write_sec = machine_desc->l2c_write_sec;
-> +               ret = l2x0_of_init(machine_desc->l2c_aux_val,
-> +                                  machine_desc->l2c_aux_mask);
+>>
+>>>                         compatible = "allwinner,sun6i-a31-prcm";
+>>>                         reg = <0x01f01400 0x200>;
+>>> +
+>>> +                       ar100_mux: ar100_mux {
+>> Might we use clk at 01f01XXX for the names of the clock nodes?
+>
+> Actually, I had a discussion with Maxime, and we decided to remove the
+> address suffix because the PRCM block is not a bus, and thus should not
+> have child node with addresses.
+> But I'm not a DT binding expert (it might be acceptable to define child
+> nodes with addresses even when the parent is not a bus :-)).
+> Advices from DT maintainers on that specific point would be great.
 
-This function should be a nop if there is no DT node matching, so we
-don't really need to trigger calling it based on machine_desc values.
-If we do that, then we can have aux_mask and aux_val values of 0 for
-both also mean don't do any aux ctrl setup. That would help minimize
-the machine_desc for many platforms.
+Then I would suggest using a _clk suffix in the name, so at least we can
+tell what type of device it is. That might be enough to satisfy ePAPR.
+At least socfpga, omap54xx, omap44xx are doing it this way.
 
-Rob
+>>> +                               compatible = "allwinner,sun6i-a31-ar100-mux-clk";
+>>> +                               #clock-cells = <0>;
+>>> +                               clocks = <&osc32k>, <&osc24M>, <&pll6>, <&pll6>;
+>>> +                       };
+>>> +
+>>> +                       ar100: ar100 {
+>>> +                               compatible = "allwinner,sun6i-a31-ar100-clk";
+>>> +                               #clock-cells = <0>;
+>>> +                               clocks = <&ar100_mux>;
+>>> +                       };
+>>> +
+>>> +                       ar100_div: ar100_div {
+>>> +                               compatible = "allwinner,sun6i-a31-ar100-div-clk";
+>>> +                               #clock-cells = <0>;
+>>> +                               clocks = <&ar100>;
+>>> +                       };
+>>> +
+>>> +                       ahb0: ahb0 {
+>>> +                               compatible = "fixed-factor-clock";
+>>> +                               #clock-cells = <0>;
+>>> +                               clock-div = <1>;
+>>> +                               clock-mult = <1>;
+>>> +                               clocks = <&ar100_div>;
+>>> +                               clock-output-names = "ahb0";
+>>> +                       };
+>>> +
+>>> +                       apb0: apb0 {
+>>> +                               compatible = "allwinner,sun6i-a31-apb0-clk";
+>>> +                               #clock-cells = <0>;
+>>> +                               clocks = <&ahb0>;
+>>> +                               clock-output-names = "apb0";
+>>> +                       };
+>>> +
+>>> +                       apb0_gates: apb0_gates {
+>>> +                               compatible = "allwinner,sun6i-a31-apb0-gates-clk";
+>>> +                               #clock-cells = <1>;
+>>> +                               clocks = <&apb0>;
+>>> +                               clock-output-names = "apb0_pio", "apb0_ir",
+>>> +                                               "apb0_timer01", "apb0_p2wi",
+>>> +                                               "apb0_uart", "apb0_1wire",
+>>> +                                               "apb0_i2c";
+>>> +                       };
+>>> +
+>>> +                       apb0_rst: apb0_rst {
+>> Also use reset at 01f01XXX here?
+>>
+>>> +                               compatible = "allwinner,sun6i-a31-clock-reset";
+>>> +                               #reset-cells = <1>;
+>>> +                       };
+>>>                 };
+>>>         };
+>>>  };
+>> Thanks!
+>>
+>> ChenYu
+>
+> --
+> Boris Brezillon, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
+>
