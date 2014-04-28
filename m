@@ -1,46 +1,43 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 28 Apr 2014 18:17:09 +0200
-Subject: [PATCHv3 2/7] pwm: sunxi: document OF bindings
+Date: Mon, 28 Apr 2014 18:17:10 +0200
+Subject: [PATCHv3 3/7] ARM: sun4i: dt: add pinmux configuration for the PWM
 In-Reply-To: <1398701834-3719-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1398701834-3719-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1398701834-3719-3-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1398701834-3719-4-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the documentation for the Allwinner Socs PWM bindings.
+Add the pinctrl descriptions for both PWM channels of the Allwinner A10.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- Documentation/devicetree/bindings/pwm/pwm-sunxi.txt | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pwm/pwm-sunxi.txt
+ arch/arm/boot/dts/sun4i-a10.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/pwm/pwm-sunxi.txt b/Documentation/devicetree/bindings/pwm/pwm-sunxi.txt
-new file mode 100644
-index 000000000000..9eda87e7d233
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pwm/pwm-sunxi.txt
-@@ -0,0 +1,20 @@
-+Allwinner PWM controller
+diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+index 9174724571e2..109e796e4a69 100644
+--- a/arch/arm/boot/dts/sun4i-a10.dtsi
++++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+@@ -477,6 +477,20 @@
+ 			#size-cells = <0>;
+ 			#gpio-cells = <3>;
+ 
++			pwm0_pins_a: pwm0 at 0 {
++				allwinner,pins = "PB2";
++				allwinner,function = "pwm";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
 +
-+Required properties:
-+  - compatible: should be one of:
-+    - "allwinner,sun4i-a10-pwm"
-+    - "allwinner,sun7i-a20-pwm"
-+  - reg: physical base address and length of the controller's registers
-+  - #pwm-cells: should be 3. See pwm.txt in this directory for a description of
-+    the cells format.
-+  - clocks: from common clock binding, handle to the parent clock.
++			pwm1_pins_a: pwm1 at 0 {
++				allwinner,pins = "PI3";
++				allwinner,function = "pwm";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
 +
-+Example:
-+
-+	pwm: pwm at 01c20e00 {
-+		compatible = "allwinner,sun7i-a20-pwm";
-+		reg = <0x01c20e00 0xc>;
-+		clocks = <&osc24M>;
-+		#pwm-cells = <3>;
-+		status = "disabled";
-+	};
+ 			uart0_pins_a: uart0 at 0 {
+ 				allwinner,pins = "PB22", "PB23";
+ 				allwinner,function = "uart0";
 -- 
 1.9.1
