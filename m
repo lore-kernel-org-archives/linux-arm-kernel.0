@@ -1,114 +1,24 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Mon, 28 Apr 2014 19:27:04 +0200
-Subject: [PATCH 7/7] ARM: sunxi: dt: add PRCM clk and reset controller
- subdevices
-In-Reply-To: <CAGb2v67GnW_ziDMjg6zObCAHZrHppGzP=+-VhpWet-NaAzx-Fg@mail.gmail.com>
-References: <1398697130-8338-1-git-send-email-boris.brezillon@free-electrons.com>
- <1398697130-8338-8-git-send-email-boris.brezillon@free-electrons.com>
- <CAGb2v67GnW_ziDMjg6zObCAHZrHppGzP=+-VhpWet-NaAzx-Fg@mail.gmail.com>
-Message-ID: <535E8F68.7040206@free-electrons.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 28 Apr 2014 11:28:00 -0600
+Subject: [PATCH 07/16] ARM: l2c: convert tegra to generic l2c
+ initialisation
+In-Reply-To: <E1Weoso-0002Pj-LE@rmk-PC.arm.linux.org.uk>
+References: <20140428165631.GM26756@n2100.arm.linux.org.uk>
+ <E1Weoso-0002Pj-LE@rmk-PC.arm.linux.org.uk>
+Message-ID: <535E8FA0.6040205@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 04/28/2014 10:58 AM, Russell King wrote:
 
-On 28/04/2014 18:02, Chen-Yu Tsai wrote:
-> Hi,
->
-> On Mon, Apr 28, 2014 at 10:58 PM, Boris BREZILLON
-> <boris.brezillon@free-electrons.com> wrote:
->> Add DT definitions for PRCM (Power/Reset/Clock Management) clock and reset
->> controller subdevices.
->>
->> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
->> ---
->>  arch/arm/boot/dts/sun6i-a31.dtsi | 49 ++++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 49 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
->> index ec3253a..83a1634 100644
->> --- a/arch/arm/boot/dts/sun6i-a31.dtsi
->> +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
->> @@ -501,6 +501,55 @@
->>                 prcm at 01f01c00 {
-> Seems the address here was wrong to start with.
+> diff --git a/arch/arm/mach-tegra/tegra.c b/arch/arm/mach-tegra/tegra.c
 
-Absolutely, I'll fix it.
+>  DT_MACHINE_START(TEGRA_DT, "NVIDIA Tegra SoC (Flattened Device Tree)")
+> -	.map_io		= tegra_map_common_io,
+>  	.smp		= smp_ops(tegra_smp_ops),
+> +	.l2c_aux_val	= 0x3c400001,
+> +	.l2c_aux_mask	= 0xc20fc3fe,
+> +	.map_io		= tegra_map_common_io,
 
->
->>                         compatible = "allwinner,sun6i-a31-prcm";
->>                         reg = <0x01f01400 0x200>;
->> +
->> +                       ar100_mux: ar100_mux {
-> Might we use clk at 01f01XXX for the names of the clock nodes?
-
-Actually, I had a discussion with Maxime, and we decided to remove the
-address suffix because the PRCM block is not a bus, and thus should not
-have child node with addresses.
-But I'm not a DT binding expert (it might be acceptable to define child
-nodes with addresses even when the parent is not a bus :-)).
-Advices from DT maintainers on that specific point would be great.
-
-Best Regards,
-
-Boris
-
->> +                               compatible = "allwinner,sun6i-a31-ar100-mux-clk";
->> +                               #clock-cells = <0>;
->> +                               clocks = <&osc32k>, <&osc24M>, <&pll6>, <&pll6>;
->> +                       };
->> +
->> +                       ar100: ar100 {
->> +                               compatible = "allwinner,sun6i-a31-ar100-clk";
->> +                               #clock-cells = <0>;
->> +                               clocks = <&ar100_mux>;
->> +                       };
->> +
->> +                       ar100_div: ar100_div {
->> +                               compatible = "allwinner,sun6i-a31-ar100-div-clk";
->> +                               #clock-cells = <0>;
->> +                               clocks = <&ar100>;
->> +                       };
->> +
->> +                       ahb0: ahb0 {
->> +                               compatible = "fixed-factor-clock";
->> +                               #clock-cells = <0>;
->> +                               clock-div = <1>;
->> +                               clock-mult = <1>;
->> +                               clocks = <&ar100_div>;
->> +                               clock-output-names = "ahb0";
->> +                       };
->> +
->> +                       apb0: apb0 {
->> +                               compatible = "allwinner,sun6i-a31-apb0-clk";
->> +                               #clock-cells = <0>;
->> +                               clocks = <&ahb0>;
->> +                               clock-output-names = "apb0";
->> +                       };
->> +
->> +                       apb0_gates: apb0_gates {
->> +                               compatible = "allwinner,sun6i-a31-apb0-gates-clk";
->> +                               #clock-cells = <1>;
->> +                               clocks = <&apb0>;
->> +                               clock-output-names = "apb0_pio", "apb0_ir",
->> +                                               "apb0_timer01", "apb0_p2wi",
->> +                                               "apb0_uart", "apb0_1wire",
->> +                                               "apb0_i2c";
->> +                       };
->> +
->> +                       apb0_rst: apb0_rst {
-> Also use reset at 01f01XXX here?
->
->> +                               compatible = "allwinner,sun6i-a31-clock-reset";
->> +                               #reset-cells = <1>;
->> +                       };
->>                 };
->>         };
->>  };
-> Thanks!
->
-> ChenYu
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+I'm not sure why .map_io was moved. Was it to sort the entries in order
+of execution? If so, I assume that .smp should be moved too?
