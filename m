@@ -1,28 +1,27 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 28 Apr 2014 09:50:29 +0100
-Subject: [PATCH v3 part1 07/11] ARM64 / ACPI: Introduce
- arch_fix_phys_package_id() for cpu topology
-In-Reply-To: <535DC431.4000900@linaro.org>
-References: <1398432017-8506-1-git-send-email-hanjun.guo@linaro.org>
- <1398432017-8506-8-git-send-email-hanjun.guo@linaro.org>
- <20140425145249.GP12304@sirena.org.uk>
- <535DC431.4000900@linaro.org>
-Message-ID: <20140428085029.GB15125@sirena.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 28 Apr 2014 10:50:51 +0200
+Subject: [PATCH v3 2/4] ARM: dts: Add support for DRA72x family of devices
+In-Reply-To: <535DF092.7000307@ti.com>
+References: <1398333987-19454-1-git-send-email-rnayak@ti.com>
+ <201404241513.54380.arnd@arndb.de> <535DF092.7000307@ti.com>
+Message-ID: <5761706.QaRvAizEZ2@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 11:00:01AM +0800, Hanjun Guo wrote:
+On Monday 28 April 2014 11:39:22 Rajendra Nayak wrote:
+> 
+> DRA742 EVM:  Software Developement Board for DRA742
+> compatible = "ti,dra7-evm", "ti,dra742", "ti,dra74", "ti,dra7"
+> DRA722 EVM: Software Development Board for DRA722
+> compatible = "ti,dra72-evm", "ti,dra722", "ti,dra72", "ti,dra7"
+> 
+> I was also calling the .dtsi files as dra72x.dtsi and dra74x.dtsi, do you suggest I call
+> them dra742.dtsi and dra722.dtsi instead? Just that if we end up with a dra745 which is
+> fully compatible with dra742, as you mentioned above, we would be using a dra742.dtsi for a dra745
+> device which could be a little confusing.
 
-> Since platform software (firmware) knows the topology of the system, if
-> ACPI describes a slot number for this CPU, I think we can use it
-> unconditionally.
+For the file names, wildcards are ok. Alternatively you could have
+a dra745.dtsi that does nothing but include dra752.dtsi and override
+the compatible string (if there is one to start with).
 
-Right, the only concern with that is upsetting the scheduler but since
-x86 does the same thing presumably this is safe.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140428/b84429af/attachment.sig>
+	Arnd
