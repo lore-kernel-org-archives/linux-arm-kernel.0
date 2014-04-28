@@ -1,231 +1,102 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 28 Apr 2014 12:54:47 +0200
-Subject: [PATCH v4 06/17] ASoC: fsl-ssi: Cleanup probe function
+Date: Mon, 28 Apr 2014 12:54:42 +0200
+Subject: [PATCH v4 01/17] ASoC: fsl-ssi: Fix register values when disabling
 In-Reply-To: <1398682498-24357-1-git-send-email-mpa@pengutronix.de>
 References: <1398682498-24357-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1398682498-24357-7-git-send-email-mpa@pengutronix.de>
+Message-ID: <1398682498-24357-2-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reorder the probe function to be able to move the second imx-specific
-block to the seperate imx probe function. The patch also removes some
-comments/variables/code that are not used anymore or could be simply
-replaced by other variables.
+The bits we have to clear when disabling are different when the other
+stream is still active.
+
+This patch fixes the calculation of new register values after disabling
+one stream. It also adds a more detailed description of the new register
+value calculation.
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- sound/soc/fsl/fsl_ssi.c | 113 +++++++++++++++++++++++-------------------------
- 1 file changed, 53 insertions(+), 60 deletions(-)
+ sound/soc/fsl/fsl_ssi.c | 40 +++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 35 insertions(+), 5 deletions(-)
 
 diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-index 8072926..af1b82f 100644
+index fdb123d..fadb264 100644
 --- a/sound/soc/fsl/fsl_ssi.c
 +++ b/sound/soc/fsl/fsl_ssi.c
-@@ -159,7 +159,6 @@ struct fsl_ssi_private {
- 	bool imx_ac97;
- 	bool use_dma;
- 	bool baudclk_locked;
--	bool irq_stats;
- 	bool offline_config;
- 	bool use_dual_fifo;
- 	u8 i2s_mode;
-@@ -991,7 +990,7 @@ static void make_lowercase(char *s)
+@@ -490,6 +490,26 @@ static void fsl_ssi_rxtx_config(struct fsl_ssi_private *ssi_private,
  }
  
- static int fsl_ssi_imx_probe(struct platform_device *pdev,
--		struct fsl_ssi_private *ssi_private)
-+		struct fsl_ssi_private *ssi_private, void __iomem *iomem)
- {
- 	struct device_node *np = pdev->dev.of_node;
- 	u32 dmas[4];
-@@ -1041,12 +1040,47 @@ static int fsl_ssi_imx_probe(struct platform_device *pdev,
- 		ssi_private->dma_params_rx.maxburst &= ~0x1;
+ /*
++ * Calculate the bits that have to be disabled for the current stream that is
++ * getting disabled. This keeps the bits enabled that are necessary for the
++ * second stream to work if 'stream_active' is true.
++ *
++ * Detailed calculation:
++ * These are the values that need to be active after disabling. For non-active
++ * second stream, this is 0:
++ *	vals_stream * !!stream_active
++ *
++ * The following computes the overall differences between the setup for the
++ * to-disable stream and the active stream, a simple XOR:
++ *	vals_disable ^ (vals_stream * !!(stream_active))
++ *
++ * The full expression adds a mask on all values we care about
++ */
++#define fsl_ssi_disable_val(vals_disable, vals_stream, stream_active) \
++	((vals_disable) & \
++	 ((vals_disable) ^ ((vals_stream) * (u32)!!(stream_active))))
++
++/*
+  * Enable/Disable a ssi configuration. You have to pass either
+  * ssi_private->rxtx_reg_val.rx or tx as vals parameter.
+  */
+@@ -501,6 +521,12 @@ static void fsl_ssi_config(struct fsl_ssi_private *ssi_private, bool enable,
+ 	u32 scr_val = read_ssi(&ssi->scr);
+ 	int nr_active_streams = !!(scr_val & CCSR_SSI_SCR_TE) +
+ 				!!(scr_val & CCSR_SSI_SCR_RE);
++	int keep_active;
++
++	if (nr_active_streams - 1 > 0)
++		keep_active = 1;
++	else
++		keep_active = 0;
+ 
+ 	/* Find the other direction values rx or tx which we do not want to
+ 	 * modify */
+@@ -511,7 +537,8 @@ static void fsl_ssi_config(struct fsl_ssi_private *ssi_private, bool enable,
+ 
+ 	/* If vals should be disabled, start with disabling the unit */
+ 	if (!enable) {
+-		u32 scr = vals->scr & (vals->scr ^ avals->scr);
++		u32 scr = fsl_ssi_disable_val(vals->scr, avals->scr,
++				keep_active);
+ 		write_ssi_mask(&ssi->scr, scr, 0);
  	}
  
-+	if (!ssi_private->use_dma) {
-+
-+		/*
-+		 * Some boards use an incompatible codec. To get it
-+		 * working, we are using imx-fiq-pcm-audio, that
-+		 * can handle those codecs. DMA is not possible in this
-+		 * situation.
-+		 */
-+
-+		ssi_private->fiq_params.irq = ssi_private->irq;
-+		ssi_private->fiq_params.base = iomem;
-+		ssi_private->fiq_params.dma_params_rx =
-+			&ssi_private->dma_params_rx;
-+		ssi_private->fiq_params.dma_params_tx =
-+			&ssi_private->dma_params_tx;
-+
-+		ret = imx_pcm_fiq_init(pdev, &ssi_private->fiq_params);
-+		if (ret)
-+			goto error_pcm;
-+	} else {
-+		ret = imx_pcm_dma_init(pdev);
-+		if (ret)
-+			goto error_pcm;
-+	}
-+
- 	return 0;
-+
-+error_pcm:
-+	if (!IS_ERR(ssi_private->baudclk))
-+		clk_disable_unprepare(ssi_private->baudclk);
-+
-+	clk_disable_unprepare(ssi_private->clk);
-+
-+	return ret;
- }
+@@ -522,7 +549,7 @@ static void fsl_ssi_config(struct fsl_ssi_private *ssi_private, bool enable,
+ 	 */
+ 	if (ssi_private->offline_config) {
+ 		if ((enable && !nr_active_streams) ||
+-				(!enable && nr_active_streams == 1))
++				(!enable && !keep_active))
+ 			fsl_ssi_rxtx_config(ssi_private, enable);
  
- static void fsl_ssi_imx_clean(struct platform_device *pdev,
- 		struct fsl_ssi_private *ssi_private)
- {
-+	if (!ssi_private->use_dma)
-+		imx_pcm_fiq_exit(pdev);
- 	if (!IS_ERR(ssi_private->baudclk))
- 		clk_disable_unprepare(ssi_private->baudclk);
- 	clk_disable_unprepare(ssi_private->clk);
-@@ -1056,7 +1090,6 @@ static int fsl_ssi_probe(struct platform_device *pdev)
- {
- 	struct fsl_ssi_private *ssi_private;
- 	int ret = 0;
--	struct device_attribute *dev_attr = NULL;
- 	struct device_node *np = pdev->dev.of_node;
- 	const struct of_device_id *of_id;
- 	enum fsl_ssi_type hw_type;
-@@ -1149,6 +1182,8 @@ static int fsl_ssi_probe(struct platform_device *pdev)
- 	ssi_private->baudclk_locked = false;
- 	spin_lock_init(&ssi_private->baudclk_lock);
+ 		goto config_done;
+@@ -551,9 +578,12 @@ static void fsl_ssi_config(struct fsl_ssi_private *ssi_private, bool enable,
+ 		 */
  
-+	dev_set_drvdata(&pdev->dev, ssi_private);
-+
- 	/*
- 	 * imx51 and later SoCs have a slightly different IP that allows the
- 	 * SSI configuration while the SSI unit is running.
-@@ -1179,20 +1214,22 @@ static int fsl_ssi_probe(struct platform_device *pdev)
- 			hw_type == FSL_SSI_MX35) {
- 		ssi_private->ssi_on_imx = true;
+ 		/* These assignments are simply vals without bits set in avals*/
+-		sier = vals->sier & (vals->sier ^ avals->sier);
+-		srcr = vals->srcr & (vals->srcr ^ avals->srcr);
+-		stcr = vals->stcr & (vals->stcr ^ avals->stcr);
++		sier = fsl_ssi_disable_val(vals->sier, avals->sier,
++				keep_active);
++		srcr = fsl_ssi_disable_val(vals->srcr, avals->srcr,
++				keep_active);
++		stcr = fsl_ssi_disable_val(vals->stcr, avals->stcr,
++				keep_active);
  
--		ret = fsl_ssi_imx_probe(pdev, ssi_private);
-+		ret = fsl_ssi_imx_probe(pdev, ssi_private, ssi_private->ssi);
- 		if (ret)
- 			goto error_irqmap;
- 	}
- 
--	/*
--	 * Enable interrupts only for MCP8610 and MX51. The other MXs have
--	 * different writeable interrupt status registers.
--	 */
-+	ret = snd_soc_register_component(&pdev->dev, &fsl_ssi_component,
-+					 &ssi_private->cpu_dai_drv, 1);
-+	if (ret) {
-+		dev_err(&pdev->dev, "failed to register DAI: %d\n", ret);
-+		goto error_asoc_register;
-+	}
-+
- 	if (ssi_private->use_dma) {
- 		ret = devm_request_irq(&pdev->dev, ssi_private->irq,
- 					fsl_ssi_isr, 0, ssi_private->name,
- 					ssi_private);
--		ssi_private->irq_stats = true;
- 		if (ret < 0) {
- 			dev_err(&pdev->dev, "could not claim irq %u\n",
- 					ssi_private->irq);
-@@ -1200,46 +1237,9 @@ static int fsl_ssi_probe(struct platform_device *pdev)
- 		}
- 	}
- 
--	/* Register with ASoC */
--	dev_set_drvdata(&pdev->dev, ssi_private);
--
--	ret = snd_soc_register_component(&pdev->dev, &fsl_ssi_component,
--					 &ssi_private->cpu_dai_drv, 1);
--	if (ret) {
--		dev_err(&pdev->dev, "failed to register DAI: %d\n", ret);
--		goto error_dev;
--	}
--
- 	ret = fsl_ssi_debugfs_create(&ssi_private->dbg_stats, &pdev->dev);
- 	if (ret)
--		goto error_dbgfs;
--
--	if (ssi_private->ssi_on_imx) {
--		if (!ssi_private->use_dma) {
--
--			/*
--			 * Some boards use an incompatible codec. To get it
--			 * working, we are using imx-fiq-pcm-audio, that
--			 * can handle those codecs. DMA is not possible in this
--			 * situation.
--			 */
--
--			ssi_private->fiq_params.irq = ssi_private->irq;
--			ssi_private->fiq_params.base = ssi_private->ssi;
--			ssi_private->fiq_params.dma_params_rx =
--				&ssi_private->dma_params_rx;
--			ssi_private->fiq_params.dma_params_tx =
--				&ssi_private->dma_params_tx;
--
--			ret = imx_pcm_fiq_init(pdev, &ssi_private->fiq_params);
--			if (ret)
--				goto error_pcm;
--		} else {
--			ret = imx_pcm_dma_init(pdev);
--			if (ret)
--				goto error_pcm;
--		}
--	}
-+		goto error_asoc_register;
- 
- 	/*
- 	 * If codec-handle property is missing from SSI node, we assume
-@@ -1269,32 +1269,25 @@ static int fsl_ssi_probe(struct platform_device *pdev)
- 	if (IS_ERR(ssi_private->pdev)) {
- 		ret = PTR_ERR(ssi_private->pdev);
- 		dev_err(&pdev->dev, "failed to register platform: %d\n", ret);
--		goto error_dai;
-+		goto error_sound_card;
- 	}
- 
- done:
- 	return 0;
- 
--error_dai:
--	if (ssi_private->ssi_on_imx && !ssi_private->use_dma)
--		imx_pcm_fiq_exit(pdev);
--
--error_pcm:
-+error_sound_card:
- 	fsl_ssi_debugfs_remove(&ssi_private->dbg_stats);
- 
--error_dbgfs:
-+error_irq:
- 	snd_soc_unregister_component(&pdev->dev);
- 
--error_dev:
--	device_remove_file(&pdev->dev, dev_attr);
--
--error_irq:
-+error_asoc_register:
- 	if (ssi_private->ssi_on_imx) {
- 		fsl_ssi_imx_clean(pdev, ssi_private);
- 	}
- 
- error_irqmap:
--	if (ssi_private->irq_stats)
-+	if (ssi_private->use_dma)
- 		irq_dispose_mapping(ssi_private->irq);
- 
- 	return ret;
-@@ -1313,7 +1306,7 @@ static int fsl_ssi_remove(struct platform_device *pdev)
- 	if (ssi_private->ssi_on_imx)
- 		fsl_ssi_imx_clean(pdev, ssi_private);
- 
--	if (ssi_private->irq_stats)
-+	if (ssi_private->use_dma)
- 		irq_dispose_mapping(ssi_private->irq);
- 
- 	return 0;
+ 		write_ssi_mask(&ssi->srcr, srcr, 0);
+ 		write_ssi_mask(&ssi->stcr, stcr, 0);
 -- 
 1.9.1
