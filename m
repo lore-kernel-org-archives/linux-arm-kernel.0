@@ -1,53 +1,165 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Mon, 28 Apr 2014 14:53:39 +0800
-Subject: [PATCH v4 01/14] ARM: debug: add HiP04 debug uart
+Date: Mon, 28 Apr 2014 14:53:40 +0800
+Subject: [PATCH v4 02/14] ARM: append ARCH_MULTI_V7_LPAE
 In-Reply-To: <1398668032-8335-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1398668032-8335-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1398668032-8335-2-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1398668032-8335-3-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the support of Hisilicon HiP04 debug uart.
+Add new ARCH_MULTI_V7_LPAE config. It will select ARM_LPAE only both
+ARCH_MULTI_V6 & ARCH_MULTI_V7 is disabled.
+
+ARCH_MULTI_V7 means non-LPAE platform.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- arch/arm/Kconfig.debug | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/Kconfig               | 10 +++++++++-
+ arch/arm/mach-berlin/Kconfig   |  2 +-
+ arch/arm/mach-highbank/Kconfig |  2 +-
+ arch/arm/mach-mvebu/Kconfig    |  4 ++--
+ arch/arm/mach-omap2/Kconfig    |  4 ++--
+ arch/arm/mach-qcom/Kconfig     |  2 +-
+ arch/arm/mach-shmobile/Kconfig |  2 +-
+ arch/arm/mach-tegra/Kconfig    |  2 +-
+ arch/arm/mach-vexpress/Kconfig |  2 +-
+ 9 files changed, 19 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 4a2fc0b..5a311af 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -223,6 +223,14 @@ choice
- 		  Say Y here if you want kernel low-level debugging support
- 		  on HI3716 UART.
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index ab438cb..5ef96ea 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -918,12 +918,20 @@ config ARCH_MULTI_V6
+ 	select CPU_V6K
  
-+	config DEBUG_HIP04_UART
-+		bool "Hisilicon HiP04 Debug UART"
-+		depends on ARCH_HIP04
-+		select DEBUG_UART_8250
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on HIP04 UART.
+ config ARCH_MULTI_V7
+-	bool "ARMv7 based platforms (Cortex-A, PJ4, Scorpion, Krait)"
++	bool "ARMv7 non-LPAE based platforms (Cortex-A5/A8/A9, PJ4, PJ4B, Scorpion)"
+ 	default y
+ 	select ARCH_MULTI_V6_V7
++	select ARCH_MULTI_V7_LPAE
+ 	select CPU_V7
+ 	select HAVE_SMP
+ 
++config ARCH_MULTI_V7_LPAE
++	bool "ARMv7 LPAE based platforms (Cortex-A7/A12/A15/A17, Brahma-B15, PJ4B-MP, Krait)"
++	select ARCH_MULTI_V6_V7
++	select CPU_V7
++	select HAVE_SMP
++	select ARM_LPAE if !(ARCH_MULTI_V6 || ARCH_MULTI_V7)
 +
- 	config DEBUG_HIGHBANK_UART
- 		bool "Kernel low-level debugging messages via Highbank UART"
- 		depends on ARCH_HIGHBANK
-@@ -1044,6 +1052,7 @@ config DEBUG_UART_PHYS
- 	default 0xd4017000 if DEBUG_MMP_UART2
- 	default 0xd4018000 if DEBUG_MMP_UART3
- 	default 0xe0000000 if ARCH_SPEAR13XX
-+	default 0xe4007000 if DEBUG_HIP04_UART
- 	default 0xf0000be0 if ARCH_EBSA110
- 	default 0xf1012000 if DEBUG_MVEBU_UART_ALTERNATE
- 	default 0xf1012000 if ARCH_DOVE || ARCH_KIRKWOOD || ARCH_MV78XX0 || \
-@@ -1076,6 +1085,7 @@ config DEBUG_UART_VIRT
- 	default 0xf4090000 if ARCH_LPC32XX
- 	default 0xf4200000 if ARCH_GEMINI
- 	default 0xf7fc9000 if DEBUG_BERLIN_UART
-+	default 0xf8007000 if DEBUG_HIP04_UART
- 	default 0xf8009000 if DEBUG_VEXPRESS_UART0_CA9
- 	default 0xf8090000 if DEBUG_VEXPRESS_UART0_RS1
- 	default 0xfb009000 if DEBUG_REALVIEW_STD_PORT
+ config ARCH_MULTI_V6_V7
+ 	bool
+ 	select MIGHT_HAVE_CACHE_L2X0
+diff --git a/arch/arm/mach-berlin/Kconfig b/arch/arm/mach-berlin/Kconfig
+index b0cb072..be0512d 100644
+--- a/arch/arm/mach-berlin/Kconfig
++++ b/arch/arm/mach-berlin/Kconfig
+@@ -1,5 +1,5 @@
+ config ARCH_BERLIN
+-	bool "Marvell Berlin SoCs" if ARCH_MULTI_V7
++	bool "Marvell Berlin SoCs" if (ARCH_MULTI_V7 || ARCH_MULTI_V7_LPAE)
+ 	select ARM_GIC
+ 	select GENERIC_IRQ_CHIP
+ 	select DW_APB_ICTL
+diff --git a/arch/arm/mach-highbank/Kconfig b/arch/arm/mach-highbank/Kconfig
+index 830b76e..9b6b3f8 100644
+--- a/arch/arm/mach-highbank/Kconfig
++++ b/arch/arm/mach-highbank/Kconfig
+@@ -1,5 +1,5 @@
+ config ARCH_HIGHBANK
+-	bool "Calxeda ECX-1000/2000 (Highbank/Midway)" if ARCH_MULTI_V7
++	bool "Calxeda ECX-1000/2000 (Highbank/Midway)" if ARCH_MULTI_V7_LPAE
+ 	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
+ 	select ARCH_HAS_CPUFREQ
+ 	select ARCH_HAS_HOLES_MEMORYMODEL
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index 3f73eec..0d54d1a 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -1,5 +1,5 @@
+ config ARCH_MVEBU
+-	bool "Marvell Engineering Business Unit (MVEBU) SoCs" if (ARCH_MULTI_V7 || ARCH_MULTI_V5)
++	bool "Marvell Engineering Business Unit (MVEBU) SoCs" if (ARCH_MULTI_V7 || ARCH_MULTI_V7_LPAE || ARCH_MULTI_V5)
+ 	select ARCH_SUPPORTS_BIG_ENDIAN
+ 	select CLKSRC_MMIO
+ 	select GENERIC_IRQ_CHIP
+@@ -59,7 +59,7 @@ config MACH_ARMADA_38X
+ 	  on the Marvell Armada 380/385 SoC with device tree.
+ 
+ config MACH_ARMADA_XP
+-	bool "Marvell Armada XP boards" if ARCH_MULTI_V7
++	bool "Marvell Armada XP boards" if ARCH_MULTI_V7_LPAE
+ 	select ARMADA_XP_CLK
+ 	select CPU_PJ4B
+ 	select MACH_MVEBU_V7
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index cb31d43..1958791 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -41,7 +41,7 @@ config ARCH_OMAP4
+ 
+ config SOC_OMAP5
+ 	bool "TI OMAP5"
+-	depends on ARCH_MULTI_V7
++	depends on ARCH_MULTI_V7_LPAE
+ 	select ARCH_OMAP2PLUS
+ 	select ARCH_HAS_OPP
+ 	select ARM_CPU_SUSPEND if PM
+@@ -68,7 +68,7 @@ config SOC_AM43XX
+ 
+ config SOC_DRA7XX
+ 	bool "TI DRA7XX"
+-	depends on ARCH_MULTI_V7
++	depends on ARCH_MULTI_V7_LPAE
+ 	select ARCH_OMAP2PLUS
+ 	select ARCH_HAS_OPP
+ 	select ARM_CPU_SUSPEND if PM
+diff --git a/arch/arm/mach-qcom/Kconfig b/arch/arm/mach-qcom/Kconfig
+index a028be2..0da77d2 100644
+--- a/arch/arm/mach-qcom/Kconfig
++++ b/arch/arm/mach-qcom/Kconfig
+@@ -1,5 +1,5 @@
+ config ARCH_QCOM
+-	bool "Qualcomm Support" if ARCH_MULTI_V7
++	bool "Qualcomm Support" if (ARCH_MULTI_V7 || ARCH_MULTI_V7_LPAE)
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARM_GIC
+ 	select CLKSRC_OF
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 0f92ba8..c2a1fce 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -2,7 +2,7 @@ config ARCH_SHMOBILE
+ 	bool
+ 
+ config ARCH_SHMOBILE_MULTI
+-	bool "Renesas ARM SoCs" if ARCH_MULTI_V7
++	bool "Renesas ARM SoCs" if (ARCH_MULTI_V7 || ARCH_MULTI_V7_LPAE)
+ 	depends on MMU
+ 	select ARCH_SHMOBILE
+ 	select HAVE_ARM_SCU if SMP
+diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+index 92d660f..12e1b49 100644
+--- a/arch/arm/mach-tegra/Kconfig
++++ b/arch/arm/mach-tegra/Kconfig
+@@ -1,5 +1,5 @@
+ config ARCH_TEGRA
+-	bool "NVIDIA Tegra" if ARCH_MULTI_V7
++	bool "NVIDIA Tegra" if (ARCH_MULTI_V7 || ARCH_MULTI_V7_LPAE)
+ 	select ARCH_HAS_CPUFREQ
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARCH_SUPPORTS_TRUSTED_FOUNDATIONS
+diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
+index 657d52d..a1d69d1 100644
+--- a/arch/arm/mach-vexpress/Kconfig
++++ b/arch/arm/mach-vexpress/Kconfig
+@@ -1,5 +1,5 @@
+ config ARCH_VEXPRESS
+-	bool "ARM Ltd. Versatile Express family" if ARCH_MULTI_V7
++	bool "ARM Ltd. Versatile Express family" if (ARCH_MULTI_V7 || ARCH_MULTI_V7_LPAE)
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARCH_SUPPORTS_BIG_ENDIAN
+ 	select ARM_AMBA
 -- 
 1.9.1
