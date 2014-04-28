@@ -1,87 +1,161 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Mon, 28 Apr 2014 10:14:52 -0500
-Subject: [PATCH V3 12/20] bus: omap_l3_noc: fix masterid detection
+Date: Mon, 28 Apr 2014 10:14:53 -0500
+Subject: [PATCH V3 13/20] bus: omap_l3_noc: make error reporting and handling
+ common
 In-Reply-To: <1398698101-25513-1-git-send-email-nm@ti.com>
 References: <1397492726-17203-1-git-send-email-nm@ti.com>
  <1398698101-25513-1-git-send-email-nm@ti.com>
-Message-ID: <1398698101-25513-13-git-send-email-nm@ti.com>
+Message-ID: <1398698101-25513-14-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As per Documentation (OMAP4+), then masterid is infact encoded as
-follows:
-"L3_TARG_STDERRLOG_MSTADDR[7:0] STDERRLOG_MSTADDR stores the NTTP
-master address. The master address is the concatenation of Prefix &
-Initiator ConnID. It is defined on 8 bits. The 6 MSBs are used to
-distinguish the different initiators."
+The logic between handling CUSTOM_ERROR and STANDARD_ERROR is just the
+reporting style.
 
-So, when we matchup currently with the master ID list, we never get a
-proper match other than when MPU is the master (thanks to 0).
+So make it generic, simplify and standardize the reporting with both
+master and target information printed to log.
 
-Now, on other platforms such as AM437x, this tends to be bits[5:0].
+Handle the register address difference for master code for standard
+error and custom error as well.
 
-Fix this by using the relevant 6MSBits to identify the master ID for
-standard and custom errors.
+While at it, fix a minor indentation error.
 
-Reported-by: Darren Etheridge <detheridge@ti.com>
 Signed-off-by: Nishanth Menon <nm@ti.com>
 Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 Tested-by: Darren Etheridge <detheridge@ti.com>
 ---
+V3: no change
 
-V3: made master id information into a structure field thanks to AM437x
-information recently recieved.
-
- drivers/bus/omap_l3_noc.c |    6 +++++-
- drivers/bus/omap_l3_noc.h |    4 ++++
- 2 files changed, 9 insertions(+), 1 deletion(-)
+ drivers/bus/omap_l3_noc.c |   72 ++++++++++++++++++++++++++++-----------------
+ drivers/bus/omap_l3_noc.h |    3 +-
+ 2 files changed, 47 insertions(+), 28 deletions(-)
 
 diff --git a/drivers/bus/omap_l3_noc.c b/drivers/bus/omap_l3_noc.c
-index 9524452..8a1926d 100644
+index 8a1926d..42e4114 100644
 --- a/drivers/bus/omap_l3_noc.c
 +++ b/drivers/bus/omap_l3_noc.c
-@@ -127,7 +127,11 @@ static irqreturn_t l3_interrupt_handler(int irq, void *_l3)
- 					  L3_TARG_STDERRLOG_MSTADDR;
+@@ -62,6 +62,8 @@ static irqreturn_t l3_interrupt_handler(int irq, void *_l3)
+ 	struct l3_target_data *l3_targ_inst;
+ 	struct l3_flagmux_data *flag_mux;
+ 	struct l3_masters_data *master;
++	char *err_description;
++	char err_string[30] = { 0 };
+ 
+ 	/* Get the Type of interrupt */
+ 	inttype = irq == l3->app_irq ? L3_APPLICATION_ERROR : L3_DEBUG_ERROR;
+@@ -78,6 +80,8 @@ static irqreturn_t l3_interrupt_handler(int irq, void *_l3)
+ 
+ 		/* Get the corresponding error and analyse */
+ 		if (err_reg) {
++			bool std_err = true;
++
+ 			/* Identify the source from control status register */
+ 			err_src = __ffs(err_reg);
+ 
+@@ -123,47 +127,61 @@ static irqreturn_t l3_interrupt_handler(int irq, void *_l3)
+ 			l3_targ_stderr = l3_targ_base + L3_TARG_STDERRLOG_MAIN;
+ 			l3_targ_slvofslsb = l3_targ_base +
+ 					    L3_TARG_STDERRLOG_SLVOFSLSB;
+-			l3_targ_mstaddr = l3_targ_base +
+-					  L3_TARG_STDERRLOG_MSTADDR;
  
  			std_err_main = readl_relaxed(l3_targ_stderr);
--			masterid = readl_relaxed(l3_targ_mstaddr);
+ 
+-			/* STDERRLOG_MSTADDR Stores the NTTP master address. */
+-			masterid = (readl_relaxed(l3_targ_mstaddr) &
+-				    l3->mst_addr_mask) >>
+-					__ffs(l3->mst_addr_mask);
+-
+ 			switch (std_err_main & CUSTOM_ERROR) {
+ 			case STANDARD_ERROR:
+-				WARN(true, "L3 standard error: TARGET:%s at address 0x%x\n",
+-					target_name,
+-					readl_relaxed(l3_targ_slvofslsb));
+-				/* clear the std error log*/
+-				clear = std_err_main | CLEAR_STDERR_LOG;
+-				writel_relaxed(clear, l3_targ_stderr);
++				err_description = "Standard";
++				snprintf(err_string, sizeof(err_string),
++					 ": At Address: 0x%08X ",
++					 readl_relaxed(l3_targ_slvofslsb));
++
++				l3_targ_mstaddr = l3_targ_base +
++						L3_TARG_STDERRLOG_MSTADDR;
+ 				break;
+ 
+ 			case CUSTOM_ERROR:
+-				for (k = 0, master = l3->l3_masters;
+-				     k < l3->num_masters; k++, master++) {
+-					if (masterid == master->id) {
+-						master_name = master->name;
+-						break;
+-					}
+-				}
+-				WARN(true, "L3 custom error: MASTER:%s TARGET:%s\n",
+-					master_name, target_name);
+-				/* clear the std error log*/
+-				clear = std_err_main | CLEAR_STDERR_LOG;
+-				writel_relaxed(clear, l3_targ_stderr);
++				err_description = "Custom";
++
++				l3_targ_mstaddr = l3_targ_base +
++						L3_TARG_STDERRLOG_CINFO_MSTADDR;
+ 				break;
+ 
+ 			default:
++				std_err = false;
+ 				/* Nothing to be handled here as of now */
+ 				break;
+ 			}
+-		/* Error found so break the for loop */
+-		break;
++
++			if (!std_err)
++				break;
 +
 +			/* STDERRLOG_MSTADDR Stores the NTTP master address. */
 +			masterid = (readl_relaxed(l3_targ_mstaddr) &
 +				    l3->mst_addr_mask) >>
 +					__ffs(l3->mst_addr_mask);
- 
- 			switch (std_err_main & CUSTOM_ERROR) {
- 			case STANDARD_ERROR:
++
++			for (k = 0, master = l3->l3_masters;
++			     k < l3->num_masters; k++, master++) {
++				if (masterid == master->id) {
++					master_name = master->name;
++					break;
++				}
++			}
++
++			WARN(true,
++			     "%s:L3 %s Error: MASTER %s TARGET %s%s\n",
++			     dev_name(l3->dev),
++			     err_description,
++			     master_name, target_name,
++			     err_string);
++			/* clear the std error log*/
++			clear = std_err_main | CLEAR_STDERR_LOG;
++			writel_relaxed(clear, l3_targ_stderr);
++
++			/* Error found so break the for loop */
++			break;
+ 		}
+ 	}
+ 	return IRQ_HANDLED;
 diff --git a/drivers/bus/omap_l3_noc.h b/drivers/bus/omap_l3_noc.h
-index 64869fe..ba86924 100644
+index ba86924..ea2f51c 100644
 --- a/drivers/bus/omap_l3_noc.h
 +++ b/drivers/bus/omap_l3_noc.h
-@@ -84,6 +84,7 @@ struct l3_flagmux_data {
-  * @l3_masters:	array pointing to master data containing name and register
-  *		offset for the master.
-  * @num_master: number of masters
-+ * @mst_addr_mask: Mask representing MSTADDR information of NTTP packet
-  * @debug_irq:	irq number of the debug interrupt (populated runtime)
-  * @app_irq:	irq number of the application interrupt (populated runtime)
-  */
-@@ -96,6 +97,7 @@ struct omap_l3 {
+@@ -29,8 +29,9 @@
  
- 	struct l3_masters_data *l3_masters;
- 	int num_masters;
-+	u32 mst_addr_mask;
+ /* L3 TARG register offsets */
+ #define L3_TARG_STDERRLOG_MAIN		0x48
++#define L3_TARG_STDERRLOG_MSTADDR	0x50
+ #define L3_TARG_STDERRLOG_SLVOFSLSB	0x5c
+-#define L3_TARG_STDERRLOG_MSTADDR	0x68
++#define L3_TARG_STDERRLOG_CINFO_MSTADDR	0x68
+ #define L3_FLAGMUX_REGERR0		0xc
+ #define L3_FLAGMUX_MASK0		0x8
  
- 	int debug_irq;
- 	int app_irq;
-@@ -200,6 +202,8 @@ static const struct omap_l3 omap_l3_data = {
- 	.num_modules = ARRAY_SIZE(omap_l3_flagmux),
- 	.l3_masters = omap_l3_masters,
- 	.num_masters = ARRAY_SIZE(omap_l3_masters),
-+	/* The 6 MSBs of register field used to distinguish initiator */
-+	.mst_addr_mask = 0xFC,
- };
- 
- #endif	/* __OMAP_L3_NOC_H */
 -- 
 1.7.9.5
