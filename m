@@ -1,98 +1,74 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 28 Apr 2014 13:43:57 +0300
-Subject: [PATCHv3 19/41] OMAPDSS: panel-dpi: Add DT support
-In-Reply-To: <20140425235348.GH20807@atomide.com>
-References: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
- <1390301833-24944-20-git-send-email-tomi.valkeinen@ti.com>
- <20140418155107.GB5354@atomide.com> <5358DEEA.1000506@ti.com>
- <20140425235348.GH20807@atomide.com>
-Message-ID: <535E30ED.10903@ti.com>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Mon, 28 Apr 2014 16:08:14 +0530
+Subject: [PATCH v12 18/31] iommu/exynos: allow having multiple System
+ MMUs for a master H/W
+In-Reply-To: <1398584283-22846-19-git-send-email-shaik.ameer@samsung.com>
+References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
+ <1398584283-22846-19-git-send-email-shaik.ameer@samsung.com>
+Message-ID: <535E2F96.908@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/04/14 02:53, Tony Lindgren wrote:
-> * Tomi Valkeinen <tomi.valkeinen@ti.com> [140424 02:53]:
->> On 18/04/14 18:51, Tony Lindgren wrote:
->>
->>>> +	gpio = of_get_gpio(node, 0);
->>>> +	if (gpio_is_valid(gpio) || gpio == -ENOENT) {
->>>> +		ddata->enable_gpio = gpio;
->>>> +	} else {
->>>> +		dev_err(&pdev->dev, "failed to parse enable gpio\n");
->>>> +		return gpio;
->>>> +	}
->>>
->>> We should set the GPIO polarity based on the OF_GPIO_ACTIVE_LOW like
->>> gpio_backlight_probe_dt is doing. 
->>
->> Instead of doing it with the old gpio API, and checking the 'active'
->> flag everywhere, I think we can use the new gpiod API which handles the
->> polarity automatically.
->>
->> I attached prototype patches (based on -rc2) for panel dpi using that
->> approach. It's a bit messier than I'd like, because for non-DT boot we
->> need to request the gpio using the old API, and then convert it to
->> gpio_desc. We can remove that code when all the boards use DT.
->>
->> I've compiled tested this only, as I don't have DPI panels I could use.
->> I did try similar approach for TFP410, and it seemed to work fine.
+On 04/27/2014 01:07 PM, Shaik Ameer Basha wrote:
+> From: Cho KyongHo <pullip.cho@samsung.com>
 > 
-> Got these working by updating my test patch to use enable-gpios instead
-> of gpios, and had to change from GPIO_ACTIVE_LOW to GPIO_ACTIVE_HIGH.
-> Are we now also breaking legacy booting by reversing the polarity?
-
-I don't think so. The GPIOs should be active-high by default, if I'm not
-mistaken, so the polarities should be the same for legacy boot with or
-without those patches. Of course, I don't have the boards so I have no
-idea if the polarities have been correct even before.
-
-debugfs/gpio shows the actual value of the gpio, so you could check from
-there what it is.
-
-> In any case, looks like we have some duplicate panel code.. Turns
-> out most panel dpi users for omap3 board-*.c files are just
-> sharp-ls037v7dw01 panels but configured in QVGA mode. At least for
-> EVM and and LDP based on looking at the pictures and the configuration
-
-Hmm, true, board-ldp.c's panel looks very much like sharp-ls037v7dw01.
-
-Which EVM are you talking about?
-
-> pins (using the names kernel):
+> Some master device descriptor like fimc-is which is an abstraction
+> of very complex H/W may have multiple System MMUs. For those devices,
+> the design of the link between System MMU and its master H/W is needed
+> to be reconsidered.
 > 
-> QVGA = lcd MO
-> reset = lcd RESB
-> ...
+> A link structure, sysmmu_list_data is introduced that provides a link
+> to master H/W and that has a pointer to the device descriptor of a
+> System MMU. Given a device descriptor of a master H/W, it is possible
+> to traverse all System MMUs that must be controlled along with the
+> master H/W.
 > 
-> Then the enable_gpio should be just a GPIO controlled 3.3V regulator
-> in most cases. I suggest we move them over to ls037v7dw01 and allow
-> configuring them both for VGA and QVGA depending on the orientation.
+> Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
 
-Looking at the panel spec, it has the following pins:
+Since you are posting the patches, you should also add your
+Signed-of-by.
 
-RESB - reset
-MO - VGA/QVGA
-UD - vertical scanning direction
-LR - horizontal scanning direction
-INI - power on control
+> ---
+>  drivers/iommu/exynos-iommu.c |  545 ++++++++++++++++++++++++++----------------
+>  1 file changed, 335 insertions(+), 210 deletions(-)
+> 
+> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+> index fefedec3..c2e6365 100755
+> --- a/drivers/iommu/exynos-iommu.c
+> +++ b/drivers/iommu/exynos-iommu.c
 
-And it needs 3.3V power.
+[ ... ]
 
-Are you saying that on some boards the gpio used for enable_gpio is
-actually used to switch on a 3.3V regulator?
+>  static int sysmmu_pm_genpd_save_state(struct device *dev)
+> @@ -1215,7 +1349,7 @@ static int sysmmu_pm_genpd_save_state(struct device *dev)
+>  		ret = cb(dev);
+>  
+>  	if (ret == 0)
+> -		sysmmu_save_state(client->sysmmu);
+> +		sysmmu_save_state(dev);
+>  
 
-> I guess you do have some device with ls037v7dw01 since you've been
-> patching it?
+client is now unused, remove the variable.
 
-No, I don't have any boards with that panel.
+>  	return ret;
+>  }
+> @@ -1238,13 +1372,13 @@ static int sysmmu_pm_genpd_restore_state(struct device *dev)
+>  	if (!cb && dev->driver && dev->driver->pm)
+>  		cb = dev->driver->pm->runtime_resume;
+>  
+> -	sysmmu_restore_state(client->sysmmu);
+> +	sysmmu_restore_state(dev);
+>  
+>  	if (cb)
+>  		ret = cb(dev);
+>  
+>  	if (ret)
+> -		sysmmu_save_state(client->sysmmu);
+> +		sysmmu_restore_state(dev);
+>  
 
- Tomi
+client is now unused, remove the variable.
 
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140428/5f622a34/attachment.sig>
+-- 
+Tushar Behera
