@@ -1,73 +1,25 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 28 Apr 2014 16:27:54 -0700
-Subject: [PATCH 2/7] reset: sunxi: allow MFD subdevices probe
-In-Reply-To: <1398697130-8338-3-git-send-email-boris.brezillon@free-electrons.com>
-References: <1398697130-8338-1-git-send-email-boris.brezillon@free-electrons.com>
- <1398697130-8338-3-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20140428232754.GQ3134@lukather>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 28 Apr 2014 16:30:44 -0700
+Subject: [PATCH] mfd: pm8921: Remove pm8xxx API now that sub-devices use
+ regmap
+In-Reply-To: <1397002455-12854-1-git-send-email-sboyd@codeaurora.org>
+References: <1397002455-12854-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <535EE4A4.6040208@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 04:58:45PM +0200, Boris BREZILLON wrote:
-> The current implementation uses sunxi_reset_init function for both early
-> init and platform device probe.
-> 
-> The sunxi_reset_init function uses DT to retrieve device resources, which
-> will be an issue if reset controllers are registered from an MFD device
-> that define resources from mfd_cell definition.
-> 
-> Moreover, we can make use of devm functions when we're in probe context.
-> 
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+On 04/08/14 17:14, Stephen Boyd wrote:
+> The pm8xxx read/write wrappers are no longer necessary now that
+> all the sub-device drivers are using the regmap API. Remove it.
+>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 > ---
->  drivers/reset/reset-sunxi.c | 19 ++++++++++++++++++-
->  1 file changed, 18 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/reset/reset-sunxi.c b/drivers/reset/reset-sunxi.c
-> index 695bd34..115fbb1 100644
-> --- a/drivers/reset/reset-sunxi.c
-> +++ b/drivers/reset/reset-sunxi.c
-> @@ -145,7 +145,24 @@ MODULE_DEVICE_TABLE(of, sunxi_reset_dt_ids);
->  
->  static int sunxi_reset_probe(struct platform_device *pdev)
->  {
-> -	return sunxi_reset_init(pdev->dev.of_node);
-> +	struct sunxi_reset_data *data;
-> +	struct resource *res;
-> +
-> +	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-> +	if (!data)
-> +		return -ENOMEM;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	data->membase = devm_request_and_ioremap(&pdev->dev, res);
-> +	if (!data->membase)
-> +		return -ENOMEM;
-> +
-> +	data->rcdev.owner = THIS_MODULE;
-> +	data->rcdev.nr_resets = resource_size(res) * 32;
-> +	data->rcdev.ops = &sunxi_reset_ops;
-> +	data->rcdev.of_node = pdev->dev.of_node;
-> +
-> +	return reset_controller_register(&data->rcdev);
->  }
->  
->  static int sunxi_reset_remove(struct platform_device *pdev)
+>
+> Based on Linus' tip as of a7963eb7f4c4 (Merge branch 'for_linus' of
+> git://git.kernel.org/pub/scm/linux/kernel/git/jack/linux-fs, 2014-04-07)
 
-If you're switching to devm_ functions, you'll also have to remove the
-iounmap and kfree in the _remove.
-
-Thanks!
-Maxime
+ping?
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140428/b94dd354/attachment.sig>
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
