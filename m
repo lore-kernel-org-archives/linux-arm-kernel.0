@@ -1,76 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 28 Apr 2014 12:51:07 +0100
-Subject: [PATCH 21/38] mmc: sdhci: hack up driver to make it more
- compliant with UHS-1
-In-Reply-To: <CAPDyKFpHoLbY4Li45UfPweJ0xKpa5E5d=YX+Sgz9pvRG4W2xiQ@mail.gmail.com>
-References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
- <E1Wd2WT-0003vg-Ke@rmk-PC.arm.linux.org.uk>
- <20140425123820.GA15179@pengutronix.de>
- <CAPDyKFpja-dGwsEL6YP=Nn=YSRRgMzTTz6WVQ8DiUOMrkLJpBQ@mail.gmail.com>
- <20140428110259.GI26756@n2100.arm.linux.org.uk>
- <CAPDyKFpHoLbY4Li45UfPweJ0xKpa5E5d=YX+Sgz9pvRG4W2xiQ@mail.gmail.com>
-Message-ID: <20140428115107.GJ26756@n2100.arm.linux.org.uk>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 28 Apr 2014 13:55:40 +0200
+Subject: [PATCH 3/5] ARM: dove: create a proper PMU driver for power
+ domains, PMU IRQs and resets
+In-Reply-To: <E1WeP8f-0000Uo-1q@rmk-PC.arm.linux.org.uk>
+References: <20140427132312.GC26756@n2100.arm.linux.org.uk>
+ <E1WeP8f-0000Uo-1q@rmk-PC.arm.linux.org.uk>
+Message-ID: <CAPDyKFoboE4iKyom86+EwHHTQAGpgKxGq969yrjQVpqizk-SLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 01:11:20PM +0200, Ulf Hansson wrote:
-> On 28 April 2014 13:02, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> > On Mon, Apr 28, 2014 at 12:50:54PM +0200, Ulf Hansson wrote:
-> >> On 25 April 2014 14:38, Markus Pargmann <mpa@pengutronix.de> wrote:
-> >> > Hi,
-> >> >
-> >> > On Wed, Apr 23, 2014 at 08:07:57PM +0100, Russell King wrote:
-> >> >> Patch suggested by Dong Aisheng <dongas86@gmail.com>, this avoids
-> >> >> additional clock start/stop cycles during the transition to 1.8V
-> >> >> signalling mode.
-> >> >>
-> >> >> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> >> >
-> >> > I tested the series on imx6s with a RIoT board. With this patch applied
-> >> > the RIoT board emmc does not work. Here is the output of the board:
-> >>
-> >> Hi Markus,
-> >>
-> >> Thanks for helping out testing!
-> >>
-> >> Does that mean patch 1->20 works fine for you? May I add your tested-by tag?
-> >
-> > Why should _you_ add someone elses tested-by tag to _my_ patches?
-> >
-> > I still wonder whether you understood anything that I've already said to
-> > you about the handling of this patch set.
-> 
-> That was based upon that _I_ would help out in creating the pull
-> request to Chris, to minimize his effort in resolving conflicts.
-> 
-> All-right, I back off - I was just trying to help here. Please send
-> the pull request to Chris directly instead.
+On 27 April 2014 15:29, Russell King <rmk+kernel@arm.linux.org.uk> wrote:
+> The PMU device contains an interrupt controller, power control and
+> resets.  The interrupt controller is a little sub-standard in that
+> there is no race free way to clear down pending interrupts, so we try
+> to avoid problems by reducing the window as much as possible, and
+> clearing as infrequently as possible.
+>
+> The interrupt support is implemented using an IRQ domain, and the
+> parent interrupt referenced in the standard DT way.
+>
+> The power domains and reset support is closely related - there is a
+> defined sequence for powering down a domain which is tightly coupled
+> with asserting the reset.  Hence, it makes sense to group these two
+> together.
+>
+> This patch adds the core PMU driver: power domains must be defined in
+> the DT file in order to make use of them.  The reset controller can
+> be referenced in the standard way for reset controllers.
 
-I thought I clearly explained the logistics in a previous mail:
+Hi Russell,
 
-| I /could/ rebase it but then I wouldn't be able to produce the patch
-| sets/patches for others [*] (such as the Novena project) to derive
-| their kernel tree from my iMX6 patch set.
-| 
-| What I'd prefer is to keep the patch set intact, and provide Chris
-| with a pull request for it up to patch 33, which would need a
-| conflict fixed - and this would mean that I can be sure that what
-| I'm testing, and what I'm distributing is what Chris will also be
-| submitting.
+This patch would be simplified if this was based upon the not yet
+merged patchset from Tomasz Figa, "[PATCH v3 0/3] Generic Device Tree
+based power domain look-up".
 
-One of the problems with your approaches is that the commit IDs for
-the patches I'm carrying become different from the commit IDs which
-will end up being merged, which then means I have to either silently
-drop _my_ commits and hope that they've been merged intact, or I have
-to manually diff each patch and compare it with what's merged, or
-I have to rebase my patch set on top of what's merged and hope that
-git spots that the patches are already applied (which it won't do if
-there's other changes on top of them which make it non-obvious to git
-that they're applied.)
+For example you would likely not need to add some of the marvel
+specific DT bindings, and you wouldn?t need the bus_notifiers to add
+devices to the power domain. I guess I just though it could be useful
+input to consider while going forward, unless you already knew.
 
-To put it another way, recommitting these changes makes /more/ work
-for me in the long run because of how git works.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Kind regards
+Ulf Hansson
