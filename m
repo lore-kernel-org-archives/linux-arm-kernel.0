@@ -1,33 +1,83 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 28 Apr 2014 10:42:35 -0600
-Subject: [PATCH 00/38] MMC updates, plus CuBox-i WiFi support
-In-Reply-To: <20140423185534.GA26756@n2100.arm.linux.org.uk>
-References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
-Message-ID: <535E84FB.4080305@wwwdotorg.org>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 28 Apr 2014 17:43:54 +0100
+Subject: [PATCH] ARM: OMAP5: Switch to THUMB mode if needed on secondary
+ CPU
+In-Reply-To: <1398191506-3741-1-git-send-email-joelf@ti.com>
+References: <1398191506-3741-1-git-send-email-joelf@ti.com>
+Message-ID: <20140428164348.GA14354@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/23/2014 12:55 PM, Russell King - ARM Linux wrote:
-> All,
+On Tue, Apr 22, 2014 at 01:31:46PM -0500, Joel Fernandes wrote:
+> On my DRA7 system, when the kernel is built in THUMB mode, the secondary CPU
+> (Cortex A15) fails to come up causing SMP boot on second CPU to timeout. This
+> seems to be because the CPU is in ARM mode once the ROM hands over control to
+> the kernel.  Switch to THUMB mode if required once the kernel is control of
+> secondary CPU. On OMAP4 on the other hand, it appears to be in THUMB mode on
+> entry so this is not required and SMP boot works as is.
 > 
-> This is where I'm at with trying to clean up the SDHCI mess, and sort out
-> issues I've noticed when trying to get UHS support working on CuBoxes.
-> This is my full patch set, but I recommend not applying patch 37 as there
-> appears to be a hardware issue preventing it working reliably.
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Nishanth Menon <nm@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Joel Fernandes <joelf@ti.com>
+> ---
+>  arch/arm/mach-omap2/omap-headsmp.S |    8 ++++++--
+>  1 file changed, 6 insertions(+), 2 deletions(-)
 > 
-> In any case, patches 0-33 inclusive are the SDHCI clean up, based against
-> v3.15-rc1.  Patches 34 and 35 are Olof's Wifi support, 36 is my fix against
-> those, and 38 adds the Broadcom Wifi and BT support for CuBox.
-> 
-> The questions over how to handle these devices were never properly settled,
-> so I recommend against merging patch 34 onwards.  As for the rest, I'm not
-> planning on any further work, so it may be a good idea for people to
-> consider testing them with a view to getting them merged.
+> diff --git a/arch/arm/mach-omap2/omap-headsmp.S b/arch/arm/mach-omap2/omap-headsmp.S
+> index 75e9295..1809dce 100644
+> --- a/arch/arm/mach-omap2/omap-headsmp.S
+> +++ b/arch/arm/mach-omap2/omap-headsmp.S
+> @@ -1,7 +1,7 @@
+>  /*
+>   * Secondary CPU startup routine source file.
+>   *
+> - * Copyright (C) 2009 Texas Instruments, Inc.
+> + * Copyright (C) 2014 Texas Instruments, Inc.
+>   *
+>   * Author:
+>   *      Santosh Shilimkar <santosh.shilimkar@ti.com>
+> @@ -28,9 +28,13 @@
+>   * code.  This routine also provides a holding flag into which
+>   * secondary core is held until we're ready for it to initialise.
+>   * The primary core will update this flag using a hardware
+> -+ * register AuxCoreBoot0.
+> + * register AuxCoreBoot0.
+>   */
+>  ENTRY(omap5_secondary_startup)
 
-The series,
-Tested-by: Stephen Warren <swarren@nvidia.com>
+Are you sure this problem is not caused by the missing ENDPROC() for
+omap5_secondary_startup?
 
-(On an NVIDIA Tegra "Jetson TK1" board, with the patches applied on top
-of next-20140428, also with Andrew Bresticker's Tegra SDHCI patches
-"mmc: tegra: disable UHS modes" and "mmc: tegra: fix reporting of base
-clock frequency" applied)
+You have END() instead (which may have been accidental).
+
+Without ENDPROC(), the symbol is not marked as a function and so
+the Thumb bit won't be set when taking a pointer -- so the kernel
+is actually telling the firmware to enter in ARM state.
+
+
+Try changing END() to ENDPROC() without this patch, and see if it
+makes a difference.
+
+If it still doesn't work, then the firmware either doesn't support
+entering in ARM, or is buggy.
+
+Cheers
+---Dave
+
+> +.arm
+> +THUMB( adr     r9, BSYM(wait)  )       @ CPU may be entered in ARM mode.
+> +THUMB( bx      r9              )       @ If this is a Thumb-2 kernel,
+> +THUMB( .thumb                  )       @ switch to Thumb now.
+>  wait:	ldr	r2, =AUX_CORE_BOOT0_PA	@ read from AuxCoreBoot0
+>  	ldr	r0, [r2]
+>  	mov	r0, r0, lsr #5
+> -- 
+> 1.7.9.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
