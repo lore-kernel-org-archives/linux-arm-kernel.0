@@ -1,41 +1,41 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 28 Apr 2014 12:21:01 +0100
-Subject: [RFC PATCH v2 2/3] ARM: EXYNOS: Move pmu specific header files
- under "linux/mfd/samsung"
-In-Reply-To: <1398431131-5946-3-git-send-email-pankaj.dubey@samsung.com>
+Date: Mon, 28 Apr 2014 12:21:53 +0100
+Subject: [RFC PATCH v2 3/3] drivers: mfd: Add support for Exynos PMU driver
+In-Reply-To: <1398431131-5946-4-git-send-email-pankaj.dubey@samsung.com>
 References: <1396427085-4696-1-git-send-email-pankaj.dubey@samsung.com>
  <1398431131-5946-1-git-send-email-pankaj.dubey@samsung.com>
- <1398431131-5946-3-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <20140428112101.GS21279@lee--X1>
+ <1398431131-5946-4-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <20140428112153.GT21279@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Moving Exynos PMU specific header file into "include/linux/mfd/samsung"
-> thus updated affected files under "mach-exynos" to use new location of
-> these header files.
+On Fri, 25 Apr 2014, Pankaj Dubey wrote:
+
+> This patch moves Exynos PMU driver implementation from
+> "arm/mach-exynos" to "drivers/mfd".
+> This driver is mainly used for setting misc bits of register from PMU IP
+> of Exynos SoC which will be required to configure before Suspend/Resume.
+> Currently all these settings are done in "arch/arm/mach-exynos/pmu.c" but
+> moving ahead for ARM64 based SoC support, there is a need of DT based
+> implementation of PMU driver.
+> This driver uses already existing DT binding information.
 > 
 > CC: Sangbeom Kim <sbkim73@samsung.com>
 > CC: Samuel Ortiz <sameo@linux.intel.com>
 > CC: Lee Jones <lee.jones@linaro.org>
 > Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 > ---
->  arch/arm/mach-exynos/cpuidle.c              |    4 +-
->  arch/arm/mach-exynos/exynos-pmu.h           |   31 ---
->  arch/arm/mach-exynos/exynos.c               |    2 +-
->  arch/arm/mach-exynos/hotplug.c              |    2 +-
->  arch/arm/mach-exynos/platsmp.c              |    2 +-
->  arch/arm/mach-exynos/pm.c                   |    4 +-
->  arch/arm/mach-exynos/pmu.c                  |    5 +-
->  arch/arm/mach-exynos/regs-pmu.h             |  308 ---------------------------
->  include/linux/mfd/samsung/exynos-pmu.h      |   31 +++
->  include/linux/mfd/samsung/exynos-regs-pmu.h |  308 +++++++++++++++++++++++++++
->  10 files changed, 348 insertions(+), 349 deletions(-)
->  delete mode 100644 arch/arm/mach-exynos/exynos-pmu.h
->  delete mode 100644 arch/arm/mach-exynos/regs-pmu.h
->  create mode 100644 include/linux/mfd/samsung/exynos-pmu.h
->  create mode 100644 include/linux/mfd/samsung/exynos-regs-pmu.h
+>  arch/arm/mach-exynos/Kconfig  |    2 +
+>  arch/arm/mach-exynos/Makefile |    2 -
+>  arch/arm/mach-exynos/pmu.c    |  521 -----------------------------------------
+>  drivers/mfd/Kconfig           |    9 +
+>  drivers/mfd/Makefile          |    1 +
+>  drivers/mfd/exynos-pmu.c      |  521 +++++++++++++++++++++++++++++++++++++++++
+>  6 files changed, 533 insertions(+), 523 deletions(-)
+>  delete mode 100644 arch/arm/mach-exynos/pmu.c
+>  create mode 100644 drivers/mfd/exynos-pmu.c
 
-Can you resubmit this using the -M option for format-patch please?
+Same with this patch, `git format-patch -M`.
 
 -- 
 Lee Jones
