@@ -1,76 +1,321 @@
-From: tthayer.linux@gmail.com (T Thayer)
-Date: Mon, 28 Apr 2014 18:37:21 -0500
-Subject: [patch] Fix CAN on socfpga, for net/master
-In-Reply-To: <20140428211505.GA28242@amd.pavel.ucw.cz>
-References: <1396422700-3962-4-git-send-email-s.trumtrar@pengutronix.de>
- <20140404102815.GA9242@amd.pavel.ucw.cz>
- <20140425195319.GA3677@amd.pavel.ucw.cz>
- <1398457446.26387.0.camel@linux-builds1>
- <1398461518.3587.11.camel@dinh-ubuntu>
- <20140426093646.GE8730@amd.pavel.ucw.cz>
- <20140426203131.GA21832@amd.pavel.ucw.cz>
- <6bf951b6-51e7-4b90-b054-9ba5b6e93874@email.android.com>
- <20140427122510.GB12901@amd.pavel.ucw.cz>
- <1398716449.836.4.camel@dinh-ubuntu>
- <20140428211505.GA28242@amd.pavel.ucw.cz>
-Message-ID: <CAF03EBf9KXqB4W9GuDduhLwp_kwFjUEi3syU7fX3KpXfZEFxHg@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 28 Apr 2014 16:40:39 -0700
+Subject: [PATCH 5/7] clk: sunxi: add PRCM (Power/Reset/Clock Management)
+ clks support
+In-Reply-To: <1398697130-8338-6-git-send-email-boris.brezillon@free-electrons.com>
+References: <1398697130-8338-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1398697130-8338-6-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140428234039.GT3134@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 4:15 PM, Pavel Machek <pavel@denx.de> wrote:
-> Hi!
->
-> On Mon 2014-04-28 15:20:49, Thor Thayer wrote:
->> On Sun, 2014-04-27 at 14:25 +0200, ZY - pavel wrote:
->> > Apparently, socfpga CAN needs 32-bit accesses and different raminit
->> > sequence.
->> >
->> > Signed-off-by: Pavel Machek <pavel@denx.de>
->> >
->> > ---
->> >
->> > >
->> > > I'm not in the office (and fighting with my phone's email client) until 5th of May, however please rebase all your patches against the latest net/master from David Miller, as this tree includes all c_can fixes by Thomas.
->> > >
->> >
->> > Ok, combined patch is here. Lightly tested using loopback on Arrow
->> > SocKit.
->>
->> Hi Pavel.
->>
->> Thanks for your help on the SOCFPGA support! I can test this on the
->> Altera Development Kit but I'm not able to cleanly apply to the latest
->> David Miller net-next branch. Is there a different branch I should
->> use?
->
-> It should have been against net-next branch... but perhaps I made a
-> mistake somewhere. I should get some sleep now.
->
-> Or ... let me upload my tree so that you can generate the diff.
->
-> You should be able to get it using:
->
-> git pull git://git.denx.de/linux-denx-pavel.git my_net_master
->
->> I also like your updates to my patch as shown below - much cleaner.
->
-> Thanks :-).
->
-> Best regards,
->
->                                                                 Pavel
+On Mon, Apr 28, 2014 at 04:58:48PM +0200, Boris BREZILLON wrote:
+> The PRCM (Power/Reset/Clock Management) unit provides several clock
+> devices:
+> - AR100 clk: used to clock the Power Management co-processor
+> - AHB0 clk: used to clock the AHB0 bus
+> - APB0 clk and gates: used to clk
 
-Hi Pavel,
+Used to clk?
 
-I didn't get a chance to pull and test your patch but a visual
-inspection looks good.
+> 
+> Add support for these clks in a separate driver so that they can be probed
+> as platform devices instead of registered during early init.
+> We need this to be able to probe PRCM MFD subdevices.
+> 
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> ---
+>  drivers/clk/sunxi/Makefile         |   2 +
+>  drivers/clk/sunxi/clk-sun6i-prcm.c | 253 +++++++++++++++++++++++++++++++++++++
+>  2 files changed, 255 insertions(+)
+>  create mode 100644 drivers/clk/sunxi/clk-sun6i-prcm.c
+> 
+> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
+> index b5bac91..ef8cdc9 100644
+> --- a/drivers/clk/sunxi/Makefile
+> +++ b/drivers/clk/sunxi/Makefile
+> @@ -3,3 +3,5 @@
+>  #
+>  
+>  obj-y += clk-sunxi.o clk-factors.o
+> +
+> +obj-$(CONFIG_MFD_SUN6I_PRCM) += clk-sun6i-prcm.o
+> diff --git a/drivers/clk/sunxi/clk-sun6i-prcm.c b/drivers/clk/sunxi/clk-sun6i-prcm.c
+> new file mode 100644
+> index 0000000..bb7b25a
+> --- /dev/null
+> +++ b/drivers/clk/sunxi/clk-sun6i-prcm.c
+> @@ -0,0 +1,253 @@
+> +/*
+> + * Copyright (C) 2014 Free Electrons
+> + *
+> + * License Terms: GNU General Public License v2
+> + * Author: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> + *
+> + * Allwinner PRCM (Power/Reset/Clock Management) driver
+> + *
+> + */
+> +
+> +#include <linux/clk-provider.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +
+> +#define SUN6I_APB0_GATES_MAX_SIZE	32
+> +#define SUN6I_AR100_MAX_PARENTS		4
+> +
+> +static int sun6i_a31_ar100_mux_clk_register(struct platform_device *pdev)
+> +{
+> +	const char *parents[SUN6I_AR100_MAX_PARENTS];
+> +	struct device_node *np = pdev->dev.of_node;
+> +	const char *clk_name = np->name;
+> +	struct resource *r;
+> +	void __iomem *reg;
+> +	struct clk *clk;
+> +	int nparents;
+> +	int i;
+> +
+> +	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	reg = devm_ioremap(&pdev->dev, r->start, resource_size(r));
+> +	if (IS_ERR(reg))
+> +		return PTR_ERR(reg);
 
-Since you based this patch on my original code, feel free to add my signed-off.
+devm_ioremap returns NULL on error, and not an error pointer.
 
-Thor
+> +
+> +	nparents = of_clk_get_parent_count(np);
+> +	if (nparents > SUN6I_AR100_MAX_PARENTS)
+> +		nparents = SUN6I_AR100_MAX_PARENTS;
+> +
+> +	for (i = 0; i < nparents; i++)
+> +		parents[i] = of_clk_get_parent_name(np, i);
+> +
+> +	of_property_read_string(np, "clock-output-names", &clk_name);
+> +
+> +	clk = clk_register_mux(&pdev->dev, clk_name, parents, nparents,
+> +			       CLK_SET_RATE_NO_REPARENT, reg,
+> +			       16, 2, 0, NULL);
+> +	if (IS_ERR(clk))
+> +		return PTR_ERR(clk);
+> +
+> +	return of_clk_add_provider(np, of_clk_src_simple_get, clk);
+> +}
+> +
+> +static int sun6i_a31_ar100_clk_register(struct platform_device *pdev)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	const char *clk_name = np->name;
+> +	const char *clk_parent;
+> +	struct resource *r;
+> +	void __iomem *reg;
+> +	struct clk *clk;
+> +
+> +	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	reg = devm_ioremap(&pdev->dev, r->start, resource_size(r));
+> +	if (IS_ERR(reg))
+> +		return PTR_ERR(reg);
 
->
->
-> --
-> (english) http://www.livejournal.com/~pavelmachek
-> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Ditto.
+
+And you'll probably want to use devm_ioremap_resource when you'll have
+a single clock for the AR100.
+
+> +
+> +	clk_parent = of_clk_get_parent_name(np, 0);
+> +	if (!clk_parent)
+> +		return -EINVAL;
+> +
+> +	of_property_read_string(np, "clock-output-names", &clk_name);
+> +
+> +	clk = clk_register_divider(&pdev->dev, clk_name, clk_parent,
+> +				   0, reg, 4, 2, CLK_DIVIDER_POWER_OF_TWO,
+> +				   NULL);
+> +	if (IS_ERR(clk))
+> +		return PTR_ERR(clk);
+> +
+> +	return of_clk_add_provider(np, of_clk_src_simple_get, clk);
+> +}
+> +
+> +static int sun6i_a31_ar100_div_clk_register(struct platform_device *pdev)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	const char *clk_name = np->name;
+> +	const char *clk_parent;
+> +	struct resource *r;
+> +	void __iomem *reg;
+> +	struct clk *clk;
+> +
+> +	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	reg = devm_ioremap(&pdev->dev, r->start, resource_size(r));
+> +	if (IS_ERR(reg))
+> +		return PTR_ERR(reg);
+> +
+> +	clk_parent = of_clk_get_parent_name(np, 0);
+> +	if (!clk_parent)
+> +		return -EINVAL;
+> +
+> +	of_property_read_string(np, "clock-output-names", &clk_name);
+> +
+> +	clk = clk_register_divider(&pdev->dev, clk_name, clk_parent,
+> +				   0, reg, 8, 5, 0, NULL);
+> +	if (IS_ERR(clk))
+> +		return PTR_ERR(clk);
+> +
+> +	return of_clk_add_provider(np, of_clk_src_simple_get, clk);
+> +}
+> +
+> +static int sun6i_a31_apb0_clk_register(struct platform_device *pdev)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	const char *clk_name = np->name;
+> +	const char *clk_parent;
+> +	struct resource *r;
+> +	void __iomem *reg;
+> +	struct clk *clk;
+> +
+> +	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	reg = devm_ioremap_resource(&pdev->dev, r);
+> +	if (IS_ERR(reg))
+> +		return PTR_ERR(reg);
+> +
+> +	clk_parent = of_clk_get_parent_name(np, 0);
+> +	if (!clk_parent)
+> +		return -EINVAL;
+> +
+> +	of_property_read_string(np, "clock-output-names", &clk_name);
+> +
+> +	clk = clk_register_divider(&pdev->dev, clk_name, clk_parent,
+> +				   0, reg, 0, 2, CLK_DIVIDER_POWER_OF_TWO,
+> +				   NULL);
+> +	if (IS_ERR(clk))
+> +		return PTR_ERR(clk);
+> +
+> +	return of_clk_add_provider(np, of_clk_src_simple_get, clk);
+> +}
+> +
+> +static int sun6i_a31_apb0_gates_clk_register(struct platform_device *pdev)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	struct clk_onecell_data *clk_data;
+> +	const char *clk_parent;
+> +	const char *clk_name;
+> +	struct resource *r;
+> +	void __iomem *reg;
+> +	int gate_id;
+> +	int ngates;
+> +	int i;
+> +
+> +	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	reg = devm_ioremap_resource(&pdev->dev, r);
+> +	if (!reg)
+> +		return PTR_ERR(reg);
+> +
+> +	clk_parent = of_clk_get_parent_name(np, 0);
+> +	if (!clk_parent)
+> +		return -EINVAL;
+> +
+> +	ngates = of_property_count_strings(np, "clock-output-names");
+> +	if (ngates < 0)
+> +		return ngates;
+> +
+> +	if (!ngates || ngates > SUN6I_APB0_GATES_MAX_SIZE)
+> +		return -EINVAL;
+> +
+> +	clk_data = devm_kzalloc(&pdev->dev, sizeof(struct clk_onecell_data),
+> +				GFP_KERNEL);
+> +	if (!clk_data)
+> +		return -ENOMEM;
+> +
+> +	clk_data->clks = devm_kzalloc(&pdev->dev,
+> +				      SUN6I_APB0_GATES_MAX_SIZE *
+> +				      sizeof(struct clk *),
+> +				      GFP_KERNEL);
+> +	if (!clk_data->clks)
+> +		return -ENOMEM;
+> +
+> +	for (i = 0; i < ngates; i++) {
+> +		of_property_read_string_index(np, "clock-output-names",
+> +					      i, &clk_name);
+> +
+> +		gate_id = i;
+> +		of_property_read_u32_index(np, "clock-indices", i, &gate_id);
+> +
+> +		WARN_ON(gate_id >= SUN6I_APB0_GATES_MAX_SIZE);
+> +		if (gate_id >= SUN6I_APB0_GATES_MAX_SIZE)
+> +			continue;
+> +
+> +		clk_data->clks[gate_id] = clk_register_gate(&pdev->dev,
+> +							    clk_name,
+> +							    clk_parent, 0,
+> +							    reg, gate_id,
+> +							    0, NULL);
+> +		WARN_ON(IS_ERR(clk_data->clks[gate_id]));
+> +	}
+> +
+> +	clk_data->clk_num = ngates;
+> +
+> +	return of_clk_add_provider(np, of_clk_src_onecell_get, clk_data);
+> +}
+> +
+> +const struct of_device_id sun6i_a31_prcm_clk_dt_ids[] = {
+> +	{
+> +		.compatible = "allwinner,sun6i-a31-ar100-mux-clk",
+> +		.data = sun6i_a31_ar100_mux_clk_register,
+> +	},
+> +	{
+> +		.compatible = "allwinner,sun6i-a31-ar100-clk",
+> +		.data = sun6i_a31_ar100_clk_register,
+> +	},
+> +	{
+> +		.compatible = "allwinner,sun6i-a31-ar100-div-clk",
+> +		.data = sun6i_a31_ar100_div_clk_register,
+> +	},
+> +	{
+> +		.compatible = "allwinner,sun6i-a31-apb0-clk",
+> +		.data = sun6i_a31_apb0_clk_register,
+> +	},
+> +	{
+> +		.compatible = "allwinner,sun6i-a31-apb0-gates-clk",
+> +		.data = sun6i_a31_apb0_gates_clk_register,
+> +	},
+> +	{ /* sentinel */ }
+> +};
+> +
+> +static int sun6i_a31_prcm_clk_probe(struct platform_device *pdev)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	int (*register_func)(struct platform_device *pdev);
+> +	const struct of_device_id *match;
+> +
+> +	match = of_match_node(sun6i_a31_prcm_clk_dt_ids, np);
+> +	if (!match)
+> +		return -EINVAL;
+> +
+> +	register_func = match->data;
+> +	return register_func(pdev);
+> +}
+> +
+> +static struct platform_driver sun6i_a31_prcm_clk_driver = {
+> +	.driver = {
+> +		.name = "sun6i-a31-prcm-clk",
+> +		.owner = THIS_MODULE,
+> +		.of_match_table = sun6i_a31_prcm_clk_dt_ids,
+> +	},
+> +	.probe = sun6i_a31_prcm_clk_probe,
+
+You're not calling the of_clk_del_provider, and you should probably
+unregister your clocks too.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140428/bbe71c49/attachment-0001.sig>
