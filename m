@@ -1,50 +1,33 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Mon, 28 Apr 2014 11:38:33 -0500
-Subject: [PATCH 07/10] ARM: dts: DRA7: Add DT node for DES IP
-In-Reply-To: <535BE096.2060407@cogentembedded.com>
-References: <1398466968-29506-1-git-send-email-joelf@ti.com>
- <1398466968-29506-8-git-send-email-joelf@ti.com>
- <535BE096.2060407@cogentembedded.com>
-Message-ID: <535E8409.10905@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 28 Apr 2014 10:42:35 -0600
+Subject: [PATCH 00/38] MMC updates, plus CuBox-i WiFi support
+In-Reply-To: <20140423185534.GA26756@n2100.arm.linux.org.uk>
+References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
+Message-ID: <535E84FB.4080305@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/26/2014 11:36 AM, Sergei Shtylyov wrote:
-> Hello.
+On 04/23/2014 12:55 PM, Russell King - ARM Linux wrote:
+> All,
 > 
-> On 26-04-2014 3:02, Joel Fernandes wrote:
+> This is where I'm at with trying to clean up the SDHCI mess, and sort out
+> issues I've noticed when trying to get UHS support working on CuBoxes.
+> This is my full patch set, but I recommend not applying patch 37 as there
+> appears to be a hardware issue preventing it working reliably.
 > 
->> DRA7xx SoCs have a DES3DES IP. Add DT data for the same.
+> In any case, patches 0-33 inclusive are the SDHCI clean up, based against
+> v3.15-rc1.  Patches 34 and 35 are Olof's Wifi support, 36 is my fix against
+> those, and 38 adds the Broadcom Wifi and BT support for CuBox.
 > 
->> Signed-off-by: Joel Fernandes <joelf@ti.com>
->> ---
->>   arch/arm/boot/dts/dra7.dtsi |   11 +++++++++++
->>   1 file changed, 11 insertions(+)
-> 
->> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
->> index 1c0f8e1..0533b89 100644
->> --- a/arch/arm/boot/dts/dra7.dtsi
->> +++ b/arch/arm/boot/dts/dra7.dtsi
->> @@ -789,6 +789,17 @@
->>               dma-names = "tx0", "rx0";
->>               status = "disabled";
->>           };
->> +
->> +        des: des at 480a5000 {
-> 
->    Shouldn't the node name be "crypto at 480a5000", according to the ePAPR
-> standard?
-> 
-Actually I'm not a big fan of the standard here in this regard.
-"crypto at 480a5000" doesn't mean anything and serves no purpose for
-anyone. There are quite a few crypto modules and such a name doesn't
-help and is confusing at best.
+> The questions over how to handle these devices were never properly settled,
+> so I recommend against merging patch 34 onwards.  As for the rest, I'm not
+> planning on any further work, so it may be a good idea for people to
+> consider testing them with a view to getting them merged.
 
-There's no property either in the device tree node itself to describe it
-as des, except for the phandle label which is used only at dt
-compile-time if I'm right. So makes sense to have the name be more specific.
+The series,
+Tested-by: Stephen Warren <swarren@nvidia.com>
 
-This is how we have added dts nodes for other crypto modules in the past...
-
-thanks,
- -Joel
+(On an NVIDIA Tegra "Jetson TK1" board, with the patches applied on top
+of next-20140428, also with Andrew Bresticker's Tegra SDHCI patches
+"mmc: tegra: disable UHS modes" and "mmc: tegra: fix reporting of base
+clock frequency" applied)
