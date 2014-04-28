@@ -1,95 +1,52 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 28 Apr 2014 18:20:53 -0500
-Subject: [PATCH v2 3/7] tty/serial: convert 8250 to generic earlycon
-In-Reply-To: <CAE9FiQVrwypK4u5yTCt-AxMuBnOn7jv=V3d4Zb3cd9JDNEUVPw@mail.gmail.com>
-References: <1397859600-11507-1-git-send-email-robherring2@gmail.com>
- <1397859600-11507-4-git-send-email-robherring2@gmail.com>
- <CAE9FiQVrwypK4u5yTCt-AxMuBnOn7jv=V3d4Zb3cd9JDNEUVPw@mail.gmail.com>
-Message-ID: <CAL_JsqKux+BTHeYo6XEzzQMAFJZHVjbURM973oHT=t698GbJbA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 28 Apr 2014 16:22:32 -0700
+Subject: [PATCH 1/7] reset: sunxi: document sunxi's reset controllers
+ bindings
+In-Reply-To: <1398697130-8338-2-git-send-email-boris.brezillon@free-electrons.com>
+References: <1398697130-8338-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1398697130-8338-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140428232232.GP3134@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 26, 2014 at 1:19 AM, Yinghai Lu <yinghai@kernel.org> wrote:
-> On Fri, Apr 18, 2014 at 3:19 PM, Rob Herring <robherring2@gmail.com> wrote:
->> From: Rob Herring <robh@kernel.org>
->>
->> With the generic earlycon infrastructure in place, convert the 8250
->> early console to use it.
->>
->> Signed-off-by: Rob Herring <robh@kernel.org>
->> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->> Cc: Jiri Slaby <jslaby@suse.cz>
->> ---
->>  drivers/tty/serial/8250/8250_early.c | 138 ++++-------------------------------
->>  drivers/tty/serial/8250/Kconfig      |   1 +
->>  2 files changed, 16 insertions(+), 123 deletions(-)
->
-> Hi Greg, Rob
->
-> This one in tty-next breaks booting: "console=uart8250,io,0x3f8,115200".
-> No early console and regular console anymore.
->
-> It should produce "early con and regular con".
+Hi Boris,
 
-This is what I get for running checkpatch and converting
-simple_strtoul to kstrto* which are not so equivalent. kstrto* will
-not convert things such as 115200n8 to a number.
+On Mon, Apr 28, 2014 at 04:58:44PM +0200, Boris BREZILLON wrote:
+> Add DT bindings documentation for sunxi's reset controllers.
+> 
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> ---
+>  .../bindings/reset/allwinner,sunxi-clock-reset.txt  | 21 +++++++++++++++++++++
+>  1 file changed, 21 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/reset/allwinner,sunxi-clock-reset.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/reset/allwinner,sunxi-clock-reset.txt b/Documentation/devicetree/bindings/reset/allwinner,sunxi-clock-reset.txt
+> new file mode 100644
+> index 0000000..a582804
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/reset/allwinner,sunxi-clock-reset.txt
+> @@ -0,0 +1,21 @@
+> +Allwinner sunxi Peripheral Reset Controller
+> +===========================================
+> +
+> +Please also refer to reset.txt in this directory for common reset
+> +controller binding usage.
+> +
+> +Required properties:
+> +- compatible: Should be one of the following depending on your SoC:
 
-Greg, Do you want a fix or for me to respin the series? The fix looks like this:
+It doesn't really depend on the SoC.
 
-diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
-index 73bf1e2..c92e830 100644
---- a/drivers/tty/serial/earlycon.c
-+++ b/drivers/tty/serial/earlycon.c
-@@ -53,7 +53,7 @@ static int __init parse_options(struct
-earlycon_device *device,
-                                char *options)
- {
-        struct uart_port *port = &device->port;
--       int mmio, mmio32, length, ret;
-+       int mmio, mmio32, length;
-        unsigned long addr;
+Maxime
 
-        if (!options)
-@@ -64,25 +64,19 @@ static int __init parse_options(struct
-earlycon_device *device,
-        if (mmio || mmio32) {
-                port->iotype = (mmio ? UPIO_MEM : UPIO_MEM32);
-                options += mmio ? 5 : 7;
--               ret = kstrtoul(options, 0, &addr);
--               if (ret)
--                       return ret;
-+               addr = simple_strtoul(options, NULL, 0);
-                port->mapbase = addr;
-                if (mmio32)
-                        port->regshift = 2;
-        } else if (!strncmp(options, "io,", 3)) {
-                port->iotype = UPIO_PORT;
-                options += 3;
--               ret = kstrtoul(options, 0, &addr);
--               if (ret)
--                       return ret;
-+               addr = simple_strtoul(options, NULL, 0);
-                port->iobase = addr;
-                mmio = 0;
-        } else if (!strncmp(options, "0x", 2)) {
-                port->iotype = UPIO_MEM;
--               ret = kstrtoul(options, 0, &addr);
--               if (ret)
--                       return ret;
-+               addr = simple_strtoul(options, NULL, 0);
-                port->mapbase = addr;
-        } else {
-                return -EINVAL;
-@@ -93,9 +87,7 @@ static int __init parse_options(struct
-earlycon_device *device,
-        options = strchr(options, ',');
-        if (options) {
-                options++;
--               ret = kstrtouint(options, 0, &device->baud);
--               if (ret)
--                       return ret;
-+               device->baud = simple_strtoul(options, NULL, 0);
-                length = min(strcspn(options, " ") + 1,
-                             (size_t)(sizeof(device->options)));
-                strlcpy(device->options, options, length);
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140428/fa8af110/attachment.sig>
