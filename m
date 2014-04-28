@@ -1,62 +1,23 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 28 Apr 2014 09:47:39 +0200
-Subject: [PATCH RFC 0/5] Dove PMU support
-In-Reply-To: <20140427132312.GC26756@n2100.arm.linux.org.uk>
-References: <20140427132312.GC26756@n2100.arm.linux.org.uk>
-Message-ID: <535E079B.6010701@gmail.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Mon, 28 Apr 2014 09:55:31 +0200
+Subject: [PATCH 4/6] drivers: net: cpsw: Enable Annexe F Time sync
+In-Reply-To: <1398658225-25873-5-git-send-email-george.cherian@ti.com>
+References: <1398658225-25873-1-git-send-email-george.cherian@ti.com>
+ <1398658225-25873-5-git-send-email-george.cherian@ti.com>
+Message-ID: <20140428075530.GA8371@netboy>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/27/2014 03:23 PM, Russell King - ARM Linux wrote:
-> The following series of patches add better PMU support for Dove.  This
-> has been developed on the Cubox, and tested in non-DT and DT modes.
->
-> This also improves the interrupt handling over the existing code: the
-> existing code ends up calling the interrupt handlers twice for every
-> interrupt raised, because the interrupt clear-down is done at the
-> wrong point - we need to clear down the interrupt in the device first,
-> then clear it down in the controller.
->
-> The problem this gives is that it can be racy (see comments in the
-> driver) so we're careful about how we do that to minimise the window.
->
-> I've included all patches here - the initial set are targetted towards
-> adding DT support, with the final adding the non-DT support.  There is
-> a call to the initialisation function missing for DT mode - I'd like
-> the mvebu people to comment on how that should be handled, as it needs
-> to be done pretty early.
->
-> Also included are two PM domain changes: the first I've discussed with
-> Rafael who seems happy with it.  The second is necessary because we
-> have no way to know if a generic PM domain is associated with a device
-> or whether something else making use of the PM domain is installed in
-> the dev->pm_domain pointer, so this allows that decision to be made by
-> core PM code.
->
-> This is more a "this is where I'm at" with this stuff than a real
-> submission, nevertheless comments on how to get it ready for submission
-> would be welcome.  I'd like to get this off my plate ASAP.
+On Mon, Apr 28, 2014 at 09:40:23AM +0530, George Cherian wrote:
+> Enable the Annex F Time Sync explicitly for DRA7x and AM4372.
+> With this enabled the L2 PTP is working.
 
-Russell,
+L2 works fine without this bit. If this is needed for V3 hardware,
+then it should have its own code variant.
+ 
+> while at that rename TS_BIT8 to TS_TTL_NONZERO
 
-thanks for dropping those patches. I know you are packed with a bunch
-of other patch sets, so if you agree, I can pick up your Dove related
-patches and finish them.
+Is this bit finally documented for am335x?
 
-One thing that comes into my mind is, that we moved Dove DT to
-mach-mvebu starting with v3.15-rc1 so we need to find a better place
-for the driver than mach-dove.
-
-Sebastian
-
->   arch/arm/Kconfig                     |   1 +
->   arch/arm/boot/dts/dove.dtsi          |   7 +
->   arch/arm/mach-dove/Makefile          |   1 +
->   arch/arm/mach-dove/common.c          |   2 +
->   arch/arm/mach-dove/common.h          |   1 +
->   arch/arm/mach-dove/include/mach/pm.h |  17 --
->   arch/arm/mach-dove/irq.c             |  87 ------
->   arch/arm/mach-dove/pmu.c             | 531 +++++++++++++++++++++++++++++++++++
->   drivers/base/power/domain.c          |   8 +-
->   9 files changed, 547 insertions(+), 108 deletions(-)
->
+Thanks,
+Richard
