@@ -1,67 +1,56 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 28 Apr 2014 10:29:48 +0100
-Subject: [PATCH 2/4] mfd: bcm590xx: add support for second i2c slave
- address space
-In-Reply-To: <20140423220500.GA1127@beef>
-References: <1397501428-8857-1-git-send-email-mporter@linaro.org>
- <1397501428-8857-3-git-send-email-mporter@linaro.org>
- <20140416110603.GA19671@lee--X1>
- <20140416213141.GD12304@sirena.org.uk>
- <20140417065753.GC28725@lee--X1> <20140417222616.GK23695@beef>
- <20140422082139.GF17657@lee--X1> <20140423220126.GC4164@beef>
- <20140423220500.GA1127@beef>
-Message-ID: <20140428092947.GN6264@lee--X1>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Mon, 28 Apr 2014 15:02:09 +0530
+Subject: [PATCH v3 0/4] usb: ehci/ohci-exynos: Move to generic phy
+ framework
+In-Reply-To: <1398677132-30600-1-git-send-email-gautam.vivek@samsung.com>
+References: <1398677132-30600-1-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <CAFp+6iE67ikwj7QU4vwJ8RZKhQo5WFTFb297WiD_Ej3SZ2u+gQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > > > > > s/regmap/Regmap
-> > > > > > 
-> > > > > > It's consistently written regmap in all the documentation and so on :)
-> > > > > 
-> > > > > Furry muff; but the comments still stand for the acronyms.
-> > > > > 
-> > > > > > > addmap{0,1} doesn't quite sit right with me.
-> > > > > > 
-> > > > > > > REVISIT: Ah, it's address-map, rather than add map. Okay, not as bad
-> > > > > > > as I first thought, but still, is there a better naming convention you
-> > > > > > > could use?
-> > > > > > 
-> > > > > > addrmap or something?
-> > > > > 
-> > > > > Right, that was what I was thinking. However, I prefer something along
-> > > > > the lines of 'i2c' and 'i2c_sec' or 'client' and 'client_slv' etc.
-> > > > 
-> > > > FWIW, the reason it's addmap{0,1} is that the datasheet has documents
-> > > > ADDMAP=0 and the first bank of registers and ADDMAP=1 as the second bank
-> > > > of registers. I adopted that to match the docs for the part.
-> > > > 
-> > > > I guess we could do i2c and i2c_sec, I'll just have to put a comment
-> > > > correlating it to the h/w. Calling it 'slv' implies something else
-> > > > so we should avoid that here. The notion of a "secondary" i2c device
-> > > > is completely a Linux I2C subsystem fabrication which wouldn't exist
-> > > > if it allowed multiple slave addresses per device. From a h/w
-> > > > perspective there is really no primary and secondary relationship.
-> > > > 
-> > > > I'm fine with i2c/i2c_sec or addrmap0/1 and I will just comment to
-> > > > correlate with the datasheet..pick one.
-> > > 
-> > > Let's stick method fabricated by the I2C subsystem. It may seem strange
-> > > from a h/w perspective, but it is the way we (you) have coded it, as
-> > > the first parameter of i2c_new_dummy() is the 'managing' (primary,
-> > > parent, master, whatever) device, so '_sec' would suit as an
-> > > identifying appendage for the resultant device.
-> > 
-> > That works, I'll also switch to addrmap_[pri|sec] which touches the
-> > regulator driver as well. That will keep the relationship  between device
-> > and regmap clear.
-> 
-> Misspoke...I'm switching regmap[0|1] to regmap_[pri|sec] to keep that
-> synced with i2c_[pri|sec]
+On Mon, Apr 28, 2014 at 2:55 PM, Vivek Gautam <gautam.vivek@samsung.com> wrote:
+> Based and tested on 'usb-next' branch of Greg's usb tree, with relevant
+> device tree patches[1]
 
-Sounds good, thanks Matt.
+[1] [PATCH v7 0/2] dts: Add usb2phy to Exynos 5250
+     http://www.spinics.net/lists/linux-usb/msg106427.html
+
+
+>
+> Changes from v2:
+>  - Added two patches in the series for some cleanup.
+>    usb: ohci-exynos: Use struct device instead of platform_device
+>    usb: ehci-exynos: Use struct device instead of platform_device
+>  - Addressed review comments.
+>    -- Moved exynos_ohci_phyg_on()/off routines inside
+>       exynos_ohci_phy_enable()/disable.
+>    -- Added functions exynos_ehci_phy_enable() and exynos_ehci_phy_disable()
+>       and moved exynos_ehci_phyg_on()/off routines respectively in them.
+>    -- Added necessary checks.
+>
+> Kamil Debski (1):
+>   usb: ehci-exynos: Change to use phy provided by the generic phy
+>     framework
+>
+> Vivek Gautam (3):
+>   usb: ohci-exynos: Use struct device instead of platform_device
+>   usb: ehci-exynos: Use struct device instead of platform_device
+>   usb: ohci-exynos: Add facility to use phy provided by the generic phy
+>     framework
+>
+>  .../devicetree/bindings/usb/exynos-usb.txt         |   37 +++++
+>  drivers/usb/host/ehci-exynos.c                     |  148 +++++++++++++++++---
+>  drivers/usb/host/ohci-exynos.c                     |  141 ++++++++++++++++---
+>  3 files changed, 280 insertions(+), 46 deletions(-)
+>
+> --
+> 1.7.10.4
+>
+
+
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Best Regards
+Vivek Gautam
+Samsung R&D Institute, Bangalore
+India
