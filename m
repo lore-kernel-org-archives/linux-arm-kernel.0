@@ -1,67 +1,76 @@
 From: zhichang.yuan@linaro.org (zhichang.yuan at linaro.org)
-Date: Mon, 28 Apr 2014 13:11:32 +0800
-Subject: [PATCHv2 4/6] arm64: lib: Implement optimized memcmp routine
+Date: Mon, 28 Apr 2014 13:11:34 +0800
+Subject: [PATCHv2 6/6] arm64: lib: Implement optimized string length routines
 In-Reply-To: <1398661895-5559-1-git-send-email-zhichang.yuan@linaro.org>
 References: <1398661895-5559-1-git-send-email-zhichang.yuan@linaro.org>
-Message-ID: <1398661895-5559-5-git-send-email-zhichang.yuan@linaro.org>
+Message-ID: <1398661895-5559-7-git-send-email-zhichang.yuan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "zhichang.yuan" <zhichang.yuan@linaro.org>
 
 This patch, based on Linaro's Cortex Strings library, adds
-an assembly optimized memcmp() function.
+an assembly optimized strlen() and strnlen() functions.
 
 Signed-off-by: Zhichang Yuan <zhichang.yuan@linaro.org>
 Signed-off-by: Deepak Saxena <dsaxena@linaro.org>
 ---
- arch/arm64/include/asm/string.h |    3 +
- arch/arm64/kernel/arm64ksyms.c  |    1 +
- arch/arm64/lib/Makefile         |    2 +-
- arch/arm64/lib/memcmp.S         |  258 +++++++++++++++++++++++++++++++++++++++
- 4 files changed, 263 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/lib/memcmp.S
+ arch/arm64/include/asm/string.h |    6 ++
+ arch/arm64/kernel/arm64ksyms.c  |    2 +
+ arch/arm64/lib/Makefile         |    3 +-
+ arch/arm64/lib/strlen.S         |  126 +++++++++++++++++++++++++++++
+ arch/arm64/lib/strnlen.S        |  171 +++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 307 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/lib/strlen.S
+ create mode 100644 arch/arm64/lib/strnlen.S
 
 diff --git a/arch/arm64/include/asm/string.h b/arch/arm64/include/asm/string.h
-index 3ee8b30..3a43305 100644
+index 6133f49..64d2d48 100644
 --- a/arch/arm64/include/asm/string.h
 +++ b/arch/arm64/include/asm/string.h
-@@ -34,4 +34,7 @@ extern void *memchr(const void *, int, __kernel_size_t);
- #define __HAVE_ARCH_MEMSET
- extern void *memset(void *, int, __kernel_size_t);
+@@ -28,6 +28,12 @@ extern int strcmp(const char *, const char *);
+ #define __HAVE_ARCH_STRNCMP
+ extern int strncmp(const char *, const char *, __kernel_size_t);
  
-+#define __HAVE_ARCH_MEMCMP
-+extern int memcmp(const void *, const void *, size_t);
++#define __HAVE_ARCH_STRLEN
++extern __kernel_size_t strlen(const char *);
 +
- #endif
++#define __HAVE_ARCH_STRNLEN
++extern __kernel_size_t strnlen(const char *, __kernel_size_t);
++
+ #define __HAVE_ARCH_MEMCPY
+ extern void *memcpy(void *, const void *, __kernel_size_t);
+ 
 diff --git a/arch/arm64/kernel/arm64ksyms.c b/arch/arm64/kernel/arm64ksyms.c
-index 338b568..909c18e 100644
+index 2784a79..1edc792 100644
 --- a/arch/arm64/kernel/arm64ksyms.c
 +++ b/arch/arm64/kernel/arm64ksyms.c
-@@ -48,6 +48,7 @@ EXPORT_SYMBOL(memset);
+@@ -46,6 +46,8 @@ EXPORT_SYMBOL(strchr);
+ EXPORT_SYMBOL(strrchr);
+ EXPORT_SYMBOL(strcmp);
+ EXPORT_SYMBOL(strncmp);
++EXPORT_SYMBOL(strlen);
++EXPORT_SYMBOL(strnlen);
+ EXPORT_SYMBOL(memset);
  EXPORT_SYMBOL(memcpy);
  EXPORT_SYMBOL(memmove);
- EXPORT_SYMBOL(memchr);
-+EXPORT_SYMBOL(memcmp);
- 
- 	/* atomic bitops */
- EXPORT_SYMBOL(set_bit);
 diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile
-index 328ce1a..112c67f 100644
+index aaaf618..d98d3e3 100644
 --- a/arch/arm64/lib/Makefile
 +++ b/arch/arm64/lib/Makefile
-@@ -1,4 +1,4 @@
+@@ -1,4 +1,5 @@
  lib-y		:= bitops.o clear_user.o delay.o copy_from_user.o	\
  		   copy_to_user.o copy_in_user.o copy_page.o		\
  		   clear_page.o memchr.o memcpy.o memmove.o memset.o	\
--		   strchr.o strrchr.o
-+		   memcmp.o strchr.o strrchr.o
-diff --git a/arch/arm64/lib/memcmp.S b/arch/arm64/lib/memcmp.S
+-		   memcmp.o strcmp.o strncmp.o strchr.o strrchr.o
++		   memcmp.o strcmp.o strncmp.o strlen.o strnlen.o	\
++		   strchr.o strrchr.o
+diff --git a/arch/arm64/lib/strlen.S b/arch/arm64/lib/strlen.S
 new file mode 100644
-index 0000000..6ea0776
+index 0000000..987b68b
 --- /dev/null
-+++ b/arch/arm64/lib/memcmp.S
-@@ -0,0 +1,258 @@
++++ b/arch/arm64/lib/strlen.S
+@@ -0,0 +1,126 @@
 +/*
 + * Copyright (C) 2013 ARM Ltd.
 + * Copyright (C) 2013 Linaro.
@@ -90,235 +99,280 @@ index 0000000..6ea0776
 +#include <asm/assembler.h>
 +
 +/*
-+* compare memory areas(when two memory areas' offset are different,
-+* alignment handled by the hardware)
-+*
-+* Parameters:
-+*  x0 - const memory area 1 pointer
-+*  x1 - const memory area 2 pointer
-+*  x2 - the maximal compare byte length
-+* Returns:
-+*  x0 - a compare result, maybe less than, equal to, or greater than ZERO
-+*/
++ * calculate the length of a string
++ *
++ * Parameters:
++ *	x0 - const string pointer
++ * Returns:
++ *	x0 - the return length of specific string
++ */
 +
-+/* Parameters and result.  */
-+src1		.req	x0
-+src2		.req	x1
-+limit		.req	x2
-+result		.req	x0
++/* Arguments and results.  */
++srcin		.req	x0
++len		.req	x0
 +
-+/* Internal variables.  */
++/* Locals and temporaries.  */
++src		.req	x1
++data1		.req	x2
++data2		.req	x3
++data2a		.req	x4
++has_nul1	.req	x5
++has_nul2	.req	x6
++tmp1		.req	x7
++tmp2		.req	x8
++tmp3		.req	x9
++tmp4		.req	x10
++zeroones	.req	x11
++pos		.req	x12
++
++#define REP8_01 0x0101010101010101
++#define REP8_7f 0x7f7f7f7f7f7f7f7f
++#define REP8_80 0x8080808080808080
++
++ENTRY(strlen)
++	mov	zeroones, #REP8_01
++	bic	src, srcin, #15
++	ands	tmp1, srcin, #15
++	b.ne	.Lmisaligned
++	/*
++	* NUL detection works on the principle that (X - 1) & (~X) & 0x80
++	* (=> (X - 1) & ~(X | 0x7f)) is non-zero iff a byte is zero, and
++	* can be done in parallel across the entire word.
++	*/
++	/*
++	* The inner loop deals with two Dwords at a time. This has a
++	* slightly higher start-up cost, but we should win quite quickly,
++	* especially on cores with a high number of issue slots per
++	* cycle, as we get much better parallelism out of the operations.
++	*/
++.Lloop:
++	ldp	data1, data2, [src], #16
++.Lrealigned:
++	sub	tmp1, data1, zeroones
++	orr	tmp2, data1, #REP8_7f
++	sub	tmp3, data2, zeroones
++	orr	tmp4, data2, #REP8_7f
++	bic	has_nul1, tmp1, tmp2
++	bics	has_nul2, tmp3, tmp4
++	ccmp	has_nul1, #0, #0, eq	/* NZCV = 0000  */
++	b.eq	.Lloop
++
++	sub	len, src, srcin
++	cbz	has_nul1, .Lnul_in_data2
++CPU_BE(	mov	data2, data1 )	/*prepare data to re-calculate the syndrome*/
++	sub	len, len, #8
++	mov	has_nul2, has_nul1
++.Lnul_in_data2:
++	/*
++	* For big-endian, carry propagation (if the final byte in the
++	* string is 0x01) means we cannot use has_nul directly.  The
++	* easiest way to get the correct byte is to byte-swap the data
++	* and calculate the syndrome a second time.
++	*/
++CPU_BE( rev	data2, data2 )
++CPU_BE( sub	tmp1, data2, zeroones )
++CPU_BE( orr	tmp2, data2, #REP8_7f )
++CPU_BE( bic	has_nul2, tmp1, tmp2 )
++
++	sub	len, len, #8
++	rev	has_nul2, has_nul2
++	clz	pos, has_nul2
++	add	len, len, pos, lsr #3		/* Bits to bytes.  */
++	ret
++
++.Lmisaligned:
++	cmp	tmp1, #8
++	neg	tmp1, tmp1
++	ldp	data1, data2, [src], #16
++	lsl	tmp1, tmp1, #3		/* Bytes beyond alignment -> bits.  */
++	mov	tmp2, #~0
++	/* Big-endian.  Early bytes are at MSB.  */
++CPU_BE( lsl	tmp2, tmp2, tmp1 )	/* Shift (tmp1 & 63).  */
++	/* Little-endian.  Early bytes are at LSB.  */
++CPU_LE( lsr	tmp2, tmp2, tmp1 )	/* Shift (tmp1 & 63).  */
++
++	orr	data1, data1, tmp2
++	orr	data2a, data2, tmp2
++	csinv	data1, data1, xzr, le
++	csel	data2, data2, data2a, le
++	b	.Lrealigned
++ENDPROC(strlen)
+diff --git a/arch/arm64/lib/strnlen.S b/arch/arm64/lib/strnlen.S
+new file mode 100644
+index 0000000..2ca6657
+--- /dev/null
++++ b/arch/arm64/lib/strnlen.S
+@@ -0,0 +1,171 @@
++/*
++ * Copyright (C) 2013 ARM Ltd.
++ * Copyright (C) 2013 Linaro.
++ *
++ * This code is based on glibc cortex strings work originally authored by Linaro
++ * and re-licensed under GPLv2 for the Linux kernel. The original code can
++ * be found @
++ *
++ * http://bazaar.launchpad.net/~linaro-toolchain-dev/cortex-strings/trunk/
++ * files/head:/src/aarch64/
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/linkage.h>
++#include <asm/assembler.h>
++
++/*
++ * determine the length of a fixed-size string
++ *
++ * Parameters:
++ *	x0 - const string pointer
++ *	x1 - maximal string length
++ * Returns:
++ *	x0 - the return length of specific string
++ */
++
++/* Arguments and results.  */
++srcin		.req	x0
++len		.req	x0
++limit		.req	x1
++
++/* Locals and temporaries.  */
++src		.req	x2
 +data1		.req	x3
-+data1w		.req	w3
 +data2		.req	x4
-+data2w		.req	w4
-+has_nul		.req	x5
-+diff		.req	x6
-+endloop		.req	x7
++data2a		.req	x5
++has_nul1	.req	x6
++has_nul2	.req	x7
 +tmp1		.req	x8
 +tmp2		.req	x9
 +tmp3		.req	x10
-+pos		.req	x11
-+limit_wd	.req	x12
-+mask		.req	x13
++tmp4		.req	x11
++zeroones	.req	x12
++pos		.req	x13
++limit_wd	.req	x14
 +
-+ENTRY(memcmp)
-+	cbz	limit, .Lret0
-+	eor	tmp1, src1, src2
-+	tst	tmp1, #7
-+	b.ne	.Lmisaligned8
-+	ands	tmp1, src1, #7
-+	b.ne	.Lmutual_align
-+	sub	limit_wd, limit, #1 /* limit != 0, so no underflow.  */
-+	lsr	limit_wd, limit_wd, #3 /* Convert to Dwords.  */
++#define REP8_01 0x0101010101010101
++#define REP8_7f 0x7f7f7f7f7f7f7f7f
++#define REP8_80 0x8080808080808080
++
++ENTRY(strnlen)
++	cbz	limit, .Lhit_limit
++	mov	zeroones, #REP8_01
++	bic	src, srcin, #15
++	ands	tmp1, srcin, #15
++	b.ne	.Lmisaligned
++	/* Calculate the number of full and partial words -1.  */
++	sub	limit_wd, limit, #1 /* Limit != 0, so no underflow.  */
++	lsr	limit_wd, limit_wd, #4  /* Convert to Qwords.  */
++
 +	/*
-+	* The input source addresses are at alignment boundary.
-+	* Directly compare eight bytes each time.
++	* NUL detection works on the principle that (X - 1) & (~X) & 0x80
++	* (=> (X - 1) & ~(X | 0x7f)) is non-zero iff a byte is zero, and
++	* can be done in parallel across the entire word.
 +	*/
-+.Lloop_aligned:
-+	ldr	data1, [src1], #8
-+	ldr	data2, [src2], #8
-+.Lstart_realigned:
++	/*
++	* The inner loop deals with two Dwords at a time.  This has a
++	* slightly higher start-up cost, but we should win quite quickly,
++	* especially on cores with a high number of issue slots per
++	* cycle, as we get much better parallelism out of the operations.
++	*/
++.Lloop:
++	ldp	data1, data2, [src], #16
++.Lrealigned:
++	sub	tmp1, data1, zeroones
++	orr	tmp2, data1, #REP8_7f
++	sub	tmp3, data2, zeroones
++	orr	tmp4, data2, #REP8_7f
++	bic	has_nul1, tmp1, tmp2
++	bic	has_nul2, tmp3, tmp4
 +	subs	limit_wd, limit_wd, #1
-+	eor	diff, data1, data2	/* Non-zero if differences found.  */
-+	csinv	endloop, diff, xzr, cs	/* Last Dword or differences.  */
-+	cbz	endloop, .Lloop_aligned
++	orr	tmp1, has_nul1, has_nul2
++	ccmp	tmp1, #0, #0, pl    /* NZCV = 0000  */
++	b.eq	.Lloop
 +
-+	/* Not reached the limit, must have found a diff.  */
-+	tbz	limit_wd, #63, .Lnot_limit
++	cbz	tmp1, .Lhit_limit   /* No null in final Qword.  */
 +
-+	/* Limit % 8 == 0 => the diff is in the last 8 bytes. */
-+	ands	limit, limit, #7
-+	b.eq	.Lnot_limit
 +	/*
-+	* The remained bytes less than 8. It is needed to extract valid data
-+	* from last eight bytes of the intended memory range.
++	* We know there's a null in the final Qword. The easiest thing
++	* to do now is work out the length of the string and return
++	* MIN (len, limit).
 +	*/
-+	lsl	limit, limit, #3	/* bytes-> bits.  */
-+	mov	mask, #~0
-+CPU_BE( lsr	mask, mask, limit )
-+CPU_LE( lsl	mask, mask, limit )
-+	bic	data1, data1, mask
-+	bic	data2, data2, mask
++	sub	len, src, srcin
++	cbz	has_nul1, .Lnul_in_data2
++CPU_BE( mov	data2, data1 )	/*perpare data to re-calculate the syndrome*/
 +
-+	orr	diff, diff, mask
-+	b	.Lnot_limit
++	sub	len, len, #8
++	mov	has_nul2, has_nul1
++.Lnul_in_data2:
++	/*
++	* For big-endian, carry propagation (if the final byte in the
++	* string is 0x01) means we cannot use has_nul directly.  The
++	* easiest way to get the correct byte is to byte-swap the data
++	* and calculate the syndrome a second time.
++	*/
++CPU_BE( rev	data2, data2 )
++CPU_BE( sub	tmp1, data2, zeroones )
++CPU_BE( orr	tmp2, data2, #REP8_7f )
++CPU_BE( bic	has_nul2, tmp1, tmp2 )
 +
-+.Lmutual_align:
++	sub	len, len, #8
++	rev	has_nul2, has_nul2
++	clz	pos, has_nul2
++	add	len, len, pos, lsr #3       /* Bits to bytes.  */
++	cmp	len, limit
++	csel	len, len, limit, ls     /* Return the lower value.  */
++	ret
++
++.Lmisaligned:
 +	/*
-+	* Sources are mutually aligned, but are not currently at an
-+	* alignment boundary. Round down the addresses and then mask off
-+	* the bytes that precede the start point.
++	* Deal with a partial first word.
++	* We're doing two things in parallel here;
++	* 1) Calculate the number of words (but avoiding overflow if
++	* limit is near ULONG_MAX) - to do this we need to work out
++	* limit + tmp1 - 1 as a 65-bit value before shifting it;
++	* 2) Load and mask the initial data words - we force the bytes
++	* before the ones we are interested in to 0xff - this ensures
++	* early bytes will not hit any zero detection.
 +	*/
-+	bic	src1, src1, #7
-+	bic	src2, src2, #7
-+	ldr	data1, [src1], #8
-+	ldr	data2, [src2], #8
-+	/*
-+	* We can not add limit with alignment offset(tmp1) here. Since the
-+	* addition probably make the limit overflown.
-+	*/
-+	sub	limit_wd, limit, #1/*limit != 0, so no underflow.*/
-+	and	tmp3, limit_wd, #7
-+	lsr	limit_wd, limit_wd, #3
++	ldp	data1, data2, [src], #16
++
++	sub	limit_wd, limit, #1
++	and	tmp3, limit_wd, #15
++	lsr	limit_wd, limit_wd, #4
++
 +	add	tmp3, tmp3, tmp1
-+	add	limit_wd, limit_wd, tmp3, lsr #3
-+	add	limit, limit, tmp1/* Adjust the limit for the extra.  */
++	add	limit_wd, limit_wd, tmp3, lsr #4
 +
-+	lsl	tmp1, tmp1, #3/* Bytes beyond alignment -> bits.*/
-+	neg	tmp1, tmp1/* Bits to alignment -64.  */
++	neg	tmp4, tmp1
++	lsl	tmp4, tmp4, #3  /* Bytes beyond alignment -> bits.  */
++
 +	mov	tmp2, #~0
-+	/*mask off the non-intended bytes before the start address.*/
-+CPU_BE( lsl	tmp2, tmp2, tmp1 )/*Big-endian.Early bytes are at MSB*/
++	/* Big-endian.  Early bytes are at MSB.  */
++CPU_BE( lsl	tmp2, tmp2, tmp4 )	/* Shift (tmp1 & 63).  */
 +	/* Little-endian.  Early bytes are at LSB.  */
-+CPU_LE( lsr	tmp2, tmp2, tmp1 )
++CPU_LE( lsr	tmp2, tmp2, tmp4 )	/* Shift (tmp1 & 63).  */
++
++	cmp	tmp1, #8
 +
 +	orr	data1, data1, tmp2
-+	orr	data2, data2, tmp2
-+	b	.Lstart_realigned
++	orr	data2a, data2, tmp2
 +
-+	/*src1 and src2 have different alignment offset.*/
-+.Lmisaligned8:
-+	cmp	limit, #8
-+	b.lo	.Ltiny8proc /*limit < 8: compare byte by byte*/
++	csinv	data1, data1, xzr, le
++	csel	data2, data2, data2a, le
++	b	.Lrealigned
 +
-+	and	tmp1, src1, #7
-+	neg	tmp1, tmp1
-+	add	tmp1, tmp1, #8/*valid length in the first 8 bytes of src1*/
-+	and	tmp2, src2, #7
-+	neg	tmp2, tmp2
-+	add	tmp2, tmp2, #8/*valid length in the first 8 bytes of src2*/
-+	subs	tmp3, tmp1, tmp2
-+	csel	pos, tmp1, tmp2, hi /*Choose the maximum.*/
-+
-+	sub	limit, limit, pos
-+	/*compare the proceeding bytes in the first 8 byte segment.*/
-+.Ltinycmp:
-+	ldrb	data1w, [src1], #1
-+	ldrb	data2w, [src2], #1
-+	subs	pos, pos, #1
-+	ccmp	data1w, data2w, #0, ne  /* NZCV = 0b0000.  */
-+	b.eq	.Ltinycmp
-+	cbnz	pos, 1f /*diff occurred before the last byte.*/
-+	cmp	data1w, data2w
-+	b.eq	.Lstart_align
-+1:
-+	sub	result, data1, data2
++.Lhit_limit:
++	mov	len, limit
 +	ret
-+
-+.Lstart_align:
-+	lsr	limit_wd, limit, #3
-+	cbz	limit_wd, .Lremain8
-+
-+	ands	xzr, src1, #7
-+	b.eq	.Lrecal_offset
-+	/*process more leading bytes to make src1 aligned...*/
-+	add	src1, src1, tmp3 /*backwards src1 to alignment boundary*/
-+	add	src2, src2, tmp3
-+	sub	limit, limit, tmp3
-+	lsr	limit_wd, limit, #3
-+	cbz	limit_wd, .Lremain8
-+	/*load 8 bytes from aligned SRC1..*/
-+	ldr	data1, [src1], #8
-+	ldr	data2, [src2], #8
-+
-+	subs	limit_wd, limit_wd, #1
-+	eor	diff, data1, data2  /*Non-zero if differences found.*/
-+	csinv	endloop, diff, xzr, ne
-+	cbnz	endloop, .Lunequal_proc
-+	/*How far is the current SRC2 from the alignment boundary...*/
-+	and	tmp3, tmp3, #7
-+
-+.Lrecal_offset:/*src1 is aligned now..*/
-+	neg	pos, tmp3
-+.Lloopcmp_proc:
-+	/*
-+	* Divide the eight bytes into two parts. First,backwards the src2
-+	* to an alignment boundary,load eight bytes and compare from
-+	* the SRC2 alignment boundary. If all 8 bytes are equal,then start
-+	* the second part's comparison. Otherwise finish the comparison.
-+	* This special handle can garantee all the accesses are in the
-+	* thread/task space in avoid to overrange access.
-+	*/
-+	ldr	data1, [src1,pos]
-+	ldr	data2, [src2,pos]
-+	eor	diff, data1, data2  /* Non-zero if differences found.  */
-+	cbnz	diff, .Lnot_limit
-+
-+	/*The second part process*/
-+	ldr	data1, [src1], #8
-+	ldr	data2, [src2], #8
-+	eor	diff, data1, data2  /* Non-zero if differences found.  */
-+	subs	limit_wd, limit_wd, #1
-+	csinv	endloop, diff, xzr, ne/*if limit_wd is 0,will finish the cmp*/
-+	cbz	endloop, .Lloopcmp_proc
-+.Lunequal_proc:
-+	cbz	diff, .Lremain8
-+
-+/*There is differnence occured in the latest comparison.*/
-+.Lnot_limit:
-+/*
-+* For little endian,reverse the low significant equal bits into MSB,then
-+* following CLZ can find how many equal bits exist.
-+*/
-+CPU_LE( rev	diff, diff )
-+CPU_LE( rev	data1, data1 )
-+CPU_LE( rev	data2, data2 )
-+
-+	/*
-+	* The MS-non-zero bit of DIFF marks either the first bit
-+	* that is different, or the end of the significant data.
-+	* Shifting left now will bring the critical information into the
-+	* top bits.
-+	*/
-+	clz	pos, diff
-+	lsl	data1, data1, pos
-+	lsl	data2, data2, pos
-+	/*
-+	* We need to zero-extend (char is unsigned) the value and then
-+	* perform a signed subtraction.
-+	*/
-+	lsr	data1, data1, #56
-+	sub	result, data1, data2, lsr #56
-+	ret
-+
-+.Lremain8:
-+	/* Limit % 8 == 0 =>. all data are equal.*/
-+	ands	limit, limit, #7
-+	b.eq	.Lret0
-+
-+.Ltiny8proc:
-+	ldrb	data1w, [src1], #1
-+	ldrb	data2w, [src2], #1
-+	subs	limit, limit, #1
-+
-+	ccmp	data1w, data2w, #0, ne  /* NZCV = 0b0000. */
-+	b.eq	.Ltiny8proc
-+	sub	result, data1, data2
-+	ret
-+.Lret0:
-+	mov	result, #0
-+	ret
-+ENDPROC(memcmp)
++ENDPROC(strnlen)
 -- 
 1.7.9.5
