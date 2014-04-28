@@ -1,28 +1,50 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 28 Apr 2014 12:13:52 -0700
-Subject: [PATCHv3 6/7] ARM: sun7i: dt: add PWM support
-In-Reply-To: <1398701834-3719-7-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1398701834-3719-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1398701834-3719-7-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20140428191352.GE3134@lukather>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 28 Apr 2014 19:19:46 +0000 (UTC)
+Subject: [PATCH 1/5] drivers: w1: omap_hdq: cleanup and bug fixes.
+In-Reply-To: <1397651532-31456-2-git-send-email-sourav.poddar@ti.com>
+References: <1397651532-31456-1-git-send-email-sourav.poddar@ti.com>
+ <1397651532-31456-2-git-send-email-sourav.poddar@ti.com>
+Message-ID: <alpine.DEB.2.02.1404281918360.14616@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 06:17:13PM +0200, Alexandre Belloni wrote:
-> Add the PWM bindings for the Allwinner A20.
+On Wed, 16 Apr 2014, Sourav Poddar wrote:
+
+> The patch adds the following to the omap hdq driver.
+> 1. HDQ Device reset call in probe.
+> 2. Enabling '1 wire mode' and checking for presence pulse bit.
+> 3. Proper disabling and enabling of interrupts during read path.
+> 4. Add re-initialization code during SKIP ROM command execution.
+> 5. Miscellaneous cleanup(formatting, return error checks).
 > 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+> ---
+>  drivers/w1/masters/omap_hdq.c |   85 ++++++++++++++++++++++++++++++++---------
+>  1 file changed, 68 insertions(+), 17 deletions(-)
+> 
+> diff --git a/drivers/w1/masters/omap_hdq.c b/drivers/w1/masters/omap_hdq.c
+> index 9900e8e..0a7bf7f 100644
+> --- a/drivers/w1/masters/omap_hdq.c
+> +++ b/drivers/w1/masters/omap_hdq.c
 
-Applied, thanks
+...
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140428/5fa7f321/attachment-0001.sig>
+> @@ -115,6 +116,15 @@ static inline u8 hdq_reg_merge(struct hdq_data *hdq_data, u32 offset,
+>  	return new_val;
+>  }
+>  
+> +static void hdq_disable_interrupt(struct hdq_data *hdq_data, u32 offset,
+> +				  u8 mask)
+> +{
+> +	u32 ie;
+> +
+> +	ie = readl(hdq_data->hdq_base + offset);
+> +	writel(ie & mask, hdq_data->hdq_base + offset);
+> +}
+> +
+
+Does this function really need to take offset and mask arguments?  Won't 
+they always be constant, and therefore, no need to pass them?
+
+
+- Paul
