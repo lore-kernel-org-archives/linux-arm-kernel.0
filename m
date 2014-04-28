@@ -1,31 +1,51 @@
 From: george.cherian@ti.com (George Cherian)
-Date: Mon, 28 Apr 2014 09:40:21 +0530
-Subject: [PATCH 2/6] ARM: dts: am33xx: Add clock names for cpsw and cpts
+Date: Mon, 28 Apr 2014 09:40:22 +0530
+Subject: [PATCH 3/6] drivers: net: cpsw: Enable CPTS for DRA7xx and AM4372
 In-Reply-To: <1398658225-25873-1-git-send-email-george.cherian@ti.com>
 References: <1398658225-25873-1-git-send-email-george.cherian@ti.com>
-Message-ID: <1398658225-25873-3-git-send-email-george.cherian@ti.com>
+Message-ID: <1398658225-25873-4-git-send-email-george.cherian@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add CPSW fck and CPTS clock and clock names
+Enable cpts hardware time stamping for Dra7xx and AM4372.
+This enables PTPv2 for DRA7xx and AM4372.
 
 Signed-off-by: George Cherian <george.cherian@ti.com>
 ---
- arch/arm/boot/dts/am33xx.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/net/ethernet/ti/cpsw.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 9770e35..d1e2b36 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -665,6 +665,8 @@
- 		mac: ethernet at 4a100000 {
- 			compatible = "ti,cpsw";
- 			ti,hwmods = "cpgmac0";
-+			clocks = <&cpsw_125mhz_gclk>, <&cpsw_cpts_rft_clk>;
-+			clock-names = "fck", "cpts";
- 			cpdma_channels = <8>;
- 			ale_entries = <1024>;
- 			bd_ram_size = <0x2000>;
+diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
+index 36aa109..085ffb5 100644
+--- a/drivers/net/ethernet/ti/cpsw.c
++++ b/drivers/net/ethernet/ti/cpsw.c
+@@ -1398,7 +1398,8 @@ static int cpsw_hwtstamp_set(struct net_device *dev, struct ifreq *ifr)
+ 	struct hwtstamp_config cfg;
+ 
+ 	if (priv->version != CPSW_VERSION_1 &&
+-	    priv->version != CPSW_VERSION_2)
++	    priv->version != CPSW_VERSION_2 &&
++	    priv->version != CPSW_VERSION_3)
+ 		return -EOPNOTSUPP;
+ 
+ 	if (copy_from_user(&cfg, ifr->ifr_data, sizeof(cfg)))
+@@ -1443,6 +1444,7 @@ static int cpsw_hwtstamp_set(struct net_device *dev, struct ifreq *ifr)
+ 		cpsw_hwtstamp_v1(priv);
+ 		break;
+ 	case CPSW_VERSION_2:
++	case CPSW_VERSION_3:
+ 		cpsw_hwtstamp_v2(priv);
+ 		break;
+ 	default:
+@@ -1459,7 +1461,8 @@ static int cpsw_hwtstamp_get(struct net_device *dev, struct ifreq *ifr)
+ 	struct hwtstamp_config cfg;
+ 
+ 	if (priv->version != CPSW_VERSION_1 &&
+-	    priv->version != CPSW_VERSION_2)
++	    priv->version != CPSW_VERSION_2 &&
++	    priv->version != CPSW_VERSION_3)
+ 		return -EOPNOTSUPP;
+ 
+ 	cfg.flags = 0;
 -- 
 1.8.3.1
