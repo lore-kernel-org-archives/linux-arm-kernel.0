@@ -1,35 +1,57 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 28 Apr 2014 20:32:55 +0200 (CEST)
-Subject: [PATCH] arm: edma: Fix xbar mapping
-In-Reply-To: <534BED36.2060907@ti.com>
-References: <alpine.DEB.2.02.1404132123100.22697@ionos.tec.linutronix.de>
- <534BED36.2060907@ti.com>
-Message-ID: <alpine.DEB.2.02.1404282032150.6261@ionos.tec.linutronix.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 28 Apr 2014 14:33:27 -0400
+Subject: [PATCH v2 10/10] ARM: mvebu: Enable the thermal sensor in
+ Armada 380/385 SoC
+In-Reply-To: <20140428164403.GA17824@arch.cereza>
+References: <1398371004-15807-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1398371004-15807-11-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20140428164403.GA17824@arch.cereza>
+Message-ID: <20140428183327.GA28159@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 Apr 2014, Sekhar Nori wrote:
-> > Fix the issues by:
+On Mon, Apr 28, 2014 at 01:44:03PM -0300, Ezequiel Garcia wrote:
+> On Apr 24, Ezequiel Garcia wrote:
+> > This commit enables the thermal sensor found in Armada 380/385 SoCs.
 > > 
-> > - annotating the device tree entry with "/bits/ 16" as documented in
-> >   the of_property_read_u16_array kernel doc
+> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > ---
+> >  arch/arm/boot/dts/armada-38x.dtsi | 6 ++++++
+> >  1 file changed, 6 insertions(+)
 > > 
-> > - make the size of the xbar register mapping correct
-> > 
-> > - invalidating the end of the array and not the start
-> > 
-> > This convoluted mess wants to be completely rewritten as there is no
-> > point to keep the xbar_chan array memory and the iomapping of the xbar
-> > regs around forever. Marking the xbar mapped channels as used should
-> > be done right there.
-> > 
-> > But that's a different issue and this patch is small enough to make it
-> > work and allows a simple backport for stable.
-> > 
-> > Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+> > diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+> > index a064f59..02c6139 100644
+> > --- a/arch/arm/boot/dts/armada-38x.dtsi
+> > +++ b/arch/arm/boot/dts/armada-38x.dtsi
+> > @@ -346,6 +346,12 @@
+> >  				clock-output-names = "nand";
+> >  			};
+> >  
+> > +			thermal at e8078 {
+> > +				compatible = "marvell,armada380-thermal";
+> > +				reg = <0xe4078 0x4>, <0xe404 0x4>;
 > 
-> This time, I tested this patch and FWIW you can add:
+> Dammit, there's a stupid typo in the register offset. I never noticed this, because
+> the initialization sequence does not do much, and this register is not really used
+> (for now). The fix is this:
 > 
-> Acked-by: Sekhar Nori <nsekhar@ti.com>
+> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+> index 02c6139..370220f 100644
+> --- a/arch/arm/boot/dts/armada-38x.dtsi
+> +++ b/arch/arm/boot/dts/armada-38x.dtsi
+> @@ -348,7 +348,7 @@
+>  
+>  			thermal at e8078 {
+>  				compatible = "marvell,armada380-thermal";
+> -				reg = <0xe4078 0x4>, <0xe404 0x4>;
+> +				reg = <0xe4078 0x4>, <0xe4074 0x4>;
+>  				status = "okay";
+>  			};
+>  
+> Want me to send a follow-up patch?
 
-Can someone pick this up please?
+Nope, I squashed it in and pushed it out.
+
+thx,
+
+Jason.
