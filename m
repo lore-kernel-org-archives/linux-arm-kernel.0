@@ -1,44 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 28 Apr 2014 11:07:03 +0200
-Subject: [PATCH] gpio: always enable GPIO_OMAP on ARCH_OMAP
-Message-ID: <5523458.JVZJJObMjC@wuerfel>
+From: jean.pihet@linaro.org (Jean Pihet)
+Date: Mon, 28 Apr 2014 11:15:43 +0200
+Subject: [PATCH] perf: ARM64: wire up perf_regs and unwind support
+In-Reply-To: <CAFrcx1mZg-kdBG2d4bwWdqJByYXLG2SJ5+GD7cSteqJj=A6Sxw@mail.gmail.com>
+References: <1392311193-21214-1-git-send-email-jean.pihet@linaro.org>
+ <CAFrcx1=ZBWt1mak_6+=KbCFZEsaD3T_xZ8up4WBLSr6_JTkP1A@mail.gmail.com>
+ <20140312174520.GB17308@arm.com>
+ <20140313101202.GB11365@mudshark.cambridge.arm.com>
+ <20140313102203.GC30339@arm.com>
+ <CAFrcx1mZg-kdBG2d4bwWdqJByYXLG2SJ5+GD7cSteqJj=A6Sxw@mail.gmail.com>
+Message-ID: <CAFrcx1mvSMFea999FZCEVxMZsmyFw+b_fugdGSEsAJkqwzkXQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 4df42de9d3e "gpio: omap: add a GPIO_OMAP option instead of using
-ARCH_OMAP" made it possible to build OMAP kernels without the GPIO driver,
-which at least on OMAP2 and OMAP3 causes build errors because of functions
-used by the platform power management code:
+Arnaldo,
 
-arch/arm/mach-omap2/built-in.o: In function `omap_sram_idle':
-arch/arm/mach-omap2/pm24xx.c:129: undefined reference to `omap2_gpio_prepare_for_idle'
-arch/arm/mach-omap2/pm24xx.c:129: undefined reference to `omap2_gpio_resume_after_idle'
+> This patch hooks in the perf_regs and libunwind code for ARM64.
+> The tools/perf/arch/arm64 is created; it contains the arch specific
+> code for DWARF unwinding.
+>
+> Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
+> Acked-by: Will Deacon <will.deacon@arm.com>
 
-We presumably always want the GPIO driver on OMAP, so this adds a slightly
-broader dependency and only allows disabling the driver only when no
-OMAP2PLUS platform is selected.
+Ping on this patch. Can you take this patch in your tree?
+Please let me know if you need a rebased version of this one.
 
-However, it seems entirely reasonable to include the driver in build tests
-on other platforms, so we should also allow building it for COMPILE_TEST
-builds and select the required GENERIC_IRQ_CHIP that may not already be
-enabled on other platforms.
+Regards,
+Jean
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-index c58b828..c8c42be 100644
---- a/drivers/gpio/Kconfig
-+++ b/drivers/gpio/Kconfig
-@@ -244,9 +244,10 @@ config GPIO_OCTEON
- 	  family of SOCs.
- 
- config GPIO_OMAP
--	bool "TI OMAP GPIO support"
-+	bool "TI OMAP GPIO support" if COMPILE_TEST && !ARCH_OMAP2PLUS
- 	default y if ARCH_OMAP
--	depends on ARM && ARCH_OMAP
-+	depends on ARM
-+	select GENERIC_IRQ_CHIP
- 	select GPIOLIB_IRQCHIP
- 	help
- 	  Say yes here to enable GPIO support for TI OMAP SoCs.
+On 13 March 2014 13:01, Jean Pihet <jean.pihet@linaro.org> wrote:
+> On 13 March 2014 11:22, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> On Thu, Mar 13, 2014 at 10:12:02AM +0000, Will Deacon wrote:
+>>> On Wed, Mar 12, 2014 at 05:45:20PM +0000, Catalin Marinas wrote:
+>>> > On Wed, Mar 12, 2014 at 01:42:51PM +0100, Jean Pihet wrote:
+>>> > > On 13 February 2014 18:06, Jean Pihet <jean.pihet@linaro.org> wrote:
+>>> > > > This patch hooks in the perf_regs and libunwind code for ARM64.
+>>> > > > The tools/perf/arch/arm64 is created; it contains the arch specific
+>>> > > > code for DWARF unwinding.
+>>> > > >
+>>> > > > Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
+>>> > > > Acked-by: Will Deacon <will.deacon@arm.com>
+>>> > >
+>>> > > Ping on this patch. Can this one go into the perf tree?
+>>> >
+>>> > I'm happy to take it as well if there are no objections from the perf
+>>> > maintainers.
+>>>
+>>> I object :) Last time I took a patch for perf tools (via the arm tree) it
+>>> ended in a conflict from hell and we vowed not to take tools patches via
+>>> arch trees again.
+>>
+>> Works for me ;)
+> Ok thanks!
+>
+> Arnaldo, can you take this patch in your tree?
+>
+> Jean
+>
+>>
+>> --
+>> Catalin
