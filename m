@@ -1,96 +1,24 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 29 Apr 2014 00:02:27 +0800
-Subject: [PATCH 7/7] ARM: sunxi: dt: add PRCM clk and reset controller
- subdevices
-In-Reply-To: <1398697130-8338-8-git-send-email-boris.brezillon@free-electrons.com>
-References: <1398697130-8338-1-git-send-email-boris.brezillon@free-electrons.com>
- <1398697130-8338-8-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <CAGb2v67GnW_ziDMjg6zObCAHZrHppGzP=+-VhpWet-NaAzx-Fg@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 28 Apr 2014 10:04:13 -0600
+Subject: [PATCH 0/7] ARM: tegra: HDMI and DSI updates
+In-Reply-To: <1398440691-23366-1-git-send-email-thierry.reding@gmail.com>
+References: <1398440691-23366-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <535E7BFD.60708@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 04/25/2014 09:44 AM, Thierry Reding wrote:
+> From: Thierry Reding <treding@nvidia.com>
+> 
+> This series enables support for HDMI on Venice2 and Jetson TK1. It also
+> adds the missing +5V regulators for Harmony, Beaver and Dalmore. Other
+> boards may also need similar changes, but I don't have access to them.
+> That said existing boards should continue to work without modifications
+> since we were completely ignoring the +5V regulator before. So the only
+> change that this should introduce is that perhaps some additional power
+> can be saved because the +5V regulator now isn't always on.
+> 
+> The final patch in this series hooks up the DSI power supply on Dalmore
+> so that it can also be switched of if not used.
 
-On Mon, Apr 28, 2014 at 10:58 PM, Boris BREZILLON
-<boris.brezillon@free-electrons.com> wrote:
-> Add DT definitions for PRCM (Power/Reset/Clock Management) clock and reset
-> controller subdevices.
->
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> ---
->  arch/arm/boot/dts/sun6i-a31.dtsi | 49 ++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 49 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-> index ec3253a..83a1634 100644
-> --- a/arch/arm/boot/dts/sun6i-a31.dtsi
-> +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-> @@ -501,6 +501,55 @@
->                 prcm at 01f01c00 {
-
-Seems the address here was wrong to start with.
-
->                         compatible = "allwinner,sun6i-a31-prcm";
->                         reg = <0x01f01400 0x200>;
-> +
-> +                       ar100_mux: ar100_mux {
-
-Might we use clk at 01f01XXX for the names of the clock nodes?
-
-> +                               compatible = "allwinner,sun6i-a31-ar100-mux-clk";
-> +                               #clock-cells = <0>;
-> +                               clocks = <&osc32k>, <&osc24M>, <&pll6>, <&pll6>;
-> +                       };
-> +
-> +                       ar100: ar100 {
-> +                               compatible = "allwinner,sun6i-a31-ar100-clk";
-> +                               #clock-cells = <0>;
-> +                               clocks = <&ar100_mux>;
-> +                       };
-> +
-> +                       ar100_div: ar100_div {
-> +                               compatible = "allwinner,sun6i-a31-ar100-div-clk";
-> +                               #clock-cells = <0>;
-> +                               clocks = <&ar100>;
-> +                       };
-> +
-> +                       ahb0: ahb0 {
-> +                               compatible = "fixed-factor-clock";
-> +                               #clock-cells = <0>;
-> +                               clock-div = <1>;
-> +                               clock-mult = <1>;
-> +                               clocks = <&ar100_div>;
-> +                               clock-output-names = "ahb0";
-> +                       };
-> +
-> +                       apb0: apb0 {
-> +                               compatible = "allwinner,sun6i-a31-apb0-clk";
-> +                               #clock-cells = <0>;
-> +                               clocks = <&ahb0>;
-> +                               clock-output-names = "apb0";
-> +                       };
-> +
-> +                       apb0_gates: apb0_gates {
-> +                               compatible = "allwinner,sun6i-a31-apb0-gates-clk";
-> +                               #clock-cells = <1>;
-> +                               clocks = <&apb0>;
-> +                               clock-output-names = "apb0_pio", "apb0_ir",
-> +                                               "apb0_timer01", "apb0_p2wi",
-> +                                               "apb0_uart", "apb0_1wire",
-> +                                               "apb0_i2c";
-> +                       };
-> +
-> +                       apb0_rst: apb0_rst {
-
-Also use reset at 01f01XXX here?
-
-> +                               compatible = "allwinner,sun6i-a31-clock-reset";
-> +                               #reset-cells = <1>;
-> +                       };
->                 };
->         };
->  };
-
-Thanks!
-
-ChenYu
+I've applied the series to Tegra's for-3.16/dt branch.
