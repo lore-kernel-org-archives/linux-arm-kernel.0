@@ -1,166 +1,235 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Mon, 28 Apr 2014 10:15:00 -0500
-Subject: [PATCH V3 20/20] bus: omap_l3_noc: Add AM4372 interconnect error data
+Date: Mon, 28 Apr 2014 10:14:51 -0500
+Subject: [PATCH V3 11/20] bus: omap_l3_noc: convert flagmux information into a
+ structure
 In-Reply-To: <1398698101-25513-1-git-send-email-nm@ti.com>
 References: <1397492726-17203-1-git-send-email-nm@ti.com>
  <1398698101-25513-1-git-send-email-nm@ti.com>
-Message-ID: <1398698101-25513-21-git-send-email-nm@ti.com>
+Message-ID: <1398698101-25513-12-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Afzal Mohammed <afzal@ti.com>
+This allows us to encompass target information and flag mux offset that
+points to the target information into a singular structure. This saves
+us the need to look up two different arrays indexed by module ID for
+information.
 
-Add AM4372 information to handle L3 error.
+This allows us to reduce the static target information allocation to
+just the ones that are documented.
 
-AM4372 has two clk domains 100f and 200s. Provide flagmux and data
-associated with it.
-
-NOTE: Timeout doesn't have STDERRLOG_MAIN register. And per hardware
-team, L3 timeout error cannot be cleared the normal way (by setting
-bit 31 in STDERRLOG_MAIN), instead it may be required to do system
-reset. L3 error handler can't help in such scenarios.
-
-Hence indicate timeout target offset as L3_TARGET_NOT_SUPPORTED as
-done for undocumented bits.
-
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 Signed-off-by: Nishanth Menon <nm@ti.com>
 Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 Tested-by: Darren Etheridge <detheridge@ti.com>
 ---
-V3: New master information + masterid parse information update
+V3: no change
 
- .../devicetree/bindings/arm/omap/l3-noc.txt        |    1 +
- drivers/bus/omap_l3_noc.c                          |    1 +
- drivers/bus/omap_l3_noc.h                          |   91 ++++++++++++++++++++
- 3 files changed, 93 insertions(+)
+ drivers/bus/omap_l3_noc.c |   16 +++++++----
+ drivers/bus/omap_l3_noc.h |   70 +++++++++++++++++++++++++++++----------------
+ 2 files changed, 56 insertions(+), 30 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/omap/l3-noc.txt b/Documentation/devicetree/bindings/arm/omap/l3-noc.txt
-index 45d0fc2..974624e 100644
---- a/Documentation/devicetree/bindings/arm/omap/l3-noc.txt
-+++ b/Documentation/devicetree/bindings/arm/omap/l3-noc.txt
-@@ -7,6 +7,7 @@ Required properties:
- - compatible : Should be "ti,omap3-l3-smx" for OMAP3 family
-                Should be "ti,omap4-l3-noc" for OMAP4 family
- 	       Should be "ti,dra7-l3-noc" for DRA7 family
-+               Should be "ti,am4372-l3-noc" for AM43 family
- - reg:	Contains L3 register address range for each noc domain.
- - ti,hwmods: "l3_main_1", ... One hwmod for each noc domain.
- 
 diff --git a/drivers/bus/omap_l3_noc.c b/drivers/bus/omap_l3_noc.c
-index 6cdd02e..531ae59 100644
+index 7e0a988..9524452 100644
 --- a/drivers/bus/omap_l3_noc.c
 +++ b/drivers/bus/omap_l3_noc.c
-@@ -231,6 +231,7 @@ static irqreturn_t l3_interrupt_handler(int irq, void *_l3)
- static const struct of_device_id l3_noc_match[] = {
- 	{.compatible = "ti,omap4-l3-noc", .data = &omap_l3_data},
- 	{.compatible = "ti,dra7-l3-noc", .data = &dra_l3_data},
-+	{.compatible = "ti,am4372-l3-noc", .data = &am4372_l3_data},
- 	{},
- };
- MODULE_DEVICE_TABLE(of, l3_noc_match);
+@@ -60,6 +60,7 @@ static irqreturn_t l3_interrupt_handler(int irq, void *_l3)
+ 	void __iomem *l3_targ_stderr, *l3_targ_slvofslsb, *l3_targ_mstaddr;
+ 	char *target_name, *master_name = "UN IDENTIFIED";
+ 	struct l3_target_data *l3_targ_inst;
++	struct l3_flagmux_data *flag_mux;
+ 	struct l3_masters_data *master;
+ 
+ 	/* Get the Type of interrupt */
+@@ -71,7 +72,8 @@ static irqreturn_t l3_interrupt_handler(int irq, void *_l3)
+ 		 * to determine the source
+ 		 */
+ 		base = l3->l3_base[i];
+-		err_reg = readl_relaxed(base + l3->l3_flagmux[i] +
++		flag_mux = l3->l3_flagmux[i];
++		err_reg = readl_relaxed(base + flag_mux->offset +
+ 					L3_FLAGMUX_REGERR0 + (inttype << 3));
+ 
+ 		/* Get the corresponding error and analyse */
+@@ -82,9 +84,13 @@ static irqreturn_t l3_interrupt_handler(int irq, void *_l3)
+ 			/* We DONOT expect err_src to go out of bounds */
+ 			BUG_ON(err_src > MAX_CLKDM_TARGETS);
+ 
+-			l3_targ_inst = &l3->l3_targ[i][err_src];
+-			target_name = l3_targ_inst->name;
+-			l3_targ_base = base + l3_targ_inst->offset;
++			if (err_src < flag_mux->num_targ_data) {
++				l3_targ_inst = &flag_mux->l3_targ[err_src];
++				target_name = l3_targ_inst->name;
++				l3_targ_base = base + l3_targ_inst->offset;
++			} else {
++				target_name = L3_TARGET_NOT_SUPPORTED;
++			}
+ 
+ 			/*
+ 			 * If we do not know of a register offset to decode
+@@ -104,7 +110,7 @@ static irqreturn_t l3_interrupt_handler(int irq, void *_l3)
+ 					inttype ? "debug" : "application",
+ 					err_src, i, "(unclearable)");
+ 
+-				mask_reg = base + l3->l3_flagmux[i] +
++				mask_reg = base + flag_mux->offset +
+ 					   L3_FLAGMUX_MASK0 + (inttype << 3);
+ 				mask_val = readl_relaxed(mask_reg);
+ 				mask_val &= ~(1 << err_src);
 diff --git a/drivers/bus/omap_l3_noc.h b/drivers/bus/omap_l3_noc.h
-index 9562a75..551e010 100644
+index e60865f..64869fe 100644
 --- a/drivers/bus/omap_l3_noc.h
 +++ b/drivers/bus/omap_l3_noc.h
-@@ -381,4 +381,95 @@ static const struct omap_l3 dra_l3_data = {
- 	.mst_addr_mask = 0xFC,
+@@ -17,8 +17,8 @@
+ #ifndef __OMAP_L3_NOC_H
+ #define __OMAP_L3_NOC_H
+ 
+-#define OMAP_L3_MODULES			3
+ #define MAX_L3_MODULES			3
++#define MAX_CLKDM_TARGETS		31
+ 
+ #define CLEAR_STDERR_LOG		(1 << 31)
+ #define CUSTOM_ERROR			0x2
+@@ -36,8 +36,6 @@
+ 
+ #define L3_TARGET_NOT_SUPPORTED		NULL
+ 
+-#define MAX_CLKDM_TARGETS		31
+-
+ /**
+  * struct l3_masters_data - L3 Master information
+  * @id:		ID of the L3 Master
+@@ -60,21 +58,32 @@ struct l3_target_data {
+ 	char *name;
  };
  
-+/* AM4372 data */
-+static struct l3_target_data am4372_l3_target_data_200f[] = {
-+	{0xf00,  "EMIF",},
-+	{0x1200, "DES",},
-+	{0x400,  "OCMCRAM",},
-+	{0x700,  "TPTC0",},
-+	{0x800,  "TPTC1",},
-+	{0x900,  "TPTC2"},
-+	{0xb00,  "TPCC",},
-+	{0xd00,  "DEBUGSS",},
-+	{0xdead, L3_TARGET_NOT_SUPPORTED,},
-+	{0x200,  "SHA",},
-+	{0xc00,  "SGX530",},
-+	{0x500,  "AES0",},
-+	{0xa00,  "L4_FAST",},
-+	{0x300,  "MPUSS_L2_RAM",},
-+	{0x100,  "ICSS",},
++/**
++ * struct l3_flagmux_data - Flag Mux information
++ * @offset:	offset from base for flagmux register
++ * @l3_targ:	array indexed by flagmux index (bit offset) pointing to the
++ *		target data. unsupported ones are marked with
++ *		L3_TARGET_NOT_SUPPORTED
++ * @num_targ_data: number of entries in target data
++ */
++struct l3_flagmux_data {
++	u32 offset;
++	struct l3_target_data *l3_targ;
++	u8 num_targ_data;
 +};
 +
-+static struct l3_flagmux_data am4372_l3_flagmux_200f = {
+ 
+ /**
+  * struct omap_l3 - Description of data relevant for L3 bus.
+  * @dev:	device representing the bus (populated runtime)
+  * @l3_base:	base addresses of modules (populated runtime)
+- * @l3_flag_mux: array containing offsets to flag mux per module
++ * @l3_flag_mux: array containing flag mux data per module
+  *		 offset from corresponding module base indexed per
+  *		 module.
+  * @num_modules: number of clock domains / modules.
+  * @l3_masters:	array pointing to master data containing name and register
+  *		offset for the master.
+  * @num_master: number of masters
+- * @l3_targ:	array indexed by flagmux index (bit offset) pointing to the
+- *		target data. unsupported ones are marked with
+- *		L3_TARGET_NOT_SUPPORTED
+  * @debug_irq:	irq number of the debug interrupt (populated runtime)
+  * @app_irq:	irq number of the application interrupt (populated runtime)
+  */
+@@ -82,25 +91,17 @@ struct omap_l3 {
+ 	struct device *dev;
+ 
+ 	void __iomem *l3_base[MAX_L3_MODULES];
+-	u32 *l3_flagmux;
++	struct l3_flagmux_data **l3_flagmux;
+ 	int num_modules;
+ 
+ 	struct l3_masters_data *l3_masters;
+ 	int num_masters;
+ 
+-	struct l3_target_data **l3_targ;
+-
+ 	int debug_irq;
+ 	int app_irq;
+ };
+ 
+-static u32 omap_l3_flagmux[OMAP_L3_MODULES] = {
+-	0x500,
+-	0x1000,
+-	0X0200
+-};
+-
+-static struct l3_target_data omap_l3_target_data_clk1[MAX_CLKDM_TARGETS] = {
++static struct l3_target_data omap_l3_target_data_clk1[] = {
+ 	{0x100,	"DMM1",},
+ 	{0x200,	"DMM2",},
+ 	{0x300,	"ABE",},
+@@ -110,7 +111,14 @@ static struct l3_target_data omap_l3_target_data_clk1[MAX_CLKDM_TARGETS] = {
+ 	{0x900,	"L4WAKEUP",},
+ };
+ 
+-static struct l3_target_data omap_l3_target_data_clk2[MAX_CLKDM_TARGETS] = {
++static struct l3_flagmux_data omap_l3_flagmux_clk1 = {
++	.offset = 0x500,
++	.l3_targ = omap_l3_target_data_clk1,
++	.num_targ_data = ARRAY_SIZE(omap_l3_target_data_clk1),
++};
++
++
++static struct l3_target_data omap_l3_target_data_clk2[] = {
+ 	{0x500,	"CORTEXM3",},
+ 	{0x300,	"DSS",},
+ 	{0x100,	"GPMC",},
+@@ -134,12 +142,25 @@ static struct l3_target_data omap_l3_target_data_clk2[MAX_CLKDM_TARGETS] = {
+ 	{0x1700, "LLI",},
+ };
+ 
+-static struct l3_target_data omap_l3_target_data_clk3[MAX_CLKDM_TARGETS] = {
++static struct l3_flagmux_data omap_l3_flagmux_clk2 = {
 +	.offset = 0x1000,
-+	.l3_targ = am4372_l3_target_data_200f,
-+	.num_targ_data = ARRAY_SIZE(am4372_l3_target_data_200f),
++	.l3_targ = omap_l3_target_data_clk2,
++	.num_targ_data = ARRAY_SIZE(omap_l3_target_data_clk2),
 +};
 +
-+static struct l3_target_data am4372_l3_target_data_100s[] = {
-+	{0x100, "L4_PER_0",},
-+	{0x200, "L4_PER_1",},
-+	{0x300, "L4_PER_2",},
-+	{0x400, "L4_PER_3",},
-+	{0x800, "McASP0",},
-+	{0x900, "McASP1",},
-+	{0xC00, "MMCHS2",},
-+	{0x700, "GPMC",},
-+	{0xD00, "L4_FW",},
-+	{0xdead, L3_TARGET_NOT_SUPPORTED,},
-+	{0x500, "ADCTSC",},
-+	{0xE00, "L4_WKUP",},
-+	{0xA00, "MAG_CARD",},
++
++static struct l3_target_data omap_l3_target_data_clk3[] = {
+ 	{0x0100, "EMUSS",},
+ 	{0x0300, "DEBUG SOURCE",},
+ 	{0x0,	"HOST CLK3",},
+ };
+ 
++static struct l3_flagmux_data omap_l3_flagmux_clk3 = {
++	.offset = 0x0200,
++	.l3_targ = omap_l3_target_data_clk3,
++	.num_targ_data = ARRAY_SIZE(omap_l3_target_data_clk3),
 +};
 +
-+static struct l3_flagmux_data am4372_l3_flagmux_100s = {
-+	.offset = 0x600,
-+	.l3_targ = am4372_l3_target_data_100s,
-+	.num_targ_data = ARRAY_SIZE(am4372_l3_target_data_100s),
-+};
-+
-+static struct l3_masters_data am4372_l3_masters[] = {
-+	{ 0x0, "M1 (128-bit)"},
-+	{ 0x1, "M2 (64-bit)"},
-+	{ 0x4, "DAP"},
-+	{ 0x5, "P1500"},
-+	{ 0xC, "ICSS0"},
-+	{ 0xD, "ICSS1"},
-+	{ 0x14, "Wakeup Processor"},
-+	{ 0x18, "TPTC0 Read"},
-+	{ 0x19, "TPTC0 Write"},
-+	{ 0x1A, "TPTC1 Read"},
-+	{ 0x1B, "TPTC1 Write"},
-+	{ 0x1C, "TPTC2 Read"},
-+	{ 0x1D, "TPTC2 Write"},
-+	{ 0x20, "SGX530"},
-+	{ 0x21, "OCP WP Traffic Probe"},
-+	{ 0x22, "OCP WP DMA Profiling"},
-+	{ 0x23, "OCP WP Event Trace"},
-+	{ 0x25, "DSS"},
-+	{ 0x28, "Crypto DMA RD"},
-+	{ 0x29, "Crypto DMA WR"},
-+	{ 0x2C, "VPFE0"},
-+	{ 0x2D, "VPFE1"},
-+	{ 0x30, "GEMAC"},
-+	{ 0x34, "USB0 RD"},
-+	{ 0x35, "USB0 WR"},
-+	{ 0x36, "USB1 RD"},
-+	{ 0x37, "USB1 WR"},
-+};
-+
-+static struct l3_flagmux_data *am4372_l3_flagmux[] = {
-+	&am4372_l3_flagmux_200f,
-+	&am4372_l3_flagmux_100s,
-+};
-+
-+static const struct omap_l3 am4372_l3_data = {
-+	.l3_flagmux = am4372_l3_flagmux,
-+	.num_modules = ARRAY_SIZE(am4372_l3_flagmux),
-+	.l3_masters = am4372_l3_masters,
-+	.num_masters = ARRAY_SIZE(am4372_l3_masters),
-+	/* All 6 bits of register field used to distinguish initiator */
-+	.mst_addr_mask = 0x3F,
-+};
-+
+ static struct l3_masters_data omap_l3_masters[] = {
+ 	{ 0x0 , "MPU"},
+ 	{ 0x10, "CS_ADP"},
+@@ -168,18 +189,17 @@ static struct l3_masters_data omap_l3_masters[] = {
+ 	{ 0xC8, "USBHOSTFS"}
+ };
+ 
+-static struct l3_target_data *omap_l3_targ[OMAP_L3_MODULES] = {
+-	omap_l3_target_data_clk1,
+-	omap_l3_target_data_clk2,
+-	omap_l3_target_data_clk3,
++static struct l3_flagmux_data *omap_l3_flagmux[] = {
++	&omap_l3_flagmux_clk1,
++	&omap_l3_flagmux_clk2,
++	&omap_l3_flagmux_clk3,
+ };
+ 
+ static const struct omap_l3 omap_l3_data = {
+ 	.l3_flagmux = omap_l3_flagmux,
+-	.num_modules = OMAP_L3_MODULES,
++	.num_modules = ARRAY_SIZE(omap_l3_flagmux),
+ 	.l3_masters = omap_l3_masters,
+ 	.num_masters = ARRAY_SIZE(omap_l3_masters),
+-	.l3_targ = omap_l3_targ,
+ };
+ 
  #endif	/* __OMAP_L3_NOC_H */
 -- 
 1.7.9.5
