@@ -1,62 +1,63 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 28 Apr 2014 20:28:34 +0100
-Subject: [PATCH 28/97] ARM: l2c: simplify l2x0 unlocking code
+Date: Mon, 28 Apr 2014 20:28:39 +0100
+Subject: [PATCH 29/97] ARM: l2c: move pl310_set_debug() into l2c-310 code
 In-Reply-To: <20140428192419.GV26756@n2100.arm.linux.org.uk>
 References: <20140428192419.GV26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WerEA-0001VF-Rm@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WerEF-0001VJ-VM@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The l2x0 unlocking code is only called from l2x0_enable() now, so move
-the logic entirely into that function and simplify it.
+Move the pl310_set_debug() into the l2c-310 code area, and don't hide
+it with ifdefs.  Rename it to l2c310_set_debug().
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mm/cache-l2x0.c | 25 ++++++++-----------------
- 1 file changed, 8 insertions(+), 17 deletions(-)
+ arch/arm/mm/cache-l2x0.c | 14 ++++++--------
+ 1 file changed, 6 insertions(+), 8 deletions(-)
 
 diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index e3f4fcbcc88b..157fd7ae331a 100644
+index 157fd7ae331a..9586be73ca4f 100644
 --- a/arch/arm/mm/cache-l2x0.c
 +++ b/arch/arm/mm/cache-l2x0.c
-@@ -352,30 +352,21 @@ static void l2x0_disable(void)
- 	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+@@ -154,18 +154,11 @@ static inline void debug_writel(unsigned long val)
+ 	if (outer_cache.set_debug)
+ 		l2c_set_debug(l2x0_base, val);
  }
- 
--static void l2x0_unlock(u32 cache_id)
-+static void l2x0_enable(void __iomem *base, u32 aux, unsigned num_lock)
- {
--	int lockregs;
-+	unsigned id;
- 
--	switch (cache_id & L2X0_CACHE_ID_PART_MASK) {
--	case L2X0_CACHE_ID_PART_L310:
--		lockregs = 8;
--		break;
--	default:
--		/* L210 and unknown types */
--		lockregs = 1;
--		break;
--	}
 -
--	l2c_unlock(l2x0_base, lockregs);
--}
-+	id = readl_relaxed(base + L2X0_CACHE_ID) & L2X0_CACHE_ID_PART_MASK;
-+	if (id == L2X0_CACHE_ID_PART_L310)
-+		num_lock = 8;
-+	else
-+		num_lock = 1;
- 
--static void l2x0_enable(void __iomem *base, u32 aux, unsigned num_lock)
+-static void pl310_set_debug(unsigned long val)
 -{
- 	/* l2x0 controller is disabled */
- 	writel_relaxed(aux, base + L2X0_AUX_CTRL);
+-	writel_relaxed(val, l2x0_base + L2X0_DEBUG_CTRL);
+-}
+ #else
+ /* Optimised out for non-errata case */
+ static inline void debug_writel(unsigned long val)
+ {
+ }
+-
+-#define pl310_set_debug	NULL
+ #endif
  
- 	/* Make sure that I&D is not locked down when starting */
--	l2x0_unlock(readl_relaxed(base + L2X0_CACHE_ID));
-+	l2c_unlock(base, num_lock);
+ #ifdef CONFIG_PL310_ERRATA_588369
+@@ -422,6 +415,11 @@ static const struct l2c_init_data l2x0_init_fns __initconst = {
+  *	Affects: store buffer
+  *	store buffer is not automatically drained.
+  */
++static void l2c310_set_debug(unsigned long val)
++{
++	writel_relaxed(val, l2x0_base + L2X0_DEBUG_CTRL);
++}
++
+ static void __init l2c310_save(void __iomem *base)
+ {
+ 	unsigned revision;
+@@ -488,7 +486,7 @@ static void __init l2c310_fixup(void __iomem *base, u32 cache_id,
+ 	unsigned n = 0;
  
- 	l2x0_inv_all();
+ 	if (revision <= L310_CACHE_ID_RTL_R3P0)
+-		fns->set_debug = pl310_set_debug;
++		fns->set_debug = l2c310_set_debug;
  
+ 	if (IS_ENABLED(CONFIG_PL310_ERRATA_753970) &&
+ 	    revision == L310_CACHE_ID_RTL_R3P0) {
 -- 
 1.8.3.1
