@@ -1,50 +1,37 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 29 Apr 2014 00:19:34 +0800
-Subject: [linux-sunxi] Re: [PATCH 1/7] gpiolib: gpiolib-of: Implement
- device tree gpio-names based lookup
-In-Reply-To: <CAAVeFuL7B7kVw7ME=Vo_snhG27aBphKO8Uzvzen1gyD=R2ETNA@mail.gmail.com>
-References: <1397544101-18135-1-git-send-email-wens@csie.org>
- <1397544101-18135-2-git-send-email-wens@csie.org>
- <CACRpkdZDjC1KxM2yJqsgpg2MxBamX1EObsuahB-2c+ShuBXm8A@mail.gmail.com>
- <CAAVeFuL7B7kVw7ME=Vo_snhG27aBphKO8Uzvzen1gyD=R2ETNA@mail.gmail.com>
-Message-ID: <CAGb2v64rs4UYMbQ--i=pcuuORVneozDpucCeHQKE4Qn7+qSCdA@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 28 Apr 2014 10:28:49 -0600
+Subject: [PATCH 33/38] mmc: sdhci: fix SDHCI dependencies
+In-Reply-To: <E1Wd2XT-0003wV-0H@rmk-PC.arm.linux.org.uk>
+References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
+ <E1Wd2XT-0003wV-0H@rmk-PC.arm.linux.org.uk>
+Message-ID: <535E81C1.3020902@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 23, 2014 at 9:49 AM, Alexandre Courbot <gnurou@gmail.com> wrote:
-> On Wed, Apr 23, 2014 at 12:02 AM, Linus Walleij
-> <linus.walleij@linaro.org> wrote:
->> On Tue, Apr 15, 2014 at 8:41 AM, Chen-Yu Tsai <wens@csie.org> wrote:
->>
->>> This patch provides of_get_gpiod_flags_by_name(), which looks up GPIO
->>> phandles by name only, through gpios/gpio-names, and not by index.
->>>
->>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->>
->> Like Alexandre I have no strong opinion on this alternative scheme.
->
-> Yeah this new lookup scheme probably does no harm, but I think it
-> should be a little bit more motivated as it is, after all, introducing
-> more potential confusion for DT users.
->
-> It does not look like this new lookup scheme is necessary to Chen-Yu's
-> patchset and that he could as well have used the current one. Right
-> now there is only one way to define GPIOs - if we introduce a second
-> one, then which one should new DT users choose? Which one looks
-> better? I can already endless fights taking place over this.
+On 04/23/2014 01:08 PM, Russell King wrote:
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-I will pull out the two patches.
+A patch description would be useful so I can work out why...
 
-> Does this new lookup help with some of the existing problems we have
-> like ACPI/DT lookup compatibility?
+> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
 
-I hope they will be compatible with ACPI named gpios, whenever support
-for ACPI named properties extension lands. But that really depends on
-the ACPI implementation. For now I think it's best that I just hold on
-to these. We can revisit the discussion later if needed.
+>  config MMC_SDHCI
+> -	tristate "Secure Digital Host Controller Interface support"
+> -	depends on HAS_DMA
+> +	tristate
+>  	help
+>  	  This selects the generic Secure Digital Host Controller Interface.
+>  	  It is used by manufacturers such as Texas Instruments(R), Ricoh(R)
 
-> I just need to be given one practical reason to give my ack.
+... it's useful to remove that depends from here and ...
+>  config MMC_SDHCI_TEGRA
+>  	tristate "SDHCI platform support for the Tegra SD/MMC Controller"
+> -	depends on ARCH_TEGRA
+> -	depends on MMC_SDHCI_PLTFM
+> +	depends on ARCH_TEGRA && HAS_DMA
 
+... duplicate it in all the HW-specific drivers.
 
-Thanks
-ChenYu
+On Tegra (and I believe at least any ARM system), I think HAS_DMA is
+always true, so is there a need for "&& HAS_DMA" at all, now that this
+statement is pushed into arch-/HW-specific options?
