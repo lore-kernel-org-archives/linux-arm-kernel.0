@@ -1,64 +1,99 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 28 Apr 2014 08:36:20 -0700
-Subject: [PATCH 2/4] mfd: twl4030-power: Add support for board specific
- configuration
-In-Reply-To: <20140428114726.GW21279@lee--X1>
-References: <1398300030-7386-1-git-send-email-tony@atomide.com>
- <1398300030-7386-3-git-send-email-tony@atomide.com>
- <20140428114726.GW21279@lee--X1>
-Message-ID: <20140428153620.GJ20807@atomide.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Mon, 28 Apr 2014 11:41:36 -0400 (EDT)
+Subject: [PATCH v3 3/4] usb: ohci-exynos: Add facility to use phy provided
+ by the generic phy framework
+In-Reply-To: <1398677132-30600-4-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <Pine.LNX.4.44L0.1404281136440.1270-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Lee Jones <lee.jones@linaro.org> [140428 04:47]:
-> > With the recommended twl4030 configuration added, we can now add
-> > board specific changes as modifications to the recommended
-> > configuration.
-> > 
-> > Cc: Peter De Schrijver <pdeschrijver@nvidia.com>
-> > Cc: Samuel Ortiz <sameo@linux.intel.com>
-> > Cc: Lee Jones <lee.jones@linaro.org>
-> > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> > ---
-> >  drivers/mfd/twl4030-power.c | 21 +++++++++++++++++++++
-> >  include/linux/i2c/twl.h     |  1 +
-> >  2 files changed, 22 insertions(+)
-> > 
-> > diff --git a/drivers/mfd/twl4030-power.c b/drivers/mfd/twl4030-power.c
-> > index 89a8528..89c6b1a 100644
-> > --- a/drivers/mfd/twl4030-power.c
-> > +++ b/drivers/mfd/twl4030-power.c
-> > @@ -511,13 +511,34 @@ twl4030_power_configure_scripts(const struct twl4030_power_data *pdata)
-> >  	return 0;
-> >  }
-> >  
-> > +static void twl4030_patch_rconfig(struct twl4030_resconfig *common,
-> > +				  struct twl4030_resconfig *board)
-> > +{
-> > +	while (common->resource) {
-> > +		struct twl4030_resconfig *b = board;
-> > +
-> > +		while (b->resource) {
-> > +			if (b->resource == common->resource) {
-> > +				*common = *b;
-> > +				break;
-> > +			}
-> > +			b++;
-> > +		}
-> > +		common++;
-> > +	}
-> > +}
+On Mon, 28 Apr 2014, Vivek Gautam wrote:
+
+> Add support to consume phy provided by Generic phy framework.
+> Keeping the support for older usb-phy intact right now, in order
+> to prevent any functionality break in absence of relevant
+> device tree side change for ohci-exynos.
+> Once we move to new phy in the device nodes for ohci, we can
+> remove the support for older phys.
 > 
-> Forgive my ignorance, as I don't know how 'common' is setup, but we
-> appear to move to the next 'common' reference them immediately
-> dereference it without checking to see if it actually exists. Same
-> with 'b'. What happens if we reach the end of the array? NULL
-> dereference or does the final element always have a NULLed resource
-> attribute?
+> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+> Cc: Jingoo Han <jg1.han@samsung.com>
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> ---
 
-Yes there's always a NULL entry at the end of the list always in
-this case, and the configured lists are always static in the driver.
+> +static int exynos_ohci_phy_enable(struct device *dev)
+>  {
+>  	struct usb_hcd *hcd = dev_get_drvdata(dev);
+>  	struct exynos_ohci_hcd *exynos_ohci = to_exynos_ohci(hcd);
+> +	int i;
+> +	int ret = 0;
+>  
+> -	if (exynos_ohci->phy)
+> -		usb_phy_init(exynos_ohci->phy);
+> +	if (exynos_ohci->phy) {
+> +		ret = usb_phy_init(exynos_ohci->phy);
+> +		if (ret)
+> +			return ret;
+> +	}
+> +
+> +	for (i = 0; ret == 0 && i < PHY_NUMBER; i++)
+> +		if (exynos_ohci->phy_g[i])
+> +			ret = phy_power_on(exynos_ohci->phy_g[i]);
+> +	if (ret)
+> +		for (i--; i >= 0; i--)
+> +			if (exynos_ohci->phy_g[i])
+> +				phy_power_off(exynos_ohci->phy_g[i]);
 
-Regards,
+Do you want to call usb_phy_shutdown() at this point?
 
-Tony
+> +
+> +	return ret;
+>  }
+>  
+> -static void exynos_ohci_phy_disable(struct device *dev)
+> +static int exynos_ohci_phy_disable(struct device *dev)
+>  {
+>  	struct usb_hcd *hcd = dev_get_drvdata(dev);
+>  	struct exynos_ohci_hcd *exynos_ohci = to_exynos_ohci(hcd);
+> +	int i;
+> +	int ret = 0;
+>  
+>  	if (exynos_ohci->phy)
+>  		usb_phy_shutdown(exynos_ohci->phy);
+> +
+> +	for (i = 0; i < PHY_NUMBER; i++)
+> +		if (exynos_ohci->phy_g[i])
+> +			ret = phy_power_off(exynos_ohci->phy_g[i]);
+> +
+> +	return ret;
+>  }
+
+This return value is practically meaningless.  It is the status from 
+the last PHY only; any errors involving the other PHYs have been lost.
+
+You may as well make this function return void.
+
+> @@ -210,13 +302,18 @@ static int exynos_ohci_resume(struct device *dev)
+>  {
+>  	struct usb_hcd *hcd			= dev_get_drvdata(dev);
+>  	struct exynos_ohci_hcd *exynos_ohci	= to_exynos_ohci(hcd);
+> +	int ret;
+>  
+>  	clk_prepare_enable(exynos_ohci->clk);
+>  
+>  	if (exynos_ohci->otg)
+>  		exynos_ohci->otg->set_host(exynos_ohci->otg, &hcd->self);
+>  
+> -	exynos_ohci_phy_enable(dev);
+> +	ret = exynos_ohci_phy_enable(dev);
+> +	if (ret) {
+> +		dev_err(dev, "Failed to enable USB phy\n");
+
+Do you want to call clk_disable_unprepare() here?
+
+> +		return ret;
+> +	}
+>  
+>  	ohci_resume(hcd, false);
+
+Alan Stern
