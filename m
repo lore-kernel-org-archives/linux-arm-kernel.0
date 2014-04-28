@@ -1,35 +1,24 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 28 Apr 2014 19:21:27 +0100
-Subject: [PATCH 08/16] ARM: l2c: convert prima2 to generic l2c
+Date: Mon, 28 Apr 2014 19:23:12 +0100
+Subject: [PATCH 02/16] ARM: l2c: add platform independent core L2 cache
  initialisation
-In-Reply-To: <20140428173435.GE7719@beef>
+In-Reply-To: <CAL_JsqJDj_JZT_Mo5=Y1NqObX19v7WvuWSrmAZ4UXi9s6-prXA@mail.gmail.com>
 References: <20140428165631.GM26756@n2100.arm.linux.org.uk>
- <E1Weost-0002Pn-OT@rmk-PC.arm.linux.org.uk> <20140428173435.GE7719@beef>
-Message-ID: <20140428182127.GQ26756@n2100.arm.linux.org.uk>
+ <E1WeosP-0002PO-5m@rmk-PC.arm.linux.org.uk>
+ <CAL_JsqJDj_JZT_Mo5=Y1NqObX19v7WvuWSrmAZ4UXi9s6-prXA@mail.gmail.com>
+Message-ID: <20140428182312.GR26756@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 01:34:35PM -0400, Matt Porter wrote:
-> On Mon, Apr 28, 2014 at 05:58:27PM +0100, Russell King wrote:
-> > Along with this change, we can delete l2x0.c from prima2.
-> > 
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > ---
-> >  arch/arm/mach-prima2/Makefile |  1 -
-> >  arch/arm/mach-prima2/common.c |  6 ++++++
-> >  arch/arm/mach-prima2/l2x0.c   | 17 -----------------
-> >  3 files changed, 6 insertions(+), 18 deletions(-)
-> >  delete mode 100644 arch/arm/mach-prima2/l2x0.c
-> 
-> I can confirm that this approach fixes the boot failure on bcm281xx and
-> bcm21664 against the previous set of l2c patches in -next.
-> 
-> Tested-by: Matt Porter <mporter@linaro.org>
+On Mon, Apr 28, 2014 at 12:54:58PM -0500, Rob Herring wrote:
+> This function should be a nop if there is no DT node matching, so we
+> don't really need to trigger calling it based on machine_desc values.
+> If we do that, then we can have aux_mask and aux_val values of 0 for
+> both also mean don't do any aux ctrl setup. That would help minimize
+> the machine_desc for many platforms.
 
-Great, rather than taking that tested-by, I'll rework the patches such
-that we avoid the breakage through the patch series.
-
-The resulting patch series is now around 100 patches long...
+Calling it with both set to zero results in the auxiliary control register
+being cleared to zero.  We don't want that to happen.
 
 -- 
 FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
