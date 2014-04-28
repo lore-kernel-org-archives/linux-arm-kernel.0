@@ -1,45 +1,43 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 28 Apr 2014 20:33:51 +0100
-Subject: [PATCH 90/97] ARM: l2c: convert rockchip to generic l2c initialisation
+Date: Mon, 28 Apr 2014 20:33:56 +0100
+Subject: [PATCH 91/97] ARM: l2c: convert highbank to generic l2c initialisation
 In-Reply-To: <20140428192419.GV26756@n2100.arm.linux.org.uk>
 References: <20140428192419.GV26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WerJH-0001Zo-S0@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WerJM-0001Zs-VI@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This also allows us to eliminate the .init_machine function.
-
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-rockchip/rockchip.c | 9 ++-------
- 1 file changed, 2 insertions(+), 7 deletions(-)
+ arch/arm/mach-highbank/highbank.c | 9 +++------
+ 1 file changed, 3 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-rockchip/rockchip.c b/arch/arm/mach-rockchip/rockchip.c
-index d252efe3747b..138b9975313a 100644
---- a/arch/arm/mach-rockchip/rockchip.c
-+++ b/arch/arm/mach-rockchip/rockchip.c
-@@ -24,12 +24,6 @@
- #include <asm/hardware/cache-l2x0.h>
- #include "core.h"
+diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
+index 245e588859ec..8c35ae4ff176 100644
+--- a/arch/arm/mach-highbank/highbank.c
++++ b/arch/arm/mach-highbank/highbank.c
+@@ -66,12 +66,6 @@ static void __init highbank_init_irq(void)
  
--static void __init rockchip_dt_init(void)
--{
--	l2x0_of_init(0, ~0);
--	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
--}
+ 	if (of_find_compatible_node(NULL, NULL, "arm,cortex-a9"))
+ 		highbank_scu_map_io();
 -
- static const char * const rockchip_board_dt_compat[] = {
- 	"rockchip,rk2928",
- 	"rockchip,rk3066a",
-@@ -39,7 +33,8 @@ static const char * const rockchip_board_dt_compat[] = {
- };
+-	/* Enable PL310 L2 Cache controller */
+-	if (IS_ENABLED(CONFIG_CACHE_L2X0)) {
+-		outer_cache.write_sec = highbank_l2c310_write_sec;
+-		l2x0_of_init(0, ~0);
+-	}
+ }
  
- DT_MACHINE_START(ROCKCHIP_DT, "Rockchip Cortex-A9 (Device Tree)")
+ static void highbank_power_off(void)
+@@ -185,6 +179,9 @@ DT_MACHINE_START(HIGHBANK, "Highbank")
+ #if defined(CONFIG_ZONE_DMA) && defined(CONFIG_ARM_LPAE)
+ 	.dma_zone_size	= (4ULL * SZ_1G),
+ #endif
 +	.l2c_aux_val	= 0,
 +	.l2c_aux_mask	= ~0,
- 	.smp		= smp_ops(rockchip_smp_ops),
--	.init_machine	= rockchip_dt_init,
- 	.dt_compat	= rockchip_board_dt_compat,
- MACHINE_END
++	.l2c_write_sec	= highbank_l2c310_write_sec,
+ 	.init_irq	= highbank_init_irq,
+ 	.init_machine	= highbank_init,
+ 	.dt_compat	= highbank_match,
 -- 
 1.8.3.1
