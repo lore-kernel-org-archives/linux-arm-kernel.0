@@ -1,66 +1,45 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 28 Apr 2014 21:39:15 +0200 (CEST)
-Subject: [PATCH RESEND 3/3] irqchip: orion: reverse irq handling priority
-In-Reply-To: <1398540855-27367-4-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1398540855-27367-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1398540855-27367-4-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <alpine.DEB.2.02.1404282137240.6261@ionos.tec.linutronix.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 28 Apr 2014 12:37:53 -0700
+Subject: [PATCH v9 10/17] ARM: dts: sun6i: Add mmc clocks
+In-Reply-To: <1398507381-5614-11-git-send-email-hdegoede@redhat.com>
+References: <1398507381-5614-1-git-send-email-hdegoede@redhat.com>
+ <1398507381-5614-11-git-send-email-hdegoede@redhat.com>
+Message-ID: <20140428193753.GJ3134@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 26 Apr 2014, Sebastian Hesselbarth wrote:
-
-> Non-DT irq handlers were working through irq causes from most-significant
-> to least-significant bit, while DT irqchip driver does it the other way
-> round. This revealed some more HW issues on Kirkwood peripheral IP, where
-> spurious sdio irqs can happen although IP's irq enable registers are all
-> zero. Although, not directly related with the described issue, reverse
-> irq bit handling back to original order by replacing ffs() with fls().
-
-So why are we reverting to the original order?
-
-The explanation above is just confusing.
-
-Thanks,
-
-	tglx
- 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Acked-by: Jason Cooper <jason@lakedaemon.net>
+On Sat, Apr 26, 2014 at 12:16:14PM +0200, Hans de Goede wrote:
+> Add clk-nodes for the mmc clocks.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 > ---
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  drivers/irqchip/irq-orion.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  arch/arm/boot/dts/sun6i-a31.dtsi | 32 ++++++++++++++++++++++++++++++++
+>  1 file changed, 32 insertions(+)
 > 
-> diff --git a/drivers/irqchip/irq-orion.c b/drivers/irqchip/irq-orion.c
-> index e25f246cd2fb..34d18b48bb78 100644
-> --- a/drivers/irqchip/irq-orion.c
-> +++ b/drivers/irqchip/irq-orion.c
-> @@ -42,7 +42,7 @@ __exception_irq_entry orion_handle_irq(struct pt_regs *regs)
->  		u32 stat = readl_relaxed(gc->reg_base + ORION_IRQ_CAUSE) &
->  			gc->mask_cache;
->  		while (stat) {
-> -			u32 hwirq = ffs(stat) - 1;
-> +			u32 hwirq = __fls(stat);
->  			u32 irq = irq_find_mapping(orion_irq_domain,
->  						   gc->irq_base + hwirq);
->  			handle_IRQ(irq, regs);
-> @@ -117,7 +117,7 @@ static void orion_bridge_irq_handler(unsigned int irq, struct irq_desc *desc)
->  		   gc->mask_cache;
+> diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+> index d45efa7..12bcc17 100644
+> --- a/arch/arm/boot/dts/sun6i-a31.dtsi
+> +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+> @@ -198,6 +198,38 @@
+>  					"apb2_uart4", "apb2_uart5";
+>  		};
 >  
->  	while (stat) {
-> -		u32 hwirq = ffs(stat) - 1;
-> +		u32 hwirq = __fls(stat);
->  
->  		generic_handle_irq(irq_find_mapping(d, gc->irq_base + hwirq));
->  		stat &= ~(1 << hwirq);
-> -- 
-> 1.9.1
-> 
-> 
+> +		mmc0_clk: clk at 01c20088 {
+> +			#clock-cells = <0>;
+> +			compatible = "allwinner,sun4i-a10-mod0-clk";
+
+And this is not misleading but wrong. The MMC clocks have the phase
+control feature that mod0 clock don't have, so they should have a
+compatible of their own.
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140428/76115818/attachment.sig>
