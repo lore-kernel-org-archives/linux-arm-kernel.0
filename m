@@ -1,54 +1,28 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 28 Apr 2014 18:17:07 +0200
-Subject: [PATCHv3 0/7] Add Allwinner SoCs PWM support
-Message-ID: <1398701834-3719-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: yegorslists@googlemail.com (Yegor Yefremov)
+Date: Mon, 28 Apr 2014 18:17:29 +0200
+Subject: [PATCH] ARM: dts: am33xx: fix DMA support for the second USB
+ interface
+In-Reply-To: <535E64EF.2020108@ti.com>
+References: <1398674237-4129-1-git-send-email-yegorslists@googlemail.com>
+ <535E64EF.2020108@ti.com>
+Message-ID: <CAGm1_kt_yQZowthaFq=imM5J6=1FkJX_1LtRV7eEiqeursbDZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Apr 28, 2014 at 4:25 PM, George Cherian <george.cherian@ti.com> wrote:
+> On 4/28/2014 2:07 PM, yegorslists at googlemail.com wrote:
+>>
+>> From: Yegor Yefremov <yegorslists@googlemail.com>
+>>
+>> This patch creates unique DMA channels for the second USB
+>> interface, otherwise the second USB interface is not usable
+>> at all.
+>
+> MUSB_DMA_NUM_CHANNELS is 15, so if you pass  any dma-names > 15 (>
+> rx15/tx15),
+> the dma_controller_create in musb_core.c fails and it falls back to PIO
+> mode.
 
-This patch set adds support for the PWM controller found on the Allwinner SoCs.
+What's the proper fix for the DMA issue?
 
-The first patch adds the driver itself.
-The second patch adds the DT binding documentation
-The third patch adds the bindings to the sun7i-a20 DTS include.
-And finally, the la patch adds support for the PWMs to the cubietruck which is
-the board I used to test.
-
-Changes in v3:
- - added COMPILE_TEST as a dependency
- - fixed indentation
- - modified the macros like suggested by Maxime
-
-Changes in v2:
- - changed the compatible string
- - documented the clocks property
- - Added support in the A10 dtsi
- - split the patch adding pinctrl
- - a few cosmetic changes (removed empty lines, PWM_PRESCAL_MASK, ...)
- - fixed the period register calculation (the period is actually N + 1 cycles)
-   so write prd - 1
- - properly locked accesses to PWM_CTRL_REG with a mutex
-
-Alexandre Belloni (7):
-  pwm: Add Allwinner SoC support
-  pwm: sunxi: document OF bindings
-  ARM: sun4i: dt: add pinmux configuration for the PWM
-  ARM: sun4i: dt: add PWM support
-  ARM: sun7i: dt: add pinmux configuration for the PWM
-  ARM: sun7i: dt: add PWM support
-  ARM: sunxi: dt: add PWM support for the cubietruck
-
- .../devicetree/bindings/pwm/pwm-sunxi.txt          |  20 ++
- arch/arm/boot/dts/sun4i-a10.dtsi                   |  22 ++
- arch/arm/boot/dts/sun7i-a20-cubietruck.dts         |   6 +
- arch/arm/boot/dts/sun7i-a20.dtsi                   |  22 ++
- drivers/pwm/Kconfig                                |   9 +
- drivers/pwm/Makefile                               |   1 +
- drivers/pwm/pwm-sunxi.c                            | 345 +++++++++++++++++++++
- 7 files changed, 425 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pwm/pwm-sunxi.txt
- create mode 100644 drivers/pwm/pwm-sunxi.c
-
--- 
-1.9.1
+Yegor
