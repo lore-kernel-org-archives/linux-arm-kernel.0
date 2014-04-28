@@ -1,51 +1,108 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 28 Apr 2014 09:31:15 -0500
-Subject: [PATCH 1/6] drivers: net: cpts: Remove hardcoded clock name for
- CPTS
-In-Reply-To: <1398658225-25873-2-git-send-email-george.cherian@ti.com>
-References: <1398658225-25873-1-git-send-email-george.cherian@ti.com>
- <1398658225-25873-2-git-send-email-george.cherian@ti.com>
-Message-ID: <20140428143115.GC30292@saruman.home>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 28 Apr 2014 15:34:14 +0100
+Subject: [PATCH v10 07/12] ARM/ARM64: KVM: Emulate PSCI v0.2 SYSTEM_OFF
+ and SYSTEM_RESET
+In-Reply-To: <1398085206-30555-8-git-send-email-anup.patel@linaro.org> (Anup
+ Patel's message of "Mon, 21 Apr 2014 14:00:01 +0100")
+References: <1398085206-30555-1-git-send-email-anup.patel@linaro.org>
+ <1398085206-30555-8-git-send-email-anup.patel@linaro.org>
+Message-ID: <87d2g1tteh.fsf@approximate.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 09:40:20AM +0530, George Cherian wrote:
-> CPTS refclk name is hardcoded, which makes it fail in case of DRA7x
-> Remove the hardcoded clock name for CPTS refclk and get the same from DT.
-> 
-> Signed-off-by: George Cherian <george.cherian@ti.com>
+On Mon, Apr 21 2014 at  2:00:01 pm BST, Anup Patel <anup.patel@linaro.org> wrote:
+> The PSCI v0.2 SYSTEM_OFF and SYSTEM_RESET functions are system-level
+> functions hence cannot be fully emulated by in-kernel PSCI emulation code.
+>
+> To tackle this, we forward PSCI v0.2 SYSTEM_OFF and SYSTEM_RESET function
+> calls from vcpu to user space (i.e. QEMU or KVMTOOL) via kvm_run structure
+> using KVM_EXIT_SYSTEM_EVENT exit reasons.
+>
+> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 > ---
->  drivers/net/ethernet/ti/cpts.c | 11 ++++-------
->  1 file changed, 4 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/net/ethernet/ti/cpts.c b/drivers/net/ethernet/ti/cpts.c
-> index 2435139..0b6f6f7 100644
-> --- a/drivers/net/ethernet/ti/cpts.c
-> +++ b/drivers/net/ethernet/ti/cpts.c
-> @@ -236,13 +236,11 @@ static void cpts_overflow_check(struct work_struct *work)
->  	schedule_delayed_work(&cpts->overflow_work, CPTS_OVERFLOW_PERIOD);
+>  arch/arm/kvm/psci.c |   32 +++++++++++++++++++++++++++++---
+>  1 file changed, 29 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
+> index 14e6fa6..4486d0f 100644
+> --- a/arch/arm/kvm/psci.c
+> +++ b/arch/arm/kvm/psci.c
+> @@ -85,6 +85,23 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
+>  	return PSCI_RET_SUCCESS;
 >  }
 >  
-> -#define CPTS_REF_CLOCK_NAME "cpsw_cpts_rft_clk"
-> -
-> -static void cpts_clk_init(struct cpts *cpts)
-> +static void cpts_clk_init(struct device *dev, struct cpts *cpts)
+> +static void kvm_prepare_system_event(struct kvm_vcpu *vcpu, u32 type)
+> +{
+> +	memset(&vcpu->run->system_event, 0, sizeof(vcpu->run->system_event));
+> +	vcpu->run->system_event.type = type;
+> +	vcpu->run->exit_reason = KVM_EXIT_SYSTEM_EVENT;
+> +}
+> +
+> +static void kvm_psci_system_off(struct kvm_vcpu *vcpu)
+> +{
+> +	kvm_prepare_system_event(vcpu, KVM_SYSTEM_EVENT_SHUTDOWN);
+> +}
+> +
+> +static void kvm_psci_system_reset(struct kvm_vcpu *vcpu)
+> +{
+> +	kvm_prepare_system_event(vcpu, KVM_SYSTEM_EVENT_RESET);
+> +}
+> +
+>  int kvm_psci_version(struct kvm_vcpu *vcpu)
 >  {
-> -	cpts->refclk = clk_get(NULL, CPTS_REF_CLOCK_NAME);
-> +	cpts->refclk = devm_clk_get(dev, "cpts");
->  	if (IS_ERR(cpts->refclk)) {
-> -		pr_err("Failed to clk_get %s\n", CPTS_REF_CLOCK_NAME);
-> +		pr_err("Failed to get cpts refclk\n");
+>  	if (test_bit(KVM_ARM_VCPU_PSCI_0_2, vcpu->arch.features))
+> @@ -95,6 +112,7 @@ int kvm_psci_version(struct kvm_vcpu *vcpu)
+>  
+>  static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+>  {
+> +	int ret = 1;
+>  	unsigned long psci_fn = *vcpu_reg(vcpu, 0) & ~((u32) 0);
+>  	unsigned long val;
+>  
+> @@ -114,13 +132,21 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+>  	case PSCI_0_2_FN64_CPU_ON:
+>  		val = kvm_psci_vcpu_on(vcpu);
+>  		break;
+> +	case PSCI_0_2_FN_SYSTEM_OFF:
+> +		kvm_psci_system_off(vcpu);
+> +		val = PSCI_RET_INTERNAL_FAILURE;
+> +		ret = 0;
+> +		break;
+> +	case PSCI_0_2_FN_SYSTEM_RESET:
+> +		kvm_psci_system_reset(vcpu);
+> +		val = PSCI_RET_INTERNAL_FAILURE;
+> +		ret = 0;
+> +		break;
 
-now you have a dev pointer as argument, how about converting this to
-dev_err() ?
+Maybe add a comment about why we set INTERNAL_FAILURE here (we shouldn't
+be able to come back from such a PSCI call).
 
+>  	case PSCI_0_2_FN_CPU_SUSPEND:
+>  	case PSCI_0_2_FN_AFFINITY_INFO:
+>  	case PSCI_0_2_FN_MIGRATE:
+>  	case PSCI_0_2_FN_MIGRATE_INFO_TYPE:
+>  	case PSCI_0_2_FN_MIGRATE_INFO_UP_CPU:
+> -	case PSCI_0_2_FN_SYSTEM_OFF:
+> -	case PSCI_0_2_FN_SYSTEM_RESET:
+>  	case PSCI_0_2_FN64_CPU_SUSPEND:
+>  	case PSCI_0_2_FN64_AFFINITY_INFO:
+>  	case PSCI_0_2_FN64_MIGRATE:
+> @@ -132,7 +158,7 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+>  	}
+>  
+>  	*vcpu_reg(vcpu, 0) = val;
+> -	return 1;
+> +	return ret;
+>  }
+>  
+>  static int kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
+
+Aside from this minor comment:
+
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140428/595dfd51/attachment-0001.sig>
+Jazz is not dead. It just smells funny.
