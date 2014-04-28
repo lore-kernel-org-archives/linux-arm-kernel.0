@@ -1,38 +1,41 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 28 Apr 2014 15:12:17 -0400
-Subject: [PATCH] ARM: mvebu: refine which files are build in mach-mvebu
-In-Reply-To: <1398709239-6126-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <20140427231044.GX28159@titan.lakedaemon.net>
- <1398709239-6126-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140428191217.GB28159@titan.lakedaemon.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 28 Apr 2014 20:12:56 +0100
+Subject: [PATCH 02/16] ARM: l2c: add platform independent core L2 cache
+ initialisation
+In-Reply-To: <CAL_JsqJXQzrNxyLW68nEdu=QNr2FrYEDnT_JUzLcxJXBh2=dNQ@mail.gmail.com>
+References: <20140428165631.GM26756@n2100.arm.linux.org.uk>
+ <E1WeosP-0002PO-5m@rmk-PC.arm.linux.org.uk>
+ <CAL_JsqJDj_JZT_Mo5=Y1NqObX19v7WvuWSrmAZ4UXi9s6-prXA@mail.gmail.com>
+ <20140428182312.GR26756@n2100.arm.linux.org.uk>
+ <CAL_JsqJXQzrNxyLW68nEdu=QNr2FrYEDnT_JUzLcxJXBh2=dNQ@mail.gmail.com>
+Message-ID: <20140428191256.GU26756@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 08:20:39PM +0200, Thomas Petazzoni wrote:
-> Following the integration into mach-mvebu of the Kirkwood ARMv5
-> support, we need to be more careful about which files get built. For
-> example, the pmsu.c file now calls wfi(), which only exists on ARMv7
-> platforms.
+On Mon, Apr 28, 2014 at 01:50:33PM -0500, Rob Herring wrote:
+> On Mon, Apr 28, 2014 at 1:23 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Mon, Apr 28, 2014 at 12:54:58PM -0500, Rob Herring wrote:
+> >> This function should be a nop if there is no DT node matching, so we
+> >> don't really need to trigger calling it based on machine_desc values.
+> >> If we do that, then we can have aux_mask and aux_val values of 0 for
+> >> both also mean don't do any aux ctrl setup. That would help minimize
+> >> the machine_desc for many platforms.
+> >
+> > Calling it with both set to zero results in the auxiliary control register
+> > being cleared to zero.  We don't want that to happen.
 > 
-> Therefore, this commit changes mach-mvebu/Makefile to build the Armada
-> 370/XP/375/38x specific files only when CONFIG_MACH_MVEBU_V7 is
-> enabled.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
-> This commit applies on top of mvebu/soc, and has been built tested
-> with mvebu_v7_defconfig, mvebu_v5_defconfig, multi_v7_defconfig and
-> multi_v5_defconfig (on top of mvebu/for-next).
+> Right, but we can make the core L2 init code only write aux ctrl if
+> (aux_val && ~aux_mask). Then you don't have to add the values on a
+> bunch of platforms.
 
-Awesome!  thanks.  I've applied it just after
+I would rather add them right now rather than introduce new logic which
+_could_ potentially change the behaviour for an existing platform.  Maybe
+that's an improvement to come after this series is merged, but I'm already
+up to almost 100 patches in this series right now, and I'll be damned if
+I'm going to change the behaviour of this stuff even more as part of a
+single series.
 
-  14bde0f0fb54 ARM: mvebu: Add the PMSU related part of the cpu idle functions
-
-which introduced the call to wfi() in pmsu.c.
-
-both patches are in mvebu/soc-cpuidle.
-
-thx,
-
-Jason.
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
