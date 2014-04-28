@@ -1,48 +1,24 @@
-From: george.cherian@ti.com (George Cherian)
-Date: Mon, 28 Apr 2014 18:25:56 +0530
-Subject: [PATCH 5/6] ARM: AM43xx: clk: Change the cpts ref clock source
- to dpll_core_m5 clk
-In-Reply-To: <20140428071034.GB4380@netboy>
-References: <1398658225-25873-1-git-send-email-george.cherian@ti.com>
- <1398658225-25873-6-git-send-email-george.cherian@ti.com>
- <20140428071034.GB4380@netboy>
-Message-ID: <535E4FDC.70306@ti.com>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Mon, 28 Apr 2014 15:03:23 +0200
+Subject: [PATCH v8 3/3] ARM: Check if a CPU has gone offline
+In-Reply-To: <CAMJs5B9d+=kfJ=rnf=_9ywmjtXK4v=OQeVcDu53j0J89GWzfpA@mail.gmail.com>
+References: <1398455329-18136-1-git-send-email-ashwin.chaugule@linaro.org>	<1398455329-18136-4-git-send-email-ashwin.chaugule@linaro.org>	<CALrVBkuV2kQmBScDSMUVG+hOMZ3FQ1tEOEwUEPHRoCo9si+ygA@mail.gmail.com>	<CAJ5Y-eYFz0CQU4jWOnmiFNRJ+Q=12pvyTf72w7MUk3ebY75wgg@mail.gmail.com>
+ <CAMJs5B9d+=kfJ=rnf=_9ywmjtXK4v=OQeVcDu53j0J89GWzfpA@mail.gmail.com>
+Message-ID: <535E519B.7070101@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/28/2014 12:40 PM, Richard Cochran wrote:
-> On Mon, Apr 28, 2014 at 09:40:24AM +0530, George Cherian wrote:
->> cpsw_cpts_rft_clk has got the choice of 3 clocksources
->>   -dpll_core_m4_ck
->>   -dpll_core_m5_ck
->>   -dpll_disp_m2_ck
->>
->> By default dpll_core_m4_ck is selected, witn this as clock
->> source the CPTS doesnot work properly. It gives clockcheck errors
->> while running PTP.
->>
->>   clockcheck: clock jumped backward or running slower than expected!
-> It is strange that I have never seen this error, since I have often
-> tested linuxptp on a beagle bone white.
-In beagle bone white (AM335x)  CPTS has a choice of 2 clocksource
--dpll_core_m5_ck
--dpll_core_m4_ck
-and by default  dpll_core_m5_ck is used. Where as in AM437x the default 
-clocksource used is dpll_core_m4_ck .
-
-You can change the clocksource in beagle bone white by writing  1 to 
-0x44e00520 (By default its 0).
+Il 28/04/2014 14:23, Christoffer Dall ha scritto:
+> Are they inter-dependent?  I thought your patches depended on Anup's -
+> not the other way around?
 >
-> Can you please explain why this clock doesn't work correctly?
+> If my assumption is correct, I think we can make sure to send the pull
+> request to kvm/next early and ask Catalin to pull in kvm/next before
+> pulling your changes.
 >
->> By selecting dpll_core_m5_ck as the clocksource fixes this issue.
->> In AM335x dpll_core_m5_ck is the default clocksource.
-> The choice of clock source in the CPTS driver originally came from
-> TI. It would be nice to know why that was the wrong choice.
->
-> Thanks,
-> Richard
+> I'm cc'ing both Catalin and Paolo here for their advice.
 
+Is Anup's patchset already on a branch?  If you send me a pointer to it 
+I can look at that branch history and see what's best.
 
--- 
--George
+Paolo
