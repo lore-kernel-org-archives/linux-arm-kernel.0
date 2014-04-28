@@ -1,46 +1,44 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 28 Apr 2014 09:29:51 -0500
-Subject: [PATCH] ARM: l2c: prima2: only call l2x0_of_init() on matching
- nodes
-In-Reply-To: <1398644860-22973-1-git-send-email-mporter@linaro.org>
-References: <1398644860-22973-1-git-send-email-mporter@linaro.org>
-Message-ID: <20140428142950.GB30292@saruman.home>
+Date: Mon, 28 Apr 2014 09:31:15 -0500
+Subject: [PATCH 1/6] drivers: net: cpts: Remove hardcoded clock name for
+ CPTS
+In-Reply-To: <1398658225-25873-2-git-send-email-george.cherian@ti.com>
+References: <1398658225-25873-1-git-send-email-george.cherian@ti.com>
+ <1398658225-25873-2-git-send-email-george.cherian@ti.com>
+Message-ID: <20140428143115.GC30292@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 27, 2014 at 08:27:40PM -0400, Matt Porter wrote:
-> l2x0_of_init() is executed unconditionally within the sirfsoc_l2x0_init()
-> early initcall. In a multi v7 kernel this causes bcm281xx and bcm21664
-> platform to fail boot since they have their own pre l2x0 init sequence
-> that is required. Fix this by checking that a matching OF ID is present
-> before calling l2x0_of_init().
+On Mon, Apr 28, 2014 at 09:40:20AM +0530, George Cherian wrote:
+> CPTS refclk name is hardcoded, which makes it fail in case of DRA7x
+> Remove the hardcoded clock name for CPTS refclk and get the same from DT.
 > 
-> Reported-by: Kevin Hilman <khilman@linaro.org>
-> Signed-off-by: Matt Porter <mporter@linaro.org>
+> Signed-off-by: George Cherian <george.cherian@ti.com>
 > ---
-> Applies against next-20140424 to fix the issue introduced in
-> 50655e6 ARM: l2c: prima2: remove cache size override
+>  drivers/net/ethernet/ti/cpts.c | 11 ++++-------
+>  1 file changed, 4 insertions(+), 7 deletions(-)
 > 
->  arch/arm/mach-prima2/l2x0.c | 16 +++++++++++++++-
->  1 file changed, 15 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-prima2/l2x0.c b/arch/arm/mach-prima2/l2x0.c
-> index 09f68f0..1c2ed15 100644
-> --- a/arch/arm/mach-prima2/l2x0.c
-> +++ b/arch/arm/mach-prima2/l2x0.c
-> @@ -8,10 +8,24 @@
+> diff --git a/drivers/net/ethernet/ti/cpts.c b/drivers/net/ethernet/ti/cpts.c
+> index 2435139..0b6f6f7 100644
+> --- a/drivers/net/ethernet/ti/cpts.c
+> +++ b/drivers/net/ethernet/ti/cpts.c
+> @@ -236,13 +236,11 @@ static void cpts_overflow_check(struct work_struct *work)
+>  	schedule_delayed_work(&cpts->overflow_work, CPTS_OVERFLOW_PERIOD);
+>  }
 >  
->  #include <linux/init.h>
->  #include <linux/kernel.h>
-> +#include <linux/of.h>
->  #include <asm/hardware/cache-l2x0.h>
->  
-> +static const struct of_device_id sirf_l2x0_ids[] __initconst = {
-> +	{ .compatible = "sirf,prima2-pl310-cache" },
-> +	{ .compatible = "sirf,marco-pl310-cache" },
+> -#define CPTS_REF_CLOCK_NAME "cpsw_cpts_rft_clk"
+> -
+> -static void cpts_clk_init(struct cpts *cpts)
+> +static void cpts_clk_init(struct device *dev, struct cpts *cpts)
+>  {
+> -	cpts->refclk = clk_get(NULL, CPTS_REF_CLOCK_NAME);
+> +	cpts->refclk = devm_clk_get(dev, "cpts");
+>  	if (IS_ERR(cpts->refclk)) {
+> -		pr_err("Failed to clk_get %s\n", CPTS_REF_CLOCK_NAME);
+> +		pr_err("Failed to get cpts refclk\n");
 
-that same commit removed these two from DTS, did you test with old DTS,
-btw any chance ?
+now you have a dev pointer as argument, how about converting this to
+dev_err() ?
 
 -- 
 balbi
@@ -50,4 +48,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140428/284557e2/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140428/595dfd51/attachment-0001.sig>
