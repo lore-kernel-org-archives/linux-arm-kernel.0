@@ -1,41 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 28 Apr 2014 20:12:56 +0100
-Subject: [PATCH 02/16] ARM: l2c: add platform independent core L2 cache
- initialisation
-In-Reply-To: <CAL_JsqJXQzrNxyLW68nEdu=QNr2FrYEDnT_JUzLcxJXBh2=dNQ@mail.gmail.com>
-References: <20140428165631.GM26756@n2100.arm.linux.org.uk>
- <E1WeosP-0002PO-5m@rmk-PC.arm.linux.org.uk>
- <CAL_JsqJDj_JZT_Mo5=Y1NqObX19v7WvuWSrmAZ4UXi9s6-prXA@mail.gmail.com>
- <20140428182312.GR26756@n2100.arm.linux.org.uk>
- <CAL_JsqJXQzrNxyLW68nEdu=QNr2FrYEDnT_JUzLcxJXBh2=dNQ@mail.gmail.com>
-Message-ID: <20140428191256.GU26756@n2100.arm.linux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 28 Apr 2014 12:13:34 -0700
+Subject: [PATCHv3 4/7] ARM: sun4i: dt: add PWM support
+In-Reply-To: <1398701834-3719-5-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1398701834-3719-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1398701834-3719-5-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20140428191334.GD3134@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 01:50:33PM -0500, Rob Herring wrote:
-> On Mon, Apr 28, 2014 at 1:23 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Mon, Apr 28, 2014 at 12:54:58PM -0500, Rob Herring wrote:
-> >> This function should be a nop if there is no DT node matching, so we
-> >> don't really need to trigger calling it based on machine_desc values.
-> >> If we do that, then we can have aux_mask and aux_val values of 0 for
-> >> both also mean don't do any aux ctrl setup. That would help minimize
-> >> the machine_desc for many platforms.
-> >
-> > Calling it with both set to zero results in the auxiliary control register
-> > being cleared to zero.  We don't want that to happen.
+On Mon, Apr 28, 2014 at 06:17:11PM +0200, Alexandre Belloni wrote:
+> Add the PWM bindings for the Allwinner A10.
 > 
-> Right, but we can make the core L2 init code only write aux ctrl if
-> (aux_val && ~aux_mask). Then you don't have to add the values on a
-> bunch of platforms.
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-I would rather add them right now rather than introduce new logic which
-_could_ potentially change the behaviour for an existing platform.  Maybe
-that's an improvement to come after this series is merged, but I'm already
-up to almost 100 patches in this series right now, and I'll be damned if
-I'm going to change the behaviour of this stuff even more as part of a
-single series.
+Applied, thanks
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140428/3d7dacef/attachment.sig>
