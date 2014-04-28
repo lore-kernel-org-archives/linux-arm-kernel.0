@@ -1,80 +1,33 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Mon, 28 Apr 2014 16:58:50 +0200
-Subject: [PATCH 7/7] ARM: sunxi: dt: add PRCM clk and reset controller
- subdevices
-In-Reply-To: <1398697130-8338-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1398697130-8338-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1398697130-8338-8-git-send-email-boris.brezillon@free-electrons.com>
+From: tim.kryger@linaro.org (Tim Kryger)
+Date: Mon, 28 Apr 2014 08:00:39 -0700
+Subject: [PATCH v6 RESEND 0/5] Add Broadcom Kona PWM Support
+In-Reply-To: <20140428110731.GH19455@ulmo>
+References: <1398450675-19609-1-git-send-email-tim.kryger@linaro.org>
+ <20140428110731.GH19455@ulmo>
+Message-ID: <CAAYSxhpOP78EQAM0cWM2RwLu29-0eRVgLCFX3Hob8q=J==5wUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT definitions for PRCM (Power/Reset/Clock Management) clock and reset
-controller subdevices.
+On Mon, Apr 28, 2014 at 4:07 AM, Thierry Reding
+<thierry.reding@gmail.com> wrote:
+> On Fri, Apr 25, 2014 at 11:31:10AM -0700, Tim Kryger wrote:
+>> This series introduces the driver for the Kona PWM controller found in
+>> Broadcom mobile SoCs like bcm281xx and updates the device tree and the
+>> defconfig to enable use of this hardware on the bcm28155 AP board.
+>>
 
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
----
- arch/arm/boot/dts/sun6i-a31.dtsi | 49 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 49 insertions(+)
+>> Tim Kryger (5):
+>>   Documentation: dt: Add Kona PWM binding
+>>   pwm: kona: Introduce Kona PWM controller support
+>>   ARM: dts: Declare the PWM for bcm11351 (bcm281xx)
+>>   ARM: dts: Enable the PWM for bcm28155 AP board
+>>   ARM: bcm_defconfig: Enable PWM and Backlight
 
-diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index ec3253a..83a1634 100644
---- a/arch/arm/boot/dts/sun6i-a31.dtsi
-+++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-@@ -501,6 +501,55 @@
- 		prcm at 01f01c00 {
- 			compatible = "allwinner,sun6i-a31-prcm";
- 			reg = <0x01f01400 0x200>;
-+
-+			ar100_mux: ar100_mux {
-+				compatible = "allwinner,sun6i-a31-ar100-mux-clk";
-+				#clock-cells = <0>;
-+				clocks = <&osc32k>, <&osc24M>, <&pll6>, <&pll6>;
-+			};
-+
-+			ar100: ar100 {
-+				compatible = "allwinner,sun6i-a31-ar100-clk";
-+				#clock-cells = <0>;
-+				clocks = <&ar100_mux>;
-+			};
-+
-+			ar100_div: ar100_div {
-+				compatible = "allwinner,sun6i-a31-ar100-div-clk";
-+				#clock-cells = <0>;
-+				clocks = <&ar100>;
-+			};
-+
-+			ahb0: ahb0 {
-+				compatible = "fixed-factor-clock";
-+				#clock-cells = <0>;
-+				clock-div = <1>;
-+				clock-mult = <1>;
-+				clocks = <&ar100_div>;
-+				clock-output-names = "ahb0";
-+			};
-+
-+			apb0: apb0 {
-+				compatible = "allwinner,sun6i-a31-apb0-clk";
-+				#clock-cells = <0>;
-+				clocks = <&ahb0>;
-+				clock-output-names = "apb0";
-+			};
-+
-+			apb0_gates: apb0_gates {
-+				compatible = "allwinner,sun6i-a31-apb0-gates-clk";
-+				#clock-cells = <1>;
-+				clocks = <&apb0>;
-+				clock-output-names = "apb0_pio", "apb0_ir",
-+						"apb0_timer01", "apb0_p2wi",
-+						"apb0_uart", "apb0_1wire",
-+						"apb0_i2c";
-+			};
-+
-+			apb0_rst: apb0_rst {
-+				compatible = "allwinner,sun6i-a31-clock-reset";
-+				#reset-cells = <1>;
-+			};
- 		};
- 	};
- };
--- 
-1.8.3.2
+> I've applied patches 1 and 2 (with two tiny whitespace cleanups) to my
+> for-next branch.
+
+Sounds good.  Thank you.
+
+Matt and Christian, are you okay taking patches 3-5 through your tree?
+
+-Tim
