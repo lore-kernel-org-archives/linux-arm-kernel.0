@@ -1,43 +1,34 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 28 Apr 2014 13:55:40 +0200
-Subject: [PATCH 3/5] ARM: dove: create a proper PMU driver for power
- domains, PMU IRQs and resets
-In-Reply-To: <E1WeP8f-0000Uo-1q@rmk-PC.arm.linux.org.uk>
-References: <20140427132312.GC26756@n2100.arm.linux.org.uk>
- <E1WeP8f-0000Uo-1q@rmk-PC.arm.linux.org.uk>
-Message-ID: <CAPDyKFoboE4iKyom86+EwHHTQAGpgKxGq969yrjQVpqizk-SLA@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 28 Apr 2014 12:56:27 +0100
+Subject: [PATCH v2 2/4] mfd: bcm590xx: add support for secondary I2C
+ slave address
+In-Reply-To: <1398295293-11033-3-git-send-email-mporter@linaro.org>
+References: <1398295293-11033-1-git-send-email-mporter@linaro.org>
+ <1398295293-11033-3-git-send-email-mporter@linaro.org>
+Message-ID: <20140428115627.GY21279@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 April 2014 15:29, Russell King <rmk+kernel@arm.linux.org.uk> wrote:
-> The PMU device contains an interrupt controller, power control and
-> resets.  The interrupt controller is a little sub-standard in that
-> there is no race free way to clear down pending interrupts, so we try
-> to avoid problems by reducing the window as much as possible, and
-> clearing as infrequently as possible.
->
-> The interrupt support is implemented using an IRQ domain, and the
-> parent interrupt referenced in the standard DT way.
->
-> The power domains and reset support is closely related - there is a
-> defined sequence for powering down a domain which is tightly coupled
-> with asserting the reset.  Hence, it makes sense to group these two
-> together.
->
-> This patch adds the core PMU driver: power domains must be defined in
-> the DT file in order to make use of them.  The reset controller can
-> be referenced in the standard way for reset controllers.
+On Wed, 23 Apr 2014, Matt Porter wrote:
 
-Hi Russell,
+> BCM590xx utilizes a secondary I2C slave address to access additional
+> register space. Add support for the secondary address space by
+> instantiating a dummy I2C device with the appropriate secondary
+> I2C slave address. Also expose a secondary regmap register space so
+> that MFD drivers can access this secondary i2c slave address space.
+> 
+> Signed-off-by: Matt Porter <mporter@linaro.org>
+> ---
+>  drivers/mfd/bcm590xx.c       | 60 +++++++++++++++++++++++++++++++++-----------
+>  include/linux/mfd/bcm590xx.h |  9 ++++---
+>  2 files changed, 52 insertions(+), 17 deletions(-)
 
-This patch would be simplified if this was based upon the not yet
-merged patchset from Tomasz Figa, "[PATCH v3 0/3] Generic Device Tree
-based power domain look-up".
+Nice, flows much better now.
 
-For example you would likely not need to add some of the marvel
-specific DT bindings, and you wouldn?t need the bus_notifiers to add
-devices to the power domain. I guess I just though it could be useful
-input to consider while going forward, unless you already knew.
+Can I just apply the two MFD patches, or are there cross-deps?
 
-Kind regards
-Ulf Hansson
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
