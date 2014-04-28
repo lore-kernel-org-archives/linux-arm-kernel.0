@@ -1,49 +1,50 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 28 Apr 2014 18:19:32 +0200
-Subject: [PATCH] QEMU: ARM: boot: Load kernel at an Image friendly address
-In-Reply-To: <1395718484-20424-1-git-send-email-joelf@ti.com>
-References: <1395718484-20424-1-git-send-email-joelf@ti.com>
-Message-ID: <20140428161932.GG28564@pengutronix.de>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 29 Apr 2014 00:19:34 +0800
+Subject: [linux-sunxi] Re: [PATCH 1/7] gpiolib: gpiolib-of: Implement
+ device tree gpio-names based lookup
+In-Reply-To: <CAAVeFuL7B7kVw7ME=Vo_snhG27aBphKO8Uzvzen1gyD=R2ETNA@mail.gmail.com>
+References: <1397544101-18135-1-git-send-email-wens@csie.org>
+ <1397544101-18135-2-git-send-email-wens@csie.org>
+ <CACRpkdZDjC1KxM2yJqsgpg2MxBamX1EObsuahB-2c+ShuBXm8A@mail.gmail.com>
+ <CAAVeFuL7B7kVw7ME=Vo_snhG27aBphKO8Uzvzen1gyD=R2ETNA@mail.gmail.com>
+Message-ID: <CAGb2v64rs4UYMbQ--i=pcuuORVneozDpucCeHQKE4Qn7+qSCdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 24, 2014 at 10:34:44PM -0500, Joel Fernandes wrote:
-> Loading kernel at offset 0x10000 works only for zImage, but not for Image,
-> because the kernel expect the start of decompressed kernel (.head.text) to be
-> at an address that's a distance that's 16MB aligned from  PAGE_OFFSET +
-> TEXT_OFFSET (see vmlinux.lds.S). This check is enfornced in __fixup_pv_table in
-> arch/arm/kernel/head.S TEXT_OFFSET is 0x00008000, so a 16MB alignment needs to
-> have a "0x8000" in the lower 16 bits so that they cancel out. Currently the
-> offset Qemu loads it at is 0x10000.
-I'm not a native speaker, but I think the wording and logic is broken.
-I think what you mean is:
+On Wed, Apr 23, 2014 at 9:49 AM, Alexandre Courbot <gnurou@gmail.com> wrote:
+> On Wed, Apr 23, 2014 at 12:02 AM, Linus Walleij
+> <linus.walleij@linaro.org> wrote:
+>> On Tue, Apr 15, 2014 at 8:41 AM, Chen-Yu Tsai <wens@csie.org> wrote:
+>>
+>>> This patch provides of_get_gpiod_flags_by_name(), which looks up GPIO
+>>> phandles by name only, through gpios/gpio-names, and not by index.
+>>>
+>>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>>
+>> Like Alexandre I have no strong opinion on this alternative scheme.
+>
+> Yeah this new lookup scheme probably does no harm, but I think it
+> should be a little bit more motivated as it is, after all, introducing
+> more potential confusion for DT users.
+>
+> It does not look like this new lookup scheme is necessary to Chen-Yu's
+> patchset and that he could as well have used the current one. Right
+> now there is only one way to define GPIOs - if we introduce a second
+> one, then which one should new DT users choose? Which one looks
+> better? I can already endless fights taking place over this.
 
-	An uncompressed ARM kernel Image must be loaded to the
-	(physical) address PHYS_OFFSET + TEXT_OFFSET. (If
-	CONFIG_ARM_PATCH_PHYS_VIRT=y the condition is more lax, but we
-	cannot assume this to be enabled.)
+I will pull out the two patches.
 
-Speaking about PAGE_OFFSET doesn't make sense here, because that's a
-virual address and the MMU is expected to be off (or loaded with a 1:1
-mapping). Also note that not all machines use TEXT_OFFSET == 0x8000, see
+> Does this new lookup help with some of the existing problems we have
+> like ACPI/DT lookup compatibility?
 
-	git grep textofs- arch/arm/Makefile
+I hope they will be compatible with ACPI named gpios, whenever support
+for ACPI named properties extension lands. But that really depends on
+the ACPI implementation. For now I think it's best that I just hold on
+to these. We can revisit the discussion later if needed.
 
-.
+> I just need to be given one practical reason to give my ack.
 
-Additionally let me note, that for a zImage most addresses should work,
-but there are more and less sensible ones. Both PHYS_OFFSET + 0x8000 and
-PHYS_OFFSET + 0x10000 are in the latter group. That's because the
-compressed image and the then uncompressed image overlap, so you loose
-booting time by relocating one of them. Not sure if you care.
 
-As you cannot determine the actual value of TEXT_OFFSET for a given
-Image, I'd recommend to only support booting zImages and then place it
-somewhere at the end of RAM.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thanks
+ChenYu
