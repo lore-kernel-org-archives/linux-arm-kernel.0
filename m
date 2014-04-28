@@ -1,71 +1,116 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 28 Apr 2014 20:26:15 +0100
-Subject: [PATCH 04/97] ARM: l2c: omap2: remove ES1.0 support
+Date: Mon, 28 Apr 2014 20:26:27 +0100
+Subject: [PATCH 06/97] ARM: outer cache: add documentation of outer cache
+ functions
 In-Reply-To: <20140428192419.GV26756@n2100.arm.linux.org.uk>
 References: <20140428192419.GV26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WerBv-0007VC-SE@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WerC7-0007VK-BR@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh says:
-> But we should kill all of that since we long back decided to remove
-> ES1.0 related code. The mach-omap code alreasy has removed the ES1.0
-> compatibility so feel free to remove any specific ES1.0
-> related stuff. That silicon is long dead.
+Add some documentation to cover the outer cache functions so that their
+requirements can be better understood.  Of particular note are the
+flush_all() and disable() methods which must not be called except in
+very specific circumstances.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-omap2/omap4-common.c | 25 ++++++++-----------------
- 1 file changed, 8 insertions(+), 17 deletions(-)
+ arch/arm/include/asm/outercache.h | 48 ++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 47 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-index 95e171a055f3..48cf74d284ec 100644
---- a/arch/arm/mach-omap2/omap4-common.c
-+++ b/arch/arm/mach-omap2/omap4-common.c
-@@ -182,7 +182,7 @@ static void omap4_l2x0_set_debug(unsigned long val)
+diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
+index 0e4420858990..2615b3d9e807 100644
+--- a/arch/arm/include/asm/outercache.h
++++ b/arch/arm/include/asm/outercache.h
+@@ -39,35 +39,75 @@ struct outer_cache_fns {
+ extern struct outer_cache_fns outer_cache;
  
- static int __init omap_l2_cache_init(void)
- {
--	u32 aux_ctrl = 0;
-+	u32 aux_ctrl;
- 
- 	/*
- 	 * To avoid code running on other OMAPs in
-@@ -196,27 +196,18 @@ static int __init omap_l2_cache_init(void)
- 	if (WARN_ON(!l2cache_base))
- 		return -ENOMEM;
- 
--	/*
--	 * 16-way associativity, parity disabled
--	 * Way size - 32KB (es1.0)
--	 * Way size - 64KB (es2.0 +)
--	 */
--	aux_ctrl = ((1 << L2X0_AUX_CTRL_ASSOCIATIVITY_SHIFT) |
-+	/* 16-way associativity, parity disabled, way size - 64KB (es2.0 +) */
-+	aux_ctrl = (1 << L2X0_AUX_CTRL_ASSOCIATIVITY_SHIFT) |
- 			(0x1 << 25) |
- 			(0x1 << L2X0_AUX_CTRL_NS_LOCKDOWN_SHIFT) |
--			(0x1 << L2X0_AUX_CTRL_NS_INT_CTRL_SHIFT));
+ #ifdef CONFIG_OUTER_CACHE
 -
--	if (omap_rev() == OMAP4430_REV_ES1_0) {
--		aux_ctrl |= 0x2 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT;
--	} else {
--		aux_ctrl |= ((0x3 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT) |
-+			(0x1 << L2X0_AUX_CTRL_NS_INT_CTRL_SHIFT)) |
-+			(0x3 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT) |
- 			(1 << L2X0_AUX_CTRL_SHARE_OVERRIDE_SHIFT) |
- 			(1 << L2X0_AUX_CTRL_DATA_PREFETCH_SHIFT) |
- 			(1 << L2X0_AUX_CTRL_INSTR_PREFETCH_SHIFT) |
--			(1 << L2X0_AUX_CTRL_EARLY_BRESP_SHIFT));
--	}
--	if (omap_rev() != OMAP4430_REV_ES1_0)
--		omap_smc1(0x109, aux_ctrl);
-+			(1 << L2X0_AUX_CTRL_EARLY_BRESP_SHIFT);
++/**
++ * outer_inv_range - invalidate range of outer cache lines
++ * @start: starting physical address, inclusive
++ * @end: end physical address, exclusive
++ */
+ static inline void outer_inv_range(phys_addr_t start, phys_addr_t end)
+ {
+ 	if (outer_cache.inv_range)
+ 		outer_cache.inv_range(start, end);
+ }
 +
-+	omap_smc1(0x109, aux_ctrl);
++/**
++ * outer_clean_range - clean dirty outer cache lines
++ * @start: starting physical address, inclusive
++ * @end: end physical address, exclusive
++ */
+ static inline void outer_clean_range(phys_addr_t start, phys_addr_t end)
+ {
+ 	if (outer_cache.clean_range)
+ 		outer_cache.clean_range(start, end);
+ }
++
++/**
++ * outer_flush_range - clean and invalidate outer cache lines
++ * @start: starting physical address, inclusive
++ * @end: end physical address, exclusive
++ */
+ static inline void outer_flush_range(phys_addr_t start, phys_addr_t end)
+ {
+ 	if (outer_cache.flush_range)
+ 		outer_cache.flush_range(start, end);
+ }
  
- 	/* Enable PL310 L2 Cache controller */
- 	omap_smc1(0x102, 0x1);
++/**
++ * outer_flush_all - clean and invalidate all cache lines in the outer cache
++ *
++ * Note: depending on implementation, this may not be atomic - it must
++ * only be called with interrupts disabled and no other active outer
++ * cache masters.
++ *
++ * It is intended that this function is only used by implementations
++ * needing to override the outer_cache.disable() method due to security.
++ * (Some implementations perform this as a clean followed by an invalidate.)
++ */
+ static inline void outer_flush_all(void)
+ {
+ 	if (outer_cache.flush_all)
+ 		outer_cache.flush_all();
+ }
+ 
++/**
++ * outer_disable - clean, invalidate and disable the outer cache
++ *
++ * Disable the outer cache, ensuring that any data contained in the outer
++ * cache is pushed out to lower levels of system memory.  The note and
++ * conditions above concerning outer_flush_all() applies here.
++ */
+ static inline void outer_disable(void)
+ {
+ 	if (outer_cache.disable)
+ 		outer_cache.disable();
+ }
+ 
++/**
++ * outer_resume - restore the cache configuration and re-enable outer cache
++ *
++ * Restore any configuration that the cache had when previously enabled,
++ * and re-enable the outer cache.
++ */
+ static inline void outer_resume(void)
+ {
+ 	if (outer_cache.resume)
+@@ -89,6 +129,12 @@ static inline void outer_resume(void) { }
+ #endif
+ 
+ #ifdef CONFIG_OUTER_CACHE_SYNC
++/**
++ * outer_sync - perform a sync point for outer cache
++ *
++ * Ensure that all outer cache operations are complete and any store
++ * buffers are drained.
++ */
+ static inline void outer_sync(void)
+ {
+ 	if (outer_cache.sync)
 -- 
 1.8.3.1
