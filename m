@@ -1,47 +1,27 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 28 Apr 2014 10:13:55 +0900
-Subject: [PATCH/RFC] serial: sh-sci: Add device tree support for r8a7779
-In-Reply-To: <2068512.62K6gPl1LN@avalon>
-References: <1398322484-3630-1-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdWB4ZnwyNFXMK_rdCKAMOXt+HRMZKG+j4O-tdfiP_-PLg@mail.gmail.com>
- <20140428000314.GK32087@verge.net.au> <2068512.62K6gPl1LN@avalon>
-Message-ID: <20140428011354.GA13324@verge.net.au>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Sun, 27 Apr 2014 18:22:12 -0700
+Subject: [ANNOUNCE / UPDATE]: ARM mini-summit at ELC changed to BoFs (+
+ hack day)
+In-Reply-To: <20140407185732.GA18857@quad.lixom.net>
+References: <20140407185732.GA18857@quad.lixom.net>
+Message-ID: <CAGa+x86W1x6F0fsOa2rovsB-B5sgP76kU1+OH1_Ck0Uc-mrrTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 02:08:16AM +0200, Laurent Pinchart wrote:
-> Hi Simon,
-> 
-> On Monday 28 April 2014 09:03:14 Simon Horman wrote:
-> > On Fri, Apr 25, 2014 at 09:11:06AM +0200, Geert Uytterhoeven wrote:
-> > > On Fri, Apr 25, 2014 at 9:05 AM, Laurent Pinchart wrote:
-> > > >> +     scif0: serial at ffe40000 {
-> > > >> +             compatible = "renesas,scif", "renesas,scif-r8a7779";
-> > > >> +             reg = <0xffe40000 265>;
-> > > >> +             interrupt-parent = <&gic>;
-> > > >> +             interrupts = <0 88 IRQ_TYPE_LEVEL_HIGH>;
-> > > >> +             clocks = <&cpg_clocks R8A7779_CLK_P>;
-> > > >> +             clock-names = "sci_ick";
-> > > > 
-> > > > Clock handling in the sh-sci driver should probably be improved. The
-> > > > driver currently requires an "sci_ick" interface clock and supports an
-> > > > optional "sci_fck" functional clock. In practice, as far as I can see,
-> > > > platforms that provide both sci_ick and sci_fck set the two clocks to
-> > > > the same source.
-> >
-> > > That's right. As a consequence, the clock's enable count is incremented
-> > > 
-> > > 3 times:
-> > >   - once for fck,
-> > >   - once for ick,
-> > >   - once for generic Runtime PM using the "NULL" clock.
-> > 
-> > This approach is fine by me.
-> > But I think you need to maintain compatibility with the old
-> > binding ("sci_ick" required, "sci_fsk") as it seems that
-> > was included in v3.14.
-> 
-> sci_fck isn't part of the DT bindings, so we can at least drop that one.
+On Mon, Apr 7, 2014 at 11:57 AM, Olof Johansson <olof@lixom.net> wrote:
+> Based on the results of the call-for-invites, we've decided that there
+> aren't enough topics (and absence of several crucial participants)
+> to warrant a whole day of mini-summit at this time.
 
-So long as its not used anywhere in-tree, which I believe is the case,
-then that is fine by me.
+[...]
+
+> However, we still have the room we've reserved. We'll cancel meal service,
+> which means that there will be no cost involved for participants (and
+> no registration), and we'll keep the room available for a generic hack
+> day. If you've got something you want to work on together with someone
+> else from the community, this is a great opportunity to do so. Want to
+> come by and show off a cute embedded hack? Swing by!
+
+FYI... the room we have reserved is Willow Glen 2 & 3 at the San Jose Marriott.
+
+Kevin
