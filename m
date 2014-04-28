@@ -1,37 +1,110 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Mon, 28 Apr 2014 15:48:29 +0200
-Subject: [PATCH v8 3/3] ARM: Check if a CPU has gone offline
-In-Reply-To: <20140428130639.GD2868@lvm>
-References: <1398455329-18136-1-git-send-email-ashwin.chaugule@linaro.org>
- <1398455329-18136-4-git-send-email-ashwin.chaugule@linaro.org>
- <CALrVBkuV2kQmBScDSMUVG+hOMZ3FQ1tEOEwUEPHRoCo9si+ygA@mail.gmail.com>
- <CAJ5Y-eYFz0CQU4jWOnmiFNRJ+Q=12pvyTf72w7MUk3ebY75wgg@mail.gmail.com>
- <CAMJs5B9d+=kfJ=rnf=_9ywmjtXK4v=OQeVcDu53j0J89GWzfpA@mail.gmail.com>
- <535E519B.7070101@redhat.com> <20140428130639.GD2868@lvm>
-Message-ID: <535E5C2D.4090405@redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 28 Apr 2014 15:49:50 +0200
+Subject: [PATCH v3 part1 08/11] ARM64 / ACPI: Introduce PCI functions for
+ ACPI on ARM64
+In-Reply-To: <1398432017-8506-9-git-send-email-hanjun.guo@linaro.org>
+References: <1398432017-8506-1-git-send-email-hanjun.guo@linaro.org>
+ <1398432017-8506-9-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <201404281549.50738.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Il 28/04/2014 15:06, Christoffer Dall ha scritto:
->> >
->> > Is Anup's patchset already on a branch?  If you send me a pointer to
->> > it I can look at that branch history and see what's best.
->> >
-> I didn't merge it yet - need to make one final pass over it (likely
-> later tonight).
->
-> But this is the series:
-> https://lists.cs.columbia.edu/pipermail/kvmarm/2014-April/009061.html
+On Friday 25 April 2014, Hanjun Guo wrote:
+> CONFIG_ACPI depends CONFIG_PCI now, and ACPI provides ACPI based
+> PCI hotplug and PCI host bridge hotplug, introduce some PCI
+> functions to make ACPI core can be compiled, some of the functions
+> should be revisited when implemented on ARM64.
 
-Even better. :)
+> diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
+> index d93576f..0aa3607 100644
+> --- a/arch/arm64/include/asm/pci.h
+> +++ b/arch/arm64/include/asm/pci.h
+> @@ -21,6 +21,17 @@ struct pci_host_bridge *find_pci_host_bridge(struct pci_bus *bus);
+>  #define pcibios_assign_all_busses() \
+>  	(pci_has_flag(PCI_REASSIGN_ALL_BUS))
+>  
+> +static inline void pcibios_penalize_isa_irq(int irq, int active)
+> +{
+> +	/* we don't do dynamic pci irq allocation */
+> +}
+> +
+> +static inline int pci_get_legacy_ide_irq(struct pci_dev *dev, int channel)
+> +{
+> +	/* no legacy IRQ on arm64 */
+> +	return -ENODEV;
+> +}
+> +
 
-1) Catalin can apply "Add common header for PSCI related defines", or 
-Ashwin can resend his series with the patch at the beginning.  Duplicate 
-commits are fine, especially for seldom-modified files where they do not 
-cause conflicts.
+I think these would be better addressed in the caller. From what I can tell, they
+are only called by the ISAPNP code path for doing IRQ resource allocation, while
+the ACPIPNP code uses hardwired IRQ resources.
 
-2) Send Anup's patchset as a pull request to both me and Catalin, 
-relative to v3.16-rc1, both of us can apply it and Ashwin's series can 
-be commit on top.
+> @@ -171,3 +172,36 @@ unsigned long pci_ioremap_io(const struct resource *res, phys_addr_t phys_addr)
+>  	/* return io_offset */
+>  	return start * PAGE_SIZE - res->start;
+>  }
+> +
+> +/*
+> + * raw_pci_read - Platform-specific PCI config space access.
+> + *
+> + * Default empty implementation.  Replace with an architecture-specific setup
+> + * routine, if necessary.
+> + */
+> +int raw_pci_read(unsigned int domain, unsigned int bus,
+> +		  unsigned int devfn, int reg, int len, u32 *val)
+> +{
+> +	return -EINVAL;
+> +}
+> +
+> +int raw_pci_write(unsigned int domain, unsigned int bus,
+> +		  unsigned int devfn, int reg, int len, u32 val)
+> +{
+> +	return -EINVAL;
+> +}
+> +
+> +#ifdef CONFIG_ACPI
+> +/* Root bridge scanning */
+> +struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+> +{
+> +	/* TODO: Should be revisited when implementing PCI on ACPI */
+> +	return NULL;
+> +}
+> +
+> +void __init pci_acpi_crs_quirks(void)
+> +{
+> +	/* Do nothing on ARM64 */
+> +	return;
+> +}
+> +#endif
 
-Paolo
+And these probably don't need to be done at the architecture level. I expect we
+will only have to worry about SBSA compliant PCI hosts, so this can be done in
+the host controller driver for compliant devices, which is probably the one
+that Will Deacon is working on already.
+
+Note that we are aiming for an empty PCI implementation in ARM64, doing everything
+in either the PCI core or in the individual host drivers.
+
+For pci_acpi_crs_quirks(), it's probably enough to stub out the declaration and
+to make it x86 specific. ia64 already doesn't use it, and we can hope we won't
+need it for arm64 either.
+
+For raw_pci_{read,write} we can have a trivial generic implementation in
+the PCI core, like
+
+int __weak raw_pci_read(unsigned int domain, unsigned int bus,
+		  unsigned int devfn, int reg, int len, u32 *val)
+{
+	struct pci_bus *bus = pci_find_bus(domain, bus);
+	if (!bus)
+		return -ENODEV;
+
+	return bus->ops->read(bus, devfn, reg, len, val);
+}
+
+which won't work on x86 or ia64, but should be fine everywhere else. Alternatively,
+you can change the ACPI code to do the above manually and call the architecture
+independent interfaces, either bus->ops->read, or pci_bus_read_config_{byte,word,dword},
+which would actually simplify the ACPI code.
+
+	Arnd
