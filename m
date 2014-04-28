@@ -1,113 +1,131 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 28 Apr 2014 04:49:27 +0000 (UTC)
-Subject: OMAP baseline test results for v3.15-rc3
-Message-ID: <alpine.DEB.2.02.1404280445100.9132@utopia.booyaka.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Mon, 28 Apr 2014 11:53:37 +0800
+Subject: [PATCH v2 00/10] mtd: spi-nor: Add the DDR quad read support
+Message-ID: <1398657227-20721-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+ (0) This patch set depends on the patch:
+	http://lists.infradead.org/pipermail/linux-mtd/2014-April/053308.html
+  
+ (1) This patch set tries to add the DDR quad read support for the SPI
+     NOR framework, and it also adds the DDR quad read support for FREESCALE
+     quadspi controller driver.
 
-Here are some basic OMAP test results for Linux v3.15-rc3.
-Logs and other details at:
+ (2) Test this patch set with Spansion s25fl128s, the performance with mtd_speedtest.ko:
+     =================================================
+     mtd_speedtest: MTD device: 0
+     mtd_speedtest: not NAND flash, assume page size is 512 bytes.
+     mtd_speedtest: MTD device size 16777216, eraseblock size 65536, page size 512,
+                    count of eraseblocks 256, pages per eraseblock 128, OOB size 0
+     mtd_speedtest: testing eraseblock write speed
+     mtd_speedtest: eraseblock write speed is 665 KiB/s
+     mtd_speedtest: testing eraseblock read speed
+     mtd_speedtest: eraseblock read speed is 49799 KiB/s
+     mtd_speedtest: testing page write speed
+     mtd_speedtest: page write speed is 662 KiB/s
+     mtd_speedtest: testing page read speed
+     mtd_speedtest: page read speed is 24236 KiB/s
+     mtd_speedtest: testing 2 page write speed
+     mtd_speedtest: 2 page write speed is 657 KiB/s
+     mtd_speedtest: testing 2 page read speed
+     mtd_speedtest: 2 page read speed is 32637 KiB/s
+     mtd_speedtest: Testing erase speed
+     mtd_speedtest: erase speed is 518 KiB/s
+     mtd_speedtest: Testing 2x multi-block erase speed
+     mtd_speedtest: 2x multi-block erase speed is 506 KiB/s
+     mtd_speedtest: Testing 4x multi-block erase speed
+     mtd_speedtest: 4x multi-block erase speed is 503 KiB/s
+     mtd_speedtest: Testing 8x multi-block erase speed
+     mtd_speedtest: 8x multi-block erase speed is 501 KiB/s
+     mtd_speedtest: Testing 16x multi-block erase speed
+     mtd_speedtest: 16x multi-block erase speed is 498 KiB/s
+     mtd_speedtest: Testing 32x multi-block erase speed
+     mtd_speedtest: 32x multi-block erase speed is 496 KiB/s
+     mtd_speedtest: Testing 64x multi-block erase speed
+     mtd_speedtest: 64x multi-block erase speed is 495 KiB/s
+     mtd_speedtest: finished
+     =================================================
 
-    http://www.pwsan.com/omap/testlogs/test_v3.15-rc3/20140427213739/
+  (3) Add the DDR quad read support for Micron N25Q256A:
+    =================================================
+    mtd_speedtest: MTD device: 1
+    mtd_speedtest: not NAND flash, assume page size is 512 bytes.
+    mtd_speedtest: MTD device size 33554432, eraseblock size 65536,
+                   page size 512, count of eraseblocks 512, pages per eraseblock 128, OOB size 0
+    mtd_speedtest: testing eraseblock write speed
+    mtd_speedtest: eraseblock write speed is 2426 KiB/s
+    mtd_speedtest: testing eraseblock read speed
+    mtd_speedtest: eraseblock read speed is 32157 KiB/s
+    mtd_speedtest: testing page write speed
+    mtd_speedtest: page write speed is 2362 KiB/s
+    mtd_speedtest: testing page read speed
+    mtd_speedtest: page read speed is 17741 KiB/s
+    mtd_speedtest: testing 2 page write speed
+    mtd_speedtest: 2 page write speed is 2384 KiB/s
+    mtd_speedtest: testing 2 page read speed
+    mtd_speedtest: 2 page read speed is 24058 KiB/s
+    mtd_speedtest: Testing erase speed
+    mtd_speedtest: erase speed is 1927529 KiB/s
+    mtd_speedtest: Testing 2x multi-block erase speed
+    mtd_speedtest: 2x multi-block erase speed is 2184533 KiB/s
+    mtd_speedtest: Testing 4x multi-block erase speed
+    mtd_speedtest: 4x multi-block erase speed is 2184533 KiB/s
+    mtd_speedtest: Testing 8x multi-block erase speed
+    mtd_speedtest: 8x multi-block erase speed is 2340571 KiB/s
+    mtd_speedtest: Testing 16x multi-block erase speed
+    mtd_speedtest: 16x multi-block erase speed is 2340571 KiB/s
+    mtd_speedtest: Testing 32x multi-block erase speed
+    mtd_speedtest: 32x multi-block erase speed is 2340571 KiB/s
+    mtd_speedtest: Testing 64x multi-block erase speed
+    mtd_speedtest: 64x multi-block erase speed is 2340571 KiB/s
+    mtd_speedtest: finished
+
+  (3) Conclusion:
+     The DDR quad read could be 49799 KiB/s for Spansion s25fl128s,
+     The DDR quad read could be 32157/s for Micron N25Q256A;
+     
+Changlog:
+
+v1 --> v2:
+  [1] add the new patch: " mtd: spi-nor: add a new field for spi_nor{}"
+  [2] remove the patch :
+        "mtd: fsl-quadspi: get the dummy cycles for DDR Quad read from the DT
+	    property"
+  [3] add the DDR quad read for Micron N25Q256A.	    
+  [4] fix types.
+  [5] others.
+
+before v1:  
+
+  About this patch set:
+     For patch 1, please see the old discusstion:
+     http://lists.infradead.org/pipermail/linux-mtd/2014-April/053370.html
+
+     For patch 2, please see the old discusstion:
+     http://lists.infradead.org/pipermail/linux-mtd/2014-April/053374.html
 
 
-Test summary
-------------
+Huang Shijie (10):
+  mtd: spi-nor: fix the wrong dummy value
+  mtd: spi-nor: add a new field for spi_nor{}
+  mtd: spi-nor: add DDR quad read support
+  Documentation: mtd: add a new document for SPI NOR flash
+  Documentation: fsl-quadspi: update the document
+  mtd: fsl-quadspi: use the information stored in spi-nor{}
+  mtd: fsl-quadspi: add the DDR quad read support for Spansion NOR
+  mtd: spi-nor: add more read transfer flags for n25q256a
+  mtd: spi-nor: add DDR quad read support for Micron
+  mtd: fsl-quadspi: add DDR quad read support for Micron
 
-Build: uImage:
-    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only
+ .../devicetree/bindings/mtd/fsl-quadspi.txt        |   16 +++
+ .../devicetree/bindings/mtd/spi-nor-flash.txt      |    7 +
+ drivers/mtd/devices/m25p80.c                       |    6 +-
+ drivers/mtd/spi-nor/fsl-quadspi.c                  |  132 ++++++++++++++------
+ drivers/mtd/spi-nor/spi-nor.c                      |   65 +++++++++-
+ include/linux/mtd/spi-nor.h                        |   12 ++-
+ 6 files changed, 189 insertions(+), 49 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mtd/spi-nor-flash.txt
 
-Build: zImage:
-    Pass (14/14): multi_v7_defconfig, omap2plus_defconfig,
-		  omap2plus_defconfig_am33xx_only,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_n800_only_a,
-		  omap2plus_defconfig_n800_multi_omap2xxx,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig,
-		  rmk_omap4430_sdp_oldconfig
-
-Build: uImage+dtb:
-    Pass ( 9/ 9): omap2plus_defconfig_am33xx_only/am335x-bone,
-		  omap2plus_defconfig/omap4-panda,
-		  omap2plus_defconfig/omap4-panda-es,
-		  omap2plus_defconfig/am3517-evm,
-		  omap2plus_defconfig/omap2430-sdp,
-		  omap2plus_defconfig/omap3-beagle,
-		  omap2plus_defconfig/omap3-beagle-xm,
-		  omap2plus_defconfig/omap3-evm-37xx,
-		  omap2plus_defconfig/omap4-var-som
-
-Boot to userspace:
-    FAIL ( 1/12): 2430sdp
-    skip ( 2/12): 5912osk, cmt3517
-    Pass ( 9/12): 3517evm, 3530es3beagle, 3730beaglexm, 37xxevm,
-		  4430es2panda, 4460pandaes, am335xbone, am335xbonelt,
-		  4460varsomom
-
-PM: chip retention via suspend:
-    FAIL ( 3/ 7): 2430sdp, 4430es2panda, 4460varsomom
-    Pass ( 4/ 7): 3530es3beagle, 3730beaglexm, 37xxevm, 4460pandaes
-
-PM: chip retention via dynamic idle:
-    FAIL ( 7/ 7): 2430sdp, 3530es3beagle, 3730beaglexm, 37xxevm,
-		  4430es2panda, 4460pandaes, 4460varsomom
-
-PM: chip off except CORE via suspend:
-    FAIL ( 1/ 1): 3730beaglexm
-
-PM: chip off except CORE via dynamic idle:
-    FAIL ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    FAIL ( 5/ 5): 3530es3beagle, 37xxevm, 4430es2panda, 4460pandaes,
-		  4460varsomom
-
-PM: chip off via dynamic idle:
-    FAIL ( 5/ 5): 3530es3beagle, 37xxevm, 4430es2panda, 4460pandaes,
-		  4460varsomom
-
-
-vmlinux object size
-(delta in bytes from test_v3.15-rc2 (a798c10faf62a505d24e5f6213fbaf904a39623f)):
-   text     data      bss    total  kernel
-     +8        0        0       +8  omap1_defconfig
-    -56        0        0      -56  omap1_defconfig_1510innovator_only
-    -24        0        0      -24  omap1_defconfig_5912osk_only
-  +1292       -8        0    +1284  multi_v7_defconfig
-   +776        0      +64     +840  omap2plus_defconfig
-    +51     +136        0     +187  omap2plus_defconfig_2430sdp_only
-   +740        0      +64     +804  omap2plus_defconfig_am33xx_only
-  +4952        0        0    +4952  omap2plus_defconfig_am43xx_only
-   +776      +64      +64     +904  omap2plus_defconfig_cpupm
-   +740      +64        0     +804  omap2plus_defconfig_dra7xx_only
-   +340     +232      +32     +604  omap2plus_defconfig_n800_multi_omap2xxx
-   +340     +240      +32     +612  omap2plus_defconfig_n800_only_a
-  +4808      +56      +64    +4928  omap2plus_defconfig_no_pm
-   +804      +72      +64     +940  omap2plus_defconfig_omap2_4_only
-   +648        0      +64     +712  omap2plus_defconfig_omap3_4_only
-   +740      +72        0     +812  omap2plus_defconfig_omap5_only
-  +1036     +216     -568     +684  rmk_omap3430_ldp_allnoconfig
-   +300     +200        0     +500  rmk_omap3430_ldp_oldconfig
-  +1180     +244     -584     +840  rmk_omap4430_sdp_allnoconfig
-   +112      +16        0     +128  rmk_omap4430_sdp_oldconfig
-
-Boot-time memory difference
-(delta in bytes from test_v3.15-rc2 (a798c10faf62a505d24e5f6213fbaf904a39623f))
-  avail  rsrvd   high  freed  board          kconfig
-     4k    -4k      .      .  2420n800       omap2plus_defconfig_n800_only_a
-    -8k     8k      .      .  2430sdp        omap2plus_defconfig
-    -8k     8k      .      .  3517evm        omap2plus_defconfig
-    -4k     4k      .      .  3530es3beagle  omap2plus_defconfig
-    -8k     8k      .      .  3730beaglexm   omap2plus_defconfig
-    -8k     8k      .      .  37xxevm        omap2plus_defconfig
-    -8k     8k      .      .  4430es2panda   omap2plus_defconfig
-    -8k     8k      .      .  4460pandaes    omap2plus_defconfig
-    -8k     8k      .      .  4460varsomom   omap2plus_defconfig
-     4k    -4k      .      .  am335xbone     omap2plus_defconfig_am33xx_only
+-- 
+1.7.2.rc3
