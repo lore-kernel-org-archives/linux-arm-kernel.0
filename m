@@ -1,59 +1,36 @@
-From: guido@vanguardiasur.com.ar (=?UTF-8?q?Guido=20Mart=C3=ADnez?=)
-Date: Mon, 28 Apr 2014 10:58:32 -0300
-Subject: [PATCH 4/4] ARM: dts: am335x-igep0033: use phandles for USB and DMA
- refs
-In-Reply-To: <1398693512-5355-1-git-send-email-guido@vanguardiasur.com.ar>
-References: <1398693512-5355-1-git-send-email-guido@vanguardiasur.com.ar>
-Message-ID: <1398693512-5355-4-git-send-email-guido@vanguardiasur.com.ar>
+From: mporter@linaro.org (Matt Porter)
+Date: Mon, 28 Apr 2014 10:09:10 -0400
+Subject: [PATCH v2 2/4] mfd: bcm590xx: add support for secondary I2C
+ slave address
+In-Reply-To: <20140428115627.GY21279@lee--X1>
+References: <1398295293-11033-1-git-send-email-mporter@linaro.org>
+ <1398295293-11033-3-git-send-email-mporter@linaro.org>
+ <20140428115627.GY21279@lee--X1>
+Message-ID: <20140428140910.GB7719@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use phandles instead of unit adresses to reference usb and dma nodes.
-This makes the DT more robust and readable.
+On Mon, Apr 28, 2014 at 12:56:27PM +0100, Lee Jones wrote:
+> On Wed, 23 Apr 2014, Matt Porter wrote:
+> 
+> > BCM590xx utilizes a secondary I2C slave address to access additional
+> > register space. Add support for the secondary address space by
+> > instantiating a dummy I2C device with the appropriate secondary
+> > I2C slave address. Also expose a secondary regmap register space so
+> > that MFD drivers can access this secondary i2c slave address space.
+> > 
+> > Signed-off-by: Matt Porter <mporter@linaro.org>
+> > ---
+> >  drivers/mfd/bcm590xx.c       | 60 +++++++++++++++++++++++++++++++++-----------
+> >  include/linux/mfd/bcm590xx.h |  9 ++++---
+> >  2 files changed, 52 insertions(+), 17 deletions(-)
+> 
+> Nice, flows much better now.
+> 
+> Can I just apply the two MFD patches, or are there cross-deps?
 
-Signed-off-by: Guido Mart?nez <guido@vanguardiasur.com.ar>
----
- arch/arm/boot/dts/am335x-igep0033.dtsi | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+There's cross-deps so the regulator driver will need to go with it.
+Mark mentioned earlier in the thread that he wanted to merge through
+the regulator tree though.
 
-diff --git a/arch/arm/boot/dts/am335x-igep0033.dtsi b/arch/arm/boot/dts/am335x-igep0033.dtsi
-index 9f22c18..81cf68b 100644
---- a/arch/arm/boot/dts/am335x-igep0033.dtsi
-+++ b/arch/arm/boot/dts/am335x-igep0033.dtsi
-@@ -201,28 +201,28 @@
- &usb {
- 	status = "okay";
- 
--	control at 44e10620 {
-+	&usb_ctrl_mod {
- 		status = "okay";
- 	};
- 
--	usb-phy at 47401300 {
-+	&usb0_phy {
- 		status = "okay";
- 	};
- 
--	usb-phy at 47401b00 {
-+	&usb1_phy {
- 		status = "okay";
- 	};
- 
--	usb at 47401000 {
-+	&usb0 {
- 		status = "okay";
- 	};
- 
--	usb at 47401800 {
-+	&usb1 {
- 		status = "okay";
- 		dr_mode = "host";
- 	};
- 
--	dma-controller at 47402000  {
-+	&cppi41dma  {
- 		status = "okay";
- 	};
- };
--- 
-1.9.2
+-Matt
