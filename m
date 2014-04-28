@@ -1,43 +1,53 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 28 Apr 2014 17:58:17 +0100
-Subject: [PATCH 06/16] ARM: l2c: convert highbank to generic l2c initialisation
+Date: Mon, 28 Apr 2014 17:58:22 +0100
+Subject: [PATCH 07/16] ARM: l2c: convert tegra to generic l2c initialisation
 In-Reply-To: <20140428165631.GM26756@n2100.arm.linux.org.uk>
 References: <20140428165631.GM26756@n2100.arm.linux.org.uk>
-Message-ID: <E1Weosj-0002Pf-IR@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Weoso-0002Pj-LE@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-highbank/highbank.c | 9 +++------
- 1 file changed, 3 insertions(+), 6 deletions(-)
+ arch/arm/mach-tegra/tegra.c | 12 +++---------
+ 1 file changed, 3 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
-index 245e588859ec..8c35ae4ff176 100644
---- a/arch/arm/mach-highbank/highbank.c
-+++ b/arch/arm/mach-highbank/highbank.c
-@@ -66,12 +66,6 @@ static void __init highbank_init_irq(void)
+diff --git a/arch/arm/mach-tegra/tegra.c b/arch/arm/mach-tegra/tegra.c
+index 1bc49f9db015..d90065e2552a 100644
+--- a/arch/arm/mach-tegra/tegra.c
++++ b/arch/arm/mach-tegra/tegra.c
+@@ -70,20 +70,12 @@ u32 tegra_uart_config[3] = {
+ 	0,
+ };
  
- 	if (of_find_compatible_node(NULL, NULL, "arm,cortex-a9"))
- 		highbank_scu_map_io();
+-static void __init tegra_init_cache(void)
+-{
+-#ifdef CONFIG_CACHE_L2X0
+-	l2x0_of_init(0x3c400001, 0xc20fc3fe);
+-#endif
+-}
 -
--	/* Enable PL310 L2 Cache controller */
--	if (IS_ENABLED(CONFIG_CACHE_L2X0)) {
--		outer_cache.write_sec = highbank_l2c310_write_sec;
--		l2x0_of_init(0, ~0);
--	}
+ static void __init tegra_init_early(void)
+ {
+ 	of_register_trusted_foundations();
+ 	tegra_apb_io_init();
+ 	tegra_init_fuse();
+ 	tegra_cpu_reset_handler_init();
+-	tegra_init_cache();
+ 	tegra_powergate_init();
+ 	tegra_hotplug_init();
  }
+@@ -171,8 +163,10 @@ static const char * const tegra_dt_board_compat[] = {
+ };
  
- static void highbank_power_off(void)
-@@ -185,6 +179,9 @@ DT_MACHINE_START(HIGHBANK, "Highbank")
- #if defined(CONFIG_ZONE_DMA) && defined(CONFIG_ARM_LPAE)
- 	.dma_zone_size	= (4ULL * SZ_1G),
- #endif
-+	.l2c_aux_val	= 0,
-+	.l2c_aux_mask	= ~0,
-+	.l2c_write_sec	= highbank_l2c310_write_sec,
- 	.init_irq	= highbank_init_irq,
- 	.init_machine	= highbank_init,
- 	.dt_compat	= highbank_match,
+ DT_MACHINE_START(TEGRA_DT, "NVIDIA Tegra SoC (Flattened Device Tree)")
+-	.map_io		= tegra_map_common_io,
+ 	.smp		= smp_ops(tegra_smp_ops),
++	.l2c_aux_val	= 0x3c400001,
++	.l2c_aux_mask	= 0xc20fc3fe,
++	.map_io		= tegra_map_common_io,
+ 	.init_early	= tegra_init_early,
+ 	.init_irq	= tegra_dt_init_irq,
+ 	.init_machine	= tegra_dt_init,
 -- 
 1.8.3.1
