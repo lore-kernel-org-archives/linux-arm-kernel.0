@@ -1,57 +1,56 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 28 Apr 2014 19:02:01 +0200
-Subject: [PATCH v4 11/11] ARM: shmobile: r7s72100: use workaround for non
- DT-clocks
-In-Reply-To: <1398704521-23767-1-git-send-email-wsa@the-dreams.de>
-References: <1398704521-23767-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1398704521-23767-12-git-send-email-wsa@the-dreams.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 28 Apr 2014 10:02:40 -0700
+Subject: [linux-sunxi] [PATCH 1/2] ARM: sunxi: Split the various SoCs
+ support in Kconfig
+In-Reply-To: <1398529014-1152-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1398529014-1152-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1398529014-1152-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CAOesGMiYRwmBnynw8dg6hBWens4_ncbvE2wN5rnJoW5DV_YB5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Hi,
 
-MTU2 is not yet prepared for DT usage, so use the common workaround via clkdev
-for now.
+On Sat, Apr 26, 2014 at 9:16 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> This will allow to better isolate various options, and reduce the overall
+> kernel size if we're interested in only one of the SoCs.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  arch/arm/mach-sunxi/Kconfig | 35 +++++++++++++++++++++++++++++------
+>  1 file changed, 29 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+> index b57d7d53b9d3..23575010ff49 100644
+> --- a/arch/arm/mach-sunxi/Kconfig
+> +++ b/arch/arm/mach-sunxi/Kconfig
+> @@ -1,14 +1,37 @@
+>  config ARCH_SUNXI
+> -       bool "Allwinner A1X SOCs" if ARCH_MULTI_V7
+> -       select ARCH_HAS_RESET_CONTROLLER
+> +       bool "Allwinner SoCs" if ARCH_MULTI_V7
+>         select ARCH_REQUIRE_GPIOLIB
+> -       select ARM_GIC
+> -       select ARM_PSCI
+>         select CLKSRC_MMIO
+>         select GENERIC_IRQ_CHIP
+> -       select HAVE_ARM_ARCH_TIMER
+>         select PINCTRL
+>         select PINCTRL_SUNXI
+> -       select RESET_CONTROLLER
+>         select SUN4I_TIMER
+> +
+> +if ARCH_SUNXI
+> +
+> +menu "Allwinner SoCs variants"
+> +
+> +config MACH_SUN4I
+> +       bool "Allwinner A10 (sun4i) SoCs support"
 
-Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
----
- arch/arm/mach-shmobile/board-genmai-reference.c | 14 ++++++++++++--
- 1 file changed, 12 insertions(+), 2 deletions(-)
+If you add "default MACH_SUNXI" then you don't have to churn the
+defconfigs, but it'll still make it possible for people to turn it
+off.
 
-diff --git a/arch/arm/mach-shmobile/board-genmai-reference.c b/arch/arm/mach-shmobile/board-genmai-reference.c
-index 7630c1053e32..fde558b66d4e 100644
---- a/arch/arm/mach-shmobile/board-genmai-reference.c
-+++ b/arch/arm/mach-shmobile/board-genmai-reference.c
-@@ -18,18 +18,28 @@
-  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-  */
- 
--#include <linux/clk-provider.h>
- #include <linux/kernel.h>
- #include <linux/of_platform.h>
-+#include <mach/clock.h>
- #include <mach/common.h>
- #include <mach/r7s72100.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- 
-+#ifdef CONFIG_COMMON_CLK
-+/*
-+ * This is a really crude hack to provide clkdev support to platform
-+ * devices until they get moved to DT.
-+ */
-+static const struct clk_name clk_names[] = {
-+	{ "mtu2", NULL, "sh_mtu2.0" },
-+};
-+#endif
-+
- static void __init genmai_add_standard_devices(void)
- {
- #ifdef CONFIG_COMMON_CLK
--	of_clk_init(NULL);
-+	shmobile_clk_workaround(clk_names, ARRAY_SIZE(clk_names), true);
- #else
- 	r7s72100_clock_init();
- #endif
--- 
-1.9.2
+
+-Olof
