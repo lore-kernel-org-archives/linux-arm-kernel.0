@@ -1,37 +1,49 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Mon, 28 Apr 2014 11:19:49 -0400
-Subject: [PATCH v6 RESEND 0/5] Add Broadcom Kona PWM Support
-In-Reply-To: <CAAYSxhpOP78EQAM0cWM2RwLu29-0eRVgLCFX3Hob8q=J==5wUA@mail.gmail.com>
-References: <1398450675-19609-1-git-send-email-tim.kryger@linaro.org>
- <20140428110731.GH19455@ulmo>
- <CAAYSxhpOP78EQAM0cWM2RwLu29-0eRVgLCFX3Hob8q=J==5wUA@mail.gmail.com>
-Message-ID: <20140428151949.GD7719@beef>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 28 Apr 2014 16:22:40 +0100
+Subject: [Linaro-acpi] [PATCH v3 part1 06/11] ARM64 / ACPI: Introduce
+ lowlevel suspend function
+In-Reply-To: <1398432017-8506-7-git-send-email-hanjun.guo@linaro.org>
+References: <1398432017-8506-1-git-send-email-hanjun.guo@linaro.org>
+ <1398432017-8506-7-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20140428152240.GD31782@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 08:00:39AM -0700, Tim Kryger wrote:
-> On Mon, Apr 28, 2014 at 4:07 AM, Thierry Reding
-> <thierry.reding@gmail.com> wrote:
-> > On Fri, Apr 25, 2014 at 11:31:10AM -0700, Tim Kryger wrote:
-> >> This series introduces the driver for the Kona PWM controller found in
-> >> Broadcom mobile SoCs like bcm281xx and updates the device tree and the
-> >> defconfig to enable use of this hardware on the bcm28155 AP board.
-> >>
+On Fri, Apr 25, 2014 at 02:20:12PM +0100, Hanjun Guo wrote:
+> acpi_wakeup_address is used on x86 as the address bios jumps into
+> when machine wakes up from suspend. As arm64 does not have such a
+> bios this mechanism will be provided by other means. But the define
+> is still required inside the acpi core.
 > 
-> >> Tim Kryger (5):
-> >>   Documentation: dt: Add Kona PWM binding
-> >>   pwm: kona: Introduce Kona PWM controller support
-> >>   ARM: dts: Declare the PWM for bcm11351 (bcm281xx)
-> >>   ARM: dts: Enable the PWM for bcm28155 AP board
-> >>   ARM: bcm_defconfig: Enable PWM and Backlight
+> Introduce a null stub for acpi_suspend_lowlevel as this is also
+> required by core. This will be filled in when standards are
+> defined for arm64 ACPI global power states.
 > 
-> > I've applied patches 1 and 2 (with two tiny whitespace cleanups) to my
-> > for-next branch.
+> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  arch/arm64/include/asm/acpi.h |    4 ++++
+>  drivers/acpi/plat/arm-core.c  |    7 +++++++
+>  2 files changed, 11 insertions(+)
 > 
-> Sounds good.  Thank you.
-> 
-> Matt and Christian, are you okay taking patches 3-5 through your tree?
+> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> index 3ac9dfb..60e3a72 100644
+> --- a/arch/arm64/include/asm/acpi.h
+> +++ b/arch/arm64/include/asm/acpi.h
+> @@ -85,6 +85,10 @@ static inline void acpi_disable_pci(void)
+>   */ 
+>  #define cpu_physical_id(cpu) -1
+>  
+> +/* Low-level suspend routine. */
+> +extern int (*acpi_suspend_lowlevel)(void);
+> +#define acpi_wakeup_address (0)
 
-Yes, I've now applied them to the appropropriate mach-bcm 3.16 branches.
+I understand you want code to compile, but as I mentioned in another
+thread, I would focus more on understanding if these macros/hooks are
+really needed for ARM rather than defining them _just_ to make code
+compile. The fact that you are forced to define them makes me think
+there is something to be changed in ACPI core code instead of adding
+empty and probably useless macros/hooks for ARM which I have no idea
+whatsoever whether will ever be needed or not.
 
--Matt
+Lorenzo
