@@ -1,25 +1,23 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 28 Apr 2014 19:23:12 +0100
-Subject: [PATCH 02/16] ARM: l2c: add platform independent core L2 cache
- initialisation
-In-Reply-To: <CAL_JsqJDj_JZT_Mo5=Y1NqObX19v7WvuWSrmAZ4UXi9s6-prXA@mail.gmail.com>
-References: <20140428165631.GM26756@n2100.arm.linux.org.uk>
- <E1WeosP-0002PO-5m@rmk-PC.arm.linux.org.uk>
- <CAL_JsqJDj_JZT_Mo5=Y1NqObX19v7WvuWSrmAZ4UXi9s6-prXA@mail.gmail.com>
-Message-ID: <20140428182312.GR26756@n2100.arm.linux.org.uk>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 28 Apr 2014 18:28:45 +0000 (UTC)
+Subject: [PATCH 3/5] arm: omap2: skip device build from platform code
+ for dt.
+In-Reply-To: <1397651532-31456-4-git-send-email-sourav.poddar@ti.com>
+References: <1397651532-31456-1-git-send-email-sourav.poddar@ti.com>
+ <1397651532-31456-4-git-send-email-sourav.poddar@ti.com>
+Message-ID: <alpine.DEB.2.02.1404281827410.14616@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 12:54:58PM -0500, Rob Herring wrote:
-> This function should be a nop if there is no DT node matching, so we
-> don't really need to trigger calling it based on machine_desc values.
-> If we do that, then we can have aux_mask and aux_val values of 0 for
-> both also mean don't do any aux ctrl setup. That would help minimize
-> the machine_desc for many platforms.
+On Wed, 16 Apr 2014, Sourav Poddar wrote:
 
-Calling it with both set to zero results in the auxiliary control register
-being cleared to zero.  We don't want that to happen.
+> For SOCs with dt enabled, device should be build through device tree.
+> Prevent device build call from platform code, if device tree is
+> enabled.
+> 
+> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Isn't OMAP2+ only supporting DT device enumeration now?
+
+
+- Paul
