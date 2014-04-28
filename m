@@ -1,53 +1,31 @@
-From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Mon, 28 Apr 2014 19:06:59 +0200
-Subject: [PATCH v2 1/7] pinctrl: berlin: add the core pinctrl driver for
- Marvell Berlin SoCs
-In-Reply-To: <535B79C6.7010502@gmail.com>
-References: <1398268276-9696-1-git-send-email-antoine.tenart@free-electrons.com>
- <1398268276-9696-2-git-send-email-antoine.tenart@free-electrons.com>
- <535B79C6.7010502@gmail.com>
-Message-ID: <20140428170659.GC4211@kwain>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 28 Apr 2014 11:07:26 -0600
+Subject: [PATCH] ARM: tegra: add SD wp-gpios to Jetson TK1 DT
+Message-ID: <1398704846-18262-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sebastian,
+From: Stephen Warren <swarren@nvidia.com>
 
-On Sat, Apr 26, 2014 at 11:17:58AM +0200, Sebastian Hesselbarth wrote:
-> On 04/23/2014 05:51 PM, Antoine T?nart wrote:
-> > The Marvell Berlin boards have a group based pinmuxing mechanism. This
-> > adds the core driver support. We actually do not need any information
-> > about the pins here and only have the definition of the groups.
-> > 
-> > Let's take the example of the uart0 pinmuxing on the BG2Q. Balls BK4 and
-> > BH6 are muxed to respectively UART0 RX and TX if the group GSM12 is set
-> > to mode 0:
-> > 
-> > Group	Modes	Offset Base	Offset	LSB	Bit Width
-> > GSM12	3	sm_base		0x40	0x10	0x2
-> > 
-> > Ball	Group	Mode 0		Mode 1		Mode 2
-> > BK4	GSM12	UART0_RX	IrDA0_RX	GPIO9
-> > BH6	GSM12	UART0_TX	IrDA0_TX	GPIO10
-> > 
-> > So in order to configure BK4 -> UART0_TX and BH6 -> UART0_RX, we need
-> > to set (sm_base + 0x40 + 0x10) &= ff3fffff.
-> > 
-> > Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
-> 
-> Antoine,
-> 
-> I only have some cosmetic nits on the pinctrl driver and one fixup for
-> the dts.
-> 
-> If you resend, feel free to add my
-> 
-> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Jetson TK1 can detect write-protect on the SD card. Add the required
+DT entries to allow this.
 
-Will do. Thanks for the review!
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/boot/dts/tegra124-jetson-tk1.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
-Antoine
-
+diff --git a/arch/arm/boot/dts/tegra124-jetson-tk1.dts b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+index fbc34933cf69..e31fb61a81d3 100644
+--- a/arch/arm/boot/dts/tegra124-jetson-tk1.dts
++++ b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+@@ -1624,6 +1624,7 @@
+ 		status = "okay";
+ 		cd-gpios = <&gpio TEGRA_GPIO(V, 2) GPIO_ACTIVE_LOW>;
+ 		power-gpios = <&gpio TEGRA_GPIO(R, 0) GPIO_ACTIVE_HIGH>;
++		wp-gpios = <&gpio TEGRA_GPIO(Q, 4) GPIO_ACTIVE_HIGH>;
+ 		bus-width = <4>;
+ 		vqmmc-supply = <&vddio_sdmmc3>;
+ 	};
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.8.1.5
