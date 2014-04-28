@@ -1,35 +1,66 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 28 Apr 2014 17:13:15 -0600
-Subject: [PATCH REPOST] ARM: multi_v7: enable AT24C EEPROM driver
-Message-ID: <1398726795-13454-1-git-send-email-swarren@wwwdotorg.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 28 Apr 2014 16:13:19 -0700
+Subject: [PATCH v12 30/31] ARM: dts: add System MMU nodes of exynos5250
+In-Reply-To: <CAGm_ybhTEN9QxFBd1Su8NGP32KeYTF8d_Z8gXKo7cYpapZrA9w@mail.gmail.com>
+References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
+ <1398584283-22846-31-git-send-email-shaik.ameer@samsung.com>
+ <CAGm_ybhTEN9QxFBd1Su8NGP32KeYTF8d_Z8gXKo7cYpapZrA9w@mail.gmail.com>
+Message-ID: <CAD=FV=UCpQRg9nWu5EfuzWmBpee9N3X6yCmtpRaNQxitfFZkMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+Vikas,
 
-This is used for the board ID EEPROM on Jetson TK1, as well as likely
-a whole slew of other NVIDIA reference boards; we simply haven't added
-enabled the EEPROM in the DT files until now.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-I assume this should be applied directly in arm-soc, to prevent causing
-conflicts from changes to this file in lots of SoC-specific trees.
+On Sun, Apr 27, 2014 at 10:39 AM, Vikas Sajjan <sajjan.linux@gmail.com> wrote:
+> Hi shaik,
+>
+> +Doug, Abhilash,
+>
+> On Sun, Apr 27, 2014 at 1:08 PM, Shaik Ameer Basha
+> <shaik.ameer@samsung.com> wrote:
+>> From: Cho KyongHo <pullip.cho@samsung.com>
+>>
+>> Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
+>> ---
+>>  arch/arm/boot/dts/exynos5250.dtsi |  270 ++++++++++++++++++++++++++++++++++++-
+>>  1 file changed, 267 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+>> index 3742331..eebd397 100644
+>> --- a/arch/arm/boot/dts/exynos5250.dtsi
+>> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+>> @@ -82,6 +82,16 @@
+>>                 reg = <0x10044040 0x20>;
+>>         };
+>>
+>> +       pd_isp: isp-power-domain at 0x10044020 {
+>> +               compatible = "samsung,exynos4210-pd";
+>> +               reg = <0x10044020 0x20>;
+>> +       };
+>> +
+>> +       pd_disp1: disp1-power-domain at 0x100440A0 {
+>> +               compatible = "samsung,exynos4210-pd";
+>> +               reg = <0x100440A0 0x20>;
+>> +       };
+>> +
+>
+> As per subject "add System MMU nodes of exynos5250", it should only
+> add SysMMU node.
+> So, I think adding power domain nodes should go in a separate patch.
+>
+> Adding power domain nodes can break the system, if powering ON/OFF of
+> the given power domain is NOT taken care well.
+> I can see ISP is one such case. With this series I can see S2R breaks
+> [1] on 5250 chromebook with current mainline kernel (same applies for
+> arndale and smdk5250, but I have tested on these boards yet)
 
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Thanks for catching that!  Let's make sure not to break suspend/resume.
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index d4e8a47a2f7c..a692b7ae3bd1 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -112,6 +112,7 @@ CONFIG_BLK_DEV_LOOP=y
- CONFIG_ICS932S401=y
- CONFIG_APDS9802ALS=y
- CONFIG_ISL29003=y
-+CONFIG_EEPROM_AT24=y
- CONFIG_BLK_DEV_SD=y
- CONFIG_BLK_DEV_SR=y
- CONFIG_SCSI_MULTI_LUN=y
--- 
-1.8.1.5
+Given that these power domains are actually used as the domains for
+some of the System MMU nodes I don't totally object to adding them in
+the same patch, but if they're breaking things then I agree that we
+could leave them out and add them in a later patch (once issues are
+sorted out).
+
+-Doug
