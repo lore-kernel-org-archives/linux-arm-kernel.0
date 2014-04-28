@@ -1,321 +1,47 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 28 Apr 2014 16:40:39 -0700
-Subject: [PATCH 5/7] clk: sunxi: add PRCM (Power/Reset/Clock Management)
- clks support
-In-Reply-To: <1398697130-8338-6-git-send-email-boris.brezillon@free-electrons.com>
-References: <1398697130-8338-1-git-send-email-boris.brezillon@free-electrons.com>
- <1398697130-8338-6-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20140428234039.GT3134@lukather>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 28 Apr 2014 18:51:18 -0500
+Subject: [PATCH] arm64: fixmap: fix missing sub-page offset for earlyprintk
+In-Reply-To: <1398711006-14943-1-git-send-email-marc.zyngier@arm.com>
+References: <1398711006-14943-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <CAL_JsqLwhkSR42CeOcnAC-C43O9fbrXdcTnNrkov5hq9t3_Usg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 04:58:48PM +0200, Boris BREZILLON wrote:
-> The PRCM (Power/Reset/Clock Management) unit provides several clock
-> devices:
-> - AR100 clk: used to clock the Power Management co-processor
-> - AHB0 clk: used to clock the AHB0 bus
-> - APB0 clk and gates: used to clk
-
-Used to clk?
-
-> 
-> Add support for these clks in a separate driver so that they can be probed
-> as platform devices instead of registered during early init.
-> We need this to be able to probe PRCM MFD subdevices.
-> 
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+On Mon, Apr 28, 2014 at 1:50 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> Commit d57c33c5daa4 (add generic fixmap.h) added (among other
+> similar things) set_fixmap_io to deal with early ioremap of devices.
+>
+> More recently, commit bf4b558eba92 (arm64: add early_ioremap support)
+> converted the arm64 earlyprintk to use set_fixmap_io. A side effect of
+> this conversion is that my virtual machines have stopped booting when
+> I pass "earlyprintk=uart8250-8bit,0x3f8" to the guest kernel.
+>
+> Turns out that the new earlyprintk code doesn't care at all about
+> sub-page offsets, and just assumes that the earlyprintk device will
+> be page-aligned. Obviously, that doesn't play well with the above example.
+>
+> Further investigation shows that set_fixmap_io uses __set_fixmap instead
+> of __set_fixmap_offset. A fix is to introduce a set_fixmap_offset_io that
+> uses the latter, and to remove the superflous call to fix_to_virt
+> (which only returns the value that set_fixmap_io has already given us).
+>
+> With this applied, my VMs are back in business. Tested on a Cortex-A57
+> platform with kvmtool as platform emulation.
+>
+> Cc: Mark Salter <msalter@redhat.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  drivers/clk/sunxi/Makefile         |   2 +
->  drivers/clk/sunxi/clk-sun6i-prcm.c | 253 +++++++++++++++++++++++++++++++++++++
->  2 files changed, 255 insertions(+)
->  create mode 100644 drivers/clk/sunxi/clk-sun6i-prcm.c
-> 
-> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-> index b5bac91..ef8cdc9 100644
-> --- a/drivers/clk/sunxi/Makefile
-> +++ b/drivers/clk/sunxi/Makefile
-> @@ -3,3 +3,5 @@
->  #
->  
->  obj-y += clk-sunxi.o clk-factors.o
-> +
-> +obj-$(CONFIG_MFD_SUN6I_PRCM) += clk-sun6i-prcm.o
-> diff --git a/drivers/clk/sunxi/clk-sun6i-prcm.c b/drivers/clk/sunxi/clk-sun6i-prcm.c
-> new file mode 100644
-> index 0000000..bb7b25a
-> --- /dev/null
-> +++ b/drivers/clk/sunxi/clk-sun6i-prcm.c
-> @@ -0,0 +1,253 @@
-> +/*
-> + * Copyright (C) 2014 Free Electrons
-> + *
-> + * License Terms: GNU General Public License v2
-> + * Author: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> + *
-> + * Allwinner PRCM (Power/Reset/Clock Management) driver
-> + *
-> + */
-> +
-> +#include <linux/clk-provider.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/platform_device.h>
-> +
-> +#define SUN6I_APB0_GATES_MAX_SIZE	32
-> +#define SUN6I_AR100_MAX_PARENTS		4
-> +
-> +static int sun6i_a31_ar100_mux_clk_register(struct platform_device *pdev)
-> +{
-> +	const char *parents[SUN6I_AR100_MAX_PARENTS];
-> +	struct device_node *np = pdev->dev.of_node;
-> +	const char *clk_name = np->name;
-> +	struct resource *r;
-> +	void __iomem *reg;
-> +	struct clk *clk;
-> +	int nparents;
-> +	int i;
-> +
-> +	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	reg = devm_ioremap(&pdev->dev, r->start, resource_size(r));
-> +	if (IS_ERR(reg))
-> +		return PTR_ERR(reg);
+>  arch/arm64/kernel/early_printk.c | 6 ++----
+>  include/asm-generic/fixmap.h     | 3 +++
+>  2 files changed, 5 insertions(+), 4 deletions(-)
 
-devm_ioremap returns NULL on error, and not an error pointer.
+This will be fixed already in 3.16 with my earlycon series[1] if this
+is not taken for 3.15.
 
-> +
-> +	nparents = of_clk_get_parent_count(np);
-> +	if (nparents > SUN6I_AR100_MAX_PARENTS)
-> +		nparents = SUN6I_AR100_MAX_PARENTS;
-> +
-> +	for (i = 0; i < nparents; i++)
-> +		parents[i] = of_clk_get_parent_name(np, i);
-> +
-> +	of_property_read_string(np, "clock-output-names", &clk_name);
-> +
-> +	clk = clk_register_mux(&pdev->dev, clk_name, parents, nparents,
-> +			       CLK_SET_RATE_NO_REPARENT, reg,
-> +			       16, 2, 0, NULL);
-> +	if (IS_ERR(clk))
-> +		return PTR_ERR(clk);
-> +
-> +	return of_clk_add_provider(np, of_clk_src_simple_get, clk);
-> +}
-> +
-> +static int sun6i_a31_ar100_clk_register(struct platform_device *pdev)
-> +{
-> +	struct device_node *np = pdev->dev.of_node;
-> +	const char *clk_name = np->name;
-> +	const char *clk_parent;
-> +	struct resource *r;
-> +	void __iomem *reg;
-> +	struct clk *clk;
-> +
-> +	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	reg = devm_ioremap(&pdev->dev, r->start, resource_size(r));
-> +	if (IS_ERR(reg))
-> +		return PTR_ERR(reg);
+Probably still a good addition for fixmap.
 
-Ditto.
+Rob
 
-And you'll probably want to use devm_ioremap_resource when you'll have
-a single clock for the AR100.
-
-> +
-> +	clk_parent = of_clk_get_parent_name(np, 0);
-> +	if (!clk_parent)
-> +		return -EINVAL;
-> +
-> +	of_property_read_string(np, "clock-output-names", &clk_name);
-> +
-> +	clk = clk_register_divider(&pdev->dev, clk_name, clk_parent,
-> +				   0, reg, 4, 2, CLK_DIVIDER_POWER_OF_TWO,
-> +				   NULL);
-> +	if (IS_ERR(clk))
-> +		return PTR_ERR(clk);
-> +
-> +	return of_clk_add_provider(np, of_clk_src_simple_get, clk);
-> +}
-> +
-> +static int sun6i_a31_ar100_div_clk_register(struct platform_device *pdev)
-> +{
-> +	struct device_node *np = pdev->dev.of_node;
-> +	const char *clk_name = np->name;
-> +	const char *clk_parent;
-> +	struct resource *r;
-> +	void __iomem *reg;
-> +	struct clk *clk;
-> +
-> +	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	reg = devm_ioremap(&pdev->dev, r->start, resource_size(r));
-> +	if (IS_ERR(reg))
-> +		return PTR_ERR(reg);
-> +
-> +	clk_parent = of_clk_get_parent_name(np, 0);
-> +	if (!clk_parent)
-> +		return -EINVAL;
-> +
-> +	of_property_read_string(np, "clock-output-names", &clk_name);
-> +
-> +	clk = clk_register_divider(&pdev->dev, clk_name, clk_parent,
-> +				   0, reg, 8, 5, 0, NULL);
-> +	if (IS_ERR(clk))
-> +		return PTR_ERR(clk);
-> +
-> +	return of_clk_add_provider(np, of_clk_src_simple_get, clk);
-> +}
-> +
-> +static int sun6i_a31_apb0_clk_register(struct platform_device *pdev)
-> +{
-> +	struct device_node *np = pdev->dev.of_node;
-> +	const char *clk_name = np->name;
-> +	const char *clk_parent;
-> +	struct resource *r;
-> +	void __iomem *reg;
-> +	struct clk *clk;
-> +
-> +	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	reg = devm_ioremap_resource(&pdev->dev, r);
-> +	if (IS_ERR(reg))
-> +		return PTR_ERR(reg);
-> +
-> +	clk_parent = of_clk_get_parent_name(np, 0);
-> +	if (!clk_parent)
-> +		return -EINVAL;
-> +
-> +	of_property_read_string(np, "clock-output-names", &clk_name);
-> +
-> +	clk = clk_register_divider(&pdev->dev, clk_name, clk_parent,
-> +				   0, reg, 0, 2, CLK_DIVIDER_POWER_OF_TWO,
-> +				   NULL);
-> +	if (IS_ERR(clk))
-> +		return PTR_ERR(clk);
-> +
-> +	return of_clk_add_provider(np, of_clk_src_simple_get, clk);
-> +}
-> +
-> +static int sun6i_a31_apb0_gates_clk_register(struct platform_device *pdev)
-> +{
-> +	struct device_node *np = pdev->dev.of_node;
-> +	struct clk_onecell_data *clk_data;
-> +	const char *clk_parent;
-> +	const char *clk_name;
-> +	struct resource *r;
-> +	void __iomem *reg;
-> +	int gate_id;
-> +	int ngates;
-> +	int i;
-> +
-> +	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	reg = devm_ioremap_resource(&pdev->dev, r);
-> +	if (!reg)
-> +		return PTR_ERR(reg);
-> +
-> +	clk_parent = of_clk_get_parent_name(np, 0);
-> +	if (!clk_parent)
-> +		return -EINVAL;
-> +
-> +	ngates = of_property_count_strings(np, "clock-output-names");
-> +	if (ngates < 0)
-> +		return ngates;
-> +
-> +	if (!ngates || ngates > SUN6I_APB0_GATES_MAX_SIZE)
-> +		return -EINVAL;
-> +
-> +	clk_data = devm_kzalloc(&pdev->dev, sizeof(struct clk_onecell_data),
-> +				GFP_KERNEL);
-> +	if (!clk_data)
-> +		return -ENOMEM;
-> +
-> +	clk_data->clks = devm_kzalloc(&pdev->dev,
-> +				      SUN6I_APB0_GATES_MAX_SIZE *
-> +				      sizeof(struct clk *),
-> +				      GFP_KERNEL);
-> +	if (!clk_data->clks)
-> +		return -ENOMEM;
-> +
-> +	for (i = 0; i < ngates; i++) {
-> +		of_property_read_string_index(np, "clock-output-names",
-> +					      i, &clk_name);
-> +
-> +		gate_id = i;
-> +		of_property_read_u32_index(np, "clock-indices", i, &gate_id);
-> +
-> +		WARN_ON(gate_id >= SUN6I_APB0_GATES_MAX_SIZE);
-> +		if (gate_id >= SUN6I_APB0_GATES_MAX_SIZE)
-> +			continue;
-> +
-> +		clk_data->clks[gate_id] = clk_register_gate(&pdev->dev,
-> +							    clk_name,
-> +							    clk_parent, 0,
-> +							    reg, gate_id,
-> +							    0, NULL);
-> +		WARN_ON(IS_ERR(clk_data->clks[gate_id]));
-> +	}
-> +
-> +	clk_data->clk_num = ngates;
-> +
-> +	return of_clk_add_provider(np, of_clk_src_onecell_get, clk_data);
-> +}
-> +
-> +const struct of_device_id sun6i_a31_prcm_clk_dt_ids[] = {
-> +	{
-> +		.compatible = "allwinner,sun6i-a31-ar100-mux-clk",
-> +		.data = sun6i_a31_ar100_mux_clk_register,
-> +	},
-> +	{
-> +		.compatible = "allwinner,sun6i-a31-ar100-clk",
-> +		.data = sun6i_a31_ar100_clk_register,
-> +	},
-> +	{
-> +		.compatible = "allwinner,sun6i-a31-ar100-div-clk",
-> +		.data = sun6i_a31_ar100_div_clk_register,
-> +	},
-> +	{
-> +		.compatible = "allwinner,sun6i-a31-apb0-clk",
-> +		.data = sun6i_a31_apb0_clk_register,
-> +	},
-> +	{
-> +		.compatible = "allwinner,sun6i-a31-apb0-gates-clk",
-> +		.data = sun6i_a31_apb0_gates_clk_register,
-> +	},
-> +	{ /* sentinel */ }
-> +};
-> +
-> +static int sun6i_a31_prcm_clk_probe(struct platform_device *pdev)
-> +{
-> +	struct device_node *np = pdev->dev.of_node;
-> +	int (*register_func)(struct platform_device *pdev);
-> +	const struct of_device_id *match;
-> +
-> +	match = of_match_node(sun6i_a31_prcm_clk_dt_ids, np);
-> +	if (!match)
-> +		return -EINVAL;
-> +
-> +	register_func = match->data;
-> +	return register_func(pdev);
-> +}
-> +
-> +static struct platform_driver sun6i_a31_prcm_clk_driver = {
-> +	.driver = {
-> +		.name = "sun6i-a31-prcm-clk",
-> +		.owner = THIS_MODULE,
-> +		.of_match_table = sun6i_a31_prcm_clk_dt_ids,
-> +	},
-> +	.probe = sun6i_a31_prcm_clk_probe,
-
-You're not calling the of_clk_del_provider, and you should probably
-unregister your clocks too.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140428/bbe71c49/attachment-0001.sig>
+[1] https://lkml.org/lkml/2014/4/18/573
