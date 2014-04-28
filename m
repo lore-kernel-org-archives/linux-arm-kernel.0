@@ -1,102 +1,256 @@
-From: javi.merino@arm.com (Javi Merino)
-Date: Mon, 28 Apr 2014 11:55:11 +0100
-Subject: [PATCH] ARM: dts: Remove vmmc-supply for mmc@12220000 on
- arndale-octa board
-In-Reply-To: <CAK9yfHz5bkyTUr3Y=q8msuY_ciAjv5=n7dtf7DhTwgDxntOMNQ@mail.gmail.com>
-References: <1398456672-3936-1-git-send-email-javi.merino@arm.com>
- <535AC29E.8010905@gmail.com>
- <20140425203051.GD3027@e102654-lin.cambridge.arm.com>
- <535AC717.40805@gmail.com>
- <20140425204135.GF3027@e102654-lin.cambridge.arm.com>
- <0b5c01cf6141$687f5ea0$397e1be0$@samsung.com>
- <CAK9yfHz5bkyTUr3Y=q8msuY_ciAjv5=n7dtf7DhTwgDxntOMNQ@mail.gmail.com>
-Message-ID: <20140428105511.GA17293@e102654-lin.cambridge.arm.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Mon, 28 Apr 2014 12:54:49 +0200
+Subject: [PATCH v4 08/17] ASoC: fsl-ssi: introduce SoC specific data
+In-Reply-To: <1398682498-24357-1-git-send-email-mpa@pengutronix.de>
+References: <1398682498-24357-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1398682498-24357-9-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sachin,
+From: Sascha Hauer <s.hauer@pengutronix.de>
 
-On Mon, Apr 28, 2014 at 05:30:19AM +0100, Sachin Kamat wrote:
-> On 26 April 2014 16:49, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > Javi Merino wrote:
-> >>
-> >> On Fri, Apr 25, 2014 at 09:35:35PM +0100, Tomasz Figa wrote:
-> >> > On 25.04.2014 22:30, Javi Merino wrote:
-> >> > > On Fri, Apr 25, 2014 at 09:16:30PM +0100, Tomasz Figa wrote:
-> >> > >> On 25.04.2014 22:11, Javi Merino wrote:
-> >> > >>> d726ca2d3316 (ARM: dts: Add vmmc-supply to MMC on arndale-octa board)
-> >> > >>> added the vmmc-supply to nodes mmc at 12200000 and mmc at 12220000 of the
-> >> > >>> DT.  However, this makes the kernel fail to boot on the arndale-octa
-> >> > >>> spews:
-> >> > >>>
-> >> > >>> [    5.060000] dwmmc_exynos 12200000.mmc: num-slots property not
-> >> found, assuming 1 slot is available
-> >> > >>> [    5.065000] platform 12200000.mmc: Driver dwmmc_exynos requests
-> >> probe deferral
-> >> > >>> [    5.075000] dwmmc_exynos 12220000.mmc: num-slots property not
-> >> found, assuming 1 slot is available
-> >> > >>> [    5.085000] platform 12220000.mmc: Driver dwmmc_exynos requests
-> >> probe deferral
-> >> > >>>
-> >> > >>> And eventually hangs.  Without the vmmc-supply property in the
-> >> > >>> mmc at 12220000 node, the kernel boots again.
-> >> > >>>
-> >> > >>> Signed-off-by: Javi Merino <javi.merino@arm.com>
-> >> > >>> ---
-> >> > >>>
-> >> > >>> Hi,
-> >> > >>>
-> >> > >>> Note that I don't know *why* removing the property works, all I know
-> >> > >>> is that 3.15-rc2 fails to boot on my Arndale Octa unless I apply
-> >> this
-> >> > >>> patch.
-> >> > >>
-> >> > >> Are you sure you have the required PMIC driver enabled in your kernel
-> >> > >> config?
-> >> > >
-> >> > > I configured the kernel using exynos_defconfig and that gives me:
-> >> > >
-> >> > > # CONFIG_PMIC_ADP5520 is not set
-> >> > > # CONFIG_PMIC_DA903X is not set
-> >> > >
-> >> > > Should I be using other defconfig for this board?  exynos_defconfig
-> >> > > used to work in 3.14.  Cheers,
-> >> >
-> >> > Well, unfortunately exynos_defconfig is known to be far from being
-> >> > reasonable. Right now it should be considered just as a base to
-> >> > configure the kernel for Exynos SoCs. Most of board specific options
-> >> > (and many of SoC-wide ones) need to be selected manually.
-> >> >
-> >> > Anyway, with the number of Exynos boards supported in mainline, I don't
-> >> > think we will be ever going to enable all options for all the supported
-> >> > boards by default in defconfig, especially considering the fact that we
-> >> > will be moving to generic multi_v7_defconfig and likely dropping
-> >> > exynos_defconfig completely.
-> >
-> > Well, keeping exynos_defconfig would be helpful even if exynos multiplatform is available. Please see the case of omap2plus_defconfig?
-> >
-> >> >
-> >> > As for now, I believe you should just make sure yourself that any
-> >> > options relevant to your board are enabled.
-> >>
-> >> Great.  And I assume that there isn't a list of those options in the
-> >> web.  So how do I know what options are relevant to my board?  By
-> >> sending emails to linux-samsung-soc whenever it fails to boot?
-> >>
-> > I think, we need to enable all of regarding configs for each exynos boards so that exynos_defconfig can cover whenever.
-> 
-> You need the following patch to mount the MMC. Without this the regulator will
-> not be enabled which is required by MMC.
-> 
-> ARM: exynos_defconfig: Enable HS-I2C
-> http://permalink.gmane.org/gmane.linux.kernel.samsung-soc/27527
+Introduce a SoC data struct which contains the differences between
+the different SoCs this driver supports. This makes it easy to support
+more differences without having to introduce a new switch/case each
+time.
 
-Yes, that's the bit that I was missing.  With that patch 3.15-rc2
-boots on my Arndale Octa.
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ sound/soc/fsl/fsl_ssi.c | 125 ++++++++++++++++++++++--------------------------
+ 1 file changed, 57 insertions(+), 68 deletions(-)
 
-> Kukjin, can you please apply this patch?
-
-You can add my Tested-by for Arndale Octa.
-
-Thanks!
-Javi
+diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
+index 794f25f..f2255cb 100644
+--- a/sound/soc/fsl/fsl_ssi.c
++++ b/sound/soc/fsl/fsl_ssi.c
+@@ -132,6 +132,12 @@ struct fsl_ssi_rxtx_reg_val {
+ 	struct fsl_ssi_reg_val tx;
+ };
+ 
++struct fsl_ssi_soc_data {
++	bool imx;
++	bool offline_config;
++	u32 sisr_write_mask;
++};
++
+ /**
+  * fsl_ssi_private: per-SSI private data
+  *
+@@ -153,7 +159,6 @@ struct fsl_ssi_private {
+ 	struct platform_device *pdev;
+ 	unsigned int dai_fmt;
+ 
+-	enum fsl_ssi_type hw_type;
+ 	bool use_dma;
+ 	bool baudclk_locked;
+ 	bool use_dual_fifo;
+@@ -168,35 +173,9 @@ struct fsl_ssi_private {
+ 	struct fsl_ssi_rxtx_reg_val rxtx_reg_val;
+ 
+ 	struct fsl_ssi_dbg dbg_stats;
+-};
+ 
+-static const struct of_device_id fsl_ssi_ids[] = {
+-	{ .compatible = "fsl,mpc8610-ssi", .data = (void *) FSL_SSI_MCP8610},
+-	{ .compatible = "fsl,imx51-ssi", .data = (void *) FSL_SSI_MX51},
+-	{ .compatible = "fsl,imx35-ssi", .data = (void *) FSL_SSI_MX35},
+-	{ .compatible = "fsl,imx21-ssi", .data = (void *) FSL_SSI_MX21},
+-	{}
++	const struct fsl_ssi_soc_data *soc;
+ };
+-MODULE_DEVICE_TABLE(of, fsl_ssi_ids);
+-
+-static bool fsl_ssi_is_ac97(struct fsl_ssi_private *ssi_private)
+-{
+-	return !!(ssi_private->dai_fmt & SND_SOC_DAIFMT_AC97);
+-}
+-
+-static bool fsl_ssi_on_imx(struct fsl_ssi_private *ssi_private)
+-{
+-	switch (ssi_private->hw_type) {
+-	case FSL_SSI_MX21:
+-	case FSL_SSI_MX35:
+-	case FSL_SSI_MX51:
+-		return true;
+-	case FSL_SSI_MCP8610:
+-		return false;
+-	}
+-
+-	return false;
+-}
+ 
+ /*
+  * imx51 and later SoCs have a slightly different IP that allows the
+@@ -213,18 +192,48 @@ static bool fsl_ssi_on_imx(struct fsl_ssi_private *ssi_private)
+  * while the SSI unit is running (SSIEN). So we support the necessary
+  * online configuration of fsl-ssi starting at imx51.
+  */
+-static bool fsl_ssi_offline_config(struct fsl_ssi_private *ssi_private)
+-{
+-	switch (ssi_private->hw_type) {
+-	case FSL_SSI_MCP8610:
+-	case FSL_SSI_MX21:
+-	case FSL_SSI_MX35:
+-		return true;
+-	case FSL_SSI_MX51:
+-		return false;
+-	}
+ 
+-	return true;
++static struct fsl_ssi_soc_data fsl_ssi_mpc8610 = {
++	.imx = false,
++	.offline_config = true,
++	.sisr_write_mask = CCSR_SSI_SISR_RFRC | CCSR_SSI_SISR_TFRC |
++			CCSR_SSI_SISR_ROE0 | CCSR_SSI_SISR_ROE1 |
++			CCSR_SSI_SISR_TUE0 | CCSR_SSI_SISR_TUE1,
++};
++
++static struct fsl_ssi_soc_data fsl_ssi_imx21 = {
++	.imx = true,
++	.offline_config = true,
++	.sisr_write_mask = 0,
++};
++
++static struct fsl_ssi_soc_data fsl_ssi_imx35 = {
++	.imx = true,
++	.offline_config = true,
++	.sisr_write_mask = CCSR_SSI_SISR_RFRC | CCSR_SSI_SISR_TFRC |
++			CCSR_SSI_SISR_ROE0 | CCSR_SSI_SISR_ROE1 |
++			CCSR_SSI_SISR_TUE0 | CCSR_SSI_SISR_TUE1,
++};
++
++static struct fsl_ssi_soc_data fsl_ssi_imx51 = {
++	.imx = true,
++	.offline_config = false,
++	.sisr_write_mask = CCSR_SSI_SISR_ROE0 | CCSR_SSI_SISR_ROE1 |
++		CCSR_SSI_SISR_TUE0 | CCSR_SSI_SISR_TUE1,
++};
++
++static const struct of_device_id fsl_ssi_ids[] = {
++	{ .compatible = "fsl,mpc8610-ssi", .data = &fsl_ssi_mpc8610 },
++	{ .compatible = "fsl,imx51-ssi", .data = &fsl_ssi_imx51 },
++	{ .compatible = "fsl,imx35-ssi", .data = &fsl_ssi_imx35 },
++	{ .compatible = "fsl,imx21-ssi", .data = &fsl_ssi_imx21 },
++	{}
++};
++MODULE_DEVICE_TABLE(of, fsl_ssi_ids);
++
++static bool fsl_ssi_is_ac97(struct fsl_ssi_private *ssi_private)
++{
++	return !!(ssi_private->dai_fmt & SND_SOC_DAIFMT_AC97);
+ }
+ 
+ /**
+@@ -245,25 +254,6 @@ static irqreturn_t fsl_ssi_isr(int irq, void *dev_id)
+ 	struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
+ 	__be32 sisr;
+ 	__be32 sisr2;
+-	__be32 sisr_write_mask = 0;
+-
+-	switch (ssi_private->hw_type) {
+-	case FSL_SSI_MX21:
+-		sisr_write_mask = 0;
+-		break;
+-
+-	case FSL_SSI_MCP8610:
+-	case FSL_SSI_MX35:
+-		sisr_write_mask = CCSR_SSI_SISR_RFRC | CCSR_SSI_SISR_TFRC |
+-			CCSR_SSI_SISR_ROE0 | CCSR_SSI_SISR_ROE1 |
+-			CCSR_SSI_SISR_TUE0 | CCSR_SSI_SISR_TUE1;
+-		break;
+-
+-	case FSL_SSI_MX51:
+-		sisr_write_mask = CCSR_SSI_SISR_ROE0 | CCSR_SSI_SISR_ROE1 |
+-			CCSR_SSI_SISR_TUE0 | CCSR_SSI_SISR_TUE1;
+-		break;
+-	}
+ 
+ 	/* We got an interrupt, so read the status register to see what we
+ 	   were interrupted for.  We mask it with the Interrupt Enable register
+@@ -271,7 +261,7 @@ static irqreturn_t fsl_ssi_isr(int irq, void *dev_id)
+ 	 */
+ 	sisr = read_ssi(&ssi->sisr);
+ 
+-	sisr2 = sisr & sisr_write_mask;
++	sisr2 = sisr & ssi_private->soc->sisr_write_mask;
+ 	/* Clear the bits that we set */
+ 	if (sisr2)
+ 		write_ssi(sisr2, &ssi->sisr);
+@@ -359,7 +349,7 @@ static void fsl_ssi_config(struct fsl_ssi_private *ssi_private, bool enable,
+ 	 * reconfiguration, so we have to enable all necessary flags at once
+ 	 * even if we do not use them later (capture and playback configuration)
+ 	 */
+-	if (fsl_ssi_offline_config(ssi_private)) {
++	if (ssi_private->soc->offline_config) {
+ 		if ((enable && !nr_active_streams) ||
+ 				(!enable && !keep_active))
+ 			fsl_ssi_rxtx_config(ssi_private, enable);
+@@ -910,7 +900,7 @@ static int fsl_ssi_dai_probe(struct snd_soc_dai *dai)
+ {
+ 	struct fsl_ssi_private *ssi_private = snd_soc_dai_get_drvdata(dai);
+ 
+-	if (fsl_ssi_on_imx(ssi_private) && ssi_private->use_dma) {
++	if (ssi_private->soc->imx && ssi_private->use_dma) {
+ 		dai->playback_dma_data = &ssi_private->dma_params_tx;
+ 		dai->capture_dma_data = &ssi_private->dma_params_rx;
+ 	}
+@@ -1136,7 +1126,6 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 	int ret = 0;
+ 	struct device_node *np = pdev->dev.of_node;
+ 	const struct of_device_id *of_id;
+-	enum fsl_ssi_type hw_type;
+ 	const char *p, *sprop;
+ 	const uint32_t *iprop;
+ 	struct resource res;
+@@ -1151,9 +1140,8 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 		return -ENODEV;
+ 
+ 	of_id = of_match_device(fsl_ssi_ids, &pdev->dev);
+-	if (!of_id)
++	if (!of_id || !of_id->data)
+ 		return -EINVAL;
+-	hw_type = (enum fsl_ssi_type) of_id->data;
+ 
+ 	sprop = of_get_property(np, "fsl,mode", NULL);
+ 	if (!sprop) {
+@@ -1170,9 +1158,10 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 	}
+ 
++	ssi_private->soc = of_id->data;
++
+ 	ssi_private->use_dma = !of_property_read_bool(np,
+ 			"fsl,fiq-stream-filter");
+-	ssi_private->hw_type = hw_type;
+ 
+ 	if (ac97) {
+ 		memcpy(&ssi_private->cpu_dai_drv, &fsl_ssi_ac97_dai,
+@@ -1227,7 +1216,7 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 
+ 	dev_set_drvdata(&pdev->dev, ssi_private);
+ 
+-	if (fsl_ssi_on_imx(ssi_private)) {
++	if (ssi_private->soc->imx) {
+ 		ret = fsl_ssi_imx_probe(pdev, ssi_private, ssi_private->ssi);
+ 		if (ret)
+ 			goto error_irqmap;
+@@ -1294,7 +1283,7 @@ error_irq:
+ 	snd_soc_unregister_component(&pdev->dev);
+ 
+ error_asoc_register:
+-	if (fsl_ssi_on_imx(ssi_private))
++	if (ssi_private->soc->imx)
+ 		fsl_ssi_imx_clean(pdev, ssi_private);
+ 
+ error_irqmap:
+@@ -1314,7 +1303,7 @@ static int fsl_ssi_remove(struct platform_device *pdev)
+ 		platform_device_unregister(ssi_private->pdev);
+ 	snd_soc_unregister_component(&pdev->dev);
+ 
+-	if (fsl_ssi_on_imx(ssi_private))
++	if (ssi_private->soc->imx)
+ 		fsl_ssi_imx_clean(pdev, ssi_private);
+ 
+ 	if (ssi_private->use_dma)
+-- 
+1.9.1
