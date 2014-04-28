@@ -1,112 +1,279 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 28 Apr 2014 20:29:10 +0100
-Subject: [PATCH 35/97] ARM: l2c: convert Broadcom L2C-310 to new code
+Date: Mon, 28 Apr 2014 20:29:15 +0100
+Subject: [PATCH 36/97] ARM: l2c: remove obsolete l2x0 ops for non-OF init
 In-Reply-To: <20140428192419.GV26756@n2100.arm.linux.org.uk>
 References: <20140428192419.GV26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WerEk-0001Vh-MV@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WerEp-0001Vm-Q9@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Broadcom L2C-310 devices use ARMs L2C-310 R2P3 or later.  These
-require no errata workarounds, and so we can directly call the l2c210
-functions from their methods.
+non-OF initialisation has never been used with any cache controller
+which isn't an ARM cache controller, so we can safely get rid of the
+old (and buggy) l2x0_*-based operations structure.
+
+This is also the last reference to:
+- l2x0_clean_line()
+- l2x0_inv_line()
+- l2x0_flush_line()
+- l2x0_flush_all()
+- l2x0_clean_all()
+- l2x0_inv_all()
+- l2x0_inv_range()
+- l2x0_clean_range()
+- l2x0_flush_range()
+- l2x0_enable()
+- l2x0_resume()
+so kill those functions too.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mm/cache-l2x0.c | 27 +++++++++++----------------
- 1 file changed, 11 insertions(+), 16 deletions(-)
+ arch/arm/mm/cache-l2x0.c | 206 -----------------------------------------------
+ 1 file changed, 206 deletions(-)
 
 diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 751c3d7a22b3..57680e03da84 100644
+index 57680e03da84..c5d754912f96 100644
 --- a/arch/arm/mm/cache-l2x0.c
 +++ b/arch/arm/mm/cache-l2x0.c
-@@ -1360,16 +1360,16 @@ static void bcm_inv_range(unsigned long start, unsigned long end)
- 
- 	/* normal case, no cross section between start and end */
- 	if (likely(bcm_addr_is_sys_emi(end) || !bcm_addr_is_sys_emi(start))) {
--		l2x0_inv_range(new_start, new_end);
-+		l2c210_inv_range(new_start, new_end);
- 		return;
- 	}
- 
- 	/* They cross sections, so it can only be a cross from section
- 	 * 2 to section 3
- 	 */
--	l2x0_inv_range(new_start,
-+	l2c210_inv_range(new_start,
- 		bcm_l2_phys_addr(BCM_VC_EMI_SEC3_START_ADDR-1));
--	l2x0_inv_range(bcm_l2_phys_addr(BCM_VC_EMI_SEC3_START_ADDR),
-+	l2c210_inv_range(bcm_l2_phys_addr(BCM_VC_EMI_SEC3_START_ADDR),
- 		new_end);
+@@ -134,20 +134,6 @@ static inline void cache_sync(void)
+ 	cache_wait(base + L2X0_CACHE_SYNC, 1);
  }
  
-@@ -1382,26 +1382,21 @@ static void bcm_clean_range(unsigned long start, unsigned long end)
- 	if (unlikely(end <= start))
- 		return;
+-static inline void l2x0_clean_line(unsigned long addr)
+-{
+-	void __iomem *base = l2x0_base;
+-	cache_wait(base + L2X0_CLEAN_LINE_PA, 1);
+-	writel_relaxed(addr, base + L2X0_CLEAN_LINE_PA);
+-}
+-
+-static inline void l2x0_inv_line(unsigned long addr)
+-{
+-	void __iomem *base = l2x0_base;
+-	cache_wait(base + L2X0_INV_LINE_PA, 1);
+-	writel_relaxed(addr, base + L2X0_INV_LINE_PA);
+-}
+-
+ #if defined(CONFIG_PL310_ERRATA_588369) || defined(CONFIG_PL310_ERRATA_727915)
+ static inline void debug_writel(unsigned long val)
+ {
+@@ -161,27 +147,6 @@ static inline void debug_writel(unsigned long val)
+ }
+ #endif
  
+-#ifdef CONFIG_PL310_ERRATA_588369
+-static inline void l2x0_flush_line(unsigned long addr)
+-{
+-	void __iomem *base = l2x0_base;
+-
+-	/* Clean by PA followed by Invalidate by PA */
+-	cache_wait(base + L2X0_CLEAN_LINE_PA, 1);
+-	writel_relaxed(addr, base + L2X0_CLEAN_LINE_PA);
+-	cache_wait(base + L2X0_INV_LINE_PA, 1);
+-	writel_relaxed(addr, base + L2X0_INV_LINE_PA);
+-}
+-#else
+-
+-static inline void l2x0_flush_line(unsigned long addr)
+-{
+-	void __iomem *base = l2x0_base;
+-	cache_wait(base + L2X0_CLEAN_INV_LINE_PA, 1);
+-	writel_relaxed(addr, base + L2X0_CLEAN_INV_LINE_PA);
+-}
+-#endif
+-
+ static void l2x0_cache_sync(void)
+ {
+ 	unsigned long flags;
+@@ -209,131 +174,6 @@ static void l2x0_flush_all(void)
+ 	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+ }
+ 
+-static void l2x0_clean_all(void)
+-{
+-	unsigned long flags;
+-
+-	/* clean all ways */
+-	raw_spin_lock_irqsave(&l2x0_lock, flags);
+-	__l2c_op_way(l2x0_base + L2X0_CLEAN_WAY);
+-	cache_sync();
+-	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+-}
+-
+-static void l2x0_inv_all(void)
+-{
+-	unsigned long flags;
+-
+-	/* invalidate all ways */
+-	raw_spin_lock_irqsave(&l2x0_lock, flags);
+-	/* Invalidating when L2 is enabled is a nono */
+-	BUG_ON(readl(l2x0_base + L2X0_CTRL) & L2X0_CTRL_EN);
+-	__l2c_op_way(l2x0_base + L2X0_INV_WAY);
+-	cache_sync();
+-	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+-}
+-
+-static void l2x0_inv_range(unsigned long start, unsigned long end)
+-{
+-	void __iomem *base = l2x0_base;
+-	unsigned long flags;
+-
+-	raw_spin_lock_irqsave(&l2x0_lock, flags);
+-	if (start & (CACHE_LINE_SIZE - 1)) {
+-		start &= ~(CACHE_LINE_SIZE - 1);
+-		debug_writel(0x03);
+-		l2x0_flush_line(start);
+-		debug_writel(0x00);
+-		start += CACHE_LINE_SIZE;
+-	}
+-
+-	if (end & (CACHE_LINE_SIZE - 1)) {
+-		end &= ~(CACHE_LINE_SIZE - 1);
+-		debug_writel(0x03);
+-		l2x0_flush_line(end);
+-		debug_writel(0x00);
+-	}
+-
+-	while (start < end) {
+-		unsigned long blk_end = start + min(end - start, 4096UL);
+-
+-		while (start < blk_end) {
+-			l2x0_inv_line(start);
+-			start += CACHE_LINE_SIZE;
+-		}
+-
+-		if (blk_end < end) {
+-			raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+-			raw_spin_lock_irqsave(&l2x0_lock, flags);
+-		}
+-	}
+-	cache_wait(base + L2X0_INV_LINE_PA, 1);
+-	cache_sync();
+-	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+-}
+-
+-static void l2x0_clean_range(unsigned long start, unsigned long end)
+-{
+-	void __iomem *base = l2x0_base;
+-	unsigned long flags;
+-
 -	if ((end - start) >= l2x0_size) {
 -		l2x0_clean_all();
 -		return;
 -	}
 -
- 	new_start = bcm_l2_phys_addr(start);
- 	new_end = bcm_l2_phys_addr(end);
- 
- 	/* normal case, no cross section between start and end */
- 	if (likely(bcm_addr_is_sys_emi(end) || !bcm_addr_is_sys_emi(start))) {
--		l2x0_clean_range(new_start, new_end);
-+		l2c210_clean_range(new_start, new_end);
- 		return;
- 	}
- 
- 	/* They cross sections, so it can only be a cross from section
- 	 * 2 to section 3
- 	 */
--	l2x0_clean_range(new_start,
-+	l2c210_clean_range(new_start,
- 		bcm_l2_phys_addr(BCM_VC_EMI_SEC3_START_ADDR-1));
--	l2x0_clean_range(bcm_l2_phys_addr(BCM_VC_EMI_SEC3_START_ADDR),
-+	l2c210_clean_range(bcm_l2_phys_addr(BCM_VC_EMI_SEC3_START_ADDR),
- 		new_end);
- }
- 
-@@ -1415,7 +1410,7 @@ static void bcm_flush_range(unsigned long start, unsigned long end)
- 		return;
- 
- 	if ((end - start) >= l2x0_size) {
+-	raw_spin_lock_irqsave(&l2x0_lock, flags);
+-	start &= ~(CACHE_LINE_SIZE - 1);
+-	while (start < end) {
+-		unsigned long blk_end = start + min(end - start, 4096UL);
+-
+-		while (start < blk_end) {
+-			l2x0_clean_line(start);
+-			start += CACHE_LINE_SIZE;
+-		}
+-
+-		if (blk_end < end) {
+-			raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+-			raw_spin_lock_irqsave(&l2x0_lock, flags);
+-		}
+-	}
+-	cache_wait(base + L2X0_CLEAN_LINE_PA, 1);
+-	cache_sync();
+-	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+-}
+-
+-static void l2x0_flush_range(unsigned long start, unsigned long end)
+-{
+-	void __iomem *base = l2x0_base;
+-	unsigned long flags;
+-
+-	if ((end - start) >= l2x0_size) {
 -		l2x0_flush_all();
-+		outer_cache.flush_all();
- 		return;
- 	}
- 
-@@ -1424,24 +1419,24 @@ static void bcm_flush_range(unsigned long start, unsigned long end)
- 
- 	/* normal case, no cross section between start and end */
- 	if (likely(bcm_addr_is_sys_emi(end) || !bcm_addr_is_sys_emi(start))) {
--		l2x0_flush_range(new_start, new_end);
-+		l2c210_flush_range(new_start, new_end);
- 		return;
- 	}
- 
- 	/* They cross sections, so it can only be a cross from section
- 	 * 2 to section 3
- 	 */
--	l2x0_flush_range(new_start,
-+	l2c210_flush_range(new_start,
- 		bcm_l2_phys_addr(BCM_VC_EMI_SEC3_START_ADDR-1));
--	l2x0_flush_range(bcm_l2_phys_addr(BCM_VC_EMI_SEC3_START_ADDR),
-+	l2c210_flush_range(bcm_l2_phys_addr(BCM_VC_EMI_SEC3_START_ADDR),
- 		new_end);
+-		return;
+-	}
+-
+-	raw_spin_lock_irqsave(&l2x0_lock, flags);
+-	start &= ~(CACHE_LINE_SIZE - 1);
+-	while (start < end) {
+-		unsigned long blk_end = start + min(end - start, 4096UL);
+-
+-		debug_writel(0x03);
+-		while (start < blk_end) {
+-			l2x0_flush_line(start);
+-			start += CACHE_LINE_SIZE;
+-		}
+-		debug_writel(0x00);
+-
+-		if (blk_end < end) {
+-			raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+-			raw_spin_lock_irqsave(&l2x0_lock, flags);
+-		}
+-	}
+-	cache_wait(base + L2X0_CLEAN_INV_LINE_PA, 1);
+-	cache_sync();
+-	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+-}
+-
+ static void l2x0_disable(void)
+ {
+ 	unsigned long flags;
+@@ -345,49 +185,6 @@ static void l2x0_disable(void)
+ 	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
  }
  
-+/* Broadcom L2C-310 start from ARMs R3P2 or later, and require no fixups */
- static const struct l2c_init_data of_bcm_l2x0_data __initconst = {
- 	.num_lock = 8,
- 	.of_parse = l2c310_of_parse,
- 	.enable = l2c_enable,
--	.fixup = l2c310_fixup,
- 	.save  = l2c310_save,
- 	.outer_cache = {
- 		.inv_range   = bcm_inv_range,
+-static void l2x0_enable(void __iomem *base, u32 aux, unsigned num_lock)
+-{
+-	unsigned id;
+-
+-	id = readl_relaxed(base + L2X0_CACHE_ID) & L2X0_CACHE_ID_PART_MASK;
+-	if (id == L2X0_CACHE_ID_PART_L310)
+-		num_lock = 8;
+-	else
+-		num_lock = 1;
+-
+-	/* l2x0 controller is disabled */
+-	writel_relaxed(aux, base + L2X0_AUX_CTRL);
+-
+-	/* Make sure that I&D is not locked down when starting */
+-	l2c_unlock(base, num_lock);
+-
+-	l2x0_inv_all();
+-
+-	/* enable L2X0 */
+-	writel_relaxed(L2X0_CTRL_EN, base + L2X0_CTRL);
+-}
+-
+-static void l2x0_resume(void)
+-{
+-	void __iomem *base = l2x0_base;
+-
+-	if (!(readl_relaxed(base + L2X0_CTRL) & L2X0_CTRL_EN))
+-		l2x0_enable(base, l2x0_saved_regs.aux_ctrl, 0);
+-}
+-
+-static const struct l2c_init_data l2x0_init_fns __initconst = {
+-	.enable = l2x0_enable,
+-	.outer_cache = {
+-		.inv_range = l2x0_inv_range,
+-		.clean_range = l2x0_clean_range,
+-		.flush_range = l2x0_flush_range,
+-		.flush_all = l2x0_flush_all,
+-		.disable = l2x0_disable,
+-		.sync = l2x0_cache_sync,
+-		.resume = l2x0_resume,
+-	},
+-};
+-
+ /*
+  * L2C-210 specific code.
+  *
+@@ -966,9 +763,6 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
+ 
+ 	switch (cache_id & L2X0_CACHE_ID_PART_MASK) {
+ 	default:
+-		data = &l2x0_init_fns;
+-		break;
+-
+ 	case L2X0_CACHE_ID_PART_L210:
+ 		data = &l2c210_data;
+ 		break;
 -- 
 1.8.3.1
