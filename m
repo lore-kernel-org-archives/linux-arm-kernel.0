@@ -1,109 +1,39 @@
-From: r.sh.open@gmail.com (Rahul Sharma)
-Date: Mon, 28 Apr 2014 12:03:21 +0530
-Subject: [PATCH v8 1/3] ARM: EXYNOS: initial board support for exynos5260
- SoC
-In-Reply-To: <0b4101cf613e$eb2d87d0$c1889770$@samsung.com>
-References: <1397620738-14431-1-git-send-email-rahul.sharma@samsung.com>
- <1397620738-14431-2-git-send-email-rahul.sharma@samsung.com>
- <534E3803.5010404@gmail.com>
- <CAK9yfHztqGWhUJ=PNc7L-epu48PkEM6=v6JFDZ1n52NBeOUB8w@mail.gmail.com>
- <534E3AE7.10907@gmail.com>
- <00eb01cf5e7b$4eb9edf0$ec2dc9d0$@samsung.com>
- <CAPdUM4O3imVNv3A3K1uEkfohc-r668SC6mVZQRCO8N+waxyb4w@mail.gmail.com>
- <0b4101cf613e$eb2d87d0$c1889770$@samsung.com>
-Message-ID: <CAPdUM4McJD92rp77fkAho9oEDH8sv4LKm9y9Vfv1pbbRKT-vqw@mail.gmail.com>
+From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
+Date: Mon, 28 Apr 2014 12:05:02 +0530
+Subject: [PATCH 2/2 v4] i2c: exynos5: configure fifo_depth based on HSI2C
+ module variant
+In-Reply-To: <20140312192037.GC28891@katana>
+References: <1385100851-32254-1-git-send-email-ch.naveen@samsung.com>
+ <1391748195-12490-1-git-send-email-ch.naveen@samsung.com>
+ <20140312192037.GC28891@katana>
+Message-ID: <CAHfPSqCg-BqezXCTfDjtKwvaD3G8Ej79OCFKAfshfO0uZvyewg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+Hello Wolfram,
 
-Please share your opinion.
+On 13 March 2014 00:50, Wolfram Sang <wsa@the-dreams.de> wrote:
+> On Fri, Feb 07, 2014 at 10:13:15AM +0530, Naveen Krishna Chatradhi wrote:
+>> fifo_depth of the HSI2C is not constant
+>> Exynos5420 and Exynos5250 supports fifo_depth of 64bytes
+>> Exynos5260 supports fifo_depth of 16bytes.
+>>
+>> This patch configures the fifo_depth based on HSI2C modules version.
+>>
+>> Signed-off-by: Naveen Krishna Chatradhi <ich.naveen@samsung.com>
+>> [For finding out the difference and initial contribution]
+>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+>
+> I know Tomasz said differently, but I prefer the patches squashed (and
+> the commit message extended).
+Please accept my apologies for coming back late on this CL.
+Will squash and fix the compilation error and submit.
 
-Regards,
-Rahul Sharma
+Thanks,
+>
 
-On 26 April 2014 16:31, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Rahul Sharma wrote:
->>
->> Hi Kukjin,
->>
-> Hi,
->
->> Need this macro to enable build for clock driver.
->>
-> I found it in your patch, "clk/exynos5260: add clock file for exynos5260".
-> For consistency, I'm fine on this, if Tomasz has no objection me to pick
-> this into samsung tree for the 5260 clock stuff
-> "drivers/clk/samsung/Makefile".
->
-> Thanks,
-> Kukjin
->
->> Regards,
->> Rahul Sharma.
->>
->>
->> On 22 April 2014 15:36, Kukjin Kim <kgene.kim@samsung.com> wrote:
->> > Tomasz Figa wrote:
->> >>
->> >> On 16.04.2014 10:08, Sachin Kamat wrote:
->> >> > Hi Tomasz,
->> >> >
->> >> > On 16 April 2014 13:27, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->> >> >> Hi Rahul,
->> >> >>
->> >> >>
->> >> >> On 16.04.2014 05:58, Rahul Sharma wrote:
->> >> >>>
->> >> >>> From: Pankaj Dubey <pankaj.dubey@samsung.com>
->> >> >>>
->> >> >>> This patch add basic arch side support for exynos5260 SoC.
->> >> >>>
->> >> >>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->> >> >>> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
->> >> >>> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
->> >> >>> ---
->> >> >>>    arch/arm/mach-exynos/Kconfig |    5 +++++
->> >> >>>    1 file changed, 5 insertions(+)
->> >> >>>
->> >> >>> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-
->> >> exynos/Kconfig
->> >> >>> index fc8bf18..bf4ed87 100644
->> >> >>> --- a/arch/arm/mach-exynos/Kconfig
->> >> >>> +++ b/arch/arm/mach-exynos/Kconfig
->> >> >>> @@ -84,6 +84,11 @@ config SOC_EXYNOS5250
->> >> >>>          help
->> >> >>>            Enable EXYNOS5250 SoC support
->> >> >>>
->> >> >>> +config SOC_EXYNOS5260
->> >> >>> +       bool "SAMSUNG EXYNOS5260"
->> >> >>> +       default y
->> >> >>> +       depends on ARCH_EXYNOS5
->> >> >>> +
->> >> >>>    config SOC_EXYNOS5420
->> >> >>>          bool "SAMSUNG EXYNOS5420"
->> >> >>>          default y
->> >> >>>
->> >> >>
->> >> >> Is this patch necessary now? After Sachin's consolidation series
->> there
->> >> are
->> >> >> no per SoC entries anymore.
->> >> >
->> >> > Kukjin still wanted individual SoCs to be selectable. Please refer
->> [1].
->> >> >
->> >> > [1] http://www.spinics.net/lists/devicetree/msg27040.html
->> >>
->> >> I don't think any valid reason was presented there. Features in code
->> >> should not be selected using #ifdef CONFIG_ anymore, so I don't really
->> >> see any reason to not proceed with this consolidation. Olof, Arnd?
->> >>
->> > Hi,
->> >
->> > Yeah, in this case, nothing happened with adding SOC_EXYNOS5260. So I
->> don't have any idea why this is required.
->> >
->> > - Kukjin
->> >
->
+
+
+-- 
+Shine bright,
+(: Nav :)
