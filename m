@@ -1,44 +1,32 @@
-From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
-Date: Mon, 28 Apr 2014 12:25:10 -0300
-Subject: [PATCH 5/7] clk: sunxi: add PRCM (Power/Reset/Clock Management)
- clks support
-In-Reply-To: <1398697130-8338-6-git-send-email-boris.brezillon@free-electrons.com>
-References: <1398697130-8338-1-git-send-email-boris.brezillon@free-electrons.com>
- <1398697130-8338-6-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <535E72D6.6060206@elopez.com.ar>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 28 Apr 2014 08:33:47 -0700
+Subject: [PATCH 1/4] mfd: twl4030-power: Add recommended idle configuration
+In-Reply-To: <20140428114133.GV21279@lee--X1>
+References: <1398300030-7386-1-git-send-email-tony@atomide.com>
+ <1398300030-7386-2-git-send-email-tony@atomide.com>
+ <20140428114133.GV21279@lee--X1>
+Message-ID: <20140428153346.GI20807@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+* Lee Jones <lee.jones@linaro.org> [140428 04:42]:
+> > These settings are based on the "Recommended Sleep Sequences for
+> > the Zoom Platform" pdf at:
+> > 
+> > http://omappedia.com/wiki/File:Recommended_Sleep_Sequences_Zoom.pdf
+> > 
+> > These settings assume most of the regulators are under control of
+> > Linux, and cuts off VDD1 and VDD2 during off-idle as Linux cannot
+> > do it.
+> 
+> Linux does it becuase Linux can't do it. Eh?
 
-El 28/04/14 11:58, Boris BREZILLON escribi?:
-> The PRCM (Power/Reset/Clock Management) unit provides several clock
-> devices:
-> - AR100 clk: used to clock the Power Management co-processor
-> - AHB0 clk: used to clock the AHB0 bus
-> - APB0 clk and gates: used to clk
->
-> Add support for these clks in a separate driver so that they can be probed
-> as platform devices instead of registered during early init.
-> We need this to be able to probe PRCM MFD subdevices.
->
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> ---
-(..)
-> +
-> +MODULE_AUTHOR("Boris BREZILLON <boris.brezillon@free-electrons.com");
+Heh yeah that's confusing, will update to:
 
-There's a missing >
+These settings assume most of the regulators are under control of
+Linux, and twl4030 only cuts off VDD1 and VDD2 during off-idle as
+Linux cannot do it.
 
-> +MODULE_DESCRIPTION("Allwinner Reset Controller Driver");
+Regards,
 
-Copy/paste leftover?
-
-> +MODULE_LICENSE("GPL v2");
-
-I just skimmed through this now, I'll have a more detailed look later. 
-Thanks for working on sun6i support :)
-
-Cheers,
-
-Emilio
+Tony
