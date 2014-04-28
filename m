@@ -1,78 +1,30 @@
 From: zhichang.yuan@linaro.org (zhichang.yuan at linaro.org)
-Date: Mon, 28 Apr 2014 13:11:34 +0800
-Subject: [PATCHv2 6/6] arm64: lib: Implement optimized string length routines
+Date: Mon, 28 Apr 2014 13:11:31 +0800
+Subject: [PATCHv2 3/6] arm64: lib: Implement optimized memset routine
 In-Reply-To: <1398661895-5559-1-git-send-email-zhichang.yuan@linaro.org>
 References: <1398661895-5559-1-git-send-email-zhichang.yuan@linaro.org>
-Message-ID: <1398661895-5559-7-git-send-email-zhichang.yuan@linaro.org>
+Message-ID: <1398661895-5559-4-git-send-email-zhichang.yuan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "zhichang.yuan" <zhichang.yuan@linaro.org>
 
-This patch, based on Linaro's Cortex Strings library, adds
-an assembly optimized strlen() and strnlen() functions.
+This patch, based on Linaro's Cortex Strings library, improves
+the performance of the assembly optimized memset() function.
 
 Signed-off-by: Zhichang Yuan <zhichang.yuan@linaro.org>
 Signed-off-by: Deepak Saxena <dsaxena@linaro.org>
 ---
- arch/arm64/include/asm/string.h |    6 ++
- arch/arm64/kernel/arm64ksyms.c  |    2 +
- arch/arm64/lib/Makefile         |    3 +-
- arch/arm64/lib/strlen.S         |  126 +++++++++++++++++++++++++++++
- arch/arm64/lib/strnlen.S        |  171 +++++++++++++++++++++++++++++++++++++++
- 5 files changed, 307 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/lib/strlen.S
- create mode 100644 arch/arm64/lib/strnlen.S
+ arch/arm64/lib/memset.S |  207 ++++++++++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 185 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm64/include/asm/string.h b/arch/arm64/include/asm/string.h
-index 6133f49..64d2d48 100644
---- a/arch/arm64/include/asm/string.h
-+++ b/arch/arm64/include/asm/string.h
-@@ -28,6 +28,12 @@ extern int strcmp(const char *, const char *);
- #define __HAVE_ARCH_STRNCMP
- extern int strncmp(const char *, const char *, __kernel_size_t);
- 
-+#define __HAVE_ARCH_STRLEN
-+extern __kernel_size_t strlen(const char *);
-+
-+#define __HAVE_ARCH_STRNLEN
-+extern __kernel_size_t strnlen(const char *, __kernel_size_t);
-+
- #define __HAVE_ARCH_MEMCPY
- extern void *memcpy(void *, const void *, __kernel_size_t);
- 
-diff --git a/arch/arm64/kernel/arm64ksyms.c b/arch/arm64/kernel/arm64ksyms.c
-index 2784a79..1edc792 100644
---- a/arch/arm64/kernel/arm64ksyms.c
-+++ b/arch/arm64/kernel/arm64ksyms.c
-@@ -46,6 +46,8 @@ EXPORT_SYMBOL(strchr);
- EXPORT_SYMBOL(strrchr);
- EXPORT_SYMBOL(strcmp);
- EXPORT_SYMBOL(strncmp);
-+EXPORT_SYMBOL(strlen);
-+EXPORT_SYMBOL(strnlen);
- EXPORT_SYMBOL(memset);
- EXPORT_SYMBOL(memcpy);
- EXPORT_SYMBOL(memmove);
-diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile
-index aaaf618..d98d3e3 100644
---- a/arch/arm64/lib/Makefile
-+++ b/arch/arm64/lib/Makefile
-@@ -1,4 +1,5 @@
- lib-y		:= bitops.o clear_user.o delay.o copy_from_user.o	\
- 		   copy_to_user.o copy_in_user.o copy_page.o		\
- 		   clear_page.o memchr.o memcpy.o memmove.o memset.o	\
--		   memcmp.o strcmp.o strncmp.o strchr.o strrchr.o
-+		   memcmp.o strcmp.o strncmp.o strlen.o strnlen.o	\
-+		   strchr.o strrchr.o
-diff --git a/arch/arm64/lib/strlen.S b/arch/arm64/lib/strlen.S
-new file mode 100644
-index 0000000..987b68b
---- /dev/null
-+++ b/arch/arm64/lib/strlen.S
-@@ -0,0 +1,126 @@
-+/*
-+ * Copyright (C) 2013 ARM Ltd.
+diff --git a/arch/arm64/lib/memset.S b/arch/arm64/lib/memset.S
+index 87e4a68..7c72dfd 100644
+--- a/arch/arm64/lib/memset.S
++++ b/arch/arm64/lib/memset.S
+@@ -1,5 +1,13 @@
+ /*
+  * Copyright (C) 2013 ARM Ltd.
 + * Copyright (C) 2013 Linaro.
 + *
 + * This code is based on glibc cortex strings work originally authored by Linaro
@@ -81,298 +33,220 @@ index 0000000..987b68b
 + *
 + * http://bazaar.launchpad.net/~linaro-toolchain-dev/cortex-strings/trunk/
 + * files/head:/src/aarch64/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -16,6 +24,7 @@
+ 
+ #include <linux/linkage.h>
+ #include <asm/assembler.h>
++#include <asm/cache.h>
+ 
+ /*
+  * Fill in the buffer with character c (alignment handled by the hardware)
+@@ -27,27 +36,181 @@
+  * Returns:
+  *	x0 - buf
+  */
 +
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
++dstin		.req	x0
++val		.req	w1
++count		.req	x2
++tmp1		.req	x3
++tmp1w		.req	w3
++tmp2		.req	x4
++tmp2w		.req	w4
++zva_len_x	.req	x5
++zva_len		.req	w5
++zva_bits_x	.req	x6
 +
-+/*
-+ * calculate the length of a string
-+ *
-+ * Parameters:
-+ *	x0 - const string pointer
-+ * Returns:
-+ *	x0 - the return length of specific string
-+ */
-+
-+/* Arguments and results.  */
-+srcin		.req	x0
-+len		.req	x0
-+
-+/* Locals and temporaries.  */
-+src		.req	x1
-+data1		.req	x2
-+data2		.req	x3
-+data2a		.req	x4
-+has_nul1	.req	x5
-+has_nul2	.req	x6
-+tmp1		.req	x7
-+tmp2		.req	x8
++A_l		.req	x7
++A_lw		.req	w7
++dst		.req	x8
++tmp3w		.req	w9
 +tmp3		.req	x9
-+tmp4		.req	x10
-+zeroones	.req	x11
-+pos		.req	x12
 +
-+#define REP8_01 0x0101010101010101
-+#define REP8_7f 0x7f7f7f7f7f7f7f7f
-+#define REP8_80 0x8080808080808080
+ ENTRY(memset)
+-	mov	x4, x0
+-	and	w1, w1, #0xff
+-	orr	w1, w1, w1, lsl #8
+-	orr	w1, w1, w1, lsl #16
+-	orr	x1, x1, x1, lsl #32
+-	subs	x2, x2, #8
+-	b.mi	2f
+-1:	str	x1, [x4], #8
+-	subs	x2, x2, #8
+-	b.pl	1b
+-2:	adds	x2, x2, #4
+-	b.mi	3f
+-	sub	x2, x2, #4
+-	str	w1, [x4], #4
+-3:	adds	x2, x2, #2
+-	b.mi	4f
+-	sub	x2, x2, #2
+-	strh	w1, [x4], #2
+-4:	adds	x2, x2, #1
+-	b.mi	5f
+-	strb	w1, [x4]
+-5:	ret
++	mov	dst, dstin	/* Preserve return value.  */
++	and	A_lw, val, #255
++	orr	A_lw, A_lw, A_lw, lsl #8
++	orr	A_lw, A_lw, A_lw, lsl #16
++	orr	A_l, A_l, A_l, lsl #32
 +
-+ENTRY(strlen)
-+	mov	zeroones, #REP8_01
-+	bic	src, srcin, #15
-+	ands	tmp1, srcin, #15
-+	b.ne	.Lmisaligned
-+	/*
-+	* NUL detection works on the principle that (X - 1) & (~X) & 0x80
-+	* (=> (X - 1) & ~(X | 0x7f)) is non-zero iff a byte is zero, and
-+	* can be done in parallel across the entire word.
-+	*/
-+	/*
-+	* The inner loop deals with two Dwords at a time. This has a
-+	* slightly higher start-up cost, but we should win quite quickly,
-+	* especially on cores with a high number of issue slots per
-+	* cycle, as we get much better parallelism out of the operations.
-+	*/
-+.Lloop:
-+	ldp	data1, data2, [src], #16
-+.Lrealigned:
-+	sub	tmp1, data1, zeroones
-+	orr	tmp2, data1, #REP8_7f
-+	sub	tmp3, data2, zeroones
-+	orr	tmp4, data2, #REP8_7f
-+	bic	has_nul1, tmp1, tmp2
-+	bics	has_nul2, tmp3, tmp4
-+	ccmp	has_nul1, #0, #0, eq	/* NZCV = 0000  */
-+	b.eq	.Lloop
-+
-+	sub	len, src, srcin
-+	cbz	has_nul1, .Lnul_in_data2
-+CPU_BE(	mov	data2, data1 )	/*prepare data to re-calculate the syndrome*/
-+	sub	len, len, #8
-+	mov	has_nul2, has_nul1
-+.Lnul_in_data2:
-+	/*
-+	* For big-endian, carry propagation (if the final byte in the
-+	* string is 0x01) means we cannot use has_nul directly.  The
-+	* easiest way to get the correct byte is to byte-swap the data
-+	* and calculate the syndrome a second time.
-+	*/
-+CPU_BE( rev	data2, data2 )
-+CPU_BE( sub	tmp1, data2, zeroones )
-+CPU_BE( orr	tmp2, data2, #REP8_7f )
-+CPU_BE( bic	has_nul2, tmp1, tmp2 )
-+
-+	sub	len, len, #8
-+	rev	has_nul2, has_nul2
-+	clz	pos, has_nul2
-+	add	len, len, pos, lsr #3		/* Bits to bytes.  */
++	cmp	count, #15
++	b.hi	.Lover16_proc
++	/*All store maybe are non-aligned..*/
++	tbz	count, #3, 1f
++	str	A_l, [dst], #8
++1:
++	tbz	count, #2, 2f
++	str	A_lw, [dst], #4
++2:
++	tbz	count, #1, 3f
++	strh	A_lw, [dst], #2
++3:
++	tbz	count, #0, 4f
++	strb	A_lw, [dst]
++4:
 +	ret
 +
-+.Lmisaligned:
-+	cmp	tmp1, #8
-+	neg	tmp1, tmp1
-+	ldp	data1, data2, [src], #16
-+	lsl	tmp1, tmp1, #3		/* Bytes beyond alignment -> bits.  */
-+	mov	tmp2, #~0
-+	/* Big-endian.  Early bytes are at MSB.  */
-+CPU_BE( lsl	tmp2, tmp2, tmp1 )	/* Shift (tmp1 & 63).  */
-+	/* Little-endian.  Early bytes are at LSB.  */
-+CPU_LE( lsr	tmp2, tmp2, tmp1 )	/* Shift (tmp1 & 63).  */
-+
-+	orr	data1, data1, tmp2
-+	orr	data2a, data2, tmp2
-+	csinv	data1, data1, xzr, le
-+	csel	data2, data2, data2a, le
-+	b	.Lrealigned
-+ENDPROC(strlen)
-diff --git a/arch/arm64/lib/strnlen.S b/arch/arm64/lib/strnlen.S
-new file mode 100644
-index 0000000..2ca6657
---- /dev/null
-+++ b/arch/arm64/lib/strnlen.S
-@@ -0,0 +1,171 @@
++.Lover16_proc:
++	/*Whether  the start address is aligned with 16.*/
++	neg	tmp2, dst
++	ands	tmp2, tmp2, #15
++	b.eq	.Laligned
 +/*
-+ * Copyright (C) 2013 ARM Ltd.
-+ * Copyright (C) 2013 Linaro.
-+ *
-+ * This code is based on glibc cortex strings work originally authored by Linaro
-+ * and re-licensed under GPLv2 for the Linux kernel. The original code can
-+ * be found @
-+ *
-+ * http://bazaar.launchpad.net/~linaro-toolchain-dev/cortex-strings/trunk/
-+ * files/head:/src/aarch64/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
++* The count is not less than 16, we can use stp to store the start 16 bytes,
++* then adjust the dst aligned with 16.This process will make the current
++* memory address at alignment boundary.
++*/
++	stp	A_l, A_l, [dst] /*non-aligned store..*/
++	/*make the dst aligned..*/
++	sub	count, count, tmp2
++	add	dst, dst, tmp2
 +
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
++.Laligned:
++	cbz	A_l, .Lzero_mem
 +
++.Ltail_maybe_long:
++	cmp	count, #64
++	b.ge	.Lnot_short
++.Ltail63:
++	ands	tmp1, count, #0x30
++	b.eq	3f
++	cmp	tmp1w, #0x20
++	b.eq	1f
++	b.lt	2f
++	stp	A_l, A_l, [dst], #16
++1:
++	stp	A_l, A_l, [dst], #16
++2:
++	stp	A_l, A_l, [dst], #16
 +/*
-+ * determine the length of a fixed-size string
-+ *
-+ * Parameters:
-+ *	x0 - const string pointer
-+ *	x1 - maximal string length
-+ * Returns:
-+ *	x0 - the return length of specific string
-+ */
-+
-+/* Arguments and results.  */
-+srcin		.req	x0
-+len		.req	x0
-+limit		.req	x1
-+
-+/* Locals and temporaries.  */
-+src		.req	x2
-+data1		.req	x3
-+data2		.req	x4
-+data2a		.req	x5
-+has_nul1	.req	x6
-+has_nul2	.req	x7
-+tmp1		.req	x8
-+tmp2		.req	x9
-+tmp3		.req	x10
-+tmp4		.req	x11
-+zeroones	.req	x12
-+pos		.req	x13
-+limit_wd	.req	x14
-+
-+#define REP8_01 0x0101010101010101
-+#define REP8_7f 0x7f7f7f7f7f7f7f7f
-+#define REP8_80 0x8080808080808080
-+
-+ENTRY(strnlen)
-+	cbz	limit, .Lhit_limit
-+	mov	zeroones, #REP8_01
-+	bic	src, srcin, #15
-+	ands	tmp1, srcin, #15
-+	b.ne	.Lmisaligned
-+	/* Calculate the number of full and partial words -1.  */
-+	sub	limit_wd, limit, #1 /* Limit != 0, so no underflow.  */
-+	lsr	limit_wd, limit_wd, #4  /* Convert to Qwords.  */
-+
-+	/*
-+	* NUL detection works on the principle that (X - 1) & (~X) & 0x80
-+	* (=> (X - 1) & ~(X | 0x7f)) is non-zero iff a byte is zero, and
-+	* can be done in parallel across the entire word.
-+	*/
-+	/*
-+	* The inner loop deals with two Dwords at a time.  This has a
-+	* slightly higher start-up cost, but we should win quite quickly,
-+	* especially on cores with a high number of issue slots per
-+	* cycle, as we get much better parallelism out of the operations.
-+	*/
-+.Lloop:
-+	ldp	data1, data2, [src], #16
-+.Lrealigned:
-+	sub	tmp1, data1, zeroones
-+	orr	tmp2, data1, #REP8_7f
-+	sub	tmp3, data2, zeroones
-+	orr	tmp4, data2, #REP8_7f
-+	bic	has_nul1, tmp1, tmp2
-+	bic	has_nul2, tmp3, tmp4
-+	subs	limit_wd, limit_wd, #1
-+	orr	tmp1, has_nul1, has_nul2
-+	ccmp	tmp1, #0, #0, pl    /* NZCV = 0000  */
-+	b.eq	.Lloop
-+
-+	cbz	tmp1, .Lhit_limit   /* No null in final Qword.  */
-+
-+	/*
-+	* We know there's a null in the final Qword. The easiest thing
-+	* to do now is work out the length of the string and return
-+	* MIN (len, limit).
-+	*/
-+	sub	len, src, srcin
-+	cbz	has_nul1, .Lnul_in_data2
-+CPU_BE( mov	data2, data1 )	/*perpare data to re-calculate the syndrome*/
-+
-+	sub	len, len, #8
-+	mov	has_nul2, has_nul1
-+.Lnul_in_data2:
-+	/*
-+	* For big-endian, carry propagation (if the final byte in the
-+	* string is 0x01) means we cannot use has_nul directly.  The
-+	* easiest way to get the correct byte is to byte-swap the data
-+	* and calculate the syndrome a second time.
-+	*/
-+CPU_BE( rev	data2, data2 )
-+CPU_BE( sub	tmp1, data2, zeroones )
-+CPU_BE( orr	tmp2, data2, #REP8_7f )
-+CPU_BE( bic	has_nul2, tmp1, tmp2 )
-+
-+	sub	len, len, #8
-+	rev	has_nul2, has_nul2
-+	clz	pos, has_nul2
-+	add	len, len, pos, lsr #3       /* Bits to bytes.  */
-+	cmp	len, limit
-+	csel	len, len, limit, ls     /* Return the lower value.  */
++* The last store length is less than 16,use stp to write last 16 bytes.
++* It will lead some bytes written twice and the access is non-aligned.
++*/
++3:
++	ands	count, count, #15
++	cbz	count, 4f
++	add	dst, dst, count
++	stp	A_l, A_l, [dst, #-16]	/* Repeat some/all of last store. */
++4:
 +	ret
 +
-+.Lmisaligned:
 +	/*
-+	* Deal with a partial first word.
-+	* We're doing two things in parallel here;
-+	* 1) Calculate the number of words (but avoiding overflow if
-+	* limit is near ULONG_MAX) - to do this we need to work out
-+	* limit + tmp1 - 1 as a 65-bit value before shifting it;
-+	* 2) Load and mask the initial data words - we force the bytes
-+	* before the ones we are interested in to 0xff - this ensures
-+	* early bytes will not hit any zero detection.
++	* Critical loop. Start at a new cache line boundary. Assuming
++	* 64 bytes per line, this ensures the entire loop is in one line.
 +	*/
-+	ldp	data1, data2, [src], #16
-+
-+	sub	limit_wd, limit, #1
-+	and	tmp3, limit_wd, #15
-+	lsr	limit_wd, limit_wd, #4
-+
-+	add	tmp3, tmp3, tmp1
-+	add	limit_wd, limit_wd, tmp3, lsr #4
-+
-+	neg	tmp4, tmp1
-+	lsl	tmp4, tmp4, #3  /* Bytes beyond alignment -> bits.  */
-+
-+	mov	tmp2, #~0
-+	/* Big-endian.  Early bytes are at MSB.  */
-+CPU_BE( lsl	tmp2, tmp2, tmp4 )	/* Shift (tmp1 & 63).  */
-+	/* Little-endian.  Early bytes are at LSB.  */
-+CPU_LE( lsr	tmp2, tmp2, tmp4 )	/* Shift (tmp1 & 63).  */
-+
-+	cmp	tmp1, #8
-+
-+	orr	data1, data1, tmp2
-+	orr	data2a, data2, tmp2
-+
-+	csinv	data1, data1, xzr, le
-+	csel	data2, data2, data2a, le
-+	b	.Lrealigned
-+
-+.Lhit_limit:
-+	mov	len, limit
++	.p2align	L1_CACHE_SHIFT
++.Lnot_short:
++	sub	dst, dst, #16/* Pre-bias.  */
++	sub	count, count, #64
++1:
++	stp	A_l, A_l, [dst, #16]
++	stp	A_l, A_l, [dst, #32]
++	stp	A_l, A_l, [dst, #48]
++	stp	A_l, A_l, [dst, #64]!
++	subs	count, count, #64
++	b.ge	1b
++	tst	count, #0x3f
++	add	dst, dst, #16
++	b.ne	.Ltail63
++.Lexitfunc:
 +	ret
-+ENDPROC(strnlen)
++
++	/*
++	* For zeroing memory, check to see if we can use the ZVA feature to
++	* zero entire 'cache' lines.
++	*/
++.Lzero_mem:
++	cmp	count, #63
++	b.le	.Ltail63
++	/*
++	* For zeroing small amounts of memory, it's not worth setting up
++	* the line-clear code.
++	*/
++	cmp	count, #128
++	b.lt	.Lnot_short /*count is at least  128 bytes*/
++
++	mrs	tmp1, dczid_el0
++	tbnz	tmp1, #4, .Lnot_short
++	mov	tmp3w, #4
++	and	zva_len, tmp1w, #15	/* Safety: other bits reserved.  */
++	lsl	zva_len, tmp3w, zva_len
++
++	ands	tmp3w, zva_len, #63
++	/*
++	* ensure the zva_len is not less than 64.
++	* It is not meaningful to use ZVA if the block size is less than 64.
++	*/
++	b.ne	.Lnot_short
++.Lzero_by_line:
++	/*
++	* Compute how far we need to go to become suitably aligned. We're
++	* already at quad-word alignment.
++	*/
++	cmp	count, zva_len_x
++	b.lt	.Lnot_short		/* Not enough to reach alignment.  */
++	sub	zva_bits_x, zva_len_x, #1
++	neg	tmp2, dst
++	ands	tmp2, tmp2, zva_bits_x
++	b.eq	2f			/* Already aligned.  */
++	/* Not aligned, check that there's enough to copy after alignment.*/
++	sub	tmp1, count, tmp2
++	/*
++	* grantee the remain length to be ZVA is bigger than 64,
++	* avoid to make the 2f's process over mem range.*/
++	cmp	tmp1, #64
++	ccmp	tmp1, zva_len_x, #8, ge	/* NZCV=0b1000 */
++	b.lt	.Lnot_short
++	/*
++	* We know that there's at least 64 bytes to zero and that it's safe
++	* to overrun by 64 bytes.
++	*/
++	mov	count, tmp1
++1:
++	stp	A_l, A_l, [dst]
++	stp	A_l, A_l, [dst, #16]
++	stp	A_l, A_l, [dst, #32]
++	subs	tmp2, tmp2, #64
++	stp	A_l, A_l, [dst, #48]
++	add	dst, dst, #64
++	b.ge	1b
++	/* We've overrun a bit, so adjust dst downwards.*/
++	add	dst, dst, tmp2
++2:
++	sub	count, count, zva_len_x
++3:
++	dc	zva, dst
++	add	dst, dst, zva_len_x
++	subs	count, count, zva_len_x
++	b.ge	3b
++	ands	count, count, zva_bits_x
++	b.ne	.Ltail_maybe_long
++	ret
+ ENDPROC(memset)
 -- 
 1.7.9.5
