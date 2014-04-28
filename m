@@ -1,162 +1,131 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Mon, 28 Apr 2014 21:20:06 +0900
-Subject: [RESUBMIT RFC PATCH v2 2/3] ARM: EXYNOS: Move pmu specific header
- files under "linux/mfd/samsung"
-In-Reply-To: <1398687607-4554-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1398687607-4554-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1398687607-4554-3-git-send-email-pankaj.dubey@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 28 Apr 2014 14:05:30 +0200
+Subject: [PATCH v12 11/31] documentation: iommu: add binding document of
+ Exynos System MMU
+In-Reply-To: <20140428111802.GI19455@ulmo>
+References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
+ <6544270.ddFBoY6LMm@wuerfel> <20140428111802.GI19455@ulmo>
+Message-ID: <4780885.JaktFvJeC7@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Moving Exynos PMU specific header file into "include/linux/mfd/samsung"
-thus updated affected files under "mach-exynos" to use new location of
-these header files.
+On Monday 28 April 2014 13:18:03 Thierry Reding wrote:
+> On Mon, Apr 28, 2014 at 12:56:03PM +0200, Arnd Bergmann wrote:
+> > On Monday 28 April 2014 12:39:20 Thierry Reding wrote:
+> > > And possibly with a iommu-names property to go along with that. The idea
+> > > being that a device can be a master on possibly multiple IOMMUs. Using
+> > > the above it would also be possible to have one device be multiple
+> > > masters on the same IOMMU.
+> > 
+> > Yes, that seems reasonable. Just one question: How would you represent a
+> > device that has multiple masters, with at least one connected to an IOMMU
+> > and another one connected to memory directly, without going to the IOMMU?
+> 
+> Heh, I don't think I've ever thought about that use-case. I guess I was
+> always assuming that in the absence of an IOMMU the device would simply
+> access memory directly. From what I can tell that's how Tegra works at
+> least. If the IOMMU is not enabled for a given client, that client will
+> access physical memory untranslated.
+> 
+> I suppose if that really must be represented then a global dummy IOMMU
+> could be introduced to help with these cases.
 
-CC: Sangbeom Kim <sbkim73@samsung.com>
-CC: Samuel Ortiz <sameo@linux.intel.com>
-CC: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
----
- arch/arm/mach-exynos/cpuidle.c                                    |    4 ++--
- arch/arm/mach-exynos/exynos.c                                     |    2 +-
- arch/arm/mach-exynos/hotplug.c                                    |    2 +-
- arch/arm/mach-exynos/platsmp.c                                    |    2 +-
- arch/arm/mach-exynos/pm.c                                         |    4 ++--
- arch/arm/mach-exynos/pmu.c                                        |    5 ++---
- {arch/arm/mach-exynos => include/linux/mfd/samsung}/exynos-pmu.h  |    0
- .../regs-pmu.h => include/linux/mfd/samsung/exynos-regs-pmu.h     |    0
- 8 files changed, 9 insertions(+), 10 deletions(-)
- rename {arch/arm/mach-exynos => include/linux/mfd/samsung}/exynos-pmu.h (100%)
- rename arch/arm/mach-exynos/regs-pmu.h => include/linux/mfd/samsung/exynos-regs-pmu.h (100%)
+It's actually not too uncommon: you can have e.g. the lower 2GB mapped
+directly from the device address space into the host memory, but have
+an iommu that translates accesses from some range in the upper 2GB of
+the 32-bit address space into full 64-bit addresses.
 
-diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
-index ff3be9c..4c18087 100644
---- a/arch/arm/mach-exynos/cpuidle.c
-+++ b/arch/arm/mach-exynos/cpuidle.c
-@@ -18,6 +18,8 @@
- #include <linux/time.h>
- #include <linux/platform_device.h>
- #include <linux/regmap.h>
-+#include <linux/mfd/samsung/exynos-regs-pmu.h>
-+#include <linux/mfd/samsung/exynos-pmu.h>
- 
- #include <asm/proc-fns.h>
- #include <asm/smp_scu.h>
-@@ -31,8 +33,6 @@
- #include <mach/map.h>
- 
- #include "common.h"
--#include "regs-pmu.h"
--#include "exynos-pmu.h"
- 
- #define REG_DIRECTGO_ADDR	(samsung_rev() == EXYNOS4210_REV_1_1 ? \
- 			S5P_INFORM7 : (samsung_rev() == EXYNOS4210_REV_1_0 ? \
-diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-index b01987e..24c774a 100644
---- a/arch/arm/mach-exynos/exynos.c
-+++ b/arch/arm/mach-exynos/exynos.c
-@@ -21,6 +21,7 @@
- #include <linux/pm_domain.h>
- #include <linux/mfd/syscon.h>
- #include <linux/regmap.h>
-+#include <linux/mfd/samsung/exynos-regs-pmu.h>
- 
- #include <asm/cacheflush.h>
- #include <asm/hardware/cache-l2x0.h>
-@@ -32,7 +33,6 @@
- 
- #include "common.h"
- #include "mfc.h"
--#include "regs-pmu.h"
- #include "regs-sys.h"
- 
- #define L2_AUX_VAL 0x7C470001
-diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
-index 7831e64..1d3ad84 100644
---- a/arch/arm/mach-exynos/hotplug.c
-+++ b/arch/arm/mach-exynos/hotplug.c
-@@ -14,6 +14,7 @@
- #include <linux/smp.h>
- #include <linux/io.h>
- #include <linux/regmap.h>
-+#include <linux/mfd/samsung/exynos-regs-pmu.h>
- 
- #include <asm/cacheflush.h>
- #include <asm/cp15.h>
-@@ -22,7 +23,6 @@
- #include <plat/cpu.h>
- 
- #include "common.h"
--#include "regs-pmu.h"
- 
- static inline void cpu_enter_lowpower_a9(void)
- {
-diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-index 3831e6c..54c0df8 100644
---- a/arch/arm/mach-exynos/platsmp.c
-+++ b/arch/arm/mach-exynos/platsmp.c
-@@ -19,6 +19,7 @@
- #include <linux/jiffies.h>
- #include <linux/smp.h>
- #include <linux/io.h>
-+#include <linux/mfd/samsung/exynos-regs-pmu.h>
- 
- #include <asm/cacheflush.h>
- #include <asm/smp_plat.h>
-@@ -29,7 +30,6 @@
- #include <mach/map.h>
- 
- #include "common.h"
--#include "regs-pmu.h"
- 
- extern void exynos4_secondary_startup(void);
- static void __iomem *pmu_base;
-diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-index 103ab92..3e75565 100644
---- a/arch/arm/mach-exynos/pm.c
-+++ b/arch/arm/mach-exynos/pm.c
-@@ -21,6 +21,8 @@
- #include <linux/err.h>
- #include <linux/clk.h>
- #include <linux/regmap.h>
-+#include <linux/mfd/samsung/exynos-regs-pmu.h>
-+#include <linux/mfd/samsung/exynos-pmu.h>
- 
- #include <asm/cacheflush.h>
- #include <asm/hardware/cache-l2x0.h>
-@@ -35,9 +37,7 @@
- #include <mach/map.h>
- 
- #include "common.h"
--#include "regs-pmu.h"
- #include "regs-sys.h"
--#include "exynos-pmu.h"
- 
- static struct regmap *pmu_regmap;
- 
-diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
-index d020557..a26332f 100644
---- a/arch/arm/mach-exynos/pmu.c
-+++ b/arch/arm/mach-exynos/pmu.c
-@@ -15,9 +15,8 @@
- #include <linux/platform_device.h>
- #include <linux/slab.h>
- #include <linux/mfd/syscon.h>
--
--#include "exynos-pmu.h"
--#include "regs-pmu.h"
-+#include <linux/mfd/samsung/exynos-regs-pmu.h>
-+#include <linux/mfd/samsung/exynos-pmu.h>
- 
- enum exynos_pmu_id {
- 	PMU_EXYNOS4210,
-diff --git a/arch/arm/mach-exynos/exynos-pmu.h b/include/linux/mfd/samsung/exynos-pmu.h
-similarity index 100%
-rename from arch/arm/mach-exynos/exynos-pmu.h
-rename to include/linux/mfd/samsung/exynos-pmu.h
-diff --git a/arch/arm/mach-exynos/regs-pmu.h b/include/linux/mfd/samsung/exynos-regs-pmu.h
-similarity index 100%
-rename from arch/arm/mach-exynos/regs-pmu.h
-rename to include/linux/mfd/samsung/exynos-regs-pmu.h
--- 
-1.7.10.4
+This use case makes no sense if you use the IOMMU for isolation
+or virtualization, but it gives better performance for lowmem access
+when the only reason to have the IOMMU is to map highmem addresses.
+
+> > > On Tegra the specifier would be used to encode a memory controller's
+> > > client ID. One discussion point back at the time was to encode the ID as
+> > > a bitmask to allow more than a single master per entry. Another solution
+> > > which I think is a little cleaner and more generic, would be to use one
+> > > entry per master and use a single cell to encode the client ID. Devices
+> > > with multiple clients to the same IOMMU could then use multiple entries
+> > > referencing the same IOMMU.
+> > 
+> > I'm not completely following here. Are you talking about the generic
+> > binding, or the part that is tegra specific for the specifier?
+> > 
+> > My first impression is that the generic binding should just allow an
+> > arbitrary specifier with a variable #iommu-cells, and leave the format
+> > up to the IOMMU driver.
+> 
+> Yes, I was getting ahead of myself. The idea was to have #iommu-cells
+> and allow the specifier to be IOMMU-specific. On Tegra that would
+> translate to the memory controller client ID, on other devices I suspect
+> something similar might exist, but for the generic binding it should be
+> completely opaque and hence irrelevant.
+> 
+> Really just like any of the other bindings that have foos and #foo-cells
+> properties.
+
+Ok.
+
+> > A lot of drivers probably only support one
+> > master, so they can just set #iommu-cells=<0>, others might require
+> > IDs that do not fit into one cell.
+> 
+> You mean "#iommu-cells = <1>" for devices that only require one master?
+
+I meant an IOMMU device that acts as the slave for exactly one device,
+even if that device has multiple master ports.
+
+> There still has to be one cell to specify which master. Unless perhaps
+> if they can be arbitrarily assigned. I guess even if there's a fixed
+> mapping that applies to one SoC generation, it might be good to still
+> employ a specifier and have the mapping in DT for flexibility.
+
+let me clarify by example:
+
+	iommu at 1 {
+		compatible = "some,simple-iommu";
+		reg = <1>;
+		#iommu-cells = <0>; /* supports only one master */
+	};
+
+	iommu at 2 {
+		compatible = "some,other-iommu";
+		reg = <3>;
+		#iommu-cells = <1>; /* contains master ID */
+	};
+
+	iommu at 3 {
+		compatible = "some,windowed-iommu";
+		reg = <2>;
+		#iommu-cells = <2>; /* contains dma-window */
+	};
+
+	device at 4 {
+		compatible = "some,ethernet";
+		iommus = <&/iommu@1>;
+	};
+
+	device at 5 {
+		compatible = "some,dmaengine";
+		iommus = <&/iommu@2 0x40000000 0x1000000>,
+			 <&/iommu@3 0x101>;
+	};
+
+The device at address 4 has a one-one relationship with iommu at 1, so there
+is no need for any data. device at 5 has two master ports. One is connected to
+an IOMMU that has a per-device aperture, device at 5 can only issue transfers
+to the 256MB area at 0x40000000, and the IOMMU will have to put entries for
+this device into that address. The second master port is connected to
+iommu at 3, which uses a master ID that gets passed along with each transfer,
+so that needs to be put into the IOTLBs.
+
+A variation would be to not use #iommu-cells at all, but provide a
+#address-cells / #size-cells pair in the IOMMU, and have a translation
+as we do for dma-ranges. This is probably most flexible.
+
+One completely open question that I just noticed is how the kernel should
+deal with the case of multiple IOMMUs attached to one master: the
+data structures we have assume that we know exactly how to do DMA by
+setting the per-device dma_map_ops (iommu or not, coherent or not),
+and by setting a pointer to at most one IOMMU.
+
+	Arnd
