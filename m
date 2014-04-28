@@ -1,66 +1,47 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 28 Apr 2014 16:13:19 -0700
-Subject: [PATCH v12 30/31] ARM: dts: add System MMU nodes of exynos5250
-In-Reply-To: <CAGm_ybhTEN9QxFBd1Su8NGP32KeYTF8d_Z8gXKo7cYpapZrA9w@mail.gmail.com>
-References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
- <1398584283-22846-31-git-send-email-shaik.ameer@samsung.com>
- <CAGm_ybhTEN9QxFBd1Su8NGP32KeYTF8d_Z8gXKo7cYpapZrA9w@mail.gmail.com>
-Message-ID: <CAD=FV=UCpQRg9nWu5EfuzWmBpee9N3X6yCmtpRaNQxitfFZkMQ@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 28 Apr 2014 16:11:08 -0700
+Subject: [PATCH 2/5] power: reset: Add Allwinner A31 reset code
+In-Reply-To: <535BD18B.2070902@roeck-us.net>
+References: <1398265476-29373-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1398265476-29373-3-git-send-email-maxime.ripard@free-electrons.com>
+ <535BD18B.2070902@roeck-us.net>
+Message-ID: <20140428231108.GO3134@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vikas,
+Hi,
 
+On Sat, Apr 26, 2014 at 08:32:27AM -0700, Guenter Roeck wrote:
+> On 04/23/2014 08:04 AM, Maxime Ripard wrote:
+> >That code used to be in the machine code, but it's more fit here with other
+> >restart hooks.
+> >
+> >That will allow to cleanup the machine directory, while waiting for a proper
+> >watchdog driver for the A31.
+> >
+> >Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> 
+> I am a bit lost here. Why is this a separate driver, accessing watchdog registers,
+> while the other reset functions are being moved into the watchdog code ?
+> 
+> Any chance to handle all platforms the same ? Seems to me that would be less messy.
 
-On Sun, Apr 27, 2014 at 10:39 AM, Vikas Sajjan <sajjan.linux@gmail.com> wrote:
-> Hi shaik,
->
-> +Doug, Abhilash,
->
-> On Sun, Apr 27, 2014 at 1:08 PM, Shaik Ameer Basha
-> <shaik.ameer@samsung.com> wrote:
->> From: Cho KyongHo <pullip.cho@samsung.com>
->>
->> Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
->> ---
->>  arch/arm/boot/dts/exynos5250.dtsi |  270 ++++++++++++++++++++++++++++++++++++-
->>  1 file changed, 267 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
->> index 3742331..eebd397 100644
->> --- a/arch/arm/boot/dts/exynos5250.dtsi
->> +++ b/arch/arm/boot/dts/exynos5250.dtsi
->> @@ -82,6 +82,16 @@
->>                 reg = <0x10044040 0x20>;
->>         };
->>
->> +       pd_isp: isp-power-domain at 0x10044020 {
->> +               compatible = "samsung,exynos4210-pd";
->> +               reg = <0x10044020 0x20>;
->> +       };
->> +
->> +       pd_disp1: disp1-power-domain at 0x100440A0 {
->> +               compatible = "samsung,exynos4210-pd";
->> +               reg = <0x100440A0 0x20>;
->> +       };
->> +
->
-> As per subject "add System MMU nodes of exynos5250", it should only
-> add SysMMU node.
-> So, I think adding power domain nodes should go in a separate patch.
->
-> Adding power domain nodes can break the system, if powering ON/OFF of
-> the given power domain is NOT taken care well.
-> I can see ISP is one such case. With this series I can see S2R breaks
-> [1] on 5250 chromebook with current mainline kernel (same applies for
-> arndale and smdk5250, but I have tested on these boards yet)
+The A31 watchdog is actually a different watchdog from the one in the
+other Allwinner SoCs, that probably needs a driver of its own, or at
+least, a significant refactoring.
 
-Thanks for catching that!  Let's make sure not to break suspend/resume.
+No one did this yet, but eventually this will probably happen.
 
-Given that these power domains are actually used as the domains for
-some of the System MMU nodes I don't totally object to adding them in
-the same patch, but if they're breaking things then I agree that we
-could leave them out and add them in a later patch (once issues are
-sorted out).
+Maxime
 
--Doug
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140428/155f63fb/attachment.sig>
