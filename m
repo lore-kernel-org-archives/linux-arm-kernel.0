@@ -1,96 +1,88 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 28 Apr 2014 12:54:46 +0200
-Subject: [PATCH v4 05/17] ASoC: fsl-ssi: Remove useless DMA code
+Date: Mon, 28 Apr 2014 12:54:53 +0200
+Subject: [PATCH v4 12/17] ASoC: fsl-ssi: set bitclock in master mode from
+ hw_params
 In-Reply-To: <1398682498-24357-1-git-send-email-mpa@pengutronix.de>
 References: <1398682498-24357-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1398682498-24357-6-git-send-email-mpa@pengutronix.de>
+Message-ID: <1398682498-24357-13-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simplify dma DT property handling. fsl,ssi-dma-events is not used
-anymore. It passes invalid data to imx_pcm_dma_params_init_data() which
-copies some data into an imx dma struct. This struct is never used in
-imx-dma or imx-sdma because of generic OF DMA handling. The
-"fsl,ssi-dma-events" is not used anywhere in dts files.
+From: Sascha Hauer <s.hauer@pengutronix.de>
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+The fsl_ssi driver uses the .set_sysclk callback to configure the
+bitclock for master mode. This is unnecessary since the bitclock
+is known in hw_params. This patch removes the .set_sysclk callback
+and configures the bitclock from .hw_params.
+
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- sound/soc/fsl/fsl_ssi.c | 40 +++-------------------------------------
- 1 file changed, 3 insertions(+), 37 deletions(-)
+ sound/soc/fsl/fsl_ssi.c | 18 +++++++++++++-----
+ 1 file changed, 13 insertions(+), 5 deletions(-)
 
 diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-index 418c646..8072926 100644
+index d8f9a5f..8ed724c 100644
 --- a/sound/soc/fsl/fsl_ssi.c
 +++ b/sound/soc/fsl/fsl_ssi.c
-@@ -168,8 +168,6 @@ struct fsl_ssi_private {
- 	struct clk *clk;
- 	struct snd_dmaengine_dai_dma_data dma_params_tx;
- 	struct snd_dmaengine_dai_dma_data dma_params_rx;
--	struct imx_dma_data filter_data_tx;
--	struct imx_dma_data filter_data_rx;
- 	struct imx_pcm_fiq_params fiq_params;
- 	/* Register values for rx/tx configuration */
- 	struct fsl_ssi_rxtx_reg_val rxtx_reg_val;
-@@ -996,8 +994,7 @@ static int fsl_ssi_imx_probe(struct platform_device *pdev,
- 		struct fsl_ssi_private *ssi_private)
- {
- 	struct device_node *np = pdev->dev.of_node;
--	u32 dma_events[2], dmas[4];
--	bool shared;
-+	u32 dmas[4];
- 	int ret;
- 
- 	ssi_private->clk = devm_clk_get(&pdev->dev, NULL);
-@@ -1033,26 +1030,9 @@ static int fsl_ssi_imx_probe(struct platform_device *pdev,
- 			offsetof(struct ccsr_ssi, stx0);
- 	ssi_private->dma_params_rx.addr = ssi_private->ssi_phys +
- 			offsetof(struct ccsr_ssi, srx0);
--	ssi_private->dma_params_tx.filter_data = &ssi_private->filter_data_tx;
--	ssi_private->dma_params_rx.filter_data = &ssi_private->filter_data_rx;
- 
--	if (!of_property_read_bool(pdev->dev.of_node, "dmas") &&
--			ssi_private->use_dma) {
--		/*
--		 * FIXME: This is a temporary solution until all
--		 * necessary dma drivers support the generic dma
--		 * bindings.
--		 */
--		ret = of_property_read_u32_array(pdev->dev.of_node,
--				"fsl,ssi-dma-events", dma_events, 2);
--		if (ret && ssi_private->use_dma) {
--			dev_err(&pdev->dev, "could not get dma events but fsl-ssi is configured to use DMA\n");
--			goto error_dma_events;
--		}
--	}
--	/* Should this be merge with the above? */
--	if (!of_property_read_u32_array(pdev->dev.of_node, "dmas", dmas, 4)
--			&& dmas[2] == IMX_DMATYPE_SSI_DUAL) {
-+	ret = !of_property_read_u32_array(np, "dmas", dmas, 4);
-+	if (ssi_private->use_dma && !ret && dmas[2] == IMX_DMATYPE_SSI_DUAL) {
- 		ssi_private->use_dual_fifo = true;
- 		/* When using dual fifo mode, we need to keep watermark
- 		 * as even numbers due to dma script limitation.
-@@ -1061,21 +1041,7 @@ static int fsl_ssi_imx_probe(struct platform_device *pdev,
- 		ssi_private->dma_params_rx.maxburst &= ~0x1;
- 	}
- 
--	shared = of_device_is_compatible(of_get_parent(np), "fsl,spba-bus");
--
--	imx_pcm_dma_params_init_data(&ssi_private->filter_data_tx,
--		dma_events[0], shared ? IMX_DMATYPE_SSI_SP : IMX_DMATYPE_SSI);
--	imx_pcm_dma_params_init_data(&ssi_private->filter_data_rx,
--		dma_events[1], shared ? IMX_DMATYPE_SSI_SP : IMX_DMATYPE_SSI);
--
- 	return 0;
--
--error_dma_events:
--	if (!IS_ERR(ssi_private->baudclk))
--		clk_disable_unprepare(ssi_private->baudclk);
--	clk_disable_unprepare(ssi_private->clk);
--
--	return ret;
+@@ -509,7 +509,7 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
  }
  
- static void fsl_ssi_imx_clean(struct platform_device *pdev,
+ /**
+- * fsl_ssi_set_dai_sysclk - configure Digital Audio Interface bit clock
++ * fsl_ssi_set_bclk - configure Digital Audio Interface bit clock
+  *
+  * Note: This function can be only called when using SSI as DAI master
+  *
+@@ -517,8 +517,8 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
+  * freq: Output BCLK frequency = samplerate * 32 (fixed) * channels
+  * dir: SND_SOC_CLOCK_OUT -> TxBCLK, SND_SOC_CLOCK_IN -> RxBCLK.
+  */
+-static int fsl_ssi_set_dai_sysclk(struct snd_soc_dai *cpu_dai,
+-				  int clk_id, unsigned int freq, int dir)
++static int fsl_ssi_set_bclk(struct snd_pcm_substream *substream,
++		struct snd_soc_dai *cpu_dai, unsigned int freq)
+ {
+ 	struct fsl_ssi_private *ssi_private = snd_soc_dai_get_drvdata(cpu_dai);
+ 	struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
+@@ -583,7 +583,7 @@ static int fsl_ssi_set_dai_sysclk(struct snd_soc_dai *cpu_dai,
+ 	mask = CCSR_SSI_SxCCR_PM_MASK | CCSR_SSI_SxCCR_DIV2 |
+ 		CCSR_SSI_SxCCR_PSR;
+ 
+-	if (dir == SND_SOC_CLOCK_OUT || synchronous)
++	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK || synchronous)
+ 		write_ssi_mask(&ssi->stccr, mask, stccr);
+ 	else
+ 		write_ssi_mask(&ssi->srccr, mask, stccr);
+@@ -627,6 +627,7 @@ static int fsl_ssi_hw_params(struct snd_pcm_substream *substream,
+ 		snd_pcm_format_width(params_format(hw_params));
+ 	u32 wl = CCSR_SSI_SxCCR_WL(sample_size);
+ 	int enabled = read_ssi(&ssi->scr) & CCSR_SSI_SCR_SSIEN;
++	int ret;
+ 
+ 	/*
+ 	 * If we're in synchronous mode, and the SSI is already enabled,
+@@ -635,6 +636,14 @@ static int fsl_ssi_hw_params(struct snd_pcm_substream *substream,
+ 	if (enabled && ssi_private->cpu_dai_drv.symmetric_rates)
+ 		return 0;
+ 
++	if (fsl_ssi_is_i2s_master(ssi_private)) {
++		ret = fsl_ssi_set_bclk(substream, cpu_dai,
++				params_channels(hw_params) * 32 *
++				params_rate(hw_params));
++		if (ret)
++			return ret;
++	}
++
+ 	/*
+ 	 * FIXME: The documentation says that SxCCR[WL] should not be
+ 	 * modified while the SSI is enabled.  The only time this can
+@@ -923,7 +932,6 @@ static const struct snd_soc_dai_ops fsl_ssi_dai_ops = {
+ 	.startup	= fsl_ssi_startup,
+ 	.hw_params	= fsl_ssi_hw_params,
+ 	.set_fmt	= fsl_ssi_set_dai_fmt,
+-	.set_sysclk	= fsl_ssi_set_dai_sysclk,
+ 	.set_tdm_slot	= fsl_ssi_set_dai_tdm_slot,
+ 	.trigger	= fsl_ssi_trigger,
+ };
 -- 
 1.9.1
