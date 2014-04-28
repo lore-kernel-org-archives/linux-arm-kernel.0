@@ -1,279 +1,160 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 28 Apr 2014 20:29:15 +0100
-Subject: [PATCH 36/97] ARM: l2c: remove obsolete l2x0 ops for non-OF init
+Date: Mon, 28 Apr 2014 20:29:20 +0100
+Subject: [PATCH 37/97] ARM: l2c: move type string into l2c_init_data structure
 In-Reply-To: <20140428192419.GV26756@n2100.arm.linux.org.uk>
 References: <20140428192419.GV26756@n2100.arm.linux.org.uk>
-Message-ID: <E1WerEp-0001Vm-Q9@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WerEu-0001Vq-Tw@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-non-OF initialisation has never been used with any cache controller
-which isn't an ARM cache controller, so we can safely get rid of the
-old (and buggy) l2x0_*-based operations structure.
-
-This is also the last reference to:
-- l2x0_clean_line()
-- l2x0_inv_line()
-- l2x0_flush_line()
-- l2x0_flush_all()
-- l2x0_clean_all()
-- l2x0_inv_all()
-- l2x0_inv_range()
-- l2x0_clean_range()
-- l2x0_flush_range()
-- l2x0_enable()
-- l2x0_resume()
-so kill those functions too.
+Rather than decoding this from the ID register, store it in the
+l2c_init_data structure.  This simplifies things some more, and
+allows us to better provide further details as to how we're
+driving the cache.  We print the cache ID value anyway should we
+need to precisely identify the cache hardware.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mm/cache-l2x0.c | 206 -----------------------------------------------
- 1 file changed, 206 deletions(-)
+ arch/arm/mm/cache-l2x0.c | 20 +++++++++++++-------
+ 1 file changed, 13 insertions(+), 7 deletions(-)
 
 diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 57680e03da84..c5d754912f96 100644
+index c5d754912f96..b4dd2f4b491b 100644
 --- a/arch/arm/mm/cache-l2x0.c
 +++ b/arch/arm/mm/cache-l2x0.c
-@@ -134,20 +134,6 @@ static inline void cache_sync(void)
- 	cache_wait(base + L2X0_CACHE_SYNC, 1);
+@@ -29,6 +29,7 @@
+ #include "cache-aurora-l2.h"
+ 
+ struct l2c_init_data {
++	const char *type;
+ 	unsigned num_lock;
+ 	void (*of_parse)(const struct device_node *, u32 *, u32 *);
+ 	void (*enable)(void __iomem *, u32, unsigned);
+@@ -274,6 +275,7 @@ static void l2c210_resume(void)
  }
  
--static inline void l2x0_clean_line(unsigned long addr)
--{
--	void __iomem *base = l2x0_base;
--	cache_wait(base + L2X0_CLEAN_LINE_PA, 1);
--	writel_relaxed(addr, base + L2X0_CLEAN_LINE_PA);
--}
--
--static inline void l2x0_inv_line(unsigned long addr)
--{
--	void __iomem *base = l2x0_base;
--	cache_wait(base + L2X0_INV_LINE_PA, 1);
--	writel_relaxed(addr, base + L2X0_INV_LINE_PA);
--}
--
- #if defined(CONFIG_PL310_ERRATA_588369) || defined(CONFIG_PL310_ERRATA_727915)
- static inline void debug_writel(unsigned long val)
- {
-@@ -161,27 +147,6 @@ static inline void debug_writel(unsigned long val)
- }
- #endif
- 
--#ifdef CONFIG_PL310_ERRATA_588369
--static inline void l2x0_flush_line(unsigned long addr)
--{
--	void __iomem *base = l2x0_base;
--
--	/* Clean by PA followed by Invalidate by PA */
--	cache_wait(base + L2X0_CLEAN_LINE_PA, 1);
--	writel_relaxed(addr, base + L2X0_CLEAN_LINE_PA);
--	cache_wait(base + L2X0_INV_LINE_PA, 1);
--	writel_relaxed(addr, base + L2X0_INV_LINE_PA);
--}
--#else
--
--static inline void l2x0_flush_line(unsigned long addr)
--{
--	void __iomem *base = l2x0_base;
--	cache_wait(base + L2X0_CLEAN_INV_LINE_PA, 1);
--	writel_relaxed(addr, base + L2X0_CLEAN_INV_LINE_PA);
--}
--#endif
--
- static void l2x0_cache_sync(void)
- {
- 	unsigned long flags;
-@@ -209,131 +174,6 @@ static void l2x0_flush_all(void)
- 	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+ static const struct l2c_init_data l2c210_data __initconst = {
++	.type = "L2C-210",
+ 	.num_lock = 1,
+ 	.enable = l2c_enable,
+ 	.outer_cache = {
+@@ -416,6 +418,7 @@ static void l2c220_sync(void)
  }
  
--static void l2x0_clean_all(void)
--{
--	unsigned long flags;
--
--	/* clean all ways */
--	raw_spin_lock_irqsave(&l2x0_lock, flags);
--	__l2c_op_way(l2x0_base + L2X0_CLEAN_WAY);
--	cache_sync();
--	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
--}
--
--static void l2x0_inv_all(void)
--{
--	unsigned long flags;
--
--	/* invalidate all ways */
--	raw_spin_lock_irqsave(&l2x0_lock, flags);
--	/* Invalidating when L2 is enabled is a nono */
--	BUG_ON(readl(l2x0_base + L2X0_CTRL) & L2X0_CTRL_EN);
--	__l2c_op_way(l2x0_base + L2X0_INV_WAY);
--	cache_sync();
--	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
--}
--
--static void l2x0_inv_range(unsigned long start, unsigned long end)
--{
--	void __iomem *base = l2x0_base;
--	unsigned long flags;
--
--	raw_spin_lock_irqsave(&l2x0_lock, flags);
--	if (start & (CACHE_LINE_SIZE - 1)) {
--		start &= ~(CACHE_LINE_SIZE - 1);
--		debug_writel(0x03);
--		l2x0_flush_line(start);
--		debug_writel(0x00);
--		start += CACHE_LINE_SIZE;
--	}
--
--	if (end & (CACHE_LINE_SIZE - 1)) {
--		end &= ~(CACHE_LINE_SIZE - 1);
--		debug_writel(0x03);
--		l2x0_flush_line(end);
--		debug_writel(0x00);
--	}
--
--	while (start < end) {
--		unsigned long blk_end = start + min(end - start, 4096UL);
--
--		while (start < blk_end) {
--			l2x0_inv_line(start);
--			start += CACHE_LINE_SIZE;
--		}
--
--		if (blk_end < end) {
--			raw_spin_unlock_irqrestore(&l2x0_lock, flags);
--			raw_spin_lock_irqsave(&l2x0_lock, flags);
--		}
--	}
--	cache_wait(base + L2X0_INV_LINE_PA, 1);
--	cache_sync();
--	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
--}
--
--static void l2x0_clean_range(unsigned long start, unsigned long end)
--{
--	void __iomem *base = l2x0_base;
--	unsigned long flags;
--
--	if ((end - start) >= l2x0_size) {
--		l2x0_clean_all();
--		return;
--	}
--
--	raw_spin_lock_irqsave(&l2x0_lock, flags);
--	start &= ~(CACHE_LINE_SIZE - 1);
--	while (start < end) {
--		unsigned long blk_end = start + min(end - start, 4096UL);
--
--		while (start < blk_end) {
--			l2x0_clean_line(start);
--			start += CACHE_LINE_SIZE;
--		}
--
--		if (blk_end < end) {
--			raw_spin_unlock_irqrestore(&l2x0_lock, flags);
--			raw_spin_lock_irqsave(&l2x0_lock, flags);
--		}
--	}
--	cache_wait(base + L2X0_CLEAN_LINE_PA, 1);
--	cache_sync();
--	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
--}
--
--static void l2x0_flush_range(unsigned long start, unsigned long end)
--{
--	void __iomem *base = l2x0_base;
--	unsigned long flags;
--
--	if ((end - start) >= l2x0_size) {
--		l2x0_flush_all();
--		return;
--	}
--
--	raw_spin_lock_irqsave(&l2x0_lock, flags);
--	start &= ~(CACHE_LINE_SIZE - 1);
--	while (start < end) {
--		unsigned long blk_end = start + min(end - start, 4096UL);
--
--		debug_writel(0x03);
--		while (start < blk_end) {
--			l2x0_flush_line(start);
--			start += CACHE_LINE_SIZE;
--		}
--		debug_writel(0x00);
--
--		if (blk_end < end) {
--			raw_spin_unlock_irqrestore(&l2x0_lock, flags);
--			raw_spin_lock_irqsave(&l2x0_lock, flags);
--		}
--	}
--	cache_wait(base + L2X0_CLEAN_INV_LINE_PA, 1);
--	cache_sync();
--	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
--}
--
- static void l2x0_disable(void)
- {
- 	unsigned long flags;
-@@ -345,49 +185,6 @@ static void l2x0_disable(void)
- 	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+ static const struct l2c_init_data l2c220_data = {
++	.type = "L2C-220",
+ 	.num_lock = 1,
+ 	.enable = l2c_enable,
+ 	.outer_cache = {
+@@ -650,6 +653,7 @@ static void __init l2c310_fixup(void __iomem *base, u32 cache_id,
  }
  
--static void l2x0_enable(void __iomem *base, u32 aux, unsigned num_lock)
--{
--	unsigned id;
--
--	id = readl_relaxed(base + L2X0_CACHE_ID) & L2X0_CACHE_ID_PART_MASK;
--	if (id == L2X0_CACHE_ID_PART_L310)
--		num_lock = 8;
--	else
--		num_lock = 1;
--
--	/* l2x0 controller is disabled */
--	writel_relaxed(aux, base + L2X0_AUX_CTRL);
--
--	/* Make sure that I&D is not locked down when starting */
--	l2c_unlock(base, num_lock);
--
--	l2x0_inv_all();
--
--	/* enable L2X0 */
--	writel_relaxed(L2X0_CTRL_EN, base + L2X0_CTRL);
--}
--
--static void l2x0_resume(void)
--{
--	void __iomem *base = l2x0_base;
--
--	if (!(readl_relaxed(base + L2X0_CTRL) & L2X0_CTRL_EN))
--		l2x0_enable(base, l2x0_saved_regs.aux_ctrl, 0);
--}
--
--static const struct l2c_init_data l2x0_init_fns __initconst = {
--	.enable = l2x0_enable,
--	.outer_cache = {
--		.inv_range = l2x0_inv_range,
--		.clean_range = l2x0_clean_range,
--		.flush_range = l2x0_flush_range,
--		.flush_all = l2x0_flush_all,
--		.disable = l2x0_disable,
--		.sync = l2x0_cache_sync,
--		.resume = l2x0_resume,
--	},
--};
--
- /*
-  * L2C-210 specific code.
-  *
-@@ -966,9 +763,6 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
+ static const struct l2c_init_data l2c310_init_fns __initconst = {
++	.type = "L2C-310",
+ 	.num_lock = 8,
+ 	.enable = l2c_enable,
+ 	.fixup = l2c310_fixup,
+@@ -674,7 +678,6 @@ static void __init __l2c_init(const struct l2c_init_data *data,
+ 	u32 way_size = 0;
+ 	int ways;
+ 	int way_size_shift = L2X0_WAY_SIZE_SHIFT;
+-	const char *type;
  
- 	switch (cache_id & L2X0_CACHE_ID_PART_MASK) {
- 	default:
--		data = &l2x0_init_fns;
--		break;
--
- 	case L2X0_CACHE_ID_PART_L210:
- 		data = &l2c210_data;
+ 	/*
+ 	 * It is strange to save the register state before initialisation,
+@@ -695,25 +698,21 @@ static void __init __l2c_init(const struct l2c_init_data *data,
+ 			ways = 16;
+ 		else
+ 			ways = 8;
+-		type = "L310";
  		break;
+ 
+ 	case L2X0_CACHE_ID_PART_L210:
+ 		ways = (aux >> 13) & 0xf;
+-		type = "L210";
+ 		break;
+ 
+ 	case AURORA_CACHE_ID:
+ 		ways = (aux >> 13) & 0xf;
+ 		ways = 2 << ((ways + 1) >> 2);
+ 		way_size_shift = AURORA_WAY_SIZE_SHIFT;
+-		type = "Aurora";
+ 		break;
+ 
+ 	default:
+ 		/* Assume unknown chips have 8 ways */
+ 		ways = 8;
+-		type = "L2x0 series";
+ 		break;
+ 	}
+ 
+@@ -747,9 +746,9 @@ static void __init __l2c_init(const struct l2c_init_data *data,
+ 	outer_cache = fns;
+ 
+ 	pr_info("%s cache controller enabled, %d ways, %d kB\n",
+-		type, ways, l2x0_size >> 10);
++		data->type, ways, l2x0_size >> 10);
+ 	pr_info("%s: CACHE_ID 0x%08x, AUX_CTRL 0x%08x\n",
+-		type, cache_id, aux);
++		data->type, cache_id, aux);
+ }
+ 
+ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
+@@ -821,6 +820,7 @@ static void __init l2x0_of_parse(const struct device_node *np,
+ }
+ 
+ static const struct l2c_init_data of_l2c210_data __initconst = {
++	.type = "L2C-210",
+ 	.num_lock = 1,
+ 	.of_parse = l2x0_of_parse,
+ 	.enable = l2c_enable,
+@@ -836,6 +836,7 @@ static const struct l2c_init_data of_l2c210_data __initconst = {
+ };
+ 
+ static const struct l2c_init_data of_l2c220_data __initconst = {
++	.type = "L2C-220",
+ 	.num_lock = 1,
+ 	.of_parse = l2x0_of_parse,
+ 	.enable = l2c_enable,
+@@ -885,6 +886,7 @@ static void __init l2c310_of_parse(const struct device_node *np,
+ }
+ 
+ static const struct l2c_init_data of_l2c310_data __initconst = {
++	.type = "L2C-310",
+ 	.num_lock = 8,
+ 	.of_parse = l2c310_of_parse,
+ 	.enable = l2c_enable,
+@@ -1063,6 +1065,7 @@ static void __init aurora_of_parse(const struct device_node *np,
+ }
+ 
+ static const struct l2c_init_data of_aurora_with_outer_data __initconst = {
++	.type = "Aurora",
+ 	.num_lock = 4,
+ 	.of_parse = aurora_of_parse,
+ 	.enable = l2c_enable,
+@@ -1080,6 +1083,7 @@ static const struct l2c_init_data of_aurora_with_outer_data __initconst = {
+ };
+ 
+ static const struct l2c_init_data of_aurora_no_outer_data __initconst = {
++	.type = "Aurora",
+ 	.num_lock = 4,
+ 	.of_parse = aurora_of_parse,
+ 	.enable = aurora_enable_no_outer,
+@@ -1228,6 +1232,7 @@ static void bcm_flush_range(unsigned long start, unsigned long end)
+ 
+ /* Broadcom L2C-310 start from ARMs R3P2 or later, and require no fixups */
+ static const struct l2c_init_data of_bcm_l2x0_data __initconst = {
++	.type = "BCM-L2C-310",
+ 	.num_lock = 8,
+ 	.of_parse = l2c310_of_parse,
+ 	.enable = l2c_enable,
+@@ -1266,6 +1271,7 @@ static void tauros3_resume(void)
+ }
+ 
+ static const struct l2c_init_data of_tauros3_data __initconst = {
++	.type = "Tauros3",
+ 	.num_lock = 8,
+ 	.enable = l2c_enable,
+ 	.save  = tauros3_save,
 -- 
 1.8.3.1
