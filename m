@@ -1,105 +1,108 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Mon, 28 Apr 2014 11:47:54 +0530
-Subject: [PATCH v7 2/2] phy: exynos5-usbdrd: Add facility for VBUS supply
-In-Reply-To: <1398665874-31238-1-git-send-email-gautam.vivek@samsung.com>
-References: <1398665874-31238-1-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <1398665874-31238-2-git-send-email-gautam.vivek@samsung.com>
+From: anup.patel@linaro.org (Anup Patel)
+Date: Mon, 28 Apr 2014 11:48:57 +0530
+Subject: [PATCH v8 3/3] ARM: Check if a CPU has gone offline
+In-Reply-To: <1398455329-18136-4-git-send-email-ashwin.chaugule@linaro.org>
+References: <1398455329-18136-1-git-send-email-ashwin.chaugule@linaro.org>
+ <1398455329-18136-4-git-send-email-ashwin.chaugule@linaro.org>
+Message-ID: <CALrVBkuV2kQmBScDSMUVG+hOMZ3FQ1tEOEwUEPHRoCo9si+ygA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding support to enable/disable VBUS controlled by a
-regulator, to enable vbus supply on the port.
+Hi Ashwin,
 
-Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
----
+On 26 April 2014 01:18, Ashwin Chaugule <ashwin.chaugule@linaro.org> wrote:
+> PSCIv0.2 adds a new function called AFFINITY_INFO, which
+> can be used to query if a specified CPU has actually gone
+> offline. Calling this function via cpu_kill ensures that
+> a CPU has quiesced after a call to cpu_die.
+>
+> Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> ---
+>  arch/arm/kernel/psci_smp.c | 32 ++++++++++++++++++++++++++++++++
+>  include/uapi/linux/psci.h  |  5 +++++
+>  2 files changed, 37 insertions(+)
+>
+> diff --git a/arch/arm/kernel/psci_smp.c b/arch/arm/kernel/psci_smp.c
+> index 570a48c..94e230c 100644
+> --- a/arch/arm/kernel/psci_smp.c
+> +++ b/arch/arm/kernel/psci_smp.c
+> @@ -16,6 +16,8 @@
+>  #include <linux/init.h>
+>  #include <linux/smp.h>
+>  #include <linux/of.h>
+> +#include <linux/delay.h>
+> +#include <uapi/linux/psci.h>
+>
+>  #include <asm/psci.h>
+>  #include <asm/smp_plat.h>
+> @@ -66,6 +68,35 @@ void __ref psci_cpu_die(unsigned int cpu)
+>         /* We should never return */
+>         panic("psci: cpu %d failed to shutdown\n", cpu);
+>  }
+> +
+> +int __ref psci_cpu_kill(unsigned int cpu)
+> +{
+> +       int err, i;
+> +
+> +       if (!psci_ops.affinity_info)
+> +               return 1;
+> +       /*
+> +        * cpu_kill could race with cpu_die and we can
+> +        * potentially end up declaring this cpu undead
+> +        * while it is dying. So, try again a few times.
+> +        */
+> +
+> +       for (i=0; i<10; i++) {
+> +               err = psci_ops.affinity_info(cpu_logical_map(cpu), 0);
+> +
+> +               if (err == PSCI_AFFINITY_INFO_RET_OFF)
+> +                       return 1;
+> +
+> +               msleep(10);
+> +               pr_info("Retrying again to check for CPU kill\n");
+> +       }
+> +
+> +       pr_err("psci: Cannot kill CPU:%d, psci ret val: %d\n",
+> +                       cpu, err);
+> +       /* Make platform_cpu_kill() fail. */
+> +       return 0;
+> +}
+> +
+>  #endif
+>
+>  bool __init psci_smp_available(void)
+> @@ -78,5 +109,6 @@ struct smp_operations __initdata psci_smp_ops = {
+>         .smp_boot_secondary     = psci_boot_secondary,
+>  #ifdef CONFIG_HOTPLUG_CPU
+>         .cpu_die                = psci_cpu_die,
+> +       .cpu_kill               = psci_cpu_kill,
+>  #endif
+>  };
+> diff --git a/include/uapi/linux/psci.h b/include/uapi/linux/psci.h
+> index a4136c3..857209b 100644
+> --- a/include/uapi/linux/psci.h
+> +++ b/include/uapi/linux/psci.h
+> @@ -74,4 +74,9 @@
+>  #define PSCI_RET_NOT_PRESENT                   -7
+>  #define PSCI_RET_DISABLED                      -8
+>
+> +/* Return values from the PSCI_ID_AFFINITY_INFO Function. */
+> +#define PSCI_AFFINITY_INFO_RET_ON                      0
+> +#define PSCI_AFFINITY_INFO_RET_OFF                     1
+> +#define PSCI_AFFINITY_INFO_RET_ON_PENDING      2
 
-Changes from v6:
- - Rebased on top of [PATCH v7 1/2] phy: Add new Exynos5 USB 3.0 PHY driver.
+I have already added this return values in v10 patchset for PSCI v0.2
+emulation for KVM ARM/ARM64.
+(http://www.spinics.net/lists/kvm-arm/msg09062.html)
 
- drivers/phy/phy-exynos5-usbdrd.c |   32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+Please rebase your patch against that.
 
-diff --git a/drivers/phy/phy-exynos5-usbdrd.c b/drivers/phy/phy-exynos5-usbdrd.c
-index bc381e3..6e8540e 100644
---- a/drivers/phy/phy-exynos5-usbdrd.c
-+++ b/drivers/phy/phy-exynos5-usbdrd.c
-@@ -23,6 +23,7 @@
- #include <linux/mutex.h>
- #include <linux/mfd/syscon.h>
- #include <linux/regmap.h>
-+#include <linux/regulator/consumer.h>
- 
- /* Exynos USB PHY registers */
- #define EXYNOS5_FSEL_9MHZ6		0x0
-@@ -170,6 +171,7 @@ struct exynos5_usbdrd_phy {
- 	} phys[EXYNOS5_DRDPHYS_NUM];
- 	u32 extrefclk;
- 	struct clk *ref_clk;
-+	struct regulator *vbus;
- };
- 
- static inline
-@@ -438,6 +440,7 @@ static int exynos5_usbdrd_phy_exit(struct phy *phy)
- 
- static int exynos5_usbdrd_phy_power_on(struct phy *phy)
- {
-+	int ret;
- 	struct phy_usb_instance *inst = phy_get_drvdata(phy);
- 	struct exynos5_usbdrd_phy *phy_drd = to_usbdrd_phy(inst);
- 
-@@ -445,10 +448,24 @@ static int exynos5_usbdrd_phy_power_on(struct phy *phy)
- 
- 	clk_prepare_enable(phy_drd->ref_clk);
- 
-+	/* Enable VBUS supply */
-+	if (phy_drd->vbus) {
-+		ret = regulator_enable(phy_drd->vbus);
-+		if (ret) {
-+			dev_err(phy_drd->dev, "Failed to enable VBUS supply\n");
-+			goto fail_vbus;
-+		}
-+	}
-+
- 	/* Power-on PHY*/
- 	inst->phy_cfg->phy_isol(inst, 0);
- 
- 	return 0;
-+
-+fail_vbus:
-+	clk_disable_unprepare(phy_drd->ref_clk);
-+
-+	return ret;
- }
- 
- static int exynos5_usbdrd_phy_power_off(struct phy *phy)
-@@ -461,6 +478,10 @@ static int exynos5_usbdrd_phy_power_off(struct phy *phy)
- 	/* Power-off the PHY */
- 	inst->phy_cfg->phy_isol(inst, 1);
- 
-+	/* Disable VBUS supply */
-+	if (phy_drd->vbus)
-+		regulator_disable(phy_drd->vbus);
-+
- 	clk_disable_unprepare(phy_drd->ref_clk);
- 
- 	return 0;
-@@ -583,6 +604,17 @@ static int exynos5_usbdrd_phy_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
-+	/* Get Vbus regulator */
-+	phy_drd->vbus = devm_regulator_get(dev, "vbus");
-+	if (IS_ERR(phy_drd->vbus)) {
-+		ret = PTR_ERR(phy_drd->vbus);
-+		if (ret == -EPROBE_DEFER)
-+			return ret;
-+
-+		dev_warn(dev, "Failed to get VBUS supply regulator\n");
-+		phy_drd->vbus = NULL;
-+	}
-+
- 	dev_vdbg(dev, "Creating usbdrd_phy phy\n");
- 
- 	for (i = 0; i < EXYNOS5_DRDPHYS_NUM; i++) {
--- 
-1.7.10.4
+> +
+>  #endif /* _UAPI_LINUX_PSCI_H */
+> --
+> 1.8.3.2
+>
+
+Regards,
+Anup
