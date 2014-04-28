@@ -1,105 +1,36 @@
-From: jean.pihet@linaro.org (Jean Pihet)
-Date: Mon, 28 Apr 2014 15:12:10 +0200
-Subject: [PATCH 1/3] perf tests: Introduce perf_regs_load function on ARM64
-In-Reply-To: <CAFrcx1nfkDWTu9vF+a7UGjd1fzHpXS44pzqKLZS9ej7KJwqkOg@mail.gmail.com>
-References: <CAFrcx1nfkDWTu9vF+a7UGjd1fzHpXS44pzqKLZS9ej7KJwqkOg@mail.gmail.com>
-Message-ID: <1398690730-5454-1-git-send-email-jean.pihet@linaro.org>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 28 Apr 2014 10:19:49 -0300
+Subject: [PATCH v2 05/38] memory: mvebu-devbus: use ARMADA_ prefix in
+ defines
+In-Reply-To: <20140426142132.GU28159@titan.lakedaemon.net>
+References: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1398202002-28530-6-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140426142132.GU28159@titan.lakedaemon.net>
+Message-ID: <20140428131949.GA11604@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introducing perf_regs_load function, which is going
-to be used for dwarf unwind test in following patches.
+Hi guys,
 
-It takes single argument as a pointer to the regs dump
-buffer and populates it with current registers values, as
-expected by the perf built-in unwinding test.
+On Apr 26, Jason Cooper wrote:
+> On Tue, Apr 22, 2014 at 11:26:09PM +0200, Thomas Petazzoni wrote:
+> > The mvebu-devbus driver currently only supports the Armada 370/XP
+> > family, but it can also cover the Orion5x family. However, the Orion5x
+> > family has a different organization of the register. Therefore, in
+> > preparation to the introduction of Orion5x support, we rename the
+> > Armada 370/XP specific definitions to have an ARMADA_ prefix.
+> > 
+> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > ---
+> >  drivers/memory/mvebu-devbus.c | 48 +++++++++++++++++++++----------------------
+> >  1 file changed, 24 insertions(+), 24 deletions(-)
+> 
+> Patches 5 through 9 (devbus) applied to mvebu/drivers With Sebastian's
+> Acks and a dep on mvebu/fixes.
+> 
 
-Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
-Cc: Steve Capper <steve.capper@linaro.org>
-Cc: Corey Ashford <cjashfor@linux.vnet.ibm.com>
-Cc: Frederic Weisbecker <fweisbec@gmail.com>
-Cc: Ingo Molnar <mingo@kernel.org>
-Cc: Namhyung Kim <namhyung@kernel.org>
-Cc: Paul Mackerras <paulus@samba.org>
-Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
-Cc: Arnaldo Carvalho de Melo <acme@ghostprotocols.net>
-Cc: David Ahern <dsahern@gmail.com>
-Cc: Jiri Olsa <jolsa@redhat.com>
----
- tools/perf/arch/arm64/Makefile            |  1 +
- tools/perf/arch/arm64/include/perf_regs.h |  2 ++
- tools/perf/arch/arm64/tests/regs_load.S   | 40 +++++++++++++++++++++++++++++++
- 3 files changed, 43 insertions(+)
- create mode 100644 tools/perf/arch/arm64/tests/regs_load.S
-
-diff --git a/tools/perf/arch/arm64/Makefile b/tools/perf/arch/arm64/Makefile
-index 67e9b3d..9b8f87e 100644
---- a/tools/perf/arch/arm64/Makefile
-+++ b/tools/perf/arch/arm64/Makefile
-@@ -4,4 +4,5 @@ LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/dwarf-regs.o
- endif
- ifndef NO_LIBUNWIND
- LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/unwind-libunwind.o
-+LIB_OBJS += $(OUTPUT)arch/$(ARCH)/tests/regs_load.o
- endif
-diff --git a/tools/perf/arch/arm64/include/perf_regs.h b/tools/perf/arch/arm64/include/perf_regs.h
-index 2359546..1e052f1 100644
---- a/tools/perf/arch/arm64/include/perf_regs.h
-+++ b/tools/perf/arch/arm64/include/perf_regs.h
-@@ -9,6 +9,8 @@
- #define PERF_REG_IP	PERF_REG_ARM64_PC
- #define PERF_REG_SP	PERF_REG_ARM64_SP
- 
-+void perf_regs_load(u64 *regs);
-+
- static inline const char *perf_reg_name(int id)
- {
- 	switch (id) {
-diff --git a/tools/perf/arch/arm64/tests/regs_load.S b/tools/perf/arch/arm64/tests/regs_load.S
-new file mode 100644
-index 0000000..40b8b99
---- /dev/null
-+++ b/tools/perf/arch/arm64/tests/regs_load.S
-@@ -0,0 +1,40 @@
-+#include <linux/linkage.h>
-+
-+/*
-+ * Implementation of void perf_regs_load(u64 *regs);
-+ *
-+ * This functions fills in the 'regs' buffer from the actual registers values,
-+ * in the way the perf built-in unwinding test expects them, e.g. an address
-+ * within the caller:
-+ * - the PC at the time at the call to this function. Since this function
-+ *   is called using a bl instruction, the PC value is taken from LR,
-+ * - the current SP (not touched by this function),
-+ * - the current value of LR is merely retrieved and stored because the
-+ *   value before the call to this function is unknown at this time; it will
-+ *   be unwound from the dwarf information in unwind__get_entries.
-+ */
-+
-+.text
-+.type perf_regs_load,%function
-+ENTRY(perf_regs_load)
-+	stp x0,  x1,  [x0], #16	// store x0..x29
-+	stp x2,  x3,  [x0], #16
-+	stp x4,  x5,  [x0], #16
-+	stp x6,  x7,  [x0], #16
-+	stp x8,  x9,  [x0], #16
-+	stp x10, x11, [x0], #16
-+	stp x12, x13, [x0], #16
-+	stp x14, x15, [x0], #16
-+	stp x16, x17, [x0], #16
-+	stp x18, x19, [x0], #16
-+	stp x20, x21, [x0], #16
-+	stp x22, x23, [x0], #16
-+	stp x24, x25, [x0], #16
-+	stp x26, x27, [x0], #16
-+	stp x28, x29, [x0], #16
-+	mov x1,  sp
-+	stp x30, x1,  [x0], #16	// store lr and sp
-+	str x30, [x0]		// store lr as the PC in order to skip the call
-+				//  to this function
-+	ret
-+ENDPROC(perf_regs_load)
+Tested the branch (plus some -next fixes) on the AXP-GP. The NOR works perfectly fine.
 -- 
-1.7.11.7
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
