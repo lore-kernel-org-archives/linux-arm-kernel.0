@@ -1,27 +1,27 @@
 From: zhichang.yuan@linaro.org (zhichang.yuan at linaro.org)
-Date: Mon, 28 Apr 2014 13:11:29 +0800
-Subject: [PATCHv2 1/6] arm64: lib: Implement optimized memcpy routine
+Date: Mon, 28 Apr 2014 13:11:30 +0800
+Subject: [PATCHv2 2/6] arm64: lib: Implement optimized memmove routine
 In-Reply-To: <1398661895-5559-1-git-send-email-zhichang.yuan@linaro.org>
 References: <1398661895-5559-1-git-send-email-zhichang.yuan@linaro.org>
-Message-ID: <1398661895-5559-2-git-send-email-zhichang.yuan@linaro.org>
+Message-ID: <1398661895-5559-3-git-send-email-zhichang.yuan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "zhichang.yuan" <zhichang.yuan@linaro.org>
 
 This patch, based on Linaro's Cortex Strings library, improves
-the performance of the assembly optimized memcpy() function.
+the performance of the assembly optimized memmove() function.
 
 Signed-off-by: Zhichang Yuan <zhichang.yuan@linaro.org>
 Signed-off-by: Deepak Saxena <dsaxena@linaro.org>
 ---
- arch/arm64/lib/memcpy.S |  192 +++++++++++++++++++++++++++++++++++++++++------
- 1 file changed, 170 insertions(+), 22 deletions(-)
+ arch/arm64/lib/memmove.S |  190 ++++++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 165 insertions(+), 25 deletions(-)
 
-diff --git a/arch/arm64/lib/memcpy.S b/arch/arm64/lib/memcpy.S
-index 27b5003..8a9a96d 100644
---- a/arch/arm64/lib/memcpy.S
-+++ b/arch/arm64/lib/memcpy.S
+diff --git a/arch/arm64/lib/memmove.S b/arch/arm64/lib/memmove.S
+index b79fdfa..57b19ea 100644
+--- a/arch/arm64/lib/memmove.S
++++ b/arch/arm64/lib/memmove.S
 @@ -1,5 +1,13 @@
  /*
   * Copyright (C) 2013 ARM Ltd.
@@ -43,8 +43,8 @@ index 27b5003..8a9a96d 100644
 +#include <asm/cache.h>
  
  /*
-  * Copy a buffer from src to dest (alignment handled by the hardware)
-@@ -27,27 +36,166 @@
+  * Move a buffer from src to test (alignment handled by the hardware).
+@@ -28,30 +37,161 @@
   * Returns:
   *	x0 - dest
   */
@@ -68,63 +68,71 @@ index 27b5003..8a9a96d 100644
 +D_l	.req	x13
 +D_h	.req	x14
 +
- ENTRY(memcpy)
--	mov	x4, x0
+ ENTRY(memmove)
+-	cmp	x0, x1
+-	b.ls	memcpy
+-	add	x4, x0, x2
+-	add	x1, x1, x2
 -	subs	x2, x2, #8
 -	b.mi	2f
--1:	ldr	x3, [x1], #8
+-1:	ldr	x3, [x1, #-8]!
 -	subs	x2, x2, #8
--	str	x3, [x4], #8
+-	str	x3, [x4, #-8]!
 -	b.pl	1b
 -2:	adds	x2, x2, #4
 -	b.mi	3f
--	ldr	w3, [x1], #4
+-	ldr	w3, [x1, #-4]!
 -	sub	x2, x2, #4
--	str	w3, [x4], #4
+-	str	w3, [x4, #-4]!
 -3:	adds	x2, x2, #2
 -	b.mi	4f
--	ldrh	w3, [x1], #2
+-	ldrh	w3, [x1, #-2]!
 -	sub	x2, x2, #2
--	strh	w3, [x4], #2
+-	strh	w3, [x4, #-2]!
 -4:	adds	x2, x2, #1
 -	b.mi	5f
--	ldrb	w3, [x1]
--	strb	w3, [x4]
+-	ldrb	w3, [x1, #-1]
+-	strb	w3, [x4, #-1]
 -5:	ret
-+	mov	dst, dstin
-+	cmp	count, #16
-+	/*When memory length is less than 16, the accessed are not aligned.*/
-+	b.lo	.Ltiny15
++	cmp	dstin, src
++	b.lo	memcpy
++	add	tmp1, src, count
++	cmp	dstin, tmp1
++	b.hs	memcpy		/* No overlap.  */
 +
-+	neg	tmp2, src
-+	ands	tmp2, tmp2, #15/* Bytes to reach alignment. */
++	add	dst, dstin, count
++	add	src, src, count
++	cmp	count, #16
++	b.lo	.Ltail15  /*probably non-alignment accesses.*/
++
++	ands	tmp2, src, #15     /* Bytes to reach alignment.  */
 +	b.eq	.LSrcAligned
 +	sub	count, count, tmp2
 +	/*
-+	* Copy the leading memory data from src to dst in an increasing
-+	* address order.By this way,the risk of overwritting the source
-+	* memory data is eliminated when the distance between src and
-+	* dst is less than 16. The memory accesses here are alignment.
++	* process the aligned offset length to make the src aligned firstly.
++	* those extra instructions' cost is acceptable. It also make the
++	* coming accesses are based on aligned address.
 +	*/
 +	tbz	tmp2, #0, 1f
-+	ldrb	tmp1w, [src], #1
-+	strb	tmp1w, [dst], #1
++	ldrb	tmp1w, [src, #-1]!
++	strb	tmp1w, [dst, #-1]!
 +1:
 +	tbz	tmp2, #1, 2f
-+	ldrh	tmp1w, [src], #2
-+	strh	tmp1w, [dst], #2
++	ldrh	tmp1w, [src, #-2]!
++	strh	tmp1w, [dst, #-2]!
 +2:
 +	tbz	tmp2, #2, 3f
-+	ldr	tmp1w, [src], #4
-+	str	tmp1w, [dst], #4
++	ldr	tmp1w, [src, #-4]!
++	str	tmp1w, [dst, #-4]!
 +3:
 +	tbz	tmp2, #3, .LSrcAligned
-+	ldr	tmp1, [src],#8
-+	str	tmp1, [dst],#8
++	ldr	tmp1, [src, #-8]!
++	str	tmp1, [dst, #-8]!
 +
 +.LSrcAligned:
 +	cmp	count, #64
 +	b.ge	.Lcpy_over64
++
 +	/*
 +	* Deal with small copies quickly by dropping straight into the
 +	* exit block.
@@ -135,45 +143,35 @@ index 27b5003..8a9a96d 100644
 +	* bottom 6 bits of count to be accurate.
 +	*/
 +	ands	tmp1, count, #0x30
-+	b.eq	.Ltiny15
++	b.eq	.Ltail15
 +	cmp	tmp1w, #0x20
 +	b.eq	1f
 +	b.lt	2f
-+	ldp	A_l, A_h, [src], #16
-+	stp	A_l, A_h, [dst], #16
++	ldp	A_l, A_h, [src, #-16]!
++	stp	A_l, A_h, [dst, #-16]!
 +1:
-+	ldp	A_l, A_h, [src], #16
-+	stp	A_l, A_h, [dst], #16
++	ldp	A_l, A_h, [src, #-16]!
++	stp	A_l, A_h, [dst, #-16]!
 +2:
-+	ldp	A_l, A_h, [src], #16
-+	stp	A_l, A_h, [dst], #16
-+.Ltiny15:
-+	/*
-+	* Prefer to break one ldp/stp into several load/store to access
-+	* memory in an increasing address order,rather than to load/store 16
-+	* bytes from (src-16) to (dst-16) and to backward the src to aligned
-+	* address,which way is used in original cortex memcpy. If keeping
-+	* the original memcpy process here, memmove need to satisfy the
-+	* precondition that src address is at least 16 bytes bigger than dst
-+	* address,otherwise some source data will be overwritten when memove
-+	* call memcpy directly. To make memmove simpler and decouple the
-+	* memcpy's dependency on memmove, withdrew the original process.
-+	*/
++	ldp	A_l, A_h, [src, #-16]!
++	stp	A_l, A_h, [dst, #-16]!
++
++.Ltail15:
 +	tbz	count, #3, 1f
-+	ldr	tmp1, [src], #8
-+	str	tmp1, [dst], #8
++	ldr	tmp1, [src, #-8]!
++	str	tmp1, [dst, #-8]!
 +1:
 +	tbz	count, #2, 2f
-+	ldr	tmp1w, [src], #4
-+	str	tmp1w, [dst], #4
++	ldr	tmp1w, [src, #-4]!
++	str	tmp1w, [dst, #-4]!
 +2:
 +	tbz	count, #1, 3f
-+	ldrh	tmp1w, [src], #2
-+	strh	tmp1w, [dst], #2
++	ldrh	tmp1w, [src, #-2]!
++	strh	tmp1w, [dst, #-2]!
 +3:
 +	tbz	count, #0, .Lexitfunc
-+	ldrb	tmp1w, [src]
-+	strb	tmp1w, [dst]
++	ldrb	tmp1w, [src, #-1]
++	strb	tmp1w, [dst, #-1]
 +
 +.Lexitfunc:
 +	ret
@@ -182,56 +180,56 @@ index 27b5003..8a9a96d 100644
 +	subs	count, count, #128
 +	b.ge	.Lcpy_body_large
 +	/*
-+	* Less than 128 bytes to copy, so handle 64 here and then jump
++	* Less than 128 bytes to copy, so handle 64 bytes here and then jump
 +	* to the tail.
 +	*/
-+	ldp	A_l, A_h, [src],#16
-+	stp	A_l, A_h, [dst],#16
-+	ldp	B_l, B_h, [src],#16
-+	ldp	C_l, C_h, [src],#16
-+	stp	B_l, B_h, [dst],#16
-+	stp	C_l, C_h, [dst],#16
-+	ldp	D_l, D_h, [src],#16
-+	stp	D_l, D_h, [dst],#16
++	ldp	A_l, A_h, [src, #-16]
++	stp	A_l, A_h, [dst, #-16]
++	ldp	B_l, B_h, [src, #-32]
++	ldp	C_l, C_h, [src, #-48]
++	stp	B_l, B_h, [dst, #-32]
++	stp	C_l, C_h, [dst, #-48]
++	ldp	D_l, D_h, [src, #-64]!
++	stp	D_l, D_h, [dst, #-64]!
 +
 +	tst	count, #0x3f
 +	b.ne	.Ltail63
 +	ret
 +
 +	/*
-+	* Critical loop.  Start at a new cache line boundary.  Assuming
++	* Critical loop. Start at a new cache line boundary. Assuming
 +	* 64 bytes per line this ensures the entire loop is in one line.
 +	*/
 +	.p2align	L1_CACHE_SHIFT
 +.Lcpy_body_large:
-+	/* pre-get 64 bytes data. */
-+	ldp	A_l, A_h, [src],#16
-+	ldp	B_l, B_h, [src],#16
-+	ldp	C_l, C_h, [src],#16
-+	ldp	D_l, D_h, [src],#16
++	/* pre-load 64 bytes data. */
++	ldp	A_l, A_h, [src, #-16]
++	ldp	B_l, B_h, [src, #-32]
++	ldp	C_l, C_h, [src, #-48]
++	ldp	D_l, D_h, [src, #-64]!
 +1:
 +	/*
 +	* interlace the load of next 64 bytes data block with store of the last
 +	* loaded 64 bytes data.
 +	*/
-+	stp	A_l, A_h, [dst],#16
-+	ldp	A_l, A_h, [src],#16
-+	stp	B_l, B_h, [dst],#16
-+	ldp	B_l, B_h, [src],#16
-+	stp	C_l, C_h, [dst],#16
-+	ldp	C_l, C_h, [src],#16
-+	stp	D_l, D_h, [dst],#16
-+	ldp	D_l, D_h, [src],#16
++	stp	A_l, A_h, [dst, #-16]
++	ldp	A_l, A_h, [src, #-16]
++	stp	B_l, B_h, [dst, #-32]
++	ldp	B_l, B_h, [src, #-32]
++	stp	C_l, C_h, [dst, #-48]
++	ldp	C_l, C_h, [src, #-48]
++	stp	D_l, D_h, [dst, #-64]!
++	ldp	D_l, D_h, [src, #-64]!
 +	subs	count, count, #64
 +	b.ge	1b
-+	stp	A_l, A_h, [dst],#16
-+	stp	B_l, B_h, [dst],#16
-+	stp	C_l, C_h, [dst],#16
-+	stp	D_l, D_h, [dst],#16
++	stp	A_l, A_h, [dst, #-16]
++	stp	B_l, B_h, [dst, #-32]
++	stp	C_l, C_h, [dst, #-48]
++	stp	D_l, D_h, [dst, #-64]!
 +
 +	tst	count, #0x3f
 +	b.ne	.Ltail63
 +	ret
- ENDPROC(memcpy)
+ ENDPROC(memmove)
 -- 
 1.7.9.5
