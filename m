@@ -1,255 +1,148 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Mon, 28 Apr 2014 11:17:53 +0530
-Subject: [PATCH v5 1/2] phy: Add new Exynos5 USB 3.0 PHY driver
-In-Reply-To: <535AE9D2.9070605@gmail.com>
-References: <1398153795-28475-1-git-send-email-gautam.vivek@samsung.com>
- <1398153795-28475-2-git-send-email-gautam.vivek@samsung.com>
- <535AE9D2.9070605@gmail.com>
-Message-ID: <CAFp+6iGc1zEqwpbGKejDSDta12ASZ=_P7dFBKmtJpTnE7-VTwA@mail.gmail.com>
+From: alim.akhtar@gmail.com (Alim Akhtar)
+Date: Mon, 28 Apr 2014 11:31:35 +0530
+Subject: [PATCH v3 03/16] clk: exynos5420: update clocks for GSCL and MSCL
+ blocks
+In-Reply-To: <1398344632-18623-4-git-send-email-shaik.ameer@samsung.com>
+References: <1398344632-18623-1-git-send-email-shaik.ameer@samsung.com>
+ <1398344632-18623-4-git-send-email-shaik.ameer@samsung.com>
+Message-ID: <CAGOxZ52vcemipA5kUZd+1-AQv3NDZHeVq_1YdapEEaqs4v96Dw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+Hi Shaik
 
+On Thu, Apr 24, 2014 at 6:33 PM, Shaik Ameer Basha
+<shaik.ameer@samsung.com> wrote:
+> This patch adds the missing GSCL and MSCL block clocks
+> and corrects some wrong parent-child relationships.
+>
+> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+> Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
+> ---
+Looks ok
+Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
+>  drivers/clk/samsung/clk-exynos5420.c   |   41 +++++++++++++++++++++-----------
+>  include/dt-bindings/clock/exynos5420.h |    2 +-
+>  2 files changed, 28 insertions(+), 15 deletions(-)
+>
+> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+> index 972da5d..c3c8ceb 100755
+> --- a/drivers/clk/samsung/clk-exynos5420.c
+> +++ b/drivers/clk/samsung/clk-exynos5420.c
+> @@ -80,6 +80,7 @@
+>  #define DIV_PERIC4             0x10568
+>  #define SCLK_DIV_ISP0          0x10580
+>  #define SCLK_DIV_ISP1          0x10584
+> +#define DIV2_RATIO0            0x10590
+>  #define GATE_BUS_TOP           0x10700
+>  #define GATE_BUS_FSYS0         0x10740
+>  #define GATE_BUS_PERIC         0x10750
+> @@ -165,6 +166,7 @@ static unsigned long exynos5420_clk_regs[] __initdata = {
+>         DIV_PERIC4,
+>         SCLK_DIV_ISP0,
+>         SCLK_DIV_ISP1,
+> +       DIV2_RATIO0,
+>         GATE_BUS_TOP,
+>         GATE_BUS_FSYS0,
+>         GATE_BUS_PERIC,
+> @@ -572,6 +574,11 @@ static struct samsung_div_clock exynos5420_div_clks[] __initdata = {
+>         DIV(0, "dout_pre_spi1", "dout_spi1", DIV_PERIC4, 16, 8),
+>         DIV(0, "dout_pre_spi2", "dout_spi2", DIV_PERIC4, 24, 8),
+>
+> +       /* GSCL Block */
+> +       DIV(0, "dout_gscl_blk_300", "mout_user_aclk300_gscl",
+> +               DIV2_RATIO0, 4, 2),
+> +       DIV(0, "dout_gscl_blk_333", "aclk333_432_gscl", DIV2_RATIO0, 6, 2),
+> +
+>         /* ISP Block */
+>         DIV(0, "dout_aclk400_isp", "mout_aclk400_isp", DIV_TOP0, 0, 3),
+>         DIV(0, "dout_aclk333_432_isp0", "mout_aclk333_432_isp0",
+> @@ -666,9 +673,9 @@ static struct samsung_gate_clock exynos5420_gate_clks[] __initdata = {
+>         GATE(CLK_SCLK_USBD301, "sclk_unipro", "dout_unipro",
+>                 SRC_MASK_FSYS, 24, CLK_SET_RATE_PARENT, 0),
+>
+> -       GATE(CLK_SCLK_GSCL_WA, "sclk_gscl_wa", "aclK333_432_gscl",
+> +       GATE(CLK_SCLK_GSCL_WA, "sclk_gscl_wa", "mout_user_aclk333_432_gscl",
+>                 GATE_TOP_SCLK_GSCL, 6, CLK_SET_RATE_PARENT, 0),
+> -       GATE(CLK_SCLK_GSCL_WB, "sclk_gscl_wb", "aclk333_432_gscl",
+> +       GATE(CLK_SCLK_GSCL_WB, "sclk_gscl_wb", "mout_user_aclk333_432_gscl",
+>                 GATE_TOP_SCLK_GSCL, 7, CLK_SET_RATE_PARENT, 0),
+>
+>         /* Display */
+> @@ -766,22 +773,25 @@ static struct samsung_gate_clock exynos5420_gate_clks[] __initdata = {
+>
+>         GATE(CLK_GSCL0, "gscl0", "aclk300_gscl", GATE_IP_GSCL0, 0, 0, 0),
+>         GATE(CLK_GSCL1, "gscl1", "aclk300_gscl", GATE_IP_GSCL0, 1, 0, 0),
+> -       GATE(CLK_CLK_3AA, "clk_3aa", "aclk300_gscl", GATE_IP_GSCL0, 4, 0, 0),
+> +       GATE(CLK_FIMC_3AA, "fimc_3aa", "aclk333_432_gscl",
+> +                       GATE_IP_GSCL0, 4, 0, 0),
+>
+> -       GATE(CLK_SMMU_3AA, "smmu_3aa", "aclk333_432_gscl", GATE_IP_GSCL1, 2, 0,
+> -               0),
+> -       GATE(CLK_SMMU_FIMCL0, "smmu_fimcl0", "aclk333_432_gscl",
+> +       GATE(CLK_SMMU_3AA, "smmu_3aa", "dout_gscl_blk_333",
+> +                       GATE_IP_GSCL1, 2, 0, 0),
+> +       GATE(CLK_SMMU_FIMCL0, "smmu_fimcl0", "dout_gscl_blk_333",
+>                         GATE_IP_GSCL1, 3, 0, 0),
+> -       GATE(CLK_SMMU_FIMCL1, "smmu_fimcl1", "aclk333_432_gscl",
+> +       GATE(CLK_SMMU_FIMCL1, "smmu_fimcl1", "dout_gscl_blk_333",
+>                         GATE_IP_GSCL1, 4, 0, 0),
+> -       GATE(CLK_SMMU_GSCL0, "smmu_gscl0", "aclk300_gscl", GATE_IP_GSCL1, 6, 0,
+> -               0),
+> -       GATE(CLK_SMMU_GSCL1, "smmu_gscl1", "aclk300_gscl", GATE_IP_GSCL1, 7, 0,
+> -               0),
+> -       GATE(CLK_GSCL_WA, "gscl_wa", "aclk300_gscl", GATE_IP_GSCL1, 12, 0, 0),
+> -       GATE(CLK_GSCL_WB, "gscl_wb", "aclk300_gscl", GATE_IP_GSCL1, 13, 0, 0),
+> -       GATE(CLK_SMMU_FIMCL3, "smmu_fimcl3,", "aclk333_432_gscl",
+> +       GATE(CLK_SMMU_GSCL0, "smmu_gscl0", "dout_gscl_blk_300",
+> +                       GATE_IP_GSCL1, 6, 0, 0),
+> +       GATE(CLK_SMMU_GSCL1, "smmu_gscl1", "dout_gscl_blk_300",
+> +                       GATE_IP_GSCL1, 7, 0, 0),
+> +       GATE(CLK_GSCL_WA, "gscl_wa", "sclk_gscl_wa", GATE_IP_GSCL1, 12, 0, 0),
+> +       GATE(CLK_GSCL_WB, "gscl_wb", "sclk_gscl_wb", GATE_IP_GSCL1, 13, 0, 0),
+> +       GATE(CLK_SMMU_FIMCL3, "smmu_fimcl3,", "dout_gscl_blk_333",
+>                         GATE_IP_GSCL1, 16, 0, 0),
+> +       GATE(0, "fimc_lite0", "aclk333_432_gscl", GATE_IP_GSCL0, 5, 0, 0),
+> +       GATE(0, "fimc_lite1", "aclk333_432_gscl", GATE_IP_GSCL0, 6, 0, 0),
+>         GATE(CLK_FIMC_LITE3, "fimc_lite3", "aclk333_432_gscl",
+>                         GATE_IP_GSCL1, 17, 0, 0),
+>
+> @@ -818,6 +828,9 @@ static struct samsung_gate_clock exynos5420_gate_clks[] __initdata = {
+>                 0),
+>         GATE(CLK_SMMU_MIXER, "smmu_mixer", "aclk200_disp1", GATE_IP_DISP1, 9, 0,
+>                 0),
+> +       /* gating of aclk300_gscl causes system hang. It should not be gated. */
+[nit] Probably.... s/aclk300_gscl/aclk400_mscl
 
-On Sat, Apr 26, 2014 at 4:33 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> Hi Vivek,
+> +       GATE(CLK_ACLK400_MSCL, "aclk400_mscl", "mout_user_aclk400_mscl",
+> +                       GATE_BUS_TOP, 17, CLK_IGNORE_UNUSED, 0),
+>         GATE(0, "aclk266_isp", "mout_user_aclk266_isp",
+>                         GATE_BUS_TOP, 13, 0, 0),
+>         GATE(0, "aclk400_isp", "mout_user_aclk400_isp",
+> diff --git a/include/dt-bindings/clock/exynos5420.h b/include/dt-bindings/clock/exynos5420.h
+> index 5eefd88..223925f 100644
+> --- a/include/dt-bindings/clock/exynos5420.h
+> +++ b/include/dt-bindings/clock/exynos5420.h
+> @@ -159,7 +159,7 @@
+>  #define CLK_GSCL_WB            464
+>  #define CLK_GSCL0              465
+>  #define CLK_GSCL1              466
+> -#define CLK_CLK_3AA            467
+> +#define CLK_FIMC_3AA           467
+>  #define CLK_ACLK266_G2D                470
+>  #define CLK_SSS                        471
+>  #define CLK_SLIM_SSS           472
+> --
+> 1.7.9.5
 >
 >
-> On 22.04.2014 10:03, Vivek Gautam wrote:
->>
->> Add a new driver for the USB 3.0 PHY on Exynos5 series of SoCs.
->> The new driver uses the generic PHY framework and will interact
->> with DWC3 controller present on Exynos5 series of SoCs.
->> Thereby, removing old phy-samsung-usb3 driver and related code
->> used untill now which was based on usb/phy framework.
->>
->> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
->> ---
->>   .../devicetree/bindings/phy/samsung-phy.txt        |   40 ++
->>   drivers/phy/Kconfig                                |   11 +
->>   drivers/phy/Makefile                               |    1 +
->>   drivers/phy/phy-exynos5-usbdrd.c                   |  629
->> ++++++++++++++++++++
->>   4 files changed, 681 insertions(+)
->>   create mode 100644 drivers/phy/phy-exynos5-usbdrd.c
->>
->> diff --git a/Documentation/devicetree/bindings/phy/samsung-phy.txt
->> b/Documentation/devicetree/bindings/phy/samsung-phy.txt
->> index b422e38..51efe4c 100644
->> --- a/Documentation/devicetree/bindings/phy/samsung-phy.txt
->> +++ b/Documentation/devicetree/bindings/phy/samsung-phy.txt
->> @@ -114,3 +114,43 @@ Example:
->>                 compatible = "samsung,exynos-sataphy-i2c";
->>                 reg = <0x38>;
->>         };
->> +
->> +Samsung Exynos5 SoC series USB DRD PHY controller
-
-[snip]
-
->> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
->> index 3bb05f1..8a5d2b4 100644
->> --- a/drivers/phy/Kconfig
->> +++ b/drivers/phy/Kconfig
->> @@ -166,4 +166,15 @@ config PHY_XGENE
->>         help
->>           This option enables support for APM X-Gene SoC multi-purpose
->> PHY.
->>
->> +config PHY_EXYNOS5_USBDRD
->> +       tristate "Exynos5 SoC series USB DRD PHY driver"
->> +       depends on ARCH_EXYNOS5 && OF
->> +       depends on HAS_IOMEM
->> +       select GENERIC_PHY
->> +       select MFD_SYSCON
->> +       help
->> +         Enable USB DRD PHY support for Exynos 5 SoC series.
->> +         This driver provides PHY interface for USB 3.0 DRD controller
->> +         present on Exynos5 SoC series.
->> +
->
->
-> I think you should probably keep the entries sorted, so this one should be
-> somewhere around other EXYNOS PHYs.
-
-Right, thanks for pointing this out.
-Will move this along with other PHY_EXYNOS USB* configs.
-
->
->
->>   endmenu
->> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
->> index 2faf78e..31baa0c 100644
->> --- a/drivers/phy/Makefile
->> +++ b/drivers/phy/Makefile
->> @@ -18,3 +18,4 @@ obj-$(CONFIG_PHY_EXYNOS4210_USB2)     +=
->> phy-exynos4210-usb2.o
->>   obj-$(CONFIG_PHY_EXYNOS4X12_USB2)     += phy-exynos4x12-usb2.o
->>   obj-$(CONFIG_PHY_EXYNOS5250_USB2)     += phy-exynos5250-usb2.o
->>   obj-$(CONFIG_PHY_XGENE)                       += phy-xgene.o
->> +obj-$(CONFIG_PHY_EXYNOS5_USBDRD)       += phy-exynos5-usbdrd.o
->
->
-> Ditto.
-
-Ok
-
->
->
->> diff --git a/drivers/phy/phy-exynos5-usbdrd.c
->> b/drivers/phy/phy-exynos5-usbdrd.c
->> new file mode 100644
->> index 0000000..89d7ae8
->> --- /dev/null
->> +++ b/drivers/phy/phy-exynos5-usbdrd.c
->> @@ -0,0 +1,629 @@
->> +/*
->> + * Samsung EXYNOS5 SoC series USB DRD PHY driver
->> + *
->> + * Phy provider for USB 3.0 DRD controller on Exynos5 SoC series
->> + *
->> + * Copyright (C) 2014 Samsung Electronics Co., Ltd.
->> + * Author: Vivek Gautam <gautam.vivek@samsung.com>
->> + *
-
-[snip]
-
->> +       } phys[EXYNOS5_DRDPHYS_NUM];
->> +       unsigned int extrefclk;
->> +       struct clk *ref_clk;
->> +       unsigned long ref_rate;
->> +};
->> +
->> +#define to_usbdrd_phy(inst) \
->> +       container_of((inst), struct exynos5_usbdrd_phy, \
->> +                    phys[(inst)->index]);
->
->
-> This should be made a static inline to enforce type checking.
-
-Ok, will make this as static inline routine, so that compiler don't
-skip type checking.
-
->
->
->> +
->> +/*
->> + * exynos5_rate_to_clk() converts the supplied clock rate to the value
->> that
->> + * can be written to the phy register.
->> + */
->> +static unsigned int exynos5_rate_to_clk(unsigned long rate)
->> +{
->> +       unsigned int clksel;
->> +
->> +       /* EXYNOS5_FSEL_MASK */
->> +
->> +       switch (rate) {
->> +       case 9600 * KHZ:
->> +               clksel = EXYNOS5_FSEL_9MHZ6;
->> +               break;
->> +       case 10 * MHZ:
->> +               clksel = EXYNOS5_FSEL_10MHZ;
->> +               break;
->> +       case 12 * MHZ:
->> +               clksel = EXYNOS5_FSEL_12MHZ;
->> +               break;
->> +       case 19200 * KHZ:
->> +               clksel = EXYNOS5_FSEL_19MHZ2;
->> +               break;
->> +       case 20 * MHZ:
->> +               clksel = EXYNOS5_FSEL_20MHZ;
->> +               break;
->> +       case 24 * MHZ:
->> +               clksel = EXYNOS5_FSEL_24MHZ;
->> +               break;
->> +       case 50 * MHZ:
->> +               clksel = EXYNOS5_FSEL_50MHZ;
->> +               break;
->> +       default:
->> +               clksel = -EINVAL;
->
->
-> Based on clksel (and return value of this function) being unsigned I don't
-> think this is a good idea. You should probably adapt the approach from
-> Exynos USB 2 PHY, where a function like this return an integer status code
-> and returns the bitfield value through a pointer passed as another argument.
-
-Right, will amend this as suggested.
-
->
->
->> +       }
->> +
->> +       return clksel;
->> +}
->> +
->> +static void exynos5_usbdrd_phy_isol(struct phy_usb_instance *inst,
->> +                                               unsigned int on)
->> +{
->> +       if (!inst->reg_pmu)
->> +               return;
->> +
->> +       regmap_update_bits(inst->reg_pmu, inst->pmu_offset,
->> +                          EXYNOS5_USBDRD_PMU_ISOL, ~on);
->
->
-> I don't think ~on is correct here. Even if technically it produces the
-> correct value, because bit 0 is being changed here, this should be fixed. If
-> EXYNOS5_USBDRD_PMU_ISOL wasn't BIT(0), then always 1 would be written, as on
-> could be 0 or 1 and ~on respectively 0xffffffff or 0xfffffffe.
->
-> I'd suggest something like this:
->
-> unsigned int val = on ? 0 : EXYNOS5_USBDRD_PMU_ISOL;
-
-Sure will change this as suggested.
-
-[snip]
-
->> +const struct usbdrd_phy_config exynos5_usbdrd_phy_cfg[] = {
->> +       {
->> +               .id             = EXYNOS5_DRDPHY_UTMI,
->> +               .phy_isol       = exynos5_usbdrd_phy_isol,
->> +               .phy_init       = exynos5_usbdrd_utmi_init,
->> +               .set_refclk     = exynos5_usbdrd_utmi_set_refclk,
->> +       },
->> +       {
->> +               .id             = EXYNOS5_DRDPHY_PIPE3,
->> +               .phy_isol       = exynos5_usbdrd_phy_isol,
->> +               .phy_init       = exynos5_usbdrd_pipe3_init,
->> +               .set_refclk     = exynos5_usbdrd_pipe3_set_refclk,
->> +       },
->> +       {},
->
->
-> You seem to use a fixed number of PHYs. Do you still need this sentinel
-> entry?
-
-Right, we don't need this sentinel entry since we have limited the
-number of PHYs to EXYNOS5_DRDPHYS_NUM.
-Will remove this.
-
->
->
->> +};
-
-[snip]
-
->> +
->> +       match = of_match_node(exynos5_usbdrd_phy_of_match,
->> pdev->dev.of_node);
->> +       if (!match) {
->
->
-> This can't happen, otherwise probe() wouldn't be called at all.
-True, will remove this check.
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 
 
 -- 
-Best Regards
-Vivek Gautam
-Samsung R&D Institute, Bangalore
-India
+Regards,
+Alim
