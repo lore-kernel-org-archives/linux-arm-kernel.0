@@ -1,43 +1,24 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 28 Apr 2014 11:35:31 -0600
-Subject: [PATCH v3 1/3] base: power: Add generic OF-based power domain
- look-up
-In-Reply-To: <1398271618-28932-2-git-send-email-t.figa@samsung.com>
-References: <1398271618-28932-1-git-send-email-t.figa@samsung.com>
- <1398271618-28932-2-git-send-email-t.figa@samsung.com>
-Message-ID: <535E9163.3070305@wwwdotorg.org>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 28 Apr 2014 18:37:40 +0100
+Subject: [PATCH 1/3] driver core & of: Mark of_nodes of added device as
+ populated
+In-Reply-To: <CAL_JsqJQy7ob87=wPOLxn3X0fTrt2QhAEJ2nPTAmCMZqNZp+sw@mail.gmail.com>
+References: <1392137610-27842-1-git-send-email-pawel.moll@arm.com>
+ <1392137610-27842-2-git-send-email-pawel.moll@arm.com>
+ <CAL_JsqJQy7ob87=wPOLxn3X0fTrt2QhAEJ2nPTAmCMZqNZp+sw@mail.gmail.com>
+Message-ID: <1398706660.20390.5.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/23/2014 10:46 AM, Tomasz Figa wrote:
-> This patch introduces generic code to perform power domain look-up using
-> device tree and automatically bind devices to their power domains.
-> Generic device tree binding is introduced to specify power domains of
-> devices in their device tree nodes.
-> 
-> Backwards compatibility with legacy Samsung-specific power domain
-> bindings is provided, but for now the new code is not compiled when
-> CONFIG_ARCH_EXYNOS is selected to avoid collision with legacy code. This
-> will change as soon as Exynos power domain code gets converted to use
-> the generic framework in further patch.
+On Thu, 2014-02-13 at 13:15 -0600, Rob Herring wrote:
+> On Tue, Feb 11, 2014 at 10:53 AM, Pawel Moll <pawel.moll@arm.com> wrote:
+> > In "Device Tree powered" systems, platform devices are usually
+> > massively populated with of_platform_populate() call, executed
+> > at some level of initcalls, either by generic architecture
+> > or by platform-specific code.
+>
+> Go read Grant's and my comments from your last posting.
 
-> diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
+Right, I can't explain why I missed those. Will do right now.
 
-> +==Power domain consumers==
-> +
-> +Required properties:
-> + - power-domain : A phandle and power domain specifier as defined by bindings
-> +                  of power controller specified by phandle.
-
-It seems quite likely that a single logical device could have components
-in multiple power domains. Consider an HDMI controller with different
-power domains for the HDMI core, CEC communication, DDC/I2C
-communication, and the I/O pads, with no clear separation between those
-two components of the module (no separate register spaces, but the
-bits/registers are interleaved all together).
-
-As such, I think that rather than a "power-domain" property, we need a
-pair of "power-domains", and "power-domain-names" properties, and
-preferably with mandatory usage of name-based lookups, rather than
-allowing a random mix of name-based and index-based lookups like we have
-with some existing resource bindings.
+Pawel
