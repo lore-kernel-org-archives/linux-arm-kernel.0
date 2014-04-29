@@ -1,40 +1,69 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Apr 2014 22:34:50 +0200
-Subject: [RFC 08/11] ARM: dts: am33xx: Add prcm_resets node
-In-Reply-To: <1398802790-29287-9-git-send-email-dmurphy@ti.com>
-References: <1398802790-29287-1-git-send-email-dmurphy@ti.com>
- <1398802790-29287-9-git-send-email-dmurphy@ti.com>
-Message-ID: <6286135.g77D4pMffU@wuerfel>
+From: mitchelh@codeaurora.org (Mitchel Humpherys)
+Date: Tue, 29 Apr 2014 13:35:23 -0700
+Subject: [PATCH v4 1/7] arm64: Use pr_* instead of printk
+In-Reply-To: <000101cf6367$c4c219f0$4e464dd0$@samsung.com> (Jungseok Lee's
+ message of "Tue, 29 Apr 2014 13:59:14 +0900")
+References: <000101cf6367$c4c219f0$4e464dd0$@samsung.com>
+Message-ID: <vnkwsioveuwk.fsf@mitchelh-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 April 2014 15:19:47 Dan Murphy wrote:
-> + * AM33xx reset index for PRCM Module
-> + *
-> + * Copyright 2014 Texas Instruments Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#ifndef _DT_BINDINGS_RESET_TI_AM33XX_H
-> +#define _DT_BINDINGS_RESET_TI_AM33XX_H
-> +
-> +#define RESET_DEVICE_RESET                     0
-> +#define RESET_GFX_RESET                                1
-> +#define RESET_PER_RESET                                2
-> +
-> +#endif
+On Mon, Apr 28 2014 at 09:59:14 PM, Jungseok Lee <jays.lee@samsung.com> wrote:
+> This patch fixed the following checkpatch complaint as using pr_*
+> instead of printk.
+>
+> WARNING: printk() should include KERN_ facility level
+>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Jungseok Lee <jays.lee@samsung.com>
+> Reviewed-by: Sungjinn Chung <sungjinn.chung@samsung.com>
+> ---
+>  arch/arm64/kernel/traps.c |   14 +++++++-------
+>  1 file changed, 7 insertions(+), 7 deletions(-)
+>
+> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+> index 7ffaddd..0484e81 100644
+> --- a/arch/arm64/kernel/traps.c
+> +++ b/arch/arm64/kernel/traps.c
+> @@ -65,7 +65,7 @@ static void dump_mem(const char *lvl, const char *str, unsigned long bottom,
+>  	fs = get_fs();
+>  	set_fs(KERNEL_DS);
+>  
+> -	printk("%s%s(0x%016lx to 0x%016lx)\n", lvl, str, bottom, top);
+> +	pr_emerg("%s%s(0x%016lx to 0x%016lx)\n", lvl, str, bottom, top);
 
-Interfaces like this should only be used if you can't use hardware
-numbers, in general. If these numbers are in the data sheet, just
-put them directly into the dts file, as we do for interrupt numbers,
-gpio numbers, register offsets etc.
+Currently this printk is being called with lvl=KERN_EMERG or lvl="". In
+the case of lvl=KERN_EMERG leaving lvl in is redundant. In the case of
+lvl="" this is a behavioral change (printing to a different log
+level). Was this intended?
 
-If you have made them up to define an interface between the driver
-and DT because there is no usable hardare ID, I'd suggest just using
-a single file across all SoCs that have this driver, and have
-a unified name space.
+>  
+>  	for (first = bottom & ~31; first < top; first += 32) {
+>  		unsigned long p;
+> @@ -83,7 +83,7 @@ static void dump_mem(const char *lvl, const char *str, unsigned long bottom,
+>  					sprintf(str + i * 9, " ????????");
+>  			}
+>  		}
+> -		printk("%s%04lx:%s\n", lvl, first & 0xffff, str);
+> +		pr_emerg("%s%04lx:%s\n", lvl, first & 0xffff, str);
 
-	Arnd
+Ditto
+
+>  	}
+>  
+>  	set_fs(fs);
+> @@ -124,7 +124,7 @@ static void dump_instr(const char *lvl, struct pt_regs *regs)
+>  			break;
+>  		}
+>  	}
+> -	printk("%sCode: %s\n", lvl, str);
+> +	pr_emerg("%sCode: %s\n", lvl, str);
+
+Ditto. Also called with with lvl=KERN_INFO.
+
+
+Mitch
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
