@@ -1,46 +1,63 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 29 Apr 2014 08:21:18 -0400
-Subject: [GIT PULL] ARM: mvebu: fixes for v3.15
-Message-ID: <20140429122118.GF28159@titan.lakedaemon.net>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 29 Apr 2014 14:31:26 +0200
+Subject: [PATCH 0/8] i.MX6 PCIe binding change and MSI support
+In-Reply-To: <CAErSpo7Boi8d+apAUC3TmmE33LuRMYJ6J+TEPLRbeyZyU3O8RQ@mail.gmail.com>
+References: <1396025579-14344-1-git-send-email-l.stach@pengutronix.de>
+ <20140424175844.GD29593@google.com>
+ <1398421265.4657.25.camel@weser.hi.pengutronix.de>
+ <CAErSpo7Boi8d+apAUC3TmmE33LuRMYJ6J+TEPLRbeyZyU3O8RQ@mail.gmail.com>
+Message-ID: <1398774686.4677.12.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guys,
+Hi Bjorn,
 
-Not too many fixes so far, but I didn't want to sit on them any longer.
-They've already been in -next for over a week.
+Am Freitag, den 25.04.2014, 08:39 -0600 schrieb Bjorn Helgaas:
+[...]
+> >> >   PCI: designware: split Exynos and i.MX bindings
+> >> >   ARM: dts: imx6: update pcie to bring in line with new binding
+> >> >   PCI: imx6: use new clock names
+> >> >   PCI: imx6: drop old irq mapping
+> >> >   PCI: imx6: rip out optional (and unused) irqs
+> >> >   PCI: designware: make MSI isr shared irq aware
+> >> >   PCI: imx6: add support for MSI
+> >>
+> >> What's the status of all these?  I would normally apply patches 4-8 of this
+> >> series through my tree, given the appropriate acks, but I haven't seen
+> >> those yet.  And I'm not sure what dependencies there are between the
+> >> non-PCI patches and the PCI ones.
+> >>
+> > It's a complete binding change, so applying one part without the other
+> > is going to horribly break things.
+> >
+> > So I would at least want to see an ack for the binding change on the
+> > i.MX side from Shawn and Richard. This will need some follow on patches,
+> > as some boards adding PCIe using the old binding have cropped up in
+> > linux-next, but I can do the patches on short notice if everyone agrees
+> > to merge this patchset.
+> >
+> > The designware part is pretty simple and doesn't change anything for
+> > other users than i.MX. Though I would like to see an ack from Jingoo for
+> > those.
+> >
+> > I have some more stuff in the pipes regarding multiple MSI irqs, that
+> > depend on this series and also the Keystone people are waiting for this
+> > to be applied in order to consolidate the clock handling of the
+> > designware core driver, so it would be nice to get this moving again.
+> 
+> OK, just poke me again when you're ready for me to do something with these.
+> 
 
-Please pull.
+As both Richard and Jingoo gave their ack for the respective patches I
+think this is good to go in and I would expect all the PCI patches to go
+through your tree for 3.16.
 
-thx,
+Shawn, if you are not okay with this change, please speak up now.
+Otherwise please pick the dts change for 3.16. I'll go over linux-next
+and prepare the patches to fix up the boards there.
 
-Jason.
-
-
-The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
-
-  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-3.15
-
-for you to fetch changes up to 1cc9d48145b81e307fab94a5cf6ee66ec2f0de60:
-
-  ARM: orion5x: fix target ID for crypto SRAM window (2014-04-17 04:52:26 +0000)
-
-----------------------------------------------------------------
-mvebu fixes for v3.15
-
- - devbus: fix bus-width conversion
-
- - orion5x: fix target ID for crypto SRAM window
-
-----------------------------------------------------------------
-Thomas Petazzoni (2):
-      memory: mvebu-devbus: fix the conversion of the bus width
-      ARM: orion5x: fix target ID for crypto SRAM window
-
- arch/arm/mach-orion5x/common.h |  2 +-
- drivers/memory/mvebu-devbus.c  | 15 +++++++++++++--
- 2 files changed, 14 insertions(+), 3 deletions(-)
+Regards,
+Lucas
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
