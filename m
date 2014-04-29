@@ -1,50 +1,35 @@
-From: baohua@kernel.org (Barry Song)
-Date: Tue, 29 Apr 2014 23:10:57 +0800
-Subject: [PATCH] ARM: l2c: prima2: only call l2x0_of_init() on matching
- nodes
-In-Reply-To: <20140428134047.GA7719@beef>
-References: <1398644860-22973-1-git-send-email-mporter@linaro.org>
- <20140428091532.GG26756@n2100.arm.linux.org.uk> <20140428134047.GA7719@beef>
-Message-ID: <CAGsJ_4yHf__KPx079pLnBb3=up=-CfSMSm=LkR7w1rX_TyRU1w@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 29 Apr 2014 10:12:35 -0500
+Subject: [PATCH v2 0/7] Generic serial earlycon
+In-Reply-To: <20140429110950.GF17007@arm.com>
+References: <1397859600-11507-1-git-send-email-robherring2@gmail.com>
+ <20140429110950.GF17007@arm.com>
+Message-ID: <CAL_JsqJtXeB55kv7VD4DRj4F2W9HsJ39JFuaDQtocZLzHE_RUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-04-28 21:40 GMT+08:00 Matt Porter <mporter@linaro.org>:
-> On Mon, Apr 28, 2014 at 10:15:33AM +0100, Russell King wrote:
->> On Sun, Apr 27, 2014 at 08:27:40PM -0400, Matt Porter wrote:
->> > l2x0_of_init() is executed unconditionally within the sirfsoc_l2x0_init()
->> > early initcall. In a multi v7 kernel this causes bcm281xx and bcm21664
->> > platform to fail boot since they have their own pre l2x0 init sequence
->> > that is required. Fix this by checking that a matching OF ID is present
->> > before calling l2x0_of_init().
->> >
->> > Reported-by: Kevin Hilman <khilman@linaro.org>
->> > Signed-off-by: Matt Porter <mporter@linaro.org>
->> > ---
->> > Applies against next-20140424 to fix the issue introduced in
->> > 50655e6 ARM: l2c: prima2: remove cache size override
->>
->> Err, this only "fixes" it because it effectively disables the L2 cache
->> _entirely_ - in the above commit, I kill your private compatible strings.
->>
->> This doesn't make sense.  If the cache is already enabled, then the L2C
->> code won't try to enable it again.
+On Tue, Apr 29, 2014 at 6:09 AM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Fri, Apr 18, 2014 at 11:19:53PM +0100, Rob Herring wrote:
+>> Rob Herring (7):
+>>   x86: move FIX_EARLYCON_MEM kconfig into x86
+>>   tty/serial: add generic serial earlycon
+>>   tty/serial: convert 8250 to generic earlycon
+>>   tty/serial: pl011: add generic earlycon support
+>>   tty/serial: add arm/arm64 semihosting earlycon
+>>   arm64: enable FIX_EARLYCON_MEM kconfig
+>>   arm64: remove arch specific earlyprintk
 >
-> Ok, please suggest an alternative. You merged this commit..it looks like
-> it had no ack from the platform maintainer..and I don't have hardware.
-> The commit is wrong, we can't have every platform executing sirfsoc's
-> l2x0_of_init() call/parameters by having this stuff in an early initcall
-> like that.
+> The series looks fine, you can add:
 >
-> It would be pretty straightforward to add those private compatibles
-> back so the approach works. If not, we need to move this to
-> .init_machine where it's guaranteed to only run on sirfsoc.
-
-these has been one V1 patch at
-http://permalink.gmane.org/gmane.linux.ports.arm.kernel/316312
-my v2 has moved to init_irq() as Russell's suggestion.
-
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 >
-> -Matt
 
--barry
+Thanks.
+
+> BTW, are you merging all of them via some other tree or would prefer me
+> to take the arm64-specific patches?
+
+Greg has taken it, but there were a few issues, so it may get reposted.
+
+Rob
