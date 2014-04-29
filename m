@@ -1,55 +1,35 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 29 Apr 2014 08:09:11 +0100
-Subject: [PATCH 1/1] ahci: st: Provide DT bindings for ST's SATA implementation
-Message-ID: <1398755351-31794-1-git-send-email-lee.jones@linaro.org>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Tue, 29 Apr 2014 16:20:11 +0900
+Subject: [PATCH/RFC v2] serial: sh-sci: Add device tree support for r8a7779
+Message-ID: <1398756011-4672-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: devicetree at vger.kernel.org
-Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- Documentation/devicetree/bindings/ata/ahci-st.txt | 31 +++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/ata/ahci-st.txt
+Simply document a new compat string.
+There appears to be no need for a driver updates.
 
-diff --git a/Documentation/devicetree/bindings/ata/ahci-st.txt b/Documentation/devicetree/bindings/ata/ahci-st.txt
-new file mode 100644
-index 0000000..1b69fa9
---- /dev/null
-+++ b/Documentation/devicetree/bindings/ata/ahci-st.txt
-@@ -0,0 +1,31 @@
-+STMicroelectronics STi SATA controller
-+
-+This binding describes a SATA device.
-+
-+Required properties:
-+ - compatible	   : Must be "st,ahci"
-+ - reg		   : Physical base addresses and length of register sets
-+ - interrupts	   : Interrupt associated with the SATA device
-+ - interrupt-names :   Associated name must be; "hostc"
-+ - resets	   : The power-down and soft-reset lines of SATA IP
-+ - reset-names	   :   Associated names must be; "pwr-dwn" and "sw-rst"
-+ - clocks	   : The phandle for the clock
-+ - clock-names	   :   Associated name must be; "ahci_clk"
-+ - phys		   : The phandle for the PHY device
-+ - phy-names	   :   Associated name must be; "ahci_phy"
-+
-+Example:
-+
-+	sata0: sata at fe380000 {
-+		compatible      = "st,ahci";
-+		reg             = <0xfe380000 0x1000>;
-+		interrupts      = <GIC_SPI 157 IRQ_TYPE_NONE>;
-+		interrupt-names = "hostc";
-+		phys	        = <&miphy365x_phy MIPHY_PORT_0 MIPHY_TYPE_SATA>;
-+		phy-names       = "ahci_phy";
-+		resets	        = <&powerdown STIH416_SATA0_POWERDOWN>,
-+				  <&softreset STIH416_SATA0_SOFTRESET>;
-+		reset-names     = "pwr-dwn", "sw-rst";
-+		clocks	        = <&CLK_S_ICN_REG_0>;
-+		clock-names     = "ahci_clk";
-+	};
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+
+---
+
+v2
+* Do not update the driver to set SCSCR_CKE1.
+  Instead DT may provide the P clock as the clock for the SCIF devices.
+---
+ Documentation/devicetree/bindings/serial/renesas,sci-serial.txt | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt b/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt
+index 53e6c17..bba86de 100644
+--- a/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt
++++ b/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt
+@@ -12,6 +12,7 @@ Required properties:
+     - "renesas,scifa-r8a7791" for R8A7791 (R-Car M2) SCIFA compatible UART.
+     - "renesas,scifb-r8a7791" for R8A7791 (R-Car M2) SCIFB compatible UART.
+     - "renesas,hscif-r8a7791" for R8A7791 (R-Car M2) HSCIF compatible UART.
++    - "renesas,scif-r8a7779" for R8A7779 (R-Car H1) SCIF compatible UART.
+     - "renesas,scif" for generic SCIF compatible UART.
+     - "renesas,scifa" for generic SCIFA compatible UART.
+     - "renesas,scifb" for generic SCIFB compatible UART.
 -- 
-1.8.3.2
+1.8.5.2
