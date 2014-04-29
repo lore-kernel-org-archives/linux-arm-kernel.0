@@ -1,122 +1,59 @@
 From: dmurphy@ti.com (Dan Murphy)
-Date: Tue, 29 Apr 2014 15:19:42 -0500
-Subject: [RFC 03/11] drivers: reset: omap5: Add reset data for omap5
+Date: Tue, 29 Apr 2014 15:19:46 -0500
+Subject: [RFC 07/11] ARM: TI: Describe the ti reset DT entries
 In-Reply-To: <1398802790-29287-1-git-send-email-dmurphy@ti.com>
 References: <1398802790-29287-1-git-send-email-dmurphy@ti.com>
-Message-ID: <1398802790-29287-4-git-send-email-dmurphy@ti.com>
+Message-ID: <1398802790-29287-8-git-send-email-dmurphy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the reset register data for the omap5 SoC.
+Describe the TI reset DT entries for TI SoC's.
 
 Signed-off-by: Dan Murphy <dmurphy@ti.com>
 ---
- drivers/reset/ti/Makefile         |    1 +
- drivers/reset/ti/reset-ti-data.h  |    2 ++
- drivers/reset/ti/reset-ti-omap5.c |   61 +++++++++++++++++++++++++++++++++++++
- drivers/reset/ti/reset-ti.c       |    3 ++
- 4 files changed, 67 insertions(+)
- create mode 100644 drivers/reset/ti/reset-ti-omap5.c
+ .../devicetree/bindings/reset/ti,reset.txt         |   34 ++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/reset/ti,reset.txt
 
-diff --git a/drivers/reset/ti/Makefile b/drivers/reset/ti/Makefile
-index 622eb3b..4d2d06c 100644
---- a/drivers/reset/ti/Makefile
-+++ b/drivers/reset/ti/Makefile
-@@ -1,2 +1,3 @@
- obj-$(CONFIG_RESET_TI) += reset-ti.o
- obj-$(CONFIG_SOC_DRA7XX) += reset-ti-dra7xx.o
-+obj-$(CONFIG_SOC_OMAP5) += reset-ti-omap5.o
-diff --git a/drivers/reset/ti/reset-ti-data.h b/drivers/reset/ti/reset-ti-data.h
-index 5812ed5..d3c6d42 100644
---- a/drivers/reset/ti/reset-ti-data.h
-+++ b/drivers/reset/ti/reset-ti-data.h
-@@ -56,4 +56,6 @@ struct ti_reset_data {
- };
- 
- extern struct ti_reset_data dra7_reset_data;
-+extern struct ti_reset_data omap5_reset_data;
-+
- #endif
-diff --git a/drivers/reset/ti/reset-ti-omap5.c b/drivers/reset/ti/reset-ti-omap5.c
+diff --git a/Documentation/devicetree/bindings/reset/ti,reset.txt b/Documentation/devicetree/bindings/reset/ti,reset.txt
 new file mode 100644
-index 0000000..3e7529c
+index 0000000..19f5603
 --- /dev/null
-+++ b/drivers/reset/ti/reset-ti-omap5.c
-@@ -0,0 +1,61 @@
-+/*
-+ * OMAP5 reset data for PRCM Module
-+ *
-+ * Copyright 2014 Texas Instruments Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
++++ b/Documentation/devicetree/bindings/reset/ti,reset.txt
+@@ -0,0 +1,34 @@
++Texas Instruments Reset Controller
++======================================
++Please also refer to reset.txt in this directory for common reset
++controller binding usage.
 +
-+#include "reset-ti-data.h"
++Specifying the reset entries for the IP module
++==============================================
++Parent module:
++This is the module node that contains the reset registers and bits.
 +
-+static struct ti_reset_reg_data omap5_reset_reg_data[] = {
-+	{
-+		.rstctrl_offs = 0x1c00,
-+		.rstctrl_bit = 0x0,
-+		.rstst_offs	= 0x1c04,
-+		.rstst_bit = 0x0,
-+	},
-+	{
-+		.rstctrl_offs = 0x410,
-+		.rstctrl_bit = 0x0,
-+		.rstst_offs	= 0x414,
-+		.rstst_bit = 0x0,
-+	}, /* DSP_RESET */
-+	{
-+		.rstctrl_offs = 0x410,
-+		.rstctrl_bit = 0x1,
-+		.rstst_offs	= 0x414,
-+		.rstst_bit = 0x1,
-+	}, /* DSP_MMU_CACHE */
-+	{
-+		.rstctrl_offs = 0x910,
-+		.rstctrl_bit = 0x0,
-+		.rstst_offs	= 0x914,
-+		.rstst_bit = 0x0,
-+	}, /* IPU_CPU0 */
-+	{
-+		.rstctrl_offs = 0x910,
-+		.rstctrl_bit = 0x1,
-+		.rstst_offs	= 0x914,
-+		.rstst_bit = 0x1,
-+	}, /* IPU_CPU1 */
-+	{
-+		.rstctrl_offs = 0x910,
-+		.rstctrl_bit = 0x2,
-+		.rstst_offs	= 0x914,
-+		.rstst_bit = 0x2,
-+	}, /* IPU_MMU_CACHE */
-+	{
-+		.rstctrl_offs = 0x1210,
-+		.rstctrl_bit = 0,
-+		.rstst_offs	= 0x1214,
-+		.rstst_bit	= 0,
-+	},
-+};
++example:
++			prcm_resets: resets {
++				compatible = "ti,dra7-resets";
++				#reset-cells = <1>;
++			};
 +
-+struct ti_reset_data omap5_reset_data = {
-+	.reg_data	= omap5_reset_reg_data,
-+	.nr_resets	= ARRAY_SIZE(omap5_reset_reg_data),
-+};
-diff --git a/drivers/reset/ti/reset-ti.c b/drivers/reset/ti/reset-ti.c
-index 486b77c..7310827 100644
---- a/drivers/reset/ti/reset-ti.c
-+++ b/drivers/reset/ti/reset-ti.c
-@@ -135,6 +135,9 @@ static const struct of_device_id ti_reset_of_match[] = {
- #ifdef CONFIG_SOC_DRA7XX
- 	{ .compatible = "ti,dra7-resets", .data = &dra7_reset_data,},
- #endif
-+#ifdef CONFIG_SOC_OMAP5
-+	{ .compatible = "ti,omap5-resets", .data = &omap5_reset_data,},
-+#endif
- 	{},
- };
- 
++Required Properties:
++compatible - Should be "ti-<Soc>-resets
++
++DRA7xx:
++Compatible - ti,dra7-resets
++Reset indices - include/dt-bindings/reset/ti,dra7-resets.h
++
++OMAP5:
++Compatible - ti,omap5-resets
++Reset indices - include/dt-bindings/reset/ti,omap5-resets.h
++
++AM33xx:
++Compatible - ti-am335x-resets
++Reset indices - include/dt-bindings/reset/ti,am33xx-resets.h
++
++AM43xx:
++Compatible - ti,am4372-resets
++Reset indices - include/dt-bindings/reset/ti,am437x-resets.h
 -- 
 1.7.9.5
