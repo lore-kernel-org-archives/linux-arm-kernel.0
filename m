@@ -1,31 +1,57 @@
-From: fthain@telegraphics.com.au (Finn Thain)
-Date: Tue, 29 Apr 2014 12:22:18 +1000 (EST)
-Subject: [PATCH v2 00/12] scsi/NCR5380: fix debugging macros and #include
- structure
-In-Reply-To: <1398532863.24466.2.camel@dabdike.int.hansenpartnership.com>
-References: <20140319123516.542623278@telegraphics.com.au>
- <1398532863.24466.2.camel@dabdike.int.hansenpartnership.com>
-Message-ID: <alpine.LNX.2.00.1404291202190.32739@nippy.intranet>
+From: yinghai@kernel.org (Yinghai Lu)
+Date: Mon, 28 Apr 2014 19:56:54 -0700
+Subject: [PATCH v2 3/7] tty/serial: convert 8250 to generic earlycon
+In-Reply-To: <CAL_JsqKiYmCNGrkiwS7m-OAt3rHZBq_yNGycen-AojbV-7famg@mail.gmail.com>
+References: <1397859600-11507-1-git-send-email-robherring2@gmail.com>
+ <1397859600-11507-4-git-send-email-robherring2@gmail.com>
+ <CAE9FiQVp5u-jF_xjCu68BgbZ=e0D508tn_-auoiT6cbkYtX8Og@mail.gmail.com>
+ <CAL_JsqKiYmCNGrkiwS7m-OAt3rHZBq_yNGycen-AojbV-7famg@mail.gmail.com>
+Message-ID: <CAE9FiQVdwumX7Dsmt8NJhw4uWsj2sjUKaKS1wJQujW1fn1szLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Apr 28, 2014 at 4:24 PM, Rob Herring <robherring2@gmail.com> wrote:
+> On Sat, Apr 26, 2014 at 1:29 AM, Yinghai Lu <yinghai@kernel.org> wrote:
+>
+> Thanks for finding these. I missed them in my build tests. This should fix them:
+>
+> diff --git a/drivers/tty/serial/8250/8250_early.c
+> b/drivers/tty/serial/8250/8250_early.c
+> index e83c9db..2094c3b 100644
+> --- a/drivers/tty/serial/8250/8250_early.c
+> +++ b/drivers/tty/serial/8250/8250_early.c
+> @@ -156,6 +156,11 @@ static int __init early_serial8250_setup(struct
+> earlycon_device *device,
+>  EARLYCON_DECLARE(uart8250, early_serial8250_setup);
+>  EARLYCON_DECLARE(uart, early_serial8250_setup);
+>
+> +int __init setup_early_serial8250_console(char *cmdline)
+> +{
+> +       return setup_earlycon(cmdline, "uart8250", early_serial8250_setup);
+> +}
+> +
+>  int serial8250_find_port_for_earlycon(void)
+>  {
+>         struct earlycon_device *device = early_device;
 
-On Sat, 26 Apr 2014, James Bottomley wrote:
+that only handle "uart8250,", may need to add more lines to handle "uart,"
 
-> OK, so this is a pretty big change to an unmaintained driver.  I'll take 
-> it if you're willing to maintain the driver afterwards ... in which case 
-> I need another patch to add you to the MAINTAINERS file.
++int __init setup_early_serial8250_console(char *cmdline)
++{
++       char *options;
++       options = strstr(cmdline, "uart8250,");
++       if (options)
++               return setup_earlycon(cmdline, "uart8250",
+early_serial8250_setup);
++
++       options = strstr(cmdline, "uart,");
++       if (options)
++              return setup_earlycon(cmdline, "uart", early_serial8250_setup);
++
++      return 0;
++}
++
 
-Sure, I'm happy to support these patches and future work I plan to do on 
-the driver.
+Thanks
 
-What additional responsibilities would come with adding my name the 
-MAINTAINERS file?
-
-Perhaps Michael and Sam would be interested in sharing the role, for atari 
-and sun3 NCR5380 drivers (?)
-
-I only have hardware to test mac_scsi but I can obtain a Domex DMX3191D 
-PCI card on ebay.
-
---
+Yinghai
