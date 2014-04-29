@@ -1,17 +1,17 @@
 From: kaixu.xia@linaro.org (Xia Kaixu)
-Date: Tue, 29 Apr 2014 19:18:24 +0800
-Subject: [PATCH 03/15] ASoC: SMDK_WM8580_PCM needs REGMAP_I2C
+Date: Tue, 29 Apr 2014 19:18:25 +0800
+Subject: [PATCH 04/15] ASoC: samsung-idma: avoid 64-bit division
 In-Reply-To: <1398770316-19715-1-git-send-email-kaixu.xia@linaro.org>
 References: <1398770316-19715-1-git-send-email-kaixu.xia@linaro.org>
-Message-ID: <1398770316-19715-4-git-send-email-kaixu.xia@linaro.org>
+Message-ID: <1398770316-19715-5-git-send-email-kaixu.xia@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Arnd Bergmann <arnd@arndb.de>
 
-This adds a missing dependency for SND_SOC_SMDK_WM8580_PCM to
-require REGMAP_I2C to be enabled, avoiding possible build
-erorrs.
+dma_addr_t may be 64 bit wide, which causes a build failure
+when doing a division on it. Here it is safe to cast to an
+u32 type, which avoids the problem.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Xia Kaixu <kaixu.xia@linaro.org>
@@ -24,28 +24,21 @@ Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-samsung-soc at vger.kernel.org
 Cc: alsa-devel at alsa-project.org
 ---
- sound/soc/samsung/Kconfig |    2 ++
- 1 file changed, 2 insertions(+)
+ sound/soc/samsung/idma.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
-index 14568be..0c5e9e2 100644
---- a/sound/soc/samsung/Kconfig
-+++ b/sound/soc/samsung/Kconfig
-@@ -64,6 +64,7 @@ config SND_SOC_SAMSUNG_JIVE_WM8750
- config SND_SOC_SAMSUNG_SMDK_WM8580
- 	tristate "SoC I2S Audio support for WM8580 on SMDK"
- 	depends on SND_SOC_SAMSUNG && (MACH_SMDK6410 || MACH_SMDKC100 || MACH_SMDK6440 || MACH_SMDK6450 || MACH_SMDKV210 || MACH_SMDKC110)
-+	depends on REGMAP_I2C
- 	select SND_SOC_WM8580
- 	select SND_SAMSUNG_I2S
- 	help
-@@ -178,6 +179,7 @@ config SND_SOC_SAMSUNG_SMDK_SPDIF
- config SND_SOC_SMDK_WM8580_PCM
- 	tristate "SoC PCM Audio support for WM8580 on SMDK"
- 	depends on SND_SOC_SAMSUNG && (MACH_SMDK6450 || MACH_SMDKV210 || MACH_SMDKC110)
-+	depends on REGMAP_I2C
- 	select SND_SOC_WM8580
- 	select SND_SAMSUNG_PCM
- 	help
+diff --git a/sound/soc/samsung/idma.c b/sound/soc/samsung/idma.c
+index 3d5cf15..e9891b4 100644
+--- a/sound/soc/samsung/idma.c
++++ b/sound/soc/samsung/idma.c
+@@ -274,7 +274,7 @@ static irqreturn_t iis_irq(int irqno, void *dev_id)
+ 
+ 		addr = readl(idma.regs + I2SLVL0ADDR) - idma.lp_tx_addr;
+ 		addr += prtd->periodsz;
+-		addr %= (prtd->end - prtd->start);
++		addr %= (u32)(prtd->end - prtd->start);
+ 		addr += idma.lp_tx_addr;
+ 
+ 		writel(addr, idma.regs + I2SLVL0ADDR);
 -- 
 1.7.9.5
