@@ -1,47 +1,57 @@
-From: baohua@kernel.org (Barry Song)
-Date: Tue, 29 Apr 2014 23:05:06 +0800
-Subject: [PATCH] ARM: l2c: prima2: only call l2x0_of_init() on matching
- nodes
-In-Reply-To: <20140428145223.GL26756@n2100.arm.linux.org.uk>
-References: <1398644860-22973-1-git-send-email-mporter@linaro.org>
- <20140428142950.GB30292@saruman.home> <20140428143709.GC7719@beef>
- <20140428145223.GL26756@n2100.arm.linux.org.uk>
-Message-ID: <CAGsJ_4x1+eePRDMP0-0WeTG6ZJdzmMkN_9USbKt8joY8AKsDdw@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 29 Apr 2014 08:05:30 -0700
+Subject: [PATCH 06/23] ARM: OMAP: add OMAP5 DSI muxing
+In-Reply-To: <535F37E9.8090609@ti.com>
+References: <1398334639-14172-1-git-send-email-tomi.valkeinen@ti.com>
+ <1398334639-14172-7-git-send-email-tomi.valkeinen@ti.com>
+ <535A42D6.5090107@ti.com> <535A4470.2000509@ti.com>
+ <535A5C0A.7040808@ti.com> <535A6C40.10609@ti.com>
+ <20140425153150.GA20807@atomide.com> <535DFAAE.1010606@ti.com>
+ <20140428164528.GM20807@atomide.com> <535F37E9.8090609@ti.com>
+Message-ID: <20140429150529.GA27571@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-04-28 22:52 GMT+08:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Mon, Apr 28, 2014 at 10:37:09AM -0400, Matt Porter wrote:
->> The "fix" is tested against bcm281xx and bcm21664 as that is what the
->> l2c cleanup breaks in -next. As mentioned, I don't have the sirfsoc h/w
->> so this first attempt at a fix also breaks their platform. It can be
->> addressed by adding those platform specific compatibles back to the dts,
->> of course.
->>
->> I'd much prefer that the sirfsoc folks fix this...it's going to break
->> other platforms in a multi v7 build.
->
-> Well, it's about time we got rid of this from platform specific code
-> anyway, taking it away from platform maintainers to mess around with.
-> So that's what I'm doing.
->
-> It's worth noting that if you build a single zImage with exynos also
-> enabled, then you also end up with an unconditional call from that
-> code to l2x0_of_init() with it's own magic numbers - and that applies
-> before my changes.
->
-> So let's fix this properly and yank this crap from platform maintainers
-> fingers.
+* Tomi Valkeinen <tomi.valkeinen@ti.com> [140428 22:26]:
+> On 28/04/14 19:45, Tony Lindgren wrote:
+> > * Tomi Valkeinen <tomi.valkeinen@ti.com> [140427 23:53]:
+> >> On 25/04/14 18:31, Tony Lindgren wrote:
+> >>
+> >>> Chances are any mux register in the syscon area already works with
+> >>> pinctrl-single,pins or pinctrl-single,bits option. The ones in the
+> >>> padconf area should be already mapped so the driver just has to
+> >>> request them.
+> >>
+> >> If using the padconf (say omap4_padconf_global for omap4), doesn't that
+> >> mean we need to have platform specific bits in the driver? Isn't that
+> >> something we've been trying to remove all the time?
+> > 
+> > No, it's all done in a Linux generic way during driver probe, see
+> > drivers/base/pinctrl.c. You just need to define the default pins
+> > in the .dts files. If you need dynamic remuxing in the driver,
+> > you can define other named states that the driver can then toggle
+> > with pinctrl_select_state().
+> 
+> omap4_padconf_global is a syscon node, not pinctrl. As syscon just gives
+> a raw regmap to its memory area, the driver needs to know about the OMAP
+> control registers to use it.
 
-i mentioned dropping specific dts compatible prop will break non-csr
-platforms in the mail thread "ARM: prima2: remove L2 cache size
-override" and i said i was going to send v2. you said you need it
-before rc6. now it has been sent, but i am sorry it is not against
-next-20140424.
+That would be probably best set up the same way we have already set up
+for example omap4_padconf_global: tisyscon at 4a1005a0. Then drivers can
+access it using regmap, see how drivers/regulator/pbias-regulator.c
+sets up the pbias regulator with regmap for MMC.
+ 
+> Pinctrl-single cannot be used for CONTROL_DSIPHY register, as the
+> register contents are a bit funny and DSI1 and DSI2 bits are mixed
+> together. And CONTROL_DSIPHY is already in the memory region defined by
+> the omap4_padconf_global, so I guess it wouldn't be good to map parts of
+> the same memory region in a pinctrl node.
 
->
-> --
-> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-> improving, and getting towards what was expected from it.
+If it's more than a mux, then it should not be set up as a pinctrl
+register. Looks like CONTROL_DSIPHY is already available for drivers
+via regmap as it falls into the *_padconf_global mappings for omap4
+and omap5.
 
--barry
+Regards,
+
+Tony
