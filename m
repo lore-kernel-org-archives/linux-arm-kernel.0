@@ -1,111 +1,62 @@
-From: anup.patel@linaro.org (Anup Patel)
-Date: Tue, 29 Apr 2014 11:24:21 +0530
-Subject: [PATCH v11 08/12] ARM/ARM64: KVM: Emulate PSCI v0.2 AFFINITY_INFO
-In-Reply-To: <1398750865-10892-1-git-send-email-anup.patel@linaro.org>
-References: <1398750865-10892-1-git-send-email-anup.patel@linaro.org>
-Message-ID: <1398750865-10892-9-git-send-email-anup.patel@linaro.org>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 29 Apr 2014 13:55:38 +0800
+Subject: [PATCH 3/3] ARM: dts: imx: Fix LVDS mapping for Ventana GW52xx
+In-Reply-To: <1398377247-3901-4-git-send-email-tharvey@gateworks.com>
+References: <1398377247-3901-1-git-send-email-tharvey@gateworks.com>
+ <1398377247-3901-4-git-send-email-tharvey@gateworks.com>
+Message-ID: <20140429055531.GF16451@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds emulation of PSCI v0.2 AFFINITY_INFO function call
-for KVM ARM/ARM64. This is a VCPU-level function call which will be
-used to determine current state of given affinity level.
+On Thu, Apr 24, 2014 at 03:07:27PM -0700, Tim Harvey wrote:
+> The GW52xx supports LVDS on channel 0. Remove the obsolete crtcs node and
+> add display timings for the HanStar HSD100PXN1 display.
 
-Signed-off-by: Anup Patel <anup.patel@linaro.org>
-Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/kvm/psci.c |   52 +++++++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 50 insertions(+), 2 deletions(-)
+The obsolete crtcs property has been removed by one patch in my queue.
+So please rebase the patch on my for-next branch.
 
-diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-index 5936213..3b6a0cf 100644
---- a/arch/arm/kvm/psci.c
-+++ b/arch/arm/kvm/psci.c
-@@ -27,6 +27,16 @@
-  * as described in ARM document number ARM DEN 0022A.
-  */
- 
-+#define AFFINITY_MASK(level)	~((0x1UL << ((level) * MPIDR_LEVEL_BITS)) - 1)
-+
-+static unsigned long psci_affinity_mask(unsigned long affinity_level)
-+{
-+	if (affinity_level <= 3)
-+		return MPIDR_HWID_BITMASK & AFFINITY_MASK(affinity_level);
-+
-+	return 0;
-+}
-+
- static void kvm_psci_vcpu_off(struct kvm_vcpu *vcpu)
- {
- 	vcpu->arch.pause = true;
-@@ -85,6 +95,42 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
- 	return PSCI_RET_SUCCESS;
- }
- 
-+static unsigned long kvm_psci_vcpu_affinity_info(struct kvm_vcpu *vcpu)
-+{
-+	int i;
-+	unsigned long mpidr;
-+	unsigned long target_affinity;
-+	unsigned long target_affinity_mask;
-+	unsigned long lowest_affinity_level;
-+	struct kvm *kvm = vcpu->kvm;
-+	struct kvm_vcpu *tmp;
-+
-+	target_affinity = *vcpu_reg(vcpu, 1);
-+	lowest_affinity_level = *vcpu_reg(vcpu, 2);
-+
-+	/* Determine target affinity mask */
-+	target_affinity_mask = psci_affinity_mask(lowest_affinity_level);
-+	if (!target_affinity_mask)
-+		return PSCI_RET_INVALID_PARAMS;
-+
-+	/* Ignore other bits of target affinity */
-+	target_affinity &= target_affinity_mask;
-+
-+	/*
-+	 * If one or more VCPU matching target affinity are running
-+	 * then ON else OFF
-+	 */
-+	kvm_for_each_vcpu(i, tmp, kvm) {
-+		mpidr = kvm_vcpu_get_mpidr(tmp);
-+		if (((mpidr & target_affinity_mask) == target_affinity) &&
-+		    !tmp->arch.pause) {
-+			return PSCI_0_2_AFFINITY_LEVEL_ON;
-+		}
-+	}
-+
-+	return PSCI_0_2_AFFINITY_LEVEL_OFF;
-+}
-+
- static void kvm_prepare_system_event(struct kvm_vcpu *vcpu, u32 type)
- {
- 	memset(&vcpu->run->system_event, 0, sizeof(vcpu->run->system_event));
-@@ -132,6 +178,10 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
- 	case PSCI_0_2_FN64_CPU_ON:
- 		val = kvm_psci_vcpu_on(vcpu);
- 		break;
-+	case PSCI_0_2_FN_AFFINITY_INFO:
-+	case PSCI_0_2_FN64_AFFINITY_INFO:
-+		val = kvm_psci_vcpu_affinity_info(vcpu);
-+		break;
- 	case PSCI_0_2_FN_SYSTEM_OFF:
- 		kvm_psci_system_off(vcpu);
- 		/*
-@@ -157,12 +207,10 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
- 		ret = 0;
- 		break;
- 	case PSCI_0_2_FN_CPU_SUSPEND:
--	case PSCI_0_2_FN_AFFINITY_INFO:
- 	case PSCI_0_2_FN_MIGRATE:
- 	case PSCI_0_2_FN_MIGRATE_INFO_TYPE:
- 	case PSCI_0_2_FN_MIGRATE_INFO_UP_CPU:
- 	case PSCI_0_2_FN64_CPU_SUSPEND:
--	case PSCI_0_2_FN64_AFFINITY_INFO:
- 	case PSCI_0_2_FN64_MIGRATE:
- 	case PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU:
- 		val = PSCI_RET_NOT_SUPPORTED;
--- 
-1.7.9.5
+Shawn
+
+> 
+> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+> ---
+>  arch/arm/boot/dts/imx6qdl-gw52xx.dtsi | 20 +++++++++++++++++++-
+>  1 file changed, 19 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
+> index 9c9259b..735e8e3 100644
+> --- a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
+> @@ -455,8 +455,26 @@
+>  
+>  &ldb {
+>  	status = "okay";
+> +
+>  	lvds-channel at 0 {
+> -		crtcs = <&ipu1 0>, <&ipu1 1>;
+> +		fsl,data-mapping = "spwg";
+> +		fsl,data-width = <18>;
+> +		status = "okay";
+> +
+> +		display-timings {
+> +			native-mode = <&timing0>;
+> +			timing0: hsd100pxn1 {
+> +				clock-frequency = <65000000>;
+> +				hactive = <1024>;
+> +				vactive = <768>;
+> +				hback-porch = <220>;
+> +				hfront-porch = <40>;
+> +				vback-porch = <21>;
+> +				vfront-porch = <7>;
+> +				hsync-len = <60>;
+> +				vsync-len = <10>;
+> +			};
+> +		};
+>  	};
+>  };
+>  
+> -- 
+> 1.8.3.2
+> 
+> 
+> 
