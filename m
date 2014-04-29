@@ -1,266 +1,323 @@
-From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Mon, 28 Apr 2014 20:29:42 -0700
-Subject: [PATCH v5] ARM: uprobes need icache flush after xol write
-In-Reply-To: <535D7024.6050002@linaro.org>
-References: <1398494096-11311-1-git-send-email-victor.kamensky@linaro.org>
- <1398494096-11311-2-git-send-email-victor.kamensky@linaro.org>
- <535D7024.6050002@linaro.org>
-Message-ID: <CAA3XUr1U9j9iR1aNqCr1M+URapFAASPck31syCVkBuGtnGEGzQ@mail.gmail.com>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Tue, 29 Apr 2014 09:02:35 +0530
+Subject: [PATCH v3 5/6] arm: exynos: Add MCPM call-back functions
+In-Reply-To: <20140428174456.GE31782@e102568-lin.cambridge.arm.com>
+References: <1398528348-21214-1-git-send-email-a.kesavan@samsung.com>
+ <1398528348-21214-6-git-send-email-a.kesavan@samsung.com>
+ <20140428174456.GE31782@e102568-lin.cambridge.arm.com>
+Message-ID: <CAM4voa=mhcZO9v7nDdrcz+T8RVN-Av3eERVErCX52k1ftUcKcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reviewed-by David L and Acked-by Oleg I've posted the patch into
-Russell's patch system as:
+Hi Lorenzo,
 
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8043/1
+Thanks for the review.
 
-Normally, I wait longer for feedback. In this case there is some sense
-of urgency and hope that it could make into 3.15, so I've chosen to
-submit it.
+[...]
 
-Russell, if you don't like it at all, please let us know and/or
-act accordingly within your patch system.
+>> +#include <linux/kernel.h>
+>> +#include <linux/io.h>
+>> +#include <linux/spinlock.h>
+>> +#include <linux/uaccess.h>
+>> +#include <linux/miscdevice.h>
+>> +#include <linux/fs.h>
+>> +#include <linux/delay.h>
+>> +#include <linux/arm-cci.h>
+>
+> Alphabetical order please.
+Will fix.
 
-Thanks,
-Victor
-
-
-On 27 April 2014 14:01, David Long <dave.long@linaro.org> wrote:
-> On 04/26/14 02:34, Victor Kamensky wrote:
->>
->> After instruction write into xol area, on ARM V7
->> architecture code need to flush dcache and icache to sync
->> them up for given set of addresses. Having just
->> 'flush_dcache_page(page)' call is not enough - it is
->> possible to have stale instruction sitting in icache
->> for given xol area slot address.
->>
->> Introduce arch_uprobe_ixol_copy weak function
->> that by default calls uprobes copy_to_page function and
->> than flush_dcache_page function and on ARM define new one
->> that handles xol slot copy in ARM specific way
->>
->> flush_uprobe_xol_access function shares/reuses implementation
->> with/of flush_ptrace_access function and takes care of writing
->> instruction to user land address space on given variety of
->> different cache types on ARM CPUs. Because
->> flush_uprobe_xol_access does not have vma around
->> flush_ptrace_access was split into two parts. First that
->> retrieves set of condition from vma and common that receives
->> those conditions as flags.
->>
->> Note ARM cache flush function need kernel address
->> through which instruction write happened, so instead
->> of using uprobes copy_to_page function changed
->> code to explicitly map page and do memcpy.
->>
->> Note arch_uprobe_copy_ixol function, in similar way as
->> copy_to_user_page function, has preempt_disable/preempt_enable.
->>
->> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
->> ---
->>   arch/arm/include/asm/cacheflush.h |  2 ++
->>   arch/arm/kernel/uprobes.c         | 20 ++++++++++++++++++++
->>   arch/arm/mm/flush.c               | 33 ++++++++++++++++++++++++++++-----
->>   include/linux/uprobes.h           |  3 +++
->>   kernel/events/uprobes.c           | 25 +++++++++++++++++--------
->>   5 files changed, 70 insertions(+), 13 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/cacheflush.h
->> b/arch/arm/include/asm/cacheflush.h
->> index 8b8b616..e02712a 100644
->> --- a/arch/arm/include/asm/cacheflush.h
->> +++ b/arch/arm/include/asm/cacheflush.h
->> @@ -487,4 +487,6 @@ int set_memory_rw(unsigned long addr, int numpages);
->>   int set_memory_x(unsigned long addr, int numpages);
->>   int set_memory_nx(unsigned long addr, int numpages);
->>
->> +void flush_uprobe_xol_access(struct page *page, unsigned long uaddr,
->> +                            void *kaddr, unsigned long len);
->>   #endif
->> diff --git a/arch/arm/kernel/uprobes.c b/arch/arm/kernel/uprobes.c
->> index f9bacee..56adf9c 100644
->> --- a/arch/arm/kernel/uprobes.c
->> +++ b/arch/arm/kernel/uprobes.c
->> @@ -113,6 +113,26 @@ int arch_uprobe_analyze_insn(struct arch_uprobe
->> *auprobe, struct mm_struct *mm,
->>         return 0;
->>   }
->>
->> +void arch_uprobe_copy_ixol(struct page *page, unsigned long vaddr,
->> +                          void *src, unsigned long len)
+[...]
+>> +#define exynos_v7_exit_coherency_flush(level) \
+>> +       asm volatile( \
+>> +       "stmfd  sp!, {fp, ip}\n\t"\
+>> +       "mrc    p15, 0, r0, c1, c0, 0   @ get SCTLR\n\t" \
+>> +       "bic    r0, r0, #"__stringify(CR_C)"\n\t" \
+>> +       "mcr    p15, 0, r0, c1, c0, 0   @ set SCTLR\n\t" \
+>> +       "isb\n\t"\
+>> +       "bl     v7_flush_dcache_"__stringify(level)"\n\t" \
+>> +       "clrex\n\t"\
+>> +       "mrc    p15, 0, r0, c1, c0, 1   @ get ACTLR\n\t" \
+>> +       "bic    r0, r0, #(1 << 6)       @ disable local coherency\n\t" \
+>> +       /* Dummy Load of a device register to avoid Erratum 799270 */ \
+>> +       "ldr    r4, [%0]\n\t" \
+>> +       "and    r4, r4, #0\n\t" \
+>> +       "orr    r0, r0, r4\n\t" \
+>> +       "mcr    p15, 0, r0, c1, c0, 1   @ set ACTLR\n\t" \
+>> +       "isb\n\t" \
+>> +       "dsb\n\t" \
+>> +       "ldmfd  sp!, {fp, ip}" \
+>> +       : \
+>> +       : "Ir" (S5P_INFORM0) \
+>> +       : "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", \
+>> +         "r9", "r10", "lr", "memory")
+>> +
+>
+> Still investigating to see if can work around errata 799270 in a
+> different fashion, will keep you posted.
+Thanks.
+>
+>> +/*
+>> + * We can't use regular spinlocks. In the switcher case, it is possible
+>> + * for an outbound CPU to call power_down() after its inbound counterpart
+>> + * is already live using the same logical CPU number which trips lockdep
+>> + * debugging.
+>> + */
+>> +static arch_spinlock_t exynos_mcpm_lock = __ARCH_SPIN_LOCK_UNLOCKED;
+>> +static int
+>> +cpu_use_count[EXYNOS5420_CPUS_PER_CLUSTER][EXYNOS5420_NR_CLUSTERS];
+>> +
+>> +static int exynos_cluster_power_control(unsigned int cluster, int enable)
 >> +{
->> +       void *xol_page_kaddr = kmap_atomic(page);
->> +       void *dst = xol_page_kaddr + (vaddr & ~PAGE_MASK);
+>> +       unsigned int tries = 100;
+>> +       unsigned int val = 0;
 >> +
->> +       preempt_disable();
+>> +       if (enable) {
+>> +               exynos_cluster_powerup(cluster);
+>> +               val = S5P_CORE_LOCAL_PWR_EN;
+>> +       } else {
+>> +               exynos_cluster_powerdown(cluster);
+>> +       }
 >> +
->> +       /* Initialize the slot */
->> +       memcpy(dst, src, len);
+>> +       /* Wait until cluster power control is applied */
+>> +       while (tries--) {
+>> +               if (exynos_cluster_power_state(cluster) == val)
+>
+> Do you really need val ?
+Yes, val can be 0x0 or 0x3 depending on whether we want to enable or
+disable the cluster.
+>
+>> +                       return 0;
 >> +
->> +       /* flush caches (dcache/icache) */
->> +       flush_uprobe_xol_access(page, vaddr, dst, len);
+>> +               cpu_relax();
+>> +       }
+>> +       pr_warn("timed out waiting for cluster %u to power %s\n", cluster,
+>> +               enable ? "on" : "off");
 >> +
->> +       preempt_enable();
->> +
->> +       kunmap_atomic(xol_page_kaddr);
+>> +       return -ETIMEDOUT;
 >> +}
 >> +
->> +
->>   int arch_uprobe_pre_xol(struct arch_uprobe *auprobe, struct pt_regs
->> *regs)
->>   {
->>         struct uprobe_task *utask = current->utask;
->> diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
->> index 3387e60..43d54f5 100644
->> --- a/arch/arm/mm/flush.c
->> +++ b/arch/arm/mm/flush.c
->> @@ -104,17 +104,20 @@ void flush_cache_page(struct vm_area_struct *vma,
->> unsigned long user_addr, unsig
->>   #define flush_icache_alias(pfn,vaddr,len)     do { } while (0)
->>   #endif
->>
->> +#define FLAG_PA_IS_EXEC 1
->> +#define FLAG_PA_CORE_IN_MM 2
->> +
->>   static void flush_ptrace_access_other(void *args)
->>   {
->>         __flush_icache_all();
->>   }
->>
->> -static
->> -void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
->> -                        unsigned long uaddr, void *kaddr, unsigned long
->> len)
->> +static inline
->> +void __flush_ptrace_access(struct page *page, unsigned long uaddr, void
->> *kaddr,
->> +                          unsigned long len, unsigned int flags)
->>   {
->>         if (cache_is_vivt()) {
->> -               if (cpumask_test_cpu(smp_processor_id(),
->> mm_cpumask(vma->vm_mm))) {
->> +               if (flags & FLAG_PA_CORE_IN_MM) {
->>                         unsigned long addr = (unsigned long)kaddr;
->>                         __cpuc_coherent_kern_range(addr, addr + len);
->>                 }
->> @@ -128,7 +131,7 @@ void flush_ptrace_access(struct vm_area_struct *vma,
->> struct page *page,
->>         }
->>
->>         /* VIPT non-aliasing D-cache */
->> -       if (vma->vm_flags & VM_EXEC) {
->> +       if (flags & FLAG_PA_IS_EXEC) {
->>                 unsigned long addr = (unsigned long)kaddr;
->>                 if (icache_is_vipt_aliasing())
->>                         flush_icache_alias(page_to_pfn(page), uaddr, len);
->> @@ -140,6 +143,26 @@ void flush_ptrace_access(struct vm_area_struct *vma,
->> struct page *page,
->>         }
->>   }
->>
->> +static
->> +void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
->> +                        unsigned long uaddr, void *kaddr, unsigned long
->> len)
+>> +static int exynos_power_up(unsigned int cpu, unsigned int cluster)
 >> +{
->> +       unsigned int flags = 0;
->> +       if (cpumask_test_cpu(smp_processor_id(), mm_cpumask(vma->vm_mm)))
->> +               flags |= FLAG_PA_CORE_IN_MM;
->> +       if (vma->vm_flags & VM_EXEC)
->> +               flags |= FLAG_PA_IS_EXEC;
->> +       __flush_ptrace_access(page, uaddr, kaddr, len, flags);
->> +}
+>> +       unsigned int cpunr = cpu + (cluster * EXYNOS5420_CPUS_PER_CLUSTER);
+>> +       unsigned int err;
 >> +
->> +void flush_uprobe_xol_access(struct page *page, unsigned long uaddr,
->> +                            void *kaddr, unsigned long len)
->> +{
->> +       unsigned int flags = FLAG_PA_CORE_IN_MM|FLAG_PA_IS_EXEC;
->> +
->> +       __flush_ptrace_access(page, uaddr, kaddr, len, flags);
->> +}
->> +
->>   /*
->>    * Copy user data from/to a page which is mapped into a different
->>    * processes address space.  Really, we want to allow our "user
->> diff --git a/include/linux/uprobes.h b/include/linux/uprobes.h
->> index edff2b9..c52f827 100644
->> --- a/include/linux/uprobes.h
->> +++ b/include/linux/uprobes.h
->> @@ -32,6 +32,7 @@ struct vm_area_struct;
->>   struct mm_struct;
->>   struct inode;
->>   struct notifier_block;
->> +struct page;
->>
->>   #define UPROBE_HANDLER_REMOVE         1
->>   #define UPROBE_HANDLER_MASK           1
->> @@ -127,6 +128,8 @@ extern int  arch_uprobe_exception_notify(struct
->> notifier_block *self, unsigned l
->>   extern void arch_uprobe_abort_xol(struct arch_uprobe *aup, struct
->> pt_regs *regs);
->>   extern unsigned long arch_uretprobe_hijack_return_addr(unsigned long
->> trampoline_vaddr, struct pt_regs *regs);
->>   extern bool __weak arch_uprobe_ignore(struct arch_uprobe *aup, struct
->> pt_regs *regs);
->> +extern void __weak arch_uprobe_copy_ixol(struct page *page, unsigned long
->> vaddr,
->> +                                        void *src, unsigned long len);
->>   #else /* !CONFIG_UPROBES */
->>   struct uprobes_state {
->>   };
->> diff --git a/kernel/events/uprobes.c b/kernel/events/uprobes.c
->> index 04709b6..4968213 100644
->> --- a/kernel/events/uprobes.c
->> +++ b/kernel/events/uprobes.c
->> @@ -1296,14 +1296,8 @@ static unsigned long xol_get_insn_slot(struct
->> uprobe *uprobe)
->>         if (unlikely(!xol_vaddr))
->>                 return 0;
->>
->> -       /* Initialize the slot */
->> -       copy_to_page(area->page, xol_vaddr,
->> -                       &uprobe->arch.ixol, sizeof(uprobe->arch.ixol));
->> -       /*
->> -        * We probably need flush_icache_user_range() but it needs vma.
->> -        * This should work on supported architectures too.
->> -        */
->> -       flush_dcache_page(area->page);
->> +       arch_uprobe_copy_ixol(area->page, xol_vaddr,
->> +                             &uprobe->arch.ixol,
->> sizeof(uprobe->arch.ixol));
->>
->>         return xol_vaddr;
->>   }
->> @@ -1346,6 +1340,21 @@ static void xol_free_insn_slot(struct task_struct
->> *tsk)
->>         }
->>   }
->>
->> +void __weak arch_uprobe_copy_ixol(struct page *page, unsigned long vaddr,
->> +                                 void *src, unsigned long len)
->> +{
->> +       /* Initialize the slot */
->> +       copy_to_page(page, vaddr, src, len);
+>> +       pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
+>> +       if (cpu >= EXYNOS5420_CPUS_PER_CLUSTER ||
+>> +               cluster >= EXYNOS5420_NR_CLUSTERS)
+>> +               return -EINVAL;
 >> +
 >> +       /*
->> +        * We probably need flush_icache_user_range() but it needs vma.
->> +        * This should work on most of architectures by default. If
->> +        * architecture needs to do something different it can define
->> +        * its own version of the function.
+>> +        * Since this is called with IRQs enabled, and no arch_spin_lock_irq
+>> +        * variant exists, we need to disable IRQs manually here.
 >> +        */
->> +       flush_dcache_page(page);
+>> +       local_irq_disable();
+>> +       arch_spin_lock(&exynos_mcpm_lock);
+>> +
+>> +       cpu_use_count[cpu][cluster]++;
+>> +       if (cpu_use_count[cpu][cluster] == 1) {
+>> +               bool was_cluster_down =
+>> +                       __mcpm_cluster_state(cluster) == CLUSTER_DOWN;
+>> +
+>> +               /*
+>> +                * Turn on the cluster (L2/COMMON) and then power on the cores.
+>> +                * TODO: Turn off the clusters when all cores in the cluster
+>> +                * are down to achieve significant power savings.
+>> +                */
+>> +               if (was_cluster_down) {
+>> +                       err = exynos_cluster_power_control(cluster, 1);
+>> +                       if (err) {
+>> +                               exynos_cluster_power_control(cluster, 0);
+>> +                               return err;
+>
+> You must not return without undoing what you should (irqs and locking).
+Will do so.
+>
+>> +                       }
+>> +               }
+>> +
+>> +               exynos_cpu_powerup(cpunr);
+>> +
+>> +               /* CPU should be powered up there */
+>> +               /* Also setup Cluster Power Sequence here */
+>
+> Stale comment ?
+Will remove.
+>
+>> +       } else if (cpu_use_count[cpu][cluster] != 2) {
+>> +               /*
+>> +                * The only possible values are:
+>> +                * 0 = CPU down
+>> +                * 1 = CPU (still) up
+>> +                * 2 = CPU requested to be up before it had a chance
+>> +                *     to actually make itself down.
+>> +                * Any other value is a bug.
+>> +                */
+>> +               BUG();
+>> +       }
+>> +
+>> +       arch_spin_unlock(&exynos_mcpm_lock);
+>> +       local_irq_enable();
+>> +
+>> +       return 0;
 >> +}
 >> +
->>   /**
->>    * uprobe_get_swbp_addr - compute address of swbp given post-swbp regs
->>    * @regs: Reflects the saved state of the task after it has hit a
->> breakpoint
->>
+>> +static void exynos_power_down(void)
+>> +{
+>> +       unsigned int mpidr, cpu, cluster;
+>> +       bool last_man = false, skip_wfi = false;
+>> +       unsigned int cpunr;
+>> +
+>> +       mpidr = read_cpuid_mpidr();
+>> +       cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+>> +       cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+>> +       cpunr =  cpu + (cluster * EXYNOS5420_CPUS_PER_CLUSTER);
+>> +
+>> +       pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
+>> +       BUG_ON(cpu >= EXYNOS5420_CPUS_PER_CLUSTER ||
+>> +                       cluster >= EXYNOS5420_NR_CLUSTERS);
+>> +
+>> +       __mcpm_cpu_going_down(cpu, cluster);
+>> +
+>> +       arch_spin_lock(&exynos_mcpm_lock);
+>> +       BUG_ON(__mcpm_cluster_state(cluster) != CLUSTER_UP);
+>> +       cpu_use_count[cpu][cluster]--;
+>> +       if (cpu_use_count[cpu][cluster] == 0) {
+>> +               int cnt = 0, i;
+>> +
+>> +               exynos_cpu_powerdown(cpunr);
+>> +               for (i = 0; i < EXYNOS5420_CPUS_PER_CLUSTER; i++)
+>> +                       cnt += cpu_use_count[i][cluster];
+>> +               if (cnt == 0)
+>> +                       last_man = true;
 >
+>                 for (i = 0; i < EXYNOS5420_CPUS_PER_CLUSTER; i++)
+>                         if (cpu_use_count[i][cluster])
+>                                 break;
+>                 last_man = i == EXYNOS5420_CPUS_PER_CLUSTER;
 >
-> Reviewed-by: David A. Long <dave.long@linaro.org>
+> and get rid of cnt.
+OK.
 >
+>> +       } else if (cpu_use_count[cpu][cluster] == 1) {
+>> +               /*
+>> +                * A power_up request went ahead of us.
+>> +                * Even if we do not want to shut this CPU down,
+>> +                * the caller expects a certain state as if the WFI
+>> +                * was aborted.  So let's continue with cache cleaning.
+>> +                */
+>> +               skip_wfi = true;
+>> +       } else {
+>> +               BUG();
+>> +       }
+>> +
+>> +       if (last_man && __mcpm_outbound_enter_critical(cpu, cluster)) {
+>> +               arch_spin_unlock(&exynos_mcpm_lock);
+>> +
+>> +               /* Flush all cache levels for this cluster. */
+>> +               exynos_v7_exit_coherency_flush(all);
+>> +
+>> +               /*
+>> +                * Disable cluster-level coherency by masking
+>> +                * incoming snoops and DVM messages:
+>> +                */
+>> +               cci_disable_port_by_cpu(mpidr);
+>> +
+>> +               __mcpm_outbound_leave_critical(cluster, CLUSTER_DOWN);
+>> +       } else {
+>> +               arch_spin_unlock(&exynos_mcpm_lock);
+>> +
+>> +               /* Disable and flush the local CPU cache. */
+>> +               exynos_v7_exit_coherency_flush(louis);
+>> +       }
+>> +
+>> +       __mcpm_cpu_down(cpu, cluster);
+>> +
+>> +       /* Now we are prepared for power-down, do it: */
+>> +       if (!skip_wfi)
+>> +               wfi();
+>> +
+>> +       /* Not dead at this point?  Let our caller cope. */
+>> +}
+>> +
+>> +static int exynos_power_down_finish(unsigned int cpu, unsigned int cluster)
+>> +{
+>> +       unsigned int tries = 100;
+>> +       unsigned int cpunr = cpu + (cluster * EXYNOS5420_CPUS_PER_CLUSTER);
+>> +
+>> +       pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
+>> +       BUG_ON(cpu >= EXYNOS5420_CPUS_PER_CLUSTER ||
+>> +                       cluster >= EXYNOS5420_NR_CLUSTERS);
+>> +
+>> +       /* Wait for the core state to be OFF */
+>> +       while (tries--) {
+>> +               if (ACCESS_ONCE(cpu_use_count[cpu][cluster]) == 0) {
+>> +                       if ((exynos_cpu_power_state(cpunr) == 0))
+>> +                               return 0; /* success: the CPU is halted */
+>> +               }
+>> +
+>> +               /* Otherwise, wait and retry: */
+>> +               msleep(1);
+>> +       }
+>> +
+>> +       return -ETIMEDOUT; /* timeout */
+>> +}
+>> +
+>> +static const struct mcpm_platform_ops exynos_power_ops = {
+>> +       .power_up               = exynos_power_up,
+>> +       .power_down             = exynos_power_down,
+>> +       .power_down_finish      = exynos_power_down_finish,
+>> +};
+>> +
+>> +static void __init exynos_mcpm_usage_count_init(void)
+>> +{
+>> +       unsigned int mpidr, cpu, cluster;
+>> +
+>> +       mpidr = read_cpuid_mpidr();
+>> +       cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+>> +       cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+>> +
+>> +       pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
+>> +       BUG_ON(cpu >= EXYNOS5420_CPUS_PER_CLUSTER  ||
+>> +                       cluster >= EXYNOS5420_NR_CLUSTERS);
+>> +
+>> +       cpu_use_count[cpu][cluster] = 1;
+>> +}
+>> +
+>> +/*
+>> + * Enable cluster-level coherency, in preparation for turning on the MMU.
+>> + */
+>> +static void __naked exynos_pm_power_up_setup(unsigned int affinity_level)
+>> +{
+>> +       asm volatile ("\n"
+>> +       "cmp    r0, #1\n"
+>> +       "bxne   lr\n"
+>> +       "b      cci_enable_port_for_self");
+>> +}
 >
-> -dl
+> How many times are we going to duplicate this function before we decide
+> to move it to a common header ?
+I see this being used in arch/arm/mach-vexpress/tc2_pm.c (where I
+copied it from for exynos) and arch/arm/mach-vexpress/dcscb.c. A
+common function named "mcpm_default_power_up_setup" in the mcpm header
+would be acceptable ?
+>
+>> +static int __init exynos_mcpm_init(void)
+>> +{
+>> +       int ret = 0;
+>> +
+>> +       if (!soc_is_exynos5420())
+>> +               return -ENODEV;
+>
+> I do not particularly like these soc_is* stubs, but it is just a matter
+> of taste.
+Would you prefer a of_find_compatible_node check for exynos5420 ?
+
+Will wait a day or two for more comments and then re-post.
+
+Regards,
+Abhilash
+>
+> Thanks,
+> Lorenzo
 >
