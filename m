@@ -1,37 +1,100 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 29 Apr 2014 12:03:41 +0200
-Subject: [PATCH v5 10/11] ARM: shmobile: r7s72100: remove SPI DT clocks from
- legacy clock support
+Date: Tue, 29 Apr 2014 12:03:40 +0200
+Subject: [PATCH v5 09/11] ARM: shmobile: r7s72100: add spi clocks to dtsi
 In-Reply-To: <1398765822-2314-1-git-send-email-wsa@the-dreams.de>
 References: <1398765822-2314-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1398765822-2314-11-git-send-email-wsa@the-dreams.de>
+Message-ID: <1398765822-2314-10-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-Not used anymore since we switched to CCF.
-
 Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
 ---
- arch/arm/mach-shmobile/clock-r7s72100.c | 5 -----
- 1 file changed, 5 deletions(-)
+ arch/arm/boot/dts/r7s72100.dtsi            | 18 ++++++++++++++++++
+ include/dt-bindings/clock/r7s72100-clock.h |  7 +++++++
+ 2 files changed, 25 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/clock-r7s72100.c b/arch/arm/mach-shmobile/clock-r7s72100.c
-index 6974cadac51c..7ea712a051f0 100644
---- a/arch/arm/mach-shmobile/clock-r7s72100.c
-+++ b/arch/arm/mach-shmobile/clock-r7s72100.c
-@@ -194,11 +194,6 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("rspi-rz.2", &mstp_clks[MSTP105]),
- 	CLKDEV_DEV_ID("rspi-rz.3", &mstp_clks[MSTP104]),
- 	CLKDEV_DEV_ID("rspi-rz.4", &mstp_clks[MSTP103]),
--	CLKDEV_DEV_ID("e800c800.spi", &mstp_clks[MSTP107]),
--	CLKDEV_DEV_ID("e800d000.spi", &mstp_clks[MSTP106]),
--	CLKDEV_DEV_ID("e800d800.spi", &mstp_clks[MSTP105]),
--	CLKDEV_DEV_ID("e800e000.spi", &mstp_clks[MSTP104]),
--	CLKDEV_DEV_ID("e800e800.spi", &mstp_clks[MSTP103]),
- 	CLKDEV_DEV_ID("r7s72100-ether", &mstp_clks[MSTP74]),
- 	CLKDEV_CON_ID("mtu2_fck", &mstp_clks[MSTP33]),
+diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
+index afce2e344c7a..f50fbc8f3bd9 100644
+--- a/arch/arm/boot/dts/r7s72100.dtsi
++++ b/arch/arm/boot/dts/r7s72100.dtsi
+@@ -121,6 +121,19 @@
+ 			>;
+ 			clock-output-names = "i2c0", "i2c1", "i2c2", "i2c3";
+ 		};
++
++		mstp10_clks: mstp10_clks at fcfe043c {
++			#clock-cells = <1>;
++			compatible = "renesas,r7s72100-mstp-clocks", "renesas,cpg-mstp-clocks";
++			reg = <0xfcfe043c 4>;
++			clocks = <&p1_clk>, <&p1_clk>, <&p1_clk>, <&p1_clk>,
++				 <&p1_clk>;
++			clock-indices = <
++				R7S72100_CLK_SPI0 R7S72100_CLK_SPI1 R7S72100_CLK_SPI2 R7S72100_CLK_SPI3
++				R7S72100_CLK_SPI4
++			>;
++			clock-output-names = "spi0", "spi1", "spi2", "spi3", "spi4";
++		};
+ 	};
  
+ 	cpus {
+@@ -318,6 +331,7 @@
+ 			     <0 239 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 240 IRQ_TYPE_LEVEL_HIGH>;
+ 		interrupt-names = "error", "rx", "tx";
++		clocks = <&mstp10_clks R7S72100_CLK_SPI0>;
+ 		num-cs = <1>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -331,6 +345,7 @@
+ 			     <0 242 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 243 IRQ_TYPE_LEVEL_HIGH>;
+ 		interrupt-names = "error", "rx", "tx";
++		clocks = <&mstp10_clks R7S72100_CLK_SPI1>;
+ 		num-cs = <1>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -344,6 +359,7 @@
+ 			     <0 245 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 246 IRQ_TYPE_LEVEL_HIGH>;
+ 		interrupt-names = "error", "rx", "tx";
++		clocks = <&mstp10_clks R7S72100_CLK_SPI2>;
+ 		num-cs = <1>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -357,6 +373,7 @@
+ 			     <0 248 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 249 IRQ_TYPE_LEVEL_HIGH>;
+ 		interrupt-names = "error", "rx", "tx";
++		clocks = <&mstp10_clks R7S72100_CLK_SPI3>;
+ 		num-cs = <1>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -370,6 +387,7 @@
+ 			     <0 251 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 252 IRQ_TYPE_LEVEL_HIGH>;
+ 		interrupt-names = "error", "rx", "tx";
++		clocks = <&mstp10_clks R7S72100_CLK_SPI4>;
+ 		num-cs = <1>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+diff --git a/include/dt-bindings/clock/r7s72100-clock.h b/include/dt-bindings/clock/r7s72100-clock.h
+index ff84e0bafd7b..5128f4d94f44 100644
+--- a/include/dt-bindings/clock/r7s72100-clock.h
++++ b/include/dt-bindings/clock/r7s72100-clock.h
+@@ -31,4 +31,11 @@
+ #define R7S72100_CLK_I2C2	5
+ #define R7S72100_CLK_I2C3	4
+ 
++/* MSTP10 */
++#define R7S72100_CLK_SPI0	7
++#define R7S72100_CLK_SPI1	6
++#define R7S72100_CLK_SPI2	5
++#define R7S72100_CLK_SPI3	4
++#define R7S72100_CLK_SPI4	3
++
+ #endif /* __DT_BINDINGS_CLOCK_R7S72100_H__ */
 -- 
 1.9.2
