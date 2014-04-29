@@ -1,61 +1,120 @@
 From: jays.lee@samsung.com (Jungseok Lee)
-Date: Tue, 29 Apr 2014 13:59:23 +0900
-Subject: [PATCH v4 3/7] arm64: Introduce a kernel configuration option for
- VA_BITS
-Message-ID: <000301cf6367$ca12e150$5e38a3f0$@samsung.com>
+Date: Tue, 29 Apr 2014 13:59:27 +0900
+Subject: [PATCH v4 4/7] arm64: Add a description on 48-bit address space with
+ 4KB pages
+Message-ID: <000401cf6367$cc461500$64d23f00$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a kernel configuration for VA_BITS.
-
-It helps to prevent unnecessary #ifdef statements insertions
-for VA_BITS when implementing different page sizes and level of
-translation tables.
+This patch adds memory layout and translation lookup information
+about 48-bit address space with 4K pages. The description is based
+on 4 levels of translation tables.
 
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Steve Capper <steve.capper@linaro.org>
 Signed-off-by: Jungseok Lee <jays.lee@samsung.com>
 Reviewed-by: Sungjinn Chung <sungjinn.chung@samsung.com>
 ---
- arch/arm64/Kconfig              |    8 ++++++++
- arch/arm64/include/asm/memory.h |    6 +-----
- 2 files changed, 9 insertions(+), 5 deletions(-)
+ Documentation/arm64/memory.txt |   59 ++++++++++++++++++++++++++++++++++------
+ 1 file changed, 51 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index c7f5d65..7b8d429 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -186,6 +186,14 @@ config ARM64_3_LEVELS
+diff --git a/Documentation/arm64/memory.txt b/Documentation/arm64/memory.txt
+index d50fa61..8142709 100644
+--- a/Documentation/arm64/memory.txt
++++ b/Documentation/arm64/memory.txt
+@@ -8,10 +8,11 @@ This document describes the virtual memory layout used by the AArch64
+ Linux kernel. The architecture allows up to 4 levels of translation
+ tables with a 4KB page size and up to 3 levels with a 64KB page size.
  
- endchoice
+-AArch64 Linux uses 3 levels of translation tables with the 4KB page
+-configuration, allowing 39-bit (512GB) virtual addresses for both user
+-and kernel. With 64KB pages, only 2 levels of translation tables are
+-used but the memory layout is the same.
++AArch64 Linux uses 3 levels and 4 levels of translation tables with
++the 4KB page configuration, allowing 39-bit (512GB) and 48-bit (256TB)
++virtual addresses, respectively, for both user and kernel. With 64KB
++pages, only 2 levels of translation tables are used but the memory layout
++is the same.
  
-+config ARM64_VA_BITS
-+	int "Virtual address space size"
-+	range 39 39 if ARM64_4K_PAGES && ARM64_3_LEVELS
-+	range 42 42 if ARM64_64K_PAGES && ARM64_2_LEVELS
-+	help
-+	  This feature is determined by a combination of page size and
-+	  level of translation tables.
+ User addresses have bits 63:39 set to 0 while the kernel addresses have
+ the same bits set to 1. TTBRx selection is given by bit 63 of the
+@@ -21,7 +22,7 @@ The swapper_pgd_dir address is written to TTBR1 and never written to
+ TTBR0.
+ 
+ 
+-AArch64 Linux memory layout with 4KB pages:
++AArch64 Linux memory layout with 4KB pages + 3 levels:
+ 
+ Start			End			Size		Use
+ -----------------------------------------------------------------------
+@@ -48,7 +49,34 @@ ffffffbffc000000	ffffffbfffffffff	  64MB		modules
+ ffffffc000000000	ffffffffffffffff	 256GB		kernel logical memory map
+ 
+ 
+-AArch64 Linux memory layout with 64KB pages:
++AArch64 Linux memory layout with 4KB pages + 4 levels:
 +
- config CPU_BIG_ENDIAN
-        bool "Build big-endian kernel"
-        help
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index e94f945..f6e7480 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -41,11 +41,7 @@
-  * The module space lives between the addresses given by TASK_SIZE
-  * and PAGE_OFFSET - it must be within 128MB of the kernel text.
-  */
--#ifdef CONFIG_ARM64_64K_PAGES
--#define VA_BITS			(42)
--#else
--#define VA_BITS			(39)
--#endif
-+#define VA_BITS			(CONFIG_ARM64_VA_BITS)
- #define PAGE_OFFSET		(UL(0xffffffffffffffff) << (VA_BITS - 1))
- #define MODULES_END		(PAGE_OFFSET)
- #define MODULES_VADDR		(MODULES_END - SZ_64M)
++Start			End			Size		Use
++-----------------------------------------------------------------------
++0000000000000000	0000ffffffffffff	 256TB		user
++
++ffff000000000000	ffff7bfffffeffff	~124TB		vmalloc
++
++ffff7bffffff0000	ffff7bffffffffff	  64KB		[guard page]
++
++ffff7c0000000000	ffff7dffffffffff	   2TB		vmemmap
++
++ffff7e0000000000	ffff7ffffbbfffff	  ~2TB		[guard, future vmmemap]
++
++ffff7ffffa000000	ffff7ffffaffffff	  16MB		PCI I/O space
++
++ffff7ffffb000000	ffff7ffffbbfffff	  12MB		[guard]
++
++ffff7ffffbc00000	ffff7ffffbdfffff	   2MB		earlyprintk device
++
++ffff7ffffbe00000	ffff7ffffbffffff	   2MB		[guard]
++
++ffff7ffffc000000	ffff7fffffffffff	  64MB		modules
++
++ffff800000000000	ffffffffffffffff	 128TB		kernel logical memory map
++
++
++AArch64 Linux memory layout with 64KB pages + 2 levels:
+ 
+ Start			End			Size		Use
+ -----------------------------------------------------------------------
+@@ -75,7 +103,7 @@ fffffdfffc000000	fffffdffffffffff	  64MB		modules
+ fffffe0000000000	ffffffffffffffff	   2TB		kernel logical memory map
+ 
+ 
+-Translation table lookup with 4KB pages:
++Translation table lookup with 4KB pages + 3 levels:
+ 
+ +--------+--------+--------+--------+--------+--------+--------+--------+
+ |63    56|55    48|47    40|39    32|31    24|23    16|15     8|7      0|
+@@ -90,7 +118,22 @@ Translation table lookup with 4KB pages:
+  +-------------------------------------------------> [63] TTBR0/1
+ 
+ 
+-Translation table lookup with 64KB pages:
++Translation table lookup with 4KB pages + 4 levels:
++
+++--------+--------+--------+--------+--------+--------+--------+--------+
++|63    56|55    48|47    40|39    32|31    24|23    16|15     8|7      0|
+++--------+--------+--------+--------+--------+--------+--------+--------+
++ |                 |         |         |         |         |
++ |                 |         |         |         |         v
++ |                 |         |         |         |   [11:0]  in-page offset
++ |                 |         |         |         +-> [20:12] L3 index
++ |                 |         |         +-----------> [29:21] L2 index
++ |                 |         +---------------------> [38:30] L1 index
++ |                 +-------------------------------> [47:39] L0 index
++ +-------------------------------------------------> [63] TTBR0/1
++
++
++Translation table lookup with 64KB pages + 2 levels:
+ 
+ +--------+--------+--------+--------+--------+--------+--------+--------+
+ |63    56|55    48|47    40|39    32|31    24|23    16|15     8|7      0|
 -- 
 1.7.10.4
