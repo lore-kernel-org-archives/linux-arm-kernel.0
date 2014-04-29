@@ -1,64 +1,54 @@
-From: jhbird.choi@samsung.com (Jonghwan Choi)
-Date: Tue, 29 Apr 2014 14:24:05 +0900
-Subject: [PATCH 2/2] cpufreq: Remove exynos_sort_descend_freq_table in
- exynos5440-cpufreq.c
-Message-ID: <000701cf636b$3d1d13c0$b7573b40$@samsung.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 29 Apr 2014 13:24:56 +0800
+Subject: [PATCH] ARM: dts: imx6qdl-wandboard: Move FEC reset pin into the
+ FEC pin group
+In-Reply-To: <1398284002-14396-1-git-send-email-festevam@gmail.com>
+References: <1398284002-14396-1-git-send-email-festevam@gmail.com>
+Message-ID: <20140429052454.GC16451@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After applying "PM / OPP: Use list_for_each_entry_reverse instead of
-list_for_each_entry",
-cpufreq table is sorted int descending order. So
-exynos_sort_descend_freq_table
-doesn't need anymore.
+On Wed, Apr 23, 2014 at 05:13:22PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> Remove GPIO3_29 (FEC PHY reset pin) from the hog group and place it into
+> pinctrl_enet pin group instead.
 
-Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
----
- drivers/cpufreq/exynos5440-cpufreq.c |   20 --------------------
- 1 file changed, 20 deletions(-)
+If you can clean up the pinctrl settings to kill hog group completely
+for the board, I would be happy to take the patch.  Otherwise, let's
+leave it there for now, until you see a real problem with having the
+pin in hog group than pinctrl_enet.
 
-diff --git a/drivers/cpufreq/exynos5440-cpufreq.c
-b/drivers/cpufreq/exynos5440-cpufreq.c
-index a6b8214..92db80b 100644
---- a/drivers/cpufreq/exynos5440-cpufreq.c
-+++ b/drivers/cpufreq/exynos5440-cpufreq.c
-@@ -279,25 +279,6 @@ static irqreturn_t exynos_cpufreq_irq(int irq, void
-*id)
- 	return IRQ_HANDLED;
- }
- 
--static void exynos_sort_descend_freq_table(void)
--{
--	struct cpufreq_frequency_table *freq_tbl = dvfs_info->freq_table;
--	int i = 0, index;
--	unsigned int tmp_freq;
--	/*
--	 * Exynos5440 clock controller state logic expects the cpufreq table
-to
--	 * be in descending order. But the OPP library constructs the table
-in
--	 * ascending order. So to make the table descending we just need to
--	 * swap the i element with the N - i element.
--	 */
--	for (i = 0; i < dvfs_info->freq_count / 2; i++) {
--		index = dvfs_info->freq_count - i - 1;
--		tmp_freq = freq_tbl[i].frequency;
--		freq_tbl[i].frequency = freq_tbl[index].frequency;
--		freq_tbl[index].frequency = tmp_freq;
--	}
--}
--
- static int exynos_cpufreq_cpu_init(struct cpufreq_policy *policy)
- {
- 	policy->clk = dvfs_info->cpu_clk;
-@@ -374,7 +355,6 @@ static int exynos_cpufreq_probe(struct platform_device
-*pdev)
- 		goto err_put_node;
- 	}
- 	dvfs_info->freq_count = dev_pm_opp_get_opp_count(dvfs_info->dev);
--	exynos_sort_descend_freq_table();
- 
- 	if (of_property_read_u32(np, "clock-latency", &dvfs_info->latency))
- 		dvfs_info->latency = DEF_TRANS_LATENCY;
--- 
-1.7.10.4
+Shawn
+
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/boot/dts/imx6qdl-wandboard.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+> index 5c6f10c..79498ca 100644
+> --- a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+> @@ -104,7 +104,6 @@
+>  				MX6QDL_PAD_ENET_RXD1__GPIO1_IO26 0x80000000 /* WL_REG_ON */
+>  				MX6QDL_PAD_ENET_TXD1__GPIO1_IO29 0x80000000 /* WL_HOST_WAKE */
+>  				MX6QDL_PAD_ENET_TXD0__GPIO1_IO30 0x80000000 /* WL_WAKE */
+> -				MX6QDL_PAD_EIM_D29__GPIO3_IO29   0x80000000
+>  			>;
+>  		};
+>  
+> @@ -136,6 +135,7 @@
+>  				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x1b0b0
+>  				MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0x4001b0a8
+>  				MX6QDL_PAD_GPIO_6__ENET_IRQ		0x000b1
+> +				MX6QDL_PAD_EIM_D29__GPIO3_IO29   	0x80000000
+>  			>;
+>  		};
+>  
+> -- 
+> 1.8.3.2
+> 
+> 
+> 
