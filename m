@@ -1,87 +1,25 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 29 Apr 2014 16:43:23 +0900
-Subject: [PATCH 1/4] ARM: shmobile: r8a7779: Add scif nodes to dtsi
-In-Reply-To: <1398757406-30920-1-git-send-email-horms+renesas@verge.net.au>
-References: <1398757406-30920-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1398757406-30920-2-git-send-email-horms+renesas@verge.net.au>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Tue, 29 Apr 2014 09:43:58 +0200
+Subject: [PATCH v4 05/11] ARM: shmobile: r7s72100: genmai: add uart
+ aliases and activate scif2 as console
+In-Reply-To: <20140429073501.GA3050@verge.net.au>
+References: <1398704521-23767-1-git-send-email-wsa@the-dreams.de>
+ <1398704521-23767-6-git-send-email-wsa@the-dreams.de>
+ <CANqRtoTHy+-ac0kWY5a9MdYN0=jwWdeuOus9CVBckmas32_hSQ@mail.gmail.com>
+ <20140429072143.GA2732@katana> <20140429073501.GA3050@verge.net.au>
+Message-ID: <20140429074358.GB2732@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7779.dtsi | 60 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 60 insertions(+)
+> So at the risk of being contradicted by Magnus and others
+> my recommendation is to remove the aliases that Magnus highlighted.
 
-diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
-index e924f96..3e9cca4 100644
---- a/arch/arm/boot/dts/r8a7779.dtsi
-+++ b/arch/arm/boot/dts/r8a7779.dtsi
-@@ -203,6 +203,66 @@
- 		status = "disabled";
- 	};
- 
-+	scif0: serial at ffe40000 {
-+		compatible = "renesas,scif", "renesas,scif-r8a7779";
-+		reg = <0xffe40000 265>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 88 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cpg_clocks R8A7779_CLK_P>;
-+		clock-names = "sci_ick";
-+		status = "disabled";
-+	};
-+
-+	scif1: serial at ffe41000 {
-+		compatible = "renesas,scif", "renesas,scif-r8a7779";
-+		reg = <0xffe41000 265>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 89 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cpg_clocks R8A7779_CLK_P>;
-+		clock-names = "sci_ick";
-+		status = "disabled";
-+	};
-+
-+	scif2: serial at ffe42000 {
-+		compatible = "renesas,scif", "renesas,scif-r8a7779";
-+		reg = <0xffe42000 265>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 90 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cpg_clocks R8A7779_CLK_P>;
-+		clock-names = "sci_ick";
-+		status = "disabled";
-+	};
-+
-+	scif3: serial at ffe43000 {
-+		compatible = "renesas,scif", "renesas,scif-r8a7779";
-+		reg = <0xffe43000 265>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 91 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cpg_clocks R8A7779_CLK_P>;
-+		clock-names = "sci_ick";
-+		status = "disabled";
-+	};
-+
-+	scif4: serial at ffe44000 {
-+		compatible = "renesas,scif", "renesas,scif-r8a7779";
-+		reg = <0xffe44000 265>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 92 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cpg_clocks R8A7779_CLK_P>;
-+		clock-names = "sci_ick";
-+		status = "disabled";
-+	};
-+
-+	scif5: serial at ffe45000 {
-+		compatible = "renesas,scif", "renesas,scif-r8a7779";
-+		reg = <0xffe45000 265>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 93 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cpg_clocks R8A7779_CLK_P>;
-+		clock-names = "sci_ick";
-+		status = "disabled";
-+	};
-+
- 	pfc: pfc at fffc0000 {
- 		compatible = "renesas,pfc-r8a7779";
- 		reg = <0xfffc0000 0x23c>;
--- 
-1.8.5.2
+OK. Shall I resend the series or only this patch?
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140429/040ec80e/attachment.sig>
