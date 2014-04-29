@@ -1,50 +1,57 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 29 Apr 2014 13:40:16 +0100
-Subject: ARM: mm: Could I change module space size or place modules in
- vmalloc area?
-In-Reply-To: <4710126.4mE2sZLRKS@wuerfel>
-References: <002001cf07a1$fd4bdc10$f7e39430$@lge.com>
- <535B1618.5030504@huawei.com> <20140429111946.GC26067@arm.com>
- <4710126.4mE2sZLRKS@wuerfel>
-Message-ID: <20140429124016.GE26067@arm.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Tue, 29 Apr 2014 13:56:57 +0100
+Subject: [PATCH 01/10] of: Keep track of populated platform devices
+In-Reply-To: <CAL_JsqJxWoxNL=P0SJm+Q1rTRGTpMkzmzTJDbFq2P1vPH4XxZQ@mail.gmail.com>
+References: <1398707877-22596-1-git-send-email-pawel.moll@arm.com>
+ <1398707877-22596-2-git-send-email-pawel.moll@arm.com>
+ <CAL_JsqJxWoxNL=P0SJm+Q1rTRGTpMkzmzTJDbFq2P1vPH4XxZQ@mail.gmail.com>
+Message-ID: <20140429125657.65910C4089D@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 29, 2014 at 12:35:34PM +0100, Arnd Bergmann wrote:
-> On Tuesday 29 April 2014 12:19:46 Will Deacon wrote:
-> > On Sat, Apr 26, 2014 at 03:12:40AM +0100, Jianguo Wu wrote:
-> > > On 2014/1/3 8:47, Russell King - ARM Linux wrote:
-> > > > ARM can only branch relatively within +/- 32MB.  Hence, with a module
-> > > > space of 16MB, modules can reach up to a maximum 16MB into the direct-
-> > > > mapped kernel image.  As module space increases in size, so that figure
-> > > > decreases.  So, if module space were to be 40MB, the maximum size of the
-> > > > kernel binary would be 8MB.
-> > > > 
-> > > 
-> > > Hi Russell ,Arnd or Will,
-> > > 
-> > > I encountered the same situation in arm64, I loaded 80+ modules in arm64, and
-> > > run out of module address space(64M). Why the module space is restricted to 64M,
-> > > can it be expanded?  
-> > 
-> > The module space is restricted to 64M on AArch64 because the range of the BL
-> > instruction is += 128M. In order to call kernel functions, we need to ensure
-> > that this range is large enough and therefore place the modules 64M below the
-> > kernel text, allowing 64M for modules and 64M for the kernel text. We could
-> > probably improve this a bit by assuming a maximum size for the kernel text.
-> > 
-> > If we want to remove the problem altogether, we'd need to hack the module
-> > loader to insert trampolines (fiddly) or somehow persuade the tools to use
-> > indirect branches (BLR) for all calls (inefficient).
+On Mon, 28 Apr 2014 13:02:28 -0500, Rob Herring <robherring2@gmail.com> wrote:
+> On Mon, Apr 28, 2014 at 12:57 PM, Pawel Moll <pawel.moll@arm.com> wrote:
+> > In "Device Tree powered" systems, platform devices are usually
+> > massively populated with of_platform_populate() call, executed
+> > at some level of initcalls, either by generic architecture
+> > or by platform-specific code.
+> >
+> > There are situations though where certain devices must be
+> > created (and bound with drivers) before all the others.
+> > This presents a challenge, as devices created explicitly
+> > would be created again by of_platform_populate().
+> >
+> > This patch tries to solve that issue in a generic way,
+> > adding a "populated" flag for a DT node description.
+> > Once set, this device will never be created again via
+> > of_* API, so of_platform_populate() will skip such nodes
+> > (and its children) in a similar way to the non-available
+> > ones.
+> >
+> > Cc: devicetree at vger.kernel.org
+> > Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> > ---
+> >  drivers/of/platform.c | 10 ++++++++--
+> >  include/linux/of.h    |  1 +
+> >  2 files changed, 9 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> > index 404d1da..0ae757a 100644
+> > --- a/drivers/of/platform.c
+> > +++ b/drivers/of/platform.c
+> > @@ -204,7 +204,8 @@ static struct platform_device *of_platform_device_create_pdata(
+> >  {
+> >         struct platform_device *dev;
+> >
+> > -       if (!of_device_is_available(np))
+> > +       if (!of_device_is_available(np) ||
+> > +                       of_node_check_flag(np, OF_POPULATED))
 > 
-> Well, there might also be a bug involved. Loading 80 modules should never
-> take up 64MB. The typical size of a loadable module should be a few dozen
-> kilobytes, although we have a few modules that are hundreds of kilobytes.
-> 
-> Jianguo Wu, can you send the defconfig you were using? Did you have
-> some debugging option enabled that increased the module size?
+> This and the amba case should be a test_and_set operation to avoid a
+> race condition.
 
-If 64K pages are in use we could end up with a tonne of fragmentation but
-yes, worth looking at the .config.
+Yes. It is an unlikely condition at the time that Pawel is handling, but
+it should also work for later calls to of_platform_populate() which may
+happen at runtime and in parallel.
 
-Will
+g.
