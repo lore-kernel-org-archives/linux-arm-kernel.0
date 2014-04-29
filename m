@@ -1,33 +1,24 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 29 Apr 2014 09:05:53 +0100
-Subject: [PATCH] mfd: pm8921: Remove pm8xxx API now that sub-devices use
- regmap
-In-Reply-To: <1397002455-12854-1-git-send-email-sboyd@codeaurora.org>
-References: <1397002455-12854-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20140429080553.GD29462@lee--X1>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Tue, 29 Apr 2014 10:06:03 +0200
+Subject: [PATCH v2] ARM: dts: am33xx: Move the cppi41dma node so it's
+ probed early
+In-Reply-To: <535F5BA5.6000903@ti.com>
+References: <1398373881-23369-1-git-send-email-ezequiel@vanguardiasur.com.ar>
+ <CAGm1_kvHtSLNEfkJ24xZGGzsqAjHDTM1XztnX-QGs4iM5voMUw@mail.gmail.com>
+ <535F5BA5.6000903@ti.com>
+Message-ID: <535F5D6B.6090802@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> The pm8xxx read/write wrappers are no longer necessary now that
-> all the sub-device drivers are using the regmap API. Remove it.
-> 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
-> 
-> Based on Linus' tip as of a7963eb7f4c4 (Merge branch 'for_linus' of
-> git://git.kernel.org/pub/scm/linux/kernel/git/jack/linux-fs, 2014-04-07)
-> 
->  drivers/mfd/pm8921-core.c       | 123 +---------------------------------------
->  include/linux/mfd/pm8xxx/core.h |  81 --------------------------
->  2 files changed, 2 insertions(+), 202 deletions(-)
->  delete mode 100644 include/linux/mfd/pm8xxx/core.h
+On 04/29/2014 09:58 AM, George Cherian wrote:
+>>> This is easily fixed by moving the node at the beggining of the child
+>>> list,
+>>> so it's probed first.
+> This will give issues on module removal.
+> Since we use device_for_each_child in remove patch, it will try to
+> remove cppi dma controller, while the channel
+> is still in use by musb node.
 
-Sorry, this slipped through the gaps.
+Isn't this currently disabled because it blew up in the phy code?
 
-Diff looks great. Applied, thanks.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Sebastian
