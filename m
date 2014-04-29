@@ -1,331 +1,93 @@
 From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Mon, 28 Apr 2014 17:54:56 -0700
-Subject: [PATCH v4 2/5] live migration support for initial write protect of VM
-Message-ID: <535EF860.9040002@samsung.com>
+Date: Mon, 28 Apr 2014 17:54:50 -0700
+Subject: [PATCH v4 1/5] add ARMv7 HYP API to flush VM TLBs without address
+ param
+Message-ID: <535EF85A.8030105@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch adds support for live migration initial split up of huge pages
-in memory slot and write protection of all pages in memory slot.
+Patch adds HYP interface for global VM TLB invalidation without address
+parameter.
+
+- Added ARM version of kvm_flush_remote_tlbs()
 
 
 Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
 ---
- arch/arm/include/asm/kvm_host.h |    8 ++
- arch/arm/include/asm/kvm_mmu.h  |   11 ++
- arch/arm/kvm/arm.c              |    3 +
- arch/arm/kvm/mmu.c              |  215 +++++++++++++++++++++++++++++++++++++++
- virt/kvm/kvm_main.c             |    5 +-
- 5 files changed, 241 insertions(+), 1 deletion(-)
+ arch/arm/include/asm/kvm_asm.h  |    1 +
+ arch/arm/include/asm/kvm_host.h |    2 ++
+ arch/arm/kvm/interrupts.S       |    5 +++++
+ arch/arm/kvm/mmu.c              |   10 ++++++++++
+ 4 files changed, 18 insertions(+)
 
+diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+index 661da11..0eeaca1 100644
+--- a/arch/arm/include/asm/kvm_asm.h
++++ b/arch/arm/include/asm/kvm_asm.h
+@@ -76,6 +76,7 @@ extern char __kvm_hyp_code_end[];
+ 
+ extern void __kvm_flush_vm_context(void);
+ extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
++extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
+ 
+ extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+ #endif
 diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 1e739f9..9f827c8 100644
+index 098f7dd..1e739f9 100644
 --- a/arch/arm/include/asm/kvm_host.h
 +++ b/arch/arm/include/asm/kvm_host.h
-@@ -67,6 +67,12 @@ struct kvm_arch {
+@@ -228,4 +228,6 @@ int kvm_perf_teardown(void);
+ u64 kvm_arm_timer_get_reg(struct kvm_vcpu *, u64 regid);
+ int kvm_arm_timer_set_reg(struct kvm_vcpu *, u64 regid, u64 value);
  
- 	/* Interrupt controller */
- 	struct vgic_dist	vgic;
-+
-+	/* Marks start of migration, used to handle 2nd stage page faults
-+	 * during migration, prevent installing huge pages and split huge pages
-+	 * to small pages.
-+	 */
-+	int migration_in_progress;
- };
- 
- #define KVM_NR_MEM_OBJS     40
-@@ -230,4 +236,6 @@ int kvm_arm_timer_set_reg(struct kvm_vcpu *, u64 regid, u64 value);
- 
- void kvm_tlb_flush_vmid(struct kvm *kvm);
- 
-+int kvm_mmu_slot_remove_write_access(struct kvm *kvm, int slot);
++void kvm_tlb_flush_vmid(struct kvm *kvm);
 +
  #endif /* __ARM_KVM_HOST_H__ */
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index a91c863..342ae81 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -111,6 +111,17 @@ static inline void kvm_set_s2pte_writable(pte_t *pte)
- 	pte_val(*pte) |= L_PTE_S2_RDWR;
- }
+diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
+index 0d68d40..8620280 100644
+--- a/arch/arm/kvm/interrupts.S
++++ b/arch/arm/kvm/interrupts.S
+@@ -45,8 +45,12 @@ __kvm_hyp_code_start:
+  *
+  * As v7 does not support flushing per IPA, just nuke the whole TLB
+  * instead, ignoring the ipa value.
++ *
++ * void __kvm_tlb_flush_vm(struct kvm *kvm) - alias on ARMv7 for global VM TLB
++ * flush with no address parameters.
+  */
+ ENTRY(__kvm_tlb_flush_vmid_ipa)
++ENTRY(__kvm_tlb_flush_vmid)
+ 	push	{r2, r3}
  
-+static inline void kvm_set_s2pte_readonly(pte_t *pte)
-+{
-+	pte_val(*pte) &= ~(L_PTE_S2_RDONLY ^ L_PTE_S2_RDWR);
-+}
-+
-+static inline bool kvm_s2pte_readonly(pte_t *pte)
-+{
-+	return (pte_val(*pte) & L_PTE_S2_RDWR) == L_PTE_S2_RDONLY;
-+}
-+
-+
- static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
- {
- 	pmd_val(*pmd) |= L_PMD_S2_RDWR;
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 9a4bc10..b916478 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -233,6 +233,9 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
- 				   struct kvm_userspace_memory_region *mem,
- 				   enum kvm_mr_change change)
- {
-+	/* Request for migration issued by user, write protect memory slot */
-+	if ((change != KVM_MR_DELETE) && (mem->flags & KVM_MEM_LOG_DIRTY_PAGES))
-+		return kvm_mmu_slot_remove_write_access(kvm, mem->slot);
- 	return 0;
- }
+ 	dsb	ishst
+@@ -65,6 +69,7 @@ ENTRY(__kvm_tlb_flush_vmid_ipa)
+ 	pop	{r2, r3}
+ 	bx	lr
+ ENDPROC(__kvm_tlb_flush_vmid_ipa)
++ENDPROC(__kvm_tlb_flush_vmid)
  
+ /********************************************************************
+  * Flush TLBs and instruction caches of all CPUs inside the inner-shareable
 diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 7ab77f3..15bbca2 100644
+index e8580e2..7ab77f3 100644
 --- a/arch/arm/kvm/mmu.c
 +++ b/arch/arm/kvm/mmu.c
-@@ -44,6 +44,41 @@ static phys_addr_t hyp_idmap_vector;
- 
- #define kvm_pmd_huge(_x)	(pmd_huge(_x) || pmd_trans_huge(_x))
- 
-+/* Used for 2nd stage and identity mappings. For stage 2 mappings
-+ * instead of unsigned long, u64 is use  which won't overflow on ARMv7 for
-+ * IPAs above 4GB. For ARMv8 use default functions.
-+ */
-+
-+static phys_addr_t kvm_pgd_addr_end(phys_addr_t addr, phys_addr_t end)
-+{
-+#if BITS_PER_LONG == 32
-+	u64 __boundary = ((addr) + PGDIR_SIZE) & PGDIR_MASK;
-+	return __boundary - 1 < end - 1 ? __boundary : end;
-+#else
-+	return pgd_addr_end(addr, end);
-+#endif
-+}
-+
-+static phys_addr_t kvm_pud_addr_end(phys_addr_t addr, phys_addr_t end)
-+{
-+#if BITS_PER_LONG == 32
-+	u64 __boundary = ((addr) + PUD_SIZE) & PUD_MASK;
-+	return __boundary - 1 < end - 1 ? __boundary : end;
-+#else
-+	return pud_addr_end(addr, end);
-+#endif
-+}
-+
-+static phys_addr_t kvm_pmd_addr_end(phys_addr_t addr, phys_addr_t end)
-+{
-+#if BITS_PER_LONG == 32
-+	u64 __boundary = ((addr) + PMD_SIZE) & PMD_MASK;
-+	return __boundary - 1 < end - 1 ? __boundary : end;
-+#else
-+	return pmd_addr_end(addr, end);
-+#endif
-+}
-+
- static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
- {
- 	/*
-@@ -649,6 +684,186 @@ static bool transparent_hugepage_adjust(pfn_t *pfnp, phys_addr_t *ipap)
- 	return false;
+@@ -56,6 +56,16 @@ static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+ 		kvm_call_hyp(__kvm_tlb_flush_vmid_ipa, kvm, ipa);
  }
  
-+/**
-+ * kvm_split_pmd - splits huge pages to small pages, required to keep a dirty
-+ *	log of smaller memory granules, otherwise huge pages would need to be
-+ *	migrated. Practically an idle system has problems migrating with
-+ *	huge pages.  Called during WP of entire VM address space, done
-+ *	initially when  migration thread isses the KVM_MEM_LOG_DIRTY_PAGES
-+ *	ioctl.
-+ *	The mmu_lock is held during splitting.
-+ *
-+ * @kvm:        The KVM pointer
-+ * @pmd:        Pmd to 2nd stage huge page
-+ * @addr:       Guest Physical Address
++/* Function reuses __kvm_tlb_flush_vmid_ipa() HYP interface without additional
++ * address argument to flush entire VM TLBs.
 + */
-+static int kvm_split_pmd(struct kvm *kvm, pmd_t *pmd, u64 addr)
++void kvm_flush_remote_tlbs(struct kvm *kvm)
 +{
-+	struct page *page;
-+	pfn_t pfn = pmd_pfn(*pmd);
-+	pte_t *pte;
-+	int i;
-+
-+	page = alloc_page(GFP_KERNEL);
-+	if (page == NULL)
-+		return -ENOMEM;
-+
-+	pte = page_address(page);
-+	/* cycle through ptes first, use pmd pfn */
-+	for (i = 0; i < PTRS_PER_PMD; i++)
-+		pte[i] = pfn_pte(pfn+i, PAGE_S2);
-+
-+	kvm_clean_pte(pte);
-+	/* After page table setup set pmd */
-+	pmd_populate_kernel(NULL, pmd, pte);
-+
-+	/* get reference on pte page */
-+	get_page(virt_to_page(pte));
-+	return 0;
++	if (kvm)
++		kvm_call_hyp(__kvm_tlb_flush_vmid, kvm);
 +}
 +
-+/* Walks PMD page table range and write protects it. Called with
-+ * 'kvm->mmu_lock'  held
-+ */
-+static void stage2_wp_pmd_range(phys_addr_t addr, phys_addr_t end, pmd_t *pmd)
-+{
-+	pte_t *pte;
 +
-+	while (addr < end) {
-+		pte = pte_offset_kernel(pmd, addr);
-+		addr += PAGE_SIZE;
-+		if (!pte_present(*pte))
-+			continue;
-+		/* skip write protected pages */
-+		if (kvm_s2pte_readonly(pte))
-+			continue;
-+		kvm_set_s2pte_readonly(pte);
-+	}
-+}
-+
-+/* Walks PUD  page table range to write protects it , if necessary splits up
-+ * huge pages to small pages. Called with 'kvm->mmu_lock' held.
-+ */
-+static int stage2_wp_pud_range(struct kvm *kvm, phys_addr_t addr,
-+				phys_addr_t end, pud_t *pud)
-+{
-+	pmd_t *pmd;
-+	phys_addr_t pmd_end;
-+	int ret;
-+
-+	while (addr < end) {
-+		/* If needed give up CPU during PUD page table walk */
-+		if (need_resched() || spin_needbreak(&kvm->mmu_lock))
-+			cond_resched_lock(&kvm->mmu_lock);
-+
-+		pmd = pmd_offset(pud, addr);
-+		if (!pmd_present(*pmd)) {
-+			addr = kvm_pmd_addr_end(addr, end);
-+			continue;
-+		}
-+
-+		if (kvm_pmd_huge(*pmd)) {
-+			ret = kvm_split_pmd(kvm, pmd, addr);
-+			/* Failed to split up huge  page abort. */
-+			if (ret < 0)
-+				return ret;
-+
-+			addr = kvm_pmd_addr_end(addr, end);
-+			continue;
-+		}
-+
-+		pmd_end = kvm_pmd_addr_end(addr, end);
-+		stage2_wp_pmd_range(addr, pmd_end, pmd);
-+		addr = pmd_end;
-+	}
-+	return 0;
-+}
-+
-+/* Walks PGD page table range to write protect it. Called with 'kvm->mmu_lock'
-+ * held.
-+ */
-+static int stage2_wp_pgd_range(struct kvm *kvm, phys_addr_t addr,
-+				phys_addr_t end, pgd_t *pgd)
-+{
-+	phys_addr_t pud_end;
-+	pud_t *pud;
-+	int ret;
-+
-+	while (addr < end) {
-+		/* give up CPU if mmu_lock is needed by other vCPUs */
-+		if (need_resched() || spin_needbreak(&kvm->mmu_lock))
-+			cond_resched_lock(&kvm->mmu_lock);
-+
-+		pud = pud_offset(pgd, addr);
-+		if (!pud_present(*pud)) {
-+			addr = kvm_pud_addr_end(addr, end);
-+			continue;
-+		}
-+
-+		/* Fail if PUD is huge, splitting PUDs not supported */
-+		if (pud_huge(*pud))
-+			return -EFAULT;
-+
-+		/* By default 'nopud' is supported which fails with guests
-+		 * larger then 1GB. Added to support 4-level page tables.
-+		 */
-+		pud_end = kvm_pud_addr_end(addr, end);
-+		ret = stage2_wp_pud_range(kvm, addr, pud_end, pud);
-+		if (ret < 0)
-+			return ret;
-+		addr = pud_end;
-+	}
-+	return 0;
-+}
-+
-+/**
-+ * kvm_mmu_slot_remove_access - write protects entire memslot address space.
-+ *      Called@start of migration when KVM_MEM_LOG_DIRTY_PAGES ioctl is
-+ *      issued. After this function returns all pages (minus the ones faulted
-+ *      in or released when mmu_lock is give nup) must be write protected to
-+ *	keep track of dirty pages to migrate on subsequent dirty log read.
-+ *      mmu_lock is held during write protecting, released on contention.
-+ *
-+ * @kvm:        The KVM pointer
-+ * @slot:       The memory slot the dirty log is retrieved for
-+ */
-+int kvm_mmu_slot_remove_write_access(struct kvm *kvm, int slot)
-+{
-+	pgd_t *pgd;
-+	pgd_t *pgdp = kvm->arch.pgd;
-+	struct kvm_memory_slot *memslot = id_to_memslot(kvm->memslots, slot);
-+	phys_addr_t addr = memslot->base_gfn << PAGE_SHIFT;
-+	phys_addr_t end = (memslot->base_gfn + memslot->npages) << PAGE_SHIFT;
-+	phys_addr_t pgdir_end;
-+	int ret = -ENOMEM;
-+
-+	spin_lock(&kvm->mmu_lock);
-+	/* set start of migration, sychronize with Data Abort handler */
-+	kvm->arch.migration_in_progress = 1;
-+
-+	/* Walk range, split up huge pages as needed and write protect ptes */
-+	while (addr < end) {
-+		pgd = pgdp + pgd_index(addr);
-+		if (!pgd_present(*pgd)) {
-+			addr = kvm_pgd_addr_end(addr, end);
-+			continue;
-+		}
-+
-+		pgdir_end = kvm_pgd_addr_end(addr, end);
-+		ret = stage2_wp_pgd_range(kvm, addr, pgdir_end, pgd);
-+		/* Failed to WP a pgd range abort */
-+		if (ret < 0)
-+			goto out;
-+		addr = pgdir_end;
-+	}
-+	ret = 0;
-+	/* Flush TLBs, >= ARMv7 variant uses hardware broadcast not IPIs */
-+	kvm_flush_remote_tlbs(kvm);
-+out:
-+	spin_unlock(&kvm->mmu_lock);
-+	return ret;
-+}
-+
- static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 			  struct kvm_memory_slot *memslot,
- 			  unsigned long fault_status)
-diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-index 03a0381..1d11912 100644
---- a/virt/kvm/kvm_main.c
-+++ b/virt/kvm/kvm_main.c
-@@ -184,7 +184,10 @@ static bool make_all_cpus_request(struct kvm *kvm, unsigned int req)
- 	return called;
- }
- 
--void kvm_flush_remote_tlbs(struct kvm *kvm)
-+/* Architectures like >= ARMv7 hardware broadcast TLB invalidations and don't
-+ * use IPIs.
-+ */
-+void __weak kvm_flush_remote_tlbs(struct kvm *kvm)
+ static int mmu_topup_memory_cache(struct kvm_mmu_memory_cache *cache,
+ 				  int min, int max)
  {
- 	long dirty_count = kvm->tlbs_dirty;
- 
 -- 
 1.7.9.5
