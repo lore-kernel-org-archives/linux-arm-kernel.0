@@ -1,55 +1,41 @@
-From: lznuaa@gmail.com (Frank Li)
-Date: Tue, 29 Apr 2014 08:57:20 -0500
-Subject: [PATCH net-next 5/7] net:fec: add support for dumping transmit
- ring on timeout
-In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6D0F7014F0@AcuExch.aculab.com>
-References: <1398773350-7293-1-git-send-email-Frank.Li@freescale.com>
- <1398773350-7293-5-git-send-email-Frank.Li@freescale.com>
- <063D6719AE5E284EB5DD2968C1650D6D0F7014F0@AcuExch.aculab.com>
-Message-ID: <CAHrpEqSCSw=bYgx5Egk4Mva-CODnw5=vvK6y3VWmB3_QpBQ8sQ@mail.gmail.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Tue, 29 Apr 2014 15:00:48 +0100
+Subject: [PATCH v2 00/21] FDT clean-ups and libfdt support
+In-Reply-To: <1398215901-25609-1-git-send-email-robherring2@gmail.com>
+References: <1398215901-25609-1-git-send-email-robherring2@gmail.com>
+Message-ID: <20140429140048.7C9D0C40992@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 29, 2014 at 8:38 AM, David Laight <David.Laight@aculab.com> wrote:
-> From: Of Frank Li
-> ...
->> When we timeout on transmit, it would be useful to dump the transmit
->> ring, so we can see the ring state.  This can be helpful to diagnose
->> the cause of transmit timeouts.
-> ...
->> +static void fec_dump(struct net_device *ndev)
->> +{
->> +     struct fec_enet_private *fep = netdev_priv(ndev);
->> +     struct bufdesc *bdp = fep->tx_bd_base;
->> +     unsigned index = 0;
->> +
->> +     netdev_info(ndev, "TX ring dump\n");
->> +     pr_info("Nr     SC     addr       len  SKB\n");
->> +
->> +     do {
->> +             pr_info("%3u %c%c 0x%04x 0x%08lx %4u %p\n",
->> +                     index,
->> +                     bdp == fep->cur_tx ? 'S' : ' ',
->> +                     bdp == fep->dirty_tx ? 'H' : ' ',
->> +                     bdp->cbd_sc, bdp->cbd_bufaddr, bdp->cbd_datlen,
->> +                     fep->tx_skbuff[index]);
->> +             bdp = fec_enet_get_nextdesc(bdp, fep);
->> +             index++;
->> +     } while (bdp != fep->tx_bd_base);
->> +}
->> +
->
-> You probably want the read and write indexes as well.
+On Tue, 22 Apr 2014 20:18:00 -0500, Rob Herring <robherring2@gmail.com> wrote:
+> From: Rob Herring <robh@kernel.org>
+> 
+> This is a series of clean-ups of architecture FDT code and converts the
+> core FDT code over to using libfdt functions. This is in preparation
+> to add FDT based address translation parsing functions for early
+> console support. This series removes direct access to FDT data from all
+> arches except powerpc.
+> 
+> The current MIPS lantiq and xlp DT code is buggy as built-in DTBs need
+> to be copied out of init section. Patches 2 and 3 should be applied to
+> 3.15.
+> 
+> Changes in v2 are relatively minor. There was a bug in the unflattening
+> code where walking up the tree was not being handled correctly (thanks
+> to Michal Simek). I re-worked things a bit to avoid globally adding
+> libfdt include paths.
+> 
+> A branch is available here[1], and I plan to put into linux-next in a few
+> days. Please test! I've compiled on arm, arm64, mips, microblaze, xtensa,
+> and powerpc and booted on arm and arm64.
 
-                     bdp == fep->cur_tx ? 'S' : ' ',
-                     bdp == fep->dirty_tx ? 'H' : ' ',
+This is pretty great work. I'll read through them again and I may have a
+comment or two, but in general you can add my tested by tag:
 
-Above code already print read and write index. 'S', 'H'
+Tested-by: Grant Likely <grant.likely@linaro.org>
 
-Frank Li
+>  40 files changed, 280 insertions(+), 598 deletions(-)
 
->
->         David
->
->
->
+I love the diffstat!
+
+g.
