@@ -1,31 +1,50 @@
-From: lznuaa@gmail.com (Frank Li)
-Date: Tue, 29 Apr 2014 10:11:18 -0500
-Subject: [PATCH net-next 5/7] net:fec: add support for dumping transmit
- ring on timeout
-In-Reply-To: <20140429150403.GC26756@n2100.arm.linux.org.uk>
-References: <1398773350-7293-1-git-send-email-Frank.Li@freescale.com>
- <1398773350-7293-5-git-send-email-Frank.Li@freescale.com>
- <063D6719AE5E284EB5DD2968C1650D6D0F7014F0@AcuExch.aculab.com>
- <CAHrpEqSCSw=bYgx5Egk4Mva-CODnw5=vvK6y3VWmB3_QpBQ8sQ@mail.gmail.com>
- <063D6719AE5E284EB5DD2968C1650D6D0F701524@AcuExch.aculab.com>
- <20140429141527.GZ26756@n2100.arm.linux.org.uk>
- <CAHrpEqTc6=yS4ApLO7AbZyVq26kGxq+WBcyFjgjbiPySq7055Q@mail.gmail.com>
- <20140429143243.GA26756@n2100.arm.linux.org.uk>
- <CAHrpEqQL7LviXA4_NLNwSBoW84W_vbnzWkc9At5QBqUkqu63yw@mail.gmail.com>
- <20140429150403.GC26756@n2100.arm.linux.org.uk>
-Message-ID: <CAHrpEqSw3iwJj1nHuCJ7LcoL2EUxYqMb-eA1QZN0_WvR-Y_mWA@mail.gmail.com>
+From: baohua@kernel.org (Barry Song)
+Date: Tue, 29 Apr 2014 23:10:57 +0800
+Subject: [PATCH] ARM: l2c: prima2: only call l2x0_of_init() on matching
+ nodes
+In-Reply-To: <20140428134047.GA7719@beef>
+References: <1398644860-22973-1-git-send-email-mporter@linaro.org>
+ <20140428091532.GG26756@n2100.arm.linux.org.uk> <20140428134047.GA7719@beef>
+Message-ID: <CAGsJ_4yHf__KPx079pLnBb3=up=-CfSMSm=LkR7w1rX_TyRU1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 29, 2014 at 10:04 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> I'd just like to see what you're doing.  Note that your submission also
-> didn't get through the linux-arm-kernel list either, so I didn't get it
-> via that path either.
+2014-04-28 21:40 GMT+08:00 Matt Porter <mporter@linaro.org>:
+> On Mon, Apr 28, 2014 at 10:15:33AM +0100, Russell King wrote:
+>> On Sun, Apr 27, 2014 at 08:27:40PM -0400, Matt Porter wrote:
+>> > l2x0_of_init() is executed unconditionally within the sirfsoc_l2x0_init()
+>> > early initcall. In a multi v7 kernel this causes bcm281xx and bcm21664
+>> > platform to fail boot since they have their own pre l2x0 init sequence
+>> > that is required. Fix this by checking that a matching OF ID is present
+>> > before calling l2x0_of_init().
+>> >
+>> > Reported-by: Kevin Hilman <khilman@linaro.org>
+>> > Signed-off-by: Matt Porter <mporter@linaro.org>
+>> > ---
+>> > Applies against next-20140424 to fix the issue introduced in
+>> > 50655e6 ARM: l2c: prima2: remove cache size override
+>>
+>> Err, this only "fixes" it because it effectively disables the L2 cache
+>> _entirely_ - in the above commit, I kill your private compatible strings.
+>>
+>> This doesn't make sense.  If the cache is already enabled, then the L2C
+>> code won't try to enable it again.
+>
+> Ok, please suggest an alternative. You merged this commit..it looks like
+> it had no ack from the platform maintainer..and I don't have hardware.
+> The commit is wrong, we can't have every platform executing sirfsoc's
+> l2x0_of_init() call/parameters by having this stuff in an early initcall
+> like that.
+>
+> It would be pretty straightforward to add those private compatibles
+> back so the approach works. If not, we need to move this to
+> .init_machine where it's guaranteed to only run on sirfsoc.
 
-We have not sent out to public mail list yet.
-But there are really big change.
-We need support 3 ring queues for tx and rx.
+these has been one V1 patch at
+http://permalink.gmane.org/gmane.linux.ports.arm.kernel/316312
+my v2 has moved to init_irq() as Russell's suggestion.
 
-best regards
-Frank Li
+>
+> -Matt
+
+-barry
