@@ -1,106 +1,48 @@
-From: lznuaa@gmail.com (Frank Li)
-Date: Tue, 29 Apr 2014 13:33:02 -0500
-Subject: [PATCH] ARM: imx6q: work around faulty PMU irq routing
-In-Reply-To: <535F8A2F.2060507@de.bosch.com>
-References: <1398371029-21176-1-git-send-email-l.stach@pengutronix.de>
- <5359F4AB.9090502@de.bosch.com>
- <1398417205.4657.10.camel@weser.hi.pengutronix.de>
- <20140429052824.GD16451@dragon>
- <1398765300.4677.8.camel@weser.hi.pengutronix.de>
- <535F8A2F.2060507@de.bosch.com>
-Message-ID: <CAHrpEqQ8C2ziWobckGHhZtu5Q0e_xQz7BncZnoUUX0WT96Sz1g@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 29 Apr 2014 14:55:27 -0400
+Subject: [PATCH 1/5] ARM: defconfigs: add MTD_SPI_NOR (new dependency
+ for M25P80)
+In-Reply-To: <20140429182815.GA28069@arch.cereza>
+References: <1397719309-2022-1-git-send-email-computersforpeace@gmail.com>
+ <1397719309-2022-2-git-send-email-computersforpeace@gmail.com>
+ <535A8FC9.8040707@wwwdotorg.org>
+ <20140429172227.GB11657@arch.cereza>
+ <20140429174849.GO28159@titan.lakedaemon.net>
+ <20140429182815.GA28069@arch.cereza>
+Message-ID: <20140429185527.GP28159@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 29, 2014 at 6:17 AM, Dirk Behme <dirk.behme@de.bosch.com> wrote:
-> On 29.04.2014 11:55, Lucas Stach wrote:
->>
->> Am Dienstag, den 29.04.2014, 13:28 +0800 schrieb Shawn Guo:
->>>
->>> On Fri, Apr 25, 2014 at 11:13:25AM +0200, Lucas Stach wrote:
->>>>
->>>> Am Freitag, den 25.04.2014, 07:37 +0200 schrieb Dirk Behme:
->>>>>
->>>>> On 24.04.2014 22:23, Lucas Stach wrote:
->>>>>>
->>>>>> The i.MX6 PMU has a design errata where the interrupts of all cores
->>>>>> are
->>>>>> wired together into a single irq line. To work around this we have to
->>>>>> bounce the interrupt around all cores until we find the one where the
->>>>>> PMU
->>>>>> counter overflow has happened.
->>>>>>
->>>>>> This causes the perf measurements to be less accurate and we can't
->>>>>> really
->>>>>> handle the case where two cores fire a PMU irq at the same time. The
->>>>>> implemented woraround makes perf at least somewhat useable on imx6
->>>>>> SoCs
->>>>>> with more than one core.
->>>>>>
->> [...]
->>>>>
->>>>> Do you have anything like a test case which shows that it works (at
->>>>> least better) on a !single core with this patch? Compared to a
->>>>> non-patched system?
->>>>>
->>>> Without this patch, running perf top completely kills the system on
->>>> i.MX6q, most likely because of the sheer number of spurious interrupts
->>>> hitting the system from 4 cores. Even the spurious killer doesn't work
->>>> sometimes, so perf is completely busted right now.
->>>>
->>>> With this patch perf has to reduce the sample frequency in order to
->>>> compensate the added irq latency, but at least we get some plausible
->>>> numbers out. Though I won't take any blame if the amount of salt you
->>>> have to apply while looking at those numbers is already a deadly
->>>> dose. ;)
->>>>
->>>> I don't yet have any numbers on how accurate the measurement is, but at
->>>> least things didn't look completely off.
->>>
->>>
->>> If it cannot provide correct/accurate data, I'd say let's not fake it
->>> to, and just let it be completely broken there, so that people can be
->>> aware of the brokenness, and not take inaccurate data as accurate one.
->>>
->> The data isn't bogus, it just isn't as accurate as it could be with a
->> properly working PMU. I'll run some tests with a defined load on
->> Solo/Quad to see how far the measurements are off. I'm fine with holding
->> this patch until then.
->>
->> But the thing is this patch also fixes a serious userspace triggerable
->> DoS on i.MX6q. Just running perf top completely locks up the system
->> because of the sheer number of stray irqs. This isn't the case anymore
->> with this patch applied.
+On Tue, Apr 29, 2014 at 03:28:15PM -0300, Ezequiel Garcia wrote:
+> On Apr 29, Jason Cooper wrote:
+> > On Tue, Apr 29, 2014 at 02:22:27PM -0300, Ezequiel Garcia wrote:
+> > > On Apr 25, Stephen Warren wrote:
+> > > > On 04/17/2014 01:21 AM, Brian Norris wrote:
+> > > > > These defconfigs contain the CONFIG_M25P80 symbol, which is now
+> > > > > dependent on the MTD_SPI_NOR symbol. Add CONFIG_MTD_SPI_NOR to the
+> > > > > relevant defconfigs.
+> > > > > 
+> > > > > At the same time, drop the now-nonexistent CONFIG_MTD_CHAR symbol.
+> > 
+> > Excuse my ignorance of the history of this bug, but shouldn't this be
+> > solved in the Kconfig logic?  Since when do we solve config symbol
+> > dependency bugs in the defconfigs?
+> > 
+> 
+> Long story short: it was decided that select'ing this new symbol was not
+> appropriate. Instead, it must be explicitly selected by the user, hence
+> the defconfig fix.
+> 
+> The full story: https://lkml.org/lkml/2014/4/17/45
 
-I am very strange. Why PMU can work because below errata?
+ahhh, it already depend's on MTD_SPI_NOR in Kconfig
 
-ERR006259 ARM: Debug/trace functions (PMU, PTM and ETB) are disabled
-with absence of JTAG_TCK clock after POR
+  http://git.infradead.org/l2-mtd.git/blobdiff/254592db612aeb55d80399a04995b68f7da48c99..e43b20619bdb6c851dd7b49cbd15e52875a785d4:/drivers/mtd/devices/Kconfig
 
-Default it should no any PMU irqs happen.
+ok, now it makes sense.
 
-best regards
-Frank Li
+Acked-by: Jason Cooper <jason@lakedaemon.net>
 
->>
->> Maybe we can just print a warning into dmesg to make the users aware of
->> the imprecise measurement.
->
->
-> Yes, I think this sounds like a good compromise :)
->
-> Best regards
->
-> Dirk
->
->
->
->
->
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+thx,
+
+Jason.
