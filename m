@@ -1,76 +1,72 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 29 Apr 2014 11:19:22 -0700
-Subject: [GIT PULL] Versatile LEDs conversion
-In-Reply-To: <CACRpkdb4VhN5Dt6ZoUNgwphxUD7Q69waF9vfO_=SenbvA=WSeA@mail.gmail.com>
-References: <CACRpkdb4VhN5Dt6ZoUNgwphxUD7Q69waF9vfO_=SenbvA=WSeA@mail.gmail.com>
-Message-ID: <CACRpkdbtH3SoDf-Nx1X0UwAddx11j12ZXJywxJznny45s71DMQ@mail.gmail.com>
+From: yinghai@kernel.org (Yinghai Lu)
+Date: Tue, 29 Apr 2014 11:22:28 -0700
+Subject: [PATCH v2 3/7] tty/serial: convert 8250 to generic earlycon
+In-Reply-To: <CAL_Jsq+uNunqfsvPNxZLQQ3y1ay_XMZKb4c=HNWvKtwuiZGQ0g@mail.gmail.com>
+References: <1397859600-11507-1-git-send-email-robherring2@gmail.com>
+ <1397859600-11507-4-git-send-email-robherring2@gmail.com>
+ <CAE9FiQVp5u-jF_xjCu68BgbZ=e0D508tn_-auoiT6cbkYtX8Og@mail.gmail.com>
+ <CAL_JsqKiYmCNGrkiwS7m-OAt3rHZBq_yNGycen-AojbV-7famg@mail.gmail.com>
+ <CAE9FiQVdwumX7Dsmt8NJhw4uWsj2sjUKaKS1wJQujW1fn1szLw@mail.gmail.com>
+ <CAL_Jsq+uNunqfsvPNxZLQQ3y1ay_XMZKb4c=HNWvKtwuiZGQ0g@mail.gmail.com>
+Message-ID: <CAE9FiQU40p-e8mqZKzaGg6nTuPdep3inRdpQtNu5txPOJ6Aw-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM SoC guys:
+On Tue, Apr 29, 2014 at 8:16 AM, Rob Herring <robherring2@gmail.com> wrote:
+> On Mon, Apr 28, 2014 at 9:56 PM, Yinghai Lu <yinghai@kernel.org> wrote:
+>> On Mon, Apr 28, 2014 at 4:24 PM, Rob Herring <robherring2@gmail.com> wrote:
+>>> On Sat, Apr 26, 2014 at 1:29 AM, Yinghai Lu <yinghai@kernel.org> wrote:
+>>>
+>>> Thanks for finding these. I missed them in my build tests. This should fix them:
+>>>
+>>> diff --git a/drivers/tty/serial/8250/8250_early.c
+>>> b/drivers/tty/serial/8250/8250_early.c
+>>> index e83c9db..2094c3b 100644
+>>> --- a/drivers/tty/serial/8250/8250_early.c
+>>> +++ b/drivers/tty/serial/8250/8250_early.c
+>>> @@ -156,6 +156,11 @@ static int __init early_serial8250_setup(struct
+>>> earlycon_device *device,
+>>>  EARLYCON_DECLARE(uart8250, early_serial8250_setup);
+>>>  EARLYCON_DECLARE(uart, early_serial8250_setup);
+>>>
+>>> +int __init setup_early_serial8250_console(char *cmdline)
+>>> +{
+>>> +       return setup_earlycon(cmdline, "uart8250", early_serial8250_setup);
+>>> +}
+>>> +
+>>>  int serial8250_find_port_for_earlycon(void)
+>>>  {
+>>>         struct earlycon_device *device = early_device;
+>>
+>> that only handle "uart8250,", may need to add more lines to handle "uart,"
+>
+>
+> That is on purpose because the only 2 users use uart8250. I consider
+> this a legacy interface and use of "uart" is horrible because there
+> are lots of uarts which are not 8250.
+>
+> Rob
+>
+>>
+>> +int __init setup_early_serial8250_console(char *cmdline)
+>> +{
+>> +       char *options;
+>> +       options = strstr(cmdline, "uart8250,");
+>> +       if (options)
+>> +               return setup_earlycon(cmdline, "uart8250",
+>> early_serial8250_setup);
+>> +
+>> +       options = strstr(cmdline, "uart,");
+>> +       if (options)
+>> +              return setup_earlycon(cmdline, "uart", early_serial8250_setup);
+>> +
+>> +      return 0;
+>> +}
 
-PING on this pull request!
+You want to obsolete "console=uart,io,0x3f8,115200n8" ?
 
-Yours,
-Linus Walleij
+ Let's check with Andrew. He suggested to use uart and uart8250 at that time.
 
-On Fri, Mar 28, 2014 at 3:02 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> Hi ARM SoC folks,
->
-> here is a Versatile LEDs patch stack, it has been finished for a while,
-> but delayed waiting for an ACK from the LEDs subsystem maintainer
-> which arrived today. (My bad for not hunting it more actively.)
->
-> I pretty sure the patches are safe and they need some rotation in linux-next,
-> but I understand if you want to wait until after v3.15-rc1 before pulling this
-> in. (I'll nag you later in that case.)
->
-> Yours,
-> Linus Walleij
->
-> The following changes since commit cfbf8d4857c26a8a307fb7cd258074c9dcd8c691:
->
->   Linux 3.14-rc4 (2014-02-23 17:40:03 -0800)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-> tags/versatile-leds
->
-> for you to fetch changes up to 9b58d187fdce9df05fd331ad5790bf503d7e3dfe:
->
->   ARM: plat-versatile: update defconfigs for Versatile LEDs
-> (2014-03-28 10:54:31 +0100)
->
-> ----------------------------------------------------------------
-> This contains a christmas-decoration fix from Russell
-> King, converts the Versatile LEDs to a platform device
-> and moves the driver to the LEDs subsystem.
->
-> ----------------------------------------------------------------
-> Linus Walleij (3):
->       ARM: plat-versatile: convert LEDs to platform device
->       ARM/leds: move ARM Versatile LED driver to leds subsystem
->       ARM: plat-versatile: update defconfigs for Versatile LEDs
->
-> Russell King (1):
->       ARM: plat-versatile: LEDs initialise to off state
->
->  arch/arm/configs/realview-smp_defconfig            |  2 +
->  arch/arm/configs/realview_defconfig                |  2 +
->  arch/arm/configs/versatile_defconfig               |  3 ++
->  arch/arm/mach-realview/core.c                      | 15 +++++++
->  arch/arm/mach-realview/core.h                      |  1 +
->  arch/arm/mach-realview/realview_eb.c               |  1 +
->  arch/arm/mach-realview/realview_pb1176.c           |  1 +
->  arch/arm/mach-realview/realview_pb11mp.c           |  1 +
->  arch/arm/mach-realview/realview_pba8.c             |  1 +
->  arch/arm/mach-realview/realview_pbx.c              |  1 +
->  arch/arm/mach-versatile/core.c                     | 16 +++++++
->  arch/arm/plat-versatile/Kconfig                    |  6 ---
->  arch/arm/plat-versatile/Makefile                   |  1 -
->  drivers/leds/Kconfig                               |  8 ++++
->  drivers/leds/Makefile                              |  1 +
->  .../leds.c => drivers/leds/leds-versatile.c        | 51 ++++++++++++----------
->  16 files changed, 82 insertions(+), 29 deletions(-)
->  rename arch/arm/plat-versatile/leds.c => drivers/leds/leds-versatile.c (68%)
+Thanks
+
+Yinghai
