@@ -1,77 +1,49 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Tue, 29 Apr 2014 11:52:59 +0300
-Subject: [PATCH 54/97] ARM: l2c: tegra: remove associativity and way size
- from aux_ctrl
-In-Reply-To: <535EB88F.9000202@wwwdotorg.org>
-References: <20140428192419.GV26756@n2100.arm.linux.org.uk>
- <E1WerGJ-0001XP-TI@rmk-PC.arm.linux.org.uk> <535EB88F.9000202@wwwdotorg.org>
-Message-ID: <20140429085259.GB30476@tbergstrom-lnx.Nvidia.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 29 Apr 2014 09:57:31 +0100
+Subject: [PATCH] arm64: fixmap: fix missing sub-page offset for earlyprintk
+In-Reply-To: <CAL_JsqLwhkSR42CeOcnAC-C43O9fbrXdcTnNrkov5hq9t3_Usg@mail.gmail.com>
+References: <1398711006-14943-1-git-send-email-marc.zyngier@arm.com>
+ <CAL_JsqLwhkSR42CeOcnAC-C43O9fbrXdcTnNrkov5hq9t3_Usg@mail.gmail.com>
+Message-ID: <20140429085730.GB17007@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 10:22:39PM +0200, Stephen Warren wrote:
-> On 04/28/2014 01:30 PM, Russell King wrote:
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+On Tue, Apr 29, 2014 at 12:51:18AM +0100, Rob Herring wrote:
+> On Mon, Apr 28, 2014 at 1:50 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> > Commit d57c33c5daa4 (add generic fixmap.h) added (among other
+> > similar things) set_fixmap_io to deal with early ioremap of devices.
+> >
+> > More recently, commit bf4b558eba92 (arm64: add early_ioremap support)
+> > converted the arm64 earlyprintk to use set_fixmap_io. A side effect of
+> > this conversion is that my virtual machines have stopped booting when
+> > I pass "earlyprintk=uart8250-8bit,0x3f8" to the guest kernel.
+> >
+> > Turns out that the new earlyprintk code doesn't care at all about
+> > sub-page offsets, and just assumes that the earlyprintk device will
+> > be page-aligned. Obviously, that doesn't play well with the above example.
+> >
+> > Further investigation shows that set_fixmap_io uses __set_fixmap instead
+> > of __set_fixmap_offset. A fix is to introduce a set_fixmap_offset_io that
+> > uses the latter, and to remove the superflous call to fix_to_virt
+> > (which only returns the value that set_fixmap_io has already given us).
+> >
+> > With this applied, my VMs are back in business. Tested on a Cortex-A57
+> > platform with kvmtool as platform emulation.
+> >
+> > Cc: Mark Salter <msalter@redhat.com>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > ---
+> >  arch/arm64/kernel/early_printk.c | 6 ++----
+> >  include/asm-generic/fixmap.h     | 3 +++
+> >  2 files changed, 5 insertions(+), 4 deletions(-)
 > 
-> Peter, can you please ack this patch if you see no issue. Discussion
-> below...
-> 
-> > diff --git a/arch/arm/mach-tegra/tegra.c b/arch/arm/mach-tegra/tegra.c
-> 
-> >  static void __init tegra_init_cache(void)
-> >  {
-> >  #ifdef CONFIG_CACHE_L2X0
-> > -	static const struct of_device_id pl310_ids[] __initconst = {
-> > -		{ .compatible = "arm,pl310-cache",  },
-> > -		{}
-> > -	};
-> > -
-> > -	struct device_node *np;
-> >  	int ret;
-> > -	void __iomem *p = IO_ADDRESS(TEGRA_ARM_PERIF_BASE) + 0x3000;
-> > -	u32 aux_ctrl, cache_type;
-> > -
-> > -	np = of_find_matching_node(NULL, pl310_ids);
-> > -	if (!np)
-> > -		return;
-> > -
-> > -	cache_type = readl(p + L2X0_CACHE_TYPE);
-> > -	aux_ctrl = (cache_type & 0x700) << (17-8);
-> > -	aux_ctrl |= 0x3c400001;
-> >  
-> > -	ret = l2x0_of_init(aux_ctrl, 0xc200c3fe);
-> > +	ret = l2x0_of_init(0x3c400001, 0xc20fc3fe);
-> >  	if (!ret)
-> >  		l2x0_saved_regs_addr = virt_to_phys(&l2x0_saved_regs);
-> >  #endif
-> 
-> Acked-by: Stephen Warren <swarren@nvidia.com>
-> Tested-by: Stephen Warren <swarren@nvidia.com>
-> 
-> I tested on both Tegra20 and Tegra30, and see bits 19:16 are 8 on both,
-> with or without this patch.
-> 
-> I know that the code above was introduced in:
-> 
-> 01548673fa15 arm/tegra: generalize L2 cache initialization
-> 
-> ... by Peter, as part of the port to Tegra30. However, there was no
-> explanation in that patch why it was needed. The existence of the patch
-> implies that Tegra20/30 use different way sizes or associativity for
-> their cache, and hence if we're going to forcibly over-write that part
-> of the aux register, we need to dynamically calculate the correct value
-> to put there. However in practice, both chips seem to use the same value
-> for that field anyway (unless perhaps U-Boot is trashing the field
-> before the kernel boots).
+> This will be fixed already in 3.16 with my earlycon series[1] if this
+> is not taken for 3.15.
 
-This code was written anticipating A9 based designs which have a different
-number of ways per cluster. However up to now, we haven't done
-any upstreaming work for those, so this code is indeed not required for
-the currently upstreamed Tegra SoCs. I don't think that will change in the
-forseeable future. Therefore:
+I'd like to take this for 3.15 as it's currently broken. I just need
+another ack from Arnd on the generic header change.
 
-Acked-by: Peter De Schrijver <pdeschrijver@nvidia.com>
-
-Cheers,
-
-Peter.
+-- 
+Catalin
