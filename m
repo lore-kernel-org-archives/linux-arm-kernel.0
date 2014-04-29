@@ -1,62 +1,69 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 29 Apr 2014 13:55:38 +0800
-Subject: [PATCH 3/3] ARM: dts: imx: Fix LVDS mapping for Ventana GW52xx
-In-Reply-To: <1398377247-3901-4-git-send-email-tharvey@gateworks.com>
-References: <1398377247-3901-1-git-send-email-tharvey@gateworks.com>
- <1398377247-3901-4-git-send-email-tharvey@gateworks.com>
-Message-ID: <20140429055531.GF16451@dragon>
+From: anup.patel@linaro.org (Anup Patel)
+Date: Tue, 29 Apr 2014 11:24:22 +0530
+Subject: [PATCH v11 09/12] ARM/ARM64: KVM: Emulate PSCI v0.2 MIGRATE_INFO_TYPE
+ and related functions
+In-Reply-To: <1398750865-10892-1-git-send-email-anup.patel@linaro.org>
+References: <1398750865-10892-1-git-send-email-anup.patel@linaro.org>
+Message-ID: <1398750865-10892-10-git-send-email-anup.patel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 24, 2014 at 03:07:27PM -0700, Tim Harvey wrote:
-> The GW52xx supports LVDS on channel 0. Remove the obsolete crtcs node and
-> add display timings for the HanStar HSD100PXN1 display.
+This patch adds emulation of PSCI v0.2 MIGRATE, MIGRATE_INFO_TYPE, and
+MIGRATE_INFO_UP_CPU function calls for KVM ARM/ARM64.
 
-The obsolete crtcs property has been removed by one patch in my queue.
-So please rebase the patch on my for-next branch.
+KVM ARM/ARM64 being a hypervisor (and not a Trusted OS), we cannot provide
+this functions hence we emulate these functions in following way:
+1. MIGRATE - Returns "Not Supported"
+2. MIGRATE_INFO_TYPE - Return 2 i.e. Trusted OS is not present
+3. MIGRATE_INFO_UP_CPU - Returns "Not Supported"
 
-Shawn
+Signed-off-by: Anup Patel <anup.patel@linaro.org>
+Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/kvm/psci.c |   21 ++++++++++++++++-----
+ 1 file changed, 16 insertions(+), 5 deletions(-)
 
-> 
-> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
-> ---
->  arch/arm/boot/dts/imx6qdl-gw52xx.dtsi | 20 +++++++++++++++++++-
->  1 file changed, 19 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-> index 9c9259b..735e8e3 100644
-> --- a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-> @@ -455,8 +455,26 @@
->  
->  &ldb {
->  	status = "okay";
-> +
->  	lvds-channel at 0 {
-> -		crtcs = <&ipu1 0>, <&ipu1 1>;
-> +		fsl,data-mapping = "spwg";
-> +		fsl,data-width = <18>;
-> +		status = "okay";
-> +
-> +		display-timings {
-> +			native-mode = <&timing0>;
-> +			timing0: hsd100pxn1 {
-> +				clock-frequency = <65000000>;
-> +				hactive = <1024>;
-> +				vactive = <768>;
-> +				hback-porch = <220>;
-> +				hfront-porch = <40>;
-> +				vback-porch = <21>;
-> +				vfront-porch = <7>;
-> +				hsync-len = <60>;
-> +				vsync-len = <10>;
-> +			};
-> +		};
->  	};
->  };
->  
-> -- 
-> 1.8.3.2
-> 
-> 
-> 
+diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
+index 3b6a0cf..cce901a 100644
+--- a/arch/arm/kvm/psci.c
++++ b/arch/arm/kvm/psci.c
+@@ -182,6 +182,22 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+ 	case PSCI_0_2_FN64_AFFINITY_INFO:
+ 		val = kvm_psci_vcpu_affinity_info(vcpu);
+ 		break;
++	case PSCI_0_2_FN_MIGRATE:
++	case PSCI_0_2_FN64_MIGRATE:
++		val = PSCI_RET_NOT_SUPPORTED;
++		break;
++	case PSCI_0_2_FN_MIGRATE_INFO_TYPE:
++		/*
++		 * Trusted OS is MP hence does not require migration
++	         * or
++		 * Trusted OS is not present
++		 */
++		val = PSCI_0_2_TOS_MP;
++		break;
++	case PSCI_0_2_FN_MIGRATE_INFO_UP_CPU:
++	case PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU:
++		val = PSCI_RET_NOT_SUPPORTED;
++		break;
+ 	case PSCI_0_2_FN_SYSTEM_OFF:
+ 		kvm_psci_system_off(vcpu);
+ 		/*
+@@ -207,12 +223,7 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+ 		ret = 0;
+ 		break;
+ 	case PSCI_0_2_FN_CPU_SUSPEND:
+-	case PSCI_0_2_FN_MIGRATE:
+-	case PSCI_0_2_FN_MIGRATE_INFO_TYPE:
+-	case PSCI_0_2_FN_MIGRATE_INFO_UP_CPU:
+ 	case PSCI_0_2_FN64_CPU_SUSPEND:
+-	case PSCI_0_2_FN64_MIGRATE:
+-	case PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU:
+ 		val = PSCI_RET_NOT_SUPPORTED;
+ 		break;
+ 	default:
+-- 
+1.7.9.5
