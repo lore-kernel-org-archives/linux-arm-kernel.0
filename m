@@ -1,57 +1,86 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 29 Apr 2014 10:27:23 +0100
-Subject: [RESUBMIT RFC PATCH v2 3/3] drivers: mfd: Add support for Exynos
- PMU driver
-In-Reply-To: <535F5AA7.2050001@samsung.com>
-References: <1398687607-4554-1-git-send-email-pankaj.dubey@samsung.com>
- <1398687607-4554-4-git-send-email-pankaj.dubey@samsung.com>
- <20140428122646.GF21279@lee--X1> <535F5AA7.2050001@samsung.com>
-Message-ID: <20140429092723.GG29462@lee--X1>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Tue, 29 Apr 2014 10:39:40 +0100
+Subject: [PATCH v3 part1 02/11] ARM64 / ACPI: Introduce the skeleton of
+ _PDC related for ARM64
+In-Reply-To: <1398432017-8506-3-git-send-email-hanjun.guo@linaro.org>
+References: <1398432017-8506-1-git-send-email-hanjun.guo@linaro.org>
+ <1398432017-8506-3-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20140429093941.02167C4095B@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >>This patch moves Exynos PMU driver implementation from
-> >>"arm/mach-exynos" to "drivers/mfd".
-> >>This driver is mainly used for setting misc bits of register from PMU IP
-> >>of Exynos SoC which will be required to configure before Suspend/Resume.
-> >>Currently all these settings are done in "arch/arm/mach-exynos/pmu.c" but
-> >>moving ahead for ARM64 based SoC support, there is a need of DT based
-> >>implementation of PMU driver.
-> >>This driver uses already existing DT binding information.
-> >>
-> >>CC: Sangbeom Kim <sbkim73@samsung.com>
-> >>CC: Samuel Ortiz <sameo@linux.intel.com>
-> >>CC: Lee Jones <lee.jones@linaro.org>
-> >>Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> >>---
-> >>  arch/arm/mach-exynos/Kconfig                           |    2 ++
-> >>  arch/arm/mach-exynos/Makefile                          |    2 --
-> >>  drivers/mfd/Kconfig                                    |    9 +++++++++
-> >>  drivers/mfd/Makefile                                   |    1 +
-> >>  arch/arm/mach-exynos/pmu.c => drivers/mfd/exynos-pmu.c |    0
-> >>  5 files changed, 12 insertions(+), 2 deletions(-)
-> >>  rename arch/arm/mach-exynos/pmu.c => drivers/mfd/exynos-pmu.c (100%)
-> >So I just took a look at the code as zero changes looks suspicious to
-> >me. The driver can not simply be copied and pasted into the MFD
-> >subsystem in its current state.
-> >
-> >The fundamental question is; is this chip actually an MFD? What does
-> >it do besides Power Management?
+On Fri, 25 Apr 2014 21:20:08 +0800, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+> The _PDC (Processor Driver Capabilities) object provides OSPM a
+> mechanism to convey to the platform the capabilities supported
+> by OSPM for processor power management.
 > 
-> Exynos PMU chip controls different power states of Exynos, so mainly it
-> does power management related stuff. Apart from this it has few registers
-> which controls PHY of various IP blocks of Exynos such as USB, HDMI,
-> ADC etc. But these phy controlling register are currently being accessed
-> via "syscon" driver provided regmap APIs. For same the same reason
-> Exynos PMU has second compatibility string as "syscon".
+> OSPM evaluates _PDC prior to evaluating any other processor
+> power management objects returning configuration information.
+> 
+> This patch introduces the skeleton of _PDC related file to make
+> ACPI core can be compiled on ARM64, and should be revisited when
+> implementing CPU power control.
+> 
+> Signed-off-by: Al Stone <al.stone@linaro.org>
+> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  arch/arm64/include/asm/acpi.h |   37 +++++++++++++++++++++++++++++++++++++
+>  1 file changed, 37 insertions(+)
+>  create mode 100644 arch/arm64/include/asm/acpi.h
+> 
+> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> new file mode 100644
+> index 0000000..e3e990e
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/acpi.h
+> @@ -0,0 +1,37 @@
+> +/*
+> + *  Copyright (C) 2013~2014, Al Stone <al.stone@linaro.org>
 
-I suggest that this is not suitable for the MFD subsystem then.
+Not really a correct copyright assignement. The copyright is held by
+Linaro, but the author is Al. It should instead read:
 
-Try drivers/power.
+ * Copyright (C0 2013-2014, Linaro Ltd.
+ * Author: Al Stone <al.stone@linaro.org>
 
+Acked-by: Grant Likely <grant.likely@linaro.org>
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> + *
+> + * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+> + *
+> + *  This program is free software; you can redistribute it and/or modify
+> + *  it under the terms of the GNU General Public License as published by
+> + *  the Free Software Foundation; either version 2 of the License, or
+> + *  (at your option) any later version.
+> + *
+> + *  This program is distributed in the hope that it will be useful,
+> + *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *  GNU General Public License for more details.
+> + *
+> + * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+> + */
+> +
+> +#ifndef _ASM_ACPI_H
+> +#define _ASM_ACPI_H
+> +
+> +static inline bool arch_has_acpi_pdc(void)
+> +{
+> +	/*
+> +	 * Always false for now, should be revisited when
+> +	 * implementing CPU power management
+> +	 */
+> +	return false;
+> +}
+> +
+> +static inline void arch_acpi_set_pdc_bits(u32 *buf)
+> +{
+> +	/* Should be revisited when implementing CPU power management */
+> +	return;
+> +}
+> +
+> +#endif /*_ASM_ACPI_H*/
+> -- 
+> 1.7.9.5
+> 
