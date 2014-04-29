@@ -1,301 +1,146 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 29 Apr 2014 11:06:34 -0700
-Subject: [PATCH] RFT: pinctrl: msm: switch to using generic GPIO irqchip
- helpers
-Message-ID: <1398794794-28920-1-git-send-email-linus.walleij@linaro.org>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 29 Apr 2014 19:16:02 +0100
+Subject: [PATCH v12 11/31] documentation: iommu: add binding document of
+ Exynos System MMU
+In-Reply-To: <5242619.ZKgCdLW1L4@wuerfel>
+References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
+ <4780885.JaktFvJeC7@wuerfel> <20140428193056.GD22135@arm.com>
+ <5242619.ZKgCdLW1L4@wuerfel>
+Message-ID: <20140429181601.GE3582@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This switches the Qualcomm MSM pin control driver over to using
-the generic GPIO irqchip helpers.
+On Mon, Apr 28, 2014 at 09:55:00PM +0200, Arnd Bergmann wrote:
+> On Monday 28 April 2014 20:30:56 Will Deacon wrote:
+> > Hi Arnd,
+> > 
+> > [and thanks Thierry for CCing me -- I have been tangled up with this before
+> > :)]
+> > 
+> > On Mon, Apr 28, 2014 at 01:05:30PM +0100, Arnd Bergmann wrote:
+> > > On Monday 28 April 2014 13:18:03 Thierry Reding wrote:
+> > > > There still has to be one cell to specify which master. Unless perhaps
+> > > > if they can be arbitrarily assigned. I guess even if there's a fixed
+> > > > mapping that applies to one SoC generation, it might be good to still
+> > > > employ a specifier and have the mapping in DT for flexibility.
+> > > 
+> > > let me clarify by example:
+> > > 
+> > > 	iommu at 1 {
+> > > 		compatible = "some,simple-iommu";
+> > > 		reg = <1>;
+> > > 		#iommu-cells = <0>; /* supports only one master */
+> > > 	};
+> > > 
+> > > 	iommu at 2 {
+> > > 		compatible = "some,other-iommu";
+> > > 		reg = <3>;
+> > > 		#iommu-cells = <1>; /* contains master ID */
+> > > 	};
+> > > 
+> > > 	iommu at 3 {
+> > > 		compatible = "some,windowed-iommu";
+> > > 		reg = <2>;
+> > > 		#iommu-cells = <2>; /* contains dma-window */
+> > > 	};
 
-Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: Josh Cartwright <joshc@codeaurora.org>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-Stephen: you may get the lockdep warnings back if you use this
-with the pinctrl tree only, but the GPIO tree also has this patch:
-http://marc.info/?l=linux-gpio&m=139817061114511&w=2
+An IOMMU is really a specialised bridge, so it may be cleaner to describe
+an IOMMU using a real bus node in the DT, if we also define a way to make
+master/slave linkages explicit where it matters.
 
-Bj?rn: you may see the HW setup happening for each interrupt, but
-the GPIO tree also has this patch:
-http://marc.info/?l=linux-gpio&m=139826462511107&w=2
----
- drivers/pinctrl/Kconfig       |  1 +
- drivers/pinctrl/pinctrl-msm.c | 99 ++++++++++++-------------------------------
- 2 files changed, 28 insertions(+), 72 deletions(-)
 
-diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
-index 934fd89978d3..4f7b8397e0af 100644
---- a/drivers/pinctrl/Kconfig
-+++ b/drivers/pinctrl/Kconfig
-@@ -224,6 +224,7 @@ config PINCTRL_MSM
- 	select PINMUX
- 	select PINCONF
- 	select GENERIC_PINCONF
-+	select GPIOLIB_IRQCHIP
- 
- config PINCTRL_APQ8064
- 	tristate "Qualcomm APQ8064 pin controller driver"
-diff --git a/drivers/pinctrl/pinctrl-msm.c b/drivers/pinctrl/pinctrl-msm.c
-index 5fa9341cc589..df6dda4ce803 100644
---- a/drivers/pinctrl/pinctrl-msm.c
-+++ b/drivers/pinctrl/pinctrl-msm.c
-@@ -13,7 +13,6 @@
-  */
- 
- #include <linux/err.h>
--#include <linux/irqdomain.h>
- #include <linux/io.h>
- #include <linux/module.h>
- #include <linux/of.h>
-@@ -26,8 +25,6 @@
- #include <linux/slab.h>
- #include <linux/gpio.h>
- #include <linux/interrupt.h>
--#include <linux/irq.h>
--#include <linux/irqchip/chained_irq.h>
- #include <linux/spinlock.h>
- 
- #include "core.h"
-@@ -41,7 +38,6 @@
-  * struct msm_pinctrl - state for a pinctrl-msm device
-  * @dev:            device handle.
-  * @pctrl:          pinctrl handle.
-- * @domain:         irqdomain handle.
-  * @chip:           gpiochip handle.
-  * @irq:            parent irq for the TLMM irq_chip.
-  * @lock:           Spinlock to protect register resources as well
-@@ -55,7 +51,6 @@
- struct msm_pinctrl {
- 	struct device *dev;
- 	struct pinctrl_dev *pctrl;
--	struct irq_domain *domain;
- 	struct gpio_chip chip;
- 	int irq;
- 
-@@ -68,6 +63,11 @@ struct msm_pinctrl {
- 	void __iomem *regs;
- };
- 
-+static inline struct msm_pinctrl *to_msm_pinctrl(struct gpio_chip *gc)
-+{
-+	return container_of(gc, struct msm_pinctrl, chip);
-+}
-+
- static int msm_get_groups_count(struct pinctrl_dev *pctldev)
- {
- 	struct msm_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctldev);
-@@ -480,13 +480,6 @@ static void msm_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
- 	spin_unlock_irqrestore(&pctrl->lock, flags);
- }
- 
--static int msm_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
--{
--	struct msm_pinctrl *pctrl = container_of(chip, struct msm_pinctrl, chip);
--
--	return irq_find_mapping(pctrl->domain, offset);
--}
--
- static int msm_gpio_request(struct gpio_chip *chip, unsigned offset)
- {
- 	int gpio = chip->base + offset;
-@@ -556,7 +549,6 @@ static struct gpio_chip msm_gpio_template = {
- 	.direction_output = msm_gpio_direction_output,
- 	.get              = msm_gpio_get,
- 	.set              = msm_gpio_set,
--	.to_irq           = msm_gpio_to_irq,
- 	.request          = msm_gpio_request,
- 	.free             = msm_gpio_free,
- 	.dbg_show         = msm_gpio_dbg_show,
-@@ -608,12 +600,12 @@ static void msm_gpio_update_dual_edge_pos(struct msm_pinctrl *pctrl,
- 
- static void msm_gpio_irq_mask(struct irq_data *d)
- {
-+	struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
-+	struct msm_pinctrl *pctrl = to_msm_pinctrl(gc);
- 	const struct msm_pingroup *g;
--	struct msm_pinctrl *pctrl;
- 	unsigned long flags;
- 	u32 val;
- 
--	pctrl = irq_data_get_irq_chip_data(d);
- 	g = &pctrl->soc->groups[d->hwirq];
- 
- 	spin_lock_irqsave(&pctrl->lock, flags);
-@@ -629,12 +621,12 @@ static void msm_gpio_irq_mask(struct irq_data *d)
- 
- static void msm_gpio_irq_unmask(struct irq_data *d)
- {
-+	struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
-+	struct msm_pinctrl *pctrl = to_msm_pinctrl(gc);
- 	const struct msm_pingroup *g;
--	struct msm_pinctrl *pctrl;
- 	unsigned long flags;
- 	u32 val;
- 
--	pctrl = irq_data_get_irq_chip_data(d);
- 	g = &pctrl->soc->groups[d->hwirq];
- 
- 	spin_lock_irqsave(&pctrl->lock, flags);
-@@ -654,12 +646,12 @@ static void msm_gpio_irq_unmask(struct irq_data *d)
- 
- static void msm_gpio_irq_ack(struct irq_data *d)
- {
-+	struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
-+	struct msm_pinctrl *pctrl = to_msm_pinctrl(gc);
- 	const struct msm_pingroup *g;
--	struct msm_pinctrl *pctrl;
- 	unsigned long flags;
- 	u32 val;
- 
--	pctrl = irq_data_get_irq_chip_data(d);
- 	g = &pctrl->soc->groups[d->hwirq];
- 
- 	spin_lock_irqsave(&pctrl->lock, flags);
-@@ -681,12 +673,12 @@ static void msm_gpio_irq_ack(struct irq_data *d)
- 
- static int msm_gpio_irq_set_type(struct irq_data *d, unsigned int type)
- {
-+	struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
-+	struct msm_pinctrl *pctrl = to_msm_pinctrl(gc);
- 	const struct msm_pingroup *g;
--	struct msm_pinctrl *pctrl;
- 	unsigned long flags;
- 	u32 val;
- 
--	pctrl = irq_data_get_irq_chip_data(d);
- 	g = &pctrl->soc->groups[d->hwirq];
- 
- 	spin_lock_irqsave(&pctrl->lock, flags);
-@@ -775,11 +767,10 @@ static int msm_gpio_irq_set_type(struct irq_data *d, unsigned int type)
- 
- static int msm_gpio_irq_set_wake(struct irq_data *d, unsigned int on)
- {
--	struct msm_pinctrl *pctrl;
-+	struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
-+	struct msm_pinctrl *pctrl = to_msm_pinctrl(gc);
- 	unsigned long flags;
- 
--	pctrl = irq_data_get_irq_chip_data(d);
--
- 	spin_lock_irqsave(&pctrl->lock, flags);
- 
- 	irq_set_irq_wake(pctrl->irq, on);
-@@ -789,25 +780,6 @@ static int msm_gpio_irq_set_wake(struct irq_data *d, unsigned int on)
- 	return 0;
- }
- 
--static int msm_gpio_irq_reqres(struct irq_data *d)
--{
--	struct msm_pinctrl *pctrl = irq_data_get_irq_chip_data(d);
--
--	if (gpio_lock_as_irq(&pctrl->chip, d->hwirq)) {
--		dev_err(pctrl->dev, "unable to lock HW IRQ %lu for IRQ\n",
--			d->hwirq);
--		return -EINVAL;
--	}
--	return 0;
--}
--
--static void msm_gpio_irq_relres(struct irq_data *d)
--{
--	struct msm_pinctrl *pctrl = irq_data_get_irq_chip_data(d);
--
--	gpio_unlock_as_irq(&pctrl->chip, d->hwirq);
--}
--
- static struct irq_chip msm_gpio_irq_chip = {
- 	.name           = "msmgpio",
- 	.irq_mask       = msm_gpio_irq_mask,
-@@ -815,14 +787,13 @@ static struct irq_chip msm_gpio_irq_chip = {
- 	.irq_ack        = msm_gpio_irq_ack,
- 	.irq_set_type   = msm_gpio_irq_set_type,
- 	.irq_set_wake   = msm_gpio_irq_set_wake,
--	.irq_request_resources = msm_gpio_irq_reqres,
--	.irq_release_resources = msm_gpio_irq_relres,
- };
- 
- static void msm_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- {
-+	struct gpio_chip *gc = irq_desc_get_handler_data(desc);
- 	const struct msm_pingroup *g;
--	struct msm_pinctrl *pctrl = irq_desc_get_handler_data(desc);
-+	struct msm_pinctrl *pctrl = to_msm_pinctrl(gc);
- 	struct irq_chip *chip = irq_get_chip(irq);
- 	int irq_pin;
- 	int handled = 0;
-@@ -839,7 +810,7 @@ static void msm_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- 		g = &pctrl->soc->groups[i];
- 		val = readl(pctrl->regs + g->intr_status_reg);
- 		if (val & BIT(g->intr_status_bit)) {
--			irq_pin = irq_find_mapping(pctrl->domain, i);
-+			irq_pin = irq_find_mapping(gc->irqdomain, i);
- 			generic_handle_irq(irq_pin);
- 			handled++;
- 		}
-@@ -852,19 +823,10 @@ static void msm_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- 	chained_irq_exit(chip, desc);
- }
- 
--/*
-- * This lock class tells lockdep that GPIO irqs are in a different
-- * category than their parents, so it won't report false recursion.
-- */
--static struct lock_class_key gpio_lock_class;
--
- static int msm_gpio_init(struct msm_pinctrl *pctrl)
- {
- 	struct gpio_chip *chip;
--	int irq;
- 	int ret;
--	int i;
--	int r;
- 	unsigned ngpio = pctrl->soc->ngpios;
- 
- 	if (WARN_ON(ngpio > MAX_NR_GPIO))
-@@ -890,23 +852,18 @@ static int msm_gpio_init(struct msm_pinctrl *pctrl)
- 		return ret;
- 	}
- 
--	pctrl->domain = irq_domain_add_linear(pctrl->dev->of_node, chip->ngpio,
--					      &irq_domain_simple_ops, NULL);
--	if (!pctrl->domain) {
--		dev_err(pctrl->dev, "Failed to register irq domain\n");
--		r = gpiochip_remove(&pctrl->chip);
-+	ret = gpiochip_irqchip_add(chip,
-+				   &msm_gpio_irq_chip,
-+				   0,
-+				   handle_edge_irq,
-+				   IRQ_TYPE_NONE);
-+	if (ret) {
-+		dev_err(pctrl->dev, "Failed to add irqchip to gpiochip\n");
- 		return -ENOSYS;
- 	}
- 
--	for (i = 0; i < chip->ngpio; i++) {
--		irq = irq_create_mapping(pctrl->domain, i);
--		irq_set_lockdep_class(irq, &gpio_lock_class);
--		irq_set_chip_and_handler(irq, &msm_gpio_irq_chip, handle_edge_irq);
--		irq_set_chip_data(irq, pctrl);
--	}
--
--	irq_set_handler_data(pctrl->irq, pctrl);
--	irq_set_chained_handler(pctrl->irq, msm_gpio_irq_handler);
-+	gpiochip_set_chained_irqchip(chip, &msm_gpio_irq_chip, pctrl->irq,
-+				     msm_gpio_irq_handler);
- 
- 	return 0;
- }
-@@ -974,8 +931,6 @@ int msm_pinctrl_remove(struct platform_device *pdev)
- 		return ret;
- 	}
- 
--	irq_set_chained_handler(pctrl->irq, NULL);
--	irq_domain_remove(pctrl->domain);
- 	pinctrl_unregister(pctrl->pctrl);
- 
- 	return 0;
--- 
-1.9.0
+The problems of how to describe master/slave linkage, coherency between
+masters, and how to describe sideband ID information present on the bus
+are really interrelated.
+
+
+If we can come up with a consistent description for these things, it
+should help us to describe IOMMUs, bus mastering peripherals, MSI
+controllers and complex bridges in a more uniform way, without having to
+reinvent so much for each binding.  That's my hope anyway.
+
+I've been hacking around some proposals on these areas which are a bit
+different from the approach suggested here -- I'll try to summarise some
+of it intelligibly and post something tomorrow so that we can discuss.
+
+
+> > > 
+> > > 	device at 4 {
+> > > 		compatible = "some,ethernet";
+> > > 		iommus = <&/iommu@1>;
+> > > 	};
+> > > 
+> > > 	device at 5 {
+> > > 		compatible = "some,dmaengine";
+> > > 		iommus = <&/iommu@2 0x40000000 0x1000000>,
+> > > 			 <&/iommu@3 0x101>;
+> > > 	};
+> > > 
+> > > The device at address 4 has a one-one relationship with iommu at 1, so there
+> > > is no need for any data. device at 5 has two master ports. One is connected to
+> > > an IOMMU that has a per-device aperture, device at 5 can only issue transfers
+> > > to the 256MB area at 0x40000000, and the IOMMU will have to put entries for
+> > > this device into that address. The second master port is connected to
+> > > iommu at 3, which uses a master ID that gets passed along with each transfer,
+> > > so that needs to be put into the IOTLBs.
+> > 
+> > I think this is definitely going in the right direction, but it's not clear
+> > to me how the driver for device at 5 knows how to configure the two ports.
+> > We're still lacking topology information (unless that's implicit in the
+> > ordering of the properties) to say how the mastering capabilities of the
+> > device are actually routed and configured.
+> 
+> It would be helpful to have a concrete example of a device that has multiple
+> masters. I have heard people mention this multiple times, and I can understand
+
+You mean "a device that contains multiple independent bus masters",
+right?  In particular, a device composed of multiple bus masters that
+do different things or should be handled differently by the interconnect.
+
+There has definitely been talk on the list about real devices that
+use multiple stream IDs.
+
+
+I'll ask around for "device-like" examples, but the most obvious
+example is the IOMMU itself.
+
+Transactions generated by the IOMMU clearly need to be handled
+differently by the interconnect, compared with transactions
+translated and forwarded by IOMMU on behalf of its clients.
+
+For example, suppose devices can post MSIs to an interrupt controller
+via a mailbox accessed through the IOMMU.  Suppose also that the IOMMU
+generates MSIs itself in order to signal management events or faults
+to a host OS.  Linux (as host) will need to configure the interrupt
+controller separately for the IOMMU and for the IOMMU clients.  This
+means that Linux needs to know which IDs may travel to the interrupt
+controller for which purpose, and they must be distinct.
+
+I'm not sure whether there is actually a SoC today that is MSI-capable
+and contains an IOMMU, but all the components to build one are out
+there today.  GICv3 is also explicitly designed to support such
+systems.
+
+
+In the future, it is likely that "HSA"-style GPUs and other high-
+throughput virtualisable bus mastering devices will have capabilities
+of this sort, but I don't think there's anything concrete yet.
+
+
+> how it might be wired up in hardware, but I don't know what it's good for,
+> or who would actually do it.
+> 
+> > > A variation would be to not use #iommu-cells at all, but provide a
+> > > #address-cells / #size-cells pair in the IOMMU, and have a translation
+> > > as we do for dma-ranges. This is probably most flexible.
+> > 
+> > That would also allow us to describe ranges of master IDs, which we need for
+> > things like PCI RCs on the ARM SMMU. Furthermore, basic transformations of
+> > these ranges could also be described like this, although I think Dave (CC'd)
+> > has some similar ideas in this area.
+
+Ideally, we would reuse the ePAPR "ranges" concept and describe the way
+sideband ID signals propagate down the bus hierarchy in a similar way.
+
+Cheers
+---Dave
