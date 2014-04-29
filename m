@@ -1,53 +1,87 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 29 Apr 2014 16:43:22 +0900
-Subject: [PATCH/RFC 0/4] ARM: shmobile: marzen: Initialise SCIF devices using
- DT
-Message-ID: <1398757406-30920-1-git-send-email-horms+renesas@verge.net.au>
+Date: Tue, 29 Apr 2014 16:43:23 +0900
+Subject: [PATCH 1/4] ARM: shmobile: r8a7779: Add scif nodes to dtsi
+In-Reply-To: <1398757406-30920-1-git-send-email-horms+renesas@verge.net.au>
+References: <1398757406-30920-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1398757406-30920-2-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The aim of this series is to provide a working prototype for enabling
-SCIF devices using DT on the marzen board when booting using multiplatform.
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7779.dtsi | 60 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 60 insertions(+)
 
-This series aims to be in keeping with the discussion both online
-and offline relating to "[PATCH/RFC] ARM: shmobile: Koelsch DT serial
-integration prototype" (Magnus Damm, 21st April 2014).
-
-Other relevant work in this area includes:
-
-* "[PATCH v4 0/2] [RESEND] Lager and Koelsch reference serial port support"
-  (Laurent Pinchart, 11th February 2014).
-  Deprecated by the above mentioned discussion.
-
-* "[PATCH v4 00/11] CCF support for Renesas r7s72100"
-  (Wolfram Sang, 28th April 2014).
-  I believe the approach of Wolfram's r7s72100 work and
-  my marzen work are quite similar if not the same.
-
-
-This series depends on:
-[PATCH v5 00/20] ARM: shmobile: r8a7779, marzen: CCF and multiplatform
-
-This series was created and tested with the above mentioned series applied
-on top of the renesas-next-v3.15-rc1-20140416 tag of my renesas tree.
-
-This series works in conjunction with but does not have a run or compile
-time dependency on:
-[PATCH/RFC v2] serial: sh-sci: Add device tree support for r8a7779
-
-
-Simon Horman (4):
-  ARM: shmobile: r8a7779: Add scif nodes to dtsi
-  ARM: shmobile: marzen: Remove early_printk from command line
-  ARM: shmobile: marzen: Initialise SCIF devices using DT
-  ARM: shmobile: marzen: Use disabled variant of clock workaround for
-    scif devices
-
- arch/arm/boot/dts/r8a7779-marzen.dts            | 24 ++++++++--
- arch/arm/boot/dts/r8a7779.dtsi                  | 60 +++++++++++++++++++++++++
- arch/arm/mach-shmobile/board-marzen-reference.c | 12 ++---
- arch/arm/mach-shmobile/setup-r8a7779.c          | 10 ++---
- 4 files changed, 91 insertions(+), 15 deletions(-)
-
+diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
+index e924f96..3e9cca4 100644
+--- a/arch/arm/boot/dts/r8a7779.dtsi
++++ b/arch/arm/boot/dts/r8a7779.dtsi
+@@ -203,6 +203,66 @@
+ 		status = "disabled";
+ 	};
+ 
++	scif0: serial at ffe40000 {
++		compatible = "renesas,scif", "renesas,scif-r8a7779";
++		reg = <0xffe40000 265>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 88 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cpg_clocks R8A7779_CLK_P>;
++		clock-names = "sci_ick";
++		status = "disabled";
++	};
++
++	scif1: serial at ffe41000 {
++		compatible = "renesas,scif", "renesas,scif-r8a7779";
++		reg = <0xffe41000 265>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 89 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cpg_clocks R8A7779_CLK_P>;
++		clock-names = "sci_ick";
++		status = "disabled";
++	};
++
++	scif2: serial at ffe42000 {
++		compatible = "renesas,scif", "renesas,scif-r8a7779";
++		reg = <0xffe42000 265>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 90 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cpg_clocks R8A7779_CLK_P>;
++		clock-names = "sci_ick";
++		status = "disabled";
++	};
++
++	scif3: serial at ffe43000 {
++		compatible = "renesas,scif", "renesas,scif-r8a7779";
++		reg = <0xffe43000 265>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 91 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cpg_clocks R8A7779_CLK_P>;
++		clock-names = "sci_ick";
++		status = "disabled";
++	};
++
++	scif4: serial at ffe44000 {
++		compatible = "renesas,scif", "renesas,scif-r8a7779";
++		reg = <0xffe44000 265>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 92 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cpg_clocks R8A7779_CLK_P>;
++		clock-names = "sci_ick";
++		status = "disabled";
++	};
++
++	scif5: serial at ffe45000 {
++		compatible = "renesas,scif", "renesas,scif-r8a7779";
++		reg = <0xffe45000 265>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 93 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cpg_clocks R8A7779_CLK_P>;
++		clock-names = "sci_ick";
++		status = "disabled";
++	};
++
+ 	pfc: pfc at fffc0000 {
+ 		compatible = "renesas,pfc-r8a7779";
+ 		reg = <0xfffc0000 0x23c>;
 -- 
 1.8.5.2
