@@ -1,51 +1,25 @@
-From: matt@console-pimps.org (Matt Fleming)
-Date: Tue, 29 Apr 2014 12:21:02 +0100
-Subject: [PATCH v2 03/10] efi: add helper function to get UEFI params
- from FDT
-In-Reply-To: <1398442154-19974-4-git-send-email-leif.lindholm@linaro.org>
-References: <1398442154-19974-1-git-send-email-leif.lindholm@linaro.org>
- <1398442154-19974-4-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <20140429112102.GG26088@console-pimps.org>
+From: miklos@szeredi.hu (Szeredi Miklos)
+Date: Tue, 29 Apr 2014 13:24:36 +0200
+Subject: [RFC 3/3] asm-generic: Drop renameat syscall from default list
+In-Reply-To: <CAAG0J9-2=rP3RP08eEjd17R3wEaeiUtGfWD-LeqXV=y9sBamfA@mail.gmail.com>
+References: <1398247687-13453-1-git-send-email-james.hogan@imgtec.com>
+ <1398247687-13453-4-git-send-email-james.hogan@imgtec.com>
+ <201404231418.05174.arnd@arndb.de>
+ <CAAG0J9-2=rP3RP08eEjd17R3wEaeiUtGfWD-LeqXV=y9sBamfA@mail.gmail.com>
+Message-ID: <CAELBmZB=74foyc_b-MTVOXeP6rVAD2x4=um2RVezTb68DifEbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 25 Apr, at 05:09:07PM, Leif Lindholm wrote:
-> From: Mark Salter <msalter@redhat.com>
-> 
-> ARM and ARM64 architectures use the device tree to pass UEFI parameters
-> from stub to kernel. These parameters are things known to the stub but
-> not discoverable by the kernel after the stub calls ExitBootSerives().
-> There is a helper function in:
-> 
->    drivers/firmware/efi/fdt.c
-> 
-> which the stub uses to add the UEFI parameters to the device tree.
-> This patch adds a complimentary helper function which UEFI runtime
-> support may use to retrieve the parameters from the device tree.
-> If an architecture wants to use this helper, it should select
-> CONFIG_UEFI_PARAMS_FROM_FDT.
-> 
-> Signed-off-by: Mark Salter <msalter@redhat.com>
-> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
-> ---
->  drivers/firmware/efi/Kconfig |    7 ++++
->  drivers/firmware/efi/efi.c   |   79 ++++++++++++++++++++++++++++++++++++++++++
->  include/linux/efi.h          |    9 +++++
->  3 files changed, 95 insertions(+)
+On Wed, Apr 23, 2014 at 2:41 PM, James Hogan <james.hogan@imgtec.com> wrote:
 
-Looks OK, but is there any chance we could swap CONFIG_UEFI_* for
-CONFIG_EFI_* when someone picks this up? We've generally done pretty
-well to keep the naming consistent and I'd like to hold on to that
-consistency for as long as possible (especially since the function names
-begin efi_*).
+> It appears Miklos Szeredi beat me to it with patch 1 (adding renameat2
+> syscall to asm-generic unistd.h), and will be submitting it to Linus
+> at some point as part of his renameat2 series.
+> Miklos: Do you think it makes sense for you to include my second patch
+> in your series too since it's renameat2 related?
+> http://marc.info/?l=linux-kernel&m=139824773305016&w=2
 
-And yes, I realise that no one (apart from perhaps Apple) ships with EFI
-anymore and it's all UEFI, but we've kinda developed our own naming
-scheme at this point.
+I've queued up the first two patches with acks from Arnd.
 
-Otherwise, 
-
-Acked-by: Matt Fleming <matt.fleming@intel.com>
-
--- 
-Matt Fleming, Intel Open Source Technology Center
+Thanks,
+Miklos
