@@ -1,35 +1,76 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 29 Apr 2014 10:12:35 -0500
-Subject: [PATCH v2 0/7] Generic serial earlycon
-In-Reply-To: <20140429110950.GF17007@arm.com>
-References: <1397859600-11507-1-git-send-email-robherring2@gmail.com>
- <20140429110950.GF17007@arm.com>
-Message-ID: <CAL_JsqJtXeB55kv7VD4DRj4F2W9HsJ39JFuaDQtocZLzHE_RUw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 29 Apr 2014 16:14:33 +0100
+Subject: [PATCH] ARM: l2c: prima2: only call l2x0_of_init() on matching
+ nodes
+In-Reply-To: <CAGsJ_4x1+eePRDMP0-0WeTG6ZJdzmMkN_9USbKt8joY8AKsDdw@mail.gmail.com>
+References: <1398644860-22973-1-git-send-email-mporter@linaro.org>
+ <20140428142950.GB30292@saruman.home> <20140428143709.GC7719@beef>
+ <20140428145223.GL26756@n2100.arm.linux.org.uk>
+ <CAGsJ_4x1+eePRDMP0-0WeTG6ZJdzmMkN_9USbKt8joY8AKsDdw@mail.gmail.com>
+Message-ID: <20140429151433.GD26756@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 29, 2014 at 6:09 AM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Fri, Apr 18, 2014 at 11:19:53PM +0100, Rob Herring wrote:
->> Rob Herring (7):
->>   x86: move FIX_EARLYCON_MEM kconfig into x86
->>   tty/serial: add generic serial earlycon
->>   tty/serial: convert 8250 to generic earlycon
->>   tty/serial: pl011: add generic earlycon support
->>   tty/serial: add arm/arm64 semihosting earlycon
->>   arm64: enable FIX_EARLYCON_MEM kconfig
->>   arm64: remove arch specific earlyprintk
->
-> The series looks fine, you can add:
->
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
->
+On Tue, Apr 29, 2014 at 11:05:06PM +0800, Barry Song wrote:
+> 2014-04-28 22:52 GMT+08:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> > On Mon, Apr 28, 2014 at 10:37:09AM -0400, Matt Porter wrote:
+> >> The "fix" is tested against bcm281xx and bcm21664 as that is what the
+> >> l2c cleanup breaks in -next. As mentioned, I don't have the sirfsoc h/w
+> >> so this first attempt at a fix also breaks their platform. It can be
+> >> addressed by adding those platform specific compatibles back to the dts,
+> >> of course.
+> >>
+> >> I'd much prefer that the sirfsoc folks fix this...it's going to break
+> >> other platforms in a multi v7 build.
+> >
+> > Well, it's about time we got rid of this from platform specific code
+> > anyway, taking it away from platform maintainers to mess around with.
+> > So that's what I'm doing.
+> >
+> > It's worth noting that if you build a single zImage with exynos also
+> > enabled, then you also end up with an unconditional call from that
+> > code to l2x0_of_init() with it's own magic numbers - and that applies
+> > before my changes.
+> >
+> > So let's fix this properly and yank this crap from platform maintainers
+> > fingers.
+> 
+> i mentioned dropping specific dts compatible prop will break non-csr
+> platforms in the mail thread "ARM: prima2: remove L2 cache size
+> override" and i said i was going to send v2. you said you need it
+> before rc6. now it has been sent, but i am sorry it is not against
+> next-20140424.
 
-Thanks.
+FFS.  IT HASN'T BEEN SENT.  All that I did was drop it into linux-next
+so that more people would get off their fat backsides and test this
+fscking patch set - something which hasn't happened because no one
+pays attention to emails sent to mailing lists.
 
-> BTW, are you merging all of them via some other tree or would prefer me
-> to take the arm64-specific patches?
+I also told you that this was what I was going to do.  But... is it
+really on to hold up such a large patch set which impacts virtually
+everyone because _you_ don't have time to sort out your small special
+requirements - no it is not, that's just fscking selfish.
 
-Greg has taken it, but there were a few issues, so it may get reposted.
+Anyway, I've had it with dealing with platform maintainers, I've yanked
+this patch set, and I'm no longer planning to do anything with it -
+platform maintainers have destroyed my will to get any of this series
+into the kernel.
 
-Rob
+So, the L2 cache code is going to remain in its current state, and it's
+going to rot because it's _FAR_ too much effort dealing with slow people
+like yourselves, or people who want the series split up, or people who
+whinge that there aren't any acks there (WELL GET OFF YOUR FAT BACKSIDES
+AND SEND ME SOME IF YOU CARE ABOUT THIS - no, don't, I'm no longer pushing
+this series.)
+
+This is the last time I'm going to ever try cleaning up any core ARM code.
+Core ARM maintanence is impossible in this environment with arm-soc split
+from core ARM stuff, because core ARM stuff /always/ impacts on SoC
+specific code.  You can't get away from that.
+
+My position in this community has been made impossible and obsolete by
+Linaro.  I'm at the point of walking away from this crap.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
