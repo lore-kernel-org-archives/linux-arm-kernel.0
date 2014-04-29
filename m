@@ -1,89 +1,80 @@
-From: anup.patel@linaro.org (Anup Patel)
-Date: Tue, 29 Apr 2014 11:24:24 +0530
-Subject: [PATCH v11 11/12] ARM/ARM64: KVM: Emulate PSCI v0.2 CPU_SUSPEND
-In-Reply-To: <1398750865-10892-1-git-send-email-anup.patel@linaro.org>
-References: <1398750865-10892-1-git-send-email-anup.patel@linaro.org>
-Message-ID: <1398750865-10892-12-git-send-email-anup.patel@linaro.org>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Tue, 29 Apr 2014 08:55:35 +0300
+Subject: [PATCH v12 11/31] documentation: iommu: add binding document of
+ Exynos System MMU
+In-Reply-To: <20140428103919.GF19455@ulmo>
+References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
+ <1398584283-22846-12-git-send-email-shaik.ameer@samsung.com>
+ <4447051.OnJtcFSqFV@wuerfel> <20140428103919.GF19455@ulmo>
+Message-ID: <87eh0gd6i0.fsf@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds emulation of PSCI v0.2 CPU_SUSPEND function call for
-KVM ARM/ARM64. This is a CPU-level function call which can suspend
-current CPU or current CPU cluster. We don't have VCPU clusters in
-KVM so we only suspend the current VCPU.
 
-The CPU_SUSPEND emulation is not tested much because currently there
-is no CPUIDLE driver in Linux kernel that uses PSCI CPU_SUSPEND. The
-PSCI CPU_SUSPEND implementation in ARM64 kernel was tested using a
-Simple CPUIDLE driver which is not published due to unstable DT-bindings
-for PSCI.
-(For more info, http://lwn.net/Articles/574950/)
+Thierry Reding <thierry.reding@gmail.com> writes:
 
-For simplicity, we implement CPU_SUSPEND emulation similar to WFI
-(Wait-for-interrupt) emulation and we also treat power-down request
-to be same as stand-by request. This is consistent with section
-5.4.1 and section 5.4.2 of PSCI v0.2 specification.
+> * PGP Signed by an unknown key
+>
+> On Sun, Apr 27, 2014 at 08:23:06PM +0200, Arnd Bergmann wrote:
+>> On Sunday 27 April 2014 13:07:43 Shaik Ameer Basha wrote:
+>> > +- mmu-masters: A phandle to device nodes representing the master for which
+>> > +               the System MMU can provide a translation. Any additional values
+>> > +              after the phandle will be ignored because a System MMU never
+>> > +              have two or more masters. "#stream-id-cells" specified in the
+>> > +              master's node will be also ignored.
+>> > +              If more than one phandle is specified, only the first phandle
+>> > +              will be treated.
+>> 
+>> This seems completely backwards: Why would you list the masters for an IOMMU
+>> in the IOMMU node?
+>> 
+>> The master should have a standard property pointing to the IOMMU instead.
+>> 
+>> We don't have a generic binding for IOMMUs yet it seems, but the time is
+>> overdue to make one.
+>> 
+>> Consider this NAKed until there is a generic binding for IOMMUs that all
+>> relevant developers have agreed to.
+>
+> I'd like to take this opportunity and revive one of the hibernating
+> patch sets that we have for Tegra. The last effort to get things merged
+> was back in January I think. I haven't bothered to look up the reference
+> since it's probably good to start from scratch anyway.
+>
+> The latest version of the binding that was under discussion back then I
+> think looked something like this:
+>
+> 	device at ... {
+> 		iommus = <&iommu [spec]>[, <&other_iommu [other_spec]>...];
+> 	};
+>
+> And possibly with a iommu-names property to go along with that. The idea
+> being that a device can be a master on possibly multiple IOMMUs. Using
+> the above it would also be possible to have one device be multiple
+> masters on the same IOMMU.
+>
+> On Tegra the specifier would be used to encode a memory controller's
+> client ID. One discussion point back at the time was to encode the ID as
+> a bitmask to allow more than a single master per entry. Another solution
+> which I think is a little cleaner and more generic, would be to use one
+> entry per master and use a single cell to encode the client ID. Devices
+> with multiple clients to the same IOMMU could then use multiple entries
+> referencing the same IOMMU.
+>
+> I've added Hiroshi Doyu on Cc since he knows the Tegra IOMMU best.
+> Hiroshi, can you summarize exactly what the proposed bindings were. If
+> my memory serves me well they were mostly along the lines of what Arnd
+> proposes here, and perhaps they are something that can also be used for
+> Exynos.
 
-Signed-off-by: Anup Patel <anup.patel@linaro.org>
-Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/kvm/psci.c |   28 ++++++++++++++++++++++++----
- 1 file changed, 24 insertions(+), 4 deletions(-)
+You can find the detail from:
 
-diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-index 1067579..09cf377 100644
---- a/arch/arm/kvm/psci.c
-+++ b/arch/arm/kvm/psci.c
-@@ -37,6 +37,26 @@ static unsigned long psci_affinity_mask(unsigned long affinity_level)
- 	return 0;
- }
- 
-+static unsigned long kvm_psci_vcpu_suspend(struct kvm_vcpu *vcpu)
-+{
-+	/*
-+	 * NOTE: For simplicity, we make VCPU suspend emulation to be
-+	 * same-as WFI (Wait-for-interrupt) emulation.
-+	 *
-+	 * This means for KVM the wakeup events are interrupts and
-+	 * this is consistent with intended use of StateID as described
-+	 * in section 5.4.1 of PSCI v0.2 specification (ARM DEN 0022A).
-+	 *
-+	 * Further, we also treat power-down request to be same as
-+	 * stand-by request as-per section 5.4.2 clause 3 of PSCI v0.2
-+	 * specification (ARM DEN 0022A). This means all suspend states
-+	 * for KVM will preserve the register state.
-+	 */
-+	kvm_vcpu_block(vcpu);
-+
-+	return PSCI_RET_SUCCESS;
-+}
-+
- static void kvm_psci_vcpu_off(struct kvm_vcpu *vcpu)
- {
- 	vcpu->arch.pause = true;
-@@ -183,6 +203,10 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
- 		 */
- 		val = 2;
- 		break;
-+	case PSCI_0_2_FN_CPU_SUSPEND:
-+	case PSCI_0_2_FN64_CPU_SUSPEND:
-+		val = kvm_psci_vcpu_suspend(vcpu);
-+		break;
- 	case PSCI_0_2_FN_CPU_OFF:
- 		kvm_psci_vcpu_off(vcpu);
- 		val = PSCI_RET_SUCCESS;
-@@ -235,10 +259,6 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
- 		val = PSCI_RET_INTERNAL_FAILURE;
- 		ret = 0;
- 		break;
--	case PSCI_0_2_FN_CPU_SUSPEND:
--	case PSCI_0_2_FN64_CPU_SUSPEND:
--		val = PSCI_RET_NOT_SUPPORTED;
--		break;
- 	default:
- 		return -EINVAL;
- 	}
--- 
-1.7.9.5
+[PATCHv7 09/12] iommu/tegra: smmu: get swgroups from DT "iommus="
+  http://lists.linuxfoundation.org/pipermail/iommu/2013-December/007212.html
+
+You can specify any parameters which your iommu requires from a device,
+and a device(master) can have multiple IOMMUs.
+
+ 	device at ... {
+ 		iommus = <&iommu [spec]>[, <&other_iommu [other_spec]>...];
+ 	};
