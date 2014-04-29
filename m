@@ -1,71 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Apr 2014 14:07:43 +0200
-Subject: [PATCH] gpio: always enable GPIO_OMAP on ARCH_OMAP
-In-Reply-To: <535F84B9.6000406@collabora.co.uk>
-References: <5523458.JVZJJObMjC@wuerfel> <13943940.Yb2C7lPSBy@wuerfel>
- <535F84B9.6000406@collabora.co.uk>
-Message-ID: <4195837.kkE84zMEnN@wuerfel>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 29 Apr 2014 08:21:18 -0400
+Subject: [GIT PULL] ARM: mvebu: fixes for v3.15
+Message-ID: <20140429122118.GF28159@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 April 2014 12:53:45 Javier Martinez Canillas wrote:
-> Hello Arnd,
-> 
-> On 04/29/2014 12:26 PM, Arnd Bergmann wrote:
-> > On Tuesday 29 April 2014 01:59:20 Javier Martinez Canillas wrote:
-> >> This driver is also used by OMAP1. Even when disabling GPIO_OMAP on that
-> >> platform doesn't cause a build error since no function defined in the driver is
-> >> used directly by platform code, I think that we always want this driver on OMAP1
-> >> too.
-> >> 
-> >> > However, it seems entirely reasonable to include the driver in build tests
-> >> > on other platforms, so we should also allow building it for COMPILE_TEST
-> >> > builds and select the required GENERIC_IRQ_CHIP that may not already be
-> >> > enabled on other platforms.
-> >> > 
-> >> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> >> > 
-> >> > diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-> >> > index c58b828..c8c42be 100644
-> >> > --- a/drivers/gpio/Kconfig
-> >> > +++ b/drivers/gpio/Kconfig
-> >> > @@ -244,9 +244,10 @@ config GPIO_OCTEON
-> >> >         family of SOCs.
-> >> >  
-> >> >  config GPIO_OMAP
-> >> > -     bool "TI OMAP GPIO support"
-> >> > +     bool "TI OMAP GPIO support" if COMPILE_TEST && !ARCH_OMAP2PLUS
-> >> 
-> >> So this should be:
-> >> 
-> >> +       bool "TI OMAP GPIO support" if COMPILE_TEST && !ARCH_OMAP2PLUS &&
-> >> !ARCH_OMAP1
-> >> 
-> > 
-> > Well, if COMPILE_TEST is disabled on OMAP1, the option is already
-> > hidden and enabled in my version. It seems reasonable to me to 
-> > allow compile-testing OMAP1 without the GPIO driver, while a kernel
-> > running on OMAP1 should always have COMPILE_TEST disabled.
-> > 
-> 
-> I understand your point. I thought you also wanted to be sure that the option
-> will be hidden in platforms where it make sense to always enable GPIO_OMAP even
-> if COMPILE_TEST is enabled.
+Guys,
 
-I thought about that, but didn't want to enforce it without a good reason
-when your original patch had just made it possible to disable the option.
+Not too many fixes so far, but I didn't want to sit on them any longer.
+They've already been in -next for over a week.
 
-> If the idea of this patch is to only avoid build errors when GPIO_OMAP is
-> disabled and allowing build testing the driver in other platforms, then I'm ok
-> with your patch and feel free to add my Acked-by tag.
+Please pull.
 
-Ok, thanks!
+thx,
 
-> And you are right that COMPILE_TEST is disabled in omap1_defconfig and after all
-> there are so many drivers needed for a platform to be usable on boot. So one has
-> to take care of enabling all the needed options as long as there isn't a
-> combination that cause a build error like the one you are fixing here.
+Jason.
 
-Ok
 
-	Arnd
+The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+
+  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-3.15
+
+for you to fetch changes up to 1cc9d48145b81e307fab94a5cf6ee66ec2f0de60:
+
+  ARM: orion5x: fix target ID for crypto SRAM window (2014-04-17 04:52:26 +0000)
+
+----------------------------------------------------------------
+mvebu fixes for v3.15
+
+ - devbus: fix bus-width conversion
+
+ - orion5x: fix target ID for crypto SRAM window
+
+----------------------------------------------------------------
+Thomas Petazzoni (2):
+      memory: mvebu-devbus: fix the conversion of the bus width
+      ARM: orion5x: fix target ID for crypto SRAM window
+
+ arch/arm/mach-orion5x/common.h |  2 +-
+ drivers/memory/mvebu-devbus.c  | 15 +++++++++++++--
+ 2 files changed, 14 insertions(+), 3 deletions(-)
