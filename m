@@ -1,100 +1,29 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 29 Apr 2014 08:21:33 +0100
-Subject: [PATCH 3/4] ARM: DT: STi: Add DT node for MiPHY365x
-In-Reply-To: <1398756095-32542-1-git-send-email-lee.jones@linaro.org>
-References: <1398756095-32542-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1398756095-32542-4-git-send-email-lee.jones@linaro.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 29 Apr 2014 00:24:20 -0700
+Subject: [PATCH 0/2] Clock unregistration fixes
+In-Reply-To: <1397863783-10728-1-git-send-email-sboyd@codeaurora.org>
+References: <1397863783-10728-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20140429072420.4468.87933@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
-devices. It has 2 ports which it can use for either; both SATA, both
-PCIe or one of each in any configuration.
+Quoting Stephen Boyd (2014-04-18 16:29:41)
+> Two fixes for fallout from commit fcb0ee6a3d33 (clk: Implement clk_unregister).
+> 
+> Stephen Boyd (2):
+>   clk: Fix double free due to devm_clk_register()
+>   clk: Fix slab corruption in clk_unregister()
 
-Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/boot/dts/stih416-b2020-revE.dts | 22 ++++++++++++++++++++++
- arch/arm/boot/dts/stih416-b2020.dts      |  6 ++++++
- arch/arm/boot/dts/stih416.dtsi           | 14 ++++++++++++++
- 3 files changed, 42 insertions(+)
- create mode 100644 arch/arm/boot/dts/stih416-b2020-revE.dts
+Thanks for the fixes. I've Cc'd them to stable as well for 3.14.
 
-diff --git a/arch/arm/boot/dts/stih416-b2020-revE.dts b/arch/arm/boot/dts/stih416-b2020-revE.dts
-new file mode 100644
-index 0000000..23fdaf7
---- /dev/null
-+++ b/arch/arm/boot/dts/stih416-b2020-revE.dts
-@@ -0,0 +1,22 @@
-+/*
-+ * Copyright (C) 2014 STMicroelectronics Limited.
-+ * Author: Lee Jones <lee.jones@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * publishhed by the Free Software Foundation.
-+ */
-+/dts-v1/;
-+#include "stih416.dtsi"
-+#include "stih41x-b2020.dtsi"
-+/ {
-+        model = "STiH416 B2020 REV-E";
-+	compatible = "st,stih416-b2020", "st,stih416";
-+
-+	soc {
-+		miphy365x_phy: miphy365x at fe382000 {
-+			st,pcie-tx-pol-inv;
-+			st,sata-gen = <3>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/stih416-b2020.dts b/arch/arm/boot/dts/stih416-b2020.dts
-index 276f28d..172f222 100644
---- a/arch/arm/boot/dts/stih416-b2020.dts
-+++ b/arch/arm/boot/dts/stih416-b2020.dts
-@@ -13,4 +13,10 @@
- 	model = "STiH416 B2020";
- 	compatible = "st,stih416", "st,stih416-b2020";
- 
-+	soc {
-+		miphy365x_phy: miphy365x at fe382000 {
-+			st,pcie-tx-pol-inv;
-+			st,sata-gen = <3>;
-+		};
-+	};
- };
-diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
-index 78746d2..00b217a 100644
---- a/arch/arm/boot/dts/stih416.dtsi
-+++ b/arch/arm/boot/dts/stih416.dtsi
-@@ -9,6 +9,8 @@
- #include "stih41x.dtsi"
- #include "stih416-clock.dtsi"
- #include "stih416-pinctrl.dtsi"
-+
-+#include <dt-bindings/phy/phy-miphy365x.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/reset-controller/stih416-resets.h>
- / {
-@@ -224,5 +226,17 @@
- 
- 			status = "disabled";
- 		};
-+
-+		miphy365x_phy: miphy365x at fe382000 {
-+			compatible      = "st,miphy365x-phy";
-+			reg        	= <0xfe382000 0x100>,
-+					  <0xfe38a000 0x100>,
-+					  <0xfe394000 0x100>,
-+					  <0xfe804000 0x100>;
-+			reg-names  	= "sata0", "sata1", "pcie0", "pcie1";
-+
-+			#phy-cells 	= <2>;
-+			st,syscfg  	= <&syscfg_rear>;
-+		};
- 	};
- };
--- 
-1.8.3.2
+Regards,
+Mike
+
+> 
+>  drivers/clk/clk.c | 74 ++++++++++++++++++++++++-------------------------------
+>  1 file changed, 32 insertions(+), 42 deletions(-)
+> 
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
+> 
