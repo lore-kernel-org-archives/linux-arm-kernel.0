@@ -1,37 +1,67 @@
-From: a.motakis@virtualopensystems.com (Antonios Motakis)
-Date: Tue, 29 Apr 2014 11:52:29 +0200
-Subject: [RFC PATCH v5 02/11] ARM SMMU: Add capability IOMMU_CAP_DMA_EXEC
-In-Reply-To: <20140428193709.GE22135@arm.com>
-References: <1398700371-20096-1-git-send-email-a.motakis@virtualopensystems.com>
- <1398700371-20096-3-git-send-email-a.motakis@virtualopensystems.com>
- <20140428193709.GE22135@arm.com>
-Message-ID: <CAG8rG2x9ebs0KQREnrB52Og6-XkrCQ7hJv929QBLWQ4z2m_1WQ@mail.gmail.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 29 Apr 2014 11:55:00 +0200
+Subject: [PATCH] ARM: imx6q: work around faulty PMU irq routing
+In-Reply-To: <20140429052824.GD16451@dragon>
+References: <1398371029-21176-1-git-send-email-l.stach@pengutronix.de>
+ <5359F4AB.9090502@de.bosch.com>
+ <1398417205.4657.10.camel@weser.hi.pengutronix.de>
+ <20140429052824.GD16451@dragon>
+Message-ID: <1398765300.4677.8.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 9:37 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Mon, Apr 28, 2014 at 04:52:42PM +0100, Antonios Motakis wrote:
->> The ARM SMMU can take an IOMMU_EXEC protection flag in addition to
->> IOMMU_READ and IOMMU_WRITE. Expose this as an IOMMU capability.
->
-> The other way of handling this would be to negate the capability and
-> advertise a NOEXEC cap instead. That would need the IOMMU_EXEC flag to
-> become IOMMU_NOEXEC and the ARM SMMU driver updating accordingly, but it
-> might make more sense if people don't object to mixing positive and negative
-> logic in the IOMMU_* flags.
->
-> Any thoughts?
->
+Am Dienstag, den 29.04.2014, 13:28 +0800 schrieb Shawn Guo:
+> On Fri, Apr 25, 2014 at 11:13:25AM +0200, Lucas Stach wrote:
+> > Am Freitag, den 25.04.2014, 07:37 +0200 schrieb Dirk Behme:
+> > > On 24.04.2014 22:23, Lucas Stach wrote:
+> > > > The i.MX6 PMU has a design errata where the interrupts of all cores are
+> > > > wired together into a single irq line. To work around this we have to
+> > > > bounce the interrupt around all cores until we find the one where the PMU
+> > > > counter overflow has happened.
+> > > >
+> > > > This causes the perf measurements to be less accurate and we can't really
+> > > > handle the case where two cores fire a PMU irq at the same time. The
+> > > > implemented woraround makes perf at least somewhat useable on imx6 SoCs
+> > > > with more than one core.
+> > > >
+[...]
+> > > Do you have anything like a test case which shows that it works (at 
+> > > least better) on a !single core with this patch? Compared to a 
+> > > non-patched system?
+> > > 
+> > Without this patch, running perf top completely kills the system on
+> > i.MX6q, most likely because of the sheer number of spurious interrupts
+> > hitting the system from 4 cores. Even the spurious killer doesn't work
+> > sometimes, so perf is completely busted right now.
+> > 
+> > With this patch perf has to reduce the sample frequency in order to
+> > compensate the added irq latency, but at least we get some plausible
+> > numbers out. Though I won't take any blame if the amount of salt you
+> > have to apply while looking at those numbers is already a deadly
+> > dose. ;)
+> > 
+> > I don't yet have any numbers on how accurate the measurement is, but at
+> > least things didn't look completely off.
+> 
+> If it cannot provide correct/accurate data, I'd say let's not fake it
+> to, and just let it be completely broken there, so that people can be
+> aware of the brokenness, and not take inaccurate data as accurate one.
+> 
+The data isn't bogus, it just isn't as accurate as it could be with a
+properly working PMU. I'll run some tests with a defined load on
+Solo/Quad to see how far the measurements are off. I'm fine with holding
+this patch until then.
 
-I agree, that would be simpler for the user. As it is now we have to
-worry about whether the EXEC flac is available just to use the PL330,
-with NOEXEC the device would always be usable by default.
+But the thing is this patch also fixes a serious userspace triggerable
+DoS on i.MX6q. Just running perf top completely locks up the system
+because of the sheer number of stray irqs. This isn't the case anymore
+with this patch applied.
 
+Maybe we can just print a warning into dmesg to make the users aware of
+the imprecise measurement.
 
-> Will
-
-
-
+Regards,
+Lucas
 -- 
-Antonios Motakis
-Virtual Open Systems
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
