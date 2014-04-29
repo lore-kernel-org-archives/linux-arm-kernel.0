@@ -1,38 +1,25 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 29 Apr 2014 13:42:50 -0600
-Subject: [PATCH 1/5] ARM: defconfigs: add MTD_SPI_NOR (new dependency
- for M25P80)
-In-Reply-To: <20140429190603.GB9418@norris-Latitude-E6410>
-References: <1397719309-2022-1-git-send-email-computersforpeace@gmail.com>
- <1397719309-2022-2-git-send-email-computersforpeace@gmail.com>
- <535A8FC9.8040707@wwwdotorg.org>
- <20140429190603.GB9418@norris-Latitude-E6410>
-Message-ID: <536000BA.4000101@wwwdotorg.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 29 Apr 2014 12:43:20 -0700
+Subject: [PATCH v11 02/12] ARM/ARM64: KVM: Add common header for PSCI
+ related defines
+In-Reply-To: <1398750865-10892-3-git-send-email-anup.patel@linaro.org>
+References: <1398750865-10892-1-git-send-email-anup.patel@linaro.org>
+ <1398750865-10892-3-git-send-email-anup.patel@linaro.org>
+Message-ID: <20140429194320.GB3003@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/29/2014 01:06 PM, Brian Norris wrote:
-> Hi Stephen,
+On Tue, Apr 29, 2014 at 11:24:15AM +0530, Anup Patel wrote:
+> We need a common place to share PSCI related defines among ARM kernel,
+> ARM64 kernel, KVM ARM/ARM64 PSCI emulation, and user space.
 > 
-> On Fri, Apr 25, 2014 at 10:39:37AM -0600, Stephen Warren wrote:
->> On 04/17/2014 01:21 AM, Brian Norris wrote:
->>> These defconfigs contain the CONFIG_M25P80 symbol, which is now
->>> dependent on the MTD_SPI_NOR symbol. Add CONFIG_MTD_SPI_NOR to the
->>> relevant defconfigs.
->>>
->>> At the same time, drop the now-nonexistent CONFIG_MTD_CHAR symbol.
-...
->> I think this should be split it up so that each defconfig can go through
->> the tree that owns it to avoid conflicts. If you repost split up, I can
->> apply the tegra_defconfig change to the Tegra tree.
+> We introduce uapi/linux/psci.h for this purpose. This newly added
+> header will be first used by KVM ARM/ARM64 in-kernel PSCI emulation
+> and user space (i.e. QEMU or KVMTOOL).
 > 
-> OK, I'll try to split it up. Is ARM unique in tracking defconfigs in
-> separate trees? I assume MIPS, PowerPC, and Blackfin won't require the
-> same splitting? I'd like to avoid 31 patches when <20 could suffice.
+> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+> Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+> ---
 
-Sorry, I have no idea how the other arches handle defconfigs:-(
-
-I guess you could also just see if arm-soc (arm@kernel.org) will take
-this patch, and deal with any merge conflicts that arise when they merge
-all the sub-arch defconfig changes. I CC'd them to find out if they
-think that's a better idea.
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
