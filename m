@@ -1,27 +1,49 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Tue, 29 Apr 2014 17:40:02 +0800
-Subject: [PATCH 70/97] ARM: l2c: tegra: convert to common l2c310 early
- resume functionality
-In-Reply-To: <535EBD19.4060304@wwwdotorg.org>
-References: <20140428192419.GV26756@n2100.arm.linux.org.uk>
- <E1WerHd-0001YS-LA@rmk-PC.arm.linux.org.uk> <535EBD19.4060304@wwwdotorg.org>
-Message-ID: <535F7372.5000507@nvidia.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Tue, 29 Apr 2014 10:40:55 +0100
+Subject: [PATCH v3 part1 03/11] ARM64 : Add dummy asm/cpu.h
+In-Reply-To: <1398432017-8506-4-git-send-email-hanjun.guo@linaro.org>
+References: <1398432017-8506-1-git-send-email-hanjun.guo@linaro.org>
+ <1398432017-8506-4-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20140429094055.2FCBEC4095B@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/29/2014 04:42 AM, Stephen Warren wrote:
-> On 04/28/2014 01:32 PM, Russell King wrote:
->> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
->
-> Acked-by: Stephen Warren <swarren@nvidia.com>
-> Tested-by: Stephen Warren <swarren@nvidia.com>
->
-> (On Springbank/Tegra20 and Beaver/Tegra30; tested suspend/resume via RTC
-> wakealarm IRQ)
->
-> Joseph, if you see any issue here, please respond. Thanks.
->
+On Fri, 25 Apr 2014 21:20:09 +0800, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+> ACPI core requires a cpu.h, add a dummy one here temporarily.
+> This file will be updated in the future to add definitions for
+> arch_(un)register_cpu which are required for ACPI based physical
+> CPU hotplug when these standards have be ratified by the ASWG.
+> 
+> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  arch/arm64/include/asm/cpu.h |   11 +++++++++++
+>  1 file changed, 11 insertions(+)
+>  create mode 100644 arch/arm64/include/asm/cpu.h
 
-Thanks for taking care of this. LGTM.
+I think we're trying to get away from these empty header stubs by
+putting them in asm-generic. Arnd, care to comment here?
 
-Reviewed-by: Joseph Lo <josephl@nvidia.com>
+g.
+
+> 
+> diff --git a/arch/arm64/include/asm/cpu.h b/arch/arm64/include/asm/cpu.h
+> new file mode 100644
+> index 0000000..cee7d3f
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/cpu.h
+> @@ -0,0 +1,11 @@
+> +/*
+> + *  Copyright (C) 2013-2014 ARM Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +#ifndef __ASM_CPU_H
+> +#define __ASM_CPU_H
+> +
+> +#endif
+> -- 
+> 1.7.9.5
+> 
