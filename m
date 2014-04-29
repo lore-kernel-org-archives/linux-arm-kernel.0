@@ -1,25 +1,79 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 29 Apr 2014 15:45:06 +0100
-Subject: [PATCH v4 3/7] arm64: Introduce a kernel configuration option
- for VA_BITS
-In-Reply-To: <000301cf6367$ca12e150$5e38a3f0$@samsung.com>
-References: <000301cf6367$ca12e150$5e38a3f0$@samsung.com>
-Message-ID: <20140429144506.GK17007@arm.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Tue, 29 Apr 2014 09:47:25 -0500
+Subject: [PATCH] ARM: dts: am437x-gp-evm: Boot fixes
+In-Reply-To: <20140425164141.GD20807@atomide.com>
+References: <1398192739-8901-1-git-send-email-d-gerlach@ti.com>
+ <20140422190132.GA12204@atomide.com> <5356C8AE.3090907@ti.com>
+ <20140423145904.GB4833@atomide.com> <5357F78A.5000406@ti.com>
+ <20140425164141.GD20807@atomide.com>
+Message-ID: <535FBB7D.9000807@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 29, 2014 at 05:59:23AM +0100, Jungseok Lee wrote:
-> +config ARM64_VA_BITS
-> +	int "Virtual address space size"
-> +	range 39 39 if ARM64_4K_PAGES && ARM64_3_LEVELS
-> +	range 42 42 if ARM64_64K_PAGES && ARM64_2_LEVELS
-> +	help
-> +	  This feature is determined by a combination of page size and
-> +	  level of translation tables.
+On 04/25/2014 11:41 AM, Tony Lindgren wrote:
+> * Dave Gerlach <d-gerlach@ti.com> [140423 10:25]:
+>> On 04/23/2014 09:59 AM, Tony Lindgren wrote:
+>>> * Dave Gerlach <d-gerlach@ti.com> [140422 12:53]:
+>>>> On 04/22/2014 02:01 PM, Tony Lindgren wrote:
+>>>>> * Dave Gerlach <d-gerlach@ti.com> [140422 11:52]:
+>>>>>> This patch, along with patch here [1], fixes boot for am437x-gp-evm. The
+>>>>>> bootloader configures gpio5_7 to control the DDR3 termination regulator,
+>>>>>> the linked patch prevents that gpio bank from being reset and losing
+>>>>>> the previously configured state, and this patch binds the gpio to a
+>>>>>> regulator so the kernel is aware of the state of the gpio.
+>>>>>>
+>>>>>> [1] https://www.mail-archive.com/linux-omap at vger.kernel.org/msg102941.html
+>>>>>
+>>>>> Setting up the GPIO regulator makes sense to me. But the hack in the
+>>>>> link above is potentially a nasty time bomb for anybody trying to
+>>>>> use GPIO bank 5 on that board.
+>>>>>
+>>>>> What tests have been done that the GPIO bank behaves properly when
+>>>>> it's not reset?
+>>>>
+>>>> We've been using this configuration on this board for a while without any
+>>>> apparent issues. Also, am335x-evmsk already uses the same idea for the VTT
+>>>> regulator on board from commit 6046adb6ad701026c10adeac8d6a4138895f12e5
+>>>> [ARM: dts: am335x-evmsk: Do not reset gpio0] and I am unaware of any issues
+>>>> with that either.
+>>>
+>>> OK. Do you have other GPIOs in use as interrupts for devices in these
+>>> banks and do they work fine?
+>>
+>> I dont see any interrupts in use from gpio5 bank but as a quick test if I
+>> add ti,no-reset-on-init to gpio3 and gpio4 I see no issue with matrix-keypad
+>> operation which uses gpios from each of those banks.
+>
+> OK thanks for testing. I'll apply the ti,no-reset-on-init patch from [1]
+> above into omap-for-v3.15/fixes-v2.
+>
+> The regulator patch can wait for v3.16, and should be also implemented
+> for the am335x-evmsk the same way, so maybe add that too to your patch?
 
-OK, so you are doing the VA bits selection already. But see my other
-email about setting only exposing this and hiding the number of levels
-(though number of levels can be mentioned in the help).
+Alright thanks, yes I can do that as well for v2.
 
--- 
-Catalin
+Regards,
+Dave
+
+>
+>>> Also, can you please test to make sure this works with the most recent
+>>> Javier's GPIO patches that had the issue of not booting on am335x-evmsk?
+>>>
+>>
+>> Yes, when using Javier's patches in addition to this patch [1], which was
+>> found to be necessary through this discussion [2], the AM437x GP EVM boots
+>> fine with linux-next with my regulator patch and gpio5 no reset patch
+>> applied.
+>
+> OK good to hear.
+>
+> Tony
+>
+>> [1] https://patchwork.kernel.org/patch/4041881/
+>> [2] http://marc.info/?t=139817273800014&r=1&w=2
+>>
+>>> Regards,
+>>>
+>>> Tony
+>>>
+>>
