@@ -1,33 +1,32 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Tue, 29 Apr 2014 11:49:35 +0530
-Subject: [PATCH] ARM: configs: drop CONFIG_COMMON_CLK_DEBUG
-In-Reply-To: <20140429061417.GJ16451@dragon>
-References: <1398504922-9223-1-git-send-email-prabhakar.csengg@gmail.com>
- <20140429061417.GJ16451@dragon>
-Message-ID: <CA+V-a8vnha1Pk7pJ0nRizk=A+b-w_bAyS6E+32dPimSBCMg-Dg@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 29 Apr 2014 14:20:10 +0800
+Subject: [PATCH] ARM: imx_v4_v5_defconfig: drop CONFIG_COMMON_CLK_DEBUG option
+Message-ID: <1398752410-20308-1-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 29, 2014 at 11:44 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
-> On Sat, Apr 26, 2014 at 03:05:22PM +0530, Lad Prabhakar wrote:
->> From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
->>
->> this patch removes COMMON_CLK_DEBUG config option
->> from defconfig file as this config option is obsolete.
->>
->> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
->> ---
->>  arch/arm/configs/imx_v4_v5_defconfig    |    1 -
->>  arch/arm/configs/imx_v6_v7_defconfig    |    1 -
-> ...
->>  arch/arm/configs/mxs_defconfig          |    1 -
->
-> Please drop these 3 files from your patch.  The obsolete
-> COMMON_CLK_DEBUG option has been removed from two of them on my branch
-> by savedefconfig, and we will address the remaining one in another
-> patch.
->
-OK will post the updated patch dropping these 3 files.
+The option COMMON_CLK_DEBUG was removed by commit ea72dc2 (clk: remove
+CONFIG_COMMON_CLK_DEBUG), so let's remove CONFIG_COMMON_CLK_DEBUG from
+the defconfig.
 
-Regards,
---Prabhakar Lad
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+---
+Thanks to Lad Prabhakar <prabhakar.csengg@gmail.com> for the reminding.
+
+ arch/arm/configs/imx_v4_v5_defconfig | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
+index 54bc649..bada59d 100644
+--- a/arch/arm/configs/imx_v4_v5_defconfig
++++ b/arch/arm/configs/imx_v4_v5_defconfig
+@@ -182,7 +182,6 @@ CONFIG_RTC_DRV_MXC=y
+ CONFIG_DMADEVICES=y
+ CONFIG_IMX_SDMA=y
+ CONFIG_IMX_DMA=y
+-CONFIG_COMMON_CLK_DEBUG=y
+ # CONFIG_IOMMU_SUPPORT is not set
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT3_FS=y
+-- 
+1.8.3.2
