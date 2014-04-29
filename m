@@ -1,55 +1,42 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 29 Apr 2014 09:19:32 -0400
-Subject: [PATCH v2 05/38] memory: mvebu-devbus: use ARMADA_ prefix in
- defines
-In-Reply-To: <20140428160429.GA13813@arch.cereza>
-References: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1398202002-28530-6-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140426142132.GU28159@titan.lakedaemon.net>
- <20140428131949.GA11604@arch.cereza>
- <20140428145632.GZ28159@titan.lakedaemon.net>
- <20140428160429.GA13813@arch.cereza>
-Message-ID: <20140429131932.GJ28159@titan.lakedaemon.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 29 Apr 2014 15:30:16 +0200
+Subject: [alsa-devel] [PATCH] ASoC: fsl: select SND_SOC_IMX_PCM_DMA where
+ needed
+In-Reply-To: <535F8594.40609@metafoo.de>
+References: <6606961.lAGLvkNsEj@wuerfel> <4270904.84oGcCXL4B@wuerfel>
+ <535F8594.40609@metafoo.de>
+Message-ID: <4275868.O962kiiyJa@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 01:04:29PM -0300, Ezequiel Garcia wrote:
-> On Apr 28, Jason Cooper wrote:
-> > On Mon, Apr 28, 2014 at 10:19:49AM -0300, Ezequiel Garcia wrote:
-> > > Hi guys,
-> > > 
-> > > On Apr 26, Jason Cooper wrote:
-> > > > On Tue, Apr 22, 2014 at 11:26:09PM +0200, Thomas Petazzoni wrote:
-> > > > > The mvebu-devbus driver currently only supports the Armada 370/XP
-> > > > > family, but it can also cover the Orion5x family. However, the Orion5x
-> > > > > family has a different organization of the register. Therefore, in
-> > > > > preparation to the introduction of Orion5x support, we rename the
-> > > > > Armada 370/XP specific definitions to have an ARMADA_ prefix.
-> > > > > 
-> > > > > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > > > > ---
-> > > > >  drivers/memory/mvebu-devbus.c | 48 +++++++++++++++++++++----------------------
-> > > > >  1 file changed, 24 insertions(+), 24 deletions(-)
-> > > > 
-> > > > Patches 5 through 9 (devbus) applied to mvebu/drivers With Sebastian's
-> > > > Acks and a dep on mvebu/fixes.
-> > > > 
-> > > 
-> > > Tested the branch (plus some -next fixes) on the AXP-GP. The NOR works perfectly fine.
-> > 
-> > Which fixes?
-> > 
+On Tuesday 29 April 2014 12:57:24 Lars-Peter Clausen wrote:
+> On 04/29/2014 12:37 PM, Arnd Bergmann wrote:
+> > On Tuesday 29 April 2014 07:07:33 Alexander Shiyan wrote:
+> >> Mon, 28 Apr 2014 23:12:14 +0200 ?? Arnd Bergmann <arnd@arndb.de>:
+> >>> On Tuesday 29 April 2014 00:35:41 Alexander Shiyan wrote:
+> >>>>
+> >>>> So, I don't understand why this error happen, as well as I can not
+> >>>> reproduce this...
+> >>>
+> >>> It's probably CONFIG_SND_SOC_IMX_PCM_DMA=m and CONFIG_SND_SOC_FSL_SSI=y then.
+> >>> What is the intended behavior in this case? Should CONFIG_SND_SOC_FSL_SSI
+> >>> be forced to be a module as well?
+> >>
+> >> Hmm, yes...
+> >> I thought that I had already solved a similar problem for the earlier
+> >> version of the patch ...
+> >
+> > How about this?
 > 
-> Gah, nevermind. I took the mvneta -netdev fixes, but the XP-GP wasn't affected.
-> So, no fixes required.
+> Having FSL_SSI/FSL_SPDIF, but not SND_SOC_IMX_PCM_DMA does not make sense on 
+> iMX.
+> So how about:
 > 
-> > Does this count as a Tested-by?
-> > 
+>         select SND_SOC_IMX_PCM_DMA if SND_IMX_SOC
 > 
-> Sure: Tested-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> and remove all the other 'select SND_SOC_IMX_PCM_DMA' statements. That's in 
+> my opinion much nicer.
 
-Added, thanks for testing.
+Yes, makes sense. Should I do another version of the patch?
 
-thx,
-
-Jason.
+	Arnd
