@@ -1,55 +1,106 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 29 Apr 2014 19:31:31 +0100
-Subject: [PATCH] ARM: OMAP5: Switch to THUMB mode if needed on secondary
- CPU
-In-Reply-To: <D49C397D-1ABD-4882-B3F5-94F359D7552B@gmail.com>
-References: <1398191506-3741-1-git-send-email-joelf@ti.com>
- <20140428164348.GA14354@e103592.cambridge.arm.com>
- <535E8DC2.4010504@ti.com> <535E8E2D.1020708@ti.com>
- <20140429091725.GA3582@e103592.cambridge.arm.com>
- <D49C397D-1ABD-4882-B3F5-94F359D7552B@gmail.com>
-Message-ID: <20140429183131.GF3582@e103592.cambridge.arm.com>
+From: lznuaa@gmail.com (Frank Li)
+Date: Tue, 29 Apr 2014 13:33:02 -0500
+Subject: [PATCH] ARM: imx6q: work around faulty PMU irq routing
+In-Reply-To: <535F8A2F.2060507@de.bosch.com>
+References: <1398371029-21176-1-git-send-email-l.stach@pengutronix.de>
+ <5359F4AB.9090502@de.bosch.com>
+ <1398417205.4657.10.camel@weser.hi.pengutronix.de>
+ <20140429052824.GD16451@dragon>
+ <1398765300.4677.8.camel@weser.hi.pengutronix.de>
+ <535F8A2F.2060507@de.bosch.com>
+Message-ID: <CAHrpEqQ8C2ziWobckGHhZtu5Q0e_xQz7BncZnoUUX0WT96Sz1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 29, 2014 at 05:36:30PM +0100, Joel Fernandes wrote:
+On Tue, Apr 29, 2014 at 6:17 AM, Dirk Behme <dirk.behme@de.bosch.com> wrote:
+> On 29.04.2014 11:55, Lucas Stach wrote:
+>>
+>> Am Dienstag, den 29.04.2014, 13:28 +0800 schrieb Shawn Guo:
+>>>
+>>> On Fri, Apr 25, 2014 at 11:13:25AM +0200, Lucas Stach wrote:
+>>>>
+>>>> Am Freitag, den 25.04.2014, 07:37 +0200 schrieb Dirk Behme:
+>>>>>
+>>>>> On 24.04.2014 22:23, Lucas Stach wrote:
+>>>>>>
+>>>>>> The i.MX6 PMU has a design errata where the interrupts of all cores
+>>>>>> are
+>>>>>> wired together into a single irq line. To work around this we have to
+>>>>>> bounce the interrupt around all cores until we find the one where the
+>>>>>> PMU
+>>>>>> counter overflow has happened.
+>>>>>>
+>>>>>> This causes the perf measurements to be less accurate and we can't
+>>>>>> really
+>>>>>> handle the case where two cores fire a PMU irq at the same time. The
+>>>>>> implemented woraround makes perf at least somewhat useable on imx6
+>>>>>> SoCs
+>>>>>> with more than one core.
+>>>>>>
+>> [...]
+>>>>>
+>>>>> Do you have anything like a test case which shows that it works (at
+>>>>> least better) on a !single core with this patch? Compared to a
+>>>>> non-patched system?
+>>>>>
+>>>> Without this patch, running perf top completely kills the system on
+>>>> i.MX6q, most likely because of the sheer number of spurious interrupts
+>>>> hitting the system from 4 cores. Even the spurious killer doesn't work
+>>>> sometimes, so perf is completely busted right now.
+>>>>
+>>>> With this patch perf has to reduce the sample frequency in order to
+>>>> compensate the added irq latency, but at least we get some plausible
+>>>> numbers out. Though I won't take any blame if the amount of salt you
+>>>> have to apply while looking at those numbers is already a deadly
+>>>> dose. ;)
+>>>>
+>>>> I don't yet have any numbers on how accurate the measurement is, but at
+>>>> least things didn't look completely off.
+>>>
+>>>
+>>> If it cannot provide correct/accurate data, I'd say let's not fake it
+>>> to, and just let it be completely broken there, so that people can be
+>>> aware of the brokenness, and not take inaccurate data as accurate one.
+>>>
+>> The data isn't bogus, it just isn't as accurate as it could be with a
+>> properly working PMU. I'll run some tests with a defined load on
+>> Solo/Quad to see how far the measurements are off. I'm fine with holding
+>> this patch until then.
+>>
+>> But the thing is this patch also fixes a serious userspace triggerable
+>> DoS on i.MX6q. Just running perf top completely locks up the system
+>> because of the sheer number of stray irqs. This isn't the case anymore
+>> with this patch applied.
 
-[...]
+I am very strange. Why PMU can work because below errata?
 
-> >> Sorry what I meant is, say its of Type function. What tells the firmware
-> >> to switch to THUMB?
-> >> 
-> >> What's typically done is a boot address register is written by the
-> >> kernel, and the firmware jumps to it after WFE.
-> > 
-> > Using ENTRY(x) ... ENDPROC(x) causes the symbol seen by the linker
-> > for x to have the Thumb bit set if the code is Thumb.
-> > 
-> > This means that any reference the linker fixes up for that symbol
-> > will have the Thumb bit set appropriately.  This applies to any kind
-> > of reference, so code in another file that takes the address of the
-> > symbol and then passes that address to the firmware should result in the
-> > firmware getting an address with the Thumb bit.
-> > 
-> > From the firmware's point of view it just gets a raw address, but
-> > the Thumb bit will now be set.  The firmware still needs to handle
-> > this correctly when jumping, but from the look of the code this may
-> > already work on omap3/4.  It would be interesting to know whether it
-> > works on omap5.
-> 
-> Thanks a lot for the explanation. That makes perfect sense. I will try it and let you know if it works on OMAP5.
+ERR006259 ARM: Debug/trace functions (PMU, PTM and ETB) are disabled
+with absence of JTAG_TCK clock after POR
 
-ARM/thumb interworking making perfect sense?  I'll have to frame that
-and put it on the wall :)
+Default it should no any PMU irqs happen.
 
-objdump and nm conveniently mask off the Thumb bit from all function
-addresses they print out, but if you show the symbols using readelf
-instead you'll see addresses with bit 0 set for Thumb functions.
+best regards
+Frank Li
 
-
-It's possible that the firmware still doesn't handle branching to Thumb
-correctly, but if it does it would be nice to remove the requirement to
-build an odd piece of a Thumb-2 kernel in ARM.
-
-Cheers
----Dave
+>>
+>> Maybe we can just print a warning into dmesg to make the users aware of
+>> the imprecise measurement.
+>
+>
+> Yes, I think this sounds like a good compromise :)
+>
+> Best regards
+>
+> Dirk
+>
+>
+>
+>
+>
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
