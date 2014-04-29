@@ -1,48 +1,55 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 29 Apr 2014 00:07:37 -0700
-Subject: [PATCH 4/4] devicetree: bindings: qcom,
- mmcc: Document GDSC binding
-In-Reply-To: <1396637136-29974-5-git-send-email-sboyd@codeaurora.org>
-References: <1396637136-29974-1-git-send-email-sboyd@codeaurora.org>
- <1396637136-29974-5-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20140429070737.7224.72350@quantum>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 29 Apr 2014 08:09:11 +0100
+Subject: [PATCH 1/1] ahci: st: Provide DT bindings for ST's SATA implementation
+Message-ID: <1398755351-31794-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Stephen Boyd (2014-04-04 11:45:36)
-> +Example:
-> +       clock-controller at 4000000 {
-> +               compatible = "qcom,mmcc-msm8974";
-> +               reg = <0x4000000 0x1000>;
-> +               #clock-cells = <1>;
-> +               #reset-cells = <1>;
-> +
-> +               regulators {
-> +                       gdsc_oxili_gx: gdsc_oxili_gx {
-> +                               regulator-name = "gdsc_oxili_gx";
+Cc: devicetree at vger.kernel.org
+Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ Documentation/devicetree/bindings/ata/ahci-st.txt | 31 +++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/ata/ahci-st.txt
 
-Hi Stephen,
-
-It makes sense to model the gdsc's as regulators. It also makes sense to
-nest them within the clock-controller node, assuming that matches the
-register manual for your part.
-
-However, does it make sense to put this new code under drivers/clk/qcom?
-I don't see a compelling reason. How about breaking the registers out
-into a header for easier reuse?
-
-Regards,
-Mike
-
-> +                               parent-supply = <&pm8841_s4>;
-> +                               qcom,retain-mem;
-> +                               qcom,retain-periph;
-> +                               qcom,skip-logic-collapse;
-> +                               qcom,support-hw-trigger;
-> +                       };
-> +               };
-> +       };
-> -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
-> 
+diff --git a/Documentation/devicetree/bindings/ata/ahci-st.txt b/Documentation/devicetree/bindings/ata/ahci-st.txt
+new file mode 100644
+index 0000000..1b69fa9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/ata/ahci-st.txt
+@@ -0,0 +1,31 @@
++STMicroelectronics STi SATA controller
++
++This binding describes a SATA device.
++
++Required properties:
++ - compatible	   : Must be "st,ahci"
++ - reg		   : Physical base addresses and length of register sets
++ - interrupts	   : Interrupt associated with the SATA device
++ - interrupt-names :   Associated name must be; "hostc"
++ - resets	   : The power-down and soft-reset lines of SATA IP
++ - reset-names	   :   Associated names must be; "pwr-dwn" and "sw-rst"
++ - clocks	   : The phandle for the clock
++ - clock-names	   :   Associated name must be; "ahci_clk"
++ - phys		   : The phandle for the PHY device
++ - phy-names	   :   Associated name must be; "ahci_phy"
++
++Example:
++
++	sata0: sata at fe380000 {
++		compatible      = "st,ahci";
++		reg             = <0xfe380000 0x1000>;
++		interrupts      = <GIC_SPI 157 IRQ_TYPE_NONE>;
++		interrupt-names = "hostc";
++		phys	        = <&miphy365x_phy MIPHY_PORT_0 MIPHY_TYPE_SATA>;
++		phy-names       = "ahci_phy";
++		resets	        = <&powerdown STIH416_SATA0_POWERDOWN>,
++				  <&softreset STIH416_SATA0_SOFTRESET>;
++		reset-names     = "pwr-dwn", "sw-rst";
++		clocks	        = <&CLK_S_ICN_REG_0>;
++		clock-names     = "ahci_clk";
++	};
+-- 
+1.8.3.2
