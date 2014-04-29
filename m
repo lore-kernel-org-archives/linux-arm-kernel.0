@@ -1,57 +1,37 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 29 Apr 2014 12:03:42 +0200
-Subject: [PATCH v5 11/11] ARM: shmobile: r7s72100: use workaround for non
- DT-clocks
+Date: Tue, 29 Apr 2014 12:03:41 +0200
+Subject: [PATCH v5 10/11] ARM: shmobile: r7s72100: remove SPI DT clocks from
+ legacy clock support
 In-Reply-To: <1398765822-2314-1-git-send-email-wsa@the-dreams.de>
 References: <1398765822-2314-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1398765822-2314-12-git-send-email-wsa@the-dreams.de>
+Message-ID: <1398765822-2314-11-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-MTU2 is not yet prepared for DT usage, so use the common workaround via
-clkdev for now.
+Not used anymore since we switched to CCF.
 
 Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 ---
- arch/arm/mach-shmobile/board-genmai-reference.c | 14 ++++++++++++--
- 1 file changed, 12 insertions(+), 2 deletions(-)
+ arch/arm/mach-shmobile/clock-r7s72100.c | 5 -----
+ 1 file changed, 5 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-genmai-reference.c b/arch/arm/mach-shmobile/board-genmai-reference.c
-index 7630c1053e32..fde558b66d4e 100644
---- a/arch/arm/mach-shmobile/board-genmai-reference.c
-+++ b/arch/arm/mach-shmobile/board-genmai-reference.c
-@@ -18,18 +18,28 @@
-  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-  */
+diff --git a/arch/arm/mach-shmobile/clock-r7s72100.c b/arch/arm/mach-shmobile/clock-r7s72100.c
+index 6974cadac51c..7ea712a051f0 100644
+--- a/arch/arm/mach-shmobile/clock-r7s72100.c
++++ b/arch/arm/mach-shmobile/clock-r7s72100.c
+@@ -194,11 +194,6 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("rspi-rz.2", &mstp_clks[MSTP105]),
+ 	CLKDEV_DEV_ID("rspi-rz.3", &mstp_clks[MSTP104]),
+ 	CLKDEV_DEV_ID("rspi-rz.4", &mstp_clks[MSTP103]),
+-	CLKDEV_DEV_ID("e800c800.spi", &mstp_clks[MSTP107]),
+-	CLKDEV_DEV_ID("e800d000.spi", &mstp_clks[MSTP106]),
+-	CLKDEV_DEV_ID("e800d800.spi", &mstp_clks[MSTP105]),
+-	CLKDEV_DEV_ID("e800e000.spi", &mstp_clks[MSTP104]),
+-	CLKDEV_DEV_ID("e800e800.spi", &mstp_clks[MSTP103]),
+ 	CLKDEV_DEV_ID("r7s72100-ether", &mstp_clks[MSTP74]),
+ 	CLKDEV_CON_ID("mtu2_fck", &mstp_clks[MSTP33]),
  
--#include <linux/clk-provider.h>
- #include <linux/kernel.h>
- #include <linux/of_platform.h>
-+#include <mach/clock.h>
- #include <mach/common.h>
- #include <mach/r7s72100.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- 
-+#ifdef CONFIG_COMMON_CLK
-+/*
-+ * This is a really crude hack to provide clkdev support to platform
-+ * devices until they get moved to DT.
-+ */
-+static const struct clk_name clk_names[] = {
-+	{ "mtu2", NULL, "sh_mtu2.0" },
-+};
-+#endif
-+
- static void __init genmai_add_standard_devices(void)
- {
- #ifdef CONFIG_COMMON_CLK
--	of_clk_init(NULL);
-+	shmobile_clk_workaround(clk_names, ARRAY_SIZE(clk_names), true);
- #else
- 	r7s72100_clock_init();
- #endif
 -- 
 1.9.2
