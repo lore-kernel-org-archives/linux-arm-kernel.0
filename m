@@ -1,83 +1,26 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 30 Apr 2014 00:10:41 +0200
-Subject: [PATCH 8/8] ARM: dts: rockchip: convert pinctrl nodes to new bindings
-In-Reply-To: <1414506.B4e2jZujVm@diego>
-References: <1414506.B4e2jZujVm@diego>
-Message-ID: <6633845.bKvtTVmUrN@diego>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 29 Apr 2014 15:21:31 -0700
+Subject: [PATCH 02/10] mfd: vexpress: Convert custom func API to regmap
+In-Reply-To: <1398707877-22596-3-git-send-email-pawel.moll@arm.com>
+References: <1398707877-22596-1-git-send-email-pawel.moll@arm.com>
+ <1398707877-22596-3-git-send-email-pawel.moll@arm.com>
+Message-ID: <20140429222131.GO15125@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce the grf syscon and convert the pinctrl drivers for rk3066 and rk3188
-to use it, instead of mapping the grf registers themselfs.
+On Mon, Apr 28, 2014 at 06:57:49PM +0100, Pawel Moll wrote:
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- arch/arm/boot/dts/rk3066a.dtsi | 2 +-
- arch/arm/boot/dts/rk3188.dtsi  | 9 ++++-----
- arch/arm/boot/dts/rk3xxx.dtsi  | 9 +++++++--
- 3 files changed, 12 insertions(+), 8 deletions(-)
+> Components of the Versatile Express platform (configuration
+> microcontrollers on motherboard and daughterboards in particular)
+> talk to each other over a custom configuration bus. They
+> provide miscellaneous functions (from clock generator control
+> to energy sensors) which are represented as platform devices
 
-diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
-index 4d4dfbb..048c5de 100644
---- a/arch/arm/boot/dts/rk3066a.dtsi
-+++ b/arch/arm/boot/dts/rk3066a.dtsi
-@@ -79,7 +79,7 @@
- 
- 		pinctrl at 20008000 {
- 			compatible = "rockchip,rk3066a-pinctrl";
--			reg = <0x20008000 0x150>;
-+			rockchip,grf = <&grf>;
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			ranges;
-diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
-index ed9a70a..a494fb0 100644
---- a/arch/arm/boot/dts/rk3188.dtsi
-+++ b/arch/arm/boot/dts/rk3188.dtsi
-@@ -75,17 +75,16 @@
- 
- 		pinctrl at 20008000 {
- 			compatible = "rockchip,rk3188-pinctrl";
--			reg = <0x20008000 0xa0>,
--			      <0x20008164 0x1a0>;
--			reg-names = "base", "pull";
-+			rockchip,grf = <&grf>;
-+			rockchip,pmu = <&pmu>;
-+
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			ranges;
- 
- 			gpio0: gpio0 at 0x2000a000 {
- 				compatible = "rockchip,rk3188-gpio-bank0";
--				reg = <0x2000a000 0x100>,
--				      <0x20004064 0x8>;
-+				reg = <0x2000a000 0x100>;
- 				interrupts = <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clk_gates8 9>;
- 
-diff --git a/arch/arm/boot/dts/rk3xxx.dtsi b/arch/arm/boot/dts/rk3xxx.dtsi
-index 26e5a96..2adf1cc9e 100644
---- a/arch/arm/boot/dts/rk3xxx.dtsi
-+++ b/arch/arm/boot/dts/rk3xxx.dtsi
-@@ -31,11 +31,16 @@
- 			reg = <0x1013c000 0x100>;
- 		};
- 
--		pmu at 20004000 {
--			compatible = "rockchip,rk3066-pmu";
-+		pmu: pmu at 20004000 {
-+			compatible = "rockchip,rk3066-pmu", "syscon";
- 			reg = <0x20004000 0x100>;
- 		};
- 
-+		grf: grf at 20008000 {
-+			compatible = "syscon";
-+			reg = <0x20008000 0x200>;
-+		};
-+
- 		gic: interrupt-controller at 1013d000 {
- 			compatible = "arm,cortex-a9-gic";
- 			interrupt-controller;
--- 
-1.9.0
+Acked-by: Mark Brown <broonie@linaro.org>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140429/1e0b3e9e/attachment.sig>
