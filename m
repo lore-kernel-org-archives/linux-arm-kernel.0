@@ -1,30 +1,168 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 29 Apr 2014 12:03:32 +0200
-Subject: [PATCH v5 01/11] ARM: shmobile: r7s72100: document MSTP clock support
+Date: Tue, 29 Apr 2014 12:03:33 +0200
+Subject: [PATCH v5 02/11] ARM: shmobile: r7s72100: add essential clock nodes
+ to dtsi
 In-Reply-To: <1398765822-2314-1-git-send-email-wsa@the-dreams.de>
 References: <1398765822-2314-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1398765822-2314-2-git-send-email-wsa@the-dreams.de>
+Message-ID: <1398765822-2314-3-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
+Only essential clocks are added for now. Other clocks will be added when
+needed.
+
 Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 ---
- Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/r7s72100.dtsi            | 86 +++++++++++++++++++++++++++++-
+ include/dt-bindings/clock/r7s72100-clock.h | 28 ++++++++++
+ 2 files changed, 113 insertions(+), 1 deletion(-)
+ create mode 100644 include/dt-bindings/clock/r7s72100-clock.h
 
-diff --git a/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt b/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
-index 02a25d99ca61..6c3c0847e4fd 100644
---- a/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
-+++ b/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
-@@ -10,6 +10,7 @@ index in the group, from 0 to 31.
- Required Properties:
+diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
+index ee700717a34b..5a6e2481b567 100644
+--- a/arch/arm/boot/dts/r7s72100.dtsi
++++ b/arch/arm/boot/dts/r7s72100.dtsi
+@@ -1,13 +1,15 @@
+ /*
+  * Device Tree Source for the r7s72100 SoC
+  *
+- * Copyright (C) 2013 Renesas Solutions Corp.
++ * Copyright (C) 2013-14 Renesas Solutions Corp.
++ * Copyright (C) 2014 Wolfram Sang, Sang Engineering <wsa@sang-engineering.com>
+  *
+  * This file is licensed under the terms of the GNU General Public License
+  * version 2.  This program is licensed "as is" without any warranty of any
+  * kind, whether express or implied.
+  */
  
-   - compatible: Must be one of the following
-+    - "renesas,r7s72100-mstp-clocks" for R7S72100 (RZ) MSTP gate clocks
-     - "renesas,r8a7790-mstp-clocks" for R8A7790 (R-Car H2) MSTP gate clocks
-     - "renesas,r8a7791-mstp-clocks" for R8A7791 (R-Car M2) MSTP gate clocks
-     - "renesas,cpg-mstp-clock" for generic MSTP gate clocks
++#include <dt-bindings/clock/r7s72100-clock.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
+ 
+ / {
+@@ -28,6 +30,88 @@
+ 		spi4 = &spi4;
+ 	};
+ 
++	clocks {
++		ranges;
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		/* External clocks */
++		extal_clk: extal_clk {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			/* If clk present, value must be set by board */
++			clock-frequency = <0>;
++			clock-output-names = "extal";
++		};
++
++		usb_x1_clk: usb_x1_clk {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			/* If clk present, value must be set by board */
++			clock-frequency = <0>;
++			clock-output-names = "usb_x1";
++		};
++
++		/* Special CPG clocks */
++		cpg_clocks: cpg_clocks at fcfe0000 {
++			#clock-cells = <1>;
++			compatible = "renesas,r7s72100-cpg-clocks",
++				     "renesas,rz-cpg-clocks";
++			reg = <0xfcfe0000 0x18>;
++			clocks = <&extal_clk>, <&usb_x1_clk>;
++			clock-output-names = "pll", "i", "g";
++		};
++
++		/* Fixed factor clocks */
++		b_clk: b_clk {
++			#clock-cells = <0>;
++			compatible = "fixed-factor-clock";
++			clocks = <&cpg_clocks R7S72100_CLK_PLL>;
++			clock-mult = <1>;
++			clock-div = <3>;
++			clock-output-names = "b";
++		};
++		p1_clk: p1_clk {
++			#clock-cells = <0>;
++			compatible = "fixed-factor-clock";
++			clocks = <&cpg_clocks R7S72100_CLK_PLL>;
++			clock-mult = <1>;
++			clock-div = <6>;
++			clock-output-names = "p1";
++		};
++		p0_clk: p0_clk {
++			#clock-cells = <0>;
++			compatible = "fixed-factor-clock";
++			clocks = <&cpg_clocks R7S72100_CLK_PLL>;
++			clock-mult = <1>;
++			clock-div = <12>;
++			clock-output-names = "p0";
++		};
++
++		/* MSTP clocks */
++		mstp3_clks: mstp3_clks at fcfe0420 {
++			#clock-cells = <1>;
++			compatible = "renesas,r7s72100-mstp-clocks", "renesas,cpg-mstp-clocks";
++			reg = <0xfcfe0420 4>;
++			clocks = <&p0_clk>;
++			clock-indices = <R7S72100_CLK_MTU2>;
++			clock-output-names = "mtu2";
++		};
++
++		mstp4_clks: mstp4_clks at fcfe0424 {
++			#clock-cells = <1>;
++			compatible = "renesas,r7s72100-mstp-clocks", "renesas,cpg-mstp-clocks";
++			reg = <0xfcfe0424 4>;
++			clocks = <&p1_clk>, <&p1_clk>, <&p1_clk>, <&p1_clk>,
++				 <&p1_clk>, <&p1_clk>, <&p1_clk>, <&p1_clk>;
++			clock-indices = <
++				R7S72100_CLK_SCIF0 R7S72100_CLK_SCIF1 R7S72100_CLK_SCIF2 R7S72100_CLK_SCIF3
++				R7S72100_CLK_SCIF4 R7S72100_CLK_SCIF5 R7S72100_CLK_SCIF6 R7S72100_CLK_SCIF7
++			>;
++			clock-output-names = "scif0", "scif1", "scif2", "scif3", "scif4", "scif5", "scif6", "scif7";
++		};
++	};
++
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+diff --git a/include/dt-bindings/clock/r7s72100-clock.h b/include/dt-bindings/clock/r7s72100-clock.h
+new file mode 100644
+index 000000000000..c756f1cf0d52
+--- /dev/null
++++ b/include/dt-bindings/clock/r7s72100-clock.h
+@@ -0,0 +1,28 @@
++/*
++ * Copyright (C) 2014 Renesas Solutions Corp.
++ * Copyright (C) 2014 Wolfram Sang, Sang Engineering <wsa@sang-engineering.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
++ */
++
++#ifndef __DT_BINDINGS_CLOCK_R7S72100_H__
++#define __DT_BINDINGS_CLOCK_R7S72100_H__
++
++#define R7S72100_CLK_PLL	0
++
++/* MSTP3 */
++#define R7S72100_CLK_MTU2	3
++
++/* MSTP4 */
++#define R7S72100_CLK_SCIF0	7
++#define R7S72100_CLK_SCIF1	6
++#define R7S72100_CLK_SCIF2	5
++#define R7S72100_CLK_SCIF3	4
++#define R7S72100_CLK_SCIF4	3
++#define R7S72100_CLK_SCIF5	2
++#define R7S72100_CLK_SCIF6	1
++#define R7S72100_CLK_SCIF7	0
++
++#endif /* __DT_BINDINGS_CLOCK_R7S72100_H__ */
 -- 
 1.9.2
