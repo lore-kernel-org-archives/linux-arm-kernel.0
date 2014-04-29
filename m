@@ -1,88 +1,54 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 29 Apr 2014 12:03:38 +0200
-Subject: [PATCH v5 07/11] ARM: shmobile: r7s72100: add i2c clocks to dtsi
+Date: Tue, 29 Apr 2014 12:03:36 +0200
+Subject: [PATCH v5 05/11] ARM: shmobile: r7s72100: genmai: add uart alias and
+ activate scif2 as console
 In-Reply-To: <1398765822-2314-1-git-send-email-wsa@the-dreams.de>
 References: <1398765822-2314-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1398765822-2314-8-git-send-email-wsa@the-dreams.de>
+Message-ID: <1398765822-2314-6-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
+We keep the UART naming backwards compatible with the legacy version.
+
 Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 ---
- arch/arm/boot/dts/r7s72100.dtsi            | 15 +++++++++++++++
- include/dt-bindings/clock/r7s72100-clock.h |  6 ++++++
- 2 files changed, 21 insertions(+)
+ arch/arm/boot/dts/r7s72100-genmai-reference.dts | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
-index a4a67380b0a2..afce2e344c7a 100644
---- a/arch/arm/boot/dts/r7s72100.dtsi
-+++ b/arch/arm/boot/dts/r7s72100.dtsi
-@@ -110,6 +110,17 @@
- 			>;
- 			clock-output-names = "scif0", "scif1", "scif2", "scif3", "scif4", "scif5", "scif6", "scif7";
- 		};
-+
-+		mstp9_clks: mstp9_clks at fcfe0438 {
-+			#clock-cells = <1>;
-+			compatible = "renesas,r7s72100-mstp-clocks", "renesas,cpg-mstp-clocks";
-+			reg = <0xfcfe0438 4>;
-+			clocks = <&p0_clk>, <&p0_clk>, <&p0_clk>, <&p0_clk>;
-+			clock-indices = <
-+				R7S72100_CLK_I2C0 R7S72100_CLK_I2C1 R7S72100_CLK_I2C2 R7S72100_CLK_I2C3
-+			>;
-+			clock-output-names = "i2c0", "i2c1", "i2c2", "i2c3";
-+		};
- 	};
+diff --git a/arch/arm/boot/dts/r7s72100-genmai-reference.dts b/arch/arm/boot/dts/r7s72100-genmai-reference.dts
+index 941e72ce7c82..ca88458e0706 100644
+--- a/arch/arm/boot/dts/r7s72100-genmai-reference.dts
++++ b/arch/arm/boot/dts/r7s72100-genmai-reference.dts
+@@ -1,7 +1,8 @@
+ /*
+  * Device Tree Source for the Genmai board
+  *
+- * Copyright (C) 2013 Renesas Solutions Corp.
++ * Copyright (C) 2013-14 Renesas Solutions Corp.
++ * Copyright (C) 2014 Wolfram Sang, Sang Engineering <wsa@sang-engineering.com>
+  *
+  * This file is licensed under the terms of the GNU General Public License
+  * version 2.  This program is licensed "as is" without any warranty of any
+@@ -15,6 +16,10 @@
+ 	model = "Genmai";
+ 	compatible = "renesas,genmai-reference", "renesas,r7s72100";
  
- 	cpus {
-@@ -145,6 +156,7 @@
- 			     <0 162 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 163 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 164 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp9_clks R7S72100_CLK_I2C0>;
- 		clock-frequency = <100000>;
- 		status = "disabled";
- 	};
-@@ -162,6 +174,7 @@
- 			     <0 170 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 171 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 172 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp9_clks R7S72100_CLK_I2C1>;
- 		clock-frequency = <100000>;
- 		status = "disabled";
- 	};
-@@ -179,6 +192,7 @@
- 			     <0 178 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 179 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 180 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp9_clks R7S72100_CLK_I2C2>;
- 		clock-frequency = <100000>;
- 		status = "disabled";
- 	};
-@@ -196,6 +210,7 @@
- 			     <0 186 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 187 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 188 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp9_clks R7S72100_CLK_I2C3>;
- 		clock-frequency = <100000>;
- 		status = "disabled";
- 	};
-diff --git a/include/dt-bindings/clock/r7s72100-clock.h b/include/dt-bindings/clock/r7s72100-clock.h
-index c756f1cf0d52..ff84e0bafd7b 100644
---- a/include/dt-bindings/clock/r7s72100-clock.h
-+++ b/include/dt-bindings/clock/r7s72100-clock.h
-@@ -25,4 +25,10 @@
- #define R7S72100_CLK_SCIF6	1
- #define R7S72100_CLK_SCIF7	0
- 
-+/* MSTP9 */
-+#define R7S72100_CLK_I2C0	7
-+#define R7S72100_CLK_I2C1	6
-+#define R7S72100_CLK_I2C2	5
-+#define R7S72100_CLK_I2C3	4
++	aliases {
++		serial2 = &scif2;
++	};
 +
- #endif /* __DT_BINDINGS_CLOCK_R7S72100_H__ */
+ 	chosen {
+ 		bootargs = "console=ttySC2,115200 ignore_loglevel rw root=/dev/nfs ip=dhcp";
+ 	};
+@@ -48,3 +53,7 @@
+ 		pagesize = <64>;
+ 	};
+ };
++
++&scif2 {
++	status = "okay";
++};
 -- 
 1.9.2
