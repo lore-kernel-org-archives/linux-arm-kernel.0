@@ -1,30 +1,44 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 29 Apr 2014 09:56:30 -0700
-Subject: [alsa-devel] [PATCH] ASoC: fsl: select SND_SOC_IMX_PCM_DMA where
- needed
-In-Reply-To: <535FB793.5050200@metafoo.de>
-References: <6606961.lAGLvkNsEj@wuerfel> <4270904.84oGcCXL4B@wuerfel>
- <535F8594.40609@metafoo.de> <4275868.O962kiiyJa@wuerfel>
- <535FB793.5050200@metafoo.de>
-Message-ID: <20140429165630.GD16981@sirena.org.uk>
+From: Nikolay.Borisov@arm.com (Nikolay Borisov)
+Date: Tue, 29 Apr 2014 18:02:03 +0100
+Subject: [PATCH] ARM: unwinder: Fix thread_saved_fp aka "enable backtrace on
+ THUMB2"
+Message-ID: <1398790923-24406-1-git-send-email-Nikolay.Borisov@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 29, 2014 at 04:30:43PM +0200, Lars-Peter Clausen wrote:
+The thread_save_fp macro has been defined so that it always reads the fp member
+of the cpu_context_save struct. However, in the case of THUMB2 the fp is saved
+not in the fp (r11) member but rather in r7.
 
-> Yes. The patch should also add a select for SND_SOC_IMX_PCM_FIQ as that is
-> used in the same way in the fsl_ssi driver. If anybody is afraid that
-> selecting both SND_SOC_IMX_PCM_FIQ and SND_SOC_IMX_PCM_DMA by default adds
-> too much overhead you could add boolean sub-options that allow to
-> enable/disable support individually.
+This patch changes the way the macro is defined such that FP is read from the
+correct place depending on whether we are a THUMB2 kernel or not. This enables
+the backtrace in sitaution such as "echo t > /proc/sysrq-trigger" or the
+function in which a process sleeping when "ps -Al" is invoked. 
 
-Yes, the overhead should be negligable since the FIQ code is tiny.
-Arnd, please CC maintainers on patches - you've sent this to my
-Linaro address again and not added Liam.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140429/178cbaa6/attachment.sig>
+Signed-off-by: Nikolay Borisov <Nikolay.Borisov@arm.com>
+Tested-by: Nikolay Borisov <Nikolay.Borisov@arm.com>
+---
+ arch/arm/include/asm/thread_info.h | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
+index f989d7c..e4e4208 100644
+--- a/arch/arm/include/asm/thread_info.h
++++ b/arch/arm/include/asm/thread_info.h
+@@ -114,8 +114,14 @@ static inline struct thread_info *current_thread_info(void)
+ 	((unsigned long)(task_thread_info(tsk)->cpu_context.pc))
+ #define thread_saved_sp(tsk)	\
+ 	((unsigned long)(task_thread_info(tsk)->cpu_context.sp))
++
++#ifndef CONFIG_THUMB2_KERNEL
+ #define thread_saved_fp(tsk)	\
+ 	((unsigned long)(task_thread_info(tsk)->cpu_context.fp))
++#else
++#define thread_saved_fp(tsk)	\
++	((unsigned long)(task_thread_info(tsk)->cpu_context.r7))
++#endif
+ 
+ extern void crunch_task_disable(struct thread_info *);
+ extern void crunch_task_copy(struct thread_info *, void *);
+-- 
+1.8.1.5
