@@ -1,131 +1,33 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 29 Apr 2014 19:59:23 +0100
-Subject: [PATCH v2 3/3] arm: exynos: Add /dev/bL_status user interface on
- Exynos5420
-In-Reply-To: <1398147457-3186-1-git-send-email-a.kesavan@samsung.com>
-References: <1398147457-3186-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <20140429185923.GG3582@e103592.cambridge.arm.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Tue, 29 Apr 2014 21:02:01 +0200
+Subject: [PATCH v6 3/5] devicetree: bindings: Document Krait cache error
+ interrupts
+In-Reply-To: <20140429103400.GB22015@e102568-lin.cambridge.arm.com>
+References: <1396641450-12854-1-git-send-email-sboyd@codeaurora.org>
+ <1396641450-12854-4-git-send-email-sboyd@codeaurora.org>
+ <20140408153925.GJ30077@pd.tnic>
+ <20140429103400.GB22015@e102568-lin.cambridge.arm.com>
+Message-ID: <20140429190200.GD22062@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 22, 2014 at 11:47:37AM +0530, Abhilash Kesavan wrote:
-> Add a user interface to check the core and cluster status on
-> Exynos5420. This can be utilized while debugging mcpm issues.
-> cat /dev/bL_status will show the current power status of all
-> the 8 cores along with the cluster.
+On Tue, Apr 29, 2014 at 11:34:00AM +0100, Lorenzo Pieralisi wrote:
+> Sorry for the delay in replying. Those cache bindings need an ACK
+> to get merged, and were introduced so that idle states can retrieve
+> power domain information for caches. I am going to revive the idle
+> bindings thread to see what we can/should merge of these bindings as
+> things stand, I really hope this won't block the series any further,
+> otherwise we can rework the patches so that this series can get in
+> first, or simplify my series to allow both to get merged as soon as
+> possible without compromising future requirements.
 
-You might want to make this conditional on some Kconfig option.
-Like any debug interface, there is a risk that it will be misused if
-people assume it will always be available.
+Right, I think this is Stephen's call. AFAIR, the current state of
+affairs is for a followup patchset to come up which I can ack for the
+EDAC bits and then another maintainer picks the whole thing up.
 
-I think debugfs is better for this kind of thing rather than creating a
-new misc device.
+-- 
+Regards/Gruss,
+    Boris.
 
-
-If the SoC-specific parts can be factored out, maybe this would be
-usable on other SoCs too.  The information can also be made richer,
-with displaying the MCPM state of each CPU and cluster as well as
-the hardware state of each.
-
-Just a thought.
-
-Cheers
----Dave
-
-
-> 
-> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> Signed-off-by: Inderpal Singh <inderpal.s@samsung.com>
-> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
-> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> ---
->  arch/arm/mach-exynos/mcpm-exynos.c |   64 ++++++++++++++++++++++++++++++++++++
->  1 file changed, 64 insertions(+)
-> 
-> diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
-> index 49b9031..6c74c82 100644
-> --- a/arch/arm/mach-exynos/mcpm-exynos.c
-> +++ b/arch/arm/mach-exynos/mcpm-exynos.c
-> @@ -293,6 +293,53 @@ static void __init exynos_mcpm_usage_count_init(void)
->  	cpu_use_count[cpu][cluster] = 1;
->  }
->  
-> +static size_t bL_check_status(char *info)
-> +{
-> +	size_t len = 0;
-> +	int i;
-> +
-> +	len += sprintf(&info[len], "\t0 1 2 3 L2\n");
-> +	len += sprintf(&info[len], "[A15]   ");
-> +	for (i = 0; i < 4; i++) {
-> +		len += sprintf(&info[len], "%d ",
-> +			(readl(EXYNOS_ARM_CORE_STATUS(i)) & 0x3) == 3 ? 1 : 0);
-> +	}
-> +	len += sprintf(&info[len], "%d\n",
-> +			(readl(EXYNOS_COMMON_STATUS(0)) & 0x3) == 3 ? 1 : 0);
-> +
-> +	len += sprintf(&info[len], "[A7]    ");
-> +	for (i = 4; i < 8; i++)
-> +		len += sprintf(&info[len], "%d ",
-> +			(readl(EXYNOS_ARM_CORE_STATUS(i)) & 0x3) == 3 ? 1 : 0);
-> +	len += sprintf(&info[len], "%d\n\n",
-> +			(readl(EXYNOS_COMMON_STATUS(1)) & 0x3) == 3 ? 1 : 0);
-> +
-> +	return len;
-> +}
-> +
-> +static ssize_t bL_status_read(struct file *file, char __user *buf,
-> +			size_t len, loff_t *pos)
-> +{
-> +	size_t count = 0;
-> +	char info[100];
-> +
-> +	count = bL_check_status(info);
-> +	if (count < 0)
-> +		return -EINVAL;
-> +
-> +	return simple_read_from_buffer(buf, len, pos, info, count);
-> +}
-> +
-> +static const struct file_operations bL_status_fops = {
-> +	.read		= bL_status_read,
-> +};
-> +
-> +static struct miscdevice bL_status_device = {
-> +	MISC_DYNAMIC_MINOR,
-> +	"bL_status",
-> +	&bL_status_fops
-> +};
-> +
->  /*
->   * Enable cluster-level coherency, in preparation for turning on the MMU.
->   */
-> @@ -343,3 +390,20 @@ static int __init exynos_mcpm_init(void)
->  }
->  
->  early_initcall(exynos_mcpm_init);
-> +
-> +static int __init exynos_bl_status_init(void)
-> +{
-> +	int ret;
-> +
-> +	if (!soc_is_exynos5420())
-> +		return -ENODEV;
-> +
-> +	ret = misc_register(&bL_status_device);
-> +	if (ret) {
-> +		pr_info("bl_status not available\n");
-> +		return ret;
-> +	}
-> +	return 0;
-> +}
-> +
-> +late_initcall(exynos_bl_status_init);
-> -- 
-> 1.7.9.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Sent from a fat crate under my desk. Formatting is fine.
+--
