@@ -1,78 +1,44 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 29 Apr 2014 06:13:32 -0700
-Subject: [PATCH v4] drivercore: deferral race condition fix
-In-Reply-To: <1398774909-13649-1-git-send-email-grant.likely@linaro.org>
-References: <1398774909-13649-1-git-send-email-grant.likely@linaro.org>
-Message-ID: <20140429131332.GA7049@kroah.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 29 Apr 2014 14:16:10 +0100
+Subject: [PATCH/RFC 3/4] of/clk: Register clocks suitable for Runtime PM
+ with the PM core
+In-Reply-To: <7hoazpdldx.fsf@paris.lan>
+References: <1398334403-26181-1-git-send-email-geert+renesas@glider.be>
+ <1398334403-26181-4-git-send-email-geert+renesas@glider.be>
+ <7hoazpdldx.fsf@paris.lan>
+Message-ID: <20140429131610.29859C4094A@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 29, 2014 at 01:35:09PM +0100, Grant Likely wrote:
-> When the kernel is built with CONFIG_PREEMPT it is possible to reach a state
-> when all modules loaded but some driver still stuck in the deferred list
-> and there is a need for external event to kick the deferred queue to probe
-> these drivers.
+On Fri, 25 Apr 2014 16:44:58 -0700, Kevin Hilman <khilman@linaro.org> wrote:
+> Geert Uytterhoeven <geert+renesas@glider.be> writes:
 > 
-> The issue has been observed on embedded systems with CONFIG_PREEMPT enabled,
-> audio support built as modules and using nfsroot for root filesystem.
+> > When adding a device from DT, check if its clocks are suitable for Runtime
+> > PM, and register them with the PM core.
+> > If Runtime PM is disabled, just enable the clock.
+> >
+> > This allows the PM core to automatically manage gate clocks of devices for
+> > Runtime PM.
 > 
-> The following log fragment shows such sequence when all audio modules
-> were loaded but the sound card is not present since the machine driver has
-> failed to probe due to missing dependency during it's probe.
-> The board is am335x-evmsk (McASP<->tlv320aic3106 codec) with davinci-evm
-> machine driver:
+> ...unless the device is already in an existing pm_domain, right?
 > 
-> ...
-> [   12.615118] davinci-mcasp 4803c000.mcasp: davinci_mcasp_probe: ENTER
-> [   12.719969] davinci_evm sound.3: davinci_evm_probe: ENTER
-> [   12.725753] davinci_evm sound.3: davinci_evm_probe: snd_soc_register_card
-> [   12.753846] davinci-mcasp 4803c000.mcasp: davinci_mcasp_probe: snd_soc_register_component
-> [   12.922051] davinci-mcasp 4803c000.mcasp: davinci_mcasp_probe: snd_soc_register_component DONE
-> [   12.950839] davinci_evm sound.3: ASoC: platform (null) not registered
-> [   12.957898] davinci_evm sound.3: davinci_evm_probe: snd_soc_register_card DONE (-517)
-> [   13.099026] davinci-mcasp 4803c000.mcasp: Kicking the deferred list
-> [   13.177838] davinci-mcasp 4803c000.mcasp: really_probe: probe_count = 2
-> [   13.194130] davinci_evm sound.3: snd_soc_register_card failed (-517)
-> [   13.346755] davinci_mcasp_driver_init: LEAVE
-> [   13.377446] platform sound.3: Driver davinci_evm requests probe deferral
-> [   13.592527] platform sound.3: really_probe: probe_count = 0
+> I like this approach, and it extends nicely what we already do on
+> platforms using drivers/base/power/clock_ops.c into DT land.
 > 
-> In the log the machine driver enters it's probe at 12.719969 (this point it
-> has been removed from the deferred lists). McASP driver already executing
-> it's probing (since 12.615118).
-> The machine driver tries to construct the sound card (12.950839) but did
-> not found one of the components so it fails. After this McASP driver
-> registers all the ASoC components (the machine driver still in it's probe
-> function after it failed to construct the card) and the deferred work is
-> prepared at 13.099026 (note that this time the machine driver is not in the
-> lists so it is not going to be handled when the work is executing).
-> Lastly the machine driver exit from it's probe and the core places it to
-> the deferred list but there will be no other driver going to load and the
-> deferred queue is not going to be kicked again - till we have external event
-> like connecting USB stick, etc.
-> 
-> The proposed solution is to try the deferred queue once more when the last
-> driver is asking for deferring and we had drivers loaded while this last
-> driver was probing.
-> 
-> This way we can avoid drivers stuck in the deferred queue.
-> 
-> v4: New approach; keep track of trigger events instead of nested probing.
-> 
-> Signed-off-by: Grant Likely <grant.likely@linaro.org>
-> Reviewed-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> Tested-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Mark Brown <broonie@kernel.org>
-> Cc: Stable <stable@vger.kernel.org> # v3.4+
-> ---
-> 
-> Hi Greg,
-> 
-> This change needs to go into 3.15. I've got this patch in the
-> devicetree/merge branch of my tree and can ask Linus to pull it directly
-> if you would like.
+> My only concern is how this will interact if it's used along with
+> devices that have existing pm_domains.  I don't have any specific
+> concerns (yet, because it's Friday, and my brain is turing off), but it
+> just made me wonder if this will be potentially confusing.
 
-Sure, that would be fine:
+I have big concerns about this approach. First, it will only work if
+a clock is available at deivce creation time. The conversion of irq
+controllers to normal device drivers has already shown that is a bad
+idea.
 
-Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+I also don't like that it tries to set up every clock, but there is no
+guarantee that the driver will even use it. I would rather see this
+behaviour linked into the function that obtains the clock at driver
+.probe() time. That way it can handle deferred probe correctly and it
+only sets up clocks that are actually used by the driver.
+
+g.
