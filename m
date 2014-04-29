@@ -1,34 +1,45 @@
-From: matt@console-pimps.org (Matt Fleming)
-Date: Tue, 29 Apr 2014 15:47:13 +0100
-Subject: [PATCH v2 00/10] arm64: UEFI support
-In-Reply-To: <20140429134726.GH17007@arm.com>
-References: <1398442154-19974-1-git-send-email-leif.lindholm@linaro.org>
- <20140429102817.GE17007@arm.com>
- <20140429114356.GK26088@console-pimps.org>
- <20140429134726.GH17007@arm.com>
-Message-ID: <20140429144713.GL26088@console-pimps.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 29 Apr 2014 15:47:59 +0100
+Subject: [PATCH v4 4/7] arm64: Add a description on 48-bit address space
+ with 4KB pages
+In-Reply-To: <000401cf6367$cc461500$64d23f00$@samsung.com>
+References: <000401cf6367$cc461500$64d23f00$@samsung.com>
+Message-ID: <20140429144759.GL17007@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 29 Apr, at 02:47:28PM, Catalin Marinas wrote:
-> 
-> Waiting for the tip/x86/efi to be merged first is not a problem. We
-> also need a stable base for testing the arm64 UEFI series, so I assume
-> this series can be based onto tip/x86/efi (would such branch be rebased
-> before hitting mainline?).
- 
-tip/x86/efi is unlikely to be rebased. Certainly with dependencies like
-this there would have to be a really good reason to rebase it.
+On Tue, Apr 29, 2014 at 05:59:27AM +0100, Jungseok Lee wrote:
+> --- a/Documentation/arm64/memory.txt
+> +++ b/Documentation/arm64/memory.txt
+> @@ -8,10 +8,11 @@ This document describes the virtual memory layout used by the AArch64
+>  Linux kernel. The architecture allows up to 4 levels of translation
+>  tables with a 4KB page size and up to 3 levels with a 64KB page size.
+>  
+> -AArch64 Linux uses 3 levels of translation tables with the 4KB page
+> -configuration, allowing 39-bit (512GB) virtual addresses for both user
+> -and kernel. With 64KB pages, only 2 levels of translation tables are
+> -used but the memory layout is the same.
+> +AArch64 Linux uses 3 levels and 4 levels of translation tables with
+> +the 4KB page configuration, allowing 39-bit (512GB) and 48-bit (256TB)
+> +virtual addresses, respectively, for both user and kernel. With 64KB
+> +pages, only 2 levels of translation tables are used but the memory layout
+> +is the same.
 
-> Given that Leif's series contains both generic efi and arm64 patches,
-> what's your preference for merging them? I'm happy to add my ack and
-> they go via your tree (or the other way around).
+Any reason why we couldn't use 48-bit address space with 64K pages
+(implying 3 levels)?
 
-I'm happy either way, though if I take them through my tree (and
-subsequently through tip) you won't have to worry about the merge window
-rigmarole, which is a plus.
+> -AArch64 Linux memory layout with 64KB pages:
+> +AArch64 Linux memory layout with 4KB pages + 4 levels:
+> +
+> +Start			End			Size		Use
+> +-----------------------------------------------------------------------
+> +0000000000000000	0000ffffffffffff	 256TB		user
+> +
+> +ffff000000000000	ffff7bfffffeffff	~124TB		vmalloc
 
-So, eveyone happy for me to take these with Catalin's Acked-by?
+BTW, maybe as a separate patch we should change the "end" to be
+exclusive. It becomes harder to modify (I've been through this a few
+times already ;)) and even follow the changes.
 
 -- 
-Matt Fleming, Intel Open Source Technology Center
+Catalin
