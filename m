@@ -1,32 +1,89 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 28 Apr 2014 23:17:49 -0700
-Subject: [PATCH 0/3] CCF fixlets
-In-Reply-To: <1395875197-16816-1-git-send-email-sboyd@codeaurora.org>
-References: <1395875197-16816-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20140429061749.7224.52047@quantum>
+From: yegorslists@googlemail.com (Yegor Yefremov)
+Date: Tue, 29 Apr 2014 08:19:11 +0200
+Subject: [PATCH v2] ARM: dts: am33xx: Move the cppi41dma node so it's
+ probed early
+In-Reply-To: <1398373881-23369-1-git-send-email-ezequiel@vanguardiasur.com.ar>
+References: <1398373881-23369-1-git-send-email-ezequiel@vanguardiasur.com.ar>
+Message-ID: <CAGm1_kvHtSLNEfkJ24xZGGzsqAjHDTM1XztnX-QGs4iM5voMUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Stephen Boyd (2014-03-26 16:06:34)
-> Two small changes to clean up the code plus a change to make
-> driver code simpler.
+On Thu, Apr 24, 2014 at 11:11 PM, Ezequiel Garcia
+<ezequiel@vanguardiasur.com.ar> wrote:
+> The DMA controller is needed for the USB controller to be correctly
+> registered. Therefore, if the DMA node is located at the end an unecessary
+> probe deferral is produced systematically.
+>
+> This is easily fixed by moving the node at the beggining of the child list,
+> so it's probed first.
+>
+> Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
 
-Take into clk-next. Thanks for the fixlets.
+Tested-by: Yegor Yefremov <yegorslists@googlemail.com>
 
-Regards,
-Mike
-
-> 
-> Stephen Boyd (3):
->   clk: Don't check for missing ops in clk_set_parent()
->   clk: Consolidate recalc rate logic
->   clk: Ignore error and NULL pointers passed to
->     clk_{unprepare,disable}()
-> 
->  drivers/clk/clk.c | 39 +++++++++++++++++----------------------
->  1 file changed, 17 insertions(+), 22 deletions(-)
-> 
-> -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
-> 
+> --
+> v1->v2:
+>   * Added a comment to prevent a future clean-up based on the memory offset.
+>
+>  arch/arm/boot/dts/am33xx.dtsi | 34 ++++++++++++++++++++--------------
+>  1 file changed, 20 insertions(+), 14 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> index 9770e35..02e1eb6 100644
+> --- a/arch/arm/boot/dts/am33xx.dtsi
+> +++ b/arch/arm/boot/dts/am33xx.dtsi
+> @@ -453,6 +453,26 @@
+>                         ti,hwmods = "usb_otg_hs";
+>                         status = "disabled";
+>
+> +                       /*
+> +                        * The probe order matches the child ordering so the
+> +                        * dma-controller node must be the first one to prevent
+> +                        * spurious probe deferrals.
+> +                        */
+> +                       cppi41dma: dma-controller at 47402000 {
+> +                               compatible = "ti,am3359-cppi41";
+> +                               reg =  <0x47400000 0x1000
+> +                                       0x47402000 0x1000
+> +                                       0x47403000 0x1000
+> +                                       0x47404000 0x4000>;
+> +                               reg-names = "glue", "controller", "scheduler", "queuemgr";
+> +                               interrupts = <17>;
+> +                               interrupt-names = "glue";
+> +                               #dma-cells = <2>;
+> +                               #dma-channels = <30>;
+> +                               #dma-requests = <256>;
+> +                               status = "disabled";
+> +                       };
+> +
+>                         usb_ctrl_mod: control at 44e10620 {
+>                                 compatible = "ti,am335x-usb-ctrl-module";
+>                                 reg = <0x44e10620 0x10
+> @@ -556,20 +576,6 @@
+>                                         "tx14", "tx15";
+>                         };
+>
+> -                       cppi41dma: dma-controller at 47402000 {
+> -                               compatible = "ti,am3359-cppi41";
+> -                               reg =  <0x47400000 0x1000
+> -                                       0x47402000 0x1000
+> -                                       0x47403000 0x1000
+> -                                       0x47404000 0x4000>;
+> -                               reg-names = "glue", "controller", "scheduler", "queuemgr";
+> -                               interrupts = <17>;
+> -                               interrupt-names = "glue";
+> -                               #dma-cells = <2>;
+> -                               #dma-channels = <30>;
+> -                               #dma-requests = <256>;
+> -                               status = "disabled";
+> -                       };
+>                 };
+>
+>                 epwmss0: epwmss at 48300000 {
+> --
+> 1.9.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
