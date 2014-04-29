@@ -1,39 +1,51 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 29 Apr 2014 14:22:27 -0300
-Subject: [PATCH 1/5] ARM: defconfigs: add MTD_SPI_NOR (new dependency for
- M25P80)
-In-Reply-To: <535A8FC9.8040707@wwwdotorg.org>
-References: <1397719309-2022-1-git-send-email-computersforpeace@gmail.com>
- <1397719309-2022-2-git-send-email-computersforpeace@gmail.com>
- <535A8FC9.8040707@wwwdotorg.org>
-Message-ID: <20140429172227.GB11657@arch.cereza>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 29 Apr 2014 10:38:39 -0700
+Subject: [PATCH 06/23] ARM: OMAP: add OMAP5 DSI muxing
+In-Reply-To: <535FD43B.3030102@ti.com>
+References: <535A4470.2000509@ti.com> <535A5C0A.7040808@ti.com>
+ <535A6C40.10609@ti.com> <20140425153150.GA20807@atomide.com>
+ <535DFAAE.1010606@ti.com> <20140428164528.GM20807@atomide.com>
+ <535F37E9.8090609@ti.com> <20140429150529.GA27571@atomide.com>
+ <535FD10B.4020108@ti.com> <535FD43B.3030102@ti.com>
+Message-ID: <20140429173838.GB27571@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Apr 25, Stephen Warren wrote:
-> On 04/17/2014 01:21 AM, Brian Norris wrote:
-> > These defconfigs contain the CONFIG_M25P80 symbol, which is now
-> > dependent on the MTD_SPI_NOR symbol. Add CONFIG_MTD_SPI_NOR to the
-> > relevant defconfigs.
+* Tomi Valkeinen <tomi.valkeinen@ti.com> [140429 09:33]:
+> On 29/04/14 19:19, Tomi Valkeinen wrote:
+> > On 29/04/14 18:05, Tony Lindgren wrote:
 > > 
-> > At the same time, drop the now-nonexistent CONFIG_MTD_CHAR symbol.
-> 
-> I hadn't realized that the problem this patch solves was already present
-> in the code, so this patch is simply catching up the defconfigs rather
-> than part of a series which changed the code to cause the problem.
-> 
-> So, this needs to be applied ASAP.
-> 
+> >>> omap4_padconf_global is a syscon node, not pinctrl. As syscon just gives
+> >>> a raw regmap to its memory area, the driver needs to know about the OMAP
+> >>> control registers to use it.
+> >>
+> >> That would be probably best set up the same way we have already set up
+> >> for example omap4_padconf_global: tisyscon at 4a1005a0. Then drivers can
+> >> access it using regmap, see how drivers/regulator/pbias-regulator.c
+> >> sets up the pbias regulator with regmap for MMC.
+> > 
+> > Right, but it means that the driver will contain platform specific code
+> > for all the omap revisions it supports. Isn't that wrong?
+> > 
+> > I already have a patch for DSI that uses the syscon-method, and it works
+> > fine. But it's quite ugly, imo, to fiddle with the OMAP control
+> > registers in a driver.
 
-What's the status of this?
+Anything using the system control module registers should be a separate
+driver. And it should ideally be implemeting some Linux generic framework
+that the consumer driver can then use. That leaves out the need to export
+custom functions.
 
-> I think this should be split it up so that each defconfig can go through
-> the tree that owns it to avoid conflicts. If you repost split up, I can
-> apply the tegra_defconfig change to the Tegra tree.
-> 
+I guess we don't have a PHY framework for displays though, so how about
+just a separate minimal driver under drivers/video/omap2 that uses the
+syscon?
+ 
+> Oh, also, if I do that, I need to know both the SoC version and the DSS
+> version in the driver.
 
-Probably the same for mvebu (Ccing Jason).
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Don't you get all you need in the compatible string? Something like
+compatible ti,dss-phy-omap5?
+
+Regards,
+
+Tony
