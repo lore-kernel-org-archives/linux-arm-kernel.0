@@ -1,25 +1,43 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 29 Apr 2014 12:44:16 -0700
-Subject: [PATCH v11 00/12] In-kernel PSCI v0.2 emulation for KVM ARM/ARM64
-In-Reply-To: <1398750865-10892-1-git-send-email-anup.patel@linaro.org>
-References: <1398750865-10892-1-git-send-email-anup.patel@linaro.org>
-Message-ID: <20140429194416.GC3003@lvm>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 29 Apr 2014 16:49:59 -0300
+Subject: [PATCH for v3.15] net: mvmdio: Check for a valid interrupt instead of
+ an error
+Message-ID: <1398800999-9814-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 29, 2014 at 11:24:13AM +0530, Anup Patel wrote:
-> Currently, KVM ARM/ARM64 only provides in-kernel emulation of Power State
-> and Coordination Interface (PSCI) v0.1.
-> 
-> This patchset aims at providing newer PSCI v0.2 for KVM ARM/ARM64 VCPUs
-> such that it does not break current KVM ARM/ARM64 ABI.
-> 
-> The user space tools (i.e. QEMU or KVMTOOL) will have to explicitly enable
-> KVM_ARM_VCPU_PSCI_0_2 feature using KVM_ARM_VCPU_INIT ioctl for providing
-> PSCI v0.2 to VCPUs.
-> 
+The following commit:
 
-I feel like this is ready to queue for the next merge window.  Last
-chance to object.
+commit 9ec36cafe43bf835f8f29273597a5b0cbc8267ef
+Author: Rob Herring <robh@kernel.org>
+Date:   Wed Apr 23 17:57:41 2014 -0500
 
--Christoffer
+    of/irq: do irq resolution in platform_get_irq
+
+changed platform_get_irq() which now returns ENODEV and EPROBE_DEFER,
+in addition to ENXIO. If there's no interrupt for mvmdio, platform_get_irq()
+returns ENODEV, but we currently check only for ENXIO.
+
+Fix this by looking for a positive integer, which is the proper way of
+validating a virtual interrupt number.
+
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ drivers/net/ethernet/marvell/mvmdio.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
+index b161a52..eb2cabf 100644
+--- a/drivers/net/ethernet/marvell/mvmdio.c
++++ b/drivers/net/ethernet/marvell/mvmdio.c
+@@ -232,7 +232,7 @@ static int orion_mdio_probe(struct platform_device *pdev)
+ 		clk_prepare_enable(dev->clk);
+ 
+ 	dev->err_interrupt = platform_get_irq(pdev, 0);
+-	if (dev->err_interrupt != -ENXIO) {
++	if (dev->err_interrupt > 0) {
+ 		ret = devm_request_irq(&pdev->dev, dev->err_interrupt,
+ 					orion_mdio_err_irq,
+ 					IRQF_SHARED, pdev->name, dev);
+-- 
+1.9.1
