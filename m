@@ -1,49 +1,76 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 29 Apr 2014 09:57:31 +0100
-Subject: [PATCH] arm64: fixmap: fix missing sub-page offset for earlyprintk
-In-Reply-To: <CAL_JsqLwhkSR42CeOcnAC-C43O9fbrXdcTnNrkov5hq9t3_Usg@mail.gmail.com>
-References: <1398711006-14943-1-git-send-email-marc.zyngier@arm.com>
- <CAL_JsqLwhkSR42CeOcnAC-C43O9fbrXdcTnNrkov5hq9t3_Usg@mail.gmail.com>
-Message-ID: <20140429085730.GB17007@arm.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 29 Apr 2014 14:16:35 +0530
+Subject: [patch V2 0/6] dma: edma: Provide granular residue accounting
+In-Reply-To: <535EBE69.6060803@ti.com>
+References: <20140428104416.464002156@linutronix.de> <535EBE69.6060803@ti.com>
+Message-ID: <20140429084635.GN32284@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 29, 2014 at 12:51:18AM +0100, Rob Herring wrote:
-> On Mon, Apr 28, 2014 at 1:50 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> > Commit d57c33c5daa4 (add generic fixmap.h) added (among other
-> > similar things) set_fixmap_io to deal with early ioremap of devices.
-> >
-> > More recently, commit bf4b558eba92 (arm64: add early_ioremap support)
-> > converted the arm64 earlyprintk to use set_fixmap_io. A side effect of
-> > this conversion is that my virtual machines have stopped booting when
-> > I pass "earlyprintk=uart8250-8bit,0x3f8" to the guest kernel.
-> >
-> > Turns out that the new earlyprintk code doesn't care at all about
-> > sub-page offsets, and just assumes that the earlyprintk device will
-> > be page-aligned. Obviously, that doesn't play well with the above example.
-> >
-> > Further investigation shows that set_fixmap_io uses __set_fixmap instead
-> > of __set_fixmap_offset. A fix is to introduce a set_fixmap_offset_io that
-> > uses the latter, and to remove the superflous call to fix_to_virt
-> > (which only returns the value that set_fixmap_io has already given us).
-> >
-> > With this applied, my VMs are back in business. Tested on a Cortex-A57
-> > platform with kvmtool as platform emulation.
-> >
-> > Cc: Mark Salter <msalter@redhat.com>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > ---
-> >  arch/arm64/kernel/early_printk.c | 6 ++----
-> >  include/asm-generic/fixmap.h     | 3 +++
-> >  2 files changed, 5 insertions(+), 4 deletions(-)
+On Mon, Apr 28, 2014 at 03:47:37PM -0500, Joel Fernandes wrote:
+> On 04/28/2014 05:49 AM, Thomas Gleixner wrote:
+> > A simpler version to provide granular residue accounting and readout
+> > for EDMA.
+> > 
+> > Delta to V1:
+> > 
+> >       - Removed the double read of the address in PaRAM
+> > 
+> >       - Simplified the stats update in the interrupt callback for
+> >         intermediate transfers
+> > 
+> > Thanks,
+> > 
+> > 	tglx
+> > 
 > 
-> This will be fixed already in 3.16 with my earlycon series[1] if this
-> is not taken for 3.15.
+> Thanks for the series. I went over all the patches and it looks great.
+> Acked-by: Joel Fernandes <joelf@ti.com>
+> 
+> The patches however didn't apply and had some conflicts with my dma
+> memcpy series and peter's cyclic series so I resolved conflicts and
+> created a single branch based on Vinod's slave-dma next branch (commit
+> 406efb1a745c1dc512dc9c3c859e302e7b7f907e) that Vinod can pull.
+> 
+> I also renamed subject line of patches in Thomas's series to be
+> "dmaengine: edma" and documented some of the variables used.
+> 
+> https://github.com/joelagnel/linux-kernel.git (for-vinod branch)
+> 
+> Vinod, could you pull if it looks OK?
 
-I'd like to take this for 3.15 as it's currently broken. I just need
-another ack from Arnd on the generic header change.
+The patches look good.
+
+But,
+commit 770f0f3a20188b7e17db2790803b9da925dc0b94
+Author: Thomas Gleixner <tglx@linutronix.de>
+Date:   Mon Apr 28 10:49:43 2014 +0000
+
+    dmaengine: edma: Make reading the position of active channels work
+
+    As Joel pointed out, edma_read_position() uses memcpy_fromio() to read
+    the parameter ram. That's not synchronized with the internal update as
+    it does a byte by byte copy. We need to do a 32bit read to get a
+    consistent value.
+
+    Further reading destination and source is pointless. In DEV_TO_MEM
+    transfers we are only interested in the destination, in MEM_TO_DEV we
+    care about the source. In MEM_TO_MEM it really does not matter which
+    one you read.
+
+    Simple solution: Remove the pointers, select dest/source via a bool
+    and return the read value.
+
+    Remove the export of this function while at it. The only potential
+    user is the dmaengine and that's always builtin.
+
+    Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+
+You s-o-b missing in this one, also ack from Sekhar missing. Do you want to redo
+this or prefer me to cherry-pick patches adding acks and your s-o-b, since I
+already fetched your branch
+
+Either way is fine with me...
 
 -- 
-Catalin
+~Vinod
