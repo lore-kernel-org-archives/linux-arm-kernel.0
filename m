@@ -1,104 +1,47 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Tue, 29 Apr 2014 12:21:46 +0530
-Subject: [PATCHv2] ARM: dts: exynos4: clean up arm-pmu node
-In-Reply-To: <1398391553-4797-1-git-send-email-chanho61.park@samsung.com>
-References: <1398391553-4797-1-git-send-email-chanho61.park@samsung.com>
-Message-ID: <535F4C02.6040204@linaro.org>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 29 Apr 2014 08:54:24 +0200
+Subject: [PATCH v2 02/10] mtd: spi-nor: add a new field for spi_nor{}
+In-Reply-To: <20140429051832.GC21064@localhost>
+References: <1398657227-20721-1-git-send-email-b32955@freescale.com>
+ <201404282223.26174.marex@denx.de> <20140429051832.GC21064@localhost>
+Message-ID: <201404290854.25116.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/25/2014 07:35 AM, Chanho Park wrote:
-> This patch cleans a arm-pmu node up for exynos4. Only exynos4412 series
-> boards have four pmu interrupts. Rest of exynos4 boards, except 4412, have only
-> two pmu interrupts. Thus, we can define two interrupts in the
-> exynos4.dtsi and extends the interrupts only exynos4412.dtsi.
+On Tuesday, April 29, 2014 at 07:18:34 AM, Huang Shijie wrote:
+> On Mon, Apr 28, 2014 at 10:23:26PM +0200, Marek Vasut wrote:
+> > On Monday, April 28, 2014 at 05:53:39 AM, Huang Shijie wrote:
+> > > We need the SPI NOR child node to store some specific features, such as
+> > > the dummy cycles for the DDR Quad read.
+> > > 
+> > > But now, we only have the @dev field in the spi_nor{}. The @dev may
+> > > points to a spi_device{} for m25p80, while it may points to a
+> > > platform_deivice{} for the SPI NOR controller, such as fsl_quadspi.c.
+> > > 
+> > > It is not convenient for us to get come information from the SPI NOR
+> > > flash.
+> > > 
+> > > This patch adds a new field @np to spi_nor{}, it points to the child
+> > > node for the SPI NOR flash.
+> > > 
+> > > Signed-off-by: Huang Shijie <b32955@freescale.com>
+> > 
+> > Just handle the case where dev->of_node == NULL instead ?
 > 
-> Cc: Chanwoo Choi <cw00.choi@samsung.com>
-> Cc: Tomasz Figa <t.figa@samsung.com>
-> Signed-off-by: Chanho Park <chanho61.park@samsung.com>
-> ---
-
-Tested on Exynos4210 based Origen and Exynos4412 based Origenquad boards.
-
-Tested-by: Tushar Behera <tushar.behera@linaro.org>
-
-> Changes from v1:
->  - Remove duplicated properties in exynos4412.dtsi(Comment from Tomasz Figa)
+> It is not enough.
 > 
->  arch/arm/boot/dts/exynos4.dtsi    | 6 ++++++
->  arch/arm/boot/dts/exynos4210.dtsi | 6 ------
->  arch/arm/boot/dts/exynos4412.dtsi | 4 ++++
->  arch/arm/boot/dts/exynos4x12.dtsi | 6 ------
->  4 files changed, 10 insertions(+), 12 deletions(-)
+> For the m25p80.c, @dev stands for a child node for the SPI master,
+> and it points to a spi_device{}. Yes, in this case, the dev->of_node is
+> NULL.
 > 
-> diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-> index 0401f4d..b43dc24 100644
-> --- a/arch/arm/boot/dts/exynos4.dtsi
-> +++ b/arch/arm/boot/dts/exynos4.dtsi
-> @@ -105,6 +105,12 @@
->  		reg = <0x10440000 0x1000>;
->  	};
->  
-> +	pmu {
-> +		compatible = "arm,cortex-a9-pmu";
-> +		interrupt-parent = <&combiner>;
-> +		interrupts = <2 2>, <3 2>;
-> +	};
-> +
->  	sys_reg: syscon at 10010000 {
->  		compatible = "samsung,exynos4-sysreg", "syscon";
->  		reg = <0x10010000 0x400>;
-> diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-> index cb0e768d..e19c154 100644
-> --- a/arch/arm/boot/dts/exynos4210.dtsi
-> +++ b/arch/arm/boot/dts/exynos4210.dtsi
-> @@ -75,12 +75,6 @@
->  		#clock-cells = <1>;
->  	};
->  
-> -	pmu {
-> -		compatible = "arm,cortex-a9-pmu";
-> -		interrupt-parent = <&combiner>;
-> -		interrupts = <2 2>, <3 2>;
-> -	};
-> -
->  	pinctrl_0: pinctrl at 11400000 {
->  		compatible = "samsung,exynos4210-pinctrl";
->  		reg = <0x11400000 0x1000>;
-> diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
-> index a40b6e2..7b75762 100644
-> --- a/arch/arm/boot/dts/exynos4412.dtsi
-> +++ b/arch/arm/boot/dts/exynos4412.dtsi
-> @@ -26,6 +26,10 @@
->  		samsung,combiner-nr = <20>;
->  	};
->  
-> +	pmu {
-> +		interrupts = <2 2>, <3 2>, <18 2>, <19 2>;
-> +	};
-> +
->  	gic: interrupt-controller at 10490000 {
->  		cpu-offset = <0x4000>;
->  	};
-> diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
-> index c4a9306..b730a74 100644
-> --- a/arch/arm/boot/dts/exynos4x12.dtsi
-> +++ b/arch/arm/boot/dts/exynos4x12.dtsi
-> @@ -31,12 +31,6 @@
->  		mshc0 = &mshc_0;
->  	};
->  
-> -	pmu {
-> -		compatible = "arm,cortex-a9-pmu";
-> -		interrupt-parent = <&combiner>;
-> -		interrupts = <2 2>, <3 2>, <18 2>, <19 2>;
-> -	};
-> -
->  	pd_isp: isp-power-domain at 10023CA0 {
->  		compatible = "samsung,exynos4210-pd";
->  		reg = <0x10023CA0 0x20>;
-> 
+> But for the fsl_quadspi or other SPI NOR drivers, the @dev stands for the
+> controller itself, the @dev->of_node is a list of the child nodes, so we
+> can _NOT_ know which child node we are working at now.
 
+Huh ? The dev is being recycled for two different kind of things ?
 
--- 
-Tushar Behera
+> So it's better to add a new field @np for the spi-nor{} which points the
+> child node we are working at.
+
+Best regards,
+Marek Vasut
