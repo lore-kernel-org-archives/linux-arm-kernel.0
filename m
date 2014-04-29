@@ -1,25 +1,35 @@
-From: miklos@szeredi.hu (Szeredi Miklos)
-Date: Tue, 29 Apr 2014 13:24:36 +0200
-Subject: [RFC 3/3] asm-generic: Drop renameat syscall from default list
-In-Reply-To: <CAAG0J9-2=rP3RP08eEjd17R3wEaeiUtGfWD-LeqXV=y9sBamfA@mail.gmail.com>
-References: <1398247687-13453-1-git-send-email-james.hogan@imgtec.com>
- <1398247687-13453-4-git-send-email-james.hogan@imgtec.com>
- <201404231418.05174.arnd@arndb.de>
- <CAAG0J9-2=rP3RP08eEjd17R3wEaeiUtGfWD-LeqXV=y9sBamfA@mail.gmail.com>
-Message-ID: <CAELBmZB=74foyc_b-MTVOXeP6rVAD2x4=um2RVezTb68DifEbA@mail.gmail.com>
+From: matt@console-pimps.org (Matt Fleming)
+Date: Tue, 29 Apr 2014 12:24:59 +0100
+Subject: [PATCH v2 05/10] efi: Add shared FDT related functions for
+ ARM/ARM64
+In-Reply-To: <1398442154-19974-6-git-send-email-leif.lindholm@linaro.org>
+References: <1398442154-19974-1-git-send-email-leif.lindholm@linaro.org>
+ <1398442154-19974-6-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <20140429112459.GH26088@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 23, 2014 at 2:41 PM, James Hogan <james.hogan@imgtec.com> wrote:
+On Fri, 25 Apr, at 05:09:09PM, Leif Lindholm wrote:
+> From: Roy Franz <roy.franz@linaro.org>
+> 
+> Both ARM and ARM64 stubs will update the device tree that they pass to
+> the kernel.  In both cases they primarily need to add the same UEFI
+> related information, so the function can be shared.  Create a new FDT
+> related file for this to avoid use of architecture #ifdefs in
+> efi-stub-helper.c.
+> 
+> Signed-off-by: Roy Franz <roy.franz@linaro.org>
+> [ Fixed memory node deletion code. ]
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+> Acked-by: Grant Likely <grant.likely@linaro.org>
+> ---
+>  drivers/firmware/efi/fdt.c |  285 ++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/efi.h        |    3 +
+>  2 files changed, 288 insertions(+)
+>  create mode 100644 drivers/firmware/efi/fdt.c
 
-> It appears Miklos Szeredi beat me to it with patch 1 (adding renameat2
-> syscall to asm-generic unistd.h), and will be submitting it to Linus
-> at some point as part of his renameat2 series.
-> Miklos: Do you think it makes sense for you to include my second patch
-> in your series too since it's renameat2 related?
-> http://marc.info/?l=linux-kernel&m=139824773305016&w=2
+Acked-by: Matt Fleming <matt.fleming@intel.com>
 
-I've queued up the first two patches with acks from Arnd.
-
-Thanks,
-Miklos
+-- 
+Matt Fleming, Intel Open Source Technology Center
