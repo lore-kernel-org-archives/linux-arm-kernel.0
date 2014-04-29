@@ -1,44 +1,45 @@
-From: Nikolay.Borisov@arm.com (Nikolay Borisov)
-Date: Tue, 29 Apr 2014 18:02:03 +0100
-Subject: [PATCH] ARM: unwinder: Fix thread_saved_fp aka "enable backtrace on
- THUMB2"
-Message-ID: <1398790923-24406-1-git-send-email-Nikolay.Borisov@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 29 Apr 2014 18:04:04 +0100
+Subject: [PATCH v4 6/7] arm64: mm: Implement 4 levels of translation tables
+In-Reply-To: <000601cf6367$cffab890$6ff029b0$@samsung.com>
+References: <000601cf6367$cffab890$6ff029b0$@samsung.com>
+Message-ID: <20140429170404.GA32121@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The thread_save_fp macro has been defined so that it always reads the fp member
-of the cpu_context_save struct. However, in the case of THUMB2 the fp is saved
-not in the fp (r11) member but rather in r7.
+On Tue, Apr 29, 2014 at 05:59:33AM +0100, Jungseok Lee wrote:
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index 0fd5650..03ec424 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -37,8 +37,9 @@
+> 
+>  /*
+>   * swapper_pg_dir is the virtual address of the initial page table. We place
+> - * the page tables 3 * PAGE_SIZE below KERNEL_RAM_VADDR. The idmap_pg_dir has
+> - * 2 pages and is placed below swapper_pg_dir.
+> + * the page tables 3 * PAGE_SIZE (2 or 3 levels) or 4 * PAGE_SIZE (4 levels)
+> + * below KERNEL_RAM_VADDR. The idmap_pg_dir has 2 pages (2 or 3 levels) or
+> + * 3 pages (4 levels) and is placed below swapper_pg_dir.
+>   */
+>  #define KERNEL_RAM_VADDR       (PAGE_OFFSET + TEXT_OFFSET)
+> 
+> @@ -46,8 +47,13 @@
+>  #error KERNEL_RAM_VADDR must start at 0xXXX80000
+>  #endif
+> 
+> +#ifdef CONFIG_ARM64_4_LEVELS
+> +#define SWAPPER_DIR_SIZE       (4 * PAGE_SIZE)
+> +#define IDMAP_DIR_SIZE         (3 * PAGE_SIZE)
+> +#else
+>  #define SWAPPER_DIR_SIZE       (3 * PAGE_SIZE)
+>  #define IDMAP_DIR_SIZE         (2 * PAGE_SIZE)
+> +#endif
 
-This patch changes the way the macro is defined such that FP is read from the
-correct place depending on whether we are a THUMB2 kernel or not. This enables
-the backtrace in sitaution such as "echo t > /proc/sysrq-trigger" or the
-function in which a process sleeping when "ps -Al" is invoked. 
+Mark Rutland was doing some clean-up of this code to no longer place
+swapper_pg_dir and idmap_pg_dir below the kernel image. I'm not sure
+whether the patches ended up on the list yet (not a problem for now,
+just a slight change for your patches).
 
-Signed-off-by: Nikolay Borisov <Nikolay.Borisov@arm.com>
-Tested-by: Nikolay Borisov <Nikolay.Borisov@arm.com>
----
- arch/arm/include/asm/thread_info.h | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
-index f989d7c..e4e4208 100644
---- a/arch/arm/include/asm/thread_info.h
-+++ b/arch/arm/include/asm/thread_info.h
-@@ -114,8 +114,14 @@ static inline struct thread_info *current_thread_info(void)
- 	((unsigned long)(task_thread_info(tsk)->cpu_context.pc))
- #define thread_saved_sp(tsk)	\
- 	((unsigned long)(task_thread_info(tsk)->cpu_context.sp))
-+
-+#ifndef CONFIG_THUMB2_KERNEL
- #define thread_saved_fp(tsk)	\
- 	((unsigned long)(task_thread_info(tsk)->cpu_context.fp))
-+#else
-+#define thread_saved_fp(tsk)	\
-+	((unsigned long)(task_thread_info(tsk)->cpu_context.r7))
-+#endif
- 
- extern void crunch_task_disable(struct thread_info *);
- extern void crunch_task_copy(struct thread_info *, void *);
 -- 
-1.8.1.5
+Catalin
