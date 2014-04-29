@@ -1,44 +1,55 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 29 Apr 2014 14:16:10 +0100
-Subject: [PATCH/RFC 3/4] of/clk: Register clocks suitable for Runtime PM
- with the PM core
-In-Reply-To: <7hoazpdldx.fsf@paris.lan>
-References: <1398334403-26181-1-git-send-email-geert+renesas@glider.be>
- <1398334403-26181-4-git-send-email-geert+renesas@glider.be>
- <7hoazpdldx.fsf@paris.lan>
-Message-ID: <20140429131610.29859C4094A@trevor.secretlab.ca>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 29 Apr 2014 09:19:32 -0400
+Subject: [PATCH v2 05/38] memory: mvebu-devbus: use ARMADA_ prefix in
+ defines
+In-Reply-To: <20140428160429.GA13813@arch.cereza>
+References: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1398202002-28530-6-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140426142132.GU28159@titan.lakedaemon.net>
+ <20140428131949.GA11604@arch.cereza>
+ <20140428145632.GZ28159@titan.lakedaemon.net>
+ <20140428160429.GA13813@arch.cereza>
+Message-ID: <20140429131932.GJ28159@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 25 Apr 2014 16:44:58 -0700, Kevin Hilman <khilman@linaro.org> wrote:
-> Geert Uytterhoeven <geert+renesas@glider.be> writes:
+On Mon, Apr 28, 2014 at 01:04:29PM -0300, Ezequiel Garcia wrote:
+> On Apr 28, Jason Cooper wrote:
+> > On Mon, Apr 28, 2014 at 10:19:49AM -0300, Ezequiel Garcia wrote:
+> > > Hi guys,
+> > > 
+> > > On Apr 26, Jason Cooper wrote:
+> > > > On Tue, Apr 22, 2014 at 11:26:09PM +0200, Thomas Petazzoni wrote:
+> > > > > The mvebu-devbus driver currently only supports the Armada 370/XP
+> > > > > family, but it can also cover the Orion5x family. However, the Orion5x
+> > > > > family has a different organization of the register. Therefore, in
+> > > > > preparation to the introduction of Orion5x support, we rename the
+> > > > > Armada 370/XP specific definitions to have an ARMADA_ prefix.
+> > > > > 
+> > > > > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > > > > ---
+> > > > >  drivers/memory/mvebu-devbus.c | 48 +++++++++++++++++++++----------------------
+> > > > >  1 file changed, 24 insertions(+), 24 deletions(-)
+> > > > 
+> > > > Patches 5 through 9 (devbus) applied to mvebu/drivers With Sebastian's
+> > > > Acks and a dep on mvebu/fixes.
+> > > > 
+> > > 
+> > > Tested the branch (plus some -next fixes) on the AXP-GP. The NOR works perfectly fine.
+> > 
+> > Which fixes?
+> > 
 > 
-> > When adding a device from DT, check if its clocks are suitable for Runtime
-> > PM, and register them with the PM core.
-> > If Runtime PM is disabled, just enable the clock.
-> >
-> > This allows the PM core to automatically manage gate clocks of devices for
-> > Runtime PM.
+> Gah, nevermind. I took the mvneta -netdev fixes, but the XP-GP wasn't affected.
+> So, no fixes required.
 > 
-> ...unless the device is already in an existing pm_domain, right?
+> > Does this count as a Tested-by?
+> > 
 > 
-> I like this approach, and it extends nicely what we already do on
-> platforms using drivers/base/power/clock_ops.c into DT land.
-> 
-> My only concern is how this will interact if it's used along with
-> devices that have existing pm_domains.  I don't have any specific
-> concerns (yet, because it's Friday, and my brain is turing off), but it
-> just made me wonder if this will be potentially confusing.
+> Sure: Tested-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 
-I have big concerns about this approach. First, it will only work if
-a clock is available at deivce creation time. The conversion of irq
-controllers to normal device drivers has already shown that is a bad
-idea.
+Added, thanks for testing.
 
-I also don't like that it tries to set up every clock, but there is no
-guarantee that the driver will even use it. I would rather see this
-behaviour linked into the function that obtains the clock at driver
-.probe() time. That way it can handle deferred probe correctly and it
-only sets up clocks that are actually used by the driver.
+thx,
 
-g.
+Jason.
