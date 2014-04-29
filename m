@@ -1,101 +1,77 @@
-From: george.cherian@ti.com (George Cherian)
-Date: Tue, 29 Apr 2014 13:28:29 +0530
-Subject: [PATCH v2] ARM: dts: am33xx: Move the cppi41dma node so it's
- probed early
-In-Reply-To: <CAGm1_kvHtSLNEfkJ24xZGGzsqAjHDTM1XztnX-QGs4iM5voMUw@mail.gmail.com>
-References: <1398373881-23369-1-git-send-email-ezequiel@vanguardiasur.com.ar>
- <CAGm1_kvHtSLNEfkJ24xZGGzsqAjHDTM1XztnX-QGs4iM5voMUw@mail.gmail.com>
-Message-ID: <535F5BA5.6000903@ti.com>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Tue, 29 Apr 2014 13:33:59 +0530
+Subject: [PATCH-RESEND] ARM: dts: Add arm-pmu node for exynos4412
+In-Reply-To: <00f501cf6378$2efd6ee0$8cf84ca0$@samsung.com>
+References: <1376044914-1759-1-git-send-email-chanho61.park@samsung.com>
+ <535F41B1.70404@linaro.org> <00f501cf6378$2efd6ee0$8cf84ca0$@samsung.com>
+Message-ID: <535F5CEF.10504@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/29/2014 11:49 AM, Yegor Yefremov wrote:
-> On Thu, Apr 24, 2014 at 11:11 PM, Ezequiel Garcia
-> <ezequiel@vanguardiasur.com.ar> wrote:
->> The DMA controller is needed for the USB controller to be correctly
->> registered. Therefore, if the DMA node is located at the end an unecessary
->> probe deferral is produced systematically.
+On 04/29/2014 12:26 PM, Chanho Park wrote:
+> Hi Tushar,
+> 
+>> -----Original Message-----
+>> From: Tushar Behera [mailto:tushar.behera at linaro.org]
+>> Sent: Tuesday, April 29, 2014 3:08 PM
+>> To: Chanho Park; kgene.kim at samsung.com
+>> Cc: linux-samsung-soc at vger.kernel.org; thomas.abraham at linaro.org; linux-
+>> arm-kernel at lists.infradead.org; Kyungmin Park
+>> Subject: Re: [PATCH-RESEND] ARM: dts: Add arm-pmu node for exynos4412
 >>
->> This is easily fixed by moving the node at the beggining of the child list,
->> so it's probed first.
-This will give issues on module removal.
-Since we use device_for_each_child in remove patch, it will try to 
-remove cppi dma controller, while the channel
-is still in use by musb node.
->> Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
-> Tested-by: Yegor Yefremov <yegorslists@googlemail.com>
->
->> --
->> v1->v2:
->>    * Added a comment to prevent a future clean-up based on the memory offset.
+>> On 08/09/2013 04:11 PM, Chanho Park wrote:
+>>> The Exynos4412 has 4 cpus and each has a performance counter.
+>>> Thus, we should define 4 interrupts which are combined by irq-combiner
+>> for arm
+>>> pmu.
+>>>
+>>> Signed-off-by: Chanho Park <chanho61.park@samsung.com>
+>>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>>> ---
+>>>  arch/arm/boot/dts/exynos4412.dtsi |    6 ++++++
+>>>  1 file changed, 6 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/exynos4412.dtsi
+>> b/arch/arm/boot/dts/exynos4412.dtsi
+>>> index e743e67..cfad655 100644
+>>> --- a/arch/arm/boot/dts/exynos4412.dtsi
+>>> +++ b/arch/arm/boot/dts/exynos4412.dtsi
+>>> @@ -35,6 +35,12 @@
+>>>  			     <0 107 0>, <0 108 0>, <0 48 0>, <0 42 0>;
+>>>  	};
+>>>
+>>> +	pmu {
+>>> +		compatible = "arm,cortex-a9-pmu";
+>>> +		interrupt-parent = <&combiner>;
+>>> +		interrupts = <2 2>, <3 2>, <18 2>, <19 2>;
+>>> +	};
+>>> +
+>>>  	mct at 10050000 {
+>>>  		compatible = "samsung,exynos4412-mct";
+>>>  		reg = <0x10050000 0x800>;
+>>>
 >>
->>   arch/arm/boot/dts/am33xx.dtsi | 34 ++++++++++++++++++++--------------
->>   1 file changed, 20 insertions(+), 14 deletions(-)
+>> Tested on Exynos4412 based Origen-Quad board. You would required to
+>> rebase it on latest code though.
 >>
->> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
->> index 9770e35..02e1eb6 100644
->> --- a/arch/arm/boot/dts/am33xx.dtsi
->> +++ b/arch/arm/boot/dts/am33xx.dtsi
->> @@ -453,6 +453,26 @@
->>                          ti,hwmods = "usb_otg_hs";
->>                          status = "disabled";
->>
->> +                       /*
->> +                        * The probe order matches the child ordering so the
->> +                        * dma-controller node must be the first one to prevent
->> +                        * spurious probe deferrals.
->> +                        */
->> +                       cppi41dma: dma-controller at 47402000 {
->> +                               compatible = "ti,am3359-cppi41";
->> +                               reg =  <0x47400000 0x1000
->> +                                       0x47402000 0x1000
->> +                                       0x47403000 0x1000
->> +                                       0x47404000 0x4000>;
->> +                               reg-names = "glue", "controller", "scheduler", "queuemgr";
->> +                               interrupts = <17>;
->> +                               interrupt-names = "glue";
->> +                               #dma-cells = <2>;
->> +                               #dma-channels = <30>;
->> +                               #dma-requests = <256>;
->> +                               status = "disabled";
->> +                       };
->> +
->>                          usb_ctrl_mod: control at 44e10620 {
->>                                  compatible = "ti,am335x-usb-ctrl-module";
->>                                  reg = <0x44e10620 0x10
->> @@ -556,20 +576,6 @@
->>                                          "tx14", "tx15";
->>                          };
->>
->> -                       cppi41dma: dma-controller at 47402000 {
->> -                               compatible = "ti,am3359-cppi41";
->> -                               reg =  <0x47400000 0x1000
->> -                                       0x47402000 0x1000
->> -                                       0x47403000 0x1000
->> -                                       0x47404000 0x4000>;
->> -                               reg-names = "glue", "controller", "scheduler", "queuemgr";
->> -                               interrupts = <17>;
->> -                               interrupt-names = "glue";
->> -                               #dma-cells = <2>;
->> -                               #dma-channels = <30>;
->> -                               #dma-requests = <256>;
->> -                               status = "disabled";
->> -                       };
->>                  };
->>
->>                  epwmss0: epwmss at 48300000 {
->> --
->> 1.9.1
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> Tested-by: Tushar Behera <tushar.behera@linaro.org>
+> 
+> You took old patch which I cannot remember now:) Actually, arm-pmu support
+> for exynos4412 was already merged in the latest code.[1]. I sent a clean-up
+> patch recently[2]. It could be more readable for exynos4412.
+> Thanks.
+> 
+
+I realized that a little late. I have replied to the new patch with my
+Tested-by.
+
+> [1] : https://lkml.org/lkml/2014/3/12/27
+> [2] : http://www.spinics.net/linux/lists/arm-kernel/msg325565.html
+> 
+> Best Regards,
+> Chanho Park
+> 
 
 
 -- 
--George
+Tushar Behera
