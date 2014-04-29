@@ -1,62 +1,57 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 29 Apr 2014 15:44:46 +0200
-Subject: [PATCH/RFC] serial: sh-sci: Add device tree support for r8a7779
-In-Reply-To: <20140428070748.GA24537@verge.net.au>
-References: <1398322484-3630-1-git-send-email-horms+renesas@verge.net.au>
- <20140428011354.GA13324@verge.net.au> <20140428070748.GA24537@verge.net.au>
-Message-ID: <1986104.5bpNkKVN8D@avalon>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 29 Apr 2014 14:47:28 +0100
+Subject: [PATCH v2 00/10] arm64: UEFI support
+In-Reply-To: <20140429114356.GK26088@console-pimps.org>
+References: <1398442154-19974-1-git-send-email-leif.lindholm@linaro.org>
+ <20140429102817.GE17007@arm.com>
+ <20140429114356.GK26088@console-pimps.org>
+Message-ID: <20140429134726.GH17007@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
-
-On Monday 28 April 2014 16:07:49 Simon Horman wrote:
-> On Mon, Apr 28, 2014 at 10:13:55AM +0900, Simon Horman wrote:
-> > On Mon, Apr 28, 2014 at 02:08:16AM +0200, Laurent Pinchart wrote:
-> > > On Monday 28 April 2014 09:03:14 Simon Horman wrote:
-> > > > On Fri, Apr 25, 2014 at 09:11:06AM +0200, Geert Uytterhoeven wrote:
-> > > > > On Fri, Apr 25, 2014 at 9:05 AM, Laurent Pinchart wrote:
-> > > > > >> +     scif0: serial at ffe40000 {
-> > > > > >> +             compatible = "renesas,scif",
-> > > > > >> "renesas,scif-r8a7779";
-> > > > > >> +             reg = <0xffe40000 265>;
-> > > > > >> +             interrupt-parent = <&gic>;
-> > > > > >> +             interrupts = <0 88 IRQ_TYPE_LEVEL_HIGH>;
-> > > > > >> +             clocks = <&cpg_clocks R8A7779_CLK_P>;
-> > > > > >> +             clock-names = "sci_ick";
-> > > > > > 
-> > > > > > Clock handling in the sh-sci driver should probably be improved.
-> > > > > > The driver currently requires an "sci_ick" interface clock and
-> > > > > > supports an optional "sci_fck" functional clock. In practice, as
-> > > > > > far as I can see, platforms that provide both sci_ick and sci_fck
-> > > > > > set the two clocks to the same source.
-> > > > > 
-> > > > > That's right. As a consequence, the clock's enable count is
-> > > > > incremented
-> > > > > 
-> > > > > 3 times:
-> > > > >   - once for fck,
-> > > > >   - once for ick,
-> > > > >   - once for generic Runtime PM using the "NULL" clock.
-> > > > 
-> > > > This approach is fine by me.
-> > > > But I think you need to maintain compatibility with the old
-> > > > binding ("sci_ick" required, "sci_fsk") as it seems that
-> > > > was included in v3.14.
-> > > 
-> > > sci_fck isn't part of the DT bindings, so we can at least drop that one.
-> > 
-> > So long as its not used anywhere in-tree, which I believe is the case,
-> > then that is fine by me.
+On Tue, Apr 29, 2014 at 12:43:56PM +0100, Matt Fleming wrote:
+> (Pulling in Peter and Stephen)
 > 
-> BTW, are you planning to make the above mentioned driver update
-> before or after re-posting enablement patches for Koelsch and/or Lager?
-> I ask because I would like to make such patches the basis for
-> a patch for Marzen.
+> On Tue, 29 Apr, at 11:28:17AM, Catalin Marinas wrote:
+> > 
+> > The patches look fine to me, they've been through several rounds of
+> > review already. How do we propose these get merged as the series
+> > contains both generic and arm64 patches? And there are dependencies
+> > already in linux-next.
+> > 
+> > Are the EFI patches in -next pulled from some non-rebaseable branch?
+> 
+> Peter suggsted a plan when he took the generic EFI stuff that's in tip
+> (and hence currently in linux-next),
+> 
+>   It doesn't hurt to inform Stephen, although I think it will simply fall
+>   out automatically since he uses git to merge and git will recognize the
+>   graph.
+> 
+>   During the merge window, it means they should not push their patches
+>   until Linus has accepted the precondition patches from the tip tree.
+>   Since Ingo and I try to push most of the tip tree as early as possible
+>   in the merge window, this is usually not a problem.
+> 
+> So we currently have the prerequisites in tip/x86/efi, and assuming that
+> this 10-patch series gets merged into a single branch somewhere, things
+> should work automatically for linux-next.
+> 
+> It may be prudent to negotiate a plan now for when the merge window
+> opens because, as Peter mentions above, the stuff in tip/x86/efi needs
+> to be merged by Linus first to avoid build breakage with the arm64
+> stuff.
 
-I'll try to do so today, after my talk at the ELC :-)
+Waiting for the tip/x86/efi to be merged first is not a problem. We
+also need a stable base for testing the arm64 UEFI series, so I assume
+this series can be based onto tip/x86/efi (would such branch be rebased
+before hitting mainline?).
+
+Given that Leif's series contains both generic efi and arm64 patches,
+what's your preference for merging them? I'm happy to add my ack and
+they go via your tree (or the other way around).
+
+Thanks.
 
 -- 
-Regards,
-
-Laurent Pinchart
+Catalin
