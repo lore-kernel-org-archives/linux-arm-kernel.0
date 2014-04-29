@@ -1,42 +1,25 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 29 Apr 2014 19:19:23 +0300
-Subject: [PATCH 06/23] ARM: OMAP: add OMAP5 DSI muxing
-In-Reply-To: <20140429150529.GA27571@atomide.com>
-References: <1398334639-14172-1-git-send-email-tomi.valkeinen@ti.com>
- <1398334639-14172-7-git-send-email-tomi.valkeinen@ti.com>
- <535A42D6.5090107@ti.com> <535A4470.2000509@ti.com> <535A5C0A.7040808@ti.com>
- <535A6C40.10609@ti.com> <20140425153150.GA20807@atomide.com>
- <535DFAAE.1010606@ti.com> <20140428164528.GM20807@atomide.com>
- <535F37E9.8090609@ti.com> <20140429150529.GA27571@atomide.com>
-Message-ID: <535FD10B.4020108@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 29 Apr 2014 09:22:29 -0700
+Subject: [PATCH v3 00/18] ASoC: fsl-ssi: Driver cleanup
+In-Reply-To: <20140428085453.GC15179@pengutronix.de>
+References: <1397482548-28463-1-git-send-email-mpa@pengutronix.de>
+ <20140424114403.GN12304@sirena.org.uk>
+ <20140428085453.GC15179@pengutronix.de>
+Message-ID: <20140429162229.GA16981@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/04/14 18:05, Tony Lindgren wrote:
+On Mon, Apr 28, 2014 at 10:54:53AM +0200, Markus Pargmann wrote:
 
->> omap4_padconf_global is a syscon node, not pinctrl. As syscon just gives
->> a raw regmap to its memory area, the driver needs to know about the OMAP
->> control registers to use it.
-> 
-> That would be probably best set up the same way we have already set up
-> for example omap4_padconf_global: tisyscon at 4a1005a0. Then drivers can
-> access it using regmap, see how drivers/regulator/pbias-regulator.c
-> sets up the pbias regulator with regmap for MMC.
+> What do you think of some framework function like
+> of_regmap_parse_endianess()? This would offer a common devicetree
+> binding and the driver would still be involved.
 
-Right, but it means that the driver will contain platform specific code
-for all the omap revisions it supports. Isn't that wrong?
-
-I already have a patch for DSI that uses the syscon-method, and it works
-fine. But it's quite ugly, imo, to fiddle with the OMAP control
-registers in a driver.
-
- Tomi
-
-
+Something like that should be fine, Xiubo has been working on it.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140429/ec3a6b0c/attachment.sig>
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140429/2c1bf647/attachment.sig>
