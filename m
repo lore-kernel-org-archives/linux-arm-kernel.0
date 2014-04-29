@@ -1,76 +1,40 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 29 Apr 2014 14:16:35 +0530
-Subject: [patch V2 0/6] dma: edma: Provide granular residue accounting
-In-Reply-To: <535EBE69.6060803@ti.com>
-References: <20140428104416.464002156@linutronix.de> <535EBE69.6060803@ti.com>
-Message-ID: <20140429084635.GN32284@intel.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Tue, 29 Apr 2014 11:09:07 +0200
+Subject: [PATCH v2] ARM: dts: am33xx: Move the cppi41dma node so it's
+ probed early
+In-Reply-To: <535F6276.4050601@ti.com>
+References: <1398373881-23369-1-git-send-email-ezequiel@vanguardiasur.com.ar>
+ <CAGm1_kvHtSLNEfkJ24xZGGzsqAjHDTM1XztnX-QGs4iM5voMUw@mail.gmail.com>
+ <535F5BA5.6000903@ti.com> <535F5D6B.6090802@linutronix.de>
+ <535F6276.4050601@ti.com>
+Message-ID: <535F6C33.9040408@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 03:47:37PM -0500, Joel Fernandes wrote:
-> On 04/28/2014 05:49 AM, Thomas Gleixner wrote:
-> > A simpler version to provide granular residue accounting and readout
-> > for EDMA.
-> > 
-> > Delta to V1:
-> > 
-> >       - Removed the double read of the address in PaRAM
-> > 
-> >       - Simplified the stats update in the interrupt callback for
-> >         intermediate transfers
-> > 
-> > Thanks,
-> > 
-> > 	tglx
-> > 
-> 
-> Thanks for the series. I went over all the patches and it looks great.
-> Acked-by: Joel Fernandes <joelf@ti.com>
-> 
-> The patches however didn't apply and had some conflicts with my dma
-> memcpy series and peter's cyclic series so I resolved conflicts and
-> created a single branch based on Vinod's slave-dma next branch (commit
-> 406efb1a745c1dc512dc9c3c859e302e7b7f907e) that Vinod can pull.
-> 
-> I also renamed subject line of patches in Thomas's series to be
-> "dmaengine: edma" and documented some of the variables used.
-> 
-> https://github.com/joelagnel/linux-kernel.git (for-vinod branch)
-> 
-> Vinod, could you pull if it looks OK?
+On 04/29/2014 10:27 AM, George Cherian wrote:
+> Hi Sebastian,
 
-The patches look good.
+Hi George,
 
-But,
-commit 770f0f3a20188b7e17db2790803b9da925dc0b94
-Author: Thomas Gleixner <tglx@linutronix.de>
-Date:   Mon Apr 28 10:49:43 2014 +0000
+> On 4/29/2014 1:36 PM, Sebastian Andrzej Siewior wrote:
+>> On 04/29/2014 09:58 AM, George Cherian wrote:
+>>>>> This is easily fixed by moving the node at the beggining of the child
+>>>>> list,
+>>>>> so it's probed first.
+>>> This will give issues on module removal.
+>>> Since we use device_for_each_child in remove patch, it will try to
+>>> remove cppi dma controller, while the channel
+>>> is still in use by musb node.
+>> Isn't this currently disabled because it blew up in the phy code?
+> Yes. So how if the dt  looks like this
 
-    dmaengine: edma: Make reading the position of active channels work
+No. I remember we talked about this and we decided not to duct tape the
+bug by moving the nodes around. Instead we wanted to disable the child
+removal part (one tiny module that can't be removed) until the PHY code
+does no longer blow up.
+If the same case is for the DMA driver then it should be fixed, too.
+The order of the nodes in .dts should not crash the kernel under any
+circumstances. If a different node order accelerates the probing then
+fine. But a crash is a no no.
 
-    As Joel pointed out, edma_read_position() uses memcpy_fromio() to read
-    the parameter ram. That's not synchronized with the internal update as
-    it does a byte by byte copy. We need to do a 32bit read to get a
-    consistent value.
-
-    Further reading destination and source is pointless. In DEV_TO_MEM
-    transfers we are only interested in the destination, in MEM_TO_DEV we
-    care about the source. In MEM_TO_MEM it really does not matter which
-    one you read.
-
-    Simple solution: Remove the pointers, select dest/source via a bool
-    and return the read value.
-
-    Remove the export of this function while at it. The only potential
-    user is the dmaengine and that's always builtin.
-
-    Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-
-You s-o-b missing in this one, also ack from Sekhar missing. Do you want to redo
-this or prefer me to cherry-pick patches adding acks and your s-o-b, since I
-already fetched your branch
-
-Either way is fine with me...
-
--- 
-~Vinod
+Sebastian
