@@ -1,27 +1,77 @@
-From: sourav.poddar@ti.com (sourav)
-Date: Tue, 29 Apr 2014 14:21:36 +0530
-Subject: [PATCH 3/5] arm: omap2: skip device build from platform code
- for dt.
-In-Reply-To: <20140428183922.GV30292@saruman.home>
-References: <1397651532-31456-1-git-send-email-sourav.poddar@ti.com>
- <1397651532-31456-4-git-send-email-sourav.poddar@ti.com>
- <alpine.DEB.2.02.1404281827410.14616@utopia.booyaka.com>
- <20140428183922.GV30292@saruman.home>
-Message-ID: <535F6818.5060406@ti.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Tue, 29 Apr 2014 11:52:59 +0300
+Subject: [PATCH 54/97] ARM: l2c: tegra: remove associativity and way size
+ from aux_ctrl
+In-Reply-To: <535EB88F.9000202@wwwdotorg.org>
+References: <20140428192419.GV26756@n2100.arm.linux.org.uk>
+ <E1WerGJ-0001XP-TI@rmk-PC.arm.linux.org.uk> <535EB88F.9000202@wwwdotorg.org>
+Message-ID: <20140429085259.GB30476@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 April 2014 12:09 AM, Felipe Balbi wrote:
-> On Mon, Apr 28, 2014 at 06:28:45PM +0000, Paul Walmsley wrote:
->> On Wed, 16 Apr 2014, Sourav Poddar wrote:
->>
->>> For SOCs with dt enabled, device should be build through device tree.
->>> Prevent device build call from platform code, if device tree is
->>> enabled.
->>>
->>> Signed-off-by: Sourav Poddar<sourav.poddar@ti.com>
->> Isn't OMAP2+ only supporting DT device enumeration now?
-> At least OMAP3 still isn't Dt-only.
->
-Yes, for omap3 boards only, I have kept a #ifndef. Else we could
-have remove this code.
+On Mon, Apr 28, 2014 at 10:22:39PM +0200, Stephen Warren wrote:
+> On 04/28/2014 01:30 PM, Russell King wrote:
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> 
+> Peter, can you please ack this patch if you see no issue. Discussion
+> below...
+> 
+> > diff --git a/arch/arm/mach-tegra/tegra.c b/arch/arm/mach-tegra/tegra.c
+> 
+> >  static void __init tegra_init_cache(void)
+> >  {
+> >  #ifdef CONFIG_CACHE_L2X0
+> > -	static const struct of_device_id pl310_ids[] __initconst = {
+> > -		{ .compatible = "arm,pl310-cache",  },
+> > -		{}
+> > -	};
+> > -
+> > -	struct device_node *np;
+> >  	int ret;
+> > -	void __iomem *p = IO_ADDRESS(TEGRA_ARM_PERIF_BASE) + 0x3000;
+> > -	u32 aux_ctrl, cache_type;
+> > -
+> > -	np = of_find_matching_node(NULL, pl310_ids);
+> > -	if (!np)
+> > -		return;
+> > -
+> > -	cache_type = readl(p + L2X0_CACHE_TYPE);
+> > -	aux_ctrl = (cache_type & 0x700) << (17-8);
+> > -	aux_ctrl |= 0x3c400001;
+> >  
+> > -	ret = l2x0_of_init(aux_ctrl, 0xc200c3fe);
+> > +	ret = l2x0_of_init(0x3c400001, 0xc20fc3fe);
+> >  	if (!ret)
+> >  		l2x0_saved_regs_addr = virt_to_phys(&l2x0_saved_regs);
+> >  #endif
+> 
+> Acked-by: Stephen Warren <swarren@nvidia.com>
+> Tested-by: Stephen Warren <swarren@nvidia.com>
+> 
+> I tested on both Tegra20 and Tegra30, and see bits 19:16 are 8 on both,
+> with or without this patch.
+> 
+> I know that the code above was introduced in:
+> 
+> 01548673fa15 arm/tegra: generalize L2 cache initialization
+> 
+> ... by Peter, as part of the port to Tegra30. However, there was no
+> explanation in that patch why it was needed. The existence of the patch
+> implies that Tegra20/30 use different way sizes or associativity for
+> their cache, and hence if we're going to forcibly over-write that part
+> of the aux register, we need to dynamically calculate the correct value
+> to put there. However in practice, both chips seem to use the same value
+> for that field anyway (unless perhaps U-Boot is trashing the field
+> before the kernel boots).
+
+This code was written anticipating A9 based designs which have a different
+number of ways per cluster. However up to now, we haven't done
+any upstreaming work for those, so this code is indeed not required for
+the currently upstreamed Tegra SoCs. I don't think that will change in the
+forseeable future. Therefore:
+
+Acked-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+
+Cheers,
+
+Peter.
