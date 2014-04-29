@@ -1,81 +1,34 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 29 Apr 2014 11:15:41 +0900
-Subject: [PATCH] ARM: shmobile: Ignore callbacks for subsys
- generic_pm_domain_data
-In-Reply-To: <cover.1398737681.git.horms+renesas@verge.net.au>
-References: <cover.1398737681.git.horms+renesas@verge.net.au>
-Message-ID: <ab496b9d259e754f5d646219e4f032b274b9fffe.1398737681.git.horms+renesas@verge.net.au>
+From: xiaofeng.yan@huawei.com (xiaofeng.yan)
+Date: Tue, 29 Apr 2014 10:17:13 +0800
+Subject: mem-hotplug: Can arm receive memory-hotplug feature from x86 platform
+Message-ID: <535F0BA9.5070309@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulf Hansson <ulf.hansson@linaro.org>
+Hi all,
 
-There are no active users of these callbacks, thus there are no benefit
-of trying to invoke them.
+I found some scenario could need memory-hotplug feature in their product 
+based on platform ARM.
 
-Cc: Simon Horman <horms@verge.net.au>
-Cc: Magnus Damm <magnus.damm@gmail.com>
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/pm-rmobile.c | 38 +++----------------------------------
- 1 file changed, 3 insertions(+), 35 deletions(-)
+  A typical scenario can be described as follows:
+  Developer reserve some memory which can't be accessed by kernel and 
+other function can use these memory before system start up.
+After booting, system can reclaim the memory reserved with memory-hot 
+plug mechanism. for example ,  user can add the reserved memory by the 
+next command.
+#echo "PHYSICAL_ADDRESS_OF_MEMORY, SIZE_FOR_ADDING_MEMORY" > 
+/kernel/sys/addmemory/addmemory.
 
-diff --git a/arch/arm/mach-shmobile/pm-rmobile.c b/arch/arm/mach-shmobile/pm-rmobile.c
-index 1fc05d9..f710235 100644
---- a/arch/arm/mach-shmobile/pm-rmobile.c
-+++ b/arch/arm/mach-shmobile/pm-rmobile.c
-@@ -99,39 +99,7 @@ static int rmobile_pd_power_up(struct generic_pm_domain *genpd)
- 
- static bool rmobile_pd_active_wakeup(struct device *dev)
- {
--	bool (*active_wakeup)(struct device *dev);
--
--	active_wakeup = dev_gpd_data(dev)->ops.active_wakeup;
--	return active_wakeup ? active_wakeup(dev) : true;
--}
--
--static int rmobile_pd_stop_dev(struct device *dev)
--{
--	int (*stop)(struct device *dev);
--
--	stop = dev_gpd_data(dev)->ops.stop;
--	if (stop) {
--		int ret = stop(dev);
--		if (ret)
--			return ret;
--	}
--	return pm_clk_suspend(dev);
--}
--
--static int rmobile_pd_start_dev(struct device *dev)
--{
--	int (*start)(struct device *dev);
--	int ret;
--
--	ret = pm_clk_resume(dev);
--	if (ret)
--		return ret;
--
--	start = dev_gpd_data(dev)->ops.start;
--	if (start)
--		ret = start(dev);
--
--	return ret;
-+	return true;
- }
- 
- static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
-@@ -140,8 +108,8 @@ static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
- 	struct dev_power_governor *gov = rmobile_pd->gov;
- 
- 	pm_genpd_init(genpd, gov ? : &simple_qos_governor, false);
--	genpd->dev_ops.stop		= rmobile_pd_stop_dev;
--	genpd->dev_ops.start		= rmobile_pd_start_dev;
-+	genpd->dev_ops.stop		= pm_clk_suspend;
-+	genpd->dev_ops.start		= pm_clk_resume;
- 	genpd->dev_ops.active_wakeup	= rmobile_pd_active_wakeup;
- 	genpd->dev_irq_safe		= true;
- 	genpd->power_off		= rmobile_pd_power_down;
--- 
-1.8.5.2
+PHYSICAL_ADDRESS_OF_MEMORY: the begging position for adding memory
+SIZE_FOR_ADDING_MEMORY: the memory size you want to add. the unit should 
+be integral multiple of a section size.
+
+So my question is whether arm support memory-hot plug or not in next 
+plan. I am very interested to move the feature from x86 to arm.  I have 
+finish the above function and realize dynamic memory addition.
+I can push my patches if possible.
+Give me your suggestion.
+
+Thanks
+
+xiaofeng.yan
