@@ -1,18 +1,53 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 29 Apr 2014 14:44:48 +0800
-Subject: [PATCH v2] ARM: dts: imx53-qsb-common: Add TVE support
-In-Reply-To: <1398747576-12214-1-git-send-email-festevam@gmail.com>
-References: <1398747576-12214-1-git-send-email-festevam@gmail.com>
-Message-ID: <20140429064447.GL16451@dragon>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Tue, 29 Apr 2014 07:48:00 +0100
+Subject: [PATCH 68/97] ARM: l2c: sti: remove cache size override
+In-Reply-To: <E1WerHT-0001YK-DL@rmk-PC.arm.linux.org.uk>
+References: <20140428192419.GV26756@n2100.arm.linux.org.uk>
+ <E1WerHT-0001YK-DL@rmk-PC.arm.linux.org.uk>
+Message-ID: <535F4B20.9090904@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 29, 2014 at 01:59:36AM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> Changes since v1:
-> - Do not use the suffix 1 in pinctrl_vga_sync
+Hi Russell,
+Thankyou for the patch,
 
-Applied, thanks.
+The only issue I see is, on most of the STi SOCs the default value for 
+AUXCTRL register is 0x0, so the waysize is not set.
+
+The way size is different on some SOCs in the same series.
+
+Where is the way-size mentioned in this new style?
+
+Thanks,
+srini
+
+On 28/04/14 20:31, Russell King wrote:
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>   arch/arm/mach-sti/board-dt.c | 12 +++---------
+>   1 file changed, 3 insertions(+), 9 deletions(-)
+>
+> diff --git a/arch/arm/mach-sti/board-dt.c b/arch/arm/mach-sti/board-dt.c
+> index dc8669efc12d..cf716ae10726 100644
+> --- a/arch/arm/mach-sti/board-dt.c
+> +++ b/arch/arm/mach-sti/board-dt.c
+> @@ -16,15 +16,9 @@
+>
+>   void __init stih41x_l2x0_init(void)
+>   {
+> -	u32 way_size = 0x4;
+> -	u32 aux_ctrl;
+> -	/* may be this can be encoded in macros like BIT*() */
+> -	aux_ctrl = L2C_AUX_CTRL_SHARED_OVERRIDE |
+> -		   L310_AUX_CTRL_DATA_PREFETCH |
+> -		   L310_AUX_CTRL_INSTR_PREFETCH |
+> -		   L2C_AUX_CTRL_WAY_SIZE(way_size);
+> -
+> -	l2x0_of_init(aux_ctrl, L2X0_AUX_CTRL_MASK);
+> +	l2x0_of_init(L2C_AUX_CTRL_SHARED_OVERRIDE |
+> +		     L310_AUX_CTRL_DATA_PREFETCH |
+> +		     L310_AUX_CTRL_INSTR_PREFETCH, 0xc00f0fff);
+>   }
+>
+>   static void __init stih41x_machine_init(void)
+>
