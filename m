@@ -1,41 +1,33 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 29 Apr 2014 11:37:40 +0530
-Subject: [PATCH] arm: edma: Fix xbar mapping
-In-Reply-To: <alpine.DEB.2.02.1404282032150.6261@ionos.tec.linutronix.de>
-References: <alpine.DEB.2.02.1404132123100.22697@ionos.tec.linutronix.de>
- <534BED36.2060907@ti.com>
- <alpine.DEB.2.02.1404282032150.6261@ionos.tec.linutronix.de>
-Message-ID: <20140429060740.GM32284@intel.com>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Tue, 29 Apr 2014 11:49:35 +0530
+Subject: [PATCH] ARM: configs: drop CONFIG_COMMON_CLK_DEBUG
+In-Reply-To: <20140429061417.GJ16451@dragon>
+References: <1398504922-9223-1-git-send-email-prabhakar.csengg@gmail.com>
+ <20140429061417.GJ16451@dragon>
+Message-ID: <CA+V-a8vnha1Pk7pJ0nRizk=A+b-w_bAyS6E+32dPimSBCMg-Dg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 08:32:55PM +0200, Thomas Gleixner wrote:
-> On Mon, 14 Apr 2014, Sekhar Nori wrote:
-> > > Fix the issues by:
-> > > 
-> > > - annotating the device tree entry with "/bits/ 16" as documented in
-> > >   the of_property_read_u16_array kernel doc
-> > > 
-> > > - make the size of the xbar register mapping correct
-> > > 
-> > > - invalidating the end of the array and not the start
-> > > 
-> > > This convoluted mess wants to be completely rewritten as there is no
-> > > point to keep the xbar_chan array memory and the iomapping of the xbar
-> > > regs around forever. Marking the xbar mapped channels as used should
-> > > be done right there.
-> > > 
-> > > But that's a different issue and this patch is small enough to make it
-> > > work and allows a simple backport for stable.
-> > > 
-> > > Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-> > 
-> > This time, I tested this patch and FWIW you can add:
-> > 
-> > Acked-by: Sekhar Nori <nsekhar@ti.com>
-> 
-> Can someone pick this up please?
-Shouldnt this go thru ARM tree?
+On Tue, Apr 29, 2014 at 11:44 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
+> On Sat, Apr 26, 2014 at 03:05:22PM +0530, Lad Prabhakar wrote:
+>> From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
+>>
+>> this patch removes COMMON_CLK_DEBUG config option
+>> from defconfig file as this config option is obsolete.
+>>
+>> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+>> ---
+>>  arch/arm/configs/imx_v4_v5_defconfig    |    1 -
+>>  arch/arm/configs/imx_v6_v7_defconfig    |    1 -
+> ...
+>>  arch/arm/configs/mxs_defconfig          |    1 -
+>
+> Please drop these 3 files from your patch.  The obsolete
+> COMMON_CLK_DEBUG option has been removed from two of them on my branch
+> by savedefconfig, and we will address the remaining one in another
+> patch.
+>
+OK will post the updated patch dropping these 3 files.
 
--- 
-~Vinod
+Regards,
+--Prabhakar Lad
