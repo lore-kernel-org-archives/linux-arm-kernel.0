@@ -1,40 +1,55 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 29 Apr 2014 15:28:15 -0300
-Subject: [PATCH 1/5] ARM: defconfigs: add MTD_SPI_NOR (new dependency for
- M25P80)
-In-Reply-To: <20140429174849.GO28159@titan.lakedaemon.net>
-References: <1397719309-2022-1-git-send-email-computersforpeace@gmail.com>
- <1397719309-2022-2-git-send-email-computersforpeace@gmail.com>
- <535A8FC9.8040707@wwwdotorg.org>
- <20140429172227.GB11657@arch.cereza>
- <20140429174849.GO28159@titan.lakedaemon.net>
-Message-ID: <20140429182815.GA28069@arch.cereza>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 29 Apr 2014 19:31:31 +0100
+Subject: [PATCH] ARM: OMAP5: Switch to THUMB mode if needed on secondary
+ CPU
+In-Reply-To: <D49C397D-1ABD-4882-B3F5-94F359D7552B@gmail.com>
+References: <1398191506-3741-1-git-send-email-joelf@ti.com>
+ <20140428164348.GA14354@e103592.cambridge.arm.com>
+ <535E8DC2.4010504@ti.com> <535E8E2D.1020708@ti.com>
+ <20140429091725.GA3582@e103592.cambridge.arm.com>
+ <D49C397D-1ABD-4882-B3F5-94F359D7552B@gmail.com>
+Message-ID: <20140429183131.GF3582@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Apr 29, Jason Cooper wrote:
-> On Tue, Apr 29, 2014 at 02:22:27PM -0300, Ezequiel Garcia wrote:
-> > On Apr 25, Stephen Warren wrote:
-> > > On 04/17/2014 01:21 AM, Brian Norris wrote:
-> > > > These defconfigs contain the CONFIG_M25P80 symbol, which is now
-> > > > dependent on the MTD_SPI_NOR symbol. Add CONFIG_MTD_SPI_NOR to the
-> > > > relevant defconfigs.
-> > > > 
-> > > > At the same time, drop the now-nonexistent CONFIG_MTD_CHAR symbol.
+On Tue, Apr 29, 2014 at 05:36:30PM +0100, Joel Fernandes wrote:
+
+[...]
+
+> >> Sorry what I meant is, say its of Type function. What tells the firmware
+> >> to switch to THUMB?
+> >> 
+> >> What's typically done is a boot address register is written by the
+> >> kernel, and the firmware jumps to it after WFE.
+> > 
+> > Using ENTRY(x) ... ENDPROC(x) causes the symbol seen by the linker
+> > for x to have the Thumb bit set if the code is Thumb.
+> > 
+> > This means that any reference the linker fixes up for that symbol
+> > will have the Thumb bit set appropriately.  This applies to any kind
+> > of reference, so code in another file that takes the address of the
+> > symbol and then passes that address to the firmware should result in the
+> > firmware getting an address with the Thumb bit.
+> > 
+> > From the firmware's point of view it just gets a raw address, but
+> > the Thumb bit will now be set.  The firmware still needs to handle
+> > this correctly when jumping, but from the look of the code this may
+> > already work on omap3/4.  It would be interesting to know whether it
+> > works on omap5.
 > 
-> Excuse my ignorance of the history of this bug, but shouldn't this be
-> solved in the Kconfig logic?  Since when do we solve config symbol
-> dependency bugs in the defconfigs?
-> 
+> Thanks a lot for the explanation. That makes perfect sense. I will try it and let you know if it works on OMAP5.
 
-Long story short: it was decided that select'ing this new symbol was not
-appropriate. Instead, it must be explicitly selected by the user, hence
-the defconfig fix.
+ARM/thumb interworking making perfect sense?  I'll have to frame that
+and put it on the wall :)
 
-The full story: https://lkml.org/lkml/2014/4/17/45
+objdump and nm conveniently mask off the Thumb bit from all function
+addresses they print out, but if you show the symbols using readelf
+instead you'll see addresses with bit 0 set for Thumb functions.
 
-And in particular: https://lkml.org/lkml/2014/4/21/425
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+
+It's possible that the firmware still doesn't handle branching to Thumb
+correctly, but if it does it would be nice to remove the requirement to
+build an odd piece of a Thumb-2 kernel in ARM.
+
+Cheers
+---Dave
