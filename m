@@ -1,44 +1,71 @@
-From: matt@console-pimps.org (Matt Fleming)
-Date: Tue, 29 Apr 2014 12:43:56 +0100
-Subject: [PATCH v2 00/10] arm64: UEFI support
-In-Reply-To: <20140429102817.GE17007@arm.com>
-References: <1398442154-19974-1-git-send-email-leif.lindholm@linaro.org>
- <20140429102817.GE17007@arm.com>
-Message-ID: <20140429114356.GK26088@console-pimps.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 29 Apr 2014 14:07:43 +0200
+Subject: [PATCH] gpio: always enable GPIO_OMAP on ARCH_OMAP
+In-Reply-To: <535F84B9.6000406@collabora.co.uk>
+References: <5523458.JVZJJObMjC@wuerfel> <13943940.Yb2C7lPSBy@wuerfel>
+ <535F84B9.6000406@collabora.co.uk>
+Message-ID: <4195837.kkE84zMEnN@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Pulling in Peter and Stephen)
-
-On Tue, 29 Apr, at 11:28:17AM, Catalin Marinas wrote:
+On Tuesday 29 April 2014 12:53:45 Javier Martinez Canillas wrote:
+> Hello Arnd,
 > 
-> The patches look fine to me, they've been through several rounds of
-> review already. How do we propose these get merged as the series
-> contains both generic and arm64 patches? And there are dependencies
-> already in linux-next.
+> On 04/29/2014 12:26 PM, Arnd Bergmann wrote:
+> > On Tuesday 29 April 2014 01:59:20 Javier Martinez Canillas wrote:
+> >> This driver is also used by OMAP1. Even when disabling GPIO_OMAP on that
+> >> platform doesn't cause a build error since no function defined in the driver is
+> >> used directly by platform code, I think that we always want this driver on OMAP1
+> >> too.
+> >> 
+> >> > However, it seems entirely reasonable to include the driver in build tests
+> >> > on other platforms, so we should also allow building it for COMPILE_TEST
+> >> > builds and select the required GENERIC_IRQ_CHIP that may not already be
+> >> > enabled on other platforms.
+> >> > 
+> >> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> >> > 
+> >> > diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+> >> > index c58b828..c8c42be 100644
+> >> > --- a/drivers/gpio/Kconfig
+> >> > +++ b/drivers/gpio/Kconfig
+> >> > @@ -244,9 +244,10 @@ config GPIO_OCTEON
+> >> >         family of SOCs.
+> >> >  
+> >> >  config GPIO_OMAP
+> >> > -     bool "TI OMAP GPIO support"
+> >> > +     bool "TI OMAP GPIO support" if COMPILE_TEST && !ARCH_OMAP2PLUS
+> >> 
+> >> So this should be:
+> >> 
+> >> +       bool "TI OMAP GPIO support" if COMPILE_TEST && !ARCH_OMAP2PLUS &&
+> >> !ARCH_OMAP1
+> >> 
+> > 
+> > Well, if COMPILE_TEST is disabled on OMAP1, the option is already
+> > hidden and enabled in my version. It seems reasonable to me to 
+> > allow compile-testing OMAP1 without the GPIO driver, while a kernel
+> > running on OMAP1 should always have COMPILE_TEST disabled.
+> > 
 > 
-> Are the EFI patches in -next pulled from some non-rebaseable branch?
+> I understand your point. I thought you also wanted to be sure that the option
+> will be hidden in platforms where it make sense to always enable GPIO_OMAP even
+> if COMPILE_TEST is enabled.
 
-Peter suggsted a plan when he took the generic EFI stuff that's in tip
-(and hence currently in linux-next),
+I thought about that, but didn't want to enforce it without a good reason
+when your original patch had just made it possible to disable the option.
 
-  It doesn't hurt to inform Stephen, although I think it will simply fall
-  out automatically since he uses git to merge and git will recognize the
-  graph.
+> If the idea of this patch is to only avoid build errors when GPIO_OMAP is
+> disabled and allowing build testing the driver in other platforms, then I'm ok
+> with your patch and feel free to add my Acked-by tag.
 
-  During the merge window, it means they should not push their patches
-  until Linus has accepted the precondition patches from the tip tree.
-  Since Ingo and I try to push most of the tip tree as early as possible
-  in the merge window, this is usually not a problem.
+Ok, thanks!
 
-So we currently have the prerequisites in tip/x86/efi, and assuming that
-this 10-patch series gets merged into a single branch somewhere, things
-should work automatically for linux-next.
+> And you are right that COMPILE_TEST is disabled in omap1_defconfig and after all
+> there are so many drivers needed for a platform to be usable on boot. So one has
+> to take care of enabling all the needed options as long as there isn't a
+> combination that cause a build error like the one you are fixing here.
 
-It may be prudent to negotiate a plan now for when the merge window
-opens because, as Peter mentions above, the stuff in tip/x86/efi needs
-to be merged by Linus first to avoid build breakage with the arm64
-stuff.
+Ok
 
--- 
-Matt Fleming, Intel Open Source Technology Center
+	Arnd
