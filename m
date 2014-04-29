@@ -1,40 +1,54 @@
 From: dmurphy@ti.com (Dan Murphy)
-Date: Tue, 29 Apr 2014 15:19:43 -0500
-Subject: [RFC 04/11] drivers: reset: am335: Add reset data for am335
+Date: Tue, 29 Apr 2014 15:19:47 -0500
+Subject: [RFC 08/11] ARM: dts: am33xx: Add prcm_resets node
 In-Reply-To: <1398802790-29287-1-git-send-email-dmurphy@ti.com>
 References: <1398802790-29287-1-git-send-email-dmurphy@ti.com>
-Message-ID: <1398802790-29287-5-git-send-email-dmurphy@ti.com>
+Message-ID: <1398802790-29287-9-git-send-email-dmurphy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the reset register data for the am335 SoC.
+Add the prcm_resets node to the prcm parent node.
+Add the dt-bindings header to the DT file
 
 Signed-off-by: Dan Murphy <dmurphy@ti.com>
 ---
- drivers/reset/ti/Makefile          |    1 +
- drivers/reset/ti/reset-ti-am33xx.c |   37 ++++++++++++++++++++++++++++++++++++
- drivers/reset/ti/reset-ti-data.h   |    1 +
- drivers/reset/ti/reset-ti.c        |    3 +++
- 4 files changed, 42 insertions(+)
- create mode 100644 drivers/reset/ti/reset-ti-am33xx.c
+ arch/arm/boot/dts/am33xx.dtsi                |    6 ++++++
+ include/dt-bindings/reset/ti,am33xx-resets.h |   18 ++++++++++++++++++
+ 2 files changed, 24 insertions(+)
+ create mode 100644 include/dt-bindings/reset/ti,am33xx-resets.h
 
-diff --git a/drivers/reset/ti/Makefile b/drivers/reset/ti/Makefile
-index 4d2d06c..f0dbd01 100644
---- a/drivers/reset/ti/Makefile
-+++ b/drivers/reset/ti/Makefile
-@@ -1,3 +1,4 @@
- obj-$(CONFIG_RESET_TI) += reset-ti.o
- obj-$(CONFIG_SOC_DRA7XX) += reset-ti-dra7xx.o
- obj-$(CONFIG_SOC_OMAP5) += reset-ti-omap5.o
-+obj-$(CONFIG_SOC_AM33XX) += reset-ti-am33xx.o
-diff --git a/drivers/reset/ti/reset-ti-am33xx.c b/drivers/reset/ti/reset-ti-am33xx.c
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index 07f283c..df9d9c6 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -10,6 +10,7 @@
+ 
+ #include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/pinctrl/am33xx.h>
++#include <dt-bindings/reset/ti,am33xx-resets.h>
+ 
+ #include "skeleton.dtsi"
+ 
+@@ -117,6 +118,11 @@
+ 
+ 			prcm_clockdomains: clockdomains {
+ 			};
++
++			prcm_resets: resets {
++				compatible = "ti,am335x-resets";
++				#reset-cells = <1>;
++			};
+ 		};
+ 
+ 		scrm: scrm at 44e10000 {
+diff --git a/include/dt-bindings/reset/ti,am33xx-resets.h b/include/dt-bindings/reset/ti,am33xx-resets.h
 new file mode 100644
-index 0000000..d28f41b
+index 0000000..dfe7954
 --- /dev/null
-+++ b/drivers/reset/ti/reset-ti-am33xx.c
-@@ -0,0 +1,37 @@
++++ b/include/dt-bindings/reset/ti,am33xx-resets.h
+@@ -0,0 +1,18 @@
 +/*
-+ * am33xx reset data for PRCM Module
++ * AM33xx reset index for PRCM Module
 + *
 + * Copyright 2014 Texas Instruments Inc.
 + *
@@ -43,57 +57,13 @@ index 0000000..d28f41b
 + * published by the Free Software Foundation.
 + */
 +
-+#include "reset-ti-data.h"
++#ifndef _DT_BINDINGS_RESET_TI_AM33XX_H
++#define _DT_BINDINGS_RESET_TI_AM33XX_H
 +
-+static struct ti_reset_reg_data am335x_reset_reg_data[] = {
-+	{
-+		.rstctrl_offs = 0xf00,
-+		.rstctrl_bit = 0,
-+		.rstst_offs	= 0xf08,
-+		.rstst_bit	= 0,
-+	},
-+	{
-+		.rstctrl_offs = 0x1104,
-+		.rstctrl_bit = 0,
-+		.rstst_offs	= 0x1114,
-+		.rstst_bit	= 0,
-+	},
-+	{
-+		.rstctrl_offs = 0x0D00,
-+		.rstctrl_bit = 3,
-+		.rstst_offs	= 0x0D0C,
-+		.rstst_bit	= 5,
-+	},
-+};
++#define RESET_DEVICE_RESET			0
++#define RESET_GFX_RESET				1
++#define RESET_PER_RESET				2
 +
-+struct ti_reset_data am335x_reset_data = {
-+	.reg_data	= am335x_reset_reg_data,
-+	.nr_resets	= ARRAY_SIZE(am335x_reset_reg_data),
-+};
-diff --git a/drivers/reset/ti/reset-ti-data.h b/drivers/reset/ti/reset-ti-data.h
-index d3c6d42..48a1476 100644
---- a/drivers/reset/ti/reset-ti-data.h
-+++ b/drivers/reset/ti/reset-ti-data.h
-@@ -57,5 +57,6 @@ struct ti_reset_data {
- 
- extern struct ti_reset_data dra7_reset_data;
- extern struct ti_reset_data omap5_reset_data;
-+extern struct ti_reset_data am335x_reset_data;
- 
- #endif
-diff --git a/drivers/reset/ti/reset-ti.c b/drivers/reset/ti/reset-ti.c
-index 7310827..146353f 100644
---- a/drivers/reset/ti/reset-ti.c
-+++ b/drivers/reset/ti/reset-ti.c
-@@ -138,6 +138,9 @@ static const struct of_device_id ti_reset_of_match[] = {
- #ifdef CONFIG_SOC_OMAP5
- 	{ .compatible = "ti,omap5-resets", .data = &omap5_reset_data,},
- #endif
-+#ifdef CONFIG_SOC_AM33XX
-+	{ .compatible = "ti,am335x-resets", .data = &am335x_reset_data,},
 +#endif
- 	{},
- };
- 
 -- 
 1.7.9.5
