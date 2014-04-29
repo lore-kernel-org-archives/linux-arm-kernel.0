@@ -1,43 +1,80 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 29 Apr 2014 16:49:59 -0300
-Subject: [PATCH for v3.15] net: mvmdio: Check for a valid interrupt instead of
- an error
-Message-ID: <1398800999-9814-1-git-send-email-ezequiel.garcia@free-electrons.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Tue, 29 Apr 2014 13:00:41 -0700
+Subject: [PATCH v2] PM / devfreq: Use freq_table for available_frequencies
+In-Reply-To: <4324793.197151398649314597.JavaMail.weblogic@epv6ml10>
+References: <4324793.197151398649314597.JavaMail.weblogic@epv6ml10>
+Message-ID: <536004E9.1010300@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following commit:
+On 04/27/2014 06:41 PM, MyungJoo Ham wrote:
+>> Some devices use freq_table instead of OPP. For those devices, the
+>> available_frequencies file shows up empty. Fix that by using freq_table to
+>> generate the available_frequencies data when it's available.
+>>
+>> OPP find frequency APIs also skips frequencies that have been temporarily
+>> disabled (say, due to thermal, etc). Since available_frequencies is
+>> supposed to show the entire list of available frequencies without taking
+>> temporary limits into consideration, preference is given to freq_table when
+>> available.
+>>
+>> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
+>> ---
+>>   drivers/devfreq/devfreq.c | 29 ++++++++++++++++++-----------
+>>   1 file changed, 18 insertions(+), 11 deletions(-)
+>>
+>> diff --git a/drivers/devfreq/devfreq.c b/drivers/devfreq/devfreq.c
+>> index 2042ec3..527cbe2 100644
+>> --- a/drivers/devfreq/devfreq.c
+>> +++ b/drivers/devfreq/devfreq.c
+>> @@ -912,20 +912,27 @@ static ssize_t available_frequencies_show(struct device *d,
+>>   	struct devfreq *df = to_devfreq(d);
+>>   	struct device *dev = df->dev.parent;
+>>   	struct dev_pm_opp *opp;
+>> +	unsigned int i = 0;
+>>   	ssize_t count = 0;
+>>   	unsigned long freq = 0;
+>>   
+>> -	rcu_read_lock();
+>> -	do {
+>> -		opp = dev_pm_opp_find_freq_ceil(dev, &freq);
+>> -		if (IS_ERR(opp))
+>> -			break;
+>> -
+>> -		count += scnprintf(&buf[count], (PAGE_SIZE - count - 2),
+>> -				   "%lu ", freq);
+>> -		freq++;
+>> -	} while (1);
+>> -	rcu_read_unlock();
+>> +	if (df->profile->freq_table) {
+>> +		for (i = 0; i < df->profile->max_state; i++)
+>> +			count += scnprintf(&buf[count], (PAGE_SIZE - count - 2),
+>> +					   "%u ", df->profile->freq_table[i]);
+> 
+> You are hereby changing the semmantics of the original
+> available_frequencies node.
+> 
+> When a frequency/voltage pair has been disabled (opp_disable), probably
+> by opp_disable(), the frequency is no more "available".
+> However, when the driver author supplied freq_table as well as OPP
+> in order to see the statistics, the node will behave differently.
+> 
+> Please do not affect the current users as long as it does not give
+> additional benefit or fix a bug.
 
-commit 9ec36cafe43bf835f8f29273597a5b0cbc8267ef
-Author: Rob Herring <robh@kernel.org>
-Date:   Wed Apr 23 17:57:41 2014 -0500
+I was actually trying to stick with the semantics as it was documented.
+The documentation for this file says it'll show frequencies that are not
+allowed by the current min/max settings either. To me, an OPP disable
+seems similar to some frequencies "disabled" by min/max settings.
 
-    of/irq: do irq resolution in platform_get_irq
+Giving preference to OPP is not a hard change to do, but it seems to go
+againsts the documented semantics.
 
-changed platform_get_irq() which now returns ENODEV and EPROBE_DEFER,
-in addition to ENXIO. If there's no interrupt for mvmdio, platform_get_irq()
-returns ENODEV, but we currently check only for ENXIO.
+Thoughts?
 
-Fix this by looking for a positive integer, which is the proper way of
-validating a virtual interrupt number.
+-Saravana
 
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
- drivers/net/ethernet/marvell/mvmdio.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
-index b161a52..eb2cabf 100644
---- a/drivers/net/ethernet/marvell/mvmdio.c
-+++ b/drivers/net/ethernet/marvell/mvmdio.c
-@@ -232,7 +232,7 @@ static int orion_mdio_probe(struct platform_device *pdev)
- 		clk_prepare_enable(dev->clk);
- 
- 	dev->err_interrupt = platform_get_irq(pdev, 0);
--	if (dev->err_interrupt != -ENXIO) {
-+	if (dev->err_interrupt > 0) {
- 		ret = devm_request_irq(&pdev->dev, dev->err_interrupt,
- 					orion_mdio_err_irq,
- 					IRQF_SHARED, pdev->name, dev);
 -- 
-1.9.1
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
