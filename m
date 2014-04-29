@@ -1,72 +1,41 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 29 Apr 2014 11:15:32 +0900
-Subject: [PATCH 2/3] ARM: shmobile: henninger: add Ether DT support
-In-Reply-To: <cover.1398737464.git.horms+renesas@verge.net.au>
-References: <cover.1398737464.git.horms+renesas@verge.net.au>
-Message-ID: <26b0d2cf73cb5091962c81598a36346d05e9ba83.1398737464.git.horms+renesas@verge.net.au>
+Date: Tue, 29 Apr 2014 11:15:38 +0900
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Updates for v3.16
+Message-ID: <cover.1398737681.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Define the Henninger board dependent part of the Ether device node.
-Enable DHCP and NFS root for the kernel booting.
+Please consider these second round of Renesas ARM based SoC updates for v3.16.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7791-henninger.dts | 28 +++++++++++++++++++++++++++-
- 1 file changed, 27 insertions(+), 1 deletion(-)
+This pull request is based on the previous round of
+such requests, tagged as renesas-soc-for-v3.16,
+which I have already sent a pull-request for.
 
-diff --git a/arch/arm/boot/dts/r8a7791-henninger.dts b/arch/arm/boot/dts/r8a7791-henninger.dts
-index 0053f52..f82f306 100644
---- a/arch/arm/boot/dts/r8a7791-henninger.dts
-+++ b/arch/arm/boot/dts/r8a7791-henninger.dts
-@@ -21,7 +21,7 @@
- 	};
- 
- 	chosen {
--		bootargs = "console=ttySC0,38400 ignore_loglevel";
-+		bootargs = "console=ttySC0,38400 ignore_loglevel rw root=/dev/nfs ip=dhcp";
- 	};
- 
- 	memory at 40000000 {
-@@ -40,6 +40,16 @@
- 		renesas,groups = "scif0_data_d";
- 		renesas,function = "scif0";
- 	};
-+
-+	ether_pins: ether {
-+		renesas,groups = "eth_link", "eth_mdio", "eth_rmii";
-+		renesas,function = "eth";
-+	};
-+
-+	phy1_pins: phy1 {
-+		renesas,groups = "intc_irq0";
-+		renesas,function = "intc";
-+	};
- };
- 
- &scif0 {
-@@ -48,3 +58,19 @@
- 
- 	status = "okay";
- };
-+
-+&ether {
-+	pinctrl-0 = <&ether_pins &phy1_pins>;
-+	pinctrl-names = "default";
-+
-+	phy-handle = <&phy1>;
-+	renesas,ether-link-active-low;
-+	status = "ok";
-+
-+	phy1: ethernet-phy at 1 {
-+		reg = <1>;
-+		interrupt-parent = <&irqc0>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+		micrel,led-mode = <1>;
-+	};
-+};
--- 
-1.8.5.2
+
+The following changes since commit e35db38d66d1e4007cfc1bb90a05e11b4aaee2a8:
+
+  ARM: shmobile: r8a7778/bockw: Move "select RENESAS_INTC_IRQPIN" under SoC (2014-04-14 11:28:43 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc2-for-v3.16
+
+for you to fetch changes up to ab496b9d259e754f5d646219e4f032b274b9fffe:
+
+  ARM: shmobile: Ignore callbacks for subsys generic_pm_domain_data (2014-04-25 10:01:43 +0900)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM Based SoC Updates for v3.16
+
+Power management code which is only used by
+sh7372 (SH-Mobile AP4) based Mackerl board
+* Ignore callbacks for subsys generic_pm_domain_data
+
+----------------------------------------------------------------
+Ulf Hansson (1):
+      ARM: shmobile: Ignore callbacks for subsys generic_pm_domain_data
+
+ arch/arm/mach-shmobile/pm-rmobile.c | 38 +++----------------------------------
+ 1 file changed, 3 insertions(+), 35 deletions(-)
