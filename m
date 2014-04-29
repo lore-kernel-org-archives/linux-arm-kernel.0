@@ -1,57 +1,56 @@
-From: yinghai@kernel.org (Yinghai Lu)
-Date: Mon, 28 Apr 2014 19:56:54 -0700
-Subject: [PATCH v2 3/7] tty/serial: convert 8250 to generic earlycon
-In-Reply-To: <CAL_JsqKiYmCNGrkiwS7m-OAt3rHZBq_yNGycen-AojbV-7famg@mail.gmail.com>
-References: <1397859600-11507-1-git-send-email-robherring2@gmail.com>
- <1397859600-11507-4-git-send-email-robherring2@gmail.com>
- <CAE9FiQVp5u-jF_xjCu68BgbZ=e0D508tn_-auoiT6cbkYtX8Og@mail.gmail.com>
- <CAL_JsqKiYmCNGrkiwS7m-OAt3rHZBq_yNGycen-AojbV-7famg@mail.gmail.com>
-Message-ID: <CAE9FiQVdwumX7Dsmt8NJhw4uWsj2sjUKaKS1wJQujW1fn1szLw@mail.gmail.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Tue, 29 Apr 2014 07:07:33 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSF0gQVNvQzogZnNsOiBzZWxlY3QgU05EX1NPQ19JTVhfUENN?=
+ =?UTF-8?B?X0RNQSB3aGVyZSBuZWVkZWQ=?=
+In-Reply-To: <6285923.UQqcZVikjI@wuerfel>
+References: <6606961.lAGLvkNsEj@wuerfel> <1398717341.630093136@f319.i.mail.ru>
+ <6285923.UQqcZVikjI@wuerfel>
+Message-ID: <1398740853.880576398@f238.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 4:24 PM, Rob Herring <robherring2@gmail.com> wrote:
-> On Sat, Apr 26, 2014 at 1:29 AM, Yinghai Lu <yinghai@kernel.org> wrote:
->
-> Thanks for finding these. I missed them in my build tests. This should fix them:
->
-> diff --git a/drivers/tty/serial/8250/8250_early.c
-> b/drivers/tty/serial/8250/8250_early.c
-> index e83c9db..2094c3b 100644
-> --- a/drivers/tty/serial/8250/8250_early.c
-> +++ b/drivers/tty/serial/8250/8250_early.c
-> @@ -156,6 +156,11 @@ static int __init early_serial8250_setup(struct
-> earlycon_device *device,
->  EARLYCON_DECLARE(uart8250, early_serial8250_setup);
->  EARLYCON_DECLARE(uart, early_serial8250_setup);
->
-> +int __init setup_early_serial8250_console(char *cmdline)
-> +{
-> +       return setup_earlycon(cmdline, "uart8250", early_serial8250_setup);
-> +}
-> +
->  int serial8250_find_port_for_earlycon(void)
->  {
->         struct earlycon_device *device = early_device;
+Mon, 28 Apr 2014 23:12:14 +0200 ?? Arnd Bergmann <arnd@arndb.de>:
+> On Tuesday 29 April 2014 00:35:41 Alexander Shiyan wrote:
+...
+> > > > > Since commit 204dec93eaa "ASoC: fsl: Allow to select individual common
+> > > > > options", it is possible to enable SND_SOC_FSL_SSI and SND_SOC_FSL_SPDIF
+> > > > > manually. However, these two options are for drivers that both
+> > > > > require the imx-pcm-dma framework and result in a link error if that
+> > > > > is not provided.
+> > > > > 
+> > > > > This changes Kconfig to automatically select SND_SOC_IMX_PCM_DMA
+> > > > > to avoid the problem, as we do for other drivers that need the same
+> > > > > framework.
+> > > > > 
+> > > > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > > > 
+> > > > Can you give an exact error?
+> > > 
+> > > 
+> > > sound/built-in.o: In function `fsl_ssi_probe':
+> > > :(.text+0x51fb8): undefined reference to `imx_pcm_dma_init'
+> > > sound/built-in.o: In function `fsl_spdif_probe':
+> > > :(.text+0x52e20): undefined reference to `imx_pcm_dma_init'
+> > 
+> > This call is defined in imx-pcm.h as:
+> > #if IS_ENABLED(CONFIG_SND_SOC_IMX_PCM_DMA)
+> > int imx_pcm_dma_init(struct platform_device *pdev);
+> > #else
+> > static inline int imx_pcm_dma_init(struct platform_device *pdev)
+> > {
+> >   return -ENODEV;
+> > }
+> > #endif
+> > 
+> > So, I don't understand why this error happen, as well as I can not
+> > reproduce this...
+> 
+> It's probably CONFIG_SND_SOC_IMX_PCM_DMA=m and CONFIG_SND_SOC_FSL_SSI=y then.
+> What is the intended behavior in this case? Should CONFIG_SND_SOC_FSL_SSI
+> be forced to be a module as well?
 
-that only handle "uart8250,", may need to add more lines to handle "uart,"
+Hmm, yes...
+I thought that I had already solved a similar problem for the earlier
+version of the patch ...
 
-+int __init setup_early_serial8250_console(char *cmdline)
-+{
-+       char *options;
-+       options = strstr(cmdline, "uart8250,");
-+       if (options)
-+               return setup_earlycon(cmdline, "uart8250",
-early_serial8250_setup);
-+
-+       options = strstr(cmdline, "uart,");
-+       if (options)
-+              return setup_earlycon(cmdline, "uart", early_serial8250_setup);
-+
-+      return 0;
-+}
-+
-
-Thanks
-
-Yinghai
+---
