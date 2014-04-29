@@ -1,80 +1,36 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Tue, 29 Apr 2014 08:55:35 +0300
-Subject: [PATCH v12 11/31] documentation: iommu: add binding document of
- Exynos System MMU
-In-Reply-To: <20140428103919.GF19455@ulmo>
-References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
- <1398584283-22846-12-git-send-email-shaik.ameer@samsung.com>
- <4447051.OnJtcFSqFV@wuerfel> <20140428103919.GF19455@ulmo>
-Message-ID: <87eh0gd6i0.fsf@nvidia.com>
+From: anup.patel@linaro.org (Anup Patel)
+Date: Tue, 29 Apr 2014 11:24:25 +0530
+Subject: [PATCH v11 12/12] ARM/ARM64: KVM: Advertise KVM_CAP_ARM_PSCI_0_2 to
+ user space
+In-Reply-To: <1398750865-10892-1-git-send-email-anup.patel@linaro.org>
+References: <1398750865-10892-1-git-send-email-anup.patel@linaro.org>
+Message-ID: <1398750865-10892-13-git-send-email-anup.patel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+We have PSCI v0.2 emulation available in KVM ARM/ARM64
+hence advertise this to user space (i.e. QEMU or KVMTOOL)
+via KVM_CHECK_EXTENSION ioctl.
 
-Thierry Reding <thierry.reding@gmail.com> writes:
+Signed-off-by: Anup Patel <anup.patel@linaro.org>
+Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/kvm/arm.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-> * PGP Signed by an unknown key
->
-> On Sun, Apr 27, 2014 at 08:23:06PM +0200, Arnd Bergmann wrote:
->> On Sunday 27 April 2014 13:07:43 Shaik Ameer Basha wrote:
->> > +- mmu-masters: A phandle to device nodes representing the master for which
->> > +               the System MMU can provide a translation. Any additional values
->> > +              after the phandle will be ignored because a System MMU never
->> > +              have two or more masters. "#stream-id-cells" specified in the
->> > +              master's node will be also ignored.
->> > +              If more than one phandle is specified, only the first phandle
->> > +              will be treated.
->> 
->> This seems completely backwards: Why would you list the masters for an IOMMU
->> in the IOMMU node?
->> 
->> The master should have a standard property pointing to the IOMMU instead.
->> 
->> We don't have a generic binding for IOMMUs yet it seems, but the time is
->> overdue to make one.
->> 
->> Consider this NAKed until there is a generic binding for IOMMUs that all
->> relevant developers have agreed to.
->
-> I'd like to take this opportunity and revive one of the hibernating
-> patch sets that we have for Tegra. The last effort to get things merged
-> was back in January I think. I haven't bothered to look up the reference
-> since it's probably good to start from scratch anyway.
->
-> The latest version of the binding that was under discussion back then I
-> think looked something like this:
->
-> 	device at ... {
-> 		iommus = <&iommu [spec]>[, <&other_iommu [other_spec]>...];
-> 	};
->
-> And possibly with a iommu-names property to go along with that. The idea
-> being that a device can be a master on possibly multiple IOMMUs. Using
-> the above it would also be possible to have one device be multiple
-> masters on the same IOMMU.
->
-> On Tegra the specifier would be used to encode a memory controller's
-> client ID. One discussion point back at the time was to encode the ID as
-> a bitmask to allow more than a single master per entry. Another solution
-> which I think is a little cleaner and more generic, would be to use one
-> entry per master and use a single cell to encode the client ID. Devices
-> with multiple clients to the same IOMMU could then use multiple entries
-> referencing the same IOMMU.
->
-> I've added Hiroshi Doyu on Cc since he knows the Tegra IOMMU best.
-> Hiroshi, can you summarize exactly what the proposed bindings were. If
-> my memory serves me well they were mostly along the lines of what Arnd
-> proposes here, and perhaps they are something that can also be used for
-> Exynos.
-
-You can find the detail from:
-
-[PATCHv7 09/12] iommu/tegra: smmu: get swgroups from DT "iommus="
-  http://lists.linuxfoundation.org/pipermail/iommu/2013-December/007212.html
-
-You can specify any parameters which your iommu requires from a device,
-and a device(master) can have multiple IOMMUs.
-
- 	device at ... {
- 		iommus = <&iommu [spec]>[, <&other_iommu [other_spec]>...];
- 	};
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index f0e50a0..3c82b37 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -197,6 +197,7 @@ int kvm_dev_ioctl_check_extension(long ext)
+ 	case KVM_CAP_DESTROY_MEMORY_REGION_WORKS:
+ 	case KVM_CAP_ONE_REG:
+ 	case KVM_CAP_ARM_PSCI:
++	case KVM_CAP_ARM_PSCI_0_2:
+ 		r = 1;
+ 		break;
+ 	case KVM_CAP_COALESCED_MMIO:
+-- 
+1.7.9.5
