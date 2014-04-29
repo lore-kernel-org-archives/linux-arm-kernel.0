@@ -1,45 +1,64 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 29 Apr 2014 13:08:12 +0800
-Subject: [PATCH] ARM: dts: imx27-phytec-phycard-s-rdk: Remove
- 'regulator-always-on'
-In-Reply-To: <1398265137-32586-1-git-send-email-festevam@gmail.com>
-References: <1398265137-32586-1-git-send-email-festevam@gmail.com>
-Message-ID: <20140429050810.GB16451@dragon>
+From: jhbird.choi@samsung.com (Jonghwan Choi)
+Date: Tue, 29 Apr 2014 14:24:05 +0900
+Subject: [PATCH 2/2] cpufreq: Remove exynos_sort_descend_freq_table in
+ exynos5440-cpufreq.c
+Message-ID: <000701cf636b$3d1d13c0$b7573b40$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 23, 2014 at 11:58:57AM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> There is no point in using 'regulator-always-on' for a fixed regulator that is 
-> not controlled via GPIO.
+After applying "PM / OPP: Use list_for_each_entry_reverse instead of
+list_for_each_entry",
+cpufreq table is sorted int descending order. So
+exynos_sort_descend_freq_table
+doesn't need anymore.
 
-I've seen such cosmetic change a couple of times, and wouldn't like to
-take the patch individually.  If you think it's really a change worth
-patching, please do it globally for i.MX dts files.
+Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
+---
+ drivers/cpufreq/exynos5440-cpufreq.c |   20 --------------------
+ 1 file changed, 20 deletions(-)
 
-Shawn
-
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts b/arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts
-> index 3c3964a..3376041 100644
-> --- a/arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts
-> +++ b/arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts
-> @@ -46,7 +46,6 @@
->  			regulator-name = "3V3";
->  			regulator-min-microvolt = <3300000>;
->  			regulator-max-microvolt = <3300000>;
-> -			regulator-always-on;
->  		};
->  	};
->  };
-> -- 
-> 1.8.3.2
-> 
-> 
-> 
+diff --git a/drivers/cpufreq/exynos5440-cpufreq.c
+b/drivers/cpufreq/exynos5440-cpufreq.c
+index a6b8214..92db80b 100644
+--- a/drivers/cpufreq/exynos5440-cpufreq.c
++++ b/drivers/cpufreq/exynos5440-cpufreq.c
+@@ -279,25 +279,6 @@ static irqreturn_t exynos_cpufreq_irq(int irq, void
+*id)
+ 	return IRQ_HANDLED;
+ }
+ 
+-static void exynos_sort_descend_freq_table(void)
+-{
+-	struct cpufreq_frequency_table *freq_tbl = dvfs_info->freq_table;
+-	int i = 0, index;
+-	unsigned int tmp_freq;
+-	/*
+-	 * Exynos5440 clock controller state logic expects the cpufreq table
+to
+-	 * be in descending order. But the OPP library constructs the table
+in
+-	 * ascending order. So to make the table descending we just need to
+-	 * swap the i element with the N - i element.
+-	 */
+-	for (i = 0; i < dvfs_info->freq_count / 2; i++) {
+-		index = dvfs_info->freq_count - i - 1;
+-		tmp_freq = freq_tbl[i].frequency;
+-		freq_tbl[i].frequency = freq_tbl[index].frequency;
+-		freq_tbl[index].frequency = tmp_freq;
+-	}
+-}
+-
+ static int exynos_cpufreq_cpu_init(struct cpufreq_policy *policy)
+ {
+ 	policy->clk = dvfs_info->cpu_clk;
+@@ -374,7 +355,6 @@ static int exynos_cpufreq_probe(struct platform_device
+*pdev)
+ 		goto err_put_node;
+ 	}
+ 	dvfs_info->freq_count = dev_pm_opp_get_opp_count(dvfs_info->dev);
+-	exynos_sort_descend_freq_table();
+ 
+ 	if (of_property_read_u32(np, "clock-latency", &dvfs_info->latency))
+ 		dvfs_info->latency = DEF_TRANS_LATENCY;
+-- 
+1.7.10.4
