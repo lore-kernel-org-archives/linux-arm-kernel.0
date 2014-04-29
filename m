@@ -1,47 +1,33 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 29 Apr 2014 19:32:59 +0300
-Subject: [PATCH 06/23] ARM: OMAP: add OMAP5 DSI muxing
-In-Reply-To: <535FD10B.4020108@ti.com>
-References: <1398334639-14172-1-git-send-email-tomi.valkeinen@ti.com>
- <1398334639-14172-7-git-send-email-tomi.valkeinen@ti.com>
- <535A42D6.5090107@ti.com> <535A4470.2000509@ti.com> <535A5C0A.7040808@ti.com>
- <535A6C40.10609@ti.com> <20140425153150.GA20807@atomide.com>
- <535DFAAE.1010606@ti.com> <20140428164528.GM20807@atomide.com>
- <535F37E9.8090609@ti.com> <20140429150529.GA27571@atomide.com>
- <535FD10B.4020108@ti.com>
-Message-ID: <535FD43B.3030102@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 29 Apr 2014 17:35:19 +0100
+Subject: [PATCH v2 00/10] arm64: UEFI support
+In-Reply-To: <20140429144713.GL26088@console-pimps.org>
+References: <1398442154-19974-1-git-send-email-leif.lindholm@linaro.org>
+ <20140429102817.GE17007@arm.com>
+ <20140429114356.GK26088@console-pimps.org>
+ <20140429134726.GH17007@arm.com>
+ <20140429144713.GL26088@console-pimps.org>
+Message-ID: <20140429163517.GA18644@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/04/14 19:19, Tomi Valkeinen wrote:
-> On 29/04/14 18:05, Tony Lindgren wrote:
+On Tue, Apr 29, 2014 at 03:47:13PM +0100, Matt Fleming wrote:
+> On Tue, 29 Apr, at 02:47:28PM, Catalin Marinas wrote:
+> > Given that Leif's series contains both generic efi and arm64 patches,
+> > what's your preference for merging them? I'm happy to add my ack and
+> > they go via your tree (or the other way around).
 > 
->>> omap4_padconf_global is a syscon node, not pinctrl. As syscon just gives
->>> a raw regmap to its memory area, the driver needs to know about the OMAP
->>> control registers to use it.
->>
->> That would be probably best set up the same way we have already set up
->> for example omap4_padconf_global: tisyscon at 4a1005a0. Then drivers can
->> access it using regmap, see how drivers/regulator/pbias-regulator.c
->> sets up the pbias regulator with regmap for MMC.
+> I'm happy either way, though if I take them through my tree (and
+> subsequently through tip) you won't have to worry about the merge window
+> rigmarole, which is a plus.
 > 
-> Right, but it means that the driver will contain platform specific code
-> for all the omap revisions it supports. Isn't that wrong?
-> 
-> I already have a patch for DSI that uses the syscon-method, and it works
-> fine. But it's quite ugly, imo, to fiddle with the OMAP control
-> registers in a driver.
+> So, eveyone happy for me to take these with Catalin's Acked-by?
 
-Oh, also, if I do that, I need to know both the SoC version and the DSS
-version in the driver.
+Fine by me. Just in case I haven't stated it explicitly for this series:
 
- Tomi
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
+Thanks.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140429/a1aa03e7/attachment.sig>
+-- 
+Catalin
