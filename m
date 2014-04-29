@@ -1,36 +1,132 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 30 Apr 2014 00:52:17 +0200
-Subject: [PATCH] PM / Sleep: Fall back to subsystem level PM callbacks for
- PM domains
-In-Reply-To: <1753685.C73DLtyD2t@vostro.rjw.lan>
-References: <1398422695-2295-1-git-send-email-ulf.hansson@linaro.org>
- <1753685.C73DLtyD2t@vostro.rjw.lan>
-Message-ID: <1679843.u9z8cZFExt@vostro.rjw.lan>
+From: zlim@broadcom.com (Zi Shen Lim)
+Date: Tue, 29 Apr 2014 16:36:13 -0700
+Subject: [PATCHv3] arm64: topology: add MPIDR-based detection
+Message-ID: <1398814573-27389-1-git-send-email-zlim@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, April 30, 2014 12:47:28 AM Rafael J. Wysocki wrote:
-> On Friday, April 25, 2014 12:44:55 PM Ulf Hansson wrote:
-> > Previously once the PM core found a PM domain pointer for a device,
-> > but which didn't have a valid PM callback, it falled back to try the
-> > driver's PM callback.
-> > 
-> > In this scenario, change the behavior of the PM core to try out the
-> > other subsystem level PM callbacks, before it moves on to the driver.
-> > 
-> > This gives provision for PM domains to easier re-use subsystem level
-> > code to handle the needed operations.
-> > 
-> > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> 
-> Are you sure this is not going to break the existing PM domains?
+Create cpu topology based on MPIDR. When hardware sets MPIDR to sane
+values, this method will always work. Therefore it should also work well
+as the fallback method. [1]
 
-And even if it isn't, the idea behind PM domains was to provide a mechanism to
-bypass the bus types' (etc) PM callbacks, so I'm not liking this patch at all.
+When we have multiple processing elements in the system, we create
+the cpu topology by mapping each affinity level (from lowest to highest)
+to threads (if they exist), cores, and clusters.
 
-Thanks!
+We combine data from all higher affinity levels into cluster_id
+so we don't lose any information from MPIDR. [2]
 
+[1] http://www.spinics.net/lists/arm-kernel/msg317445.html
+[2] https://lkml.org/lkml/2014/4/23/703
 
+Signed-off-by: Zi Shen Lim <zlim@broadcom.com>
+---
+v1->v2: Addressed comments from Mark Brown.
+ - Reduce noise. Use pr_debug instead of pr_info.
+ - Don't ignore higher affinity levels.
+
+v2->v3: Addressed comments from Lorenzo Pieralisi.
+ - Rebased on top of Mark Brown's DT topology series.
+ - Make MPIDR fallback option.
+ - Fixed usage of mpidr_hash.shift_aff. Please review :)
+
+Tested on my multi-core multi-thread model.
+
+ arch/arm64/include/asm/cputype.h |  5 +++++
+ arch/arm64/kernel/topology.c     | 44 +++++++++++++++++++++++++++++++++++++---
+ 2 files changed, 46 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index c404fb0..b3b3287 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -18,6 +18,8 @@
+ 
+ #define INVALID_HWID		ULONG_MAX
+ 
++#define MPIDR_UP_BITMASK	(0x1 << 30)
++#define MPIDR_MT_BITMASK	(0x1 << 24)
+ #define MPIDR_HWID_BITMASK	0xff00ffffff
+ 
+ #define MPIDR_LEVEL_BITS_SHIFT	3
+@@ -30,6 +32,9 @@
+ #define MPIDR_AFFINITY_LEVEL(mpidr, level) \
+ 	((mpidr >> MPIDR_LEVEL_SHIFT(level)) & MPIDR_LEVEL_MASK)
+ 
++#define MPIDR_AFF_MASK(level) \
++	((u64)MPIDR_LEVEL_MASK << MPIDR_LEVEL_SHIFT(level))
++
+ #define read_cpuid(reg) ({						\
+ 	u64 __val;							\
+ 	asm("mrs	%0, " #reg : "=r" (__val));			\
+diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+index caf2a7c..cfaa2a3 100644
+--- a/arch/arm64/kernel/topology.c
++++ b/arch/arm64/kernel/topology.c
+@@ -21,6 +21,8 @@
+ #include <linux/sched.h>
+ #include <linux/slab.h>
+ 
++#include <asm/cputype.h>
++#include <asm/smp_plat.h>
+ #include <asm/topology.h>
+ 
+ /*
+@@ -362,9 +364,7 @@ static void update_siblings_masks(unsigned int cpuid)
+ 	int cpu;
+ 
+ 	if (cpuid_topo->cluster_id == -1) {
+-		/*
+-		 * DT does not contain topology information for this cpu.
+-		 */
++		/* No topology information for this cpu ?! */
+ 		pr_debug("CPU%u: No topology information configured\n", cpuid);
+ 		return;
+ 	}
+@@ -391,6 +391,44 @@ static void update_siblings_masks(unsigned int cpuid)
+ 
+ void store_cpu_topology(unsigned int cpuid)
+ {
++	struct cpu_topology *cpuid_topo = &cpu_topology[cpuid];
++	u64 mpidr;
++
++	if (cpuid_topo->cluster_id != -1)
++		goto topology_populated;
++
++	mpidr = read_cpuid_mpidr();
++
++	/* Create cpu topology mapping based on MPIDR. */
++	if (mpidr & MPIDR_UP_BITMASK) {
++		/* Uniprocessor system */
++		cpuid_topo->thread_id  = -1;
++		cpuid_topo->core_id    = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++		cpuid_topo->cluster_id = 0;
++	} else if (mpidr & MPIDR_MT_BITMASK) {
++		/* Multiprocessor system : Multi-threads per core */
++		cpuid_topo->thread_id  = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++		cpuid_topo->core_id    = MPIDR_AFFINITY_LEVEL(mpidr, 1);
++		cpuid_topo->cluster_id =
++			((mpidr & MPIDR_AFF_MASK(2)) >> mpidr_hash.shift_aff[2] |
++			 (mpidr & MPIDR_AFF_MASK(3)) >> mpidr_hash.shift_aff[3])
++			>> mpidr_hash.shift_aff[1] >> mpidr_hash.shift_aff[0];
++	} else {
++		/* Multiprocessor system : Single-thread per core */
++		cpuid_topo->thread_id  = -1;
++		cpuid_topo->core_id    = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++		cpuid_topo->cluster_id =
++			((mpidr & MPIDR_AFF_MASK(1)) >> mpidr_hash.shift_aff[1] |
++			 (mpidr & MPIDR_AFF_MASK(2)) >> mpidr_hash.shift_aff[2] |
++			 (mpidr & MPIDR_AFF_MASK(3)) >> mpidr_hash.shift_aff[3])
++			>> mpidr_hash.shift_aff[0];
++	}
++
++	pr_debug("CPU%u: cluster %d core %d thread %d mpidr %llx\n",
++		 cpuid, cpuid_topo->cluster_id, cpuid_topo->core_id,
++		 cpuid_topo->thread_id, mpidr);
++
++topology_populated:
+ 	update_siblings_masks(cpuid);
+ 	update_cpu_power(cpuid);
+ }
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+1.8.4.3
