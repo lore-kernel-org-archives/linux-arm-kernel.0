@@ -1,33 +1,43 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Tue, 29 Apr 2014 14:05:04 +0800
-Subject: [PATCH v2 02/10] mtd: spi-nor: add a new field for spi_nor{}
-In-Reply-To: <201404290854.25116.marex@denx.de>
-References: <1398657227-20721-1-git-send-email-b32955@freescale.com>
- <201404282223.26174.marex@denx.de> <20140429051832.GC21064@localhost>
- <201404290854.25116.marex@denx.de>
-Message-ID: <20140429060502.GA14227@localhost>
+From: jhbird.choi@samsung.com (Jonghwan Choi)
+Date: Tue, 29 Apr 2014 16:05:28 +0900
+Subject: [PATCH 2/2] cpufreq: Remove exynos_sort_descend_freq_table in
+ exynos5440-cpufreq.c
+In-Reply-To: <CAKohponkT9o4WVUo=fNmVq+kMjm68Z3hdFVMhe7+8qsKPPc2CQ@mail.gmail.com>
+References: <000701cf636b$3d1d13c0$b7573b40$@samsung.com>
+ <CAKohpo=ei0v69iQtjd6cjmfUCo-+sd1JzNc4RDza92nxaPoiVg@mail.gmail.com>
+ <CADGdYn7cA940sxPszP5TA5tMnXD_=QkH3U3Wedy2DoC++rwRkQ@mail.gmail.com>
+ <CAKohponkT9o4WVUo=fNmVq+kMjm68Z3hdFVMhe7+8qsKPPc2CQ@mail.gmail.com>
+Message-ID: <001501cf6379$66fea1f0$34fbe5d0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 29, 2014 at 08:54:24AM +0200, Marek Vasut wrote:
-> On Tuesday, April 29, 2014 at 07:18:34 AM, Huang Shijie wrote:
-> > For the m25p80.c, @dev stands for a child node for the SPI master,
-> > and it points to a spi_device{}. Yes, in this case, the dev->of_node is
-> > NULL.
-> > 
-> > But for the fsl_quadspi or other SPI NOR drivers, the @dev stands for the
-> > controller itself, the @dev->of_node is a list of the child nodes, so we
-> > can _NOT_ know which child node we are working at now.
+Thanks to Amit Kachhap & Viresh Kumar
+
+
+> -----Original Message-----
+> From: Viresh Kumar [mailto:viresh.kumar at linaro.org]
+> Sent: Tuesday, April 29, 2014 3:21 PM
+> To: Amit Kachhap
+> Cc: Jonghwan Choi; Kukjin Kim; linux-samsung-soc; Rafael J. Wysocki;
+> linux-arm-kernel at lists.infradead.org; open list:CPU FREQUENCY DRI...
+> Subject: Re: [PATCH 2/2] cpufreq: Remove exynos_sort_descend_freq_table in
+> exynos5440-cpufreq.c
 > 
-> Huh ? The dev is being recycled for two different kind of things ?
-yes.
-
-for the SPI bus, the of_register_spi_devices() will allocate a spi_device{}
-for each child node for the SPI NOR flash. So in the m25p80.c, the @dev points
-to a spi_device{}.
-
-For the simplicity,  we do not allocate any *_device{} for the child
-node in the SPI NOR flash driver, such as in the fsl-quadspi.c.
-
-thanks
-Huang Shijie
+> On 29 April 2014 11:44, Amit Kachhap <amit.kachhap@gmail.com> wrote:
+> > In the frequency table dts file, the frequencies are arranged in
+> > descending order which maps 1 to 1 with other frequency parameter to
+> > be calculated and programmed in some registers.
+> > But the OPP library works by generating the frequencies in ascending
+> > order which breaks the above logic. Ideally i should expect frequency
+> > values in same order as what is supplied.
+> > So OPP library should not change the order or should take input flags
+> > flags like, dev_pm_opp_init_cpufreq_table(TABLE_ORDER_ASCEND|
+> > TABLE_ORDER_DESCEND|TABLE_ORDER_ORIGINAL )
+> 
+> Looks a good idea :)
+> 
+> This is what I wrote in another thread:
+> 
+> What I would recommend is, use .driver_data field to hold what has to be
+> written to hardware for any frequency. And then simply use driver_data
+> instead of index.
