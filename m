@@ -1,37 +1,63 @@
-From: george.cherian@ti.com (George Cherian)
-Date: Tue, 29 Apr 2014 10:01:21 +0530
-Subject: [PATCH] ARM: dts: am33xx: fix DMA support for the second USB
- interface
-In-Reply-To: <CAGm1_kt_yQZowthaFq=imM5J6=1FkJX_1LtRV7eEiqeursbDZQ@mail.gmail.com>
-References: <1398674237-4129-1-git-send-email-yegorslists@googlemail.com>
- <535E64EF.2020108@ti.com>
- <CAGm1_kt_yQZowthaFq=imM5J6=1FkJX_1LtRV7eEiqeursbDZQ@mail.gmail.com>
-Message-ID: <535F2B19.7020300@ti.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 29 Apr 2014 12:55:07 +0800
+Subject: [PATCH] ARM: dts: imx53-qsb-common: Add TVE support
+In-Reply-To: <1398254769-10513-1-git-send-email-festevam@gmail.com>
+References: <1398254769-10513-1-git-send-email-festevam@gmail.com>
+Message-ID: <20140429045504.GA16451@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/28/2014 9:47 PM, Yegor Yefremov wrote:
-> On Mon, Apr 28, 2014 at 4:25 PM, George Cherian <george.cherian@ti.com> wrote:
->> On 4/28/2014 2:07 PM, yegorslists at googlemail.com wrote:
->>> From: Yegor Yefremov <yegorslists@googlemail.com>
->>>
->>> This patch creates unique DMA channels for the second USB
->>> interface, otherwise the second USB interface is not usable
->>> at all.
->> MUSB_DMA_NUM_CHANNELS is 15, so if you pass  any dma-names > 15 (>
->> rx15/tx15),
->> the dma_controller_create in musb_core.c fails and it falls back to PIO
->> mode.
-> What's the proper fix for the DMA issue?
-I could not understand what issue you are referring to.
-In my setup I use both BBB and BBW (Beagle Bone Black/White)with one USB 
-in host (USB1)
-and one USB in gadget (USB0). I dont see any issues with DMA.
+On Wed, Apr 23, 2014 at 09:06:09AM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/boot/dts/imx53-qsb-common.dtsi | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx53-qsb-common.dtsi b/arch/arm/boot/dts/imx53-qsb-common.dtsi
+> index ede04fa..a491bde 100644
+> --- a/arch/arm/boot/dts/imx53-qsb-common.dtsi
+> +++ b/arch/arm/boot/dts/imx53-qsb-common.dtsi
+> @@ -272,6 +272,14 @@
+>  			>;
+>  		};
+>  
+> +		pinctrl_vga_sync_1: vgasync-grp1 {
 
-Can you be more specific?
->
-> Yegor
+Will there be pinctrl_vga_sync_2, pinctrl_vga_sync_3, ...?  Otherwise, I
+see no point to have the number suffix in there?
 
+Shawn
 
--- 
--George
+> +			fsl,pins = <
+> +				/* VGA_HSYNC, VSYNC with max drive strength */
+> +				MX53_PAD_EIM_OE__IPU_DI1_PIN7 0xe6
+> +				MX53_PAD_EIM_RW__IPU_DI1_PIN8 0xe6
+> +			>;
+> +		};
+> +
+>  		pinctrl_uart1: uart1grp {
+>  			fsl,pins = <
+>  				MX53_PAD_CSI0_DAT10__UART1_TXD_MUX	0x1e4
+> @@ -281,6 +289,15 @@
+>  	};
+>  };
+>  
+> +&tve {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_vga_sync_1>;
+> +	fsl,tve-mode = "vga";
+> +	fsl,hsync-pin = <4>;
+> +	fsl,vsync-pin = <6>;
+> +	status = "okay";
+> +};
+> +
+>  &uart1 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_uart1>;
+> -- 
+> 1.8.3.2
+> 
+> 
+> 
