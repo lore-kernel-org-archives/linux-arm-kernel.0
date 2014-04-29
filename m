@@ -1,107 +1,30 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Tue, 29 Apr 2014 22:24:45 +0530
-Subject: [PATCH 5/5] devfreq: exynos5: Use devm_devfreq_* function using
- device resource management
-In-Reply-To: <1398416894-6782-6-git-send-email-cw00.choi@samsung.com>
-References: <1398416894-6782-1-git-send-email-cw00.choi@samsung.com>
- <1398416894-6782-6-git-send-email-cw00.choi@samsung.com>
-Message-ID: <CAK9yfHyP63QaaBwc4vkkqU4g3+B2DpqeC_11E5+LevWXED0Qxg@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 29 Apr 2014 09:56:30 -0700
+Subject: [alsa-devel] [PATCH] ASoC: fsl: select SND_SOC_IMX_PCM_DMA where
+ needed
+In-Reply-To: <535FB793.5050200@metafoo.de>
+References: <6606961.lAGLvkNsEj@wuerfel> <4270904.84oGcCXL4B@wuerfel>
+ <535F8594.40609@metafoo.de> <4275868.O962kiiyJa@wuerfel>
+ <535FB793.5050200@metafoo.de>
+Message-ID: <20140429165630.GD16981@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chanwoo,
+On Tue, Apr 29, 2014 at 04:30:43PM +0200, Lars-Peter Clausen wrote:
 
-On 25 April 2014 14:38, Chanwoo Choi <cw00.choi@samsung.com> wrote:
-> This patch uses devm_devfreq_add_device()/devm_devfreq_register_opp_notifier()
-> to control automatically the resource of devfreq.
->
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Sachin Kamat <sachin.kamat@linaro.org>
-> Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> Cc: Manish Badarkhe <badarkhe.manish@gmail.com>
-> Cc: Abhilash Kesavan <a.kesavan@samsung.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-samsung-soc at vger.kernel.org
-> ---
->  drivers/devfreq/exynos/exynos5_bus.c | 23 ++++++++---------------
->  1 file changed, 8 insertions(+), 15 deletions(-)
->
-> diff --git a/drivers/devfreq/exynos/exynos5_bus.c b/drivers/devfreq/exynos/exynos5_bus.c
-> index ab54a69..1f622f8 100644
-> --- a/drivers/devfreq/exynos/exynos5_bus.c
-> +++ b/drivers/devfreq/exynos/exynos5_bus.c
-> @@ -165,11 +165,6 @@ static int exynos5_int_get_dev_status(struct device *dev,
->  }
->  static void exynos5_int_exit(struct device *dev)
->  {
-> -       struct platform_device *pdev = container_of(dev, struct platform_device,
-> -                                                   dev);
-> -       struct busfreq_data_int *data = platform_get_drvdata(pdev);
-> -
-> -       devfreq_unregister_opp_notifier(dev, data->devfreq);
->  }
+> Yes. The patch should also add a select for SND_SOC_IMX_PCM_FIQ as that is
+> used in the same way in the fsl_ssi driver. If anybody is afraid that
+> selecting both SND_SOC_IMX_PCM_FIQ and SND_SOC_IMX_PCM_DMA by default adds
+> too much overhead you could add boolean sub-options that allow to
+> enable/disable support individually.
 
-Do you need an empty function?
-
->
->  static struct devfreq_dev_profile exynos5_devfreq_int_profile = {
-> @@ -343,30 +338,29 @@ static int exynos5_busfreq_int_probe(struct platform_device *pdev)
->
->         busfreq_mon_reset(ppmu_data);
->
-> -       data->devfreq = devfreq_add_device(dev, &exynos5_devfreq_int_profile,
-> +       data->devfreq = devm_devfreq_add_device(dev, &exynos5_devfreq_int_profile,
->                                            "simple_ondemand", NULL);
-> -
->         if (IS_ERR(data->devfreq)) {
->                 err = PTR_ERR(data->devfreq);
-
-No need of err.   return PTR_ERR(data->devfreq);
-
-> -               goto err_devfreq_add;
-> +               return err;
->         }
->
-> -       devfreq_register_opp_notifier(dev, data->devfreq);
-> +       err = devm_devfreq_register_opp_notifier(dev, data->devfreq);
-> +       if (err < 0) {
-> +               dev_err(dev, "Failed to register opp notifier\n");
-> +               return err;
-> +       }
->
->         err = register_pm_notifier(&data->pm_notifier);
->         if (err) {
->                 dev_err(dev, "Failed to setup pm notifier\n");
-> -               goto err_devfreq_add;
-> +               return err;
->         }
->
->         /* TODO: Add a new QOS class for int/mif bus */
->         pm_qos_add_request(&data->int_req, PM_QOS_NETWORK_THROUGHPUT, -1);
->
->         return 0;
-> -
-> -err_devfreq_add:
-> -       devfreq_remove_device(data->devfreq);
-> -       return err;
->  }
->
->  static int exynos5_busfreq_int_remove(struct platform_device *pdev)
-> @@ -375,7 +369,6 @@ static int exynos5_busfreq_int_remove(struct platform_device *pdev)
->
->         pm_qos_remove_request(&data->int_req);
->         unregister_pm_notifier(&data->pm_notifier);
-> -       devfreq_remove_device(data->devfreq);
->
->         return 0;
->  }
-> --
-> 1.8.0
->
-
-
-
--- 
-With warm regards,
-Sachin
+Yes, the overhead should be negligable since the FIQ code is tiny.
+Arnd, please CC maintainers on patches - you've sent this to my
+Linaro address again and not added Liam.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140429/178cbaa6/attachment.sig>
