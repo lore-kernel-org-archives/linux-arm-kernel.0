@@ -1,48 +1,52 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 29 Apr 2014 14:55:27 -0400
-Subject: [PATCH 1/5] ARM: defconfigs: add MTD_SPI_NOR (new dependency
- for M25P80)
-In-Reply-To: <20140429182815.GA28069@arch.cereza>
-References: <1397719309-2022-1-git-send-email-computersforpeace@gmail.com>
- <1397719309-2022-2-git-send-email-computersforpeace@gmail.com>
- <535A8FC9.8040707@wwwdotorg.org>
- <20140429172227.GB11657@arch.cereza>
- <20140429174849.GO28159@titan.lakedaemon.net>
- <20140429182815.GA28069@arch.cereza>
-Message-ID: <20140429185527.GP28159@titan.lakedaemon.net>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 29 Apr 2014 14:49:48 -0400 (EDT)
+Subject: [PATCH v3 5/6] arm: exynos: Add MCPM call-back functions
+In-Reply-To: <CAM4voa=mhcZO9v7nDdrcz+T8RVN-Av3eERVErCX52k1ftUcKcQ@mail.gmail.com>
+References: <1398528348-21214-1-git-send-email-a.kesavan@samsung.com>
+ <1398528348-21214-6-git-send-email-a.kesavan@samsung.com>
+ <20140428174456.GE31782@e102568-lin.cambridge.arm.com>
+ <CAM4voa=mhcZO9v7nDdrcz+T8RVN-Av3eERVErCX52k1ftUcKcQ@mail.gmail.com>
+Message-ID: <alpine.LFD.2.11.1404291435450.980@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 29, 2014 at 03:28:15PM -0300, Ezequiel Garcia wrote:
-> On Apr 29, Jason Cooper wrote:
-> > On Tue, Apr 29, 2014 at 02:22:27PM -0300, Ezequiel Garcia wrote:
-> > > On Apr 25, Stephen Warren wrote:
-> > > > On 04/17/2014 01:21 AM, Brian Norris wrote:
-> > > > > These defconfigs contain the CONFIG_M25P80 symbol, which is now
-> > > > > dependent on the MTD_SPI_NOR symbol. Add CONFIG_MTD_SPI_NOR to the
-> > > > > relevant defconfigs.
-> > > > > 
-> > > > > At the same time, drop the now-nonexistent CONFIG_MTD_CHAR symbol.
-> > 
-> > Excuse my ignorance of the history of this bug, but shouldn't this be
-> > solved in the Kconfig logic?  Since when do we solve config symbol
-> > dependency bugs in the defconfigs?
-> > 
-> 
-> Long story short: it was decided that select'ing this new symbol was not
-> appropriate. Instead, it must be explicitly selected by the user, hence
-> the defconfig fix.
-> 
-> The full story: https://lkml.org/lkml/2014/4/17/45
+On Tue, 29 Apr 2014, Abhilash Kesavan wrote:
 
-ahhh, it already depend's on MTD_SPI_NOR in Kconfig
+> >> +/*
+> >> + * Enable cluster-level coherency, in preparation for turning on the MMU.
+> >> + */
+> >> +static void __naked exynos_pm_power_up_setup(unsigned int affinity_level)
+> >> +{
+> >> +       asm volatile ("\n"
+> >> +       "cmp    r0, #1\n"
+> >> +       "bxne   lr\n"
+> >> +       "b      cci_enable_port_for_self");
+> >> +}
+> >
+> > How many times are we going to duplicate this function before we decide
+> > to move it to a common header ?
+> I see this being used in arch/arm/mach-vexpress/tc2_pm.c (where I
+> copied it from for exynos) and arch/arm/mach-vexpress/dcscb.c. A
+> common function named "mcpm_default_power_up_setup" in the mcpm header
+> would be acceptable ?
 
-  http://git.infradead.org/l2-mtd.git/blobdiff/254592db612aeb55d80399a04995b68f7da48c99..e43b20619bdb6c851dd7b49cbd15e52875a785d4:/drivers/mtd/devices/Kconfig
+Not necessarily.
 
-ok, now it makes sense.
+First of all, this can't be a static inline as we need a pointer to it.  
+And moving this to a header would create multiple instances of the same 
+function in a multiplatform build for example.
 
-Acked-by: Jason Cooper <jason@lakedaemon.net>
+Furthermore, this can't be called "default_power_up_setup" as this is 
+specific to systems with a CCI.
 
-thx,
+It is true that the code in dcscb_setup.S does the same thing as this 
+3-line inline assembly, but the former is heavily commented and may 
+serve as an example template for platforms that may require something 
+more sophisticated here.
 
-Jason.
+There are other patterns that seem to emerge as more MCPM backends are 
+being submitted.  I'm making a list of them and I intend to address such 
+duplications after those backends do hit mainline.
+
+
+Nicolas
