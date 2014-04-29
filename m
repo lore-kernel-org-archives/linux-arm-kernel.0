@@ -1,49 +1,59 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Tue, 29 Apr 2014 10:40:55 +0100
-Subject: [PATCH v3 part1 03/11] ARM64 : Add dummy asm/cpu.h
-In-Reply-To: <1398432017-8506-4-git-send-email-hanjun.guo@linaro.org>
-References: <1398432017-8506-1-git-send-email-hanjun.guo@linaro.org>
- <1398432017-8506-4-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20140429094055.2FCBEC4095B@trevor.secretlab.ca>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 29 Apr 2014 10:42:11 +0100
+Subject: [PATCH 1/3] arm64: adjust el0_sync so that a function can be
+ called
+In-Reply-To: <1398627854-9617-2-git-send-email-larry.bassel@linaro.org>
+References: <1398627854-9617-1-git-send-email-larry.bassel@linaro.org>
+ <1398627854-9617-2-git-send-email-larry.bassel@linaro.org>
+Message-ID: <20140429094211.GC17007@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 25 Apr 2014 21:20:09 +0800, Hanjun Guo <hanjun.guo@linaro.org> wrote:
-> ACPI core requires a cpu.h, add a dummy one here temporarily.
-> This file will be updated in the future to add definitions for
-> arch_(un)register_cpu which are required for ACPI based physical
-> CPU hotplug when these standards have be ratified by the ASWG.
-> 
-> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->  arch/arm64/include/asm/cpu.h |   11 +++++++++++
->  1 file changed, 11 insertions(+)
->  create mode 100644 arch/arm64/include/asm/cpu.h
+On Sun, Apr 27, 2014 at 08:44:12PM +0100, Larry Bassel wrote:
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index 39ac630..eda7755 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+[...]
+> @@ -421,28 +421,30 @@ el0_da:
+>  	/*
+>  	 * Data abort handling
+>  	 */
+> -	mrs	x0, far_el1
+> -	bic	x0, x0, #(0xff << 56)
+>  	disable_step x1
+>  	isb
+>  	enable_dbg
+>  	// enable interrupts before calling the main handler
+>  	enable_irq
+> +	mrs	x0, far_el1
+> +	bic	x0, x0, #(0xff << 56)
+>  	mov	x1, x25
+>  	mov	x2, sp
+> +	adr	lr, ret_from_exception
+>  	b	do_mem_abort
 
-I think we're trying to get away from these empty header stubs by
-putting them in asm-generic. Arnd, care to comment here?
+Reading the far_el1 after enable_dbg and enable_irq is racy, we can no
+longer guarantee its value in the original data abort context.
 
-g.
+>  el0_ia:
+>  	/*
+>  	 * Instruction abort handling
+>  	 */
+> -	mrs	x0, far_el1
+>  	disable_step x1
+>  	isb
+>  	enable_dbg
+>  	// enable interrupts before calling the main handler
+>  	enable_irq
+> +	mrs	x0, far_el1
+>  	orr	x1, x25, #1 << 24		// use reserved ISS bit for instruction aborts
+>  	mov	x2, sp
+> +	adr	lr, ret_from_exception
+>  	b	do_mem_abort
+>  el0_fpsimd_acc:
 
-> 
-> diff --git a/arch/arm64/include/asm/cpu.h b/arch/arm64/include/asm/cpu.h
-> new file mode 100644
-> index 0000000..cee7d3f
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/cpu.h
-> @@ -0,0 +1,11 @@
-> +/*
-> + *  Copyright (C) 2013-2014 ARM Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +#ifndef __ASM_CPU_H
-> +#define __ASM_CPU_H
-> +
-> +#endif
-> -- 
-> 1.7.9.5
-> 
+Same here.
+
+-- 
+Catalin
