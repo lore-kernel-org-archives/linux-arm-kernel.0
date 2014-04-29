@@ -1,57 +1,58 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 29 Apr 2014 14:47:28 +0100
-Subject: [PATCH v2 00/10] arm64: UEFI support
-In-Reply-To: <20140429114356.GK26088@console-pimps.org>
-References: <1398442154-19974-1-git-send-email-leif.lindholm@linaro.org>
- <20140429102817.GE17007@arm.com>
- <20140429114356.GK26088@console-pimps.org>
-Message-ID: <20140429134726.GH17007@arm.com>
+From: ezequiel@vanguardiasur.com.ar (=?UTF-8?Q?Ezequiel_Garc=C3=ADa?=)
+Date: Tue, 29 Apr 2014 10:50:25 -0300
+Subject: [PATCH v2] ARM: dts: am33xx: Move the cppi41dma node so it's
+ probed early
+In-Reply-To: <535F6C33.9040408@linutronix.de>
+References: <1398373881-23369-1-git-send-email-ezequiel@vanguardiasur.com.ar>
+ <CAGm1_kvHtSLNEfkJ24xZGGzsqAjHDTM1XztnX-QGs4iM5voMUw@mail.gmail.com>
+ <535F5BA5.6000903@ti.com> <535F5D6B.6090802@linutronix.de>
+ <535F6276.4050601@ti.com> <535F6C33.9040408@linutronix.de>
+Message-ID: <CAAEAJfChJPN8gy89qsyenibWuKmNOaQUc-GFzoXTirv=Z8mCag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 29, 2014 at 12:43:56PM +0100, Matt Fleming wrote:
-> (Pulling in Peter and Stephen)
-> 
-> On Tue, 29 Apr, at 11:28:17AM, Catalin Marinas wrote:
-> > 
-> > The patches look fine to me, they've been through several rounds of
-> > review already. How do we propose these get merged as the series
-> > contains both generic and arm64 patches? And there are dependencies
-> > already in linux-next.
-> > 
-> > Are the EFI patches in -next pulled from some non-rebaseable branch?
-> 
-> Peter suggsted a plan when he took the generic EFI stuff that's in tip
-> (and hence currently in linux-next),
-> 
->   It doesn't hurt to inform Stephen, although I think it will simply fall
->   out automatically since he uses git to merge and git will recognize the
->   graph.
-> 
->   During the merge window, it means they should not push their patches
->   until Linus has accepted the precondition patches from the tip tree.
->   Since Ingo and I try to push most of the tip tree as early as possible
->   in the merge window, this is usually not a problem.
-> 
-> So we currently have the prerequisites in tip/x86/efi, and assuming that
-> this 10-patch series gets merged into a single branch somewhere, things
-> should work automatically for linux-next.
-> 
-> It may be prudent to negotiate a plan now for when the merge window
-> opens because, as Peter mentions above, the stuff in tip/x86/efi needs
-> to be merged by Linus first to avoid build breakage with the arm64
-> stuff.
+On 29 April 2014 06:09, Sebastian Andrzej Siewior <bigeasy@linutronix.de> wrote:
+> On 04/29/2014 10:27 AM, George Cherian wrote:
+>> Hi Sebastian,
+>
+> Hi George,
+>
+>> On 4/29/2014 1:36 PM, Sebastian Andrzej Siewior wrote:
+>>> On 04/29/2014 09:58 AM, George Cherian wrote:
+>>>>>> This is easily fixed by moving the node at the beggining of the child
+>>>>>> list,
+>>>>>> so it's probed first.
+>>>> This will give issues on module removal.
+>>>> Since we use device_for_each_child in remove patch, it will try to
+>>>> remove cppi dma controller, while the channel
+>>>> is still in use by musb node.
+>>> Isn't this currently disabled because it blew up in the phy code?
+>> Yes. So how if the dt  looks like this
+>
+> No. I remember we talked about this and we decided not to duct tape the
+> bug by moving the nodes around. Instead we wanted to disable the child
+> removal part (one tiny module that can't be removed) until the PHY code
+> does no longer blow up.
+> If the same case is for the DMA driver then it should be fixed, too.
+> The order of the nodes in .dts should not crash the kernel under any
+> circumstances. If a different node order accelerates the probing then
+> fine. But a crash is a no no.
+>
 
-Waiting for the tip/x86/efi to be merged first is not a problem. We
-also need a stable base for testing the arm64 UEFI series, so I assume
-this series can be based onto tip/x86/efi (would such branch be rebased
-before hitting mainline?).
+I still don't see any reason to have the DMA controller node as a
+child of the USB.
+However, it seems we need it this way for now; at least until we get
+rid of the hwmod
+altogether.
 
-Given that Leif's series contains both generic efi and arm64 patches,
-what's your preference for merging them? I'm happy to add my ack and
-they go via your tree (or the other way around).
+That said, this DT-ordering to fix other issues is starting to seem a
+very bad idea.
+I'll prepare a v3 to leave the DT as it is, and instead force the
+driver to probe and
+remove the childs so the DMA is probed first and the removed last.
 
-Thanks.
-
+We can always get rid of such workaround, once we can remove the DMA controller
+out of the USB - as it should be.
 -- 
-Catalin
+Ezequiel Garc?a, VanguardiaSur
+www.vanguardiasur.com.ar
