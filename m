@@ -1,26 +1,50 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 29 Apr 2014 15:21:31 -0700
-Subject: [PATCH 02/10] mfd: vexpress: Convert custom func API to regmap
-In-Reply-To: <1398707877-22596-3-git-send-email-pawel.moll@arm.com>
-References: <1398707877-22596-1-git-send-email-pawel.moll@arm.com>
- <1398707877-22596-3-git-send-email-pawel.moll@arm.com>
-Message-ID: <20140429222131.GO15125@sirena.org.uk>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 30 Apr 2014 00:45:53 +0200
+Subject: [PATCH 1/4] ARM: shmobile: Ignore callbacks for subsys
+ generic_pm_domain_data
+In-Reply-To: <20140425010651.GC12641@verge.net.au>
+References: <1397230004-22306-1-git-send-email-ulf.hansson@linaro.org>
+ <CAPDyKFpbX3cdAgvUx=4FbmNxFLH4VO8JqrQqRB3nxXMxZDyXJQ@mail.gmail.com>
+ <20140425010651.GC12641@verge.net.au>
+Message-ID: <1469030.SEtTICGcIm@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 06:57:49PM +0100, Pawel Moll wrote:
+On Friday, April 25, 2014 10:06:51 AM Simon Horman wrote:
+> On Thu, Apr 24, 2014 at 01:25:14PM +0200, Ulf Hansson wrote:
+> > On 14 April 2014 11:22, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> > > On 14 April 2014 03:20, Simon Horman <horms@verge.net.au> wrote:
+> > >> On Fri, Apr 11, 2014 at 05:26:41PM +0200, Ulf Hansson wrote:
+> > >>> There are no active users of these callbacks, thus there are no benefit
+> > >>> of trying to invoke them.
+> > >>>
+> > >>> Cc: Simon Horman <horms@verge.net.au>
+> > >>> Cc: Magnus Damm <magnus.damm@gmail.com>
+> > >>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> > >>> ---
+> > >>>
+> > >>> I am seeking ack from the SOC maintainers since this needs to go with the other
+> > >>> patches in this patchset on the PM core.
+> > >>
+> > >> In order to reduce the possibility of conflicts I would prefer
+> > >> to take this patch through my tree.
+> > >
+> > > Okay, go ahead!
+> > >
+> > 
+> > Hi Simon,
+> > 
+> > Just wanted to know, if you decided to queue this patch in your tree.
+> > Or were there anything else you needed me to fix here?
+> 
+> Sorry for dropping the ball. I will queue-up this patch.
 
-> Components of the Versatile Express platform (configuration
-> microcontrollers on motherboard and daughterboards in particular)
-> talk to each other over a custom configuration bus. They
-> provide miscellaneous functions (from clock generator control
-> to energy sensors) which are represented as platform devices
+OK
 
-Acked-by: Mark Brown <broonie@linaro.org>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140429/1e0b3e9e/attachment.sig>
+Ulf, since the rest of the series depends on this one (or at least that's
+how it looks to me), would you mind resending it when this one gets into the
+Linus' tree?
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
