@@ -1,37 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Apr 2014 12:43:51 +0200
-Subject: [PATCH v3 part1 03/11] ARM64 : Add dummy asm/cpu.h
-In-Reply-To: <20140429094055.2FCBEC4095B@trevor.secretlab.ca>
-References: <1398432017-8506-1-git-send-email-hanjun.guo@linaro.org>
- <1398432017-8506-4-git-send-email-hanjun.guo@linaro.org>
- <20140429094055.2FCBEC4095B@trevor.secretlab.ca>
-Message-ID: <5207782.DLgr40qRPl@wuerfel>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Tue, 29 Apr 2014 12:53:45 +0200
+Subject: [PATCH] gpio: always enable GPIO_OMAP on ARCH_OMAP
+In-Reply-To: <13943940.Yb2C7lPSBy@wuerfel>
+References: <5523458.JVZJJObMjC@wuerfel> <535EEB58.60809@collabora.co.uk>
+ <13943940.Yb2C7lPSBy@wuerfel>
+Message-ID: <535F84B9.6000406@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 April 2014 10:40:55 Grant Likely wrote:
-> On Fri, 25 Apr 2014 21:20:09 +0800, Hanjun Guo <hanjun.guo@linaro.org> wrote:
-> > ACPI core requires a cpu.h, add a dummy one here temporarily.
-> > This file will be updated in the future to add definitions for
-> > arch_(un)register_cpu which are required for ACPI based physical
-> > CPU hotplug when these standards have be ratified by the ASWG.
-> > 
-> > Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
-> > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> > ---
-> >  arch/arm64/include/asm/cpu.h |   11 +++++++++++
-> >  1 file changed, 11 insertions(+)
-> >  create mode 100644 arch/arm64/include/asm/cpu.h
+Hello Arnd,
+
+On 04/29/2014 12:26 PM, Arnd Bergmann wrote:
+> On Tuesday 29 April 2014 01:59:20 Javier Martinez Canillas wrote:
+>> This driver is also used by OMAP1. Even when disabling GPIO_OMAP on that
+>> platform doesn't cause a build error since no function defined in the driver is
+>> used directly by platform code, I think that we always want this driver on OMAP1
+>> too.
+>> 
+>> > However, it seems entirely reasonable to include the driver in build tests
+>> > on other platforms, so we should also allow building it for COMPILE_TEST
+>> > builds and select the required GENERIC_IRQ_CHIP that may not already be
+>> > enabled on other platforms.
+>> > 
+>> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> > 
+>> > diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+>> > index c58b828..c8c42be 100644
+>> > --- a/drivers/gpio/Kconfig
+>> > +++ b/drivers/gpio/Kconfig
+>> > @@ -244,9 +244,10 @@ config GPIO_OCTEON
+>> >         family of SOCs.
+>> >  
+>> >  config GPIO_OMAP
+>> > -     bool "TI OMAP GPIO support"
+>> > +     bool "TI OMAP GPIO support" if COMPILE_TEST && !ARCH_OMAP2PLUS
+>> 
+>> So this should be:
+>> 
+>> +       bool "TI OMAP GPIO support" if COMPILE_TEST && !ARCH_OMAP2PLUS &&
+>> !ARCH_OMAP1
+>> 
 > 
-> I think we're trying to get away from these empty header stubs by
-> putting them in asm-generic. Arnd, care to comment here?
+> Well, if COMPILE_TEST is disabled on OMAP1, the option is already
+> hidden and enabled in my version. It seems reasonable to me to 
+> allow compile-testing OMAP1 without the GPIO driver, while a kernel
+> running on OMAP1 should always have COMPILE_TEST disabled.
+> 
+> 	Arnd
+> 
 
-I started a reply yesterday on a similar note, but didn't send it,
-as the comment explains that it will be needed for the arch_(un)register_cpu()
-declarations later, which seems reasonable.
+I understand your point. I thought you also wanted to be sure that the option
+will be hidden in platforms where it make sense to always enable GPIO_OMAP even
+if COMPILE_TEST is enabled.
 
-On second thought, we could probably just put the declarations into
-include/linux/cpu.h, since the prototypes are architecture independent,
-they just happen to be implemented by only a subset of the architectures.
+If the idea of this patch is to only avoid build errors when GPIO_OMAP is
+disabled and allowing build testing the driver in other platforms, then I'm ok
+with your patch and feel free to add my Acked-by tag.
 
-	Arnd
+And you are right that COMPILE_TEST is disabled in omap1_defconfig and after all
+there are so many drivers needed for a platform to be usable on boot. So one has
+to take care of enabling all the needed options as long as there isn't a
+combination that cause a build error like the one you are fixing here.
+
+Thanks a lot and best regards,
+Javier
