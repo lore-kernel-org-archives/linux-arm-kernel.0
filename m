@@ -1,67 +1,33 @@
-From: chanho61.park@samsung.com (Chanho Park)
-Date: Tue, 29 Apr 2014 15:56:45 +0900
-Subject: [PATCH-RESEND] ARM: dts: Add arm-pmu node for exynos4412
-In-Reply-To: <535F41B1.70404@linaro.org>
-References: <1376044914-1759-1-git-send-email-chanho61.park@samsung.com>
- <535F41B1.70404@linaro.org>
-Message-ID: <00f501cf6378$2efd6ee0$8cf84ca0$@samsung.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Tue, 29 Apr 2014 14:05:04 +0800
+Subject: [PATCH v2 02/10] mtd: spi-nor: add a new field for spi_nor{}
+In-Reply-To: <201404290854.25116.marex@denx.de>
+References: <1398657227-20721-1-git-send-email-b32955@freescale.com>
+ <201404282223.26174.marex@denx.de> <20140429051832.GC21064@localhost>
+ <201404290854.25116.marex@denx.de>
+Message-ID: <20140429060502.GA14227@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tushar,
-
-> -----Original Message-----
-> From: Tushar Behera [mailto:tushar.behera at linaro.org]
-> Sent: Tuesday, April 29, 2014 3:08 PM
-> To: Chanho Park; kgene.kim at samsung.com
-> Cc: linux-samsung-soc at vger.kernel.org; thomas.abraham at linaro.org; linux-
-> arm-kernel at lists.infradead.org; Kyungmin Park
-> Subject: Re: [PATCH-RESEND] ARM: dts: Add arm-pmu node for exynos4412
+On Tue, Apr 29, 2014 at 08:54:24AM +0200, Marek Vasut wrote:
+> On Tuesday, April 29, 2014 at 07:18:34 AM, Huang Shijie wrote:
+> > For the m25p80.c, @dev stands for a child node for the SPI master,
+> > and it points to a spi_device{}. Yes, in this case, the dev->of_node is
+> > NULL.
+> > 
+> > But for the fsl_quadspi or other SPI NOR drivers, the @dev stands for the
+> > controller itself, the @dev->of_node is a list of the child nodes, so we
+> > can _NOT_ know which child node we are working at now.
 > 
-> On 08/09/2013 04:11 PM, Chanho Park wrote:
-> > The Exynos4412 has 4 cpus and each has a performance counter.
-> > Thus, we should define 4 interrupts which are combined by irq-combiner
-> for arm
-> > pmu.
-> >
-> > Signed-off-by: Chanho Park <chanho61.park@samsung.com>
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > ---
-> >  arch/arm/boot/dts/exynos4412.dtsi |    6 ++++++
-> >  1 file changed, 6 insertions(+)
-> >
-> > diff --git a/arch/arm/boot/dts/exynos4412.dtsi
-> b/arch/arm/boot/dts/exynos4412.dtsi
-> > index e743e67..cfad655 100644
-> > --- a/arch/arm/boot/dts/exynos4412.dtsi
-> > +++ b/arch/arm/boot/dts/exynos4412.dtsi
-> > @@ -35,6 +35,12 @@
-> >  			     <0 107 0>, <0 108 0>, <0 48 0>, <0 42 0>;
-> >  	};
-> >
-> > +	pmu {
-> > +		compatible = "arm,cortex-a9-pmu";
-> > +		interrupt-parent = <&combiner>;
-> > +		interrupts = <2 2>, <3 2>, <18 2>, <19 2>;
-> > +	};
-> > +
-> >  	mct at 10050000 {
-> >  		compatible = "samsung,exynos4412-mct";
-> >  		reg = <0x10050000 0x800>;
-> >
-> 
-> Tested on Exynos4412 based Origen-Quad board. You would required to
-> rebase it on latest code though.
-> 
-> Tested-by: Tushar Behera <tushar.behera@linaro.org>
+> Huh ? The dev is being recycled for two different kind of things ?
+yes.
 
-You took old patch which I cannot remember now:) Actually, arm-pmu support
-for exynos4412 was already merged in the latest code.[1]. I sent a clean-up
-patch recently[2]. It could be more readable for exynos4412.
-Thanks.
+for the SPI bus, the of_register_spi_devices() will allocate a spi_device{}
+for each child node for the SPI NOR flash. So in the m25p80.c, the @dev points
+to a spi_device{}.
 
-[1] : https://lkml.org/lkml/2014/3/12/27
-[2] : http://www.spinics.net/linux/lists/arm-kernel/msg325565.html
+For the simplicity,  we do not allocate any *_device{} for the child
+node in the SPI NOR flash driver, such as in the fsl-quadspi.c.
 
-Best Regards,
-Chanho Park
+thanks
+Huang Shijie
