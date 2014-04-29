@@ -1,62 +1,45 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Tue, 29 Apr 2014 17:05:01 +0900
-Subject: [RESUBMIT RFC PATCH v2 3/3] drivers: mfd: Add support for Exynos
- PMU driver
-In-Reply-To: <20140428173743.GA14853@arm.com>
-References: <1398687607-4554-1-git-send-email-pankaj.dubey@samsung.com>
- <1398687607-4554-4-git-send-email-pankaj.dubey@samsung.com>
- <20140428122646.GF21279@lee--X1> <20140428173743.GA14853@arm.com>
-Message-ID: <535F5D2D.4000406@samsung.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Tue, 29 Apr 2014 09:50:58 +0200
+Subject: [RFC 1/5] =?UTF-8?Q?mtd=3Afsl=5Fnfc=3A=20Nand=20flash=20contr?=
+ =?UTF-8?Q?oller=20for=20VF=36=31=30=2C=20MPC=35=31=32=35=2C=20etc=2E?=
+In-Reply-To: <87mwf5v1lj.fsf@nbsps.com>
+References: <87siupheou.fsf@nbsps.com>
+ <1389222441-4322-1-git-send-email-bpringlemeir@nbsps.com>
+ <1389222441-4322-2-git-send-email-bpringlemeir@nbsps.com>
+ <708e6f84e177e1d02310358688b44c53@agner.ch> <87mwf5v1lj.fsf@nbsps.com>
+Message-ID: <0abdf97559279af681b6d2bfce26c947@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/29/2014 02:37 AM, Catalin Marinas wrote:
-> On Mon, Apr 28, 2014 at 01:26:46PM +0100, Lee Jones wrote:
->>> This patch moves Exynos PMU driver implementation from
->>> "arm/mach-exynos" to "drivers/mfd".
->>> This driver is mainly used for setting misc bits of register from PMU IP
->>> of Exynos SoC which will be required to configure before Suspend/Resume.
->>> Currently all these settings are done in "arch/arm/mach-exynos/pmu.c" but
->>> moving ahead for ARM64 based SoC support, there is a need of DT based
->>> implementation of PMU driver.
->>> This driver uses already existing DT binding information.
->>>
->>> CC: Sangbeom Kim <sbkim73@samsung.com>
->>> CC: Samuel Ortiz <sameo@linux.intel.com>
->>> CC: Lee Jones <lee.jones@linaro.org>
->>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->>> ---
->>>   arch/arm/mach-exynos/Kconfig                           |    2 ++
->>>   arch/arm/mach-exynos/Makefile                          |    2 --
->>>   drivers/mfd/Kconfig                                    |    9 +++++++++
->>>   drivers/mfd/Makefile                                   |    1 +
->>>   arch/arm/mach-exynos/pmu.c => drivers/mfd/exynos-pmu.c |    0
->>>   5 files changed, 12 insertions(+), 2 deletions(-)
->>>   rename arch/arm/mach-exynos/pmu.c => drivers/mfd/exynos-pmu.c (100%)
->> So I just took a look at the code as zero changes looks suspicious to
->> me. The driver can not simply be copied and pasted into the MFD
->> subsystem in its current state.
->>
->> The fundamental question is; is this chip actually an MFD? What does
->> it do besides Power Management?
-> I looked at the code briefly as well and I don't think it matches the
-> mfd idea. Maybe it could be merged together with
-> arch/arm/mach-exynos/pm.c and moved to drivers/power/ or a more
-> appropriate directory for platform_suspend_ops.
+Hi Bill,
 
-Well I was also not quite sure about if "drivers/mfd" is proper place
-for Exynos PMU, so I posted this patch as RFC.
+Am 2014-04-28 18:51, schrieb Bill Pringlemeir:
+> The email "reference" was a previous email I sent some time ago to the
+> MTD mailing list.  I wondered if anyone was interested and I knew that
+> people would not like the name 'fsl_nfc'.  But I don't know what to call
+> it; it is a bike shed issue to me (specifics of what to call it), but I
+> see how people will want to avoid a generic ambigious name like
+> 'fsl_nfc'.
 
-If it does not seems matching with "drivers/mfd" idea, will it be suitable
-for "drivers/power/" or should I go for something like "drivers/soc/samsung"?
+In all documentation and block diagram I've read Freescale itself calls
+that IP "NAND Flash Controller", even with the abbreviation NFC. IMHO,
+its a valid name then. The only alternative would probably be MCF5441x,
+since this is the first device that controller appeared, but since this
+is ColdFire microprocessor which isn't suited for Linux, a driver named
+after it in the kernel tree would be somewhat weird.
 
-Regarding your second point about merging this code with "mach-exynos/pm.c"
-We have plan for this but, I would like to get it done via a separate patch 
-series
-as "mach-exynos/pm.c" has a lot of dependencies and requires significant
-modifications. So this work can be treated as a first step towards that 
-direction.
 
--- 
-Best Regards,
-Pankaj Dubey
+> I was waiting to see about the clocking with HW-ECC; it seems above
+> 33MHz, the HW-ECC module doesn't seem to work (at least for me).
+
+Yes, I could also verify this (see my comment on that Freescale
+Community post).
+
+Appreciate your work, count me as interested!
+
+This is my U-Boot port of the driver, I'm going to cleanup and test it
+on the Tower:
+http://git.toradex.com/gitweb/u-boot-toradex.git/shortlog/refs/heads/2014.04-colibri_vf
+
+--
+Stefan
