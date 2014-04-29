@@ -1,120 +1,82 @@
 From: jays.lee@samsung.com (Jungseok Lee)
-Date: Tue, 29 Apr 2014 13:59:27 +0900
-Subject: [PATCH v4 4/7] arm64: Add a description on 48-bit address space with
- 4KB pages
-Message-ID: <000401cf6367$cc461500$64d23f00$@samsung.com>
+Date: Tue, 29 Apr 2014 13:59:14 +0900
+Subject: [PATCH v4 1/7] arm64: Use pr_* instead of printk
+Message-ID: <000101cf6367$c4c219f0$4e464dd0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds memory layout and translation lookup information
-about 48-bit address space with 4K pages. The description is based
-on 4 levels of translation tables.
+This patch fixed the following checkpatch complaint as using pr_*
+instead of printk.
+
+WARNING: printk() should include KERN_ facility level
 
 Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Steve Capper <steve.capper@linaro.org>
 Signed-off-by: Jungseok Lee <jays.lee@samsung.com>
 Reviewed-by: Sungjinn Chung <sungjinn.chung@samsung.com>
 ---
- Documentation/arm64/memory.txt |   59 ++++++++++++++++++++++++++++++++++------
- 1 file changed, 51 insertions(+), 8 deletions(-)
+ arch/arm64/kernel/traps.c |   14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/Documentation/arm64/memory.txt b/Documentation/arm64/memory.txt
-index d50fa61..8142709 100644
---- a/Documentation/arm64/memory.txt
-+++ b/Documentation/arm64/memory.txt
-@@ -8,10 +8,11 @@ This document describes the virtual memory layout used by the AArch64
- Linux kernel. The architecture allows up to 4 levels of translation
- tables with a 4KB page size and up to 3 levels with a 64KB page size.
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index 7ffaddd..0484e81 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -65,7 +65,7 @@ static void dump_mem(const char *lvl, const char *str, unsigned long bottom,
+ 	fs = get_fs();
+ 	set_fs(KERNEL_DS);
  
--AArch64 Linux uses 3 levels of translation tables with the 4KB page
--configuration, allowing 39-bit (512GB) virtual addresses for both user
--and kernel. With 64KB pages, only 2 levels of translation tables are
--used but the memory layout is the same.
-+AArch64 Linux uses 3 levels and 4 levels of translation tables with
-+the 4KB page configuration, allowing 39-bit (512GB) and 48-bit (256TB)
-+virtual addresses, respectively, for both user and kernel. With 64KB
-+pages, only 2 levels of translation tables are used but the memory layout
-+is the same.
+-	printk("%s%s(0x%016lx to 0x%016lx)\n", lvl, str, bottom, top);
++	pr_emerg("%s%s(0x%016lx to 0x%016lx)\n", lvl, str, bottom, top);
  
- User addresses have bits 63:39 set to 0 while the kernel addresses have
- the same bits set to 1. TTBRx selection is given by bit 63 of the
-@@ -21,7 +22,7 @@ The swapper_pgd_dir address is written to TTBR1 and never written to
- TTBR0.
+ 	for (first = bottom & ~31; first < top; first += 32) {
+ 		unsigned long p;
+@@ -83,7 +83,7 @@ static void dump_mem(const char *lvl, const char *str, unsigned long bottom,
+ 					sprintf(str + i * 9, " ????????");
+ 			}
+ 		}
+-		printk("%s%04lx:%s\n", lvl, first & 0xffff, str);
++		pr_emerg("%s%04lx:%s\n", lvl, first & 0xffff, str);
+ 	}
  
+ 	set_fs(fs);
+@@ -124,7 +124,7 @@ static void dump_instr(const char *lvl, struct pt_regs *regs)
+ 			break;
+ 		}
+ 	}
+-	printk("%sCode: %s\n", lvl, str);
++	pr_emerg("%sCode: %s\n", lvl, str);
  
--AArch64 Linux memory layout with 4KB pages:
-+AArch64 Linux memory layout with 4KB pages + 3 levels:
+ 	set_fs(fs);
+ }
+@@ -156,7 +156,7 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
+ 		frame.pc = thread_saved_pc(tsk);
+ 	}
  
- Start			End			Size		Use
- -----------------------------------------------------------------------
-@@ -48,7 +49,34 @@ ffffffbffc000000	ffffffbfffffffff	  64MB		modules
- ffffffc000000000	ffffffffffffffff	 256GB		kernel logical memory map
+-	printk("Call trace:\n");
++	pr_emerg("Call trace:\n");
+ 	while (1) {
+ 		unsigned long where = frame.pc;
+ 		int ret;
+@@ -328,17 +328,17 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
  
+ void __pte_error(const char *file, int line, unsigned long val)
+ {
+-	printk("%s:%d: bad pte %016lx.\n", file, line, val);
++	pr_crit("%s:%d: bad pte %016lx.\n", file, line, val);
+ }
  
--AArch64 Linux memory layout with 64KB pages:
-+AArch64 Linux memory layout with 4KB pages + 4 levels:
-+
-+Start			End			Size		Use
-+-----------------------------------------------------------------------
-+0000000000000000	0000ffffffffffff	 256TB		user
-+
-+ffff000000000000	ffff7bfffffeffff	~124TB		vmalloc
-+
-+ffff7bffffff0000	ffff7bffffffffff	  64KB		[guard page]
-+
-+ffff7c0000000000	ffff7dffffffffff	   2TB		vmemmap
-+
-+ffff7e0000000000	ffff7ffffbbfffff	  ~2TB		[guard, future vmmemap]
-+
-+ffff7ffffa000000	ffff7ffffaffffff	  16MB		PCI I/O space
-+
-+ffff7ffffb000000	ffff7ffffbbfffff	  12MB		[guard]
-+
-+ffff7ffffbc00000	ffff7ffffbdfffff	   2MB		earlyprintk device
-+
-+ffff7ffffbe00000	ffff7ffffbffffff	   2MB		[guard]
-+
-+ffff7ffffc000000	ffff7fffffffffff	  64MB		modules
-+
-+ffff800000000000	ffffffffffffffff	 128TB		kernel logical memory map
-+
-+
-+AArch64 Linux memory layout with 64KB pages + 2 levels:
+ void __pmd_error(const char *file, int line, unsigned long val)
+ {
+-	printk("%s:%d: bad pmd %016lx.\n", file, line, val);
++	pr_crit("%s:%d: bad pmd %016lx.\n", file, line, val);
+ }
  
- Start			End			Size		Use
- -----------------------------------------------------------------------
-@@ -75,7 +103,7 @@ fffffdfffc000000	fffffdffffffffff	  64MB		modules
- fffffe0000000000	ffffffffffffffff	   2TB		kernel logical memory map
+ void __pgd_error(const char *file, int line, unsigned long val)
+ {
+-	printk("%s:%d: bad pgd %016lx.\n", file, line, val);
++	pr_crit("%s:%d: bad pgd %016lx.\n", file, line, val);
+ }
  
- 
--Translation table lookup with 4KB pages:
-+Translation table lookup with 4KB pages + 3 levels:
- 
- +--------+--------+--------+--------+--------+--------+--------+--------+
- |63    56|55    48|47    40|39    32|31    24|23    16|15     8|7      0|
-@@ -90,7 +118,22 @@ Translation table lookup with 4KB pages:
-  +-------------------------------------------------> [63] TTBR0/1
- 
- 
--Translation table lookup with 64KB pages:
-+Translation table lookup with 4KB pages + 4 levels:
-+
-++--------+--------+--------+--------+--------+--------+--------+--------+
-+|63    56|55    48|47    40|39    32|31    24|23    16|15     8|7      0|
-++--------+--------+--------+--------+--------+--------+--------+--------+
-+ |                 |         |         |         |         |
-+ |                 |         |         |         |         v
-+ |                 |         |         |         |   [11:0]  in-page offset
-+ |                 |         |         |         +-> [20:12] L3 index
-+ |                 |         |         +-----------> [29:21] L2 index
-+ |                 |         +---------------------> [38:30] L1 index
-+ |                 +-------------------------------> [47:39] L0 index
-+ +-------------------------------------------------> [63] TTBR0/1
-+
-+
-+Translation table lookup with 64KB pages + 2 levels:
- 
- +--------+--------+--------+--------+--------+--------+--------+--------+
- |63    56|55    48|47    40|39    32|31    24|23    16|15     8|7      0|
+ void __init trap_init(void)
 -- 
 1.7.10.4
