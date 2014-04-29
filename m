@@ -1,85 +1,84 @@
 From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Mon, 28 Apr 2014 17:55:08 -0700
-Subject: [PATCH v4 4/5] add 2nd stage page fault handling during live migration
-Message-ID: <535EF86C.7020506@samsung.com>
+Date: Mon, 28 Apr 2014 18:06:41 -0700
+Subject: [PATCH v4 5/5] change update_range to handle > 4GB 2nd stage range for
+ ARMv7
+In-Reply-To: <535EF871.9090604@samsung.com>
+References: <535EF871.9090604@samsung.com>
+Message-ID: <535EFB21.9040308@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add support for handling 2nd stage page faults during migration,
-it disables faulting in huge pages, and splits up existing huge pages.
 
+This patch adds support for unmapping 2nd stage page tables for addresses >4GB
+on ARMv7.
 
 Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
 ---
- arch/arm/kvm/mmu.c |   31 +++++++++++++++++++++++++++++--
- 1 file changed, 29 insertions(+), 2 deletions(-)
+ arch/arm/kvm/mmu.c |   20 ++++++++++++--------
+ 1 file changed, 12 insertions(+), 8 deletions(-)
 
 diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 3442594..88f5503 100644
+index 88f5503..afbf8ba 100644
 --- a/arch/arm/kvm/mmu.c
 +++ b/arch/arm/kvm/mmu.c
-@@ -978,6 +978,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	struct kvm_mmu_memory_cache *memcache = &vcpu->arch.mmu_page_cache;
- 	struct vm_area_struct *vma;
- 	pfn_t pfn;
-+	bool migration_active;
- 
- 	write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
- 	if (fault_status == FSC_PERM && !write_fault) {
-@@ -1029,12 +1030,21 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 		return -EFAULT;
- 
- 	spin_lock(&kvm->mmu_lock);
-+	/* place inside lock to prevent race condition when whole VM is being
-+	 * write proteced. Prevent race of huge page install when migration is
-+	 * active.
-+	 */
-+	migration_active = vcpu->kvm->arch.migration_in_progress;
-+
- 	if (mmu_notifier_retry(kvm, mmu_seq))
- 		goto out_unlock;
--	if (!hugetlb && !force_pte)
-+
-+	/* During migration don't rebuild huge pages */
-+	if (!hugetlb && !force_pte && !migration_active)
- 		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
- 
--	if (hugetlb) {
-+	/* During migration don't install new huge pages */
-+	if (hugetlb && !migration_active) {
- 		pmd_t new_pmd = pfn_pmd(pfn, PAGE_S2);
- 		new_pmd = pmd_mkhuge(new_pmd);
- 		if (writable) {
-@@ -1046,6 +1056,21 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	} else {
- 		pte_t new_pte = pfn_pte(pfn, PAGE_S2);
- 		if (writable) {
-+			/* First convert huge page pfn to normal 4k page pfn,
-+			 * while  migration is in progress.
-+			 * Second in migration mode and rare case where
-+			 * splitting of huge pages fails check if pmd is
-+			 * mapping a huge page if it is then clear it so
-+			 * stage2_set_pte() can map in a small page.
-+			 */
-+			if (migration_active && hugetlb) {
-+				pmd_t *pmd;
-+				pfn += pte_index(fault_ipa);
-+				new_pte = pfn_pte(pfn, PAGE_S2);
-+				pmd = stage2_get_pmd(kvm, NULL, fault_ipa);
-+				if (pmd && kvm_pmd_huge(*pmd))
-+					clear_pmd_entry(kvm, pmd, fault_ipa);
-+			}
- 			kvm_set_s2pte_writable(&new_pte);
- 			kvm_set_pfn_dirty(pfn);
- 		}
-@@ -1053,6 +1078,8 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, false);
+@@ -176,21 +176,25 @@ static void clear_pte_entry(struct kvm *kvm, pte_t *pte, phys_addr_t addr)
  	}
+ }
  
-+	if (writable)
-+		mark_page_dirty(kvm, gfn);
++/* Function shared between identity and 2nd stage mappings. For 2nd stage
++ * the IPA may be > 4GB on ARMv7, and page table range functions
++ * will fail. kvm_xxx_addr_end() is used to handle both cases.
++ */
+ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
+-			unsigned long long start, u64 size)
++			phys_addr_t start, u64 size)
+ {
+ 	pgd_t *pgd;
+ 	pud_t *pud;
+ 	pmd_t *pmd;
+ 	pte_t *pte;
+-	unsigned long long addr = start, end = start + size;
+-	u64 next;
++	phys_addr_t addr = start, end = start + size;
++	phys_addr_t next;
  
- out_unlock:
- 	spin_unlock(&kvm->mmu_lock);
+ 	while (addr < end) {
+ 		pgd = pgdp + pgd_index(addr);
+ 		pud = pud_offset(pgd, addr);
+ 		if (pud_none(*pud)) {
+-			addr = pud_addr_end(addr, end);
++			addr = kvm_pud_addr_end(addr, end);
+ 			continue;
+ 		}
+ 
+@@ -200,13 +204,13 @@ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
+ 			 * move on.
+ 			 */
+ 			clear_pud_entry(kvm, pud, addr);
+-			addr = pud_addr_end(addr, end);
++			addr = kvm_pud_addr_end(addr, end);
+ 			continue;
+ 		}
+ 
+ 		pmd = pmd_offset(pud, addr);
+ 		if (pmd_none(*pmd)) {
+-			addr = pmd_addr_end(addr, end);
++			addr = kvm_pmd_addr_end(addr, end);
+ 			continue;
+ 		}
+ 
+@@ -221,10 +225,10 @@ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
+ 		 */
+ 		if (kvm_pmd_huge(*pmd) || page_empty(pte)) {
+ 			clear_pmd_entry(kvm, pmd, addr);
+-			next = pmd_addr_end(addr, end);
++			next = kvm_pmd_addr_end(addr, end);
+ 			if (page_empty(pmd) && !page_empty(pud)) {
+ 				clear_pud_entry(kvm, pud, addr);
+-				next = pud_addr_end(addr, end);
++				next = kvm_pud_addr_end(addr, end);
+ 			}
+ 		}
+ 
 -- 
 1.7.9.5
