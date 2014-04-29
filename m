@@ -1,49 +1,66 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Tue, 29 Apr 2014 16:30:43 +0200
-Subject: [alsa-devel] [PATCH] ASoC: fsl: select SND_SOC_IMX_PCM_DMA where
- needed
-In-Reply-To: <4275868.O962kiiyJa@wuerfel>
-References: <6606961.lAGLvkNsEj@wuerfel> <4270904.84oGcCXL4B@wuerfel>
- <535F8594.40609@metafoo.de> <4275868.O962kiiyJa@wuerfel>
-Message-ID: <535FB793.5050200@metafoo.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 29 Apr 2014 15:32:44 +0100
+Subject: [PATCH net-next 5/7] net:fec: add support for dumping transmit
+ ring on timeout
+In-Reply-To: <CAHrpEqTc6=yS4ApLO7AbZyVq26kGxq+WBcyFjgjbiPySq7055Q@mail.gmail.com>
+References: <1398773350-7293-1-git-send-email-Frank.Li@freescale.com>
+ <1398773350-7293-5-git-send-email-Frank.Li@freescale.com>
+ <063D6719AE5E284EB5DD2968C1650D6D0F7014F0@AcuExch.aculab.com>
+ <CAHrpEqSCSw=bYgx5Egk4Mva-CODnw5=vvK6y3VWmB3_QpBQ8sQ@mail.gmail.com>
+ <063D6719AE5E284EB5DD2968C1650D6D0F701524@AcuExch.aculab.com>
+ <20140429141527.GZ26756@n2100.arm.linux.org.uk>
+ <CAHrpEqTc6=yS4ApLO7AbZyVq26kGxq+WBcyFjgjbiPySq7055Q@mail.gmail.com>
+Message-ID: <20140429143243.GA26756@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/29/2014 03:30 PM, Arnd Bergmann wrote:
-> On Tuesday 29 April 2014 12:57:24 Lars-Peter Clausen wrote:
->> On 04/29/2014 12:37 PM, Arnd Bergmann wrote:
->>> On Tuesday 29 April 2014 07:07:33 Alexander Shiyan wrote:
->>>> Mon, 28 Apr 2014 23:12:14 +0200 ?? Arnd Bergmann <arnd@arndb.de>:
->>>>> On Tuesday 29 April 2014 00:35:41 Alexander Shiyan wrote:
->>>>>>
->>>>>> So, I don't understand why this error happen, as well as I can not
->>>>>> reproduce this...
->>>>>
->>>>> It's probably CONFIG_SND_SOC_IMX_PCM_DMA=m and CONFIG_SND_SOC_FSL_SSI=y then.
->>>>> What is the intended behavior in this case? Should CONFIG_SND_SOC_FSL_SSI
->>>>> be forced to be a module as well?
->>>>
->>>> Hmm, yes...
->>>> I thought that I had already solved a similar problem for the earlier
->>>> version of the patch ...
->>>
->>> How about this?
->>
->> Having FSL_SSI/FSL_SPDIF, but not SND_SOC_IMX_PCM_DMA does not make sense on
->> iMX.
->> So how about:
->>
->>          select SND_SOC_IMX_PCM_DMA if SND_IMX_SOC
->>
->> and remove all the other 'select SND_SOC_IMX_PCM_DMA' statements. That's in
->> my opinion much nicer.
->
-> Yes, makes sense. Should I do another version of the patch?
+On Tue, Apr 29, 2014 at 09:22:13AM -0500, Frank Li wrote:
+> On Tue, Apr 29, 2014 at 9:15 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Tue, Apr 29, 2014 at 02:01:54PM +0000, David Laight wrote:
+> >> From: Frank ...
+> >> > > You probably want the read and write indexes as well.
+> >> >
+> >> >                      bdp == fep->cur_tx ? 'S' : ' ',
+> >> >                      bdp == fep->dirty_tx ? 'H' : ' ',
+> >> >
+> >> > Above code already print read and write index. 'S', 'H'
+> >>
+> >> Gah I must be asleep!
+> >> Something made be think that was to do with the ring ownership bit!
+> >
+> > Err, what's going on... this is my patch.  If it's been submitted by
+> > others, why wasn't its submission at least Cc'd to me?
+> 
+> I added " --to rmk+kernel at arm.linux.org.uk" when I send patch.
+> I don't know what's wrong.
 
-Yes. The patch should also add a select for SND_SOC_IMX_PCM_FIQ as that is 
-used in the same way in the fsl_ssi driver. If anybody is afraid that 
-selecting both SND_SOC_IMX_PCM_FIQ and SND_SOC_IMX_PCM_DMA by default adds 
-too much overhead you could add boolean sub-options that allow to 
-enable/disable support individually.
+Yes... I guess you don't know what went wrong because you'll never know
+if it failed to be delivered, because you sent them with an envelope
+address of "b20596 at shlinux1.ap.freescale.net" which doesn't actually
+exist.  Therefore, DSNs can't be returned to you.
 
-- Lars
+> I ask you if need someone help send to david millar before.
+
+You did, but I didn't agree to it.  I did point out that they need a
+certain amount of rework first:
+
+  I know they need to re-worked to convert unsigned -> unsigned int before
+  David sees them, otherwise it'd be an instant review failure.  Doing the
+  conversion is the easy bit, doing it without hitting the 80 column limit
+  is much harder...
+
+Some of them need a little more work in addition to that before being
+sent to David.
+
+I've also subsequently received in private email one issue which indicates
+a problem with the patch set - as yet I've not been able to look at it,
+but it sounds like the RX ring is full, but NAPI is in hard-irq mode,
+and the hardware won't deliver an IRQ without free space in the RX ring.
+
+Since people have got wind that I've been looking at this driver, everyone
+has started sending their various FEC issues directly to me...
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
