@@ -1,67 +1,24 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 29 Apr 2014 10:16:27 -0500
-Subject: [PATCH v2 3/7] tty/serial: convert 8250 to generic earlycon
-In-Reply-To: <CAE9FiQVdwumX7Dsmt8NJhw4uWsj2sjUKaKS1wJQujW1fn1szLw@mail.gmail.com>
-References: <1397859600-11507-1-git-send-email-robherring2@gmail.com>
- <1397859600-11507-4-git-send-email-robherring2@gmail.com>
- <CAE9FiQVp5u-jF_xjCu68BgbZ=e0D508tn_-auoiT6cbkYtX8Og@mail.gmail.com>
- <CAL_JsqKiYmCNGrkiwS7m-OAt3rHZBq_yNGycen-AojbV-7famg@mail.gmail.com>
- <CAE9FiQVdwumX7Dsmt8NJhw4uWsj2sjUKaKS1wJQujW1fn1szLw@mail.gmail.com>
-Message-ID: <CAL_Jsq+uNunqfsvPNxZLQQ3y1ay_XMZKb4c=HNWvKtwuiZGQ0g@mail.gmail.com>
+From: matt@console-pimps.org (Matt Fleming)
+Date: Tue, 29 Apr 2014 16:27:07 +0100
+Subject: [PATCH v2 00/10] arm64: UEFI support
+In-Reply-To: <535FBD94.9040101@zytor.com>
+References: <1398442154-19974-1-git-send-email-leif.lindholm@linaro.org>
+ <20140429102817.GE17007@arm.com>
+ <20140429114356.GK26088@console-pimps.org>
+ <20140429134726.GH17007@arm.com>
+ <20140429144713.GL26088@console-pimps.org>
+ <535FBD94.9040101@zytor.com>
+Message-ID: <20140429152707.GM26088@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 9:56 PM, Yinghai Lu <yinghai@kernel.org> wrote:
-> On Mon, Apr 28, 2014 at 4:24 PM, Rob Herring <robherring2@gmail.com> wrote:
->> On Sat, Apr 26, 2014 at 1:29 AM, Yinghai Lu <yinghai@kernel.org> wrote:
->>
->> Thanks for finding these. I missed them in my build tests. This should fix them:
->>
->> diff --git a/drivers/tty/serial/8250/8250_early.c
->> b/drivers/tty/serial/8250/8250_early.c
->> index e83c9db..2094c3b 100644
->> --- a/drivers/tty/serial/8250/8250_early.c
->> +++ b/drivers/tty/serial/8250/8250_early.c
->> @@ -156,6 +156,11 @@ static int __init early_serial8250_setup(struct
->> earlycon_device *device,
->>  EARLYCON_DECLARE(uart8250, early_serial8250_setup);
->>  EARLYCON_DECLARE(uart, early_serial8250_setup);
->>
->> +int __init setup_early_serial8250_console(char *cmdline)
->> +{
->> +       return setup_earlycon(cmdline, "uart8250", early_serial8250_setup);
->> +}
->> +
->>  int serial8250_find_port_for_earlycon(void)
->>  {
->>         struct earlycon_device *device = early_device;
->
-> that only handle "uart8250,", may need to add more lines to handle "uart,"
+On Tue, 29 Apr, at 07:56:20AM, H. Peter Anvin wrote:
+> 
+> I'm wondering if it would be better to organize it into a separate topic
+> branch.  We can still take it through tip, if you want, but it would be
+> better than putting it all into one tree.
 
+Sure, that makes sense. I'll do that.
 
-That is on purpose because the only 2 users use uart8250. I consider
-this a legacy interface and use of "uart" is horrible because there
-are lots of uarts which are not 8250.
-
-Rob
-
->
-> +int __init setup_early_serial8250_console(char *cmdline)
-> +{
-> +       char *options;
-> +       options = strstr(cmdline, "uart8250,");
-> +       if (options)
-> +               return setup_earlycon(cmdline, "uart8250",
-> early_serial8250_setup);
-> +
-> +       options = strstr(cmdline, "uart,");
-> +       if (options)
-> +              return setup_earlycon(cmdline, "uart", early_serial8250_setup);
-> +
-> +      return 0;
-> +}
-> +
->
-> Thanks
->
-> Yinghai
+-- 
+Matt Fleming, Intel Open Source Technology Center
