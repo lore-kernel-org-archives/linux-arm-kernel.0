@@ -1,91 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Apr 2014 23:00:29 +0200
-Subject: [PATCH v12 11/31] documentation: iommu: add binding document of
- Exynos System MMU
-In-Reply-To: <CANEJEGs6TXNzE8cWYgEKfFSsD2w5XiYvwSbhQ_+gtfzfs+6udA@mail.gmail.com>
-References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
- <20140429181601.GE3582@e103592.cambridge.arm.com>
- <CANEJEGs6TXNzE8cWYgEKfFSsD2w5XiYvwSbhQ_+gtfzfs+6udA@mail.gmail.com>
-Message-ID: <7044616.kdaKNu3Qet@wuerfel>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 29 Apr 2014 23:37:26 +0200
+Subject: [PATCH for v3.15] net: mvmdio: Check for a valid interrupt instead
+ of an error
+In-Reply-To: <1398800999-9814-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1398800999-9814-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <53601B96.3000608@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 April 2014 13:07:54 Grant Grundler wrote:
-> On Tue, Apr 29, 2014 at 11:16 AM, Dave Martin <Dave.Martin@arm.com> wrote:
-> ...
-> > An IOMMU is really a specialised bridge
+On 04/29/2014 09:49 PM, Ezequiel Garcia wrote:
+> The following commit:
 > 
-> Is a GART a bridge?
+> commit 9ec36cafe43bf835f8f29273597a5b0cbc8267ef
+> Author: Rob Herring <robh@kernel.org>
+> Date:   Wed Apr 23 17:57:41 2014 -0500
 > 
-> IOMMUs can provide three basic functions:
-> 1) remap address space to reach phys mem ranges that the device is
-> otherwise not capable of accessing (classic 32-bit DMA to reach 64-bit
-> Phys address)
+>     of/irq: do irq resolution in platform_get_irq
 > 
-> 2) implement scatter-gather (page level granularity) so the device
-> doesn't have to
+> changed platform_get_irq() which now returns ENODEV and EPROBE_DEFER,
+> in addition to ENXIO. If there's no interrupt for mvmdio, platform_get_irq()
+> returns ENODEV, but we currently check only for ENXIO.
 > 
-> 3) provide some level of system protection against "rogue" DMA by
-> forcing everything through a DMA mapping interface and faulting when
-> encountering unmapped DMA transactions.
-
-[ 4) provide isolation between multiple contexts, typically for purposes
-     of virtualization]
-
-> I summarize IOMMUs as: "participate in the routing of MMIO
-> transactions in the system fabric."
-> In this sense, IOMMUs are sort of a bridge. Defining what kind of
-> routing they can do (coalesce transactions? remapping MMIO domains?)
-> and which address ranges they route would describe most of that
-> functionality.
+> Fix this by looking for a positive integer, which is the proper way of
+> validating a virtual interrupt number.
 > 
-> This "remapping" of MMIO transaction is also usually asymmetric.
-> Meaning routing of "downstream" transactions *might* be completely
-> different than the routing + remapping of transactions heading
-> upstream. DMA mappings services are designed to handle only the
-> transactions generated (aka "mastered") by a downstream device.
-
-For the purposes of the DT binding, we have a 'ranges' property
-that defines the downstream translation (CPU-to-MMIO) and a
-'dma-ranges' property for the opposite address translation
-(device-to-memory).
-
-> >, so it may be cleaner to describe
-> > an IOMMU using a real bus node in the DT, if we also define a way to make
-> > master/slave linkages explicit where it matters.
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  drivers/net/ethernet/marvell/mvmdio.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> "where it matters" is a bit vague.  Is the goal to just enable DMA
-> mapping services to "do the right thing" for a device that can
-> generate DMA?
+> diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
+> index b161a52..eb2cabf 100644
+> --- a/drivers/net/ethernet/marvell/mvmdio.c
+> +++ b/drivers/net/ethernet/marvell/mvmdio.c
+> @@ -232,7 +232,7 @@ static int orion_mdio_probe(struct platform_device *pdev)
+>  		clk_prepare_enable(dev->clk);
+>  
+>  	dev->err_interrupt = platform_get_irq(pdev, 0);
+> -	if (dev->err_interrupt != -ENXIO) {
+> +	if (dev->err_interrupt > 0) {
 
-Yes. It's very complicated unfortunately, because we have to be
-able to deal with arbitrary combinations of a lot of oddball cases
-that can show up in random SoCs:
+Ezequiel,
 
-- device can only do DMA to a limited address range
-- DMA is noncoherent and needs manual cache management
-- DMA address is at an offset from physical address
-- some devices have an IOMMU
-- some IOMMUs are shared between devices
-- some devices with IOMMU can have multiple simultaneous contexts
-- a device may access some memory directly and some other memory through IOMMU
-- a device may have DMA access to a bus that is invisible to the CPU
-- DMA on some device is only coherent if the IOMMU is enabled
-- DMA on some device is only coherent if the IOMMU is disabled
-- the IOVA range to an IOMMU is device dependent
+I cannot find where Rob's mentioned patch set adds -ENODEV, but isn't
+the semantic for -EPROBE_DEFER: there *should* be an irq, but it is
+not yet available. That basically means, we should also defer on that
+error otherwise we would ignore that we have actually been given an irq
+to work with, right?
 
-> > I've been hacking around some proposals on these areas which are a bit
-> > different from the approach suggested here -- I'll try to summarise some
-> > of it intelligibly and post something tomorrow so that we can discuss.
+Sebastian
+
+>  		ret = devm_request_irq(&pdev->dev, dev->err_interrupt,
+>  					orion_mdio_err_irq,
+>  					IRQF_SHARED, pdev->name, dev);
 > 
-> Are you planning on consolidating Documentation/devicetree/bindings/iommu/ ?
-> Do you care about Documentation/Intel-IOMMU.txt?
-
-I think we can ignore the Intel-IOMMU because that is specialized on PCI
-devices, which we don't normally represent in DT. It is also a special
-case because the Intel IOMMU is a single-instance device. If it's present
-and enabled, it will be used by every device. The case we do need to describe
-is when we don't know which IOMMU is used for which master, or how to
-configure it.
-
-	Arnd
