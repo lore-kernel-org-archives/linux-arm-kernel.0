@@ -1,149 +1,114 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 29 Apr 2014 12:00:28 +0200
-Subject: TASK_SIZE for !MMU
-Message-ID: <20140429100028.GH28564@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 29 Apr 2014 12:01:30 +0200
+Subject: [Linaro-acpi] [PATCH v3 part1 08/11] ARM64 / ACPI: Introduce PCI
+ functions for ACPI on ARM64
+In-Reply-To: <535F6675.1060109@linaro.org>
+References: <1398432017-8506-1-git-send-email-hanjun.guo@linaro.org>
+ <201404281549.50738.arnd@arndb.de> <535F6675.1060109@linaro.org>
+Message-ID: <8888740.lgd2Xkrtad@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tuesday 29 April 2014 16:44:37 Hanjun Guo wrote:
+> On 2014-4-28 21:49, Arnd Bergmann wrote:
+> > On Friday 25 April 2014, Hanjun Guo wrote:
+> >> CONFIG_ACPI depends CONFIG_PCI now, and ACPI provides ACPI based
+> >> PCI hotplug and PCI host bridge hotplug, introduce some PCI
+> >> functions to make ACPI core can be compiled, some of the functions
+> >> should be revisited when implemented on ARM64.
+> > 
+> >> diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
+> >> index d93576f..0aa3607 100644
+> >> --- a/arch/arm64/include/asm/pci.h
+> >> +++ b/arch/arm64/include/asm/pci.h
+> >> @@ -21,6 +21,17 @@ struct pci_host_bridge *find_pci_host_bridge(struct pci_bus *bus);
+> >>  #define pcibios_assign_all_busses() \
+> >>  	(pci_has_flag(PCI_REASSIGN_ALL_BUS))
+> >>  
+> >> +static inline void pcibios_penalize_isa_irq(int irq, int active)
+> >> +{
+> >> +	/* we don't do dynamic pci irq allocation */
+> >> +}
+> >> +
+> >> +static inline int pci_get_legacy_ide_irq(struct pci_dev *dev, int channel)
+> >> +{
+> >> +	/* no legacy IRQ on arm64 */
+> >> +	return -ENODEV;
+> >> +}
+> >> +
+> > 
+> > I think these would be better addressed in the caller. From what I can tell, they
+> > are only called by the ISAPNP code path for doing IRQ resource allocation, while
+> > the ACPIPNP code uses hardwired IRQ resources.
+> 
+> I agree. pcibios_penalize_isa_irq() is only used by x86 and I will send out a
+> patch to make pcibios_penalize_isa_irq() as __weak in PCI core and remove
+> all the stub function out except x86. For pci_get_legacy_ide_irq(), I think we
+> can fix it in the same way, does this make sense to you?
 
-I grepped through the kernel (v3.15-rc1) for usages of TASK_SIZE to
-check if/how it is used on !MMU ARM machines. Most open questions also
-affect the other !MMU platforms, so I put the blackfin, c6x, frv and
-m32r, m68k, microblaze and xtensa lists on Cc:. (Did I miss a platform
-that cares for !MMU ?)
+Actually I had only looked at pci_get_legacy_ide_irq() and I'm pretty sure it's
+only needed for ISAPNP. I had missed the fact that pcibios_penalize_isa_irq()
+is used in other places as well, but it makes sense that it's also not needed,
+since we don't have legacy ISA IRQs.
 
-Most occurences are fine, see the list at the end of this mail. However
-some are not or are unclear to me. Here is the complete list[1] apart from
-the definition of TASK_SIZE for !MMU in arch/arm/include/asm/memory.h:
+> > And these probably don't need to be done at the architecture level. I expect we
+> > will only have to worry about SBSA compliant PCI hosts, so this can be done in
+> > the host controller driver for compliant devices, which is probably the one
+> > that Will Deacon is working on already.
+> > 
+> > Note that we are aiming for an empty PCI implementation in ARM64, doing everything
+> > in either the PCI core or in the individual host drivers.
+> 
+> Ok, I will review Will Deacon's patch to find out the solution for
+> pci_acpi_scan_root().
 
- - Probably this should be explict s/TASK_SIZE/CONFIG_DRAM_SIZE/. This
-   is generic code however while CONFIG_DRAM_SIZE is ARM only.
-        mm/nommu.c:     if (!rlen || rlen > TASK_SIZE)
+Ok. Please ask if you have more questions about that. It's definitely a complex
+topic.
 
- - The issue the patch by Rabin is addressing (Subject: [PATCH] ARM: fix
-   string functions on !MMU), alternatively make TASK_SIZE ~0UL.
-        arch/arm/include/asm/uaccess.h:#define user_addr_max() \
-        arch/arm/include/asm/uaccess.h: (segment_eq(get_fs(), USER_DS) ? TASK_SIZE : ~0UL)
+> > For raw_pci_{read,write} we can have a trivial generic implementation in
+> > the PCI core, like
+> > 
+> > int __weak raw_pci_read(unsigned int domain, unsigned int bus,
+> > 		  unsigned int devfn, int reg, int len, u32 *val)
+> > {
+> > 	struct pci_bus *bus = pci_find_bus(domain, bus);
+> > 	if (!bus)
+> > 		return -ENODEV;
+> > 
+> > 	return bus->ops->read(bus, devfn, reg, len, val);
+> > }
+> > 
+> > which won't work on x86 or ia64, but should be fine everywhere else. Alternatively,
+> > you can change the ACPI code to do the above manually and call the architecture
+> > independent interfaces, either bus->ops->read, or pci_bus_read_config_{byte,word,dword},
+> > which would actually simplify the ACPI code.
+> 
+> This may not work. ACPI needs to be able to access PCI config space before
+> we've done a PCI bus scan and created pci_bus structures, so the pointer
+> of bus will be NULL.
 
- - probably bearable if broken:
-        drivers/misc/lkdtm.c:           if (user_addr >= TASK_SIZE) {
-        lib/test_user_copy.c:   user_addr = vm_mmap(...)
-        lib/test_user_copy.c:   if (user_addr >= (unsigned long)(TASK_SIZE)) {
-        lib/test_user_copy.c:           pr_warn("Failed to allocate user memory\n");
-        lib/test_user_copy.c:           return -ENOMEM;
+Hmm, this is a serious issue, and I don't have a good idea for how
+to solve it yet, we need to discuss it some more I think.
 
- - unclear to me:
-        fs/exec.c:      current->mm->task_size = TASK_SIZE;
-   - depends on PERF_EVENTS
-        kernel/events/core.c:   if (!addr || addr >= TASK_SIZE)
-        kernel/events/core.c:   return TASK_SIZE - addr;
-        kernel/events/uprobes.c:                area->vaddr = get_unmapped_area(NULL, TASK_SIZE - PAGE_SIZE,
-   - depends on (PERF_EVENTS && (CPU_V6 || CPU_V6K || CPU_V7)):
-        arch/arm/kernel/hw_breakpoint.c:        return (va >= TASK_SIZE) && ((va + len - 1) >= TASK_SIZE);
-   - seems to cope with big TASK_SIZE
-        fs/namespace.c:        size = TASK_SIZE - (unsigned long)data;
-        fs/namespace.c:        if (size > PAGE_SIZE)
-        fs/namespace.c:                size = PAGE_SIZE;
-   - depends on PLAT_S5P || ARCH_EXYNOS, this looks wrong
-        drivers/media/platform/s5p-mfc/s5p_mfc_common.h:#define DST_QUEUE_OFF_BASE      (TASK_SIZE / 2)
-   - used for prctl(PR_SET_MM, ...)
-        kernel/sys.c:   if (addr >= TASK_SIZE || addr < mmap_min_addr)
+We are currently working on generic PCI support for ARM64 with DT, which
+will be based around the concept that all PCI host drivers can be loadable
+modules, and each host driver would supply its own config space access
+method.
 
-Any help to judge if these are OK is appreciated (even from Will :-)
+With ACPI, we probably don't need the flexibility, because hopefully all
+PCI host bridges will be SBSA compliant and have a regular ECAM config
+space implementation (as opposed to the proprietary methods used by
+e.g. APM X-Gene, Samsung GH7 or everything we have on ARM32).
 
-I think it would be OK to define TASK_SIZE to 0xffffffff for !MMU.
-blackfin, frv and m68k also do this. c6x does define it to 0xFFFFF000 to
-leave space for error codes.
+If we can rely on always having ECAM support available, it would be
+easy enough to add an implementation of that specifically for ACPI,
+outside of the architecture code or the PCI core, or we could have
+a global implementation of that, which gets used by both ACPI and
+the compliant PCI host bridge drivers and can be built-in even for
+loadable host drivers.
 
-Thoughts?
+Alternatively, you could try to see if it's possible to defer the PCI
+access to the time the host driver is loaded. Do you know what the access
+to config space is actually needed for?
 
-Best regards
-Uwe
-
-[1] complete as in "skip everything below arch/ but arch/arm" :-)
-
-======= These occurences are fine =======
-mmu-only:
-        arch/arm/include/asm/memory.h: * TASK_SIZE - the maximum size of a user space task.
-        arch/arm/include/asm/memory.h:#define TASK_SIZE         (UL(CONFIG_PAGE_OFFSET) - UL(SZ_16M))
-        arch/arm/include/asm/memory.h:#define TASK_UNMAPPED_BASE        ALIGN(TASK_SIZE / 3, SZ_16M)
-        arch/arm/include/asm/memory.h:#define TASK_SIZE_26              (UL(1) << 26)
-        arch/arm/include/asm/memory.h: * The module space lives between the addresses given by TASK_SIZE
-        arch/arm/include/asm/memory.h:#if TASK_SIZE > MODULES_VADDR
-        arch/arm/include/asm/pgtable-2level.h:#define USER_PTRS_PER_PGD (TASK_SIZE / PGDIR_SIZE)
-        arch/arm/include/asm/pgtable-3level.h:  BUG_ON(addr >= TASK_SIZE);
-        arch/arm/include/asm/pgtable.h: * Use TASK_SIZE as the ceiling argument for free_pgtables() and
-        arch/arm/include/asm/pgtable.h:#define USER_PGTABLES_CEILING    TASK_SIZE
-        arch/arm/include/asm/pgtable.h: if (addr < TASK_SIZE && pte_valid_user(pteval)) {
-        arch/arm/include/asm/tlb.h:             tlb->range_start = TASK_SIZE;
-        arch/arm/include/asm/tlb.h:             tlb->range_start = TASK_SIZE;
-        arch/arm/kernel/entry-armv.S:   cmp     r4, #TASK_SIZE
-        arch/arm/mm/fault.c:    if (addr < TASK_SIZE)
-        arch/arm/mm/init.c:     BUILD_BUG_ON(TASK_SIZE                          > MODULES_VADDR);
-        arch/arm/mm/init.c:     BUG_ON(TASK_SIZE                                > MODULES_VADDR);
-        arch/arm/mm/mmap.c:#define MAX_GAP ((TASK_SIZE)/6*5)
-        arch/arm/mm/mmap.c:     return PAGE_ALIGN(TASK_SIZE - gap - rnd);
-        arch/arm/mm/mmap.c:     if (len > TASK_SIZE)
-        arch/arm/mm/mmap.c:             if (TASK_SIZE - len >= addr &&
-        arch/arm/mm/mmap.c:     info.high_limit = TASK_SIZE;
-        arch/arm/mm/mmap.c:     if (len > TASK_SIZE)
-        arch/arm/mm/mmap.c:             if (TASK_SIZE - len >= addr &&
-        arch/arm/mm/mmap.c:             info.high_limit = TASK_SIZE;
-        arch/arm/mm/mmu.c:      if (md->virtual != vectors_base() && md->virtual < TASK_SIZE) {
-        arch/arm/include/asm/uaccess.h:#define USER_DS          TASK_SIZE
-        mm/memory.c:                    if (pg > TASK_SIZE)
-        mm/mlock.c:             mm_populate(0, TASK_SIZE);
-        mm/mmap.c:      if (len > TASK_SIZE - mmap_min_addr)
-        mm/mmap.c:              if (TASK_SIZE - len >= addr && addr >= mmap_min_addr &&
-        mm/mmap.c:      info.high_limit = TASK_SIZE;
-        mm/mmap.c:      if (len > TASK_SIZE - mmap_min_addr)
-        mm/mmap.c:              if (TASK_SIZE - len >= addr && addr >= mmap_min_addr &&
-        mm/mmap.c:              info.high_limit = TASK_SIZE;
-        mm/mmap.c:      if (len > TASK_SIZE)
-        mm/mmap.c:      if (addr > TASK_SIZE - len)
-        mm/mmap.c:      if ((start & ~PAGE_MASK) || start > TASK_SIZE || len > TASK_SIZE
-        mm/mremap.c:    if (new_len > TASK_SIZE || new_addr > TASK_SIZE - new_len)
-
-enabled by CONFIG_NUMA, unavailable on ARM:
-        mm/mempolicy.c:         pvma.vm_end = TASK_SIZE;        /* policy covers entire
-
-Only used in fs/exec.c in #ifdef CONFIG_MMU:
-        arch/arm/include/asm/processor.h:#define STACK_TOP_MAX  TASK_SIZE
-
-Used in:
- - fs/binfmt_aout.c (HAVE_AOUT=n on ARM)
- - fs/binfmt_elf.c (depends on MMU)
- - fs/binfmt_som.c (BINFMT_SOM depends on PARISC && HPUX)
- - fs/exec.c (#ifdef CONFIG_MMU)
-        arch/arm/include/asm/processor.h:#define STACK_TOP       ((current->personality & ADDR_LIMIT_32BIT) ? \
-        arch/arm/include/asm/processor.h:                        TASK_SIZE : TASK_SIZE_26)
-
-Only used in fs/{,compat_}binfmt_elf.c, depends on MMU
-        arch/arm/include/asm/elf.h:#define ELF_ET_DYN_BASE      (2 * TASK_SIZE / 3)
-
-fs/binfmt_aout.c (HAVE_AOUT=n on ARM)
-        fs/binfmt_aout.c:#define BAD_ADDR(x)    ((unsigned long)(x) >= TASK_SIZE)
-fs/binfmt_elf.c (depends on MMU)
-        fs/binfmt_elf.c:#define BAD_ADDR(x) ((unsigned long)(x) >= TASK_SIZE)
-        fs/binfmt_elf.c:                            eppnt->p_memsz > TASK_SIZE ||
-        fs/binfmt_elf.c:                            TASK_SIZE - eppnt->p_memsz < k) {
-        fs/binfmt_elf.c:                    elf_ppnt->p_memsz > TASK_SIZE ||
-        fs/binfmt_elf.c:                    TASK_SIZE - elf_ppnt->p_memsz < k) {
-
-HUGETLBFS depends on !ARM || ARM_LPAE || BROKEN, LPAE depends on MMU
-        fs/hugetlbfs/inode.c:   if (len > TASK_SIZE)
-        fs/hugetlbfs/inode.c:           if (TASK_SIZE - len >= addr &&
-        fs/hugetlbfs/inode.c:   info.high_limit = TASK_SIZE;
-
-USER_DS is defined in arch/arm/include/asm/uaccess.h:
-        include/asm-generic/uaccess.h:#ifndef USER_DS
-        include/asm-generic/uaccess.h:#define USER_DS           MAKE_MM_SEG(TASK_SIZE -
-        include/asm-generic/uaccess.h:#endif
-
-Only used in fs/proc/task_mmu.c, depends on CONFIG_MMU
-        include/linux/sched.h:#define TASK_SIZE_OF(tsk) TASK_SIZE
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+	Arnd
