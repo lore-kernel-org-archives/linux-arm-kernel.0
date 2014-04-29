@@ -1,69 +1,73 @@
 From: anup.patel@linaro.org (Anup Patel)
-Date: Tue, 29 Apr 2014 11:24:22 +0530
-Subject: [PATCH v11 09/12] ARM/ARM64: KVM: Emulate PSCI v0.2 MIGRATE_INFO_TYPE
- and related functions
+Date: Tue, 29 Apr 2014 11:24:23 +0530
+Subject: [PATCH v11 10/12] ARM/ARM64: KVM: Fix CPU_ON emulation for PSCI v0.2
 In-Reply-To: <1398750865-10892-1-git-send-email-anup.patel@linaro.org>
 References: <1398750865-10892-1-git-send-email-anup.patel@linaro.org>
-Message-ID: <1398750865-10892-10-git-send-email-anup.patel@linaro.org>
+Message-ID: <1398750865-10892-11-git-send-email-anup.patel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds emulation of PSCI v0.2 MIGRATE, MIGRATE_INFO_TYPE, and
-MIGRATE_INFO_UP_CPU function calls for KVM ARM/ARM64.
+As-per PSCI v0.2, the source CPU provides physical address of
+"entry point" and "context id" for starting a target CPU. Also,
+if target CPU is already running then we should return ALREADY_ON.
 
-KVM ARM/ARM64 being a hypervisor (and not a Trusted OS), we cannot provide
-this functions hence we emulate these functions in following way:
-1. MIGRATE - Returns "Not Supported"
-2. MIGRATE_INFO_TYPE - Return 2 i.e. Trusted OS is not present
-3. MIGRATE_INFO_UP_CPU - Returns "Not Supported"
+Current emulation of CPU_ON function does not consider physical
+address of "context id" and returns INVALID_PARAMETERS if target
+CPU is already running.
+
+This patch updates kvm_psci_vcpu_on() such that it works for both
+PSCI v0.1 and PSCI v0.2.
 
 Signed-off-by: Anup Patel <anup.patel@linaro.org>
 Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/psci.c |   21 ++++++++++++++++-----
- 1 file changed, 16 insertions(+), 5 deletions(-)
+ arch/arm/kvm/psci.c |   15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-index 3b6a0cf..cce901a 100644
+index cce901a..1067579 100644
 --- a/arch/arm/kvm/psci.c
 +++ b/arch/arm/kvm/psci.c
-@@ -182,6 +182,22 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
- 	case PSCI_0_2_FN64_AFFINITY_INFO:
- 		val = kvm_psci_vcpu_affinity_info(vcpu);
- 		break;
-+	case PSCI_0_2_FN_MIGRATE:
-+	case PSCI_0_2_FN64_MIGRATE:
-+		val = PSCI_RET_NOT_SUPPORTED;
-+		break;
-+	case PSCI_0_2_FN_MIGRATE_INFO_TYPE:
-+		/*
-+		 * Trusted OS is MP hence does not require migration
-+	         * or
-+		 * Trusted OS is not present
-+		 */
-+		val = PSCI_0_2_TOS_MP;
-+		break;
-+	case PSCI_0_2_FN_MIGRATE_INFO_UP_CPU:
-+	case PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU:
-+		val = PSCI_RET_NOT_SUPPORTED;
-+		break;
- 	case PSCI_0_2_FN_SYSTEM_OFF:
- 		kvm_psci_system_off(vcpu);
- 		/*
-@@ -207,12 +223,7 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
- 		ret = 0;
- 		break;
- 	case PSCI_0_2_FN_CPU_SUSPEND:
--	case PSCI_0_2_FN_MIGRATE:
--	case PSCI_0_2_FN_MIGRATE_INFO_TYPE:
--	case PSCI_0_2_FN_MIGRATE_INFO_UP_CPU:
- 	case PSCI_0_2_FN64_CPU_SUSPEND:
--	case PSCI_0_2_FN64_MIGRATE:
--	case PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU:
- 		val = PSCI_RET_NOT_SUPPORTED;
- 		break;
- 	default:
+@@ -48,6 +48,7 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
+ 	struct kvm_vcpu *vcpu = NULL, *tmp;
+ 	wait_queue_head_t *wq;
+ 	unsigned long cpu_id;
++	unsigned long context_id;
+ 	unsigned long mpidr;
+ 	phys_addr_t target_pc;
+ 	int i;
+@@ -68,10 +69,17 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
+ 	 * Make sure the caller requested a valid CPU and that the CPU is
+ 	 * turned off.
+ 	 */
+-	if (!vcpu || !vcpu->arch.pause)
++	if (!vcpu)
+ 		return PSCI_RET_INVALID_PARAMS;
++	if (!vcpu->arch.pause) {
++		if (kvm_psci_version(source_vcpu) != KVM_ARM_PSCI_0_1)
++			return PSCI_RET_ALREADY_ON;
++		else
++			return PSCI_RET_INVALID_PARAMS;
++	}
+ 
+ 	target_pc = *vcpu_reg(source_vcpu, 2);
++	context_id = *vcpu_reg(source_vcpu, 3);
+ 
+ 	kvm_reset_vcpu(vcpu);
+ 
+@@ -86,6 +94,11 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
+ 		kvm_vcpu_set_be(vcpu);
+ 
+ 	*vcpu_pc(vcpu) = target_pc;
++	/*
++	 * NOTE: We always update r0 (or x0) because for PSCI v0.1
++	 * the general puspose registers are undefined upon CPU_ON.
++	 */
++	*vcpu_reg(vcpu, 0) = context_id;
+ 	vcpu->arch.pause = false;
+ 	smp_mb();		/* Make sure the above is visible */
+ 
 -- 
 1.7.9.5
