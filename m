@@ -1,47 +1,49 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 29 Apr 2014 11:34:00 +0100
-Subject: [PATCH v6 3/5] devicetree: bindings: Document Krait cache error
- interrupts
-In-Reply-To: <20140408153925.GJ30077@pd.tnic>
-References: <1396641450-12854-1-git-send-email-sboyd@codeaurora.org>
- <1396641450-12854-4-git-send-email-sboyd@codeaurora.org>
- <20140408153925.GJ30077@pd.tnic>
-Message-ID: <20140429103400.GB22015@e102568-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 29 Apr 2014 12:37:45 +0200
+Subject: [PATCH] ASoC: fsl: select SND_SOC_IMX_PCM_DMA where needed
+In-Reply-To: <1398740853.880576398@f238.i.mail.ru>
+References: <6606961.lAGLvkNsEj@wuerfel> <6285923.UQqcZVikjI@wuerfel>
+ <1398740853.880576398@f238.i.mail.ru>
+Message-ID: <4270904.84oGcCXL4B@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 08, 2014 at 04:39:25PM +0100, Borislav Petkov wrote:
-> On Fri, Apr 04, 2014 at 12:57:28PM -0700, Stephen Boyd wrote:
-> > The Krait L1/L2 error reporting hardware is made up a per-CPU
-> > interrupt for the L1 cache and a SPI interrupt for the L2.
+On Tuesday 29 April 2014 07:07:33 Alexander Shiyan wrote:
+> Mon, 28 Apr 2014 23:12:14 +0200 ?? Arnd Bergmann <arnd@arndb.de>:
+> > On Tuesday 29 April 2014 00:35:41 Alexander Shiyan wrote:
+> > > 
+> > > So, I don't understand why this error happen, as well as I can not
+> > > reproduce this...
 > > 
-> > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Cc: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Kumar Gala <galak@codeaurora.org>
-> > Cc: <devicetree@vger.kernel.org>
-> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> > ---
-> >  Documentation/devicetree/bindings/arm/cache.txt | 48 ++++++++++++++++++++++++-
-> >  1 file changed, 47 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/arm/cache.txt b/Documentation/devicetree/bindings/arm/cache.txt
-> > index b90fcc7c53cf..d7357e777399 100644
-> > --- a/Documentation/devicetree/bindings/arm/cache.txt
-> > +++ b/Documentation/devicetree/bindings/arm/cache.txt
+> > It's probably CONFIG_SND_SOC_IMX_PCM_DMA=m and CONFIG_SND_SOC_FSL_SSI=y then.
+> > What is the intended behavior in this case? Should CONFIG_SND_SOC_FSL_SSI
+> > be forced to be a module as well?
 > 
-> Right, that's http://www.spinics.net/lists/arm-kernel/msg308540.html
-> 
-> So whoever picks those patches up, Lorenzo's doc needs to be in his tree
-> first too.
+> Hmm, yes...
+> I thought that I had already solved a similar problem for the earlier
+> version of the patch ...
 
-Sorry for the delay in replying. Those cache bindings need an ACK to get
-merged, and were introduced so that idle states can retrieve power domain
-information for caches. I am going to revive the idle bindings thread
-to see what we can/should merge of these bindings as things stand, I
-really hope this won't block the series any further, otherwise we can
-rework the patches so that this series can get in first, or simplify my
-series to allow both to get merged as soon as possible without compromising
-future requirements.
+How about this?
 
-Thanks,
-Lorenzo
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/sound/soc/fsl/Kconfig b/sound/soc/fsl/Kconfig
+index fb26345..af0bb92 100644
+--- a/sound/soc/fsl/Kconfig
++++ b/sound/soc/fsl/Kconfig
+@@ -9,6 +9,7 @@ config SND_SOC_FSL_SAI
+ 
+ config SND_SOC_FSL_SSI
+ 	tristate "Synchronous Serial Interface module support"
++	depends on m || SND_SOC_IMX_PCM_DMA != m
+ 	help
+ 	  Say Y if you want to add Synchronous Serial Interface (SSI)
+ 	  support for the Freescale CPUs.
+@@ -18,6 +19,7 @@ config SND_SOC_FSL_SSI
+ config SND_SOC_FSL_SPDIF
+ 	tristate "Sony/Philips Digital Interface module support"
+ 	select REGMAP_MMIO
++	depends on m || SND_SOC_IMX_PCM_DMA != m
+ 	help
+ 	  Say Y if you want to add Sony/Philips Digital Interface (SPDIF)
+ 	  support for the Freescale CPUs.
