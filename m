@@ -1,72 +1,54 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 29 Apr 2014 15:25:42 +0100
-Subject: [PATCH] Fix for the arm64 kern_addr_valid() function
-In-Reply-To: <20140416075144.GA29754@arm.com>
-References: <1397584404-28762-1-git-send-email-anderson@redhat.com>
- <20140416075144.GA29754@arm.com>
-Message-ID: <20140429142542.GI17007@arm.com>
+From: lznuaa@gmail.com (Frank Li)
+Date: Tue, 29 Apr 2014 09:30:51 -0500
+Subject: [PATCH net-next 5/7] net:fec: add support for dumping transmit
+ ring on timeout
+In-Reply-To: <CAHrpEqTc6=yS4ApLO7AbZyVq26kGxq+WBcyFjgjbiPySq7055Q@mail.gmail.com>
+References: <1398773350-7293-1-git-send-email-Frank.Li@freescale.com>
+ <1398773350-7293-5-git-send-email-Frank.Li@freescale.com>
+ <063D6719AE5E284EB5DD2968C1650D6D0F7014F0@AcuExch.aculab.com>
+ <CAHrpEqSCSw=bYgx5Egk4Mva-CODnw5=vvK6y3VWmB3_QpBQ8sQ@mail.gmail.com>
+ <063D6719AE5E284EB5DD2968C1650D6D0F701524@AcuExch.aculab.com>
+ <20140429141527.GZ26756@n2100.arm.linux.org.uk>
+ <CAHrpEqTc6=yS4ApLO7AbZyVq26kGxq+WBcyFjgjbiPySq7055Q@mail.gmail.com>
+Message-ID: <CAHrpEqQ62O=C7eMQbgpSNQ_Kh8rD6-ERL4j2vkJOuGvZuE=L2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 16, 2014 at 08:51:44AM +0100, Will Deacon wrote:
-> On Tue, Apr 15, 2014 at 06:53:24PM +0100, Dave Anderson wrote:
-> >  Fix for the arm64 kern_addr_valid() function to recognize
-> >  virtual addresses in the kernel logical memory map.  The
-> >  function fails as written because it does not check whether
-> >  the addresses in that region are mapped at the pmd level to
-> >  2MB or 512MB pages, continues the page table walk to the
-> >  pte level, and issues a garbage value to pfn_valid().
-> > 
-> >  Tested on 4K-page and 64K-page kernels.
-> > 
-> > Signed-off-by: Dave Anderson <anderson@redhat.com>
-> > ---
-> >  arch/arm64/mm/mmu.c | 3 +++
-> >  1 file changed, 3 insertions(+)
-> > 
-> > diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> > index 6b7e895..0a472c4 100644
-> > --- a/arch/arm64/mm/mmu.c
-> > +++ b/arch/arm64/mm/mmu.c
-> > @@ -374,6 +374,9 @@ int kern_addr_valid(unsigned long addr)
-> >  	if (pmd_none(*pmd))
-> >  		return 0;
-> >  
-> > +	if (pmd_sect(*pmd))
-> > +		return pfn_valid(pmd_pfn(*pmd));
-> > +
-> >  	pte = pte_offset_kernel(pmd, addr);
-> >  	if (pte_none(*pte))
-> >  		return 0;
-> 
-> Whilst this patch looks fine to me, I wonder whether walking the page tables
-> is really necessary for this function? The only user is fs/proc/kcore.c,
-> which basically wants to know if a lowmem address is actually backed by
-> physical memory. Our current implementation of kern_addr_valid will return
-> true even for MMIO mappings,
+On Tue, Apr 29, 2014 at 9:22 AM, Frank Li <lznuaa@gmail.com> wrote:
+> On Tue, Apr 29, 2014 at 9:15 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> On Tue, Apr 29, 2014 at 02:01:54PM +0000, David Laight wrote:
+>>> From: Frank ...
+>>> > > You probably want the read and write indexes as well.
+>>> >
+>>> >                      bdp == fep->cur_tx ? 'S' : ' ',
+>>> >                      bdp == fep->dirty_tx ? 'H' : ' ',
+>>> >
+>>> > Above code already print read and write index. 'S', 'H'
+>>>
+>>> Gah I must be asleep!
+>>> Something made be think that was to do with the ring ownership bit!
+>>
+>> Err, what's going on... this is my patch.  If it's been submitted by
+>> others, why wasn't its submission at least Cc'd to me?
+>
+> I added " --to rmk+kernel at arm.linux.org.uk" when I send patch.
+> I don't know what's wrong.
+> I kept your name.
+>
+> I ask you if need someone help send to david millar before.
 
-There is still a pfn_valid() check, so MMIO mappings wouldn't return
-true.
+I found the reason.
+Your email in MAINTAINS is
+Russell King <linux@arm.linux.org.uk>
 
-> whilst I think we could actually just do
-> something like:
-> 
-> 
-> 	if ((((long)addr) >> VA_BITS) != -1UL)
-> 		return 0;
-> 
-> 	return pfn_valid(__pa(addr) >> PAGE_SHIFT);
-> 
-> Am I missing something here?
+But signed off in your original patch is
+Russell King <rmk+kernel@arm.linux.org.uk>
 
-__pa(addr) isn't valid for vmalloc/ioremap addresses (which would pass
-the VA_BITS test above).
+Which one should be kept in patch?
 
-I would go with Dave's original patch for now. We've discussing change
-the memory map a bit for the kernel at some point in the future with
-PHYS_OFFSET always 0 and the kernel text/data mapped at a different
-address from PAGE_OFFSET (similar to x86_64). If we get there, this
-function would work unmodified.
-
--- 
-Catalin
+>
+>>
+>> --
+>> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+>> improving, and getting towards what was expected from it.
