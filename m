@@ -1,38 +1,92 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 29 Apr 2014 09:21:43 +0200
-Subject: [PATCH v4 05/11] ARM: shmobile: r7s72100: genmai: add uart
- aliases and activate scif2 as console
-In-Reply-To: <CANqRtoTHy+-ac0kWY5a9MdYN0=jwWdeuOus9CVBckmas32_hSQ@mail.gmail.com>
-References: <1398704521-23767-1-git-send-email-wsa@the-dreams.de>
- <1398704521-23767-6-git-send-email-wsa@the-dreams.de>
- <CANqRtoTHy+-ac0kWY5a9MdYN0=jwWdeuOus9CVBckmas32_hSQ@mail.gmail.com>
-Message-ID: <20140429072143.GA2732@katana>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 29 Apr 2014 08:21:31 +0100
+Subject: [PATCH 1/4] phy: miphy365x: Add Device Tree bindings for the MiPHY365x
+In-Reply-To: <1398756095-32542-1-git-send-email-lee.jones@linaro.org>
+References: <1398756095-32542-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1398756095-32542-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Magnus,
+The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
+devices. It has 2 ports which it can use for either; both SATA, both
+PCIe or one of each in any configuration.
 
-> Thanks for your updated series. For this patch I only have a minor
-> comment. I believe we only want to enable the serial port that is used
-> on the board. At the same time we want to keep the same ordering as
-> the legacy code. I believe you keep the same order already and only
-> enable ttySC2, but I wonder if you really need all the aliases above?
-> Perhaps it is possible to keep just serial2?
+Cc: Kishon Vijay Abraham I <kishon@ti.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ .../devicetree/bindings/phy/phy-miphy365x.txt      | 62 ++++++++++++++++++++++
+ 1 file changed, 62 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/phy-miphy365x.txt
 
-Yeah, this is easily possible. I wanted to add the additional aliases
-because the other SCIF pins are available on the external connectors and
-wanted potential users to save some hassle. Let me know if you think
-this is not needed and I will resend this patch only taking care of
-SCIF2.
-
-Thanks,
-
-   Wolfram
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140429/22a4b582/attachment-0001.sig>
+diff --git a/Documentation/devicetree/bindings/phy/phy-miphy365x.txt b/Documentation/devicetree/bindings/phy/phy-miphy365x.txt
+new file mode 100644
+index 0000000..cb39de1
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/phy-miphy365x.txt
+@@ -0,0 +1,62 @@
++STMicroelectronics STi MIPHY365x PHY binding
++============================================
++
++This binding describes a miphy device that is used to control PHY hardware
++for SATA and PCIe.
++
++Required properties:
++- compatible :	Should be "st,miphy365x-phy"
++- #phy-cells :	Should be 2 (See second example)
++		First cell is the port number from:
++			- MIPHY_PORT_0
++			- MIPHY_PORT_1
++		Second cell is device type from:
++			- MIPHY_TYPE_SATA
++			- MIPHY_TYPE_PCI
++- reg       :	Address and length of register sets for each device in
++		"reg-names"
++- reg-names : 	The names of the register addresses corresponding to the
++		registers filled in "reg", from:
++			- sata0: For SATA port 0 registers
++			- sata1: For SATA port 1 registers
++			- pcie0: For PCIE port 0 registers
++			- pcie1: For PCIE port 1 registers
++- st,syscfg : 	Should be a phandle of the system configuration register group
++		which contain the SATA, PCIe mode setting bits
++
++Optional properties:
++- st,sata-gen	     :	Generation of locally attached SATA IP. Expected values
++			are {1,2,3). If not supplied generation 1 hardware will
++			be expected
++- st,pcie-tx-pol-inv :	Bool property to invert the polarity PCIe Tx (Txn/Txp)
++- st,sata-tx-pol-inv :	Bool property to invert the polarity SATA Tx (Txn/Txp)
++
++Example:
++
++	miphy365x_phy: miphy365x at fe382000 {
++		compatible = "st,miphy365x-phy";
++		#phy-cells = <2>;
++		reg =	<0xfe382000 0x100>,
++			<0xfe38a000 0x100>,
++			<0xfe394000 0x100>,
++			<0xfe804000 0x100>;
++		reg-names = "sata0", "sata1", "pcie0", "pcie1";
++		st,syscfg = <&syscfg_rear>;
++	};
++
++Specifying phy control of devices
++=================================
++
++Device nodes should specify the configuration required in their "phys"
++property, containing a phandle to the miphy device node, a port number
++and a device type.
++
++Example:
++
++#include <dt-bindings/phy/phy-miphy365x.h>
++
++	sata0: sata at fe380000 {
++		...
++		phys	  = <&miphy365x_phy MIPHY_PORT_0 MIPHY_TYPE_SATA>;
++		...
++	};
+-- 
+1.8.3.2
