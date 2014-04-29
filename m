@@ -1,58 +1,55 @@
-From: ezequiel@vanguardiasur.com.ar (=?UTF-8?Q?Ezequiel_Garc=C3=ADa?=)
-Date: Tue, 29 Apr 2014 10:50:25 -0300
-Subject: [PATCH v2] ARM: dts: am33xx: Move the cppi41dma node so it's
- probed early
-In-Reply-To: <535F6C33.9040408@linutronix.de>
-References: <1398373881-23369-1-git-send-email-ezequiel@vanguardiasur.com.ar>
- <CAGm1_kvHtSLNEfkJ24xZGGzsqAjHDTM1XztnX-QGs4iM5voMUw@mail.gmail.com>
- <535F5BA5.6000903@ti.com> <535F5D6B.6090802@linutronix.de>
- <535F6276.4050601@ti.com> <535F6C33.9040408@linutronix.de>
-Message-ID: <CAAEAJfChJPN8gy89qsyenibWuKmNOaQUc-GFzoXTirv=Z8mCag@mail.gmail.com>
+From: lznuaa@gmail.com (Frank Li)
+Date: Tue, 29 Apr 2014 08:57:20 -0500
+Subject: [PATCH net-next 5/7] net:fec: add support for dumping transmit
+ ring on timeout
+In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6D0F7014F0@AcuExch.aculab.com>
+References: <1398773350-7293-1-git-send-email-Frank.Li@freescale.com>
+ <1398773350-7293-5-git-send-email-Frank.Li@freescale.com>
+ <063D6719AE5E284EB5DD2968C1650D6D0F7014F0@AcuExch.aculab.com>
+Message-ID: <CAHrpEqSCSw=bYgx5Egk4Mva-CODnw5=vvK6y3VWmB3_QpBQ8sQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 April 2014 06:09, Sebastian Andrzej Siewior <bigeasy@linutronix.de> wrote:
-> On 04/29/2014 10:27 AM, George Cherian wrote:
->> Hi Sebastian,
+On Tue, Apr 29, 2014 at 8:38 AM, David Laight <David.Laight@aculab.com> wrote:
+> From: Of Frank Li
+> ...
+>> When we timeout on transmit, it would be useful to dump the transmit
+>> ring, so we can see the ring state.  This can be helpful to diagnose
+>> the cause of transmit timeouts.
+> ...
+>> +static void fec_dump(struct net_device *ndev)
+>> +{
+>> +     struct fec_enet_private *fep = netdev_priv(ndev);
+>> +     struct bufdesc *bdp = fep->tx_bd_base;
+>> +     unsigned index = 0;
+>> +
+>> +     netdev_info(ndev, "TX ring dump\n");
+>> +     pr_info("Nr     SC     addr       len  SKB\n");
+>> +
+>> +     do {
+>> +             pr_info("%3u %c%c 0x%04x 0x%08lx %4u %p\n",
+>> +                     index,
+>> +                     bdp == fep->cur_tx ? 'S' : ' ',
+>> +                     bdp == fep->dirty_tx ? 'H' : ' ',
+>> +                     bdp->cbd_sc, bdp->cbd_bufaddr, bdp->cbd_datlen,
+>> +                     fep->tx_skbuff[index]);
+>> +             bdp = fec_enet_get_nextdesc(bdp, fep);
+>> +             index++;
+>> +     } while (bdp != fep->tx_bd_base);
+>> +}
+>> +
 >
-> Hi George,
->
->> On 4/29/2014 1:36 PM, Sebastian Andrzej Siewior wrote:
->>> On 04/29/2014 09:58 AM, George Cherian wrote:
->>>>>> This is easily fixed by moving the node at the beggining of the child
->>>>>> list,
->>>>>> so it's probed first.
->>>> This will give issues on module removal.
->>>> Since we use device_for_each_child in remove patch, it will try to
->>>> remove cppi dma controller, while the channel
->>>> is still in use by musb node.
->>> Isn't this currently disabled because it blew up in the phy code?
->> Yes. So how if the dt  looks like this
->
-> No. I remember we talked about this and we decided not to duct tape the
-> bug by moving the nodes around. Instead we wanted to disable the child
-> removal part (one tiny module that can't be removed) until the PHY code
-> does no longer blow up.
-> If the same case is for the DMA driver then it should be fixed, too.
-> The order of the nodes in .dts should not crash the kernel under any
-> circumstances. If a different node order accelerates the probing then
-> fine. But a crash is a no no.
->
+> You probably want the read and write indexes as well.
 
-I still don't see any reason to have the DMA controller node as a
-child of the USB.
-However, it seems we need it this way for now; at least until we get
-rid of the hwmod
-altogether.
+                     bdp == fep->cur_tx ? 'S' : ' ',
+                     bdp == fep->dirty_tx ? 'H' : ' ',
 
-That said, this DT-ordering to fix other issues is starting to seem a
-very bad idea.
-I'll prepare a v3 to leave the DT as it is, and instead force the
-driver to probe and
-remove the childs so the DMA is probed first and the removed last.
+Above code already print read and write index. 'S', 'H'
 
-We can always get rid of such workaround, once we can remove the DMA controller
-out of the USB - as it should be.
--- 
-Ezequiel Garc?a, VanguardiaSur
-www.vanguardiasur.com.ar
+Frank Li
+
+>
+>         David
+>
+>
+>
