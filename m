@@ -1,49 +1,37 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Apr 2014 12:37:45 +0200
-Subject: [PATCH] ASoC: fsl: select SND_SOC_IMX_PCM_DMA where needed
-In-Reply-To: <1398740853.880576398@f238.i.mail.ru>
-References: <6606961.lAGLvkNsEj@wuerfel> <6285923.UQqcZVikjI@wuerfel>
- <1398740853.880576398@f238.i.mail.ru>
-Message-ID: <4270904.84oGcCXL4B@wuerfel>
+Date: Tue, 29 Apr 2014 12:43:51 +0200
+Subject: [PATCH v3 part1 03/11] ARM64 : Add dummy asm/cpu.h
+In-Reply-To: <20140429094055.2FCBEC4095B@trevor.secretlab.ca>
+References: <1398432017-8506-1-git-send-email-hanjun.guo@linaro.org>
+ <1398432017-8506-4-git-send-email-hanjun.guo@linaro.org>
+ <20140429094055.2FCBEC4095B@trevor.secretlab.ca>
+Message-ID: <5207782.DLgr40qRPl@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 April 2014 07:07:33 Alexander Shiyan wrote:
-> Mon, 28 Apr 2014 23:12:14 +0200 ?? Arnd Bergmann <arnd@arndb.de>:
-> > On Tuesday 29 April 2014 00:35:41 Alexander Shiyan wrote:
-> > > 
-> > > So, I don't understand why this error happen, as well as I can not
-> > > reproduce this...
+On Tuesday 29 April 2014 10:40:55 Grant Likely wrote:
+> On Fri, 25 Apr 2014 21:20:09 +0800, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+> > ACPI core requires a cpu.h, add a dummy one here temporarily.
+> > This file will be updated in the future to add definitions for
+> > arch_(un)register_cpu which are required for ACPI based physical
+> > CPU hotplug when these standards have be ratified by the ASWG.
 > > 
-> > It's probably CONFIG_SND_SOC_IMX_PCM_DMA=m and CONFIG_SND_SOC_FSL_SSI=y then.
-> > What is the intended behavior in this case? Should CONFIG_SND_SOC_FSL_SSI
-> > be forced to be a module as well?
+> > Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+> > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> > ---
+> >  arch/arm64/include/asm/cpu.h |   11 +++++++++++
+> >  1 file changed, 11 insertions(+)
+> >  create mode 100644 arch/arm64/include/asm/cpu.h
 > 
-> Hmm, yes...
-> I thought that I had already solved a similar problem for the earlier
-> version of the patch ...
+> I think we're trying to get away from these empty header stubs by
+> putting them in asm-generic. Arnd, care to comment here?
 
-How about this?
+I started a reply yesterday on a similar note, but didn't send it,
+as the comment explains that it will be needed for the arch_(un)register_cpu()
+declarations later, which seems reasonable.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+On second thought, we could probably just put the declarations into
+include/linux/cpu.h, since the prototypes are architecture independent,
+they just happen to be implemented by only a subset of the architectures.
 
-diff --git a/sound/soc/fsl/Kconfig b/sound/soc/fsl/Kconfig
-index fb26345..af0bb92 100644
---- a/sound/soc/fsl/Kconfig
-+++ b/sound/soc/fsl/Kconfig
-@@ -9,6 +9,7 @@ config SND_SOC_FSL_SAI
- 
- config SND_SOC_FSL_SSI
- 	tristate "Synchronous Serial Interface module support"
-+	depends on m || SND_SOC_IMX_PCM_DMA != m
- 	help
- 	  Say Y if you want to add Synchronous Serial Interface (SSI)
- 	  support for the Freescale CPUs.
-@@ -18,6 +19,7 @@ config SND_SOC_FSL_SSI
- config SND_SOC_FSL_SPDIF
- 	tristate "Sony/Philips Digital Interface module support"
- 	select REGMAP_MMIO
-+	depends on m || SND_SOC_IMX_PCM_DMA != m
- 	help
- 	  Say Y if you want to add Sony/Philips Digital Interface (SPDIF)
- 	  support for the Freescale CPUs.
+	Arnd
