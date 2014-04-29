@@ -1,32 +1,31 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 29 Apr 2014 14:20:10 +0800
-Subject: [PATCH] ARM: imx_v4_v5_defconfig: drop CONFIG_COMMON_CLK_DEBUG option
-Message-ID: <1398752410-20308-1-git-send-email-shawn.guo@freescale.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 29 Apr 2014 11:51:03 +0530
+Subject: [PATCH 2/2] cpufreq: Remove exynos_sort_descend_freq_table in
+ exynos5440-cpufreq.c
+In-Reply-To: <CADGdYn7cA940sxPszP5TA5tMnXD_=QkH3U3Wedy2DoC++rwRkQ@mail.gmail.com>
+References: <000701cf636b$3d1d13c0$b7573b40$@samsung.com>
+ <CAKohpo=ei0v69iQtjd6cjmfUCo-+sd1JzNc4RDza92nxaPoiVg@mail.gmail.com>
+ <CADGdYn7cA940sxPszP5TA5tMnXD_=QkH3U3Wedy2DoC++rwRkQ@mail.gmail.com>
+Message-ID: <CAKohponkT9o4WVUo=fNmVq+kMjm68Z3hdFVMhe7+8qsKPPc2CQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The option COMMON_CLK_DEBUG was removed by commit ea72dc2 (clk: remove
-CONFIG_COMMON_CLK_DEBUG), so let's remove CONFIG_COMMON_CLK_DEBUG from
-the defconfig.
+On 29 April 2014 11:44, Amit Kachhap <amit.kachhap@gmail.com> wrote:
+> In the frequency table dts file, the frequencies are arranged in
+> descending order which maps 1 to 1 with other frequency parameter to
+> be calculated and programmed in some registers.
+> But the OPP library works by generating the frequencies in ascending
+> order which breaks the above logic. Ideally i should expect frequency
+> values in same order as what is supplied.
+> So OPP library should not change the order or should take input flags
+> flags like,
+> dev_pm_opp_init_cpufreq_table(TABLE_ORDER_ASCEND|
+> TABLE_ORDER_DESCEND|TABLE_ORDER_ORIGINAL )
 
-Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
----
-Thanks to Lad Prabhakar <prabhakar.csengg@gmail.com> for the reminding.
+Looks a good idea :)
 
- arch/arm/configs/imx_v4_v5_defconfig | 1 -
- 1 file changed, 1 deletion(-)
+This is what I wrote in another thread:
 
-diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
-index 54bc649..bada59d 100644
---- a/arch/arm/configs/imx_v4_v5_defconfig
-+++ b/arch/arm/configs/imx_v4_v5_defconfig
-@@ -182,7 +182,6 @@ CONFIG_RTC_DRV_MXC=y
- CONFIG_DMADEVICES=y
- CONFIG_IMX_SDMA=y
- CONFIG_IMX_DMA=y
--CONFIG_COMMON_CLK_DEBUG=y
- # CONFIG_IOMMU_SUPPORT is not set
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
--- 
-1.8.3.2
+What I would recommend is, use .driver_data field to hold what has to
+be written to hardware for any frequency. And then simply use
+driver_data instead of index.
