@@ -1,72 +1,40 @@
-From: yinghai@kernel.org (Yinghai Lu)
-Date: Tue, 29 Apr 2014 11:22:28 -0700
-Subject: [PATCH v2 3/7] tty/serial: convert 8250 to generic earlycon
-In-Reply-To: <CAL_Jsq+uNunqfsvPNxZLQQ3y1ay_XMZKb4c=HNWvKtwuiZGQ0g@mail.gmail.com>
-References: <1397859600-11507-1-git-send-email-robherring2@gmail.com>
- <1397859600-11507-4-git-send-email-robherring2@gmail.com>
- <CAE9FiQVp5u-jF_xjCu68BgbZ=e0D508tn_-auoiT6cbkYtX8Og@mail.gmail.com>
- <CAL_JsqKiYmCNGrkiwS7m-OAt3rHZBq_yNGycen-AojbV-7famg@mail.gmail.com>
- <CAE9FiQVdwumX7Dsmt8NJhw4uWsj2sjUKaKS1wJQujW1fn1szLw@mail.gmail.com>
- <CAL_Jsq+uNunqfsvPNxZLQQ3y1ay_XMZKb4c=HNWvKtwuiZGQ0g@mail.gmail.com>
-Message-ID: <CAE9FiQU40p-e8mqZKzaGg6nTuPdep3inRdpQtNu5txPOJ6Aw-Q@mail.gmail.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 29 Apr 2014 15:28:15 -0300
+Subject: [PATCH 1/5] ARM: defconfigs: add MTD_SPI_NOR (new dependency for
+ M25P80)
+In-Reply-To: <20140429174849.GO28159@titan.lakedaemon.net>
+References: <1397719309-2022-1-git-send-email-computersforpeace@gmail.com>
+ <1397719309-2022-2-git-send-email-computersforpeace@gmail.com>
+ <535A8FC9.8040707@wwwdotorg.org>
+ <20140429172227.GB11657@arch.cereza>
+ <20140429174849.GO28159@titan.lakedaemon.net>
+Message-ID: <20140429182815.GA28069@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 29, 2014 at 8:16 AM, Rob Herring <robherring2@gmail.com> wrote:
-> On Mon, Apr 28, 2014 at 9:56 PM, Yinghai Lu <yinghai@kernel.org> wrote:
->> On Mon, Apr 28, 2014 at 4:24 PM, Rob Herring <robherring2@gmail.com> wrote:
->>> On Sat, Apr 26, 2014 at 1:29 AM, Yinghai Lu <yinghai@kernel.org> wrote:
->>>
->>> Thanks for finding these. I missed them in my build tests. This should fix them:
->>>
->>> diff --git a/drivers/tty/serial/8250/8250_early.c
->>> b/drivers/tty/serial/8250/8250_early.c
->>> index e83c9db..2094c3b 100644
->>> --- a/drivers/tty/serial/8250/8250_early.c
->>> +++ b/drivers/tty/serial/8250/8250_early.c
->>> @@ -156,6 +156,11 @@ static int __init early_serial8250_setup(struct
->>> earlycon_device *device,
->>>  EARLYCON_DECLARE(uart8250, early_serial8250_setup);
->>>  EARLYCON_DECLARE(uart, early_serial8250_setup);
->>>
->>> +int __init setup_early_serial8250_console(char *cmdline)
->>> +{
->>> +       return setup_earlycon(cmdline, "uart8250", early_serial8250_setup);
->>> +}
->>> +
->>>  int serial8250_find_port_for_earlycon(void)
->>>  {
->>>         struct earlycon_device *device = early_device;
->>
->> that only handle "uart8250,", may need to add more lines to handle "uart,"
->
->
-> That is on purpose because the only 2 users use uart8250. I consider
-> this a legacy interface and use of "uart" is horrible because there
-> are lots of uarts which are not 8250.
->
-> Rob
->
->>
->> +int __init setup_early_serial8250_console(char *cmdline)
->> +{
->> +       char *options;
->> +       options = strstr(cmdline, "uart8250,");
->> +       if (options)
->> +               return setup_earlycon(cmdline, "uart8250",
->> early_serial8250_setup);
->> +
->> +       options = strstr(cmdline, "uart,");
->> +       if (options)
->> +              return setup_earlycon(cmdline, "uart", early_serial8250_setup);
->> +
->> +      return 0;
->> +}
+On Apr 29, Jason Cooper wrote:
+> On Tue, Apr 29, 2014 at 02:22:27PM -0300, Ezequiel Garcia wrote:
+> > On Apr 25, Stephen Warren wrote:
+> > > On 04/17/2014 01:21 AM, Brian Norris wrote:
+> > > > These defconfigs contain the CONFIG_M25P80 symbol, which is now
+> > > > dependent on the MTD_SPI_NOR symbol. Add CONFIG_MTD_SPI_NOR to the
+> > > > relevant defconfigs.
+> > > > 
+> > > > At the same time, drop the now-nonexistent CONFIG_MTD_CHAR symbol.
+> 
+> Excuse my ignorance of the history of this bug, but shouldn't this be
+> solved in the Kconfig logic?  Since when do we solve config symbol
+> dependency bugs in the defconfigs?
+> 
 
-You want to obsolete "console=uart,io,0x3f8,115200n8" ?
+Long story short: it was decided that select'ing this new symbol was not
+appropriate. Instead, it must be explicitly selected by the user, hence
+the defconfig fix.
 
- Let's check with Andrew. He suggested to use uart and uart8250 at that time.
+The full story: https://lkml.org/lkml/2014/4/17/45
 
-Thanks
-
-Yinghai
+And in particular: https://lkml.org/lkml/2014/4/21/425
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
