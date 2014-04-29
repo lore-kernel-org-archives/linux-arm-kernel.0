@@ -1,56 +1,64 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 28 Apr 2014 18:08:53 -0700
-Subject: [PATCH 5/5] ARM: sunxi: Remove sun4i and sun7i machine definitions
-In-Reply-To: <1401022774.yKcHJAmPtb@wuerfel>
-References: <1398265476-29373-1-git-send-email-maxime.ripard@free-electrons.com>
- <1398265476-29373-6-git-send-email-maxime.ripard@free-electrons.com>
- <1401022774.yKcHJAmPtb@wuerfel>
-Message-ID: <CAOesGMhgTJugKyfa3QB=Zk1O0bDX9EgBnr4i9KeCD5bBpZ9mVw@mail.gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 29 Apr 2014 10:37:42 +0900
+Subject: [PATCHv5] ARM: EXYNOS: Support secondary CPU boot of Exynos4212
+Message-ID: <1398735462-1938-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 23, 2014 at 9:02 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 23 April 2014 17:04:36 Maxime Ripard wrote:
->>
->> -static void __init sunxi_dt_init(void)
->> -{
->> -       of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
->> -}
->> -
->> -static const char * const sunxi_board_dt_compat[] = {
->> -       "allwinner,sun4i-a10",
->> -       "allwinner,sun5i-a10s",
->> -       "allwinner,sun5i-a13",
->> -       NULL,
->> -};
->> -
->> -DT_MACHINE_START(SUNXI_DT, "Allwinner A1X (Device Tree)")
->> -       .init_machine   = sunxi_dt_init,
->> -       .dt_compat      = sunxi_board_dt_compat,
->> -MACHINE_END
->> -
->>  static const char * const sun6i_board_dt_compat[] = {
->>         "allwinner,sun6i-a31",
->>         NULL,
->
-> I'd like to hear more opinions on this. We could either rely
-> on the generic code, or we could keep the entry with just
-> the .dt_compat line and the name, so /proc/cpuinfo contains
-> a meaningful platform name.
->
-> Either approach works for me, but I think we should do this
-> consistent across platforms. Olof, do you have an opinion?
+From: Kyungmin Park <kyungmin.park@samsung.com>
 
-In reality, today, most platforms still need some out-of-tree stuff
-that usually goes into the mach directory on out of tree kernels. It
-also gives a place to stick the Kconfig entries, it's been nice to
-have them split out in per-platform Kconfigs instead of having them
-all modify and conflict the shared one.
+This patch fix the offset of CPU boot address and change parameter of smc call
+of SMC_CMD_CPU1BOOT command for Exynos4212.
 
-I know those aren't strong arguments to keep it, but given that all
-other things are more or less equal, it's a good a reason as any.
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+---
+Changes from v4:
+- Post only this patch separated from following patchset[1]
+[1] https://lkml.org/lkml/2014/4/24/873
 
-But, I'm not picky either way.
+ arch/arm/mach-exynos/firmware.c | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
 
-
--Olof
+diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
+index 932129e..aa01c42 100644
+--- a/arch/arm/mach-exynos/firmware.c
++++ b/arch/arm/mach-exynos/firmware.c
+@@ -18,6 +18,8 @@
+ 
+ #include <mach/map.h>
+ 
++#include <plat/cpu.h>
++
+ #include "smc.h"
+ 
+ static int exynos_do_idle(void)
+@@ -28,13 +30,24 @@ static int exynos_do_idle(void)
+ 
+ static int exynos_cpu_boot(int cpu)
+ {
++	/*
++	 * The second parameter of SMC_CMD_CPU1BOOT command means CPU id.
++	 * But, Exynos4212 has only one secondary CPU so second parameter
++	 * isn't used for informing secure firmware about CPU id.
++	 */
++	if (soc_is_exynos4212())
++		cpu = 0;
++
+ 	exynos_smc(SMC_CMD_CPU1BOOT, cpu, 0, 0);
+ 	return 0;
+ }
+ 
+ static int exynos_set_cpu_boot_addr(int cpu, unsigned long boot_addr)
+ {
+-	void __iomem *boot_reg = S5P_VA_SYSRAM_NS + 0x1c + 4*cpu;
++	void __iomem *boot_reg = S5P_VA_SYSRAM_NS + 0x1c;
++
++	if (!soc_is_exynos4212())
++		boot_reg += 4*cpu;
+ 
+ 	__raw_writel(boot_addr, boot_reg);
+ 	return 0;
+-- 
+1.8.0
