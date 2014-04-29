@@ -1,57 +1,63 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Tue, 29 Apr 2014 13:56:57 +0100
-Subject: [PATCH 01/10] of: Keep track of populated platform devices
-In-Reply-To: <CAL_JsqJxWoxNL=P0SJm+Q1rTRGTpMkzmzTJDbFq2P1vPH4XxZQ@mail.gmail.com>
-References: <1398707877-22596-1-git-send-email-pawel.moll@arm.com>
- <1398707877-22596-2-git-send-email-pawel.moll@arm.com>
- <CAL_JsqJxWoxNL=P0SJm+Q1rTRGTpMkzmzTJDbFq2P1vPH4XxZQ@mail.gmail.com>
-Message-ID: <20140429125657.65910C4089D@trevor.secretlab.ca>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 29 Apr 2014 09:11:01 -0400
+Subject: [GIT PULL] ARM: mvebu: pci/mbus fixes for v3.15
+Message-ID: <20140429131101.GI28159@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 28 Apr 2014 13:02:28 -0500, Rob Herring <robherring2@gmail.com> wrote:
-> On Mon, Apr 28, 2014 at 12:57 PM, Pawel Moll <pawel.moll@arm.com> wrote:
-> > In "Device Tree powered" systems, platform devices are usually
-> > massively populated with of_platform_populate() call, executed
-> > at some level of initcalls, either by generic architecture
-> > or by platform-specific code.
-> >
-> > There are situations though where certain devices must be
-> > created (and bound with drivers) before all the others.
-> > This presents a challenge, as devices created explicitly
-> > would be created again by of_platform_populate().
-> >
-> > This patch tries to solve that issue in a generic way,
-> > adding a "populated" flag for a DT node description.
-> > Once set, this device will never be created again via
-> > of_* API, so of_platform_populate() will skip such nodes
-> > (and its children) in a similar way to the non-available
-> > ones.
-> >
-> > Cc: devicetree at vger.kernel.org
-> > Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-> > ---
-> >  drivers/of/platform.c | 10 ++++++++--
-> >  include/linux/of.h    |  1 +
-> >  2 files changed, 9 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> > index 404d1da..0ae757a 100644
-> > --- a/drivers/of/platform.c
-> > +++ b/drivers/of/platform.c
-> > @@ -204,7 +204,8 @@ static struct platform_device *of_platform_device_create_pdata(
-> >  {
-> >         struct platform_device *dev;
-> >
-> > -       if (!of_device_is_available(np))
-> > +       if (!of_device_is_available(np) ||
-> > +                       of_node_check_flag(np, OF_POPULATED))
-> 
-> This and the amba case should be a test_and_set operation to avoid a
-> race condition.
+arm-soc guys,
 
-Yes. It is an unlikely condition at the time that Pawel is handling, but
-it should also work for later calls to of_platform_populate() which may
-happen at runtime and in parallel.
+This rather large (for fixes) changeset resolves multiple problems with
+the mvebu PCIe driver.  While it works fine for simple use cases, more
+complicated uses highlighted multiple problems with MSI handling and mbus
+window creation.
 
-g.
+These changes are Acked by the appropriate maintainers and have been in
+-next for about a week.
+
+Please pull.
+
+thx,
+
+Jason.
+
+
+The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+
+  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-mbus_pci-fixes-3.15
+
+for you to fetch changes up to 398f5d5e10b6b917cd9d35ef21d545b0afbada22:
+
+  PCI: mvebu: split PCIe BARs into multiple MBus windows when needed (2014-04-24 03:48:41 +0000)
+
+----------------------------------------------------------------
+mvebu drivers (mbus and pci) fixes for v3.15
+
+ - pci
+
+    - fix off-by-one for mbus window size
+    - split BARs into multiple mbus windows when needed
+
+ - mbus
+
+    - avoid setting undefined window size
+    - allow several windows with the same target/attr
+
+----------------------------------------------------------------
+Jason Gunthorpe (1):
+      bus: mvebu-mbus: Avoid setting an undefined window size
+
+Thomas Petazzoni (2):
+      bus: mvebu-mbus: allow several windows with the same target/attribute
+      PCI: mvebu: split PCIe BARs into multiple MBus windows when needed
+
+Willy Tarreau (1):
+      PCI: mvebu: fix off-by-one in the computed size of the mbus windows
+
+ drivers/bus/mvebu-mbus.c     | 22 ++++++++---
+ drivers/pci/host/pci-mvebu.c | 92 ++++++++++++++++++++++++++++++++++++--------
+ 2 files changed, 92 insertions(+), 22 deletions(-)
