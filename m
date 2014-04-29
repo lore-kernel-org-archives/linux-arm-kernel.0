@@ -1,45 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Apr 2014 13:35:34 +0200
-Subject: ARM: mm: Could I change module space size or place modules in
- vmalloc area?
-In-Reply-To: <20140429111946.GC26067@arm.com>
-References: <002001cf07a1$fd4bdc10$f7e39430$@lge.com>
- <535B1618.5030504@huawei.com> <20140429111946.GC26067@arm.com>
-Message-ID: <4710126.4mE2sZLRKS@wuerfel>
+From: matt@console-pimps.org (Matt Fleming)
+Date: Tue, 29 Apr 2014 12:43:56 +0100
+Subject: [PATCH v2 00/10] arm64: UEFI support
+In-Reply-To: <20140429102817.GE17007@arm.com>
+References: <1398442154-19974-1-git-send-email-leif.lindholm@linaro.org>
+ <20140429102817.GE17007@arm.com>
+Message-ID: <20140429114356.GK26088@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 April 2014 12:19:46 Will Deacon wrote:
-> On Sat, Apr 26, 2014 at 03:12:40AM +0100, Jianguo Wu wrote:
-> > On 2014/1/3 8:47, Russell King - ARM Linux wrote:
-> > > ARM can only branch relatively within +/- 32MB.  Hence, with a module
-> > > space of 16MB, modules can reach up to a maximum 16MB into the direct-
-> > > mapped kernel image.  As module space increases in size, so that figure
-> > > decreases.  So, if module space were to be 40MB, the maximum size of the
-> > > kernel binary would be 8MB.
-> > > 
-> > 
-> > Hi Russell ,Arnd or Will,
-> > 
-> > I encountered the same situation in arm64, I loaded 80+ modules in arm64, and
-> > run out of module address space(64M). Why the module space is restricted to 64M,
-> > can it be expanded?  
+(Pulling in Peter and Stephen)
+
+On Tue, 29 Apr, at 11:28:17AM, Catalin Marinas wrote:
 > 
-> The module space is restricted to 64M on AArch64 because the range of the BL
-> instruction is += 128M. In order to call kernel functions, we need to ensure
-> that this range is large enough and therefore place the modules 64M below the
-> kernel text, allowing 64M for modules and 64M for the kernel text. We could
-> probably improve this a bit by assuming a maximum size for the kernel text.
+> The patches look fine to me, they've been through several rounds of
+> review already. How do we propose these get merged as the series
+> contains both generic and arm64 patches? And there are dependencies
+> already in linux-next.
 > 
-> If we want to remove the problem altogether, we'd need to hack the module
-> loader to insert trampolines (fiddly) or somehow persuade the tools to use
-> indirect branches (BLR) for all calls (inefficient).
+> Are the EFI patches in -next pulled from some non-rebaseable branch?
 
-Well, there might also be a bug involved. Loading 80 modules should never
-take up 64MB. The typical size of a loadable module should be a few dozen
-kilobytes, although we have a few modules that are hundreds of kilobytes.
+Peter suggsted a plan when he took the generic EFI stuff that's in tip
+(and hence currently in linux-next),
 
-Jianguo Wu, can you send the defconfig you were using? Did you have
-some debugging option enabled that increased the module size?
+  It doesn't hurt to inform Stephen, although I think it will simply fall
+  out automatically since he uses git to merge and git will recognize the
+  graph.
 
-	Arnd
+  During the merge window, it means they should not push their patches
+  until Linus has accepted the precondition patches from the tip tree.
+  Since Ingo and I try to push most of the tip tree as early as possible
+  in the merge window, this is usually not a problem.
+
+So we currently have the prerequisites in tip/x86/efi, and assuming that
+this 10-patch series gets merged into a single branch somewhere, things
+should work automatically for linux-next.
+
+It may be prudent to negotiate a plan now for when the merge window
+opens because, as Peter mentions above, the stuff in tip/x86/efi needs
+to be merged by Linus first to avoid build breakage with the arm64
+stuff.
+
+-- 
+Matt Fleming, Intel Open Source Technology Center
