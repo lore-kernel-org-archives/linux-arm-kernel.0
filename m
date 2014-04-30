@@ -1,83 +1,127 @@
-From: jhbird.choi@samsung.com (Jonghwan Choi)
-Date: Wed, 30 Apr 2014 15:28:36 +0900
-Subject: [PATCH 3/3] cpufreq: Pass third argument as function parameter is
-Message-ID: <000201cf643d$6ac0da00$40428e00$@samsung.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 30 Apr 2014 01:34:05 -0500
+Subject: Fwd: [PATCH v4 02/14] ARM: append ARCH_MULTI_V7_LPAE
+In-Reply-To: <1398668032-8335-3-git-send-email-haojian.zhuang@linaro.org>
+References: <1398668032-8335-1-git-send-email-haojian.zhuang@linaro.org>
+ <1398668032-8335-3-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <CAL_Jsq+PGPTYBNu2rnD56ko3E0LNryNK8e0ZsR+pU=U1q-vZ9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In dev_pm_opp_init_cpufreq_table, flags parameter is added to
-indicate descending order. If flags is zero, it is a ascending
-order.
+On Mon, Apr 28, 2014 at 1:53 AM, Haojian Zhuang
+<haojian.zhuang@linaro.org> wrote:
+> Add new ARCH_MULTI_V7_LPAE config. It will select ARM_LPAE only both
+> ARCH_MULTI_V6 & ARCH_MULTI_V7 is disabled.
+>
+> ARCH_MULTI_V7 means non-LPAE platform.
+>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> ---
+>  arch/arm/Kconfig               | 10 +++++++++-
+>  arch/arm/mach-berlin/Kconfig   |  2 +-
+>  arch/arm/mach-highbank/Kconfig |  2 +-
+>  arch/arm/mach-mvebu/Kconfig    |  4 ++--
+>  arch/arm/mach-omap2/Kconfig    |  4 ++--
+>  arch/arm/mach-qcom/Kconfig     |  2 +-
+>  arch/arm/mach-shmobile/Kconfig |  2 +-
+>  arch/arm/mach-tegra/Kconfig    |  2 +-
+>  arch/arm/mach-vexpress/Kconfig |  2 +-
+>  9 files changed, 19 insertions(+), 11 deletions(-)
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index ab438cb..5ef96ea 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -918,12 +918,20 @@ config ARCH_MULTI_V6
+>         select CPU_V6K
+>
+>  config ARCH_MULTI_V7
+> -       bool "ARMv7 based platforms (Cortex-A, PJ4, Scorpion, Krait)"
+> +       bool "ARMv7 non-LPAE based platforms (Cortex-A5/A8/A9, PJ4, PJ4B, Scorpion)"
+>         default y
+>         select ARCH_MULTI_V6_V7
+> +       select ARCH_MULTI_V7_LPAE
 
-Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
----
- drivers/cpufreq/arm_big_little.c |    2 +-
- drivers/cpufreq/cpufreq-cpu0.c   |    2 +-
- drivers/cpufreq/imx6q-cpufreq.c  |    2 +-
- drivers/cpufreq/omap-cpufreq.c   |    2 +-
- 4 files changed, 4 insertions(+), 4 deletions(-)
+This doesn't seem right.
 
-diff --git a/drivers/cpufreq/arm_big_little.c
-b/drivers/cpufreq/arm_big_little.c
-index bad2ed3..851f53b 100644
---- a/drivers/cpufreq/arm_big_little.c
-+++ b/drivers/cpufreq/arm_big_little.c
-@@ -332,7 +332,7 @@ static int _get_cluster_clk_and_freq_table(struct device
-*cpu_dev)
- 		goto out;
- 	}
- 
--	ret = dev_pm_opp_init_cpufreq_table(cpu_dev, &freq_table[cluster]);
-+	ret = dev_pm_opp_init_cpufreq_table(cpu_dev, &freq_table[cluster],
-0);
- 	if (ret) {
- 		dev_err(cpu_dev, "%s: failed to init cpufreq table, cpu: %d,
-err: %d\n",
- 				__func__, cpu_dev->id, ret);
-diff --git a/drivers/cpufreq/cpufreq-cpu0.c b/drivers/cpufreq/cpufreq-cpu0.c
-index 1bf6bba..2557860 100644
---- a/drivers/cpufreq/cpufreq-cpu0.c
-+++ b/drivers/cpufreq/cpufreq-cpu0.c
-@@ -158,7 +158,7 @@ static int cpu0_cpufreq_probe(struct platform_device
-*pdev)
- 		goto out_put_node;
- 	}
- 
--	ret = dev_pm_opp_init_cpufreq_table(cpu_dev, &freq_table);
-+	ret = dev_pm_opp_init_cpufreq_table(cpu_dev, &freq_table, 0);
- 	if (ret) {
- 		pr_err("failed to init cpufreq table: %d\n", ret);
- 		goto out_put_node;
-diff --git a/drivers/cpufreq/imx6q-cpufreq.c
-b/drivers/cpufreq/imx6q-cpufreq.c
-index e27fca8..c2bf03f 100644
---- a/drivers/cpufreq/imx6q-cpufreq.c
-+++ b/drivers/cpufreq/imx6q-cpufreq.c
-@@ -212,7 +212,7 @@ static int imx6q_cpufreq_probe(struct platform_device
-*pdev)
- 		}
- 	}
- 
--	ret = dev_pm_opp_init_cpufreq_table(cpu_dev, &freq_table);
-+	ret = dev_pm_opp_init_cpufreq_table(cpu_dev, &freq_table, 0);
- 	if (ret) {
- 		dev_err(cpu_dev, "failed to init cpufreq table: %d\n", ret);
- 		goto put_node;
-diff --git a/drivers/cpufreq/omap-cpufreq.c b/drivers/cpufreq/omap-cpufreq.c
-index 5f69c9a..afe9bf8 100644
---- a/drivers/cpufreq/omap-cpufreq.c
-+++ b/drivers/cpufreq/omap-cpufreq.c
-@@ -119,7 +119,7 @@ static int omap_cpu_init(struct cpufreq_policy *policy)
- 		return PTR_ERR(policy->clk);
- 
- 	if (!freq_table) {
--		result = dev_pm_opp_init_cpufreq_table(mpu_dev,
-&freq_table);
-+		result = dev_pm_opp_init_cpufreq_table(mpu_dev, &freq_table,
-0);
- 		if (result) {
- 			dev_err(mpu_dev,
- 				"%s: cpu%d: failed creating freq
-table[%d]\n",
--- 
-1.7.10.4
+>         select CPU_V7
+>         select HAVE_SMP
+>
+> +config ARCH_MULTI_V7_LPAE
+> +       bool "ARMv7 LPAE based platforms (Cortex-A7/A12/A15/A17, Brahma-B15, PJ4B-MP, Krait)"
+> +       select ARCH_MULTI_V6_V7
+> +       select CPU_V7
+> +       select HAVE_SMP
+> +       select ARM_LPAE if !(ARCH_MULTI_V6 || ARCH_MULTI_V7)
+
+This logic doesn't really seem right either.
+
+Most of the rest of the changes can be avoided if you rename
+ARCH_MULTI_V7 to ARCH_MULTI_V7_NONLPAE and then add:
+
+config ARCH_MULTI_V7
+    def_bool y if (ARCH_MULTI_V7_NONLPAE || ARCH_MULTI_V7_LPAE)
+
+> +
+>  config ARCH_MULTI_V6_V7
+>         bool
+>         select MIGHT_HAVE_CACHE_L2X0
+> diff --git a/arch/arm/mach-berlin/Kconfig b/arch/arm/mach-berlin/Kconfig
+> index b0cb072..be0512d 100644
+> --- a/arch/arm/mach-berlin/Kconfig
+> +++ b/arch/arm/mach-berlin/Kconfig
+> @@ -1,5 +1,5 @@
+>  config ARCH_BERLIN
+> -       bool "Marvell Berlin SoCs" if ARCH_MULTI_V7
+> +       bool "Marvell Berlin SoCs" if (ARCH_MULTI_V7 || ARCH_MULTI_V7_LPAE)
+>         select ARM_GIC
+>         select GENERIC_IRQ_CHIP
+>         select DW_APB_ICTL
+> diff --git a/arch/arm/mach-highbank/Kconfig b/arch/arm/mach-highbank/Kconfig
+> index 830b76e..9b6b3f8 100644
+> --- a/arch/arm/mach-highbank/Kconfig
+> +++ b/arch/arm/mach-highbank/Kconfig
+> @@ -1,5 +1,5 @@
+>  config ARCH_HIGHBANK
+> -       bool "Calxeda ECX-1000/2000 (Highbank/Midway)" if ARCH_MULTI_V7
+> +       bool "Calxeda ECX-1000/2000 (Highbank/Midway)" if ARCH_MULTI_V7_LPAE
+
+Highbank is not LPAE. Midway is LPAE (and can run non-LPAE kernels).
+
+>         select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
+>         select ARCH_HAS_CPUFREQ
+>         select ARCH_HAS_HOLES_MEMORYMODEL
+> diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+> index 3f73eec..0d54d1a 100644
+> --- a/arch/arm/mach-mvebu/Kconfig
+> +++ b/arch/arm/mach-mvebu/Kconfig
+> @@ -1,5 +1,5 @@
+>  config ARCH_MVEBU
+> -       bool "Marvell Engineering Business Unit (MVEBU) SoCs" if (ARCH_MULTI_V7 || ARCH_MULTI_V5)
+> +       bool "Marvell Engineering Business Unit (MVEBU) SoCs" if (ARCH_MULTI_V7 || ARCH_MULTI_V7_LPAE || ARCH_MULTI_V5)
+>         select ARCH_SUPPORTS_BIG_ENDIAN
+>         select CLKSRC_MMIO
+>         select GENERIC_IRQ_CHIP
+> @@ -59,7 +59,7 @@ config MACH_ARMADA_38X
+>           on the Marvell Armada 380/385 SoC with device tree.
+>
+>  config MACH_ARMADA_XP
+> -       bool "Marvell Armada XP boards" if ARCH_MULTI_V7
+> +       bool "Marvell Armada XP boards" if ARCH_MULTI_V7_LPAE
+>         select ARMADA_XP_CLK
+>         select CPU_PJ4B
+>         select MACH_MVEBU_V7
+> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> index cb31d43..1958791 100644
+> --- a/arch/arm/mach-omap2/Kconfig
+> +++ b/arch/arm/mach-omap2/Kconfig
+> @@ -41,7 +41,7 @@ config ARCH_OMAP4
+>
+>  config SOC_OMAP5
+>         bool "TI OMAP5"
+> -       depends on ARCH_MULTI_V7
+> +       depends on ARCH_MULTI_V7_LPAE
+
+Can't OMAP5 run a non-LPAE enabled kernel?
+
+Rob
