@@ -1,36 +1,93 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 30 Apr 2014 04:15:52 -0700
-Subject: [PATCH 1/5] ARM: KVM: disable KVM in Kconfig on big-endian systems
+Date: Wed, 30 Apr 2014 04:15:53 -0700
+Subject: [PATCH 2/5] arm: KVM: fix possible misalignment of PGDs and bounce
+ page
 In-Reply-To: <1398856556-13199-1-git-send-email-christoffer.dall@linaro.org>
 References: <1398856556-13199-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1398856556-13199-2-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1398856556-13199-3-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Will Deacon <will.deacon@arm.com>
+From: Mark Salter <msalter@redhat.com>
 
-KVM currently crashes and burns on big-endian hosts, so don't allow it
-to be selected until we've got that fixed.
+The kvm/mmu code shared by arm and arm64 uses kalloc() to allocate
+a bounce page (if hypervisor init code crosses page boundary) and
+hypervisor PGDs. The problem is that kalloc() does not guarantee
+the proper alignment. In the case of the bounce page, the page sized
+buffer allocated may also cross a page boundary negating the purpose
+and leading to a hang during kvm initialization. Likewise the PGDs
+allocated may not meet the minimum alignment requirements of the
+underlying MMU. This patch uses __get_free_page() to guarantee the
+worst case alignment needs of the bounce page and PGDs on both arm
+and arm64.
 
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
+Cc: <stable@vger.kernel.org> # 3.10+
+Signed-off-by: Mark Salter <msalter@redhat.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/kvm/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/kvm/mmu.c | 15 +++++++++------
+ 1 file changed, 9 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
-index 466bd29..4be5bb1 100644
---- a/arch/arm/kvm/Kconfig
-+++ b/arch/arm/kvm/Kconfig
-@@ -23,7 +23,7 @@ config KVM
- 	select HAVE_KVM_CPU_RELAX_INTERCEPT
- 	select KVM_MMIO
- 	select KVM_ARM_HOST
--	depends on ARM_VIRT_EXT && ARM_LPAE
-+	depends on ARM_VIRT_EXT && ARM_LPAE && !CPU_BIG_ENDIAN
- 	---help---
- 	  Support hosting virtualized guest machines. You will also
- 	  need to select one or more of the processor modules below.
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 80bb1e6..16f8049 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -42,6 +42,8 @@ static unsigned long hyp_idmap_start;
+ static unsigned long hyp_idmap_end;
+ static phys_addr_t hyp_idmap_vector;
+ 
++#define pgd_order get_order(PTRS_PER_PGD * sizeof(pgd_t))
++
+ #define kvm_pmd_huge(_x)	(pmd_huge(_x) || pmd_trans_huge(_x))
+ 
+ static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+@@ -293,14 +295,14 @@ void free_boot_hyp_pgd(void)
+ 	if (boot_hyp_pgd) {
+ 		unmap_range(NULL, boot_hyp_pgd, hyp_idmap_start, PAGE_SIZE);
+ 		unmap_range(NULL, boot_hyp_pgd, TRAMPOLINE_VA, PAGE_SIZE);
+-		kfree(boot_hyp_pgd);
++		free_pages((unsigned long)boot_hyp_pgd, pgd_order);
+ 		boot_hyp_pgd = NULL;
+ 	}
+ 
+ 	if (hyp_pgd)
+ 		unmap_range(NULL, hyp_pgd, TRAMPOLINE_VA, PAGE_SIZE);
+ 
+-	kfree(init_bounce_page);
++	free_page((unsigned long)init_bounce_page);
+ 	init_bounce_page = NULL;
+ 
+ 	mutex_unlock(&kvm_hyp_pgd_mutex);
+@@ -330,7 +332,7 @@ void free_hyp_pgds(void)
+ 		for (addr = VMALLOC_START; is_vmalloc_addr((void*)addr); addr += PGDIR_SIZE)
+ 			unmap_range(NULL, hyp_pgd, KERN_TO_HYP(addr), PGDIR_SIZE);
+ 
+-		kfree(hyp_pgd);
++		free_pages((unsigned long)hyp_pgd, pgd_order);
+ 		hyp_pgd = NULL;
+ 	}
+ 
+@@ -1024,7 +1026,7 @@ int kvm_mmu_init(void)
+ 		size_t len = __hyp_idmap_text_end - __hyp_idmap_text_start;
+ 		phys_addr_t phys_base;
+ 
+-		init_bounce_page = kmalloc(PAGE_SIZE, GFP_KERNEL);
++		init_bounce_page = (void *)__get_free_page(GFP_KERNEL);
+ 		if (!init_bounce_page) {
+ 			kvm_err("Couldn't allocate HYP init bounce page\n");
+ 			err = -ENOMEM;
+@@ -1050,8 +1052,9 @@ int kvm_mmu_init(void)
+ 			 (unsigned long)phys_base);
+ 	}
+ 
+-	hyp_pgd = kzalloc(PTRS_PER_PGD * sizeof(pgd_t), GFP_KERNEL);
+-	boot_hyp_pgd = kzalloc(PTRS_PER_PGD * sizeof(pgd_t), GFP_KERNEL);
++	hyp_pgd = (pgd_t *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, pgd_order);
++	boot_hyp_pgd = (pgd_t *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, pgd_order);
++
+ 	if (!hyp_pgd || !boot_hyp_pgd) {
+ 		kvm_err("Hyp mode PGD not allocated\n");
+ 		err = -ENOMEM;
 -- 
 1.8.5.2
