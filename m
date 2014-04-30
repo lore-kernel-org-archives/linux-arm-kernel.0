@@ -1,114 +1,37 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 30 Apr 2014 09:58:40 +0900
-Subject: [PATCH 5/5] devfreq: exynos5: Use devm_devfreq_* function using
- device resource management
-In-Reply-To: <CAK9yfHyP63QaaBwc4vkkqU4g3+B2DpqeC_11E5+LevWXED0Qxg@mail.gmail.com>
-References: <1398416894-6782-1-git-send-email-cw00.choi@samsung.com>
- <1398416894-6782-6-git-send-email-cw00.choi@samsung.com>
- <CAK9yfHyP63QaaBwc4vkkqU4g3+B2DpqeC_11E5+LevWXED0Qxg@mail.gmail.com>
-Message-ID: <53604AC0.6020306@samsung.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 30 Apr 2014 02:59:46 +0200
+Subject: [PATCH/RFC] serial: sh-sci: Add device tree support for r8a7779
+In-Reply-To: <20140429214846.GA27566@verge.net.au>
+References: <1398322484-3630-1-git-send-email-horms+renesas@verge.net.au>
+ <1986104.5bpNkKVN8D@avalon> <20140429214846.GA27566@verge.net.au>
+Message-ID: <48241008.smQVDtv0CD@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sachin,
+Hi Simon,
 
-On 04/30/2014 01:54 AM, Sachin Kamat wrote:
-> Hi Chanwoo,
-> 
-> On 25 April 2014 14:38, Chanwoo Choi <cw00.choi@samsung.com> wrote:
->> This patch uses devm_devfreq_add_device()/devm_devfreq_register_opp_notifier()
->> to control automatically the resource of devfreq.
->>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> Cc: Kukjin Kim <kgene.kim@samsung.com>
->> Cc: Sachin Kamat <sachin.kamat@linaro.org>
->> Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
->> Cc: Manish Badarkhe <badarkhe.manish@gmail.com>
->> Cc: Abhilash Kesavan <a.kesavan@samsung.com>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linux-samsung-soc at vger.kernel.org
->> ---
->>  drivers/devfreq/exynos/exynos5_bus.c | 23 ++++++++---------------
->>  1 file changed, 8 insertions(+), 15 deletions(-)
->>
->> diff --git a/drivers/devfreq/exynos/exynos5_bus.c b/drivers/devfreq/exynos/exynos5_bus.c
->> index ab54a69..1f622f8 100644
->> --- a/drivers/devfreq/exynos/exynos5_bus.c
->> +++ b/drivers/devfreq/exynos/exynos5_bus.c
->> @@ -165,11 +165,6 @@ static int exynos5_int_get_dev_status(struct device *dev,
->>  }
->>  static void exynos5_int_exit(struct device *dev)
->>  {
->> -       struct platform_device *pdev = container_of(dev, struct platform_device,
->> -                                                   dev);
->> -       struct busfreq_data_int *data = platform_get_drvdata(pdev);
->> -
->> -       devfreq_unregister_opp_notifier(dev, data->devfreq);
->>  }
-> 
-> Do you need an empty function?
+On Wednesday 30 April 2014 06:48:50 Simon Horman wrote:
+> On Tue, Apr 29, 2014 at 03:44:46PM +0200, Laurent Pinchart wrote:
+> > On Monday 28 April 2014 16:07:49 Simon Horman wrote:
 
-exynos5_init_exit() function would be removed because this function is not necessary.
+[snip]
 
+> > > BTW, are you planning to make the above mentioned driver update
+> > > before or after re-posting enablement patches for Koelsch and/or Lager?
+> > > I ask because I would like to make such patches the basis for
+> > > a patch for Marzen.
+> > 
+> > I'll try to do so today, after my talk at the ELC :-)
 > 
->>
->>  static struct devfreq_dev_profile exynos5_devfreq_int_profile = {
->> @@ -343,30 +338,29 @@ static int exynos5_busfreq_int_probe(struct platform_device *pdev)
->>
->>         busfreq_mon_reset(ppmu_data);
->>
->> -       data->devfreq = devfreq_add_device(dev, &exynos5_devfreq_int_profile,
->> +       data->devfreq = devm_devfreq_add_device(dev, &exynos5_devfreq_int_profile,
->>                                            "simple_ondemand", NULL);
->> -
->>         if (IS_ERR(data->devfreq)) {
->>                 err = PTR_ERR(data->devfreq);
-> 
-> No need of err.   return PTR_ERR(data->devfreq);
+> I thought you might be a bit busy with ELC so I went
+> ahead and made my Marzen patches. Hopefully they aren't
+> too far away from what you have in mind for the Koelsch and Lager.
 
-OK, I'll fix it.
+I was busy, but I've just sent the patches :-) Could you please test them ? If 
+no problem is found I'd like the SCI patch to go in before this series, to 
+avoid adding a dependency on sci_ick in the marzen DT.
 
-> 
->> -               goto err_devfreq_add;
->> +               return err;
->>         }
->>
->> -       devfreq_register_opp_notifier(dev, data->devfreq);
->> +       err = devm_devfreq_register_opp_notifier(dev, data->devfreq);
->> +       if (err < 0) {
->> +               dev_err(dev, "Failed to register opp notifier\n");
->> +               return err;
->> +       }
->>
->>         err = register_pm_notifier(&data->pm_notifier);
->>         if (err) {
->>                 dev_err(dev, "Failed to setup pm notifier\n");
->> -               goto err_devfreq_add;
->> +               return err;
->>         }
->>
->>         /* TODO: Add a new QOS class for int/mif bus */
->>         pm_qos_add_request(&data->int_req, PM_QOS_NETWORK_THROUGHPUT, -1);
->>
->>         return 0;
->> -
->> -err_devfreq_add:
->> -       devfreq_remove_device(data->devfreq);
->> -       return err;
->>  }
->>
->>  static int exynos5_busfreq_int_remove(struct platform_device *pdev)
->> @@ -375,7 +369,6 @@ static int exynos5_busfreq_int_remove(struct platform_device *pdev)
->>
->>         pm_qos_remove_request(&data->int_req);
->>         unregister_pm_notifier(&data->pm_notifier);
->> -       devfreq_remove_device(data->devfreq);
->>
->>         return 0;
->>  }
->> --
->> 1.8.0
->>
-> 
-> 
-> 
+-- 
+Regards,
+
+Laurent Pinchart
