@@ -1,28 +1,61 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 30 Apr 2014 15:13:44 +0100
-Subject: [PATCH 02/10] mfd: vexpress: Convert custom func API to regmap
-In-Reply-To: <20140430135855.GO29462@lee--X1>
-References: <1398707877-22596-1-git-send-email-pawel.moll@arm.com>
- <1398707877-22596-3-git-send-email-pawel.moll@arm.com>
- <20140430135855.GO29462@lee--X1>
-Message-ID: <1398867224.24255.22.camel@hornet>
+From: monstr@monstr.eu (Michal Simek)
+Date: Wed, 30 Apr 2014 16:19:10 +0200
+Subject: [PATCH v3] pcie: Add Xilinx PCIe Host Bridge IP driver
+In-Reply-To: <1397561911-11647-1-git-send-email-sthokal@xilinx.com>
+References: <1397561911-11647-1-git-send-email-sthokal@xilinx.com>
+Message-ID: <5361065E.80304@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-04-30 at 14:58 +0100, Lee Jones wrote:
-> MFD diffstat looks great and the changes look sensible:
->   Acked-by: Lee Jones <lee.jones@linaro.org>
+Hi Bjorn,
 
-Thanks!
+On 04/15/2014 01:38 PM, Srikanth Thokala wrote:
+> This is the driver for Xilinx AXI PCIe Host Bridge Soft IP
+> 
+> Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
+> ---
+> Changes in v3:
+> - Rebased on v3.15.0-rc1
+> - Added support for interrupt-map DT functionality.
+> - Removed map_irq() wrapper, instead using of_irq_parse_and_map_pci().
+> - Modified resource mapping logic as per the series
+>   "PCI: ARM: add support for generic PCI host controller"
+> - Modified devicetree binding documentation to update with interrupt-
+>   map properties.
+> - Use devm calls wherever applicable.
+> - Fixed minor comments from Jason
+> - Thanks Jason for the review and suggestions.
+> 
+> Changes in v2:
+> - Rebased on v3.14.0-rc8
+> - Removed IP specific DT properties like include-rc, axibar-num etc.,
+>   as suggested by Jason and Bjorn, Thanks
+> ---
+>  .../devicetree/bindings/pci/xilinx-pcie.txt        |   62 ++
+>  drivers/pci/host/Kconfig                           |    7 +
+>  drivers/pci/host/Makefile                          |    1 +
+>  drivers/pci/host/pci-xilinx.c                      |  999 ++++++++++++++++++++
+>  4 files changed, 1069 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/xilinx-pcie.txt
+>  create mode 100644 drivers/pci/host/pci-xilinx.c
 
-> I guess someone will need to create a branch for us all to pull from.
-> I'm happy to do it if needs be.
+Any comment on this patch?
 
-I was thinking that, with enough acks (and I'm counting on one from you
-for "[PATCH 04/10] mfd: vexpress: Define the device as MFD cells" :-),
-merging the whole series (or at least patches 1-4 and 7-8) through
-arm-soc tree would be the simplest option. I have no problem with the
-independent bits (clk, clocksource, hwmon and the mfd/HBI change) going
-through appropriate subsystems.
+Thanks,
+Michal
 
-Pawe?
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140430/308d0c3a/attachment.sig>
