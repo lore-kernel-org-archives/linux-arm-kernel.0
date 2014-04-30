@@ -1,37 +1,71 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 30 Apr 2014 10:19:35 +0100
-Subject: [RFC 43/47] mtd: nand: stm_nand_bch: read and write functions
- (BCH)
-In-Reply-To: <20980858CB6D3A4BAE95CA194937D5E73EAB5CC7@DBDE04.ent.ti.com>
-References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
- <1395735604-26706-44-git-send-email-lee.jones@linaro.org>
- <20980858CB6D3A4BAE95CA194937D5E73EAB5CC7@DBDE04.ent.ti.com>
-Message-ID: <20140430091935.GI29462@lee--X1>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 30 Apr 2014 10:43:56 +0100
+Subject: [PATCH] ARM: OMAP5: Redo THUMB mode switch on secondary CPU
+In-Reply-To: <1398826427-17200-1-git-send-email-joelf@ti.com>
+References: <1398826427-17200-1-git-send-email-joelf@ti.com>
+Message-ID: <20140430094348.GA3986@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >From: Lee Jones [mailto:lee.jones at linaro.org]
-> >
-> >Helper function for bch_mtd_read() and bch_mtd_write() to handle
-> >multi-page or non-aligned reads and writes respectively.
-> >
-> >Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> >---
+On Tue, Apr 29, 2014 at 09:53:47PM -0500, Joel Fernandes wrote:
+> Here's a redo of the patch [1] that effectively does the same
+> thing but is the right way to do things by using ENDPROC instead.
+> The firmware correctly switches to THUMB before entry.
 > 
-> I think below code is duplicate of nand_do_read_ops() and nand_do_write_ops()
-> in nand_base.c. If you could just populate chip->ecc.read_page and
-> chip->ecc.write_page much of this could be avoided.
+> The patch applies ontop of the earlier patch [1].
+> 
+> [1] https://lkml.org/lkml/2014/4/22/1044
+> 
+> Suggested-by: Dave Martin <Dave.Martin@arm.com>
+> Cc: Dave Martin <Dave.Martin@arm.com>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Nishanth Menon <nm@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Joel Fernandes <joelf@ti.com>
 
-chip->ecc.read_page and chip->ecc.write_page now populated.
+Looks OK to me.
 
-> Also, you need to break your bch_read_page() into given generic NAND
-> driver interfaces chip->ecc.calculate(), chip->ecc.correct() ...
+This also makes omap5 consistent with omap3/4 here.
 
-Our h/w calculates and corrects automatically.  No need for
-intervention.
+Reviewed-by: Dave Martin <Dave.Martin@arm.com>
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> ---
+> 
+> Tony, the earlier patch went into your fixes, and can remain. This patch is just a simple redo of the same and can go in for v3.16, no problem. Thanks.
+> 
+>  arch/arm/mach-omap2/omap-headsmp.S |    6 +-----
+>  1 file changed, 1 insertion(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/omap-headsmp.S b/arch/arm/mach-omap2/omap-headsmp.S
+> index 1809dce..bf36f26 100644
+> --- a/arch/arm/mach-omap2/omap-headsmp.S
+> +++ b/arch/arm/mach-omap2/omap-headsmp.S
+> @@ -31,10 +31,6 @@
+>   * register AuxCoreBoot0.
+>   */
+>  ENTRY(omap5_secondary_startup)
+> -.arm
+> -THUMB( adr     r9, BSYM(wait)  )       @ CPU may be entered in ARM mode.
+> -THUMB( bx      r9              )       @ If this is a Thumb-2 kernel,
+> -THUMB( .thumb                  )       @ switch to Thumb now.
+>  wait:	ldr	r2, =AUX_CORE_BOOT0_PA	@ read from AuxCoreBoot0
+>  	ldr	r0, [r2]
+>  	mov	r0, r0, lsr #5
+> @@ -43,7 +39,7 @@ wait:	ldr	r2, =AUX_CORE_BOOT0_PA	@ read from AuxCoreBoot0
+>  	cmp	r0, r4
+>  	bne	wait
+>  	b	secondary_startup
+> -END(omap5_secondary_startup)
+> +ENDPROC(omap5_secondary_startup)
+>  /*
+>   * OMAP4 specific entry point for secondary CPU to jump from ROM
+>   * code.  This routine also provides a holding flag into which
+> -- 
+> 1.7.9.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
