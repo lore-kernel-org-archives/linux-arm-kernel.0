@@ -1,44 +1,56 @@
 From: jays.lee@samsung.com (Jungseok Lee)
-Date: Wed, 30 Apr 2014 11:32:32 +0900
-Subject: [PATCH v4 1/7] arm64: Use pr_* instead of printk
-In-Reply-To: <vnkwsioveuwk.fsf@mitchelh-linux.qualcomm.com>
-References: <000101cf6367$c4c219f0$4e464dd0$@samsung.com>
- <vnkwsioveuwk.fsf@mitchelh-linux.qualcomm.com>
-Message-ID: <007c01cf641c$708af310$51a0d930$@samsung.com>
+Date: Wed, 30 Apr 2014 11:44:13 +0900
+Subject: [PATCH v4 2/7] arm64: Decouple page size from level of translation
+ tables
+In-Reply-To: <20140429144052.GJ17007@arm.com>
+References: <000201cf6367$c8084440$5818ccc0$@samsung.com>
+ <20140429144052.GJ17007@arm.com>
+Message-ID: <007d01cf641e$122f9b20$368ed160$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, April 30, 2014 5:35 AM, Mitchel Humpherys wrote:
-> On Mon, Apr 28 2014 at 09:59:14 PM, Jungseok Lee <jays.lee@samsung.com> wrote:
-> > This patch fixed the following checkpatch complaint as using pr_*
-> > instead of printk.
-> >
-> > WARNING: printk() should include KERN_ facility level
-> >
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Signed-off-by: Jungseok Lee <jays.lee@samsung.com>
-> > Reviewed-by: Sungjinn Chung <sungjinn.chung@samsung.com>
-> > ---
-> >  arch/arm64/kernel/traps.c |   14 +++++++-------
-> >  1 file changed, 7 insertions(+), 7 deletions(-)
-> >
-> > diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-> > index 7ffaddd..0484e81 100644
-> > --- a/arch/arm64/kernel/traps.c
-> > +++ b/arch/arm64/kernel/traps.c
-> > @@ -65,7 +65,7 @@ static void dump_mem(const char *lvl, const char *str, unsigned long bottom,
-> >  	fs = get_fs();
-> >  	set_fs(KERNEL_DS);
-> >
-> > -	printk("%s%s(0x%016lx to 0x%016lx)\n", lvl, str, bottom, top);
-> > +	pr_emerg("%s%s(0x%016lx to 0x%016lx)\n", lvl, str, bottom, top);
-> 
-> Currently this printk is being called with lvl=KERN_EMERG or lvl="". In the case of lvl=KERN_EMERG
-> leaving lvl in is redundant. In the case of lvl="" this is a behavioral change (printing to a
-> different log level). Was this intended?
+On Tuesday, April 29, 2014 11:41 PM, Catalin Marinas wrote:
+> Jungseok,
 
-No intention. I will drop the change in the next version.
-Thanks!!
+Hi, Catalin
+
+> On Tue, Apr 29, 2014 at 05:59:20AM +0100, Jungseok Lee wrote:
+> > +choice
+> > +	prompt "Level of translation tables"
+> > +	default ARM64_3_LEVELS if ARM64_4K_PAGES
+> > +	default ARM64_2_LEVELS if ARM64_64K_PAGES
+> > +	help
+> > +	  Allows level of translation tables.
+> > +
+> > +config ARM64_2_LEVELS
+> > +	bool "2 level"
+> > +	depends on ARM64_64K_PAGES
+> > +	help
+> > +	  This feature enables 2 levels of translation tables.
+> > +
+> > +config ARM64_3_LEVELS
+> > +	bool "3 level"
+> > +	depends on ARM64_4K_PAGES
+> > +	help
+> > +	  This feature enables 3 levels of translation tables.
+> > +
+> > +endchoice
+> 
+> As I mentioned previously
+> (http://www.spinics.net/linux/lists/arm-kernel/msg319552.html), just expose options for the VA space
+> bits rather than the number of levels.
+> You can still keep the number of levels config options but not visible in menuconfig (though I think
+> you could also hide them in some header and avoid config altogether). The VA bits config options can
+> be:
+> 
+> VA_BITS_39 if 4K (3 levels)
+> VA_BITS_42 if 64K (2 levels)
+> VA_BITS_47 if 16K (3 levels)
+> VA_BITS_48 if 4K || 16K || 64K (4/4/3 levels depending on page size)
+> 
+> That's more meaningful to people configuring the kernel.
+
+Okay, I will revise VA_BITS config as hiding the number of levels.
 
 Best Regards
 Jungseok Lee
