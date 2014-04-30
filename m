@@ -1,58 +1,63 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Tue, 29 Apr 2014 21:55:38 -0500
-Subject: [PATCH] ARM: OMAP5: Switch to THUMB mode if needed on secondary
- CPU
-In-Reply-To: <20140429183131.GF3582@e103592.cambridge.arm.com>
-References: <1398191506-3741-1-git-send-email-joelf@ti.com>
- <20140428164348.GA14354@e103592.cambridge.arm.com> <535E8DC2.4010504@ti.com>
- <535E8E2D.1020708@ti.com> <20140429091725.GA3582@e103592.cambridge.arm.com>
- <D49C397D-1ABD-4882-B3F5-94F359D7552B@gmail.com>
- <20140429183131.GF3582@e103592.cambridge.arm.com>
-Message-ID: <5360662A.50106@ti.com>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Wed, 30 Apr 2014 08:31:24 +0530
+Subject: [PATCH v3 5/6] arm: exynos: Add MCPM call-back functions
+In-Reply-To: <alpine.LFD.2.11.1404291435450.980@knanqh.ubzr>
+References: <1398528348-21214-1-git-send-email-a.kesavan@samsung.com>
+ <1398528348-21214-6-git-send-email-a.kesavan@samsung.com>
+ <20140428174456.GE31782@e102568-lin.cambridge.arm.com>
+ <CAM4voa=mhcZO9v7nDdrcz+T8RVN-Av3eERVErCX52k1ftUcKcQ@mail.gmail.com>
+ <alpine.LFD.2.11.1404291435450.980@knanqh.ubzr>
+Message-ID: <CAM4voa=Po9r5MpxyjQKcYhyES1UjfVaqbP_PnKCbsw5LtEkpZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/29/2014 01:31 PM, Dave Martin wrote:
-> On Tue, Apr 29, 2014 at 05:36:30PM +0100, Joel Fernandes wrote:
-> 
-> [...]
-> 
->>>> Sorry what I meant is, say its of Type function. What tells the firmware
->>>> to switch to THUMB?
->>>>
->>>> What's typically done is a boot address register is written by the
->>>> kernel, and the firmware jumps to it after WFE.
->>>
->>> Using ENTRY(x) ... ENDPROC(x) causes the symbol seen by the linker
->>> for x to have the Thumb bit set if the code is Thumb.
->>>
->>> This means that any reference the linker fixes up for that symbol
->>> will have the Thumb bit set appropriately.  This applies to any kind
->>> of reference, so code in another file that takes the address of the
->>> symbol and then passes that address to the firmware should result in the
->>> firmware getting an address with the Thumb bit.
->>>
->>> From the firmware's point of view it just gets a raw address, but
->>> the Thumb bit will now be set.  The firmware still needs to handle
->>> this correctly when jumping, but from the look of the code this may
->>> already work on omap3/4.  It would be interesting to know whether it
->>> works on omap5.
->>
->> Thanks a lot for the explanation. That makes perfect sense. I will try it and let you know if it works on OMAP5.
-> 
-> ARM/thumb interworking making perfect sense?  I'll have to frame that
-> and put it on the wall :)
-> 
-> objdump and nm conveniently mask off the Thumb bit from all function
-> addresses they print out, but if you show the symbols using readelf
-> instead you'll see addresses with bit 0 set for Thumb functions.
-> 
-> It's possible that the firmware still doesn't handle branching to Thumb
-> correctly, but if it does it would be nice to remove the requirement to
-> build an odd piece of a Thumb-2 kernel in ARM.
+Hi Nicolas,
 
-Sure, it works great! thanks, I sent out a patch that applies on top of
-the first one. Thanks for spotting it.
+On Wed, Apr 30, 2014 at 12:19 AM, Nicolas Pitre
+<nicolas.pitre@linaro.org> wrote:
+> On Tue, 29 Apr 2014, Abhilash Kesavan wrote:
+>
+>> >> +/*
+>> >> + * Enable cluster-level coherency, in preparation for turning on the MMU.
+>> >> + */
+>> >> +static void __naked exynos_pm_power_up_setup(unsigned int affinity_level)
+>> >> +{
+>> >> +       asm volatile ("\n"
+>> >> +       "cmp    r0, #1\n"
+>> >> +       "bxne   lr\n"
+>> >> +       "b      cci_enable_port_for_self");
+>> >> +}
+>> >
+>> > How many times are we going to duplicate this function before we decide
+>> > to move it to a common header ?
+>> I see this being used in arch/arm/mach-vexpress/tc2_pm.c (where I
+>> copied it from for exynos) and arch/arm/mach-vexpress/dcscb.c. A
+>> common function named "mcpm_default_power_up_setup" in the mcpm header
+>> would be acceptable ?
+>
+> Not necessarily.
+>
+> First of all, this can't be a static inline as we need a pointer to it.
+> And moving this to a header would create multiple instances of the same
+> function in a multiplatform build for example.
+>
+> Furthermore, this can't be called "default_power_up_setup" as this is
+> specific to systems with a CCI.
+>
+> It is true that the code in dcscb_setup.S does the same thing as this
+> 3-line inline assembly, but the former is heavily commented and may
+> serve as an example template for platforms that may require something
+> more sophisticated here.
+>
+> There are other patterns that seem to emerge as more MCPM backends are
+> being submitted.  I'm making a list of them and I intend to address such
+> duplications after those backends do hit mainline.
+OK. I'll keep the power_up_setup code in the exynos mcpm backend as it is.
+Are there any other comments that you have or should I re-post a new
+version that handles Lorenzo's comments.
 
 Regards,
--Joel
+Abhilash
+>
+>
+> Nicolas
