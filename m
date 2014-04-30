@@ -1,64 +1,19 @@
-From: shaik.samsung@gmail.com (Shaik Ameer Basha)
-Date: Wed, 30 Apr 2014 16:27:10 +0530
-Subject: [PATCH v12 00/31] iommu/exynos: Fixes and Enhancements of System
- MMU driver with DT
-In-Reply-To: <26065037.GxQQuIURPg@wuerfel>
-References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
- <26065037.GxQQuIURPg@wuerfel>
-Message-ID: <CAOD6ATqZ5UwRwSKiPDQLrgmX=UUrJVE7ybM_RhXz_CEUjM3W7w@mail.gmail.com>
+From: catalin.marinas@arm.com (catalin.marinas at arm.com)
+Date: Wed, 30 Apr 2014 11:58:20 +0100
+Subject: ARMv8: Allowing user space to perform cache-maintenance
+In-Reply-To: <SNT151-W939A3657D532DA8406405DE8410@phx.gbl>
+References: <SNT151-W6986D9EAC402142465B4BE8410@phx.gbl>
+ <SNT151-W939A3657D532DA8406405DE8410@phx.gbl>
+Message-ID: <20140430105820.GA31224@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 2:04 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Sunday 27 April 2014 13:07:32 Shaik Ameer Basha wrote:
->> The current exynos-iommu(System MMU) driver does not work autonomously
->> since it is lack of support for power management of peripheral blocks.
->> For example, MFC device driver must ensure that its System MMU is disabled
->> before MFC block is power-down not to invalidate IOTLB in the System MMU
->> when I/O memory mapping is changed. Because a System MMU resides in the
->> same H/W block, access to control registers of System MMU while the H/W
->> block is turned off must be prohibited.
->>
->> This set of changes solves the above problem with setting each System MMUs
->> as the parent of the device which owns the System MMU to receive the
->> information when the device is turned off or turned on.
->>
->> Another big change to the driver is the support for devicetree.
->> The bindings for System MMU is described in
->> Documentation/devicetree/bindings/arm/samsung/system-mmu.txt
->
-> Sorry I've been absent from the review so far. Most of the patches
-> seem entirely reasonable to me, but I'm worried about the DT binding
-> aspect. We are going to see more systems shipping with IOMMUs now,
-> and we are seeing an increasing number of submissions for 64-bit
-> systems. We really have to work out what the DT representation for
-> IOMMUs should look like in general before adding another ad-hod
-> implementation that is private to one driver.
+On Wed, Apr 30, 2014 at 02:01:38PM +0530, Rajan Srivastava wrote:
+> ARMv8 allows AArch64-EL0 to execute cache maintenance instructions
+> (eg, by setting SCTLR_EL1.UCI). It looks like the current ARMv8 kernel
+> doesn't support the above feature.
 
+Where have you looked and came up to this conclusion?
 
-I have one question.
-
-This series is going on for quite a long time and most of the patches here
-doesn't depend on dt bindings. As Exynos IOMMU h/w is introducing new versions
-very frequently, maintaining and reviewing all these patches again and
-again is quite a hard job.
-
-If it is acceptable, I can post one more series with the subset of
-above patches,
-which doesn't depend on dt-bindings. As all the patches which doesn't depend on
-DT bindings are already tested,  I hope merging these subset of patches may help
-in reducing the rework and review effort every time.
-
-Once we finalize the generic DT bindings for the IOMMU devices, the driver
-can be updated with the proposed DT bindings in mind.
-
-Regards,
-Shaik
-
-
->
->         Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+Catalin
