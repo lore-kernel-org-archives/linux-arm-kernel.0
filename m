@@ -1,92 +1,92 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 30 Apr 2014 14:15:38 +0200
-Subject: [PATCH] PM / Sleep: Fall back to subsystem level PM callbacks for
- PM domains
-In-Reply-To: <1679843.u9z8cZFExt@vostro.rjw.lan>
-References: <1398422695-2295-1-git-send-email-ulf.hansson@linaro.org>
- <1753685.C73DLtyD2t@vostro.rjw.lan>
- <1679843.u9z8cZFExt@vostro.rjw.lan>
-Message-ID: <CAPDyKFr_1CJZ3KAwAbrzeoW0me1SjqC221Kb=_4RnaXa8Uh_gA@mail.gmail.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Wed, 30 Apr 2014 14:23:34 +0200
+Subject: [RFC PATCH] sched_clock: also call register_current_timer_delay() if
+ possible
+Message-ID: <1398860614-29469-1-git-send-email-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 April 2014 00:52, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> On Wednesday, April 30, 2014 12:47:28 AM Rafael J. Wysocki wrote:
->> On Friday, April 25, 2014 12:44:55 PM Ulf Hansson wrote:
->> > Previously once the PM core found a PM domain pointer for a device,
->> > but which didn't have a valid PM callback, it falled back to try the
->> > driver's PM callback.
->> >
->> > In this scenario, change the behavior of the PM core to try out the
->> > other subsystem level PM callbacks, before it moves on to the driver.
->> >
->> > This gives provision for PM domains to easier re-use subsystem level
->> > code to handle the needed operations.
->> >
->> > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->>
->> Are you sure this is not going to break the existing PM domains?
+On ARM one has to call register_current_timer_delay() in order to use
+the (quick) timer based calibrarion instead of the a little slower loop
+based delay.
+The timer function specified in register_current_timer_delay() is also
+used by read_current_timer() which would otherwise return -ENXIO.
+And read_current_timer() timer is used by get_cycles() which in turn is
+used by random_get_entropy(). That means each sub-architecture returned
+here 0 if register_current_timer_delay() was no performed.
 
-I have checked the current implementations of the PM domains - all are
-providing the PM callbacks. So this should be safe.
+The parameters for for sched_clock_register() and
+register_current_timer_delay() are mostly the same. Instead of calling
+register_current_timer_delay() each time just after (or before)
+sched_clock_register() I thought it might easier by doing it once at
+sched_clock time since the parameter are the same. That means each ARM sub
+arch that working sched-clock would also have a working random_get_entropy()
+implementation.
 
->
-> And even if it isn't, the idea behind PM domains was to provide a mechanism to
-> bypass the bus types' (etc) PM callbacks, so I'm not liking this patch at all.
+Any comments?
 
-I understand your view, it's the current mindset we have of the
-hierarchy of handling the callbacks. I am wondering if it's time to
-reconsider. :-)
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ arch/arm/include/asm/delay.h |  1 +
+ kernel/time/sched_clock.c    | 20 ++++++++++++++++++++
+ 2 files changed, 21 insertions(+)
 
-To be clear, I don't want to prevent the PM domain from bypassing bus,
-types etc, that's should be up to each implementation to decide, and
-this patch won't affect that behaviour.
-
-I intend to only simplify for those PM domains that want to re-use the
-callbacks from bus, types. etc. Currently that's the most of them.
-
-a)
-Those ARM SOCs that implements PM domains, which don't use the generic
-power domain, cares only about platform devices attached to the
-platform_bus_type. These are copying the callbacks from the
-platform_bus_type (using the USE_PLATFORM_PM_SLEEP_OPS macro)  - I
-assume this is because they need to handle legacy suspend/resume.
-
-arch/arm/mach-davinci/pm_domain.c
-arch/arm/mach-keystone/pm_domain.c
-arch/arm/mach-omap1/pm_bus.c
-arch/arm/mach-omap2/omap_device.c
-drivers/sh/pm_runtime.c
-
-b)
-An actual copy of the bus' PM callbacks to the PM domain's callbacks also exist.
-
-drivers/gpu/vga/vga_switcheroo.c:
-vga_switcheroo_init_domain_pm_ops()
-vga_switcheroo_init_domain_pm_optimus_hdmi_audio()
-
-c)
-That leaves the generic power domain and acpi power domain, which
-don't re-use callbacks, but have their own set.
-
-
-The more complicated scenario have not yet been implemented - but I
-can see it coming. :-)
-That's when the PM domain wants to re-use callbacks for whatever bus,
-types etc, the device is attached to.
-
-To handle this, the PM domain will have to re-implement the code for
-walking the hierarchy of callbacks, which is a bit messy. This patch
-will make it possible for the PM domain to rely on the PM core to
-handle this instead.
-
-Kind regards
-Ulf Hansson
-
->
-> Thanks!
->
->
-> --
-> I speak only for myself.
-> Rafael J. Wysocki, Intel Open Source Technology Center.
+diff --git a/arch/arm/include/asm/delay.h b/arch/arm/include/asm/delay.h
+index dff714d..0ae3ff9 100644
+--- a/arch/arm/include/asm/delay.h
++++ b/arch/arm/include/asm/delay.h
+@@ -64,6 +64,7 @@ extern void __loop_const_udelay(unsigned long);
+ 
+ /* Delay-loop timer registration. */
+ #define ARCH_HAS_READ_CURRENT_TIMER
++#define ARCH_HAS_CURRENT_TIMER_DELAY
+ extern void register_current_timer_delay(const struct delay_timer *timer);
+ 
+ #endif /* __ASSEMBLY__ */
+diff --git a/kernel/time/sched_clock.c b/kernel/time/sched_clock.c
+index 0abb364..dc09496 100644
+--- a/kernel/time/sched_clock.c
++++ b/kernel/time/sched_clock.c
+@@ -17,6 +17,7 @@
+ #include <linux/sched_clock.h>
+ #include <linux/seqlock.h>
+ #include <linux/bitops.h>
++#include <linux/delay.h>
+ 
+ struct clock_data {
+ 	ktime_t wrap_kt;
+@@ -112,6 +113,24 @@ static enum hrtimer_restart sched_clock_poll(struct hrtimer *hrt)
+ 	hrtimer_forward_now(hrt, cd.wrap_kt);
+ 	return HRTIMER_RESTART;
+ }
++#ifdef ARCH_HAS_CURRENT_TIMER_DELAY
++static struct delay_timer generic_timer;
++
++static void __init do_register_current_timer_delay(u64 (*read)(void),
++		unsigned long rate)
++{
++	if (generic_timer.read_current_timer)
++		return;
++	generic_timer.read_current_timer = (unsigned long (*)(void))read;
++	generic_timer.freq = rate;
++	register_current_timer_delay(&generic_timer);
++}
++
++#else
++
++static inline void do_register_current_timer_delay(u64 (*read)(void),
++		unsigned long rate) {}
++#endif
+ 
+ void __init sched_clock_register(u64 (*read)(void), int bits,
+ 				 unsigned long rate)
+@@ -162,6 +181,7 @@ void __init sched_clock_register(u64 (*read)(void), int bits,
+ 		enable_sched_clock_irqtime();
+ 
+ 	pr_debug("Registered %pF as sched_clock source\n", read);
++	do_register_current_timer_delay(read, rate);
+ }
+ 
+ void __init setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate)
+-- 
+1.9.2
