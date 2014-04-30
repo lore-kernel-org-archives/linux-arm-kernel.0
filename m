@@ -1,168 +1,175 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 30 Apr 2014 15:59:11 +0100
-Subject: [PATCH v3 5/6] arm: exynos: Add MCPM call-back functions
-In-Reply-To: <1398528348-21214-6-git-send-email-a.kesavan@samsung.com>
-References: <1398528348-21214-1-git-send-email-a.kesavan@samsung.com>
- <1398528348-21214-6-git-send-email-a.kesavan@samsung.com>
-Message-ID: <20140430145911.GA32671@e102568-lin.cambridge.arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 30 Apr 2014 16:14:15 +0100
+Subject: [PATCH v12 11/31] documentation: iommu: add binding document of
+ Exynos System MMU
+In-Reply-To: <7044616.kdaKNu3Qet@wuerfel>
+References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
+ <20140429181601.GE3582@e103592.cambridge.arm.com>
+ <CANEJEGs6TXNzE8cWYgEKfFSsD2w5XiYvwSbhQ_+gtfzfs+6udA@mail.gmail.com>
+ <7044616.kdaKNu3Qet@wuerfel>
+Message-ID: <20140430151415.GC3986@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 26, 2014 at 05:05:47PM +0100, Abhilash Kesavan wrote:
+On Tue, Apr 29, 2014 at 11:00:29PM +0200, Arnd Bergmann wrote: > On Tuesday 29 April 2014 13:07:54 Grant Grundler wrote: > > On Tue, Apr 29, 2014 at 11:16 AM, Dave Martin <Dave.Martin@arm.com> wrote:
+> > ...
+> > > An IOMMU is really a specialised bridge
+> > 
+> > Is a GART a bridge?
 
-[...]
+Depends what you mean by "bridge".
 
-> +       if (last_man && __mcpm_outbound_enter_critical(cpu, cluster)) {
-> +               arch_spin_unlock(&exynos_mcpm_lock);
-> +
+I would say that it can be logically viewed as a bridge through which
+graphics cards master onto the bus.
 
-I missed it on first review, but you do need to disable L2 prefetching
-on A15 here as we do in TC2 (tc2_pm.c), this power down procedure is not
-compliant otherwise.
+In this context it's integrated into the bus, but I think the function
+it performs is still in series with, and logically distinct from, the
+routing done by the bus proper.
 
-Thanks,
-Lorenzo
+> > IOMMUs can provide three basic functions:
+> > 1) remap address space to reach phys mem ranges that the device is
+> > otherwise not capable of accessing (classic 32-bit DMA to reach 64-bit
+> > Phys address)
+> > 
+> > 2) implement scatter-gather (page level granularity) so the device
+> > doesn't have to
+> > 
+> > 3) provide some level of system protection against "rogue" DMA by
+> > forcing everything through a DMA mapping interface and faulting when
+> > encountering unmapped DMA transactions.
+> 
+> [ 4) provide isolation between multiple contexts, typically for purposes
+>      of virtualization]
 
-> +               /* Flush all cache levels for this cluster. */
-> +               exynos_v7_exit_coherency_flush(all);
-> +
-> +               /*
-> +                * Disable cluster-level coherency by masking
-> +                * incoming snoops and DVM messages:
-> +                */
-> +               cci_disable_port_by_cpu(mpidr);
-> +
-> +               __mcpm_outbound_leave_critical(cluster, CLUSTER_DOWN);
-> +       } else {
-> +               arch_spin_unlock(&exynos_mcpm_lock);
-> +
-> +               /* Disable and flush the local CPU cache. */
-> +               exynos_v7_exit_coherency_flush(louis);
-> +       }
-> +
-> +       __mcpm_cpu_down(cpu, cluster);
-> +
-> +       /* Now we are prepared for power-down, do it: */
-> +       if (!skip_wfi)
-> +               wfi();
-> +
-> +       /* Not dead at this point?  Let our caller cope. */
-> +}
-> +
-> +static int exynos_power_down_finish(unsigned int cpu, unsigned int cluster)
-> +{
-> +       unsigned int tries = 100;
-> +       unsigned int cpunr = cpu + (cluster * EXYNOS5420_CPUS_PER_CLUSTER);
-> +
-> +       pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
-> +       BUG_ON(cpu >= EXYNOS5420_CPUS_PER_CLUSTER ||
-> +                       cluster >= EXYNOS5420_NR_CLUSTERS);
-> +
-> +       /* Wait for the core state to be OFF */
-> +       while (tries--) {
-> +               if (ACCESS_ONCE(cpu_use_count[cpu][cluster]) == 0) {
-> +                       if ((exynos_cpu_power_state(cpunr) == 0))
-> +                               return 0; /* success: the CPU is halted */
-> +               }
-> +
-> +               /* Otherwise, wait and retry: */
-> +               msleep(1);
-> +       }
-> +
-> +       return -ETIMEDOUT; /* timeout */
-> +}
-> +
-> +static const struct mcpm_platform_ops exynos_power_ops = {
-> +       .power_up               = exynos_power_up,
-> +       .power_down             = exynos_power_down,
-> +       .power_down_finish      = exynos_power_down_finish,
-> +};
-> +
-> +static void __init exynos_mcpm_usage_count_init(void)
-> +{
-> +       unsigned int mpidr, cpu, cluster;
-> +
-> +       mpidr = read_cpuid_mpidr();
-> +       cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-> +       cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-> +
-> +       pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
-> +       BUG_ON(cpu >= EXYNOS5420_CPUS_PER_CLUSTER  ||
-> +                       cluster >= EXYNOS5420_NR_CLUSTERS);
-> +
-> +       cpu_use_count[cpu][cluster] = 1;
-> +}
-> +
-> +/*
-> + * Enable cluster-level coherency, in preparation for turning on the MMU.
-> + */
-> +static void __naked exynos_pm_power_up_setup(unsigned int affinity_level)
-> +{
-> +       asm volatile ("\n"
-> +       "cmp    r0, #1\n"
-> +       "bxne   lr\n"
-> +       "b      cci_enable_port_for_self");
-> +}
-> +
-> +static int __init exynos_mcpm_init(void)
-> +{
-> +       int ret = 0;
-> +
-> +       if (!soc_is_exynos5420())
-> +               return -ENODEV;
-> +
-> +       if (!cci_probed())
-> +               return -ENODEV;
-> +
-> +       /*
-> +        * To increase the stability of KFC reset we need to program
-> +        * the PMU SPARE3 register
-> +        */
-> +       __raw_writel(EXYNOS5420_SWRESET_KFC_SEL, S5P_PMU_SPARE3);
-> +
-> +       exynos_mcpm_usage_count_init();
-> +
-> +       ret = mcpm_platform_register(&exynos_power_ops);
-> +       if (!ret)
-> +               ret = mcpm_sync_init(exynos_pm_power_up_setup);
-> +       if (ret)
-> +               return ret;
-> +
-> +       mcpm_smp_set_ops();
-> +
-> +       pr_info("Exynos MCPM support installed\n");
-> +
-> +       /*
-> +        * Future entries into the kernel can now go
-> +        * through the cluster entry vectors.
-> +        */
-> +       __raw_writel(virt_to_phys(mcpm_entry_point),
-> +               REG_ENTRY_ADDR);
-> +
-> +       return ret;
-> +}
-> +
-> +early_initcall(exynos_mcpm_init);
-> diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
-> index 6685ebf..f44d318 100644
-> --- a/arch/arm/mach-exynos/regs-pmu.h
-> +++ b/arch/arm/mach-exynos/regs-pmu.h
-> @@ -38,6 +38,7 @@
->  #define S5P_INFORM5                            S5P_PMUREG(0x0814)
->  #define S5P_INFORM6                            S5P_PMUREG(0x0818)
->  #define S5P_INFORM7                            S5P_PMUREG(0x081C)
-> +#define S5P_PMU_SPARE3                         S5P_PMUREG(0x090C)
+All of which are classic functionalities of an MMU.  What is different
+is that the CPU MMU is built into the CPU and standardised, and either
+symmetrically shared or private to the CPU so that there is rarely if
+ever any need to describe anything in DT ... whereas an IOMMU is not
+tightly coupled to the CPU, and wired up to external hardware in
+sometimes arbitrary ways that may require description (especially for
+SoC systems).
+
+> > I summarize IOMMUs as: "participate in the routing of MMIO
+> > transactions in the system fabric."
+> > In this sense, IOMMUs are sort of a bridge. Defining what kind of
+> > routing they can do (coalesce transactions? remapping MMIO domains?)
+> > and which address ranges they route would describe most of that
+> > functionality.
+
+agreed
+
+> > This "remapping" of MMIO transaction is also usually asymmetric.
+> > Meaning routing of "downstream" transactions *might* be completely
+> > different than the routing + remapping of transactions heading
+> > upstream. DMA mappings services are designed to handle only the
+> > transactions generated (aka "mastered") by a downstream device.
+
+Also agreed.  In the SoC world, the upstream and downstream paths
+may be completely separate in the topology, not following the same
+path at all, so then it becomes more natural for them to have
+independent characteristics.  "dma-ranges" doesn't work for these
+situations.
+
+> For the purposes of the DT binding, we have a 'ranges' property
+> that defines the downstream translation (CPU-to-MMIO) and a
+> 'dma-ranges' property for the opposite address translation
+> (device-to-memory).
 > 
->  #define S5P_ARM_CORE0_LOWPWR                   S5P_PMUREG(0x1000)
->  #define S5P_DIS_IRQ_CORE0                      S5P_PMUREG(0x1004)
-> @@ -325,4 +326,6 @@
+> > >, so it may be cleaner to describe
+> > > an IOMMU using a real bus node in the DT, if we also define a way to make
+> > > master/slave linkages explicit where it matters.
+> > 
+> > "where it matters" is a bit vague.  Is the goal to just enable DMA
+> > mapping services to "do the right thing" for a device that can
+> > generate DMA?
 > 
->  #define EXYNOS5_OPTION_USE_RETENTION                           (1 << 4)
+> Yes. It's very complicated unfortunately, because we have to be
+> able to deal with arbitrary combinations of a lot of oddball cases
+> that can show up in random SoCs:
 > 
-> +#define EXYNOS5420_SWRESET_KFC_SEL                             0x3
-> +
->  #endif /* __ASM_ARCH_REGS_PMU_H */
-> --
-> 1.8.3.2
-> 
-> 
+> - device can only do DMA to a limited address range
+> - DMA is noncoherent and needs manual cache management
+> - DMA address is at an offset from physical address
+> - some devices have an IOMMU
+> - some IOMMUs are shared between devices
+> - some devices with IOMMU can have multiple simultaneous contexts
+> - a device may access some memory directly and some other memory through IOMMU
+> - a device may have DMA access to a bus that is invisible to the CPU
+> - DMA on some device is only coherent if the IOMMU is enabled
+> - DMA on some device is only coherent if the IOMMU is disabled
+> - the IOVA range to an IOMMU is device dependent
+
+This sounds bad on the surface, but really these are permutations of a
+few key concepts:
+
+ 1) Topologies that can't be reduced to a tree, resulting from
+   unidirectional buses (common in SoC architectures).
+
+ 2) Many-to-many connectivity of devices, unlike the familiar
+   many-to-one parent/child relationship from PCI and similar.
+
+ 3) Interconnects made up of independently configured and
+   connected components, such that they can't be described as optional
+   features of some standard bus.
+
+ 4) Bridge components and devices that process, route or transform
+   transactions based on more than just the destination address.
+   Instead, the handling of a transaction can involve some kind of
+   device ID, memory type and cacheability attributes and coherency
+   domain information in addition to the address.
+
+
+To address these, we need a few things:
+
+ a) A way to describe the cross-links where the topology is not
+    reducible to a tree.  This would involve a phandle to describe
+    a "A masters on B" relationship analogous to what the parent/
+    child relationship in DT already means.
+
+ b) For devices with multiple distinct master roles with different
+    routing or behaviour in the interconnect, a way to describe those
+    roles.
+
+ c) A way to describe mappings across bridges that builds on
+    "ranges" to cover a wider range of situations.
+
+
+> > > I've been hacking around some proposals on these areas which are a bit
+> > > different from the approach suggested here -- I'll try to summarise some
+> > > of it intelligibly and post something tomorrow so that we can discuss.
+> > 
+> > Are you planning on consolidating Documentation/devicetree/bindings/iommu/ ?
+
+Not initially.  Ripping out old bindings that work perfectly well today
+will just cause churn.  But if we can lay a good foundation for future
+bindings that should help us in the future.
+
+> > Do you care about Documentation/Intel-IOMMU.txt?
+
+Probably answered by my above point.
+
+If it ain't broke, there's no reason to fix it.
+
+Defining DT bindings and refactoring kernel frameworks are pretty
+orthogonal: we could retain compatibility with existing IOMMU bindings
+within a modified framework that can also handle more diverse SoC
+scenarios which may use a more uniform and sophisticated description in
+the DT.
+
+> I think we can ignore the Intel-IOMMU because that is specialized on PCI
+> devices, which we don't normally represent in DT. It is also a special
+> case because the Intel IOMMU is a single-instance device. If it's present
+> and enabled, it will be used by every device. The case we do need to describe
+> is when we don't know which IOMMU is used for which master, or how to
+> configure it.
+
+Agreed.  Because of the single-instance nature of the Intel IOMMU, and
+the fact that is integrated into the interconnect in a pretty standard
+way, we can get away with much less description.
+
+
+I'll follow up with some more concrete details on my thinking --
+hopefully that will make it a bit clearer what I mean.
+
+Cheers
+---Dave
