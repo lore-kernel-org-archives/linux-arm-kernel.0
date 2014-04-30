@@ -1,47 +1,61 @@
 From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Wed, 30 Apr 2014 14:25:06 +0530
-Subject: [PATCH 0/4] dts: Add usb2phy to Exynos 5250/5420
-Message-ID: <1398848110-6152-1-git-send-email-gautam.vivek@samsung.com>
+Date: Wed, 30 Apr 2014 14:25:07 +0530
+Subject: [PATCH v8 1/4] ARM: dts: Add sysreg sytem controller node to
+ exynos5250 and exynos5420
+In-Reply-To: <1398848110-6152-1-git-send-email-gautam.vivek@samsung.com>
+References: <1398848110-6152-1-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <1398848110-6152-2-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Next version for earlier patch-series:
-[PATCH v7 0/2] dts: Add usb2phy to Exynos 5250
+This patch adds sysreg-syscon node to exynos5250 and exynos5420 device
+tree, to access System Register's registers using syscon driver.
 
-Based on 'for-next' branch of Kgene's linux-samsung tree.
+Signed-off-by: Kamil Debski <k.debski@samsung.com>
+[gautam.vivek at samsung.com: Split this syreg-syscon dts entry from
+dts: Add usb2phy to Exynos 5250 patch]
+[gautam.vivek at samsung.com: added similar syscon entry for exynos5420]
+Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+---
 
-Tested with driver side patches:
-[PATCH v2 1/4] usb: ohci-exynos: Use struct device instead of platform_device
-[PATCH v2 2/4] usb: ehci-exynos: Use struct device instead of platform_device
-[PATCH v4 1/2] usb: ohci-exynos: Add facility to use phy provided by the generic phy framework
-[PATCH v10 4/4] usb: ehci-exynos: Change to use phy provided by the generic phy framework
+Changes from v7:
+None
 
+ arch/arm/boot/dts/exynos5250.dtsi |    5 +++++
+ arch/arm/boot/dts/exynos5420.dtsi |    5 +++++
+ 2 files changed, 10 insertions(+)
 
-Changes from v7 series:
- - Added patches to enable usb 2.0 support on exynos5420;
-   which include dt nodes for usb2phy as well as ehci and ohci
-   controllers.
-
-Changes from v6:
- - Splitted the patch into two:
-    adding syscon nodes to Exynos5250 and Exynos5420 in first;
-    and phy entry change in the second.
- - Changed the name of phandle for usb2phy from 'usb2_phy_new'
-   to 'usb2_phy_gen' indicating generic phy.
- - Using clock macros in dt entries.
-
-Kamil Debski (1):
-  ARM: dts: Add usb2phy to Exynos 5250
-
-Vivek Gautam (3):
-  ARM: dts: Add sysreg sytem controller node to exynos5250 and
-    exynos5420
-  ARM: dts: Add usb2phy support on exynos5420
-  ARM: dts: Add usb 2.0 support on exynos5420
-
- arch/arm/boot/dts/exynos5250.dtsi |   31 +++++++++++++++++++++++
- arch/arm/boot/dts/exynos5420.dtsi |   49 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 80 insertions(+)
-
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index 3742331..70f0cd5 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -175,6 +175,11 @@
+ 		reg = <0x10040000 0x5000>;
+ 	};
+ 
++	sysreg_system_controller: syscon at 10050000 {
++		compatible = "samsung,exynos5250-sys", "syscon";
++		reg = <0x10050000 0x5000>;
++	};
++
+ 	watchdog at 101D0000 {
+ 		compatible = "samsung,exynos5250-wdt";
+ 		reg = <0x101D0000 0x100>;
+diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+index c3a9a66..cfa3755 100644
+--- a/arch/arm/boot/dts/exynos5420.dtsi
++++ b/arch/arm/boot/dts/exynos5420.dtsi
+@@ -675,6 +675,11 @@
+ 		reg = <0x10040000 0x5000>;
+ 	};
+ 
++	sysreg_system_controller: syscon at 10050000 {
++		compatible = "samsung,exynos5420-sys", "syscon";
++		reg = <0x10050000 0x5000>;
++	};
++
+ 	tmu_cpu0: tmu at 10060000 {
+ 		compatible = "samsung,exynos5420-tmu";
+ 		reg = <0x10060000 0x100>;
 -- 
 1.7.10.4
