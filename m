@@ -1,62 +1,71 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 30 Apr 2014 10:44:03 -0700
-Subject: [PATCH v3 0/7] Add cros_ec changes for newer boards
-Message-ID: <1398879850-9111-1-git-send-email-dianders@chromium.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 30 Apr 2014 10:47:52 -0700
+Subject: [PATCH 4/4] ARM: dts: Add LCD panel sharp ls037v7dw01 support
+ for omap3-evm and ldp
+In-Reply-To: <CAGhQ9Vwa8xXQEo5dNEKAvmaS9DoBjVSthtd8=owk+atVdFuiiA@mail.gmail.com>
+References: <1398815562-24113-1-git-send-email-tony@atomide.com>
+ <1398815562-24113-5-git-send-email-tony@atomide.com>
+ <CAGhQ9Vwa8xXQEo5dNEKAvmaS9DoBjVSthtd8=owk+atVdFuiiA@mail.gmail.com>
+Message-ID: <20140430174751.GA12362@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds the most critical cros_ec changes for newer boards
-using cros_ec.  Specifically:
-* Fixes timing/locking issues with the previously upstreamed (but
-  never used upstream) cros_ec_spi driver.
-* Updates the cros_ec header file to the latest version which allows
-  us to use newer EC features like i2c tunneling.
-* Adds an i2c tunnel driver to allow communication to the EC's i2c
-  devices.
+* Joachim Eastwood <manabian@gmail.com> [140429 18:08]:
+> On 30 April 2014 01:52, Tony Lindgren <tony@atomide.com> wrote:
+> > Looks like quite a few omaps have sharp ls037v7dw01 that's configured
+> > as various panel dpi entries for whatever legacy reasons. For device
+> > tree based support, let's just configure these properly for panel
+> > ls037v7dw01 instead of panel dpi.
+> >
+> > This patch creates a common file for panel ls037v7dw01, and makes
+> > boards ldp and omap3-evm to use it. The panel for ldp is configured
+> > in the qvga mode and omap3-evm panel in vga mode.
+> >
+> > The ls037v7dw01 also seems to be coupled with an ad7846 touchscreen
+> > controller for the omaps, so let's add a basic configuration for
+> > the touchscreen also using the default values.
+> >
+> > Note that we can now remove the regulator-name = "vdds_dsi"
+> > entry for ldp, that's no longer needed as we have the entry
+> > for vdds_dsi-supply = <&vpll2>.
+> >
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > ---
+> >  .../arm/boot/dts/omap-panel-sharp-ls037v7dw01.dtsi | 82 ++++++++++++++++++++++
+> >  arch/arm/boot/dts/omap3-evm-37xx.dts               | 50 +++++++++++++
+> >  arch/arm/boot/dts/omap3-evm-common.dtsi            | 47 +++++++++++++
+> >  arch/arm/boot/dts/omap3-ldp.dts                    | 31 ++++++--
+> >  4 files changed, 205 insertions(+), 5 deletions(-)
+> >  create mode 100644 arch/arm/boot/dts/omap-panel-sharp-ls037v7dw01.dtsi
+> 
+> > diff --git a/arch/arm/boot/dts/omap3-ldp.dts b/arch/arm/boot/dts/omap3-ldp.dts
+> > index 0abe986..50fdac9 100644
+> > --- a/arch/arm/boot/dts/omap3-ldp.dts
+> > +++ b/arch/arm/boot/dts/omap3-ldp.dts
+> > @@ -164,6 +164,7 @@
+> >
+> >  #include "twl4030.dtsi"
+> >  #include "twl4030_omap3.dtsi"
+> > +#include "omap-panel-sharp-ls037v7dw01.dtsi"
+> >
+> >  &i2c2 {
+> >         clock-frequency = <400000>;
+> > @@ -173,6 +174,31 @@
+> >         clock-frequency = <400000>;
+> >  };
+> >
+> > +&lcd_3v3 {
+> > +       gpio = <&twl_gpio 7 GPIO_ACTIVE_HIGH>;
+> > +       enable-active-high;
+> > +};
+> > +
+> > +&lcd0 {
+> > +       reset-gpios = <&gpio2 23 GPIO_ACTIVE_HIGH>;     /* gpio55, lcd RESB */
+> > +       gpios = <&gpio2 24 GPIO_ACTIVE_LOW      /* gpio56, lcd MO */
+> 
+> enable-gpios ?
 
-This _doesn't_ get the EC driver fully up to speed with what's in the
-current Chromium OS trees.  There are a whole slew of cleanup patches
-there, an addition of an LPC transport mode, and exports of functions
-to userspace.  Once these patches land and we have functionality we
-can continue to pick more cleanup patches.
+Oops yes, changed from gpios to enable-gpios while reading the panel
+binding doc, probably forgot to commit the change, will update.
 
-Changes in v3:
-- Separate out packet sizing from packet stuffing.
-- Get rid of useless dev_dbg.
-- Check command_sendrecv against NULL.
-- Don't check np against NULL.
-- Get rid of useless error on memory alloc fail.
-- Get rid of useless platform_set_drvdata(dev, NULL);
-
-Changes in v2:
-- Update tunnel binding as per swarren
-- Removed i2c20 alias for i2c tunnel
-
-Bill Richardson (1):
-  mfd: cros_ec: Sync to the latest cros_ec_commands.h from EC sources
-
-David Hendricks (1):
-  mfd: cros_ec: spi: calculate delay between transfers correctly
-
-Doug Anderson (5):
-  mfd: cros_ec: spi: Add mutex to cros_ec_spi
-  mfd: cros_ec: spi: Make the cros_ec_spi timeout more reliable
-  mfd: cros_ec: spi: Increase cros_ec_spi deadline from 5ms to 100ms
-  i2c: ChromeOS EC tunnel driver
-  ARM: tegra: Add the EC i2c tunnel to tegra124-venice2
-
- .../devicetree/bindings/i2c/i2c-cros-ec-tunnel.txt |   39 +
- arch/arm/boot/dts/tegra124-venice2.dts             |   26 +
- drivers/i2c/busses/Kconfig                         |    9 +
- drivers/i2c/busses/Makefile                        |    1 +
- drivers/i2c/busses/i2c-cros-ec-tunnel.c            |  318 ++++++
- drivers/mfd/cros_ec.c                              |    7 +-
- drivers/mfd/cros_ec_spi.c                          |   67 +-
- include/linux/mfd/cros_ec.h                        |    4 +-
- include/linux/mfd/cros_ec_commands.h               | 1128 ++++++++++++++++++--
- 9 files changed, 1507 insertions(+), 92 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/i2c/i2c-cros-ec-tunnel.txt
- create mode 100644 drivers/i2c/busses/i2c-cros-ec-tunnel.c
-
--- 
-1.9.1.423.g4596e3a
+Tony
