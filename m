@@ -1,106 +1,91 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 30 Apr 2014 02:45:55 +0200
-Subject: [PATCH 3/4] ARM: shmobile: marzen: Initialise SCIF devices using
- DT
-In-Reply-To: <1398757406-30920-4-git-send-email-horms+renesas@verge.net.au>
+Date: Wed, 30 Apr 2014 02:47:30 +0200
+Subject: [PATCH 4/4] ARM: shmobile: marzen: Use disabled variant of clock
+ workaround for scif devices
+In-Reply-To: <20140429235106.GB5289@verge.net.au>
 References: <1398757406-30920-1-git-send-email-horms+renesas@verge.net.au>
- <1398757406-30920-4-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <22937305.8Aq8zO6ih4@avalon>
+ <CANqRtoS2p9+2tBWeOQ1K-JME7OrXJDW_afxgbW7YuqSi-WOEVg@mail.gmail.com>
+ <20140429235106.GB5289@verge.net.au>
+Message-ID: <3243856.KKuL7WUL5g@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Simon,
 
-Thank you for the patch.
+On Wednesday 30 April 2014 08:51:11 Simon Horman wrote:
+> On Tue, Apr 29, 2014 at 01:40:08PM +0000, Magnus Damm wrote:
+> > On Tue, Apr 29, 2014 at 7:43 AM, Simon Horman wrote:
+> > > Now that SCIF devices are initialised using DT it should
+> > > be sufficient to use the disabled variant of the clock workaround.
+> > > 
+> > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > > ---
+> > > 
+> > >  arch/arm/mach-shmobile/board-marzen-reference.c | 12 ++++++------
+> > >  1 file changed, 6 insertions(+), 6 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/mach-shmobile/board-marzen-reference.c
+> > > b/arch/arm/mach-shmobile/board-marzen-reference.c index
+> > > 6d34baf..1f14d80 100644
+> > > --- a/arch/arm/mach-shmobile/board-marzen-reference.c
+> > > +++ b/arch/arm/mach-shmobile/board-marzen-reference.c
+> > > @@ -40,12 +40,6 @@ static void __init marzen_init_timer(void)
+> > > 
+> > >   * devices until they get moved to DT.
+> > >   */
+> > >  
+> > >  static const struct clk_name clk_names[] __initconst = {
+> > > 
+> > > -       { "scif0", NULL, "sh-sci.0" },
+> > > -       { "scif1", NULL, "sh-sci.1" },
+> > > -       { "scif2", NULL, "sh-sci.2" },
+> > > -       { "scif3", NULL, "sh-sci.3" },
+> > > -       { "scif4", NULL, "sh-sci.4" },
+> > > -       { "scif5", NULL, "sh-sci.5" },
+> > > 
+> > >         { "tmu0", NULL, "sh_tmu.0" },
+> > >         { "tmu1", NULL, "sh_tmu.1" },
+> > >         { "tmu2", NULL, "sh_tmu.2" },
+> > > 
+> > > @@ -55,6 +49,12 @@ static const struct clk_name clk_names[] __initconst
+> > > = {
+> > > 
+> > >   * This is a really crude hack to work around core platform clock
+> > >   issues
+> > >   */
+> > >  
+> > >  static const struct clk_name clk_enables[] __initconst = {
+> > > 
+> > > +       { "scif0", NULL, "sh-sci.0" },
+> > > +       { "scif1", NULL, "sh-sci.1" },
+> > > +       { "scif2", NULL, "sh-sci.2" },
+> > > +       { "scif3", NULL, "sh-sci.3" },
+> > > +       { "scif4", NULL, "sh-sci.4" },
+> > > +       { "scif5", NULL, "sh-sci.5" },
+> > > 
+> > >         { "sdhi0", NULL, "ffe4c000.sd" },
+> > >         { "thermal", NULL, "ffc48000.thermal" },
+> > >  
+> > >  };
+> > 
+> > Hi Simon,
+> > 
+> > Thanks for your SCIF DT patches for r8a7779. They look good and clean
+> > in general I think.
+> > 
+> > Regarding this specific patch, I'm not sure why you need to perform
+> > this kind of change. Is it following the same style as other SoCs?
+> > 
+> > In my mind the SCIF driver at least used to rely on both Runtime PM
+> > and the clock framework for clock control so only relying on clock
+> > framework should be enough for now. The driver may have been updated
+> > though, but if so we should make sure we follow the same pattern on
+> > other SoCs as well.
+> 
+> Thanks, I agree this is not needed.
 
-On Tuesday 29 April 2014 16:43:25 Simon Horman wrote:
-> Initialise SCIF devices using DT when booting marzen
-> using multiplatform.
-> 
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
-> ---
->  arch/arm/boot/dts/r8a7779-marzen.dts   | 22 +++++++++++++++++++---
->  arch/arm/mach-shmobile/setup-r8a7779.c | 10 +++++-----
->  2 files changed, 24 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/r8a7779-marzen.dts
-> b/arch/arm/boot/dts/r8a7779-marzen.dts index 769ae84..6e603db 100644
-> --- a/arch/arm/boot/dts/r8a7779-marzen.dts
-> +++ b/arch/arm/boot/dts/r8a7779-marzen.dts
-> @@ -18,6 +18,11 @@
->  	model = "marzen";
->  	compatible = "renesas,marzen", "renesas,r8a7779";
-> 
-> +	aliases {
-> +		serial2 = &scif2;
-> +		serial4 = &scif4;
-> +	};
-> +
->  	chosen {
->  		bootargs = "console=ttySC2,115200 ignore_loglevel root=/dev/nfs 
-ip=on";
->  	};
-> @@ -73,9 +78,6 @@
->  };
-> 
->  &pfc {
-> -	pinctrl-0 = <&scif2_pins &scif4_pins>;
-> -	pinctrl-names = "default";
-> -
->  	lan0_pins: lan0 {
->  		intc {
->  			renesas,groups = "intc_irq1_b";
-> @@ -108,6 +110,20 @@
->  	};
->  };
-> 
-> +&scif2 {
-> +       pinctrl-0 = <&scif2_pins>;
-> +       pinctrl-names = "default";
-> +
-> +       status = "okay";
-> +};
-> +
-> +&scif4 {
-> +       pinctrl-0 = <&scif4_pins>;
-> +       pinctrl-names = "default";
-> +
-> +       status = "okay";
-> +};
-> +
->  &sdhi0 {
->  	pinctrl-0 = <&sdhi0_pins>;
->  	pinctrl-names = "default";
-> diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c
-> b/arch/arm/mach-shmobile/setup-r8a7779.c index 3471a9b..0d2910c 100644
-> --- a/arch/arm/mach-shmobile/setup-r8a7779.c
-> +++ b/arch/arm/mach-shmobile/setup-r8a7779.c
-> @@ -679,17 +679,17 @@ static void __init r8a7779_register_hpb_dmae(void)
->  }
-> 
->  static struct platform_device *r8a7779_devices_dt[] __initdata = {
-> +	&tmu00_device,
-> +	&tmu01_device,
-> +};
-> +
-> +static struct platform_device *r8a7779_standard_devices[] __initdata = {
->  	&scif0_device,
->  	&scif1_device,
->  	&scif2_device,
->  	&scif3_device,
->  	&scif4_device,
->  	&scif5_device,
-> -	&tmu00_device,
-> -	&tmu01_device,
-> -};
-> -
-> -static struct platform_device *r8a7779_standard_devices[] __initdata = {
->  	&i2c0_device,
->  	&i2c1_device,
->  	&i2c2_device,
+Shouldn't we remove the scif clock entries from the clk_names array completely 
+?
 
 -- 
 Regards,
