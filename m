@@ -1,19 +1,15 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 30 Apr 2014 14:56:37 +0200
-Subject: [PATCH 10/15] ARM: dts: kirkwood: set default pinctrl for SPI0
+Date: Wed, 30 Apr 2014 14:56:41 +0200
+Subject: [PATCH 14/15] ARM: dts: kirkwood: set Guruplug ethernet PHY compatible
 In-Reply-To: <1398862602-29595-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1398862602-29595-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1398862602-29595-11-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1398862602-29595-15-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most Kirkwood boards use the default SPI0 pinctrl setting anyway. Add a
-default pinctrl setting to the toplevel SoC SPI0 node and put a note
-in front of the corresponding pinctrl node to overwrite the setting
-on board level.
-
-Currently, only T5325 is using a different setting and already
-overwrites the corresponding pinctrl node.
+Ethernet PHY compatible shall be "ethernet-phy-ieee802.3-c22" and
+"ethernet-phy-idAAAA.BBBB" if PHY OUI id is known. We know it for
+the PHY found on Guruplug, so set it accordingly.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
@@ -31,169 +27,31 @@ Cc: devicetree at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/boot/dts/kirkwood-b3.dts              | 2 --
- arch/arm/boot/dts/kirkwood-cloudbox.dts        | 2 --
- arch/arm/boot/dts/kirkwood-dreamplug.dts       | 2 --
- arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts | 2 --
- arch/arm/boot/dts/kirkwood-ns2-common.dtsi     | 2 --
- arch/arm/boot/dts/kirkwood-rd88f6192.dts       | 2 --
- arch/arm/boot/dts/kirkwood-synology.dtsi       | 2 --
- arch/arm/boot/dts/kirkwood-t5325.dts           | 6 ------
- arch/arm/boot/dts/kirkwood-ts219.dtsi          | 2 --
- arch/arm/boot/dts/kirkwood.dtsi                | 6 ++++++
- 10 files changed, 6 insertions(+), 22 deletions(-)
+ arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-b3.dts b/arch/arm/boot/dts/kirkwood-b3.dts
-index 38972b221089..6678e0b318d5 100644
---- a/arch/arm/boot/dts/kirkwood-b3.dts
-+++ b/arch/arm/boot/dts/kirkwood-b3.dts
-@@ -70,8 +70,6 @@
+diff --git a/arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts b/arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts
+index 871a5f8afb01..f6f15e2910ed 100644
+--- a/arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts
++++ b/arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts
+@@ -101,12 +101,16 @@
+ 	status = "okay";
  
- 		spi at 10600 {
- 			status = "okay";
--			pinctrl-0 = <&pmx_spi>;
--			pinctrl-names = "default";
+ 	ethphy0: ethernet-phy at 0 {
+-		compatible = "marvell,88e1121";
++		/* Marvell 88E1121R */
++		compatible = "ethernet-phy-id0141.0cb0",
++		             "ethernet-phy-ieee802.3-c22";
+ 		reg = <0>;
+ 	};
  
- 			m25p16 at 0 {
- 				#address-cells = <1>;
-diff --git a/arch/arm/boot/dts/kirkwood-cloudbox.dts b/arch/arm/boot/dts/kirkwood-cloudbox.dts
-index 1ac6bd9f54de..e7a232eb28b0 100644
---- a/arch/arm/boot/dts/kirkwood-cloudbox.dts
-+++ b/arch/arm/boot/dts/kirkwood-cloudbox.dts
-@@ -37,8 +37,6 @@
- 		};
- 
- 		spi at 10600 {
--			pinctrl-0 = <&pmx_spi>;
--			pinctrl-names = "default";
- 			status = "okay";
- 
- 			flash at 0 {
-diff --git a/arch/arm/boot/dts/kirkwood-dreamplug.dts b/arch/arm/boot/dts/kirkwood-dreamplug.dts
-index dd8d1a4611a8..af56cecc6c73 100644
---- a/arch/arm/boot/dts/kirkwood-dreamplug.dts
-+++ b/arch/arm/boot/dts/kirkwood-dreamplug.dts
-@@ -38,8 +38,6 @@
- 
- 		spi at 10600 {
- 			status = "okay";
--			pinctrl-0 = <&pmx_spi>;
--			pinctrl-names = "default";
- 
- 			m25p40 at 0 {
- 				#address-cells = <1>;
-diff --git a/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts b/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
-index acbebc6dc169..b318d5d82d67 100644
---- a/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
-+++ b/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
-@@ -60,8 +60,6 @@
- 		};
- 
- 		spi at 10600 {
--			pinctrl-0 = <&pmx_spi>;
--			pinctrl-names = "default";
- 			status = "okay";
- 
- 			flash at 0 {
-diff --git a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
-index 696b208b676f..c10ff0f5290b 100644
---- a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
-@@ -24,8 +24,6 @@
- 		};
- 
- 		spi at 10600 {
--			pinctrl-0 = <&pmx_spi>;
--			pinctrl-names = "default";
- 			status = "okay";
- 
- 			flash at 0 {
-diff --git a/arch/arm/boot/dts/kirkwood-rd88f6192.dts b/arch/arm/boot/dts/kirkwood-rd88f6192.dts
-index 30087b19efae..35a29dee8dd8 100644
---- a/arch/arm/boot/dts/kirkwood-rd88f6192.dts
-+++ b/arch/arm/boot/dts/kirkwood-rd88f6192.dts
-@@ -57,8 +57,6 @@
- 
- 		spi at 10600 {
- 			status = "okay";
--			pinctrl-0 = <&pmx_spi>;
--			pinctrl-names = "default";
- 
- 			m25p128 at 0 {
- 				#address-cells = <1>;
-diff --git a/arch/arm/boot/dts/kirkwood-synology.dtsi b/arch/arm/boot/dts/kirkwood-synology.dtsi
-index 370af7f69319..a21419f78bee 100644
---- a/arch/arm/boot/dts/kirkwood-synology.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-synology.dtsi
-@@ -213,8 +213,6 @@
- 
- 		spi at 10600 {
- 			status = "okay";
--			pinctrl-0 = <&pmx_spi>;
--			pinctrl-names = "default";
- 
- 			m25p80 at 0 {
- 				#address-cells = <1>;
-diff --git a/arch/arm/boot/dts/kirkwood-t5325.dts b/arch/arm/boot/dts/kirkwood-t5325.dts
-index ae102abcab04..289fc9e2afc2 100644
---- a/arch/arm/boot/dts/kirkwood-t5325.dts
-+++ b/arch/arm/boot/dts/kirkwood-t5325.dts
-@@ -65,10 +65,6 @@
- 				marvell,function = "gpio";
- 			};
- 
--			/*
--			 * Redefined from kirkwood-6281.dtsi, because
--			 * we don't use SPI CS on MPP0, but on MPP7.
--			 */
- 			pmx_spi: pmx-spi {
- 				marvell,pins = "mpp1", "mpp2", "mpp3", "mpp7";
- 				marvell,function = "spi";
-@@ -87,8 +83,6 @@
- 		};
- 
- 		spi at 10600 {
--			pinctrl-0 = <&pmx_spi>;
--			pinctrl-names = "default";
- 			status = "okay";
- 
- 			flash at 0 {
-diff --git a/arch/arm/boot/dts/kirkwood-ts219.dtsi b/arch/arm/boot/dts/kirkwood-ts219.dtsi
-index 21cb9aeb2455..539a2f80a3ad 100644
---- a/arch/arm/boot/dts/kirkwood-ts219.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-ts219.dtsi
-@@ -47,8 +47,6 @@
- 		};
- 		spi at 10600 {
- 			status = "okay";
--			pinctrl-0 = <&pmx_spi>;
--			pinctrl-names = "default";
- 
- 			m25p128 at 0 {
- 				#address-cells = <1>;
-diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-index f92c8c4e3908..0c8d8fa29926 100644
---- a/arch/arm/boot/dts/kirkwood.dtsi
-+++ b/arch/arm/boot/dts/kirkwood.dtsi
-@@ -88,6 +88,10 @@
- 				marvell,function = "nand";
- 			};
- 
-+			/*
-+			 * Default SPI0 pinctrl setting with CSn on mpp0,
-+			 * overwrite marvell,pins on board level if required.
-+			 */
- 			pmx_spi: pmx-spi {
- 				marvell,pins = "mpp0", "mpp1", "mpp2", "mpp3";
- 				marvell,function = "spi";
-@@ -127,6 +131,8 @@
- 			interrupts = <23>;
- 			reg = <0x10600 0x28>;
- 			clocks = <&gate_clk 7>;
-+			pinctrl-0 = <&pmx_spi>;
-+			pinctrl-names = "default";
- 			status = "disabled";
- 		};
- 
+ 	ethphy1: ethernet-phy at 1 {
+-		compatible = "marvell,88e1121";
++		/* Marvell 88E1121R */
++		compatible = "ethernet-phy-id0141.0cb0",
++		             "ethernet-phy-ieee802.3-c22";
+ 		reg = <1>;
+ 	};
+ };
 -- 
 1.9.1
