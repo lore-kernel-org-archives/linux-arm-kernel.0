@@ -1,37 +1,34 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 30 Apr 2014 16:33:58 +0100
-Subject: [PATCH 10/10] hwmon: vexpress: Use devm helper for hwmon device
- registration
-In-Reply-To: <20140430152754.GA30924@roeck-us.net>
-References: <1398707877-22596-1-git-send-email-pawel.moll@arm.com>
- <1398707877-22596-11-git-send-email-pawel.moll@arm.com>
- <535EDD49.8050107@roeck-us.net> <1398870979.24255.37.camel@hornet>
- <20140430152754.GA30924@roeck-us.net>
-Message-ID: <1398872038.24255.41.camel@hornet>
+From: rajan_srivastava@hotmail.com (Rajan Srivastava)
+Date: Wed, 30 Apr 2014 21:04:29 +0530
+Subject: ARMv8: Allowing user space to perform cache-maintenance
+In-Reply-To: <20140430105820.GA31224@arm.com>
+References: <SNT151-W6986D9EAC402142465B4BE8410@phx.gbl>,
+ <SNT151-W939A3657D532DA8406405DE8410@phx.gbl>,
+ <20140430105820.GA31224@arm.com>
+Message-ID: <SNT151-W56573F5C94CEAFC1787DC2E8410@phx.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-04-30 at 16:27 +0100, Guenter Roeck wrote:
-> > I'm not sure I understand the question. The other patch from the series
-> 
-> The code above seems to change from
-> 
->    	data->reg = devm_regmap_init_vexpress_config(&pdev->dev);
-> 	if (!data->reg)
-> 		return -ENODEV;
-> 
-> to
-> 
->    	data->reg = devm_regmap_init_vexpress_config(&pdev->dev);
-> 	if (IS_ERR(data->reg))
-> 		return PTR_ERR(data->reg);
-> 
-> as part of this patch. This suggests that the return value from
-> devm_regmap_init_vexpress_config may have changed from NULL to 
-> ERR_PTR. Is my understanding wrong ?
+I am referring to ARM for ARMv8-A, "ARM DDI 0487A.a_errata_2013_Q3 (ID100313)", section D8.2.79 'System Control Register (EL1)'.
 
-No, you've got it right, but it's me making a mistake in patch splitting
-- it is supposed to be a part of the first patch. Thanks for spotting
-this!
+Thanks,
+Rajan
 
-Pawel
+
+----------------------------------------
+> Date: Wed, 30 Apr 2014 11:58:20 +0100
+> From: catalin.marinas at arm.com
+> To: rajan_srivastava at hotmail.com
+> CC: linaro-kernel at lists.linaro.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: ARMv8: Allowing user space to perform cache-maintenance
+>
+> On Wed, Apr 30, 2014 at 02:01:38PM +0530, Rajan Srivastava wrote:
+>> ARMv8 allows AArch64-EL0 to execute cache maintenance instructions
+>> (eg, by setting SCTLR_EL1.UCI). It looks like the current ARMv8 kernel
+>> doesn't support the above feature.
+>
+> Where have you looked and came up to this conclusion?
+>
+> --
+> Catalin
+ 		 	   		  
