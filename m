@@ -1,101 +1,61 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 30 Apr 2014 12:19:33 +0100
-Subject: [RFC 23/47] mtd: nand: stm_nand_bch: read and write page (BCH)
-In-Reply-To: <20980858CB6D3A4BAE95CA194937D5E73EAB5CAC@DBDE04.ent.ti.com>
-References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
- <1395735604-26706-24-git-send-email-lee.jones@linaro.org>
- <20980858CB6D3A4BAE95CA194937D5E73EAB5CAC@DBDE04.ent.ti.com>
-Message-ID: <20140430111933.GL29462@lee--X1>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 30 Apr 2014 04:15:55 -0700
+Subject: [PATCH 4/5] KVM: arm/arm64: vgic: fix GICD_ICFGR register accesses
+In-Reply-To: <1398856556-13199-1-git-send-email-christoffer.dall@linaro.org>
+References: <1398856556-13199-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1398856556-13199-5-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >From: Lee Jones [mailto:lee.jones at linaro.org]
-> >
-> >Use DMA to read and/or write a single page of data.
-> >
-> >Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> >---
-> > drivers/mtd/nand/stm_nand_bch.c | 119 ++++++++++++++++++++++++++++++++++++++++
-> > 1 file changed, 119 insertions(+)
-> >
-> >diff --git a/drivers/mtd/nand/stm_nand_bch.c b/drivers/mtd/nand/stm_nand_bch.c
-> >index 7874d85..6323590 100644
-> >--- a/drivers/mtd/nand/stm_nand_bch.c
-> >+++ b/drivers/mtd/nand/stm_nand_bch.c
-> >@@ -21,6 +21,7 @@
+From: Andre Przywara <andre.przywara@arm.com>
 
-[...]
+Since KVM internally represents the ICFGR registers by stuffing two
+of them into one word, the offset for accessing the internal
+representation and the one for the MMIO based access are different.
+So keep the original offset around, but adjust the internal array
+offset by one bit.
 
-> >+/* Returns the number of ECC errors, or '-1' for uncorrectable error */
-> >+static int bch_read_page(struct nandi_controller *nandi,
-> >+			 loff_t offs,
-> >+			 uint8_t *buf)
-> >+{
+Reported-by: Haibin Wang <wanghaibin.wang@huawei.com>
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ virt/kvm/arm/vgic.c | 9 ++++-----
+ 1 file changed, 4 insertions(+), 5 deletions(-)
 
-[...]
-
-> >+	/* Use the maximum per-sector ECC count! */
-> 
-> Firstly, this ecc checking and correction should not be part of bch_read_page().
-> This should be part of chip->ecc.correct().
-
-I'm not sure that's true.  The functionality below isn't correcting
-any data.  I believe it's preventing a false-positive error return.
-All calculate() and correct() behaviour is dealt with internally by
-h/w.  There should be no intervention from s/w, hence the lack of
-call-back functions of the same name.
-
-> But, I don't see your driver using nand_chip->ecc interfaces.
-> Why do you want to break away from generic driver flow ? any controller limitation ?
-
-When this driver was written, a great deal of the framework was not
-present.  I believe the author also wanted to prevent any changes in
-the framework from adversely affecting the leaf driver.  It was
-considered that if there is no intention to upstream, it would be much
-better to hack around the framework and have full control of the
-driver.
-
-Things are different now, as upstreaming is considered necessary.
-It's my job to make this driver acceptable so it can be Mainlined.
-This includes a 'port' to ensure the driver is using the correct
-interfaces provided by the framework.
-
-> I think much of the code in below patch can be reused from nand_base.c
-> 	[RFC 43/47] mtd: nand: stm_nand_bch: read and write functions (BCH)
-
-I agree and have taken care of this now.
-
-> >+	ecc_err = readl(nandi->base + NANDBCH_ECC_SCORE_REG_A) & 0xff;
-> >+	if (ecc_err == 0xff) {
-> >+		/*
-> >+		 * Downgrade uncorrectable ECC error for an erased page,
-> >+		 * tolerating 'sectors_per_page' bits at zero.
-> >+		 */
-> >+		ret = check_erased_page(buf, page_size,
-> >+					nandi->sectors_per_page);
-> 
-> This is also not correct. Here 'max_zeros' should be ecc.strength
-
-I need to check this with the original author, but I'm inclined to
-agree with you.  I'll make the changes before re-submitting.
-
-> >+		if (ret >= 0)
-> >+			dev_dbg(nandi->dev,
-> >+				"%s: erased page detected: \n"
-> >+				"  downgrading uncorrectable ECC error.\n",
-> >+				__func__);
-> >+	} else {
-> >+		ret = (int)ecc_err;
-> >+	}
-> >+
-> >+	return ret;
-> >+}
-> >+
-> 
-> with regards, pekon
-
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 7e8b44e..f9af48c 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -548,11 +548,10 @@ static bool handle_mmio_cfg_reg(struct kvm_vcpu *vcpu,
+ 	u32 val;
+ 	u32 *reg;
+ 
+-	offset >>= 1;
+ 	reg = vgic_bitmap_get_reg(&vcpu->kvm->arch.vgic.irq_cfg,
+-				  vcpu->vcpu_id, offset);
++				  vcpu->vcpu_id, offset >> 1);
+ 
+-	if (offset & 2)
++	if (offset & 4)
+ 		val = *reg >> 16;
+ 	else
+ 		val = *reg & 0xffff;
+@@ -561,13 +560,13 @@ static bool handle_mmio_cfg_reg(struct kvm_vcpu *vcpu,
+ 	vgic_reg_access(mmio, &val, offset,
+ 			ACCESS_READ_VALUE | ACCESS_WRITE_VALUE);
+ 	if (mmio->is_write) {
+-		if (offset < 4) {
++		if (offset < 8) {
+ 			*reg = ~0U; /* Force PPIs/SGIs to 1 */
+ 			return false;
+ 		}
+ 
+ 		val = vgic_cfg_compress(val);
+-		if (offset & 2) {
++		if (offset & 4) {
+ 			*reg &= 0xffff;
+ 			*reg |= val << 16;
+ 		} else {
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.8.5.2
