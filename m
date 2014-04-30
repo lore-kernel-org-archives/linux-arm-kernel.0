@@ -1,82 +1,83 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 30 Apr 2014 15:27:17 +0200
-Subject: [PATCH for v3.15] net: mvmdio: Check for a valid interrupt instead
- of an error
-In-Reply-To: <20140430114209.GA1907@arch.cereza>
-References: <1398800999-9814-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <53601B96.3000608@gmail.com> <20140430114209.GA1907@arch.cereza>
-Message-ID: <5360FA35.7070209@gmail.com>
+From: alim.akhtar@gmail.com (Alim Akhtar)
+Date: Wed, 30 Apr 2014 19:08:50 +0530
+Subject: [PATCH v3 11/16] clk: exynos5420: correct sysmmu-mfc parent clocks
+In-Reply-To: <1398344632-18623-12-git-send-email-shaik.ameer@samsung.com>
+References: <1398344632-18623-1-git-send-email-shaik.ameer@samsung.com>
+ <1398344632-18623-12-git-send-email-shaik.ameer@samsung.com>
+Message-ID: <CAGOxZ53FSkV-ncYq2gJL7VKT4HJvvjTVRL98vS5VELWLhC7WYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/30/2014 01:42 PM, Ezequiel Garcia wrote:
-> On Apr 29, Sebastian Hesselbarth wrote:
->> On 04/29/2014 09:49 PM, Ezequiel Garcia wrote:
->>> The following commit:
->>>
->>> commit 9ec36cafe43bf835f8f29273597a5b0cbc8267ef
->>> Author: Rob Herring <robh@kernel.org>
->>> Date:   Wed Apr 23 17:57:41 2014 -0500
->>>
->>>      of/irq: do irq resolution in platform_get_irq
->>>
->>> changed platform_get_irq() which now returns ENODEV and EPROBE_DEFER,
->>> in addition to ENXIO. If there's no interrupt for mvmdio, platform_get_irq()
->>> returns ENODEV, but we currently check only for ENXIO.
->>>
->>> Fix this by looking for a positive integer, which is the proper way of
->>> validating a virtual interrupt number.
->>>
->>> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
->>> ---
->>>   drivers/net/ethernet/marvell/mvmdio.c | 2 +-
->>>   1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
->>> index b161a52..eb2cabf 100644
->>> --- a/drivers/net/ethernet/marvell/mvmdio.c
->>> +++ b/drivers/net/ethernet/marvell/mvmdio.c
->>> @@ -232,7 +232,7 @@ static int orion_mdio_probe(struct platform_device *pdev)
->>>   		clk_prepare_enable(dev->clk);
->>>
->>>   	dev->err_interrupt = platform_get_irq(pdev, 0);
->>> -	if (dev->err_interrupt != -ENXIO) {
->>> +	if (dev->err_interrupt > 0) {
->>
->> Ezequiel,
->>
->> I cannot find where Rob's mentioned patch set adds -ENODEV, but isn't
+Hi Shaik,
+
+On Thu, Apr 24, 2014 at 6:33 PM, Shaik Ameer Basha
+<shaik.ameer@samsung.com> wrote:
+> This patch corrects the wrong parent-child relationship
+> between sysmmu-mfc clocks.
 >
-> Well, I don't think it's not mentioned in the patch. The path is:
+> Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
+> ---
+Hoping you have tested vedio playback with this patch, especially
+after across a suspend/resume cycles.
+This looks ok.
+
+Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
+
+>  drivers/clk/samsung/clk-exynos5420.c |    9 +++++++--
+>  1 file changed, 7 insertions(+), 2 deletions(-)
 >
-> platform_get_irq -> of_irq_get -> of_irq_parse_one -> EINVAL.
+> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+> index d8fe6d8..6daf739 100755
+> --- a/drivers/clk/samsung/clk-exynos5420.c
+> +++ b/drivers/clk/samsung/clk-exynos5420.c
+> @@ -82,6 +82,7 @@
+>  #define SCLK_DIV_ISP0          0x10580
+>  #define SCLK_DIV_ISP1          0x10584
+>  #define DIV2_RATIO0            0x10590
+> +#define DIV4_RATIO             0x105a0
+>  #define GATE_BUS_TOP           0x10700
+>  #define GATE_BUS_GEN           0x1073c
+>  #define GATE_BUS_FSYS0         0x10740
+> @@ -176,6 +177,7 @@ static unsigned long exynos5420_clk_regs[] __initdata = {
+>         SCLK_DIV_ISP0,
+>         SCLK_DIV_ISP1,
+>         DIV2_RATIO0,
+> +       DIV4_RATIO,
+>         GATE_BUS_TOP,
+>         GATE_BUS_GEN,
+>         GATE_BUS_FSYS0,
+> @@ -636,6 +638,9 @@ static struct samsung_div_clock exynos5420_div_clks[] __initdata = {
+>         DIV(0, "dout_spi1_pre", "dout_spi1", DIV_PERIC4, 16, 8),
+>         DIV(0, "dout_spi2_pre", "dout_spi2", DIV_PERIC4, 24, 8),
 >
-> So it's EINVAL, not ENODEV. But the lesson is to avoid checking for
-> a particular error (except EPROBE_DEFER which is special) because
-> it's a fragile practice.
-
-Ok, thanks for the clarification.
-
->> the semantic for -EPROBE_DEFER: there *should* be an irq, but it is
->> not yet available. That basically means, we should also defer on that
->> error otherwise we would ignore that we have actually been given an irq
->> to work with, right?
->>
+> +       /* Mfc Blk */
+> +       DIV(0, "dout_mfc_blk", "mout_user_aclk333", DIV4_RATIO, 0, 2),
+> +
+>         /* GSCL Block */
+>         DIV(0, "dout_gscl_blk_300", "mout_user_aclk300_gscl",
+>                 DIV2_RATIO0, 4, 2),
+> @@ -873,8 +878,8 @@ static struct samsung_gate_clock exynos5420_gate_clks[] __initdata = {
+>                         GATE_IP_DISP1, 8, 0, 0),
 >
-> Yes, I agree. Did another patch for that, but haven't send it yet.
-> AFAICS, mvebu platforms will never hit the deferred case as the irqchip
-> is the first driver registered (as per drivers/Makefile).
+>         GATE(CLK_MFC, "mfc", "aclk333", GATE_IP_MFC, 0, 0, 0),
+> -       GATE(CLK_SMMU_MFCL, "smmu_mfcl", "aclk333", GATE_IP_MFC, 1, 0, 0),
+> -       GATE(CLK_SMMU_MFCR, "smmu_mfcr", "aclk333", GATE_IP_MFC, 2, 0, 0),
+> +       GATE(CLK_SMMU_MFCL, "smmu_mfcl", "dout_mfc_blk", GATE_IP_MFC, 1, 0, 0),
+> +       GATE(CLK_SMMU_MFCR, "smmu_mfcr", "dout_mfc_blk", GATE_IP_MFC, 2, 0, 0),
 >
-> Not that we should count on that :)
+>         GATE(CLK_G3D, "g3d", "aclkg3d", GATE_IP_G3D, 9, 0, 0),
+>
+> --
+> 1.7.9.5
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-It doesn't hit it _now_ because of the above. I read about proper
-platform_device for early devices here and there over and over
-again, so I guess some day it may become an issue.
 
-As we know about the potential -EPROBE_DEFER now, I suggest to
-deal with it now, too.
 
-Can you resend this as v2 with the other patch you mentioned
-squashed in?
-
-Sebastian
+-- 
+Regards,
+Alim
