@@ -1,45 +1,41 @@
-From: joshc@codeaurora.org (Josh Cartwright)
-Date: Wed, 30 Apr 2014 11:17:17 -0500
-Subject: [PATCH] arm: socfpga: reserve the region at start of phys mem
-In-Reply-To: <1392744897-6384-1-git-send-email-bigeasy@linutronix.de>
-References: <1392744897-6384-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <20140430161717.GY5546@joshc.qualcomm.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 30 Apr 2014 13:21:01 -0300
+Subject: [PATCH for v3.15] net: mvmdio: Check for a valid interrupt
+ instead of an error
+In-Reply-To: <5360FA35.7070209@gmail.com>
+References: <1398800999-9814-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <53601B96.3000608@gmail.com> <20140430114209.GA1907@arch.cereza>
+ <5360FA35.7070209@gmail.com>
+Message-ID: <20140430162101.GA18300@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 18, 2014 at 06:34:57PM +0100, Sebastian Andrzej Siewior wrote:
-> The SMP bringup code copies trampline code to the physical location 0x0.
-> If somebody allocated memory from this location then it will be
-> overwritten.
-> This patch reserves the few bytes so that it won't be used by the memory
-> allocator.
+On Apr 30, Sebastian Hesselbarth wrote:
+> >
+> >Yes, I agree. Did another patch for that, but haven't send it yet.
+> >AFAICS, mvebu platforms will never hit the deferred case as the irqchip
+> >is the first driver registered (as per drivers/Makefile).
+> >
+> >Not that we should count on that :)
 > 
-> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-[..]
-> +static void __init socfmpga_smp_reserve(void)
-> +{
-> +#ifdef CONFIG_SMP
-> +	int trampoline_size = &secondary_trampoline_end - &secondary_trampoline;
-> +	int ret;
-> +
-> +	ret = memblock_reserve(0, trampoline_size);
-> +	WARN_ON(ret);
-> +#endif
-> +}
-> +
->  static const char *altera_dt_match[] = {
->  	"altr,socfpga",
->  	NULL
-> @@ -327,4 +339,5 @@ DT_MACHINE_START(SOCFPGA, "Altera SOCFPGA")
->  	.init_machine	= socfpga_cyclone5_init,
->  	.restart	= socfpga_cyclone5_restart,
->  	.dt_compat	= altera_dt_match,
-> +	.reserve	= socfmpga_smp_reserve,
->  MACHINE_END
+> It doesn't hit it _now_ because of the above. I read about proper
+> platform_device for early devices here and there over and over
+> again, so I guess some day it may become an issue.
+> 
+> As we know about the potential -EPROBE_DEFER now, I suggest to
+> deal with it now, too.
+> 
+> Can you resend this as v2 with the other patch you mentioned
+> squashed in?
+> 
 
-Is there a particular reason why you aren't describing this reservation
-in devicetree using a /memreserve/ node?
+Oh! I've just remembered why I didn't send the EPROBE_DEFER patch in the first
+place. The mvneta driver connects to the phy at open()-time, in a function
+called "mvneta_mdio_probe()". This name confused me to think the mdio was
+really probed at open()-time.
 
+I guess it was very late at night when I came to such conclusion :)
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
