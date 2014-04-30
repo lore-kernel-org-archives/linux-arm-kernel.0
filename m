@@ -1,38 +1,29 @@
-From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
-Date: Wed, 30 Apr 2014 02:01:23 +0000
-Subject: [PATCH v3 00/18] ASoC: fsl-ssi: Driver cleanup
-In-Reply-To: <20140429162229.GA16981@sirena.org.uk>
-References: <1397482548-28463-1-git-send-email-mpa@pengutronix.de>
- <20140424114403.GN12304@sirena.org.uk>
- <20140428085453.GC15179@pengutronix.de>
- <20140429162229.GA16981@sirena.org.uk>
-Message-ID: <56674acdcf9f4c19916f349286c883f7@BY2PR03MB505.namprd03.prod.outlook.com>
+From: jays.lee@samsung.com (Jungseok Lee)
+Date: Wed, 30 Apr 2014 11:21:00 +0900
+Subject: [PATCH v4 3/7] arm64: Introduce a kernel configuration option for
+ VA_BITS
+In-Reply-To: <20140429144506.GK17007@arm.com>
+References: <000301cf6367$ca12e150$5e38a3f0$@samsung.com>
+ <20140429144506.GK17007@arm.com>
+Message-ID: <007901cf641a$d3fbb710$7bf32530$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-
-> -----Original Message-----
-> From: Mark Brown [mailto:broonie at kernel.org]
-> Sent: Wednesday, April 30, 2014 12:22 AM
-> To: Markus Pargmann
-> Cc: Timur Tabi; Chen Guangyu-B42378; Estevam Fabio-R49496; Alexander Shiyan;
-> Xiubo Li-B47053; alsa-devel at alsa-project.org; linux-arm-
-> kernel at lists.infradead.org; kernel at pengutronix.de
-> Subject: Re: [PATCH v3 00/18] ASoC: fsl-ssi: Driver cleanup
+On Tuesday, April 29, 2014 11:45 PM, Catalin Marinas wrote:
+> On Tue, Apr 29, 2014 at 05:59:23AM +0100, Jungseok Lee wrote:
+> > +config ARM64_VA_BITS
+> > +	int "Virtual address space size"
+> > +	range 39 39 if ARM64_4K_PAGES && ARM64_3_LEVELS
+> > +	range 42 42 if ARM64_64K_PAGES && ARM64_2_LEVELS
+> > +	help
+> > +	  This feature is determined by a combination of page size and
+> > +	  level of translation tables.
 > 
-> On Mon, Apr 28, 2014 at 10:54:53AM +0200, Markus Pargmann wrote:
-> 
-> > What do you think of some framework function like
-> > of_regmap_parse_endianess()? This would offer a common devicetree
-> > binding and the driver would still be involved.
-> 
-> Something like that should be fine, Xiubo has been working on it.
+> OK, so you are doing the VA bits selection already. But see my other
+> email about setting only exposing this and hiding the number of levels
+> (though number of levels can be mentioned in the help).
 
-Yes, the patch is still discussing.
+Okay. I will hide the number of levels.
 
-Thanks,
-
-BRs
-Xiubo
+Best Regards
+Jungseok Lee
