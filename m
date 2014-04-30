@@ -1,69 +1,287 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Wed, 30 Apr 2014 12:36:22 +0100
-Subject: [PATCH] arm64: mm: Create gigabyte kernel logical mappings where
- possible
-Message-ID: <1398857782-1525-1-git-send-email-steve.capper@linaro.org>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 30 Apr 2014 14:41:35 +0300
+Subject: [PATCH 1/2] ARM: DTS: omap54xx-clocks: remove the autoidle properties
+ for clock nodes
+Message-ID: <1398858096-32144-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have the capability to map 1GB level 1 blocks when using a 4K
-granule.
+In OMAP5 bit 8 in PRCM registers are not defined (Reserved) unlike their
+counterpart in OMAP4.
+It is better to not write to these bits.
 
-This patch adjusts the create_mapping logic s.t. when mapping physical
-memory on boot, we attempt to use a 1GB block if both the VA and PA
-start and end are 1GB aligned. This both reduces the levels of lookup
-required to resolve a kernel logical address, as well as reduces TLB
-pressure on cores that support 1GB TLB entries.
-
-Signed-off-by: Steve Capper <steve.capper@linaro.org>
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
-Hello,
-This patch has been tested on the FastModel for 4K and 64K pages.
-Also, this has been tested with Jungseok's 4 level patch.
+ arch/arm/boot/dts/omap54xx-clocks.dtsi | 48 ----------------------------------
+ 1 file changed, 48 deletions(-)
 
-I put in the explicit check for PAGE_SHIFT, as I am anticipating a
-three level 64KB configuration at some point.
-
-With two level 64K, a PUD is equivalent to a PMD which is equivalent to
-a PGD, and these are all level 2 descriptors.
-
-Under three level 64K, a PUD would be equivalent to a PGD which would
-be a level 1 descriptor thus may not be a block.
-
-Comments/critique/testers welcome.
-
-Cheers,
+diff --git a/arch/arm/boot/dts/omap54xx-clocks.dtsi b/arch/arm/boot/dts/omap54xx-clocks.dtsi
+index d487fdab3921..d784ff5d3904 100644
+--- a/arch/arm/boot/dts/omap54xx-clocks.dtsi
++++ b/arch/arm/boot/dts/omap54xx-clocks.dtsi
+@@ -120,10 +120,8 @@
+ 		compatible = "ti,divider-clock";
+ 		clocks = <&dpll_abe_x2_ck>;
+ 		ti,max-div = <31>;
+-		ti,autoidle-shift = <8>;
+ 		reg = <0x01f0>;
+ 		ti,index-starts-at-one;
+-		ti,invert-autoidle-bit;
+ 	};
+ 
+ 	abe_24m_fclk: abe_24m_fclk {
+@@ -164,10 +162,8 @@
+ 		compatible = "ti,divider-clock";
+ 		clocks = <&dpll_abe_x2_ck>;
+ 		ti,max-div = <31>;
+-		ti,autoidle-shift = <8>;
+ 		reg = <0x01f4>;
+ 		ti,index-starts-at-one;
+-		ti,invert-autoidle-bit;
+ 	};
+ 
+ 	dpll_core_ck: dpll_core_ck {
+@@ -188,10 +184,8 @@
+ 		compatible = "ti,divider-clock";
+ 		clocks = <&dpll_core_x2_ck>;
+ 		ti,max-div = <63>;
+-		ti,autoidle-shift = <8>;
+ 		reg = <0x0150>;
+ 		ti,index-starts-at-one;
+-		ti,invert-autoidle-bit;
+ 	};
+ 
+ 	c2c_fclk: c2c_fclk {
+@@ -215,10 +209,8 @@
+ 		compatible = "ti,divider-clock";
+ 		clocks = <&dpll_core_x2_ck>;
+ 		ti,max-div = <63>;
+-		ti,autoidle-shift = <8>;
+ 		reg = <0x0138>;
+ 		ti,index-starts-at-one;
+-		ti,invert-autoidle-bit;
+ 	};
+ 
+ 	dpll_core_h12x2_ck: dpll_core_h12x2_ck {
+@@ -226,10 +218,8 @@
+ 		compatible = "ti,divider-clock";
+ 		clocks = <&dpll_core_x2_ck>;
+ 		ti,max-div = <63>;
+-		ti,autoidle-shift = <8>;
+ 		reg = <0x013c>;
+ 		ti,index-starts-at-one;
+-		ti,invert-autoidle-bit;
+ 	};
+ 
+ 	dpll_core_h13x2_ck: dpll_core_h13x2_ck {
+@@ -237,10 +227,8 @@
+ 		compatible = "ti,divider-clock";
+ 		clocks = <&dpll_core_x2_ck>;
+ 		ti,max-div = <63>;
+-		ti,autoidle-shift = <8>;
+ 		reg = <0x0140>;
+ 		ti,index-starts-at-one;
+-		ti,invert-autoidle-bit;
+ 	};
+ 
+ 	dpll_core_h14x2_ck: dpll_core_h14x2_ck {
+@@ -248,10 +236,8 @@
+ 		compatible = "ti,divider-clock";
+ 		clocks = <&dpll_core_x2_ck>;
+ 		ti,max-div = <63>;
+-		ti,autoidle-shift = <8>;
+ 		reg = <0x0144>;
+ 		ti,index-starts-at-one;
+-		ti,invert-autoidle-bit;
+ 	};
+ 
+ 	dpll_core_h22x2_ck: dpll_core_h22x2_ck {
+@@ -259,10 +245,8 @@
+ 		compatible = "ti,divider-clock";
+ 		clocks = <&dpll_core_x2_ck>;
+ 		ti,max-div = <63>;
+-		ti,autoidle-shift = <8>;
+ 		reg = <0x0154>;
+ 		ti,index-starts-at-one;
+-		ti,invert-autoidle-bit;
+ 	};
+ 
+ 	dpll_core_h23x2_ck: dpll_core_h23x2_ck {
+@@ -270,10 +254,8 @@
+ 		compatible = "ti,divider-clock";
+ 		clocks = <&dpll_core_x2_ck>;
+ 		ti,max-div = <63>;
+-		ti,autoidle-shift = <8>;
+ 		reg = <0x0158>;
+ 		ti,index-starts-at-one;
+-		ti,invert-autoidle-bit;
+ 	};
+ 
+ 	dpll_core_h24x2_ck: dpll_core_h24x2_ck {
+@@ -281,10 +263,8 @@
+ 		compatible = "ti,divider-clock";
+ 		clocks = <&dpll_core_x2_ck>;
+ 		ti,max-div = <63>;
+-		ti,autoidle-shift = <8>;
+ 		reg = <0x015c>;
+ 		ti,index-starts-at-one;
+-		ti,invert-autoidle-bit;
+ 	};
+ 
+ 	dpll_core_m2_ck: dpll_core_m2_ck {
+@@ -292,10 +272,8 @@
+ 		compatible = "ti,divider-clock";
+ 		clocks = <&dpll_core_ck>;
+ 		ti,max-div = <31>;
+-		ti,autoidle-shift = <8>;
+ 		reg = <0x0130>;
+ 		ti,index-starts-at-one;
+-		ti,invert-autoidle-bit;
+ 	};
+ 
+ 	dpll_core_m3x2_ck: dpll_core_m3x2_ck {
+@@ -303,10 +281,8 @@
+ 		compatible = "ti,divider-clock";
+ 		clocks = <&dpll_core_x2_ck>;
+ 		ti,max-div = <31>;
+-		ti,autoidle-shift = <8>;
+ 		reg = <0x0134>;
+ 		ti,index-starts-at-one;
+-		ti,invert-autoidle-bit;
+ 	};
+ 
+ 	iva_dpll_hs_clk_div: iva_dpll_hs_clk_div {
+@@ -335,10 +311,8 @@
+ 		compatible = "ti,divider-clock";
+ 		clocks = <&dpll_iva_x2_ck>;
+ 		ti,max-div = <63>;
+-		ti,autoidle-shift = <8>;
+ 		reg = <0x01b8>;
+ 		ti,index-starts-at-one;
+-		ti,invert-autoidle-bit;
+ 	};
+ 
+ 	dpll_iva_h12x2_ck: dpll_iva_h12x2_ck {
+@@ -346,10 +320,8 @@
+ 		compatible = "ti,divider-clock";
+ 		clocks = <&dpll_iva_x2_ck>;
+ 		ti,max-div = <63>;
+-		ti,autoidle-shift = <8>;
+ 		reg = <0x01bc>;
+ 		ti,index-starts-at-one;
+-		ti,invert-autoidle-bit;
+ 	};
+ 
+ 	mpu_dpll_hs_clk_div: mpu_dpll_hs_clk_div {
+@@ -372,10 +344,8 @@
+ 		compatible = "ti,divider-clock";
+ 		clocks = <&dpll_mpu_ck>;
+ 		ti,max-div = <31>;
+-		ti,autoidle-shift = <8>;
+ 		reg = <0x0170>;
+ 		ti,index-starts-at-one;
+-		ti,invert-autoidle-bit;
+ 	};
+ 
+ 	per_dpll_hs_clk_div: per_dpll_hs_clk_div {
+@@ -642,10 +612,8 @@
+ 		compatible = "ti,divider-clock";
+ 		clocks = <&dpll_per_x2_ck>;
+ 		ti,max-div = <63>;
+-		ti,autoidle-shift = <8>;
+ 		reg = <0x0158>;
+ 		ti,index-starts-at-one;
+-		ti,invert-autoidle-bit;
+ 	};
+ 
+ 	dpll_per_h12x2_ck: dpll_per_h12x2_ck {
+@@ -653,10 +621,8 @@
+ 		compatible = "ti,divider-clock";
+ 		clocks = <&dpll_per_x2_ck>;
+ 		ti,max-div = <63>;
+-		ti,autoidle-shift = <8>;
+ 		reg = <0x015c>;
+ 		ti,index-starts-at-one;
+-		ti,invert-autoidle-bit;
+ 	};
+ 
+ 	dpll_per_h14x2_ck: dpll_per_h14x2_ck {
+@@ -664,10 +630,8 @@
+ 		compatible = "ti,divider-clock";
+ 		clocks = <&dpll_per_x2_ck>;
+ 		ti,max-div = <63>;
+-		ti,autoidle-shift = <8>;
+ 		reg = <0x0164>;
+ 		ti,index-starts-at-one;
+-		ti,invert-autoidle-bit;
+ 	};
+ 
+ 	dpll_per_m2_ck: dpll_per_m2_ck {
+@@ -675,10 +639,8 @@
+ 		compatible = "ti,divider-clock";
+ 		clocks = <&dpll_per_ck>;
+ 		ti,max-div = <31>;
+-		ti,autoidle-shift = <8>;
+ 		reg = <0x0150>;
+ 		ti,index-starts-at-one;
+-		ti,invert-autoidle-bit;
+ 	};
+ 
+ 	dpll_per_m2x2_ck: dpll_per_m2x2_ck {
+@@ -686,10 +648,8 @@
+ 		compatible = "ti,divider-clock";
+ 		clocks = <&dpll_per_x2_ck>;
+ 		ti,max-div = <31>;
+-		ti,autoidle-shift = <8>;
+ 		reg = <0x0150>;
+ 		ti,index-starts-at-one;
+-		ti,invert-autoidle-bit;
+ 	};
+ 
+ 	dpll_per_m3x2_ck: dpll_per_m3x2_ck {
+@@ -697,10 +657,8 @@
+ 		compatible = "ti,divider-clock";
+ 		clocks = <&dpll_per_x2_ck>;
+ 		ti,max-div = <31>;
+-		ti,autoidle-shift = <8>;
+ 		reg = <0x0154>;
+ 		ti,index-starts-at-one;
+-		ti,invert-autoidle-bit;
+ 	};
+ 
+ 	dpll_unipro1_ck: dpll_unipro1_ck {
+@@ -723,10 +681,8 @@
+ 		compatible = "ti,divider-clock";
+ 		clocks = <&dpll_unipro1_ck>;
+ 		ti,max-div = <127>;
+-		ti,autoidle-shift = <8>;
+ 		reg = <0x0210>;
+ 		ti,index-starts-at-one;
+-		ti,invert-autoidle-bit;
+ 	};
+ 
+ 	dpll_unipro2_ck: dpll_unipro2_ck {
+@@ -749,10 +705,8 @@
+ 		compatible = "ti,divider-clock";
+ 		clocks = <&dpll_unipro2_ck>;
+ 		ti,max-div = <127>;
+-		ti,autoidle-shift = <8>;
+ 		reg = <0x01d0>;
+ 		ti,index-starts-at-one;
+-		ti,invert-autoidle-bit;
+ 	};
+ 
+ 	dpll_usb_ck: dpll_usb_ck {
+@@ -775,10 +729,8 @@
+ 		compatible = "ti,divider-clock";
+ 		clocks = <&dpll_usb_ck>;
+ 		ti,max-div = <127>;
+-		ti,autoidle-shift = <8>;
+ 		reg = <0x0190>;
+ 		ti,index-starts-at-one;
+-		ti,invert-autoidle-bit;
+ 	};
+ 
+ 	func_128m_clk: func_128m_clk {
 -- 
-Steve
----
- arch/arm64/mm/mmu.c | 15 ++++++++++++++-
- 1 file changed, 14 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 4d29332..867e979 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -234,7 +234,20 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
- 	pud = pud_offset(pgd, addr);
- 	do {
- 		next = pud_addr_end(addr, end);
--		alloc_init_pmd(pud, addr, next, phys);
-+
-+		/*
-+		 * For 4K granule only, attempt to put down a 1GB block
-+		 */
-+		if ((PAGE_SHIFT == 12) &&
-+			((addr | next | phys) & ~PUD_MASK) == 0) {
-+			pud_t old_pud = *pud;
-+			set_pud(pud, __pud(phys | prot_sect_kernel));
-+
-+			if (!pud_none(old_pud))
-+				flush_tlb_all();
-+		} else {
-+			alloc_init_pmd(pud, addr, next, phys);
-+		}
- 		phys += next - addr;
- 	} while (pud++, addr = next, addr != end);
- }
--- 
-1.8.1.4
+1.9.2
