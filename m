@@ -1,64 +1,32 @@
-From: alim.akhtar@gmail.com (Alim Akhtar)
-Date: Wed, 30 Apr 2014 19:24:39 +0530
-Subject: [PATCH v3 15/16] clk: exynos5420: create clock ID for
- mout_sclk_vpll
-In-Reply-To: <1398344632-18623-16-git-send-email-shaik.ameer@samsung.com>
-References: <1398344632-18623-1-git-send-email-shaik.ameer@samsung.com>
- <1398344632-18623-16-git-send-email-shaik.ameer@samsung.com>
-Message-ID: <CAGOxZ50ZQ9NkwmBGv2M1wgHJyAnWtF8MA3QA6pen0teUHkuKog@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 30 Apr 2014 15:02:23 +0100
+Subject: [PATCH 09/10] ARM: vexpress: move HBI check to sysreg driver
+In-Reply-To: <1398707877-22596-10-git-send-email-pawel.moll@arm.com>
+References: <1398707877-22596-1-git-send-email-pawel.moll@arm.com>
+ <1398707877-22596-10-git-send-email-pawel.moll@arm.com>
+Message-ID: <20140430140223.GP29462@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shaik
-
-On Thu, Apr 24, 2014 at 6:33 PM, Shaik Ameer Basha
-<shaik.ameer@samsung.com> wrote:
-> This patch adds clock ID for mout_sclk_vpll clock
->
-> Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
+> The last reason for static memory mapping is the HBI (board
+> identification number) check early in the machine code.
+> 
+> Moving the check to the sysreg driver makes it possible to
+> completely remove the early mapping and init functions.
+> 
+> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 > ---
->  drivers/clk/samsung/clk-exynos5420.c   |    2 +-
->  include/dt-bindings/clock/exynos5420.h |    1 +
->  2 files changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
-> index 944ff20..33a48d2 100755
-> --- a/drivers/clk/samsung/clk-exynos5420.c
-> +++ b/drivers/clk/samsung/clk-exynos5420.c
-> @@ -437,7 +437,7 @@ static struct samsung_mux_clock exynos5420_mux_clks[] __initdata = {
->                         SRC_TOP5, 28, 1),
->
->         MUX(0, "mout_sclk_mpll", mout_mpll_p, SRC_TOP6, 0, 1),
-> -       MUX(0, "mout_sclk_vpll", mout_vpll_p, SRC_TOP6, 4, 1),
-> +       MUX(CLK_MOUT_VPLL, "mout_sclk_vpll", mout_vpll_p, SRC_TOP6, 4, 1),
-Any perticular reason for just this change??
+>  arch/arm/mach-vexpress/v2m.c  | 49 -------------------------------------------
+>  drivers/mfd/vexpress-sysreg.c | 30 ++++++++++----------------
+>  include/linux/vexpress.h      |  1 -
+>  3 files changed, 11 insertions(+), 69 deletions(-)
 
->         MUX(0, "mout_sclk_spll", mout_spll_p, SRC_TOP6, 8, 1),
->         MUX(0, "mout_sclk_ipll", mout_ipll_p, SRC_TOP6, 12, 1),
->         MUX(0, "mout_sclk_rpll", mout_rpll_p, SRC_TOP6, 16, 1),
-> diff --git a/include/dt-bindings/clock/exynos5420.h b/include/dt-bindings/clock/exynos5420.h
-> index b2410bc..7c80443 100755
-> --- a/include/dt-bindings/clock/exynos5420.h
-> +++ b/include/dt-bindings/clock/exynos5420.h
-> @@ -190,6 +190,7 @@
->  #define CLK_MOUT_HDMI          640
->  #define CLK_MOUT_MAUDIO0       642
->  #define CLK_MOUT_G3D           643
-> +#define CLK_MOUT_VPLL          644
->
->  /* divider clocks */
->  #define CLK_DOUT_PIXEL         768
-> --
-> 1.7.9.5
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
-
+How do you want this patch handled?
 
 -- 
-Regards,
-Alim
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
