@@ -1,66 +1,133 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 30 Apr 2014 10:29:02 +0200
-Subject: [PATCH] reset: Add of_reset_control_get to reset.h
-In-Reply-To: <20140423122750.GP24905@lukather>
-References: <1397390955-22644-1-git-send-email-hdegoede@redhat.com>
- <1397462286.3800.2.camel@paszta.hi.pengutronix.de>
- <20140423122750.GP24905@lukather>
-Message-ID: <1398846542.19894.23.camel@paszta.hi.pengutronix.de>
+From: leela.krishna@linaro.org (Leela Krishna Amudala)
+Date: Wed, 30 Apr 2014 13:59:12 +0530
+Subject: [PATCH V2] ARM: EXYNOS: cpu hotplug: use v7_exit_coherency_flush
+ macro for cache disabling
+In-Reply-To: <5360AE05.7020106@samsung.com>
+References: <1398232351-16280-1-git-send-email-leela.krishna@linaro.org>
+ <5360AE05.7020106@samsung.com>
+Message-ID: <CAM7CM0mJHWEAaqJ=jMkKXjkxr+XzC+QstSkFzX_g52JvrLUDCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Hello Kgene,
 
-Am Mittwoch, den 23.04.2014, 14:27 +0200 schrieb Maxime Ripard:
-> On Mon, Apr 14, 2014 at 09:58:06AM +0200, Philipp Zabel wrote:
-> > Am Sonntag, den 13.04.2014, 14:09 +0200 schrieb Hans de Goede:
-> > > of_reset_control_get is not declared static in drivers/reset/core.c, which
-> > > is correct as we want to use it elsewhere too. But it does not have a
-> > > protype declared anywhere under include/linux. Add a prototype / stub for it
-> > > to linux/reset.h to fix this.
-> > > 
-> > > Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> > > ---
-> > >  include/linux/reset.h | 9 +++++++++
-> > >  1 file changed, 9 insertions(+)
-> > > 
-> > > diff --git a/include/linux/reset.h b/include/linux/reset.h
-> > > index c0eda50..f1ae7ce 100644
-> > > --- a/include/linux/reset.h
-> > > +++ b/include/linux/reset.h
-> > > @@ -33,6 +33,9 @@ static inline struct reset_control *devm_reset_control_get_optional(
-> > >  	return devm_reset_control_get(dev, id);
-> > >  }
-> > >  
-> > > +struct reset_control *of_reset_control_get(struct device_node *node,
-> > > +					   const char *id);
-> > > +
-> > >  #else
-> > >  
-> > >  static inline int reset_control_reset(struct reset_control *rstc)
-> > > @@ -75,6 +78,12 @@ static inline struct reset_control *devm_reset_control_get_optional(
-> > >  	return ERR_PTR(-ENOSYS);
-> > >  }
-> > >  
-> > > +static inline struct reset_control *of_reset_control_get(
-> > > +				struct device_node *node, const char *id)
-> > > +{
-> > > +	return ERR_PTR(-ENOSYS);
-> > > +}
-> > > +
-> > >  #endif /* CONFIG_RESET_CONTROLLER */
-> > >  
-> > >  #endif
-> > 
-> > Applied, thanks.
-> 
-> I just noticed you queued this patch up for 3.16.
-> 
-> Since that function got introduced in 3.15-rc1, maybe it would be
-> better if you queued it for one of 3.15-rc* ?
+Can you please pick this patch to your tree ?
 
-Good point, this is the first reset framework patch that should actually
-be fast-tracked.
+Best Wishes,
+Leela Krishna.
 
-regards
-Philipp
+On Wed, Apr 30, 2014 at 1:32 PM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+> Hi,
+>
+> On 04/23/2014 02:52 PM, Leela Krishna Amudala wrote:
+>> A common macro v7_exit_coherency_flush available which does the below tasks in
+>> the seqeunce.
+>> -clearing C bit
+>> -clearing L1 cache
+>> -exit SMP
+>> -instruction and data synchronization
+>>
+>> So removing the local functions which does the same thing and use the macro instead.
+>>
+>> Signed-off-by: Leela Krishna Amudala <leela.krishna@linaro.org>
+>> Acked-by: Nicolas Pitre <nico@linaro.org>
+>> ---
+>> Changes since V1:
+>>       - removed unwanted primary_part variable in exynos_cpu_die()
+>>       - given more description in commit message
+>>         suggested by Daniel Lezcano <daniel.lezcano@linaro.org>
+>>
+>>  arch/arm/mach-exynos/hotplug.c |   63 +---------------------------------------
+>>  1 file changed, 1 insertion(+), 62 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
+>> index 5eead53..9ca692d 100644
+>> --- a/arch/arm/mach-exynos/hotplug.c
+>> +++ b/arch/arm/mach-exynos/hotplug.c
+>> @@ -24,56 +24,6 @@
+>>  #include "common.h"
+>>  #include "regs-pmu.h"
+>>
+>> -static inline void cpu_enter_lowpower_a9(void)
+>> -{
+>> -     unsigned int v;
+>> -
+>> -     asm volatile(
+>> -     "       mcr     p15, 0, %1, c7, c5, 0\n"
+>> -     "       mcr     p15, 0, %1, c7, c10, 4\n"
+>> -     /*
+>> -      * Turn off coherency
+>> -      */
+>> -     "       mrc     p15, 0, %0, c1, c0, 1\n"
+>> -     "       bic     %0, %0, %3\n"
+>> -     "       mcr     p15, 0, %0, c1, c0, 1\n"
+>> -     "       mrc     p15, 0, %0, c1, c0, 0\n"
+>> -     "       bic     %0, %0, %2\n"
+>> -     "       mcr     p15, 0, %0, c1, c0, 0\n"
+>> -       : "=&r" (v)
+>> -       : "r" (0), "Ir" (CR_C), "Ir" (0x40)
+>> -       : "cc");
+>> -}
+>> -
+>> -static inline void cpu_enter_lowpower_a15(void)
+>> -{
+>> -     unsigned int v;
+>> -
+>> -     asm volatile(
+>> -     "       mrc     p15, 0, %0, c1, c0, 0\n"
+>> -     "       bic     %0, %0, %1\n"
+>> -     "       mcr     p15, 0, %0, c1, c0, 0\n"
+>> -       : "=&r" (v)
+>> -       : "Ir" (CR_C)
+>> -       : "cc");
+>> -
+>> -     flush_cache_louis();
+>> -
+>> -     asm volatile(
+>> -     /*
+>> -     * Turn off coherency
+>> -     */
+>> -     "       mrc     p15, 0, %0, c1, c0, 1\n"
+>> -     "       bic     %0, %0, %1\n"
+>> -     "       mcr     p15, 0, %0, c1, c0, 1\n"
+>> -     : "=&r" (v)
+>> -     : "Ir" (0x40)
+>> -     : "cc");
+>> -
+>> -     isb();
+>> -     dsb();
+>> -}
+>> -
+>>  static inline void cpu_leave_lowpower(void)
+>>  {
+>>       unsigned int v;
+>> @@ -132,19 +82,8 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+>>  void __ref exynos_cpu_die(unsigned int cpu)
+>>  {
+>>       int spurious = 0;
+>> -     int primary_part = 0;
+>>
+>> -     /*
+>> -      * we're ready for shutdown now, so do it.
+>> -      * Exynos4 is A9 based while Exynos5 is A15; check the CPU part
+>> -      * number by reading the Main ID register and then perform the
+>> -      * appropriate sequence for entering low power.
+>> -      */
+>> -     asm("mrc p15, 0, %0, c0, c0, 0" : "=r"(primary_part) : : "cc");
+>> -     if ((primary_part & 0xfff0) == 0xc0f0)
+>> -             cpu_enter_lowpower_a15();
+>> -     else
+>> -             cpu_enter_lowpower_a9();
+>> +     v7_exit_coherency_flush(louis);
+>>
+>>       platform_do_lowpower(cpu, &spurious);
+>>
+>>
+>
+> I tested this patch on Exynos3250 based on Cortex-A7 dual core.
+>
+> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
+>
+> Thanks,
+> Chanwoo Choi
+>
