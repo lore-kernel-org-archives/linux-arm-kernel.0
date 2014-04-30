@@ -1,37 +1,92 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 30 Apr 2014 12:48:49 +0100
-Subject: [PATCH 01/10] of: Keep track of populated platform devices
-In-Reply-To: <20140429125657.65910C4089D@trevor.secretlab.ca>
-References: <1398707877-22596-1-git-send-email-pawel.moll@arm.com>
- <1398707877-22596-2-git-send-email-pawel.moll@arm.com>
- <CAL_JsqJxWoxNL=P0SJm+Q1rTRGTpMkzmzTJDbFq2P1vPH4XxZQ@mail.gmail.com>
- <20140429125657.65910C4089D@trevor.secretlab.ca>
-Message-ID: <1398858529.24255.3.camel@hornet>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 30 Apr 2014 14:15:38 +0200
+Subject: [PATCH] PM / Sleep: Fall back to subsystem level PM callbacks for
+ PM domains
+In-Reply-To: <1679843.u9z8cZFExt@vostro.rjw.lan>
+References: <1398422695-2295-1-git-send-email-ulf.hansson@linaro.org>
+ <1753685.C73DLtyD2t@vostro.rjw.lan>
+ <1679843.u9z8cZFExt@vostro.rjw.lan>
+Message-ID: <CAPDyKFr_1CJZ3KAwAbrzeoW0me1SjqC221Kb=_4RnaXa8Uh_gA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-04-29 at 13:56 +0100, Grant Likely wrote:
-> > > diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> > > index 404d1da..0ae757a 100644
-> > > --- a/drivers/of/platform.c
-> > > +++ b/drivers/of/platform.c
-> > > @@ -204,7 +204,8 @@ static struct platform_device *of_platform_device_create_pdata(
-> > >  {
-> > >         struct platform_device *dev;
-> > >
-> > > -       if (!of_device_is_available(np))
-> > > +       if (!of_device_is_available(np) ||
-> > > +                       of_node_check_flag(np, OF_POPULATED))
-> > 
-> > This and the amba case should be a test_and_set operation to avoid a
-> > race condition.
-> 
-> Yes. It is an unlikely condition at the time that Pawel is handling, but
-> it should also work for later calls to of_platform_populate() which may
-> happen at runtime and in parallel.
+On 30 April 2014 00:52, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Wednesday, April 30, 2014 12:47:28 AM Rafael J. Wysocki wrote:
+>> On Friday, April 25, 2014 12:44:55 PM Ulf Hansson wrote:
+>> > Previously once the PM core found a PM domain pointer for a device,
+>> > but which didn't have a valid PM callback, it falled back to try the
+>> > driver's PM callback.
+>> >
+>> > In this scenario, change the behavior of the PM core to try out the
+>> > other subsystem level PM callbacks, before it moves on to the driver.
+>> >
+>> > This gives provision for PM domains to easier re-use subsystem level
+>> > code to handle the needed operations.
+>> >
+>> > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>>
+>> Are you sure this is not going to break the existing PM domains?
 
-Sure thing, will fix.
+I have checked the current implementations of the PM domains - all are
+providing the PM callbacks. So this should be safe.
 
-Thanks!
+>
+> And even if it isn't, the idea behind PM domains was to provide a mechanism to
+> bypass the bus types' (etc) PM callbacks, so I'm not liking this patch at all.
 
-Pawel
+I understand your view, it's the current mindset we have of the
+hierarchy of handling the callbacks. I am wondering if it's time to
+reconsider. :-)
+
+To be clear, I don't want to prevent the PM domain from bypassing bus,
+types etc, that's should be up to each implementation to decide, and
+this patch won't affect that behaviour.
+
+I intend to only simplify for those PM domains that want to re-use the
+callbacks from bus, types. etc. Currently that's the most of them.
+
+a)
+Those ARM SOCs that implements PM domains, which don't use the generic
+power domain, cares only about platform devices attached to the
+platform_bus_type. These are copying the callbacks from the
+platform_bus_type (using the USE_PLATFORM_PM_SLEEP_OPS macro)  - I
+assume this is because they need to handle legacy suspend/resume.
+
+arch/arm/mach-davinci/pm_domain.c
+arch/arm/mach-keystone/pm_domain.c
+arch/arm/mach-omap1/pm_bus.c
+arch/arm/mach-omap2/omap_device.c
+drivers/sh/pm_runtime.c
+
+b)
+An actual copy of the bus' PM callbacks to the PM domain's callbacks also exist.
+
+drivers/gpu/vga/vga_switcheroo.c:
+vga_switcheroo_init_domain_pm_ops()
+vga_switcheroo_init_domain_pm_optimus_hdmi_audio()
+
+c)
+That leaves the generic power domain and acpi power domain, which
+don't re-use callbacks, but have their own set.
+
+
+The more complicated scenario have not yet been implemented - but I
+can see it coming. :-)
+That's when the PM domain wants to re-use callbacks for whatever bus,
+types etc, the device is attached to.
+
+To handle this, the PM domain will have to re-implement the code for
+walking the hierarchy of callbacks, which is a bit messy. This patch
+will make it possible for the PM domain to rely on the PM core to
+handle this instead.
+
+Kind regards
+Ulf Hansson
+
+>
+> Thanks!
+>
+>
+> --
+> I speak only for myself.
+> Rafael J. Wysocki, Intel Open Source Technology Center.
