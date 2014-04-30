@@ -1,48 +1,64 @@
-From: Nikolay.Borisov@arm.com (Nikolay Borisov)
-Date: Wed, 30 Apr 2014 11:52:11 +0100
-Subject: [PATCH] ARM: unwind: Fix handling of "Pop r4-r[4+nnn],r14" opcode
-Message-ID: <1398855131-15079-1-git-send-email-Nikolay.Borisov@arm.com>
+From: shaik.samsung@gmail.com (Shaik Ameer Basha)
+Date: Wed, 30 Apr 2014 16:27:10 +0530
+Subject: [PATCH v12 00/31] iommu/exynos: Fixes and Enhancements of System
+ MMU driver with DT
+In-Reply-To: <26065037.GxQQuIURPg@wuerfel>
+References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
+ <26065037.GxQQuIURPg@wuerfel>
+Message-ID: <CAOD6ATqZ5UwRwSKiPDQLrgmX=UUrJVE7ybM_RhXz_CEUjM3W7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arm EABI states that opcode 10100nnn means pop register r4-4[4+nnn],
-aditionally there is a similar opcode: 10101nnn which means the same thing plus
-popping r14. Those two cases are handled by the unwind_exec_pop_r4_to_rN
-function which checks whether the 4th bit is set and does r14 popping.
+On Mon, Apr 28, 2014 at 2:04 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Sunday 27 April 2014 13:07:32 Shaik Ameer Basha wrote:
+>> The current exynos-iommu(System MMU) driver does not work autonomously
+>> since it is lack of support for power management of peripheral blocks.
+>> For example, MFC device driver must ensure that its System MMU is disabled
+>> before MFC block is power-down not to invalidate IOTLB in the System MMU
+>> when I/O memory mapping is changed. Because a System MMU resides in the
+>> same H/W block, access to control registers of System MMU while the H/W
+>> block is turned off must be prohibited.
+>>
+>> This set of changes solves the above problem with setting each System MMUs
+>> as the parent of the device which owns the System MMU to receive the
+>> information when the device is turned off or turned on.
+>>
+>> Another big change to the driver is the support for devicetree.
+>> The bindings for System MMU is described in
+>> Documentation/devicetree/bindings/arm/samsung/system-mmu.txt
+>
+> Sorry I've been absent from the review so far. Most of the patches
+> seem entirely reasonable to me, but I'm worried about the DT binding
+> aspect. We are going to see more systems shipping with IOMMUs now,
+> and we are seeing an increasing number of submissions for 64-bit
+> systems. We really have to work out what the DT representation for
+> IOMMUs should look like in general before adding another ad-hod
+> implementation that is private to one driver.
 
-However, up until now it has been checking whether the 8th was set (mask & 0x80)
-instead of the 4th (mask & 0x8), a simple to make typo but this meant that we
-were always popping r14 even if we had the former opcode.
 
-This patch changes the mask so that the 2 opcodes are being handled correctly.
+I have one question.
 
-Signed-off-by: Nikolay Borisov <Nikolay.Borisov@arm.com>
----
+This series is going on for quite a long time and most of the patches here
+doesn't depend on dt bindings. As Exynos IOMMU h/w is introducing new versions
+very frequently, maintaining and reviewing all these patches again and
+again is quite a hard job.
 
-I tested this patch using magic sysrq to generate backtrace of every process and
-it was working. However, inspecting the unwind table for vmlinuz it seems that
-the majority of the instructions do in fact require popping r14 so that's why
-this has gone unnoticed for a long period, however I'm open to suggestions how
-to more thoroughly test this. 
+If it is acceptable, I can post one more series with the subset of
+above patches,
+which doesn't depend on dt-bindings. As all the patches which doesn't depend on
+DT bindings are already tested,  I hope merging these subset of patches may help
+in reducing the rework and review effort every time.
 
-The first thing that comes to mind is manually fiddle with the unwind table of a
-well-known function so that it no longer requires r14 being popped. 
+Once we finalize the generic DT bindings for the IOMMU devices, the driver
+can be updated with the proposed DT bindings in mind.
 
- arch/arm/kernel/unwind.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Regards,
+Shaik
 
-diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
-index 3c21769..cb791ac 100644
---- a/arch/arm/kernel/unwind.c
-+++ b/arch/arm/kernel/unwind.c
-@@ -285,7 +285,7 @@ static int unwind_exec_pop_r4_to_rN(struct unwind_ctrl_block *ctrl,
- 		if (unwind_pop_register(ctrl, &vsp, reg))
- 				return -URC_FAILURE;
- 
--	if (insn & 0x80)
-+	if (insn & 0x8)
- 		if (unwind_pop_register(ctrl, &vsp, 14))
- 				return -URC_FAILURE;
- 
--- 
-1.8.1.5
+
+>
+>         Arnd
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
