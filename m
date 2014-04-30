@@ -1,49 +1,89 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 30 Apr 2014 20:11:26 +0200
-Subject: [PATCH] arm64: mm: Create gigabyte kernel logical mappings where
- possible
-In-Reply-To: <1398857782-1525-1-git-send-email-steve.capper@linaro.org>
-References: <1398857782-1525-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <4217068.6LErVYxoHJ@wuerfel>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 30 Apr 2014 11:12:51 -0700
+Subject: [PATCH v3 00/11] ARM: at91: rework main and slow clk
+ implementation
+In-Reply-To: <1398172360-7837-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1398172360-7837-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <53613D23.3020503@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 30 April 2014 12:36:22 Steve Capper wrote:
-> We have the capability to map 1GB level 1 blocks when using a 4K
-> granule.
-> 
-> This patch adjusts the create_mapping logic s.t. when mapping physical
-> memory on boot, we attempt to use a 1GB block if both the VA and PA
-> start and end are 1GB aligned. This both reduces the levels of lookup
-> required to resolve a kernel logical address, as well as reduces TLB
-> pressure on cores that support 1GB TLB entries.
-> 
-> Signed-off-by: Steve Capper <steve.capper@linaro.org>
-> ---
+On 22/04/2014 06:12, Boris BREZILLON :
 > Hello,
-> This patch has been tested on the FastModel for 4K and 64K pages.
-> Also, this has been tested with Jungseok's 4 level patch.
 > 
-> I put in the explicit check for PAGE_SHIFT, as I am anticipating a
-> three level 64KB configuration at some point.
+> This series introduce the real clock model (as described in atmel datasheets)
+> for slow and main clocks.
 > 
-> With two level 64K, a PUD is equivalent to a PMD which is equivalent to
-> a PGD, and these are all level 2 descriptors.
+> The modifications introduced by this series break the DT compat, but, as the
+> at91 CCF based implementation is pretty new (introduced in 3.14 only for sama5
+> eval boards) I think it won't impact a lot of users.
 > 
-> Under three level 64K, a PUD would be equivalent to a PGD which would
-> be a level 1 descriptor thus may not be a block.
+> Nicolas, Mike, if this series is accepted, I'd like to get it merged as soon as
+> possible to prevent other developpers from using a deprecated DT binding.
+> Moreover, I think this series should go through the same path for both clk
+> and DT changes (whatever path is chosen: either at91 or clk tree) because the
+> changes are tightly coupled.
+
+Boris,
+
+First of all, well...
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+I didn't find something to add but the little comment about the
+documentation that you already fixed in this v3 version.
+
+Mike,
+
+I would like to merge this whole series through my tree and then the
+arm-soc tree. If it is okay for you, can you give your acknowledgement
+before that I build a pull-request for the arm-soc guys?
+
+Thanks a lot, bye,
+
+> Changes since v2:
+>  - add missing compatible in pmc.c
+>  - fix sam9261 slow clock definition
+>  - move xtal nodes out of /clocks node
+>  - fix DT bindings documentation
+>  - fix main RC oscillator initilization
 > 
-> Comments/critique/testers welcome.
+> Changes since v1:
+> - fix sam9rl main clk definition
+> Boris BREZILLON (11):
+>   clk: at91: rework main clk implementation
+>   clk: at91: update main clk documentation
+>   clk: at91: add slow clks driver
+>   clk: at91: add slow clk documentation
+>   ARM: at91/dt: move sama5d3 SoC to the new main/slow clk model
+>   ARM: at91/dt: add xtal frequencies to sama5d3xcm boards
+>   ARM: at91/dt: add xtal frequencies to sama5d3 xplained board
+>   ARM: at91/dt: move at91sam9261 SoC to the new main clock model
+>   ARM: at91/dt: define main xtal frequency of the at91sam9261ek board
+>   ARM: at91/dt: move at91sam9rl SoC to the new slow/main clock models
+>   ARM: at91/dt: define sam9rlek crystal frequencies
+> 
+>  .../devicetree/bindings/clock/at91-clock.txt       | 128 ++++-
+>  arch/arm/boot/dts/at91-sama5d3_xplained.dts        |   8 +
+>  arch/arm/boot/dts/at91sam9261.dtsi                 |  23 +-
+>  arch/arm/boot/dts/at91sam9261ek.dts                |   4 +
+>  arch/arm/boot/dts/at91sam9rl.dtsi                  |  46 +-
+>  arch/arm/boot/dts/at91sam9rlek.dts                 |   9 +
+>  arch/arm/boot/dts/sama5d3.dtsi                     |  61 ++-
+>  arch/arm/boot/dts/sama5d3xcm.dtsi                  |   8 +
+>  drivers/clk/at91/Makefile                          |   4 +-
+>  drivers/clk/at91/clk-main.c                        | 577 ++++++++++++++++++---
+>  drivers/clk/at91/clk-slow.c                        | 467 +++++++++++++++++
+>  drivers/clk/at91/pmc.c                             |  17 +
+>  drivers/clk/at91/pmc.h                             |   9 +
+>  drivers/clk/at91/sckc.c                            |  57 ++
+>  drivers/clk/at91/sckc.h                            |  22 +
+>  include/linux/clk/at91_pmc.h                       |   1 +
+>  16 files changed, 1352 insertions(+), 89 deletions(-)
+>  create mode 100644 drivers/clk/at91/clk-slow.c
+>  create mode 100644 drivers/clk/at91/sckc.c
+>  create mode 100644 drivers/clk/at91/sckc.h
+> 
 
-It seems like a great idea. I have to admit that I don't understand
-the existing code, but what are the page sizes used here?
 
-Does the code always use the largest possible page size, or does
-it just use either small pages or 1G pages?
-
-In combination with the contiguous page hint, we should be able
-to theoretically support 4KB/64KB/2M/32M/1G/16G TLBs in any
-combination for boot-time mappings on a 4K page size kernel,
-or 64KB/1M/512M/8G on a 64KB page size kernel.
-
-	Arnd
+-- 
+Nicolas Ferre
