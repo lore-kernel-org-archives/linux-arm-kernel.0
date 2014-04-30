@@ -1,36 +1,20 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 30 Apr 2014 14:22:02 +0800
-Subject: [PATCH net-next 5/7] net:fec: add support for dumping transmit
- ring on timeout
-In-Reply-To: <CAHrpEqSw3iwJj1nHuCJ7LcoL2EUxYqMb-eA1QZN0_WvR-Y_mWA@mail.gmail.com>
-References: <1398773350-7293-5-git-send-email-Frank.Li@freescale.com>
- <063D6719AE5E284EB5DD2968C1650D6D0F7014F0@AcuExch.aculab.com>
- <CAHrpEqSCSw=bYgx5Egk4Mva-CODnw5=vvK6y3VWmB3_QpBQ8sQ@mail.gmail.com>
- <063D6719AE5E284EB5DD2968C1650D6D0F701524@AcuExch.aculab.com>
- <20140429141527.GZ26756@n2100.arm.linux.org.uk>
- <CAHrpEqTc6=yS4ApLO7AbZyVq26kGxq+WBcyFjgjbiPySq7055Q@mail.gmail.com>
- <20140429143243.GA26756@n2100.arm.linux.org.uk>
- <CAHrpEqQL7LviXA4_NLNwSBoW84W_vbnzWkc9At5QBqUkqu63yw@mail.gmail.com>
- <20140429150403.GC26756@n2100.arm.linux.org.uk>
- <CAHrpEqSw3iwJj1nHuCJ7LcoL2EUxYqMb-eA1QZN0_WvR-Y_mWA@mail.gmail.com>
-Message-ID: <20140430062200.GB16727@dragon>
+Date: Wed, 30 Apr 2014 14:25:29 +0800
+Subject: [PATCH] ARM: imx: imx6q, Add i2c4 clock to the clock tree
+In-Reply-To: <1398693282-5286-1-git-send-email-mpa@pengutronix.de>
+References: <1398693282-5286-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <20140430062527.GC16727@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 29, 2014 at 10:11:18AM -0500, Frank Li wrote:
-> On Tue, Apr 29, 2014 at 10:04 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > I'd just like to see what you're doing.  Note that your submission also
-> > didn't get through the linux-arm-kernel list either, so I didn't get it
-> > via that path either.
+On Mon, Apr 28, 2014 at 03:54:42PM +0200, Markus Pargmann wrote:
+> This clock was missing for imx6dl SoCs. This patch adds the missing
+> clock so we can use i2c4.
 > 
-> We have not sent out to public mail list yet.
-> But there are really big change.
-> We need support 3 ring queues for tx and rx.
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 
-Frank,
+I've queued a patch which adds the clock in a slightly different way.
 
-I guess Russell was saying that these 7 patches did not reach
-linux-arm-kernel list for some reason.
+https://git.kernel.org/cgit/linux/kernel/git/shawnguo/linux.git/commit/?h=imx/soc&id=95dcc2093da280e5ee440d7b418997da4d9b9c01
 
 Shawn
