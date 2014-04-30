@@ -1,41 +1,119 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 30 Apr 2014 23:28:39 +0100
-Subject: [RFC PATCH 0/4] drivers/base: Generic framework for tracking
- internal interfaces
-In-Reply-To: <53616E31.3050404@wp.pl>
-References: <1398866574-27001-1-git-send-email-a.hajda@samsung.com>
- <20140430154914.GA898@kroah.com> <53616E31.3050404@wp.pl>
-Message-ID: <20140430222839.GE26756@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 30 Apr 2014 15:33:36 -0700
+Subject: [RFC 08/11] ARM: dts: am33xx: Add prcm_resets node
+In-Reply-To: <53613D47.4000905@ti.com>
+References: <1398802790-29287-1-git-send-email-dmurphy@ti.com>
+ <1398802790-29287-9-git-send-email-dmurphy@ti.com>
+ <6286135.g77D4pMffU@wuerfel> <20140430002211.GC27571@atomide.com>
+ <53613A29.8080803@ti.com> <20140430181042.GC12362@atomide.com>
+ <53613D47.4000905@ti.com>
+Message-ID: <20140430223335.GB21341@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 30, 2014 at 11:42:09PM +0200, Andrzej Hajda wrote:
-> The main problem with component framework is that componentization  
-> significantly changes every driver and changes it in a way which is not  
-> compatible with traditional drivers, so devices which are intended to  
-> work with different DRM masters are hard to componentize if some of DRMs  
-> are componentized and some not.
+* Dan Murphy <dmurphy@ti.com> [140430 11:14]:
+> On 04/30/2014 01:10 PM, Tony Lindgren wrote:
+> > * Dan Murphy <dmurphy@ti.com> [140430 11:00]:
+> >> Tony and Arnd
+> >>
+> >> Thanks for the comments
+> >>
+> >> On 04/29/2014 07:22 PM, Tony Lindgren wrote:
+> >>> * Arnd Bergmann <arnd@arndb.de> [140429 13:35]:
+> >>>> On Tuesday 29 April 2014 15:19:47 Dan Murphy wrote:
+> >>>>> + * AM33xx reset index for PRCM Module
+> >>>>> + *
+> >>>>> + * Copyright 2014 Texas Instruments Inc.
+> >>>>> + *
+> >>>>> + * This program is free software; you can redistribute it and/or modify
+> >>>>> + * it under the terms of the GNU General Public License version 2 as
+> >>>>> + * published by the Free Software Foundation.
+> >>>>> + */
+> >>>>> +
+> >>>>> +#ifndef _DT_BINDINGS_RESET_TI_AM33XX_H
+> >>>>> +#define _DT_BINDINGS_RESET_TI_AM33XX_H
+> >>>>> +
+> >>>>> +#define RESET_DEVICE_RESET                     0
+> >>>>> +#define RESET_GFX_RESET                                1
+> >>>>> +#define RESET_PER_RESET                                2
+> >>>>> +
+> >>>>> +#endif
+> >>>> Interfaces like this should only be used if you can't use hardware
+> >>>> numbers, in general. If these numbers are in the data sheet, just
+> >>>> put them directly into the dts file, as we do for interrupt numbers,
+> >>>> gpio numbers, register offsets etc.
+> >>>>
+> >>>> If you have made them up to define an interface between the driver
+> >>>> and DT because there is no usable hardare ID, I'd suggest just using
+> >>>> a single file across all SoCs that have this driver, and have
+> >>>> a unified name space.
+> >>> Also, it's a bit unclear how the reset controller phandle is used
+> >>> referenced and used by the consumer device.. Maybe setting that up
+> >>> first in a Linux generic way is a good point starting point.
+> >>>
+> >>> Maybe something like this along the same way as clocks are set up
+> >>> (completely untested):
+> >>>
+> >>> &reset1 {
+> >>> 	iva_reset: reset1 {
+> >>> 		reg = /bits/ 8 <0>;
+> >>> 	};
+> >>> 	gfx_reset: reset1 {
+> >>> 		reg = /bits/ 8 <1>;
+> >>> 	};
+> >>> 	...
+> >>> };
+> >>>
+> >>> &iva {
+> >>> 	compatible = "ti,ivahd";
+> >>> 	resets = <&reset1 1>;
+> >>> 	...
+> >>> };
+> >> I had something very similar to this when I was developing this driver but moved away from this.
+> >>
+> >> Following the clocks implementation I had a separate dtsi for resets for each device and had the data defined like so
+> >> for each SoC.
+> >>
+> >> &prcm_resets {
+> >>        device_reset: device_reset {
+> >>                rstctrl_offs = <0x1104>;
+> >>                ctrl_bit-shift = <0>;
+> >>                rstst_offs      = <0x1114>;
+> >>                sts_bit-shift   = <0>;
+> >>        };
+> >>
+> >>        gpu_reset: gpu_reset {
+> >>                rstctrl_offs = <0x0D00>;
+> >>                ctrl_bit-shift = <3>;
+> >>                rstst_offs      = <0x0D0C>;
+> >>                sts_bit-shift = <5>;
+> >>        };
+> >> };
+> >>
+> >> And then any client interested in a specific reset driver would include this
+> >>
+> >> resets = <&prcm_resets &gpu_reset>;
+> >> reset-names = "gpu_reset";
+> >>
+> >> Our reset code would then retrieve the register data through the phandle instead of an index.
+> >>
+> >> Thoughts?
+> > Using phandles makes sense here because it avoids the indexing. Indexing
+> > has a problem of needing to be in sync with the .dts files and the
+> > device driver(s). Using an index also easily causes misuse of virtual
+> > indexes being added that no longer describe the hardware at all.
+> 
+> Thanks.  What about placing register data in the dts files?  Is there any issue with this concept?
 
-Many of the problems which the component helpers are designed to solve
-are those where you need the drm_device structure (or snd_card, or whatever
-subsystem specific card/device representation structure) pre-created in
-order to initialise the components.
+I don't have issues with that but others may. In this case it seems
+like you should get away just defining few different types of reset
+controllers without adding any any custom properties?
 
-In the case of DRM, you can't initialise encoders or connectors without
-their drm_device structure pre-existing - because these components are
-attached to the drm_device.
+In your example above, the rstctrl_offs should be just standard
+reg entry as an offset from the prcm_resets base address. Then you
+you only really need the bit shift and the type of the reset
+controller? And the type could be the compatible flag?
 
-Your solution to that is to delay those calls, but the DRM subsystem is
-not designed to cope like that - it's designed such that when the
-connector or encoder initialisation functions are called, it is assumed
-that the driver is initialising its state. (I've raised this point before
-but you've just fobbed it off in the past.)
+Regards,
 
-Another issue here is that the order of initialisation matters greatly.
-Take CRTCs for example.  In DRM, the order of attachment of CRTCs defines
-their identity, changing the order changes their identity, and changes
-how they are bound to their respective connectors.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Tony
