@@ -1,68 +1,29 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 30 Apr 2014 18:51:28 +0900
-Subject: [PATCH v6 0/4] arm64: prerequisites for audit and ftrace
-In-Reply-To: <1394861948-28712-1-git-send-email-takahiro.akashi@linaro.org>
-References: <1394861948-28712-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <1398851492-16345-1-git-send-email-takahiro.akashi@linaro.org>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 30 Apr 2014 12:17:56 +0200
+Subject: [PATCH 3/8] ARM: dts: imx6: update pcie to bring in line with
+ new binding
+In-Reply-To: <20140430060208.GA16727@dragon>
+References: <1396025579-14344-1-git-send-email-l.stach@pengutronix.de>
+ <1396025579-14344-4-git-send-email-l.stach@pengutronix.de>
+ <20140430060208.GA16727@dragon>
+Message-ID: <1398853076.4653.5.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(This patchset was already acked by the maintainer along with a minor typo
-fix. See below.)
+Am Mittwoch, den 30.04.2014, 14:02 +0800 schrieb Shawn Guo:
+> On Fri, Mar 28, 2014 at 05:52:54PM +0100, Lucas Stach wrote:
+> > The new bindings drops one clock, renames the others and
+> > drops the old interrupt mapping.
+> > 
+> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> 
+> It does not apply on my branch, and I had to apply it manually.  Please
+> check my imx/dt branch to see if I did it right.
+> 
+The diff as applied in your imx/dt looks good to me.
 
-This patchset contains some patches commonly applied for audit and ftrace.
-
-Patch [1/4] defines syscall trace related TIF_* flags in order to add hooks,
-including ftrace, audit and seccomp, later on.  Those features will be
-implemented in separate patchsets, but it's safe to check for all TIF_*
-now because they can not be turned on anyway.
-
-Patch [2/4] doesn't change a behavior but make it easy and manageable to
-confirm we invoke those hooks in correct order by splitting syscall_trace().
-
-Patch [3/4] adds a commonly used function, which returns a return value of
-system call.
-
-Patch [4/4] removes is_compat_task from asm/compat.h to avoid conflicted
-definitions.
-
-Changes v5 -> v6:
-* renamed a temporary variable's name to more meaningful one [2/4]
-
-Changes v4 -> v5:
-* added the following patch from my seccomp patch since it is required for
-  audit and ftrace in case of !COMPAT, too. [4/4]
-  "arm64: is_compat_task is defined both in asm/compat.h and linux/compat.h"
-
-Changes v3 -> v4:
-* added "arm64: split syscall_trace() into separate functions for enter/
-  exit", which is just a preparation for adding syscall trace hooks later.
-
-Changes v2 -> v3:
-* reverted a change in syscall_trace() in v1 [1/2]
-* added "arm64: Add regs_return_value() in syscall.h" patch which was
-  previously included in audit patch [2/2]
-
-Changes v1 -> v2:
-* added a guard against TIF_SYSCALL_TRACE at tracehook_report_syscall_*()
-* renamed _TIF_WORK_SYSCALL to _TIF_SYSCALL_WORK
-
-AKASHI Takahiro (4):
-  arm64: make a single hook to syscall_trace() for all syscall features
-  arm64: split syscall_trace() into separate functions for enter/exit
-  arm64: Add regs_return_value() in syscall.h
-  arm64: is_compat_task is defined both in asm/compat.h and
-    linux/compat.h
-
- arch/arm64/include/asm/compat.h      |    5 ----
- arch/arm64/include/asm/ptrace.h      |    5 ++++
- arch/arm64/include/asm/thread_info.h |   13 +++++++++
- arch/arm64/kernel/entry.S            |   15 +++++-----
- arch/arm64/kernel/hw_breakpoint.c    |    2 +-
- arch/arm64/kernel/process.c          |    1 +
- arch/arm64/kernel/ptrace.c           |   51 ++++++++++++++++++++--------------
- arch/arm64/kernel/signal.c           |    2 +-
- 8 files changed, 58 insertions(+), 36 deletions(-)
-
+Regards,
+Lucas
 -- 
-1.7.9.5
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
