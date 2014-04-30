@@ -1,16 +1,11 @@
 From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Wed, 30 Apr 2014 16:02:50 +0200
-Subject: [RFC PATCH 0/4] drivers/base: Generic framework for tracking internal
- interfaces
-Message-ID: <1398866574-27001-1-git-send-email-a.hajda@samsung.com>
+Date: Wed, 30 Apr 2014 16:02:51 +0200
+Subject: [RFC PATCH 1/4] drivers/base: add interface tracker framework
+In-Reply-To: <1398866574-27001-1-git-send-email-a.hajda@samsung.com>
+References: <1398866574-27001-1-git-send-email-a.hajda@samsung.com>
+Message-ID: <1398866574-27001-2-git-send-email-a.hajda@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Generic framework for tracking internal interfaces
-==================================================
-
-Summary
--------
 
 interface_tracker is a generic framework which allows to track appearance
 and disappearance of different interfaces provided by kernel/driver code inside
@@ -19,140 +14,374 @@ Interface is specified by a pair of object pointer and interface type. Object
 type depends on interface type, for example interface type drm_panel determines
 that object is a device_node. Object pointer is used to distinguish different
 interfaces of the same type and should identify object the interface is bound to.
-For example it could be DT node, struct device,...
 
-The framework provides two functions for interface providers which should be
-called just after interface becomes available or just before interface
-removal. Interface consumers can register callback which will be called
-when requested interface changes its state, if during callback registration
-the interface is already up, notification will be sent also.
-
-The framework allows nesting calls, for example it is possible to signal one
-interface in tracker callback of another interface. It is done by putting
-every request into the queue. If the queue is empty before adding
-the request, the queue will be processed after, if there is already another
-request in the queue it means the queue is already processed by different
-thread so no additional action is required. With this pattern only spinlock
-is necessary to protect the queue. However in case of removal of either
-callback or interface caller should be sure that his request has been
-processed so framework waits until the queue becomes empty, it is done using
-completion mechanism.
-
-The framework functions should not be called in atomic context. Callbacks
-should be aware that they can be called in any time between registration and
-de-registration, so they should use synchronization mechanisms carefully.
-Callbacks should also avoid to perform time consuming tasks, the framework
-serializes them, so it could stall other callbacks.
-
-Use cases
----------
-
-The interface is very generic, there are many situations it can be useful:
-
-1. Replacement for subsystem specific methods of publishing/unpublishing
-interfaces. Currently many frameworks allows only querying for presence of given
-interface. In such cases client can defer probing or implement interface
-polling, which is usually subobtimal. Additionally subsystems often do not
-provide methods to signal to the consumers that they are about to be destroyed.
-
-2. Monitoring for different interfaces provided by the same object. An example
-should explain it better. Lets assume in device tree drm crtc device node have
-video link to another node, so it knows only that there is something connected
-to its RGB output. It can be a RGB panel (drm_panel framework), it can be an
-image enhancer (SoC specific framework) or it can be some signal converter
-(drm_encoder, drm_bridge, drm_encoder_slave...). Driver have only phandle to
-another node. Currently it is difficult to handle such situations in a generic
-way. interface_tracker should make it simple: crtc should monitor all supported
-interface types that appears at the device_node pointed by the phandle.
-
-Potential use cases
--------------------
-
-Points mentioned above were the reasons for writing this framework. During
-development I have realized that this framework can be also useful for other
-tasks.
-
-3. Replacement for deferred probing - if for some reason driver do not wants to
-defer but it requires given resources it can use interface_tracker. It should be
-possible to create an helper which will wait for appearance of all interfaces
-from a given list, and 'continue' probe only when all resources becomes
-available.
-
-4. Replacement or helper for subsystem specific solutions:
-- V4L2 subdev async registration,
-- component framework.
-Both frameworks solves a problem of tracking sub-components (un-)registration
-by master device, it should be possible to do the same with interface_tracker
-framework. Some additional helpers can be convienent to make the implementation
-easier.
-
-5. Cure the situation with sysfs 'unbind' property. Currently many drivers are
-providers of different resources/interfaces: regulators, clocks, phys,
-V4L2 subdevs, ... They are usually protected from module unloading by getting
-module reference, but there is no protection from driver unbinding using sysfs
-method: echo 'device' >/sys/bus/.../drivers/.../unbind. After unbind consumer
-stays with the pointer to non-existing object, next time it tries to use it
-system usually crashes. interface_tracker do not add any protection, but it adds
-a way to signal to the consumer that given resource will disappear. It allows
-to handle such situations more gently.
-
-Potential issues/extensions
----------------------------
-
-1. Scalability - the framework serializes all tasks and callbacks. In case there
-are no many users it should not be a problem. If the number of users grows there
-are different options to consider:
-- run callbacks in parallel, I guess async_schedule_domain can be helpfull,
-- partition trackers, for example per interface types - different interface
-  types will use different internal queues/lists.
-
-2. Complication of code - asynchronous programming usually seems to be more
-complicated. Adding some helpers could make it less painfull.
-
-3. Object comparison - currently object pointers are compared by value, it could
-be desirable to allow also other ways of comparison, for example string
-comparison. It is not a problem to extend the framework.
-
-TODO
-----
-
-1. Testing - the patchset have not been tested yet with multiple users.
-2. Add tracker support in other frameworks - currently there is only drm_panel.
-   I plan also to add something more complicated, for example use it in
-   exynos_drm to track components. If there is positive feedback I can try
-   to add also other frameworks.
-3. devm_* registration.
-4. Helpers - as the situation 'wait for number interfaces before continue'
-   seems to be quite common, some helper to easy handling it could be useful.
-
-Final remarks
--------------
-
-Primarily I have planned notifications for DRM panels. Next I have realized
-something similar would be necessary for drm_bridge. Discussions with other
-developers showed to me that it could be useful in many other areas. I am not
-sure if other developers agree with adding it to things like regulators, clocks,
-phys, but I will be glad if it can be used at least with drm_panel.
-
-Regards
-Andrzej
-
-
-Andrzej Hajda (4):
-  drivers/base: add interface tracker framework
-  drm/panel: add interface tracker support
-  drm/exynos/dpi: add interface tracker support
-  drm/panel/ld9040: do not power off panel on removal
-
- drivers/base/Makefile                   |   2 +-
- drivers/base/interface_tracker.c        | 307 ++++++++++++++++++++++++++++++++
- drivers/gpu/drm/drm_panel.c             |   5 +
- drivers/gpu/drm/exynos/exynos_drm_dpi.c |  58 ++++--
- drivers/gpu/drm/panel/panel-ld9040.c    |   1 -
- include/linux/interface_tracker.h       |  29 +++
- 6 files changed, 389 insertions(+), 13 deletions(-)
+Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+---
+ drivers/base/Makefile             |   2 +-
+ drivers/base/interface_tracker.c  | 307 ++++++++++++++++++++++++++++++++++++++
+ include/linux/interface_tracker.h |  27 ++++
+ 3 files changed, 335 insertions(+), 1 deletion(-)
  create mode 100644 drivers/base/interface_tracker.c
  create mode 100644 include/linux/interface_tracker.h
 
+diff --git a/drivers/base/Makefile b/drivers/base/Makefile
+index 04b314e..5a45c41 100644
+--- a/drivers/base/Makefile
++++ b/drivers/base/Makefile
+@@ -4,7 +4,7 @@ obj-y			:= component.o core.o bus.o dd.o syscore.o \
+ 			   driver.o class.o platform.o \
+ 			   cpu.o firmware.o init.o map.o devres.o \
+ 			   attribute_container.o transport_class.o \
+-			   topology.o container.o
++			   topology.o container.o interface_tracker.o
+ obj-$(CONFIG_DEVTMPFS)	+= devtmpfs.o
+ obj-$(CONFIG_DMA_CMA) += dma-contiguous.o
+ obj-y			+= power/
+diff --git a/drivers/base/interface_tracker.c b/drivers/base/interface_tracker.c
+new file mode 100644
+index 0000000..3d36cba
+--- /dev/null
++++ b/drivers/base/interface_tracker.c
+@@ -0,0 +1,307 @@
++/*
++ * Generic framework for tracking kernel interfaces
++ *
++ * Copyright (c) 2014 Samsung Electronics Co., Ltd
++ * Andrzej Hajda <a.hajda@samsung.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * interface_tracker is a generic framework which allows to track appearance
++ * and disappearance of different interfaces provided by kernel/driver code
++ * inside the kernel. Examples of such interfaces: clocks, phys, regulators,
++ * drm_panel...
++ * Interface is specified by a pair of object pointer and interface type. Object
++ * type depends on interface type, for example interface type drm_panel
++ * determines that object is a device_node. Object pointer is used
++ * to distinguish different interfaces of the same type and should identify
++ * object the interface is bound to. For example it could be DT node,
++ * struct device...
++ *
++ * The framework provides two functions for interface providers which should be
++ * called just after interface becomes available or just before interface
++ * removal. Interface consumers can register callback which will be called when
++ * the requested interface changes its state, if during callback registration
++ * the interface is already up, notification will be sent also.
++ *
++ * The framework allows nesting calls, for example it is possible to signal one
++ * interface in tracker callback of another interface. It is done by putting
++ * every request into the queue. If the queue is empty before adding
++ * the request, the queue will be processed after, if there is already another
++ * request in the queue it means the queue is already processed by different
++ * thread so no additional action is required. With this pattern only spinlock
++ * is necessary to protect the queue. However in case of removal of either
++ * callback or interface caller should be sure that his request has been
++ * processed so framework waits until the queue becomes empty, it is done using
++ * completion mechanism.
++ * The framework functions should not be called in atomic context. Callbacks
++ * should be aware that they can be called in any time between registration and
++ * unregistration, so they should use synchronization mechanisms carefully.
++ * Callbacks should also avoid to perform time consuming tasks, the framework
++ * serializes them, so it could stall other callbacks.
++ */
++
++#include <linux/completion.h>
++#include <linux/interface_tracker.h>
++#include <linux/list.h>
++#include <linux/slab.h>
++#include <linux/spinlock.h>
++
++enum interface_tracker_task_id {
++	interface_tracker_task_register,
++	interface_tracker_task_unregister,
++	interface_tracker_task_ifup,
++	interface_tracker_task_ifdown,
++};
++
++struct interface_tracker_task {
++	struct list_head list;
++	enum interface_tracker_task_id task_id;
++
++	const void *object;
++	unsigned long type;
++	union {
++		struct interface_tracker_block *itb;
++		void *data;
++	};
++};
++
++struct interface_tracker_node {
++	struct list_head list;
++	struct list_head itb_head;
++	const void *object;
++	unsigned long type;
++	void *data;
++	bool ifup;
++};
++
++static LIST_HEAD(interface_tracker_queue);
++static DEFINE_SPINLOCK(interface_tracker_queue_lock);
++static DECLARE_COMPLETION(interface_tracker_queue_completion);
++
++static LIST_HEAD(interface_tracker_nodes);
++
++static struct interface_tracker_node *
++interface_tracker_get_node(const void *object, unsigned long type, bool create)
++{
++	struct interface_tracker_node *node;
++
++	list_for_each_entry(node, &interface_tracker_nodes, list) {
++		if (node->type == type && node->object == object)
++			return node;
++	}
++
++	if (!create)
++		return NULL;
++
++	node = kmalloc(sizeof(*node), GFP_KERNEL);
++	node->object = object;
++	node->type = type;
++	node->ifup = false;
++	INIT_LIST_HEAD(&node->itb_head);
++	list_add(&node->list, &interface_tracker_nodes);
++
++	return node;
++}
++
++static void interface_tracker_process_task(struct interface_tracker_task *task)
++{
++	struct interface_tracker_block *itb;
++	struct interface_tracker_node *node;
++
++	switch (task->task_id) {
++	case interface_tracker_task_register:
++		node = interface_tracker_get_node(task->object, task->type,
++						  true);
++		list_add_tail(&task->itb->list, &node->itb_head);
++
++		if (node->ifup)
++			task->itb->callback(task->itb, task->object, task->type,
++					    true, node->data);
++		return;
++	case interface_tracker_task_unregister:
++		node = interface_tracker_get_node(task->object, task->type,
++						  false);
++		if (WARN_ON(!node))
++			return;
++
++		list_for_each_entry(itb, &node->itb_head, list) {
++			if (itb != task->itb)
++				continue;
++			list_del(&itb->list);
++			if (list_empty(&node->itb_head)) {
++				list_del(&node->list);
++				kfree(node);
++			}
++			return;
++		}
++
++		WARN_ON(true);
++
++		return;
++	case interface_tracker_task_ifup:
++		node = interface_tracker_get_node(task->object, task->type,
++						  true);
++
++		if (WARN_ON(node->ifup))
++			return;
++
++		node->ifup = true;
++		node->data = task->data;
++		list_for_each_entry(itb, &node->itb_head, list)
++			itb->callback(itb, task->object, task->type, true,
++				      node->data);
++		return;
++	case interface_tracker_task_ifdown:
++		node = interface_tracker_get_node(task->object, task->type,
++						  false);
++
++		if (WARN_ON(!node))
++			return;
++
++		WARN_ON(!node->ifup);
++
++		if (list_empty(&node->itb_head)) {
++			list_del(&node->list);
++			kfree(node);
++			return;
++		}
++
++		node->ifup = false;
++		node->data = task->data;
++
++		list_for_each_entry(itb, &node->itb_head, list)
++			itb->callback(itb, task->object, task->type, false,
++				      node->data);
++	}
++}
++
++static int interface_tracker_process_queue(void)
++{
++	struct interface_tracker_task *task, *ptask = NULL;
++	unsigned long flags;
++	bool empty;
++
++	/* Queue non-emptiness is used as a sentinel to prevent processing
++	 * by multiple threads, so we cannot delete entry from the queue
++	 * until it is processed.
++	 */
++	while (true) {
++		spin_lock_irqsave(&interface_tracker_queue_lock, flags);
++
++		if (ptask)
++			list_del(&ptask->list);
++		task = list_first_entry(&interface_tracker_queue,
++					struct interface_tracker_task, list);
++
++		empty = list_empty(&interface_tracker_queue);
++		if (empty)
++			complete_all(&interface_tracker_queue_completion);
++
++		spin_unlock_irqrestore(&interface_tracker_queue_lock, flags);
++
++		if (ptask)
++			kfree(ptask);
++
++		if (empty)
++			break;
++
++		interface_tracker_process_task(task);
++		ptask = task;
++	}
++
++	return 0;
++}
++
++static int interface_tracker_add_task(struct interface_tracker_task *task,
++				      bool sync)
++{
++	unsigned long flags;
++	int ret = 0;
++	bool empty;
++
++	spin_lock_irqsave(&interface_tracker_queue_lock, flags);
++
++	empty = list_empty(&interface_tracker_queue);
++	if (empty)
++		reinit_completion(&interface_tracker_queue_completion);
++
++	list_add(&task->list, &interface_tracker_queue);
++
++	spin_unlock_irqrestore(&interface_tracker_queue_lock, flags);
++
++	if (empty) {
++		ret = interface_tracker_process_queue();
++	}else if (sync) {
++		wait_for_completion(&interface_tracker_queue_completion);
++	}
++
++	return ret;
++}
++
++int interface_tracker_register(const void *object, unsigned long type,
++			       struct interface_tracker_block *itb)
++{
++	struct interface_tracker_task *task;
++
++	task = kmalloc(sizeof(*task), GFP_KERNEL);
++	if (!task)
++		return -ENOMEM;
++
++	task->task_id = interface_tracker_task_register;
++	task->object = object;
++	task->type = type;
++	task->itb = itb;
++
++	return interface_tracker_add_task(task, false);
++}
++
++int interface_tracker_unregister(const void *object, unsigned long type,
++				 struct interface_tracker_block *itb)
++{
++	struct interface_tracker_task *task;
++
++	task = kmalloc(sizeof(*task), GFP_KERNEL);
++	if (!task)
++		return -ENOMEM;
++
++	task->task_id = interface_tracker_task_unregister;
++	task->object = object;
++	task->type = type;
++	task->itb = itb;
++
++	return interface_tracker_add_task(task, true);
++}
++
++int interface_tracker_ifup(const void *object, unsigned long type, void *data)
++{
++	struct interface_tracker_task *task;
++
++	task = kmalloc(sizeof(*task), GFP_KERNEL);
++	if (!task)
++		return -ENOMEM;
++
++	task->task_id = interface_tracker_task_ifup;
++	task->object = object;
++	task->type = type;
++	task->data = data;
++
++	return interface_tracker_add_task(task, false);
++}
++
++int interface_tracker_ifdown(const void *object, unsigned long type, void *data)
++{
++	struct interface_tracker_task *task;
++
++	task = kmalloc(sizeof(*task), GFP_KERNEL);
++	if (!task)
++		return -ENOMEM;
++
++	task->task_id = interface_tracker_task_ifdown;
++	task->object = object;
++	task->type = type;
++	task->data = data;
++
++	return interface_tracker_add_task(task, true);
++}
+diff --git a/include/linux/interface_tracker.h b/include/linux/interface_tracker.h
+new file mode 100644
+index 0000000..e1eff00
+--- /dev/null
++++ b/include/linux/interface_tracker.h
+@@ -0,0 +1,27 @@
++#ifndef INTERFACE_TRACKER_H
++#define INTERFACE_TRACKER_H
++
++#include <linux/types.h>
++
++struct list_head;
++struct interface_tracker_block;
++
++typedef void (*interface_tracker_fn_t)(struct interface_tracker_block *itb,
++				       const void *object, unsigned long type,
++				       bool on, void *data);
++
++struct interface_tracker_block {
++	interface_tracker_fn_t callback;
++	struct list_head list;
++};
++
++extern int interface_tracker_register(const void *object, unsigned long type,
++				      struct interface_tracker_block *itb);
++extern int interface_tracker_unregister(const void *object, unsigned long type,
++					struct interface_tracker_block *itb);
++extern int interface_tracker_ifup(const void *object, unsigned long type,
++				  void *data);
++extern int interface_tracker_ifdown(const void *object, unsigned long type,
++				    void *data);
++
++#endif /* INTERFACE_TRACKER_H */
 -- 
 1.8.3.2
