@@ -1,56 +1,90 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 30 Apr 2014 20:21:51 +0200
-Subject: [PATCH v5 01/11] ARM: shmobile: r7s72100: document MSTP clock
- support
-In-Reply-To: <20140430014148.GC24989@verge.net.au>
-References: <1398765822-2314-1-git-send-email-wsa@the-dreams.de>
- <1398765822-2314-2-git-send-email-wsa@the-dreams.de>
- <20140430014148.GC24989@verge.net.au>
-Message-ID: <CAMuHMdUYLrG53GgpPqixc7CBmgqSAGUo9Ue7t1Yy-8mDwEzM8Q@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 30 Apr 2014 11:29:47 -0700
+Subject: [PATCH v4 1/2] Documentation: Add GPIO reset binding to reset
+ binding documentation
+In-Reply-To: <1398848062.19894.38.camel@paszta.hi.pengutronix.de>
+References: <1397463709-19405-1-git-send-email-p.zabel@pengutronix.de>
+ <20140417115820.GD4132@lukather>
+ <1398848062.19894.38.camel@paszta.hi.pengutronix.de>
+Message-ID: <20140430182947.GF3000@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 30, 2014 at 3:41 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Tue, Apr 29, 2014 at 12:03:32PM +0200, Wolfram Sang wrote:
->> From: Wolfram Sang <wsa+renesas@sang-engineering.com>
->>
->> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
->> ---
->>  Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt | 1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt b/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
->> index 02a25d99ca61..6c3c0847e4fd 100644
->> --- a/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
->> +++ b/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
->> @@ -10,6 +10,7 @@ index in the group, from 0 to 31.
->>  Required Properties:
->>
->>    - compatible: Must be one of the following
->> +    - "renesas,r7s72100-mstp-clocks" for R7S72100 (RZ) MSTP gate clocks
->>      - "renesas,r8a7790-mstp-clocks" for R8A7790 (R-Car H2) MSTP gate clocks
->>      - "renesas,r8a7791-mstp-clocks" for R8A7791 (R-Car M2) MSTP gate clocks
->>      - "renesas,cpg-mstp-clock" for generic MSTP gate clocks
->> --
->> 1.9.2
->
-> I believe that Mike Turquette (CCed) should take this.
->
-> I also believe that as it is relates to bindings it
-> needs to be reviewed by the devicetree people (CCed).
-> (Please correct me if I am wrong.)
+On Wed, Apr 30, 2014 at 10:54:22AM +0200, Philipp Zabel wrote:
+> Hi Maxime,
+> 
+> Am Donnerstag, den 17.04.2014, 13:58 +0200 schrieb Maxime Ripard:
+> > I still feel like we should really treat gpios like just another reset
+> > controller, ie. using the resets property.
+> 
+> I now feel like we really shouldn't. If we do anything but use the
+> generic gpio bindings for reset gpios, we might force every OS or
+> bootloader using the device tree to implement some kind of reset
+> controller framework, even for hardware that only has gpio resets.
 
-You're correct, but this change is fairly trivial.
+Well, we pretty much introduced that requirement already whenever we
+got this framework in the first place.
 
-Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+You can now expect pretty much anything, even a CPU or a timer to have
+a reset property, so you have to handle them anyway.
 
-Gr{oetje,eeting}s,
+So I'd be much more in favor of consistency both with other frameworks
+and within the reset framework itself.
 
-                        Geert
+> > I understand that you chose this pattern to be pretty much compatible
+> > with what have been done so fare, bu I don't see how to fulfill that
+> > goal completely, since most of the devices are actually using
+> > reset-gpios, but some are using other names too (including
+> > reset-gpio).
+> 
+> Yes, that is a problem that applies to all gpios, not only to reset
+> gpios, though.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Indeed, but you're the only one I can think of that have tried to
+factor the gpio handling in the framework after the facts. All the
+other either have no standards and let the driver deal with it, or
+have explicitly asked for a given property name.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> > So if we can't be fully backward compatible, I don't see the benefit
+> > of being inconsistent with how reset controllers are used in general,
+> 
+> See above.
+> 
+> > and more globally on how gpios are tied for regulators for example.
+> 
+> Reset controllers are rather more similar to gpio or interrupt
+> controllers. Those also have a number of entities per device node,
+> as opposed to regulators.
+
+Well, that depends on the bindings actually. The fact that the reset
+controller can handle several reset lines is dependent of the
+controller itself. And I believe we can say pretty much the same about
+the regulators.
+
+> > That would also make reset-gpio a regular reset driver, instead of
+> > adding logic to the core itself to handle this special case.
+> 
+> Which is what I initially tried and moved away from.
+
+Yeah, I know.
+
+Overall, I'd very much like the DT maintainers to step in on
+this. Especially after the discussion we had again yesterday about the
+stable DT bindings things.
+
+Stable DT bindings only works if the DT maintainers can do some
+arbitration in this case.
+
+Mark? Ping?
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140430/5e34ea60/attachment.sig>
