@@ -1,85 +1,60 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 30 Apr 2014 19:23:08 +0900
-Subject: [PATCH 1/4] ARM: shmobile: Ignore callbacks for subsys
- generic_pm_domain_data
-In-Reply-To: <CAPDyKFqH-0rvs6WorcirY+wVMLWnycWHO6=ZcvK1GebcuzaH0w@mail.gmail.com>
-References: <1397230004-22306-1-git-send-email-ulf.hansson@linaro.org>
- <CAPDyKFpbX3cdAgvUx=4FbmNxFLH4VO8JqrQqRB3nxXMxZDyXJQ@mail.gmail.com>
- <20140425010651.GC12641@verge.net.au>
- <1469030.SEtTICGcIm@vostro.rjw.lan>
- <CAPDyKFqH-0rvs6WorcirY+wVMLWnycWHO6=ZcvK1GebcuzaH0w@mail.gmail.com>
-Message-ID: <20140430102308.GA23426@verge.net.au>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 30 Apr 2014 11:24:18 +0100
+Subject: [PATCH v3 5/6] arm: exynos: Add MCPM call-back functions
+In-Reply-To: <CAM4voa=Po9r5MpxyjQKcYhyES1UjfVaqbP_PnKCbsw5LtEkpZg@mail.gmail.com>
+References: <1398528348-21214-1-git-send-email-a.kesavan@samsung.com>
+ <1398528348-21214-6-git-send-email-a.kesavan@samsung.com>
+ <20140428174456.GE31782@e102568-lin.cambridge.arm.com>
+ <CAM4voa=mhcZO9v7nDdrcz+T8RVN-Av3eERVErCX52k1ftUcKcQ@mail.gmail.com>
+ <alpine.LFD.2.11.1404291435450.980@knanqh.ubzr>
+ <CAM4voa=Po9r5MpxyjQKcYhyES1UjfVaqbP_PnKCbsw5LtEkpZg@mail.gmail.com>
+Message-ID: <20140430102418.GB3986@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 30, 2014 at 10:53:58AM +0200, Ulf Hansson wrote:
-> On 30 April 2014 00:45, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> > On Friday, April 25, 2014 10:06:51 AM Simon Horman wrote:
-> >> On Thu, Apr 24, 2014 at 01:25:14PM +0200, Ulf Hansson wrote:
-> >> > On 14 April 2014 11:22, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> >> > > On 14 April 2014 03:20, Simon Horman <horms@verge.net.au> wrote:
-> >> > >> On Fri, Apr 11, 2014 at 05:26:41PM +0200, Ulf Hansson wrote:
-> >> > >>> There are no active users of these callbacks, thus there are no benefit
-> >> > >>> of trying to invoke them.
-> >> > >>>
-> >> > >>> Cc: Simon Horman <horms@verge.net.au>
-> >> > >>> Cc: Magnus Damm <magnus.damm@gmail.com>
-> >> > >>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> >> > >>> ---
-> >> > >>>
-> >> > >>> I am seeking ack from the SOC maintainers since this needs to go with the other
-> >> > >>> patches in this patchset on the PM core.
-> >> > >>
-> >> > >> In order to reduce the possibility of conflicts I would prefer
-> >> > >> to take this patch through my tree.
-> >> > >
-> >> > > Okay, go ahead!
-> >> > >
+On Wed, Apr 30, 2014 at 04:01:24AM +0100, Abhilash Kesavan wrote:
+> Hi Nicolas,
+> 
+> On Wed, Apr 30, 2014 at 12:19 AM, Nicolas Pitre
+> <nicolas.pitre@linaro.org> wrote:
+> > On Tue, 29 Apr 2014, Abhilash Kesavan wrote:
+> >
+> >> >> +/*
+> >> >> + * Enable cluster-level coherency, in preparation for turning on the MMU.
+> >> >> + */
+> >> >> +static void __naked exynos_pm_power_up_setup(unsigned int affinity_level)
+> >> >> +{
+> >> >> +       asm volatile ("\n"
+> >> >> +       "cmp    r0, #1\n"
+> >> >> +       "bxne   lr\n"
+> >> >> +       "b      cci_enable_port_for_self");
+> >> >> +}
 > >> >
-> >> > Hi Simon,
-> >> >
-> >> > Just wanted to know, if you decided to queue this patch in your tree.
-> >> > Or were there anything else you needed me to fix here?
-> >>
-> >> Sorry for dropping the ball. I will queue-up this patch.
+> >> > How many times are we going to duplicate this function before we decide
+> >> > to move it to a common header ?
+> >> I see this being used in arch/arm/mach-vexpress/tc2_pm.c (where I
+> >> copied it from for exynos) and arch/arm/mach-vexpress/dcscb.c. A
+> >> common function named "mcpm_default_power_up_setup" in the mcpm header
+> >> would be acceptable ?
 > >
-> > OK
+> > Not necessarily.
 > >
-> > Ulf, since the rest of the series depends on this one (or at least that's
-> > how it looks to me), would you mind resending it when this one gets into the
-> > Linus' tree?
-> 
-> Well, I would prefer if we could go ahead with the rest of the patches
-> somehow for 3.16, but I guess it will be hard if Simon picks up this
-> patch!?
-> 
-> Simon,
-> I guess the reason for your concern were about conflicts, but the file
-> this patch touch has actually not been modified since Sep 2012. So,
-> maybe we could go through Rafaels tree anyway?
-
-Yes, my primary concern was conflicts.
-But as you point out that seems unlikely.
-
-I have already picked up the patch but the pull request I sent to
-the ARM SoC maintainers has not been pulled. And regardless it
-won't appear in Linus's tree via that route until v3.16-rc1.
-
-Perhaps a good way forwards would be for Rafael to also apply the patch
-with my Ack. I could also revert the version applied to my tree
-if that is of any help.
-
-Acked-by: Simon Horman <horms+renesas@verge.net.au>
-
-> I have a bunch of other patches for genpd which I plan to send once
-> the first part of clean up patches were merged. Those are likely
-> material for 3.17 though.
-> 
-> Kind regards
-> Ulf Hansson
-> 
+> > First of all, this can't be a static inline as we need a pointer to it.
+> > And moving this to a header would create multiple instances of the same
+> > function in a multiplatform build for example.
 > >
-> > --
-> > I speak only for myself.
-> > Rafael J. Wysocki, Intel Open Source Technology Center.
-> 
+> > Furthermore, this can't be called "default_power_up_setup" as this is
+> > specific to systems with a CCI.
+
+On some SoCs the argument to cmp might not be #1, or the constant required
+might not even be the same on all CPUs.  Some SoCs might need to do other
+setup too, such as invalidating a cluster-level cache that doesn't power
+up into a clean state.
+
+So, the above function is going to be common but it's not really generic.
+
+For such a tiny function, I agree that factoring it may not be that
+beneficial.
+
+Cheers
+---Dave
