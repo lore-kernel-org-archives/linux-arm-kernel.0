@@ -1,57 +1,57 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Wed, 30 Apr 2014 09:20:47 +0530
-Subject: [PATCH 04/15] ASoC: samsung-idma: avoid 64-bit division
-In-Reply-To: <1398770316-19715-5-git-send-email-kaixu.xia@linaro.org>
-References: <1398770316-19715-1-git-send-email-kaixu.xia@linaro.org>
- <1398770316-19715-5-git-send-email-kaixu.xia@linaro.org>
-Message-ID: <53607317.4040206@linaro.org>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Wed, 30 Apr 2014 09:39:54 +0530
+Subject: [PATCH Resend] ARM: EXYNOS: Map SYSRAM address through DT
+In-Reply-To: <1493367.CDjMd4ghZP@phil>
+References: <1397649051-3288-1-git-send-email-sachin.kamat@linaro.org>
+ <5721231.s2ATyWsK21@wuerfel> <1493367.CDjMd4ghZP@phil>
+Message-ID: <CAK9yfHxBh3x7coj1FtLOrYvRv9viN_1tS3irL5+inarwuHZWYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/29/2014 04:48 PM, Xia Kaixu wrote:
-> From: Arnd Bergmann <arnd@arndb.de>
-> 
-> dma_addr_t may be 64 bit wide, which causes a build failure
-> when doing a division on it. Here it is safe to cast to an
-> u32 type, which avoids the problem.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Xia Kaixu <kaixu.xia@linaro.org>
-> Cc: Mark Brown <broonie@kernel.org>
-> Cc: Liam Girdwood <lgirdwood@gmail.com>
-> Cc: Ben Dooks <ben-linux@fluff.org>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Sangbeom Kim <sbkim73@samsung.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-samsung-soc at vger.kernel.org
-> Cc: alsa-devel at alsa-project.org
-> ---
+Hi Heiko,
 
-Tested with ARM_LPAE enabled. Without this patch, getting following error.
+On 16 April 2014 22:55, Heiko St?bner <heiko@sntech.de> wrote:
+> Hi,
+>
+> Am Mittwoch, 16. April 2014, 16:35:36 schrieb Arnd Bergmann:
+>> On Wednesday 16 April 2014 17:20:51 Sachin Kamat wrote:
+>> > Instead of hardcoding the SYSRAM details for each SoC,
+>> > pass this information through device tree (DT) and make
+>> > the code SoC agnostic.
+>> >
+>> > Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+>> > ---
+>> > Rebased on latest linux-next.
+>>
+>> Thanks for sending this again. I'd like Heiko to have a look
+>> and provide an Ack if he's happy with it.
+>>
+>> It seems similar to what he did with the SRAM for mach-rockchip,
+>> and if it is we should use the same binding that he introduced,
+>> which would be a minor variation of this.
+>
+> The sram binding is derived from the generic reserved-memory bindings to
+> enable the sram in general to be used generically through the sram driver,
+> while still retaining some areas for special purposes, like the smp-trampoline
+> in my case.
+>
+> From my reading of platsmp.c, it looks like offset+0x4 starts the so called
+> boot-registesr, which get the smp-start-address written to.
+>
+> So I guess it all depends on what is contained in the rest of the sysram. If
+> it is all covered with such special registers or other special uses, the code
+> below is fine. But if the most of the area is just general purpose sram, a
+> solution like on rockchip might be nicer - i.e. handling the sysram via the
+> sram driver and declaring a reserved section for the boot registers.
 
-sound/built-in.o: In function `iis_irq':
-sound/soc/samsung/idma.c:277: undefined reference to `__aeabi_uldivmod'
+Thanks for your inputs. In our case, we use sram for secondary boot
+addresses but could not find any other general purpose use.
 
-Tested-by: Tushar Behera <tushar.behera@linaro.org>
+> So, depending on the above:
+> Acked-by: Heiko Stuebner <heiko@sntech.de>
 
->  sound/soc/samsung/idma.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/sound/soc/samsung/idma.c b/sound/soc/samsung/idma.c
-> index 3d5cf15..e9891b4 100644
-> --- a/sound/soc/samsung/idma.c
-> +++ b/sound/soc/samsung/idma.c
-> @@ -274,7 +274,7 @@ static irqreturn_t iis_irq(int irqno, void *dev_id)
->  
->  		addr = readl(idma.regs + I2SLVL0ADDR) - idma.lp_tx_addr;
->  		addr += prtd->periodsz;
-> -		addr %= (prtd->end - prtd->start);
-> +		addr %= (u32)(prtd->end - prtd->start);
->  		addr += idma.lp_tx_addr;
->  
->  		writel(addr, idma.regs + I2SLVL0ADDR);
-> 
-
+So I believe your ack applies to our case :). Thanks again.
 
 -- 
-Tushar Behera
+With warm regards,
+Sachin
