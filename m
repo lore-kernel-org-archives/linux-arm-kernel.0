@@ -1,61 +1,39 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Wed, 30 Apr 2014 03:24:23 +0200
-Subject: [PATCH 1/4] ARM: dts: Add support for OMAP4 Variscite OM44 family
-In-Reply-To: <1397833849-22396-2-git-send-email-manabian@gmail.com>
-References: <1397833849-22396-1-git-send-email-manabian@gmail.com>
- <1397833849-22396-2-git-send-email-manabian@gmail.com>
-Message-ID: <CAGhQ9Vw8sxifmG5Y3xbywm9B9e36VHxCk_oKLmh1qCgoOUOBSQ@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 30 Apr 2014 10:41:48 +0900
+Subject: [PATCH v5 01/11] ARM: shmobile: r7s72100: document MSTP clock
+ support
+In-Reply-To: <1398765822-2314-2-git-send-email-wsa@the-dreams.de>
+References: <1398765822-2314-1-git-send-email-wsa@the-dreams.de>
+ <1398765822-2314-2-git-send-email-wsa@the-dreams.de>
+Message-ID: <20140430014148.GC24989@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 April 2014 17:10, Joachim Eastwood <manabian@gmail.com> wrote:
-> Add support for VAR-SOM-OM44[1] SODIMM system on module from Variscite. SoM
-> features a OMAP4460, 1GB RAM, Gigabit Ethernet (LAN7500) and optional WLAN/BT.
->
-> Also add support for VAR-STK-OM44 development board from Variscite. This kit
-> features a VAR-SOM-OM44 and the carrier board VAR-OM44CustomBoard[2]. The
-> VAR-STK-OM44 is the same as VAR-DVK-OM44 but without the LCD display.
->
-> omap4-var-stk-om44.dts replace the old and very limited omap4-var-som.dts.
->
-> [1] http://www.variscite.com/products/system-on-module-som/cortex-a9/var-som-om44-cpu-ti-omap-4-omap4460
-> [2] http://www.variscite.com/products/single-board-computers/var-om44customboard
->
-> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+On Tue, Apr 29, 2014 at 12:03:32PM +0200, Wolfram Sang wrote:
+> From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> 
+> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 > ---
+>  Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt b/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
+> index 02a25d99ca61..6c3c0847e4fd 100644
+> --- a/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
+> +++ b/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
+> @@ -10,6 +10,7 @@ index in the group, from 0 to 31.
+>  Required Properties:
+>  
+>    - compatible: Must be one of the following
+> +    - "renesas,r7s72100-mstp-clocks" for R7S72100 (RZ) MSTP gate clocks
+>      - "renesas,r8a7790-mstp-clocks" for R8A7790 (R-Car H2) MSTP gate clocks
+>      - "renesas,r8a7791-mstp-clocks" for R8A7791 (R-Car M2) MSTP gate clocks
+>      - "renesas,cpg-mstp-clock" for generic MSTP gate clocks
+> -- 
+> 1.9.2
 
-Tomi,
+I believe that Mike Turquette (CCed) should take this.
 
-Do you plan to push the patch that add hpd-gpios to the
-"hdmi-connector" for 3.16? (nodes for my board below)
-https://patchwork.kernel.org/patch/4006021/
-
-Also in the patch set I am using your DT bindings for "panel-dpi". See
-patch [2 of 4] for nodes.
-https://patchwork.kernel.org/patch/4047241/
-
-Will this patch be upstream in 3.16?
-
-As I am about to send out a new version of this patch set it would be
-nice to know if I need to split out the display stuff, for later
-inclusion, or if it can go in as it is.
-
-regards
-Joachim Eastwood
-
-> +       hdmi0: connector at 0 {
-> +               compatible = "hdmi-connector";
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&hdmi_hpd_pins>;
-> +               label = "hdmi";
-> +               type = "a";
-> +
-> +               hpd-gpios = <&gpio2 31 GPIO_ACTIVE_HIGH>; /* gpio_63 */
-> +
-> +               port {
-> +                       hdmi_connector_in: endpoint {
-> +                               remote-endpoint = <&hdmi_out>;
-> +                       };
-> +               };
-> +       };
-> +};
+I also believe that as it is relates to bindings it
+needs to be reviewed by the devicetree people (CCed).
+(Please correct me if I am wrong.)
