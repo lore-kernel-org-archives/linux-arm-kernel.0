@@ -1,61 +1,59 @@
-From: bay@hackerdom.ru (Alexander Bersenev)
-Date: Wed, 30 Apr 2014 21:16:47 +0600
-Subject: [PATCH v5 0/3] ARM: sunxi: Add support for consumer infrared devices
-Message-ID: <1398871010-30681-1-git-send-email-bay@hackerdom.ru>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 30 Apr 2014 16:23:06 +0100
+Subject: [PATCH] arm64: xchg: prevent warning if return value is unused
+Message-ID: <1398871386-27311-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces Consumer IR(CIR) support for sunxi boards.
+Some users of xchg() don't bother using the return value, which results
+in a compiler warning like the following (from kgdb):
 
-This is based on Alexsey Shestacov's work based on the original driver 
-supplied by Allwinner.
+In file included from linux/arch/arm64/include/asm/atomic.h:27:0,
+                 from include/linux/atomic.h:4,
+                 from include/linux/spinlock.h:402,
+                 from include/linux/seqlock.h:35,
+                 from include/linux/time.h:5,
+                 from include/uapi/linux/timex.h:56,
+                 from include/linux/timex.h:56,
+                 from include/linux/sched.h:19,
+                 from include/linux/pid_namespace.h:4,
+                 from kernel/debug/debug_core.c:30:
+kernel/debug/debug_core.c: In function ?kgdb_cpu_enter?:
+linux/arch/arm64/include/asm/cmpxchg.h:75:3: warning: value computed is not used [-Wunused-value]
+  ((__typeof__(*(ptr)))__xchg((unsigned long)(x),(ptr),sizeof(*(ptr))))
+   ^
+linux/arch/arm64/include/asm/atomic.h:132:30: note: in expansion of macro ?xchg?
+ #define atomic_xchg(v, new) (xchg(&((v)->counter), new))
 
-Signed-off-by: Alexander Bersenev <bay@hackerdom.ru>
-Signed-off-by: Alexsey Shestacov <wingrime@linux-sunxi.org>
+kernel/debug/debug_core.c:504:4: note: in expansion of macro ?atomic_xchg?
+    atomic_xchg(&kgdb_active, cpu);
+    ^
 
+This patch makes use of the same trick as we do for cmpxchg, by assigning
+the return value to a dummy variable in the xchg() macro itself.
+
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
-Changes since version 1: 
- - Fix timer memory leaks 
- - Fix race condition when driver unloads while interrupt handler is active
- - Support Cubieboard 2(need testing)
+ arch/arm64/include/asm/cmpxchg.h | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-Changes since version 2:
-- More reliable keydown events
-- Documentation fixes
-- Rename registers accurding to A20 user manual
-- Remove some includes, order includes alphabetically
-- Use BIT macro
-- Typo fixes
-
-Changes since version 3:
-- Split the patch on smaller parts
-- More documentation fixes
-- Add clock-names in DT
-- Use devm_clk_get function to get the clocks
-- Removed gpios property from ir's DT
-- Changed compatible from allwinner,sunxi-ir to allwinner,sun7i-a20-ir in DT
-- Use spin_lock_irq instead spin_lock_irqsave in interrupt handler
-- Add myself in the copyright ;)
-- Coding style and indentation fixes
-
-Changes since version 4:
-- Try to fix indentation errors by sending patches with git send-mail
-
-Alexander Bersenev (3):
-  ARM: sunxi: Add documentation for sunxi consumer infrared devices
-  ARM: sunxi: Add driver for sunxi IR controller
-  ARM: sunxi: Add IR controller support in DT on A20
-
- .../devicetree/bindings/media/sunxi-ir.txt         |  23 ++
- arch/arm/boot/dts/sun7i-a20-cubieboard2.dts        |   6 +
- arch/arm/boot/dts/sun7i-a20-cubietruck.dts         |   6 +
- arch/arm/boot/dts/sun7i-a20.dtsi                   |  31 +++
- drivers/media/rc/Kconfig                           |  10 +
- drivers/media/rc/Makefile                          |   1 +
- drivers/media/rc/sunxi-ir.c                        | 303 +++++++++++++++++++++
- 7 files changed, 380 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/media/sunxi-ir.txt
- create mode 100644 drivers/media/rc/sunxi-ir.c
-
+diff --git a/arch/arm64/include/asm/cmpxchg.h b/arch/arm64/include/asm/cmpxchg.h
+index 57c0fa7bf711..ddb9d7830558 100644
+--- a/arch/arm64/include/asm/cmpxchg.h
++++ b/arch/arm64/include/asm/cmpxchg.h
+@@ -72,7 +72,12 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
+ }
+ 
+ #define xchg(ptr,x) \
+-	((__typeof__(*(ptr)))__xchg((unsigned long)(x),(ptr),sizeof(*(ptr))))
++({ \
++	__typeof__(*(ptr)) __ret; \
++	__ret = (__typeof__(*(ptr))) \
++		__xchg((unsigned long)(x), (ptr), sizeof(*(ptr))); \
++	__ret; \
++})
+ 
+ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
+ 				      unsigned long new, int size)
 -- 
 1.9.2
