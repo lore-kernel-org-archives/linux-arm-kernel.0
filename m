@@ -1,85 +1,88 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 30 Apr 2014 10:54:58 -0700
-Subject: [PATCH 0/3] Make kexec work with CONFIG_DEBUG_RODATA enabled
-In-Reply-To: <1C23526A7C42DB45BBF55B662C7C530E2B769FB60D@BUNGLE.Emea.Arm.com>
-References: <1398677507-6687-1-git-send-email-Nikolay.Borisov@arm.com>
- <20140430130241.GA15719@arm.com>
- <1C23526A7C42DB45BBF55B662C7C530E2B769FB60D@BUNGLE.Emea.Arm.com>
-Message-ID: <CAGXu5j+htWTt1V8VVCKM9Zkj3=bzEO16MoFisOCz6qUFvmsdTg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 30 Apr 2014 10:56:51 -0700
+Subject: [PATCH 06/23] ARM: OMAP: add OMAP5 DSI muxing
+In-Reply-To: <5360948A.5020607@ti.com>
+References: <535A6C40.10609@ti.com> <20140425153150.GA20807@atomide.com>
+ <535DFAAE.1010606@ti.com> <20140428164528.GM20807@atomide.com>
+ <535F37E9.8090609@ti.com> <20140429150529.GA27571@atomide.com>
+ <535FD10B.4020108@ti.com> <535FD43B.3030102@ti.com>
+ <20140429173838.GB27571@atomide.com> <5360948A.5020607@ti.com>
+Message-ID: <20140430175651.GB12362@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 30, 2014 at 6:19 AM, Nikolay Borisov
-<Nikolay.Borisov@arm.com> wrote:
->> From: Will Deacon [mailto:will.deacon at arm.com]
->> Hi Nikolay,
->>
->> On Mon, Apr 28, 2014 at 10:31:44AM +0100, Nikolay Borisov wrote:
->> > This patch makes kexec work on a kernel that has its .text section
->> set to read
->> > only. The main reason of doing it is because there is a patch in the
->> making
->> > (http://lists.infradead.org/pipermail/linux-arm-kernel/2014-
->> April/244779.html)
->> > which aims to make it possible to flag the kernel's code section as
->> read-only,
->> > rendering kexec inoperable.
->> >
->> > The first patch does the actual functional changes while the 2nd one
->> is
->> > optional and is only to be used in case you have already applied the
->> aforementioned
->> > CONFIG_DEBUG_RODATA patch
->> >
->> > Patch 3 is also optional and tries to make the assembly code a bit
->> more "sane"
->> > by introducing a .struct to describe the parameters for the kernel
->> relocation
->> > stub.
->> >
->> > Those patches have been tested on linux 3.14 on THUMB-2/non-THUMB-2
->> host
->> > kernels.
->> >
->> > Patch 1 and 3 apply cleanly on 3.15-rc3 and Patch 2 applies cleanly,
->> provided
->> > that Kees' patch is applied as well.
->> >
->> > Kees also managed to test that on a QEMU 2.0 based machine.
->>
->> Wouldn't it be far simpler to set_kernel_text_rw() on a kexec? At this
->> point, we've committed to replacing our image, so whether we can write
->> to the .text of the old image before we clobber it entirely seems somewhat
->> moot to me.
->>
->
-> We are poking one of the values in the prepare stage so doing set_kernel_text_rw() there
-> won't be very clean solution. However, I agree that if the values being poked into the prep
+* Tomi Valkeinen <tomi.valkeinen@ti.com> [140429 23:14]:
+> On 29/04/14 20:38, Tony Lindgren wrote:
+> > * Tomi Valkeinen <tomi.valkeinen@ti.com> [140429 09:33]:
+> >> On 29/04/14 19:19, Tomi Valkeinen wrote:
+> >>> On 29/04/14 18:05, Tony Lindgren wrote:
+> >>>
+> >>>>> omap4_padconf_global is a syscon node, not pinctrl. As syscon just gives
+> >>>>> a raw regmap to its memory area, the driver needs to know about the OMAP
+> >>>>> control registers to use it.
+> >>>>
+> >>>> That would be probably best set up the same way we have already set up
+> >>>> for example omap4_padconf_global: tisyscon at 4a1005a0. Then drivers can
+> >>>> access it using regmap, see how drivers/regulator/pbias-regulator.c
+> >>>> sets up the pbias regulator with regmap for MMC.
+> >>>
+> >>> Right, but it means that the driver will contain platform specific code
+> >>> for all the omap revisions it supports. Isn't that wrong?
+> >>>
+> >>> I already have a patch for DSI that uses the syscon-method, and it works
+> >>> fine. But it's quite ugly, imo, to fiddle with the OMAP control
+> >>> registers in a driver.
+> > 
+> > Anything using the system control module registers should be a separate
+> > driver. And it should ideally be implemeting some Linux generic framework
+> > that the consumer driver can then use. That leaves out the need to export
+> > custom functions.
+> 
+> Ok.
+> 
+> > I guess we don't have a PHY framework for displays though, so how about
+> > just a separate minimal driver under drivers/video/omap2 that uses the
+> > syscon?
+> 
+> Well, this one is not really about DSI PHY. The CONTROL_DSIPHY register
+> is not in the DSI PHY block, but in the control module, and it is used
+> to enable/disable the pins (for omap4/5) and to set pull up/down for the
+> pins (only for omap4). Oddly, for omap5, there's also a normal padconfig
+> register for the DSI pins, but not so for omap4.
+> 
+> To me it looks like a pad config register. I don't know why there's a
+> separate odd register for it and it's not using the normal padconfig system.
+> 
+> I'd like to use the pinctrl framework for it, but the pinctrl-single
+> cannot handle such a funny register. So, if "Anything using the system
+> control module registers should be a separate driver", then I guess I
+> need to write a pinctrl driver for this single register?
 
-set_kernel_text_rw() is also mm-specific, since the PMD sections are
-copied per-mm. I'm not sure if that's as much of a problem here since
-the prepare looks to be all in the same thread, but if we can avoid
-set_kernel_text_rw() that'll probably make things less surprising if
-changes are made later on.
+Have you checked out pinctrl-single,bits binding? That should allow
+you to map random bits in a single register to a pinctrl driver
+instance.
+ 
+> >> Oh, also, if I do that, I need to know both the SoC version and the DSS
+> >> version in the driver.
+> > 
+> > Don't you get all you need in the compatible string? Something like
+> > compatible ti,dss-phy-omap5?
+> 
+> We do use different compatible strings for different major versions of
+> the DSS blocks, like ti,omap5-dsi. But that exactly same DSS block could
+> be used on some other SoC, with different control stuff.
+> 
+> We could use separate compatible string for each SoC that uses DSS, but
+> then we're really encoding the SoC version into the compatible string,
+> not DSS version.
+> 
+> Of course, if there will be a separate driver managing the
+> CONTROL_DSIPHY register, then that one should use compatible string
+> specific to the SoC, as it's not a DSS driver at all.
 
--Kees
+Yeah probably using pinctrl-single,bits, or a separate driver with syscon
+makes most sense here.
 
-> stage is stashed in a static variable and then in the kexec_execute function we make the kernel
-> RW since we are turning the MMO off and nuking the old kernel anyway.
->
->> Will
->
-> Regards,
-> Nikolay
->
-> -- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
->
-> ARM Limited, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2557590
-> ARM Holdings plc, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2548782
->
+Regards,
 
-
-
--- 
-Kees Cook
-Chrome OS Security
+Tony
