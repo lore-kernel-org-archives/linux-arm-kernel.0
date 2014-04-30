@@ -1,122 +1,112 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 30 Apr 2014 14:43:28 +0300
-Subject: [PATCH 2/2] ARM: omap5: hwmod_data: Add AESS related data
-In-Reply-To: <1398858208-1346-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1398858208-1346-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1398858208-1346-2-git-send-email-peter.ujfalusi@ti.com>
+From: alim.akhtar@gmail.com (Alim Akhtar)
+Date: Wed, 30 Apr 2014 17:15:08 +0530
+Subject: [PATCH v3 09/16] clk: exynos5420: update clocks for WCORE block
+In-Reply-To: <1398344632-18623-10-git-send-email-shaik.ameer@samsung.com>
+References: <1398344632-18623-1-git-send-email-shaik.ameer@samsung.com>
+ <1398344632-18623-10-git-send-email-shaik.ameer@samsung.com>
+Message-ID: <CAGOxZ51cUq74B5pCEg6HRNxMbkTA20MqPBy2LtHzGiHog4U_Rg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the needed hwmod entries which is needed for AESS (Audio Engine
-SubSystem) and ABE.
+Hi Shaik,
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod_54xx_data.c | 64 ++++++++++++++++++++++++++++++
- 1 file changed, 64 insertions(+)
+On Thu, Apr 24, 2014 at 6:33 PM, Shaik Ameer Basha
+<shaik.ameer@samsung.com> wrote:
+> This patch adds missing clocks from WCORE block.
+>
+> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+> Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
+> ---
+Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-index e829664e6a6c..3e20c025b5a4 100644
---- a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-@@ -146,6 +146,7 @@ static struct omap_hwmod omap54xx_l4_abe_hwmod = {
- 	.prcm = {
- 		.omap4 = {
- 			.clkctrl_offs = OMAP54XX_CM_ABE_L4_ABE_CLKCTRL_OFFSET,
-+			.context_offs = OMAP54XX_RM_ABE_AESS_CONTEXT_OFFSET,
- 			.flags = HWMOD_OMAP4_NO_CONTEXT_LOSS_BIT,
- 		},
- 	},
-@@ -211,6 +212,42 @@ static struct omap_hwmod omap54xx_mpu_private_hwmod = {
- };
- 
- /*
-+ * 'aess' class
-+ * audio engine sub system
-+ */
-+
-+static struct omap_hwmod_class_sysconfig omap54xx_aess_sysc = {
-+	.rev_offs	= 0x0000,
-+	.sysc_offs	= 0x0010,
-+	.sysc_flags	= (SYSC_HAS_MIDLEMODE | SYSC_HAS_SIDLEMODE),
-+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
-+			   MSTANDBY_FORCE | MSTANDBY_NO | MSTANDBY_SMART |
-+			   MSTANDBY_SMART_WKUP),
-+	.sysc_fields	= &omap_hwmod_sysc_type2,
-+};
-+
-+static struct omap_hwmod_class omap54xx_aess_hwmod_class = {
-+	.name	= "aess",
-+	.sysc	= &omap54xx_aess_sysc,
-+	.enable_preprogram = omap_hwmod_aess_preprogram,
-+};
-+
-+/* aess */
-+static struct omap_hwmod omap54xx_aess_hwmod = {
-+	.name		= "aess",
-+	.class		= &omap54xx_aess_hwmod_class,
-+	.clkdm_name	= "abe_clkdm",
-+	.main_clk	= "aess_fclk",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = OMAP54XX_CM_ABE_AESS_CLKCTRL_OFFSET,
-+			.context_offs = OMAP54XX_RM_ABE_AESS_CONTEXT_OFFSET,
-+			.modulemode   = MODULEMODE_SWCTRL,
-+		},
-+	},
-+};
-+
-+/*
-  * 'counter' class
-  * 32-bit ordinary counter, clocked by the falling edge of the 32 khz clock
-  */
-@@ -1892,6 +1929,14 @@ static struct omap_hwmod_ocp_if omap54xx_l4_cfg__l3_main_3 = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
-+/* aess -> l4_abe */
-+static struct omap_hwmod_ocp_if __maybe_unused omap54xx_aess__l4_abe = {
-+	.master		= &omap54xx_aess_hwmod,
-+	.slave		= &omap54xx_l4_abe_hwmod,
-+	.clk		= "abe_iclk",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
- /* l3_main_1 -> l4_abe */
- static struct omap_hwmod_ocp_if omap54xx_l3_main_1__l4_abe = {
- 	.master		= &omap54xx_l3_main_1_hwmod,
-@@ -1966,6 +2011,22 @@ static struct omap_hwmod_ocp_if omap54xx_l4_cfg__dma_system = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
-+/* l4_abe -> aess */
-+static struct omap_hwmod_ocp_if __maybe_unused omap54xx_l4_abe__aess = {
-+	.master		= &omap54xx_l4_abe_hwmod,
-+	.slave		= &omap54xx_aess_hwmod,
-+	.clk		= "abe_iclk",
-+	.user		= OCP_USER_MPU,
-+};
-+
-+/* l4_abe -> aess (dma) */
-+static struct omap_hwmod_ocp_if __maybe_unused omap54xx_l4_abe__aess_dma = {
-+	.master		= &omap54xx_l4_abe_hwmod,
-+	.slave		= &omap54xx_aess_hwmod,
-+	.clk		= "abe_iclk",
-+	.user		= OCP_USER_SDMA,
-+};
-+
- /* l4_abe -> dmic */
- static struct omap_hwmod_ocp_if omap54xx_l4_abe__dmic = {
- 	.master		= &omap54xx_l4_abe_hwmod,
-@@ -2417,6 +2478,9 @@ static struct omap_hwmod_ocp_if *omap54xx_hwmod_ocp_ifs[] __initdata = {
- 	&omap54xx_l3_main_1__l3_main_3,
- 	&omap54xx_l3_main_2__l3_main_3,
- 	&omap54xx_l4_cfg__l3_main_3,
-+	&omap54xx_l4_abe__aess,
-+	&omap54xx_l4_abe__aess_dma,
-+	&omap54xx_aess__l4_abe,
- 	&omap54xx_l3_main_1__l4_abe,
- 	&omap54xx_mpu__l4_abe,
- 	&omap54xx_l3_main_1__l4_cfg,
+>  drivers/clk/samsung/clk-exynos5420.c |   28 ++++++++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+>
+> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+> index 6ad87d1..d9996dd 100755
+> --- a/drivers/clk/samsung/clk-exynos5420.c
+> +++ b/drivers/clk/samsung/clk-exynos5420.c
+> @@ -89,6 +89,7 @@
+>  #define GATE_BUS_PERIC1                0x10754
+>  #define GATE_BUS_PERIS0                0x10760
+>  #define GATE_BUS_PERIS1                0x10764
+> +#define GATE_BUS_NOC           0x10770
+>  #define GATE_TOP_SCLK_ISP      0x10870
+>  #define GATE_IP_GSCL0          0x10910
+>  #define GATE_IP_GSCL1          0x10920
+> @@ -180,6 +181,7 @@ static unsigned long exynos5420_clk_regs[] __initdata = {
+>         GATE_BUS_PERIC1,
+>         GATE_BUS_PERIS0,
+>         GATE_BUS_PERIS1,
+> +       GATE_BUS_NOC,
+>         GATE_TOP_SCLK_ISP,
+>         GATE_IP_GSCL0,
+>         GATE_IP_GSCL1,
+> @@ -271,6 +273,13 @@ PNAME(mout_user_aclk200_fsys_p)    = {"fin_pll", "mout_sw_aclk200_fsys"};
+>
+>  PNAME(mout_sw_aclk200_fsys2_p) = {"dout_aclk200_fsys2", "mout_sclk_spll"};
+>  PNAME(mout_user_aclk200_fsys2_p) = {"fin_pll", "mout_sw_aclk200_fsys2"};
+> +PNAME(mout_sw_aclk100_noc_p) = {"dout_aclk100_noc", "mout_sclk_spll"};
+> +PNAME(mout_user_aclk100_noc_p) = {"fin_pll", "mout_sw_aclk100_noc"};
+> +
+> +PNAME(mout_sw_aclk400_wcore_p) = {"dout_aclk400_wcore", "mout_sclk_spll"};
+> +PNAME(mout_aclk400_wcore_bpll_p) = {"mout_aclk400_wcore", "sclk_bpll"};
+> +PNAME(mout_user_aclk400_wcore_p) = {"fin_pll", "mout_sw_aclk400_wcore"};
+> +
+>  PNAME(mout_sw_aclk400_isp_p) = {"dout_aclk400_isp", "mout_sclk_spll"};
+>  PNAME(mout_user_aclk400_isp_p) = {"fin_pll", "mout_sw_aclk400_isp"};
+>
+> @@ -486,6 +495,18 @@ static struct samsung_mux_clock exynos5420_mux_clks[] __initdata = {
+>         MUX(0, "mout_spi0", mout_group2_p, SRC_PERIC1, 20, 3),
+>         MUX(0, "mout_spi1", mout_group2_p, SRC_PERIC1, 24, 3),
+>         MUX(0, "mout_spi2", mout_group2_p, SRC_PERIC1, 28, 3),
+> +       MUX(0, "mout_aclk100_noc", mout_group1_p, SRC_TOP0, 20, 2),
+> +       MUX(0, "mout_sw_aclk100_noc", mout_sw_aclk100_noc_p,
+> +               SRC_TOP10, 20, 1),
+> +       MUX(0, "mout_user_aclk100_noc", mout_user_aclk100_noc_p,
+> +               SRC_TOP3, 20, 1),
+> +       MUX(0, "mout_aclk400_wcore", mout_group1_p, SRC_TOP0, 16, 2),
+> +       MUX(0, "mout_aclk400_wcore_bpll", mout_aclk400_wcore_bpll_p,
+> +               TOP_SPARE2, 4, 1),
+> +       MUX(0, "mout_sw_aclk400_wcore", mout_sw_aclk400_wcore_p,
+> +               SRC_TOP10, 16, 1),
+> +       MUX(0, "mout_user_aclk400_wcore", mout_user_aclk400_wcore_p,
+> +               SRC_TOP3, 16, 1),
+>         MUX(0, "mout_aclk400_isp", mout_group1_p, SRC_TOP0, 0, 2),
+>         MUX(0, "mout_sw_aclk400_isp", mout_sw_aclk400_isp_p,
+>                 SRC_TOP10, 0, 1),
+> @@ -553,6 +574,10 @@ static struct samsung_div_clock exynos5420_div_clks[] __initdata = {
+>         DIV(0, "dout_disp1_blk", "aclk200_disp1", DIV2_RATIO0, 16, 2),
+>         DIV(0, "dout_aclk400_disp1", "mout_aclk400_disp1", DIV_TOP2, 4, 3),
+>
+> +       DIV(0, "dout_aclk100_noc", "mout_aclk100_noc", DIV_TOP0, 20, 3),
+> +       DIV(0, "dout_aclk400_wcore", "mout_aclk400_wcore_bpll",
+> +               DIV_TOP0, 16, 3),
+> +
+>         /* Audio Block */
+>         DIV(0, "dout_maudio0", "mout_maudio0", DIV_MAU, 20, 4),
+>         DIV(0, "dout_maupcm0", "dout_maudio0", DIV_MAU, 24, 8),
+> @@ -867,6 +892,9 @@ static struct samsung_gate_clock exynos5420_gate_clks[] __initdata = {
+>                         GATE_IP_MSCL, 10, 0, 0),
+>         GATE(CLK_SMMU_MIXER, "smmu_mixer", "aclk200_disp1",
+>                         GATE_IP_DISP1, 9, 0, 0),
+> +       /* aclk266 also gates other IPs in psgen. It should not be gated. */
+> +       GATE(0, "aclk266", "mout_user_aclk266",
+> +                       GATE_BUS_NOC, 22, CLK_IGNORE_UNUSED, 0),
+>         GATE(0, "aclk200_disp1", "mout_user_aclk200_disp1",
+>                         GATE_BUS_TOP, 18, CLK_IGNORE_UNUSED, 0),
+>         GATE(0, "aclk300_disp1", "mout_user_aclk300_disp1",
+> --
+> 1.7.9.5
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+
 -- 
-1.9.2
+Regards,
+Alim
