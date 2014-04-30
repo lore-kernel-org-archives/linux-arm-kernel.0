@@ -1,173 +1,115 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 30 Apr 2014 17:34:14 +0200
-Subject: [PATCH v3] pcie: Add Xilinx PCIe Host Bridge IP driver
-In-Reply-To: <1397561911-11647-1-git-send-email-sthokal@xilinx.com>
-References: <1397561911-11647-1-git-send-email-sthokal@xilinx.com>
-Message-ID: <201404301734.14478.arnd@arndb.de>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 30 Apr 2014 08:27:54 -0700
+Subject: [PATCH 10/10] hwmon: vexpress: Use devm helper for hwmon device
+ registration
+In-Reply-To: <1398870979.24255.37.camel@hornet>
+References: <1398707877-22596-1-git-send-email-pawel.moll@arm.com>
+ <1398707877-22596-11-git-send-email-pawel.moll@arm.com>
+ <535EDD49.8050107@roeck-us.net> <1398870979.24255.37.camel@hornet>
+Message-ID: <20140430152754.GA30924@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 April 2014, Srikanth Thokala wrote:
-> +Required properties:
-> +- #address-cells: Address representation for root ports, set to <3>
-> +- #size-cells: Size representation for root ports, set to <2>
-> +- #interrupt-cells: specifies the number of cells needed to encode an
-> +	interrupt source. The value must be 1.
-> +- compatible: Should contain "xlnx,axi-pcie-host-1.00.a"
-> +- reg: Should contain AXI PCIe registers location and length
-> +- device_type: must be "pci"
-> +- interrupts: Should contain AXI PCIe interrupt
-> +- interrupt-map-mask,
-> +  interrupt-map: standard PCI properties to define the mapping of the
-> +	PCI interface to interrupt numbers.
-> +- ranges: ranges for the PCI memory regions (I/O space region is noti
+On Wed, Apr 30, 2014 at 04:16:19PM +0100, Pawel Moll wrote:
+> On Mon, 2014-04-28 at 23:59 +0100, Guenter Roeck wrote:
+> > On 04/28/2014 10:uct attribute_group **attr_groups;
+> > > @@ -114,10 +95,13 @@ struct vexpress_hwmon_type {
+> > >   static DEVICE_ATTR(in1_label, S_IRUGO, vexpress_hwmon_label_show, NULL);
+> > >   static SENSOR_DEVICE_ATTR(in1_input, S_IRUGO, vexpress_hwmon_u32_show,
+> > >   		NULL, 1000);
+> > > -static VEXPRESS_HWMON_ATTRS(volt, in1_label, in1_input);
+> > >   static struct attribute_group vexpress_hwmon_group_volt = {
+> > >   	.is_visible = vexpress_hwmon_attr_is_visible,
+> > > -	.attrs = vexpress_hwmon_attrs_volt,
+> > > +	.attrs = (struct attribute *[]) {
+> > 
+> > Is this typecast necessary ?
+> 
+> Yes, it's the gcc extension that allows compound literals to be used for
+> static structure members initialization. I like it, because it makes
+> them easier to understand (in my opinion, that is), but if you prefer
+> the classic approach, I'll unroll VEXPRESS_HWMON_ATTRS into:
+> 
+> static struct attribute vexpress_hwmon_attrs_volt = {
+> 	&dev_attr_in1_label.attr,
+> 	&sensor_dev_attr_in1_input.dev_attr.attr,
+> 	NULL
+> };
+> 
+> And keep
+> 
+> static struct attribute_group vexpress_hwmon_group_volt = {
+>   	.is_visible = vexpress_hwmon_attr_is_visible,
+> 	.attrs = vexpress_hwmon_attrs_volt,
+> };
+> 
+Yes, would be great if you can do that.
 
-typo: noti -> not
+> > > @@ -232,45 +227,19 @@ static int vexpress_hwmon_probe(struct platform_device *pdev)
+> > >   	if (!match)
+> > >   		return -ENODEV;
+> > >   	type = match->data;
+> > > -	data->name = type->name;
+> > >
+> > >   	data->reg = devm_regmap_init_vexpress_config(&pdev->dev);
+> > > -	if (!data->reg)
+> > > -		return -ENODEV;
+> > > -
+> > > -	err = sysfs_create_groups(&pdev->dev.kobj, type->attr_groups);
+> > > -	if (err)
+> > > -		goto error;
+> > > -
+> > > -	data->hwmon_dev = hwmon_device_register(&pdev->dev);
+> > > -	if (IS_ERR(data->hwmon_dev)) {
+> > > -		err = PTR_ERR(data->hwmon_dev);
+> > > -		goto error;
+> > > -	}
+> > > +	if (IS_ERR(data->reg))
+> > > +		return PTR_ERR(data->reg);
+> > 
+> > Did the API for devm_regmap_init_vexpress_config change ?
+> > If so, it might make sense to separate this out into a separate patch,
+> > together with the API change (it is a logically different change).
+> 
+> I'm not sure I understand the question. The other patch from the series
 
-> +	supported by hardware)
-> +	Please refer to the standard PCI bus binding document for a more
-> +	detailed explanation
-> +
-> +Optional properties:
-> +- bus-range: PCI bus numbers covered
-> +
-> +Interrupt controller child node
-> ++++++++++++++++++++++++++++++++
-> +Required properties:
-> +- interrupt-controller: identifies the node as an interrupt controller
-> +- #address-cells: specifies the number of cells needed to encode an
-> +	address. The value must be 0.
-> +- #interrupt-cells: specifies the number of cells needed to encode an
-> +	interrupt source. The value must be 1.
-> +
-> +NOTE:
-> +The core provides a single interrupt for both INTx/MSI messages. So,
-> +created a interrupt controller node to support 'interrupt-map' DT
-> +functionality.  The driver will create an IRQ domain for this map, decode
-> +the four INTx interrupts in ISR and route them to this domain.
+The code above seems to change from
 
-How does this work if the pci core is combined with a GIC version that
-also has MSI support. Presumably you'd want to use that for performance
-reason rather than the integrated MSI chip.
+   	data->reg = devm_regmap_init_vexpress_config(&pdev->dev);
+	if (!data->reg)
+		return -ENODEV;
 
-Shouldn't there be a way to pick between the two?
+to
 
-> +/**
-> + * xilinx_pcie_get_config_base - Get configuration base
-> + * @bus: Bus structure of current bus
-> + * @devfn: Device/function
-> + * @where: Offset from base
-> + *
-> + * Return: Base address of the configuration space needed to be
-> + *	   accessed.
-> + */
-> +static void __iomem *xilinx_pcie_get_config_base(struct pci_bus *bus,
-> +						 unsigned int devfn,
-> +						 int where)
-> +{
-> +	struct xilinx_pcie_port *port = sys_to_pcie(bus->sysdata);
-> +	int relbus;
-> +
-> +	relbus = (bus->number << ECAM_BUS_NUM_SHIFT) |
-> +		 (devfn << ECAM_DEV_NUM_SHIFT);
-> +
-> +	return port->reg_base + relbus + where;
-> +}
+   	data->reg = devm_regmap_init_vexpress_config(&pdev->dev);
+	if (IS_ERR(data->reg))
+		return PTR_ERR(data->reg);
 
-Does this mean you have an ECAM-compliant config space? Nice!
+as part of this patch. This suggests that the return value from
+devm_regmap_init_vexpress_config may have changed from NULL to 
+ERR_PTR. Is my understanding wrong ?
 
-Would it be possible to split the config space access out into
-a separate file? It would be nice to share that with the generic
-ECAM driver that Will Deacon has sent.
+> I've copied you on
+> (http://article.gmane.org/gmane.linux.ports.arm.kernel/320577 "[PATCH
+> 02/10] mfd: vexpress: Convert custom func API to regmap") changes
+> 
+> -       data->func = vexpress_config_func_get_by_dev(&pdev->dev);
+> 
+> into
+> 
+> +       data->reg = devm_regmap_init_vexpress_config(&pdev->dev);
+> 
+> Your ack there, by the way, will be really appreciated :-)
+> 
+I'll have a look.
 
-> +
-> +	msg.address_hi = 0;
-> +	msg.address_lo = virt_to_phys((void *)port->msg_addr);
-> +	msg.data = irq;
-> +
-> +	write_msi_msg(irq, &msg);
+> > One question - I seem to be unable to apply the patch. What is your
+> > baseline branch / repository ?
+> 
+> The whole series, based on v3.15-rc3 lives here:
+> 
+> 	git://git.linaro.org/people/pawel.moll/linux.git vexpress/sysreg
+> 
+Great, thanks.
 
-It seems strange to pass the msg_addr as an integer referring to
-a virtual address. I'd suggest using phys_addr_t for the type
-and converting it at the point the page gets allocated, and then
-always assigning both the high and low part here. You'll need
-that anyway for 64-bit operation.
-
-> +/**
-> + * xilinx_pcie_enable_msi - Enable MSI support
-> + * @port: PCIe port information
-> + */
-> +static void xilinx_pcie_enable_msi(struct xilinx_pcie_port *port)
-> +{
-> +	port->msg_addr = __get_free_pages(GFP_KERNEL, 0);
-> +
-> +	pcie_write(port, 0x0, XILINX_PCIE_REG_MSIBASE1);
-> +	pcie_write(port, virt_to_phys((void *)port->msg_addr),
-> +		   XILINX_PCIE_REG_MSIBASE2);
-> +}
-
-here too.
-
-As a general comment about the MSI implementation, I wonder if this is actually
-generic enough to be shared with other host controllers. It could be moved
-into a separate file like the config space access in that case.
-
-> +/**
-> + * xilinx_pcie_init_irq_domain - Initialize IRQ domain
-> + * @port: PCIe port information
-> + *
-> + * Return: '0' on success and error value on failure
-> + */
-> +static int xilinx_pcie_init_irq_domain(struct xilinx_pcie_port *port)
-> +{
-> +	struct device *dev = port->dev;
-> +	struct device_node *node = dev->of_node;
-> +
-> +	if (IS_ENABLED(CONFIG_PCI_MSI)) {
-> +		/* Setup MSI */
-> +		int i;
-> +
-> +		port->irq_domain = irq_domain_add_linear(node,
-> +							 XILINX_NUM_MSI_IRQS,
-> +							 &msi_domain_ops,
-> +							 &xilinx_pcie_msi_chip);
-> +		if (!port->irq_domain) {
-> +			dev_err(dev, "Failed to get a MSI IRQ domain\n");
-> +			return PTR_ERR(port->irq_domain);
-> +		}
-> +
-> +		for (i = 0; i < XILINX_NUM_MSI_IRQS; i++)
-> +			irq_create_mapping(port->irq_domain, i);
-
-I'm still not that familiar with the irqdomain code, but shouldn't you
-do the irq_create_mapping() in xilinx_pcie_assign_msi()?
-
-It seems wasteful to create all 128 mappings upfront.
-
-> +/**
-> + * xilinx_pcie_setup - Setup memory resources
-> + * @nr: Bus number
-> + * @sys: Per controller structure
-> + *
-> + * Return: '1' on success and error value on failure
-> + */
-> +static int xilinx_pcie_setup(int nr, struct pci_sys_data *sys)
-> +{
-
-I think if you move most of the code from this function into the probe()
-function, it will be easier later to add arm64 support, and you can handle
-errors better.
-
-AFAICT, the only thing you need here is to list_move() the resources
-from the xilinx_pcie_port to sys->resources. Ideally, the entire range
-parsing can go away soon, once we have generic infrastructure for that.
-
-
-> +	/* Register the device */
-> +	pci_common_init_dev(dev, &hw);
-> +
-> +	platform_set_drvdata(pdev, port);
-
-Don't you have to do the platform_set_drvdata() before pci_common_init_dev()?
-
-	Arnd
+Guenter
