@@ -1,59 +1,58 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 30 Apr 2014 09:10:44 +0200
-Subject: [PATCH 2/3] arm: dts: imx6* Add clock-names for all ssi nodes
-In-Reply-To: <20140430064104.GE16727@dragon>
-References: <1398694356-22511-1-git-send-email-mpa@pengutronix.de>
- <1398694356-22511-3-git-send-email-mpa@pengutronix.de>
- <20140430064104.GE16727@dragon>
-Message-ID: <20140430071044.GI15179@pengutronix.de>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 30 Apr 2014 09:13:31 +0200
+Subject: [PATCH 97/97] ARM: l2c: convert berlin to generic l2c
+ initialisation
+In-Reply-To: <E1WerJr-0001aG-Jk@rmk-PC.arm.linux.org.uk>
+References: <20140428192419.GV26756@n2100.arm.linux.org.uk>
+ <E1WerJr-0001aG-Jk@rmk-PC.arm.linux.org.uk>
+Message-ID: <5360A29B.8070203@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 30, 2014 at 02:41:06PM +0800, Shawn Guo wrote:
-> On Mon, Apr 28, 2014 at 04:12:35PM +0200, Markus Pargmann wrote:
-> > There are two possible clocks now, baud and ipg. To avoid any issues,
-> > add clock-names to all ssi device nodes.
-> > 
-> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > ---
-> >  arch/arm/boot/dts/imx6qdl.dtsi | 3 +++
-> >  arch/arm/boot/dts/imx6sl.dtsi  | 3 +++
-> >  2 files changed, 6 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-> > index b230c09..288c76e 100644
-> > --- a/arch/arm/boot/dts/imx6qdl.dtsi
-> > +++ b/arch/arm/boot/dts/imx6qdl.dtsi
-> > @@ -257,6 +257,7 @@
-> >  					reg = <0x02028000 0x4000>;
-> >  					interrupts = <0 46 IRQ_TYPE_LEVEL_HIGH>;
-> >  					clocks = <&clks 178>;
-> > +					clock-names = "ipg";
+On 04/28/2014 09:34 PM, Russell King wrote:
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+FWIW,
+
+Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+
+Thanks for looking into this!
+
+> ---
+>  arch/arm/mach-berlin/berlin.c | 17 ++++++-----------
+>  1 file changed, 6 insertions(+), 11 deletions(-)
 > 
-> I'd like to make such change at the time when we have multiple clocks to
-> define here.
-
-Currently the fsl-ssi code acquires the clock using
-"devm_clk_get(dev, NULL)" and later another clock using a clock name
-"baud". I would like to have a clock-names property so that it does not
-depend on the order of the clocks in the "clocks" property.
-
-However I will have a look at the clocks and add a correct baudclock and
-send a new version.
-
-Thanks,
-
-Markus
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140430/2fdeb098/attachment.sig>
+> diff --git a/arch/arm/mach-berlin/berlin.c b/arch/arm/mach-berlin/berlin.c
+> index 6709d2a6bec8..ac181c6797ee 100644
+> --- a/arch/arm/mach-berlin/berlin.c
+> +++ b/arch/arm/mach-berlin/berlin.c
+> @@ -18,16 +18,6 @@
+>  #include <asm/hardware/cache-l2x0.h>
+>  #include <asm/mach/arch.h>
+>  
+> -static void __init berlin_init_machine(void)
+> -{
+> -	/*
+> -	 * with DT probing for L2CCs, berlin_init_machine can be removed.
+> -	 * Note: 88DE3005 (Armada 1500-mini) uses pl310 l2cc
+> -	 */
+> -	l2x0_of_init(0x30c00000, 0xfeffffff);
+> -	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> -}
+> -
+>  static const char * const berlin_dt_compat[] = {
+>  	"marvell,berlin",
+>  	NULL,
+> @@ -35,5 +25,10 @@ static const char * const berlin_dt_compat[] = {
+>  
+>  DT_MACHINE_START(BERLIN_DT, "Marvell Berlin")
+>  	.dt_compat	= berlin_dt_compat,
+> -	.init_machine	= berlin_init_machine,
+> +	/*
+> +	 * with DT probing for L2CCs, berlin_init_machine can be removed.
+> +	 * Note: 88DE3005 (Armada 1500-mini) uses pl310 l2cc
+> +	 */
+> +	.l2c_aux_val	= 0x30c00000,
+> +	.l2c_aux_mask	= 0xfeffffff,
+>  MACHINE_END
+> 
