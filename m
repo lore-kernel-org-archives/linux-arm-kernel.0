@@ -1,35 +1,36 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 30 Apr 2014 09:19:35 +0300
-Subject: [PATCH 1/4] ARM: dts: Add support for OMAP4 Variscite OM44 family
-In-Reply-To: <CAGhQ9Vw8sxifmG5Y3xbywm9B9e36VHxCk_oKLmh1qCgoOUOBSQ@mail.gmail.com>
-References: <1397833849-22396-1-git-send-email-manabian@gmail.com>	<1397833849-22396-2-git-send-email-manabian@gmail.com>
- <CAGhQ9Vw8sxifmG5Y3xbywm9B9e36VHxCk_oKLmh1qCgoOUOBSQ@mail.gmail.com>
-Message-ID: <536095F7.2050103@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 30 Apr 2014 14:22:02 +0800
+Subject: [PATCH net-next 5/7] net:fec: add support for dumping transmit
+ ring on timeout
+In-Reply-To: <CAHrpEqSw3iwJj1nHuCJ7LcoL2EUxYqMb-eA1QZN0_WvR-Y_mWA@mail.gmail.com>
+References: <1398773350-7293-5-git-send-email-Frank.Li@freescale.com>
+ <063D6719AE5E284EB5DD2968C1650D6D0F7014F0@AcuExch.aculab.com>
+ <CAHrpEqSCSw=bYgx5Egk4Mva-CODnw5=vvK6y3VWmB3_QpBQ8sQ@mail.gmail.com>
+ <063D6719AE5E284EB5DD2968C1650D6D0F701524@AcuExch.aculab.com>
+ <20140429141527.GZ26756@n2100.arm.linux.org.uk>
+ <CAHrpEqTc6=yS4ApLO7AbZyVq26kGxq+WBcyFjgjbiPySq7055Q@mail.gmail.com>
+ <20140429143243.GA26756@n2100.arm.linux.org.uk>
+ <CAHrpEqQL7LviXA4_NLNwSBoW84W_vbnzWkc9At5QBqUkqu63yw@mail.gmail.com>
+ <20140429150403.GC26756@n2100.arm.linux.org.uk>
+ <CAHrpEqSw3iwJj1nHuCJ7LcoL2EUxYqMb-eA1QZN0_WvR-Y_mWA@mail.gmail.com>
+Message-ID: <20140430062200.GB16727@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/04/14 04:24, Joachim Eastwood wrote:
-
-> Do you plan to push the patch that add hpd-gpios to the
-> "hdmi-connector" for 3.16? (nodes for my board below)
-> https://patchwork.kernel.org/patch/4006021/
+On Tue, Apr 29, 2014 at 10:11:18AM -0500, Frank Li wrote:
+> On Tue, Apr 29, 2014 at 10:04 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > I'd just like to see what you're doing.  Note that your submission also
+> > didn't get through the linux-arm-kernel list either, so I didn't get it
+> > via that path either.
 > 
-> Also in the patch set I am using your DT bindings for "panel-dpi". See
-> patch [2 of 4] for nodes.
-> https://patchwork.kernel.org/patch/4047241/
-> 
-> Will this patch be upstream in 3.16?
+> We have not sent out to public mail list yet.
+> But there are really big change.
+> We need support 3 ring queues for tx and rx.
 
-Yes, they are both planned to be in 3.16. The patches are still under
-work, though.
+Frank,
 
- Tomi
+I guess Russell was saying that these 7 patches did not reach
+linux-arm-kernel list for some reason.
 
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140430/bbd25bfc/attachment.sig>
+Shawn
