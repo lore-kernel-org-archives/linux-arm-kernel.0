@@ -1,32 +1,128 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 30 Apr 2014 16:20:47 +0100
-Subject: [RFC PATCH V4 6/7] arm64: mm: Enable HAVE_RCU_TABLE_FREE logic
-In-Reply-To: <1396018892-6773-7-git-send-email-steve.capper@linaro.org>
-References: <1396018892-6773-1-git-send-email-steve.capper@linaro.org>
- <1396018892-6773-7-git-send-email-steve.capper@linaro.org>
-Message-ID: <20140430152047.GF31220@arm.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 30 Apr 2014 10:22:25 -0500
+Subject: [PATCH v2] of: Keep track of populated platform devices
+In-Reply-To: <1398866717-20268-1-git-send-email-pawel.moll@arm.com>
+References: <1398858529.24255.3.camel@hornet>
+ <1398866717-20268-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <CAL_JsqL=mxqEKpAsXm7Du0vEDpKk4n+dp5-DyvbuGhTA6bP5Lg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 28, 2014 at 03:01:31PM +0000, Steve Capper wrote:
-> In order to implement fast_get_user_pages we need to ensure that the
-> page table walker is protected from page table pages being freed from
-> under it.
-> 
-> This patch enables HAVE_RCU_TABLE_FREE, any page table pages belonging
-> to address spaces with multiple users will be call_rcu_sched freed.
-> Meaning that disabling interrupts will block the free and protect the
-> fast gup page walker.
-> 
-> Signed-off-by: Steve Capper <steve.capper@linaro.org>
+On Wed, Apr 30, 2014 at 9:05 AM, Pawel Moll <pawel.moll@arm.com> wrote:
+> In "Device Tree powered" systems, platform devices are usually
+> massively populated with of_platform_populate() call, executed
+> at some level of initcalls, either by generic architecture
+> or by platform-specific code.
+>
+> There are situations though where certain devices must be
+> created (and bound with drivers) before all the others.
+> This presents a challenge, as devices created explicitly
+> would be created again by of_platform_populate().
+>
+> This patch tries to solve that issue in a generic way,
+> adding a "populated" flag for a DT node description.
+> Once set, this device will never be created again via
+> of_* API, so of_platform_populate() will skip such nodes
+> (and its children) in a similar way to the non-available
+> ones.
+>
+> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 
-While this patch is simple, I'd like to better understand the reason for
-it. Currently HAVE_RCU_TABLE_FREE is enabled for powerpc and sparc while
-__get_user_pages_fast() is supported by a few other architectures that
-don't select HAVE_RCU_TABLE_FREE. So why do we need it for fast gup on
-arm/arm64 while not all the other archs need it?
+One pondering and one minor change below, otherwise:
 
-Thanks.
+Acked-by: Rob Herring <robh@kernel.org>
 
--- 
-Catalin
+
+> ---
+>
+> Changes since v1:
+>
+> - added of_node_check_and_set_flag()... (atomic test and set)
+> - ... used it to atomically mark a node...
+> - ... clearing the bit on error path.
+>
+>  drivers/of/platform.c | 18 +++++++++++++-----
+>  include/linux/of.h    |  7 +++++++
+>  2 files changed, 20 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> index 404d1da..b33927a 100644
+> --- a/drivers/of/platform.c
+> +++ b/drivers/of/platform.c
+> @@ -204,12 +204,13 @@ static struct platform_device *of_platform_device_create_pdata(
+>  {
+>         struct platform_device *dev;
+>
+> -       if (!of_device_is_available(np))
+> +       if (!of_device_is_available(np) ||
+> +                       of_node_check_and_set_flag(np, OF_POPULATED))
+>                 return NULL;
+>
+>         dev = of_device_alloc(np, bus_id, parent);
+>         if (!dev)
+> -               return NULL;
+> +               goto err_clear_flag;
+
+I wonder if leaving it set would be the right behavior. I can't see
+that we would want to process the node again. But this is the
+exceptional case, so its probably not too important and can stay like
+this.
+
+>
+>  #if defined(CONFIG_MICROBLAZE)
+>         dev->archdata.dma_mask = 0xffffffffUL;
+> @@ -227,10 +228,14 @@ static struct platform_device *of_platform_device_create_pdata(
+>
+>         if (of_device_add(dev) != 0) {
+>                 platform_device_put(dev);
+> -               return NULL;
+> +               goto err_clear_flag;
+>         }
+>
+>         return dev;
+> +
+> +err_clear_flag:
+> +       of_node_clear_flag(np, OF_POPULATED);
+> +       return NULL;
+>  }
+>
+>  /**
+> @@ -262,14 +267,15 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
+>
+>         pr_debug("Creating amba device %s\n", node->full_name);
+>
+> -       if (!of_device_is_available(node))
+> +       if (!of_device_is_available(node) ||
+> +                       of_node_check_and_set_flag(node, OF_POPULATED))
+>                 return NULL;
+>
+>         dev = amba_device_alloc(NULL, 0, 0);
+>         if (!dev) {
+>                 pr_err("%s(): amba_device_alloc() failed for %s\n",
+>                        __func__, node->full_name);
+> -               return NULL;
+> +               goto err_clear_flag;
+>         }
+>
+>         /* setup generic device info */
+> @@ -309,6 +315,8 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
+>
+>  err_free:
+>         amba_device_put(dev);
+> +err_clear_flag:
+> +       of_node_clear_flag(node, OF_POPULATED);
+>         return NULL;
+>  }
+>  #else /* CONFIG_ARM_AMBA */
+> diff --git a/include/linux/of.h b/include/linux/of.h
+> index 3bad8d1..534cab8 100644
+> --- a/include/linux/of.h
+> +++ b/include/linux/of.h
+> @@ -130,6 +130,12 @@ static inline int of_node_check_flag(struct device_node *n, unsigned long flag)
+>         return test_bit(flag, &n->_flags);
+>  }
+>
+> +static inline int of_node_check_and_set_flag(struct device_node *n,
+
+Please keep the well known naming convention of the called function:
+of_node_test_and_set_flag
