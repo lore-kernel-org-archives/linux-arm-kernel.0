@@ -1,124 +1,108 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 30 Apr 2014 10:57:18 +0100
-Subject: [RFC 00/47] mtd: nand: Add new driver supporting ST's BCH h/w
-In-Reply-To: <20140410200004.GP32070@ld-irv-0074>
-References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
- <20140325125050.GB665@arch.cereza> <20140325131139.GB24823@lee--X1>
- <20140325220045.GA12185@arch.cereza>
- <20140326072805.GB31517@norris-Latitude-E6410>
- <20140327102835.GA17779@lee--X1> <20140401112926.GB24013@lee--X1>
- <20140410200004.GP32070@ld-irv-0074>
-Message-ID: <20140430095718.GJ29462@lee--X1>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed, 30 Apr 2014 18:57:21 +0900
+Subject: [PATCH v9 0/2] arm64: Add audit support
+In-Reply-To: <1394862548-29060-1-git-send-email-takahiro.akashi@linaro.org>
+References: <1394862548-29060-1-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <1398851843-16435-1-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > The BBT requirements are somewhere more complex. To provide you with
-> > > the complete picture, a little knowledge of driver history is
-> > > required. When it was initially created the MTD core only supported
-> > > OOB BBTs, but the ST BCH Controller doesn't support OOB access, so
-> > > Angus wrote his on In-Band (IB) implementation. Unfortunately the IB
-> > > support which _is_ now present in the kernel doesn't match the
-> > > internal implementation. Normally this wouldn't be an issue in itself,
-> > > but ST's boot-stack and tooling (Primary Bootloader, U-Boot, various
-> > > Programmers, etc) are aware of the internal IB BTT and utilise it
-> > > in varying ways. Shifting over to the Mainline version in
-> > > one-foul-swoop _will_ cause lots of pain and will probably result in
-> > > the disownership of driver we're trying to Mainline today. Naturally
-> > > I'm keen to avoid this.
-> > 
-> > Just looking into this now. Can I add support for a vendor specific
-> > signature extension? ST's flashers, bootloaders and tooling currently
-> > use the format:
-> > 
-> > /* Extend IBBT header with some stm-nand-bch niceties */
-> > struct nand_ibbt_bch_header {
-> > 	uint8_t signature[4];           /* "Bbt0" or "1tbB" signature */
-> > 	uint8_t version;                /* BBT version ("age") */
-> > 	uint8_t reserved[3];            /* padding */
-> > 	uint8_t baseschema[4];          /* "base" schema (x4) */
-> > 	uint8_t privschema[4];          /* "private" schema (x4) */
-> 
-> Not sure what these schema mean.
+(This patchset was already acked by the maintainer, but now re-submitted
+since it needs to be modified due to rebase to 3.15. See below)
 
-To be honest, me either, but I know that they are used by ST's
-tooling; flashers, bootloaders and debuggers.
+(Please apply this patch after my ftrace patch to resolve some conflict
+on arm64/kernel/ptrace.c, functionally it doesn't depend on ftrace though)
 
-> > 	uint8_t ecc_size[4];            /* ECC bytes (0, 32, 54) (x4) */
-> > 	char    author[64];             /* Arbitrary string for S/W to use */
-> > }; __attribute__((__packed__))
-> 
-> Nit: that would just be __packed (see compiler-gcc.h).
+This patchset adds system call audit support on arm64.
+Both 32-bit (AUDIT_ARCH_ARM) and 64-bit tasks (AUDIT_ARCH_AARCH64)
+are supported. Since arm64 has the exact same set of system calls
+on LE and BE, we don't care about endianness (or more specifically
+__AUDIT_ARCH_64BIT bit in AUDIT_ARCH_*).
 
-Okay.
+There are some prerequisites for this patch to work correctly:
+* "audit: Add CONFIG_HAVE_ARCH_AUDITSYSCALL" patch
+* "audit: generic compat system call audit support" patch
+* "arm64: __NR_* definitions for compat syscalls" patch from Catalin
+* "arm64: make a single hook to syscall_trace() for all syscall features" patch
+* "arm64: split syscall_trace() into separate functions for enter/exit" patch
+* "arm64: Add regs_return_value() in syscall.h" patch
+* "arm64: is_compat_task is defined both in asm/compat.h and 
+   linux/compat.h" patch
+* userspace audit tool (v2.3.6)
 
-> In principle, I'm OK with extending the BBT somewhat. Preferably, this
-> would provide some extensibility, so that other custom formats can use
-> the same base code. For instance, it looks like many of these fields
-> would be fixed, and specific to your platform. So (from nand_bbt's
-> perspective) these could just be consolidated int a field:
-> 
-> 	u8 custom[76];
-> 
-> Or make it variable-length, with the length provided by the driver?
-> nand_bbt would just know not to check for it when scanning, and it
-> would know to program it to flash when updating.
-> 
-> > It would be great if we can support this with a descriptor option or
-> > suchlike, as it would a) save me a lot of aggravation and b) continue
-> > to support ST with their current use-case.
-> 
-> Yeah, I realize you can't just jump over to the current format for
-> production systems. And there are admittedly some rough spots in our
-> current nand_bbt; it's not perfect.
-> 
-> Some random notes (not necessarily your problem; but things to be aware
-> of): nand_bbt could use some additional robustness checks, I think. Like
-> a CRC field, and maybe a versioning system for allowing
-> (backwards-compatible) changes in the format. To make
-> backwards-compatible changes, though, the original format needs to have
-> reserved space, or at least an 'offset' field, which would point to
-> where the actual BBT starts--not just a fixed offset.
-> 
-> There's also still a bit of cruft that really can be removed from
-> nand_bbt (the handling of bad block markers, which is duplicated in
-> nand_base). It's a low-priority item on my plate, but I think it might
-> be a good first step before trying to expand nand_bbt much.
+Please review them as well for better understandings.
 
-So I've been looking into the differences between the Mainline and
-ST's implementation.  I've concluded that the transition over to
-Mainline's version is best dealt with in the device driver.
+This code was tested on both 32-bit and 64-bit LE userland 
+in the following two ways:
+1) basic operations with auditctl/autrace
+  # auditctl -a exit,always -S openat -F path=/etc/inittab
+  # auditctl -a exit,always -F dir=/tmp -F perm=rw
+  # auditctl -a task,always
+  # autrace /bin/ls
+    by comparing output from autrace with one from strace
 
-I have depicted the differences between the two versions at [1].
-You'll see that the BBT header and BBT data have been separated into
-different pages the ST version.  This hardens the process against
-power failures whilst creating the BBT by only writing the pattern
-once the BBT data has been successfully applied to flash.  A small
-corner-case perhaps, but these things do happen.
+2) audit-test-code (+ my workarounds for arm/arm64)
+  by running "audit-tool", "filter" and "syscalls" test categories.
 
-What I'd like to do is supply our own scan_bbt() call.  This is
-supported by the framework already, so no extra modifications are
-required.  Converting nand_bbt to add support for our (and other)
-formats would be fairly intrusive.  The framework already allows us to
-search from the last block backwards, which is great, but that same
-functionality is missing for searching from the last page in the
-block.  The ability to separate header from data is also vacant,
-which we require for the aforementioned reasons.
+Changes v8 -> v9:
+* rebased on 3.15-rc, especially due to the change of syscall_get_arch()
+  interface [1,2/2]
 
-In our scan_bbt() I would like to start off by only supporting solely
-the ST schema, then over time search in both locations but preferring
-ST's.  Subsequently the choice should be version number based, with a
-view to phasing out ST's implementation completely once we've had a
-change to adapt the tooling which currently use only ST's
-implementation.
+Changes v7 -> v8:
+* aligned with the change in "audit: generic compat system call audit
+  support" v5 [1/2]
+* aligned with the change in "arm64: split syscall_trace() into separate
+  functions for enter/exit" v5 [2/2]
 
-I'm hoping to submit the next version either today or tomorrow, which
-will conform to the proposal above.  I hope that you find this
-adequate.
+Changes v6 -> v7:
+* changed an include file in syscall.h from <linux/audit.h> to
+  <uapi/linux/audit.h> [1/2]
+* aligned with the patch, "arm64: split syscall_trace() into separate
+  functions for enter/exit" [2/2]
 
-[1] goo.gl/WnGLVQ
+Changes v5 -> v6:
+* removed and put "arm64: Add regs_return_value() in syscall.h" patch into
+  a separate set
+* aligned with the change in "arm64: make a single hook to syscall_trace()
+  for all syscall features" v3 [1/2]
+
+Changes v4 -> v5:
+* rebased to 3.14-rcX
+* added a guard against TIF_SYSCALL_AUDIT [3/3]
+* aligned with the change in "arm64: make a single hook to syscall_trace()
+  for all syscall features" v2 [3/3]
+
+Changes v3 -> v4:
+* Modified to sync with the patch, "make a single hook to syscall_trace()
+  for all syscall features"
+* aligned with "audit: Add CONFIG_HAVE_ARCH_AUDITSYSCALL" patch
+
+Changes v2 -> v3:
+* Remove asm/audit.h.
+  See "generic compat syscall audit support" patch v4
+* Remove endianness dependency, ie. AUDIT_ARCH_ARMEB/AARCH64EB.
+* Remove kernel/syscalls/Makefile which was used to create unistd32.h.
+  See Catalin's "Add __NR_* definitions for compat syscalls" patch
+
+Changes v1 -> v2:
+* Modified to utilize "generic compat system call audit" [3/6, 4/6, 5/6]
+  Please note that a required header, unistd_32.h, is automatically
+  generated from unistd32.h.
+* Refer to regs->orig_x0 instead of regs->x0 as the first argument of
+  system call in audit_syscall_entry() [6/6]
+* Include "Add regs_return_value() in syscall.h" patch [2/6],
+  which was not intentionally included in v1 because it could be added
+  by "kprobes support".
+
+AKASHI Takahiro (2):
+  arm64: Add audit support
+  arm64: audit: Add audit hook in syscall_trace_enter/exit()
+
+ arch/arm64/Kconfig               |    2 ++
+ arch/arm64/include/asm/syscall.h |   14 ++++++++++++++
+ arch/arm64/kernel/ptrace.c       |    7 +++++++
+ include/uapi/linux/audit.h       |    1 +
+ 4 files changed, 24 insertions(+)
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.9.5
