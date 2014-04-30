@@ -1,152 +1,59 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 30 Apr 2014 10:43:39 +0900
-Subject: [PATCH v5 04/11] ARM: shmobile: r7s72100: add scif nodes to dtsi
-In-Reply-To: <4363543.Ma69ibRefE@avalon>
-References: <1398765822-2314-1-git-send-email-wsa@the-dreams.de>
- <1398765822-2314-5-git-send-email-wsa@the-dreams.de>
- <4363543.Ma69ibRefE@avalon>
-Message-ID: <20140430014338.GD24989@verge.net.au>
+Date: Wed, 30 Apr 2014 10:44:15 +0900
+Subject: [PATCH/RFC v2] serial: sh-sci: Add device tree support for r8a7779
+In-Reply-To: <2737920.PNRvA9nzcM@avalon>
+References: <1398756011-4672-1-git-send-email-horms+renesas@verge.net.au>
+ <2737920.PNRvA9nzcM@avalon>
+Message-ID: <20140430014414.GE24989@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 30, 2014 at 02:58:21AM +0200, Laurent Pinchart wrote:
-> Hi Wolfram,
+On Wed, Apr 30, 2014 at 03:06:49AM +0200, Laurent Pinchart wrote:
+> Hi Simon,
 > 
-> Thank you for the patches.
+> Thank you for the patch.
 > 
-> On Tuesday 29 April 2014 12:03:35 Wolfram Sang wrote:
-> > From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> I've CC'ed the DT list which seems to have been forgotten.
+> 
+> On Tuesday 29 April 2014 16:20:11 Simon Horman wrote:
+> > Simply document a new compat string.
+> > There appears to be no need for a driver updates.
 > > 
-> > Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > 
 > > ---
-> >  arch/arm/boot/dts/r7s72100.dtsi | 96 ++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 96 insertions(+)
 > > 
-> > diff --git a/arch/arm/boot/dts/r7s72100.dtsi
-> > b/arch/arm/boot/dts/r7s72100.dtsi index 5a6e2481b567..a4a67380b0a2 100644
-> > --- a/arch/arm/boot/dts/r7s72100.dtsi
-> > +++ b/arch/arm/boot/dts/r7s72100.dtsi
-> > @@ -200,6 +200,102 @@
-> >  		status = "disabled";
-> >  	};
+> > v2
+> > * Do not update the driver to set SCSCR_CKE1.
+> >   Instead DT may provide the P clock as the clock for the SCIF devices.
+> > ---
+> >  Documentation/devicetree/bindings/serial/renesas,sci-serial.txt | 1 +
+> >  1 file changed, 1 insertion(+)
 > > 
-> > +	scif0: serial at e8007000 {
-> > +		compatible = "renesas,scif-r7s72100", "renesas,scif";
-> > +		reg = <0xe8007000 64>;
-> > +		interrupts = <0 190 IRQ_TYPE_LEVEL_HIGH>,
-> > +			     <0 191 IRQ_TYPE_LEVEL_HIGH>,
-> > +			     <0 192 IRQ_TYPE_LEVEL_HIGH>,
-> > +			     <0 189 IRQ_TYPE_LEVEL_HIGH>;
-> > +		clocks = <&mstp4_clks R7S72100_CLK_SCIF0>;
-> > +		clock-names = "sci_ick";
+> > diff --git a/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt
+> > b/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt index
+> > 53e6c17..bba86de 100644
+> > --- a/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt
+> > +++ b/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt
+> > @@ -12,6 +12,7 @@ Required properties:
+> >      - "renesas,scifa-r8a7791" for R8A7791 (R-Car M2) SCIFA compatible UART.
+> >      - "renesas,scifb-r8a7791" for R8A7791 (R-Car M2) SCIFB compatible UART.
+> >      - "renesas,hscif-r8a7791" for R8A7791 (R-Car M2) HSCIF compatible UART.
+> > +    - "renesas,scif-r8a7779" for R8A7779 (R-Car H1) SCIF compatible UART.
 > 
-> I've just sent a patch set that removes the interface clock from the SCI 
-> driver in favour of the functional clock. I can't test the patch set this week 
-> as I'm traveling and don't have access to the hardware. I've asked Simon to 
-> test it with his SCI DT enabling patches for r8a7779. If not problem is found, 
-> I'd like that series to go in first to avoid dependencies on sci_ick in the 
-> device tree. Could you then rebase this patch on top of that, and rename 
-> sci_ick to fck ?
+> What about moving this at the top of the list to keep it sorted by SoC number 
+> ?
 
-I think it would be better to merge things in parallel rather
-than needing to wait on Greg to pick up an SCI driver change
-and for it to filter into a tree where we can use it before
-enabling these devices.
+Sure, will do.
 
-> Apart from that, for the whole series,
+> 
+> Apart from that,
 > 
 > Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 > 
-> > +		status = "disabled";
-> > +	};
-> > +
-> > +	scif1: serial at e8007800 {
-> > +		compatible = "renesas,scif-r7s72100", "renesas,scif";
-> > +		reg = <0xe8007800 64>;
-> > +		interrupts = <0 194 IRQ_TYPE_LEVEL_HIGH>,
-> > +			     <0 195 IRQ_TYPE_LEVEL_HIGH>,
-> > +			     <0 196 IRQ_TYPE_LEVEL_HIGH>,
-> > +			     <0 193 IRQ_TYPE_LEVEL_HIGH>;
-> > +		clocks = <&mstp4_clks R7S72100_CLK_SCIF1>;
-> > +		clock-names = "sci_ick";
-> > +		status = "disabled";
-> > +	};
-> > +
-> > +	scif2: serial at e8008000 {
-> > +		compatible = "renesas,scif-r7s72100", "renesas,scif";
-> > +		reg = <0xe8008000 64>;
-> > +		interrupts = <0 198 IRQ_TYPE_LEVEL_HIGH>,
-> > +			     <0 199 IRQ_TYPE_LEVEL_HIGH>,
-> > +			     <0 200 IRQ_TYPE_LEVEL_HIGH>,
-> > +			     <0 197 IRQ_TYPE_LEVEL_HIGH>;
-> > +		clocks = <&mstp4_clks R7S72100_CLK_SCIF2>;
-> > +		clock-names = "sci_ick";
-> > +		status = "disabled";
-> > +	};
-> > +
-> > +	scif3: serial at e8008800 {
-> > +		compatible = "renesas,scif-r7s72100", "renesas,scif";
-> > +		reg = <0xe8008800 64>;
-> > +		interrupts = <0 202 IRQ_TYPE_LEVEL_HIGH>,
-> > +			     <0 203 IRQ_TYPE_LEVEL_HIGH>,
-> > +			     <0 204 IRQ_TYPE_LEVEL_HIGH>,
-> > +			     <0 201 IRQ_TYPE_LEVEL_HIGH>;
-> > +		clocks = <&mstp4_clks R7S72100_CLK_SCIF3>;
-> > +		clock-names = "sci_ick";
-> > +		status = "disabled";
-> > +	};
-> > +
-> > +	scif4: serial at e8009000 {
-> > +		compatible = "renesas,scif-r7s72100", "renesas,scif";
-> > +		reg = <0xe8009000 64>;
-> > +		interrupts = <0 206 IRQ_TYPE_LEVEL_HIGH>,
-> > +			     <0 207 IRQ_TYPE_LEVEL_HIGH>,
-> > +			     <0 208 IRQ_TYPE_LEVEL_HIGH>,
-> > +			     <0 205 IRQ_TYPE_LEVEL_HIGH>;
-> > +		clocks = <&mstp4_clks R7S72100_CLK_SCIF4>;
-> > +		clock-names = "sci_ick";
-> > +		status = "disabled";
-> > +	};
-> > +
-> > +	scif5: serial at e8009800 {
-> > +		compatible = "renesas,scif-r7s72100", "renesas,scif";
-> > +		reg = <0xe8009800 64>;
-> > +		interrupts = <0 210 IRQ_TYPE_LEVEL_HIGH>,
-> > +			     <0 211 IRQ_TYPE_LEVEL_HIGH>,
-> > +			     <0 212 IRQ_TYPE_LEVEL_HIGH>,
-> > +			     <0 209 IRQ_TYPE_LEVEL_HIGH>;
-> > +		clocks = <&mstp4_clks R7S72100_CLK_SCIF5>;
-> > +		clock-names = "sci_ick";
-> > +		status = "disabled";
-> > +	};
-> > +
-> > +	scif6: serial at e800a000 {
-> > +		compatible = "renesas,scif-r7s72100", "renesas,scif";
-> > +		reg = <0xe800a000 64>;
-> > +		interrupts = <0 214 IRQ_TYPE_LEVEL_HIGH>,
-> > +			     <0 215 IRQ_TYPE_LEVEL_HIGH>,
-> > +			     <0 216 IRQ_TYPE_LEVEL_HIGH>,
-> > +			     <0 213 IRQ_TYPE_LEVEL_HIGH>;
-> > +		clocks = <&mstp4_clks R7S72100_CLK_SCIF6>;
-> > +		clock-names = "sci_ick";
-> > +		status = "disabled";
-> > +	};
-> > +
-> > +	scif7: serial at e800a800 {
-> > +		compatible = "renesas,scif-r7s72100", "renesas,scif";
-> > +		reg = <0xe800a800 64>;
-> > +		interrupts = <0 218 IRQ_TYPE_LEVEL_HIGH>,
-> > +			     <0 219 IRQ_TYPE_LEVEL_HIGH>,
-> > +			     <0 220 IRQ_TYPE_LEVEL_HIGH>,
-> > +			     <0 217 IRQ_TYPE_LEVEL_HIGH>;
-> > +		clocks = <&mstp4_clks R7S72100_CLK_SCIF7>;
-> > +		clock-names = "sci_ick";
-> > +		status = "disabled";
-> > +	};
-> > +
-> >  	spi0: spi at e800c800 {
-> >  		compatible = "renesas,rspi-r7s72100", "renesas,rspi-rz";
-> >  		reg = <0xe800c800 0x24>;
+> >      - "renesas,scif" for generic SCIF compatible UART.
+> >      - "renesas,scifa" for generic SCIFA compatible UART.
+> >      - "renesas,scifb" for generic SCIFB compatible UART.
 > 
 > -- 
 > Regards,
