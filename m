@@ -1,55 +1,91 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 1 May 2014 00:06:07 +0200
-Subject: [PATCH/RFC 3/4] of/clk: Register clocks suitable for Runtime PM
- with the PM core
-In-Reply-To: <2068296.FXWLXn1mqR@avalon>
-References: <1398334403-26181-1-git-send-email-geert+renesas@glider.be>
- <1398334403-26181-4-git-send-email-geert+renesas@glider.be>
- <CAPDyKFr02yyhGNncYX2AgBXTA3Sc0AGQcExjtLvQ5QU0_=YJwg@mail.gmail.com>
- <2068296.FXWLXn1mqR@avalon>
-Message-ID: <CAMuHMdUz9bOx3AMfCQuk8nhW3A_xm1Y8DYi9-yg30iu_j94Vzw@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 01 May 2014 00:19:09 +0200
+Subject: [PATCH 1/4] clk: propagate parent change up one level
+In-Reply-To: <5344198B.2030604@samsung.com>
+References: <1396623201-26000-1-git-send-email-t.stanislaws@samsung.com>
+ <1396623201-26000-2-git-send-email-t.stanislaws@samsung.com>
+ <5344198B.2030604@samsung.com>
+Message-ID: <536176DD.5020507@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+Mike,
 
-On Wed, Apr 30, 2014 at 11:23 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> On Thursday 24 April 2014 15:11:24 Ulf Hansson wrote:
->> On 24 April 2014 12:13, Geert Uytterhoeven <geert+renesas@glider.be> wrote:
->> > When adding a device from DT, check if its clocks are suitable for Runtime
->> > PM, and register them with the PM core.
->> > If Runtime PM is disabled, just enable the clock.
->> >
->> > This allows the PM core to automatically manage gate clocks of devices for
->> > Runtime PM.
->>
->> Normally I don't think it's a good idea to "automatically" manage
->> clocks from PM core or any other place but from the driver (and
->> possibly the subsystem).
->>
->> The reason is simply that we hide things that normally is supposed to
->> be handled by the driver. Typically a cross SOC driver should work
->> fine both with and without a pm_domain. It should also not rely on
->> CONFIG_PM_RUNTIME.
+On 08.04.2014 17:45, Tomasz Figa wrote:
+> Hi,
 >
-> That's a very good point. Geert, what do you think should happen if
-> CONFIG_PM_RUNTIME is not set ? I don't have a strong opinion (yet) on whether
-> we could require CONFIG_PM_RUNTIME, but it would indeed be nice to support
-> both cases. One option would be to keep the clocks enabled unconditionally in
-> that case, as not setting CONFIG_PM_RUNTIME means that the user doesn't care
-> (or cares less) about power consumption.
+> On 04.04.2014 16:53, Tomasz Stanislawski wrote:
+>> This patch adds support for propagation of setup of clock's parent one
+>> level
+>> up.
+>>
+>> This feature is helpful when a driver changes topology of its clocks
+>> using
+>> clk_set_parent().  The problem occurs when on one platform/SoC
+>> driver's clock
+>> is located at MUX output but on the other platform/SoC there is a
+>> gated proxy
+>> clock between the MUX and driver's clock.  In such a case, driver's
+>> code has to
+>> be modified to use one clock for enabling and the other clock for
+>> setup of a
+>> parent.
+>>
+>> The code updates are avoided by propagating setup of a parent up one
+>> level.
+>>
+>> Additionally, this patch adds CLK_SET_PARENT_PARENT (sorry for naming)
+>> flag to
+>> inform clk-core that clk_set_parent() should be propagated.
+>>
+>> Signed-off-by: Tomasz Stanislawski <t.stanislaws@samsung.com>
+>> ---
+>>   drivers/clk/clk.c            |    6 ++++++
+>>   include/linux/clk-provider.h |    1 +
+>>   2 files changed, 7 insertions(+)
+>>
+>> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+>> index dff0373..53bbfda 100644
+>> --- a/drivers/clk/clk.c
+>> +++ b/drivers/clk/clk.c
+>> @@ -1737,6 +1737,12 @@ int clk_set_parent(struct clk *clk, struct clk
+>> *parent)
+>>
+>>       /* try finding the new parent index */
+>>       if (parent) {
+>> +        if ((clk->flags & CLK_SET_PARENT_PARENT)
+>> +            && clk->num_parents == 1) {
+>> +            ret = clk_set_parent(clk->parent, parent);
+>> +            goto out;
+>> +        }
+>> +
+>>           p_index = clk_fetch_parent_index(clk, parent);
+>>           p_rate = parent->rate;
+>>           if (p_index < 0) {
+>> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+>> index 5119174..daa0b03 100644
+>> --- a/include/linux/clk-provider.h
+>> +++ b/include/linux/clk-provider.h
+>> @@ -30,6 +30,7 @@
+>>   #define CLK_GET_RATE_NOCACHE    BIT(6) /* do not use the cached clk
+>> rate */
+>>   #define CLK_SET_RATE_NO_REPARENT BIT(7) /* don't re-parent on rate
+>> change */
+>>   #define CLK_GET_ACCURACY_NOCACHE BIT(8) /* do not use the cached clk
+>> accuracy */
+>> +#define CLK_SET_PARENT_PARENT    BIT(9) /* propagate parent change up
+>> one level */
+>>
+>>   struct clk_hw;
+>>   struct dentry;
+>>
+>
+> This would be very useful, at least on Exynos platforms, with
+> mux-div-gate clock paths. PARENT_PARENT sounds a bit funny, though.
+>
+> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 
-This is already handled by my patch. If CONFIG_PM_RUNTIME is disabled,
-the clocks are enabled by calling clk_prepare_enabled().
+Your opinion on this would be greatly appreciated.
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Best regards,
+Tomasz
