@@ -1,445 +1,391 @@
-From: alim.akhtar@gmail.com (Alim Akhtar)
-Date: Wed, 30 Apr 2014 16:38:08 +0530
-Subject: [PATCH v3 01/16] clk: exynos5420: rename parent clocks
-In-Reply-To: <1398344632-18623-2-git-send-email-shaik.ameer@samsung.com>
-References: <1398344632-18623-1-git-send-email-shaik.ameer@samsung.com>
- <1398344632-18623-2-git-send-email-shaik.ameer@samsung.com>
-Message-ID: <CAGOxZ537-qSncHk3ZdT+zyvw08=TN7cQOCm7f80s-m5ugp4umA@mail.gmail.com>
+From: m.chehab@samsung.com (Mauro Carvalho Chehab)
+Date: Wed, 30 Apr 2014 04:11:27 -0700
+Subject: [PATCH v4 02/03] ARM: sunxi: Add driver for sunxi IR controller
+In-Reply-To: <3881d16f-578a-417b-8a55-ea9bad5af206@googlegroups.com>
+References: <d641a69a-01b4-443d-b121-48d13f46ee03@googlegroups.com>
+ <3881d16f-578a-417b-8a55-ea9bad5af206@googlegroups.com>
+Message-ID: <20140430041127.450b913f.m.chehab@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shaik
+Em Wed, 30 Apr 2014 03:58:18 -0700 (PDT)
+????????? ???????? <bay@hackerdom.ru> escreveu:
 
-On Thu, Apr 24, 2014 at 6:33 PM, Shaik Ameer Basha
-<shaik.ameer@samsung.com> wrote:
-> This patch modifies the defined parent clock names as per the
-> exynos5420 datasheet.
->
-> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
-> Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
-> ---
-This looks good. Mostly renaming is done here.
-For this you have my
-Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
+> [PATCH v4 02/03] ARM: sunxi: Add driver for sunxi IR controller
+> 
+> This patch adds driver for sunxi IR controller.
+> It is based on Alexsey Shestacov's work based on the original driver 
+> supplied by Allwinner.
+> 
+> Signed-off-by: Alexander Bersenev <bay@hackerdom.ru>
+> Signed-off-by: Alexsey Shestacov <wingrime@linux-sunxi.org>
+> 
+> diff --git a/drivers/media/rc/Kconfig b/drivers/media/rc/Kconfig
+> index 8fbd377..9427fad 100644
+> --- a/drivers/media/rc/Kconfig
+> +++ b/drivers/media/rc/Kconfig
+> @@ -343,4 +343,14 @@ config RC_ST
+>  
+>   If you're not sure, select N here.
+>  
+> +config IR_SUNXI
+> +    tristate "SUNXI IR remote control"
+> +    depends on RC_CORE
+> +    depends on ARCH_SUNXI
+> +    ---help---
+> +      Say Y if you want to use sunXi internal IR Controller
+> +
+> +      To compile this driver as a module, choose M here: the module will
+> +      be called sunxi-ir.
+> +
+>  endif #RC_DEVICES
+> diff --git a/drivers/media/rc/Makefile b/drivers/media/rc/Makefile
+> index f8b54ff..93cdbe9 100644
+> --- a/drivers/media/rc/Makefile
+> +++ b/drivers/media/rc/Makefile
+> @@ -32,4 +32,5 @@ obj-$(CONFIG_IR_GPIO_CIR) += gpio-ir-recv.o
+>  obj-$(CONFIG_IR_IGUANA) += iguanair.o
+>  obj-$(CONFIG_IR_TTUSBIR) += ttusbir.o
+>  obj-$(CONFIG_RC_ST) += st_rc.o
+> +obj-$(CONFIG_IR_SUNXI) += sunxi-ir.o
+>  obj-$(CONFIG_IR_IMG) += img-ir/
+> diff --git a/drivers/media/rc/sunxi-ir.c b/drivers/media/rc/sunxi-ir.c
+> new file mode 100644
+> index 0000000..f051d94
+> --- /dev/null
+> +++ b/drivers/media/rc/sunxi-ir.c
+> @@ -0,0 +1,303 @@
+> +/*
+> + * Driver for Allwinner sunXi IR controller
+> + *
+> + * Copyright (C) 2014 Alexsey Shestacov <wingrime@linux-sunxi.org>
+> + * Copyright (C) 2014 Alexander Bersenev <bay@hackerdom.ru>
+> + *
+> + * Based on sun5i-ir.c:
+> + * Copyright (C) 2007-2012 Daniel Wang
+> + * Allwinner Technology Co., Ltd. <www.allwinnertech.com>
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation; either version 2 of
+> + * the License, or (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/module.h>
+> +#include <linux/of_platform.h>
+> +#include <media/rc-core.h>
+> +
+> +#define SUNXI_IR_DEV "sunxi-ir"
+> +
+> +/* Registers */
+> +/* IR Control */
+> +#define SUNXI_IR_CTL_REG      0x00
+> +/* Rx Config */
+> +#define SUNXI_IR_RXCTL_REG    0x10
+> +/* Rx Data */
+> +#define SUNXI_IR_RXFIFO_REG   0x20
+> +/* Rx Interrupt Enable */
+> +#define SUNXI_IR_RXINT_REG    0x2C
+> +/* Rx Interrupt Status */
+> +#define SUNXI_IR_RXSTA_REG    0x30
+> +/* IR Sample Config */
+> +#define SUNXI_IR_CIR_REG      0x34
+> +
+> +/* Bit Definition of IR_RXINTS_REG Register */
+> +#define SUNXI_IR_RXINTS_RXOF  BIT(0) /* Rx FIFO Overflow */
+> +#define SUNXI_IR_RXINTS_RXPE  BIT(1) /* Rx Packet End */
+> +#define SUNXI_IR_RXINTS_RXDA  BIT(4) /* Rx FIFO Data Available */
+> +/* Hardware supported fifo size */
+> +#define SUNXI_IR_FIFO_SIZE    16
+> +/* How much messages in fifo triggers IRQ */
+> +#define SUNXI_IR_FIFO_TRIG    8
+> +/* Required frequency for IR0 or IR1 clock in CIR mode */
+> +#define SUNXI_IR_BASE_CLK     8000000
+> +/* Frequency after IR internal divider  */
+> +#define SUNXI_IR_CLK          (SUNXI_IR_BASE_CLK / 64)
+> +/* Sample period in ns */
+> +#define SUNXI_IR_SAMPLE       (1000000000ul / SUNXI_IR_CLK)
+> +/* Filter threshold in samples  */
+> +#define SUNXI_IR_RXFILT       1
+> +/* Idle Threshold in samples */
+> +#define SUNXI_IR_RXIDLE       20
+> +/* Time after which device stops sending data in ms */
+> +#define SUNXI_IR_TIMEOUT      120
+> +
+> +struct sunxi_ir {
+> + spinlock_t      ir_lock;
+> + struct rc_dev   *rc;
+> + void __iomem    *base;
+> + int             irq;
+> + struct clk      *clk;
+> + struct clk      *apb_clk;
+> + const char      *map_name;
+> +};
 
->  drivers/clk/samsung/clk-exynos5420.c |  359 ++++++++++++++++++----------------
->  1 file changed, 187 insertions(+), 172 deletions(-)
->  mode change 100644 => 100755 drivers/clk/samsung/clk-exynos5420.c
->
-> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
-> old mode 100644
-> new mode 100755
-> index 35311e1..389d4b1
-> --- a/drivers/clk/samsung/clk-exynos5420.c
-> +++ b/drivers/clk/samsung/clk-exynos5420.c
-> @@ -217,85 +217,92 @@ static void exynos5420_clk_sleep_init(void) {}
->  #endif
->
->  /* list of all parent clocks */
-> -PNAME(mspll_cpu_p)     = { "sclk_cpll", "sclk_dpll",
-> -                               "sclk_mpll", "sclk_spll" };
-> -PNAME(cpu_p)           = { "mout_apll" , "mout_mspll_cpu" };
-> -PNAME(kfc_p)           = { "mout_kpll" , "mout_mspll_kfc" };
-> -PNAME(apll_p)          = { "fin_pll", "fout_apll", };
-> -PNAME(bpll_p)          = { "fin_pll", "fout_bpll", };
-> -PNAME(cpll_p)          = { "fin_pll", "fout_cpll", };
-> -PNAME(dpll_p)          = { "fin_pll", "fout_dpll", };
-> -PNAME(epll_p)          = { "fin_pll", "fout_epll", };
-> -PNAME(ipll_p)          = { "fin_pll", "fout_ipll", };
-> -PNAME(kpll_p)          = { "fin_pll", "fout_kpll", };
-> -PNAME(mpll_p)          = { "fin_pll", "fout_mpll", };
-> -PNAME(rpll_p)          = { "fin_pll", "fout_rpll", };
-> -PNAME(spll_p)          = { "fin_pll", "fout_spll", };
-> -PNAME(vpll_p)          = { "fin_pll", "fout_vpll", };
-> -
-> -PNAME(group1_p)                = { "sclk_cpll", "sclk_dpll", "sclk_mpll" };
-> -PNAME(group2_p)                = { "fin_pll", "sclk_cpll", "sclk_dpll", "sclk_mpll",
-> -                         "sclk_spll", "sclk_ipll", "sclk_epll", "sclk_rpll" };
-> -PNAME(group3_p)                = { "sclk_rpll", "sclk_spll" };
-> -PNAME(group4_p)                = { "sclk_ipll", "sclk_dpll", "sclk_mpll" };
-> -PNAME(group5_p)                = { "sclk_vpll", "sclk_dpll" };
-> -
-> -PNAME(sw_aclk66_p)     = { "dout_aclk66", "sclk_spll" };
-> -PNAME(aclk66_peric_p)  = { "fin_pll", "mout_sw_aclk66" };
-> -
-> -PNAME(sw_aclk200_fsys_p) = { "dout_aclk200_fsys", "sclk_spll"};
-> -PNAME(user_aclk200_fsys_p)     = { "fin_pll", "mout_sw_aclk200_fsys" };
-> -
-> -PNAME(sw_aclk200_fsys2_p) = { "dout_aclk200_fsys2", "sclk_spll"};
-> -PNAME(user_aclk200_fsys2_p)    = { "fin_pll", "mout_sw_aclk200_fsys2" };
-> -
-> -PNAME(sw_aclk200_p) = { "dout_aclk200", "sclk_spll"};
-> -PNAME(aclk200_disp1_p) = { "fin_pll", "mout_sw_aclk200" };
-> -
-> -PNAME(sw_aclk400_mscl_p) = { "dout_aclk400_mscl", "sclk_spll"};
-> -PNAME(user_aclk400_mscl_p)     = { "fin_pll", "mout_sw_aclk400_mscl" };
-> -
-> -PNAME(sw_aclk333_p) = { "dout_aclk333", "sclk_spll"};
-> -PNAME(user_aclk333_p)  = { "fin_pll", "mout_sw_aclk333" };
-> -
-> -PNAME(sw_aclk166_p) = { "dout_aclk166", "sclk_spll"};
-> -PNAME(user_aclk166_p)  = { "fin_pll", "mout_sw_aclk166" };
-> -
-> -PNAME(sw_aclk266_p) = { "dout_aclk266", "sclk_spll"};
-> -PNAME(user_aclk266_p)  = { "fin_pll", "mout_sw_aclk266" };
-> -
-> -PNAME(sw_aclk333_432_gscl_p) = { "dout_aclk333_432_gscl", "sclk_spll"};
-> -PNAME(user_aclk333_432_gscl_p) = { "fin_pll", "mout_sw_aclk333_432_gscl" };
-> -
-> -PNAME(sw_aclk300_gscl_p) = { "dout_aclk300_gscl", "sclk_spll"};
-> -PNAME(user_aclk300_gscl_p)     = { "fin_pll", "mout_sw_aclk300_gscl" };
-> -
-> -PNAME(sw_aclk300_disp1_p) = { "dout_aclk300_disp1", "sclk_spll"};
-> -PNAME(user_aclk300_disp1_p)    = { "fin_pll", "mout_sw_aclk300_disp1" };
-> -
-> -PNAME(sw_aclk300_jpeg_p) = { "dout_aclk300_jpeg", "sclk_spll"};
-> -PNAME(user_aclk300_jpeg_p)     = { "fin_pll", "mout_sw_aclk300_jpeg" };
-> -
-> -PNAME(sw_aclk_g3d_p) = { "dout_aclk_g3d", "sclk_spll"};
-> -PNAME(user_aclk_g3d_p) = { "fin_pll", "mout_sw_aclk_g3d" };
-> -
-> -PNAME(sw_aclk266_g2d_p) = { "dout_aclk266_g2d", "sclk_spll"};
-> -PNAME(user_aclk266_g2d_p)      = { "fin_pll", "mout_sw_aclk266_g2d" };
-> -
-> -PNAME(sw_aclk333_g2d_p) = { "dout_aclk333_g2d", "sclk_spll"};
-> -PNAME(user_aclk333_g2d_p)      = { "fin_pll", "mout_sw_aclk333_g2d" };
-> -
-> -PNAME(audio0_p)        = { "fin_pll", "cdclk0", "sclk_dpll", "sclk_mpll",
-> -                 "sclk_spll", "sclk_ipll", "sclk_epll", "sclk_rpll" };
-> -PNAME(audio1_p)        = { "fin_pll", "cdclk1", "sclk_dpll", "sclk_mpll",
-> -                 "sclk_spll", "sclk_ipll", "sclk_epll", "sclk_rpll" };
-> -PNAME(audio2_p)        = { "fin_pll", "cdclk2", "sclk_dpll", "sclk_mpll",
-> -                 "sclk_spll", "sclk_ipll", "sclk_epll", "sclk_rpll" };
-> -PNAME(spdif_p) = { "fin_pll", "dout_audio0", "dout_audio1", "dout_audio2",
-> -                 "spdif_extclk", "sclk_ipll", "sclk_epll", "sclk_rpll" };
-> -PNAME(hdmi_p)  = { "dout_hdmi_pixel", "sclk_hdmiphy" };
-> -PNAME(maudio0_p)       = { "fin_pll", "maudio_clk", "sclk_dpll", "sclk_mpll",
-> -                         "sclk_spll", "sclk_ipll", "sclk_epll", "sclk_rpll" };
-> +PNAME(mout_mspll_cpu_p) = {"mout_sclk_cpll", "mout_sclk_dpll",
-> +                               "mout_sclk_mpll", "mout_sclk_spll"};
-> +PNAME(mout_cpu_p) = {"mout_apll" , "mout_mspll_cpu"};
-> +PNAME(mout_kfc_p) = {"mout_kpll" , "mout_mspll_kfc"};
-> +PNAME(mout_apll_p) = {"fin_pll", "fout_apll"};
-> +PNAME(mout_bpll_p) = {"fin_pll", "fout_bpll"};
-> +PNAME(mout_cpll_p) = {"fin_pll", "fout_cpll"};
-> +PNAME(mout_dpll_p) = {"fin_pll", "fout_dpll"};
-> +PNAME(mout_epll_p) = {"fin_pll", "fout_epll"};
-> +PNAME(mout_ipll_p) = {"fin_pll", "fout_ipll"};
-> +PNAME(mout_kpll_p) = {"fin_pll", "fout_kpll"};
-> +PNAME(mout_mpll_p) = {"fin_pll", "fout_mpll"};
-> +PNAME(mout_rpll_p) = {"fin_pll", "fout_rpll"};
-> +PNAME(mout_spll_p) = {"fin_pll", "fout_spll"};
-> +PNAME(mout_vpll_p) = {"fin_pll", "fout_vpll"};
-> +
-> +PNAME(mout_group1_p) = {"mout_sclk_cpll", "mout_sclk_dpll",
-> +                                       "mout_sclk_mpll"};
-> +PNAME(mout_group2_p) = {"fin_pll", "mout_sclk_cpll",
-> +                       "mout_sclk_dpll", "mout_sclk_mpll", "mout_sclk_spll",
-> +                       "mout_sclk_ipll", "mout_sclk_epll", "mout_sclk_rpll"};
-> +PNAME(mout_group3_p) = {"mout_sclk_rpll", "mout_sclk_spll"};
-> +PNAME(mout_group4_p) = {"mout_sclk_ipll", "mout_sclk_dpll", "mout_sclk_mpll"};
-> +PNAME(mout_group5_p) = {"mout_sclk_vpll", "mout_sclk_dpll"};
-> +
-> +PNAME(mout_sw_aclk66_p)        = {"dout_aclk66", "mout_sclk_spll"};
-> +PNAME(mout_user_aclk66_peric_p) = {"fin_pll", "mout_sw_aclk66"};
-> +
-> +PNAME(mout_sw_aclk200_fsys_p) = {"dout_aclk200_fsys", "mout_sclk_spll"};
-> +PNAME(mout_user_aclk200_fsys_p)        = {"fin_pll", "mout_sw_aclk200_fsys"};
-> +
-> +PNAME(mout_sw_aclk200_fsys2_p) = {"dout_aclk200_fsys2", "mout_sclk_spll"};
-> +PNAME(mout_user_aclk200_fsys2_p) = {"fin_pll", "mout_sw_aclk200_fsys2"};
-> +
-> +PNAME(mout_sw_aclk200_p) = {"dout_aclk200", "mout_sclk_spll"};
-> +PNAME(mout_aclk200_disp1_p) = {"fin_pll", "mout_sw_aclk200"};
-> +
-> +PNAME(mout_sw_aclk400_mscl_p) = {"dout_aclk400_mscl", "mout_sclk_spll"};
-> +PNAME(mout_user_aclk400_mscl_p)        = {"fin_pll", "mout_sw_aclk400_mscl"};
-> +
-> +PNAME(mout_sw_aclk333_p) = {"dout_aclk333", "mout_sclk_spll"};
-> +PNAME(mout_user_aclk333_p) = {"fin_pll", "mout_sw_aclk333"};
-> +
-> +PNAME(mout_sw_aclk166_p) = {"dout_aclk166", "mout_sclk_spll"};
-> +PNAME(mout_user_aclk166_p) = {"fin_pll", "mout_sw_aclk166"};
-> +
-> +PNAME(mout_sw_aclk266_p) = {"dout_aclk266", "mout_sclk_spll"};
-> +PNAME(mout_user_aclk266_p) = {"fin_pll", "mout_sw_aclk266"};
-> +
-> +PNAME(mout_sw_aclk333_432_gscl_p) = {"dout_aclk333_432_gscl", "mout_sclk_spll"};
-> +PNAME(mout_user_aclk333_432_gscl_p) = {"fin_pll", "mout_sw_aclk333_432_gscl"};
-> +
-> +PNAME(mout_sw_aclk300_gscl_p) = {"dout_aclk300_gscl", "mout_sclk_spll"};
-> +PNAME(mout_user_aclk300_gscl_p)        = {"fin_pll", "mout_sw_aclk300_gscl"};
-> +
-> +PNAME(mout_sw_aclk300_disp1_p) = {"dout_aclk300_disp1", "mout_sclk_spll"};
-> +PNAME(mout_user_aclk300_disp1_p) = {"fin_pll", "mout_sw_aclk300_disp1"};
-> +
-> +PNAME(mout_sw_aclk300_jpeg_p) = {"dout_aclk300_jpeg", "mout_sclk_spll"};
-> +PNAME(mout_user_aclk300_jpeg_p) = {"fin_pll", "mout_sw_aclk300_jpeg"};
-> +
-> +PNAME(mout_sw_aclk_g3d_p) = {"dout_aclk_g3d", "mout_sclk_spll"};
-> +PNAME(mout_user_aclk_g3d_p) = {"fin_pll", "mout_sw_aclk_g3d"};
-> +
-> +PNAME(mout_sw_aclk266_g2d_p) = {"dout_aclk266_g2d", "mout_sclk_spll"};
-> +PNAME(mout_user_aclk266_g2d_p) = {"fin_pll", "mout_sw_aclk266_g2d"};
-> +
-> +PNAME(mout_sw_aclk333_g2d_p) = {"dout_aclk333_g2d", "mout_sclk_spll"};
-> +PNAME(mout_user_aclk333_g2d_p) = {"fin_pll", "mout_sw_aclk333_g2d"};
-> +
-> +PNAME(mout_audio0_p) = {"fin_pll", "cdclk0", "mout_sclk_dpll",
-> +                       "mout_sclk_mpll", "mout_sclk_spll", "mout_sclk_ipll",
-> +                       "mout_sclk_epll", "mout_sclk_rpll"};
-> +PNAME(mout_audio1_p) = {"fin_pll", "cdclk1", "mout_sclk_dpll",
-> +                       "mout_sclk_mpll", "mout_sclk_spll", "mout_sclk_ipll",
-> +                       "mout_sclk_epll", "mout_sclk_rpll"};
-> +PNAME(mout_audio2_p) = {"fin_pll", "cdclk2", "mout_sclk_dpll",
-> +                       "mout_sclk_mpll", "mout_sclk_spll", "mout_sclk_ipll",
-> +                       "mout_sclk_epll", "mout_sclk_rpll"};
-> +PNAME(mout_spdif_p) = {"fin_pll", "dout_audio0", "dout_audio1",
-> +                       "dout_audio2", "spdif_extclk", "mout_sclk_ipll",
-> +                       "mout_sclk_epll", "mout_sclk_rpll"};
-> +PNAME(mout_hdmi_p) = {"dout_hdmi_pixel", "sclk_hdmiphy"};
-> +PNAME(mout_maudio0_p) = {"fin_pll", "maudio_clk", "mout_sclk_dpll",
-> +                        "mout_sclk_mpll", "mout_sclk_spll", "mout_sclk_ipll",
-> +                        "mout_sclk_epll", "mout_sclk_rpll"};
->
->  /* fixed rate clocks generated outside the soc */
->  static struct samsung_fixed_rate_clock exynos5420_fixed_rate_ext_clks[] __initdata = {
-> @@ -316,123 +323,131 @@ static struct samsung_fixed_factor_clock exynos5420_fixed_factor_clks[] __initda
->  };
->
->  static struct samsung_mux_clock exynos5420_mux_clks[] __initdata = {
-> -       MUX(0, "mout_mspll_kfc", mspll_cpu_p, SRC_TOP7, 8, 2),
-> -       MUX(0, "mout_mspll_cpu", mspll_cpu_p, SRC_TOP7, 12, 2),
-> -       MUX(0, "mout_apll", apll_p, SRC_CPU, 0, 1),
-> -       MUX(0, "mout_cpu", cpu_p, SRC_CPU, 16, 1),
-> -       MUX(0, "mout_kpll", kpll_p, SRC_KFC, 0, 1),
-> -       MUX(0, "mout_cpu_kfc", kfc_p, SRC_KFC, 16, 1),
-> +       MUX(0, "mout_mspll_kfc", mout_mspll_cpu_p, SRC_TOP7, 8, 2),
-> +       MUX(0, "mout_mspll_cpu", mout_mspll_cpu_p, SRC_TOP7, 12, 2),
-> +       MUX(0, "mout_apll", mout_apll_p, SRC_CPU, 0, 1),
-> +       MUX(0, "mout_cpu", mout_cpu_p, SRC_CPU, 16, 1),
-> +       MUX(0, "mout_kpll", mout_kpll_p, SRC_KFC, 0, 1),
-> +       MUX(0, "mout_kfc", mout_kfc_p, SRC_KFC, 16, 1),
->
-> -       MUX(0, "sclk_bpll", bpll_p, SRC_CDREX, 0, 1),
-> +       MUX(0, "sclk_bpll", mout_bpll_p, SRC_CDREX, 0, 1),
->
-> -       MUX_A(0, "mout_aclk400_mscl", group1_p,
-> +       MUX_A(0, "mout_aclk400_mscl", mout_group1_p,
->                         SRC_TOP0, 4, 2, "aclk400_mscl"),
-> -       MUX(0, "mout_aclk200", group1_p, SRC_TOP0, 8, 2),
-> -       MUX(0, "mout_aclk200_fsys2", group1_p, SRC_TOP0, 12, 2),
-> -       MUX(0, "mout_aclk200_fsys", group1_p, SRC_TOP0, 28, 2),
-> -
-> -       MUX(0, "mout_aclk333_432_gscl", group4_p, SRC_TOP1, 0, 2),
-> -       MUX(0, "mout_aclk66", group1_p, SRC_TOP1, 8, 2),
-> -       MUX(0, "mout_aclk266", group1_p, SRC_TOP1, 20, 2),
-> -       MUX(0, "mout_aclk166", group1_p, SRC_TOP1, 24, 2),
-> -       MUX(0, "mout_aclk333", group1_p, SRC_TOP1, 28, 2),
-> -
-> -       MUX(0, "mout_aclk333_g2d", group1_p, SRC_TOP2, 8, 2),
-> -       MUX(0, "mout_aclk266_g2d", group1_p, SRC_TOP2, 12, 2),
-> -       MUX(0, "mout_aclk_g3d", group5_p, SRC_TOP2, 16, 1),
-> -       MUX(0, "mout_aclk300_jpeg", group1_p, SRC_TOP2, 20, 2),
-> -       MUX(0, "mout_aclk300_disp1", group1_p, SRC_TOP2, 24, 2),
-> -       MUX(0, "mout_aclk300_gscl", group1_p, SRC_TOP2, 28, 2),
-> -
-> -       MUX(0, "mout_user_aclk400_mscl", user_aclk400_mscl_p,
-> +       MUX(0, "mout_aclk200", mout_group1_p, SRC_TOP0, 8, 2),
-> +       MUX(0, "mout_aclk200_fsys2", mout_group1_p, SRC_TOP0, 12, 2),
-> +       MUX(0, "mout_aclk200_fsys", mout_group1_p, SRC_TOP0, 28, 2),
-> +
-> +       MUX(0, "mout_aclk333_432_gscl", mout_group4_p, SRC_TOP1, 0, 2),
-> +       MUX(0, "mout_aclk66", mout_group1_p, SRC_TOP1, 8, 2),
-> +       MUX(0, "mout_aclk266", mout_group1_p, SRC_TOP1, 20, 2),
-> +       MUX(0, "mout_aclk166", mout_group1_p, SRC_TOP1, 24, 2),
-> +       MUX(0, "mout_aclk333", mout_group1_p, SRC_TOP1, 28, 2),
-> +
-> +       MUX(0, "mout_aclk333_g2d", mout_group1_p, SRC_TOP2, 8, 2),
-> +       MUX(0, "mout_aclk266_g2d", mout_group1_p, SRC_TOP2, 12, 2),
-> +       MUX(0, "mout_aclk_g3d", mout_group5_p, SRC_TOP2, 16, 1),
-> +       MUX(0, "mout_aclk300_jpeg", mout_group1_p, SRC_TOP2, 20, 2),
-> +       MUX(0, "mout_aclk300_disp1", mout_group1_p, SRC_TOP2, 24, 2),
-> +       MUX(0, "mout_aclk300_gscl", mout_group1_p, SRC_TOP2, 28, 2),
-> +
-> +       MUX(0, "mout_user_aclk400_mscl", mout_user_aclk400_mscl_p,
->                         SRC_TOP3, 4, 1),
-> -       MUX_A(0, "mout_aclk200_disp1", aclk200_disp1_p,
-> -                       SRC_TOP3, 8, 1, "aclk200_disp1"),
-> -       MUX(0, "mout_user_aclk200_fsys2", user_aclk200_fsys2_p,
-> +       MUX(0, "mout_aclk200_disp1", mout_aclk200_disp1_p, SRC_TOP3, 8, 1),
-> +       MUX(0, "mout_user_aclk200_fsys2", mout_user_aclk200_fsys2_p,
->                         SRC_TOP3, 12, 1),
-> -       MUX(0, "mout_user_aclk200_fsys", user_aclk200_fsys_p,
-> +       MUX(0, "mout_user_aclk200_fsys", mout_user_aclk200_fsys_p,
->                         SRC_TOP3, 28, 1),
->
-> -       MUX(0, "mout_user_aclk333_432_gscl", user_aclk333_432_gscl_p,
-> +       MUX(0, "mout_user_aclk333_432_gscl", mout_user_aclk333_432_gscl_p,
->                         SRC_TOP4, 0, 1),
-> -       MUX(0, "mout_aclk66_peric", aclk66_peric_p, SRC_TOP4, 8, 1),
-> -       MUX(0, "mout_user_aclk266", user_aclk266_p, SRC_TOP4, 20, 1),
-> -       MUX(0, "mout_user_aclk166", user_aclk166_p, SRC_TOP4, 24, 1),
-> -       MUX(0, "mout_user_aclk333", user_aclk333_p, SRC_TOP4, 28, 1),
-> -
-> -       MUX(0, "mout_aclk66_psgen", aclk66_peric_p, SRC_TOP5, 4, 1),
-> -       MUX(0, "mout_user_aclk333_g2d", user_aclk333_g2d_p, SRC_TOP5, 8, 1),
-> -       MUX(0, "mout_user_aclk266_g2d", user_aclk266_g2d_p, SRC_TOP5, 12, 1),
-> -       MUX_A(0, "mout_user_aclk_g3d", user_aclk_g3d_p,
-> +       MUX(0, "mout_user_aclk66_peric", mout_user_aclk66_peric_p,
-> +                       SRC_TOP4, 8, 1),
-> +       MUX(0, "mout_user_aclk266", mout_user_aclk266_p, SRC_TOP4, 20, 1),
-> +       MUX(0, "mout_user_aclk166", mout_user_aclk166_p, SRC_TOP4, 24, 1),
-> +       MUX(0, "mout_user_aclk333", mout_user_aclk333_p, SRC_TOP4, 28, 1),
-> +
-> +       MUX(0, "mout_user_aclk66_psgen", mout_user_aclk66_peric_p, SRC_TOP5,
-> +                       4, 1),
-> +       MUX(0, "mout_user_aclk333_g2d", mout_user_aclk333_g2d_p, SRC_TOP5,
-> +                       8, 1),
-> +       MUX(0, "mout_user_aclk266_g2d", mout_user_aclk266_g2d_p, SRC_TOP5,
-> +                       12, 1),
-> +       MUX_A(0, "mout_user_aclk_g3d", mout_user_aclk_g3d_p,
->                         SRC_TOP5, 16, 1, "aclkg3d"),
-> -       MUX(0, "mout_user_aclk300_jpeg", user_aclk300_jpeg_p,
-> +       MUX(0, "mout_user_aclk300_jpeg", mout_user_aclk300_jpeg_p,
->                         SRC_TOP5, 20, 1),
-> -       MUX(0, "mout_user_aclk300_disp1", user_aclk300_disp1_p,
-> +       MUX(0, "mout_user_aclk300_disp1", mout_user_aclk300_disp1_p,
->                         SRC_TOP5, 24, 1),
-> -       MUX(0, "mout_user_aclk300_gscl", user_aclk300_gscl_p,
-> +       MUX(0, "mout_user_aclk300_gscl", mout_user_aclk300_gscl_p,
->                         SRC_TOP5, 28, 1),
->
-> -       MUX(0, "sclk_mpll", mpll_p, SRC_TOP6, 0, 1),
-> -       MUX(0, "sclk_vpll", vpll_p, SRC_TOP6, 4, 1),
-> -       MUX(0, "sclk_spll", spll_p, SRC_TOP6, 8, 1),
-> -       MUX(0, "sclk_ipll", ipll_p, SRC_TOP6, 12, 1),
-> -       MUX(0, "sclk_rpll", rpll_p, SRC_TOP6, 16, 1),
-> -       MUX(0, "sclk_epll", epll_p, SRC_TOP6, 20, 1),
-> -       MUX(0, "sclk_dpll", dpll_p, SRC_TOP6, 24, 1),
-> -       MUX(0, "sclk_cpll", cpll_p, SRC_TOP6, 28, 1),
-> -
-> -       MUX(0, "mout_sw_aclk400_mscl", sw_aclk400_mscl_p, SRC_TOP10, 4, 1),
-> -       MUX(0, "mout_sw_aclk200", sw_aclk200_p, SRC_TOP10, 8, 1),
-> -       MUX(0, "mout_sw_aclk200_fsys2", sw_aclk200_fsys2_p,
-> +       MUX(0, "mout_sclk_mpll", mout_mpll_p, SRC_TOP6, 0, 1),
-> +       MUX(0, "mout_sclk_vpll", mout_vpll_p, SRC_TOP6, 4, 1),
-> +       MUX(0, "mout_sclk_spll", mout_spll_p, SRC_TOP6, 8, 1),
-> +       MUX(0, "mout_sclk_ipll", mout_ipll_p, SRC_TOP6, 12, 1),
-> +       MUX(0, "mout_sclk_rpll", mout_rpll_p, SRC_TOP6, 16, 1),
-> +       MUX(0, "mout_sclk_epll", mout_epll_p, SRC_TOP6, 20, 1),
-> +       MUX(0, "mout_sclk_dpll", mout_dpll_p, SRC_TOP6, 24, 1),
-> +       MUX(0, "mout_sclk_cpll", mout_cpll_p, SRC_TOP6, 28, 1),
-> +
-> +       MUX(0, "mout_sw_aclk400_mscl", mout_sw_aclk400_mscl_p,
-> +                       SRC_TOP10, 4, 1),
-> +       MUX(0, "mout_sw_aclk200", mout_sw_aclk200_p, SRC_TOP10, 8, 1),
-> +       MUX(0, "mout_sw_aclk200_fsys2", mout_sw_aclk200_fsys2_p,
->                         SRC_TOP10, 12, 1),
-> -       MUX(0, "mout_sw_aclk200_fsys", sw_aclk200_fsys_p, SRC_TOP10, 28, 1),
-> -
-> -       MUX(0, "mout_sw_aclk333_432_gscl", sw_aclk333_432_gscl_p,
-> +       MUX(0, "mout_sw_aclk200_fsys", mout_sw_aclk200_fsys_p,
-> +                       SRC_TOP10, 28, 1),
-> +       MUX(0, "mout_sw_aclk333_432_gscl", mout_sw_aclk333_432_gscl_p,
->                         SRC_TOP11, 0, 1),
-> -       MUX(0, "mout_sw_aclk66", sw_aclk66_p, SRC_TOP11, 8, 1),
-> -       MUX(0, "mout_sw_aclk266", sw_aclk266_p, SRC_TOP11, 20, 1),
-> -       MUX(0, "mout_sw_aclk166", sw_aclk166_p, SRC_TOP11, 24, 1),
-> -       MUX(0, "mout_sw_aclk333", sw_aclk333_p, SRC_TOP11, 28, 1),
-> -
-> -       MUX(0, "mout_sw_aclk333_g2d", sw_aclk333_g2d_p, SRC_TOP12, 8, 1),
-> -       MUX(0, "mout_sw_aclk266_g2d", sw_aclk266_g2d_p, SRC_TOP12, 12, 1),
-> -       MUX(0, "mout_sw_aclk_g3d", sw_aclk_g3d_p, SRC_TOP12, 16, 1),
-> -       MUX(0, "mout_sw_aclk300_jpeg", sw_aclk300_jpeg_p, SRC_TOP12, 20, 1),
-> -       MUX(0, "mout_sw_aclk300_disp1", sw_aclk300_disp1_p,
-> +       MUX(0, "mout_sw_aclk66", mout_sw_aclk66_p, SRC_TOP11, 8, 1),
-> +       MUX(0, "mout_sw_aclk266", mout_sw_aclk266_p, SRC_TOP11, 20, 1),
-> +       MUX(0, "mout_sw_aclk166", mout_sw_aclk166_p, SRC_TOP11, 24, 1),
-> +       MUX(0, "mout_sw_aclk333", mout_sw_aclk333_p, SRC_TOP11, 28, 1),
-> +
-> +       MUX(0, "mout_sw_aclk333_g2d", mout_sw_aclk333_g2d_p,
-> +                       SRC_TOP12, 8, 1),
-> +       MUX(0, "mout_sw_aclk266_g2d", mout_sw_aclk266_g2d_p,
-> +                       SRC_TOP12, 12, 1),
-> +       MUX(0, "mout_sw_aclk_g3d", mout_sw_aclk_g3d_p, SRC_TOP12, 16, 1),
-> +       MUX(0, "mout_sw_aclk300_jpeg", mout_sw_aclk300_jpeg_p,
-> +                       SRC_TOP12, 20, 1),
-> +       MUX(0, "mout_sw_aclk300_disp1", mout_sw_aclk300_disp1_p,
->                         SRC_TOP12, 24, 1),
-> -       MUX(0, "mout_sw_aclk300_gscl", sw_aclk300_gscl_p, SRC_TOP12, 28, 1),
-> +       MUX(0, "mout_sw_aclk300_gscl", mout_sw_aclk300_gscl_p,
-> +                       SRC_TOP12, 28, 1),
->
->         /* DISP1 Block */
-> -       MUX(0, "mout_fimd1", group3_p, SRC_DISP10, 4, 1),
-> -       MUX(0, "mout_mipi1", group2_p, SRC_DISP10, 16, 3),
-> -       MUX(0, "mout_dp1", group2_p, SRC_DISP10, 20, 3),
-> -       MUX(0, "mout_pixel", group2_p, SRC_DISP10, 24, 3),
-> -       MUX(CLK_MOUT_HDMI, "mout_hdmi", hdmi_p, SRC_DISP10, 28, 1),
-> +       MUX(0, "mout_fimd1", mout_group3_p, SRC_DISP10, 4, 1),
-> +       MUX(0, "mout_mipi1", mout_group2_p, SRC_DISP10, 16, 3),
-> +       MUX(0, "mout_dp1", mout_group2_p, SRC_DISP10, 20, 3),
-> +       MUX(0, "mout_pixel", mout_group2_p, SRC_DISP10, 24, 3),
-> +       MUX(CLK_MOUT_HDMI, "mout_hdmi", mout_hdmi_p, SRC_DISP10, 28, 1),
->
->         /* MAU Block */
-> -       MUX(0, "mout_maudio0", maudio0_p, SRC_MAU, 28, 3),
-> +       MUX(0, "mout_maudio0", mout_maudio0_p, SRC_MAU, 28, 3),
->
->         /* FSYS Block */
-> -       MUX(0, "mout_usbd301", group2_p, SRC_FSYS, 4, 3),
-> -       MUX(0, "mout_mmc0", group2_p, SRC_FSYS, 8, 3),
-> -       MUX(0, "mout_mmc1", group2_p, SRC_FSYS, 12, 3),
-> -       MUX(0, "mout_mmc2", group2_p, SRC_FSYS, 16, 3),
-> -       MUX(0, "mout_usbd300", group2_p, SRC_FSYS, 20, 3),
-> -       MUX(0, "mout_unipro", group2_p, SRC_FSYS, 24, 3),
-> +       MUX(0, "mout_usbd301", mout_group2_p, SRC_FSYS, 4, 3),
-> +       MUX(0, "mout_mmc0", mout_group2_p, SRC_FSYS, 8, 3),
-> +       MUX(0, "mout_mmc1", mout_group2_p, SRC_FSYS, 12, 3),
-> +       MUX(0, "mout_mmc2", mout_group2_p, SRC_FSYS, 16, 3),
-> +       MUX(0, "mout_usbd300", mout_group2_p, SRC_FSYS, 20, 3),
-> +       MUX(0, "mout_unipro", mout_group2_p, SRC_FSYS, 24, 3),
->
->         /* PERIC Block */
-> -       MUX(0, "mout_uart0", group2_p, SRC_PERIC0, 4, 3),
-> -       MUX(0, "mout_uart1", group2_p, SRC_PERIC0, 8, 3),
-> -       MUX(0, "mout_uart2", group2_p, SRC_PERIC0, 12, 3),
-> -       MUX(0, "mout_uart3", group2_p, SRC_PERIC0, 16, 3),
-> -       MUX(0, "mout_pwm", group2_p, SRC_PERIC0, 24, 3),
-> -       MUX(0, "mout_spdif", spdif_p, SRC_PERIC0, 28, 3),
-> -       MUX(0, "mout_audio0", audio0_p, SRC_PERIC1, 8, 3),
-> -       MUX(0, "mout_audio1", audio1_p, SRC_PERIC1, 12, 3),
-> -       MUX(0, "mout_audio2", audio2_p, SRC_PERIC1, 16, 3),
-> -       MUX(0, "mout_spi0", group2_p, SRC_PERIC1, 20, 3),
-> -       MUX(0, "mout_spi1", group2_p, SRC_PERIC1, 24, 3),
-> -       MUX(0, "mout_spi2", group2_p, SRC_PERIC1, 28, 3),
-> +       MUX(0, "mout_uart0", mout_group2_p, SRC_PERIC0, 4, 3),
-> +       MUX(0, "mout_uart1", mout_group2_p, SRC_PERIC0, 8, 3),
-> +       MUX(0, "mout_uart2", mout_group2_p, SRC_PERIC0, 12, 3),
-> +       MUX(0, "mout_uart3", mout_group2_p, SRC_PERIC0, 16, 3),
-> +       MUX(0, "mout_pwm", mout_group2_p, SRC_PERIC0, 24, 3),
-> +       MUX(0, "mout_spdif", mout_spdif_p, SRC_PERIC0, 28, 3),
-> +       MUX(0, "mout_audio0", mout_audio0_p, SRC_PERIC1, 8, 3),
-> +       MUX(0, "mout_audio1", mout_audio1_p, SRC_PERIC1, 12, 3),
-> +       MUX(0, "mout_audio2", mout_audio2_p, SRC_PERIC1, 16, 3),
-> +       MUX(0, "mout_spi0", mout_group2_p, SRC_PERIC1, 20, 3),
-> +       MUX(0, "mout_spi1", mout_group2_p, SRC_PERIC1, 24, 3),
-> +       MUX(0, "mout_spi2", mout_group2_p, SRC_PERIC1, 28, 3),
->  };
->
->  static struct samsung_div_clock exynos5420_div_clks[] __initdata = {
-> --
-> 1.7.9.5
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Still badly indented. Maybe your emailer is mangling whitespaces.
 
+The best is to use git send-email to send the patches.
+
+Also, please c/c linux-media ML for the entire patch series, as, in general,
+we generally merge all patches via one tree (typically, the tree to where the
+real driver will be merged - in this case, the media tree), after getting
+the needed acks from DT and arm subarch maintainers (when applicable).
+
+I'll do a better review after the whitespace fixups.
+
+Regards,
+Mauro
+
+> +
+> +static irqreturn_t sunxi_ir_irq(int irqno, void *dev_id)
+> +{
+> + unsigned long status;
+> + unsigned char dt;
+> + unsigned int cnt, rc;
+> + struct sunxi_ir *ir = dev_id;
+> + DEFINE_IR_RAW_EVENT(rawir);
+> +
+> + spin_lock_irq(&ir->ir_lock);
+> +
+> + status = readl(ir->base + SUNXI_IR_RXSTA_REG);
+> +
+> + /* clean all pending statuses */
+> + writel(status | 0xff, ir->base + SUNXI_IR_RXSTA_REG);
+> +
+> + if (status & SUNXI_IR_RXINTS_RXDA) {
+> + /* How much messages in fifo */
+> + rc  = (status >> 8) & 0x3f;
+> + /* Sanity check */
+> + rc = rc > SUNXI_IR_FIFO_SIZE ? SUNXI_IR_FIFO_SIZE : rc;
+> + /* if we have data */
+> + for (cnt = 0; cnt < rc; cnt++) {
+> + /* for each bit in fifo */
+> + dt = readb(ir->base + SUNXI_IR_RXFIFO_REG);
+> + rawir.pulse = (dt & 0x80) != 0;
+> + rawir.duration = (dt & 0x7f) * SUNXI_IR_SAMPLE;
+> + ir_raw_event_store_with_filter(ir->rc, &rawir);
+> + }
+> + }
+> +
+> + if (status & SUNXI_IR_RXINTS_RXOF)
+> + ir_raw_event_reset(ir->rc);
+> + else if (status & SUNXI_IR_RXINTS_RXPE) {
+> + ir_raw_event_set_idle(ir->rc, true);
+> + ir_raw_event_handle(ir->rc);
+> + }
+> +
+> + spin_unlock_irq(&ir->ir_lock);
+> +
+> + return IRQ_HANDLED;
+> +}
+> +
+> +
+> +static int sunxi_ir_probe(struct platform_device *pdev)
+> +{
+> + int ret = 0;
+> + unsigned long tmp = 0;
+> +
+> + struct device *dev = &pdev->dev;
+> + struct device_node *dn = dev->of_node;
+> + struct resource *res;
+> + struct sunxi_ir *ir;
+> +
+> + ir = devm_kzalloc(dev, sizeof(struct sunxi_ir), GFP_KERNEL);
+> + if (!ir)
+> + return -ENOMEM;
+> +
+> + /* Clock */
+> + ir->apb_clk = devm_clk_get(dev, "apb");
+> + if (IS_ERR(ir->apb_clk)) {
+> + dev_err(dev, "failed to get a apb clock.\n");
+> + return -EINVAL;
+> + }
+> + ir->clk = devm_clk_get(dev, "ir");
+> + if (IS_ERR(ir->clk)) {
+> + dev_err(dev, "failed to get a ir clock.\n");
+> + return -EINVAL;
+> + }
+> +
+> + ret = clk_set_rate(ir->clk, SUNXI_IR_BASE_CLK);
+> + if (ret) {
+> + dev_err(dev, "set ir base clock failed!\n");
+> + return -EINVAL;
+> + }
+> +
+> + if (clk_prepare_enable(ir->apb_clk)) {
+> + dev_err(dev, "try to enable apb_ir_clk failed\n");
+> + return -EINVAL;
+> + }
+> +
+> + if (clk_prepare_enable(ir->clk)) {
+> + dev_err(dev, "try to enable ir_clk failed\n");
+> + ret = -EINVAL;
+> + goto exit_clkdisable_apb_clk;
+> + }
+> +
+> + /* IO */
+> + res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +
+> + ir->base = devm_ioremap_resource(dev, res);
+> + if (IS_ERR(ir->base)) {
+> + dev_err(dev, "failed to map registers\n");
+> + ret = -ENOMEM;
+> + goto exit_clkdisable_clk;
+> + }
+> +
+> + /* IRQ */
+> + ir->irq = platform_get_irq(pdev, 0);
+> + if (ir->irq < 0) {
+> + dev_err(dev, "no irq resource\n");
+> + ret = -EINVAL;
+> + goto exit_clkdisable_clk;
+> + }
+> +
+> + ret = devm_request_irq(dev, ir->irq, sunxi_ir_irq, 0, SUNXI_IR_DEV, ir);
+> + if (ret) {
+> + dev_err(dev, "failed request irq\n");
+> + ret = -EINVAL;
+> + goto exit_clkdisable_clk;
+> + }
+> +
+> + ir->rc = rc_allocate_device();
+> +
+> + if (!ir->rc) {
+> + dev_err(dev, "failed to allocate device\n");
+> + ret = -ENOMEM;
+> + goto exit_clkdisable_clk;
+> + }
+> +
+> + ir->rc->priv = ir;
+> + ir->rc->input_name = SUNXI_IR_DEV;
+> + ir->rc->input_phys = "sunxi-ir/input0";
+> + ir->rc->input_id.bustype = BUS_HOST;
+> + ir->rc->input_id.vendor = 0x0001;
+> + ir->rc->input_id.product = 0x0001;
+> + ir->rc->input_id.version = 0x0100;
+> + ir->map_name = of_get_property(dn, "linux,rc-map-name", NULL);
+> + ir->rc->map_name = ir->map_name ?: RC_MAP_EMPTY;
+> + ir->rc->dev.parent = dev;
+> + ir->rc->driver_type = RC_DRIVER_IR_RAW;
+> + rc_set_allowed_protocols(ir->rc, RC_BIT_ALL);
+> + ir->rc->rx_resolution = SUNXI_IR_SAMPLE;
+> + ir->rc->timeout = MS_TO_NS(SUNXI_IR_TIMEOUT);
+> + ir->rc->driver_name = SUNXI_IR_DEV;
+> +
+> + ret = rc_register_device(ir->rc);
+> + if (ret) {
+> + dev_err(dev, "failed to register rc device\n");
+> + ret = -EINVAL;
+> + goto exit_free_dev;
+> + }
+> +
+> + platform_set_drvdata(pdev, ir);
+> +
+> + /* Enable CIR Mode */
+> + writel(0x3 << 4, ir->base+SUNXI_IR_CTL_REG);
+> +
+> + /* Config IR Sample Register */
+> + /* Fsample = clk */
+> + tmp = 0;
+> + /* Set Filter Threshold */
+> + tmp |= (SUNXI_IR_RXFILT & 0x3f) << 2;
+> + /* Set Idle Threshold */
+> + tmp |= (SUNXI_IR_RXIDLE & 0xff) << 8;
+> + writel(tmp, ir->base + SUNXI_IR_CIR_REG);
+> +
+> + /* Invert Input Signal */
+> + writel(0x1 << 2, ir->base + SUNXI_IR_RXCTL_REG);
+> +
+> + /* Clear All Rx Interrupt Status */
+> + writel(0xff, ir->base + SUNXI_IR_RXSTA_REG);
+> +
+> + /* Enable IRQ on data, overflow, packed end */
+> + tmp = (0x1 << 4) | 0x3;
+> +
+> + /* Rx FIFO Threshold */
+> + tmp |= (SUNXI_IR_FIFO_TRIG - 1) << 8;
+> +
+> + writel(tmp, ir->base + SUNXI_IR_RXINT_REG);
+> +
+> + /* Enable IR Module */
+> + tmp = readl(ir->base + SUNXI_IR_CTL_REG);
+> +
+> + writel(tmp | 0x3, ir->base + SUNXI_IR_CTL_REG);
+> +
+> + dev_info(dev, "initialized sunXi IR driver\n");
+> + return 0;
+> +
+> +exit_free_dev:
+> + rc_free_device(ir->rc);
+> +exit_clkdisable_clk:
+> + clk_disable_unprepare(ir->clk);
+> +exit_clkdisable_apb_clk:
+> + clk_disable_unprepare(ir->apb_clk);
+> +
+> + return ret;
+> +}
+> +
+> +static int sunxi_ir_remove(struct platform_device *pdev)
+> +{
+> + unsigned long flags;
+> + struct sunxi_ir *ir = platform_get_drvdata(pdev);
+> +
+> + clk_disable_unprepare(ir->clk);
+> + clk_disable_unprepare(ir->apb_clk);
+> +
+> + spin_lock_irqsave(&ir->ir_lock, flags);
+> + /* disable IR IRQ */
+> + writel(0, ir->base + SUNXI_IR_RXINT_REG);
+> + /* clear All Rx Interrupt Status */
+> + writel(0xff, ir->base + SUNXI_IR_RXSTA_REG);
+> + /* disable IR */
+> + writel(0, ir->base + SUNXI_IR_CTL_REG);
+> + spin_unlock_irqrestore(&ir->ir_lock, flags);
+> +
+> + rc_unregister_device(ir->rc);
+> + return 0;
+> +}
+> +
+> +static const struct of_device_id sunxi_ir_match[] = {
+> + { .compatible = "allwinner,sun7i-a20-ir", },
+> + {},
+> +};
+> +
+> +static struct platform_driver sunxi_ir_driver = {
+> + .probe          = sunxi_ir_probe,
+> + .remove         = sunxi_ir_remove,
+> + .driver = {
+> + .name = SUNXI_IR_DEV,
+> + .owner = THIS_MODULE,
+> + .of_match_table = sunxi_ir_match,
+> + },
+> +};
+> +
+> +module_platform_driver(sunxi_ir_driver);
+> +
+> +MODULE_DESCRIPTION("Allwinner sunXi IR controller driver");
+> +MODULE_AUTHOR("Alexsey Shestacov <wingrime@linux-sunxi.org>");
+> +MODULE_LICENSE("GPL");
+> 
+> 
+> ?????, 30 ?????? 2014 ?., 16:51:12 UTC+6 ???????????? ????????? ???????? 
+> ???????:
+> >
+> > This patch introduces Consumer IR(CIR) support for sunxi boards.
+> >
+> > This is based on Alexsey Shestacov's work based on the original driver 
+> > supplied by Allwinner.
+> >
 
 
 -- 
-Regards,
-Alim
+
+Cheers,
+Mauro
