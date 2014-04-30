@@ -1,56 +1,55 @@
-From: jays.lee@samsung.com (Jungseok Lee)
-Date: Wed, 30 Apr 2014 11:44:13 +0900
-Subject: [PATCH v4 2/7] arm64: Decouple page size from level of translation
- tables
-In-Reply-To: <20140429144052.GJ17007@arm.com>
-References: <000201cf6367$c8084440$5818ccc0$@samsung.com>
- <20140429144052.GJ17007@arm.com>
-Message-ID: <007d01cf641e$122f9b20$368ed160$@samsung.com>
+From: joelf@ti.com (Joel Fernandes)
+Date: Tue, 29 Apr 2014 21:53:47 -0500
+Subject: [PATCH] ARM: OMAP5: Redo THUMB mode switch on secondary CPU
+Message-ID: <1398826427-17200-1-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, April 29, 2014 11:41 PM, Catalin Marinas wrote:
-> Jungseok,
+Here's a redo of the patch [1] that effectively does the same
+thing but is the right way to do things by using ENDPROC instead.
+The firmware correctly switches to THUMB before entry.
 
-Hi, Catalin
+The patch applies ontop of the earlier patch [1].
 
-> On Tue, Apr 29, 2014 at 05:59:20AM +0100, Jungseok Lee wrote:
-> > +choice
-> > +	prompt "Level of translation tables"
-> > +	default ARM64_3_LEVELS if ARM64_4K_PAGES
-> > +	default ARM64_2_LEVELS if ARM64_64K_PAGES
-> > +	help
-> > +	  Allows level of translation tables.
-> > +
-> > +config ARM64_2_LEVELS
-> > +	bool "2 level"
-> > +	depends on ARM64_64K_PAGES
-> > +	help
-> > +	  This feature enables 2 levels of translation tables.
-> > +
-> > +config ARM64_3_LEVELS
-> > +	bool "3 level"
-> > +	depends on ARM64_4K_PAGES
-> > +	help
-> > +	  This feature enables 3 levels of translation tables.
-> > +
-> > +endchoice
-> 
-> As I mentioned previously
-> (http://www.spinics.net/linux/lists/arm-kernel/msg319552.html), just expose options for the VA space
-> bits rather than the number of levels.
-> You can still keep the number of levels config options but not visible in menuconfig (though I think
-> you could also hide them in some header and avoid config altogether). The VA bits config options can
-> be:
-> 
-> VA_BITS_39 if 4K (3 levels)
-> VA_BITS_42 if 64K (2 levels)
-> VA_BITS_47 if 16K (3 levels)
-> VA_BITS_48 if 4K || 16K || 64K (4/4/3 levels depending on page size)
-> 
-> That's more meaningful to people configuring the kernel.
+[1] https://lkml.org/lkml/2014/4/22/1044
 
-Okay, I will revise VA_BITS config as hiding the number of levels.
+Suggested-by: Dave Martin <Dave.Martin@arm.com>
+Cc: Dave Martin <Dave.Martin@arm.com>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Nishanth Menon <nm@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Joel Fernandes <joelf@ti.com>
+---
 
-Best Regards
-Jungseok Lee
+Tony, the earlier patch went into your fixes, and can remain. This patch is just a simple redo of the same and can go in for v3.16, no problem. Thanks.
+
+ arch/arm/mach-omap2/omap-headsmp.S |    6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/omap-headsmp.S b/arch/arm/mach-omap2/omap-headsmp.S
+index 1809dce..bf36f26 100644
+--- a/arch/arm/mach-omap2/omap-headsmp.S
++++ b/arch/arm/mach-omap2/omap-headsmp.S
+@@ -31,10 +31,6 @@
+  * register AuxCoreBoot0.
+  */
+ ENTRY(omap5_secondary_startup)
+-.arm
+-THUMB( adr     r9, BSYM(wait)  )       @ CPU may be entered in ARM mode.
+-THUMB( bx      r9              )       @ If this is a Thumb-2 kernel,
+-THUMB( .thumb                  )       @ switch to Thumb now.
+ wait:	ldr	r2, =AUX_CORE_BOOT0_PA	@ read from AuxCoreBoot0
+ 	ldr	r0, [r2]
+ 	mov	r0, r0, lsr #5
+@@ -43,7 +39,7 @@ wait:	ldr	r2, =AUX_CORE_BOOT0_PA	@ read from AuxCoreBoot0
+ 	cmp	r0, r4
+ 	bne	wait
+ 	b	secondary_startup
+-END(omap5_secondary_startup)
++ENDPROC(omap5_secondary_startup)
+ /*
+  * OMAP4 specific entry point for secondary CPU to jump from ROM
+  * code.  This routine also provides a holding flag into which
+-- 
+1.7.9.5
