@@ -1,56 +1,72 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 30 Apr 2014 03:06:49 +0200
-Subject: [PATCH/RFC v2] serial: sh-sci: Add device tree support for r8a7779
-In-Reply-To: <1398756011-4672-1-git-send-email-horms+renesas@verge.net.au>
-References: <1398756011-4672-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <2737920.PNRvA9nzcM@avalon>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Wed, 30 Apr 2014 03:07:53 +0200
+Subject: [PATCH 4/4] ARM: dts: Add LCD panel sharp ls037v7dw01 support for
+ omap3-evm and ldp
+In-Reply-To: <1398815562-24113-5-git-send-email-tony@atomide.com>
+References: <1398815562-24113-1-git-send-email-tony@atomide.com>
+ <1398815562-24113-5-git-send-email-tony@atomide.com>
+Message-ID: <CAGhQ9Vwa8xXQEo5dNEKAvmaS9DoBjVSthtd8=owk+atVdFuiiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
-
-Thank you for the patch.
-
-I've CC'ed the DT list which seems to have been forgotten.
-
-On Tuesday 29 April 2014 16:20:11 Simon Horman wrote:
-> Simply document a new compat string.
-> There appears to be no need for a driver updates.
-> 
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> 
+On 30 April 2014 01:52, Tony Lindgren <tony@atomide.com> wrote:
+> Looks like quite a few omaps have sharp ls037v7dw01 that's configured
+> as various panel dpi entries for whatever legacy reasons. For device
+> tree based support, let's just configure these properly for panel
+> ls037v7dw01 instead of panel dpi.
+>
+> This patch creates a common file for panel ls037v7dw01, and makes
+> boards ldp and omap3-evm to use it. The panel for ldp is configured
+> in the qvga mode and omap3-evm panel in vga mode.
+>
+> The ls037v7dw01 also seems to be coupled with an ad7846 touchscreen
+> controller for the omaps, so let's add a basic configuration for
+> the touchscreen also using the default values.
+>
+> Note that we can now remove the regulator-name = "vdds_dsi"
+> entry for ldp, that's no longer needed as we have the entry
+> for vdds_dsi-supply = <&vpll2>.
+>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 > ---
-> 
-> v2
-> * Do not update the driver to set SCSCR_CKE1.
->   Instead DT may provide the P clock as the clock for the SCIF devices.
-> ---
->  Documentation/devicetree/bindings/serial/renesas,sci-serial.txt | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt
-> b/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt index
-> 53e6c17..bba86de 100644
-> --- a/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt
-> +++ b/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt
-> @@ -12,6 +12,7 @@ Required properties:
->      - "renesas,scifa-r8a7791" for R8A7791 (R-Car M2) SCIFA compatible UART.
->      - "renesas,scifb-r8a7791" for R8A7791 (R-Car M2) SCIFB compatible UART.
->      - "renesas,hscif-r8a7791" for R8A7791 (R-Car M2) HSCIF compatible UART.
-> +    - "renesas,scif-r8a7779" for R8A7779 (R-Car H1) SCIF compatible UART.
+>  .../arm/boot/dts/omap-panel-sharp-ls037v7dw01.dtsi | 82 ++++++++++++++++++++++
+>  arch/arm/boot/dts/omap3-evm-37xx.dts               | 50 +++++++++++++
+>  arch/arm/boot/dts/omap3-evm-common.dtsi            | 47 +++++++++++++
+>  arch/arm/boot/dts/omap3-ldp.dts                    | 31 ++++++--
+>  4 files changed, 205 insertions(+), 5 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/omap-panel-sharp-ls037v7dw01.dtsi
 
-What about moving this at the top of the list to keep it sorted by SoC number 
-?
+> diff --git a/arch/arm/boot/dts/omap3-ldp.dts b/arch/arm/boot/dts/omap3-ldp.dts
+> index 0abe986..50fdac9 100644
+> --- a/arch/arm/boot/dts/omap3-ldp.dts
+> +++ b/arch/arm/boot/dts/omap3-ldp.dts
+> @@ -164,6 +164,7 @@
+>
+>  #include "twl4030.dtsi"
+>  #include "twl4030_omap3.dtsi"
+> +#include "omap-panel-sharp-ls037v7dw01.dtsi"
+>
+>  &i2c2 {
+>         clock-frequency = <400000>;
+> @@ -173,6 +174,31 @@
+>         clock-frequency = <400000>;
+>  };
+>
+> +&lcd_3v3 {
+> +       gpio = <&twl_gpio 7 GPIO_ACTIVE_HIGH>;
+> +       enable-active-high;
+> +};
+> +
+> +&lcd0 {
+> +       reset-gpios = <&gpio2 23 GPIO_ACTIVE_HIGH>;     /* gpio55, lcd RESB */
+> +       gpios = <&gpio2 24 GPIO_ACTIVE_LOW      /* gpio56, lcd MO */
 
-Apart from that,
+enable-gpios ?
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> +                0                              /* lcd LR */
+> +                0                              /* lcd UD */
+> +                0>;                            /* lcd INI */
+> +};
 
->      - "renesas,scif" for generic SCIF compatible UART.
->      - "renesas,scifa" for generic SCIFA compatible UART.
->      - "renesas,scifb" for generic SCIFB compatible UART.
-
--- 
-Regards,
-
-Laurent Pinchart
+regards
+Joachim Eastwood
