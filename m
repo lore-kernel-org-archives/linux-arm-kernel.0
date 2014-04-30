@@ -1,34 +1,35 @@
-From: schmitzmic@gmail.com (Michael Schmitz)
-Date: Wed, 30 Apr 2014 19:45:25 +1200
-Subject: [PATCH v2 00/12] scsi/NCR5380: fix debugging macros and #include
- structure
-In-Reply-To: <1398782476.2218.20.camel@dabdike.int.hansenpartnership.com>
-References: <20140319123516.542623278@telegraphics.com.au>
- <1398532863.24466.2.camel@dabdike.int.hansenpartnership.com>
- <alpine.LNX.2.00.1404291202190.32739@nippy.intranet>
- <CAOmrzk+kuepC7QR4uchP_zxk7-Bi7faiF-Z5jGX9KMcHn-7_9Q@mail.gmail.com>
- <1398782476.2218.20.camel@dabdike.int.hansenpartnership.com>
-Message-ID: <5360AA15.9060006@gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 30 Apr 2014 09:57:59 +0200
+Subject: [PATCH] Xen: hibernation is x86-only at the moment
+In-Reply-To: <5165529.jneGVBC5b5@wuerfel>
+References: <5165529.jneGVBC5b5@wuerfel>
+Message-ID: <20140430075759.GA5899@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
-> Perhaps Michael and Sam would be interested in sharing the role, for atari
-> and sun3 NCR5380 drivers (?)
->> If you insist ...
->>
->> (kidding - I"m OK with it if James thinks it's worth it)
-> As long as you understand how it works and how to fix it, the more the
-> merrier.  It gives me more people to yell at if something goes wrong
-> with the driver.
+On Tue 2014-04-29 22:00:53, Arnd Bergmann wrote:
+> In commit 603fb42a66499ab "ARM: 8011/1: ARM hibernation / suspend-to-disk",
+> currently in linux-next, the ARM architecture gains support for
+> hibernation (suspend-to-disk). Xen supports this in principle, but only
+> has an architecture specific hypercall defined on x86, which leads
+> to a build error when both hibernation and Xen support are enabled:
+> 
+> drivers/xen/manage.c:105:2: error: implicit declaration of function 'HYPERVISOR_suspend' [-Werror=implicit-function-declaration]
+>   si->cancelled = HYPERVISOR_suspend(si->arg);
+> 
+> It is probably a good idea to define this hypercall on ARM as well
+> and provide an implementation in the host, but until that is done,
+> this patch helps disable the broken code in the Xen guest by making
+> it depend on CONFIG_X86.
 
-I used to have a fair understanding of the Atari driver years back - 
-just need to get my head around all the midlevel and error handling 
-changes since.
+You should better do the dependency in Kconfig.
 
-You'll be yelling at me regarding any breakage in the Atari NCR5380 
-driver anyway in the end - count me in.
+This way, you'll have to update two places each time new architecture
+is supported...
 
-Cheers,
+Thanks,
+								Pavel
 
-     Michael
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
