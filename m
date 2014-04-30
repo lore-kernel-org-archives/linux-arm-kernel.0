@@ -1,71 +1,83 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 30 Apr 2014 10:43:56 +0100
-Subject: [PATCH] ARM: OMAP5: Redo THUMB mode switch on secondary CPU
-In-Reply-To: <1398826427-17200-1-git-send-email-joelf@ti.com>
-References: <1398826427-17200-1-git-send-email-joelf@ti.com>
-Message-ID: <20140430094348.GA3986@e103592.cambridge.arm.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed, 30 Apr 2014 18:51:29 +0900
+Subject: [PATCH v6 1/4] arm64: make a single hook to syscall_trace() for all
+ syscall features
+In-Reply-To: <1398851492-16345-1-git-send-email-takahiro.akashi@linaro.org>
+References: <1394861948-28712-1-git-send-email-takahiro.akashi@linaro.org>
+ <1398851492-16345-1-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <1398851492-16345-2-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 29, 2014 at 09:53:47PM -0500, Joel Fernandes wrote:
-> Here's a redo of the patch [1] that effectively does the same
-> thing but is the right way to do things by using ENDPROC instead.
-> The firmware correctly switches to THUMB before entry.
-> 
-> The patch applies ontop of the earlier patch [1].
-> 
-> [1] https://lkml.org/lkml/2014/4/22/1044
-> 
-> Suggested-by: Dave Martin <Dave.Martin@arm.com>
-> Cc: Dave Martin <Dave.Martin@arm.com>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Nishanth Menon <nm@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Joel Fernandes <joelf@ti.com>
+Currently syscall_trace() is called only for ptrace.
+With additional TIF_xx flags defined, it is now called in all the cases
+of audit, ftrace and seccomp in addition to ptrace.
 
-Looks OK to me.
+Acked-by: Richard Guy Briggs <rgb@redhat.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+---
+ arch/arm64/include/asm/thread_info.h |   13 +++++++++++++
+ arch/arm64/kernel/entry.S            |    5 +++--
+ 2 files changed, 16 insertions(+), 2 deletions(-)
 
-This also makes omap5 consistent with omap3/4 here.
-
-Reviewed-by: Dave Martin <Dave.Martin@arm.com>
-
-> ---
-> 
-> Tony, the earlier patch went into your fixes, and can remain. This patch is just a simple redo of the same and can go in for v3.16, no problem. Thanks.
-> 
->  arch/arm/mach-omap2/omap-headsmp.S |    6 +-----
->  1 file changed, 1 insertion(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/omap-headsmp.S b/arch/arm/mach-omap2/omap-headsmp.S
-> index 1809dce..bf36f26 100644
-> --- a/arch/arm/mach-omap2/omap-headsmp.S
-> +++ b/arch/arm/mach-omap2/omap-headsmp.S
-> @@ -31,10 +31,6 @@
->   * register AuxCoreBoot0.
->   */
->  ENTRY(omap5_secondary_startup)
-> -.arm
-> -THUMB( adr     r9, BSYM(wait)  )       @ CPU may be entered in ARM mode.
-> -THUMB( bx      r9              )       @ If this is a Thumb-2 kernel,
-> -THUMB( .thumb                  )       @ switch to Thumb now.
->  wait:	ldr	r2, =AUX_CORE_BOOT0_PA	@ read from AuxCoreBoot0
->  	ldr	r0, [r2]
->  	mov	r0, r0, lsr #5
-> @@ -43,7 +39,7 @@ wait:	ldr	r2, =AUX_CORE_BOOT0_PA	@ read from AuxCoreBoot0
->  	cmp	r0, r4
->  	bne	wait
->  	b	secondary_startup
-> -END(omap5_secondary_startup)
-> +ENDPROC(omap5_secondary_startup)
->  /*
->   * OMAP4 specific entry point for secondary CPU to jump from ROM
->   * code.  This routine also provides a holding flag into which
-> -- 
-> 1.7.9.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+index 720e70b..0a8b2a9 100644
+--- a/arch/arm64/include/asm/thread_info.h
++++ b/arch/arm64/include/asm/thread_info.h
+@@ -91,6 +91,9 @@ static inline struct thread_info *current_thread_info(void)
+ /*
+  * thread information flags:
+  *  TIF_SYSCALL_TRACE	- syscall trace active
++ *  TIF_SYSCALL_TRACEPOINT - syscall tracepoint for ftrace
++ *  TIF_SYSCALL_AUDIT	- syscall auditing
++ *  TIF_SECOMP		- syscall secure computing
+  *  TIF_SIGPENDING	- signal pending
+  *  TIF_NEED_RESCHED	- rescheduling necessary
+  *  TIF_NOTIFY_RESUME	- callback before returning to user
+@@ -101,6 +104,9 @@ static inline struct thread_info *current_thread_info(void)
+ #define TIF_NEED_RESCHED	1
+ #define TIF_NOTIFY_RESUME	2	/* callback before returning to user */
+ #define TIF_SYSCALL_TRACE	8
++#define TIF_SYSCALL_AUDIT	9
++#define TIF_SYSCALL_TRACEPOINT	10
++#define TIF_SECCOMP		11
+ #define TIF_POLLING_NRFLAG	16
+ #define TIF_MEMDIE		18	/* is terminating due to OOM killer */
+ #define TIF_FREEZE		19
+@@ -112,10 +118,17 @@ static inline struct thread_info *current_thread_info(void)
+ #define _TIF_SIGPENDING		(1 << TIF_SIGPENDING)
+ #define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
+ #define _TIF_NOTIFY_RESUME	(1 << TIF_NOTIFY_RESUME)
++#define _TIF_SYSCALL_TRACE	(1 << TIF_SYSCALL_TRACE)
++#define _TIF_SYSCALL_AUDIT	(1 << TIF_SYSCALL_AUDIT)
++#define _TIF_SYSCALL_TRACEPOINT	(1 << TIF_SYSCALL_TRACEPOINT)
++#define _TIF_SECCOMP		(1 << TIF_SECCOMP)
+ #define _TIF_32BIT		(1 << TIF_32BIT)
+ 
+ #define _TIF_WORK_MASK		(_TIF_NEED_RESCHED | _TIF_SIGPENDING | \
+ 				 _TIF_NOTIFY_RESUME)
+ 
++#define _TIF_SYSCALL_WORK	(_TIF_SYSCALL_TRACE | _TIF_SYSCALL_AUDIT | \
++				 _TIF_SYSCALL_TRACEPOINT | _TIF_SECCOMP)
++
+ #endif /* __KERNEL__ */
+ #endif /* __ASM_THREAD_INFO_H */
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 39ac630..f9f2cae 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -631,8 +631,9 @@ el0_svc_naked:					// compat entry point
+ 	enable_irq
+ 
+ 	get_thread_info tsk
+-	ldr	x16, [tsk, #TI_FLAGS]		// check for syscall tracing
+-	tbnz	x16, #TIF_SYSCALL_TRACE, __sys_trace // are we tracing syscalls?
++	ldr	x16, [tsk, #TI_FLAGS]		// check for syscall hooks
++	tst	x16, #_TIF_SYSCALL_WORK
++	b.ne	__sys_trace
+ 	adr	lr, ret_fast_syscall		// return address
+ 	cmp     scno, sc_nr                     // check upper syscall limit
+ 	b.hs	ni_sys
+-- 
+1.7.9.5
