@@ -1,112 +1,54 @@
-From: alim.akhtar@gmail.com (Alim Akhtar)
-Date: Wed, 30 Apr 2014 17:15:08 +0530
-Subject: [PATCH v3 09/16] clk: exynos5420: update clocks for WCORE block
-In-Reply-To: <1398344632-18623-10-git-send-email-shaik.ameer@samsung.com>
-References: <1398344632-18623-1-git-send-email-shaik.ameer@samsung.com>
- <1398344632-18623-10-git-send-email-shaik.ameer@samsung.com>
-Message-ID: <CAGOxZ51cUq74B5pCEg6HRNxMbkTA20MqPBy2LtHzGiHog4U_Rg@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 30 Apr 2014 07:45:48 -0400
+Subject: [PATCH 1/5] ARM: defconfigs: add MTD_SPI_NOR (new dependency
+ for M25P80)
+In-Reply-To: <20140429190603.GB9418@norris-Latitude-E6410>
+References: <1397719309-2022-1-git-send-email-computersforpeace@gmail.com>
+ <1397719309-2022-2-git-send-email-computersforpeace@gmail.com>
+ <535A8FC9.8040707@wwwdotorg.org>
+ <20140429190603.GB9418@norris-Latitude-E6410>
+Message-ID: <20140430114548.GQ28159@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shaik,
+On Tue, Apr 29, 2014 at 12:06:03PM -0700, Brian Norris wrote:
+> Hi Stephen,
+> 
+> On Fri, Apr 25, 2014 at 10:39:37AM -0600, Stephen Warren wrote:
+> > On 04/17/2014 01:21 AM, Brian Norris wrote:
+> > > These defconfigs contain the CONFIG_M25P80 symbol, which is now
+> > > dependent on the MTD_SPI_NOR symbol. Add CONFIG_MTD_SPI_NOR to the
+> > > relevant defconfigs.
+> > > 
+> > > At the same time, drop the now-nonexistent CONFIG_MTD_CHAR symbol.
+> > 
+> > I hadn't realized that the problem this patch solves was already present
+> > in the code, so this patch is simply catching up the defconfigs rather
+> > than part of a series which changed the code to cause the problem.
+> 
+> Yes, this is "catching up the defconfigs." The SPI_NOR framework is new,
+> and I didn't want to generate defconfig noise until a few things
+> stabilized (particularly, its Kconfig symbol name).
+> 
+> > So, this needs to be applied ASAP.
+> > 
+> > I think this should be split it up so that each defconfig can go through
+> > the tree that owns it to avoid conflicts. If you repost split up, I can
+> > apply the tegra_defconfig change to the Tegra tree.
+> 
+> OK, I'll try to split it up. Is ARM unique in tracking defconfigs in
+> separate trees? I assume MIPS, PowerPC, and Blackfin won't require the
+> same splitting? I'd like to avoid 31 patches when <20 could suffice.
 
-On Thu, Apr 24, 2014 at 6:33 PM, Shaik Ameer Basha
-<shaik.ameer@samsung.com> wrote:
-> This patch adds missing clocks from WCORE block.
->
-> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
-> Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
-> ---
-Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
+wrt arm-soc, typically they take all changes to multi_v7_defconfig
+directly since it is prone to conflicts.  All the other ones are managed
+by the individual sub-arch maintainers.
 
->  drivers/clk/samsung/clk-exynos5420.c |   28 ++++++++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
->
-> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
-> index 6ad87d1..d9996dd 100755
-> --- a/drivers/clk/samsung/clk-exynos5420.c
-> +++ b/drivers/clk/samsung/clk-exynos5420.c
-> @@ -89,6 +89,7 @@
->  #define GATE_BUS_PERIC1                0x10754
->  #define GATE_BUS_PERIS0                0x10760
->  #define GATE_BUS_PERIS1                0x10764
-> +#define GATE_BUS_NOC           0x10770
->  #define GATE_TOP_SCLK_ISP      0x10870
->  #define GATE_IP_GSCL0          0x10910
->  #define GATE_IP_GSCL1          0x10920
-> @@ -180,6 +181,7 @@ static unsigned long exynos5420_clk_regs[] __initdata = {
->         GATE_BUS_PERIC1,
->         GATE_BUS_PERIS0,
->         GATE_BUS_PERIS1,
-> +       GATE_BUS_NOC,
->         GATE_TOP_SCLK_ISP,
->         GATE_IP_GSCL0,
->         GATE_IP_GSCL1,
-> @@ -271,6 +273,13 @@ PNAME(mout_user_aclk200_fsys_p)    = {"fin_pll", "mout_sw_aclk200_fsys"};
->
->  PNAME(mout_sw_aclk200_fsys2_p) = {"dout_aclk200_fsys2", "mout_sclk_spll"};
->  PNAME(mout_user_aclk200_fsys2_p) = {"fin_pll", "mout_sw_aclk200_fsys2"};
-> +PNAME(mout_sw_aclk100_noc_p) = {"dout_aclk100_noc", "mout_sclk_spll"};
-> +PNAME(mout_user_aclk100_noc_p) = {"fin_pll", "mout_sw_aclk100_noc"};
-> +
-> +PNAME(mout_sw_aclk400_wcore_p) = {"dout_aclk400_wcore", "mout_sclk_spll"};
-> +PNAME(mout_aclk400_wcore_bpll_p) = {"mout_aclk400_wcore", "sclk_bpll"};
-> +PNAME(mout_user_aclk400_wcore_p) = {"fin_pll", "mout_sw_aclk400_wcore"};
-> +
->  PNAME(mout_sw_aclk400_isp_p) = {"dout_aclk400_isp", "mout_sclk_spll"};
->  PNAME(mout_user_aclk400_isp_p) = {"fin_pll", "mout_sw_aclk400_isp"};
->
-> @@ -486,6 +495,18 @@ static struct samsung_mux_clock exynos5420_mux_clks[] __initdata = {
->         MUX(0, "mout_spi0", mout_group2_p, SRC_PERIC1, 20, 3),
->         MUX(0, "mout_spi1", mout_group2_p, SRC_PERIC1, 24, 3),
->         MUX(0, "mout_spi2", mout_group2_p, SRC_PERIC1, 28, 3),
-> +       MUX(0, "mout_aclk100_noc", mout_group1_p, SRC_TOP0, 20, 2),
-> +       MUX(0, "mout_sw_aclk100_noc", mout_sw_aclk100_noc_p,
-> +               SRC_TOP10, 20, 1),
-> +       MUX(0, "mout_user_aclk100_noc", mout_user_aclk100_noc_p,
-> +               SRC_TOP3, 20, 1),
-> +       MUX(0, "mout_aclk400_wcore", mout_group1_p, SRC_TOP0, 16, 2),
-> +       MUX(0, "mout_aclk400_wcore_bpll", mout_aclk400_wcore_bpll_p,
-> +               TOP_SPARE2, 4, 1),
-> +       MUX(0, "mout_sw_aclk400_wcore", mout_sw_aclk400_wcore_p,
-> +               SRC_TOP10, 16, 1),
-> +       MUX(0, "mout_user_aclk400_wcore", mout_user_aclk400_wcore_p,
-> +               SRC_TOP3, 16, 1),
->         MUX(0, "mout_aclk400_isp", mout_group1_p, SRC_TOP0, 0, 2),
->         MUX(0, "mout_sw_aclk400_isp", mout_sw_aclk400_isp_p,
->                 SRC_TOP10, 0, 1),
-> @@ -553,6 +574,10 @@ static struct samsung_div_clock exynos5420_div_clks[] __initdata = {
->         DIV(0, "dout_disp1_blk", "aclk200_disp1", DIV2_RATIO0, 16, 2),
->         DIV(0, "dout_aclk400_disp1", "mout_aclk400_disp1", DIV_TOP2, 4, 3),
->
-> +       DIV(0, "dout_aclk100_noc", "mout_aclk100_noc", DIV_TOP0, 20, 3),
-> +       DIV(0, "dout_aclk400_wcore", "mout_aclk400_wcore_bpll",
-> +               DIV_TOP0, 16, 3),
-> +
->         /* Audio Block */
->         DIV(0, "dout_maudio0", "mout_maudio0", DIV_MAU, 20, 4),
->         DIV(0, "dout_maupcm0", "dout_maudio0", DIV_MAU, 24, 8),
-> @@ -867,6 +892,9 @@ static struct samsung_gate_clock exynos5420_gate_clks[] __initdata = {
->                         GATE_IP_MSCL, 10, 0, 0),
->         GATE(CLK_SMMU_MIXER, "smmu_mixer", "aclk200_disp1",
->                         GATE_IP_DISP1, 9, 0, 0),
-> +       /* aclk266 also gates other IPs in psgen. It should not be gated. */
-> +       GATE(0, "aclk266", "mout_user_aclk266",
-> +                       GATE_BUS_NOC, 22, CLK_IGNORE_UNUSED, 0),
->         GATE(0, "aclk200_disp1", "mout_user_aclk200_disp1",
->                         GATE_BUS_TOP, 18, CLK_IGNORE_UNUSED, 0),
->         GATE(0, "aclk300_disp1", "mout_user_aclk300_disp1",
-> --
-> 1.7.9.5
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> I'll also rebase on linux-next. I think there may be a few conflicts.
 
+I can't speak for the other sub-archs, but I typically prefer that
+patches be based on an -rc tag, -rc1 if possible.
 
+thx,
 
--- 
-Regards,
-Alim
+Jason.
