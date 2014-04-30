@@ -1,88 +1,21 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Wed, 30 Apr 2014 11:30:59 +0530
-Subject: [PATCH v3 01/12] ARM: EXYNOS: Make exynos machine_ops as static
-In-Reply-To: <1398835057-3860-2-git-send-email-pankaj.dubey@samsung.com>
-References: <1398835057-3860-1-git-send-email-pankaj.dubey@samsung.com>
- <1398835057-3860-2-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <CAK9yfHxfkegFzzJCz4nAkxrHT6FGT0OQ-5RkCdTA3ruo2kU8CA@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 30 Apr 2014 14:02:10 +0800
+Subject: [PATCH 3/8] ARM: dts: imx6: update pcie to bring in line with
+ new binding
+In-Reply-To: <1396025579-14344-4-git-send-email-l.stach@pengutronix.de>
+References: <1396025579-14344-1-git-send-email-l.stach@pengutronix.de>
+ <1396025579-14344-4-git-send-email-l.stach@pengutronix.de>
+Message-ID: <20140430060208.GA16727@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pankaj,
+On Fri, Mar 28, 2014 at 05:52:54PM +0100, Lucas Stach wrote:
+> The new bindings drops one clock, renames the others and
+> drops the old interrupt mapping.
+> 
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 
-On 30 April 2014 10:47, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
-> As machine function ops are used only in this file let's make
-> them static.
->
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
->  arch/arm/mach-exynos/exynos.c |    6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-> index 3d69e8d..06dcce5 100644
-> --- a/arch/arm/mach-exynos/exynos.c
-> +++ b/arch/arm/mach-exynos/exynos.c
-> @@ -198,7 +198,7 @@ static struct map_desc exynos5_iodesc[] __initdata = {
->         },
->  };
->
-> -void exynos_restart(enum reboot_mode mode, const char *cmd)
-> +static void exynos_restart(enum reboot_mode mode, const char *cmd)
->  {
->         struct device_node *np;
->         u32 val = 0x1;
-> @@ -239,7 +239,7 @@ void __init exynos_cpufreq_init(void)
->         platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
->  }
->
-> -void __init exynos_init_late(void)
-> +static void __init exynos_init_late(void)
->  {
->         if (of_machine_is_compatible("samsung,exynos5440"))
->                 /* to be supported later */
-> @@ -300,7 +300,7 @@ static void __init exynos_map_io(void)
->                 iotable_init(exynos5250_iodesc, ARRAY_SIZE(exynos5250_iodesc));
->  }
->
-> -void __init exynos_init_io(void)
-> +static void __init exynos_init_io(void)
->  {
->         debug_ll_io_init();
+It does not apply on my branch, and I had to apply it manually.  Please
+check my imx/dt branch to see if I did it right.
 
-
-The declarations from common.h should also be removed in this patch to
-avoid the below
-build errors:
-
-arch/arm/mach-exynos/exynos.c:198:13: error: static declaration of
-?exynos_restart? follows non-static declaration
- static void exynos_restart(enum reboot_mode mode, const char *cmd)
-             ^
-In file included from arch/arm/mach-exynos/exynos.c:31:0:
-arch/arm/mach-exynos/common.h:22:6: note: previous declaration of
-?exynos_restart? was here
- void exynos_restart(enum reboot_mode mode, const char *cmd);
-      ^
-arch/arm/mach-exynos/exynos.c:235:20: error: static declaration of
-?exynos_init_late? follows non-static declaration
- static void __init exynos_init_late(void)
-                    ^
-In file included from arch/arm/mach-exynos/exynos.c:31:0:
-arch/arm/mach-exynos/common.h:25:6: note: previous declaration of
-?exynos_init_late? was here
- void exynos_init_late(void);
-      ^
-arch/arm/mach-exynos/exynos.c:296:20: error: static declaration of
-?exynos_init_io? follows non-static declaration
- static void __init exynos_init_io(void)
-                    ^
-In file included from arch/arm/mach-exynos/exynos.c:31:0:
-arch/arm/mach-exynos/common.h:21:6: note: previous declaration of
-?exynos_init_io? was here
- void exynos_init_io(void);
-
-
--- 
-With warm regards,
-Sachin
+Shawn
