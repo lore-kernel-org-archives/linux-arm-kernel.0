@@ -1,43 +1,120 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 30 Apr 2014 13:48:00 +0100
-Subject: [RFC PATCH] sched_clock: also call
- register_current_timer_delay() if possible
-In-Reply-To: <1398860614-29469-1-git-send-email-bigeasy@linutronix.de>
-References: <1398860614-29469-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <20140430124800.GC21876@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 30 Apr 2014 13:54:06 +0100
+Subject: [RFC 13/47] mtd: nand: stm_nand_bch: provide Device Tree support
+In-Reply-To: <20980858CB6D3A4BAE95CA194937D5E73EAB5C83@DBDE04.ent.ti.com>
+References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
+ <1395735604-26706-14-git-send-email-lee.jones@linaro.org>
+ <20980858CB6D3A4BAE95CA194937D5E73EAB5C83@DBDE04.ent.ti.com>
+Message-ID: <20140430125406.GN29462@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian,
+> >From: Lee Jones [mailto:lee.jones at linaro.org]
+> >
+> >Fetch platform specific data from Device Tree. Any functions which
+> >are useful to other STM NAND Controllers have been separated into a
+> >separate file so they can be easily referenced by them as they
+> >appear.
+> >
+> >Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-On Wed, Apr 30, 2014 at 01:23:34PM +0100, Sebastian Andrzej Siewior wrote:
-> On ARM one has to call register_current_timer_delay() in order to use
-> the (quick) timer based calibrarion instead of the a little slower loop
-> based delay.
-> The timer function specified in register_current_timer_delay() is also
-> used by read_current_timer() which would otherwise return -ENXIO.
-> And read_current_timer() timer is used by get_cycles() which in turn is
-> used by random_get_entropy(). That means each sub-architecture returned
-> here 0 if register_current_timer_delay() was no performed.
+[...]
+
+> >+#ifdef CONFIG_OF
+> >+static void *stm_bch_dt_get_pdata(struct platform_device *pdev)
+> >+{
+> >+	struct device_node *np = pdev->dev.of_node;
+> >+	struct stm_plat_nand_bch_data *pdata;
+> >+	const char *ecc_config;
+> >+	int ret;
+> >+
+> >+	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+> >+	if (!pdata)
+> >+		return ERR_PTR(-ENOMEM);
+> >+
+> >+	of_property_read_string(np, "st,bch-ecc-mode", &ecc_config);
 > 
-> The parameters for for sched_clock_register() and
-> register_current_timer_delay() are mostly the same. Instead of calling
-> register_current_timer_delay() each time just after (or before)
-> sched_clock_register() I thought it might easier by doing it once at
-> sched_clock time since the parameter are the same. That means each ARM sub
-> arch that working sched-clock would also have a working random_get_entropy()
-> implementation.
+> Can you use any of the existing generic NAND bindings like combination of
+> "nand-ecc-mode" and "nand-ecc-strength" ?
+> Example: nand-ecc-mode = "bch" & nand-ecc-strength=18
+> Some of generic bindings are recently added
+> 	commit 8dd49165ef5f46b5ad9ba296c559ccff315f9421  (currently in l2-mtd tree)
+> 	mtd: nand: Add a devicetree binding for ECC strength and ECC step size
 > 
-> Any comments?
+> It's good to use generic bindings as much as you can, and you don't need
+> any approvals from DT Maintainers too. Though you may need to add
+> new values for "nand-ecc-mode" like {auto, hw-ham, hw-bch}
 
-As long as sched_clock is guaranteed to be a fixed frequency, always-on
-clocksource then this could work, but it removes the flexibility of having
-a separate delay clock and sched clock (is this useful?).
+Sure, I can make use of the generic bindings already offered here.
 
-Looking at your patch, I noticed that we need to extend the
-register_current_timer_delay function to deal with clocks that aren't as
-wide as cycle_t, otherwise we don't delay() for long enough when the clock
-overflows (this is potentially already an issue for architected timers <
-64-bit). Could you cook a patch for that please?
+> >+	if (!strcmp("noecc", ecc_config))
+> >+		pdata->bch_ecc_cfg = BCH_NO_ECC;
+> >+	else if (!strcmp("18bit", ecc_config))
+> >+		pdata->bch_ecc_cfg = BCH_18BIT_ECC;
+> >+	else if (!strcmp("30bit", ecc_config))
+> >+		pdata->bch_ecc_cfg = BCH_30BIT_ECC;
+> >+	else
+> >+		pdata->bch_ecc_cfg = BCH_ECC_AUTO;
+> >+
+> >+	ret = stm_of_get_nand_banks(&pdev->dev, np, &pdata->bank);
+> >+	if (ret < 0)
+> >+		return ERR_PTR(ret);
+> >+
+> >+	pdata->flashss = of_property_read_bool(np, "st,nand-flashss");
+> >+
+> >+	of_property_read_u32(np, "st,bch-bitflip-threshold",
+> >+			     &pdata->bch_bitflip_threshold);
+> >+
+> mtd->bitflip_threshold is by default set to ecc.strength (unless a driver initializes it).
+> And then can be re-configured for each MTD partition separately 
+> 	/sys/class/mtd/mtdX/bitflip_threshold
+> 	Refer: $kernel/Documentation/ABI/testing/sysfs-class-mtd
+> So, I don't think this is a HW parameter, and so should not be passed from DT.
 
-Will
+I think the bit-flip threshold is/can be chip specific, and as we know
+which chip we're likely to be booting on, we can specify this via the
+hardware description.  Thus, I think it's perfectly viable for an
+option to pass through DT to exist.
+
+
+> >+struct device_node *stm_of_get_partitions_node(struct device_node *np,
+> >+					       int bank_nr)
+> >+{
+> >+	struct device_node *banksnp, *banknp, *partsnp = NULL;
+> >+	char name[10];
+> >+
+> >+	banksnp = of_parse_phandle(np, "st,nand-banks", 0);
+> >+	if (!banksnp)
+> >+		return NULL;
+> >+
+> >+	sprintf(name, "bank%d", bank_nr);
+> >+	banknp = of_get_child_by_name(banksnp, name);
+> >+	if (banknp)
+> >+		return NULL;
+> >+
+> >+	partsnp = of_get_child_by_name(banknp, "partitions");
+> >+	of_node_put(banknp);
+> >+
+> Sorry, I'm bit confused here .. I think you don't need to find children of
+> Your bank node. This should already taken care in default parser
+> drivers/mtd/ofpart.c : parse_ofpart_partitions()
+> And all you need to pass is 'of_node' of bank (device).
+> Is my understanding correct ?
+
+We have 3 options here, you _can_ use parse_ofpart_partitions() if
+your partition information conforms to its schema, but said schema
+does not support banks and/or other information that we choose to
+place within the bank node.  The second option is to register a
+parser.  My personal view is that registering a parser is using the
+framework for 'using the framework's' sake i.e. doesn't actually
+achieve anything special.  We've chosen the third option, which is to
+parse and extract the information ourselves - which is actually fairly
+trivial, and pass the required partition data in through the
+mtd_device_parse_register() call - which is where the information
+would be parsed in the case of the first two options.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
