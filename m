@@ -1,97 +1,103 @@
-From: shaik.samsung@gmail.com (Shaik Ameer Basha)
-Date: Wed, 30 Apr 2014 10:20:05 +0530
-Subject: [PATCH v12 00/31] iommu/exynos: Fixes and Enhancements of System
- MMU driver with DT
-In-Reply-To: <26065037.GxQQuIURPg@wuerfel>
-References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
- <26065037.GxQQuIURPg@wuerfel>
-Message-ID: <CAOD6ATrKumCcFFWFp7i7XLMssG23QV0FZ=3KqGCnnJt17Xmr1A@mail.gmail.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Wed, 30 Apr 2014 14:17:29 +0900
+Subject: [PATCH v3 04/12] ARM: EXYNOS: Move SYSREG definition into sys-reg
+ specific file.
+In-Reply-To: <1398835057-3860-1-git-send-email-pankaj.dubey@samsung.com>
+References: <1398835057-3860-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1398835057-3860-5-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 2:04 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Sunday 27 April 2014 13:07:32 Shaik Ameer Basha wrote:
->> The current exynos-iommu(System MMU) driver does not work autonomously
->> since it is lack of support for power management of peripheral blocks.
->> For example, MFC device driver must ensure that its System MMU is disabled
->> before MFC block is power-down not to invalidate IOTLB in the System MMU
->> when I/O memory mapping is changed. Because a System MMU resides in the
->> same H/W block, access to control registers of System MMU while the H/W
->> block is turned off must be prohibited.
->>
->> This set of changes solves the above problem with setting each System MMUs
->> as the parent of the device which owns the System MMU to receive the
->> information when the device is turned off or turned on.
->>
->> Another big change to the driver is the support for devicetree.
->> The bindings for System MMU is described in
->> Documentation/devicetree/bindings/arm/samsung/system-mmu.txt
->
-> Sorry I've been absent from the review so far. Most of the patches
-> seem entirely reasonable to me, but I'm worried about the DT binding
-> aspect. We are going to see more systems shipping with IOMMUs now,
-> and we are seeing an increasing number of submissions for 64-bit
-> systems. We really have to work out what the DT representation for
-> IOMMUs should look like in general before adding another ad-hod
-> implementation that is private to one driver.
+From: Young-Gun Jang <yg1004.jang@samsung.com>
 
-Hi Arnd,
+While making PMU implementation to be device tree based, there are
+few register offsets related with SYSREG present in regs-pmu.h, so
+let's make a new header file "regs-sys.h" to keep all such SYSREG
+related register offsets and remove them from "regs-pmu.h"
 
-No issues. Its good that finally you are here :)
+Signed-off-by: Young-Gun Jang <yg1004.jang@samsung.com>
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+---
+ arch/arm/mach-exynos/exynos.c   |    1 +
+ arch/arm/mach-exynos/pm.c       |    1 +
+ arch/arm/mach-exynos/regs-pmu.h |    3 ---
+ arch/arm/mach-exynos/regs-sys.h |   22 ++++++++++++++++++++++
+ 4 files changed, 24 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/mach-exynos/regs-sys.h
 
-I am going through the possibilities for new bindings that you
-mentioned in the other thread.
-    -- [PATCH v12 11/31] documentation: iommu: add binding document of
-Exynos System MMU
-
-Exynos IOMMU driver is pretty simple with only one exception, "some
-devices are using multiple IOMMUs".
-
->From starting (of this patch set), we were trying to fix three major issues.
-[1] How to control the probing order of required IOMMU(s) for a given
-device and a device itself.
-[2] Handling multiple IOMMUs for one device.
-[3] Generic DT bindings to link Device and IOMMUs.
-
-I have gone through the implementation of Tegra SMMU driver by "Hiroshi Doyu"
-    -- [PATCHv7 00/12] Unifying SMMU driver among Tegra SoCs
-[https://lkml.org/lkml/2013/12/12/74]
-
-For the first point [1],
-------------------------------
-Tegra implementation tries to fix this issue with these two patches
-    -- iommu/of: check if dependee iommu is ready or not
-[http://patchwork.ozlabs.org/patch/300560/]
-    -- driver/core: populate devices in order for IOMMUs
-[http://patchwork.ozlabs.org/patch/300558/]
-I can follow this driver if this approach is acceptable.
-
-For the second point [2]
-----------------------------------
-Currently we are handling this issue by providing same mapping for all
-IOMMUs linked to the same device.
-And current Exynos drivers doesn't have any special implementation to
-handle this case differently.
-
-I thought of understanding how Tegra SMMU driver is handling this case.
-Frankly speaking, I didn't understand how its done there.
-
-For the third point [3]
--------------------------------
-As Tegra SMMU driver is inline with the discussion in other thread, we
-can follow the same bindings, unless
-the discussion takes us in the other direction.
-
-"KyongHo Cho" is the author for this driver and hope he has more inputs.
-
-Regards,
-Shaik
-
-
-
->
->         Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index 9315bd8..a7b45db 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -31,6 +31,7 @@
+ #include "common.h"
+ #include "mfc.h"
+ #include "regs-pmu.h"
++#include "regs-sys.h"
+ 
+ #define L2_AUX_VAL 0x7C470001
+ #define L2_AUX_MASK 0xC200ffff
+diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+index b380d48..f445c49 100644
+--- a/arch/arm/mach-exynos/pm.c
++++ b/arch/arm/mach-exynos/pm.c
+@@ -36,6 +36,7 @@
+ 
+ #include "common.h"
+ #include "regs-pmu.h"
++#include "regs-sys.h"
+ 
+ /**
+  * struct exynos_wkup_irq - Exynos GIC to PMU IRQ mapping
+diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
+index 6c1d2db..b68b5cc 100644
+--- a/arch/arm/mach-exynos/regs-pmu.h
++++ b/arch/arm/mach-exynos/regs-pmu.h
+@@ -15,7 +15,6 @@
+ #include <mach/map.h>
+ 
+ #define S5P_PMUREG(x)				(S5P_VA_PMU + (x))
+-#define S5P_SYSREG(x)				(S3C_VA_SYS + (x))
+ 
+ #define S5P_CENTRAL_SEQ_CONFIGURATION		S5P_PMUREG(0x0200)
+ 
+@@ -178,8 +177,6 @@
+ 
+ /* For EXYNOS5 */
+ 
+-#define EXYNOS5_SYS_I2C_CFG					S5P_SYSREG(0x0234)
+-
+ #define EXYNOS5_AUTO_WDTRESET_DISABLE				S5P_PMUREG(0x0408)
+ #define EXYNOS5_MASK_WDTRESET_REQUEST				S5P_PMUREG(0x040C)
+ 
+diff --git a/arch/arm/mach-exynos/regs-sys.h b/arch/arm/mach-exynos/regs-sys.h
+new file mode 100644
+index 0000000..84332b0
+--- /dev/null
++++ b/arch/arm/mach-exynos/regs-sys.h
+@@ -0,0 +1,22 @@
++/*
++ * Copyright (c) 2014 Samsung Electronics Co., Ltd.
++ *             http://www.samsung.com
++ *
++ * EXYNOS - system register definition
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#ifndef __ASM_ARCH_REGS_SYS_H
++#define __ASM_ARCH_REGS_SYS_H __FILE__
++
++#include <mach/map.h>
++
++#define S5P_SYSREG(x)                          (S3C_VA_SYS + (x))
++
++/* For EXYNOS5 */
++#define EXYNOS5_SYS_I2C_CFG                    S5P_SYSREG(0x0234)
++
++#endif /* __ASM_ARCH_REGS_SYS_H */
+-- 
+1.7.10.4
