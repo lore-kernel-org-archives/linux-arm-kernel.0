@@ -1,70 +1,228 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 30 Apr 2014 23:54:37 +0200
-Subject: [PATCH/RFC 3/4] of/clk: Register clocks suitable for Runtime PM
- with the PM core
-In-Reply-To: <20140429131610.29859C4094A@trevor.secretlab.ca>
-References: <1398334403-26181-1-git-send-email-geert+renesas@glider.be>
- <1398334403-26181-4-git-send-email-geert+renesas@glider.be>
- <7hoazpdldx.fsf@paris.lan>
- <20140429131610.29859C4094A@trevor.secretlab.ca>
-Message-ID: <CAMuHMdUdnoah1uZbMn_xONXZ2i8wG5kY7msMzCdBwS+xt9tmDA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 30 Apr 2014 14:53:22 -0700
+Subject: [PATCH v7] DMA: sun6i: Add driver for the Allwinner A31 DMA
+ controller
+In-Reply-To: <20140430070408.GR32284@intel.com>
+References: <20140430070408.GR32284@intel.com>
+Message-ID: <20140430215322.GH3000@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant,
+Hi Vinod,
 
-On Tue, Apr 29, 2014 at 3:16 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Fri, 25 Apr 2014 16:44:58 -0700, Kevin Hilman <khilman@linaro.org> wrote:
->> Geert Uytterhoeven <geert+renesas@glider.be> writes:
->>
->> > When adding a device from DT, check if its clocks are suitable for Runtime
->> > PM, and register them with the PM core.
->> > If Runtime PM is disabled, just enable the clock.
->> >
->> > This allows the PM core to automatically manage gate clocks of devices for
->> > Runtime PM.
->>
->> ...unless the device is already in an existing pm_domain, right?
->>
->> I like this approach, and it extends nicely what we already do on
->> platforms using drivers/base/power/clock_ops.c into DT land.
->>
->> My only concern is how this will interact if it's used along with
->> devices that have existing pm_domains.  I don't have any specific
->> concerns (yet, because it's Friday, and my brain is turing off), but it
->> just made me wonder if this will be potentially confusing.
->
-> I have big concerns about this approach. First, it will only work if
-> a clock is available at deivce creation time. The conversion of irq
-> controllers to normal device drivers has already shown that is a bad
-> idea.
+On Wed, Apr 30, 2014 at 12:34:08PM +0530, Vinod Koul wrote:
+> On Thu, Apr 24, 2014 at 04:22:44PM +0200, Maxime Ripard wrote:
+> > The Allwinner A31 has a 16 channels DMA controller that it shares with the
+> > newer A23. Although sharing some similarities with the DMA controller of the
+> > older Allwinner SoCs, it's significantly different, I don't expect it to be
+> > possible to share the driver for these two.
+> > 
+> > The A31 Controller is able to memory-to-memory or memory-to-device transfers on
+> > the 16 channels in parallel.
+> 
+> Overall driver looks in good shape, few comments though...
+> 
+> > +This driver follows the generic DMA bindings defined in dma.txt.
+> > +
+> > +Required properties:
+> > +
+> > +- compatible:	Must be "allwinner,sun6i-a31-dma"
+> > +- reg:		Should contain the registers base address and length
+> > +- interrupts:	Should contain a reference to the interrupt used by this device
+> > +- clocks:	Should contain a reference to the parent AHB clock
+> > +- resets:	Should contain a reference to the reset controller asserting
+> > +	  	this device in reset
+> > +- #dma-cells :	Should be 1, a single cell holding a line request number
+> > +
+> > +Example:
+> > +	dma: dma-controller at 01c02000 {
+> > +		compatible = "allwinner,sun6i-a31-dma";
+> > +		reg = <0x01c02000 0x1000>;
+> > +		interrupts = <0 50 4>;
+> > +		clocks = <&ahb1_gates 6>;
+> > +		resets = <&ahb1_rst 6>;
+> > +		#dma-cells = <1>;
+> > +	};
+> > +
+> > +Clients:
+> > +
+> > +DMA clients connected to the A31 DMA controller must use the format
+> > +described in the dma.txt file, using a two-cell specifier for each
+> > +channel: a phandle plus one integer cells.
+> > +The two cells in order are:
+> > +
+> > +1. A phandle pointing to the DMA controller.
+> > +2. The port ID as specified in the datasheet
+> > +
+> > +Example:
+> > +spi2: spi at 01c6a000 {
+> > +	compatible = "allwinner,sun6i-a31-spi";
+> > +	reg = <0x01c6a000 0x1000>;
+> > +	interrupts = <0 67 4>;
+> > +	clocks = <&ahb1_gates 22>, <&spi2_clk>;
+> > +	clock-names = "ahb", "mod";
+> > +	dmas = <&dma 25>, <&dma 25>;
+> > +	dma-names = "rx", "tx";
+> > +	resets = <&ahb1_rst 22>;
+> > +};
+> Ideally binding should be a separate patch
 
-That's  indeed a valid concern that needs to be addressed.
+Ok
 
-> I also don't like that it tries to set up every clock, but there is no
-> guarantee that the driver will even use it. I would rather see this
-> behaviour linked into the function that obtains the clock at driver
-> .probe() time. That way it can handle deferred probe correctly and it
-> only sets up clocks that are actually used by the driver.
+> > +static inline u8 convert_burst(u8 maxburst)
+> > +{
+> > +	if (maxburst == 1 || maxburst > 16)
+> > +		return 0;
+> are these valid configurations?
 
-Not every clock. Only the clocks that are advertised by the clock driver as
-being suitable for runtime_pm management. These are typically module
-clocks, that must be enabled for the module to work. The driver doesn't
-always want to handle these explicitly.
+The only valid burst values are 1 (0) and 8 (2).
 
-In fact we have one case on shmobile where the module clock for an IP
-core (rcar-gpio) is enabled unconditionally in one SoC,  while it became
-controllable through a gate clock in a later SoC.
-With my patch, just adding the clock to the DT node is sufficient to make
-it work.
+> > +
+> > +	return fls(maxburst) - 1;
+> > +}
+> > +
+> > +static inline u8 convert_buswidth(enum dma_slave_buswidth addr_width)
+> > +{
+> > +	switch (addr_width) {
+> > +	case DMA_SLAVE_BUSWIDTH_2_BYTES:
+> > +		return 1;
+> > +	case DMA_SLAVE_BUSWIDTH_4_BYTES:
+> > +		return 2;
+> return (addr_width >> 1); ..??
+> since DMA_SLAVE_BUSWIDTH_2_BYTES is numeric 2 and DMA_SLAVE_BUSWIDTH_4_BYTES
+> numeric 4. 
 
-Gr{oetje,eeting}s,
+Yes, it would work.
 
-                        Geert
+> > +	default:
+> > +		return 0;
+> error?
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Ok.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> > +static inline void sun6i_dma_cfg_lli(struct sun6i_dma_lli *lli,
+> > +				     dma_addr_t src,
+> > +				     dma_addr_t dst, u32 len,
+> > +				     struct dma_slave_config *config)
+> > +{
+> > +	u32 src_width, dst_width, src_burst, dst_burst;
+> > +
+> > +	if (!config)
+> > +		return;
+> > +
+> > +	src_burst = convert_burst(config->src_maxburst);
+> > +	dst_burst = convert_burst(config->dst_maxburst);
+> > +
+> > +	src_width = convert_buswidth(config->src_addr_width);
+> > +	dst_width = convert_buswidth(config->dst_addr_width);
+> is 0 a valid case then?
+
+Yes, it is. 0 is a burst of 1, and a width of a byte.
+
+> > +
+> > +static int sun6i_dma_terminate_all(struct sun6i_vchan *vchan)
+> > +{
+> > +	struct sun6i_dma_dev *sdev = to_sun6i_dma_dev(vchan->vc.chan.device);
+> > +	struct sun6i_pchan *pchan = vchan->phy;
+> > +	unsigned long flags;
+> > +	LIST_HEAD(head);
+> > +
+> > +	spin_lock(&sdev->lock);
+> > +	list_del_init(&vchan->node);
+> > +	spin_unlock(&sdev->lock);
+> > +
+> > +	spin_lock_irqsave(&vchan->vc.lock, flags);
+> > +
+> > +	vchan_get_all_descriptors(&vchan->vc, &head);
+> > +
+> > +	if (pchan) {
+> > +		writel(DMA_CHAN_ENABLE_STOP, pchan->base + DMA_CHAN_ENABLE);
+> > +		writel(DMA_CHAN_PAUSE_RESUME, pchan->base + DMA_CHAN_PAUSE);
+> > +
+> > +		vchan->phy = NULL;
+> > +		pchan->vchan = NULL;
+> > +		pchan->desc = NULL;
+> > +		pchan->done = NULL;
+> > +	}
+> > +
+> > +	spin_unlock_irqrestore(&vchan->vc.lock, flags);
+> > +
+> > +	vchan_dma_desc_free_list(&vchan->vc, &head);
+> 
+> shouldn't you kill the tasklet as well here?
+
+Hmm, yes.
+
+> > +static inline void sun6i_dma_free(struct sun6i_dma_dev *sdc)
+> > +{
+> > +	int i;
+> > +
+> > +	for (i = 0; i < NR_MAX_VCHANS; i++) {
+> > +		struct sun6i_vchan *vchan = &sdc->vchans[i];
+> > +
+> > +		list_del(&vchan->vc.chan.device_node);
+> > +		tasklet_kill(&vchan->vc.task);
+> > +	}
+> > +
+> > +	tasklet_kill(&sdc->task);
+> This is again not good. see http://lwn.net/Articles/588457/
+> At this point HW can still generate interrupts or you can have irq running!
+
+I'm not sure to fully understand the issue here, but what is not good?
+the first or the second tasklet_kill calls, or both?
+
+>From what I understood, the issue is only there whenever you are
+calling tasklet_disable without making sure that no one will schedule
+your tasklet before disabling it.
+
+But the point is I don't actually use either _enable/_disable. I might
+be wrong in not using those functions, but I don't really see how I
+can be impacted.
+
+> > +static int sun6i_dma_probe(struct platform_device *pdev)
+> > +{
+> > +	struct sun6i_dma_dev *sdc;
+> > +	struct resource *res;
+> > +	struct clk *mux, *pll6;
+> > +	int irq;
+> > +	int ret, i;
+> > +
+> > +	sdc = devm_kzalloc(&pdev->dev, sizeof(*sdc), GFP_KERNEL);
+> > +	if (!sdc)
+> > +		return -ENOMEM;
+> > +
+> > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > +	sdc->base = devm_ioremap_resource(&pdev->dev, res);
+> > +	if (IS_ERR(sdc->base))
+> > +		return PTR_ERR(sdc->base);
+> > +
+> > +	irq = platform_get_irq(pdev, 0);
+> > +	ret = devm_request_irq(&pdev->dev, irq, sun6i_dma_interrupt, 0,
+> > +			       dev_name(&pdev->dev), sdc);
+> > +	if (ret) {
+> > +		dev_err(&pdev->dev, "Cannot request IRQ\n");
+> > +		return ret;
+> > +	}
+> this is not good. You have registered for irq, so your irq handlers can be
+> invoked but you initialization is not complete yet.
+
+Not really, the device is maintained in reset, we deassert it only
+later, and we're only deasserting it from reset later on in the
+probe. And since it was kept in reset, you will only get interrupts
+whenever you actually enable them, in the tasklet, that is only
+scheduled from _issue_pending (and the interrupt handler, which would
+not happen)
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140430/be909528/attachment-0001.sig>
