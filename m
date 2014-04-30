@@ -1,46 +1,32 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 30 Apr 2014 10:49:36 -0400 (EDT)
-Subject: [PATCH v3 6/6] arm: exynos: Add /dev/bL_status user interface
- on Exynos5420
-In-Reply-To: <CAM4voak-oXToBK=owO=jmpwk3rDkg71JS=8YOTz1HfiQvZa5Vw@mail.gmail.com>
-References: <1398528348-21214-1-git-send-email-a.kesavan@samsung.com>
- <1398528348-21214-7-git-send-email-a.kesavan@samsung.com>
- <535E3A8C.6070304@linaro.org>
- <CAM4voak-oXToBK=owO=jmpwk3rDkg71JS=8YOTz1HfiQvZa5Vw@mail.gmail.com>
-Message-ID: <alpine.LFD.2.11.1404301044280.980@knanqh.ubzr>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 30 Apr 2014 16:20:47 +0100
+Subject: [RFC PATCH V4 6/7] arm64: mm: Enable HAVE_RCU_TABLE_FREE logic
+In-Reply-To: <1396018892-6773-7-git-send-email-steve.capper@linaro.org>
+References: <1396018892-6773-1-git-send-email-steve.capper@linaro.org>
+ <1396018892-6773-7-git-send-email-steve.capper@linaro.org>
+Message-ID: <20140430152047.GF31220@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 28 Apr 2014, Abhilash Kesavan wrote:
-
-> On Mon, Apr 28, 2014 at 4:55 PM, Daniel Lezcano
-> <daniel.lezcano@linaro.org> wrote:
-> > On 04/26/2014 06:05 PM, Abhilash Kesavan wrote:
-> >>
-> >> Add a user interface to check the core and cluster status on
-> >> Exynos5420. This can be utilized while debugging mcpm issues.
-> >> cat /dev/bL_status will show the current power status of all
-> >> the 8 cores along with the cluster.
-> >>
-> >> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> >> Signed-off-by: Inderpal Singh <inderpal.s@samsung.com>
-> >> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
-> >> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> >> ---
-> >
-> >
-> > Hi Abhilash,
+On Fri, Mar 28, 2014 at 03:01:31PM +0000, Steve Capper wrote:
+> In order to implement fast_get_user_pages we need to ensure that the
+> page table walker is protected from page table pages being freed from
+> under it.
 > 
-> Hi Daniel,
-> >
-> > I don't think you should add this file.
-> >
-> > 1. big Little is not exynos specific
-> But the core control/status bits that I am accessing are exynos
-> specific and currently it is being enabled only on 5420.
+> This patch enables HAVE_RCU_TABLE_FREE, any page table pages belonging
+> to address spaces with multiple users will be call_rcu_sched freed.
+> Meaning that disabling interrupts will block the free and protect the
+> fast gup page walker.
+> 
+> Signed-off-by: Steve Capper <steve.capper@linaro.org>
 
-Maybe yt is not worth pushing this patch upstream?  Once basic debugging 
-is over, you shouldn't have to use this code anymore.
+While this patch is simple, I'd like to better understand the reason for
+it. Currently HAVE_RCU_TABLE_FREE is enabled for powerpc and sparc while
+__get_user_pages_fast() is supported by a few other architectures that
+don't select HAVE_RCU_TABLE_FREE. So why do we need it for fast gup on
+arm/arm64 while not all the other archs need it?
 
+Thanks.
 
-Nicolas
+-- 
+Catalin
