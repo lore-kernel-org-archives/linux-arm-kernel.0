@@ -1,67 +1,108 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 29 Apr 2014 17:22:11 -0700
-Subject: [RFC 08/11] ARM: dts: am33xx: Add prcm_resets node
-In-Reply-To: <6286135.g77D4pMffU@wuerfel>
-References: <1398802790-29287-1-git-send-email-dmurphy@ti.com>
- <1398802790-29287-9-git-send-email-dmurphy@ti.com>
- <6286135.g77D4pMffU@wuerfel>
-Message-ID: <20140430002211.GC27571@atomide.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 30 Apr 2014 02:42:20 +0200
+Subject: [PATCH 1/4] ARM: shmobile: r8a7779: Add scif nodes to dtsi
+In-Reply-To: <1398757406-30920-2-git-send-email-horms+renesas@verge.net.au>
+References: <1398757406-30920-1-git-send-email-horms+renesas@verge.net.au>
+ <1398757406-30920-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <2171203.7Ft1Jpoq1o@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [140429 13:35]:
-> On Tuesday 29 April 2014 15:19:47 Dan Murphy wrote:
-> > + * AM33xx reset index for PRCM Module
-> > + *
-> > + * Copyright 2014 Texas Instruments Inc.
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + */
-> > +
-> > +#ifndef _DT_BINDINGS_RESET_TI_AM33XX_H
-> > +#define _DT_BINDINGS_RESET_TI_AM33XX_H
-> > +
-> > +#define RESET_DEVICE_RESET                     0
-> > +#define RESET_GFX_RESET                                1
-> > +#define RESET_PER_RESET                                2
-> > +
-> > +#endif
+Hi Simon,
+
+Thank you for the patch.
+
+On Tuesday 29 April 2014 16:43:23 Simon Horman wrote:
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>  arch/arm/boot/dts/r8a7779.dtsi | 60 +++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 60 insertions(+)
 > 
-> Interfaces like this should only be used if you can't use hardware
-> numbers, in general. If these numbers are in the data sheet, just
-> put them directly into the dts file, as we do for interrupt numbers,
-> gpio numbers, register offsets etc.
+> diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
+> index e924f96..3e9cca4 100644
+> --- a/arch/arm/boot/dts/r8a7779.dtsi
+> +++ b/arch/arm/boot/dts/r8a7779.dtsi
+> @@ -203,6 +203,66 @@
+>  		status = "disabled";
+>  	};
 > 
-> If you have made them up to define an interface between the driver
-> and DT because there is no usable hardare ID, I'd suggest just using
-> a single file across all SoCs that have this driver, and have
-> a unified name space.
+> +	scif0: serial at ffe40000 {
+> +		compatible = "renesas,scif", "renesas,scif-r8a7779";
 
-Also, it's a bit unclear how the reset controller phandle is used
-referenced and used by the consumer device.. Maybe setting that up
-first in a Linux generic way is a good point starting point.
+The most specific compatible string should come first, so this should read
 
-Maybe something like this along the same way as clocks are set up
-(completely untested):
+		compatible = "renesas,scif-r8a7779", "renesas,scif";
 
-&reset1 {
-	iva_reset: reset1 {
-		reg = /bits/ 8 <0>;
-	};
-	gfx_reset: reset1 {
-		reg = /bits/ 8 <1>;
-	};
-	...
-};
+> +		reg = <0xffe40000 265>;
 
-&iva {
-	compatible = "ti,ivahd";
-	resets = <&reset1 1>;
-	...
-};
+265 ? Don't you mean 256 ? 0x100 might be a better option.
 
+> +		interrupt-parent = <&gic>;
+> +		interrupts = <0 88 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&cpg_clocks R8A7779_CLK_P>;
+> +		clock-names = "sci_ick";
+
+Could you try the SCI RFC patch set I've just sent that drop the interface 
+clock in favour of the functional clock ?
+
+> +		status = "disabled";
+> +	};
+> +
+> +	scif1: serial at ffe41000 {
+> +		compatible = "renesas,scif", "renesas,scif-r8a7779";
+> +		reg = <0xffe41000 265>;
+> +		interrupt-parent = <&gic>;
+> +		interrupts = <0 89 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&cpg_clocks R8A7779_CLK_P>;
+> +		clock-names = "sci_ick";
+> +		status = "disabled";
+> +	};
+> +
+> +	scif2: serial at ffe42000 {
+> +		compatible = "renesas,scif", "renesas,scif-r8a7779";
+> +		reg = <0xffe42000 265>;
+> +		interrupt-parent = <&gic>;
+> +		interrupts = <0 90 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&cpg_clocks R8A7779_CLK_P>;
+> +		clock-names = "sci_ick";
+> +		status = "disabled";
+> +	};
+> +
+> +	scif3: serial at ffe43000 {
+> +		compatible = "renesas,scif", "renesas,scif-r8a7779";
+> +		reg = <0xffe43000 265>;
+> +		interrupt-parent = <&gic>;
+> +		interrupts = <0 91 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&cpg_clocks R8A7779_CLK_P>;
+> +		clock-names = "sci_ick";
+> +		status = "disabled";
+> +	};
+> +
+> +	scif4: serial at ffe44000 {
+> +		compatible = "renesas,scif", "renesas,scif-r8a7779";
+> +		reg = <0xffe44000 265>;
+> +		interrupt-parent = <&gic>;
+> +		interrupts = <0 92 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&cpg_clocks R8A7779_CLK_P>;
+> +		clock-names = "sci_ick";
+> +		status = "disabled";
+> +	};
+> +
+> +	scif5: serial at ffe45000 {
+> +		compatible = "renesas,scif", "renesas,scif-r8a7779";
+> +		reg = <0xffe45000 265>;
+> +		interrupt-parent = <&gic>;
+> +		interrupts = <0 93 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&cpg_clocks R8A7779_CLK_P>;
+> +		clock-names = "sci_ick";
+> +		status = "disabled";
+> +	};
+> +
+>  	pfc: pfc at fffc0000 {
+>  		compatible = "renesas,pfc-r8a7779";
+>  		reg = <0xfffc0000 0x23c>;
+
+-- 
 Regards,
 
-Tony
+Laurent Pinchart
