@@ -1,60 +1,70 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Wed, 30 Apr 2014 23:53:59 +0200
-Subject: [patch] Fix CAN on socfpga, for net/master
-In-Reply-To: <CAF03EBd19PC5RAsLR6-dMPF2x3XRf9X4bFPgX2kRdCYWUQBYcA@mail.gmail.com>
-References: <1398457446.26387.0.camel@linux-builds1>
- <1398461518.3587.11.camel@dinh-ubuntu>
- <20140426093646.GE8730@amd.pavel.ucw.cz>
- <20140426203131.GA21832@amd.pavel.ucw.cz>
- <6bf951b6-51e7-4b90-b054-9ba5b6e93874@email.android.com>
- <20140427122510.GB12901@amd.pavel.ucw.cz>
- <1398716449.836.4.camel@dinh-ubuntu>
- <20140428211505.GA28242@amd.pavel.ucw.cz>
- <CAF03EBf9KXqB4W9GuDduhLwp_kwFjUEi3syU7fX3KpXfZEFxHg@mail.gmail.com>
- <CAF03EBd19PC5RAsLR6-dMPF2x3XRf9X4bFPgX2kRdCYWUQBYcA@mail.gmail.com>
-Message-ID: <20140430215359.GA15148@amd.pavel.ucw.cz>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 30 Apr 2014 23:54:37 +0200
+Subject: [PATCH/RFC 3/4] of/clk: Register clocks suitable for Runtime PM
+ with the PM core
+In-Reply-To: <20140429131610.29859C4094A@trevor.secretlab.ca>
+References: <1398334403-26181-1-git-send-email-geert+renesas@glider.be>
+ <1398334403-26181-4-git-send-email-geert+renesas@glider.be>
+ <7hoazpdldx.fsf@paris.lan>
+ <20140429131610.29859C4094A@trevor.secretlab.ca>
+Message-ID: <CAMuHMdUdnoah1uZbMn_xONXZ2i8wG5kY7msMzCdBwS+xt9tmDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi Grant,
 
-> >>> > Apparently, socfpga CAN needs 32-bit accesses and different raminit
-> >>> > sequence.
-> >>> >
-> >>> > Signed-off-by: Pavel Machek <pavel@denx.de>
+On Tue, Apr 29, 2014 at 3:16 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> On Fri, 25 Apr 2014 16:44:58 -0700, Kevin Hilman <khilman@linaro.org> wrote:
+>> Geert Uytterhoeven <geert+renesas@glider.be> writes:
+>>
+>> > When adding a device from DT, check if its clocks are suitable for Runtime
+>> > PM, and register them with the PM core.
+>> > If Runtime PM is disabled, just enable the clock.
+>> >
+>> > This allows the PM core to automatically manage gate clocks of devices for
+>> > Runtime PM.
+>>
+>> ...unless the device is already in an existing pm_domain, right?
+>>
+>> I like this approach, and it extends nicely what we already do on
+>> platforms using drivers/base/power/clock_ops.c into DT land.
+>>
+>> My only concern is how this will interact if it's used along with
+>> devices that have existing pm_domains.  I don't have any specific
+>> concerns (yet, because it's Friday, and my brain is turing off), but it
+>> just made me wonder if this will be potentially confusing.
+>
+> I have big concerns about this approach. First, it will only work if
+> a clock is available at deivce creation time. The conversion of irq
+> controllers to normal device drivers has already shown that is a bad
+> idea.
 
-...
+That's  indeed a valid concern that needs to be addressed.
 
-> >> Or ... let me upload my tree so that you can generate the diff.
-> >>
-> >> You should be able to get it using:
-> >>
-> >> git pull git://git.denx.de/linux-denx-pavel.git my_net_master
-> >>
-> >>> I also like your updates to my patch as shown below - much cleaner.
+> I also don't like that it tries to set up every clock, but there is no
+> guarantee that the driver will even use it. I would rather see this
+> behaviour linked into the function that obtains the clock at driver
+> .probe() time. That way it can handle deferred probe correctly and it
+> only sets up clocks that are actually used by the driver.
 
-> > Since you based this patch on my original code, feel free to add my
-> signed-off.
+Not every clock. Only the clocks that are advertised by the clock driver as
+being suitable for runtime_pm management. These are typically module
+clocks, that must be enabled for the module to work. The driver doesn't
+always want to handle these explicitly.
 
-Will do.
+In fact we have one case on shmobile where the module clock for an IP
+core (rcar-gpio) is enabled unconditionally in one SoC,  while it became
+controllable through a gate clock in a later SoC.
+With my patch, just adding the clock to the DT node is sufficient to make
+it work.
 
-> I pulled in your branch
-> (git://git.denx.de/linux-denx-pavel.gitmy_net_master) and tested it on
-> the Altera Development Kit. It works well -
-> I don't see any issues at a number of different bitrates (80K, 200K, 800K,
-> 1Mb).
+Gr{oetje,eeting}s,
 
-Thanks for testing. I'll also add your Tested-by: header, if you don't
-mind.
+                        Geert
 
-> I didn't investigate what the issues were with applying the patch though. I
-> just used your branch.
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-The way I generated that branch... you picked up some extra code in
-other areas of the kernel, but it should not affect the testing.
-
-Thanks!
-								Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
