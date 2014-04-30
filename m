@@ -1,50 +1,172 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Wed, 30 Apr 2014 16:38:25 +0100
-Subject: [RFC PATCH V4 6/7] arm64: mm: Enable HAVE_RCU_TABLE_FREE logic
-In-Reply-To: <20140430153317.GG31220@arm.com>
-References: <1396018892-6773-1-git-send-email-steve.capper@linaro.org>
- <1396018892-6773-7-git-send-email-steve.capper@linaro.org>
- <20140430152047.GF31220@arm.com> <20140430153317.GG31220@arm.com>
-Message-ID: <20140430153824.GA7166@linaro.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 30 Apr 2014 10:38:53 -0500
+Subject: [PATCH 2/2] ARM: OMAP2+: fix dpll round_rate() to actually round
+In-Reply-To: <53172BA9.2050901@ti.com>
+References: <1389944699-27962-1-git-send-email-tomi.valkeinen@ti.com>
+ <1389944699-27962-3-git-send-email-tomi.valkeinen@ti.com>
+ <alpine.DEB.2.02.1402191928480.8777@utopia.booyaka.com>
+ <alpine.DEB.2.02.1402201927280.10791@utopia.booyaka.com>
+ <53172BA9.2050901@ti.com>
+Message-ID: <20140430153853.GB23679@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 30, 2014 at 04:33:17PM +0100, Catalin Marinas wrote:
-> On Wed, Apr 30, 2014 at 04:20:47PM +0100, Catalin Marinas wrote:
-> > On Fri, Mar 28, 2014 at 03:01:31PM +0000, Steve Capper wrote:
-> > > In order to implement fast_get_user_pages we need to ensure that the
-> > > page table walker is protected from page table pages being freed from
-> > > under it.
-> > > 
-> > > This patch enables HAVE_RCU_TABLE_FREE, any page table pages belonging
-> > > to address spaces with multiple users will be call_rcu_sched freed.
-> > > Meaning that disabling interrupts will block the free and protect the
-> > > fast gup page walker.
-> > > 
-> > > Signed-off-by: Steve Capper <steve.capper@linaro.org>
+Hi Mike/Paul,
+
+(sorry for top-posting)
+
+any comments here, what do we do ? Do we split this patch ? Use v1 ? Use
+v2 ?
+
+cheers
+
+On Wed, Mar 05, 2014 at 03:50:33PM +0200, Tomi Valkeinen wrote:
+> On 20/02/14 21:30, Paul Walmsley wrote:
+> > On Wed, 19 Feb 2014, Paul Walmsley wrote:
 > > 
-> > While this patch is simple, I'd like to better understand the reason for
-> > it. Currently HAVE_RCU_TABLE_FREE is enabled for powerpc and sparc while
-> > __get_user_pages_fast() is supported by a few other architectures that
-> > don't select HAVE_RCU_TABLE_FREE. So why do we need it for fast gup on
-> > arm/arm64 while not all the other archs need it?
+> >> On Fri, 17 Jan 2014, Tomi Valkeinen wrote:
+> >>
+> >>> This patch adds a simple method of rounding: during the iteration, the 
+> >>> code keeps track of the closest rate match. If no exact match is found, 
+> >>> the closest is returned.
+> >>
+> >> So that's one possible rounding policy; maybe it works fine for a display 
+> >> interface PLL, at least for some values of "closest rate".  But another 
+> >> might be "only allow a selection from a set of pre-determined rates 
+> >> characterized by the silicon validation team".  Or another rounding 
+> >> function might need to select a more distant rate that minimizes jitter, 
+> >> EMI, or power consumption.  
+> > 
+> > Thought about this some more.  Do you only need this for the DSS PLL, or 
+> > do you need it for one of the core OMAP PLLs?
+> > 
+> > If the former, then how about modifying your patch to create a separate 
+> > round_rate function that's only used for the DSS PLL that implements the 
+> > behavior that you want?
+> > 
+> > That would eliminate any risk of impacting other users on the system.  And 
+> > would also allow this change to get into the codebase much faster, since 
+> > there's no need for clk API changes, etc.
 > 
-> OK, replying to myself. I assume the other architectures that don't need
-> HAVE_RCU_TABLE_FREE use IPI for TLB shootdown, hence they gup_fast
-> synchronisation for free.
-
-Hi Catalin,
-Yes that is roughly the case.
-Essentially we want to RCU free the page table backing pages at a
-later time when we aren't walking on them.
-
-Other arches use IPI, some others have their own RCU logic. I opted to
-activate some existing logic to reduce code duplication.
-
-Cheers,
--- 
-Steve
-
+> How about this one:
 > 
+> From f5a78303411e9192899a6a681acac37f09f4cc3b Mon Sep 17 00:00:00 2001
+> From: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> Date: Wed, 15 Jan 2014 11:45:07 +0200
+> Subject: [PATCH] ARM: OMAP2+: fix dpll round_rate() to actually round
+> 
+> omap2_dpll_round_rate() doesn't actually round the given rate, even if
+> the name and the description so hints. Instead it only tries to find an
+> exact rate match, or if that fails, return ~0 as an error.
+> 
+> What this basically means is that the user of the clock needs to know
+> what rates the dpll can support, which obviously isn't right.
+> 
+> This patch adds a simple method of rounding: during the iteration, the
+> code keeps track of the closest rate match. If no exact match is found,
+> the closest is returned.
+> 
+> However, as it is unclear whether current drivers rely on the current
+> behavior, the rounding functionality not enabled by default, but by
+> setting DPLL_USE_ROUNDED_RATE for the DPLL.
+> 
+> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> ---
+>  arch/arm/mach-omap2/clkt_dpll.c | 23 ++++++++++++++++++-----
+>  drivers/clk/ti/dpll.c           |  3 +++
+>  include/linux/clk/ti.h          |  1 +
+>  3 files changed, 22 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/clkt_dpll.c b/arch/arm/mach-omap2/clkt_dpll.c
+> index 2649ce445845..fed7538e1eed 100644
+> --- a/arch/arm/mach-omap2/clkt_dpll.c
+> +++ b/arch/arm/mach-omap2/clkt_dpll.c
+> @@ -298,6 +298,8 @@ long omap2_dpll_round_rate(struct clk_hw *hw, unsigned long target_rate,
+>  	struct dpll_data *dd;
+>  	unsigned long ref_rate;
+>  	const char *clk_name;
+> +	unsigned long diff, closest_diff = ~0;
+> +	bool use_rounding = clk->flags & DPLL_USE_ROUNDED_RATE;
+>  
+>  	if (!clk || !clk->dpll_data)
+>  		return ~0;
+> @@ -345,20 +347,31 @@ long omap2_dpll_round_rate(struct clk_hw *hw, unsigned long target_rate,
+>  		pr_debug("clock: %s: m = %d: n = %d: new_rate = %lu\n",
+>  			 clk_name, m, n, new_rate);
+>  
+> -		if (target_rate == new_rate) {
+> +		diff = max(target_rate, new_rate) - min(target_rate, new_rate);
+> +
+> +		if ((use_rounding && diff < closest_diff) ||
+> +			(!use_rounding && diff == 0)) {
+> +			closest_diff = diff;
+> +
+>  			dd->last_rounded_m = m;
+>  			dd->last_rounded_n = n;
+> -			dd->last_rounded_rate = target_rate;
+> -			break;
+> +			dd->last_rounded_rate = new_rate;
+> +
+> +			if (diff == 0)
+> +				break;
+>  		}
+>  	}
+>  
+> -	if (target_rate != new_rate) {
+> +	if (closest_diff == ~0) {
+>  		pr_debug("clock: %s: cannot round to rate %lu\n",
+>  			 clk_name, target_rate);
+>  		return ~0;
+>  	}
+>  
+> -	return target_rate;
+> +	if (closest_diff > 0)
+> +		pr_debug("clock: %s: rounded rate %lu to %lu\n",
+> +			 clk_name, target_rate, dd->last_rounded_rate);
+> +
+> +	return dd->last_rounded_rate;
+>  }
+>  
+> diff --git a/drivers/clk/ti/dpll.c b/drivers/clk/ti/dpll.c
+> index 7e498a44f97d..c5858c46b58c 100644
+> --- a/drivers/clk/ti/dpll.c
+> +++ b/drivers/clk/ti/dpll.c
+> @@ -265,6 +265,9 @@ static void __init of_ti_dpll_setup(struct device_node *node,
+>  	if (dpll_mode)
+>  		dd->modes = dpll_mode;
+>  
+> +	if (of_property_read_bool(node, "ti,round-rate"))
+> +		clk_hw->flags |= DPLL_USE_ROUNDED_RATE;
+> +
+>  	ti_clk_register_dpll(&clk_hw->hw, node);
+>  	return;
+>  
+> diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
+> index 092b64168d7f..c9ed8b6b8513 100644
+> --- a/include/linux/clk/ti.h
+> +++ b/include/linux/clk/ti.h
+> @@ -155,6 +155,7 @@ struct clk_hw_omap {
+>  #define INVERT_ENABLE		(1 << 4)	/* 0 enables, 1 disables */
+>  #define CLOCK_CLKOUTX2		(1 << 5)
+>  #define MEMMAP_ADDRESSING	(1 << 6)
+> +#define DPLL_USE_ROUNDED_RATE	(1 << 7)	/* dpll's round_rate() returns rounded rate */
+>  
+>  /* CM_CLKEN_PLL*.EN* bit values - not all are available for every DPLL */
+>  #define DPLL_LOW_POWER_STOP	0x1
 > -- 
-> Catalin
+> 1.8.3.2
+> 
+> 
+> 
+
+
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140430/d2737861/attachment.sig>
