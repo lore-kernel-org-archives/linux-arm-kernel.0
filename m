@@ -1,40 +1,58 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 30 Apr 2014 14:02:42 +0100
-Subject: [PATCH 0/3] Make kexec work with CONFIG_DEBUG_RODATA enabled
-In-Reply-To: <1398677507-6687-1-git-send-email-Nikolay.Borisov@arm.com>
-References: <1398677507-6687-1-git-send-email-Nikolay.Borisov@arm.com>
-Message-ID: <20140430130241.GA15719@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 30 Apr 2014 14:12:24 +0100
+Subject: [PATCH v4 4/7] arm64: Add a description on 48-bit address space
+ with 4KB pages
+In-Reply-To: <008e01cf643f$3e67eff0$bb37cfd0$@samsung.com>
+References: <000401cf6367$cc461500$64d23f00$@samsung.com>
+ <20140429144759.GL17007@arm.com>
+ <008e01cf643f$3e67eff0$bb37cfd0$@samsung.com>
+Message-ID: <20140430131224.GD31220@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nikolay,
+On Wed, Apr 30, 2014 at 07:41:40AM +0100, Jungseok Lee wrote:
+> On Tuesday, April 29, 2014 11:48 PM, Catalin Marinas wrote:
+> > On Tue, Apr 29, 2014 at 05:59:27AM +0100, Jungseok Lee wrote:
+> > > --- a/Documentation/arm64/memory.txt
+> > > +++ b/Documentation/arm64/memory.txt
+> > > @@ -8,10 +8,11 @@ This document describes the virtual memory layout
+> > > used by the AArch64  Linux kernel. The architecture allows up to 4
+> > > levels of translation  tables with a 4KB page size and up to 3 levels with a 64KB page size.
+> > >
+> > > -AArch64 Linux uses 3 levels of translation tables with the 4KB page
+> > > -configuration, allowing 39-bit (512GB) virtual addresses for both
+> > > user -and kernel. With 64KB pages, only 2 levels of translation tables
+> > > are -used but the memory layout is the same.
+> > > +AArch64 Linux uses 3 levels and 4 levels of translation tables with
+> > > +the 4KB page configuration, allowing 39-bit (512GB) and 48-bit
+> > > +(256TB) virtual addresses, respectively, for both user and kernel.
+> > > +With 64KB pages, only 2 levels of translation tables are used but the
+> > > +memory layout is the same.
+> > 
+> > Any reason why we couldn't use 48-bit address space with 64K pages (implying 3 levels)?
+> 
+> No technical reason.
+> Since 64K+3levels is not implemented in this set, I didn't add it.
+> 
+> Should 64K+3levels be prepared in this patchset?
+> 
+> > > -AArch64 Linux memory layout with 64KB pages:
+> > > +AArch64 Linux memory layout with 4KB pages + 4 levels:
+> > > +
+> > > +Start			End			Size		Use
+> > > +-----------------------------------------------------------------------
+> > > +0000000000000000	0000ffffffffffff	 256TB		user
+> > > +
+> > > +ffff000000000000	ffff7bfffffeffff	~124TB		vmalloc
+> > 
+> > BTW, maybe as a separate patch we should change the "end" to be exclusive. It becomes harder to modify
+> > (I've been through this a few times already ;)) and even follow the changes.
+> 
+> Does "exclusive" mean that 0000ffffffffffff is changed to 0001000000000000?
+> Or Does it mean that "End" column is dropped?
 
-On Mon, Apr 28, 2014 at 10:31:44AM +0100, Nikolay Borisov wrote:
-> This patch makes kexec work on a kernel that has its .text section set to read
-> only. The main reason of doing it is because there is a patch in the making 
-> (http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/244779.html)
-> which aims to make it possible to flag the kernel's code section as read-only,
-> rendering kexec inoperable.
-> 
-> The first patch does the actual functional changes while the 2nd one is
-> optional and is only to be used in case you have already applied the aforementioned
-> CONFIG_DEBUG_RODATA patch
-> 
-> Patch 3 is also optional and tries to make the assembly code a bit more "sane"
-> by introducing a .struct to describe the parameters for the kernel relocation
-> stub. 
-> 
-> Those patches have been tested on linux 3.14 on THUMB-2/non-THUMB-2 host
-> kernels. 
-> 
-> Patch 1 and 3 apply cleanly on 3.15-rc3 and Patch 2 applies cleanly, provided
-> that Kees' patch is applied as well. 
-> 
-> Kees also managed to test that on a QEMU 2.0 based machine. 
+Not dropped but changed to 0001.... (the kernel already prints the
+memory layout in a similar way).
 
-Wouldn't it be far simpler to set_kernel_text_rw() on a kexec? At this
-point, we've committed to replacing our image, so whether we can write to
-the .text of the old image before we clobber it entirely seems somewhat
-moot to me.
-
-Will
+-- 
+Catalin
