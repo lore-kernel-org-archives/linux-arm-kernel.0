@@ -1,91 +1,85 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 30 Apr 2014 10:51:57 -0700
-Subject: [PATCH v3 1/9] mtd: nand: define struct nand_timings
-In-Reply-To: <1394647664-8258-2-git-send-email-b.brezillon.dev@gmail.com>
-References: <1394647664-8258-1-git-send-email-b.brezillon.dev@gmail.com>
- <1394647664-8258-2-git-send-email-b.brezillon.dev@gmail.com>
-Message-ID: <20140430175157.GB2497@norris-Latitude-E6410>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 30 Apr 2014 10:54:58 -0700
+Subject: [PATCH 0/3] Make kexec work with CONFIG_DEBUG_RODATA enabled
+In-Reply-To: <1C23526A7C42DB45BBF55B662C7C530E2B769FB60D@BUNGLE.Emea.Arm.com>
+References: <1398677507-6687-1-git-send-email-Nikolay.Borisov@arm.com>
+ <20140430130241.GA15719@arm.com>
+ <1C23526A7C42DB45BBF55B662C7C530E2B769FB60D@BUNGLE.Emea.Arm.com>
+Message-ID: <CAGXu5j+htWTt1V8VVCKM9Zkj3=bzEO16MoFisOCz6qUFvmsdTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+On Wed, Apr 30, 2014 at 6:19 AM, Nikolay Borisov
+<Nikolay.Borisov@arm.com> wrote:
+>> From: Will Deacon [mailto:will.deacon at arm.com]
+>> Hi Nikolay,
+>>
+>> On Mon, Apr 28, 2014 at 10:31:44AM +0100, Nikolay Borisov wrote:
+>> > This patch makes kexec work on a kernel that has its .text section
+>> set to read
+>> > only. The main reason of doing it is because there is a patch in the
+>> making
+>> > (http://lists.infradead.org/pipermail/linux-arm-kernel/2014-
+>> April/244779.html)
+>> > which aims to make it possible to flag the kernel's code section as
+>> read-only,
+>> > rendering kexec inoperable.
+>> >
+>> > The first patch does the actual functional changes while the 2nd one
+>> is
+>> > optional and is only to be used in case you have already applied the
+>> aforementioned
+>> > CONFIG_DEBUG_RODATA patch
+>> >
+>> > Patch 3 is also optional and tries to make the assembly code a bit
+>> more "sane"
+>> > by introducing a .struct to describe the parameters for the kernel
+>> relocation
+>> > stub.
+>> >
+>> > Those patches have been tested on linux 3.14 on THUMB-2/non-THUMB-2
+>> host
+>> > kernels.
+>> >
+>> > Patch 1 and 3 apply cleanly on 3.15-rc3 and Patch 2 applies cleanly,
+>> provided
+>> > that Kees' patch is applied as well.
+>> >
+>> > Kees also managed to test that on a QEMU 2.0 based machine.
+>>
+>> Wouldn't it be far simpler to set_kernel_text_rw() on a kexec? At this
+>> point, we've committed to replacing our image, so whether we can write
+>> to the .text of the old image before we clobber it entirely seems somewhat
+>> moot to me.
+>>
+>
+> We are poking one of the values in the prepare stage so doing set_kernel_text_rw() there
+> won't be very clean solution. However, I agree that if the values being poked into the prep
 
-On Wed, Mar 12, 2014 at 07:07:36PM +0100, Boris BREZILLON wrote:
-> Define a struct containing the standard NAND timings as described in NAND
-> datasheets.
-> 
-> Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
-> ---
->  include/linux/mtd/nand.h |   49 ++++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 49 insertions(+)
-> 
-> diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
-> index 389b3c5..f3ff3a3 100644
-> --- a/include/linux/mtd/nand.h
-> +++ b/include/linux/mtd/nand.h
-> @@ -846,4 +846,53 @@ static inline bool nand_is_slc(struct nand_chip *chip)
->  {
->  	return chip->bits_per_cell == 1;
->  }
-> +
-> +/**
-> + * struct nand_sdr_timings - SDR NAND chip timings
-> + *
-> + * This struct defines the timing requirements of a SDR NAND chip.
-> + * These informations can be found in every NAND datasheets and the timings
-> + * meaning are described in the ONFI specifications:
-> + * www.onfi.org/~/media/ONFI/specs/onfi_3_1_spec.pdf? (chapter 4.15 Timing
+set_kernel_text_rw() is also mm-specific, since the PMD sections are
+copied per-mm. I'm not sure if that's as much of a problem here since
+the prepare looks to be all in the same thread, but if we can avoid
+set_kernel_text_rw() that'll probably make things less surprising if
+changes are made later on.
 
-Can you remove the unicode U+200E character?
+-Kees
 
-> + * Parameters)
+> stage is stashed in a static variable and then in the kexec_execute function we make the kernel
+> RW since we are turning the MMO off and nuking the old kernel anyway.
+>
+>> Will
+>
+> Regards,
+> Nikolay
+>
+> -- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
+>
+> ARM Limited, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2557590
+> ARM Holdings plc, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2548782
+>
 
-Please document the units for these fields here. It looks like you're
-using picoseconds.
 
-> + *
-> + */
-> +
 
-Extra blank line.
-
-> +struct nand_sdr_timings {
-> +	u32 tALH_min;
-> +	u32 tADL_min;
-> +	u32 tALS_min;
-> +	u32 tAR_min;
-> +	u32 tCEA_max;
-> +	u32 tCEH_min;
-> +	u32 tCH_min;
-> +	u32 tCHZ_max;
-> +	u32 tCLH_min;
-> +	u32 tCLR_min;
-> +	u32 tCLS_min;
-> +	u32 tCOH_min;
-> +	u32 tCS_min;
-> +	u32 tDH_min;
-> +	u32 tDS_min;
-> +	u32 tFEAT_max;
-> +	u32 tIR_min;
-> +	u32 tITC_max;
-> +	u32 tRC_min;
-> +	u32 tREA_max;
-> +	u32 tREH_min;
-> +	u32 tRHOH_min;
-> +	u32 tRHW_min;
-> +	u32 tRHZ_max;
-> +	u32 tRLOH_min;
-> +	u32 tRP_min;
-> +	u32 tRR_min;
-> +	u64 tRST_max;
-> +	u32 tWB_max;
-> +	u32 tWC_min;
-> +	u32 tWH_min;
-> +	u32 tWHR_min;
-> +	u32 tWP_min;
-> +	u32 tWW_min;
-> +};
-> +
->  #endif /* __LINUX_MTD_NAND_H */
-
-Brian
+-- 
+Kees Cook
+Chrome OS Security
