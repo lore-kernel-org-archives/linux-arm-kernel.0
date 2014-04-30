@@ -1,49 +1,271 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 30 Apr 2014 04:15:56 -0700
-Subject: [PATCH 5/5] KVM: ARM: vgic: Fix the overlap check action about
- setting the GICD & GICC base address.
-In-Reply-To: <1398856556-13199-1-git-send-email-christoffer.dall@linaro.org>
-References: <1398856556-13199-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1398856556-13199-6-git-send-email-christoffer.dall@linaro.org>
+From: alim.akhtar@gmail.com (Alim Akhtar)
+Date: Wed, 30 Apr 2014 16:45:50 +0530
+Subject: [PATCH v3 07/16] clk: exynos5420: update clocks for PERIC block
+In-Reply-To: <1398344632-18623-8-git-send-email-shaik.ameer@samsung.com>
+References: <1398344632-18623-1-git-send-email-shaik.ameer@samsung.com>
+ <1398344632-18623-8-git-send-email-shaik.ameer@samsung.com>
+Message-ID: <CAGOxZ50Qw3TAX4KBjHMnGT8FHoj=vxXJWHq7+cCdE6CJKdPO9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Haibin Wang <wanghaibin.wang@huawei.com>
+HI shaik,
 
-Currently below check in vgic_ioaddr_overlap will always succeed,
-because the vgic dist base and vgic cpu base are still kept UNDEF
-after initialization. The code as follows will be return forever.
+On Thu, Apr 24, 2014 at 6:33 PM, Shaik Ameer Basha
+<shaik.ameer@samsung.com> wrote:
+> This patch includes,
+>     1] renaming of the HSI2C clocks
+>     2] renaming of spi clocks according to the datasheet
+>     3] fixes for child-parent relationships
+>     4] adding of more clocks related to PERIC block
+You are also fixing the gate clock, GATE_BUS_PERIC -> GATE_IP_PERIC
+Please add them in your commit message.
+>
+> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+> Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos5420.dtsi      |   14 +++---
+>  drivers/clk/samsung/clk-exynos5420.c   |   73 ++++++++++++++++----------------
+>  include/dt-bindings/clock/exynos5420.h |   14 +++---
+>  3 files changed, 50 insertions(+), 51 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+> index c3a9a66..67ba2c5 100644
+> --- a/arch/arm/boot/dts/exynos5420.dtsi
+> +++ b/arch/arm/boot/dts/exynos5420.dtsi
+> @@ -549,7 +549,7 @@
+>                 #size-cells = <0>;
+>                 pinctrl-names = "default";
+>                 pinctrl-0 = <&i2c4_hs_bus>;
+> -               clocks = <&clock CLK_I2C4>;
+> +               clocks = <&clock CLK_USI0>;
+>                 clock-names = "hsi2c";
+>                 status = "disabled";
+>         };
+> @@ -562,7 +562,7 @@
+>                 #size-cells = <0>;
+>                 pinctrl-names = "default";
+>                 pinctrl-0 = <&i2c5_hs_bus>;
+> -               clocks = <&clock CLK_I2C5>;
+> +               clocks = <&clock CLK_USI1>;
+>                 clock-names = "hsi2c";
+>                 status = "disabled";
+>         };
+> @@ -575,7 +575,7 @@
+>                 #size-cells = <0>;
+>                 pinctrl-names = "default";
+>                 pinctrl-0 = <&i2c6_hs_bus>;
+> -               clocks = <&clock CLK_I2C6>;
+> +               clocks = <&clock CLK_USI2>;
+>                 clock-names = "hsi2c";
+>                 status = "disabled";
+>         };
+> @@ -588,7 +588,7 @@
+>                 #size-cells = <0>;
+>                 pinctrl-names = "default";
+>                 pinctrl-0 = <&i2c7_hs_bus>;
+> -               clocks = <&clock CLK_I2C7>;
+> +               clocks = <&clock CLK_USI3>;
+>                 clock-names = "hsi2c";
+>                 status = "disabled";
+>         };
+> @@ -601,7 +601,7 @@
+>                 #size-cells = <0>;
+>                 pinctrl-names = "default";
+>                 pinctrl-0 = <&i2c8_hs_bus>;
+> -               clocks = <&clock CLK_I2C8>;
+> +               clocks = <&clock CLK_USI4>;
+>                 clock-names = "hsi2c";
+>                 status = "disabled";
+>         };
+> @@ -614,7 +614,7 @@
+>                 #size-cells = <0>;
+>                 pinctrl-names = "default";
+>                 pinctrl-0 = <&i2c9_hs_bus>;
+> -               clocks = <&clock CLK_I2C9>;
+> +               clocks = <&clock CLK_USI5>;
+>                 clock-names = "hsi2c";
+>                 status = "disabled";
+>         };
+> @@ -627,7 +627,7 @@
+>                 #size-cells = <0>;
+>                 pinctrl-names = "default";
+>                 pinctrl-0 = <&i2c10_hs_bus>;
+> -               clocks = <&clock CLK_I2C10>;
+> +               clocks = <&clock CLK_USI6>;
+>                 clock-names = "hsi2c";
+>                 status = "disabled";
+>         };
+> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+> index cd75661..b4cf4c1 100755
+> --- a/drivers/clk/samsung/clk-exynos5420.c
+> +++ b/drivers/clk/samsung/clk-exynos5420.c
+> @@ -95,6 +95,7 @@
+>  #define GATE_IP_DISP1          0x10928
+>  #define GATE_IP_G3D            0x10930
+>  #define GATE_IP_GEN            0x10934
+> +#define GATE_IP_PERIC          0x10950
+>  #define GATE_IP_MSCL           0x10970
+>  #define GATE_TOP_SCLK_GSCL     0x10820
+>  #define GATE_TOP_SCLK_DISP1    0x10828
+> @@ -183,6 +184,7 @@ static unsigned long exynos5420_clk_regs[] __initdata = {
+>         GATE_IP_DISP1,
+>         GATE_IP_G3D,
+>         GATE_IP_GEN,
+> +       GATE_IP_PERIC,
+>         GATE_IP_MSCL,
+>         GATE_TOP_SCLK_GSCL,
+>         GATE_TOP_SCLK_DISP1,
+> @@ -588,9 +590,9 @@ static struct samsung_div_clock exynos5420_div_clks[] __initdata = {
+>         DIV(0, "dout_audio2", "mout_audio2", DIV_PERIC3, 28, 4),
+>
+>         /* SPI Pre-Ratio */
+> -       DIV(0, "dout_pre_spi0", "dout_spi0", DIV_PERIC4, 8, 8),
+> -       DIV(0, "dout_pre_spi1", "dout_spi1", DIV_PERIC4, 16, 8),
+> -       DIV(0, "dout_pre_spi2", "dout_spi2", DIV_PERIC4, 24, 8),
+> +       DIV(0, "dout_spi0_pre", "dout_spi0", DIV_PERIC4, 8, 8),
+> +       DIV(0, "dout_spi1_pre", "dout_spi1", DIV_PERIC4, 16, 8),
+> +       DIV(0, "dout_spi2_pre", "dout_spi2", DIV_PERIC4, 24, 8),
+>
+>         /* GSCL Block */
+>         DIV(0, "dout_gscl_blk_300", "mout_user_aclk300_gscl",
+> @@ -641,8 +643,8 @@ static struct samsung_gate_clock exynos5420_gate_clks[] __initdata = {
+>                         GATE_BUS_TOP, 9, CLK_IGNORE_UNUSED, 0),
+>         GATE(0, "aclk66_psgen", "mout_aclk66_psgen",
+>                         GATE_BUS_TOP, 10, CLK_IGNORE_UNUSED, 0),
+> -       GATE(0, "aclk66_peric", "mout_aclk66_peric",
+> -                       GATE_BUS_TOP, 11, 0, 0),
+> +       GATE(0, "aclk66_peric", "mout_user_aclk66_peric",
+> +               GATE_BUS_TOP, 11, CLK_IGNORE_UNUSED, 0),
+>         GATE(0, "aclk166", "mout_user_aclk166",
+>                         GATE_BUS_TOP, 14, CLK_IGNORE_UNUSED, 0),
+>         GATE(0, "aclk333", "mout_aclk333",
+> @@ -657,11 +659,11 @@ static struct samsung_gate_clock exynos5420_gate_clks[] __initdata = {
+>                 GATE_TOP_SCLK_PERIC, 2, CLK_SET_RATE_PARENT, 0),
+>         GATE(CLK_SCLK_UART3, "sclk_uart3", "dout_uart3",
+>                 GATE_TOP_SCLK_PERIC, 3, CLK_SET_RATE_PARENT, 0),
+> -       GATE(CLK_SCLK_SPI0, "sclk_spi0", "dout_pre_spi0",
+> +       GATE(CLK_SCLK_SPI0, "sclk_spi0", "dout_spi0_pre",
+>                 GATE_TOP_SCLK_PERIC, 6, CLK_SET_RATE_PARENT, 0),
+> -       GATE(CLK_SCLK_SPI1, "sclk_spi1", "dout_pre_spi1",
+> +       GATE(CLK_SCLK_SPI1, "sclk_spi1", "dout_spi1_pre",
+>                 GATE_TOP_SCLK_PERIC, 7, CLK_SET_RATE_PARENT, 0),
+> -       GATE(CLK_SCLK_SPI2, "sclk_spi2", "dout_pre_spi2",
+> +       GATE(CLK_SCLK_SPI2, "sclk_spi2", "dout_spi2_pre",
+>                 GATE_TOP_SCLK_PERIC, 8, CLK_SET_RATE_PARENT, 0),
+>         GATE(CLK_SCLK_SPDIF, "sclk_spdif", "mout_spdif",
+>                 GATE_TOP_SCLK_PERIC, 9, CLK_SET_RATE_PARENT, 0),
+> @@ -732,42 +734,39 @@ static struct samsung_gate_clock exynos5420_gate_clks[] __initdata = {
+>         GATE(CLK_USBD301, "usbd301", "aclk200_fsys", GATE_BUS_FSYS0, 28, 0, 0),
+>
+>         /* UART */
+> -       GATE(CLK_UART0, "uart0", "aclk66_peric", GATE_BUS_PERIC, 4, 0, 0),
+> -       GATE(CLK_UART1, "uart1", "aclk66_peric", GATE_BUS_PERIC, 5, 0, 0),
+> -       GATE_A(CLK_UART2, "uart2", "aclk66_peric",
+> -               GATE_BUS_PERIC, 6, CLK_IGNORE_UNUSED, 0, "uart2"),
+> -       GATE(CLK_UART3, "uart3", "aclk66_peric", GATE_BUS_PERIC, 7, 0, 0),
+> +       GATE(CLK_UART0, "uart0", "aclk66_peric", GATE_IP_PERIC, 0, 0, 0),
+> +       GATE(CLK_UART1, "uart1", "aclk66_peric", GATE_IP_PERIC, 1, 0, 0),
+> +       GATE(CLK_UART2, "uart2", "aclk66_peric", GATE_IP_PERIC, 2, 0, 0),
+> +       GATE(CLK_UART3, "uart3", "aclk66_peric", GATE_IP_PERIC, 3, 0, 0),
+>         /* I2C */
+> -       GATE(CLK_I2C0, "i2c0", "aclk66_peric", GATE_BUS_PERIC, 9, 0, 0),
+> -       GATE(CLK_I2C1, "i2c1", "aclk66_peric", GATE_BUS_PERIC, 10, 0, 0),
+> -       GATE(CLK_I2C2, "i2c2", "aclk66_peric", GATE_BUS_PERIC, 11, 0, 0),
+> -       GATE(CLK_I2C3, "i2c3", "aclk66_peric", GATE_BUS_PERIC, 12, 0, 0),
+> -       GATE(CLK_I2C4, "i2c4", "aclk66_peric", GATE_BUS_PERIC, 13, 0, 0),
+> -       GATE(CLK_I2C5, "i2c5", "aclk66_peric", GATE_BUS_PERIC, 14, 0, 0),
+> -       GATE(CLK_I2C6, "i2c6", "aclk66_peric", GATE_BUS_PERIC, 15, 0, 0),
+> -       GATE(CLK_I2C7, "i2c7", "aclk66_peric", GATE_BUS_PERIC, 16, 0, 0),
+> -       GATE(CLK_I2C_HDMI, "i2c_hdmi", "aclk66_peric", GATE_BUS_PERIC, 17, 0,
+> -               0),
+> -       GATE(CLK_TSADC, "tsadc", "aclk66_peric", GATE_BUS_PERIC, 18, 0, 0),
+> +       GATE(CLK_I2C0, "i2c0", "aclk66_peric", GATE_IP_PERIC, 6, 0, 0),
+> +       GATE(CLK_I2C1, "i2c1", "aclk66_peric", GATE_IP_PERIC, 7, 0, 0),
+> +       GATE(CLK_I2C2, "i2c2", "aclk66_peric", GATE_IP_PERIC, 8, 0, 0),
+> +       GATE(CLK_I2C3, "i2c3", "aclk66_peric", GATE_IP_PERIC, 9, 0, 0),
+> +       GATE(CLK_USI0, "usi0", "aclk66_peric", GATE_IP_PERIC, 10, 0, 0),
+> +       GATE(CLK_USI1, "usi1", "aclk66_peric", GATE_IP_PERIC, 11, 0, 0),
+> +       GATE(CLK_USI2, "usi2", "aclk66_peric", GATE_IP_PERIC, 12, 0, 0),
+> +       GATE(CLK_USI3, "usi3", "aclk66_peric", GATE_IP_PERIC, 13, 0, 0),
+> +       GATE(CLK_USI4, "usi4", "aclk66_peric", GATE_IP_PERIC, 28, 0, 0),
+> +       GATE(CLK_USI5, "usi5", "aclk66_peric", GATE_IP_PERIC, 30, 0, 0),
+> +       GATE(CLK_USI6, "usi6", "aclk66_peric", GATE_IP_PERIC, 31, 0, 0),
+> +       GATE(CLK_I2C_HDMI, "i2c_hdmi", "aclk66_peric", GATE_IP_PERIC, 14, 0, 0),
+> +       GATE(CLK_TSADC, "tsadc", "aclk66_peric", GATE_IP_PERIC, 15, 0, 0),
+>         /* SPI */
+> -       GATE(CLK_SPI0, "spi0", "aclk66_peric", GATE_BUS_PERIC, 19, 0, 0),
+> -       GATE(CLK_SPI1, "spi1", "aclk66_peric", GATE_BUS_PERIC, 20, 0, 0),
+> -       GATE(CLK_SPI2, "spi2", "aclk66_peric", GATE_BUS_PERIC, 21, 0, 0),
+> +       GATE(CLK_SPI0, "spi0", "aclk66_peric", GATE_IP_PERIC, 16, 0, 0),
+> +       GATE(CLK_SPI1, "spi1", "aclk66_peric", GATE_IP_PERIC, 17, 0, 0),
+> +       GATE(CLK_SPI2, "spi2", "aclk66_peric", GATE_IP_PERIC, 18, 0, 0),
+>         GATE(CLK_KEYIF, "keyif", "aclk66_peric", GATE_BUS_PERIC, 22, 0, 0),
+>         /* I2S */
+> -       GATE(CLK_I2S1, "i2s1", "aclk66_peric", GATE_BUS_PERIC, 23, 0, 0),
+> -       GATE(CLK_I2S2, "i2s2", "aclk66_peric", GATE_BUS_PERIC, 24, 0, 0),
+> +       GATE(CLK_I2S1, "i2s1", "aclk66_peric", GATE_IP_PERIC, 20, 0, 0),
+> +       GATE(CLK_I2S2, "i2s2", "aclk66_peric", GATE_IP_PERIC, 21, 0, 0),
+>         /* PCM */
+> -       GATE(CLK_PCM1, "pcm1", "aclk66_peric", GATE_BUS_PERIC, 25, 0, 0),
+> -       GATE(CLK_PCM2, "pcm2", "aclk66_peric", GATE_BUS_PERIC, 26, 0, 0),
+> +       GATE(CLK_PCM1, "pcm1", "aclk66_peric", GATE_IP_PERIC, 22, 0, 0),
+> +       GATE(CLK_PCM2, "pcm2", "aclk66_peric", GATE_IP_PERIC, 23, 0, 0),
+>         /* PWM */
+> -       GATE(CLK_PWM, "pwm", "aclk66_peric", GATE_BUS_PERIC, 27, 0, 0),
+> +       GATE(CLK_PWM, "pwm", "aclk66_peric", GATE_IP_PERIC, 24, 0, 0),
+>         /* SPDIF */
+> -       GATE(CLK_SPDIF, "spdif", "aclk66_peric", GATE_BUS_PERIC, 29, 0, 0),
+> -
+> -       GATE(CLK_I2C8, "i2c8", "aclk66_peric", GATE_BUS_PERIC1, 0, 0, 0),
+> -       GATE(CLK_I2C9, "i2c9", "aclk66_peric", GATE_BUS_PERIC1, 1, 0, 0),
+> -       GATE(CLK_I2C10, "i2c10", "aclk66_peric", GATE_BUS_PERIC1, 2, 0, 0),
+> +       GATE(CLK_SPDIF, "spdif", "aclk66_peric", GATE_IP_PERIC, 26, 0, 0),
+>
+>         GATE(CLK_CHIPID, "chipid", "aclk66_psgen",
+>                         GATE_BUS_PERIS0, 12, CLK_IGNORE_UNUSED, 0),
+> diff --git a/include/dt-bindings/clock/exynos5420.h b/include/dt-bindings/clock/exynos5420.h
+> index 228cc5c..ff2e5b6 100755
+> --- a/include/dt-bindings/clock/exynos5420.h
+> +++ b/include/dt-bindings/clock/exynos5420.h
+> @@ -69,10 +69,10 @@
+>  #define CLK_I2C1               262
+>  #define CLK_I2C2               263
+>  #define CLK_I2C3               264
+> -#define CLK_I2C4               265
+> -#define CLK_I2C5               266
+> -#define CLK_I2C6               267
+> -#define CLK_I2C7               268
+> +#define CLK_USI0               265
+> +#define CLK_USI1               266
+> +#define CLK_USI2               267
+> +#define CLK_USI3               268
+>  #define CLK_I2C_HDMI           269
+>  #define CLK_TSADC              270
+>  #define CLK_SPI0               271
+> @@ -85,9 +85,9 @@
+>  #define CLK_PCM2               278
+>  #define CLK_PWM                        279
+>  #define CLK_SPDIF              280
+> -#define CLK_I2C8               281
+> -#define CLK_I2C9               282
+> -#define CLK_I2C10              283
+> +#define CLK_USI4               281
+> +#define CLK_USI5               282
+> +#define CLK_USI6               283
+>  #define CLK_ACLK66_PSGEN       300
+>  #define CLK_CHIPID             301
+>  #define CLK_SYSREG             302
+> --
+> 1.7.9.5
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-	if (IS_VGIC_ADDR_UNDEF(dist) || IS_VGIC_ADDR_UNDEF(cpu))
-                return 0;
 
-So, before invoking the vgic_ioaddr_overlap, it needs to set the
-corresponding base address firstly.
 
-Signed-off-by: Haibin Wang <wanghaibin.wang@huawei.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- virt/kvm/arm/vgic.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index f9af48c..56ff9be 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1667,10 +1667,11 @@ static int vgic_ioaddr_assign(struct kvm *kvm, phys_addr_t *ioaddr,
- 	if (addr + size < addr)
- 		return -EINVAL;
- 
-+	*ioaddr = addr;
- 	ret = vgic_ioaddr_overlap(kvm);
- 	if (ret)
--		return ret;
--	*ioaddr = addr;
-+		*ioaddr = VGIC_ADDR_UNDEF;
-+
- 	return ret;
- }
- 
 -- 
-1.8.5.2
+Regards,
+Alim
