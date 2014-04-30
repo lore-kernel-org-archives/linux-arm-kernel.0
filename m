@@ -1,20 +1,15 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 30 Apr 2014 14:56:36 +0200
-Subject: [PATCH 09/15] ARM: dts: kirkwood: set default pinctrl for UART0/1
+Date: Wed, 30 Apr 2014 14:56:35 +0200
+Subject: [PATCH 08/15] ARM: dts: kirkwood: set default pinctrl for GBE1
 In-Reply-To: <1398862602-29595-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1398862602-29595-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1398862602-29595-10-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1398862602-29595-9-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most boards use the default UART0/1 pinctrl setting without RTS/CTS.
-Add the pinctrl setting to the toplevel SoC UART nodes and put a note
-in front of the corresponding pinctrl node to overwrite the setting
-on board level. Currently, both boards using a different UART pinctrl
-setting (Openblocks A6, A7) already overwrite the pinctrl node.
-
-While at it, also fix up some status = "ok" to "okay" and again
-whitespace issues on mplcec4 uart nodes.
+On Kirkwood, there is only one valid pinctrl setting for GBE1. With
+a common SoC pinctrl node, we can now set it in the node instead of
+in each board file.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
@@ -32,306 +27,35 @@ Cc: devicetree at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/boot/dts/kirkwood-b3.dts                      | 2 --
- arch/arm/boot/dts/kirkwood-cloudbox.dts                | 2 --
- arch/arm/boot/dts/kirkwood-db.dtsi                     | 4 +---
- arch/arm/boot/dts/kirkwood-dns320.dts                  | 2 --
- arch/arm/boot/dts/kirkwood-laplug.dts                  | 2 --
- arch/arm/boot/dts/kirkwood-mplcec4.dts                 | 8 +++-----
- arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts         | 4 +---
- arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts | 2 --
- arch/arm/boot/dts/kirkwood-netgear_readynas_nv+_v2.dts | 2 --
- arch/arm/boot/dts/kirkwood-ns2-common.dtsi             | 2 --
- arch/arm/boot/dts/kirkwood-openblocks_a6.dts           | 8 ++------
- arch/arm/boot/dts/kirkwood-openblocks_a7.dts           | 8 ++------
- arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi      | 2 --
- arch/arm/boot/dts/kirkwood-synology.dtsi               | 4 ----
- arch/arm/boot/dts/kirkwood-topkick.dts                 | 4 +---
- arch/arm/boot/dts/kirkwood-ts219.dtsi                  | 4 ----
- arch/arm/boot/dts/kirkwood.dtsi                        | 8 ++++++++
- 17 files changed, 18 insertions(+), 50 deletions(-)
+ arch/arm/boot/dts/kirkwood-openblocks_a7.dts | 2 --
+ arch/arm/boot/dts/kirkwood.dtsi              | 2 ++
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-b3.dts b/arch/arm/boot/dts/kirkwood-b3.dts
-index c723ce7ad1b8..38972b221089 100644
---- a/arch/arm/boot/dts/kirkwood-b3.dts
-+++ b/arch/arm/boot/dts/kirkwood-b3.dts
-@@ -114,8 +114,6 @@
- 			 * UART0_TX = Testpoint 66
- 			 * See the Excito Wiki for more details.
- 		 	 */
--			pinctrl-0 = <&pmx_uart0>;
--			pinctrl-names = "default";
- 			status = "okay";
- 		};
- 
-diff --git a/arch/arm/boot/dts/kirkwood-cloudbox.dts b/arch/arm/boot/dts/kirkwood-cloudbox.dts
-index 3f30475fea11..1ac6bd9f54de 100644
---- a/arch/arm/boot/dts/kirkwood-cloudbox.dts
-+++ b/arch/arm/boot/dts/kirkwood-cloudbox.dts
-@@ -26,8 +26,6 @@
- 		};
- 
- 		serial at 12000 {
--			pinctrl-0 = <&pmx_uart0>;
--			pinctrl-names = "default";
- 			status = "okay";
- 		};
- 
-diff --git a/arch/arm/boot/dts/kirkwood-db.dtsi b/arch/arm/boot/dts/kirkwood-db.dtsi
-index 9b62f78b516b..2790f46d87e0 100644
---- a/arch/arm/boot/dts/kirkwood-db.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-db.dtsi
-@@ -34,9 +34,7 @@
- 		};
- 
- 		serial at 12000 {
--			pinctrl-0 = <&pmx_uart0>;
--			pinctrl-names = "default";
--			status = "ok";
-+			status = "okay";
- 		};
- 
- 		sata at 80000 {
-diff --git a/arch/arm/boot/dts/kirkwood-dns320.dts b/arch/arm/boot/dts/kirkwood-dns320.dts
-index 3210daeb264c..d85ef0a91b50 100644
---- a/arch/arm/boot/dts/kirkwood-dns320.dts
-+++ b/arch/arm/boot/dts/kirkwood-dns320.dts
-@@ -52,8 +52,6 @@
- 		};
- 
- 		serial at 12100 {
--			pinctrl-0 = <&pmx_uart1>;
--			pinctrl-names = "default";
- 			status = "okay";
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/kirkwood-laplug.dts b/arch/arm/boot/dts/kirkwood-laplug.dts
-index 4f7741184f98..4c91fbb084c5 100644
---- a/arch/arm/boot/dts/kirkwood-laplug.dts
-+++ b/arch/arm/boot/dts/kirkwood-laplug.dts
-@@ -38,8 +38,6 @@
- 
- 	ocp at f1000000 {
- 		serial at 12000 {
--			pinctrl-0 = <&pmx_uart0>;
--			pinctrl-names = "default";
- 			status = "okay";
- 		};
- 
-diff --git a/arch/arm/boot/dts/kirkwood-mplcec4.dts b/arch/arm/boot/dts/kirkwood-mplcec4.dts
-index 414024c578e8..79796c8b9c4f 100644
---- a/arch/arm/boot/dts/kirkwood-mplcec4.dts
-+++ b/arch/arm/boot/dts/kirkwood-mplcec4.dts
-@@ -90,11 +90,9 @@
- 
-                 };
- 
--                serial at 12000 {
--                        status = "ok";
--                        pinctrl-0 = <&pmx_uart0>;
--                        pinctrl-names = "default";
--                };
-+		serial at 12000 {
-+			status = "okay";
-+		};
- 
- 		rtc at 10300 {
- 			status = "disabled";
-diff --git a/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts b/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
-index 52b80b108f8e..acbebc6dc169 100644
---- a/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
-+++ b/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
-@@ -75,9 +75,7 @@
- 		};
- 
- 		serial at 12000 {
--			pinctrl-0 = <&pmx_uart0>;
--			pinctrl-names = "default";
--			status = "ok";
-+			status = "okay";
- 		};
- 
- 		ehci at 50000 {
-diff --git a/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts b/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
-index c4741699605c..fd733c63bc27 100644
---- a/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
-+++ b/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
-@@ -113,8 +113,6 @@
- 		};
- 
- 		serial at 12000 {
--			pinctrl-0 = <&pmx_uart0>;
--			pinctrl-names = "default";
- 			status = "okay";
- 		};
- 
-diff --git a/arch/arm/boot/dts/kirkwood-netgear_readynas_nv+_v2.dts b/arch/arm/boot/dts/kirkwood-netgear_readynas_nv+_v2.dts
-index 8437f3e3b8d7..b514d643fb6c 100644
---- a/arch/arm/boot/dts/kirkwood-netgear_readynas_nv+_v2.dts
-+++ b/arch/arm/boot/dts/kirkwood-netgear_readynas_nv+_v2.dts
-@@ -120,8 +120,6 @@
- 		};
- 
- 		serial at 12000 {
--			pinctrl-0 = <&pmx_uart0>;
--			pinctrl-names = "default";
- 			status = "okay";
- 		};
- 
-diff --git a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
-index 46eb8f6b6243..696b208b676f 100644
---- a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
-@@ -20,8 +20,6 @@
- 		};
- 
- 		serial at 12000 {
--			pinctrl-0 = <&pmx_uart0>;
--			pinctrl-names = "default";
- 			status = "okay";
- 		};
- 
-diff --git a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
-index fd1c8b535e28..1e056b3b1817 100644
---- a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
-+++ b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
-@@ -19,15 +19,11 @@
- 
- 	ocp at f1000000 {
- 		serial at 12000 {
--			status = "ok";
--			pinctrl-0 = <&pmx_uart0>;
--			pinctrl-names = "default";
-+			status = "okay";
- 		};
- 
- 		serial at 12100 {
--			status = "ok";
--			pinctrl-0 = <&pmx_uart1>;
--			pinctrl-names = "default";
-+			status = "okay";
- 		};
- 
- 		sata at 80000 {
 diff --git a/arch/arm/boot/dts/kirkwood-openblocks_a7.dts b/arch/arm/boot/dts/kirkwood-openblocks_a7.dts
-index 622a3ca12c2d..07f6bf6aba91 100644
+index 1a7f18d5530d..622a3ca12c2d 100644
 --- a/arch/arm/boot/dts/kirkwood-openblocks_a7.dts
 +++ b/arch/arm/boot/dts/kirkwood-openblocks_a7.dts
-@@ -31,15 +31,11 @@
+@@ -207,8 +207,6 @@
  
- 	ocp at f1000000 {
- 		serial at 12000 {
--			status = "ok";
--			pinctrl-0 = <&pmx_uart0>;
--			pinctrl-names = "default";
-+			status = "okay";
- 		};
- 
- 		serial at 12100 {
--			status = "ok";
--			pinctrl-0 = <&pmx_uart1>;
--			pinctrl-names = "default";
-+			status = "okay";
- 		};
- 
- 		sata at 80000 {
-diff --git a/arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi b/arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi
-index a015af4da9a2..e2c43aecc7b2 100644
---- a/arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi
-@@ -45,8 +45,6 @@
- 			};
- 		};
- 		serial at 12000 {
--			pinctrl-0 = <&pmx_uart0>;
--			pinctrl-names = "default";
- 			status = "okay";
- 		};
+ &eth1 {
+ 	status = "okay";
+-	pinctrl-0 = <&pmx_ge1>;
+-	pinctrl-names = "default";
+ 	ethernet1-port at 0 {
+ 		phy-handle = <&ethphy1>;
  	};
-diff --git a/arch/arm/boot/dts/kirkwood-synology.dtsi b/arch/arm/boot/dts/kirkwood-synology.dtsi
-index e137bd4e26fd..370af7f69319 100644
---- a/arch/arm/boot/dts/kirkwood-synology.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-synology.dtsi
-@@ -277,14 +277,10 @@
- 
- 		serial at 12000 {
- 			status = "okay";
--			pinctrl-0 = <&pmx_uart0>;
--			pinctrl-names = "default";
- 		};
- 
- 		serial at 12100 {
- 			status = "okay";
--			pinctrl-0 = <&pmx_uart1>;
--			pinctrl-names = "default";
- 		};
- 
- 		poweroff at 12100 {
-diff --git a/arch/arm/boot/dts/kirkwood-topkick.dts b/arch/arm/boot/dts/kirkwood-topkick.dts
-index 5bc57efbee99..14b12189d464 100644
---- a/arch/arm/boot/dts/kirkwood-topkick.dts
-+++ b/arch/arm/boot/dts/kirkwood-topkick.dts
-@@ -86,9 +86,7 @@
- 		};
- 
- 		serial at 12000 {
--			status = "ok";
--			pinctrl-0 = <&pmx_uart0>;
--			pinctrl-names = "default";
-+			status = "okay";
- 		};
- 
- 		sata at 80000 {
-diff --git a/arch/arm/boot/dts/kirkwood-ts219.dtsi b/arch/arm/boot/dts/kirkwood-ts219.dtsi
-index 414d2246b37c..21cb9aeb2455 100644
---- a/arch/arm/boot/dts/kirkwood-ts219.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-ts219.dtsi
-@@ -36,13 +36,9 @@
- 		};
- 		serial at 12000 {
- 			status = "okay";
--			pinctrl-0 = <&pmx_uart0>;
--			pinctrl-names = "default";
- 		};
- 		serial at 12100 {
- 			status = "okay";
--			pinctrl-0 = <&pmx_uart1>;
--			pinctrl-names = "default";
- 		};
- 		poweroff at 12100 {
- 			compatible = "qnap,power-off";
 diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-index fff28b71b474..f92c8c4e3908 100644
+index 5d412e71b9fb..fff28b71b474 100644
 --- a/arch/arm/boot/dts/kirkwood.dtsi
 +++ b/arch/arm/boot/dts/kirkwood.dtsi
-@@ -98,6 +98,10 @@
- 				marvell,function = "twsi0";
- 			};
- 
-+			/*
-+			 * Default UART pinctrl setting without RTS/CTS,
-+			 * overwrite marvell,pins on board level if required.
-+			 */
- 			pmx_uart0: pmx-uart0 {
- 				marvell,pins = "mpp10", "mpp11";
- 				marvell,function = "uart0";
-@@ -167,6 +171,8 @@
- 			reg-shift = <2>;
- 			interrupts = <33>;
- 			clocks = <&gate_clk 7>;
-+			pinctrl-0 = <&pmx_uart0>;
+@@ -320,6 +320,8 @@
+ 			reg = <0x76000 0x4000>;
+ 			clocks = <&gate_clk 19>;
+ 			marvell,tx-checksum-limit = <1600>;
++			pinctrl-0 = <&pmx_ge1>;
 +			pinctrl-names = "default";
  			status = "disabled";
- 		};
  
-@@ -176,6 +182,8 @@
- 			reg-shift = <2>;
- 			interrupts = <34>;
- 			clocks = <&gate_clk 7>;
-+			pinctrl-0 = <&pmx_uart1>;
-+			pinctrl-names = "default";
- 			status = "disabled";
- 		};
- 
+ 			ethernet1-port at 0 {
 -- 
 1.9.1
