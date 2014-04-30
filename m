@@ -1,56 +1,83 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 30 Apr 2014 21:54:00 +0200
-Subject: [PATCH 07/15] ARM: dts: kirkwood: consolidate common pinctrl
- settings
-In-Reply-To: <20140430194437.GB17365@obsidianresearch.com>
-References: <1398862602-29595-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1398862602-29595-8-git-send-email-sebastian.hesselbarth@gmail.com>
- <20140430164236.GC12944@obsidianresearch.com> <5361517D.8000106@gmail.com>
- <20140430194437.GB17365@obsidianresearch.com>
-Message-ID: <536154D8.2010600@gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 30 Apr 2014 22:21:07 +0200
+Subject: [PATCH 1/4] ARM: shmobile: Ignore callbacks for subsys
+ generic_pm_domain_data
+In-Reply-To: <20140430102308.GA23426@verge.net.au>
+References: <1397230004-22306-1-git-send-email-ulf.hansson@linaro.org>
+ <CAPDyKFqH-0rvs6WorcirY+wVMLWnycWHO6=ZcvK1GebcuzaH0w@mail.gmail.com>
+ <20140430102308.GA23426@verge.net.au>
+Message-ID: <1639184.jtW6HVkuRH@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/30/2014 09:44 PM, Jason Gunthorpe wrote:
-> On Wed, Apr 30, 2014 at 09:39:41PM +0200, Sebastian Hesselbarth wrote:
->> On 04/30/2014 06:42 PM, Jason Gunthorpe wrote:
->>> On Wed, Apr 30, 2014 at 02:56:34PM +0200, Sebastian Hesselbarth wrote:
->>>> All SoCs have the same pinctrl setting for NAND, UART0/1, SPI, TWSI0,
->>>> and GBE1. Move it to the common pinctrl node that we now have.
+On Wednesday, April 30, 2014 07:23:08 PM Simon Horman wrote:
+> On Wed, Apr 30, 2014 at 10:53:58AM +0200, Ulf Hansson wrote:
+> > On 30 April 2014 00:45, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> > > On Friday, April 25, 2014 10:06:51 AM Simon Horman wrote:
+> > >> On Thu, Apr 24, 2014 at 01:25:14PM +0200, Ulf Hansson wrote:
+> > >> > On 14 April 2014 11:22, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> > >> > > On 14 April 2014 03:20, Simon Horman <horms@verge.net.au> wrote:
+> > >> > >> On Fri, Apr 11, 2014 at 05:26:41PM +0200, Ulf Hansson wrote:
+> > >> > >>> There are no active users of these callbacks, thus there are no benefit
+> > >> > >>> of trying to invoke them.
+> > >> > >>>
+> > >> > >>> Cc: Simon Horman <horms@verge.net.au>
+> > >> > >>> Cc: Magnus Damm <magnus.damm@gmail.com>
+> > >> > >>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> > >> > >>> ---
+> > >> > >>>
+> > >> > >>> I am seeking ack from the SOC maintainers since this needs to go with the other
+> > >> > >>> patches in this patchset on the PM core.
+> > >> > >>
+> > >> > >> In order to reduce the possibility of conflicts I would prefer
+> > >> > >> to take this patch through my tree.
+> > >> > >
+> > >> > > Okay, go ahead!
+> > >> > >
+> > >> >
+> > >> > Hi Simon,
+> > >> >
+> > >> > Just wanted to know, if you decided to queue this patch in your tree.
+> > >> > Or were there anything else you needed me to fix here?
+> > >>
+> > >> Sorry for dropping the ball. I will queue-up this patch.
+> > >
+> > > OK
+> > >
+> > > Ulf, since the rest of the series depends on this one (or at least that's
+> > > how it looks to me), would you mind resending it when this one gets into the
+> > > Linus' tree?
+> > 
+> > Well, I would prefer if we could go ahead with the rest of the patches
+> > somehow for 3.16, but I guess it will be hard if Simon picks up this
+> > patch!?
+> > 
+> > Simon,
+> > I guess the reason for your concern were about conflicts, but the file
+> > this patch touch has actually not been modified since Sep 2012. So,
+> > maybe we could go through Rafaels tree anyway?
 > 
->> Yes, there are already some boards (e.g. t5325 with spi0) overwriting
->> pinctrl settings instead of overwriting the pinctrl-0 property. I
->> thought, I keep this behavior and note it above each pinctrl node in
->> some of the following patches.
+> Yes, my primary concern was conflicts.
+> But as you point out that seems unlikely.
 > 
-> That all makes sense, I think the commit message just seemed to say
-> something else.
-
-Well, this patch is about moving the pinctrl nodes to the common SoC
-dtsi. The next 6 patches are about setting the default pinctrl property.
-
-> Maybe more like:
+> I have already picked up the patch but the pull request I sent to
+> the ARM SoC maintainers has not been pulled. And regardless it
+> won't appear in Linus's tree via that route until v3.16-rc1.
 > 
-> NAND and TWSI0 have only one valid pin control choice on Kirkwood,
-> move those definitions into the common dtsi.
+> Perhaps a good way forwards would be for Rafael to also apply the patch
+> with my Ack.
+
+Not really.  No duplicate patches with different changelogs coming from
+different trees.  Please!
+
+> I could also revert the version applied to my tree
+> if that is of any help.
 > 
-> For UART0/1 and SPI, which have two choices, move the definition that
-> is used in the majority of the board files into the common dtsi.
-> Board files that are different will override.
+> Acked-by: Simon Horman <horms+renesas@verge.net.au>
 
-Ok, I see. Well, strictly speaking the setting node itself is always
-valid, no matter if the board uses it. So that is why I first moved
-them into kirkwood.dtsi and did set the pinctrl-0 property in the
-later patches, e.g. commit message of Patch 9 reads:
+Ulf, can you please do as I said?
 
-"""
-Most boards use the default UART0/1 pinctrl setting without RTS/CTS.
-Add the pinctrl setting to the toplevel SoC UART nodes and put a note
-in front of the corresponding pinctrl node to overwrite the setting
-on board level. Currently, both boards using a different UART pinctrl
-setting (Openblocks A6, A7) already overwrite the pinctrl node.
-"""
 
-But I can, of course, reword this commit message.
-
-Sebastian
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
