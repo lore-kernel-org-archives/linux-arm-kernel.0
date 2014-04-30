@@ -1,48 +1,111 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Wed, 30 Apr 2014 14:17:35 +0900
-Subject: [PATCH v3 10/12] ARM: EXYNOS: Move "mach/map.h" inclusion from
- regs-pmu.h to platsmp.c
-In-Reply-To: <1398835057-3860-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1398835057-3860-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1398835057-3860-11-git-send-email-pankaj.dubey@samsung.com>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Wed, 30 Apr 2014 10:49:49 +0530
+Subject: [PATCH v2 1/4] usb: ohci-exynos: Use struct device instead of
+ platform_device
+Message-ID: <1398835192-21634-1-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we have removed static mappings from "regs-pmu.h" it does not
-need map.h anymore. But "platsmp.c" needed this and till now it
-got included indirectly. So lets move header inclusion of
-"mach/map.h" from "regs-pmu.h" to "platsmp.c".
+Change to use struct device instead of struct platform_device
+for some static functions.
 
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+Cc: Alan Stern <stern@rowland.harvard.edu>
+Acked-by: Jingoo Han <jg1.han@samsung.com>
 ---
- arch/arm/mach-exynos/platsmp.c  |    1 +
- arch/arm/mach-exynos/regs-pmu.h |    2 --
- 2 files changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-index 375ea4e..8f3b866 100644
---- a/arch/arm/mach-exynos/platsmp.c
-+++ b/arch/arm/mach-exynos/platsmp.c
-@@ -27,6 +27,7 @@
- #include <asm/firmware.h>
+Changes from v1:
+ - none
+
+ drivers/usb/host/ohci-exynos.c |   20 +++++++++-----------
+ 1 file changed, 9 insertions(+), 11 deletions(-)
+
+diff --git a/drivers/usb/host/ohci-exynos.c b/drivers/usb/host/ohci-exynos.c
+index 9cf80cb..05f00e3 100644
+--- a/drivers/usb/host/ohci-exynos.c
++++ b/drivers/usb/host/ohci-exynos.c
+@@ -39,18 +39,18 @@ struct exynos_ohci_hcd {
+ 	struct usb_otg *otg;
+ };
  
- #include <plat/cpu.h>
-+#include <mach/map.h>
+-static void exynos_ohci_phy_enable(struct platform_device *pdev)
++static void exynos_ohci_phy_enable(struct device *dev)
+ {
+-	struct usb_hcd *hcd = platform_get_drvdata(pdev);
++	struct usb_hcd *hcd = dev_get_drvdata(dev);
+ 	struct exynos_ohci_hcd *exynos_ohci = to_exynos_ohci(hcd);
  
- #include "common.h"
- #include "regs-pmu.h"
-diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
-index a72b1bc..1d83c7e 100644
---- a/arch/arm/mach-exynos/regs-pmu.h
-+++ b/arch/arm/mach-exynos/regs-pmu.h
-@@ -12,8 +12,6 @@
- #ifndef __ASM_ARCH_REGS_PMU_H
- #define __ASM_ARCH_REGS_PMU_H __FILE__
+ 	if (exynos_ohci->phy)
+ 		usb_phy_init(exynos_ohci->phy);
+ }
  
--#include <mach/map.h>
--
- #define S5P_CENTRAL_SEQ_CONFIGURATION		0x0200
+-static void exynos_ohci_phy_disable(struct platform_device *pdev)
++static void exynos_ohci_phy_disable(struct device *dev)
+ {
+-	struct usb_hcd *hcd = platform_get_drvdata(pdev);
++	struct usb_hcd *hcd = dev_get_drvdata(dev);
+ 	struct exynos_ohci_hcd *exynos_ohci = to_exynos_ohci(hcd);
  
- #define S5P_CENTRAL_LOWPWR_CFG			(1 << 16)
+ 	if (exynos_ohci->phy)
+@@ -139,7 +139,7 @@ skip_phy:
+ 
+ 	platform_set_drvdata(pdev, hcd);
+ 
+-	exynos_ohci_phy_enable(pdev);
++	exynos_ohci_phy_enable(&pdev->dev);
+ 
+ 	err = usb_add_hcd(hcd, irq, IRQF_SHARED);
+ 	if (err) {
+@@ -150,7 +150,7 @@ skip_phy:
+ 	return 0;
+ 
+ fail_add_hcd:
+-	exynos_ohci_phy_disable(pdev);
++	exynos_ohci_phy_disable(&pdev->dev);
+ fail_io:
+ 	clk_disable_unprepare(exynos_ohci->clk);
+ fail_clk:
+@@ -168,7 +168,7 @@ static int exynos_ohci_remove(struct platform_device *pdev)
+ 	if (exynos_ohci->otg)
+ 		exynos_ohci->otg->set_host(exynos_ohci->otg, &hcd->self);
+ 
+-	exynos_ohci_phy_disable(pdev);
++	exynos_ohci_phy_disable(&pdev->dev);
+ 
+ 	clk_disable_unprepare(exynos_ohci->clk);
+ 
+@@ -190,7 +190,6 @@ static int exynos_ohci_suspend(struct device *dev)
+ {
+ 	struct usb_hcd *hcd = dev_get_drvdata(dev);
+ 	struct exynos_ohci_hcd *exynos_ohci = to_exynos_ohci(hcd);
+-	struct platform_device *pdev = to_platform_device(dev);
+ 	bool do_wakeup = device_may_wakeup(dev);
+ 	int rc = ohci_suspend(hcd, do_wakeup);
+ 
+@@ -200,7 +199,7 @@ static int exynos_ohci_suspend(struct device *dev)
+ 	if (exynos_ohci->otg)
+ 		exynos_ohci->otg->set_host(exynos_ohci->otg, &hcd->self);
+ 
+-	exynos_ohci_phy_disable(pdev);
++	exynos_ohci_phy_disable(dev);
+ 
+ 	clk_disable_unprepare(exynos_ohci->clk);
+ 
+@@ -211,14 +210,13 @@ static int exynos_ohci_resume(struct device *dev)
+ {
+ 	struct usb_hcd *hcd			= dev_get_drvdata(dev);
+ 	struct exynos_ohci_hcd *exynos_ohci	= to_exynos_ohci(hcd);
+-	struct platform_device *pdev		= to_platform_device(dev);
+ 
+ 	clk_prepare_enable(exynos_ohci->clk);
+ 
+ 	if (exynos_ohci->otg)
+ 		exynos_ohci->otg->set_host(exynos_ohci->otg, &hcd->self);
+ 
+-	exynos_ohci_phy_enable(pdev);
++	exynos_ohci_phy_enable(dev);
+ 
+ 	ohci_resume(hcd, false);
+ 
 -- 
 1.7.10.4
