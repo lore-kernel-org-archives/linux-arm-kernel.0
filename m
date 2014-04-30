@@ -1,87 +1,85 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 30 Apr 2014 11:22:44 +0100
-Subject: [RFC 07/47] mtd: nand: stm_nand_bch: initialise the BCH Controller
-In-Reply-To: <20980858CB6D3A4BAE95CA194937D5E73EAB5CB7@DBDE04.ent.ti.com>
-References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
- <1395735604-26706-8-git-send-email-lee.jones@linaro.org>
- <20980858CB6D3A4BAE95CA194937D5E73EAB5CB7@DBDE04.ent.ti.com>
-Message-ID: <20140430102244.GK29462@lee--X1>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 30 Apr 2014 19:23:08 +0900
+Subject: [PATCH 1/4] ARM: shmobile: Ignore callbacks for subsys
+ generic_pm_domain_data
+In-Reply-To: <CAPDyKFqH-0rvs6WorcirY+wVMLWnycWHO6=ZcvK1GebcuzaH0w@mail.gmail.com>
+References: <1397230004-22306-1-git-send-email-ulf.hansson@linaro.org>
+ <CAPDyKFpbX3cdAgvUx=4FbmNxFLH4VO8JqrQqRB3nxXMxZDyXJQ@mail.gmail.com>
+ <20140425010651.GC12641@verge.net.au>
+ <1469030.SEtTICGcIm@vostro.rjw.lan>
+ <CAPDyKFqH-0rvs6WorcirY+wVMLWnycWHO6=ZcvK1GebcuzaH0w@mail.gmail.com>
+Message-ID: <20140430102308.GA23426@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 26 Mar 2014, Gupta, Pekon wrote:
-
-> Hi Lee,
+On Wed, Apr 30, 2014 at 10:53:58AM +0200, Ulf Hansson wrote:
+> On 30 April 2014 00:45, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> > On Friday, April 25, 2014 10:06:51 AM Simon Horman wrote:
+> >> On Thu, Apr 24, 2014 at 01:25:14PM +0200, Ulf Hansson wrote:
+> >> > On 14 April 2014 11:22, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> >> > > On 14 April 2014 03:20, Simon Horman <horms@verge.net.au> wrote:
+> >> > >> On Fri, Apr 11, 2014 at 05:26:41PM +0200, Ulf Hansson wrote:
+> >> > >>> There are no active users of these callbacks, thus there are no benefit
+> >> > >>> of trying to invoke them.
+> >> > >>>
+> >> > >>> Cc: Simon Horman <horms@verge.net.au>
+> >> > >>> Cc: Magnus Damm <magnus.damm@gmail.com>
+> >> > >>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> >> > >>> ---
+> >> > >>>
+> >> > >>> I am seeking ack from the SOC maintainers since this needs to go with the other
+> >> > >>> patches in this patchset on the PM core.
+> >> > >>
+> >> > >> In order to reduce the possibility of conflicts I would prefer
+> >> > >> to take this patch through my tree.
+> >> > >
+> >> > > Okay, go ahead!
+> >> > >
+> >> >
+> >> > Hi Simon,
+> >> >
+> >> > Just wanted to know, if you decided to queue this patch in your tree.
+> >> > Or were there anything else you needed me to fix here?
+> >>
+> >> Sorry for dropping the ball. I will queue-up this patch.
+> >
+> > OK
+> >
+> > Ulf, since the rest of the series depends on this one (or at least that's
+> > how it looks to me), would you mind resending it when this one gets into the
+> > Linus' tree?
 > 
-> >From: Lee Jones [mailto:lee.jones at linaro.org]
-> missing commit log :-)
-> Though $subject is self-explanatory, but you can add more description about
-> assumption and hardware caveats about the controller, and its use.
+> Well, I would prefer if we could go ahead with the rest of the patches
+> somehow for 3.16, but I guess it will be hard if Simon picks up this
+> patch!?
+> 
+> Simon,
+> I guess the reason for your concern were about conflicts, but the file
+> this patch touch has actually not been modified since Sep 2012. So,
+> maybe we could go through Rafaels tree anyway?
+
+Yes, my primary concern was conflicts.
+But as you point out that seems unlikely.
+
+I have already picked up the patch but the pull request I sent to
+the ARM SoC maintainers has not been pulled. And regardless it
+won't appear in Linus's tree via that route until v3.16-rc1.
+
+Perhaps a good way forwards would be for Rafael to also apply the patch
+with my Ack. I could also revert the version applied to my tree
+if that is of any help.
+
+Acked-by: Simon Horman <horms+renesas@verge.net.au>
+
+> I have a bunch of other patches for genpd which I plan to send once
+> the first part of clean up patches were merged. Those are likely
+> material for 3.17 though.
+> 
+> Kind regards
+> Ulf Hansson
 > 
 > >
-> >Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> >---
-> > drivers/mtd/nand/stm_nand_bch.c | 56 +++++++++++++++++++++++++++++++++++++++++
-> > include/linux/mtd/stm_nand.h    | 20 +++++++++++++++
-> > 2 files changed, 76 insertions(+)
-> >
-> >diff --git a/drivers/mtd/nand/stm_nand_bch.c b/drivers/mtd/nand/stm_nand_bch.c
-> >index 76a0d02..1a93f8d 100644
-> >--- a/drivers/mtd/nand/stm_nand_bch.c
-> >+++ b/drivers/mtd/nand/stm_nand_bch.c
-> >@@ -14,6 +14,7 @@
-> >
-> > #include <linux/kernel.h>
-> > #include <linux/module.h>
-> >+#include <linux/delay.h>
-> > #include <linux/io.h>
-> > #include <linux/interrupt.h>
-> > #include <linux/device.h>
-> >@@ -102,6 +103,56 @@ static void nandi_disable_interrupts(struct nandi_controller *nandi,
-> > 	writel(val, nandi->base + NANDBCH_INT_EN);
-> > }
-> >
-> >+static void nandi_init_bch(struct nandi_controller *nandi, int emi_bank)
-> >+{
-> >+	dev_dbg(nandi->dev, "%s\n", __func__);
-> >+
-> >+	/* Initialise BCH Controller */
-> >+	emiss_nandi_select(STM_NANDI_BCH);
-> >+
-> >+	/* Reset and disable boot-mode controller */
-> >+	writel(BOOT_CFG_RESET, nandi->base + NANDBCH_BOOTBANK_CFG);
-> >+	udelay(1);
-> >+	writel(0x00000000, nandi->base + NANDBCH_BOOTBANK_CFG);
+> > --
+> > I speak only for myself.
+> > Rafael J. Wysocki, Intel Open Source Technology Center.
 > 
-> Why using 'udelay' ?
-> Isn't there any status register which tells you that controller is reset / initialized ?
-> Or may be polling on NANDBCH_BOOTBANK_CFG may itself give you status.
-
-Documenation says:
-
-  "The soft reset bit has to be reset to ?0? to de-assert the soft
-   reset. The soft reset bit is expected to be asserted for at least
-   one clock cycle for proper reset"
-
-> >+
-> >+	/* Reset AFM controller */
-> >+	writel(CFG_RESET, nandi->base + NANDBCH_CONTROLLER_CFG);
-> >+	udelay(1);
-> >+	writel(0x00000000, nandi->base + NANDBCH_CONTROLLER_CFG);
-> >+
-> >+	/* Set EMI Bank */
-> >+	writel(0x1 << emi_bank, nandi->base + NANDBCH_FLEX_MUXCTRL);
-> >+
-> >+	/* Reset ECC stats */
-> >+	writel(0x7f0, nandi->base + NANDBCH_CONTROLLER_CFG);
-> >+	udelay(1);
-> >+
-> "0x7f0" ?? please use Macro instead.
-
-Sure.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
