@@ -1,31 +1,69 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Wed, 30 Apr 2014 14:11:43 +0530
-Subject: [PATCH v3 05/12] ARM: EXYNOS: Remove file path from comment
- section
-In-Reply-To: <1398835057-3860-6-git-send-email-pankaj.dubey@samsung.com>
-References: <1398835057-3860-1-git-send-email-pankaj.dubey@samsung.com>
- <1398835057-3860-6-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <CAK9yfHy8kbNk6mVZy_ARiWZ8kLbn7r7R8vj+3ETCcGsASQZsCw@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 30 Apr 2014 10:53:58 +0200
+Subject: [PATCH 1/4] ARM: shmobile: Ignore callbacks for subsys
+ generic_pm_domain_data
+In-Reply-To: <1469030.SEtTICGcIm@vostro.rjw.lan>
+References: <1397230004-22306-1-git-send-email-ulf.hansson@linaro.org>
+ <CAPDyKFpbX3cdAgvUx=4FbmNxFLH4VO8JqrQqRB3nxXMxZDyXJQ@mail.gmail.com>
+ <20140425010651.GC12641@verge.net.au>
+ <1469030.SEtTICGcIm@vostro.rjw.lan>
+Message-ID: <CAPDyKFqH-0rvs6WorcirY+wVMLWnycWHO6=ZcvK1GebcuzaH0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pankaj,
-
-On 30 April 2014 10:47, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
-> Many files under "arm/mach-exynos" are having file path in file
-> comment section which is invalid now.
-> So for better code maintainability let's remove them.
+On 30 April 2014 00:45, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Friday, April 25, 2014 10:06:51 AM Simon Horman wrote:
+>> On Thu, Apr 24, 2014 at 01:25:14PM +0200, Ulf Hansson wrote:
+>> > On 14 April 2014 11:22, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> > > On 14 April 2014 03:20, Simon Horman <horms@verge.net.au> wrote:
+>> > >> On Fri, Apr 11, 2014 at 05:26:41PM +0200, Ulf Hansson wrote:
+>> > >>> There are no active users of these callbacks, thus there are no benefit
+>> > >>> of trying to invoke them.
+>> > >>>
+>> > >>> Cc: Simon Horman <horms@verge.net.au>
+>> > >>> Cc: Magnus Damm <magnus.damm@gmail.com>
+>> > >>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>> > >>> ---
+>> > >>>
+>> > >>> I am seeking ack from the SOC maintainers since this needs to go with the other
+>> > >>> patches in this patchset on the PM core.
+>> > >>
+>> > >> In order to reduce the possibility of conflicts I would prefer
+>> > >> to take this patch through my tree.
+>> > >
+>> > > Okay, go ahead!
+>> > >
+>> >
+>> > Hi Simon,
+>> >
+>> > Just wanted to know, if you decided to queue this patch in your tree.
+>> > Or were there anything else you needed me to fix here?
+>>
+>> Sorry for dropping the ball. I will queue-up this patch.
 >
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> ---
+> OK
+>
+> Ulf, since the rest of the series depends on this one (or at least that's
+> how it looks to me), would you mind resending it when this one gets into the
+> Linus' tree?
 
-The change is sensible. However Kukjin had refused to accept such patches
-when I had submitted patches doing such cleanup for all Samsung platform files.
+Well, I would prefer if we could go ahead with the rest of the patches
+somehow for 3.16, but I guess it will be hard if Simon picks up this
+patch!?
 
-Anyway, FWIW
-Reviewed-by: Sachin Kamat <sachin.kamat@linaro.org>
+Simon,
+I guess the reason for your concern were about conflicts, but the file
+this patch touch has actually not been modified since Sep 2012. So,
+maybe we could go through Rafaels tree anyway?
 
--- 
-With warm regards,
-Sachin
+I have a bunch of other patches for genpd which I plan to send once
+the first part of clean up patches were merged. Those are likely
+material for 3.17 though.
+
+Kind regards
+Ulf Hansson
+
+>
+> --
+> I speak only for myself.
+> Rafael J. Wysocki, Intel Open Source Technology Center.
