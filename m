@@ -1,59 +1,21 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 30 Apr 2014 16:23:06 +0100
-Subject: [PATCH] arm64: xchg: prevent warning if return value is unused
-Message-ID: <1398871386-27311-1-git-send-email-will.deacon@arm.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Wed, 30 Apr 2014 17:27:15 +0200
+Subject: [PATCH] arm: socfpga: reserve the region at start of phys mem
+In-Reply-To: <1394816499.25786.1.camel@linux-builds1>
+References: <1392744897-6384-1-git-send-email-bigeasy@linutronix.de>
+ <1394816499.25786.1.camel@linux-builds1>
+Message-ID: <53611653.2080007@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some users of xchg() don't bother using the return value, which results
-in a compiler warning like the following (from kgdb):
+On 03/14/2014 06:01 PM, Dinh Nguyen wrote:
+> I've applied this patch with the above edits.
 
-In file included from linux/arch/arm64/include/asm/atomic.h:27:0,
-                 from include/linux/atomic.h:4,
-                 from include/linux/spinlock.h:402,
-                 from include/linux/seqlock.h:35,
-                 from include/linux/time.h:5,
-                 from include/uapi/linux/timex.h:56,
-                 from include/linux/timex.h:56,
-                 from include/linux/sched.h:19,
-                 from include/linux/pid_namespace.h:4,
-                 from kernel/debug/debug_core.c:30:
-kernel/debug/debug_core.c: In function ?kgdb_cpu_enter?:
-linux/arch/arm64/include/asm/cmpxchg.h:75:3: warning: value computed is not used [-Wunused-value]
-  ((__typeof__(*(ptr)))__xchg((unsigned long)(x),(ptr),sizeof(*(ptr))))
-   ^
-linux/arch/arm64/include/asm/atomic.h:132:30: note: in expansion of macro ?xchg?
- #define atomic_xchg(v, new) (xchg(&((v)->counter), new))
+I could find this patch v3.15-rc3 and I couldn't find it in your next
+git tree. Did I miss something?
 
-kernel/debug/debug_core.c:504:4: note: in expansion of macro ?atomic_xchg?
-    atomic_xchg(&kgdb_active, cpu);
-    ^
+> 
+> Thanks,
+> Dinh
 
-This patch makes use of the same trick as we do for cmpxchg, by assigning
-the return value to a dummy variable in the xchg() macro itself.
-
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/cmpxchg.h | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/include/asm/cmpxchg.h b/arch/arm64/include/asm/cmpxchg.h
-index 57c0fa7bf711..ddb9d7830558 100644
---- a/arch/arm64/include/asm/cmpxchg.h
-+++ b/arch/arm64/include/asm/cmpxchg.h
-@@ -72,7 +72,12 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
- }
- 
- #define xchg(ptr,x) \
--	((__typeof__(*(ptr)))__xchg((unsigned long)(x),(ptr),sizeof(*(ptr))))
-+({ \
-+	__typeof__(*(ptr)) __ret; \
-+	__ret = (__typeof__(*(ptr))) \
-+		__xchg((unsigned long)(x), (ptr), sizeof(*(ptr))); \
-+	__ret; \
-+})
- 
- static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
- 				      unsigned long new, int size)
--- 
-1.9.2
+Sebastian
