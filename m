@@ -1,17 +1,17 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 30 Apr 2014 14:56:39 +0200
-Subject: [PATCH 12/15] ARM: dts: kirkwood: set default pinctrl for I2C0
+Date: Wed, 30 Apr 2014 14:56:38 +0200
+Subject: [PATCH 11/15] ARM: dts: kirkwood: set default pinctrl for NAND
 In-Reply-To: <1398862602-29595-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1398862602-29595-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1398862602-29595-13-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1398862602-29595-12-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is only one valid pinctrl setting for I2C0 on Kirkwood. Now that we
-have the setting in the common SoC pinctrl, move it to the I2C0 controller
+There is only one valid pinctrl setting for NAND on Kirkwood. Now that we
+have the setting in the common SoC pinctrl, move it to the NAND controller
 node directly and remove it from the individual boards.
 
-While at it, also fix up status = "okay" to "ok" on one board's I2C0 node.
+While at it, also fix up status = "okay" to "ok" on one board's NAND node.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
@@ -29,93 +29,162 @@ Cc: devicetree at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/boot/dts/kirkwood-laplug.dts      | 2 --
- arch/arm/boot/dts/kirkwood-ns2-common.dtsi | 2 --
- arch/arm/boot/dts/kirkwood-synology.dtsi   | 2 --
- arch/arm/boot/dts/kirkwood-topkick.dts     | 4 +---
- arch/arm/boot/dts/kirkwood-ts219.dtsi      | 2 --
- arch/arm/boot/dts/kirkwood.dtsi            | 2 ++
- 6 files changed, 3 insertions(+), 11 deletions(-)
+ arch/arm/boot/dts/kirkwood-db.dtsi                | 2 --
+ arch/arm/boot/dts/kirkwood-dnskw.dtsi             | 2 --
+ arch/arm/boot/dts/kirkwood-ib62x0.dts             | 2 --
+ arch/arm/boot/dts/kirkwood-km_kirkwood.dts        | 4 +---
+ arch/arm/boot/dts/kirkwood-laplug.dts             | 1 -
+ arch/arm/boot/dts/kirkwood-mplcec4.dts            | 2 --
+ arch/arm/boot/dts/kirkwood-openblocks_a6.dts      | 2 --
+ arch/arm/boot/dts/kirkwood-openblocks_a7.dts      | 2 --
+ arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi | 2 --
+ arch/arm/boot/dts/kirkwood-topkick.dts            | 2 --
+ arch/arm/boot/dts/kirkwood.dtsi                   | 2 ++
+ 11 files changed, 3 insertions(+), 20 deletions(-)
 
+diff --git a/arch/arm/boot/dts/kirkwood-db.dtsi b/arch/arm/boot/dts/kirkwood-db.dtsi
+index 2790f46d87e0..812df691ae3d 100644
+--- a/arch/arm/boot/dts/kirkwood-db.dtsi
++++ b/arch/arm/boot/dts/kirkwood-db.dtsi
+@@ -57,8 +57,6 @@
+ };
+ 
+ &nand {
+-	pinctrl-0 = <&pmx_nand>;
+-	pinctrl-names = "default";
+ 	chip-delay = <25>;
+ 	status = "okay";
+ 
+diff --git a/arch/arm/boot/dts/kirkwood-dnskw.dtsi b/arch/arm/boot/dts/kirkwood-dnskw.dtsi
+index bcc6e0f48571..113dcf056dcf 100644
+--- a/arch/arm/boot/dts/kirkwood-dnskw.dtsi
++++ b/arch/arm/boot/dts/kirkwood-dnskw.dtsi
+@@ -183,8 +183,6 @@
+ };
+ 
+ &nand {
+-	pinctrl-0 = <&pmx_nand>;
+-	pinctrl-names = "default";
+ 	status = "okay";
+ 	chip-delay = <35>;
+ 
+diff --git a/arch/arm/boot/dts/kirkwood-ib62x0.dts b/arch/arm/boot/dts/kirkwood-ib62x0.dts
+index 6804638eb87e..bfa5edde179c 100644
+--- a/arch/arm/boot/dts/kirkwood-ib62x0.dts
++++ b/arch/arm/boot/dts/kirkwood-ib62x0.dts
+@@ -105,8 +105,6 @@
+ 
+ &nand {
+ 	status = "okay";
+-	pinctrl-0 = <&pmx_nand>;
+-	pinctrl-names = "default";
+ 
+ 	partition at 0 {
+ 		label = "u-boot";
+diff --git a/arch/arm/boot/dts/kirkwood-km_kirkwood.dts b/arch/arm/boot/dts/kirkwood-km_kirkwood.dts
+index db14bd03b86b..61139bf30985 100644
+--- a/arch/arm/boot/dts/kirkwood-km_kirkwood.dts
++++ b/arch/arm/boot/dts/kirkwood-km_kirkwood.dts
+@@ -46,9 +46,7 @@
+ };
+ 
+ &nand {
+-	pinctrl-0 = <&pmx_nand>;
+-	pinctrl-names = "default";
+-	status = "ok";
++	status = "okay";
+ 	chip-delay = <25>;
+ };
+ 
 diff --git a/arch/arm/boot/dts/kirkwood-laplug.dts b/arch/arm/boot/dts/kirkwood-laplug.dts
-index 642755acf2fe..92c2d3c16546 100644
+index 4c91fbb084c5..642755acf2fe 100644
 --- a/arch/arm/boot/dts/kirkwood-laplug.dts
 +++ b/arch/arm/boot/dts/kirkwood-laplug.dts
-@@ -42,8 +42,6 @@
- 		};
+@@ -138,7 +138,6 @@
+ &nand {
+ 	/* Total size : 512MB */
+ 	status = "okay";
+-	pinctrl-0 = <&pmx_nand>;
  
- 		i2c at 11000 {
--			pinctrl-0 = <&pmx_twsi0>;
--			pinctrl-names = "default";
- 			status = "okay";
+ 	partition at 0 {
+ 		label = "u-boot";
+diff --git a/arch/arm/boot/dts/kirkwood-mplcec4.dts b/arch/arm/boot/dts/kirkwood-mplcec4.dts
+index 79796c8b9c4f..f3a991837515 100644
+--- a/arch/arm/boot/dts/kirkwood-mplcec4.dts
++++ b/arch/arm/boot/dts/kirkwood-mplcec4.dts
+@@ -162,8 +162,6 @@
+ };
  
- 			eeprom at 50 {
-diff --git a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
-index c10ff0f5290b..e6863ed87d76 100644
---- a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
-@@ -42,8 +42,6 @@
- 		};
+ &nand {
+-	pinctrl-0 = <&pmx_nand>;
+-	pinctrl-names = "default";
+ 	status = "okay";
  
- 		i2c at 11000 {
--			pinctrl-0 = <&pmx_twsi0>;
--			pinctrl-names = "default";
- 			status = "okay";
+ 	partition at 0 {
+diff --git a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
+index 1e056b3b1817..00c2e5a9d863 100644
+--- a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
++++ b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
+@@ -130,8 +130,6 @@
+ &nand {
+ 	chip-delay = <25>;
+ 	status = "okay";
+-	pinctrl-0 = <&pmx_nand>;
+-	pinctrl-names = "default";
  
- 			eeprom at 50 {
-diff --git a/arch/arm/boot/dts/kirkwood-synology.dtsi b/arch/arm/boot/dts/kirkwood-synology.dtsi
-index a21419f78bee..811e0971fc58 100644
---- a/arch/arm/boot/dts/kirkwood-synology.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-synology.dtsi
-@@ -257,8 +257,6 @@
- 		i2c at 11000 {
- 			status = "okay";
- 			clock-frequency = <400000>;
--			pinctrl-0 = <&pmx_twsi0>;
--			pinctrl-names = "default";
+ 	partition at 0 {
+ 		label = "uboot";
+diff --git a/arch/arm/boot/dts/kirkwood-openblocks_a7.dts b/arch/arm/boot/dts/kirkwood-openblocks_a7.dts
+index 07f6bf6aba91..bc07aa5e6698 100644
+--- a/arch/arm/boot/dts/kirkwood-openblocks_a7.dts
++++ b/arch/arm/boot/dts/kirkwood-openblocks_a7.dts
+@@ -148,8 +148,6 @@
+ &nand {
+ 	chip-delay = <25>;
+ 	status = "okay";
+-	pinctrl-0 = <&pmx_nand>;
+-	pinctrl-names = "default";
  
- 			rs5c372: rs5c372 at 32 {
- 				status = "disabled";
+ 	partition at 0 {
+ 		label = "uboot";
+diff --git a/arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi b/arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi
+index e2c43aecc7b2..7196c7f3e109 100644
+--- a/arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi
++++ b/arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi
+@@ -71,8 +71,6 @@
+ };
+ 
+ &nand {
+-	pinctrl-0 = <&pmx_nand>;
+-	pinctrl-names = "default";
+ 	status = "okay";
+ 
+ 	partition at 0 {
 diff --git a/arch/arm/boot/dts/kirkwood-topkick.dts b/arch/arm/boot/dts/kirkwood-topkick.dts
-index a4dd47acf98a..f5c8c0dd41dc 100644
+index 14b12189d464..a4dd47acf98a 100644
 --- a/arch/arm/boot/dts/kirkwood-topkick.dts
 +++ b/arch/arm/boot/dts/kirkwood-topkick.dts
-@@ -95,9 +95,7 @@
- 		};
+@@ -174,8 +174,6 @@
  
- 		i2c at 11000 {
--			status = "ok";
--			pinctrl-0 = <&pmx_twsi0>;
--			pinctrl-names = "default";
-+			status = "okay";
- 		};
+ &nand {
+ 	status = "okay";
+-	pinctrl-0 = <&pmx_nand>;
+-	pinctrl-names = "default";
  
- 		mvsdio at 90000 {
-diff --git a/arch/arm/boot/dts/kirkwood-ts219.dtsi b/arch/arm/boot/dts/kirkwood-ts219.dtsi
-index 539a2f80a3ad..df7f15276575 100644
---- a/arch/arm/boot/dts/kirkwood-ts219.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-ts219.dtsi
-@@ -26,8 +26,6 @@
- 		i2c at 11000 {
- 			status = "okay";
- 			clock-frequency = <400000>;
--			pinctrl-0 = <&pmx_twsi0>;
--			pinctrl-names = "default";
- 
- 			s35390a: s35390a at 30 {
- 				compatible = "s35390a";
+ 	partition at 0 {
+ 		label = "u-boot";
 diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-index caafcde88f67..0399a096e324 100644
+index 0c8d8fa29926..caafcde88f67 100644
 --- a/arch/arm/boot/dts/kirkwood.dtsi
 +++ b/arch/arm/boot/dts/kirkwood.dtsi
-@@ -170,6 +170,8 @@
- 			interrupts = <29>;
- 			clock-frequency = <100000>;
+@@ -61,6 +61,8 @@
+ 			chip-delay = <25>;
+ 			/* set partition map and/or chip-delay in board dts */
  			clocks = <&gate_clk 7>;
-+			pinctrl-0 = <&pmx_twsi0>;
++			pinctrl-0 = <&pmx_nand>;
 +			pinctrl-names = "default";
  			status = "disabled";
  		};
- 
+ 	};
 -- 
 1.9.1
