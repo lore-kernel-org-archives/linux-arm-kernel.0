@@ -1,49 +1,47 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 30 Apr 2014 10:54:22 +0200
-Subject: [PATCH v4 1/2] Documentation: Add GPIO reset binding to reset
- binding documentation
-In-Reply-To: <20140417115820.GD4132@lukather>
-References: <1397463709-19405-1-git-send-email-p.zabel@pengutronix.de>
- <20140417115820.GD4132@lukather>
-Message-ID: <1398848062.19894.38.camel@paszta.hi.pengutronix.de>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Wed, 30 Apr 2014 14:25:06 +0530
+Subject: [PATCH 0/4] dts: Add usb2phy to Exynos 5250/5420
+Message-ID: <1398848110-6152-1-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Next version for earlier patch-series:
+[PATCH v7 0/2] dts: Add usb2phy to Exynos 5250
 
-Am Donnerstag, den 17.04.2014, 13:58 +0200 schrieb Maxime Ripard:
-> I still feel like we should really treat gpios like just another reset
-> controller, ie. using the resets property.
+Based on 'for-next' branch of Kgene's linux-samsung tree.
 
-I now feel like we really shouldn't. If we do anything but use the
-generic gpio bindings for reset gpios, we might force every OS or
-bootloader using the device tree to implement some kind of reset
-controller framework, even for hardware that only has gpio resets.
+Tested with driver side patches:
+[PATCH v2 1/4] usb: ohci-exynos: Use struct device instead of platform_device
+[PATCH v2 2/4] usb: ehci-exynos: Use struct device instead of platform_device
+[PATCH v4 1/2] usb: ohci-exynos: Add facility to use phy provided by the generic phy framework
+[PATCH v10 4/4] usb: ehci-exynos: Change to use phy provided by the generic phy framework
 
-> I understand that you chose this pattern to be pretty much compatible
-> with what have been done so fare, bu I don't see how to fulfill that
-> goal completely, since most of the devices are actually using
-> reset-gpios, but some are using other names too (including
-> reset-gpio).
 
-Yes, that is a problem that applies to all gpios, not only to reset
-gpios, though.
+Changes from v7 series:
+ - Added patches to enable usb 2.0 support on exynos5420;
+   which include dt nodes for usb2phy as well as ehci and ohci
+   controllers.
 
-> So if we can't be fully backward compatible, I don't see the benefit
-> of being inconsistent with how reset controllers are used in general,
+Changes from v6:
+ - Splitted the patch into two:
+    adding syscon nodes to Exynos5250 and Exynos5420 in first;
+    and phy entry change in the second.
+ - Changed the name of phandle for usb2phy from 'usb2_phy_new'
+   to 'usb2_phy_gen' indicating generic phy.
+ - Using clock macros in dt entries.
 
-See above.
+Kamil Debski (1):
+  ARM: dts: Add usb2phy to Exynos 5250
 
-> and more globally on how gpios are tied for regulators for example.
+Vivek Gautam (3):
+  ARM: dts: Add sysreg sytem controller node to exynos5250 and
+    exynos5420
+  ARM: dts: Add usb2phy support on exynos5420
+  ARM: dts: Add usb 2.0 support on exynos5420
 
-Reset controllers are rather more similar to gpio or interrupt
-controllers. Those also have a number of entities per device node,
-as opposed to regulators.
+ arch/arm/boot/dts/exynos5250.dtsi |   31 +++++++++++++++++++++++
+ arch/arm/boot/dts/exynos5420.dtsi |   49 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 80 insertions(+)
 
-> That would also make reset-gpio a regular reset driver, instead of
-> adding logic to the core itself to handle this special case.
-
-Which is what I initially tried and moved away from.
-
-regards
-Philipp
+-- 
+1.7.10.4
