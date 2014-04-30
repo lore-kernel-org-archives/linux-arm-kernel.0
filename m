@@ -1,50 +1,68 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Wed, 30 Apr 2014 14:17:26 +0900
-Subject: [PATCH v3 01/12] ARM: EXYNOS: Make exynos machine_ops as static
+Date: Wed, 30 Apr 2014 14:17:30 +0900
+Subject: [PATCH v3 05/12] ARM: EXYNOS: Remove file path from comment section
 In-Reply-To: <1398835057-3860-1-git-send-email-pankaj.dubey@samsung.com>
 References: <1398835057-3860-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1398835057-3860-2-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1398835057-3860-6-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As machine function ops are used only in this file let's make
-them static.
+Many files under "arm/mach-exynos" are having file path in file
+comment section which is invalid now.
+So for better code maintainability let's remove them.
 
 Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 ---
- arch/arm/mach-exynos/exynos.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-exynos/headsmp.S             |    2 --
+ arch/arm/mach-exynos/hotplug.c             |    3 +--
+ arch/arm/mach-exynos/include/mach/memory.h |    3 +--
+ arch/arm/mach-exynos/platsmp.c             |    3 +--
+ 4 files changed, 3 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-index 3d69e8d..06dcce5 100644
---- a/arch/arm/mach-exynos/exynos.c
-+++ b/arch/arm/mach-exynos/exynos.c
-@@ -198,7 +198,7 @@ static struct map_desc exynos5_iodesc[] __initdata = {
- 	},
- };
- 
--void exynos_restart(enum reboot_mode mode, const char *cmd)
-+static void exynos_restart(enum reboot_mode mode, const char *cmd)
- {
- 	struct device_node *np;
- 	u32 val = 0x1;
-@@ -239,7 +239,7 @@ void __init exynos_cpufreq_init(void)
- 	platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
- }
- 
--void __init exynos_init_late(void)
-+static void __init exynos_init_late(void)
- {
- 	if (of_machine_is_compatible("samsung,exynos5440"))
- 		/* to be supported later */
-@@ -300,7 +300,7 @@ static void __init exynos_map_io(void)
- 		iotable_init(exynos5250_iodesc, ARRAY_SIZE(exynos5250_iodesc));
- }
- 
--void __init exynos_init_io(void)
-+static void __init exynos_init_io(void)
- {
- 	debug_ll_io_init();
- 
+diff --git a/arch/arm/mach-exynos/headsmp.S b/arch/arm/mach-exynos/headsmp.S
+index cdd9d91..698c57f 100644
+--- a/arch/arm/mach-exynos/headsmp.S
++++ b/arch/arm/mach-exynos/headsmp.S
+@@ -1,6 +1,4 @@
+ /*
+- *  linux/arch/arm/mach-exynos4/headsmp.S
+- *
+  *  Cloned from linux/arch/arm/mach-realview/headsmp.S
+  *
+  *  Copyright (c) 2003 ARM Limited
+diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
+index 5eead53..73b0b5c 100644
+--- a/arch/arm/mach-exynos/hotplug.c
++++ b/arch/arm/mach-exynos/hotplug.c
+@@ -1,5 +1,4 @@
+-/* linux arch/arm/mach-exynos4/hotplug.c
+- *
++/*
+  *  Cloned from linux/arch/arm/mach-realview/hotplug.c
+  *
+  *  Copyright (C) 2002 ARM Ltd.
+diff --git a/arch/arm/mach-exynos/include/mach/memory.h b/arch/arm/mach-exynos/include/mach/memory.h
+index 2a4cdb7..e19df1f 100644
+--- a/arch/arm/mach-exynos/include/mach/memory.h
++++ b/arch/arm/mach-exynos/include/mach/memory.h
+@@ -1,5 +1,4 @@
+-/* linux/arch/arm/mach-exynos4/include/mach/memory.h
+- *
++/*
+  * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
+  *		http://www.samsung.com
+  *
+diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+index 03e5e9f..29c2286 100644
+--- a/arch/arm/mach-exynos/platsmp.c
++++ b/arch/arm/mach-exynos/platsmp.c
+@@ -1,5 +1,4 @@
+-/* linux/arch/arm/mach-exynos4/platsmp.c
+- *
++/*
+  * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
+  *		http://www.samsung.com
+  *
 -- 
 1.7.10.4
