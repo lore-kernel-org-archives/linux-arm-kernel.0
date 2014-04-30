@@ -1,120 +1,84 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 30 Apr 2014 13:54:06 +0100
-Subject: [RFC 13/47] mtd: nand: stm_nand_bch: provide Device Tree support
-In-Reply-To: <20980858CB6D3A4BAE95CA194937D5E73EAB5C83@DBDE04.ent.ti.com>
-References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
- <1395735604-26706-14-git-send-email-lee.jones@linaro.org>
- <20980858CB6D3A4BAE95CA194937D5E73EAB5C83@DBDE04.ent.ti.com>
-Message-ID: <20140430125406.GN29462@lee--X1>
+From: luis.henriques@canonical.com (Luis Henriques)
+Date: Wed, 30 Apr 2014 13:55:14 +0100
+Subject: [3.11.y.z extended stable] Patch "clocksource: Exynos_mct: Register
+ clock event after request_irq()" has been added to staging queue
+Message-ID: <1398862514-14647-1-git-send-email-luis.henriques@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >From: Lee Jones [mailto:lee.jones at linaro.org]
-> >
-> >Fetch platform specific data from Device Tree. Any functions which
-> >are useful to other STM NAND Controllers have been separated into a
-> >separate file so they can be easily referenced by them as they
-> >appear.
-> >
-> >Signed-off-by: Lee Jones <lee.jones@linaro.org>
+This is a note to let you know that I have just added a patch titled
 
-[...]
+    clocksource: Exynos_mct: Register clock event after request_irq()
 
-> >+#ifdef CONFIG_OF
-> >+static void *stm_bch_dt_get_pdata(struct platform_device *pdev)
-> >+{
-> >+	struct device_node *np = pdev->dev.of_node;
-> >+	struct stm_plat_nand_bch_data *pdata;
-> >+	const char *ecc_config;
-> >+	int ret;
-> >+
-> >+	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-> >+	if (!pdata)
-> >+		return ERR_PTR(-ENOMEM);
-> >+
-> >+	of_property_read_string(np, "st,bch-ecc-mode", &ecc_config);
-> 
-> Can you use any of the existing generic NAND bindings like combination of
-> "nand-ecc-mode" and "nand-ecc-strength" ?
-> Example: nand-ecc-mode = "bch" & nand-ecc-strength=18
-> Some of generic bindings are recently added
-> 	commit 8dd49165ef5f46b5ad9ba296c559ccff315f9421  (currently in l2-mtd tree)
-> 	mtd: nand: Add a devicetree binding for ECC strength and ECC step size
-> 
-> It's good to use generic bindings as much as you can, and you don't need
-> any approvals from DT Maintainers too. Though you may need to add
-> new values for "nand-ecc-mode" like {auto, hw-ham, hw-bch}
+to the linux-3.11.y-queue branch of the 3.11.y.z extended stable tree 
+which can be found at:
 
-Sure, I can make use of the generic bindings already offered here.
+ http://kernel.ubuntu.com/git?p=ubuntu/linux.git;a=shortlog;h=refs/heads/linux-3.11.y-queue
 
-> >+	if (!strcmp("noecc", ecc_config))
-> >+		pdata->bch_ecc_cfg = BCH_NO_ECC;
-> >+	else if (!strcmp("18bit", ecc_config))
-> >+		pdata->bch_ecc_cfg = BCH_18BIT_ECC;
-> >+	else if (!strcmp("30bit", ecc_config))
-> >+		pdata->bch_ecc_cfg = BCH_30BIT_ECC;
-> >+	else
-> >+		pdata->bch_ecc_cfg = BCH_ECC_AUTO;
-> >+
-> >+	ret = stm_of_get_nand_banks(&pdev->dev, np, &pdata->bank);
-> >+	if (ret < 0)
-> >+		return ERR_PTR(ret);
-> >+
-> >+	pdata->flashss = of_property_read_bool(np, "st,nand-flashss");
-> >+
-> >+	of_property_read_u32(np, "st,bch-bitflip-threshold",
-> >+			     &pdata->bch_bitflip_threshold);
-> >+
-> mtd->bitflip_threshold is by default set to ecc.strength (unless a driver initializes it).
-> And then can be re-configured for each MTD partition separately 
-> 	/sys/class/mtd/mtdX/bitflip_threshold
-> 	Refer: $kernel/Documentation/ABI/testing/sysfs-class-mtd
-> So, I don't think this is a HW parameter, and so should not be passed from DT.
+If you, or anyone else, feels it should not be added to this tree, please 
+reply to this email.
 
-I think the bit-flip threshold is/can be chip specific, and as we know
-which chip we're likely to be booting on, we can specify this via the
-hardware description.  Thus, I think it's perfectly viable for an
-option to pass through DT to exist.
+For more information about the 3.11.y.z tree, see
+https://wiki.ubuntu.com/Kernel/Dev/ExtendedStable
 
+Thanks.
+-Luis
 
-> >+struct device_node *stm_of_get_partitions_node(struct device_node *np,
-> >+					       int bank_nr)
-> >+{
-> >+	struct device_node *banksnp, *banknp, *partsnp = NULL;
-> >+	char name[10];
-> >+
-> >+	banksnp = of_parse_phandle(np, "st,nand-banks", 0);
-> >+	if (!banksnp)
-> >+		return NULL;
-> >+
-> >+	sprintf(name, "bank%d", bank_nr);
-> >+	banknp = of_get_child_by_name(banksnp, name);
-> >+	if (banknp)
-> >+		return NULL;
-> >+
-> >+	partsnp = of_get_child_by_name(banknp, "partitions");
-> >+	of_node_put(banknp);
-> >+
-> Sorry, I'm bit confused here .. I think you don't need to find children of
-> Your bank node. This should already taken care in default parser
-> drivers/mtd/ofpart.c : parse_ofpart_partitions()
-> And all you need to pass is 'of_node' of bank (device).
-> Is my understanding correct ?
+------
 
-We have 3 options here, you _can_ use parse_ofpart_partitions() if
-your partition information conforms to its schema, but said schema
-does not support banks and/or other information that we choose to
-place within the bank node.  The second option is to register a
-parser.  My personal view is that registering a parser is using the
-framework for 'using the framework's' sake i.e. doesn't actually
-achieve anything special.  We've chosen the third option, which is to
-parse and extract the information ourselves - which is actually fairly
-trivial, and pass the required partition data in through the
-mtd_device_parse_register() call - which is where the information
-would be parsed in the case of the first two options.
+>From 8ea3993e0f0c5686c8cc41498bc7cdb8d02546c7 Mon Sep 17 00:00:00 2001
+From: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Date: Wed, 16 Apr 2014 14:36:45 +0000
+Subject: clocksource: Exynos_mct: Register clock event after request_irq()
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+commit 8db6e5104b77de5d0b7002b95069da0992a34be9 upstream.
+
+After hotplugging CPU1 the first call of interrupt handler for CPU1
+oneshot timer was called on CPU0 because it fired before setting IRQ
+affinity. Affected are SoCs where Multi Core Timer interrupts are
+shared (SPI), e.g. Exynos 4210.
+
+During setup of the MCT timers the clock event device should be
+registered after setting the affinity for interrupt. This will prevent
+starting the timer too early.
+
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Cc: Kyungmin Park <kyungmin.park@samsung.com>
+Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Cc: Tomasz Figa <t.figa@samsung.com>,
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>,
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: linux-arm-kernel at lists.infradead.org,
+Link: http://lkml.kernel.org/r/20140416143316.299247848 at linutronix.de
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Luis Henriques <luis.henriques@canonical.com>
+---
+ drivers/clocksource/exynos_mct.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+index b2bbc41..14bc622 100644
+--- a/drivers/clocksource/exynos_mct.c
++++ b/drivers/clocksource/exynos_mct.c
+@@ -417,8 +417,6 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
+ 	evt->set_mode = exynos4_tick_set_mode;
+ 	evt->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
+ 	evt->rating = 450;
+-	clockevents_config_and_register(evt, clk_rate / (TICK_BASE_CNT + 1),
+-					0xf, 0x7fffffff);
+
+ 	exynos4_mct_write(TICK_BASE_CNT, mevt->base + MCT_L_TCNTB_OFFSET);
+
+@@ -435,6 +433,8 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
+ 	} else {
+ 		enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
+ 	}
++	clockevents_config_and_register(evt, clk_rate / (TICK_BASE_CNT + 1),
++					0xf, 0x7fffffff);
+
+ 	return 0;
+ }
+--
+1.9.1
