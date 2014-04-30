@@ -1,89 +1,117 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 30 Apr 2014 11:12:51 -0700
-Subject: [PATCH v3 00/11] ARM: at91: rework main and slow clk
- implementation
-In-Reply-To: <1398172360-7837-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1398172360-7837-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <53613D23.3020503@atmel.com>
+From: dmurphy@ti.com (Dan Murphy)
+Date: Wed, 30 Apr 2014 13:13:27 -0500
+Subject: [RFC 08/11] ARM: dts: am33xx: Add prcm_resets node
+In-Reply-To: <20140430181042.GC12362@atomide.com>
+References: <1398802790-29287-1-git-send-email-dmurphy@ti.com>
+ <1398802790-29287-9-git-send-email-dmurphy@ti.com>
+ <6286135.g77D4pMffU@wuerfel> <20140430002211.GC27571@atomide.com>
+ <53613A29.8080803@ti.com> <20140430181042.GC12362@atomide.com>
+Message-ID: <53613D47.4000905@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/04/2014 06:12, Boris BREZILLON :
-> Hello,
-> 
-> This series introduce the real clock model (as described in atmel datasheets)
-> for slow and main clocks.
-> 
-> The modifications introduced by this series break the DT compat, but, as the
-> at91 CCF based implementation is pretty new (introduced in 3.14 only for sama5
-> eval boards) I think it won't impact a lot of users.
-> 
-> Nicolas, Mike, if this series is accepted, I'd like to get it merged as soon as
-> possible to prevent other developpers from using a deprecated DT binding.
-> Moreover, I think this series should go through the same path for both clk
-> and DT changes (whatever path is chosen: either at91 or clk tree) because the
-> changes are tightly coupled.
+Tony
 
-Boris,
+On 04/30/2014 01:10 PM, Tony Lindgren wrote:
+> * Dan Murphy <dmurphy@ti.com> [140430 11:00]:
+>> Tony and Arnd
+>>
+>> Thanks for the comments
+>>
+>> On 04/29/2014 07:22 PM, Tony Lindgren wrote:
+>>> * Arnd Bergmann <arnd@arndb.de> [140429 13:35]:
+>>>> On Tuesday 29 April 2014 15:19:47 Dan Murphy wrote:
+>>>>> + * AM33xx reset index for PRCM Module
+>>>>> + *
+>>>>> + * Copyright 2014 Texas Instruments Inc.
+>>>>> + *
+>>>>> + * This program is free software; you can redistribute it and/or modify
+>>>>> + * it under the terms of the GNU General Public License version 2 as
+>>>>> + * published by the Free Software Foundation.
+>>>>> + */
+>>>>> +
+>>>>> +#ifndef _DT_BINDINGS_RESET_TI_AM33XX_H
+>>>>> +#define _DT_BINDINGS_RESET_TI_AM33XX_H
+>>>>> +
+>>>>> +#define RESET_DEVICE_RESET                     0
+>>>>> +#define RESET_GFX_RESET                                1
+>>>>> +#define RESET_PER_RESET                                2
+>>>>> +
+>>>>> +#endif
+>>>> Interfaces like this should only be used if you can't use hardware
+>>>> numbers, in general. If these numbers are in the data sheet, just
+>>>> put them directly into the dts file, as we do for interrupt numbers,
+>>>> gpio numbers, register offsets etc.
+>>>>
+>>>> If you have made them up to define an interface between the driver
+>>>> and DT because there is no usable hardare ID, I'd suggest just using
+>>>> a single file across all SoCs that have this driver, and have
+>>>> a unified name space.
+>>> Also, it's a bit unclear how the reset controller phandle is used
+>>> referenced and used by the consumer device.. Maybe setting that up
+>>> first in a Linux generic way is a good point starting point.
+>>>
+>>> Maybe something like this along the same way as clocks are set up
+>>> (completely untested):
+>>>
+>>> &reset1 {
+>>> 	iva_reset: reset1 {
+>>> 		reg = /bits/ 8 <0>;
+>>> 	};
+>>> 	gfx_reset: reset1 {
+>>> 		reg = /bits/ 8 <1>;
+>>> 	};
+>>> 	...
+>>> };
+>>>
+>>> &iva {
+>>> 	compatible = "ti,ivahd";
+>>> 	resets = <&reset1 1>;
+>>> 	...
+>>> };
+>> I had something very similar to this when I was developing this driver but moved away from this.
+>>
+>> Following the clocks implementation I had a separate dtsi for resets for each device and had the data defined like so
+>> for each SoC.
+>>
+>> &prcm_resets {
+>>        device_reset: device_reset {
+>>                rstctrl_offs = <0x1104>;
+>>                ctrl_bit-shift = <0>;
+>>                rstst_offs      = <0x1114>;
+>>                sts_bit-shift   = <0>;
+>>        };
+>>
+>>        gpu_reset: gpu_reset {
+>>                rstctrl_offs = <0x0D00>;
+>>                ctrl_bit-shift = <3>;
+>>                rstst_offs      = <0x0D0C>;
+>>                sts_bit-shift = <5>;
+>>        };
+>> };
+>>
+>> And then any client interested in a specific reset driver would include this
+>>
+>> resets = <&prcm_resets &gpu_reset>;
+>> reset-names = "gpu_reset";
+>>
+>> Our reset code would then retrieve the register data through the phandle instead of an index.
+>>
+>> Thoughts?
+> Using phandles makes sense here because it avoids the indexing. Indexing
+> has a problem of needing to be in sync with the .dts files and the
+> device driver(s). Using an index also easily causes misuse of virtual
+> indexes being added that no longer describe the hardware at all.
 
-First of all, well...
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Thanks.  What about placing register data in the dts files?  Is there any issue with this concept?
 
-I didn't find something to add but the little comment about the
-documentation that you already fixed in this v3 version.
+Dan
 
-Mike,
-
-I would like to merge this whole series through my tree and then the
-arm-soc tree. If it is okay for you, can you give your acknowledgement
-before that I build a pull-request for the arm-soc guys?
-
-Thanks a lot, bye,
-
-> Changes since v2:
->  - add missing compatible in pmc.c
->  - fix sam9261 slow clock definition
->  - move xtal nodes out of /clocks node
->  - fix DT bindings documentation
->  - fix main RC oscillator initilization
-> 
-> Changes since v1:
-> - fix sam9rl main clk definition
-> Boris BREZILLON (11):
->   clk: at91: rework main clk implementation
->   clk: at91: update main clk documentation
->   clk: at91: add slow clks driver
->   clk: at91: add slow clk documentation
->   ARM: at91/dt: move sama5d3 SoC to the new main/slow clk model
->   ARM: at91/dt: add xtal frequencies to sama5d3xcm boards
->   ARM: at91/dt: add xtal frequencies to sama5d3 xplained board
->   ARM: at91/dt: move at91sam9261 SoC to the new main clock model
->   ARM: at91/dt: define main xtal frequency of the at91sam9261ek board
->   ARM: at91/dt: move at91sam9rl SoC to the new slow/main clock models
->   ARM: at91/dt: define sam9rlek crystal frequencies
-> 
->  .../devicetree/bindings/clock/at91-clock.txt       | 128 ++++-
->  arch/arm/boot/dts/at91-sama5d3_xplained.dts        |   8 +
->  arch/arm/boot/dts/at91sam9261.dtsi                 |  23 +-
->  arch/arm/boot/dts/at91sam9261ek.dts                |   4 +
->  arch/arm/boot/dts/at91sam9rl.dtsi                  |  46 +-
->  arch/arm/boot/dts/at91sam9rlek.dts                 |   9 +
->  arch/arm/boot/dts/sama5d3.dtsi                     |  61 ++-
->  arch/arm/boot/dts/sama5d3xcm.dtsi                  |   8 +
->  drivers/clk/at91/Makefile                          |   4 +-
->  drivers/clk/at91/clk-main.c                        | 577 ++++++++++++++++++---
->  drivers/clk/at91/clk-slow.c                        | 467 +++++++++++++++++
->  drivers/clk/at91/pmc.c                             |  17 +
->  drivers/clk/at91/pmc.h                             |   9 +
->  drivers/clk/at91/sckc.c                            |  57 ++
->  drivers/clk/at91/sckc.h                            |  22 +
->  include/linux/clk/at91_pmc.h                       |   1 +
->  16 files changed, 1352 insertions(+), 89 deletions(-)
->  create mode 100644 drivers/clk/at91/clk-slow.c
->  create mode 100644 drivers/clk/at91/sckc.c
->  create mode 100644 drivers/clk/at91/sckc.h
-> 
+> Regards,
+>
+> Tony
 
 
 -- 
-Nicolas Ferre
+------------------
+Dan Murphy
