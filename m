@@ -1,35 +1,41 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Wed, 30 Apr 2014 17:06:28 -0500
-Subject: [PATCH] arm: socfpga: reserve the region at start of phys mem
-In-Reply-To: <20140430173220.GZ5546@joshc.qualcomm.com>
-References: <1392744897-6384-1-git-send-email-bigeasy@linutronix.de>
- <20140430161717.GY5546@joshc.qualcomm.com> <53612C70.6000109@linutronix.de>
- <20140430173220.GZ5546@joshc.qualcomm.com>
-Message-ID: <536173E4.2010404@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 30 Apr 2014 23:28:39 +0100
+Subject: [RFC PATCH 0/4] drivers/base: Generic framework for tracking
+ internal interfaces
+In-Reply-To: <53616E31.3050404@wp.pl>
+References: <1398866574-27001-1-git-send-email-a.hajda@samsung.com>
+ <20140430154914.GA898@kroah.com> <53616E31.3050404@wp.pl>
+Message-ID: <20140430222839.GE26756@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian,
+On Wed, Apr 30, 2014 at 11:42:09PM +0200, Andrzej Hajda wrote:
+> The main problem with component framework is that componentization  
+> significantly changes every driver and changes it in a way which is not  
+> compatible with traditional drivers, so devices which are intended to  
+> work with different DRM masters are hard to componentize if some of DRMs  
+> are componentized and some not.
 
-On 4/30/14 12:32 PM, Josh Cartwright wrote:
-> On Wed, Apr 30, 2014 at 07:01:36PM +0200, Sebastian Andrzej Siewior wrote:
->> On 04/30/2014 06:17 PM, Josh Cartwright wrote:
->>> Is there a particular reason why you aren't describing this reservation
->>> in devicetree using a /memreserve/ node?
->> Because the kernel is using memory at a specific address it did not
->> allocate. If the memory address where the second CPU come up could be
->> set then this node wouldn't be required and a simple kmalloc() would do
->> it, too.
-> I understand the need to reserve the area, but questioning the mechanism
-> used to do so.  How is the socfpga case different from Highbank, for
-> example, which makes use of /memreserve/ for what appears to be a very
-> similar purpose (see arch/arm/boot/dts/highbank.dts):
->
-> 	/* First 4KB has pen for secondary cores. */
-> 	/memreserve/ 0x00000000 0x0001000;
->
-I apologize but it looks like I accidently dropped this patch. But in
-light of Josh's
-comments, I think doing the /memreserve/ is the correct way.
+Many of the problems which the component helpers are designed to solve
+are those where you need the drm_device structure (or snd_card, or whatever
+subsystem specific card/device representation structure) pre-created in
+order to initialise the components.
 
-Dinh
+In the case of DRM, you can't initialise encoders or connectors without
+their drm_device structure pre-existing - because these components are
+attached to the drm_device.
+
+Your solution to that is to delay those calls, but the DRM subsystem is
+not designed to cope like that - it's designed such that when the
+connector or encoder initialisation functions are called, it is assumed
+that the driver is initialising its state. (I've raised this point before
+but you've just fobbed it off in the past.)
+
+Another issue here is that the order of initialisation matters greatly.
+Take CRTCs for example.  In DRM, the order of attachment of CRTCs defines
+their identity, changing the order changes their identity, and changes
+how they are bound to their respective connectors.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
