@@ -1,34 +1,69 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 30 Apr 2014 04:36:11 -0700
-Subject: [PATCH v11 00/12] In-kernel PSCI v0.2 emulation for KVM ARM/ARM64
-In-Reply-To: <5360C8D9.1030906@arm.com>
-References: <1398750865-10892-1-git-send-email-anup.patel@linaro.org>
- <20140429194416.GC3003@lvm> <5360C8D9.1030906@arm.com>
-Message-ID: <20140430113611.GB22132@lvm>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Wed, 30 Apr 2014 12:36:22 +0100
+Subject: [PATCH] arm64: mm: Create gigabyte kernel logical mappings where
+ possible
+Message-ID: <1398857782-1525-1-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 30, 2014 at 10:56:41AM +0100, Marc Zyngier wrote:
-> On 29/04/14 20:44, Christoffer Dall wrote:
-> > On Tue, Apr 29, 2014 at 11:24:13AM +0530, Anup Patel wrote:
-> >> Currently, KVM ARM/ARM64 only provides in-kernel emulation of Power State
-> >> and Coordination Interface (PSCI) v0.1.
-> >>
-> >> This patchset aims at providing newer PSCI v0.2 for KVM ARM/ARM64 VCPUs
-> >> such that it does not break current KVM ARM/ARM64 ABI.
-> >>
-> >> The user space tools (i.e. QEMU or KVMTOOL) will have to explicitly enable
-> >> KVM_ARM_VCPU_PSCI_0_2 feature using KVM_ARM_VCPU_INIT ioctl for providing
-> >> PSCI v0.2 to VCPUs.
-> >>
-> > 
-> > I feel like this is ready to queue for the next merge window.  Last
-> > chance to object.
-> 
-> Looks OK to me.
-> 
-Applied to queue.  Note that KVM_CAP_ARM_PSCI_0_2 is now defined to 102
-after rebasing the patch set onto kvm/next.
+We have the capability to map 1GB level 1 blocks when using a 4K
+granule.
 
-Thanks,
--Christoffer
+This patch adjusts the create_mapping logic s.t. when mapping physical
+memory on boot, we attempt to use a 1GB block if both the VA and PA
+start and end are 1GB aligned. This both reduces the levels of lookup
+required to resolve a kernel logical address, as well as reduces TLB
+pressure on cores that support 1GB TLB entries.
+
+Signed-off-by: Steve Capper <steve.capper@linaro.org>
+---
+Hello,
+This patch has been tested on the FastModel for 4K and 64K pages.
+Also, this has been tested with Jungseok's 4 level patch.
+
+I put in the explicit check for PAGE_SHIFT, as I am anticipating a
+three level 64KB configuration at some point.
+
+With two level 64K, a PUD is equivalent to a PMD which is equivalent to
+a PGD, and these are all level 2 descriptors.
+
+Under three level 64K, a PUD would be equivalent to a PGD which would
+be a level 1 descriptor thus may not be a block.
+
+Comments/critique/testers welcome.
+
+Cheers,
+-- 
+Steve
+---
+ arch/arm64/mm/mmu.c | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 4d29332..867e979 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -234,7 +234,20 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
+ 	pud = pud_offset(pgd, addr);
+ 	do {
+ 		next = pud_addr_end(addr, end);
+-		alloc_init_pmd(pud, addr, next, phys);
++
++		/*
++		 * For 4K granule only, attempt to put down a 1GB block
++		 */
++		if ((PAGE_SHIFT == 12) &&
++			((addr | next | phys) & ~PUD_MASK) == 0) {
++			pud_t old_pud = *pud;
++			set_pud(pud, __pud(phys | prot_sect_kernel));
++
++			if (!pud_none(old_pud))
++				flush_tlb_all();
++		} else {
++			alloc_init_pmd(pud, addr, next, phys);
++		}
+ 		phys += next - addr;
+ 	} while (pud++, addr = next, addr != end);
+ }
+-- 
+1.8.1.4
