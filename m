@@ -1,45 +1,43 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 30 Apr 2014 15:31:38 +0300
-Subject: [PATCH 2/2] ARM: DTS: omap54xx-clocks: Correct abe_iclk clock node
-In-Reply-To: <1398858096-32144-2-git-send-email-peter.ujfalusi@ti.com>
-References: <1398858096-32144-1-git-send-email-peter.ujfalusi@ti.com>
- <1398858096-32144-2-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <5360ED2A.5070605@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 30 Apr 2014 13:48:00 +0100
+Subject: [RFC PATCH] sched_clock: also call
+ register_current_timer_delay() if possible
+In-Reply-To: <1398860614-29469-1-git-send-email-bigeasy@linutronix.de>
+References: <1398860614-29469-1-git-send-email-bigeasy@linutronix.de>
+Message-ID: <20140430124800.GC21876@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/30/2014 02:41 PM, Peter Ujfalusi wrote:
-> abe_iclk's parent is aess_fclk and not abe_clk.
-> Also correct the parameters for clock rate calculation as used for OMAP4
-> since in PRCM level there's no difference between the two platform
-> regarding to AESS/ABE clocking.
->
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Hi Sebastian,
 
-Acked-by: Tero Kristo <t-kristo@ti.com>
+On Wed, Apr 30, 2014 at 01:23:34PM +0100, Sebastian Andrzej Siewior wrote:
+> On ARM one has to call register_current_timer_delay() in order to use
+> the (quick) timer based calibrarion instead of the a little slower loop
+> based delay.
+> The timer function specified in register_current_timer_delay() is also
+> used by read_current_timer() which would otherwise return -ENXIO.
+> And read_current_timer() timer is used by get_cycles() which in turn is
+> used by random_get_entropy(). That means each sub-architecture returned
+> here 0 if register_current_timer_delay() was no performed.
+> 
+> The parameters for for sched_clock_register() and
+> register_current_timer_delay() are mostly the same. Instead of calling
+> register_current_timer_delay() each time just after (or before)
+> sched_clock_register() I thought it might easier by doing it once at
+> sched_clock time since the parameter are the same. That means each ARM sub
+> arch that working sched-clock would also have a working random_get_entropy()
+> implementation.
+> 
+> Any comments?
 
-> ---
->   arch/arm/boot/dts/omap54xx-clocks.dtsi | 9 +++++----
->   1 file changed, 5 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/omap54xx-clocks.dtsi b/arch/arm/boot/dts/omap54xx-clocks.dtsi
-> index d784ff5d3904..86fc507a0567 100644
-> --- a/arch/arm/boot/dts/omap54xx-clocks.dtsi
-> +++ b/arch/arm/boot/dts/omap54xx-clocks.dtsi
-> @@ -143,10 +143,11 @@
->
->   	abe_iclk: abe_iclk {
->   		#clock-cells = <0>;
-> -		compatible = "fixed-factor-clock";
-> -		clocks = <&abe_clk>;
-> -		clock-mult = <1>;
-> -		clock-div = <2>;
-> +		compatible = "ti,divider-clock";
-> +		clocks = <&aess_fclk>;
-> +		ti,bit-shift = <24>;
-> +		reg = <0x0528>;
-> +		ti,dividers = <2>, <1>;
->   	};
->
->   	abe_lp_clk_div: abe_lp_clk_div {
->
+As long as sched_clock is guaranteed to be a fixed frequency, always-on
+clocksource then this could work, but it removes the flexibility of having
+a separate delay clock and sched clock (is this useful?).
+
+Looking at your patch, I noticed that we need to extend the
+register_current_timer_delay function to deal with clocks that aren't as
+wide as cycle_t, otherwise we don't delay() for long enough when the clock
+overflows (this is potentially already an issue for architected timers <
+64-bit). Could you cook a patch for that please?
+
+Will
