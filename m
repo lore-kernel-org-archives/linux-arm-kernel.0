@@ -1,123 +1,23 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 30 Apr 2014 17:02:13 +0900
-Subject: [PATCH V2] ARM: EXYNOS: cpu hotplug: use v7_exit_coherency_flush
- macro for cache disabling
-In-Reply-To: <1398232351-16280-1-git-send-email-leela.krishna@linaro.org>
-References: <1398232351-16280-1-git-send-email-leela.krishna@linaro.org>
-Message-ID: <5360AE05.7020106@samsung.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Wed, 30 Apr 2014 09:14:41 +0100
+Subject: [RFC v2] ARM VM System Specification
+In-Reply-To: <20140429144206.GA14379@lvm>
+References: <20140328184517.GA27219@cbox> <20140429144206.GA14379@lvm>
+Message-ID: <20140430081441.CD18DC4094A@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, 29 Apr 2014 07:42:06 -0700, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> On Fri, Mar 28, 2014 at 11:45:17AM -0700, Christoffer Dall wrote:
+> > ARM VM System Specification
+> > ===========================
+> > 
+> 
+> I didn't receive a lot of comments on this one, I take this to mean that
+> most people are happy with the content.  If not, now is the time to
+> speak up, otherwise we'll be taking steps to try and publish this
+> slightly more formally.
 
-On 04/23/2014 02:52 PM, Leela Krishna Amudala wrote:
-> A common macro v7_exit_coherency_flush available which does the below tasks in
-> the seqeunce.
-> -clearing C bit
-> -clearing L1 cache
-> -exit SMP
-> -instruction and data synchronization
-> 
-> So removing the local functions which does the same thing and use the macro instead.
-> 
-> Signed-off-by: Leela Krishna Amudala <leela.krishna@linaro.org>
-> Acked-by: Nicolas Pitre <nico@linaro.org>
-> ---
-> Changes since V1:
-> 	- removed unwanted primary_part variable in exynos_cpu_die()
-> 	- given more description in commit message
-> 	  suggested by Daniel Lezcano <daniel.lezcano@linaro.org>
-> 
->  arch/arm/mach-exynos/hotplug.c |   63 +---------------------------------------
->  1 file changed, 1 insertion(+), 62 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
-> index 5eead53..9ca692d 100644
-> --- a/arch/arm/mach-exynos/hotplug.c
-> +++ b/arch/arm/mach-exynos/hotplug.c
-> @@ -24,56 +24,6 @@
->  #include "common.h"
->  #include "regs-pmu.h"
->  
-> -static inline void cpu_enter_lowpower_a9(void)
-> -{
-> -	unsigned int v;
-> -
-> -	asm volatile(
-> -	"	mcr	p15, 0, %1, c7, c5, 0\n"
-> -	"	mcr	p15, 0, %1, c7, c10, 4\n"
-> -	/*
-> -	 * Turn off coherency
-> -	 */
-> -	"	mrc	p15, 0, %0, c1, c0, 1\n"
-> -	"	bic	%0, %0, %3\n"
-> -	"	mcr	p15, 0, %0, c1, c0, 1\n"
-> -	"	mrc	p15, 0, %0, c1, c0, 0\n"
-> -	"	bic	%0, %0, %2\n"
-> -	"	mcr	p15, 0, %0, c1, c0, 0\n"
-> -	  : "=&r" (v)
-> -	  : "r" (0), "Ir" (CR_C), "Ir" (0x40)
-> -	  : "cc");
-> -}
-> -
-> -static inline void cpu_enter_lowpower_a15(void)
-> -{
-> -	unsigned int v;
-> -
-> -	asm volatile(
-> -	"	mrc	p15, 0, %0, c1, c0, 0\n"
-> -	"	bic	%0, %0, %1\n"
-> -	"	mcr	p15, 0, %0, c1, c0, 0\n"
-> -	  : "=&r" (v)
-> -	  : "Ir" (CR_C)
-> -	  : "cc");
-> -
-> -	flush_cache_louis();
-> -
-> -	asm volatile(
-> -	/*
-> -	* Turn off coherency
-> -	*/
-> -	"	mrc	p15, 0, %0, c1, c0, 1\n"
-> -	"	bic	%0, %0, %1\n"
-> -	"	mcr	p15, 0, %0, c1, c0, 1\n"
-> -	: "=&r" (v)
-> -	: "Ir" (0x40)
-> -	: "cc");
-> -
-> -	isb();
-> -	dsb();
-> -}
-> -
->  static inline void cpu_leave_lowpower(void)
->  {
->  	unsigned int v;
-> @@ -132,19 +82,8 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
->  void __ref exynos_cpu_die(unsigned int cpu)
->  {
->  	int spurious = 0;
-> -	int primary_part = 0;
->  
-> -	/*
-> -	 * we're ready for shutdown now, so do it.
-> -	 * Exynos4 is A9 based while Exynos5 is A15; check the CPU part
-> -	 * number by reading the Main ID register and then perform the
-> -	 * appropriate sequence for entering low power.
-> -	 */
-> -	asm("mrc p15, 0, %0, c0, c0, 0" : "=r"(primary_part) : : "cc");
-> -	if ((primary_part & 0xfff0) == 0xc0f0)
-> -		cpu_enter_lowpower_a15();
-> -	else
-> -		cpu_enter_lowpower_a9();
-> +	v7_exit_coherency_flush(louis);
->  
->  	platform_do_lowpower(cpu, &spurious);
->  
-> 
+Yes, I'm happy with it.
 
-I tested this patch on Exynos3250 based on Cortex-A7 dual core.
-
-Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
-
-Thanks,
-Chanwoo Choi
+g.
