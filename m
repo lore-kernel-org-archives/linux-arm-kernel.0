@@ -1,20 +1,20 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Wed, 30 Apr 2014 19:01:36 +0200
-Subject: [PATCH] arm: socfpga: reserve the region at start of phys mem
-In-Reply-To: <20140430161717.GY5546@joshc.qualcomm.com>
-References: <1392744897-6384-1-git-send-email-bigeasy@linutronix.de>
- <20140430161717.GY5546@joshc.qualcomm.com>
-Message-ID: <53612C70.6000109@linutronix.de>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 30 Apr 2014 10:06:56 -0700
+Subject: [PATCH v2] hwmon: vexpress: Use devm helper for hwmon device
+ registration
+In-Reply-To: <1398874030-8759-1-git-send-email-pawel.moll@arm.com>
+References: <1398874030-8759-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <20140430170656.GB3389@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/30/2014 06:17 PM, Josh Cartwright wrote:
-> Is there a particular reason why you aren't describing this reservation
-> in devicetree using a /memreserve/ node?
+On Wed, Apr 30, 2014 at 05:07:10PM +0100, Pawel Moll wrote:
+> Use devm_hwmon_device_register_with_groups instead of
+> the old-style manual attributes and hwmon device registration.
+> 
+> Also, unroll the attribute group macros for better code
+> readability.
+> 
+> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 
-Because the kernel is using memory at a specific address it did not
-allocate. If the memory address where the second CPU come up could be
-set then this node wouldn't be required and a simple kmalloc() would do
-it, too.
-
-Sebastian
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
