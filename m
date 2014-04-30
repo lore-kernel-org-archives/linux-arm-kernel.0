@@ -1,107 +1,49 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 30 Apr 2014 11:10:43 -0700
-Subject: [RFC 08/11] ARM: dts: am33xx: Add prcm_resets node
-In-Reply-To: <53613A29.8080803@ti.com>
-References: <1398802790-29287-1-git-send-email-dmurphy@ti.com>
- <1398802790-29287-9-git-send-email-dmurphy@ti.com>
- <6286135.g77D4pMffU@wuerfel> <20140430002211.GC27571@atomide.com>
- <53613A29.8080803@ti.com>
-Message-ID: <20140430181042.GC12362@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 30 Apr 2014 20:11:26 +0200
+Subject: [PATCH] arm64: mm: Create gigabyte kernel logical mappings where
+ possible
+In-Reply-To: <1398857782-1525-1-git-send-email-steve.capper@linaro.org>
+References: <1398857782-1525-1-git-send-email-steve.capper@linaro.org>
+Message-ID: <4217068.6LErVYxoHJ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dan Murphy <dmurphy@ti.com> [140430 11:00]:
-> Tony and Arnd
+On Wednesday 30 April 2014 12:36:22 Steve Capper wrote:
+> We have the capability to map 1GB level 1 blocks when using a 4K
+> granule.
 > 
-> Thanks for the comments
+> This patch adjusts the create_mapping logic s.t. when mapping physical
+> memory on boot, we attempt to use a 1GB block if both the VA and PA
+> start and end are 1GB aligned. This both reduces the levels of lookup
+> required to resolve a kernel logical address, as well as reduces TLB
+> pressure on cores that support 1GB TLB entries.
 > 
-> On 04/29/2014 07:22 PM, Tony Lindgren wrote:
-> > * Arnd Bergmann <arnd@arndb.de> [140429 13:35]:
-> >> On Tuesday 29 April 2014 15:19:47 Dan Murphy wrote:
-> >>> + * AM33xx reset index for PRCM Module
-> >>> + *
-> >>> + * Copyright 2014 Texas Instruments Inc.
-> >>> + *
-> >>> + * This program is free software; you can redistribute it and/or modify
-> >>> + * it under the terms of the GNU General Public License version 2 as
-> >>> + * published by the Free Software Foundation.
-> >>> + */
-> >>> +
-> >>> +#ifndef _DT_BINDINGS_RESET_TI_AM33XX_H
-> >>> +#define _DT_BINDINGS_RESET_TI_AM33XX_H
-> >>> +
-> >>> +#define RESET_DEVICE_RESET                     0
-> >>> +#define RESET_GFX_RESET                                1
-> >>> +#define RESET_PER_RESET                                2
-> >>> +
-> >>> +#endif
-> >> Interfaces like this should only be used if you can't use hardware
-> >> numbers, in general. If these numbers are in the data sheet, just
-> >> put them directly into the dts file, as we do for interrupt numbers,
-> >> gpio numbers, register offsets etc.
-> >>
-> >> If you have made them up to define an interface between the driver
-> >> and DT because there is no usable hardare ID, I'd suggest just using
-> >> a single file across all SoCs that have this driver, and have
-> >> a unified name space.
-> > Also, it's a bit unclear how the reset controller phandle is used
-> > referenced and used by the consumer device.. Maybe setting that up
-> > first in a Linux generic way is a good point starting point.
-> >
-> > Maybe something like this along the same way as clocks are set up
-> > (completely untested):
-> >
-> > &reset1 {
-> > 	iva_reset: reset1 {
-> > 		reg = /bits/ 8 <0>;
-> > 	};
-> > 	gfx_reset: reset1 {
-> > 		reg = /bits/ 8 <1>;
-> > 	};
-> > 	...
-> > };
-> >
-> > &iva {
-> > 	compatible = "ti,ivahd";
-> > 	resets = <&reset1 1>;
-> > 	...
-> > };
+> Signed-off-by: Steve Capper <steve.capper@linaro.org>
+> ---
+> Hello,
+> This patch has been tested on the FastModel for 4K and 64K pages.
+> Also, this has been tested with Jungseok's 4 level patch.
 > 
-> I had something very similar to this when I was developing this driver but moved away from this.
+> I put in the explicit check for PAGE_SHIFT, as I am anticipating a
+> three level 64KB configuration at some point.
 > 
-> Following the clocks implementation I had a separate dtsi for resets for each device and had the data defined like so
-> for each SoC.
+> With two level 64K, a PUD is equivalent to a PMD which is equivalent to
+> a PGD, and these are all level 2 descriptors.
 > 
-> &prcm_resets {
->        device_reset: device_reset {
->                rstctrl_offs = <0x1104>;
->                ctrl_bit-shift = <0>;
->                rstst_offs      = <0x1114>;
->                sts_bit-shift   = <0>;
->        };
+> Under three level 64K, a PUD would be equivalent to a PGD which would
+> be a level 1 descriptor thus may not be a block.
 > 
->        gpu_reset: gpu_reset {
->                rstctrl_offs = <0x0D00>;
->                ctrl_bit-shift = <3>;
->                rstst_offs      = <0x0D0C>;
->                sts_bit-shift = <5>;
->        };
-> };
-> 
-> And then any client interested in a specific reset driver would include this
-> 
-> resets = <&prcm_resets &gpu_reset>;
-> reset-names = "gpu_reset";
-> 
-> Our reset code would then retrieve the register data through the phandle instead of an index.
-> 
-> Thoughts?
+> Comments/critique/testers welcome.
 
-Using phandles makes sense here because it avoids the indexing. Indexing
-has a problem of needing to be in sync with the .dts files and the
-device driver(s). Using an index also easily causes misuse of virtual
-indexes being added that no longer describe the hardware at all.
+It seems like a great idea. I have to admit that I don't understand
+the existing code, but what are the page sizes used here?
 
-Regards,
+Does the code always use the largest possible page size, or does
+it just use either small pages or 1G pages?
 
-Tony
+In combination with the contiguous page hint, we should be able
+to theoretically support 4KB/64KB/2M/32M/1G/16G TLBs in any
+combination for boot-time mappings on a 4K page size kernel,
+or 64KB/1M/512M/8G on a 64KB page size kernel.
+
+	Arnd
