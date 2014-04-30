@@ -1,111 +1,97 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 30 Apr 2014 04:49:57 +0000
-Subject: [PATCH 4/4] ARM: shmobile: marzen: Use disabled variant of clock
- workaround for scif devices
-In-Reply-To: <20140430015045.GG24989@verge.net.au>
-References: <1398757406-30920-1-git-send-email-horms+renesas@verge.net.au>
- <CANqRtoS2p9+2tBWeOQ1K-JME7OrXJDW_afxgbW7YuqSi-WOEVg@mail.gmail.com>
- <20140429235106.GB5289@verge.net.au> <3243856.KKuL7WUL5g@avalon>
- <20140430015045.GG24989@verge.net.au>
-Message-ID: <CANqRtoQkOPj00fBfJ_-vhooiXcE4Li_SAnPgEEfoOGA+FHUEXA@mail.gmail.com>
+From: shaik.samsung@gmail.com (Shaik Ameer Basha)
+Date: Wed, 30 Apr 2014 10:20:05 +0530
+Subject: [PATCH v12 00/31] iommu/exynos: Fixes and Enhancements of System
+ MMU driver with DT
+In-Reply-To: <26065037.GxQQuIURPg@wuerfel>
+References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
+ <26065037.GxQQuIURPg@wuerfel>
+Message-ID: <CAOD6ATrKumCcFFWFp7i7XLMssG23QV0FZ=3KqGCnnJt17Xmr1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 30, 2014 at 1:50 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Wed, Apr 30, 2014 at 02:47:30AM +0200, Laurent Pinchart wrote:
->> Hi Simon,
+On Mon, Apr 28, 2014 at 2:04 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Sunday 27 April 2014 13:07:32 Shaik Ameer Basha wrote:
+>> The current exynos-iommu(System MMU) driver does not work autonomously
+>> since it is lack of support for power management of peripheral blocks.
+>> For example, MFC device driver must ensure that its System MMU is disabled
+>> before MFC block is power-down not to invalidate IOTLB in the System MMU
+>> when I/O memory mapping is changed. Because a System MMU resides in the
+>> same H/W block, access to control registers of System MMU while the H/W
+>> block is turned off must be prohibited.
 >>
->> On Wednesday 30 April 2014 08:51:11 Simon Horman wrote:
->> > On Tue, Apr 29, 2014 at 01:40:08PM +0000, Magnus Damm wrote:
->> > > On Tue, Apr 29, 2014 at 7:43 AM, Simon Horman wrote:
->> > > > Now that SCIF devices are initialised using DT it should
->> > > > be sufficient to use the disabled variant of the clock workaround.
->> > > >
->> > > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->> > > > ---
->> > > >
->> > > >  arch/arm/mach-shmobile/board-marzen-reference.c | 12 ++++++------
->> > > >  1 file changed, 6 insertions(+), 6 deletions(-)
->> > > >
->> > > > diff --git a/arch/arm/mach-shmobile/board-marzen-reference.c
->> > > > b/arch/arm/mach-shmobile/board-marzen-reference.c index
->> > > > 6d34baf..1f14d80 100644
->> > > > --- a/arch/arm/mach-shmobile/board-marzen-reference.c
->> > > > +++ b/arch/arm/mach-shmobile/board-marzen-reference.c
->> > > > @@ -40,12 +40,6 @@ static void __init marzen_init_timer(void)
->> > > >
->> > > >   * devices until they get moved to DT.
->> > > >   */
->> > > >
->> > > >  static const struct clk_name clk_names[] __initconst = {
->> > > >
->> > > > -       { "scif0", NULL, "sh-sci.0" },
->> > > > -       { "scif1", NULL, "sh-sci.1" },
->> > > > -       { "scif2", NULL, "sh-sci.2" },
->> > > > -       { "scif3", NULL, "sh-sci.3" },
->> > > > -       { "scif4", NULL, "sh-sci.4" },
->> > > > -       { "scif5", NULL, "sh-sci.5" },
->> > > >
->> > > >         { "tmu0", NULL, "sh_tmu.0" },
->> > > >         { "tmu1", NULL, "sh_tmu.1" },
->> > > >         { "tmu2", NULL, "sh_tmu.2" },
->> > > >
->> > > > @@ -55,6 +49,12 @@ static const struct clk_name clk_names[] __initconst
->> > > > = {
->> > > >
->> > > >   * This is a really crude hack to work around core platform clock
->> > > >   issues
->> > > >   */
->> > > >
->> > > >  static const struct clk_name clk_enables[] __initconst = {
->> > > >
->> > > > +       { "scif0", NULL, "sh-sci.0" },
->> > > > +       { "scif1", NULL, "sh-sci.1" },
->> > > > +       { "scif2", NULL, "sh-sci.2" },
->> > > > +       { "scif3", NULL, "sh-sci.3" },
->> > > > +       { "scif4", NULL, "sh-sci.4" },
->> > > > +       { "scif5", NULL, "sh-sci.5" },
->> > > >
->> > > >         { "sdhi0", NULL, "ffe4c000.sd" },
->> > > >         { "thermal", NULL, "ffc48000.thermal" },
->> > > >
->> > > >  };
->> > >
->> > > Hi Simon,
->> > >
->> > > Thanks for your SCIF DT patches for r8a7779. They look good and clean
->> > > in general I think.
->> > >
->> > > Regarding this specific patch, I'm not sure why you need to perform
->> > > this kind of change. Is it following the same style as other SoCs?
->> > >
->> > > In my mind the SCIF driver at least used to rely on both Runtime PM
->> > > and the clock framework for clock control so only relying on clock
->> > > framework should be enough for now. The driver may have been updated
->> > > though, but if so we should make sure we follow the same pattern on
->> > > other SoCs as well.
->> >
->> > Thanks, I agree this is not needed.
+>> This set of changes solves the above problem with setting each System MMUs
+>> as the parent of the device which owns the System MMU to receive the
+>> information when the device is turned off or turned on.
 >>
->> Shouldn't we remove the scif clock entries from the clk_names array completely
->> ?
+>> Another big change to the driver is the support for devicetree.
+>> The bindings for System MMU is described in
+>> Documentation/devicetree/bindings/arm/samsung/system-mmu.txt
 >
-> To be honest I am somewhat confused.
->
-> My understanding was that clk_enables were used for devices
-> that are initialised using DT but whose clocks need to be forcibly
-> enabled because the interaction with runtime PM isn't handled properly
-> yet.
->
-> And my reading of Magnus's email was that SCI devices do not need
-> to be enabled as the driver interacts with runtime PM correctly.
->
-> So I tend to agree with you that we ought to be able to simply remove
-> the SCI devices from clk_names now they are initialised via DT
-> (unlike TMU which is still initialised as a platform device).
+> Sorry I've been absent from the review so far. Most of the patches
+> seem entirely reasonable to me, but I'm worried about the DT binding
+> aspect. We are going to see more systems shipping with IOMMUs now,
+> and we are seeing an increasing number of submissions for 64-bit
+> systems. We really have to work out what the DT representation for
+> IOMMUs should look like in general before adding another ad-hod
+> implementation that is private to one driver.
 
-I suspect that simply removing the SCIF bits from clk_names makes sense.
+Hi Arnd,
 
-Thanks,
+No issues. Its good that finally you are here :)
 
-/ magnus
+I am going through the possibilities for new bindings that you
+mentioned in the other thread.
+    -- [PATCH v12 11/31] documentation: iommu: add binding document of
+Exynos System MMU
+
+Exynos IOMMU driver is pretty simple with only one exception, "some
+devices are using multiple IOMMUs".
+
+>From starting (of this patch set), we were trying to fix three major issues.
+[1] How to control the probing order of required IOMMU(s) for a given
+device and a device itself.
+[2] Handling multiple IOMMUs for one device.
+[3] Generic DT bindings to link Device and IOMMUs.
+
+I have gone through the implementation of Tegra SMMU driver by "Hiroshi Doyu"
+    -- [PATCHv7 00/12] Unifying SMMU driver among Tegra SoCs
+[https://lkml.org/lkml/2013/12/12/74]
+
+For the first point [1],
+------------------------------
+Tegra implementation tries to fix this issue with these two patches
+    -- iommu/of: check if dependee iommu is ready or not
+[http://patchwork.ozlabs.org/patch/300560/]
+    -- driver/core: populate devices in order for IOMMUs
+[http://patchwork.ozlabs.org/patch/300558/]
+I can follow this driver if this approach is acceptable.
+
+For the second point [2]
+----------------------------------
+Currently we are handling this issue by providing same mapping for all
+IOMMUs linked to the same device.
+And current Exynos drivers doesn't have any special implementation to
+handle this case differently.
+
+I thought of understanding how Tegra SMMU driver is handling this case.
+Frankly speaking, I didn't understand how its done there.
+
+For the third point [3]
+-------------------------------
+As Tegra SMMU driver is inline with the discussion in other thread, we
+can follow the same bindings, unless
+the discussion takes us in the other direction.
+
+"KyongHo Cho" is the author for this driver and hope he has more inputs.
+
+Regards,
+Shaik
+
+
+
+>
+>         Arnd
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
