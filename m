@@ -1,212 +1,154 @@
-From: luis.henriques@canonical.com (Luis Henriques)
-Date: Wed, 30 Apr 2014 13:55:10 +0100
-Subject: [3.11.y.z extended stable] Patch "genirq: Allow forcing cpu affinity
- of interrupts" has been added to staging queue
-Message-ID: <1398862510-14577-1-git-send-email-luis.henriques@canonical.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 30 Apr 2014 14:56:27 +0200
+Subject: [PATCH 00/15] Kirkwood DT fix and cleanup round 1
+Message-ID: <1398862602-29595-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a note to let you know that I have just added a patch titled
+This is a patch set starting Kirkwood DT cleanup since over time some
+cleanup potential piled up on it. Also, now that Barebox is going to
+reuse the same DT code basis, we need some lowlevel property
+improvements, that we ignore(d) on Linux up to now.
 
-    genirq: Allow forcing cpu affinity of interrupts
+The patches are based on recent mvebu/dt to ease integration by Jason
+since there are some Kirkwood dts related patches already queued up
+for v3.16.
 
-to the linux-3.11.y-queue branch of the 3.11.y.z extended stable tree 
-which can be found at:
+The first patch is a real fix and should be treated accordingly. We
+moved pcie-controller nodes to mbus node a while ago. Somehow, we missed
+two boards that should have broken pcie since then. A formal Tested-by
+would be nice by someone who has one of the affected boards.
 
- http://kernel.ubuntu.com/git?p=ubuntu/linux.git;a=shortlog;h=refs/heads/linux-3.11.y-queue
+Basically, cleanup patches 2-13 up to now comprise:
+- Patch 2 adds node labels for all common and SoC-specific nodes to ease
+  further cleanup series I have in mind:
+  MVEBU maintainers will know, current ocp at f1000000 isn't really correct
+  but should be moved to mbus/internal-regs instead. Unfortunately, there
+  are some 40+ boards replaying ocp bus node. 
+  I _plan_ to convert boards ocp nodes to node label references in
+  subsequent patch sets to finally move the ocp bus nodes to
+  mbus/internal-regs more easily.
+- Patch 3 adds stdout-path to all boards with ttyS0 bootargs:
+  Linux currently doesn't really care about stdout-path property set, but
+  Barebox does. ePAPR explicitly names it, so set it now and ease Barebox
+  progress at least.
+- Patch 4 removes clock-frequency from UART nodes:
+  Back when we didn't have DT clock providers for Kirkwood, TCLK was
+  spread over UART nodes in board files. Just remove the now unnecessary
+  clock-frequency property, as we reference TCLK in the SoCs UART nodes.
+- Patches 5-7 consolidate common pinctrl settings:
+  First, rename the pinctrl node to a more appropriate name as recommended
+  by ePAPR, then add a minimal stub to the toplevel SoC DT include. That
+  stub then gets filled with common pinctrl settings that are currently
+  spead over SoC-specific includes or even board files. Again, this also
+  eases Barebox progress, as pinctrl for a bootloader is a really
+  important property.
+- Patches 8-13 set default pinctrl properties for some nodes:
+  With pinctrl settings in common SoC DT, we can now reference them in the
+  device nodes also located there. If there are other possible pinctrl
+  settings, put a note in front of the corresponding pinctrl node and
+  overwrite the pinctrl setting in the board file.
+- Patches 14 and 15 set some lowlevel properties for Guruplug ethernet:
+  While working with Barebox, I noticed missing phy-connection-type
+  and non-standard PHY's compatible on Guruplug. This also applies to
+  most of the other boards, but Guruplug is the only board I use Barebox
+  on and have the required information.
 
-If you, or anyone else, feels it should not be added to this tree, please 
-reply to this email.
+Overall commit stats aren't as bad as I initially thought:
+218 insertions and 300 deletions still is ~25% less LOC :)
 
-For more information about the 3.11.y.z tree, see
-https://wiki.ubuntu.com/Kernel/Dev/ExtendedStable
+Sebastian
 
-Thanks.
--Luis
+Sebastian Hesselbarth (15):
+  ARM: dts: kirkwood: fix mislocated pcie-controller nodes
+  ARM: dts: kirkwood: add node labels
+  ARM: dts: kirkwood: add stdout-path property to all boards
+  ARM: dts: kirkwood: remove clock-frequency properties from UART nodes
+  ARM: dts: kirkwood: rename pin-controller nodes
+  ARM: dts: kirkwood: add pinctrl node to common SoC include
+  ARM: dts: kirkwood: consolidate common pinctrl settings
+  ARM: dts: kirkwood: set default pinctrl for GBE1
+  ARM: dts: kirkwood: set default pinctrl for UART0/1
+  ARM: dts: kirkwood: set default pinctrl for SPI0
+  ARM: dts: kirkwood: set default pinctrl for NAND
+  ARM: dts: kirkwood: set default pinctrl for I2C0
+  ARM: dts: kirkwood: set default pinctrl for I2C1 on 6282
+  ARM: dts: kirkwood: set Guruplug ethernet PHY compatible
+  ARM: dts: kirkwood: set Guruplug phy-connection-type to rgmii-id
 
-------
+ arch/arm/boot/dts/kirkwood-6192.dtsi               | 35 ++--------
+ arch/arm/boot/dts/kirkwood-6281.dtsi               | 35 ++--------
+ arch/arm/boot/dts/kirkwood-6282.dtsi               | 48 +++++---------
+ arch/arm/boot/dts/kirkwood-98dx4122.dtsi           | 25 +-------
+ arch/arm/boot/dts/kirkwood-b3.dts                  |  7 +-
+ arch/arm/boot/dts/kirkwood-cloudbox.dts            |  8 +--
+ arch/arm/boot/dts/kirkwood-db.dtsi                 | 10 +--
+ arch/arm/boot/dts/kirkwood-dns320.dts              |  3 +-
+ arch/arm/boot/dts/kirkwood-dns325.dts              |  1 +
+ arch/arm/boot/dts/kirkwood-dnskw.dtsi              |  4 +-
+ arch/arm/boot/dts/kirkwood-dockstar.dts            |  3 +-
+ arch/arm/boot/dts/kirkwood-dreamplug.dts           |  5 +-
+ arch/arm/boot/dts/kirkwood-ds109.dts               |  1 +
+ arch/arm/boot/dts/kirkwood-ds110jv10.dts           |  1 +
+ arch/arm/boot/dts/kirkwood-ds111.dts               |  1 +
+ arch/arm/boot/dts/kirkwood-ds112.dts               |  1 +
+ arch/arm/boot/dts/kirkwood-ds209.dts               |  1 +
+ arch/arm/boot/dts/kirkwood-ds210.dts               |  1 +
+ arch/arm/boot/dts/kirkwood-ds212.dts               |  1 +
+ arch/arm/boot/dts/kirkwood-ds212j.dts              |  1 +
+ arch/arm/boot/dts/kirkwood-ds409.dts               |  1 +
+ arch/arm/boot/dts/kirkwood-ds409slim.dts           |  1 +
+ arch/arm/boot/dts/kirkwood-ds411.dts               |  1 +
+ arch/arm/boot/dts/kirkwood-ds411j.dts              |  1 +
+ arch/arm/boot/dts/kirkwood-ds411slim.dts           |  1 +
+ arch/arm/boot/dts/kirkwood-goflexnet.dts           |  3 +-
+ .../arm/boot/dts/kirkwood-guruplug-server-plus.dts | 14 ++--
+ arch/arm/boot/dts/kirkwood-ib62x0.dts              |  5 +-
+ arch/arm/boot/dts/kirkwood-iconnect.dts            |  3 +-
+ arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts      |  3 +-
+ arch/arm/boot/dts/kirkwood-km_kirkwood.dts         |  7 +-
+ arch/arm/boot/dts/kirkwood-laplug.dts              |  8 +--
+ arch/arm/boot/dts/kirkwood-lsxl.dtsi               |  3 +-
+ arch/arm/boot/dts/kirkwood-mplcec4.dts             | 19 +++---
+ arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts     | 28 ++++----
+ .../boot/dts/kirkwood-netgear_readynas_duo_v2.dts  |  5 +-
+ .../boot/dts/kirkwood-netgear_readynas_nv+_v2.dts  |  5 +-
+ arch/arm/boot/dts/kirkwood-ns2-common.dtsi         |  9 +--
+ arch/arm/boot/dts/kirkwood-nsa310.dts              |  3 +-
+ arch/arm/boot/dts/kirkwood-nsa310a.dts             |  3 +-
+ arch/arm/boot/dts/kirkwood-nsa320.dts              |  3 +-
+ arch/arm/boot/dts/kirkwood-nsa3x0-common.dtsi      | 20 +++---
+ arch/arm/boot/dts/kirkwood-openblocks_a6.dts       | 15 ++---
+ arch/arm/boot/dts/kirkwood-openblocks_a7.dts       | 24 ++-----
+ arch/arm/boot/dts/kirkwood-rd88f6192.dts           |  5 +-
+ arch/arm/boot/dts/kirkwood-rd88f6281.dtsi          |  3 +-
+ arch/arm/boot/dts/kirkwood-rs212.dts               |  1 +
+ arch/arm/boot/dts/kirkwood-rs409.dts               |  1 +
+ arch/arm/boot/dts/kirkwood-rs411.dts               |  1 +
+ arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi  |  7 +-
+ arch/arm/boot/dts/kirkwood-synology.dtsi           | 10 +--
+ arch/arm/boot/dts/kirkwood-t5325.dts               |  9 +--
+ arch/arm/boot/dts/kirkwood-topkick.dts             | 13 ++--
+ arch/arm/boot/dts/kirkwood-ts219-6281.dts          |  2 +-
+ arch/arm/boot/dts/kirkwood-ts219-6282.dts          |  2 +-
+ arch/arm/boot/dts/kirkwood-ts219.dtsi              | 11 +---
+ arch/arm/boot/dts/kirkwood-ts419.dtsi              |  2 +-
+ arch/arm/boot/dts/kirkwood.dtsi                    | 74 +++++++++++++++++++---
+ 58 files changed, 218 insertions(+), 300 deletions(-)
 
->From a9abefbeb8e2865bf5c09473122adf7fac28c714 Mon Sep 17 00:00:00 2001
-From: Thomas Gleixner <tglx@linutronix.de>
-Date: Wed, 16 Apr 2014 14:36:44 +0000
-Subject: genirq: Allow forcing cpu affinity of interrupts
-
-commit 01f8fa4f01d8362358eb90e412bd7ae18a3ec1ad upstream.
-
-The current implementation of irq_set_affinity() refuses rightfully to
-route an interrupt to an offline cpu.
-
-But there is a special case, where this is actually desired. Some of
-the ARM SoCs have per cpu timers which require setting the affinity
-during cpu startup where the cpu is not yet in the online mask.
-
-If we can't do that, then the local timer interrupt for the about to
-become online cpu is routed to some random online cpu.
-
-The developers of the affected machines tried to work around that
-issue, but that results in a massive mess in that timer code.
-
-We have a yet unused argument in the set_affinity callbacks of the irq
-chips, which I added back then for a similar reason. It was never
-required so it got not used. But I'm happy that I never removed it.
-
-That allows us to implement a sane handling of the above scenario. So
-the affected SoC drivers can add the required force handling to their
-interrupt chip, switch the timer code to irq_force_affinity() and
-things just work.
-
-This does not affect any existing user of irq_set_affinity().
-
-Tagged for stable to allow a simple fix of the affected SoC clock
-event drivers.
-
-Reported-and-tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Cc: Kyungmin Park <kyungmin.park@samsung.com>
-Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-Cc: Tomasz Figa <t.figa@samsung.com>,
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>,
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: linux-arm-kernel at lists.infradead.org,
-Link: http://lkml.kernel.org/r/20140416143315.717251504 at linutronix.de
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Signed-off-by: Luis Henriques <luis.henriques@canonical.com>
 ---
- arch/mips/cavium-octeon/octeon-irq.c |  2 +-
- include/linux/interrupt.h            | 35 ++++++++++++++++++++++++++++++++++-
- include/linux/irq.h                  |  3 ++-
- kernel/irq/manage.c                  | 17 ++++++-----------
- 4 files changed, 43 insertions(+), 14 deletions(-)
-
-diff --git a/arch/mips/cavium-octeon/octeon-irq.c b/arch/mips/cavium-octeon/octeon-irq.c
-index 9d36774..011e704 100644
---- a/arch/mips/cavium-octeon/octeon-irq.c
-+++ b/arch/mips/cavium-octeon/octeon-irq.c
-@@ -635,7 +635,7 @@ static void octeon_irq_cpu_offline_ciu(struct irq_data *data)
- 		cpumask_clear(&new_affinity);
- 		cpumask_set_cpu(cpumask_first(cpu_online_mask), &new_affinity);
- 	}
--	__irq_set_affinity_locked(data, &new_affinity);
-+	irq_set_affinity_locked(data, &new_affinity, false);
- }
-
- static int octeon_irq_ciu_set_affinity(struct irq_data *data,
-diff --git a/include/linux/interrupt.h b/include/linux/interrupt.h
-index 5fa5afe..e8401d0 100644
---- a/include/linux/interrupt.h
-+++ b/include/linux/interrupt.h
-@@ -239,7 +239,40 @@ static inline int check_wakeup_irqs(void) { return 0; }
-
- extern cpumask_var_t irq_default_affinity;
-
--extern int irq_set_affinity(unsigned int irq, const struct cpumask *cpumask);
-+/* Internal implementation. Use the helpers below */
-+extern int __irq_set_affinity(unsigned int irq, const struct cpumask *cpumask,
-+			      bool force);
-+
-+/**
-+ * irq_set_affinity - Set the irq affinity of a given irq
-+ * @irq:	Interrupt to set affinity
-+ * @mask:	cpumask
-+ *
-+ * Fails if cpumask does not contain an online CPU
-+ */
-+static inline int
-+irq_set_affinity(unsigned int irq, const struct cpumask *cpumask)
-+{
-+	return __irq_set_affinity(irq, cpumask, false);
-+}
-+
-+/**
-+ * irq_force_affinity - Force the irq affinity of a given irq
-+ * @irq:	Interrupt to set affinity
-+ * @mask:	cpumask
-+ *
-+ * Same as irq_set_affinity, but without checking the mask against
-+ * online cpus.
-+ *
-+ * Solely for low level cpu hotplug code, where we need to make per
-+ * cpu interrupts affine before the cpu becomes online.
-+ */
-+static inline int
-+irq_force_affinity(unsigned int irq, const struct cpumask *cpumask)
-+{
-+	return __irq_set_affinity(irq, cpumask, true);
-+}
-+
- extern int irq_can_set_affinity(unsigned int irq);
- extern int irq_select_affinity(unsigned int irq);
-
-diff --git a/include/linux/irq.h b/include/linux/irq.h
-index f04d3ba..04b979c 100644
---- a/include/linux/irq.h
-+++ b/include/linux/irq.h
-@@ -380,7 +380,8 @@ extern void remove_percpu_irq(unsigned int irq, struct irqaction *act);
-
- extern void irq_cpu_online(void);
- extern void irq_cpu_offline(void);
--extern int __irq_set_affinity_locked(struct irq_data *data,  const struct cpumask *cpumask);
-+extern int irq_set_affinity_locked(struct irq_data *data,
-+				   const struct cpumask *cpumask, bool force);
-
- #ifdef CONFIG_GENERIC_HARDIRQS
-
-diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
-index 4c84746..9e31fa7 100644
---- a/kernel/irq/manage.c
-+++ b/kernel/irq/manage.c
-@@ -150,7 +150,7 @@ int irq_do_set_affinity(struct irq_data *data, const struct cpumask *mask,
- 	struct irq_chip *chip = irq_data_get_irq_chip(data);
- 	int ret;
-
--	ret = chip->irq_set_affinity(data, mask, false);
-+	ret = chip->irq_set_affinity(data, mask, force);
- 	switch (ret) {
- 	case IRQ_SET_MASK_OK:
- 		cpumask_copy(data->affinity, mask);
-@@ -162,7 +162,8 @@ int irq_do_set_affinity(struct irq_data *data, const struct cpumask *mask,
- 	return ret;
- }
-
--int __irq_set_affinity_locked(struct irq_data *data, const struct cpumask *mask)
-+int irq_set_affinity_locked(struct irq_data *data, const struct cpumask *mask,
-+			    bool force)
- {
- 	struct irq_chip *chip = irq_data_get_irq_chip(data);
- 	struct irq_desc *desc = irq_data_to_desc(data);
-@@ -172,7 +173,7 @@ int __irq_set_affinity_locked(struct irq_data *data, const struct cpumask *mask)
- 		return -EINVAL;
-
- 	if (irq_can_move_pcntxt(data)) {
--		ret = irq_do_set_affinity(data, mask, false);
-+		ret = irq_do_set_affinity(data, mask, force);
- 	} else {
- 		irqd_set_move_pending(data);
- 		irq_copy_pending(desc, mask);
-@@ -187,13 +188,7 @@ int __irq_set_affinity_locked(struct irq_data *data, const struct cpumask *mask)
- 	return ret;
- }
-
--/**
-- *	irq_set_affinity - Set the irq affinity of a given irq
-- *	@irq:		Interrupt to set affinity
-- *	@mask:		cpumask
-- *
-- */
--int irq_set_affinity(unsigned int irq, const struct cpumask *mask)
-+int __irq_set_affinity(unsigned int irq, const struct cpumask *mask, bool force)
- {
- 	struct irq_desc *desc = irq_to_desc(irq);
- 	unsigned long flags;
-@@ -203,7 +198,7 @@ int irq_set_affinity(unsigned int irq, const struct cpumask *mask)
- 		return -EINVAL;
-
- 	raw_spin_lock_irqsave(&desc->lock, flags);
--	ret =  __irq_set_affinity_locked(irq_desc_get_irq_data(desc), mask);
-+	ret = irq_set_affinity_locked(irq_desc_get_irq_data(desc), mask, force);
- 	raw_spin_unlock_irqrestore(&desc->lock, flags);
- 	return ret;
- }
---
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: Kumar Gala <galak@codeaurora.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: devicetree at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+-- 
 1.9.1
