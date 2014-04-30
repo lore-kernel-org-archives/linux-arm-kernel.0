@@ -1,115 +1,68 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 30 Apr 2014 08:27:54 -0700
-Subject: [PATCH 10/10] hwmon: vexpress: Use devm helper for hwmon device
- registration
-In-Reply-To: <1398870979.24255.37.camel@hornet>
-References: <1398707877-22596-1-git-send-email-pawel.moll@arm.com>
- <1398707877-22596-11-git-send-email-pawel.moll@arm.com>
- <535EDD49.8050107@roeck-us.net> <1398870979.24255.37.camel@hornet>
-Message-ID: <20140430152754.GA30924@roeck-us.net>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Wed, 30 Apr 2014 21:07:58 +0530
+Subject: [PATCH v3 12/16] clk: exynos5420: fix register offset for
+ sclk_bpll
+In-Reply-To: <1398344632-18623-13-git-send-email-shaik.ameer@samsung.com>
+References: <1398344632-18623-1-git-send-email-shaik.ameer@samsung.com>
+ <1398344632-18623-13-git-send-email-shaik.ameer@samsung.com>
+Message-ID: <CAK9yfHz-=rOuVakyttVaNnFpnF+WFckU+zyWjVwYPQ8BggHX0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 30, 2014 at 04:16:19PM +0100, Pawel Moll wrote:
-> On Mon, 2014-04-28 at 23:59 +0100, Guenter Roeck wrote:
-> > On 04/28/2014 10:uct attribute_group **attr_groups;
-> > > @@ -114,10 +95,13 @@ struct vexpress_hwmon_type {
-> > >   static DEVICE_ATTR(in1_label, S_IRUGO, vexpress_hwmon_label_show, NULL);
-> > >   static SENSOR_DEVICE_ATTR(in1_input, S_IRUGO, vexpress_hwmon_u32_show,
-> > >   		NULL, 1000);
-> > > -static VEXPRESS_HWMON_ATTRS(volt, in1_label, in1_input);
-> > >   static struct attribute_group vexpress_hwmon_group_volt = {
-> > >   	.is_visible = vexpress_hwmon_attr_is_visible,
-> > > -	.attrs = vexpress_hwmon_attrs_volt,
-> > > +	.attrs = (struct attribute *[]) {
-> > 
-> > Is this typecast necessary ?
-> 
-> Yes, it's the gcc extension that allows compound literals to be used for
-> static structure members initialization. I like it, because it makes
-> them easier to understand (in my opinion, that is), but if you prefer
-> the classic approach, I'll unroll VEXPRESS_HWMON_ATTRS into:
-> 
-> static struct attribute vexpress_hwmon_attrs_volt = {
-> 	&dev_attr_in1_label.attr,
-> 	&sensor_dev_attr_in1_input.dev_attr.attr,
-> 	NULL
-> };
-> 
-> And keep
-> 
-> static struct attribute_group vexpress_hwmon_group_volt = {
->   	.is_visible = vexpress_hwmon_attr_is_visible,
-> 	.attrs = vexpress_hwmon_attrs_volt,
-> };
-> 
-Yes, would be great if you can do that.
+Hi Shaik,
 
-> > > @@ -232,45 +227,19 @@ static int vexpress_hwmon_probe(struct platform_device *pdev)
-> > >   	if (!match)
-> > >   		return -ENODEV;
-> > >   	type = match->data;
-> > > -	data->name = type->name;
-> > >
-> > >   	data->reg = devm_regmap_init_vexpress_config(&pdev->dev);
-> > > -	if (!data->reg)
-> > > -		return -ENODEV;
-> > > -
-> > > -	err = sysfs_create_groups(&pdev->dev.kobj, type->attr_groups);
-> > > -	if (err)
-> > > -		goto error;
-> > > -
-> > > -	data->hwmon_dev = hwmon_device_register(&pdev->dev);
-> > > -	if (IS_ERR(data->hwmon_dev)) {
-> > > -		err = PTR_ERR(data->hwmon_dev);
-> > > -		goto error;
-> > > -	}
-> > > +	if (IS_ERR(data->reg))
-> > > +		return PTR_ERR(data->reg);
-> > 
-> > Did the API for devm_regmap_init_vexpress_config change ?
-> > If so, it might make sense to separate this out into a separate patch,
-> > together with the API change (it is a logically different change).
-> 
-> I'm not sure I understand the question. The other patch from the series
+On 24 April 2014 18:33, Shaik Ameer Basha <shaik.ameer@samsung.com> wrote:
+> This patch fixes the wrong register offset for sclk_bpll clock.
 
-The code above seems to change from
+Since this patch is a fix, it is better to send it separately so that
+it gets into one of
+the upcoming RCs (and if needed to stable).
 
-   	data->reg = devm_regmap_init_vexpress_config(&pdev->dev);
-	if (!data->reg)
-		return -ENODEV;
+>
+> Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
+> ---
+>  drivers/clk/samsung/clk-exynos5420.c |    4 +---
+>  1 file changed, 1 insertion(+), 3 deletions(-)
+>
+> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+> index 6daf739..3afc112 100755
+> --- a/drivers/clk/samsung/clk-exynos5420.c
+> +++ b/drivers/clk/samsung/clk-exynos5420.c
+> @@ -111,7 +111,6 @@
+>  #define TOP_SPARE2             0x10b08
+>  #define BPLL_LOCK              0x20010
+>  #define BPLL_CON0              0x20110
+> -#define SRC_CDREX              0x20200
+>  #define KPLL_LOCK              0x28000
+>  #define KPLL_CON0              0x28100
+>  #define SRC_KFC                        0x28200
+> @@ -204,7 +203,6 @@ static unsigned long exynos5420_clk_regs[] __initdata = {
+>         GATE_TOP_SCLK_FSYS,
+>         GATE_TOP_SCLK_PERIC,
+>         TOP_SPARE2,
+> -       SRC_CDREX,
+>         SRC_KFC,
+>         DIV_KFC0,
+>  };
+> @@ -380,7 +378,7 @@ static struct samsung_mux_clock exynos5420_mux_clks[] __initdata = {
+>         MUX(0, "mout_kpll", mout_kpll_p, SRC_KFC, 0, 1),
+>         MUX(0, "mout_kfc", mout_kfc_p, SRC_KFC, 16, 1),
+>
+> -       MUX(0, "sclk_bpll", mout_bpll_p, SRC_CDREX, 0, 1),
+> +       MUX(0, "sclk_bpll", mout_bpll_p, TOP_SPARE2, 0, 1),
+>
+>         MUX_A(0, "mout_aclk400_mscl", mout_group1_p,
+>                         SRC_TOP0, 4, 2, "aclk400_mscl"),
+> --
+> 1.7.9.5
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-to
 
-   	data->reg = devm_regmap_init_vexpress_config(&pdev->dev);
-	if (IS_ERR(data->reg))
-		return PTR_ERR(data->reg);
 
-as part of this patch. This suggests that the return value from
-devm_regmap_init_vexpress_config may have changed from NULL to 
-ERR_PTR. Is my understanding wrong ?
-
-> I've copied you on
-> (http://article.gmane.org/gmane.linux.ports.arm.kernel/320577 "[PATCH
-> 02/10] mfd: vexpress: Convert custom func API to regmap") changes
-> 
-> -       data->func = vexpress_config_func_get_by_dev(&pdev->dev);
-> 
-> into
-> 
-> +       data->reg = devm_regmap_init_vexpress_config(&pdev->dev);
-> 
-> Your ack there, by the way, will be really appreciated :-)
-> 
-I'll have a look.
-
-> > One question - I seem to be unable to apply the patch. What is your
-> > baseline branch / repository ?
-> 
-> The whole series, based on v3.15-rc3 lives here:
-> 
-> 	git://git.linaro.org/people/pawel.moll/linux.git vexpress/sysreg
-> 
-Great, thanks.
-
-Guenter
+-- 
+With warm regards,
+Sachin
