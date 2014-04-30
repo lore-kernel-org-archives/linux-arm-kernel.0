@@ -1,99 +1,46 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 30 Apr 2014 12:07:42 -0700
-Subject: [PATCH v3 00/11] ARM: at91: rework main and slow clk
- implementation
-In-Reply-To: <53613D23.3020503@atmel.com>
-References: <1398172360-7837-1-git-send-email-boris.brezillon@free-electrons.com>
- <53613D23.3020503@atmel.com>
-Message-ID: <20140430190742.5718.938@quantum>
+Date: Wed, 30 Apr 2014 12:14:23 -0700
+Subject: [PATCH] clk: qcom: Various fixes for MSM8960's global clock
+ controller
+In-Reply-To: <20140430155308.GE20486@codeaurora.org>
+References: <1396629176-7413-1-git-send-email-galak@codeaurora.org>
+ <20140429065114.7224.13620@quantum> <20140430155308.GE20486@codeaurora.org>
+Message-ID: <20140430191423.5718.27549@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Nicolas Ferre (2014-04-30 11:12:51)
-> On 22/04/2014 06:12, Boris BREZILLON :
-> > Hello,
+Quoting Stephen Boyd (2014-04-30 08:53:08)
+> On 04/28, Mike Turquette wrote:
+> > Quoting Kumar Gala (2014-04-04 09:32:56)
+> > > diff --git a/include/dt-bindings/clock/qcom,gcc-msm8960.h b/include/dt-bindings/clock/qcom,gcc-msm8960.h
+> > > index 03bbf49..f9f5471 100644
+> > > --- a/include/dt-bindings/clock/qcom,gcc-msm8960.h
+> > > +++ b/include/dt-bindings/clock/qcom,gcc-msm8960.h
+> > > @@ -51,7 +51,7 @@
+> > >  #define QDSS_TSCTR_CLK                         34
+> > >  #define SFAB_ADM0_M0_A_CLK                     35
+> > >  #define SFAB_ADM0_M1_A_CLK                     36
+> > > -#define SFAB_ADM0_M2_A_CLK                     37
+> > > +#define SFAB_ADM0_M2_H_CLK                     37
 > > 
-> > This series introduce the real clock model (as described in atmel datasheets)
-> > for slow and main clocks.
-> > 
-> > The modifications introduced by this series break the DT compat, but, as the
-> > at91 CCF based implementation is pretty new (introduced in 3.14 only for sama5
-> > eval boards) I think it won't impact a lot of users.
-> > 
-> > Nicolas, Mike, if this series is accepted, I'd like to get it merged as soon as
-> > possible to prevent other developpers from using a deprecated DT binding.
-> > Moreover, I think this series should go through the same path for both clk
-> > and DT changes (whatever path is chosen: either at91 or clk tree) because the
-> > changes are tightly coupled.
+> > Technically these changes break backwards compatibility, but I guess
+> > that field updates to newer kernel images for this SoC are not a
+> > concern?
 > 
-> Boris,
-> 
-> First of all, well...
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> 
-> I didn't find something to add but the little comment about the
-> documentation that you already fixed in this v3 version.
-> 
-> Mike,
-> 
-> I would like to merge this whole series through my tree and then the
-> arm-soc tree. If it is okay for you, can you give your acknowledgement
-> before that I build a pull-request for the arm-soc guys?
+> I thought only the number was the ABI. The #defines are just here
+> to make it easier to speak about the same numbers in the driver
+> and the DT. Technically we could have made two #defines for 37
+> but since nobody is using it so far, it seems easier to just
+> rename it.
 
-Patches #1-4:
-
-Acked-by: Mike Turquette <mturquette@linaro.org>
+It makes sense for the number to be the ABI, but I've never gone digging
+into the dtb format. Either way this change was taken in yesterday so no
+big deal.
 
 Regards,
 Mike
 
 > 
-> Thanks a lot, bye,
-> 
-> > Changes since v2:
-> >  - add missing compatible in pmc.c
-> >  - fix sam9261 slow clock definition
-> >  - move xtal nodes out of /clocks node
-> >  - fix DT bindings documentation
-> >  - fix main RC oscillator initilization
-> > 
-> > Changes since v1:
-> > - fix sam9rl main clk definition
-> > Boris BREZILLON (11):
-> >   clk: at91: rework main clk implementation
-> >   clk: at91: update main clk documentation
-> >   clk: at91: add slow clks driver
-> >   clk: at91: add slow clk documentation
-> >   ARM: at91/dt: move sama5d3 SoC to the new main/slow clk model
-> >   ARM: at91/dt: add xtal frequencies to sama5d3xcm boards
-> >   ARM: at91/dt: add xtal frequencies to sama5d3 xplained board
-> >   ARM: at91/dt: move at91sam9261 SoC to the new main clock model
-> >   ARM: at91/dt: define main xtal frequency of the at91sam9261ek board
-> >   ARM: at91/dt: move at91sam9rl SoC to the new slow/main clock models
-> >   ARM: at91/dt: define sam9rlek crystal frequencies
-> > 
-> >  .../devicetree/bindings/clock/at91-clock.txt       | 128 ++++-
-> >  arch/arm/boot/dts/at91-sama5d3_xplained.dts        |   8 +
-> >  arch/arm/boot/dts/at91sam9261.dtsi                 |  23 +-
-> >  arch/arm/boot/dts/at91sam9261ek.dts                |   4 +
-> >  arch/arm/boot/dts/at91sam9rl.dtsi                  |  46 +-
-> >  arch/arm/boot/dts/at91sam9rlek.dts                 |   9 +
-> >  arch/arm/boot/dts/sama5d3.dtsi                     |  61 ++-
-> >  arch/arm/boot/dts/sama5d3xcm.dtsi                  |   8 +
-> >  drivers/clk/at91/Makefile                          |   4 +-
-> >  drivers/clk/at91/clk-main.c                        | 577 ++++++++++++++++++---
-> >  drivers/clk/at91/clk-slow.c                        | 467 +++++++++++++++++
-> >  drivers/clk/at91/pmc.c                             |  17 +
-> >  drivers/clk/at91/pmc.h                             |   9 +
-> >  drivers/clk/at91/sckc.c                            |  57 ++
-> >  drivers/clk/at91/sckc.h                            |  22 +
-> >  include/linux/clk/at91_pmc.h                       |   1 +
-> >  16 files changed, 1352 insertions(+), 89 deletions(-)
-> >  create mode 100644 drivers/clk/at91/clk-slow.c
-> >  create mode 100644 drivers/clk/at91/sckc.c
-> >  create mode 100644 drivers/clk/at91/sckc.h
-> > 
-> 
-> 
 > -- 
-> Nicolas Ferre
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> hosted by The Linux Foundation
