@@ -1,61 +1,68 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 30 Apr 2014 18:57:23 +0900
-Subject: [PATCH v9 2/2] arm64: audit: Add audit hook in
- syscall_trace_enter/exit()
-In-Reply-To: <1398851843-16435-1-git-send-email-takahiro.akashi@linaro.org>
-References: <1394862548-29060-1-git-send-email-takahiro.akashi@linaro.org>
- <1398851843-16435-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <1398851843-16435-3-git-send-email-takahiro.akashi@linaro.org>
+Date: Wed, 30 Apr 2014 18:51:28 +0900
+Subject: [PATCH v6 0/4] arm64: prerequisites for audit and ftrace
+In-Reply-To: <1394861948-28712-1-git-send-email-takahiro.akashi@linaro.org>
+References: <1394861948-28712-1-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <1398851492-16345-1-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds auditing functions on entry to or exit from
-every system call invocation.
+(This patchset was already acked by the maintainer along with a minor typo
+fix. See below.)
 
-Acked-by: Richard Guy Briggs <rgb@redhat.com>
-Acked-by Will Deacon <will.deacon@arm.com>
+This patchset contains some patches commonly applied for audit and ftrace.
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
----
- arch/arm64/kernel/ptrace.c |    7 +++++++
- 1 file changed, 7 insertions(+)
+Patch [1/4] defines syscall trace related TIF_* flags in order to add hooks,
+including ftrace, audit and seccomp, later on.  Those features will be
+implemented in separate patchsets, but it's safe to check for all TIF_*
+now because they can not be turned on anyway.
 
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index 0bf1955..0568dc9 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -19,6 +19,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
-+#include <linux/audit.h>
- #include <linux/compat.h>
- #include <linux/kernel.h>
- #include <linux/sched.h>
-@@ -39,6 +40,7 @@
- #include <asm/compat.h>
- #include <asm/debug-monitors.h>
- #include <asm/pgtable.h>
-+#include <asm/syscall.h>
- #include <asm/traps.h>
- #include <asm/system_misc.h>
- 
-@@ -1097,11 +1099,16 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs)
- 	if (test_thread_flag(TIF_SYSCALL_TRACEPOINT))
- 		trace_sys_enter(regs, regs->syscallno);
- 
-+	audit_syscall_entry(syscall_get_arch(), regs->syscallno,
-+		regs->orig_x0, regs->regs[1], regs->regs[2], regs->regs[3]);
-+
- 	return regs->syscallno;
- }
- 
- asmlinkage void syscall_trace_exit(struct pt_regs *regs)
- {
-+	audit_syscall_exit(regs);
-+
- 	if (test_thread_flag(TIF_SYSCALL_TRACEPOINT))
- 		trace_sys_exit(regs, regs_return_value(regs));
- 
+Patch [2/4] doesn't change a behavior but make it easy and manageable to
+confirm we invoke those hooks in correct order by splitting syscall_trace().
+
+Patch [3/4] adds a commonly used function, which returns a return value of
+system call.
+
+Patch [4/4] removes is_compat_task from asm/compat.h to avoid conflicted
+definitions.
+
+Changes v5 -> v6:
+* renamed a temporary variable's name to more meaningful one [2/4]
+
+Changes v4 -> v5:
+* added the following patch from my seccomp patch since it is required for
+  audit and ftrace in case of !COMPAT, too. [4/4]
+  "arm64: is_compat_task is defined both in asm/compat.h and linux/compat.h"
+
+Changes v3 -> v4:
+* added "arm64: split syscall_trace() into separate functions for enter/
+  exit", which is just a preparation for adding syscall trace hooks later.
+
+Changes v2 -> v3:
+* reverted a change in syscall_trace() in v1 [1/2]
+* added "arm64: Add regs_return_value() in syscall.h" patch which was
+  previously included in audit patch [2/2]
+
+Changes v1 -> v2:
+* added a guard against TIF_SYSCALL_TRACE at tracehook_report_syscall_*()
+* renamed _TIF_WORK_SYSCALL to _TIF_SYSCALL_WORK
+
+AKASHI Takahiro (4):
+  arm64: make a single hook to syscall_trace() for all syscall features
+  arm64: split syscall_trace() into separate functions for enter/exit
+  arm64: Add regs_return_value() in syscall.h
+  arm64: is_compat_task is defined both in asm/compat.h and
+    linux/compat.h
+
+ arch/arm64/include/asm/compat.h      |    5 ----
+ arch/arm64/include/asm/ptrace.h      |    5 ++++
+ arch/arm64/include/asm/thread_info.h |   13 +++++++++
+ arch/arm64/kernel/entry.S            |   15 +++++-----
+ arch/arm64/kernel/hw_breakpoint.c    |    2 +-
+ arch/arm64/kernel/process.c          |    1 +
+ arch/arm64/kernel/ptrace.c           |   51 ++++++++++++++++++++--------------
+ arch/arm64/kernel/signal.c           |    2 +-
+ 8 files changed, 58 insertions(+), 36 deletions(-)
+
 -- 
 1.7.9.5
