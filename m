@@ -1,41 +1,163 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 30 Apr 2014 15:38:33 +0100
-Subject: [PATCH 02/10] mfd: vexpress: Convert custom func API to regmap
-In-Reply-To: <20140430142922.GU29462@lee--X1>
-References: <1398707877-22596-1-git-send-email-pawel.moll@arm.com>
- <1398707877-22596-3-git-send-email-pawel.moll@arm.com>
- <20140430135855.GO29462@lee--X1> <1398867224.24255.22.camel@hornet>
- <20140430142922.GU29462@lee--X1>
-Message-ID: <1398868713.24255.27.camel@hornet>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 30 Apr 2014 10:43:16 -0400 (EDT)
+Subject: [PATCH v3 5/6] arm: exynos: Add MCPM call-back functions
+In-Reply-To: <1398528348-21214-6-git-send-email-a.kesavan@samsung.com>
+References: <1398528348-21214-1-git-send-email-a.kesavan@samsung.com>
+ <1398528348-21214-6-git-send-email-a.kesavan@samsung.com>
+Message-ID: <alpine.LFD.2.11.1404301021270.980@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-04-30 at 15:29 +0100, Lee Jones wrote:
-> > > MFD diffstat looks great and the changes look sensible:
-> > >   Acked-by: Lee Jones <lee.jones@linaro.org>
-> > 
-> > Thanks!
-> > 
-> > > I guess someone will need to create a branch for us all to pull from.
-> > > I'm happy to do it if needs be.
-> > 
-> > I was thinking that, with enough acks (and I'm counting on one from you
-> > for "[PATCH 04/10] mfd: vexpress: Define the device as MFD cells" :-),
+On Sat, 26 Apr 2014, Abhilash Kesavan wrote:
+
+> Add machine-dependent MCPM call-backs for Exynos5420. These are used
+> to power up/down the secondary CPUs during boot, shutdown, s2r and
+> switching.
 > 
-> That won't happen right away - it's another 500+ line patch and
-> contary to popular believe I do have my own work to contend with too.
+> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> Signed-off-by: Inderpal Singh <inderpal.s@samsung.com>
+> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
 
-Didn't expect it today :-)
+Small comments below.
 
-> > merging the whole series (or at least patches 1-4 and 7-8) through
-> > arm-soc tree would be the simplest option. I have no problem with the
-> > independent bits (clk, clocksource, hwmon and the mfd/HBI change) going
-> > through appropriate subsystems.
-> 
-> I have no problem with that as long as one of the ARM-SoC guys can
-> provide a branch where the other subsystems can pull from.  If they
-> have no time, my offer still stands.
+> +static int exynos_cluster_power_control(unsigned int cluster, int enable)
+> +{
+> +	unsigned int tries = 100;
+> +	unsigned int val = 0;
+> +
+> +	if (enable) {
+> +		exynos_cluster_powerup(cluster);
+> +		val = S5P_CORE_LOCAL_PWR_EN;
+> +	} else {
+> +		exynos_cluster_powerdown(cluster);
 
-Appreciate this, thanks!
+It would be clearer if you have "val = 0" here instead so it looks 
+symetric.
 
-Pawel
+> +	}
+> +
+> +	/* Wait until cluster power control is applied */
+> +	while (tries--) {
+> +		if (exynos_cluster_power_state(cluster) == val)
+> +			return 0;
+> +
+> +		cpu_relax();
+> +	}
+> +	pr_warn("timed out waiting for cluster %u to power %s\n", cluster,
+> +		enable ? "on" : "off");
+> +
+> +	return -ETIMEDOUT;
+> +}
+> +
+> +static int exynos_power_up(unsigned int cpu, unsigned int cluster)
+> +{
+> +	unsigned int cpunr = cpu + (cluster * EXYNOS5420_CPUS_PER_CLUSTER);
+> +	unsigned int err;
+> +
+> +	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
+> +	if (cpu >= EXYNOS5420_CPUS_PER_CLUSTER ||
+> +		cluster >= EXYNOS5420_NR_CLUSTERS)
+> +		return -EINVAL;
+> +
+> +	/*
+> +	 * Since this is called with IRQs enabled, and no arch_spin_lock_irq
+> +	 * variant exists, we need to disable IRQs manually here.
+> +	 */
+> +	local_irq_disable();
+> +	arch_spin_lock(&exynos_mcpm_lock);
+> +
+> +	cpu_use_count[cpu][cluster]++;
+> +	if (cpu_use_count[cpu][cluster] == 1) {
+> +		bool was_cluster_down =
+> +			__mcpm_cluster_state(cluster) == CLUSTER_DOWN;
+> +
+> +		/*
+> +		 * Turn on the cluster (L2/COMMON) and then power on the cores.
+> +		 * TODO: Turn off the clusters when all cores in the cluster
+> +		 * are down to achieve significant power savings.
+> +		 */
+
+This TODO comment should be moved in exynos_power_down() were last_man 
+is determined to be true.
+
+> +		if (was_cluster_down) {
+> +			err = exynos_cluster_power_control(cluster, 1);
+> +			if (err) {
+> +				exynos_cluster_power_control(cluster, 0);
+> +				return err;
+
+The lock is still held.
+
+To make the code clearer, you should do:
+
+			if (!err)
+				exynos_cpu_powerup(cpunr);
+
+and return err at the end.
+
+> +			}
+> +		}
+> +
+> +		exynos_cpu_powerup(cpunr);
+> +
+> +		/* CPU should be powered up there */
+> +		/* Also setup Cluster Power Sequence here */
+
+Both comments are wrong.  The CPU is not necessarily powered up yet at 
+this point, and "Cluster Power Sequence" (whatever that is) should not 
+happen here but in the callback provided to mcpm_sync_init().
+
+> +	} else if (cpu_use_count[cpu][cluster] != 2) {
+> +		/*
+> +		 * The only possible values are:
+> +		 * 0 = CPU down
+> +		 * 1 = CPU (still) up
+> +		 * 2 = CPU requested to be up before it had a chance
+> +		 *     to actually make itself down.
+> +		 * Any other value is a bug.
+> +		 */
+> +		BUG();
+> +	}
+> +
+> +	arch_spin_unlock(&exynos_mcpm_lock);
+> +	local_irq_enable();
+> +
+> +	return 0;
+> +}
+> +
+> +static void exynos_power_down(void)
+> +{
+> +	unsigned int mpidr, cpu, cluster;
+> +	bool last_man = false, skip_wfi = false;
+> +	unsigned int cpunr;
+> +
+> +	mpidr = read_cpuid_mpidr();
+> +	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+> +	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+> +	cpunr =  cpu + (cluster * EXYNOS5420_CPUS_PER_CLUSTER);
+> +
+> +	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
+> +	BUG_ON(cpu >= EXYNOS5420_CPUS_PER_CLUSTER ||
+> +			cluster >= EXYNOS5420_NR_CLUSTERS);
+> +
+> +	__mcpm_cpu_going_down(cpu, cluster);
+> +
+> +	arch_spin_lock(&exynos_mcpm_lock);
+> +	BUG_ON(__mcpm_cluster_state(cluster) != CLUSTER_UP);
+> +	cpu_use_count[cpu][cluster]--;
+> +	if (cpu_use_count[cpu][cluster] == 0) {
+> +		int cnt = 0, i;
+> +
+> +		exynos_cpu_powerdown(cpunr);
+> +		for (i = 0; i < EXYNOS5420_CPUS_PER_CLUSTER; i++)
+> +			cnt += cpu_use_count[i][cluster];
+> +		if (cnt == 0)
+> +			last_man = true;
+
+I think Lorenzo commented on this code block already.
+
+Otherwise it is almost there.
+
+
+Nicolas
