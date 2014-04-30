@@ -1,16 +1,19 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 30 Apr 2014 14:56:40 +0200
-Subject: [PATCH 13/15] ARM: dts: kirkwood: set default pinctrl for I2C1 on 6282
+Date: Wed, 30 Apr 2014 14:56:37 +0200
+Subject: [PATCH 10/15] ARM: dts: kirkwood: set default pinctrl for SPI0
 In-Reply-To: <1398862602-29595-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1398862602-29595-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1398862602-29595-14-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1398862602-29595-11-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, the only 6282-based Kirkwood boards that use I2C1 are Openblocks
-A6/A7. Both use the same default I2C1 pinctrl setting from kirkwood-6282.dtsi.
-Move the pinctrl setting to the I2C1 node directly and put a note in front of
-the corresponding pinctrl node to overwrite the setting on board level.
+Most Kirkwood boards use the default SPI0 pinctrl setting anyway. Add a
+default pinctrl setting to the toplevel SoC SPI0 node and put a note
+in front of the corresponding pinctrl node to overwrite the setting
+on board level.
+
+Currently, only T5325 is using a different setting and already
+overwrites the corresponding pinctrl node.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
@@ -28,60 +31,169 @@ Cc: devicetree at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/boot/dts/kirkwood-6282.dtsi         | 6 ++++++
- arch/arm/boot/dts/kirkwood-openblocks_a6.dts | 2 --
- arch/arm/boot/dts/kirkwood-openblocks_a7.dts | 2 --
- 3 files changed, 6 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/kirkwood-b3.dts              | 2 --
+ arch/arm/boot/dts/kirkwood-cloudbox.dts        | 2 --
+ arch/arm/boot/dts/kirkwood-dreamplug.dts       | 2 --
+ arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts | 2 --
+ arch/arm/boot/dts/kirkwood-ns2-common.dtsi     | 2 --
+ arch/arm/boot/dts/kirkwood-rd88f6192.dts       | 2 --
+ arch/arm/boot/dts/kirkwood-synology.dtsi       | 2 --
+ arch/arm/boot/dts/kirkwood-t5325.dts           | 6 ------
+ arch/arm/boot/dts/kirkwood-ts219.dtsi          | 2 --
+ arch/arm/boot/dts/kirkwood.dtsi                | 6 ++++++
+ 10 files changed, 6 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-6282.dtsi b/arch/arm/boot/dts/kirkwood-6282.dtsi
-index b869f48cac02..4680eec990f0 100644
---- a/arch/arm/boot/dts/kirkwood-6282.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-6282.dtsi
-@@ -68,6 +68,10 @@
- 				marvell,function = "sata1";
+diff --git a/arch/arm/boot/dts/kirkwood-b3.dts b/arch/arm/boot/dts/kirkwood-b3.dts
+index 38972b221089..6678e0b318d5 100644
+--- a/arch/arm/boot/dts/kirkwood-b3.dts
++++ b/arch/arm/boot/dts/kirkwood-b3.dts
+@@ -70,8 +70,6 @@
+ 
+ 		spi at 10600 {
+ 			status = "okay";
+-			pinctrl-0 = <&pmx_spi>;
+-			pinctrl-names = "default";
+ 
+ 			m25p16 at 0 {
+ 				#address-cells = <1>;
+diff --git a/arch/arm/boot/dts/kirkwood-cloudbox.dts b/arch/arm/boot/dts/kirkwood-cloudbox.dts
+index 1ac6bd9f54de..e7a232eb28b0 100644
+--- a/arch/arm/boot/dts/kirkwood-cloudbox.dts
++++ b/arch/arm/boot/dts/kirkwood-cloudbox.dts
+@@ -37,8 +37,6 @@
+ 		};
+ 
+ 		spi at 10600 {
+-			pinctrl-0 = <&pmx_spi>;
+-			pinctrl-names = "default";
+ 			status = "okay";
+ 
+ 			flash at 0 {
+diff --git a/arch/arm/boot/dts/kirkwood-dreamplug.dts b/arch/arm/boot/dts/kirkwood-dreamplug.dts
+index dd8d1a4611a8..af56cecc6c73 100644
+--- a/arch/arm/boot/dts/kirkwood-dreamplug.dts
++++ b/arch/arm/boot/dts/kirkwood-dreamplug.dts
+@@ -38,8 +38,6 @@
+ 
+ 		spi at 10600 {
+ 			status = "okay";
+-			pinctrl-0 = <&pmx_spi>;
+-			pinctrl-names = "default";
+ 
+ 			m25p40 at 0 {
+ 				#address-cells = <1>;
+diff --git a/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts b/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
+index acbebc6dc169..b318d5d82d67 100644
+--- a/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
++++ b/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
+@@ -60,8 +60,6 @@
+ 		};
+ 
+ 		spi at 10600 {
+-			pinctrl-0 = <&pmx_spi>;
+-			pinctrl-names = "default";
+ 			status = "okay";
+ 
+ 			flash at 0 {
+diff --git a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
+index 696b208b676f..c10ff0f5290b 100644
+--- a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
++++ b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
+@@ -24,8 +24,6 @@
+ 		};
+ 
+ 		spi at 10600 {
+-			pinctrl-0 = <&pmx_spi>;
+-			pinctrl-names = "default";
+ 			status = "okay";
+ 
+ 			flash at 0 {
+diff --git a/arch/arm/boot/dts/kirkwood-rd88f6192.dts b/arch/arm/boot/dts/kirkwood-rd88f6192.dts
+index 30087b19efae..35a29dee8dd8 100644
+--- a/arch/arm/boot/dts/kirkwood-rd88f6192.dts
++++ b/arch/arm/boot/dts/kirkwood-rd88f6192.dts
+@@ -57,8 +57,6 @@
+ 
+ 		spi at 10600 {
+ 			status = "okay";
+-			pinctrl-0 = <&pmx_spi>;
+-			pinctrl-names = "default";
+ 
+ 			m25p128 at 0 {
+ 				#address-cells = <1>;
+diff --git a/arch/arm/boot/dts/kirkwood-synology.dtsi b/arch/arm/boot/dts/kirkwood-synology.dtsi
+index 370af7f69319..a21419f78bee 100644
+--- a/arch/arm/boot/dts/kirkwood-synology.dtsi
++++ b/arch/arm/boot/dts/kirkwood-synology.dtsi
+@@ -213,8 +213,6 @@
+ 
+ 		spi at 10600 {
+ 			status = "okay";
+-			pinctrl-0 = <&pmx_spi>;
+-			pinctrl-names = "default";
+ 
+ 			m25p80 at 0 {
+ 				#address-cells = <1>;
+diff --git a/arch/arm/boot/dts/kirkwood-t5325.dts b/arch/arm/boot/dts/kirkwood-t5325.dts
+index ae102abcab04..289fc9e2afc2 100644
+--- a/arch/arm/boot/dts/kirkwood-t5325.dts
++++ b/arch/arm/boot/dts/kirkwood-t5325.dts
+@@ -65,10 +65,6 @@
+ 				marvell,function = "gpio";
+ 			};
+ 
+-			/*
+-			 * Redefined from kirkwood-6281.dtsi, because
+-			 * we don't use SPI CS on MPP0, but on MPP7.
+-			 */
+ 			pmx_spi: pmx-spi {
+ 				marvell,pins = "mpp1", "mpp2", "mpp3", "mpp7";
+ 				marvell,function = "spi";
+@@ -87,8 +83,6 @@
+ 		};
+ 
+ 		spi at 10600 {
+-			pinctrl-0 = <&pmx_spi>;
+-			pinctrl-names = "default";
+ 			status = "okay";
+ 
+ 			flash at 0 {
+diff --git a/arch/arm/boot/dts/kirkwood-ts219.dtsi b/arch/arm/boot/dts/kirkwood-ts219.dtsi
+index 21cb9aeb2455..539a2f80a3ad 100644
+--- a/arch/arm/boot/dts/kirkwood-ts219.dtsi
++++ b/arch/arm/boot/dts/kirkwood-ts219.dtsi
+@@ -47,8 +47,6 @@
+ 		};
+ 		spi at 10600 {
+ 			status = "okay";
+-			pinctrl-0 = <&pmx_spi>;
+-			pinctrl-names = "default";
+ 
+ 			m25p128 at 0 {
+ 				#address-cells = <1>;
+diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+index f92c8c4e3908..0c8d8fa29926 100644
+--- a/arch/arm/boot/dts/kirkwood.dtsi
++++ b/arch/arm/boot/dts/kirkwood.dtsi
+@@ -88,6 +88,10 @@
+ 				marvell,function = "nand";
  			};
  
 +			/*
-+			 * Default I2C1 pinctrl setting on mpp36/mpp37,
++			 * Default SPI0 pinctrl setting with CSn on mpp0,
 +			 * overwrite marvell,pins on board level if required.
 +			 */
- 			pmx_twsi1: pmx-twsi1 {
- 				marvell,pins = "mpp36", "mpp37";
- 				marvell,function = "twsi1";
-@@ -101,6 +105,8 @@
- 			interrupts = <32>;
- 			clock-frequency = <100000>;
+ 			pmx_spi: pmx-spi {
+ 				marvell,pins = "mpp0", "mpp1", "mpp2", "mpp3";
+ 				marvell,function = "spi";
+@@ -127,6 +131,8 @@
+ 			interrupts = <23>;
+ 			reg = <0x10600 0x28>;
  			clocks = <&gate_clk 7>;
-+			pinctrl-0 = <&pmx_twsi1>;
++			pinctrl-0 = <&pmx_spi>;
 +			pinctrl-names = "default";
  			status = "disabled";
  		};
  
-diff --git a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
-index 00c2e5a9d863..3dcb5c26b78b 100644
---- a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
-+++ b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
-@@ -33,8 +33,6 @@
- 
- 		i2c at 11100 {
- 			status = "okay";
--			pinctrl-0 = <&pmx_twsi1>;
--			pinctrl-names = "default";
- 
- 			s35390a: s35390a at 30 {
- 				compatible = "s35390a";
-diff --git a/arch/arm/boot/dts/kirkwood-openblocks_a7.dts b/arch/arm/boot/dts/kirkwood-openblocks_a7.dts
-index bc07aa5e6698..4e10e92b7822 100644
---- a/arch/arm/boot/dts/kirkwood-openblocks_a7.dts
-+++ b/arch/arm/boot/dts/kirkwood-openblocks_a7.dts
-@@ -45,8 +45,6 @@
- 
- 		i2c at 11100 {
- 			status = "okay";
--			pinctrl-0 = <&pmx_twsi1>;
--			pinctrl-names = "default";
- 
- 			s24c02: s24c02 at 50 {
- 				compatible = "24c02";
 -- 
 1.9.1
