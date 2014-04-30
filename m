@@ -1,66 +1,36 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Wed, 30 Apr 2014 14:25:10 +0530
-Subject: [PATCH 4/4] ARM: dts: Add usb 2.0 support on exynos5420
-In-Reply-To: <1398848110-6152-1-git-send-email-gautam.vivek@samsung.com>
-References: <1398848110-6152-1-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <1398848110-6152-5-git-send-email-gautam.vivek@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 30 Apr 2014 11:06:29 +0200
+Subject: [PATCH] ASoC: cq93vc: fix cq93vc_get_regmap build error
+Message-ID: <4308079.So6q7GrfYB@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add required device node for ehci and ohci controllers to
-enable USB 2.0 support.
+49101a25acd69c "ASoC: cq93vc: Remove the set_cache_io() entirely from
+ASoC probe" introduced the cq93vc_get_regmap function that has an
+obvious build error referring to the 'codec' variable that is not
+declared anywhere"
 
-Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
----
- arch/arm/boot/dts/exynos5420.dtsi |   36 +++++++++++++++++++++++++++++++++++-
- 1 file changed, 35 insertions(+), 1 deletion(-)
+sound/soc/codecs/cq93vc.c: In function 'cq93vc_get_regmap':
+sound/soc/codecs/cq93vc.c:157:34: error: 'codec' undeclared (first use in this function)
+  struct davinci_vc *davinci_vc = codec->dev->platform_data;
+                                  ^
 
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index 16b860a..392d340 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -738,7 +738,41 @@
- 		samsung,power-domain = <&g2d_pd>;
- 	};
+This changes the code to compile again, presumably in the way it was
+intended. Not tested.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Xiubo Li <Li.Xiubo@freescale.com>
+
+diff --git a/sound/soc/codecs/cq93vc.c b/sound/soc/codecs/cq93vc.c
+index 5ee48c8..537327c 100644
+--- a/sound/soc/codecs/cq93vc.c
++++ b/sound/soc/codecs/cq93vc.c
+@@ -154,7 +154,7 @@ static int cq93vc_remove(struct snd_soc_codec *codec)
  
--	phy at 12130000 {
-+	usb at 12110000 {
-+		compatible = "samsung,exynos4210-ehci";
-+		reg = <0x12110000 0x100>;
-+		interrupts = <0 71 0>;
-+
-+		clocks = <&clock CLK_USBH20>;
-+		clock-names = "usbhost";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		port at 0 {
-+			reg = <0>;
-+			phys = <&usb2_phy_gen 1>;
-+			phy-names = "host";
-+			status = "ok";
-+		};
-+	};
-+
-+	usb at 12120000 {
-+		compatible = "samsung,exynos4210-ohci";
-+		reg = <0x12120000 0x100>;
-+		interrupts = <0 71 0>;
-+
-+		clocks = <&clock CLK_USBH20>;
-+		clock-names = "usbhost";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		port at 0 {
-+			reg = <0>;
-+			phys = <&usb2_phy_gen 1>;
-+			phy-names = "host";
-+			status = "ok";
-+		};
-+	};
-+
-+	usb2_phy_gen: phy at 12130000 {
- 		compatible = "samsung,exynos5250-usb2-phy";
- 		reg = <0x12130000 0x100>;
- 		clocks = <&clock CLK_USBH20>, <&clock CLK_SCLK_USBPHY300>;
--- 
-1.7.10.4
+ static struct regmap *cq93vc_get_regmap(struct device *dev)
+ {
+-	struct davinci_vc *davinci_vc = codec->dev->platform_data;
++	struct davinci_vc *davinci_vc = dev->platform_data;
+ 
+ 	return davinci_vc->regmap;
+ }
