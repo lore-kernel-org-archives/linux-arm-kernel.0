@@ -1,22 +1,14 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 30 Apr 2014 14:56:28 +0200
-Subject: [PATCH 01/15] ARM: dts: kirkwood: fix mislocated pcie-controller nodes
+Date: Wed, 30 Apr 2014 14:56:29 +0200
+Subject: [PATCH 02/15] ARM: dts: kirkwood: add node labels
 In-Reply-To: <1398862602-29595-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1398862602-29595-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1398862602-29595-2-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1398862602-29595-3-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 54397d85349f
- ("ARM: kirkwood: Relocate PCIe device tree nodes")
-
-moved the pcie-controller nodes for the Kirkwood SoCs to the mbus
-bus node. For some reason, two boards were not properly converted
-and have their pci-controller nodes still in the ocp bus node.
-
-As the corresponding SoC pcie-controller does not exist anymore,
-it is likely that pcie is broken on those boards since above commit.
-Fix it by moving the pcie related nodes to the correct location.
+This adds missing node labels to Kirkwood common and SoC specific nodes
+to allow to reference them more easily.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
@@ -34,81 +26,253 @@ Cc: devicetree at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts | 18 ++++++++++--------
- arch/arm/boot/dts/kirkwood-nsa3x0-common.dtsi  | 18 ++++++++++--------
- 2 files changed, 20 insertions(+), 16 deletions(-)
+ arch/arm/boot/dts/kirkwood-6192.dtsi | 10 +++++-----
+ arch/arm/boot/dts/kirkwood-6281.dtsi | 10 +++++-----
+ arch/arm/boot/dts/kirkwood-6282.dtsi | 16 ++++++++--------
+ arch/arm/boot/dts/kirkwood.dtsi      | 16 ++++++++--------
+ 4 files changed, 26 insertions(+), 26 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts b/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
-index 2cb0dc529165..4bf358c28be2 100644
---- a/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
-+++ b/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
-@@ -30,6 +30,16 @@
- 		bootargs = "console=ttyS0,115200n8 earlyprintk";
- 	};
- 
-+	mbus {
-+		pcie-controller {
-+			status = "okay";
-+
-+			pcie at 1,0 {
-+				status = "okay";
-+			};
-+		};
-+        };
-+
- 	ocp at f1000000 {
- 		pinctrl at 10000 {
- 			pmx_usb_led: pmx-usb-led {
-@@ -73,14 +83,6 @@
- 		ehci at 50000 {
- 			status = "okay";
- 		};
--
--		pcie-controller {
--			status = "okay";
--
--			pcie at 1,0 {
--				status = "okay";
--			};
--		};
- 	};
- 
- 	gpio-leds {
-diff --git a/arch/arm/boot/dts/kirkwood-nsa3x0-common.dtsi b/arch/arm/boot/dts/kirkwood-nsa3x0-common.dtsi
-index 843b8b561e5e..b88810df7ca2 100644
---- a/arch/arm/boot/dts/kirkwood-nsa3x0-common.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-nsa3x0-common.dtsi
-@@ -4,6 +4,16 @@
+diff --git a/arch/arm/boot/dts/kirkwood-6192.dtsi b/arch/arm/boot/dts/kirkwood-6192.dtsi
+index 3916937d6818..294a6fa0208c 100644
+--- a/arch/arm/boot/dts/kirkwood-6192.dtsi
++++ b/arch/arm/boot/dts/kirkwood-6192.dtsi
+@@ -1,6 +1,6 @@
  / {
- 	model = "ZyXEL NSA310";
- 
-+	mbus {
-+		pcie-controller {
-+			status = "okay";
-+
-+			pcie at 1,0 {
-+				status = "okay";
-+			};
-+		};
-+	};
-+
- 	ocp at f1000000 {
- 		pinctrl: pinctrl at 10000 {
- 
-@@ -51,14 +61,6 @@
- 			status = "okay";
- 			nr-ports = <2>;
- 		};
--
+ 	mbus {
 -		pcie-controller {
--			status = "okay";
--
--			pcie at 1,0 {
--				status = "okay";
--			};
--		};
- 	};
++		pciec: pcie-controller {
+ 			compatible = "marvell,kirkwood-pcie";
+ 			status = "disabled";
+ 			device_type = "pci";
+@@ -15,7 +15,7 @@
+ 				0x82000000 0x1 0     MBUS_ID(0x04, 0xe8) 0       1 0 /* Port 0.0 MEM */
+ 				0x81000000 0x1 0     MBUS_ID(0x04, 0xe0) 0       1 0 /* Port 0.0 IO  */>;
  
- 	gpio_poweroff {
+-			pcie at 1,0 {
++			pcie0: pcie at 1,0 {
+ 				device_type = "pci";
+ 				assigned-addresses = <0x82000800 0 0x00040000 0 0x2000>;
+ 				reg = <0x0800 0 0 0 0>;
+@@ -76,14 +76,14 @@
+ 			};
+ 		};
+ 
+-		rtc at 10300 {
++		rtc: rtc at 10300 {
+ 			compatible = "marvell,kirkwood-rtc", "marvell,orion-rtc";
+ 			reg = <0x10300 0x20>;
+ 			interrupts = <53>;
+ 			clocks = <&gate_clk 7>;
+ 		};
+ 
+-		sata at 80000 {
++		sata: sata at 80000 {
+ 			compatible = "marvell,orion-sata";
+ 			reg = <0x80000 0x5000>;
+ 			interrupts = <21>;
+@@ -92,7 +92,7 @@
+ 			status = "disabled";
+ 		};
+ 
+-		mvsdio at 90000 {
++		sdio: mvsdio at 90000 {
+ 			compatible = "marvell,orion-sdio";
+ 			reg = <0x90000 0x200>;
+ 			interrupts = <28>;
+diff --git a/arch/arm/boot/dts/kirkwood-6281.dtsi b/arch/arm/boot/dts/kirkwood-6281.dtsi
+index 416d96e1302f..2560cbbdb0b3 100644
+--- a/arch/arm/boot/dts/kirkwood-6281.dtsi
++++ b/arch/arm/boot/dts/kirkwood-6281.dtsi
+@@ -1,6 +1,6 @@
+ / {
+ 	mbus {
+-		pcie-controller {
++		pciec: pcie-controller {
+ 			compatible = "marvell,kirkwood-pcie";
+ 			status = "disabled";
+ 			device_type = "pci";
+@@ -15,7 +15,7 @@
+ 				0x82000000 0x1 0     MBUS_ID(0x04, 0xe8) 0       1 0 /* Port 0.0 MEM */
+ 				0x81000000 0x1 0     MBUS_ID(0x04, 0xe0) 0       1 0 /* Port 0.0 IO  */>;
+ 
+-			pcie at 1,0 {
++			pcie0: pcie at 1,0 {
+ 				device_type = "pci";
+ 				assigned-addresses = <0x82000800 0 0x00040000 0 0x2000>;
+ 				reg = <0x0800 0 0 0 0>;
+@@ -76,14 +76,14 @@
+ 			};
+ 		};
+ 
+-		rtc at 10300 {
++		rtc: rtc at 10300 {
+ 			compatible = "marvell,kirkwood-rtc", "marvell,orion-rtc";
+ 			reg = <0x10300 0x20>;
+ 			interrupts = <53>;
+ 			clocks = <&gate_clk 7>;
+ 		};
+ 
+-		sata at 80000 {
++		sata: sata at 80000 {
+ 			compatible = "marvell,orion-sata";
+ 			reg = <0x80000 0x5000>;
+ 			interrupts = <21>;
+@@ -94,7 +94,7 @@
+ 			status = "disabled";
+ 		};
+ 
+-		mvsdio at 90000 {
++		sdio: mvsdio at 90000 {
+ 			compatible = "marvell,orion-sdio";
+ 			reg = <0x90000 0x200>;
+ 			interrupts = <28>;
+diff --git a/arch/arm/boot/dts/kirkwood-6282.dtsi b/arch/arm/boot/dts/kirkwood-6282.dtsi
+index 2902e0d7971d..f4b4786b9a01 100644
+--- a/arch/arm/boot/dts/kirkwood-6282.dtsi
++++ b/arch/arm/boot/dts/kirkwood-6282.dtsi
+@@ -1,6 +1,6 @@
+ / {
+ 	mbus {
+-		pcie-controller {
++		pciec: pcie-controller {
+ 			compatible = "marvell,kirkwood-pcie";
+ 			status = "disabled";
+ 			device_type = "pci";
+@@ -19,7 +19,7 @@
+ 				0x82000000 0x2 0     MBUS_ID(0x04, 0xd8) 0       1 0 /* Port 1.0 MEM */
+ 				0x81000000 0x2 0     MBUS_ID(0x04, 0xd0) 0       1 0 /* Port 1.0 IO  */>;
+ 
+-			pcie at 1,0 {
++			pcie0: pcie at 1,0 {
+ 				device_type = "pci";
+ 				assigned-addresses = <0x82000800 0 0x00040000 0 0x2000>;
+ 				reg = <0x0800 0 0 0 0>;
+@@ -36,7 +36,7 @@
+ 				status = "disabled";
+ 			};
+ 
+-			pcie at 2,0 {
++			pcie1: pcie at 2,0 {
+ 				device_type = "pci";
+ 				assigned-addresses = <0x82001000 0 0x00044000 0 0x2000>;
+ 				reg = <0x1000 0 0 0 0>;
+@@ -104,20 +104,20 @@
+ 			};
+ 		};
+ 
+-		thermal at 10078 {
++		thermal: thermal at 10078 {
+ 			compatible = "marvell,kirkwood-thermal";
+ 			reg = <0x10078 0x4>;
+ 			status = "okay";
+ 		};
+ 
+-		rtc at 10300 {
++		rtc: rtc at 10300 {
+ 			compatible = "marvell,kirkwood-rtc", "marvell,orion-rtc";
+ 			reg = <0x10300 0x20>;
+ 			interrupts = <53>;
+ 			clocks = <&gate_clk 7>;
+ 		};
+ 
+-		i2c at 11100 {
++		i2c1: i2c at 11100 {
+ 			compatible = "marvell,mv64xxx-i2c";
+ 			reg = <0x11100 0x20>;
+ 			#address-cells = <1>;
+@@ -128,7 +128,7 @@
+ 			status = "disabled";
+ 		};
+ 
+-		sata at 80000 {
++		sata: sata at 80000 {
+ 			compatible = "marvell,orion-sata";
+ 			reg = <0x80000 0x5000>;
+ 			interrupts = <21>;
+@@ -139,7 +139,7 @@
+ 			status = "disabled";
+ 		};
+ 
+-		mvsdio at 90000 {
++		sdio: mvsdio at 90000 {
+ 			compatible = "marvell,orion-sdio";
+ 			reg = <0x90000 0x200>;
+ 			interrupts = <28>;
+diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+index 90384587c278..2570e0f1673f 100644
+--- a/arch/arm/boot/dts/kirkwood.dtsi
++++ b/arch/arm/boot/dts/kirkwood.dtsi
+@@ -40,7 +40,7 @@
+ 		pcie-mem-aperture = <0xe0000000 0x10000000>; /* 256 MiB memory space */
+ 		pcie-io-aperture  = <0xf2000000 0x100000>;   /*   1 MiB    I/O space */
+ 
+-		crypto at 0301 {
++		cesa: crypto at 0301 {
+ 			compatible = "marvell,orion-crypto";
+ 			reg = <MBUS_ID(0xf0, 0x01) 0x30000 0x10000>,
+ 			      <MBUS_ID(0x03, 0x01) 0 0x800>;
+@@ -77,7 +77,7 @@
+ 			#clock-cells = <1>;
+ 		};
+ 
+-		spi at 10600 {
++		spi0: spi at 10600 {
+ 			compatible = "marvell,orion-spi";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+@@ -123,7 +123,7 @@
+ 			status = "disabled";
+ 		};
+ 
+-		serial at 12000 {
++		uart0: serial at 12000 {
+ 			compatible = "ns16550a";
+ 			reg = <0x12000 0x100>;
+ 			reg-shift = <2>;
+@@ -132,7 +132,7 @@
+ 			status = "disabled";
+ 		};
+ 
+-		serial at 12100 {
++		uart1: serial at 12100 {
+ 			compatible = "ns16550a";
+ 			reg = <0x12100 0x100>;
+ 			reg-shift = <2>;
+@@ -146,7 +146,7 @@
+ 			reg = <0x20000 0x80>, <0x1500 0x20>;
+ 		};
+ 
+-		system-controller at 20000 {
++		sysc: system-controller at 20000 {
+ 			compatible = "marvell,orion-system-controller";
+ 			reg = <0x20000 0x120>;
+ 		};
+@@ -196,7 +196,7 @@
+ 			status = "okay";
+ 		};
+ 
+-		ehci at 50000 {
++		usb0: ehci at 50000 {
+ 			compatible = "marvell,orion-ehci";
+ 			reg = <0x50000 0x1000>;
+ 			interrupts = <19>;
+@@ -204,7 +204,7 @@
+ 			status = "okay";
+ 		};
+ 
+-		xor at 60800 {
++		dma0: xor at 60800 {
+ 			compatible = "marvell,orion-xor";
+ 			reg = <0x60800 0x100
+ 			       0x60A00 0x100>;
+@@ -224,7 +224,7 @@
+ 			};
+ 		};
+ 
+-		xor at 60900 {
++		dma1: xor at 60900 {
+ 			compatible = "marvell,orion-xor";
+ 			reg = <0x60900 0x100
+ 			       0x60B00 0x100>;
 -- 
 1.9.1
