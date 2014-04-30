@@ -1,32 +1,37 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Wed, 30 Apr 2014 10:25:59 +0100
-Subject: [Xen-devel] [PATCH] Xen: hibernation is x86-only at the moment
-In-Reply-To: <5165529.jneGVBC5b5@wuerfel>
-References: <5165529.jneGVBC5b5@wuerfel>
-Message-ID: <5360C1A7.8060401@citrix.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 30 Apr 2014 10:19:35 +0100
+Subject: [RFC 43/47] mtd: nand: stm_nand_bch: read and write functions
+ (BCH)
+In-Reply-To: <20980858CB6D3A4BAE95CA194937D5E73EAB5CC7@DBDE04.ent.ti.com>
+References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
+ <1395735604-26706-44-git-send-email-lee.jones@linaro.org>
+ <20980858CB6D3A4BAE95CA194937D5E73EAB5CC7@DBDE04.ent.ti.com>
+Message-ID: <20140430091935.GI29462@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/04/14 21:00, Arnd Bergmann wrote:
-> In commit 603fb42a66499ab "ARM: 8011/1: ARM hibernation / suspend-to-disk",
-> currently in linux-next, the ARM architecture gains support for
-> hibernation (suspend-to-disk). Xen supports this in principle, but only
-> has an architecture specific hypercall defined on x86, which leads
-> to a build error when both hibernation and Xen support are enabled:
+> >From: Lee Jones [mailto:lee.jones at linaro.org]
+> >
+> >Helper function for bch_mtd_read() and bch_mtd_write() to handle
+> >multi-page or non-aligned reads and writes respectively.
+> >
+> >Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> >---
 > 
-> drivers/xen/manage.c:105:2: error: implicit declaration of function 'HYPERVISOR_suspend' [-Werror=implicit-function-declaration]
->   si->cancelled = HYPERVISOR_suspend(si->arg);
-> 
-> It is probably a good idea to define this hypercall on ARM as well
-> and provide an implementation in the host, but until that is done,
-> this patch helps disable the broken code in the Xen guest by making
-> it depend on CONFIG_X86.
+> I think below code is duplicate of nand_do_read_ops() and nand_do_write_ops()
+> in nand_base.c. If you could just populate chip->ecc.read_page and
+> chip->ecc.write_page much of this could be avoided.
 
-Since this isn't a regression in 3.15-rcX can you provide the
-appropriate hypercall on ARM.  This does not require that there is an
-implementation on Xen.
+chip->ecc.read_page and chip->ecc.write_page now populated.
 
-When the Xen implementation exists it will be easier to use if the
-support already exists in Linux.
+> Also, you need to break your bch_read_page() into given generic NAND
+> driver interfaces chip->ecc.calculate(), chip->ecc.correct() ...
 
-David
+Our h/w calculates and corrects automatically.  No need for
+intervention.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
