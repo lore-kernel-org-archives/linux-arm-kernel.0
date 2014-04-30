@@ -1,53 +1,140 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 01 May 2014 00:47:50 +0200
-Subject: [PATCH] clk: exynos4: Use single clock ID for CLK_MDMA gate clocks
-In-Reply-To: <1397579420-18776-1-git-send-email-s.nawrocki@samsung.com>
-References: <1397579420-18776-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <53617D96.6010707@gmail.com>
+Date: Thu, 01 May 2014 00:48:54 +0200
+Subject: [PATCH v6] clk: Exynos5250: Add clocks for G3D
+In-Reply-To: <1398677821-11529-1-git-send-email-arun.kk@samsung.com>
+References: <1398677821-11529-1-git-send-email-arun.kk@samsung.com>
+Message-ID: <53617DD6.60507@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15.04.2014 18:30, Sylwester Nawrocki wrote:
-> Exynos4210 and Exynos4x12 SoCs have the PL330 MDMA IP block clock
-> defined exactly in same way in documentation. Using different
-> names for these clocks is a bit misleading. Since there is no users
-> of CLK_MDMA2 in existing dts files this patch drops CLK_MDMA2 and
-> replaces it with CLK_MDMA in the driver. This ensures PL330 MDMA
-> has correct clock assigned on Exynos4x12 SoCs.
+On 28.04.2014 11:37, Arun Kumar K wrote:
+> This patch adds the required clocks for ARM Mali IP
+> in Exynos5250.
 >
-> Suggested-by: Tomasz Figa <t.figa@samsung.com>
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Signed-off-by: Arun Kumar K <arun.kk@samsung.com>
 > ---
->   drivers/clk/samsung/clk-exynos4.c   |    2 +-
->   include/dt-bindings/clock/exynos4.h |    1 -
->   2 files changed, 1 insertion(+), 2 deletions(-)
+> Changes from v5
+> - Addressed comments from Tomasz Figa
+>    http://www.spinics.net/lists/arm-kernel/msg326118.html
+> Changes from v4
+> - Rebased on latest kernel
+> - Added macros
+> Changes from v3
+> - Renamed some clocks as per Tomasz Figa's comments
+> Changes from v2
+> - Rebased on clk-next
+> Changes from v1
+> - Removed exporting of parent DIV clock for g3d
+>    as per Tomsz Figa's comment.
+> ---
+>   drivers/clk/samsung/clk-exynos5250.c   |   15 ++++++++++++++-
+>   include/dt-bindings/clock/exynos5250.h |    4 +++-
+>   2 files changed, 17 insertions(+), 2 deletions(-)
 >
-> diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
-> index b4f9672..5247caa 100644
-> --- a/drivers/clk/samsung/clk-exynos4.c
-> +++ b/drivers/clk/samsung/clk-exynos4.c
-> @@ -903,7 +903,7 @@ static struct samsung_gate_clock exynos4x12_gate_clks[] __initdata = {
->   	GATE(CLK_AUDSS, "audss", "sclk_epll", E4X12_GATE_IP_MAUDIO, 0, 0, 0),
->   	GATE(CLK_MDNIE0, "mdnie0", "aclk160", GATE_IP_LCD0, 2, 0, 0),
->   	GATE(CLK_ROTATOR, "rotator", "aclk200", E4X12_GATE_IP_IMAGE, 1, 0, 0),
-> -	GATE(CLK_MDMA2, "mdma2", "aclk200", E4X12_GATE_IP_IMAGE, 2, 0, 0),
-> +	GATE(CLK_MDMA, "mdma", "aclk200", E4X12_GATE_IP_IMAGE, 2, 0, 0),
->   	GATE(CLK_SMMU_MDMA, "smmu_mdma", "aclk200", E4X12_GATE_IP_IMAGE, 5, 0,
+> diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
+> index e7ee442..df02526 100644
+> --- a/drivers/clk/samsung/clk-exynos5250.c
+> +++ b/drivers/clk/samsung/clk-exynos5250.c
+> @@ -37,6 +37,7 @@
+>   #define VPLL_CON0		0x10140
+>   #define GPLL_CON0		0x10150
+>   #define SRC_TOP0		0x10210
+> +#define SRC_TOP1		0x10214
+>   #define SRC_TOP2		0x10218
+>   #define SRC_TOP3		0x1021c
+>   #define SRC_GSCL		0x10220
+> @@ -71,6 +72,7 @@
+>   #define GATE_IP_GSCL		0x10920
+>   #define GATE_IP_DISP1		0x10928
+>   #define GATE_IP_MFC		0x1092c
+> +#define GATE_IP_G3D		0x10930
+>   #define GATE_IP_GEN		0x10934
+>   #define GATE_IP_FSYS		0x10944
+>   #define GATE_IP_PERIC		0x10950
+> @@ -100,6 +102,7 @@ static unsigned long exynos5250_clk_regs[] __initdata = {
+>   	DIV_CPU0,
+>   	SRC_CORE1,
+>   	SRC_TOP0,
+> +	SRC_TOP1,
+>   	SRC_TOP2,
+>   	SRC_TOP3,
+>   	SRC_GSCL,
+> @@ -133,6 +136,7 @@ static unsigned long exynos5250_clk_regs[] __initdata = {
+>   	DIV_PERIC5,
+>   	GATE_IP_GSCL,
+>   	GATE_IP_MFC,
+> +	GATE_IP_G3D,
+>   	GATE_IP_GEN,
+>   	GATE_IP_FSYS,
+>   	GATE_IP_PERIC,
+> @@ -189,10 +193,12 @@ PNAME(mout_vpllsrc_p)	= { "fin_pll", "sclk_hdmi27m" };
+>   PNAME(mout_vpll_p)	= { "mout_vpllsrc", "fout_vpll" };
+>   PNAME(mout_cpll_p)	= { "fin_pll", "fout_cpll" };
+>   PNAME(mout_epll_p)	= { "fin_pll", "fout_epll" };
+> +PNAME(mout_gpll_p)	= { "fin_pll", "fout_gpll" };
+>   PNAME(mout_mpll_user_p)	= { "fin_pll", "mout_mpll" };
+>   PNAME(mout_bpll_user_p)	= { "fin_pll", "mout_bpll" };
+>   PNAME(mout_aclk166_p)	= { "mout_cpll", "mout_mpll_user" };
+>   PNAME(mout_aclk200_p)	= { "mout_mpll_user", "mout_bpll_user" };
+> +PNAME(mout_aclk400_p)	= { "mout_aclk400_g3d_mid", "mout_gpll" };
+>   PNAME(mout_aclk200_sub_p) = { "fin_pll", "div_aclk200" };
+>   PNAME(mout_aclk266_sub_p) = { "fin_pll", "div_aclk266" };
+>   PNAME(mout_aclk333_sub_p) = { "fin_pll", "div_aclk333" };
+> @@ -273,12 +279,16 @@ static struct samsung_mux_clock exynos5250_mux_clks[] __initdata = {
+>   	MUX(0, "mout_aclk166", mout_aclk166_p, SRC_TOP0, 8, 1),
+>   	MUX(0, "mout_aclk200", mout_aclk200_p, SRC_TOP0, 12, 1),
+>   	MUX(0, "mout_aclk333", mout_aclk166_p, SRC_TOP0, 16, 1),
+> +	MUX(0, "mout_aclk400_g3d_mid", mout_aclk200_p, SRC_TOP0, 20, 1),
+> +
+> +	MUX(0, "mout_aclk400_g3d", mout_aclk400_p, SRC_TOP1, 28, 1),
+>
+>   	MUX(0, "mout_cpll", mout_cpll_p, SRC_TOP2, 8, 1),
+>   	MUX(0, "mout_epll", mout_epll_p, SRC_TOP2, 12, 1),
+>   	MUX(0, "mout_vpll", mout_vpll_p, SRC_TOP2, 16, 1),
+>   	MUX(0, "mout_mpll_user", mout_mpll_user_p, SRC_TOP2, 20, 1),
+>   	MUX(0, "mout_bpll_user", mout_bpll_user_p, SRC_TOP2, 24, 1),
+> +	MUX(CLK_MOUT_GPLL, "mout_gpll", mout_gpll_p, SRC_TOP2, 28, 1),
+>
+>   	MUX(0, "mout_aclk200_disp1_sub", mout_aclk200_sub_p, SRC_TOP3, 4, 1),
+>   	MUX(0, "mout_aclk266_gscl_sub", mout_aclk266_sub_p, SRC_TOP3, 8, 1),
+> @@ -351,6 +361,8 @@ static struct samsung_div_clock exynos5250_div_clks[] __initdata = {
+>   	DIV(0, "div_aclk200", "mout_aclk200", DIV_TOP0, 12, 3),
+>   	DIV(0, "div_aclk266", "mout_mpll_user", DIV_TOP0, 16, 3),
+>   	DIV(0, "div_aclk333", "mout_aclk333", DIV_TOP0, 20, 3),
+> +	DIV(0, "div_aclk400_g3d", "mout_aclk400_g3d", DIV_TOP0,
+> +							24, 3),
+>
+>   	DIV(0, "div_aclk66_pre", "mout_mpll_user", DIV_TOP1, 24, 3),
+>
+> @@ -533,7 +545,8 @@ static struct samsung_gate_clock exynos5250_gate_clks[] __initdata = {
 >   		0),
->   	GATE(CLK_MIPI_HSI, "mipi_hsi", "aclk133", GATE_IP_FSYS, 10, 0, 0),
-> diff --git a/include/dt-bindings/clock/exynos4.h b/include/dt-bindings/clock/exynos4.h
-> index 75aff33..3ff13bc 100644
-> --- a/include/dt-bindings/clock/exynos4.h
-> +++ b/include/dt-bindings/clock/exynos4.h
-> @@ -181,7 +181,6 @@
->   #define CLK_KEYIF		347
->   #define CLK_AUDSS		348
->   #define CLK_MIPI_HSI		349 /* Exynos4210 only */
-> -#define CLK_MDMA2		350 /* Exynos4210 only */
->   #define CLK_PIXELASYNCM0	351
->   #define CLK_PIXELASYNCM1	352
->   #define CLK_FIMC_LITE0		353 /* Exynos4x12 only */
+>   	GATE(CLK_SMMU_MFCL, "smmu_mfcl", "mout_aclk333_sub", GATE_IP_MFC, 2, 0,
+>   		0),
+> -
+> +	GATE(CLK_G3D, "g3d", "div_aclk400_g3d", GATE_IP_G3D, 0,
+> +					CLK_SET_RATE_PARENT, 0),
+>   	GATE(CLK_ROTATOR, "rotator", "div_aclk266", GATE_IP_GEN, 1, 0, 0),
+>   	GATE(CLK_JPEG, "jpeg", "div_aclk166", GATE_IP_GEN, 2, 0, 0),
+>   	GATE(CLK_MDMA1, "mdma1", "div_aclk266", GATE_IP_GEN, 4, 0, 0),
+> diff --git a/include/dt-bindings/clock/exynos5250.h b/include/dt-bindings/clock/exynos5250.h
+> index 922f2dc..a3c6777 100644
+> --- a/include/dt-bindings/clock/exynos5250.h
+> +++ b/include/dt-bindings/clock/exynos5250.h
+> @@ -150,11 +150,13 @@
+>   #define CLK_G2D			345
+>   #define CLK_MDMA0		346
+>   #define CLK_SMMU_MDMA0		347
+> +#define CLK_G3D			348
+>
+>   /* mux clocks */
+>   #define CLK_MOUT_HDMI		1024
+> +#define CLK_MOUT_GPLL		1025
+>
+>   /* must be greater than maximal clock id */
+> -#define CLK_NR_CLKS		1025
+> +#define CLK_NR_CLKS		1026
+>
+>   #endif /* _DT_BINDINGS_CLOCK_EXYNOS_5250_H */
 >
 
 Applied.
