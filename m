@@ -1,167 +1,141 @@
-From: arun.kk@samsung.com (Arun Kumar K)
-Date: Thu, 1 May 2014 14:01:44 +0530
-Subject: [PATCH v6] clk: Exynos5250: Add clocks for G3D
-In-Reply-To: <53617DD6.60507@gmail.com>
-References: <1398677821-11529-1-git-send-email-arun.kk@samsung.com>
- <53617DD6.60507@gmail.com>
-Message-ID: <CALt3h78XP+W2TA4F4EtHxtCO0Fm48pmQi1gbir8ScsKLjwUw9w@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 1 May 2014 17:54:47 +0900
+Subject: [PATCH v2 02/12] ARM: defconfigs: add MTD_SPI_NOR (new
+ dependency for M25P80)
+In-Reply-To: <1398925607-7482-3-git-send-email-computersforpeace@gmail.com>
+References: <1398925607-7482-1-git-send-email-computersforpeace@gmail.com>
+ <1398925607-7482-3-git-send-email-computersforpeace@gmail.com>
+Message-ID: <20140501085447.GB20410@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+[ CC linux-sh and Magnus Damm (shmobile co-maintainer) ]
 
-On Thu, May 1, 2014 at 4:18 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> On 28.04.2014 11:37, Arun Kumar K wrote:
->>
->> This patch adds the required clocks for ARM Mali IP
->> in Exynos5250.
->>
->> Signed-off-by: Arun Kumar K <arun.kk@samsung.com>
->> ---
->> Changes from v5
->> - Addressed comments from Tomasz Figa
->>    http://www.spinics.net/lists/arm-kernel/msg326118.html
->> Changes from v4
->> - Rebased on latest kernel
->> - Added macros
->> Changes from v3
->> - Renamed some clocks as per Tomasz Figa's comments
->> Changes from v2
->> - Rebased on clk-next
->> Changes from v1
->> - Removed exporting of parent DIV clock for g3d
->>    as per Tomsz Figa's comment.
->> ---
->>   drivers/clk/samsung/clk-exynos5250.c   |   15 ++++++++++++++-
->>   include/dt-bindings/clock/exynos5250.h |    4 +++-
->>   2 files changed, 17 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/clk/samsung/clk-exynos5250.c
->> b/drivers/clk/samsung/clk-exynos5250.c
->> index e7ee442..df02526 100644
->> --- a/drivers/clk/samsung/clk-exynos5250.c
->> +++ b/drivers/clk/samsung/clk-exynos5250.c
->> @@ -37,6 +37,7 @@
->>   #define VPLL_CON0             0x10140
->>   #define GPLL_CON0             0x10150
->>   #define SRC_TOP0              0x10210
->> +#define SRC_TOP1               0x10214
->>   #define SRC_TOP2              0x10218
->>   #define SRC_TOP3              0x1021c
->>   #define SRC_GSCL              0x10220
->> @@ -71,6 +72,7 @@
->>   #define GATE_IP_GSCL          0x10920
->>   #define GATE_IP_DISP1         0x10928
->>   #define GATE_IP_MFC           0x1092c
->> +#define GATE_IP_G3D            0x10930
->>   #define GATE_IP_GEN           0x10934
->>   #define GATE_IP_FSYS          0x10944
->>   #define GATE_IP_PERIC         0x10950
->> @@ -100,6 +102,7 @@ static unsigned long exynos5250_clk_regs[] __initdata
->> = {
->>         DIV_CPU0,
->>         SRC_CORE1,
->>         SRC_TOP0,
->> +       SRC_TOP1,
->>         SRC_TOP2,
->>         SRC_TOP3,
->>         SRC_GSCL,
->> @@ -133,6 +136,7 @@ static unsigned long exynos5250_clk_regs[] __initdata
->> = {
->>         DIV_PERIC5,
->>         GATE_IP_GSCL,
->>         GATE_IP_MFC,
->> +       GATE_IP_G3D,
->>         GATE_IP_GEN,
->>         GATE_IP_FSYS,
->>         GATE_IP_PERIC,
->> @@ -189,10 +193,12 @@ PNAME(mout_vpllsrc_p)     = { "fin_pll",
->> "sclk_hdmi27m" };
->>   PNAME(mout_vpll_p)    = { "mout_vpllsrc", "fout_vpll" };
->>   PNAME(mout_cpll_p)    = { "fin_pll", "fout_cpll" };
->>   PNAME(mout_epll_p)    = { "fin_pll", "fout_epll" };
->> +PNAME(mout_gpll_p)     = { "fin_pll", "fout_gpll" };
->>   PNAME(mout_mpll_user_p)       = { "fin_pll", "mout_mpll" };
->>   PNAME(mout_bpll_user_p)       = { "fin_pll", "mout_bpll" };
->>   PNAME(mout_aclk166_p) = { "mout_cpll", "mout_mpll_user" };
->>   PNAME(mout_aclk200_p) = { "mout_mpll_user", "mout_bpll_user" };
->> +PNAME(mout_aclk400_p)  = { "mout_aclk400_g3d_mid", "mout_gpll" };
->>   PNAME(mout_aclk200_sub_p) = { "fin_pll", "div_aclk200" };
->>   PNAME(mout_aclk266_sub_p) = { "fin_pll", "div_aclk266" };
->>   PNAME(mout_aclk333_sub_p) = { "fin_pll", "div_aclk333" };
->> @@ -273,12 +279,16 @@ static struct samsung_mux_clock
->> exynos5250_mux_clks[] __initdata = {
->>         MUX(0, "mout_aclk166", mout_aclk166_p, SRC_TOP0, 8, 1),
->>         MUX(0, "mout_aclk200", mout_aclk200_p, SRC_TOP0, 12, 1),
->>         MUX(0, "mout_aclk333", mout_aclk166_p, SRC_TOP0, 16, 1),
->> +       MUX(0, "mout_aclk400_g3d_mid", mout_aclk200_p, SRC_TOP0, 20, 1),
->> +
->> +       MUX(0, "mout_aclk400_g3d", mout_aclk400_p, SRC_TOP1, 28, 1),
->>
->>         MUX(0, "mout_cpll", mout_cpll_p, SRC_TOP2, 8, 1),
->>         MUX(0, "mout_epll", mout_epll_p, SRC_TOP2, 12, 1),
->>         MUX(0, "mout_vpll", mout_vpll_p, SRC_TOP2, 16, 1),
->>         MUX(0, "mout_mpll_user", mout_mpll_user_p, SRC_TOP2, 20, 1),
->>         MUX(0, "mout_bpll_user", mout_bpll_user_p, SRC_TOP2, 24, 1),
->> +       MUX(CLK_MOUT_GPLL, "mout_gpll", mout_gpll_p, SRC_TOP2, 28, 1),
->>
->>         MUX(0, "mout_aclk200_disp1_sub", mout_aclk200_sub_p, SRC_TOP3, 4,
->> 1),
->>         MUX(0, "mout_aclk266_gscl_sub", mout_aclk266_sub_p, SRC_TOP3, 8,
->> 1),
->> @@ -351,6 +361,8 @@ static struct samsung_div_clock exynos5250_div_clks[]
->> __initdata = {
->>         DIV(0, "div_aclk200", "mout_aclk200", DIV_TOP0, 12, 3),
->>         DIV(0, "div_aclk266", "mout_mpll_user", DIV_TOP0, 16, 3),
->>         DIV(0, "div_aclk333", "mout_aclk333", DIV_TOP0, 20, 3),
->> +       DIV(0, "div_aclk400_g3d", "mout_aclk400_g3d", DIV_TOP0,
->> +                                                       24, 3),
->>
->>         DIV(0, "div_aclk66_pre", "mout_mpll_user", DIV_TOP1, 24, 3),
->>
->> @@ -533,7 +545,8 @@ static struct samsung_gate_clock
->> exynos5250_gate_clks[] __initdata = {
->>                 0),
->>         GATE(CLK_SMMU_MFCL, "smmu_mfcl", "mout_aclk333_sub", GATE_IP_MFC,
->> 2, 0,
->>                 0),
->> -
->> +       GATE(CLK_G3D, "g3d", "div_aclk400_g3d", GATE_IP_G3D, 0,
->> +                                       CLK_SET_RATE_PARENT, 0),
->>         GATE(CLK_ROTATOR, "rotator", "div_aclk266", GATE_IP_GEN, 1, 0, 0),
->>         GATE(CLK_JPEG, "jpeg", "div_aclk166", GATE_IP_GEN, 2, 0, 0),
->>         GATE(CLK_MDMA1, "mdma1", "div_aclk266", GATE_IP_GEN, 4, 0, 0),
->> diff --git a/include/dt-bindings/clock/exynos5250.h
->> b/include/dt-bindings/clock/exynos5250.h
->> index 922f2dc..a3c6777 100644
->> --- a/include/dt-bindings/clock/exynos5250.h
->> +++ b/include/dt-bindings/clock/exynos5250.h
->> @@ -150,11 +150,13 @@
->>   #define CLK_G2D                       345
->>   #define CLK_MDMA0             346
->>   #define CLK_SMMU_MDMA0                347
->> +#define CLK_G3D                        348
->>
->>   /* mux clocks */
->>   #define CLK_MOUT_HDMI         1024
->> +#define CLK_MOUT_GPLL          1025
->>
->>   /* must be greater than maximal clock id */
->> -#define CLK_NR_CLKS            1025
->> +#define CLK_NR_CLKS            1026
->>
->>   #endif /* _DT_BINDINGS_CLOCK_EXYNOS_5250_H */
->>
->
-> Applied.
->
+On Wed, Apr 30, 2014 at 11:26:37PM -0700, Brian Norris wrote:
+> These defconfigs contain the CONFIG_M25P80 symbol, which is now
+> dependent on the MTD_SPI_NOR symbol. Add CONFIG_MTD_SPI_NOR to satisfy
+> the new dependency.
+> 
+> At the same time, drop the now-nonexistent CONFIG_MTD_CHAR symbol.
+> 
+> Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+> This patch catches all the configs I couldn't find a sub-arch for, plus the ARM
+> multiplatform defconfigs
+> 
+>  arch/arm/configs/bockw_defconfig    | 2 +-
+>  arch/arm/configs/koelsch_defconfig  | 1 +
+>  arch/arm/configs/lager_defconfig    | 1 +
 
-Thanks. Can you have a look at this patch too -
-https://patchwork.kernel.org/patch/4076161/
-It is for the same purpose (for Mali GPU) in 5420 SoC.
+The above changes are for shmobile SoC defconfigs which I maintain
+(as is one other patch in the series).
+While the below ones are not.
 
-Regards
-Arun
 
-> Best regards,
-> Tomasz
+With regards to updating shmobile configuration options,
+we have recently moved towards using Kconfig rather than
+defconfig in cases where selecting A means we really ought
+to select B too. Something along the lines of:
+
+	select CONFIG_MTD_SPI_NOR if CONFIG_MTD_M25P80
+
+Do you consider that CONFIG_MTD_SPI_NOR should always
+be selected if CONFIG_MTD_M25P80 if selected?
+
+If so, perhaps it would be best to update the CONFIG_MTD_M25P80 Kconfig
+node to select CONFIG_MTD_M25P80. This would probably imply that most
+if not all of this series would no longer be needed.
+
+If not, would you be able to make a patch to add something like
+the above snippet to arch/arm/shmobile/Kconfig (probably more than once)
+and drop the changes to shmobile defconfigs from this series?
+
+
+>  arch/arm/configs/multi_v5_defconfig | 1 +
+>  arch/arm/configs/multi_v7_defconfig | 1 +
+>  5 files changed, 5 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/configs/bockw_defconfig b/arch/arm/configs/bockw_defconfig
+> index e816140d81c5..28339e072a71 100644
+> --- a/arch/arm/configs/bockw_defconfig
+> +++ b/arch/arm/configs/bockw_defconfig
+> @@ -50,11 +50,11 @@ CONFIG_DEVTMPFS_MOUNT=y
+>  # CONFIG_PREVENT_FIRMWARE_BUILD is not set
+>  # CONFIG_FW_LOADER is not set
+>  CONFIG_MTD=y
+> -CONFIG_MTD_CHAR=y
+
+The above change seems unrelated to the subject of the patch.
+
+If its valid then I'd prefer it submitted as a separate patch.
+
+>  CONFIG_MTD_BLOCK=y
+>  CONFIG_MTD_CFI=y
+>  CONFIG_MTD_CFI_AMDSTD=y
+>  CONFIG_MTD_M25P80=y
+> +CONFIG_MTD_SPI_NOR=y
+>  CONFIG_SCSI=y
+>  CONFIG_BLK_DEV_SD=y
+>  CONFIG_NETDEVICES=y
+> diff --git a/arch/arm/configs/koelsch_defconfig b/arch/arm/configs/koelsch_defconfig
+> index 86faab565a96..dcd55f20d36e 100644
+> --- a/arch/arm/configs/koelsch_defconfig
+> +++ b/arch/arm/configs/koelsch_defconfig
+> @@ -42,6 +42,7 @@ CONFIG_ATA=y
+>  CONFIG_SATA_RCAR=y
+>  CONFIG_MTD=y
+>  CONFIG_MTD_M25P80=y
+> +CONFIG_MTD_SPI_NOR=y
+>  CONFIG_NETDEVICES=y
+>  # CONFIG_NET_VENDOR_ARC is not set
+>  # CONFIG_NET_CADENCE is not set
+> diff --git a/arch/arm/configs/lager_defconfig b/arch/arm/configs/lager_defconfig
+> index 58702440472a..c4dbd778458b 100644
+> --- a/arch/arm/configs/lager_defconfig
+> +++ b/arch/arm/configs/lager_defconfig
+> @@ -53,6 +53,7 @@ CONFIG_DEVTMPFS=y
+>  CONFIG_DEVTMPFS_MOUNT=y
+>  CONFIG_MTD=y
+>  CONFIG_MTD_M25P80=y
+> +CONFIG_MTD_SPI_NOR=y
+>  CONFIG_BLK_DEV_SD=y
+>  CONFIG_ATA=y
+>  CONFIG_SATA_RCAR=y
+> diff --git a/arch/arm/configs/multi_v5_defconfig b/arch/arm/configs/multi_v5_defconfig
+> index aa3dfb084fed..aaf23933fb91 100644
+> --- a/arch/arm/configs/multi_v5_defconfig
+> +++ b/arch/arm/configs/multi_v5_defconfig
+> @@ -56,6 +56,7 @@ CONFIG_MTD_PHYSMAP=y
+>  CONFIG_MTD_M25P80=y
+>  CONFIG_MTD_NAND=y
+>  CONFIG_MTD_NAND_ORION=y
+> +CONFIG_MTD_SPI_NOR=y
+>  CONFIG_BLK_DEV_LOOP=y
+>  CONFIG_EEPROM_AT24=y
+>  # CONFIG_SCSI_PROC_FS is not set
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index d4e8a47a2f7c..9937db16050c 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -108,6 +108,7 @@ CONFIG_CMA_SIZE_MBYTES=64
+>  CONFIG_OMAP_OCP2SCP=y
+>  CONFIG_MTD=y
+>  CONFIG_MTD_M25P80=y
+> +CONFIG_MTD_SPI_NOR=y
+>  CONFIG_BLK_DEV_LOOP=y
+>  CONFIG_ICS932S401=y
+>  CONFIG_APDS9802ALS=y
+> -- 
+> 1.8.3.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
