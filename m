@@ -1,27 +1,39 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 1 May 2014 12:11:25 -0700
-Subject: [PATCH 13/15] ASoC: SND_S3C_DMA_LEGACY needs S3C24XX_DMA
-In-Reply-To: <1398770316-19715-14-git-send-email-kaixu.xia@linaro.org>
-References: <1398770316-19715-1-git-send-email-kaixu.xia@linaro.org>
- <1398770316-19715-14-git-send-email-kaixu.xia@linaro.org>
-Message-ID: <20140501191125.GB3245@sirena.org.uk>
+From: b.galvani@gmail.com (Beniamino Galvani)
+Date: Thu,  1 May 2014 21:50:34 +0200
+Subject: [PATCH 1/2] of: add bq and radxa vendor prefixes
+Message-ID: <1398973835-26303-1-git-send-email-b.galvani@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 29, 2014 at 07:18:34PM +0800, Xia Kaixu wrote:
-> From: Arnd Bergmann <arnd@arndb.de>
-> 
-> SND_S3C_DMA_LEGACY can only be set on S3C24xx, which does not
-> (yet) support the dmaengine framework, so samsung_dma_get_ops()
-> fails to link if S3C24XX_DMA is disabled:
+Add new vendor prefixes for:
 
-Why is the fix for this not to ensure that s3c24xx always enables the
-DMA controller - how likely is it that it would be sane to build a
-kernel without DMA after all?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140501/940051e4/attachment.sig>
+    * bq, a company that sells multimedia devices and 3D printers
+    * Radxa, manufacturer of ARM boards
+
+Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
+---
+ Documentation/devicetree/bindings/vendor-prefixes.txt |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index abc3080..6f8177c 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -21,6 +21,7 @@ atmel	Atmel Corporation
+ auo	AU Optronics Corporation
+ avago	Avago Technologies
+ bosch	Bosch Sensortec GmbH
++bq	bq
+ brcm	Broadcom Corporation
+ buffalo	Buffalo, Inc.
+ calxeda	Calxeda
+@@ -98,6 +99,7 @@ powervr	PowerVR (deprecated, use img)
+ qca	Qualcomm Atheros, Inc.
+ qcom	Qualcomm Technologies, Inc
+ qnap	QNAP Systems, Inc.
++radxa	Radxa
+ raidsonic	RaidSonic Technology GmbH
+ ralink	Mediatek/Ralink Technology Corp.
+ ramtron	Ramtron International
+-- 
+1.7.10.4
