@@ -1,85 +1,143 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Thu, 1 May 2014 09:54:12 +0100
-Subject: [PATCH] arm64: mm: Create gigabyte kernel logical mappings where
- possible
-In-Reply-To: <4217068.6LErVYxoHJ@wuerfel>
-References: <1398857782-1525-1-git-send-email-steve.capper@linaro.org>
- <4217068.6LErVYxoHJ@wuerfel>
-Message-ID: <20140501085411.GA31607@linaro.org>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Thu, 01 May 2014 10:26:34 +0100
+Subject: [PATCH v2] of: Keep track of populated platform devices
+In-Reply-To: <CAL_JsqL=mxqEKpAsXm7Du0vEDpKk4n+dp5-DyvbuGhTA6bP5Lg@mail.gmail.com>
+References: <1398858529.24255.3.camel@hornet>
+ <1398866717-20268-1-git-send-email-pawel.moll@arm.com>
+ <CAL_JsqL=mxqEKpAsXm7Du0vEDpKk4n+dp5-DyvbuGhTA6bP5Lg@mail.gmail.com>
+Message-ID: <20140501092635.05011C409DA@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 30, 2014 at 08:11:26PM +0200, Arnd Bergmann wrote:
-> On Wednesday 30 April 2014 12:36:22 Steve Capper wrote:
-> > We have the capability to map 1GB level 1 blocks when using a 4K
-> > granule.
-> > 
-> > This patch adjusts the create_mapping logic s.t. when mapping physical
-> > memory on boot, we attempt to use a 1GB block if both the VA and PA
-> > start and end are 1GB aligned. This both reduces the levels of lookup
-> > required to resolve a kernel logical address, as well as reduces TLB
-> > pressure on cores that support 1GB TLB entries.
-> > 
-> > Signed-off-by: Steve Capper <steve.capper@linaro.org>
+On Wed, 30 Apr 2014 10:22:25 -0500, Rob Herring <robherring2@gmail.com> wrote:
+> On Wed, Apr 30, 2014 at 9:05 AM, Pawel Moll <pawel.moll@arm.com> wrote:
+> > In "Device Tree powered" systems, platform devices are usually
+> > massively populated with of_platform_populate() call, executed
+> > at some level of initcalls, either by generic architecture
+> > or by platform-specific code.
+> >
+> > There are situations though where certain devices must be
+> > created (and bound with drivers) before all the others.
+> > This presents a challenge, as devices created explicitly
+> > would be created again by of_platform_populate().
+> >
+> > This patch tries to solve that issue in a generic way,
+> > adding a "populated" flag for a DT node description.
+> > Once set, this device will never be created again via
+> > of_* API, so of_platform_populate() will skip such nodes
+> > (and its children) in a similar way to the non-available
+> > ones.
+> >
+> > Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> 
+> One pondering and one minor change below, otherwise:
+> 
+> Acked-by: Rob Herring <robh@kernel.org>
+> 
+> 
 > > ---
-> > Hello,
-> > This patch has been tested on the FastModel for 4K and 64K pages.
-> > Also, this has been tested with Jungseok's 4 level patch.
-> > 
-> > I put in the explicit check for PAGE_SHIFT, as I am anticipating a
-> > three level 64KB configuration at some point.
-> > 
-> > With two level 64K, a PUD is equivalent to a PMD which is equivalent to
-> > a PGD, and these are all level 2 descriptors.
-> > 
-> > Under three level 64K, a PUD would be equivalent to a PGD which would
-> > be a level 1 descriptor thus may not be a block.
-> > 
-> > Comments/critique/testers welcome.
+> >
+> > Changes since v1:
+> >
+> > - added of_node_check_and_set_flag()... (atomic test and set)
+> > - ... used it to atomically mark a node...
+> > - ... clearing the bit on error path.
+> >
+> >  drivers/of/platform.c | 18 +++++++++++++-----
+> >  include/linux/of.h    |  7 +++++++
+> >  2 files changed, 20 insertions(+), 5 deletions(-)
+> >
+> > diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> > index 404d1da..b33927a 100644
+> > --- a/drivers/of/platform.c
+> > +++ b/drivers/of/platform.c
+> > @@ -204,12 +204,13 @@ static struct platform_device *of_platform_device_create_pdata(
+> >  {
+> >         struct platform_device *dev;
+> >
+> > -       if (!of_device_is_available(np))
+> > +       if (!of_device_is_available(np) ||
+> > +                       of_node_check_and_set_flag(np, OF_POPULATED))
+> >                 return NULL;
+> >
+> >         dev = of_device_alloc(np, bus_id, parent);
+> >         if (!dev)
+> > -               return NULL;
+> > +               goto err_clear_flag;
 > 
-> It seems like a great idea. I have to admit that I don't understand
-> the existing code, but what are the page sizes used here?
+> I wonder if leaving it set would be the right behavior. I can't see
+> that we would want to process the node again. But this is the
+> exceptional case, so its probably not too important and can stay like
+> this.
 
-Actually, I think it was your idea ;-). I remember you talking about
-increasing the mapping size when 4-level page tables were being
-discussed. (I think I should have added a Reported-by, would be happy
-to if you want?).
+That doesn't work in the case where drivers use of_platform_populate().
+MFD devices in particular make use of it. If the driver does not get
+cleared on removal of the devices, then all MFD users will be broken on
+driver unbind/rebind. *
 
-With a 64KB granule, we'll map 512MB blocks if possible, otherwise 64K.
-And with a 4KB granule, the original code will map 2MB blocks if
-possible, and 4KB otherwise.
+We really need to have the inverse of of_platform_populate which will
+remove all child and child's child devices and clear all flags and such.
+Right now moany drivers are open-coding the removal.
 
-The patch will make the 4KB granule case also map 1GB blocks if
-possible.
-
-> 
-> Does the code always use the largest possible page size, or does
-> it just use either small pages or 1G pages?
-
-The code will put down the largest mappings it can. As the physical
-memory sizes/address are very likely to be aligned to whatever block
-size we use; we are likely to achieve the maximum size for our
-mappings.
+* most drivers are somewhat broken on unbind/rebind anyway, but I don't
+  want to make it impossible for a driver to get it right.
 
 > 
-> In combination with the contiguous page hint, we should be able
-> to theoretically support 4KB/64KB/2M/32M/1G/16G TLBs in any
-> combination for boot-time mappings on a 4K page size kernel,
-> or 64KB/1M/512M/8G on a 64KB page size kernel.
+> >
+> >  #if defined(CONFIG_MICROBLAZE)
+> >         dev->archdata.dma_mask = 0xffffffffUL;
+> > @@ -227,10 +228,14 @@ static struct platform_device *of_platform_device_create_pdata(
+> >
+> >         if (of_device_add(dev) != 0) {
+> >                 platform_device_put(dev);
+> > -               return NULL;
+> > +               goto err_clear_flag;
+> >         }
+> >
+> >         return dev;
+> > +
+> > +err_clear_flag:
+> > +       of_node_clear_flag(np, OF_POPULATED);
+> > +       return NULL;
+> >  }
+> >
+> >  /**
+> > @@ -262,14 +267,15 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
+> >
+> >         pr_debug("Creating amba device %s\n", node->full_name);
+> >
+> > -       if (!of_device_is_available(node))
+> > +       if (!of_device_is_available(node) ||
+> > +                       of_node_check_and_set_flag(node, OF_POPULATED))
+> >                 return NULL;
+> >
+> >         dev = amba_device_alloc(NULL, 0, 0);
+> >         if (!dev) {
+> >                 pr_err("%s(): amba_device_alloc() failed for %s\n",
+> >                        __func__, node->full_name);
+> > -               return NULL;
+> > +               goto err_clear_flag;
+> >         }
+> >
+> >         /* setup generic device info */
+> > @@ -309,6 +315,8 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
+> >
+> >  err_free:
+> >         amba_device_put(dev);
+> > +err_clear_flag:
+> > +       of_node_clear_flag(node, OF_POPULATED);
+> >         return NULL;
+> >  }
+> >  #else /* CONFIG_ARM_AMBA */
+> > diff --git a/include/linux/of.h b/include/linux/of.h
+> > index 3bad8d1..534cab8 100644
+> > --- a/include/linux/of.h
+> > +++ b/include/linux/of.h
+> > @@ -130,6 +130,12 @@ static inline int of_node_check_flag(struct device_node *n, unsigned long flag)
+> >         return test_bit(flag, &n->_flags);
+> >  }
+> >
+> > +static inline int of_node_check_and_set_flag(struct device_node *n,
 > 
-
-A contiguous hint could be applied to these mappings. The logic would
-be a bit more complicated though when we consider different granules.
-For 4KB we chain together 16 entries, for 64KB we use 32. If/when we
-adopt a 16KB granule, we use 32 entries for a level 2 lookup and
-128 entries for a level 3 lookup...
-
-The largest TLB entry sizes that I am aware of in play are the block
-sizes (i.e. 2MB, 512MB, 1GB). So I don't think we'll get any benefit at
-the moment for adding the contiguous logic.
-
-Cheers,
--- 
-Steve
-
-> 	Arnd
+> Please keep the well known naming convention of the called function:
+> of_node_test_and_set_flag
