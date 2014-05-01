@@ -1,78 +1,167 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 01 May 2014 09:03:31 +0100
-Subject: [PATCH/RFC 3/4] of/clk: Register clocks suitable for Runtime PM
- with the PM core
-In-Reply-To: <CAMuHMdUdnoah1uZbMn_xONXZ2i8wG5kY7msMzCdBwS+xt9tmDA@mail.gmail.com>
-References: <1398334403-26181-1-git-send-email-geert+renesas@glider.be>
- <1398334403-26181-4-git-send-email-geert+renesas@glider.be>
- <7hoazpdldx.fsf@paris.lan>
- <20140429131610.29859C4094A@trevor.secretlab.ca>
- <CAMuHMdUdnoah1uZbMn_xONXZ2i8wG5kY7msMzCdBwS+xt9tmDA@mail.gmail.com>
-Message-ID: <20140501080331.D3CFAC409DA@trevor.secretlab.ca>
+From: arun.kk@samsung.com (Arun Kumar K)
+Date: Thu, 1 May 2014 14:01:44 +0530
+Subject: [PATCH v6] clk: Exynos5250: Add clocks for G3D
+In-Reply-To: <53617DD6.60507@gmail.com>
+References: <1398677821-11529-1-git-send-email-arun.kk@samsung.com>
+ <53617DD6.60507@gmail.com>
+Message-ID: <CALt3h78XP+W2TA4F4EtHxtCO0Fm48pmQi1gbir8ScsKLjwUw9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 30 Apr 2014 23:54:37 +0200, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
-> Hi Grant,
-> 
-> On Tue, Apr 29, 2014 at 3:16 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> > On Fri, 25 Apr 2014 16:44:58 -0700, Kevin Hilman <khilman@linaro.org> wrote:
-> >> Geert Uytterhoeven <geert+renesas@glider.be> writes:
-> >>
-> >> > When adding a device from DT, check if its clocks are suitable for Runtime
-> >> > PM, and register them with the PM core.
-> >> > If Runtime PM is disabled, just enable the clock.
-> >> >
-> >> > This allows the PM core to automatically manage gate clocks of devices for
-> >> > Runtime PM.
-> >>
-> >> ...unless the device is already in an existing pm_domain, right?
-> >>
-> >> I like this approach, and it extends nicely what we already do on
-> >> platforms using drivers/base/power/clock_ops.c into DT land.
-> >>
-> >> My only concern is how this will interact if it's used along with
-> >> devices that have existing pm_domains.  I don't have any specific
-> >> concerns (yet, because it's Friday, and my brain is turing off), but it
-> >> just made me wonder if this will be potentially confusing.
-> >
-> > I have big concerns about this approach. First, it will only work if
-> > a clock is available at deivce creation time. The conversion of irq
-> > controllers to normal device drivers has already shown that is a bad
-> > idea.
-> 
-> That's  indeed a valid concern that needs to be addressed.
-> 
-> > I also don't like that it tries to set up every clock, but there is no
-> > guarantee that the driver will even use it. I would rather see this
-> > behaviour linked into the function that obtains the clock at driver
-> > .probe() time. That way it can handle deferred probe correctly and it
-> > only sets up clocks that are actually used by the driver.
-> 
-> Not every clock. Only the clocks that are advertised by the clock driver as
-> being suitable for runtime_pm management. These are typically module
-> clocks, that must be enabled for the module to work. The driver doesn't
-> always want to handle these explicitly.
+Hi Tomasz,
 
-Help me out here becasue I don't understand how that works with this
-patch set. From my, admittedly naive, reading it looks like the setup is
-being done at device creation time, but if the driver (or module) gets
-to declare which clocks need to be enabled in order to work, then that
-information is not available at device creation time.
+On Thu, May 1, 2014 at 4:18 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> On 28.04.2014 11:37, Arun Kumar K wrote:
+>>
+>> This patch adds the required clocks for ARM Mali IP
+>> in Exynos5250.
+>>
+>> Signed-off-by: Arun Kumar K <arun.kk@samsung.com>
+>> ---
+>> Changes from v5
+>> - Addressed comments from Tomasz Figa
+>>    http://www.spinics.net/lists/arm-kernel/msg326118.html
+>> Changes from v4
+>> - Rebased on latest kernel
+>> - Added macros
+>> Changes from v3
+>> - Renamed some clocks as per Tomasz Figa's comments
+>> Changes from v2
+>> - Rebased on clk-next
+>> Changes from v1
+>> - Removed exporting of parent DIV clock for g3d
+>>    as per Tomsz Figa's comment.
+>> ---
+>>   drivers/clk/samsung/clk-exynos5250.c   |   15 ++++++++++++++-
+>>   include/dt-bindings/clock/exynos5250.h |    4 +++-
+>>   2 files changed, 17 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/clk/samsung/clk-exynos5250.c
+>> b/drivers/clk/samsung/clk-exynos5250.c
+>> index e7ee442..df02526 100644
+>> --- a/drivers/clk/samsung/clk-exynos5250.c
+>> +++ b/drivers/clk/samsung/clk-exynos5250.c
+>> @@ -37,6 +37,7 @@
+>>   #define VPLL_CON0             0x10140
+>>   #define GPLL_CON0             0x10150
+>>   #define SRC_TOP0              0x10210
+>> +#define SRC_TOP1               0x10214
+>>   #define SRC_TOP2              0x10218
+>>   #define SRC_TOP3              0x1021c
+>>   #define SRC_GSCL              0x10220
+>> @@ -71,6 +72,7 @@
+>>   #define GATE_IP_GSCL          0x10920
+>>   #define GATE_IP_DISP1         0x10928
+>>   #define GATE_IP_MFC           0x1092c
+>> +#define GATE_IP_G3D            0x10930
+>>   #define GATE_IP_GEN           0x10934
+>>   #define GATE_IP_FSYS          0x10944
+>>   #define GATE_IP_PERIC         0x10950
+>> @@ -100,6 +102,7 @@ static unsigned long exynos5250_clk_regs[] __initdata
+>> = {
+>>         DIV_CPU0,
+>>         SRC_CORE1,
+>>         SRC_TOP0,
+>> +       SRC_TOP1,
+>>         SRC_TOP2,
+>>         SRC_TOP3,
+>>         SRC_GSCL,
+>> @@ -133,6 +136,7 @@ static unsigned long exynos5250_clk_regs[] __initdata
+>> = {
+>>         DIV_PERIC5,
+>>         GATE_IP_GSCL,
+>>         GATE_IP_MFC,
+>> +       GATE_IP_G3D,
+>>         GATE_IP_GEN,
+>>         GATE_IP_FSYS,
+>>         GATE_IP_PERIC,
+>> @@ -189,10 +193,12 @@ PNAME(mout_vpllsrc_p)     = { "fin_pll",
+>> "sclk_hdmi27m" };
+>>   PNAME(mout_vpll_p)    = { "mout_vpllsrc", "fout_vpll" };
+>>   PNAME(mout_cpll_p)    = { "fin_pll", "fout_cpll" };
+>>   PNAME(mout_epll_p)    = { "fin_pll", "fout_epll" };
+>> +PNAME(mout_gpll_p)     = { "fin_pll", "fout_gpll" };
+>>   PNAME(mout_mpll_user_p)       = { "fin_pll", "mout_mpll" };
+>>   PNAME(mout_bpll_user_p)       = { "fin_pll", "mout_bpll" };
+>>   PNAME(mout_aclk166_p) = { "mout_cpll", "mout_mpll_user" };
+>>   PNAME(mout_aclk200_p) = { "mout_mpll_user", "mout_bpll_user" };
+>> +PNAME(mout_aclk400_p)  = { "mout_aclk400_g3d_mid", "mout_gpll" };
+>>   PNAME(mout_aclk200_sub_p) = { "fin_pll", "div_aclk200" };
+>>   PNAME(mout_aclk266_sub_p) = { "fin_pll", "div_aclk266" };
+>>   PNAME(mout_aclk333_sub_p) = { "fin_pll", "div_aclk333" };
+>> @@ -273,12 +279,16 @@ static struct samsung_mux_clock
+>> exynos5250_mux_clks[] __initdata = {
+>>         MUX(0, "mout_aclk166", mout_aclk166_p, SRC_TOP0, 8, 1),
+>>         MUX(0, "mout_aclk200", mout_aclk200_p, SRC_TOP0, 12, 1),
+>>         MUX(0, "mout_aclk333", mout_aclk166_p, SRC_TOP0, 16, 1),
+>> +       MUX(0, "mout_aclk400_g3d_mid", mout_aclk200_p, SRC_TOP0, 20, 1),
+>> +
+>> +       MUX(0, "mout_aclk400_g3d", mout_aclk400_p, SRC_TOP1, 28, 1),
+>>
+>>         MUX(0, "mout_cpll", mout_cpll_p, SRC_TOP2, 8, 1),
+>>         MUX(0, "mout_epll", mout_epll_p, SRC_TOP2, 12, 1),
+>>         MUX(0, "mout_vpll", mout_vpll_p, SRC_TOP2, 16, 1),
+>>         MUX(0, "mout_mpll_user", mout_mpll_user_p, SRC_TOP2, 20, 1),
+>>         MUX(0, "mout_bpll_user", mout_bpll_user_p, SRC_TOP2, 24, 1),
+>> +       MUX(CLK_MOUT_GPLL, "mout_gpll", mout_gpll_p, SRC_TOP2, 28, 1),
+>>
+>>         MUX(0, "mout_aclk200_disp1_sub", mout_aclk200_sub_p, SRC_TOP3, 4,
+>> 1),
+>>         MUX(0, "mout_aclk266_gscl_sub", mout_aclk266_sub_p, SRC_TOP3, 8,
+>> 1),
+>> @@ -351,6 +361,8 @@ static struct samsung_div_clock exynos5250_div_clks[]
+>> __initdata = {
+>>         DIV(0, "div_aclk200", "mout_aclk200", DIV_TOP0, 12, 3),
+>>         DIV(0, "div_aclk266", "mout_mpll_user", DIV_TOP0, 16, 3),
+>>         DIV(0, "div_aclk333", "mout_aclk333", DIV_TOP0, 20, 3),
+>> +       DIV(0, "div_aclk400_g3d", "mout_aclk400_g3d", DIV_TOP0,
+>> +                                                       24, 3),
+>>
+>>         DIV(0, "div_aclk66_pre", "mout_mpll_user", DIV_TOP1, 24, 3),
+>>
+>> @@ -533,7 +545,8 @@ static struct samsung_gate_clock
+>> exynos5250_gate_clks[] __initdata = {
+>>                 0),
+>>         GATE(CLK_SMMU_MFCL, "smmu_mfcl", "mout_aclk333_sub", GATE_IP_MFC,
+>> 2, 0,
+>>                 0),
+>> -
+>> +       GATE(CLK_G3D, "g3d", "div_aclk400_g3d", GATE_IP_G3D, 0,
+>> +                                       CLK_SET_RATE_PARENT, 0),
+>>         GATE(CLK_ROTATOR, "rotator", "div_aclk266", GATE_IP_GEN, 1, 0, 0),
+>>         GATE(CLK_JPEG, "jpeg", "div_aclk166", GATE_IP_GEN, 2, 0, 0),
+>>         GATE(CLK_MDMA1, "mdma1", "div_aclk266", GATE_IP_GEN, 4, 0, 0),
+>> diff --git a/include/dt-bindings/clock/exynos5250.h
+>> b/include/dt-bindings/clock/exynos5250.h
+>> index 922f2dc..a3c6777 100644
+>> --- a/include/dt-bindings/clock/exynos5250.h
+>> +++ b/include/dt-bindings/clock/exynos5250.h
+>> @@ -150,11 +150,13 @@
+>>   #define CLK_G2D                       345
+>>   #define CLK_MDMA0             346
+>>   #define CLK_SMMU_MDMA0                347
+>> +#define CLK_G3D                        348
+>>
+>>   /* mux clocks */
+>>   #define CLK_MOUT_HDMI         1024
+>> +#define CLK_MOUT_GPLL          1025
+>>
+>>   /* must be greater than maximal clock id */
+>> -#define CLK_NR_CLKS            1025
+>> +#define CLK_NR_CLKS            1026
+>>
+>>   #endif /* _DT_BINDINGS_CLOCK_EXYNOS_5250_H */
+>>
+>
+> Applied.
+>
 
-> In fact we have one case on shmobile where the module clock for an IP
-> core (rcar-gpio) is enabled unconditionally in one SoC,  while it became
-> controllable through a gate clock in a later SoC.
-> With my patch, just adding the clock to the DT node is sufficient to make
-> it work.
-> 
-> Gr{oetje,eeting}s,
-> 
->                         Geert
-> 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-> 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
+Thanks. Can you have a look at this patch too -
+https://patchwork.kernel.org/patch/4076161/
+It is for the same purpose (for Mali GPU) in 5420 SoC.
+
+Regards
+Arun
+
+> Best regards,
+> Tomasz
