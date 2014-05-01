@@ -1,31 +1,26 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Wed, 30 Apr 2014 20:27:56 -0700
-Subject: [alsa-devel] [PATCH 01/15] ASoC: CS42L51 and WM8962 codecs
- depend on INPUT
-In-Reply-To: <08914164-8CE6-4170-BC21-9E2840FFA05E@cirrus.com>
+Date: Wed, 30 Apr 2014 20:30:57 -0700
+Subject: [PATCH 03/15] ASoC: SMDK_WM8580_PCM needs REGMAP_I2C
+In-Reply-To: <1398770316-19715-4-git-send-email-kaixu.xia@linaro.org>
 References: <1398770316-19715-1-git-send-email-kaixu.xia@linaro.org>
- <1398770316-19715-2-git-send-email-kaixu.xia@linaro.org>
- <alpine.DEB.2.02.1404292124270.31465@heelrod>
- <20140501013103.GK3245@sirena.org.uk>
- <13D36045-EE68-418B-983B-2704C52391E3@cirrus.com>
- <08914164-8CE6-4170-BC21-9E2840FFA05E@cirrus.com>
-Message-ID: <20140501032756.GM3245@sirena.org.uk>
+ <1398770316-19715-4-git-send-email-kaixu.xia@linaro.org>
+Message-ID: <20140501033057.GO3245@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 01, 2014 at 02:16:27AM +0000, Austin, Brian wrote:
+On Tue, Apr 29, 2014 at 07:18:24PM +0800, Xia Kaixu wrote:
+> From: Arnd Bergmann <arnd@arndb.de>
+> 
+> This adds a missing dependency for SND_SOC_SMDK_WM8580_PCM to
+> require REGMAP_I2C to be enabled, avoiding possible build
+> erorrs.
 
-> Apparently not.
-> I would like to come up with a better solution than making INPUT a requirement. I just need some time.
-> In the meantime I suppose it?s OK to apply it? 
-
-Yeah.  Realistically it's probably not going to ever be a practical
-problem - the number of systems with audio but no input is likely to be
-very close to zero.
+Applied, thanks.  As well as the Cc list thing please try to use subject
+lines matching the style for the subsystem.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140430/75e65354/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140430/1971b613/attachment-0001.sig>
