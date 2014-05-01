@@ -1,217 +1,472 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  1 May 2014 17:49:36 +0200
-Subject: [PATCH resend 04/15] arm64: add support for kernel mode NEON in
- interrupt context
+Date: Thu,  1 May 2014 17:49:38 +0200
+Subject: [PATCH resend 06/15] arm64/crypto: SHA-224/SHA-256 using ARMv8 Crypto
+ Extensions
 In-Reply-To: <1398959381-8126-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1398959381-8126-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1398959381-8126-5-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1398959381-8126-7-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch modifies kernel_neon_begin() and kernel_neon_end(), so
-they may be called from any context. To address the case where only
-a couple of registers are needed, kernel_neon_begin_partial(u32) is
-introduced which takes as a parameter the number of bottom 'n' NEON
-q-registers required. To mark the end of such a partial section, the
-regular kernel_neon_end() should be used.
+This patch adds support for the SHA-224 and SHA-256 Secure Hash Algorithms
+for CPUs that have support for the SHA-2 part of the ARM v8 Crypto Extensions.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/include/asm/fpsimd.h       | 15 ++++++++++++
- arch/arm64/include/asm/fpsimdmacros.h | 35 ++++++++++++++++++++++++++++
- arch/arm64/include/asm/neon.h         |  6 ++++-
- arch/arm64/kernel/entry-fpsimd.S      | 24 +++++++++++++++++++
- arch/arm64/kernel/fpsimd.c            | 44 ++++++++++++++++++++++++-----------
- 5 files changed, 109 insertions(+), 15 deletions(-)
+ arch/arm64/crypto/Kconfig        |   5 +
+ arch/arm64/crypto/Makefile       |   3 +
+ arch/arm64/crypto/sha2-ce-core.S | 156 ++++++++++++++++++++++++
+ arch/arm64/crypto/sha2-ce-glue.c | 254 +++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 418 insertions(+)
+ create mode 100644 arch/arm64/crypto/sha2-ce-core.S
+ create mode 100644 arch/arm64/crypto/sha2-ce-glue.c
 
-diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-index 7a900142dbc8..05e1b24aca4c 100644
---- a/arch/arm64/include/asm/fpsimd.h
-+++ b/arch/arm64/include/asm/fpsimd.h
-@@ -41,6 +41,17 @@ struct fpsimd_state {
- 	unsigned int cpu;
- };
+diff --git a/arch/arm64/crypto/Kconfig b/arch/arm64/crypto/Kconfig
+index 7956881b5986..eb1e99770c21 100644
+--- a/arch/arm64/crypto/Kconfig
++++ b/arch/arm64/crypto/Kconfig
+@@ -13,4 +13,9 @@ config CRYPTO_SHA1_ARM64_CE
+ 	depends on ARM64 && KERNEL_MODE_NEON
+ 	select CRYPTO_HASH
  
++config CRYPTO_SHA2_ARM64_CE
++	tristate "SHA-224/SHA-256 digest algorithm (ARMv8 Crypto Extensions)"
++	depends on ARM64 && KERNEL_MODE_NEON
++	select CRYPTO_HASH
++
+ endif
+diff --git a/arch/arm64/crypto/Makefile b/arch/arm64/crypto/Makefile
+index 0ed3caaec81b..0b3885a60d43 100644
+--- a/arch/arm64/crypto/Makefile
++++ b/arch/arm64/crypto/Makefile
+@@ -10,3 +10,6 @@
+ 
+ obj-$(CONFIG_CRYPTO_SHA1_ARM64_CE) += sha1-ce.o
+ sha1-ce-y := sha1-ce-glue.o sha1-ce-core.o
++
++obj-$(CONFIG_CRYPTO_SHA2_ARM64_CE) += sha2-ce.o
++sha2-ce-y := sha2-ce-glue.o sha2-ce-core.o
+diff --git a/arch/arm64/crypto/sha2-ce-core.S b/arch/arm64/crypto/sha2-ce-core.S
+new file mode 100644
+index 000000000000..53e750614169
+--- /dev/null
++++ b/arch/arm64/crypto/sha2-ce-core.S
+@@ -0,0 +1,156 @@
 +/*
-+ * Struct for stacking the bottom 'n' FP/SIMD registers.
-+ */
-+struct fpsimd_partial_state {
-+	u32		num_regs;
-+	u32		fpsr;
-+	u32		fpcr;
-+	__uint128_t	vregs[32] __aligned(16);
-+} __aligned(16);
-+
-+
- #if defined(__KERNEL__) && defined(CONFIG_COMPAT)
- /* Masks for extracting the FPSR and FPCR from the FPSCR */
- #define VFP_FPSCR_STAT_MASK	0xf800009f
-@@ -66,6 +77,10 @@ extern void fpsimd_update_current_state(struct fpsimd_state *state);
- 
- extern void fpsimd_flush_task_state(struct task_struct *target);
- 
-+extern void fpsimd_save_partial_state(struct fpsimd_partial_state *state,
-+				      u32 num_regs);
-+extern void fpsimd_load_partial_state(struct fpsimd_partial_state *state);
-+
- #endif
- 
- #endif
-diff --git a/arch/arm64/include/asm/fpsimdmacros.h b/arch/arm64/include/asm/fpsimdmacros.h
-index bbec599c96bd..69e75134689d 100644
---- a/arch/arm64/include/asm/fpsimdmacros.h
-+++ b/arch/arm64/include/asm/fpsimdmacros.h
-@@ -62,3 +62,38 @@
- 	ldr	w\tmpnr, [\state, #16 * 2 + 4]
- 	msr	fpcr, x\tmpnr
- .endm
-+
-+.altmacro
-+.macro fpsimd_save_partial state, numnr, tmpnr1, tmpnr2
-+	mrs	x\tmpnr1, fpsr
-+	str	w\numnr, [\state]
-+	mrs	x\tmpnr2, fpcr
-+	stp	w\tmpnr1, w\tmpnr2, [\state, #4]
-+	adr	x\tmpnr1, 0f
-+	add	\state, \state, x\numnr, lsl #4
-+	sub	x\tmpnr1, x\tmpnr1, x\numnr, lsl #1
-+	br	x\tmpnr1
-+	.irp	qa, 30, 28, 26, 24, 22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 2, 0
-+	.irp	qb, %(qa + 1)
-+	stp	q\qa, q\qb, [\state, # -16 * \qa - 16]
-+	.endr
-+	.endr
-+0:
-+.endm
-+
-+.macro fpsimd_restore_partial state, tmpnr1, tmpnr2
-+	ldp	w\tmpnr1, w\tmpnr2, [\state, #4]
-+	msr	fpsr, x\tmpnr1
-+	msr	fpcr, x\tmpnr2
-+	adr	x\tmpnr1, 0f
-+	ldr	w\tmpnr2, [\state]
-+	add	\state, \state, x\tmpnr2, lsl #4
-+	sub	x\tmpnr1, x\tmpnr1, x\tmpnr2, lsl #1
-+	br	x\tmpnr1
-+	.irp	qa, 30, 28, 26, 24, 22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 2, 0
-+	.irp	qb, %(qa + 1)
-+	ldp	q\qa, q\qb, [\state, # -16 * \qa - 16]
-+	.endr
-+	.endr
-+0:
-+.endm
-diff --git a/arch/arm64/include/asm/neon.h b/arch/arm64/include/asm/neon.h
-index b0cc58a97780..13ce4cc18e26 100644
---- a/arch/arm64/include/asm/neon.h
-+++ b/arch/arm64/include/asm/neon.h
-@@ -8,7 +8,11 @@
-  * published by the Free Software Foundation.
-  */
- 
-+#include <linux/types.h>
-+
- #define cpu_has_neon()		(1)
- 
--void kernel_neon_begin(void);
-+#define kernel_neon_begin()	kernel_neon_begin_partial(32)
-+
-+void kernel_neon_begin_partial(u32 num_regs);
- void kernel_neon_end(void);
-diff --git a/arch/arm64/kernel/entry-fpsimd.S b/arch/arm64/kernel/entry-fpsimd.S
-index 6a27cd6dbfa6..d358ccacfc00 100644
---- a/arch/arm64/kernel/entry-fpsimd.S
-+++ b/arch/arm64/kernel/entry-fpsimd.S
-@@ -41,3 +41,27 @@ ENTRY(fpsimd_load_state)
- 	fpsimd_restore x0, 8
- 	ret
- ENDPROC(fpsimd_load_state)
-+
-+#ifdef CONFIG_KERNEL_MODE_NEON
-+
-+/*
-+ * Save the bottom n FP registers.
++ * sha2-ce-core.S - core SHA-224/SHA-256 transform using v8 Crypto Extensions
 + *
-+ * x0 - pointer to struct fpsimd_partial_state
-+ */
-+ENTRY(fpsimd_save_partial_state)
-+	fpsimd_save_partial x0, 1, 8, 9
-+	ret
-+ENDPROC(fpsimd_load_partial_state)
-+
-+/*
-+ * Load the bottom n FP registers.
++ * Copyright (C) 2014 Linaro Ltd <ard.biesheuvel@linaro.org>
 + *
-+ * x0 - pointer to struct fpsimd_partial_state
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + */
-+ENTRY(fpsimd_load_partial_state)
-+	fpsimd_restore_partial x0, 8, 9
++
++#include <linux/linkage.h>
++#include <asm/assembler.h>
++
++	.text
++	.arch		armv8-a+crypto
++
++	dga		.req	q20
++	dgav		.req	v20
++	dgb		.req	q21
++	dgbv		.req	v21
++
++	t0		.req	v22
++	t1		.req	v23
++
++	dg0q		.req	q24
++	dg0v		.req	v24
++	dg1q		.req	q25
++	dg1v		.req	v25
++	dg2q		.req	q26
++	dg2v		.req	v26
++
++	.macro		add_only, ev, rc, s0
++	mov		dg2v.16b, dg0v.16b
++	.ifeq		\ev
++	add		t1.4s, v\s0\().4s, \rc\().4s
++	sha256h		dg0q, dg1q, t0.4s
++	sha256h2	dg1q, dg2q, t0.4s
++	.else
++	.ifnb		\s0
++	add		t0.4s, v\s0\().4s, \rc\().4s
++	.endif
++	sha256h		dg0q, dg1q, t1.4s
++	sha256h2	dg1q, dg2q, t1.4s
++	.endif
++	.endm
++
++	.macro		add_update, ev, rc, s0, s1, s2, s3
++	sha256su0	v\s0\().4s, v\s1\().4s
++	sha256su1	v\s0\().4s, v\s2\().4s, v\s3\().4s
++	add_only	\ev, \rc, \s1
++	.endm
++
++	/*
++	 * The SHA-256 round constants
++	 */
++	.align		4
++.Lsha2_rcon:
++	.word		0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5
++	.word		0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5
++	.word		0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3
++	.word		0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174
++	.word		0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc
++	.word		0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da
++	.word		0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7
++	.word		0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967
++	.word		0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13
++	.word		0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85
++	.word		0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3
++	.word		0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070
++	.word		0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5
++	.word		0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3
++	.word		0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208
++	.word		0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
++
++	/*
++	 * void sha2_ce_transform(int blocks, u8 const *src, u32 *state,
++	 *                        u8 *head, long bytes)
++	 */
++ENTRY(sha2_ce_transform)
++	/* load round constants */
++	adr		x8, .Lsha2_rcon
++	ld1		{ v0.4s- v3.4s}, [x8], #64
++	ld1		{ v4.4s- v7.4s}, [x8], #64
++	ld1		{ v8.4s-v11.4s}, [x8], #64
++	ld1		{v12.4s-v15.4s}, [x8]
++
++	/* load state */
++	ldp		dga, dgb, [x2]
++
++	/* load partial input (if supplied) */
++	cbz		x3, 0f
++	ld1		{v16.4s-v19.4s}, [x3]
++	b		1f
++
++	/* load input */
++0:	ld1		{v16.4s-v19.4s}, [x1], #64
++	sub		w0, w0, #1
++
++1:
++CPU_LE(	rev32		v16.16b, v16.16b	)
++CPU_LE(	rev32		v17.16b, v17.16b	)
++CPU_LE(	rev32		v18.16b, v18.16b	)
++CPU_LE(	rev32		v19.16b, v19.16b	)
++
++2:	add		t0.4s, v16.4s, v0.4s
++	mov		dg0v.16b, dgav.16b
++	mov		dg1v.16b, dgbv.16b
++
++	add_update	0,  v1, 16, 17, 18, 19
++	add_update	1,  v2, 17, 18, 19, 16
++	add_update	0,  v3, 18, 19, 16, 17
++	add_update	1,  v4, 19, 16, 17, 18
++
++	add_update	0,  v5, 16, 17, 18, 19
++	add_update	1,  v6, 17, 18, 19, 16
++	add_update	0,  v7, 18, 19, 16, 17
++	add_update	1,  v8, 19, 16, 17, 18
++
++	add_update	0,  v9, 16, 17, 18, 19
++	add_update	1, v10, 17, 18, 19, 16
++	add_update	0, v11, 18, 19, 16, 17
++	add_update	1, v12, 19, 16, 17, 18
++
++	add_only	0, v13, 17
++	add_only	1, v14, 18
++	add_only	0, v15, 19
++	add_only	1
++
++	/* update state */
++	add		dgav.4s, dgav.4s, dg0v.4s
++	add		dgbv.4s, dgbv.4s, dg1v.4s
++
++	/* handled all input blocks? */
++	cbnz		w0, 0b
++
++	/*
++	 * Final block: add padding and total bit count.
++	 * Skip if we have no total byte count in x4. In that case, the input
++	 * size was not a round multiple of the block size, and the padding is
++	 * handled by the C code.
++	 */
++	cbz		x4, 3f
++	movi		v17.2d, #0
++	mov		x8, #0x80000000
++	movi		v18.2d, #0
++	ror		x7, x4, #29		// ror(lsl(x4, 3), 32)
++	fmov		d16, x8
++	mov		x4, #0
++	mov		v19.d[0], xzr
++	mov		v19.d[1], x7
++	b		2b
++
++	/* store new state */
++3:	stp		dga, dgb, [x2]
 +	ret
-+ENDPROC(fpsimd_load_partial_state)
++ENDPROC(sha2_ce_transform)
+diff --git a/arch/arm64/crypto/sha2-ce-glue.c b/arch/arm64/crypto/sha2-ce-glue.c
+new file mode 100644
+index 000000000000..81617262b3df
+--- /dev/null
++++ b/arch/arm64/crypto/sha2-ce-glue.c
+@@ -0,0 +1,254 @@
++/*
++ * sha2-ce-glue.c - SHA-224/SHA-256 using ARMv8 Crypto Extensions
++ *
++ * Copyright (C) 2014 Linaro Ltd <ard.biesheuvel@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
 +
-+#endif
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 6cfbb4ef27d7..82ebc259a787 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -218,29 +218,45 @@ void fpsimd_flush_task_state(struct task_struct *t)
- 
- #ifdef CONFIG_KERNEL_MODE_NEON
- 
-+static DEFINE_PER_CPU(struct fpsimd_partial_state, hardirq_fpsimdstate);
-+static DEFINE_PER_CPU(struct fpsimd_partial_state, softirq_fpsimdstate);
++#include <asm/neon.h>
++#include <asm/unaligned.h>
++#include <crypto/internal/hash.h>
++#include <crypto/sha.h>
++#include <linux/cpufeature.h>
++#include <linux/crypto.h>
++#include <linux/module.h>
 +
- /*
-  * Kernel-side NEON support functions
-  */
--void kernel_neon_begin(void)
-+void kernel_neon_begin_partial(u32 num_regs)
- {
--	/* Avoid using the NEON in interrupt context */
--	BUG_ON(in_interrupt());
--	preempt_disable();
-+	if (in_interrupt()) {
-+		struct fpsimd_partial_state *s = this_cpu_ptr(
-+			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
- 
--	/*
--	 * Save the userland FPSIMD state if we have one and if we haven't done
--	 * so already. Clear fpsimd_last_state to indicate that there is no
--	 * longer userland FPSIMD state in the registers.
--	 */
--	if (current->mm && !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
--		fpsimd_save_state(&current->thread.fpsimd_state);
--	this_cpu_write(fpsimd_last_state, NULL);
-+		BUG_ON(num_regs > 32);
-+		fpsimd_save_partial_state(s, roundup(num_regs, 2));
-+	} else {
-+		/*
-+		 * Save the userland FPSIMD state if we have one and if we
-+		 * haven't done so already. Clear fpsimd_last_state to indicate
-+		 * that there is no longer userland FPSIMD state in the
-+		 * registers.
-+		 */
-+		preempt_disable();
-+		if (current->mm &&
-+		    !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
-+			fpsimd_save_state(&current->thread.fpsimd_state);
-+		this_cpu_write(fpsimd_last_state, NULL);
++MODULE_DESCRIPTION("SHA-224/SHA-256 secure hash using ARMv8 Crypto Extensions");
++MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
++MODULE_LICENSE("GPL v2");
++
++asmlinkage void sha2_ce_transform(int blocks, u8 const *src, u32 *state,
++				 u8 *head, long bytes);
++
++static int sha224_init(struct shash_desc *desc)
++{
++	struct sha256_state *sctx = shash_desc_ctx(desc);
++
++	*sctx = (struct sha256_state){
++		.state = {
++			SHA224_H0, SHA224_H1, SHA224_H2, SHA224_H3,
++			SHA224_H4, SHA224_H5, SHA224_H6, SHA224_H7,
++		}
++	};
++	return 0;
++}
++
++static int sha256_init(struct shash_desc *desc)
++{
++	struct sha256_state *sctx = shash_desc_ctx(desc);
++
++	*sctx = (struct sha256_state){
++		.state = {
++			SHA256_H0, SHA256_H1, SHA256_H2, SHA256_H3,
++			SHA256_H4, SHA256_H5, SHA256_H6, SHA256_H7,
++		}
++	};
++	return 0;
++}
++
++static int sha2_update(struct shash_desc *desc, const u8 *data,
++		       unsigned int len)
++{
++	struct sha256_state *sctx = shash_desc_ctx(desc);
++	unsigned int partial = sctx->count % SHA256_BLOCK_SIZE;
++
++	sctx->count += len;
++
++	if ((partial + len) >= SHA256_BLOCK_SIZE) {
++		int blocks;
++
++		if (partial) {
++			int p = SHA256_BLOCK_SIZE - partial;
++
++			memcpy(sctx->buf + partial, data, p);
++			data += p;
++			len -= p;
++		}
++
++		blocks = len / SHA256_BLOCK_SIZE;
++		len %= SHA256_BLOCK_SIZE;
++
++		kernel_neon_begin_partial(28);
++		sha2_ce_transform(blocks, data, sctx->state,
++				  partial ? sctx->buf : NULL, 0);
++		kernel_neon_end();
++
++		data += blocks * SHA256_BLOCK_SIZE;
++		partial = 0;
 +	}
- }
--EXPORT_SYMBOL(kernel_neon_begin);
-+EXPORT_SYMBOL(kernel_neon_begin_partial);
- 
- void kernel_neon_end(void)
- {
--	preempt_enable();
-+	if (in_interrupt()) {
-+		struct fpsimd_partial_state *s = this_cpu_ptr(
-+			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
-+		fpsimd_load_partial_state(s);
-+	} else {
-+		preempt_enable();
++	if (len)
++		memcpy(sctx->buf + partial, data, len);
++	return 0;
++}
++
++static void sha2_final(struct shash_desc *desc)
++{
++	static const u8 padding[SHA256_BLOCK_SIZE] = { 0x80, };
++
++	struct sha256_state *sctx = shash_desc_ctx(desc);
++	__be64 bits = cpu_to_be64(sctx->count << 3);
++	u32 padlen = SHA256_BLOCK_SIZE
++		     - ((sctx->count + sizeof(bits)) % SHA256_BLOCK_SIZE);
++
++	sha2_update(desc, padding, padlen);
++	sha2_update(desc, (const u8 *)&bits, sizeof(bits));
++}
++
++static int sha224_final(struct shash_desc *desc, u8 *out)
++{
++	struct sha256_state *sctx = shash_desc_ctx(desc);
++	__be32 *dst = (__be32 *)out;
++	int i;
++
++	sha2_final(desc);
++
++	for (i = 0; i < SHA224_DIGEST_SIZE / sizeof(__be32); i++)
++		put_unaligned_be32(sctx->state[i], dst++);
++
++	*sctx = (struct sha256_state){};
++	return 0;
++}
++
++static int sha256_final(struct shash_desc *desc, u8 *out)
++{
++	struct sha256_state *sctx = shash_desc_ctx(desc);
++	__be32 *dst = (__be32 *)out;
++	int i;
++
++	sha2_final(desc);
++
++	for (i = 0; i < SHA256_DIGEST_SIZE / sizeof(__be32); i++)
++		put_unaligned_be32(sctx->state[i], dst++);
++
++	*sctx = (struct sha256_state){};
++	return 0;
++}
++
++static void sha2_finup(struct shash_desc *desc, const u8 *data,
++		       unsigned int len)
++{
++	struct sha256_state *sctx = shash_desc_ctx(desc);
++	int blocks;
++
++	if (sctx->count || !len || (len % SHA256_BLOCK_SIZE)) {
++		sha2_update(desc, data, len);
++		sha2_final(desc);
++		return;
 +	}
- }
- EXPORT_SYMBOL(kernel_neon_end);
- 
++
++	/*
++	 * Use a fast path if the input is a multiple of 64 bytes. In
++	 * this case, there is no need to copy data around, and we can
++	 * perform the entire digest calculation in a single invocation
++	 * of sha2_ce_transform()
++	 */
++	blocks = len / SHA256_BLOCK_SIZE;
++
++	kernel_neon_begin_partial(28);
++	sha2_ce_transform(blocks, data, sctx->state, NULL, len);
++	kernel_neon_end();
++}
++
++static int sha224_finup(struct shash_desc *desc, const u8 *data,
++			unsigned int len, u8 *out)
++{
++	struct sha256_state *sctx = shash_desc_ctx(desc);
++	__be32 *dst = (__be32 *)out;
++	int i;
++
++	sha2_finup(desc, data, len);
++
++	for (i = 0; i < SHA224_DIGEST_SIZE / sizeof(__be32); i++)
++		put_unaligned_be32(sctx->state[i], dst++);
++
++	*sctx = (struct sha256_state){};
++	return 0;
++}
++
++static int sha256_finup(struct shash_desc *desc, const u8 *data,
++			unsigned int len, u8 *out)
++{
++	struct sha256_state *sctx = shash_desc_ctx(desc);
++	__be32 *dst = (__be32 *)out;
++	int i;
++
++	sha2_finup(desc, data, len);
++
++	for (i = 0; i < SHA256_DIGEST_SIZE / sizeof(__be32); i++)
++		put_unaligned_be32(sctx->state[i], dst++);
++
++	*sctx = (struct sha256_state){};
++	return 0;
++}
++
++static int sha2_export(struct shash_desc *desc, void *out)
++{
++	struct sha256_state *sctx = shash_desc_ctx(desc);
++	struct sha256_state *dst = out;
++
++	*dst = *sctx;
++	return 0;
++}
++
++static int sha2_import(struct shash_desc *desc, const void *in)
++{
++	struct sha256_state *sctx = shash_desc_ctx(desc);
++	struct sha256_state const *src = in;
++
++	*sctx = *src;
++	return 0;
++}
++
++static struct shash_alg algs[] = { {
++	.init			= sha224_init,
++	.update			= sha2_update,
++	.final			= sha224_final,
++	.finup			= sha224_finup,
++	.export			= sha2_export,
++	.import			= sha2_import,
++	.descsize		= sizeof(struct sha256_state),
++	.digestsize		= SHA224_DIGEST_SIZE,
++	.statesize		= sizeof(struct sha256_state),
++	.base			= {
++		.cra_name		= "sha224",
++		.cra_driver_name	= "sha224-ce",
++		.cra_priority		= 200,
++		.cra_flags		= CRYPTO_ALG_TYPE_SHASH,
++		.cra_blocksize		= SHA256_BLOCK_SIZE,
++		.cra_module		= THIS_MODULE,
++	}
++}, {
++	.init			= sha256_init,
++	.update			= sha2_update,
++	.final			= sha256_final,
++	.finup			= sha256_finup,
++	.export			= sha2_export,
++	.import			= sha2_import,
++	.descsize		= sizeof(struct sha256_state),
++	.digestsize		= SHA256_DIGEST_SIZE,
++	.statesize		= sizeof(struct sha256_state),
++	.base			= {
++		.cra_name		= "sha256",
++		.cra_driver_name	= "sha256-ce",
++		.cra_priority		= 200,
++		.cra_flags		= CRYPTO_ALG_TYPE_SHASH,
++		.cra_blocksize		= SHA256_BLOCK_SIZE,
++		.cra_module		= THIS_MODULE,
++	}
++} };
++
++static int __init sha2_ce_mod_init(void)
++{
++	return crypto_register_shashes(algs, ARRAY_SIZE(algs));
++}
++
++static void __exit sha2_ce_mod_fini(void)
++{
++	crypto_unregister_shashes(algs, ARRAY_SIZE(algs));
++}
++
++module_cpu_feature_match(SHA2, sha2_ce_mod_init);
++module_exit(sha2_ce_mod_fini);
 -- 
 1.8.3.2
