@@ -1,789 +1,150 @@
 From: carlo@caione.org (Carlo Caione)
-Date: Thu,  1 May 2014 14:29:34 +0200
-Subject: [PATCH v5 8/8] ARM: sun7i/sun4i: dt: Add AXP209 support to various
- boards
-In-Reply-To: <1398947374-3115-1-git-send-email-carlo@caione.org>
-References: <1398947374-3115-1-git-send-email-carlo@caione.org>
-Message-ID: <1398947374-3115-9-git-send-email-carlo@caione.org>
+Date: Thu,  1 May 2014 14:29:26 +0200
+Subject: [PATCH v5 0/8] mfd: AXP20x: Add support for AXP202 and AXP209
+Message-ID: <1398947374-3115-1-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-Signed-off-by: Carlo Caione <carlo@caione.org>
----
- arch/arm/boot/dts/sun4i-a10-a1000.dts           | 58 ++++++++++++++++++++++
- arch/arm/boot/dts/sun4i-a10-cubieboard.dts      | 58 ++++++++++++++++++++++
- arch/arm/boot/dts/sun4i-a10-hackberry.dts       | 64 ++++++++++++++++++++++++
- arch/arm/boot/dts/sun4i-a10-inet97fv2.dts       | 58 ++++++++++++++++++++++
- arch/arm/boot/dts/sun4i-a10-mini-xplus.dts      | 65 +++++++++++++++++++++++++
- arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts  | 64 ++++++++++++++++++++++++
- arch/arm/boot/dts/sun4i-a10-pcduino.dts         | 58 ++++++++++++++++++++++
- arch/arm/boot/dts/sun7i-a20-cubieboard2.dts     | 59 ++++++++++++++++++++++
- arch/arm/boot/dts/sun7i-a20-cubietruck.dts      | 59 ++++++++++++++++++++++
- arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 59 ++++++++++++++++++++++
- 10 files changed, 602 insertions(+)
+AXP209 and AXP202 are the PMUs (Power Management Unit) used by A10, A13
+and A20 SoCs and developed by X-Powers, a sister company of Allwinner.
+AXP20x comprises an adaptive USB-Compatible PWM charger, 2 BUCK DC-DC
+converters, 5 LDOs, multiple 12-bit ADCs of voltage, current and temperature
+as well as 4 configurable GPIOs. 
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-a1000.dts b/arch/arm/boot/dts/sun4i-a10-a1000.dts
-index fa746aea..57d3fb4 100644
---- a/arch/arm/boot/dts/sun4i-a10-a1000.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-a1000.dts
-@@ -88,6 +88,56 @@
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&i2c0_pins_a>;
- 			status = "okay";
-+
-+			axp209: pmic at 34 {
-+				compatible = "x-powers,axp209";
-+				reg = <0x34>;
-+				interrupts = <0>;
-+
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+
-+				acin-supply = <&reg_axp_ipsout>;
-+				vin2-supply = <&reg_axp_ipsout>;
-+				vin3-supply = <&reg_axp_ipsout>;
-+				ldo24in-supply = <&reg_axp_ipsout>;
-+				ldo3in-supply = <&reg_axp_ipsout>;
-+				ldo5in-supply = <&reg_axp_ipsout>;
-+
-+				regulators {
-+					x-powers,dcdc-freq = <1500>;
-+
-+					axp_vcore_reg: dcdc2 {
-+						regulator-min-microvolt = <700000>;
-+						regulator-max-microvolt = <2275000>;
-+						regulator-always-on;
-+					};
-+
-+					axp_ddr_reg: dcdc3 {
-+						regulator-always-on;
-+					};
-+
-+					axp_rtc_reg: ldo1 {
-+						regulator-always-on;
-+					};
-+
-+					axp_analog_reg: ldo2 {
-+						regulator-always-on;
-+					};
-+
-+					axp_pll_reg: ldo3 {
-+						regulator-always-on;
-+					};
-+
-+					axp_hdmi_reg: ldo4 {
-+						regulator-always-on;
-+					};
-+
-+					axp_mic_reg: ldo5 {
-+						regulator-always-on;
-+					};
-+				};
-+			};
- 		};
- 	};
- 
-@@ -125,4 +175,12 @@
- 	reg_usb2_vbus: usb2-vbus {
- 		status = "okay";
- 	};
-+
-+	reg_axp_ipsout: axp_ipsout {
-+		compatible = "regulator-fixed";
-+		regulator-name = "axp-ipsout";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+	};
- };
-diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-index 4684cbe..0aed114 100644
---- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-@@ -80,6 +80,56 @@
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&i2c0_pins_a>;
- 			status = "okay";
-+
-+			axp209: pmic at 34 {
-+				compatible = "x-powers,axp209";
-+				reg = <0x34>;
-+				interrupts = <0>;
-+
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+
-+				acin-supply = <&reg_axp_ipsout>;
-+				vin2-supply = <&reg_axp_ipsout>;
-+				vin3-supply = <&reg_axp_ipsout>;
-+				ldo24in-supply = <&reg_axp_ipsout>;
-+				ldo3in-supply = <&reg_axp_ipsout>;
-+				ldo5in-supply = <&reg_axp_ipsout>;
-+
-+				regulators {
-+					x-powers,dcdc-freq = <1500>;
-+
-+					axp_vcore_reg: dcdc2 {
-+						regulator-min-microvolt = <700000>;
-+						regulator-max-microvolt = <2275000>;
-+						regulator-always-on;
-+					};
-+
-+					axp_ddr_reg: dcdc3 {
-+						regulator-always-on;
-+					};
-+
-+					axp_rtc_reg: ldo1 {
-+						regulator-always-on;
-+					};
-+
-+					axp_analog_reg: ldo2 {
-+						regulator-always-on;
-+					};
-+
-+					axp_pll_reg: ldo3 {
-+						regulator-always-on;
-+					};
-+
-+					axp_hdmi_reg: ldo4 {
-+						regulator-always-on;
-+					};
-+
-+					axp_mic_reg: ldo5 {
-+						regulator-always-on;
-+					};
-+				};
-+			};
- 		};
- 
- 		i2c1: i2c at 01c2b000 {
-@@ -117,4 +167,12 @@
- 	reg_usb2_vbus: usb2-vbus {
- 		status = "okay";
- 	};
-+
-+	reg_axp_ipsout: axp_ipsout {
-+		compatible = "regulator-fixed";
-+		regulator-name = "axp-ipsout";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+	};
- };
-diff --git a/arch/arm/boot/dts/sun4i-a10-hackberry.dts b/arch/arm/boot/dts/sun4i-a10-hackberry.dts
-index d7c17e4..c81db47 100644
---- a/arch/arm/boot/dts/sun4i-a10-hackberry.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-hackberry.dts
-@@ -82,6 +82,62 @@
- 			pinctrl-0 = <&uart0_pins_a>;
- 			status = "okay";
- 		};
-+
-+		i2c0: i2c at 01c2ac00 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c0_pins_a>;
-+			status = "okay";
-+
-+			axp209: pmic at 34 {
-+				compatible = "x-powers,axp209";
-+				reg = <0x34>;
-+				interrupts = <0>;
-+
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+
-+				acin-supply = <&reg_axp_ipsout>;
-+				vin2-supply = <&reg_axp_ipsout>;
-+				vin3-supply = <&reg_axp_ipsout>;
-+				ldo24in-supply = <&reg_axp_ipsout>;
-+				ldo3in-supply = <&reg_axp_ipsout>;
-+				ldo5in-supply = <&reg_axp_ipsout>;
-+
-+				regulators {
-+					x-powers,dcdc-freq = <1500>;
-+
-+					axp_vcore_reg: dcdc2 {
-+						regulator-min-microvolt = <700000>;
-+						regulator-max-microvolt = <2275000>;
-+						regulator-always-on;
-+					};
-+
-+					axp_ddr_reg: dcdc3 {
-+						regulator-always-on;
-+					};
-+
-+					axp_rtc_reg: ldo1 {
-+						regulator-always-on;
-+					};
-+
-+					axp_analog_reg: ldo2 {
-+						regulator-always-on;
-+					};
-+
-+					axp_pll_reg: ldo3 {
-+						regulator-always-on;
-+					};
-+
-+					axp_hdmi_reg: ldo4 {
-+						regulator-always-on;
-+					};
-+
-+					axp_mic_reg: ldo5 {
-+						regulator-always-on;
-+					};
-+				};
-+			};
-+		};
- 	};
- 
- 	reg_emac_3v3: emac-3v3 {
-@@ -102,4 +158,12 @@
- 		gpio = <&pio 7 12 0>;
- 		status = "okay";
- 	};
-+
-+	reg_axp_ipsout: axp_ipsout {
-+		compatible = "regulator-fixed";
-+		regulator-name = "axp-ipsout";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+	};
- };
-diff --git a/arch/arm/boot/dts/sun4i-a10-inet97fv2.dts b/arch/arm/boot/dts/sun4i-a10-inet97fv2.dts
-index fe9272e..5d0d3c2 100644
---- a/arch/arm/boot/dts/sun4i-a10-inet97fv2.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-inet97fv2.dts
-@@ -34,6 +34,56 @@
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&i2c0_pins_a>;
- 			status = "okay";
-+
-+			axp209: pmic at 34 {
-+				compatible = "x-powers,axp209";
-+				reg = <0x34>;
-+				interrupts = <0>;
-+
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+
-+				acin-supply = <&reg_axp_ipsout>;
-+				vin2-supply = <&reg_axp_ipsout>;
-+				vin3-supply = <&reg_axp_ipsout>;
-+				ldo24in-supply = <&reg_axp_ipsout>;
-+				ldo3in-supply = <&reg_axp_ipsout>;
-+				ldo5in-supply = <&reg_axp_ipsout>;
-+
-+				regulators {
-+					x-powers,dcdc-freq = <1500>;
-+
-+					axp_vcore_reg: dcdc2 {
-+						regulator-min-microvolt = <700000>;
-+						regulator-max-microvolt = <2275000>;
-+						regulator-always-on;
-+					};
-+
-+					axp_ddr_reg: dcdc3 {
-+						regulator-always-on;
-+					};
-+
-+					axp_rtc_reg: ldo1 {
-+						regulator-always-on;
-+					};
-+
-+					axp_analog_reg: ldo2 {
-+						regulator-always-on;
-+					};
-+
-+					axp_pll_reg: ldo3 {
-+						regulator-always-on;
-+					};
-+
-+					axp_hdmi_reg: ldo4 {
-+						regulator-always-on;
-+					};
-+
-+					axp_mic_reg: ldo5 {
-+						regulator-always-on;
-+					};
-+				};
-+			};
- 		};
- 
- 		usbphy: phy at 01c13400 {
-@@ -66,4 +116,12 @@
- 	reg_usb2_vbus: usb2-vbus {
- 		status = "okay";
- 	};
-+
-+	reg_axp_ipsout: axp_ipsout {
-+		compatible = "regulator-fixed";
-+		regulator-name = "axp-ipsout";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+	};
- };
-diff --git a/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts b/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
-index dd84a9e..b23989d 100644
---- a/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
-@@ -47,6 +47,62 @@
- 			pinctrl-0 = <&uart0_pins_a>;
- 			status = "okay";
- 		};
-+
-+		i2c0: i2c at 01c2ac00 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c0_pins_a>;
-+			status = "okay";
-+
-+			axp209: pmic at 34 {
-+				compatible = "x-powers,axp209";
-+				reg = <0x34>;
-+				interrupts = <0>;
-+
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+
-+				acin-supply = <&reg_axp_ipsout>;
-+				vin2-supply = <&reg_axp_ipsout>;
-+				vin3-supply = <&reg_axp_ipsout>;
-+				ldo24in-supply = <&reg_axp_ipsout>;
-+				ldo3in-supply = <&reg_axp_ipsout>;
-+				ldo5in-supply = <&reg_axp_ipsout>;
-+
-+				regulators {
-+					x-powers,dcdc-freq = <1500>;
-+
-+					axp_vcore_reg: dcdc2 {
-+						regulator-min-microvolt = <700000>;
-+						regulator-max-microvolt = <2275000>;
-+						regulator-always-on;
-+					};
-+
-+					axp_ddr_reg: dcdc3 {
-+						regulator-always-on;
-+					};
-+
-+					axp_rtc_reg: ldo1 {
-+						regulator-always-on;
-+					};
-+
-+					axp_analog_reg: ldo2 {
-+						regulator-always-on;
-+					};
-+
-+					axp_pll_reg: ldo3 {
-+						regulator-always-on;
-+					};
-+
-+					axp_hdmi_reg: ldo4 {
-+						regulator-always-on;
-+					};
-+
-+					axp_mic_reg: ldo5 {
-+						regulator-always-on;
-+					};
-+				};
-+			};
-+		};
- 	};
- 
- 	reg_usb1_vbus: usb1-vbus {
-@@ -56,4 +112,13 @@
- 	reg_usb2_vbus: usb2-vbus {
- 		status = "okay";
- 	};
-+
-+
-+	reg_axp_ipsout: axp_ipsout {
-+		compatible = "regulator-fixed";
-+		regulator-name = "axp-ipsout";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+	};
- };
-diff --git a/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts b/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
-index 66cf0c7..004a6f0 100644
---- a/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
-@@ -81,6 +81,62 @@
- 			pinctrl-0 = <&uart0_pins_a>;
- 			status = "okay";
- 		};
-+
-+		i2c0: i2c at 01c2ac00 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c0_pins_a>;
-+			status = "okay";
-+
-+			axp209: pmic at 34 {
-+				compatible = "x-powers,axp209";
-+				reg = <0x34>;
-+				interrupts = <0>;
-+
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+
-+				acin-supply = <&reg_axp_ipsout>;
-+				vin2-supply = <&reg_axp_ipsout>;
-+				vin3-supply = <&reg_axp_ipsout>;
-+				ldo24in-supply = <&reg_axp_ipsout>;
-+				ldo3in-supply = <&reg_axp_ipsout>;
-+				ldo5in-supply = <&reg_axp_ipsout>;
-+
-+				regulators {
-+					x-powers,dcdc-freq = <1500>;
-+
-+					axp_vcore_reg: dcdc2 {
-+						regulator-min-microvolt = <700000>;
-+						regulator-max-microvolt = <2275000>;
-+						regulator-always-on;
-+					};
-+
-+					axp_ddr_reg: dcdc3 {
-+						regulator-always-on;
-+					};
-+
-+					axp_rtc_reg: ldo1 {
-+						regulator-always-on;
-+					};
-+
-+					axp_analog_reg: ldo2 {
-+						regulator-always-on;
-+					};
-+
-+					axp_pll_reg: ldo3 {
-+						regulator-always-on;
-+					};
-+
-+					axp_hdmi_reg: ldo4 {
-+						regulator-always-on;
-+					};
-+
-+					axp_mic_reg: ldo5 {
-+						regulator-always-on;
-+					};
-+				};
-+			};
-+		};
- 	};
- 
- 	leds {
-@@ -108,4 +164,12 @@
- 	reg_usb2_vbus: usb2-vbus {
- 		status = "okay";
- 	};
-+
-+	reg_axp_ipsout: axp_ipsout {
-+		compatible = "regulator-fixed";
-+		regulator-name = "axp-ipsout";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+	};
- };
-diff --git a/arch/arm/boot/dts/sun4i-a10-pcduino.dts b/arch/arm/boot/dts/sun4i-a10-pcduino.dts
-index 255b47e..fcd7c86 100644
---- a/arch/arm/boot/dts/sun4i-a10-pcduino.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-pcduino.dts
-@@ -66,6 +66,56 @@
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&i2c0_pins_a>;
- 			status = "okay";
-+
-+			axp209: pmic at 34 {
-+				compatible = "x-powers,axp209";
-+				reg = <0x34>;
-+				interrupts = <0>;
-+
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+
-+				acin-supply = <&reg_axp_ipsout>;
-+				vin2-supply = <&reg_axp_ipsout>;
-+				vin3-supply = <&reg_axp_ipsout>;
-+				ldo24in-supply = <&reg_axp_ipsout>;
-+				ldo3in-supply = <&reg_axp_ipsout>;
-+				ldo5in-supply = <&reg_axp_ipsout>;
-+
-+				regulators {
-+					x-powers,dcdc-freq = <1500>;
-+
-+					axp_vcore_reg: dcdc2 {
-+						regulator-min-microvolt = <700000>;
-+						regulator-max-microvolt = <2275000>;
-+						regulator-always-on;
-+					};
-+
-+					axp_ddr_reg: dcdc3 {
-+						regulator-always-on;
-+					};
-+
-+					axp_rtc_reg: ldo1 {
-+						regulator-always-on;
-+					};
-+
-+					axp_analog_reg: ldo2 {
-+						regulator-always-on;
-+					};
-+
-+					axp_pll_reg: ldo3 {
-+						regulator-always-on;
-+					};
-+
-+					axp_hdmi_reg: ldo4 {
-+						regulator-always-on;
-+					};
-+
-+					axp_mic_reg: ldo5 {
-+						regulator-always-on;
-+					};
-+				};
-+			};
- 		};
- 	};
- 
-@@ -76,4 +126,12 @@
- 	reg_usb2_vbus: usb2-vbus {
- 		status = "okay";
- 	};
-+
-+	reg_axp_ipsout: axp_ipsout {
-+		compatible = "regulator-fixed";
-+		regulator-name = "axp-ipsout";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+	};
- };
-diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-index 68de89f..3e748ed 100644
---- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-@@ -66,6 +66,57 @@
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&i2c0_pins_a>;
- 			status = "okay";
-+
-+			axp209: pmic at 34 {
-+				compatible = "x-powers,axp209";
-+				reg = <0x34>;
-+				interrupt-parent = <&nmi_intc>;
-+				interrupts = <0 8>;
-+
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+
-+				acin-supply = <&reg_axp_ipsout>;
-+				vin2-supply = <&reg_axp_ipsout>;
-+				vin3-supply = <&reg_axp_ipsout>;
-+				ldo24in-supply = <&reg_axp_ipsout>;
-+				ldo3in-supply = <&reg_axp_ipsout>;
-+				ldo5in-supply = <&reg_axp_ipsout>;
-+
-+				regulators {
-+					x-powers,dcdc-freq = <1500>;
-+
-+					axp_vcore_reg: dcdc2 {
-+						regulator-min-microvolt = <700000>;
-+						regulator-max-microvolt = <2275000>;
-+						regulator-always-on;
-+					};
-+
-+					axp_ddr_reg: dcdc3 {
-+						regulator-always-on;
-+					};
-+
-+					axp_rtc_reg: ldo1 {
-+						regulator-always-on;
-+					};
-+
-+					axp_analog_reg: ldo2 {
-+						regulator-always-on;
-+					};
-+
-+					axp_pll_reg: ldo3 {
-+						regulator-always-on;
-+					};
-+
-+					axp_hdmi_reg: ldo4 {
-+						regulator-always-on;
-+					};
-+
-+					axp_mic_reg: ldo5 {
-+						regulator-always-on;
-+					};
-+				};
-+			};
- 		};
- 
- 		i2c1: i2c at 01c2b000 {
-@@ -114,4 +165,12 @@
- 	reg_usb2_vbus: usb2-vbus {
- 		status = "okay";
- 	};
-+
-+	reg_axp_ipsout: axp_ipsout {
-+		compatible = "regulator-fixed";
-+		regulator-name = "axp-ipsout";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+	};
- };
-diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-index cb25d3c..d863469 100644
---- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-@@ -73,6 +73,57 @@
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&i2c0_pins_a>;
- 			status = "okay";
-+
-+			axp209: pmic at 34 {
-+				compatible = "x-powers,axp209";
-+				reg = <0x34>;
-+				interrupt-parent = <&nmi_intc>;
-+				interrupts = <0 8>;
-+
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+
-+				acin-supply = <&reg_axp_ipsout>;
-+				vin2-supply = <&reg_axp_ipsout>;
-+				vin3-supply = <&reg_axp_ipsout>;
-+				ldo24in-supply = <&reg_axp_ipsout>;
-+				ldo3in-supply = <&reg_axp_ipsout>;
-+				ldo5in-supply = <&reg_axp_ipsout>;
-+
-+				regulators {
-+					x-powers,dcdc-freq = <1500>;
-+
-+					axp_vcore_reg: dcdc2 {
-+						regulator-min-microvolt = <700000>;
-+						regulator-max-microvolt = <2275000>;
-+						regulator-always-on;
-+					};
-+
-+					axp_ddr_reg: dcdc3 {
-+						regulator-always-on;
-+					};
-+
-+					axp_rtc_reg: ldo1 {
-+						regulator-always-on;
-+					};
-+
-+					axp_analog_reg: ldo2 {
-+						regulator-always-on;
-+					};
-+
-+					axp_pll_reg: ldo3 {
-+						regulator-always-on;
-+					};
-+
-+					axp_hdmi_reg: ldo4 {
-+						regulator-always-on;
-+					};
-+
-+					axp_mic_reg: ldo5 {
-+						regulator-always-on;
-+					};
-+				};
-+			};
- 		};
- 
- 		i2c1: i2c at 01c2b000 {
-@@ -139,4 +190,12 @@
- 	reg_usb2_vbus: usb2-vbus {
- 		status = "okay";
- 	};
-+
-+	reg_axp_ipsout: axp_ipsout {
-+		compatible = "regulator-fixed";
-+		regulator-name = "axp-ipsout";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+	};
- };
-diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-index eeadf76..047340a 100644
---- a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-@@ -95,6 +95,57 @@
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&i2c0_pins_a>;
- 			status = "okay";
-+
-+			axp209: pmic at 34 {
-+				compatible = "x-powers,axp209";
-+				reg = <0x34>;
-+				interrupt-parent = <&nmi_intc>;
-+				interrupts = <0 8>;
-+
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+
-+				acin-supply = <&reg_axp_ipsout>;
-+				vin2-supply = <&reg_axp_ipsout>;
-+				vin3-supply = <&reg_axp_ipsout>;
-+				ldo24in-supply = <&reg_axp_ipsout>;
-+				ldo3in-supply = <&reg_axp_ipsout>;
-+				ldo5in-supply = <&reg_axp_ipsout>;
-+
-+				regulators {
-+					x-powers,dcdc-freq = <1500>;
-+
-+					axp_vcore_reg: dcdc2 {
-+						regulator-min-microvolt = <700000>;
-+						regulator-max-microvolt = <2275000>;
-+						regulator-always-on;
-+					};
-+
-+					axp_ddr_reg: dcdc3 {
-+						regulator-always-on;
-+					};
-+
-+					axp_rtc_reg: ldo1 {
-+						regulator-always-on;
-+					};
-+
-+					axp_analog_reg: ldo2 {
-+						regulator-always-on;
-+					};
-+
-+					axp_pll_reg: ldo3 {
-+						regulator-always-on;
-+					};
-+
-+					axp_hdmi_reg: ldo4 {
-+						regulator-always-on;
-+					};
-+
-+					axp_mic_reg: ldo5 {
-+						regulator-always-on;
-+					};
-+				};
-+			};
- 		};
- 
- 		i2c1: i2c at 01c2b000 {
-@@ -145,4 +196,12 @@
- 	reg_usb2_vbus: usb2-vbus {
- 		status = "okay";
- 	};
-+
-+	reg_axp_ipsout: axp_ipsout {
-+		compatible = "regulator-fixed";
-+		regulator-name = "axp-ipsout";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+	};
- };
+This set of patches introduces the core driver and support for two different
+subsystems:
+	- Regulators
+	- PEK (Power Enable Key)
+
+Changes since v1:
+
+	- Added a new standalone patch for defconfig
+
+	- MFD core:
+	  * Removed axp,system-power-controller property
+
+	- Bindings documentation:
+	  * Corrected description for dcdc-workmode property
+	  * Removed unused axp20x-pek compatible
+
+	- Input misc PEK driver:
+	  * Fixed seconds in lower case
+
+	- Regulators subsystem:
+	  * Fixed axp20x_set_suspend_voltage()
+	  * Switched to using multi-bit control for regulators
+	  * When "regulators" node is not found driver doesn't quit
+	  * Driver is now using devm_regulator_register()
+	  * Added module_platform_driver() instead of subsys_initcall()
+
+	- DT:
+	  * Added new DTSI for AXP209
+	  * Added support for cubietruck and olinuxino-micro
+
+Changes since v2:
+
+	- Added a new patch for multi_v7_defconfig to enable MFD core
+	  and subsystems
+
+	- DT:
+	  * Dropped axp,system-power-controller property from DTS
+	  * Moved compatible and interrupt-related properties from the
+	    DTSI file to the DTS board files
+
+	- Regulators subsystem:
+	  * Deleted useless struct axp20x_regulators
+	  * Added a warning when out of specs values are used for the
+	    dcdc frequency
+
+	- MFD core:
+	  * Fixed coding style
+	  * Removed IDs from device table for i2c
+
+	- Bindings documentation:
+	  * Several corrections and fixes
+
+Changes since v3:
+
+	- Removed x-powers-axp209.dtsi file
+	- Rewritten bindings document
+
+	- MFD core:
+	  * Fixed casting
+	  * Better comments / documentation
+
+	- Input misc PEK driver:
+	  * Timings are now expressed in ms and the sysfs appies the
+	    closest possible value
+	  * No more useless pretty-printing
+	  * Removed devm_request_threaded_irq in favour of
+	    devm_request_any_context_irq
+	  * Moved from input attributes to platform device attributes
+
+	- Regulators subsystem:
+	  * Removed suspend mode (axp20x_set_suspend_voltage)
+	  * Added regulators input supply
+
+	- DT:
+	  * DTs doesn't include anymore the dtsi
+	  * Added input supplies for regulators
+
+Changes since v4:
+
+	- Removed regulator patches already applied / acked by Mark Brown
+
+	- Input misc PEK driver:
+	  * Don't print anymore the "us" unit
+	  * Added cleanup for attributes when unbindind the device
+	  * Fixed error code returned when device_create_file() fails
+
+	- DT:
+	  * Enable all the regulators on at boot-time
+       	  * Removed min and max microvolts for all the regulators but DCDC2
+	  * Moved the axp_ipsout regulator outside the MFD node
+	  
+	- MFD core:
+	  * The supply regulators are now specified in the MFD driver using
+	    regulator_bulk_register_supply_alias() and the .parent_supplies
+	    in the MFD cell
+
+Carlo Caione (8):
+  mfd: AXP20x: Add mfd driver for AXP20x PMIC
+  dt-bindings: add vendor-prefix for X-Powers
+  mfd: AXP20x: Add bindings documentation
+  input: misc: Add driver for AXP20x Power Enable Key
+  input: misc: Add ABI docs for AXP20x PEK
+  ARM: sunxi: Add AXP20x support in defconfig
+  ARM: sunxi: Add AXP20x support multi_v7_defconfig
+  ARM: sun7i/sun4i: dt: Add AXP209 support to various boards
+
+ .../ABI/testing/sysfs-driver-input-axp-pek         |  11 +
+ Documentation/devicetree/bindings/mfd/axp20x.txt   |  93 +++++++
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/boot/dts/sun4i-a10-a1000.dts              |  58 +++++
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts         |  58 +++++
+ arch/arm/boot/dts/sun4i-a10-hackberry.dts          |  64 +++++
+ arch/arm/boot/dts/sun4i-a10-inet97fv2.dts          |  58 +++++
+ arch/arm/boot/dts/sun4i-a10-mini-xplus.dts         |  65 +++++
+ arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts     |  64 +++++
+ arch/arm/boot/dts/sun4i-a10-pcduino.dts            |  58 +++++
+ arch/arm/boot/dts/sun7i-a20-cubieboard2.dts        |  59 +++++
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts         |  59 +++++
+ arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts    |  59 +++++
+ arch/arm/configs/multi_v7_defconfig                |   3 +
+ arch/arm/configs/sunxi_defconfig                   |   4 +
+ drivers/input/misc/Kconfig                         |  11 +
+ drivers/input/misc/Makefile                        |   1 +
+ drivers/input/misc/axp20x-pek.c                    | 281 +++++++++++++++++++++
+ drivers/mfd/Kconfig                                |  12 +
+ drivers/mfd/Makefile                               |   1 +
+ drivers/mfd/axp20x.c                               | 258 +++++++++++++++++++
+ include/linux/mfd/axp20x.h                         | 180 +++++++++++++
+ 22 files changed, 1458 insertions(+)
+ create mode 100644 Documentation/ABI/testing/sysfs-driver-input-axp-pek
+ create mode 100644 Documentation/devicetree/bindings/mfd/axp20x.txt
+ create mode 100644 drivers/input/misc/axp20x-pek.c
+ create mode 100644 drivers/mfd/axp20x.c
+ create mode 100644 include/linux/mfd/axp20x.h
+
 -- 
 1.8.3.2
