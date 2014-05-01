@@ -1,80 +1,78 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Thu, 1 May 2014 08:34:03 +0100
-Subject: [RFC PATCH V4 6/7] arm64: mm: Enable HAVE_RCU_TABLE_FREE logic
-In-Reply-To: <20140430172114.GI31220@arm.com>
-References: <1396018892-6773-1-git-send-email-steve.capper@linaro.org>
- <1396018892-6773-7-git-send-email-steve.capper@linaro.org>
- <20140430152047.GF31220@arm.com> <20140430153317.GG31220@arm.com>
- <20140430153824.GA7166@linaro.org> <20140430172114.GI31220@arm.com>
-Message-ID: <20140501073402.GA30358@linaro.org>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 01 May 2014 09:03:31 +0100
+Subject: [PATCH/RFC 3/4] of/clk: Register clocks suitable for Runtime PM
+ with the PM core
+In-Reply-To: <CAMuHMdUdnoah1uZbMn_xONXZ2i8wG5kY7msMzCdBwS+xt9tmDA@mail.gmail.com>
+References: <1398334403-26181-1-git-send-email-geert+renesas@glider.be>
+ <1398334403-26181-4-git-send-email-geert+renesas@glider.be>
+ <7hoazpdldx.fsf@paris.lan>
+ <20140429131610.29859C4094A@trevor.secretlab.ca>
+ <CAMuHMdUdnoah1uZbMn_xONXZ2i8wG5kY7msMzCdBwS+xt9tmDA@mail.gmail.com>
+Message-ID: <20140501080331.D3CFAC409DA@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 30, 2014 at 06:21:14PM +0100, Catalin Marinas wrote:
-> On Wed, Apr 30, 2014 at 04:38:25PM +0100, Steve Capper wrote:
-> > On Wed, Apr 30, 2014 at 04:33:17PM +0100, Catalin Marinas wrote:
-> > > On Wed, Apr 30, 2014 at 04:20:47PM +0100, Catalin Marinas wrote:
-> > > > On Fri, Mar 28, 2014 at 03:01:31PM +0000, Steve Capper wrote:
-> > > > > In order to implement fast_get_user_pages we need to ensure that the
-> > > > > page table walker is protected from page table pages being freed from
-> > > > > under it.
-> > > > > 
-> > > > > This patch enables HAVE_RCU_TABLE_FREE, any page table pages belonging
-> > > > > to address spaces with multiple users will be call_rcu_sched freed.
-> > > > > Meaning that disabling interrupts will block the free and protect the
-> > > > > fast gup page walker.
-> > > > > 
-> > > > > Signed-off-by: Steve Capper <steve.capper@linaro.org>
-> > > > 
-> > > > While this patch is simple, I'd like to better understand the reason for
-> > > > it. Currently HAVE_RCU_TABLE_FREE is enabled for powerpc and sparc while
-> > > > __get_user_pages_fast() is supported by a few other architectures that
-> > > > don't select HAVE_RCU_TABLE_FREE. So why do we need it for fast gup on
-> > > > arm/arm64 while not all the other archs need it?
-> > > 
-> > > OK, replying to myself. I assume the other architectures that don't need
-> > > HAVE_RCU_TABLE_FREE use IPI for TLB shootdown, hence they gup_fast
-> > > synchronisation for free.
-> > 
-> > Yes that is roughly the case.
-> > Essentially we want to RCU free the page table backing pages at a
-> > later time when we aren't walking on them.
-> > 
-> > Other arches use IPI, some others have their own RCU logic. I opted to
-> > activate some existing logic to reduce code duplication.
+On Wed, 30 Apr 2014 23:54:37 +0200, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> Hi Grant,
 > 
-> Both powerpc and sparc use tlb_remove_table() via their __pte_free_tlb()
-> etc. which implies an IPI for synchronisation if mm_users > 1. For
-> gup_fast we may not need it since we use the RCU for protection. Am I
-> missing anything?
-
-So my understanding is:
-
-tlb_remove_table will just immediately free any pages where there's a
-single user as there's no need to consider a gup walking.
-
-For the case of multiple users we have an mmu_table_batch structure
-that holds references to pages that should be freed at a later point.
-
-This batch is contained on a page that is allocated on the fly. If, for
-any reason, we can't allocate the batch container we fallback to a slow
-path which is to issue an IPI (via tlb_remove_table_one). This IPI will
-block on the gup walker. We need this fallback behaviour on ARM/ARM64.
-
-Most of the time we will be able to allocate the batch container, and
-we will populate it with references to page table containing pages that
-are freed via an RCU scheduler delayed callback to tlb_remove_table_rcu.
-
-In the fast_gup walker, we block tlb_remove_table_rcu from running by
-disabling interrupts in the critical path. Technically we could issue
-a call to rcu_read_lock_sched instead to block tlb_remove_table_rcu,
-but that wouldn't be sufficient to block THP splits; so we opt to
-disable interrupts to block both THP and tlb_remove_table_rcu.
-
-Cheers,
--- 
-Steve
-
+> On Tue, Apr 29, 2014 at 3:16 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> > On Fri, 25 Apr 2014 16:44:58 -0700, Kevin Hilman <khilman@linaro.org> wrote:
+> >> Geert Uytterhoeven <geert+renesas@glider.be> writes:
+> >>
+> >> > When adding a device from DT, check if its clocks are suitable for Runtime
+> >> > PM, and register them with the PM core.
+> >> > If Runtime PM is disabled, just enable the clock.
+> >> >
+> >> > This allows the PM core to automatically manage gate clocks of devices for
+> >> > Runtime PM.
+> >>
+> >> ...unless the device is already in an existing pm_domain, right?
+> >>
+> >> I like this approach, and it extends nicely what we already do on
+> >> platforms using drivers/base/power/clock_ops.c into DT land.
+> >>
+> >> My only concern is how this will interact if it's used along with
+> >> devices that have existing pm_domains.  I don't have any specific
+> >> concerns (yet, because it's Friday, and my brain is turing off), but it
+> >> just made me wonder if this will be potentially confusing.
+> >
+> > I have big concerns about this approach. First, it will only work if
+> > a clock is available at deivce creation time. The conversion of irq
+> > controllers to normal device drivers has already shown that is a bad
+> > idea.
 > 
-> -- 
-> Catalin
+> That's  indeed a valid concern that needs to be addressed.
+> 
+> > I also don't like that it tries to set up every clock, but there is no
+> > guarantee that the driver will even use it. I would rather see this
+> > behaviour linked into the function that obtains the clock at driver
+> > .probe() time. That way it can handle deferred probe correctly and it
+> > only sets up clocks that are actually used by the driver.
+> 
+> Not every clock. Only the clocks that are advertised by the clock driver as
+> being suitable for runtime_pm management. These are typically module
+> clocks, that must be enabled for the module to work. The driver doesn't
+> always want to handle these explicitly.
+
+Help me out here becasue I don't understand how that works with this
+patch set. From my, admittedly naive, reading it looks like the setup is
+being done at device creation time, but if the driver (or module) gets
+to declare which clocks need to be enabled in order to work, then that
+information is not available at device creation time.
+
+> In fact we have one case on shmobile where the module clock for an IP
+> core (rcar-gpio) is enabled unconditionally in one SoC,  while it became
+> controllable through a gate clock in a later SoC.
+> With my patch, just adding the clock to the DT node is sufficient to make
+> it work.
+> 
+> Gr{oetje,eeting}s,
+> 
+>                         Geert
+> 
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
