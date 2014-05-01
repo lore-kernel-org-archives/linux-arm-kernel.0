@@ -1,93 +1,115 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 01 May 2014 15:27:02 +0200
-Subject: [PATCH 1/2] ARM: EXYNOS: Map SYSRAM through generic SRAM bindings
-In-Reply-To: <1398941085-10224-1-git-send-email-sachin.kamat@linaro.org>
-References: <1398941085-10224-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <11106990.1tS5A7pf5r@diego>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 01 May 2014 15:29:50 +0200
+Subject: [PATCH v12 11/31] documentation: iommu: add binding document of
+ Exynos System MMU
+In-Reply-To: <20140501111527.GA3732@e103592.cambridge.arm.com>
+References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
+ <6607258.MzzLbm2Afe@wuerfel>
+ <20140501111527.GA3732@e103592.cambridge.arm.com>
+Message-ID: <36874558.Vf2LgdL3qf@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sachin,
-
-Am Donnerstag, 1. Mai 2014, 16:14:44 schrieb Sachin Kamat:
-> Instead of hardcoding the SYSRAM details for each SoC,
-> pass this information through device tree (DT) and make
-> the code SoC agnostic. Generic SRAM bindings are used
-> for achieving this.
+On Thursday 01 May 2014 12:15:35 Dave Martin wrote:
+> On Tue, Apr 29, 2014 at 10:46:18PM +0200, Arnd Bergmann wrote:
+> > On Tuesday 29 April 2014 19:16:02 Dave Martin wrote:
 > 
-> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-> Cc: Heiko Stuebner <heiko@sntech.de>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-
-very cool :-).
-
-I've found one little thing I do not understand, which I describe below. 
-Otherwise
-Acked-by: Heiko Stuebner <heiko@sntech.de>
-
-> ---
-> This patch is based on linux next (next-20140501) on top of
-> my Kconfig consolidation patch
-> http://comments.gmane.org/gmane.linux.kernel.samsung-soc/28642
+> [...]
 > 
-> Tested on 4210/4412 Origen, 5250/5420 Arndale and SMDK5420 boards.
-> ---
->  arch/arm/Kconfig                                |    1 +
->  arch/arm/boot/dts/exynos4210-universal_c210.dts |   17 ++++++
->  arch/arm/boot/dts/exynos4210.dtsi               |   18 +++++++
->  arch/arm/boot/dts/exynos4x12.dtsi               |   18 +++++++
->  arch/arm/boot/dts/exynos5250.dtsi               |   18 +++++++
->  arch/arm/boot/dts/exynos5420.dtsi               |   18 +++++++
->  arch/arm/mach-exynos/common.h                   |    1 +
->  arch/arm/mach-exynos/exynos.c                   |   64
-> ----------------------- arch/arm/mach-exynos/firmware.c                 |  
->  5 +-
->  arch/arm/mach-exynos/include/mach/map.h         |    7 ---
->  arch/arm/mach-exynos/platsmp.c                  |   39 +++++++++++++-
->  11 files changed, 133 insertions(+), 73 deletions(-)
+> > > For example, suppose devices can post MSIs to an interrupt controller
+> > > via a mailbox accessed through the IOMMU.  Suppose also that the IOMMU
+> > > generates MSIs itself in order to signal management events or faults
+> > > to a host OS.  Linux (as host) will need to configure the interrupt
+> > > controller separately for the IOMMU and for the IOMMU clients.  This
+> > > means that Linux needs to know which IDs may travel to the interrupt
+> > > controller for which purpose, and they must be distinct.
+> > 
+> > I don't understand. An MSI controller is just an address that acts
+> > as a DMA slave for a 4-byte inbound data packet. It has no way of
+> > knowing who is sending data, other than by the address or the data
+> > sent to it. Are you talking of something else?
 > 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index a6aaaad19b1a..f66ea9453df9 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -855,6 +855,7 @@ config ARCH_EXYNOS
->  	select S5P_DEV_MFC
->  	select SAMSUNG_DMADEV
->  	select SPARSE_IRQ
-> +	select SRAM
->  	select USE_OF
->  	help
->  	  Support for SAMSUNG's EXYNOS SoCs (EXYNOS4/5)
-> diff --git a/arch/arm/boot/dts/exynos4210-universal_c210.dts
-> b/arch/arm/boot/dts/exynos4210-universal_c210.dts index
-> 63e34b24b04f..8d4de5c0d0c7 100644
-> --- a/arch/arm/boot/dts/exynos4210-universal_c210.dts
-> +++ b/arch/arm/boot/dts/exynos4210-universal_c210.dts
-> @@ -28,6 +28,23 @@
->  		bootargs = "console=ttySAC2,115200N8 root=/dev/mmcblk0p5 rw rootwait
-> earlyprintk panic=5 maxcpus=1"; };
+> Oops, looks like there are a few points I failed to respond to here...
 > 
-> +	sram at 02020000 {
-> +		status = "disabled";
-> +	};
-> +
-> +	sram at 02025000 {
-> +		compatible = "mmio-sram";
-> +		reg = <0x02025000 0x1000>;
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges = <0 0x02025000 0x1000>;
-> +
-> +		smp-sram at 0 {
-> +			compatible = "samsung,exynos4210-sram";
-> +			reg = <0x0 0x1000>;
-> +		};
-> +	};
+> 
+> I'm not an expert on PCI -- I'm prepared to believe it works that way.
+> 
+> GICv3 can descriminate between different MSI senders based on ID
+> signals on the bus.
 
-exynos_smp_prepare_sram returns -ENODEV if it can't find
-samsung,exynos4210-sram-ns, so are you sure your universal_c210 will run 
-without it? I didn't dig to deep into this, so it can also simply be something 
-I overlooked :-)
+Any idea what this is good for? Do we have to use it? It probably doesn't
+fit very well into the way Linux handles MSIs today.
 
+> > > I'm not sure whether there is actually a SoC today that is MSI-capable
+> > > and contains an IOMMU, but all the components to build one are out
+> > > there today.  GICv3 is also explicitly designed to support such
+> > > systems.
+> > 
+> > A lot of SoCs have MSI integrated into the PCI root complex, which
+> > of course is pointless from MSI perspective, as well as implying that
+> > the MSI won't go through the IOMMU.
+> > 
+> > We have briefly mentioned MSI in the review of the Samsung GH7 PCI
+> > support. It's possible that this one can either use the built-in
+> > MSI or the one in the GICv2m.
+> 
+> We are likely to get non-PCI MSIs in future SoC systems too, and there
+> are no standards governing how such systems should look.
 
-Heiko
+I wouldn't call that MSI though -- using the same term in the code
+can be rather confusing. There are existing SoCs that use message
+based interrupt notification. We are probably better off modeling
+those are regular irqchips in Linux and DT, given that they may
+not be bound by the same constraints as PCI MSI.
+
+> > > In the future, it is likely that "HSA"-style GPUs and other high-
+> > > throughput virtualisable bus mastering devices will have capabilities
+> > > of this sort, but I don't think there's anything concrete yet.
+> > 
+> > Wouldn't they just have IOMMUs with multiple contexts?
+> 
+> Who knows?  A management component of the GPU that is under exclusive
+> control of the host or hypervisor might be wired up to bypass the IOMMU
+> completely.
+> 
+> I'm not saying this kind of thing definitely will happen, but I can't
+> say confidently that it won't.
+
+Supporting this case in DT straight away is going to add a major burden.
+If nobody can say for sure that they are actually going to do it, I'd
+lean towards assuming that we won't need it and not putting the extra
+complexity in.
+
+If someone actually needs it later, let's make it their problem for
+not participating in the design.
+
+> > > > how it might be wired up in hardware, but I don't know what it's good for,
+> > > > or who would actually do it.
+> > > > 
+> > > > > > A variation would be to not use #iommu-cells at all, but provide a
+> > > > > > #address-cells / #size-cells pair in the IOMMU, and have a translation
+> > > > > > as we do for dma-ranges. This is probably most flexible.
+> > > > > 
+> > > > > That would also allow us to describe ranges of master IDs, which we need for
+> > > > > things like PCI RCs on the ARM SMMU. Furthermore, basic transformations of
+> > > > > these ranges could also be described like this, although I think Dave (CC'd)
+> > > > > has some similar ideas in this area.
+> > > 
+> > > Ideally, we would reuse the ePAPR "ranges" concept and describe the way
+> > > sideband ID signals propagate down the bus hierarchy in a similar way.
+> > 
+> > It would be 'dma-ranges'. Unfortunately that would imply that each DMA
+> > master is connected to only one IOMMU, which you say is not necessarily
+> > the case. The simpler case of a device is only a master on a single IOMMU
+> > but can use multiple contexts would however work fine with dma-ranges.
+> 
+> Partly, yes.  The concept embodied by "dma-ranges" is correct, but the
+> topological relationship is not: the assumption that a master device
+> always masters onto its parent node doesn't work for non-tree-like
+> topologies.
+
+In almost all cases it will fit. When it doesn't, we can work around it by
+defining virtual address spaces the way that the PCI binding does. The only
+major exception that we know we have to handle is IOMMUs.
+
+	Arnd
