@@ -1,58 +1,63 @@
-From: max.schwarz@online.de (Max Schwarz)
-Date: Thu, 01 May 2014 12:43:13 +0200
-Subject: [RFC/PATCH 0/8] pinctrl-rockchip: Change wrong initial assumptions
-In-Reply-To: <1414506.B4e2jZujVm@diego>
-References: <1414506.B4e2jZujVm@diego>
-Message-ID: <699502106.fEF2JGVO0i@typ>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Thu,  1 May 2014 16:14:45 +0530
+Subject: [PATCH 2/2] Documentation: DT: Exynos: Bind SRAM though DT
+In-Reply-To: <1398941085-10224-1-git-send-email-sachin.kamat@linaro.org>
+References: <1398941085-10224-1-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <1398941085-10224-2-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 30 April 2014 at 00:07:12, Heiko St?bner wrote:
-> While this wasn't a problem until now, the upcoming rk3288 introduces
-> additional changes to both the grf and pmu areas. On it even part of
-> the pinmux registers move into the pmu space.
+Add SRAM binding documentation.
 
-Could you give us more information on that? I tried to find details on the 
-RK3288 but came up with nothing. How are the pinmux registers divided?
+Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+---
+ .../devicetree/bindings/arm/exynos/smp-sram.txt    |   38 ++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/exynos/smp-sram.txt
 
-Would adding a third reg element for the pinmux register to the gpio subnodes 
-suffice to fix your problem?
-
-> For this my current gut-feeling is, that providing both the grf and pmu
-> as syscons to the pinctrl driver might be more future proof for the next
-> socs. But as I'm not sure on this, I'd like of course comments :-)
-
-I don't see the problem with the current solution. In my mind it's cleaner to 
-specify register mappings explicitly in the dt rather than map one large block 
-and let the drivers figure out themselves where their registers are.
-
-There are some question marks for me on the syscon solution. Regmap uses 
-locking internally, which means separate drivers can't access separate 
-registers simultaneously. We have an SMP machine here, so that's not far-
-fetched. And that locking is completely unnecessary, as we *know* in most 
-cases that the accessed areas do not overlap.
-
-> The other option would be to leave the grf as it is and create separate
-> syscons for real small individual parts like the soc-conf and usb-phys.
-> But apart from creating these real small syscons that would
-> also make it necessary to introduce another register map for the
-> drive-strength settings of the pin-controller, which are sitting in the
-> middle of everything at least on rk3066 and rk3188.
-
-Wy do we need a syscon for usb-phys? Is it shared by multiple drivers?
-My instinctive approach would be two usb-phys devices mapping the GRF_UOC0/1 
-spaces directly via reg properties. Or did I miss something?
-
-The only register space I see that is used from many drivers is the GRF_SOC_* 
-space. So in my mind that should be the only syscon device.
-
-> @Max: sorry to come up with this now, but I feel this should be resolved
-> (in whatever direction) before we introduce any grf syscon. Because due
-> to dt being an API we will be tied for a long time to it.
-
-Yes, I agree. If we want to change something, we should change it now. All in 
-all I would vote for the current solution. But it seems you have more 
-information than me, so my vote is somewhat uneducated ;-)
-
-Cheers,
-  Max
+diff --git a/Documentation/devicetree/bindings/arm/exynos/smp-sram.txt b/Documentation/devicetree/bindings/arm/exynos/smp-sram.txt
+new file mode 100644
+index 000000000000..9969ca22b6af
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/exynos/smp-sram.txt
+@@ -0,0 +1,38 @@
++Samsung Exynos SRAM for SMP bringup:
++------------------------------------
++
++Samsung SMP-capable Exynos SoCs use part of the SRAM for the bringup
++of the cores. Once the core gets powered up it executes the code
++that is residing at some specific location of the SRAM.
++
++Therefore reserved section sub-nodes have to be added to the mmio-sram
++declaration. These nodes are of two types depending upon secure or
++non-secure execution environment.
++
++Required sub-node properties:
++- compatible : should be
++		"samsung,exynos4210-sram" : Secure SYSRAM
++		"samsung,exynos4210-sram-ns" : Non-secure SYSRAM
++
++The rest of the properties should follow the generic mmio-sram discription
++found in ../../misc/sram.txt
++
++Example:
++
++	sram at 02020000 {
++		compatible = "mmio-sram";
++		reg = <0x02020000 0x54000>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0x02020000 0x54000>;
++
++		smp-sram at 0 {
++			compatible = "samsung,exynos4210-sram";
++			reg = <0x0 0x1000>;
++		};
++
++		smp-sram at 53000 {
++			compatible = "samsung,exynos4210-sram-ns";
++			reg = <0x53000 0x1000>;
++		};
++	};
+-- 
+1.7.9.5
