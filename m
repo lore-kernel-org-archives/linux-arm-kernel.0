@@ -1,28 +1,44 @@
-From: b.brezillon.dev@gmail.com (Boris BREZILLON)
-Date: Thu, 01 May 2014 19:18:44 +0200
-Subject: [RFC PATCH 2/3] of: mtd: add NAND randomizer mode retrieval
-In-Reply-To: <20140501131605.9CB7CC409DA@trevor.secretlab.ca>
-References: <1398906592-24677-1-git-send-email-b.brezillon.dev@gmail.com>	<1398906592-24677-3-git-send-email-b.brezillon.dev@gmail.com>
- <20140501131605.9CB7CC409DA@trevor.secretlab.ca>
-Message-ID: <536281F4.1000402@gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 01 May 2014 19:19:10 +0200
+Subject: [PATCH 1/1] clk: exynos-5420: Fix VPLL lock offset
+In-Reply-To: <CAK9yfHxg4CbfrpwwqO=xzCDeeoSWVXu4CU4haZEhvj1YszRCTA@mail.gmail.com>
+References: <1394681222-27882-1-git-send-email-sachin.kamat@linaro.org>
+ <53219C1C.1030501@samsung.com>
+ <CAK9yfHyVVjfip2p6gDM8ghJ301NH9kTtVK1La53WPFfxxLD9nQ@mail.gmail.com>
+ <CAK9yfHxg4CbfrpwwqO=xzCDeeoSWVXu4CU4haZEhvj1YszRCTA@mail.gmail.com>
+Message-ID: <5362820E.6040101@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Sachin,
 
-On 01/05/2014 15:16, Grant Likely wrote:
-> On Thu,  1 May 2014 03:09:51 +0200, Boris BREZILLON <b.brezillon.dev@gmail.com> wrote:
->> Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
->> ---
-> No commit message? Immediate NAK. Please, make sure you write a
-> description for each and every patch. This is not optional. Future
-> readers want to know what this patch solves and any other information
-> you can provide without having to read the diff.
+On 01.05.2014 13:10, Sachin Kamat wrote:
+> Hi Tomasz,
+>
+> On 13 March 2014 20:27, Sachin Kamat <sachin.kamat@linaro.org> wrote:
+>> On 13 March 2014 17:23, Tomasz Figa <t.figa@samsung.com> wrote:
+>>> Hi Sachin,
+>>>
+>>>
+>>> On 13.03.2014 04:27, Sachin Kamat wrote:
+>>>>
+>>>> Set it as per the user manual.
+>>>>
+>>>> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+>>>> ---
+>>
+>>>
+>>> Looks fine. Will queue for 3.15, since ATM there is no support for PLL rate
+>>> setting on Exynos 5420 (no rate tables registered).
+>>
+>> Yes, that is correct. Thanks Tomasz.
+>
+> Looks like this patch hasn't made it to mainline yet.
+>
 
-My bad. I just sent a commit I forgot to rework to add a proper commit
-message.
-I'll add a commit message describing the different options for the
-"nand-rnd-mode" property and update the nand DT bindings documentation.
+Unfortunately that's right. Due to problems with cross tree dependencies 
+there was some fall out and I needed to requeue some patches for 3.16. 
+Sorry for this.
 
-Best Regards,
-
-Boris
+Best regards,
+Tomasz
