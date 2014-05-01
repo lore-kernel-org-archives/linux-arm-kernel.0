@@ -1,26 +1,100 @@
 From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 30 Apr 2014 23:08:38 -0700
-Subject: [PATCH 1/5] ARM: defconfigs: add MTD_SPI_NOR (new dependency for
+Date: Wed, 30 Apr 2014 23:26:37 -0700
+Subject: [PATCH v2 02/12] ARM: defconfigs: add MTD_SPI_NOR (new dependency for
  M25P80)
-In-Reply-To: <20140430114548.GQ28159@titan.lakedaemon.net>
-References: <1397719309-2022-1-git-send-email-computersforpeace@gmail.com>
- <1397719309-2022-2-git-send-email-computersforpeace@gmail.com>
- <535A8FC9.8040707@wwwdotorg.org>
- <20140429190603.GB9418@norris-Latitude-E6410>
- <20140430114548.GQ28159@titan.lakedaemon.net>
-Message-ID: <20140501060838.GI2497@norris-Latitude-E6410>
+In-Reply-To: <1398925607-7482-1-git-send-email-computersforpeace@gmail.com>
+References: <1398925607-7482-1-git-send-email-computersforpeace@gmail.com>
+Message-ID: <1398925607-7482-3-git-send-email-computersforpeace@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 30, 2014 at 07:45:48AM -0400, Jason Cooper wrote:
-> On Tue, Apr 29, 2014 at 12:06:03PM -0700, Brian Norris wrote:
-> > I'll also rebase on linux-next. I think there may be a few conflicts.
-> 
-> I can't speak for the other sub-archs, but I typically prefer that
-> patches be based on an -rc tag, -rc1 if possible.
+These defconfigs contain the CONFIG_M25P80 symbol, which is now
+dependent on the MTD_SPI_NOR symbol. Add CONFIG_MTD_SPI_NOR to satisfy
+the new dependency.
 
-OK, this was already based on -rc1. I'll leave it as-is, and maintainers
-can easily work out the conflicts.
+At the same time, drop the now-nonexistent CONFIG_MTD_CHAR symbol.
 
-Thanks,
-Brian
+Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Olof Johansson <olof@lixom.net>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+This patch catches all the configs I couldn't find a sub-arch for, plus the ARM
+multiplatform defconfigs
+
+ arch/arm/configs/bockw_defconfig    | 2 +-
+ arch/arm/configs/koelsch_defconfig  | 1 +
+ arch/arm/configs/lager_defconfig    | 1 +
+ arch/arm/configs/multi_v5_defconfig | 1 +
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 5 files changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/configs/bockw_defconfig b/arch/arm/configs/bockw_defconfig
+index e816140d81c5..28339e072a71 100644
+--- a/arch/arm/configs/bockw_defconfig
++++ b/arch/arm/configs/bockw_defconfig
+@@ -50,11 +50,11 @@ CONFIG_DEVTMPFS_MOUNT=y
+ # CONFIG_PREVENT_FIRMWARE_BUILD is not set
+ # CONFIG_FW_LOADER is not set
+ CONFIG_MTD=y
+-CONFIG_MTD_CHAR=y
+ CONFIG_MTD_BLOCK=y
+ CONFIG_MTD_CFI=y
+ CONFIG_MTD_CFI_AMDSTD=y
+ CONFIG_MTD_M25P80=y
++CONFIG_MTD_SPI_NOR=y
+ CONFIG_SCSI=y
+ CONFIG_BLK_DEV_SD=y
+ CONFIG_NETDEVICES=y
+diff --git a/arch/arm/configs/koelsch_defconfig b/arch/arm/configs/koelsch_defconfig
+index 86faab565a96..dcd55f20d36e 100644
+--- a/arch/arm/configs/koelsch_defconfig
++++ b/arch/arm/configs/koelsch_defconfig
+@@ -42,6 +42,7 @@ CONFIG_ATA=y
+ CONFIG_SATA_RCAR=y
+ CONFIG_MTD=y
+ CONFIG_MTD_M25P80=y
++CONFIG_MTD_SPI_NOR=y
+ CONFIG_NETDEVICES=y
+ # CONFIG_NET_VENDOR_ARC is not set
+ # CONFIG_NET_CADENCE is not set
+diff --git a/arch/arm/configs/lager_defconfig b/arch/arm/configs/lager_defconfig
+index 58702440472a..c4dbd778458b 100644
+--- a/arch/arm/configs/lager_defconfig
++++ b/arch/arm/configs/lager_defconfig
+@@ -53,6 +53,7 @@ CONFIG_DEVTMPFS=y
+ CONFIG_DEVTMPFS_MOUNT=y
+ CONFIG_MTD=y
+ CONFIG_MTD_M25P80=y
++CONFIG_MTD_SPI_NOR=y
+ CONFIG_BLK_DEV_SD=y
+ CONFIG_ATA=y
+ CONFIG_SATA_RCAR=y
+diff --git a/arch/arm/configs/multi_v5_defconfig b/arch/arm/configs/multi_v5_defconfig
+index aa3dfb084fed..aaf23933fb91 100644
+--- a/arch/arm/configs/multi_v5_defconfig
++++ b/arch/arm/configs/multi_v5_defconfig
+@@ -56,6 +56,7 @@ CONFIG_MTD_PHYSMAP=y
+ CONFIG_MTD_M25P80=y
+ CONFIG_MTD_NAND=y
+ CONFIG_MTD_NAND_ORION=y
++CONFIG_MTD_SPI_NOR=y
+ CONFIG_BLK_DEV_LOOP=y
+ CONFIG_EEPROM_AT24=y
+ # CONFIG_SCSI_PROC_FS is not set
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index d4e8a47a2f7c..9937db16050c 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -108,6 +108,7 @@ CONFIG_CMA_SIZE_MBYTES=64
+ CONFIG_OMAP_OCP2SCP=y
+ CONFIG_MTD=y
+ CONFIG_MTD_M25P80=y
++CONFIG_MTD_SPI_NOR=y
+ CONFIG_BLK_DEV_LOOP=y
+ CONFIG_ICS932S401=y
+ CONFIG_APDS9802ALS=y
+-- 
+1.8.3.2
