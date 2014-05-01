@@ -1,78 +1,55 @@
 From: jays.lee@samsung.com (Jungseok Lee)
-Date: Thu, 01 May 2014 11:33:39 +0900
-Subject: [PATCH v5 0/6] Support 4 levels of translation tables for ARM64
-Message-ID: <000001cf64e5$c2d71e40$48855ac0$@samsung.com>
+Date: Thu, 01 May 2014 11:33:50 +0900
+Subject: [PATCH v5 1/6] arm64: Use pr_* instead of printk
+Message-ID: <000101cf64e5$c944c750$5bce55f0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+This patch fixed the following checkpatch complaint as using pr_*
+instead of printk.
 
-This v5 patchset supports 4 levels of tranlsation tables for ARM64.
+WARNING: printk() should include KERN_ facility level
 
-Firstly, the patchset introduces virtual address space size and
-translation level options as taking account into the comment from
-Catalin Marinas:
-http://www.spinics.net/linux/lists/arm-kernel/msg319552.html
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Jungseok Lee <jays.lee@samsung.com>
+Reviewed-by: Sungjinn Chung <sungjinn.chung@samsung.com>
+---
+ arch/arm64/kernel/traps.c |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-Then, it implements 4 levels of translation tables for native, HYP and
-stage2 sides.
-
-All ARMv8 and ARMv7 related changes are validated with FastModels+kvmtool and
-A15+QEMU, respectively.
-
-Changes since v1:
-- fixed unmatched data types as per Steve's comment
-- removed unnecessary #ifdef in arch/arm64/mm/* as per Steve's comment
-- revised create_pgd_entry to deal with PUD entry as per Steve's comment
-- introduced a macro for initial memblock limit as per Steve's comment
-- dropped "Fix line length exceeding 80 characters" patch as per Marc's comment
-- removed unnecessary #ifdef in arch/arm/kvm/mmu.c as per Marc's comment
-- added a macro for a number of objects of as per Marc's comment
-
-Changes since v2:
-- revised some macros in a generic way as per Marc's comment
-- added a 2 level option for kvm mmu cache allocation as per Marc's comment
-
-Changes since v3:
-- added #ifdef to decide swapper and idmap size as per Steve's comment
-- introduced Steve's create_pgd_entry
-
-Changes since v4:
-- hided translation level options from menuconfig as per Catalin's comment
-- dropped some printk changes as per Mitchel's comment
-- squashed VA_BITS related patches into a single patch
-
-Jungseok Lee (6):
-  arm64: Use pr_* instead of printk
-  arm64: Introduce VA_BITS and translation level options
-  arm64: Add a description on 48-bit address space with 4KB pages
-  arm64: Add 4 levels of page tables definition with 4KB pages
-  arm64: mm: Implement 4 levels of translation tables
-  arm64: KVM: Implement 4 levels of translation tables for HYP and
-    stage2
-
- Documentation/arm64/memory.txt                |   59 ++++++++++++++---
- arch/arm/include/asm/kvm_mmu.h                |   10 +++
- arch/arm/kvm/mmu.c                            |   88 +++++++++++++++++++++----
- arch/arm64/Kconfig                            |   53 ++++++++++++++-
- arch/arm64/include/asm/kvm_arm.h              |   34 ++++++++--
- arch/arm64/include/asm/kvm_mmu.h              |   12 ++++
- arch/arm64/include/asm/memblock.h             |    6 ++
- arch/arm64/include/asm/memory.h               |    6 +-
- arch/arm64/include/asm/page.h                 |    6 +-
- arch/arm64/include/asm/pgalloc.h              |   24 ++++++-
- arch/arm64/include/asm/pgtable-4level-hwdef.h |   50 ++++++++++++++
- arch/arm64/include/asm/pgtable-4level-types.h |   71 ++++++++++++++++++++
- arch/arm64/include/asm/pgtable-hwdef.h        |    8 ++-
- arch/arm64/include/asm/pgtable.h              |   53 +++++++++++++--
- arch/arm64/include/asm/tlb.h                  |   11 +++-
- arch/arm64/kernel/head.S                      |   46 ++++++++++---
- arch/arm64/kernel/traps.c                     |   13 ++--
- arch/arm64/mm/fault.c                         |    1 +
- arch/arm64/mm/mmu.c                           |   16 +++--
- 19 files changed, 507 insertions(+), 60 deletions(-)
- create mode 100644 arch/arm64/include/asm/pgtable-4level-hwdef.h
- create mode 100644 arch/arm64/include/asm/pgtable-4level-types.h
-
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index 7ffaddd..268ce96 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -156,7 +156,7 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
+ 		frame.pc = thread_saved_pc(tsk);
+ 	}
+ 
+-	printk("Call trace:\n");
++	pr_emerg("Call trace:\n");
+ 	while (1) {
+ 		unsigned long where = frame.pc;
+ 		int ret;
+@@ -328,17 +328,17 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
+ 
+ void __pte_error(const char *file, int line, unsigned long val)
+ {
+-	printk("%s:%d: bad pte %016lx.\n", file, line, val);
++	pr_crit("%s:%d: bad pte %016lx.\n", file, line, val);
+ }
+ 
+ void __pmd_error(const char *file, int line, unsigned long val)
+ {
+-	printk("%s:%d: bad pmd %016lx.\n", file, line, val);
++	pr_crit("%s:%d: bad pmd %016lx.\n", file, line, val);
+ }
+ 
+ void __pgd_error(const char *file, int line, unsigned long val)
+ {
+-	printk("%s:%d: bad pgd %016lx.\n", file, line, val);
++	pr_crit("%s:%d: bad pgd %016lx.\n", file, line, val);
+ }
+ 
+ void __init trap_init(void)
 -- 
 1.7.10.4
