@@ -1,94 +1,97 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu,  1 May 2014 08:41:33 -0700
-Subject: [RFC PATCH 5/5] watchdog: sunxi: Register reboot handler with
- watchdog subsystem
-In-Reply-To: <1398958893-30049-1-git-send-email-linux@roeck-us.net>
-References: <1398958893-30049-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1398958893-30049-6-git-send-email-linux@roeck-us.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 01 May 2014 17:46:03 +0200
+Subject: [PATCH v12 11/31] documentation: iommu: add binding document of
+ Exynos System MMU
+In-Reply-To: <20140501143654.GB3732@e103592.cambridge.arm.com>
+References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
+ <36874558.Vf2LgdL3qf@wuerfel>
+ <20140501143654.GB3732@e103592.cambridge.arm.com>
+Message-ID: <8052890.tELEFf8xoX@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The watchdog subsystem now provides an API to trigger a system reboot.
-Register with it.
+On Thursday 01 May 2014 15:36:54 Dave Martin wrote:
+> On Thu, May 01, 2014 at 02:29:50PM +0100, Arnd Bergmann wrote:
+> > On Thursday 01 May 2014 12:15:35 Dave Martin wrote:
+> > > > > I'm not sure whether there is actually a SoC today that is MSI-capable
+> > > > > and contains an IOMMU, but all the components to build one are out
+> > > > > there today.  GICv3 is also explicitly designed to support such
+> > > > > systems.
+> > > > 
+> > > > A lot of SoCs have MSI integrated into the PCI root complex, which
+> > > > of course is pointless from MSI perspective, as well as implying that
+> > > > the MSI won't go through the IOMMU.
+> > > > 
+> > > > We have briefly mentioned MSI in the review of the Samsung GH7 PCI
+> > > > support. It's possible that this one can either use the built-in
+> > > > MSI or the one in the GICv2m.
+> > > 
+> > > We are likely to get non-PCI MSIs in future SoC systems too, and there
+> > > are no standards governing how such systems should look.
+> > 
+> > I wouldn't call that MSI though -- using the same term in the code
+> > can be rather confusing. There are existing SoCs that use message
+> > based interrupt notification. We are probably better off modeling
+> > those are regular irqchips in Linux and DT, given that they may
+> > not be bound by the same constraints as PCI MSI.
+> 
+> We can call it what we like and maybe bury the distinction in irqchip
+> drivers for some fixed-configuration cases, but it's logically the same
+> concept.  Naming and subsystem factoring are implementation decisions
+> for Linux.
+> 
+> For full dynamic assignment of pluggable devices or buses to VMs, I'm
+> less sure that we can model that as plain irqchips.
 
-Signed-off-by: Guenter Roeck <linux@roeck-us.net>
----
- drivers/watchdog/sunxi_wdt.c |   22 +++++++---------------
- 1 file changed, 7 insertions(+), 15 deletions(-)
+I definitely hope we won't have to deal with plugging non-PCI devices
+into VMs. Nothing good can come out of that.
 
-diff --git a/drivers/watchdog/sunxi_wdt.c b/drivers/watchdog/sunxi_wdt.c
-index c9ca343..744b6f5 100644
---- a/drivers/watchdog/sunxi_wdt.c
-+++ b/drivers/watchdog/sunxi_wdt.c
-@@ -27,8 +27,6 @@
- #include <linux/types.h>
- #include <linux/watchdog.h>
- 
--#include <asm/system_misc.h>
--
- #define WDT_MAX_TIMEOUT         16
- #define WDT_MIN_TIMEOUT         1
- #define WDT_MODE_TIMEOUT(n)     ((n) << 3)
-@@ -74,27 +72,25 @@ static const int wdt_timeout_map[] = {
- 	[16] = 0xB, /* 16s */
- };
- 
--static struct sunxi_wdt_dev *sunxi_restart_ctx;
--
--static void sun4i_wdt_restart(enum reboot_mode mode, const char *cmd)
-+static void sunxi_wdt_reboot(struct watchdog_device *wdt_dev,
-+			     enum reboot_mode mode, const char *cmd)
- {
--	if (!sunxi_restart_ctx)
--		return;
-+	struct sunxi_wdt_dev *sunxi_wdt = watchdog_get_drvdata(wdt_dev);
- 
- 	/* Enable timer and set reset bit in the watchdog */
- 	writel(WDT_MODE_EN | WDT_MODE_RST_EN,
--	       sunxi_restart_ctx->wdt_base + WDT_MODE);
-+	       sunxi_wdt->wdt_base + WDT_MODE);
- 
- 	/*
- 	 * Restart the watchdog. The default (and lowest) interval
- 	 * value for the watchdog is 0.5s.
- 	 */
--	writel(WDT_CTRL_RELOAD, sunxi_restart_ctx->wdt_base + WDT_CTRL);
-+	writel(WDT_CTRL_RELOAD, sunxi_wdt->wdt_base + WDT_CTRL);
- 
- 	while (1) {
- 		mdelay(5);
- 		writel(WDT_MODE_EN | WDT_MODE_RST_EN,
--		       sunxi_restart_ctx->wdt_base + WDT_MODE);
-+		       sunxi_wdt->wdt_base + WDT_MODE);
- 	}
- }
- 
-@@ -171,6 +167,7 @@ static const struct watchdog_ops sunxi_wdt_ops = {
- 	.start		= sunxi_wdt_start,
- 	.stop		= sunxi_wdt_stop,
- 	.ping		= sunxi_wdt_ping,
-+	.reboot		= sunxi_wdt_reboot,
- 	.set_timeout	= sunxi_wdt_set_timeout,
- };
- 
-@@ -209,9 +206,6 @@ static int sunxi_wdt_probe(struct platform_device *pdev)
- 	if (unlikely(err))
- 		return err;
- 
--	sunxi_restart_ctx = sunxi_wdt;
--	arm_pm_restart = sun4i_wdt_restart;
--
- 	dev_info(&pdev->dev, "Watchdog enabled (timeout=%d sec, nowayout=%d)",
- 			sunxi_wdt->wdt_dev.timeout, nowayout);
- 
-@@ -222,8 +216,6 @@ static int sunxi_wdt_remove(struct platform_device *pdev)
- {
- 	struct sunxi_wdt_dev *sunxi_wdt = platform_get_drvdata(pdev);
- 
--	arm_pm_restart = NULL;
--
- 	watchdog_unregister_device(&sunxi_wdt->wdt_dev);
- 	watchdog_set_drvdata(&sunxi_wdt->wdt_dev, NULL);
- 
--- 
-1.7.9.7
+> > Supporting this case in DT straight away is going to add a major burden.
+> > If nobody can say for sure that they are actually going to do it, I'd
+> > lean towards assuming that we won't need it and not putting the extra
+> > complexity in.
+> > 
+> > If someone actually needs it later, let's make it their problem for
+> > not participating in the design.
+> 
+> This is a fair point, but there is a difference between the bindings and
+> what kind of wacky configurations a particular version of Linux actually
+> supports.
+> 
+> DT is supposed to be a description of the hardware, not a description
+> of how Linux subsystems are structured, though if the two are not
+> reasonably well aligned that will lead to pain...
+> 
+> The key thing is to make sure the DT bindings are extensible to
+> things that we can reasonably foresee.
+
+Yes, defining them in an extensible way is always a good idea, but I
+think it would be better not to define the fine details until we
+actually need them in this case.
+
+> > > > It would be 'dma-ranges'. Unfortunately that would imply that each DMA
+> > > > master is connected to only one IOMMU, which you say is not necessarily
+> > > > the case. The simpler case of a device is only a master on a single IOMMU
+> > > > but can use multiple contexts would however work fine with dma-ranges.
+> > > 
+> > > Partly, yes.  The concept embodied by "dma-ranges" is correct, but the
+> > > topological relationship is not: the assumption that a master device
+> > > always masters onto its parent node doesn't work for non-tree-like
+> > > topologies.
+> > 
+> > In almost all cases it will fit. When it doesn't, we can work around it by
+> > defining virtual address spaces the way that the PCI binding does. The only
+> > major exception that we know we have to handle is IOMMUs.
+> 
+> My concern here is that as new exceptions and oddball or complex systems
+> crop up, we will end up repeatedly inventing different bodges to solve
+> essentially the same problem.
+> 
+> Unlike some of the other situations we have to deal with, these are valid
+> hardware configurations rather than quirks or broken systems.
+
+Can you give an example where this would be done for a good reason?
+I can't come up with an example that doesn't involve the hardware
+design being seriously screwed.
+
+	Arnd
