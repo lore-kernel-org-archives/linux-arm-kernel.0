@@ -1,78 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 01 May 2014 15:36:05 +0200
-Subject: [PATCH] arm64: mm: Create gigabyte kernel logical mappings where
- possible
-In-Reply-To: <20140501085411.GA31607@linaro.org>
-References: <1398857782-1525-1-git-send-email-steve.capper@linaro.org>
- <4217068.6LErVYxoHJ@wuerfel> <20140501085411.GA31607@linaro.org>
-Message-ID: <4594528.Vh64ixABlG@wuerfel>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 1 May 2014 15:41:11 +0200
+Subject: [PATCH/RFC 3/4] of/clk: Register clocks suitable for Runtime PM
+ with the PM core
+In-Reply-To: <20140501080331.D3CFAC409DA@trevor.secretlab.ca>
+References: <1398334403-26181-1-git-send-email-geert+renesas@glider.be>
+ <1398334403-26181-4-git-send-email-geert+renesas@glider.be>
+ <7hoazpdldx.fsf@paris.lan>
+ <20140429131610.29859C4094A@trevor.secretlab.ca>
+ <CAMuHMdUdnoah1uZbMn_xONXZ2i8wG5kY7msMzCdBwS+xt9tmDA@mail.gmail.com>
+ <20140501080331.D3CFAC409DA@trevor.secretlab.ca>
+Message-ID: <CAMuHMdXbJrnNPyPmD-rcGN-M4ybFtrS3FCuvegJue1Pe-ae8SQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 01 May 2014 09:54:12 Steve Capper wrote:
-> On Wed, Apr 30, 2014 at 08:11:26PM +0200, Arnd Bergmann wrote:
-> > On Wednesday 30 April 2014 12:36:22 Steve Capper wrote:
-> > > We have the capability to map 1GB level 1 blocks when using a 4K
-> > > granule.
-> > > 
-> > > This patch adjusts the create_mapping logic s.t. when mapping physical
-> > > memory on boot, we attempt to use a 1GB block if both the VA and PA
-> > > start and end are 1GB aligned. This both reduces the levels of lookup
-> > > required to resolve a kernel logical address, as well as reduces TLB
-> > > pressure on cores that support 1GB TLB entries.
-> > > 
-> > > Signed-off-by: Steve Capper <steve.capper@linaro.org>
-> > > ---
-> > > Hello,
-> > > This patch has been tested on the FastModel for 4K and 64K pages.
-> > > Also, this has been tested with Jungseok's 4 level patch.
-> > > 
-> > > I put in the explicit check for PAGE_SHIFT, as I am anticipating a
-> > > three level 64KB configuration at some point.
-> > > 
-> > > With two level 64K, a PUD is equivalent to a PMD which is equivalent to
-> > > a PGD, and these are all level 2 descriptors.
-> > > 
-> > > Under three level 64K, a PUD would be equivalent to a PGD which would
-> > > be a level 1 descriptor thus may not be a block.
-> > > 
-> > > Comments/critique/testers welcome.
-> > 
-> > It seems like a great idea. I have to admit that I don't understand
-> > the existing code, but what are the page sizes used here?
-> 
-> Actually, I think it was your idea ;-). I remember you talking about
-> increasing the mapping size when 4-level page tables were being
-> discussed. (I think I should have added a Reported-by, would be happy
-> to if you want?).
+Hi Grant,
 
-I completely forgot we had talked about this.
+On Thu, May 1, 2014 at 10:03 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> On Wed, 30 Apr 2014 23:54:37 +0200, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+>> On Tue, Apr 29, 2014 at 3:16 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+>> > I also don't like that it tries to set up every clock, but there is no
+>> > guarantee that the driver will even use it. I would rather see this
+>> > behaviour linked into the function that obtains the clock at driver
+>> > .probe() time. That way it can handle deferred probe correctly and it
+>> > only sets up clocks that are actually used by the driver.
+>>
+>> Not every clock. Only the clocks that are advertised by the clock driver as
+>> being suitable for runtime_pm management. These are typically module
+>> clocks, that must be enabled for the module to work. The driver doesn't
+>> always want to handle these explicitly.
+>
+> Help me out here becasue I don't understand how that works with this
+> patch set. From my, admittedly naive, reading it looks like the setup is
+> being done at device creation time, but if the driver (or module) gets
+> to declare which clocks need to be enabled in order to work, then that
+> information is not available at device creation time.
 
-> With a 64KB granule, we'll map 512MB blocks if possible, otherwise 64K.
-> And with a 4KB granule, the original code will map 2MB blocks if
-> possible, and 4KB otherwise.
-> 
-> The patch will make the 4KB granule case also map 1GB blocks if
-> possible.
+Setup is indeed done at registration time. Note the check calling
+clk_may_runtime_pm(), which is introduced in "[PATCH/RFC 1/4] clk: Add
+CLK_RUNTIME_PM and clk_may_runtime_pm()".
 
-Ok.
+Clock drivers are initialized much earlier, so they can set the CLK_RUNTIME_PM
+flag for suitable clocks before platform devices are created from DT, cfr. the
+example for shmobile MSTP clocks in "[PATCH/RFC 4/4] clk: shmobile: mstp:
+Set CLK_RUNTIME_PM flag".
 
-> > In combination with the contiguous page hint, we should be able
-> > to theoretically support 4KB/64KB/2M/32M/1G/16G TLBs in any
-> > combination for boot-time mappings on a 4K page size kernel,
-> > or 64KB/1M/512M/8G on a 64KB page size kernel.
-> 
-> A contiguous hint could be applied to these mappings. The logic would
-> be a bit more complicated though when we consider different granules.
-> For 4KB we chain together 16 entries, for 64KB we use 32. If/when we
-> adopt a 16KB granule, we use 32 entries for a level 2 lookup and
-> 128 entries for a level 3 lookup...
-> 
-> The largest TLB entry sizes that I am aware of in play are the block
-> sizes (i.e. 2MB, 512MB, 1GB). So I don't think we'll get any benefit at
-> the moment for adding the contiguous logic.
+I hope this makes it clear.
 
-Is that an architecture limit, or specific to the Cortex-A53/A57
-implementations?
+Gr{oetje,eeting}s,
 
-	Arnd
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
