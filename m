@@ -1,179 +1,183 @@
-From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Thu, 1 May 2014 15:09:46 +0530
-Subject: [PATCH v3 5/6] arm: exynos: Add MCPM call-back functions
-In-Reply-To: <20140430145911.GA32671@e102568-lin.cambridge.arm.com>
-References: <1398528348-21214-1-git-send-email-a.kesavan@samsung.com>
- <1398528348-21214-6-git-send-email-a.kesavan@samsung.com>
- <20140430145911.GA32671@e102568-lin.cambridge.arm.com>
-Message-ID: <CAM4voanN3qxa+VB3h39L5MbPQOAtF5_D=zssfJM2qV+Xkt0pCg@mail.gmail.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Thu, 1 May 2014 10:43:38 +0100
+Subject: [PATCH v2] of: Keep track of populated platform devices
+In-Reply-To: <20140501092635.05011C409DA@trevor.secretlab.ca>
+References: <1398858529.24255.3.camel@hornet>
+ <1398866717-20268-1-git-send-email-pawel.moll@arm.com>
+ <CAL_JsqL=mxqEKpAsXm7Du0vEDpKk4n+dp5-DyvbuGhTA6bP5Lg@mail.gmail.com>
+ <20140501092635.05011C409DA@trevor.secretlab.ca>
+Message-ID: <CACxGe6usWdey1qQT2JF=7LuE62H-_xtd1QkRT9z_Tj2pxdQEjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+On Thu, May 1, 2014 at 10:26 AM, Grant Likely <grant.likely@linaro.org> wrote:
+> On Wed, 30 Apr 2014 10:22:25 -0500, Rob Herring <robherring2@gmail.com> wrote:
+>> On Wed, Apr 30, 2014 at 9:05 AM, Pawel Moll <pawel.moll@arm.com> wrote:
+>> > In "Device Tree powered" systems, platform devices are usually
+>> > massively populated with of_platform_populate() call, executed
+>> > at some level of initcalls, either by generic architecture
+>> > or by platform-specific code.
+>> >
+>> > There are situations though where certain devices must be
+>> > created (and bound with drivers) before all the others.
+>> > This presents a challenge, as devices created explicitly
+>> > would be created again by of_platform_populate().
+>> >
+>> > This patch tries to solve that issue in a generic way,
+>> > adding a "populated" flag for a DT node description.
+>> > Once set, this device will never be created again via
+>> > of_* API, so of_platform_populate() will skip such nodes
+>> > (and its children) in a similar way to the non-available
+>> > ones.
+>> >
+>> > Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+>>
+>> One pondering and one minor change below, otherwise:
+>>
+>> Acked-by: Rob Herring <robh@kernel.org>
+>>
+>>
+>> > ---
+>> >
+>> > Changes since v1:
+>> >
+>> > - added of_node_check_and_set_flag()... (atomic test and set)
+>> > - ... used it to atomically mark a node...
+>> > - ... clearing the bit on error path.
+>> >
+>> >  drivers/of/platform.c | 18 +++++++++++++-----
+>> >  include/linux/of.h    |  7 +++++++
+>> >  2 files changed, 20 insertions(+), 5 deletions(-)
+>> >
+>> > diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+>> > index 404d1da..b33927a 100644
+>> > --- a/drivers/of/platform.c
+>> > +++ b/drivers/of/platform.c
+>> > @@ -204,12 +204,13 @@ static struct platform_device *of_platform_device_create_pdata(
+>> >  {
+>> >         struct platform_device *dev;
+>> >
+>> > -       if (!of_device_is_available(np))
+>> > +       if (!of_device_is_available(np) ||
+>> > +                       of_node_check_and_set_flag(np, OF_POPULATED))
+>> >                 return NULL;
+>> >
+>> >         dev = of_device_alloc(np, bus_id, parent);
+>> >         if (!dev)
+>> > -               return NULL;
+>> > +               goto err_clear_flag;
+>>
+>> I wonder if leaving it set would be the right behavior. I can't see
+>> that we would want to process the node again. But this is the
+>> exceptional case, so its probably not too important and can stay like
+>> this.
+>
+> That doesn't work in the case where drivers use of_platform_populate().
+> MFD devices in particular make use of it. If the driver does not get
+> cleared on removal of the devices, then all MFD users will be broken on
+> driver unbind/rebind. *
+>
+> We really need to have the inverse of of_platform_populate which will
+> remove all child and child's child devices and clear all flags and such.
+> Right now moany drivers are open-coding the removal.
+>
+> * most drivers are somewhat broken on unbind/rebind anyway, but I don't
+>   want to make it impossible for a driver to get it right.
 
-On Wed, Apr 30, 2014 at 8:29 PM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> On Sat, Apr 26, 2014 at 05:05:47PM +0100, Abhilash Kesavan wrote:
->
-> [...]
->
->> +       if (last_man && __mcpm_outbound_enter_critical(cpu, cluster)) {
->> +               arch_spin_unlock(&exynos_mcpm_lock);
->> +
->
-> I missed it on first review, but you do need to disable L2 prefetching
-> on A15 here as we do in TC2 (tc2_pm.c), this power down procedure is not
-> compliant otherwise.
-OK, I see this as being part of the power down sequence described in
-A15 TRM, will add.
+The function shouldn't be too difficult. I would expect it to look
+something like this. You'll need to check the details.
 
-Regards,
-Abhilash
+static int __of_platform_unpopulate_device(struct device *dev, void *c)
+{
+    if (!dev->of_node || !of_node_get_flag(dev->of_node, OF_POPULATED)
+        return 0;
+
+    // recursively remove the children too --- I'd like to find a way
+to do this non-recursively
+    device_for_each_child(dev, NULL, __of_platform_unpopulate_device);
+
+    // Need to check if the device should be explicitly unbound from
+it's driver before removing it. However, I think the driver core takes
+care of this for us.
+
+    // Remove based on the bus type
+    switch (dev->bus) {
+        case &platform_bus_type:
+            platform_device_remove(to_platform_device(dev));
+            break;
+        case &amba_bus_type:
+            amba_device_remove(to_platform_device(dev));
+            break;
+    }
+
+    // Should check here if there are any other children to the
+device. It is probably bad to remove a device that still has children.
+Need to check what the driver core will do.
+}
+
+void of_platform_unpopulate(struct device *parent)
+{
+    device_for_each_child(parent, NULL, __of_platform_unpopulate_device);
+}
+
 >
-> Thanks,
-> Lorenzo
->
->> +               /* Flush all cache levels for this cluster. */
->> +               exynos_v7_exit_coherency_flush(all);
->> +
->> +               /*
->> +                * Disable cluster-level coherency by masking
->> +                * incoming snoops and DVM messages:
->> +                */
->> +               cci_disable_port_by_cpu(mpidr);
->> +
->> +               __mcpm_outbound_leave_critical(cluster, CLUSTER_DOWN);
->> +       } else {
->> +               arch_spin_unlock(&exynos_mcpm_lock);
->> +
->> +               /* Disable and flush the local CPU cache. */
->> +               exynos_v7_exit_coherency_flush(louis);
->> +       }
->> +
->> +       __mcpm_cpu_down(cpu, cluster);
->> +
->> +       /* Now we are prepared for power-down, do it: */
->> +       if (!skip_wfi)
->> +               wfi();
->> +
->> +       /* Not dead at this point?  Let our caller cope. */
->> +}
->> +
->> +static int exynos_power_down_finish(unsigned int cpu, unsigned int cluster)
->> +{
->> +       unsigned int tries = 100;
->> +       unsigned int cpunr = cpu + (cluster * EXYNOS5420_CPUS_PER_CLUSTER);
->> +
->> +       pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
->> +       BUG_ON(cpu >= EXYNOS5420_CPUS_PER_CLUSTER ||
->> +                       cluster >= EXYNOS5420_NR_CLUSTERS);
->> +
->> +       /* Wait for the core state to be OFF */
->> +       while (tries--) {
->> +               if (ACCESS_ONCE(cpu_use_count[cpu][cluster]) == 0) {
->> +                       if ((exynos_cpu_power_state(cpunr) == 0))
->> +                               return 0; /* success: the CPU is halted */
->> +               }
->> +
->> +               /* Otherwise, wait and retry: */
->> +               msleep(1);
->> +       }
->> +
->> +       return -ETIMEDOUT; /* timeout */
->> +}
->> +
->> +static const struct mcpm_platform_ops exynos_power_ops = {
->> +       .power_up               = exynos_power_up,
->> +       .power_down             = exynos_power_down,
->> +       .power_down_finish      = exynos_power_down_finish,
->> +};
->> +
->> +static void __init exynos_mcpm_usage_count_init(void)
->> +{
->> +       unsigned int mpidr, cpu, cluster;
->> +
->> +       mpidr = read_cpuid_mpidr();
->> +       cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
->> +       cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
->> +
->> +       pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
->> +       BUG_ON(cpu >= EXYNOS5420_CPUS_PER_CLUSTER  ||
->> +                       cluster >= EXYNOS5420_NR_CLUSTERS);
->> +
->> +       cpu_use_count[cpu][cluster] = 1;
->> +}
->> +
->> +/*
->> + * Enable cluster-level coherency, in preparation for turning on the MMU.
->> + */
->> +static void __naked exynos_pm_power_up_setup(unsigned int affinity_level)
->> +{
->> +       asm volatile ("\n"
->> +       "cmp    r0, #1\n"
->> +       "bxne   lr\n"
->> +       "b      cci_enable_port_for_self");
->> +}
->> +
->> +static int __init exynos_mcpm_init(void)
->> +{
->> +       int ret = 0;
->> +
->> +       if (!soc_is_exynos5420())
->> +               return -ENODEV;
->> +
->> +       if (!cci_probed())
->> +               return -ENODEV;
->> +
->> +       /*
->> +        * To increase the stability of KFC reset we need to program
->> +        * the PMU SPARE3 register
->> +        */
->> +       __raw_writel(EXYNOS5420_SWRESET_KFC_SEL, S5P_PMU_SPARE3);
->> +
->> +       exynos_mcpm_usage_count_init();
->> +
->> +       ret = mcpm_platform_register(&exynos_power_ops);
->> +       if (!ret)
->> +               ret = mcpm_sync_init(exynos_pm_power_up_setup);
->> +       if (ret)
->> +               return ret;
->> +
->> +       mcpm_smp_set_ops();
->> +
->> +       pr_info("Exynos MCPM support installed\n");
->> +
->> +       /*
->> +        * Future entries into the kernel can now go
->> +        * through the cluster entry vectors.
->> +        */
->> +       __raw_writel(virt_to_phys(mcpm_entry_point),
->> +               REG_ENTRY_ADDR);
->> +
->> +       return ret;
->> +}
->> +
->> +early_initcall(exynos_mcpm_init);
->> diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
->> index 6685ebf..f44d318 100644
->> --- a/arch/arm/mach-exynos/regs-pmu.h
->> +++ b/arch/arm/mach-exynos/regs-pmu.h
->> @@ -38,6 +38,7 @@
->>  #define S5P_INFORM5                            S5P_PMUREG(0x0814)
->>  #define S5P_INFORM6                            S5P_PMUREG(0x0818)
->>  #define S5P_INFORM7                            S5P_PMUREG(0x081C)
->> +#define S5P_PMU_SPARE3                         S5P_PMUREG(0x090C)
 >>
->>  #define S5P_ARM_CORE0_LOWPWR                   S5P_PMUREG(0x1000)
->>  #define S5P_DIS_IRQ_CORE0                      S5P_PMUREG(0x1004)
->> @@ -325,4 +326,6 @@
+>> >
+>> >  #if defined(CONFIG_MICROBLAZE)
+>> >         dev->archdata.dma_mask = 0xffffffffUL;
+>> > @@ -227,10 +228,14 @@ static struct platform_device *of_platform_device_create_pdata(
+>> >
+>> >         if (of_device_add(dev) != 0) {
+>> >                 platform_device_put(dev);
+>> > -               return NULL;
+>> > +               goto err_clear_flag;
+>> >         }
+>> >
+>> >         return dev;
+>> > +
+>> > +err_clear_flag:
+>> > +       of_node_clear_flag(np, OF_POPULATED);
+>> > +       return NULL;
+>> >  }
+>> >
+>> >  /**
+>> > @@ -262,14 +267,15 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
+>> >
+>> >         pr_debug("Creating amba device %s\n", node->full_name);
+>> >
+>> > -       if (!of_device_is_available(node))
+>> > +       if (!of_device_is_available(node) ||
+>> > +                       of_node_check_and_set_flag(node, OF_POPULATED))
+>> >                 return NULL;
+>> >
+>> >         dev = amba_device_alloc(NULL, 0, 0);
+>> >         if (!dev) {
+>> >                 pr_err("%s(): amba_device_alloc() failed for %s\n",
+>> >                        __func__, node->full_name);
+>> > -               return NULL;
+>> > +               goto err_clear_flag;
+>> >         }
+>> >
+>> >         /* setup generic device info */
+>> > @@ -309,6 +315,8 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
+>> >
+>> >  err_free:
+>> >         amba_device_put(dev);
+>> > +err_clear_flag:
+>> > +       of_node_clear_flag(node, OF_POPULATED);
+>> >         return NULL;
+>> >  }
+>> >  #else /* CONFIG_ARM_AMBA */
+>> > diff --git a/include/linux/of.h b/include/linux/of.h
+>> > index 3bad8d1..534cab8 100644
+>> > --- a/include/linux/of.h
+>> > +++ b/include/linux/of.h
+>> > @@ -130,6 +130,12 @@ static inline int of_node_check_flag(struct device_node *n, unsigned long flag)
+>> >         return test_bit(flag, &n->_flags);
+>> >  }
+>> >
+>> > +static inline int of_node_check_and_set_flag(struct device_node *n,
 >>
->>  #define EXYNOS5_OPTION_USE_RETENTION                           (1 << 4)
->>
->> +#define EXYNOS5420_SWRESET_KFC_SEL                             0x3
->> +
->>  #endif /* __ASM_ARCH_REGS_PMU_H */
->> --
->> 1.8.3.2
->>
->>
+>> Please keep the well known naming convention of the called function:
+>> of_node_test_and_set_flag
 >
