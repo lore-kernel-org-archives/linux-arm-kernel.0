@@ -1,122 +1,67 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Thu, 01 May 2014 14:12:10 +0100
-Subject: [PATCH v3 4/7] of: configure the platform device dma parameters
-In-Reply-To: <53610663.7070305@ti.com>
-References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
- <1398353407-2345-5-git-send-email-santosh.shilimkar@ti.com>
- <20140429144147.004EEC40992@trevor.secretlab.ca> <53610663.7070305@ti.com>
-Message-ID: <20140501131210.CCC13C409DA@trevor.secretlab.ca>
+From: tthayer.linux@gmail.com (Thor Thayer)
+Date: Thu, 1 May 2014 08:15:50 -0500
+Subject: [patch] Fix CAN on socfpga, for net/master
+In-Reply-To: <20140430215359.GA15148@amd.pavel.ucw.cz>
+References: <1398457446.26387.0.camel@linux-builds1>
+ <1398461518.3587.11.camel@dinh-ubuntu>
+ <20140426093646.GE8730@amd.pavel.ucw.cz>
+ <20140426203131.GA21832@amd.pavel.ucw.cz>
+ <6bf951b6-51e7-4b90-b054-9ba5b6e93874@email.android.com>
+ <20140427122510.GB12901@amd.pavel.ucw.cz>
+ <1398716449.836.4.camel@dinh-ubuntu>
+ <20140428211505.GA28242@amd.pavel.ucw.cz>
+ <CAF03EBf9KXqB4W9GuDduhLwp_kwFjUEi3syU7fX3KpXfZEFxHg@mail.gmail.com>
+ <CAF03EBd19PC5RAsLR6-dMPF2x3XRf9X4bFPgX2kRdCYWUQBYcA@mail.gmail.com>
+ <20140430215359.GA15148@amd.pavel.ucw.cz>
+Message-ID: <CAF03EBewoV0pOOmNQBwPrKgm-zhaSbFcNd_UiEhFWyUrq91-Jg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 30 Apr 2014 10:19:15 -0400, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
-> Hi Grant,
-> 
-> On Tuesday 29 April 2014 10:41 AM, Grant Likely wrote:
-> > On Thu, 24 Apr 2014 11:30:04 -0400, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
-> >> Retrieve DMA configuration from DT and setup platform device's DMA
-> >> parameters. The DMA configuration in DT has to be specified using
-> >> "dma-ranges" and "dma-coherent" properties if supported.
-> >>
-> >> We setup dma_pfn_offset using "dma-ranges" and dma_coherent_ops
-> >> using "dma-coherent" device tree properties.
-> >>
-> >> The set_arch_dma_coherent_ops macro has to be defined by arch if
-> >> it supports coherent dma_ops. Otherwise, set_arch_dma_coherent_ops() is
-> >> declared as nop.
-> >>
-> >> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> >> Cc: Russell King <linux@arm.linux.org.uk>
-> >> Cc: Arnd Bergmann <arnd@arndb.de>
-> >> Cc: Olof Johansson <olof@lixom.net>
-> >> Cc: Grant Likely <grant.likely@linaro.org>
-> >> Cc: Rob Herring <robh+dt@kernel.org>
-> >> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> >> Cc: Linus Walleij <linus.walleij@linaro.org>
-> >> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> >> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> >> ---
-> >>  drivers/of/platform.c       |   48 ++++++++++++++++++++++++++++++++++++++++---
-> >>  include/linux/dma-mapping.h |    7 +++++++
-> >>  2 files changed, 52 insertions(+), 3 deletions(-)
-> >>
-> >> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> >> index 48de98f..270c0b9 100644
-> >> --- a/drivers/of/platform.c
-> >> +++ b/drivers/of/platform.c
-> >> @@ -187,6 +187,50 @@ struct platform_device *of_device_alloc(struct device_node *np,
-> >>  EXPORT_SYMBOL(of_device_alloc);
-> >>  
-> >>  /**
-> >> + * of_dma_configure - Setup DMA configuration
-> >> + * @dev:	Device to apply DMA configuration
-> >> + *
-> >> + * Try to get devices's DMA configuration from DT and update it
-> >> + * accordingly.
-> >> + *
-> >> + * In case if platform code need to use own special DMA configuration,it
-> >> + * can use Platform bus notifier and handle BUS_NOTIFY_ADD_DEVICE event
-> >> + * to fix up DMA configuration.
-> >> + */
-> >> +static void of_dma_configure(struct device *dev)
-> >> +{
-> >> +	u64 dma_addr, paddr, size;
-> >> +	int ret;
-> >> +
-> >> +	dev->coherent_dma_mask = DMA_BIT_MASK(32);
-> >> +	if (!dev->dma_mask)
-> >> +		dev->dma_mask = &dev->coherent_dma_mask;
-> >> +
-> >> +	/*
-> >> +	 * if dma-coherent property exist, call arch hook to setup
-> >> +	 * dma coherent operations.
-> >> +	 */
-> >> +	if (of_dma_is_coherent(dev->of_node)) {
-> >> +		set_arch_dma_coherent_ops(dev);
-> >> +		dev_dbg(dev, "device is dma coherent\n");
-> >> +	}
-> >> +
-> >> +	/*
-> >> +	 * if dma-ranges property doesn't exist - just return else
-> >> +	 * setup the dma offset
-> >> +	 */
-> >> +	ret = of_dma_get_range(dev->of_node, &dma_addr, &paddr, &size);
-> >> +	if ((ret == -ENODEV) || (ret < 0)) {
-> >> +		dev_dbg(dev, "no dma range information to setup\n");
-> >> +		return;
-> >> +	}
-> >> +
-> >> +	/* DMA ranges found. Calculate and set dma_pfn_offset */
-> >> +	dev->dma_pfn_offset = PFN_DOWN(paddr - dma_addr);
-> >> +	dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", dev->dma_pfn_offset);
-> > 
-> > I've got two concerns here. of_dma_get_range() retrieves only the first
-> > tuple from the dma-ranges property, but it is perfectly valid for
-> > dma-ranges to contain multiple tuples. How should we handle it if a
-> > device has multiple ranges it can DMA from?
-> > 
-> 
-> We've not found any cases in current Linux where more than one dma-ranges
-> would be used. Moreover, The MM (definitely for ARM) isn't supported such
-> cases at all (if i understand everything right).
-> - there are only one arm_dma_pfn_limit
-> - there is only one MM zone is used for ARM
-> - some arches like x86,mips can support 2 zones (per arch - not per device or bus)
->   DMA & DMA32, but they configured once and forever per arch.
+On Wed, Apr 30, 2014 at 4:53 PM, Pavel Machek <pavel@denx.de> wrote:
+> Hi!
+>
+>> >>> > Apparently, socfpga CAN needs 32-bit accesses and different raminit
+>> >>> > sequence.
+>> >>> >
+>> >>> > Signed-off-by: Pavel Machek <pavel@denx.de>
+>
+> ...
+>
+>> >> Or ... let me upload my tree so that you can generate the diff.
+>> >>
+>> >> You should be able to get it using:
+>> >>
+>> >> git pull git://git.denx.de/linux-denx-pavel.git my_net_master
+>> >>
+>> >>> I also like your updates to my patch as shown below - much cleaner.
+>
+>> > Since you based this patch on my original code, feel free to add my
+>> signed-off.
+>
+> Will do.
+>
+>> I pulled in your branch
+>> (git://git.denx.de/linux-denx-pavel.gitmy_net_master) and tested it on
+>> the Altera Development Kit. It works well -
+>> I don't see any issues at a number of different bitrates (80K, 200K, 800K,
+>> 1Mb).
+>
+> Thanks for testing. I'll also add your Tested-by: header, if you don't
+> mind.
 
-Okay. If anyone ever does implement multiple ranges then this code will
-need to be revisited.
+Hi Pavel. That would be fine.
 
-> > Second, while the pfn offset is being determined, I don't see anything
-> > making use of either the base address or size. How is the device
-> > constrained to only getting DMA buffers from within that range? Is the
-> > driver expected to manage that directly?
-> > 
-> Drivers don't have to do anything special apart from setting
-> the correct mask. The pfn_offset case, we use DMA_ZONE which takes
-> care of masks already. Size is suppose to be used for dma_mask
-> setup which we discussed in previous threads.
+Thor
 
-okay.
-
-g.
+>
+>> I didn't investigate what the issues were with applying the patch though. I
+>> just used your branch.
+>
+> The way I generated that branch... you picked up some extra code in
+> other areas of the kernel, but it should not affect the testing.
+>
+> Thanks!
+>                                                                 Pavel
+> --
+> (english) http://www.livejournal.com/~pavelmachek
+> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
