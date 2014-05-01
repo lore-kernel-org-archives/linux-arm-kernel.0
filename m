@@ -1,115 +1,51 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 01 May 2014 16:11:48 +0100
-Subject: [PATCH v12 11/31] documentation: iommu: add binding document
- of Exynos System MMU
-In-Reply-To: <20140501143654.GB3732@e103592.cambridge.arm.com>
-References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
- <6607258.MzzLbm2Afe@wuerfel>
- <20140501111527.GA3732@e103592.cambridge.arm.com>
- <36874558.Vf2LgdL3qf@wuerfel>
- <20140501143654.GB3732@e103592.cambridge.arm.com>
-Message-ID: <53626434.8000807@arm.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Thu, 01 May 2014 16:14:35 +0100
+Subject: [PATCH] vexpress: Initialise the sysregs before setting up the
+ clocks
+In-Reply-To: <1398953107-29426-1-git-send-email-catalin.marinas@arm.com>
+References: <1398953107-29426-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1398957275.3452.69.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/05/14 15:36, Dave Martin wrote:
-> On Thu, May 01, 2014 at 02:29:50PM +0100, Arnd Bergmann wrote:
->> On Thursday 01 May 2014 12:15:35 Dave Martin wrote:
->>> On Tue, Apr 29, 2014 at 10:46:18PM +0200, Arnd Bergmann wrote:
->>>> On Tuesday 29 April 2014 19:16:02 Dave Martin wrote:
->>>
->>> [...]
->>>
->>>>> For example, suppose devices can post MSIs to an interrupt controller
->>>>> via a mailbox accessed through the IOMMU.  Suppose also that the IOMMU
->>>>> generates MSIs itself in order to signal management events or faults
->>>>> to a host OS.  Linux (as host) will need to configure the interrupt
->>>>> controller separately for the IOMMU and for the IOMMU clients.  This
->>>>> means that Linux needs to know which IDs may travel to the interrupt
->>>>> controller for which purpose, and they must be distinct.
->>>>
->>>> I don't understand. An MSI controller is just an address that acts
->>>> as a DMA slave for a 4-byte inbound data packet. It has no way of
->>>> knowing who is sending data, other than by the address or the data
->>>> sent to it. Are you talking of something else?
->>>
->>> Oops, looks like there are a few points I failed to respond to here...
->>>
->>>
->>> I'm not an expert on PCI -- I'm prepared to believe it works that way.
->>>
->>> GICv3 can descriminate between different MSI senders based on ID
->>> signals on the bus.
->>
->> Any idea what this is good for? Do we have to use it? It probably doesn't
->> fit very well into the way Linux handles MSIs today.
+On Thu, 2014-05-01 at 15:05 +0100, Catalin Marinas wrote:
+[...]
+> In addition, vexpress_sysreg_init() is changed to a device_initcall()
+
+Not in this patch it isn't ;-)
+
+>  as the core_initcall() is no longer
+> required.
 > 
-> Marc may be better placed than me to comment on this in detail.
-
-As to "fitting Linux", it seems to match what Linux does fairly well
-(see the kvm-arm64/gicv3 branch in my tree). Not saying that it does it
-in a very simple way (far from it, actually), but it works.
-
-As to "what it is good for" (and before someone bursts into an Edwin
-Starr interpretation), it mostly has to do with isolation, and the fact
-that you may want to let the whole MSI programming to a guest (and yet
-ensure that the guest cannot generate interrupts that would be assigned
-to other devices). This is done by sampling the requester-id at the ITS
-level, and use this information to index a per-device interrupt
-translation table (I could talk for hours about the concept and its
-variations, mostly using expletives and possibly a hammer, but I think
-it is the time for my pink pill).
-
-> However, I believe it's correct to say that because the GIC is not part
-> of PCI, end-to-end MSI delivery inherently involves a non-PCI step from
-> the PCI RC to the GIC itself.
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> Tested-by: Will Deacon <will.deacon@arm.com>
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> Tested-by: Pawel Moll <pawel.moll@arm.com>
+> Acked-by: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mike Turquette <mturquette@linaro.org>
+> ---
 > 
-> Thus this is likely to be a fundamental requirement for MSIs on ARM SoCs
-> using GIC, if we want to have a hope of mapping MSIs to VMs efficiently.
-
-Indeed. GICv[34] is the ARM way of implementing MSI on SBSA compliant
-systems (from level 1 onwards, if memory serves well). People are
-actively building systems with this architecture, and relying on it to
-provide VM isolation.
-
->>>>> I'm not sure whether there is actually a SoC today that is MSI-capable
->>>>> and contains an IOMMU, but all the components to build one are out
->>>>> there today.  GICv3 is also explicitly designed to support such
->>>>> systems.
->>>>
->>>> A lot of SoCs have MSI integrated into the PCI root complex, which
->>>> of course is pointless from MSI perspective, as well as implying that
->>>> the MSI won't go through the IOMMU.
->>>>
->>>> We have briefly mentioned MSI in the review of the Samsung GH7 PCI
->>>> support. It's possible that this one can either use the built-in
->>>> MSI or the one in the GICv2m.
->>>
->>> We are likely to get non-PCI MSIs in future SoC systems too, and there
->>> are no standards governing how such systems should look.
->>
->> I wouldn't call that MSI though -- using the same term in the code
->> can be rather confusing. There are existing SoCs that use message
->> based interrupt notification. We are probably better off modeling
->> those are regular irqchips in Linux and DT, given that they may
->> not be bound by the same constraints as PCI MSI.
+> Mike, I'd like to get this in for 3.15 and I'm happy to push it via the arm64
+> tree. Are you ok with this? Thanks.
 > 
-> We can call it what we like and maybe bury the distinction in irqchip
-> drivers for some fixed-configuration cases, but it's logically the same
-> concept.  Naming and subsystem factoring are implementation decisions
-> for Linux.
+>  drivers/clk/versatile/clk-vexpress-osc.c | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> For full dynamic assignment of pluggable devices or buses to VMs, I'm
-> less sure that we can model that as plain irqchips.
-
-Yeah, I've been looking at that. For some restricted cases, the irqchip
-model works very well (think of wire to "MSI" translators, which are
-likely to have a fixed configuration). Anything more dynamic requires a
-more evolved infrastructure, but I'd hope they would also be on a
-discoverable bus, removing most of the need for description in DT.
-
-Cheers,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> diff --git a/drivers/clk/versatile/clk-vexpress-osc.c b/drivers/clk/versatile/clk-vexpress-osc.c
+> index a535c7bf8574..422391242b39 100644
+> --- a/drivers/clk/versatile/clk-vexpress-osc.c
+> +++ b/drivers/clk/versatile/clk-vexpress-osc.c
+> @@ -100,6 +100,8 @@ void __init vexpress_osc_of_setup(struct device_node *node)
+>  	struct clk *clk;
+>  	u32 range[2];
+>  
+> +	vexpress_sysreg_of_early_init();
+> +
+>  	osc = kzalloc(sizeof(*osc), GFP_KERNEL);
+>  	if (!osc)
+>  		return;
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
