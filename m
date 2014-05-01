@@ -1,85 +1,54 @@
-From: grundler@chromium.org (Grant Grundler)
-Date: Thu, 1 May 2014 09:42:24 -0700
-Subject: [PATCH v12 11/31] documentation: iommu: add binding document of
- Exynos System MMU
-In-Reply-To: <36874558.Vf2LgdL3qf@wuerfel>
-References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
- <6607258.MzzLbm2Afe@wuerfel>
- <20140501111527.GA3732@e103592.cambridge.arm.com>
- <36874558.Vf2LgdL3qf@wuerfel>
-Message-ID: <CANEJEGtS8VHgT=W54QT-849Nz9n+uURj6LFM-sie0cX6=zn37A@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu,  1 May 2014 10:43:28 -0600
+Subject: [PATCH] ARM: tegra: remove UART5/UARTE from tegra124.dtsi
+Message-ID: <1398962608-11867-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 1, 2014 at 6:29 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-...
->> GICv3 can descriminate between different MSI senders based on ID
->> signals on the bus.
->
-> Any idea what this is good for? Do we have to use it? It probably doesn't
-> fit very well into the way Linux handles MSIs today.
+From: Stephen Warren <swarren@nvidia.com>
 
-I can see this being used for diagnosing failures - e.g. hung system
-would leave tracks if an interrupt was or was not provided by the
-device. I can't think of a reason why Linux MSI code would need to
-support this though.
+(This is commit 862f0eea38409ff0d7f226c1245b787e3f0e2607 upstream)
 
-...
->> We are likely to get non-PCI MSIs in future SoC systems too, and there
->> are no standards governing how such systems should look.
+Tegra124 only has 4 UARTs. Parts of the documentation hint at a fifth
+UART, but this appears to be left-over from earlier SoC documentation.
+Remove the non-existent DT node for UART5.
 
-Why look to the future when one can look in the past? :)
+Cc: <stable@vger.kernel.org> # v3.14
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+This is a backport of the upstream commit specifically for 3.13.
+The following commits in mainline follow on from this:
+9ef1af9ea28c dt: tegra: remove non-existent clock IDs
+9ba71705706a clk: tegra: remove non-existent clocks
+... and can be directly cherry-picked without conflict, after this.
+---
+ arch/arm/boot/dts/tegra124.dtsi | 13 -------------
+ 1 file changed, 13 deletions(-)
 
-PA-RISC was designed in the 1980s to use "MSI" to generate all CPU
-interrupts. This is as simple as it gets.
-
-The concept is identical to MSI: MMIO routeable address with a payload
-to indicate interrupt source (or map that source to some "vector
-table".) Look at arch/parisc/kernel/smp.c:ipi_send() for an example
-(note "p->hpa" is "processor->host physical address").
-
-Current and  future products do the same things but add more
-"features" that make this more complicated. But the basic transaction
-will be identical and it needs to be routed like any other MMIO
-transaction by any bridge (including IOMMUs).
-
-> I wouldn't call that MSI though -- using the same term in the code
-> can be rather confusing. There are existing SoCs that use message
-> based interrupt notification. We are probably better off modeling
-> those are regular irqchips in Linux and DT, given that they may
-> not be bound by the same constraints as PCI MSI.
-
-PCI device is one "source" for MSI and PCI defines how to initialize
-an MSI source.  The target is not PCI (or not even Intel). Intel
-defines how MSI works on their chipsets/CPUs. Other can still do it
-differently.
-
-I'm perfectly ok with using "MSI" to refer to any "in band interrupt message".
-
->> Who knows?  A management component of the GPU that is under exclusive
->> control of the host or hypervisor might be wired up to bypass the IOMMU
->> completely.
-
-Does the linux kernel need to know about a device/component that it
-can't control?
-Either linux kernel shouldn't be told about it OR should ignore this
-device/component.
-
->> Partly, yes.  The concept embodied by "dma-ranges" is correct, but the
->> topological relationship is not: the assumption that a master device
->> always masters onto its parent node doesn't work for non-tree-like
->> topologies.
->
-> In almost all cases it will fit. When it doesn't, we can work around it by
-> defining virtual address spaces the way that the PCI binding does. The only
-> major exception that we know we have to handle is IOMMUs.
-
-MMIO routing (and thus dma-ranges) is a "graph" (very comparable to
-network routing). Some simple (e.g. PCI) implementations look like a
-tree - but that's not the general case.
-
-DMA cares about more than routing though - cache coherency and
-performance (BW and latency) matter too.
-
-cheers,
-grant
+diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
+index ec0698a8354a..9c2ba74a8b60 100644
+--- a/arch/arm/boot/dts/tegra124.dtsi
++++ b/arch/arm/boot/dts/tegra124.dtsi
+@@ -164,19 +164,6 @@
+ 		status = "disabled";
+ 	};
+ 
+-	serial at 70006400 {
+-		compatible = "nvidia,tegra124-uart", "nvidia,tegra20-uart";
+-		reg = <0x70006400 0x40>;
+-		reg-shift = <2>;
+-		interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
+-		clocks = <&tegra_car TEGRA124_CLK_UARTE>;
+-		resets = <&tegra_car 66>;
+-		reset-names = "serial";
+-		dmas = <&apbdma 20>, <&apbdma 20>;
+-		dma-names = "rx", "tx";
+-		status = "disabled";
+-	};
+-
+ 	pwm at 7000a000 {
+ 		compatible = "nvidia,tegra124-pwm", "nvidia,tegra20-pwm";
+ 		reg = <0x7000a000 0x100>;
+-- 
+1.8.1.5
