@@ -1,77 +1,41 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 1 May 2014 10:50:03 -0600
-Subject: [PATCH v7 01/10] PCI: host: rcar: Add Renesas R-Car PCIe driver
-In-Reply-To: <b9160c7a49304270b5070dcf49482723@HKXPR06MB168.apcprd06.prod.outlook.com>
-References: <1396261856-22465-1-git-send-email-phil.edworthy@renesas.com>
- <1396261856-22465-2-git-send-email-phil.edworthy@renesas.com>
- <20140424191901.GE29593@google.com>
- <9b8bedae9d604383ac7ec22fd0f62fdb@HKXPR06MB168.apcprd06.prod.outlook.com>
- <CAErSpo6Autto4n4A4wHtXQNJzD3RKevkVcLZHUods-2-eiRDYQ@mail.gmail.com>
- <20140428203501.GA3016@obsidianresearch.com>
- <ac795ce3bb6349708e2e96686e19d24f@HKXPR06MB168.apcprd06.prod.outlook.com>
- <20140430154345.GA1705@obsidianresearch.com>
- <b9160c7a49304270b5070dcf49482723@HKXPR06MB168.apcprd06.prod.outlook.com>
-Message-ID: <20140501165003.GC3296@obsidianresearch.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 01 May 2014 10:50:26 -0600
+Subject: [PATCH] ARM: trusted_foundations: only set setup_max_cpus if
+ SMP set
+In-Reply-To: <CAAVeFuKbhMSDz3QQAJaNsxOyk_EfAaGq-_m-rsc8RmdnYLXeew@mail.gmail.com>
+References: <20140427093250.GA26756@n2100.arm.linux.org.uk>
+ <1398592890-31301-1-git-send-email-acourbot@nvidia.com>
+ <CAAVeFuKbhMSDz3QQAJaNsxOyk_EfAaGq-_m-rsc8RmdnYLXeew@mail.gmail.com>
+Message-ID: <53627B52.6090806@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 01, 2014 at 09:50:56AM +0000, Phil Edworthy wrote:
+On 05/01/2014 01:22 AM, Alexandre Courbot wrote:
+> On Sun, Apr 27, 2014 at 7:01 PM, Alexandre Courbot <acourbot@nvidia.com> wrote:
+>> The setup_max_cpu variable is only defined if CONFIG_SMP is set. Add
+>> a preprocessor condition to avoid the following compilation error if
+>> CONFIG_SMP is not set:
+>>
+>>     arch/arm/include/asm/trusted_foundations.h: In function 'register_trusted_foundations':
+>>     arch/arm/include/asm/trusted_foundations.h:57:2: error: 'setup_max_cpus' undeclared (first use in this function)
+>>
+>> Reported-by: Russell King <rmk@arm.linux.org.uk>
+>> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+>> ---
+>> Hi Russell,
+>>
+>> This should take care of the trusted foundations issue. Thanks for reporting this.
+> 
+> Russell,
+> 
+> Do you mind taking this into your tree? Or do you prefer if the Tegra
+> folks do it?
 
-> > The logic should be:
-> >  if (bus == primary)
-> >     do io access to host bridge
-> >  else if (bus == secondary)
-> >     issue type 0 TLP on the wire
-> >  else if (bus > secondary && bus <= subordinate)
-> >     issue type 1 TLP on the wire
-> >  else
-> >     fail, invalid bus number
-> > Where the three values come from the register in the PCI host bridge's
-> > configuration space, and are kept in sync with the programming from
-> > the Linux PCI core.
-> > 
-> > It is just a happy hapenstance that root_bus_nr equals the value the
-> > PCI core programmed into secondary - that is not guarenteed, you must
-> > use the primary value directly.
+I /think/ that Russell prefers to pick patches up from his patch tracker:
 
-> For type0 TLPs, we are not checking that root_bus_nr equals the
-> value the PCI core programmed into secondary, we are checking that
-> the (root_bus_nr == bus->parent->number). The only way this wouldn't
-> work is if root_bus_nr was not the root bus number.
+http://www.arm.linux.org.uk/developer/patches/
 
-Okay, that isn't as sketchy, but that process still ignores the
-subordinate bus number and the failure case as required by PCI.
+and instructions:
+http://www.arm.linux.org.uk/developer/patches/info.php
 
-The goal here is to have the stuff below the drivers implement the PCI
-spec so that the core code can assume everything below is
-conformant. Drivers should not introduce gratuitous differences 'just
-because'
-
-There is no reason drivers should be using PCI core structures to make
-decisions when the spec says those decisions are driven by config
-space fields.
-
-This way the PCI core code doesn't have to be aware of any weird
-non-standard edge cases.. Such as not failing bus numbers beyond the
-subordinate bus number.
-
-> Since the Synopsys DW driver also saves off sys->busnr and later
-> uses this to determine if accesses are for the host bridge, I guess
-> that means it won't always work either, right? Or is it ok because
-> the DW driver saves sys->busnr in its .scan function?
-
-Sounds like it is making the same mistake, and nobody noticed. This is
-another reason why it is important to implement correctly so people
-copying copy the right stuff :)
-
-> When would the PCI core change the root bus number to something
-> other than set in sys->busnr?
-
-I think the more likely scenario is that 'sys' in general is
-architecture specific and its use is being discouraged so that host
-drivers are not arch specific.
-
-A domain driver like rcar should always place the root complex
-integrated bus as bus 0 in the domain.
-
-Jason
+If you add it there and he objects, I expect he'll let you know:-)
