@@ -1,42 +1,44 @@
 From: carlo@caione.org (Carlo Caione)
-Date: Thu,  1 May 2014 14:29:32 +0200
-Subject: [PATCH v5 6/8] ARM: sunxi: Add AXP20x support in defconfig
+Date: Thu,  1 May 2014 14:29:33 +0200
+Subject: [PATCH v5 7/8] ARM: sunxi: Add AXP20x support multi_v7_defconfig
 In-Reply-To: <1398947374-3115-1-git-send-email-carlo@caione.org>
 References: <1398947374-3115-1-git-send-email-carlo@caione.org>
-Message-ID: <1398947374-3115-7-git-send-email-carlo@caione.org>
+Message-ID: <1398947374-3115-8-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Carlo Caione <carlo@caione.org>
 ---
- arch/arm/configs/sunxi_defconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/configs/multi_v7_defconfig | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
-index b5df4a5..6e305da 100644
---- a/arch/arm/configs/sunxi_defconfig
-+++ b/arch/arm/configs/sunxi_defconfig
-@@ -40,6 +40,8 @@ CONFIG_SUN4I_EMAC=y
- # CONFIG_NET_VENDOR_STMICRO is not set
- # CONFIG_NET_VENDOR_WIZNET is not set
- # CONFIG_WLAN is not set
-+CONFIG_INPUT_MISC=y
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index d4e8a47..5aeea19 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -146,6 +146,7 @@ CONFIG_KEYBOARD_SPEAR=y
+ CONFIG_KEYBOARD_CROS_EC=y
+ CONFIG_MOUSE_PS2_ELANTECH=y
+ CONFIG_INPUT_MISC=y
 +CONFIG_INPUT_AXP20X_PEK=y
+ CONFIG_INPUT_MPU3050=y
+ CONFIG_SERIO_AMBAKMI=y
  CONFIG_SERIAL_8250=y
- CONFIG_SERIAL_8250_CONSOLE=y
- CONFIG_SERIAL_8250_NR_UARTS=8
-@@ -55,6 +57,7 @@ CONFIG_GPIO_SYSFS=y
- # CONFIG_HWMON is not set
+@@ -207,6 +208,7 @@ CONFIG_ARMADA_THERMAL=y
  CONFIG_WATCHDOG=y
- CONFIG_SUNXI_WATCHDOG=y
+ CONFIG_ORION_WATCHDOG=y
+ CONFIG_MFD_AS3722=y
 +CONFIG_MFD_AXP20X=y
- # CONFIG_USB_SUPPORT is not set
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
-@@ -69,3 +72,4 @@ CONFIG_NFS_FS=y
- CONFIG_ROOT_NFS=y
- CONFIG_NLS=y
- CONFIG_PRINTK_TIME=y
+ CONFIG_MFD_CROS_EC=y
+ CONFIG_MFD_CROS_EC_SPI=y
+ CONFIG_MFD_MAX8907=y
+@@ -217,6 +219,7 @@ CONFIG_MFD_TPS65910=y
+ CONFIG_REGULATOR_VIRTUAL_CONSUMER=y
+ CONFIG_REGULATOR_AB8500=y
+ CONFIG_REGULATOR_AS3722=y
 +CONFIG_REGULATOR_AXP20X=y
+ CONFIG_REGULATOR_GPIO=y
+ CONFIG_REGULATOR_MAX8907=y
+ CONFIG_REGULATOR_PALMAS=y
 -- 
 1.8.3.2
