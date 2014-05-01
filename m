@@ -1,51 +1,39 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 01 May 2014 11:33:26 -0600
-Subject: [PATCH] ARM: tegra: add Tegra Note 7 device tree
-In-Reply-To: <1398928217-32629-1-git-send-email-acourbot@nvidia.com>
-References: <1398928217-32629-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <53628566.1070602@wwwdotorg.org>
+From: b.brezillon.dev@gmail.com (Boris BREZILLON)
+Date: Thu, 01 May 2014 19:36:39 +0200
+Subject: [PATCH v3 1/9] mtd: nand: define struct nand_timings
+In-Reply-To: <20140430175157.GB2497@norris-Latitude-E6410>
+References: <1394647664-8258-1-git-send-email-b.brezillon.dev@gmail.com>
+ <1394647664-8258-2-git-send-email-b.brezillon.dev@gmail.com>
+ <20140430175157.GB2497@norris-Latitude-E6410>
+Message-ID: <53628627.2020401@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/01/2014 01:10 AM, Alexandre Courbot wrote:
-> Tegra Note 7 is a consumer tablet embedding a Tegra 4 SoC with 1GB RAM
-> and a 720p panel.
-> 
-> The following features are enabled by this device tree: UART, eMMC, USB
-> (needs external power), PMIC, backlight, DSI panel, keys.
-> 
-> SD card, HDMI, charger, self-powered USB, audio, wifi, bluetooth are not
-> yet supported but might be by future patches (likely in that order).
+Hi Brian,
 
-> diff --git a/arch/arm/boot/dts/tegra114-tn7.dts b/arch/arm/boot/dts/tegra114-tn7.dts
+On 30/04/2014 19:51, Brian Norris wrote:
+> Hi Boris,
+>
+> On Wed, Mar 12, 2014 at 07:07:36PM +0100, Boris BREZILLON wrote:
+>> +
+>> +/**
+>> + * struct nand_sdr_timings - SDR NAND chip timings
+>> + *
+>> + * This struct defines the timing requirements of a SDR NAND chip.
+>> + * These informations can be found in every NAND datasheets and the timings
+>> + * meaning are described in the ONFI specifications:
+>> + * www.onfi.org/~/media/ONFI/specs/onfi_3_1_spec.pdf? (chapter 4.15 Timing
+> Can you remove the unicode U+200E character?
 
-> +	chosen {
-> +		/* TN7's bootloader's arguments need to be overridden */
-> +		bootargs = "console=ttyS0,115200n8 console=tty1 gpt cma=128M fbcon=rotate:2";
+Sure
 
-Do we still need the cma argument at all now? The default is now 64M in
-tegra_defconfig, and 128M seems quite large.
+>
+>> + * Parameters)
+> Please document the units for these fields here. It looks like you're
+> using picoseconds.
 
-> +	host1x at 50000000 {
-> +		hdmi at 54280000 {
-> +			status = "okay";
-> +
-> +			hdmi-supply = <&vdd_5v0_hdmi>;
-> +			vdd-supply = <&vdd_3v3_hdmi>;
-> +			pll-supply = <&vdd_1v05_pll>;
-> +
-> +			nvidia,ddc-i2c-bus = <&hdmi_ddc>;
-> +			nvidia,hpd-gpio =
-> +				<&gpio TEGRA_GPIO(N, 7) GPIO_ACTIVE_HIGH>;
-> +		};
+I'll add field units (which are indeed picoseconds) to this comment.
 
-If HDMI doesn't work yet (per commit description), should we leave it
-out of the DT for now?
+Best Regards,
 
-> +	serial at 70006300 {
-> +		status = "okay";
-> +	};
-
-Is there actually an accessible UART on the board? I guess this is for
-people lucky enough to have internal boards with the debug connector. If
-so, this is probably fine.
+Boris
