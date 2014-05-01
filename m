@@ -1,55 +1,58 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Thu, 1 May 2014 11:15:49 +0100
-Subject: [RFC PATCH V4 6/7] arm64: mm: Enable HAVE_RCU_TABLE_FREE logic
-In-Reply-To: <20140501100415.GC22316@arm.com>
-References: <1396018892-6773-1-git-send-email-steve.capper@linaro.org>
- <1396018892-6773-7-git-send-email-steve.capper@linaro.org>
- <20140430152047.GF31220@arm.com> <20140430153317.GG31220@arm.com>
- <20140430153824.GA7166@linaro.org> <20140430172114.GI31220@arm.com>
- <20140501073402.GA30358@linaro.org>
- <20140501095246.GB22316@arm.com>
- <20140501095739.GO11096@twins.programming.kicks-ass.net>
- <20140501100415.GC22316@arm.com>
-Message-ID: <20140501101548.GA2254@linaro.org>
+From: max.schwarz@online.de (Max Schwarz)
+Date: Thu, 01 May 2014 12:43:13 +0200
+Subject: [RFC/PATCH 0/8] pinctrl-rockchip: Change wrong initial assumptions
+In-Reply-To: <1414506.B4e2jZujVm@diego>
+References: <1414506.B4e2jZujVm@diego>
+Message-ID: <699502106.fEF2JGVO0i@typ>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 01, 2014 at 11:04:15AM +0100, Catalin Marinas wrote:
-> On Thu, May 01, 2014 at 10:57:39AM +0100, Peter Zijlstra wrote:
-> > On Thu, May 01, 2014 at 10:52:47AM +0100, Catalin Marinas wrote:
-> > > Does gup_fast walking increment the mm_users? Or is it a requirement of
-> > > the calling code? I can't seem to find where this happens.
-> > 
-> > No, its not required at all. One should only walk current->mm with
-> > gup_fast, any other usage is broken.
-> 
-> OK, I get it now.
-> 
-> > And by delaying TLB shootdown, either through disabling IRQs and
-> > stalling IPIs or by using RCU freeing, you're guaranteed your own page
-> > tables won't disappear underneath your feet.
-> 
-> And for RCU to work, we still need to use the full tlb_remove_table()
-> logic (Steve's patches just use tlb_remove_page() for table freeing).
+On Wednesday 30 April 2014 at 00:07:12, Heiko St?bner wrote:
+> While this wasn't a problem until now, the upcoming rk3288 introduces
+> additional changes to both the grf and pmu areas. On it even part of
+> the pinmux registers move into the pmu space.
 
-Yes, I see.
-This is a bug in the arm64 patch (arm correctly calls tlb_remove_page),
-I think it got ate during a rebase.
+Could you give us more information on that? I tried to find details on the 
+RK3288 but came up with nothing. How are the pinmux registers divided?
 
-I will fix the arm64 activation logic.
+Would adding a third reg element for the pinmux register to the gpio subnodes 
+suffice to fix your problem?
 
-Apologies for the confustion,
--- 
-Steve
+> For this my current gut-feeling is, that providing both the grf and pmu
+> as syscons to the pinctrl driver might be more future proof for the next
+> socs. But as I'm not sure on this, I'd like of course comments :-)
 
-> 
-> Thanks.
-> 
-> -- 
-> Catalin
-> 
-> --
-> To unsubscribe, send a message with 'unsubscribe linux-mm' in
-> the body to majordomo at kvack.org.  For more info on Linux MM,
-> see: http://www.linux-mm.org/ .
-> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
+I don't see the problem with the current solution. In my mind it's cleaner to 
+specify register mappings explicitly in the dt rather than map one large block 
+and let the drivers figure out themselves where their registers are.
+
+There are some question marks for me on the syscon solution. Regmap uses 
+locking internally, which means separate drivers can't access separate 
+registers simultaneously. We have an SMP machine here, so that's not far-
+fetched. And that locking is completely unnecessary, as we *know* in most 
+cases that the accessed areas do not overlap.
+
+> The other option would be to leave the grf as it is and create separate
+> syscons for real small individual parts like the soc-conf and usb-phys.
+> But apart from creating these real small syscons that would
+> also make it necessary to introduce another register map for the
+> drive-strength settings of the pin-controller, which are sitting in the
+> middle of everything at least on rk3066 and rk3188.
+
+Wy do we need a syscon for usb-phys? Is it shared by multiple drivers?
+My instinctive approach would be two usb-phys devices mapping the GRF_UOC0/1 
+spaces directly via reg properties. Or did I miss something?
+
+The only register space I see that is used from many drivers is the GRF_SOC_* 
+space. So in my mind that should be the only syscon device.
+
+> @Max: sorry to come up with this now, but I feel this should be resolved
+> (in whatever direction) before we introduce any grf syscon. Because due
+> to dt being an API we will be tied for a long time to it.
+
+Yes, I agree. If we want to change something, we should change it now. All in 
+all I would vote for the current solution. But it seems you have more 
+information than me, so my vote is somewhat uneducated ;-)
+
+Cheers,
+  Max
