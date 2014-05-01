@@ -1,107 +1,43 @@
-From: pullip.cho@samsung.com (Cho KyongHo)
-Date: Thu, 01 May 2014 23:02:14 +0900
-Subject: [PATCH v12 11/31] documentation: iommu: add binding document of
- Exynos System MMU
-In-Reply-To: <7044616.kdaKNu3Qet@wuerfel>
-References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
- <20140429181601.GE3582@e103592.cambridge.arm.com>
- <CANEJEGs6TXNzE8cWYgEKfFSsD2w5XiYvwSbhQ_+gtfzfs+6udA@mail.gmail.com>
- <7044616.kdaKNu3Qet@wuerfel>
-Message-ID: <20140501230214.ed53cd0fc977225f37b14e29@samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu,  1 May 2014 15:05:07 +0100
+Subject: [PATCH] vexpress: Initialise the sysregs before setting up the clocks
+Message-ID: <1398953107-29426-1-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 29 Apr 2014 23:00:29 +0200, Arnd Bergmann wrote:
-> On Tuesday 29 April 2014 13:07:54 Grant Grundler wrote:
-> > On Tue, Apr 29, 2014 at 11:16 AM, Dave Martin <Dave.Martin@arm.com> wrote:
-> > ...
-> > > An IOMMU is really a specialised bridge
-> > 
-> > Is a GART a bridge?
-> > 
-> > IOMMUs can provide three basic functions:
-> > 1) remap address space to reach phys mem ranges that the device is
-> > otherwise not capable of accessing (classic 32-bit DMA to reach 64-bit
-> > Phys address)
-> > 
-> > 2) implement scatter-gather (page level granularity) so the device
-> > doesn't have to
-> > 
-> > 3) provide some level of system protection against "rogue" DMA by
-> > forcing everything through a DMA mapping interface and faulting when
-> > encountering unmapped DMA transactions.
-> 
-> [ 4) provide isolation between multiple contexts, typically for purposes
->      of virtualization]
-> 
-> > I summarize IOMMUs as: "participate in the routing of MMIO
-> > transactions in the system fabric."
-> > In this sense, IOMMUs are sort of a bridge. Defining what kind of
-> > routing they can do (coalesce transactions? remapping MMIO domains?)
-> > and which address ranges they route would describe most of that
-> > functionality.
-> > 
-> > This "remapping" of MMIO transaction is also usually asymmetric.
-> > Meaning routing of "downstream" transactions *might* be completely
-> > different than the routing + remapping of transactions heading
-> > upstream. DMA mappings services are designed to handle only the
-> > transactions generated (aka "mastered") by a downstream device.
-> 
-> For the purposes of the DT binding, we have a 'ranges' property
-> that defines the downstream translation (CPU-to-MMIO) and a
-> 'dma-ranges' property for the opposite address translation
-> (device-to-memory).
-> 
-> > >, so it may be cleaner to describe
-> > > an IOMMU using a real bus node in the DT, if we also define a way to make
-> > > master/slave linkages explicit where it matters.
-> > 
-> > "where it matters" is a bit vague.  Is the goal to just enable DMA
-> > mapping services to "do the right thing" for a device that can
-> > generate DMA?
-> 
-> Yes. It's very complicated unfortunately, because we have to be
-> able to deal with arbitrary combinations of a lot of oddball cases
-> that can show up in random SoCs:
-> 
-> - device can only do DMA to a limited address range
-> - DMA is noncoherent and needs manual cache management
-> - DMA address is at an offset from physical address
-> - some devices have an IOMMU
-> - some IOMMUs are shared between devices
-> - some devices with IOMMU can have multiple simultaneous contexts
-> - a device may access some memory directly and some other memory through IOMMU
+Following arm64 commit bc3ee18a7a57 (arm64: init: Move of_clk_init to
+time_init()), vexpress_osc_of_setup() is called via of_clk_init() long
+before initcalls are issued. Initialising the vexpress oscillators
+requires the vespress sysregs to be already initialised, so this patch
+adds an explicit call to vexpress_sysreg_of_early_init() in vexpress
+oscillator setup function. In addition, vexpress_sysreg_init() is
+changed to a device_initcall() as the core_initcall() is no longer
+required.
 
-Do we need to consider this case?
-I don't think a device can have different contexts at the same time.
-If there such device is in a system, its driver must handle it correctly
-with different devices descriptors for the different contexts, for example.
-I mean, if a device has two DMA ports that are in different contexts,
-they can be treated as different devices which are handed by a driver.
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Tested-by: Will Deacon <will.deacon@arm.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+Tested-by: Pawel Moll <pawel.moll@arm.com>
+Acked-by: Pawel Moll <pawel.moll@arm.com>
+Cc: Mike Turquette <mturquette@linaro.org>
+---
 
-I worry that abstracting everything we can think may make the problem harder.
+Mike, I'd like to get this in for 3.15 and I'm happy to push it via the arm64
+tree. Are you ok with this? Thanks.
 
-Regards,
+ drivers/clk/versatile/clk-vexpress-osc.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-   KyongHo
-
-> - a device may have DMA access to a bus that is invisible to the CPU
-> - DMA on some device is only coherent if the IOMMU is enabled
-> - DMA on some device is only coherent if the IOMMU is disabled
-> - the IOVA range to an IOMMU is device dependent
-> 
-> > > I've been hacking around some proposals on these areas which are a bit
-> > > different from the approach suggested here -- I'll try to summarise some
-> > > of it intelligibly and post something tomorrow so that we can discuss.
-> > 
-> > Are you planning on consolidating Documentation/devicetree/bindings/iommu/ ?
-> > Do you care about Documentation/Intel-IOMMU.txt?
-> 
-> I think we can ignore the Intel-IOMMU because that is specialized on PCI
-> devices, which we don't normally represent in DT. It is also a special
-> case because the Intel IOMMU is a single-instance device. If it's present
-> and enabled, it will be used by every device. The case we do need to describe
-> is when we don't know which IOMMU is used for which master, or how to
-> configure it.
-> 
-> 	Arnd
+diff --git a/drivers/clk/versatile/clk-vexpress-osc.c b/drivers/clk/versatile/clk-vexpress-osc.c
+index a535c7bf8574..422391242b39 100644
+--- a/drivers/clk/versatile/clk-vexpress-osc.c
++++ b/drivers/clk/versatile/clk-vexpress-osc.c
+@@ -100,6 +100,8 @@ void __init vexpress_osc_of_setup(struct device_node *node)
+ 	struct clk *clk;
+ 	u32 range[2];
+ 
++	vexpress_sysreg_of_early_init();
++
+ 	osc = kzalloc(sizeof(*osc), GFP_KERNEL);
+ 	if (!osc)
+ 		return;
