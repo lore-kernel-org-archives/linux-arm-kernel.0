@@ -1,75 +1,47 @@
-From: phil.edworthy@renesas.com (Phil Edworthy)
-Date: Thu, 1 May 2014 09:50:56 +0000
-Subject: [PATCH v7 01/10] PCI: host: rcar: Add Renesas R-Car PCIe driver
-In-Reply-To: <20140430154345.GA1705@obsidianresearch.com>
-References: <1396261856-22465-1-git-send-email-phil.edworthy@renesas.com>
- <1396261856-22465-2-git-send-email-phil.edworthy@renesas.com>
- <20140424191901.GE29593@google.com>
- <9b8bedae9d604383ac7ec22fd0f62fdb@HKXPR06MB168.apcprd06.prod.outlook.com>
- <CAErSpo6Autto4n4A4wHtXQNJzD3RKevkVcLZHUods-2-eiRDYQ@mail.gmail.com>
- <20140428203501.GA3016@obsidianresearch.com>
- <ac795ce3bb6349708e2e96686e19d24f@HKXPR06MB168.apcprd06.prod.outlook.com>
- <20140430154345.GA1705@obsidianresearch.com>
-Message-ID: <b9160c7a49304270b5070dcf49482723@HKXPR06MB168.apcprd06.prod.outlook.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 1 May 2014 10:52:47 +0100
+Subject: [RFC PATCH V4 6/7] arm64: mm: Enable HAVE_RCU_TABLE_FREE logic
+In-Reply-To: <20140501073402.GA30358@linaro.org>
+References: <1396018892-6773-1-git-send-email-steve.capper@linaro.org>
+ <1396018892-6773-7-git-send-email-steve.capper@linaro.org>
+ <20140430152047.GF31220@arm.com> <20140430153317.GG31220@arm.com>
+ <20140430153824.GA7166@linaro.org> <20140430172114.GI31220@arm.com>
+ <20140501073402.GA30358@linaro.org>
+Message-ID: <20140501095246.GB22316@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
-
-On 30 April 2014 16:44, Jason wrote:
-> On Wed, Apr 30, 2014 at 10:33:08AM +0000, Phil Edworthy wrote:
+On Thu, May 01, 2014 at 08:34:03AM +0100, Steve Capper wrote:
+> On Wed, Apr 30, 2014 at 06:21:14PM +0100, Catalin Marinas wrote:
+> > Both powerpc and sparc use tlb_remove_table() via their __pte_free_tlb()
+> > etc. which implies an IPI for synchronisation if mm_users > 1. For
+> > gup_fast we may not need it since we use the RCU for protection. Am I
+> > missing anything?
 > 
-> > > You set the value of the integrated bus based on the bus number in the
-> > > TYPE0 accesses the driver performs and it shows up in the PCI config
-> > > space of the root port bridge:
-> > >
-> > > root at koelsch:~# lspci -vv
-> > > 00:00.0 PCI bridge: Renesas Technology Corp. Device 001f (prog-if 00
-> > > [Normal decode])
-> > >         Bus: primary=00, secondary=01, subordinate=01, sec-latency=0
-> > >
-> > > The value here will be also be exported on-the-wire in certain PCI-E
-> > > TLPs.
-> > >
-> > > So it is important, and must be set properly.
-> > I am not so sure about this...
-> >
-> > There are three things we need to consider:
-> > 1) talking to the host bridge itself
-> > 2) talking to immediate device (connected directly to host bridge)
-> > 3) talking to other devices
-> >
-> > The PCI standard tells us we use type 1's for 3) and type 0's for
-> > 2). The driver uses root_bus_nr to make this decision.  For 1),
-> > there is a note in the driver that the hardware cannot target
-> > itself. The driver has code in rcar_pcie_config_access() to check if
-> > it's an access to the host bridge, and if so, use I/O (readl/writel)
-> > to perform the config access.
+> So my understanding is:
 > 
-> The logic should be:
->  if (bus == primary)
->     do io access to host bridge
->  else if (bus == secondary)
->     issue type 0 TLP on the wire
->  else if (bus > secondary && bus <= subordinate)
->     issue type 1 TLP on the wire
->  else
->     fail, invalid bus number
-> Where the three values come from the register in the PCI host bridge's
-> configuration space, and are kept in sync with the programming from
-> the Linux PCI core.
-> 
-> It is just a happy hapenstance that root_bus_nr equals the value the
-> PCI core programmed into secondary - that is not guarenteed, you must
-> use the primary value directly.
-For type0 TLPs, we are not checking that root_bus_nr equals the value the PCI core programmed into secondary, we are checking that the (root_bus_nr == bus->parent->number). The only way this wouldn't work is if root_bus_nr was not the root bus number.
+> tlb_remove_table will just immediately free any pages where there's a
+> single user as there's no need to consider a gup walking.
 
-Since the Synopsys DW driver also saves off sys->busnr and later uses this to determine if accesses are for the host bridge, I guess that means it won't always work either, right? Or is it ok because the DW driver saves sys->busnr in its .scan function?
+Does gup_fast walking increment the mm_users? Or is it a requirement of
+the calling code? I can't seem to find where this happens.
 
-When would the PCI core change the root bus number to something other than set in sys->busnr?
+> For the case of multiple users we have an mmu_table_batch structure
+> that holds references to pages that should be freed at a later point.
 
-> I recommend capturing it on write to the host bridge config
-> space.
+Yes.
 
-Thanks
-Phil
+> This batch is contained on a page that is allocated on the fly. If, for
+> any reason, we can't allocate the batch container we fallback to a slow
+> path which is to issue an IPI (via tlb_remove_table_one). This IPI will
+> block on the gup walker. We need this fallback behaviour on ARM/ARM64.
+
+That's my main point: this batch page allocation on the fly for table
+pages happens in tlb_remove_table(). With your patch for arm64
+HAVE_RCU_TABLE_FREE, I can comment out tlb_remove_table() and it
+compiles just fine because you don't call it from functions like
+__pte_free_tlb() (as powerpc and sparc do). The __tlb_remove_page() that
+we currently use doesn't give us any RCU protection here.
+
+-- 
+Catalin
