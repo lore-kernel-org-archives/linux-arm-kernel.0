@@ -1,30 +1,68 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 01 May 2014 23:28:42 +0200
-Subject: [PATCH v3 00/16] exynos5420: clock file cleanup
-In-Reply-To: <1398344632-18623-1-git-send-email-shaik.ameer@samsung.com>
-References: <1398344632-18623-1-git-send-email-shaik.ameer@samsung.com>
-Message-ID: <5362BC8A.6020609@gmail.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 1 May 2014 15:31:48 -0600
+Subject: [RFC PATCH 0/3] mtd: nand: add randomizer support
+In-Reply-To: <5362B4E6.7010009@free-electrons.com>
+References: <1398906592-24677-1-git-send-email-b.brezillon.dev@gmail.com>
+ <20140501163407.GB3296@obsidianresearch.com>
+ <536284E1.50001@free-electrons.com>
+ <20140501175946.GA14539@obsidianresearch.com>
+ <5362B4E6.7010009@free-electrons.com>
+Message-ID: <20140501213148.GA1563@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24.04.2014 15:03, Shaik Ameer Basha wrote:
-> Many changes/fixes have been identified for clock file for exynos5420.
-> These include correct parents, bit fields, new clocks etc. Existing
-> files needs some correction in terms of names of the clock and
-> indentation. These issues are addressed in this patch series. It also
-> replaces the usage of enums with macro as clock ids.
->
-> This patch series is rebased on,
-> git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git:master
->
-> This patch is also dependent on the following patch.
-> ARM: dts: add dt node for sss module for exynos5250/5420
+On Thu, May 01, 2014 at 10:56:06PM +0200, Boris BREZILLON wrote:
 
-Also a general comment to all the patches. Please assign clock IDs for 
-all the clocks being added. In general, all the defined clocks should 
-have clock IDs defined to let them be accessed from Device Tree, for 
-example in case of DT clock initialization that is being worked on right 
-now.
+> > However, with a synchronous scrambler the security concern boils down
+> > to how robust and unpredictable is the PRBS.
+> 
+> I'm not sure security is the main concern here.
+> AFAICT, NAND scramblers (note that I stopped using the name "randomizer"
+> :-)) is mainly used to avoid large island of identical data, because
+> some NAND chips are sensible to such patterns (see [1] page 14).
 
-Best regards,
-Tomasz
+Right, if you send to the flash 'the wrong data' then some combination of:
+1) Retention time till ECC failure is reduced
+2) The flash block is permanently damaged early
+3) A 'nearby', unrelated flash block has ECC failure due to interference
+
+So, if someone deliberately and maliciously defeats the scrambler and
+deliberately sends in wrong data what happens?
+ 1/3) Delibrate, predictable file system corruption
+ 2) Create device damage and significantly early replacement of the device.
+All could lead to a DOS attack of some sort, at a minimum.
+
+FWIW, there was a similar attack against a certain communication
+system. The line scrambler was statistically predictable, and if an
+attacker sent enough packets that were the predictable anti-scramble
+then enough would align with the scamble pattern and the
+communication channel would fail and retrain creating a DOS vector.
+
+For this reason these days com systems tend to use a 58 bit
+self-synchronous LFSR for scrambling purposes.
+
+> And this is exactly what's done in the sunxi HW  scrambler
+> implementation, or at least you can do it based on what you're
+> specifying in your DT (see the "nand-randomizer-seeds" in the 3rd
+> patch): you can define a seed table and the seed is selected based on
+> the page number you're reading or writing.
+
+Well, re-using fixed (and public) seeds:
+
+ state = rnd->seeds[page % rnd->nseeds];
+
+Just changes the probabilities. For instance, some filesystems can be
+asked to create extents with a large alignment (like 2M) to speed IOs,
+and a small seeds table means the seeds within such a file will be
+fully predictable.
+
+If you are already stuck with this, then fine, it can be a driver
+specific binding - but if this is a new green-field design, intended
+to be broadly used as a core MTD feature:
+
+I'd suggest just seeding with the block number xor some value, and
+using a LFSR with a state space larger than the number of blocks in
+the device, and don't specify a seeds array in DT.
+
+Regards,
+Jason
