@@ -1,315 +1,215 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  1 May 2014 17:49:39 +0200
-Subject: [PATCH resend 07/15] arm64/crypto: GHASH secure hash using ARMv8
- Crypto Extensions
+Date: Thu,  1 May 2014 17:49:40 +0200
+Subject: [PATCH resend 08/15] arm64/crypto: AES using ARMv8 Crypto Extensions
 In-Reply-To: <1398959381-8126-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1398959381-8126-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1398959381-8126-8-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1398959381-8126-9-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a port to ARMv8 (Crypto Extensions) of the Intel implementation of the
-GHASH Secure Hash (used in the Galois/Counter chaining mode). It relies on the
-optional PMULL/PMULL2 instruction (polynomial multiply long, what Intel call
-carry-less multiply).
+This patch adds support for the AES symmetric encryption algorithm for CPUs
+that have support for the AES part of the ARM v8 Crypto Extensions.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/crypto/Kconfig         |   6 ++
+ arch/arm64/crypto/Kconfig         |   7 +-
  arch/arm64/crypto/Makefile        |   3 +
- arch/arm64/crypto/ghash-ce-core.S |  95 +++++++++++++++++++++++
- arch/arm64/crypto/ghash-ce-glue.c | 155 ++++++++++++++++++++++++++++++++++++++
- 4 files changed, 259 insertions(+)
- create mode 100644 arch/arm64/crypto/ghash-ce-core.S
- create mode 100644 arch/arm64/crypto/ghash-ce-glue.c
+ arch/arm64/crypto/aes-ce-cipher.c | 155 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 164 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/crypto/aes-ce-cipher.c
 
 diff --git a/arch/arm64/crypto/Kconfig b/arch/arm64/crypto/Kconfig
-index eb1e99770c21..0c50859ee7b9 100644
+index 0c50859ee7b9..9ba32c0da871 100644
 --- a/arch/arm64/crypto/Kconfig
 +++ b/arch/arm64/crypto/Kconfig
-@@ -18,4 +18,10 @@ config CRYPTO_SHA2_ARM64_CE
+@@ -18,10 +18,15 @@ config CRYPTO_SHA2_ARM64_CE
  	depends on ARM64 && KERNEL_MODE_NEON
  	select CRYPTO_HASH
  
-+
-+config CRYPTO_GHASH_ARM64_CE
-+	tristate "GHASH (for GCM chaining mode) using ARMv8 Crypto Extensions"
+-
+ config CRYPTO_GHASH_ARM64_CE
+ 	tristate "GHASH (for GCM chaining mode) using ARMv8 Crypto Extensions"
+ 	depends on ARM64 && KERNEL_MODE_NEON
+ 	select CRYPTO_HASH
+ 
++config CRYPTO_AES_ARM64_CE
++	tristate "AES core cipher using ARMv8 Crypto Extensions"
 +	depends on ARM64 && KERNEL_MODE_NEON
-+	select CRYPTO_HASH
++	select CRYPTO_ALGAPI
++	select CRYPTO_AES
 +
  endif
 diff --git a/arch/arm64/crypto/Makefile b/arch/arm64/crypto/Makefile
-index 0b3885a60d43..e8c81a068868 100644
+index e8c81a068868..908abd9242b1 100644
 --- a/arch/arm64/crypto/Makefile
 +++ b/arch/arm64/crypto/Makefile
-@@ -13,3 +13,6 @@ sha1-ce-y := sha1-ce-glue.o sha1-ce-core.o
+@@ -16,3 +16,6 @@ sha2-ce-y := sha2-ce-glue.o sha2-ce-core.o
  
- obj-$(CONFIG_CRYPTO_SHA2_ARM64_CE) += sha2-ce.o
- sha2-ce-y := sha2-ce-glue.o sha2-ce-core.o
+ obj-$(CONFIG_CRYPTO_GHASH_ARM64_CE) += ghash-ce.o
+ ghash-ce-y := ghash-ce-glue.o ghash-ce-core.o
 +
-+obj-$(CONFIG_CRYPTO_GHASH_ARM64_CE) += ghash-ce.o
-+ghash-ce-y := ghash-ce-glue.o ghash-ce-core.o
-diff --git a/arch/arm64/crypto/ghash-ce-core.S b/arch/arm64/crypto/ghash-ce-core.S
++obj-$(CONFIG_CRYPTO_AES_ARM64_CE) += aes-ce-cipher.o
++CFLAGS_aes-ce-cipher.o += -march=armv8-a+crypto
+diff --git a/arch/arm64/crypto/aes-ce-cipher.c b/arch/arm64/crypto/aes-ce-cipher.c
 new file mode 100644
-index 000000000000..b9e6eaf41c9b
+index 000000000000..2075e1acae6b
 --- /dev/null
-+++ b/arch/arm64/crypto/ghash-ce-core.S
-@@ -0,0 +1,95 @@
-+/*
-+ * Accelerated GHASH implementation with ARMv8 PMULL instructions.
-+ *
-+ * Copyright (C) 2014 Linaro Ltd. <ard.biesheuvel@linaro.org>
-+ *
-+ * Based on arch/x86/crypto/ghash-pmullni-intel_asm.S
-+ *
-+ * Copyright (c) 2009 Intel Corp.
-+ *   Author: Huang Ying <ying.huang@intel.com>
-+ *           Vinodh Gopal
-+ *           Erdinc Ozturk
-+ *           Deniz Karakoyunlu
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published
-+ * by the Free Software Foundation.
-+ */
-+
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
-+
-+	DATA	.req	v0
-+	SHASH	.req	v1
-+	IN1	.req	v2
-+	T1	.req	v2
-+	T2	.req	v3
-+	T3	.req	v4
-+	VZR	.req	v5
-+
-+	.text
-+	.arch		armv8-a+crypto
-+
-+	/*
-+	 * void pmull_ghash_update(int blocks, u64 dg[], const char *src,
-+	 *			   struct ghash_key const *k, const char *head)
-+	 */
-+ENTRY(pmull_ghash_update)
-+	ld1		{DATA.16b}, [x1]
-+	ld1		{SHASH.16b}, [x3]
-+	eor		VZR.16b, VZR.16b, VZR.16b
-+
-+	/* do the head block first, if supplied */
-+	cbz		x4, 0f
-+	ld1		{IN1.2d}, [x4]
-+	b		1f
-+
-+0:	ld1		{IN1.2d}, [x2], #16
-+	sub		w0, w0, #1
-+1:	ext		IN1.16b, IN1.16b, IN1.16b, #8
-+CPU_LE(	rev64		IN1.16b, IN1.16b	)
-+	eor		DATA.16b, DATA.16b, IN1.16b
-+
-+	/* multiply DATA by SHASH in GF(2^128) */
-+	ext		T2.16b, DATA.16b, DATA.16b, #8
-+	ext		T3.16b, SHASH.16b, SHASH.16b, #8
-+	eor		T2.16b, T2.16b, DATA.16b
-+	eor		T3.16b, T3.16b, SHASH.16b
-+
-+	pmull2		T1.1q, SHASH.2d, DATA.2d	// a1 * b1
-+	pmull		DATA.1q, SHASH.1d, DATA.1d	// a0 * b0
-+	pmull		T2.1q, T2.1d, T3.1d		// (a1 + a0)(b1 + b0)
-+	eor		T2.16b, T2.16b, T1.16b		// (a0 * b1) + (a1 * b0)
-+	eor		T2.16b, T2.16b, DATA.16b
-+
-+	ext		T3.16b, VZR.16b, T2.16b, #8
-+	ext		T2.16b, T2.16b, VZR.16b, #8
-+	eor		DATA.16b, DATA.16b, T3.16b
-+	eor		T1.16b, T1.16b, T2.16b	// <T1:DATA> is result of
-+						// carry-less multiplication
-+
-+	/* first phase of the reduction */
-+	shl		T3.2d, DATA.2d, #1
-+	eor		T3.16b, T3.16b, DATA.16b
-+	shl		T3.2d, T3.2d, #5
-+	eor		T3.16b, T3.16b, DATA.16b
-+	shl		T3.2d, T3.2d, #57
-+	ext		T2.16b, VZR.16b, T3.16b, #8
-+	ext		T3.16b, T3.16b, VZR.16b, #8
-+	eor		DATA.16b, DATA.16b, T2.16b
-+	eor		T1.16b, T1.16b, T3.16b
-+
-+	/* second phase of the reduction */
-+	ushr		T2.2d, DATA.2d, #5
-+	eor		T2.16b, T2.16b, DATA.16b
-+	ushr		T2.2d, T2.2d, #1
-+	eor		T2.16b, T2.16b, DATA.16b
-+	ushr		T2.2d, T2.2d, #1
-+	eor		T1.16b, T1.16b, T2.16b
-+	eor		DATA.16b, DATA.16b, T1.16b
-+
-+	cbnz		w0, 0b
-+
-+	st1		{DATA.16b}, [x1]
-+	ret
-+ENDPROC(pmull_ghash_update)
-diff --git a/arch/arm64/crypto/ghash-ce-glue.c b/arch/arm64/crypto/ghash-ce-glue.c
-new file mode 100644
-index 000000000000..b92baf3f68c7
---- /dev/null
-+++ b/arch/arm64/crypto/ghash-ce-glue.c
++++ b/arch/arm64/crypto/aes-ce-cipher.c
 @@ -0,0 +1,155 @@
 +/*
-+ * Accelerated GHASH implementation with ARMv8 PMULL instructions.
++ * aes-ce-cipher.c - core AES cipher using ARMv8 Crypto Extensions
 + *
-+ * Copyright (C) 2014 Linaro Ltd. <ard.biesheuvel@linaro.org>
++ * Copyright (C) 2013 - 2014 Linaro Ltd <ard.biesheuvel@linaro.org>
 + *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published
-+ * by the Free Software Foundation.
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + */
 +
 +#include <asm/neon.h>
-+#include <asm/unaligned.h>
-+#include <crypto/internal/hash.h>
++#include <crypto/aes.h>
 +#include <linux/cpufeature.h>
 +#include <linux/crypto.h>
 +#include <linux/module.h>
 +
-+MODULE_DESCRIPTION("GHASH secure hash using ARMv8 Crypto Extensions");
++MODULE_DESCRIPTION("Synchronous AES cipher using ARMv8 Crypto Extensions");
 +MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
 +MODULE_LICENSE("GPL v2");
 +
-+#define GHASH_BLOCK_SIZE	16
-+#define GHASH_DIGEST_SIZE	16
-+
-+struct ghash_key {
-+	u64 a;
-+	u64 b;
++struct aes_block {
++	u8 b[AES_BLOCK_SIZE];
 +};
 +
-+struct ghash_desc_ctx {
-+	u64 digest[GHASH_DIGEST_SIZE/sizeof(u64)];
-+	u8 buf[GHASH_BLOCK_SIZE];
-+	u32 count;
++static int num_rounds(struct crypto_aes_ctx *ctx)
++{
++	/*
++	 * # of rounds specified by AES:
++	 * 128 bit key		10 rounds
++	 * 192 bit key		12 rounds
++	 * 256 bit key		14 rounds
++	 * => n byte key	=> 6 + (n/4) rounds
++	 */
++	return 6 + ctx->key_length / 4;
++}
++
++static void aes_cipher_encrypt(struct crypto_tfm *tfm, u8 dst[], u8 const src[])
++{
++	struct crypto_aes_ctx *ctx = crypto_tfm_ctx(tfm);
++	struct aes_block *out = (struct aes_block *)dst;
++	struct aes_block const *in = (struct aes_block *)src;
++	void *dummy0;
++	int dummy1;
++
++	kernel_neon_begin_partial(4);
++
++	__asm__("	ld1	{v0.16b}, %[in]			;"
++		"	ld1	{v1.2d}, [%[key]], #16		;"
++		"	cmp	%w[rounds], #10			;"
++		"	bmi	0f				;"
++		"	bne	3f				;"
++		"	mov	v3.16b, v1.16b			;"
++		"	b	2f				;"
++		"0:	mov	v2.16b, v1.16b			;"
++		"	ld1	{v3.2d}, [%[key]], #16		;"
++		"1:	aese	v0.16b, v2.16b			;"
++		"	aesmc	v0.16b, v0.16b			;"
++		"2:	ld1	{v1.2d}, [%[key]], #16		;"
++		"	aese	v0.16b, v3.16b			;"
++		"	aesmc	v0.16b, v0.16b			;"
++		"3:	ld1	{v2.2d}, [%[key]], #16		;"
++		"	subs	%w[rounds], %w[rounds], #3	;"
++		"	aese	v0.16b, v1.16b			;"
++		"	aesmc	v0.16b, v0.16b			;"
++		"	ld1	{v3.2d}, [%[key]], #16		;"
++		"	bpl	1b				;"
++		"	aese	v0.16b, v2.16b			;"
++		"	eor	v0.16b, v0.16b, v3.16b		;"
++		"	st1	{v0.16b}, %[out]		;"
++
++	:	[out]		"=Q"(*out),
++		[key]		"=r"(dummy0),
++		[rounds]	"=r"(dummy1)
++	:	[in]		"Q"(*in),
++				"1"(ctx->key_enc),
++				"2"(num_rounds(ctx) - 2)
++	:	"cc");
++
++	kernel_neon_end();
++}
++
++static void aes_cipher_decrypt(struct crypto_tfm *tfm, u8 dst[], u8 const src[])
++{
++	struct crypto_aes_ctx *ctx = crypto_tfm_ctx(tfm);
++	struct aes_block *out = (struct aes_block *)dst;
++	struct aes_block const *in = (struct aes_block *)src;
++	void *dummy0;
++	int dummy1;
++
++	kernel_neon_begin_partial(4);
++
++	__asm__("	ld1	{v0.16b}, %[in]			;"
++		"	ld1	{v1.2d}, [%[key]], #16		;"
++		"	cmp	%w[rounds], #10			;"
++		"	bmi	0f				;"
++		"	bne	3f				;"
++		"	mov	v3.16b, v1.16b			;"
++		"	b	2f				;"
++		"0:	mov	v2.16b, v1.16b			;"
++		"	ld1	{v3.2d}, [%[key]], #16		;"
++		"1:	aesd	v0.16b, v2.16b			;"
++		"	aesimc	v0.16b, v0.16b			;"
++		"2:	ld1	{v1.2d}, [%[key]], #16		;"
++		"	aesd	v0.16b, v3.16b			;"
++		"	aesimc	v0.16b, v0.16b			;"
++		"3:	ld1	{v2.2d}, [%[key]], #16		;"
++		"	subs	%w[rounds], %w[rounds], #3	;"
++		"	aesd	v0.16b, v1.16b			;"
++		"	aesimc	v0.16b, v0.16b			;"
++		"	ld1	{v3.2d}, [%[key]], #16		;"
++		"	bpl	1b				;"
++		"	aesd	v0.16b, v2.16b			;"
++		"	eor	v0.16b, v0.16b, v3.16b		;"
++		"	st1	{v0.16b}, %[out]		;"
++
++	:	[out]		"=Q"(*out),
++		[key]		"=r"(dummy0),
++		[rounds]	"=r"(dummy1)
++	:	[in]		"Q"(*in),
++				"1"(ctx->key_dec),
++				"2"(num_rounds(ctx) - 2)
++	:	"cc");
++
++	kernel_neon_end();
++}
++
++static struct crypto_alg aes_alg = {
++	.cra_name		= "aes",
++	.cra_driver_name	= "aes-ce",
++	.cra_priority		= 300,
++	.cra_flags		= CRYPTO_ALG_TYPE_CIPHER,
++	.cra_blocksize		= AES_BLOCK_SIZE,
++	.cra_ctxsize		= sizeof(struct crypto_aes_ctx),
++	.cra_module		= THIS_MODULE,
++	.cra_cipher = {
++		.cia_min_keysize	= AES_MIN_KEY_SIZE,
++		.cia_max_keysize	= AES_MAX_KEY_SIZE,
++		.cia_setkey		= crypto_aes_set_key,
++		.cia_encrypt		= aes_cipher_encrypt,
++		.cia_decrypt		= aes_cipher_decrypt
++	}
 +};
 +
-+asmlinkage void pmull_ghash_update(int blocks, u64 dg[], const char *src,
-+				   struct ghash_key const *k, const char *head);
-+
-+static int ghash_init(struct shash_desc *desc)
++static int __init aes_mod_init(void)
 +{
-+	struct ghash_desc_ctx *ctx = shash_desc_ctx(desc);
-+
-+	*ctx = (struct ghash_desc_ctx){};
-+	return 0;
++	return crypto_register_alg(&aes_alg);
 +}
 +
-+static int ghash_update(struct shash_desc *desc, const u8 *src,
-+			unsigned int len)
++static void __exit aes_mod_exit(void)
 +{
-+	struct ghash_desc_ctx *ctx = shash_desc_ctx(desc);
-+	unsigned int partial = ctx->count % GHASH_BLOCK_SIZE;
-+
-+	ctx->count += len;
-+
-+	if ((partial + len) >= GHASH_BLOCK_SIZE) {
-+		struct ghash_key *key = crypto_shash_ctx(desc->tfm);
-+		int blocks;
-+
-+		if (partial) {
-+			int p = GHASH_BLOCK_SIZE - partial;
-+
-+			memcpy(ctx->buf + partial, src, p);
-+			src += p;
-+			len -= p;
-+		}
-+
-+		blocks = len / GHASH_BLOCK_SIZE;
-+		len %= GHASH_BLOCK_SIZE;
-+
-+		kernel_neon_begin_partial(6);
-+		pmull_ghash_update(blocks, ctx->digest, src, key,
-+				   partial ? ctx->buf : NULL);
-+		kernel_neon_end();
-+		src += blocks * GHASH_BLOCK_SIZE;
-+	}
-+	if (len)
-+		memcpy(ctx->buf + partial, src, len);
-+	return 0;
++	crypto_unregister_alg(&aes_alg);
 +}
 +
-+static int ghash_final(struct shash_desc *desc, u8 *dst)
-+{
-+	struct ghash_desc_ctx *ctx = shash_desc_ctx(desc);
-+	unsigned int partial = ctx->count % GHASH_BLOCK_SIZE;
-+
-+	if (partial) {
-+		struct ghash_key *key = crypto_shash_ctx(desc->tfm);
-+
-+		memset(ctx->buf + partial, 0, GHASH_BLOCK_SIZE - partial);
-+
-+		kernel_neon_begin_partial(6);
-+		pmull_ghash_update(1, ctx->digest, ctx->buf, key, NULL);
-+		kernel_neon_end();
-+	}
-+	put_unaligned_be64(ctx->digest[1], dst);
-+	put_unaligned_be64(ctx->digest[0], dst + 8);
-+
-+	*ctx = (struct ghash_desc_ctx){};
-+	return 0;
-+}
-+
-+static int ghash_setkey(struct crypto_shash *tfm,
-+			const u8 *inkey, unsigned int keylen)
-+{
-+	struct ghash_key *key = crypto_shash_ctx(tfm);
-+	u64 a, b;
-+
-+	if (keylen != GHASH_BLOCK_SIZE) {
-+		crypto_shash_set_flags(tfm, CRYPTO_TFM_RES_BAD_KEY_LEN);
-+		return -EINVAL;
-+	}
-+
-+	/* perform multiplication by 'x' in GF(2^128) */
-+	b = get_unaligned_be64(inkey);
-+	a = get_unaligned_be64(inkey + 8);
-+
-+	key->a = (a << 1) | (b >> 63);
-+	key->b = (b << 1) | (a >> 63);
-+
-+	if (b >> 63)
-+		key->b ^= 0xc200000000000000UL;
-+
-+	return 0;
-+}
-+
-+static struct shash_alg ghash_alg = {
-+	.digestsize	= GHASH_DIGEST_SIZE,
-+	.init		= ghash_init,
-+	.update		= ghash_update,
-+	.final		= ghash_final,
-+	.setkey		= ghash_setkey,
-+	.descsize	= sizeof(struct ghash_desc_ctx),
-+	.base		= {
-+		.cra_name		= "ghash",
-+		.cra_driver_name	= "ghash-ce",
-+		.cra_priority		= 200,
-+		.cra_flags		= CRYPTO_ALG_TYPE_SHASH,
-+		.cra_blocksize		= GHASH_BLOCK_SIZE,
-+		.cra_ctxsize		= sizeof(struct ghash_key),
-+		.cra_module		= THIS_MODULE,
-+	},
-+};
-+
-+static int __init ghash_ce_mod_init(void)
-+{
-+	return crypto_register_shash(&ghash_alg);
-+}
-+
-+static void __exit ghash_ce_mod_exit(void)
-+{
-+	crypto_unregister_shash(&ghash_alg);
-+}
-+
-+module_cpu_feature_match(PMULL, ghash_ce_mod_init);
-+module_exit(ghash_ce_mod_exit);
++module_cpu_feature_match(AES, aes_mod_init);
++module_exit(aes_mod_exit);
 -- 
 1.8.3.2
