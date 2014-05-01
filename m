@@ -1,51 +1,90 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Wed, 30 Apr 2014 23:34:04 -0700
-Subject: [PATCH 2/2] ARM: dts: imx: Fix LVDS mapping for Ventana GW52xx
-In-Reply-To: <20140429055531.GF16451@dragon>
-References: <20140429055531.GF16451@dragon>
-Message-ID: <1398926044-26125-1-git-send-email-tharvey@gateworks.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed, 30 Apr 2014 23:26:35 -0700
+Subject: [PATCH v2 00/12] defconfigs: add MTD_SPI_NOR (new subsystem
+ dependency for M25P80)
+Message-ID: <1398925607-7482-1-git-send-email-computersforpeace@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GW52xx supports LVDS on channel 0. Remove the obsolete crtcs node and
-add display timings for the HanStar HSD100PXN1 display.
+v1 --> v2: split ARM defconfig changes into their sub-architectures. No change
+           in the overall diff.
 
-Signed-off-by: Tim Harvey <tharvey@gateworks.com>
----
- arch/arm/boot/dts/imx6qdl-gw52xx.dtsi | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+Hi all,
 
-diff --git a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-index 62f533a..367af3e 100644
---- a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-@@ -454,6 +454,27 @@
- 
- &ldb {
- 	status = "okay";
-+
-+	lvds-channel at 0 {
-+		fsl,data-mapping = "spwg";
-+		fsl,data-width = <18>;
-+		status = "okay";
-+
-+		display-timings {
-+			native-mode = <&timing0>;
-+			timing0: hsd100pxn1 {
-+				clock-frequency = <65000000>;
-+				hactive = <1024>;
-+				vactive = <768>;
-+				hback-porch = <220>;
-+				hfront-porch = <40>;
-+				vback-porch = <21>;
-+				vfront-porch = <7>;
-+				hsync-len = <60>;
-+				vsync-len = <10>;
-+			};
-+		};
-+	};
- };
- 
- &pcie {
+We are introducing a new SPI-NOR subsystem/framework for MTD, to support
+various types of SPI-NOR flash controllers which require (or benefit from)
+intimate knowledge of the flash interface, rather than just the relatively dumb
+SPI interface. This framework borrows much of the m25p80 driver for its
+abstraction and moves this code into a spi-nor module.
+
+This means CONFIG_M25P80 now has a dependency on CONFIG_MTD_SPI_NOR, which
+should be added to the defconfigs. I expect that each (sub)architecture
+maintainer can merge these patches to their own tree.
+
+Note that without the new CONFIG_MTD_SPI_NOR symbol in your defconfig, Kconfig
+will automatically drop M25P80 for you.
+
+Please keep general comments to the cover letter, so all parties can see.
+
+This series is based on 3.15-rc1.
+
+The SPI-NOR development code (in -next, queued for 3.16) is here:
+
+  git://git.infradead.org/l2-mtd.git +spinor
+
+This defconfig series is available in the same repo at:
+
+  git://git.infradead.org/l2-mtd.git +defconfigs
+
+Thanks,
+Brian
+
+Brian Norris (12):
+  ARM: imx/mxs defconfigs: add MTD_SPI_NOR (new dependency for M25P80)
+  ARM: defconfigs: add MTD_SPI_NOR (new dependency for M25P80)
+  ARM: keystone: add MTD_SPI_NOR (new dependency for M25P80)
+  ARM: tegra: add MTD_SPI_NOR (new dependency for M25P80)
+  ARM: lpc32xx: add MTD_SPI_NOR (new dependency for M25P80)
+  ARM: at91: add MTD_SPI_NOR (new dependency for M25P80)
+  ARM: shmobile: add MTD_SPI_NOR (new dependency for M25P80)
+  ARM: marvell: add MTD_SPI_NOR (new dependency for M25P80)
+  blackfin: defconfigs: add MTD_SPI_NOR (new dependency for M25P80)
+  mips: defconfigs: add MTD_SPI_NOR (new dependency for M25P80)
+  powerpc: defconfigs: add MTD_SPI_NOR (new dependency for M25P80)
+  sh: defconfig: add MTD_SPI_NOR (new dependency for M25P80)
+
+ arch/arm/configs/bockw_defconfig               | 2 +-
+ arch/arm/configs/dove_defconfig                | 2 +-
+ arch/arm/configs/imx_v6_v7_defconfig           | 1 +
+ arch/arm/configs/keystone_defconfig            | 1 +
+ arch/arm/configs/kirkwood_defconfig            | 1 +
+ arch/arm/configs/koelsch_defconfig             | 1 +
+ arch/arm/configs/lager_defconfig               | 1 +
+ arch/arm/configs/lpc32xx_defconfig             | 2 +-
+ arch/arm/configs/multi_v5_defconfig            | 1 +
+ arch/arm/configs/multi_v7_defconfig            | 1 +
+ arch/arm/configs/mvebu_v5_defconfig            | 1 +
+ arch/arm/configs/mvebu_v7_defconfig            | 1 +
+ arch/arm/configs/mxs_defconfig                 | 1 +
+ arch/arm/configs/sama5_defconfig               | 2 +-
+ arch/arm/configs/shmobile_defconfig            | 1 +
+ arch/arm/configs/tegra_defconfig               | 1 +
+ arch/blackfin/configs/BF526-EZBRD_defconfig    | 2 +-
+ arch/blackfin/configs/BF527-EZKIT-V2_defconfig | 2 +-
+ arch/blackfin/configs/BF527-EZKIT_defconfig    | 2 +-
+ arch/blackfin/configs/BF548-EZKIT_defconfig    | 2 +-
+ arch/blackfin/configs/BF609-EZKIT_defconfig    | 2 +-
+ arch/blackfin/configs/BlackStamp_defconfig     | 3 +--
+ arch/blackfin/configs/H8606_defconfig          | 3 +--
+ arch/mips/configs/ath79_defconfig              | 3 +--
+ arch/mips/configs/db1xxx_defconfig             | 1 +
+ arch/mips/configs/rt305x_defconfig             | 2 +-
+ arch/powerpc/configs/corenet32_smp_defconfig   | 2 +-
+ arch/powerpc/configs/corenet64_smp_defconfig   | 2 +-
+ arch/powerpc/configs/mpc85xx_defconfig         | 2 +-
+ arch/powerpc/configs/mpc85xx_smp_defconfig     | 2 +-
+ arch/sh/configs/sh7757lcr_defconfig            | 2 +-
+ 31 files changed, 31 insertions(+), 21 deletions(-)
+
 -- 
 1.8.3.2
