@@ -1,67 +1,106 @@
-From: tthayer.linux@gmail.com (Thor Thayer)
-Date: Thu, 1 May 2014 08:15:50 -0500
-Subject: [patch] Fix CAN on socfpga, for net/master
-In-Reply-To: <20140430215359.GA15148@amd.pavel.ucw.cz>
-References: <1398457446.26387.0.camel@linux-builds1>
- <1398461518.3587.11.camel@dinh-ubuntu>
- <20140426093646.GE8730@amd.pavel.ucw.cz>
- <20140426203131.GA21832@amd.pavel.ucw.cz>
- <6bf951b6-51e7-4b90-b054-9ba5b6e93874@email.android.com>
- <20140427122510.GB12901@amd.pavel.ucw.cz>
- <1398716449.836.4.camel@dinh-ubuntu>
- <20140428211505.GA28242@amd.pavel.ucw.cz>
- <CAF03EBf9KXqB4W9GuDduhLwp_kwFjUEi3syU7fX3KpXfZEFxHg@mail.gmail.com>
- <CAF03EBd19PC5RAsLR6-dMPF2x3XRf9X4bFPgX2kRdCYWUQBYcA@mail.gmail.com>
- <20140430215359.GA15148@amd.pavel.ucw.cz>
-Message-ID: <CAF03EBewoV0pOOmNQBwPrKgm-zhaSbFcNd_UiEhFWyUrq91-Jg@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 01 May 2014 14:16:05 +0100
+Subject: [RFC PATCH 2/3] of: mtd: add NAND randomizer mode retrieval
+In-Reply-To: <1398906592-24677-3-git-send-email-b.brezillon.dev@gmail.com>
+References: <1398906592-24677-1-git-send-email-b.brezillon.dev@gmail.com>
+ <1398906592-24677-3-git-send-email-b.brezillon.dev@gmail.com>
+Message-ID: <20140501131605.9CB7CC409DA@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 30, 2014 at 4:53 PM, Pavel Machek <pavel@denx.de> wrote:
-> Hi!
->
->> >>> > Apparently, socfpga CAN needs 32-bit accesses and different raminit
->> >>> > sequence.
->> >>> >
->> >>> > Signed-off-by: Pavel Machek <pavel@denx.de>
->
-> ...
->
->> >> Or ... let me upload my tree so that you can generate the diff.
->> >>
->> >> You should be able to get it using:
->> >>
->> >> git pull git://git.denx.de/linux-denx-pavel.git my_net_master
->> >>
->> >>> I also like your updates to my patch as shown below - much cleaner.
->
->> > Since you based this patch on my original code, feel free to add my
->> signed-off.
->
-> Will do.
->
->> I pulled in your branch
->> (git://git.denx.de/linux-denx-pavel.gitmy_net_master) and tested it on
->> the Altera Development Kit. It works well -
->> I don't see any issues at a number of different bitrates (80K, 200K, 800K,
->> 1Mb).
->
-> Thanks for testing. I'll also add your Tested-by: header, if you don't
-> mind.
+On Thu,  1 May 2014 03:09:51 +0200, Boris BREZILLON <b.brezillon.dev@gmail.com> wrote:
+> Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
+> ---
 
-Hi Pavel. That would be fine.
+No commit message? Immediate NAK. Please, make sure you write a
+description for each and every patch. This is not optional. Future
+readers want to know what this patch solves and any other information
+you can provide without having to read the diff.
 
-Thor
+>  drivers/of/of_mtd.c    | 35 +++++++++++++++++++++++++++++++++++
+>  include/linux/of_mtd.h |  6 ++++++
 
->
->> I didn't investigate what the issues were with applying the patch though. I
->> just used your branch.
->
-> The way I generated that branch... you picked up some extra code in
-> other areas of the kernel, but it should not affect the testing.
->
-> Thanks!
->                                                                 Pavel
-> --
-> (english) http://www.livejournal.com/~pavelmachek
-> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Don't forget to update Documentation/devicetree/bindings/mtd/nand.txt
+
+g.
+
+>  2 files changed, 41 insertions(+)
+> 
+> diff --git a/drivers/of/of_mtd.c b/drivers/of/of_mtd.c
+> index a862c08..f941a5e 100644
+> --- a/drivers/of/of_mtd.c
+> +++ b/drivers/of/of_mtd.c
+> @@ -84,6 +84,41 @@ int of_get_nand_ecc_strength(struct device_node *np)
+>  EXPORT_SYMBOL_GPL(of_get_nand_ecc_strength);
+>  
+>  /**
+> + * It maps 'enum nand_rnd_modes_t' found in include/linux/mtd/nand.h
+> + * into the device tree binding of 'nand-rnd', so that MTD
+> + * device driver can get nand rnd from device tree.
+> + */
+> +static const char * const nand_rnd_modes[] = {
+> +	[NAND_RND_NONE]		= "none",
+> +	[NAND_RND_SOFT]		= "soft",
+> +	[NAND_RND_HW]		= "hw",
+> +};
+> +
+> +/**
+> + * of_get_nand_rnd_mode - Get nand randomizer mode for given device_node
+> + * @np:	Pointer to the given device_node
+> + *
+> + * The function gets randomizer mode string from property 'nand-rnd-mode',
+> + * and return its index in nand_rnd_modes table, or errno in error case.
+> + */
+> +int of_get_nand_rnd_mode(struct device_node *np)
+> +{
+> +	const char *pm;
+> +	int err, i;
+> +
+> +	err = of_property_read_string(np, "nand-rnd-mode", &pm);
+> +	if (err < 0)
+> +		return err;
+> +
+> +	for (i = 0; i < ARRAY_SIZE(nand_rnd_modes); i++)
+> +		if (!strcasecmp(pm, nand_rnd_modes[i]))
+> +			return i;
+> +
+> +	return -ENODEV;
+> +}
+> +EXPORT_SYMBOL_GPL(of_get_nand_rnd_mode);
+> +
+> +/**
+>   * of_get_nand_bus_width - Get nand bus witdh for given device_node
+>   * @np:	Pointer to the given device_node
+>   *
+> diff --git a/include/linux/of_mtd.h b/include/linux/of_mtd.h
+> index d0145fb..2f43362 100644
+> --- a/include/linux/of_mtd.h
+> +++ b/include/linux/of_mtd.h
+> @@ -15,6 +15,7 @@
+>  int of_get_nand_ecc_mode(struct device_node *np);
+>  int of_get_nand_ecc_step_size(struct device_node *np);
+>  int of_get_nand_ecc_strength(struct device_node *np);
+> +int of_get_nand_rnd_mode(struct device_node *np);
+>  int of_get_nand_bus_width(struct device_node *np);
+>  bool of_get_nand_on_flash_bbt(struct device_node *np);
+>  int of_get_nand_onfi_timing_mode(struct device_node *np);
+> @@ -36,6 +37,11 @@ static inline int of_get_nand_ecc_strength(struct device_node *np)
+>  	return -ENOSYS;
+>  }
+>  
+> +static inline int of_get_nand_rnd_mode(struct device_node *np)
+> +{
+> +	return -ENOSYS;
+> +}
+> +
+>  static inline int of_get_nand_bus_width(struct device_node *np)
+>  {
+>  	return -ENOSYS;
+> -- 
+> 1.8.3.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
