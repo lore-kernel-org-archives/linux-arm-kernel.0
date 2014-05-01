@@ -1,63 +1,53 @@
-From: jays.lee@samsung.com (Jungseok Lee)
-Date: Thu, 01 May 2014 09:53:07 +0900
-Subject: [PATCH v4 4/7] arm64: Add a description on 48-bit address space
- with 4KB pages
-In-Reply-To: <20140430131224.GD31220@arm.com>
-References: <000401cf6367$cc461500$64d23f00$@samsung.com>
- <20140429144759.GL17007@arm.com> <008e01cf643f$3e67eff0$bb37cfd0$@samsung.com>
- <20140430131224.GD31220@arm.com>
-Message-ID: <000001cf64d7$b78fe200$26afa600$@samsung.com>
+From: b.brezillon.dev@gmail.com (Boris BREZILLON)
+Date: Thu,  1 May 2014 03:09:49 +0200
+Subject: [RFC PATCH 0/3] mtd: nand: add randomizer support
+Message-ID: <1398906592-24677-1-git-send-email-b.brezillon.dev@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, April 30, 2014 10:12 PM, Catalin Marinas wrote:
-> On Wed, Apr 30, 2014 at 07:41:40AM +0100, Jungseok Lee wrote:
-> > On Tuesday, April 29, 2014 11:48 PM, Catalin Marinas wrote:
-> > > On Tue, Apr 29, 2014 at 05:59:27AM +0100, Jungseok Lee wrote:
-> > > > --- a/Documentation/arm64/memory.txt
-> > > > +++ b/Documentation/arm64/memory.txt
-> > > > @@ -8,10 +8,11 @@ This document describes the virtual memory
-> > > > layout used by the AArch64  Linux kernel. The architecture allows
-> > > > up to 4 levels of translation  tables with a 4KB page size and up to 3 levels with a 64KB page
-> size.
-> > > >
-> > > > -AArch64 Linux uses 3 levels of translation tables with the 4KB
-> > > > page -configuration, allowing 39-bit (512GB) virtual addresses for
-> > > > both user -and kernel. With 64KB pages, only 2 levels of
-> > > > translation tables are -used but the memory layout is the same.
-> > > > +AArch64 Linux uses 3 levels and 4 levels of translation tables
-> > > > +with the 4KB page configuration, allowing 39-bit (512GB) and
-> > > > +48-bit
-> > > > +(256TB) virtual addresses, respectively, for both user and kernel.
-> > > > +With 64KB pages, only 2 levels of translation tables are used but
-> > > > +the memory layout is the same.
-> > >
-> > > Any reason why we couldn't use 48-bit address space with 64K pages (implying 3 levels)?
-> >
-> > No technical reason.
-> > Since 64K+3levels is not implemented in this set, I didn't add it.
-> >
-> > Should 64K+3levels be prepared in this patchset?
-> >
-> > > > -AArch64 Linux memory layout with 64KB pages:
-> > > > +AArch64 Linux memory layout with 4KB pages + 4 levels:
-> > > > +
-> > > > +Start			End			Size		Use
-> > > > +-----------------------------------------------------------------------
-> > > > +0000000000000000	0000ffffffffffff	 256TB		user
-> > > > +
-> > > > +ffff000000000000	ffff7bfffffeffff	~124TB		vmalloc
-> > >
-> > > BTW, maybe as a separate patch we should change the "end" to be
-> > > exclusive. It becomes harder to modify (I've been through this a few times already ;)) and even
-> follow the changes.
-> >
-> > Does "exclusive" mean that 0000ffffffffffff is changed to 0001000000000000?
-> > Or Does it mean that "End" column is dropped?
-> 
-> Not dropped but changed to 0001.... (the kernel already prints the memory layout in a similar way).
+Hello,
 
-I see. I will make it as a separate patch.
+This series is a proposal to add support for randomizers (either software
+or hardware) to NAND flash controller drivers.
 
-Best Regards
-Jungseok Lee
+The last patch is the sunxi HW randomizer implementation and is just given
+as an example (it won't apply on the MTD tree, because it depends on other
+stuff not yet posted on the MTD ML, but if you want a full overview of the
+NAND Flash controller driver you can take a look at this series [2]).
+
+I can also provide a software implementation based on LFSR (Left Feedback
+Shift Register) algorithm, thought I haven't tested it yet, hence why it's
+not part of this series. Let me know if you're interested in this
+implementation.
+
+This series depends on the "per-partition ECC" series [1], because I need
+the randomizer seed to be different depending on the partition (for the
+same reason I needed ECC config to be different for each partition: the
+bootrom config might not fit the NAND chip requirements).
+
+I'd like to have feedback from both MTD maintainers and driver
+developers who might need to implement (or use) a randomizer in their
+system, so feel free to comment on this series.
+
+Best Regards,
+
+Boris
+
+[1] https://lkml.org/lkml/2014/2/12/627
+[2] https://groups.google.com/forum/#!msg/linux-sunxi/s3lBb01I0Js/z2NoCFJ83g4J 
+
+
+Boris BREZILLON (3):
+  mtd: nand: introduce a randomizer layer in the NAND framework
+  of: mtd: add NAND randomizer mode retrieval
+  mtd: nand: add sunxi randomizer support
+
+ drivers/mtd/nand/nand_base.c  | 278 ++++++++++++++++++-----
+ drivers/mtd/nand/sunxi_nand.c | 507 +++++++++++++++++++++++++++++++++++++++++-
+ drivers/of/of_mtd.c           |  35 +++
+ include/linux/mtd/nand.h      |  98 ++++++++
+ include/linux/of_mtd.h        |   6 +
+ 5 files changed, 858 insertions(+), 66 deletions(-)
+
+-- 
+1.8.3.2
