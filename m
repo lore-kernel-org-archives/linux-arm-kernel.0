@@ -1,42 +1,29 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Thu,  1 May 2014 21:07:49 +0200
-Subject: [PATCH v2 4/4] ARM: OMAP2+: Use pdata quirks for wl12xx on
- VAR-STK/DVK-OM44
-In-Reply-To: <1398971269-20515-1-git-send-email-manabian@gmail.com>
-References: <1398971269-20515-1-git-send-email-manabian@gmail.com>
-Message-ID: <1398971269-20515-5-git-send-email-manabian@gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 1 May 2014 12:08:42 -0700
+Subject: [PATCH 11/15] ASoC: WM0010 needs SPI
+In-Reply-To: <1398770316-19715-12-git-send-email-kaixu.xia@linaro.org>
+References: <1398770316-19715-1-git-send-email-kaixu.xia@linaro.org>
+ <1398770316-19715-12-git-send-email-kaixu.xia@linaro.org>
+Message-ID: <20140501190842.GZ3245@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Joachim Eastwood <manabian@gmail.com>
----
- arch/arm/mach-omap2/pdata-quirks.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+On Tue, Apr 29, 2014 at 07:18:32PM +0800, Xia Kaixu wrote:
 
-diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
-index c3b73351cb7a..ab94f3a87c32 100644
---- a/arch/arm/mach-omap2/pdata-quirks.c
-+++ b/arch/arm/mach-omap2/pdata-quirks.c
-@@ -254,6 +254,11 @@ static void __init omap4_panda_legacy_init(void)
- {
- 	legacy_init_wl12xx(WL12XX_REFCLOCK_38, 0, 53);
- }
-+
-+static void __init var_som_om44_legacy_init(void)
-+{
-+	legacy_init_wl12xx(WL12XX_REFCLOCK_38, 0, 41);
-+}
- #endif
- 
- #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
-@@ -364,6 +369,8 @@ static struct pdata_init pdata_quirks[] __initdata = {
- #ifdef CONFIG_ARCH_OMAP4
- 	{ "ti,omap4-sdp", omap4_sdp_legacy_init, },
- 	{ "ti,omap4-panda", omap4_panda_legacy_init, },
-+	{ "variscite,var-dvk-om44", var_som_om44_legacy_init, },
-+	{ "variscite,var-stk-om44", var_som_om44_legacy_init, },
- #endif
- #ifdef CONFIG_SOC_AM33XX
- 	{ "ti,am335x-evmsk", am335x_evmsk_legacy_init, },
--- 
-1.8.0
+> @@ -201,7 +201,7 @@ config SND_SOC_SPEYSIDE
+>  	select SND_SAMSUNG_I2S
+>  	select SND_SOC_WM8996
+>  	select SND_SOC_WM9081
+> -	select SND_SOC_WM0010
+> +	select SND_SOC_WM0010 if SPI
+>  	select SND_SOC_WM1250_EV1
+
+No, this is broken.  The driver won't work if all the components it uses
+don't load and the dependency for SPI isn't SPI, it's SPI_MASTER.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140501/7b3f6f04/attachment.sig>
