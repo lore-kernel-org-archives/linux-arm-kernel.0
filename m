@@ -1,66 +1,89 @@
-From: sdu.liu@huawei.com (Liu hua)
-Date: Tue, 1 Apr 2014 11:29:05 +0800
-Subject: [PATCH 0/3] add LPAE support for kexec and kernel (Liu Hua)
-In-Reply-To: <1897155363.7224032.1396021473883.JavaMail.zimbra@redhat.com>
-References: <mailman.28599.1395907790.1059.kexec@lists.infradead.org>
- <420609342.5318732.1395929059090.JavaMail.zimbra@redhat.com>
- <53356590.3030005@huawei.com>
- <1897155363.7224032.1396021473883.JavaMail.zimbra@redhat.com>
-Message-ID: <533A3281.6080907@huawei.com>
+From: andrzej.hajda@wp.pl (Andrzej Hajda)
+Date: Thu, 01 May 2014 09:04:19 +0200
+Subject: [RFC PATCH 0/4] drivers/base: Generic framework for tracking
+ internal interfaces
+In-Reply-To: <20140430222839.GE26756@n2100.arm.linux.org.uk>
+References: <1398866574-27001-1-git-send-email-a.hajda@samsung.com>
+ <20140430154914.GA898@kroah.com> <53616E31.3050404@wp.pl>
+ <20140430222839.GE26756@n2100.arm.linux.org.uk>
+Message-ID: <5361F1F3.7070005@wp.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2014/3/28 23:44, Dave Anderson ??:
-> 
-> 
-> ----- Original Message -----
->> On 2014/3/27 22:04, Dave Anderson wrote:
->>>
->>>
->>> ----- Original Message -----
->>>
->>>> The patch series introduce LPAE support for user space
->>>> utility kexec(the last) and ARM linux kernel(the others).
->>>>
->>>> I have tested the patch series in armA15 platform which have
->>>> more than 4G memory.
->>>
->>> Hello Liu,
->>>
->>> I'm curious how you tested this?  The crash utility does not have
->>> any specific support for LPAE on ARM, and a couple years ago I
->>> asked on the crash-utility mailing list whether any of the ARM
->>> developers were working on it.  But at that time none of them were
->>> working with LPAE.  I see that you are on the crash-utility mailing
->>> list -- are you planning to post follow-up patches to the crash-utility?
->>>
->>> Thanks,
->>>   Dave
->>
->> Yes, you are very "sensitive"! our team has worked on it for a while. And
->> we went through the whole kdump process for LPAE enabled ARM. Our changes
->> include kexec-tools, makedumpfile, crash utility and the kernel.
->>
->> But we did that in a rather limited time. So some patches are silly and
->> need to be reconstructed before submission. In addition, my job is quit
->> full now. So I decide to post the patch series that are clear and
->> independent of the others at first.
->>
->> But I got no response from the linux-arm and kexec mailinglist. What about
->> your opinion about the feature of LPAE support for kdump related tools
->> including crash utility and the kernel?
-> 
-> I can't speak for the linux-arm and kexec mailing lists, but certainly 
-> when you post your crash-related patches on the crash-utility mailing 
-> list, I'll review, respond, and get them in place as soon as possible.
-> 
-> Thanks,
->   Dave
+Russell King - ARM Linux wrote, On 01.05.2014 00:28:
+> On Wed, Apr 30, 2014 at 11:42:09PM +0200, Andrzej Hajda wrote:
+>> The main problem with component framework is that componentization
+>> significantly changes every driver and changes it in a way which is not
+>> compatible with traditional drivers, so devices which are intended to
+>> work with different DRM masters are hard to componentize if some of DRMs
+>> are componentized and some not.
+> Many of the problems which the component helpers are designed to solve
+> are those where you need the drm_device structure (or snd_card, or whatever
+> subsystem specific card/device representation structure) pre-created in
+> order to initialise the components.
+>
+> In the case of DRM, you can't initialise encoders or connectors without
+> their drm_device structure pre-existing - because these components are
+> attached to the drm_device.
+>
+> Your solution to that is to delay those calls, but the DRM subsystem is
+> not designed to cope like that - it's designed such that when the
+> connector or encoder initialisation functions are called, it is assumed
+> that the driver is initialising its state. (I've raised this point before
+> but you've just fobbed it off in the past.)
+>
+> Another issue here is that the order of initialisation matters greatly.
+> Take CRTCs for example.  In DRM, the order of attachment of CRTCs defines
+> their identity, changing the order changes their identity, and changes
+> how they are bound to their respective connectors.
+>
+The two problems you show here are not a real problems in this framework:
+1. making real device initialization during drm initialization - 
+decision is left
+to driver developer what should be done in probe, what should be done in
+'bind', I guess this is also true for components, at least the framework 
+allows it.
+2. initialization order - if you put initialization into components 
+'bind' function,
+master can choose any order of calls to 'bind'.
 
-Hi Dave,
+Anyway you can implement the same behaviour as components with
+interface_tracker. Just simple proof of concept, how to convert 
+componentized
+drivers to interface_tracker:
+Components:
+1. you can reuse component_ops
+2. You replace calls of component_add and component_del with calls
+to interface_tracker_ifup(dev, INTERFACE_TRACKER_TYPE_COMPONENT, 
+&specific_component_ops),
+or interface_tracker_ifdown.
+Thats all for components.
 
-That's great. I will post crash-related patches after finishing my
-work on hand, perhaps two weeks or longer. Thanks to your advice.
+Master:
+1. you register callback for tracking all components.
+2. in the callback you check if all components are up, if yes you do the
+same as in component framework initialization, to simplify it
+helper function can be added.
 
-Thanks,
-Liu Hua
+I guess it should work the same way, if there is interest in it I can 
+develop the
+helper next week, I hope.
+
+What is the benefit of interface_tracker:
+1. interface_tracker is more generic - it can track not only components.
+2. you put component initialization code into helper function - sounds 
+like mid-layer removal,
+developer can choose different helper if it suits better.
+
+So from component point of view interface_tracker can be treated as kind 
+of extensions
+of the component framework.
+
+I hope I have answerer all your concerns.
+
+I have holidays till Sunday and I am not sure if I will be able to 
+answer next emails before
+Monday.
+
+Regards
+Andrzej
