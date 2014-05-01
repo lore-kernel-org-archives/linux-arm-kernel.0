@@ -1,187 +1,432 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  1 May 2014 17:49:34 +0200
-Subject: [PATCH resend 02/15] arm64: add abstractions for FPSIMD state
- manipulation
+Date: Thu,  1 May 2014 17:49:37 +0200
+Subject: [PATCH resend 05/15] arm64/crypto: SHA-1 using ARMv8 Crypto Extensions
 In-Reply-To: <1398959381-8126-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1398959381-8126-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1398959381-8126-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1398959381-8126-6-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are two tacit assumptions in the FPSIMD handling code that will no longer
-hold after the next patch that optimizes away some FPSIMD state restores:
-. the FPSIMD registers of this CPU contain the userland FPSIMD state of
-  task 'current';
-. when switching to a task, its FPSIMD state will always be restored from
-  memory.
-
-This patch adds the following functions to abstract away from straight FPSIMD
-register file saves and restores:
-- fpsimd_preserve_current_state -> ensure current's FPSIMD state is saved
-- fpsimd_restore_current_state -> ensure current's FPSIMD state is loaded
-- fpsimd_update_current_state -> replace current's FPSIMD state
-- fpsimd_flush_task_state -> invalidate live copies of a task's FPSIMD state
-
-Where necessary, the ptrace, signal handling and fork code are updated to use
-the above wrappers instead of poking into the FPSIMD registers directly.
+This patch adds support for the SHA-1 Secure Hash Algorithm for CPUs that
+have support for the SHA-1 part of the ARM v8 Crypto Extensions.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/include/asm/fpsimd.h |  6 ++++++
- arch/arm64/kernel/fpsimd.c      | 33 +++++++++++++++++++++++++++++++++
- arch/arm64/kernel/process.c     |  2 +-
- arch/arm64/kernel/ptrace.c      |  2 ++
- arch/arm64/kernel/signal.c      |  9 +++------
- arch/arm64/kernel/signal32.c    |  9 +++------
- 6 files changed, 48 insertions(+), 13 deletions(-)
+ arch/arm64/Kconfig               |   3 +
+ arch/arm64/Makefile              |   1 +
+ arch/arm64/crypto/Kconfig        |  16 ++++
+ arch/arm64/crypto/Makefile       |  12 +++
+ arch/arm64/crypto/sha1-ce-core.S | 153 ++++++++++++++++++++++++++++++++++
+ arch/arm64/crypto/sha1-ce-glue.c | 174 +++++++++++++++++++++++++++++++++++++++
+ 6 files changed, 359 insertions(+)
+ create mode 100644 arch/arm64/crypto/Kconfig
+ create mode 100644 arch/arm64/crypto/Makefile
+ create mode 100644 arch/arm64/crypto/sha1-ce-core.S
+ create mode 100644 arch/arm64/crypto/sha1-ce-glue.c
 
-diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-index c43b4ac13008..9f9b8e438546 100644
---- a/arch/arm64/include/asm/fpsimd.h
-+++ b/arch/arm64/include/asm/fpsimd.h
-@@ -58,6 +58,12 @@ extern void fpsimd_load_state(struct fpsimd_state *state);
- extern void fpsimd_thread_switch(struct task_struct *next);
- extern void fpsimd_flush_thread(void);
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index e6e4d3749a6e..1cefc6fe969a 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -342,5 +342,8 @@ source "arch/arm64/Kconfig.debug"
+ source "security/Kconfig"
  
-+extern void fpsimd_preserve_current_state(void);
-+extern void fpsimd_restore_current_state(void);
-+extern void fpsimd_update_current_state(struct fpsimd_state *state);
+ source "crypto/Kconfig"
++if CRYPTO
++source "arch/arm64/crypto/Kconfig"
++endif
+ 
+ source "lib/Kconfig"
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index 2fceb71ac3b7..8185a913c5ed 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -45,6 +45,7 @@ export	TEXT_OFFSET GZFLAGS
+ core-y		+= arch/arm64/kernel/ arch/arm64/mm/
+ core-$(CONFIG_KVM) += arch/arm64/kvm/
+ core-$(CONFIG_XEN) += arch/arm64/xen/
++core-$(CONFIG_CRYPTO) += arch/arm64/crypto/
+ libs-y		:= arch/arm64/lib/ $(libs-y)
+ libs-y		+= $(LIBGCC)
+ 
+diff --git a/arch/arm64/crypto/Kconfig b/arch/arm64/crypto/Kconfig
+new file mode 100644
+index 000000000000..7956881b5986
+--- /dev/null
++++ b/arch/arm64/crypto/Kconfig
+@@ -0,0 +1,16 @@
 +
-+extern void fpsimd_flush_task_state(struct task_struct *target);
++menuconfig ARM64_CRYPTO
++	bool "ARM64 Accelerated Cryptographic Algorithms"
++	depends on ARM64
++	help
++	  Say Y here to choose from a selection of cryptographic algorithms
++	  implemented using ARM64 specific CPU features or instructions.
 +
- #endif
- 
- #endif
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 4aef42a04bdc..86ac6a9bc86a 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -87,6 +87,39 @@ void fpsimd_flush_thread(void)
- 	preempt_enable();
- }
- 
++if ARM64_CRYPTO
++
++config CRYPTO_SHA1_ARM64_CE
++	tristate "SHA-1 digest algorithm (ARMv8 Crypto Extensions)"
++	depends on ARM64 && KERNEL_MODE_NEON
++	select CRYPTO_HASH
++
++endif
+diff --git a/arch/arm64/crypto/Makefile b/arch/arm64/crypto/Makefile
+new file mode 100644
+index 000000000000..0ed3caaec81b
+--- /dev/null
++++ b/arch/arm64/crypto/Makefile
+@@ -0,0 +1,12 @@
++#
++# linux/arch/arm64/crypto/Makefile
++#
++# Copyright (C) 2014 Linaro Ltd <ard.biesheuvel@linaro.org>
++#
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License version 2 as
++# published by the Free Software Foundation.
++#
++
++obj-$(CONFIG_CRYPTO_SHA1_ARM64_CE) += sha1-ce.o
++sha1-ce-y := sha1-ce-glue.o sha1-ce-core.o
+diff --git a/arch/arm64/crypto/sha1-ce-core.S b/arch/arm64/crypto/sha1-ce-core.S
+new file mode 100644
+index 000000000000..bd4af29f2722
+--- /dev/null
++++ b/arch/arm64/crypto/sha1-ce-core.S
+@@ -0,0 +1,153 @@
 +/*
-+ * Save the userland FPSIMD state of 'current' to memory
++ * sha1-ce-core.S - SHA-1 secure hash using ARMv8 Crypto Extensions
++ *
++ * Copyright (C) 2014 Linaro Ltd <ard.biesheuvel@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + */
-+void fpsimd_preserve_current_state(void)
++
++#include <linux/linkage.h>
++#include <asm/assembler.h>
++
++	.text
++	.arch		armv8-a+crypto
++
++	k0		.req	v0
++	k1		.req	v1
++	k2		.req	v2
++	k3		.req	v3
++
++	t0		.req	v4
++	t1		.req	v5
++
++	dga		.req	q6
++	dgav		.req	v6
++	dgb		.req	s7
++	dgbv		.req	v7
++
++	dg0q		.req	q12
++	dg0s		.req	s12
++	dg0v		.req	v12
++	dg1s		.req	s13
++	dg1v		.req	v13
++	dg2s		.req	s14
++
++	.macro		add_only, op, ev, rc, s0, dg1
++	.ifc		\ev, ev
++	add		t1.4s, v\s0\().4s, \rc\().4s
++	sha1h		dg2s, dg0s
++	.ifnb		\dg1
++	sha1\op		dg0q, \dg1, t0.4s
++	.else
++	sha1\op		dg0q, dg1s, t0.4s
++	.endif
++	.else
++	.ifnb		\s0
++	add		t0.4s, v\s0\().4s, \rc\().4s
++	.endif
++	sha1h		dg1s, dg0s
++	sha1\op		dg0q, dg2s, t1.4s
++	.endif
++	.endm
++
++	.macro		add_update, op, ev, rc, s0, s1, s2, s3, dg1
++	sha1su0		v\s0\().4s, v\s1\().4s, v\s2\().4s
++	sha1su1		v\s0\().4s, v\s3\().4s
++	add_only	\op, \ev, \rc, \s1, \dg1
++	.endm
++
++	/*
++	 * The SHA1 round constants
++	 */
++	.align		4
++.Lsha1_rcon:
++	.word		0x5a827999, 0x6ed9eba1, 0x8f1bbcdc, 0xca62c1d6
++
++	/*
++	 * void sha1_ce_transform(int blocks, u8 const *src, u32 *state,
++	 * 			  u8 *head, long bytes)
++	 */
++ENTRY(sha1_ce_transform)
++	/* load round constants */
++	adr		x6, .Lsha1_rcon
++	ld1r		{k0.4s}, [x6], #4
++	ld1r		{k1.4s}, [x6], #4
++	ld1r		{k2.4s}, [x6], #4
++	ld1r		{k3.4s}, [x6]
++
++	/* load state */
++	ldr		dga, [x2]
++	ldr		dgb, [x2, #16]
++
++	/* load partial state (if supplied) */
++	cbz		x3, 0f
++	ld1		{v8.4s-v11.4s}, [x3]
++	b		1f
++
++	/* load input */
++0:	ld1		{v8.4s-v11.4s}, [x1], #64
++	sub		w0, w0, #1
++
++1:
++CPU_LE(	rev32		v8.16b, v8.16b		)
++CPU_LE(	rev32		v9.16b, v9.16b		)
++CPU_LE(	rev32		v10.16b, v10.16b	)
++CPU_LE(	rev32		v11.16b, v11.16b	)
++
++2:	add		t0.4s, v8.4s, k0.4s
++	mov		dg0v.16b, dgav.16b
++
++	add_update	c, ev, k0,  8,  9, 10, 11, dgb
++	add_update	c, od, k0,  9, 10, 11,  8
++	add_update	c, ev, k0, 10, 11,  8,  9
++	add_update	c, od, k0, 11,  8,  9, 10
++	add_update	c, ev, k1,  8,  9, 10, 11
++
++	add_update	p, od, k1,  9, 10, 11,  8
++	add_update	p, ev, k1, 10, 11,  8,  9
++	add_update	p, od, k1, 11,  8,  9, 10
++	add_update	p, ev, k1,  8,  9, 10, 11
++	add_update	p, od, k2,  9, 10, 11,  8
++
++	add_update	m, ev, k2, 10, 11,  8,  9
++	add_update	m, od, k2, 11,  8,  9, 10
++	add_update	m, ev, k2,  8,  9, 10, 11
++	add_update	m, od, k2,  9, 10, 11,  8
++	add_update	m, ev, k3, 10, 11,  8,  9
++
++	add_update	p, od, k3, 11,  8,  9, 10
++	add_only	p, ev, k3,  9
++	add_only	p, od, k3, 10
++	add_only	p, ev, k3, 11
++	add_only	p, od
++
++	/* update state */
++	add		dgbv.2s, dgbv.2s, dg1v.2s
++	add		dgav.4s, dgav.4s, dg0v.4s
++
++	cbnz		w0, 0b
++
++	/*
++	 * Final block: add padding and total bit count.
++	 * Skip if we have no total byte count in x4. In that case, the input
++	 * size was not a round multiple of the block size, and the padding is
++	 * handled by the C code.
++	 */
++	cbz		x4, 3f
++	movi		v9.2d, #0
++	mov		x8, #0x80000000
++	movi		v10.2d, #0
++	ror		x7, x4, #29		// ror(lsl(x4, 3), 32)
++	fmov		d8, x8
++	mov		x4, #0
++	mov		v11.d[0], xzr
++	mov		v11.d[1], x7
++	b		2b
++
++	/* store new state */
++3:	str		dga, [x2]
++	str		dgb, [x2, #16]
++	ret
++ENDPROC(sha1_ce_transform)
+diff --git a/arch/arm64/crypto/sha1-ce-glue.c b/arch/arm64/crypto/sha1-ce-glue.c
+new file mode 100644
+index 000000000000..6fe83f37a750
+--- /dev/null
++++ b/arch/arm64/crypto/sha1-ce-glue.c
+@@ -0,0 +1,174 @@
++/*
++ * sha1-ce-glue.c - SHA-1 secure hash using ARMv8 Crypto Extensions
++ *
++ * Copyright (C) 2014 Linaro Ltd <ard.biesheuvel@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <asm/neon.h>
++#include <asm/unaligned.h>
++#include <crypto/internal/hash.h>
++#include <crypto/sha.h>
++#include <linux/cpufeature.h>
++#include <linux/crypto.h>
++#include <linux/module.h>
++
++MODULE_DESCRIPTION("SHA1 secure hash using ARMv8 Crypto Extensions");
++MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
++MODULE_LICENSE("GPL v2");
++
++asmlinkage void sha1_ce_transform(int blocks, u8 const *src, u32 *state,
++				  u8 *head, long bytes);
++
++static int sha1_init(struct shash_desc *desc)
 +{
-+	fpsimd_save_state(&current->thread.fpsimd_state);
++	struct sha1_state *sctx = shash_desc_ctx(desc);
++
++	*sctx = (struct sha1_state){
++		.state = { SHA1_H0, SHA1_H1, SHA1_H2, SHA1_H3, SHA1_H4 },
++	};
++	return 0;
 +}
 +
-+/*
-+ * Load the userland FPSIMD state of 'current' from memory
-+ */
-+void fpsimd_restore_current_state(void)
++static int sha1_update(struct shash_desc *desc, const u8 *data,
++		       unsigned int len)
 +{
-+	fpsimd_load_state(&current->thread.fpsimd_state);
++	struct sha1_state *sctx = shash_desc_ctx(desc);
++	unsigned int partial = sctx->count % SHA1_BLOCK_SIZE;
++
++	sctx->count += len;
++
++	if ((partial + len) >= SHA1_BLOCK_SIZE) {
++		int blocks;
++
++		if (partial) {
++			int p = SHA1_BLOCK_SIZE - partial;
++
++			memcpy(sctx->buffer + partial, data, p);
++			data += p;
++			len -= p;
++		}
++
++		blocks = len / SHA1_BLOCK_SIZE;
++		len %= SHA1_BLOCK_SIZE;
++
++		kernel_neon_begin_partial(16);
++		sha1_ce_transform(blocks, data, sctx->state,
++				  partial ? sctx->buffer : NULL, 0);
++		kernel_neon_end();
++
++		data += blocks * SHA1_BLOCK_SIZE;
++		partial = 0;
++	}
++	if (len)
++		memcpy(sctx->buffer + partial, data, len);
++	return 0;
 +}
 +
-+/*
-+ * Load an updated userland FPSIMD state for 'current' from memory
-+ */
-+void fpsimd_update_current_state(struct fpsimd_state *state)
++static int sha1_final(struct shash_desc *desc, u8 *out)
 +{
-+	preempt_disable();
-+	fpsimd_load_state(state);
-+	preempt_enable();
++	static const u8 padding[SHA1_BLOCK_SIZE] = { 0x80, };
++
++	struct sha1_state *sctx = shash_desc_ctx(desc);
++	__be64 bits = cpu_to_be64(sctx->count << 3);
++	__be32 *dst = (__be32 *)out;
++	int i;
++
++	u32 padlen = SHA1_BLOCK_SIZE
++		     - ((sctx->count + sizeof(bits)) % SHA1_BLOCK_SIZE);
++
++	sha1_update(desc, padding, padlen);
++	sha1_update(desc, (const u8 *)&bits, sizeof(bits));
++
++	for (i = 0; i < SHA1_DIGEST_SIZE / sizeof(__be32); i++)
++		put_unaligned_be32(sctx->state[i], dst++);
++
++	*sctx = (struct sha1_state){};
++	return 0;
 +}
 +
-+/*
-+ * Invalidate live CPU copies of task t's FPSIMD state
-+ */
-+void fpsimd_flush_task_state(struct task_struct *t)
++static int sha1_finup(struct shash_desc *desc, const u8 *data,
++		      unsigned int len, u8 *out)
 +{
++	struct sha1_state *sctx = shash_desc_ctx(desc);
++	__be32 *dst = (__be32 *)out;
++	int blocks;
++	int i;
++
++	if (sctx->count || !len || (len % SHA1_BLOCK_SIZE)) {
++		sha1_update(desc, data, len);
++		return sha1_final(desc, out);
++	}
++
++	/*
++	 * Use a fast path if the input is a multiple of 64 bytes. In
++	 * this case, there is no need to copy data around, and we can
++	 * perform the entire digest calculation in a single invocation
++	 * of sha1_ce_transform()
++	 */
++	blocks = len / SHA1_BLOCK_SIZE;
++
++	kernel_neon_begin_partial(16);
++	sha1_ce_transform(blocks, data, sctx->state, NULL, len);
++	kernel_neon_end();
++
++	for (i = 0; i < SHA1_DIGEST_SIZE / sizeof(__be32); i++)
++		put_unaligned_be32(sctx->state[i], dst++);
++
++	*sctx = (struct sha1_state){};
++	return 0;
 +}
 +
- #ifdef CONFIG_KERNEL_MODE_NEON
- 
- /*
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index 6391485f342d..c5693163408c 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -205,7 +205,7 @@ void release_thread(struct task_struct *dead_task)
- 
- int arch_dup_task_struct(struct task_struct *dst, struct task_struct *src)
- {
--	fpsimd_save_state(&current->thread.fpsimd_state);
-+	fpsimd_preserve_current_state();
- 	*dst = *src;
- 	return 0;
- }
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index 6a8928bba03c..f8700eca24e7 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -517,6 +517,7 @@ static int fpr_set(struct task_struct *target, const struct user_regset *regset,
- 		return ret;
- 
- 	target->thread.fpsimd_state.user_fpsimd = newstate;
-+	fpsimd_flush_task_state(target);
- 	return ret;
- }
- 
-@@ -764,6 +765,7 @@ static int compat_vfp_set(struct task_struct *target,
- 		uregs->fpcr = fpscr & VFP_FPSCR_CTRL_MASK;
- 	}
- 
-+	fpsimd_flush_task_state(target);
- 	return ret;
- }
- 
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index 890a591f75dd..06448a77ff53 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -51,7 +51,7 @@ static int preserve_fpsimd_context(struct fpsimd_context __user *ctx)
- 	int err;
- 
- 	/* dump the hardware registers to the fpsimd_state structure */
--	fpsimd_save_state(fpsimd);
-+	fpsimd_preserve_current_state();
- 
- 	/* copy the FP and status/control registers */
- 	err = __copy_to_user(ctx->vregs, fpsimd->vregs, sizeof(fpsimd->vregs));
-@@ -86,11 +86,8 @@ static int restore_fpsimd_context(struct fpsimd_context __user *ctx)
- 	__get_user_error(fpsimd.fpcr, &ctx->fpcr, err);
- 
- 	/* load the hardware registers from the fpsimd_state structure */
--	if (!err) {
--		preempt_disable();
--		fpsimd_load_state(&fpsimd);
--		preempt_enable();
--	}
-+	if (!err)
-+		fpsimd_update_current_state(&fpsimd);
- 
- 	return err ? -EFAULT : 0;
- }
-diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
-index b3fc9f5ec6d3..ac7e237d0bda 100644
---- a/arch/arm64/kernel/signal32.c
-+++ b/arch/arm64/kernel/signal32.c
-@@ -219,7 +219,7 @@ static int compat_preserve_vfp_context(struct compat_vfp_sigframe __user *frame)
- 	 * Note that this also saves V16-31, which aren't visible
- 	 * in AArch32.
- 	 */
--	fpsimd_save_state(fpsimd);
-+	fpsimd_preserve_current_state();
- 
- 	/* Place structure header on the stack */
- 	__put_user_error(magic, &frame->magic, err);
-@@ -282,11 +282,8 @@ static int compat_restore_vfp_context(struct compat_vfp_sigframe __user *frame)
- 	 * We don't need to touch the exception register, so
- 	 * reload the hardware state.
- 	 */
--	if (!err) {
--		preempt_disable();
--		fpsimd_load_state(&fpsimd);
--		preempt_enable();
--	}
-+	if (!err)
-+		fpsimd_update_current_state(&fpsimd);
- 
- 	return err ? -EFAULT : 0;
- }
++static int sha1_export(struct shash_desc *desc, void *out)
++{
++	struct sha1_state *sctx = shash_desc_ctx(desc);
++	struct sha1_state *dst = out;
++
++	*dst = *sctx;
++	return 0;
++}
++
++static int sha1_import(struct shash_desc *desc, const void *in)
++{
++	struct sha1_state *sctx = shash_desc_ctx(desc);
++	struct sha1_state const *src = in;
++
++	*sctx = *src;
++	return 0;
++}
++
++static struct shash_alg alg = {
++	.init			= sha1_init,
++	.update			= sha1_update,
++	.final			= sha1_final,
++	.finup			= sha1_finup,
++	.export			= sha1_export,
++	.import			= sha1_import,
++	.descsize		= sizeof(struct sha1_state),
++	.digestsize		= SHA1_DIGEST_SIZE,
++	.statesize		= sizeof(struct sha1_state),
++	.base			= {
++		.cra_name		= "sha1",
++		.cra_driver_name	= "sha1-ce",
++		.cra_priority		= 200,
++		.cra_flags		= CRYPTO_ALG_TYPE_SHASH,
++		.cra_blocksize		= SHA1_BLOCK_SIZE,
++		.cra_module		= THIS_MODULE,
++	}
++};
++
++static int __init sha1_ce_mod_init(void)
++{
++	return crypto_register_shash(&alg);
++}
++
++static void __exit sha1_ce_mod_fini(void)
++{
++	crypto_unregister_shash(&alg);
++}
++
++module_cpu_feature_match(SHA1, sha1_ce_mod_init);
++module_exit(sha1_ce_mod_fini);
 -- 
 1.8.3.2
