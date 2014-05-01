@@ -1,97 +1,80 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 01 May 2014 17:46:03 +0200
-Subject: [PATCH v12 11/31] documentation: iommu: add binding document of
- Exynos System MMU
-In-Reply-To: <20140501143654.GB3732@e103592.cambridge.arm.com>
-References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
- <36874558.Vf2LgdL3qf@wuerfel>
- <20140501143654.GB3732@e103592.cambridge.arm.com>
-Message-ID: <8052890.tELEFf8xoX@wuerfel>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu,  1 May 2014 17:49:32 +0200
+Subject: [PATCH resend 00/15] arm64 crypto roundup
+Message-ID: <1398959381-8126-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 01 May 2014 15:36:54 Dave Martin wrote:
-> On Thu, May 01, 2014 at 02:29:50PM +0100, Arnd Bergmann wrote:
-> > On Thursday 01 May 2014 12:15:35 Dave Martin wrote:
-> > > > > I'm not sure whether there is actually a SoC today that is MSI-capable
-> > > > > and contains an IOMMU, but all the components to build one are out
-> > > > > there today.  GICv3 is also explicitly designed to support such
-> > > > > systems.
-> > > > 
-> > > > A lot of SoCs have MSI integrated into the PCI root complex, which
-> > > > of course is pointless from MSI perspective, as well as implying that
-> > > > the MSI won't go through the IOMMU.
-> > > > 
-> > > > We have briefly mentioned MSI in the review of the Samsung GH7 PCI
-> > > > support. It's possible that this one can either use the built-in
-> > > > MSI or the one in the GICv2m.
-> > > 
-> > > We are likely to get non-PCI MSIs in future SoC systems too, and there
-> > > are no standards governing how such systems should look.
-> > 
-> > I wouldn't call that MSI though -- using the same term in the code
-> > can be rather confusing. There are existing SoCs that use message
-> > based interrupt notification. We are probably better off modeling
-> > those are regular irqchips in Linux and DT, given that they may
-> > not be bound by the same constraints as PCI MSI.
-> 
-> We can call it what we like and maybe bury the distinction in irqchip
-> drivers for some fixed-configuration cases, but it's logically the same
-> concept.  Naming and subsystem factoring are implementation decisions
-> for Linux.
-> 
-> For full dynamic assignment of pluggable devices or buses to VMs, I'm
-> less sure that we can model that as plain irqchips.
+This is a repost of the arm64 crypto patches that I have posted to the LAKML
+over the past months. They have now been verified on actual hardware
+(Cortex-A57) so if there are no remaining issues I would like to propose them
+for 3.16.
 
-I definitely hope we won't have to deal with plugging non-PCI devices
-into VMs. Nothing good can come out of that.
+Ard Biesheuvel (15):
+  asm-generic: allow generic unaligned access if the arch supports it
+  arm64: add abstractions for FPSIMD state manipulation
+  arm64: defer reloading a task's FPSIMD state to userland resume
+  arm64: add support for kernel mode NEON in interrupt context
+  arm64/crypto: SHA-1 using ARMv8 Crypto Extensions
+  arm64/crypto: SHA-224/SHA-256 using ARMv8 Crypto Extensions
+  arm64/crypto: GHASH secure hash using ARMv8 Crypto Extensions
+  arm64/crypto: AES using ARMv8 Crypto Extensions
+  arm64/crypto: AES in CCM mode using ARMv8 Crypto Extensions
+  arm64: pull in <asm/simd.h> from asm-generic
+  arm64/crypto: AES-ECB/CBC/CTR/XTS using ARMv8 NEON and Crypto
+    Extensions
+  arm64/crypto: add shared macro to test for NEED_RESCHED
+  arm64/crypto: add voluntary preemption to Crypto Extensions SHA1
+  arm64/crypto: add voluntary preemption to Crypto Extensions SHA2
+  arm64/crypto: add voluntary preemption to Crypto Extensions GHASH
 
-> > Supporting this case in DT straight away is going to add a major burden.
-> > If nobody can say for sure that they are actually going to do it, I'd
-> > lean towards assuming that we won't need it and not putting the extra
-> > complexity in.
-> > 
-> > If someone actually needs it later, let's make it their problem for
-> > not participating in the design.
-> 
-> This is a fair point, but there is a difference between the bindings and
-> what kind of wacky configurations a particular version of Linux actually
-> supports.
-> 
-> DT is supposed to be a description of the hardware, not a description
-> of how Linux subsystems are structured, though if the two are not
-> reasonably well aligned that will lead to pain...
-> 
-> The key thing is to make sure the DT bindings are extensible to
-> things that we can reasonably foresee.
+ arch/arm64/Kconfig                    |   3 +
+ arch/arm64/Makefile                   |   1 +
+ arch/arm64/crypto/Kconfig             |  53 ++++
+ arch/arm64/crypto/Makefile            |  38 +++
+ arch/arm64/crypto/aes-ce-ccm-core.S   | 222 ++++++++++++++
+ arch/arm64/crypto/aes-ce-ccm-glue.c   | 297 ++++++++++++++++++
+ arch/arm64/crypto/aes-ce-cipher.c     | 155 ++++++++++
+ arch/arm64/crypto/aes-ce.S            | 147 +++++++++
+ arch/arm64/crypto/aes-glue.c          | 446 +++++++++++++++++++++++++++
+ arch/arm64/crypto/aes-modes.S         | 548 ++++++++++++++++++++++++++++++++++
+ arch/arm64/crypto/aes-neon.S          | 382 ++++++++++++++++++++++++
+ arch/arm64/crypto/ghash-ce-core.S     |  97 ++++++
+ arch/arm64/crypto/ghash-ce-glue.c     | 172 +++++++++++
+ arch/arm64/crypto/sha1-ce-core.S      | 154 ++++++++++
+ arch/arm64/crypto/sha1-ce-glue.c      | 201 +++++++++++++
+ arch/arm64/crypto/sha2-ce-core.S      | 159 ++++++++++
+ arch/arm64/crypto/sha2-ce-glue.c      | 281 +++++++++++++++++
+ arch/arm64/include/asm/Kbuild         |   1 +
+ arch/arm64/include/asm/assembler.h    |  21 ++
+ arch/arm64/include/asm/fpsimd.h       |  23 ++
+ arch/arm64/include/asm/fpsimdmacros.h |  35 +++
+ arch/arm64/include/asm/neon.h         |   6 +-
+ arch/arm64/include/asm/thread_info.h  |   4 +-
+ arch/arm64/kernel/entry-fpsimd.S      |  24 ++
+ arch/arm64/kernel/entry.S             |   2 +-
+ arch/arm64/kernel/fpsimd.c            | 187 ++++++++++--
+ arch/arm64/kernel/process.c           |   2 +-
+ arch/arm64/kernel/ptrace.c            |   2 +
+ arch/arm64/kernel/signal.c            |  13 +-
+ arch/arm64/kernel/signal32.c          |   9 +-
+ include/asm-generic/unaligned.h       |  21 +-
+ 31 files changed, 3662 insertions(+), 44 deletions(-)
+ create mode 100644 arch/arm64/crypto/Kconfig
+ create mode 100644 arch/arm64/crypto/Makefile
+ create mode 100644 arch/arm64/crypto/aes-ce-ccm-core.S
+ create mode 100644 arch/arm64/crypto/aes-ce-ccm-glue.c
+ create mode 100644 arch/arm64/crypto/aes-ce-cipher.c
+ create mode 100644 arch/arm64/crypto/aes-ce.S
+ create mode 100644 arch/arm64/crypto/aes-glue.c
+ create mode 100644 arch/arm64/crypto/aes-modes.S
+ create mode 100644 arch/arm64/crypto/aes-neon.S
+ create mode 100644 arch/arm64/crypto/ghash-ce-core.S
+ create mode 100644 arch/arm64/crypto/ghash-ce-glue.c
+ create mode 100644 arch/arm64/crypto/sha1-ce-core.S
+ create mode 100644 arch/arm64/crypto/sha1-ce-glue.c
+ create mode 100644 arch/arm64/crypto/sha2-ce-core.S
+ create mode 100644 arch/arm64/crypto/sha2-ce-glue.c
 
-Yes, defining them in an extensible way is always a good idea, but I
-think it would be better not to define the fine details until we
-actually need them in this case.
-
-> > > > It would be 'dma-ranges'. Unfortunately that would imply that each DMA
-> > > > master is connected to only one IOMMU, which you say is not necessarily
-> > > > the case. The simpler case of a device is only a master on a single IOMMU
-> > > > but can use multiple contexts would however work fine with dma-ranges.
-> > > 
-> > > Partly, yes.  The concept embodied by "dma-ranges" is correct, but the
-> > > topological relationship is not: the assumption that a master device
-> > > always masters onto its parent node doesn't work for non-tree-like
-> > > topologies.
-> > 
-> > In almost all cases it will fit. When it doesn't, we can work around it by
-> > defining virtual address spaces the way that the PCI binding does. The only
-> > major exception that we know we have to handle is IOMMUs.
-> 
-> My concern here is that as new exceptions and oddball or complex systems
-> crop up, we will end up repeatedly inventing different bodges to solve
-> essentially the same problem.
-> 
-> Unlike some of the other situations we have to deal with, these are valid
-> hardware configurations rather than quirks or broken systems.
-
-Can you give an example where this would be done for a good reason?
-I can't come up with an example that doesn't involve the hardware
-design being seriously screwed.
-
-	Arnd
+-- 
+1.8.3.2
