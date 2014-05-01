@@ -1,35 +1,77 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 01 May 2014 10:48:48 -0600
-Subject: [PATCH 1/5] ARM: defconfigs: add MTD_SPI_NOR (new dependency
- for M25P80)
-In-Reply-To: <20140501060739.GH2497@norris-Latitude-E6410>
-References: <1397719309-2022-1-git-send-email-computersforpeace@gmail.com>
- <1397719309-2022-2-git-send-email-computersforpeace@gmail.com>
- <535A8FC9.8040707@wwwdotorg.org>
- <20140429190603.GB9418@norris-Latitude-E6410>
- <536000BA.4000101@wwwdotorg.org>
- <20140501060739.GH2497@norris-Latitude-E6410>
-Message-ID: <53627AF0.6060408@wwwdotorg.org>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 1 May 2014 10:50:03 -0600
+Subject: [PATCH v7 01/10] PCI: host: rcar: Add Renesas R-Car PCIe driver
+In-Reply-To: <b9160c7a49304270b5070dcf49482723@HKXPR06MB168.apcprd06.prod.outlook.com>
+References: <1396261856-22465-1-git-send-email-phil.edworthy@renesas.com>
+ <1396261856-22465-2-git-send-email-phil.edworthy@renesas.com>
+ <20140424191901.GE29593@google.com>
+ <9b8bedae9d604383ac7ec22fd0f62fdb@HKXPR06MB168.apcprd06.prod.outlook.com>
+ <CAErSpo6Autto4n4A4wHtXQNJzD3RKevkVcLZHUods-2-eiRDYQ@mail.gmail.com>
+ <20140428203501.GA3016@obsidianresearch.com>
+ <ac795ce3bb6349708e2e96686e19d24f@HKXPR06MB168.apcprd06.prod.outlook.com>
+ <20140430154345.GA1705@obsidianresearch.com>
+ <b9160c7a49304270b5070dcf49482723@HKXPR06MB168.apcprd06.prod.outlook.com>
+Message-ID: <20140501165003.GC3296@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/01/2014 12:07 AM, Brian Norris wrote:
-> On Tue, Apr 29, 2014 at 01:42:50PM -0600, Stephen Warren wrote:
->> I guess you could also just see if arm-soc (arm at kernel.org) will take
->> this patch, and deal with any merge conflicts that arise when they merge
->> all the sub-arch defconfig changes. I CC'd them to find out if they
->> think that's a better idea.
-> 
-> I'm preparing a split patch series and should send v2 shortly. A few of
-> the unaccounted platforms + the multi-platform are lumped together for
-> direct inclusion in arm-soc (?).
-> 
-> What is this arm at kernel.org you speak of? My Google-fu doesn't turn up a
-> separate arm-soc email / mailing list, and it's not in MAINTAINERS.
+On Thu, May 01, 2014 at 09:50:56AM +0000, Phil Edworthy wrote:
 
-It's the email address of the ARM SoC maintainers (Arnd, Olof, Kevin).
-All the ARM sub-architecture maintainers send their pull requests there,
-which all get aggregated and forwarded to Linus. They also take some
-patches directly, for cross-sub-architecture stuff like
-multi_v7_defconfig, or small amounts of bug-fixes after the main pull
-requests are sent.
+> > The logic should be:
+> >  if (bus == primary)
+> >     do io access to host bridge
+> >  else if (bus == secondary)
+> >     issue type 0 TLP on the wire
+> >  else if (bus > secondary && bus <= subordinate)
+> >     issue type 1 TLP on the wire
+> >  else
+> >     fail, invalid bus number
+> > Where the three values come from the register in the PCI host bridge's
+> > configuration space, and are kept in sync with the programming from
+> > the Linux PCI core.
+> > 
+> > It is just a happy hapenstance that root_bus_nr equals the value the
+> > PCI core programmed into secondary - that is not guarenteed, you must
+> > use the primary value directly.
+
+> For type0 TLPs, we are not checking that root_bus_nr equals the
+> value the PCI core programmed into secondary, we are checking that
+> the (root_bus_nr == bus->parent->number). The only way this wouldn't
+> work is if root_bus_nr was not the root bus number.
+
+Okay, that isn't as sketchy, but that process still ignores the
+subordinate bus number and the failure case as required by PCI.
+
+The goal here is to have the stuff below the drivers implement the PCI
+spec so that the core code can assume everything below is
+conformant. Drivers should not introduce gratuitous differences 'just
+because'
+
+There is no reason drivers should be using PCI core structures to make
+decisions when the spec says those decisions are driven by config
+space fields.
+
+This way the PCI core code doesn't have to be aware of any weird
+non-standard edge cases.. Such as not failing bus numbers beyond the
+subordinate bus number.
+
+> Since the Synopsys DW driver also saves off sys->busnr and later
+> uses this to determine if accesses are for the host bridge, I guess
+> that means it won't always work either, right? Or is it ok because
+> the DW driver saves sys->busnr in its .scan function?
+
+Sounds like it is making the same mistake, and nobody noticed. This is
+another reason why it is important to implement correctly so people
+copying copy the right stuff :)
+
+> When would the PCI core change the root bus number to something
+> other than set in sys->busnr?
+
+I think the more likely scenario is that 'sys' in general is
+architecture specific and its use is being discouraged so that host
+drivers are not arch specific.
+
+A domain driver like rcar should always place the root complex
+integrated bus as bus 0 in the domain.
+
+Jason
