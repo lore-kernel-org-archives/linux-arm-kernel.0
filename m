@@ -1,53 +1,87 @@
 From: b.brezillon.dev@gmail.com (Boris BREZILLON)
-Date: Thu,  1 May 2014 03:09:49 +0200
-Subject: [RFC PATCH 0/3] mtd: nand: add randomizer support
-Message-ID: <1398906592-24677-1-git-send-email-b.brezillon.dev@gmail.com>
+Date: Thu,  1 May 2014 03:09:51 +0200
+Subject: [RFC PATCH 2/3] of: mtd: add NAND randomizer mode retrieval
+In-Reply-To: <1398906592-24677-1-git-send-email-b.brezillon.dev@gmail.com>
+References: <1398906592-24677-1-git-send-email-b.brezillon.dev@gmail.com>
+Message-ID: <1398906592-24677-3-git-send-email-b.brezillon.dev@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
+---
+ drivers/of/of_mtd.c    | 35 +++++++++++++++++++++++++++++++++++
+ include/linux/of_mtd.h |  6 ++++++
+ 2 files changed, 41 insertions(+)
 
-This series is a proposal to add support for randomizers (either software
-or hardware) to NAND flash controller drivers.
-
-The last patch is the sunxi HW randomizer implementation and is just given
-as an example (it won't apply on the MTD tree, because it depends on other
-stuff not yet posted on the MTD ML, but if you want a full overview of the
-NAND Flash controller driver you can take a look at this series [2]).
-
-I can also provide a software implementation based on LFSR (Left Feedback
-Shift Register) algorithm, thought I haven't tested it yet, hence why it's
-not part of this series. Let me know if you're interested in this
-implementation.
-
-This series depends on the "per-partition ECC" series [1], because I need
-the randomizer seed to be different depending on the partition (for the
-same reason I needed ECC config to be different for each partition: the
-bootrom config might not fit the NAND chip requirements).
-
-I'd like to have feedback from both MTD maintainers and driver
-developers who might need to implement (or use) a randomizer in their
-system, so feel free to comment on this series.
-
-Best Regards,
-
-Boris
-
-[1] https://lkml.org/lkml/2014/2/12/627
-[2] https://groups.google.com/forum/#!msg/linux-sunxi/s3lBb01I0Js/z2NoCFJ83g4J 
-
-
-Boris BREZILLON (3):
-  mtd: nand: introduce a randomizer layer in the NAND framework
-  of: mtd: add NAND randomizer mode retrieval
-  mtd: nand: add sunxi randomizer support
-
- drivers/mtd/nand/nand_base.c  | 278 ++++++++++++++++++-----
- drivers/mtd/nand/sunxi_nand.c | 507 +++++++++++++++++++++++++++++++++++++++++-
- drivers/of/of_mtd.c           |  35 +++
- include/linux/mtd/nand.h      |  98 ++++++++
- include/linux/of_mtd.h        |   6 +
- 5 files changed, 858 insertions(+), 66 deletions(-)
-
+diff --git a/drivers/of/of_mtd.c b/drivers/of/of_mtd.c
+index a862c08..f941a5e 100644
+--- a/drivers/of/of_mtd.c
++++ b/drivers/of/of_mtd.c
+@@ -84,6 +84,41 @@ int of_get_nand_ecc_strength(struct device_node *np)
+ EXPORT_SYMBOL_GPL(of_get_nand_ecc_strength);
+ 
+ /**
++ * It maps 'enum nand_rnd_modes_t' found in include/linux/mtd/nand.h
++ * into the device tree binding of 'nand-rnd', so that MTD
++ * device driver can get nand rnd from device tree.
++ */
++static const char * const nand_rnd_modes[] = {
++	[NAND_RND_NONE]		= "none",
++	[NAND_RND_SOFT]		= "soft",
++	[NAND_RND_HW]		= "hw",
++};
++
++/**
++ * of_get_nand_rnd_mode - Get nand randomizer mode for given device_node
++ * @np:	Pointer to the given device_node
++ *
++ * The function gets randomizer mode string from property 'nand-rnd-mode',
++ * and return its index in nand_rnd_modes table, or errno in error case.
++ */
++int of_get_nand_rnd_mode(struct device_node *np)
++{
++	const char *pm;
++	int err, i;
++
++	err = of_property_read_string(np, "nand-rnd-mode", &pm);
++	if (err < 0)
++		return err;
++
++	for (i = 0; i < ARRAY_SIZE(nand_rnd_modes); i++)
++		if (!strcasecmp(pm, nand_rnd_modes[i]))
++			return i;
++
++	return -ENODEV;
++}
++EXPORT_SYMBOL_GPL(of_get_nand_rnd_mode);
++
++/**
+  * of_get_nand_bus_width - Get nand bus witdh for given device_node
+  * @np:	Pointer to the given device_node
+  *
+diff --git a/include/linux/of_mtd.h b/include/linux/of_mtd.h
+index d0145fb..2f43362 100644
+--- a/include/linux/of_mtd.h
++++ b/include/linux/of_mtd.h
+@@ -15,6 +15,7 @@
+ int of_get_nand_ecc_mode(struct device_node *np);
+ int of_get_nand_ecc_step_size(struct device_node *np);
+ int of_get_nand_ecc_strength(struct device_node *np);
++int of_get_nand_rnd_mode(struct device_node *np);
+ int of_get_nand_bus_width(struct device_node *np);
+ bool of_get_nand_on_flash_bbt(struct device_node *np);
+ int of_get_nand_onfi_timing_mode(struct device_node *np);
+@@ -36,6 +37,11 @@ static inline int of_get_nand_ecc_strength(struct device_node *np)
+ 	return -ENOSYS;
+ }
+ 
++static inline int of_get_nand_rnd_mode(struct device_node *np)
++{
++	return -ENOSYS;
++}
++
+ static inline int of_get_nand_bus_width(struct device_node *np)
+ {
+ 	return -ENOSYS;
 -- 
 1.8.3.2
