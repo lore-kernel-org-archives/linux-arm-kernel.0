@@ -1,432 +1,217 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  1 May 2014 17:49:37 +0200
-Subject: [PATCH resend 05/15] arm64/crypto: SHA-1 using ARMv8 Crypto Extensions
+Date: Thu,  1 May 2014 17:49:36 +0200
+Subject: [PATCH resend 04/15] arm64: add support for kernel mode NEON in
+ interrupt context
 In-Reply-To: <1398959381-8126-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1398959381-8126-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1398959381-8126-6-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1398959381-8126-5-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the SHA-1 Secure Hash Algorithm for CPUs that
-have support for the SHA-1 part of the ARM v8 Crypto Extensions.
+This patch modifies kernel_neon_begin() and kernel_neon_end(), so
+they may be called from any context. To address the case where only
+a couple of registers are needed, kernel_neon_begin_partial(u32) is
+introduced which takes as a parameter the number of bottom 'n' NEON
+q-registers required. To mark the end of such a partial section, the
+regular kernel_neon_end() should be used.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/Kconfig               |   3 +
- arch/arm64/Makefile              |   1 +
- arch/arm64/crypto/Kconfig        |  16 ++++
- arch/arm64/crypto/Makefile       |  12 +++
- arch/arm64/crypto/sha1-ce-core.S | 153 ++++++++++++++++++++++++++++++++++
- arch/arm64/crypto/sha1-ce-glue.c | 174 +++++++++++++++++++++++++++++++++++++++
- 6 files changed, 359 insertions(+)
- create mode 100644 arch/arm64/crypto/Kconfig
- create mode 100644 arch/arm64/crypto/Makefile
- create mode 100644 arch/arm64/crypto/sha1-ce-core.S
- create mode 100644 arch/arm64/crypto/sha1-ce-glue.c
+ arch/arm64/include/asm/fpsimd.h       | 15 ++++++++++++
+ arch/arm64/include/asm/fpsimdmacros.h | 35 ++++++++++++++++++++++++++++
+ arch/arm64/include/asm/neon.h         |  6 ++++-
+ arch/arm64/kernel/entry-fpsimd.S      | 24 +++++++++++++++++++
+ arch/arm64/kernel/fpsimd.c            | 44 ++++++++++++++++++++++++-----------
+ 5 files changed, 109 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index e6e4d3749a6e..1cefc6fe969a 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -342,5 +342,8 @@ source "arch/arm64/Kconfig.debug"
- source "security/Kconfig"
+diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+index 7a900142dbc8..05e1b24aca4c 100644
+--- a/arch/arm64/include/asm/fpsimd.h
++++ b/arch/arm64/include/asm/fpsimd.h
+@@ -41,6 +41,17 @@ struct fpsimd_state {
+ 	unsigned int cpu;
+ };
  
- source "crypto/Kconfig"
-+if CRYPTO
-+source "arch/arm64/crypto/Kconfig"
-+endif
- 
- source "lib/Kconfig"
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 2fceb71ac3b7..8185a913c5ed 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -45,6 +45,7 @@ export	TEXT_OFFSET GZFLAGS
- core-y		+= arch/arm64/kernel/ arch/arm64/mm/
- core-$(CONFIG_KVM) += arch/arm64/kvm/
- core-$(CONFIG_XEN) += arch/arm64/xen/
-+core-$(CONFIG_CRYPTO) += arch/arm64/crypto/
- libs-y		:= arch/arm64/lib/ $(libs-y)
- libs-y		+= $(LIBGCC)
- 
-diff --git a/arch/arm64/crypto/Kconfig b/arch/arm64/crypto/Kconfig
-new file mode 100644
-index 000000000000..7956881b5986
---- /dev/null
-+++ b/arch/arm64/crypto/Kconfig
-@@ -0,0 +1,16 @@
-+
-+menuconfig ARM64_CRYPTO
-+	bool "ARM64 Accelerated Cryptographic Algorithms"
-+	depends on ARM64
-+	help
-+	  Say Y here to choose from a selection of cryptographic algorithms
-+	  implemented using ARM64 specific CPU features or instructions.
-+
-+if ARM64_CRYPTO
-+
-+config CRYPTO_SHA1_ARM64_CE
-+	tristate "SHA-1 digest algorithm (ARMv8 Crypto Extensions)"
-+	depends on ARM64 && KERNEL_MODE_NEON
-+	select CRYPTO_HASH
-+
-+endif
-diff --git a/arch/arm64/crypto/Makefile b/arch/arm64/crypto/Makefile
-new file mode 100644
-index 000000000000..0ed3caaec81b
---- /dev/null
-+++ b/arch/arm64/crypto/Makefile
-@@ -0,0 +1,12 @@
-+#
-+# linux/arch/arm64/crypto/Makefile
-+#
-+# Copyright (C) 2014 Linaro Ltd <ard.biesheuvel@linaro.org>
-+#
-+# This program is free software; you can redistribute it and/or modify
-+# it under the terms of the GNU General Public License version 2 as
-+# published by the Free Software Foundation.
-+#
-+
-+obj-$(CONFIG_CRYPTO_SHA1_ARM64_CE) += sha1-ce.o
-+sha1-ce-y := sha1-ce-glue.o sha1-ce-core.o
-diff --git a/arch/arm64/crypto/sha1-ce-core.S b/arch/arm64/crypto/sha1-ce-core.S
-new file mode 100644
-index 000000000000..bd4af29f2722
---- /dev/null
-+++ b/arch/arm64/crypto/sha1-ce-core.S
-@@ -0,0 +1,153 @@
 +/*
-+ * sha1-ce-core.S - SHA-1 secure hash using ARMv8 Crypto Extensions
-+ *
-+ * Copyright (C) 2014 Linaro Ltd <ard.biesheuvel@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * Struct for stacking the bottom 'n' FP/SIMD registers.
 + */
++struct fpsimd_partial_state {
++	u32		num_regs;
++	u32		fpsr;
++	u32		fpcr;
++	__uint128_t	vregs[32] __aligned(16);
++} __aligned(16);
 +
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
 +
-+	.text
-+	.arch		armv8-a+crypto
+ #if defined(__KERNEL__) && defined(CONFIG_COMPAT)
+ /* Masks for extracting the FPSR and FPCR from the FPSCR */
+ #define VFP_FPSCR_STAT_MASK	0xf800009f
+@@ -66,6 +77,10 @@ extern void fpsimd_update_current_state(struct fpsimd_state *state);
+ 
+ extern void fpsimd_flush_task_state(struct task_struct *target);
+ 
++extern void fpsimd_save_partial_state(struct fpsimd_partial_state *state,
++				      u32 num_regs);
++extern void fpsimd_load_partial_state(struct fpsimd_partial_state *state);
 +
-+	k0		.req	v0
-+	k1		.req	v1
-+	k2		.req	v2
-+	k3		.req	v3
+ #endif
+ 
+ #endif
+diff --git a/arch/arm64/include/asm/fpsimdmacros.h b/arch/arm64/include/asm/fpsimdmacros.h
+index bbec599c96bd..69e75134689d 100644
+--- a/arch/arm64/include/asm/fpsimdmacros.h
++++ b/arch/arm64/include/asm/fpsimdmacros.h
+@@ -62,3 +62,38 @@
+ 	ldr	w\tmpnr, [\state, #16 * 2 + 4]
+ 	msr	fpcr, x\tmpnr
+ .endm
 +
-+	t0		.req	v4
-+	t1		.req	v5
++.altmacro
++.macro fpsimd_save_partial state, numnr, tmpnr1, tmpnr2
++	mrs	x\tmpnr1, fpsr
++	str	w\numnr, [\state]
++	mrs	x\tmpnr2, fpcr
++	stp	w\tmpnr1, w\tmpnr2, [\state, #4]
++	adr	x\tmpnr1, 0f
++	add	\state, \state, x\numnr, lsl #4
++	sub	x\tmpnr1, x\tmpnr1, x\numnr, lsl #1
++	br	x\tmpnr1
++	.irp	qa, 30, 28, 26, 24, 22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 2, 0
++	.irp	qb, %(qa + 1)
++	stp	q\qa, q\qb, [\state, # -16 * \qa - 16]
++	.endr
++	.endr
++0:
++.endm
 +
-+	dga		.req	q6
-+	dgav		.req	v6
-+	dgb		.req	s7
-+	dgbv		.req	v7
++.macro fpsimd_restore_partial state, tmpnr1, tmpnr2
++	ldp	w\tmpnr1, w\tmpnr2, [\state, #4]
++	msr	fpsr, x\tmpnr1
++	msr	fpcr, x\tmpnr2
++	adr	x\tmpnr1, 0f
++	ldr	w\tmpnr2, [\state]
++	add	\state, \state, x\tmpnr2, lsl #4
++	sub	x\tmpnr1, x\tmpnr1, x\tmpnr2, lsl #1
++	br	x\tmpnr1
++	.irp	qa, 30, 28, 26, 24, 22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 2, 0
++	.irp	qb, %(qa + 1)
++	ldp	q\qa, q\qb, [\state, # -16 * \qa - 16]
++	.endr
++	.endr
++0:
++.endm
+diff --git a/arch/arm64/include/asm/neon.h b/arch/arm64/include/asm/neon.h
+index b0cc58a97780..13ce4cc18e26 100644
+--- a/arch/arm64/include/asm/neon.h
++++ b/arch/arm64/include/asm/neon.h
+@@ -8,7 +8,11 @@
+  * published by the Free Software Foundation.
+  */
+ 
++#include <linux/types.h>
 +
-+	dg0q		.req	q12
-+	dg0s		.req	s12
-+	dg0v		.req	v12
-+	dg1s		.req	s13
-+	dg1v		.req	v13
-+	dg2s		.req	s14
+ #define cpu_has_neon()		(1)
+ 
+-void kernel_neon_begin(void);
++#define kernel_neon_begin()	kernel_neon_begin_partial(32)
 +
-+	.macro		add_only, op, ev, rc, s0, dg1
-+	.ifc		\ev, ev
-+	add		t1.4s, v\s0\().4s, \rc\().4s
-+	sha1h		dg2s, dg0s
-+	.ifnb		\dg1
-+	sha1\op		dg0q, \dg1, t0.4s
-+	.else
-+	sha1\op		dg0q, dg1s, t0.4s
-+	.endif
-+	.else
-+	.ifnb		\s0
-+	add		t0.4s, v\s0\().4s, \rc\().4s
-+	.endif
-+	sha1h		dg1s, dg0s
-+	sha1\op		dg0q, dg2s, t1.4s
-+	.endif
-+	.endm
++void kernel_neon_begin_partial(u32 num_regs);
+ void kernel_neon_end(void);
+diff --git a/arch/arm64/kernel/entry-fpsimd.S b/arch/arm64/kernel/entry-fpsimd.S
+index 6a27cd6dbfa6..d358ccacfc00 100644
+--- a/arch/arm64/kernel/entry-fpsimd.S
++++ b/arch/arm64/kernel/entry-fpsimd.S
+@@ -41,3 +41,27 @@ ENTRY(fpsimd_load_state)
+ 	fpsimd_restore x0, 8
+ 	ret
+ ENDPROC(fpsimd_load_state)
 +
-+	.macro		add_update, op, ev, rc, s0, s1, s2, s3, dg1
-+	sha1su0		v\s0\().4s, v\s1\().4s, v\s2\().4s
-+	sha1su1		v\s0\().4s, v\s3\().4s
-+	add_only	\op, \ev, \rc, \s1, \dg1
-+	.endm
++#ifdef CONFIG_KERNEL_MODE_NEON
 +
-+	/*
-+	 * The SHA1 round constants
-+	 */
-+	.align		4
-+.Lsha1_rcon:
-+	.word		0x5a827999, 0x6ed9eba1, 0x8f1bbcdc, 0xca62c1d6
-+
-+	/*
-+	 * void sha1_ce_transform(int blocks, u8 const *src, u32 *state,
-+	 * 			  u8 *head, long bytes)
-+	 */
-+ENTRY(sha1_ce_transform)
-+	/* load round constants */
-+	adr		x6, .Lsha1_rcon
-+	ld1r		{k0.4s}, [x6], #4
-+	ld1r		{k1.4s}, [x6], #4
-+	ld1r		{k2.4s}, [x6], #4
-+	ld1r		{k3.4s}, [x6]
-+
-+	/* load state */
-+	ldr		dga, [x2]
-+	ldr		dgb, [x2, #16]
-+
-+	/* load partial state (if supplied) */
-+	cbz		x3, 0f
-+	ld1		{v8.4s-v11.4s}, [x3]
-+	b		1f
-+
-+	/* load input */
-+0:	ld1		{v8.4s-v11.4s}, [x1], #64
-+	sub		w0, w0, #1
-+
-+1:
-+CPU_LE(	rev32		v8.16b, v8.16b		)
-+CPU_LE(	rev32		v9.16b, v9.16b		)
-+CPU_LE(	rev32		v10.16b, v10.16b	)
-+CPU_LE(	rev32		v11.16b, v11.16b	)
-+
-+2:	add		t0.4s, v8.4s, k0.4s
-+	mov		dg0v.16b, dgav.16b
-+
-+	add_update	c, ev, k0,  8,  9, 10, 11, dgb
-+	add_update	c, od, k0,  9, 10, 11,  8
-+	add_update	c, ev, k0, 10, 11,  8,  9
-+	add_update	c, od, k0, 11,  8,  9, 10
-+	add_update	c, ev, k1,  8,  9, 10, 11
-+
-+	add_update	p, od, k1,  9, 10, 11,  8
-+	add_update	p, ev, k1, 10, 11,  8,  9
-+	add_update	p, od, k1, 11,  8,  9, 10
-+	add_update	p, ev, k1,  8,  9, 10, 11
-+	add_update	p, od, k2,  9, 10, 11,  8
-+
-+	add_update	m, ev, k2, 10, 11,  8,  9
-+	add_update	m, od, k2, 11,  8,  9, 10
-+	add_update	m, ev, k2,  8,  9, 10, 11
-+	add_update	m, od, k2,  9, 10, 11,  8
-+	add_update	m, ev, k3, 10, 11,  8,  9
-+
-+	add_update	p, od, k3, 11,  8,  9, 10
-+	add_only	p, ev, k3,  9
-+	add_only	p, od, k3, 10
-+	add_only	p, ev, k3, 11
-+	add_only	p, od
-+
-+	/* update state */
-+	add		dgbv.2s, dgbv.2s, dg1v.2s
-+	add		dgav.4s, dgav.4s, dg0v.4s
-+
-+	cbnz		w0, 0b
-+
-+	/*
-+	 * Final block: add padding and total bit count.
-+	 * Skip if we have no total byte count in x4. In that case, the input
-+	 * size was not a round multiple of the block size, and the padding is
-+	 * handled by the C code.
-+	 */
-+	cbz		x4, 3f
-+	movi		v9.2d, #0
-+	mov		x8, #0x80000000
-+	movi		v10.2d, #0
-+	ror		x7, x4, #29		// ror(lsl(x4, 3), 32)
-+	fmov		d8, x8
-+	mov		x4, #0
-+	mov		v11.d[0], xzr
-+	mov		v11.d[1], x7
-+	b		2b
-+
-+	/* store new state */
-+3:	str		dga, [x2]
-+	str		dgb, [x2, #16]
++/*
++ * Save the bottom n FP registers.
++ *
++ * x0 - pointer to struct fpsimd_partial_state
++ */
++ENTRY(fpsimd_save_partial_state)
++	fpsimd_save_partial x0, 1, 8, 9
 +	ret
-+ENDPROC(sha1_ce_transform)
-diff --git a/arch/arm64/crypto/sha1-ce-glue.c b/arch/arm64/crypto/sha1-ce-glue.c
-new file mode 100644
-index 000000000000..6fe83f37a750
---- /dev/null
-+++ b/arch/arm64/crypto/sha1-ce-glue.c
-@@ -0,0 +1,174 @@
++ENDPROC(fpsimd_load_partial_state)
++
 +/*
-+ * sha1-ce-glue.c - SHA-1 secure hash using ARMv8 Crypto Extensions
++ * Load the bottom n FP registers.
 + *
-+ * Copyright (C) 2014 Linaro Ltd <ard.biesheuvel@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * x0 - pointer to struct fpsimd_partial_state
 + */
++ENTRY(fpsimd_load_partial_state)
++	fpsimd_restore_partial x0, 8, 9
++	ret
++ENDPROC(fpsimd_load_partial_state)
 +
-+#include <asm/neon.h>
-+#include <asm/unaligned.h>
-+#include <crypto/internal/hash.h>
-+#include <crypto/sha.h>
-+#include <linux/cpufeature.h>
-+#include <linux/crypto.h>
-+#include <linux/module.h>
++#endif
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 6cfbb4ef27d7..82ebc259a787 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -218,29 +218,45 @@ void fpsimd_flush_task_state(struct task_struct *t)
+ 
+ #ifdef CONFIG_KERNEL_MODE_NEON
+ 
++static DEFINE_PER_CPU(struct fpsimd_partial_state, hardirq_fpsimdstate);
++static DEFINE_PER_CPU(struct fpsimd_partial_state, softirq_fpsimdstate);
 +
-+MODULE_DESCRIPTION("SHA1 secure hash using ARMv8 Crypto Extensions");
-+MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
-+MODULE_LICENSE("GPL v2");
-+
-+asmlinkage void sha1_ce_transform(int blocks, u8 const *src, u32 *state,
-+				  u8 *head, long bytes);
-+
-+static int sha1_init(struct shash_desc *desc)
-+{
-+	struct sha1_state *sctx = shash_desc_ctx(desc);
-+
-+	*sctx = (struct sha1_state){
-+		.state = { SHA1_H0, SHA1_H1, SHA1_H2, SHA1_H3, SHA1_H4 },
-+	};
-+	return 0;
-+}
-+
-+static int sha1_update(struct shash_desc *desc, const u8 *data,
-+		       unsigned int len)
-+{
-+	struct sha1_state *sctx = shash_desc_ctx(desc);
-+	unsigned int partial = sctx->count % SHA1_BLOCK_SIZE;
-+
-+	sctx->count += len;
-+
-+	if ((partial + len) >= SHA1_BLOCK_SIZE) {
-+		int blocks;
-+
-+		if (partial) {
-+			int p = SHA1_BLOCK_SIZE - partial;
-+
-+			memcpy(sctx->buffer + partial, data, p);
-+			data += p;
-+			len -= p;
-+		}
-+
-+		blocks = len / SHA1_BLOCK_SIZE;
-+		len %= SHA1_BLOCK_SIZE;
-+
-+		kernel_neon_begin_partial(16);
-+		sha1_ce_transform(blocks, data, sctx->state,
-+				  partial ? sctx->buffer : NULL, 0);
-+		kernel_neon_end();
-+
-+		data += blocks * SHA1_BLOCK_SIZE;
-+		partial = 0;
+ /*
+  * Kernel-side NEON support functions
+  */
+-void kernel_neon_begin(void)
++void kernel_neon_begin_partial(u32 num_regs)
+ {
+-	/* Avoid using the NEON in interrupt context */
+-	BUG_ON(in_interrupt());
+-	preempt_disable();
++	if (in_interrupt()) {
++		struct fpsimd_partial_state *s = this_cpu_ptr(
++			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
+ 
+-	/*
+-	 * Save the userland FPSIMD state if we have one and if we haven't done
+-	 * so already. Clear fpsimd_last_state to indicate that there is no
+-	 * longer userland FPSIMD state in the registers.
+-	 */
+-	if (current->mm && !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
+-		fpsimd_save_state(&current->thread.fpsimd_state);
+-	this_cpu_write(fpsimd_last_state, NULL);
++		BUG_ON(num_regs > 32);
++		fpsimd_save_partial_state(s, roundup(num_regs, 2));
++	} else {
++		/*
++		 * Save the userland FPSIMD state if we have one and if we
++		 * haven't done so already. Clear fpsimd_last_state to indicate
++		 * that there is no longer userland FPSIMD state in the
++		 * registers.
++		 */
++		preempt_disable();
++		if (current->mm &&
++		    !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
++			fpsimd_save_state(&current->thread.fpsimd_state);
++		this_cpu_write(fpsimd_last_state, NULL);
 +	}
-+	if (len)
-+		memcpy(sctx->buffer + partial, data, len);
-+	return 0;
-+}
-+
-+static int sha1_final(struct shash_desc *desc, u8 *out)
-+{
-+	static const u8 padding[SHA1_BLOCK_SIZE] = { 0x80, };
-+
-+	struct sha1_state *sctx = shash_desc_ctx(desc);
-+	__be64 bits = cpu_to_be64(sctx->count << 3);
-+	__be32 *dst = (__be32 *)out;
-+	int i;
-+
-+	u32 padlen = SHA1_BLOCK_SIZE
-+		     - ((sctx->count + sizeof(bits)) % SHA1_BLOCK_SIZE);
-+
-+	sha1_update(desc, padding, padlen);
-+	sha1_update(desc, (const u8 *)&bits, sizeof(bits));
-+
-+	for (i = 0; i < SHA1_DIGEST_SIZE / sizeof(__be32); i++)
-+		put_unaligned_be32(sctx->state[i], dst++);
-+
-+	*sctx = (struct sha1_state){};
-+	return 0;
-+}
-+
-+static int sha1_finup(struct shash_desc *desc, const u8 *data,
-+		      unsigned int len, u8 *out)
-+{
-+	struct sha1_state *sctx = shash_desc_ctx(desc);
-+	__be32 *dst = (__be32 *)out;
-+	int blocks;
-+	int i;
-+
-+	if (sctx->count || !len || (len % SHA1_BLOCK_SIZE)) {
-+		sha1_update(desc, data, len);
-+		return sha1_final(desc, out);
+ }
+-EXPORT_SYMBOL(kernel_neon_begin);
++EXPORT_SYMBOL(kernel_neon_begin_partial);
+ 
+ void kernel_neon_end(void)
+ {
+-	preempt_enable();
++	if (in_interrupt()) {
++		struct fpsimd_partial_state *s = this_cpu_ptr(
++			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
++		fpsimd_load_partial_state(s);
++	} else {
++		preempt_enable();
 +	}
-+
-+	/*
-+	 * Use a fast path if the input is a multiple of 64 bytes. In
-+	 * this case, there is no need to copy data around, and we can
-+	 * perform the entire digest calculation in a single invocation
-+	 * of sha1_ce_transform()
-+	 */
-+	blocks = len / SHA1_BLOCK_SIZE;
-+
-+	kernel_neon_begin_partial(16);
-+	sha1_ce_transform(blocks, data, sctx->state, NULL, len);
-+	kernel_neon_end();
-+
-+	for (i = 0; i < SHA1_DIGEST_SIZE / sizeof(__be32); i++)
-+		put_unaligned_be32(sctx->state[i], dst++);
-+
-+	*sctx = (struct sha1_state){};
-+	return 0;
-+}
-+
-+static int sha1_export(struct shash_desc *desc, void *out)
-+{
-+	struct sha1_state *sctx = shash_desc_ctx(desc);
-+	struct sha1_state *dst = out;
-+
-+	*dst = *sctx;
-+	return 0;
-+}
-+
-+static int sha1_import(struct shash_desc *desc, const void *in)
-+{
-+	struct sha1_state *sctx = shash_desc_ctx(desc);
-+	struct sha1_state const *src = in;
-+
-+	*sctx = *src;
-+	return 0;
-+}
-+
-+static struct shash_alg alg = {
-+	.init			= sha1_init,
-+	.update			= sha1_update,
-+	.final			= sha1_final,
-+	.finup			= sha1_finup,
-+	.export			= sha1_export,
-+	.import			= sha1_import,
-+	.descsize		= sizeof(struct sha1_state),
-+	.digestsize		= SHA1_DIGEST_SIZE,
-+	.statesize		= sizeof(struct sha1_state),
-+	.base			= {
-+		.cra_name		= "sha1",
-+		.cra_driver_name	= "sha1-ce",
-+		.cra_priority		= 200,
-+		.cra_flags		= CRYPTO_ALG_TYPE_SHASH,
-+		.cra_blocksize		= SHA1_BLOCK_SIZE,
-+		.cra_module		= THIS_MODULE,
-+	}
-+};
-+
-+static int __init sha1_ce_mod_init(void)
-+{
-+	return crypto_register_shash(&alg);
-+}
-+
-+static void __exit sha1_ce_mod_fini(void)
-+{
-+	crypto_unregister_shash(&alg);
-+}
-+
-+module_cpu_feature_match(SHA1, sha1_ce_mod_init);
-+module_exit(sha1_ce_mod_fini);
+ }
+ EXPORT_SYMBOL(kernel_neon_end);
+ 
 -- 
 1.8.3.2
