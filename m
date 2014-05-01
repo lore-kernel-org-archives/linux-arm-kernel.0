@@ -1,43 +1,82 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu,  1 May 2014 15:05:07 +0100
-Subject: [PATCH] vexpress: Initialise the sysregs before setting up the clocks
-Message-ID: <1398953107-29426-1-git-send-email-catalin.marinas@arm.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 1 May 2014 10:06:58 -0400
+Subject: [PATCH v3 0/7] of: setup dma parameters using dma-ranges and
+ dma-coherent
+In-Reply-To: <20140501132516.GG26756@n2100.arm.linux.org.uk>
+References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
+ <536249D6.3020008@ti.com> <20140501132516.GG26756@n2100.arm.linux.org.uk>
+Message-ID: <53625502.1040808@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Following arm64 commit bc3ee18a7a57 (arm64: init: Move of_clk_init to
-time_init()), vexpress_osc_of_setup() is called via of_clk_init() long
-before initcalls are issued. Initialising the vexpress oscillators
-requires the vespress sysregs to be already initialised, so this patch
-adds an explicit call to vexpress_sysreg_of_early_init() in vexpress
-oscillator setup function. In addition, vexpress_sysreg_init() is
-changed to a device_initcall() as the core_initcall() is no longer
-required.
+On Thursday 01 May 2014 09:25 AM, Russell King - ARM Linux wrote:
+> On Thu, May 01, 2014 at 09:19:18AM -0400, Santosh Shilimkar wrote:
+>> Rob, Russell,
+>>
+>> On Thursday 24 April 2014 11:30 AM, Santosh Shilimkar wrote:
+>>> Here is an updated v3 of the series. Series introduces support for setting up
+>>> dma parameters based on device tree properties like 'dma-ranges' and
+>>> 'dma-coherent' and also update to ARM 32 bit port. Earlier version of the
+>>> series can be found here [3], [2] and [1].
+>>>
+>>> The 'dma-ranges' helps to take care of few DMAable system memory restrictions
+>>> by use of dma_pfn_offset which we maintain now per device. Arch code then
+>>> uses it for dma address translations for such cases. We update the
+>>> dma_pfn_offset accordingly during DT the device creation process.The
+>>> 'dma-coherent' property is used to setup arch's coherent dma_ops.
+>>>
+>>> Hopefully with acks, tested-by this version can get into 3.16 queue. I will
+>>> post a followup series for Keystone SOC which will use this infrastructure.
+>>> Linus W also wants to use this for ARM integrator platform dma offset issue.
+>>>
+>>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>>> Cc: Russell King <linux@arm.linux.org.uk>
+>>> Cc: Arnd Bergmann <arnd@arndb.de>
+>>> Cc: Olof Johansson <olof@lixom.net>
+>>> Cc: Grant Likely <grant.likely@linaro.org>
+>>> Cc: Rob Herring <robh+dt@kernel.org>
+>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>>> Cc: Linus Walleij <linus.walleij@linaro.org>
+>>> Cc: Grygorii Strashko <grygorii.strashko@ti.com>
+>>>
+>>> Grygorii Strashko (2):
+>>>   of: introduce of_dma_get_range() helper
+>>>   ARM: dma: Use dma_pfn_offset for dma address translation
+>>>
+>>> Santosh Shilimkar (5):
+>>>   device: introduce per device dma_pfn_offset
+>>>   of: introduce of_dma_is_coherent() helper
+>>>   of: configure the platform device dma parameters
+>>>   ARM: dma: implement set_arch_dma_coherent_ops()
+>>>   ARM: dma: use phys_addr_t in __dma_page_[cpu_to_dev/dev_to_cpu]
+>>>
+>>>  arch/arm/include/asm/dma-mapping.h |   28 ++++++++++--
+>>>  arch/arm/mm/dma-mapping.c          |    4 +-
+>>>  drivers/of/address.c               |   87 ++++++++++++++++++++++++++++++++++++
+>>>  drivers/of/platform.c              |   71 +++++++++++++++++++++++++++--
+>>>  include/linux/device.h             |    2 +
+>>>  include/linux/dma-mapping.h        |    7 +++
+>>>  include/linux/of_address.h         |    8 ++++
+>>>  include/linux/of_platform.h        |    6 +++
+>>>  8 files changed, 204 insertions(+), 9 deletions(-)
+>>>
+>> How do we go about merging this series ? There is a dependency
+>> between the patches and hence the question.
+> 
+> I don't know anymore.  People today want to assert exclusive rights over
+> parts of the kernel tree, which makes this kind of cross-patching rather
+> impossible.
+> 
+> The only workable solution I can see is the long winded way to split the
+> series up, merge the first set of dependencies in one merge window, and
+> hold the rest back for the following merge window.  Not ideal, but it
+> stops the arguments.
+> 
+I really hope we don't have to go this route. I think since the changes
+as such used for ARM arch for now, if we get this series via your tree
+or arm-soc which pulls your tree, things should work. I also have small
+series on the list on top of $subject series which enables coherency
+for Keystone.
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Tested-by: Will Deacon <will.deacon@arm.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
-Tested-by: Pawel Moll <pawel.moll@arm.com>
-Acked-by: Pawel Moll <pawel.moll@arm.com>
-Cc: Mike Turquette <mturquette@linaro.org>
----
-
-Mike, I'd like to get this in for 3.15 and I'm happy to push it via the arm64
-tree. Are you ok with this? Thanks.
-
- drivers/clk/versatile/clk-vexpress-osc.c | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/drivers/clk/versatile/clk-vexpress-osc.c b/drivers/clk/versatile/clk-vexpress-osc.c
-index a535c7bf8574..422391242b39 100644
---- a/drivers/clk/versatile/clk-vexpress-osc.c
-+++ b/drivers/clk/versatile/clk-vexpress-osc.c
-@@ -100,6 +100,8 @@ void __init vexpress_osc_of_setup(struct device_node *node)
- 	struct clk *clk;
- 	u32 range[2];
- 
-+	vexpress_sysreg_of_early_init();
-+
- 	osc = kzalloc(sizeof(*osc), GFP_KERNEL);
- 	if (!osc)
- 		return;
+Regards,
+Santosh
