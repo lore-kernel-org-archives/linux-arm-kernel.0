@@ -1,113 +1,67 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 1 May 2014 09:16:12 -0400
-Subject: [PATCH v3 4/7] of: configure the platform device dma parameters
-In-Reply-To: <20140501131210.CCC13C409DA@trevor.secretlab.ca>
-References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>	<1398353407-2345-5-git-send-email-santosh.shilimkar@ti.com>	<20140429144147.004EEC40992@trevor.secretlab.ca>
- <53610663.7070305@ti.com> <20140501131210.CCC13C409DA@trevor.secretlab.ca>
-Message-ID: <5362491C.9020402@ti.com>
+Date: Thu, 1 May 2014 09:19:18 -0400
+Subject: [PATCH v3 0/7] of: setup dma parameters using dma-ranges and
+ dma-coherent
+In-Reply-To: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <536249D6.3020008@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 01 May 2014 09:12 AM, Grant Likely wrote:
-> On Wed, 30 Apr 2014 10:19:15 -0400, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
->> Hi Grant,
->>
->> On Tuesday 29 April 2014 10:41 AM, Grant Likely wrote:
->>> On Thu, 24 Apr 2014 11:30:04 -0400, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
->>>> Retrieve DMA configuration from DT and setup platform device's DMA
->>>> parameters. The DMA configuration in DT has to be specified using
->>>> "dma-ranges" and "dma-coherent" properties if supported.
->>>>
->>>> We setup dma_pfn_offset using "dma-ranges" and dma_coherent_ops
->>>> using "dma-coherent" device tree properties.
->>>>
->>>> The set_arch_dma_coherent_ops macro has to be defined by arch if
->>>> it supports coherent dma_ops. Otherwise, set_arch_dma_coherent_ops() is
->>>> declared as nop.
->>>>
->>>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->>>> Cc: Russell King <linux@arm.linux.org.uk>
->>>> Cc: Arnd Bergmann <arnd@arndb.de>
->>>> Cc: Olof Johansson <olof@lixom.net>
->>>> Cc: Grant Likely <grant.likely@linaro.org>
->>>> Cc: Rob Herring <robh+dt@kernel.org>
->>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
->>>> Cc: Linus Walleij <linus.walleij@linaro.org>
->>>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>> ---
->>>>  drivers/of/platform.c       |   48 ++++++++++++++++++++++++++++++++++++++++---
->>>>  include/linux/dma-mapping.h |    7 +++++++
->>>>  2 files changed, 52 insertions(+), 3 deletions(-)
->>>>
->>>> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
->>>> index 48de98f..270c0b9 100644
->>>> --- a/drivers/of/platform.c
->>>> +++ b/drivers/of/platform.c
->>>> @@ -187,6 +187,50 @@ struct platform_device *of_device_alloc(struct device_node *np,
->>>>  EXPORT_SYMBOL(of_device_alloc);
->>>>  
->>>>  /**
->>>> + * of_dma_configure - Setup DMA configuration
->>>> + * @dev:	Device to apply DMA configuration
->>>> + *
->>>> + * Try to get devices's DMA configuration from DT and update it
->>>> + * accordingly.
->>>> + *
->>>> + * In case if platform code need to use own special DMA configuration,it
->>>> + * can use Platform bus notifier and handle BUS_NOTIFY_ADD_DEVICE event
->>>> + * to fix up DMA configuration.
->>>> + */
->>>> +static void of_dma_configure(struct device *dev)
->>>> +{
->>>> +	u64 dma_addr, paddr, size;
->>>> +	int ret;
->>>> +
->>>> +	dev->coherent_dma_mask = DMA_BIT_MASK(32);
->>>> +	if (!dev->dma_mask)
->>>> +		dev->dma_mask = &dev->coherent_dma_mask;
->>>> +
->>>> +	/*
->>>> +	 * if dma-coherent property exist, call arch hook to setup
->>>> +	 * dma coherent operations.
->>>> +	 */
->>>> +	if (of_dma_is_coherent(dev->of_node)) {
->>>> +		set_arch_dma_coherent_ops(dev);
->>>> +		dev_dbg(dev, "device is dma coherent\n");
->>>> +	}
->>>> +
->>>> +	/*
->>>> +	 * if dma-ranges property doesn't exist - just return else
->>>> +	 * setup the dma offset
->>>> +	 */
->>>> +	ret = of_dma_get_range(dev->of_node, &dma_addr, &paddr, &size);
->>>> +	if ((ret == -ENODEV) || (ret < 0)) {
->>>> +		dev_dbg(dev, "no dma range information to setup\n");
->>>> +		return;
->>>> +	}
->>>> +
->>>> +	/* DMA ranges found. Calculate and set dma_pfn_offset */
->>>> +	dev->dma_pfn_offset = PFN_DOWN(paddr - dma_addr);
->>>> +	dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", dev->dma_pfn_offset);
->>>
->>> I've got two concerns here. of_dma_get_range() retrieves only the first
->>> tuple from the dma-ranges property, but it is perfectly valid for
->>> dma-ranges to contain multiple tuples. How should we handle it if a
->>> device has multiple ranges it can DMA from?
->>>
->>
->> We've not found any cases in current Linux where more than one dma-ranges
->> would be used. Moreover, The MM (definitely for ARM) isn't supported such
->> cases at all (if i understand everything right).
->> - there are only one arm_dma_pfn_limit
->> - there is only one MM zone is used for ARM
->> - some arches like x86,mips can support 2 zones (per arch - not per device or bus)
->>   DMA & DMA32, but they configured once and forever per arch.
+Rob, Russell,
+
+On Thursday 24 April 2014 11:30 AM, Santosh Shilimkar wrote:
+> Here is an updated v3 of the series. Series introduces support for setting up
+> dma parameters based on device tree properties like 'dma-ranges' and
+> 'dma-coherent' and also update to ARM 32 bit port. Earlier version of the
+> series can be found here [3], [2] and [1].
 > 
-> Okay. If anyone ever does implement multiple ranges then this code will
-> need to be revisited.
->
-Sure. Thanks for the review !!
- 
-Regards,
-Santosh
+> The 'dma-ranges' helps to take care of few DMAable system memory restrictions
+> by use of dma_pfn_offset which we maintain now per device. Arch code then
+> uses it for dma address translations for such cases. We update the
+> dma_pfn_offset accordingly during DT the device creation process.The
+> 'dma-coherent' property is used to setup arch's coherent dma_ops.
+> 
+> Hopefully with acks, tested-by this version can get into 3.16 queue. I will
+> post a followup series for Keystone SOC which will use this infrastructure.
+> Linus W also wants to use this for ARM integrator platform dma offset issue.
+> 
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Grygorii Strashko <grygorii.strashko@ti.com>
+> 
+> Grygorii Strashko (2):
+>   of: introduce of_dma_get_range() helper
+>   ARM: dma: Use dma_pfn_offset for dma address translation
+> 
+> Santosh Shilimkar (5):
+>   device: introduce per device dma_pfn_offset
+>   of: introduce of_dma_is_coherent() helper
+>   of: configure the platform device dma parameters
+>   ARM: dma: implement set_arch_dma_coherent_ops()
+>   ARM: dma: use phys_addr_t in __dma_page_[cpu_to_dev/dev_to_cpu]
+> 
+>  arch/arm/include/asm/dma-mapping.h |   28 ++++++++++--
+>  arch/arm/mm/dma-mapping.c          |    4 +-
+>  drivers/of/address.c               |   87 ++++++++++++++++++++++++++++++++++++
+>  drivers/of/platform.c              |   71 +++++++++++++++++++++++++++--
+>  include/linux/device.h             |    2 +
+>  include/linux/dma-mapping.h        |    7 +++
+>  include/linux/of_address.h         |    8 ++++
+>  include/linux/of_platform.h        |    6 +++
+>  8 files changed, 204 insertions(+), 9 deletions(-)
+> 
+How do we go about merging this series ? There is a dependency
+between the patches and hence the question.
+
+> 
+> [1] http://www.spinics.net/lists/arm-kernel/msg311678.html
+> [2] https://lkml.org/lkml/2014/3/6/186
+> [3] https://lkml.org/lkml/2014/4/19/80
+> 
