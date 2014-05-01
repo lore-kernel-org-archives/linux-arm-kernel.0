@@ -1,43 +1,33 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 01 May 2014 16:12:35 +0100
-Subject: [PATCH 51/97] ARM: l2c: remove platforms/SoCs setting early BRESP
-In-Reply-To: <20140429002140.GP27282@n2100.arm.linux.org.uk>
-References: <20140428192419.GV26756@n2100.arm.linux.org.uk>
- <E1WerG4-0001X4-Ic@rmk-PC.arm.linux.org.uk>
- <20140429000224.GA31083@verge.net.au>
- <20140429002140.GP27282@n2100.arm.linux.org.uk>
-Message-ID: <20140501151236.078E3C409DA@trevor.secretlab.ca>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu,  1 May 2014 08:41:28 -0700
+Subject: [RFC PATCH 0/5] watchdog: Add reboot API
+Message-ID: <1398958893-30049-1-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 29 Apr 2014 01:21:41 +0100, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> On Tue, Apr 29, 2014 at 09:02:27AM +0900, Simon Horman wrote:
-> > On Mon, Apr 28, 2014 at 08:30:32PM +0100, Russell King wrote:
-> > > Since we now automatically enable early BRESP in core L2C-310 code when
-> > > we detect a Cortex-A9, we don't need platforms/SoCs to set this bit
-> > > explicitly.  Instead, they should seek to preserve the value of bit 30
-> > > in the auxiliary control register.
-> > > 
-> > > Acked-by: Tony Lindgren <tony@atomide.com>
-> > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > 
-> > I would prefer if this patch was broken out into individual patches
-> > for each board or SoC file and that they were then picked up
-> > by their respective platform maintainers.
-> > 
-> > Likewise for patch 66/97. Although it is only for shmobile
-> > I would prefer it broken out.
-> 
-> Oh fuck that.
-> 
-> Okay, I'm dropping the whole patch set right now and forgetting the whole
-> damned thing.  The L2 cache code can damned well stay as it is and remain
-> an unmaintainable mess.
+Some hardware implements reboot through its watchdog hardware, for example
+by triggering a watchdog timeout or by writing into its watchdog register
+set. Platform specific code starts to spread into watchdog drivers,
+typically by setting pointers to a callback function which is then called
+from the architecture's reset handler.
 
-FWIW, there are an awful lot of people, myself included, who do care
-that you've done this work. It is 100% okay for you to say "no" to
-requests to split things up because of the complexity of the series.
+While global and exported callback function pointers (such as arm_pm_restart)
+may be acceptable as long as they are used from platform and/or architecture
+code, using such a mechanism across subsystems and drivers is less than
+desirable. Ultimately, we'll need a better solution.
 
-I really hope you're reconsider and not give up on this series.
+This patch series is an attempt to provide such a solution. It extends
+the watchdog subsystem to support reboot functionality, provides an
+API function call to trigger reboots, adds support for the new API
+to arm and arm64, and converts the drivers providing reboot functionality
+to use the new infrastructure.
 
-g.
+The first patch in the series implements the new API. The second and third
+patch modify the arm and arm64 architecture reset handlers to call the
+added API function. The final two patches register the reboot handlers
+in the sunxi and moxart watchdog drivers with the watchdog subsystem.
+
+The sunxi patche depends on the most recent patch series sumitted by
+Maxime Ripard.
+
+Compile tested only.
