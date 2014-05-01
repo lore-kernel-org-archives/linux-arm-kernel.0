@@ -1,76 +1,93 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 1 May 2014 14:25:16 +0100
-Subject: [PATCH v3 0/7] of: setup dma parameters using dma-ranges and
- dma-coherent
-In-Reply-To: <536249D6.3020008@ti.com>
-References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
- <536249D6.3020008@ti.com>
-Message-ID: <20140501132516.GG26756@n2100.arm.linux.org.uk>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 01 May 2014 15:27:02 +0200
+Subject: [PATCH 1/2] ARM: EXYNOS: Map SYSRAM through generic SRAM bindings
+In-Reply-To: <1398941085-10224-1-git-send-email-sachin.kamat@linaro.org>
+References: <1398941085-10224-1-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <11106990.1tS5A7pf5r@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 01, 2014 at 09:19:18AM -0400, Santosh Shilimkar wrote:
-> Rob, Russell,
+Hi Sachin,
+
+Am Donnerstag, 1. Mai 2014, 16:14:44 schrieb Sachin Kamat:
+> Instead of hardcoding the SYSRAM details for each SoC,
+> pass this information through device tree (DT) and make
+> the code SoC agnostic. Generic SRAM bindings are used
+> for achieving this.
 > 
-> On Thursday 24 April 2014 11:30 AM, Santosh Shilimkar wrote:
-> > Here is an updated v3 of the series. Series introduces support for setting up
-> > dma parameters based on device tree properties like 'dma-ranges' and
-> > 'dma-coherent' and also update to ARM 32 bit port. Earlier version of the
-> > series can be found here [3], [2] and [1].
-> > 
-> > The 'dma-ranges' helps to take care of few DMAable system memory restrictions
-> > by use of dma_pfn_offset which we maintain now per device. Arch code then
-> > uses it for dma address translations for such cases. We update the
-> > dma_pfn_offset accordingly during DT the device creation process.The
-> > 'dma-coherent' property is used to setup arch's coherent dma_ops.
-> > 
-> > Hopefully with acks, tested-by this version can get into 3.16 queue. I will
-> > post a followup series for Keystone SOC which will use this infrastructure.
-> > Linus W also wants to use this for ARM integrator platform dma offset issue.
-> > 
-> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > Cc: Russell King <linux@arm.linux.org.uk>
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Olof Johansson <olof@lixom.net>
-> > Cc: Grant Likely <grant.likely@linaro.org>
-> > Cc: Rob Herring <robh+dt@kernel.org>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Linus Walleij <linus.walleij@linaro.org>
-> > Cc: Grygorii Strashko <grygorii.strashko@ti.com>
-> > 
-> > Grygorii Strashko (2):
-> >   of: introduce of_dma_get_range() helper
-> >   ARM: dma: Use dma_pfn_offset for dma address translation
-> > 
-> > Santosh Shilimkar (5):
-> >   device: introduce per device dma_pfn_offset
-> >   of: introduce of_dma_is_coherent() helper
-> >   of: configure the platform device dma parameters
-> >   ARM: dma: implement set_arch_dma_coherent_ops()
-> >   ARM: dma: use phys_addr_t in __dma_page_[cpu_to_dev/dev_to_cpu]
-> > 
-> >  arch/arm/include/asm/dma-mapping.h |   28 ++++++++++--
-> >  arch/arm/mm/dma-mapping.c          |    4 +-
-> >  drivers/of/address.c               |   87 ++++++++++++++++++++++++++++++++++++
-> >  drivers/of/platform.c              |   71 +++++++++++++++++++++++++++--
-> >  include/linux/device.h             |    2 +
-> >  include/linux/dma-mapping.h        |    7 +++
-> >  include/linux/of_address.h         |    8 ++++
-> >  include/linux/of_platform.h        |    6 +++
-> >  8 files changed, 204 insertions(+), 9 deletions(-)
-> > 
-> How do we go about merging this series ? There is a dependency
-> between the patches and hence the question.
+> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Cc: Arnd Bergmann <arnd@arndb.de>
 
-I don't know anymore.  People today want to assert exclusive rights over
-parts of the kernel tree, which makes this kind of cross-patching rather
-impossible.
+very cool :-).
 
-The only workable solution I can see is the long winded way to split the
-series up, merge the first set of dependencies in one merge window, and
-hold the rest back for the following merge window.  Not ideal, but it
-stops the arguments.
+I've found one little thing I do not understand, which I describe below. 
+Otherwise
+Acked-by: Heiko Stuebner <heiko@sntech.de>
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+> ---
+> This patch is based on linux next (next-20140501) on top of
+> my Kconfig consolidation patch
+> http://comments.gmane.org/gmane.linux.kernel.samsung-soc/28642
+> 
+> Tested on 4210/4412 Origen, 5250/5420 Arndale and SMDK5420 boards.
+> ---
+>  arch/arm/Kconfig                                |    1 +
+>  arch/arm/boot/dts/exynos4210-universal_c210.dts |   17 ++++++
+>  arch/arm/boot/dts/exynos4210.dtsi               |   18 +++++++
+>  arch/arm/boot/dts/exynos4x12.dtsi               |   18 +++++++
+>  arch/arm/boot/dts/exynos5250.dtsi               |   18 +++++++
+>  arch/arm/boot/dts/exynos5420.dtsi               |   18 +++++++
+>  arch/arm/mach-exynos/common.h                   |    1 +
+>  arch/arm/mach-exynos/exynos.c                   |   64
+> ----------------------- arch/arm/mach-exynos/firmware.c                 |  
+>  5 +-
+>  arch/arm/mach-exynos/include/mach/map.h         |    7 ---
+>  arch/arm/mach-exynos/platsmp.c                  |   39 +++++++++++++-
+>  11 files changed, 133 insertions(+), 73 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index a6aaaad19b1a..f66ea9453df9 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -855,6 +855,7 @@ config ARCH_EXYNOS
+>  	select S5P_DEV_MFC
+>  	select SAMSUNG_DMADEV
+>  	select SPARSE_IRQ
+> +	select SRAM
+>  	select USE_OF
+>  	help
+>  	  Support for SAMSUNG's EXYNOS SoCs (EXYNOS4/5)
+> diff --git a/arch/arm/boot/dts/exynos4210-universal_c210.dts
+> b/arch/arm/boot/dts/exynos4210-universal_c210.dts index
+> 63e34b24b04f..8d4de5c0d0c7 100644
+> --- a/arch/arm/boot/dts/exynos4210-universal_c210.dts
+> +++ b/arch/arm/boot/dts/exynos4210-universal_c210.dts
+> @@ -28,6 +28,23 @@
+>  		bootargs = "console=ttySAC2,115200N8 root=/dev/mmcblk0p5 rw rootwait
+> earlyprintk panic=5 maxcpus=1"; };
+> 
+> +	sram at 02020000 {
+> +		status = "disabled";
+> +	};
+> +
+> +	sram at 02025000 {
+> +		compatible = "mmio-sram";
+> +		reg = <0x02025000 0x1000>;
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges = <0 0x02025000 0x1000>;
+> +
+> +		smp-sram at 0 {
+> +			compatible = "samsung,exynos4210-sram";
+> +			reg = <0x0 0x1000>;
+> +		};
+> +	};
+
+exynos_smp_prepare_sram returns -ENODEV if it can't find
+samsung,exynos4210-sram-ns, so are you sure your universal_c210 will run 
+without it? I didn't dig to deep into this, so it can also simply be something 
+I overlooked :-)
+
+
+Heiko
