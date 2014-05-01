@@ -1,69 +1,89 @@
-From: loeliger@gmail.com (Jon Loeliger)
-Date: Thu, 1 May 2014 11:18:45 -0500
-Subject: [PATCH 51/97] ARM: l2c: remove platforms/SoCs setting early BRESP
-In-Reply-To: <20140501151236.078E3C409DA@trevor.secretlab.ca>
-References: <20140428192419.GV26756@n2100.arm.linux.org.uk>
- <E1WerG4-0001X4-Ic@rmk-PC.arm.linux.org.uk>
- <20140429000224.GA31083@verge.net.au>
- <20140429002140.GP27282@n2100.arm.linux.org.uk>
- <20140501151236.078E3C409DA@trevor.secretlab.ca>
-Message-ID: <CAJgR-BiGjp9G=E7SzgidyVLTjpQ3ETFTFwxDapVc28PyokGa=g@mail.gmail.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Thu, 1 May 2014 17:20:29 +0100
+Subject: [PATCH] arm64: mm: Create gigabyte kernel logical mappings where
+ possible
+In-Reply-To: <4594528.Vh64ixABlG@wuerfel>
+References: <1398857782-1525-1-git-send-email-steve.capper@linaro.org>
+ <4217068.6LErVYxoHJ@wuerfel> <20140501085411.GA31607@linaro.org>
+ <4594528.Vh64ixABlG@wuerfel>
+Message-ID: <20140501162028.GA11201@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Thu, May 01, 2014 at 03:36:05PM +0200, Arnd Bergmann wrote:
+> On Thursday 01 May 2014 09:54:12 Steve Capper wrote:
+> > On Wed, Apr 30, 2014 at 08:11:26PM +0200, Arnd Bergmann wrote:
+> > > On Wednesday 30 April 2014 12:36:22 Steve Capper wrote:
+> > > > We have the capability to map 1GB level 1 blocks when using a 4K
+> > > > granule.
+> > > > 
+> > > > This patch adjusts the create_mapping logic s.t. when mapping physical
+> > > > memory on boot, we attempt to use a 1GB block if both the VA and PA
+> > > > start and end are 1GB aligned. This both reduces the levels of lookup
+> > > > required to resolve a kernel logical address, as well as reduces TLB
+> > > > pressure on cores that support 1GB TLB entries.
+> > > > 
+> > > > Signed-off-by: Steve Capper <steve.capper@linaro.org>
+> > > > ---
+> > > > Hello,
+> > > > This patch has been tested on the FastModel for 4K and 64K pages.
+> > > > Also, this has been tested with Jungseok's 4 level patch.
+> > > > 
+> > > > I put in the explicit check for PAGE_SHIFT, as I am anticipating a
+> > > > three level 64KB configuration at some point.
+> > > > 
+> > > > With two level 64K, a PUD is equivalent to a PMD which is equivalent to
+> > > > a PGD, and these are all level 2 descriptors.
+> > > > 
+> > > > Under three level 64K, a PUD would be equivalent to a PGD which would
+> > > > be a level 1 descriptor thus may not be a block.
+> > > > 
+> > > > Comments/critique/testers welcome.
+> > > 
+> > > It seems like a great idea. I have to admit that I don't understand
+> > > the existing code, but what are the page sizes used here?
+> > 
+> > Actually, I think it was your idea ;-). I remember you talking about
+> > increasing the mapping size when 4-level page tables were being
+> > discussed. (I think I should have added a Reported-by, would be happy
+> > to if you want?).
+> 
+> I completely forgot we had talked about this.
+> 
+> > With a 64KB granule, we'll map 512MB blocks if possible, otherwise 64K.
+> > And with a 4KB granule, the original code will map 2MB blocks if
+> > possible, and 4KB otherwise.
+> > 
+> > The patch will make the 4KB granule case also map 1GB blocks if
+> > possible.
+> 
+> Ok.
+> 
+> > > In combination with the contiguous page hint, we should be able
+> > > to theoretically support 4KB/64KB/2M/32M/1G/16G TLBs in any
+> > > combination for boot-time mappings on a 4K page size kernel,
+> > > or 64KB/1M/512M/8G on a 64KB page size kernel.
+> > 
+> > A contiguous hint could be applied to these mappings. The logic would
+> > be a bit more complicated though when we consider different granules.
+> > For 4KB we chain together 16 entries, for 64KB we use 32. If/when we
+> > adopt a 16KB granule, we use 32 entries for a level 2 lookup and
+> > 128 entries for a level 3 lookup...
+> > 
+> > The largest TLB entry sizes that I am aware of in play are the block
+> > sizes (i.e. 2MB, 512MB, 1GB). So I don't think we'll get any benefit at
+> > the moment for adding the contiguous logic.
+> 
+> Is that an architecture limit, or specific to the Cortex-A53/A57
+> implementations?
 
-I emphatically second Grant's opinion here:
-This is a good patch series and is a much-needed improvement.
+Those are the TLBs that are documented for the Cortex-A53 and
+Cortex-A57. I have an idea of what the architectural limit is, but I
+will need to seek confirmation on it.
 
-I am in the middle of a board-port for an A9 system, and this
-series will greatly simplify things for me *despite* the fact that
-I will need to convert to the new write_sec() form of L2C control
-on PSCI-enabled non-secure platforms.
+Cheers,
+-- 
+Steve 
 
-To reiterate Grant's request, please re-consider applying
-this L2C patch series!
-
-Thank you,
-jdl
-
-
-On Thu, May 1, 2014 at 10:12 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Tue, 29 Apr 2014 01:21:41 +0100, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
->> On Tue, Apr 29, 2014 at 09:02:27AM +0900, Simon Horman wrote:
->> > On Mon, Apr 28, 2014 at 08:30:32PM +0100, Russell King wrote:
->> > > Since we now automatically enable early BRESP in core L2C-310 code when
->> > > we detect a Cortex-A9, we don't need platforms/SoCs to set this bit
->> > > explicitly.  Instead, they should seek to preserve the value of bit 30
->> > > in the auxiliary control register.
->> > >
->> > > Acked-by: Tony Lindgren <tony@atomide.com>
->> > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
->> >
->> > I would prefer if this patch was broken out into individual patches
->> > for each board or SoC file and that they were then picked up
->> > by their respective platform maintainers.
->> >
->> > Likewise for patch 66/97. Although it is only for shmobile
->> > I would prefer it broken out.
->>
->> Oh fuck that.
->>
->> Okay, I'm dropping the whole patch set right now and forgetting the whole
->> damned thing.  The L2 cache code can damned well stay as it is and remain
->> an unmaintainable mess.
->
-> FWIW, there are an awful lot of people, myself included, who do care
-> that you've done this work. It is 100% okay for you to say "no" to
-> requests to split things up because of the complexity of the series.
->
-> I really hope you're reconsider and not give up on this series.
->
-> g.
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> 	Arnd
