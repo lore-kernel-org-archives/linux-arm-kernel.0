@@ -1,80 +1,61 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  1 May 2014 17:49:32 +0200
-Subject: [PATCH resend 00/15] arm64 crypto roundup
-Message-ID: <1398959381-8126-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Thu,  1 May 2014 17:49:33 +0200
+Subject: [PATCH resend 01/15] asm-generic: allow generic unaligned access if
+ the arch supports it
+In-Reply-To: <1398959381-8126-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1398959381-8126-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1398959381-8126-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a repost of the arm64 crypto patches that I have posted to the LAKML
-over the past months. They have now been verified on actual hardware
-(Cortex-A57) so if there are no remaining issues I would like to propose them
-for 3.16.
+Switch the default unaligned access method to 'hardware implemented'
+if HAVE_EFFICIENT_UNALIGNED_ACCESS is set.
 
-Ard Biesheuvel (15):
-  asm-generic: allow generic unaligned access if the arch supports it
-  arm64: add abstractions for FPSIMD state manipulation
-  arm64: defer reloading a task's FPSIMD state to userland resume
-  arm64: add support for kernel mode NEON in interrupt context
-  arm64/crypto: SHA-1 using ARMv8 Crypto Extensions
-  arm64/crypto: SHA-224/SHA-256 using ARMv8 Crypto Extensions
-  arm64/crypto: GHASH secure hash using ARMv8 Crypto Extensions
-  arm64/crypto: AES using ARMv8 Crypto Extensions
-  arm64/crypto: AES in CCM mode using ARMv8 Crypto Extensions
-  arm64: pull in <asm/simd.h> from asm-generic
-  arm64/crypto: AES-ECB/CBC/CTR/XTS using ARMv8 NEON and Crypto
-    Extensions
-  arm64/crypto: add shared macro to test for NEED_RESCHED
-  arm64/crypto: add voluntary preemption to Crypto Extensions SHA1
-  arm64/crypto: add voluntary preemption to Crypto Extensions SHA2
-  arm64/crypto: add voluntary preemption to Crypto Extensions GHASH
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+---
+ include/asm-generic/unaligned.h | 21 +++++++++++++--------
+ 1 file changed, 13 insertions(+), 8 deletions(-)
 
- arch/arm64/Kconfig                    |   3 +
- arch/arm64/Makefile                   |   1 +
- arch/arm64/crypto/Kconfig             |  53 ++++
- arch/arm64/crypto/Makefile            |  38 +++
- arch/arm64/crypto/aes-ce-ccm-core.S   | 222 ++++++++++++++
- arch/arm64/crypto/aes-ce-ccm-glue.c   | 297 ++++++++++++++++++
- arch/arm64/crypto/aes-ce-cipher.c     | 155 ++++++++++
- arch/arm64/crypto/aes-ce.S            | 147 +++++++++
- arch/arm64/crypto/aes-glue.c          | 446 +++++++++++++++++++++++++++
- arch/arm64/crypto/aes-modes.S         | 548 ++++++++++++++++++++++++++++++++++
- arch/arm64/crypto/aes-neon.S          | 382 ++++++++++++++++++++++++
- arch/arm64/crypto/ghash-ce-core.S     |  97 ++++++
- arch/arm64/crypto/ghash-ce-glue.c     | 172 +++++++++++
- arch/arm64/crypto/sha1-ce-core.S      | 154 ++++++++++
- arch/arm64/crypto/sha1-ce-glue.c      | 201 +++++++++++++
- arch/arm64/crypto/sha2-ce-core.S      | 159 ++++++++++
- arch/arm64/crypto/sha2-ce-glue.c      | 281 +++++++++++++++++
- arch/arm64/include/asm/Kbuild         |   1 +
- arch/arm64/include/asm/assembler.h    |  21 ++
- arch/arm64/include/asm/fpsimd.h       |  23 ++
- arch/arm64/include/asm/fpsimdmacros.h |  35 +++
- arch/arm64/include/asm/neon.h         |   6 +-
- arch/arm64/include/asm/thread_info.h  |   4 +-
- arch/arm64/kernel/entry-fpsimd.S      |  24 ++
- arch/arm64/kernel/entry.S             |   2 +-
- arch/arm64/kernel/fpsimd.c            | 187 ++++++++++--
- arch/arm64/kernel/process.c           |   2 +-
- arch/arm64/kernel/ptrace.c            |   2 +
- arch/arm64/kernel/signal.c            |  13 +-
- arch/arm64/kernel/signal32.c          |   9 +-
- include/asm-generic/unaligned.h       |  21 +-
- 31 files changed, 3662 insertions(+), 44 deletions(-)
- create mode 100644 arch/arm64/crypto/Kconfig
- create mode 100644 arch/arm64/crypto/Makefile
- create mode 100644 arch/arm64/crypto/aes-ce-ccm-core.S
- create mode 100644 arch/arm64/crypto/aes-ce-ccm-glue.c
- create mode 100644 arch/arm64/crypto/aes-ce-cipher.c
- create mode 100644 arch/arm64/crypto/aes-ce.S
- create mode 100644 arch/arm64/crypto/aes-glue.c
- create mode 100644 arch/arm64/crypto/aes-modes.S
- create mode 100644 arch/arm64/crypto/aes-neon.S
- create mode 100644 arch/arm64/crypto/ghash-ce-core.S
- create mode 100644 arch/arm64/crypto/ghash-ce-glue.c
- create mode 100644 arch/arm64/crypto/sha1-ce-core.S
- create mode 100644 arch/arm64/crypto/sha1-ce-glue.c
- create mode 100644 arch/arm64/crypto/sha2-ce-core.S
- create mode 100644 arch/arm64/crypto/sha2-ce-glue.c
-
+diff --git a/include/asm-generic/unaligned.h b/include/asm-generic/unaligned.h
+index 03cf5936bad6..1ac097279db1 100644
+--- a/include/asm-generic/unaligned.h
++++ b/include/asm-generic/unaligned.h
+@@ -4,22 +4,27 @@
+ /*
+  * This is the most generic implementation of unaligned accesses
+  * and should work almost anywhere.
+- *
+- * If an architecture can handle unaligned accesses in hardware,
+- * it may want to use the linux/unaligned/access_ok.h implementation
+- * instead.
+  */
+ #include <asm/byteorder.h>
+ 
++/* Set by the arch if it can handle unaligned accesses in hardware. */
++#ifdef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
++# include <linux/unaligned/access_ok.h>
++#endif
++
+ #if defined(__LITTLE_ENDIAN)
+-# include <linux/unaligned/le_struct.h>
+-# include <linux/unaligned/be_byteshift.h>
++# ifndef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
++#  include <linux/unaligned/le_struct.h>
++#  include <linux/unaligned/be_byteshift.h>
++# endif
+ # include <linux/unaligned/generic.h>
+ # define get_unaligned	__get_unaligned_le
+ # define put_unaligned	__put_unaligned_le
+ #elif defined(__BIG_ENDIAN)
+-# include <linux/unaligned/be_struct.h>
+-# include <linux/unaligned/le_byteshift.h>
++# ifndef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
++#  include <linux/unaligned/be_struct.h>
++#  include <linux/unaligned/le_byteshift.h>
++# endif
+ # include <linux/unaligned/generic.h>
+ # define get_unaligned	__get_unaligned_be
+ # define put_unaligned	__put_unaligned_be
 -- 
 1.8.3.2
