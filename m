@@ -1,16 +1,17 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 01 May 2014 11:58:40 -0700
-Subject: [PATCH v2] mfd: vexpress: Convert custom func API to regmap
-In-Reply-To: <1398873686-8618-1-git-send-email-pawel.moll@arm.com>
-References: <1398707877-22596-3-git-send-email-pawel.moll@arm.com>
- <1398873686-8618-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <20140501185840.5739.2000@quantum>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 01 May 2014 13:06:17 -0600
+Subject: [PATCH v3 7/7] ARM: tegra: Add the EC i2c tunnel to
+ tegra124-venice2
+In-Reply-To: <1398879850-9111-8-git-send-email-dianders@chromium.org>
+References: <1398879850-9111-1-git-send-email-dianders@chromium.org>
+ <1398879850-9111-8-git-send-email-dianders@chromium.org>
+Message-ID: <53629B29.3050702@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Pawel Moll (2014-04-30 09:01:26)
-> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-> Acked-by: Mark Brown <broonie@linaro.org>
-> Acked-by: Lee Jones <lee.jones@linaro.org>
+On 04/30/2014 11:44 AM, Doug Anderson wrote:
+> This adds the EC i2c tunnel (and devices under it) to the
+> tegra124-venice2 device tree.
 
-Acked-by: Mike Turquette <mturquette@linaro.org>
+I'll happily take this into the Tegra tree once the patch containing the
+binding it uses is applied.
