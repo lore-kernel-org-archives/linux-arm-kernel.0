@@ -1,88 +1,152 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 30 Apr 2014 23:26:43 -0700
-Subject: [PATCH v2 08/12] ARM: marvell: add MTD_SPI_NOR (new dependency for
- M25P80)
-In-Reply-To: <1398925607-7482-1-git-send-email-computersforpeace@gmail.com>
-References: <1398925607-7482-1-git-send-email-computersforpeace@gmail.com>
-Message-ID: <1398925607-7482-9-git-send-email-computersforpeace@gmail.com>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Wed, 30 Apr 2014 23:32:30 -0700
+Subject: [PATCH 1/2] ARM: dts: imx: add LVDS backlight for Ventana
+In-Reply-To: <20140429060106.GG16451@dragon>
+References: <20140429060106.GG16451@dragon>
+Message-ID: <1398925950-26081-1-git-send-email-tharvey@gateworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These defconfigs contain the CONFIG_M25P80 symbol, which is now
-dependent on the MTD_SPI_NOR symbol. Add CONFIG_MTD_SPI_NOR to satisfy
-the new dependency.
+The GW54xx/GW53xx/GW52xx all support LVDS with a PWM controlled backlight.
 
-At the same time, drop the now-nonexistent CONFIG_MTD_CHAR symbol.
-
-Signed-off-by: Brian Norris <computersforpeace@gmail.com>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Acked-by: Jason Cooper <jason@lakedaemon.net>
+Signed-off-by: Tim Harvey <tharvey@gateworks.com>
 ---
- arch/arm/configs/dove_defconfig     | 2 +-
- arch/arm/configs/kirkwood_defconfig | 1 +
- arch/arm/configs/mvebu_v5_defconfig | 1 +
- arch/arm/configs/mvebu_v7_defconfig | 1 +
- 4 files changed, 4 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/imx6qdl-gw52xx.dtsi | 19 +++++++++++++++++++
+ arch/arm/boot/dts/imx6qdl-gw53xx.dtsi | 19 +++++++++++++++++++
+ arch/arm/boot/dts/imx6qdl-gw54xx.dtsi | 19 +++++++++++++++++++
+ 3 files changed, 57 insertions(+)
 
-diff --git a/arch/arm/configs/dove_defconfig b/arch/arm/configs/dove_defconfig
-index f15955144175..701677f9248c 100644
---- a/arch/arm/configs/dove_defconfig
-+++ b/arch/arm/configs/dove_defconfig
-@@ -37,7 +37,6 @@ CONFIG_DEVTMPFS=y
- CONFIG_DEVTMPFS_MOUNT=y
- CONFIG_MTD=y
- CONFIG_MTD_CMDLINE_PARTS=y
--CONFIG_MTD_CHAR=y
- CONFIG_MTD_BLOCK=y
- CONFIG_MTD_CFI=y
- CONFIG_MTD_JEDECPROBE=y
-@@ -48,6 +47,7 @@ CONFIG_MTD_CFI_INTELEXT=y
- CONFIG_MTD_CFI_STAA=y
- CONFIG_MTD_PHYSMAP=y
- CONFIG_MTD_M25P80=y
-+CONFIG_MTD_SPI_NOR=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_COUNT=1
-diff --git a/arch/arm/configs/kirkwood_defconfig b/arch/arm/configs/kirkwood_defconfig
-index 2e762d94e94b..b9e480c10b10 100644
---- a/arch/arm/configs/kirkwood_defconfig
-+++ b/arch/arm/configs/kirkwood_defconfig
-@@ -61,6 +61,7 @@ CONFIG_MTD_PHYSMAP=y
- CONFIG_MTD_M25P80=y
- CONFIG_MTD_NAND=y
- CONFIG_MTD_NAND_ORION=y
-+CONFIG_MTD_SPI_NOR=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_EEPROM_AT24=y
- # CONFIG_SCSI_PROC_FS is not set
-diff --git a/arch/arm/configs/mvebu_v5_defconfig b/arch/arm/configs/mvebu_v5_defconfig
-index 36484a37a1ca..85d20666cef5 100644
---- a/arch/arm/configs/mvebu_v5_defconfig
-+++ b/arch/arm/configs/mvebu_v5_defconfig
-@@ -50,6 +50,7 @@ CONFIG_MTD_PHYSMAP=y
- CONFIG_MTD_M25P80=y
- CONFIG_MTD_NAND=y
- CONFIG_MTD_NAND_ORION=y
-+CONFIG_MTD_SPI_NOR=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_EEPROM_AT24=y
- # CONFIG_SCSI_PROC_FS is not set
-diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
-index a34713d8db9f..ae45bf05fa00 100644
---- a/arch/arm/configs/mvebu_v7_defconfig
-+++ b/arch/arm/configs/mvebu_v7_defconfig
-@@ -53,6 +53,7 @@ CONFIG_I2C_MV64XXX=y
- CONFIG_MTD=y
- CONFIG_MTD_CHAR=y
- CONFIG_MTD_M25P80=y
-+CONFIG_MTD_SPI_NOR=y
- CONFIG_MTD_CFI=y
- CONFIG_MTD_CFI_INTELEXT=y
- CONFIG_MTD_CFI_AMDSTD=y
+diff --git a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
+index 1022197..62f533a 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
+@@ -27,6 +27,13 @@
+ 		bootargs = "console=ttymxc1,115200";
+ 	};
+ 
++	backlight {
++		compatible = "pwm-backlight";
++		pwms = <&pwm4 0 5000000>;
++		brightness-levels = <0 4 8 16 32 64 128 255>;
++		default-brightness-level = <7>;
++	};
++
+ 	leds {
+ 		compatible = "gpio-leds";
+ 
+@@ -399,6 +406,12 @@
+ 			>;
+ 		};
+ 
++		pinctrl_pwm4: pwm4grp {
++			fsl,pins = <
++				MX6QDL_PAD_SD1_CMD__PWM4_OUT		0x1b0b1
++			>;
++		};
++
+ 		pinctrl_uart1: uart1grp {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_SD3_DAT7__UART1_TX_DATA	0x1b0b1
+@@ -448,6 +461,12 @@
+ 	status = "okay";
+ };
+ 
++&pwm4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm4>;
++	status = "okay";
++};
++
+ &ssi1 {
+ 	fsl,mode = "i2s-slave";
+ 	status = "okay";
+diff --git a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
+index ef7bd99..c2284c8 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
+@@ -30,6 +30,13 @@
+ 		bootargs = "console=ttymxc1,115200";
+ 	};
+ 
++	backlight {
++		compatible = "pwm-backlight";
++		pwms = <&pwm4 0 5000000>;
++		brightness-levels = <0 4 8 16 32 64 128 255>;
++		default-brightness-level = <7>;
++	};
++
+ 	leds {
+ 		compatible = "gpio-leds";
+ 
+@@ -439,6 +446,12 @@
+ 			>;
+ 		};
+ 
++		pinctrl_pwm4: pwm4grp {
++			fsl,pins = <
++				MX6QDL_PAD_SD1_CMD__PWM4_OUT		0x1b0b1
++			>;
++		};
++
+ 		pinctrl_uart1: uart1grp {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_SD3_DAT7__UART1_TX_DATA	0x1b0b1
+@@ -513,6 +526,12 @@
+ 	};
+ };
+ 
++&pwm4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm4>;
++	status = "okay";
++};
++
+ &ssi1 {
+ 	fsl,mode = "i2s-slave";
+ 	status = "okay";
+diff --git a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
+index 4ce8f68..9aa95c8 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
+@@ -30,6 +30,13 @@
+ 		bootargs = "console=ttymxc1,115200";
+ 	};
+ 
++	backlight {
++		compatible = "pwm-backlight";
++		pwms = <&pwm4 0 5000000>;
++		brightness-levels = <0 4 8 16 32 64 128 255>;
++		default-brightness-level = <7>;
++	};
++
+ 	leds {
+ 		compatible = "gpio-leds";
+ 
+@@ -461,6 +468,12 @@
+ 			>;
+ 		};
+ 
++		pinctrl_pwm4: pwm4grp {
++			fsl,pins = <
++				MX6QDL_PAD_SD1_CMD__PWM4_OUT		0x1b0b1
++			>;
++		};
++
+ 		pinctrl_uart1: uart1grp {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_SD3_DAT7__UART1_TX_DATA	0x1b0b1
+@@ -535,6 +548,12 @@
+ 	};
+ };
+ 
++&pwm4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm4>;
++	status = "okay";
++};
++
+ &ssi1 {
+ 	fsl,mode = "i2s-slave";
+ 	status = "okay";
 -- 
 1.8.3.2
