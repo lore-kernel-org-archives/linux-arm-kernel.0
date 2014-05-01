@@ -1,34 +1,91 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 30 Apr 2014 15:33:39 -0700
-Subject: [PATCH v2] mtd: davinci-nand: disable subpage write for
- keystone-nand
-In-Reply-To: <535E5AF5.2020203@ti.com>
-References: <1395346112-13350-1-git-send-email-ivan.khoronzhuk@ti.com>
- <532B4C36.8060405@ti.com> <5343F0D6.2010804@ti.com>
- <20140416070833.GA5512@norris-Latitude-E6410>
- <534E51BF.9050508@ti.com> <535E5AF5.2020203@ti.com>
-Message-ID: <20140430223339.GF2497@norris-Latitude-E6410>
+From: s-anna@ti.com (Suman Anna)
+Date: Wed, 30 Apr 2014 19:34:22 -0500
+Subject: [PATCHv5 01/15] Documentation: dt: add common bindings for hwspinlock
+In-Reply-To: <1398904476-26200-1-git-send-email-s-anna@ti.com>
+References: <1398904476-26200-1-git-send-email-s-anna@ti.com>
+Message-ID: <1398904476-26200-2-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 09:43:17AM -0400, Santosh Shilimkar wrote:
-> On Wednesday 16 April 2014 05:47 AM, Ivan Khoronzhuk wrote:
-> > On 04/16/2014 10:08 AM, Brian Norris wrote:
-> >> On Tue, Apr 08, 2014 at 03:51:34PM +0300, Ivan Khoronzhuk wrote:
-> >>> Could you pick up subj patch?
-> >> Pushed to l2-mtd.git. Is it critical this goes in for 3.15? It's
-> >> currently queued for -next (3.16).
-> >>
-> 
-> [..]
-> 
-> > 
-> > This is a critical fix and it should be for 3.15.
-> Ping. 3.15-rc3 is already out and I still see this fix merged
-> yet.
+This patch adds the generic common bindings used to represent
+a hwlock device and use/request locks in a device-tree build.
 
-OK, cherry-picked to linux-mtd.git with the intention of sending to
-Linus soon.
+All the platform-specific hwlock driver implementations need the
+number of locks and associated base id for registering the locks
+present within the device with the driver core. The number of locks
+is represented by 'hwlock-num-locks' property in DT bindings. A
+property for base id is not needed in DT binding, as it can be
+satisfied using a phandle + args specifier. The args specifier
+length is dependent on each vendor-specific implementation and
+is represented through the '#hwlock-cells' property.
 
-Regards,
-Brian
+Note that the document is named hwlock.txt deliberately to keep it
+a bit more generic.
+
+Cc: Rob Herring <robh+dt@kernel.org>
+Signed-off-by: Suman Anna <s-anna@ti.com>
+---
+ .../devicetree/bindings/hwlock/hwlock.txt          | 52 ++++++++++++++++++++++
+ 1 file changed, 52 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/hwlock/hwlock.txt
+
+diff --git a/Documentation/devicetree/bindings/hwlock/hwlock.txt b/Documentation/devicetree/bindings/hwlock/hwlock.txt
+new file mode 100644
+index 0000000..32381cc
+--- /dev/null
++++ b/Documentation/devicetree/bindings/hwlock/hwlock.txt
+@@ -0,0 +1,52 @@
++Generic hwlock bindings
++=======================
++
++Generic bindings that are common to all the hwlock platform specific driver
++implementations, the retrieved values are used for registering the device
++specific parameters with the hwspinlock core.
++
++The validity and need of these common properties may vary from one platform
++implementation to another. The platform specific bindings should explicitly
++state if a property is mandatory or optional. Please look through the
++individual platform specific hwlock binding documentations for identifying
++the applicable properties.
++
++Common properties:
++- #hwlock-cells:	Specifies the number of cells needed to represent a
++			specific lock.
++- hwlock-num-locks:	Number of locks present in a hwlock device. This
++			property is needed on hwlock devices, where the number
++			of supported locks within a hwlock device cannot be
++			read from a register.
++
++Hwlock Users:
++=============
++
++Nodes that require specific hwlock(s) should specify them using one or more
++properties, each containing a phandle to the hwlock node and an args specifier
++value as indicated by #hwlock-cells. Multiple hwlocks can be requested using
++an array of the phandle and hwlock number specifier tuple.
++
++1. Example of a node using a single specific hwlock:
++
++The following example has a node requesting a hwlock in the bank defined by
++the node hwlock1. hwlock1 is a hwlock provider with an argument specifier
++of length 1.
++
++	node {
++		...
++		hwlocks = <&hwlock1 2>;
++		...
++	};
++
++2. Example of a node using multiple specific hwlocks:
++
++The following example has a node requesting two hwlocks, a hwlock within
++the hwlock device node 'hwlock1' with #hwlock-cells value of 1, and another
++hwlock within the hwlock device node 'hwlock2' with #hwlock-cells value of 2.
++
++	node {
++		...
++		hwlocks = <&hwlock1 2>, <&hwlock2 0 3>;
++		...
++	};
+-- 
+1.9.2
