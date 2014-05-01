@@ -1,89 +1,101 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Thu, 1 May 2014 17:20:29 +0100
-Subject: [PATCH] arm64: mm: Create gigabyte kernel logical mappings where
- possible
-In-Reply-To: <4594528.Vh64ixABlG@wuerfel>
-References: <1398857782-1525-1-git-send-email-steve.capper@linaro.org>
- <4217068.6LErVYxoHJ@wuerfel> <20140501085411.GA31607@linaro.org>
- <4594528.Vh64ixABlG@wuerfel>
-Message-ID: <20140501162028.GA11201@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 01 May 2014 17:24:31 +0100
+Subject: [PATCH v12 11/31] documentation: iommu: add binding document
+ of Exynos System MMU
+In-Reply-To: <4916028.thxt7fH2bg@wuerfel>
+References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
+ <20140501143654.GB3732@e103592.cambridge.arm.com> <53626434.8000807@arm.com>
+ <4916028.thxt7fH2bg@wuerfel>
+Message-ID: <5362753F.4030904@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 01, 2014 at 03:36:05PM +0200, Arnd Bergmann wrote:
-> On Thursday 01 May 2014 09:54:12 Steve Capper wrote:
-> > On Wed, Apr 30, 2014 at 08:11:26PM +0200, Arnd Bergmann wrote:
-> > > On Wednesday 30 April 2014 12:36:22 Steve Capper wrote:
-> > > > We have the capability to map 1GB level 1 blocks when using a 4K
-> > > > granule.
-> > > > 
-> > > > This patch adjusts the create_mapping logic s.t. when mapping physical
-> > > > memory on boot, we attempt to use a 1GB block if both the VA and PA
-> > > > start and end are 1GB aligned. This both reduces the levels of lookup
-> > > > required to resolve a kernel logical address, as well as reduces TLB
-> > > > pressure on cores that support 1GB TLB entries.
-> > > > 
-> > > > Signed-off-by: Steve Capper <steve.capper@linaro.org>
-> > > > ---
-> > > > Hello,
-> > > > This patch has been tested on the FastModel for 4K and 64K pages.
-> > > > Also, this has been tested with Jungseok's 4 level patch.
-> > > > 
-> > > > I put in the explicit check for PAGE_SHIFT, as I am anticipating a
-> > > > three level 64KB configuration at some point.
-> > > > 
-> > > > With two level 64K, a PUD is equivalent to a PMD which is equivalent to
-> > > > a PGD, and these are all level 2 descriptors.
-> > > > 
-> > > > Under three level 64K, a PUD would be equivalent to a PGD which would
-> > > > be a level 1 descriptor thus may not be a block.
-> > > > 
-> > > > Comments/critique/testers welcome.
-> > > 
-> > > It seems like a great idea. I have to admit that I don't understand
-> > > the existing code, but what are the page sizes used here?
-> > 
-> > Actually, I think it was your idea ;-). I remember you talking about
-> > increasing the mapping size when 4-level page tables were being
-> > discussed. (I think I should have added a Reported-by, would be happy
-> > to if you want?).
+On 01/05/14 16:53, Arnd Bergmann wrote:
+> On Thursday 01 May 2014 16:11:48 Marc Zyngier wrote:
+>> On 01/05/14 15:36, Dave Martin wrote:
+>>> On Thu, May 01, 2014 at 02:29:50PM +0100, Arnd Bergmann wrote:
+>>>> On Thursday 01 May 2014 12:15:35 Dave Martin wrote:
+>>>>> On Tue, Apr 29, 2014 at 10:46:18PM +0200, Arnd Bergmann wrote:
+>>>>>> I don't understand. An MSI controller is just an address that acts
+>>>>>> as a DMA slave for a 4-byte inbound data packet. It has no way of
+>>>>>> knowing who is sending data, other than by the address or the data
+>>>>>> sent to it. Are you talking of something else?
+>>>>>
+>>>>> Oops, looks like there are a few points I failed to respond to here...
+>>>>>
+>>>>>
+>>>>> I'm not an expert on PCI -- I'm prepared to believe it works that way.
+>>>>>
+>>>>> GICv3 can descriminate between different MSI senders based on ID
+>>>>> signals on the bus.
+>>>>
+>>>> Any idea what this is good for? Do we have to use it? It probably doesn't
+>>>> fit very well into the way Linux handles MSIs today.
+>>>
+>>> Marc may be better placed than me to comment on this in detail.
+>>
+>> As to "fitting Linux", it seems to match what Linux does fairly well
+>> (see the kvm-arm64/gicv3 branch in my tree). Not saying that it does it
+>> in a very simple way (far from it, actually), but it works.
 > 
-> I completely forgot we had talked about this.
+> ok.
 > 
-> > With a 64KB granule, we'll map 512MB blocks if possible, otherwise 64K.
-> > And with a 4KB granule, the original code will map 2MB blocks if
-> > possible, and 4KB otherwise.
-> > 
-> > The patch will make the 4KB granule case also map 1GB blocks if
-> > possible.
+>> As to "what it is good for" (and before someone bursts into an Edwin
+>> Starr interpretation), it mostly has to do with isolation, and the fact
+>> that you may want to let the whole MSI programming to a guest (and yet
+>> ensure that the guest cannot generate interrupts that would be assigned
+>> to other devices). This is done by sampling the requester-id at the ITS
+>> level, and use this information to index a per-device interrupt
+>> translation table (I could talk for hours about the concept and its
+>> variations, mostly using expletives and possibly a hammer, but I think
+>> it is the time for my pink pill).
 > 
-> Ok.
+> So the idea is that you want to give the guest unfiltered access to the
+> PCI config space of an assigned device?
 > 
-> > > In combination with the contiguous page hint, we should be able
-> > > to theoretically support 4KB/64KB/2M/32M/1G/16G TLBs in any
-> > > combination for boot-time mappings on a 4K page size kernel,
-> > > or 64KB/1M/512M/8G on a 64KB page size kernel.
-> > 
-> > A contiguous hint could be applied to these mappings. The logic would
-> > be a bit more complicated though when we consider different granules.
-> > For 4KB we chain together 16 entries, for 64KB we use 32. If/when we
-> > adopt a 16KB granule, we use 32 entries for a level 2 lookup and
-> > 128 entries for a level 3 lookup...
-> > 
-> > The largest TLB entry sizes that I am aware of in play are the block
-> > sizes (i.e. 2MB, 512MB, 1GB). So I don't think we'll get any benefit at
-> > the moment for adding the contiguous logic.
+> Is that safe?
 > 
-> Is that an architecture limit, or specific to the Cortex-A53/A57
-> implementations?
+> If the config space access goes through the hypervisor (as I think we
+> always do today), there should be no isse.
 
-Those are the TLBs that are documented for the Cortex-A53 and
-Cortex-A57. I have an idea of what the architectural limit is, but I
-will need to seek confirmation on it.
+My natural tendency would be to filter everything, as we certainly don't
+want the device to be reconfigured in weird and fancy ways (my PCI-foo
+is a bit limited, so bear with me). But as usual, GICv3 is not PCI
+specific, and is designed to cater for weird and wonderful cases, PCI
+being only one possible implementation...
 
-Cheers,
+On a non-PCI system, you definitely could assign a MSI-like capable
+device, and let the guest do its thing. I'm already seeing that kind of
+design.
+
+>>> However, I believe it's correct to say that because the GIC is not part
+>>> of PCI, end-to-end MSI delivery inherently involves a non-PCI step from
+>>> the PCI RC to the GIC itself.
+>>>
+>>> Thus this is likely to be a fundamental requirement for MSIs on ARM SoCs
+>>> using GIC, if we want to have a hope of mapping MSIs to VMs efficiently.
+>>
+>> Indeed. GICv[34] is the ARM way of implementing MSI on SBSA compliant
+>> systems (from level 1 onwards, if memory serves well). People are
+>> actively building systems with this architecture, and relying on it to
+>> provide VM isolation.
+> 
+> I don't mind it being there, but if we don't need it, we shouldn't
+> have to use that isolation feature and be able to just allow any
+> initiator to send an MSI.
+
+It is not that simple. You could design things around a global ITT,
+pointed to by all the possible devices in your system. But that table
+would be quite big (it has to contain the routing information for all
+the possible messages in your system, and must be physically
+contiguous). You still need to know the devices (requester-id,
+device-id, whatever), as there is no wildcard mechanism.
+
+Also, this approach pretty much kills hotplug (you cannot easily resize
+that table to add new interrupt entries). That's why I've opted for a
+more dynamic configuration, where each device gets its own ITT as it
+appears on the system.
+
+	M.
 -- 
-Steve 
-
-> 
-> 	Arnd
+Jazz is not dead. It just smells funny...
