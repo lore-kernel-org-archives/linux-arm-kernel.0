@@ -1,44 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 01 May 2014 16:12:24 +0200
-Subject: [PATCH v12 11/31] documentation: iommu: add binding document of
- Exynos System MMU
-In-Reply-To: <20140501230214.ed53cd0fc977225f37b14e29@samsung.com>
-References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
- <7044616.kdaKNu3Qet@wuerfel>
- <20140501230214.ed53cd0fc977225f37b14e29@samsung.com>
-Message-ID: <5035945.xBiLK9bFYq@wuerfel>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 1 May 2014 10:16:05 -0400
+Subject: [PATCH v2 03/12] ARM: keystone: add MTD_SPI_NOR (new dependency
+ for M25P80)
+In-Reply-To: <1398925607-7482-4-git-send-email-computersforpeace@gmail.com>
+References: <1398925607-7482-1-git-send-email-computersforpeace@gmail.com>
+ <1398925607-7482-4-git-send-email-computersforpeace@gmail.com>
+Message-ID: <53625725.6060401@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 01 May 2014 23:02:14 Cho KyongHo wrote:
-> > 
-> > - device can only do DMA to a limited address range
-> > - DMA is noncoherent and needs manual cache management
-> > - DMA address is at an offset from physical address
-> > - some devices have an IOMMU
-> > - some IOMMUs are shared between devices
-> > - some devices with IOMMU can have multiple simultaneous contexts
-> > - a device may access some memory directly and some other memory through IOMMU
+On Thursday 01 May 2014 02:26 AM, Brian Norris wrote:
+> This defconfig contains the CONFIG_M25P80 symbol, which is now
+> dependent on the MTD_SPI_NOR symbol. Add CONFIG_MTD_SPI_NOR to satisfy
+> the new dependency.
 > 
-> Do we need to consider this case?
-> I don't think a device can have different contexts at the same time.
-> If there such device is in a system, its driver must handle it correctly
-> with different devices descriptors for the different contexts, for example.
-> I mean, if a device has two DMA ports that are in different contexts,
-> they can be treated as different devices which are handed by a driver.
+> Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+I will pick this up for 3.16.
+
+>  arch/arm/configs/keystone_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> I worry that abstracting everything we can think may make the problem harder.
-
-It's the default operation for some of the simpler IOMMUs, see
-arch/x86/kernel/amd_gart_64.c for instance. It's possible that AMD
-will have the same thing in their ARM64 SoCs, but I don't have
-specific information about that.
-
-It can probably be handled in the iommu_map_ops() as a generalization,
-at least if we only have to worry about checking whether a memory address
-is below the dma_mask in order to decide whether to use the IOMMU or not.
-
-Or we can decide not to handle it at all, and always go through the IOMMU,
-which would be slightly slower but still functional.
-
-	Arnd
+> diff --git a/arch/arm/configs/keystone_defconfig b/arch/arm/configs/keystone_defconfig
+> index ec9a41d50680..b3057730689f 100644
+> --- a/arch/arm/configs/keystone_defconfig
+> +++ b/arch/arm/configs/keystone_defconfig
+> @@ -112,6 +112,7 @@ CONFIG_MTD_PLATRAM=y
+>  CONFIG_MTD_M25P80=y
+>  CONFIG_MTD_NAND=y
+>  CONFIG_MTD_NAND_DAVINCI=y
+> +CONFIG_MTD_SPI_NOR=y
+>  CONFIG_MTD_UBI=y
+>  CONFIG_PROC_DEVICETREE=y
+>  CONFIG_BLK_DEV_LOOP=y
+> 
