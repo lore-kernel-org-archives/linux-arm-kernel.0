@@ -1,69 +1,101 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 1 May 2014 16:46:31 +0200
-Subject: [PATCH/RFC 3/4] of/clk: Register clocks suitable for Runtime PM
- with the PM core
-In-Reply-To: <CACxGe6sy-fumkNPRcQqB8G4so85dHW_5pZSv+cQDqzJfoneZ+A@mail.gmail.com>
-References: <1398334403-26181-1-git-send-email-geert+renesas@glider.be>
- <1398334403-26181-4-git-send-email-geert+renesas@glider.be>
- <7hoazpdldx.fsf@paris.lan>
- <20140429131610.29859C4094A@trevor.secretlab.ca>
- <CAMuHMdUdnoah1uZbMn_xONXZ2i8wG5kY7msMzCdBwS+xt9tmDA@mail.gmail.com>
- <20140501080331.D3CFAC409DA@trevor.secretlab.ca>
- <CAMuHMdXbJrnNPyPmD-rcGN-M4ybFtrS3FCuvegJue1Pe-ae8SQ@mail.gmail.com>
- <CACxGe6sy-fumkNPRcQqB8G4so85dHW_5pZSv+cQDqzJfoneZ+A@mail.gmail.com>
-Message-ID: <CAMuHMdVSSZwEn=R_vDPYLWnZoxrdynwJMgKSsbbNZYdvQaYxvg@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 1 May 2014 15:50:03 +0100
+Subject: [PATCH v12 11/31] documentation: iommu: add binding document of
+ Exynos System MMU
+In-Reply-To: <20140501230214.ed53cd0fc977225f37b14e29@samsung.com>
+References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
+ <20140429181601.GE3582@e103592.cambridge.arm.com>
+ <CANEJEGs6TXNzE8cWYgEKfFSsD2w5XiYvwSbhQ_+gtfzfs+6udA@mail.gmail.com>
+ <7044616.kdaKNu3Qet@wuerfel>
+ <20140501230214.ed53cd0fc977225f37b14e29@samsung.com>
+Message-ID: <20140501145003.GC3732@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant,
+On Thu, May 01, 2014 at 11:02:14PM +0900, Cho KyongHo wrote:
+> On Tue, 29 Apr 2014 23:00:29 +0200, Arnd Bergmann wrote:
+> > On Tuesday 29 April 2014 13:07:54 Grant Grundler wrote:
+> > > On Tue, Apr 29, 2014 at 11:16 AM, Dave Martin <Dave.Martin@arm.com> wrote:
+> > > ...
+> > > > An IOMMU is really a specialised bridge
+> > > 
+> > > Is a GART a bridge?
+> > > 
+> > > IOMMUs can provide three basic functions:
+> > > 1) remap address space to reach phys mem ranges that the device is
+> > > otherwise not capable of accessing (classic 32-bit DMA to reach 64-bit
+> > > Phys address)
+> > > 
+> > > 2) implement scatter-gather (page level granularity) so the device
+> > > doesn't have to
+> > > 
+> > > 3) provide some level of system protection against "rogue" DMA by
+> > > forcing everything through a DMA mapping interface and faulting when
+> > > encountering unmapped DMA transactions.
+> > 
+> > [ 4) provide isolation between multiple contexts, typically for purposes
+> >      of virtualization]
+> > 
+> > > I summarize IOMMUs as: "participate in the routing of MMIO
+> > > transactions in the system fabric."
+> > > In this sense, IOMMUs are sort of a bridge. Defining what kind of
+> > > routing they can do (coalesce transactions? remapping MMIO domains?)
+> > > and which address ranges they route would describe most of that
+> > > functionality.
+> > > 
+> > > This "remapping" of MMIO transaction is also usually asymmetric.
+> > > Meaning routing of "downstream" transactions *might* be completely
+> > > different than the routing + remapping of transactions heading
+> > > upstream. DMA mappings services are designed to handle only the
+> > > transactions generated (aka "mastered") by a downstream device.
+> > 
+> > For the purposes of the DT binding, we have a 'ranges' property
+> > that defines the downstream translation (CPU-to-MMIO) and a
+> > 'dma-ranges' property for the opposite address translation
+> > (device-to-memory).
+> > 
+> > > >, so it may be cleaner to describe
+> > > > an IOMMU using a real bus node in the DT, if we also define a way to make
+> > > > master/slave linkages explicit where it matters.
+> > > 
+> > > "where it matters" is a bit vague.  Is the goal to just enable DMA
+> > > mapping services to "do the right thing" for a device that can
+> > > generate DMA?
+> > 
+> > Yes. It's very complicated unfortunately, because we have to be
+> > able to deal with arbitrary combinations of a lot of oddball cases
+> > that can show up in random SoCs:
+> > 
+> > - device can only do DMA to a limited address range
+> > - DMA is noncoherent and needs manual cache management
+> > - DMA address is at an offset from physical address
+> > - some devices have an IOMMU
+> > - some IOMMUs are shared between devices
+> > - some devices with IOMMU can have multiple simultaneous contexts
+> > - a device may access some memory directly and some other memory through IOMMU
+> 
+> Do we need to consider this case?
+> I don't think a device can have different contexts at the same time.
+> If there such device is in a system, its driver must handle it correctly
+> with different devices descriptors for the different contexts, for example.
+> I mean, if a device has two DMA ports that are in different contexts,
+> they can be treated as different devices which are handed by a driver.
 
-On Thu, May 1, 2014 at 3:56 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Thu, May 1, 2014 at 2:41 PM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
->> On Thu, May 1, 2014 at 10:03 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
->>> On Wed, 30 Apr 2014 23:54:37 +0200, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
->>>> On Tue, Apr 29, 2014 at 3:16 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
->>>> > I also don't like that it tries to set up every clock, but there is no
->>>> > guarantee that the driver will even use it. I would rather see this
->>>> > behaviour linked into the function that obtains the clock at driver
->>>> > .probe() time. That way it can handle deferred probe correctly and it
->>>> > only sets up clocks that are actually used by the driver.
->>>>
->>>> Not every clock. Only the clocks that are advertised by the clock driver as
->>>> being suitable for runtime_pm management. These are typically module
->>>> clocks, that must be enabled for the module to work. The driver doesn't
->>>> always want to handle these explicitly.
->>>
->>> Help me out here becasue I don't understand how that works with this
->>> patch set. From my, admittedly naive, reading it looks like the setup is
->>> being done at device creation time, but if the driver (or module) gets
->>> to declare which clocks need to be enabled in order to work, then that
->>> information is not available at device creation time.
->>
->> Setup is indeed done at registration time. Note the check calling
->> clk_may_runtime_pm(), which is introduced in "[PATCH/RFC 1/4] clk: Add
->> CLK_RUNTIME_PM and clk_may_runtime_pm()".
->>
->> Clock drivers are initialized much earlier, so they can set the CLK_RUNTIME_PM
->> flag for suitable clocks before platform devices are created from DT, cfr. the
->> example for shmobile MSTP clocks in "[PATCH/RFC 4/4] clk: shmobile: mstp:
->> Set CLK_RUNTIME_PM flag".
->
-> This is where I have issue. You're *assuming* clock drivers are
-> initialized much earlier. That is not guaranteed. It is perfectly
-> valid for clocks to be set up by a normal device driver, just like for
-> interrupt controllers or gpio controllers.
+GPUs will definitely be capable of acting on behalf of multiple contexts
+at the same time, in a dynamic fashion.  This doesn't necessarily mean
+that it masters through different ports or onto different buses though.
 
-OK, I didn't know that. In that case, nothing happens, and everything
-works like before. So the drivers still have to take care of the
-clocks themselves.
+Sketching out how we would describe this in DT doesn't imply that we
+need Linux to support it.  It's more about asking: if we have to support
+this in the future, how badly will it screw up the current framework?
 
-Gr{oetje,eeting}s,
+> I worry that abstracting everything we can think may make the problem harder.
 
-                        Geert
+That's always a risk, though pain today may be worth it if is saves a
+larger amount of pain in the future.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+As I say on the other branch of this thread, I'll follow up with
+something a bit more concrete to illustrate the kind of thing I mean.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Cheers
+---Dave
