@@ -1,344 +1,789 @@
 From: carlo@caione.org (Carlo Caione)
-Date: Thu,  1 May 2014 14:29:30 +0200
-Subject: [PATCH v5 4/8] input: misc: Add driver for AXP20x Power Enable Key
+Date: Thu,  1 May 2014 14:29:34 +0200
+Subject: [PATCH v5 8/8] ARM: sun7i/sun4i: dt: Add AXP209 support to various
+ boards
 In-Reply-To: <1398947374-3115-1-git-send-email-carlo@caione.org>
 References: <1398947374-3115-1-git-send-email-carlo@caione.org>
-Message-ID: <1398947374-3115-5-git-send-email-carlo@caione.org>
+Message-ID: <1398947374-3115-9-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add support for the Power Enable Key found on MFD AXP202 and
-AXP209. Besides the basic support for the button, the driver adds two
-entries in sysfs to configure the time delay for power on/off.
-
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 Signed-off-by: Carlo Caione <carlo@caione.org>
 ---
- drivers/input/misc/Kconfig      |  11 ++
- drivers/input/misc/Makefile     |   1 +
- drivers/input/misc/axp20x-pek.c | 281 ++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 293 insertions(+)
- create mode 100644 drivers/input/misc/axp20x-pek.c
+ arch/arm/boot/dts/sun4i-a10-a1000.dts           | 58 ++++++++++++++++++++++
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts      | 58 ++++++++++++++++++++++
+ arch/arm/boot/dts/sun4i-a10-hackberry.dts       | 64 ++++++++++++++++++++++++
+ arch/arm/boot/dts/sun4i-a10-inet97fv2.dts       | 58 ++++++++++++++++++++++
+ arch/arm/boot/dts/sun4i-a10-mini-xplus.dts      | 65 +++++++++++++++++++++++++
+ arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts  | 64 ++++++++++++++++++++++++
+ arch/arm/boot/dts/sun4i-a10-pcduino.dts         | 58 ++++++++++++++++++++++
+ arch/arm/boot/dts/sun7i-a20-cubieboard2.dts     | 59 ++++++++++++++++++++++
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts      | 59 ++++++++++++++++++++++
+ arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 59 ++++++++++++++++++++++
+ 10 files changed, 602 insertions(+)
 
-diff --git a/drivers/input/misc/Kconfig b/drivers/input/misc/Kconfig
-index 5928ea7..f4c3177 100644
---- a/drivers/input/misc/Kconfig
-+++ b/drivers/input/misc/Kconfig
-@@ -393,6 +393,17 @@ config INPUT_RETU_PWRBUTTON
- 	  To compile this driver as a module, choose M here. The module will
- 	  be called retu-pwrbutton.
+diff --git a/arch/arm/boot/dts/sun4i-a10-a1000.dts b/arch/arm/boot/dts/sun4i-a10-a1000.dts
+index fa746aea..57d3fb4 100644
+--- a/arch/arm/boot/dts/sun4i-a10-a1000.dts
++++ b/arch/arm/boot/dts/sun4i-a10-a1000.dts
+@@ -88,6 +88,56 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&i2c0_pins_a>;
+ 			status = "okay";
++
++			axp209: pmic at 34 {
++				compatible = "x-powers,axp209";
++				reg = <0x34>;
++				interrupts = <0>;
++
++				interrupt-controller;
++				#interrupt-cells = <1>;
++
++				acin-supply = <&reg_axp_ipsout>;
++				vin2-supply = <&reg_axp_ipsout>;
++				vin3-supply = <&reg_axp_ipsout>;
++				ldo24in-supply = <&reg_axp_ipsout>;
++				ldo3in-supply = <&reg_axp_ipsout>;
++				ldo5in-supply = <&reg_axp_ipsout>;
++
++				regulators {
++					x-powers,dcdc-freq = <1500>;
++
++					axp_vcore_reg: dcdc2 {
++						regulator-min-microvolt = <700000>;
++						regulator-max-microvolt = <2275000>;
++						regulator-always-on;
++					};
++
++					axp_ddr_reg: dcdc3 {
++						regulator-always-on;
++					};
++
++					axp_rtc_reg: ldo1 {
++						regulator-always-on;
++					};
++
++					axp_analog_reg: ldo2 {
++						regulator-always-on;
++					};
++
++					axp_pll_reg: ldo3 {
++						regulator-always-on;
++					};
++
++					axp_hdmi_reg: ldo4 {
++						regulator-always-on;
++					};
++
++					axp_mic_reg: ldo5 {
++						regulator-always-on;
++					};
++				};
++			};
+ 		};
+ 	};
  
-+config INPUT_AXP20X_PEK
-+	tristate "X-Powers AXP20X power button driver"
-+	depends on MFD_AXP20X
-+	help
-+	  Say Y here if you want to enable power key reporting via the
-+	  AXP20X PMIC.
+@@ -125,4 +175,12 @@
+ 	reg_usb2_vbus: usb2-vbus {
+ 		status = "okay";
+ 	};
 +
-+	  To compile this driver as a module, choose M here. The module will
-+	  be called axp20x-pek.
++	reg_axp_ipsout: axp_ipsout {
++		compatible = "regulator-fixed";
++		regulator-name = "axp-ipsout";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-always-on;
++	};
+ };
+diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+index 4684cbe..0aed114 100644
+--- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
++++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+@@ -80,6 +80,56 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&i2c0_pins_a>;
+ 			status = "okay";
++
++			axp209: pmic at 34 {
++				compatible = "x-powers,axp209";
++				reg = <0x34>;
++				interrupts = <0>;
++
++				interrupt-controller;
++				#interrupt-cells = <1>;
++
++				acin-supply = <&reg_axp_ipsout>;
++				vin2-supply = <&reg_axp_ipsout>;
++				vin3-supply = <&reg_axp_ipsout>;
++				ldo24in-supply = <&reg_axp_ipsout>;
++				ldo3in-supply = <&reg_axp_ipsout>;
++				ldo5in-supply = <&reg_axp_ipsout>;
++
++				regulators {
++					x-powers,dcdc-freq = <1500>;
++
++					axp_vcore_reg: dcdc2 {
++						regulator-min-microvolt = <700000>;
++						regulator-max-microvolt = <2275000>;
++						regulator-always-on;
++					};
++
++					axp_ddr_reg: dcdc3 {
++						regulator-always-on;
++					};
++
++					axp_rtc_reg: ldo1 {
++						regulator-always-on;
++					};
++
++					axp_analog_reg: ldo2 {
++						regulator-always-on;
++					};
++
++					axp_pll_reg: ldo3 {
++						regulator-always-on;
++					};
++
++					axp_hdmi_reg: ldo4 {
++						regulator-always-on;
++					};
++
++					axp_mic_reg: ldo5 {
++						regulator-always-on;
++					};
++				};
++			};
+ 		};
+ 
+ 		i2c1: i2c at 01c2b000 {
+@@ -117,4 +167,12 @@
+ 	reg_usb2_vbus: usb2-vbus {
+ 		status = "okay";
+ 	};
++
++	reg_axp_ipsout: axp_ipsout {
++		compatible = "regulator-fixed";
++		regulator-name = "axp-ipsout";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-always-on;
++	};
+ };
+diff --git a/arch/arm/boot/dts/sun4i-a10-hackberry.dts b/arch/arm/boot/dts/sun4i-a10-hackberry.dts
+index d7c17e4..c81db47 100644
+--- a/arch/arm/boot/dts/sun4i-a10-hackberry.dts
++++ b/arch/arm/boot/dts/sun4i-a10-hackberry.dts
+@@ -82,6 +82,62 @@
+ 			pinctrl-0 = <&uart0_pins_a>;
+ 			status = "okay";
+ 		};
++
++		i2c0: i2c at 01c2ac00 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c0_pins_a>;
++			status = "okay";
++
++			axp209: pmic at 34 {
++				compatible = "x-powers,axp209";
++				reg = <0x34>;
++				interrupts = <0>;
++
++				interrupt-controller;
++				#interrupt-cells = <1>;
++
++				acin-supply = <&reg_axp_ipsout>;
++				vin2-supply = <&reg_axp_ipsout>;
++				vin3-supply = <&reg_axp_ipsout>;
++				ldo24in-supply = <&reg_axp_ipsout>;
++				ldo3in-supply = <&reg_axp_ipsout>;
++				ldo5in-supply = <&reg_axp_ipsout>;
++
++				regulators {
++					x-powers,dcdc-freq = <1500>;
++
++					axp_vcore_reg: dcdc2 {
++						regulator-min-microvolt = <700000>;
++						regulator-max-microvolt = <2275000>;
++						regulator-always-on;
++					};
++
++					axp_ddr_reg: dcdc3 {
++						regulator-always-on;
++					};
++
++					axp_rtc_reg: ldo1 {
++						regulator-always-on;
++					};
++
++					axp_analog_reg: ldo2 {
++						regulator-always-on;
++					};
++
++					axp_pll_reg: ldo3 {
++						regulator-always-on;
++					};
++
++					axp_hdmi_reg: ldo4 {
++						regulator-always-on;
++					};
++
++					axp_mic_reg: ldo5 {
++						regulator-always-on;
++					};
++				};
++			};
++		};
+ 	};
+ 
+ 	reg_emac_3v3: emac-3v3 {
+@@ -102,4 +158,12 @@
+ 		gpio = <&pio 7 12 0>;
+ 		status = "okay";
+ 	};
++
++	reg_axp_ipsout: axp_ipsout {
++		compatible = "regulator-fixed";
++		regulator-name = "axp-ipsout";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-always-on;
++	};
+ };
+diff --git a/arch/arm/boot/dts/sun4i-a10-inet97fv2.dts b/arch/arm/boot/dts/sun4i-a10-inet97fv2.dts
+index fe9272e..5d0d3c2 100644
+--- a/arch/arm/boot/dts/sun4i-a10-inet97fv2.dts
++++ b/arch/arm/boot/dts/sun4i-a10-inet97fv2.dts
+@@ -34,6 +34,56 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&i2c0_pins_a>;
+ 			status = "okay";
++
++			axp209: pmic at 34 {
++				compatible = "x-powers,axp209";
++				reg = <0x34>;
++				interrupts = <0>;
++
++				interrupt-controller;
++				#interrupt-cells = <1>;
++
++				acin-supply = <&reg_axp_ipsout>;
++				vin2-supply = <&reg_axp_ipsout>;
++				vin3-supply = <&reg_axp_ipsout>;
++				ldo24in-supply = <&reg_axp_ipsout>;
++				ldo3in-supply = <&reg_axp_ipsout>;
++				ldo5in-supply = <&reg_axp_ipsout>;
++
++				regulators {
++					x-powers,dcdc-freq = <1500>;
++
++					axp_vcore_reg: dcdc2 {
++						regulator-min-microvolt = <700000>;
++						regulator-max-microvolt = <2275000>;
++						regulator-always-on;
++					};
++
++					axp_ddr_reg: dcdc3 {
++						regulator-always-on;
++					};
++
++					axp_rtc_reg: ldo1 {
++						regulator-always-on;
++					};
++
++					axp_analog_reg: ldo2 {
++						regulator-always-on;
++					};
++
++					axp_pll_reg: ldo3 {
++						regulator-always-on;
++					};
++
++					axp_hdmi_reg: ldo4 {
++						regulator-always-on;
++					};
++
++					axp_mic_reg: ldo5 {
++						regulator-always-on;
++					};
++				};
++			};
+ 		};
+ 
+ 		usbphy: phy at 01c13400 {
+@@ -66,4 +116,12 @@
+ 	reg_usb2_vbus: usb2-vbus {
+ 		status = "okay";
+ 	};
++
++	reg_axp_ipsout: axp_ipsout {
++		compatible = "regulator-fixed";
++		regulator-name = "axp-ipsout";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-always-on;
++	};
+ };
+diff --git a/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts b/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
+index dd84a9e..b23989d 100644
+--- a/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
++++ b/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
+@@ -47,6 +47,62 @@
+ 			pinctrl-0 = <&uart0_pins_a>;
+ 			status = "okay";
+ 		};
++
++		i2c0: i2c at 01c2ac00 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c0_pins_a>;
++			status = "okay";
++
++			axp209: pmic at 34 {
++				compatible = "x-powers,axp209";
++				reg = <0x34>;
++				interrupts = <0>;
++
++				interrupt-controller;
++				#interrupt-cells = <1>;
++
++				acin-supply = <&reg_axp_ipsout>;
++				vin2-supply = <&reg_axp_ipsout>;
++				vin3-supply = <&reg_axp_ipsout>;
++				ldo24in-supply = <&reg_axp_ipsout>;
++				ldo3in-supply = <&reg_axp_ipsout>;
++				ldo5in-supply = <&reg_axp_ipsout>;
++
++				regulators {
++					x-powers,dcdc-freq = <1500>;
++
++					axp_vcore_reg: dcdc2 {
++						regulator-min-microvolt = <700000>;
++						regulator-max-microvolt = <2275000>;
++						regulator-always-on;
++					};
++
++					axp_ddr_reg: dcdc3 {
++						regulator-always-on;
++					};
++
++					axp_rtc_reg: ldo1 {
++						regulator-always-on;
++					};
++
++					axp_analog_reg: ldo2 {
++						regulator-always-on;
++					};
++
++					axp_pll_reg: ldo3 {
++						regulator-always-on;
++					};
++
++					axp_hdmi_reg: ldo4 {
++						regulator-always-on;
++					};
++
++					axp_mic_reg: ldo5 {
++						regulator-always-on;
++					};
++				};
++			};
++		};
+ 	};
+ 
+ 	reg_usb1_vbus: usb1-vbus {
+@@ -56,4 +112,13 @@
+ 	reg_usb2_vbus: usb2-vbus {
+ 		status = "okay";
+ 	};
 +
 +
- config INPUT_TWL4030_PWRBUTTON
- 	tristate "TWL4030 Power button Driver"
- 	depends on TWL4030_CORE
-diff --git a/drivers/input/misc/Makefile b/drivers/input/misc/Makefile
-index 4955ad3..a25ad18 100644
---- a/drivers/input/misc/Makefile
-+++ b/drivers/input/misc/Makefile
-@@ -50,6 +50,7 @@ obj-$(CONFIG_INPUT_POWERMATE)		+= powermate.o
- obj-$(CONFIG_INPUT_PWM_BEEPER)		+= pwm-beeper.o
- obj-$(CONFIG_INPUT_RB532_BUTTON)	+= rb532_button.o
- obj-$(CONFIG_INPUT_RETU_PWRBUTTON)	+= retu-pwrbutton.o
-+obj-$(CONFIG_INPUT_AXP20X_PEK)		+= axp20x-pek.o
- obj-$(CONFIG_INPUT_GPIO_ROTARY_ENCODER)	+= rotary_encoder.o
- obj-$(CONFIG_INPUT_SGI_BTNS)		+= sgi_btns.o
- obj-$(CONFIG_INPUT_SIRFSOC_ONKEY)	+= sirfsoc-onkey.o
-diff --git a/drivers/input/misc/axp20x-pek.c b/drivers/input/misc/axp20x-pek.c
-new file mode 100644
-index 0000000..0fba252
---- /dev/null
-+++ b/drivers/input/misc/axp20x-pek.c
-@@ -0,0 +1,281 @@
-+/*
-+ * axp20x power button driver.
-+ *
-+ * Copyright (C) 2013 Carlo Caione <carlo@caione.org>
-+ *
-+ * This file is subject to the terms and conditions of the GNU General
-+ * Public License. See the file "COPYING" in the main directory of this
-+ * archive for more details.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
-+ */
++	reg_axp_ipsout: axp_ipsout {
++		compatible = "regulator-fixed";
++		regulator-name = "axp-ipsout";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-always-on;
++	};
+ };
+diff --git a/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts b/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
+index 66cf0c7..004a6f0 100644
+--- a/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
++++ b/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
+@@ -81,6 +81,62 @@
+ 			pinctrl-0 = <&uart0_pins_a>;
+ 			status = "okay";
+ 		};
 +
-+#include <linux/errno.h>
-+#include <linux/irq.h>
-+#include <linux/init.h>
-+#include <linux/input.h>
-+#include <linux/interrupt.h>
-+#include <linux/kernel.h>
-+#include <linux/mfd/axp20x.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
-+#include <linux/slab.h>
++		i2c0: i2c at 01c2ac00 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c0_pins_a>;
++			status = "okay";
 +
-+#define AXP20X_PEK_STARTUP_MASK		(0xc0)
-+#define AXP20X_PEK_SHUTDOWN_MASK	(0x03)
++			axp209: pmic at 34 {
++				compatible = "x-powers,axp209";
++				reg = <0x34>;
++				interrupts = <0>;
 +
-+struct axp20x_pek {
-+	struct axp20x_dev *axp20x;
-+	struct input_dev *input;
-+	int irq_dbr;
-+	int irq_dbf;
-+};
++				interrupt-controller;
++				#interrupt-cells = <1>;
 +
-+struct axp20x_time {
-+	unsigned int time;
-+	unsigned int idx;
-+};
++				acin-supply = <&reg_axp_ipsout>;
++				vin2-supply = <&reg_axp_ipsout>;
++				vin3-supply = <&reg_axp_ipsout>;
++				ldo24in-supply = <&reg_axp_ipsout>;
++				ldo3in-supply = <&reg_axp_ipsout>;
++				ldo5in-supply = <&reg_axp_ipsout>;
 +
-+static const struct axp20x_time startup_time[] = {
-+	{ .time = 128,  .idx = 0 },
-+	{ .time = 1000, .idx = 2 },
-+	{ .time = 3000, .idx = 1 },
-+	{ .time = 2000, .idx = 3 },
-+};
++				regulators {
++					x-powers,dcdc-freq = <1500>;
 +
-+static const struct axp20x_time shutdown_time[] = {
-+	{ .time = 4000,  .idx = 0 },
-+	{ .time = 6000,  .idx = 1 },
-+	{ .time = 8000,  .idx = 2 },
-+	{ .time = 10000, .idx = 3 },
-+};
++					axp_vcore_reg: dcdc2 {
++						regulator-min-microvolt = <700000>;
++						regulator-max-microvolt = <2275000>;
++						regulator-always-on;
++					};
 +
-+struct axp20x_pek_ext_attr {
-+	const struct axp20x_time *p_time;
-+	unsigned int mask;
-+};
++					axp_ddr_reg: dcdc3 {
++						regulator-always-on;
++					};
 +
-+static struct axp20x_pek_ext_attr axp20x_pek_startup_ext_attr = {
-+	.p_time	= startup_time,
-+	.mask	= AXP20X_PEK_STARTUP_MASK,
-+};
++					axp_rtc_reg: ldo1 {
++						regulator-always-on;
++					};
 +
-+static struct axp20x_pek_ext_attr axp20x_pek_shutdown_ext_attr = {
-+	.p_time	= shutdown_time,
-+	.mask	= AXP20X_PEK_SHUTDOWN_MASK,
-+};
++					axp_analog_reg: ldo2 {
++						regulator-always-on;
++					};
 +
-+static struct axp20x_pek_ext_attr *get_axp_ext_attr(struct device_attribute *attr)
-+{
-+	return container_of(attr, struct dev_ext_attribute, attr)->var;
-+}
++					axp_pll_reg: ldo3 {
++						regulator-always-on;
++					};
 +
-+static ssize_t axp20x_show_ext_attr(struct device *dev, struct device_attribute *attr,
-+				    char *buf)
-+{
-+	struct axp20x_pek *axp20x_pek = dev_get_drvdata(dev);
-+	struct axp20x_pek_ext_attr *axp20x_ea = get_axp_ext_attr(attr);
-+	unsigned int val;
-+	int ret, i;
++					axp_hdmi_reg: ldo4 {
++						regulator-always-on;
++					};
 +
-+	ret = regmap_read(axp20x_pek->axp20x->regmap, AXP20X_PEK_KEY, &val);
-+	if (ret != 0)
-+		return ret;
++					axp_mic_reg: ldo5 {
++						regulator-always-on;
++					};
++				};
++			};
++		};
+ 	};
+ 
+ 	leds {
+@@ -108,4 +164,12 @@
+ 	reg_usb2_vbus: usb2-vbus {
+ 		status = "okay";
+ 	};
 +
-+	val &= axp20x_ea->mask;
-+	val >>= ffs(axp20x_ea->mask) - 1;
++	reg_axp_ipsout: axp_ipsout {
++		compatible = "regulator-fixed";
++		regulator-name = "axp-ipsout";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-always-on;
++	};
+ };
+diff --git a/arch/arm/boot/dts/sun4i-a10-pcduino.dts b/arch/arm/boot/dts/sun4i-a10-pcduino.dts
+index 255b47e..fcd7c86 100644
+--- a/arch/arm/boot/dts/sun4i-a10-pcduino.dts
++++ b/arch/arm/boot/dts/sun4i-a10-pcduino.dts
+@@ -66,6 +66,56 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&i2c0_pins_a>;
+ 			status = "okay";
 +
-+	for (i = 0; i < 4; i++)
-+		if (val == axp20x_ea->p_time[i].idx)
-+			val = axp20x_ea->p_time[i].time;
++			axp209: pmic at 34 {
++				compatible = "x-powers,axp209";
++				reg = <0x34>;
++				interrupts = <0>;
 +
-+	return sprintf(buf, "%u\n", val);
-+}
++				interrupt-controller;
++				#interrupt-cells = <1>;
 +
-+static ssize_t axp20x_store_ext_attr(struct device *dev, struct device_attribute *attr,
-+				     const char *buf, size_t count)
-+{
-+	struct axp20x_pek *axp20x_pek = dev_get_drvdata(dev);
-+	struct axp20x_pek_ext_attr *axp20x_ea = get_axp_ext_attr(attr);
-+	char val_str[20];
-+	size_t len;
-+	int ret, i;
-+	unsigned int val, idx = 0;
-+	unsigned int best_err = UINT_MAX;
++				acin-supply = <&reg_axp_ipsout>;
++				vin2-supply = <&reg_axp_ipsout>;
++				vin3-supply = <&reg_axp_ipsout>;
++				ldo24in-supply = <&reg_axp_ipsout>;
++				ldo3in-supply = <&reg_axp_ipsout>;
++				ldo5in-supply = <&reg_axp_ipsout>;
 +
-+	val_str[sizeof(val_str) - 1] = '\0';
-+	strncpy(val_str, buf, sizeof(val_str) - 1);
-+	len = strlen(val_str);
++				regulators {
++					x-powers,dcdc-freq = <1500>;
 +
-+	if (len && val_str[len - 1] == '\n')
-+		val_str[len - 1] = '\0';
++					axp_vcore_reg: dcdc2 {
++						regulator-min-microvolt = <700000>;
++						regulator-max-microvolt = <2275000>;
++						regulator-always-on;
++					};
 +
-+	ret = kstrtouint(val_str, 10, &val);
-+	if (ret)
-+		return ret;
++					axp_ddr_reg: dcdc3 {
++						regulator-always-on;
++					};
 +
-+	for (i = 3; i >= 0; i--) {
-+		unsigned int err;
++					axp_rtc_reg: ldo1 {
++						regulator-always-on;
++					};
 +
-+		err = abs(axp20x_ea->p_time[i].time - val);
-+		if (err < best_err) {
-+			best_err = err;
-+			idx = axp20x_ea->p_time[i].idx;
-+		}
++					axp_analog_reg: ldo2 {
++						regulator-always-on;
++					};
 +
-+		if (!err)
-+			break;
-+	}
++					axp_pll_reg: ldo3 {
++						regulator-always-on;
++					};
 +
-+	idx <<= ffs(axp20x_ea->mask) - 1;
-+	ret = regmap_update_bits(axp20x_pek->axp20x->regmap,
-+				 AXP20X_PEK_KEY,
-+				 axp20x_ea->mask, idx);
-+	if (ret != 0)
-+		return -EINVAL;
-+	return count;
-+}
++					axp_hdmi_reg: ldo4 {
++						regulator-always-on;
++					};
 +
-+static struct dev_ext_attribute axp20x_dev_attr_startup = {
-+	.attr	= __ATTR(startup, 0644, axp20x_show_ext_attr, axp20x_store_ext_attr),
-+	.var	= &axp20x_pek_startup_ext_attr
-+};
++					axp_mic_reg: ldo5 {
++						regulator-always-on;
++					};
++				};
++			};
+ 		};
+ 	};
+ 
+@@ -76,4 +126,12 @@
+ 	reg_usb2_vbus: usb2-vbus {
+ 		status = "okay";
+ 	};
 +
-+static struct dev_ext_attribute axp20x_dev_attr_shutdown = {
-+	.attr	= __ATTR(shutdown, 0644, axp20x_show_ext_attr, axp20x_store_ext_attr),
-+	.var	= &axp20x_pek_shutdown_ext_attr
-+};
++	reg_axp_ipsout: axp_ipsout {
++		compatible = "regulator-fixed";
++		regulator-name = "axp-ipsout";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-always-on;
++	};
+ };
+diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+index 68de89f..3e748ed 100644
+--- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
++++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+@@ -66,6 +66,57 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&i2c0_pins_a>;
+ 			status = "okay";
 +
-+static irqreturn_t axp20x_pek_irq(int irq, void *pwr)
-+{
-+	struct input_dev *idev = pwr;
-+	struct axp20x_pek *axp20x_pek = input_get_drvdata(idev);
++			axp209: pmic at 34 {
++				compatible = "x-powers,axp209";
++				reg = <0x34>;
++				interrupt-parent = <&nmi_intc>;
++				interrupts = <0 8>;
 +
-+	if (irq == axp20x_pek->irq_dbr)
-+		input_report_key(idev, KEY_POWER, true);
-+	else if (irq == axp20x_pek->irq_dbf)
-+		input_report_key(idev, KEY_POWER, false);
++				interrupt-controller;
++				#interrupt-cells = <1>;
 +
-+	input_sync(idev);
++				acin-supply = <&reg_axp_ipsout>;
++				vin2-supply = <&reg_axp_ipsout>;
++				vin3-supply = <&reg_axp_ipsout>;
++				ldo24in-supply = <&reg_axp_ipsout>;
++				ldo3in-supply = <&reg_axp_ipsout>;
++				ldo5in-supply = <&reg_axp_ipsout>;
 +
-+	return IRQ_HANDLED;
-+}
++				regulators {
++					x-powers,dcdc-freq = <1500>;
 +
-+static int axp20x_pek_probe(struct platform_device *pdev)
-+{
-+	struct axp20x_pek *axp20x_pek;
-+	struct axp20x_dev *axp20x;
-+	struct input_dev *idev;
-+	int error;
++					axp_vcore_reg: dcdc2 {
++						regulator-min-microvolt = <700000>;
++						regulator-max-microvolt = <2275000>;
++						regulator-always-on;
++					};
 +
-+	axp20x_pek = devm_kzalloc(&pdev->dev, sizeof(struct axp20x_pek),
-+				  GFP_KERNEL);
-+	if (!axp20x_pek)
-+		return -ENOMEM;
++					axp_ddr_reg: dcdc3 {
++						regulator-always-on;
++					};
 +
-+	axp20x_pek->axp20x = dev_get_drvdata(pdev->dev.parent);
-+	axp20x = axp20x_pek->axp20x;
++					axp_rtc_reg: ldo1 {
++						regulator-always-on;
++					};
 +
-+	axp20x_pek->irq_dbr = platform_get_irq_byname(pdev, "PEK_DBR");
-+	if (axp20x_pek->irq_dbr < 0) {
-+		dev_err(&pdev->dev, "No IRQ for PEK_DBR, error=%d\n",
-+				axp20x_pek->irq_dbr);
-+		return axp20x_pek->irq_dbr;
-+	}
-+	axp20x_pek->irq_dbr = regmap_irq_get_virq(axp20x->regmap_irqc,
-+						  axp20x_pek->irq_dbr);
++					axp_analog_reg: ldo2 {
++						regulator-always-on;
++					};
 +
-+	axp20x_pek->irq_dbf = platform_get_irq_byname(pdev, "PEK_DBF");
-+	if (axp20x_pek->irq_dbf < 0) {
-+		dev_err(&pdev->dev, "No IRQ for PEK_DBF, error=%d\n",
-+				axp20x_pek->irq_dbf);
-+		return axp20x_pek->irq_dbf;
-+	}
-+	axp20x_pek->irq_dbf = regmap_irq_get_virq(axp20x->regmap_irqc,
-+						  axp20x_pek->irq_dbf);
++					axp_pll_reg: ldo3 {
++						regulator-always-on;
++					};
 +
-+	axp20x_pek->input = devm_input_allocate_device(&pdev->dev);
-+	if (!axp20x_pek->input)
-+		return -ENOMEM;
++					axp_hdmi_reg: ldo4 {
++						regulator-always-on;
++					};
 +
-+	idev = axp20x_pek->input;
++					axp_mic_reg: ldo5 {
++						regulator-always-on;
++					};
++				};
++			};
+ 		};
+ 
+ 		i2c1: i2c at 01c2b000 {
+@@ -114,4 +165,12 @@
+ 	reg_usb2_vbus: usb2-vbus {
+ 		status = "okay";
+ 	};
 +
-+	idev->name = "axp20x-pek";
-+	idev->phys = "m1kbd/input2";
-+	idev->dev.parent = &pdev->dev;
++	reg_axp_ipsout: axp_ipsout {
++		compatible = "regulator-fixed";
++		regulator-name = "axp-ipsout";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-always-on;
++	};
+ };
+diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+index cb25d3c..d863469 100644
+--- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
++++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+@@ -73,6 +73,57 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&i2c0_pins_a>;
+ 			status = "okay";
 +
-+	input_set_capability(idev, EV_KEY, KEY_POWER);
++			axp209: pmic at 34 {
++				compatible = "x-powers,axp209";
++				reg = <0x34>;
++				interrupt-parent = <&nmi_intc>;
++				interrupts = <0 8>;
 +
-+	input_set_drvdata(idev, axp20x_pek);
++				interrupt-controller;
++				#interrupt-cells = <1>;
 +
-+	error = devm_request_any_context_irq(&pdev->dev, axp20x_pek->irq_dbr,
-+					  axp20x_pek_irq, 0,
-+					  "axp20x-pek-dbr", idev);
-+	if (error < 0) {
-+		dev_err(axp20x->dev, "Failed to request dbr IRQ#%d: %d\n",
-+			axp20x_pek->irq_dbr, error);
++				acin-supply = <&reg_axp_ipsout>;
++				vin2-supply = <&reg_axp_ipsout>;
++				vin3-supply = <&reg_axp_ipsout>;
++				ldo24in-supply = <&reg_axp_ipsout>;
++				ldo3in-supply = <&reg_axp_ipsout>;
++				ldo5in-supply = <&reg_axp_ipsout>;
 +
-+		return error;
-+	}
++				regulators {
++					x-powers,dcdc-freq = <1500>;
 +
-+	error = devm_request_any_context_irq(&pdev->dev, axp20x_pek->irq_dbf,
-+					  axp20x_pek_irq, 0,
-+					  "axp20x-pek-dbf", idev);
-+	if (error < 0) {
-+		dev_err(axp20x->dev, "Failed to request dbf IRQ#%d: %d\n",
-+			axp20x_pek->irq_dbf, error);
-+		return error;
-+	}
++					axp_vcore_reg: dcdc2 {
++						regulator-min-microvolt = <700000>;
++						regulator-max-microvolt = <2275000>;
++						regulator-always-on;
++					};
 +
-+	error = device_create_file(&pdev->dev, &axp20x_dev_attr_startup.attr);
-+	if (error)
-+		return error;
++					axp_ddr_reg: dcdc3 {
++						regulator-always-on;
++					};
 +
-+	error = device_create_file(&pdev->dev, &axp20x_dev_attr_shutdown.attr);
-+	if (error)
-+		goto clear_startup_attr;
++					axp_rtc_reg: ldo1 {
++						regulator-always-on;
++					};
 +
-+	error = input_register_device(idev);
-+	if (error) {
-+		dev_err(axp20x->dev, "Can't register input device: %d\n", error);
-+		goto clear_attr;
-+	}
++					axp_analog_reg: ldo2 {
++						regulator-always-on;
++					};
 +
-+	platform_set_drvdata(pdev, axp20x_pek);
++					axp_pll_reg: ldo3 {
++						regulator-always-on;
++					};
 +
-+	return 0;
++					axp_hdmi_reg: ldo4 {
++						regulator-always-on;
++					};
 +
-+clear_attr:
-+	device_remove_file(&pdev->dev, &axp20x_dev_attr_shutdown.attr);
++					axp_mic_reg: ldo5 {
++						regulator-always-on;
++					};
++				};
++			};
+ 		};
+ 
+ 		i2c1: i2c at 01c2b000 {
+@@ -139,4 +190,12 @@
+ 	reg_usb2_vbus: usb2-vbus {
+ 		status = "okay";
+ 	};
 +
-+clear_startup_attr:
-+	device_remove_file(&pdev->dev, &axp20x_dev_attr_startup.attr);
++	reg_axp_ipsout: axp_ipsout {
++		compatible = "regulator-fixed";
++		regulator-name = "axp-ipsout";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-always-on;
++	};
+ };
+diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+index eeadf76..047340a 100644
+--- a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
++++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+@@ -95,6 +95,57 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&i2c0_pins_a>;
+ 			status = "okay";
 +
-+	return error;
-+}
++			axp209: pmic at 34 {
++				compatible = "x-powers,axp209";
++				reg = <0x34>;
++				interrupt-parent = <&nmi_intc>;
++				interrupts = <0 8>;
 +
-+int axp20x_pek_remove(struct platform_device *pdev)
-+{
-+	device_remove_file(&pdev->dev, &axp20x_dev_attr_shutdown.attr);
-+	device_remove_file(&pdev->dev, &axp20x_dev_attr_startup.attr);
++				interrupt-controller;
++				#interrupt-cells = <1>;
 +
-+	return 0;
-+}
++				acin-supply = <&reg_axp_ipsout>;
++				vin2-supply = <&reg_axp_ipsout>;
++				vin3-supply = <&reg_axp_ipsout>;
++				ldo24in-supply = <&reg_axp_ipsout>;
++				ldo3in-supply = <&reg_axp_ipsout>;
++				ldo5in-supply = <&reg_axp_ipsout>;
 +
-+static struct platform_driver axp20x_pek_driver = {
-+	.probe		= axp20x_pek_probe,
-+	.remove		= axp20x_pek_remove,
-+	.driver		= {
-+		.name		= "axp20x-pek",
-+		.owner		= THIS_MODULE,
-+	},
-+};
-+module_platform_driver(axp20x_pek_driver);
++				regulators {
++					x-powers,dcdc-freq = <1500>;
 +
-+MODULE_DESCRIPTION("axp20x Power Button");
-+MODULE_AUTHOR("Carlo Caione <carlo@caione.org>");
-+MODULE_LICENSE("GPL");
++					axp_vcore_reg: dcdc2 {
++						regulator-min-microvolt = <700000>;
++						regulator-max-microvolt = <2275000>;
++						regulator-always-on;
++					};
++
++					axp_ddr_reg: dcdc3 {
++						regulator-always-on;
++					};
++
++					axp_rtc_reg: ldo1 {
++						regulator-always-on;
++					};
++
++					axp_analog_reg: ldo2 {
++						regulator-always-on;
++					};
++
++					axp_pll_reg: ldo3 {
++						regulator-always-on;
++					};
++
++					axp_hdmi_reg: ldo4 {
++						regulator-always-on;
++					};
++
++					axp_mic_reg: ldo5 {
++						regulator-always-on;
++					};
++				};
++			};
+ 		};
+ 
+ 		i2c1: i2c at 01c2b000 {
+@@ -145,4 +196,12 @@
+ 	reg_usb2_vbus: usb2-vbus {
+ 		status = "okay";
+ 	};
++
++	reg_axp_ipsout: axp_ipsout {
++		compatible = "regulator-fixed";
++		regulator-name = "axp-ipsout";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-always-on;
++	};
+ };
 -- 
 1.8.3.2
