@@ -1,26 +1,56 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 30 Apr 2014 18:31:03 -0700
-Subject: [alsa-devel] [PATCH 01/15] ASoC: CS42L51 and WM8962 codecs
- depend on INPUT
-In-Reply-To: <alpine.DEB.2.02.1404292124270.31465@heelrod>
-References: <1398770316-19715-1-git-send-email-kaixu.xia@linaro.org>
- <1398770316-19715-2-git-send-email-kaixu.xia@linaro.org>
- <alpine.DEB.2.02.1404292124270.31465@heelrod>
-Message-ID: <20140501013103.GK3245@sirena.org.uk>
+From: agnel.joel@gmail.com (Joel Fernandes)
+Date: Wed, 30 Apr 2014 20:57:05 -0500
+Subject: [patch V2 0/6] dma: edma: Provide granular residue accounting
+In-Reply-To: <20140430050828.GP32284@intel.com>
+References: <20140428104416.464002156@linutronix.de> <535EBE69.6060803@ti.com>
+ <20140429084635.GN32284@intel.com> <53607B1E.2030906@ti.com>
+ <20140430050828.GP32284@intel.com>
+Message-ID: <CAD=GYpY-aYaF5YqeqcyR3E=zWbfMFYf7fsuV36wvCfpyZ7Ud=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 29, 2014 at 09:31:30PM -0500, Brian Austin wrote:
+On Wed, Apr 30, 2014 at 12:08 AM, Vinod Koul <vinod.koul@intel.com> wrote:
+> On Tue, Apr 29, 2014 at 11:25:02PM -0500, Joel Fernandes wrote:
+>> On 04/29/2014 03:46 AM, Vinod Koul wrote:
+>> [..]
+>> > commit 770f0f3a20188b7e17db2790803b9da925dc0b94
+>> > Author: Thomas Gleixner <tglx@linutronix.de>
+>> > Date:   Mon Apr 28 10:49:43 2014 +0000
+>> >
+>> >     dmaengine: edma: Make reading the position of active channels work
+>> >
+>> >     As Joel pointed out, edma_read_position() uses memcpy_fromio() to read
+>> >     the parameter ram. That's not synchronized with the internal update as
+>> >     it does a byte by byte copy. We need to do a 32bit read to get a
+>> >     consistent value.
+>> >
+>> >     Further reading destination and source is pointless. In DEV_TO_MEM
+>> >     transfers we are only interested in the destination, in MEM_TO_DEV we
+>> >     care about the source. In MEM_TO_MEM it really does not matter which
+>> >     one you read.
+>> >
+>> >     Simple solution: Remove the pointers, select dest/source via a bool
+>> >     and return the read value.
+>> >
+>> >     Remove the export of this function while at it. The only potential
+>> >     user is the dmaengine and that's always builtin.
+>> >
+>> >     Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+>> >
+>> > You s-o-b missing in this one, also ack from Sekhar missing. Do you want to redo
+>> > this or prefer me to cherry-pick patches adding acks and your s-o-b, since I
+>> > already fetched your branch
+>> >
+>> > Either way is fine with me...
+>> >
+>>
+>> If its Ok with you, it would great if you could add my Ack and Sob.
+>> Thanks a lot. Let me know if you'd want me to do anything else here.
+> Done, The changes are getting pushed, pls do verify
 
-> I assume you mean the CS42L52 instead of the L51. INPUT is used for a BEEP
-> Generator but when I disable CONFIG_INPUT I do not get an error. Is there
-> any information available on what the error is?
+Sorry for the late reply as I'm at a conference.
 
-I suspect it's ASoC built in and INPUT build as a module.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140430/5fc142ba/attachment.sig>
+Thanks, I verified and it looks OK.
+
+Regards,
+-Joel
