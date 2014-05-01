@@ -1,38 +1,80 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 1 May 2014 09:30:01 +0200
-Subject: [PATCH 03/15] ARM: dts: kirkwood: add stdout-path property to
- all boards
-In-Reply-To: <142642785.6KSg8q4tJP@wuerfel>
-References: <1398862602-29595-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <53615342.8010600@gmail.com> <20140430202130.GE3082@lunn.ch>
- <142642785.6KSg8q4tJP@wuerfel>
-Message-ID: <20140501073001.GI3082@lunn.ch>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Thu, 1 May 2014 08:34:03 +0100
+Subject: [RFC PATCH V4 6/7] arm64: mm: Enable HAVE_RCU_TABLE_FREE logic
+In-Reply-To: <20140430172114.GI31220@arm.com>
+References: <1396018892-6773-1-git-send-email-steve.capper@linaro.org>
+ <1396018892-6773-7-git-send-email-steve.capper@linaro.org>
+ <20140430152047.GF31220@arm.com> <20140430153317.GG31220@arm.com>
+ <20140430153824.GA7166@linaro.org> <20140430172114.GI31220@arm.com>
+Message-ID: <20140501073402.GA30358@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 30, 2014 at 10:30:21PM +0200, Arnd Bergmann wrote:
-> On Wednesday 30 April 2014 22:21:30 Andrew Lunn wrote:
-> > > Yes, we *can* move it in kirkwood.dtsi, but IMHO we *should* keep it in
-> > > the board files. I see the "chosen" node and its properties as _the_
-> > > board node.
+On Wed, Apr 30, 2014 at 06:21:14PM +0100, Catalin Marinas wrote:
+> On Wed, Apr 30, 2014 at 04:38:25PM +0100, Steve Capper wrote:
+> > On Wed, Apr 30, 2014 at 04:33:17PM +0100, Catalin Marinas wrote:
+> > > On Wed, Apr 30, 2014 at 04:20:47PM +0100, Catalin Marinas wrote:
+> > > > On Fri, Mar 28, 2014 at 03:01:31PM +0000, Steve Capper wrote:
+> > > > > In order to implement fast_get_user_pages we need to ensure that the
+> > > > > page table walker is protected from page table pages being freed from
+> > > > > under it.
+> > > > > 
+> > > > > This patch enables HAVE_RCU_TABLE_FREE, any page table pages belonging
+> > > > > to address spaces with multiple users will be call_rcu_sched freed.
+> > > > > Meaning that disabling interrupts will block the free and protect the
+> > > > > fast gup page walker.
+> > > > > 
+> > > > > Signed-off-by: Steve Capper <steve.capper@linaro.org>
+> > > > 
+> > > > While this patch is simple, I'd like to better understand the reason for
+> > > > it. Currently HAVE_RCU_TABLE_FREE is enabled for powerpc and sparc while
+> > > > __get_user_pages_fast() is supported by a few other architectures that
+> > > > don't select HAVE_RCU_TABLE_FREE. So why do we need it for fast gup on
+> > > > arm/arm64 while not all the other archs need it?
 > > > 
-> > > One could argue then, that we should count the memory properties too and
-> > > put the most common in the SoC dtsi. But you are right, as UART0 is also
-> > > the UART with boot support, it is likely to be always connected to
-> > > a more-or-less accessible console output.
-> > > 
-> > > I really have no strong opinion about it.
+> > > OK, replying to myself. I assume the other architectures that don't need
+> > > HAVE_RCU_TABLE_FREE use IPI for TLB shootdown, hence they gup_fast
+> > > synchronisation for free.
 > > 
-> > Me neithe, but the advantage of putting it in kirkwood.dtsi is that it
-> > then does not get forgotten, and is always there for bearbox to use.
+> > Yes that is roughly the case.
+> > Essentially we want to RCU free the page table backing pages at a
+> > later time when we aren't walking on them.
+> > 
+> > Other arches use IPI, some others have their own RCU logic. I opted to
+> > activate some existing logic to reduce code duplication.
 > 
-> I would prefer having it in the board.dts file out of principle, but I
-> agree it's not very important either way.
+> Both powerpc and sparc use tlb_remove_table() via their __pte_free_tlb()
+> etc. which implies an IPI for synchronisation if mm_users > 1. For
+> gup_fast we may not need it since we use the RCU for protection. Am I
+> missing anything?
 
-OK, then i can add my 
+So my understanding is:
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
+tlb_remove_table will just immediately free any pages where there's a
+single user as there's no need to consider a gup walking.
 
-I will try to do some testing over the weekend.
+For the case of multiple users we have an mmu_table_batch structure
+that holds references to pages that should be freed at a later point.
 
-	  Andrew
+This batch is contained on a page that is allocated on the fly. If, for
+any reason, we can't allocate the batch container we fallback to a slow
+path which is to issue an IPI (via tlb_remove_table_one). This IPI will
+block on the gup walker. We need this fallback behaviour on ARM/ARM64.
+
+Most of the time we will be able to allocate the batch container, and
+we will populate it with references to page table containing pages that
+are freed via an RCU scheduler delayed callback to tlb_remove_table_rcu.
+
+In the fast_gup walker, we block tlb_remove_table_rcu from running by
+disabling interrupts in the critical path. Technically we could issue
+a call to rcu_read_lock_sched instead to block tlb_remove_table_rcu,
+but that wouldn't be sufficient to block THP splits; so we opt to
+disable interrupts to block both THP and tlb_remove_table_rcu.
+
+Cheers,
+-- 
+Steve
+
+> 
+> -- 
+> Catalin
