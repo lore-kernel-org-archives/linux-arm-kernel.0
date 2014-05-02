@@ -1,61 +1,53 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 2 May 2014 16:06:00 +0300
-Subject: [PATCH 06/23] ARM: OMAP: add OMAP5 DSI muxing
-In-Reply-To: <20140430175651.GB12362@atomide.com>
-References: <535A6C40.10609@ti.com> <20140425153150.GA20807@atomide.com>
- <535DFAAE.1010606@ti.com> <20140428164528.GM20807@atomide.com>
- <535F37E9.8090609@ti.com> <20140429150529.GA27571@atomide.com>
- <535FD10B.4020108@ti.com> <535FD43B.3030102@ti.com>
- <20140429173838.GB27571@atomide.com> <5360948A.5020607@ti.com>
- <20140430175651.GB12362@atomide.com>
-Message-ID: <53639838.3070907@ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 2 May 2014 09:13:48 -0400
+Subject: [PATCH v3 4/7] of: configure the platform device dma parameters
+In-Reply-To: <5279118.J5305KQNjB@wuerfel>
+References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
+ <53610663.7070305@ti.com> <20140501131210.CCC13C409DA@trevor.secretlab.ca>
+ <5279118.J5305KQNjB@wuerfel>
+Message-ID: <53639A0C.8070306@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/04/14 20:56, Tony Lindgren wrote:
-
-> Have you checked out pinctrl-single,bits binding? That should allow
-> you to map random bits in a single register to a pinctrl driver
-> instance.
-
-If I recall right, the problem there was that we have one register,
-which has bits for two separate devices, and the bits are mixed up. i.e.
-not 16 upper bits for one, 16 lower for the other, but 5 bits for one
-device, the next 5 bits for the other, then again few bits for the
-first, etc.
-
-pinctrl-single,bits didn't like it that.
-
->>>> Oh, also, if I do that, I need to know both the SoC version and the DSS
->>>> version in the driver.
+On Friday 02 May 2014 05:58 AM, Arnd Bergmann wrote:
+> On Thursday 01 May 2014 14:12:10 Grant Likely wrote:
+>>>> I've got two concerns here. of_dma_get_range() retrieves only the first
+>>>> tuple from the dma-ranges property, but it is perfectly valid for
+>>>> dma-ranges to contain multiple tuples. How should we handle it if a
+>>>> device has multiple ranges it can DMA from?
+>>>>
 >>>
->>> Don't you get all you need in the compatible string? Something like
->>> compatible ti,dss-phy-omap5?
+>>> We've not found any cases in current Linux where more than one dma-ranges
+>>> would be used. Moreover, The MM (definitely for ARM) isn't supported such
+>>> cases at all (if i understand everything right).
+>>> - there are only one arm_dma_pfn_limit
+>>> - there is only one MM zone is used for ARM
+>>> - some arches like x86,mips can support 2 zones (per arch - not per device or bus)
+>>>   DMA & DMA32, but they configured once and forever per arch.
 >>
->> We do use different compatible strings for different major versions of
->> the DSS blocks, like ti,omap5-dsi. But that exactly same DSS block could
->> be used on some other SoC, with different control stuff.
->>
->> We could use separate compatible string for each SoC that uses DSS, but
->> then we're really encoding the SoC version into the compatible string,
->> not DSS version.
->>
->> Of course, if there will be a separate driver managing the
->> CONTROL_DSIPHY register, then that one should use compatible string
->> specific to the SoC, as it's not a DSS driver at all.
+>> Okay. If anyone ever does implement multiple ranges then this code will
+>> need to be revisited.
 > 
-> Yeah probably using pinctrl-single,bits, or a separate driver with syscon
-> makes most sense here.
+> I wonder if it's needed for platforms implementing the standard "ARM memory map" [1].
+> The document only talks about addresses as seen from the CPU, and I can see
+> two logical interpretations how the RAM is supposed to be visible from a device:
+> either all RAM would be visible contiguously at DMA address zero, or everything
+> would be visible at the same physical address as the CPU sees it.
+> 
+> If anyone picks the first interpretation, we will have to implement that
+> in Linux. We can of course hope that all hardware designs follow the second
+> interpretation, which would be more convenient for us here.
+>
+not sure if I got your point correctly but DMA address 0 isn't used as DRAM start in
+any of the ARM SOC today, mainly because of the boot architecture where address 0 is
+typically used by ROM code. RAM start will be at some offset always and hence I
+believe ARM SOCs will follow second interpretation. This was one of the main reason
+we ended up fixing the max*pfn stuff. 
+26ba47b {ARM: 7805/1: mm: change max*pfn to include the physical offset of memory}
 
-Yep, I'll have to come up with something.
-
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140502/7a4db19a/attachment.sig>
+> 
+> [1] http://infocenter.arm.com/help/topic/com.arm.doc.den0001c/DEN0001C_principles_of_arm_memory_maps.pdf
+> 
+ 
+Regards,
+Santosh
