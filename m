@@ -1,187 +1,57 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 02 May 2014 19:54:24 +0200
-Subject: [PATCH v2 1/2] ARM: EXYNOS: Map SYSRAM through generic SRAM
- bindings
-In-Reply-To: <1399007180-20680-1-git-send-email-sachin.kamat@linaro.org>
-References: <1399007180-20680-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <5363DBD0.2060903@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 2 May 2014 19:07:07 +0100
+Subject: [PATCH] arm64: Introduce execute-only page access permissions
+In-Reply-To: <20140502171336.GA5341@arm.com>
+References: <1399045792-5490-1-git-send-email-catalin.marinas@arm.com>
+ <20140502170027.GE20642@arm.com> <20140502171336.GA5341@arm.com>
+Message-ID: <20140502180706.GB14645@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sachin,
+On Fri, May 02, 2014 at 06:13:37PM +0100, Catalin Marinas wrote:
+> On Fri, May 02, 2014 at 06:00:28PM +0100, Will Deacon wrote:
+> > On Fri, May 02, 2014 at 04:49:52PM +0100, Catalin Marinas wrote:
+> > > The ARMv8 architecture allows execute-only user permissions by clearing
+> > > the PTE_UXN and PTE_USER bits. The kernel, however, can still access
+> > > such page.
+> > > 
+> > > This patch changes the arm64 __P100 and __S100 protection_map[] macros
+> > > to the new __PAGE_EXECONLY attributes. A side effect is that
+> > > pte_valid_user() no longer triggers for __PAGE_EXECONLY since PTE_USER
+> > > isn't set. To work around this, the check is done on the PTE_NG bit via
+> > > the pte_valid_ng() macro. VM_READ is also checked now for page faults.
+> > 
+> > How does this interact with things like ptrace and pipes? Can I get the
+> > kernel to read my text for me?
+> 
+> access_process_vm() would work fine since this is done using the kernel
+> linear mapping (and get_user_pages). Also, if you get_user etc. it would
+> still work since LDR/STR in EL1 mode would not be restricted (only
+> LDRT/STRT but we don't use them).
 
-The whole series looks quite good, but I have one concern about support 
-for Universal C210 board. Please see my comment inline.
+Depends on how you define `work fine'!
 
-On 02.05.2014 07:06, Sachin Kamat wrote:
-> Instead of hardcoding the SYSRAM details for each SoC,
-> pass this information through device tree (DT) and make
-> the code SoC agnostic. Generic SRAM bindings are used
-> for achieving this.
->
-> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> Acked-by: Heiko Stuebner <heiko@sntech.de>
-> ---
-> This patch is based on linux next (next-20140501) on top of
-> my Kconfig consolidation patch
-> http://comments.gmane.org/gmane.linux.kernel.samsung-soc/28642
->
-> Changes since v1:
-> Type and presence of sram nodes is SoC/board dependent. V1 mandated the
-> presence of both the nodes and used to return an error if one of the
-> nodes was absent and thus fail the boot altogether. Removed this dependency.
->
-> Tested on 4210/4412 Origen, 5250/5420 Arndale and SMDK5420 boards.
-> ---
->   arch/arm/Kconfig                                |    1 +
->   arch/arm/boot/dts/exynos4210-universal_c210.dts |   17 ++++++
->   arch/arm/boot/dts/exynos4210.dtsi               |   18 +++++++
->   arch/arm/boot/dts/exynos4x12.dtsi               |   18 +++++++
->   arch/arm/boot/dts/exynos5250.dtsi               |   18 +++++++
->   arch/arm/boot/dts/exynos5420.dtsi               |   18 +++++++
->   arch/arm/mach-exynos/common.h                   |    1 +
->   arch/arm/mach-exynos/exynos.c                   |   64 -----------------------
->   arch/arm/mach-exynos/firmware.c                 |    8 ++-
->   arch/arm/mach-exynos/include/mach/map.h         |    7 ---
->   arch/arm/mach-exynos/platsmp.c                  |   33 ++++++++++--
->   11 files changed, 128 insertions(+), 75 deletions(-)
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index a6aaaad19b1a..f66ea9453df9 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -855,6 +855,7 @@ config ARCH_EXYNOS
->   	select S5P_DEV_MFC
->   	select SAMSUNG_DMADEV
->   	select SPARSE_IRQ
-> +	select SRAM
->   	select USE_OF
->   	help
->   	  Support for SAMSUNG's EXYNOS SoCs (EXYNOS4/5)
-> diff --git a/arch/arm/boot/dts/exynos4210-universal_c210.dts b/arch/arm/boot/dts/exynos4210-universal_c210.dts
-> index 63e34b24b04f..8d4de5c0d0c7 100644
-> --- a/arch/arm/boot/dts/exynos4210-universal_c210.dts
-> +++ b/arch/arm/boot/dts/exynos4210-universal_c210.dts
-> @@ -28,6 +28,23 @@
->   		bootargs = "console=ttySAC2,115200N8 root=/dev/mmcblk0p5 rw rootwait earlyprintk panic=5 maxcpus=1";
->   	};
->
-> +	sram at 02020000 {
-> +		status = "disabled";
+> But note that this is only for pages explicitly marked PROT_EXEC only.
+> Standard user apps just use r-x mappings, so not affected.
 
-Here you just disable just the top level node of non-secure SYSRAM, but 
-the sub-nodes are still present and enabled.
+Ok, but it does mean that any task being subjected to --x permissions can
+trivially read from that mapping via a syscall, so this patch only makes
+sense in the context of something like seccomp, where you additionally
+restrict the set of syscalls available to the target.
 
-> +	};
-> +
-> +	sram at 02025000 {
-> +		compatible = "mmio-sram";
-> +		reg = <0x02025000 0x1000>;
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges = <0 0x02025000 0x1000>;
-> +
-> +		smp-sram at 0 {
-> +			compatible = "samsung,exynos4210-sram";
-> +			reg = <0x0 0x1000>;
-> +		};
-> +	};
-> +
->   	mct at 10050000 {
->   		compatible = "none";
->   	};
+> > Also: do we really want to differ from x86 here?
+> 
+> x86 has a hardware limitation IIUC, same as ARMv7. This was a request
+> from security people and they claim it's a feature they would like
+> (apparently on Chrome OS). Of course, they have to adapt their tools/JIT
+> to avoid literal pools on such mappings but there is ongoing work
+> already.
+> 
+> We could make it configurable, though assume that it doesn't break any
+> user ABI (so far OK but it needs more testing), we could make it the
+> default.
 
-[snip]
+Why not make it depend on SECCOMP or AUDIT? I don't think it's at all
+useful without them.
 
-> diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-> index 03e5e9f94705..0aac03204f9f 100644
-> --- a/arch/arm/mach-exynos/platsmp.c
-> +++ b/arch/arm/mach-exynos/platsmp.c
-> @@ -20,6 +20,7 @@
->   #include <linux/jiffies.h>
->   #include <linux/smp.h>
->   #include <linux/io.h>
-> +#include <linux/of_address.h>
->
->   #include <asm/cacheflush.h>
->   #include <asm/smp_plat.h>
-> @@ -33,11 +34,33 @@
->
->   extern void exynos4_secondary_startup(void);
->
-> +static void __iomem *sram_base_addr;
-> +void __iomem *sram_ns_base_addr;
-> +
-> +static void __init exynos_smp_prepare_sram(void)
-> +{
-> +	struct device_node *node;
-> +
-> +	node = of_find_compatible_node(NULL, NULL, "samsung,exynos4210-sram");
-
-Now here you don't check whether the node is "okay", so on Universal 
-C210 it will pick just the first node with this compatible string,
-
-I think you should be using for_each_compatible_node() here, then check 
-if the node is "okay" using of_devicE_is_available() and only then use 
-this node to map the SYSRAM.
-
-> +	if (node) {
-> +		sram_base_addr = of_iomap(node, 0);
-> +		if (!sram_base_addr)
-> +			pr_err("Secondary CPU boot address not found\n");
-> +	}
-> +
-> +	node = of_find_compatible_node(NULL, NULL, "samsung,exynos4210-sram-ns");
-
-Same here.
-
-> +	if (node) {
-> +		sram_ns_base_addr = of_iomap(node, 0);
-> +		if (!sram_ns_base_addr)
-> +			pr_err("Secondary CPU boot address not found\n");
-> +	}
-> +}
-> +
->   static inline void __iomem *cpu_boot_reg_base(void)
->   {
->   	if (soc_is_exynos4210() && samsung_rev() == EXYNOS4210_REV_1_1)
->   		return S5P_INFORM5;
-> -	return S5P_VA_SYSRAM;
-> +	return sram_base_addr;
->   }
->
->   static inline void __iomem *cpu_boot_reg(int cpu)
-> @@ -147,7 +170,8 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
->   		 * and fall back to boot register if it fails.
->   		 */
->   		if (call_firmware_op(set_cpu_boot_addr, phys_cpu, boot_addr))
-> -			__raw_writel(boot_addr, cpu_boot_reg(phys_cpu));
-> +			if (cpu_boot_reg_base())
-
-When can this condition be not met?
-
-> +				__raw_writel(boot_addr, cpu_boot_reg(phys_cpu));
->
->   		call_firmware_op(cpu_boot, phys_cpu);
->
-> @@ -205,6 +229,8 @@ static void __init exynos_smp_prepare_cpus(unsigned int max_cpus)
->   	if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
->   		scu_enable(scu_base_addr());
->
-> +	exynos_smp_prepare_sram();
-> +
->   	/*
->   	 * Write the address of secondary startup into the
->   	 * system-wide flags register. The boot monitor waits
-> @@ -222,7 +248,8 @@ static void __init exynos_smp_prepare_cpus(unsigned int max_cpus)
->   		boot_addr = virt_to_phys(exynos4_secondary_startup);
->
->   		if (call_firmware_op(set_cpu_boot_addr, phys_cpu, boot_addr))
-> -			__raw_writel(boot_addr, cpu_boot_reg(phys_cpu));
-> +			if (cpu_boot_reg_base())
-
-Ditto.
-
-Best regards,
-Tomasz
+Will
