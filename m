@@ -1,39 +1,42 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri,  2 May 2014 17:41:16 +0100
-Subject: [RESEND PATCH 3/3] MAINTAINERS: add entry for generic PCI host
- controller driver
-In-Reply-To: <1399048876-11862-1-git-send-email-will.deacon@arm.com>
-References: <1399048876-11862-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1399048876-11862-4-git-send-email-will.deacon@arm.com>
+Date: Fri,  2 May 2014 17:41:13 +0100
+Subject: [RESEND PATCH 0/3] Support for Generic PCI Host Controller
+Message-ID: <1399048876-11862-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add myself as the maintainer for the generic PCI host controller driver.
+Hi all,
 
-Cc: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- MAINTAINERS | 8 ++++++++
- 1 file changed, 8 insertions(+)
+This is a resend of the generic PCI host controller patch I last posted
+in March:
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index e67ea2442041..d5db11484062 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -6740,6 +6740,14 @@ L:	linux-pci at vger.kernel.org
- S:	Maintained
- F:	drivers/pci/host/*designware*
- 
-+PCI DRIVER FOR GENERIC OF HOSTS
-+M:	Will Deacon <will.deacon@arm.com>
-+L:	linux-pci at vger.kernel.org
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	Maintained
-+F:	Documentation/devicetree/bindings/pci/host-generic-pci.txt
-+F:	drivers/pci/host/pci-host-generic.c
-+
- PCMCIA SUBSYSTEM
- P:	Linux PCMCIA Team
- L:	linux-pcmcia at lists.infradead.org
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/237540.html
+
+I've also included two additional patches to enable PCI for mach-virt
+and add a MAINTAINERS entry for the new driver (Arnd -- I'm happy to add
+you here as well if you like).
+
+I've tested successfully on a 3.15-rc3-based kernel with kvmtool and would
+really like to see this merged for 3.16.
+
+All feedback welcome,
+
+Will
+
+Will Deacon (3):
+  ARM: mach-virt: allow PCI support to be selected
+  PCI: ARM: add support for generic PCI host controller
+  MAINTAINERS: add entry for generic PCI host controller driver
+
+ .../devicetree/bindings/pci/host-generic-pci.txt   | 100 ++++++
+ MAINTAINERS                                        |   8 +
+ arch/arm/Kconfig                                   |   1 +
+ drivers/pci/host/Kconfig                           |   7 +
+ drivers/pci/host/Makefile                          |   1 +
+ drivers/pci/host/pci-host-generic.c                | 369 +++++++++++++++++++++
+ 6 files changed, 486 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/host-generic-pci.txt
+ create mode 100644 drivers/pci/host/pci-host-generic.c
+
 -- 
 1.9.2
