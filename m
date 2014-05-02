@@ -1,68 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 02 May 2014 21:29:30 +0200
-Subject: [RESEND PATCH 2/3] PCI: ARM: add support for generic PCI host
- controller
-In-Reply-To: <20140502190318.GE3179@obsidianresearch.com>
-References: <1399048876-11862-1-git-send-email-will.deacon@arm.com>
- <20140502184421.GF14645@arm.com> <20140502190318.GE3179@obsidianresearch.com>
-Message-ID: <12080862.flQZBvPba4@wuerfel>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 2 May 2014 21:36:15 +0200 (CEST)
+Subject: BUG: spinlock trylock failure on UP, i.MX28 3.12.15-rt25
+In-Reply-To: <alpine.DEB.2.02.1405022100351.6261@ionos.tec.linutronix.de>
+References: <534C3606.7010206@meduna.org> <534C731F.1050406@meduna.org>
+ <534DADF1.6060608@meduna.org> <20140422115439.GA20669@linutronix.de>
+ <20140422094657.5b6ca1e2@gandalf.local.home> <53569E05.8010600@linutronix.de>
+ <20140422134802.73fc1fa4@gandalf.local.home>
+ <20140422141650.7f43d5ba@gandalf.local.home>
+ <20140502183824.GH9178@linutronix.de>
+ <alpine.DEB.2.02.1405022100351.6261@ionos.tec.linutronix.de>
+Message-ID: <alpine.DEB.2.02.1405022134380.6261@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 02 May 2014 13:03:18 Jason Gunthorpe wrote:
-> 
-> > > Setup is called from probe, through pci_common_init_dev(), so that shouldn't
-> > > make a difference.
+On Fri, 2 May 2014, Thomas Gleixner wrote:
+> On Fri, 2 May 2014, Sebastian Andrzej Siewior wrote:
+> > * Steven Rostedt | 2014-04-22 14:16:50 [-0400]:
+> > > /*
+> > >  * Called by the local, per-CPU timer interrupt on SMP.
+> > >  */
+> > >@@ -1467,7 +1473,7 @@ void run_local_timers(void)
+> > > 		return;
+> > > 	}
+> > > 
+> > >-	if (!spin_do_trylock(&base->lock)) {
+> > >+	if (timer_should_raise_softirq(&base->lock)) {
+> > > 		raise_softirq(TIMER_SOFTIRQ);
+> > > 		return;
+> > > 	}
 > > 
-> > Given that the idea was to separate setup() and probe(), I didn't want to
-> > make the assumption that I was called in probe context.
+> > Okay. So Peter said that it is okay to apply this since FULL_NO_HZ users
+> > wouldn't complain on UP. I still wouldn't say it is broken but that is a
+> > different story.
+> > We have two users of this trylock. run_local_timers() which pops up
+> > quite often (and you patched here) and the other is
+> > get_next_timer_interrupt(). What do you suggest we do here? It is
+> > basically the same thing.
 > 
-> IMHO, we need to have clear purposes for setup() and probe().
-> 
-> Probe is well defined already, it requests resources, claims the
-> device, puts it in reset and then does some subsystem specific thing.
-> The interaction with probe and devm is also already well specified.
-> 
-> It doesn't matter for this driver, but look at mvebu, you cannot move
-> the interrupt, gpio and clock acquisitions from probe() to setup(), as
-> they could all trigger a defered probe. Better to be consistent,
-> especially if this is the golden reference driver we want everyone to
-> follow (sorry Will)
+> It's different as it CANNOT fail on UP. That's called from the idle
+> code and there is no way that anything holds that lock on UP when idle
+> runs.
 
-Fair enough. It shouldn't be hard to move.
+So yeah, you are right, that it's called from irq_exit() so it needs
+an annotation at least. Maybe it's really cleaner to make it #if SMP
+as well just for clarity raisins.
 
-> To me setup() is more like netdev open(), so it should just do that
-> final step to enable the links and bring up the PCI network and be
-> ready to run PCI discovery. Consider, someday we might have an
-> unsetup() for power mangement reasons, just like we have a close() in
-> netdev.
+Thanks,
 
-I expect setup() to just go away in the long run for loadable host
-controllers, and get merged into probe().
-
-> If the long term plan is to keep probe() then I don't think it makes
-> sense to move probe() duties into setup(). That just restricts what we
-> can do with the setup() call if setup() is now required to always
-> handle defered probe and so forth.
-
-setup() makes sense for the traditional ARM32 PCI support with
-nr_controllers > 1: dove, kirkwood, mv78xx0, orion5x and iop13xx
-(most of these are gradually getting replace with pci-mvebu.c,
-which doesn't do that, as you know). All other classic drivers only
-support one host bridge anyway, and the loadable driver just
-use one domain per host bridge, which means you lose all the
-advantages of having pci_common_init_dev() assign the bus
-numbers and call setup functions for each host bridge.
-
-It should be fine to have a trivial setup function like this
-
-static int gen_pci_setup(int nr, struct pci_sys_data *sys)
-{
-	struct gen_pci *pci = sys->private_data;
-	list_splice_init(pci->resource, sys->resources);
-	return 1;
-}
-
-and do everything in probe().
-
-	Arnd
+	tglx
