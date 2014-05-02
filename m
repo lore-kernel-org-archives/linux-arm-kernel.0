@@ -1,54 +1,36 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 2 May 2014 19:10:17 +0100
-Subject: [PATCH] arm64: Implement cache_line_size() based on CTR_EL0.CWG
-In-Reply-To: <20140502173121.GB5341@arm.com>
-References: <1399046132-5760-1-git-send-email-catalin.marinas@arm.com>
- <20140502171247.GG20642@arm.com> <20140502173121.GB5341@arm.com>
-Message-ID: <20140502181017.GC14645@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 02 May 2014 20:11:04 +0200
+Subject: [RESEND PATCH 1/3] ARM: mach-virt: allow PCI support to be
+ selected
+In-Reply-To: <1399048876-11862-2-git-send-email-will.deacon@arm.com>
+References: <1399048876-11862-1-git-send-email-will.deacon@arm.com>
+ <1399048876-11862-2-git-send-email-will.deacon@arm.com>
+Message-ID: <4646975.AnXvL4OPrE@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 02, 2014 at 06:31:21PM +0100, Catalin Marinas wrote:
-> On Fri, May 02, 2014 at 06:12:47PM +0100, Will Deacon wrote:
-> > On Fri, May 02, 2014 at 04:55:32PM +0100, Catalin Marinas wrote:
-> > > The hardware provides the maximum cache line size in the system via the
-> > > CTR_EL0.CWG bits. This patch implements the cache_line_size() function
-> > > to read such information, together with a sanity check if the statically
-> > > defined L1_CACHE_BYTES is smaller than the hardware value.
-
-[...]
-
-> > > +static inline int cache_line_size(void)
-> > > +{
-> > > +	u32 cwg = cache_type_cwg();
-> > > +	return cwg ? 4 << cwg : L1_CACHE_BYTES;
-> > > +}
-> > 
-> > Hmmm, but the CWG is not the same thing as the L1 cache line size, so
-> > something is amiss here. If I have an L2 cache with bigger lines, then
-> > reporting L1_CACHE_BYTES is wrong here.
+On Friday 02 May 2014 17:41:14 Will Deacon wrote:
+> mach-virt can make use of virtio-pci devices, which requires the guest
+> kernel to have PCI support selected.
 > 
-> L1 is usually DMinSize while CWG is the maximum in the system. If a
-> system has a system cache, it should be covered by CWG (especially those
-> semi-transparent system caches).
+> This patch selects CONFIG_MIGHT_HAVE_PCI when CONFIG_ARCH_VIRT=y.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index db3c5414223e..f24356c4d630 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -941,6 +941,7 @@ config ARCH_VIRT
+>         select ARM_GIC
+>         select ARM_PSCI
+>         select HAVE_ARM_ARCH_TIMER
+> +       select MIGHT_HAVE_PCI
 
-I wouldn't bet on that, but it should at least define the maximum line size
-of your inner caches.
+I would actually just put it under ARCH_MULTIPLATFORM. Anything can
+have PCI really, and it doesn't cause any harm.
 
-> Using this macro is misleading indeed but Linux has lots of assumptions
-> about the cache line size and only using L1_CACHE_BYTES, including cache
-> line aligned sections. I consider L1 in this context to actually mean
-> any cache line flushed by the standard DC instructions.
-
-Yes, Linux uses L1_CACHE_BYTES and __cacheline_aligned etc for all sorts of
-cases. Some of these are performance improvements, and should be as small as
-possible (since they probably just refer to the L1 size for coherent CPUs)
-but others are critical for correct operation, and should be large enough to
-get things right (like early boot synchronisation).
-
-I suppose that means we always use CWG and should loudly if it's bogus...
-which is exactly what your patch does!
-
-  Acked-by: Will Deacon <will.deacon@arm.com>
-
-Will
+	Arnd
