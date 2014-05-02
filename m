@@ -1,119 +1,95 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 1 May 2014 22:37:21 -0700
-Subject: [PATCH RESEND 3/5] ARM: BCM63XX: add BCM63138 minimal Device Tree
-In-Reply-To: <4701106.5EnjdVQgVO@wuerfel>
-References: <1398130758-19456-1-git-send-email-f.fainelli@gmail.com>
- <1398130758-19456-4-git-send-email-f.fainelli@gmail.com>
- <4701106.5EnjdVQgVO@wuerfel>
-Message-ID: <CAGVrzcac=jUVtjZrX9NrNC7=eOKVGn6cBabmm98qD9k7Q5BtEg@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 02 May 2014 14:44:56 +0900
+Subject: [PATCH v5 0/6] Support 4 levels of translation tables for ARM64
+In-Reply-To: <000001cf64e5$c2d71e40$48855ac0$@samsung.com>
+References: <000001cf64e5$c2d71e40$48855ac0$@samsung.com>
+Message-ID: <06d401cf65c9$a60e2350$f22a69f0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-04-22 3:52 GMT-07:00 Arnd Bergmann <arnd@arndb.de>:
-> On Monday 21 April 2014 18:39:16 Florian Fainelli wrote:
->>
->> +#include "skeleton.dtsi"
->> +
->> +/ {
->> +       compatible = "brcm,bcm63138";
->> +       model = "Broadcom BCM63138 DSL SoC";
->> +       interrupt-parent = <&gic>;
->> +
->> +       cpus {
->> +               #address-cells = <1>;
->> +               #size-cells = <0>;
->> +
->> +               cpu at 0 {
->> +                       device_type = "cpu";
->> +                       compatible = "arm,cortex-a9";
->> +                       next-level-cache = <&L2>;
->> +                       reg = <0>;
->> +               };
->> +       };
->
-> Even if you don't support SMP yet, I can see no reason not
-> to list both CPUs here. The binding is known and the code
-> should ignore the extra cores if it doesn't know how to
-> turn them on.
+Jungseok Lee wrote:
+> 
+> Hi All,
+> 
+> This v5 patchset supports 4 levels of tranlsation tables for ARM64.
+> 
+> Firstly, the patchset introduces virtual address space size and
+> translation level options as taking account into the comment from
+> Catalin Marinas:
+> http://www.spinics.net/linux/lists/arm-kernel/msg319552.html
+> 
+> Then, it implements 4 levels of translation tables for native, HYP and
+> stage2 sides.
+> 
+> All ARMv8 and ARMv7 related changes are validated with FastModels+kvmtool
+> and
+> A15+QEMU, respectively.
+> 
+> Changes since v1:
+> - fixed unmatched data types as per Steve's comment
+> - removed unnecessary #ifdef in arch/arm64/mm/* as per Steve's comment
+> - revised create_pgd_entry to deal with PUD entry as per Steve's comment
+> - introduced a macro for initial memblock limit as per Steve's comment
+> - dropped "Fix line length exceeding 80 characters" patch as per Marc's
+> comment
+> - removed unnecessary #ifdef in arch/arm/kvm/mmu.c as per Marc's comment
+> - added a macro for a number of objects of as per Marc's comment
+> 
+> Changes since v2:
+> - revised some macros in a generic way as per Marc's comment
+> - added a 2 level option for kvm mmu cache allocation as per Marc's
+> comment
+> 
+> Changes since v3:
+> - added #ifdef to decide swapper and idmap size as per Steve's comment
+> - introduced Steve's create_pgd_entry
+> 
+> Changes since v4:
+> - hided translation level options from menuconfig as per Catalin's comment
+> - dropped some printk changes as per Mitchel's comment
+> - squashed VA_BITS related patches into a single patch
+> 
+> Jungseok Lee (6):
+>   arm64: Use pr_* instead of printk
+>   arm64: Introduce VA_BITS and translation level options
+>   arm64: Add a description on 48-bit address space with 4KB pages
+>   arm64: Add 4 levels of page tables definition with 4KB pages
+>   arm64: mm: Implement 4 levels of translation tables
+>   arm64: KVM: Implement 4 levels of translation tables for HYP and
+>     stage2
+> 
+>  Documentation/arm64/memory.txt                |   59 ++++++++++++++---
+>  arch/arm/include/asm/kvm_mmu.h                |   10 +++
+>  arch/arm/kvm/mmu.c                            |   88
++++++++++++++++++++++----
+>  arch/arm64/Kconfig                            |   53 ++++++++++++++-
+>  arch/arm64/include/asm/kvm_arm.h              |   34 ++++++++--
+>  arch/arm64/include/asm/kvm_mmu.h              |   12 ++++
+>  arch/arm64/include/asm/memblock.h             |    6 ++
+>  arch/arm64/include/asm/memory.h               |    6 +-
+>  arch/arm64/include/asm/page.h                 |    6 +-
+>  arch/arm64/include/asm/pgalloc.h              |   24 ++++++-
+>  arch/arm64/include/asm/pgtable-4level-hwdef.h |   50 ++++++++++++++
+>  arch/arm64/include/asm/pgtable-4level-types.h |   71 ++++++++++++++++++++
+>  arch/arm64/include/asm/pgtable-hwdef.h        |    8 ++-
+>  arch/arm64/include/asm/pgtable.h              |   53 +++++++++++++--
+>  arch/arm64/include/asm/tlb.h                  |   11 +++-
+>  arch/arm64/kernel/head.S                      |   46 ++++++++++---
+>  arch/arm64/kernel/traps.c                     |   13 ++--
+>  arch/arm64/mm/fault.c                         |    1 +
+>  arch/arm64/mm/mmu.c                           |   16 +++--
+>  19 files changed, 507 insertions(+), 60 deletions(-)
+>  create mode 100644 arch/arm64/include/asm/pgtable-4level-hwdef.h
+>  create mode 100644 arch/arm64/include/asm/pgtable-4level-types.h
+> 
+> --
+> 1.7.10.4
 
-OK.
+Looks good to me and Samsung SoCs stuff :-)
 
->
->> +
->> +       /* ARM bus */
->> +       axi at 80000000 {
->> +               compatible = "simple-bus";
->> +               ranges = <0 0x80000000 0x783003>;
->> +               reg = <0x80000000 0x783003>;
->
-> The length seems odd, I would expect that the bus actually
-> translates all addresses in the 0x80000000 range to downstream
-> devices even if there is nothing connected. Just round it up
-> to your best knowledge.
->
-> I would also drop the 'reg' property. Since you don't have a
-> specific "compatible" value, there is no way to use the registers
-> in this node.
+All of this series:
 
-OK.
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
->
->> +               #address-cells = <1>;
->> +               #size-cells = <1>;
->> +
->> +               L2: cache-controller at 1d000 {
->> +                       compatible = "arm,pl310-cache";
->> +                       reg = <0x1d000 0x1000>;
->> +                       cache-unified;
->> +                       cache-level = <2>;
->> +                       interrupts = <GIC_PPI 0 IRQ_TYPE_LEVEL_HIGH>;
->> +               };
->> +
->> +               mpcore at 1e000 {
->> +                       compatible = "simple-bus";
->> +                       reg = <0x1e000 0x20000>;
->> +                       ranges = <0 0x1e000 0x20000>;
->> +                       #address-cells = <1>;
->> +                       #size-cells = <1>;
->
->
-> Same thing here.
->
-> Also, can you explain why there is a separate 'mpcore' bus, and why the
-> cache controller is not part of that?
->
-> Do you have reason to believe that this is how the hardware actually
-> looks?
-
-I think I was just mistaken by how the register space looks like and
-is named, but there probably is not a separate underlying bus, so I
-will move this up one level as it should.
-
->
->> +
->> +       /* Legacy UBUS base */
->> +       ubus at fffe8000 {
->> +               compatible = "simple-bus";
->> +               reg = <0xfffe8000 0x8053>;
->> +               #address-cells = <1>;
->> +               #size-cells = <1>;
->> +               ranges = <0 0xfffe8000 0x8053>;
->> +       };
->> +};
->
->
-> Again, use a proper 'length' here and remove the 'reg' property.
-
-
->
->         Arnd
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
-
--- 
-Florian
+Thanks,
+Kukjin
