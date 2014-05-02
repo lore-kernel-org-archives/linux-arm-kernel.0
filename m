@@ -1,93 +1,110 @@
 From: a.kesavan@samsung.com (Abhilash Kesavan)
-Date: Fri,  2 May 2014 20:55:31 +0530
-Subject: [PATCH v4 3/5] arm: exynos: Add generic cluster power control
- functions
-In-Reply-To: <1398528348-21214-4-git-send-email-a.kesavan@samsung.com>
-References: <1398528348-21214-4-git-send-email-a.kesavan@samsung.com>
-Message-ID: <1399044331-15707-1-git-send-email-a.kesavan@samsung.com>
+Date: Fri,  2 May 2014 20:55:46 +0530
+Subject: [PATCH v4 4/5] ARM: dts: exynos5420: add CCI node
+In-Reply-To: <1398528348-21214-5-git-send-email-a.kesavan@samsung.com>
+References: <1398528348-21214-5-git-send-email-a.kesavan@samsung.com>
+Message-ID: <1399044346-15742-1-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add generic cluster power control functions for exynos based SoCS
-for cluster power up/down and to know the cluster status.
+From: Andrew Bresticker <abrestic@chromium.org>
 
+Add device-tree bindings for the ARM CCI-400 on Exynos5420.  There
+are two slave interfaces: one for the A15 cluster and one for the
+A7 cluster.
+
+Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
 Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
 ---
- arch/arm/mach-exynos/common.h   |    3 +++
- arch/arm/mach-exynos/pm.c       |   30 ++++++++++++++++++++++++++++++
- arch/arm/mach-exynos/regs-pmu.h |    6 ++++++
- 3 files changed, 39 insertions(+)
+ arch/arm/boot/dts/exynos5420.dtsi |   27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-index a7dbb5f..03b8bb2 100644
---- a/arch/arm/mach-exynos/common.h
-+++ b/arch/arm/mach-exynos/common.h
-@@ -66,5 +66,8 @@ extern void exynos_sys_powerdown_conf(enum sys_powerdown mode);
- extern void exynos_cpu_powerdown(int cpu);
- extern void exynos_cpu_powerup(int cpu);
- extern int  exynos_cpu_power_state(int cpu);
-+extern void exynos_cluster_powerdown(int cluster);
-+extern void exynos_cluster_powerup(int cluster);
-+extern int  exynos_cluster_power_state(int cluster);
+diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+index ff496ad..3140138 100644
+--- a/arch/arm/boot/dts/exynos5420.dtsi
++++ b/arch/arm/boot/dts/exynos5420.dtsi
+@@ -58,6 +58,7 @@
+ 			compatible = "arm,cortex-a15";
+ 			reg = <0x0>;
+ 			clock-frequency = <1800000000>;
++			cci-control-port = <&cci_control1>;
+ 		};
  
- #endif /* __ARCH_ARM_MACH_EXYNOS_COMMON_H */
-diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-index 6651028..f02d864 100644
---- a/arch/arm/mach-exynos/pm.c
-+++ b/arch/arm/mach-exynos/pm.c
-@@ -136,6 +136,36 @@ int exynos_cpu_power_state(int cpu)
- 			S5P_CORE_LOCAL_PWR_EN);
- }
+ 		cpu1: cpu at 1 {
+@@ -65,6 +66,7 @@
+ 			compatible = "arm,cortex-a15";
+ 			reg = <0x1>;
+ 			clock-frequency = <1800000000>;
++			cci-control-port = <&cci_control1>;
+ 		};
  
-+/**
-+ * exynos_common_powerdown : power down the specified cluster
-+ * @cluster : the cluster to power down
-+ */
-+void exynos_cluster_powerdown(int cluster)
-+{
-+	__raw_writel(0, EXYNOS_COMMON_CONFIGURATION(cluster));
-+}
-+
-+/**
-+ * exynos_cluster_powerup : power up the specified cluster
-+ * @cluster : the cluster to power up
-+ */
-+void exynos_cluster_powerup(int cluster)
-+{
-+	__raw_writel(S5P_CORE_LOCAL_PWR_EN,
-+		     EXYNOS_COMMON_CONFIGURATION(cluster));
-+}
-+
-+/**
-+ * exynos_cluster_power_state : returns the power state of the cluster
-+ * @cluster : the cluster to retrieve the power state from
-+ *
-+ */
-+int exynos_cluster_power_state(int cluster)
-+{
-+	return (__raw_readl(EXYNOS_COMMON_STATUS(cluster)) &
-+			S5P_CORE_LOCAL_PWR_EN);
-+}
-+
- /* For Cortex-A9 Diagnostic and Power control register */
- static unsigned int save_arm_register[2];
+ 		cpu2: cpu at 2 {
+@@ -72,6 +74,7 @@
+ 			compatible = "arm,cortex-a15";
+ 			reg = <0x2>;
+ 			clock-frequency = <1800000000>;
++			cci-control-port = <&cci_control1>;
+ 		};
  
-diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
-index 0bdfcbc..6685ebf 100644
---- a/arch/arm/mach-exynos/regs-pmu.h
-+++ b/arch/arm/mach-exynos/regs-pmu.h
-@@ -127,6 +127,12 @@
- #define EXYNOS_ARM_CORE_STATUS(_nr)		\
- 			(EXYNOS_ARM_CORE_CONFIGURATION(_nr) + 0x4)
+ 		cpu3: cpu at 3 {
+@@ -79,6 +82,7 @@
+ 			compatible = "arm,cortex-a15";
+ 			reg = <0x3>;
+ 			clock-frequency = <1800000000>;
++			cci-control-port = <&cci_control1>;
+ 		};
  
-+#define EXYNOS_ARM_COMMON_CONFIGURATION		S5P_PMUREG(0x2500)
-+#define EXYNOS_COMMON_CONFIGURATION(_nr)	\
-+			(EXYNOS_ARM_COMMON_CONFIGURATION + (0x80 * (_nr)))
-+#define EXYNOS_COMMON_STATUS(_nr)		\
-+			(EXYNOS_COMMON_CONFIGURATION(_nr) + 0x4)
+ 		cpu4: cpu at 100 {
+@@ -86,6 +90,7 @@
+ 			compatible = "arm,cortex-a7";
+ 			reg = <0x100>;
+ 			clock-frequency = <1000000000>;
++			cci-control-port = <&cci_control0>;
+ 		};
+ 
+ 		cpu5: cpu at 101 {
+@@ -93,6 +98,7 @@
+ 			compatible = "arm,cortex-a7";
+ 			reg = <0x101>;
+ 			clock-frequency = <1000000000>;
++			cci-control-port = <&cci_control0>;
+ 		};
+ 
+ 		cpu6: cpu at 102 {
+@@ -100,6 +106,7 @@
+ 			compatible = "arm,cortex-a7";
+ 			reg = <0x102>;
+ 			clock-frequency = <1000000000>;
++			cci-control-port = <&cci_control0>;
+ 		};
+ 
+ 		cpu7: cpu at 103 {
+@@ -107,6 +114,26 @@
+ 			compatible = "arm,cortex-a7";
+ 			reg = <0x103>;
+ 			clock-frequency = <1000000000>;
++			cci-control-port = <&cci_control0>;
++		};
++	};
 +
- /* Only for EXYNOS4210 */
- #define S5P_CMU_CLKSTOP_LCD1_LOWPWR	S5P_PMUREG(0x1154)
- #define S5P_CMU_RESET_LCD1_LOWPWR	S5P_PMUREG(0x1174)
++	cci at 10d20000 {
++		compatible = "arm,cci-400";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		reg = <0x10d20000 0x1000>;
++		ranges = <0x0 0x10d20000 0x6000>;
++
++		cci_control0: slave-if at 4000 {
++			compatible = "arm,cci-400-ctrl-if";
++			interface-type = "ace";
++			reg = <0x4000 0x1000>;
++		};
++		cci_control1: slave-if at 5000 {
++			compatible = "arm,cci-400-ctrl-if";
++			interface-type = "ace";
++			reg = <0x5000 0x1000>;
+ 		};
+ 	};
+ 
 -- 
 1.7.9.5
