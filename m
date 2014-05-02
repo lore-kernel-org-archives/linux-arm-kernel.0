@@ -1,55 +1,60 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 2 May 2014 22:04:29 +0530
-Subject: [PATCH v7] DMA: sun6i: Add driver for the Allwinner A31 DMA
- controller
-In-Reply-To: <20140430215322.GH3000@lukather>
-References: <20140430070408.GR32284@intel.com> <20140430215322.GH3000@lukather>
-Message-ID: <20140502163429.GA32284@intel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 2 May 2014 17:50:12 +0100
+Subject: [RFC PATCH] sched_clock: also call
+ register_current_timer_delay() if possible
+In-Reply-To: <20140430165653.GA26716@linutronix.de>
+References: <1398860614-29469-1-git-send-email-bigeasy@linutronix.de>
+ <20140430124800.GC21876@arm.com> <5360F42C.9080401@linutronix.de>
+ <20140430132628.GC15719@arm.com>
+ <20140430165653.GA26716@linutronix.de>
+Message-ID: <20140502165011.GC20642@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 30, 2014 at 02:53:22PM -0700, Maxime Ripard wrote:
-> Hi Vinod,
+On Wed, Apr 30, 2014 at 05:56:53PM +0100, Sebastian Andrzej Siewior wrote:
+> * Will Deacon | 2014-04-30 14:26:28 [+0100]:
+> >I don't think that's the problem I was referring to. What I mean is that a
+> >clocksource might overflow at any number of bits, so the delay calculation
+> >needs to take this into account when it does:
+> >
+> >	while ((get_cycles() - start) < cycles)
+> >
+> >because a premature overflow from get_cycles() will cause us to return
+> >early. The solution is to mask the result of the subtraction before the
+> >comparison to match the width of the clock.
 > 
-> On Wed, Apr 30, 2014 at 12:34:08PM +0530, Vinod Koul wrote:
-> > On Thu, Apr 24, 2014 at 04:22:44PM +0200, Maxime Ripard wrote:
-> > > +static inline void sun6i_dma_free(struct sun6i_dma_dev *sdc)
-> > > +{
-> > > +	int i;
-> > > +
-> > > +	for (i = 0; i < NR_MAX_VCHANS; i++) {
-> > > +		struct sun6i_vchan *vchan = &sdc->vchans[i];
-> > > +
-> > > +		list_del(&vchan->vc.chan.device_node);
-> > > +		tasklet_kill(&vchan->vc.task);
-> > > +	}
-> > > +
-> > > +	tasklet_kill(&sdc->task);
-> > This is again not good. see http://lwn.net/Articles/588457/
-> > At this point HW can still generate interrupts or you can have irq running!
-> 
-> I'm not sure to fully understand the issue here, but what is not good?
-> the first or the second tasklet_kill calls, or both?
-> 
-> From what I understood, the issue is only there whenever you are
-> calling tasklet_disable without making sure that no one will schedule
-> your tasklet before disabling it.
-> 
-> But the point is I don't actually use either _enable/_disable. I might
-> be wrong in not using those functions, but I don't really see how I
-> can be impacted.
+> So I got this:
 
-Well that was one part of it. How do you ensure the tasklet is not scheduled
-while and after you are killing it. You need to ensure irq is disabled and pending irqs
-have finished processing. I dont see that bit.
+[...]
 
--- 
-~Vinod
+> Is this what you had in mind? If so, there is one user of
+> register_current_timer_delay() which I didn't convert. That is
+> arch_timer_delay_timer_register(). It returns arch_counter_get_cntvct()
+> which seems to return an u64 (which is truncated to 32bit). However
+> arch_counter_register() registers the clocksource with 56bits. So this
+> does not look too good, right?
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140502/201766f9/attachment.sig>
+That should be fine, I think there's only an issue if you can overflow
+twice during a single delay operation, so the thing would need to be
+ticking at quite a frequency for that to happen!
+
+> The other thing I noticed is
+> |arch/arm/include/asm/timex.h:typedef unsigned long cycles_t;
+> 
+> This works for clocksource because timekeeping is using
+> |include/linux/clocksource.h:typedef u64 cycle_t;
+> 
+> instead.
+> Do I assume correct, that the arch_timer is really providing a number
+> wider than 32bit? Shouldn't I then promote cycles_t to 64bit if that
+> timer is active? Unless you have better suggestions of course :)
+
+The architected timer is guaranteed to be at least 56 bits wide, but I
+think we can safely truncate delay sources to 32-bit.
+
+So actually, we only have a problem if people want to register delay clocks
+smaller than 32-bit. Maybe it's simpler to enforce at least 32-bit precision
+and don't bother with the registration if the clock is smaller than that?
+You could use sizeof(cycles_t) to parameterise that.
+
+Will
