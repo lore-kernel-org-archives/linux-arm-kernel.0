@@ -1,77 +1,113 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 02 May 2014 14:32:08 +0200
-Subject: [RFC] Describing arbitrary bus mastering relationships in DT
-In-Reply-To: <20140502110557.GA18452@ulmo>
-References: <20140501173248.GD3732@e103592.cambridge.arm.com>
- <20140502110557.GA18452@ulmo>
-Message-ID: <4369315.NLgjZW6qVF@wuerfel>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Fri,  2 May 2014 18:17:32 +0530
+Subject: [PATCH v3 1/4] usb: ohci-exynos: Use struct device instead of
+ platform_device
+In-Reply-To: <1399034855-9686-1-git-send-email-gautam.vivek@samsung.com>
+References: <1399034855-9686-1-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <1399034855-9686-2-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 02 May 2014 13:05:58 Thierry Reding wrote:
-> 
-> Let me see if I understood the above proposal by trying to translate it
-> into a simple example for a specific use-case. On Tegra for example we
-> have various units that can either access system memory directly or use
-> the IOMMU to translate accesses for them. One such unit would be the
-> display controller that scans out a framebuffer from memory.
+Change to use struct device instead of struct platform_device
+for some static functions.
 
-Can you explain how the decision is made whether the IOMMU gets used
-or not? In all cases I've seen so far, I think we can hardwire this
-in DT, and only expose one or the other. Are both ways used
-concurrently?
+Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
+Acked-by: Jingoo Han <jg1.han@samsung.com>
+---
 
->         dc at 0,54200000 {
->                 ...
-> 
->                 slave {
->                         /*
->                          * 2 is the memory controller client ID of the
->                          * display controller.
->                          */
->                         iommu = <&iommu 2>;
-> 
->                         ...
->                 };
->         };
-> 
-> Admittedly this is probably a lot more trivial than what you're looking
-> for. There's no need for virtualization here, the IOMMU is simply used
-> to isolate memory accesses by devices. Still it's a use-case that needs
-> to be supported and one that at least Tegra and Exynos have an immediate
-> need for.
-> 
-> So the above isn't much different from the proposed bindings, except
-> that the iommu property is now nested within a slave node. I guess this
-> gives us a lot more flexibility to extend the description of a slave as
-> needed to represent more complex scenarios.
+Changes from v2:
+ - none
 
-This looks rather complicated to parse automatically in the generic
-DT code when we try to decide which dma_map_ops to use. We'd have
-to look for 'slave' nodes in each device we instatiate and then see
-if they use an iommu or not.
+ drivers/usb/host/ohci-exynos.c |   20 +++++++++-----------
+ 1 file changed, 9 insertions(+), 11 deletions(-)
+
+diff --git a/drivers/usb/host/ohci-exynos.c b/drivers/usb/host/ohci-exynos.c
+index 9cf80cb..05f00e3 100644
+--- a/drivers/usb/host/ohci-exynos.c
++++ b/drivers/usb/host/ohci-exynos.c
+@@ -39,18 +39,18 @@ struct exynos_ohci_hcd {
+ 	struct usb_otg *otg;
+ };
  
-> Also, are slaves/slave-names and slave subnodes mutually exclusive? It
-> sounds like slaves/slave-names would be a specialization of the slave
-> subnode concept for the trivial cases. Would the following be an
-> equivalent description of the above example?
-> 
->         dc at 0,54200000 {
->                 ...
-> 
->                 slaves = <&iommu 2>;
->         };
-> 
-> I don't see how it could be exactly equivalent since it misses context
-> regarding the type of slave that's being interacted with. Perhaps that
-> could be solved by making that knowledge driver-specific (i.e. the
-> driver for the Tegra display controller will know that it can only be
-> the master on an IOMMU and therefore derive the slave type). Or the
-> slave's type could be derived from the slave-names property.
-
-I'd rather have a device-specific property that tells the driver
-about things the iommu driver doesn't need to know but the master
-does. In most cases, we should be fine without a name attached to the
-slave.
-
-	Arnd
+-static void exynos_ohci_phy_enable(struct platform_device *pdev)
++static void exynos_ohci_phy_enable(struct device *dev)
+ {
+-	struct usb_hcd *hcd = platform_get_drvdata(pdev);
++	struct usb_hcd *hcd = dev_get_drvdata(dev);
+ 	struct exynos_ohci_hcd *exynos_ohci = to_exynos_ohci(hcd);
+ 
+ 	if (exynos_ohci->phy)
+ 		usb_phy_init(exynos_ohci->phy);
+ }
+ 
+-static void exynos_ohci_phy_disable(struct platform_device *pdev)
++static void exynos_ohci_phy_disable(struct device *dev)
+ {
+-	struct usb_hcd *hcd = platform_get_drvdata(pdev);
++	struct usb_hcd *hcd = dev_get_drvdata(dev);
+ 	struct exynos_ohci_hcd *exynos_ohci = to_exynos_ohci(hcd);
+ 
+ 	if (exynos_ohci->phy)
+@@ -139,7 +139,7 @@ skip_phy:
+ 
+ 	platform_set_drvdata(pdev, hcd);
+ 
+-	exynos_ohci_phy_enable(pdev);
++	exynos_ohci_phy_enable(&pdev->dev);
+ 
+ 	err = usb_add_hcd(hcd, irq, IRQF_SHARED);
+ 	if (err) {
+@@ -150,7 +150,7 @@ skip_phy:
+ 	return 0;
+ 
+ fail_add_hcd:
+-	exynos_ohci_phy_disable(pdev);
++	exynos_ohci_phy_disable(&pdev->dev);
+ fail_io:
+ 	clk_disable_unprepare(exynos_ohci->clk);
+ fail_clk:
+@@ -168,7 +168,7 @@ static int exynos_ohci_remove(struct platform_device *pdev)
+ 	if (exynos_ohci->otg)
+ 		exynos_ohci->otg->set_host(exynos_ohci->otg, &hcd->self);
+ 
+-	exynos_ohci_phy_disable(pdev);
++	exynos_ohci_phy_disable(&pdev->dev);
+ 
+ 	clk_disable_unprepare(exynos_ohci->clk);
+ 
+@@ -190,7 +190,6 @@ static int exynos_ohci_suspend(struct device *dev)
+ {
+ 	struct usb_hcd *hcd = dev_get_drvdata(dev);
+ 	struct exynos_ohci_hcd *exynos_ohci = to_exynos_ohci(hcd);
+-	struct platform_device *pdev = to_platform_device(dev);
+ 	bool do_wakeup = device_may_wakeup(dev);
+ 	int rc = ohci_suspend(hcd, do_wakeup);
+ 
+@@ -200,7 +199,7 @@ static int exynos_ohci_suspend(struct device *dev)
+ 	if (exynos_ohci->otg)
+ 		exynos_ohci->otg->set_host(exynos_ohci->otg, &hcd->self);
+ 
+-	exynos_ohci_phy_disable(pdev);
++	exynos_ohci_phy_disable(dev);
+ 
+ 	clk_disable_unprepare(exynos_ohci->clk);
+ 
+@@ -211,14 +210,13 @@ static int exynos_ohci_resume(struct device *dev)
+ {
+ 	struct usb_hcd *hcd			= dev_get_drvdata(dev);
+ 	struct exynos_ohci_hcd *exynos_ohci	= to_exynos_ohci(hcd);
+-	struct platform_device *pdev		= to_platform_device(dev);
+ 
+ 	clk_prepare_enable(exynos_ohci->clk);
+ 
+ 	if (exynos_ohci->otg)
+ 		exynos_ohci->otg->set_host(exynos_ohci->otg, &hcd->self);
+ 
+-	exynos_ohci_phy_enable(pdev);
++	exynos_ohci_phy_enable(dev);
+ 
+ 	ohci_resume(hcd, false);
+ 
+-- 
+1.7.10.4
