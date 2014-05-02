@@ -1,69 +1,44 @@
-From: Nikolay.Borisov@arm.com (Nikolay Borisov)
-Date: Fri,  2 May 2014 16:37:36 +0100
-Subject: [PATCH v2] ARM: unwinder: Fix handling of 'fp' in thumb2 mode
-Message-ID: <1399045056-26751-1-git-send-email-Nikolay.Borisov@arm.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Fri, 2 May 2014 11:42:32 -0400
+Subject: [PATCH v2 1/2] ahci: imx: add namespace for register enums
+In-Reply-To: <1397803466-28411-2-git-send-email-shawn.guo@freescale.com>
+References: <1397803466-28411-1-git-send-email-shawn.guo@freescale.com>
+ <1397803466-28411-2-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20140502154232.GI10204@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The thread_save_fp macro has been defined so that it always reads the fp member
-of the cpu_context_save struct. However, in the case of THUMB2 the fp is saved
-not in the fp (r11) member but rather in r7.
+On Fri, Apr 18, 2014 at 02:44:25PM +0800, Shawn Guo wrote:
+> Update register enums a little bit to add proper namespace prefix, and
+> have the names match i.MX reference manual.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> ---
+>  drivers/ata/ahci_imx.c | 14 +++++++-------
+>  1 file changed, 7 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/ata/ahci_imx.c b/drivers/ata/ahci_imx.c
+> index 497c7ab..009a074 100644
+> --- a/drivers/ata/ahci_imx.c
+> +++ b/drivers/ata/ahci_imx.c
+> @@ -29,9 +29,9 @@
+>  #include "ahci.h"
+>  
+>  enum {
+> -	PORT_PHY_CTL = 0x178,			/* Port0 PHY Control */
+> -	PORT_PHY_CTL_PDDQ_LOC = 0x100000,	/* PORT_PHY_CTL bits */
+> -	HOST_TIMER1MS = 0xe0,			/* Timer 1-ms */
+> +	IMX_SATA_TIMER1MS			= 0x00e0,
+> +	IMX_SATA_P0PHYCR			= 0x0178,
 
-This patch changes the way the macro is defined such that FP is read from the
-correct place depending on whether we are a THUMB2 kernel or not. This enables
-the backtrace in sitaution such as "echo t > /proc/sysrq-trigger" or the
-function in which a process sleeping when "ps -Al" is invoked.
+P0PHYCR isn't really readily dechipherable to "Port0 PHY Control".
+Probably keeping the comment is better?  Also, constant names don't
+necessarily have to be exactly the same as hardware manuals.  If
+easier to understand and map back (via comment or whatever), using
+more humanly-readable names is completely fine.  Also, maybe IMX_SATA_
+is a bit too long for prefix?
 
-Another place where similar change is requried is when working with pt_reg.
-regs->ARM_fp is defined such that r11 is always referenced as the frame pointer,
-so the definition of ARM_fp needs to change depending on the type of kernel we
-are running.
+Thanks.
 
-Changes since v1:
-* Added changes for the pt_reg structure.
-
-Signed-off-by: Nikolay Borisov <Nikolay.Borisov@arm.com>
-
-handle the case when we've got regs present
----
- arch/arm/include/asm/thread_info.h | 6 ++++++
- arch/arm/include/uapi/asm/ptrace.h | 4 ++++
- 2 files changed, 10 insertions(+)
-
-diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
-index f989d7c..e4e4208 100644
---- a/arch/arm/include/asm/thread_info.h
-+++ b/arch/arm/include/asm/thread_info.h
-@@ -114,8 +114,14 @@ static inline struct thread_info *current_thread_info(void)
- 	((unsigned long)(task_thread_info(tsk)->cpu_context.pc))
- #define thread_saved_sp(tsk)	\
- 	((unsigned long)(task_thread_info(tsk)->cpu_context.sp))
-+
-+#ifndef CONFIG_THUMB2_KERNEL
- #define thread_saved_fp(tsk)	\
- 	((unsigned long)(task_thread_info(tsk)->cpu_context.fp))
-+#else
-+#define thread_saved_fp(tsk)	\
-+	((unsigned long)(task_thread_info(tsk)->cpu_context.r7))
-+#endif
- 
- extern void crunch_task_disable(struct thread_info *);
- extern void crunch_task_copy(struct thread_info *, void *);
-diff --git a/arch/arm/include/uapi/asm/ptrace.h b/arch/arm/include/uapi/asm/ptrace.h
-index 5af0ed1..92e1bae 100644
---- a/arch/arm/include/uapi/asm/ptrace.h
-+++ b/arch/arm/include/uapi/asm/ptrace.h
-@@ -131,7 +131,11 @@ struct pt_regs {
- #define ARM_lr		uregs[14]
- #define ARM_sp		uregs[13]
- #define ARM_ip		uregs[12]
-+#ifndef CONFIG_THUMB2_KERNEL
- #define ARM_fp		uregs[11]
-+#else
-+#define ARM_fp		uregs[7]
-+#endif
- #define ARM_r10		uregs[10]
- #define ARM_r9		uregs[9]
- #define ARM_r8		uregs[8]
 -- 
-1.8.1.5
+tejun
