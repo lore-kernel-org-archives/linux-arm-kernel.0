@@ -1,137 +1,101 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri,  2 May 2014 16:55:32 +0100
-Subject: [PATCH] arm64: Implement cache_line_size() based on CTR_EL0.CWG
-Message-ID: <1399046132-5760-1-git-send-email-catalin.marinas@arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri,  2 May 2014 17:57:14 +0200
+Subject: [PATCH v10 00/15] ARM: sunxi: Add driver for SD/MMC hosts found on
+ Allwinner sunxi SoCs
+Message-ID: <1399046249-19472-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The hardware provides the maximum cache line size in the system via the
-CTR_EL0.CWG bits. This patch implements the cache_line_size() function
-to read such information, together with a sanity check if the statically
-defined L1_CACHE_BYTES is smaller than the hardware value.
+Hi All,
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm64/Kconfig                 |  3 +++
- arch/arm64/include/asm/cache.h     | 13 ++++++++++++-
- arch/arm64/include/asm/cachetype.h | 11 +++++++++++
- arch/arm64/kernel/setup.c          | 15 +++++++++++++++
- 4 files changed, 41 insertions(+), 1 deletion(-)
+Here is v10 of the sunxi-mmc patch-set David Lanzend?rfer and I have been
+working on, this has some minor changes since v9, the plan for upstreaming is
+still the same:
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index e759af5d7098..9a5b5fea86ba 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -242,6 +242,9 @@ config ARCH_WANT_HUGE_PMD_SHARE
- config HAVE_ARCH_TRANSPARENT_HUGEPAGE
- 	def_bool y
- 
-+config ARCH_HAS_CACHE_LINE_SIZE
-+	def_bool y
-+
- source "mm/Kconfig"
- 
- config XEN_DOM0
-diff --git a/arch/arm64/include/asm/cache.h b/arch/arm64/include/asm/cache.h
-index 390308a67f0d..88cc05b5f3ac 100644
---- a/arch/arm64/include/asm/cache.h
-+++ b/arch/arm64/include/asm/cache.h
-@@ -16,6 +16,8 @@
- #ifndef __ASM_CACHE_H
- #define __ASM_CACHE_H
- 
-+#include <asm/cachetype.h>
-+
- #define L1_CACHE_SHIFT		6
- #define L1_CACHE_BYTES		(1 << L1_CACHE_SHIFT)
- 
-@@ -27,6 +29,15 @@
-  * the CPU.
-  */
- #define ARCH_DMA_MINALIGN	L1_CACHE_BYTES
--#define ARCH_SLAB_MINALIGN	8
-+
-+#ifndef __ASSEMBLY__
-+
-+static inline int cache_line_size(void)
-+{
-+	u32 cwg = cache_type_cwg();
-+	return cwg ? 4 << cwg : L1_CACHE_BYTES;
-+}
-+
-+#endif	/* __ASSEMBLY__ */
- 
- #endif
-diff --git a/arch/arm64/include/asm/cachetype.h b/arch/arm64/include/asm/cachetype.h
-index 85f5f511352a..4b23e758d5e0 100644
---- a/arch/arm64/include/asm/cachetype.h
-+++ b/arch/arm64/include/asm/cachetype.h
-@@ -20,12 +20,16 @@
- 
- #define CTR_L1IP_SHIFT		14
- #define CTR_L1IP_MASK		3
-+#define CTR_CWG_SHIFT		24
-+#define CTR_CWG_MASK		15
- 
- #define ICACHE_POLICY_RESERVED	0
- #define ICACHE_POLICY_AIVIVT	1
- #define ICACHE_POLICY_VIPT	2
- #define ICACHE_POLICY_PIPT	3
- 
-+#ifndef __ASSEMBLY__
-+
- static inline u32 icache_policy(void)
- {
- 	return (read_cpuid_cachetype() >> CTR_L1IP_SHIFT) & CTR_L1IP_MASK;
-@@ -45,4 +49,11 @@ static inline int icache_is_aivivt(void)
- 	return icache_policy() == ICACHE_POLICY_AIVIVT;
- }
- 
-+static inline u32 cache_type_cwg(void)
-+{
-+	return (read_cpuid_cachetype() >> CTR_CWG_SHIFT) & CTR_CWG_MASK;
-+}
-+
-+#endif	/* __ASSEMBLY__ */
-+
- #endif	/* __ASM_CACHETYPE_H */
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 7ec784653b29..5b9e046d580e 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -25,6 +25,7 @@
- #include <linux/utsname.h>
- #include <linux/initrd.h>
- #include <linux/console.h>
-+#include <linux/cache.h>
- #include <linux/bootmem.h>
- #include <linux/seq_file.h>
- #include <linux/screen_info.h>
-@@ -198,6 +199,8 @@ static void __init setup_processor(void)
- {
- 	struct cpu_info *cpu_info;
- 	u64 features, block;
-+	u32 cwg;
-+	int cls;
- 
- 	cpu_info = lookup_processor_type(read_cpuid_id());
- 	if (!cpu_info) {
-@@ -215,6 +218,18 @@ static void __init setup_processor(void)
- 	elf_hwcap = 0;
- 
- 	/*
-+	 * Check for sane CTR_EL0.CWG value.
-+	 */
-+	cwg = cache_type_cwg();
-+	cls = cache_line_size();
-+	if (!cwg)
-+		pr_warn("No Cache Writeback Granule information, assuming cache line size %d\n",
-+			cls);
-+	if (L1_CACHE_BYTES < cls)
-+		pr_warn("L1_CACHE_BYTES smaller than the Cache Writeback Granule (%d < %d)\n",
-+			L1_CACHE_BYTES, cls);
-+
-+	/*
- 	 * ID_AA64ISAR0_EL1 contains 4-bit wide signed feature blocks.
- 	 * The blocks we test below represent incremental functionality
- 	 * for non-negative values. Negative values are reserved.
+The first 2 patches are depenencies which should go in through the clk tree,
+Mike can you pick these 2 up please ?  :
+
+"clk: sunxi: factors: automatic reparenting support"
+Is uncontroversial and has been favorably reviewed by various people.
+
+"clk: sunxi: Implement MMC phase control"
+Is somewhat more controversial as there has been lots of discussion about
+adding a generic phase control method to the clk framework. The problem is
+that there has been a lot of talk about such a generic phase control method
+but not a single patch. Therefor I would like to move forwards with using
+a platform specific method for now. I hereby promise that once we've a generic
+method I'll write patches to convert the sunxi code to that method.
+
+The third patch is the patch adding the actual mmc driver and should go in
+through the mmc tree.
+
+All the other patches are devicetree patches hooking things up, and should
+go upstream through Maxime's sunxi-dt tree.
+
+Changes since v1:
+-Using mmc_of_parse instead of diy dt parsing
+-Adding nodes for all mmc controller to the dtsi files,
+ including sofar unused controllers
+-Using generic GPIO slot library for WP/CD
+-Adding additional MMC device nodes into DTSI files
+
+Changes since v2:
+-Add missing Signed-off-by tags
+-Stop using __raw_readl / __raw_writel so that barriers are properly used
+-Adding missing new lines
+-Adding missing patch for automatic reparenting of clocks
+
+Changes since v3:
+-Move clk_enable / disable into host_init / exit (Hans)
+-Fix hang on boot caused by irq storm (Hans)
+
+Changes since v4:
+-moving sunxi-mci.{c/h} to sunxi-mmc.{c/h}
+-removing camel cases from the defines in  sunxi-mmc.h
+-moving defines out of the struct definition
+ since this is bad coding style
+-adding documentation for the device tree binding
+Changes since v5:
+-adding host initialization for when the sdio irq is enabled
+ (just to make sure having a defined state at all time)
+-add mmc support fixup: set pullup on cd pins
+-fixup: Don't set MMC_CAP_NEEDS_POLL /  MMC_CAP_4_BIT_DATA
+
+Changes since v6:
+-fixing copyright info in sunxi-mmc.*
+-s/__SUNXI_MCI_H__/__SUNXI_MMC_H__/g
+-s/SDXC_RESPONSE_/SDXC_RESP_/g
+-s/define/definitions <- Comment from Priit Laes
+
+Changes since v7:
+-Merge sunxi-mmc.h into sunxi-mmc.c
+-Various style fixes / cleanups based on Maxime's review
+-sun6i support
+-Fix a race condition in interrupt / tasklet interaction
+-Split the dts patches into 3 per platform:
+ 1) Add mmc nodes to the dtsi
+ 2) Add mmc pinmux to the dtsi
+ 3) Add mmc nodes to the various board files
+-Moved setting of bus-width and cd gpio polarity from .dtsi to the board-files
+-Added sun6i dts patches
+
+Changes since v8:
+-Don't claim MMC_CAP_SDIO_IRQ by default, sdio-irq support appears to not
+ always be reliable. Can be re-added to the caps on a per board basis
+ through dts
+-Added EXPORT_SYMBOL(clk_sunxi_mmc_phase_control)
+-Moved bus-width and cd-inverted dts attributes for sun6i from dtsi to dts
+-Squashed patches adding sun6i-a31-m9.dts and mmc support for m9 together
+-Added a patch enabling the sdio wifi on the cubietruck in dts
+
+Changes since v9:
+-Drop the sun5i and sun6i dts pinmux patches as those have already been
+ accepted
+-Rename the mmc clock for the controller from "mod" to "mmc" so as
+ to not confuse it with a regular mod0 clock
+-Rename pinmux for the reference design card-detect pin from cd_pin_a to
+ cd_pin_reference_design
+
+Regards,
+
+Hans
