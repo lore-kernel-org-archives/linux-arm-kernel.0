@@ -1,38 +1,32 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 2 May 2014 09:51:21 +0100
-Subject: [PATCH] arm64: mm: Create gigabyte kernel logical mappings where
- possible
-In-Reply-To: <1398857782-1525-1-git-send-email-steve.capper@linaro.org>
-References: <1398857782-1525-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <20140502085119.GA456@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 02 May 2014 10:53:44 +0200
+Subject: [PATCH v2 2/2] Documentation: DT: Exynos: Bind SRAM though DT
+In-Reply-To: <1399007180-20680-2-git-send-email-sachin.kamat@linaro.org>
+References: <1399007180-20680-1-git-send-email-sachin.kamat@linaro.org>
+ <1399007180-20680-2-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <4811186.9DeISv2WWp@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 30, 2014 at 12:36:22PM +0100, Steve Capper wrote:
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index 4d29332..867e979 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -234,7 +234,20 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
->  	pud = pud_offset(pgd, addr);
->  	do {
->  		next = pud_addr_end(addr, end);
-> -		alloc_init_pmd(pud, addr, next, phys);
+On Friday 02 May 2014 10:36:20 Sachin Kamat wrote:
+> +       sram at 02020000 {
+> +               compatible = "mmio-sram";
+> +               reg = <0x02020000 0x54000>;
+> +               #address-cells = <1>;
+> +               #size-cells = <1>;
+> +               ranges = <0 0x02020000 0x54000>;
 > +
-> +		/*
-> +		 * For 4K granule only, attempt to put down a 1GB block
-> +		 */
-> +		if ((PAGE_SHIFT == 12) &&
-> +			((addr | next | phys) & ~PUD_MASK) == 0) {
-> +			pud_t old_pud = *pud;
-> +			set_pud(pud, __pud(phys | prot_sect_kernel));
-> +
-> +			if (!pud_none(old_pud))
-> +				flush_tlb_all();
 
-We could even free the original pmd here. I think a
-memblock_free(pud_pfn(old_pud) << PAGE_SHIFT, PAGE_SIZE) should do
-(untested, and you need to define pud_pfn).
+That is actually quite a lot of unused SRAM. Since it came up this
+morning in another thread, there may be value in using this for
+coherent DMA allocations for some devices. Not sure about how
+to best hook this up, but there could be some serious performance
+improvements. A typical case would be DMA descriptors for a
+gigabit ethernet adapter, which are a pain to maintain on platforms
+without cache-coherent DMA.
 
--- 
-Catalin
+You could check what drivers you have that call dma_alloc_coherent,
+and see if any of them are performance-critical, then hack them
+up to use this memory instead as an experiment.
+
+	Arnd
