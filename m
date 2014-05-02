@@ -1,315 +1,202 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 2 May 2014 14:16:11 -0400 (EDT)
-Subject: [PATCH v4 5/5] arm: exynos: Add MCPM call-back functions
-In-Reply-To: <1399044359-15784-1-git-send-email-a.kesavan@samsung.com>
-References: <1398528348-21214-6-git-send-email-a.kesavan@samsung.com>
- <1399044359-15784-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <alpine.LFD.2.11.1405021347500.980@knanqh.ubzr>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 2 May 2014 19:13:48 +0100
+Subject: [PATCH v8 1/8] ftrace: make CALLER_ADDRx macros more generic
+In-Reply-To: <1398851676-16389-2-git-send-email-takahiro.akashi@linaro.org>
+References: <1394862048-28758-1-git-send-email-takahiro.akashi@linaro.org>
+ <1398851676-16389-1-git-send-email-takahiro.akashi@linaro.org>
+ <1398851676-16389-2-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <20140502181348.GD14645@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2 May 2014, Abhilash Kesavan wrote:
+Hi Akashi,
 
-> Add machine-dependent MCPM call-backs for Exynos5420. These are used
-> to power up/down the secondary CPUs during boot, shutdown, s2r and
-> switching.
+On Wed, Apr 30, 2014 at 10:54:29AM +0100, AKASHI Takahiro wrote:
+> Most archs with HAVE_ARCH_CALLER_ADDR have the almost same definitions
+> of CALLER_ADDRx(n), and so put them into linux/ftrace.h.
 > 
-> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> Signed-off-by: Inderpal Singh <inderpal.s@samsung.com>
-> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
-> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-
-OK.... There is still a detail wrong.  At least we are converging.
-
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 > ---
->  arch/arm/mach-exynos/Kconfig       |    8 +
->  arch/arm/mach-exynos/Makefile      |    2 +
->  arch/arm/mach-exynos/mcpm-exynos.c |  345 ++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-exynos/regs-pmu.h    |    3 +
->  4 files changed, 358 insertions(+)
->  create mode 100644 arch/arm/mach-exynos/mcpm-exynos.c
+>  arch/arm/include/asm/ftrace.h      |   10 +---------
+>  arch/blackfin/include/asm/ftrace.h |   11 +----------
+>  arch/parisc/include/asm/ftrace.h   |   10 +---------
+>  arch/sh/include/asm/ftrace.h       |   10 +---------
+>  arch/xtensa/include/asm/ftrace.h   |   14 ++++----------
+>  include/linux/ftrace.h             |   34 ++++++++++++++++++----------------
+>  6 files changed, 26 insertions(+), 63 deletions(-)
+
+This one looks a bit too widespread to be merged via the arm64 tree. I
+wonder if the ftrace maintainers would consider taking it as a cleanup?
+
+Will
+
+> diff --git a/arch/arm/include/asm/ftrace.h b/arch/arm/include/asm/ftrace.h
+> index f89515a..eb577f4 100644
+> --- a/arch/arm/include/asm/ftrace.h
+> +++ b/arch/arm/include/asm/ftrace.h
+> @@ -52,15 +52,7 @@ extern inline void *return_address(unsigned int level)
+>  
+>  #endif
+>  
+> -#define HAVE_ARCH_CALLER_ADDR
+> -
+> -#define CALLER_ADDR0 ((unsigned long)__builtin_return_address(0))
+> -#define CALLER_ADDR1 ((unsigned long)return_address(1))
+> -#define CALLER_ADDR2 ((unsigned long)return_address(2))
+> -#define CALLER_ADDR3 ((unsigned long)return_address(3))
+> -#define CALLER_ADDR4 ((unsigned long)return_address(4))
+> -#define CALLER_ADDR5 ((unsigned long)return_address(5))
+> -#define CALLER_ADDR6 ((unsigned long)return_address(6))
+> +#define ftrace_return_addr(n) return_address(n)
+>  
+>  #endif /* ifndef __ASSEMBLY__ */
+>  
+> diff --git a/arch/blackfin/include/asm/ftrace.h b/arch/blackfin/include/asm/ftrace.h
+> index 8a02950..2f1c3c2 100644
+> --- a/arch/blackfin/include/asm/ftrace.h
+> +++ b/arch/blackfin/include/asm/ftrace.h
+> @@ -66,16 +66,7 @@ extern inline void *return_address(unsigned int level)
+>  
+>  #endif /* CONFIG_FRAME_POINTER */
+>  
+> -#define HAVE_ARCH_CALLER_ADDR
+> -
+> -/* inline function or macro may lead to unexpected result */
+> -#define CALLER_ADDR0 ((unsigned long)__builtin_return_address(0))
+> -#define CALLER_ADDR1 ((unsigned long)return_address(1))
+> -#define CALLER_ADDR2 ((unsigned long)return_address(2))
+> -#define CALLER_ADDR3 ((unsigned long)return_address(3))
+> -#define CALLER_ADDR4 ((unsigned long)return_address(4))
+> -#define CALLER_ADDR5 ((unsigned long)return_address(5))
+> -#define CALLER_ADDR6 ((unsigned long)return_address(6))
+> +#define ftrace_return_address(n) return_address(n)
+>  
+>  #endif /* __ASSEMBLY__ */
+>  
+> diff --git a/arch/parisc/include/asm/ftrace.h b/arch/parisc/include/asm/ftrace.h
+> index 72c0faf..544ed8e 100644
+> --- a/arch/parisc/include/asm/ftrace.h
+> +++ b/arch/parisc/include/asm/ftrace.h
+> @@ -24,15 +24,7 @@ extern void return_to_handler(void);
+>  
+>  extern unsigned long return_address(unsigned int);
+>  
+> -#define HAVE_ARCH_CALLER_ADDR
+> -
+> -#define CALLER_ADDR0 ((unsigned long)__builtin_return_address(0))
+> -#define CALLER_ADDR1 return_address(1)
+> -#define CALLER_ADDR2 return_address(2)
+> -#define CALLER_ADDR3 return_address(3)
+> -#define CALLER_ADDR4 return_address(4)
+> -#define CALLER_ADDR5 return_address(5)
+> -#define CALLER_ADDR6 return_address(6)
+> +#define ftrace_return_address(n) return_address(n)
+>  
+>  #endif /* __ASSEMBLY__ */
+>  
+> diff --git a/arch/sh/include/asm/ftrace.h b/arch/sh/include/asm/ftrace.h
+> index 13e9966..e79fb6e 100644
+> --- a/arch/sh/include/asm/ftrace.h
+> +++ b/arch/sh/include/asm/ftrace.h
+> @@ -40,15 +40,7 @@ static inline unsigned long ftrace_call_adjust(unsigned long addr)
+>  /* arch/sh/kernel/return_address.c */
+>  extern void *return_address(unsigned int);
+>  
+> -#define HAVE_ARCH_CALLER_ADDR
+> -
+> -#define CALLER_ADDR0 ((unsigned long)__builtin_return_address(0))
+> -#define CALLER_ADDR1 ((unsigned long)return_address(1))
+> -#define CALLER_ADDR2 ((unsigned long)return_address(2))
+> -#define CALLER_ADDR3 ((unsigned long)return_address(3))
+> -#define CALLER_ADDR4 ((unsigned long)return_address(4))
+> -#define CALLER_ADDR5 ((unsigned long)return_address(5))
+> -#define CALLER_ADDR6 ((unsigned long)return_address(6))
+> +#define ftrace_return_address(n) return_address(n)
+>  
+>  #endif /* __ASSEMBLY__ */
+>  
+> diff --git a/arch/xtensa/include/asm/ftrace.h b/arch/xtensa/include/asm/ftrace.h
+> index 736b9d2..6c6d9a9 100644
+> --- a/arch/xtensa/include/asm/ftrace.h
+> +++ b/arch/xtensa/include/asm/ftrace.h
+> @@ -12,24 +12,18 @@
+>  
+>  #include <asm/processor.h>
+>  
+> -#define HAVE_ARCH_CALLER_ADDR
+>  #ifndef __ASSEMBLY__
+> -#define CALLER_ADDR0 ({ unsigned long a0, a1; \
+> +#define ftrace_return_address0 ({ unsigned long a0, a1; \
+>  		__asm__ __volatile__ ( \
+>  			"mov %0, a0\n" \
+>  			"mov %1, a1\n" \
+>  			: "=r"(a0), "=r"(a1)); \
+>  		MAKE_PC_FROM_RA(a0, a1); })
+> +
+>  #ifdef CONFIG_FRAME_POINTER
+>  extern unsigned long return_address(unsigned level);
+> -#define CALLER_ADDR1 return_address(1)
+> -#define CALLER_ADDR2 return_address(2)
+> -#define CALLER_ADDR3 return_address(3)
+> -#else /* CONFIG_FRAME_POINTER */
+> -#define CALLER_ADDR1 (0)
+> -#define CALLER_ADDR2 (0)
+> -#define CALLER_ADDR3 (0)
+> -#endif /* CONFIG_FRAME_POINTER */
+> +#define ftrace_return_address(n) return_address(n)
+> +#endif
+>  #endif /* __ASSEMBLY__ */
+>  
+>  #ifdef CONFIG_FUNCTION_TRACER
+> diff --git a/include/linux/ftrace.h b/include/linux/ftrace.h
+> index 9212b01..18f1ae7 100644
+> --- a/include/linux/ftrace.h
+> +++ b/include/linux/ftrace.h
+> @@ -614,25 +614,27 @@ static inline void __ftrace_enabled_restore(int enabled)
+>  #endif
+>  }
+>  
+> -#ifndef HAVE_ARCH_CALLER_ADDR
+> +/* All archs should have this, but we define it for consistency */
+> +#ifndef ftrace_return_address0
+> +# define ftrace_return_address0 __builtin_return_address(0)
+> +#endif
+> +
+> +/* Archs may use other ways for ADDR1 and beyond */
+> +#ifndef ftrace_return_address
+>  # ifdef CONFIG_FRAME_POINTER
+> -#  define CALLER_ADDR0 ((unsigned long)__builtin_return_address(0))
+> -#  define CALLER_ADDR1 ((unsigned long)__builtin_return_address(1))
+> -#  define CALLER_ADDR2 ((unsigned long)__builtin_return_address(2))
+> -#  define CALLER_ADDR3 ((unsigned long)__builtin_return_address(3))
+> -#  define CALLER_ADDR4 ((unsigned long)__builtin_return_address(4))
+> -#  define CALLER_ADDR5 ((unsigned long)__builtin_return_address(5))
+> -#  define CALLER_ADDR6 ((unsigned long)__builtin_return_address(6))
+> +#  define ftrace_return_address(n) __builtin_return_address(n)
+>  # else
+> -#  define CALLER_ADDR0 ((unsigned long)__builtin_return_address(0))
+> -#  define CALLER_ADDR1 0UL
+> -#  define CALLER_ADDR2 0UL
+> -#  define CALLER_ADDR3 0UL
+> -#  define CALLER_ADDR4 0UL
+> -#  define CALLER_ADDR5 0UL
+> -#  define CALLER_ADDR6 0UL
+> +#  define ftrace_return_address(n) 0UL
+>  # endif
+> -#endif /* ifndef HAVE_ARCH_CALLER_ADDR */
+> +#endif
+> +
+> +#define CALLER_ADDR0 ((unsigned long)ftrace_return_address0)
+> +#define CALLER_ADDR1 ((unsigned long)ftrace_return_address(1))
+> +#define CALLER_ADDR2 ((unsigned long)ftrace_return_address(2))
+> +#define CALLER_ADDR3 ((unsigned long)ftrace_return_address(3))
+> +#define CALLER_ADDR4 ((unsigned long)ftrace_return_address(4))
+> +#define CALLER_ADDR5 ((unsigned long)ftrace_return_address(5))
+> +#define CALLER_ADDR6 ((unsigned long)ftrace_return_address(6))
+>  
+>  #ifdef CONFIG_IRQSOFF_TRACER
+>    extern void time_hardirqs_on(unsigned long a0, unsigned long a1);
+> -- 
+> 1.7.9.5
 > 
-> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-> index 5c34dc2..138070e 100644
-> --- a/arch/arm/mach-exynos/Kconfig
-> +++ b/arch/arm/mach-exynos/Kconfig
-> @@ -73,4 +73,12 @@ config SOC_EXYNOS5440
->  
->  endmenu
->  
-> +config EXYNOS5420_MCPM
-> +	bool "Exynos5420 Multi-Cluster PM support"
-> +	depends on MCPM && SOC_EXYNOS5420
-> +	select ARM_CCI
-> +	help
-> +	  This is needed to provide CPU and cluster power management
-> +	  on Exynos5420 implementing big.LITTLE.
-> +
->  endif
-> diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
-> index a656dbe..01bc9b9 100644
-> --- a/arch/arm/mach-exynos/Makefile
-> +++ b/arch/arm/mach-exynos/Makefile
-> @@ -29,3 +29,5 @@ obj-$(CONFIG_ARCH_EXYNOS)	+= firmware.o
->  
->  plus_sec := $(call as-instr,.arch_extension sec,+sec)
->  AFLAGS_exynos-smc.o		:=-Wa,-march=armv7-a$(plus_sec)
-> +
-> +obj-$(CONFIG_EXYNOS5420_MCPM)	+= mcpm-exynos.o
-> diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
-> new file mode 100644
-> index 0000000..d0f7461
-> --- /dev/null
-> +++ b/arch/arm/mach-exynos/mcpm-exynos.c
-> @@ -0,0 +1,345 @@
-> +/*
-> + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
-> + *		http://www.samsung.com
-> + *
-> + * arch/arm/mach-exynos/mcpm-exynos.c
-> + *
-> + * Based on arch/arm/mach-vexpress/dcscb.c
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/arm-cci.h>
-> +#include <linux/delay.h>
-> +#include <linux/io.h>
-> +#include <linux/of_address.h>
-> +
-> +#include <asm/cputype.h>
-> +#include <asm/cp15.h>
-> +#include <asm/mcpm.h>
-> +
-> +#include "regs-pmu.h"
-> +#include "common.h"
-> +
-> +#define EXYNOS5420_CPUS_PER_CLUSTER	4
-> +#define EXYNOS5420_NR_CLUSTERS		2
-> +
-> +/* Non-secure iRAM base address */
-> +static void __iomem *ns_sram_base_addr;
-> +
-> +/*
-> + * The common v7_exit_coherency_flush API could not be used because of the
-> + * Erratum 799270 workaround. This macro is the same as the common one (in
-> + * arch/arm/include/asm/cacheflush.h) except for the erratum handling.
-> + */
-> +#define exynos_v7_exit_coherency_flush(level) \
-> +	asm volatile( \
-> +	"stmfd	sp!, {fp, ip}\n\t"\
-> +	"mrc	p15, 0, r0, c1, c0, 0	@ get SCTLR\n\t" \
-> +	"bic	r0, r0, #"__stringify(CR_C)"\n\t" \
-> +	"mcr	p15, 0, r0, c1, c0, 0	@ set SCTLR\n\t" \
-> +	"isb\n\t"\
-> +	"bl	v7_flush_dcache_"__stringify(level)"\n\t" \
-> +	"clrex\n\t"\
-> +	"mrc	p15, 0, r0, c1, c0, 1	@ get ACTLR\n\t" \
-> +	"bic	r0, r0, #(1 << 6)	@ disable local coherency\n\t" \
-> +	/* Dummy Load of a device register to avoid Erratum 799270 */ \
-> +	"ldr	r4, [%0]\n\t" \
-> +	"and	r4, r4, #0\n\t" \
-> +	"orr	r0, r0, r4\n\t" \
-> +	"mcr	p15, 0, r0, c1, c0, 1	@ set ACTLR\n\t" \
-> +	"isb\n\t" \
-> +	"dsb\n\t" \
-> +	"ldmfd	sp!, {fp, ip}" \
-> +	: \
-> +	: "Ir" (S5P_INFORM0) \
-> +	: "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", \
-> +	  "r9", "r10", "lr", "memory")
-> +
-> +/*
-> + * We can't use regular spinlocks. In the switcher case, it is possible
-> + * for an outbound CPU to call power_down() after its inbound counterpart
-> + * is already live using the same logical CPU number which trips lockdep
-> + * debugging.
-> + */
-> +static arch_spinlock_t exynos_mcpm_lock = __ARCH_SPIN_LOCK_UNLOCKED;
-> +static int
-> +cpu_use_count[EXYNOS5420_CPUS_PER_CLUSTER][EXYNOS5420_NR_CLUSTERS];
-> +
-> +#define exynos_cluster_unused(cluster) \
-> +	(!cpu_use_count[0][cluster] && \
-> +	 !cpu_use_count[1][cluster] && \
-> +	 !cpu_use_count[2][cluster] && \
-> +	 !cpu_use_count[3][cluster])
-> +
-> +static int exynos_cluster_power_control(unsigned int cluster, int enable)
-> +{
-> +	unsigned int tries = 100;
-> +	unsigned int val;
-> +
-> +	if (enable) {
-> +		exynos_cluster_powerup(cluster);
-> +		val = S5P_CORE_LOCAL_PWR_EN;
-> +	} else {
-> +		exynos_cluster_powerdown(cluster);
-> +		val = 0;
-> +	}
-> +
-> +	/* Wait until cluster power control is applied */
-> +	while (tries--) {
-> +		if (exynos_cluster_power_state(cluster) == val)
-> +			return 0;
-> +
-> +		cpu_relax();
-> +	}
-> +	pr_warn("timed out waiting for cluster %u to power %s\n", cluster,
-> +		enable ? "on" : "off");
-> +
-> +	return -ETIMEDOUT;
-> +}
-> +
-> +static int exynos_power_up(unsigned int cpu, unsigned int cluster)
-> +{
-> +	unsigned int cpunr = cpu + (cluster * EXYNOS5420_CPUS_PER_CLUSTER);
-> +	int err = 0;
-> +
-> +	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
-> +	if (cpu >= EXYNOS5420_CPUS_PER_CLUSTER ||
-> +		cluster >= EXYNOS5420_NR_CLUSTERS)
-> +		return -EINVAL;
-> +
-> +	/*
-> +	 * Since this is called with IRQs enabled, and no arch_spin_lock_irq
-> +	 * variant exists, we need to disable IRQs manually here.
-> +	 */
-> +	local_irq_disable();
-> +	arch_spin_lock(&exynos_mcpm_lock);
-> +
-> +	cpu_use_count[cpu][cluster]++;
-> +	if (cpu_use_count[cpu][cluster] == 1) {
-> +		bool was_cluster_down =
-> +			__mcpm_cluster_state(cluster) == CLUSTER_DOWN;
-
-This is racy.  I probably made this comment already.  The MCPM cluster 
-state may change in mcpm-head.S where concurrency protection is achieved 
-with a different mechanism.
-
-What you should do instead is to redefine exynos_cluster_unused() into 
-exynos_cluster_usecnt() and simply add all counts together.  You could 
-even have:
-
-#define exynos_cluster_unused(cluster) !exynos_cluster_usecnt(cluster)
-
-Yet, here you should use:
-
-	bool was_cluster_down = (exynos_cluster_usecnt(cluster) == 1);
-
-> +
-> +		/*
-> +		 * Turn on the cluster (L2/COMMON) and then power on the
-> +		 * cores.
-> +		 */
-> +		if (was_cluster_down)
-> +			err = exynos_cluster_power_control(cluster, 1);
-> +
-> +		if (!err)
-> +			exynos_cpu_powerup(cpunr);
-> +		else
-> +			exynos_cluster_power_control(cluster, 0);
-> +	} else if (cpu_use_count[cpu][cluster] != 2) {
-> +		/*
-> +		 * The only possible values are:
-> +		 * 0 = CPU down
-> +		 * 1 = CPU (still) up
-> +		 * 2 = CPU requested to be up before it had a chance
-> +		 *     to actually make itself down.
-> +		 * Any other value is a bug.
-> +		 */
-> +		BUG();
-> +	}
-> +
-> +	arch_spin_unlock(&exynos_mcpm_lock);
-> +	local_irq_enable();
-> +
-> +	return err;
-> +}
-> +
-> +static void exynos_power_down(void)
-> +{
-> +	unsigned int mpidr, cpu, cluster;
-> +	bool last_man = false, skip_wfi = false;
-> +	unsigned int cpunr;
-> +
-> +	mpidr = read_cpuid_mpidr();
-> +	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-> +	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-> +	cpunr =  cpu + (cluster * EXYNOS5420_CPUS_PER_CLUSTER);
-> +
-> +	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
-> +	BUG_ON(cpu >= EXYNOS5420_CPUS_PER_CLUSTER ||
-> +			cluster >= EXYNOS5420_NR_CLUSTERS);
-> +
-> +	__mcpm_cpu_going_down(cpu, cluster);
-> +
-> +	arch_spin_lock(&exynos_mcpm_lock);
-> +	BUG_ON(__mcpm_cluster_state(cluster) != CLUSTER_UP);
-> +	cpu_use_count[cpu][cluster]--;
-> +	if (cpu_use_count[cpu][cluster] == 0) {
-> +		exynos_cpu_powerdown(cpunr);
-> +
-> +		if (exynos_cluster_unused(cluster))
-> +			last_man = true;
-> +	} else if (cpu_use_count[cpu][cluster] == 1) {
-> +		/*
-> +		 * A power_up request went ahead of us.
-> +		 * Even if we do not want to shut this CPU down,
-> +		 * the caller expects a certain state as if the WFI
-> +		 * was aborted.  So let's continue with cache cleaning.
-> +		 */
-> +		skip_wfi = true;
-> +	} else {
-> +		BUG();
-> +	}
-> +
-> +	/*
-> +	 * TODO: Turn off the clusters when all cores in the cluster
-> +	 * are down to achieve significant power savings.
-> +	 */
-
-This comment should actually be located right after the 
-"if (exynos_cluster_unused(cluster))" above.  That is where the cluster 
-control should be applied, assuming it'll be effective only when WFI is 
-executed.
-
-
-> +	if (last_man && __mcpm_outbound_enter_critical(cpu, cluster)) {
-> +		arch_spin_unlock(&exynos_mcpm_lock);
-> +
-> +		/* Flush all cache levels for this cluster. */
-> +		exynos_v7_exit_coherency_flush(all);
-> +
-> +		/*
-> +		 * Disable cluster-level coherency by masking
-> +		 * incoming snoops and DVM messages:
-> +		 */
-> +		cci_disable_port_by_cpu(mpidr);
-> +
-> +		__mcpm_outbound_leave_critical(cluster, CLUSTER_DOWN);
-> +	} else {
-> +		arch_spin_unlock(&exynos_mcpm_lock);
-> +
-> +		if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A15) {
-> +			/*
-> +			 * On the Cortex-A15 we need to disable
-> +			 * L2 prefetching before flushing the cache.
-> +			 */
-> +			asm volatile(
-> +			"mcr	p15, 1, %0, c15, c0, 3\n\t"
-> +			"isb\n\t"
-> +			"dsb"
-> +			: : "r" (0x400));
-> +		}
-
-This doesn't belong here.  That is for the last_man only to do, right 
-before the "Flush all cache levels for this cluster" comment.
-
-The rest looks fine to me.
-
-
-Nicolas
+> 
