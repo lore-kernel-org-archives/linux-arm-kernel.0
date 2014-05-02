@@ -1,40 +1,54 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri,  2 May 2014 16:24:09 +0100
-Subject: [PATCH 2/8] ARM: cache: remove redundant dsb instruction from
- v7_coherent_user_range
+Date: Fri,  2 May 2014 16:24:11 +0100
+Subject: [PATCH 4/8] arm64: barriers: wire up new barrier options
 In-Reply-To: <1399044255-20435-1-git-send-email-will.deacon@arm.com>
 References: <1399044255-20435-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1399044255-20435-3-git-send-email-will.deacon@arm.com>
+Message-ID: <1399044255-20435-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v7_coherent_user_range takes a virtual address range, cleans the D-side
-to PoU and then invalidates the I-side so that subsequent instruction
-fetches can see any new data written to the range in question.
+Now that all callers of the barrier macros are updated to pass the
+mandatory options, update the macros so the option is actually used.
 
-Since cache maintenance by MVA is architected to execute in program
-order with respect to other cache maintenance operations specifying
-the same virtual address, we do not require a barrier between the
-D-side clean and the I-side invalidation.
-
-This patch removes the redundant dsb.
-
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mm/cache-v7.S | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm64/include/asm/barrier.h | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
-index 615c99e38ba1..b040d3ca20ac 100644
---- a/arch/arm/mm/cache-v7.S
-+++ b/arch/arm/mm/cache-v7.S
-@@ -282,7 +282,6 @@ ENTRY(v7_coherent_user_range)
- 	add	r12, r12, r2
- 	cmp	r12, r1
- 	blo	1b
--	dsb	ishst
- 	icache_line_size r2, r3
- 	sub	r3, r2, #1
- 	bic	r12, r0, r3
+diff --git a/arch/arm64/include/asm/barrier.h b/arch/arm64/include/asm/barrier.h
+index 5d69eddbe39e..71a42d6599fb 100644
+--- a/arch/arm64/include/asm/barrier.h
++++ b/arch/arm64/include/asm/barrier.h
+@@ -25,12 +25,12 @@
+ #define wfi()		asm volatile("wfi" : : : "memory")
+ 
+ #define isb()		asm volatile("isb" : : : "memory")
+-#define dmb(opt)	asm volatile("dmb sy" : : : "memory")
+-#define dsb(opt)	asm volatile("dsb sy" : : : "memory")
++#define dmb(opt)	asm volatile("dmb " #opt : : : "memory")
++#define dsb(opt)	asm volatile("dsb " #opt : : : "memory")
+ 
+ #define mb()		dsb(sy)
+-#define rmb()		asm volatile("dsb ld" : : : "memory")
+-#define wmb()		asm volatile("dsb st" : : : "memory")
++#define rmb()		dsb(ld)
++#define wmb()		dsb(st)
+ 
+ #ifndef CONFIG_SMP
+ #define smp_mb()	barrier()
+@@ -54,9 +54,9 @@ do {									\
+ 
+ #else
+ 
+-#define smp_mb()	asm volatile("dmb ish" : : : "memory")
+-#define smp_rmb()	asm volatile("dmb ishld" : : : "memory")
+-#define smp_wmb()	asm volatile("dmb ishst" : : : "memory")
++#define smp_mb()	dmb(ish)
++#define smp_rmb()	dmb(ishld)
++#define smp_wmb()	dmb(ishst)
+ 
+ #define smp_store_release(p, v)						\
+ do {									\
 -- 
 1.9.2
