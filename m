@@ -1,53 +1,39 @@
-From: agnel.joel@gmail.com (Joel Fernandes)
-Date: Fri, 2 May 2014 16:33:25 -0500
-Subject: [PATCH] ARM: mm: dma: Update coherent streaming apis with missing
- memory barrier
-In-Reply-To: <20140423171727.GK5649@arm.com>
-References: <1398103390-31968-1-git-send-email-santosh.shilimkar@ti.com>
- <201404222153.41786.arnd@arndb.de> <5356C9D1.2060001@ti.com>
- <5895821.PvurJ8TWz2@wuerfel> <5356D163.1070304@ti.com>
- <20140423090251.GA5281@arm.com> <20140423160216.GC2208@arm.com>
- <20140423171727.GK5649@arm.com>
-Message-ID: <CAD=GYpYQhJbKOKp_jXefjMHUy-3dWavtoSH2K2tt0XViEP-bEw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 2 May 2014 15:14:34 -0700
+Subject: [PATCH 04/12] clocksource: Sched clock source for Versatile
+ Express
+In-Reply-To: <1392138636-29240-5-git-send-email-pawel.moll@arm.com>
+References: <1392138636-29240-1-git-send-email-pawel.moll@arm.com>
+ <1392138636-29240-5-git-send-email-pawel.moll@arm.com>
+Message-ID: <CACRpkdZ2Chwm0xu+bf8UAEi_5DR8WhMTv0gDJ6NC+6bQwHeB6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Will,
+On Tue, Feb 11, 2014 at 9:10 AM, Pawel Moll <pawel.moll@arm.com> wrote:
 
-On Wed, Apr 23, 2014 at 12:17 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Apr 23, 2014 at 05:02:16PM +0100, Catalin Marinas wrote:
->> On Wed, Apr 23, 2014 at 10:02:51AM +0100, Will Deacon wrote:
->> > On Tue, Apr 22, 2014 at 09:30:27PM +0100, Santosh Shilimkar wrote:
->> > > writel() or an explcit barrier in the driver will do the job. I was
->> > > just thinking that we are trying to work around the short comings
->> > > of streaming API by adding barriers in the driver. For example
->> > > on a non-coherent system, i don't need that barrier because
->> > > dma_ops does take care of that.
->> >
->> > I wonder whether we can remove those barriers altogether then (from the DMA
->> > cache operations). For the coherent case, the driver must provide the
->> > barrier (probably via writel) so the non-coherent case shouldn't be any
->> > different.
->>
->> For the DMA_TO_DEVICE case the effect should be the same as wmb()
->> implies dsb (and outer_sync() for write). But the reason we have
->> barriers in the DMA ops is slightly different - the completion of the
->> cache maintenance operation rather than ordering with any previous
->> writes to the DMA buffer.
->>
->> In the DMA_FROM_DEVICE scenario for example, the CPU gets an interrupt
->> for a finished DMA transfer and executes dma_unmap_single() prior to
->> accessing the page. However the CPU access after unmapping is done using
->> normal LDR/STR which do not imply any barrier. So we need to ensure the
->> completion of the cache invalidation in the dma operation.
+> This patch adds a trival sched clock source using free
+> running, 24MHz clocked counter present in the ARM Ltd.
+> Versatile Express platform's System Registers block.
 >
-> I don't think we necessarily need completion, we just need ordering. That
-> is, the normal LDR/STR instructions must be observed after the cache
-> maintenance. I'll have to revisit the ARM ARM to be sure of this, but a dmb
-> should be sufficient for that guarantee.
+> This code replaces the call in the VE machine code.
+>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 
-Just wondering if you were convinced from the ARM ARM that a dsb is
-not required after cache maintenance for the DMA_FROM_DEVICE case?
+Even the Integrator is very similar, albeit using register 0x28 instead
+of register 0x5c. cd commit
+a79528e9d849803457b6235ddb1a1cfd4e11c6cd
 
-thanks,
--Joel
+It's one of these things where writing a device driver results in
+more code than just registering this counter with the sched_clock
+guts :-/
+
+Getting the clock from the DT gives this nice feeling of having it all
+complete, and sched_clock cannot really change frequency anyway
+so I'm happy with this thing.
+
+I'll augment it for Integrator when/if I find time.
+
+Yours,
+Linus Walleij
