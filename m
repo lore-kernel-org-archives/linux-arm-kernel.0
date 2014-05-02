@@ -1,108 +1,113 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Fri, 2 May 2014 10:38:47 +0530
-Subject: [PATCH 1/2] ARM: EXYNOS: Map SYSRAM through generic SRAM bindings
-In-Reply-To: <045301cf65ad$c95badd0$5c130970$@samsung.com>
-References: <1398941085-10224-1-git-send-email-sachin.kamat@linaro.org>
- <11106990.1tS5A7pf5r@diego>
- <045301cf65ad$c95badd0$5c130970$@samsung.com>
-Message-ID: <CAK9yfHy++XcfhVat78s48f7-Lojo6mW=pvG58-CwsatVH84g4g@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 2 May 2014 00:18:10 -0500
+Subject: [RFC PATCH] PM / OPP: move cpufreq specific OPP functions out of
+ generic OPP library
+In-Reply-To: <CAKohpokEuZ69HnnKE89maXk=21cgAMjEYjEvEcaoBpg4bLRsGg@mail.gmail.com>
+References: <1398992810-14957-1-git-send-email-nm@ti.com>
+ <CAKohpokEuZ69HnnKE89maXk=21cgAMjEYjEvEcaoBpg4bLRsGg@mail.gmail.com>
+Message-ID: <CAGo_u6ohKZh+zKWSzGbvT+AKgnhSjzX7v9isqpd2pc-Cpmxocg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 May 2014 07:55, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Heiko St?bner wrote:
+On Thu, May 1, 2014 at 11:30 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> On 2 May 2014 06:36, Nishanth Menon <nm@ti.com> wrote:
+>> diff --git a/drivers/cpufreq/Kconfig b/drivers/cpufreq/Kconfig
+>> index 1fbe11f..281ccfb 100644
+>> --- a/drivers/cpufreq/Kconfig
+>> +++ b/drivers/cpufreq/Kconfig
+>> @@ -17,6 +17,11 @@ config CPU_FREQ
 >>
->> Hi Sachin,
+>>  if CPU_FREQ
 >>
->> Am Donnerstag, 1. Mai 2014, 16:14:44 schrieb Sachin Kamat:
->> > Instead of hardcoding the SYSRAM details for each SoC,
->> > pass this information through device tree (DT) and make
->> > the code SoC agnostic. Generic SRAM bindings are used
->> > for achieving this.
->> >
->> > Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
->> > Cc: Heiko Stuebner <heiko@sntech.de>
->> > Cc: Arnd Bergmann <arnd@arndb.de>
->>
->> very cool :-).
->>
->> I've found one little thing I do not understand, which I describe below.
->> Otherwise
->> Acked-by: Heiko Stuebner <heiko@sntech.de>
->>
->> > ---
->> > This patch is based on linux next (next-20140501) on top of
->> > my Kconfig consolidation patch
->> > http://comments.gmane.org/gmane.linux.kernel.samsung-soc/28642
->> >
->> > Tested on 4210/4412 Origen, 5250/5420 Arndale and SMDK5420 boards.
->> > ---
->> >  arch/arm/Kconfig                                |    1 +
->> >  arch/arm/boot/dts/exynos4210-universal_c210.dts |   17 ++++++
->> >  arch/arm/boot/dts/exynos4210.dtsi               |   18 +++++++
->> >  arch/arm/boot/dts/exynos4x12.dtsi               |   18 +++++++
->> >  arch/arm/boot/dts/exynos5250.dtsi               |   18 +++++++
->> >  arch/arm/boot/dts/exynos5420.dtsi               |   18 +++++++
->> >  arch/arm/mach-exynos/common.h                   |    1 +
->> >  arch/arm/mach-exynos/exynos.c                   |   64
->> > ----------------------- arch/arm/mach-exynos/firmware.c
-> |
->> >  5 +-
->> >  arch/arm/mach-exynos/include/mach/map.h         |    7 ---
->> >  arch/arm/mach-exynos/platsmp.c                  |   39 +++++++++++++-
->> >  11 files changed, 133 insertions(+), 73 deletions(-)
->> >
->> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->> > index a6aaaad19b1a..f66ea9453df9 100644
->> > --- a/arch/arm/Kconfig
->> > +++ b/arch/arm/Kconfig
->> > @@ -855,6 +855,7 @@ config ARCH_EXYNOS
->> >     select S5P_DEV_MFC
->> >     select SAMSUNG_DMADEV
->> >     select SPARSE_IRQ
->> > +   select SRAM
->> >     select USE_OF
->> >     help
->> >       Support for SAMSUNG's EXYNOS SoCs (EXYNOS4/5)
->> > diff --git a/arch/arm/boot/dts/exynos4210-universal_c210.dts
->> > b/arch/arm/boot/dts/exynos4210-universal_c210.dts index
->> > 63e34b24b04f..8d4de5c0d0c7 100644
->> > --- a/arch/arm/boot/dts/exynos4210-universal_c210.dts
->> > +++ b/arch/arm/boot/dts/exynos4210-universal_c210.dts
->> > @@ -28,6 +28,23 @@
->> >             bootargs = "console=ttySAC2,115200N8 root=/dev/mmcblk0p5 rw
->> rootwait
->> > earlyprintk panic=5 maxcpus=1"; };
->> >
->> > +   sram at 02020000 {
->> > +           status = "disabled";
->> > +   };
->> > +
->> > +   sram at 02025000 {
->> > +           compatible = "mmio-sram";
->> > +           reg = <0x02025000 0x1000>;
->> > +           #address-cells = <1>;
->> > +           #size-cells = <1>;
->> > +           ranges = <0 0x02025000 0x1000>;
->> > +
->> > +           smp-sram at 0 {
->> > +                   compatible = "samsung,exynos4210-sram";
->> > +                   reg = <0x0 0x1000>;
->> > +           };
->> > +   };
->>
->> exynos_smp_prepare_sram returns -ENODEV if it can't find
->> samsung,exynos4210-sram-ns, so are you sure your universal_c210 will run
->> without it? I didn't dig to deep into this, so it can also simply be
->> something
->> I overlooked :-)
->>
-> Hi Andrzej and Tomasz,
+>> +config CPU_FREQ_PM_OPP
+>> +       bool
+>> +       depends on PM_OPP
+>> +       default y
+>> +
 >
-> Can you please check above?
+> Don't need this
 
-Please test v2 of this series.
+ok.
 
--- 
-With warm regards,
-Sachin
+>
+>>  config CPU_FREQ_GOV_COMMON
+>>         bool
+>>
+>> diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
+>> index 0dbb963..16eea68 100644
+>> --- a/drivers/cpufreq/Makefile
+>> +++ b/drivers/cpufreq/Makefile
+>> @@ -1,5 +1,7 @@
+>>  # CPUfreq core
+>>  obj-$(CONFIG_CPU_FREQ)                 += cpufreq.o freq_table.o
+>> +obj-$(CONFIG_CPU_FREQ_PM_OPP)          += cpufreq_opp.o
+>
+> Just use: obj-$(CONFIG_PM_OPP)
+ok.
+
+>
+>> +
+>>  # CPUfreq stats
+>>  obj-$(CONFIG_CPU_FREQ_STAT)             += cpufreq_stats.o
+>>
+>
+>> diff --git a/drivers/cpufreq/cpufreq_opp.c b/drivers/cpufreq/cpufreq_opp.c
+>> new file mode 100644
+>> index 0000000..2602ff8
+>> --- /dev/null
+>> +++ b/drivers/cpufreq/cpufreq_opp.c
+>> @@ -0,0 +1,102 @@
+>> +/*
+>> + * Generic OPP Interface for CPUFREQ drivers
+>> + *
+>> + * Copyright (C) 2009-2014 Texas Instruments Incorporated.
+>> + *     Nishanth Menon
+>> + *     Romit Dasgupta
+>> + *     Kevin Hilman
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>
+> I hope you have just copy pasted routines to this file, and haven't done
+> even the most minor modification in those, as its hard to review it.
+
+there is code replacement ofcourse ->
+* the logic of walking down the list holding a mutex has been replaced
+with rcu locks,
+* instead of reading internal data structure and generating the list,
+use the existing search API that does exactly the same.
+* Documentation update for the same.
+
+Both are needed if you have to move the code out. functionally, both
+are equivalent
+
+>
+>> +#include <linux/slab.h>
+>
+> Sure? That's it, nothing else required to compile this file independently?
+> As a rule include all the files directly which might be required for compilation
+> of this file and don't expect them to be included by some other header
+> files indirectly.
+
+Alrite. will do, I try to trim the headers down to bare minimum, but
+will take care of it in the formal post.
+
+>
+>> diff --git a/drivers/cpufreq/cpufreq_opp.h b/drivers/cpufreq/cpufreq_opp.h
+>
+> Two problems, driver may lie in arch/ as well, though we don't recommend
+> them, secondly move these in cpufreq.h, don't need a header here for sure.
+
+There are none at the moment. ideally, we'd like to discourage folks
+putting cpufreq drivers in arch/ given the amount of effort you have
+undertaken in bringing them all here. but I have personally no strong
+objection to getting rid of the private header and using the generic
+cpufreq header.
+
+Otherwise, I assume you are ok with this approach and will post a
+formal patch by monday.
+
+Regards,
+Nishanth Menon
