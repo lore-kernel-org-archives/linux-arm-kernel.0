@@ -1,59 +1,39 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Fri, 2 May 2014 15:07:11 +0100
-Subject: [PATCH 1/3] arm64: Add CONFIG_DEBUG_SET_MODULE_RONX support
-In-Reply-To: <1397782023-28114-2-git-send-email-lauraa@codeaurora.org>
-References: <1397782023-28114-1-git-send-email-lauraa@codeaurora.org>
- <1397782023-28114-2-git-send-email-lauraa@codeaurora.org>
-Message-ID: <20140502140709.GA6780@linaro.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 2 May 2014 16:35:44 +0200
+Subject: [PATCH/RFC 3/4] of/clk: Register clocks suitable for Runtime PM
+ with the PM core
+In-Reply-To: <CAPDyKFpTwPDu9afhOjhhQ2PKGFB+hWsp=mcaYTq8OvuGF7yT3Q@mail.gmail.com>
+References: <1398334403-26181-1-git-send-email-geert+renesas@glider.be>
+ <1398334403-26181-4-git-send-email-geert+renesas@glider.be>
+ <CAPDyKFpTwPDu9afhOjhhQ2PKGFB+hWsp=mcaYTq8OvuGF7yT3Q@mail.gmail.com>
+Message-ID: <CAMuHMdUGdfF8x58dz46VWNsC4X0cmFng39Z2xSO_pXYqn9u=HA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 17, 2014 at 05:47:01PM -0700, Laura Abbott wrote:
-> In a similar fashion to other architecture, add the infrastructure
-> and Kconfig to enable DEBUG_SET_MODULE_RONX support. When
-> enabled, module ranges will be marked read-only/no-execute as
-> appropriate.
-> 
-> Change-Id: I4251a0929b1fe6f43f84b14f0a64fed30769700e
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-> ---
+Hi Ulf,
 
-[ ... ]
+On Fri, May 2, 2014 at 10:56 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> +static int of_clk_pm_runtime_suspend(struct device *dev)
+>> +{
+>> +       int ret;
+>> +
+>> +       ret = pm_generic_runtime_suspend(dev);
+>> +       if (ret)
+>> +               return ret;
+>> +
+>> +       ret = pm_clk_suspend(dev);
+>
+> What about slow clocks? Those aren't handled with pm_clk_suspend().
 
-> diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
-> new file mode 100644
-> index 0000000..e48f980
-> --- /dev/null
-> +++ b/arch/arm64/mm/pageattr.c
+How are slow clocks handled?
 
-[ ... ]
+Gr{oetje,eeting}s,
 
-> +static int change_memory_common(unsigned long addr, int numpages,
-> +				pgprot_t prot, bool set)
-> +{
-> +	unsigned long start = addr;
-> +	unsigned long size = PAGE_SIZE*numpages;
-> +	unsigned long end = start + size;
-> +	int ret;
-> +
-> +	if (start < MODULES_VADDR || start >= MODULES_END)
-> +		return -EINVAL;
-> +
-> +	if (end < MODULES_VADDR || end >= MODULES_END)
-> +		return -EINVAL;
-> +
-> +	if (set)
-> +		ret = apply_to_page_range(&init_mm, start, size,
-> +					set_page_range, (void *)prot);
-> +	else
-> +		ret = apply_to_page_range(&init_mm, start, size,
-> +					clear_page_range, (void *)prot);
-> +
-> +	flush_tlb_kernel_range(start, end);
+                        Geert
 
-Could you please add an isb() here? (We're about to nuke the one in
-flush_tlb_kernel_range).
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-Cheers,
--- 
-Steve
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
