@@ -1,22 +1,36 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 2 May 2014 11:30:12 +0900
-Subject: [PATCH] ARM: shmobile: henninger: specify EXTAL frequency
-In-Reply-To: <201405020256.34093.sergei.shtylyov@cogentembedded.com>
-References: <201405020256.34093.sergei.shtylyov@cogentembedded.com>
-Message-ID: <20140502023012.GH2265@verge.net.au>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 02 May 2014 11:31:11 +0900
+Subject: [PATCH 1/2] ARM: EXYNOS: Map SYSRAM through generic SRAM bindings
+In-Reply-To: <1625238.xy1WDqNhgs@diego>
+References: <1398941085-10224-1-git-send-email-sachin.kamat@linaro.org>
+ <5153376.z2oJ163pLF@wuerfel> <1625238.xy1WDqNhgs@diego>
+Message-ID: <045901cf65ae$94f4f4b0$bedede10$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 02, 2014 at 02:56:33AM +0400, Sergei Shtylyov wrote:
-> When creating the initial device tree for the Henninger board,  I've overlooked
-> that EXTAL frequency needs to be overridden there. The 'sh-sci' driver  managed
-> to work somehow but the SDHI driver that I've tried to enable just hanged with
-> the default EXTAL frequency of 0...
+Heiko St?bner wrote:
+> Am Donnerstag, 1. Mai 2014, 15:32:14 schrieb Arnd Bergmann:
+> > On Thursday 01 May 2014 16:14:44 Sachin Kamat wrote:
+> > > Instead of hardcoding the SYSRAM details for each SoC,
+> > > pass this information through device tree (DT) and make
+> > > the code SoC agnostic. Generic SRAM bindings are used
+> > > for achieving this.
+> > >
+> > > Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+> > > Cc: Heiko Stuebner <heiko@sntech.de>
+> > > Cc: Arnd Bergmann <arnd@arndb.de>
+> >
+> > Looks good to me. Both patches
+> >
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> >
+> > Heiko, can you also have a look?
 > 
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
-> ---
-> This patch is against 'renesas-devel-v3.15-rc3-20140429' tag of Simon Horman's
-> 'renesas.git' repo.
+> Already did :-)
 
-Thanks, I have queued this up.
+Thanks you guys ;-)
+
+I will take this series when I get confirmation of universal-c210's behavior
+from Andrzej or Tomasz.
+
+- Kukjin
