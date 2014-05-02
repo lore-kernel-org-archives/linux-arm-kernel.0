@@ -1,38 +1,274 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Fri, 02 May 2014 11:50:59 -0400
-Subject: [PATCH 0/2] arm64: TLB flush issues
-In-Reply-To: <20140502153019.GA9179@linaro.org>
-References: <1399044035-11274-1-git-send-email-msalter@redhat.com>
- <20140502153019.GA9179@linaro.org>
-Message-ID: <1399045859.1604.1.camel@deneb.redhat.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri,  2 May 2014 16:51:59 +0100
+Subject: [PATCH] arm64: Clean up the default pgprot setting
+Message-ID: <1399045919-5615-1-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-05-02 at 16:30 +0100, Steve Capper wrote:
-> On Fri, May 02, 2014 at 11:20:33AM -0400, Mark Salter wrote:
-> > As explained in more detail in the second patch, I have observed a soft
-> > lockup under some loads. These lockups were in flush_tlb_kernel_range()
-> > which was looping through a very large address range. While looking into
-> > this, I also noticed the flush routines in tlb.S were not properly
-> > handling pages larger than 4k. This is corrected in the first patch.
-> > The second patch limits the loop size for the flush_tlb_[kernel_]range
-> > functions. It uses an arbitrary constant to limit the loop, but it
-> > would be better if it were based on actual tlb size or some other
-> > heuristic.
-> > 
-> > Mark Salter (2):
-> >   arm64: fix unnecessary tlb flushes
-> >   arm64: fix soft lockup due to large tlb flush range
-> > 
-> >  arch/arm64/include/asm/tlbflush.h | 28 +++++++++++++++++++++++++---
-> >  arch/arm64/mm/tlb.S               |  4 ++--
-> >  2 files changed, 27 insertions(+), 5 deletions(-)
-> > 
-> 
-> Hi Mark,
-> As a heads-up, I posted this earlier today:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/252837.html
-> 
-> Cheers,
+The primary aim of this patchset is to remove the pgprot_default and
+prot_sect_default global variables and rely strictly on predefined
+values. The original goal was to be able to run SMP kernels on UP
+hardware by not setting the Shareability bit. However, it is unlikely to
+see UP ARMv8 hardware and even if we do, the Shareability bit is no
+longer assumed to disable cacheable accesses.
 
-Thanks. That takes care of the pagesize handling (my patch 1/2).
+A side effect is that the device mappings now have the Shareability
+attribute set. The hardware, however, should ignore it since Device
+accesses are always Outer Shareable.
+
+Following the removal of the two global variables, there is some PROT_*
+macro reshuffling and cleanup, including the __PAGE_* macros (replaced
+by PAGE_*).
+
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm64/include/asm/io.h      |  8 ----
+ arch/arm64/include/asm/pgtable.h | 98 +++++++++++++++++++---------------------
+ arch/arm64/kernel/setup.c        |  1 -
+ arch/arm64/mm/dma-mapping.c      |  2 +-
+ arch/arm64/mm/mmu.c              | 36 +--------------
+ 5 files changed, 50 insertions(+), 95 deletions(-)
+
+diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+index a1bef78f0303..e0ecdcf6632d 100644
+--- a/arch/arm64/include/asm/io.h
++++ b/arch/arm64/include/asm/io.h
+@@ -230,19 +230,11 @@ extern void __iomem *__ioremap(phys_addr_t phys_addr, size_t size, pgprot_t prot
+ extern void __iounmap(volatile void __iomem *addr);
+ extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
+ 
+-#define PROT_DEFAULT		(PTE_TYPE_PAGE | PTE_AF | PTE_DIRTY)
+-#define PROT_DEVICE_nGnRE	(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_ATTRINDX(MT_DEVICE_nGnRE))
+-#define PROT_NORMAL_NC		(PROT_DEFAULT | PTE_ATTRINDX(MT_NORMAL_NC))
+-#define PROT_NORMAL		(PROT_DEFAULT | PTE_ATTRINDX(MT_NORMAL))
+-
+ #define ioremap(addr, size)		__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
+ #define ioremap_nocache(addr, size)	__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
+ #define ioremap_wc(addr, size)		__ioremap((addr), (size), __pgprot(PROT_NORMAL_NC))
+ #define iounmap				__iounmap
+ 
+-#define PROT_SECT_DEFAULT	(PMD_TYPE_SECT | PMD_SECT_AF)
+-#define PROT_SECT_DEVICE_nGnRE	(PROT_SECT_DEFAULT | PTE_PXN | PTE_UXN | PMD_ATTRINDX(MT_DEVICE_nGnRE))
+-
+ #define ARCH_HAS_IOREMAP_WC
+ #include <asm-generic/iomap.h>
+ 
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index e50bb3cbd8f2..84fed0fe99ba 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -52,67 +52,60 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
+ #endif
+ #define pgd_ERROR(pgd)		__pgd_error(__FILE__, __LINE__, pgd_val(pgd))
+ 
+-/*
+- * The pgprot_* and protection_map entries will be fixed up at runtime to
+- * include the cachable and bufferable bits based on memory policy, as well as
+- * any architecture dependent bits like global/ASID and SMP shared mapping
+- * bits.
+- */
+-#define _PAGE_DEFAULT		PTE_TYPE_PAGE | PTE_AF
++#ifdef CONFIG_SMP
++#define PROT_DEFAULT		(PTE_TYPE_PAGE | PTE_AF | PTE_SHARED)
++#define PROT_SECT_DEFAULT	(PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S)
++#else
++#define PROT_DEFAULT		(PTE_TYPE_PAGE | PTE_AF)
++#define PROT_SECT_DEFAULT	(PMD_TYPE_SECT | PMD_SECT_AF)
++#endif
+ 
+-extern pgprot_t pgprot_default;
++#define PROT_DEVICE_nGnRE	(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_ATTRINDX(MT_DEVICE_nGnRE))
++#define PROT_NORMAL_NC		(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_ATTRINDX(MT_NORMAL_NC))
++#define PROT_NORMAL		(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_ATTRINDX(MT_NORMAL))
+ 
+-#define __pgprot_modify(prot,mask,bits) \
+-	__pgprot((pgprot_val(prot) & ~(mask)) | (bits))
++#define PROT_SECT_DEVICE_nGnRE	(PROT_SECT_DEFAULT | PMD_SECT_PXN | PMD_SECT_UXN | PMD_ATTRINDX(MT_DEVICE_nGnRE))
++#define PROT_SECT_NORMAL	(PROT_SECT_DEFAULT | PMD_SECT_PXN | PMD_SECT_UXN | PMD_ATTRINDX(MT_NORMAL))
++#define PROT_SECT_NORMAL_EXEC	(PROT_SECT_DEFAULT | PMD_SECT_UXN | PMD_ATTRINDX(MT_NORMAL))
+ 
+-#define _MOD_PROT(p, b)		__pgprot_modify(p, 0, b)
++#define _PAGE_DEFAULT		(PROT_DEFAULT | PTE_ATTRINDX(MT_NORMAL))
+ 
+-#define PAGE_NONE		__pgprot_modify(pgprot_default, PTE_TYPE_MASK, PTE_PROT_NONE | PTE_PXN | PTE_UXN)
+-#define PAGE_SHARED		_MOD_PROT(pgprot_default, PTE_USER | PTE_NG | PTE_PXN | PTE_UXN | PTE_WRITE)
+-#define PAGE_SHARED_EXEC	_MOD_PROT(pgprot_default, PTE_USER | PTE_NG | PTE_PXN | PTE_WRITE)
+-#define PAGE_COPY		_MOD_PROT(pgprot_default, PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
+-#define PAGE_COPY_EXEC		_MOD_PROT(pgprot_default, PTE_USER | PTE_NG | PTE_PXN)
+-#define PAGE_READONLY		_MOD_PROT(pgprot_default, PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
+-#define PAGE_READONLY_EXEC	_MOD_PROT(pgprot_default, PTE_USER | PTE_NG | PTE_PXN)
+-#define PAGE_KERNEL		_MOD_PROT(pgprot_default, PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE)
+-#define PAGE_KERNEL_EXEC	_MOD_PROT(pgprot_default, PTE_UXN | PTE_DIRTY | PTE_WRITE)
++#define PAGE_KERNEL		__pgprot(_PAGE_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE)
++#define PAGE_KERNEL_EXEC	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE)
+ 
+-#define PAGE_HYP		_MOD_PROT(pgprot_default, PTE_HYP)
++#define PAGE_HYP		__pgprot(_PAGE_DEFAULT | PTE_HYP)
+ #define PAGE_HYP_DEVICE		__pgprot(PROT_DEVICE_nGnRE | PTE_HYP)
+ 
+-#define PAGE_S2			__pgprot_modify(pgprot_default, PTE_S2_MEMATTR_MASK, PTE_S2_MEMATTR(MT_S2_NORMAL) | PTE_S2_RDONLY)
++#define PAGE_S2			__pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_NORMAL) | PTE_S2_RDONLY)
+ #define PAGE_S2_DEVICE		__pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_DEVICE_nGnRE) | PTE_S2_RDWR | PTE_UXN)
+ 
+-#define __PAGE_NONE		__pgprot(((_PAGE_DEFAULT) & ~PTE_TYPE_MASK) | PTE_PROT_NONE | PTE_PXN | PTE_UXN)
+-#define __PAGE_SHARED		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN | PTE_WRITE)
+-#define __PAGE_SHARED_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_WRITE)
+-#define __PAGE_COPY		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
+-#define __PAGE_COPY_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN)
+-#define __PAGE_READONLY		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
+-#define __PAGE_READONLY_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN)
+-#define __PAGE_EXECONLY		__pgprot(_PAGE_DEFAULT | PTE_NG | PTE_PXN)
+-
+-#endif /* __ASSEMBLY__ */
+-
+-#define __P000  __PAGE_NONE
+-#define __P001  __PAGE_READONLY
+-#define __P010  __PAGE_COPY
+-#define __P011  __PAGE_COPY
+-#define __P100  __PAGE_EXECONLY
+-#define __P101  __PAGE_READONLY_EXEC
+-#define __P110  __PAGE_COPY_EXEC
+-#define __P111  __PAGE_COPY_EXEC
+-
+-#define __S000  __PAGE_NONE
+-#define __S001  __PAGE_READONLY
+-#define __S010  __PAGE_SHARED
+-#define __S011  __PAGE_SHARED
+-#define __S100  __PAGE_EXECONLY
+-#define __S101  __PAGE_READONLY_EXEC
+-#define __S110  __PAGE_SHARED_EXEC
+-#define __S111  __PAGE_SHARED_EXEC
++#define PAGE_NONE		__pgprot(((_PAGE_DEFAULT) & ~PTE_TYPE_MASK) | PTE_PROT_NONE | PTE_PXN | PTE_UXN)
++#define PAGE_SHARED		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN | PTE_WRITE)
++#define PAGE_SHARED_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_WRITE)
++#define PAGE_COPY		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
++#define PAGE_COPY_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN)
++#define PAGE_READONLY		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
++#define PAGE_READONLY_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN)
++#define PAGE_EXECONLY		__pgprot(_PAGE_DEFAULT | PTE_NG | PTE_PXN)
++
++#define __P000  PAGE_NONE
++#define __P001  PAGE_READONLY
++#define __P010  PAGE_COPY
++#define __P011  PAGE_COPY
++#define __P100  PAGE_EXECONLY
++#define __P101  PAGE_READONLY_EXEC
++#define __P110  PAGE_COPY_EXEC
++#define __P111  PAGE_COPY_EXEC
++
++#define __S000  PAGE_NONE
++#define __S001  PAGE_READONLY
++#define __S010  PAGE_SHARED
++#define __S011  PAGE_SHARED
++#define __S100  PAGE_EXECONLY
++#define __S101  PAGE_READONLY_EXEC
++#define __S110  PAGE_SHARED_EXEC
++#define __S111  PAGE_SHARED_EXEC
+ 
+-#ifndef __ASSEMBLY__
+ /*
+  * ZERO_PAGE is a global shared page that is always zero: used
+  * for zero-mapped memory areas etc..
+@@ -274,6 +267,9 @@ static inline int has_transparent_hugepage(void)
+ 	return 1;
+ }
+ 
++#define __pgprot_modify(prot,mask,bits) \
++	__pgprot((pgprot_val(prot) & ~(mask)) | (bits))
++
+ /*
+  * Mark the prot value as uncacheable and unbufferable.
+  */
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 5b9e046d580e..7450c5802c3f 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -376,7 +376,6 @@ void __init setup_arch(char **cmdline_p)
+ 
+ 	*cmdline_p = boot_command_line;
+ 
+-	init_mem_pgprot();
+ 	early_ioremap_init();
+ 
+ 	parse_early_param();
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index c851eb44dc50..4164c5ace9f8 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -115,7 +115,7 @@ static void *__dma_alloc_noncoherent(struct device *dev, size_t size,
+ 	for (i = 0; i < (size >> PAGE_SHIFT); i++)
+ 		map[i] = page + i;
+ 	coherent_ptr = vmap(map, size >> PAGE_SHIFT, VM_MAP,
+-			    __get_dma_pgprot(attrs, pgprot_default, false));
++			    __get_dma_pgprot(attrs, __pgprot(PROT_NORMAL_NC), false));
+ 	kfree(map);
+ 	if (!coherent_ptr)
+ 		goto no_map;
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 0a472c41a67f..2c0e1dda8163 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -43,11 +43,6 @@
+ struct page *empty_zero_page;
+ EXPORT_SYMBOL(empty_zero_page);
+ 
+-pgprot_t pgprot_default;
+-EXPORT_SYMBOL(pgprot_default);
+-
+-static pmdval_t prot_sect_kernel;
+-
+ struct cachepolicy {
+ 	const char	policy[16];
+ 	u64		mair;
+@@ -122,33 +117,6 @@ static int __init early_cachepolicy(char *p)
+ }
+ early_param("cachepolicy", early_cachepolicy);
+ 
+-/*
+- * Adjust the PMD section entries according to the CPU in use.
+- */
+-void __init init_mem_pgprot(void)
+-{
+-	pteval_t default_pgprot;
+-	int i;
+-
+-	default_pgprot = PTE_ATTRINDX(MT_NORMAL);
+-	prot_sect_kernel = PMD_TYPE_SECT | PMD_SECT_AF | PMD_ATTRINDX(MT_NORMAL);
+-
+-#ifdef CONFIG_SMP
+-	/*
+-	 * Mark memory with the "shared" attribute for SMP systems
+-	 */
+-	default_pgprot |= PTE_SHARED;
+-	prot_sect_kernel |= PMD_SECT_S;
+-#endif
+-
+-	for (i = 0; i < 16; i++) {
+-		unsigned long v = pgprot_val(protection_map[i]);
+-		protection_map[i] = __pgprot(v | default_pgprot);
+-	}
+-
+-	pgprot_default = __pgprot(PTE_TYPE_PAGE | PTE_AF | default_pgprot);
+-}
+-
+ pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
+ 			      unsigned long size, pgprot_t vma_prot)
+ {
+@@ -205,7 +173,7 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
+ 		/* try section mapping first */
+ 		if (((addr | next | phys) & ~SECTION_MASK) == 0) {
+ 			pmd_t old_pmd =*pmd;
+-			set_pmd(pmd, __pmd(phys | prot_sect_kernel));
++			set_pmd(pmd, __pmd(phys | PROT_SECT_NORMAL_EXEC));
+ 			/*
+ 			 * Check for previous table entries created during
+ 			 * boot (__create_page_tables) and flush them.
+@@ -417,7 +385,7 @@ int __meminit vmemmap_populate(unsigned long start, unsigned long end, int node)
+ 			if (!p)
+ 				return -ENOMEM;
+ 
+-			set_pmd(pmd, __pmd(__pa(p) | prot_sect_kernel));
++			set_pmd(pmd, __pmd(__pa(p) | PROT_SECT_NORMAL));
+ 		} else
+ 			vmemmap_verify((pte_t *)pmd, node, addr, next);
+ 	} while (addr = next, addr != end);
