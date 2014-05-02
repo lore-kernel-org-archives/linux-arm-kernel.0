@@ -1,80 +1,70 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri,  2 May 2014 17:57:29 +0200
-Subject: [PATCH v10 15/15] ARM: dts: sun7i: Add basic support for the
- Cubietruck WiFi module
-In-Reply-To: <1399046249-19472-1-git-send-email-hdegoede@redhat.com>
-References: <1399046249-19472-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1399046249-19472-16-git-send-email-hdegoede@redhat.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 2 May 2014 21:16:34 +0530
+Subject: [PATCH 1/6] dmaengine: Add fly-by transfer flag to slave
+ configuration structure
+In-Reply-To: <1397574817-15559-2-git-send-email-laurent.pinchart@ideasonboard.com>
+References: <1397574817-15559-1-git-send-email-laurent.pinchart@ideasonboard.com>
+ <1397574817-15559-2-git-send-email-laurent.pinchart@ideasonboard.com>
+Message-ID: <20140502154634.GS32284@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chen-Yu Tsai <wens@csie.org>
+On Tue, Apr 15, 2014 at 05:13:32PM +0200, Laurent Pinchart wrote:
+> Fly-by transfer mode cuts down the number of bus transactions by letting
+> the slave drive or latch the memory data bus during memory transactions
+??            ^^^^^^^^^^^
+> instead of performing a dedicated transaction to read data from or write
+/								^^^^
+> data to the slave.
+> 
+> Support for fly-by mode by adding a new flag field to struct
+> dma_slave_config.
+> 
+> Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> ---
+>  include/linux/dmaengine.h | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+> 
+> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+> index c5c92d5..ae99153 100644
+> --- a/include/linux/dmaengine.h
+> +++ b/include/linux/dmaengine.h
+> @@ -304,6 +304,17 @@ enum dma_slave_buswidth {
+>  };
+>  
+>  /**
+> + * enum dma_slave_flags - DMA slave configuration flags
+> + * @DMA_SLAVE_FLAG_FLY_BY - perform DMA transfers for the slave in fly-by mode.
+> + *   Instead of performing a bus transaction to read (write) data from (to) the
+> + *   slave, let the slave drive (latch) the memory bus data signals during the
+> + *   memory write (read) transaction.
+> + */
+> +enum dma_slave_flags {
+> +	DMA_SLAVE_FLAG_FLY_BY = (1 << 0),
+> +};
+> +
+> +/**
+>   * struct dma_slave_config - dma slave channel runtime config
+>   * @direction: whether the data shall go in or out on this slave
+>   * channel, right now. DMA_MEM_TO_DEV and DMA_DEV_TO_MEM are
+> @@ -333,6 +344,7 @@ enum dma_slave_buswidth {
+>   * @slave_id: Slave requester id. Only valid for slave channels. The dma
+>   * slave peripheral will have unique id as dma requester which need to be
+>   * pass as slave config.
+> + * @flags: DMA slave flags, a combination of enum dma_slave_flags flags.
+>   *
+>   * This struct is passed in as configuration data to a DMA engine
+>   * in order to set up a certain channel for DMA transport at runtime.
+> @@ -361,6 +373,7 @@ struct dma_slave_config {
+>  	u32 dst_maxburst;
+>  	bool device_fc;
+>  	unsigned int slave_id;
+> +	u32 flags;
+>  };
+I am not sure about this. Should we have a generic flag for this or just add a
+bool for fly_by mode?
 
-The CubieTruck has an AMPAK AP6210 WiFi+Bluetooth module. The WiFi
-part is a BCM43362 IC connected to MMC3 in the A20 SoC via SDIO.
-The IC also takes a power enable signal via GPIO.
+Suggestions?
 
-The WiFi module supports out-of-band interrupt signaling via GPIO,
-but this is not supported in this patch.
-
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 31 ++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-index b2e2efd..97b6f02 100644
---- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-@@ -29,6 +29,14 @@
- 			status = "okay";
- 		};
- 
-+		mmc3: mmc at 01c12000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&mmc3_pins_a>;
-+			vmmc-supply = <&reg_vmmc3>;
-+			non-removable;
-+			status = "okay";
-+		};
-+
- 		usbphy: phy at 01c13400 {
- 			usb1_vbus-supply = <&reg_usb1_vbus>;
- 			usb2_vbus-supply = <&reg_usb2_vbus>;
-@@ -57,6 +65,18 @@
- 		};
- 
- 		pinctrl at 01c20800 {
-+			mmc3_pins_a: mmc3 at 0 {
-+				/* AP6210 requires pull-up */
-+				allwinner,pull = <1>;
-+			};
-+
-+			vmmc3_pin_cubietruck: vmmc3_pin at 0 {
-+				allwinner,pins = "PH9";
-+				allwinner,function = "gpio_out";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+
- 			ahci_pwr_pin_cubietruck: ahci_pwr_pin at 1 {
- 				allwinner,pins = "PH12";
- 				allwinner,function = "gpio_out";
-@@ -148,4 +168,15 @@
- 	reg_usb2_vbus: usb2-vbus {
- 		status = "okay";
- 	};
-+
-+	reg_vmmc3: vmmc3 {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&vmmc3_pin_cubietruck>;
-+		regulator-name = "vmmc3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		enable-active-high;
-+		gpio = <&pio 7 9 0>;
-+	};
- };
 -- 
-1.9.0
+~Vinod
