@@ -1,88 +1,55 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 2 May 2014 12:41:43 -0400
-Subject: [PATCH v3 0/7] of: setup dma parameters using dma-ranges and
- dma-coherent
-In-Reply-To: <CAL_JsqKcQ3eHPVGmz7LwE-s1KdkOAKTiF43XPjD3bVS2ghKLJA@mail.gmail.com>
-References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>	<536249D6.3020008@ti.com>	<20140501132516.GG26756@n2100.arm.linux.org.uk>
- <CAL_JsqKcQ3eHPVGmz7LwE-s1KdkOAKTiF43XPjD3bVS2ghKLJA@mail.gmail.com>
-Message-ID: <5363CAC7.3020706@ti.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 2 May 2014 22:04:29 +0530
+Subject: [PATCH v7] DMA: sun6i: Add driver for the Allwinner A31 DMA
+ controller
+In-Reply-To: <20140430215322.GH3000@lukather>
+References: <20140430070408.GR32284@intel.com> <20140430215322.GH3000@lukather>
+Message-ID: <20140502163429.GA32284@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 02 May 2014 10:41 AM, Rob Herring wrote:
-> On Thu, May 1, 2014 at 8:25 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Thu, May 01, 2014 at 09:19:18AM -0400, Santosh Shilimkar wrote:
->>> Rob, Russell,
->>>
->>> On Thursday 24 April 2014 11:30 AM, Santosh Shilimkar wrote:
->>>> Here is an updated v3 of the series. Series introduces support for setting up
->>>> dma parameters based on device tree properties like 'dma-ranges' and
->>>> 'dma-coherent' and also update to ARM 32 bit port. Earlier version of the
->>>> series can be found here [3], [2] and [1].
->>>>
->>>> The 'dma-ranges' helps to take care of few DMAable system memory restrictions
->>>> by use of dma_pfn_offset which we maintain now per device. Arch code then
->>>> uses it for dma address translations for such cases. We update the
->>>> dma_pfn_offset accordingly during DT the device creation process.The
->>>> 'dma-coherent' property is used to setup arch's coherent dma_ops.
->>>>
->>>> Hopefully with acks, tested-by this version can get into 3.16 queue. I will
->>>> post a followup series for Keystone SOC which will use this infrastructure.
->>>> Linus W also wants to use this for ARM integrator platform dma offset issue.
->>>>
->>>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->>>> Cc: Russell King <linux@arm.linux.org.uk>
->>>> Cc: Arnd Bergmann <arnd@arndb.de>
->>>> Cc: Olof Johansson <olof@lixom.net>
->>>> Cc: Grant Likely <grant.likely@linaro.org>
->>>> Cc: Rob Herring <robh+dt@kernel.org>
->>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
->>>> Cc: Linus Walleij <linus.walleij@linaro.org>
->>>> Cc: Grygorii Strashko <grygorii.strashko@ti.com>
->>>>
->>>> Grygorii Strashko (2):
->>>>   of: introduce of_dma_get_range() helper
->>>>   ARM: dma: Use dma_pfn_offset for dma address translation
->>>>
->>>> Santosh Shilimkar (5):
->>>>   device: introduce per device dma_pfn_offset
->>>>   of: introduce of_dma_is_coherent() helper
->>>>   of: configure the platform device dma parameters
->>>>   ARM: dma: implement set_arch_dma_coherent_ops()
->>>>   ARM: dma: use phys_addr_t in __dma_page_[cpu_to_dev/dev_to_cpu]
->>>>
->>>>  arch/arm/include/asm/dma-mapping.h |   28 ++++++++++--
->>>>  arch/arm/mm/dma-mapping.c          |    4 +-
->>>>  drivers/of/address.c               |   87 ++++++++++++++++++++++++++++++++++++
->>>>  drivers/of/platform.c              |   71 +++++++++++++++++++++++++++--
->>>>  include/linux/device.h             |    2 +
->>>>  include/linux/dma-mapping.h        |    7 +++
->>>>  include/linux/of_address.h         |    8 ++++
->>>>  include/linux/of_platform.h        |    6 +++
->>>>  8 files changed, 204 insertions(+), 9 deletions(-)
->>>>
->>> How do we go about merging this series ? There is a dependency
->>> between the patches and hence the question.
->>
->> I don't know anymore.  People today want to assert exclusive rights over
->> parts of the kernel tree, which makes this kind of cross-patching rather
->> impossible.
+On Wed, Apr 30, 2014 at 02:53:22PM -0700, Maxime Ripard wrote:
+> Hi Vinod,
 > 
-> I can take this series or provide an ack for the DT parts. Either way
-> it does not matter to me.
+> On Wed, Apr 30, 2014 at 12:34:08PM +0530, Vinod Koul wrote:
+> > On Thu, Apr 24, 2014 at 04:22:44PM +0200, Maxime Ripard wrote:
+> > > +static inline void sun6i_dma_free(struct sun6i_dma_dev *sdc)
+> > > +{
+> > > +	int i;
+> > > +
+> > > +	for (i = 0; i < NR_MAX_VCHANS; i++) {
+> > > +		struct sun6i_vchan *vchan = &sdc->vchans[i];
+> > > +
+> > > +		list_del(&vchan->vc.chan.device_node);
+> > > +		tasklet_kill(&vchan->vc.task);
+> > > +	}
+> > > +
+> > > +	tasklet_kill(&sdc->task);
+> > This is again not good. see http://lwn.net/Articles/588457/
+> > At this point HW can still generate interrupts or you can have irq running!
 > 
->> The only workable solution I can see is the long winded way to split the
->> series up, merge the first set of dependencies in one merge window, and
->> hold the rest back for the following merge window.  Not ideal, but it
->> stops the arguments.
+> I'm not sure to fully understand the issue here, but what is not good?
+> the first or the second tasklet_kill calls, or both?
 > 
-> That should not be necessary. We should be able to sort this out as it
-> is not a difficult problem.
+> From what I understood, the issue is only there whenever you are
+> calling tasklet_disable without making sure that no one will schedule
+> your tasklet before disabling it.
 > 
-yeah. After addressing those few minor comments, I will create a pull
-request for both RMK and arm-soc to pull from with your ack. That way
-I can also add keystone specific parts on top of this series to arm-soc.
+> But the point is I don't actually use either _enable/_disable. I might
+> be wrong in not using those functions, but I don't really see how I
+> can be impacted.
 
-Regards,
-Santosh  
+Well that was one part of it. How do you ensure the tasklet is not scheduled
+while and after you are killing it. You need to ensure irq is disabled and pending irqs
+have finished processing. I dont see that bit.
+
+-- 
+~Vinod
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140502/201766f9/attachment.sig>
