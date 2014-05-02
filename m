@@ -1,294 +1,59 @@
 From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Fri,  2 May 2014 18:17:35 +0530
-Subject: [PATCH v11 4/4] usb: ehci-exynos: Change to use phy provided by the
- generic phy framework
-In-Reply-To: <1399034855-9686-1-git-send-email-gautam.vivek@samsung.com>
-References: <1399034855-9686-1-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <1399034855-9686-5-git-send-email-gautam.vivek@samsung.com>
+Date: Fri,  2 May 2014 18:17:31 +0530
+Subject: [PATCH v5 0/4] usb: ehci/ohci-exynos: Move to generic phy framework
+Message-ID: <1399034855-9686-1-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kamil Debski <k.debski@samsung.com>
+Based and tested on 'usb-next' branch of Greg's usb tree, with relevant
+device tree patches[1]
 
-Add the phy provider, supplied by new Exynos-usb2phy using
-Generic phy framework.
-Keeping the support for older USB phy intact right now, in order
-to prevent any functionality break in absence of relevant
-device tree side change for ehci-exynos.
-Once we move to new phy in the device nodes for ehci, we can
-remove the support for older phys.
+Hi Alan,
+ I have included your Acked-by in all the four patches, but there has been
+ some amount of restructuring as suggested by Tomasz Figa.
+ Please let me know if you have some comments on this patch-series.
 
-Signed-off-by: Kamil Debski <k.debski@samsung.com>
-[gautam.vivek at samsung.com: Addressed review comments from mailing list]
-[gautam.vivek at samsung.com: Kept the code for old usb-phy, and just
-added support for new exynos5-usb2phy in generic phy framework]
-[gautam.vivek at samsung.com: Edited the commit message]
-Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
-Cc: Jingoo Han <jg1.han@samsung.com>
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
----
+Changes from v4:
+ - Addressed review comments for restructuring exynos_ohci_get_phy()
+   and exynos_ehci_get_phy(); and thereby adding proper checks in
+   exynos_ohci_phy_enable()/disable() as well as exynos_ehci_phy_enable()/
+   disable().
 
-Changes from v10:
- - Removed 'phy-names' property from the bindings since we don't need it.
- - Restructured exynos_ehci_get_phy() function to handle error codes as
-   well as return relevant error codes effectively.
- - Added IS_ERR() check for PHYs in exynos_ehci_phy_enable()/disable().
-
-Changes from v9:
- - Calling usb_phy_shutdown() when exynos_ehci_phy_enable() is failing.
- - Made exynos_ehci_phy_disable() return void, since its return value
+Changes from v3:
+ - Calling usb_phy_shutdown() when exynos_o/ehci_phy_enable() is failing.
+ - Made exynos_o/ehci_phy_disable() return void, since its return value
    did not serve any purpose.
- - Calling clk_disable_unprepare() in exynos_ehci_resume() when
-   exynos_ehci_phy_enable() is failed.
+ - Calling clk_disable_unprepare() in exynos_o/ehci_resume() when
+   exynos_o/ehci_phy_enable() is failed.
 
- .../devicetree/bindings/usb/exynos-usb.txt         |   15 +++
- drivers/usb/host/ehci-exynos.c                     |  131 +++++++++++++++++---
- 2 files changed, 126 insertions(+), 20 deletions(-)
+Changes from v2:
+ - Added two patches in the series for some cleanup.
+   usb: ohci-exynos: Use struct device instead of platform_device
+   usb: ehci-exynos: Use struct device instead of platform_device
+ - Addressed review comments.
+   -- Moved exynos_ohci_phyg_on()/off routines inside
+      exynos_ohci_phy_enable()/disable.
+   -- Added functions exynos_ehci_phy_enable() and exynos_ehci_phy_disable()
+      and moved exynos_ehci_phyg_on()/off routines respectively in them.
+   -- Added necessary checks.
 
-diff --git a/Documentation/devicetree/bindings/usb/exynos-usb.txt b/Documentation/devicetree/bindings/usb/exynos-usb.txt
-index 49a9c6f..a3b5990 100644
---- a/Documentation/devicetree/bindings/usb/exynos-usb.txt
-+++ b/Documentation/devicetree/bindings/usb/exynos-usb.txt
-@@ -12,6 +12,13 @@ Required properties:
-  - interrupts: interrupt number to the cpu.
-  - clocks: from common clock binding: handle to usb clock.
-  - clock-names: from common clock binding: Shall be "usbhost".
-+ - port: if in the SoC there are EHCI phys, they should be listed here.
-+   One phy per port. Each port should have following entries:
-+	- reg: port number on EHCI controller, e.g
-+	       On Exynos5250, port 0 is USB2.0 otg phy
-+			      port 1 is HSIC phy0
-+			      port 2 is HSIC phy1
-+	- phys: from the *Generic PHY* bindings; specifying phy used by port.
- 
- Optional properties:
-  - samsung,vbus-gpio:  if present, specifies the GPIO that
-@@ -27,6 +34,14 @@ Example:
- 
- 		clocks = <&clock 285>;
- 		clock-names = "usbhost";
-+
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		port at 0 {
-+		    reg = <0>;
-+		    phys = <&usb2phy 1>;
-+		    status = "disabled";
-+		};
- 	};
- 
- OHCI
-diff --git a/drivers/usb/host/ehci-exynos.c b/drivers/usb/host/ehci-exynos.c
-index 4d763dc..e8b518a 100644
---- a/drivers/usb/host/ehci-exynos.c
-+++ b/drivers/usb/host/ehci-exynos.c
-@@ -19,6 +19,7 @@
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/of_gpio.h>
-+#include <linux/phy/phy.h>
- #include <linux/platform_device.h>
- #include <linux/usb/phy.h>
- #include <linux/usb/samsung_usb_phy.h>
-@@ -42,14 +43,106 @@
- static const char hcd_name[] = "ehci-exynos";
- static struct hc_driver __read_mostly exynos_ehci_hc_driver;
- 
-+#define PHY_NUMBER 3
-+
- struct exynos_ehci_hcd {
- 	struct clk *clk;
- 	struct usb_phy *phy;
- 	struct usb_otg *otg;
-+	struct phy *phy_g[PHY_NUMBER];
- };
- 
- #define to_exynos_ehci(hcd) (struct exynos_ehci_hcd *)(hcd_to_ehci(hcd)->priv)
- 
-+static int exynos_ehci_get_phy(struct device *dev,
-+				struct exynos_ehci_hcd *exynos_ehci)
-+{
-+	struct device_node *child;
-+	struct phy *phy;
-+	int phy_number;
-+	int ret = 0;
-+
-+	exynos_ehci->phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
-+	if (IS_ERR(exynos_ehci->phy)) {
-+		ret = PTR_ERR(exynos_ehci->phy);
-+		if (ret != -ENXIO && ret != -ENODEV) {
-+			dev_err(dev, "no usb2 phy configured\n");
-+			return ret;
-+		}
-+		dev_dbg(dev, "Failed to get usb2 phy\n");
-+		exynos_ehci->phy = ERR_PTR(-ENODEV);
-+	} else {
-+		exynos_ehci->otg = exynos_ehci->phy->otg;
-+	}
-+
-+	for_each_available_child_of_node(dev->of_node, child) {
-+		ret = of_property_read_u32(child, "reg", &phy_number);
-+		if (ret) {
-+			dev_err(dev, "Failed to parse device tree\n");
-+			of_node_put(child);
-+			return ret;
-+		}
-+
-+		if (phy_number >= PHY_NUMBER) {
-+			dev_err(dev, "Invalid number of PHYs\n");
-+			of_node_put(child);
-+			return -EINVAL;
-+		}
-+
-+		phy = devm_of_phy_get(dev, child, 0);
-+		of_node_put(child);
-+		if (IS_ERR(phy)) {
-+			ret = PTR_ERR(phy);
-+			if (ret != -ENXIO && ret != -ENODEV) {
-+				dev_err(dev, "no usb2 phy configured\n");
-+				return ret;
-+			}
-+			dev_dbg(dev, "Failed to get usb2 phy\n");
-+			phy = ERR_PTR(-ENODEV);
-+		}
-+		exynos_ehci->phy_g[phy_number] = phy;
-+	}
-+
-+	return ret;
-+}
-+
-+static int exynos_ehci_phy_enable(struct device *dev)
-+{
-+	struct usb_hcd *hcd = dev_get_drvdata(dev);
-+	struct exynos_ehci_hcd *exynos_ehci = to_exynos_ehci(hcd);
-+	int i;
-+	int ret = 0;
-+
-+	if (!IS_ERR(exynos_ehci->phy))
-+		return usb_phy_init(exynos_ehci->phy);
-+
-+	for (i = 0; ret == 0 && i < PHY_NUMBER; i++)
-+		if (!IS_ERR(exynos_ehci->phy_g[i]))
-+			ret = phy_power_on(exynos_ehci->phy_g[i]);
-+	if (ret)
-+		for (i--; i >= 0; i--)
-+			if (!IS_ERR(exynos_ehci->phy_g[i]))
-+				phy_power_off(exynos_ehci->phy_g[i]);
-+
-+	return ret;
-+}
-+
-+static void exynos_ehci_phy_disable(struct device *dev)
-+{
-+	struct usb_hcd *hcd = dev_get_drvdata(dev);
-+	struct exynos_ehci_hcd *exynos_ehci = to_exynos_ehci(hcd);
-+	int i;
-+
-+	if (!IS_ERR(exynos_ehci->phy)) {
-+		usb_phy_shutdown(exynos_ehci->phy);
-+		return;
-+	}
-+
-+	for (i = 0; i < PHY_NUMBER; i++)
-+		if (!IS_ERR(exynos_ehci->phy_g[i]))
-+			phy_power_off(exynos_ehci->phy_g[i]);
-+}
-+
- static void exynos_setup_vbus_gpio(struct device *dev)
- {
- 	int err;
-@@ -74,7 +167,6 @@ static int exynos_ehci_probe(struct platform_device *pdev)
- 	struct usb_hcd *hcd;
- 	struct ehci_hcd *ehci;
- 	struct resource *res;
--	struct usb_phy *phy;
- 	int irq;
- 	int err;
- 
-@@ -101,15 +193,9 @@ static int exynos_ehci_probe(struct platform_device *pdev)
- 					"samsung,exynos5440-ehci"))
- 		goto skip_phy;
- 
--	phy = devm_usb_get_phy(&pdev->dev, USB_PHY_TYPE_USB2);
--	if (IS_ERR(phy)) {
--		usb_put_hcd(hcd);
--		dev_warn(&pdev->dev, "no platform data or transceiver defined\n");
--		return -EPROBE_DEFER;
--	} else {
--		exynos_ehci->phy = phy;
--		exynos_ehci->otg = phy->otg;
--	}
-+	err = exynos_ehci_get_phy(&pdev->dev, exynos_ehci);
-+	if (err)
-+		goto fail_clk;
- 
- skip_phy:
- 
-@@ -151,8 +237,11 @@ skip_phy:
- 	if (exynos_ehci->otg)
- 		exynos_ehci->otg->set_host(exynos_ehci->otg, &hcd->self);
- 
--	if (exynos_ehci->phy)
--		usb_phy_init(exynos_ehci->phy);
-+	err = exynos_ehci_phy_enable(&pdev->dev);
-+	if (err) {
-+		dev_err(&pdev->dev, "Failed to enable USB phy\n");
-+		goto fail_io;
-+	}
- 
- 	ehci = hcd_to_ehci(hcd);
- 	ehci->caps = hcd->regs;
-@@ -172,8 +261,7 @@ skip_phy:
- 	return 0;
- 
- fail_add_hcd:
--	if (exynos_ehci->phy)
--		usb_phy_shutdown(exynos_ehci->phy);
-+	exynos_ehci_phy_disable(&pdev->dev);
- fail_io:
- 	clk_disable_unprepare(exynos_ehci->clk);
- fail_clk:
-@@ -191,8 +279,7 @@ static int exynos_ehci_remove(struct platform_device *pdev)
- 	if (exynos_ehci->otg)
- 		exynos_ehci->otg->set_host(exynos_ehci->otg, &hcd->self);
- 
--	if (exynos_ehci->phy)
--		usb_phy_shutdown(exynos_ehci->phy);
-+	exynos_ehci_phy_disable(&pdev->dev);
- 
- 	clk_disable_unprepare(exynos_ehci->clk);
- 
-@@ -217,8 +304,7 @@ static int exynos_ehci_suspend(struct device *dev)
- 	if (exynos_ehci->otg)
- 		exynos_ehci->otg->set_host(exynos_ehci->otg, &hcd->self);
- 
--	if (exynos_ehci->phy)
--		usb_phy_shutdown(exynos_ehci->phy);
-+	exynos_ehci_phy_disable(dev);
- 
- 	clk_disable_unprepare(exynos_ehci->clk);
- 
-@@ -229,14 +315,19 @@ static int exynos_ehci_resume(struct device *dev)
- {
- 	struct usb_hcd *hcd = dev_get_drvdata(dev);
- 	struct exynos_ehci_hcd *exynos_ehci = to_exynos_ehci(hcd);
-+	int ret;
- 
- 	clk_prepare_enable(exynos_ehci->clk);
- 
- 	if (exynos_ehci->otg)
- 		exynos_ehci->otg->set_host(exynos_ehci->otg, &hcd->self);
- 
--	if (exynos_ehci->phy)
--		usb_phy_init(exynos_ehci->phy);
-+	ret = exynos_ehci_phy_enable(dev);
-+	if (ret) {
-+		dev_err(dev, "Failed to enable USB phy\n");
-+		clk_disable_unprepare(exynos_ehci->clk);
-+		return ret;
-+	}
- 
- 	/* DMA burst Enable */
- 	writel(EHCI_INSNREG00_ENABLE_DMA_BURST, EHCI_INSNREG00(hcd->regs));
+[1]: [PATCH 0/4] dts: Add usb2phy to Exynos 5250/5420
+     https://lkml.org/lkml/2014/4/30/119
+
+Kamil Debski (1):
+  usb: ehci-exynos: Change to use phy provided by the generic phy
+    framework
+
+Vivek Gautam (3):
+  usb: ohci-exynos: Use struct device instead of platform_device
+  usb: ehci-exynos: Use struct device instead of platform_device
+  usb: ohci-exynos: Add facility to use phy provided by the generic phy
+    framework
+
+ .../devicetree/bindings/usb/exynos-usb.txt         |   31 +++++
+ drivers/usb/host/ehci-exynos.c                     |  136 ++++++++++++++++----
+ drivers/usb/host/ohci-exynos.c                     |  134 +++++++++++++++----
+ 3 files changed, 254 insertions(+), 47 deletions(-)
+
 -- 
 1.7.10.4
