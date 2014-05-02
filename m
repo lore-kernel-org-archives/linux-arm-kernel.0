@@ -1,32 +1,56 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Fri,  2 May 2014 13:38:26 -0700
-Subject: [PATCH 0/6] arm64: topology: DT and MPIDR support
-Message-ID: <1399063112-16917-1-git-send-email-broonie@kernel.org>
+Date: Fri,  2 May 2014 13:38:28 -0700
+Subject: [PATCH 2/6] arm64: topology: Initialise default topology state
+ immediately
+In-Reply-To: <1399063112-16917-1-git-send-email-broonie@kernel.org>
+References: <1399063112-16917-1-git-send-email-broonie@kernel.org>
+Message-ID: <1399063112-16917-3-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Mark Brown <broonie@linaro.org>
 
-This reposting of the series rolls together the work from myself and Zi
-Shen, it includes the revisions Lorenzo provided on the last round of
-review.  It is also available at:
+As a legacy of the way 32 bit ARM did things the topology code uses a null
+topology map by default and then overwrites it by mapping cores with no
+information to a cluster by themselves later. In order to make it simpler
+to reset things as part of recovering from parse failures in firmware
+information directly set this configuration on init. A core will always be
+its own sibling so there should be no risk of confusion with firmware
+provided information.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/broonie/misc.git tags/arm64-topology-dt-mpidr
+Signed-off-by: Mark Brown <broonie@linaro.org>
+Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+---
+ arch/arm64/kernel/topology.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-Mark Brown (4):
-  arm64: topology: Initialise default topology state immediately
-  arm64: topology: Add support for topology DT bindings
-  arm64: topology: Tell the scheduler about the relative power of cores
-  arm64: topology: Provide relative power numbers for cores
-
-Zi Shen Lim (2):
-  arm64: sched: Remove unused mc_capable() and smt_capable()
-  arm64: topology: add MPIDR-based detection
-
- arch/arm64/include/asm/cputype.h  |   5 +
- arch/arm64/include/asm/topology.h |   3 -
- arch/arm64/kernel/topology.c      | 411 ++++++++++++++++++++++++++++++++++++--
- 3 files changed, 401 insertions(+), 18 deletions(-)
-
+diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+index 3e06b0b..ff662b2 100644
+--- a/arch/arm64/kernel/topology.c
++++ b/arch/arm64/kernel/topology.c
+@@ -43,9 +43,6 @@ static void update_siblings_masks(unsigned int cpuid)
+ 		 * reset it to default behaviour
+ 		 */
+ 		pr_debug("CPU%u: No topology information configured\n", cpuid);
+-		cpuid_topo->core_id = 0;
+-		cpumask_set_cpu(cpuid, &cpuid_topo->core_sibling);
+-		cpumask_set_cpu(cpuid, &cpuid_topo->thread_sibling);
+ 		return;
+ 	}
+ 
+@@ -87,9 +84,12 @@ void __init init_cpu_topology(void)
+ 		struct cpu_topology *cpu_topo = &cpu_topology[cpu];
+ 
+ 		cpu_topo->thread_id = -1;
+-		cpu_topo->core_id =  -1;
++		cpu_topo->core_id = 0;
+ 		cpu_topo->cluster_id = -1;
++
+ 		cpumask_clear(&cpu_topo->core_sibling);
++		cpumask_set_cpu(cpu, &cpu_topo->core_sibling);
+ 		cpumask_clear(&cpu_topo->thread_sibling);
++		cpumask_set_cpu(cpu, &cpu_topo->thread_sibling);
+ 	}
+ }
 -- 
 1.9.2
