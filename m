@@ -1,21 +1,133 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 2 May 2014 15:43:24 -0700
-Subject: [PATCH] pinctrl: qcom: Correct name for pin 0
-In-Reply-To: <1398458515-15654-1-git-send-email-agross@codeaurora.org>
-References: <1398458515-15654-1-git-send-email-agross@codeaurora.org>
-Message-ID: <CACRpkdaa+NEETz5aS6Sb=G4bqHuwPgLB2s0DJ0dwj-pmJ4-YtA@mail.gmail.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Fri, 2 May 2014 17:46:00 -0500
+Subject: [PATCHv5 01/15] Documentation: dt: add common bindings for
+ hwspinlock
+In-Reply-To: <CAL_JsqJEVU7j0+biWuW2FiV-avu1_SO4w+OCdirAc6mw2OxrOA@mail.gmail.com>
+References: <1398904476-26200-1-git-send-email-s-anna@ti.com>	<1398904476-26200-2-git-send-email-s-anna@ti.com>
+ <CAL_JsqJEVU7j0+biWuW2FiV-avu1_SO4w+OCdirAc6mw2OxrOA@mail.gmail.com>
+Message-ID: <53642028.2040308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 25, 2014 at 1:41 PM, Andy Gross <agross@codeaurora.org> wrote:
+Hi Rob,
 
-> Fix copy/paste error in pinctrl_pin_desc for pin 0.
->
-> Signed-off-by: Andy Gross <agross@codeaurora.org>
+On 05/02/2014 09:58 AM, Rob Herring wrote:
+> On Wed, Apr 30, 2014 at 7:34 PM, Suman Anna <s-anna@ti.com> wrote:
+>> This patch adds the generic common bindings used to represent
+>> a hwlock device and use/request locks in a device-tree build.
+>>
+>> All the platform-specific hwlock driver implementations need the
+>> number of locks and associated base id for registering the locks
+>> present within the device with the driver core. The number of locks
+>> is represented by 'hwlock-num-locks' property in DT bindings. A
+>> property for base id is not needed in DT binding, as it can be
+>> satisfied using a phandle + args specifier. The args specifier
+>> length is dependent on each vendor-specific implementation and
+>> is represented through the '#hwlock-cells' property.
+>>
+>> Note that the document is named hwlock.txt deliberately to keep it
+>> a bit more generic.
+>>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Signed-off-by: Suman Anna <s-anna@ti.com>
+>> ---
+>>  .../devicetree/bindings/hwlock/hwlock.txt          | 52 ++++++++++++++++++++++
+>>  1 file changed, 52 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/hwlock/hwlock.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/hwlock/hwlock.txt b/Documentation/devicetree/bindings/hwlock/hwlock.txt
+>> new file mode 100644
+>> index 0000000..32381cc
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/hwlock/hwlock.txt
+>> @@ -0,0 +1,52 @@
+>> +Generic hwlock bindings
+>> +=======================
+>> +
+>> +Generic bindings that are common to all the hwlock platform specific driver
+>> +implementations, the retrieved values are used for registering the device
+>> +specific parameters with the hwspinlock core.
+>> +
+>> +The validity and need of these common properties may vary from one platform
+>> +implementation to another. The platform specific bindings should explicitly
+>> +state if a property is mandatory or optional. Please look through the
+>> +individual platform specific hwlock binding documentations for identifying
+>> +the applicable properties.
+>> +
+>> +Common properties:
+>> +- #hwlock-cells:       Specifies the number of cells needed to represent a
+>> +                       specific lock.
+> 
+> This should never be optional.
 
-Pretty obvious.
+Thanks for reviewing this. I can add a statement here to make this clear.
 
-Patch applied!
+> 
+>> +- hwlock-num-locks:    Number of locks present in a hwlock device. This
+>> +                       property is needed on hwlock devices, where the number
+>> +                       of supported locks within a hwlock device cannot be
+>> +                       read from a register.
+> 
+> Do you have any users of this? The omap binding doesn't use it.
+> Wouldn't you typically know this based on the IP block? Similarly you
+> typically don't have to list how many irqs an interrupt controller
+> has.
 
-Yours,
-Linus Walleij
+The MSM Spinlock driver [1] would be using this, it is waiting on this
+series to get finalized. It currently defines a custom property, and the
+number of locks is a generic property that the hwspinlock core uses and
+is common to different platform implementations, so created the generic
+property. OMAP doesn't use this because the number is read directly off
+a IP register.
+
+ can you also take a look at patches 8 and 12 as they add additional
+properties based on discussion in [2]. The hwspinlocks are used for
+arbitration between different initiators on an SoC, and typically would
+need a SoC-level identifier for each lock. All these properties allow a
+hwlock to be statically identified and be assigned to a user and its
+peer user on a different initiator, and not allowing them to be run-time
+assigned.
+
+regards
+Suman
+
+[1] https://lkml.org/lkml/2013/8/14/528
+[2] http://marc.info/?l=linux-omap&m=139510004009415&w=2
+
+> 
+> 
+>> +
+>> +Hwlock Users:
+>> +=============
+>> +
+>> +Nodes that require specific hwlock(s) should specify them using one or more
+>> +properties, each containing a phandle to the hwlock node and an args specifier
+>> +value as indicated by #hwlock-cells. Multiple hwlocks can be requested using
+>> +an array of the phandle and hwlock number specifier tuple.
+>> +
+>> +1. Example of a node using a single specific hwlock:
+>> +
+>> +The following example has a node requesting a hwlock in the bank defined by
+>> +the node hwlock1. hwlock1 is a hwlock provider with an argument specifier
+>> +of length 1.
+>> +
+>> +       node {
+>> +               ...
+>> +               hwlocks = <&hwlock1 2>;
+>> +               ...
+>> +       };
+>> +
+>> +2. Example of a node using multiple specific hwlocks:
+>> +
+>> +The following example has a node requesting two hwlocks, a hwlock within
+>> +the hwlock device node 'hwlock1' with #hwlock-cells value of 1, and another
+>> +hwlock within the hwlock device node 'hwlock2' with #hwlock-cells value of 2.
+>> +
+>> +       node {
+>> +               ...
+>> +               hwlocks = <&hwlock1 2>, <&hwlock2 0 3>;
+>> +               ...
+>> +       };
+>> --
+>> 1.9.2
+>>
