@@ -1,71 +1,96 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 2 May 2014 12:41:01 +0100
-Subject: [PATCH v12 11/31] documentation: iommu: add binding document of
- Exynos System MMU
-In-Reply-To: <53628751.9000609@wwwdotorg.org>
-References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
- <20140429181601.GE3582@e103592.cambridge.arm.com>
- <CANEJEGs6TXNzE8cWYgEKfFSsD2w5XiYvwSbhQ_+gtfzfs+6udA@mail.gmail.com>
- <7044616.kdaKNu3Qet@wuerfel> <53628751.9000609@wwwdotorg.org>
-Message-ID: <20140502114054.GA3805@e103592.cambridge.arm.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Fri, 02 May 2014 13:57:59 +0200
+Subject: [PATCH 1/4] ARM: shmobile: Ignore callbacks for subsys
+ generic_pm_domain_data
+In-Reply-To: <CAPDyKFpce1v8Ec4kJzAHxp8QtvXF=PqXi0FbzJbMgs9TCousSQ@mail.gmail.com>
+References: <1397230004-22306-1-git-send-email-ulf.hansson@linaro.org>
+ <1639184.jtW6HVkuRH@vostro.rjw.lan>
+ <CAPDyKFpce1v8Ec4kJzAHxp8QtvXF=PqXi0FbzJbMgs9TCousSQ@mail.gmail.com>
+Message-ID: <8001410.m2PQVQUM5h@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 01, 2014 at 06:41:37PM +0100, Stephen Warren wrote:
-> On 04/29/2014 03:00 PM, Arnd Bergmann wrote:
-> ...
-> > Yes. It's very complicated unfortunately, because we have to be
-> > able to deal with arbitrary combinations of a lot of oddball cases
-> > that can show up in random SoCs:
-> ...
-> > - a device may have DMA access to a bus that is invisible to the CPU
+On Friday, May 02, 2014 11:13:23 AM Ulf Hansson wrote:
+> On 30 April 2014 22:21, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> > On Wednesday, April 30, 2014 07:23:08 PM Simon Horman wrote:
+> >> On Wed, Apr 30, 2014 at 10:53:58AM +0200, Ulf Hansson wrote:
+> >> > On 30 April 2014 00:45, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> >> > > On Friday, April 25, 2014 10:06:51 AM Simon Horman wrote:
+> >> > >> On Thu, Apr 24, 2014 at 01:25:14PM +0200, Ulf Hansson wrote:
+> >> > >> > On 14 April 2014 11:22, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> >> > >> > > On 14 April 2014 03:20, Simon Horman <horms@verge.net.au> wrote:
+> >> > >> > >> On Fri, Apr 11, 2014 at 05:26:41PM +0200, Ulf Hansson wrote:
+> >> > >> > >>> There are no active users of these callbacks, thus there are no benefit
+> >> > >> > >>> of trying to invoke them.
+> >> > >> > >>>
+> >> > >> > >>> Cc: Simon Horman <horms@verge.net.au>
+> >> > >> > >>> Cc: Magnus Damm <magnus.damm@gmail.com>
+> >> > >> > >>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> >> > >> > >>> ---
+> >> > >> > >>>
+> >> > >> > >>> I am seeking ack from the SOC maintainers since this needs to go with the other
+> >> > >> > >>> patches in this patchset on the PM core.
+> >> > >> > >>
+> >> > >> > >> In order to reduce the possibility of conflicts I would prefer
+> >> > >> > >> to take this patch through my tree.
+> >> > >> > >
+> >> > >> > > Okay, go ahead!
+> >> > >> > >
+> >> > >> >
+> >> > >> > Hi Simon,
+> >> > >> >
+> >> > >> > Just wanted to know, if you decided to queue this patch in your tree.
+> >> > >> > Or were there anything else you needed me to fix here?
+> >> > >>
+> >> > >> Sorry for dropping the ball. I will queue-up this patch.
+> >> > >
+> >> > > OK
+> >> > >
+> >> > > Ulf, since the rest of the series depends on this one (or at least that's
+> >> > > how it looks to me), would you mind resending it when this one gets into the
+> >> > > Linus' tree?
+> >> >
+> >> > Well, I would prefer if we could go ahead with the rest of the patches
+> >> > somehow for 3.16, but I guess it will be hard if Simon picks up this
+> >> > patch!?
+> >> >
+> >> > Simon,
+> >> > I guess the reason for your concern were about conflicts, but the file
+> >> > this patch touch has actually not been modified since Sep 2012. So,
+> >> > maybe we could go through Rafaels tree anyway?
+> >>
+> >> Yes, my primary concern was conflicts.
+> >> But as you point out that seems unlikely.
+> >>
+> >> I have already picked up the patch but the pull request I sent to
+> >> the ARM SoC maintainers has not been pulled. And regardless it
+> >> won't appear in Linus's tree via that route until v3.16-rc1.
+> >>
+> >> Perhaps a good way forwards would be for Rafael to also apply the patch
+> >> with my Ack.
+> >
+> > Not really.  No duplicate patches with different changelogs coming from
+> > different trees.  Please!
+> >
+> >> I could also revert the version applied to my tree
+> >> if that is of any help.
+> >>
+> >> Acked-by: Simon Horman <horms+renesas@verge.net.au>
+> >
+> > Ulf, can you please do as I said?
 > 
-> The issue is slightly more general than that. It's more that the bus
-> structure "seen" by a device is simply /different/ than that seen by the
-> CPU. I don't think it's a requirement that there be CPU-invisible buses
-> for that to be true.
+> Okay! It seems like I have no choice. :-)
 > 
-> For example, I could conceive of a HW setup like:
-> 
-> primary CPU bus ----------------------> other devices
->    |    \_________________      /
->    |                      \    |
->    v                      v    ^
-> device registers ----> some secondary bus
->                           |
->                           v
->                        memory
-> 
-> Here, all the buses are visible to the CPU, yet the path that
-> transactions take between the buses is simply different to the CPU. More
-> complex situations than the above, while still maintaining that
-> description, are certainly possible.
-> 
+> Does that mean you were happy with the rest from this patchset?
 
-I tend to think in terms of links rather than buses.  A link is
-effectively a 1:1 point-to-point bus that passes all transactions with
-no modification.
+Yes, those changes are fine by me.
 
-So, although "some secondary bus" is visible to the CPUs, crucially the
-link "some secondary bus" to "other devices" is not visible -- in the
-sense that transactions issued by the CPUs never flow down that link.
-Thus, if the link actually has remappings associated with it, then
-devices mastering onto "some secondary bus" will observe those mappings
-but the CPUs won't.  That's precisely what we need to know about when
-configuring DMA buffers.
+> Additionally, I intend to post some more patches for the PM domain
+> soon. Thus I will need to fold in these patches to any other upcoming
+> patchset. Thought it could be good to know.
 
-"invisible bus" situations are therefore a subset of "invisible link"
-situations, and it is the latter which are the source of the complexity.
+OK, thanks!
 
-However, if the extra link(s) don't have any special characteristics, it
-may be software-transparent with no need for description, because we
-can pretend for logical purposes that there is a single bus in that case.
-Effectively that what we've relied on for simpler systems up to now.
-
-I'm assming in your example that the direct link between "primary CPU
-bus" and "other devices" is always used by preference, instead of CPUs'
-transactions toward "other devices" being sent to "some secondary bus"
-first.
-
-Cheers
----Dave
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
