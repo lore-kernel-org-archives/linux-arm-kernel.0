@@ -1,68 +1,45 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 1 May 2014 20:01:09 -0500
-Subject: [PATCH v3 1/7] device: introduce per device dma_pfn_offset
-In-Reply-To: <1398353407-2345-2-git-send-email-santosh.shilimkar@ti.com>
-References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
- <1398353407-2345-2-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <CAL_JsqJqmdYh61KGs-qfw_SRwUu=WT02ivkK5Rw4CKeDB3mXSw@mail.gmail.com>
+From: jays.lee@samsung.com (Jungseok Lee)
+Date: Fri, 02 May 2014 10:03:02 +0900
+Subject: [PATCH] arm64: mm: Create gigabyte kernel logical mappings where
+ possible
+In-Reply-To: <1398857782-1525-1-git-send-email-steve.capper@linaro.org>
+References: <1398857782-1525-1-git-send-email-steve.capper@linaro.org>
+Message-ID: <000801cf65a2$44551e10$ccff5a30$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 24, 2014 at 10:30 AM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-> On few architectures, there are few restrictions on DMAble area of system
-> RAM. That also means that devices needs to know about this restrictions so
-> that the dma_masks can be updated accordingly and dma address translation
-> helpers can add/subtract the dma offset.
->
-> In most of cases DMA addresses can be performed using offset value of
-> Bus address space relatively to physical address space as following:
->
-> PFN->DMA:  __pfn_to_phys(pfn + [-]dma_pfn_offset)
-> DMA->PFN:  __phys_to_pfn(dma_addr) + [-]dma_pfn_offset
->
-> So we introduce per device dma_pfn_offset which can be popullated
-> by architecture init code while creating the devices.
->
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Grant Likely <grant.likely@linaro.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-
-Reviewed-by: Rob Herring <robh@kernel.org>
-
-Rob
-
+On Wednesday, April 30, 2014 8:36 PM, Steve Capper wrote:
+> We have the capability to map 1GB level 1 blocks when using a 4K granule.
+> 
+> This patch adjusts the create_mapping logic s.t. when mapping physical memory on boot, we attempt to
+> use a 1GB block if both the VA and PA start and end are 1GB aligned. This both reduces the levels of
+> lookup required to resolve a kernel logical address, as well as reduces TLB pressure on cores that
+> support 1GB TLB entries.
+> 
+> Signed-off-by: Steve Capper <steve.capper@linaro.org>
 > ---
->  include/linux/device.h |    2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/include/linux/device.h b/include/linux/device.h
-> index 233bbbe..85a52d6 100644
-> --- a/include/linux/device.h
-> +++ b/include/linux/device.h
-> @@ -691,6 +691,7 @@ struct acpi_dev_node {
->   * @coherent_dma_mask: Like dma_mask, but for alloc_coherent mapping as not all
->   *             hardware supports 64-bit addresses for consistent allocations
->   *             such descriptors.
-> + * @dma_pfn_offset: offset of DMA memory range relatively of RAM
->   * @dma_parms: A low level driver may set these to teach IOMMU code about
->   *             segment limitations.
->   * @dma_pools: Dma pools (if dma'ble device).
-> @@ -756,6 +757,7 @@ struct device {
->                                              not all hardware supports
->                                              64 bit addresses for consistent
->                                              allocations such descriptors. */
-> +       unsigned long   dma_pfn_offset;
->
->         struct device_dma_parameters *dma_parms;
->
-> --
-> 1.7.9.5
->
+> Hello,
+> This patch has been tested on the FastModel for 4K and 64K pages.
+> Also, this has been tested with Jungseok's 4 level patch.
+> 
+> I put in the explicit check for PAGE_SHIFT, as I am anticipating a three level 64KB configuration at
+> some point.
+> 
+> With two level 64K, a PUD is equivalent to a PMD which is equivalent to a PGD, and these are all level
+> 2 descriptors.
+> 
+> Under three level 64K, a PUD would be equivalent to a PGD which would be a level 1 descriptor thus may
+> not be a block.
+> 
+> Comments/critique/testers welcome.
+
+Hi, Steve
+
+I've tested on my platform, and it works well.
+
+If SoC design follows "Principles of ARM Memory Maps",
+PA should be supposed to be 1GB aligned. Thus, I think
+this patch is effective against them.
+
+Best Regards
+Jungseok Lee
