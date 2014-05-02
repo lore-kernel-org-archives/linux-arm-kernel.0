@@ -1,96 +1,74 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 02 May 2014 13:57:59 +0200
-Subject: [PATCH 1/4] ARM: shmobile: Ignore callbacks for subsys
- generic_pm_domain_data
-In-Reply-To: <CAPDyKFpce1v8Ec4kJzAHxp8QtvXF=PqXi0FbzJbMgs9TCousSQ@mail.gmail.com>
-References: <1397230004-22306-1-git-send-email-ulf.hansson@linaro.org>
- <1639184.jtW6HVkuRH@vostro.rjw.lan>
- <CAPDyKFpce1v8Ec4kJzAHxp8QtvXF=PqXi0FbzJbMgs9TCousSQ@mail.gmail.com>
-Message-ID: <8001410.m2PQVQUM5h@vostro.rjw.lan>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 2 May 2014 12:41:34 +0100
+Subject: FEC ethernet issues [Was: PL310 errata workarounds]
+In-Reply-To: <CAGzjT4d8H6YE6P6A1E4aHiPAenJFvZH01LHXaNzVwhF2MRBvWQ@mail.gmail.com>
+References: <OF42C103CA.1A3B5524-ON87257CA5.005C7764-87257CA5.0062A13A@grpleg.it>
+ <201403242121.58705.marex@denx.de>
+ <OF5A7B7FA4.2FEB0248-ON87257CA5.007AE2AE-87257CA5.007C44DB@grpleg.it>
+ <20140324234443.GS7528@n2100.arm.linux.org.uk>
+ <20140326001135.GV7528@n2100.arm.linux.org.uk>
+ <20140401092638.GA10224@n2100.arm.linux.org.uk>
+ <OF15BAA4F9.E675BBEF-ON87257CAD.006812E9-87257CAD.006BE81E@grpleg.it>
+ <20140401225149.GC7528@n2100.arm.linux.org.uk>
+ <OF62048746.594D7A9E-ON87257CB0.006DF18B-87257CB0.006FDEED@grpleg.it>
+ <CAGzjT4d8H6YE6P6A1E4aHiPAenJFvZH01LHXaNzVwhF2MRBvWQ@mail.gmail.com>
+Message-ID: <20140502114133.GB3693@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, May 02, 2014 11:13:23 AM Ulf Hansson wrote:
-> On 30 April 2014 22:21, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> > On Wednesday, April 30, 2014 07:23:08 PM Simon Horman wrote:
-> >> On Wed, Apr 30, 2014 at 10:53:58AM +0200, Ulf Hansson wrote:
-> >> > On 30 April 2014 00:45, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> >> > > On Friday, April 25, 2014 10:06:51 AM Simon Horman wrote:
-> >> > >> On Thu, Apr 24, 2014 at 01:25:14PM +0200, Ulf Hansson wrote:
-> >> > >> > On 14 April 2014 11:22, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> >> > >> > > On 14 April 2014 03:20, Simon Horman <horms@verge.net.au> wrote:
-> >> > >> > >> On Fri, Apr 11, 2014 at 05:26:41PM +0200, Ulf Hansson wrote:
-> >> > >> > >>> There are no active users of these callbacks, thus there are no benefit
-> >> > >> > >>> of trying to invoke them.
-> >> > >> > >>>
-> >> > >> > >>> Cc: Simon Horman <horms@verge.net.au>
-> >> > >> > >>> Cc: Magnus Damm <magnus.damm@gmail.com>
-> >> > >> > >>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> >> > >> > >>> ---
-> >> > >> > >>>
-> >> > >> > >>> I am seeking ack from the SOC maintainers since this needs to go with the other
-> >> > >> > >>> patches in this patchset on the PM core.
-> >> > >> > >>
-> >> > >> > >> In order to reduce the possibility of conflicts I would prefer
-> >> > >> > >> to take this patch through my tree.
-> >> > >> > >
-> >> > >> > > Okay, go ahead!
-> >> > >> > >
-> >> > >> >
-> >> > >> > Hi Simon,
-> >> > >> >
-> >> > >> > Just wanted to know, if you decided to queue this patch in your tree.
-> >> > >> > Or were there anything else you needed me to fix here?
-> >> > >>
-> >> > >> Sorry for dropping the ball. I will queue-up this patch.
-> >> > >
-> >> > > OK
-> >> > >
-> >> > > Ulf, since the rest of the series depends on this one (or at least that's
-> >> > > how it looks to me), would you mind resending it when this one gets into the
-> >> > > Linus' tree?
-> >> >
-> >> > Well, I would prefer if we could go ahead with the rest of the patches
-> >> > somehow for 3.16, but I guess it will be hard if Simon picks up this
-> >> > patch!?
-> >> >
-> >> > Simon,
-> >> > I guess the reason for your concern were about conflicts, but the file
-> >> > this patch touch has actually not been modified since Sep 2012. So,
-> >> > maybe we could go through Rafaels tree anyway?
-> >>
-> >> Yes, my primary concern was conflicts.
-> >> But as you point out that seems unlikely.
-> >>
-> >> I have already picked up the patch but the pull request I sent to
-> >> the ARM SoC maintainers has not been pulled. And regardless it
-> >> won't appear in Linus's tree via that route until v3.16-rc1.
-> >>
-> >> Perhaps a good way forwards would be for Rafael to also apply the patch
-> >> with my Ack.
-> >
-> > Not really.  No duplicate patches with different changelogs coming from
-> > different trees.  Please!
-> >
-> >> I could also revert the version applied to my tree
-> >> if that is of any help.
-> >>
-> >> Acked-by: Simon Horman <horms+renesas@verge.net.au>
-> >
-> > Ulf, can you please do as I said?
+On Tue, Apr 29, 2014 at 11:05:04AM +0200, Jaccon Bastiaansen wrote:
+> Hello all,
 > 
-> Okay! It seems like I have no choice. :-)
+> I tried the FEC patches from Russel
+> (http://ftp.arm.linux.org.uk/cgit/linux-arm.git/log/?h=fec-testing),
+> but with the following test the FEC complety stops receiving frames:
 > 
-> Does that mean you were happy with the rest from this patchset?
+> 
+>  Linux PC <----->  Gigabit Ethernet switch  <------> SabreSD board
+> 
+> Both ethernet links run at 1 Gigabit, full duplex.
+> 
+> The SabreSD board runs the fec-testing kernel from Russel.
+> 
+> On the SabreSD board we run "iperf -s -u"
+> 
+> On the Linux PC we
+> - run the iperf client (command used: ?while [ 1 ]; do iperf ?c ?IP
+> address of SabreSD? -u -b 100m -t 300 -l 256;sleep 1;done?)
+> - ping the SabreSD board every second
+> 
+> After a while (sometimes 10 seconds, sometimes a couple of minutes),
+> we see that the SabreSD board stops replying to the pings from the
+> Linux PC. Closer inspection shows that the FEC doesn't generate
+> receive frame interrupts anymore. The attached debugger screenshots
+> show the FEC registers when it is in this state. The RXF interrupt is
+> enabled and we know that the FEC is still receiving ethernet frames
+> (because the IEEE_R_FRAME_OK event counter is increasing), but no
+> receive frame interrupts are occurring. We only see MII interrupts
+> occurring.
 
-Yes, those changes are fine by me.
+If the RXF interrupt is enabled, it means that we must have received
+less than NAPI_POLL_WEIGHT (64) frames from the ring during the previous
+NAPI poll - this is the only circumstance when we will re-enable
+interrupts.
 
-> Additionally, I intend to post some more patches for the PM domain
-> soon. Thus I will need to fold in these patches to any other upcoming
-> patchset. Thought it could be good to know.
+There are only two conditions where we stop receiving frames from the
+receive ring:
+1. if we reach the NAPI poll weight number of frames received.
+2. if we encounter a packet descriptor marked empty.
 
-OK, thanks!
+It can't be (1) because we would have left the TXF/RXF interrupts
+disabled and waited for the next NAPI poll.  So, it can only be (2).
+
+(2) implies that there is a ring descriptor which is marked as being
+owned by the FEC, which means that there are descriptors free.  Whether
+it's the one which the FEC is expecting to be free or not is something
+that's impossible to tell (the FEC hardware doesn't tell us where it
+is in its ring, which is a big minus point against debugging.)
+
+It would be useful to see the state of the receive ring, as well as
+the rx_next index.  That may be difficult to get though.
 
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
