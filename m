@@ -1,56 +1,50 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri,  2 May 2014 13:38:28 -0700
-Subject: [PATCH 2/6] arm64: topology: Initialise default topology state
- immediately
-In-Reply-To: <1399063112-16917-1-git-send-email-broonie@kernel.org>
-References: <1399063112-16917-1-git-send-email-broonie@kernel.org>
-Message-ID: <1399063112-16917-3-git-send-email-broonie@kernel.org>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Fri,  2 May 2014 14:07:32 -0700
+Subject: [PATCH] ARM: zynq: dt: Add a fixed regulator for CPU voltage
+Message-ID: <1399064852-19569-1-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Brown <broonie@linaro.org>
+To silence the warning
+	cpufreq_cpu0: failed to get cpu0 regulator: -19
+from the cpufreq driver regarding a missing regulator,
+add a fixed regulator to the DT.
+Zynq does not support voltage scaling and the CPU rail should always be
+supplied with 1 V, hence it is added in the SOC-level dtsi.
 
-As a legacy of the way 32 bit ARM did things the topology code uses a null
-topology map by default and then overwrites it by mapping cores with no
-information to a cluster by themselves later. In order to make it simpler
-to reset things as part of recovering from parse failures in firmware
-information directly set this configuration on init. A core will always be
-its own sibling so there should be no risk of confusion with firmware
-provided information.
-
-Signed-off-by: Mark Brown <broonie@linaro.org>
-Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 ---
- arch/arm64/kernel/topology.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-index 3e06b0b..ff662b2 100644
---- a/arch/arm64/kernel/topology.c
-+++ b/arch/arm64/kernel/topology.c
-@@ -43,9 +43,6 @@ static void update_siblings_masks(unsigned int cpuid)
- 		 * reset it to default behaviour
- 		 */
- 		pr_debug("CPU%u: No topology information configured\n", cpuid);
--		cpuid_topo->core_id = 0;
--		cpumask_set_cpu(cpuid, &cpuid_topo->core_sibling);
--		cpumask_set_cpu(cpuid, &cpuid_topo->thread_sibling);
- 		return;
- 	}
+ arch/arm/boot/dts/zynq-7000.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+index c1176abc34d9..64779f9d5c38 100644
+--- a/arch/arm/boot/dts/zynq-7000.dtsi
++++ b/arch/arm/boot/dts/zynq-7000.dtsi
+@@ -25,6 +25,7 @@
+ 			reg = <0>;
+ 			clocks = <&clkc 3>;
+ 			clock-latency = <1000>;
++			cpu0-supply = <&regulator_vccpint>;
+ 			operating-points = <
+ 				/* kHz    uV */
+ 				666667  1000000
+@@ -48,6 +49,15 @@
+ 		reg = < 0xf8891000 0x1000 0xf8893000 0x1000 >;
+ 	};
  
-@@ -87,9 +84,12 @@ void __init init_cpu_topology(void)
- 		struct cpu_topology *cpu_topo = &cpu_topology[cpu];
- 
- 		cpu_topo->thread_id = -1;
--		cpu_topo->core_id =  -1;
-+		cpu_topo->core_id = 0;
- 		cpu_topo->cluster_id = -1;
++	regulator_vccpint: fixedregulator at 0 {
++		compatible = "regulator-fixed";
++		regulator-name = "VCCPINT";
++		regulator-min-microvolt = <1000000>;
++		regulator-max-microvolt = <1000000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
 +
- 		cpumask_clear(&cpu_topo->core_sibling);
-+		cpumask_set_cpu(cpu, &cpu_topo->core_sibling);
- 		cpumask_clear(&cpu_topo->thread_sibling);
-+		cpumask_set_cpu(cpu, &cpu_topo->thread_sibling);
- 	}
- }
+ 	amba {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
 -- 
-1.9.2
+1.9.2.1.g06c4abd
