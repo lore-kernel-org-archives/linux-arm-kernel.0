@@ -1,291 +1,131 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 02 May 2014 22:36:43 +0200
-Subject: [RFC] Describing arbitrary bus mastering relationships in DT
-In-Reply-To: <20140502173120.GD3805@e103592.cambridge.arm.com>
-References: <20140501173248.GD3732@e103592.cambridge.arm.com>
- <6774053.rAccqTeoiQ@wuerfel>
- <20140502173120.GD3805@e103592.cambridge.arm.com>
-Message-ID: <4327552.i65x7H2WQr@wuerfel>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri,  2 May 2014 13:38:30 -0700
+Subject: [PATCH 4/6] arm64: topology: add MPIDR-based detection
+In-Reply-To: <1399063112-16917-1-git-send-email-broonie@kernel.org>
+References: <1399063112-16917-1-git-send-email-broonie@kernel.org>
+Message-ID: <1399063112-16917-5-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 02 May 2014 18:31:20 Dave Martin wrote:
-> No, but I didn't state it very clearly.
-> 
-> In this:
-> 
->         parent {
->                 child {
->                         ranges = < ... >;
->                         dma-ranges = < ... >;
->                 };
->         };
+From: Zi Shen Lim <zlim@broadcom.com>
 
-The ranges and dma-ranges properties belong into parent, not child here.
-I guess that's what you meant at least.
+Create cpu topology based on MPIDR. When hardware sets MPIDR to sane
+values, this method will always work. Therefore it should also work well
+as the fallback method. [1]
 
-> There are two transaction flows being described.  There are transactions
-> from parent -> child, for which "ranges" describes the mappings, and
-> there are transactions from child -> parent, for which "dma-ranges"
-> describes the mappings.
+When we have multiple processing elements in the system, we create
+the cpu topology by mapping each affinity level (from lowest to highest)
+to threads (if they exist), cores, and clusters.
 
-Right.
+We combine data from all higher affinity levels into cluster_id
+so we don't lose any information from MPIDR. [2]
 
-> The name "dma-ranges" obfuscates this symmetry, so it took me a while
-> to figure out what it really means -- maybe I'm still confused, but
-> I think that's the gist of it.
-> 
-> 
-> For the purposes of cross-links, my plan was that we interpret all
-> those links as "forward" (i.e., parent -> child) links, where the
-> referencing node is deemed to be the parent, and the referenced node is
-> deemed to be the child. Just as in the ePAPR case, the associated mapping
-> is then described by "ranges".
+[1] http://www.spinics.net/lists/arm-kernel/msg317445.html
+[2] https://lkml.org/lkml/2014/4/23/703
 
-That seems counterintuitive to me. When a device initiates a transaction,
-it should look at the "dma-ranges" of its parent. The "slaves" property
-would be a way to redirect the parent for these transactions, but it
-doesn't mean that the device suddenly translates ranges as seen from
-its parent.
+[Raise the priority of the error message if we don't discover topology
+now that we can read it from MPIDIR -- broonie]
 
-In other words, "ranges" should always move from CPU to MMIO target
-(slave), while "dma-ranges" should always move from a DMA master towards
-memory. If you want to represent a device-to-device DMA, you may have
-to move up a few levels using "dma-ranges" and then move down again
-using "ranges".
+Signed-off-by: Zi Shen Lim <zlim@broadcom.com>
+Signed-off-by: Mark Brown <broonie@linaro.org>
+---
+ arch/arm64/include/asm/cputype.h |  5 +++++
+ arch/arm64/kernel/topology.c     | 46 ++++++++++++++++++++++++++++++++++++----
+ 2 files changed, 47 insertions(+), 4 deletions(-)
 
-> > Don't you need arguments to the phandle? It seems that in most
-> > cases, you need at least one of a dma-ranges like translation
-> > or a master ID. What you need would be specific to the slave.
-> 
-> For any 1:N relationship between nodes, you can describe the
-> _relationship_ by putting properties on the nodes at the "1" end.  This
-> is precisely how "ranges" and "dma-ranges" work.
-
-That doesn't seem very helpful or intuitive though. If I have
-an IOMMU that N DMA masters can target, I don't want to have
-information about all the masters in the IOMMU, that information
-belongs into the masters, but the format in which it is stored
-must be specific to the IOMMU.
-
-> The N:M case can be resolved by inserting simple-bus nodes into any
-> links with non-default mappings: i.e., you split each affected link in
-> two, with a simple-bus node in the middle describing the mapping:
-
-Ok, ignoring those oddball cases for now, I'd like to first
-try to come to a more useful representation for the common case.
-
-> root: / {
->         ranges;
->         ...
-> 
->         master at 1 {
->                 slave {
->                         ranges = < ... >;
->                         slaves = <&root>;
->                 };
->         };
-
-The "ranges" property here is really weird. I understand you
-mean this to be a device that has a unique mapping into its
-the slave (the root device here). I would reduce this to one
-of two cases:
-
-a) it sits on an intermediate bus by itself, and that bus
-has the non-default mapping:
-
-/ {
-	dma-ranges;
-	ranges;
-
-	bus at x {
-		ranges;
-		dma-ranges = < ... >; // this is the mapping
-		master at 1 {
-			...
-		};
-	};
-
-b) the device itself is strange, but it's a property of the
-device that the driver knows about (e.g. it can only do
-a 30-bit DMA mask rather than 32 bit, for a realistic case),
-so we don't have represent this at all and let the driver
-deal with the translation:
-
-/ {
-	dma-ranges;
-	ranges;
-
-	master at 1 {
-		...
-	};
-
-};
-
->         master at 2 {
->                 slave {
->                         slaves = < &root &master2_dma_slave >;
->                         slave-names = "config-fetch", "dma";
-> 
->                	   master2_dma_slave: dma-slave {
->                                 ranges = < ... >;
->                                 slaves = <&root>;
->                         };
->                 };
->         };
-
-As I said before, I'd consider this a non-issue until anyone
-can come up with a case that needs the complexity.
-
-A possible representation would be to have two masters
-as child nodes of the actual device to avoid having a 'slaves'
-property with multiple entries, and if the device is the only
-one with a weird translation, that can go to some other bus
-node we make up for this purpose:
-
-/ {
-	ranges;
-	dma-ranges;
-
-	fake-bus {
-		dma-ranges = < ... >;
-		slaves = < &{/} >; // is the default, so can be ommitted
-	};
-
-	bus {
-		ranges;
-		// no dma-ranges --> no default DMA translation
-
-		device at 1 {
-			master at 1 {
-				// hopefully will never be
-				// needed in real life
-				slaves = < &{/fake-bus}>;
-			};
-
-			master at 2 {
-				slaves = < &{/} >;
-			};
-		};
-	};
-};
-
->         master at 3 {
->                 slaves = <&root>;
->         };
-> };
-
-Here, the slave is the parent device, which is the default
-anyway, so I wouldn't require listing anything at all,
-besides an empty dma-ranges in the parent node.
-
-If we can get away with just a single entry in 'slaves' all
-the time, we could actually rename that property to 'dma-parent',
-for consistency with 'interrupt-parent' and a few other things.
-
-Freescale already has 'fsl,iommu-parent' for this case, a
-'dma-parent' would be a generalization of that, but less general
-than your 'slaves' property.
-
-> > It may be best to make the ranges explicit here and then also
-> > allow additional fields depending on e.g. a #dma-slave-cells
-> > property in the slave.
-> > 
-> > For instance, a 32-bit master on a a 64-bit bus that has master-id
-> > 23 would look like
-> > 
-> >       otherbus: axi at somewhere{
-> >               #address-cells = <2>;
-> >               #size-cells = <2>;
-> >       };
-> > 
-> >       somemaster at somewhere {
-> >               #address-cells = <1>;
-> >               #size-cells = <1>;
-> >               slaves = <&otherbus  // phandle
-> >                               0     // local address
-> >                               0 0   // remote address
-> >                               0x1 0 // size
-> >                               23>;  // master id
-> >       };
-> 
-> I thought about this possibility, but was worried that the "slaves"
-> property would become awkward to parse, where except for the "master id"
-> concept, all these attributes are well described by ePAPR already for
-> bus nodes if we can figure out how to piggyback on them -- hence my
-> alternative approach explained above.
-> 
-> How to describe the "master id" is particularly problematic and may
-> be a separate discussion.  It can get munged or remapped as it
-> passes through the interconnect: for example, a PCI device's ID 
-> accompanying an MSI write may be translated once as it passes from
-> the PCI RC to an IOMMU, then again before it reaches the GIC.
-
-Hmm, that would actually mean we'd have to do complex "dma-ranges"
-properties with more than one entry, which I had hoped to avoid.
-
-> In the "windowed IOMMU" case, address bits are effectively being
-> mapped to ID bits as they reach IOMMU.
-> 
-> An IOMMU also does a complete mapping of ID+address -> ID'+address'
-> (although programmable rather than static and unprobeable, so the
-> actual mappings for an IOMMU won't be in the DT).
-
-right.
-
-> > > 2) The generic "slave" node(s) are for convenience and readability.
-> > >    They could be made eliminated by using child nodes with
-> > >    binding-specific names and referencing them in "slaves".  This is a
-> > >    bit more awkward, but has the same expressive power.
-> > > 
-> > >    Should the generic "slave" nodes go away?
-> > 
-> > I would prefer not having to have subnodes for the simple case
-> > where you just need to reference one slave iommu from a master
-> > device.
-> 
-> My expectation is that subnodes would only be useful in special cases in
-> any case.
-> 
-> We can remove the special "slave" name, because there's nothing to
-> stop us referencing other random nested nodes with the "slaves" property.
-
-Ok.
-
-> > I wouldn't be worried about cycles. We can just declare them forbidden
-> > in the binding. Anything can break if you supply a broken DT, this
-> > is the least of the problems.
-> 
-> That's my thought.  If there turns out to be a really good reason to
-> describe cycles then we can cross that bridge* when we come to it,
-> but it's best to forbid it until/unless the need for it is proven.
-> 
-> (*no pun intended)
-
-Right.
-
-> Note that a certain kind of trivial cycle will always be created
-> when a node refers back to its parent:
-> 
-> root: / {
->         ranges;
-> 
->         iommu {
->                 reg = < ... >;
->                 slaves = <&root>;
->         };
-> };
-> 
-> ePAPR says that if there is no "ranges" property, then the parent
-> node cannot access any address of the child -- we can interpret
-> this as saying that transactions do not propagate.  "ranges" with
-> an empty value imples a complete 1:1 mapping, which we can interpret
-> as transactions being forwarded without any transformation.
-> 
-> Crucially, "iommu" must not have a "ranges" property in this case,
-> because this would permit a static routing cycle root -> iommu ->
-> root.
-
-Makes sense.
-
-	Arnd
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index c404fb0..b3b3287 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -18,6 +18,8 @@
+ 
+ #define INVALID_HWID		ULONG_MAX
+ 
++#define MPIDR_UP_BITMASK	(0x1 << 30)
++#define MPIDR_MT_BITMASK	(0x1 << 24)
+ #define MPIDR_HWID_BITMASK	0xff00ffffff
+ 
+ #define MPIDR_LEVEL_BITS_SHIFT	3
+@@ -30,6 +32,9 @@
+ #define MPIDR_AFFINITY_LEVEL(mpidr, level) \
+ 	((mpidr >> MPIDR_LEVEL_SHIFT(level)) & MPIDR_LEVEL_MASK)
+ 
++#define MPIDR_AFF_MASK(level) \
++	((u64)MPIDR_LEVEL_MASK << MPIDR_LEVEL_SHIFT(level))
++
+ #define read_cpuid(reg) ({						\
+ 	u64 __val;							\
+ 	asm("mrs	%0, " #reg : "=r" (__val));			\
+diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+index 43514f9..3b2479c 100644
+--- a/arch/arm64/kernel/topology.c
++++ b/arch/arm64/kernel/topology.c
+@@ -20,6 +20,8 @@
+ #include <linux/of.h>
+ #include <linux/sched.h>
+ 
++#include <asm/cputype.h>
++#include <asm/smp_plat.h>
+ #include <asm/topology.h>
+ 
+ static int __init get_cpu_for_node(struct device_node *node)
+@@ -220,10 +222,8 @@ static void update_siblings_masks(unsigned int cpuid)
+ 	int cpu;
+ 
+ 	if (cpuid_topo->cluster_id == -1) {
+-		/*
+-		 * DT does not contain topology information for this cpu.
+-		 */
+-		pr_debug("CPU%u: No topology information configured\n", cpuid);
++		/* No topology information for this cpu ?! */
++		pr_err("CPU%u: No topology information configured\n", cpuid);
+ 		return;
+ 	}
+ 
+@@ -249,6 +249,44 @@ static void update_siblings_masks(unsigned int cpuid)
+ 
+ void store_cpu_topology(unsigned int cpuid)
+ {
++	struct cpu_topology *cpuid_topo = &cpu_topology[cpuid];
++	u64 mpidr;
++
++	if (cpuid_topo->cluster_id != -1)
++		goto topology_populated;
++
++	mpidr = read_cpuid_mpidr();
++
++	/* Create cpu topology mapping based on MPIDR. */
++	if (mpidr & MPIDR_UP_BITMASK) {
++		/* Uniprocessor system */
++		cpuid_topo->thread_id  = -1;
++		cpuid_topo->core_id    = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++		cpuid_topo->cluster_id = 0;
++	} else if (mpidr & MPIDR_MT_BITMASK) {
++		/* Multiprocessor system : Multi-threads per core */
++		cpuid_topo->thread_id  = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++		cpuid_topo->core_id    = MPIDR_AFFINITY_LEVEL(mpidr, 1);
++		cpuid_topo->cluster_id =
++			((mpidr & MPIDR_AFF_MASK(2)) >> mpidr_hash.shift_aff[2] |
++			 (mpidr & MPIDR_AFF_MASK(3)) >> mpidr_hash.shift_aff[3])
++			>> mpidr_hash.shift_aff[1] >> mpidr_hash.shift_aff[0];
++	} else {
++		/* Multiprocessor system : Single-thread per core */
++		cpuid_topo->thread_id  = -1;
++		cpuid_topo->core_id    = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++		cpuid_topo->cluster_id =
++			((mpidr & MPIDR_AFF_MASK(1)) >> mpidr_hash.shift_aff[1] |
++			 (mpidr & MPIDR_AFF_MASK(2)) >> mpidr_hash.shift_aff[2] |
++			 (mpidr & MPIDR_AFF_MASK(3)) >> mpidr_hash.shift_aff[3])
++			>> mpidr_hash.shift_aff[0];
++	}
++
++	pr_debug("CPU%u: cluster %d core %d thread %d mpidr %llx\n",
++		 cpuid, cpuid_topo->cluster_id, cpuid_topo->core_id,
++		 cpuid_topo->thread_id, mpidr);
++
++topology_populated:
+ 	update_siblings_masks(cpuid);
+ }
+ 
+-- 
+1.9.2
