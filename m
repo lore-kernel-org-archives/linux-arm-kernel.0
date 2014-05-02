@@ -1,352 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri,  2 May 2014 16:46:20 +0100
-Subject: [PATCH] arm64: debug: avoid accessing mdscr_el1 on fault paths where
- possible
-Message-ID: <1399045580-20750-1-git-send-email-will.deacon@arm.com>
+From: baohua@kernel.org (Barry Song)
+Date: Fri, 2 May 2014 23:48:35 +0800
+Subject: [PATCH 02/97] ARM: l2c: remove unnecessary call to
+ outer_flush_all()
+In-Reply-To: <E1WerBl-0007V2-Kf@rmk-PC.arm.linux.org.uk>
+References: <20140428192419.GV26756@n2100.arm.linux.org.uk>
+ <E1WerBl-0007V2-Kf@rmk-PC.arm.linux.org.uk>
+Message-ID: <CAGsJ_4xG=y6-Am+t-2BE2Tqe02N1MZaQGaEx8x0GvvdsjETFPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since mdscr_el1 is part of the debug register group, it is highly likely
-to be trapped by a hypervisor to prevent virtual machines from debugging
-(buggering?) each other. Unfortunately, this absolutely destroys our
-performance, since we access the register on many of our low-level
-fault handling paths to keep track of the various debug state machines.
+2014-04-29 3:26 GMT+08:00, Russell King <rmk+kernel@arm.linux.org.uk>:
+> outer_disable() is defined to safely turn the L2 cache off without data
+> loss: this means that outer_flush_all() should never be called unless
+> you need to implement some special L2 cache disabling, and even then
+> only from your replacement L2 cache disable function.
+>
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-This patch removes our dependency on mdscr_el1 in the case that debugging
-is not being used. More specifically we:
+Acked-by: Barry Song <Baohua.Song@csr.com>
 
-  - Use TIF_SINGLESTEP to indicate that a task is stepping at EL0 and
-    avoid disabling step in the MDSCR when we don't need to.
-    MDSCR_EL1.SS handling is moved to kernel_entry, when trapping from
-    userspace.
-
-  - Ensure debug exceptions are re-enabled on *all* exception entry
-    paths, even the debug exception handling path (where we re-enable
-    exceptions after invoking the handler). Since we can now rely on
-    MDSCR_EL1.SS being cleared by the entry code, exception handlers can
-    usually enable debug immediately before enabling interrupts.
-
-  - Remove all debug exception unmasking from ret_to_user and
-    el1_preempt, since we will never get here with debug exceptions
-    masked.
-
-This results in a slight change to kernel debug behaviour, where we now
-step into interrupt handlers and data aborts from EL1 when debugging the
-kernel, which is actually a useful thing to do. A side-effect of this is
-that it *does* potentially prevent stepping off {break,watch}points when
-there is a high-frequency interrupt source (e.g. a timer), so a debugger
-would need to use either breakpoints or manually disable interrupts to
-get around this issue.
-
-With this patch applied, guest performance is restored under KVM when
-debug register accesses are trapped (and we get a measurable performance
-increase on the host on Cortex-A57 too).
-
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/assembler.h | 23 ++++++++----
- arch/arm64/kernel/entry.S          | 73 ++++++++++++++------------------------
- 2 files changed, 42 insertions(+), 54 deletions(-)
-
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index fd3e3924041b..5901480bfdca 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -21,6 +21,7 @@
- #endif
- 
- #include <asm/ptrace.h>
-+#include <asm/thread_info.h>
- 
- /*
-  * Stack pushing/popping (register pairs only). Equivalent to store decrement
-@@ -68,23 +69,31 @@
- 	msr	daifclr, #8
- 	.endm
- 
--	.macro	disable_step, tmp
-+	.macro	disable_step_tsk, flgs, tmp
-+	tbz	\flgs, #TIF_SINGLESTEP, 9990f
- 	mrs	\tmp, mdscr_el1
- 	bic	\tmp, \tmp, #1
- 	msr	mdscr_el1, \tmp
-+	isb	// Synchronise with enable_dbg
-+9990:
- 	.endm
- 
--	.macro	enable_step, tmp
-+	.macro	enable_step_tsk, flgs, tmp
-+	tbz	\flgs, #TIF_SINGLESTEP, 9990f
-+	disable_dbg
- 	mrs	\tmp, mdscr_el1
- 	orr	\tmp, \tmp, #1
- 	msr	mdscr_el1, \tmp
-+9990:
- 	.endm
- 
--	.macro	enable_dbg_if_not_stepping, tmp
--	mrs	\tmp, mdscr_el1
--	tbnz	\tmp, #0, 9990f
--	enable_dbg
--9990:
-+/*
-+ * Enable both debug exceptions and interrupts. This is likely to be
-+ * faster than two daifclr operations, since writes to this register
-+ * are self-synchronising.
-+ */
-+	.macro	enable_dbg_and_irq
-+	msr	daifclr, #(8 | 2)
- 	.endm
- 
- /*
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 39ac630d83de..e8b23a3b68d0 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -60,6 +60,9 @@
- 	push	x0, x1
- 	.if	\el == 0
- 	mrs	x21, sp_el0
-+	get_thread_info tsk			// Ensure MDSCR_EL1.SS is clear,
-+	ldr	x19, [tsk, #TI_FLAGS]		// since we can unmask debug
-+	disable_step_tsk x19, x20		// exceptions when scheduling.
- 	.else
- 	add	x21, sp, #S_FRAME_SIZE
- 	.endif
-@@ -259,7 +262,7 @@ el1_da:
- 	 * Data abort handling
- 	 */
- 	mrs	x0, far_el1
--	enable_dbg_if_not_stepping x2
-+	enable_dbg
- 	// re-enable interrupts if they were enabled in the aborted context
- 	tbnz	x23, #7, 1f			// PSR_I_BIT
- 	enable_irq
-@@ -275,6 +278,7 @@ el1_sp_pc:
- 	 * Stack or PC alignment exception handling
- 	 */
- 	mrs	x0, far_el1
-+	enable_dbg
- 	mov	x1, x25
- 	mov	x2, sp
- 	b	do_sp_pc_abort
-@@ -282,6 +286,7 @@ el1_undef:
- 	/*
- 	 * Undefined instruction
- 	 */
-+	enable_dbg
- 	mov	x0, sp
- 	b	do_undefinstr
- el1_dbg:
-@@ -294,10 +299,11 @@ el1_dbg:
- 	mrs	x0, far_el1
- 	mov	x2, sp				// struct pt_regs
- 	bl	do_debug_exception
--
-+	enable_dbg
- 	kernel_exit 1
- el1_inv:
- 	// TODO: add support for undefined instructions in kernel mode
-+	enable_dbg
- 	mov	x0, sp
- 	mov	x1, #BAD_SYNC
- 	mrs	x2, esr_el1
-@@ -307,7 +313,7 @@ ENDPROC(el1_sync)
- 	.align	6
- el1_irq:
- 	kernel_entry 1
--	enable_dbg_if_not_stepping x0
-+	enable_dbg
- #ifdef CONFIG_TRACE_IRQFLAGS
- 	bl	trace_hardirqs_off
- #endif
-@@ -332,8 +338,7 @@ ENDPROC(el1_irq)
- #ifdef CONFIG_PREEMPT
- el1_preempt:
- 	mov	x24, lr
--1:	enable_dbg
--	bl	preempt_schedule_irq		// irq en/disable is done inside
-+1:	bl	preempt_schedule_irq		// irq en/disable is done inside
- 	ldr	x0, [tsk, #TI_FLAGS]		// get new tasks TI_FLAGS
- 	tbnz	x0, #TIF_NEED_RESCHED, 1b	// needs rescheduling?
- 	ret	x24
-@@ -349,7 +354,7 @@ el0_sync:
- 	lsr	x24, x25, #ESR_EL1_EC_SHIFT	// exception class
- 	cmp	x24, #ESR_EL1_EC_SVC64		// SVC in 64-bit state
- 	b.eq	el0_svc
--	adr	lr, ret_from_exception
-+	adr	lr, ret_to_user
- 	cmp	x24, #ESR_EL1_EC_DABT_EL0	// data abort in EL0
- 	b.eq	el0_da
- 	cmp	x24, #ESR_EL1_EC_IABT_EL0	// instruction abort in EL0
-@@ -378,7 +383,7 @@ el0_sync_compat:
- 	lsr	x24, x25, #ESR_EL1_EC_SHIFT	// exception class
- 	cmp	x24, #ESR_EL1_EC_SVC32		// SVC in 32-bit state
- 	b.eq	el0_svc_compat
--	adr	lr, ret_from_exception
-+	adr	lr, ret_to_user
- 	cmp	x24, #ESR_EL1_EC_DABT_EL0	// data abort in EL0
- 	b.eq	el0_da
- 	cmp	x24, #ESR_EL1_EC_IABT_EL0	// instruction abort in EL0
-@@ -423,11 +428,8 @@ el0_da:
- 	 */
- 	mrs	x0, far_el1
- 	bic	x0, x0, #(0xff << 56)
--	disable_step x1
--	isb
--	enable_dbg
- 	// enable interrupts before calling the main handler
--	enable_irq
-+	enable_dbg_and_irq
- 	mov	x1, x25
- 	mov	x2, sp
- 	b	do_mem_abort
-@@ -436,11 +438,8 @@ el0_ia:
- 	 * Instruction abort handling
- 	 */
- 	mrs	x0, far_el1
--	disable_step x1
--	isb
--	enable_dbg
- 	// enable interrupts before calling the main handler
--	enable_irq
-+	enable_dbg_and_irq
- 	orr	x1, x25, #1 << 24		// use reserved ISS bit for instruction aborts
- 	mov	x2, sp
- 	b	do_mem_abort
-@@ -448,6 +447,7 @@ el0_fpsimd_acc:
- 	/*
- 	 * Floating Point or Advanced SIMD access
- 	 */
-+	enable_dbg
- 	mov	x0, x25
- 	mov	x1, sp
- 	b	do_fpsimd_acc
-@@ -455,6 +455,7 @@ el0_fpsimd_exc:
- 	/*
- 	 * Floating Point or Advanced SIMD exception
- 	 */
-+	enable_dbg
- 	mov	x0, x25
- 	mov	x1, sp
- 	b	do_fpsimd_exc
-@@ -463,11 +464,8 @@ el0_sp_pc:
- 	 * Stack or PC alignment exception handling
- 	 */
- 	mrs	x0, far_el1
--	disable_step x1
--	isb
--	enable_dbg
- 	// enable interrupts before calling the main handler
--	enable_irq
-+	enable_dbg_and_irq
- 	mov	x1, x25
- 	mov	x2, sp
- 	b	do_sp_pc_abort
-@@ -475,9 +473,9 @@ el0_undef:
- 	/*
- 	 * Undefined instruction
- 	 */
--	mov	x0, sp
- 	// enable interrupts before calling the main handler
--	enable_irq
-+	enable_dbg_and_irq
-+	mov	x0, sp
- 	b	do_undefinstr
- el0_dbg:
- 	/*
-@@ -485,11 +483,13 @@ el0_dbg:
- 	 */
- 	tbnz	x24, #0, el0_inv		// EL0 only
- 	mrs	x0, far_el1
--	disable_step x1
- 	mov	x1, x25
- 	mov	x2, sp
--	b	do_debug_exception
-+	bl	do_debug_exception
-+	enable_dbg
-+	b	ret_to_user
- el0_inv:
-+	enable_dbg
- 	mov	x0, sp
- 	mov	x1, #BAD_SYNC
- 	mrs	x2, esr_el1
-@@ -500,15 +500,12 @@ ENDPROC(el0_sync)
- el0_irq:
- 	kernel_entry 0
- el0_irq_naked:
--	disable_step x1
--	isb
- 	enable_dbg
- #ifdef CONFIG_TRACE_IRQFLAGS
- 	bl	trace_hardirqs_off
- #endif
- 
- 	irq_handler
--	get_thread_info tsk
- 
- #ifdef CONFIG_TRACE_IRQFLAGS
- 	bl	trace_hardirqs_on
-@@ -517,14 +514,6 @@ el0_irq_naked:
- ENDPROC(el0_irq)
- 
- /*
-- * This is the return code to user mode for abort handlers
-- */
--ret_from_exception:
--	get_thread_info tsk
--	b	ret_to_user
--ENDPROC(ret_from_exception)
--
--/*
-  * Register switch for AArch64. The callee-saved registers need to be saved
-  * and restored. On entry:
-  *   x0 = previous task_struct (must be preserved across the switch)
-@@ -563,10 +552,7 @@ ret_fast_syscall:
- 	ldr	x1, [tsk, #TI_FLAGS]
- 	and	x2, x1, #_TIF_WORK_MASK
- 	cbnz	x2, fast_work_pending
--	tbz	x1, #TIF_SINGLESTEP, fast_exit
--	disable_dbg
--	enable_step x2
--fast_exit:
-+	enable_step_tsk x1, x2
- 	kernel_exit 0, ret = 1
- 
- /*
-@@ -585,7 +571,6 @@ work_pending:
- 	bl	do_notify_resume
- 	b	ret_to_user
- work_resched:
--	enable_dbg
- 	bl	schedule
- 
- /*
-@@ -596,9 +581,7 @@ ret_to_user:
- 	ldr	x1, [tsk, #TI_FLAGS]
- 	and	x2, x1, #_TIF_WORK_MASK
- 	cbnz	x2, work_pending
--	tbz	x1, #TIF_SINGLESTEP, no_work_pending
--	disable_dbg
--	enable_step x2
-+	enable_step_tsk x1, x2
- no_work_pending:
- 	kernel_exit 0, ret = 0
- ENDPROC(ret_to_user)
-@@ -625,12 +608,8 @@ el0_svc:
- 	mov	sc_nr, #__NR_syscalls
- el0_svc_naked:					// compat entry point
- 	stp	x0, scno, [sp, #S_ORIG_X0]	// save the original x0 and syscall number
--	disable_step x16
--	isb
--	enable_dbg
--	enable_irq
-+	enable_dbg_and_irq
- 
--	get_thread_info tsk
- 	ldr	x16, [tsk, #TI_FLAGS]		// check for syscall tracing
- 	tbnz	x16, #TIF_SYSCALL_TRACE, __sys_trace // are we tracing syscalls?
- 	adr	lr, ret_fast_syscall		// return address
--- 
-1.9.2
+> ---
+>  arch/arm/mach-prima2/pm.c | 1 -
+>  1 file changed, 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-prima2/pm.c b/arch/arm/mach-prima2/pm.c
+> index c4525a88e5da..96e9bc102117 100644
+> --- a/arch/arm/mach-prima2/pm.c
+> +++ b/arch/arm/mach-prima2/pm.c
+> @@ -71,7 +71,6 @@ static int sirfsoc_pm_enter(suspend_state_t state)
+>  	case PM_SUSPEND_MEM:
+>  		sirfsoc_pre_suspend_power_off();
+>
+> -		outer_flush_all();
+>  		outer_disable();
+>  		/* go zzz */
+>  		cpu_suspend(0, sirfsoc_finish_suspend);
+> --
+> 1.8.3.1
+>
+>
