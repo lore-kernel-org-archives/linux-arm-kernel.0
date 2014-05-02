@@ -1,64 +1,169 @@
 From: steve.capper@linaro.org (Steve Capper)
-Date: Fri, 2 May 2014 14:27:16 +0100
-Subject: [PATCH V2] arm64: mm: Optimise tlb flush logic where we have >4K
+Date: Fri,  2 May 2014 14:49:00 +0100
+Subject: [PATH V3] arm64: mm: Optimise tlb flush logic where we have >4K
  granule
-In-Reply-To: <20140502125906.GF17370@arm.com>
-References: <1399027034-1277-1-git-send-email-steve.capper@linaro.org>
- <20140502112618.GD17370@arm.com> <20140502123011.GA4054@linaro.org>
- <20140502125906.GF17370@arm.com>
-Message-ID: <20140502132715.GA5885@linaro.org>
+Message-ID: <1399038540-6547-1-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 02, 2014 at 01:59:06PM +0100, Will Deacon wrote:
-> On Fri, May 02, 2014 at 01:31:28PM +0100, Steve Capper wrote:
-> > On Fri, May 02, 2014 at 12:26:18PM +0100, Will Deacon wrote:
-> > > On Fri, May 02, 2014 at 11:37:14AM +0100, Steve Capper wrote:
-> > > > The tlb maintainence functions: __cpu_flush_user_tlb_range and
-> > > > __cpu_flush_kern_tlb_range do not take into consideration the page
-> > > > granule when looping through the address range, and repeatedly flush
-> > > > tlb entries for the same page when operating with 64K pages.
-> > > > 
-> > > > This patch re-works the logic s.t. we instead advance the loop by
-> > > >  1 << (PAGE_SHIFT - 12), so avoid repeating ourselves.
-> > > > 
-> > > > Also the routines have been converted from assembler to static inline
-> > > > functions to aid with legibility and potential compiler optimisations.
-> > > > 
-> > > > Signed-off-by: Steve Capper <steve.capper@linaro.org>
-> > > > Acked-by: Will Deacon <will.deacon@arm.com>
-> > > > ---
-> > > > Changed in V2: added the missing isb(.) to the kernel tlb flush.
-> > > 
-> > > Hold your horses ;)
-> > 
-> > :-)
-> > 
-> > > 
-> > > You mentioned remapping kernel text rw/ro, but if you think about it, it's
-> > > still executable for both of these, so the isb() isn't needed. Do we have a
-> > > case for changing whether or not something is executable?
-> > 
-> > I think module loading and unloading in future would likely need this.
-> > i.e. if we get stuff like set_memory_nx and friends for ARM64.
-> > 
-> > We've just had this added to ARM:
-> >  75374ad ARM: mm: Define set_memory_* functions for ARM
-> 
-> Ok, but if it's just set_memory_nx that needs this, I'd rather put the isb()
-> there instead of penalising all kernel TLB flushes.
+The tlb maintainence functions: __cpu_flush_user_tlb_range and
+__cpu_flush_kern_tlb_range do not take into consideration the page
+granule when looping through the address range, and repeatedly flush
+tlb entries for the same page when operating with 64K pages.
 
-Sure that makes sense, I can't think of any other scenarios that would
-require this isb(.). I will document the fact that the isb has been
-removed in the commit log for V3. Also...
+This patch re-works the logic s.t. we instead advance the loop by
+ 1 << (PAGE_SHIFT - 12), so avoid repeating ourselves.
 
-Laura,
-I'll add you to CC for the patch, as you're working on the set_memory_*
-functions for ARM64.
+Also the routines have been converted from assembler to static inline
+functions to aid with legibility and potential compiler optimisations.
 
-Cheers,
+The isb() has been removed from flush_tlb_kernel_range(.) as it is
+only needed when changing the execute permission of a mapping. If one
+needs to set an area of the kernel as execute/non-execute an isb()
+must be inserted after the call to flush_tlb_kernel_range.
+
+Cc: Laura Abbott <lauraa@codeaurora.org>
+Signed-off-by: Steve Capper <steve.capper@linaro.org>
+Acked-by: Will Deacon <will.deacon@arm.com>
+---
+Changed in V3: isb() taken out of flush_tlb_kernel_range, as it is only
+really needed when changing execute permissions. This has been
+documented in the commit log.
+---
+ arch/arm64/include/asm/tlbflush.h | 30 ++++++++++++++---
+ arch/arm64/mm/Makefile            |  2 +-
+ arch/arm64/mm/tlb.S               | 71 ---------------------------------------
+ 3 files changed, 26 insertions(+), 77 deletions(-)
+ delete mode 100644 arch/arm64/mm/tlb.S
+
+diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
+index 8b48203..7881d7d 100644
+--- a/arch/arm64/include/asm/tlbflush.h
++++ b/arch/arm64/include/asm/tlbflush.h
+@@ -98,11 +98,31 @@ static inline void flush_tlb_page(struct vm_area_struct *vma,
+ 	dsb();
+ }
+ 
+-/*
+- * Convert calls to our calling convention.
+- */
+-#define flush_tlb_range(vma,start,end)	__cpu_flush_user_tlb_range(start,end,vma)
+-#define flush_tlb_kernel_range(s,e)	__cpu_flush_kern_tlb_range(s,e)
++static inline void flush_tlb_range(struct vm_area_struct *vma,
++					unsigned long start, unsigned long end)
++{
++	unsigned long asid = (unsigned long)ASID(vma->vm_mm) << 48;
++	unsigned long addr;
++	start = asid | (start >> 12);
++	end = asid | (end >> 12);
++
++	dsb(ishst);
++	for (addr = start; addr < end; addr += 1 << (PAGE_SHIFT - 12))
++		asm("tlbi vae1is, %0" : : "r"(addr));
++	dsb(ish);
++}
++
++static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end)
++{
++	unsigned long addr;
++	start >>= 12;
++	end >>= 12;
++
++	dsb(ishst);
++	for (addr = start; addr < end; addr += 1 << (PAGE_SHIFT - 12))
++		asm("tlbi vaae1is, %0" : : "r"(addr));
++	dsb(ish);
++}
+ 
+ /*
+  * On AArch64, the cache coherency is handled via the set_pte_at() function.
+diff --git a/arch/arm64/mm/Makefile b/arch/arm64/mm/Makefile
+index b51d364..3ecb56c 100644
+--- a/arch/arm64/mm/Makefile
++++ b/arch/arm64/mm/Makefile
+@@ -1,5 +1,5 @@
+ obj-y				:= dma-mapping.o extable.o fault.o init.o \
+ 				   cache.o copypage.o flush.o \
+ 				   ioremap.o mmap.o pgd.o mmu.o \
+-				   context.o tlb.o proc.o
++				   context.o proc.o
+ obj-$(CONFIG_HUGETLB_PAGE)	+= hugetlbpage.o
+diff --git a/arch/arm64/mm/tlb.S b/arch/arm64/mm/tlb.S
+deleted file mode 100644
+index 19da91e..0000000
+--- a/arch/arm64/mm/tlb.S
++++ /dev/null
+@@ -1,71 +0,0 @@
+-/*
+- * Based on arch/arm/mm/tlb.S
+- *
+- * Copyright (C) 1997-2002 Russell King
+- * Copyright (C) 2012 ARM Ltd.
+- * Written by Catalin Marinas <catalin.marinas@arm.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+- */
+-#include <linux/linkage.h>
+-#include <asm/assembler.h>
+-#include <asm/asm-offsets.h>
+-#include <asm/page.h>
+-#include <asm/tlbflush.h>
+-#include "proc-macros.S"
+-
+-/*
+- *	__cpu_flush_user_tlb_range(start, end, vma)
+- *
+- *	Invalidate a range of TLB entries in the specified address space.
+- *
+- *	- start - start address (may not be aligned)
+- *	- end   - end address (exclusive, may not be aligned)
+- *	- vma   - vma_struct describing address range
+- */
+-ENTRY(__cpu_flush_user_tlb_range)
+-	vma_vm_mm x3, x2			// get vma->vm_mm
+-	mmid	w3, x3				// get vm_mm->context.id
+-	dsb	sy
+-	lsr	x0, x0, #12			// align address
+-	lsr	x1, x1, #12
+-	bfi	x0, x3, #48, #16		// start VA and ASID
+-	bfi	x1, x3, #48, #16		// end VA and ASID
+-1:	tlbi	vae1is, x0			// TLB invalidate by address and ASID
+-	add	x0, x0, #1
+-	cmp	x0, x1
+-	b.lo	1b
+-	dsb	sy
+-	ret
+-ENDPROC(__cpu_flush_user_tlb_range)
+-
+-/*
+- *	__cpu_flush_kern_tlb_range(start,end)
+- *
+- *	Invalidate a range of kernel TLB entries.
+- *
+- *	- start - start address (may not be aligned)
+- *	- end   - end address (exclusive, may not be aligned)
+- */
+-ENTRY(__cpu_flush_kern_tlb_range)
+-	dsb	sy
+-	lsr	x0, x0, #12			// align address
+-	lsr	x1, x1, #12
+-1:	tlbi	vaae1is, x0			// TLB invalidate by address
+-	add	x0, x0, #1
+-	cmp	x0, x1
+-	b.lo	1b
+-	dsb	sy
+-	isb
+-	ret
+-ENDPROC(__cpu_flush_kern_tlb_range)
 -- 
-Steve
-
-> 
-> Will
+1.8.1.4
