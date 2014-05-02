@@ -1,60 +1,137 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 02 May 2014 16:52:46 +0100
-Subject: [PATCH] arm64: debug: avoid accessing mdscr_el1 on fault paths
- where possible
-In-Reply-To: <1399045580-20750-1-git-send-email-will.deacon@arm.com> (Will
- Deacon's message of "Fri, 2 May 2014 16:46:20 +0100")
-References: <1399045580-20750-1-git-send-email-will.deacon@arm.com>
-Message-ID: <87r44c5ga9.fsf@sofa.wild-wind.fr.eu.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri,  2 May 2014 16:55:32 +0100
+Subject: [PATCH] arm64: Implement cache_line_size() based on CTR_EL0.CWG
+Message-ID: <1399046132-5760-1-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 02 2014 at  4:46:20 pm BST, Will Deacon <will.deacon@arm.com> wrote:
-> Since mdscr_el1 is part of the debug register group, it is highly likely
-> to be trapped by a hypervisor to prevent virtual machines from debugging
-> (buggering?) each other. Unfortunately, this absolutely destroys our
-> performance, since we access the register on many of our low-level
-> fault handling paths to keep track of the various debug state machines.
->
-> This patch removes our dependency on mdscr_el1 in the case that debugging
-> is not being used. More specifically we:
->
->   - Use TIF_SINGLESTEP to indicate that a task is stepping at EL0 and
->     avoid disabling step in the MDSCR when we don't need to.
->     MDSCR_EL1.SS handling is moved to kernel_entry, when trapping from
->     userspace.
->
->   - Ensure debug exceptions are re-enabled on *all* exception entry
->     paths, even the debug exception handling path (where we re-enable
->     exceptions after invoking the handler). Since we can now rely on
->     MDSCR_EL1.SS being cleared by the entry code, exception handlers can
->     usually enable debug immediately before enabling interrupts.
->
->   - Remove all debug exception unmasking from ret_to_user and
->     el1_preempt, since we will never get here with debug exceptions
->     masked.
->
-> This results in a slight change to kernel debug behaviour, where we now
-> step into interrupt handlers and data aborts from EL1 when debugging the
-> kernel, which is actually a useful thing to do. A side-effect of this is
-> that it *does* potentially prevent stepping off {break,watch}points when
-> there is a high-frequency interrupt source (e.g. a timer), so a debugger
-> would need to use either breakpoints or manually disable interrupts to
-> get around this issue.
->
-> With this patch applied, guest performance is restored under KVM when
-> debug register accesses are trapped (and we get a measurable performance
-> increase on the host on Cortex-A57 too).
->
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+The hardware provides the maximum cache line size in the system via the
+CTR_EL0.CWG bits. This patch implements the cache_line_size() function
+to read such information, together with a sanity check if the statically
+defined L1_CACHE_BYTES is smaller than the hardware value.
 
-Tried with KVM on Cortex-A57 (and a set of yet to be posted patches to
-support debug in a VM), and very pleased with it. This patch makes it
-fly! ;-)
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm64/Kconfig                 |  3 +++
+ arch/arm64/include/asm/cache.h     | 13 ++++++++++++-
+ arch/arm64/include/asm/cachetype.h | 11 +++++++++++
+ arch/arm64/kernel/setup.c          | 15 +++++++++++++++
+ 4 files changed, 41 insertions(+), 1 deletion(-)
 
-Tested-by: Marc Zyngier <marc.zyngier@arm.com>
-
-	M.
--- 
-AAAFNRAA
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index e759af5d7098..9a5b5fea86ba 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -242,6 +242,9 @@ config ARCH_WANT_HUGE_PMD_SHARE
+ config HAVE_ARCH_TRANSPARENT_HUGEPAGE
+ 	def_bool y
+ 
++config ARCH_HAS_CACHE_LINE_SIZE
++	def_bool y
++
+ source "mm/Kconfig"
+ 
+ config XEN_DOM0
+diff --git a/arch/arm64/include/asm/cache.h b/arch/arm64/include/asm/cache.h
+index 390308a67f0d..88cc05b5f3ac 100644
+--- a/arch/arm64/include/asm/cache.h
++++ b/arch/arm64/include/asm/cache.h
+@@ -16,6 +16,8 @@
+ #ifndef __ASM_CACHE_H
+ #define __ASM_CACHE_H
+ 
++#include <asm/cachetype.h>
++
+ #define L1_CACHE_SHIFT		6
+ #define L1_CACHE_BYTES		(1 << L1_CACHE_SHIFT)
+ 
+@@ -27,6 +29,15 @@
+  * the CPU.
+  */
+ #define ARCH_DMA_MINALIGN	L1_CACHE_BYTES
+-#define ARCH_SLAB_MINALIGN	8
++
++#ifndef __ASSEMBLY__
++
++static inline int cache_line_size(void)
++{
++	u32 cwg = cache_type_cwg();
++	return cwg ? 4 << cwg : L1_CACHE_BYTES;
++}
++
++#endif	/* __ASSEMBLY__ */
+ 
+ #endif
+diff --git a/arch/arm64/include/asm/cachetype.h b/arch/arm64/include/asm/cachetype.h
+index 85f5f511352a..4b23e758d5e0 100644
+--- a/arch/arm64/include/asm/cachetype.h
++++ b/arch/arm64/include/asm/cachetype.h
+@@ -20,12 +20,16 @@
+ 
+ #define CTR_L1IP_SHIFT		14
+ #define CTR_L1IP_MASK		3
++#define CTR_CWG_SHIFT		24
++#define CTR_CWG_MASK		15
+ 
+ #define ICACHE_POLICY_RESERVED	0
+ #define ICACHE_POLICY_AIVIVT	1
+ #define ICACHE_POLICY_VIPT	2
+ #define ICACHE_POLICY_PIPT	3
+ 
++#ifndef __ASSEMBLY__
++
+ static inline u32 icache_policy(void)
+ {
+ 	return (read_cpuid_cachetype() >> CTR_L1IP_SHIFT) & CTR_L1IP_MASK;
+@@ -45,4 +49,11 @@ static inline int icache_is_aivivt(void)
+ 	return icache_policy() == ICACHE_POLICY_AIVIVT;
+ }
+ 
++static inline u32 cache_type_cwg(void)
++{
++	return (read_cpuid_cachetype() >> CTR_CWG_SHIFT) & CTR_CWG_MASK;
++}
++
++#endif	/* __ASSEMBLY__ */
++
+ #endif	/* __ASM_CACHETYPE_H */
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 7ec784653b29..5b9e046d580e 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -25,6 +25,7 @@
+ #include <linux/utsname.h>
+ #include <linux/initrd.h>
+ #include <linux/console.h>
++#include <linux/cache.h>
+ #include <linux/bootmem.h>
+ #include <linux/seq_file.h>
+ #include <linux/screen_info.h>
+@@ -198,6 +199,8 @@ static void __init setup_processor(void)
+ {
+ 	struct cpu_info *cpu_info;
+ 	u64 features, block;
++	u32 cwg;
++	int cls;
+ 
+ 	cpu_info = lookup_processor_type(read_cpuid_id());
+ 	if (!cpu_info) {
+@@ -215,6 +218,18 @@ static void __init setup_processor(void)
+ 	elf_hwcap = 0;
+ 
+ 	/*
++	 * Check for sane CTR_EL0.CWG value.
++	 */
++	cwg = cache_type_cwg();
++	cls = cache_line_size();
++	if (!cwg)
++		pr_warn("No Cache Writeback Granule information, assuming cache line size %d\n",
++			cls);
++	if (L1_CACHE_BYTES < cls)
++		pr_warn("L1_CACHE_BYTES smaller than the Cache Writeback Granule (%d < %d)\n",
++			L1_CACHE_BYTES, cls);
++
++	/*
+ 	 * ID_AA64ISAR0_EL1 contains 4-bit wide signed feature blocks.
+ 	 * The blocks we test below represent incremental functionality
+ 	 * for non-negative values. Negative values are reserved.
