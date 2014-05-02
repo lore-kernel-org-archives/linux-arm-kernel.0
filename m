@@ -1,131 +1,266 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Fri,  2 May 2014 13:38:30 -0700
-Subject: [PATCH 4/6] arm64: topology: add MPIDR-based detection
+Date: Fri,  2 May 2014 13:38:29 -0700
+Subject: [PATCH 3/6] arm64: topology: Add support for topology DT bindings
 In-Reply-To: <1399063112-16917-1-git-send-email-broonie@kernel.org>
 References: <1399063112-16917-1-git-send-email-broonie@kernel.org>
-Message-ID: <1399063112-16917-5-git-send-email-broonie@kernel.org>
+Message-ID: <1399063112-16917-4-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Zi Shen Lim <zlim@broadcom.com>
+From: Mark Brown <broonie@linaro.org>
 
-Create cpu topology based on MPIDR. When hardware sets MPIDR to sane
-values, this method will always work. Therefore it should also work well
-as the fallback method. [1]
+Add support for parsing the explicit topology bindings to discover the
+topology of the system.
 
-When we have multiple processing elements in the system, we create
-the cpu topology by mapping each affinity level (from lowest to highest)
-to threads (if they exist), cores, and clusters.
+Since it is not currently clear how to map multi-level clusters for the
+scheduler all leaf clusters are presented to the scheduler at the same
+level. This should be enough to provide good support for current systems.
 
-We combine data from all higher affinity levels into cluster_id
-so we don't lose any information from MPIDR. [2]
-
-[1] http://www.spinics.net/lists/arm-kernel/msg317445.html
-[2] https://lkml.org/lkml/2014/4/23/703
-
-[Raise the priority of the error message if we don't discover topology
-now that we can read it from MPIDIR -- broonie]
-
-Signed-off-by: Zi Shen Lim <zlim@broadcom.com>
 Signed-off-by: Mark Brown <broonie@linaro.org>
+Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
- arch/arm64/include/asm/cputype.h |  5 +++++
- arch/arm64/kernel/topology.c     | 46 ++++++++++++++++++++++++++++++++++++----
- 2 files changed, 47 insertions(+), 4 deletions(-)
+ arch/arm64/kernel/topology.c | 204 +++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 196 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
-index c404fb0..b3b3287 100644
---- a/arch/arm64/include/asm/cputype.h
-+++ b/arch/arm64/include/asm/cputype.h
-@@ -18,6 +18,8 @@
- 
- #define INVALID_HWID		ULONG_MAX
- 
-+#define MPIDR_UP_BITMASK	(0x1 << 30)
-+#define MPIDR_MT_BITMASK	(0x1 << 24)
- #define MPIDR_HWID_BITMASK	0xff00ffffff
- 
- #define MPIDR_LEVEL_BITS_SHIFT	3
-@@ -30,6 +32,9 @@
- #define MPIDR_AFFINITY_LEVEL(mpidr, level) \
- 	((mpidr >> MPIDR_LEVEL_SHIFT(level)) & MPIDR_LEVEL_MASK)
- 
-+#define MPIDR_AFF_MASK(level) \
-+	((u64)MPIDR_LEVEL_MASK << MPIDR_LEVEL_SHIFT(level))
-+
- #define read_cpuid(reg) ({						\
- 	u64 __val;							\
- 	asm("mrs	%0, " #reg : "=r" (__val));			\
 diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-index 43514f9..3b2479c 100644
+index ff662b2..43514f9 100644
 --- a/arch/arm64/kernel/topology.c
 +++ b/arch/arm64/kernel/topology.c
-@@ -20,6 +20,8 @@
- #include <linux/of.h>
+@@ -17,10 +17,192 @@
+ #include <linux/percpu.h>
+ #include <linux/node.h>
+ #include <linux/nodemask.h>
++#include <linux/of.h>
  #include <linux/sched.h>
  
-+#include <asm/cputype.h>
-+#include <asm/smp_plat.h>
  #include <asm/topology.h>
  
- static int __init get_cpu_for_node(struct device_node *node)
-@@ -220,10 +222,8 @@ static void update_siblings_masks(unsigned int cpuid)
- 	int cpu;
- 
- 	if (cpuid_topo->cluster_id == -1) {
--		/*
--		 * DT does not contain topology information for this cpu.
--		 */
--		pr_debug("CPU%u: No topology information configured\n", cpuid);
-+		/* No topology information for this cpu ?! */
-+		pr_err("CPU%u: No topology information configured\n", cpuid);
- 		return;
- 	}
- 
-@@ -249,6 +249,44 @@ static void update_siblings_masks(unsigned int cpuid)
- 
- void store_cpu_topology(unsigned int cpuid)
- {
-+	struct cpu_topology *cpuid_topo = &cpu_topology[cpuid];
-+	u64 mpidr;
++static int __init get_cpu_for_node(struct device_node *node)
++{
++	struct device_node *cpu_node;
++	int cpu;
 +
-+	if (cpuid_topo->cluster_id != -1)
-+		goto topology_populated;
++	cpu_node = of_parse_phandle(node, "cpu", 0);
++	if (!cpu_node)
++		return -1;
 +
-+	mpidr = read_cpuid_mpidr();
-+
-+	/* Create cpu topology mapping based on MPIDR. */
-+	if (mpidr & MPIDR_UP_BITMASK) {
-+		/* Uniprocessor system */
-+		cpuid_topo->thread_id  = -1;
-+		cpuid_topo->core_id    = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-+		cpuid_topo->cluster_id = 0;
-+	} else if (mpidr & MPIDR_MT_BITMASK) {
-+		/* Multiprocessor system : Multi-threads per core */
-+		cpuid_topo->thread_id  = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-+		cpuid_topo->core_id    = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-+		cpuid_topo->cluster_id =
-+			((mpidr & MPIDR_AFF_MASK(2)) >> mpidr_hash.shift_aff[2] |
-+			 (mpidr & MPIDR_AFF_MASK(3)) >> mpidr_hash.shift_aff[3])
-+			>> mpidr_hash.shift_aff[1] >> mpidr_hash.shift_aff[0];
-+	} else {
-+		/* Multiprocessor system : Single-thread per core */
-+		cpuid_topo->thread_id  = -1;
-+		cpuid_topo->core_id    = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-+		cpuid_topo->cluster_id =
-+			((mpidr & MPIDR_AFF_MASK(1)) >> mpidr_hash.shift_aff[1] |
-+			 (mpidr & MPIDR_AFF_MASK(2)) >> mpidr_hash.shift_aff[2] |
-+			 (mpidr & MPIDR_AFF_MASK(3)) >> mpidr_hash.shift_aff[3])
-+			>> mpidr_hash.shift_aff[0];
++	for_each_possible_cpu(cpu) {
++		if (of_get_cpu_node(cpu, NULL) == cpu_node) {
++			of_node_put(cpu_node);
++			return cpu;
++		}
 +	}
 +
-+	pr_debug("CPU%u: cluster %d core %d thread %d mpidr %llx\n",
-+		 cpuid, cpuid_topo->cluster_id, cpuid_topo->core_id,
-+		 cpuid_topo->thread_id, mpidr);
++	pr_crit("Unable to find CPU node for %s\n", cpu_node->full_name);
 +
-+topology_populated:
++	of_node_put(cpu_node);
++	return -1;
++}
++
++static int __init parse_core(struct device_node *core, int cluster_id,
++			     int core_id)
++{
++	char name[10];
++	bool leaf = true;
++	int i = 0;
++	int cpu;
++	struct device_node *t;
++
++	do {
++		snprintf(name, sizeof(name), "thread%d", i);
++		t = of_get_child_by_name(core, name);
++		if (t) {
++			leaf = false;
++			cpu = get_cpu_for_node(t);
++			if (cpu >= 0) {
++				cpu_topology[cpu].cluster_id = cluster_id;
++				cpu_topology[cpu].core_id = core_id;
++				cpu_topology[cpu].thread_id = i;
++			} else {
++				pr_err("%s: Can't get CPU for thread\n",
++				       t->full_name);
++				of_node_put(t);
++				return -EINVAL;
++			}
++			of_node_put(t);
++		}
++		i++;
++	} while (t);
++
++	cpu = get_cpu_for_node(core);
++	if (cpu >= 0) {
++		if (!leaf) {
++			pr_err("%s: Core has both threads and CPU\n",
++			       core->full_name);
++			return -EINVAL;
++		}
++
++		cpu_topology[cpu].cluster_id = cluster_id;
++		cpu_topology[cpu].core_id = core_id;
++	} else if (leaf) {
++		pr_err("%s: Can't get CPU for leaf core\n", core->full_name);
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++static int __init parse_cluster(struct device_node *cluster, int depth)
++{
++	char name[10];
++	bool leaf = true;
++	bool has_cores = false;
++	struct device_node *c;
++	static int cluster_id __initdata;
++	int core_id = 0;
++	int i, ret;
++
++	/*
++	 * First check for child clusters; we currently ignore any
++	 * information about the nesting of clusters and present the
++	 * scheduler with a flat list of them.
++	 */
++	i = 0;
++	do {
++		snprintf(name, sizeof(name), "cluster%d", i);
++		c = of_get_child_by_name(cluster, name);
++		if (c) {
++			leaf = false;
++			ret = parse_cluster(c, depth + 1);
++			of_node_put(c);
++			if (ret != 0)
++				return ret;
++		}
++		i++;
++	} while (c);
++
++	/* Now check for cores */
++	i = 0;
++	do {
++		snprintf(name, sizeof(name), "core%d", i);
++		c = of_get_child_by_name(cluster, name);
++		if (c) {
++			has_cores = true;
++
++			if (depth == 0) {
++				pr_err("%s: cpu-map children should be clusters\n",
++				       c->full_name);
++				of_node_put(c);
++				return -EINVAL;
++			}
++
++			if (leaf) {
++				ret = parse_core(c, cluster_id, core_id++);
++			} else {
++				pr_err("%s: Non-leaf cluster with core %s\n",
++				       cluster->full_name, name);
++				ret = -EINVAL;
++			}
++
++			of_node_put(c);
++			if (ret != 0)
++				return ret;
++		}
++		i++;
++	} while (c);
++
++	if (leaf && !has_cores)
++		pr_warn("%s: empty cluster\n", cluster->full_name);
++
++	if (leaf)
++		cluster_id++;
++
++	return 0;
++}
++
++static int __init parse_dt_topology(void)
++{
++	struct device_node *cn, *map;
++	int ret = 0;
++	int cpu;
++
++	cn = of_find_node_by_path("/cpus");
++	if (!cn) {
++		pr_err("No CPU information found in DT\n");
++		return 0;
++	}
++
++	/*
++	 * When topology is provided cpu-map is essentially a root
++	 * cluster with restricted subnodes.
++	 */
++	map = of_get_child_by_name(cn, "cpu-map");
++	if (!map)
++		goto out;
++
++	ret = parse_cluster(map, 0);
++	if (ret != 0)
++		goto out_map;
++
++	/*
++	 * Check that all cores are in the topology; the SMP code will
++	 * only mark cores described in the DT as possible.
++	 */
++	for_each_possible_cpu(cpu) {
++		if (cpu_topology[cpu].cluster_id == -1) {
++			pr_err("CPU%d: No topology information specified\n",
++			       cpu);
++			ret = -EINVAL;
++		}
++	}
++
++out_map:
++	of_node_put(map);
++out:
++	of_node_put(cn);
++	return ret;
++}
++
+ /*
+  * cpu topology table
+  */
+@@ -39,8 +221,7 @@ static void update_siblings_masks(unsigned int cpuid)
+ 
+ 	if (cpuid_topo->cluster_id == -1) {
+ 		/*
+-		 * DT does not contain topology information for this cpu
+-		 * reset it to default behaviour
++		 * DT does not contain topology information for this cpu.
+ 		 */
+ 		pr_debug("CPU%u: No topology information configured\n", cpuid);
+ 		return;
+@@ -71,15 +252,10 @@ void store_cpu_topology(unsigned int cpuid)
  	update_siblings_masks(cpuid);
  }
  
+-/*
+- * init_cpu_topology is called at boot when only one cpu is running
+- * which prevent simultaneous write access to cpu_topology array
+- */
+-void __init init_cpu_topology(void)
++static void __init reset_cpu_topology(void)
+ {
+ 	unsigned int cpu;
+ 
+-	/* init core mask and power*/
+ 	for_each_possible_cpu(cpu) {
+ 		struct cpu_topology *cpu_topo = &cpu_topology[cpu];
+ 
+@@ -93,3 +269,15 @@ void __init init_cpu_topology(void)
+ 		cpumask_set_cpu(cpu, &cpu_topo->thread_sibling);
+ 	}
+ }
++
++void __init init_cpu_topology(void)
++{
++	reset_cpu_topology();
++
++	/*
++	 * Discard anything that was parsed if we hit an error so we
++	 * don't use partial information.
++	 */
++	if (parse_dt_topology())
++		reset_cpu_topology();
++}
 -- 
 1.9.2
