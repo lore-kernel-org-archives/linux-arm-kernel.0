@@ -1,44 +1,56 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri,  2 May 2014 16:24:12 +0100
-Subject: [PATCH 5/8] arm64: barriers: use barrier() instead of smp_mb() when
- !SMP
+Date: Fri,  2 May 2014 16:24:14 +0100
+Subject: [PATCH 7/8] arm64: kvm: use inner-shareable barriers for
+ inner-shareable maintenance
 In-Reply-To: <1399044255-20435-1-git-send-email-will.deacon@arm.com>
 References: <1399044255-20435-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1399044255-20435-6-git-send-email-will.deacon@arm.com>
+Message-ID: <1399044255-20435-8-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The recently introduced acquire/release accessors refer to smp_mb()
-in the !CONFIG_SMP case. This is confusing when reading the code, so use
-barrier() directly when we know we're UP.
+In order to ensure completion of inner-shareable maintenance instructions
+(cache and TLB) on AArch64, we can use the -ish suffix to the dsb
+instruction.
+
+This patch relaxes our dsb sy instructions to dsb ish where possible.
 
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/barrier.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm64/kvm/hyp.S | 12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/include/asm/barrier.h b/arch/arm64/include/asm/barrier.h
-index 71a42d6599fb..709f1f6d6bbd 100644
---- a/arch/arm64/include/asm/barrier.h
-+++ b/arch/arm64/include/asm/barrier.h
-@@ -40,7 +40,7 @@
- #define smp_store_release(p, v)						\
- do {									\
- 	compiletime_assert_atomic_type(*p);				\
--	smp_mb();							\
-+	barrier();							\
- 	ACCESS_ONCE(*p) = (v);						\
- } while (0)
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index 2c56012cb2d2..b0d1512acf08 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -630,9 +630,15 @@ ENTRY(__kvm_tlb_flush_vmid_ipa)
+ 	 * whole of Stage-1. Weep...
+ 	 */
+ 	tlbi	ipas2e1is, x1
+-	dsb	sy
++	/*
++	 * We have to ensure completion of the invalidation at Stage-2,
++	 * since a table walk on another CPU could refill a TLB with a
++	 * complete (S1 + S2) walk based on the old Stage-2 mapping if
++	 * the Stage-1 invalidation happened first.
++	 */
++	dsb	ish
+ 	tlbi	vmalle1is
+-	dsb	sy
++	dsb	ish
+ 	isb
  
-@@ -48,7 +48,7 @@ do {									\
- ({									\
- 	typeof(*p) ___p1 = ACCESS_ONCE(*p);				\
- 	compiletime_assert_atomic_type(*p);				\
--	smp_mb();							\
-+	barrier();							\
- 	___p1;								\
- })
+ 	msr	vttbr_el2, xzr
+@@ -643,7 +649,7 @@ ENTRY(__kvm_flush_vm_context)
+ 	dsb	ishst
+ 	tlbi	alle1is
+ 	ic	ialluis
+-	dsb	sy
++	dsb	ish
+ 	ret
+ ENDPROC(__kvm_flush_vm_context)
  
 -- 
 1.9.2
