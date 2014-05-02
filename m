@@ -1,79 +1,452 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 2 May 2014 11:24:45 +0200
-Subject: [PATCH 1/5] pm: domains: quieten down generic pm domains
-In-Reply-To: <10021780.rnCkCYmgZH@vostro.rjw.lan>
-References: <20140427132312.GC26756@n2100.arm.linux.org.uk>
- <E1WeP8U-0000Ug-RQ@rmk-PC.arm.linux.org.uk>
- <10021780.rnCkCYmgZH@vostro.rjw.lan>
-Message-ID: <CAPDyKFpKnhcttY-BWDEG=XTYsKHro0t5G7YBao-+F=o3ez3grA@mail.gmail.com>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Fri, 2 May 2014 14:55:13 +0530
+Subject: [PATCH v4 3/4] usb: ohci-exynos: Add facility to use phy provided
+ by the generic phy framework
+In-Reply-To: <53628154.4080101@gmail.com>
+References: <1398835192-21634-1-git-send-email-gautam.vivek@samsung.com>
+ <1398835192-21634-3-git-send-email-gautam.vivek@samsung.com>
+ <53628154.4080101@gmail.com>
+Message-ID: <CAFp+6iHgdgUNcbWky9TH6=3aSWZ4fcjTVgRs2NohYY6-VsQPiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 May 2014 01:46, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> On Sunday, April 27, 2014 02:28:50 PM Russell King wrote:
->> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Hi Tomasz,
+
+
+On Thu, May 1, 2014 at 10:46 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> Hi Vivek,
 >
-> Acked-by: Rafael J. Wysocki <rjw@rjwysocki.net>
->
-> Since you need this one and [2/5] for the rest of the patchset, please feel
-> free to take them through your tree if that's convenient.
+> Please see my comments inline.
 
-Unless it complicates things for Russell, I would prefer if this could
-go via Rafael's tree.
-
-I have a quite big patchset for the PM domain, it would help me if I
-have a single point to base my work upon.
-
-Additionally, you have Tomasz Figa patchset below to consider for the
-PM domain code.
-
-[PATCH v3 0/3] Generic Device Tree based power domain look-up
-
-Kind regards
-Ulf Hansson
+Thanks for the review, please find my answers inline.
 
 >
+>
+> On 30.04.2014 07:19, Vivek Gautam wrote:
+>>
+>> Add support to consume phy provided by Generic phy framework.
+>> Keeping the support for older usb-phy intact right now, in order
+>> to prevent any functionality break in absence of relevant
+>> device tree side change for ohci-exynos.
+>> Once we move to new phy in the device nodes for ohci, we can
+>> remove the support for older phys.
+>>
+>> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+>> Cc: Jingoo Han <jg1.han@samsung.com>
+>> Cc: Alan Stern <stern@rowland.harvard.edu>
 >> ---
->>  drivers/base/power/domain.c | 6 +++---
->>  1 file changed, 3 insertions(+), 3 deletions(-)
 >>
->> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
->> index bfb8955c406c..ea91ea0e137b 100644
->> --- a/drivers/base/power/domain.c
->> +++ b/drivers/base/power/domain.c
->> @@ -42,7 +42,7 @@
->>       struct gpd_timing_data *__td = &dev_gpd_data(dev)->td;                  \
->>       if (!__retval && __elapsed > __td->field) {                             \
->>               __td->field = __elapsed;                                        \
->> -             dev_warn(dev, name " latency exceeded, new value %lld ns\n",    \
->> +             dev_dbg(dev, name " latency exceeded, new value %lld ns\n",     \
->>                       __elapsed);                                             \
->>               genpd->max_off_time_changed = true;                             \
->>               __td->constraint_changed = true;                                \
->> @@ -242,7 +242,7 @@ static int __pm_genpd_poweron(struct generic_pm_domain *genpd)
->>                       genpd->max_off_time_changed = true;
->>                       genpd_recalc_cpu_exit_latency(genpd);
->>                       if (genpd->name)
->> -                             pr_warning("%s: Power-on latency exceeded, "
->> +                             pr_debug("%s: Power-on latency exceeded, "
->>                                       "new value %lld ns\n", genpd->name,
->>                                       elapsed_ns);
->>               }
->> @@ -566,7 +566,7 @@ static int pm_genpd_poweroff(struct generic_pm_domain *genpd)
->>                       genpd->power_off_latency_ns = elapsed_ns;
->>                       genpd->max_off_time_changed = true;
->>                       if (genpd->name)
->> -                             pr_warning("%s: Power-off latency exceeded, "
->> +                             pr_debug("%s: Power-off latency exceeded, "
->>                                       "new value %lld ns\n", genpd->name,
->>                                       elapsed_ns);
->>               }
+>> Changes from v3:
+>>   - Calling usb_phy_shutdown() when exynos_ohci_phy_enable() is failing.
+>>   - Made exynos_ohci_phy_disable() return void, since its return value
+>>     did not serve any purpose.
+>>   - Calling clk_disable_unprepare() in exynos_ohci_resume() when
+>>     exynos_ohci_phy_enable() is failed.
 >>
+>>   .../devicetree/bindings/usb/exynos-usb.txt         |   19 +++
+>>   drivers/usb/host/ohci-exynos.c                     |  128
+>> +++++++++++++++++---
+>>   2 files changed, 132 insertions(+), 15 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/usb/exynos-usb.txt
+>> b/Documentation/devicetree/bindings/usb/exynos-usb.txt
+>> index d967ba1..a90c973 100644
+>> --- a/Documentation/devicetree/bindings/usb/exynos-usb.txt
+>> +++ b/Documentation/devicetree/bindings/usb/exynos-usb.txt
+>> @@ -38,6 +38,15 @@ Required properties:
+>>    - interrupts: interrupt number to the cpu.
+>>    - clocks: from common clock binding: handle to usb clock.
+>>    - clock-names: from common clock binding: Shall be "usbhost".
+>> + - port: if in the SoC there are OHCI phys, they should be listed here.
+>> +   One phy per port. Each port should have following entries:
+>> +       - reg: port number on OHCI controller, e.g
+>> +              On Exynos5250, port 0 is USB2.0 otg phy
+>> +                             port 1 is HSIC phy0
+>> +                             port 2 is HSIC phy1
+>> +       - phys: from the *Generic PHY* bindings, specifying phy used by
+>> port.
+>> +       - phy-names: from the *Generic PHY* bindings, specifying name of
+>> phy
+>> +                    used by the port.
 >
-> --
-> I speak only for myself.
-> Rafael J. Wysocki, Intel Open Source Technology Center.
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+> I think you don't need this property for this binding, as the PHYs are being
+> requested by indices (in fact only index 0 is used).
+
+True, that phy-names property is not used, since PHYs are being
+requested using indices.
+We can remove this.
+
+>
+>
+>>
+>>   Example:
+>>         usb at 12120000 {
+>> @@ -47,6 +56,16 @@ Example:
+>>
+>>                 clocks = <&clock 285>;
+>>                 clock-names = "usbhost";
+>> +
+>> +               #address-cells = <1>;
+>> +               #size-cells = <0>;
+>> +               port at 0 {
+>> +                   reg = <0>;
+>> +                   phys = <&usb2phy 1>;
+>> +                   phy-names = "host";
+>
+>
+> Ditto.
+will remove this.
+
+>
+>
+>> +                   status = "disabled";
+>> +               };
+>> +
+>>         };
+>>
+>>   DWC3
+>> diff --git a/drivers/usb/host/ohci-exynos.c
+>> b/drivers/usb/host/ohci-exynos.c
+>> index 05f00e3..f90bf9a 100644
+>> --- a/drivers/usb/host/ohci-exynos.c
+>> +++ b/drivers/usb/host/ohci-exynos.c
+>> @@ -18,6 +18,7 @@
+>>   #include <linux/module.h>
+>>   #include <linux/of.h>
+>>   #include <linux/platform_device.h>
+>> +#include <linux/phy/phy.h>
+>>   #include <linux/usb/phy.h>
+>>   #include <linux/usb/samsung_usb_phy.h>
+>>   #include <linux/usb.h>
+>> @@ -33,28 +34,122 @@ static struct hc_driver __read_mostly
+>> exynos_ohci_hc_driver;
+>>
+>>   #define to_exynos_ohci(hcd) (struct exynos_ohci_hcd
+>> *)(hcd_to_ohci(hcd)->priv)
+>>
+>> +#define PHY_NUMBER 3
+>
+>
+> nit: A blank line would be nice here to separate from the struct below.
+
+Ok, will add one.
+
+>
+> By the way, doesn't the number of PHY ports depend on platform? Of course
+> right now the driver supports only Exynos >= 4210 SoCs with the generic PHY
+> interface, so it might be changed in further patches.
+
+Yes, the number of PHY ports will be platform dependent feature.
+In subsequent patches we can add support to count the number of PHYs,
+or rather in this patch
+itself, when we do -
+         for_each_available_child_of_node(dev->of_node, child) {
+we can keep a count of how many child nodes we found, and then
+configure those many.
+As such the host controller drivers will have 'host' and 'hsic' PHYs.
+
+>
+>
+>>   struct exynos_ohci_hcd {
+>>         struct clk *clk;
+>>         struct usb_phy *phy;
+>>         struct usb_otg *otg;
+>> +       struct phy *phy_g[PHY_NUMBER];
+>>   };
+>>
+>> -static void exynos_ohci_phy_enable(struct device *dev)
+>> +static int exynos_ohci_get_phy(struct device *dev,
+>> +                               struct exynos_ohci_hcd *exynos_ohci)
+>> +{
+>> +       struct device_node *child;
+>> +       struct phy *phy;
+>> +       int phy_number;
+>> +       int ret = 0;
+>> +
+>> +       exynos_ohci->phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
+>> +       if (IS_ERR(exynos_ohci->phy)) {
+>> +               ret = PTR_ERR(exynos_ohci->phy);
+>> +               /* This is the case when PHY config is disabled */
+>> +               if (ret == -ENXIO || ret == -ENODEV) {
+>> +                       dev_dbg(dev, "Failed to get usb2 phy\n");
+>> +                       exynos_ohci->phy = NULL;
+>
+>
+> I think you should keep this an ERR_PTR() and just use IS_ERR() check
+> further in the driver instead of checking for NULL.
+
+Yea, that's also one way to check for phy, i can modify this.
+
+>
+>> +                       ret = 0;
+>
+>
+> Do you need to set ret to 0 here? The code for getting generic PHYs will
+> either leave it unchanged when there are no port nodes defined or overwrite
+> it with value returned by of_property_read_u32(). In the first case, an
+> error code should be returned, not zero, as the driver was unable to get any
+> PHY.
+
+The idea was to not fail exynos_ohci_get_phy() call when the PHY
+configs are not even enabled.
+Since this would mean, that the driver will never be able to get a PHY
+in future, and there will be no point in
+failing the driver probe.
+
+In a case when the host controller dts is still on older PHY bindings,
+this 'ret' will *not* be over-wriiten, since the
+generic phy nodes will not be there.
+And in case the host dts is moved to the new generic PHY based
+bindings. then the part of this function exynos_ohci_get_phy()
+related to older usb-phy, shall not execute.
+
+This is reason why i did not really add a fall-back mechanism for getting PHY.
+Since from DT either of the two bindings be supplied, and then things
+here will be handles almost independently.
+
+>
+>
+>> +               } else if (ret == -EPROBE_DEFER) {
+>
+>
+> I think you could merge this case with the else clause below, as most driver
+> do. Moreover, since the only thing done after the fail_phy label is
+> returning the error code, you could just immediately return from here. So
+> the whole block of code would end up like this:
+>
+>         if (IS_ERR(exynos_ohci->phy)) {
+>                 ret = PTR_ERR(exynos_ohci->phy);
+>                 if (ret != -ENXIO && ret != -ENODEV) {
+>
+>                         dev_err(dev, "no usb2 phy configured\n");
+>                         return ret;
+>
+>                 }
+>                 dev_dbg(dev, "Failed to get usb2 phy\n");
+>                 exynos_ohci->phy = NULL;
+>         } else {
+>
+>                 exynos_ohci->otg = exynos_ohci->phy->otg;
+>         }
+
+Ok, this seems a good restructuring. I shall change this.
+
+>
+>> +                       goto fail_phy;
+>>
+>> +               } else {
+>> +                       dev_err(dev, "no usb2 phy configured\n");
+>> +                       goto fail_phy;
+>> +               }
+>> +       } else {
+>> +               exynos_ohci->otg = exynos_ohci->phy->otg;
+>> +       }
+>> +
+>> +       /* Getting generic phy:
+>
+>
+> CodingStyle: Multi-line comments should begin and end with a single empty
+> line:
+>
+>         /*
+>          * Getting generic phy:
+>          * ...
+>          */
+>
+> also nit: s/phy/PHY/
+>
+
+Ok, will correct this.
+
+>
+>> +        * We are keeping both types of phys as a part of transiting OHCI
+>> +        * to generic phy framework, so that in absence of supporting dts
+>> +        * changes the functionality doesn't break.
+>> +        * Once we move the ohci dt nodes to use new generic phys,
+>> +        * we can remove support for older PHY in this driver.
+>
+>
+> Well, this is not entirely true. The problem here is not caused by existing
+> DTS files, but rather a chance that there are existing devices using DTB
+> files built from them. So to remove the support for old bindings, we need to
+> make sure that such devices have their DTBs updated to ones built from new
+> DTS.
+
+Fair enough, thanks for explaining. :-)
+I shall modify this comment.
+
+>
+>
+>> +        */
+>> +       for_each_available_child_of_node(dev->of_node, child) {
+>> +               ret = of_property_read_u32(child, "reg", &phy_number);
+>> +               if (ret) {
+>> +                       dev_err(dev, "Failed to parse device tree\n");
+>> +                       of_node_put(child);
+>> +                       goto fail_phy;
+>
+>
+> Why not just return ret here?
+>
+>> +               }
+>
+>
+> nit: Blank line here would be nice.
+
+ok
+
+>
+>
+>> +               if (phy_number >= PHY_NUMBER) {
+>> +                       dev_err(dev, "Invalid number of PHYs\n");
+>> +                       of_node_put(child);
+>> +                       ret = -EINVAL;
+>> +                       goto fail_phy;
+>
+>
+> What about just return -EINVAL;
+
+Yea, just another way of doing things. ;-)
+I felt 'goto' to be a bit clean than adding number of returns in
+between statements.
+
+>
+>> +               }
+>
+>
+> nit: Here too.
+yea, will add a blank line.
+
+>
+>> +               phy = devm_of_phy_get(dev, child, 0);
+>> +               of_node_put(child);
+>> +               if (IS_ERR(phy)) {
+>> +                       ret = PTR_ERR(phy);
+>> +                       /* This is the case when PHY config is disabled */
+>> +                       if (ret == -ENOSYS || ret == -ENODEV) {
+>> +                               dev_dbg(dev, "Failed to get usb2 phy\n");
+>> +                               phy = NULL;
+>>
+>> +                               ret = 0;
+>> +                       } else if (ret == -EPROBE_DEFER) {
+>> +                               goto fail_phy;
+>> +                       } else {
+>> +                               dev_err(dev, "no usb2 phy configured\n");
+>> +                               goto fail_phy;
+>> +                       }
+>> +               }
+>
+>
+> Similar comments to this block apply as for the block getting legacy USB
+> PHY.
+
+Ok, i will restructure this same as 'legacy PHY  block'
+
+>
+>
+>> +               exynos_ohci->phy_g[phy_number] = phy;
+>> +       }
+>> +
+>> +fail_phy:
+>> +       return ret;
+>> +}
+>> +
+>> +static int exynos_ohci_phy_enable(struct device *dev)
+>>   {
+>>         struct usb_hcd *hcd = dev_get_drvdata(dev);
+>>         struct exynos_ohci_hcd *exynos_ohci = to_exynos_ohci(hcd);
+>> +       int i;
+>> +       int ret = 0;
+>>
+>> -       if (exynos_ohci->phy)
+>> -               usb_phy_init(exynos_ohci->phy);
+>> +       if (exynos_ohci->phy) {
+>
+>
+> !IS_ERR() should be used to check for validity.
+
+Ok, this with the earlier change of setting exynos_ohci->phy as
+ERR_PTR(), should be good then.
+
+>
+>
+>> +               ret = usb_phy_init(exynos_ohci->phy);
+>> +               if (ret)
+>> +                       return ret;
+>
+>
+> IMHO a simple return usb_phy_init(...) could be used here, if we are using
+> the legacy PHY interface.
+
+Right, with legacy PHY, just a 'return usb_phy_init(...)' should do;
+since those devices will not have the generic
+PHYs.
+
+>
+>
+>> +       }
+>> +
+>> +       for (i = 0; ret == 0 && i < PHY_NUMBER; i++)
+>> +               if (exynos_ohci->phy_g[i])
+>
+>
+> !IS_ERR(). Just make sure that the array is initialized with an ERR_PTR()
+> with some error code, (-ENODEV) probably
+
+Ok.
+
+>
+>
+>> +                       ret = phy_power_on(exynos_ohci->phy_g[i]);
+>> +       if (ret) {
+>> +               for (i--; i >= 0; i--)
+>> +                       if (exynos_ohci->phy_g[i])
+>
+>
+> Ditto.
+>
+>
+>> +                               phy_power_off(exynos_ohci->phy_g[i]);
+>> +               if (exynos_ohci->phy)
+>> +                       usb_phy_shutdown(exynos_ohci->phy);
+>
+>
+> I don't think handling of legacy PHY is needed here. I don't think we can
+> have both legacy and generic PHY used at the same time.
+
+Right, we will not have both the PHYs existing at the same time.
+And if we are doing a simple return usb_phy_init(...); then ofcourse
+we will not need to do this.
+
+>
+>
+>> +       }
+>> +
+>> +       return ret;
+>>   }
+>>
+>>   static void exynos_ohci_phy_disable(struct device *dev)
+>>   {
+>>         struct usb_hcd *hcd = dev_get_drvdata(dev);
+>>         struct exynos_ohci_hcd *exynos_ohci = to_exynos_ohci(hcd);
+>> +       int i;
+>>
+>>         if (exynos_ohci->phy)
+>>                 usb_phy_shutdown(exynos_ohci->phy);
+>> +
+>> +       for (i = 0; i < PHY_NUMBER; i++)
+>> +               if (exynos_ohci->phy_g[i])
+>
+>
+> !IS_ERR()
+
+Yes.
+
+
+
+-- 
+Best Regards
+Vivek Gautam
+Samsung R&D Institute, Bangalore
+India
