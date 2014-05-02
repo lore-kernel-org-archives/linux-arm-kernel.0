@@ -1,50 +1,91 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 2 May 2014 20:44:11 +0200
-Subject: [PATCH] ARM: Fix non-uapi types.h export
-In-Reply-To: <1399030220-13628-1-git-send-email-james.hogan@imgtec.com>
-References: <1399030220-13628-1-git-send-email-james.hogan@imgtec.com>
-Message-ID: <CAKv+Gu8fxci_-Q0ys0L4FFPFeSYYoQGPCKgZK5972xG5ArhnvA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 2 May 2014 19:44:21 +0100
+Subject: [RESEND PATCH 2/3] PCI: ARM: add support for generic PCI host
+ controller
+In-Reply-To: <5644412.ouY7G25ZK8@wuerfel>
+References: <1399048876-11862-1-git-send-email-will.deacon@arm.com>
+ <1399048876-11862-3-git-send-email-will.deacon@arm.com>
+ <20140502172317.GC3179@obsidianresearch.com>
+ <5644412.ouY7G25ZK8@wuerfel>
+Message-ID: <20140502184421.GF14645@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 May 2014 13:30, James Hogan <james.hogan@imgtec.com> wrote:
-> The arch/arm/include/asm/types.h is being apparently unintentionally
-> exported in the kernel headers since commit 262576fffe42 (ARM: 7843/1:
-> drop asm/types.h from generic-y) which dropped the generic-y += types.h.
-> This happens because Makefile.headersinst still checks the old asm/
-> directory if the specified header doesn't exist in the uapi directory.
->
-> As far as I can tell the definitions in this file are intended only for
-> use in the kernel, so add back the generic-y += types.h so that the
-> generic asm/types.h is exported in kernel headers, but add it to the
-> uapi Kbuild file to make it clearer what its purpose is.
->
-> Also make the asm/types.h file include the generated <uapi/asm/types.h>
-> rather than <asm-generic/int-ll64.h>, so that the use of int-ll64.h
-> isn't duplicated between the asm-generic/types.h (for exported headers)
-> and asm/types.h (for the kernel build).
->
-> Signed-off-by: James Hogan <james.hogan@imgtec.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: David Howells <dhowells@redhat.com>
-> ---
-> AFAICT the previously exported asm/types.h seemed to include definitions
-> that changed the behaviour of <inttypes.h> (I could have misunderstood
-> though). I presume it wasn't intended to be exported in kernel headers?
+Hi Arnd, Jason,
 
-No it wasn't. The point of the change is to remove subtle
-inconsistencies between kernels built with bare metal toolchains and
-kernels built with glibc targeted toolchains, and this is hardly
-something you want to expose externally.
+Thanks for taking a look.
 
-> The comment suggests that this patch would change / fix the behaviour of
-> userland code which includes the kernel headers and <inttypes.h>. I
-> don't know enough about it to be sure of that though.
+On Fri, May 02, 2014 at 07:25:36PM +0100, Arnd Bergmann wrote:
+> On Friday 02 May 2014 11:23:18 Jason Gunthorpe wrote:
+> > On Fri, May 02, 2014 at 05:41:15PM +0100, Will Deacon wrote:
+> > 
+> > > +       bus_range = &pci->cfg.bus_range;
+> > > +       for (busn = bus_range->start; busn <= bus_range->end; ++busn) {
+> > > +               u32 idx = busn - bus_range->start;
+> > > +               u32 sz = 1 << pci->cfg.ops->bus_shift;
+> > > +
+> > > +               pci->cfg.win[idx] = devm_ioremap(dev,
+> > > +                                                pci->cfg.res.start + busn * sz,
+> > > +                                                sz);
+> > 
+> > Why map each bus individually? Both CAM and ECAM define consecutive
+> > busses consecutively in the address space, and I though ioremap was OK
+> > with unaligned stuff?
+> 
+> One optimization we discussed before was to do this ioremap on the first
+> access to any config space register in one bus, so we don't actually have
+> to map all of them but only the ones that are in use.
 
-No it does not apply to userland code, only to kernel code that
-[indirectly] includes <stdint.h>.
+Right, and this optimisation is because we don't have a lot of virtual
+address space on 32-bit ARM, so blowing away 256M on ECAM isn't viable.
 
-Regards,
-Ard.
+> I don't know if there was a technical problem with that. We can't just
+> map/unmap on every config space access, because it can be called from
+> atomic context and ioremap can sleep, but the initial bus scan is
+> always done in a context in which we are allowed to sleep.
+
+It just doesn't seem worth it, given that we have the bus-range property
+in the DT. I can revisit it if there are strong objections to the current
+code though (looking back, I ended up needing to take a lock last time I
+tried this).
+
+> > > +out_unmap_cfg:
+> > > +     while (busn-- > bus_range->start)
+> > > +             devm_iounmap(dev, pci->cfg.win[busn - bus_range->start]);
+> > 
+> > Is there a reason to explicitly clean up devm resources? I guess it is
+> > because this is in setup not probe?
+> 
+> Setup is called from probe, through pci_common_init_dev(), so that shouldn't
+> make a difference.
+
+Given that the idea was to separate setup() and probe(), I didn't want to
+make the assumption that I was called in probe context.
+
+> > It seems strange to me for a driver to do this sort of work in a setup
+> > function, typically probe acquires as much stuff as it can, that way
+> > defered probe can work properly.
+> > 
+> > Looking at pci-mvebu, 'setup' is only populating the resource list, I
+> > would suggest the same split for this driver.
+> 
+> I suggested moving it all into setup, to make it easier to port this code
+> to arm64: I don't expect we will have the same pci_common_init_dev()
+> mechanism there, so setup will get called directly from the probe
+> function.
+
+In which case, I *could* remove that freeing code, but I'd rather wait until
+we know for sure that it's not needed (that is, when I go about plumbing in
+the support for arm64 after Liviu's patches are merged).
+
+> The alternative is to do everything in probe() as well for arm32, and only
+> do a single list_move() of the resources list to sys->resources in the
+> setup function. That was the advice I gave in the xilinx pci host driver
+> review for the same reason. I only now noticed that I recommended the opposite
+> here. Anyway it shouldn't matter where we do all the things, but I feel
+> it's better to have only one function that does all the work for the case
+> of having nr_controllers=1, as we always do for loadable host drivers.
+
+Ok, I'll leave it like it is for now then.
+
+Will
