@@ -1,408 +1,67 @@
-From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Fri, 2 May 2014 16:59:08 +0900
-Subject: [PATCH v2] ARM: tegra: add Tegra Note 7 device tree
-Message-ID: <1399017548-1638-1-git-send-email-acourbot@nvidia.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 2 May 2014 10:13:11 +0200
+Subject: [PATCH/RFC 3/4] of/clk: Register clocks suitable for Runtime PM
+ with the PM core
+In-Reply-To: <535B130C.1000007@gmail.com>
+References: <1398334403-26181-1-git-send-email-geert+renesas@glider.be>
+ <1398334403-26181-4-git-send-email-geert+renesas@glider.be>
+ <CAPDyKFr02yyhGNncYX2AgBXTA3Sc0AGQcExjtLvQ5QU0_=YJwg@mail.gmail.com>
+ <535B130C.1000007@gmail.com>
+Message-ID: <CAPDyKFqG0dV+-y2=t=d3w6_hxWsYi+sOmNdvS6ECPOuoQ61Pmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tegra Note 7 is a consumer tablet embedding a Tegra 4 SoC with 1GB RAM
-and a 720p panel.
+>>
+>>
+>> Normally I don't think it's a good idea to "automatically" manage
+>> clocks from PM core or any other place but from the driver (and
+>> possibly the subsystem).
+>>
+>> The reason is simply that we hide things that normally is supposed to
+>> be handled by the driver. Typically a cross SOC driver should work
+>> fine both with and without a pm_domain. It should also not rely on
+>> CONFIG_PM_RUNTIME.
 
-The following hardware is enabled by this device tree: UART, eMMC, USB
-(needs external power), PMIC, backlight, DSI panel, keys.
+[Snip]
 
-SD card, HDMI, charger, self-powered USB, audio, wifi, bluetooth are not
-yet supported but might be by future patches (likely in that order).
+>>
+>>> +static int of_clk_register(struct device *dev, struct clk *clk)
+>>> +{
+>>> +       int error;
+>>> +
+>>> +       if (!dev->pm_domain) {
+>>> +               error = pm_clk_create(dev);
+>>> +               if (error)
+>>> +                       return error;
+>>> +
+>>> +               dev->pm_domain = &of_clk_pm_domain;
+>>
+>>
+>> I am concerned about how this will work in conjunction with the
+>> generic power domain.
+>>
+>> A device can't reside in more than one pm_domain; thus I think it
+>> would be better to always use the generic power domain and not have a
+>> specific one for clocks. Typically the genpd should invoke
+>> pm_clk_resume|suspend from it's runtime PM callbacks.
+>
+>
+> I'm not sure about this. A typical use case would be to gate clocks ASAP and
+> then wait until device is idle long enough to consider turning off the power
+> domain worthwhile. Also sometimes we may want to gate the clocks, but
+> prevent power domain from being powered off to retain hardware state (e.g.
+> because there is no way to read it and restore later).
 
-Touch panel, sensors & cameras will probably never be supported.
+So, in principle you prefer to have driver's handle clock gating to
+save power from their runtime PM callbacks, instead of from the power
+domain, right? Just to clarify, that's my view as well.
 
-Pinctrl is not set yet, as the bootloader-provided values allow us to
-use the currently supported hardware.
+Kind regards
+Ulf Hansson
 
-Initrd addresses are hardcoded to match the static values used by the
-bootloader, since it won't add them for us. All the same, a kernel
-command-line is provided to replace the one passed by the bootloader
-which is filled with garbage.
-
-Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
-[treding at nvidia.com: DT fixes, DSI panel support]
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
-Changes since v1:
-- removed the cma kernel parameter
-- removed the not-yet-working HDMI node
-- do not keep some non-essential regulators always on
-
- arch/arm/boot/dts/Makefile         |   1 +
- arch/arm/boot/dts/tegra114-tn7.dts | 348 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 349 insertions(+)
- create mode 100644 arch/arm/boot/dts/tegra114-tn7.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 49717b2db19a..fb662207a504 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -369,6 +369,7 @@ dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
- 	tegra30-cardhu-a02.dtb \
- 	tegra30-cardhu-a04.dtb \
- 	tegra114-dalmore.dtb \
-+	tegra114-tn7.dtb \
- 	tegra124-jetson-tk1.dtb \
- 	tegra124-venice2.dtb
- dtb-$(CONFIG_ARCH_U300) += ste-u300.dtb
-diff --git a/arch/arm/boot/dts/tegra114-tn7.dts b/arch/arm/boot/dts/tegra114-tn7.dts
-new file mode 100644
-index 000000000000..963662145635
---- /dev/null
-+++ b/arch/arm/boot/dts/tegra114-tn7.dts
-@@ -0,0 +1,348 @@
-+/dts-v1/;
-+
-+#include <dt-bindings/input/input.h>
-+#include "tegra114.dtsi"
-+
-+/ {
-+	model = "Tegra Note 7";
-+	compatible = "nvidia,tn7", "nvidia,tegra114";
-+
-+	chosen {
-+		/* TN7's bootloader's arguments need to be overridden */
-+		bootargs = "console=ttyS0,115200n8 console=tty1 gpt fbcon=rotate:2";
-+		/* TN7's bootloader will place initrd at this address */
-+		linux,initrd-start = <0x82000000>;
-+		linux,initrd-end = <0x82800000>;
-+	};
-+
-+	firmware {
-+		trusted-foundations {
-+			compatible = "tlm,trusted-foundations";
-+			tlm,version-major = <2>;
-+			tlm,version-minor = <8>;
-+		};
-+	};
-+
-+	memory {
-+		/* memory >= 0x37e00000 is reserved for firmware usage */
-+		reg = <0x80000000 0x37e00000>;
-+	};
-+
-+	host1x at 50000000 {
-+		dsi at 54300000 {
-+			status = "okay";
-+
-+			vdd-supply = <&vdd_1v2_ap>;
-+
-+			panel at 0 {
-+				compatible = "lg,ld070wx3-sl01";
-+				reg = <0>;
-+
-+				power-supply = <&vdd_lcd>;
-+				backlight = <&backlight>;
-+			};
-+		};
-+	};
-+
-+	serial at 70006300 {
-+		status = "okay";
-+	};
-+
-+	pwm at 7000a000 {
-+		status = "okay";
-+	};
-+
-+	i2c at 7000d000 {
-+		status = "okay";
-+		clock-frequency = <400000>;
-+
-+		palmas: pmic at 58 {
-+			compatible = "ti,palmas";
-+			reg = <0x58>;
-+			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_LOW>;
-+
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+
-+			ti,system-power-controller;
-+
-+			palmas_gpio: gpio {
-+				compatible = "ti,palmas-gpio";
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+			};
-+
-+			pmic {
-+				compatible = "ti,tps65913-pmic", "ti,palmas-pmic";
-+
-+				ldoln-in-supply = <&vdd_smps10_out2>;
-+
-+				regulators {
-+					smps123 {
-+						regulator-name = "vd-cpu";
-+						regulator-min-microvolt = <1000000>;
-+						regulator-max-microvolt = <1000000>;
-+						regulator-always-on;
-+						regulator-boot-on;
-+					};
-+
-+					smps45 {
-+						regulator-name = "vd-soc";
-+						regulator-min-microvolt = <1100000>;
-+						regulator-max-microvolt = <1100000>;
-+						regulator-always-on;
-+						regulator-boot-on;
-+					};
-+
-+					smps6 {
-+						regulator-name = "va-lcd-hv";
-+						regulator-min-microvolt = <3000000>;
-+						regulator-max-microvolt = <3000000>;
-+						regulator-always-on;
-+						regulator-boot-on;
-+					};
-+
-+					smps7 {
-+						regulator-name = "vd-ddr";
-+						regulator-min-microvolt = <1350000>;
-+						regulator-max-microvolt = <1350000>;
-+						regulator-always-on;
-+						regulator-boot-on;
-+					};
-+
-+					vdd_1v8: smps8 {
-+						regulator-name = "vs-pmu-1v8";
-+						regulator-min-microvolt = <1800000>;
-+						regulator-max-microvolt = <1800000>;
-+						regulator-always-on;
-+						regulator-boot-on;
-+					};
-+
-+					vdd_2v9_sys: smps9 {
-+						regulator-name = "vs-sys-2v9";
-+						regulator-min-microvolt = <2900000>;
-+						regulator-max-microvolt = <2900000>;
-+						regulator-always-on;
-+						regulator-boot-on;
-+					};
-+
-+					vdd_smps10_out1: smps10_out1 {
-+						regulator-name = "vd-smps10-out1";
-+						regulator-min-microvolt = <5000000>;
-+						regulator-max-microvolt = <5000000>;
-+						regulator-always-on;
-+						regulator-boot-on;
-+					};
-+
-+					vdd_smps10_out2: smps10_out2 {
-+						regulator-name = "vd-smps10-out2";
-+						regulator-min-microvolt = <5000000>;
-+						regulator-max-microvolt = <5000000>;
-+						regulator-always-on;
-+						regulator-boot-on;
-+					};
-+
-+					ldo1 {
-+						regulator-name = "va-pllx";
-+						regulator-min-microvolt = <1050000>;
-+						regulator-max-microvolt = <1050000>;
-+						regulator-always-on;
-+						regulator-boot-on;
-+					};
-+
-+					vdd_1v2_ap: ldo2 {
-+						regulator-name = "va-ap-1v2";
-+						regulator-min-microvolt = <1200000>;
-+						regulator-max-microvolt = <1200000>;
-+						regulator-always-on;
-+						regulator-boot-on;
-+					};
-+
-+					ldo3 {
-+						regulator-name = "vd-fuse";
-+						regulator-min-microvolt = <1800000>;
-+						regulator-max-microvolt = <1800000>;
-+						regulator-always-on;
-+						regulator-boot-on;
-+					};
-+
-+					ldo4 {
-+						regulator-name = "vd-ts-hv";
-+						regulator-min-microvolt = <3200000>;
-+						regulator-max-microvolt = <3200000>;
-+						regulator-always-on;
-+						regulator-boot-on;
-+					};
-+
-+					ldo5 {
-+						regulator-name = "va-cam2-hv";
-+						regulator-min-microvolt = <2700000>;
-+						regulator-max-microvolt = <2700000>;
-+					};
-+
-+					ldo6 {
-+						regulator-name = "va-sns-hv";
-+						regulator-min-microvolt = <2850000>;
-+						regulator-max-microvolt = <2850000>;
-+					};
-+
-+					ldo7 {
-+						regulator-name = "va-cam1-hv";
-+						regulator-min-microvolt = <2700000>;
-+						regulator-max-microvolt = <2700000>;
-+					};
-+
-+					ldo8 {
-+						regulator-name = "va-ap-rtc";
-+						regulator-min-microvolt = <1100000>;
-+						regulator-max-microvolt = <1100000>;
-+						ti,enable-ldo8-tracking;
-+						regulator-always-on;
-+						regulator-boot-on;
-+					};
-+
-+					ldo9 {
-+						regulator-name = "vi-sdcard";
-+						regulator-min-microvolt = <2900000>;
-+						regulator-max-microvolt = <2900000>;
-+					};
-+
-+					ldousb {
-+						regulator-name = "avdd-usb";
-+						regulator-min-microvolt = <3300000>;
-+						regulator-max-microvolt = <3300000>;
-+						regulator-always-on;
-+						regulator-boot-on;
-+					};
-+
-+					ldoln {
-+						regulator-name = "va-hdmi";
-+						regulator-min-microvolt = <3300000>;
-+						regulator-max-microvolt = <3300000>;
-+					};
-+				};
-+			};
-+
-+			rtc {
-+				compatible = "ti,palmas-rtc";
-+				interrupt-parent = <&palmas>;
-+				interrupts = <8 0>;
-+			};
-+
-+		};
-+	};
-+
-+	pmc at 7000e400 {
-+		nvidia,invert-interrupt;
-+	};
-+
-+	/* eMMC */
-+	sdhci at 78000600 {
-+		status = "okay";
-+		bus-width = <8>;
-+		vmmc-supply = <&vdd_1v8>;
-+		non-removable;
-+	};
-+
-+	usb at 7d000000 {
-+		status = "okay";
-+	};
-+
-+	usb-phy at 7d000000 {
-+		status = "okay";
-+		nvidia,xcvr-setup = <7>;
-+		nvidia,xcvr-lsfslew = <2>;
-+		nvidia,xcvr-lsrslew = <2>;
-+		interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
-+		/* Should be changed to "otg" once we have vbus_supply */
-+		/* As of now, USB devices need to be powered externally */
-+		dr_mode = "host";
-+	};
-+
-+	backlight: backlight {
-+		compatible = "pwm-backlight";
-+		pwms = <&pwm 1 40000>;
-+
-+		brightness-levels = <0 4 8 16 32 64 128 255>;
-+		default-brightness-level = <6>;
-+
-+		power-supply = <&lcd_bl_en>;
-+	};
-+
-+	clocks {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		clk32k_in: clock {
-+			compatible = "fixed-clock";
-+			reg = <0>;
-+			#clock-cells = <0>;
-+			clock-frequency = <32768>;
-+		};
-+	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+
-+		power {
-+			label = "Power";
-+			gpios = <&gpio TEGRA_GPIO(Q, 0) GPIO_ACTIVE_LOW>;
-+			linux,code = <KEY_POWER>;
-+			gpio-key,wakeup;
-+		};
-+
-+		volume_down {
-+			label = "Volume Down";
-+			gpios = <&gpio TEGRA_GPIO(Q, 2) GPIO_ACTIVE_LOW>;
-+			linux,code = <KEY_VOLUMEDOWN>;
-+		};
-+
-+		volume_up {
-+			label = "Volume Up";
-+			gpios = <&gpio TEGRA_GPIO(R, 2) GPIO_ACTIVE_LOW>;
-+			linux,code = <KEY_VOLUMEUP>;
-+		};
-+	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		/* FIXME: output of BQ24192 */
-+		vs_sys: regulator at 0 {
-+			compatible = "regulator-fixed";
-+			reg = <0>;
-+			regulator-name = "VS_SYS";
-+			regulator-min-microvolt = <4200000>;
-+			regulator-max-microvolt = <4200000>;
-+			regulator-always-on;
-+			regulator-boot-on;
-+		};
-+
-+		lcd_bl_en: regulator at 1 {
-+			compatible = "regulator-fixed";
-+			reg = <1>;
-+			regulator-name = "VDD_LCD_BL";
-+			regulator-min-microvolt = <16500000>;
-+			regulator-max-microvolt = <16500000>;
-+			gpio = <&gpio TEGRA_GPIO(H, 2) GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
-+			vin-supply = <&vs_sys>;
-+			regulator-boot-on;
-+		};
-+
-+		vdd_lcd: regulator at 2 {
-+			compatible = "regulator-fixed";
-+			reg = <2>;
-+			regulator-name = "VD_LCD_1V8";
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <1800000>;
-+			gpio = <&palmas_gpio 4 GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
-+			vin-supply = <&vdd_1v8>;
-+			regulator-boot-on;
-+		};
-+	};
-+};
--- 
-1.9.2
+>
+> I believe, though, that for devices that are not inside a controllable power
+> domain, this might be a good solution.
+>
+> Best regards,
+> Tomasz
