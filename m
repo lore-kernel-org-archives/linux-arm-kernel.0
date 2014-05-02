@@ -1,91 +1,90 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 2 May 2014 11:05:16 -0400
-Subject: [PATCH v3 5/7] ARM: dma: Use dma_pfn_offset for dma address
- translation
-In-Reply-To: <20140502145852.GC3693@n2100.arm.linux.org.uk>
-References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
- <1398353407-2345-6-git-send-email-santosh.shilimkar@ti.com>
- <20140502145852.GC3693@n2100.arm.linux.org.uk>
-Message-ID: <5363B42C.4010404@ti.com>
+From: anurag19aggarwal@gmail.com (Anurag Aggarwal)
+Date: Fri, 2 May 2014 20:35:35 +0530
+Subject: [PATCH] ARM: unwinder: Fix thread_saved_fp aka "enable backtrace
+ on THUMB2"
+In-Reply-To: <1398790923-24406-1-git-send-email-Nikolay.Borisov@arm.com>
+References: <1398790923-24406-1-git-send-email-Nikolay.Borisov@arm.com>
+Message-ID: <CAPoNrttU=jRMZw+WCVubnay9xxJG89w1sRMi6g=FVgEQxWjwQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 02 May 2014 10:58 AM, Russell King - ARM Linux wrote:
-> On Thu, Apr 24, 2014 at 11:30:05AM -0400, Santosh Shilimkar wrote:
->> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
->> index e701a4d..424fda9 100644
->> --- a/arch/arm/include/asm/dma-mapping.h
->> +++ b/arch/arm/include/asm/dma-mapping.h
->> @@ -58,22 +58,35 @@ static inline int dma_set_mask(struct device *dev, u64 mask)
->>  #ifndef __arch_pfn_to_dma
->>  static inline dma_addr_t pfn_to_dma(struct device *dev, unsigned long pfn)
->>  {
->> -	return (dma_addr_t)__pfn_to_bus(pfn);
->> +	if (!dev)
->> +		return (dma_addr_t)__pfn_to_bus(pfn);
->> +	else
->> +		return (dma_addr_t)__pfn_to_bus(pfn - dev->dma_pfn_offset);
-> 
-> I really don't trust gcc to do this right, so I think it would be better
-> to make life easier on the compiler:
-> 
-> 	if (dev)
-> 		pfn -= dev->dma_pfn_offset;
-> 	return (dma_addr_t)__pfn_to_bus(pfn);
-> 
-This looks better. Will udpate with above.
+Hi Nikolay,
 
->>  static inline unsigned long dma_to_pfn(struct device *dev, dma_addr_t addr)
->>  {
->> -	return __bus_to_pfn(addr);
->> +	if (!dev)
->> +		return __bus_to_pfn(addr);
->> +	else
->> +		return __bus_to_pfn(addr) + dev->dma_pfn_offset;
-> 
-> and:
-> 
-> 	unsigned long pfn = __bus_to_pfn(addr);
-> 
-> 	if (dev)
-> 		pfn += dev->dma_pfn_offset;
-> 
-> 	return pfn;
-> 
-Ok..
+I have one suggestion to you, As there is already some handling
+present for Thumb-2 kernels.
 
->>  }
->>  
->>  static inline void *dma_to_virt(struct device *dev, dma_addr_t addr)
->>  {
->> -	return (void *)__bus_to_virt((unsigned long)addr);
->> +	if (!dev)
->> +		return (void *)__bus_to_virt((unsigned long)addr);
->> +	else
->> +		return (void *)__bus_to_virt(__pfn_to_bus(dma_to_pfn(dev, addr)));
-> 
-> This is quite horrendous.  There's easier ways to do this...  I assume
-> you haven't looked at the assembler resulting from this at all with
-> stuff like the p2v patching enabled?
-> 
-I haven't. Will check.
+The handling does not seem to be complete.
+In below code segment :
 
->>  }
->>  
->>  static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
->>  {
->> -	return (dma_addr_t)__virt_to_bus((unsigned long)(addr));
->> +	if (!dev)
->> +		return (dma_addr_t)__virt_to_bus((unsigned long)(addr));
->> +	else
->> +		return pfn_to_dma(dev,
->> +				__bus_to_pfn(__virt_to_bus((unsigned long)(addr))));
-> 
-> Same here.
-> 
-ok.
+In arch/arm/kernel/unwind.c :
 
-Thanks !!
+void unwind_backtrace(struct pt_regs *regs, struct task_struct *tsk)
+{
+        struct stackframe frame;
+        register unsigned long current_sp asm ("sp");
 
-Regards,
-Santosh
+        pr_debug("%s(regs = %p tsk = %p)\n", __func__, regs, tsk);
+
+        if (!tsk)
+        tsk = current;
+
+        if (regs) {
+                frame.fp = regs->ARM_fp;
+                frame.sp = regs->ARM_sp;
+                frame.lr = regs->ARM_lr;
+
+
+Similar changes need to be made as ARM_fp is nothing else but R11.
+This may create future issues.
+
+
+On Tue, Apr 29, 2014 at 10:32 PM, Nikolay Borisov
+<Nikolay.Borisov@arm.com> wrote:
+> The thread_save_fp macro has been defined so that it always reads the fp member
+> of the cpu_context_save struct. However, in the case of THUMB2 the fp is saved
+> not in the fp (r11) member but rather in r7.
+>
+> This patch changes the way the macro is defined such that FP is read from the
+> correct place depending on whether we are a THUMB2 kernel or not. This enables
+> the backtrace in sitaution such as "echo t > /proc/sysrq-trigger" or the
+> function in which a process sleeping when "ps -Al" is invoked.
+>
+> Signed-off-by: Nikolay Borisov <Nikolay.Borisov@arm.com>
+> Tested-by: Nikolay Borisov <Nikolay.Borisov@arm.com>
+> ---
+>  arch/arm/include/asm/thread_info.h | 6 ++++++
+>  1 file changed, 6 insertions(+)
+>
+> diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
+> index f989d7c..e4e4208 100644
+> --- a/arch/arm/include/asm/thread_info.h
+> +++ b/arch/arm/include/asm/thread_info.h
+> @@ -114,8 +114,14 @@ static inline struct thread_info *current_thread_info(void)
+>         ((unsigned long)(task_thread_info(tsk)->cpu_context.pc))
+>  #define thread_saved_sp(tsk)   \
+>         ((unsigned long)(task_thread_info(tsk)->cpu_context.sp))
+> +
+> +#ifndef CONFIG_THUMB2_KERNEL
+>  #define thread_saved_fp(tsk)   \
+>         ((unsigned long)(task_thread_info(tsk)->cpu_context.fp))
+> +#else
+> +#define thread_saved_fp(tsk)   \
+> +       ((unsigned long)(task_thread_info(tsk)->cpu_context.r7))
+> +#endif
+>
+>  extern void crunch_task_disable(struct thread_info *);
+>  extern void crunch_task_copy(struct thread_info *, void *);
+> --
+> 1.8.1.5
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+
+-- 
+Anurag Aggarwal
