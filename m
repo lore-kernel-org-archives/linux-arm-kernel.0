@@ -1,72 +1,79 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 02 May 2014 17:13:46 +0200
-Subject: [PATCH v3 4/7] of: configure the platform device dma parameters
-In-Reply-To: <53639A0C.8070306@ti.com>
-References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
- <5279118.J5305KQNjB@wuerfel> <53639A0C.8070306@ti.com>
-Message-ID: <4526988.X68ZFJZdRl@wuerfel>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Fri,  2 May 2014 16:17:09 +0100
+Subject: [PATCH V2] arm64: mm: Create gigabyte kernel logical mappings where
+ possible
+Message-ID: <1399043829-9036-1-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 02 May 2014 09:13:48 Santosh Shilimkar wrote:
-> On Friday 02 May 2014 05:58 AM, Arnd Bergmann wrote:
-> > On Thursday 01 May 2014 14:12:10 Grant Likely wrote:
-> >>>> I've got two concerns here. of_dma_get_range() retrieves only the first
-> >>>> tuple from the dma-ranges property, but it is perfectly valid for
-> >>>> dma-ranges to contain multiple tuples. How should we handle it if a
-> >>>> device has multiple ranges it can DMA from?
-> >>>>
-> >>>
-> >>> We've not found any cases in current Linux where more than one dma-ranges
-> >>> would be used. Moreover, The MM (definitely for ARM) isn't supported such
-> >>> cases at all (if i understand everything right).
-> >>> - there are only one arm_dma_pfn_limit
-> >>> - there is only one MM zone is used for ARM
-> >>> - some arches like x86,mips can support 2 zones (per arch - not per device or bus)
-> >>>   DMA & DMA32, but they configured once and forever per arch.
-> >>
-> >> Okay. If anyone ever does implement multiple ranges then this code will
-> >> need to be revisited.
-> > 
-> > I wonder if it's needed for platforms implementing the standard "ARM memory map" [1].
-> > The document only talks about addresses as seen from the CPU, and I can see
-> > two logical interpretations how the RAM is supposed to be visible from a device:
-> > either all RAM would be visible contiguously at DMA address zero, or everything
-> > would be visible at the same physical address as the CPU sees it.
-> > 
-> > If anyone picks the first interpretation, we will have to implement that
-> > in Linux. We can of course hope that all hardware designs follow the second
-> > interpretation, which would be more convenient for us here.
-> >
-> not sure if I got your point correctly but DMA address 0 isn't used as DRAM start in
-> any of the ARM SOC today, mainly because of the boot architecture where address 0 is
-> typically used by ROM code. RAM start will be at some offset always and hence I
-> believe ARM SOCs will follow second interpretation. This was one of the main reason
-> we ended up fixing the max*pfn stuff. 
-> 26ba47b {ARM: 7805/1: mm: change max*pfn to include the physical offset of memory}
+We have the capability to map 1GB level 1 blocks when using a 4K
+granule.
 
-Marvell normally has memory starting at physical address zero.
+This patch adjusts the create_mapping logic s.t. when mapping physical
+memory on boot, we attempt to use a 1GB block if both the VA and PA
+start and end are 1GB aligned. This both reduces the levels of lookup
+required to resolve a kernel logical address, as well as reduces TLB
+pressure on cores that support 1GB TLB entries.
 
-Even if RAM starts elsewhere, I don't think that is a reason to have
-the DMA address do the same. The memory controller internally obviously
-starts at zero, and it wouldn't be unreasonable to have the DMA space
-match what the memory controller sees rather than have it match what
-the CPU sees.
+Signed-off-by: Steve Capper <steve.capper@linaro.org>
+---
+Changed in V2: free the original pmd table from swapper_pg_dir if we
+replace it with a block pud entry.
 
-If you look at the table 3.1.4, you have both addresses listed:
+Catalin,
+pud_pfn would give us the pud pointed to by a huge pud. (so will
+resolve to a gigabyte aligned address when << PAGE_SHIFTed).
 
-	  Physical Addresses in SoC	Offset	 		Internal DRAM address
+What we want is the pointer to the pmd table. I've opted to go for
+pmd_offset as it's easier to gauge intent.
+(I know we convert from PA->VA->PA, but this will probably compile
+out, and is done once on boot...).
 
-2 GBytes	0x00 8000 0000 ?	-0x00 8000 0000		0x00 0000 0000 ?
-		0x00 FFFF FFFF			 		0x00 7FFF FFFF
+I've tested this with 3 and 4 levels on the Model (and a load of debug
+printing that I've removed from the patch).
 
-30 GBytes	0x08 8000 0000 ? 	-0x08 0000 0000		0x00 8000 0000 ?
-		0x0F FFFF FFFF					0x07 FFFF FFFF
+Cheers,
+-- 
+Steve
+---
+ arch/arm64/mm/mmu.c | 25 ++++++++++++++++++++++++-
+ 1 file changed, 24 insertions(+), 1 deletion(-)
 
-32 GBytes	0x88 0000 0000 -	-0x80 0000 0000	 	0x08 0000 0000 -
-		0x8F FFFF FFFF					0x0F FFFF FFFF
-
-The wording "Physical Addresses in SoC" would indeed suggest that the
-same address is used for DMA, but I would trust everybody to do that.
-
-	Arnd
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 4d29332..2ced5f6 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -234,7 +234,30 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
+ 	pud = pud_offset(pgd, addr);
+ 	do {
+ 		next = pud_addr_end(addr, end);
+-		alloc_init_pmd(pud, addr, next, phys);
++
++		/*
++		 * For 4K granule only, attempt to put down a 1GB block
++		 */
++		if ((PAGE_SHIFT == 12) &&
++			((addr | next | phys) & ~PUD_MASK) == 0) {
++			pud_t old_pud = *pud;
++			set_pud(pud, __pud(phys | prot_sect_kernel));
++
++			/*
++			 * If we have an old value for a pud, it will
++			 * be pointing to a pmd table that we no longer
++			 * need (from swapper_pg_dir).
++			 *
++			 * Look up the old pmd table and free it.
++			 */
++			if (!pud_none(old_pud)) {
++				phys_addr_t table = __pa(pmd_offset(&old_pud, 0));
++				memblock_free(table, PAGE_SIZE);
++				flush_tlb_all();
++			}
++		} else {
++			alloc_init_pmd(pud, addr, next, phys);
++		}
+ 		phys += next - addr;
+ 	} while (pud++, addr = next, addr != end);
+ }
+-- 
+1.8.1.4
