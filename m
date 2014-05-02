@@ -1,60 +1,60 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Fri, 2 May 2014 11:23:18 -0600
-Subject: [RESEND PATCH 2/3] PCI: ARM: add support for generic PCI host
- controller
-In-Reply-To: <1399048876-11862-3-git-send-email-will.deacon@arm.com>
-References: <1399048876-11862-1-git-send-email-will.deacon@arm.com>
- <1399048876-11862-3-git-send-email-will.deacon@arm.com>
-Message-ID: <20140502172317.GC3179@obsidianresearch.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 2 May 2014 10:24:52 -0700
+Subject: [PATCH 13/15] ASoC: SND_S3C_DMA_LEGACY needs S3C24XX_DMA
+In-Reply-To: <7071653.m3UbztQEJc@wuerfel>
+References: <1398770316-19715-1-git-send-email-kaixu.xia@linaro.org>
+ <1398770316-19715-14-git-send-email-kaixu.xia@linaro.org>
+ <20140501191125.GB3245@sirena.org.uk> <7071653.m3UbztQEJc@wuerfel>
+Message-ID: <20140502172452.GT3245@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 02, 2014 at 05:41:15PM +0100, Will Deacon wrote:
+On Fri, May 02, 2014 at 12:35:21AM +0200, Arnd Bergmann wrote:
+> On Thursday 01 May 2014 12:11:25 Mark Brown wrote:
 
-> +       bus_range = &pci->cfg.bus_range;
-> +       for (busn = bus_range->start; busn <= bus_range->end; ++busn) {
-> +               u32 idx = busn - bus_range->start;
-> +               u32 sz = 1 << pci->cfg.ops->bus_shift;
-> +
-> +               pci->cfg.win[idx] = devm_ioremap(dev,
-> +                                                pci->cfg.res.start + busn * sz,
-> +                                                sz);
+> > Why is the fix for this not to ensure that s3c24xx always enables the
+> > DMA controller - how likely is it that it would be sane to build a
+> > kernel without DMA after all?
 
-Why map each bus individually? Both CAM and ECAM define consecutive
-busses consecutively in the address space, and I though ioremap was OK
-with unaligned stuff?
+> S3C24XX_DMA is only needed for ASoC and for s3cmci. The latter
+> uses 'depends on S3C24XX_DMA'. arch/arm/configs/tct_hammer_defconfig
+> is an example of a configuration that does not include DMA because
+> it uses neither of the two drivers.
 
-> +out_unmap_cfg:
-> +	while (busn-- > bus_range->start)
-> +		devm_iounmap(dev, pci->cfg.win[busn - bus_range->start]);
+I'm having a hard time caring about that, the arch code can always do an
+"if whatever".  If that board is what I think it actually does have
+audio on it, either the defconfig was never updated or the driver wasn't
+merged into mainline.
 
-Is there a reason to explicitly clean up devm resources? I guess it is
-because this is in setup not probe?
+> How about the patch below?
 
-It seems strange to me for a driver to do this sort of work in a setup
-function, typically probe acquires as much stuff as it can, that way
-defered probe can work properly.
+I guess (modulo the issues below).  Killing the wrapper and making the
+existing selection of DMA support actually select DMA support does avoid
+the redundancy.
 
-Looking at pci-mvebu, 'setup' is only populating the resource list, I
-would suggest the same split for this driver.
+> diff --git a/sound/soc/samsung/ac97.c b/sound/soc/samsung/ac97.c
+> index 76b072b..28fe097 100644
+> --- a/sound/soc/samsung/ac97.c
+> +++ b/sound/soc/samsung/ac97.c
+> @@ -253,10 +253,7 @@ static int s3c_ac97_trigger(struct snd_pcm_substream *substream, int cmd,
+>  
+>  	writel(ac_glbctrl, s3c_ac97.regs + S3C_AC97_GLBCTRL);
+>  
+> -	if (!dma_data->ops)
+> -		dma_data->ops = samsung_dma_get_ops();
+> -
+> -	dma_data->ops->started(dma_data->channel);
+> +	s3c2410_dma_ctrl(dma_data->channel, S3C2410_DMAOP_STARTED);
+>  
+>  	return 0;
+>  }
 
-> +out_release_res:
-> +	release_child_resources(&iomem_resource);
-> +	release_child_resources(&ioport_resource);
-
-This looks really off to me, doesn't this free all resources in the
-system?
-
-This isn't enough?:
-
-> +	list_for_each_entry(win, &sys->resources, list)
-> +		devm_kfree(dev, win->res);
-> +	pci_free_resource_list(&sys->resources);
-
-
-At worst, I would guess 'release_child_resources(win->res);' in the
-loop. But since no bus scan has been done, is there any chance of
-child resources at this point?
-
-Regards,
-Jason
+This code is broken in general - at least s3c64xx has AC'97.  That's
+broken anyway though.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140502/70519974/attachment.sig>
