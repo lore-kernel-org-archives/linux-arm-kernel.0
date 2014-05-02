@@ -1,50 +1,79 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Fri, 2 May 2014 10:21:57 +0100
-Subject: [PATCH] arm64: mm: Create gigabyte kernel logical mappings where
- possible
-In-Reply-To: <20140502085119.GA456@arm.com>
-References: <1398857782-1525-1-git-send-email-steve.capper@linaro.org>
- <20140502085119.GA456@arm.com>
-Message-ID: <20140502092156.GB30999@linaro.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 2 May 2014 11:24:45 +0200
+Subject: [PATCH 1/5] pm: domains: quieten down generic pm domains
+In-Reply-To: <10021780.rnCkCYmgZH@vostro.rjw.lan>
+References: <20140427132312.GC26756@n2100.arm.linux.org.uk>
+ <E1WeP8U-0000Ug-RQ@rmk-PC.arm.linux.org.uk>
+ <10021780.rnCkCYmgZH@vostro.rjw.lan>
+Message-ID: <CAPDyKFpKnhcttY-BWDEG=XTYsKHro0t5G7YBao-+F=o3ez3grA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 02, 2014 at 09:51:21AM +0100, Catalin Marinas wrote:
-> On Wed, Apr 30, 2014 at 12:36:22PM +0100, Steve Capper wrote:
-> > diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> > index 4d29332..867e979 100644
-> > --- a/arch/arm64/mm/mmu.c
-> > +++ b/arch/arm64/mm/mmu.c
-> > @@ -234,7 +234,20 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
-> >  	pud = pud_offset(pgd, addr);
-> >  	do {
-> >  		next = pud_addr_end(addr, end);
-> > -		alloc_init_pmd(pud, addr, next, phys);
-> > +
-> > +		/*
-> > +		 * For 4K granule only, attempt to put down a 1GB block
-> > +		 */
-> > +		if ((PAGE_SHIFT == 12) &&
-> > +			((addr | next | phys) & ~PUD_MASK) == 0) {
-> > +			pud_t old_pud = *pud;
-> > +			set_pud(pud, __pud(phys | prot_sect_kernel));
-> > +
-> > +			if (!pud_none(old_pud))
-> > +				flush_tlb_all();
-> 
-> We could even free the original pmd here. I think a
-> memblock_free(pud_pfn(old_pud) << PAGE_SHIFT, PAGE_SIZE) should do
-> (untested, and you need to define pud_pfn).
+On 1 May 2014 01:46, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Sunday, April 27, 2014 02:28:50 PM Russell King wrote:
+>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>
+> Acked-by: Rafael J. Wysocki <rjw@rjwysocki.net>
+>
+> Since you need this one and [2/5] for the rest of the patchset, please feel
+> free to take them through your tree if that's convenient.
 
-I see what you mean, we will potentially have an unused page in our
-swapper_pg_dir array.
+Unless it complicates things for Russell, I would prefer if this could
+go via Rafael's tree.
 
-I'll have a think, and add some logic to remove the redundant page.
+I have a quite big patchset for the PM domain, it would help me if I
+have a single point to base my work upon.
 
-Cheers,
--- 
-Steve
+Additionally, you have Tomasz Figa patchset below to consider for the
+PM domain code.
 
-> 
-> -- 
-> Catalin
+[PATCH v3 0/3] Generic Device Tree based power domain look-up
+
+Kind regards
+Ulf Hansson
+
+>
+>> ---
+>>  drivers/base/power/domain.c | 6 +++---
+>>  1 file changed, 3 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+>> index bfb8955c406c..ea91ea0e137b 100644
+>> --- a/drivers/base/power/domain.c
+>> +++ b/drivers/base/power/domain.c
+>> @@ -42,7 +42,7 @@
+>>       struct gpd_timing_data *__td = &dev_gpd_data(dev)->td;                  \
+>>       if (!__retval && __elapsed > __td->field) {                             \
+>>               __td->field = __elapsed;                                        \
+>> -             dev_warn(dev, name " latency exceeded, new value %lld ns\n",    \
+>> +             dev_dbg(dev, name " latency exceeded, new value %lld ns\n",     \
+>>                       __elapsed);                                             \
+>>               genpd->max_off_time_changed = true;                             \
+>>               __td->constraint_changed = true;                                \
+>> @@ -242,7 +242,7 @@ static int __pm_genpd_poweron(struct generic_pm_domain *genpd)
+>>                       genpd->max_off_time_changed = true;
+>>                       genpd_recalc_cpu_exit_latency(genpd);
+>>                       if (genpd->name)
+>> -                             pr_warning("%s: Power-on latency exceeded, "
+>> +                             pr_debug("%s: Power-on latency exceeded, "
+>>                                       "new value %lld ns\n", genpd->name,
+>>                                       elapsed_ns);
+>>               }
+>> @@ -566,7 +566,7 @@ static int pm_genpd_poweroff(struct generic_pm_domain *genpd)
+>>                       genpd->power_off_latency_ns = elapsed_ns;
+>>                       genpd->max_off_time_changed = true;
+>>                       if (genpd->name)
+>> -                             pr_warning("%s: Power-off latency exceeded, "
+>> +                             pr_debug("%s: Power-off latency exceeded, "
+>>                                       "new value %lld ns\n", genpd->name,
+>>                                       elapsed_ns);
+>>               }
+>>
+>
+> --
+> I speak only for myself.
+> Rafael J. Wysocki, Intel Open Source Technology Center.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
