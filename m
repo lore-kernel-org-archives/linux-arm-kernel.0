@@ -1,45 +1,163 @@
-From: jays.lee@samsung.com (Jungseok Lee)
-Date: Fri, 02 May 2014 10:03:02 +0900
-Subject: [PATCH] arm64: mm: Create gigabyte kernel logical mappings where
- possible
-In-Reply-To: <1398857782-1525-1-git-send-email-steve.capper@linaro.org>
-References: <1398857782-1525-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <000801cf65a2$44551e10$ccff5a30$@samsung.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 1 May 2014 20:06:25 -0500
+Subject: [PATCH v3 2/7] of: introduce of_dma_get_range() helper
+In-Reply-To: <1398353407-2345-3-git-send-email-santosh.shilimkar@ti.com>
+References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
+ <1398353407-2345-3-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <CAL_Jsq+j_mVp2F=Cb4F+i2Q-B4A7YLvLCP+YnAxkUJT2S+rcQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, April 30, 2014 8:36 PM, Steve Capper wrote:
-> We have the capability to map 1GB level 1 blocks when using a 4K granule.
-> 
-> This patch adjusts the create_mapping logic s.t. when mapping physical memory on boot, we attempt to
-> use a 1GB block if both the VA and PA start and end are 1GB aligned. This both reduces the levels of
-> lookup required to resolve a kernel logical address, as well as reduces TLB pressure on cores that
-> support 1GB TLB entries.
-> 
-> Signed-off-by: Steve Capper <steve.capper@linaro.org>
+On Thu, Apr 24, 2014 at 10:30 AM, Santosh Shilimkar
+<santosh.shilimkar@ti.com> wrote:
+> From: Grygorii Strashko <grygorii.strashko@ti.com>
+>
+> The of_dma_get_range() allows to find "dma-range" property for
+> the specified device and parse it.
+>  dma-ranges format:
+>    DMA addr (dma_addr)          : naddr cells
+>    CPU addr (phys_addr_t)       : pna cells
+>    size                         : nsize cells
+>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+
+Reviewed-by: Rob Herring <robh@kernel.org>
+
 > ---
-> Hello,
-> This patch has been tested on the FastModel for 4K and 64K pages.
-> Also, this has been tested with Jungseok's 4 level patch.
-> 
-> I put in the explicit check for PAGE_SHIFT, as I am anticipating a three level 64KB configuration at
-> some point.
-> 
-> With two level 64K, a PUD is equivalent to a PMD which is equivalent to a PGD, and these are all level
-> 2 descriptors.
-> 
-> Under three level 64K, a PUD would be equivalent to a PGD which would be a level 1 descriptor thus may
-> not be a block.
-> 
-> Comments/critique/testers welcome.
-
-Hi, Steve
-
-I've tested on my platform, and it works well.
-
-If SoC design follows "Principles of ARM Memory Maps",
-PA should be supposed to be 1GB aligned. Thus, I think
-this patch is effective against them.
-
-Best Regards
-Jungseok Lee
+>  drivers/of/address.c       |   87 ++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/of_address.h |    8 ++++
+>  2 files changed, 95 insertions(+)
+>
+> diff --git a/drivers/of/address.c b/drivers/of/address.c
+> index cb4242a..c54baee 100644
+> --- a/drivers/of/address.c
+> +++ b/drivers/of/address.c
+> @@ -721,3 +721,90 @@ void __iomem *of_iomap(struct device_node *np, int index)
+>         return ioremap(res.start, resource_size(&res));
+>  }
+>  EXPORT_SYMBOL(of_iomap);
+> +
+> +/**
+> + * of_dma_get_range - Get DMA range info
+> + * @np:                device node to get DMA range info
+> + * @dma_addr:  pointer to store initial DMA address of DMA range
+> + * @paddr:     pointer to store initial CPU address of DMA range
+> + * @size:      pointer to store size of DMA range
+> + *
+> + * Look in bottom up direction for the first "dma-ranges" property
+> + * and parse it.
+> + *  dma-ranges format:
+> + *     DMA addr (dma_addr)     : naddr cells
+> + *     CPU addr (phys_addr_t)  : pna cells
+> + *     size                    : nsize cells
+> + *
+> + * It returns -ENODEV if "dma-ranges" property was not found
+> + * for this device in DT.
+> + */
+> +int of_dma_get_range(struct device_node *np, u64 *dma_addr, u64 *paddr, u64 *size)
+> +{
+> +       struct device_node *node = of_node_get(np);
+> +       const __be32 *ranges = NULL;
+> +       int len, naddr, nsize, pna;
+> +       int ret = 0;
+> +       u64 dmaaddr;
+> +
+> +       if (!node)
+> +               return -EINVAL;
+> +
+> +       while (1) {
+> +               naddr = of_n_addr_cells(node);
+> +               nsize = of_n_size_cells(node);
+> +               node = of_get_next_parent(node);
+> +               if (!node)
+> +                       break;
+> +
+> +               ranges = of_get_property(node, "dma-ranges", &len);
+> +
+> +               /* Ignore empty ranges, they imply no translation required */
+> +               if (ranges && len > 0)
+> +                       break;
+> +
+> +               /*
+> +                * At least empty ranges has to be defined for parent node if
+> +                * DMA is supported
+> +                */
+> +               if (!ranges)
+> +                       break;
+> +       }
+> +
+> +       if (!ranges) {
+> +               pr_debug("%s: no dma-ranges found for node(%s)\n",
+> +                        __func__, np->full_name);
+> +               ret = -ENODEV;
+> +               goto out;
+> +       }
+> +
+> +       len /= sizeof(u32);
+> +
+> +       pna = of_n_addr_cells(node);
+> +
+> +       /* dma-ranges format:
+> +        * DMA addr     : naddr cells
+> +        * CPU addr     : pna cells
+> +        * size         : nsize cells
+> +        */
+> +       dmaaddr = of_read_number(ranges, naddr);
+> +       *paddr = of_translate_dma_address(np, ranges);
+> +       if (*paddr == OF_BAD_ADDR) {
+> +               pr_err("%s: translation of DMA address(%pad) to CPU address failed node(%s)\n",
+> +                      __func__, dma_addr, np->full_name);
+> +               ret = -EINVAL;
+> +               goto out;
+> +       }
+> +       *dma_addr = dmaaddr;
+> +
+> +       *size = of_read_number(ranges + naddr + pna, nsize);
+> +
+> +       pr_debug("dma_addr(%llx) cpu_addr(%llx) size(%llx)\n",
+> +                *dma_addr, *paddr, *size);
+> +
+> +out:
+> +       of_node_put(node);
+> +
+> +       return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(of_dma_get_range);
+> diff --git a/include/linux/of_address.h b/include/linux/of_address.h
+> index 5f6ed6b..4d7b325 100644
+> --- a/include/linux/of_address.h
+> +++ b/include/linux/of_address.h
+> @@ -63,6 +63,8 @@ extern int of_pci_range_parser_init(struct of_pci_range_parser *parser,
+>  extern struct of_pci_range *of_pci_range_parser_one(
+>                                         struct of_pci_range_parser *parser,
+>                                         struct of_pci_range *range);
+> +extern int of_dma_get_range(struct device_node *np, u64 *dma_addr,
+> +                               u64 *paddr, u64 *size);
+>  #else /* CONFIG_OF_ADDRESS */
+>  static inline struct device_node *of_find_matching_node_by_address(
+>                                         struct device_node *from,
+> @@ -90,6 +92,12 @@ static inline struct of_pci_range *of_pci_range_parser_one(
+>  {
+>         return NULL;
+>  }
+> +
+> +static inline int of_dma_get_range(struct device_node *np, u64 *dma_addr,
+> +                               u64 *paddr, u64 *size)
+> +{
+> +       return -ENODEV;
+> +}
+>  #endif /* CONFIG_OF_ADDRESS */
+>
+>  #ifdef CONFIG_OF
+> --
+> 1.7.9.5
+>
