@@ -1,59 +1,49 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Fri,  2 May 2014 18:17:31 +0530
-Subject: [PATCH v5 0/4] usb: ehci/ohci-exynos: Move to generic phy framework
-Message-ID: <1399034855-9686-1-git-send-email-gautam.vivek@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 2 May 2014 13:59:06 +0100
+Subject: [PATCH V2] arm64: mm: Optimise tlb flush logic where we have >4K
+ granule
+In-Reply-To: <20140502123011.GA4054@linaro.org>
+References: <1399027034-1277-1-git-send-email-steve.capper@linaro.org>
+ <20140502112618.GD17370@arm.com> <20140502123011.GA4054@linaro.org>
+Message-ID: <20140502125906.GF17370@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Based and tested on 'usb-next' branch of Greg's usb tree, with relevant
-device tree patches[1]
+On Fri, May 02, 2014 at 01:31:28PM +0100, Steve Capper wrote:
+> On Fri, May 02, 2014 at 12:26:18PM +0100, Will Deacon wrote:
+> > On Fri, May 02, 2014 at 11:37:14AM +0100, Steve Capper wrote:
+> > > The tlb maintainence functions: __cpu_flush_user_tlb_range and
+> > > __cpu_flush_kern_tlb_range do not take into consideration the page
+> > > granule when looping through the address range, and repeatedly flush
+> > > tlb entries for the same page when operating with 64K pages.
+> > > 
+> > > This patch re-works the logic s.t. we instead advance the loop by
+> > >  1 << (PAGE_SHIFT - 12), so avoid repeating ourselves.
+> > > 
+> > > Also the routines have been converted from assembler to static inline
+> > > functions to aid with legibility and potential compiler optimisations.
+> > > 
+> > > Signed-off-by: Steve Capper <steve.capper@linaro.org>
+> > > Acked-by: Will Deacon <will.deacon@arm.com>
+> > > ---
+> > > Changed in V2: added the missing isb(.) to the kernel tlb flush.
+> > 
+> > Hold your horses ;)
+> 
+> :-)
+> 
+> > 
+> > You mentioned remapping kernel text rw/ro, but if you think about it, it's
+> > still executable for both of these, so the isb() isn't needed. Do we have a
+> > case for changing whether or not something is executable?
+> 
+> I think module loading and unloading in future would likely need this.
+> i.e. if we get stuff like set_memory_nx and friends for ARM64.
+> 
+> We've just had this added to ARM:
+>  75374ad ARM: mm: Define set_memory_* functions for ARM
 
-Hi Alan,
- I have included your Acked-by in all the four patches, but there has been
- some amount of restructuring as suggested by Tomasz Figa.
- Please let me know if you have some comments on this patch-series.
+Ok, but if it's just set_memory_nx that needs this, I'd rather put the isb()
+there instead of penalising all kernel TLB flushes.
 
-Changes from v4:
- - Addressed review comments for restructuring exynos_ohci_get_phy()
-   and exynos_ehci_get_phy(); and thereby adding proper checks in
-   exynos_ohci_phy_enable()/disable() as well as exynos_ehci_phy_enable()/
-   disable().
-
-Changes from v3:
- - Calling usb_phy_shutdown() when exynos_o/ehci_phy_enable() is failing.
- - Made exynos_o/ehci_phy_disable() return void, since its return value
-   did not serve any purpose.
- - Calling clk_disable_unprepare() in exynos_o/ehci_resume() when
-   exynos_o/ehci_phy_enable() is failed.
-
-Changes from v2:
- - Added two patches in the series for some cleanup.
-   usb: ohci-exynos: Use struct device instead of platform_device
-   usb: ehci-exynos: Use struct device instead of platform_device
- - Addressed review comments.
-   -- Moved exynos_ohci_phyg_on()/off routines inside
-      exynos_ohci_phy_enable()/disable.
-   -- Added functions exynos_ehci_phy_enable() and exynos_ehci_phy_disable()
-      and moved exynos_ehci_phyg_on()/off routines respectively in them.
-   -- Added necessary checks.
-
-[1]: [PATCH 0/4] dts: Add usb2phy to Exynos 5250/5420
-     https://lkml.org/lkml/2014/4/30/119
-
-Kamil Debski (1):
-  usb: ehci-exynos: Change to use phy provided by the generic phy
-    framework
-
-Vivek Gautam (3):
-  usb: ohci-exynos: Use struct device instead of platform_device
-  usb: ehci-exynos: Use struct device instead of platform_device
-  usb: ohci-exynos: Add facility to use phy provided by the generic phy
-    framework
-
- .../devicetree/bindings/usb/exynos-usb.txt         |   31 +++++
- drivers/usb/host/ehci-exynos.c                     |  136 ++++++++++++++++----
- drivers/usb/host/ohci-exynos.c                     |  134 +++++++++++++++----
- 3 files changed, 254 insertions(+), 47 deletions(-)
-
--- 
-1.7.10.4
+Will
