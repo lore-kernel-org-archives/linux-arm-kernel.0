@@ -1,116 +1,50 @@
-From: jean.pihet@linaro.org (Jean Pihet)
-Date: Fri, 2 May 2014 11:19:38 +0200
-Subject: [PATCH 1/3] perf tests: Introduce perf_regs_load function on ARM64
-In-Reply-To: <1398690730-5454-1-git-send-email-jean.pihet@linaro.org>
-References: <CAFrcx1nfkDWTu9vF+a7UGjd1fzHpXS44pzqKLZS9ej7KJwqkOg@mail.gmail.com>
- <1398690730-5454-1-git-send-email-jean.pihet@linaro.org>
-Message-ID: <CAFrcx1kQO5i+kQwDizT1F4asbFNGiDSDWt0ubnpS92fU1PBiHw@mail.gmail.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Fri, 2 May 2014 10:21:57 +0100
+Subject: [PATCH] arm64: mm: Create gigabyte kernel logical mappings where
+ possible
+In-Reply-To: <20140502085119.GA456@arm.com>
+References: <1398857782-1525-1-git-send-email-steve.capper@linaro.org>
+ <20140502085119.GA456@arm.com>
+Message-ID: <20140502092156.GB30999@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi WIll, Mark,
+On Fri, May 02, 2014 at 09:51:21AM +0100, Catalin Marinas wrote:
+> On Wed, Apr 30, 2014 at 12:36:22PM +0100, Steve Capper wrote:
+> > diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> > index 4d29332..867e979 100644
+> > --- a/arch/arm64/mm/mmu.c
+> > +++ b/arch/arm64/mm/mmu.c
+> > @@ -234,7 +234,20 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
+> >  	pud = pud_offset(pgd, addr);
+> >  	do {
+> >  		next = pud_addr_end(addr, end);
+> > -		alloc_init_pmd(pud, addr, next, phys);
+> > +
+> > +		/*
+> > +		 * For 4K granule only, attempt to put down a 1GB block
+> > +		 */
+> > +		if ((PAGE_SHIFT == 12) &&
+> > +			((addr | next | phys) & ~PUD_MASK) == 0) {
+> > +			pud_t old_pud = *pud;
+> > +			set_pud(pud, __pud(phys | prot_sect_kernel));
+> > +
+> > +			if (!pud_none(old_pud))
+> > +				flush_tlb_all();
+> 
+> We could even free the original pmd here. I think a
+> memblock_free(pud_pfn(old_pud) << PAGE_SHIFT, PAGE_SIZE) should do
+> (untested, and you need to define pud_pfn).
 
-Ping on this series. Can you please check? Is the refreshed patch OK?
+I see what you mean, we will potentially have an unused page in our
+swapper_pg_dir array.
+
+I'll have a think, and add some logic to remove the redundant page.
 
 Cheers,
-Jean
+-- 
+Steve
 
-
-On 28 April 2014 15:12, Jean Pihet <jean.pihet@linaro.org> wrote:
-> Introducing perf_regs_load function, which is going
-> to be used for dwarf unwind test in following patches.
->
-> It takes single argument as a pointer to the regs dump
-> buffer and populates it with current registers values, as
-> expected by the perf built-in unwinding test.
->
-> Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
-> Cc: Steve Capper <steve.capper@linaro.org>
-> Cc: Corey Ashford <cjashfor@linux.vnet.ibm.com>
-> Cc: Frederic Weisbecker <fweisbec@gmail.com>
-> Cc: Ingo Molnar <mingo@kernel.org>
-> Cc: Namhyung Kim <namhyung@kernel.org>
-> Cc: Paul Mackerras <paulus@samba.org>
-> Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
-> Cc: Arnaldo Carvalho de Melo <acme@ghostprotocols.net>
-> Cc: David Ahern <dsahern@gmail.com>
-> Cc: Jiri Olsa <jolsa@redhat.com>
-> ---
->  tools/perf/arch/arm64/Makefile            |  1 +
->  tools/perf/arch/arm64/include/perf_regs.h |  2 ++
->  tools/perf/arch/arm64/tests/regs_load.S   | 40 +++++++++++++++++++++++++++++++
->  3 files changed, 43 insertions(+)
->  create mode 100644 tools/perf/arch/arm64/tests/regs_load.S
->
-> diff --git a/tools/perf/arch/arm64/Makefile b/tools/perf/arch/arm64/Makefile
-> index 67e9b3d..9b8f87e 100644
-> --- a/tools/perf/arch/arm64/Makefile
-> +++ b/tools/perf/arch/arm64/Makefile
-> @@ -4,4 +4,5 @@ LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/dwarf-regs.o
->  endif
->  ifndef NO_LIBUNWIND
->  LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/unwind-libunwind.o
-> +LIB_OBJS += $(OUTPUT)arch/$(ARCH)/tests/regs_load.o
->  endif
-> diff --git a/tools/perf/arch/arm64/include/perf_regs.h b/tools/perf/arch/arm64/include/perf_regs.h
-> index 2359546..1e052f1 100644
-> --- a/tools/perf/arch/arm64/include/perf_regs.h
-> +++ b/tools/perf/arch/arm64/include/perf_regs.h
-> @@ -9,6 +9,8 @@
->  #define PERF_REG_IP    PERF_REG_ARM64_PC
->  #define PERF_REG_SP    PERF_REG_ARM64_SP
->
-> +void perf_regs_load(u64 *regs);
-> +
->  static inline const char *perf_reg_name(int id)
->  {
->         switch (id) {
-> diff --git a/tools/perf/arch/arm64/tests/regs_load.S b/tools/perf/arch/arm64/tests/regs_load.S
-> new file mode 100644
-> index 0000000..40b8b99
-> --- /dev/null
-> +++ b/tools/perf/arch/arm64/tests/regs_load.S
-> @@ -0,0 +1,40 @@
-> +#include <linux/linkage.h>
-> +
-> +/*
-> + * Implementation of void perf_regs_load(u64 *regs);
-> + *
-> + * This functions fills in the 'regs' buffer from the actual registers values,
-> + * in the way the perf built-in unwinding test expects them, e.g. an address
-> + * within the caller:
-> + * - the PC at the time at the call to this function. Since this function
-> + *   is called using a bl instruction, the PC value is taken from LR,
-> + * - the current SP (not touched by this function),
-> + * - the current value of LR is merely retrieved and stored because the
-> + *   value before the call to this function is unknown at this time; it will
-> + *   be unwound from the dwarf information in unwind__get_entries.
-> + */
-> +
-> +.text
-> +.type perf_regs_load,%function
-> +ENTRY(perf_regs_load)
-> +       stp x0,  x1,  [x0], #16 // store x0..x29
-> +       stp x2,  x3,  [x0], #16
-> +       stp x4,  x5,  [x0], #16
-> +       stp x6,  x7,  [x0], #16
-> +       stp x8,  x9,  [x0], #16
-> +       stp x10, x11, [x0], #16
-> +       stp x12, x13, [x0], #16
-> +       stp x14, x15, [x0], #16
-> +       stp x16, x17, [x0], #16
-> +       stp x18, x19, [x0], #16
-> +       stp x20, x21, [x0], #16
-> +       stp x22, x23, [x0], #16
-> +       stp x24, x25, [x0], #16
-> +       stp x26, x27, [x0], #16
-> +       stp x28, x29, [x0], #16
-> +       mov x1,  sp
-> +       stp x30, x1,  [x0], #16 // store lr and sp
-> +       str x30, [x0]           // store lr as the PC in order to skip the call
-> +                               //  to this function
-> +       ret
-> +ENDPROC(perf_regs_load)
-> --
-> 1.7.11.7
->
+> 
+> -- 
+> Catalin
