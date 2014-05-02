@@ -1,42 +1,27 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 2 May 2014 19:21:50 +0100
-Subject: [RESEND PATCH 1/3] ARM: mach-virt: allow PCI support to be
- selected
-In-Reply-To: <4646975.AnXvL4OPrE@wuerfel>
-References: <1399048876-11862-1-git-send-email-will.deacon@arm.com>
- <1399048876-11862-2-git-send-email-will.deacon@arm.com>
- <4646975.AnXvL4OPrE@wuerfel>
-Message-ID: <20140502182149.GE14645@arm.com>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Fri, 2 May 2014 11:23:51 -0700
+Subject: [PATCH v4 5/5] arm: exynos: Add MCPM call-back functions
+In-Reply-To: <alpine.LFD.2.11.1405021347500.980@knanqh.ubzr>
+References: <1398528348-21214-6-git-send-email-a.kesavan@samsung.com>
+ <1399044359-15784-1-git-send-email-a.kesavan@samsung.com>
+ <alpine.LFD.2.11.1405021347500.980@knanqh.ubzr>
+Message-ID: <CAL1qeaHrP+i4EhOQKkSX7xFNyiyBiBfpsV3B0EHCFcrNzc6KLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+>> +     /*
+>> +      * TODO: Turn off the clusters when all cores in the cluster
+>> +      * are down to achieve significant power savings.
+>> +      */
+>
+> This comment should actually be located right after the
+> "if (exynos_cluster_unused(cluster))" above.  That is where the cluster
+> control should be applied, assuming it'll be effective only when WFI is
+> executed.
 
-On Fri, May 02, 2014 at 07:11:04PM +0100, Arnd Bergmann wrote:
-> On Friday 02 May 2014 17:41:14 Will Deacon wrote:
-> > mach-virt can make use of virtio-pci devices, which requires the guest
-> > kernel to have PCI support selected.
-> > 
-> > This patch selects CONFIG_MIGHT_HAVE_PCI when CONFIG_ARCH_VIRT=y.
-> > 
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm/Kconfig | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > index db3c5414223e..f24356c4d630 100644
-> > --- a/arch/arm/Kconfig
-> > +++ b/arch/arm/Kconfig
-> > @@ -941,6 +941,7 @@ config ARCH_VIRT
-> >         select ARM_GIC
-> >         select ARM_PSCI
-> >         select HAVE_ARM_ARCH_TIMER
-> > +       select MIGHT_HAVE_PCI
-> 
-> I would actually just put it under ARCH_MULTIPLATFORM. Anything can
-> have PCI really, and it doesn't cause any harm.
+Correct me if I'm wrong Samsung folks, but I thought it was not
+possible to apply cluster power control from a CPU within the cluster
+being powered down, i.e. a CPU in the other cluster must be the one to
+apply the cluster power control to power down the outbound cluster.
 
-Sure, I can change that easily enough.
-
-Will
+-Andrew
