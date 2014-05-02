@@ -1,49 +1,61 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 2 May 2014 13:59:06 +0100
-Subject: [PATCH V2] arm64: mm: Optimise tlb flush logic where we have >4K
- granule
-In-Reply-To: <20140502123011.GA4054@linaro.org>
-References: <1399027034-1277-1-git-send-email-steve.capper@linaro.org>
- <20140502112618.GD17370@arm.com> <20140502123011.GA4054@linaro.org>
-Message-ID: <20140502125906.GF17370@arm.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 2 May 2014 16:06:00 +0300
+Subject: [PATCH 06/23] ARM: OMAP: add OMAP5 DSI muxing
+In-Reply-To: <20140430175651.GB12362@atomide.com>
+References: <535A6C40.10609@ti.com> <20140425153150.GA20807@atomide.com>
+ <535DFAAE.1010606@ti.com> <20140428164528.GM20807@atomide.com>
+ <535F37E9.8090609@ti.com> <20140429150529.GA27571@atomide.com>
+ <535FD10B.4020108@ti.com> <535FD43B.3030102@ti.com>
+ <20140429173838.GB27571@atomide.com> <5360948A.5020607@ti.com>
+ <20140430175651.GB12362@atomide.com>
+Message-ID: <53639838.3070907@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 02, 2014 at 01:31:28PM +0100, Steve Capper wrote:
-> On Fri, May 02, 2014 at 12:26:18PM +0100, Will Deacon wrote:
-> > On Fri, May 02, 2014 at 11:37:14AM +0100, Steve Capper wrote:
-> > > The tlb maintainence functions: __cpu_flush_user_tlb_range and
-> > > __cpu_flush_kern_tlb_range do not take into consideration the page
-> > > granule when looping through the address range, and repeatedly flush
-> > > tlb entries for the same page when operating with 64K pages.
-> > > 
-> > > This patch re-works the logic s.t. we instead advance the loop by
-> > >  1 << (PAGE_SHIFT - 12), so avoid repeating ourselves.
-> > > 
-> > > Also the routines have been converted from assembler to static inline
-> > > functions to aid with legibility and potential compiler optimisations.
-> > > 
-> > > Signed-off-by: Steve Capper <steve.capper@linaro.org>
-> > > Acked-by: Will Deacon <will.deacon@arm.com>
-> > > ---
-> > > Changed in V2: added the missing isb(.) to the kernel tlb flush.
-> > 
-> > Hold your horses ;)
-> 
-> :-)
-> 
-> > 
-> > You mentioned remapping kernel text rw/ro, but if you think about it, it's
-> > still executable for both of these, so the isb() isn't needed. Do we have a
-> > case for changing whether or not something is executable?
-> 
-> I think module loading and unloading in future would likely need this.
-> i.e. if we get stuff like set_memory_nx and friends for ARM64.
-> 
-> We've just had this added to ARM:
->  75374ad ARM: mm: Define set_memory_* functions for ARM
+On 30/04/14 20:56, Tony Lindgren wrote:
 
-Ok, but if it's just set_memory_nx that needs this, I'd rather put the isb()
-there instead of penalising all kernel TLB flushes.
+> Have you checked out pinctrl-single,bits binding? That should allow
+> you to map random bits in a single register to a pinctrl driver
+> instance.
 
-Will
+If I recall right, the problem there was that we have one register,
+which has bits for two separate devices, and the bits are mixed up. i.e.
+not 16 upper bits for one, 16 lower for the other, but 5 bits for one
+device, the next 5 bits for the other, then again few bits for the
+first, etc.
+
+pinctrl-single,bits didn't like it that.
+
+>>>> Oh, also, if I do that, I need to know both the SoC version and the DSS
+>>>> version in the driver.
+>>>
+>>> Don't you get all you need in the compatible string? Something like
+>>> compatible ti,dss-phy-omap5?
+>>
+>> We do use different compatible strings for different major versions of
+>> the DSS blocks, like ti,omap5-dsi. But that exactly same DSS block could
+>> be used on some other SoC, with different control stuff.
+>>
+>> We could use separate compatible string for each SoC that uses DSS, but
+>> then we're really encoding the SoC version into the compatible string,
+>> not DSS version.
+>>
+>> Of course, if there will be a separate driver managing the
+>> CONTROL_DSIPHY register, then that one should use compatible string
+>> specific to the SoC, as it's not a DSS driver at all.
+> 
+> Yeah probably using pinctrl-single,bits, or a separate driver with syscon
+> makes most sense here.
+
+Yep, I'll have to come up with something.
+
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140502/7a4db19a/attachment.sig>
