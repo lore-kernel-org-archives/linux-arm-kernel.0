@@ -1,45 +1,69 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri,  2 May 2014 17:57:19 +0200
-Subject: [PATCH v10 05/15] ARM: dts: sun4i: Add pin-muxing info for the mmc0
- controller
+Date: Fri,  2 May 2014 17:57:18 +0200
+Subject: [PATCH v10 04/15] ARM: dts: sun4i: Add mmc controller nodes
 In-Reply-To: <1399046249-19472-1-git-send-email-hdegoede@redhat.com>
 References: <1399046249-19472-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1399046249-19472-6-git-send-email-hdegoede@redhat.com>
+Message-ID: <1399046249-19472-5-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mmc0 is the only controller actually being used on boards, so limit the
-pin-muxing options to that.
+From: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
 
+Add nodes for the 4 mmc controllers found on A10 SoCs to
+arch/arm/boot/dts/sun4i-a10.dtsi.
+
+Signed-off-by: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun4i-a10.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm/boot/dts/sun4i-a10.dtsi | 36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
 diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index a0240b7..34651e9 100644
+index fe845eb..a0240b7 100644
 --- a/arch/arm/boot/dts/sun4i-a10.dtsi
 +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -565,6 +565,20 @@
- 				allwinner,drive = <0>;
- 				allwinner,pull = <0>;
- 			};
-+
-+			mmc0_pins_a: mmc0 at 0 {
-+				allwinner,pins = "PF0","PF1","PF2","PF3","PF4","PF5";
-+				allwinner,function = "mmc0";
-+				allwinner,drive = <2>;
-+				allwinner,pull = <0>;
-+			};
-+
-+			mmc0_cd_pin_reference_design: mmc0_cd_pin at 0 {
-+				allwinner,pins = "PH1";
-+				allwinner,function = "gpio_in";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <1>;
-+			};
+@@ -377,6 +377,42 @@
+ 			#size-cells = <0>;
  		};
  
- 		timer at 01c20c00 {
++		mmc0: mmc at 01c0f000 {
++			compatible = "allwinner,sun4i-a10-mmc";
++			reg = <0x01c0f000 0x1000>;
++			clocks = <&ahb_gates 8>, <&mmc0_clk>;
++			clock-names = "ahb", "mmc";
++			interrupts = <32>;
++			status = "disabled";
++		};
++
++		mmc1: mmc at 01c10000 {
++			compatible = "allwinner,sun4i-a10-mmc";
++			reg = <0x01c10000 0x1000>;
++			clocks = <&ahb_gates 9>, <&mmc1_clk>;
++			clock-names = "ahb", "mmc";
++			interrupts = <33>;
++			status = "disabled";
++		};
++
++		mmc2: mmc at 01c11000 {
++			compatible = "allwinner,sun4i-a10-mmc";
++			reg = <0x01c11000 0x1000>;
++			clocks = <&ahb_gates 10>, <&mmc2_clk>;
++			clock-names = "ahb", "mmc";
++			interrupts = <34>;
++			status = "disabled";
++		};
++
++		mmc3: mmc at 01c12000 {
++			compatible = "allwinner,sun4i-a10-mmc";
++			reg = <0x01c12000 0x1000>;
++			clocks = <&ahb_gates 11>, <&mmc3_clk>;
++			clock-names = "ahb", "mmc";
++			interrupts = <35>;
++			status = "disabled";
++		};
++
+ 		usbphy: phy at 01c13400 {
+ 			#phy-cells = <1>;
+ 			compatible = "allwinner,sun4i-a10-usb-phy";
 -- 
 1.9.0
