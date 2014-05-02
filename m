@@ -1,90 +1,72 @@
-From: anurag19aggarwal@gmail.com (Anurag Aggarwal)
-Date: Fri, 2 May 2014 20:35:35 +0530
-Subject: [PATCH] ARM: unwinder: Fix thread_saved_fp aka "enable backtrace
- on THUMB2"
-In-Reply-To: <1398790923-24406-1-git-send-email-Nikolay.Borisov@arm.com>
-References: <1398790923-24406-1-git-send-email-Nikolay.Borisov@arm.com>
-Message-ID: <CAPoNrttU=jRMZw+WCVubnay9xxJG89w1sRMi6g=FVgEQxWjwQg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 02 May 2014 17:13:46 +0200
+Subject: [PATCH v3 4/7] of: configure the platform device dma parameters
+In-Reply-To: <53639A0C.8070306@ti.com>
+References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
+ <5279118.J5305KQNjB@wuerfel> <53639A0C.8070306@ti.com>
+Message-ID: <4526988.X68ZFJZdRl@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nikolay,
+On Friday 02 May 2014 09:13:48 Santosh Shilimkar wrote:
+> On Friday 02 May 2014 05:58 AM, Arnd Bergmann wrote:
+> > On Thursday 01 May 2014 14:12:10 Grant Likely wrote:
+> >>>> I've got two concerns here. of_dma_get_range() retrieves only the first
+> >>>> tuple from the dma-ranges property, but it is perfectly valid for
+> >>>> dma-ranges to contain multiple tuples. How should we handle it if a
+> >>>> device has multiple ranges it can DMA from?
+> >>>>
+> >>>
+> >>> We've not found any cases in current Linux where more than one dma-ranges
+> >>> would be used. Moreover, The MM (definitely for ARM) isn't supported such
+> >>> cases at all (if i understand everything right).
+> >>> - there are only one arm_dma_pfn_limit
+> >>> - there is only one MM zone is used for ARM
+> >>> - some arches like x86,mips can support 2 zones (per arch - not per device or bus)
+> >>>   DMA & DMA32, but they configured once and forever per arch.
+> >>
+> >> Okay. If anyone ever does implement multiple ranges then this code will
+> >> need to be revisited.
+> > 
+> > I wonder if it's needed for platforms implementing the standard "ARM memory map" [1].
+> > The document only talks about addresses as seen from the CPU, and I can see
+> > two logical interpretations how the RAM is supposed to be visible from a device:
+> > either all RAM would be visible contiguously at DMA address zero, or everything
+> > would be visible at the same physical address as the CPU sees it.
+> > 
+> > If anyone picks the first interpretation, we will have to implement that
+> > in Linux. We can of course hope that all hardware designs follow the second
+> > interpretation, which would be more convenient for us here.
+> >
+> not sure if I got your point correctly but DMA address 0 isn't used as DRAM start in
+> any of the ARM SOC today, mainly because of the boot architecture where address 0 is
+> typically used by ROM code. RAM start will be at some offset always and hence I
+> believe ARM SOCs will follow second interpretation. This was one of the main reason
+> we ended up fixing the max*pfn stuff. 
+> 26ba47b {ARM: 7805/1: mm: change max*pfn to include the physical offset of memory}
 
-I have one suggestion to you, As there is already some handling
-present for Thumb-2 kernels.
+Marvell normally has memory starting at physical address zero.
 
-The handling does not seem to be complete.
-In below code segment :
+Even if RAM starts elsewhere, I don't think that is a reason to have
+the DMA address do the same. The memory controller internally obviously
+starts at zero, and it wouldn't be unreasonable to have the DMA space
+match what the memory controller sees rather than have it match what
+the CPU sees.
 
-In arch/arm/kernel/unwind.c :
+If you look at the table 3.1.4, you have both addresses listed:
 
-void unwind_backtrace(struct pt_regs *regs, struct task_struct *tsk)
-{
-        struct stackframe frame;
-        register unsigned long current_sp asm ("sp");
+	  Physical Addresses in SoC	Offset	 		Internal DRAM address
 
-        pr_debug("%s(regs = %p tsk = %p)\n", __func__, regs, tsk);
+2 GBytes	0x00 8000 0000 ?	-0x00 8000 0000		0x00 0000 0000 ?
+		0x00 FFFF FFFF			 		0x00 7FFF FFFF
 
-        if (!tsk)
-        tsk = current;
+30 GBytes	0x08 8000 0000 ? 	-0x08 0000 0000		0x00 8000 0000 ?
+		0x0F FFFF FFFF					0x07 FFFF FFFF
 
-        if (regs) {
-                frame.fp = regs->ARM_fp;
-                frame.sp = regs->ARM_sp;
-                frame.lr = regs->ARM_lr;
+32 GBytes	0x88 0000 0000 -	-0x80 0000 0000	 	0x08 0000 0000 -
+		0x8F FFFF FFFF					0x0F FFFF FFFF
 
+The wording "Physical Addresses in SoC" would indeed suggest that the
+same address is used for DMA, but I would trust everybody to do that.
 
-Similar changes need to be made as ARM_fp is nothing else but R11.
-This may create future issues.
-
-
-On Tue, Apr 29, 2014 at 10:32 PM, Nikolay Borisov
-<Nikolay.Borisov@arm.com> wrote:
-> The thread_save_fp macro has been defined so that it always reads the fp member
-> of the cpu_context_save struct. However, in the case of THUMB2 the fp is saved
-> not in the fp (r11) member but rather in r7.
->
-> This patch changes the way the macro is defined such that FP is read from the
-> correct place depending on whether we are a THUMB2 kernel or not. This enables
-> the backtrace in sitaution such as "echo t > /proc/sysrq-trigger" or the
-> function in which a process sleeping when "ps -Al" is invoked.
->
-> Signed-off-by: Nikolay Borisov <Nikolay.Borisov@arm.com>
-> Tested-by: Nikolay Borisov <Nikolay.Borisov@arm.com>
-> ---
->  arch/arm/include/asm/thread_info.h | 6 ++++++
->  1 file changed, 6 insertions(+)
->
-> diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
-> index f989d7c..e4e4208 100644
-> --- a/arch/arm/include/asm/thread_info.h
-> +++ b/arch/arm/include/asm/thread_info.h
-> @@ -114,8 +114,14 @@ static inline struct thread_info *current_thread_info(void)
->         ((unsigned long)(task_thread_info(tsk)->cpu_context.pc))
->  #define thread_saved_sp(tsk)   \
->         ((unsigned long)(task_thread_info(tsk)->cpu_context.sp))
-> +
-> +#ifndef CONFIG_THUMB2_KERNEL
->  #define thread_saved_fp(tsk)   \
->         ((unsigned long)(task_thread_info(tsk)->cpu_context.fp))
-> +#else
-> +#define thread_saved_fp(tsk)   \
-> +       ((unsigned long)(task_thread_info(tsk)->cpu_context.r7))
-> +#endif
->
->  extern void crunch_task_disable(struct thread_info *);
->  extern void crunch_task_copy(struct thread_info *, void *);
-> --
-> 1.8.1.5
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
-
--- 
-Anurag Aggarwal
+	Arnd
