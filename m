@@ -1,418 +1,140 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Fri, 2 May 2014 16:06:15 +0530
-Subject: [PATCH v4 3/4] usb: ohci-exynos: Add facility to use phy provided
- by the generic phy framework
-In-Reply-To: <CAFp+6iHgdgUNcbWky9TH6=3aSWZ4fcjTVgRs2NohYY6-VsQPiQ@mail.gmail.com>
-References: <1398835192-21634-1-git-send-email-gautam.vivek@samsung.com>
- <1398835192-21634-3-git-send-email-gautam.vivek@samsung.com>
- <53628154.4080101@gmail.com>
- <CAFp+6iHgdgUNcbWky9TH6=3aSWZ4fcjTVgRs2NohYY6-VsQPiQ@mail.gmail.com>
-Message-ID: <CAFp+6iH8NE7axKnwkLFnxXqcVuZ8Y7PBebmg36z2KKdj+pQjhA@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 2 May 2014 13:05:58 +0200
+Subject: [RFC] Describing arbitrary bus mastering relationships in DT
+In-Reply-To: <20140501173248.GD3732@e103592.cambridge.arm.com>
+References: <20140501173248.GD3732@e103592.cambridge.arm.com>
+Message-ID: <20140502110557.GA18452@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 2, 2014 at 2:55 PM, Vivek Gautam <gautam.vivek@samsung.com> wrote:
-> Hi Tomasz,
->
->
-> On Thu, May 1, 2014 at 10:46 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->> Hi Vivek,
->>
->> Please see my comments inline.
->
-> Thanks for the review, please find my answers inline.
->
->>
->>
->> On 30.04.2014 07:19, Vivek Gautam wrote:
->>>
->>> Add support to consume phy provided by Generic phy framework.
->>> Keeping the support for older usb-phy intact right now, in order
->>> to prevent any functionality break in absence of relevant
->>> device tree side change for ohci-exynos.
->>> Once we move to new phy in the device nodes for ohci, we can
->>> remove the support for older phys.
->>>
->>> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
->>> Cc: Jingoo Han <jg1.han@samsung.com>
->>> Cc: Alan Stern <stern@rowland.harvard.edu>
->>> ---
->>>
->>> Changes from v3:
->>>   - Calling usb_phy_shutdown() when exynos_ohci_phy_enable() is failing.
->>>   - Made exynos_ohci_phy_disable() return void, since its return value
->>>     did not serve any purpose.
->>>   - Calling clk_disable_unprepare() in exynos_ohci_resume() when
->>>     exynos_ohci_phy_enable() is failed.
->>>
->>>   .../devicetree/bindings/usb/exynos-usb.txt         |   19 +++
->>>   drivers/usb/host/ohci-exynos.c                     |  128
->>> +++++++++++++++++---
->>>   2 files changed, 132 insertions(+), 15 deletions(-)
->>>
->>> diff --git a/Documentation/devicetree/bindings/usb/exynos-usb.txt
->>> b/Documentation/devicetree/bindings/usb/exynos-usb.txt
->>> index d967ba1..a90c973 100644
->>> --- a/Documentation/devicetree/bindings/usb/exynos-usb.txt
->>> +++ b/Documentation/devicetree/bindings/usb/exynos-usb.txt
->>> @@ -38,6 +38,15 @@ Required properties:
->>>    - interrupts: interrupt number to the cpu.
->>>    - clocks: from common clock binding: handle to usb clock.
->>>    - clock-names: from common clock binding: Shall be "usbhost".
->>> + - port: if in the SoC there are OHCI phys, they should be listed here.
->>> +   One phy per port. Each port should have following entries:
->>> +       - reg: port number on OHCI controller, e.g
->>> +              On Exynos5250, port 0 is USB2.0 otg phy
->>> +                             port 1 is HSIC phy0
->>> +                             port 2 is HSIC phy1
->>> +       - phys: from the *Generic PHY* bindings, specifying phy used by
->>> port.
->>> +       - phy-names: from the *Generic PHY* bindings, specifying name of
->>> phy
->>> +                    used by the port.
->>
->>
->> I think you don't need this property for this binding, as the PHYs are being
->> requested by indices (in fact only index 0 is used).
->
-> True, that phy-names property is not used, since PHYs are being
-> requested using indices.
-> We can remove this.
->
->>
->>
->>>
->>>   Example:
->>>         usb at 12120000 {
->>> @@ -47,6 +56,16 @@ Example:
->>>
->>>                 clocks = <&clock 285>;
->>>                 clock-names = "usbhost";
->>> +
->>> +               #address-cells = <1>;
->>> +               #size-cells = <0>;
->>> +               port at 0 {
->>> +                   reg = <0>;
->>> +                   phys = <&usb2phy 1>;
->>> +                   phy-names = "host";
->>
->>
->> Ditto.
-> will remove this.
->
->>
->>
->>> +                   status = "disabled";
->>> +               };
->>> +
->>>         };
->>>
->>>   DWC3
->>> diff --git a/drivers/usb/host/ohci-exynos.c
->>> b/drivers/usb/host/ohci-exynos.c
->>> index 05f00e3..f90bf9a 100644
->>> --- a/drivers/usb/host/ohci-exynos.c
->>> +++ b/drivers/usb/host/ohci-exynos.c
->>> @@ -18,6 +18,7 @@
->>>   #include <linux/module.h>
->>>   #include <linux/of.h>
->>>   #include <linux/platform_device.h>
->>> +#include <linux/phy/phy.h>
->>>   #include <linux/usb/phy.h>
->>>   #include <linux/usb/samsung_usb_phy.h>
->>>   #include <linux/usb.h>
->>> @@ -33,28 +34,122 @@ static struct hc_driver __read_mostly
->>> exynos_ohci_hc_driver;
->>>
->>>   #define to_exynos_ohci(hcd) (struct exynos_ohci_hcd
->>> *)(hcd_to_ohci(hcd)->priv)
->>>
->>> +#define PHY_NUMBER 3
->>
->>
->> nit: A blank line would be nice here to separate from the struct below.
->
-> Ok, will add one.
->
->>
->> By the way, doesn't the number of PHY ports depend on platform? Of course
->> right now the driver supports only Exynos >= 4210 SoCs with the generic PHY
->> interface, so it might be changed in further patches.
->
-> Yes, the number of PHY ports will be platform dependent feature.
-> In subsequent patches we can add support to count the number of PHYs,
-> or rather in this patch
-> itself, when we do -
->          for_each_available_child_of_node(dev->of_node, child) {
-> we can keep a count of how many child nodes we found, and then
-> configure those many.
-> As such the host controller drivers will have 'host' and 'hsic' PHYs.
->
->>
->>
->>>   struct exynos_ohci_hcd {
->>>         struct clk *clk;
->>>         struct usb_phy *phy;
->>>         struct usb_otg *otg;
->>> +       struct phy *phy_g[PHY_NUMBER];
->>>   };
->>>
->>> -static void exynos_ohci_phy_enable(struct device *dev)
->>> +static int exynos_ohci_get_phy(struct device *dev,
->>> +                               struct exynos_ohci_hcd *exynos_ohci)
->>> +{
->>> +       struct device_node *child;
->>> +       struct phy *phy;
->>> +       int phy_number;
->>> +       int ret = 0;
->>> +
->>> +       exynos_ohci->phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
->>> +       if (IS_ERR(exynos_ohci->phy)) {
->>> +               ret = PTR_ERR(exynos_ohci->phy);
->>> +               /* This is the case when PHY config is disabled */
->>> +               if (ret == -ENXIO || ret == -ENODEV) {
->>> +                       dev_dbg(dev, "Failed to get usb2 phy\n");
->>> +                       exynos_ohci->phy = NULL;
->>
->>
->> I think you should keep this an ERR_PTR() and just use IS_ERR() check
->> further in the driver instead of checking for NULL.
->
-> Yea, that's also one way to check for phy, i can modify this.
->
->>
->>> +                       ret = 0;
->>
->>
->> Do you need to set ret to 0 here? The code for getting generic PHYs will
->> either leave it unchanged when there are no port nodes defined or overwrite
->> it with value returned by of_property_read_u32(). In the first case, an
->> error code should be returned, not zero, as the driver was unable to get any
->> PHY.
->
-> The idea was to not fail exynos_ohci_get_phy() call when the PHY
-> configs are not even enabled.
-> Since this would mean, that the driver will never be able to get a PHY
-> in future, and there will be no point in
-> failing the driver probe.
->
-> In a case when the host controller dts is still on older PHY bindings,
-> this 'ret' will *not* be over-wriiten, since the
-> generic phy nodes will not be there.
-> And in case the host dts is moved to the new generic PHY based
-> bindings. then the part of this function exynos_ohci_get_phy()
-> related to older usb-phy, shall not execute.
->
-> This is reason why i did not really add a fall-back mechanism for getting PHY.
-> Since from DT either of the two bindings be supplied, and then things
-> here will be handles almost independently.
->
->>
->>
->>> +               } else if (ret == -EPROBE_DEFER) {
->>
->>
->> I think you could merge this case with the else clause below, as most driver
->> do. Moreover, since the only thing done after the fail_phy label is
->> returning the error code, you could just immediately return from here. So
->> the whole block of code would end up like this:
->>
->>         if (IS_ERR(exynos_ohci->phy)) {
->>                 ret = PTR_ERR(exynos_ohci->phy);
->>                 if (ret != -ENXIO && ret != -ENODEV) {
->>
->>                         dev_err(dev, "no usb2 phy configured\n");
->>                         return ret;
->>
->>                 }
->>                 dev_dbg(dev, "Failed to get usb2 phy\n");
->>                 exynos_ohci->phy = NULL;
->>         } else {
->>
->>                 exynos_ohci->otg = exynos_ohci->phy->otg;
->>         }
->
-> Ok, this seems a good restructuring. I shall change this.
->
->>
->>> +                       goto fail_phy;
->>>
->>> +               } else {
->>> +                       dev_err(dev, "no usb2 phy configured\n");
->>> +                       goto fail_phy;
->>> +               }
->>> +       } else {
->>> +               exynos_ohci->otg = exynos_ohci->phy->otg;
->>> +       }
->>> +
->>> +       /* Getting generic phy:
->>
->>
->> CodingStyle: Multi-line comments should begin and end with a single empty
->> line:
->>
->>         /*
->>          * Getting generic phy:
->>          * ...
->>          */
->>
->> also nit: s/phy/PHY/
->>
->
-> Ok, will correct this.
->
->>
->>> +        * We are keeping both types of phys as a part of transiting OHCI
->>> +        * to generic phy framework, so that in absence of supporting dts
->>> +        * changes the functionality doesn't break.
->>> +        * Once we move the ohci dt nodes to use new generic phys,
->>> +        * we can remove support for older PHY in this driver.
->>
->>
->> Well, this is not entirely true. The problem here is not caused by existing
->> DTS files, but rather a chance that there are existing devices using DTB
->> files built from them. So to remove the support for old bindings, we need to
->> make sure that such devices have their DTBs updated to ones built from new
->> DTS.
->
-> Fair enough, thanks for explaining. :-)
-> I shall modify this comment.
->
->>
->>
->>> +        */
->>> +       for_each_available_child_of_node(dev->of_node, child) {
->>> +               ret = of_property_read_u32(child, "reg", &phy_number);
->>> +               if (ret) {
->>> +                       dev_err(dev, "Failed to parse device tree\n");
->>> +                       of_node_put(child);
->>> +                       goto fail_phy;
->>
->>
->> Why not just return ret here?
->>
->>> +               }
->>
->>
->> nit: Blank line here would be nice.
->
-> ok
->
->>
->>
->>> +               if (phy_number >= PHY_NUMBER) {
->>> +                       dev_err(dev, "Invalid number of PHYs\n");
->>> +                       of_node_put(child);
->>> +                       ret = -EINVAL;
->>> +                       goto fail_phy;
->>
->>
->> What about just return -EINVAL;
->
-> Yea, just another way of doing things. ;-)
-> I felt 'goto' to be a bit clean than adding number of returns in
-> between statements.
->
->>
->>> +               }
->>
->>
->> nit: Here too.
-> yea, will add a blank line.
->
->>
->>> +               phy = devm_of_phy_get(dev, child, 0);
->>> +               of_node_put(child);
->>> +               if (IS_ERR(phy)) {
->>> +                       ret = PTR_ERR(phy);
->>> +                       /* This is the case when PHY config is disabled */
->>> +                       if (ret == -ENOSYS || ret == -ENODEV) {
->>> +                               dev_dbg(dev, "Failed to get usb2 phy\n");
->>> +                               phy = NULL;
->>>
->>> +                               ret = 0;
->>> +                       } else if (ret == -EPROBE_DEFER) {
->>> +                               goto fail_phy;
->>> +                       } else {
->>> +                               dev_err(dev, "no usb2 phy configured\n");
->>> +                               goto fail_phy;
->>> +                       }
->>> +               }
->>
->>
->> Similar comments to this block apply as for the block getting legacy USB
->> PHY.
->
-> Ok, i will restructure this same as 'legacy PHY  block'
->
->>
->>
->>> +               exynos_ohci->phy_g[phy_number] = phy;
->>> +       }
->>> +
->>> +fail_phy:
->>> +       return ret;
->>> +}
->>> +
->>> +static int exynos_ohci_phy_enable(struct device *dev)
->>>   {
->>>         struct usb_hcd *hcd = dev_get_drvdata(dev);
->>>         struct exynos_ohci_hcd *exynos_ohci = to_exynos_ohci(hcd);
->>> +       int i;
->>> +       int ret = 0;
->>>
->>> -       if (exynos_ohci->phy)
->>> -               usb_phy_init(exynos_ohci->phy);
->>> +       if (exynos_ohci->phy) {
->>
->>
->> !IS_ERR() should be used to check for validity.
->
-> Ok, this with the earlier change of setting exynos_ohci->phy as
-> ERR_PTR(), should be good then.
->
->>
->>
->>> +               ret = usb_phy_init(exynos_ohci->phy);
->>> +               if (ret)
->>> +                       return ret;
->>
->>
->> IMHO a simple return usb_phy_init(...) could be used here, if we are using
->> the legacy PHY interface.
->
-> Right, with legacy PHY, just a 'return usb_phy_init(...)' should do;
-> since those devices will not have the generic
-> PHYs.
->
->>
->>
->>> +       }
->>> +
->>> +       for (i = 0; ret == 0 && i < PHY_NUMBER; i++)
->>> +               if (exynos_ohci->phy_g[i])
->>
->>
->> !IS_ERR(). Just make sure that the array is initialized with an ERR_PTR()
->> with some error code, (-ENODEV) probably
->
-> Ok.
+On Thu, May 01, 2014 at 06:32:48PM +0100, Dave Martin wrote:
+[...]
+> ** Outline binding **
+> 
+> generic device node property: "slaves"
+> 
+> 	optional
+> 
+> 	type : cell array consisting of one or more phandles
+> 
+> 	Implies that the device represented by the containing node
+> 	can issue transactions to the referenced node.
+> 
+> 	The referenced node is any bus or device node, and is
+> 	interpreted in the usual way, including the treatment
+> 	of ranges, #address-cells and #size-cells.  If the
+> 	referenced node has a non-empty ranges property, the
+> 	referencing node's #address-cells must be the same as
+> 	that of the referenced node's device tree parent.
+> 
+> generic device node property: "slave-names"
+> 
+> 	prohibited if there is no "slaves" property; otherwise
+> 	optional.  Recommended if the "slaves" property has
+> 	two or more entries.
+> 
+> 	type : string list with the same number of entries as
+> 		the number of cells in the value of the
+> 		"slaves" property.
+> 
+> 	Assigns symbolic names to the entries in the "slaves"
+> 	property, permitting slave connections with different
+> 	roles to be disambiguated.  See
+> 	Documentation/devicetree/bindings/resource-names.txt
+> 
+> generic device node: "slave"
+> 
+> 	optional
+> 
+> 	Implies that the device represented by the containing
+> 	node can issue transactions to the "slave" node.  "slave"
+> 	would always have these semantics; whether other child
+> 	nodes have a similar meaning is binding-specific.
+> 
+> 	property : "name"
+> 
+> 		optional
+> 
+> 		Assigns a symbolic name to this slave with
+> 		respect to the master.
+> 
+> If neither "slaves" nor any "slave" node is present, the topological
+> relationships are those defined by ePAPR: the device may or not be
+> a master, and if it is a master then it masters onto the parent node,
+> optionally propagating through the parent to the parent's parent
+> via mappings described by dma-ranges.
 
-I think we don't need to initialize this array to any ERR_PTR(), since
-devm_of_phy_get()
-will anyways assign an ERR_PTR() to phy in unsuccessful case, and a
-valid phy pointer
-when it successfully gets one.
-Isn't it ?
+Let me see if I understood the above proposal by trying to translate it
+into a simple example for a specific use-case. On Tegra for example we
+have various units that can either access system memory directly or use
+the IOMMU to translate accesses for them. One such unit would be the
+display controller that scans out a framebuffer from memory.
 
-I think the same goes with legacy usb-phy function devm_usb_get_phy().
+	dc at 0,54200000 {
+		...
 
+		slave {
+			/*
+			 * 2 is the memory controller client ID of the
+			 * display controller.
+			 */
+			iommu = <&iommu 2>;
 
-[snip]
+			...
+		};
+	};
 
+Admittedly this is probably a lot more trivial than what you're looking
+for. There's no need for virtualization here, the IOMMU is simply used
+to isolate memory accesses by devices. Still it's a use-case that needs
+to be supported and one that at least Tegra and Exynos have an immediate
+need for.
 
--- 
-Best Regards
-Vivek Gautam
-Samsung R&D Institute, Bangalore
-India
+So the above isn't much different from the proposed bindings, except
+that the iommu property is now nested within a slave node. I guess this
+gives us a lot more flexibility to extend the description of a slave as
+needed to represent more complex scenarios.
+
+One thing that confuses me slightly about your proposal is that these
+subnodes describe the master interfaces of the containing nodes. Would
+it not be more appropriate to name the nodes "master" instead?
+
+Also, are slaves/slave-names and slave subnodes mutually exclusive? It
+sounds like slaves/slave-names would be a specialization of the slave
+subnode concept for the trivial cases. Would the following be an
+equivalent description of the above example?
+
+	dc at 0,54200000 {
+		...
+
+		slaves = <&iommu 2>;
+	};
+
+I don't see how it could be exactly equivalent since it misses context
+regarding the type of slave that's being interacted with. Perhaps that
+could be solved by making that knowledge driver-specific (i.e. the
+driver for the Tegra display controller will know that it can only be
+the master on an IOMMU and therefore derive the slave type). Or the
+slave's type could be derived from the slave-names property.
+
+While this proposal lacks specifics for IOMMU devices, I think it could
+work well to describe them in a generic way. Especially when slave nodes
+are used, arbitrarily more data can be added to describe more complex
+master interfaces (DMA windows, ...).
+
+I still see an issue with supporting this generically with the currently
+recommended way to use IOMMUs (via the DMA mapping API). There's not
+enough granularity in the API to support this. It's probably going to
+work fine for Tegra, but I think for more complex cases drivers will
+probably need to use the IOMMU API directly.
+
+But that's an implementation detail and can probably be solved later.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140502/a79bbac7/attachment-0001.sig>
