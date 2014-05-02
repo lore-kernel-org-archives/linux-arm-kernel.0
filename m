@@ -1,65 +1,167 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 2 May 2014 10:56:23 +0200
-Subject: [PATCH/RFC 3/4] of/clk: Register clocks suitable for Runtime PM
- with the PM core
-In-Reply-To: <1398334403-26181-4-git-send-email-geert+renesas@glider.be>
-References: <1398334403-26181-1-git-send-email-geert+renesas@glider.be>
- <1398334403-26181-4-git-send-email-geert+renesas@glider.be>
-Message-ID: <CAPDyKFpTwPDu9afhOjhhQ2PKGFB+hWsp=mcaYTq8OvuGF7yT3Q@mail.gmail.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Fri,  2 May 2014 10:01:43 +0100
+Subject: [PATCH] arm64: mm: Optimise tlb flush logic where we have >4K granule
+Message-ID: <1399021303-30911-1-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hi Geert,
+The tlb maintainence functions: __cpu_flush_user_tlb_range and
+__cpu_flush_kern_tlb_range do not take into consideration the page
+granule when looping through the address range, and repeatedly flush
+tlb entries for the same page when operating with 64K pages.
 
-Some more review comments.
+This patch re-works the logic s.t. we instead advance the loop by
+ 1 << (PAGE_SHIFT - 12), so avoid repeating ourselves.
 
-> +
-> +
-> +#ifdef CONFIG_PM_RUNTIME
-> +
-> +static int of_clk_pm_runtime_suspend(struct device *dev)
-> +{
-> +       int ret;
-> +
-> +       ret = pm_generic_runtime_suspend(dev);
-> +       if (ret)
-> +               return ret;
-> +
-> +       ret = pm_clk_suspend(dev);
+Also the routines have been converted from assembler to static inline
+functions to aid with legibility and potential compiler optimisations.
 
-What about slow clocks? Those aren't handled with pm_clk_suspend().
+Signed-off-by: Steve Capper <steve.capper@linaro.org>
+---
+Hello,
+Options have been added to the dsbs in this patch. At the moment the
+dsb macro ignores the option, but this is set to change in future.
 
-> +       if (ret) {
-> +               pm_generic_runtime_resume(dev);
-> +               return ret;
-> +       }
-> +
-> +       return 0;
-> +}
-> +
-> +static int of_clk_pm_runtime_resume(struct device *dev)
-> +{
-> +       pm_clk_resume(dev);
+As always comments/critique/testers welcome!
 
-What about slow clocks? Those aren't handled with pm_clk_resume().
+Cheers,
+-- 
+Steve
+---
+ arch/arm64/include/asm/tlbflush.h | 30 ++++++++++++++---
+ arch/arm64/mm/Makefile            |  2 +-
+ arch/arm64/mm/tlb.S               | 71 ---------------------------------------
+ 3 files changed, 26 insertions(+), 77 deletions(-)
+ delete mode 100644 arch/arm64/mm/tlb.S
 
-> +       return pm_generic_runtime_resume(dev);
-> +}
-> +
-> +static struct dev_pm_domain of_clk_pm_domain = {
-> +       .ops = {
-> +               .runtime_suspend = of_clk_pm_runtime_suspend,
-> +               .runtime_resume = of_clk_pm_runtime_resume,
-
-Drivers/subsystems may invoke pm_runtime_force_suspend|resume() from
-some of their system PM callbacks, which requires the runtime PM
-callbacks to be defined for CONFIG_PM instead of CONFIG_PM_RUNTIME, I
-believe that should be changed here as well.
-
-> +               USE_PLATFORM_PM_SLEEP_OPS
-
-What about other buses beside the platfrom bus. Certainly we need to
-handle devices attached to any other subsystem type as well.
-
-Kind regards
-Ulf Hansson
+diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
+index 8b48203..7881d7d 100644
+--- a/arch/arm64/include/asm/tlbflush.h
++++ b/arch/arm64/include/asm/tlbflush.h
+@@ -98,11 +98,31 @@ static inline void flush_tlb_page(struct vm_area_struct *vma,
+ 	dsb();
+ }
+ 
+-/*
+- * Convert calls to our calling convention.
+- */
+-#define flush_tlb_range(vma,start,end)	__cpu_flush_user_tlb_range(start,end,vma)
+-#define flush_tlb_kernel_range(s,e)	__cpu_flush_kern_tlb_range(s,e)
++static inline void flush_tlb_range(struct vm_area_struct *vma,
++					unsigned long start, unsigned long end)
++{
++	unsigned long asid = (unsigned long)ASID(vma->vm_mm) << 48;
++	unsigned long addr;
++	start = asid | (start >> 12);
++	end = asid | (end >> 12);
++
++	dsb(ishst);
++	for (addr = start; addr < end; addr += 1 << (PAGE_SHIFT - 12))
++		asm("tlbi vae1is, %0" : : "r"(addr));
++	dsb(ish);
++}
++
++static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end)
++{
++	unsigned long addr;
++	start >>= 12;
++	end >>= 12;
++
++	dsb(ishst);
++	for (addr = start; addr < end; addr += 1 << (PAGE_SHIFT - 12))
++		asm("tlbi vaae1is, %0" : : "r"(addr));
++	dsb(ish);
++}
+ 
+ /*
+  * On AArch64, the cache coherency is handled via the set_pte_at() function.
+diff --git a/arch/arm64/mm/Makefile b/arch/arm64/mm/Makefile
+index b51d364..3ecb56c 100644
+--- a/arch/arm64/mm/Makefile
++++ b/arch/arm64/mm/Makefile
+@@ -1,5 +1,5 @@
+ obj-y				:= dma-mapping.o extable.o fault.o init.o \
+ 				   cache.o copypage.o flush.o \
+ 				   ioremap.o mmap.o pgd.o mmu.o \
+-				   context.o tlb.o proc.o
++				   context.o proc.o
+ obj-$(CONFIG_HUGETLB_PAGE)	+= hugetlbpage.o
+diff --git a/arch/arm64/mm/tlb.S b/arch/arm64/mm/tlb.S
+deleted file mode 100644
+index 19da91e..0000000
+--- a/arch/arm64/mm/tlb.S
++++ /dev/null
+@@ -1,71 +0,0 @@
+-/*
+- * Based on arch/arm/mm/tlb.S
+- *
+- * Copyright (C) 1997-2002 Russell King
+- * Copyright (C) 2012 ARM Ltd.
+- * Written by Catalin Marinas <catalin.marinas@arm.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+- */
+-#include <linux/linkage.h>
+-#include <asm/assembler.h>
+-#include <asm/asm-offsets.h>
+-#include <asm/page.h>
+-#include <asm/tlbflush.h>
+-#include "proc-macros.S"
+-
+-/*
+- *	__cpu_flush_user_tlb_range(start, end, vma)
+- *
+- *	Invalidate a range of TLB entries in the specified address space.
+- *
+- *	- start - start address (may not be aligned)
+- *	- end   - end address (exclusive, may not be aligned)
+- *	- vma   - vma_struct describing address range
+- */
+-ENTRY(__cpu_flush_user_tlb_range)
+-	vma_vm_mm x3, x2			// get vma->vm_mm
+-	mmid	w3, x3				// get vm_mm->context.id
+-	dsb	sy
+-	lsr	x0, x0, #12			// align address
+-	lsr	x1, x1, #12
+-	bfi	x0, x3, #48, #16		// start VA and ASID
+-	bfi	x1, x3, #48, #16		// end VA and ASID
+-1:	tlbi	vae1is, x0			// TLB invalidate by address and ASID
+-	add	x0, x0, #1
+-	cmp	x0, x1
+-	b.lo	1b
+-	dsb	sy
+-	ret
+-ENDPROC(__cpu_flush_user_tlb_range)
+-
+-/*
+- *	__cpu_flush_kern_tlb_range(start,end)
+- *
+- *	Invalidate a range of kernel TLB entries.
+- *
+- *	- start - start address (may not be aligned)
+- *	- end   - end address (exclusive, may not be aligned)
+- */
+-ENTRY(__cpu_flush_kern_tlb_range)
+-	dsb	sy
+-	lsr	x0, x0, #12			// align address
+-	lsr	x1, x1, #12
+-1:	tlbi	vaae1is, x0			// TLB invalidate by address
+-	add	x0, x0, #1
+-	cmp	x0, x1
+-	b.lo	1b
+-	dsb	sy
+-	isb
+-	ret
+-ENDPROC(__cpu_flush_kern_tlb_range)
+-- 
+1.8.1.4
