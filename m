@@ -1,97 +1,116 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 2 May 2014 11:13:23 +0200
-Subject: [PATCH 1/4] ARM: shmobile: Ignore callbacks for subsys
- generic_pm_domain_data
-In-Reply-To: <1639184.jtW6HVkuRH@vostro.rjw.lan>
-References: <1397230004-22306-1-git-send-email-ulf.hansson@linaro.org>
- <CAPDyKFqH-0rvs6WorcirY+wVMLWnycWHO6=ZcvK1GebcuzaH0w@mail.gmail.com>
- <20140430102308.GA23426@verge.net.au>
- <1639184.jtW6HVkuRH@vostro.rjw.lan>
-Message-ID: <CAPDyKFpce1v8Ec4kJzAHxp8QtvXF=PqXi0FbzJbMgs9TCousSQ@mail.gmail.com>
+From: jean.pihet@linaro.org (Jean Pihet)
+Date: Fri, 2 May 2014 11:19:38 +0200
+Subject: [PATCH 1/3] perf tests: Introduce perf_regs_load function on ARM64
+In-Reply-To: <1398690730-5454-1-git-send-email-jean.pihet@linaro.org>
+References: <CAFrcx1nfkDWTu9vF+a7UGjd1fzHpXS44pzqKLZS9ej7KJwqkOg@mail.gmail.com>
+ <1398690730-5454-1-git-send-email-jean.pihet@linaro.org>
+Message-ID: <CAFrcx1kQO5i+kQwDizT1F4asbFNGiDSDWt0ubnpS92fU1PBiHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 April 2014 22:21, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> On Wednesday, April 30, 2014 07:23:08 PM Simon Horman wrote:
->> On Wed, Apr 30, 2014 at 10:53:58AM +0200, Ulf Hansson wrote:
->> > On 30 April 2014 00:45, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
->> > > On Friday, April 25, 2014 10:06:51 AM Simon Horman wrote:
->> > >> On Thu, Apr 24, 2014 at 01:25:14PM +0200, Ulf Hansson wrote:
->> > >> > On 14 April 2014 11:22, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> > >> > > On 14 April 2014 03:20, Simon Horman <horms@verge.net.au> wrote:
->> > >> > >> On Fri, Apr 11, 2014 at 05:26:41PM +0200, Ulf Hansson wrote:
->> > >> > >>> There are no active users of these callbacks, thus there are no benefit
->> > >> > >>> of trying to invoke them.
->> > >> > >>>
->> > >> > >>> Cc: Simon Horman <horms@verge.net.au>
->> > >> > >>> Cc: Magnus Damm <magnus.damm@gmail.com>
->> > >> > >>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->> > >> > >>> ---
->> > >> > >>>
->> > >> > >>> I am seeking ack from the SOC maintainers since this needs to go with the other
->> > >> > >>> patches in this patchset on the PM core.
->> > >> > >>
->> > >> > >> In order to reduce the possibility of conflicts I would prefer
->> > >> > >> to take this patch through my tree.
->> > >> > >
->> > >> > > Okay, go ahead!
->> > >> > >
->> > >> >
->> > >> > Hi Simon,
->> > >> >
->> > >> > Just wanted to know, if you decided to queue this patch in your tree.
->> > >> > Or were there anything else you needed me to fix here?
->> > >>
->> > >> Sorry for dropping the ball. I will queue-up this patch.
->> > >
->> > > OK
->> > >
->> > > Ulf, since the rest of the series depends on this one (or at least that's
->> > > how it looks to me), would you mind resending it when this one gets into the
->> > > Linus' tree?
->> >
->> > Well, I would prefer if we could go ahead with the rest of the patches
->> > somehow for 3.16, but I guess it will be hard if Simon picks up this
->> > patch!?
->> >
->> > Simon,
->> > I guess the reason for your concern were about conflicts, but the file
->> > this patch touch has actually not been modified since Sep 2012. So,
->> > maybe we could go through Rafaels tree anyway?
->>
->> Yes, my primary concern was conflicts.
->> But as you point out that seems unlikely.
->>
->> I have already picked up the patch but the pull request I sent to
->> the ARM SoC maintainers has not been pulled. And regardless it
->> won't appear in Linus's tree via that route until v3.16-rc1.
->>
->> Perhaps a good way forwards would be for Rafael to also apply the patch
->> with my Ack.
->
-> Not really.  No duplicate patches with different changelogs coming from
-> different trees.  Please!
->
->> I could also revert the version applied to my tree
->> if that is of any help.
->>
->> Acked-by: Simon Horman <horms+renesas@verge.net.au>
->
-> Ulf, can you please do as I said?
+Hi WIll, Mark,
 
-Okay! It seems like I have no choice. :-)
+Ping on this series. Can you please check? Is the refreshed patch OK?
 
-Does that mean you were happy with the rest from this patchset?
+Cheers,
+Jean
 
-Additionally, I intend to post some more patches for the PM domain
-soon. Thus I will need to fold in these patches to any other upcoming
-patchset. Thought it could be good to know.
 
-Kind regards
-Ulf Hansson
-
+On 28 April 2014 15:12, Jean Pihet <jean.pihet@linaro.org> wrote:
+> Introducing perf_regs_load function, which is going
+> to be used for dwarf unwind test in following patches.
 >
+> It takes single argument as a pointer to the regs dump
+> buffer and populates it with current registers values, as
+> expected by the perf built-in unwinding test.
 >
+> Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
+> Cc: Steve Capper <steve.capper@linaro.org>
+> Cc: Corey Ashford <cjashfor@linux.vnet.ibm.com>
+> Cc: Frederic Weisbecker <fweisbec@gmail.com>
+> Cc: Ingo Molnar <mingo@kernel.org>
+> Cc: Namhyung Kim <namhyung@kernel.org>
+> Cc: Paul Mackerras <paulus@samba.org>
+> Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
+> Cc: Arnaldo Carvalho de Melo <acme@ghostprotocols.net>
+> Cc: David Ahern <dsahern@gmail.com>
+> Cc: Jiri Olsa <jolsa@redhat.com>
+> ---
+>  tools/perf/arch/arm64/Makefile            |  1 +
+>  tools/perf/arch/arm64/include/perf_regs.h |  2 ++
+>  tools/perf/arch/arm64/tests/regs_load.S   | 40 +++++++++++++++++++++++++++++++
+>  3 files changed, 43 insertions(+)
+>  create mode 100644 tools/perf/arch/arm64/tests/regs_load.S
+>
+> diff --git a/tools/perf/arch/arm64/Makefile b/tools/perf/arch/arm64/Makefile
+> index 67e9b3d..9b8f87e 100644
+> --- a/tools/perf/arch/arm64/Makefile
+> +++ b/tools/perf/arch/arm64/Makefile
+> @@ -4,4 +4,5 @@ LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/dwarf-regs.o
+>  endif
+>  ifndef NO_LIBUNWIND
+>  LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/unwind-libunwind.o
+> +LIB_OBJS += $(OUTPUT)arch/$(ARCH)/tests/regs_load.o
+>  endif
+> diff --git a/tools/perf/arch/arm64/include/perf_regs.h b/tools/perf/arch/arm64/include/perf_regs.h
+> index 2359546..1e052f1 100644
+> --- a/tools/perf/arch/arm64/include/perf_regs.h
+> +++ b/tools/perf/arch/arm64/include/perf_regs.h
+> @@ -9,6 +9,8 @@
+>  #define PERF_REG_IP    PERF_REG_ARM64_PC
+>  #define PERF_REG_SP    PERF_REG_ARM64_SP
+>
+> +void perf_regs_load(u64 *regs);
+> +
+>  static inline const char *perf_reg_name(int id)
+>  {
+>         switch (id) {
+> diff --git a/tools/perf/arch/arm64/tests/regs_load.S b/tools/perf/arch/arm64/tests/regs_load.S
+> new file mode 100644
+> index 0000000..40b8b99
+> --- /dev/null
+> +++ b/tools/perf/arch/arm64/tests/regs_load.S
+> @@ -0,0 +1,40 @@
+> +#include <linux/linkage.h>
+> +
+> +/*
+> + * Implementation of void perf_regs_load(u64 *regs);
+> + *
+> + * This functions fills in the 'regs' buffer from the actual registers values,
+> + * in the way the perf built-in unwinding test expects them, e.g. an address
+> + * within the caller:
+> + * - the PC at the time at the call to this function. Since this function
+> + *   is called using a bl instruction, the PC value is taken from LR,
+> + * - the current SP (not touched by this function),
+> + * - the current value of LR is merely retrieved and stored because the
+> + *   value before the call to this function is unknown at this time; it will
+> + *   be unwound from the dwarf information in unwind__get_entries.
+> + */
+> +
+> +.text
+> +.type perf_regs_load,%function
+> +ENTRY(perf_regs_load)
+> +       stp x0,  x1,  [x0], #16 // store x0..x29
+> +       stp x2,  x3,  [x0], #16
+> +       stp x4,  x5,  [x0], #16
+> +       stp x6,  x7,  [x0], #16
+> +       stp x8,  x9,  [x0], #16
+> +       stp x10, x11, [x0], #16
+> +       stp x12, x13, [x0], #16
+> +       stp x14, x15, [x0], #16
+> +       stp x16, x17, [x0], #16
+> +       stp x18, x19, [x0], #16
+> +       stp x20, x21, [x0], #16
+> +       stp x22, x23, [x0], #16
+> +       stp x24, x25, [x0], #16
+> +       stp x26, x27, [x0], #16
+> +       stp x28, x29, [x0], #16
+> +       mov x1,  sp
+> +       stp x30, x1,  [x0], #16 // store lr and sp
+> +       str x30, [x0]           // store lr as the PC in order to skip the call
+> +                               //  to this function
+> +       ret
+> +ENDPROC(perf_regs_load)
 > --
-> I speak only for myself.
-> Rafael J. Wysocki, Intel Open Source Technology Center.
+> 1.7.11.7
+>
