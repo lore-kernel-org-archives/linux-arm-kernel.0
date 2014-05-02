@@ -1,33 +1,65 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 2 May 2014 14:37:42 -0400 (EDT)
-Subject: [PATCH v4 5/5] arm: exynos: Add MCPM call-back functions
-In-Reply-To: <CAL1qeaHrP+i4EhOQKkSX7xFNyiyBiBfpsV3B0EHCFcrNzc6KLQ@mail.gmail.com>
-References: <1398528348-21214-6-git-send-email-a.kesavan@samsung.com>
- <1399044359-15784-1-git-send-email-a.kesavan@samsung.com>
- <alpine.LFD.2.11.1405021347500.980@knanqh.ubzr>
- <CAL1qeaHrP+i4EhOQKkSX7xFNyiyBiBfpsV3B0EHCFcrNzc6KLQ@mail.gmail.com>
-Message-ID: <alpine.LFD.2.11.1405021435420.980@knanqh.ubzr>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Fri, 2 May 2014 20:38:24 +0200
+Subject: BUG: spinlock trylock failure on UP, i.MX28 3.12.15-rt25
+In-Reply-To: <20140422141650.7f43d5ba@gandalf.local.home>
+References: <534C3606.7010206@meduna.org> <534C731F.1050406@meduna.org>
+ <534DADF1.6060608@meduna.org>
+ <20140422115439.GA20669@linutronix.de>
+ <20140422094657.5b6ca1e2@gandalf.local.home>
+ <53569E05.8010600@linutronix.de>
+ <20140422134802.73fc1fa4@gandalf.local.home>
+ <20140422141650.7f43d5ba@gandalf.local.home>
+Message-ID: <20140502183824.GH9178@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2 May 2014, Andrew Bresticker wrote:
+* Steven Rostedt | 2014-04-22 14:16:50 [-0400]:
 
-> >> +     /*
-> >> +      * TODO: Turn off the clusters when all cores in the cluster
-> >> +      * are down to achieve significant power savings.
-> >> +      */
-> >
-> > This comment should actually be located right after the
-> > "if (exynos_cluster_unused(cluster))" above.  That is where the cluster
-> > control should be applied, assuming it'll be effective only when WFI is
-> > executed.
+>On Tue, 22 Apr 2014 13:48:02 -0400
+>Steven Rostedt <rostedt@goodmis.org> wrote:
+>
+>> I need to take a deeper look into the actual code. But as trylocks on
+>> UP are nops (always succeed), and if it expects to be able to do
+>> something in a critical section that is protected by spinlocks (again
+>> nops on UP), this would be broken for UP.
+>
+>Reading the code, I see it's broken. We should add something like this:
+>
+>Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
+>---
+>diff --git a/kernel/timer.c b/kernel/timer.c
+>index cc34e42..a03164a 100644
+>--- a/kernel/timer.c
+>+++ b/kernel/timer.c
+>@@ -1447,6 +1447,12 @@ static void run_timer_softirq(struct softirq_action *h)
+> 		__run_timers(base);
+> }
 > 
-> Correct me if I'm wrong Samsung folks, but I thought it was not
-> possible to apply cluster power control from a CPU within the cluster
-> being powered down, i.e. a CPU in the other cluster must be the one to
-> apply the cluster power control to power down the outbound cluster.
+>+#ifdef CONFIG_SMP
+>+#define timer_should_raise_softirq(lock)	!spin_do_trylock(lock)
+>+#else
+>+#define timer_should_raise_softirq(lock)	1
+>+#endif
+>+
+> /*
+>  * Called by the local, per-CPU timer interrupt on SMP.
+>  */
+>@@ -1467,7 +1473,7 @@ void run_local_timers(void)
+> 		return;
+> 	}
+> 
+>-	if (!spin_do_trylock(&base->lock)) {
+>+	if (timer_should_raise_softirq(&base->lock)) {
+> 		raise_softirq(TIMER_SOFTIRQ);
+> 		return;
+> 	}
 
-Is this true even for deep idle C-states?
+Okay. So Peter said that it is okay to apply this since FULL_NO_HZ users
+wouldn't complain on UP. I still wouldn't say it is broken but that is a
+different story.
+We have two users of this trylock. run_local_timers() which pops up
+quite often (and you patched here) and the other is
+get_next_timer_interrupt(). What do you suggest we do here? It is
+basically the same thing.
 
-
-Nicolas
+Sebastian
