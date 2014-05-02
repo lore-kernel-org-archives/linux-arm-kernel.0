@@ -1,39 +1,88 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 2 May 2014 16:35:44 +0200
-Subject: [PATCH/RFC 3/4] of/clk: Register clocks suitable for Runtime PM
- with the PM core
-In-Reply-To: <CAPDyKFpTwPDu9afhOjhhQ2PKGFB+hWsp=mcaYTq8OvuGF7yT3Q@mail.gmail.com>
-References: <1398334403-26181-1-git-send-email-geert+renesas@glider.be>
- <1398334403-26181-4-git-send-email-geert+renesas@glider.be>
- <CAPDyKFpTwPDu9afhOjhhQ2PKGFB+hWsp=mcaYTq8OvuGF7yT3Q@mail.gmail.com>
-Message-ID: <CAMuHMdUGdfF8x58dz46VWNsC4X0cmFng39Z2xSO_pXYqn9u=HA@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 2 May 2014 09:32:56 -0500
+Subject: [PATCH v3 5/7] ARM: dma: Use dma_pfn_offset for dma address
+ translation
+In-Reply-To: <1398353407-2345-6-git-send-email-santosh.shilimkar@ti.com>
+References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
+ <1398353407-2345-6-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <CAL_JsqKapfHRMQLU+4hmRUh7Swf-_YedW=yU=nrqzftoJ09PYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
-
-On Fri, May 2, 2014 at 10:56 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> +static int of_clk_pm_runtime_suspend(struct device *dev)
->> +{
->> +       int ret;
->> +
->> +       ret = pm_generic_runtime_suspend(dev);
->> +       if (ret)
->> +               return ret;
->> +
->> +       ret = pm_clk_suspend(dev);
+On Thu, Apr 24, 2014 at 10:30 AM, Santosh Shilimkar
+<santosh.shilimkar@ti.com> wrote:
+> From: Grygorii Strashko <grygorii.strashko@ti.com>
 >
-> What about slow clocks? Those aren't handled with pm_clk_suspend().
+> In most of cases DMA addresses can be performed using offset value of
+>  Bus address space relatively to physical address space as following:
+>
+> PFN->DMA:
+>  __pfn_to_phys(pfn + [-]dma_pfn_offset)
+>
+> DMA->PFN:
+>  __phys_to_pfn(dma_addr) + [-]dma_pfn_offset
+>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-How are slow clocks handled?
+Reviewed-by: Rob Herring <robh@kernel.org>
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> ---
+>  arch/arm/include/asm/dma-mapping.h |   21 +++++++++++++++++----
+>  1 file changed, 17 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+> index e701a4d..424fda9 100644
+> --- a/arch/arm/include/asm/dma-mapping.h
+> +++ b/arch/arm/include/asm/dma-mapping.h
+> @@ -58,22 +58,35 @@ static inline int dma_set_mask(struct device *dev, u64 mask)
+>  #ifndef __arch_pfn_to_dma
+>  static inline dma_addr_t pfn_to_dma(struct device *dev, unsigned long pfn)
+>  {
+> -       return (dma_addr_t)__pfn_to_bus(pfn);
+> +       if (!dev)
+> +               return (dma_addr_t)__pfn_to_bus(pfn);
+> +       else
+> +               return (dma_addr_t)__pfn_to_bus(pfn - dev->dma_pfn_offset);
+>  }
+>
+>  static inline unsigned long dma_to_pfn(struct device *dev, dma_addr_t addr)
+>  {
+> -       return __bus_to_pfn(addr);
+> +       if (!dev)
+> +               return __bus_to_pfn(addr);
+> +       else
+> +               return __bus_to_pfn(addr) + dev->dma_pfn_offset;
+>  }
+>
+>  static inline void *dma_to_virt(struct device *dev, dma_addr_t addr)
+>  {
+> -       return (void *)__bus_to_virt((unsigned long)addr);
+> +       if (!dev)
+> +               return (void *)__bus_to_virt((unsigned long)addr);
+> +       else
+> +               return (void *)__bus_to_virt(__pfn_to_bus(dma_to_pfn(dev, addr)));
+>  }
+>
+>  static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
+>  {
+> -       return (dma_addr_t)__virt_to_bus((unsigned long)(addr));
+> +       if (!dev)
+> +               return (dma_addr_t)__virt_to_bus((unsigned long)(addr));
+> +       else
+> +               return pfn_to_dma(dev,
+> +                               __bus_to_pfn(__virt_to_bus((unsigned long)(addr))));
+>  }
+>
+>  #else
+> --
+> 1.7.9.5
+>
