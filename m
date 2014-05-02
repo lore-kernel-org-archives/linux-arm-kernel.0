@@ -1,431 +1,419 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Thu,  1 May 2014 23:44:02 -0500
-Subject: [PATCH] pinctrl: msm: Add more MSM8X74 pin definitions
-Message-ID: <1399005842-27898-1-git-send-email-agross@codeaurora.org>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Fri,  2 May 2014 10:36:19 +0530
+Subject: [PATCH v2 1/2] ARM: EXYNOS: Map SYSRAM through generic SRAM bindings
+Message-ID: <1399007180-20680-1-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds pin definitiones for the MSM8x74 TLMM.  New definitions
-include:
+Instead of hardcoding the SYSRAM details for each SoC,
+pass this information through device tree (DT) and make
+the code SoC agnostic. Generic SRAM bindings are used
+for achieving this.
 
-BLSP devices (I2C, UART, UART flow control, SPI, and UIM), mi2s, gp clk, pdm,
-gcc clk, cci_timer, cci_i2c, cam_clk, hsic, tsif, sdc3, sdc4, and other assorted
-pins.
-
-Signed-off-by: Andy Gross <agross@codeaurora.org>
+Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Heiko Stuebner <heiko@sntech.de>
 ---
- .../bindings/pinctrl/qcom,msm8974-pinctrl.txt      |  22 +-
- drivers/pinctrl/pinctrl-msm8x74.c                  | 233 ++++++++++++++-------
- 2 files changed, 173 insertions(+), 82 deletions(-)
+This patch is based on linux next (next-20140501) on top of
+my Kconfig consolidation patch
+http://comments.gmane.org/gmane.linux.kernel.samsung-soc/28642
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/qcom,msm8974-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/qcom,msm8974-pinctrl.txt
-index 9fb89e3..9c292ea 100644
---- a/Documentation/devicetree/bindings/pinctrl/qcom,msm8974-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/qcom,msm8974-pinctrl.txt
-@@ -50,7 +50,27 @@ Valid values for pins are:
-     Supports bias and drive-strength
+Changes since v1:
+Type and presence of sram nodes is SoC/board dependent. V1 mandated the
+presence of both the nodes and used to return an error if one of the
+nodes was absent and thus fail the boot altogether. Removed this dependency.
+
+Tested on 4210/4412 Origen, 5250/5420 Arndale and SMDK5420 boards.
+---
+ arch/arm/Kconfig                                |    1 +
+ arch/arm/boot/dts/exynos4210-universal_c210.dts |   17 ++++++
+ arch/arm/boot/dts/exynos4210.dtsi               |   18 +++++++
+ arch/arm/boot/dts/exynos4x12.dtsi               |   18 +++++++
+ arch/arm/boot/dts/exynos5250.dtsi               |   18 +++++++
+ arch/arm/boot/dts/exynos5420.dtsi               |   18 +++++++
+ arch/arm/mach-exynos/common.h                   |    1 +
+ arch/arm/mach-exynos/exynos.c                   |   64 -----------------------
+ arch/arm/mach-exynos/firmware.c                 |    8 ++-
+ arch/arm/mach-exynos/include/mach/map.h         |    7 ---
+ arch/arm/mach-exynos/platsmp.c                  |   33 ++++++++++--
+ 11 files changed, 128 insertions(+), 75 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index a6aaaad19b1a..f66ea9453df9 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -855,6 +855,7 @@ config ARCH_EXYNOS
+ 	select S5P_DEV_MFC
+ 	select SAMSUNG_DMADEV
+ 	select SPARSE_IRQ
++	select SRAM
+ 	select USE_OF
+ 	help
+ 	  Support for SAMSUNG's EXYNOS SoCs (EXYNOS4/5)
+diff --git a/arch/arm/boot/dts/exynos4210-universal_c210.dts b/arch/arm/boot/dts/exynos4210-universal_c210.dts
+index 63e34b24b04f..8d4de5c0d0c7 100644
+--- a/arch/arm/boot/dts/exynos4210-universal_c210.dts
++++ b/arch/arm/boot/dts/exynos4210-universal_c210.dts
+@@ -28,6 +28,23 @@
+ 		bootargs = "console=ttySAC2,115200N8 root=/dev/mmcblk0p5 rw rootwait earlyprintk panic=5 maxcpus=1";
+ 	};
  
- Valid values for function are:
--  blsp_i2c2, blsp_i2c6, blsp_i2c11, blsp_spi1, blsp_uart2, blsp_uart8, slimbus
-+  cci_i2c0, cci_i2c1, uim1, uim2, uim_batt_alarm,
-+  blsp_uim1, blsp_uart1, blsp_uart1_flow, blsp_i2c1, blsp_spi1,
-+  blsp_uim2, blsp_uart2, blsp_uart2_flow, blsp_i2c2, blsp_spi2,
-+  blsp_uim3, blsp_uart3, blsp_uart3_flow, blsp_i2c3, blsp_spi3,
-+  blsp_uim4, blsp_uart4, blsp_uart4_flow, blsp_i2c4, blsp_spi4,
-+  blsp_uim5, blsp_uart5, blsp_uart5_flow, blsp_i2c5, blsp_spi5,
-+  blsp_uim6, blsp_uart6, blsp_uart6_flow, blsp_i2c6, blsp_spi6,
-+  blsp_uim7, blsp_uart7, blsp_uart7_flow, blsp_i2c7, blsp_spi7,
-+  blsp_uim8, blsp_uart8, blsp_uart8_flow, blsp_i2c8, blsp_spi8,
-+  blsp_uim9, blsp_uart9, blsp_uart9_flow, blsp_i2c9, blsp_spi9,
-+  blsp_uim10, blsp_uart10, blsp_uart10_flow, blsp_i2c10, blsp_spi10,
-+  blsp_uim11, blsp_uart11, blsp_uart11_flow, blsp_i2c11, blsp_spi11,
-+  blsp_uim12, blsp_uart12, blsp_uart12_flow, blsp_i2c12, blsp_spi12,
-+  blsp_spi1_cs1, blsp_spi2_cs2, blsp_spi_cs3, blsp_spi2_cs1, blsp_spi2_cs2
-+  blsp_spi2_cs3, blsp_spi10_cs1, blsp_spi10_cs2, blsp_spi10_cs3,
-+  sdc3, sdc4, gcc_gp_clk1, gcc_gp_clk2, gcc_gp_clk3, cci_timer0, cci_timer1,
-+  cci_timer2, cci_timer3, cci_async_in0, cci_async_in1, cci_async_in2,
-+  cam_mckl0, cam_mclk1, cam_mclk2, cam_mclk3, mdp_vsync, hdmi_cec, hdmi_ddc,
-+  hdmi_hpd, edp_hpd, gp_pdm0, gp_pdm1, gp_pdm2, gp_pdm3, gp0_clk, gp1_clk,
-+  gp_mn, tsif1, tsif2, hsic, grfc, audio_ref_clk, qua_mi2s, pri_mi2s, spkr_mi2s,
-+  ter_mi2s, sec_mi2s, slimbus
- 
-   (Note that this is not yet the complete list of functions)
- 
-diff --git a/drivers/pinctrl/pinctrl-msm8x74.c b/drivers/pinctrl/pinctrl-msm8x74.c
-index 4dd5c0d..f1c66ef 100644
---- a/drivers/pinctrl/pinctrl-msm8x74.c
-+++ b/drivers/pinctrl/pinctrl-msm8x74.c
-@@ -402,7 +402,7 @@ static const unsigned int sdc2_data_pins[] = { 151 };
-  * the pingroup table below.
-  */
- enum msm8x74_functions {
--	MSM_MUX_cci_i2c,
-+	MSM_MUX_cci_i2c0,
- 	MSM_MUX_cci_i2c1,
- 	MSM_MUX_blsp_i2c1,
- 	MSM_MUX_blsp_i2c2,
-@@ -473,6 +473,9 @@ enum msm8x74_functions {
- 	MSM_MUX_blsp_uim10,
- 	MSM_MUX_blsp_uim11,
- 	MSM_MUX_blsp_uim12,
-+	MSM_MUX_uim1,
-+	MSM_MUX_uim2,
-+	MSM_MUX_uim_batt_alarm,
- 	MSM_MUX_sdc3,
- 	MSM_MUX_sdc4,
- 	MSM_MUX_gcc_gp_clk1,
-@@ -481,9 +484,12 @@ enum msm8x74_functions {
- 	MSM_MUX_qua_mi2s,
- 	MSM_MUX_pri_mi2s,
- 	MSM_MUX_spkr_mi2s,
-+	MSM_MUX_ter_mi2s,
-+	MSM_MUX_sec_mi2s,
- 	MSM_MUX_hdmi_cec,
- 	MSM_MUX_hdmi_ddc,
- 	MSM_MUX_hdmi_hpd,
-+	MSM_MUX_edp_hpd,
- 	MSM_MUX_mdp_vsync,
- 	MSM_MUX_cam_mclk0,
- 	MSM_MUX_cam_mclk1,
-@@ -497,6 +503,17 @@ enum msm8x74_functions {
- 	MSM_MUX_cci_async_in0,
- 	MSM_MUX_cci_async_in1,
- 	MSM_MUX_cci_async_in2,
-+	MSM_MUX_gp_pdm0,
-+	MSM_MUX_gp_pdm1,
-+	MSM_MUX_gp_pdm2,
-+	MSM_MUX_gp0_clk,
-+	MSM_MUX_gp1_clk,
-+	MSM_MUX_gp_mn,
-+	MSM_MUX_tsif1,
-+	MSM_MUX_tsif2,
-+	MSM_MUX_hsic,
-+	MSM_MUX_grfc,
-+	MSM_MUX_audio_ref_clk,
- 	MSM_MUX_slimbus,
- 	MSM_MUX_NA,
- };
-@@ -531,7 +548,7 @@ static const char * const blsp_spi3_groups[] = {
- 	"gpio8", "gpio9", "gpio10", "gpio11"
- };
- 
--static const char * const cci_i2c_groups[] = { "gpio19", "gpio20" };
-+static const char * const cci_i2c0_groups[] = { "gpio19", "gpio20" };
- static const char * const cci_i2c1_groups[] = { "gpio21", "gpio22" };
- 
- static const char * const blsp_uart4_groups[] = { "gpio19", "gpio20" };
-@@ -609,6 +626,16 @@ static const char * const blsp_spi12_groups[] = {
- 	"gpio85", "gpio86", "gpio87", "gpio88"
- };
- 
-+static const char * const uim1_groups[] = {
-+	"gpio97", "gpio98", "gpio99", "gpio100"
-+};
++	sram at 02020000 {
++		status = "disabled";
++	};
 +
-+static const char * const uim2_groups[] = {
-+	"gpio49", "gpio50", "gpio51", "gpio52"
-+};
++	sram at 02025000 {
++		compatible = "mmio-sram";
++		reg = <0x02025000 0x1000>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0x02025000 0x1000>;
 +
-+static const char * const uim_batt_alarm_groups[] = { "gpio101" };
++		smp-sram at 0 {
++			compatible = "samsung,exynos4210-sram";
++			reg = <0x0 0x1000>;
++		};
++	};
 +
- static const char * const sdc3_groups[] = {
- 	"gpio35", "gpio36", "gpio37", "gpio38", "gpio39", "gpio40"
- };
-@@ -617,6 +644,9 @@ static const char * const sdc4_groups[] = {
- 	"gpio91", "gpio92", "gpio93", "gpio94", "gpio95", "gpio96"
+ 	mct at 10050000 {
+ 		compatible = "none";
+ 	};
+diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
+index cacf6140dd2f..d3d727b0c263 100644
+--- a/arch/arm/boot/dts/exynos4210.dtsi
++++ b/arch/arm/boot/dts/exynos4210.dtsi
+@@ -31,6 +31,24 @@
+ 		pinctrl2 = &pinctrl_2;
+ 	};
+ 
++	sram at 02020000 {
++		compatible = "mmio-sram";
++		reg = <0x02020000 0x20000>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0x02020000 0x20000>;
++
++		smp-sram at 0 {
++			compatible = "samsung,exynos4210-sram";
++			reg = <0x0 0x1000>;
++		};
++
++		smp-sram at 1f000 {
++			compatible = "samsung,exynos4210-sram-ns";
++			reg = <0x1f000 0x1000>;
++		};
++	};
++
+ 	pd_lcd1: lcd1-power-domain at 10023CA0 {
+ 		compatible = "samsung,exynos4210-pd";
+ 		reg = <0x10023CA0 0x20>;
+diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
+index c4a9306f8529..75fb3e7e3999 100644
+--- a/arch/arm/boot/dts/exynos4x12.dtsi
++++ b/arch/arm/boot/dts/exynos4x12.dtsi
+@@ -37,6 +37,24 @@
+ 		interrupts = <2 2>, <3 2>, <18 2>, <19 2>;
+ 	};
+ 
++	sram at 02020000 {
++		compatible = "mmio-sram";
++		reg = <0x02020000 0x40000>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0x02020000 0x40000>;
++
++		smp-sram at 0 {
++			compatible = "samsung,exynos4210-sram";
++			reg = <0x0 0x1000>;
++		};
++
++		smp-sram at 2f000 {
++			compatible = "samsung,exynos4210-sram-ns";
++			reg = <0x2f000 0x1000>;
++		};
++	};
++
+ 	pd_isp: isp-power-domain at 10023CA0 {
+ 		compatible = "samsung,exynos4210-pd";
+ 		reg = <0x10023CA0 0x20>;
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index 37423314a028..8d724d56a5c6 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -72,6 +72,24 @@
+ 		};
+ 	};
+ 
++	sram at 02020000 {
++		compatible = "mmio-sram";
++		reg = <0x02020000 0x30000>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0x02020000 0x30000>;
++
++		smp-sram at 0 {
++			compatible = "samsung,exynos4210-sram";
++			reg = <0x0 0x1000>;
++		};
++
++		smp-sram at 2f000 {
++			compatible = "samsung,exynos4210-sram-ns";
++			reg = <0x2f000 0x1000>;
++		};
++	};
++
+ 	pd_gsc: gsc-power-domain at 10044000 {
+ 		compatible = "samsung,exynos4210-pd";
+ 		reg = <0x10044000 0x20>;
+diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+index c3a9a66c5767..ff496adfabde 100644
+--- a/arch/arm/boot/dts/exynos5420.dtsi
++++ b/arch/arm/boot/dts/exynos5420.dtsi
+@@ -110,6 +110,24 @@
+ 		};
+ 	};
+ 
++	sram at 02020000 {
++		compatible = "mmio-sram";
++		reg = <0x02020000 0x54000>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0x02020000 0x54000>;
++
++		smp-sram at 0 {
++			compatible = "samsung,exynos4210-sram";
++			reg = <0x0 0x1000>;
++		};
++
++		smp-sram at 53000 {
++			compatible = "samsung,exynos4210-sram-ns";
++			reg = <0x53000 0x1000>;
++		};
++	};
++
+ 	clock: clock-controller at 10010000 {
+ 		compatible = "samsung,exynos5420-clock";
+ 		reg = <0x10010000 0x30000>;
+diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+index 9ef3f83efaff..47cbab0f008e 100644
+--- a/arch/arm/mach-exynos/common.h
++++ b/arch/arm/mach-exynos/common.h
+@@ -18,6 +18,7 @@
+ void mct_init(void __iomem *base, int irq_g0, int irq_l0, int irq_l1);
+ 
+ struct map_desc;
++extern void __iomem *sram_ns_base_addr;
+ void exynos_init_io(void);
+ void exynos_restart(enum reboot_mode mode, const char *cmd);
+ void exynos_cpuidle_init(void);
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index 77293d39dfc9..556d148e6413 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -114,51 +114,6 @@ static struct map_desc exynos4_iodesc[] __initdata = {
+ 	},
  };
  
-+static const char * const gp0_clk_groups[] = { "gpio26" };
-+static const char * const gp1_clk_groups[] = { "gpio27", "gpio57", "gpio78" };
-+static const char * const gp_mn_groups[] = { "gpio29" };
- static const char * const gcc_gp_clk1_groups[] = { "gpio57", "gpio78" };
- static const char * const gcc_gp_clk2_groups[] = { "gpio58", "gpio81" };
- static const char * const gcc_gp_clk3_groups[] = { "gpio59", "gpio82" };
-@@ -633,17 +663,18 @@ static const char * const spkr_mi2s_groups[] = {
- 	"gpio69", "gpio70", "gpio71", "gpio72"
- };
- 
--static const char * const hdmi_cec_groups[] = {
--	"gpio31"
-+static const char * const ter_mi2s_groups[] = {
-+	"gpio73", "gpio74", "gpio75", "gpio76", "gpio77"
- };
- 
--static const char * const hdmi_ddc_groups[] = {
--	"gpio32", "gpio33"
-+static const char * const sec_mi2s_groups[] = {
-+	"gpio78", "gpio79", "gpio80", "gpio81", "gpio82"
- };
- 
--static const char * const hdmi_hpd_groups[] = {
--	"gpio34"
+-static struct map_desc exynos4_iodesc0[] __initdata = {
+-	{
+-		.virtual	= (unsigned long)S5P_VA_SYSRAM,
+-		.pfn		= __phys_to_pfn(EXYNOS4_PA_SYSRAM0),
+-		.length		= SZ_4K,
+-		.type		= MT_DEVICE,
+-	},
 -};
-+static const char * const hdmi_cec_groups[] = { "gpio31" };
-+static const char * const hdmi_ddc_groups[] = { "gpio32", "gpio33" };
-+static const char * const hdmi_hpd_groups[] = { "gpio34" };
-+static const char * const edp_hpd_groups[] = { "gpio102" };
+-
+-static struct map_desc exynos4_iodesc1[] __initdata = {
+-	{
+-		.virtual	= (unsigned long)S5P_VA_SYSRAM,
+-		.pfn		= __phys_to_pfn(EXYNOS4_PA_SYSRAM1),
+-		.length		= SZ_4K,
+-		.type		= MT_DEVICE,
+-	},
+-};
+-
+-static struct map_desc exynos4210_iodesc[] __initdata = {
+-	{
+-		.virtual	= (unsigned long)S5P_VA_SYSRAM_NS,
+-		.pfn		= __phys_to_pfn(EXYNOS4210_PA_SYSRAM_NS),
+-		.length		= SZ_4K,
+-		.type		= MT_DEVICE,
+-	},
+-};
+-
+-static struct map_desc exynos4x12_iodesc[] __initdata = {
+-	{
+-		.virtual	= (unsigned long)S5P_VA_SYSRAM_NS,
+-		.pfn		= __phys_to_pfn(EXYNOS4x12_PA_SYSRAM_NS),
+-		.length		= SZ_4K,
+-		.type		= MT_DEVICE,
+-	},
+-};
+-
+-static struct map_desc exynos5250_iodesc[] __initdata = {
+-	{
+-		.virtual	= (unsigned long)S5P_VA_SYSRAM_NS,
+-		.pfn		= __phys_to_pfn(EXYNOS5250_PA_SYSRAM_NS),
+-		.length		= SZ_4K,
+-		.type		= MT_DEVICE,
+-	},
+-};
+-
+ static struct map_desc exynos5_iodesc[] __initdata = {
+ 	{
+ 		.virtual	= (unsigned long)S3C_VA_SYS,
+@@ -181,11 +136,6 @@ static struct map_desc exynos5_iodesc[] __initdata = {
+ 		.length		= SZ_4K,
+ 		.type		= MT_DEVICE,
+ 	}, {
+-		.virtual	= (unsigned long)S5P_VA_SYSRAM,
+-		.pfn		= __phys_to_pfn(EXYNOS5_PA_SYSRAM),
+-		.length		= SZ_4K,
+-		.type		= MT_DEVICE,
+-	}, {
+ 		.virtual	= (unsigned long)S5P_VA_CMU,
+ 		.pfn		= __phys_to_pfn(EXYNOS5_PA_CMU),
+ 		.length		= 144 * SZ_1K,
+@@ -280,20 +230,6 @@ static void __init exynos_map_io(void)
  
- static const char * const mdp_vsync_groups[] = { "gpio12", "gpio13", "gpio14" };
- static const char * const cam_mclk0_groups[] = { "gpio15" };
-@@ -660,11 +691,37 @@ static const char * const cci_async_in0_groups[] = { "gpio28" };
- static const char * const cci_async_in1_groups[] = { "gpio26" };
- static const char * const cci_async_in2_groups[] = { "gpio27" };
+ 	if (soc_is_exynos5())
+ 		iotable_init(exynos5_iodesc, ARRAY_SIZE(exynos5_iodesc));
+-
+-	if (soc_is_exynos4210()) {
+-		if (samsung_rev() == EXYNOS4210_REV_0)
+-			iotable_init(exynos4_iodesc0,
+-						ARRAY_SIZE(exynos4_iodesc0));
+-		else
+-			iotable_init(exynos4_iodesc1,
+-						ARRAY_SIZE(exynos4_iodesc1));
+-		iotable_init(exynos4210_iodesc, ARRAY_SIZE(exynos4210_iodesc));
+-	}
+-	if (soc_is_exynos4212() || soc_is_exynos4412())
+-		iotable_init(exynos4x12_iodesc, ARRAY_SIZE(exynos4x12_iodesc));
+-	if (soc_is_exynos5250())
+-		iotable_init(exynos5250_iodesc, ARRAY_SIZE(exynos5250_iodesc));
+ }
  
-+static const char * const gp_pdm0_groups[] = { "gpio54", "gpio68" };
-+static const char * const gp_pdm1_groups[] = { "gpio74", "gpio86" };
-+static const char * const gp_pdm2_groups[] = { "gpio63", "gpio79" };
-+
-+static const char * const tsif1_groups[] = {
-+	"gpio89", "gpio90", "gpio91", "gpio92"
-+};
-+
-+static const char * const tsif2_groups[] = {
-+	"gpio93", "gpio94", "gpio95", "gpio96"
-+};
-+
-+static const char * const hsic_groups[] = { "gpio144", "gpio145" };
-+static const char * const grfc_groups[] = {
-+	"gpio104", "gpio105", "gpio106", "gpio107", "gpio108", "gpio109",
-+	"gpio110", "gpio111", "gpio112", "gpio113", "gpio114", "gpio115",
-+	"gpio116", "gpio117", "gpio118", "gpio119", "gpio120", "gpio121",
-+	"gpio122", "gpio123", "gpio124", "gpio125", "gpio126", "gpio127",
-+	"gpio128", "gpio136", "gpio137", "gpio141", "gpio143"
-+};
-+
-+static const char * const audio_ref_clk_groups[] = { "gpio69" };
-+
- static const char * const slimbus_groups[] = { "gpio70", "gpio71" };
+ void __init exynos_init_io(void)
+diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
+index 932129ef26c6..7d583cb73850 100644
+--- a/arch/arm/mach-exynos/firmware.c
++++ b/arch/arm/mach-exynos/firmware.c
+@@ -18,6 +18,7 @@
  
- static const struct msm_function msm8x74_functions[] = {
--	FUNCTION(cci_i2c),
-+	FUNCTION(cci_i2c0),
- 	FUNCTION(cci_i2c1),
-+	FUNCTION(uim1),
-+	FUNCTION(uim2),
-+	FUNCTION(uim_batt_alarm),
- 	FUNCTION(blsp_uim1),
- 	FUNCTION(blsp_uim2),
- 	FUNCTION(blsp_uim3),
-@@ -742,6 +799,8 @@ static const struct msm_function msm8x74_functions[] = {
- 	FUNCTION(qua_mi2s),
- 	FUNCTION(pri_mi2s),
- 	FUNCTION(spkr_mi2s),
-+	FUNCTION(ter_mi2s),
-+	FUNCTION(sec_mi2s),
- 	FUNCTION(mdp_vsync),
- 	FUNCTION(cam_mclk0),
- 	FUNCTION(cam_mclk1),
-@@ -758,6 +817,18 @@ static const struct msm_function msm8x74_functions[] = {
- 	FUNCTION(hdmi_cec),
- 	FUNCTION(hdmi_ddc),
- 	FUNCTION(hdmi_hpd),
-+	FUNCTION(edp_hpd),
-+	FUNCTION(gp_pdm0),
-+	FUNCTION(gp_pdm1),
-+	FUNCTION(gp_pdm2),
-+	FUNCTION(gp0_clk),
-+	FUNCTION(gp1_clk),
-+	FUNCTION(gp_mn),
-+	FUNCTION(tsif1),
-+	FUNCTION(tsif2),
-+	FUNCTION(hsic),
-+	FUNCTION(grfc),
-+	FUNCTION(audio_ref_clk),
- 	FUNCTION(slimbus),
- };
+ #include <mach/map.h>
  
-@@ -781,17 +852,17 @@ static const struct msm_pingroup msm8x74_groups[] = {
- 	PINGROUP(16,  cam_mclk1, NA, NA, NA, NA, NA, NA),
- 	PINGROUP(17,  cam_mclk2, NA, NA, NA, NA, NA, NA),
- 	PINGROUP(18,  cam_mclk3, NA, NA, NA, NA, NA, NA),
--	PINGROUP(19,  cci_i2c, blsp_spi4, blsp_uart4, blsp_uim4, NA, NA, NA),
--	PINGROUP(20,  cci_i2c, blsp_spi4, blsp_uart4, blsp_uim4, NA, NA, NA),
-+	PINGROUP(19,  cci_i2c0, blsp_spi4, blsp_uart4, blsp_uim4, NA, NA, NA),
-+	PINGROUP(20,  cci_i2c0, blsp_spi4, blsp_uart4, blsp_uim4, NA, NA, NA),
- 	PINGROUP(21,  cci_i2c1, blsp_spi4, blsp_uart4_flow, blsp_i2c4, NA, NA, NA),
- 	PINGROUP(22,  cci_i2c1, blsp_spi4, blsp_uart4_flow, blsp_i2c4, NA, NA, NA),
- 	PINGROUP(23,  cci_timer0, blsp_spi5, blsp_uart5, blsp_uim5, NA, NA, NA),
- 	PINGROUP(24,  cci_timer1, blsp_spi5, blsp_uart5, blsp_uim5, NA, NA, NA),
- 	PINGROUP(25,  cci_timer2, blsp_spi5, blsp_uart5_flow, blsp_i2c5, NA, NA, NA),
--	PINGROUP(26,  cci_timer3, cci_async_in1, blsp_spi5, blsp_uart5_flow, blsp_i2c5, NA, NA),
--	PINGROUP(27,  cci_timer4, cci_async_in2, blsp_spi6, blsp_uart6, blsp_i2c6, NA, NA),
-+	PINGROUP(26,  cci_timer3, cci_async_in1, blsp_spi5, blsp_uart5_flow, blsp_i2c5, gp0_clk, NA),
-+	PINGROUP(27,  cci_timer4, cci_async_in2, blsp_spi6, blsp_uart6, blsp_i2c6, gp1_clk, NA),
- 	PINGROUP(28,  cci_async_in0, blsp_spi6, blsp_uart6, blsp_uim6, NA, NA, NA),
--	PINGROUP(29,  blsp_spi6, blsp_uart6_flow, blsp_i2c6, NA, NA, NA, NA),
-+	PINGROUP(29,  blsp_spi6, blsp_uart6_flow, blsp_i2c6, gp_mn, NA, NA, NA),
- 	PINGROUP(30,  blsp_spi6, blsp_uart6_flow, blsp_i2c6, NA, NA, NA, NA),
- 	PINGROUP(31,  hdmi_cec, NA, NA, NA, NA, NA, NA),
- 	PINGROUP(32,  hdmi_ddc, NA, NA, NA, NA, NA, NA),
-@@ -811,12 +882,12 @@ static const struct msm_pingroup msm8x74_groups[] = {
- 	PINGROUP(46,  blsp_spi8, blsp_uart8, blsp_uim8, NA, NA, NA, NA),
- 	PINGROUP(47,  blsp_spi8, blsp_uart8_flow, blsp_i2c8, blsp_spi10_cs1, NA, NA, NA),
- 	PINGROUP(48,  blsp_spi8, blsp_uart8_flow, blsp_i2c8, blsp_spi10_cs2, NA, NA, NA),
--	PINGROUP(49,  NA, blsp_spi9, blsp_uart9, blsp_uim9, NA, NA, NA),
--	PINGROUP(50,  NA, blsp_spi9, blsp_uart9, blsp_uim9, NA, NA, NA),
--	PINGROUP(51,  NA, blsp_spi9, blsp_uart9_flow, blsp_i2c9, NA, NA, NA),
--	PINGROUP(52,  NA, blsp_spi9, blsp_uart9_flow, blsp_i2c9, NA, NA, NA),
-+	PINGROUP(49,  uim2, blsp_spi9, blsp_uart9, blsp_uim9, NA, NA, NA),
-+	PINGROUP(50,  uim2, blsp_spi9, blsp_uart9, blsp_uim9, NA, NA, NA),
-+	PINGROUP(51,  uim2, blsp_spi9, blsp_uart9_flow, blsp_i2c9, NA, NA, NA),
-+	PINGROUP(52,  uim2, blsp_spi9, blsp_uart9_flow, blsp_i2c9, NA, NA, NA),
- 	PINGROUP(53,  blsp_spi10, blsp_uart10, blsp_uim10, blsp_spi2_cs1, NA, NA, NA),
--	PINGROUP(54,  blsp_spi10, blsp_uart10, blsp_uim10, blsp_spi2_cs2, NA, NA, NA),
-+	PINGROUP(54,  blsp_spi10, blsp_uart10, blsp_uim10, blsp_spi2_cs2, gp_pdm0, NA, NA),
- 	PINGROUP(55,  blsp_spi10, blsp_uart10_flow, blsp_i2c10, NA, NA, NA, NA),
- 	PINGROUP(56,  blsp_spi10, blsp_uart10_flow, blsp_i2c10, NA, NA, NA, NA),
- 	PINGROUP(57,  qua_mi2s, gcc_gp_clk1, NA, NA, NA, NA, NA),
-@@ -825,72 +896,72 @@ static const struct msm_pingroup msm8x74_groups[] = {
- 	PINGROUP(60,  qua_mi2s, NA, NA, NA, NA, NA, NA),
- 	PINGROUP(61,  qua_mi2s, NA, NA, NA, NA, NA, NA),
- 	PINGROUP(62,  qua_mi2s, blsp_spi2_cs1, NA, NA, NA, NA, NA),
--	PINGROUP(63,  qua_mi2s, blsp_spi2_cs2, NA, NA, NA, NA, NA),
-+	PINGROUP(63,  qua_mi2s, blsp_spi2_cs2, gp_pdm2, NA, NA, NA, NA),
- 	PINGROUP(64,  pri_mi2s, NA, NA, NA, NA, NA, NA),
- 	PINGROUP(65,  pri_mi2s, NA, NA, NA, NA, NA, NA),
- 	PINGROUP(66,  pri_mi2s, blsp_spi2_cs3, NA, NA, NA, NA, NA),
- 	PINGROUP(67,  pri_mi2s, blsp_spi10_cs1, NA, NA, NA, NA, NA),
--	PINGROUP(68,  pri_mi2s, blsp_spi10_cs2, NA, NA, NA, NA, NA),
--	PINGROUP(69,  spkr_mi2s, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(68,  pri_mi2s, blsp_spi10_cs2, gp_pdm0, NA, NA, NA, NA),
-+	PINGROUP(69,  spkr_mi2s, audio_ref_clk, NA, NA, NA, NA, NA),
- 	PINGROUP(70,  slimbus, spkr_mi2s, NA, NA, NA, NA, NA),
- 	PINGROUP(71,  slimbus, spkr_mi2s, NA, NA, NA, NA, NA),
--	PINGROUP(72,  spkr_mi2s, NA, NA, NA, NA, NA, NA),
--	PINGROUP(73,  NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(74,  NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(75,  NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(76,  NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(77,  NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(78,  NA, gcc_gp_clk1, NA, NA, NA, NA, NA),
--	PINGROUP(79,  NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(80,  NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(81,  NA, blsp_spi11, blsp_uart11, blsp_uim11, gcc_gp_clk2, NA, NA),
--	PINGROUP(82,  NA, blsp_spi11, blsp_uart11, blsp_uim11, gcc_gp_clk3, NA, NA),
-+	PINGROUP(72,  NA, spkr_mi2s, NA, NA, NA, NA, NA),
-+	PINGROUP(73,  ter_mi2s, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(74,  ter_mi2s, gp_pdm1, NA, NA, NA, NA, NA),
-+	PINGROUP(75,  ter_mi2s, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(76,  ter_mi2s, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(77,  ter_mi2s, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(78,  sec_mi2s, gcc_gp_clk1, NA, NA, NA, NA, NA),
-+	PINGROUP(79,  sec_mi2s, gp_pdm2, NA, NA, NA, NA, NA),
-+	PINGROUP(80,  sec_mi2s, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(81,  sec_mi2s, blsp_spi11, blsp_uart11, blsp_uim11, gcc_gp_clk2, NA, NA),
-+	PINGROUP(82,  sec_mi2s, blsp_spi11, blsp_uart11, blsp_uim11, gcc_gp_clk3, NA, NA),
- 	PINGROUP(83,  blsp_spi11, blsp_uart11_flow, blsp_i2c11, NA, NA, NA, NA),
- 	PINGROUP(84,  blsp_spi11, blsp_uart11_flow, blsp_i2c11, NA, NA, NA, NA),
- 	PINGROUP(85,  blsp_spi12, blsp_uart12, blsp_uim12, NA, NA, NA, NA),
--	PINGROUP(86,  blsp_spi12, blsp_uart12, blsp_uim12, NA, NA, NA, NA),
-+	PINGROUP(86,  blsp_spi12, blsp_uart12, blsp_uim12, gp_pdm1, NA, NA, NA),
- 	PINGROUP(87,  blsp_spi12, blsp_uart12_flow, blsp_i2c12, NA, NA, NA, NA),
- 	PINGROUP(88,  blsp_spi12, blsp_uart12_flow, blsp_i2c12, NA, NA, NA, NA),
--	PINGROUP(89,  NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(90,  NA, blsp_spi10_cs3, NA, NA, NA, NA, NA),
--	PINGROUP(91,  NA, sdc4, NA, NA, NA, NA, NA),
--	PINGROUP(92,  NA, sdc4, NA, NA, NA, NA, NA),
--	PINGROUP(93,  NA, sdc4, NA, NA, NA, NA, NA),
--	PINGROUP(94,  NA, sdc4, NA, NA, NA, NA, NA),
--	PINGROUP(95,  NA, sdc4, NA, NA, NA, NA, NA),
--	PINGROUP(96,  NA, sdc4, NA, NA, NA, NA, NA),
--	PINGROUP(97,  NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(98,  NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(99,  NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(100, NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(101, NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(102, NA, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(89,  tsif1, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(90,  tsif1, blsp_spi10_cs3, NA, NA, NA, NA, NA),
-+	PINGROUP(91,  tsif1, sdc4, NA, NA, NA, NA, NA),
-+	PINGROUP(92,  tsif1, sdc4, NA, NA, NA, NA, NA),
-+	PINGROUP(93,  tsif2, sdc4, NA, NA, NA, NA, NA),
-+	PINGROUP(94,  tsif2, sdc4, NA, NA, NA, NA, NA),
-+	PINGROUP(95,  tsif2, sdc4, NA, NA, NA, NA, NA),
-+	PINGROUP(96,  tsif2, sdc4, NA, NA, NA, NA, NA),
-+	PINGROUP(97,  uim1, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(98,  uim1, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(99,  uim1, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(100, uim1, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(101, uim_batt_alarm, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(102, edp_hpd, NA, NA, NA, NA, NA, NA),
- 	PINGROUP(103, NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(104, NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(105, NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(106, NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(107, NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(108, NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(109, NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(110, NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(111, NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(112, NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(113, NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(114, NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(115, NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(116, NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(117, NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(118, NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(119, NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(120, NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(121, NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(122, NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(123, NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(124, NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(125, NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(126, NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(127, NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(128, NA, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(104, grfc, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(105, grfc, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(106, grfc, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(107, grfc, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(108, grfc, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(109, grfc, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(110, grfc, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(111, grfc, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(112, grfc, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(113, grfc, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(114, grfc, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(115, grfc, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(116, grfc, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(117, grfc, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(118, grfc, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(119, grfc, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(120, grfc, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(121, grfc, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(122, grfc, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(123, grfc, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(124, grfc, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(125, grfc, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(126, grfc, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(127, grfc, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(128, NA, grfc, NA, NA, NA, NA, NA),
- 	PINGROUP(129, NA, NA, NA, NA, NA, NA, NA),
- 	PINGROUP(130, NA, NA, NA, NA, NA, NA, NA),
- 	PINGROUP(131, NA, NA, NA, NA, NA, NA, NA),
-@@ -898,16 +969,16 @@ static const struct msm_pingroup msm8x74_groups[] = {
- 	PINGROUP(133, NA, NA, NA, NA, NA, NA, NA),
- 	PINGROUP(134, NA, NA, NA, NA, NA, NA, NA),
- 	PINGROUP(135, NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(136, NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(137, NA, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(136, NA, grfc, NA, NA, NA, NA, NA),
-+	PINGROUP(137, NA, grfc, NA, NA, NA, NA, NA),
- 	PINGROUP(138, NA, NA, NA, NA, NA, NA, NA),
- 	PINGROUP(139, NA, NA, NA, NA, NA, NA, NA),
- 	PINGROUP(140, NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(141, NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(143, NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(143, NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(144, NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(145, NA, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(141, NA, grfc, NA, NA, NA, NA, NA),
-+	PINGROUP(142, NA, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(143, NA, grfc, NA, NA, NA, NA, NA),
-+	PINGROUP(144, hsic, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(145, hsic, NA, NA, NA, NA, NA, NA),
- 	SDC_PINGROUP(sdc1_clk, 0x2044, 13, 6),
- 	SDC_PINGROUP(sdc1_cmd, 0x2044, 11, 3),
- 	SDC_PINGROUP(sdc1_data, 0x2044, 9, 0),
++#include "common.h"
+ #include "smc.h"
+ 
+ static int exynos_do_idle(void)
+@@ -34,7 +35,12 @@ static int exynos_cpu_boot(int cpu)
+ 
+ static int exynos_set_cpu_boot_addr(int cpu, unsigned long boot_addr)
+ {
+-	void __iomem *boot_reg = S5P_VA_SYSRAM_NS + 0x1c + 4*cpu;
++	void __iomem *boot_reg;
++
++	if (!sram_ns_base_addr)
++		return 0;
++
++	boot_reg = sram_ns_base_addr + 0x1c + 4*cpu;
+ 
+ 	__raw_writel(boot_addr, boot_reg);
+ 	return 0;
+diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
+index 7b046b59d9ec..548269a60634 100644
+--- a/arch/arm/mach-exynos/include/mach/map.h
++++ b/arch/arm/mach-exynos/include/mach/map.h
+@@ -23,13 +23,6 @@
+ 
+ #include <plat/map-s5p.h>
+ 
+-#define EXYNOS4_PA_SYSRAM0		0x02025000
+-#define EXYNOS4_PA_SYSRAM1		0x02020000
+-#define EXYNOS5_PA_SYSRAM		0x02020000
+-#define EXYNOS4210_PA_SYSRAM_NS		0x0203F000
+-#define EXYNOS4x12_PA_SYSRAM_NS		0x0204F000
+-#define EXYNOS5250_PA_SYSRAM_NS		0x0204F000
+-
+ #define EXYNOS_PA_CHIPID		0x10000000
+ 
+ #define EXYNOS4_PA_SYSCON		0x10010000
+diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+index 03e5e9f94705..0aac03204f9f 100644
+--- a/arch/arm/mach-exynos/platsmp.c
++++ b/arch/arm/mach-exynos/platsmp.c
+@@ -20,6 +20,7 @@
+ #include <linux/jiffies.h>
+ #include <linux/smp.h>
+ #include <linux/io.h>
++#include <linux/of_address.h>
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/smp_plat.h>
+@@ -33,11 +34,33 @@
+ 
+ extern void exynos4_secondary_startup(void);
+ 
++static void __iomem *sram_base_addr;
++void __iomem *sram_ns_base_addr;
++
++static void __init exynos_smp_prepare_sram(void)
++{
++	struct device_node *node;
++
++	node = of_find_compatible_node(NULL, NULL, "samsung,exynos4210-sram");
++	if (node) {
++		sram_base_addr = of_iomap(node, 0);
++		if (!sram_base_addr)
++			pr_err("Secondary CPU boot address not found\n");
++	}
++
++	node = of_find_compatible_node(NULL, NULL, "samsung,exynos4210-sram-ns");
++	if (node) {
++		sram_ns_base_addr = of_iomap(node, 0);
++		if (!sram_ns_base_addr)
++			pr_err("Secondary CPU boot address not found\n");
++	}
++}
++
+ static inline void __iomem *cpu_boot_reg_base(void)
+ {
+ 	if (soc_is_exynos4210() && samsung_rev() == EXYNOS4210_REV_1_1)
+ 		return S5P_INFORM5;
+-	return S5P_VA_SYSRAM;
++	return sram_base_addr;
+ }
+ 
+ static inline void __iomem *cpu_boot_reg(int cpu)
+@@ -147,7 +170,8 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 		 * and fall back to boot register if it fails.
+ 		 */
+ 		if (call_firmware_op(set_cpu_boot_addr, phys_cpu, boot_addr))
+-			__raw_writel(boot_addr, cpu_boot_reg(phys_cpu));
++			if (cpu_boot_reg_base())
++				__raw_writel(boot_addr, cpu_boot_reg(phys_cpu));
+ 
+ 		call_firmware_op(cpu_boot, phys_cpu);
+ 
+@@ -205,6 +229,8 @@ static void __init exynos_smp_prepare_cpus(unsigned int max_cpus)
+ 	if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
+ 		scu_enable(scu_base_addr());
+ 
++	exynos_smp_prepare_sram();
++
+ 	/*
+ 	 * Write the address of secondary startup into the
+ 	 * system-wide flags register. The boot monitor waits
+@@ -222,7 +248,8 @@ static void __init exynos_smp_prepare_cpus(unsigned int max_cpus)
+ 		boot_addr = virt_to_phys(exynos4_secondary_startup);
+ 
+ 		if (call_firmware_op(set_cpu_boot_addr, phys_cpu, boot_addr))
+-			__raw_writel(boot_addr, cpu_boot_reg(phys_cpu));
++			if (cpu_boot_reg_base())
++				__raw_writel(boot_addr, cpu_boot_reg(phys_cpu));
+ 	}
+ }
+ 
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+1.7.9.5
