@@ -1,83 +1,47 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Fri, 2 May 2014 21:37:05 +0200
-Subject: BUG: spinlock trylock failure on UP, i.MX28 3.12.15-rt25
-In-Reply-To: <alpine.DEB.2.02.1405022100351.6261@ionos.tec.linutronix.de>
-References: <534C3606.7010206@meduna.org> <534C731F.1050406@meduna.org>
- <534DADF1.6060608@meduna.org>
- <20140422115439.GA20669@linutronix.de>
- <20140422094657.5b6ca1e2@gandalf.local.home>
- <53569E05.8010600@linutronix.de>
- <20140422134802.73fc1fa4@gandalf.local.home>
- <20140422141650.7f43d5ba@gandalf.local.home>
- <20140502183824.GH9178@linutronix.de>
- <alpine.DEB.2.02.1405022100351.6261@ionos.tec.linutronix.de>
-Message-ID: <20140502193705.GI9178@linutronix.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 2 May 2014 13:04:33 -0700
+Subject: [PATCHv3] arm64: topology: add MPIDR-based detection
+In-Reply-To: <1398814573-27389-1-git-send-email-zlim@broadcom.com>
+References: <1398814573-27389-1-git-send-email-zlim@broadcom.com>
+Message-ID: <20140502200433.GX3245@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Thomas Gleixner | 2014-05-02 21:01:50 [+0200]:
+On Tue, Apr 29, 2014 at 04:36:13PM -0700, Zi Shen Lim wrote:
 
->It's different as it CANNOT fail on UP. That's called from the idle
->code and there is no way that anything holds that lock on UP when idle
->runs.
+This looks good to me, modulo a couple of really tiny nitpicks.
 
-Okay, so I will add the patch here. The same thing (mostly) but it will
-also skip the irq_work_needs_cpu() check since we will run the timer
-softirq anyway.
+Reviwed-by: Mark Brown <broonie@linaro.org>
 
-From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-Date: Fri, 2 May 2014 21:31:50 +0200
-Subject: [PATCH] timer: do not spin_trylock() on UP
+I'm just doing some brief testing now, I'll repost my series with this
+and Lorenzo's changes included shortly assuming no issues.
 
-This will void a warning comming from the spin-lock debugging code. The
-lock avoiding idea is from Steven Rostedt.
+>  	if (cpuid_topo->cluster_id == -1) {
+> -		/*
+> -		 * DT does not contain topology information for this cpu.
+> -		 */
+> +		/* No topology information for this cpu ?! */
+>  		pr_debug("CPU%u: No topology information configured\n", cpuid);
+>  		return;
+>  	}
 
-Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
----
- kernel/timer.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+Now that we have MPIDR support (well, will with this patch) this should
+probably be raised to a pr_err() since we've got ourselves confused
+somehow if it ever happens - we should always be able to get topology
+from MPIDR.  I'll tweak this when I repost.
 
-diff --git a/kernel/timer.c b/kernel/timer.c
-index 54596b5..8750875 100644
---- a/kernel/timer.c
-+++ b/kernel/timer.c
-@@ -1455,18 +1455,31 @@ void run_local_timers(void)
- 	struct tvec_base *base = __this_cpu_read(tvec_bases);
- 
- 	hrtimer_run_queues();
- 	/*
- 	 * We can access this lockless as we are in the timer
- 	 * interrupt. If there are no timers queued, nothing to do in
- 	 * the timer softirq.
- 	 */
- #ifdef CONFIG_PREEMPT_RT_FULL
-+
-+#ifndef CONFIG_SMP
-+	/*
-+	 * The spin_do_trylock() later may fail as the lock may be hold before
-+	 * the interrupt arrived. The spin-lock debugging code will raise a
-+	 * warning if the try_lock fails on UP. Since this is only an
-+	 * optimization for the FULL_NO_HZ case (not to run the timer softirq on
-+	 * an nohz_full CPU) we don't really care and shedule the softirq.
-+	 */
-+	raise_softirq(TIMER_SOFTIRQ);
-+	return;
-+#endif
-+
- 	/* On RT, irq work runs from softirq */
- 	if (irq_work_needs_cpu()) {
- 		raise_softirq(TIMER_SOFTIRQ);
- 		return;
- 	}
- 
- 	if (!spin_do_trylock(&base->lock)) {
- 		raise_softirq(TIMER_SOFTIRQ);
- 		return;
--- 
-2.0.0.rc0
+> +	pr_debug("CPU%u: cluster %d core %d thread %d mpidr %llx\n",
+> +		 cpuid, cpuid_topo->cluster_id, cpuid_topo->core_id,
+> +		 cpuid_topo->thread_id, mpidr);
 
->Thanks,
->
->	tglx
-
-Sebastian
+I do wonder if we should print this either unconditionally or not at
+all (rather than only if using MPIDR), I know Catalin and/or Lorenzo
+weren't keen on noise but it is just at debug level and it's nice and
+easy to refer to.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140502/aa5272e8/attachment-0001.sig>
