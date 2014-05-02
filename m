@@ -1,105 +1,80 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 2 May 2014 09:58:07 -0500
-Subject: [PATCHv5 01/15] Documentation: dt: add common bindings for
- hwspinlock
-In-Reply-To: <1398904476-26200-2-git-send-email-s-anna@ti.com>
-References: <1398904476-26200-1-git-send-email-s-anna@ti.com>
- <1398904476-26200-2-git-send-email-s-anna@ti.com>
-Message-ID: <CAL_JsqJEVU7j0+biWuW2FiV-avu1_SO4w+OCdirAc6mw2OxrOA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 2 May 2014 15:58:52 +0100
+Subject: [PATCH v3 5/7] ARM: dma: Use dma_pfn_offset for dma address
+ translation
+In-Reply-To: <1398353407-2345-6-git-send-email-santosh.shilimkar@ti.com>
+References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
+ <1398353407-2345-6-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20140502145852.GC3693@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 30, 2014 at 7:34 PM, Suman Anna <s-anna@ti.com> wrote:
-> This patch adds the generic common bindings used to represent
-> a hwlock device and use/request locks in a device-tree build.
->
-> All the platform-specific hwlock driver implementations need the
-> number of locks and associated base id for registering the locks
-> present within the device with the driver core. The number of locks
-> is represented by 'hwlock-num-locks' property in DT bindings. A
-> property for base id is not needed in DT binding, as it can be
-> satisfied using a phandle + args specifier. The args specifier
-> length is dependent on each vendor-specific implementation and
-> is represented through the '#hwlock-cells' property.
->
-> Note that the document is named hwlock.txt deliberately to keep it
-> a bit more generic.
->
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Signed-off-by: Suman Anna <s-anna@ti.com>
-> ---
->  .../devicetree/bindings/hwlock/hwlock.txt          | 52 ++++++++++++++++++++++
->  1 file changed, 52 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/hwlock/hwlock.txt
->
-> diff --git a/Documentation/devicetree/bindings/hwlock/hwlock.txt b/Documentation/devicetree/bindings/hwlock/hwlock.txt
-> new file mode 100644
-> index 0000000..32381cc
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/hwlock/hwlock.txt
-> @@ -0,0 +1,52 @@
-> +Generic hwlock bindings
-> +=======================
-> +
-> +Generic bindings that are common to all the hwlock platform specific driver
-> +implementations, the retrieved values are used for registering the device
-> +specific parameters with the hwspinlock core.
-> +
-> +The validity and need of these common properties may vary from one platform
-> +implementation to another. The platform specific bindings should explicitly
-> +state if a property is mandatory or optional. Please look through the
-> +individual platform specific hwlock binding documentations for identifying
-> +the applicable properties.
-> +
-> +Common properties:
-> +- #hwlock-cells:       Specifies the number of cells needed to represent a
-> +                       specific lock.
+On Thu, Apr 24, 2014 at 11:30:05AM -0400, Santosh Shilimkar wrote:
+> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+> index e701a4d..424fda9 100644
+> --- a/arch/arm/include/asm/dma-mapping.h
+> +++ b/arch/arm/include/asm/dma-mapping.h
+> @@ -58,22 +58,35 @@ static inline int dma_set_mask(struct device *dev, u64 mask)
+>  #ifndef __arch_pfn_to_dma
+>  static inline dma_addr_t pfn_to_dma(struct device *dev, unsigned long pfn)
+>  {
+> -	return (dma_addr_t)__pfn_to_bus(pfn);
+> +	if (!dev)
+> +		return (dma_addr_t)__pfn_to_bus(pfn);
+> +	else
+> +		return (dma_addr_t)__pfn_to_bus(pfn - dev->dma_pfn_offset);
 
-This should never be optional.
+I really don't trust gcc to do this right, so I think it would be better
+to make life easier on the compiler:
 
-> +- hwlock-num-locks:    Number of locks present in a hwlock device. This
-> +                       property is needed on hwlock devices, where the number
-> +                       of supported locks within a hwlock device cannot be
-> +                       read from a register.
+	if (dev)
+		pfn -= dev->dma_pfn_offset;
+	return (dma_addr_t)__pfn_to_bus(pfn);
 
-Do you have any users of this? The omap binding doesn't use it.
-Wouldn't you typically know this based on the IP block? Similarly you
-typically don't have to list how many irqs an interrupt controller
-has.
+>  static inline unsigned long dma_to_pfn(struct device *dev, dma_addr_t addr)
+>  {
+> -	return __bus_to_pfn(addr);
+> +	if (!dev)
+> +		return __bus_to_pfn(addr);
+> +	else
+> +		return __bus_to_pfn(addr) + dev->dma_pfn_offset;
 
+and:
 
-> +
-> +Hwlock Users:
-> +=============
-> +
-> +Nodes that require specific hwlock(s) should specify them using one or more
-> +properties, each containing a phandle to the hwlock node and an args specifier
-> +value as indicated by #hwlock-cells. Multiple hwlocks can be requested using
-> +an array of the phandle and hwlock number specifier tuple.
-> +
-> +1. Example of a node using a single specific hwlock:
-> +
-> +The following example has a node requesting a hwlock in the bank defined by
-> +the node hwlock1. hwlock1 is a hwlock provider with an argument specifier
-> +of length 1.
-> +
-> +       node {
-> +               ...
-> +               hwlocks = <&hwlock1 2>;
-> +               ...
-> +       };
-> +
-> +2. Example of a node using multiple specific hwlocks:
-> +
-> +The following example has a node requesting two hwlocks, a hwlock within
-> +the hwlock device node 'hwlock1' with #hwlock-cells value of 1, and another
-> +hwlock within the hwlock device node 'hwlock2' with #hwlock-cells value of 2.
-> +
-> +       node {
-> +               ...
-> +               hwlocks = <&hwlock1 2>, <&hwlock2 0 3>;
-> +               ...
-> +       };
-> --
-> 1.9.2
->
+	unsigned long pfn = __bus_to_pfn(addr);
+
+	if (dev)
+		pfn += dev->dma_pfn_offset;
+
+	return pfn;
+
+>  }
+>  
+>  static inline void *dma_to_virt(struct device *dev, dma_addr_t addr)
+>  {
+> -	return (void *)__bus_to_virt((unsigned long)addr);
+> +	if (!dev)
+> +		return (void *)__bus_to_virt((unsigned long)addr);
+> +	else
+> +		return (void *)__bus_to_virt(__pfn_to_bus(dma_to_pfn(dev, addr)));
+
+This is quite horrendous.  There's easier ways to do this...  I assume
+you haven't looked at the assembler resulting from this at all with
+stuff like the p2v patching enabled?
+
+>  }
+>  
+>  static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
+>  {
+> -	return (dma_addr_t)__virt_to_bus((unsigned long)(addr));
+> +	if (!dev)
+> +		return (dma_addr_t)__virt_to_bus((unsigned long)(addr));
+> +	else
+> +		return pfn_to_dma(dev,
+> +				__bus_to_pfn(__virt_to_bus((unsigned long)(addr))));
+
+Same here.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
