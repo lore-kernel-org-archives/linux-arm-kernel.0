@@ -1,251 +1,68 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Fri, 2 May 2014 15:19:57 -0400
-Subject: [PATCH v8 1/8] ftrace: make CALLER_ADDRx macros more generic
-In-Reply-To: <1398851676-16389-2-git-send-email-takahiro.akashi@linaro.org>
-References: <1394862048-28758-1-git-send-email-takahiro.akashi@linaro.org>
- <1398851676-16389-1-git-send-email-takahiro.akashi@linaro.org>
- <1398851676-16389-2-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <20140502151957.6978d870@gandalf.local.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 02 May 2014 21:29:30 +0200
+Subject: [RESEND PATCH 2/3] PCI: ARM: add support for generic PCI host
+ controller
+In-Reply-To: <20140502190318.GE3179@obsidianresearch.com>
+References: <1399048876-11862-1-git-send-email-will.deacon@arm.com>
+ <20140502184421.GF14645@arm.com> <20140502190318.GE3179@obsidianresearch.com>
+Message-ID: <12080862.flQZBvPba4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 30 Apr 2014 18:54:29 +0900
-AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
-
-> Most archs with HAVE_ARCH_CALLER_ADDR have the almost same definitions
-> of CALLER_ADDRx(n), and so put them into linux/ftrace.h.
-
-Please add a bit more to the change log. Like what you did. Something
-like:
-
-----
-Most archs with HAVE_ARCH_CALLER_ADDR have pretty much the same
-definitions of CALLER_ADDRx(n). Instead of duplicating the code for all
-the archs, define a ftrace_return_address0() and
-ftrace_return_address(n) that can be overwritten by the archs if they
-need to do something different. Instead of 7 macros in every arch, we
-now only have at most 2 (and actually only 1 as
-ftrace_return_address0() should be the same for all archs).
-
-The CALLER_ADDRx(n) will now be defined in linux/ftrace.h and use the
-ftrace_return_address*(n?) macros. This removes a lot of the duplicate
-code.
------
-
-Use that if you want :-)
-
-
+On Friday 02 May 2014 13:03:18 Jason Gunthorpe wrote:
 > 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> ---
->  arch/arm/include/asm/ftrace.h      |   10 +---------
->  arch/blackfin/include/asm/ftrace.h |   11 +----------
->  arch/parisc/include/asm/ftrace.h   |   10 +---------
->  arch/sh/include/asm/ftrace.h       |   10 +---------
->  arch/xtensa/include/asm/ftrace.h   |   14 ++++----------
->  include/linux/ftrace.h             |   34 ++++++++++++++++++----------------
->  6 files changed, 26 insertions(+), 63 deletions(-)
+> > > Setup is called from probe, through pci_common_init_dev(), so that shouldn't
+> > > make a difference.
+> > 
+> > Given that the idea was to separate setup() and probe(), I didn't want to
+> > make the assumption that I was called in probe context.
 > 
-> diff --git a/arch/arm/include/asm/ftrace.h b/arch/arm/include/asm/ftrace.h
-> index f89515a..eb577f4 100644
-> --- a/arch/arm/include/asm/ftrace.h
-> +++ b/arch/arm/include/asm/ftrace.h
-> @@ -52,15 +52,7 @@ extern inline void *return_address(unsigned int level)
->  
->  #endif
->  
-> -#define HAVE_ARCH_CALLER_ADDR
-> -
-> -#define CALLER_ADDR0 ((unsigned long)__builtin_return_address(0))
-> -#define CALLER_ADDR1 ((unsigned long)return_address(1))
-> -#define CALLER_ADDR2 ((unsigned long)return_address(2))
-> -#define CALLER_ADDR3 ((unsigned long)return_address(3))
-> -#define CALLER_ADDR4 ((unsigned long)return_address(4))
-> -#define CALLER_ADDR5 ((unsigned long)return_address(5))
-> -#define CALLER_ADDR6 ((unsigned long)return_address(6))
-> +#define ftrace_return_addr(n) return_address(n)
->  
->  #endif /* ifndef __ASSEMBLY__ */
->  
-> diff --git a/arch/blackfin/include/asm/ftrace.h b/arch/blackfin/include/asm/ftrace.h
-> index 8a02950..2f1c3c2 100644
-> --- a/arch/blackfin/include/asm/ftrace.h
-> +++ b/arch/blackfin/include/asm/ftrace.h
-> @@ -66,16 +66,7 @@ extern inline void *return_address(unsigned int level)
->  
->  #endif /* CONFIG_FRAME_POINTER */
->  
-> -#define HAVE_ARCH_CALLER_ADDR
-> -
-> -/* inline function or macro may lead to unexpected result */
-> -#define CALLER_ADDR0 ((unsigned long)__builtin_return_address(0))
-> -#define CALLER_ADDR1 ((unsigned long)return_address(1))
-> -#define CALLER_ADDR2 ((unsigned long)return_address(2))
-> -#define CALLER_ADDR3 ((unsigned long)return_address(3))
-> -#define CALLER_ADDR4 ((unsigned long)return_address(4))
-> -#define CALLER_ADDR5 ((unsigned long)return_address(5))
-> -#define CALLER_ADDR6 ((unsigned long)return_address(6))
-> +#define ftrace_return_address(n) return_address(n)
->  
->  #endif /* __ASSEMBLY__ */
->  
-> diff --git a/arch/parisc/include/asm/ftrace.h b/arch/parisc/include/asm/ftrace.h
-> index 72c0faf..544ed8e 100644
-> --- a/arch/parisc/include/asm/ftrace.h
-> +++ b/arch/parisc/include/asm/ftrace.h
-> @@ -24,15 +24,7 @@ extern void return_to_handler(void);
->  
->  extern unsigned long return_address(unsigned int);
->  
-> -#define HAVE_ARCH_CALLER_ADDR
-> -
-> -#define CALLER_ADDR0 ((unsigned long)__builtin_return_address(0))
-> -#define CALLER_ADDR1 return_address(1)
-> -#define CALLER_ADDR2 return_address(2)
-> -#define CALLER_ADDR3 return_address(3)
-> -#define CALLER_ADDR4 return_address(4)
-> -#define CALLER_ADDR5 return_address(5)
-> -#define CALLER_ADDR6 return_address(6)
-> +#define ftrace_return_address(n) return_address(n)
->  
->  #endif /* __ASSEMBLY__ */
->  
-> diff --git a/arch/sh/include/asm/ftrace.h b/arch/sh/include/asm/ftrace.h
-> index 13e9966..e79fb6e 100644
-> --- a/arch/sh/include/asm/ftrace.h
-> +++ b/arch/sh/include/asm/ftrace.h
-> @@ -40,15 +40,7 @@ static inline unsigned long ftrace_call_adjust(unsigned long addr)
->  /* arch/sh/kernel/return_address.c */
->  extern void *return_address(unsigned int);
->  
-> -#define HAVE_ARCH_CALLER_ADDR
-> -
-> -#define CALLER_ADDR0 ((unsigned long)__builtin_return_address(0))
-> -#define CALLER_ADDR1 ((unsigned long)return_address(1))
-> -#define CALLER_ADDR2 ((unsigned long)return_address(2))
-> -#define CALLER_ADDR3 ((unsigned long)return_address(3))
-> -#define CALLER_ADDR4 ((unsigned long)return_address(4))
-> -#define CALLER_ADDR5 ((unsigned long)return_address(5))
-> -#define CALLER_ADDR6 ((unsigned long)return_address(6))
-> +#define ftrace_return_address(n) return_address(n)
->  
->  #endif /* __ASSEMBLY__ */
->  
-> diff --git a/arch/xtensa/include/asm/ftrace.h b/arch/xtensa/include/asm/ftrace.h
-> index 736b9d2..6c6d9a9 100644
-> --- a/arch/xtensa/include/asm/ftrace.h
-> +++ b/arch/xtensa/include/asm/ftrace.h
-> @@ -12,24 +12,18 @@
->  
->  #include <asm/processor.h>
->  
-> -#define HAVE_ARCH_CALLER_ADDR
->  #ifndef __ASSEMBLY__
-> -#define CALLER_ADDR0 ({ unsigned long a0, a1; \
-> +#define ftrace_return_address0 ({ unsigned long a0, a1; \
->  		__asm__ __volatile__ ( \
->  			"mov %0, a0\n" \
->  			"mov %1, a1\n" \
->  			: "=r"(a0), "=r"(a1)); \
->  		MAKE_PC_FROM_RA(a0, a1); })
-> +
->  #ifdef CONFIG_FRAME_POINTER
->  extern unsigned long return_address(unsigned level);
-> -#define CALLER_ADDR1 return_address(1)
-> -#define CALLER_ADDR2 return_address(2)
-> -#define CALLER_ADDR3 return_address(3)
-> -#else /* CONFIG_FRAME_POINTER */
-> -#define CALLER_ADDR1 (0)
-> -#define CALLER_ADDR2 (0)
-> -#define CALLER_ADDR3 (0)
-> -#endif /* CONFIG_FRAME_POINTER */
-> +#define ftrace_return_address(n) return_address(n)
+> IMHO, we need to have clear purposes for setup() and probe().
+> 
+> Probe is well defined already, it requests resources, claims the
+> device, puts it in reset and then does some subsystem specific thing.
+> The interaction with probe and devm is also already well specified.
+> 
+> It doesn't matter for this driver, but look at mvebu, you cannot move
+> the interrupt, gpio and clock acquisitions from probe() to setup(), as
+> they could all trigger a defered probe. Better to be consistent,
+> especially if this is the golden reference driver we want everyone to
+> follow (sorry Will)
 
-I would add a comment here that states:
+Fair enough. It shouldn't be hard to move.
 
-/*
- * #else !CONFIG_FRAME_POINTER
- *
- * Define CALLER_ADDRn (n > 0) to 0 is the default in linux/ftrace.h if
- * ftrace_return_address(n) and CONFIG_FRAME_POINTER are not defined.
- */
+> To me setup() is more like netdev open(), so it should just do that
+> final step to enable the links and bring up the PCI network and be
+> ready to run PCI discovery. Consider, someday we might have an
+> unsetup() for power mangement reasons, just like we have a close() in
+> netdev.
 
-Otherwise it looks like you are missing the #else statement.
+I expect setup() to just go away in the long run for loadable host
+controllers, and get merged into probe().
 
-> +#endif
->  #endif /* __ASSEMBLY__ */
->  
->  #ifdef CONFIG_FUNCTION_TRACER
-> diff --git a/include/linux/ftrace.h b/include/linux/ftrace.h
-> index 9212b01..18f1ae7 100644
-> --- a/include/linux/ftrace.h
-> +++ b/include/linux/ftrace.h
-> @@ -614,25 +614,27 @@ static inline void __ftrace_enabled_restore(int enabled)
->  #endif
->  }
->  
-> -#ifndef HAVE_ARCH_CALLER_ADDR
-> +/* All archs should have this, but we define it for consistency */
+> If the long term plan is to keep probe() then I don't think it makes
+> sense to move probe() duties into setup(). That just restricts what we
+> can do with the setup() call if setup() is now required to always
+> handle defered probe and so forth.
 
-The comment is a little confusing. I think it may be better stated as:
+setup() makes sense for the traditional ARM32 PCI support with
+nr_controllers > 1: dove, kirkwood, mv78xx0, orion5x and iop13xx
+(most of these are gradually getting replace with pci-mvebu.c,
+which doesn't do that, as you know). All other classic drivers only
+support one host bridge anyway, and the loadable driver just
+use one domain per host bridge, which means you lose all the
+advantages of having pci_common_init_dev() assign the bus
+numbers and call setup functions for each host bridge.
 
-/*
- * All archs should be able to use __builtin_return_address(0) but
- * we allow them to redefine it for consistency.
- */
+It should be fine to have a trivial setup function like this
 
-> +#ifndef ftrace_return_address0
-> +# define ftrace_return_address0 __builtin_return_address(0)
-> +#endif
-> +
-> +/* Archs may use other ways for ADDR1 and beyond */
+static int gen_pci_setup(int nr, struct pci_sys_data *sys)
+{
+	struct gen_pci *pci = sys->private_data;
+	list_splice_init(pci->resource, sys->resources);
+	return 1;
+}
 
-How about:
+and do everything in probe().
 
-/* Not all archs can use __builtin_return_address(n) where n > 0 */
-
-> +#ifndef ftrace_return_address
->  # ifdef CONFIG_FRAME_POINTER
-> -#  define CALLER_ADDR0 ((unsigned long)__builtin_return_address(0))
-> -#  define CALLER_ADDR1 ((unsigned long)__builtin_return_address(1))
-> -#  define CALLER_ADDR2 ((unsigned long)__builtin_return_address(2))
-> -#  define CALLER_ADDR3 ((unsigned long)__builtin_return_address(3))
-> -#  define CALLER_ADDR4 ((unsigned long)__builtin_return_address(4))
-> -#  define CALLER_ADDR5 ((unsigned long)__builtin_return_address(5))
-> -#  define CALLER_ADDR6 ((unsigned long)__builtin_return_address(6))
-> +#  define ftrace_return_address(n) __builtin_return_address(n)
->  # else
-> -#  define CALLER_ADDR0 ((unsigned long)__builtin_return_address(0))
-> -#  define CALLER_ADDR1 0UL
-> -#  define CALLER_ADDR2 0UL
-> -#  define CALLER_ADDR3 0UL
-> -#  define CALLER_ADDR4 0UL
-> -#  define CALLER_ADDR5 0UL
-> -#  define CALLER_ADDR6 0UL
-> +#  define ftrace_return_address(n) 0UL
->  # endif
-> -#endif /* ifndef HAVE_ARCH_CALLER_ADDR */
-> +#endif
-> +
-> +#define CALLER_ADDR0 ((unsigned long)ftrace_return_address0)
-> +#define CALLER_ADDR1 ((unsigned long)ftrace_return_address(1))
-> +#define CALLER_ADDR2 ((unsigned long)ftrace_return_address(2))
-> +#define CALLER_ADDR3 ((unsigned long)ftrace_return_address(3))
-> +#define CALLER_ADDR4 ((unsigned long)ftrace_return_address(4))
-> +#define CALLER_ADDR5 ((unsigned long)ftrace_return_address(5))
-> +#define CALLER_ADDR6 ((unsigned long)ftrace_return_address(6))
-
-Other than that, it looks good. You can send me the patch and I'll add
-it to my 3.16 queue.
-
-Feel free to reply to this email with a v9. When I pull patches into
-git, it adds the link to the thread for the patch in LKML. To keep this
-entire thread, just reply to it.
-
-Thanks!
-
--- Steve
-
->  
->  #ifdef CONFIG_IRQSOFF_TRACER
->    extern void time_hardirqs_on(unsigned long a0, unsigned long a1);
+	Arnd
