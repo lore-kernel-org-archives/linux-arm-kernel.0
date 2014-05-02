@@ -1,67 +1,62 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 02 May 2014 22:17:54 +0900
-Subject: [PATCH v5 0/4] usb: ehci/ohci-exynos: Move to generic phy
- framework
-In-Reply-To: <1399034855-9686-1-git-send-email-gautam.vivek@samsung.com>
-References: <1399034855-9686-1-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <53639B02.1020101@samsung.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 02 May 2014 06:22:36 -0700
+Subject: [RFC PATCH 1/5] watchdog: Add API to trigger reboots
+In-Reply-To: <20140502100105.GC17370@arm.com>
+References: <1398958893-30049-1-git-send-email-linux@roeck-us.net>
+ <1398958893-30049-2-git-send-email-linux@roeck-us.net>
+ <20140502100105.GC17370@arm.com>
+Message-ID: <53639C1C.8050701@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/02/14 21:47, Vivek Gautam wrote:
-> Based and tested on 'usb-next' branch of Greg's usb tree, with relevant
-> device tree patches[1]
+On 05/02/2014 03:01 AM, Will Deacon wrote:
+> Hi Guenter,
 >
-> Hi Alan,
->   I have included your Acked-by in all the four patches, but there has been
->   some amount of restructuring as suggested by Tomasz Figa.
->   Please let me know if you have some comments on this patch-series.
+> This looks pretty sensible to me (and the arm/arm64 bits look fine too), but
+> I have one question below...
 >
-> Changes from v4:
->   - Addressed review comments for restructuring exynos_ohci_get_phy()
->     and exynos_ehci_get_phy(); and thereby adding proper checks in
->     exynos_ohci_phy_enable()/disable() as well as exynos_ehci_phy_enable()/
->     disable().
+> On Thu, May 01, 2014 at 04:41:29PM +0100, Guenter Roeck wrote:
+>> Some hardware implements reboot through its watchdog hardware,
+>> for example by triggering a watchdog timeout. Platform specific
+>> code starts to spread into watchdog drivers, typically by setting
+>> pointers to a callback functions which is then called from the
+>> platform reset handler.
+>>
+>> To simplify code and provide a unified API to trigger reboots by
+>> watchdog drivers, provide a single API to trigger such reboots
+>> through the watchdog subsystem.
+>>
+>> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+>> ---
+>>   drivers/watchdog/watchdog_core.c |   17 +++++++++++++++++
+>>   include/linux/watchdog.h         |   11 +++++++++++
+>>   2 files changed, 28 insertions(+)
+>>
+>> diff --git a/drivers/watchdog/watchdog_core.c b/drivers/watchdog/watchdog_core.c
+>> index cec9b55..4ec6e2f 100644
+>> --- a/drivers/watchdog/watchdog_core.c
+>> +++ b/drivers/watchdog/watchdog_core.c
+>> @@ -43,6 +43,17 @@
+>>   static DEFINE_IDA(watchdog_ida);
+>>   static struct class *watchdog_class;
+>>
+>> +static struct watchdog_device *wdd_reboot_dev;
+>> +
+>> +void watchdog_do_reboot(enum reboot_mode mode, const char *cmd)
+>> +{
+>> +	if (wdd_reboot_dev) {
+>> +		if (wdd_reboot_dev->ops->reboot)
+>> +			wdd_reboot_dev->ops->reboot(wdd_reboot_dev, mode, cmd);
+>> +	}
+>> +}
 >
-> Changes from v3:
->   - Calling usb_phy_shutdown() when exynos_o/ehci_phy_enable() is failing.
->   - Made exynos_o/ehci_phy_disable() return void, since its return value
->     did not serve any purpose.
->   - Calling clk_disable_unprepare() in exynos_o/ehci_resume() when
->     exynos_o/ehci_phy_enable() is failed.
+> What reboot_mode values would you expect a watchdog to support other than
+> REBOOT_HARD? Also, is the cmd even useful here?
 >
-> Changes from v2:
->   - Added two patches in the series for some cleanup.
->     usb: ohci-exynos: Use struct device instead of platform_device
->     usb: ehci-exynos: Use struct device instead of platform_device
->   - Addressed review comments.
->     -- Moved exynos_ohci_phyg_on()/off routines inside
->        exynos_ohci_phy_enable()/disable.
->     -- Added functions exynos_ehci_phy_enable() and exynos_ehci_phy_disable()
->        and moved exynos_ehci_phyg_on()/off routines respectively in them.
->     -- Added necessary checks.
->
-> [1]: [PATCH 0/4] dts: Add usb2phy to Exynos 5250/5420
->       https://lkml.org/lkml/2014/4/30/119
->
-> Kamil Debski (1):
->    usb: ehci-exynos: Change to use phy provided by the generic phy
->      framework
->
-> Vivek Gautam (3):
->    usb: ohci-exynos: Use struct device instead of platform_device
->    usb: ehci-exynos: Use struct device instead of platform_device
->    usb: ohci-exynos: Add facility to use phy provided by the generic phy
->      framework
->
->   .../devicetree/bindings/usb/exynos-usb.txt         |   31 +++++
->   drivers/usb/host/ehci-exynos.c                     |  136 ++++++++++++++++----
->   drivers/usb/host/ohci-exynos.c                     |  134 +++++++++++++++----
->   3 files changed, 254 insertions(+), 47 deletions(-)
->
-This series looks good to me, please feel free to add my ack on this series,
 
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+Answer is "I don't know" in both cases. I thought about dropping the parameters,
+but then I thought it does not hurt to have them around either. I am open to
+suggestions and to dropping the parameters if everyone agrees that they are
+useless.
 
-Thanks,
-Kukjin
+Guenter
