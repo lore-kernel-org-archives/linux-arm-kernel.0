@@ -1,39 +1,59 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri,  2 May 2014 17:09:58 +0100
-Subject: [PATCH v2 0/3] arm64: Provide ESR_EL1 information to user signal
- handlers
-Message-ID: <1399047001-6475-1-git-send-email-catalin.marinas@arm.com>
+Date: Fri,  2 May 2014 17:10:01 +0100
+Subject: [PATCH v2 3/3] arm64: Expose ESR_EL1 information to user when
+ SIGSEGV/SIGBUS
+In-Reply-To: <1399047001-6475-1-git-send-email-catalin.marinas@arm.com>
+References: <1399047001-6475-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1399047001-6475-4-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arm64 port omitted the fault status information in sigcontext.
-However, there are emulators like Qemu that rely on such information to
-distinguish between a read or a write fault without decoding the
-faulting instruction.
+This information is useful for instruction emulators to detect
+read/write and access size without having to decode the faulting
+instruction. The current patch exports it via sigcontext (struct
+esr_context) and is only valid for SIGSEGV and SIGBUS.
 
-The first patch fixes the compat case. The second patch is a clean-up
-and the third introduces the esr_context structure with its own magic to
-be stored on the signal handler stack when applicable (SIGSEGV and
-SIGBUS). Given that this hardware register is meant for EL1 consumption,
-if significant changes are made in future architecture versions a new
-magic number will be introduced.
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm64/include/uapi/asm/sigcontext.h |  7 +++++++
+ arch/arm64/kernel/signal.c               | 10 ++++++++++
+ 2 files changed, 17 insertions(+)
 
-Changes since v1:
-- Added definitions for FSR_WRITE_SHIFT and ESR_EL1_(WRITE|CM) to avoid
-  magic values
-
-Catalin Marinas (3):
-  arm64: Provide read/write fault information in compat signal handlers
-  arm64: Remove the aux_context structure
-  arm64: Expose ESR_EL1 information to user when SIGSEGV/SIGBUS
-
- arch/arm64/include/asm/esr.h             |  6 ++++--
- arch/arm64/include/asm/processor.h       |  1 +
- arch/arm64/include/asm/sigcontext.h      | 31 --------------------------
- arch/arm64/include/uapi/asm/sigcontext.h |  7 ++++++
- arch/arm64/kernel/signal.c               | 37 +++++++++++++++++++++++---------
- arch/arm64/kernel/signal32.c             |  7 +++++-
- arch/arm64/kernel/traps.c                |  7 ++++--
- arch/arm64/mm/fault.c                    |  8 +++----
- 8 files changed, 54 insertions(+), 50 deletions(-)
- delete mode 100644 arch/arm64/include/asm/sigcontext.h
+diff --git a/arch/arm64/include/uapi/asm/sigcontext.h b/arch/arm64/include/uapi/asm/sigcontext.h
+index 690ad51cc901..b72cf405b3fe 100644
+--- a/arch/arm64/include/uapi/asm/sigcontext.h
++++ b/arch/arm64/include/uapi/asm/sigcontext.h
+@@ -53,5 +53,12 @@ struct fpsimd_context {
+ 	__uint128_t vregs[32];
+ };
+ 
++/* ESR_EL1 context */
++#define ESR_MAGIC	0x45535201
++
++struct esr_context {
++	struct _aarch64_ctx head;
++	u64 esr;
++};
+ 
+ #endif /* _UAPI__ASM_SIGCONTEXT_H */
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index 7ff2eee96c6b..dc2ab1b0ac0d 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -194,6 +194,16 @@ static int setup_sigframe(struct rt_sigframe __user *sf,
+ 		aux += sizeof(*fpsimd_ctx);
+ 	}
+ 
++	/* fault information, if valid */
++	if (current->thread.fault_code) {
++		struct esr_context *esr_ctx =
++			container_of(aux, struct esr_context, head);
++		__put_user_error(ESR_MAGIC, &esr_ctx->head.magic, err);
++		__put_user_error(sizeof(*esr_ctx), &esr_ctx->head.size, err);
++		__put_user_error(current->thread.fault_code, &esr_ctx->esr, err);
++		aux += sizeof(*esr_ctx);
++	}
++
+ 	/* set the "end" magic */
+ 	end = aux;
+ 	__put_user_error(0, &end->magic, err);
