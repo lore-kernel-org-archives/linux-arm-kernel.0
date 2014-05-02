@@ -1,68 +1,119 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Fri, 2 May 2014 14:37:20 +0900
-Subject: [PATCH] ARM: tegra: add Tegra Note 7 device tree
-In-Reply-To: <53628566.1070602@wwwdotorg.org>
-References: <1398928217-32629-1-git-send-email-acourbot@nvidia.com>
- <53628566.1070602@wwwdotorg.org>
-Message-ID: <CAAVeFuK2dLYniekFzrN5OtkBJ_Z4RZZFOqe5yd-bzYtoyTkyZw@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 1 May 2014 22:37:21 -0700
+Subject: [PATCH RESEND 3/5] ARM: BCM63XX: add BCM63138 minimal Device Tree
+In-Reply-To: <4701106.5EnjdVQgVO@wuerfel>
+References: <1398130758-19456-1-git-send-email-f.fainelli@gmail.com>
+ <1398130758-19456-4-git-send-email-f.fainelli@gmail.com>
+ <4701106.5EnjdVQgVO@wuerfel>
+Message-ID: <CAGVrzcac=jUVtjZrX9NrNC7=eOKVGn6cBabmm98qD9k7Q5BtEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 2, 2014 at 2:33 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 05/01/2014 01:10 AM, Alexandre Courbot wrote:
->> Tegra Note 7 is a consumer tablet embedding a Tegra 4 SoC with 1GB RAM
->> and a 720p panel.
+2014-04-22 3:52 GMT-07:00 Arnd Bergmann <arnd@arndb.de>:
+> On Monday 21 April 2014 18:39:16 Florian Fainelli wrote:
 >>
->> The following features are enabled by this device tree: UART, eMMC, USB
->> (needs external power), PMIC, backlight, DSI panel, keys.
->>
->> SD card, HDMI, charger, self-powered USB, audio, wifi, bluetooth are not
->> yet supported but might be by future patches (likely in that order).
->
->> diff --git a/arch/arm/boot/dts/tegra114-tn7.dts b/arch/arm/boot/dts/tegra114-tn7.dts
->
->> +     chosen {
->> +             /* TN7's bootloader's arguments need to be overridden */
->> +             bootargs = "console=ttyS0,115200n8 console=tty1 gpt cma=128M fbcon=rotate:2";
->
-> Do we still need the cma argument at all now? The default is now 64M in
-> tegra_defconfig, and 128M seems quite large.
-
-I have omitted that parameter and my TN7 seems to be happy about it,
-so removed as you suggested.
-
->
->> +     host1x at 50000000 {
->> +             hdmi at 54280000 {
->> +                     status = "okay";
+>> +#include "skeleton.dtsi"
 >> +
->> +                     hdmi-supply = <&vdd_5v0_hdmi>;
->> +                     vdd-supply = <&vdd_3v3_hdmi>;
->> +                     pll-supply = <&vdd_1v05_pll>;
+>> +/ {
+>> +       compatible = "brcm,bcm63138";
+>> +       model = "Broadcom BCM63138 DSL SoC";
+>> +       interrupt-parent = <&gic>;
 >> +
->> +                     nvidia,ddc-i2c-bus = <&hdmi_ddc>;
->> +                     nvidia,hpd-gpio =
->> +                             <&gpio TEGRA_GPIO(N, 7) GPIO_ACTIVE_HIGH>;
->> +             };
+>> +       cpus {
+>> +               #address-cells = <1>;
+>> +               #size-cells = <0>;
+>> +
+>> +               cpu at 0 {
+>> +                       device_type = "cpu";
+>> +                       compatible = "arm,cortex-a9";
+>> +                       next-level-cache = <&L2>;
+>> +                       reg = <0>;
+>> +               };
+>> +       };
 >
-> If HDMI doesn't work yet (per commit description), should we leave it
-> out of the DT for now?
+> Even if you don't support SMP yet, I can see no reason not
+> to list both CPUs here. The binding is known and the code
+> should ignore the extra cores if it doesn't know how to
+> turn them on.
 
-Indeed.
+OK.
 
 >
->> +     serial at 70006300 {
->> +             status = "okay";
->> +     };
+>> +
+>> +       /* ARM bus */
+>> +       axi at 80000000 {
+>> +               compatible = "simple-bus";
+>> +               ranges = <0 0x80000000 0x783003>;
+>> +               reg = <0x80000000 0x783003>;
 >
-> Is there actually an accessible UART on the board? I guess this is for
-> people lucky enough to have internal boards with the debug connector. If
-> so, this is probably fine.
+> The length seems odd, I would expect that the bus actually
+> translates all addresses in the 0x80000000 range to downstream
+> devices even if there is nothing connected. Just round it up
+> to your best knowledge.
+>
+> I would also drop the 'reg' property. Since you don't have a
+> specific "compatible" value, there is no way to use the registers
+> in this node.
 
-Yes, you need to rework your tablet to get access to a serial line. It
-is possible though, and as you mentioned the dev boards we use
-internally have this rework already which makes debugging much easier.
-I'd keep that one if you don't mind.
+OK.
 
-Thanks,
-Alex.
+>
+>> +               #address-cells = <1>;
+>> +               #size-cells = <1>;
+>> +
+>> +               L2: cache-controller at 1d000 {
+>> +                       compatible = "arm,pl310-cache";
+>> +                       reg = <0x1d000 0x1000>;
+>> +                       cache-unified;
+>> +                       cache-level = <2>;
+>> +                       interrupts = <GIC_PPI 0 IRQ_TYPE_LEVEL_HIGH>;
+>> +               };
+>> +
+>> +               mpcore at 1e000 {
+>> +                       compatible = "simple-bus";
+>> +                       reg = <0x1e000 0x20000>;
+>> +                       ranges = <0 0x1e000 0x20000>;
+>> +                       #address-cells = <1>;
+>> +                       #size-cells = <1>;
+>
+>
+> Same thing here.
+>
+> Also, can you explain why there is a separate 'mpcore' bus, and why the
+> cache controller is not part of that?
+>
+> Do you have reason to believe that this is how the hardware actually
+> looks?
+
+I think I was just mistaken by how the register space looks like and
+is named, but there probably is not a separate underlying bus, so I
+will move this up one level as it should.
+
+>
+>> +
+>> +       /* Legacy UBUS base */
+>> +       ubus at fffe8000 {
+>> +               compatible = "simple-bus";
+>> +               reg = <0xfffe8000 0x8053>;
+>> +               #address-cells = <1>;
+>> +               #size-cells = <1>;
+>> +               ranges = <0 0xfffe8000 0x8053>;
+>> +       };
+>> +};
+>
+>
+> Again, use a proper 'length' here and remove the 'reg' property.
+
+
+>
+>         Arnd
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+
+-- 
+Florian
