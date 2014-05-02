@@ -1,30 +1,42 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 02 May 2014 12:20:44 -0600
-Subject: [PATCH v2] ARM: tegra: add Tegra Note 7 device tree
-In-Reply-To: <1399017548-1638-1-git-send-email-acourbot@nvidia.com>
-References: <1399017548-1638-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <5363E1FC.3080006@wwwdotorg.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 2 May 2014 19:21:50 +0100
+Subject: [RESEND PATCH 1/3] ARM: mach-virt: allow PCI support to be
+ selected
+In-Reply-To: <4646975.AnXvL4OPrE@wuerfel>
+References: <1399048876-11862-1-git-send-email-will.deacon@arm.com>
+ <1399048876-11862-2-git-send-email-will.deacon@arm.com>
+ <4646975.AnXvL4OPrE@wuerfel>
+Message-ID: <20140502182149.GE14645@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/02/2014 01:59 AM, Alexandre Courbot wrote:
-> Tegra Note 7 is a consumer tablet embedding a Tegra 4 SoC with 1GB RAM
-> and a 720p panel.
-> 
-> The following hardware is enabled by this device tree: UART, eMMC, USB
-> (needs external power), PMIC, backlight, DSI panel, keys.
-> 
-> SD card, HDMI, charger, self-powered USB, audio, wifi, bluetooth are not
-> yet supported but might be by future patches (likely in that order).
-> 
-> Touch panel, sensors & cameras will probably never be supported.
-> 
-> Pinctrl is not set yet, as the bootloader-provided values allow us to
-> use the currently supported hardware.
-> 
-> Initrd addresses are hardcoded to match the static values used by the
-> bootloader, since it won't add them for us. All the same, a kernel
-> command-line is provided to replace the one passed by the bootloader
-> which is filled with garbage.
+Hi Arnd,
 
-I've applied this to Tegra's for-3.16/dt branch.
+On Fri, May 02, 2014 at 07:11:04PM +0100, Arnd Bergmann wrote:
+> On Friday 02 May 2014 17:41:14 Will Deacon wrote:
+> > mach-virt can make use of virtio-pci devices, which requires the guest
+> > kernel to have PCI support selected.
+> > 
+> > This patch selects CONFIG_MIGHT_HAVE_PCI when CONFIG_ARCH_VIRT=y.
+> > 
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > ---
+> >  arch/arm/Kconfig | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index db3c5414223e..f24356c4d630 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -941,6 +941,7 @@ config ARCH_VIRT
+> >         select ARM_GIC
+> >         select ARM_PSCI
+> >         select HAVE_ARM_ARCH_TIMER
+> > +       select MIGHT_HAVE_PCI
+> 
+> I would actually just put it under ARCH_MULTIPLATFORM. Anything can
+> have PCI really, and it doesn't cause any harm.
+
+Sure, I can change that easily enough.
+
+Will
