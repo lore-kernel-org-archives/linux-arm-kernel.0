@@ -1,36 +1,63 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Fri, 2 May 2014 16:30:21 +0100
-Subject: [PATCH 0/2] arm64: TLB flush issues
-In-Reply-To: <1399044035-11274-1-git-send-email-msalter@redhat.com>
-References: <1399044035-11274-1-git-send-email-msalter@redhat.com>
-Message-ID: <20140502153019.GA9179@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 2 May 2014 16:30:24 +0100
+Subject: [PATCH 1/3] arm64: Add CONFIG_DEBUG_SET_MODULE_RONX support
+In-Reply-To: <20140502140709.GA6780@linaro.org>
+References: <1397782023-28114-1-git-send-email-lauraa@codeaurora.org>
+ <1397782023-28114-2-git-send-email-lauraa@codeaurora.org>
+ <20140502140709.GA6780@linaro.org>
+Message-ID: <20140502153023.GH17370@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 02, 2014 at 11:20:33AM -0400, Mark Salter wrote:
-> As explained in more detail in the second patch, I have observed a soft
-> lockup under some loads. These lockups were in flush_tlb_kernel_range()
-> which was looping through a very large address range. While looking into
-> this, I also noticed the flush routines in tlb.S were not properly
-> handling pages larger than 4k. This is corrected in the first patch.
-> The second patch limits the loop size for the flush_tlb_[kernel_]range
-> functions. It uses an arbitrary constant to limit the loop, but it
-> would be better if it were based on actual tlb size or some other
-> heuristic.
+On Fri, May 02, 2014 at 03:07:11PM +0100, Steve Capper wrote:
+> On Thu, Apr 17, 2014 at 05:47:01PM -0700, Laura Abbott wrote:
+> > In a similar fashion to other architecture, add the infrastructure
+> > and Kconfig to enable DEBUG_SET_MODULE_RONX support. When
+> > enabled, module ranges will be marked read-only/no-execute as
+> > appropriate.
+> > 
+> > Change-Id: I4251a0929b1fe6f43f84b14f0a64fed30769700e
+> > Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> > ---
 > 
-> Mark Salter (2):
->   arm64: fix unnecessary tlb flushes
->   arm64: fix soft lockup due to large tlb flush range
+> [ ... ]
 > 
->  arch/arm64/include/asm/tlbflush.h | 28 +++++++++++++++++++++++++---
->  arch/arm64/mm/tlb.S               |  4 ++--
->  2 files changed, 27 insertions(+), 5 deletions(-)
+> > diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
+> > new file mode 100644
+> > index 0000000..e48f980
+> > --- /dev/null
+> > +++ b/arch/arm64/mm/pageattr.c
 > 
+> [ ... ]
+> 
+> > +static int change_memory_common(unsigned long addr, int numpages,
+> > +				pgprot_t prot, bool set)
+> > +{
+> > +	unsigned long start = addr;
+> > +	unsigned long size = PAGE_SIZE*numpages;
+> > +	unsigned long end = start + size;
+> > +	int ret;
+> > +
+> > +	if (start < MODULES_VADDR || start >= MODULES_END)
+> > +		return -EINVAL;
+> > +
+> > +	if (end < MODULES_VADDR || end >= MODULES_END)
+> > +		return -EINVAL;
+> > +
+> > +	if (set)
+> > +		ret = apply_to_page_range(&init_mm, start, size,
+> > +					set_page_range, (void *)prot);
+> > +	else
+> > +		ret = apply_to_page_range(&init_mm, start, size,
+> > +					clear_page_range, (void *)prot);
+> > +
+> > +	flush_tlb_kernel_range(start, end);
+> 
+> Could you please add an isb() here? (We're about to nuke the one in
+> flush_tlb_kernel_range).
 
-Hi Mark,
-As a heads-up, I posted this earlier today:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/252837.html
+Thinking about this even more (too much?), how does this work with SMP
+anyway? You need each CPU to execute an isb(), so this just a race that
+is dealt with already (probably treated as benign)?
 
-Cheers,
--- 
-Steve
+Will
