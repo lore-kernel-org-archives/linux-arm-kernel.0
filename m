@@ -1,65 +1,71 @@
-From: james.hogan@imgtec.com (James Hogan)
-Date: Fri, 2 May 2014 12:30:20 +0100
-Subject: [PATCH] ARM: Fix non-uapi types.h export
-Message-ID: <1399030220-13628-1-git-send-email-james.hogan@imgtec.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 2 May 2014 12:41:01 +0100
+Subject: [PATCH v12 11/31] documentation: iommu: add binding document of
+ Exynos System MMU
+In-Reply-To: <53628751.9000609@wwwdotorg.org>
+References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
+ <20140429181601.GE3582@e103592.cambridge.arm.com>
+ <CANEJEGs6TXNzE8cWYgEKfFSsD2w5XiYvwSbhQ_+gtfzfs+6udA@mail.gmail.com>
+ <7044616.kdaKNu3Qet@wuerfel> <53628751.9000609@wwwdotorg.org>
+Message-ID: <20140502114054.GA3805@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arch/arm/include/asm/types.h is being apparently unintentionally
-exported in the kernel headers since commit 262576fffe42 (ARM: 7843/1:
-drop asm/types.h from generic-y) which dropped the generic-y += types.h.
-This happens because Makefile.headersinst still checks the old asm/
-directory if the specified header doesn't exist in the uapi directory.
+On Thu, May 01, 2014 at 06:41:37PM +0100, Stephen Warren wrote:
+> On 04/29/2014 03:00 PM, Arnd Bergmann wrote:
+> ...
+> > Yes. It's very complicated unfortunately, because we have to be
+> > able to deal with arbitrary combinations of a lot of oddball cases
+> > that can show up in random SoCs:
+> ...
+> > - a device may have DMA access to a bus that is invisible to the CPU
+> 
+> The issue is slightly more general than that. It's more that the bus
+> structure "seen" by a device is simply /different/ than that seen by the
+> CPU. I don't think it's a requirement that there be CPU-invisible buses
+> for that to be true.
+> 
+> For example, I could conceive of a HW setup like:
+> 
+> primary CPU bus ----------------------> other devices
+>    |    \_________________      /
+>    |                      \    |
+>    v                      v    ^
+> device registers ----> some secondary bus
+>                           |
+>                           v
+>                        memory
+> 
+> Here, all the buses are visible to the CPU, yet the path that
+> transactions take between the buses is simply different to the CPU. More
+> complex situations than the above, while still maintaining that
+> description, are certainly possible.
+> 
 
-As far as I can tell the definitions in this file are intended only for
-use in the kernel, so add back the generic-y += types.h so that the
-generic asm/types.h is exported in kernel headers, but add it to the
-uapi Kbuild file to make it clearer what its purpose is.
+I tend to think in terms of links rather than buses.  A link is
+effectively a 1:1 point-to-point bus that passes all transactions with
+no modification.
 
-Also make the asm/types.h file include the generated <uapi/asm/types.h>
-rather than <asm-generic/int-ll64.h>, so that the use of int-ll64.h
-isn't duplicated between the asm-generic/types.h (for exported headers)
-and asm/types.h (for the kernel build).
+So, although "some secondary bus" is visible to the CPUs, crucially the
+link "some secondary bus" to "other devices" is not visible -- in the
+sense that transactions issued by the CPUs never flow down that link.
+Thus, if the link actually has remappings associated with it, then
+devices mastering onto "some secondary bus" will observe those mappings
+but the CPUs won't.  That's precisely what we need to know about when
+configuring DMA buffers.
 
-Signed-off-by: James Hogan <james.hogan@imgtec.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: David Howells <dhowells@redhat.com>
----
-AFAICT the previously exported asm/types.h seemed to include definitions
-that changed the behaviour of <inttypes.h> (I could have misunderstood
-though). I presume it wasn't intended to be exported in kernel headers?
-The comment suggests that this patch would change / fix the behaviour of
-userland code which includes the kernel headers and <inttypes.h>. I
-don't know enough about it to be sure of that though.
----
- arch/arm/include/asm/types.h     | 2 +-
- arch/arm/include/uapi/asm/Kbuild | 2 ++
- 2 files changed, 3 insertions(+), 1 deletion(-)
+"invisible bus" situations are therefore a subset of "invisible link"
+situations, and it is the latter which are the source of the complexity.
 
-diff --git a/arch/arm/include/asm/types.h b/arch/arm/include/asm/types.h
-index a53cdb8f068c..d75f2d6b6fef 100644
---- a/arch/arm/include/asm/types.h
-+++ b/arch/arm/include/asm/types.h
-@@ -1,7 +1,7 @@
- #ifndef _ASM_TYPES_H
- #define _ASM_TYPES_H
- 
--#include <asm-generic/int-ll64.h>
-+#include <uapi/asm/types.h>
- 
- /*
-  * The C99 types uintXX_t that are usually defined in 'stdint.h' are not as
-diff --git a/arch/arm/include/uapi/asm/Kbuild b/arch/arm/include/uapi/asm/Kbuild
-index 70a1c9da30ca..4ffdc48cbf2c 100644
---- a/arch/arm/include/uapi/asm/Kbuild
-+++ b/arch/arm/include/uapi/asm/Kbuild
-@@ -17,3 +17,5 @@ header-y += stat.h
- header-y += statfs.h
- header-y += swab.h
- header-y += unistd.h
-+
-+generic-y += types.h
--- 
-1.9.2
+However, if the extra link(s) don't have any special characteristics, it
+may be software-transparent with no need for description, because we
+can pretend for logical purposes that there is a single bus in that case.
+Effectively that what we've relied on for simpler systems up to now.
+
+I'm assming in your example that the direct link between "primary CPU
+bus" and "other devices" is always used by preference, instead of CPUs'
+transactions toward "other devices" being sent to "some secondary bus"
+first.
+
+Cheers
+---Dave
