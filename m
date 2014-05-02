@@ -1,53 +1,154 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Sat, 3 May 2014 00:09:20 +0800
-Subject: pinctrl: sirf: switch driver to use gpiolib irqchip helpers
-In-Reply-To: <5EB3BFCD089AD643B9BB63439F5FD5E9012BE8AD2D@SHAASIEXM01.ASIA.ROOT.PRI>
-References: <20140502105536.GA32382@mwanda>
- <5EB3BFCD089AD643B9BB63439F5FD5E9012BE8AD2D@SHAASIEXM01.ASIA.ROOT.PRI>
-Message-ID: <CAGsJ_4yKeopvXSe7KkecL0OZExyEp0otV86m0h+VPnprXF8LzQ@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri,  2 May 2014 17:09:59 +0100
+Subject: [PATCH v2 1/3] arm64: Provide read/write fault information in compat
+ signal handlers
+In-Reply-To: <1399047001-6475-1-git-send-email-catalin.marinas@arm.com>
+References: <1399047001-6475-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1399047001-6475-2-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->
->
->> -----Original Message-----
->> From: Dan Carpenter [mailto:dan.carpenter at oracle.com]
->> Sent: Friday, May 02, 2014 6:56 PM
->> To: linus.walleij at linaro.org
->> Cc: Barry Song; linux-arm-kernel at lists.infradead.org
->> Subject: re: pinctrl: sirf: switch driver to use gpiolib irqchip helpers
->>
->> Hello Linus Walleij,
->>
->> The patch 7420d2d09b12: "pinctrl: sirf: switch driver to use gpiolib irqchip
->> helpers" from Apr 15, 2014, leads to the following static checker warning:
->>
->>       drivers/pinctrl/sirf/pinctrl-sirf.c:578 sirfsoc_gpio_handle_irq()
->>       warn: buffer overflow 'sgpio_chip.sgpio_bank' 5 <= 31
->>
->> drivers/pinctrl/sirf/pinctrl-sirf.c
->>    569  static void sirfsoc_gpio_handle_irq(unsigned int irq, struct irq_desc
->> *desc)
->>    570  {
->>    571          struct sirfsoc_gpio_bank *bank;
->>    572          u32 status, ctrl;
->>    573          int idx = 0;
->>    574          struct irq_chip *chip = irq_get_chip(irq);
->>    575          int i;
->>    576
->>    577          for (i = 0; i < SIRFSOC_GPIO_BANK_SIZE; i++) {
->>
->> Probably i < SIRFSOC_GPIO_NO_OF_BANKS (5) was intended here.
+For AArch32, bit 11 (WnR) of the FSR/ESR register is set when the fault
+was caused by a write access and applications like Qemu rely on such
+information being provided in sigcontext. This patch introduces the
+ESR_EL1 tracking for the arm64 kernel faults and sets bit 11 accordingly
+in compat sigcontext.
 
-yes. it was a typo. i'll do a patch to fix it.
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm64/include/asm/esr.h       | 6 ++++--
+ arch/arm64/include/asm/processor.h | 1 +
+ arch/arm64/kernel/signal32.c       | 7 ++++++-
+ arch/arm64/kernel/traps.c          | 7 +++++--
+ arch/arm64/mm/fault.c              | 8 ++++----
+ 5 files changed, 20 insertions(+), 9 deletions(-)
 
->>
->>    578                  bank = &sgpio_chip.sgpio_bank[i];
->>    579                  if (bank->parent_irq == irq)
->>    580                          break;
->>    581          }
->>
->> regards,
->> dan carpenter
-
--barry
+diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+index c4a7f940b387..72674f4c3871 100644
+--- a/arch/arm64/include/asm/esr.h
++++ b/arch/arm64/include/asm/esr.h
+@@ -18,9 +18,11 @@
+ #ifndef __ASM_ESR_H
+ #define __ASM_ESR_H
+ 
+-#define ESR_EL1_EC_SHIFT	(26)
+-#define ESR_EL1_IL		(1U << 25)
++#define ESR_EL1_WRITE		(1 << 6)
++#define ESR_EL1_CM		(1 << 8)
++#define ESR_EL1_IL		(1 << 25)
+ 
++#define ESR_EL1_EC_SHIFT	(26)
+ #define ESR_EL1_EC_UNKNOWN	(0x00)
+ #define ESR_EL1_EC_WFI		(0x01)
+ #define ESR_EL1_EC_CP15_32	(0x03)
+diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+index 45b20cd6cbca..34de2a8f7d93 100644
+--- a/arch/arm64/include/asm/processor.h
++++ b/arch/arm64/include/asm/processor.h
+@@ -79,6 +79,7 @@ struct thread_struct {
+ 	unsigned long		tp_value;
+ 	struct fpsimd_state	fpsimd_state;
+ 	unsigned long		fault_address;	/* fault info */
++	unsigned long		fault_code;	/* ESR_EL1 value */
+ 	struct debug_info	debug;		/* debugging */
+ };
+ 
+diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
+index b3fc9f5ec6d3..050c1c2af777 100644
+--- a/arch/arm64/kernel/signal32.c
++++ b/arch/arm64/kernel/signal32.c
+@@ -23,6 +23,7 @@
+ #include <linux/syscalls.h>
+ #include <linux/ratelimit.h>
+ 
++#include <asm/esr.h>
+ #include <asm/fpsimd.h>
+ #include <asm/signal32.h>
+ #include <asm/uaccess.h>
+@@ -81,6 +82,8 @@ struct compat_vfp_sigframe {
+ #define VFP_MAGIC		0x56465001
+ #define VFP_STORAGE_SIZE	sizeof(struct compat_vfp_sigframe)
+ 
++#define FSR_WRITE_SHIFT		(11)
++
+ struct compat_aux_sigframe {
+ 	struct compat_vfp_sigframe	vfp;
+ 
+@@ -500,7 +503,9 @@ static int compat_setup_sigframe(struct compat_sigframe __user *sf,
+ 	__put_user_error(regs->pstate, &sf->uc.uc_mcontext.arm_cpsr, err);
+ 
+ 	__put_user_error((compat_ulong_t)0, &sf->uc.uc_mcontext.trap_no, err);
+-	__put_user_error((compat_ulong_t)0, &sf->uc.uc_mcontext.error_code, err);
++	/* set the compat FSR WnR */
++	__put_user_error(!!(current->thread.fault_code & ESR_EL1_WRITE) <<
++			 FSR_WRITE_SHIFT, &sf->uc.uc_mcontext.error_code, err);
+ 	__put_user_error(current->thread.fault_address, &sf->uc.uc_mcontext.fault_address, err);
+ 	__put_user_error(set->sig[0], &sf->uc.uc_mcontext.oldmask, err);
+ 
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index 7ffadddb645d..c43cfa9b8304 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -251,10 +251,13 @@ void die(const char *str, struct pt_regs *regs, int err)
+ void arm64_notify_die(const char *str, struct pt_regs *regs,
+ 		      struct siginfo *info, int err)
+ {
+-	if (user_mode(regs))
++	if (user_mode(regs)) {
++		current->thread.fault_address = 0;
++		current->thread.fault_code = err;
+ 		force_sig_info(info->si_signo, info, current);
+-	else
++	} else {
+ 		die(str, regs, err);
++	}
+ }
+ 
+ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index c23751b06120..bcc965e2cce1 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -32,6 +32,7 @@
+ 
+ #include <asm/exception.h>
+ #include <asm/debug-monitors.h>
++#include <asm/esr.h>
+ #include <asm/system_misc.h>
+ #include <asm/pgtable.h>
+ #include <asm/tlbflush.h>
+@@ -123,6 +124,7 @@ static void __do_user_fault(struct task_struct *tsk, unsigned long addr,
+ 	}
+ 
+ 	tsk->thread.fault_address = addr;
++	tsk->thread.fault_code = esr;
+ 	si.si_signo = sig;
+ 	si.si_errno = 0;
+ 	si.si_code = code;
+@@ -148,8 +150,6 @@ static void do_bad_area(unsigned long addr, unsigned int esr, struct pt_regs *re
+ #define VM_FAULT_BADMAP		0x010000
+ #define VM_FAULT_BADACCESS	0x020000
+ 
+-#define ESR_WRITE		(1 << 6)
+-#define ESR_CM			(1 << 8)
+ #define ESR_LNX_EXEC		(1 << 24)
+ 
+ static int __do_page_fault(struct mm_struct *mm, unsigned long addr,
+@@ -218,7 +218,7 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
+ 
+ 	if (esr & ESR_LNX_EXEC) {
+ 		vm_flags = VM_EXEC;
+-	} else if ((esr & ESR_WRITE) && !(esr & ESR_CM)) {
++	} else if ((esr & ESR_EL1_WRITE) && !(esr & ESR_EL1_CM)) {
+ 		vm_flags = VM_WRITE;
+ 		mm_flags |= FAULT_FLAG_WRITE;
+ 	}
+@@ -525,7 +525,7 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
+ 	info.si_errno = 0;
+ 	info.si_code  = inf->code;
+ 	info.si_addr  = (void __user *)addr;
+-	arm64_notify_die("", regs, &info, esr);
++	arm64_notify_die("", regs, &info, 0);
+ 
+ 	return 0;
+ }
