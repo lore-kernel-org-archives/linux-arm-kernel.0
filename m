@@ -1,26 +1,45 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 2 May 2014 18:00:28 +0100
-Subject: [PATCH] arm64: Introduce execute-only page access permissions
-In-Reply-To: <1399045792-5490-1-git-send-email-catalin.marinas@arm.com>
-References: <1399045792-5490-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <20140502170027.GE20642@arm.com>
+Date: Fri, 2 May 2014 18:07:45 +0100
+Subject: [PATCH] arm64: Clean up the default pgprot setting
+In-Reply-To: <1399045919-5615-1-git-send-email-catalin.marinas@arm.com>
+References: <1399045919-5615-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <20140502170745.GF20642@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 02, 2014 at 04:49:52PM +0100, Catalin Marinas wrote:
-> The ARMv8 architecture allows execute-only user permissions by clearing
-> the PTE_UXN and PTE_USER bits. The kernel, however, can still access
-> such page.
+On Fri, May 02, 2014 at 04:51:59PM +0100, Catalin Marinas wrote:
+> The primary aim of this patchset is to remove the pgprot_default and
+> prot_sect_default global variables and rely strictly on predefined
+> values. The original goal was to be able to run SMP kernels on UP
+> hardware by not setting the Shareability bit. However, it is unlikely to
+> see UP ARMv8 hardware and even if we do, the Shareability bit is no
+> longer assumed to disable cacheable accesses.
 > 
-> This patch changes the arm64 __P100 and __S100 protection_map[] macros
-> to the new __PAGE_EXECONLY attributes. A side effect is that
-> pte_valid_user() no longer triggers for __PAGE_EXECONLY since PTE_USER
-> isn't set. To work around this, the check is done on the PTE_NG bit via
-> the pte_valid_ng() macro. VM_READ is also checked now for page faults.
+> A side effect is that the device mappings now have the Shareability
+> attribute set. The hardware, however, should ignore it since Device
+> accesses are always Outer Shareable.
+> 
+> Following the removal of the two global variables, there is some PROT_*
+> macro reshuffling and cleanup, including the __PAGE_* macros (replaced
+> by PAGE_*).
 
-How does this interact with things like ptrace and pipes? Can I get the
-kernel to read my text for me?
+[...]
 
-Also: do we really want to differ from x86 here?
+> +#define PAGE_NONE		__pgprot(((_PAGE_DEFAULT) & ~PTE_TYPE_MASK) | PTE_PROT_NONE | PTE_PXN | PTE_UXN)
+> +#define PAGE_SHARED		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN | PTE_WRITE)
+> +#define PAGE_SHARED_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_WRITE)
+> +#define PAGE_COPY		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
+> +#define PAGE_COPY_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN)
+> +#define PAGE_READONLY		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
+> +#define PAGE_READONLY_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN)
+> +#define PAGE_EXECONLY		__pgprot(_PAGE_DEFAULT | PTE_NG | PTE_PXN)
+
+Could you build the non-exec versions in terms of the exec versions? The
+difference is just the addition of PTE_UXN, and it would make this easier to
+read.
+
+Otherwise this looks fine,
+
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
 Will
