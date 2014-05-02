@@ -1,67 +1,31 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 2 May 2014 10:13:11 +0200
-Subject: [PATCH/RFC 3/4] of/clk: Register clocks suitable for Runtime PM
- with the PM core
-In-Reply-To: <535B130C.1000007@gmail.com>
-References: <1398334403-26181-1-git-send-email-geert+renesas@glider.be>
- <1398334403-26181-4-git-send-email-geert+renesas@glider.be>
- <CAPDyKFr02yyhGNncYX2AgBXTA3Sc0AGQcExjtLvQ5QU0_=YJwg@mail.gmail.com>
- <535B130C.1000007@gmail.com>
-Message-ID: <CAPDyKFqG0dV+-y2=t=d3w6_hxWsYi+sOmNdvS6ECPOuoQ61Pmw@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 2 May 2014 09:15:01 +0100
+Subject: [PATCH v5 1/8] mfd: AXP20x: Add mfd driver for AXP20x PMIC
+In-Reply-To: <1398947374-3115-2-git-send-email-carlo@caione.org>
+References: <1398947374-3115-1-git-send-email-carlo@caione.org>
+ <1398947374-3115-2-git-send-email-carlo@caione.org>
+Message-ID: <20140502081501.GB5206@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>
->>
->> Normally I don't think it's a good idea to "automatically" manage
->> clocks from PM core or any other place but from the driver (and
->> possibly the subsystem).
->>
->> The reason is simply that we hide things that normally is supposed to
->> be handled by the driver. Typically a cross SOC driver should work
->> fine both with and without a pm_domain. It should also not rely on
->> CONFIG_PM_RUNTIME.
+> This patch introduces the preliminary support for PMICs X-Powers AXP202
+> and AXP209. The AXP209 and AXP202 are the PMUs (Power Management Unit)
+> used by A10, A13 and A20 SoCs and developed by X-Powers, a sister company
+> of Allwinner.
+> 
+> The core enables support for two subsystems:
+> - PEK (Power Enable Key)
+> - Regulators
+> 
+> Signed-off-by: Carlo Caione <carlo@caione.org>
+> Acked-by: Lee Jones <lee.jones@linaro.org>
+> ---
 
-[Snip]
+I guess I can just apply this and expect not to see any adverse
+symptoms?
 
->>
->>> +static int of_clk_register(struct device *dev, struct clk *clk)
->>> +{
->>> +       int error;
->>> +
->>> +       if (!dev->pm_domain) {
->>> +               error = pm_clk_create(dev);
->>> +               if (error)
->>> +                       return error;
->>> +
->>> +               dev->pm_domain = &of_clk_pm_domain;
->>
->>
->> I am concerned about how this will work in conjunction with the
->> generic power domain.
->>
->> A device can't reside in more than one pm_domain; thus I think it
->> would be better to always use the generic power domain and not have a
->> specific one for clocks. Typically the genpd should invoke
->> pm_clk_resume|suspend from it's runtime PM callbacks.
->
->
-> I'm not sure about this. A typical use case would be to gate clocks ASAP and
-> then wait until device is idle long enough to consider turning off the power
-> domain worthwhile. Also sometimes we may want to gate the clocks, but
-> prevent power domain from being powered off to retain hardware state (e.g.
-> because there is no way to read it and restore later).
-
-So, in principle you prefer to have driver's handle clock gating to
-save power from their runtime PM callbacks, instead of from the power
-domain, right? Just to clarify, that's my view as well.
-
-Kind regards
-Ulf Hansson
-
->
-> I believe, though, that for devices that are not inside a controllable power
-> domain, this might be a good solution.
->
-> Best regards,
-> Tomasz
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
