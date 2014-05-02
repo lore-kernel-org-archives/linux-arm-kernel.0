@@ -1,54 +1,106 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri,  2 May 2014 16:24:11 +0100
-Subject: [PATCH 4/8] arm64: barriers: wire up new barrier options
+Date: Fri,  2 May 2014 16:24:08 +0100
+Subject: [PATCH 1/8] ARM: cacheflush: use -st dsb option for ensuring
+ completion
 In-Reply-To: <1399044255-20435-1-git-send-email-will.deacon@arm.com>
 References: <1399044255-20435-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1399044255-20435-5-git-send-email-will.deacon@arm.com>
+Message-ID: <1399044255-20435-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that all callers of the barrier macros are updated to pass the
-mandatory options, update the macros so the option is actually used.
+dsb st can be used to ensure completion of pending cache maintenance
+operations, so use it for the v7 cache maintenance operations.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/barrier.h | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ arch/arm/include/asm/cacheflush.h |  2 +-
+ arch/arm/mm/cache-v7.S            | 12 ++++++------
+ arch/arm/mm/mmu.c                 |  2 +-
+ 3 files changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/include/asm/barrier.h b/arch/arm64/include/asm/barrier.h
-index 5d69eddbe39e..71a42d6599fb 100644
---- a/arch/arm64/include/asm/barrier.h
-+++ b/arch/arm64/include/asm/barrier.h
-@@ -25,12 +25,12 @@
- #define wfi()		asm volatile("wfi" : : : "memory")
+diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
+index 8b8b61685a34..00af9fe435e6 100644
+--- a/arch/arm/include/asm/cacheflush.h
++++ b/arch/arm/include/asm/cacheflush.h
+@@ -212,7 +212,7 @@ extern void copy_to_user_page(struct vm_area_struct *, struct page *,
+ static inline void __flush_icache_all(void)
+ {
+ 	__flush_icache_preferred();
+-	dsb();
++	dsb(ishst);
+ }
  
- #define isb()		asm volatile("isb" : : : "memory")
--#define dmb(opt)	asm volatile("dmb sy" : : : "memory")
--#define dsb(opt)	asm volatile("dsb sy" : : : "memory")
-+#define dmb(opt)	asm volatile("dmb " #opt : : : "memory")
-+#define dsb(opt)	asm volatile("dsb " #opt : : : "memory")
+ /*
+diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
+index 778bcf88ee79..615c99e38ba1 100644
+--- a/arch/arm/mm/cache-v7.S
++++ b/arch/arm/mm/cache-v7.S
+@@ -59,7 +59,7 @@ ENTRY(v7_invalidate_l1)
+        bgt     2b
+        cmp     r2, #0
+        bgt     1b
+-       dsb
++       dsb     st
+        isb
+        mov     pc, lr
+ ENDPROC(v7_invalidate_l1)
+@@ -166,7 +166,7 @@ skip:
+ finished:
+ 	mov	r10, #0				@ swith back to cache level 0
+ 	mcr	p15, 2, r10, c0, c0, 0		@ select current cache level in cssr
+-	dsb
++	dsb	st
+ 	isb
+ 	mov	pc, lr
+ ENDPROC(v7_flush_dcache_all)
+@@ -335,7 +335,7 @@ ENTRY(v7_flush_kern_dcache_area)
+ 	add	r0, r0, r2
+ 	cmp	r0, r1
+ 	blo	1b
+-	dsb
++	dsb	st
+ 	mov	pc, lr
+ ENDPROC(v7_flush_kern_dcache_area)
  
- #define mb()		dsb(sy)
--#define rmb()		asm volatile("dsb ld" : : : "memory")
--#define wmb()		asm volatile("dsb st" : : : "memory")
-+#define rmb()		dsb(ld)
-+#define wmb()		dsb(st)
+@@ -368,7 +368,7 @@ v7_dma_inv_range:
+ 	add	r0, r0, r2
+ 	cmp	r0, r1
+ 	blo	1b
+-	dsb
++	dsb	st
+ 	mov	pc, lr
+ ENDPROC(v7_dma_inv_range)
  
- #ifndef CONFIG_SMP
- #define smp_mb()	barrier()
-@@ -54,9 +54,9 @@ do {									\
+@@ -390,7 +390,7 @@ v7_dma_clean_range:
+ 	add	r0, r0, r2
+ 	cmp	r0, r1
+ 	blo	1b
+-	dsb
++	dsb	st
+ 	mov	pc, lr
+ ENDPROC(v7_dma_clean_range)
  
- #else
+@@ -412,7 +412,7 @@ ENTRY(v7_dma_flush_range)
+ 	add	r0, r0, r2
+ 	cmp	r0, r1
+ 	blo	1b
+-	dsb
++	dsb	st
+ 	mov	pc, lr
+ ENDPROC(v7_dma_flush_range)
  
--#define smp_mb()	asm volatile("dmb ish" : : : "memory")
--#define smp_rmb()	asm volatile("dmb ishld" : : : "memory")
--#define smp_wmb()	asm volatile("dmb ishst" : : : "memory")
-+#define smp_mb()	dmb(ish)
-+#define smp_rmb()	dmb(ishld)
-+#define smp_wmb()	dmb(ishst)
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index b68c6b22e1c8..2b001e5dce87 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -1461,7 +1461,7 @@ void __init early_paging_init(const struct machine_desc *mdesc,
+ 	 * just complicate the code.
+ 	 */
+ 	flush_cache_louis();
+-	dsb();
++	dsb(ishst);
+ 	isb();
  
- #define smp_store_release(p, v)						\
- do {									\
+ 	/* remap level 1 table */
 -- 
 1.9.2
