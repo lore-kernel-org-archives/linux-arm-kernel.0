@@ -1,74 +1,48 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 2 May 2014 10:52:59 +0530
-Subject: [RFC PATCH] PM / OPP: move cpufreq specific OPP functions out of
- generic OPP library
-In-Reply-To: <CAGo_u6ohKZh+zKWSzGbvT+AKgnhSjzX7v9isqpd2pc-Cpmxocg@mail.gmail.com>
-References: <1398992810-14957-1-git-send-email-nm@ti.com>
- <CAKohpokEuZ69HnnKE89maXk=21cgAMjEYjEvEcaoBpg4bLRsGg@mail.gmail.com>
- <CAGo_u6ohKZh+zKWSzGbvT+AKgnhSjzX7v9isqpd2pc-Cpmxocg@mail.gmail.com>
-Message-ID: <CAKohponv-p20=www51rW13RSG6=ACgDrRDfL9Xd26ePgjkpWfA@mail.gmail.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Fri, 02 May 2014 07:24:38 +0200
+Subject: [PATCH v5 2/8] dt-bindings: add vendor-prefix for X-Powers
+In-Reply-To: <1398947374-3115-3-git-send-email-carlo@caione.org>
+References: <1398947374-3115-1-git-send-email-carlo@caione.org>
+ <1398947374-3115-3-git-send-email-carlo@caione.org>
+Message-ID: <53632C16.6070105@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 May 2014 10:48, Nishanth Menon <nm@ti.com> wrote:
-> On Thu, May 1, 2014 at 11:30 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
->>> diff --git a/drivers/cpufreq/cpufreq_opp.c b/drivers/cpufreq/cpufreq_opp.c
->>> new file mode 100644
->>> index 0000000..2602ff8
->>> --- /dev/null
->>> +++ b/drivers/cpufreq/cpufreq_opp.c
->>> @@ -0,0 +1,102 @@
->>> +/*
->>> + * Generic OPP Interface for CPUFREQ drivers
->>> + *
->>> + * Copyright (C) 2009-2014 Texas Instruments Incorporated.
->>> + *     Nishanth Menon
->>> + *     Romit Dasgupta
->>> + *     Kevin Hilman
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License version 2 as
->>> + * published by the Free Software Foundation.
->>> + */
->>
->> I hope you have just copy pasted routines to this file, and haven't done
->> even the most minor modification in those, as its hard to review it.
->
-> there is code replacement ofcourse ->
-> * the logic of walking down the list holding a mutex has been replaced
-> with rcu locks,
-> * instead of reading internal data structure and generating the list,
-> use the existing search API that does exactly the same.
-> * Documentation update for the same.
+On 05/01/2014 02:29 PM, Carlo Caione wrote:
+> Signed-off-by: Carlo Caione <carlo@caione.org>
+> ---
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> index abc3080..792cf56 100644
+> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> @@ -135,3 +135,4 @@ wm	Wondermedia Technologies, Inc.
+>  xes	Extreme Engineering Solutions (X-ES)
+>  xlnx	Xilinx
+>  zyxel	ZyXEL Communications Corp.
+> +x-powers	X-Powers
+> 
 
-Hmm, actually if I would have written this patch, then probably I would
-have done the same thing, but looking from the reviewers perspective,
-it would be much more easy if we can separate things into patches.
+Keep list sorted.
 
-So, maybe do these changes first in opp.c only and then finally a
-patch that just moves things around.
+Thanks,
+Michal
 
-> Both are needed if you have to move the code out. functionally, both
-> are equivalent
 
-That's an assumption and we never know when we might have screwed
-the code :) .. And so more careful review of those parts is required :)
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
 
->>> diff --git a/drivers/cpufreq/cpufreq_opp.h b/drivers/cpufreq/cpufreq_opp.h
->>
->> Two problems, driver may lie in arch/ as well, though we don't recommend
->> them, secondly move these in cpufreq.h, don't need a header here for sure.
->
-> There are none at the moment. ideally, we'd like to discourage folks
 
-Yes, we do. :)
-
-> putting cpufreq drivers in arch/ given the amount of effort you have
-> undertaken in bringing them all here. but I have personally no strong
-> objection to getting rid of the private header and using the generic
-> cpufreq header.
->
-> Otherwise, I assume you are ok with this approach and will post a
-> formal patch by monday.
-
-Yep.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140502/f2f91c89/attachment.sig>
