@@ -1,70 +1,86 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 2 May 2014 21:16:34 +0530
-Subject: [PATCH 1/6] dmaengine: Add fly-by transfer flag to slave
- configuration structure
-In-Reply-To: <1397574817-15559-2-git-send-email-laurent.pinchart@ideasonboard.com>
-References: <1397574817-15559-1-git-send-email-laurent.pinchart@ideasonboard.com>
- <1397574817-15559-2-git-send-email-laurent.pinchart@ideasonboard.com>
-Message-ID: <20140502154634.GS32284@intel.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri,  2 May 2014 16:59:45 +0100
+Subject: [PATCH] arm64: Remove boot thread synchronisation for spin-table
+ release method
+Message-ID: <1399046385-5904-1-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15, 2014 at 05:13:32PM +0200, Laurent Pinchart wrote:
-> Fly-by transfer mode cuts down the number of bus transactions by letting
-> the slave drive or latch the memory data bus during memory transactions
-??            ^^^^^^^^^^^
-> instead of performing a dedicated transaction to read data from or write
-/								^^^^
-> data to the slave.
-> 
-> Support for fly-by mode by adding a new flag field to struct
-> dma_slave_config.
-> 
-> Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> ---
->  include/linux/dmaengine.h | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
-> 
-> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-> index c5c92d5..ae99153 100644
-> --- a/include/linux/dmaengine.h
-> +++ b/include/linux/dmaengine.h
-> @@ -304,6 +304,17 @@ enum dma_slave_buswidth {
->  };
->  
->  /**
-> + * enum dma_slave_flags - DMA slave configuration flags
-> + * @DMA_SLAVE_FLAG_FLY_BY - perform DMA transfers for the slave in fly-by mode.
-> + *   Instead of performing a bus transaction to read (write) data from (to) the
-> + *   slave, let the slave drive (latch) the memory bus data signals during the
-> + *   memory write (read) transaction.
-> + */
-> +enum dma_slave_flags {
-> +	DMA_SLAVE_FLAG_FLY_BY = (1 << 0),
-> +};
-> +
-> +/**
->   * struct dma_slave_config - dma slave channel runtime config
->   * @direction: whether the data shall go in or out on this slave
->   * channel, right now. DMA_MEM_TO_DEV and DMA_DEV_TO_MEM are
-> @@ -333,6 +344,7 @@ enum dma_slave_buswidth {
->   * @slave_id: Slave requester id. Only valid for slave channels. The dma
->   * slave peripheral will have unique id as dma requester which need to be
->   * pass as slave config.
-> + * @flags: DMA slave flags, a combination of enum dma_slave_flags flags.
->   *
->   * This struct is passed in as configuration data to a DMA engine
->   * in order to set up a certain channel for DMA transport at runtime.
-> @@ -361,6 +373,7 @@ struct dma_slave_config {
->  	u32 dst_maxburst;
->  	bool device_fc;
->  	unsigned int slave_id;
-> +	u32 flags;
->  };
-I am not sure about this. Should we have a generic flag for this or just add a
-bool for fly_by mode?
+The synchronisation with the boot thread already happens in __cpu_up()
+via wait_for_completion_timeout(). In addition, __cpu_up() calls are
+protected by the cpu_add_remove_lock mutex and already serialised.
 
-Suggestions?
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm64/kernel/smp_spin_table.c | 39 +-------------------------------------
+ 1 file changed, 1 insertion(+), 38 deletions(-)
 
--- 
-~Vinod
+diff --git a/arch/arm64/kernel/smp_spin_table.c b/arch/arm64/kernel/smp_spin_table.c
+index 7a530d2cc807..0347d38eea29 100644
+--- a/arch/arm64/kernel/smp_spin_table.c
++++ b/arch/arm64/kernel/smp_spin_table.c
+@@ -30,7 +30,6 @@ extern void secondary_holding_pen(void);
+ volatile unsigned long secondary_holding_pen_release = INVALID_HWID;
+ 
+ static phys_addr_t cpu_release_addr[NR_CPUS];
+-static DEFINE_RAW_SPINLOCK(boot_lock);
+ 
+ /*
+  * Write secondary_holding_pen_release in a way that is guaranteed to be
+@@ -94,14 +93,6 @@ static int smp_spin_table_cpu_prepare(unsigned int cpu)
+ 
+ static int smp_spin_table_cpu_boot(unsigned int cpu)
+ {
+-	unsigned long timeout;
+-
+-	/*
+-	 * Set synchronisation state between this boot processor
+-	 * and the secondary one
+-	 */
+-	raw_spin_lock(&boot_lock);
+-
+ 	/*
+ 	 * Update the pen release flag.
+ 	 */
+@@ -112,34 +103,7 @@ static int smp_spin_table_cpu_boot(unsigned int cpu)
+ 	 */
+ 	sev();
+ 
+-	timeout = jiffies + (1 * HZ);
+-	while (time_before(jiffies, timeout)) {
+-		if (secondary_holding_pen_release == INVALID_HWID)
+-			break;
+-		udelay(10);
+-	}
+-
+-	/*
+-	 * Now the secondary core is starting up let it run its
+-	 * calibrations, then wait for it to finish
+-	 */
+-	raw_spin_unlock(&boot_lock);
+-
+-	return secondary_holding_pen_release != INVALID_HWID ? -ENOSYS : 0;
+-}
+-
+-static void smp_spin_table_cpu_postboot(void)
+-{
+-	/*
+-	 * Let the primary processor know we're out of the pen.
+-	 */
+-	write_pen_release(INVALID_HWID);
+-
+-	/*
+-	 * Synchronise with the boot thread.
+-	 */
+-	raw_spin_lock(&boot_lock);
+-	raw_spin_unlock(&boot_lock);
++	return 0;
+ }
+ 
+ const struct cpu_operations smp_spin_table_ops = {
+@@ -147,5 +111,4 @@ const struct cpu_operations smp_spin_table_ops = {
+ 	.cpu_init	= smp_spin_table_cpu_init,
+ 	.cpu_prepare	= smp_spin_table_cpu_prepare,
+ 	.cpu_boot	= smp_spin_table_cpu_boot,
+-	.cpu_postboot	= smp_spin_table_cpu_postboot,
+ };
