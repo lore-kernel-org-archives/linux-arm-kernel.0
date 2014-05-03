@@ -1,99 +1,114 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat,  3 May 2014 20:30:15 +0200
-Subject: [PATCH v2 5/9] ASoC: simple-card: Support setting mclk via a fixed
- factor
+Date: Sat,  3 May 2014 20:30:16 +0200
+Subject: [PATCH v2 6/9] ARM: Kirkwood: t5325: Remove platform device to
+ instantiate audio
 In-Reply-To: <1399141819-23924-1-git-send-email-andrew@lunn.ch>
 References: <1399141819-23924-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1399141819-23924-6-git-send-email-andrew@lunn.ch>
+Message-ID: <1399141819-23924-7-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some platforms require that the codecs mclk is a fixed multiplication
-factor of the audio stream rate. Add a optional property to the
-binding to hold this factor and implement a hw_params() function to
-make use of it.
+Remove platform device instantiating of the audio, which results in
+board-t5325.c being removed. A DT node will be added to take its
+place.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
-v1->v2:
-s/factor/fs/g
----
- .../devicetree/bindings/sound/simple-card.txt      |  2 ++
- sound/soc/generic/simple-card.c                    | 28 ++++++++++++++++++++++
- 2 files changed, 30 insertions(+)
+ arch/arm/mach-mvebu/Kconfig       |  7 -------
+ arch/arm/mach-mvebu/Makefile      |  1 -
+ arch/arm/mach-mvebu/board-t5325.c | 26 --------------------------
+ arch/arm/mach-mvebu/board.h       |  6 ------
+ arch/arm/mach-mvebu/kirkwood.c    |  3 ---
+ 5 files changed, 43 deletions(-)
+ delete mode 100644 arch/arm/mach-mvebu/board-t5325.c
 
-diff --git a/Documentation/devicetree/bindings/sound/simple-card.txt b/Documentation/devicetree/bindings/sound/simple-card.txt
-index 131aa2ad7f1a..34d1b845edcc 100644
---- a/Documentation/devicetree/bindings/sound/simple-card.txt
-+++ b/Documentation/devicetree/bindings/sound/simple-card.txt
-@@ -18,6 +18,8 @@ Optional properties:
- 					  Each entry is a pair of strings, the first being the
- 					  connection's sink, the second being the connection's
- 					  source.
-+- simple-audio-card,mclk-fs		: Multiplication factor between stream rate and codec
-+					  mclk.
- - dai-tdm-slot-num			: Please refer to tdm-slot.txt.
- - dai-tdm-slot-width			: Please refer to tdm-slot.txt.
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index 3f73eecbcfb0..9675f559f6fe 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -97,13 +97,6 @@ config MACH_KIRKWOOD
+ 	  Say 'Y' here if you want your kernel to support boards based
+ 	  on the Marvell Kirkwood device tree.
  
-diff --git a/sound/soc/generic/simple-card.c b/sound/soc/generic/simple-card.c
-index 21f1ccbdf582..e5a3be97096c 100644
---- a/sound/soc/generic/simple-card.c
-+++ b/sound/soc/generic/simple-card.c
-@@ -24,6 +24,7 @@ struct simple_card_data {
- 		struct asoc_simple_dai cpu_dai;
- 		struct asoc_simple_dai codec_dai;
- 	} *dai_props;
-+	unsigned int mclk_fs;
- 	struct snd_soc_dai_link dai_link[];	/* dynamically allocated */
- };
+-config MACH_T5325
+-	bool "HP T5325 thin client"
+-	depends on MACH_KIRKWOOD
+-	help
+-	  Say 'Y' here if you want your kernel to support the
+-	  HP T5325 Thin client
+-
+ endmenu
  
-@@ -151,6 +152,28 @@ asoc_simple_card_sub_parse_of(struct device_node *np,
- 	return 0;
+ endif
+diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
+index a63e43b6b451..912c0cc4cc29 100644
+--- a/arch/arm/mach-mvebu/Makefile
++++ b/arch/arm/mach-mvebu/Makefile
+@@ -10,4 +10,3 @@ obj-$(CONFIG_ARCH_MVEBU)	 += coherency.o coherency_ll.o pmsu.o
+ obj-$(CONFIG_SMP)                += platsmp.o headsmp.o
+ obj-$(CONFIG_HOTPLUG_CPU)        += hotplug.o
+ obj-$(CONFIG_MACH_KIRKWOOD)	 += kirkwood.o kirkwood-pm.o
+-obj-$(CONFIG_MACH_T5325)	 += board-t5325.o
+diff --git a/arch/arm/mach-mvebu/board-t5325.c b/arch/arm/mach-mvebu/board-t5325.c
+deleted file mode 100644
+index f2401b298218..000000000000
+--- a/arch/arm/mach-mvebu/board-t5325.c
++++ /dev/null
+@@ -1,26 +0,0 @@
+-/*
+- * HP T5325 Board Setup
+- *
+- * Copyright (C) 2014
+- *
+- * Andrew Lunn <andrew@lunn.ch>
+- *
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2.  This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
+- */
+-
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+-#include <linux/platform_device.h>
+-#include "board.h"
+-
+-static struct platform_device hp_t5325_audio_device = {
+-	.name		= "t5325-audio",
+-	.id		= -1,
+-};
+-
+-void __init t5325_init(void)
+-{
+-	platform_device_register(&hp_t5325_audio_device);
+-}
+diff --git a/arch/arm/mach-mvebu/board.h b/arch/arm/mach-mvebu/board.h
+index de7f0a191394..9c7bb4386f8b 100644
+--- a/arch/arm/mach-mvebu/board.h
++++ b/arch/arm/mach-mvebu/board.h
+@@ -13,10 +13,4 @@
+ #ifndef __ARCH_MVEBU_BOARD_H
+ #define __ARCH_MVEBU_BOARD_H
+ 
+-#ifdef CONFIG_MACH_T5325
+-void t5325_init(void);
+-#else
+-static inline void t5325_init(void) {};
+-#endif
+-
+ #endif
+diff --git a/arch/arm/mach-mvebu/kirkwood.c b/arch/arm/mach-mvebu/kirkwood.c
+index 120207fc36f1..c30bc316f40d 100644
+--- a/arch/arm/mach-mvebu/kirkwood.c
++++ b/arch/arm/mach-mvebu/kirkwood.c
+@@ -180,9 +180,6 @@ static void __init kirkwood_dt_init(void)
+ 	kirkwood_pm_init();
+ 	kirkwood_dt_eth_fixup();
+ 
+-	if (of_machine_is_compatible("hp,t5325"))
+-		t5325_init();
+-
+ 	of_platform_populate(NULL, of_default_bus_match_table, auxdata, NULL);
  }
  
-+static int simple_card_hw_params(struct snd_pcm_substream *substream,
-+				 struct snd_pcm_hw_params *params)
-+{
-+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-+	struct snd_soc_dai *codec_dai = rtd->codec_dai;
-+	struct simple_card_data *priv = snd_soc_card_get_drvdata(rtd->card);
-+	unsigned int mclk;
-+	int ret = 0;
-+
-+	if (priv->mclk_fs) {
-+		mclk = params_rate(params) * priv->mclk_fs;
-+		ret = snd_soc_dai_set_sysclk(codec_dai, 0, mclk,
-+					     SND_SOC_CLOCK_IN);
-+	}
-+
-+	return ret;
-+}
-+
-+static struct snd_soc_ops simple_card_ops = {
-+	.hw_params = simple_card_hw_params,
-+};
-+
- static int simple_card_cpu_codec_of(struct device_node *node,
- 				int daifmt,
- 				struct snd_soc_dai_link *dai_link,
-@@ -255,6 +278,7 @@ static int asoc_simple_card_parse_of(struct device_node *node,
- 		sprintf(name, "%s-%s", dai_link->cpu_dai_name,
- 					dai_link->codec_dai_name);
- 		dai_link->name = dai_link->stream_name = name;
-+		dai_link->ops = &simple_card_ops;
- 
- 		if (!multi)
- 			break;
-@@ -263,6 +287,10 @@ static int asoc_simple_card_parse_of(struct device_node *node,
- 		dai_props++;
- 	}
- 
-+	/* Factor to mclk, used in hw_params() */
-+	of_property_read_u32(node, "simple-audio-card,mclk-fs",
-+			     &priv->mclk_fs);
-+
- 	/* card name is created from CPU/CODEC dai name */
- 	dai_link = priv->snd_card.dai_link;
- 	if (!priv->snd_card.name)
 -- 
 2.0.0.rc0
