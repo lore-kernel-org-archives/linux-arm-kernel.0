@@ -1,60 +1,66 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Sat, 3 May 2014 19:39:03 +0200
-Subject: [PATCH] ARM: fix v7-M signal return
-In-Reply-To: <20140428082757.GD28564@pengutronix.de>
-References: <1398103664-23078-1-git-send-email-rabin@rab.in>
- <20140428082757.GD28564@pengutronix.de>
-Message-ID: <20140503173903.GA16300@debian>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 3 May 2014 10:45:20 -0700
+Subject: [PATCH v5 1/3] ARM: sunxi: Add documentation for sunxi consumer
+ infrared devices
+In-Reply-To: <1398871010-30681-2-git-send-email-bay@hackerdom.ru>
+References: <1398871010-30681-1-git-send-email-bay@hackerdom.ru>
+ <1398871010-30681-2-git-send-email-bay@hackerdom.ru>
+Message-ID: <20140503174520.GA15342@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 10:27:57AM +0200, Uwe Kleine-K?nig wrote:
-> This is a valid fix, but it seems on my efm32 the unpredictable
-> behaviour is to just discard the LSB. How did you find that? Is it an
-> issue on your machine? Which cpu are you using?
+On Wed, Apr 30, 2014 at 09:16:48PM +0600, Alexander Bersenev wrote:
+> This patch adds documentation for Device-Tree bindings for sunxi IR
+> controller.
+> 
+> Signed-off-by: Alexander Bersenev <bay@hackerdom.ru>
+> Signed-off-by: Alexsey Shestacov <wingrime@linux-sunxi.org>
+> ---
+>  .../devicetree/bindings/media/sunxi-ir.txt         | 23 ++++++++++++++++++++++
+>  1 file changed, 23 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/sunxi-ir.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/media/sunxi-ir.txt b/Documentation/devicetree/bindings/media/sunxi-ir.txt
+> new file mode 100644
+> index 0000000..d502cf4
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/media/sunxi-ir.txt
+> @@ -0,0 +1,23 @@
+> +Device-Tree bindings for SUNXI IR controller found in sunXi SoC family
+> +
+> +Required properties:
+> +- compatible	    : should be "allwinner,sun7i-a20-ir";
+> +- clocks	    : list of clock specifiers, corresponding to
+> +		      entries in clock-names property;
+> +- clock-names	    : should contain "apb0_ir0" and "ir0" entries;
+> +- interrupts	    : should contain IR IRQ number;
+> +- reg		    : should contain IO map address for IR.
+> +
+> +Optional properties:
+> +- linux,rc-map-name : Remote control map name.
+> +
+> +Example:
+> +
+> +ir0: ir at 01c21800 {
+> +       	compatible = "allwinner,sun7i-a20-ir";
+> +       	clocks = <&apb0_gates 6>, <&ir0_clk>;
+> +       	clock-names = "apb0_ir0", "ir0";
 
-I'm running this on QEMU.  Here is an old qemu-devel thread on this
-topic if you are interested:
-http://lists.gnu.org/archive/html/qemu-devel/2012-03/msg00158.html
+Most of the time, we use something like "apb" and "ir". The names
+being generic, if there ever comes a time where you have a second
+controller, you don't have to do anything confusing or inconsistent.
 
-> I'd like to have the instruction clearing the thumb bit above the
-> comment about the basic exception frame and please add a comment for
-> your instruction, too.
+Thanks!
+Maxime
 
-OK, here is a v2 with those changes:
-
-8<------------------
->From 4aa76f95a6ecf781eec89dba8a3884e5e4339182 Mon Sep 17 00:00:00 2001
-From: Rabin Vincent <rabin@rab.in>
-Date: Sat, 3 May 2014 19:27:09 +0200
-Subject: [PATCHv2] ARM: fix v7-M signal return
-
-According to the ARM ARM, the behaviour is UNDPREDICTABLE if the PC read
-from the exception return stack is not half word aligned.  See the
-pseudo code for ExceptionReturn() and PopStack().
-
-The signal handler's address has the bit 0 set, and setup_return()
-directly writes this to regs->ARM_pc.  Mask out bit 0 before the
-exception return to get predictable behaviour.
-
-Signed-off-by: Rabin Vincent <rabin@rab.in>
----
- arch/arm/kernel/entry-header.S | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
-index 1420725..743dff6 100644
---- a/arch/arm/kernel/entry-header.S
-+++ b/arch/arm/kernel/entry-header.S
-@@ -132,6 +132,9 @@
- 	orrne	r5, V7M_xPSR_FRAMEPTRALIGN
- 	biceq	r5, V7M_xPSR_FRAMEPTRALIGN
- 
-+	@ ensure bit 0 is cleared in the PC
-+	bic	r4, r4, #1
-+
- 	@ write basic exception frame
- 	stmdb	r2!, {r1, r3-r5}
- 	ldmia	sp, {r1, r3-r5}
 -- 
-1.9.2
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140503/042ede1e/attachment-0001.sig>
