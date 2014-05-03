@@ -1,95 +1,40 @@
-From: sdu.liu@huawei.com (Liu Hua)
-Date: Sat, 3 May 2014 21:44:46 +0800
-Subject: [RESEND PATCH] ARM: kdump: Add vmcore_elf64_check_arch
-Message-ID: <1399124686-63299-1-git-send-email-sdu.liu@huawei.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 3 May 2014 16:40:33 +0200
+Subject: Automatically detecting when to use kirkwood-tsXXX-6281.dtb vs
+ -6282.dtb (Was: Re: [PATCH 21/21] ARM: Kirkwood: Remove DT support)
+In-Reply-To: <1399123167.23380.163.camel@dagon.hellion.org.uk>
+References: <1391730137-14814-22-git-send-email-andrew@lunn.ch>
+ <52F51922.6030502@gmail.com>
+ <1392892217.23342.18.camel@kazak.uk.xensource.com>
+ <20140220105854.GL11878@lunn.ch>
+ <20140220111913.GZ21483@n2100.arm.linux.org.uk>
+ <1392896356.23342.40.camel@kazak.uk.xensource.com>
+ <20140220232649.GU7862@titan.lakedaemon.net>
+ <1393257630.16570.95.camel@kazak.uk.xensource.com>
+ <20140224162413.GE18601@lunn.ch>
+ <1399123167.23380.163.camel@dagon.hellion.org.uk>
+Message-ID: <20140503144033.GD19833@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will or Russell,
+> However on my 6281 based TS-219 system there seems to be no visible PCI
+> bus when running the 3.2 kernel in the current Debian stable release
+> (which of course uses board support). Some info:
 
-With CONFIG_LPAE=y, memory in 32-bit ARM systems can exceed
-4G. So if we use kdump in such systems. The capture kernel
-should parse 64-bit elf header(parse_crash_elf64_headers).
+The old PCI driver looks to see if there is anything on the bus, and
+if not, does not register the PCI bus to the PCI core. The new PCI
+driver always registers the busses, allowing hotplug of PCI devices.
 
-And this process can not pass because ARM linux only provides
-zero vmcore_elf64_check_arch function by commit 4b3bf7aef.
+> Is the lack of anything on the PCI bus itself sufficient to determine
+> that this is a 6281 based ts219 rather than a 6282 one (I don't have any
+> 6282 ts219 systems to try)?
 
-This patch adds check functions related to elf64 header.
+No, this is not sufficient, as far as i know. I have a 6282 based
+ts119. It also does not have any PCI devices. However, the 6282 DT
+file works fine on it. There is no need to differentiate between 119
+and 219, just between 6281 and 6282.
 
-Thanks,
-Liu Hua
+Your idea about Ethernet PHY is probably the best way to tell them
+apart. But i will see if i can find anything else.
 
-Signed-off-by: Liu Hua <sdu.liu@huawei.com>
----
- arch/arm/include/asm/elf.h |  4 +++-
- arch/arm/kernel/elf.c      | 33 +++++++++++++++++++++++++++++++++
- 2 files changed, 36 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
-index f4b46d3..8651699 100644
---- a/arch/arm/include/asm/elf.h
-+++ b/arch/arm/include/asm/elf.h
-@@ -90,14 +90,16 @@ typedef struct user_fp elf_fpregset_t;
- extern char elf_platform[];
- 
- struct elf32_hdr;
-+struct elf64_hdr;
- 
- /*
-  * This is used to ensure we don't load something for the wrong architecture.
-  */
- extern int elf_check_arch(const struct elf32_hdr *);
-+extern int elf_check_arch_64(const struct elf64_hdr *);
- #define elf_check_arch elf_check_arch
- 
--#define vmcore_elf64_check_arch(x) (0)
-+#define vmcore_elf64_check_arch(x) (elf_check_arch_64(x))
- 
- extern int arm_elf_read_implies_exec(const struct elf32_hdr *, int);
- #define elf_read_implies_exec(ex,stk) arm_elf_read_implies_exec(&(ex), stk)
-diff --git a/arch/arm/kernel/elf.c b/arch/arm/kernel/elf.c
-index d0d1e83..452086a 100644
---- a/arch/arm/kernel/elf.c
-+++ b/arch/arm/kernel/elf.c
-@@ -38,6 +38,39 @@ int elf_check_arch(const struct elf32_hdr *x)
- }
- EXPORT_SYMBOL(elf_check_arch);
- 
-+int elf_check_arch_64(const struct elf64_hdr *x)
-+{
-+	unsigned int eflags;
-+
-+	/* Make sure it's an ARM executable */
-+	if (x->e_machine != EM_ARM)
-+		return 0;
-+
-+	/* Make sure the entry address is reasonable */
-+	if (x->e_entry & 1) {
-+		if (!(elf_hwcap & HWCAP_THUMB))
-+			return 0;
-+	} else if (x->e_entry & 3)
-+		return 0;
-+
-+	eflags = x->e_flags;
-+	if ((eflags & EF_ARM_EABI_MASK) == EF_ARM_EABI_UNKNOWN) {
-+		unsigned int flt_fmt;
-+
-+		/* APCS26 is only allowed if the CPU supports it */
-+		if ((eflags & EF_ARM_APCS_26) && !(elf_hwcap & HWCAP_26BIT))
-+			return 0;
-+
-+		flt_fmt = eflags & (EF_ARM_VFP_FLOAT | EF_ARM_SOFT_FLOAT);
-+
-+		/* VFP requires the supporting code */
-+		if (flt_fmt == EF_ARM_VFP_FLOAT && !(elf_hwcap & HWCAP_VFP))
-+			return 0;
-+	}
-+	return 1;
-+}
-+EXPORT_SYMBOL(elf_check_arch_64);
-+
- void elf_set_personality(const struct elf32_hdr *x)
- {
- 	unsigned int eflags = x->e_flags;
--- 
-1.9.0
+    Andrew
