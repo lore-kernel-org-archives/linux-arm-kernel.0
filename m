@@ -1,85 +1,64 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 2 May 2014 21:29:25 -0700
-Subject: [RFC PATCH 1/5] watchdog: Add API to trigger reboots
-In-Reply-To: <20140503012243.GG4090@lukather>
-References: <1398958893-30049-1-git-send-email-linux@roeck-us.net>
- <1398958893-30049-2-git-send-email-linux@roeck-us.net>
- <20140503012243.GG4090@lukather>
-Message-ID: <20140503042925.GB5882@roeck-us.net>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Sat, 03 May 2014 15:11:36 +0900
+Subject: [PATCH 0/4] Introducing Exynos ChipId driver
+Message-ID: <1399097500-4052-1-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 02, 2014 at 06:22:43PM -0700, Maxime Ripard wrote:
-> Hi Guenter,
-> 
-> On Thu, May 01, 2014 at 08:41:29AM -0700, Guenter Roeck wrote:
-> > Some hardware implements reboot through its watchdog hardware,
-> > for example by triggering a watchdog timeout. Platform specific
-> > code starts to spread into watchdog drivers, typically by setting
-> > pointers to a callback functions which is then called from the
-> > platform reset handler.
-> > 
-> > To simplify code and provide a unified API to trigger reboots by
-> > watchdog drivers, provide a single API to trigger such reboots
-> > through the watchdog subsystem.
-> > 
-> > Signed-off-by: Guenter Roeck <linux@roeck-us.net>
-> > ---
-> >  drivers/watchdog/watchdog_core.c |   17 +++++++++++++++++
-> >  include/linux/watchdog.h         |   11 +++++++++++
-> >  2 files changed, 28 insertions(+)
-> > 
-> > diff --git a/drivers/watchdog/watchdog_core.c b/drivers/watchdog/watchdog_core.c
-> > index cec9b55..4ec6e2f 100644
-> > --- a/drivers/watchdog/watchdog_core.c
-> > +++ b/drivers/watchdog/watchdog_core.c
-> > @@ -43,6 +43,17 @@
-> >  static DEFINE_IDA(watchdog_ida);
-> >  static struct class *watchdog_class;
-> >  
-> > +static struct watchdog_device *wdd_reboot_dev;
-> > +
-> > +void watchdog_do_reboot(enum reboot_mode mode, const char *cmd)
-> > +{
-> > +	if (wdd_reboot_dev) {
-> > +		if (wdd_reboot_dev->ops->reboot)
-> > +			wdd_reboot_dev->ops->reboot(wdd_reboot_dev, mode, cmd);
-> > +	}
-> > +}
-> > +EXPORT_SYMBOL(watchdog_do_reboot);
-> > +
-> >  static void watchdog_check_min_max_timeout(struct watchdog_device *wdd)
-> >  {
-> >  	/*
-> > @@ -162,6 +173,9 @@ int watchdog_register_device(struct watchdog_device *wdd)
-> >  		return ret;
-> >  	}
-> >  
-> > +	if (wdd->ops->reboot)
-> > +		wdd_reboot_dev = wdd;
-> > +
-> 
-> Overall, it looks really great, but I guess we can make it a
-> list. Otherwise, we might end up in a situation where we could not
-> reboot anymore, like this one for example:
->   - a first watchdog is probed, registers a reboot function
->   - a second watchdog is probed, registers a reboot function that
->     overwrites the first one.
->   - then, the second watchdog disappears for some reason, and the
->     reboot is set to NULL
-> 
-I thought about that, but how likely (or unlikely) is that to ever happen ?
-So I figured it is not worth the effort, and would just add complexity without
-real gain. We could always add the list later if we ever encounter a situation
-where two watchdogs in the same system provide a reboot callback.
+This patch series attempts to get rid of soc_is_exynosXXXX macros
+and eventually with the help of this series we can probably get
+rid of CONFIG_SOC_EXYNOSXXXX in near future.
+Each Exynos SoC has ChipID block which can give information about
+SoC's product Id and revision number. Currently we have single
+DT binding information for this as "samsung,exynos4210-chipid".
+But Exynos4 and Exynos5 SoC series have one small difference in
+chip Id, with resepect to product id bit-masks. So it means we
+should have separate compatible string for these different series
+of SoCs. So I have created new binding information for handling
+this difference. Also currently I can think of putting this driver
+code under "drivers/misc/" but suggestions are welcome.
+Also current form of driver is missing platfrom driver and needs
+init function to be called from machine file (either exynos.c or
+platsmp.c). I hope lot of suggestions and comments to improve this
+further.
 
-> Or maybe we can just use the start callback, with the min timeout already
-> registered, and prevent the user to kick the watchdog.
-> 
-Doesn't always work, unfortunately, even now. The moxart driver causes 
-an explicit and immediate reset. Also, some watchdogs don't reset the system
-directly but get an interrupt, which then calls the reset handler. Which,
-in our case, would call the start callback again, and you would have an endless
-loop.
+This patch series is based on Kukjin Kim's for-next (3.14_rc1 tag)
+and prepared on top of following patch series and it's dependent
+patch series.
 
-Guenter
+[1]: Map SYSRAM through generic SRAM bindings.
+	http://www.spinics.net/lists/arm-kernel/msg327677.html
+[2]: Exynos PMU cleanup and refactoring.
+	https://lkml.org/lkml/2014/4/30/44
+
+Pankaj Dubey (4):
+  ARM: EXYNOS: remove soc_is_exynos4/5 from exynos.c
+  ARM:  EXYNOS: remove unused header inclusion from hotplug.c
+  misc: exynos-chipid: Add Exynos Chipid driver support
+  ARM: EXYNOS: Refactoring to remove soc_is_exynosXXXX macros from
+    exynos
+
+ .../bindings/arm/samsung/exynos-chipid.txt         |   15 ++++
+ arch/arm/Kconfig                                   |    1 +
+ arch/arm/boot/dts/exynos4.dtsi                     |    2 +-
+ arch/arm/boot/dts/exynos5.dtsi                     |    2 +-
+ arch/arm/mach-exynos/exynos.c                      |   66 ++++++++--------
+ arch/arm/mach-exynos/hotplug.c                     |    2 -
+ arch/arm/mach-exynos/platsmp.c                     |   10 ++-
+ arch/arm/mach-exynos/pm.c                          |   28 +++----
+ arch/arm/plat-samsung/include/plat/cpu.h           |   60 --------------
+ drivers/clk/samsung/clk-exynos4.c                  |    2 +-
+ drivers/cpufreq/exynos-cpufreq.c                   |    9 +--
+ drivers/cpufreq/exynos-cpufreq.h                   |    1 -
+ drivers/cpufreq/exynos4x12-cpufreq.c               |    5 +-
+ drivers/misc/Kconfig                               |    7 ++
+ drivers/misc/Makefile                              |    1 +
+ drivers/misc/exynos-chipid.c                       |   83 ++++++++++++++++++++
+ include/linux/exynos-soc.h                         |   46 +++++++++++
+ 17 files changed, 215 insertions(+), 125 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/samsung/exynos-chipid.txt
+ create mode 100644 drivers/misc/exynos-chipid.c
+ create mode 100644 include/linux/exynos-soc.h
+
+-- 
+1.7.10.4
