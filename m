@@ -1,97 +1,78 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Sat, 3 May 2014 14:21:06 +0200
-Subject: [linux-sunxi] Re: [PATCH v5 8/8] ARM: sun7i/sun4i: dt: Add AXP209
- support to various boards
-In-Reply-To: <20140503010936.GF4090@lukather>
-References: <1398947374-3115-1-git-send-email-carlo@caione.org>
- <1398947374-3115-9-git-send-email-carlo@caione.org>
- <20140503010936.GF4090@lukather>
-Message-ID: <CAOQ7t2Z6rLAMGXocPNcKgOUp9iy6XZkh4O6jThPkdm5M6UMGtw@mail.gmail.com>
+From: max.schwarz@online.de (Max Schwarz)
+Date: Sat, 03 May 2014 14:40:36 +0200
+Subject: syscon or memory mappings (was: Re: [RFC/PATCH 0/8]
+ pinctrl-rockchip: Change wrong initial assumptions)
+In-Reply-To: <4321949.A6Ghcdztds@diego>
+References: <1414506.B4e2jZujVm@diego> <1721270.d6hHid1rhj@typ>
+ <4321949.A6Ghcdztds@diego>
+Message-ID: <9747726.2b5sgjTxWB@typ>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 3, 2014 at 3:09 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Thu, May 01, 2014 at 02:29:34PM +0200, Carlo Caione wrote:
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> Signed-off-by: Carlo Caione <carlo@caione.org>
->> ---
->>  arch/arm/boot/dts/sun4i-a10-a1000.dts           | 58 ++++++++++++++++++++++
->>  arch/arm/boot/dts/sun4i-a10-cubieboard.dts      | 58 ++++++++++++++++++++++
->>  arch/arm/boot/dts/sun4i-a10-hackberry.dts       | 64 ++++++++++++++++++++++++
->>  arch/arm/boot/dts/sun4i-a10-inet97fv2.dts       | 58 ++++++++++++++++++++++
->>  arch/arm/boot/dts/sun4i-a10-mini-xplus.dts      | 65 +++++++++++++++++++++++++
->>  arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts  | 64 ++++++++++++++++++++++++
->>  arch/arm/boot/dts/sun4i-a10-pcduino.dts         | 58 ++++++++++++++++++++++
->>  arch/arm/boot/dts/sun7i-a20-cubieboard2.dts     | 59 ++++++++++++++++++++++
->>  arch/arm/boot/dts/sun7i-a20-cubietruck.dts      | 59 ++++++++++++++++++++++
->>  arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 59 ++++++++++++++++++++++
->>  10 files changed, 602 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/sun4i-a10-a1000.dts b/arch/arm/boot/dts/sun4i-a10-a1000.dts
->> index fa746aea..57d3fb4 100644
->> --- a/arch/arm/boot/dts/sun4i-a10-a1000.dts
->> +++ b/arch/arm/boot/dts/sun4i-a10-a1000.dts
->> @@ -88,6 +88,56 @@
->>                       pinctrl-names = "default";
->>                       pinctrl-0 = <&i2c0_pins_a>;
->>                       status = "okay";
->> +
->> +                     axp209: pmic at 34 {
->> +                             compatible = "x-powers,axp209";
->> +                             reg = <0x34>;
->> +                             interrupts = <0>;
->> +
->> +                             interrupt-controller;
->> +                             #interrupt-cells = <1>;
->> +
->> +                             acin-supply = <&reg_axp_ipsout>;
->> +                             vin2-supply = <&reg_axp_ipsout>;
->> +                             vin3-supply = <&reg_axp_ipsout>;
->> +                             ldo24in-supply = <&reg_axp_ipsout>;
->> +                             ldo3in-supply = <&reg_axp_ipsout>;
->> +                             ldo5in-supply = <&reg_axp_ipsout>;
->> +
->> +                             regulators {
->> +                                     x-powers,dcdc-freq = <1500>;
->> +
->> +                                     axp_vcore_reg: dcdc2 {
->> +                                             regulator-min-microvolt = <700000>;
->> +                                             regulator-max-microvolt = <2275000>;
->> +                                             regulator-always-on;
->> +                                     };
->> +
->> +                                     axp_ddr_reg: dcdc3 {
->> +                                             regulator-always-on;
->> +                                     };
->> +
->> +                                     axp_rtc_reg: ldo1 {
->> +                                             regulator-always-on;
->> +                                     };
->> +
->> +                                     axp_analog_reg: ldo2 {
->> +                                             regulator-always-on;
->> +                                     };
->> +
->> +                                     axp_pll_reg: ldo3 {
->> +                                             regulator-always-on;
->> +                                     };
->> +
->> +                                     axp_hdmi_reg: ldo4 {
->> +                                             regulator-always-on;
->> +                                     };
->> +
->> +                                     axp_mic_reg: ldo5 {
->> +                                             regulator-always-on;
->
-> Do all these regulators need to be always on? It makes sense for the
-> pll and vcore, but I don't get why the mic and hdmi regulators need
-> this.
+Hello Heiko,
 
-I did this way because I don't have the schematics for all the board
-so I thought it was safer to leave all the regulators enabled
+On Saturday 03 May 2014 at 01:45:11, Heiko St?bner wrote:
+> > However, this sheds light on an underlying issue: Rockchip is not treating
+> > the whole GPIO block as one cohesive device as we do currently. Instead,
+> > it
+> > seems to me, one GPIO bank is one device. Each has its cohesive mux, bank
+> > and pull registers - apart from rk3188-bank-0, maybe. But that one is
+> > special anyway with regards to register ordering (s.b.).
+> > 
+> > The issues you had with RK3188 and now have with RK3288 seem to stem from
+> > trying to group all banks together into one pinctrl driver.
+> > 
+> > So maybe we should promote the GPIO banks to full devices in the dt and
+> > make smaller mappings for each GPIO bank, i.e. three mappings for each
+> > GPIO bank (mux, bank, pull). I know we have to stay backwards compatible
+> > dt-wise, but that should be doable.
+> 
+> Yes, that is another miss-conception from the early days. The
+> gpio-controllers themself are actually Synopsis Designware IPs - the kernel
+> now even has a separate driver for them (gpio-dwapb). Only the real
+> pincontrol/muxing/pull/etc is from Rockchip.
+> 
+> Currently I can't think of a way to move over gracefully, without
+> introducing crap into the gpio-dwapb driver. As at the moment it parses all
+> information it needs from the dt directly - of course with different
+> bindings.
+> 
+> That is also the reason I do not want to introduce more "special-cases" in
+> the bank-declaration we're using currently - to not make this move more
+> difficult in the future.
+> 
+> As it is, with the patch attached to the last mail, the pinctrl driver
+> wouldn't even need the "rockchip,rk3188-gpio-bank0" compatible anymore, as
+> the information about its special case is now sitting in the bank
+> declaration inside the driver. Which then would enable us to remove the
+> gpio-bank subnodes alltogether and use the external gpio driver.
 
--- 
-Carlo Caione
+Okay, you convinced me. That sounds like a good plan to me. Maybe we can 
+introduce some compability code into the pinctrl driver to generate the 
+correct dt nodes for gpio-dwabp at runtime? I think that would depend on 
+something like CONFIG_OF_DYNAMIC though.
+
+> While for example syscon cannot handle clocks currently, the underlying
+> regmap can - so it would be only a matter of teaching syscon to tell regmap
+> of the clock to use (GRF and PMU register-clocks in this case), instead of
+> needing to have every user of parts of these registers handle the relevant
+> clock itself on register accesses.
+> 
+> Also, as you can see in the grf map, the rk3188 actually has two soc_status
+> registers (0xac and 0x108) which have the dmac, cpu and drive strength
+> registers in between. So having a syscon only for soc_con and soc_status
+> will produce problems too.
+> 
+> Another example, GRF_IO_VSEL at 0x0380 is most likely some sort of pin
+> voltage selection. As it only spans 1 register I'd assume it could contain
+> settings that span all pin banks.
+
+Okay, we couldn't handle that with individual devices for each bank.
+
+> And of course, splitting the register space into dozens of small individual
+> mappings looks messy :-)
+
+Yes, I agree now ;-)
+
+Cheers,
+  Max
