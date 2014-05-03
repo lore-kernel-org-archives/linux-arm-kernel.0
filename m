@@ -1,78 +1,84 @@
-From: max.schwarz@online.de (Max Schwarz)
-Date: Sat, 03 May 2014 14:40:36 +0200
-Subject: syscon or memory mappings (was: Re: [RFC/PATCH 0/8]
- pinctrl-rockchip: Change wrong initial assumptions)
-In-Reply-To: <4321949.A6Ghcdztds@diego>
-References: <1414506.B4e2jZujVm@diego> <1721270.d6hHid1rhj@typ>
- <4321949.A6Ghcdztds@diego>
-Message-ID: <9747726.2b5sgjTxWB@typ>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Sat, 03 May 2014 14:19:27 +0100
+Subject: Automatically detecting when to use kirkwood-tsXXX-6281.dtb vs
+ -6282.dtb (Was: Re: [PATCH 21/21] ARM: Kirkwood: Remove DT support)
+In-Reply-To: <20140224162413.GE18601@lunn.ch>
+References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
+ <1391730137-14814-22-git-send-email-andrew@lunn.ch>
+ <52F51922.6030502@gmail.com>
+ <1392892217.23342.18.camel@kazak.uk.xensource.com>
+ <20140220105854.GL11878@lunn.ch>
+ <20140220111913.GZ21483@n2100.arm.linux.org.uk>
+ <1392896356.23342.40.camel@kazak.uk.xensource.com>
+ <20140220232649.GU7862@titan.lakedaemon.net>
+ <1393257630.16570.95.camel@kazak.uk.xensource.com>
+ <20140224162413.GE18601@lunn.ch>
+Message-ID: <1399123167.23380.163.camel@dagon.hellion.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Heiko,
-
-On Saturday 03 May 2014 at 01:45:11, Heiko St?bner wrote:
-> > However, this sheds light on an underlying issue: Rockchip is not treating
-> > the whole GPIO block as one cohesive device as we do currently. Instead,
-> > it
-> > seems to me, one GPIO bank is one device. Each has its cohesive mux, bank
-> > and pull registers - apart from rk3188-bank-0, maybe. But that one is
-> > special anyway with regards to register ordering (s.b.).
+On Mon, 2014-02-24 at 17:24 +0100, Andrew Lunn wrote:
+> > > back in v3.2, lspci should still work.  Would that given you the
+> > > information you need?
 > > 
-> > The issues you had with RK3188 and now have with RK3288 seem to stem from
-> > trying to group all banks together into one pinctrl driver.
-> > 
-> > So maybe we should promote the GPIO banks to full devices in the dt and
-> > make smaller mappings for each GPIO bank, i.e. three mappings for each
-> > GPIO bank (mux, bank, pull). I know we have to stay backwards compatible
-> > dt-wise, but that should be doable.
+> > I expect it will, yes.
 > 
-> Yes, that is another miss-conception from the early days. The
-> gpio-controllers themself are actually Synopsis Designware IPs - the kernel
-> now even has a separate driver for them (gpio-dwapb). Only the real
-> pincontrol/muxing/pull/etc is from Rockchip.
-> 
-> Currently I can't think of a way to move over gracefully, without
-> introducing crap into the gpio-dwapb driver. As at the moment it parses all
-> information it needs from the dt directly - of course with different
-> bindings.
-> 
-> That is also the reason I do not want to introduce more "special-cases" in
-> the bank-declaration we're using currently - to not make this move more
-> difficult in the future.
-> 
-> As it is, with the patch attached to the last mail, the pinctrl driver
-> wouldn't even need the "rockchip,rk3188-gpio-bank0" compatible anymore, as
-> the information about its special case is now sitting in the bank
-> declaration inside the driver. Which then would enable us to remove the
-> gpio-bank subnodes alltogether and use the external gpio driver.
+> 3.14 with the new PCIe driver will also work. The patch was accepted
+> and considered a regression so made it into one of the -rc's.
 
-Okay, you convinced me. That sounds like a good plan to me. Maybe we can 
-introduce some compability code into the pinctrl driver to generate the 
-correct dt nodes for gpio-dwabp at runtime? I think that would depend on 
-something like CONFIG_OF_DYNAMIC though.
+I've finally gotten around to doing something about detecting the
+various different ts-xxx platforms in order to select between the 6281
+and 6282 dtbs (reminder: I need to do this when running both old board
+file kernels and new dtb based ones in order to support upgrades).
 
-> While for example syscon cannot handle clocks currently, the underlying
-> regmap can - so it would be only a matter of teaching syscon to tell regmap
-> of the clock to use (GRF and PMU register-clocks in this case), instead of
-> needing to have every user of parts of these registers handle the relevant
-> clock itself on register accesses.
-> 
-> Also, as you can see in the grf map, the rk3188 actually has two soc_status
-> registers (0xac and 0x108) which have the dmac, cpu and drive strength
-> registers in between. So having a syscon only for soc_con and soc_status
-> will produce problems too.
-> 
-> Another example, GRF_IO_VSEL at 0x0380 is most likely some sort of pin
-> voltage selection. As it only spans 1 register I'd assume it could contain
-> settings that span all pin banks.
+On TS-419 the PCI ID method works fine when running under 3.2 and 3.14
+both using a board file. I'm currently building 3.15 with dts support so
+I can test that too (and the soc subsystem export of the SoC ID which
+was added in 3.15) but I'm relatively confident that'll all be OK.
 
-Okay, we couldn't handle that with individual devices for each bank.
+However on my 6281 based TS-219 system there seems to be no visible PCI
+bus when running the 3.2 kernel in the current Debian stable release
+(which of course uses board support). Some info:
+        $ grep ^Hardw /proc/cpuinfo 
+        Hardware	: QNAP TS-119/TS-219
+        $ cat /proc/device-tree/model ; echo
+        cat: /proc/device-tree/model: No such file or directory
+        
+        $ lspci
+        $ ls /sys/bus/pci/devices/
+        $ ls /sys/class/pci_bus/
+        0000:00@
+        $ dmesg | grep -i pci
+        [    5.024108] Kirkwood PCIe port 0: 
+        [    5.024126] Kirkwood PCIe port 1: 
+        [    5.024143] PCI: bus0 uses PCIe port 1
+        [    5.024342] PCI: bus0: Fast back to back transfers enabled
+        [    5.048486] PCI: CLS 0 bytes, default 32
+        $ dmesg | grep 628
+        [    5.022263] Kirkwood: MV88F6281-A1, TCLK=200000000.
+        
+ts219-setup.c and ts41x-setup.c don't appear to differ meaningfully in
+their pcie setup -- i.e. they both call kirkwood_pcie_init, so I suppose
+the difference is whether there is anything on the bus or not.
 
-> And of course, splitting the register space into dozens of small individual
-> mappings looks messy :-)
+Is the lack of anything on the PCI bus itself sufficient to determine
+that this is a 6281 based ts219 rather than a 6282 one (I don't have any
+6282 ts219 systems to try)?
 
-Yes, I agree now ;-)
+Might PHYAD (reported by ethtool eth0) be a useful fallback mechanism?
+AIUI the phy addr is 8 for 6281 systems and 0 for 6282 ones.
 
-Cheers,
-  Max
+Any other ideas?
+
+Also the ts219-setup.c board file supports the ts119 as well, but I
+don't see a DTB for that, is that in the works? Any ideas how I can
+distinguish a 219 from a 119? On the 219 /sys/class/pci_bus/0000:00
+exists (there is nothing under /sys/bus/pci/devices/ though), and since
+the main difference in ts219-setup.c is that 119 doesn't call
+kirkwood_pcie_init() I suspect the presence or absence
+of /sys/class/pci_bus/0000:00 might be sufficient to distinguish them,
+does that sound likely? (I don't have a ts119 to try either).
+
+Thanks for any advice.
+
+Ian.
