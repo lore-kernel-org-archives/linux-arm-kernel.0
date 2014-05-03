@@ -1,37 +1,56 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat,  3 May 2014 20:30:13 +0200
-Subject: [PATCH v2 3/9] ARM: Kirkwood: Add node for audio codec
+Date: Sat,  3 May 2014 20:30:17 +0200
+Subject: [PATCH v2 7/9] ARM: Kirkwood: t5325: Use simple card to instantiate
+ audio
 In-Reply-To: <1399141819-23924-1-git-send-email-andrew@lunn.ch>
 References: <1399141819-23924-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1399141819-23924-4-git-send-email-andrew@lunn.ch>
+Message-ID: <1399141819-23924-8-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instantiate the audio codec via a DT node.
+Add device tree nodes to instantiate the audio drivers on the HP T5325
+device.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/boot/dts/kirkwood-t5325.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/kirkwood-t5325.dts | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
 diff --git a/arch/arm/boot/dts/kirkwood-t5325.dts b/arch/arm/boot/dts/kirkwood-t5325.dts
-index 0bd70d928c69..dbb730642543 100644
+index dbb730642543..caedc9f1e69b 100644
 --- a/arch/arm/boot/dts/kirkwood-t5325.dts
 +++ b/arch/arm/boot/dts/kirkwood-t5325.dts
-@@ -127,6 +127,14 @@
+@@ -192,6 +192,31 @@
+ 		gpios = <&gpio1 17 GPIO_ACTIVE_HIGH>;
+ 	};
  
- 		i2c at 11000 {
- 			status = "okay";
++	sound {
++		compatible = "simple-audio-card";
++		simple-audio-card,format = "i2s";
++		simple-audio-card,routing =
++			"Headphone Jack", "HPL",
++			"Headphone Jack", "HPR",
++			"Speaker", "SPKOUT",
++			"Speaker", "SPKOUTN",
++			"MIC1", "Mic Jack",
++			"MIC2", "Mic Jack";
++		simple-audio-card,widgets =
++			"Headphone", "Headphone Jack",
++			"Speaker", "Speaker",
++			"Microphone", "Mic Jack";
 +
-+			alc5621: alc5621 at 1a {
-+				compatible = "realtek,alc5621";
-+				reg = <0x1a>;
-+				#sound-dai-cells = <0>;
-+				add-ctrl = <0x3700>;
-+				jack-det-ctrl = <0x4810>;
-+			};
- 		};
++		simple-audio-card,mclk-fs = <256>;
++
++		simple-audio-card,cpu {
++			sound-dai = <&audio>;
++		};
++
++		simple-audio-card,codec {
++			sound-dai = <&alc5621>;
++		};
++	};
+ };
  
- 		serial at 12000 {
+ &mdio {
 -- 
 2.0.0.rc0
