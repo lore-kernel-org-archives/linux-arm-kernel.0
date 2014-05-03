@@ -1,325 +1,56 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 3 May 2014 10:53:17 -0700
-Subject: [PATCH v5 2/3] ARM: sunxi: Add driver for sunxi IR controller
-In-Reply-To: <1398871010-30681-3-git-send-email-bay@hackerdom.ru>
-References: <1398871010-30681-1-git-send-email-bay@hackerdom.ru>
- <1398871010-30681-3-git-send-email-bay@hackerdom.ru>
-Message-ID: <20140503175317.GC15342@lukather>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Sat,  3 May 2014 15:26:55 -0300
+Subject: [PATCH 0/7] net: ethernet: marvell: Assorted fixes
+Message-ID: <1399141622-30654-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 30, 2014 at 09:16:49PM +0600, Alexander Bersenev wrote:
-> This patch adds driver for sunxi IR controller.
-> It is based on Alexsey Shestacov's work based on the original driver
-> supplied by Allwinner.
-> 
-> Signed-off-by: Alexander Bersenev <bay@hackerdom.ru>
-> Signed-off-by: Alexsey Shestacov <wingrime@linux-sunxi.org>
-> ---
->  drivers/media/rc/Kconfig    |  10 ++
->  drivers/media/rc/Makefile   |   1 +
->  drivers/media/rc/sunxi-ir.c | 303 ++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 314 insertions(+)
->  create mode 100644 drivers/media/rc/sunxi-ir.c
-> 
-> diff --git a/drivers/media/rc/Kconfig b/drivers/media/rc/Kconfig
-> index 8fbd377..9427fad 100644
-> --- a/drivers/media/rc/Kconfig
-> +++ b/drivers/media/rc/Kconfig
-> @@ -343,4 +343,14 @@ config RC_ST
->  
->  	 If you're not sure, select N here.
->  
-> +config IR_SUNXI
-> +    tristate "SUNXI IR remote control"
-> +    depends on RC_CORE
-> +    depends on ARCH_SUNXI
-> +    ---help---
-> +      Say Y if you want to use sunXi internal IR Controller
-> +
-> +      To compile this driver as a module, choose M here: the module will
-> +      be called sunxi-ir.
-> +
->  endif #RC_DEVICES
-> diff --git a/drivers/media/rc/Makefile b/drivers/media/rc/Makefile
-> index f8b54ff..93cdbe9 100644
-> --- a/drivers/media/rc/Makefile
-> +++ b/drivers/media/rc/Makefile
-> @@ -32,4 +32,5 @@ obj-$(CONFIG_IR_GPIO_CIR) += gpio-ir-recv.o
->  obj-$(CONFIG_IR_IGUANA) += iguanair.o
->  obj-$(CONFIG_IR_TTUSBIR) += ttusbir.o
->  obj-$(CONFIG_RC_ST) += st_rc.o
-> +obj-$(CONFIG_IR_SUNXI) += sunxi-ir.o
->  obj-$(CONFIG_IR_IMG) += img-ir/
-> diff --git a/drivers/media/rc/sunxi-ir.c b/drivers/media/rc/sunxi-ir.c
-> new file mode 100644
-> index 0000000..f051d94
-> --- /dev/null
-> +++ b/drivers/media/rc/sunxi-ir.c
-> @@ -0,0 +1,303 @@
-> +/*
-> + * Driver for Allwinner sunXi IR controller
-> + *
-> + * Copyright (C) 2014 Alexsey Shestacov <wingrime@linux-sunxi.org>
-> + * Copyright (C) 2014 Alexander Bersenev <bay@hackerdom.ru>
-> + *
-> + * Based on sun5i-ir.c:
-> + * Copyright (C) 2007-2012 Daniel Wang
-> + * Allwinner Technology Co., Ltd. <www.allwinnertech.com>
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License as
-> + * published by the Free Software Foundation; either version 2 of
-> + * the License, or (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/module.h>
-> +#include <linux/of_platform.h>
-> +#include <media/rc-core.h>
-> +
-> +#define SUNXI_IR_DEV "sunxi-ir"
-> +
-> +/* Registers */
-> +/* IR Control */
-> +#define SUNXI_IR_CTL_REG      0x00
-> +/* Rx Config */
-> +#define SUNXI_IR_RXCTL_REG    0x10
-> +/* Rx Data */
-> +#define SUNXI_IR_RXFIFO_REG   0x20
-> +/* Rx Interrupt Enable */
-> +#define SUNXI_IR_RXINT_REG    0x2C
-> +/* Rx Interrupt Status */
-> +#define SUNXI_IR_RXSTA_REG    0x30
-> +/* IR Sample Config */
-> +#define SUNXI_IR_CIR_REG      0x34
-> +
-> +/* Bit Definition of IR_RXINTS_REG Register */
-> +#define SUNXI_IR_RXINTS_RXOF  BIT(0) /* Rx FIFO Overflow */
-> +#define SUNXI_IR_RXINTS_RXPE  BIT(1) /* Rx Packet End */
-> +#define SUNXI_IR_RXINTS_RXDA  BIT(4) /* Rx FIFO Data Available */
-> +/* Hardware supported fifo size */
-> +#define SUNXI_IR_FIFO_SIZE    16
-> +/* How much messages in fifo triggers IRQ */
-> +#define SUNXI_IR_FIFO_TRIG    8
-> +/* Required frequency for IR0 or IR1 clock in CIR mode */
-> +#define SUNXI_IR_BASE_CLK     8000000
-> +/* Frequency after IR internal divider  */
-> +#define SUNXI_IR_CLK          (SUNXI_IR_BASE_CLK / 64)
-> +/* Sample period in ns */
-> +#define SUNXI_IR_SAMPLE       (1000000000ul / SUNXI_IR_CLK)
-> +/* Filter threshold in samples  */
-> +#define SUNXI_IR_RXFILT       1
-> +/* Idle Threshold in samples */
-> +#define SUNXI_IR_RXIDLE       20
-> +/* Time after which device stops sending data in ms */
-> +#define SUNXI_IR_TIMEOUT      120
-> +
-> +struct sunxi_ir {
-> +	spinlock_t      ir_lock;
-> +	struct rc_dev   *rc;
-> +	void __iomem    *base;
-> +	int             irq;
-> +	struct clk      *clk;
-> +	struct clk      *apb_clk;
-> +	const char      *map_name;
-> +};
-> +
-> +static irqreturn_t sunxi_ir_irq(int irqno, void *dev_id)
-> +{
-> +	unsigned long status;
-> +	unsigned char dt;
-> +	unsigned int cnt, rc;
-> +	struct sunxi_ir *ir = dev_id;
-> +	DEFINE_IR_RAW_EVENT(rawir);
-> +
-> +	spin_lock_irq(&ir->ir_lock);
-> +
-> +	status = readl(ir->base + SUNXI_IR_RXSTA_REG);
-> +
-> +	/* clean all pending statuses */
-> +	writel(status | 0xff, ir->base + SUNXI_IR_RXSTA_REG);
-> +
-> +	if (status & SUNXI_IR_RXINTS_RXDA) {
-> +		/* How much messages in fifo */
-> +		rc  = (status >> 8) & 0x3f;
-> +		/* Sanity check */
-> +		rc = rc > SUNXI_IR_FIFO_SIZE ? SUNXI_IR_FIFO_SIZE : rc;
-> +		/* if we have data */
-> +		for (cnt = 0; cnt < rc; cnt++) {
-> +			/* for each bit in fifo */
-> +			dt = readb(ir->base + SUNXI_IR_RXFIFO_REG);
-> +			rawir.pulse = (dt & 0x80) != 0;
-> +			rawir.duration = (dt & 0x7f) * SUNXI_IR_SAMPLE;
-> +			ir_raw_event_store_with_filter(ir->rc, &rawir);
-> +		}
-> +	}
-> +
-> +	if (status & SUNXI_IR_RXINTS_RXOF)
-> +		ir_raw_event_reset(ir->rc);
-> +	else if (status & SUNXI_IR_RXINTS_RXPE) {
-> +		ir_raw_event_set_idle(ir->rc, true);
-> +		ir_raw_event_handle(ir->rc);
-> +	}
-> +
-> +	spin_unlock_irq(&ir->ir_lock);
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +
-> +static int sunxi_ir_probe(struct platform_device *pdev)
-> +{
-> +	int ret = 0;
-> +	unsigned long tmp = 0;
-> +
-> +	struct device *dev = &pdev->dev;
-> +	struct device_node *dn = dev->of_node;
-> +	struct resource *res;
-> +	struct sunxi_ir *ir;
-> +
-> +	ir = devm_kzalloc(dev, sizeof(struct sunxi_ir), GFP_KERNEL);
-> +	if (!ir)
-> +		return -ENOMEM;
-> +
-> +	/* Clock */
-> +	ir->apb_clk = devm_clk_get(dev, "apb");
-> +	if (IS_ERR(ir->apb_clk)) {
-> +		dev_err(dev, "failed to get a apb clock.\n");
-> +		return -EINVAL;
-> +	}
-> +	ir->clk = devm_clk_get(dev, "ir");
-> +	if (IS_ERR(ir->clk)) {
-> +		dev_err(dev, "failed to get a ir clock.\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	ret = clk_set_rate(ir->clk, SUNXI_IR_BASE_CLK);
-> +	if (ret) {
-> +		dev_err(dev, "set ir base clock failed!\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	if (clk_prepare_enable(ir->apb_clk)) {
-> +		dev_err(dev, "try to enable apb_ir_clk failed\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	if (clk_prepare_enable(ir->clk)) {
-> +		dev_err(dev, "try to enable ir_clk failed\n");
-> +		ret = -EINVAL;
-> +		goto exit_clkdisable_apb_clk;
-> +	}
-> +
-> +	/* IO */
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +
-> +	ir->base = devm_ioremap_resource(dev, res);
-> +	if (IS_ERR(ir->base)) {
-> +		dev_err(dev, "failed to map registers\n");
-> +		ret = -ENOMEM;
-> +		goto exit_clkdisable_clk;
-> +	}
-> +
-> +	/* IRQ */
-> +	ir->irq = platform_get_irq(pdev, 0);
-> +	if (ir->irq < 0) {
-> +		dev_err(dev, "no irq resource\n");
-> +		ret = -EINVAL;
-> +		goto exit_clkdisable_clk;
-> +	}
-> +
-> +	ret = devm_request_irq(dev, ir->irq, sunxi_ir_irq, 0, SUNXI_IR_DEV, ir);
-> +	if (ret) {
-> +		dev_err(dev, "failed request irq\n");
-> +		ret = -EINVAL;
-> +		goto exit_clkdisable_clk;
-> +	}
-> +
-> +	ir->rc = rc_allocate_device();
-> +
-> +	if (!ir->rc) {
-> +		dev_err(dev, "failed to allocate device\n");
-> +		ret = -ENOMEM;
-> +		goto exit_clkdisable_clk;
-> +	}
-> +
-> +	ir->rc->priv = ir;
-> +	ir->rc->input_name = SUNXI_IR_DEV;
-> +	ir->rc->input_phys = "sunxi-ir/input0";
-> +	ir->rc->input_id.bustype = BUS_HOST;
-> +	ir->rc->input_id.vendor = 0x0001;
-> +	ir->rc->input_id.product = 0x0001;
-> +	ir->rc->input_id.version = 0x0100;
-> +	ir->map_name = of_get_property(dn, "linux,rc-map-name", NULL);
-> +	ir->rc->map_name = ir->map_name ?: RC_MAP_EMPTY;
-> +	ir->rc->dev.parent = dev;
-> +	ir->rc->driver_type = RC_DRIVER_IR_RAW;
-> +	rc_set_allowed_protocols(ir->rc, RC_BIT_ALL);
-> +	ir->rc->rx_resolution = SUNXI_IR_SAMPLE;
-> +	ir->rc->timeout = MS_TO_NS(SUNXI_IR_TIMEOUT);
-> +	ir->rc->driver_name = SUNXI_IR_DEV;
-> +
-> +	ret = rc_register_device(ir->rc);
-> +	if (ret) {
-> +		dev_err(dev, "failed to register rc device\n");
-> +		ret = -EINVAL;
-> +		goto exit_free_dev;
-> +	}
-> +
-> +	platform_set_drvdata(pdev, ir);
-> +
-> +	/* Enable CIR Mode */
-> +	writel(0x3 << 4, ir->base+SUNXI_IR_CTL_REG);
-> +
-> +	/* Config IR Sample Register */
-> +	/* Fsample = clk */
-> +	tmp = 0;
-> +	/* Set Filter Threshold */
-> +	tmp |= (SUNXI_IR_RXFILT & 0x3f) << 2;
-> +	/* Set Idle Threshold */
-> +	tmp |= (SUNXI_IR_RXIDLE & 0xff) << 8;
-> +	writel(tmp, ir->base + SUNXI_IR_CIR_REG);
-> +
-> +	/* Invert Input Signal */
-> +	writel(0x1 << 2, ir->base + SUNXI_IR_RXCTL_REG);
-> +
-> +	/* Clear All Rx Interrupt Status */
-> +	writel(0xff, ir->base + SUNXI_IR_RXSTA_REG);
-> +
-> +	/* Enable IRQ on data, overflow, packed end */
-> +	tmp = (0x1 << 4) | 0x3;
-> +
-> +	/* Rx FIFO Threshold */
-> +	tmp |= (SUNXI_IR_FIFO_TRIG - 1) << 8;
-> +
-> +	writel(tmp, ir->base + SUNXI_IR_RXINT_REG);
-> +
-> +	/* Enable IR Module */
-> +	tmp = readl(ir->base + SUNXI_IR_CTL_REG);
-> +
-> +	writel(tmp | 0x3, ir->base + SUNXI_IR_CTL_REG);
+This series consists of cleanups and minor improvements on mvneta, mv643xx_eth
+and mvmdio drivers. None of the patches imply any functionality change, except
+for the patch six "Change the number of default rx queues to one".
 
-We don't like magic numbers too much. Please add some #define for
-those.
+This patch reduces the driver's allocated resources and makes the multiqueue
+path in the poll function not get taken. In other words, in the poll():
 
-Thanks!
-Maxime
+static int mvneta_poll(struct napi_struct *napi, int budget)
+{
+	/* .. */
+        if (rxq_number > 1) {
+		/* .. */
+        } else {
+                rx_done = mvneta_rx(pp, budget, &pp->rxqs[rxq_def]);
+                budget -= rx_done;
+        }
+}
+
+the first block of the 'if' won't be taken. This should be completely harmless,
+as the driver only supports the first queue, by requiring 'rxq_def' to be '0'.
+This is explained by a comment in the code:
+
+        /* Our multiqueue support is not complete, so for now, only
+         * allow the usage of the first RX queue
+         */
+        if (rxq_def != 0) {
+                dev_err(&pdev->dev, "Invalid rxq_def argument: %d\n", rxq_def);
+                return -EINVAL;
+        }
+
+Willy, Thomas: given you've done some work on these drivers, could you review
+the series and comment?
+
+Ezequiel Garcia (7):
+  net: mv643xx_eth: Simplify mv643xx_eth_adjust_link()
+  net: mvneta: Clean-up mvneta_tx_frag_process()
+  net: mvneta: Check tx queue setup error in mvneta_change_mtu()
+  net: mvneta: Clean-up mvneta_init()
+  net: mvneta: Use prepare/commit API to simplify MAC address setting
+  net: mvneta: Change the number of default rx queues to one
+  net: mvmdio: Use devm_* API to simplify the code
+
+ drivers/net/ethernet/marvell/mv643xx_eth.c | 15 ++----
+ drivers/net/ethernet/marvell/mvmdio.c      | 18 +++----
+ drivers/net/ethernet/marvell/mvneta.c      | 86 +++++++++++++-----------------
+ 3 files changed, 47 insertions(+), 72 deletions(-)
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140503/e2f5d5cb/attachment.sig>
+1.9.1
