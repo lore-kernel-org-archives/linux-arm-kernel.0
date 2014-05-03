@@ -1,84 +1,95 @@
-From: ijc@hellion.org.uk (Ian Campbell)
-Date: Sat, 03 May 2014 14:19:27 +0100
-Subject: Automatically detecting when to use kirkwood-tsXXX-6281.dtb vs
- -6282.dtb (Was: Re: [PATCH 21/21] ARM: Kirkwood: Remove DT support)
-In-Reply-To: <20140224162413.GE18601@lunn.ch>
-References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
- <1391730137-14814-22-git-send-email-andrew@lunn.ch>
- <52F51922.6030502@gmail.com>
- <1392892217.23342.18.camel@kazak.uk.xensource.com>
- <20140220105854.GL11878@lunn.ch>
- <20140220111913.GZ21483@n2100.arm.linux.org.uk>
- <1392896356.23342.40.camel@kazak.uk.xensource.com>
- <20140220232649.GU7862@titan.lakedaemon.net>
- <1393257630.16570.95.camel@kazak.uk.xensource.com>
- <20140224162413.GE18601@lunn.ch>
-Message-ID: <1399123167.23380.163.camel@dagon.hellion.org.uk>
+From: sdu.liu@huawei.com (Liu Hua)
+Date: Sat, 3 May 2014 21:44:46 +0800
+Subject: [RESEND PATCH] ARM: kdump: Add vmcore_elf64_check_arch
+Message-ID: <1399124686-63299-1-git-send-email-sdu.liu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-02-24 at 17:24 +0100, Andrew Lunn wrote:
-> > > back in v3.2, lspci should still work.  Would that given you the
-> > > information you need?
-> > 
-> > I expect it will, yes.
-> 
-> 3.14 with the new PCIe driver will also work. The patch was accepted
-> and considered a regression so made it into one of the -rc's.
+Hi Will or Russell,
 
-I've finally gotten around to doing something about detecting the
-various different ts-xxx platforms in order to select between the 6281
-and 6282 dtbs (reminder: I need to do this when running both old board
-file kernels and new dtb based ones in order to support upgrades).
+With CONFIG_LPAE=y, memory in 32-bit ARM systems can exceed
+4G. So if we use kdump in such systems. The capture kernel
+should parse 64-bit elf header(parse_crash_elf64_headers).
 
-On TS-419 the PCI ID method works fine when running under 3.2 and 3.14
-both using a board file. I'm currently building 3.15 with dts support so
-I can test that too (and the soc subsystem export of the SoC ID which
-was added in 3.15) but I'm relatively confident that'll all be OK.
+And this process can not pass because ARM linux only provides
+zero vmcore_elf64_check_arch function by commit 4b3bf7aef.
 
-However on my 6281 based TS-219 system there seems to be no visible PCI
-bus when running the 3.2 kernel in the current Debian stable release
-(which of course uses board support). Some info:
-        $ grep ^Hardw /proc/cpuinfo 
-        Hardware	: QNAP TS-119/TS-219
-        $ cat /proc/device-tree/model ; echo
-        cat: /proc/device-tree/model: No such file or directory
-        
-        $ lspci
-        $ ls /sys/bus/pci/devices/
-        $ ls /sys/class/pci_bus/
-        0000:00@
-        $ dmesg | grep -i pci
-        [    5.024108] Kirkwood PCIe port 0: 
-        [    5.024126] Kirkwood PCIe port 1: 
-        [    5.024143] PCI: bus0 uses PCIe port 1
-        [    5.024342] PCI: bus0: Fast back to back transfers enabled
-        [    5.048486] PCI: CLS 0 bytes, default 32
-        $ dmesg | grep 628
-        [    5.022263] Kirkwood: MV88F6281-A1, TCLK=200000000.
-        
-ts219-setup.c and ts41x-setup.c don't appear to differ meaningfully in
-their pcie setup -- i.e. they both call kirkwood_pcie_init, so I suppose
-the difference is whether there is anything on the bus or not.
+This patch adds check functions related to elf64 header.
 
-Is the lack of anything on the PCI bus itself sufficient to determine
-that this is a 6281 based ts219 rather than a 6282 one (I don't have any
-6282 ts219 systems to try)?
+Thanks,
+Liu Hua
 
-Might PHYAD (reported by ethtool eth0) be a useful fallback mechanism?
-AIUI the phy addr is 8 for 6281 systems and 0 for 6282 ones.
+Signed-off-by: Liu Hua <sdu.liu@huawei.com>
+---
+ arch/arm/include/asm/elf.h |  4 +++-
+ arch/arm/kernel/elf.c      | 33 +++++++++++++++++++++++++++++++++
+ 2 files changed, 36 insertions(+), 1 deletion(-)
 
-Any other ideas?
-
-Also the ts219-setup.c board file supports the ts119 as well, but I
-don't see a DTB for that, is that in the works? Any ideas how I can
-distinguish a 219 from a 119? On the 219 /sys/class/pci_bus/0000:00
-exists (there is nothing under /sys/bus/pci/devices/ though), and since
-the main difference in ts219-setup.c is that 119 doesn't call
-kirkwood_pcie_init() I suspect the presence or absence
-of /sys/class/pci_bus/0000:00 might be sufficient to distinguish them,
-does that sound likely? (I don't have a ts119 to try either).
-
-Thanks for any advice.
-
-Ian.
+diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
+index f4b46d3..8651699 100644
+--- a/arch/arm/include/asm/elf.h
++++ b/arch/arm/include/asm/elf.h
+@@ -90,14 +90,16 @@ typedef struct user_fp elf_fpregset_t;
+ extern char elf_platform[];
+ 
+ struct elf32_hdr;
++struct elf64_hdr;
+ 
+ /*
+  * This is used to ensure we don't load something for the wrong architecture.
+  */
+ extern int elf_check_arch(const struct elf32_hdr *);
++extern int elf_check_arch_64(const struct elf64_hdr *);
+ #define elf_check_arch elf_check_arch
+ 
+-#define vmcore_elf64_check_arch(x) (0)
++#define vmcore_elf64_check_arch(x) (elf_check_arch_64(x))
+ 
+ extern int arm_elf_read_implies_exec(const struct elf32_hdr *, int);
+ #define elf_read_implies_exec(ex,stk) arm_elf_read_implies_exec(&(ex), stk)
+diff --git a/arch/arm/kernel/elf.c b/arch/arm/kernel/elf.c
+index d0d1e83..452086a 100644
+--- a/arch/arm/kernel/elf.c
++++ b/arch/arm/kernel/elf.c
+@@ -38,6 +38,39 @@ int elf_check_arch(const struct elf32_hdr *x)
+ }
+ EXPORT_SYMBOL(elf_check_arch);
+ 
++int elf_check_arch_64(const struct elf64_hdr *x)
++{
++	unsigned int eflags;
++
++	/* Make sure it's an ARM executable */
++	if (x->e_machine != EM_ARM)
++		return 0;
++
++	/* Make sure the entry address is reasonable */
++	if (x->e_entry & 1) {
++		if (!(elf_hwcap & HWCAP_THUMB))
++			return 0;
++	} else if (x->e_entry & 3)
++		return 0;
++
++	eflags = x->e_flags;
++	if ((eflags & EF_ARM_EABI_MASK) == EF_ARM_EABI_UNKNOWN) {
++		unsigned int flt_fmt;
++
++		/* APCS26 is only allowed if the CPU supports it */
++		if ((eflags & EF_ARM_APCS_26) && !(elf_hwcap & HWCAP_26BIT))
++			return 0;
++
++		flt_fmt = eflags & (EF_ARM_VFP_FLOAT | EF_ARM_SOFT_FLOAT);
++
++		/* VFP requires the supporting code */
++		if (flt_fmt == EF_ARM_VFP_FLOAT && !(elf_hwcap & HWCAP_VFP))
++			return 0;
++	}
++	return 1;
++}
++EXPORT_SYMBOL(elf_check_arch_64);
++
+ void elf_set_personality(const struct elf32_hdr *x)
+ {
+ 	unsigned int eflags = x->e_flags;
+-- 
+1.9.0
