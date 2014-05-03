@@ -1,65 +1,35 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sat,  3 May 2014 15:27:00 -0300
-Subject: [PATCH 5/7] net: mvneta: Use prepare/commit API to simplify MAC
- address setting
+Date: Sat,  3 May 2014 15:27:01 -0300
+Subject: [PATCH 6/7] net: mvneta: Change the number of default rx queues to one
 In-Reply-To: <1399141622-30654-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1399141622-30654-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1399141622-30654-6-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1399141622-30654-7-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use eth_prepare_mac_addr_change and eth_commit_mac_addr_change, instead
-of manually checking and storing the MAC address, which makes the
-code slightly more robust. This fixes the lack of valid MAC address check
-in the driver's .ndo_set_mac_address hook.
+The driver does not support multiple rx queues, and so it's a waste
+of resources to have a default number larger than one (1).
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/mvneta.c | 19 +++++++------------
- 1 file changed, 7 insertions(+), 12 deletions(-)
+ drivers/net/ethernet/marvell/mvneta.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index 9a444a0..0dcce29 100644
+index 0dcce29..ec4f67a 100644
 --- a/drivers/net/ethernet/marvell/mvneta.c
 +++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -2323,22 +2323,19 @@ static void mvneta_get_mac_addr(struct mvneta_port *pp, unsigned char *addr)
- static int mvneta_set_mac_addr(struct net_device *dev, void *addr)
- {
- 	struct mvneta_port *pp = netdev_priv(dev);
--	u8 *mac = addr + 2;
--	int i;
--
--	if (netif_running(dev))
--		return -EBUSY;
-+	struct sockaddr *sockaddr = addr;
-+	int ret;
+@@ -441,7 +441,10 @@ struct mvneta_rx_queue {
+ 	int next_desc_to_proc;
+ };
  
-+	ret = eth_prepare_mac_addr_change(dev, addr);
-+	if (ret < 0)
-+		return ret;
- 	/* Remove previous address table entry */
- 	mvneta_mac_addr_set(pp, dev->dev_addr, -1);
+-static int rxq_number = 8;
++/* The hardware supports eight (8) rx queues, but we are only allowing
++ * the first one to be used. Therefore, let's just allocate one queue.
++ */
++static int rxq_number = 1;
+ static int txq_number = 8;
  
- 	/* Set new addr in hw */
--	mvneta_mac_addr_set(pp, mac, rxq_def);
--
--	/* Set addr in the device */
--	for (i = 0; i < ETH_ALEN; i++)
--		dev->dev_addr[i] = mac[i];
-+	mvneta_mac_addr_set(pp, sockaddr->sa_data, rxq_def);
- 
-+	eth_commit_mac_addr_change(dev, addr);
- 	return 0;
- }
- 
-@@ -2433,8 +2430,6 @@ static int mvneta_open(struct net_device *dev)
- 	struct mvneta_port *pp = netdev_priv(dev);
- 	int ret;
- 
--	mvneta_mac_addr_set(pp, dev->dev_addr, rxq_def);
--
- 	pp->pkt_size = MVNETA_RX_PKT_SIZE(pp->dev->mtu);
- 	pp->frag_size = SKB_DATA_ALIGN(MVNETA_RX_BUF_SIZE(pp->pkt_size)) +
- 	                SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
+ static int rxq_def;
 -- 
 1.9.1
