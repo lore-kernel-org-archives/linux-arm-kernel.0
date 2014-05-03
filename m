@@ -1,69 +1,97 @@
-From: anurag19aggarwal@gmail.com (Anurag Aggarwal)
-Date: Sat, 3 May 2014 12:35:39 +0530
-Subject: [PATCH] ARM: unwind: Fix handling of "Pop r4-r[4+nnn], r14" opcode
-In-Reply-To: <1398855131-15079-1-git-send-email-Nikolay.Borisov@arm.com>
-References: <1398855131-15079-1-git-send-email-Nikolay.Borisov@arm.com>
-Message-ID: <CAPoNrtsqkqR=07nq5zHnWt4eF-m_A1i_0LQf9rF_-ho+uDoY8g@mail.gmail.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Sat, 3 May 2014 14:21:06 +0200
+Subject: [linux-sunxi] Re: [PATCH v5 8/8] ARM: sun7i/sun4i: dt: Add AXP209
+ support to various boards
+In-Reply-To: <20140503010936.GF4090@lukather>
+References: <1398947374-3115-1-git-send-email-carlo@caione.org>
+ <1398947374-3115-9-git-send-email-carlo@caione.org>
+ <20140503010936.GF4090@lukather>
+Message-ID: <CAOQ7t2Z6rLAMGXocPNcKgOUp9iy6XZkh4O6jThPkdm5M6UMGtw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I must of missed the wrong opcode, as my major focus was on preventing
-the Data abort.
+On Sat, May 3, 2014 at 3:09 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
+>
+> On Thu, May 01, 2014 at 02:29:34PM +0200, Carlo Caione wrote:
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> Signed-off-by: Carlo Caione <carlo@caione.org>
+>> ---
+>>  arch/arm/boot/dts/sun4i-a10-a1000.dts           | 58 ++++++++++++++++++++++
+>>  arch/arm/boot/dts/sun4i-a10-cubieboard.dts      | 58 ++++++++++++++++++++++
+>>  arch/arm/boot/dts/sun4i-a10-hackberry.dts       | 64 ++++++++++++++++++++++++
+>>  arch/arm/boot/dts/sun4i-a10-inet97fv2.dts       | 58 ++++++++++++++++++++++
+>>  arch/arm/boot/dts/sun4i-a10-mini-xplus.dts      | 65 +++++++++++++++++++++++++
+>>  arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts  | 64 ++++++++++++++++++++++++
+>>  arch/arm/boot/dts/sun4i-a10-pcduino.dts         | 58 ++++++++++++++++++++++
+>>  arch/arm/boot/dts/sun7i-a20-cubieboard2.dts     | 59 ++++++++++++++++++++++
+>>  arch/arm/boot/dts/sun7i-a20-cubietruck.dts      | 59 ++++++++++++++++++++++
+>>  arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 59 ++++++++++++++++++++++
+>>  10 files changed, 602 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/sun4i-a10-a1000.dts b/arch/arm/boot/dts/sun4i-a10-a1000.dts
+>> index fa746aea..57d3fb4 100644
+>> --- a/arch/arm/boot/dts/sun4i-a10-a1000.dts
+>> +++ b/arch/arm/boot/dts/sun4i-a10-a1000.dts
+>> @@ -88,6 +88,56 @@
+>>                       pinctrl-names = "default";
+>>                       pinctrl-0 = <&i2c0_pins_a>;
+>>                       status = "okay";
+>> +
+>> +                     axp209: pmic at 34 {
+>> +                             compatible = "x-powers,axp209";
+>> +                             reg = <0x34>;
+>> +                             interrupts = <0>;
+>> +
+>> +                             interrupt-controller;
+>> +                             #interrupt-cells = <1>;
+>> +
+>> +                             acin-supply = <&reg_axp_ipsout>;
+>> +                             vin2-supply = <&reg_axp_ipsout>;
+>> +                             vin3-supply = <&reg_axp_ipsout>;
+>> +                             ldo24in-supply = <&reg_axp_ipsout>;
+>> +                             ldo3in-supply = <&reg_axp_ipsout>;
+>> +                             ldo5in-supply = <&reg_axp_ipsout>;
+>> +
+>> +                             regulators {
+>> +                                     x-powers,dcdc-freq = <1500>;
+>> +
+>> +                                     axp_vcore_reg: dcdc2 {
+>> +                                             regulator-min-microvolt = <700000>;
+>> +                                             regulator-max-microvolt = <2275000>;
+>> +                                             regulator-always-on;
+>> +                                     };
+>> +
+>> +                                     axp_ddr_reg: dcdc3 {
+>> +                                             regulator-always-on;
+>> +                                     };
+>> +
+>> +                                     axp_rtc_reg: ldo1 {
+>> +                                             regulator-always-on;
+>> +                                     };
+>> +
+>> +                                     axp_analog_reg: ldo2 {
+>> +                                             regulator-always-on;
+>> +                                     };
+>> +
+>> +                                     axp_pll_reg: ldo3 {
+>> +                                             regulator-always-on;
+>> +                                     };
+>> +
+>> +                                     axp_hdmi_reg: ldo4 {
+>> +                                             regulator-always-on;
+>> +                                     };
+>> +
+>> +                                     axp_mic_reg: ldo5 {
+>> +                                             regulator-always-on;
+>
+> Do all these regulators need to be always on? It makes sense for the
+> pll and vcore, but I don't get why the mic and hdmi regulators need
+> this.
 
-
-On Wed, Apr 30, 2014 at 4:22 PM, Nikolay Borisov
-<Nikolay.Borisov@arm.com> wrote:
-> The arm EABI states that opcode 10100nnn means pop register r4-4[4+nnn],
-> aditionally there is a similar opcode: 10101nnn which means the same thing plus
-> popping r14. Those two cases are handled by the unwind_exec_pop_r4_to_rN
-> function which checks whether the 4th bit is set and does r14 popping.
->
-> However, up until now it has been checking whether the 8th was set (mask & 0x80)
-> instead of the 4th (mask & 0x8), a simple to make typo but this meant that we
-> were always popping r14 even if we had the former opcode.
->
-> This patch changes the mask so that the 2 opcodes are being handled correctly.
->
-> Signed-off-by: Nikolay Borisov <Nikolay.Borisov@arm.com>
-Reviewed-by: Anurag Aggarwal <anurag19aggarwal@gmail.com>
-> ---
->
-> I tested this patch using magic sysrq to generate backtrace of every process and
-> it was working. However, inspecting the unwind table for vmlinuz it seems that
-> the majority of the instructions do in fact require popping r14 so that's why
-> this has gone unnoticed for a long period, however I'm open to suggestions how
-> to more thoroughly test this.
->
-> The first thing that comes to mind is manually fiddle with the unwind table of a
-> well-known function so that it no longer requires r14 being popped.
->
->  arch/arm/kernel/unwind.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
-> index 3c21769..cb791ac 100644
-> --- a/arch/arm/kernel/unwind.c
-> +++ b/arch/arm/kernel/unwind.c
-> @@ -285,7 +285,7 @@ static int unwind_exec_pop_r4_to_rN(struct unwind_ctrl_block *ctrl,
->                 if (unwind_pop_register(ctrl, &vsp, reg))
->                                 return -URC_FAILURE;
->
-> -       if (insn & 0x80)
-> +       if (insn & 0x8)
->                 if (unwind_pop_register(ctrl, &vsp, 14))
->                                 return -URC_FAILURE;
->
-> --
-> 1.8.1.5
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
+I did this way because I don't have the schematics for all the board
+so I thought it was safer to leave all the regulators enabled
 
 -- 
-Anurag Aggarwal
+Carlo Caione
