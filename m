@@ -1,72 +1,33 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sat,  3 May 2014 15:27:02 -0300
-Subject: [PATCH 7/7] net: mvmdio: Use devm_* API to simplify the code
-In-Reply-To: <1399141622-30654-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1399141622-30654-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1399141622-30654-8-git-send-email-ezequiel.garcia@free-electrons.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat,  3 May 2014 20:30:14 +0200
+Subject: [PATCH v2 4/9] ARM: Kirkwood: DT: Add missing #sound-dai-cells
+ property
+In-Reply-To: <1399141819-23924-1-git-send-email-andrew@lunn.ch>
+References: <1399141819-23924-1-git-send-email-andrew@lunn.ch>
+Message-ID: <1399141819-23924-5-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit makes use of devm_kmalloc() for memory allocation and the
-recently introduced devm_mdiobus_alloc() API to simplify driver's code.
-While here, remove a redundant out of memory error message.
+The sound node is missing a #sound-dai-cells property. Add it, so that
+the sounds node can be used in combination with the simple-audio-card
+binding.
 
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- drivers/net/ethernet/marvell/mvmdio.c | 18 ++++++------------
- 1 file changed, 6 insertions(+), 12 deletions(-)
+ arch/arm/boot/dts/kirkwood.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
-index b161a52..995e182 100644
---- a/drivers/net/ethernet/marvell/mvmdio.c
-+++ b/drivers/net/ethernet/marvell/mvmdio.c
-@@ -195,11 +195,10 @@ static int orion_mdio_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 	}
+diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+index 90384587c278..919d1f7f2eef 100644
+--- a/arch/arm/boot/dts/kirkwood.dtsi
++++ b/arch/arm/boot/dts/kirkwood.dtsi
+@@ -314,6 +314,7 @@
  
--	bus = mdiobus_alloc_size(sizeof(struct orion_mdio_dev));
--	if (!bus) {
--		dev_err(&pdev->dev, "Cannot allocate MDIO bus\n");
-+	bus = devm_mdiobus_alloc_size(&pdev->dev,
-+				      sizeof(struct orion_mdio_dev));
-+	if (!bus)
- 		return -ENOMEM;
--	}
- 
- 	bus->name = "orion_mdio_bus";
- 	bus->read = orion_mdio_read;
-@@ -208,11 +207,10 @@ static int orion_mdio_probe(struct platform_device *pdev)
- 		 dev_name(&pdev->dev));
- 	bus->parent = &pdev->dev;
- 
--	bus->irq = kmalloc(sizeof(int) * PHY_MAX_ADDR, GFP_KERNEL);
--	if (!bus->irq) {
--		mdiobus_free(bus);
-+	bus->irq = devm_kmalloc(&pdev->dev,
-+				sizeof(int) * PHY_MAX_ADDR, GFP_KERNEL);
-+	if (!bus->irq)
- 		return -ENOMEM;
--	}
- 
- 	for (i = 0; i < PHY_MAX_ADDR; i++)
- 		bus->irq[i] = PHY_POLL;
-@@ -261,8 +259,6 @@ static int orion_mdio_probe(struct platform_device *pdev)
- out_mdio:
- 	if (!IS_ERR(dev->clk))
- 		clk_disable_unprepare(dev->clk);
--	kfree(bus->irq);
--	mdiobus_free(bus);
- 	return ret;
- }
- 
-@@ -273,8 +269,6 @@ static int orion_mdio_remove(struct platform_device *pdev)
- 
- 	writel(0, dev->regs + MVMDIO_ERR_INT_MASK);
- 	mdiobus_unregister(bus);
--	kfree(bus->irq);
--	mdiobus_free(bus);
- 	if (!IS_ERR(dev->clk))
- 		clk_disable_unprepare(dev->clk);
- 
+ 		audio0: audio-controller at a0000 {
+ 			compatible = "marvell,kirkwood-audio";
++			#sound-dai-cells = <0>;
+ 			reg = <0xa0000 0x2210>;
+ 			interrupts = <24>;
+ 			clocks = <&gate_clk 9>;
 -- 
-1.9.1
+2.0.0.rc0
