@@ -1,30 +1,25 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Fri,  2 May 2014 20:54:29 -0500
-Subject: [PATCH] i2c: qup: Fix pm_runtime_get_sync usage
-Message-ID: <1399082069-6666-1-git-send-email-agross@codeaurora.org>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 03 May 2014 04:14:22 +0200
+Subject: [PATCH v3 00/12] ARM: Exynos: PMU cleanup and refactoring for
+ using DT
+In-Reply-To: <53644BD4.4060200@samsung.com>
+References: <1398835057-3860-1-git-send-email-pankaj.dubey@samsung.com>
+ <53644BD4.4060200@samsung.com>
+Message-ID: <536450FE.2050300@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch corrects the error check on the call to pm_runtime_get_sync.
+Hi Pankaj,
 
-Signed-off-by: Andy Gross <agross@codeaurora.org>
----
- drivers/i2c/busses/i2c-qup.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On 03.05.2014 03:52, Pankaj Dubey wrote:
+> Hi,
+>
+> Gentle ping.
+>
+> Tomasz, Kukjin will you please have a look on this series.
 
-diff --git a/drivers/i2c/busses/i2c-qup.c b/drivers/i2c/busses/i2c-qup.c
-index 1b4cf14..2a5efb5 100644
---- a/drivers/i2c/busses/i2c-qup.c
-+++ b/drivers/i2c/busses/i2c-qup.c
-@@ -479,7 +479,7 @@ static int qup_i2c_xfer(struct i2c_adapter *adap,
- 	int ret, idx;
- 
- 	ret = pm_runtime_get_sync(qup->dev);
--	if (ret)
-+	if (ret < 0)
- 		goto out;
- 
- 	writel(1, qup->base + QUP_SW_RESET);
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Sure. I have added this series to my queue and should be able to find 
+some time to review it after the weekend.
+
+Best regards,
+Tomasz
