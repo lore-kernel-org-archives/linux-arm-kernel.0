@@ -1,35 +1,56 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Sun,  4 May 2014 15:42:58 -0700
-Subject: [PATCH 1/5] net: macb: Pass same size to DMA_UNMAP as used for DMA_MAP
+Date: Sun,  4 May 2014 15:42:59 -0700
+Subject: [PATCH 2/5] net: macb: Clear interrupt flags
 In-Reply-To: <1399243382-12528-1-git-send-email-soren.brinkmann@xilinx.com>
 References: <1399243382-12528-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1399243382-12528-2-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1399243382-12528-3-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just as commit "net: macb: DMA-unmap full rx-buffer"
-(48330e08fa168395b9fd9f369f06cca1df204361), pass the size that
-was used for mapping the memory also to the unmap routine to
-avoid warnings from the DMA_API.
+A few interrupt flags were not cleared in the ISR, resulting in a sytem
+trapped in the ISR in cases one of those interrupts occurred. Clear all
+flags to avoid such situations.
 
 Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 ---
 
- drivers/net/ethernet/cadence/macb.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/net/ethernet/cadence/macb.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
 diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-index ca97005e24b4..18fdcd9d51b3 100644
+index 18fdcd9d51b3..e38fe39d9589 100644
 --- a/drivers/net/ethernet/cadence/macb.c
 +++ b/drivers/net/ethernet/cadence/macb.c
-@@ -1113,7 +1113,7 @@ static void gem_free_rx_buffers(struct macb *bp)
+@@ -951,6 +951,10 @@ static irqreturn_t macb_interrupt(int irq, void *dev_id)
+ 		if (unlikely(status & (MACB_TX_ERR_FLAGS))) {
+ 			macb_writel(bp, IDR, MACB_TX_INT_FLAGS);
+ 			schedule_work(&bp->tx_error_task);
++
++			if (bp->caps & MACB_CAPS_ISR_CLEAR_ON_WRITE)
++				macb_writel(bp, ISR, MACB_TX_ERR_FLAGS);
++
+ 			break;
+ 		}
  
- 		desc = &bp->rx_ring[i];
- 		addr = MACB_BF(RX_WADDR, MACB_BFEXT(RX_WADDR, desc->addr));
--		dma_unmap_single(&bp->pdev->dev, addr, skb->len,
-+		dma_unmap_single(&bp->pdev->dev, addr, bp->rx_buffer_size,
- 				 DMA_FROM_DEVICE);
- 		dev_kfree_skb_any(skb);
- 		skb = NULL;
+@@ -968,6 +972,9 @@ static irqreturn_t macb_interrupt(int irq, void *dev_id)
+ 				bp->hw_stats.gem.rx_overruns++;
+ 			else
+ 				bp->hw_stats.macb.rx_overruns++;
++
++			if (bp->caps & MACB_CAPS_ISR_CLEAR_ON_WRITE)
++				macb_writel(bp, ISR, MACB_BIT(ISR_ROVR));
+ 		}
+ 
+ 		if (status & MACB_BIT(HRESP)) {
+@@ -977,6 +984,9 @@ static irqreturn_t macb_interrupt(int irq, void *dev_id)
+ 			 * (work queue?)
+ 			 */
+ 			netdev_err(dev, "DMA bus error: HRESP not OK\n");
++
++			if (bp->caps & MACB_CAPS_ISR_CLEAR_ON_WRITE)
++				macb_writel(bp, ISR, MACB_BIT(HRESP));
+ 		}
+ 
+ 		status = macb_readl(bp, ISR);
 -- 
 1.9.2.1.g06c4abd
