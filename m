@@ -1,41 +1,33 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Mon, 05 May 2014 00:36:25 +0200
-Subject: [PATCH 1/5] pm: domains: quieten down generic pm domains
-In-Reply-To: <CAPDyKFpKnhcttY-BWDEG=XTYsKHro0t5G7YBao-+F=o3ez3grA@mail.gmail.com>
-References: <20140427132312.GC26756@n2100.arm.linux.org.uk>
- <10021780.rnCkCYmgZH@vostro.rjw.lan>
- <CAPDyKFpKnhcttY-BWDEG=XTYsKHro0t5G7YBao-+F=o3ez3grA@mail.gmail.com>
-Message-ID: <1412882.XTDX0QPJ6V@vostro.rjw.lan>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Sun,  4 May 2014 15:42:57 -0700
+Subject: [PATCH 0/5] net: macb: Fixes
+Message-ID: <1399243382-12528-1-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, May 02, 2014 11:24:45 AM Ulf Hansson wrote:
-> On 1 May 2014 01:46, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> > On Sunday, April 27, 2014 02:28:50 PM Russell King wrote:
-> >> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> >
-> > Acked-by: Rafael J. Wysocki <rjw@rjwysocki.net>
-> >
-> > Since you need this one and [2/5] for the rest of the patchset, please feel
-> > free to take them through your tree if that's convenient.
-> 
-> Unless it complicates things for Russell, I would prefer if this could
-> go via Rafael's tree.
-> 
-> I have a quite big patchset for the PM domain, it would help me if I
-> have a single point to base my work upon.
 
-No problem for me, but I'm not sure about what Russell things.
+Hi Nicolas,
 
-> Additionally, you have Tomasz Figa patchset below to consider for the
-> PM domain code.
-> 
-> [PATCH v3 0/3] Generic Device Tree based power domain look-up
+I think I found the cause of the issue I told you about. Looks like
+driver and HW are racing (a few more details in the commit message).
+On my way finding that, I found a few more minor issues which are fixed
+in the first patches.
+The last one is "fixing" the actual race. I don't know if I overlooked
+anything here, but this seems to work fine on Zynq.
 
-This one seems to have been under discussion recently, however.
+	Thanks,
+	S?ren
 
-Thanks!
+
+Soren Brinkmann (5):
+  net: macb: Pass same size to DMA_UNMAP as used for DMA_MAP
+  net: macb: Clear interrupt flags
+  net: macb: Re-enable RX interrupt only when RX is done
+  net: macb: Remove 'unlikely' optimization
+  net: macb: Fix race between HW and driver
+
+ drivers/net/ethernet/cadence/macb.c | 35 +++++++++++++++++------------------
+ 1 file changed, 17 insertions(+), 18 deletions(-)
 
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+1.9.2.1.g06c4abd
