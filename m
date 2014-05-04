@@ -1,47 +1,98 @@
-From: sdu.liu@huawei.com (Liu hua)
-Date: Sun, 4 May 2014 10:34:38 +0800
-Subject: [PATCH v3 0/2] change ARM linux memory layout to support 32 CPUs
-In-Reply-To: <alpine.LFD.2.11.1404221949510.980@knanqh.ubzr>
-References: <1397559967-26050-1-git-send-email-sdu.liu@huawei.com>
- <20140422213114.GA24070@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1404221949510.980@knanqh.ubzr>
-Message-ID: <5365A73E.1060006@huawei.com>
+From: kaixu.xia@linaro.org (Xia Kaixu)
+Date: Sun,  4 May 2014 11:25:21 +0800
+Subject: [PATCH 15/15] ASoC: pxa: remove mach header dependency
+Message-ID: <1399173921-3766-1-git-send-email-kaixu.xia@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/4/23 7:50, Nicolas Pitre wrote:
-> On Tue, 22 Apr 2014, Russell King - ARM Linux wrote:
-> 
->> On Tue, Apr 15, 2014 at 07:06:05PM +0800, Liu Hua wrote:
->>> This patch series change fixmap mapping region to suppport 32 CPUs.
->>> Because the "top_pmd" covers 0xfffe0000 - 0xffffffff(2M). And part 
->>> is used by vector table. So I move this region down to 0xffc00000
->>>  - 0xffdffff. 
->>
->> Can you explain why you have submitted these patches to my patch tracker
->> with a copy to stable at vger.kernel.org ?
->>
->> What makes these qualify for stable tree inclusion?  What regression are
->> they fixing?
->>
->> We don't put patches into the stable tree for things that /never/ worked
->> in the past.  We've never supported 32 CPUs so I don't think these
->> qualify.
-> 
-> Indeed.  The stable qualifier should be dropped.
-> 
-> 
-> Nicolas
-> 
-> .
-> 
-I am very sorry to ignore this mail for ten days! We have a platform of 16
-CPUs, for which these patches are necessary(15CPUs for old memory layout).
-But only with these patches, the ARM linux can not run on it.(gic part
-should also be changed)
+From: Arnd Bergmann <arnd@arndb.de>
 
-So you are right. It seems to be a new feature. Sorry for this mistake.
-If anything I should do, please inform me!
+As we are moving the mmp platform towards multiplatform support,
+we have to stop including platform header files.
 
-Thanks,
-Liu Hua
+This changes the pxa-ssp sound driver file to no longer depend
+on mach/hardware.h and mach/dma.h. The code using the definitions
+from those headers is actually gone already, the only thing
+that was still being used was the pxa_dma_desc typedef, which
+we can easily work around by using the normal 'struct pxa_dma_desc'
+name.
+
+The pxa2xx-dma driver still uses this header, so we include it
+explicitly there, which is ok because that is only used on pxa,
+not on mmp.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Xia Kaixu <kaixu.xia@linaro.org>
+Cc: Liam Girdwood <lgirdwood@gmail.com>
+Cc: Mark Brown <broonie@kernel.org>
+Cc: Eric Miao <eric.y.miao@gmail.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: alsa-devel at alsa-project.org
+---
+ sound/arm/pxa2xx-pcm.c     |    2 ++
+ sound/arm/pxa2xx-pcm.h     |    3 +--
+ sound/soc/pxa/pxa-ssp.c    |    2 --
+ sound/soc/pxa/pxa2xx-pcm.c |    2 ++
+ 4 files changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/sound/arm/pxa2xx-pcm.c b/sound/arm/pxa2xx-pcm.c
+index e6c727b..83be8e3 100644
+--- a/sound/arm/pxa2xx-pcm.c
++++ b/sound/arm/pxa2xx-pcm.c
+@@ -14,6 +14,8 @@
+ #include <linux/dma-mapping.h>
+ #include <linux/dmaengine.h>
+ 
++#include <mach/dma.h>
++
+ #include <sound/core.h>
+ #include <sound/pxa2xx-lib.h>
+ #include <sound/dmaengine_pcm.h>
+diff --git a/sound/arm/pxa2xx-pcm.h b/sound/arm/pxa2xx-pcm.h
+index 2a8fc08..0033098 100644
+--- a/sound/arm/pxa2xx-pcm.h
++++ b/sound/arm/pxa2xx-pcm.h
+@@ -9,12 +9,11 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+  */
+-#include <mach/dma.h>
+ 
+ struct pxa2xx_runtime_data {
+ 	int dma_ch;
+ 	struct snd_dmaengine_dai_dma_data *params;
+-	pxa_dma_desc *dma_desc_array;
++	struct pxa_dma_desc *dma_desc_array;
+ 	dma_addr_t dma_desc_array_phys;
+ };
+ 
+diff --git a/sound/soc/pxa/pxa-ssp.c b/sound/soc/pxa/pxa-ssp.c
+index a3119a0..9b19ee7 100644
+--- a/sound/soc/pxa/pxa-ssp.c
++++ b/sound/soc/pxa/pxa-ssp.c
+@@ -34,8 +34,6 @@
+ #include <sound/pxa2xx-lib.h>
+ #include <sound/dmaengine_pcm.h>
+ 
+-#include <mach/hardware.h>
+-
+ #include "../../arm/pxa2xx-pcm.h"
+ #include "pxa-ssp.h"
+ 
+diff --git a/sound/soc/pxa/pxa2xx-pcm.c b/sound/soc/pxa/pxa2xx-pcm.c
+index d58b09f..42f2f01 100644
+--- a/sound/soc/pxa/pxa2xx-pcm.c
++++ b/sound/soc/pxa/pxa2xx-pcm.c
+@@ -15,6 +15,8 @@
+ #include <linux/dmaengine.h>
+ #include <linux/of.h>
+ 
++#include <mach/dma.h>
++
+ #include <sound/core.h>
+ #include <sound/soc.h>
+ #include <sound/pxa2xx-lib.h>
+-- 
+1.7.9.5
