@@ -1,66 +1,68 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Sun,  4 May 2014 23:26:21 +0800
-Subject: [PATCH 4/4] drm/exynos/mixer: add support for NV21
-In-Reply-To: <1399217181-26442-1-git-send-email-djkurtz@chromium.org>
-References: <1399217181-26442-1-git-send-email-djkurtz@chromium.org>
-Message-ID: <1399217181-26442-5-git-send-email-djkurtz@chromium.org>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Sun, 4 May 2014 21:05:21 +0530
+Subject: [PATCH v2 0/6] Further cleanup and enable multiplat build
+In-Reply-To: <534E8AF9.4050206@samsung.com>
+References: <1397554134-11827-1-git-send-email-sachin.kamat@linaro.org>
+ <534E8AF9.4050206@samsung.com>
+Message-ID: <CAK9yfHxu+9Lh47ULOb7PWy=JJZqjU3jB9wteJsLvnhDDr=_PQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AFAICT, the only difference between NV12 and NV21 is Cr:Cb vs Cb:Cr.
-Since the video processor can handle either order, it should be able to
-handle both formats.
+On 16 April 2014 19:21, Tomasz Figa <t.figa@samsung.com> wrote:
+> Hi Sachin,
+>
+>
+> On 15.04.2014 11:28, Sachin Kamat wrote:
+>>
+>> This series is based on latest linux-next and depends on the
+>> following patch:
+>> ARM: EXYNOS: Consolidate Kconfig entries
+>> http://article.gmane.org/gmane.linux.kernel.samsung-soc/28642
+>>
+>> Changes since v2:
+>> Replaced patch 2, "ARM: EXYNOS: Staticize exynos_subsys"
+>> with "ARM: EXYNOS: Remove exynos_subsys registration" as that
+>> code is no more used.
+>>
+>> Tested on Exynos4210, 4412, 5250 and 5420 based boards.
+>>
+>> Arnd Bergmann (1):
+>>    ARM: EXYNOS: Enable multi-platform build support
+>>
+>> Sachin Kamat (5):
+>>    ARM: EXYNOS: Remove duplicate lines in Makefile
+>>    ARM: EXYNOS: Remove exynos_subsys registration
+>>    ARM: EXYNOS: Migrate Exynos specific macros from plat to mach
+>>    ARM: EXYNOS: Remove unnecessary inclusion of cpu.h
+>>    ARM: multi_v7_defconfig: Enable Exynos platform
+>>
+>>   arch/arm/Kconfig                         |   27 ++---------
+>>   arch/arm/configs/exynos_defconfig        |    2 +-
+>>   arch/arm/configs/multi_v7_defconfig      |   10 +++++
+>>   arch/arm/mach-exynos/Kconfig             |   27 +++++++++++
+>>   arch/arm/mach-exynos/Makefile            |    9 ++--
+>>   arch/arm/mach-exynos/common.h            |   72
+>> ++++++++++++++++++++++++++++++
+>>   arch/arm/mach-exynos/cpuidle.c           |    1 -
+>>   arch/arm/mach-exynos/exynos.c            |   13 ------
+>>   arch/arm/mach-exynos/hotplug.c           |    2 -
+>>   arch/arm/mach-exynos/platsmp.c           |    2 -
+>>   arch/arm/mach-exynos/pm.c                |    1 -
+>>   arch/arm/mach-exynos/pmu.c               |    2 -
+>>   arch/arm/plat-samsung/Makefile           |    3 ++
+>>   arch/arm/plat-samsung/include/plat/cpu.h |   61
+>> -------------------------
+>>   14 files changed, 119 insertions(+), 113 deletions(-)
+>>
+>
+> For the whole series:
+>
+> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 
-Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
----
- drivers/gpu/drm/exynos/exynos_drm_plane.c |  1 +
- drivers/gpu/drm/exynos/exynos_mixer.c     | 12 +++++++++---
- 2 files changed, 10 insertions(+), 3 deletions(-)
+Kukjin,
 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_plane.c b/drivers/gpu/drm/exynos/exynos_drm_plane.c
-index 8371cbd..bf2be7a 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_plane.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_plane.c
-@@ -31,6 +31,7 @@ static const uint32_t formats[] = {
- 	DRM_FORMAT_ARGB8888,
- 	DRM_FORMAT_NV12,
- 	DRM_FORMAT_NV12MT,
-+	DRM_FORMAT_NV21,
- };
- 
- /*
-diff --git a/drivers/gpu/drm/exynos/exynos_mixer.c b/drivers/gpu/drm/exynos/exynos_mixer.c
-index b252ec7..52a94d9 100644
---- a/drivers/gpu/drm/exynos/exynos_mixer.c
-+++ b/drivers/gpu/drm/exynos/exynos_mixer.c
-@@ -383,8 +383,8 @@ static void vp_video_buffer(struct mixer_context *ctx, int win)
- 	struct hdmi_win_data *win_data;
- 	unsigned int x_ratio, y_ratio;
- 	dma_addr_t luma_addr[2], chroma_addr[2];
--	bool tiled_mode = false;
--	bool crcb_mode = false;
-+	bool tiled_mode;
-+	bool crcb_mode;
- 	u32 val;
- 
- 	win_data = &ctx->win_data[win];
-@@ -392,10 +392,16 @@ static void vp_video_buffer(struct mixer_context *ctx, int win)
- 	switch (win_data->pixel_format) {
- 	case DRM_FORMAT_NV12MT:
- 		tiled_mode = true;
--		/* fall through */
-+		crcb_mode = false;
-+		break;
- 	case DRM_FORMAT_NV12:
-+		tiled_mode = false;
- 		crcb_mode = false;
- 		break;
-+	case DRM_FORMAT_NV21:
-+		tiled_mode = false;
-+		crcb_mode = true;
-+		break;
- 	/* TODO: single buffer format NV12, NV21 */
- 	default:
- 		DRM_ERROR("pixel format for vp is wrong [%d].\n",
+Can you please apply the first 4 patches in this series for now?
+
 -- 
-1.9.1.423.g4596e3a
+With warm regards,
+Sachin
