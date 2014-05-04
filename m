@@ -1,38 +1,16 @@
-From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Sun, 4 May 2014 19:37:14 +0800
-Subject: [PATCH 1/2] ARM: hip04: set ARCH_NR_GPIO to 128
-In-Reply-To: <5357A941.6080809@hisilicon.com>
-References: <5357A941.6080809@hisilicon.com>
-Message-ID: <5366266A.9050704@hisilicon.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sun, 4 May 2014 20:38:19 +0800
+Subject: [PATCH 1/2] ARM: dts: imx: add LVDS backlight for Ventana
+In-Reply-To: <1398925950-26081-1-git-send-email-tharvey@gateworks.com>
+References: <20140429060106.GG16451@dragon>
+ <1398925950-26081-1-git-send-email-tharvey@gateworks.com>
+Message-ID: <20140504123816.GA4461@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/4/23 19:51, Zhou Wang wrote:
-> set ARCH_NR_GPIO for Hisilicon Soc hip04, which has 4 GPIO
-> controllers with 32 GPIOs each.
+On Wed, Apr 30, 2014 at 11:32:30PM -0700, Tim Harvey wrote:
+> The GW54xx/GW53xx/GW52xx all support LVDS with a PWM controlled backlight.
 > 
-> Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
-> ---
->  arch/arm/Kconfig |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 2961627..bb00e65 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1664,6 +1664,7 @@ config ARCH_NR_GPIO
->  	default 352 if ARCH_VT8500
->  	default 288 if ARCH_SUNXI
->  	default 264 if MACH_H4700
-> +	default 128 if ARCH_HIP04
->  	default 0
->  	help
->  	  Maximum number of GPIOs in the system.
-> -- 1.7.9.5
-> 
-Hi Russell
+> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
 
- Is there anything I should pay attention to about this patch?
-
-Best regards
-Zhou Wang
+Applied both, thanks.
