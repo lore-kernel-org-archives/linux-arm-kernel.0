@@ -1,33 +1,35 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Sun,  4 May 2014 15:42:57 -0700
-Subject: [PATCH 0/5] net: macb: Fixes
-Message-ID: <1399243382-12528-1-git-send-email-soren.brinkmann@xilinx.com>
+Date: Sun,  4 May 2014 15:42:58 -0700
+Subject: [PATCH 1/5] net: macb: Pass same size to DMA_UNMAP as used for DMA_MAP
+In-Reply-To: <1399243382-12528-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1399243382-12528-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1399243382-12528-2-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Just as commit "net: macb: DMA-unmap full rx-buffer"
+(48330e08fa168395b9fd9f369f06cca1df204361), pass the size that
+was used for mapping the memory also to the unmap routine to
+avoid warnings from the DMA_API.
 
-Hi Nicolas,
+Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+---
 
-I think I found the cause of the issue I told you about. Looks like
-driver and HW are racing (a few more details in the commit message).
-On my way finding that, I found a few more minor issues which are fixed
-in the first patches.
-The last one is "fixing" the actual race. I don't know if I overlooked
-anything here, but this seems to work fine on Zynq.
+ drivers/net/ethernet/cadence/macb.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-	Thanks,
-	S?ren
-
-
-Soren Brinkmann (5):
-  net: macb: Pass same size to DMA_UNMAP as used for DMA_MAP
-  net: macb: Clear interrupt flags
-  net: macb: Re-enable RX interrupt only when RX is done
-  net: macb: Remove 'unlikely' optimization
-  net: macb: Fix race between HW and driver
-
- drivers/net/ethernet/cadence/macb.c | 35 +++++++++++++++++------------------
- 1 file changed, 17 insertions(+), 18 deletions(-)
-
+diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+index ca97005e24b4..18fdcd9d51b3 100644
+--- a/drivers/net/ethernet/cadence/macb.c
++++ b/drivers/net/ethernet/cadence/macb.c
+@@ -1113,7 +1113,7 @@ static void gem_free_rx_buffers(struct macb *bp)
+ 
+ 		desc = &bp->rx_ring[i];
+ 		addr = MACB_BF(RX_WADDR, MACB_BFEXT(RX_WADDR, desc->addr));
+-		dma_unmap_single(&bp->pdev->dev, addr, skb->len,
++		dma_unmap_single(&bp->pdev->dev, addr, bp->rx_buffer_size,
+ 				 DMA_FROM_DEVICE);
+ 		dev_kfree_skb_any(skb);
+ 		skb = NULL;
 -- 
 1.9.2.1.g06c4abd
