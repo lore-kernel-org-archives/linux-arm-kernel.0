@@ -1,68 +1,79 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Sun, 4 May 2014 21:05:21 +0530
-Subject: [PATCH v2 0/6] Further cleanup and enable multiplat build
-In-Reply-To: <534E8AF9.4050206@samsung.com>
-References: <1397554134-11827-1-git-send-email-sachin.kamat@linaro.org>
- <534E8AF9.4050206@samsung.com>
-Message-ID: <CAK9yfHxu+9Lh47ULOb7PWy=JJZqjU3jB9wteJsLvnhDDr=_PQw@mail.gmail.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Sun, 4 May 2014 17:36:18 +0200
+Subject: [PATCH] ARM: fix v7-M signal return
+In-Reply-To: <20140503184512.GO28564@pengutronix.de>
+References: <1398103664-23078-1-git-send-email-rabin@rab.in>
+ <20140428082757.GD28564@pengutronix.de>
+ <20140503173903.GA16300@debian>
+ <20140503184512.GO28564@pengutronix.de>
+Message-ID: <20140504153618.GA3795@debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 April 2014 19:21, Tomasz Figa <t.figa@samsung.com> wrote:
-> Hi Sachin,
->
->
-> On 15.04.2014 11:28, Sachin Kamat wrote:
->>
->> This series is based on latest linux-next and depends on the
->> following patch:
->> ARM: EXYNOS: Consolidate Kconfig entries
->> http://article.gmane.org/gmane.linux.kernel.samsung-soc/28642
->>
->> Changes since v2:
->> Replaced patch 2, "ARM: EXYNOS: Staticize exynos_subsys"
->> with "ARM: EXYNOS: Remove exynos_subsys registration" as that
->> code is no more used.
->>
->> Tested on Exynos4210, 4412, 5250 and 5420 based boards.
->>
->> Arnd Bergmann (1):
->>    ARM: EXYNOS: Enable multi-platform build support
->>
->> Sachin Kamat (5):
->>    ARM: EXYNOS: Remove duplicate lines in Makefile
->>    ARM: EXYNOS: Remove exynos_subsys registration
->>    ARM: EXYNOS: Migrate Exynos specific macros from plat to mach
->>    ARM: EXYNOS: Remove unnecessary inclusion of cpu.h
->>    ARM: multi_v7_defconfig: Enable Exynos platform
->>
->>   arch/arm/Kconfig                         |   27 ++---------
->>   arch/arm/configs/exynos_defconfig        |    2 +-
->>   arch/arm/configs/multi_v7_defconfig      |   10 +++++
->>   arch/arm/mach-exynos/Kconfig             |   27 +++++++++++
->>   arch/arm/mach-exynos/Makefile            |    9 ++--
->>   arch/arm/mach-exynos/common.h            |   72
->> ++++++++++++++++++++++++++++++
->>   arch/arm/mach-exynos/cpuidle.c           |    1 -
->>   arch/arm/mach-exynos/exynos.c            |   13 ------
->>   arch/arm/mach-exynos/hotplug.c           |    2 -
->>   arch/arm/mach-exynos/platsmp.c           |    2 -
->>   arch/arm/mach-exynos/pm.c                |    1 -
->>   arch/arm/mach-exynos/pmu.c               |    2 -
->>   arch/arm/plat-samsung/Makefile           |    3 ++
->>   arch/arm/plat-samsung/include/plat/cpu.h |   61
->> -------------------------
->>   14 files changed, 119 insertions(+), 113 deletions(-)
->>
->
-> For the whole series:
->
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+On Sat, May 03, 2014 at 08:45:12PM +0200, Uwe Kleine-K?nig wrote:
+> On Sat, May 03, 2014 at 07:39:03PM +0200, Rabin Vincent wrote:
+> > I'm running this on QEMU.  Here is an old qemu-devel thread on this
+> > topic if you are interested:
+> > http://lists.gnu.org/archive/html/qemu-devel/2012-03/msg00158.html
+> I'm interested in your setup and (if applicable) additional kernel
+> patches.
 
-Kukjin,
+No kernel patches are needed other than the ones I already posted.  My
+QEMU patches for EFM32 support are needed.  I put together a small
+README here: https://github.com/rabinv/qemu-efm32-tools
 
-Can you please apply the first 4 patches in this series for now?
+> > +	@ ensure bit 0 is cleared in the PC
+> Maybe add: , otherwise behaviour is unpredictable
+> 
+> > +	bic	r4, r4, #1
+> I just notice that the coding style is inconsitent here, the
+> instructions above don't repeat the dest register. Can you please make
+> this "bic r4, #1", too?
+> 
+> With these two changes you can have my ack.
 
+v3 below.
+
+> What happens on qemu without this fix? If it crashes I'd suggest to get
+> this patch into 3.15 with a stable annotation. If not I think 3.16-rc1
+> is enough.
+
+User space processes crash because qemu's emulation of the CPU does not
+discard the zero bit.
+
+8<--------------------
+>From 577b0c0e15057f58f86996da7f363c8a608c389f Mon Sep 17 00:00:00 2001
+From: Rabin Vincent <rabin@rab.in>
+Date: Sat, 3 May 2014 19:27:09 +0200
+Subject: [PATCHv3] ARM: fix v7-M signal return
+
+According to the ARM ARM, the behaviour is UNDPREDICTABLE if the PC read
+from the exception return stack is not half word aligned.  See the
+pseudo code for ExceptionReturn() and PopStack().
+
+The signal handler's address has the bit 0 set, and setup_return()
+directly writes this to regs->ARM_pc.  Mask out bit 0 before the
+exception return to get predictable behaviour.
+
+Signed-off-by: Rabin Vincent <rabin@rab.in>
+---
+ arch/arm/kernel/entry-header.S | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
+index 1420725..efb208d 100644
+--- a/arch/arm/kernel/entry-header.S
++++ b/arch/arm/kernel/entry-header.S
+@@ -132,6 +132,10 @@
+ 	orrne	r5, V7M_xPSR_FRAMEPTRALIGN
+ 	biceq	r5, V7M_xPSR_FRAMEPTRALIGN
+ 
++	@ ensure bit 0 is cleared in the PC, otherwise behaviour is
++	@ unpredictable
++	bic	r4, #1
++
+ 	@ write basic exception frame
+ 	stmdb	r2!, {r1, r3-r5}
+ 	ldmia	sp, {r1, r3-r5}
 -- 
-With warm regards,
-Sachin
+2.0.0.rc0
