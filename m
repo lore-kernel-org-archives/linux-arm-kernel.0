@@ -1,56 +1,48 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Sun,  4 May 2014 15:42:59 -0700
-Subject: [PATCH 2/5] net: macb: Clear interrupt flags
+Date: Sun,  4 May 2014 15:43:00 -0700
+Subject: [PATCH 3/5] net: macb: Re-enable RX interrupt only when RX is done
 In-Reply-To: <1399243382-12528-1-git-send-email-soren.brinkmann@xilinx.com>
 References: <1399243382-12528-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1399243382-12528-3-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1399243382-12528-4-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A few interrupt flags were not cleared in the ISR, resulting in a sytem
-trapped in the ISR in cases one of those interrupts occurred. Clear all
-flags to avoid such situations.
+When data is received during the driver processing received data the
+NAPI is re-scheduled. In that case the RX interrupt should not be
+re-enabled.
 
 Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 ---
 
- drivers/net/ethernet/cadence/macb.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ drivers/net/ethernet/cadence/macb.c | 13 ++++++-------
+ 1 file changed, 6 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-index 18fdcd9d51b3..e38fe39d9589 100644
+index e38fe39d9589..3f4b8ee0b0e7 100644
 --- a/drivers/net/ethernet/cadence/macb.c
 +++ b/drivers/net/ethernet/cadence/macb.c
-@@ -951,6 +951,10 @@ static irqreturn_t macb_interrupt(int irq, void *dev_id)
- 		if (unlikely(status & (MACB_TX_ERR_FLAGS))) {
- 			macb_writel(bp, IDR, MACB_TX_INT_FLAGS);
- 			schedule_work(&bp->tx_error_task);
-+
-+			if (bp->caps & MACB_CAPS_ISR_CLEAR_ON_WRITE)
-+				macb_writel(bp, ISR, MACB_TX_ERR_FLAGS);
-+
- 			break;
- 		}
+@@ -891,16 +891,15 @@ static int macb_poll(struct napi_struct *napi, int budget)
+ 	if (work_done < budget) {
+ 		napi_complete(napi);
  
-@@ -968,6 +972,9 @@ static irqreturn_t macb_interrupt(int irq, void *dev_id)
- 				bp->hw_stats.gem.rx_overruns++;
- 			else
- 				bp->hw_stats.macb.rx_overruns++;
-+
+-		/*
+-		 * We've done what we can to clean the buffers. Make sure we
+-		 * get notified when new packets arrive.
+-		 */
+-		macb_writel(bp, IER, MACB_RX_INT_FLAGS);
+-
+ 		/* Packets received while interrupts were disabled */
+ 		status = macb_readl(bp, RSR);
+-		if (unlikely(status))
++		if (unlikely(status)) {
 +			if (bp->caps & MACB_CAPS_ISR_CLEAR_ON_WRITE)
-+				macb_writel(bp, ISR, MACB_BIT(ISR_ROVR));
- 		}
++				macb_writel(bp, ISR, MACB_BIT(RCOMP));
+ 			napi_reschedule(napi);
++		} else {
++			macb_writel(bp, IER, MACB_RX_INT_FLAGS);
++		}
+ 	}
  
- 		if (status & MACB_BIT(HRESP)) {
-@@ -977,6 +984,9 @@ static irqreturn_t macb_interrupt(int irq, void *dev_id)
- 			 * (work queue?)
- 			 */
- 			netdev_err(dev, "DMA bus error: HRESP not OK\n");
-+
-+			if (bp->caps & MACB_CAPS_ISR_CLEAR_ON_WRITE)
-+				macb_writel(bp, ISR, MACB_BIT(HRESP));
- 		}
- 
- 		status = macb_readl(bp, ISR);
+ 	/* TODO: Handle errors */
 -- 
 1.9.2.1.g06c4abd
