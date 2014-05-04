@@ -1,66 +1,83 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Sun,  4 May 2014 15:43:02 -0700
-Subject: [PATCH 5/5] net: macb: Fix race between HW and driver
-In-Reply-To: <1399243382-12528-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1399243382-12528-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1399243382-12528-6-git-send-email-soren.brinkmann@xilinx.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 5 May 2014 00:56:43 +0200
+Subject: [PATCH v2 2/5] ARM: Kirkwood: Add DT descriptions for net2big
+ and net5big.
+In-Reply-To: <5366AF61.2090806@gmail.com>
+References: <1399142114-24257-1-git-send-email-andrew@lunn.ch>
+ <1399142114-24257-3-git-send-email-andrew@lunn.ch>
+ <5366AF61.2090806@gmail.com>
+Message-ID: <20140504225643.GC25314@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Under "heavy" RX load, the driver cannot handle the descriptors fast
-enough. In detail, when a descriptor is consumed, its used flag is
-cleared and once the RX budget is consumed all descriptors with a
-cleared used flag are prepared to receive more data. Under load though,
-the HW may constantly receive more data and use those descriptors with a
-cleared used flag before they are actually prepared for next usage.
+> > +	chosen {
+> > +		bootargs = "console=ttyS0,115200n8";
+> 
+> nit: add stdout-path = &uart0;
 
-The head and tail pointers into the RX-ring should always be valid and
-we can omit clearing and checking of the used flag.
+O.K. I had v1 of this patch before your cleanup, and forgot about
+this.
+ 
+> > +	};
+> > +
+> > +	ocp at f1000000 {
+> > +		serial at 12000 {
+> > +			status = "ok";
+> 
+> nit: s/ok/okay/
 
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
+I copied a bad example .dts files :-(
+ 
+> > +		};
+> > +
+> > +		spi at 10600 {
+> > +			pinctrl-0 = <&pmx_spi>;
+> > +			pinctrl-names = "default";
+> > +			status = "okay";
+> > +
+> > +			flash at 0 {
+> > +				#address-cells = <1>;
+> > +				#size-cells = <1>;
+> > +				compatible = "mxicy,mx25l4005a";
+> > +				reg = <0>;
+> > +				spi-max-frequency = <20000000>;
+> > +				mode = <0>;
+> > +
+> > +				partition at 0 {
+> > +					reg = <0x0 0x80000>;
+> > +					label = "u-boot";
+> > +				};
+> > +			};
+> > +		};
+> > +
+> > +		sata at 80000 {
+> > +			status = "okay";
+> > +			nr-ports = <2>;
+> > +		};
+> > +
+> > +	};
+> > +
+> > +	gpio_keys {
+> 
+> nit: s/gpio_keys/gpio-keys/
+> 
 
----
- drivers/net/ethernet/cadence/macb.c | 10 ----------
- 1 file changed, 10 deletions(-)
+I think this one is debatable. The documentation is called
+gpio_keys.txt, and the example uses gpio_keys. I don't mind chaging it
+in this file, but maybe you can submit a patch changing the example in
+the documentation?
 
-diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-index 3e13aa31548a..e9daa072ebb4 100644
---- a/drivers/net/ethernet/cadence/macb.c
-+++ b/drivers/net/ethernet/cadence/macb.c
-@@ -599,25 +599,16 @@ static void gem_rx_refill(struct macb *bp)
- {
- 	unsigned int		entry;
- 	struct sk_buff		*skb;
--	struct macb_dma_desc	*desc;
- 	dma_addr_t		paddr;
+> > +	gpio_poweroff {
+> 
+> nit: s/gpio_poweroff/gpio-poweroff/
+
+ACK.
  
- 	while (CIRC_SPACE(bp->rx_prepared_head, bp->rx_tail, RX_RING_SIZE) > 0) {
--		u32 addr, ctrl;
--
- 		entry = macb_rx_ring_wrap(bp->rx_prepared_head);
--		desc = &bp->rx_ring[entry];
+> If there is nothing more severe with this, I am sure Jason can
+> just squash in the nits.
+
+This still needs to be tested on hardware, so there is a good chance
+of a respin.
+
+   Andrew
  
- 		/* Make hw descriptor updates visible to CPU */
- 		rmb();
- 
--		addr = desc->addr;
--		ctrl = desc->ctrl;
- 		bp->rx_prepared_head++;
- 
--		if ((addr & MACB_BIT(RX_USED)))
--			continue;
--
- 		if (bp->rx_skbuff[entry] == NULL) {
- 			/* allocate sk_buff for this free entry in ring */
- 			skb = netdev_alloc_skb(bp->dev, bp->rx_buffer_size);
-@@ -698,7 +689,6 @@ static int gem_rx(struct macb *bp, int budget)
- 		if (!(addr & MACB_BIT(RX_USED)))
- 			break;
- 
--		desc->addr &= ~MACB_BIT(RX_USED);
- 		bp->rx_tail++;
- 		count++;
- 
--- 
-1.9.2.1.g06c4abd
