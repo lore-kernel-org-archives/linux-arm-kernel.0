@@ -1,24 +1,53 @@
-From: noreplyqip@pisem.net (Maintenance/mise � niveau)
-Date: Sun, 04 May 2014 00:26:17 -0700
-Subject: CE MESSAGE PROVIENT DE NOTRE �QUIPE DE SUPPORT TECHNIQUE 1
-Message-ID: <mailman.3.1399188400.4008.linux-arm-kernel@lists.infradead.org>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Sun, 04 May 2014 16:58:12 +0800
+Subject: [PATCH v3 part1 02/11] ARM64 / ACPI: Introduce the skeleton of
+ _PDC related for ARM64
+In-Reply-To: <20140429093941.02167C4095B@trevor.secretlab.ca>
+References: <1398432017-8506-1-git-send-email-hanjun.guo@linaro.org>	<1398432017-8506-3-git-send-email-hanjun.guo@linaro.org>
+ <20140429093941.02167C4095B@trevor.secretlab.ca>
+Message-ID: <53660124.6020604@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CE MESSAGE PROVIENT DE NOTRE ?QUIPE DE SUPPORT TECHNIQUE :
-Ce message est envoy? automatiquement par notre ?quipe de courrier web. Si vous recevez ce message, que cela signifie que votre adresse e-mail est sur le point d'?tre mis hors tension ; C'?tait en raison d'un code de script erreur continue : 505 r?ception de cette adresse de courriel et trop de spams dans votre compte. Vous ?tes cordialement veuillez note pour r?pondre ? cet e-mail dans les prochaines 48 heures avec les informations n?cessaires ci-dessous pour maintenir votre compte actif. Toutes les entr?es qui sera transmis directement au courriel de l'?quipe de Maintenance/mise ? niveau : accountmaintenan at pisem.net
-Pr?nom: ___
-Nom de famille: ___
-Phone: ______________________
-Nom d'utilisateur: ___
-Mot de passe: ___
-Re-confirmer le mot de passe: ___
-N'importe quel autre Web mail adresse: ___
-Mot de passe/Applicable: ___
-D?sactivation du compte: ___ (indiquer Oui pour d?sactiver. Non ? garder
-Active)
-AVIS IMPORTANT : S'il vous pla?t votre information est s?r et s?curitaire avec nous. AVERTISSEMENT : Ne pas r?initialiser votre email en ignorant ce message ou
-saisie des informations erron?es entra?nera ? la d?sactivation de cette adresse e-mail.
-Sinc?rement,
-?quipe de soutien technique.
-Copyright ? 2014 Web mail compte Service. Tous droits r?serv?s.
+On 2014-4-29 17:39, Grant Likely wrote:
+> On Fri, 25 Apr 2014 21:20:08 +0800, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+>> The _PDC (Processor Driver Capabilities) object provides OSPM a
+>> mechanism to convey to the platform the capabilities supported
+>> by OSPM for processor power management.
+>>
+>> OSPM evaluates _PDC prior to evaluating any other processor
+>> power management objects returning configuration information.
+>>
+>> This patch introduces the skeleton of _PDC related file to make
+>> ACPI core can be compiled on ARM64, and should be revisited when
+>> implementing CPU power control.
+>>
+>> Signed-off-by: Al Stone <al.stone@linaro.org>
+>> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> ---
+>>  arch/arm64/include/asm/acpi.h |   37 +++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 37 insertions(+)
+>>  create mode 100644 arch/arm64/include/asm/acpi.h
+>>
+>> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+>> new file mode 100644
+>> index 0000000..e3e990e
+>> --- /dev/null
+>> +++ b/arch/arm64/include/asm/acpi.h
+>> @@ -0,0 +1,37 @@
+>> +/*
+>> + *  Copyright (C) 2013~2014, Al Stone <al.stone@linaro.org>
+> 
+> Not really a correct copyright assignement. The copyright is held by
+> Linaro, but the author is Al. It should instead read:
+> 
+>  * Copyright (C0 2013-2014, Linaro Ltd.
+>  * Author: Al Stone <al.stone@linaro.org>
+> 
+> Acked-by: Grant Likely <grant.likely@linaro.org>
+
+We will update this patch accordingly.
+
+Thanks
+Hanjun
