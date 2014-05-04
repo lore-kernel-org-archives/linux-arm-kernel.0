@@ -1,22 +1,25 @@
 From: tj@kernel.org (Tejun Heo)
-Date: Sun, 4 May 2014 15:05:30 -0400
-Subject: [PATCH v3 0/2] ahci: imx: software workaround for phy reset issue
-In-Reply-To: <1399211286-8624-1-git-send-email-shawn.guo@freescale.com>
-References: <1399211286-8624-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <20140504190530.GA26279@htj.dyndns.org>
+Date: Sun, 4 May 2014 15:28:27 -0400
+Subject: [PATCHv3 1/5] Documentation: dt-bindings: reformat and order
+ list of ahci-platform compatibles
+In-Reply-To: <1397574006-5868-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1397574006-5868-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1397574006-5868-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140504192827.GF26279@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 04, 2014 at 09:48:04PM +0800, Shawn Guo wrote:
-> Changes since v2:
->  - Have comment for register definition
->  - Use IMX_ instead of IMX_SATA_ for prefix to make it a bit shorter
+On Tue, Apr 15, 2014 at 05:00:02PM +0200, Thomas Petazzoni wrote:
+> The ahci-platform.txt Device Tree binding documentation is gaining a
+> growing number of compatible strings, and it will gain one more with
+> the addition of the Marvell Armada 380 AHCI support. It is therefore
+> time to reformat this list into a proper bullet list, and more
+> importantly order it alphabetically;
 > 
-> Shawn Guo (2):
->   ahci: imx: add namespace for register enums
->   ahci: imx: software workaround for phy reset issue in resume
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Acked-by: Andrew Lunn <andrew@lunn.ch>
 
-Applied to libata/for-3.15-fixes.
+Applied to libata/for-3.16.
 
 Thanks.
 
