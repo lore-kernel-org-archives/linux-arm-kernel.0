@@ -1,78 +1,41 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sun, 04 May 2014 23:24:15 +0200
-Subject: [PATCH 7/7] net: mvmdio: Use devm_* API to simplify the code
-In-Reply-To: <1399141622-30654-8-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1399141622-30654-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1399141622-30654-8-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <5366AFFF.8090205@gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Mon, 05 May 2014 00:36:25 +0200
+Subject: [PATCH 1/5] pm: domains: quieten down generic pm domains
+In-Reply-To: <CAPDyKFpKnhcttY-BWDEG=XTYsKHro0t5G7YBao-+F=o3ez3grA@mail.gmail.com>
+References: <20140427132312.GC26756@n2100.arm.linux.org.uk>
+ <10021780.rnCkCYmgZH@vostro.rjw.lan>
+ <CAPDyKFpKnhcttY-BWDEG=XTYsKHro0t5G7YBao-+F=o3ez3grA@mail.gmail.com>
+Message-ID: <1412882.XTDX0QPJ6V@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/2014 08:27 PM, Ezequiel Garcia wrote:
-> This commit makes use of devm_kmalloc() for memory allocation and the
-> recently introduced devm_mdiobus_alloc() API to simplify driver's code.
-> While here, remove a redundant out of memory error message.
+On Friday, May 02, 2014 11:24:45 AM Ulf Hansson wrote:
+> On 1 May 2014 01:46, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> > On Sunday, April 27, 2014 02:28:50 PM Russell King wrote:
+> >> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> >
+> > Acked-by: Rafael J. Wysocki <rjw@rjwysocki.net>
+> >
+> > Since you need this one and [2/5] for the rest of the patchset, please feel
+> > free to take them through your tree if that's convenient.
 > 
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> Unless it complicates things for Russell, I would prefer if this could
+> go via Rafael's tree.
+> 
+> I have a quite big patchset for the PM domain, it would help me if I
+> have a single point to base my work upon.
 
-Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+No problem for me, but I'm not sure about what Russell things.
+
+> Additionally, you have Tomasz Figa patchset below to consider for the
+> PM domain code.
+> 
+> [PATCH v3 0/3] Generic Device Tree based power domain look-up
+
+This one seems to have been under discussion recently, however.
 
 Thanks!
 
-> ---
->  drivers/net/ethernet/marvell/mvmdio.c | 18 ++++++------------
->  1 file changed, 6 insertions(+), 12 deletions(-)
-> 
-> diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
-> index b161a52..995e182 100644
-> --- a/drivers/net/ethernet/marvell/mvmdio.c
-> +++ b/drivers/net/ethernet/marvell/mvmdio.c
-> @@ -195,11 +195,10 @@ static int orion_mdio_probe(struct platform_device *pdev)
->  		return -ENODEV;
->  	}
->  
-> -	bus = mdiobus_alloc_size(sizeof(struct orion_mdio_dev));
-> -	if (!bus) {
-> -		dev_err(&pdev->dev, "Cannot allocate MDIO bus\n");
-> +	bus = devm_mdiobus_alloc_size(&pdev->dev,
-> +				      sizeof(struct orion_mdio_dev));
-> +	if (!bus)
->  		return -ENOMEM;
-> -	}
->  
->  	bus->name = "orion_mdio_bus";
->  	bus->read = orion_mdio_read;
-> @@ -208,11 +207,10 @@ static int orion_mdio_probe(struct platform_device *pdev)
->  		 dev_name(&pdev->dev));
->  	bus->parent = &pdev->dev;
->  
-> -	bus->irq = kmalloc(sizeof(int) * PHY_MAX_ADDR, GFP_KERNEL);
-> -	if (!bus->irq) {
-> -		mdiobus_free(bus);
-> +	bus->irq = devm_kmalloc(&pdev->dev,
-> +				sizeof(int) * PHY_MAX_ADDR, GFP_KERNEL);
-> +	if (!bus->irq)
->  		return -ENOMEM;
-> -	}
->  
->  	for (i = 0; i < PHY_MAX_ADDR; i++)
->  		bus->irq[i] = PHY_POLL;
-> @@ -261,8 +259,6 @@ static int orion_mdio_probe(struct platform_device *pdev)
->  out_mdio:
->  	if (!IS_ERR(dev->clk))
->  		clk_disable_unprepare(dev->clk);
-> -	kfree(bus->irq);
-> -	mdiobus_free(bus);
->  	return ret;
->  }
->  
-> @@ -273,8 +269,6 @@ static int orion_mdio_remove(struct platform_device *pdev)
->  
->  	writel(0, dev->regs + MVMDIO_ERR_INT_MASK);
->  	mdiobus_unregister(bus);
-> -	kfree(bus->irq);
-> -	mdiobus_free(bus);
->  	if (!IS_ERR(dev->clk))
->  		clk_disable_unprepare(dev->clk);
->  
-> 
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
