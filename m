@@ -1,31 +1,52 @@
 From: carlo@caione.org (Carlo Caione)
-Date: Sun,  4 May 2014 16:02:38 +0200
-Subject: [PATCH 0/2] ARM: sunxi: Enable syscon for the system controller
-Message-ID: <1399212160-26934-1-git-send-email-carlo@caione.org>
+Date: Sun,  4 May 2014 16:02:39 +0200
+Subject: [PATCH 1/2] ARM: sunxi: dts: Enable syscon in DTSI
+In-Reply-To: <1399212160-26934-1-git-send-email-carlo@caione.org>
+References: <1399212160-26934-1-git-send-email-carlo@caione.org>
+Message-ID: <1399212160-26934-2-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The so called "system controller" in Allwinner A20 and A31 SoCs is
-multi-purpose controller that tries to add misc functionality to one
-memory region.
-In these SoCs it controls the internal SRAM partitioning but it also
-includes registers for chip versioning and NMI control.
-This patch adds the proper nodes in the DTS files and enable the syscon
-in the defconfig files.
+This patch adds the proper nodes in the DTSI files for Allwinner
+A20 and A31.
 
-Even though the system controller includes also register for managing the
-NMI controller, these register are not mapped in the syscon since they
-are directly used and mapped by the NMI controller itself.
+Signed-off-by: Carlo Caione <carlo@caione.org>
+---
+ arch/arm/boot/dts/sun6i-a31.dtsi | 5 +++++
+ arch/arm/boot/dts/sun7i-a20.dtsi | 5 +++++
+ 2 files changed, 10 insertions(+)
 
-Carlo Caione (2):
-  ARM: sunxi: dts: Enable syscon in DTSI
-  ARM: sunxi: Add syscon support in defconfig
-
- arch/arm/boot/dts/sun6i-a31.dtsi    | 5 +++++
- arch/arm/boot/dts/sun7i-a20.dtsi    | 5 +++++
- arch/arm/configs/multi_v7_defconfig | 1 +
- arch/arm/configs/sunxi_defconfig    | 1 +
- 4 files changed, 12 insertions(+)
-
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index bc46814..775e64a 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -237,6 +237,11 @@
+ 		#size-cells = <1>;
+ 		ranges;
+ 
++		syscon: syscon at 01c00000 {
++			compatible = "syscon";
++			reg = <0x01c00000 0x27>;
++		};
++
+ 		nmi_intc: interrupt-controller at 01f00c0c {
+ 			compatible = "allwinner,sun6i-a31-sc-nmi";
+ 			interrupt-controller;
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index 88171f4..14f8933 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -401,6 +401,11 @@
+ 		#size-cells = <1>;
+ 		ranges;
+ 
++		syscon: syscon at 01c00000 {
++			compatible = "syscon";
++			reg = <0x01c00000 0x27>;
++		};
++
+ 		nmi_intc: interrupt-controller at 01c00030 {
+ 			compatible = "allwinner,sun7i-a20-sc-nmi";
+ 			interrupt-controller;
 -- 
 1.8.3.2
