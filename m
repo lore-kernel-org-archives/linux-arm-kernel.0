@@ -1,54 +1,64 @@
 From: r.sricharan@ti.com (Sricharan R)
-Date: Mon, 5 May 2014 19:48:43 +0530
-Subject: [PATCH 1/5] irqchip: crossbar: dont use '0' to mark reserved
- interrupts
+Date: Mon, 5 May 2014 19:48:44 +0530
+Subject: [PATCH 2/5] irqchip: crossbar: check for premapped crossbar before
+ allocating
 In-Reply-To: <1399299527-10955-1-git-send-email-r.sricharan@ti.com>
 References: <1399299527-10955-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <1399299527-10955-2-git-send-email-r.sricharan@ti.com>
+Message-ID: <1399299527-10955-3-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Nishanth Menon <nm@ti.com>
 
-Today '0' is actually reserved, but may not be the same in the future.
-
-So, use a flag to mark the GIC interrupts that are reserved.
+If irq_of_parse_and_map is executed twice, the same crossbar is mapped to two
+different GIC interrupts. This is completely undesirable. Instead, check
+if the requested crossbar event is pre-allocated and provide that GIC
+mapping back to caller if already allocated.
 
 Signed-off-by: Nishanth Menon <nm@ti.com>
 Signed-off-by: Sricharan R <r.sricharan@ti.com>
 ---
- drivers/irqchip/irq-crossbar.c |    5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ drivers/irqchip/irq-crossbar.c |   16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
 diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
-index 3d15d16..20105bc 100644
+index 20105bc..51d4b87 100644
 --- a/drivers/irqchip/irq-crossbar.c
 +++ b/drivers/irqchip/irq-crossbar.c
-@@ -17,6 +17,7 @@
- #include <linux/irqchip/arm-gic.h>
+@@ -51,6 +51,17 @@ static inline void crossbar_writeb(int irq_no, int cb_no)
+ 	writeb(cb_no, cb->crossbar_base + cb->register_offsets[irq_no]);
+ }
  
- #define IRQ_FREE	-1
-+#define IRQ_RESERVED	-2
- #define GIC_IRQ_START	32
++static inline int get_prev_map_irq(int cb_no)
++{
++	int i;
++
++	for (i = 0; i < cb->int_max; i++)
++		if (cb->irq_map[i] == cb_no)
++			return i;
++
++	return -ENODEV;
++}
++
+ static inline int allocate_free_irq(int cb_no)
+ {
+ 	int i;
+@@ -88,11 +99,16 @@ static int crossbar_domain_xlate(struct irq_domain *d,
+ {
+ 	unsigned long ret;
  
- /*
-@@ -139,7 +140,7 @@ static int __init crossbar_of_init(struct device_node *node)
- 				pr_err("Invalid reserved entry\n");
- 				goto err3;
- 			}
--			cb->irq_map[entry] = 0;
-+			cb->irq_map[entry] = IRQ_RESERVED;
- 		}
- 	}
++	ret = get_prev_map_irq(intspec[1]);
++	if (!IS_ERR_VALUE(ret))
++		goto found;
++
+ 	ret = allocate_free_irq(intspec[1]);
  
-@@ -170,7 +171,7 @@ static int __init crossbar_of_init(struct device_node *node)
- 	 * reserved irqs. so find and store the offsets once.
- 	 */
- 	for (i = 0; i < max; i++) {
--		if (!cb->irq_map[i])
-+		if (cb->irq_map[i] == IRQ_RESERVED)
- 			continue;
+ 	if (IS_ERR_VALUE(ret))
+ 		return ret;
  
- 		cb->register_offsets[i] = reserved;
++found:
+ 	*out_hwirq = ret + GIC_IRQ_START;
+ 	return 0;
+ }
 -- 
 1.7.9.5
