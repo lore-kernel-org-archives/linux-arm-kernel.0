@@ -1,87 +1,53 @@
-From: catalin.udma@freescale.com (Catalin Udma)
-Date: Mon, 5 May 2014 14:51:25 +0300
-Subject: [PATCH] arm64: ptrace: fix setting hw breakpoint/watchpoint
-Message-ID: <1399290685-6336-1-git-send-email-catalin.udma@freescale.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 05 May 2014 13:57:31 +0200
+Subject: [PATCH v2 0/8] pinctrl-rockchip: Change wrong initial assumptions
+Message-ID: <11862890.WUjscWaP3U@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When setting hw breakpoints/watchpoints, GDB reports the error
-"Unexpected error setting hardware debug registers". The problem is
-reproducible on A53/A57 models where the supported number of
-breakpoints/watchpoints (6 or 4 read from ID_AA64DFR0_EL1) it is
-less than the maximum number of debug registers from user_hwdebug_state
+Initially due to lack of documentation and (personal) understanding
+I assumed that the area holding the iomux settings would be separate
+from everything else, while in fact the grf registers contain not only
+pinctrl stuff but also dma, usb-phy and general soc-status settings.
+Also things like drive-strength we do not support currently are intermixed.
 
-This patch fixes the problem by restricting the registers access to the
-maximum number of supported breakpoints/watchpoints
+The same is true for the pmu, which does not only contain power domains
+but also the system reset as well as well as general registers surviving
+system-resets. Additionally the rk3188 moved parts of the pull-setting
+registers into the pmu space.
 
-Signed-off-by: Catalin Udma <catalin.udma@freescale.com>
----
- arch/arm64/kernel/ptrace.c |   28 +++++++++++++++++++++-------
- 1 files changed, 21 insertions(+), 7 deletions(-)
+While this wasn't a problem until now, the upcoming rk3288 introduces
+additional changes to both the grf and pmu areas. On it even part of
+the pinmux registers move into the pmu space.
 
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index c484d56..dea4b28 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -241,21 +241,30 @@ static int ptrace_hbp_fill_attr_ctrl(unsigned int note_type,
- 	return 0;
- }
- 
--static int ptrace_hbp_get_resource_info(unsigned int note_type, u32 *info)
-+static int ptrace_hbp_get_breakpoint_slots(unsigned int note_type, u8 *num)
- {
--	u8 num;
--	u32 reg = 0;
--
- 	switch (note_type) {
- 	case NT_ARM_HW_BREAK:
--		num = hw_breakpoint_slots(TYPE_INST);
-+		*num = hw_breakpoint_slots(TYPE_INST);
- 		break;
- 	case NT_ARM_HW_WATCH:
--		num = hw_breakpoint_slots(TYPE_DATA);
-+		*num = hw_breakpoint_slots(TYPE_DATA);
- 		break;
- 	default:
- 		return -EINVAL;
- 	}
-+	return 0;
-+}
-+
-+static int ptrace_hbp_get_resource_info(unsigned int note_type, u32 *info)
-+{
-+	u8 num;
-+	u32 reg = 0;
-+	int ret;
-+
-+	ret = ptrace_hbp_get_breakpoint_slots(note_type, &num);
-+	if (ret)
-+		return ret;
- 
- 	reg |= debug_monitors_arch();
- 	reg <<= 8;
-@@ -425,6 +434,7 @@ static int hw_break_set(struct task_struct *target,
- 	int ret, idx = 0, offset, limit;
- 	u32 ctrl;
- 	u64 addr;
-+	u8 num_slots;
- 
- 	/* Resource info and pad */
- 	offset = offsetof(struct user_hwdebug_state, dbg_regs);
-@@ -432,9 +442,13 @@ static int hw_break_set(struct task_struct *target,
- 	if (ret)
- 		return ret;
- 
-+	ret = ptrace_hbp_get_breakpoint_slots(note_type, &num_slots);
-+	if (ret)
-+		return ret;
-+
- 	/* (address, ctrl) registers */
- 	limit = regset->n * regset->size;
--	while (count && offset < limit) {
-+	while (count && offset < limit && idx < num_slots) {
- 		ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf, &addr,
- 					 offset, offset + PTRACE_HBP_ADDR_SZ);
- 		if (ret)
+The code in it's current form supports both the old as well as the
+changed bindings.
+
+As stated in the v1 thread, this is also a first step to deprecate the
+wrongly included gpio-controllers which now duplicate the recently added
+gpio-dwapb, that should be used instead.
+
+
+changes since v1:
+- add select MFD_SYSCON as suggested by Max
+
+Heiko Stuebner (8):
+  pinctrl: rockchip: do not require 2nd register area
+  pinctrl: rockchip: use regmaps instead of raw mappings
+  pinctrl: rockchip: rockchip_pinctrl in rockchip_get_bank_data
+  pinctrl: rockchip: let pmu registers be supplied by a syscon
+  pinctrl: rockchip: only map bank0-pull-region when pmu regmap missing
+  pinctrl: rockchip: base regmap supplied by a syscon
+  dt-bindings: adapt rockchip-pinctrl doc to changed bindings
+  ARM: dts: rockchip: convert pinctrl nodes to new bindings
+
+ .../bindings/pinctrl/rockchip,pinctrl.txt          |  28 +++-
+ arch/arm/boot/dts/rk3066a.dtsi                     |   2 +-
+ arch/arm/boot/dts/rk3188.dtsi                      |   9 +-
+ arch/arm/boot/dts/rk3xxx.dtsi                      |   9 +-
+ drivers/pinctrl/Kconfig                            |   1 +
+ drivers/pinctrl/pinctrl-rockchip.c                 | 178 +++++++++++++++------
+ 6 files changed, 165 insertions(+), 62 deletions(-)
+
 -- 
-1.7.8
+1.9.0
