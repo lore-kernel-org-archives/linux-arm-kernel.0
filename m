@@ -1,40 +1,66 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 05 May 2014 15:40:04 -0400 (EDT)
-Subject: [PATCH 1/7] net: mv643xx_eth: Simplify mv643xx_eth_adjust_link()
-In-Reply-To: <1399141622-30654-2-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1399141622-30654-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1399141622-30654-2-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20140505.154004.1134814253503467382.davem@davemloft.net>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 5 May 2014 12:45:45 -0700
+Subject: [RFC PATCH 1/5] watchdog: Add API to trigger reboots
+In-Reply-To: <20140505183606.GJ17875@saruman.home>
+References: <1398958893-30049-1-git-send-email-linux@roeck-us.net>
+ <1398958893-30049-2-git-send-email-linux@roeck-us.net>
+ <20140505183606.GJ17875@saruman.home>
+Message-ID: <20140505194545.GA30333@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-Date: Sat,  3 May 2014 15:26:56 -0300
-
-> Currently, mv643xx_eth_adjust_link() is only used to call mv643xx_adjust_pscr().
-> This commit renames the latter to the former, and therefore removes the extra
-> and useless function.
+On Mon, May 05, 2014 at 01:36:06PM -0500, Felipe Balbi wrote:
+> On Thu, May 01, 2014 at 08:41:29AM -0700, Guenter Roeck wrote:
+> > Some hardware implements reboot through its watchdog hardware,
+> > for example by triggering a watchdog timeout. Platform specific
+> > code starts to spread into watchdog drivers, typically by setting
+> > pointers to a callback functions which is then called from the
+> > platform reset handler.
+> > 
+> > To simplify code and provide a unified API to trigger reboots by
+> > watchdog drivers, provide a single API to trigger such reboots
+> > through the watchdog subsystem.
+> > 
+> > Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+> > ---
+> >  drivers/watchdog/watchdog_core.c |   17 +++++++++++++++++
+> >  include/linux/watchdog.h         |   11 +++++++++++
+> >  2 files changed, 28 insertions(+)
+> > 
+> > diff --git a/drivers/watchdog/watchdog_core.c b/drivers/watchdog/watchdog_core.c
+> > index cec9b55..4ec6e2f 100644
+> > --- a/drivers/watchdog/watchdog_core.c
+> > +++ b/drivers/watchdog/watchdog_core.c
+> > @@ -43,6 +43,17 @@
+> >  static DEFINE_IDA(watchdog_ida);
+> >  static struct class *watchdog_class;
+> >  
+> > +static struct watchdog_device *wdd_reboot_dev;
+> > +
+> > +void watchdog_do_reboot(enum reboot_mode mode, const char *cmd)
+> > +{
+> > +	if (wdd_reboot_dev) {
+> > +		if (wdd_reboot_dev->ops->reboot)
 > 
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->  drivers/net/ethernet/marvell/mv643xx_eth.c | 15 +++++----------
->  1 file changed, 5 insertions(+), 10 deletions(-)
+> you can decrease one level of indentation:
 > 
-> diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
-> index b7b8d74..1e63c63 100644
-> --- a/drivers/net/ethernet/marvell/mv643xx_eth.c
-> +++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
-> @@ -1010,8 +1010,10 @@ static void txq_set_fixed_prio_mode(struct tx_queue *txq)
->  
->  
->  /* mii management interface *************************************************/
-> -static void mv643xx_adjust_pscr(struct mv643xx_eth_private *mp)
-> +static void mv643xx_eth_adjust_link(struct net_device *dev)
->  {
-> +	struct mv643xx_eth_private *mp = netdev_priv(dev);
-> +
->  	u32 pscr = rdlp(mp, PORT_SERIAL_CONTROL);
->  	u32 autoneg_disable = FORCE_LINK_PASS |
->  	             DISABLE_AUTO_NEG_SPEED_GMII |
+> 	if (wdd_reboot_dev && wdd_reboot_dev->ops->reboot)
+> 
+> also, shouldn't you test if 'ops' is valid too ? In that case:
+> 
+> 	if (wdd_reboot_dev && wdd_reboot_dev->ops &&
+> 		wdd_reboot_dev->ops->reboot)
+> 
+Hmmm ... makes me think.
 
-Please do not add empty lines in the middle of the function local variable declarations.
+If ops->reboot is not set, wdd_reboot_dev should be NULL
+to start with, since it is only initialized if ops->reboot
+is not NULL.
+
+It is not common in the Linux kernel to re-check pointers
+if the condition can not occur, so I don't think it should
+be done here.
+
+In other words, I should probably remove the ops check as well.
+
+Guenter
