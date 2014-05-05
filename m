@@ -1,77 +1,38 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Mon, 5 May 2014 20:00:38 +0530
-Subject: [GIT PULL 4/4] omap crossbar support for v3.15
-In-Reply-To: <5367A022.1040305@ti.com>
-References: <pull-1393802089-910509>
- <5313bcc5.a8fc440a.467f.7ba2SMTPIN_ADDED_MISSING@mx.google.com>
- <20140309073347.GL16310@quad.lixom.net> <20140310163620.GB4882@atomide.com>
- <531F0494.1040105@ti.com> <5367A022.1040305@ti.com>
-Message-ID: <5367A08E.5030904@ti.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 5 May 2014 11:32:48 -0300
+Subject: [PATCH 1/5] ARM: mvebu: fix thermal quirk SoC revision check
+In-Reply-To: <1399299631-30825-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1399299631-30825-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1399299631-30825-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140505143248.GA12693@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 05 May 04:20 PM, Thomas Petazzoni wrote:
+> In commit 54fe26a900bc528f3df1e4235cb6b9ca5c6d4dc2 ('ARM: mvebu: Add
+> thermal quirk for the Armada 375 DB board'), a check on the Armada SoC
+> revision was added to decide whether a quirk for the thermal device
+> should be applied or not.
+> 
+> However, the quirk implementation has a bug: it assumes
+> mvebu_get_soc_id() returns true on success, but it returns
+> 0. Therefore, the condition:
+> 
+>   if (mvebu_get_soc_id(&dev, &rev) && rev > ARMADA_375_Z1_REV)
+> 
+> is always false (as long as mvebu-soc-id is properly initialized). As
+> a consequence, the quirk is always applied, even on A0 steppings, for
+> which the quirk should not be applied.
+> 
+> This was spotted by testing the thermal driver on Armada 375 A0, which
+> Ezequiel could not do since he does not have access to the A0 revision
+> of the SoC for the moment.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Fixes: 54fe26a900bc528f3df1e4235cb6b9ca5c6d4dc2 ('ARM: mvebu: Add thermal quirk for the Armada 375 DB board')
 
-On Monday 05 May 2014 07:58 PM, Sricharan R wrote:
-> Hi Tony,
->
-> On Tuesday 11 March 2014 06:11 PM, Sricharan R wrote:
->> Tony,
->>
->> On Monday 10 March 2014 10:06 PM, Tony Lindgren wrote:
->>> * Olof Johansson <olof@lixom.net> [140308 23:36]:
->>>> On Sun, Mar 02, 2014 at 03:14:49PM -0800, Tony Lindgren wrote:
->>>>> The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
->>>>>
->>>>>   Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
->>>>>
->>>>> are available in the git repository at:
->>>>>
->>>>>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.15/crossbar-signed
->>>>>
->>>>> for you to fetch changes up to 9594274201ac3c67d5c569aae63792e58bcd33e6:
->>>>>
->>>>>   Merge branch 'crossbar_3.14_rc1' of git://github.com/Sricharanti/sricharan into omap-for-v3.15/crossbar (2014-02-28 13:35:02 -0800)
->>>>>
->>>>> ----------------------------------------------------------------
->>>>>
->>>>> Add support for GIC crossbar that routes interrupts on newer omaps.
->>>>>
->>>>> Looks like people wanted these merged via the omap tree as it's
->>>>> the only user for the GIC crossbar.
->>>>>
->>>>> ----------------------------------------------------------------
->>>>> Sricharan R (4):
->>>>>       DRIVERS: IRQCHIP: IRQ-GIC: Add support for routable irqs
->>>>>       DRIVERS: IRQCHIP: CROSSBAR: Add support for Crossbar IP
->>>>>       ARM: OMAP4+: Correct Wakeup-gen code to use physical irq number
->>>>>       ARM: DRA: Enable Crossbar IP support for DRA7XX
->>>> Whoa, lots of caps on those driver subjects. I don't think we need those
->>>> in the future, lower case is just fine (and DRIVERS: usually isn't used).
->>> Oops yeah I had them as "irqchip: crossbar" and "irqchip: irq-gic" in
->>> my earlier branch for v3.14 that did not get merged, but this time I
->>> pulled from Sricharan.
->>>
->>> Scricharan, maybe use less yelling naming for any follow-up patches?
->>>  
->>   Will make sure that there are no caps in the follow up patches.
->>
->> Regards,
->>  Sricharan
-> I have pushed the below branch for the crossbar-dts data rebased on 3.15-rc4
->
-> git at github.com:Sricharanti/sricharan.git
-> branch: crossbar_dts_3.15_rc4
->
-> These patches are dependent on the crossbar driver fixes sent below.
->
-> http://marc.info/?l=linux-omap&m=139929963420299&w=2
->
-> Regards,
->  Sricharan
->
-
- Sorry, please ignore this. Used a wrong thread.
-
-Regards,
- Sricharan
+Acked-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
