@@ -1,25 +1,30 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 5 May 2014 14:52:52 -0700
-Subject: [PATCH v2 3/3] ARM: configs: add CONFIG_MMC_SDHCI_PXAV3 to the
- multi_v7_defconfig
-In-Reply-To: <1397486478-16991-4-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1397486478-16991-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1397486478-16991-4-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140505215252.GH29245@quad.lixom.net>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 5 May 2014 23:56:04 +0200
+Subject: [PATCHv3 5/5] ARM: configs: add ahci_mvebu to multi_v7_defconfig
+In-Reply-To: <20140505215121.GG29245@quad.lixom.net>
+References: <1397574006-5868-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1397574006-5868-6-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140426002518.GL28159@titan.lakedaemon.net>
+ <20140505215121.GG29245@quad.lixom.net>
+Message-ID: <20140505235604.66d79dce@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 14, 2014 at 04:41:18PM +0200, Thomas Petazzoni wrote:
-> The Marvell Armada 38x platform has a SDHCI interface managed by the
-> sdhci-pxav3 MMC host driver. It therefore makes sense to enable this
-> driver in multi_v7_defconfig, which supports the Armada 38x platform.
+Dear Olof Johansson,
+
+On Mon, 5 May 2014 14:51:21 -0700, Olof Johansson wrote:
+
+> It's much easier if we get the patch remailed to us, or resubmitted with the
+> ack and sent to us. It's how others (like Greg) tend to prefer to get patches
+> as well.
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  arch/arm/configs/multi_v7_defconfig | 1 +
->  1 file changed, 1 insertion(+)
+> So, Thomas, care to resend us (arm at kernel.org) the patch with the ack
+> appended?  Thanks!
 
-Applied (this one I had alreayd hunted down before I sent the email
-about the other acked multi_v7_defconfig patch. :)
+Sure, will do, thanks!
 
--Olof
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
