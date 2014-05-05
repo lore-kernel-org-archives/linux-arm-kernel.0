@@ -1,28 +1,40 @@
-From: bevenson@melinkcorp.com (Bryan Evenson)
-Date: Mon, 5 May 2014 18:55:11 +0000
-Subject: [BUG] at91: rtc: Uinterruptable sleep state on hwclock -w -u
-Message-ID: <55cab9fba2ea4eed8f73591b37cc874b@BLUPR05MB037.namprd05.prod.outlook.com>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 05 May 2014 15:40:04 -0400 (EDT)
+Subject: [PATCH 1/7] net: mv643xx_eth: Simplify mv643xx_eth_adjust_link()
+In-Reply-To: <1399141622-30654-2-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1399141622-30654-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1399141622-30654-2-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20140505.154004.1134814253503467382.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I am using a variant of the 3.10 kernel on an Atmel AT91SAM9G25.  Specifically, I am using https://github.com/linux4sam/linux-at91/tree/linux-3.10-at91 HEAD revision with some of my own device tree patches to enable/disable peripherals for my system.  I am experiencing a problem that I believe I have tracked down to the AT91 rtc driver, but I am looking for confirmation on the issue I am seeing.  If I call "hwclock -w -u" at the same time in multiple processes, sometimes one of the instances will enter an uninterruptable sleep and access of the RTC will fail until there is a system reboot.  I've traced it down to an ioctl call that does not return, which leads me to believe there is an issue in the AT91 RTC driver.
+From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Date: Sat,  3 May 2014 15:26:56 -0300
 
-Step to reproduce:
-Run two instances of the following test script in the background:
-----------
-#!/bin/sh
-i=0
-while [ 1 ]; do
-  strace -f -o /home/root/hwclock_output_"$$_$i".txt /sbin/hwclock -w -u
-  : $((i++))
-  sleep 1;
-done
-----------
-On my system, eventually one instance of the hwclock call will enter an uninterruptable sleep; usually happens within a few minutes.  If I print out the strace output file for the hung process using cat, the last line shows something similar to the following:
+> Currently, mv643xx_eth_adjust_link() is only used to call mv643xx_adjust_pscr().
+> This commit renames the latter to the former, and therefore removes the extra
+> and useless function.
+> 
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  drivers/net/ethernet/marvell/mv643xx_eth.c | 15 +++++----------
+>  1 file changed, 5 insertions(+), 10 deletions(-)
+> 
+> diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
+> index b7b8d74..1e63c63 100644
+> --- a/drivers/net/ethernet/marvell/mv643xx_eth.c
+> +++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
+> @@ -1010,8 +1010,10 @@ static void txq_set_fixed_prio_mode(struct tx_queue *txq)
+>  
+>  
+>  /* mii management interface *************************************************/
+> -static void mv643xx_adjust_pscr(struct mv643xx_eth_private *mp)
+> +static void mv643xx_eth_adjust_link(struct net_device *dev)
+>  {
+> +	struct mv643xx_eth_private *mp = netdev_priv(dev);
+> +
+>  	u32 pscr = rdlp(mp, PORT_SERIAL_CONTROL);
+>  	u32 autoneg_disable = FORCE_LINK_PASS |
+>  	             DISABLE_AUTO_NEG_SPEED_GMII |
 
-3084  ioctl(3, RTC_SET_TIME, {tm_sec=45, tm_min=40, tm_hour=17, tm_mday=5, tm_mon=4, tm_year=114, ...}
-
-which is an incomplete printout of the ioctl system call.  If this occurs, then any call to hwclock fails until the system is rebooted.  I do not have any other hardware for testing, so I am unsure if this problem can be reproduced on other architectures.  Let me know if you need more detailed information.
-
-Regards,
-Bryan
+Please do not add empty lines in the middle of the function local variable declarations.
