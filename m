@@ -1,100 +1,71 @@
-From: elder@linaro.org (Alex Elder)
-Date: Mon, 05 May 2014 17:02:03 -0500
-Subject: [PATCH 2/5] ARM: add SMP support for Broadcom mobile SoCs
-In-Reply-To: <533EF21C.6000909@codeaurora.org>
-References: <1396577891-2713-1-git-send-email-elder@linaro.org>
- <1396577891-2713-3-git-send-email-elder@linaro.org>
- <533EF21C.6000909@codeaurora.org>
-Message-ID: <53680A5B.4060208@linaro.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 5 May 2014 15:04:10 -0700
+Subject: [GIT PULL] SOCFPGA DTS updates for 3.16
+In-Reply-To: <1398466670-8341-1-git-send-email-dinguyen@altera.com>
+References: <1398466670-8341-1-git-send-email-dinguyen@altera.com>
+Message-ID: <20140505220410.GI29245@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/04/2014 12:55 PM, Stephen Boyd wrote:
-> On 04/03/14 19:18, Alex Elder wrote:
->> +
->> +/*
->> + * Secondary startup method setup routine to extract the location of
->> + * the secondary boot register from a "cpu" or "cpus" device tree
->> + * node.  Only the first seen secondary boot register value is used;
->> + * any others are ignored.  The secondary boot register value must be
->> + * non-zero.
->> + *
->> + * Returns 0 if successful or an error code otherwise.
->> + */
->> +static int __init of_enable_method_setup(struct device_node *node)
->> +{
->> +	int ret;
->> +
->> +	/* Ignore all but the first one specified */
->> +	if (secondary_boot)
->> +		return 0;
->> +
->> +	ret = of_property_read_u32(node, OF_SECONDARY_BOOT, &secondary_boot);
->> +	if (ret)
->> +		pr_err("%s: missing/invalid " OF_SECONDARY_BOOT " property\n",
->> +			node->name);
->> +
->> +	return ret;
->> +}
+On Fri, Apr 25, 2014 at 05:57:49PM -0500, dinguyen at altera.com wrote:
+> Hi Arnd, Kevin and Olof,
 > 
-> I don't understand why we need this. Why can't we get the secondary boot
-> address from the /cpus node in the smp_prepare_cpus op. It isn't that
-> hard to get access to the cpus node there via of_find_node_by_path().
-> Then we don't need patch 1 at all. If it turns out to be common stuff,
-> we can always have the common function live in arm common code or maybe
-> even be a devicetree API.
+> Please consider pulling in these patches for v3.16. These consist mostly of
+> DTS updates and a few DTS bindings documentation updates for SOCFPGA.
+> 
+> Thanks,
+> 
+> The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+> 
+>   Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga-dt-updates-for-3.16
+> 
+> for you to fetch changes up to 2adecac3f50865b53c060949be4251a486547c48:
+> 
+>   dt: bindings: Typo s/clocks-names/clock-names/g (2014-04-24 17:52:30 -0500)
+> 
+> ----------------------------------------------------------------
+> dts: socfpga: general updates for the socfpga platform
+> 
+> Mostly DTS additions to the SOCFPGA platform from Steffan Trumtrar, and a
+> couple of device tree documentation updates/typo fix.
+> 
+> ----------------------------------------------------------------
+> Dinh Nguyen (4):
+>       ARM: socfpga: dts: add eeprom and rtc on i2c0
+>       ARM: socfpga: dts: Remove hard coded clock-frequency property
+>       ARM: socfpga: dts: Add DTS entries for USB
+>       ARM: socfpga: dts: Add div-reg to the main_pll clocks
+> 
+> Geert Uytterhoeven (1):
+>       dt: bindings: Typo s/clocks-names/clock-names/g
+> 
+> Sebastian Andrzej Siewior (1):
+>       ARM: dts: socfpga: add gpio pieces
+> 
+> Steffen Trumtrar (10):
+>       ARM: socfpga: dts: fix pdma interrupt
+>       ARM: socfpga: dts: add remaining interrupts for pdma
+>       ARM: socfpga: dts: add i2c busses
+>       ARM: socfpga: dts: add can0+1
+>       ARM: socfpga: dts: add support for EBV SOCrates
+>       ARM: socfpga: dts: add rtc on i2c0 to socrates
+>       ARM: socfpga: dts: convert to preprocessor includes
+>       Documentation: dt: socfpga: add reset-cells property
+>       Documentation: dt: reset: move socfpga-reset
+>       ARM: socfpga: dts: add reset-controller
 
-I already responded to this, but never got any response.  I
-was preparing to re-send this series and wanted to try to
-pull the added feature (patch 1) out and not be dependent on
-it.  But I think it's a bit ugly so I'm hoping to get a
-blessing to proceed with what I originally proposed.  For
-reference, here's the thread:
-    https://lkml.org/lkml/2014/4/3/421
+Hi,
 
-What I'm trying to do is get the value of a "secondary-boot-reg"
-property from a node known to have an "enable-method" property
-that matches the method name supplied in CPU_METHOD_OF_DECLARE().
+I had a comment on the gpio binding, so I replied to the original patch. Let's
+see that discussion reach a conclusion before I bring this in.
 
-Using the callback function as I originally proposed, this is
-very easy.  When arm_dt_init_cpu_maps() parses the "cpus" portion
-of the device tree it calls set_smp_ops_by_method() for a
-matching "cpu" or "cpus" node, and that function supplies
-the node to the callback function. The callback can extract
-additional property values if needed.
+If you prefer, you can prepare the branch without that patch if you want to
+land everything else, and then do a incremental pull request with that patch
+(or equivalent patch) once discussion has been settled.
 
-If I hold off until smp_prepare_cpus() is called, I have to
-re-parse the device tree to find the "cpus" node (this is
-in itself trivial).  I then need to re-parse that node to
-verify the matching "enable-method" property is found before
-looking for the parameter information I need for that enable
-method.  I would really prefer not to re-do this parsing
-step.  It's imprecise and a little inefficient, and it
-duplicates (but not exactly) logic that's already performed
-by arm_dt_init_cpu_maps().
 
-One more point of clarification.  This "secondary-boot-reg"
-value is *not* the secondary boot address--that is, it's
-not the address secondary cores jump to when they are
-activated.  Instead, this is the address of a register
-that's used to request the ROM code release a core from
-its ROM-implemented holding pen.  For this machine,
-control jumps at that point to secondary_startup(),
-defined in arch/arm/kernel/head.S.
-
-So...
-
-Stephen, I'd like to hear from you whether my explanation
-is adequate, and whether you think my addition and use of
-CPU_METHOD_OF_DECLARE_SETUP() is reasonable.  (If you have
-a suggestion for a better name, I'm open.)
-
-If you still don't like it, I'll follow up with a
-new version of the patches, this time parsing the
-device tree in the smp_prepare_cpus() method as
-you suggested.  I don't want this to hold up getting
-this SMP support into the kernel.
-
-Thanks.
-
-					-Alex
+-Olof
