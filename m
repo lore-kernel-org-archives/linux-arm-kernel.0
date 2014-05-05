@@ -1,35 +1,42 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Mon, 5 May 2014 09:07:11 +0200
-Subject: [PATCH 1/3] perf tests: Introduce perf_regs_load function on ARM64
-In-Reply-To: <20140502165105.GD20642@arm.com>
-References: <CAFrcx1nfkDWTu9vF+a7UGjd1fzHpXS44pzqKLZS9ej7KJwqkOg@mail.gmail.com>
- <1398690730-5454-1-git-send-email-jean.pihet@linaro.org>
- <CAFrcx1kQO5i+kQwDizT1F4asbFNGiDSDWt0ubnpS92fU1PBiHw@mail.gmail.com>
- <20140502165105.GD20642@arm.com>
-Message-ID: <CAORVsuV5qYKLd21YSJhLy7Ovi5s4sXUEgbNot7LJspNnbdBpFw@mail.gmail.com>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Mon, 05 May 2014 09:06:14 +0200
+Subject: ACPI vs DT at runtime
+In-Reply-To: <97692EF2-013E-4E4B-BC16-E0915D67EFEC@antoniou-consulting.com>
+References: <20131115095717.GC1709@e106331-lin.cambridge.arm.com>
+ <20131118150052.GC24408@sirena.org.uk> <20131119091216.GA4412@netboy>
+ <20131120064056.GB5272@netboy>
+ <20131121192136.GA16735@n2100.arm.linux.org.uk>
+ <20131121204704.E4487C40753@trevor.secretlab.ca>
+ <CAHkRjk5MstjD9JFk+co8k89i8geJBmSF6uObhGdmWSe0GJHo8g@mail.gmail.com>
+ <97692EF2-013E-4E4B-BC16-E0915D67EFEC@antoniou-consulting.com>
+Message-ID: <53673866.9000105@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Am 22.11.2013 13:00, schrieb Pantelis Antoniou:
 
-On Fri, May 2, 2014 at 6:51 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Fri, May 02, 2014 at 10:19:38AM +0100, Jean Pihet wrote:
->> Hi WIll, Mark,
->>
->> Ping on this series. Can you please check? Is the refreshed patch OK?
+> As one that's going to be dealing with this, please don't take the DTS
+> files from the kernel.
 >
-> Fine by me, as long as it's not reused outside of this test :)
-Great! Is there some precaution to avoid a mis-reuse?
-
-Other than that, which tree are the patches going to?
-
-Cheers,
-Jean
-
+> If you do this, I can guarantee that within a year almost no ARM board using DT
+> will boot a mainline kernel.
 >
-> Will
+> The reason is that vendors have enough trouble (and failing) tracking a single
+> tree, adding yet another will just end to the vendor trees as far as the eye can see.
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Maybe, maybe, EVMs from silicon vendors will still boot, but I doubt any other
+> customer board will work.
+
+A bit late (I don't follow the ML (or what happens in the ARM world) 
+closely, but as I've recently read that ARM64 will go UEFI and ACPI, I 
+wonder what was the reasoning behind that decision.
+
+Does anyone really assume we will become high quality UEFI and ACPI 
+blobs from vendors? And such with reasonable support/update periods?
+
+For me that sounds like someone asked dreamers and was unable to adjust 
+those answers in regard to reality.
+
+Regards,
+
+Alexander Holler
