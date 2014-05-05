@@ -1,59 +1,75 @@
-From: joshc@codeaurora.org (Josh Cartwright)
-Date: Mon, 5 May 2014 16:54:22 -0500
-Subject: [PATCHv5 RFC 12/15] hwspinlock/core: add OF helper to parse
- reserved locks
-In-Reply-To: <53680639.1080405@ti.com>
-References: <1398904476-26200-1-git-send-email-s-anna@ti.com>
- <1398904476-26200-13-git-send-email-s-anna@ti.com>
- <53680639.1080405@ti.com>
-Message-ID: <20140505215422.GD5546@joshc.qualcomm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon,  5 May 2014 19:00:47 -0300
+Subject: [PATCH 1/2] ARM: dts: imx51-eukrea-mbimxsd51-baseboard: Add CAN
+ support
+Message-ID: <1399327248-17887-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 05, 2014 at 04:44:25PM -0500, Suman Anna wrote:
-> Hi Rob,
-> 
-> On 04/30/2014 07:34 PM, Suman Anna wrote:
-> > The property 'hwlock-reserved-locks' will be used to represent
-> > the number of locks to be reserved for clients that would need
-> > to request/operate on specific locks. A new OF helper function,
-> > of_hwspin_lock_get_num_reserved_locks(), is added to minimize
-> > duplication in different platform implementations.
-> > 
-> > The function will return a value of 0 if the property is not
-> > defined, so as to support a default behavior of marking all
-> > locks as unused and open for anonymous allocations.
-> > 
-> > Signed-off-by: Suman Anna <s-anna@ti.com>
-> > ---
-> >  .../devicetree/bindings/hwlock/hwlock.txt          |  3 +++
-> >  drivers/hwspinlock/hwspinlock_core.c               | 25 ++++++++++++++++++++++
-> >  include/linux/hwspinlock.h                         |  1 +
-> >  3 files changed, 29 insertions(+)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/hwlock/hwlock.txt b/Documentation/devicetree/bindings/hwlock/hwlock.txt
-> > index d538a9b..88d16d2 100644
-> > --- a/Documentation/devicetree/bindings/hwlock/hwlock.txt
-> > +++ b/Documentation/devicetree/bindings/hwlock/hwlock.txt
-> > @@ -18,6 +18,9 @@ Common properties:
-> >  			property is needed on hwlock devices, where the number
-> >  			of supported locks within a hwlock device cannot be
-> >  			read from a register.
-> > +- hwlock-reserved-locks: Number of locks to reserve for clients requiring
-> > +			specific locks. This value cannot exceed the value of
-> > +			hwlock-num-locks.
-> 
-> Any suggestions here on the approach? This property falls into a gray
-> area as well, as the current approach is somewhat limiting (it doesn't
-> support sparse reserved locks, and expects them at the beginning of the
-> lock range).
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Is it possible to implement a pinctrl-like hogging approach, whereby the
-specific locks that need to be reserved are consumed by the controller
-itself?
+Add support for CAN based on a MPC2515 connected to ECSPI1.
 
-  Josh
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Eric/Denis,
 
+I don't have the hardware to test it. Please give it a test.
+
+ .../boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts  | 34 ++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
+index 8b1098e..f0067e9 100644
+--- a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
++++ b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
+@@ -86,6 +86,24 @@
+ 	status = "okay";
+ };
+ 
++&ecspi1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_ecspi1>;
++	fsl,spi-num-chipselects = <1>;
++	cs-gpios = <&gpio4 24 GPIO_ACTIVE_HIGH>;
++	status = "okay";
++
++	can0: can at 0 {
++		compatible = "microchip,mcp2515";
++		reg = <0>;
++		clocks = <&clks IMX5_CLK_OSC>;
++		spi-max-frequency = <1000000>;
++		spi-cs-high;
++		interrupt-parent = <&gpio1>;
++		interrupts = <1 IRQ_TYPE_EDGE_FALLING>;
++	};
++};
++
+ &i2c1 {
+ 	tlv320aic23: codec at 1a {
+ 		compatible = "ti,tlv320aic23";
+@@ -104,6 +122,22 @@
+ 			>;
+ 		};
+ 
++		pinctrl_ecspi1: ecspi1grp {
++			fsl,pins = <
++				MX51_PAD_CSPI1_MISO__ECSPI1_MISO	0x185
++				MX51_PAD_CSPI1_MOSI__ECSPI1_MOSI	0x185
++				MX51_PAD_CSPI1_SCLK__ECSPI1_SCLK	0x185
++				MX51_PAD_CSPI1_SS0__GPIO4_24		0x80000000 	/* CS0 */
++				MX51_PAD_CSI2_PIXCLK__GPIO4_15		0x80000000	/* nReset */
++				MX51_PAD_GPIO1_1__GPIO1_1		0x80000000	/* IRQ */
++				MX51_PAD_GPIO1_4__GPIO1_4		0x80000000	/* Control signals */
++				MX51_PAD_GPIO1_6__GPIO1_6		0x80000000
++				MX51_PAD_GPIO1_7__GPIO1_7		0x80000000
++				MX51_PAD_GPIO1_8__GPIO1_8		0x80000000
++				MX51_PAD_GPIO1_9__GPIO1_9		0x80000000
++			>;
++		};
++
+ 		pinctrl_esdhc1: esdhc1grp {
+ 			fsl,pins = <
+ 				MX51_PAD_SD1_CMD__SD1_CMD		0x400020d5
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.8.3.2
