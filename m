@@ -1,66 +1,59 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 5 May 2014 12:45:45 -0700
-Subject: [RFC PATCH 1/5] watchdog: Add API to trigger reboots
-In-Reply-To: <20140505183606.GJ17875@saruman.home>
-References: <1398958893-30049-1-git-send-email-linux@roeck-us.net>
- <1398958893-30049-2-git-send-email-linux@roeck-us.net>
- <20140505183606.GJ17875@saruman.home>
-Message-ID: <20140505194545.GA30333@roeck-us.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 5 May 2014 20:50:40 +0100
+Subject: [PATCH v3 5/7] ARM: dma: Use dma_pfn_offset for dma address
+ translation
+In-Reply-To: <5363B42C.4010404@ti.com>
+References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
+ <1398353407-2345-6-git-send-email-santosh.shilimkar@ti.com>
+ <20140502145852.GC3693@n2100.arm.linux.org.uk> <5363B42C.4010404@ti.com>
+Message-ID: <20140505195040.GE3693@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 05, 2014 at 01:36:06PM -0500, Felipe Balbi wrote:
-> On Thu, May 01, 2014 at 08:41:29AM -0700, Guenter Roeck wrote:
-> > Some hardware implements reboot through its watchdog hardware,
-> > for example by triggering a watchdog timeout. Platform specific
-> > code starts to spread into watchdog drivers, typically by setting
-> > pointers to a callback functions which is then called from the
-> > platform reset handler.
+On Fri, May 02, 2014 at 11:05:16AM -0400, Santosh Shilimkar wrote:
+> On Friday 02 May 2014 10:58 AM, Russell King - ARM Linux wrote:
+> > On Thu, Apr 24, 2014 at 11:30:05AM -0400, Santosh Shilimkar wrote:
+> >>  static inline void *dma_to_virt(struct device *dev, dma_addr_t addr)
+> >>  {
+> >> -	return (void *)__bus_to_virt((unsigned long)addr);
+> >> +	if (!dev)
+> >> +		return (void *)__bus_to_virt((unsigned long)addr);
+> >> +	else
+> >> +		return (void *)__bus_to_virt(__pfn_to_bus(dma_to_pfn(dev, addr)));
 > > 
-> > To simplify code and provide a unified API to trigger reboots by
-> > watchdog drivers, provide a single API to trigger such reboots
-> > through the watchdog subsystem.
+> > This is quite horrendous.  There's easier ways to do this...  I assume
+> > you haven't looked at the assembler resulting from this at all with
+> > stuff like the p2v patching enabled?
 > > 
-> > Signed-off-by: Guenter Roeck <linux@roeck-us.net>
-> > ---
-> >  drivers/watchdog/watchdog_core.c |   17 +++++++++++++++++
-> >  include/linux/watchdog.h         |   11 +++++++++++
-> >  2 files changed, 28 insertions(+)
+> I haven't. Will check.
+
+	if (dev) {
+		unsigned long pfn = dma_to_pfn(dev, addr);
+
+		return phys_to_virt(__pfn_to_phys(pfn));
+	}
+
+	return (void *)__bus_to_virt((unsigned long)addr);
+
+> >>  static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
+> >>  {
+> >> -	return (dma_addr_t)__virt_to_bus((unsigned long)(addr));
+> >> +	if (!dev)
+> >> +		return (dma_addr_t)__virt_to_bus((unsigned long)(addr));
+> >> +	else
+> >> +		return pfn_to_dma(dev,
+> >> +				__bus_to_pfn(__virt_to_bus((unsigned long)(addr))));
 > > 
-> > diff --git a/drivers/watchdog/watchdog_core.c b/drivers/watchdog/watchdog_core.c
-> > index cec9b55..4ec6e2f 100644
-> > --- a/drivers/watchdog/watchdog_core.c
-> > +++ b/drivers/watchdog/watchdog_core.c
-> > @@ -43,6 +43,17 @@
-> >  static DEFINE_IDA(watchdog_ida);
-> >  static struct class *watchdog_class;
-> >  
-> > +static struct watchdog_device *wdd_reboot_dev;
-> > +
-> > +void watchdog_do_reboot(enum reboot_mode mode, const char *cmd)
-> > +{
-> > +	if (wdd_reboot_dev) {
-> > +		if (wdd_reboot_dev->ops->reboot)
-> 
-> you can decrease one level of indentation:
-> 
-> 	if (wdd_reboot_dev && wdd_reboot_dev->ops->reboot)
-> 
-> also, shouldn't you test if 'ops' is valid too ? In that case:
-> 
-> 	if (wdd_reboot_dev && wdd_reboot_dev->ops &&
-> 		wdd_reboot_dev->ops->reboot)
-> 
-Hmmm ... makes me think.
+> > Same here.
+> > 
+> ok.
 
-If ops->reboot is not set, wdd_reboot_dev should be NULL
-to start with, since it is only initialized if ops->reboot
-is not NULL.
 
-It is not common in the Linux kernel to re-check pointers
-if the condition can not occur, so I don't think it should
-be done here.
+	if (dev)
+		return pfn_to_dma(dev, virt_to_pfn(addr));
 
-In other words, I should probably remove the ops check as well.
+	return (dma_addr_t)__virt_to_bus((unsigned long)(addr));
 
-Guenter
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
