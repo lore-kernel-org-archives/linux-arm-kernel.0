@@ -1,51 +1,62 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 5 May 2014 15:37:20 -0500
-Subject: [PATCHv5 RFC 08/15] hwspinlock/core: add support for base id in DT
-In-Reply-To: <1398904476-26200-9-git-send-email-s-anna@ti.com>
-References: <1398904476-26200-1-git-send-email-s-anna@ti.com>
- <1398904476-26200-9-git-send-email-s-anna@ti.com>
-Message-ID: <CAL_JsqJW1pqUjQ3DQrppO5n=MmpFOhCyU2zkSzA9s9TpYbq3CA@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 5 May 2014 22:38:39 +0200
+Subject: [E1000-devel] ARM support for igb driver
+In-Reply-To: <5367AE02.8030802@intel.com>
+References: <CAHH3p5KAwyMOY=ai_h0eM+JwYLtTO8d4jVaVOWVtOakhqPRTew@mail.gmail.com>
+ <CF7EA37A.4676A%matthew.vick@intel.com>
+ <CAHH3p5JFc3jgeK7OFd1rtgDS3gjRdjiPr3LwwqfyKMPGSTwMWA@mail.gmail.com>
+ <CF7FD060.46A87%matthew.vick@intel.com>
+ <CAHH3p5J8V6uWEzbCoT+x-6_2x1q=nc=_oMn0qnnj113FmeuW6A@mail.gmail.com>
+ <9B4A1B1917080E46B64F07F2989DADD6533627A5@ORSMSX114.amr.corp.intel.com>
+ <CAHH3p5KEPXw5mxP-13evd774nyO5C13ky0=fCaZPCNVx1gh3Ow@mail.gmail.com>
+ <CAHH3p5LaRwgdECxsO4OZSdWEhGt232yj-3347kYEStP6NLg2xg@mail.gmail.com>
+ <5360041A.7030005@intel.com>
+ <CAHH3p5L6WM3FaZ19Tw9vUcsk+kERfBKnGC2BRtnftJR1pbSF7g@mail.gmail.com>
+ <5367AE02.8030802@intel.com>
+Message-ID: <20140505223839.45778902@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 30, 2014 at 7:34 PM, Suman Anna <s-anna@ti.com> wrote:
-> The HwSpinlock core requires a base id for registering a bank
-> of hwspinlocks. This base id needs to be unique across multiple
-> IP instances of a hwspinlock device, so that each hwlock can be
-> represented uniquely in a system.
->
-> Support has been added to represent this in DT through a common
-> property 'hwlock-base-id', and retrieve the value through a core
-> OF helper function, of_hwspin_lock_get_base_id(). The representation
-> in DT provides a uniform way of assigning a fixed base value for a
-> hwspinlock device across different SoCs.
->
-> Signed-off-by: Suman Anna <s-anna@ti.com>
-> ---
->  Documentation/devicetree/bindings/hwlock/hwlock.txt |  6 ++++++
->  drivers/hwspinlock/hwspinlock_core.c                | 21 +++++++++++++++++++++
->  include/linux/hwspinlock.h                          |  1 +
->  3 files changed, 28 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/hwlock/hwlock.txt b/Documentation/devicetree/bindings/hwlock/hwlock.txt
-> index 32381cc..d538a9b 100644
-> --- a/Documentation/devicetree/bindings/hwlock/hwlock.txt
-> +++ b/Documentation/devicetree/bindings/hwlock/hwlock.txt
-> @@ -18,6 +18,12 @@ Common properties:
->                         property is needed on hwlock devices, where the number
->                         of supported locks within a hwlock device cannot be
->                         read from a register.
-> +- hwlock-base-id:      An unique base Id for the locks for a particular hwlock
-> +                       device. This property is mandatory ONLY if a SoC has
-> +                       several hwlock devices.
-> +
-> +                       See documentation on struct hwspinlock_pdata in
-> +                       include/linux/hwspinlock.h for more details.
+Dear Alexander Duyck,
 
-The documentation cannot refer to kernel files. Generally, creating a
-global number space like this would not be accepted, but I don't
-really have any better idea here.
+On Mon, 05 May 2014 08:28:02 -0700, Alexander Duyck wrote:
 
-Please put all binding docs in 1 patch and copy all the DT binding maintainers.
+> > 1. So overall issue is any memory/config space access hangs(logs above)
+> > if bus master enable bit is set on IGB NIC card,this is not observed
+> > with E1000E NIC cards on same platform.
+> > 
+> > 2. Above issue is repro'able on my ARM platform, not x86 ubuntu. Not
+> > sure how much its related to ARM though.
+> > 
+> > 3. I saw below differences in lspci -vvv output b/w e1000e and igb, I am
+> > not sure if this has anything to do with above issue.
+> > RC config is same for both cases.
+> > 
+> > IGB / E1000E
+> > 
+> > Command Status: INTx+/INTx-
+> > PM Status:           NoSoftRst+/NoSoftRst-
+> > DevCap:                FLReset-/FLReset+
+> > No Dev/Link2 Cap/Sta Registers for E1000E
+> > Some differences in AER Registers
+> > 
+> > 4. Any idea, if this card is verified on ARM by anybody?
+> > 
+> 
+> It seems like you are glossing over the obvious issue.  You said it
+> yourself, this works fine on x86.  Therefore this is likely VERY related
+> to ARM, or at least your specific ARM platform configuration.
 
-Rob
+Since I haven't seen the beginning of the thread, I might be completely
+off topic. However, I wanted to mention that I have successfully used
+and tested an IGB PCIe NIC on an ARM Armada XP platform. If that is
+useful, I'd be happy to provide you with additional details upon
+request.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
