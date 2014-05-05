@@ -1,65 +1,143 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 5 May 2014 15:22:01 +0300
-Subject: [PATCH v2 5/6] ARM: AM43xx: clk: Change the cpts ref clock source
- to dpll_core_m5 clk
-In-Reply-To: <1399012324-20737-6-git-send-email-george.cherian@ti.com>
-References: <1399012324-20737-1-git-send-email-george.cherian@ti.com>
- <1399012324-20737-6-git-send-email-george.cherian@ti.com>
-Message-ID: <53678269.2000306@ti.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Mon, 05 May 2014 14:22:51 +0200
+Subject: [PATCH 1/2] hwinit support for non-TI devices
+In-Reply-To: <5367824D.2070406@pengutronix.de>
+References: <20140426203131.GA21832@amd.pavel.ucw.cz>
+ <6bf951b6-51e7-4b90-b054-9ba5b6e93874@email.android.com>
+ <20140427122510.GB12901@amd.pavel.ucw.cz>
+ <1398716449.836.4.camel@dinh-ubuntu>
+ <20140428211505.GA28242@amd.pavel.ucw.cz>
+ <CAF03EBf9KXqB4W9GuDduhLwp_kwFjUEi3syU7fX3KpXfZEFxHg@mail.gmail.com>
+ <CAF03EBd19PC5RAsLR6-dMPF2x3XRf9X4bFPgX2kRdCYWUQBYcA@mail.gmail.com>
+ <20140430215359.GA15148@amd.pavel.ucw.cz>
+ <CAF03EBewoV0pOOmNQBwPrKgm-zhaSbFcNd_UiEhFWyUrq91-Jg@mail.gmail.com>
+ <20140502084851.GA5730@amd.pavel.ucw.cz>
+ <20140505120810.GB16461@amd.pavel.ucw.cz> <5367824D.2070406@pengutronix.de>
+Message-ID: <5367829B.4000104@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/02/2014 09:32 AM, George Cherian wrote:
-> cpsw_cpts_rft_clk has got the choice of 3 clocksources
->   -dpll_core_m4_ck
->   -dpll_core_m5_ck
->   -dpll_disp_m2_ck
->
-> By default dpll_core_m4_ck is selected, witn this as clock
-> source the CPTS doesnot work properly. It gives clockcheck errors
-> while running PTP.
->
->   clockcheck: clock jumped backward or running slower than expected!
->
-> By selecting dpll_core_m5_ck as the clocksource fixes this issue.
-> In AM335x dpll_core_m5_ck is the default clocksource.
->
-> Signed-off-by: George Cherian <george.cherian@ti.com>
+On 05/05/2014 02:21 PM, Marc Kleine-Budde wrote:
+> On 05/05/2014 02:08 PM, Pavel Machek wrote:
+>> Non-TI chips (including socfpga) needs different raminit
+>> sequence. Implement it.
+>>
+>> Tested-by: Thor Thayer <tthayer@altera.com>
+>> Signed-off-by: Thor Thayer <tthayer@altera.com>
+>> Signed-off-by: Pavel Machek <pavel@denx.de>
+>>
+>> diff --git a/drivers/net/can/c_can/c_can_platform.c b/drivers/net/can/c_can/c_can_platform.c
+>> index 1df0b32..476d1e0 100644
+>> --- a/drivers/net/can/c_can/c_can_platform.c
+>> +++ b/drivers/net/can/c_can/c_can_platform.c
+>> @@ -40,6 +40,7 @@
+>>  #define CAN_RAMINIT_START_MASK(i)	(0x001 << (i))
+>>  #define CAN_RAMINIT_DONE_MASK(i)	(0x100 << (i))
+>>  #define CAN_RAMINIT_ALL_MASK(i)		(0x101 << (i))
+>> +#define DCAN_RAM_INIT_BIT	(1 << 3)
+>>  static DEFINE_SPINLOCK(raminit_lock);
+>>  /*
+>>   * 16-bit c_can registers can be arranged differently in the memory
+>> @@ -80,7 +81,7 @@ static void c_can_hw_raminit_wait(const struct c_can_priv *priv, u32 mask,
+>>  		udelay(1);
+>>  }
+>>  
+>> -static void c_can_hw_raminit(const struct c_can_priv *priv, bool enable)
+>> +static void c_can_hw_raminit_ti(const struct c_can_priv *priv, bool enable)
+>>  {
+>>  	u32 mask = CAN_RAMINIT_ALL_MASK(priv->instance);
+>>  	u32 ctrl;
+>> @@ -88,7 +89,8 @@ static void c_can_hw_raminit(const struct c_can_priv *priv, bool enable)
+>>  	spin_lock(&raminit_lock);
+>>  
+>>  	ctrl = readl(priv->raminit_ctrlreg);
+>> -	/* We clear the done and start bit first. The start bit is
+>> +	/*
+>> +	 * We clear the done and start bit first. The start bit is
+> 
+> Please don't reformat comments.
+> 
+>>  	 * looking at the 0 -> transition, but is not self clearing;
+>>  	 * And we clear the init done bit as well.
+>>  	 */
+>> @@ -108,6 +110,54 @@ static void c_can_hw_raminit(const struct c_can_priv *priv, bool enable)
+>>  	spin_unlock(&raminit_lock);
+>>  }
+>>  
+>> +static void c_can_hw_raminit(const struct c_can_priv *priv, bool enable)
+>> +{
+>> +	u32 ctrl;
+>> +
+>> +	spin_lock(&raminit_lock);
+> 
+> Why do you need this spinlock?
+> 
+>> +
+>> +	ctrl = readl(priv->raminit_ctrlreg);
+>> +	ctrl &= ~DCAN_RAM_INIT_BIT;
+>> +	writel(ctrl, priv->raminit_ctrlreg);
+> 
+> Why don't use use the reg directly? Have you read my previous review?
+> 
+>> +	c_can_hw_raminit_wait(priv, ctrl, 0);
+>> +
+>> +	if (enable) {
+>> +		/* Set start bit. */
+>> +		ctrl |= DCAN_RAM_INIT_BIT;
+>> +		writel(ctrl, priv->raminit_ctrlreg);
+>> +		c_can_hw_raminit_wait(priv, ctrl, 0);
+>> +	}
+>> +	spin_unlock(&raminit_lock);
+>> +}
+>> +
+>> +static u32 c_can_plat_read_reg32(struct c_can_priv *priv, enum reg index)
+>> +{
+>> +	u32 val;
+>> +
+>> +	val = priv->read_reg(priv, index);
+>> +	val |= ((u32) priv->read_reg(priv, index + 1)) << 16;
+>> +
+>> +	return val;
+>> +}
+> 
+> Why are you adding the read32() support here? Your commit message
+> doesn't mention it. Please move this into a different patch.
+> 
+>> +
+>> +static void c_can_plat_write_reg32(struct c_can_priv *priv, enum reg index,
+>> +		u32 val)
+>> +{
+>> +	priv->write_reg(priv, index + 1, val>>16);
+>> +	priv->write_reg(priv, index, val);
+>> +}
+>> +
+>> +static u32 d_can_plat_read_reg32(struct c_can_priv *priv, enum reg index)
+>> +{
+>> +	return readl(priv->base + priv->regs[index]);
+>> +}
+>> +
+>> +static void d_can_plat_write_reg32(struct c_can_priv *priv, enum reg index,
+>> +		u32 val)
+>> +{
+>> +	writel(val, priv->base + priv->regs[index]);
+>> +}
+>> +
+>>  static struct platform_device_id c_can_id_table[] = {
+>>  	[BOSCH_C_CAN_PLATFORM] = {
+>>  		.name = KBUILD_MODNAME,
+>> @@ -201,11 +251,15 @@ static int c_can_plat_probe(struct platform_device *pdev)
+>>  		case IORESOURCE_MEM_32BIT:
+>>  			priv->read_reg = c_can_plat_read_reg_aligned_to_32bit;
+>>  			priv->write_reg = c_can_plat_write_reg_aligned_to_32bit;
+>> +			priv->read_reg32 = c_can_plat_read_reg32;
+>> +			priv->write_reg32 = c_can_plat_write_reg32;
 
-Acked-by: Tero Kristo <t-kristo@ti.com>
+This will not compile.
 
-> ---
->   drivers/clk/ti/clk-43xx.c | 16 ++++++++++++++++
->   1 file changed, 16 insertions(+)
->
-> diff --git a/drivers/clk/ti/clk-43xx.c b/drivers/clk/ti/clk-43xx.c
-> index 67c8de5..b4877e0 100644
-> --- a/drivers/clk/ti/clk-43xx.c
-> +++ b/drivers/clk/ti/clk-43xx.c
-> @@ -110,9 +110,25 @@ static struct ti_dt_clk am43xx_clks[] = {
->
->   int __init am43xx_dt_clk_init(void)
->   {
-> +	struct clk *clk1, *clk2;
-> +
->   	ti_dt_clocks_register(am43xx_clks);
->
->   	omap2_clk_disable_autoidle_all();
->
-> +	/*
-> +	 * cpsw_cpts_rft_clk  has got the choice of 3 clocksources
-> +	 * dpll_core_m4_ck, dpll_core_m5_ck and dpll_disp_m2_ck.
-> +	 * By default dpll_core_m4_ck is selected, witn this as clock
-> +	 * source the CPTS doesnot work properly. It gives clockcheck errors
-> +	 * while running PTP.
-> +	 * clockcheck: clock jumped backward or running slower than expected!
-> +	 * By selecting dpll_core_m5_ck as the clocksource fixes this issue.
-> +	 * In AM335x dpll_core_m5_ck is the default clocksource.
-> +	 */
-> +	clk1 = clk_get_sys(NULL, "cpsw_cpts_rft_clk");
-> +	clk2 = clk_get_sys(NULL, "dpll_core_m5_ck");
-> +	clk_set_parent(clk1, clk2);
-> +
->   	return 0;
->   }
->
+Marc
+
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
