@@ -1,42 +1,53 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 05 May 2014 01:12:04 +0200
-Subject: [PATCH v2 2/5] ARM: Kirkwood: Add DT descriptions for net2big
- and net5big.
-In-Reply-To: <20140504225643.GC25314@lunn.ch>
-References: <1399142114-24257-1-git-send-email-andrew@lunn.ch>
- <1399142114-24257-3-git-send-email-andrew@lunn.ch>
- <5366AF61.2090806@gmail.com> <20140504225643.GC25314@lunn.ch>
-Message-ID: <5366C944.1070709@gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Mon,  5 May 2014 08:05:51 +0800
+Subject: [PATCH] serial: sirf: move to writel for TXFIFO instead of writeb
+Message-ID: <1399248352-7329-1-git-send-email-21cnbao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/05/2014 12:56 AM, Andrew Lunn wrote:
->>> +	gpio_keys {
->>
->> nit: s/gpio_keys/gpio-keys/
->>
-> 
-> I think this one is debatable. The documentation is called
-> gpio_keys.txt, and the example uses gpio_keys. I don't mind chaging it
-> in this file, but maybe you can submit a patch changing the example in
-> the documentation?
+From: Barry Song <Baohua.Song@csr.com>
 
-Yes, it definitely is. Both label and node name are allowed to
-contain _ and -. Maybe, we should see it is more like a common practice.
-Anyway, all comments are nits for a reason :)
+All SiRFSoC UART registers are in 32-bits. If we use writeb for
+TXFIFO, actually all of 32-bits are still written, for TXTIFO,
+only low 8-bits are valid, so in prima2&atlas6, this causes no
+problem.
+But in the new atlas7, using writeb to write UART registers will
+cause an imprecise data abort as HW does check the "wrong" writeb.
+So move to writel and this also makes the code consistent with
+sirfsoc_uart_pio_tx_chars() in which we use writel.
 
-I can prepare a patch someday, if I don't forget about it.
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ drivers/tty/serial/sirfsoc_uart.c |    2 +-
+ drivers/tty/serial/sirfsoc_uart.h |    2 --
+ 2 files changed, 1 insertions(+), 3 deletions(-)
 
-Sebastian
-
->>> +	gpio_poweroff {
->>
->> nit: s/gpio_poweroff/gpio-poweroff/
-> 
-> ACK.
->  
->> If there is nothing more severe with this, I am sure Jason can
->> just squash in the nits.
-> 
-> This still needs to be tested on hardware, so there is a good chance
-> of a respin.
+diff --git a/drivers/tty/serial/sirfsoc_uart.c b/drivers/tty/serial/sirfsoc_uart.c
+index 68b0fd4..845548c 100644
+--- a/drivers/tty/serial/sirfsoc_uart.c
++++ b/drivers/tty/serial/sirfsoc_uart.c
+@@ -1228,7 +1228,7 @@ static void sirfsoc_uart_console_putchar(struct uart_port *port, int ch)
+ 	while (rd_regl(port,
+ 		ureg->sirfsoc_tx_fifo_status) & ufifo_st->ff_full(port->line))
+ 		cpu_relax();
+-	wr_regb(port, ureg->sirfsoc_tx_fifo_data, ch);
++	wr_regl(port, ureg->sirfsoc_tx_fifo_data, ch);
+ }
+ 
+ static void sirfsoc_uart_console_write(struct console *co, const char *s,
+diff --git a/drivers/tty/serial/sirfsoc_uart.h b/drivers/tty/serial/sirfsoc_uart.h
+index 8a6edda..4280819 100644
+--- a/drivers/tty/serial/sirfsoc_uart.h
++++ b/drivers/tty/serial/sirfsoc_uart.h
+@@ -441,9 +441,7 @@ struct sirfsoc_uart_port {
+ 
+ /* Register Access Control */
+ #define portaddr(port, reg)		((port)->membase + (reg))
+-#define rd_regb(port, reg)		(__raw_readb(portaddr(port, reg)))
+ #define rd_regl(port, reg)		(__raw_readl(portaddr(port, reg)))
+-#define wr_regb(port, reg, val)		__raw_writeb(val, portaddr(port, reg))
+ #define wr_regl(port, reg, val)		__raw_writel(val, portaddr(port, reg))
+ 
+ /* UART Port Mask */
+-- 
+1.7.5.4
