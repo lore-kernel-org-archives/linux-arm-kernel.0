@@ -1,38 +1,36 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun,  4 May 2014 22:07:58 -0500
-Subject: [PATCH 0/6] ARM: sunxi: Machine code cleanup
-Message-ID: <1399259284-6282-1-git-send-email-maxime.ripard@free-electrons.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 4 May 2014 20:56:09 -0700
+Subject: [PATCH] ARM: at91: localize GPIO header
+In-Reply-To: <1395924553-5387-1-git-send-email-linus.walleij@linaro.org>
+References: <1395924553-5387-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20140505035609.GA11035@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Mar 27, 2014 at 01:49:13PM +0100, Linus Walleij wrote:
+> This moves the <mach/gpio.h> header in the AT91 platform down
+> into the machine directory and removes the reliance on
+> MACH_NEED_GPIO_H from the AT91.
+> 
+> This does not move the platform to GENERIC_GPIO but localize
+> the remaining work to be done for this to the mach-at91
+> folder.
+> 
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> This version is rebased on top of the timex-remove branch in
+> the ARM SoC tree. I have done a few trial compilations with the
+> defconfigs after rebasing but more may still be needed. IIRC
+> one of the board files is now removed from the mainline kernel
+> so there will be some simple merge conflict wherever it gets
+> merged.
+> 
+> If you're happy with this I'd suggest applying it directly in
+> the ARM SoC tree.
 
-This serie moves the restart code out of the mach-sunxi directory to
-either the watchdog driver or to a new driver in drivers/power/reset.
+Looks like this one didn't make it for 3.15 given timing. Want to respin for
+3.16 to handle the above conflicts and send to Nicolas?
 
-Since the reset code was pretty much all the code left in the
-mach-sunxi directory for all the SoCs but the A31, the only thing left
-into mach-sunxi are empty machine definition.
 
-Thanks, Maxime
-
-Maxime Ripard (6):
-  wdt: sunxi: Move restart code to the watchdog driver
-  power: reset: Add Allwinner A31 reset code
-  ARM: sunxi: Remove reset code from the platform
-  ARM: sunxi: Remove init_machine callback
-  ARM: sunxi: Add A31 reset driver to sunxi_defconfig
-  ARM: multi_v7: Add Allwinner reset drivers to multi_v7_defconfig
-
- arch/arm/configs/multi_v7_defconfig |   2 +
- arch/arm/configs/sunxi_defconfig    |   3 +
- arch/arm/mach-sunxi/sunxi.c         | 107 ------------------------------------
- drivers/power/reset/Kconfig         |   7 +++
- drivers/power/reset/Makefile        |   1 +
- drivers/power/reset/sun6i-reboot.c  |  85 ++++++++++++++++++++++++++++
- drivers/watchdog/sunxi_wdt.c        |  29 ++++++++++
- 7 files changed, 127 insertions(+), 107 deletions(-)
- create mode 100644 drivers/power/reset/sun6i-reboot.c
-
--- 
-1.9.1
+-Olof
