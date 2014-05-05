@@ -1,38 +1,49 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon,  5 May 2014 17:05:23 +0200
-Subject: [PATCH v2 2/5] ARM: mvebu: initialize mvebu-soc-id earlier
+Date: Mon,  5 May 2014 17:05:26 +0200
+Subject: [PATCH v2 5/5] ARM: mvebu: conditionalize Armada 375 coherency
+ workaround
 In-Reply-To: <1399302326-6917-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1399302326-6917-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1399302326-6917-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1399302326-6917-6-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, the mvebu-soc-id logic is initialized through a
-core_initcall(). However, we will soon need to know the SoC revision
-before booting secondary CPUs, because a workaround affects Armada 375
-Z1 steppings, but should not be applied on Armada 375 A0 steppings.
-
-Unfortunately, core_initcall() are called way too late compared to the
-SMP initialization. Therefore, the mvebu-soc-id initialization is move
-to an early_initcall(), which is called before the SMP initialization.
+The Armada 375 coherency workaround only needs to be applied to the Z1
+revision of the SoC. The A0 and later revisions have been fixed, and
+no longer need this workaround.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-mvebu/mvebu-soc-id.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-mvebu/coherency.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-mvebu/mvebu-soc-id.c b/arch/arm/mach-mvebu/mvebu-soc-id.c
-index 874a750..e9119a9 100644
---- a/arch/arm/mach-mvebu/mvebu-soc-id.c
-+++ b/arch/arm/mach-mvebu/mvebu-soc-id.c
-@@ -118,7 +118,7 @@ clk_err:
+diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+index 489edd1..1519532 100644
+--- a/arch/arm/mach-mvebu/coherency.c
++++ b/arch/arm/mach-mvebu/coherency.c
+@@ -33,6 +33,7 @@
+ #include <asm/cacheflush.h>
+ #include "armada-370-xp.h"
+ #include "coherency.h"
++#include "mvebu-soc-id.h"
  
- 	return ret;
- }
--core_initcall(mvebu_soc_id_init);
-+early_initcall(mvebu_soc_id_init);
+ unsigned long coherency_phys_base;
+ static void __iomem *coherency_base;
+@@ -365,8 +366,13 @@ static int __init coherency_late_init(void)
+ 	if (type == COHERENCY_FABRIC_TYPE_NONE)
+ 		return 0;
  
- static int __init mvebu_soc_device(void)
- {
+-	if (type == COHERENCY_FABRIC_TYPE_ARMADA_375)
+-		armada_375_coherency_init_wa();
++	if (type == COHERENCY_FABRIC_TYPE_ARMADA_375) {
++		u32 dev, rev;
++
++		if (mvebu_get_soc_id(&dev, &rev) == 0 &&
++		    rev == ARMADA_375_Z1_REV)
++			armada_375_coherency_init_wa();
++	}
+ 
+ 	bus_register_notifier(&platform_bus_type,
+ 			      &mvebu_hwcc_platform_nb);
 -- 
 1.9.2
