@@ -1,67 +1,39 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun,  4 May 2014 22:08:02 -0500
-Subject: [PATCH 4/6] ARM: sunxi: Remove init_machine callback
+Date: Sun,  4 May 2014 22:08:04 -0500
+Subject: [PATCH 6/6] ARM: multi_v7: Add Allwinner reset drivers to
+ multi_v7_defconfig
 In-Reply-To: <1399259284-6282-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1399259284-6282-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1399259284-6282-5-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1399259284-6282-7-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The init_machine hook is now at its default value. We can remove it.
-
-Even though the sun4i and sun7i machines are nothing more than generic machines
-now, leave them in so that we won't have to add them back if needed, and so
-that the machine is still displayed in /proc/cpuinfo.
+Now that the reset code are part of drivers of their own, we need those in the
+defconfig.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/mach-sunxi/sunxi.c | 9 ---------
- 1 file changed, 9 deletions(-)
+ arch/arm/configs/multi_v7_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-index 1c62a0a021d7..efb2f93b02e6 100644
---- a/arch/arm/mach-sunxi/sunxi.c
-+++ b/arch/arm/mach-sunxi/sunxi.c
-@@ -12,17 +12,11 @@
- 
- #include <linux/clk-provider.h>
- #include <linux/clocksource.h>
--#include <linux/of_platform.h>
- 
- #include <asm/mach/arch.h>
- 
- #include "common.h"
- 
--static void __init sunxi_dt_init(void)
--{
--	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
--}
--
- static const char * const sunxi_board_dt_compat[] = {
- 	"allwinner,sun4i-a10",
- 	"allwinner,sun5i-a10s",
-@@ -31,7 +25,6 @@ static const char * const sunxi_board_dt_compat[] = {
- };
- 
- DT_MACHINE_START(SUNXI_DT, "Allwinner A1X (Device Tree)")
--	.init_machine	= sunxi_dt_init,
- 	.dt_compat	= sunxi_board_dt_compat,
- MACHINE_END
- 
-@@ -49,7 +42,6 @@ static void __init sun6i_timer_init(void)
- }
- 
- DT_MACHINE_START(SUN6I_DT, "Allwinner sun6i (A31) Family")
--	.init_machine	= sunxi_dt_init,
- 	.init_time	= sun6i_timer_init,
- 	.dt_compat	= sun6i_board_dt_compat,
- 	.smp		= smp_ops(sun6i_smp_ops),
-@@ -61,6 +53,5 @@ static const char * const sun7i_board_dt_compat[] = {
- };
- 
- DT_MACHINE_START(SUN7I_DT, "Allwinner sun7i (A20) Family")
--	.init_machine	= sunxi_dt_init,
- 	.dt_compat	= sun7i_board_dt_compat,
- MACHINE_END
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index d4e8a47a2f7c..960187ac35e0 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -200,12 +200,14 @@ CONFIG_BATTERY_SBS=y
+ CONFIG_CHARGER_TPS65090=y
+ CONFIG_POWER_RESET_AS3722=y
+ CONFIG_POWER_RESET_GPIO=y
++CONFIG_POWER_RESET_SUN6I=y
+ CONFIG_SENSORS_LM90=y
+ CONFIG_THERMAL=y
+ CONFIG_DOVE_THERMAL=y
+ CONFIG_ARMADA_THERMAL=y
+ CONFIG_WATCHDOG=y
+ CONFIG_ORION_WATCHDOG=y
++CONFIG_SUNXI_WATCHDOG=y
+ CONFIG_MFD_AS3722=y
+ CONFIG_MFD_CROS_EC=y
+ CONFIG_MFD_CROS_EC_SPI=y
 -- 
 1.9.1
