@@ -1,43 +1,106 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 5 May 2014 17:46:45 -0500
-Subject: [PATCH v10 15/15] ARM: dts: sun7i: Add basic support for the
- Cubietruck WiFi module
-In-Reply-To: <CAGb2v65egbY5-ZeioLuoTatQ_y6iQ9n=auiiCRNAvTEj1z59hA@mail.gmail.com>
-References: <1399046249-19472-1-git-send-email-hdegoede@redhat.com>
- <1399046249-19472-16-git-send-email-hdegoede@redhat.com>
- <20140505040212.GC11606@lukather>
- <CAGb2v65egbY5-ZeioLuoTatQ_y6iQ9n=auiiCRNAvTEj1z59hA@mail.gmail.com>
-Message-ID: <20140505224645.GC9464@lukather>
+Date: Mon, 5 May 2014 17:51:39 -0500
+Subject: [linux-sunxi] Re: [PATCH v5 8/8] ARM: sun7i/sun4i: dt: Add
+ AXP209 support to various boards
+In-Reply-To: <CAOQ7t2Z6rLAMGXocPNcKgOUp9iy6XZkh4O6jThPkdm5M6UMGtw@mail.gmail.com>
+References: <1398947374-3115-1-git-send-email-carlo@caione.org>
+ <1398947374-3115-9-git-send-email-carlo@caione.org>
+ <20140503010936.GF4090@lukather>
+ <CAOQ7t2Z6rLAMGXocPNcKgOUp9iy6XZkh4O6jThPkdm5M6UMGtw@mail.gmail.com>
+Message-ID: <20140505225139.GD9464@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 05, 2014 at 12:20:56PM +0800, Chen-Yu Tsai wrote:
-> On Mon, May 5, 2014 at 12:02 PM, Maxime Ripard
+On Sat, May 03, 2014 at 02:21:06PM +0200, Carlo Caione wrote:
+> On Sat, May 3, 2014 at 3:09 AM, Maxime Ripard
 > <maxime.ripard@free-electrons.com> wrote:
-> > On Fri, May 02, 2014 at 05:57:29PM +0200, Hans de Goede wrote:
-> >> From: Chen-Yu Tsai <wens@csie.org>
-> >>
-> >> The CubieTruck has an AMPAK AP6210 WiFi+Bluetooth module. The WiFi
-> >> part is a BCM43362 IC connected to MMC3 in the A20 SoC via SDIO.
-> >> The IC also takes a power enable signal via GPIO.
-> >>
-> >> The WiFi module supports out-of-band interrupt signaling via GPIO,
-> >> but this is not supported in this patch.
-> >>
-> >> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> > Hi,
 > >
-> > It doesn't have Chen-Yu SoB. Chen-Yu, are you fine with adding it?
+> > On Thu, May 01, 2014 at 02:29:34PM +0200, Carlo Caione wrote:
+> >> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> >> Signed-off-by: Carlo Caione <carlo@caione.org>
+> >> ---
+> >>  arch/arm/boot/dts/sun4i-a10-a1000.dts           | 58 ++++++++++++++++++++++
+> >>  arch/arm/boot/dts/sun4i-a10-cubieboard.dts      | 58 ++++++++++++++++++++++
+> >>  arch/arm/boot/dts/sun4i-a10-hackberry.dts       | 64 ++++++++++++++++++++++++
+> >>  arch/arm/boot/dts/sun4i-a10-inet97fv2.dts       | 58 ++++++++++++++++++++++
+> >>  arch/arm/boot/dts/sun4i-a10-mini-xplus.dts      | 65 +++++++++++++++++++++++++
+> >>  arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts  | 64 ++++++++++++++++++++++++
+> >>  arch/arm/boot/dts/sun4i-a10-pcduino.dts         | 58 ++++++++++++++++++++++
+> >>  arch/arm/boot/dts/sun7i-a20-cubieboard2.dts     | 59 ++++++++++++++++++++++
+> >>  arch/arm/boot/dts/sun7i-a20-cubietruck.dts      | 59 ++++++++++++++++++++++
+> >>  arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 59 ++++++++++++++++++++++
+> >>  10 files changed, 602 insertions(+)
+> >>
+> >> diff --git a/arch/arm/boot/dts/sun4i-a10-a1000.dts b/arch/arm/boot/dts/sun4i-a10-a1000.dts
+> >> index fa746aea..57d3fb4 100644
+> >> --- a/arch/arm/boot/dts/sun4i-a10-a1000.dts
+> >> +++ b/arch/arm/boot/dts/sun4i-a10-a1000.dts
+> >> @@ -88,6 +88,56 @@
+> >>                       pinctrl-names = "default";
+> >>                       pinctrl-0 = <&i2c0_pins_a>;
+> >>                       status = "okay";
+> >> +
+> >> +                     axp209: pmic at 34 {
+> >> +                             compatible = "x-powers,axp209";
+> >> +                             reg = <0x34>;
+> >> +                             interrupts = <0>;
+> >> +
+> >> +                             interrupt-controller;
+> >> +                             #interrupt-cells = <1>;
+> >> +
+> >> +                             acin-supply = <&reg_axp_ipsout>;
+> >> +                             vin2-supply = <&reg_axp_ipsout>;
+> >> +                             vin3-supply = <&reg_axp_ipsout>;
+> >> +                             ldo24in-supply = <&reg_axp_ipsout>;
+> >> +                             ldo3in-supply = <&reg_axp_ipsout>;
+> >> +                             ldo5in-supply = <&reg_axp_ipsout>;
+> >> +
+> >> +                             regulators {
+> >> +                                     x-powers,dcdc-freq = <1500>;
+> >> +
+> >> +                                     axp_vcore_reg: dcdc2 {
+> >> +                                             regulator-min-microvolt = <700000>;
+> >> +                                             regulator-max-microvolt = <2275000>;
+> >> +                                             regulator-always-on;
+> >> +                                     };
+> >> +
+> >> +                                     axp_ddr_reg: dcdc3 {
+> >> +                                             regulator-always-on;
+> >> +                                     };
+> >> +
+> >> +                                     axp_rtc_reg: ldo1 {
+> >> +                                             regulator-always-on;
+> >> +                                     };
+> >> +
+> >> +                                     axp_analog_reg: ldo2 {
+> >> +                                             regulator-always-on;
+> >> +                                     };
+> >> +
+> >> +                                     axp_pll_reg: ldo3 {
+> >> +                                             regulator-always-on;
+> >> +                                     };
+> >> +
+> >> +                                     axp_hdmi_reg: ldo4 {
+> >> +                                             regulator-always-on;
+> >> +                                     };
+> >> +
+> >> +                                     axp_mic_reg: ldo5 {
+> >> +                                             regulator-always-on;
+> >
+> > Do all these regulators need to be always on? It makes sense for the
+> > pll and vcore, but I don't get why the mic and hdmi regulators need
+> > this.
 > 
-> My apologies, I didn't notice this patch still had my name on it.
-> Looks good.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> (or Acked-by, not sure which applies in this situation.)
+> I did this way because I don't have the schematics for all the board
+> so I thought it was safer to leave all the regulators enabled
 
-Since you're the author, we need your SoB.
+Well, we have the schematics for most of these boards (at least all
+the cubie and olinuxinos).
 
-If you were not involved with writing (or merging the patch), Acked-by
-would have been appropriate.
+As far as the other boards are concerned, if we don't have that
+information, I'd say leave them alone until someone has access to
+these informations.
 
 Maxime
 
@@ -51,4 +114,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140505/a840a814/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140505/d94d5b5e/attachment.sig>
