@@ -1,51 +1,34 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Mon,  5 May 2014 10:34:25 +0530
-Subject: [PATCH v4 2/4] usb: ehci-exynos: Use struct device instead of
- platform_device
-In-Reply-To: <1399034855-9686-3-git-send-email-gautam.vivek@samsung.com>
-References: <1399034855-9686-3-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <1399266265-31839-1-git-send-email-gautam.vivek@samsung.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 4 May 2014 22:21:08 -0700
+Subject: [GIT PULL] somewhat urgent omap fixes against v3.15-rc1, fixes
+ gpmc
+In-Reply-To: <20140425203047.GG20807@atomide.com>
+References: <20140425203047.GG20807@atomide.com>
+Message-ID: <20140505052108.GC16022@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change to use struct device instead of struct platform_device
-for some static functions.
+On Fri, Apr 25, 2014 at 01:30:48PM -0700, Tony Lindgren wrote:
+> The following changes since commit fb677ef70b65e22cd4401d31b700a8b4041efae1:
+> 
+>   ARM: OMAP2+: Fix GPMC remap for devices using an offset (2014-04-23 11:09:22 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.15/fixes-gpmc
+> 
+> for you to fetch changes up to 4c05160342f16361fc37ae34dcae9210306a83e9:
+> 
+>   ARM: dts: AM3517: Disable absent IPs inherited from OMAP3 (2014-04-25 09:55:00 -0700)
+> 
+> ----------------------------------------------------------------
+> Mostly fixes for occasional memory corruption caused by bad
+> timings for smc911x LAN9220 (and potentially LAN9221) devices
+> that were noted on a cm-t3730 system. Also fix THUMB mode
+> for SMP, and mailbox related warnings when booted with device
+> tree.
 
-Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
-Acked-by: Jingoo Han <jg1.han@samsung.com>
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
----
+Merged into fixes.
 
-Changes since v1:
- - none
 
- drivers/usb/host/ehci-exynos.c |    5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/usb/host/ehci-exynos.c b/drivers/usb/host/ehci-exynos.c
-index 7f425ac..4d763dc 100644
---- a/drivers/usb/host/ehci-exynos.c
-+++ b/drivers/usb/host/ehci-exynos.c
-@@ -50,9 +50,8 @@ struct exynos_ehci_hcd {
- 
- #define to_exynos_ehci(hcd) (struct exynos_ehci_hcd *)(hcd_to_ehci(hcd)->priv)
- 
--static void exynos_setup_vbus_gpio(struct platform_device *pdev)
-+static void exynos_setup_vbus_gpio(struct device *dev)
- {
--	struct device *dev = &pdev->dev;
- 	int err;
- 	int gpio;
- 
-@@ -88,7 +87,7 @@ static int exynos_ehci_probe(struct platform_device *pdev)
- 	if (err)
- 		return err;
- 
--	exynos_setup_vbus_gpio(pdev);
-+	exynos_setup_vbus_gpio(&pdev->dev);
- 
- 	hcd = usb_create_hcd(&exynos_ehci_hc_driver,
- 			     &pdev->dev, dev_name(&pdev->dev));
--- 
-1.7.10.4
+-Olof
