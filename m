@@ -1,64 +1,69 @@
 From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 05 May 2014 12:57:14 +0200
-Subject: [PATCH 2/7] ARM: EXYNOS: add support for firmware-assisted c15resume
+Date: Mon, 05 May 2014 12:57:16 +0200
+Subject: [PATCH 4/7] ARM: EXYNOS: PM: replace EXYNOS_BOOT_VECTOR_* macros by
+ static inlines
 In-Reply-To: <1399287439-31376-1-git-send-email-b.zolnierkie@samsung.com>
 References: <1399287439-31376-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <1399287439-31376-3-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <1399287439-31376-5-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tomasz Figa <t.figa@samsung.com>
-
-This change is a preparation for adding secure firmware support to
-EXYNOS cpuidle driver.
+Replace EXYNOS_BOOT_VECTOR_ADDR and EXYNOS_BOOT_VECTOR_FLAG macros
+by exynos_boot_vector_addr() and exynos_boot_vector_flag() static
+inlines.
 
 This patch shouldn't cause any functionality changes.
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-[bzolnier: splitted out from bigger patch]
 Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 ---
- arch/arm/include/asm/firmware.h | 4 ++++
- arch/arm/mach-exynos/firmware.c | 8 ++++++++
- 2 files changed, 12 insertions(+)
+ arch/arm/mach-exynos/pm.c | 28 ++++++++++++++++++++--------
+ 1 file changed, 20 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/include/asm/firmware.h b/arch/arm/include/asm/firmware.h
-index c72ec47..70883c7 100644
---- a/arch/arm/include/asm/firmware.h
-+++ b/arch/arm/include/asm/firmware.h
-@@ -41,6 +41,10 @@ struct firmware_ops {
- 	 * Initializes L2 cache
- 	 */
- 	int (*l2x0_init)(void);
-+	/*
-+	 * Restores coprocessor 15 registers
-+	 */
-+	int (*c15resume)(u32 *regs);
- };
- 
- /* Global pointer for current firmware_ops structure, can't be NULL. */
-diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
-index 932129e..581c7bf 100644
---- a/arch/arm/mach-exynos/firmware.c
-+++ b/arch/arm/mach-exynos/firmware.c
-@@ -40,10 +40,18 @@ static int exynos_set_cpu_boot_addr(int cpu, unsigned long boot_addr)
- 	return 0;
+diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+index b380d48..1679c51 100644
+--- a/arch/arm/mach-exynos/pm.c
++++ b/arch/arm/mach-exynos/pm.c
+@@ -101,12 +101,23 @@ static int exynos_irq_set_wake(struct irq_data *data, unsigned int state)
+ 	return -ENOENT;
  }
  
-+static int exynos_c15resume(u32 *regs)
+-#define EXYNOS_BOOT_VECTOR_ADDR	(samsung_rev() == EXYNOS4210_REV_1_1 ? \
+-			S5P_INFORM7 : (samsung_rev() == EXYNOS4210_REV_1_0 ? \
+-			(S5P_VA_SYSRAM + 0x24) : S5P_INFORM0))
+-#define EXYNOS_BOOT_VECTOR_FLAG	(samsung_rev() == EXYNOS4210_REV_1_1 ? \
+-			S5P_INFORM6 : (samsung_rev() == EXYNOS4210_REV_1_0 ? \
+-			(S5P_VA_SYSRAM + 0x20) : S5P_INFORM1))
++static inline void __iomem *exynos_boot_vector_addr(void)
 +{
-+	exynos_smc(SMC_CMD_C15RESUME, regs[0], regs[1], 0);
-+
-+	return 0;
++	if (samsung_rev() == EXYNOS4210_REV_1_1)
++		return S5P_INFORM7;
++	else if (samsung_rev() == EXYNOS4210_REV_1_0)
++		return S5P_VA_SYSRAM + 0x24;
++	return S5P_INFORM0;
 +}
 +
- static const struct firmware_ops exynos_firmware_ops = {
- 	.do_idle		= exynos_do_idle,
- 	.set_cpu_boot_addr	= exynos_set_cpu_boot_addr,
- 	.cpu_boot		= exynos_cpu_boot,
-+	.c15resume	= exynos_c15resume,
- };
++static inline void __iomem *exynos_boot_vector_flag(void)
++{
++	if (samsung_rev() == EXYNOS4210_REV_1_1)
++		return S5P_INFORM6;
++	else if (samsung_rev() == EXYNOS4210_REV_1_0)
++		return S5P_VA_SYSRAM + 0x20;
++	return S5P_INFORM1;
++}
  
- void __init exynos_firmware_init(void)
+ #define S5P_CHECK_AFTR  0xFCBA0D10
+ #define S5P_CHECK_SLEEP 0x00000BAD
+@@ -119,8 +130,9 @@ static void exynos_set_wakeupmask(long mask)
+ 
+ static void exynos_cpu_set_boot_vector(long flags)
+ {
+-	__raw_writel(virt_to_phys(exynos_cpu_resume), EXYNOS_BOOT_VECTOR_ADDR);
+-	__raw_writel(flags, EXYNOS_BOOT_VECTOR_FLAG);
++	__raw_writel(virt_to_phys(exynos_cpu_resume),
++		     exynos_boot_vector_addr());
++	__raw_writel(flags, exynos_boot_vector_flag());
+ }
+ 
+ void exynos_enter_aftr(void)
 -- 
 1.8.2.3
