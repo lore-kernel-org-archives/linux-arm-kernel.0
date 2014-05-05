@@ -1,42 +1,41 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Mon, 5 May 2014 14:58:29 -0500
-Subject: [PATCH 2/2] ARM: dts: am335x-evmsk: Add vtt_fixed regulator
-In-Reply-To: <1399319909-53795-1-git-send-email-d-gerlach@ti.com>
-References: <1399319909-53795-1-git-send-email-d-gerlach@ti.com>
-Message-ID: <1399319909-53795-3-git-send-email-d-gerlach@ti.com>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Mon, 5 May 2014 12:59:10 -0700
+Subject: Tegra baseline test results for v3.15-rc4
+Message-ID: <5367ED8E.7030201@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The VTT regulator for DDR3 termination on the am335x-evmsk is
-controlled by a gpio. It is configured by the bootloader so here we
-define an always-on, fixed voltage regulator to hold the gpio.
+Here are some basic Tegra test results for Linux v3.15-rc4.
+Logs and other details at:
 
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
----
- arch/arm/boot/dts/am335x-evmsk.dts | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.15-rc4/20140504183106/
 
-diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
-index ab23885..d6b8acb 100644
---- a/arch/arm/boot/dts/am335x-evmsk.dts
-+++ b/arch/arm/boot/dts/am335x-evmsk.dts
-@@ -57,6 +57,17 @@
- 		enable-active-high;
- 	};
- 
-+	vtt_fixed: fixedregulator at 3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vtt";
-+		regulator-min-microvolt = <1500000>;
-+		regulator-max-microvolt = <1500000>;
-+		gpio = <&gpio0 7 GPIO_ACTIVE_HIGH>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+		enable-active-high;
-+	};
-+
- 	leds {
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&user_leds_s0>;
--- 
-1.9.0
+
+Test summary
+------------
+
+Build: zImage:
+     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Boot to userspace: multi_v7_defconfig:
+     Pass: ( 2/ 2): tegra114-dalmore-a04, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+     Pass: ( 2/ 2): tegra114-dalmore-a04, tegra30-beaver
+
+
+
+vmlinux object size
+(delta in bytes from test_v3.15-rc3 (d1db0eea852497762cab43b905b879dfcd3b8987)):
+    text     data      bss    total  kernel
+    +428       +8        0     +436  multi_v7_defconfig
+    +376      +24        0     +400  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v3.15-rc3 (d1db0eea852497762cab43b905b879dfcd3b8987))
+     avail    rsrvd     high    freed                board              kconfig                  dtb
+         .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+         .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+         .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+         .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
