@@ -1,50 +1,22 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Mon, 05 May 2014 11:18:35 -0700
-Subject: [PATCH v2] PM / devfreq: Use freq_table for available_frequencies
-In-Reply-To: <536004E9.1010300@codeaurora.org>
-References: <4324793.197151398649314597.JavaMail.weblogic@epv6ml10>
- <536004E9.1010300@codeaurora.org>
-Message-ID: <5367D5FB.2080305@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 5 May 2014 20:26:32 +0200
+Subject: [RFC PATCH 0/5] watchdog: Add reboot API
+In-Reply-To: <1398958893-30049-1-git-send-email-linux@roeck-us.net>
+References: <1398958893-30049-1-git-send-email-linux@roeck-us.net>
+Message-ID: <201405052026.32666.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/29/2014 01:00 PM, Saravana Kannan wrote:
-> On 04/27/2014 06:41 PM, MyungJoo Ham wrote:
->> You are hereby changing the semmantics of the original
->> available_frequencies node.
->>
->> When a frequency/voltage pair has been disabled (opp_disable), probably
->> by opp_disable(), the frequency is no more "available".
->> However, when the driver author supplied freq_table as well as OPP
->> in order to see the statistics, the node will behave differently.
->>
->> Please do not affect the current users as long as it does not give
->> additional benefit or fix a bug.
+On Thursday 01 May 2014, Guenter Roeck wrote:
 > 
-> I was actually trying to stick with the semantics as it was documented.
-> The documentation for this file says it'll show frequencies that are not
-> allowed by the current min/max settings either. To me, an OPP disable
-> seems similar to some frequencies "disabled" by min/max settings.
-> 
-> Giving preference to OPP is not a hard change to do, but it seems to go
-> againsts the documented semantics.
-> 
-> Thoughts?
+> Some hardware implements reboot through its watchdog hardware, for example
+> by triggering a watchdog timeout or by writing into its watchdog register
+> set. Platform specific code starts to spread into watchdog drivers,
+> typically by setting pointers to a callback function which is then called
+> from the architecture's reset handler.
 
-I'll send out another patch like you wanted -- with OPP being given
-preference over freq_table when listing frequencies.
+Looks very nice to me, thanks for starting this!
 
-But I would still like to hear your thoughts. As of today, there's no
-clean way to get the complete list of available frequencies that would
-give a consistent output irrespective of the temporary limits/conditions
-imposed by thermal, current limiting, etc. The round about way is to cat
-trans_stat and parse the frequencies from that.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-That's why I was trying to give preference to freq_table.
-
-Thanks,
-Saravana
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+	Arnd
