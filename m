@@ -1,31 +1,26 @@
-From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Mon,  5 May 2014 17:38:40 +0200
-Subject: [PATCH 4/4] ARM: multi_v7_defconfig: add ST Keyscan driver
-In-Reply-To: <1399304320-18197-1-git-send-email-gabriel.fernandez@linaro.org>
-References: <1399304320-18197-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <1399304320-18197-5-git-send-email-gabriel.fernandez@linaro.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 5 May 2014 08:51:13 -0700
+Subject: [PATCH 0/6] ARM: sunxi: Machine code cleanup
+In-Reply-To: <1399259284-6282-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1399259284-6282-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20140505155113.GB25199@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds KEYBOARD_ST_KEYSCAN config
+On Sun, May 04, 2014 at 10:07:58PM -0500, Maxime Ripard wrote:
+> Hi,
+> 
+> This serie moves the restart code out of the mach-sunxi directory to
+> either the watchdog driver or to a new driver in drivers/power/reset.
+> 
+> Since the reset code was pretty much all the code left in the
+> mach-sunxi directory for all the SoCs but the A31, the only thing left
+> into mach-sunxi are empty machine definition.
+> 
+Hi Maxime,
 
-Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
-Acked-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+what changed in this version of the series compared to the previous
+version ? Is it just the different directory for the reset driver ?
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index d4e8a47..4f0dce1 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -143,6 +143,7 @@ CONFIG_INPUT_EVDEV=y
- CONFIG_KEYBOARD_GPIO=y
- CONFIG_KEYBOARD_TEGRA=y
- CONFIG_KEYBOARD_SPEAR=y
-+CONFIG_KEYBOARD_ST_KEYSCAN=y
- CONFIG_KEYBOARD_CROS_EC=y
- CONFIG_MOUSE_PS2_ELANTECH=y
- CONFIG_INPUT_MISC=y
--- 
-1.9.1
+Thanks,
+Guenter
