@@ -1,77 +1,64 @@
 From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 05 May 2014 12:57:15 +0200
-Subject: [PATCH 3/7] ARM: EXYNOS: add AFTR mode support to firmware do_idle
- method
+Date: Mon, 05 May 2014 12:57:14 +0200
+Subject: [PATCH 2/7] ARM: EXYNOS: add support for firmware-assisted c15resume
 In-Reply-To: <1399287439-31376-1-git-send-email-b.zolnierkie@samsung.com>
 References: <1399287439-31376-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <1399287439-31376-4-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <1399287439-31376-3-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some platforms (i.e. EXYNOS ones) more than one idle mode is
-available and we need to distinguish them in firmware do_idle method.
-
-Add mode parameter to do_idle firmware method and AFTR mode support
-to EXYNOS do_idle implementation.
+From: Tomasz Figa <t.figa@samsung.com>
 
 This change is a preparation for adding secure firmware support to
 EXYNOS cpuidle driver.
 
-This patch shouldn't cause any functionality changes (please note
-that do_idle firmware method is unused currently).
+This patch shouldn't cause any functionality changes.
 
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+[bzolnier: splitted out from bigger patch]
 Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 ---
- arch/arm/include/asm/firmware.h |  7 ++++++-
- arch/arm/mach-exynos/firmware.c | 10 ++++++++--
- 2 files changed, 14 insertions(+), 3 deletions(-)
+ arch/arm/include/asm/firmware.h | 4 ++++
+ arch/arm/mach-exynos/firmware.c | 8 ++++++++
+ 2 files changed, 12 insertions(+)
 
 diff --git a/arch/arm/include/asm/firmware.h b/arch/arm/include/asm/firmware.h
-index 70883c7..63989c3 100644
+index c72ec47..70883c7 100644
 --- a/arch/arm/include/asm/firmware.h
 +++ b/arch/arm/include/asm/firmware.h
-@@ -28,7 +28,7 @@ struct firmware_ops {
- 	/*
- 	 * Enters CPU idle mode
+@@ -41,6 +41,10 @@ struct firmware_ops {
+ 	 * Initializes L2 cache
  	 */
--	int (*do_idle)(void);
-+	int (*do_idle)(int mode);
- 	/*
- 	 * Sets boot address of specified physical CPU
- 	 */
-@@ -47,6 +47,11 @@ struct firmware_ops {
- 	int (*c15resume)(u32 *regs);
+ 	int (*l2x0_init)(void);
++	/*
++	 * Restores coprocessor 15 registers
++	 */
++	int (*c15resume)(u32 *regs);
  };
  
-+enum {
-+	FW_DO_IDLE_NORMAL,
-+	FW_DO_IDLE_AFTR,
-+};
-+
  /* Global pointer for current firmware_ops structure, can't be NULL. */
- extern const struct firmware_ops *firmware_ops;
- 
 diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
-index 581c7bf..71fe169 100644
+index 932129e..581c7bf 100644
 --- a/arch/arm/mach-exynos/firmware.c
 +++ b/arch/arm/mach-exynos/firmware.c
-@@ -20,9 +20,15 @@
- 
- #include "smc.h"
- 
--static int exynos_do_idle(void)
-+static int exynos_do_idle(int mode)
- {
--	exynos_smc(SMC_CMD_SLEEP, 0, 0, 0);
-+	switch (mode) {
-+	case FW_DO_IDLE_AFTR:
-+		exynos_smc(SMC_CMD_CPU0AFTR, 0, 0, 0);
-+		break;
-+	case FW_DO_IDLE_NORMAL:
-+		exynos_smc(SMC_CMD_SLEEP, 0, 0, 0);
-+	}
+@@ -40,10 +40,18 @@ static int exynos_set_cpu_boot_addr(int cpu, unsigned long boot_addr)
  	return 0;
  }
  
++static int exynos_c15resume(u32 *regs)
++{
++	exynos_smc(SMC_CMD_C15RESUME, regs[0], regs[1], 0);
++
++	return 0;
++}
++
+ static const struct firmware_ops exynos_firmware_ops = {
+ 	.do_idle		= exynos_do_idle,
+ 	.set_cpu_boot_addr	= exynos_set_cpu_boot_addr,
+ 	.cpu_boot		= exynos_cpu_boot,
++	.c15resume	= exynos_c15resume,
+ };
+ 
+ void __init exynos_firmware_init(void)
 -- 
 1.8.2.3
