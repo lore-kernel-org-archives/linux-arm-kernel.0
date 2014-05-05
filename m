@@ -1,37 +1,30 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 5 May 2014 13:40:22 -0700
-Subject: [PATCH] net: macb: set interface name based on DT aliases
-In-Reply-To: <1394620196-6295-1-git-send-email-b.brezillon.dev@gmail.com>
-References: <1394620196-6295-1-git-send-email-b.brezillon.dev@gmail.com>
-Message-ID: <20140505204022.GA27961@quad.lixom.net>
+Date: Mon, 5 May 2014 13:42:21 -0700
+Subject: [GIT PULL] Renesas ARM Based SoC Defconfig Updates for v3.16
+In-Reply-To: <cover.1397627278.git.horms+renesas@verge.net.au>
+References: <cover.1397627278.git.horms+renesas@verge.net.au>
+Message-ID: <20140505204221.GB27961@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 12, 2014 at 11:29:56AM +0100, Boris BREZILLON wrote:
-> Use aliases to set the interface name (ethX) instead of automatic
-> assignement.
+On Wed, Apr 16, 2014 at 03:03:05PM +0900, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
-> ---
+> Please consider these Renesas ARM based SoC defconfig updates for v3.16.
 > 
-> Hello Nicolas, Jean-Christophe,
 > 
-> This is an example on how we could set the ethernet interface id based on DT
-> aliases.
-> As you can see this patch is not properly separated.
+> The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
 > 
-> I'm still not happy with this approach for several reasons:
-> 1) If another ethernet iface has already been registered with the same id the
->    net dev registration will fail.
-> 2) We bypass the ethernet macros/functions and directly use the net device
->    functions which IMHO is not future proof.
+>   Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig-for-v3.16
+> 
+> for you to fetch changes up to 1d59eb190e3dc575c7bbee4a163c3facd0de2ed9:
+> 
+>   ARM: shmobile: Enable USB [EO]HCI HCD support in shmobile_defconfig (2014-04-14 11:23:55 +0900)
 
-[Sorry for the late reply, going through old backlog of unread email]
-
-Looks like this should live in networking core instead of in the driver, it's
-how we handle it in other subsystems.
-
-I don't know what DaveM's opinions on that is though.
-
+Merged, thanks.
 
 -Olof
