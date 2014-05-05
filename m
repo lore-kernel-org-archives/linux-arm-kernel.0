@@ -1,7 +1,7 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Mon, 05 May 2014 17:38:08 +0800
+Date: Mon, 05 May 2014 17:39:43 +0800
 Subject: RCU stall on panda
-Message-ID: <53675C00.5070202@linaro.org>
+Message-ID: <53675C5F.10509@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -47,6 +47,29 @@ Is it the hardware issue or a real software problem?
 [   95.772064] softirqs last  enabled at (128730): [<c00386cd>] irq_enter+0x59/0x60^M
 [   95.779907] softirqs last disabled at (128729): [<c00386ba>] irq_enter+0x46/0x60^M
 [   95.787750] ^M
+
+
+my RCU and IDLE related kernel config as blow:
+
+CONFIG_TREE_RCU=y
+CONFIG_RCU_STALL_COMMON=y
+CONFIG_RCU_FANOUT=32
+CONFIG_RCU_FANOUT_LEAF=16
+CONFIG_TREE_RCU_TRACE=y
+CONFIG_PROVE_RCU=y
+CONFIG_PROVE_RCU_REPEATEDLY=y
+CONFIG_SPARSE_RCU_POINTER=y
+CONFIG_RCU_CPU_STALL_TIMEOUT=21
+CONFIG_RCU_CPU_STALL_INFO=y
+CONFIG_RCU_TRACE=y
+alexs at alex-panda:~$ cat /proc/config.gz | gunzip | grep IDLE
+CONFIG_NO_HZ_IDLE=y
+CONFIG_GENERIC_SMP_IDLE_THREAD=y
+CONFIG_GENERIC_IDLE_POLL_SETUP=y
+CONFIG_CPU_IDLE=y
+CONFIG_CPU_IDLE_GOV_LADDER=y
+CONFIG_CPU_IDLE_GOV_MENU=y
+CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED=y
 
 -- 
 Thanks
