@@ -1,100 +1,184 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 05 May 2014 14:11:08 +0200
-Subject: syscon or memory mappings (was: Re: [RFC/PATCH 0/8]
- pinctrl-rockchip: Change wrong initial assumptions)
-In-Reply-To: <9747726.2b5sgjTxWB@typ>
-References: <1414506.B4e2jZujVm@diego> <4321949.A6Ghcdztds@diego>
- <9747726.2b5sgjTxWB@typ>
-Message-ID: <3114029.fvjZVjkFrH@diego>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Mon, 05 May 2014 14:21:33 +0200
+Subject: [PATCH 1/2] hwinit support for non-TI devices
+In-Reply-To: <20140505120810.GB16461@amd.pavel.ucw.cz>
+References: <20140426203131.GA21832@amd.pavel.ucw.cz>
+ <6bf951b6-51e7-4b90-b054-9ba5b6e93874@email.android.com>
+ <20140427122510.GB12901@amd.pavel.ucw.cz>
+ <1398716449.836.4.camel@dinh-ubuntu>
+ <20140428211505.GA28242@amd.pavel.ucw.cz>
+ <CAF03EBf9KXqB4W9GuDduhLwp_kwFjUEi3syU7fX3KpXfZEFxHg@mail.gmail.com>
+ <CAF03EBd19PC5RAsLR6-dMPF2x3XRf9X4bFPgX2kRdCYWUQBYcA@mail.gmail.com>
+ <20140430215359.GA15148@amd.pavel.ucw.cz>
+ <CAF03EBewoV0pOOmNQBwPrKgm-zhaSbFcNd_UiEhFWyUrq91-Jg@mail.gmail.com>
+ <20140502084851.GA5730@amd.pavel.ucw.cz>
+ <20140505120810.GB16461@amd.pavel.ucw.cz>
+Message-ID: <5367824D.2070406@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Samstag, 3. Mai 2014, 14:40:36 schrieb Max Schwarz:
-> Hello Heiko,
+On 05/05/2014 02:08 PM, Pavel Machek wrote:
+> Non-TI chips (including socfpga) needs different raminit
+> sequence. Implement it.
 > 
-> On Saturday 03 May 2014 at 01:45:11, Heiko St?bner wrote:
-> > > However, this sheds light on an underlying issue: Rockchip is not
-> > > treating
-> > > the whole GPIO block as one cohesive device as we do currently. Instead,
-> > > it
-> > > seems to me, one GPIO bank is one device. Each has its cohesive mux,
-> > > bank
-> > > and pull registers - apart from rk3188-bank-0, maybe. But that one is
-> > > special anyway with regards to register ordering (s.b.).
-> > > 
-> > > The issues you had with RK3188 and now have with RK3288 seem to stem
-> > > from
-> > > trying to group all banks together into one pinctrl driver.
-> > > 
-> > > So maybe we should promote the GPIO banks to full devices in the dt and
-> > > make smaller mappings for each GPIO bank, i.e. three mappings for each
-> > > GPIO bank (mux, bank, pull). I know we have to stay backwards compatible
-> > > dt-wise, but that should be doable.
-> > 
-> > Yes, that is another miss-conception from the early days. The
-> > gpio-controllers themself are actually Synopsis Designware IPs - the
-> > kernel
-> > now even has a separate driver for them (gpio-dwapb). Only the real
-> > pincontrol/muxing/pull/etc is from Rockchip.
-> > 
-> > Currently I can't think of a way to move over gracefully, without
-> > introducing crap into the gpio-dwapb driver. As at the moment it parses
-> > all
-> > information it needs from the dt directly - of course with different
-> > bindings.
-> > 
-> > That is also the reason I do not want to introduce more "special-cases" in
-> > the bank-declaration we're using currently - to not make this move more
-> > difficult in the future.
-> > 
-> > As it is, with the patch attached to the last mail, the pinctrl driver
-> > wouldn't even need the "rockchip,rk3188-gpio-bank0" compatible anymore, as
-> > the information about its special case is now sitting in the bank
-> > declaration inside the driver. Which then would enable us to remove the
-> > gpio-bank subnodes alltogether and use the external gpio driver.
+> Tested-by: Thor Thayer <tthayer@altera.com>
+> Signed-off-by: Thor Thayer <tthayer@altera.com>
+> Signed-off-by: Pavel Machek <pavel@denx.de>
 > 
-> Okay, you convinced me. That sounds like a good plan to me. Maybe we can
-> introduce some compability code into the pinctrl driver to generate the
-> correct dt nodes for gpio-dwabp at runtime? I think that would depend on
-> something like CONFIG_OF_DYNAMIC though.
+> diff --git a/drivers/net/can/c_can/c_can_platform.c b/drivers/net/can/c_can/c_can_platform.c
+> index 1df0b32..476d1e0 100644
+> --- a/drivers/net/can/c_can/c_can_platform.c
+> +++ b/drivers/net/can/c_can/c_can_platform.c
+> @@ -40,6 +40,7 @@
+>  #define CAN_RAMINIT_START_MASK(i)	(0x001 << (i))
+>  #define CAN_RAMINIT_DONE_MASK(i)	(0x100 << (i))
+>  #define CAN_RAMINIT_ALL_MASK(i)		(0x101 << (i))
+> +#define DCAN_RAM_INIT_BIT	(1 << 3)
+>  static DEFINE_SPINLOCK(raminit_lock);
+>  /*
+>   * 16-bit c_can registers can be arranged differently in the memory
+> @@ -80,7 +81,7 @@ static void c_can_hw_raminit_wait(const struct c_can_priv *priv, u32 mask,
+>  		udelay(1);
+>  }
+>  
+> -static void c_can_hw_raminit(const struct c_can_priv *priv, bool enable)
+> +static void c_can_hw_raminit_ti(const struct c_can_priv *priv, bool enable)
+>  {
+>  	u32 mask = CAN_RAMINIT_ALL_MASK(priv->instance);
+>  	u32 ctrl;
+> @@ -88,7 +89,8 @@ static void c_can_hw_raminit(const struct c_can_priv *priv, bool enable)
+>  	spin_lock(&raminit_lock);
+>  
+>  	ctrl = readl(priv->raminit_ctrlreg);
+> -	/* We clear the done and start bit first. The start bit is
+> +	/*
+> +	 * We clear the done and start bit first. The start bit is
 
-Yep, that's one option. The other would be to let the driver support both (the 
-internal gpio code and the real gpio-dwapb), deprecate the old one 
-[of course also disallowing it for rk3288 and following] and simply remove it 
-after the appropriate timespan (1 or more years if I remember correctly :-) ].
+Please don't reformat comments.
 
+>  	 * looking at the 0 -> transition, but is not self clearing;
+>  	 * And we clear the init done bit as well.
+>  	 */
+> @@ -108,6 +110,54 @@ static void c_can_hw_raminit(const struct c_can_priv *priv, bool enable)
+>  	spin_unlock(&raminit_lock);
+>  }
+>  
+> +static void c_can_hw_raminit(const struct c_can_priv *priv, bool enable)
+> +{
+> +	u32 ctrl;
+> +
+> +	spin_lock(&raminit_lock);
 
+Why do you need this spinlock?
 
-> > While for example syscon cannot handle clocks currently, the underlying
-> > regmap can - so it would be only a matter of teaching syscon to tell
-> > regmap
-> > of the clock to use (GRF and PMU register-clocks in this case), instead of
-> > needing to have every user of parts of these registers handle the relevant
-> > clock itself on register accesses.
-> > 
-> > Also, as you can see in the grf map, the rk3188 actually has two
-> > soc_status
-> > registers (0xac and 0x108) which have the dmac, cpu and drive strength
-> > registers in between. So having a syscon only for soc_con and soc_status
-> > will produce problems too.
-> > 
-> > Another example, GRF_IO_VSEL at 0x0380 is most likely some sort of pin
-> > voltage selection. As it only spans 1 register I'd assume it could contain
-> > settings that span all pin banks.
+> +
+> +	ctrl = readl(priv->raminit_ctrlreg);
+> +	ctrl &= ~DCAN_RAM_INIT_BIT;
+> +	writel(ctrl, priv->raminit_ctrlreg);
+
+Why don't use use the reg directly? Have you read my previous review?
+
+> +	c_can_hw_raminit_wait(priv, ctrl, 0);
+> +
+> +	if (enable) {
+> +		/* Set start bit. */
+> +		ctrl |= DCAN_RAM_INIT_BIT;
+> +		writel(ctrl, priv->raminit_ctrlreg);
+> +		c_can_hw_raminit_wait(priv, ctrl, 0);
+> +	}
+> +	spin_unlock(&raminit_lock);
+> +}
+> +
+> +static u32 c_can_plat_read_reg32(struct c_can_priv *priv, enum reg index)
+> +{
+> +	u32 val;
+> +
+> +	val = priv->read_reg(priv, index);
+> +	val |= ((u32) priv->read_reg(priv, index + 1)) << 16;
+> +
+> +	return val;
+> +}
+
+Why are you adding the read32() support here? Your commit message
+doesn't mention it. Please move this into a different patch.
+
+> +
+> +static void c_can_plat_write_reg32(struct c_can_priv *priv, enum reg index,
+> +		u32 val)
+> +{
+> +	priv->write_reg(priv, index + 1, val>>16);
+> +	priv->write_reg(priv, index, val);
+> +}
+> +
+> +static u32 d_can_plat_read_reg32(struct c_can_priv *priv, enum reg index)
+> +{
+> +	return readl(priv->base + priv->regs[index]);
+> +}
+> +
+> +static void d_can_plat_write_reg32(struct c_can_priv *priv, enum reg index,
+> +		u32 val)
+> +{
+> +	writel(val, priv->base + priv->regs[index]);
+> +}
+> +
+>  static struct platform_device_id c_can_id_table[] = {
+>  	[BOSCH_C_CAN_PLATFORM] = {
+>  		.name = KBUILD_MODNAME,
+> @@ -201,11 +251,15 @@ static int c_can_plat_probe(struct platform_device *pdev)
+>  		case IORESOURCE_MEM_32BIT:
+>  			priv->read_reg = c_can_plat_read_reg_aligned_to_32bit;
+>  			priv->write_reg = c_can_plat_write_reg_aligned_to_32bit;
+> +			priv->read_reg32 = c_can_plat_read_reg32;
+> +			priv->write_reg32 = c_can_plat_write_reg32;
+>  			break;
+>  		case IORESOURCE_MEM_16BIT:
+>  		default:
+>  			priv->read_reg = c_can_plat_read_reg_aligned_to_16bit;
+>  			priv->write_reg = c_can_plat_write_reg_aligned_to_16bit;
+> +			priv->read_reg32 = c_can_plat_read_reg32;
+> +			priv->write_reg32 = c_can_plat_write_reg32;
+>  			break;
+>  		}
+>  		break;
+> @@ -214,6 +268,8 @@ static int c_can_plat_probe(struct platform_device *pdev)
+>  		priv->can.ctrlmode_supported |= CAN_CTRLMODE_3_SAMPLES;
+>  		priv->read_reg = c_can_plat_read_reg_aligned_to_16bit;
+>  		priv->write_reg = c_can_plat_write_reg_aligned_to_16bit;
+> +		priv->read_reg32 = d_can_plat_read_reg32;
+> +		priv->write_reg32 = d_can_plat_write_reg32;
+>  
+>  		if (pdev->dev.of_node)
+>  			priv->instance = of_alias_get_id(pdev->dev.of_node, "d_can");
+> @@ -221,11 +277,22 @@ static int c_can_plat_probe(struct platform_device *pdev)
+>  			priv->instance = pdev->id;
+>  
+>  		res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> +		/*
+> +		 * Not all D_CAN module have a separate register for the D_CAN
+> +		 * RAM initialization. Use default RAM init bit in D_CAN module
+> +		 * if not specified in DT.
+> +		 */
+> +		if (!res) {
+> +			priv->raminit = c_can_hw_raminit;
+> +			priv->raminit_ctrlreg = addr + priv->regs[C_CAN_FUNCTION_REG];
+> +			break;
+> +		}
+> +
+>  		priv->raminit_ctrlreg = devm_ioremap_resource(&pdev->dev, res);
+>  		if (IS_ERR(priv->raminit_ctrlreg) || priv->instance < 0)
+>  			dev_info(&pdev->dev, "control memory is not used for raminit\n");
+>  		else
+> -			priv->raminit = c_can_hw_raminit;
+> +			priv->raminit = c_can_hw_raminit_ti;
+>  		break;
+>  	default:
+>  		ret = -EINVAL;
 > 
-> Okay, we couldn't handle that with individual devices for each bank.
-> 
-> > And of course, splitting the register space into dozens of small
-> > individual
-> > mappings looks messy :-)
-> 
-> Yes, I agree now ;-)
 
-cool :-D
+Marc
 
-I've also just sent a v2, including the missing MFD_SYSCON dependency, thanks 
-for the find.
-
-
-
-Heiko
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
