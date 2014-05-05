@@ -1,33 +1,38 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun,  4 May 2014 22:08:03 -0500
-Subject: [PATCH 5/6] ARM: sunxi: Add A31 reset driver to sunxi_defconfig
-In-Reply-To: <1399259284-6282-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1399259284-6282-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1399259284-6282-6-git-send-email-maxime.ripard@free-electrons.com>
+Date: Sun,  4 May 2014 22:07:58 -0500
+Subject: [PATCH 0/6] ARM: sunxi: Machine code cleanup
+Message-ID: <1399259284-6282-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the A31 reset code is a driver of its own, we need it in the
-defconfig.
+Hi,
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/configs/sunxi_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+This serie moves the restart code out of the mach-sunxi directory to
+either the watchdog driver or to a new driver in drivers/power/reset.
 
-diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
-index 81ba78eaf54a..e0c91b23fde7 100644
---- a/arch/arm/configs/sunxi_defconfig
-+++ b/arch/arm/configs/sunxi_defconfig
-@@ -52,6 +52,9 @@ CONFIG_I2C_MV64XXX=y
- CONFIG_SPI=y
- CONFIG_SPI_SUN6I=y
- CONFIG_GPIO_SYSFS=y
-+CONFIG_POWER_SUPPLY=y
-+CONFIG_POWER_RESET=y
-+CONFIG_POWER_RESET_SUN6I=y
- # CONFIG_HWMON is not set
- CONFIG_WATCHDOG=y
- CONFIG_SUNXI_WATCHDOG=y
+Since the reset code was pretty much all the code left in the
+mach-sunxi directory for all the SoCs but the A31, the only thing left
+into mach-sunxi are empty machine definition.
+
+Thanks, Maxime
+
+Maxime Ripard (6):
+  wdt: sunxi: Move restart code to the watchdog driver
+  power: reset: Add Allwinner A31 reset code
+  ARM: sunxi: Remove reset code from the platform
+  ARM: sunxi: Remove init_machine callback
+  ARM: sunxi: Add A31 reset driver to sunxi_defconfig
+  ARM: multi_v7: Add Allwinner reset drivers to multi_v7_defconfig
+
+ arch/arm/configs/multi_v7_defconfig |   2 +
+ arch/arm/configs/sunxi_defconfig    |   3 +
+ arch/arm/mach-sunxi/sunxi.c         | 107 ------------------------------------
+ drivers/power/reset/Kconfig         |   7 +++
+ drivers/power/reset/Makefile        |   1 +
+ drivers/power/reset/sun6i-reboot.c  |  85 ++++++++++++++++++++++++++++
+ drivers/watchdog/sunxi_wdt.c        |  29 ++++++++++
+ 7 files changed, 127 insertions(+), 107 deletions(-)
+ create mode 100644 drivers/power/reset/sun6i-reboot.c
+
 -- 
 1.9.1
