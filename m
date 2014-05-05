@@ -1,28 +1,23 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 5 May 2014 17:48:33 -0700
-Subject: [PATCH 0/5] irqchip/dra7: crossbar bug fixes
-In-Reply-To: <1399299527-10955-1-git-send-email-r.sricharan@ti.com>
-References: <1399299527-10955-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <20140506004833.GP25949@atomide.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 5 May 2014 12:23:44 -0700
+Subject: [PATCH v2 2/2] spi: sirf: decrease the interrupt count and
+ latency of PIO mode
+In-Reply-To: <1399185156-521-1-git-send-email-swingboard@gmail.com>
+References: <1399185156-521-1-git-send-email-swingboard@gmail.com>
+Message-ID: <20140505192344.GL22111@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sricharan R <r.sricharan@ti.com> [140505 07:20]:
-> These are fixes for the crossbar to handle two interrupts getting
-> mapped twice to same crossbar and to skip some interrupts being used
-> due to hardware bugs.
+On Sun, May 04, 2014 at 02:32:36PM +0800, Qipan Li wrote:
+> From: Qipan Li <Qipan.Li@csr.com>
 > 
-> Nishanth Menon (5):
->   irqchip: crossbar: dont use '0' to mark reserved interrupts
->   irqchip: crossbar: check for premapped crossbar before allocating
->   irqchip: crossbar: Skip some irqs from getting mapped to crossbar
->   irqchip: crossbar: Initialise the crossbar with a safe value
->   irqchip: crossbar: Change allocation logic by reversing search for
->     free irqs
-> 
->  drivers/irqchip/irq-crossbar.c |   82 ++++++++++++++++++++++++++++++++++++----
->  1 file changed, 74 insertions(+), 8 deletions(-)
+> current PIO tranfer method be described as follows:
 
-Thanks applying all into omap-for-v3.16/crossbar.
-
-Tony
+I'm missing patch 1 here.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140505/1f2bb0b3/attachment.sig>
