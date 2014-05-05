@@ -1,55 +1,90 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 5 May 2014 11:41:38 -0700
-Subject: [PATCH 0/4] OMAPDSS: Add support for panel ls037v7dw01
-In-Reply-To: <1398815562-24113-1-git-send-email-tony@atomide.com>
-References: <1398815562-24113-1-git-send-email-tony@atomide.com>
-Message-ID: <20140505184138.GB15463@atomide.com>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Mon, 5 May 2014 21:53:08 +0300
+Subject: [PATCH v2 2/5] Power: reset: add bindings for keystone reset
+ driver
+In-Reply-To: <534D1719.40701@ti.com>
+References: <1397497283-16391-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1397497283-16391-3-git-send-email-ivan.khoronzhuk@ti.com>
+ <6937937.4J6iI7VpBO@wuerfel> <534D1719.40701@ti.com>
+Message-ID: <5367DE14.8000907@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [140429 16:53]:
-> Hi all,
-> 
-> Here are few patches to add devicetree support for panel ls037v7dw01
-> that's found on many omap3 boards. They seem to be often mis-configured
-> as various panel dpi entries, but really should be move to use panel
-> ls037v7dw01 instead. This panel is found at least on the omap3 sdp,
-> ldp, omap3 evm and few other development boards.
 
-Tomi, assuming no more comments, do you want to pick up the first
-three patches of this series? I can queue the .dts changes or you
-can also set up a separate .dts changes branch for DSS that I can
-merge in too.
+On 04/15/2014 02:25 PM, Ivan Khoronzhuk wrote:
+>
+> On 04/14/2014 09:44 PM, Arnd Bergmann wrote:
+>> On Monday 14 April 2014 20:41:20 Ivan Khoronzhuk wrote:
+>>> +Optional properties:
+>>> +
+>>> +- ti,soft-reset:       Boolean option indicating soft reset.
+>>> +                       By default hard reset is used.
+>>> +
+>>> +- ti,wdt_list:         WDT list that can cause SoC reset.
+>>> +                       The list in format: <0>, <2>;
+>>> +                       Begins from 0 to 3, as keystone can contain up
+>>> +                       to 4 SoC reset watchdogs.
+>>>
+>> This looks like your binding just describes a subset of the
+>> watchdog timer registers. If so, don't do a standalone reset
+>
+> The registers are not a subset of watchdog hardware it's SoC specific 
+> future
+> controlled by SoC specific registers (bootregs and PLL regs).
+>
+> For watchog IP setup, the Keystone uses the watchdog driver common 
+> with other
+> SoCs -- davinci_watchdog that is not depend on other SoC settings like 
+> this driver does.
+>
+> The Keystone SoCs have separate registers to tune Keystone2 reset 
+> functionality
+> by configuring Reset multiplexer &  PLL. And it tunes not only 
+> watchdog usage.
+> The keystone SoC can be rebooted in several ways. By external reset 
+> pin, by soft and
+> by watchdogs. This driver allows software reset or reset by one of the 
+> watchdogs
+> (and other settings) independently on watchdog driver settings. This 
+> is job of reset driver.
+>
+>> It's
+>> driver, but instead do a watchdog driver that can also be
+>> used for reset, and have a binding that properly describes
+>> the watchdog hardware.
+>>
+>> It is bad to have overlapping register ranges between logical
+>
+> WDT doesn't overlap with this driver.
+>
+>> devices, and it's also generally wrong to describe devices that
+>> are not actually there: The hardware contains a watchdog, not
+>> a system-reset device, so you should not make one up because
+>> it seems easier given the Linux driver model.
+>>
+>>     Arnd 
 
-Tony
- 
-> Regards,
-> 
-> Tony
-> 
-> Tony Lindgren (4):
->   OMAPDSS: Fix DSS clock multiplier issue on 3703 and probably 3630
->   OMAPDSS: panel-sharp-ls037v7dw01: update to use gpiod
->   OMAPDSS: panel-sharp-ls037v7dw01: add device tree support
->   ARM: dts: Add LCD panel sharp ls037v7dw01 support for omap3-evm and
->     ldp
-> 
->  .../bindings/panel/sharp,ls037v7dw01.txt           |  53 +++++++
->  .../arm/boot/dts/omap-panel-sharp-ls037v7dw01.dtsi |  82 ++++++++++
->  arch/arm/boot/dts/omap3-evm-37xx.dts               |  50 ++++++
->  arch/arm/boot/dts/omap3-evm-common.dtsi            |  47 ++++++
->  arch/arm/boot/dts/omap3-ldp.dts                    |  31 +++-
->  .../omap2/displays-new/panel-sharp-ls037v7dw01.c   | 176 ++++++++++++++-------
->  drivers/video/fbdev/omap2/dss/dss.c                |   5 +-
->  7 files changed, 379 insertions(+), 65 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/panel/sharp,ls037v7dw01.txt
->  create mode 100644 arch/arm/boot/dts/omap-panel-sharp-ls037v7dw01.dtsi
-> 
-> -- 
-> 1.8.1.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Hi Arnd,
+
+Could I do smth additional to make bindings explanation more clear?
+Or this is enough?
+
+I can write like the following:
+Optional properties:
+
+- ti,soft-reset:       Boolean option indicating soft reset.
+                        By default hard reset is used.
+
+- ti,wdt_list:         WDT list that can cause SoC reset. This is not
+                         related to WDT driver, it's just needed to enable
+                         a SoC related reset that is triggered by one of 
+watchdogs.
+                        The list in format: <0>, <2>;
+                        Begins from 0 to 3, as keystone can contain up
+                        to 4 SoC reset watchdogs. Can be in random order.
+
+That is OK?
+
+-- 
+Regards,
+Ivan Khoronzhuk
