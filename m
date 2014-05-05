@@ -1,128 +1,94 @@
 From: dmurphy@ti.com (Dan Murphy)
-Date: Mon, 5 May 2014 15:09:23 -0500
-Subject: [RFC] [v2 Patch 2/6] ARM: TI: Describe the ti reset DT entries
+Date: Mon, 5 May 2014 15:09:24 -0500
+Subject: [RFC] [v2 Patch 3/6] ARM: dts: am33xx: Add prcm_resets node
 In-Reply-To: <1399320567-3639-1-git-send-email-dmurphy@ti.com>
 References: <1399320567-3639-1-git-send-email-dmurphy@ti.com>
-Message-ID: <1399320567-3639-3-git-send-email-dmurphy@ti.com>
+Message-ID: <1399320567-3639-4-git-send-email-dmurphy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe the TI reset DT entries for TI SoC's.
+Add the prcm_resets node to the prcm parent node.
+
+Add the am33xx_resets file to define the
+am33xx reset lines that are handled by this reset
+framework.
 
 Signed-off-by: Dan Murphy <dmurphy@ti.com>
 ---
- .../devicetree/bindings/reset/ti,reset.txt         |  103 ++++++++++++++++++++
- 1 file changed, 103 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/reset/ti,reset.txt
+ arch/arm/boot/dts/am33xx-resets.dtsi |   42 ++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/am33xx.dtsi        |    7 ++++++
+ 2 files changed, 49 insertions(+)
+ create mode 100644 arch/arm/boot/dts/am33xx-resets.dtsi
 
-diff --git a/Documentation/devicetree/bindings/reset/ti,reset.txt b/Documentation/devicetree/bindings/reset/ti,reset.txt
+diff --git a/arch/arm/boot/dts/am33xx-resets.dtsi b/arch/arm/boot/dts/am33xx-resets.dtsi
 new file mode 100644
-index 0000000..9d5c29c
+index 0000000..9260626
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/reset/ti,reset.txt
-@@ -0,0 +1,103 @@
-+Texas Instruments Reset Controller
-+======================================
-+Please also refer to reset.txt in this directory for common reset
-+controller binding usage.
++++ b/arch/arm/boot/dts/am33xx-resets.dtsi
+@@ -0,0 +1,42 @@
++/*
++ * Device Tree Source for AM33XX reset data
++ *
++ * Copyright (C) 2014 Texas Instruments, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
 +
-+Specifying the reset entries for the IP module
-+==============================================
-+Parent module:
-+This is the module node that contains the reset registers and bits.
++&prcm_resets {
++	gfx_rstctrl {
++		reg = <0x1104>,
++			  <0x1114>;
 +
-+example:
-+			prcm_resets: resets {
-+				compatible = "ti,dra7-resets";
-+				#reset-cells = <1>;
-+			};
-+
-+Required parent properties:
-+- compatible : Should be one of,
-+		"ti,omap4-prm" for OMAP4 PRM instances
-+		"ti,omap5-prm" for OMAP5 PRM instances
-+		"ti,dra7-prm" for DRA7xx PRM instances
-+		"ti,am4-prcm" for AM43xx PRCM instances
-+		"ti,am3-prcm" for AM33xx PRCM instances
-+
-+Required child reset property:
-+- compatible : Should be
-+		"resets" for All TI SoCs
-+
-+example:
-+		prm: prm at 4ae06000 {
-+			compatible = "ti,omap5-prm";
-+			reg = <0x4ae06000 0x3000>;
-+
-+			prm_resets: resets {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				#reset-cells = <1>;
-+			};
-+		};
-+
-+
-+Reset node declaration
-+==============================================
-+The reset node is declared in a parent child relationship.  The main parent
-+is the PRCM module which contains the base address.  The first child within
-+the reset parent declares the target modules reset name.  This is followed by
-+the control and status offsets.
-+
-+Within the first reset child node is a secondary child node which declares the
-+reset signal of interest.  Under this node the control and status bits
-+are declared.  These bits declare the bit mask for the target reset.
-+
-+
-+Required properties:
-+reg - This is the register offset from the PRCM parent.
-+	This must be declared as:
-+
-+	reg = <control register offset>,
-+		  <status register offset>;
-+
-+control-bit - This is the bit within the register which controls the reset
-+	of the target module.  This is declared as a bit mask for the register.
-+status-bit - This is the bit within the register which contains the status of
-+	the reset of the target module.
-+	This is declared as a bit mask for the register.
-+
-+example:
-+&prm_resets {
-+	dsp_rstctrl {
-+		reg = <0x1c00>,
-+			  <0x1c04>;
-+
-+		dsp_reset: dsp_reset {
++		gfx_reset: gfx_reset {
 +			control-bit = <0x01>;
 +			status-bit = <0x01>;
 +		};
 +	};
-+};
 +
++	per_rstctrl {
++		reg = <0xD00>,
++			  <0xD0C>;
 +
-+
-+Client Node Declaration
-+==============================================
-+This is the consumer of the parent node to declare what resets this
-+particular module is interested in.
-+
-+example:
-+	src: src at 55082000 {
-+		    resets = <&reset_src phandle>;
-+			reset-names = "<reset_name>";
++		iva_reset: iva_reset {
++			control-bit = <0x04>;
++			status-bit = <0x10>;
++		};
 +	};
 +
-+Required Properties:
-+reset_src - This is the parent DT entry for the reset controller
-+phandle - This is the phandle of the specific reset to be used by the clien
-+	driver.
-+reset-names - This is the reset name of module that the device driver
-+	needs to be able to reset.  This value must correspond to a value within
-+	the reset controller array.
++	device_rstctrl {
++		reg = <0xf00>,
++			  <0xf08>;
 +
-+example:
-+resets = <&prm_resets &dsp_mmu_reset>;
-+reset-names = "dsp_mmu_reset";
++		device_reset: device_reset {
++			control-bit = <0x01>;
++			status-bit = <0x01>;
++		};
++	};
++
++};
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index cb6811e..6b1a6df 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -117,6 +117,12 @@
+ 
+ 			prcm_clockdomains: clockdomains {
+ 			};
++
++			prcm_resets: resets {
++				#address-cells = <1>;
++				#size-cells = <1>;
++				#reset-cells = <1>;
++			};
+ 		};
+ 
+ 		scrm: scrm at 44e10000 {
+@@ -833,3 +839,4 @@
+ };
+ 
+ /include/ "am33xx-clocks.dtsi"
++/include/ "am33xx-resets.dtsi"
 -- 
 1.7.9.5
