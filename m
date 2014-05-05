@@ -1,40 +1,79 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 5 May 2014 13:55:54 -0700
-Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Select
- CONFIG_MACH_BERLIN_BG2Q
-In-Reply-To: <534D8B25.3070103@gmail.com>
-References: <1395430757-8677-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1395430757-8677-2-git-send-email-alexandre.belloni@free-electrons.com>
- <532CB266.6050800@gmail.com> <534D8B25.3070103@gmail.com>
-Message-ID: <20140505205554.GA29112@quad.lixom.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 05 May 2014 22:55:49 +0200
+Subject: [PATCH v3 4/7] of: configure the platform device dma parameters
+In-Reply-To: <CAErSpo5-FXmVs8BWRYKz9Ln1g1Ls7_uo3oiPd32fUegf3d8hXQ@mail.gmail.com>
+References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
+ <20923376.buVzFR52Qe@wuerfel>
+ <CAErSpo5-FXmVs8BWRYKz9Ln1g1Ls7_uo3oiPd32fUegf3d8hXQ@mail.gmail.com>
+Message-ID: <5575019.Hr92MUuDnc@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15, 2014 at 09:40:21PM +0200, Sebastian Hesselbarth wrote:
-> On 03/21/2014 10:43 PM, Sebastian Hesselbarth wrote:
-> > On 03/21/2014 08:39 PM, Alexandre Belloni wrote:
-> >> Now that we support Berlin BG2Q, select CONFIG_MACH_BERLIN_BG2Q so
-> >> that we can
-> >> boot BG2Q based boards like the BG2Q DMP.
+On Monday 05 May 2014 14:45:21 Bjorn Helgaas wrote:
+> [+cc Ben, Chris]
+> 
+> On Fri, May 2, 2014 at 12:59 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Friday 02 May 2014 10:54:59 Bjorn Helgaas wrote:
+> >> > +static void of_dma_configure(struct device *dev)
+> >> > +{
+> >> > +     u64 dma_addr, paddr, size;
+> >> > +     int ret;
+> >> > +
+> >> > +     dev->coherent_dma_mask = DMA_BIT_MASK(32);
+> >> > +     if (!dev->dma_mask)
+> >> > +             dev->dma_mask = &dev->coherent_dma_mask;
+> >> > +
+> >> > +     /*
+> >> > +      * if dma-coherent property exist, call arch hook to setup
+> >> > +      * dma coherent operations.
+> >> > +      */
+> >> > +     if (of_dma_is_coherent(dev->of_node)) {
+> >> > +             set_arch_dma_coherent_ops(dev);
+> >> > +             dev_dbg(dev, "device is dma coherent\n");
+> >> > +     }
+> >> > +
+> >> > +     /*
+> >> > +      * if dma-ranges property doesn't exist - just return else
+> >> > +      * setup the dma offset
+> >> > +      */
+> >> > +     ret = of_dma_get_range(dev->of_node, &dma_addr, &paddr, &size);
+> >> > +     if ((ret == -ENODEV) || (ret < 0)) {
+> >> > +             dev_dbg(dev, "no dma range information to setup\n");
+> >> > +             return;
+> >> > +     }
+> >> > +
+> >> > +     /* DMA ranges found. Calculate and set dma_pfn_offset */
+> >> > +     dev->dma_pfn_offset = PFN_DOWN(paddr - dma_addr);
+> >> > +     dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", dev->dma_pfn_offset);
 > >>
-> >> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > 
-> > Applied to berlin/soc, Thanks!
+> >> Is this effectively the same as an IOMMU that applies a constant offset
+> >> to the bus address?  Could or should this be done by adding a simple IOMMU
+> >> driver instead of adding dma_pfn_offset to struct device?
+> >
+> > We currently have two dma_map_ops variants on ARM (plus another set for
+> > coherent/noncoherent differences, but we can ignore that for the sake
+> > of this discussion): one that handles linear mappings and one that
+> > handles IOMMUs by calling into the linux/iommu.h APIs.
+> >
+> > I guess what you mean by 'a simple IOMMU driver' would be another
+> > dma_map_ops implementation that is separate from real IOMMUs, right?
 > 
-> After talking to Arnd on IRC, I found out it is not my business
-> taking patches for multi_v7_defconfig.
+> I suppose so; it seems like the offset could be managed inside
+> arm_dma_ops.  My idea of an IOMMU is something that maps bus addresses
+> to physical memory addresses.  That's what we're doing here; it's just
+> that the mapping function is very simple.  So why add something new in
+> struct device for it?
 > 
-> Instead of me taking it, you get my
-> 
-> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> 
+> I think powerpc and tile do something similar in dma_direct_map_page()
+> and tile_pci_dma_map_page() (they store the offset in struct
+> dev_archdata).
 
-Applied, but next time please send any patch you want us to apply to
-arm at kernel.org.
+Ah, so the only question is whether to store it in dev_archdata or
+in device. I think the argument for using struct device directly
+was that it lets us access this field from architecture independent
+code. It's not important to the overall design though: we could easily
+put it in dev_archdata and call an architecture specific function to
+set it, if there are good reasons for keeping it out of the generic
+device structure.
 
-FWIW, it's usually how I distinguish between things to review if I have
-time (personal email) and things that will need attention eventually
-(arm at kernel.org). It also has the benefit of going to all current
-maintainers of arm-soc without you having to worry about who it is. :)
-
--Olof
+	Arnd
