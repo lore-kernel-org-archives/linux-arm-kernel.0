@@ -1,30 +1,30 @@
 From: dmurphy@ti.com (Dan Murphy)
-Date: Mon, 5 May 2014 15:09:27 -0500
-Subject: [RFC] [v2 Patch 6/6] ARM: dts: omap5: Add prm_resets node
+Date: Mon, 5 May 2014 15:09:26 -0500
+Subject: [RFC] [v2 Patch 5/6] ARM: dts: dra7: Add prm_resets node
 In-Reply-To: <1399320567-3639-1-git-send-email-dmurphy@ti.com>
 References: <1399320567-3639-1-git-send-email-dmurphy@ti.com>
-Message-ID: <1399320567-3639-7-git-send-email-dmurphy@ti.com>
+Message-ID: <1399320567-3639-6-git-send-email-dmurphy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the prm_resets node to the prm parent node.
+Add the prcm_resets node to the prm parent node.
 
-Add the omap54xx_resets file to define the
-omap5 reset lines that are handled by this reset
+Add the draxx_resets file to define the
+dra7xx reset lines that are handled by this reset
 framework.
 
 Signed-off-by: Dan Murphy <dmurphy@ti.com>
 ---
- arch/arm/boot/dts/omap5.dtsi           |    7 ++++
- arch/arm/boot/dts/omap54xx-resets.dtsi |   66 ++++++++++++++++++++++++++++++++
- 2 files changed, 73 insertions(+)
- create mode 100644 arch/arm/boot/dts/omap54xx-resets.dtsi
+ arch/arm/boot/dts/dra7.dtsi          |    7 +++
+ arch/arm/boot/dts/dra7xx-resets.dtsi |   82 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 89 insertions(+)
+ create mode 100644 arch/arm/boot/dts/dra7xx-resets.dtsi
 
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index f8c9855..b6e3c4c 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -134,6 +134,12 @@
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index 149b550..c008996 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -120,6 +120,12 @@
  
  			prm_clockdomains: clockdomains {
  			};
@@ -36,20 +36,20 @@ index f8c9855..b6e3c4c 100644
 +			};
  		};
  
- 		cm_core_aon: cm_core_aon at 4a004000 {
-@@ -873,3 +879,4 @@
+ 		cm_core_aon: cm_core_aon at 4a005000 {
+@@ -793,3 +799,4 @@
  };
  
- /include/ "omap54xx-clocks.dtsi"
-+/include/ "omap54xx-resets.dtsi"
-diff --git a/arch/arm/boot/dts/omap54xx-resets.dtsi b/arch/arm/boot/dts/omap54xx-resets.dtsi
+ /include/ "dra7xx-clocks.dtsi"
++/include/ "dra7xx-resets.dtsi"
+diff --git a/arch/arm/boot/dts/dra7xx-resets.dtsi b/arch/arm/boot/dts/dra7xx-resets.dtsi
 new file mode 100644
-index 0000000..cba6f52
+index 0000000..4c4966d
 --- /dev/null
-+++ b/arch/arm/boot/dts/omap54xx-resets.dtsi
-@@ -0,0 +1,66 @@
++++ b/arch/arm/boot/dts/dra7xx-resets.dtsi
+@@ -0,0 +1,82 @@
 +/*
-+ * Device Tree Source for OMAP5 reset data
++ * Device Tree Source for DRA7XX reset data
 + *
 + * Copyright (C) 2014 Texas Instruments, Inc.
 + *
@@ -60,8 +60,8 @@ index 0000000..cba6f52
 +
 +&prm_resets {
 +	dsp_rstctrl {
-+		reg = <0x1c00>,
-+			  <0x1c04>;
++		reg = <0x410>,
++			  <0x414>;
 +
 +		dsp_reset: dsp_reset {
 +			control-bit = <0x01>;
@@ -75,8 +75,8 @@ index 0000000..cba6f52
 +	};
 +
 +	ipu_rstctrl {
-+		reg = <0x910>,
-+			  <0x914>;
++		reg = <0x510>,
++			  <0x514>;
 +
 +		ipu_cpu0_reset: ipu_cpu0_reset {
 +			control-bit = <0x01>;
@@ -95,8 +95,8 @@ index 0000000..cba6f52
 +	};
 +
 +	iva_rstctrl {
-+		reg = <0x1210>,
-+			  <0x1214>;
++		reg = <0xf10>,
++			  <0xf14>;
 +
 +		iva_reset: iva_reset {
 +			control-bit = <0x01>;
@@ -104,15 +104,31 @@ index 0000000..cba6f52
 +		};
 +	};
 +
++	pcie_rstctrl {
++		reg = <0x1310>,
++			  <0x1314>;
++
++		pcie1_reset: pcie1_reset {
++			control-bit = <0x01>;
++			status-bit = <0x01>;
++		};
++
++		pcie2_reset: pcie2_reset {
++			control-bit = <0x01>;
++			status-bit = <0x01>;
++		};
++	};
++
 +	device_rstctrl {
-+		reg = <0x1c00>,
-+			  <0x1c04>;
++		reg = <0x1D00>,
++			  <0x1D04>;
 +
 +		device_reset: device_reset {
 +			control-bit = <0x01>;
 +			status-bit = <0x01>;
 +		};
 +	};
++
 +};
 -- 
 1.7.9.5
