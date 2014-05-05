@@ -1,41 +1,82 @@
 From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Mon,  5 May 2014 14:47:24 -0700
-Subject: [PATCH v4 1/4] MAINTAINERS: Add entry for APM X-Gene SoC ethernet
- driver
+Date: Mon,  5 May 2014 14:47:26 -0700
+Subject: [PATCH v4 3/4] dts: Add bindings for APM X-Gene SoC ethernet driver
 In-Reply-To: <1399326447-2329-1-git-send-email-isubramanian@apm.com>
 References: <1399326447-2329-1-git-send-email-isubramanian@apm.com>
-Message-ID: <1399326447-2329-2-git-send-email-isubramanian@apm.com>
+Message-ID: <1399326447-2329-4-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a MAINTAINERS entry for APM X-Gene SoC
-ethernet driver.
+This patch adds bindings for APM X-Gene SoC ethernet driver.
 
 Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
 Signed-off-by: Ravi Patel <rapatel@apm.com>
 Signed-off-by: Keyur Chudgar <kchudgar@apm.com>
 ---
- MAINTAINERS |    8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm64/boot/dts/apm-mustang.dts |    4 ++++
+ arch/arm64/boot/dts/apm-storm.dtsi  |   27 ++++++++++++++++++++++++---
+ 2 files changed, 28 insertions(+), 3 deletions(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 7bb7ead..02c737e 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -686,6 +686,14 @@ S:	Maintained
- F:	drivers/net/appletalk/
- F:	net/appletalk/
- 
-+APPLIED MICRO (APM) X-GENE SOC ETHERNET DRIVER
-+M:	Iyappan Subramanian <isubramanian@apm.com>
-+M:	Keyur Chudgar <kchudgar@apm.com>
-+M:	Ravi Patel <rapatel@apm.com>
-+S:	Supported
-+F:	drivers/net/ethernet/apm/xgene/
-+F:	Documentation/devicetree/bindings/net/apm-xgene-enet.txt
+diff --git a/arch/arm64/boot/dts/apm-mustang.dts b/arch/arm64/boot/dts/apm-mustang.dts
+index 1247ca1..e2fb1ef 100644
+--- a/arch/arm64/boot/dts/apm-mustang.dts
++++ b/arch/arm64/boot/dts/apm-mustang.dts
+@@ -24,3 +24,7 @@
+ 		reg = < 0x1 0x00000000 0x0 0x80000000 >; /* Updated by bootloader */
+ 	};
+ };
 +
- APTINA CAMERA SENSOR PLL
- M:	Laurent Pinchart <Laurent.pinchart@ideasonboard.com>
- L:	linux-media at vger.kernel.org
++&menet {
++	status = "ok";
++};
+diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
+index 93f4b2d..e1e3d5d 100644
+--- a/arch/arm64/boot/dts/apm-storm.dtsi
++++ b/arch/arm64/boot/dts/apm-storm.dtsi
+@@ -167,14 +167,13 @@
+ 				clock-output-names = "ethclk";
+ 			};
+ 
+-			eth8clk: eth8clk {
++			menetclk: menetclk {
+ 				compatible = "apm,xgene-device-clock";
+ 				#clock-cells = <1>;
+ 				clocks = <&ethclk 0>;
+-				clock-names = "eth8clk";
+ 				reg = <0x0 0x1702C000 0x0 0x1000>;
+ 				reg-names = "csr-reg";
+-				clock-output-names = "eth8clk";
++				clock-output-names = "menetclk";
+ 			};
+ 
+ 			sataphy1clk: sataphy1clk at 1f21c000 {
+@@ -339,5 +338,27 @@
+ 			phys = <&phy3 0>;
+ 			phy-names = "sata-phy";
+ 		};
++
++		menet: ethernet at 17020000 {
++			compatible = "apm,xgene-enet";
++			status = "disabled";
++			reg = <0x0 0x17020000 0x0 0xd100>,
++			      <0x0 0X17030000 0x0 0X400>,
++			      <0x0 0X10000000 0x0 0X200>;
++			interrupts = <0x0 0x3c 0x4>;
++			clocks = <&menetclk 0>;
++			local-mac-address = [00 01 73 00 00 01];
++			phy-connection-type = "rgmii";
++			phy-handle = <&menetphy>;
++			mdio {
++				compatible = "apm,xgene-mdio";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				menetphy: menetphy at 3 {
++					reg = <0x3>;
++				};
++
++			};
++		};
+ 	};
+ };
 -- 
 1.7.9.5
