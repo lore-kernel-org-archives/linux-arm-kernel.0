@@ -1,36 +1,47 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 5 May 2014 09:45:19 -0400 (EDT)
-Subject: [PATCH] arm: put_user: fix possible data corruption in
- put_user
-In-Reply-To: <53676D12.9040300@samsung.com>
-References: <1399270438-26181-1-git-send-email-a.ryabinin@samsung.com>
- <20140505090126.GD3693@n2100.arm.linux.org.uk> <53676D12.9040300@samsung.com>
-Message-ID: <alpine.LFD.2.11.1405050944001.980@knanqh.ubzr>
+From: elder@linaro.org (Alex Elder)
+Date: Mon,  5 May 2014 08:57:31 -0500
+Subject: [PATCH 0/5] clk: bcm: prerequisite and bus clock support
+Message-ID: <1399298256-10965-1-git-send-email-elder@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 5 May 2014, Andrey Ryabinin wrote:
+Currently only peripheral clocks are supported for Broadcom
+platforms that use Kona style CCUs for clocking.  This series
+adds support for bus clocks as well.
 
-> On 05/05/14 13:01, Russell King - ARM Linux wrote:
-> > On Mon, May 05, 2014 at 10:13:58AM +0400, Andrey Ryabinin wrote:
-> >> According to arm procedure call standart r2 register is call-cloberred.
-> >> So after the result of x expression was put into r2 any following
-> >> function call in p may overwrite r2. To fix this, the result of p
-> >> expression must be saved to the temporary variable before the
-> >> assigment x expression to __r2.
-> > 
-> > This and the patch make no sense.  You talk about r2, but you're doing
-> > nothing with r2 in the patch.
-> > 
-> 
-> No, you didn't get it. I'll try to explain better.
-> 
-> Lets consider following example:
-[...]
+One motivation for doing this is that there exist peripheral clocks
+that cannot be configured without having first enabled a related
+bus; the peripheral clock registers are simply inaccessible if the
+bus clock is not enabled.  So adding bus clock support allows such
+clocks to be usable.
 
-Thanks for the test code.  I do confirm there is indeed a problem.
+This also imposes a new requirement, however--that the bus clock
+be enabled *before* the clock that depends on it.  For this, we
+define the notion of a "prerequisite" clock.  If a clock has a
+prerequisite specified, that prequisite clock will be initialized
+first.  For now this only affects startup-time initialization.
 
-I'm trying to make sure your patch is actually the best fix.
+These patches are based on Mike Turquette's current "clk-next"
+branch.  They are available here:
+    http://git.linaro.org/landing-teams/working/broadcom/kernel.git
+    Branch review/bcm-bus-clk
 
+					-Alex
 
-Nicolas
+Alex Elder (5):
+  clk: bcm281xx: add an initialized flag
+  clk: bcm281xx: implement prerequisite clocks
+  clk: bcm281xx: add bus clock support
+  clk: bcm281xx: define a bus clock
+  ARM: dts: add bus clock bsc3_apb for bcm281xx
+
+ arch/arm/boot/dts/bcm11351.dtsi      |   3 +-
+ drivers/clk/bcm/clk-bcm281xx.c       |  13 +++-
+ drivers/clk/bcm/clk-kona-setup.c     | 112 ++++++++++++++++++++++++++++++--
+ drivers/clk/bcm/clk-kona.c           | 120 ++++++++++++++++++++++++++++++++++-
+ drivers/clk/bcm/clk-kona.h           |  35 +++++++++-
+ include/dt-bindings/clock/bcm281xx.h |   3 +-
+ 6 files changed, 271 insertions(+), 15 deletions(-)
+
+-- 
+1.9.1
