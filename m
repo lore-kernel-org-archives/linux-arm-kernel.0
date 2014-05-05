@@ -1,38 +1,31 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon,  5 May 2014 16:20:28 +0200
-Subject: [PATCH 2/5] ARM: mvebu: initialize mvebu-soc-id earlier
+Date: Mon,  5 May 2014 16:20:29 +0200
+Subject: [PATCH 3/5] ARM: mvebu: add Armada 375 A0 revision definition
 In-Reply-To: <1399299631-30825-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1399299631-30825-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1399299631-30825-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1399299631-30825-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, the mvebu-soc-id logic is initialized through a
-core_initcall(). However, we will soon need to know the SoC revision
-before booting secondary CPUs, because a workaround affects Armada 375
-Z1 steppings, but should not be applied on Armada 375 A0 steppings.
-
-Unfortunately, core_initcall() are called way too late compared to the
-SMP initialization. Therefore, the mvebu-soc-id initialization is move
-to an early_initcall(), which is called before the SMP initialization.
+Now that we have access to Armada 375 A0 platforms, we can add the
+corresponding revision definition in mvebu-soc-id.h.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-mvebu/mvebu-soc-id.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-mvebu/mvebu-soc-id.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-mvebu/mvebu-soc-id.c b/arch/arm/mach-mvebu/mvebu-soc-id.c
-index 874a750..e9119a9 100644
---- a/arch/arm/mach-mvebu/mvebu-soc-id.c
-+++ b/arch/arm/mach-mvebu/mvebu-soc-id.c
-@@ -118,7 +118,7 @@ clk_err:
+diff --git a/arch/arm/mach-mvebu/mvebu-soc-id.h b/arch/arm/mach-mvebu/mvebu-soc-id.h
+index 294a443..c16bb68 100644
+--- a/arch/arm/mach-mvebu/mvebu-soc-id.h
++++ b/arch/arm/mach-mvebu/mvebu-soc-id.h
+@@ -22,6 +22,7 @@
  
- 	return ret;
- }
--core_initcall(mvebu_soc_id_init);
-+early_initcall(mvebu_soc_id_init);
+ /* Armada 375 */
+ #define ARMADA_375_Z1_REV   0x0
++#define ARMADA_375_A0_REV   0x3
  
- static int __init mvebu_soc_device(void)
- {
+ #ifdef CONFIG_ARCH_MVEBU
+ int mvebu_get_soc_id(u32 *dev, u32 *rev);
 -- 
 1.9.2
