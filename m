@@ -1,38 +1,36 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 5 May 2014 17:45:20 -0500
-Subject: [PATCH v10 15/15] ARM: dts: sun7i: Add basic support for the
- Cubietruck WiFi module
-In-Reply-To: <1399046249-19472-16-git-send-email-hdegoede@redhat.com>
-References: <1399046249-19472-1-git-send-email-hdegoede@redhat.com>
- <1399046249-19472-16-git-send-email-hdegoede@redhat.com>
-Message-ID: <20140505224520.GB9464@lukather>
+From: Li.Xiubo@freescale.com (Xiubo Li)
+Date: Tue, 6 May 2014 07:40:56 +0800
+Subject: [PATCH] ARM: LPAE: Update the comment to support the LPAE
+Message-ID: <1399333256-10471-1-git-send-email-Li.Xiubo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 02, 2014 at 05:57:29PM +0200, Hans de Goede wrote:
-> From: Chen-Yu Tsai <wens@csie.org>
-> 
-> The CubieTruck has an AMPAK AP6210 WiFi+Bluetooth module. The WiFi
-> part is a BCM43362 IC connected to MMC3 in the A20 SoC via SDIO.
-> The IC also takes a power enable signal via GPIO.
-> 
-> The WiFi module supports out-of-band interrupt signaling via GPIO,
-> but this is not supported in this patch.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+Since the LPAE maybe enabled, so we should update the comment
+to support it.
 
-Applied with Chen-Yu SoB.
+Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
+---
+ arch/arm/kernel/head.S | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-Maxime
-
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index 914616e..005af2d 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -29,10 +29,10 @@
+ 
+ /*
+  * swapper_pg_dir is the virtual address of the initial page table.
+- * We place the page tables 16K below KERNEL_RAM_VADDR.  Therefore, we must
+- * make sure that KERNEL_RAM_VADDR is correctly set.  Currently, we expect
+- * the least significant 16 bits to be 0x8000, but we could probably
+- * relax this restriction to KERNEL_RAM_VADDR >= PAGE_OFFSET + 0x4000.
++ * We place the page tables PG_DIR_SIZE below KERNEL_RAM_VADDR. Therefore,
++ * we must make sure that KERNEL_RAM_VADDR is correctly set. Currently,
++ * we expect the least significant 16 bits to be 0x8000, but we could probably
++ * relax this restriction to KERNEL_RAM_VADDR >= PAGE_OFFSET + PG_DIR_SIZE.
+  */
+ #define KERNEL_RAM_VADDR	(PAGE_OFFSET + TEXT_OFFSET)
+ #if (KERNEL_RAM_VADDR & 0xffff) != 0x8000
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140505/ad667316/attachment.sig>
+1.8.4
