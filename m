@@ -1,30 +1,20 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 5 May 2014 19:53:14 +0530
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 5 May 2014 09:25:58 -0500
 Subject: [PATCH 1/2] PM / OPP: Remove cpufreq wrapper dependency on
  internal data organization
-In-Reply-To: <1399296830-13056-2-git-send-email-nm@ti.com>
+In-Reply-To: <CAKohpomeP3Ftx8mH=x0Hj7HEpw6A9X8O8JEFqvrJbkZYDqDS6Q@mail.gmail.com>
 References: <1399296830-13056-1-git-send-email-nm@ti.com>
  <1399296830-13056-2-git-send-email-nm@ti.com>
-Message-ID: <CAKohpomeP3Ftx8mH=x0Hj7HEpw6A9X8O8JEFqvrJbkZYDqDS6Q@mail.gmail.com>
+ <CAKohpomeP3Ftx8mH=x0Hj7HEpw6A9X8O8JEFqvrJbkZYDqDS6Q@mail.gmail.com>
+Message-ID: <CAGo_u6pcEKDiAqvJW66_p7M7D0noFj6o9Rw5_d8Af3NMBhHA=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 May 2014 19:03, Nishanth Menon <nm@ti.com> wrote:
-> diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
->  int dev_pm_opp_init_cpufreq_table(struct device *dev,
->                             struct cpufreq_frequency_table **table)
->  {
-> -       struct device_opp *dev_opp;
->         struct dev_pm_opp *opp;
-> -       struct cpufreq_frequency_table *freq_table;
-> -       int i = 0;
-> +       struct cpufreq_frequency_table *freq_table = NULL;
-> +       int i, max_opps, ret = 0;
-> +       unsigned long rate;
+On Mon, May 5, 2014 at 9:23 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
 >
-> -       /* Pretend as if I am an updater */
-> -       mutex_lock(&dev_opp_list_lock);
+>
+> What if opp is being added for some reason at the same time?
+> I hope we can surely see some awkward results, maybe some
+> NULL pointers invocations as well..
 
-What if opp is being added for some reason at the same time?
-I hope we can surely see some awkward results, maybe some
-NULL pointers invocations as well..
+we wont - rcu operations ensure that.
