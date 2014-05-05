@@ -1,60 +1,56 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 5 May 2014 10:34:02 -0500
-Subject: [PATCH 0/4] Introducing Exynos ChipId driver
-In-Reply-To: <13946837.RfnRDPQdge@wuerfel>
-References: <1399097500-4052-1-git-send-email-pankaj.dubey@samsung.com>
- <13946837.RfnRDPQdge@wuerfel>
-Message-ID: <CAL_JsqJXE4uXKA6XU1=3zFjdcEXHyUat2dL6wDKiZBx8S-p+Xg@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 5 May 2014 11:36:54 -0400
+Subject: [PATCH v2 0/5] ARM: mvebu: fixes and improvements for 375 support
+In-Reply-To: <1399302326-6917-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1399302326-6917-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140505153654.GO28159@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 3, 2014 at 10:02 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Saturday 03 May 2014 15:11:36 Pankaj Dubey wrote:
->> This patch series attempts to get rid of soc_is_exynosXXXX macros
->> and eventually with the help of this series we can probably get
->> rid of CONFIG_SOC_EXYNOSXXXX in near future.
->> Each Exynos SoC has ChipID block which can give information about
->> SoC's product Id and revision number. Currently we have single
->> DT binding information for this as "samsung,exynos4210-chipid".
->> But Exynos4 and Exynos5 SoC series have one small difference in
->> chip Id, with resepect to product id bit-masks. So it means we
->> should have separate compatible string for these different series
->> of SoCs. So I have created new binding information for handling
->> this difference. Also currently I can think of putting this driver
->> code under "drivers/misc/" but suggestions are welcome.
->> Also current form of driver is missing platfrom driver and needs
->> init function to be called from machine file (either exynos.c or
->> platsmp.c). I hope lot of suggestions and comments to improve this
->> further.
->>
->> This patch series is based on Kukjin Kim's for-next (3.14_rc1 tag)
->> and prepared on top of following patch series and it's dependent
->> patch series.
->
-> I think putting it into drivers/soc would be most appropriate.
-> We already have a few drivers lined up that we want in there,
-> although the directory currently doesn't exist.
->
-> However, I would ask that you use the infrastructure provided by
-> drivers/base/soc.c when you add this driver, to also make the
-> information available to user space using a standard API.
+On Mon, May 05, 2014 at 05:05:21PM +0200, Thomas Petazzoni wrote:
+> Hello Jason,
+> 
+> Here are five patches making fixes and improvements to the Armada 375
+> support. They are related to the fact that we now have access to
+> Armada 375 A0 boards (however, Ezequiel still only has access to a Z1
+> platform, so we would like to keep Z1 support for now).
+> 
+>  * Patch 1 is really a fix. It fixes the thermal related quirk that
+>    was added by Ezequiel, to make sure it really works on A0 revision.
+> 
+>  * Patch 2 to 5 make the SMP and coherency workarounds conditional on
+>    the Armada 375 Z1. The condition on SMP is really mandatory to get
+>    SMP working on A0. For coherency, the WA could be used on A0, but
+>    it is useless and hurt performance.
+> 
+> The series is based on your mvebu/soc branch.
+> 
+> Changes since v1:
+> 
+>  * Made the dev and rev variable local to the appropriate if() block
+>    in PATCH 5.
+> 
+>  * Re-added the "Booting CPU" message in PATCH 4, which was
+>    mistakently removed in v1.
+> 
+>  * Extended the git commit message of PATCH 4 to explain why we're
+>    moving things from ->smp_prepare_cpus() to ->smp_boot_secondary().
+> 
+>  * Added Ezequiel's Acked-by on PATCH 1.
+> 
+> Thanks,
+> 
+> Thomas
+> 
+> Thomas Petazzoni (5):
+>   ARM: mvebu: fix thermal quirk SoC revision check
+>   ARM: mvebu: initialize mvebu-soc-id earlier
+>   ARM: mvebu: add Armada 375 A0 revision definition
+>   ARM: mvebu: conditionalize Armada 375 SMP workaround
+>   ARM: mvebu: conditionalize Armada 375 coherency workaround
 
-Agreed.
+hmmm, I didn't get #5...
 
-> Ideally this should be done by slightly restructuring the DT
-> source to make all on-chip devices appear below the soc node.
-> We'd have to think a bit about how to best do this while
-> preserving compatibility with existing dts files.
+thx,
 
-I don't agree. How is a block with chip ID info the parent of all the
-other devices?
-
-In doing some work to move default of_platform_populate out of
-platforms, I noticed that most platforms using the soc device are
-making it the parent of platform devices. I think this is either wrong
-or all platforms should have a default soc device. It makes little
-sense for some platforms to have a devices under a soc sysfs directory
-while others do not. Or the location changes when a platform latter
-adds the soc device.
-
-Rob
+Jason.
