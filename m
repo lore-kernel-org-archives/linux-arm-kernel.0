@@ -1,90 +1,28 @@
-From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Mon, 5 May 2014 21:53:08 +0300
-Subject: [PATCH v2 2/5] Power: reset: add bindings for keystone reset
- driver
-In-Reply-To: <534D1719.40701@ti.com>
-References: <1397497283-16391-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1397497283-16391-3-git-send-email-ivan.khoronzhuk@ti.com>
- <6937937.4J6iI7VpBO@wuerfel> <534D1719.40701@ti.com>
-Message-ID: <5367DE14.8000907@ti.com>
+From: bevenson@melinkcorp.com (Bryan Evenson)
+Date: Mon, 5 May 2014 18:55:11 +0000
+Subject: [BUG] at91: rtc: Uinterruptable sleep state on hwclock -w -u
+Message-ID: <55cab9fba2ea4eed8f73591b37cc874b@BLUPR05MB037.namprd05.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+I am using a variant of the 3.10 kernel on an Atmel AT91SAM9G25.  Specifically, I am using https://github.com/linux4sam/linux-at91/tree/linux-3.10-at91 HEAD revision with some of my own device tree patches to enable/disable peripherals for my system.  I am experiencing a problem that I believe I have tracked down to the AT91 rtc driver, but I am looking for confirmation on the issue I am seeing.  If I call "hwclock -w -u" at the same time in multiple processes, sometimes one of the instances will enter an uninterruptable sleep and access of the RTC will fail until there is a system reboot.  I've traced it down to an ioctl call that does not return, which leads me to believe there is an issue in the AT91 RTC driver.
 
-On 04/15/2014 02:25 PM, Ivan Khoronzhuk wrote:
->
-> On 04/14/2014 09:44 PM, Arnd Bergmann wrote:
->> On Monday 14 April 2014 20:41:20 Ivan Khoronzhuk wrote:
->>> +Optional properties:
->>> +
->>> +- ti,soft-reset:       Boolean option indicating soft reset.
->>> +                       By default hard reset is used.
->>> +
->>> +- ti,wdt_list:         WDT list that can cause SoC reset.
->>> +                       The list in format: <0>, <2>;
->>> +                       Begins from 0 to 3, as keystone can contain up
->>> +                       to 4 SoC reset watchdogs.
->>>
->> This looks like your binding just describes a subset of the
->> watchdog timer registers. If so, don't do a standalone reset
->
-> The registers are not a subset of watchdog hardware it's SoC specific 
-> future
-> controlled by SoC specific registers (bootregs and PLL regs).
->
-> For watchog IP setup, the Keystone uses the watchdog driver common 
-> with other
-> SoCs -- davinci_watchdog that is not depend on other SoC settings like 
-> this driver does.
->
-> The Keystone SoCs have separate registers to tune Keystone2 reset 
-> functionality
-> by configuring Reset multiplexer &  PLL. And it tunes not only 
-> watchdog usage.
-> The keystone SoC can be rebooted in several ways. By external reset 
-> pin, by soft and
-> by watchdogs. This driver allows software reset or reset by one of the 
-> watchdogs
-> (and other settings) independently on watchdog driver settings. This 
-> is job of reset driver.
->
->> It's
->> driver, but instead do a watchdog driver that can also be
->> used for reset, and have a binding that properly describes
->> the watchdog hardware.
->>
->> It is bad to have overlapping register ranges between logical
->
-> WDT doesn't overlap with this driver.
->
->> devices, and it's also generally wrong to describe devices that
->> are not actually there: The hardware contains a watchdog, not
->> a system-reset device, so you should not make one up because
->> it seems easier given the Linux driver model.
->>
->>     Arnd 
+Step to reproduce:
+Run two instances of the following test script in the background:
+----------
+#!/bin/sh
+i=0
+while [ 1 ]; do
+  strace -f -o /home/root/hwclock_output_"$$_$i".txt /sbin/hwclock -w -u
+  : $((i++))
+  sleep 1;
+done
+----------
+On my system, eventually one instance of the hwclock call will enter an uninterruptable sleep; usually happens within a few minutes.  If I print out the strace output file for the hung process using cat, the last line shows something similar to the following:
 
-Hi Arnd,
+3084  ioctl(3, RTC_SET_TIME, {tm_sec=45, tm_min=40, tm_hour=17, tm_mday=5, tm_mon=4, tm_year=114, ...}
 
-Could I do smth additional to make bindings explanation more clear?
-Or this is enough?
+which is an incomplete printout of the ioctl system call.  If this occurs, then any call to hwclock fails until the system is rebooted.  I do not have any other hardware for testing, so I am unsure if this problem can be reproduced on other architectures.  Let me know if you need more detailed information.
 
-I can write like the following:
-Optional properties:
-
-- ti,soft-reset:       Boolean option indicating soft reset.
-                        By default hard reset is used.
-
-- ti,wdt_list:         WDT list that can cause SoC reset. This is not
-                         related to WDT driver, it's just needed to enable
-                         a SoC related reset that is triggered by one of 
-watchdogs.
-                        The list in format: <0>, <2>;
-                        Begins from 0 to 3, as keystone can contain up
-                        to 4 SoC reset watchdogs. Can be in random order.
-
-That is OK?
-
--- 
 Regards,
-Ivan Khoronzhuk
+Bryan
