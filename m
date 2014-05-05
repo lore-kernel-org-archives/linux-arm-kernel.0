@@ -1,64 +1,50 @@
-From: jhovold@gmail.com (Johan Hovold)
-Date: Mon, 5 May 2014 10:37:57 +0200
-Subject: [PATCH 3.14 012/158] ARM: dts: am33xx: correcting dt node unit
- address for usb
-In-Reply-To: <20140504154031.690140742@linuxfoundation.org>
-References: <20140504154029.975081050@linuxfoundation.org>
- <20140504154031.690140742@linuxfoundation.org>
-Message-ID: <20140505083757.GB30739@localhost>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Mon, 05 May 2014 09:44:58 +0100
+Subject: Automatically detecting when to use kirkwood-tsXXX-6281.dtb vs
+ -6282.dtb (Was: Re: [PATCH 21/21] ARM: Kirkwood: Remove DT support)
+In-Reply-To: <20140503144033.GD19833@lunn.ch>
+References: <1391730137-14814-22-git-send-email-andrew@lunn.ch>
+ <52F51922.6030502@gmail.com>
+ <1392892217.23342.18.camel@kazak.uk.xensource.com>
+ <20140220105854.GL11878@lunn.ch>
+ <20140220111913.GZ21483@n2100.arm.linux.org.uk>
+ <1392896356.23342.40.camel@kazak.uk.xensource.com>
+ <20140220232649.GU7862@titan.lakedaemon.net>
+ <1393257630.16570.95.camel@kazak.uk.xensource.com>
+ <20140224162413.GE18601@lunn.ch>
+ <1399123167.23380.163.camel@dagon.hellion.org.uk>
+ <20140503144033.GD19833@lunn.ch>
+Message-ID: <1399279498.13877.3.camel@dagon.hellion.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 04, 2014 at 11:38:41AM -0400, Greg Kroah-Hartman wrote:
-> 3.14-stable review patch.  If anyone has any objections, please let me know.
+On Sat, 2014-05-03 at 16:40 +0200, Andrew Lunn wrote:
+> > However on my 6281 based TS-219 system there seems to be no visible PCI
+> > bus when running the 3.2 kernel in the current Debian stable release
+> > (which of course uses board support). Some info:
+> 
+> The old PCI driver looks to see if there is anything on the bus, and
+> if not, does not register the PCI bus to the PCI core. The new PCI
+> driver always registers the busses, allowing hotplug of PCI devices.
 
-This one should not be backported without commit
+Got it, thanks.
 
-	a2f8d6b30321 ("ARM: dts: am335x: update USB DT references")
+> > Is the lack of anything on the PCI bus itself sufficient to determine
+> > that this is a 6281 based ts219 rather than a 6282 one (I don't have any
+> > 6282 ts219 systems to try)?
+> 
+> No, this is not sufficient, as far as i know. I have a 6282 based
+> ts119. It also does not have any PCI devices. However, the 6282 DT
+> file works fine on it. There is no need to differentiate between 119
+> and 219, just between 6281 and 6282.
 
-which is in Linus' tree but is not marked for stable (or USB will be
-disabled for the boards relying on the old node addresses).
+Thanks.
 
-Thanks,
-Johan
+> Your idea about Ethernet PHY is probably the best way to tell them
+> apart. But i will see if i can find anything else.
 
-> ------------------
-> 
-> From: Mugunthan V N <mugunthanvnm@ti.com>
-> 
-> commit 8abcdd680d543fb582371e146e62ba9f2af8a816 upstream.
-> 
-> DT node's unit address should be its own register offset address to make it a
-> unique across the system. This patch corrects the incorrect USB entries with
-> correct register offset for unit address.
-> 
-> Acked-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-> Acked-by: Felipe Balbi <balbi@ti.com>
-> Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> 
-> ---
->  arch/arm/boot/dts/am33xx.dtsi |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> --- a/arch/arm/boot/dts/am33xx.dtsi
-> +++ b/arch/arm/boot/dts/am33xx.dtsi
-> @@ -448,7 +448,7 @@
->  			ti,hwmods = "usb_otg_hs";
->  			status = "disabled";
->  
-> -			usb_ctrl_mod: control at 44e10000 {
-> +			usb_ctrl_mod: control at 44e10620 {
->  				compatible = "ti,am335x-usb-ctrl-module";
->  				reg = <0x44e10620 0x10
->  					0x44e10648 0x4>;
-> @@ -551,7 +551,7 @@
->  					"tx14", "tx15";
->  			};
->  
-> -			cppi41dma: dma-controller at 07402000 {
-> +			cppi41dma: dma-controller at 47402000 {
->  				compatible = "ti,am3359-cppi41";
->  				reg =  <0x47400000 0x1000
->  					0x47402000 0x1000
+Thanks, I'll start on the PHY base solution, it'll be easy enough to
+switch if something even better gets thought up.
+
+Cheers,
+Ian.
