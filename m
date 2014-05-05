@@ -1,47 +1,44 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Mon, 5 May 2014 19:48:47 +0530
-Subject: [PATCH 5/5] irqchip: crossbar: Change allocation logic by reversing
- search for free irqs
-In-Reply-To: <1399299527-10955-1-git-send-email-r.sricharan@ti.com>
-References: <1399299527-10955-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <1399299527-10955-6-git-send-email-r.sricharan@ti.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon,  5 May 2014 16:20:26 +0200
+Subject: [PATCH 0/5] ARM: mvebu: fixes and improvements for 375 support
+Message-ID: <1399299631-30825-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nishanth Menon <nm@ti.com>
+Hello Jason,
 
-Reverse the search algorithm to ensure that address mapping and IRQ
-allocation logics are proper. This can open up new bugs which are
-easily fixable rather than wait till allocation logic approaches
-the limit to find new bugs.
+Here are five patches making fixes and improvements to the Armada 375
+support. They are related to the fact that we now have access to
+Armada 375 A0 boards (however, Ezequiel still only has access to a Z1
+platform, so we would like to keep Z1 support for now).
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: Sricharan R <r.sricharan@ti.com>
----
- drivers/irqchip/irq-crossbar.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ * Patch 1 is really a fix. It fixes the thermal related quirk that
+   was added by Ezequiel, to make sure it really works on A0 revision.
 
-diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
-index 287d3ce..de021638 100644
---- a/drivers/irqchip/irq-crossbar.c
-+++ b/drivers/irqchip/irq-crossbar.c
-@@ -68,7 +68,7 @@ static inline int get_prev_map_irq(int cb_no)
- {
- 	int i;
- 
--	for (i = 0; i < cb->int_max; i++)
-+	for (i = cb->int_max - 1; i >= 0; i--)
- 		if (cb->irq_map[i] == cb_no)
- 			return i;
- 
-@@ -79,7 +79,7 @@ static inline int allocate_free_irq(int cb_no)
- {
- 	int i;
- 
--	for (i = 0; i < cb->int_max; i++) {
-+	for (i = cb->int_max - 1; i >= 0; i--) {
- 		if (cb->irq_map[i] == IRQ_FREE) {
- 			cb->irq_map[i] = cb_no;
- 			return i;
+ * Patch 2 to 5 make the SMP and coherency workarounds conditional on
+   the Armada 375 Z1. The condition on SMP is really mandatory to get
+   SMP working on A0. For coherency, the WA could be used on A0, but
+   it is useless and hurt performance.
+
+The series is based on your mvebu/soc branch.
+
+Thanks,
+
+Thomas
+
+Thomas Petazzoni (5):
+  ARM: mvebu: fix thermal quirk SoC revision check
+  ARM: mvebu: initialize mvebu-soc-id earlier
+  ARM: mvebu: add Armada 375 A0 revision definition
+  ARM: mvebu: conditionalize Armada 375 SMP workaround
+  ARM: mvebu: conditionalize Armada 375 coherency workaround
+
+ arch/arm/mach-mvebu/board-v7.c     |  2 +-
+ arch/arm/mach-mvebu/coherency.c    |  9 +++++++--
+ arch/arm/mach-mvebu/mvebu-soc-id.c |  2 +-
+ arch/arm/mach-mvebu/mvebu-soc-id.h |  1 +
+ arch/arm/mach-mvebu/platsmp-a9.c   | 22 +++++++++++-----------
+ 5 files changed, 21 insertions(+), 15 deletions(-)
+
 -- 
-1.7.9.5
+1.9.2
