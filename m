@@ -1,105 +1,101 @@
 From: a.kesavan@samsung.com (Abhilash Kesavan)
-Date: Mon,  5 May 2014 21:56:56 +0530
-Subject: [PATCH v5 0/5] MCPM backend for Exynos5420
-Message-ID: <1399307221-8659-1-git-send-email-a.kesavan@samsung.com>
+Date: Mon,  5 May 2014 21:56:57 +0530
+Subject: [PATCH v5 1/5] ARM: EXYNOS: Add generic cpu power control functions
+ for all exynos based SoCs
+In-Reply-To: <1399307221-8659-1-git-send-email-a.kesavan@samsung.com>
+References: <1399307221-8659-1-git-send-email-a.kesavan@samsung.com>
+Message-ID: <1399307221-8659-2-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is v5 of the series adding MCPM backend support for SMP secondary boot
-and core switching on Samsung's Exynos5420. The patches are based on the mcpm
-support added for Exynos5420 in the Chromium kernel repository here:
-https://chromium.googlesource.com/chromiumos/third_party/kernel-next/+/chromeos-3.8
+From: Leela Krishna Amudala <leela.krishna@linaro.org>
 
-This patchset depends on:
-- [v2,1/2] ARM: EXYNOS: Map SYSRAM through generic SRAM bindings
-(https://patchwork.kernel.org/patch/4101091/)
+Add generic cpu power control functions for exynos based SoCS
+for cpu power up/down and to know the cpu status.
 
-The patches have been prepared on linux-next(20140502) and tested on SMDK5420
-EVT1 using the "/dev/b.L_switcher" user interface. Secondary core boot-up has
-also been tested on an Exynos5420-based chromebook.
+Signed-off-by: Leela Krishna Amudala <leela.krishna@linaro.org>
+---
+ arch/arm/mach-exynos/common.h   |    3 +++
+ arch/arm/mach-exynos/pm.c       |   36 ++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-exynos/regs-pmu.h |    6 ++++++
+ 3 files changed, 45 insertions(+)
 
-Changes since v4:
-Addressed the following comments from Nicolas Pitre:
-	- Fixed the location of L2 prefetching disable code.
-	- Fixed the location of the "TODO" comment.
-	- Fixed a possible race in mcpm cluster state check in
-	  exynos_power_up().
-	
-Changes since v3:
-	- Rebased on top of the latest SYSRAM DT patchset from Sachin Kamat.
-
-Addressed the following comments from Lorenzo Pieralisi and Nicolas Pitre:
-	- Dropped the patch "arm: exynos: Add /dev/bL_status user interface on
-	  Exynos5420".
-	- Fixed the header ordering and removed unnecessary header inclusions.
-	- Made the code symmetric in exynos_cluster_power_control().
-	- Fixed the error path in exynos_power_up.
-	- Got rid of "cnt" variable used for last man checking.
-	- Removed stale comments.
-	- Replaced "soc_is" with "of_find_compatible_node" check for exynos5420.
-	- Added L2 prefetching disable code needed during A15 power down.
-
-Changes since v2:
-Addressed the following comments from Nicolas Pitre and Daniel Lezcano:
-	- Added generic common (cluster) configuration functions to pm.c
-	  which may be used by other subsystems.
-	- Removed unused "cpumask" variable in mcpm code.
-	- Re-worked exynos_power_down_finish() referencing the tc2_pm code.
-	- Removed the status checks in core and cluster power functions. We
-	  just set the power control bit and do not check the previous state
-	  anymore.
-	- Removed incorrect jiffies timeout usage in path where IRQs are
-	  disabled.
-
-Changes since v1:
-Addressed the following comments from Dave Martin and Nicolas Pitre:
-	- Fixed help text for EXYNOS5420_MCPM symbol.
-	- Removed mcpm-exynos-setup.S file and added similar code from tc2_pm.c.
-	- Changed the spinlock name from "bl_lock" to "exynos_mcpm_lock".
-	- Removed snoop enable/disable calls due to possible cpuidle issue and
-	  not having numbers proving a significant power savings. Dropped the
-	  "drivers/bus: arm-cci: Add common control interface for ACE ports"
-	  patch from v1 as it was no longer needed.
-	- Created a macro for exynos-specific v7_exit_coherency_flush which
-	  handles an erratum. This was done to prevent duplication of code.
-	- Removed "outer_flush_all" call.
-	- Removed redundant dsb in power_down function.
-	- Removed unnecessary initialization of global variables to zero.
-	- Split the /dev/bL_status debug interface into another patch.
-	- Fixed error handling in exynos_mcpm_init().
-	- Called mcpm_smp_set_ops directly from exynos_mcpm_init().
-	- Added a TODO for supporting cluster down on exynos5420.
-
-NOTE:
-- Have added Leela Krishna's generic cpu power control function series
-  as part of this patchset.
-- Only the patch "arm: exynos: Add MCPM call-back functions" has changed
-  from v3.
-- I have tested with and without the erratum 799270 workaround and both
-  work fine. I have kept the erratum fix for the time being.
-
-Abhilash Kesavan (2):
-  arm: exynos: Add generic cluster power control functions
-  arm: exynos: Add MCPM call-back functions
-
-Andrew Bresticker (1):
-  ARM: dts: exynos5420: add CCI node
-
-Leela Krishna Amudala (2):
-  ARM: EXYNOS: Add generic cpu power control functions for all exynos
-    based SoCs
-  ARM: EXYNOS: use generic exynos cpu power control functions
-
- arch/arm/boot/dts/exynos5420.dtsi  |   27 +++
- arch/arm/mach-exynos/Kconfig       |    8 +
- arch/arm/mach-exynos/Makefile      |    2 +
- arch/arm/mach-exynos/common.h      |    6 +
- arch/arm/mach-exynos/mcpm-exynos.c |  344 ++++++++++++++++++++++++++++++++++++
- arch/arm/mach-exynos/platsmp.c     |    9 +-
- arch/arm/mach-exynos/pm.c          |   66 +++++++
- arch/arm/mach-exynos/regs-pmu.h    |   15 ++
- 8 files changed, 471 insertions(+), 6 deletions(-)
- create mode 100644 arch/arm/mach-exynos/mcpm-exynos.c
-
+diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+index 47cbab0..a7dbb5f 100644
+--- a/arch/arm/mach-exynos/common.h
++++ b/arch/arm/mach-exynos/common.h
+@@ -63,5 +63,8 @@ struct exynos_pmu_conf {
+ };
+ 
+ extern void exynos_sys_powerdown_conf(enum sys_powerdown mode);
++extern void exynos_cpu_powerdown(int cpu);
++extern void exynos_cpu_powerup(int cpu);
++extern int  exynos_cpu_power_state(int cpu);
+ 
+ #endif /* __ARCH_ARM_MACH_EXYNOS_COMMON_H */
+diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+index 15af0ce..6651028 100644
+--- a/arch/arm/mach-exynos/pm.c
++++ b/arch/arm/mach-exynos/pm.c
+@@ -100,6 +100,42 @@ static int exynos_irq_set_wake(struct irq_data *data, unsigned int state)
+ 	return -ENOENT;
+ }
+ 
++/**
++ * exynos_cpu_powerdown : power down the specified cpu
++ * @cpu : the cpu to power down
++ *
++ * Power downs the specified cpu. The sequence must be finished by a
++ * call to cpu_do_idle()
++ *
++ */
++void exynos_cpu_powerdown(int cpu)
++{
++	__raw_writel(0, EXYNOS_ARM_CORE_CONFIGURATION(cpu));
++}
++
++/**
++ * exynos_cpu_powerup : power up the specified cpu
++ * @cpu : the cpu to power up
++ *
++ * Power up the specified cpu
++ */
++void exynos_cpu_powerup(int cpu)
++{
++	__raw_writel(S5P_CORE_LOCAL_PWR_EN,
++		     EXYNOS_ARM_CORE_CONFIGURATION(cpu));
++}
++
++/**
++ * exynos_cpu_power_state : returns the power state of the cpu
++ * @cpu : the cpu to retrieve the power state from
++ *
++ */
++int exynos_cpu_power_state(int cpu)
++{
++	return (__raw_readl(EXYNOS_ARM_CORE_STATUS(cpu)) &
++			S5P_CORE_LOCAL_PWR_EN);
++}
++
+ /* For Cortex-A9 Diagnostic and Power control register */
+ static unsigned int save_arm_register[2];
+ 
+diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
+index 4f6a256..0bdfcbc 100644
+--- a/arch/arm/mach-exynos/regs-pmu.h
++++ b/arch/arm/mach-exynos/regs-pmu.h
+@@ -121,6 +121,12 @@
+ 
+ #define S5P_CHECK_SLEEP				0x00000BAD
+ 
++#define EXYNOS_ARM_CORE0_CONFIGURATION		S5P_PMUREG(0x2000)
++#define EXYNOS_ARM_CORE_CONFIGURATION(_nr)	\
++			(EXYNOS_ARM_CORE0_CONFIGURATION + (0x80 * (_nr)))
++#define EXYNOS_ARM_CORE_STATUS(_nr)		\
++			(EXYNOS_ARM_CORE_CONFIGURATION(_nr) + 0x4)
++
+ /* Only for EXYNOS4210 */
+ #define S5P_CMU_CLKSTOP_LCD1_LOWPWR	S5P_PMUREG(0x1154)
+ #define S5P_CMU_RESET_LCD1_LOWPWR	S5P_PMUREG(0x1174)
 -- 
 1.7.9.5
