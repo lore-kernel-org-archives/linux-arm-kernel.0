@@ -1,87 +1,49 @@
-From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Mon, 05 May 2014 14:50:58 +0400
-Subject: [PATCH] arm: put_user: fix possible data corruption in put_user
-In-Reply-To: <20140505090126.GD3693@n2100.arm.linux.org.uk>
-References: <1399270438-26181-1-git-send-email-a.ryabinin@samsung.com>
- <20140505090126.GD3693@n2100.arm.linux.org.uk>
-Message-ID: <53676D12.9040300@samsung.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 05 May 2014 12:57:12 +0200
+Subject: [PATCH 0/7] ARM: EXYNOS: cpuidle: fix AFTR mode on boards with secure
+ firmware enabled
+Message-ID: <1399287439-31376-1-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/05/14 13:01, Russell King - ARM Linux wrote:
-> On Mon, May 05, 2014 at 10:13:58AM +0400, Andrey Ryabinin wrote:
->> According to arm procedure call standart r2 register is call-cloberred.
->> So after the result of x expression was put into r2 any following
->> function call in p may overwrite r2. To fix this, the result of p
->> expression must be saved to the temporary variable before the
->> assigment x expression to __r2.
-> 
-> This and the patch make no sense.  You talk about r2, but you're doing
-> nothing with r2 in the patch.
-> 
+Hi,
 
-No, you didn't get it. I'll try to explain better.
+This patch series fixes support for AFTR idle mode on boards with
+secure firmware enabled (it also includes fix for register setup on
+EXYNOS4x12 SoCs).  It has been tested on Trats2 target but should
+also work on (EXYNOS4412 based) Insignal Origen board.
 
-Lets consider following example:
+This patchset depends on "[PATCH V5 00/20] ARM: exynos: cpuidle:
+Move the driver to drivers/cpuidle" patch series from Daniel Lezcano
+("http://www.spinics.net/lists/linux-samsung-soc/msg28494.html").
 
-unsigned int __user *get_address(void);
-...
-	put_user(1, get_address());
-...
-
-Pay attention that in get_address function register r2  may be used.
-In above example, without my patch, put_user macro will be expanded to the following code:
-
-...
-	register const unsigned int __r2 asm("r2") = (1);
-	register const unsigned int __user *__p asm("r0") = (get_address());
-...
-
-At first we put value 1 into r2 register. After that get_address is called, and clobbers r2 register.
-This means that after assignment to variable __p, register r2 may no longer contain a valid value - 1.
-
-My patch put get_address calls befor the assignment of (x) to __r2.
-With my patch, put_user macro will be expanded to the following code:
-
-...
-	const unsigned int __user *tmp_p = (get_address());
-	register const unsigned int __r2 asm("r2") = (1);
-	register const unsigned int __user *__p asm("r0") = tmp_p;
-...
-
-In this time get_address() call happens before loading 1 to r2, so it won't be corrupted.
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
 
 
-Here is the full code of test, so anyone could check.
+Bartlomiej Zolnierkiewicz (5):
+  ARM: EXYNOS: add AFTR mode support to firmware do_idle method
+  ARM: EXYNOS: PM: replace EXYNOS_BOOT_VECTOR_* macros by static inlines
+  ARM: EXYNOS: PM: use c15resume firmware method if secure firmware is
+    enabled
+  ARM: EXYNOS: PM: fix register setup on EXYNOS4x12 for AFTR mode code
+  ARM: EXYNOS: cpuidle: add secure firmware support to AFTR mode code
 
-#include <linux/kernel.h>
-#include <linux/module.h>
-#include <linux/uaccess.h>
+Kyungmin Park (1):
+  arm: firmware: Check firmware is running or not
 
-unsigned int x = 0;
-unsigned int y = 0;
+Tomasz Figa (1):
+  ARM: EXYNOS: add support for firmware-assisted c15resume
 
-/* get_address returns address of x, and clobbers r2 register */
-unsigned int __user *get_address(void)
-{
-	mm_segment_t oldfs;
-	oldfs = get_fs();
-	set_fs(get_ds());
-	put_user(2, &y); /* this put_user call will put value 2 in register r2 */
-	set_fs(oldfs);
-	return &x;
-}
+ arch/arm/common/firmware.c       |  5 +++++
+ arch/arm/include/asm/firmware.h  | 14 +++++++++++++-
+ arch/arm/mach-exynos/firmware.c  | 18 ++++++++++++++++--
+ arch/arm/mach-exynos/pm.c        | 40 ++++++++++++++++++++++++++++++++--------
+ drivers/cpuidle/cpuidle-exynos.c |  7 ++++++-
+ 5 files changed, 72 insertions(+), 12 deletions(-)
 
-static __init int test_init(void)
-{
-	mm_segment_t oldfs;
-	oldfs = get_fs();
-	set_fs(get_ds());
-	put_user(1, get_address()); /* put 1 to x */
-	set_fs(oldfs);
-
-	printk("\nput_user_test: value %x\n\n", *get_address()); /* this will print "put_user_test: value 2" instead of "put_user_test: value 1"
-	return 0;
-}
-
-module_init(test_init);
+-- 
+1.8.2.3
