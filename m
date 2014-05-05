@@ -1,78 +1,51 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon,  5 May 2014 16:20:30 +0200
-Subject: [PATCH 4/5] ARM: mvebu: conditionalize Armada 375 SMP workaround
+Date: Mon,  5 May 2014 16:20:31 +0200
+Subject: [PATCH 5/5] ARM: mvebu: conditionalize Armada 375 coherency workaround
 In-Reply-To: <1399299631-30825-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1399299631-30825-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1399299631-30825-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1399299631-30825-6-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada 375 SMP workaround only needs to be applied to the Z1
+The Armada 375 coherency workaround only needs to be applied to the Z1
 revision of the SoC. The A0 and later revisions have been fixed, and
 no longer need this workaround.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-mvebu/platsmp-a9.c | 22 +++++++++++-----------
- 1 file changed, 11 insertions(+), 11 deletions(-)
+ arch/arm/mach-mvebu/coherency.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-mvebu/platsmp-a9.c b/arch/arm/mach-mvebu/platsmp-a9.c
-index 04d0b18..6038c1d 100644
---- a/arch/arm/mach-mvebu/platsmp-a9.c
-+++ b/arch/arm/mach-mvebu/platsmp-a9.c
-@@ -20,6 +20,7 @@
- #include <asm/smp_scu.h>
- #include <asm/smp_plat.h>
- #include "common.h"
+diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+index 489edd1..673c830 100644
+--- a/arch/arm/mach-mvebu/coherency.c
++++ b/arch/arm/mach-mvebu/coherency.c
+@@ -33,6 +33,7 @@
+ #include <asm/cacheflush.h>
+ #include "armada-370-xp.h"
+ #include "coherency.h"
 +#include "mvebu-soc-id.h"
- #include "pmsu.h"
  
- #define CRYPT0_ENG_ID   41
-@@ -53,8 +54,6 @@ static int __cpuinit mvebu_cortex_a9_boot_secondary(unsigned int cpu,
+ unsigned long coherency_phys_base;
+ static void __iomem *coherency_base;
+@@ -361,12 +362,16 @@ int __init coherency_init(void)
+ static int __init coherency_late_init(void)
  {
- 	int ret, hw_cpu;
+ 	int type = coherency_type();
++	u32 dev, rev;
  
--	pr_info("Booting CPU %d\n", cpu);
--
- 	/*
- 	 * Write the address of secondary startup into the system-wide
- 	 * flags register. The boot monitor waits until it receives a
-@@ -63,11 +62,19 @@ static int __cpuinit mvebu_cortex_a9_boot_secondary(unsigned int cpu,
- 	 */
- 	hw_cpu = cpu_logical_map(cpu);
+ 	if (type == COHERENCY_FABRIC_TYPE_NONE)
+ 		return 0;
  
--	if (of_machine_is_compatible("marvell,armada375"))
-+	if (of_machine_is_compatible("marvell,armada375")) {
-+		u32 dev, rev;
-+
+-	if (type == COHERENCY_FABRIC_TYPE_ARMADA_375)
+-		armada_375_coherency_init_wa();
++	if (type == COHERENCY_FABRIC_TYPE_ARMADA_375) {
 +		if (mvebu_get_soc_id(&dev, &rev) == 0 &&
 +		    rev == ARMADA_375_Z1_REV)
-+			armada_375_smp_cpu1_enable_wa();
-+
- 		mvebu_system_controller_set_cpu_boot_addr(mvebu_cortex_a9_secondary_startup);
--	else
-+	}
-+	else {
- 		mvebu_pmsu_set_cpu_boot_addr(hw_cpu,
- 					     mvebu_cortex_a9_secondary_startup);
++			armada_375_coherency_init_wa();
 +	}
  
- 	smp_wmb();
- 	ret = mvebu_cpu_reset_deassert(hw_cpu);
-@@ -80,14 +87,7 @@ static int __cpuinit mvebu_cortex_a9_boot_secondary(unsigned int cpu,
- 	return 0;
- }
- 
--static void __init mvebu_cortex_a9_smp_prepare_cpus(unsigned int max_cpus)
--{
--	if (of_machine_is_compatible("marvell,armada375"))
--		armada_375_smp_cpu1_enable_wa();
--}
--
- static struct smp_operations mvebu_cortex_a9_smp_ops __initdata = {
--	.smp_prepare_cpus	= mvebu_cortex_a9_smp_prepare_cpus,
- 	.smp_boot_secondary	= mvebu_cortex_a9_boot_secondary,
- #ifdef CONFIG_HOTPLUG_CPU
- 	.cpu_die		= armada_xp_cpu_die,
+ 	bus_register_notifier(&platform_bus_type,
+ 			      &mvebu_hwcc_platform_nb);
 -- 
 1.9.2
