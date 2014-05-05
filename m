@@ -1,40 +1,37 @@
 From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Mon,  5 May 2014 14:57:18 +0530
-Subject: [Patch v4 3/5] driver: cpuidle: cpuidle-big-little: init driver for
+Date: Mon,  5 May 2014 14:57:19 +0530
+Subject: [Patch v4 4/5] exynos: cpuidle: do not allow cpuidle registration for
  Exynos5420
 In-Reply-To: <1399282040-8995-1-git-send-email-chander.kashyap@linaro.org>
 References: <1399278444-8312-3-git-send-email-chander.kashyap@linaro.org>
  <1399282040-8995-1-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <1399282040-8995-4-git-send-email-chander.kashyap@linaro.org>
+Message-ID: <1399282040-8995-5-git-send-email-chander.kashyap@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add "samsung,exynos5420" compatible string to initialize generic
-big-little cpuidle driver for Exynos5420.
+Exynos5420 is big.Little Soc. It uses cpuidle-big-litle generic cpuidle driver.
+Hence do not allow exynos cpuidle driver registration for Exynos5420.
 
 Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
 Signed-off-by: Chander Kashyap <k.chander@samsung.com>
 Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
-Changes in v4: None
-Changes in v3:
-	1. Add compatible string to of_device_id table insted comparing directoly
-Changes in v2: none
+ arch/arm/mach-exynos/cpuidle.c |    3 +++
+ 1 file changed, 3 insertions(+)
 
- drivers/cpuidle/cpuidle-big_little.c |    1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/cpuidle/cpuidle-big_little.c b/drivers/cpuidle/cpuidle-big_little.c
-index 4cd02bd..344d79fa 100644
---- a/drivers/cpuidle/cpuidle-big_little.c
-+++ b/drivers/cpuidle/cpuidle-big_little.c
-@@ -165,6 +165,7 @@ static int __init bl_idle_driver_init(struct cpuidle_driver *drv, int cpu_id)
+diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
+index c57cae0..242f75d 100644
+--- a/arch/arm/mach-exynos/cpuidle.c
++++ b/arch/arm/mach-exynos/cpuidle.c
+@@ -219,6 +219,9 @@ static int exynos_cpuidle_probe(struct platform_device *pdev)
+ 	int cpu_id, ret;
+ 	struct cpuidle_device *device;
  
- static const struct of_device_id compatible_machine_match[] = {
- 	{ .compatible = "arm,vexpress,v2p-ca15_a7" },
-+	{ .compatible = "samsung,exynos5420" },
- 	{},
- };
++	if (soc_is_exynos5420())
++		return -ENODEV;
++
+ 	if (soc_is_exynos5250())
+ 		exynos5_core_down_clk();
  
 -- 
 1.7.9.5
