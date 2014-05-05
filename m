@@ -1,118 +1,103 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 5 May 2014 17:43:24 -0400
-Subject: [PATCH v3 5/7] ARM: dma: Use dma_pfn_offset for dma address
- translation
-In-Reply-To: <20140505195040.GE3693@n2100.arm.linux.org.uk>
-References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
- <1398353407-2345-6-git-send-email-santosh.shilimkar@ti.com>
- <20140502145852.GC3693@n2100.arm.linux.org.uk> <5363B42C.4010404@ti.com>
- <20140505195040.GE3693@n2100.arm.linux.org.uk>
-Message-ID: <536805FC.8090406@ti.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Mon, 5 May 2014 16:44:25 -0500
+Subject: [PATCHv5 RFC 12/15] hwspinlock/core: add OF helper to parse
+ reserved locks
+In-Reply-To: <1398904476-26200-13-git-send-email-s-anna@ti.com>
+References: <1398904476-26200-1-git-send-email-s-anna@ti.com>
+ <1398904476-26200-13-git-send-email-s-anna@ti.com>
+Message-ID: <53680639.1080405@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 05 May 2014 03:50 PM, Russell King - ARM Linux wrote:
-> On Fri, May 02, 2014 at 11:05:16AM -0400, Santosh Shilimkar wrote:
->> On Friday 02 May 2014 10:58 AM, Russell King - ARM Linux wrote:
->>> On Thu, Apr 24, 2014 at 11:30:05AM -0400, Santosh Shilimkar wrote:
->>>>  static inline void *dma_to_virt(struct device *dev, dma_addr_t addr)
->>>>  {
->>>> -	return (void *)__bus_to_virt((unsigned long)addr);
->>>> +	if (!dev)
->>>> +		return (void *)__bus_to_virt((unsigned long)addr);
->>>> +	else
->>>> +		return (void *)__bus_to_virt(__pfn_to_bus(dma_to_pfn(dev, addr)));
->>>
->>> This is quite horrendous.  There's easier ways to do this...  I assume
->>> you haven't looked at the assembler resulting from this at all with
->>> stuff like the p2v patching enabled?
->>>
->> I haven't. Will check.
+Hi Rob,
+
+On 04/30/2014 07:34 PM, Suman Anna wrote:
+> The property 'hwlock-reserved-locks' will be used to represent
+> the number of locks to be reserved for clients that would need
+> to request/operate on specific locks. A new OF helper function,
+> of_hwspin_lock_get_num_reserved_locks(), is added to minimize
+> duplication in different platform implementations.
 > 
-> 	if (dev) {
-> 		unsigned long pfn = dma_to_pfn(dev, addr);
+> The function will return a value of 0 if the property is not
+> defined, so as to support a default behavior of marking all
+> locks as unused and open for anonymous allocations.
 > 
-> 		return phys_to_virt(__pfn_to_phys(pfn));
-> 	}
+> Signed-off-by: Suman Anna <s-anna@ti.com>
+> ---
+>  .../devicetree/bindings/hwlock/hwlock.txt          |  3 +++
+>  drivers/hwspinlock/hwspinlock_core.c               | 25 ++++++++++++++++++++++
+>  include/linux/hwspinlock.h                         |  1 +
+>  3 files changed, 29 insertions(+)
 > 
-> 	return (void *)__bus_to_virt((unsigned long)addr);
+> diff --git a/Documentation/devicetree/bindings/hwlock/hwlock.txt b/Documentation/devicetree/bindings/hwlock/hwlock.txt
+> index d538a9b..88d16d2 100644
+> --- a/Documentation/devicetree/bindings/hwlock/hwlock.txt
+> +++ b/Documentation/devicetree/bindings/hwlock/hwlock.txt
+> @@ -18,6 +18,9 @@ Common properties:
+>  			property is needed on hwlock devices, where the number
+>  			of supported locks within a hwlock device cannot be
+>  			read from a register.
+> +- hwlock-reserved-locks: Number of locks to reserve for clients requiring
+> +			specific locks. This value cannot exceed the value of
+> +			hwlock-num-locks.
+
+Any suggestions here on the approach? This property falls into a gray
+area as well, as the current approach is somewhat limiting (it doesn't
+support sparse reserved locks, and expects them at the beginning of the
+lock range).
+
+regards
+Suman
+
+>  - hwlock-base-id:	An unique base Id for the locks for a particular hwlock
+>  			device. This property is mandatory ONLY if a SoC has
+>  			several hwlock devices.
+> diff --git a/drivers/hwspinlock/hwspinlock_core.c b/drivers/hwspinlock/hwspinlock_core.c
+> index e05cea8..e74b55b 100644
+> --- a/drivers/hwspinlock/hwspinlock_core.c
+> +++ b/drivers/hwspinlock/hwspinlock_core.c
+> @@ -286,6 +286,31 @@ int of_hwspin_lock_get_base_id(struct device_node *dn)
+>  EXPORT_SYMBOL_GPL(of_hwspin_lock_get_base_id);
+>  
+>  /**
+> + * of_hwspin_lock_get_num_reserved_locks() - retrieve number of reserved locks
+> + * @dn: device node pointer
+> + *
+> + * This is an OF helper function that can be called by the underlying platform
+> + * specific implementations, to retrieve the number of locks to reserve from
+> + * the hwspinlock device instance's base id. The hwlock-reserved-locks DT
+> + * property needs to be defined for requesting any DT-based locks.
+> + *
+> + * Returns a positive number of locks on success, a default value of 0 if the
+> + * property is missing or an appropriate error code as returned by the OF layer
+> + */
+> +int of_hwspin_lock_get_num_reserved_locks(struct device_node *dn)
+> +{
+> +	unsigned int val = 0;
+> +	int ret;
+> +
+> +	ret = of_property_read_u32(dn, "hwlock-reserved-locks", &val);
+> +	if (!ret || ret == -EINVAL)
+> +		ret = val;
+> +
+> +	return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(of_hwspin_lock_get_num_reserved_locks);
+> +
+> +/**
+>   * of_hwspin_lock_get_num_locks() - OF helper to retrieve number of locks
+>   * @dn: device node pointer
+>   *
+> diff --git a/include/linux/hwspinlock.h b/include/linux/hwspinlock.h
+> index d120035..d18431f 100644
+> --- a/include/linux/hwspinlock.h
+> +++ b/include/linux/hwspinlock.h
+> @@ -69,6 +69,7 @@ int of_hwspin_lock_simple_xlate(struct hwspinlock_device *bank,
+>  				const struct of_phandle_args *hwlock_spec);
+>  int of_hwspin_lock_get_base_id(struct device_node *dn);
+>  int of_hwspin_lock_get_num_locks(struct device_node *dn);
+> +int of_hwspin_lock_get_num_reserved_locks(struct device_node *dn);
+>  int hwspin_lock_register(struct hwspinlock_device *bank, struct device *dev,
+>  		const struct hwspinlock_ops *ops, int base_id, int num_locks,
+>  		int num_reserved_locks);
 > 
-Thanks a lot Russell. Updated patch below for archive records.
-
->From 97a6f063270265d03ffcb010b9dc156b274631e7 Mon Sep 17 00:00:00 2001
-From: Grygorii Strashko <grygorii.strashko@ti.com>
-Date: Thu, 24 Apr 2014 11:30:05 -0400
-Subject: [PATCH v3 5/7] ARM: dma: Use dma_pfn_offset for dma address
- translation
-
-In most of cases DMA addresses can be performed using offset value of
- Bus address space relatively to physical address space as following:
-
-PFN->DMA:
- __pfn_to_phys(pfn + [-]dma_pfn_offset)
-
-DMA->PFN:
- __phys_to_pfn(dma_addr) + [-]dma_pfn_offset
-
-Thanks to Russell King for suggesting the optimised macro's for
-conversion.
-
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Olof Johansson <olof@lixom.net>
-Cc: Grant Likely <grant.likely@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Reviewed-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/include/asm/dma-mapping.h |   18 +++++++++++++++++-
- 1 file changed, 17 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-index e701a4d..b0c79fd 100644
---- a/arch/arm/include/asm/dma-mapping.h
-+++ b/arch/arm/include/asm/dma-mapping.h
-@@ -58,21 +58,37 @@ static inline int dma_set_mask(struct device *dev, u64 mask)
- #ifndef __arch_pfn_to_dma
- static inline dma_addr_t pfn_to_dma(struct device *dev, unsigned long pfn)
- {
-+	if (dev)
-+		pfn -= dev->dma_pfn_offset;
- 	return (dma_addr_t)__pfn_to_bus(pfn);
- }
- 
- static inline unsigned long dma_to_pfn(struct device *dev, dma_addr_t addr)
- {
--	return __bus_to_pfn(addr);
-+	unsigned long pfn = __bus_to_pfn(addr);
-+
-+	if (dev)
-+		pfn += dev->dma_pfn_offset;
-+
-+	return pfn;
- }
- 
- static inline void *dma_to_virt(struct device *dev, dma_addr_t addr)
- {
-+	if (dev) {
-+		unsigned long pfn = dma_to_pfn(dev, addr);
-+
-+		return phys_to_virt(__pfn_to_phys(pfn));
-+	}
-+
- 	return (void *)__bus_to_virt((unsigned long)addr);
- }
- 
- static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
- {
-+	if (dev)
-+		return pfn_to_dma(dev, virt_to_pfn(addr));
-+
- 	return (dma_addr_t)__virt_to_bus((unsigned long)(addr));
- }
- 
--- 
-1.7.9.5
