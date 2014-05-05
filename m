@@ -1,51 +1,46 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon,  5 May 2014 16:20:31 +0200
-Subject: [PATCH 5/5] ARM: mvebu: conditionalize Armada 375 coherency workaround
-In-Reply-To: <1399299631-30825-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1399299631-30825-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1399299631-30825-6-git-send-email-thomas.petazzoni@free-electrons.com>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Mon, 5 May 2014 19:52:24 +0530
+Subject: [PATCH v2 0/6] Add CPTS support for AM437x
+In-Reply-To: <1399012324-20737-1-git-send-email-george.cherian@ti.com>
+References: <1399012324-20737-1-git-send-email-george.cherian@ti.com>
+Message-ID: <53679EA0.3050606@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada 375 coherency workaround only needs to be applied to the Z1
-revision of the SoC. The A0 and later revisions have been fixed, and
-no longer need this workaround.
+On Friday 02 May 2014 12:01 PM, George Cherian wrote:
+> The series adds CPTS support for AM4372.
+>
+> Patch 1 - DT changes w.r.t clock changes for AM33xx.
+> Patch 2 - CPTS clock name harcoding in the driver is removed. 
+> 	  Easier to pass the clock name from dt rather than hardcoding in driver.
+> 	  Also in prepration for DRA7x CPTS support.
+> Patch 3 - Enable the CPTS support for both DRA7x and AM4372 in the driver.
+> Patch 4 - Enable the Annexe F for L2 PTP for AM437x and DRA7x.
+> Patch 5 - Change the default clocksource to dpll_core_m5 
+> Patch 6 - DT changes for AM4372.
+>
+>
+> v1 -> v2
+> 	Patch 1 and 2 Re-ordering.
+> 	Seperate TS_BITS define for Hw version V2 and V3
+>
+> George Cherian (6):
+>   ARM: dts: am33xx: Add clock names for cpsw and cpts
+>   drivers: net: cpts: Remove hardcoded clock name for CPTS
+>   drivers: net: cpsw: Enable CPTS for DRA7xx and AM4372
+>   drivers: net: cpsw: Enable Annexe F Time sync
+>   ARM: AM43xx: clk: Change the cpts ref clock source to dpll_core_m5 clk
+>   ARM: dts: am4372: Add clock names for cpsw and cpts
+>
+>  arch/arm/boot/dts/am33xx.dtsi  |  2 ++
+>  arch/arm/boot/dts/am4372.dtsi  |  2 ++
+>  drivers/clk/ti/clk-43xx.c      | 16 ++++++++++++
+>  drivers/net/ethernet/ti/cpsw.c | 56 +++++++++++++++++++++++++++++++-----------
+>  drivers/net/ethernet/ti/cpts.c | 11 +++------
+>  5 files changed, 66 insertions(+), 21 deletions(-)
+>
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/mach-mvebu/coherency.c | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+Acked-by: Mugunthan V N <mugunthanvnm@ti.com>
 
-diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-index 489edd1..673c830 100644
---- a/arch/arm/mach-mvebu/coherency.c
-+++ b/arch/arm/mach-mvebu/coherency.c
-@@ -33,6 +33,7 @@
- #include <asm/cacheflush.h>
- #include "armada-370-xp.h"
- #include "coherency.h"
-+#include "mvebu-soc-id.h"
- 
- unsigned long coherency_phys_base;
- static void __iomem *coherency_base;
-@@ -361,12 +362,16 @@ int __init coherency_init(void)
- static int __init coherency_late_init(void)
- {
- 	int type = coherency_type();
-+	u32 dev, rev;
- 
- 	if (type == COHERENCY_FABRIC_TYPE_NONE)
- 		return 0;
- 
--	if (type == COHERENCY_FABRIC_TYPE_ARMADA_375)
--		armada_375_coherency_init_wa();
-+	if (type == COHERENCY_FABRIC_TYPE_ARMADA_375) {
-+		if (mvebu_get_soc_id(&dev, &rev) == 0 &&
-+		    rev == ARMADA_375_Z1_REV)
-+			armada_375_coherency_init_wa();
-+	}
- 
- 	bus_register_notifier(&platform_bus_type,
- 			      &mvebu_hwcc_platform_nb);
--- 
-1.9.2
+Regards
+Mugunthan V N
