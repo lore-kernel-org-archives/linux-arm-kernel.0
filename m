@@ -1,149 +1,34 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 5 May 2014 17:08:45 -0500
-Subject: [PATCH v3 4/7] of: configure the platform device dma parameters
-In-Reply-To: <536806F4.1090904@ti.com>
-References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
- <1398353407-2345-5-git-send-email-santosh.shilimkar@ti.com>
- <CAL_Jsq+nh26NZXx-9Y5FTxWZdVrG7aLTOBhC4j9P8mPPvUu2ag@mail.gmail.com>
- <536806F4.1090904@ti.com>
-Message-ID: <CAL_JsqL07fGB4Xp-aZZsj+K-UH91v-1WVmtSq+xFoA4xoJ+HwQ@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 5 May 2014 15:14:15 -0700
+Subject: [GIT PULL] SOCFPGA driver updates for 3.16
+In-Reply-To: <1398466670-8341-2-git-send-email-dinguyen@altera.com>
+References: <1398466670-8341-1-git-send-email-dinguyen@altera.com>
+ <1398466670-8341-2-git-send-email-dinguyen@altera.com>
+Message-ID: <20140505221415.GJ29245@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 5, 2014 at 4:47 PM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-> On Thursday 01 May 2014 08:49 PM, Rob Herring wrote:
->> On Thu, Apr 24, 2014 at 10:30 AM, Santosh Shilimkar
->> <santosh.shilimkar@ti.com> wrote:
+On Fri, Apr 25, 2014 at 05:57:50PM -0500, dinguyen at altera.com wrote:
+> Hi Arnd, Kevin, and Olof,
+> 
+> Please consider pulling in this patch for 3.16. It adds a reset driver for
+> the SOCFPGA platform.
+> 
+> Thanks,
+> Dinh
+> 
+> The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+> 
+>   Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga-driver-update-for-3.16
+> 
+> for you to fetch changes up to a39a493932dfc534cb761d6f95861a281e57c1e7:
+> 
+>   reset: add driver for socfpga (2014-04-25 17:40:08 -0500)
 
-> Updated patch with above minor updates.
->
-> From 80a9f06a09a90801d8ee337d9b2d155c43da8f23 Mon Sep 17 00:00:00 2001
-> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Date: Thu, 24 Apr 2014 11:30:04 -0400
-> Subject: [PATCH v3 4/7] of: configure the platform device dma parameters
->
-> Retrieve DMA configuration from DT and setup platform device's DMA
-> parameters. The DMA configuration in DT has to be specified using
-> "dma-ranges" and "dma-coherent" properties if supported.
->
-> We setup dma_pfn_offset using "dma-ranges" and dma_coherent_ops
-> using "dma-coherent" device tree properties.
->
-> The set_arch_dma_coherent_ops macro has to be defined by arch if
-> it supports coherent dma_ops. Otherwise, set_arch_dma_coherent_ops() is
-> declared as nop.
->
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Grant Likely <grant.likely@linaro.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Merged into next/drivers, thanks!
 
-Reviewed-by: Rob Herring <robh@kernel.org>
-
-> ---
->  drivers/of/platform.c       |   55 ++++++++++++++++++++++++++++++++++++++-----
->  include/linux/dma-mapping.h |    7 ++++++
->  2 files changed, 56 insertions(+), 6 deletions(-)
->
-> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> index 404d1da..b71e089 100644
-> --- a/drivers/of/platform.c
-> +++ b/drivers/of/platform.c
-> @@ -187,6 +187,54 @@ struct platform_device *of_device_alloc(struct device_node *np,
->  EXPORT_SYMBOL(of_device_alloc);
->
->  /**
-> + * of_dma_configure - Setup DMA configuration
-> + * @dev:       Device to apply DMA configuration
-> + *
-> + * Try to get devices's DMA configuration from DT and update it
-> + * accordingly.
-> + *
-> + * In case if platform code need to use own special DMA configuration,it
-> + * can use Platform bus notifier and handle BUS_NOTIFY_ADD_DEVICE event
-> + * to fix up DMA configuration.
-> + */
-> +static void of_dma_configure(struct platform_device *pdev)
-> +{
-> +       u64 dma_addr, paddr, size;
-> +       int ret;
-> +       struct device *dev = &pdev->dev;
-> +
-> +#if defined(CONFIG_MICROBLAZE)
-> +       pdev->archdata.dma_mask = 0xffffffffUL;
-> +#endif
-> +       dev->coherent_dma_mask = DMA_BIT_MASK(32);
-> +       if (!dev->dma_mask)
-> +               dev->dma_mask = &dev->coherent_dma_mask;
-> +
-> +       /*
-> +        * if dma-coherent property exist, call arch hook to setup
-> +        * dma coherent operations.
-> +        */
-> +       if (of_dma_is_coherent(dev->of_node)) {
-> +               set_arch_dma_coherent_ops(dev);
-> +               dev_dbg(dev, "device is dma coherent\n");
-> +       }
-> +
-> +       /*
-> +        * if dma-ranges property doesn't exist - just return else
-> +        * setup the dma offset
-> +        */
-> +       ret = of_dma_get_range(dev->of_node, &dma_addr, &paddr, &size);
-> +       if (ret < 0) {
-> +               dev_dbg(dev, "no dma range information to setup\n");
-> +               return;
-> +       }
-> +
-> +       /* DMA ranges found. Calculate and set dma_pfn_offset */
-> +       dev->dma_pfn_offset = PFN_DOWN(paddr - dma_addr);
-> +       dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", dev->dma_pfn_offset);
-> +}
-> +
-> +/**
->   * of_platform_device_create_pdata - Alloc, initialize and register an of_device
->   * @np: pointer to node to create device for
->   * @bus_id: name to assign device
-> @@ -211,12 +259,7 @@ static struct platform_device *of_platform_device_create_pdata(
->         if (!dev)
->                 return NULL;
->
-> -#if defined(CONFIG_MICROBLAZE)
-> -       dev->archdata.dma_mask = 0xffffffffUL;
-> -#endif
-> -       dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
-> -       if (!dev->dev.dma_mask)
-> -               dev->dev.dma_mask = &dev->dev.coherent_dma_mask;
-> +       of_dma_configure(dev);
->         dev->dev.bus = &platform_bus_type;
->         dev->dev.platform_data = platform_data;
->
-> diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-> index fd4aee2..c7d9b1b 100644
-> --- a/include/linux/dma-mapping.h
-> +++ b/include/linux/dma-mapping.h
-> @@ -123,6 +123,13 @@ static inline int dma_coerce_mask_and_coherent(struct device *dev, u64 mask)
->
->  extern u64 dma_get_required_mask(struct device *dev);
->
-> +#ifndef set_arch_dma_coherent_ops
-> +static inline int set_arch_dma_coherent_ops(struct device *dev)
-> +{
-> +       return 0;
-> +}
-> +#endif
-> +
->  static inline unsigned int dma_get_max_seg_size(struct device *dev)
->  {
->         return dev->dma_parms ? dev->dma_parms->max_segment_size : 65536;
-> --
-> 1.7.9.5
->
->
+-Olof
