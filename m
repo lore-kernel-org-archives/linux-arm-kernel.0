@@ -1,73 +1,188 @@
 From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Mon,  5 May 2014 07:27:28 +0200
-Subject: [PATCH v3 6/7] Documentation: add the Marvell Berlin pinctrl
- documentation
+Date: Mon,  5 May 2014 07:27:29 +0200
+Subject: [PATCH v3 7/7] ARM: dts: berlin: add the pinctrl node and muxing
+ setup for uarts
 In-Reply-To: <1399267649-20218-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1399267649-20218-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1399267649-20218-7-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1399267649-20218-8-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the documentation related to the Berlin pin-controller driver and
-explain how to configure this group based controller.
+The uart0 pinmux configuration is in the dtsi because uart0 will always
+use uart0-pmux to work, no other possibility. Same thing for uart1 and
+uart2 (BG2).
 
 Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
 Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
- .../bindings/pinctrl/marvell,berlin-pinctrl.txt    | 45 ++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,berlin-pinctrl.txt
+ arch/arm/boot/dts/berlin2.dtsi   | 31 +++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/berlin2cd.dtsi | 17 +++++++++++++++++
+ arch/arm/boot/dts/berlin2q.dtsi  | 24 ++++++++++++++++++++++++
+ 3 files changed, 72 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,berlin-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,berlin-pinctrl.txt
-new file mode 100644
-index 000000000000..4ca92ab2c1de
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pinctrl/marvell,berlin-pinctrl.txt
-@@ -0,0 +1,45 @@
-+* Pin-controller driver for the Marvell Berlin SoCs
+diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
+index 56a1af2f1052..fb58f43eab52 100644
+--- a/arch/arm/boot/dts/berlin2.dtsi
++++ b/arch/arm/boot/dts/berlin2.dtsi
+@@ -176,6 +176,11 @@
+ 			};
+ 		};
+ 
++		soc_pinctrl: pin-controller at ea0000 {
++			compatible = "marvell,berlin2-soc-pinctrl";
++			reg = <0xea0000 0x4c>;
++		};
 +
-+The pins controlled by the Marvell Berlin controller are organized in groups.
-+Configuration is done by group, so no actual pin information is needed.
+ 		apb at fc0000 {
+ 			compatible = "simple-bus";
+ 			#address-cells = <1>;
+@@ -184,6 +189,26 @@
+ 			ranges = <0 0xfc0000 0x10000>;
+ 			interrupt-parent = <&sic>;
+ 
++			sm_pinctrl: pin-controller at 0000 {
++				compatible = "marvell,berlin2-sysmgr-pinctrl";
++				reg = <0x0000 0x44>;
 +
-+Be aware the Marvell Berlin datasheets use the keyword 'mode' for what is called
-+a 'function' in the pin-controller subsystem.
++				uart0_pmux: uart0-pmux {
++					marvell,groups = "GSM4";
++					marvell,function = "uart0";
++				};
 +
-+Required properties:
-+- compatible: should be one of:
-+	"marvell,berlin2-soc-pinctrl",
-+	"marvell,berlin2-sysmgr-pinctrl",
-+	"marvell,berlin2cd-soc-pinctrl",
-+	"marvell,berlin2cd-sysmgr-pinctrl",
-+	"marvell,berlin2q-soc-pinctrl",
-+	"marvell,berlin2q-sysmgr-pinctrl"
-+- reg: registers physical address and length of the pin controller.
++				uart1_pmux: uart1-pmux {
++					marvell,groups = "GSM5";
++					marvell,function = "uart1";
++				};
 +
-+Please refer to pinctrl-bindings.txt in this directory for details of the
-+common pin-controller bindings used by client devices.
++				uart2_pmux: uart2-pmux {
++					marvell,groups = "GSM3";
++					marvell,function = "uart2";
++				};
++			};
 +
-+A pin-controller node should contain subnodes representing the pin group
-+configurations, one per function. Each subnode has the group name and the muxing
-+function used.
+ 			uart0: serial at 9000 {
+ 				compatible = "snps,dw-apb-uart";
+ 				reg = <0x9000 0x100>;
+@@ -191,6 +216,8 @@
+ 				reg-io-width = <1>;
+ 				interrupts = <8>;
+ 				clocks = <&smclk>;
++				pinctrl-0 = <&uart0_pmux>;
++				pinctrl-names = "default";
+ 				status = "disabled";
+ 			};
+ 
+@@ -201,6 +228,8 @@
+ 				reg-io-width = <1>;
+ 				interrupts = <9>;
+ 				clocks = <&smclk>;
++				pinctrl-0 = <&uart1_pmux>;
++				pinctrl-names = "default";
+ 				status = "disabled";
+ 			};
+ 
+@@ -211,6 +240,8 @@
+ 				reg-io-width = <1>;
+ 				interrupts = <10>;
+ 				clocks = <&smclk>;
++				pinctrl-0 = <&uart2_pmux>;
++				pinctrl-names = "default";
+ 				status = "disabled";
+ 			};
+ 
+diff --git a/arch/arm/boot/dts/berlin2cd.dtsi b/arch/arm/boot/dts/berlin2cd.dtsi
+index 094968c27533..a802d3fe5da6 100644
+--- a/arch/arm/boot/dts/berlin2cd.dtsi
++++ b/arch/arm/boot/dts/berlin2cd.dtsi
+@@ -169,6 +169,11 @@
+ 			};
+ 		};
+ 
++		soc_pinctrl: pin-controller at ae0000 {
++			compatible = "marvell,berlin2cd-soc-pinctrl";
++			reg = <0xea0000 0x4c>;
++		};
 +
-+Required subnode-properties:
-+- marvell,groups: a list of strings describing the group names.
-+- marvell,function: a string describing the function used to mux the groups.
+ 		apb at fc0000 {
+ 			compatible = "simple-bus";
+ 			#address-cells = <1>;
+@@ -177,6 +182,16 @@
+ 			ranges = <0 0xfc0000 0x10000>;
+ 			interrupt-parent = <&sic>;
+ 
++			sm_pinctrl: pin-controller at 0000 {
++				compatible = "marvell,berlin2cd-sysmgr-pinctrl";
++				reg = <0x0000 0x44>;
 +
-+Example:
++				uart0_pmux: uart0-pmux {
++					marvell,groups = "G6";
++					marvell,function = "uart0";
++				};
++			};
 +
-+sm_pinctrl: pin-controller at 0 {
-+	compatible = "marvell,berlin2q-sysmgr-pinctrl";
-+	reg = <0xfc0000 0x44>;
+ 			uart0: serial at 9000 {
+ 				compatible = "snps,dw-apb-uart";
+ 				reg = <0x9000 0x100>;
+@@ -184,6 +199,8 @@
+ 				reg-io-width = <1>;
+ 				interrupts = <8>;
+ 				clocks = <&smclk>;
++				pinctrl-0 = <&uart0_pmux>;
++				pinctrl-names = "default";
+ 				status = "disabled";
+ 			};
+ 
+diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+index 07452a7483fa..734debbf072f 100644
+--- a/arch/arm/boot/dts/berlin2q.dtsi
++++ b/arch/arm/boot/dts/berlin2q.dtsi
+@@ -183,6 +183,11 @@
+ 			};
+ 		};
+ 
++		soc_pinctrl: pin-controller at ea0000 {
++			compatible = "marvell,berlin2q-soc-pinctrl";
++			reg = <0xea0000 0x4c>;
++		};
 +
-+	uart0_pmux: uart0-pmux {
-+		marvell,groups = "GSM12", "GSM13";
-+		marvell,function = "uart0";
-+	};
-+}
+ 		apb at fc0000 {
+ 			compatible = "simple-bus";
+ 			#address-cells = <1>;
+@@ -198,6 +203,8 @@
+ 				interrupts = <8>;
+ 				clocks = <&smclk>;
+ 				reg-shift = <2>;
++				pinctrl-0 = <&uart0_pmux>;
++				pinctrl-names = "default";
+ 				status = "disabled";
+ 			};
+ 
+@@ -208,9 +215,26 @@
+ 				interrupts = <9>;
+ 				clocks = <&smclk>;
+ 				reg-shift = <2>;
++				pinctrl-0 = <&uart1_pmux>;
++				pinctrl-names = "default";
+ 				status = "disabled";
+ 			};
+ 
++			sm_pinctrl: pin-controller at d000 {
++				compatible = "marvell,berlin2q-sysmgr-pinctrl";
++				reg = <0xd000 0x44>;
 +
-+&uart0 {
-+	pinctrl-0 = <&uart0_pmux>;
-+	pinctrl-names = "default";
-+};
++				uart0_pmux: uart0-pmux {
++					marvell,groups = "GSM12";
++					marvell,function = "uart0";
++				};
++
++				uart1_pmux: uart1-pmux {
++					marvell,groups = "GSM14";
++					marvell,function = "uart1";
++				};
++			};
++
+ 			sic: interrupt-controller at e000 {
+ 				compatible = "snps,dw-apb-ictl";
+ 				reg = <0xe000 0x30>;
 -- 
 1.8.3.2
