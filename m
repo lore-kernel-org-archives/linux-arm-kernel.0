@@ -1,98 +1,55 @@
 From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Mon,  5 May 2014 07:27:23 +0200
-Subject: [PATCH v3 1/7] pinctrl: berlin: add the core pinctrl driver for
- Marvell Berlin SoCs
+Date: Mon,  5 May 2014 07:27:25 +0200
+Subject: [PATCH v3 3/7] pinctrl: berlin: add the BG2 pinctrl driver
 In-Reply-To: <1399267649-20218-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1399267649-20218-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1399267649-20218-2-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1399267649-20218-4-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Marvell Berlin boards have a group based pinmuxing mechanism. This
-adds the core driver support. We actually do not need any information
-about the pins here and only have the definition of the groups.
-
-Let's take the example of the uart0 pinmuxing on the BG2Q. Balls BK4 and
-BH6 are muxed to respectively UART0 RX and TX if the group GSM12 is set
-to mode 0:
-
-Group	Modes	Offset Base	Offset	LSB	Bit Width
-GSM12	3	sm_base		0x40	0x10	0x2
-
-Ball	Group	Mode 0		Mode 1		Mode 2
-BK4	GSM12	UART0_RX	IrDA0_RX	GPIO9
-BH6	GSM12	UART0_TX	IrDA0_TX	GPIO10
-
-So in order to configure BK4 -> UART0_TX and BH6 -> UART0_RX, we need
-to set (sm_base + 0x40 + 0x10) &= ff3fffff.
+Add the pin-controller driver for the Berlin BG2 SoC, with definition
+of its groups and functions. This uses the core Berlin pinctrl driver.
 
 Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
 Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
- drivers/pinctrl/Kconfig         |   1 +
- drivers/pinctrl/Makefile        |   1 +
- drivers/pinctrl/berlin/Kconfig  |   7 +
- drivers/pinctrl/berlin/Makefile |   1 +
- drivers/pinctrl/berlin/berlin.c | 346 ++++++++++++++++++++++++++++++++++++++++
- drivers/pinctrl/berlin/berlin.h |  71 +++++++++
- 6 files changed, 427 insertions(+)
- create mode 100644 drivers/pinctrl/berlin/Kconfig
- create mode 100644 drivers/pinctrl/berlin/Makefile
- create mode 100644 drivers/pinctrl/berlin/berlin.c
- create mode 100644 drivers/pinctrl/berlin/berlin.h
+ drivers/pinctrl/berlin/Kconfig      |   4 +
+ drivers/pinctrl/berlin/Makefile     |   1 +
+ drivers/pinctrl/berlin/berlin-bg2.c | 251 ++++++++++++++++++++++++++++++++++++
+ 3 files changed, 256 insertions(+)
+ create mode 100644 drivers/pinctrl/berlin/berlin-bg2.c
 
-diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
-index e00c02d0a094..f758fa43ab92 100644
---- a/drivers/pinctrl/Kconfig
-+++ b/drivers/pinctrl/Kconfig
-@@ -368,6 +368,7 @@ config PINCTRL_S3C64XX
- 	depends on ARCH_S3C64XX
- 	select PINCTRL_SAMSUNG
- 
-+source "drivers/pinctrl/berlin/Kconfig"
- source "drivers/pinctrl/mvebu/Kconfig"
- source "drivers/pinctrl/sh-pfc/Kconfig"
- source "drivers/pinctrl/spear/Kconfig"
-diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
-index 6d3fd62b9ae8..0bd6dcb5baf9 100644
---- a/drivers/pinctrl/Makefile
-+++ b/drivers/pinctrl/Makefile
-@@ -68,6 +68,7 @@ obj-$(CONFIG_PINCTRL_TB10X)	+= pinctrl-tb10x.o
- obj-$(CONFIG_PINCTRL_ST) 	+= pinctrl-st.o
- obj-$(CONFIG_PINCTRL_VF610)	+= pinctrl-vf610.o
- 
-+obj-$(CONFIG_ARCH_BERLIN)	+= berlin/
- obj-$(CONFIG_PLAT_ORION)        += mvebu/
- obj-$(CONFIG_ARCH_SHMOBILE)	+= sh-pfc/
- obj-$(CONFIG_SUPERH)		+= sh-pfc/
 diff --git a/drivers/pinctrl/berlin/Kconfig b/drivers/pinctrl/berlin/Kconfig
-new file mode 100644
-index 000000000000..df843e01a001
---- /dev/null
+index 58ecfd797dd8..1b34943bef1c 100644
+--- a/drivers/pinctrl/berlin/Kconfig
 +++ b/drivers/pinctrl/berlin/Kconfig
-@@ -0,0 +1,7 @@
-+if ARCH_BERLIN
-+
-+config PINCTRL_BERLIN
+@@ -4,6 +4,10 @@ config PINCTRL_BERLIN
+ 	bool
+ 	select PINMUX
+ 
++config PINCTRL_BERLIN_BG2
 +	bool
-+	select PINMUX
++	select PINCTRL_BERLIN
 +
-+endif
+ config PINCTRL_BERLIN_BG2Q
+ 	bool
+ 	select PINCTRL_BERLIN
 diff --git a/drivers/pinctrl/berlin/Makefile b/drivers/pinctrl/berlin/Makefile
-new file mode 100644
-index 000000000000..251a2b4e1057
---- /dev/null
+index 1866b1f2d1cf..e37e4e7a8838 100644
+--- a/drivers/pinctrl/berlin/Makefile
 +++ b/drivers/pinctrl/berlin/Makefile
-@@ -0,0 +1 @@
-+obj-$(CONFIG_PINCTRL_BERLIN)		+= berlin.o
-diff --git a/drivers/pinctrl/berlin/berlin.c b/drivers/pinctrl/berlin/berlin.c
+@@ -1,2 +1,3 @@
+ obj-$(CONFIG_PINCTRL_BERLIN)		+= berlin.o
++obj-$(CONFIG_PINCTRL_BERLIN_BG2)	+= berlin-bg2.o
+ obj-$(CONFIG_PINCTRL_BERLIN_BG2Q)	+= berlin-bg2q.o
+diff --git a/drivers/pinctrl/berlin/berlin-bg2.c b/drivers/pinctrl/berlin/berlin-bg2.c
 new file mode 100644
-index 000000000000..20c1374d11f0
+index 000000000000..edbe409b2454
 --- /dev/null
-+++ b/drivers/pinctrl/berlin/berlin.c
-@@ -0,0 +1,346 @@
++++ b/drivers/pinctrl/berlin/berlin-bg2.c
+@@ -0,0 +1,251 @@
 +/*
-+ * Marvell Berlin SoC pinctrl core driver
++ * Marvell Berlin BG2 pinctrl driver.
 + *
 + * Copyright (C) 2014 Marvell Technology Group Ltd.
 + *
@@ -103,416 +60,244 @@ index 000000000000..20c1374d11f0
 + * warranty of any kind, whether express or implied.
 + */
 +
-+#include <linux/io.h>
 +#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
 +#include <linux/of_device.h>
-+#include <linux/pinctrl/pinctrl.h>
-+#include <linux/pinctrl/pinmux.h>
 +#include <linux/platform_device.h>
-+#include <linux/slab.h>
 +
-+#include "../core.h"
-+#include "../pinctrl-utils.h"
 +#include "berlin.h"
 +
-+static int berlin_pinctrl_get_group_count(struct pinctrl_dev *pctrl_dev)
-+{
-+	struct berlin_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctrl_dev);
-+
-+	return pctrl->desc->ngroups;
-+}
-+
-+static const char *berlin_pinctrl_get_group_name(struct pinctrl_dev *pctrl_dev,
-+						 unsigned group)
-+{
-+	struct berlin_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctrl_dev);
-+
-+	return pctrl->desc->groups[group].name;
-+}
-+
-+static int berlin_pinctrl_dt_node_to_map(struct pinctrl_dev *pctrl_dev,
-+					 struct device_node *node,
-+					 struct pinctrl_map **map,
-+					 unsigned *num_maps)
-+{
-+	struct berlin_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctrl_dev);
-+	struct property *prop;
-+	const char *function_name, *group_name;
-+	unsigned reserved_maps = 0;
-+	int ret, ngroups;
-+
-+	*map = NULL;
-+	*num_maps = 0;
-+
-+	ret = of_property_read_string(node, "marvell,function", &function_name);
-+	if (ret) {
-+		dev_err(pctrl->dev,
-+			"missing 'marvell,function' property in node %s\n",
-+			node->name);
-+		return -EINVAL;
-+	}
-+
-+	ngroups = of_property_count_strings(node, "marvell,groups");
-+	if (ngroups < 0) {
-+		dev_err(pctrl->dev,
-+			"missing 'marvell,groups' property in node %s\n",
-+			node->name);
-+		return -EINVAL;
-+	}
-+
-+	ret = pinctrl_utils_reserve_map(pctrl_dev, map, &reserved_maps,
-+					num_maps, ngroups);
-+	if (ret) {
-+		dev_err(pctrl->dev, "can't reserve map: %d\n", ret);
-+		return ret;
-+	}
-+
-+	of_property_for_each_string(node, "marvell,groups", prop, group_name) {
-+		ret = pinctrl_utils_add_map_mux(pctrl_dev, map, &reserved_maps,
-+						num_maps, group_name,
-+						function_name);
-+		if (ret) {
-+			dev_err(pctrl->dev, "can't add map: %d\n", ret);
-+			return ret;
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+static void berlin_pinctrl_dt_free_map(struct pinctrl_dev *pctrl_dev,
-+				       struct pinctrl_map *map,
-+				       unsigned nmaps)
-+{
-+	int i;
-+
-+	for (i = 0; i < nmaps; i++) {
-+		if (map[i].type == PIN_MAP_TYPE_MUX_GROUP) {
-+			kfree(map[i].data.mux.group);
-+
-+			/* a function can be applied to multiple groups */
-+			if (i == 0)
-+				kfree(map[i].data.mux.function);
-+		}
-+	}
-+
-+	kfree(map);
-+}
-+
-+static const struct pinctrl_ops berlin_pinctrl_ops = {
-+	.get_groups_count	= &berlin_pinctrl_get_group_count,
-+	.get_group_name		= &berlin_pinctrl_get_group_name,
-+	.dt_node_to_map		= &berlin_pinctrl_dt_node_to_map,
-+	.dt_free_map		= &berlin_pinctrl_dt_free_map,
++static const struct berlin_desc_group berlin2_soc_pinctrl_groups[] = {
++	/* G */
++	BERLIN_PINCTRL_GROUP("G0", 0x00, 0x1, 0x00,
++		BERLIN_PINCTRL_FUNCTION(0x0, "spi1"),
++		BERLIN_PINCTRL_FUNCTION(0x1, "gpio")),
++	BERLIN_PINCTRL_GROUP("G1", 0x00, 0x2, 0x01,
++		BERLIN_PINCTRL_FUNCTION(0x0, "spi1"),
++		BERLIN_PINCTRL_FUNCTION(0x1, "gpio"),
++		BERLIN_PINCTRL_FUNCTION(0x2, "usb1")),
++	BERLIN_PINCTRL_GROUP("G2", 0x00, 0x2, 0x02,
++		BERLIN_PINCTRL_FUNCTION(0x0, "gpio"),
++		BERLIN_PINCTRL_FUNCTION(0x1, "spi1"),
++		BERLIN_PINCTRL_FUNCTION(0x2, "pwm"),
++		BERLIN_PINCTRL_FUNCTION(0x3, "i2s0")),
++	BERLIN_PINCTRL_GROUP("G3", 0x00, 0x2, 0x04,
++		BERLIN_PINCTRL_FUNCTION(0x0, "soc"),
++		BERLIN_PINCTRL_FUNCTION(0x1, "spi1"),
++		BERLIN_PINCTRL_FUNCTION(0x2, "gpio"),
++		BERLIN_PINCTRL_FUNCTION(0x3, "i2s1")),
++	BERLIN_PINCTRL_GROUP("G4", 0x00, 0x2, 0x06,
++		BERLIN_PINCTRL_FUNCTION(0x0, "spi1"),
++		BERLIN_PINCTRL_FUNCTION(0x1, "gpio"),
++		BERLIN_PINCTRL_FUNCTION(0x2, "pwm")),
++	BERLIN_PINCTRL_GROUP("G5", 0x00, 0x3, 0x08,
++		BERLIN_PINCTRL_FUNCTION(0x0, "gpio"),
++		BERLIN_PINCTRL_FUNCTION(0x1, "sts1"),
++		BERLIN_PINCTRL_FUNCTION(0x2, "et"),
++		/*
++		 * Mode 0x3 mux i2s2 mclk *and* i2s3 mclk:
++		 * add two functions so it can be used with other groups
++		 * within the same subnode in the device tree
++		 */
++		BERLIN_PINCTRL_FUNCTION(0x3, "i2s2"),
++		BERLIN_PINCTRL_FUNCTION(0x3, "i2s3")),
++	BERLIN_PINCTRL_GROUP("G6", 0x00, 0x2, 0x0b,
++		BERLIN_PINCTRL_FUNCTION(0x0, "gpio"),
++		BERLIN_PINCTRL_FUNCTION(0x1, "sts0"),
++		BERLIN_PINCTRL_FUNCTION(0x2, "et")),
++	BERLIN_PINCTRL_GROUP("G7", 0x00, 0x3, 0x0d,
++		BERLIN_PINCTRL_FUNCTION(0x0, "gpio"),
++		BERLIN_PINCTRL_FUNCTION(0x1, "sts0"),
++		BERLIN_PINCTRL_FUNCTION(0x2, "et"),
++		BERLIN_PINCTRL_FUNCTION(0x3, "vdac")),
++	BERLIN_PINCTRL_GROUP("G8", 0x00, 0x3, 0x10,
++		BERLIN_PINCTRL_FUNCTION(0x0, "gpio"),
++		BERLIN_PINCTRL_FUNCTION(0x1, "sd0"),
++		BERLIN_PINCTRL_FUNCTION(0x2, "et"),
++		BERLIN_PINCTRL_FUNCTION(0x3, "usb0_dbg"),
++		BERLIN_PINCTRL_FUNCTION(0x4, "sata_dbg"),
++		BERLIN_PINCTRL_FUNCTION(0x7, "usb1_dbg")),
++	BERLIN_PINCTRL_GROUP("G9", 0x00, 0x3, 0x13,
++		BERLIN_PINCTRL_FUNCTION(0x0, "gpio"),
++		BERLIN_PINCTRL_FUNCTION(0x1, "sd0"),
++		BERLIN_PINCTRL_FUNCTION(0x2, "et"),
++		BERLIN_PINCTRL_FUNCTION(0x3, "usb0_dbg"),
++		BERLIN_PINCTRL_FUNCTION(0x4, "sata_dbg"),
++		BERLIN_PINCTRL_FUNCTION(0x7, "usb1_dbg")),
++	BERLIN_PINCTRL_GROUP("G10", 0x00, 0x2, 0x16,
++		BERLIN_PINCTRL_FUNCTION(0x0, "soc"),
++		BERLIN_PINCTRL_FUNCTION(0x1, "twsi0"),
++		BERLIN_PINCTRL_FUNCTION(0x2, "gpio"),
++		BERLIN_PINCTRL_FUNCTION(0x3, "ptp")),
++	BERLIN_PINCTRL_GROUP("G11", 0x00, 0x2, 0x18,
++		BERLIN_PINCTRL_FUNCTION(0x0, "soc"),
++		BERLIN_PINCTRL_FUNCTION(0x1, "twsi1"),
++		BERLIN_PINCTRL_FUNCTION(0x2, "gpio"),
++		BERLIN_PINCTRL_FUNCTION(0x3, "eddc")),
++	BERLIN_PINCTRL_GROUP("G12", 0x00, 0x3, 0x1a,
++		BERLIN_PINCTRL_FUNCTION(0x0, "sts2"),
++		BERLIN_PINCTRL_FUNCTION(0x1, "sata"),
++		BERLIN_PINCTRL_FUNCTION(0x2, "sd1"),
++		BERLIN_PINCTRL_FUNCTION(0x3, "usb0_dbg"),
++		BERLIN_PINCTRL_FUNCTION(0x4, "sts1"),
++		BERLIN_PINCTRL_FUNCTION(0x7, "usb1_dbg")),
++	BERLIN_PINCTRL_GROUP("G13", 0x04, 0x3, 0x00,
++		BERLIN_PINCTRL_FUNCTION(0x0, "gpio"),
++		BERLIN_PINCTRL_FUNCTION(0x1, "sata"),
++		BERLIN_PINCTRL_FUNCTION(0x2, "sd1"),
++		BERLIN_PINCTRL_FUNCTION(0x3, "usb0_dbg"),
++		BERLIN_PINCTRL_FUNCTION(0x4, "sts1"),
++		BERLIN_PINCTRL_FUNCTION(0x7, "usb1_dbg")),
++	BERLIN_PINCTRL_GROUP("G14", 0x04, 0x1, 0x03,
++		BERLIN_PINCTRL_FUNCTION_UNKNOWN),
++	BERLIN_PINCTRL_GROUP("G15", 0x04, 0x2, 0x04,
++		BERLIN_PINCTRL_FUNCTION(0x0, "gpio"),
++		BERLIN_PINCTRL_FUNCTION(0x2, "et"),
++		BERLIN_PINCTRL_FUNCTION(0x3, "osco")),
++	BERLIN_PINCTRL_GROUP("G16", 0x04, 0x3, 0x06,
++		BERLIN_PINCTRL_FUNCTION(0x0, "gpio"),
++		BERLIN_PINCTRL_FUNCTION(0x1, "dvio"),
++		BERLIN_PINCTRL_FUNCTION(0x2, "fp")),
++	BERLIN_PINCTRL_GROUP("G17", 0x04, 0x3, 0x09,
++		BERLIN_PINCTRL_FUNCTION(0x0, "gpio"),
++		BERLIN_PINCTRL_FUNCTION(0x1, "dvio"),
++		BERLIN_PINCTRL_FUNCTION(0x2, "fp")),
++	BERLIN_PINCTRL_GROUP("G18", 0x04, 0x1, 0x0c,
++		BERLIN_PINCTRL_FUNCTION(0x0, "pll"),
++		BERLIN_PINCTRL_FUNCTION(0x1, "i2s0")),
++	BERLIN_PINCTRL_GROUP("G19", 0x04, 0x1, 0x0d,
++		BERLIN_PINCTRL_FUNCTION(0x0, "i2s0"),
++		BERLIN_PINCTRL_FUNCTION(0x1, "pwm")),
++	BERLIN_PINCTRL_GROUP("G20", 0x04, 0x1, 0x0e,
++		BERLIN_PINCTRL_FUNCTION(0x0, "spdif"),
++		BERLIN_PINCTRL_FUNCTION(0x1, "arc")),
++	BERLIN_PINCTRL_GROUP("G21", 0x04, 0x3, 0x0f,
++		BERLIN_PINCTRL_FUNCTION(0x0, "gpio"),
++		BERLIN_PINCTRL_FUNCTION(0x1, "dvio"),
++		BERLIN_PINCTRL_FUNCTION(0x2, "fp"),
++		BERLIN_PINCTRL_FUNCTION(0x3, "adac_dbg"),
++		BERLIN_PINCTRL_FUNCTION(0x4, "pdm_a"),	/* gpio17..19,pdm */
++		BERLIN_PINCTRL_FUNCTION(0x7, "pdm_b")),	/* gpio12..14,pdm */
++	BERLIN_PINCTRL_GROUP("G22", 0x04, 0x3, 0x12,
++		BERLIN_PINCTRL_FUNCTION(0x0, "gpio"),
++		BERLIN_PINCTRL_FUNCTION(0x1, "dv0"),
++		BERLIN_PINCTRL_FUNCTION(0x2, "fp"),
++		BERLIN_PINCTRL_FUNCTION(0x3, "twsi0"),
++		BERLIN_PINCTRL_FUNCTION(0x4, "pwm")),
++	BERLIN_PINCTRL_GROUP("G23", 0x04, 0x3, 0x15,
++		BERLIN_PINCTRL_FUNCTION(0x0, "vclki"),
++		BERLIN_PINCTRL_FUNCTION(0x1, "dv0"),
++		BERLIN_PINCTRL_FUNCTION(0x2, "fp"),
++		BERLIN_PINCTRL_FUNCTION(0x3, "i2s0"),
++		BERLIN_PINCTRL_FUNCTION(0x4, "pwm"),
++		BERLIN_PINCTRL_FUNCTION(0x7, "pdm")),
++	BERLIN_PINCTRL_GROUP("G24", 0x04, 0x2, 0x18,
++		BERLIN_PINCTRL_FUNCTION(0x0, "i2s2"),
++		BERLIN_PINCTRL_FUNCTION(0x1, "i2s1")),
++	BERLIN_PINCTRL_GROUP("G25", 0x04, 0x2, 0x1a,
++		BERLIN_PINCTRL_FUNCTION(0x0, "gpio"),
++		BERLIN_PINCTRL_FUNCTION(0x1, "nand"),
++		BERLIN_PINCTRL_FUNCTION(0x2, "i2s2")),
++	BERLIN_PINCTRL_GROUP("G26", 0x04, 0x1, 0x1c,
++		BERLIN_PINCTRL_FUNCTION(0x0, "nand"),
++		BERLIN_PINCTRL_FUNCTION(0x1, "emmc")),
++	BERLIN_PINCTRL_GROUP("G27", 0x04, 0x1, 0x1d,
++		BERLIN_PINCTRL_FUNCTION(0x0, "gpio"),
++		BERLIN_PINCTRL_FUNCTION(0x1, "nand")),
++	BERLIN_PINCTRL_GROUP("G28", 0x04, 0x2, 0x1e,
++		BERLIN_PINCTRL_FUNCTION(0x0, "dvo"),
++		BERLIN_PINCTRL_FUNCTION(0x2, "sp")),
 +};
 +
-+static int berlin_pinmux_get_functions_count(struct pinctrl_dev *pctrl_dev)
-+{
-+	struct berlin_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctrl_dev);
-+
-+	return pctrl->nfunctions;
-+}
-+
-+static const char *berlin_pinmux_get_function_name(struct pinctrl_dev *pctrl_dev,
-+						   unsigned function)
-+{
-+	struct berlin_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctrl_dev);
-+
-+	return pctrl->functions[function].name;
-+}
-+
-+static int berlin_pinmux_get_function_groups(struct pinctrl_dev *pctrl_dev,
-+					     unsigned function,
-+					     const char * const **groups,
-+					     unsigned * const num_groups)
-+{
-+	struct berlin_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctrl_dev);
-+
-+	*groups = pctrl->functions[function].groups;
-+	*num_groups = pctrl->functions[function].ngroups;
-+
-+	return 0;
-+}
-+
-+static struct berlin_desc_function *
-+berlin_pinctrl_find_function_by_name(struct berlin_pinctrl *pctrl,
-+				     const struct berlin_desc_group *group,
-+				     const char *fname)
-+{
-+	struct berlin_desc_function *function = group->functions;
-+
-+	while (function->name) {
-+		if (!strcmp(function->name, fname))
-+			return function;
-+
-+		function++;
-+	}
-+
-+	return NULL;
-+}
-+
-+static int berlin_pinmux_enable(struct pinctrl_dev *pctrl_dev,
-+				unsigned function,
-+				unsigned group)
-+{
-+	struct berlin_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctrl_dev);
-+	const struct berlin_desc_group *group_desc = pctrl->desc->groups + group;
-+	struct berlin_pinctrl_function *func = pctrl->functions + function;
-+	struct berlin_desc_function *function_desc =
-+		berlin_pinctrl_find_function_by_name(pctrl, group_desc,
-+						     func->name);
-+	unsigned long flags;
-+	u32 regval;
-+
-+	if (!function_desc)
-+		return -EINVAL;
-+
-+	spin_lock_irqsave(&pctrl->lock, flags);
-+
-+	regval = readl(pctrl->base + group_desc->offset);
-+	regval &= GENMASK(group_desc->lsb + group_desc->bit_width - 1,
-+			  group_desc->lsb);
-+	regval |= function_desc->muxval << group_desc->lsb;
-+	writel_relaxed(regval, pctrl->base + group_desc->offset);
-+
-+	spin_unlock_irqrestore(&pctrl->lock, flags);
-+
-+	return 0;
-+}
-+
-+static const struct pinmux_ops berlin_pinmux_ops = {
-+	.get_functions_count	= &berlin_pinmux_get_functions_count,
-+	.get_function_name	= &berlin_pinmux_get_function_name,
-+	.get_function_groups	= &berlin_pinmux_get_function_groups,
-+	.enable			= &berlin_pinmux_enable,
++static const struct berlin_desc_group berlin2_sysmgr_pinctrl_groups[] = {
++	/* GSM */
++	BERLIN_PINCTRL_GROUP("GSM0", 0x40, 0x2, 0x00,
++		BERLIN_PINCTRL_FUNCTION(0x0, "gpio"),
++		BERLIN_PINCTRL_FUNCTION(0x1, "spi2"),
++		BERLIN_PINCTRL_FUNCTION(0x2, "eth1")),
++	BERLIN_PINCTRL_GROUP("GSM1", 0x40, 0x2, 0x02,
++		BERLIN_PINCTRL_FUNCTION(0x0, "gpio"),
++		BERLIN_PINCTRL_FUNCTION(0x1, "spi2"),
++		BERLIN_PINCTRL_FUNCTION(0x2, "eth1")),
++	BERLIN_PINCTRL_GROUP("GSM2", 0x40, 0x2, 0x04,
++		BERLIN_PINCTRL_FUNCTION(0x0, "twsi2"),
++		BERLIN_PINCTRL_FUNCTION(0x1, "spi2")),
++	BERLIN_PINCTRL_GROUP("GSM3", 0x40, 0x2, 0x06,
++		BERLIN_PINCTRL_FUNCTION(0x0, "gpio"),
++		BERLIN_PINCTRL_FUNCTION(0x1, "uart0"),	/* CTS/RTS */
++		BERLIN_PINCTRL_FUNCTION(0x2, "uart2"),	/* RX/TX */
++		BERLIN_PINCTRL_FUNCTION(0x3, "twsi2")),
++	BERLIN_PINCTRL_GROUP("GSM4", 0x40, 0x2, 0x08,
++		BERLIN_PINCTRL_FUNCTION(0x0, "uart0"),	/* RX/TX */
++		BERLIN_PINCTRL_FUNCTION(0x1, "irda0")),
++	BERLIN_PINCTRL_GROUP("GSM5", 0x40, 0x2, 0x0a,
++		BERLIN_PINCTRL_FUNCTION(0x0, "gpio"),
++		BERLIN_PINCTRL_FUNCTION(0x1, "uart1"),	/* RX/TX */
++		BERLIN_PINCTRL_FUNCTION(0x2, "irda1"),
++		BERLIN_PINCTRL_FUNCTION(0x3, "twsi3")),
++	BERLIN_PINCTRL_GROUP("GSM6", 0x40, 0x2, 0x0c,
++		BERLIN_PINCTRL_FUNCTION(0x0, "gpio"),
++		BERLIN_PINCTRL_FUNCTION(0x1, "spi2"),
++		BERLIN_PINCTRL_FUNCTION(0x1, "clki")),
++	BERLIN_PINCTRL_GROUP("GSM7", 0x40, 0x1, 0x0e,
++		BERLIN_PINCTRL_FUNCTION(0x0, "gpio"),
++		BERLIN_PINCTRL_FUNCTION(0x1, "hdmi")),
++	BERLIN_PINCTRL_GROUP("GSM8", 0x40, 0x1, 0x0f,
++		BERLIN_PINCTRL_FUNCTION(0x0, "gpio"),
++		BERLIN_PINCTRL_FUNCTION(0x1, "hdmi")),
++	BERLIN_PINCTRL_GROUP("GSM9", 0x40, 0x1, 0x10,
++		BERLIN_PINCTRL_FUNCTION(0x0, "gpio"),
++		BERLIN_PINCTRL_FUNCTION(0x1, "led")),
++	BERLIN_PINCTRL_GROUP("GSM10", 0x40, 0x1, 0x11,
++		BERLIN_PINCTRL_FUNCTION(0x0, "gpio"),
++		BERLIN_PINCTRL_FUNCTION(0x1, "led")),
++	BERLIN_PINCTRL_GROUP("GSM11", 0x40, 0x1, 0x12,
++		BERLIN_PINCTRL_FUNCTION(0x0, "gpio"),
++		BERLIN_PINCTRL_FUNCTION(0x1, "led")),
 +};
 +
-+static int berlin_pinctrl_add_function(struct berlin_pinctrl *pctrl,
-+				       const char *name)
++static const struct berlin_pinctrl_desc berlin2_soc_pinctrl_data = {
++	.groups = berlin2_soc_pinctrl_groups,
++	.ngroups = ARRAY_SIZE(berlin2_soc_pinctrl_groups),
++};
++
++static const struct berlin_pinctrl_desc berlin2_sysmgr_pinctrl_data = {
++	.groups = berlin2_sysmgr_pinctrl_groups,
++	.ngroups = ARRAY_SIZE(berlin2_sysmgr_pinctrl_groups),
++};
++
++static const struct of_device_id berlin2_pinctrl_match[] = {
++	{
++		.compatible = "marvell,berlin2-soc-pinctrl",
++		.data = &berlin2_soc_pinctrl_data
++	},
++	{
++		.compatible = "marvell,berlin2-sysmgr-pinctrl",
++		.data = &berlin2_sysmgr_pinctrl_data
++	},
++	{}
++};
++MODULE_DEVICE_TABLE(of, berlin2_pinctrl_match);
++
++static int berlin2_pinctrl_probe(struct platform_device *pdev)
 +{
-+	struct berlin_pinctrl_function *function = pctrl->functions;
++	const struct of_device_id
++		*device = of_match_device(berlin2_pinctrl_match, &pdev->dev);
 +
-+	while (function->name) {
-+		if (!strcmp(function->name, name)) {
-+			function->ngroups++;
-+			return -EEXIST;
-+		}
-+		function++;
-+	}
-+
-+	function->name = name;
-+	function->ngroups = 1;
-+
-+	pctrl->nfunctions++;
-+
-+	return 0;
++	return berlin_pinctrl_probe(pdev, device->data);
 +}
 +
-+static int berlin_pinctrl_build_state(struct platform_device *pdev)
-+{
-+	struct berlin_pinctrl *pctrl = platform_get_drvdata(pdev);
-+	struct berlin_desc_group const *desc_group;
-+	struct berlin_desc_function const *desc_function;
-+	int i, max_functions = 0;
-+
-+	pctrl->nfunctions = 0;
-+
-+	for (i = 0; i < pctrl->desc->ngroups; i++) {
-+		desc_group = pctrl->desc->groups + i;
-+		/* compute the maxiumum number of functions a group can have */
-+		max_functions += 1 << (desc_group->bit_width + 1);
-+	}
-+
-+	/* we will reallocate later */
-+	pctrl->functions = devm_kzalloc(&pdev->dev,
-+					max_functions * sizeof(*pctrl->functions),
-+					GFP_KERNEL);
-+	if (!pctrl->functions)
-+		return -ENOMEM;
-+
-+	/* register all functions */
-+	for (i = 0; i < pctrl->desc->ngroups; i++) {
-+		desc_group = pctrl->desc->groups + i;
-+		desc_function = desc_group->functions;
-+
-+		while (desc_function->name) {
-+			berlin_pinctrl_add_function(pctrl, desc_function->name);
-+			desc_function++;
-+		}
-+	}
-+
-+	pctrl->functions = krealloc(pctrl->functions,
-+				    pctrl->nfunctions * sizeof(*pctrl->functions),
-+				    GFP_KERNEL);
-+
-+	/* map functions to theirs groups */
-+	for (i = 0; i < pctrl->desc->ngroups; i++) {
-+		desc_group = pctrl->desc->groups + i;
-+		desc_function = desc_group->functions;
-+
-+		while (desc_function->name) {
-+			struct berlin_pinctrl_function
-+				*function = pctrl->functions;
-+			const char **groups;
-+			bool found = false;
-+
-+			while (function->name) {
-+				if (!strcmp(desc_function->name, function->name)) {
-+					found = true;
-+					break;
-+				}
-+				function++;
-+			}
-+
-+			if (!found)
-+				return -EINVAL;
-+
-+			if (!function->groups) {
-+				function->groups =
-+					devm_kzalloc(&pdev->dev,
-+						     function->ngroups * sizeof(char *),
-+						     GFP_KERNEL);
-+
-+				if (!function->groups)
-+					return -ENOMEM;
-+			}
-+
-+			groups = function->groups;
-+			while (*groups)
-+				groups++;
-+
-+			*groups = desc_group->name;
-+
-+			desc_function++;
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+static struct pinctrl_desc berlin_pctrl_desc = {
-+	.name		= "berlin-pinctrl",
-+	.pctlops	= &berlin_pinctrl_ops,
-+	.pmxops		= &berlin_pinmux_ops,
-+	.owner		= THIS_MODULE,
++static struct platform_driver berlin2_pinctrl_driver = {
++	.probe	= berlin2_pinctrl_probe,
++	.driver	= {
++		.name = "berlin-bg2-pinctrl",
++		.owner = THIS_MODULE,
++		.of_match_table = berlin2_pinctrl_match,
++	},
 +};
++module_platform_driver(berlin2_pinctrl_driver);
 +
-+int berlin_pinctrl_probe(struct platform_device *pdev,
-+			 const struct berlin_pinctrl_desc *desc)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct berlin_pinctrl *pctrl;
-+	struct resource *r;
-+	int ret;
-+
-+	pctrl = devm_kzalloc(dev, sizeof(*pctrl), GFP_KERNEL);
-+	if (!pctrl)
-+		return -ENOMEM;
-+
-+	platform_set_drvdata(pdev, pctrl);
-+
-+	spin_lock_init(&pctrl->lock);
-+
-+	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	pctrl->base = devm_ioremap_resource(dev, r);
-+	if (IS_ERR(pctrl->base))
-+		return PTR_ERR(pctrl->base);
-+
-+	pctrl->dev = &pdev->dev;
-+	pctrl->desc = desc;
-+
-+	ret = berlin_pinctrl_build_state(pdev);
-+	if (ret) {
-+		dev_err(dev, "cannot build driver state: %d\n", ret);
-+		return ret;
-+	}
-+
-+	pctrl->pctrl_dev = pinctrl_register(&berlin_pctrl_desc, dev, pctrl);
-+	if (!pctrl->pctrl_dev) {
-+		dev_err(dev, "failed to register pinctrl driver\n");
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-diff --git a/drivers/pinctrl/berlin/berlin.h b/drivers/pinctrl/berlin/berlin.h
-new file mode 100644
-index 000000000000..e9214722c879
---- /dev/null
-+++ b/drivers/pinctrl/berlin/berlin.h
-@@ -0,0 +1,71 @@
-+/*
-+ * Marvell Berlin SoC pinctrl driver.
-+ *
-+ * Copyright (C) 2014 Marvell Technology Group Ltd.
-+ *
-+ * Antoine T?nart <antoine.tenart@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#ifndef __PINCTRL_BERLIN_H
-+#define __PINCTRL_BERLIN_H
-+
-+struct berlin_desc_function {
-+	const char	*name;
-+	u8		muxval;
-+};
-+
-+struct berlin_desc_group {
-+	const char			*name;
-+	u8				offset;
-+	u8				bit_width;
-+	u8				lsb;
-+	struct berlin_desc_function	*functions;
-+};
-+
-+struct berlin_pinctrl_desc {
-+	const struct berlin_desc_group	*groups;
-+	unsigned			ngroups;
-+};
-+
-+struct berlin_pinctrl_function {
-+	const char	*name;
-+	const char	**groups;
-+	unsigned	ngroups;
-+};
-+
-+struct berlin_pinctrl {
-+	spinlock_t				lock;
-+	void __iomem				*base;
-+	struct device				*dev;
-+	const struct berlin_pinctrl_desc	*desc;
-+	struct berlin_pinctrl_function		*functions;
-+	unsigned				nfunctions;
-+	struct pinctrl_dev			*pctrl_dev;
-+};
-+
-+#define BERLIN_PINCTRL_GROUP(_name, _offset, _width, _lsb, ...)		\
-+	{								\
-+		.name = _name,						\
-+		.offset = _offset,					\
-+		.bit_width = _width,					\
-+		.lsb = _lsb,						\
-+		.functions = (struct berlin_desc_function[]){		\
-+			__VA_ARGS__, { } },				\
-+	}
-+
-+#define BERLIN_PINCTRL_FUNCTION(_muxval, _name)		\
-+	{						\
-+		.name = _name,				\
-+		.muxval = _muxval,			\
-+	}
-+
-+#define BERLIN_PINCTRL_FUNCTION_UNKNOWN		{}
-+
-+int berlin_pinctrl_probe(struct platform_device *pdev,
-+			 const struct berlin_pinctrl_desc *desc);
-+
-+#endif /* __PINCTRL_BERLIN_H */
++MODULE_AUTHOR("Antoine T?nart <antoine.tenart@free-electrons.com>");
++MODULE_DESCRIPTION("Marvell Berlin BG2 pinctrl driver");
++MODULE_LICENSE("GPL");
 -- 
 1.8.3.2
