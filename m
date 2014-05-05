@@ -1,24 +1,28 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 4 May 2014 21:23:44 -0400
-Subject: [PATCH v2 8/9] ARM: mvebu_v5_defconfig: Enable sound modules
- needed for t5325
-In-Reply-To: <1399141819-23924-9-git-send-email-andrew@lunn.ch>
-References: <1399141819-23924-1-git-send-email-andrew@lunn.ch>
- <1399141819-23924-9-git-send-email-andrew@lunn.ch>
-Message-ID: <20140505012343.GH28159@titan.lakedaemon.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 4 May 2014 20:23:49 -0500
+Subject: [PATCH v2] ARM: sunxi: Split the various SoCs support in Kconfig
+In-Reply-To: <1398726200-30362-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1398726200-30362-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20140505012349.GA11606@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 03, 2014 at 08:30:18PM +0200, Andrew Lunn wrote:
-> Enable simple-card and the CODEC.
+On Mon, Apr 28, 2014 at 04:03:20PM -0700, Maxime Ripard wrote:
+> This will allow to better isolate various options, and reduce the overall
+> kernel size if we're interested in only one of the SoCs.
 > 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> ---
->  arch/arm/configs/mvebu_v5_defconfig | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Patches 8 and 9 applied to mvebu/defconfig
+Applied in sunxi/core-for-3.16
 
-thx,
-
-Jason.
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140504/d34e8c14/attachment.sig>
