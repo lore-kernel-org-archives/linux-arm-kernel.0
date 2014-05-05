@@ -1,33 +1,33 @@
-From: elder@linaro.org (Alex Elder)
-Date: Mon,  5 May 2014 08:57:36 -0500
-Subject: [PATCH 5/5] ARM: dts: add bus clock bsc3_apb for bcm281xx
-In-Reply-To: <1399298256-10965-1-git-send-email-elder@linaro.org>
-References: <1399298256-10965-1-git-send-email-elder@linaro.org>
-Message-ID: <1399298256-10965-6-git-send-email-elder@linaro.org>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 5 May 2014 17:02:40 +0300
+Subject: [PATCH] ARM: OMAP4: hwmod: Fix SOFTRESET logic for OMAP4
+In-Reply-To: <alpine.DEB.2.02.1402191752590.8777@utopia.booyaka.com>
+References: <1391612769-27890-1-git-send-email-illia.smyrnov@globallogic.com>
+ <alpine.DEB.2.02.1402191752590.8777@utopia.booyaka.com>
+Message-ID: <53679A00.70803@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the bus clock named "bsc3_apb" to the list of those provided by
-the slave CCU.
+Hi Illia,
 
-Signed-off-by: Alex Elder <elder@linaro.org>
----
- arch/arm/boot/dts/bcm11351.dtsi | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+On 02/19/2014 07:53 PM, Paul Walmsley wrote:
+> On Wed, 5 Feb 2014, Illia Smyrnov wrote:
+> 
+>> Commit 313a76e (ARM: OMAP2+: hwmod: Fix SOFTRESET logic) introduced
+>> softreset bit cleaning right after set one. It is caused L3 error for
+>> OMAP4 ISS because ISS register write occurs when ISS reset process is in
+>> progress. Avoid this situation by cleaning softreset bit later, when reset
+>> process is successfully finished.
+>>
+>> Signed-off-by: Illia Smyrnov <illia.smyrnov@globallogic.com>
+> 
+> Thanks, queued for v3.14-rc with notations from Grygorii and Roger.
+> 
 
-diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
-index 64d069b..faff8af 100644
---- a/arch/arm/boot/dts/bcm11351.dtsi
-+++ b/arch/arm/boot/dts/bcm11351.dtsi
-@@ -247,7 +247,8 @@
- 					     "bsc1",
- 					     "bsc2",
- 					     "bsc3",
--					     "pwm";
-+					     "pwm",
-+					     "bsc3_apb";
- 		};
- 
- 		ref_1m_clk: ref_1m {
--- 
-1.9.1
+This hasn't made it to the stable kernels yet.
+
+Could you please send commit 01142519ffc0 to stable at vger.kernel.org for
+v3.4+ kernels? Thanks.
+
+cheers,
+-roger
