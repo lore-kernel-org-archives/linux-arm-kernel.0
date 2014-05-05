@@ -1,49 +1,25 @@
-From: fthain@telegraphics.com.au (Finn Thain)
-Date: Mon, 5 May 2014 15:35:30 +1000 (EST)
-Subject: [PATCH] MAINTAINERS: add an entry for all the NCR5380 drivers
-Message-ID: <alpine.LNX.2.00.1405051458460.16664@nippy.intranet>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 4 May 2014 22:40:33 -0700
+Subject: [GIT PULL] ARM: mvebu: pci/mbus fixes for v3.15
+In-Reply-To: <20140429131101.GI28159@titan.lakedaemon.net>
+References: <20140429131101.GI28159@titan.lakedaemon.net>
+Message-ID: <20140505054033.GD16022@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Apr 29, 2014 at 09:11:01AM -0400, Jason Cooper wrote:
+> arm-soc guys,
+> 
+> This rather large (for fixes) changeset resolves multiple problems with
+> the mvebu PCIe driver.  While it works fine for simple use cases, more
+> complicated uses highlighted multiple problems with MSI handling and mbus
+> window creation.
+> 
+> These changes are Acked by the appropriate maintainers and have been in
+> -next for about a week.
 
-Signed-off-by: Finn Thain <fthain@telegraphics.com.au>
-Cc: Michael Schmitz <schmitzmic@gmail.com>
+Merged all three. We usually don't split up fixes in separate branches, so no
+need to do so in the future.
 
----
 
-As requested:
-http://marc.info/?l=linux-arm-kernel&m=139853302724112&w=2
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index e67ea24..60ea600 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -5996,6 +5996,28 @@ M:	Petr Vandrovec <petr@vandrovec.name>
- S:	Odd Fixes
- F:	fs/ncpfs/
- 
-+NCR 5380 SCSI DRIVERS
-+M:	Finn Thain <fthain@telegraphics.com.au>
-+M:	Michael Schmitz <schmitzmic@gmail.com>
-+L:	linux-scsi at vger.kernel.org
-+S:	Maintained
-+F:	Documentation/scsi/g_NCR5380.txt
-+F:	drivers/scsi/NCR5380.*
-+F:	drivers/scsi/arm/cumana_1.c
-+F:	drivers/scsi/arm/oak.c
-+F:	drivers/scsi/atari_NCR5380.c
-+F:	drivers/scsi/atari_scsi.*
-+F:	drivers/scsi/dmx3191d.c
-+F:	drivers/scsi/dtc.*
-+F:	drivers/scsi/g_NCR5380.*
-+F:	drivers/scsi/g_NCR5380_mmio.c
-+F:	drivers/scsi/mac_scsi.*
-+F:	drivers/scsi/pas16.*
-+F:	drivers/scsi/sun3_NCR5380.c
-+F:	drivers/scsi/sun3_scsi.*
-+F:	drivers/scsi/sun3_scsi_vme.c
-+F:	drivers/scsi/t128.*
-+
- NCR DUAL 700 SCSI DRIVER (MICROCHANNEL)
- M:	"James E.J. Bottomley" <James.Bottomley@HansenPartnership.com>
- L:	linux-scsi at vger.kernel.org
+-Olof
