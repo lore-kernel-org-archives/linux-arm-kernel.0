@@ -1,85 +1,93 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 05 May 2014 14:00:38 +0200
-Subject: [PATCH v2 8/8] ARM: dts: rockchip: convert pinctrl nodes to new
- bindings
-In-Reply-To: <11862890.WUjscWaP3U@diego>
-References: <11862890.WUjscWaP3U@diego>
-Message-ID: <1719309.HLoKcrQoNG@diego>
+From: pavel@denx.de (Pavel Machek)
+Date: Mon, 5 May 2014 14:08:01 +0200
+Subject: [PATCH 2/2] Add 32-bit accesses
+In-Reply-To: <20140502084851.GA5730@amd.pavel.ucw.cz>
+References: <20140426203131.GA21832@amd.pavel.ucw.cz>
+ <6bf951b6-51e7-4b90-b054-9ba5b6e93874@email.android.com>
+ <20140427122510.GB12901@amd.pavel.ucw.cz>
+ <1398716449.836.4.camel@dinh-ubuntu>
+ <20140428211505.GA28242@amd.pavel.ucw.cz>
+ <CAF03EBf9KXqB4W9GuDduhLwp_kwFjUEi3syU7fX3KpXfZEFxHg@mail.gmail.com>
+ <CAF03EBd19PC5RAsLR6-dMPF2x3XRf9X4bFPgX2kRdCYWUQBYcA@mail.gmail.com>
+ <20140430215359.GA15148@amd.pavel.ucw.cz>
+ <CAF03EBewoV0pOOmNQBwPrKgm-zhaSbFcNd_UiEhFWyUrq91-Jg@mail.gmail.com>
+ <20140502084851.GA5730@amd.pavel.ucw.cz>
+Message-ID: <20140505120801.GA16461@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce the grf syscon and convert the pinctrl drivers for rk3066 and rk3188
-to use it, instead of mapping the grf registers themselfs.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-Tested-by: Max Schwarz <max.schwarz@online.de>
----
- arch/arm/boot/dts/rk3066a.dtsi | 2 +-
- arch/arm/boot/dts/rk3188.dtsi  | 9 ++++-----
- arch/arm/boot/dts/rk3xxx.dtsi  | 9 +++++++--
- 3 files changed, 12 insertions(+), 8 deletions(-)
+Add helpers for 32-bit accesses and replace open-coded 32-bit access
+with calls to helpers.
 
-diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
-index 4d4dfbb..048c5de 100644
---- a/arch/arm/boot/dts/rk3066a.dtsi
-+++ b/arch/arm/boot/dts/rk3066a.dtsi
-@@ -79,7 +79,7 @@
+Tested-by: Thor Thayer <tthayer@altera.com>
+Signed-off-by: Thor Thayer <tthayer@altera.com>
+Signed-off-by: Pavel Machek <pavel@denx.de>
+
+diff --git a/drivers/net/can/c_can/c_can.h b/drivers/net/can/c_can/c_can.h
+index c56f1b1..10c3fd2 100644
+--- a/drivers/net/can/c_can/c_can.h
++++ b/drivers/net/can/c_can/c_can.h
+@@ -188,6 +190,8 @@ struct c_can_priv {
+ 	u32 comm_rcv_high;
+ 	u32 rxmasked;
+ 	u32 dlc[C_CAN_MSG_OBJ_TX_NUM];
++	u32 (*read_reg32) (struct c_can_priv *priv, enum reg index);
++	void (*write_reg32) (struct c_can_priv *priv, enum reg index, u32 val);
+ };
  
- 		pinctrl at 20008000 {
- 			compatible = "rockchip,rk3066a-pinctrl";
--			reg = <0x20008000 0x150>;
-+			rockchip,grf = <&grf>;
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			ranges;
-diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
-index ed9a70a..a494fb0 100644
---- a/arch/arm/boot/dts/rk3188.dtsi
-+++ b/arch/arm/boot/dts/rk3188.dtsi
-@@ -75,17 +75,16 @@
+ struct net_device *alloc_c_can_dev(void);
+
+diff --git a/drivers/net/can/c_can/c_can.c b/drivers/net/can/c_can/c_can.c
+index a2ca820..824ec21 100644
+--- a/drivers/net/can/c_can/c_can.c
++++ b/drivers/net/can/c_can/c_can.c
+@@ -252,8 +261,7 @@ static void c_can_obj_update(struct net_device *dev, int iface, u32 cmd, u32 obj
+ 	struct c_can_priv *priv = netdev_priv(dev);
+ 	int cnt, reg = C_CAN_IFACE(COMREQ_REG, iface);
  
- 		pinctrl at 20008000 {
- 			compatible = "rockchip,rk3188-pinctrl";
--			reg = <0x20008000 0xa0>,
--			      <0x20008164 0x1a0>;
--			reg-names = "base", "pull";
-+			rockchip,grf = <&grf>;
-+			rockchip,pmu = <&pmu>;
-+
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			ranges;
+-	priv->write_reg(priv, reg + 1, cmd);
+-	priv->write_reg(priv, reg, obj);
++	priv->write_reg32(priv, reg, (cmd << 16) | obj);
  
- 			gpio0: gpio0 at 0x2000a000 {
- 				compatible = "rockchip,rk3188-gpio-bank0";
--				reg = <0x2000a000 0x100>,
--				      <0x20004064 0x8>;
-+				reg = <0x2000a000 0x100>;
- 				interrupts = <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clk_gates8 9>;
+ 	for (cnt = MIN_TIMEOUT_VALUE; cnt; cnt--) {
+ 		if (!(priv->read_reg(priv, reg) & IF_COMR_BUSY))
+@@ -328,8 +336,7 @@ static void c_can_setup_tx_object(struct net_device *dev, int iface,
+ 		change_bit(idx, &priv->tx_dir);
+ 	}
  
-diff --git a/arch/arm/boot/dts/rk3xxx.dtsi b/arch/arm/boot/dts/rk3xxx.dtsi
-index 26e5a96..2adf1cc9e 100644
---- a/arch/arm/boot/dts/rk3xxx.dtsi
-+++ b/arch/arm/boot/dts/rk3xxx.dtsi
-@@ -31,11 +31,16 @@
- 			reg = <0x1013c000 0x100>;
- 		};
+-	priv->write_reg(priv, C_CAN_IFACE(ARB1_REG, iface), arb);
+-	priv->write_reg(priv, C_CAN_IFACE(ARB2_REG, iface), arb >> 16);
++	priv->write_reg32(priv, C_CAN_IFACE(ARB1_REG, iface), arb);
  
--		pmu at 20004000 {
--			compatible = "rockchip,rk3066-pmu";
-+		pmu: pmu at 20004000 {
-+			compatible = "rockchip,rk3066-pmu", "syscon";
- 			reg = <0x20004000 0x100>;
- 		};
+ 	priv->write_reg(priv, C_CAN_IFACE(MSGCTRL_REG, iface), ctrl);
  
-+		grf: grf at 20008000 {
-+			compatible = "syscon";
-+			reg = <0x20008000 0x200>;
-+		};
-+
- 		gic: interrupt-controller at 1013d000 {
- 			compatible = "arm,cortex-a9-gic";
- 			interrupt-controller;
+@@ -391,8 +398,7 @@ static int c_can_read_msg_object(struct net_device *dev, int iface, u32 ctrl)
+ 
+ 	frame->can_dlc = get_can_dlc(ctrl & 0x0F);
+ 
+-	arb = priv->read_reg(priv, C_CAN_IFACE(ARB1_REG, iface));
+-	arb |= priv->read_reg(priv, C_CAN_IFACE(ARB2_REG, iface)) << 16;
++	arb = priv->read_reg32(priv, C_CAN_IFACE(ARB1_REG, iface));
+ 
+ 	if (arb & IF_ARB_MSGXTD)
+ 		frame->can_id = (arb & CAN_EFF_MASK) | CAN_EFF_FLAG;
+@@ -424,12 +430,10 @@ static void c_can_setup_receive_object(struct net_device *dev, int iface,
+ 	struct c_can_priv *priv = netdev_priv(dev);
+ 
+ 	mask |= BIT(29);
+-	priv->write_reg(priv, C_CAN_IFACE(MASK1_REG, iface), mask);
+-	priv->write_reg(priv, C_CAN_IFACE(MASK2_REG, iface), mask >> 16);
++	priv->write_reg32(priv, C_CAN_IFACE(MASK1_REG, iface), mask);
+ 
+ 	id |= IF_ARB_MSGVAL;
+-	priv->write_reg(priv, C_CAN_IFACE(ARB1_REG, iface), id);
+-	priv->write_reg(priv, C_CAN_IFACE(ARB2_REG, iface), id >> 16);
++	priv->write_reg32(priv, C_CAN_IFACE(ARB1_REG, iface), id);
+ 
+ 	priv->write_reg(priv, C_CAN_IFACE(MSGCTRL_REG, iface), mcont);
+ 	c_can_object_put(dev, iface, obj, IF_COMM_RCV_SETUP);
+
 -- 
-1.9.0
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
