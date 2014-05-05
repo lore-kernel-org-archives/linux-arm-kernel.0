@@ -1,128 +1,59 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 5 May 2014 14:57:13 -0700
-Subject: [PATCH v4 2/4] Documentation: dts: Add bindings for APM X-Gene
- SoC ethernet driver
-In-Reply-To: <1399326447-2329-3-git-send-email-isubramanian@apm.com>
-References: <1399326447-2329-1-git-send-email-isubramanian@apm.com>
- <1399326447-2329-3-git-send-email-isubramanian@apm.com>
-Message-ID: <CAGVrzcbecJHbZn1UU3yaD3MtSWk8FmgjMxG4zmQONrnVc05uqg@mail.gmail.com>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Mon, 5 May 2014 16:54:22 -0500
+Subject: [PATCHv5 RFC 12/15] hwspinlock/core: add OF helper to parse
+ reserved locks
+In-Reply-To: <53680639.1080405@ti.com>
+References: <1398904476-26200-1-git-send-email-s-anna@ti.com>
+ <1398904476-26200-13-git-send-email-s-anna@ti.com>
+ <53680639.1080405@ti.com>
+Message-ID: <20140505215422.GD5546@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-05-05 14:47 GMT-07:00 Iyappan Subramanian <isubramanian@apm.com>:
-> This patch adds documentation for APM X-Gene SoC ethernet DTS binding.
->
-> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
-> Signed-off-by: Ravi Patel <rapatel@apm.com>
-> Signed-off-by: Keyur Chudgar <kchudgar@apm.com>
-> ---
->  .../devicetree/bindings/net/apm-xgene-enet.txt     |   66 ++++++++++++++++++++
->  1 file changed, 66 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/net/apm-xgene-enet.txt
->
-> diff --git a/Documentation/devicetree/bindings/net/apm-xgene-enet.txt b/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
-> new file mode 100644
-> index 0000000..9ad6fe1
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
-> @@ -0,0 +1,66 @@
-> +APM X-Gene SoC Ethernet nodes
-> +
-> +Ethernet nodes are defined to describe on-chip ethernet interfaces in
-> +APM X-Gene SoC.
-> +
-> +Required properties:
-> +- compatible:          Should be "apm,xgene-enet"
-> +- reg:                 First resource is the ethernet base register set
-> +                       Second resource is the ring base register set
-> +                       Third resource is the ring command register set
-> +- interrupts:          Ethernet main interrupt
-> +- clocks:              Reference to the clock entry.
-> +- local-mac-address:   Ethernet MAC address.
-> +- phy-connection-type: Ethernet MII mode.
+On Mon, May 05, 2014 at 04:44:25PM -0500, Suman Anna wrote:
+> Hi Rob,
+> 
+> On 04/30/2014 07:34 PM, Suman Anna wrote:
+> > The property 'hwlock-reserved-locks' will be used to represent
+> > the number of locks to be reserved for clients that would need
+> > to request/operate on specific locks. A new OF helper function,
+> > of_hwspin_lock_get_num_reserved_locks(), is added to minimize
+> > duplication in different platform implementations.
+> > 
+> > The function will return a value of 0 if the property is not
+> > defined, so as to support a default behavior of marking all
+> > locks as unused and open for anonymous allocations.
+> > 
+> > Signed-off-by: Suman Anna <s-anna@ti.com>
+> > ---
+> >  .../devicetree/bindings/hwlock/hwlock.txt          |  3 +++
+> >  drivers/hwspinlock/hwspinlock_core.c               | 25 ++++++++++++++++++++++
+> >  include/linux/hwspinlock.h                         |  1 +
+> >  3 files changed, 29 insertions(+)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/hwlock/hwlock.txt b/Documentation/devicetree/bindings/hwlock/hwlock.txt
+> > index d538a9b..88d16d2 100644
+> > --- a/Documentation/devicetree/bindings/hwlock/hwlock.txt
+> > +++ b/Documentation/devicetree/bindings/hwlock/hwlock.txt
+> > @@ -18,6 +18,9 @@ Common properties:
+> >  			property is needed on hwlock devices, where the number
+> >  			of supported locks within a hwlock device cannot be
+> >  			read from a register.
+> > +- hwlock-reserved-locks: Number of locks to reserve for clients requiring
+> > +			specific locks. This value cannot exceed the value of
+> > +			hwlock-num-locks.
+> 
+> Any suggestions here on the approach? This property falls into a gray
+> area as well, as the current approach is somewhat limiting (it doesn't
+> support sparse reserved locks, and expects them at the beginning of the
+> lock range).
 
-- phy-handle is not listed anywhere, yet, present in the example you give.
+Is it possible to implement a pinctrl-like hogging approach, whereby the
+specific locks that need to be reserved are consumed by the controller
+itself?
 
-> +
-> +- mdio device tree subnode: When the X-Gene SoC has a phy connected to its local
-> +               mdio, there must be device tree subnode with the following
-> +               required properties:
-
-In that specific case, 'phy-handle' becomes an optional property.
-
-> +
-> +       - compatible: Must be "apm,xgene-mdio".
-> +       - #address-cells: Must be <1>.
-> +       - #size-cells: Must be <0>.
-> +
-> +       For the phy on the mdio bus, there must be a node with the following
-> +       fields:
-> +
-> +       - reg: phy id used to communicate to phy.
-
-Better refer to Documentation/devicetree/bindings/ethernet/phy.txt
-which contains a more exhaustive binding description for Ethernet PHY
-nodes.
-
-> +
-> +Optional properties:
-> +- status               : Should be "ok" or "disabled" for enabled/disabled.
-> +                         Default is "ok".
-> +
-> +Example:
-> +       menetclk: menetclk {
-> +               compatible = "apm,xgene-device-clock";
-> +               clock-output-names = "menetclk";
-> +               status = "ok";
-> +       };
-> +
-> +       menet: ethernet at 17020000 {
-> +               compatible = "apm,xgene-enet";
-> +               status = "disabled";
-> +               reg = <0x0 0x17020000 0x0 0xd100>,
-> +                     <0x0 0X17030000 0x0 0X400>,
-> +                     <0x0 0X10000000 0x0 0X200>;
-
-Since you have mutliple values in your 'reg' property, you could also
-provide an optional 'reg-names' which documents what the register
-ranges are about.
-
-> +               interrupts = <0x0 0x3c 0x4>;
-> +               clocks = <&menetclk 0>;
-> +               local-mac-address = [00 01 73 00 00 01];
-> +               phy-connection-type = "rgmii";
-> +               phy-handle = <&menetphy>;
-> +               mdio {
-> +                       compatible = "apm,xgene-mdio";
-> +                       #address-cells = <1>;
-> +                       #size-cells = <0>;
-> +                       menetphy: menetphy at 3 {
-
-This PHY node is missing a compatible string as described in
-Documentation/devicetree/bindings/net/ethernet/phy.txt. Your binding
-should also link to that documentation for
-
-> +                               reg = <0x3>;
-> +                       };
-> +
-> +               };
-> +       };
-> +
-> +/* Board-specific peripheral configurations */
-> +
-> +&menet {
-> +        status = "ok";
-> +};
-> --
-> 1.7.9.5
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
+  Josh
 
 -- 
-Florian
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
