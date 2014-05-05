@@ -1,41 +1,26 @@
-From: shaik.samsung@gmail.com (Shaik Ameer Basha)
-Date: Mon, 5 May 2014 10:10:36 +0530
-Subject: [PATCH v3 00/16] exynos5420: clock file cleanup
-In-Reply-To: <5362BC8A.6020609@gmail.com>
-References: <1398344632-18623-1-git-send-email-shaik.ameer@samsung.com>
- <5362BC8A.6020609@gmail.com>
-Message-ID: <CAOD6ATqerMT4rrX7iv0ikHtqgZeVrzEoyxMmc_YmwG7fgbvgTQ@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 4 May 2014 21:55:29 -0700
+Subject: [PATCH 1/3] ARM: mvebu: clean-up unneeded kconfig selects
+In-Reply-To: <1398195678-28787-2-git-send-email-robherring2@gmail.com>
+References: <1398195678-28787-1-git-send-email-robherring2@gmail.com>
+ <1398195678-28787-2-git-send-email-robherring2@gmail.com>
+Message-ID: <20140505045529.GA16022@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+On Tue, Apr 22, 2014 at 02:41:16PM -0500, Rob Herring wrote:
+> From: Rob Herring <robh@kernel.org>
+> 
+> Multi-platform support implies all these options are already selected and
+> individual platforms don't need to select them.
+> 
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 
-On Fri, May 2, 2014 at 2:58 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> On 24.04.2014 15:03, Shaik Ameer Basha wrote:
->>
->> Many changes/fixes have been identified for clock file for exynos5420.
->> These include correct parents, bit fields, new clocks etc. Existing
->> files needs some correction in terms of names of the clock and
->> indentation. These issues are addressed in this patch series. It also
->> replaces the usage of enums with macro as clock ids.
->>
->> This patch series is rebased on,
->> git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git:master
->>
->> This patch is also dependent on the following patch.
->> ARM: dts: add dt node for sss module for exynos5250/5420
->
->
-> Also a general comment to all the patches. Please assign clock IDs for all
-> the clocks being added. In general, all the defined clocks should have clock
-> IDs defined to let them be accessed from Device Tree, for example in case of
-> DT clock initialization that is being worked on right now.
+What's this based on? It doesn't apply to 3.15-rc4.
 
-Ok. Will take care of this in next series.
 
-Regards,
-Shaik
-
->
-> Best regards,
-> Tomasz
+-Olof
