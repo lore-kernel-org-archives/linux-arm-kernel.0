@@ -1,53 +1,41 @@
 From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Mon,  5 May 2014 14:57:16 +0530
-Subject: [Patch v4 1/5] driver: cpuidle-big-little: add of_device_id structure
+Date: Mon,  5 May 2014 14:57:17 +0530
+Subject: [Patch v4 2/5] cpuidle: config: Add ARCH_EXYNOS entry to select
+ cpuidle-big-little driver
 In-Reply-To: <1399282040-8995-1-git-send-email-chander.kashyap@linaro.org>
 References: <1399278444-8312-3-git-send-email-chander.kashyap@linaro.org>
  <1399282040-8995-1-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <1399282040-8995-2-git-send-email-chander.kashyap@linaro.org>
+Message-ID: <1399282040-8995-3-git-send-email-chander.kashyap@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver will be used by many big.Little Soc's. As of now it does
-string matching of hardcoded compatible string to init the driver. This
-comparison list will keep on growing with addition of new SoC's.
-Hence add of_device_id structure to collect the compatible strings of
-SoC's using this driver.
+Add support to select generic big-little cpuidle driver for Samsung Exynos
+series SoC's. This is required for Exynos big-llittle SoC's eg, Exynos5420.
 
 Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
 Signed-off-by: Chander Kashyap <k.chander@samsung.com>
 ---
- drivers/cpuidle/cpuidle-big_little.c |   11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+Changes in v4:
+	1. Typo fixed from SOC_EXYNOS5420 to ARCH_EXYNOS
+	2. Commit message updated
+Changes in v3: None
+Changes in v2:
+	1. Changed config macro from SOC_EXYNOS5420 to ARCH_EXYNOS
+ drivers/cpuidle/Kconfig.arm |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/cpuidle/cpuidle-big_little.c b/drivers/cpuidle/cpuidle-big_little.c
-index b45fc62..4cd02bd 100644
---- a/drivers/cpuidle/cpuidle-big_little.c
-+++ b/drivers/cpuidle/cpuidle-big_little.c
-@@ -163,14 +163,23 @@ static int __init bl_idle_driver_init(struct cpuidle_driver *drv, int cpu_id)
- 	return 0;
- }
+diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
+index 97ccc31..d9596e7 100644
+--- a/drivers/cpuidle/Kconfig.arm
++++ b/drivers/cpuidle/Kconfig.arm
+@@ -4,7 +4,7 @@
  
-+static const struct of_device_id compatible_machine_match[] = {
-+	{ .compatible = "arm,vexpress,v2p-ca15_a7" },
-+	{},
-+};
-+
- static int __init bl_idle_init(void)
- {
- 	int ret;
-+	struct device_node *root = of_find_node_by_path("/");
-+
-+	if (!root)
-+		return -ENODEV;
- 
- 	/*
- 	 * Initialize the driver just for a compliant set of machines
- 	 */
--	if (!of_machine_is_compatible("arm,vexpress,v2p-ca15_a7"))
-+	if (!of_match_node(compatible_machine_match, root))
- 		return -ENODEV;
- 	/*
- 	 * For now the differentiation between little and big cores
+ config ARM_BIG_LITTLE_CPUIDLE
+ 	bool "Support for ARM big.LITTLE processors"
+-	depends on ARCH_VEXPRESS_TC2_PM
++	depends on ARCH_VEXPRESS_TC2_PM || ARCH_EXYNOS
+ 	select ARM_CPU_SUSPEND
+ 	select CPU_IDLE_MULTIPLE_DRIVERS
+ 	help
 -- 
 1.7.9.5
