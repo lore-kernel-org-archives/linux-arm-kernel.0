@@ -1,40 +1,38 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 4 May 2014 20:56:25 -0400
-Subject: [PATCH 02/15] ARM: dts: kirkwood: add node labels
-In-Reply-To: <1398862602-29595-3-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1398862602-29595-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1398862602-29595-3-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20140505005625.GD28159@titan.lakedaemon.net>
+Date: Sun, 4 May 2014 21:03:44 -0400
+Subject: [PATCH v2 08/12] ARM: marvell: add MTD_SPI_NOR (new dependency
+ for M25P80)
+In-Reply-To: <1398925607-7482-9-git-send-email-computersforpeace@gmail.com>
+References: <1398925607-7482-1-git-send-email-computersforpeace@gmail.com>
+ <1398925607-7482-9-git-send-email-computersforpeace@gmail.com>
+Message-ID: <20140505010344.GE28159@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 30, 2014 at 02:56:29PM +0200, Sebastian Hesselbarth wrote:
-> This adds missing node labels to Kirkwood common and SoC specific nodes
-> to allow to reference them more easily.
+On Wed, Apr 30, 2014 at 11:26:43PM -0700, Brian Norris wrote:
+> These defconfigs contain the CONFIG_M25P80 symbol, which is now
+> dependent on the MTD_SPI_NOR symbol. Add CONFIG_MTD_SPI_NOR to satisfy
+> the new dependency.
 > 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> Cc: Kumar Gala <galak@codeaurora.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
+> At the same time, drop the now-nonexistent CONFIG_MTD_CHAR symbol.
+> 
+> Signed-off-by: Brian Norris <computersforpeace@gmail.com>
 > Cc: Jason Cooper <jason@lakedaemon.net>
 > Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: devicetree at vger.kernel.org
+> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 > Cc: linux-arm-kernel at lists.infradead.org
 > Cc: linux-kernel at vger.kernel.org
+> Acked-by: Jason Cooper <jason@lakedaemon.net>
 > ---
->  arch/arm/boot/dts/kirkwood-6192.dtsi | 10 +++++-----
->  arch/arm/boot/dts/kirkwood-6281.dtsi | 10 +++++-----
->  arch/arm/boot/dts/kirkwood-6282.dtsi | 16 ++++++++--------
->  arch/arm/boot/dts/kirkwood.dtsi      | 16 ++++++++--------
->  4 files changed, 26 insertions(+), 26 deletions(-)
+>  arch/arm/configs/dove_defconfig     | 2 +-
+>  arch/arm/configs/kirkwood_defconfig | 1 +
+>  arch/arm/configs/mvebu_v5_defconfig | 1 +
+>  arch/arm/configs/mvebu_v7_defconfig | 1 +
+>  4 files changed, 4 insertions(+), 1 deletion(-)
 
-Patches 2 through 15 applied to mvebu/dt with Andrew's Ack.
+Applied to mvebu/defconfig with Ezequiel's Ack, and a reworded subject:
+
+"ARM: mvebu: defconfig: add MTD_SPI_NOR (new dependency for M25P80)"
 
 thx,
 
