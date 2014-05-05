@@ -1,20 +1,68 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 5 May 2014 09:25:58 -0500
-Subject: [PATCH 1/2] PM / OPP: Remove cpufreq wrapper dependency on
- internal data organization
-In-Reply-To: <CAKohpomeP3Ftx8mH=x0Hj7HEpw6A9X8O8JEFqvrJbkZYDqDS6Q@mail.gmail.com>
-References: <1399296830-13056-1-git-send-email-nm@ti.com>
- <1399296830-13056-2-git-send-email-nm@ti.com>
- <CAKohpomeP3Ftx8mH=x0Hj7HEpw6A9X8O8JEFqvrJbkZYDqDS6Q@mail.gmail.com>
-Message-ID: <CAGo_u6pcEKDiAqvJW66_p7M7D0noFj6o9Rw5_d8Af3NMBhHA=g@mail.gmail.com>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Mon, 5 May 2014 19:58:50 +0530
+Subject: [GIT PULL 4/4] omap crossbar support for v3.15
+In-Reply-To: <531F0494.1040105@ti.com>
+References: <pull-1393802089-910509>
+ <5313bcc5.a8fc440a.467f.7ba2SMTPIN_ADDED_MISSING@mx.google.com>
+ <20140309073347.GL16310@quad.lixom.net> <20140310163620.GB4882@atomide.com>
+ <531F0494.1040105@ti.com>
+Message-ID: <5367A022.1040305@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 5, 2014 at 9:23 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
->
->
-> What if opp is being added for some reason at the same time?
-> I hope we can surely see some awkward results, maybe some
-> NULL pointers invocations as well..
+Hi Tony,
 
-we wont - rcu operations ensure that.
+On Tuesday 11 March 2014 06:11 PM, Sricharan R wrote:
+> Tony,
+>
+> On Monday 10 March 2014 10:06 PM, Tony Lindgren wrote:
+>> * Olof Johansson <olof@lixom.net> [140308 23:36]:
+>>> On Sun, Mar 02, 2014 at 03:14:49PM -0800, Tony Lindgren wrote:
+>>>> The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+>>>>
+>>>>   Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+>>>>
+>>>> are available in the git repository at:
+>>>>
+>>>>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.15/crossbar-signed
+>>>>
+>>>> for you to fetch changes up to 9594274201ac3c67d5c569aae63792e58bcd33e6:
+>>>>
+>>>>   Merge branch 'crossbar_3.14_rc1' of git://github.com/Sricharanti/sricharan into omap-for-v3.15/crossbar (2014-02-28 13:35:02 -0800)
+>>>>
+>>>> ----------------------------------------------------------------
+>>>>
+>>>> Add support for GIC crossbar that routes interrupts on newer omaps.
+>>>>
+>>>> Looks like people wanted these merged via the omap tree as it's
+>>>> the only user for the GIC crossbar.
+>>>>
+>>>> ----------------------------------------------------------------
+>>>> Sricharan R (4):
+>>>>       DRIVERS: IRQCHIP: IRQ-GIC: Add support for routable irqs
+>>>>       DRIVERS: IRQCHIP: CROSSBAR: Add support for Crossbar IP
+>>>>       ARM: OMAP4+: Correct Wakeup-gen code to use physical irq number
+>>>>       ARM: DRA: Enable Crossbar IP support for DRA7XX
+>>> Whoa, lots of caps on those driver subjects. I don't think we need those
+>>> in the future, lower case is just fine (and DRIVERS: usually isn't used).
+>> Oops yeah I had them as "irqchip: crossbar" and "irqchip: irq-gic" in
+>> my earlier branch for v3.14 that did not get merged, but this time I
+>> pulled from Sricharan.
+>>
+>> Scricharan, maybe use less yelling naming for any follow-up patches?
+>>  
+>   Will make sure that there are no caps in the follow up patches.
+>
+> Regards,
+>  Sricharan
+I have pushed the below branch for the crossbar-dts data rebased on 3.15-rc4
+
+git at github.com:Sricharanti/sricharan.git
+branch: crossbar_dts_3.15_rc4
+
+These patches are dependent on the crossbar driver fixes sent below.
+
+http://marc.info/?l=linux-omap&m=139929963420299&w=2
+
+Regards,
+ Sricharan
