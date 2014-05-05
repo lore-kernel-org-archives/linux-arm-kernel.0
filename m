@@ -1,59 +1,77 @@
 From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 05 May 2014 12:57:13 +0200
-Subject: [PATCH 1/7] arm: firmware: Check firmware is running or not
+Date: Mon, 05 May 2014 12:57:15 +0200
+Subject: [PATCH 3/7] ARM: EXYNOS: add AFTR mode support to firmware do_idle
+ method
 In-Reply-To: <1399287439-31376-1-git-send-email-b.zolnierkie@samsung.com>
 References: <1399287439-31376-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <1399287439-31376-2-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <1399287439-31376-4-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kyungmin Park <kyungmin.park@samsung.com>
+On some platforms (i.e. EXYNOS ones) more than one idle mode is
+available and we need to distinguish them in firmware do_idle method.
 
-To support multi-platform, it needs to know it's running under secure
-OS or not.  Sometimes it needs to access physical address by SMC calls.
+Add mode parameter to do_idle firmware method and AFTR mode support
+to EXYNOS do_idle implementation.
 
-e.g.,
-        if (firmware_run()) {
-                addr = physical address;
-        } else {
-                addr = virtual address;
-        }
+This change is a preparation for adding secure firmware support to
+EXYNOS cpuidle driver.
 
-        call_firmware_ops(read_address, addr, &value);
+This patch shouldn't cause any functionality changes (please note
+that do_idle firmware method is unused currently).
 
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 ---
- arch/arm/common/firmware.c      | 5 +++++
- arch/arm/include/asm/firmware.h | 3 +++
- 2 files changed, 8 insertions(+)
+ arch/arm/include/asm/firmware.h |  7 ++++++-
+ arch/arm/mach-exynos/firmware.c | 10 ++++++++--
+ 2 files changed, 14 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/common/firmware.c b/arch/arm/common/firmware.c
-index 27ddccb..e9d9ee5 100644
---- a/arch/arm/common/firmware.c
-+++ b/arch/arm/common/firmware.c
-@@ -16,3 +16,8 @@
- static const struct firmware_ops default_firmware_ops;
- 
- const struct firmware_ops *firmware_ops = &default_firmware_ops;
-+
-+int firmware_run(void)
-+{
-+	return firmware_ops != &default_firmware_ops;
-+}
 diff --git a/arch/arm/include/asm/firmware.h b/arch/arm/include/asm/firmware.h
-index 2c9f10d..c72ec47 100644
+index 70883c7..63989c3 100644
 --- a/arch/arm/include/asm/firmware.h
 +++ b/arch/arm/include/asm/firmware.h
-@@ -46,6 +46,9 @@ struct firmware_ops {
+@@ -28,7 +28,7 @@ struct firmware_ops {
+ 	/*
+ 	 * Enters CPU idle mode
+ 	 */
+-	int (*do_idle)(void);
++	int (*do_idle)(int mode);
+ 	/*
+ 	 * Sets boot address of specified physical CPU
+ 	 */
+@@ -47,6 +47,11 @@ struct firmware_ops {
+ 	int (*c15resume)(u32 *regs);
+ };
+ 
++enum {
++	FW_DO_IDLE_NORMAL,
++	FW_DO_IDLE_AFTR,
++};
++
  /* Global pointer for current firmware_ops structure, can't be NULL. */
  extern const struct firmware_ops *firmware_ops;
  
-+/* Check firmware is running */
-+extern int firmware_run(void);
-+
- /*
-  * call_firmware_op(op, ...)
-  *
+diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
+index 581c7bf..71fe169 100644
+--- a/arch/arm/mach-exynos/firmware.c
++++ b/arch/arm/mach-exynos/firmware.c
+@@ -20,9 +20,15 @@
+ 
+ #include "smc.h"
+ 
+-static int exynos_do_idle(void)
++static int exynos_do_idle(int mode)
+ {
+-	exynos_smc(SMC_CMD_SLEEP, 0, 0, 0);
++	switch (mode) {
++	case FW_DO_IDLE_AFTR:
++		exynos_smc(SMC_CMD_CPU0AFTR, 0, 0, 0);
++		break;
++	case FW_DO_IDLE_NORMAL:
++		exynos_smc(SMC_CMD_SLEEP, 0, 0, 0);
++	}
+ 	return 0;
+ }
+ 
 -- 
 1.8.2.3
