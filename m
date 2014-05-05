@@ -1,33 +1,115 @@
-From: sonnyrao@chromium.org (Sonny Rao)
-Date: Mon, 5 May 2014 16:29:36 -0700
-Subject: CPU performance counters not working on big.LITTLE switcher
-In-Reply-To: <CAPz6YkXsig6XornqoMyn5DtRd9NECyc+qgQo39RQK0sDeat34Q@mail.gmail.com>
-References: <CAPz6YkXsig6XornqoMyn5DtRd9NECyc+qgQo39RQK0sDeat34Q@mail.gmail.com>
-Message-ID: <CAPz6YkV2E2NBY9E8x4JJh2S-3oqdtk2yD=aNSOopYakcc2noLQ@mail.gmail.com>
+From: gavin.guo@canonical.com (Gavin Guo)
+Date: Tue, 6 May 2014 07:34:23 +0800
+Subject: [PATCH v4 5/5] change update_range to handle > 4GB 2nd stage
+ range for ARMv7
+In-Reply-To: <535EFB21.9040308@samsung.com>
+References: <535EF871.9090604@samsung.com>
+	<535EFB21.9040308@samsung.com>
+Message-ID: <CA+eFSM2FundVPupJpr1EJ7R8XB2ZJzcGbi8KNs33v=xsYtimpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[sorry for HTML spam, resending]
+Hi Mario,
 
-Hi, we have the problem today that cpu based performance counters don't work
-when we're using the big.LITTLE switcher on Exynos 5420, and it doesn't look
-like code exists to deal with this in the switcher.
+On Tue, Apr 29, 2014 at 9:06 AM, Mario Smarduch <m.smarduch@samsung.com> wrote:
+>
+> This patch adds support for unmapping 2nd stage page tables for addresses >4GB
+> on ARMv7.
+>
+> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+> ---
+>  arch/arm/kvm/mmu.c |   20 ++++++++++++--------
+>  1 file changed, 12 insertions(+), 8 deletions(-)
+>
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index 88f5503..afbf8ba 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -176,21 +176,25 @@ static void clear_pte_entry(struct kvm *kvm, pte_t *pte, phys_addr_t addr)
+>         }
+>  }
+>
+> +/* Function shared between identity and 2nd stage mappings. For 2nd stage
+> + * the IPA may be > 4GB on ARMv7, and page table range functions
+> + * will fail. kvm_xxx_addr_end() is used to handle both cases.
+> + */
+>  static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
+> -                       unsigned long long start, u64 size)
+> +                       phys_addr_t start, u64 size)
+>  {
+>         pgd_t *pgd;
+>         pud_t *pud;
+>         pmd_t *pmd;
+>         pte_t *pte;
+> -       unsigned long long addr = start, end = start + size;
+> -       u64 next;
+> +       phys_addr_t addr = start, end = start + size;
+> +       phys_addr_t next;
+>
+>         while (addr < end) {
+>                 pgd = pgdp + pgd_index(addr);
+>                 pud = pud_offset(pgd, addr);
+>                 if (pud_none(*pud)) {
+> -                       addr = pud_addr_end(addr, end);
+> +                       addr = kvm_pud_addr_end(addr, end);
+>                         continue;
+>                 }
+>
+> @@ -200,13 +204,13 @@ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
+>                          * move on.
+>                          */
+>                         clear_pud_entry(kvm, pud, addr);
+> -                       addr = pud_addr_end(addr, end);
+> +                       addr = kvm_pud_addr_end(addr, end);
+>                         continue;
+>                 }
+>
+>                 pmd = pmd_offset(pud, addr);
+>                 if (pmd_none(*pmd)) {
+> -                       addr = pmd_addr_end(addr, end);
+> +                       addr = kvm_pmd_addr_end(addr, end);
+>                         continue;
+>                 }
+>
+> @@ -221,10 +225,10 @@ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
+>                  */
+>                 if (kvm_pmd_huge(*pmd) || page_empty(pte)) {
+>                         clear_pmd_entry(kvm, pmd, addr);
+> -                       next = pmd_addr_end(addr, end);
+> +                       next = kvm_pmd_addr_end(addr, end);
+>                         if (page_empty(pmd) && !page_empty(pud)) {
+>                                 clear_pud_entry(kvm, pud, addr);
+> -                               next = pud_addr_end(addr, end);
+> +                               next = kvm_pud_addr_end(addr, end);
+>                         }
+>                 }
+>
+> --
+> 1.7.9.5
+>
+>
+>
 
-As it stands right now, if you put an A-15 or A-7 PMU node into your
-device-tree on an bl_switcher system it's very broken.  At the minimum, I
-think it should disable performance counters until there's some kind of
-proper implementation.
+It seems that your adding kvm_pmd_addr_end(addr, end) already exists
+in the following patch and may need to remove these parts from your
+patch.
 
-I looked into trying to make this work, but it turned out to not be as
-simple as just context switching counters from A-15 to A-7.  The biggest
-problem is that the PMUs are not architecturally compatible.  There are
-different events and differing numbers of counters on these two cores.
-There's also the tangential issue of representing this in the device tree,
-but that's far less important.
+commit a3c8bd31af260a17d626514f636849ee1cd1f63e
+Author: Marc Zyngier <marc.zyngier@arm.com>
+Date:   Tue Feb 18 14:29:03 2014 +0000
 
-My guess as to how to fix this is to create an "architectural" PMU which
-contains the intersection of the two performance monitor units with the
-minimum number of counters supported by either core (which in this case
-looks to be 4 on the A7).  However, I don't really have the bandwidth to
-work on this at  the moment.  I was mostly wondering, have other people run
-into this limitation and is there any sort of plan to work on it?
+    ARM: KVM: introduce kvm_p*d_addr_end
+
+    The use of p*d_addr_end with stage-2 translation is slightly dodgy,
+    as the IPA is 40bits, while all the p*d_addr_end helpers are
+    taking an unsigned long (arm64 is fine with that as unligned long
+    is 64bit).
+
+    The fix is to introduce 64bit clean versions of the same helpers,
+    and use them in the stage-2 page table code.
+
+    Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+    Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+    Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+
+Gavin
