@@ -1,73 +1,35 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Mon,  5 May 2014 18:00:56 +0530
-Subject: [PATCH 2/2] ARM: dts: Enable USB 3503 hub on exynos5420-peach-pit
-In-Reply-To: <1399293056-17143-1-git-send-email-gautam.vivek@samsung.com>
-References: <1399293056-17143-1-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <1399293056-17143-2-git-send-email-gautam.vivek@samsung.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Mon, 05 May 2014 14:40:05 +0200
+Subject: [PATCH 2/2] Add 32-bit accesses
+In-Reply-To: <20140505120801.GA16461@amd.pavel.ucw.cz>
+References: <20140426203131.GA21832@amd.pavel.ucw.cz>
+ <6bf951b6-51e7-4b90-b054-9ba5b6e93874@email.android.com>
+ <20140427122510.GB12901@amd.pavel.ucw.cz>
+ <1398716449.836.4.camel@dinh-ubuntu>
+ <20140428211505.GA28242@amd.pavel.ucw.cz>
+ <CAF03EBf9KXqB4W9GuDduhLwp_kwFjUEi3syU7fX3KpXfZEFxHg@mail.gmail.com>
+ <CAF03EBd19PC5RAsLR6-dMPF2x3XRf9X4bFPgX2kRdCYWUQBYcA@mail.gmail.com>
+ <20140430215359.GA15148@amd.pavel.ucw.cz>
+ <CAF03EBewoV0pOOmNQBwPrKgm-zhaSbFcNd_UiEhFWyUrq91-Jg@mail.gmail.com>
+ <20140502084851.GA5730@amd.pavel.ucw.cz>
+ <20140505120801.GA16461@amd.pavel.ucw.cz>
+Message-ID: <536786A5.7070002@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The exynos5420-peach-pit has a SMSC USB3503 connected in
-hardware only mode like a PHY. Enable support for it,
-and add necessary 'reset-gpio' for it.
+On 05/05/2014 02:08 PM, Pavel Machek wrote:
+> 
+> Add helpers for 32-bit accesses and replace open-coded 32-bit access
+> with calls to helpers.
 
-This is in correspondance to similar patch by Mark Brown
-7c1b0ec ARM: dts: Enable USB hub on Arndale
+In general looks good, but please add the modifications from the
+platform file, where you add the 32 callbacks to this patch. Please
+don't forget to modify the pci driver, too.
 
-Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
----
+Marc
 
-Based on 'for-next' branch of kgene's linux-samsung tree with
-following patch:
-[PATCH v4 2/2] ARM: dts: Add peach-pit board support
-http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg29950.html
-
- arch/arm/boot/dts/exynos5420-peach-pit.dts |   14 ++++++++++++++
- arch/arm/boot/dts/exynos5420-pinctrl.dtsi  |    7 +++++++
- 2 files changed, 21 insertions(+)
-
-diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-index fae33dd..24c1e87 100644
---- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-+++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-@@ -58,6 +58,20 @@
- 		pinctrl-0 = <&pwm0_out>;
- 		pinctrl-names = "default";
- 	};
-+
-+	usb_hub_bus {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		// SMSC USB3503 connected in hardware only mode as a PHY
-+		usb_hub {
-+			compatible = "smsc,usb3503a";
-+			reset-gpios = <&gpx2 4 1>;
-+			pinctrl-0 = <&usb_hub_reset>;
-+			pinctrl-names = "default";
-+		};
-+	};
- };
- 
- &pinctrl_0 {
-diff --git a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-index e62c8eb..8add143 100644
---- a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-@@ -66,6 +66,13 @@
- 			samsung,pin-pud = <0>;
- 			samsung,pin-drv = <0>;
- 		};
-+
-+		usb_hub_reset: usb-hub-reset {
-+			samsung,pins = "gpx2-4";
-+			samsung,pin-function = <1>;
-+			samsung,pin-pud = <0>;
-+			samsung,pin-drv = <0>;
-+		};
- 	};
- 
- 	pinctrl at 13410000 {
 -- 
-1.7.10.4
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
