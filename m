@@ -1,22 +1,23 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 4 May 2014 21:21:18 -0400
-Subject: [PATCH v2 3/9] ARM: Kirkwood: Add node for audio codec
-In-Reply-To: <1399141819-23924-4-git-send-email-andrew@lunn.ch>
+Date: Sun, 4 May 2014 21:23:44 -0400
+Subject: [PATCH v2 8/9] ARM: mvebu_v5_defconfig: Enable sound modules
+ needed for t5325
+In-Reply-To: <1399141819-23924-9-git-send-email-andrew@lunn.ch>
 References: <1399141819-23924-1-git-send-email-andrew@lunn.ch>
- <1399141819-23924-4-git-send-email-andrew@lunn.ch>
-Message-ID: <20140505012118.GG28159@titan.lakedaemon.net>
+ <1399141819-23924-9-git-send-email-andrew@lunn.ch>
+Message-ID: <20140505012343.GH28159@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 03, 2014 at 08:30:13PM +0200, Andrew Lunn wrote:
-> Instantiate the audio codec via a DT node.
+On Sat, May 03, 2014 at 08:30:18PM +0200, Andrew Lunn wrote:
+> Enable simple-card and the CODEC.
 > 
 > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 > ---
->  arch/arm/boot/dts/kirkwood-t5325.dts | 8 ++++++++
->  1 file changed, 8 insertions(+)
+>  arch/arm/configs/mvebu_v5_defconfig | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 
-Patches 3, 4, and 7 applied to mvebu/dt
+Patches 8 and 9 applied to mvebu/defconfig
 
 thx,
 
