@@ -1,134 +1,47 @@
-From: dmurphy@ti.com (Dan Murphy)
-Date: Mon, 5 May 2014 15:09:26 -0500
-Subject: [RFC] [v2 Patch 5/6] ARM: dts: dra7: Add prm_resets node
-In-Reply-To: <1399320567-3639-1-git-send-email-dmurphy@ti.com>
-References: <1399320567-3639-1-git-send-email-dmurphy@ti.com>
-Message-ID: <1399320567-3639-6-git-send-email-dmurphy@ti.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Mon,  5 May 2014 22:23:08 +0200
+Subject: [PATCH] rtc: rtc-at91rm9200: fix lost ACKUPD interrupt
+In-Reply-To: <55cab9fba2ea4eed8f73591b37cc874b@BLUPR05MB037.namprd05.prod.outlook.com>
+References: <55cab9fba2ea4eed8f73591b37cc874b@BLUPR05MB037.namprd05.prod.outlook.com>
+Message-ID: <1399321388-15148-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the prcm_resets node to the prm parent node.
+If an alarm interrupt raises just after the CR register is written and
+before the ACKUPD is unmasked the ACKUPD bit might be cleaned up without
+waking up the waiting thread.
 
-Add the draxx_resets file to define the
-dra7xx reset lines that are handled by this reset
-framework.
+Unmask the ACKUPD interrupt before writing the CR register so that the
+ACKUPD cannot be lost.
 
-Signed-off-by: Dan Murphy <dmurphy@ti.com>
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+Reported-by: Bryan Evenson <bevenson@melinkcorp.com>
 ---
- arch/arm/boot/dts/dra7.dtsi          |    7 +++
- arch/arm/boot/dts/dra7xx-resets.dtsi |   82 ++++++++++++++++++++++++++++++++++
- 2 files changed, 89 insertions(+)
- create mode 100644 arch/arm/boot/dts/dra7xx-resets.dtsi
+Hello Bryan,
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 149b550..c008996 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -120,6 +120,12 @@
+Could you try to apply this patch and tell me if it fixes your bug ?
+
+Best Regards,
+
+Boris
+
+ drivers/rtc/rtc-at91rm9200.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/rtc/rtc-at91rm9200.c b/drivers/rtc/rtc-at91rm9200.c
+index 3281c90..c16c423 100644
+--- a/drivers/rtc/rtc-at91rm9200.c
++++ b/drivers/rtc/rtc-at91rm9200.c
+@@ -163,9 +163,9 @@ static int at91_rtc_settime(struct device *dev, struct rtc_time *tm)
  
- 			prm_clockdomains: clockdomains {
- 			};
-+
-+			prm_resets: resets {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				#reset-cells = <1>;
-+			};
- 		};
+ 	/* Stop Time/Calendar from counting */
+ 	cr = at91_rtc_read(AT91_RTC_CR);
++	at91_rtc_write_ier(AT91_RTC_ACKUPD);
+ 	at91_rtc_write(AT91_RTC_CR, cr | AT91_RTC_UPDCAL | AT91_RTC_UPDTIM);
  
- 		cm_core_aon: cm_core_aon at 4a005000 {
-@@ -793,3 +799,4 @@
- };
+-	at91_rtc_write_ier(AT91_RTC_ACKUPD);
+ 	wait_for_completion(&at91_rtc_updated);	/* wait for ACKUPD interrupt */
+ 	at91_rtc_write_idr(AT91_RTC_ACKUPD);
  
- /include/ "dra7xx-clocks.dtsi"
-+/include/ "dra7xx-resets.dtsi"
-diff --git a/arch/arm/boot/dts/dra7xx-resets.dtsi b/arch/arm/boot/dts/dra7xx-resets.dtsi
-new file mode 100644
-index 0000000..4c4966d
---- /dev/null
-+++ b/arch/arm/boot/dts/dra7xx-resets.dtsi
-@@ -0,0 +1,82 @@
-+/*
-+ * Device Tree Source for DRA7XX reset data
-+ *
-+ * Copyright (C) 2014 Texas Instruments, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+&prm_resets {
-+	dsp_rstctrl {
-+		reg = <0x410>,
-+			  <0x414>;
-+
-+		dsp_reset: dsp_reset {
-+			control-bit = <0x01>;
-+			status-bit = <0x01>;
-+		};
-+
-+		dsp_mmu_reset: dsp_mmu_reset {
-+			control-bit = <0x02>;
-+			status-bit = <0x02>;
-+		};
-+	};
-+
-+	ipu_rstctrl {
-+		reg = <0x510>,
-+			  <0x514>;
-+
-+		ipu_cpu0_reset: ipu_cpu0_reset {
-+			control-bit = <0x01>;
-+			status-bit = <0x01>;
-+		};
-+
-+		ipu_cpu1_reset: ipu_cpu1_reset {
-+			control-bit = <0x02>;
-+			status-bit = <0x02>;
-+		};
-+
-+		ipu_mmu_reset: ipu_mmu_reset {
-+			control-bit = <0x04>;
-+			status-bit = <0x04>;
-+		};
-+	};
-+
-+	iva_rstctrl {
-+		reg = <0xf10>,
-+			  <0xf14>;
-+
-+		iva_reset: iva_reset {
-+			control-bit = <0x01>;
-+			status-bit = <0x01>;
-+		};
-+	};
-+
-+	pcie_rstctrl {
-+		reg = <0x1310>,
-+			  <0x1314>;
-+
-+		pcie1_reset: pcie1_reset {
-+			control-bit = <0x01>;
-+			status-bit = <0x01>;
-+		};
-+
-+		pcie2_reset: pcie2_reset {
-+			control-bit = <0x01>;
-+			status-bit = <0x01>;
-+		};
-+	};
-+
-+	device_rstctrl {
-+		reg = <0x1D00>,
-+			  <0x1D04>;
-+
-+		device_reset: device_reset {
-+			control-bit = <0x01>;
-+			status-bit = <0x01>;
-+		};
-+	};
-+
-+};
 -- 
-1.7.9.5
+1.8.3.2
