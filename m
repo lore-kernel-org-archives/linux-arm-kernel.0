@@ -1,53 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 05 May 2014 16:41:02 +0200
-Subject: ACPI vs DT at runtime
-In-Reply-To: <53673866.9000105@ahsoftware.de>
-References: <20131115095717.GC1709@e106331-lin.cambridge.arm.com>
- <97692EF2-013E-4E4B-BC16-E0915D67EFEC@antoniou-consulting.com>
- <53673866.9000105@ahsoftware.de>
-Message-ID: <69387177.zGLDjZS0ln@wuerfel>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 5 May 2014 09:42:43 -0500
+Subject: [PATCH 1/3] ARM: mvebu: clean-up unneeded kconfig selects
+In-Reply-To: <20140505045529.GA16022@quad.lixom.net>
+References: <1398195678-28787-1-git-send-email-robherring2@gmail.com>
+ <1398195678-28787-2-git-send-email-robherring2@gmail.com>
+ <20140505045529.GA16022@quad.lixom.net>
+Message-ID: <CAL_JsqLNUoa3_1SFMicgCvEPzczsdadasgJZHRRPau+n-gQ0sA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 05 May 2014 09:06:14 Alexander Holler wrote:
-> 
-> A bit late (I don't follow the ML (or what happens in the ARM world) 
-> closely, but as I've recently read that ARM64 will go UEFI and ACPI, I 
-> wonder what was the reasoning behind that decision.
-> 
-> Does anyone really assume we will become high quality UEFI and ACPI 
-> blobs from vendors? And such with reasonable support/update periods?
-> 
-> For me that sounds like someone asked dreamers and was unable to adjust 
-> those answers in regard to reality.
+On Sun, May 4, 2014 at 11:55 PM, Olof Johansson <olof@lixom.net> wrote:
+> On Tue, Apr 22, 2014 at 02:41:16PM -0500, Rob Herring wrote:
+>> From: Rob Herring <robh@kernel.org>
+>>
+>> Multi-platform support implies all these options are already selected and
+>> individual platforms don't need to select them.
+>>
+>> Signed-off-by: Rob Herring <robh@kernel.org>
+>> Cc: Jason Cooper <jason@lakedaemon.net>
+>> Cc: Andrew Lunn <andrew@lunn.ch>
+>> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+>> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>
+> What's this based on? It doesn't apply to 3.15-rc4.
 
-Where did you read that? It's simply not true and we should make sure
-people stop spreading dangerous misinformation.
+v3.15-rc2. That's strange because there are no other changes since
+rc2. Here's a pull request instead.
 
-Regarding UEFI, I don't expect that to change much for Linux, since
-it has very little visibility at runtime. UEFI makes sense for some
-systems, and we can support that easily. The license is a bit problematic,
-since it allows shipping a system without bootloader sources, but other
-boot loaders allow that as well, and a lot of companies ship pirated
-u-boot without sources, too.
+Rob
 
-ACPI is a lot harder to support, as it conflicts with the normal DT
-probing method, and will be visible to a lot of drivers. I expect
-that we will see systems shipping with ACPI at some point, but
-so far, nobody has made a serious submission for supporting that,
-so it's likely a few years out, and it will only be a small subset
-of the shipping systems: basically anything that tries to look like
-an x86 PC server rather than an embedded system.
+The following changes since commit a798c10faf62a505d24e5f6213fbaf904a39623f:
 
-There is ongoing work from Linaro to provide a base enablement of
-ACPI on ARM64. Those patches are looking harmless enough, but the
-current plan is to not merge them until there is an actual user
-who is submitting their platform specific code based on that, and
-not before we have clear rules about what systems should or should
-not be using ACPI. 
+  Linux 3.15-rc2 (2014-04-20 11:08:50 -0700)
 
-For all embedded systems, DT remains the way to pass data about
-nondiscoverable devices on arm64, and I expect that to include
-"server" machines based on embedded SoCs.
+are available in the git repository at:
 
-	Arnd
+  git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git
+tags/kconfig-cleanups
+
+for you to fetch changes up to e7062b101537a0c4f4a8d725321772eb78100074:
+
+  ARM: qcom: clean-up unneeded kconfig selects (2014-04-22 14:33:27 -0500)
+
+----------------------------------------------------------------
+Several mach kconfig clean-ups of redundant selects
+
+----------------------------------------------------------------
+Rob Herring (3):
+      ARM: mvebu: clean-up unneeded kconfig selects
+      ARM: bcm: clean-up unneeded kconfig selects
+      ARM: qcom: clean-up unneeded kconfig selects
+
+ arch/arm/mach-bcm/Kconfig   | 8 --------
+ arch/arm/mach-mvebu/Kconfig | 6 ------
+ arch/arm/mach-qcom/Kconfig  | 2 --
+ 3 files changed, 16 deletions(-)
