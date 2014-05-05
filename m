@@ -1,115 +1,47 @@
-From: gavin.guo@canonical.com (Gavin Guo)
-Date: Tue, 6 May 2014 07:34:23 +0800
-Subject: [PATCH v4 5/5] change update_range to handle > 4GB 2nd stage
- range for ARMv7
-In-Reply-To: <535EFB21.9040308@samsung.com>
-References: <535EF871.9090604@samsung.com>
-	<535EFB21.9040308@samsung.com>
-Message-ID: <CA+eFSM2FundVPupJpr1EJ7R8XB2ZJzcGbi8KNs33v=xsYtimpA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 5 May 2014 17:55:17 -0500
+Subject: [PATCH 0/2] ARM: sunxi: Enable syscon for the system controller
+In-Reply-To: <1399212160-26934-1-git-send-email-carlo@caione.org>
+References: <1399212160-26934-1-git-send-email-carlo@caione.org>
+Message-ID: <20140505225517.GE9464@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mario,
+On Sun, May 04, 2014 at 04:02:38PM +0200, Carlo Caione wrote:
+> The so called "system controller" in Allwinner A20 and A31 SoCs is
+> multi-purpose controller that tries to add misc functionality to one
+> memory region.
+> In these SoCs it controls the internal SRAM partitioning but it also
+> includes registers for chip versioning and NMI control.
+> This patch adds the proper nodes in the DTS files and enable the syscon
+> in the defconfig files.
+> 
+> Even though the system controller includes also register for managing the
+> NMI controller, these register are not mapped in the syscon since they
+> are directly used and mapped by the NMI controller itself.
 
-On Tue, Apr 29, 2014 at 9:06 AM, Mario Smarduch <m.smarduch@samsung.com> wrote:
->
-> This patch adds support for unmapping 2nd stage page tables for addresses >4GB
-> on ARMv7.
->
-> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
-> ---
->  arch/arm/kvm/mmu.c |   20 ++++++++++++--------
->  1 file changed, 12 insertions(+), 8 deletions(-)
->
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index 88f5503..afbf8ba 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -176,21 +176,25 @@ static void clear_pte_entry(struct kvm *kvm, pte_t *pte, phys_addr_t addr)
->         }
->  }
->
-> +/* Function shared between identity and 2nd stage mappings. For 2nd stage
-> + * the IPA may be > 4GB on ARMv7, and page table range functions
-> + * will fail. kvm_xxx_addr_end() is used to handle both cases.
-> + */
->  static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
-> -                       unsigned long long start, u64 size)
-> +                       phys_addr_t start, u64 size)
->  {
->         pgd_t *pgd;
->         pud_t *pud;
->         pmd_t *pmd;
->         pte_t *pte;
-> -       unsigned long long addr = start, end = start + size;
-> -       u64 next;
-> +       phys_addr_t addr = start, end = start + size;
-> +       phys_addr_t next;
->
->         while (addr < end) {
->                 pgd = pgdp + pgd_index(addr);
->                 pud = pud_offset(pgd, addr);
->                 if (pud_none(*pud)) {
-> -                       addr = pud_addr_end(addr, end);
-> +                       addr = kvm_pud_addr_end(addr, end);
->                         continue;
->                 }
->
-> @@ -200,13 +204,13 @@ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
->                          * move on.
->                          */
->                         clear_pud_entry(kvm, pud, addr);
-> -                       addr = pud_addr_end(addr, end);
-> +                       addr = kvm_pud_addr_end(addr, end);
->                         continue;
->                 }
->
->                 pmd = pmd_offset(pud, addr);
->                 if (pmd_none(*pmd)) {
-> -                       addr = pmd_addr_end(addr, end);
-> +                       addr = kvm_pmd_addr_end(addr, end);
->                         continue;
->                 }
->
-> @@ -221,10 +225,10 @@ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
->                  */
->                 if (kvm_pmd_huge(*pmd) || page_empty(pte)) {
->                         clear_pmd_entry(kvm, pmd, addr);
-> -                       next = pmd_addr_end(addr, end);
-> +                       next = kvm_pmd_addr_end(addr, end);
->                         if (page_empty(pmd) && !page_empty(pud)) {
->                                 clear_pud_entry(kvm, pud, addr);
-> -                               next = pud_addr_end(addr, end);
-> +                               next = kvm_pud_addr_end(addr, end);
->                         }
->                 }
->
-> --
-> 1.7.9.5
->
->
->
+Hmmm, what exactly do you want to achieve with this?
 
-It seems that your adding kvm_pmd_addr_end(addr, end) already exists
-in the following patch and may need to remove these parts from your
-patch.
+The NMI controller won't be able to use it, since it's initialized
+much earlier than syscon and regmap.
 
-commit a3c8bd31af260a17d626514f636849ee1cd1f63e
-Author: Marc Zyngier <marc.zyngier@arm.com>
-Date:   Tue Feb 18 14:29:03 2014 +0000
+Moreover, the A31 doesn't seem to have this system controller, or at
+least this overlap.
 
-    ARM: KVM: introduce kvm_p*d_addr_end
+And since on the A20, registers seem to have one usage only, so I
+guess we can just split this IP into several nodes, just like we did
+with the NMI.
 
-    The use of p*d_addr_end with stage-2 translation is slightly dodgy,
-    as the IPA is 40bits, while all the p*d_addr_end helpers are
-    taking an unsigned long (arm64 is fine with that as unligned long
-    is 64bit).
+Maxime
 
-    The fix is to introduce 64bit clean versions of the same helpers,
-    and use them in the stage-2 page table code.
-
-    Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-    Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-    Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-
-Gavin
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140505/94cab0bb/attachment.sig>
