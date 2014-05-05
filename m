@@ -1,59 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 5 May 2014 20:50:40 +0100
-Subject: [PATCH v3 5/7] ARM: dma: Use dma_pfn_offset for dma address
- translation
-In-Reply-To: <5363B42C.4010404@ti.com>
-References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
- <1398353407-2345-6-git-send-email-santosh.shilimkar@ti.com>
- <20140502145852.GC3693@n2100.arm.linux.org.uk> <5363B42C.4010404@ti.com>
-Message-ID: <20140505195040.GE3693@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 5 May 2014 12:56:38 -0700
+Subject: [PATCH v2] ARM: dts: OMAP5: add pmu node
+In-Reply-To: <1395243953-11856-1-git-send-email-nathan_lynch@mentor.com>
+References: <1395243953-11856-1-git-send-email-nathan_lynch@mentor.com>
+Message-ID: <20140505195638.GG25949@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 02, 2014 at 11:05:16AM -0400, Santosh Shilimkar wrote:
-> On Friday 02 May 2014 10:58 AM, Russell King - ARM Linux wrote:
-> > On Thu, Apr 24, 2014 at 11:30:05AM -0400, Santosh Shilimkar wrote:
-> >>  static inline void *dma_to_virt(struct device *dev, dma_addr_t addr)
-> >>  {
-> >> -	return (void *)__bus_to_virt((unsigned long)addr);
-> >> +	if (!dev)
-> >> +		return (void *)__bus_to_virt((unsigned long)addr);
-> >> +	else
-> >> +		return (void *)__bus_to_virt(__pfn_to_bus(dma_to_pfn(dev, addr)));
-> > 
-> > This is quite horrendous.  There's easier ways to do this...  I assume
-> > you haven't looked at the assembler resulting from this at all with
-> > stuff like the p2v patching enabled?
-> > 
-> I haven't. Will check.
+* Nathan Lynch <nathan_lynch@mentor.com> [140319 08:50]:
+> Expose the PMU on OMAP5.
+> 
+> Tested with perf on OMAP5 uEVM.
+> 
+> Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
 
-	if (dev) {
-		unsigned long pfn = dma_to_pfn(dev, addr);
+Applying into omap-for-v3.16/dt thanks.
 
-		return phys_to_virt(__pfn_to_phys(pfn));
-	}
+Tony
 
-	return (void *)__bus_to_virt((unsigned long)addr);
-
-> >>  static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
-> >>  {
-> >> -	return (dma_addr_t)__virt_to_bus((unsigned long)(addr));
-> >> +	if (!dev)
-> >> +		return (dma_addr_t)__virt_to_bus((unsigned long)(addr));
-> >> +	else
-> >> +		return pfn_to_dma(dev,
-> >> +				__bus_to_pfn(__virt_to_bus((unsigned long)(addr))));
-> > 
-> > Same here.
-> > 
-> ok.
-
-
-	if (dev)
-		return pfn_to_dma(dev, virt_to_pfn(addr));
-
-	return (dma_addr_t)__virt_to_bus((unsigned long)(addr));
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+> ---
+> 
+> Changes since v1:
+> - Use symbolic constants.
+> 
+>  arch/arm/boot/dts/omap5.dtsi | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+> index a72813a9663e..ccb38944c85a 100644
+> --- a/arch/arm/boot/dts/omap5.dtsi
+> +++ b/arch/arm/boot/dts/omap5.dtsi
+> @@ -76,6 +76,12 @@
+>  			     <GIC_PPI 10 (GIC_CPU_MASK_RAW(3) | IRQ_TYPE_LEVEL_LOW)>;
+>  	};
+>  
+> +	pmu {
+> +		compatible = "arm,cortex-a15-pmu";
+> +		interrupts = <GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 132 IRQ_TYPE_LEVEL_HIGH>;
+> +	};
+> +
+>  	gic: interrupt-controller at 48211000 {
+>  		compatible = "arm,cortex-a15-gic";
+>  		interrupt-controller;
+> -- 
+> 1.8.3.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
