@@ -1,50 +1,55 @@
-From: ijc@hellion.org.uk (Ian Campbell)
-Date: Mon, 05 May 2014 09:44:58 +0100
-Subject: Automatically detecting when to use kirkwood-tsXXX-6281.dtb vs
- -6282.dtb (Was: Re: [PATCH 21/21] ARM: Kirkwood: Remove DT support)
-In-Reply-To: <20140503144033.GD19833@lunn.ch>
-References: <1391730137-14814-22-git-send-email-andrew@lunn.ch>
- <52F51922.6030502@gmail.com>
- <1392892217.23342.18.camel@kazak.uk.xensource.com>
- <20140220105854.GL11878@lunn.ch>
- <20140220111913.GZ21483@n2100.arm.linux.org.uk>
- <1392896356.23342.40.camel@kazak.uk.xensource.com>
- <20140220232649.GU7862@titan.lakedaemon.net>
- <1393257630.16570.95.camel@kazak.uk.xensource.com>
- <20140224162413.GE18601@lunn.ch>
- <1399123167.23380.163.camel@dagon.hellion.org.uk>
- <20140503144033.GD19833@lunn.ch>
-Message-ID: <1399279498.13877.3.camel@dagon.hellion.org.uk>
+From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
+Date: Mon, 05 May 2014 10:59:41 +0200
+Subject: [Patch v3 2/5] cpuidle: config: Add ARCH_EXYNOS entry to select
+ cpuidle-big-little driver
+In-Reply-To: <1399278444-8312-3-git-send-email-chander.kashyap@linaro.org>
+References: <1398245154-18771-1-git-send-email-chander.kashyap@linaro.org>
+ <1399278444-8312-1-git-send-email-chander.kashyap@linaro.org>
+ <1399278444-8312-3-git-send-email-chander.kashyap@linaro.org>
+Message-ID: <536752FD.3040704@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2014-05-03 at 16:40 +0200, Andrew Lunn wrote:
-> > However on my 6281 based TS-219 system there seems to be no visible PCI
-> > bus when running the 3.2 kernel in the current Debian stable release
-> > (which of course uses board support). Some info:
+Hi,
+
+Am 05.05.2014 10:27, schrieb Chander Kashyap:
+> Exynos5420 is a big-little SoC from Samsung. It has 4 A15 and 4 A7 cores.
+> In order to use generic cpuidle-big-little driver, this patch adds Exynos5420
+> specific check to initialize generic cpuidle driver.
 > 
-> The old PCI driver looks to see if there is anything on the bus, and
-> if not, does not register the PCI bus to the PCI core. The new PCI
-> driver always registers the busses, allowing hotplug of PCI devices.
+> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+> Signed-off-by: Chander Kashyap <k.chander@samsung.com>
+> ---
+> Changes in v3: None
+> Changes in v2:
+> 	1. Changed config macro from SOC_EXYNOS5420 to SOC_EXYNOS5420
 
-Got it, thanks.
-
-> > Is the lack of anything on the PCI bus itself sufficient to determine
-> > that this is a 6281 based ts219 rather than a 6282 one (I don't have any
-> > 6282 ts219 systems to try)?
-> 
-> No, this is not sufficient, as far as i know. I have a 6282 based
-> ts119. It also does not have any PCI devices. However, the 6282 DT
-> file works fine on it. There is no need to differentiate between 119
-> and 219, just between 6281 and 6282.
-
-Thanks.
-
-> Your idea about Ethernet PHY is probably the best way to tell them
-> apart. But i will see if i can find anything else.
-
-Thanks, I'll start on the PHY base solution, it'll be easy enough to
-switch if something even better gets thought up.
+This is probably a copy&pasto? Anyway, the commit message needs an
+update since no Exynos5420 specific check is done below afaics. That
+went into 3/5.
 
 Cheers,
-Ian.
+Andreas
+
+>  drivers/cpuidle/Kconfig.arm |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
+> index 97ccc31..d9596e7 100644
+> --- a/drivers/cpuidle/Kconfig.arm
+> +++ b/drivers/cpuidle/Kconfig.arm
+> @@ -4,7 +4,7 @@
+>  
+>  config ARM_BIG_LITTLE_CPUIDLE
+>  	bool "Support for ARM big.LITTLE processors"
+> -	depends on ARCH_VEXPRESS_TC2_PM
+> +	depends on ARCH_VEXPRESS_TC2_PM || ARCH_EXYNOS
+>  	select ARM_CPU_SUSPEND
+>  	select CPU_IDLE_MULTIPLE_DRIVERS
+>  	help
+> 
+
+
+-- 
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
