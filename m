@@ -1,75 +1,60 @@
-From: holler@ahsoftware.de (Alexander Holler)
-Date: Mon, 05 May 2014 17:29:47 +0200
-Subject: ACPI vs DT at runtime
-In-Reply-To: <69387177.zGLDjZS0ln@wuerfel>
-References: <20131115095717.GC1709@e106331-lin.cambridge.arm.com>
- <97692EF2-013E-4E4B-BC16-E0915D67EFEC@antoniou-consulting.com>
- <53673866.9000105@ahsoftware.de> <69387177.zGLDjZS0ln@wuerfel>
-Message-ID: <5367AE6B.3010105@ahsoftware.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 5 May 2014 10:34:02 -0500
+Subject: [PATCH 0/4] Introducing Exynos ChipId driver
+In-Reply-To: <13946837.RfnRDPQdge@wuerfel>
+References: <1399097500-4052-1-git-send-email-pankaj.dubey@samsung.com>
+ <13946837.RfnRDPQdge@wuerfel>
+Message-ID: <CAL_JsqJXE4uXKA6XU1=3zFjdcEXHyUat2dL6wDKiZBx8S-p+Xg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 05.05.2014 16:41, schrieb Arnd Bergmann:
-> On Monday 05 May 2014 09:06:14 Alexander Holler wrote:
+On Sat, May 3, 2014 at 10:02 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Saturday 03 May 2014 15:11:36 Pankaj Dubey wrote:
+>> This patch series attempts to get rid of soc_is_exynosXXXX macros
+>> and eventually with the help of this series we can probably get
+>> rid of CONFIG_SOC_EXYNOSXXXX in near future.
+>> Each Exynos SoC has ChipID block which can give information about
+>> SoC's product Id and revision number. Currently we have single
+>> DT binding information for this as "samsung,exynos4210-chipid".
+>> But Exynos4 and Exynos5 SoC series have one small difference in
+>> chip Id, with resepect to product id bit-masks. So it means we
+>> should have separate compatible string for these different series
+>> of SoCs. So I have created new binding information for handling
+>> this difference. Also currently I can think of putting this driver
+>> code under "drivers/misc/" but suggestions are welcome.
+>> Also current form of driver is missing platfrom driver and needs
+>> init function to be called from machine file (either exynos.c or
+>> platsmp.c). I hope lot of suggestions and comments to improve this
+>> further.
 >>
->> A bit late (I don't follow the ML (or what happens in the ARM world)
->> closely, but as I've recently read that ARM64 will go UEFI and ACPI, I
->> wonder what was the reasoning behind that decision.
->>
->> Does anyone really assume we will become high quality UEFI and ACPI
->> blobs from vendors? And such with reasonable support/update periods?
->>
->> For me that sounds like someone asked dreamers and was unable to adjust
->> those answers in regard to reality.
+>> This patch series is based on Kukjin Kim's for-next (3.14_rc1 tag)
+>> and prepared on top of following patch series and it's dependent
+>> patch series.
 >
-> Where did you read that? It's simply not true and we should make sure
-> people stop spreading dangerous misinformation.
-
-I've recently read Grant Likely's blog entry about armv8 servers: 
-http://www.secretlab.ca/archives/27 (I've read the disclaimer too ;) )
-
-> Regarding UEFI, I don't expect that to change much for Linux, since
-> it has very little visibility at runtime. UEFI makes sense for some
-> systems, and we can support that easily. The license is a bit problematic,
-> since it allows shipping a system without bootloader sources, but other
-> boot loaders allow that as well, and a lot of companies ship pirated
-> u-boot without sources, too.
+> I think putting it into drivers/soc would be most appropriate.
+> We already have a few drivers lined up that we want in there,
+> although the directory currently doesn't exist.
 >
-> ACPI is a lot harder to support, as it conflicts with the normal DT
-> probing method, and will be visible to a lot of drivers. I expect
-> that we will see systems shipping with ACPI at some point, but
-> so far, nobody has made a serious submission for supporting that,
-> so it's likely a few years out, and it will only be a small subset
-> of the shipping systems: basically anything that tries to look like
-> an x86 PC server rather than an embedded system.
->
-> There is ongoing work from Linaro to provide a base enablement of
-> ACPI on ARM64. Those patches are looking harmless enough, but the
-> current plan is to not merge them until there is an actual user
-> who is submitting their platform specific code based on that, and
-> not before we have clear rules about what systems should or should
-> not be using ACPI.
->
-> For all embedded systems, DT remains the way to pass data about
-> nondiscoverable devices on arm64, and I expect that to include
-> "server" machines based on embedded SoCs.
+> However, I would ask that you use the infrastructure provided by
+> drivers/base/soc.c when you add this driver, to also make the
+> information available to user space using a standard API.
 
-I usually avoid to talk about embedded systems as something different 
-(e.g. than servers). I think such differentations don't make much sense 
-anymore in times where people are getting in need of an administrator 
-for their phones. ;)
+Agreed.
 
-The problem I see is that if ARM requires UEFI and ACPI for general 
-purpose ARMv8 servers, SOC vendors and the kernel will have to support 
-that (I make the maybe silly assumption every ARMv8 SOC vendor wants to 
-play in the server market). That means the kernel has to support it too.
+> Ideally this should be done by slightly restructuring the DT
+> source to make all on-chip devices appear below the soc node.
+> We'd have to think a bit about how to best do this while
+> preserving compatibility with existing dts files.
 
-And nobody likes to support two types of something. So there is a 
-requirement (on paper) for UEFI and ACPI (both likely closed blobs), but 
-none for the open stuff. And when I now start to think about paper 
-loving vogons, I don't need much imagination which type will be 
-streamlined away.
+I don't agree. How is a block with chip ID info the parent of all the
+other devices?
 
-Regards,
+In doing some work to move default of_platform_populate out of
+platforms, I noticed that most platforms using the soc device are
+making it the parent of platform devices. I think this is either wrong
+or all platforms should have a default soc device. It makes little
+sense for some platforms to have a devices under a soc sysfs directory
+while others do not. Or the location changes when a platform latter
+adds the soc device.
 
-Alexander Holler
+Rob
