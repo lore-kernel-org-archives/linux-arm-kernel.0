@@ -1,43 +1,31 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 5 May 2014 15:06:35 -0500
-Subject: [GIT PULL #2/2] ARM: dts: DRA7/AM437x l3noc dts updates
-In-Reply-To: <20140505200322.GA9863@kahuna>
-References: <1397492726-17203-1-git-send-email-nm@ti.com>
- <1398698101-25513-1-git-send-email-nm@ti.com>
- <20140505200322.GA9863@kahuna>
-Message-ID: <20140505200635.GB9863@kahuna>
+From: dmurphy@ti.com (Dan Murphy)
+Date: Mon, 5 May 2014 15:09:21 -0500
+Subject: [RFC v2] TI Reset Driver adapted to the reset core 
+Message-ID: <1399320567-3639-1-git-send-email-dmurphy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+All
 
-   Please pull the following to the dts support of AM437x and DRA7
-   support for l3_noc for the upcoming 3.16 window. This series was posted
-   http://marc.info/?l=linux-omap&m=139750288003978&w=2 and the
-   functionality enabled by the first pull request for driver.
+I have made some big changes to this patchset so I did not put all the
+changes in the patches themselves.
 
-The following changes since commit 455c6fdbd219161bd09b1165f11699d6d73de11c:
+In brief
 
-  Linux 3.14 (2014-03-30 20:40:15 -0700)
+- I removed the object data files for each SoC and moved the data into
+the DT.  I updated the binding document as well
 
-are available in the git repository at:
+- The DT implementation creates a parent reset node with the base offset
+for each reset and the children within that parent declares the bit mask
 
-  https://github.com/nmenon/linux-2.6-playground.git pull/l3noc/dts-fixes
+- I created a xlate function in the reset driver to verify that reset
+data and that the phandle exists.  The core xlate checks for the nr_resets
+which we don't care about since we are not indexed based.
 
-for you to fetch changes up to 2eeddb8a5356e088021a8dd84de870de89bf793d:
+- Made the driver a platform driver as well so this removed the
+prm_common patch as well as the header file.
 
-  ARM: dts: AM4372: add l3-noc information (2014-05-05 14:35:29 -0500)
+I will add other TI devices once I feel comfortable that the design
+is acceptable.
 
-----------------------------------------------------------------
-Afzal Mohammed (1):
-      ARM: dts: AM4372: add l3-noc information
-
-Rajendra Nayak (1):
-      ARM: dts: DRA7: Use dra7-l3-noc instead of omap4-l3-noc
-
- arch/arm/boot/dts/am4372.dtsi |    6 +++++-
- arch/arm/boot/dts/dra7.dtsi   |    6 +++---
- 2 files changed, 8 insertions(+), 4 deletions(-)
--- 
-Regards,
-Nishanth Menon
+Dan
