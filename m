@@ -1,36 +1,184 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 5 May 2014 12:09:31 -0400
-Subject: [PATCH v2 0/5] ARM: mvebu: fixes and improvements for 375 support
-In-Reply-To: <20140505180520.7af699de@skate>
-References: <1399302326-6917-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140505153654.GO28159@titan.lakedaemon.net>
- <20140505180520.7af699de@skate>
-Message-ID: <20140505160931.GR28159@titan.lakedaemon.net>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 5 May 2014 11:17:14 -0500
+Subject: [PATCH v2 5/6] Documentation: dt: soc: add Keystone Navigator DMA
+ bindings
+In-Reply-To: <1398296783-1176-6-git-send-email-santosh.shilimkar@ti.com>
+References: <1398296783-1176-1-git-send-email-santosh.shilimkar@ti.com>
+ <1398296783-1176-6-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <CAL_Jsq+uZscamuezWsHrwf_OuxucXOG4kT8V9xCzmBnF9cpEXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 05, 2014 at 06:05:20PM +0200, Thomas Petazzoni wrote:
-> Dear Jason Cooper,
-> 
-> On Mon, 5 May 2014 11:36:54 -0400, Jason Cooper wrote:
-> 
-> > > Thomas Petazzoni (5):
-> > >   ARM: mvebu: fix thermal quirk SoC revision check
-> > >   ARM: mvebu: initialize mvebu-soc-id earlier
-> > >   ARM: mvebu: add Armada 375 A0 revision definition
-> > >   ARM: mvebu: conditionalize Armada 375 SMP workaround
-> > >   ARM: mvebu: conditionalize Armada 375 coherency workaround
-> > 
-> > hmmm, I didn't get #5...
-> 
-> Weird because it made it through the LAKML:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/253251.html
+On Wed, Apr 23, 2014 at 6:46 PM, Santosh Shilimkar
+<santosh.shilimkar@ti.com> wrote:
+> The Keystone Navigator DMA driver sets up the dma channels and flows for
+> the QMSS(Queue Manager SubSystem) who triggers the actual data movements
+> across clients using destination queues. Every client modules like
+> NETCP(Network Coprocessor), SRIO(Serial Rapid IO) and CRYPTO
+> Engines has its own instance of packet dma hardware. QMSS has also
+> an internal packet DMA module which is used as an infrastructure
+> DMA with zero copy.
+>
+> Initially this driver was proposed as DMA engine driver but since the
+> hardware is not typical DMA engine and hence doesn't comply with typical
+> DMA engine driver needs, that approach was naked. Link to that
+> discussion -
+>         https://lkml.org/lkml/2014/3/18/340
+>
+> As aligned, now we pair the Navigator DMA with its companion Navigator
+> QMSS subsystem driver.
+>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Kumar Gala <galak@codeaurora.org>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Sandeep Nair <sandeep_n@ti.com>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+>  .../bindings/soc/keystone-navigator-dma.txt        |  101 ++++++++++++++++++++
+>  1 file changed, 101 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/soc/keystone-navigator-dma.txt
+>
+> diff --git a/Documentation/devicetree/bindings/soc/keystone-navigator-dma.txt b/Documentation/devicetree/bindings/soc/keystone-navigator-dma.txt
+> new file mode 100644
+> index 0000000..4b7d9a7
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/soc/keystone-navigator-dma.txt
+> @@ -0,0 +1,101 @@
+> +Keystone Navigator DMA Controller
+> +
+> +This document explains the device tree bindings for the packet dma
+> +on keystone devices. The Keystone Navigator DMA driver sets up the dma
+> +channels and flows for the QMSS(Queue Manager SubSystem) who triggers
+> +the actual data movements across clients using destination queues. Every
+> +client modules like  NETCP(Network Coprocessor), SRIO(Serial Rapid IO),
+> +CRYPTO Engines etc has its own instance of dma hardware. QMSS has also
+> +an internal packet DMA module which is used as an infrastructure DMA
+> +with zero copy.
+> +
+> +Navigator DMA cloud layout:
+> +       ------------------
+> +       | Navigator DMAs |
+> +       ------------------
+> +               |
+> +               |-> DMA instance #0
+> +               |
+> +               |-> DMA instance #1
+> +                       .
+> +                       .
+> +               |
+> +               |-> DMA instance #n
+> +
+> +Navigator DMA properties:
+> +Required properties:
+> + - compatible: Should be "ti,keystone-navigator-dma"
+> + - clocks:     phandle to dma instances clocks
 
-yeah, it was probably a hiccup on my end.  Or more specifically, my
-inbound remailer. :(
+2 clocks are in the example. Define how many clocks and the order.
 
-I have it now.
+> +
+> +DMA instance properties:
+> +Required properties:
+> + - reg: Should contain register location and length of the following dma
+> +       register regions. Register regions should be specified in the following
+> +       order.
+> +       - Global control register region (global).
+> +       - Tx DMA channel configuration register region (txchan).
+> +       - Rx DMA channel configuration register region (rxchan).
+> +       - Tx DMA channel Scheduler configuration register region (txsched).
+> +       - Rx DMA flow configuration register region (rxflow).
+> + - qm-base-address: Base address of the logical queue managers for dma.
 
-thx,
+Why is this not part of reg?
 
-Jason.
+> + - #dma-cells: Has to be 1. Keystone DMA doesn't support anything else.
+
+So this uses the common DMA binding?
+
+> +
+> +Optional properties:
+> + - reg-names: Names for the register regions.
+> + - enable-all: Enable all DMA channels.
+
+vs. none of them?
+
+> + - loop-back: To loopback Tx streaming I/F to Rx streaming I/F. Used for
+> +             infrastructure transfers.
+> + - rx-retry-timeout: Number of dma cycles to wait before retry on buffer
+> +                    starvation.
+
+Prefix these with "ti,"
+
+> +Example:
+> +
+> +       knav_dmas: knav_dmas at 0 {
+> +               compatible = "ti,keystone-navigator-dma";
+> +               clocks = <&papllclk>, <&clkxge>;
+> +               #address-cells = <1>;
+> +               #size-cells = <1>;
+> +               ranges;
+> +
+> +               dma_gbe {
+> +                       dma-id = <0>;
+
+This is not documented in the above binding.
+
+> +                       reg = <0x2004000 0x100>,
+> +                                 <0x2004400 0x120>,
+> +                                 <0x2004800 0x300>,
+> +                                 <0x2004c00 0x120>,
+> +                                 <0x2005000 0x400>;
+> +                       reg-names = "global", "txchan", "rxchan",
+> +                                       "txsched", "rxflow";
+> +
+> +                       qm-base-address = <0x23a80000 0x23a90000
+> +                                          0x23aa0000 0x23ab0000>;
+> +               };
+> +
+> +               dma_xgbe {
+> +                       dma-id = <1>;
+> +                       reg = <0x2fa1000 0x100>,
+> +                               <0x2fa1400 0x200>,
+> +                               <0x2fa1800 0x200>,
+> +                               <0x2fa1c00 0x200>,
+> +                               <0x2fa2000 0x400>;
+> +                       reg-names = "global", "txchan", "rxchan",
+> +                                       "txsched", "rxflow";
+> +
+> +                       qm-base-address = <0x23a80000 0x23a90000
+> +                                          0x23aa0000 0x23ab0000>;
+
+The same address as above is correct here?
+
+> +               };
+> +       };
+> +
+> +Navigator DMA client:
+> +Required properties:
+> +- dma-id:      DMA instance number
+
+How is this used? It is to match with the above "DMA Instance"? Can
+you use phandles?
+
+The use of DMA client and DMA instance are not very clear.
+
+> +- rx-channel:  DMA receive channel number
+> +- tx-channel:  DMA transmit channel number
+
+These could be args to a phandle.
+
+> +
+> +Example:
+> +
+> +       netcp: netcp at 2090000 {
+> +               dma-id = <0>;
+> +               tx-channel = <8>;
+> +               rx-channel = <22>;
+> +               ...
+> +       };
+> --
+> 1.7.9.5
+>
