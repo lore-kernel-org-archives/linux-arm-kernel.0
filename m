@@ -1,68 +1,30 @@
-From: bevenson@melinkcorp.com (Bryan Evenson)
-Date: Mon, 5 May 2014 20:44:48 +0000
-Subject: [PATCH] rtc: rtc-at91rm9200: fix lost ACKUPD interrupt
-In-Reply-To: <1399321388-15148-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <55cab9fba2ea4eed8f73591b37cc874b@BLUPR05MB037.namprd05.prod.outlook.com>
- <1399321388-15148-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <ab4d2f575d33406f996a119e6c433a79@BLUPR05MB037.namprd05.prod.outlook.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 5 May 2014 13:45:11 -0700
+Subject: [GIT PULL] Renesas ARM Based SoC Updates for v3.16
+In-Reply-To: <cover.1397627619.git.horms+renesas@verge.net.au>
+References: <cover.1397627619.git.horms+renesas@verge.net.au>
+Message-ID: <20140505204511.GC27961@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Boris,
+On Wed, Apr 16, 2014 at 03:03:25PM +0900, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
+> 
+> Please consider these Renesas ARM based SoC updates for v3.16.
+> 
+> 
+> The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+> 
+>   Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-for-v3.16
+> 
+> for you to fetch changes up to e35db38d66d1e4007cfc1bb90a05e11b4aaee2a8:
+> 
+>   ARM: shmobile: r8a7778/bockw: Move "select RENESAS_INTC_IRQPIN" under SoC (2014-04-14 11:28:43 +0900)
 
-> -----Original Message-----
-> From: Boris BREZILLON [mailto:boris.brezillon at free-electrons.com]
-> Sent: Monday, May 05, 2014 4:23 PM
-> To: Bryan Evenson
-> Cc: Andrew Victor; Nicolas Ferre; Jean-Christophe Plagniol-Villard; linux-arm-
-> kernel at lists.infradead.org; Alessandro Zummo; rtc-
-> linux at googlegroups.com; linux-kernel at vger.kernel.org; Boris BREZILLON
-> Subject: [PATCH] rtc: rtc-at91rm9200: fix lost ACKUPD interrupt
-> 
-> If an alarm interrupt raises just after the CR register is written and before the
-> ACKUPD is unmasked the ACKUPD bit might be cleaned up without waking
-> up the waiting thread.
-> 
-> Unmask the ACKUPD interrupt before writing the CR register so that the
-> ACKUPD cannot be lost.
-> 
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> Reported-by: Bryan Evenson <bevenson@melinkcorp.com>
-> ---
-> Hello Bryan,
-> 
-> Could you try to apply this patch and tell me if it fixes your bug ?
-> 
+Merged, thanks.
 
-I'll incorporate the patch and see what happens.  I'll be able to let you know the results tomorrow morning.
-
-Regards,
-Bryan
-
-> Best Regards,
-> 
-> Boris
-> 
->  drivers/rtc/rtc-at91rm9200.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/rtc/rtc-at91rm9200.c b/drivers/rtc/rtc-at91rm9200.c index
-> 3281c90..c16c423 100644
-> --- a/drivers/rtc/rtc-at91rm9200.c
-> +++ b/drivers/rtc/rtc-at91rm9200.c
-> @@ -163,9 +163,9 @@ static int at91_rtc_settime(struct device *dev, struct
-> rtc_time *tm)
-> 
->  	/* Stop Time/Calendar from counting */
->  	cr = at91_rtc_read(AT91_RTC_CR);
-> +	at91_rtc_write_ier(AT91_RTC_ACKUPD);
->  	at91_rtc_write(AT91_RTC_CR, cr | AT91_RTC_UPDCAL |
-> AT91_RTC_UPDTIM);
-> 
-> -	at91_rtc_write_ier(AT91_RTC_ACKUPD);
->  	wait_for_completion(&at91_rtc_updated);	/* wait for ACKUPD
-> interrupt */
->  	at91_rtc_write_idr(AT91_RTC_ACKUPD);
-> 
-> --
-> 1.8.3.2
+-Olof
