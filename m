@@ -1,41 +1,64 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 5 May 2014 12:20:56 +0800
-Subject: [PATCH v10 15/15] ARM: dts: sun7i: Add basic support for the
- Cubietruck WiFi module
-In-Reply-To: <20140505040212.GC11606@lukather>
-References: <1399046249-19472-1-git-send-email-hdegoede@redhat.com>
- <1399046249-19472-16-git-send-email-hdegoede@redhat.com>
- <20140505040212.GC11606@lukather>
-Message-ID: <CAGb2v65egbY5-ZeioLuoTatQ_y6iQ9n=auiiCRNAvTEj1z59hA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 4 May 2014 23:27:26 -0500
+Subject: [RFC PATCH 1/5] watchdog: Add API to trigger reboots
+In-Reply-To: <20140503042925.GB5882@roeck-us.net>
+References: <1398958893-30049-1-git-send-email-linux@roeck-us.net>
+ <1398958893-30049-2-git-send-email-linux@roeck-us.net>
+ <20140503012243.GG4090@lukather>
+ <20140503042925.GB5882@roeck-us.net>
+Message-ID: <20140505042726.GF11606@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 5, 2014 at 12:02 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Fri, May 02, 2014 at 05:57:29PM +0200, Hans de Goede wrote:
->> From: Chen-Yu Tsai <wens@csie.org>
->>
->> The CubieTruck has an AMPAK AP6210 WiFi+Bluetooth module. The WiFi
->> part is a BCM43362 IC connected to MMC3 in the A20 SoC via SDIO.
->> The IC also takes a power enable signal via GPIO.
->>
->> The WiFi module supports out-of-band interrupt signaling via GPIO,
->> but this is not supported in this patch.
->>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->
-> It doesn't have Chen-Yu SoB. Chen-Yu, are you fine with adding it?
+On Fri, May 02, 2014 at 09:29:25PM -0700, Guenter Roeck wrote:
+> > > +	if (wdd->ops->reboot)
+> > > +		wdd_reboot_dev = wdd;
+> > > +
+> > 
+> > Overall, it looks really great, but I guess we can make it a
+> > list. Otherwise, we might end up in a situation where we could not
+> > reboot anymore, like this one for example:
+> >   - a first watchdog is probed, registers a reboot function
+> >   - a second watchdog is probed, registers a reboot function that
+> >     overwrites the first one.
+> >   - then, the second watchdog disappears for some reason, and the
+> >     reboot is set to NULL
+> > 
+> I thought about that, but how likely (or unlikely) is that to ever happen ?
+> So I figured it is not worth the effort, and would just add complexity without
+> real gain. We could always add the list later if we ever encounter a situation
+> where two watchdogs in the same system provide a reboot callback.
 
-My apologies, I didn't notice this patch still had my name on it.
-Looks good.
+The A31 we were discussing about in the other thread that doesn't have
+a watchdog driver yet has four, identical, watchogs. I'm not really
+concerned about the mentionned issue, since they will never be
+removed, but the situation might happen with an on-SoC watchdog and an
+i2c one (if that even exists).
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-(or Acked-by, not sure which applies in this situation.)
+But yes, right, that can be postponed.
 
-> No need to respin the set, I'll add it when applying if it's ok.
+> > Or maybe we can just use the start callback, with the min timeout already
+> > registered, and prevent the user to kick the watchdog.
+> > 
+> Doesn't always work, unfortunately, even now. The moxart driver causes 
+> an explicit and immediate reset. Also, some watchdogs don't reset the system
+> directly but get an interrupt, which then calls the reset handler. Which,
+> in our case, would call the start callback again, and you would have an endless
+> loop.
+
+Ok. You have my Acked-by then.
 
 Thanks!
+Maxime
 
-
-Cheers,
-ChenYu
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140504/399fa054/attachment.sig>
