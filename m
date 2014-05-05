@@ -1,99 +1,83 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 05 May 2014 15:09:26 +0200
-Subject: [PATCH v3 part1 08/11] ARM64 / ACPI: Introduce PCI functions for
- ACPI on ARM64
-In-Reply-To: <53674D62.5020004@linaro.org>
-References: <1398432017-8506-1-git-send-email-hanjun.guo@linaro.org>
- <8888740.lgd2Xkrtad@wuerfel> <53674D62.5020004@linaro.org>
-Message-ID: <4761400.zttHIHIKh6@wuerfel>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 5 May 2014 15:28:26 +0200
+Subject: [PATCH] ARM: fix v7-M signal return
+In-Reply-To: <20140504153618.GA3795@debian>
+References: <1398103664-23078-1-git-send-email-rabin@rab.in>
+ <20140428082757.GD28564@pengutronix.de>
+ <20140503173903.GA16300@debian>
+ <20140503184512.GO28564@pengutronix.de>
+ <20140504153618.GA3795@debian>
+Message-ID: <20140505132826.GQ28564@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 05 May 2014 16:35:46 Hanjun Guo wrote:
-> On 2014-4-29 18:01, Arnd Bergmann wrote:
-> [...]
-> >>> For raw_pci_{read,write} we can have a trivial generic implementation in
-> >>> the PCI core, like
-> >>>
-> >>> int __weak raw_pci_read(unsigned int domain, unsigned int bus,
-> >>> 		  unsigned int devfn, int reg, int len, u32 *val)
-> >>> {
-> >>> 	struct pci_bus *bus = pci_find_bus(domain, bus);
-> >>> 	if (!bus)
-> >>> 		return -ENODEV;
-> >>>
-> >>> 	return bus->ops->read(bus, devfn, reg, len, val);
-> >>> }
-> >>>
-> >>> which won't work on x86 or ia64, but should be fine everywhere else. Alternatively,
-> >>> you can change the ACPI code to do the above manually and call the architecture
-> >>> independent interfaces, either bus->ops->read, or pci_bus_read_config_{byte,word,dword},
-> >>> which would actually simplify the ACPI code.
-> >>
-> >> This may not work. ACPI needs to be able to access PCI config space before
-> >> we've done a PCI bus scan and created pci_bus structures, so the pointer
-> >> of bus will be NULL.
-> > 
-> > Hmm, this is a serious issue, and I don't have a good idea for how
-> > to solve it yet, we need to discuss it some more I think.
-> > 
-> > We are currently working on generic PCI support for ARM64 with DT, which
-> > will be based around the concept that all PCI host drivers can be loadable
-> > modules, and each host driver would supply its own config space access
-> > method.
+Hello Rabin,
+
+On Sun, May 04, 2014 at 05:36:18PM +0200, Rabin Vincent wrote:
+> On Sat, May 03, 2014 at 08:45:12PM +0200, Uwe Kleine-K?nig wrote:
+> > On Sat, May 03, 2014 at 07:39:03PM +0200, Rabin Vincent wrote:
+> > > I'm running this on QEMU.  Here is an old qemu-devel thread on this
+> > > topic if you are interested:
+> > > http://lists.gnu.org/archive/html/qemu-devel/2012-03/msg00158.html
+> > I'm interested in your setup and (if applicable) additional kernel
+> > patches.
 > 
-> this will be the problem, ACPI may access config space before modules are
-> loaded.
-
-I've given it some more thought independently. In the end, I think it's
-not a big issue because the standard PCI driver for ACPI will be rather
-trivial and we can always have that built-in.
-
-It destroys my dream of making the PCI core itself a loadable module,
-but I wasn't sure if that was realistic anyway, and we may still be able
-to do that for non-ACPI configurations.
-
-> > With ACPI, we probably don't need the flexibility, because hopefully all
-> > PCI host bridges will be SBSA compliant and have a regular ECAM config
-> > space implementation (as opposed to the proprietary methods used by
-> > e.g. APM X-Gene, Samsung GH7 or everything we have on ARM32).
-> > 
-> > If we can rely on always having ECAM support available, it would be
-> > easy enough to add an implementation of that specifically for ACPI,
-> > outside of the architecture code or the PCI core, or we could have
-> > a global implementation of that, which gets used by both ACPI and
-> > the compliant PCI host bridge drivers and can be built-in even for
-> > loadable host drivers.
-> > 
-> > Alternatively, you could try to see if it's possible to defer the PCI
-> > access to the time the host driver is loaded. Do you know what the access
-> > to config space is actually needed for?
+> No kernel patches are needed other than the ones I already posted.  My
+> QEMU patches for EFM32 support are needed.  I put together a small
+> README here: https://github.com/rabinv/qemu-efm32-tools
 > 
-> There is a statement in ACPI 5.0a spec:
-> OSPM must guarantee that the following operation regions must always be
-> accessible (which means even before the driver is ready):
-> PCI_Config operation regions on a PCI root bus containing a _BBN object.
-> (invoke _BBN method will return PCI bus number)
+> > > +	@ ensure bit 0 is cleared in the PC
+> > Maybe add: , otherwise behaviour is unpredictable
+> > 
+> > > +	bic	r4, r4, #1
+> > I just notice that the coding style is inconsitent here, the
+> > instructions above don't repeat the dest register. Can you please make
+> > this "bic r4, #1", too?
+> > 
+> > With these two changes you can have my ack.
+> 
+> v3 below.
+> 
+> > What happens on qemu without this fix? If it crashes I'd suggest to get
+> > this patch into 3.15 with a stable annotation. If not I think 3.16-rc1
+> > is enough.
+> 
+> User space processes crash because qemu's emulation of the CPU does not
+> discard the zero bit.
+> 
+> 8<--------------------
+> From 577b0c0e15057f58f86996da7f363c8a608c389f Mon Sep 17 00:00:00 2001
+> From: Rabin Vincent <rabin@rab.in>
+> Date: Sat, 3 May 2014 19:27:09 +0200
+> Subject: [PATCHv3] ARM: fix v7-M signal return
+> 
+> According to the ARM ARM, the behaviour is UNDPREDICTABLE if the PC read
+s/UNDPR/UNPR/
 
-Hmm, the next statement there is
+> from the exception return stack is not half word aligned.  See the
+> pseudo code for ExceptionReturn() and PopStack().
+> 
+> The signal handler's address has the bit 0 set, and setup_return()
+> directly writes this to regs->ARM_pc.  Mask out bit 0 before the
+> exception return to get predictable behaviour.
 
-* I/O operation regions.
+Actual machines seem to behave just fine (i.e. discard this bit) but
+qemu's emulation doesn't and makes processes crash.
 
-That one is even harder to make available in general, in particular
-because SBSA says it doesn't have to be provided at all.
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Fixes: 19c4d593f0b4 ("ARM: ARMv7-M: Add support for exception handling")
+Cc: stable at kernel.org
 
-> And raw_pci_{read,write} will be called in ACPICA to access the PCI_Config
-> to get some information, so theoretic any device defined in DSDT with
-> PCI_Config operation region which be enumerated before PCI host bridge will
-> access config space before the PCI bus scan.
+----
+Can you please put this in Russell's patch tracker.
 
-Just to confirm: Are they called before pci_acpi_scan_root()?
+Maybe pc in the saved struct regs should get bit 0 set during exception
+entry for consistency?! (That would be a separate patch of course.)
 
-In the same section you quote, it seems not:
+Thanks
+Uwe
 
-It should be noted that PCI Config Space Operation Regions are ready as
-soon the host controller or bridge controller has been programmed with a
-bus number. PCI1?s _REG method would not be run until the PCI-PCI bridge
-has been properly configured.
 
-	Arnd
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
