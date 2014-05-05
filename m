@@ -1,87 +1,64 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon, 05 May 2014 16:35:46 +0800
-Subject: [PATCH v3 part1 08/11] ARM64 / ACPI: Introduce PCI functions
- for ACPI on ARM64
-In-Reply-To: <8888740.lgd2Xkrtad@wuerfel>
-References: <1398432017-8506-1-git-send-email-hanjun.guo@linaro.org>
- <201404281549.50738.arnd@arndb.de> <535F6675.1060109@linaro.org>
- <8888740.lgd2Xkrtad@wuerfel>
-Message-ID: <53674D62.5020004@linaro.org>
+From: jhovold@gmail.com (Johan Hovold)
+Date: Mon, 5 May 2014 10:37:57 +0200
+Subject: [PATCH 3.14 012/158] ARM: dts: am33xx: correcting dt node unit
+ address for usb
+In-Reply-To: <20140504154031.690140742@linuxfoundation.org>
+References: <20140504154029.975081050@linuxfoundation.org>
+ <20140504154031.690140742@linuxfoundation.org>
+Message-ID: <20140505083757.GB30739@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Rafael,
+On Sun, May 04, 2014 at 11:38:41AM -0400, Greg Kroah-Hartman wrote:
+> 3.14-stable review patch.  If anyone has any objections, please let me know.
 
-Sorry for the late reply, I was on holidays...
+This one should not be backported without commit
 
-I send this email directed to Rafael to ask for help, please
-refer to the comments below.
+	a2f8d6b30321 ("ARM: dts: am335x: update USB DT references")
 
-On 2014-4-29 18:01, Arnd Bergmann wrote:
-[...]
->>> For raw_pci_{read,write} we can have a trivial generic implementation in
->>> the PCI core, like
->>>
->>> int __weak raw_pci_read(unsigned int domain, unsigned int bus,
->>> 		  unsigned int devfn, int reg, int len, u32 *val)
->>> {
->>> 	struct pci_bus *bus = pci_find_bus(domain, bus);
->>> 	if (!bus)
->>> 		return -ENODEV;
->>>
->>> 	return bus->ops->read(bus, devfn, reg, len, val);
->>> }
->>>
->>> which won't work on x86 or ia64, but should be fine everywhere else. Alternatively,
->>> you can change the ACPI code to do the above manually and call the architecture
->>> independent interfaces, either bus->ops->read, or pci_bus_read_config_{byte,word,dword},
->>> which would actually simplify the ACPI code.
->>
->> This may not work. ACPI needs to be able to access PCI config space before
->> we've done a PCI bus scan and created pci_bus structures, so the pointer
->> of bus will be NULL.
+which is in Linus' tree but is not marked for stable (or USB will be
+disabled for the boards relying on the old node addresses).
+
+Thanks,
+Johan
+
+> ------------------
 > 
-> Hmm, this is a serious issue, and I don't have a good idea for how
-> to solve it yet, we need to discuss it some more I think.
+> From: Mugunthan V N <mugunthanvnm@ti.com>
 > 
-> We are currently working on generic PCI support for ARM64 with DT, which
-> will be based around the concept that all PCI host drivers can be loadable
-> modules, and each host driver would supply its own config space access
-> method.
-
-this will be the problem, ACPI may access config space before modules are
-loaded.
-
+> commit 8abcdd680d543fb582371e146e62ba9f2af8a816 upstream.
 > 
-> With ACPI, we probably don't need the flexibility, because hopefully all
-> PCI host bridges will be SBSA compliant and have a regular ECAM config
-> space implementation (as opposed to the proprietary methods used by
-> e.g. APM X-Gene, Samsung GH7 or everything we have on ARM32).
+> DT node's unit address should be its own register offset address to make it a
+> unique across the system. This patch corrects the incorrect USB entries with
+> correct register offset for unit address.
 > 
-> If we can rely on always having ECAM support available, it would be
-> easy enough to add an implementation of that specifically for ACPI,
-> outside of the architecture code or the PCI core, or we could have
-> a global implementation of that, which gets used by both ACPI and
-> the compliant PCI host bridge drivers and can be built-in even for
-> loadable host drivers.
+> Acked-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+> Acked-by: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 > 
-> Alternatively, you could try to see if it's possible to defer the PCI
-> access to the time the host driver is loaded. Do you know what the access
-> to config space is actually needed for?
-
-There is a statement in ACPI 5.0a spec:
-OSPM must guarantee that the following operation regions must always be
-accessible (which means even before the driver is ready):
-PCI_Config operation regions on a PCI root bus containing a _BBN object.
-(invoke _BBN method will return PCI bus number)
-
-And raw_pci_{read,write} will be called in ACPICA to access the PCI_Config
-to get some information, so theoretic any device defined in DSDT with
-PCI_Config operation region which be enumerated before PCI host bridge will
-access config space before the PCI bus scan.
-
-But I haven't find any specific example, I must missed something, Rafael,
-could you please comment this?
-
-Thanks
-Hanjun
+> ---
+>  arch/arm/boot/dts/am33xx.dtsi |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> --- a/arch/arm/boot/dts/am33xx.dtsi
+> +++ b/arch/arm/boot/dts/am33xx.dtsi
+> @@ -448,7 +448,7 @@
+>  			ti,hwmods = "usb_otg_hs";
+>  			status = "disabled";
+>  
+> -			usb_ctrl_mod: control at 44e10000 {
+> +			usb_ctrl_mod: control at 44e10620 {
+>  				compatible = "ti,am335x-usb-ctrl-module";
+>  				reg = <0x44e10620 0x10
+>  					0x44e10648 0x4>;
+> @@ -551,7 +551,7 @@
+>  					"tx14", "tx15";
+>  			};
+>  
+> -			cppi41dma: dma-controller at 07402000 {
+> +			cppi41dma: dma-controller at 47402000 {
+>  				compatible = "ti,am3359-cppi41";
+>  				reg =  <0x47400000 0x1000
+>  					0x47402000 0x1000
