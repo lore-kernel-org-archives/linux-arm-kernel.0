@@ -1,79 +1,87 @@
-From: anders.berg@lsi.com (Anders Berg)
-Date: Mon, 5 May 2014 10:35:04 +0200
-Subject: [PATCH v2 0/6] Add platform support for LSI AXM55xx
-In-Reply-To: <cover.1398335771.git.anders.berg@lsi.com>
-References: <cover.1398335771.git.anders.berg@lsi.com>
-Message-ID: <20140505083407.GA3398@swsaberg01>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Mon, 05 May 2014 16:35:46 +0800
+Subject: [PATCH v3 part1 08/11] ARM64 / ACPI: Introduce PCI functions
+ for ACPI on ARM64
+In-Reply-To: <8888740.lgd2Xkrtad@wuerfel>
+References: <1398432017-8506-1-git-send-email-hanjun.guo@linaro.org>
+ <201404281549.50738.arnd@arndb.de> <535F6675.1060109@linaro.org>
+ <8888740.lgd2Xkrtad@wuerfel>
+Message-ID: <53674D62.5020004@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anrd,
+Hi Arnd, Rafael,
 
-Any comments on this updated series?
+Sorry for the late reply, I was on holidays...
 
-/Anders
+I send this email directed to Rafael to ask for help, please
+refer to the comments below.
 
-On Thu, Apr 24, 2014 at 12:44:03PM +0200, Anders Berg wrote:
-> Hi,
+On 2014-4-29 18:01, Arnd Bergmann wrote:
+[...]
+>>> For raw_pci_{read,write} we can have a trivial generic implementation in
+>>> the PCI core, like
+>>>
+>>> int __weak raw_pci_read(unsigned int domain, unsigned int bus,
+>>> 		  unsigned int devfn, int reg, int len, u32 *val)
+>>> {
+>>> 	struct pci_bus *bus = pci_find_bus(domain, bus);
+>>> 	if (!bus)
+>>> 		return -ENODEV;
+>>>
+>>> 	return bus->ops->read(bus, devfn, reg, len, val);
+>>> }
+>>>
+>>> which won't work on x86 or ia64, but should be fine everywhere else. Alternatively,
+>>> you can change the ACPI code to do the above manually and call the architecture
+>>> independent interfaces, either bus->ops->read, or pci_bus_read_config_{byte,word,dword},
+>>> which would actually simplify the ACPI code.
+>>
+>> This may not work. ACPI needs to be able to access PCI config space before
+>> we've done a PCI bus scan and created pci_bus structures, so the pointer
+>> of bus will be NULL.
 > 
-> Verion 2 of this series to introduces basic platform support for the LSI
-> AXM5516 SoC. When this is in shape, could it be merged into the arm-soc tree?
+> Hmm, this is a serious issue, and I don't have a good idea for how
+> to solve it yet, we need to discuss it some more I think.
 > 
-> Changes:
+> We are currently working on generic PCI support for ARM64 with DT, which
+> will be based around the concept that all PCI host drivers can be loadable
+> modules, and each host driver would supply its own config space access
+> method.
+
+this will be the problem, ACPI may access config space before modules are
+loaded.
+
 > 
-> v2:
->     * Rebased to arm-soc/for-next
->     * Removed redundant HAVE_SMP and ARCH_WANT_OPTIONAL_GPIOLIB from Kconfig
->     * Use CPU_METHOD_OF_DECLARE to register smp_operations
->     * Rework smp operations to avoid holding pen and custom headsmp.S
->     * Clean up board file
->     * Corrected clock properties for arm,sp804 dts node.
->     * Changed machine compatible strings to include full model number.
->     * Break out clk-axxia driver as separate patch
->     * Removed Makefile.boot
+> With ACPI, we probably don't need the flexibility, because hopefully all
+> PCI host bridges will be SBSA compliant and have a regular ECAM config
+> space implementation (as opposed to the proprietary methods used by
+> e.g. APM X-Gene, Samsung GH7 or everything we have on ARM32).
 > 
-> Anders Berg (6):
->   ARM: Add platform support for LSI AXM55xx SoC
->   clk: Add clock driver for AXM55xx SoC
->   ARM: dts: Device tree for AXM55xx.
->   ARM: axxia: Adding defconfig for AXM55xx
->   power: reset: Add Axxia system reset driver
->   ARM: dts: axxia: Add reset controller
+> If we can rely on always having ECAM support available, it would be
+> easy enough to add an implementation of that specifically for ACPI,
+> outside of the architecture code or the PCI core, or we could have
+> a global implementation of that, which gets used by both ACPI and
+> the compliant PCI host bridge drivers and can be built-in even for
+> loadable host drivers.
 > 
->  Documentation/devicetree/bindings/arm/axxia.txt    |  12 +
->  .../devicetree/bindings/clock/clk-axxia.txt        |  88 ++++++
->  .../bindings/power_supply/axxia-reset.txt          |  20 ++
->  arch/arm/Kconfig                                   |   2 +
->  arch/arm/Makefile                                  |   2 +
->  arch/arm/boot/dts/Makefile                         |   1 +
->  arch/arm/boot/dts/axm5516-amarillo.dts             |  51 ++++
->  arch/arm/boot/dts/axm5516-cpus.dtsi                | 204 ++++++++++++++
->  arch/arm/boot/dts/axm55xx.dtsi                     | 311 +++++++++++++++++++++
->  arch/arm/configs/axm55xx_defconfig                 | 248 ++++++++++++++++
->  arch/arm/mach-axxia/Kconfig                        |  16 ++
->  arch/arm/mach-axxia/Makefile                       |   2 +
->  arch/arm/mach-axxia/axxia.c                        |  28 ++
->  arch/arm/mach-axxia/platsmp.c                      |  89 ++++++
->  drivers/clk/Makefile                               |   1 +
->  drivers/clk/clk-axxia.c                            | 281 +++++++++++++++++++
->  drivers/power/reset/Kconfig                        |   8 +
->  drivers/power/reset/Makefile                       |   1 +
->  drivers/power/reset/axxia-reset.c                  |  97 +++++++
->  19 files changed, 1462 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/axxia.txt
->  create mode 100644 Documentation/devicetree/bindings/clock/clk-axxia.txt
->  create mode 100644 Documentation/devicetree/bindings/power_supply/axxia-reset.txt
->  create mode 100644 arch/arm/boot/dts/axm5516-amarillo.dts
->  create mode 100644 arch/arm/boot/dts/axm5516-cpus.dtsi
->  create mode 100644 arch/arm/boot/dts/axm55xx.dtsi
->  create mode 100644 arch/arm/configs/axm55xx_defconfig
->  create mode 100644 arch/arm/mach-axxia/Kconfig
->  create mode 100644 arch/arm/mach-axxia/Makefile
->  create mode 100644 arch/arm/mach-axxia/axxia.c
->  create mode 100644 arch/arm/mach-axxia/platsmp.c
->  create mode 100644 drivers/clk/clk-axxia.c
->  create mode 100644 drivers/power/reset/axxia-reset.c
-> 
-> -- 
-> 1.8.3.2
-> 
+> Alternatively, you could try to see if it's possible to defer the PCI
+> access to the time the host driver is loaded. Do you know what the access
+> to config space is actually needed for?
+
+There is a statement in ACPI 5.0a spec:
+OSPM must guarantee that the following operation regions must always be
+accessible (which means even before the driver is ready):
+PCI_Config operation regions on a PCI root bus containing a _BBN object.
+(invoke _BBN method will return PCI bus number)
+
+And raw_pci_{read,write} will be called in ACPICA to access the PCI_Config
+to get some information, so theoretic any device defined in DSDT with
+PCI_Config operation region which be enumerated before PCI host bridge will
+access config space before the PCI bus scan.
+
+But I haven't find any specific example, I must missed something, Rafael,
+could you please comment this?
+
+Thanks
+Hanjun
