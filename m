@@ -1,67 +1,32 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 05 May 2014 17:12:12 -0400 (EDT)
-Subject: [PATCH 5/5] net: macb: Fix race between HW and driver
-In-Reply-To: <433e19f4-93b3-458e-842e-33c511fdee74@CO9EHSMHS005.ehs.local>
-References: <7c62baab-5f60-4f04-87f7-6b53fecc4746@CH1EHSMHS038.ehs.local>
- <20140505.170959.2172440110209805460.davem@davemloft.net>
- <433e19f4-93b3-458e-842e-33c511fdee74@CO9EHSMHS005.ehs.local>
-Message-ID: <20140505.171212.1953119275767909182.davem@davemloft.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 5 May 2014 14:18:15 -0700
+Subject: [GIT PULL] at91: DT for 3.16 #1
+In-Reply-To: <1397858579-11619-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1397858579-11619-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20140505211815.GC29245@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: S?ren Brinkmann <soren.brinkmann@xilinx.com>
-Date: Mon, 5 May 2014 14:10:23 -0700
-
-> On Mon, 2014-05-05 at 05:09PM -0400, David Miller wrote:
->> From: S?ren Brinkmann <soren.brinkmann@xilinx.com>
->> Date: Mon, 5 May 2014 14:05:19 -0700
->> 
->> > On Mon, 2014-05-05 at 04:56PM -0400, David Miller wrote:
->> >> From: Soren Brinkmann <soren.brinkmann@xilinx.com>
->> >> Date: Sun,  4 May 2014 15:43:02 -0700
->> >> 
->> >> > Under "heavy" RX load, the driver cannot handle the descriptors fast
->> >> > enough. In detail, when a descriptor is consumed, its used flag is
->> >> > cleared and once the RX budget is consumed all descriptors with a
->> >> > cleared used flag are prepared to receive more data. Under load though,
->> >> > the HW may constantly receive more data and use those descriptors with a
->> >> > cleared used flag before they are actually prepared for next usage.
->> >> > 
->> >> > The head and tail pointers into the RX-ring should always be valid and
->> >> > we can omit clearing and checking of the used flag.
->> >> > 
->> >> > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
->> >> 
->> >> Isn't the RX_USED bit the only thing that controls what RX entries
->> >> the chip will try to use?
->> >> 
->> >> I can't see how you can just remove the RX_USED bit handling
->> >> altogether.
->> >> 
->> >> The problem actually seems to be that in the current code we clear the
->> >> RX_USED bit before we actually reallocate the buffer and set it up.
->> >> 
->> >> It should be a bug to see the RX_USED bit set in gem_rx_refill(), and
->> >> the only reason why it can happen is exactly because you're clearing it
->> >> too early in gem_rx().
->> > 
->> > I don't follow. The HW uses the descriptor and the driver handles the
->> > received data. So, in gem_rx_refill we should actually only replace
->> > descriptor which have the RX_USED _set_, not? Currently the test tests
->> > for the opposite, since SW clears RX_USED in gem_rx. This patch just
->> > removes those two parts. The RX_USED is left as is (HW should have set
->> > it). And in gem_rx_refill we simply rely on the head and tail pointers
->> > to refill the used descriptors. I didn't see a reason to do the additional
->> > checking of the RX_USED bit.
->> > After the refill the RX_USED flags are of course cleared for all
->> > refilled descriptors.
->> 
->> Aha, that makes sense, I didn't notice that RX_USED is cleared as a side
->> effect of gem_rx_refill()'s work.
->> 
->> I'll apply this series, thanks for explaining.
+On Sat, Apr 19, 2014 at 12:02:59AM +0200, Nicolas Ferre wrote:
+> Arnd, Olof, Kevin,
 > 
-> Thanks, but we probably wanna wait for Nicolas to test on his platforms
-> using macb?
+> Here is the first AT91 DT pull-request for 3.16. Nice enhancements for
+> three different products.
+> 
+> Thanks, best regards,
+> 
+> The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+> 
+>   Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://github.com/at91linux/linux-at91.git tags/at91-dt
+> 
+> for you to fetch changes up to 27a96a0364787d2b41d2a72d08143d95263e1b07:
+> 
+>   ARM: at91: sama5d3: clock for ssc from rk pin (2014-04-18 22:43:44 +0200)
 
-We can always apply a fixup or revert.
+Merged, thanks.
+
+-Olof
