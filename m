@@ -1,46 +1,30 @@
-From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Mon, 5 May 2014 19:52:24 +0530
-Subject: [PATCH v2 0/6] Add CPTS support for AM437x
-In-Reply-To: <1399012324-20737-1-git-send-email-george.cherian@ti.com>
-References: <1399012324-20737-1-git-send-email-george.cherian@ti.com>
-Message-ID: <53679EA0.3050606@ti.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 5 May 2014 19:53:14 +0530
+Subject: [PATCH 1/2] PM / OPP: Remove cpufreq wrapper dependency on
+ internal data organization
+In-Reply-To: <1399296830-13056-2-git-send-email-nm@ti.com>
+References: <1399296830-13056-1-git-send-email-nm@ti.com>
+ <1399296830-13056-2-git-send-email-nm@ti.com>
+Message-ID: <CAKohpomeP3Ftx8mH=x0Hj7HEpw6A9X8O8JEFqvrJbkZYDqDS6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 02 May 2014 12:01 PM, George Cherian wrote:
-> The series adds CPTS support for AM4372.
+On 5 May 2014 19:03, Nishanth Menon <nm@ti.com> wrote:
+> diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
+>  int dev_pm_opp_init_cpufreq_table(struct device *dev,
+>                             struct cpufreq_frequency_table **table)
+>  {
+> -       struct device_opp *dev_opp;
+>         struct dev_pm_opp *opp;
+> -       struct cpufreq_frequency_table *freq_table;
+> -       int i = 0;
+> +       struct cpufreq_frequency_table *freq_table = NULL;
+> +       int i, max_opps, ret = 0;
+> +       unsigned long rate;
 >
-> Patch 1 - DT changes w.r.t clock changes for AM33xx.
-> Patch 2 - CPTS clock name harcoding in the driver is removed. 
-> 	  Easier to pass the clock name from dt rather than hardcoding in driver.
-> 	  Also in prepration for DRA7x CPTS support.
-> Patch 3 - Enable the CPTS support for both DRA7x and AM4372 in the driver.
-> Patch 4 - Enable the Annexe F for L2 PTP for AM437x and DRA7x.
-> Patch 5 - Change the default clocksource to dpll_core_m5 
-> Patch 6 - DT changes for AM4372.
->
->
-> v1 -> v2
-> 	Patch 1 and 2 Re-ordering.
-> 	Seperate TS_BITS define for Hw version V2 and V3
->
-> George Cherian (6):
->   ARM: dts: am33xx: Add clock names for cpsw and cpts
->   drivers: net: cpts: Remove hardcoded clock name for CPTS
->   drivers: net: cpsw: Enable CPTS for DRA7xx and AM4372
->   drivers: net: cpsw: Enable Annexe F Time sync
->   ARM: AM43xx: clk: Change the cpts ref clock source to dpll_core_m5 clk
->   ARM: dts: am4372: Add clock names for cpsw and cpts
->
->  arch/arm/boot/dts/am33xx.dtsi  |  2 ++
->  arch/arm/boot/dts/am4372.dtsi  |  2 ++
->  drivers/clk/ti/clk-43xx.c      | 16 ++++++++++++
->  drivers/net/ethernet/ti/cpsw.c | 56 +++++++++++++++++++++++++++++++-----------
->  drivers/net/ethernet/ti/cpts.c | 11 +++------
->  5 files changed, 66 insertions(+), 21 deletions(-)
->
+> -       /* Pretend as if I am an updater */
+> -       mutex_lock(&dev_opp_list_lock);
 
-Acked-by: Mugunthan V N <mugunthanvnm@ti.com>
-
-Regards
-Mugunthan V N
+What if opp is being added for some reason at the same time?
+I hope we can surely see some awkward results, maybe some
+NULL pointers invocations as well..
