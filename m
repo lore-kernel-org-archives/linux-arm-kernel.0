@@ -1,70 +1,24 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 5 May 2014 14:45:21 -0600
-Subject: [PATCH v3 4/7] of: configure the platform device dma parameters
-In-Reply-To: <20923376.buVzFR52Qe@wuerfel>
-References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
- <1398353407-2345-5-git-send-email-santosh.shilimkar@ti.com>
- <20140502165459.GA29511@google.com> <20923376.buVzFR52Qe@wuerfel>
-Message-ID: <CAErSpo5-FXmVs8BWRYKz9Ln1g1Ls7_uo3oiPd32fUegf3d8hXQ@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 5 May 2014 13:46:33 -0700
+Subject: [PATCH] ARM: multi_v7: enable AT24C EEPROM driver
+In-Reply-To: <1397596227-23174-1-git-send-email-swarren@wwwdotorg.org>
+References: <1397596227-23174-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20140505204633.GD27961@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc Ben, Chris]
+On Tue, Apr 15, 2014 at 03:10:27PM -0600, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
+> 
+> This is used for the board ID EEPROM on Jetson TK1, as well as likely
+> a whole slew of other NVIDIA reference boards; we simply haven't added
+> enabled the EEPROM in the DT files until now.
+> 
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> I assume that updates to this file should go through arm-soc to minimize
+> conflicts.
 
-On Fri, May 2, 2014 at 12:59 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 02 May 2014 10:54:59 Bjorn Helgaas wrote:
->> > +static void of_dma_configure(struct device *dev)
->> > +{
->> > +     u64 dma_addr, paddr, size;
->> > +     int ret;
->> > +
->> > +     dev->coherent_dma_mask = DMA_BIT_MASK(32);
->> > +     if (!dev->dma_mask)
->> > +             dev->dma_mask = &dev->coherent_dma_mask;
->> > +
->> > +     /*
->> > +      * if dma-coherent property exist, call arch hook to setup
->> > +      * dma coherent operations.
->> > +      */
->> > +     if (of_dma_is_coherent(dev->of_node)) {
->> > +             set_arch_dma_coherent_ops(dev);
->> > +             dev_dbg(dev, "device is dma coherent\n");
->> > +     }
->> > +
->> > +     /*
->> > +      * if dma-ranges property doesn't exist - just return else
->> > +      * setup the dma offset
->> > +      */
->> > +     ret = of_dma_get_range(dev->of_node, &dma_addr, &paddr, &size);
->> > +     if ((ret == -ENODEV) || (ret < 0)) {
->> > +             dev_dbg(dev, "no dma range information to setup\n");
->> > +             return;
->> > +     }
->> > +
->> > +     /* DMA ranges found. Calculate and set dma_pfn_offset */
->> > +     dev->dma_pfn_offset = PFN_DOWN(paddr - dma_addr);
->> > +     dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", dev->dma_pfn_offset);
->>
->> Is this effectively the same as an IOMMU that applies a constant offset
->> to the bus address?  Could or should this be done by adding a simple IOMMU
->> driver instead of adding dma_pfn_offset to struct device?
->
-> We currently have two dma_map_ops variants on ARM (plus another set for
-> coherent/noncoherent differences, but we can ignore that for the sake
-> of this discussion): one that handles linear mappings and one that
-> handles IOMMUs by calling into the linux/iommu.h APIs.
->
-> I guess what you mean by 'a simple IOMMU driver' would be another
-> dma_map_ops implementation that is separate from real IOMMUs, right?
+Applied.
 
-I suppose so; it seems like the offset could be managed inside
-arm_dma_ops.  My idea of an IOMMU is something that maps bus addresses
-to physical memory addresses.  That's what we're doing here; it's just
-that the mapping function is very simple.  So why add something new in
-struct device for it?
-
-I think powerpc and tile do something similar in dma_direct_map_page()
-and tile_pci_dma_map_page() (they store the offset in struct
-dev_archdata).
-
-Bjorn
+-Olof
