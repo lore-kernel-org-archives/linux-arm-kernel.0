@@ -1,26 +1,84 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 5 May 2014 08:51:13 -0700
-Subject: [PATCH 0/6] ARM: sunxi: Machine code cleanup
-In-Reply-To: <1399259284-6282-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1399259284-6282-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20140505155113.GB25199@roeck-us.net>
+From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
+Date: Mon,  5 May 2014 17:53:43 +0200
+Subject: [PATCH 9/9] ARM: STi: DT: STiH415: 415 DT Entry for clockgen A9
+In-Reply-To: <1399305223-18703-1-git-send-email-gabriel.fernandez@linaro.org>
+References: <1399305223-18703-1-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <1399305223-18703-10-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 04, 2014 at 10:07:58PM -0500, Maxime Ripard wrote:
-> Hi,
-> 
-> This serie moves the restart code out of the mach-sunxi directory to
-> either the watchdog driver or to a new driver in drivers/power/reset.
-> 
-> Since the reset code was pretty much all the code left in the
-> mach-sunxi directory for all the SoCs but the A31, the only thing left
-> into mach-sunxi are empty machine definition.
-> 
-Hi Maxime,
+Patch adds DT entries for clockgen A9
 
-what changed in this version of the series compared to the previous
-version ? Is it just the different directory for the reset driver ?
+Signed-off-by: Pankaj Dev <pankaj.dev@st.com>
+Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+---
+ arch/arm/boot/dts/stih415-clock.dtsi | 48 +++++++++++++++++++++++++++++-------
+ 1 file changed, 39 insertions(+), 9 deletions(-)
 
-Thanks,
-Guenter
+diff --git a/arch/arm/boot/dts/stih415-clock.dtsi b/arch/arm/boot/dts/stih415-clock.dtsi
+index 24a7508..4ad779d 100644
+--- a/arch/arm/boot/dts/stih415-clock.dtsi
++++ b/arch/arm/boot/dts/stih415-clock.dtsi
+@@ -24,15 +24,6 @@
+ 		};
+ 
+ 		/*
+-		 * ARM Peripheral clock for timers
+-		 */
+-		arm_periph_clk: arm_periph_clk {
+-			#clock-cells = <0>;
+-			compatible = "fixed-clock";
+-			clock-frequency = <500000000>;
+-		};
+-
+-		/*
+ 		 * ClockGenAs on SASG1
+ 		 */
+ 		clockgenA at fee62000 {
+@@ -499,5 +490,44 @@
+ 						/* Remaining outputs unused */
+ 			};
+ 		};
++
++		/*
++		 * A9 PLL
++		 */
++		clockgenA9 {
++			reg = <0xfdde00d8 0x70>;
++
++			CLOCKGEN_A9_PLL: CLOCKGEN_A9_PLL {
++				#clock-cells = <1>;
++				compatible = "st,stih415-plls-c32-a9", "st,clkgen-plls-c32";
++
++				clocks = <&CLK_SYSIN>;
++				clock-output-names = "CLOCKGEN_A9_PLL_ODF";
++			};
++		};
++
++		/*
++		 * ARM CPU related clocks
++		 */
++		CLK_M_A9: CLK_M_A9 {
++			#clock-cells = <0>;
++			compatible = "st,stih415-clkgen-a9-mux", "st,clkgen-mux";
++			reg = <0xfdde00d8 0x4>;
++			clocks = <&CLOCKGEN_A9_PLL 0>,
++				 <&CLOCKGEN_A9_PLL 0>,
++				 <&CLK_M_A0_DIV1 2>,
++				 <&CLK_M_A9_EXT2F_DIV2>;
++		};
++
++		/*
++		 * ARM Peripheral clock for timers
++		 */
++		arm_periph_clk: CLK_M_A9_PERIPHS {
++			#clock-cells = <0>;
++			compatible = "fixed-factor-clock";
++			clocks = <&CLK_M_A9>;
++			clock-div = <2>;
++			clock-mult = <1>;
++		};
+ 	};
+ };
+-- 
+1.9.1
