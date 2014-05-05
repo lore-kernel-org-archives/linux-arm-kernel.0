@@ -1,42 +1,38 @@
-From: holler@ahsoftware.de (Alexander Holler)
-Date: Mon, 05 May 2014 09:06:14 +0200
-Subject: ACPI vs DT at runtime
-In-Reply-To: <97692EF2-013E-4E4B-BC16-E0915D67EFEC@antoniou-consulting.com>
-References: <20131115095717.GC1709@e106331-lin.cambridge.arm.com>
- <20131118150052.GC24408@sirena.org.uk> <20131119091216.GA4412@netboy>
- <20131120064056.GB5272@netboy>
- <20131121192136.GA16735@n2100.arm.linux.org.uk>
- <20131121204704.E4487C40753@trevor.secretlab.ca>
- <CAHkRjk5MstjD9JFk+co8k89i8geJBmSF6uObhGdmWSe0GJHo8g@mail.gmail.com>
- <97692EF2-013E-4E4B-BC16-E0915D67EFEC@antoniou-consulting.com>
-Message-ID: <53673866.9000105@ahsoftware.de>
+From: a.ryabinin@samsung.com (Andrey Ryabinin)
+Date: Mon, 05 May 2014 11:11:13 +0400
+Subject: [PATCH] arm: memset: zero out upper bytes in r1
+Message-ID: <1399273875-8403-1-git-send-email-a.ryabinin@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 22.11.2013 13:00, schrieb Pantelis Antoniou:
+memset doesn't work right for following example:
 
-> As one that's going to be dealing with this, please don't take the DTS
-> files from the kernel.
->
-> If you do this, I can guarantee that within a year almost no ARM board using DT
-> will boot a mainline kernel.
->
-> The reason is that vendors have enough trouble (and failing) tracking a single
-> tree, adding yet another will just end to the vendor trees as far as the eye can see.
->
-> Maybe, maybe, EVMs from silicon vendors will still boot, but I doubt any other
-> customer board will work.
+	signed char c = 0xF0;
+	memset(addr, c, size);
 
-A bit late (I don't follow the ML (or what happens in the ARM world) 
-closely, but as I've recently read that ARM64 will go UEFI and ACPI, I 
-wonder what was the reasoning behind that decision.
+Variable c is signed, so after typcasting to int the value will be 0xFFFFFFF0.
+This value will be passed through r1 regitster to memset function.
+memset doesn't zero out upper bytes in r1, so memory will be filled
+with 0xFFFFFFF0 instead of expected 0xF0F0F0F0.
 
-Does anyone really assume we will become high quality UEFI and ACPI 
-blobs from vendors? And such with reasonable support/update periods?
+Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
+---
+ arch/arm/lib/memset.S | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-For me that sounds like someone asked dreamers and was unable to adjust 
-those answers in regard to reality.
-
-Regards,
-
-Alexander Holler
+diff --git a/arch/arm/lib/memset.S b/arch/arm/lib/memset.S
+index 94b0650..a010f76 100644
+--- a/arch/arm/lib/memset.S
++++ b/arch/arm/lib/memset.S
+@@ -22,7 +22,8 @@ ENTRY(memset)
+ /*
+  * we know that the pointer in ip is aligned to a word boundary.
+  */
+-1:	orr	r1, r1, r1, lsl #8
++1:	and	r1, r1, #0xff
++	orr	r1, r1, r1, lsl #8
+ 	orr	r1, r1, r1, lsl #16
+ 	mov	r3, r1
+ 	cmp	r2, #16
+-- 
+1.8.3.2
