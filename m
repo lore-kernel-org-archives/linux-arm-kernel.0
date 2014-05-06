@@ -1,143 +1,36 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 05 May 2014 18:43:28 -0700
-Subject: [PATCH 2/5] ARM: add SMP support for Broadcom mobile SoCs
-In-Reply-To: <53680A5B.4060208@linaro.org>
-References: <1396577891-2713-1-git-send-email-elder@linaro.org>
- <1396577891-2713-3-git-send-email-elder@linaro.org>
- <533EF21C.6000909@codeaurora.org> <53680A5B.4060208@linaro.org>
-Message-ID: <53683E40.1060909@codeaurora.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 5 May 2014 18:44:33 -0700
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC DT Updates for
+ v3.16
+In-Reply-To: <cover.1398737464.git.horms+renesas@verge.net.au>
+References: <cover.1398737464.git.horms+renesas@verge.net.au>
+Message-ID: <20140506014433.GA4701@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/05/14 15:02, Alex Elder wrote:
-> On 04/04/2014 12:55 PM, Stephen Boyd wrote:
->> On 04/03/14 19:18, Alex Elder wrote:
->>> +
->>> +/*
->>> + * Secondary startup method setup routine to extract the location of
->>> + * the secondary boot register from a "cpu" or "cpus" device tree
->>> + * node.  Only the first seen secondary boot register value is used;
->>> + * any others are ignored.  The secondary boot register value must be
->>> + * non-zero.
->>> + *
->>> + * Returns 0 if successful or an error code otherwise.
->>> + */
->>> +static int __init of_enable_method_setup(struct device_node *node)
->>> +{
->>> +	int ret;
->>> +
->>> +	/* Ignore all but the first one specified */
->>> +	if (secondary_boot)
->>> +		return 0;
->>> +
->>> +	ret = of_property_read_u32(node, OF_SECONDARY_BOOT, &secondary_boot);
->>> +	if (ret)
->>> +		pr_err("%s: missing/invalid " OF_SECONDARY_BOOT " property\n",
->>> +			node->name);
->>> +
->>> +	return ret;
->>> +}
->> I don't understand why we need this. Why can't we get the secondary boot
->> address from the /cpus node in the smp_prepare_cpus op. It isn't that
->> hard to get access to the cpus node there via of_find_node_by_path().
->> Then we don't need patch 1 at all. If it turns out to be common stuff,
->> we can always have the common function live in arm common code or maybe
->> even be a devicetree API.
-> I already responded to this, but never got any response.  I
-> was preparing to re-send this series and wanted to try to
-> pull the added feature (patch 1) out and not be dependent on
-> it.  But I think it's a bit ugly so I'm hoping to get a
-> blessing to proceed with what I originally proposed.  For
-> reference, here's the thread:
->     https://lkml.org/lkml/2014/4/3/421
->
-> What I'm trying to do is get the value of a "secondary-boot-reg"
-> property from a node known to have an "enable-method" property
-> that matches the method name supplied in CPU_METHOD_OF_DECLARE().
+On Tue, Apr 29, 2014 at 11:15:32AM +0900, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
+> 
+> Please consider these second round of
+> Renesas ARM based SoC DT updates for v3.16.
+> 
+> This pull request is based on the previous round of
+> such requests, tagged as renesas-dt-for-v3.16,
+> which I have already sent a pull-request for.
+> 
+> 
+> The following changes since commit dd485ab9a88267f4db0d58ace23b19e876ebf8ac:
+> 
+>   ARM: shmobile: armadillo-reference dts: Seiko Instruments, Inc is "sii" (2014-04-16 10:03:42 +0900)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt2-for-v3.16
+> 
+> for you to fetch changes up to 5a62ec57004f1a434bfd3feed43e447b5780baf6:
+> 
+>   ARM: shmobile: henninger: enable SATA0 (2014-04-28 09:12:04 +0900)
 
-I don't recall seeing any documentation about the secondary-boot-reg
-property. Please make sure it is documented in the next patch series.
+Merged, thanks.
 
->
-> Using the callback function as I originally proposed, this is
-> very easy.  When arm_dt_init_cpu_maps() parses the "cpus" portion
-> of the device tree it calls set_smp_ops_by_method() for a
-> matching "cpu" or "cpus" node, and that function supplies
-> the node to the callback function. The callback can extract
-> additional property values if needed.
->
-> If I hold off until smp_prepare_cpus() is called, I have to
-> re-parse the device tree to find the "cpus" node (this is
-> in itself trivial).  I then need to re-parse that node to
-> verify the matching "enable-method" property is found before
-> looking for the parameter information I need for that enable
-> method.  I would really prefer not to re-do this parsing
-> step.  It's imprecise and a little inefficient, and it
-> duplicates (but not exactly) logic that's already performed
-> by arm_dt_init_cpu_maps().
-
-Do you have any devices where the enable-method and secondary-boot-reg
-isn't the same across all CPUs? A lot of the complexity comes from
-broken DTs that don't specify a secondary-boot-reg along with the
-enable-method. From the description and the code it seems that we should
-just always put these two properties in the cpus node to make things
-simple and precise. I agree it's a minor duplication to read the DT
-again to get the /cpus node and read a property out of it, but I doubt
-you could even measure the difference.
-
->
-> One more point of clarification.  This "secondary-boot-reg"
-> value is *not* the secondary boot address--that is, it's
-> not the address secondary cores jump to when they are
-> activated.  Instead, this is the address of a register
-> that's used to request the ROM code release a core from
-> its ROM-implemented holding pen.  For this machine,
-> control jumps at that point to secondary_startup(),
-> defined in arch/arm/kernel/head.S.
-
-Yes it wouldn't be possible to specify the entry address in DT (depends
-on compile time factors). How is this different from cpu-release-addr
-though? It looks like it describes something similar to what ePAPR
-describes and how arm64 uses it (although those two slightly differ).
-Assuming it's paired with a different enable-method than spin-table I
-don't see a problem reusing the same name.
-
->
-> So...
->
-> Stephen, I'd like to hear from you whether my explanation
-> is adequate, and whether you think my addition and use of
-> CPU_METHOD_OF_DECLARE_SETUP() is reasonable.  (If you have
-> a suggestion for a better name, I'm open.)
->
-> If you still don't like it, I'll follow up with a
-> new version of the patches, this time parsing the
-> device tree in the smp_prepare_cpus() method as
-> you suggested.  I don't want this to hold up getting
-> this SMP support into the kernel.
->
-
-This was my train of thought. It annoys me that we have smp ops at two
-levels. We already have SMP ops that deal with SMP things and now we
-have another level that is associated with the enable-method. If we
-really need this callback why couldn't we just collapse it with the
-smp_ops we already have? When we do that we realize that
-smp_prepare_cpus() is a fairly similar place to do this sort of thing,
-but changing that callback to take the node is annoying to propagate to
-all users. But do we really need that node? It seems simple enough to
-just get the cpus node and then read out the property we care about and
-we can do all that in smp_prepare_cpus() one time (and keep the mapping
-around forever) without requiring any core ARM changes.
-
-Do you have any more complicated use cases for this setup hook? RIght
-now I'm not convinced that we need to add all this framework for
-something that looks like it could be done in a couple lines in the
-prepare_cpus() step.
-
-	cpus = of_find_node_by_path("/cpus")
-	ret = of_property_read_u32(cpus, "secondary-boot-reg", &addr);
-
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+-Olof
