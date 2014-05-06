@@ -1,52 +1,59 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 6 May 2014 10:40:14 -0500
-Subject: [PATCH v3 04/20] usb: xhci: add a platform-private field
-In-Reply-To: <1399335255-589-5-git-send-email-gregory.clement@free-electrons.com>
-References: <1399335255-589-1-git-send-email-gregory.clement@free-electrons.com>
- <1399335255-589-5-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140506154014.GG25849@saruman.home>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Tue, 6 May 2014 10:42:59 -0500
+Subject: [PATCHv3 3/3] edac: altera: Add EDAC support for Altera SDRAM
+In-Reply-To: <1399330337-16748-4-git-send-email-tthayer@altera.com>
+References: <1399330337-16748-1-git-send-email-tthayer@altera.com>
+ <1399330337-16748-4-git-send-email-tthayer@altera.com>
+Message-ID: <1399390979.11533.6.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 06, 2014 at 02:13:59AM +0200, Gregory CLEMENT wrote:
-> This patch adds an xhci->priv field for private use by xHCI platform
-> drivers. This field was present for OHCI and EHCI and it was not
-> needed until now for xHCI. With the introduction of the clock support,
-> then a private field will be useful, so let's mimic what have been
-> done for the other HCI.
+On Mon, 2014-05-05 at 17:52 -0500, Thor Thayer wrote:
+> From: Thor Thayer <tthayer@altera.com>
 > 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-Acked-by: Felipe Balbi <balbi@ti.com>
-
 > ---
->  drivers/usb/host/xhci.h | 3 +++
->  1 file changed, 3 insertions(+)
+> v2: Use the SDRAM controller registers to calculate memory size
+>     instead of the Device Tree. Update To & Cc list. Add maintainer
+>     information.
 > 
-> diff --git a/drivers/usb/host/xhci.h b/drivers/usb/host/xhci.h
-> index d280e9213d08..054017f66246 100644
-> --- a/drivers/usb/host/xhci.h
-> +++ b/drivers/usb/host/xhci.h
-> @@ -1584,6 +1584,9 @@ struct xhci_hcd {
->  	u32			port_status_u0;
->  /* Compliance Mode Timer Triggered every 2 seconds */
->  #define COMP_MODE_RCVRY_MSECS 2000
-> +
-> +	/* platform-specific data -- must come last */
-> +	unsigned long		priv[0] __aligned(sizeof(s64));
->  };
+> v3: EDAC driver cleanup based on comments from Mailing list.
+> 
+> Signed-off-by: Thor Thayer <tthayer@altera.com>
+> ---
+>  MAINTAINERS                |    5 +
+>  drivers/edac/Kconfig       |    9 +
+>  drivers/edac/Makefile      |    2 +
+>  drivers/edac/altera_edac.c |  411 ++++++++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 427 insertions(+)
+>  create mode 100644 drivers/edac/altera_edac.c
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index e67ea24..ecd1277 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1290,6 +1290,11 @@ M:	Dinh Nguyen <dinguyen@altera.com>
+>  S:	Maintained
+>  F:	drivers/clk/socfpga/
 >  
->  /* convert between an HCD pointer and the corresponding EHCI_HCD */
-> -- 
-> 1.8.1.2
-> 
+> +ARM/SOCFPGA SDRAM EDAC SUPPORT
+> +M:	Thor Thayer <tthayer@altera.com>
+> +S:	Maintained
+> +F:	drivers/edac/altera_edac.c
+> +
+>  ARM/STI ARCHITECTURE
+>  M:	Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
+>  M:	Maxime Coquelin <maxime.coquelin@st.com>
+> diff --git a/drivers/edac/Kconfig b/drivers/edac/Kconfig
+> index 878f090..4f4d379 100644
+> --- a/drivers/edac/Kconfig
+> +++ b/drivers/edac/Kconfig
+> @@ -368,4 +368,13 @@ config EDAC_OCTEON_PCI
+>  	  Support for error detection and correction on the
+>  	  Cavium Octeon family of SOCs.
+>  
+> +config EDAC_ALTERA_MC
+> +	bool "Altera SDRAM Memory Controller EDAC"
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140506/473d47df/attachment-0001.sig>
+Can this be tristate?
+
+Dinh
