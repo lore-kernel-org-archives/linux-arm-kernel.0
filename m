@@ -1,71 +1,81 @@
-From: arunks.linux@gmail.com (arunks.linux at gmail.com)
-Date: Tue,  6 May 2014 21:25:08 +0530
-Subject: arm64: Fix deadlock scenario with smp_send_stop()
-In-Reply-To: <1399391708-13442-1-git-send-email-arunks.linux@gmail.com>
-References: <1399391708-13442-1-git-send-email-arunks.linux@gmail.com>
-Message-ID: <1399391708-13442-2-git-send-email-arunks.linux@gmail.com>
+From: david.vrabel@citrix.com (David Vrabel)
+Date: Tue, 6 May 2014 16:54:29 +0100
+Subject: [Xen-devel] [PATCH] Xen: hibernation is x86-only at the moment
+In-Reply-To: <alpine.DEB.2.02.1405061402520.14596@kaball.uk.xensource.com>
+References: <5165529.jneGVBC5b5@wuerfel> <5360C1A7.8060401@citrix.com>
+ <alpine.DEB.2.02.1405061402520.14596@kaball.uk.xensource.com>
+Message-ID: <536905B5.6040900@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arun KS <arunks.linux@gmail.com>
+On 06/05/14 14:35, Stefano Stabellini wrote:
+> On Wed, 30 Apr 2014, David Vrabel wrote:
+>> On 29/04/14 21:00, Arnd Bergmann wrote:
+>>> In commit 603fb42a66499ab "ARM: 8011/1: ARM hibernation / suspend-to-disk",
+>>> currently in linux-next, the ARM architecture gains support for
+>>> hibernation (suspend-to-disk). Xen supports this in principle, but only
+>>> has an architecture specific hypercall defined on x86, which leads
+>>> to a build error when both hibernation and Xen support are enabled:
+>>>
+>>> drivers/xen/manage.c:105:2: error: implicit declaration of function 'HYPERVISOR_suspend' [-Werror=implicit-function-declaration]
+>>>   si->cancelled = HYPERVISOR_suspend(si->arg);
+>>>
+>>> It is probably a good idea to define this hypercall on ARM as well
+>>> and provide an implementation in the host, but until that is done,
+>>> this patch helps disable the broken code in the Xen guest by making
+>>> it depend on CONFIG_X86.
+> 
+> Thanks Arnd.
+> 
+> 
+>> Since this isn't a regression in 3.15-rcX can you provide the
+>> appropriate hypercall on ARM.  This does not require that there is an
+>> implementation on Xen.
+>>
+>> When the Xen implementation exists it will be easier to use if the
+>> support already exists in Linux.
+> 
+> 
+> The sched_on hypercall is already implemented on ARM.
+> However SCHEDOP_shutdown, defined as it is now, is unusable on ARM:
+> 
+> /*
+>  * Halt execution of this domain (all VCPUs) and notify the system controller.
+>  * @arg == pointer to sched_shutdown_t structure.
+>  *
+>  * If the sched_shutdown_t reason is SHUTDOWN_suspend then this
+>  * hypercall takes an additional extra argument which should be the
+>  * MFN of the guest's start_info_t.
+>  *
+>  * In addition, which reason is SHUTDOWN_suspend this hypercall
+>  * returns 1 if suspend was cancelled or the domain was merely
+>  * checkpointed, and 0 if it is resuming in a new domain.
+>  */
+> #define SCHEDOP_shutdown    2
+> 
+> 
+> We don't have a start_info, and even if we had, we wouldn't know the
+> MFN.
+> I think we should make it available on ARM only if we change the
+> interface making the third argument x86 only.  Of course that would
+> impact the linux side implementation too.
 
-If one process calls sys_reboot and that process then stops other
-CPUs while those CPUs are within a spin_lock() region we can
-potentially encounter a deadlock scenario like below.
+We do not want a different number of arguments to this hypercall.  Just
+pass 0 for the MFN.  This hypercall docs should be updated to say this.
 
-CPU 0                   CPU 1
------                   -----
-                        spin_lock(my_lock)
-smp_send_stop()
- <send IPI>             handle_IPI()
-                         disable_preemption/irqs
-                          while(1);
- <PREEMPT>
-spin_lock(my_lock) <--- Waits forever
+This doesn't seem any different to x86 HVM where the start_info_mfn
+parameter is also not relevant.
 
-We shouldn't attempt to run any other tasks after we send a stop
-IPI to a CPU so disable preemption so that this task runs to
-completion. We use local_irq_disable() here for cross-arch
-consistency with x86.
+	if (xen_hvm_domain()) {
+		si.arg = 0UL;
+		si.pre = NULL;
+		si.post = &xen_hvm_post_suspend;
+	} else {
+		si.arg = virt_to_mfn(xen_start_info);
+		si.pre = &xen_pre_suspend;
+		si.post = &xen_post_suspend;
+	}
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-Signed-off-by: Arun KS <getarunks@gmail.com>
-Signed-off-by: Arun KS <arunks.linux@gmail.com>
----
- arch/arm64/kernel/process.c |    5 +++--
- 1 files changed, 3 insertions(+), 2 deletions(-)
+Changing this to be !xen_pv_domain() would then do the right thing for arm.
 
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index 2d43614..abe57e0 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -134,6 +134,7 @@ void machine_shutdown(void)
-  */
- void machine_halt(void)
- {
-+	local_irq_disable();
- 	smp_send_stop();
- 	while (1);
- }
-@@ -146,6 +147,7 @@ void machine_halt(void)
-  */
- void machine_power_off(void)
- {
-+	local_irq_disable();
- 	smp_send_stop();
- 	if (pm_power_off)
- 		pm_power_off();
-@@ -164,10 +166,9 @@ void machine_power_off(void)
-  */
- void machine_restart(char *cmd)
- {
--	smp_send_stop();
--
- 	/* Disable interrupts first */
- 	local_irq_disable();
-+	smp_send_stop();
- 
- 	/* Now call the architecture specific reboot code. */
- 	if (arm_pm_restart)
--- 
-1.7.6
+David
