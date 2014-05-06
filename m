@@ -1,191 +1,213 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue,  6 May 2014 02:14:01 +0200
-Subject: [PATCH v3 06/20] usb: host: xhci-plat: Add support for the Armada 38x
+Date: Tue,  6 May 2014 02:14:12 +0200
+Subject: [PATCH v3 17/20] phy: Add support for USB cluster on the Armada 375
+ SoC
 In-Reply-To: <1399335255-589-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1399335255-589-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1399335255-589-7-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1399335255-589-18-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the Armada 38x SoCs which come with an xhci controller, specific
-initialization must be done during probe related to the MBus windows
-configuration. This patch adds the support of this quirk.
+The Armada 375 SoC comes with an USB2 host and device controller and
+an USB3 controller. The USB cluster control register allows to manage
+common features of both USB controllers. It uses the generic PHY
+framework
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/usb/host/Kconfig      |  7 +++++
- drivers/usb/host/Makefile     |  1 +
- drivers/usb/host/xhci-mvebu.c | 71 +++++++++++++++++++++++++++++++++++++++++++
- drivers/usb/host/xhci-mvebu.h | 21 +++++++++++++
- drivers/usb/host/xhci-plat.c  |  6 ++++
- 5 files changed, 106 insertions(+)
- create mode 100644 drivers/usb/host/xhci-mvebu.c
- create mode 100644 drivers/usb/host/xhci-mvebu.h
+ drivers/phy/Kconfig              |   5 ++
+ drivers/phy/Makefile             |   1 +
+ drivers/phy/phy-armada375-usb2.c | 154 +++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 160 insertions(+)
+ create mode 100644 drivers/phy/phy-armada375-usb2.c
 
-diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index 3d9e54062d62..e70943fac4a1 100644
---- a/drivers/usb/host/Kconfig
-+++ b/drivers/usb/host/Kconfig
-@@ -29,6 +29,13 @@ if USB_XHCI_HCD
- config USB_XHCI_PLATFORM
- 	tristate
+diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+index 3bb05f17b9b4..cdf3e2c24e3a 100644
+--- a/drivers/phy/Kconfig
++++ b/drivers/phy/Kconfig
+@@ -15,6 +15,11 @@ config GENERIC_PHY
+ 	  phy users can obtain reference to the PHY. All the users of this
+ 	  framework should select this config.
  
-+config USB_XHCI_MVEBU
-+	tristate "xHCI support for Marvell Armada 38x"
-+	select USB_XHCI_PLATFORM
-+	---help---
-+	  Say 'Y' to enable the support for the xHCI host controller
-+	  found in Marvell Armada 38x ARM SOCs.
++config ARMADA375_USBCLUSTER_PHY
++	def_bool y
++	depends on OF
++	select GENERIC_PHY
 +
- endif # USB_XHCI_HCD
+ config PHY_EXYNOS_MIPI_VIDEO
+ 	tristate "S5P/EXYNOS SoC series MIPI CSI-2/DSI PHY driver"
+ 	depends on HAS_IOMEM
+diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+index 2faf78edc864..47d5a86807b6 100644
+--- a/drivers/phy/Makefile
++++ b/drivers/phy/Makefile
+@@ -3,6 +3,7 @@
+ #
  
- config USB_EHCI_HCD
-diff --git a/drivers/usb/host/Makefile b/drivers/usb/host/Makefile
-index 7530468c9a4f..7a8db7f7dc01 100644
---- a/drivers/usb/host/Makefile
-+++ b/drivers/usb/host/Makefile
-@@ -19,6 +19,7 @@ xhci-hcd-$(CONFIG_PCI)	+= xhci-pci.o
- 
- ifneq ($(CONFIG_USB_XHCI_PLATFORM), )
- 	xhci-hcd-y		+= xhci-plat.o
-+	xhci-hcd-$(CONFIG_USB_XHCI_MVEBU)	+= xhci-mvebu.o
- endif
- 
- obj-$(CONFIG_USB_WHCI_HCD)	+= whci/
-diff --git a/drivers/usb/host/xhci-mvebu.c b/drivers/usb/host/xhci-mvebu.c
+ obj-$(CONFIG_GENERIC_PHY)		+= phy-core.o
++obj-$(CONFIG_ARMADA375_USBCLUSTER_PHY)	+= phy-armada375-usb2.o
+ obj-$(CONFIG_BCM_KONA_USB2_PHY)		+= phy-bcm-kona-usb2.o
+ obj-$(CONFIG_PHY_EXYNOS_DP_VIDEO)	+= phy-exynos-dp-video.o
+ obj-$(CONFIG_PHY_EXYNOS_MIPI_VIDEO)	+= phy-exynos-mipi-video.o
+diff --git a/drivers/phy/phy-armada375-usb2.c b/drivers/phy/phy-armada375-usb2.c
 new file mode 100644
-index 000000000000..bcfa61a13f5d
+index 000000000000..8bbac45e72c8
 --- /dev/null
-+++ b/drivers/usb/host/xhci-mvebu.c
-@@ -0,0 +1,71 @@
++++ b/drivers/phy/phy-armada375-usb2.c
+@@ -0,0 +1,154 @@
 +/*
-+ * Copyright (C) 2014 Marvell
-+ * Author: Gregory CLEMENT <gregory.clement@free-electrons.com>
++ * USB cluster support for Armada 375 platform.
 + *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * version 2 as published by the Free Software Foundation.
-+ */
-+
-+#include <linux/io.h>
-+#include <linux/mbus.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+
-+#define USB3_MAX_WINDOWS	4
-+#define USB3_WIN_CTRL(w)	(0x0 + ((w) * 8))
-+#define USB3_WIN_BASE(w)	(0x4 + ((w) * 8))
-+
-+static void __init xhci_mvebu_mbus_config(void __iomem *base,
-+			const struct mbus_dram_target_info *dram)
-+{
-+	int win;
-+
-+	/* Clear all existing windows */
-+	for (win = 0; win < USB3_MAX_WINDOWS; win++) {
-+		writel(0, base + USB3_WIN_CTRL(win));
-+		writel(0, base + USB3_WIN_BASE(win));
-+	}
-+
-+	/* Program each DRAM CS in a seperate window */
-+	for (win = 0; win < dram->num_cs; win++) {
-+		const struct mbus_dram_window *cs = dram->cs + win;
-+
-+		writel(((cs->size - 1) & 0xffff0000) | (cs->mbus_attr << 8) |
-+		       (dram->mbus_dram_target_id << 4) | 1,
-+		       base + USB3_WIN_CTRL(win));
-+
-+		writel((cs->base & 0xffff0000), base + USB3_WIN_BASE(win));
-+	}
-+}
-+
-+int xhci_mvebu_mbus_init_quirk(struct platform_device *pdev)
-+{
-+	struct resource	*res;
-+	void __iomem	*base;
-+	const struct mbus_dram_target_info *dram;
-+	int ret = 0;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	if (!res)
-+		return -ENODEV;
-+
-+	/*
-+	 * We don't use devm_ioremap() because this mapping should
-+	 * only exists for the duration of this probe function.
-+	 */
-+	base = ioremap(res->start, resource_size(res));
-+	if (!base)
-+		return -ENODEV;
-+
-+	dram = mv_mbus_dram_info();
-+	xhci_mvebu_mbus_config(base, dram);
-+
-+	/*
-+	 * This memory area was only needed to configure the MBus
-+	 * windows, and is therefore no longer useful.
-+	 */
-+	iounmap(base);
-+
-+	return ret;
-+}
-diff --git a/drivers/usb/host/xhci-mvebu.h b/drivers/usb/host/xhci-mvebu.h
-new file mode 100644
-index 000000000000..61d09b6e8443
---- /dev/null
-+++ b/drivers/usb/host/xhci-mvebu.h
-@@ -0,0 +1,21 @@
-+/*
 + * Copyright (C) 2014 Marvell
 + *
-+ * Gregory Clement <gregory.clement@free-electrons.com>
++ * Gregory CLEMENT <gregory.clement@free-electrons.com>
 + *
 + * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
++ * License version 2 or later. This program is licensed "as is"
++ * without any warranty of any kind, whether express or implied.
++ *
++ * Armada 375 comes with an USB2 host and device controller and an
++ * USB3 controller. The USB cluster control register allows to manage
++ * common features of both USB controller.
 + */
 +
-+#ifndef __LINUX_XHCI_MVEBU_H
-+#define __LINUX_XHCI_MVEBU_H
-+#if IS_ENABLED(CONFIG_USB_XHCI_MVEBU)
-+int xhci_mvebu_mbus_init_quirk(struct platform_device *pdev);
-+#else
-+static inline int xhci_mvebu_mbus_init_quirk(struct device dev)
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/of_address.h>
++#include <linux/phy/phy.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
++
++#define USB2_PHY_CONFIG_ENABLE BIT(0) /* active low */
++
++/* the USB cluster allow to choose between two PHYs*/
++#define NB_PHY 2
++
++enum {
++	PHY_USB2 = 0,
++	PHY_USB3 = 1,
++};
++
++struct armada375_cluster_phy {
++	struct phy *phy;
++	void __iomem *reg;
++	bool enable;
++	bool use_usb3;
++};
++
++struct armada375_cluster_phy usb_cluster_phy[NB_PHY];
++
++static int armada375_usb_phy_init(struct phy *phy)
 +{
++	struct armada375_cluster_phy *cluster_phy = phy_get_drvdata(phy);
++	u32 reg;
++
++	if (cluster_phy->enable) {
++		reg = readl(cluster_phy->reg);
++		if (cluster_phy->use_usb3)
++			reg |= USB2_PHY_CONFIG_ENABLE;
++		else
++			reg &= ~USB2_PHY_CONFIG_ENABLE;
++		writel(reg, cluster_phy->reg);
++
++		return 0;
++	} else {
++		return -ENODEV;
++	}
++}
++
++static struct phy_ops armada375_usb_phy_ops = {
++	.init = armada375_usb_phy_init,
++	.owner		= THIS_MODULE,
++};
++
++static struct phy *armada375_usb_phy_xlate(struct device *dev,
++					struct of_phandle_args *args)
++{
++	if (WARN_ON(args->args[0] >= NB_PHY))
++		return ERR_PTR(-ENODEV);
++
++	return usb_cluster_phy[args->args[0]].phy;
++}
++
++static int armada375_usb_phy_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct phy *phy;
++	struct device_node *np = dev->of_node;
++	struct phy_provider *phy_provider;
++	void __iomem *usb_cluster_base;
++	struct device_node *xhci_node;
++	int i;
++
++	usb_cluster_base = of_iomap(np, 0);
++	BUG_ON(!usb_cluster_base);
++
++	for (i = 0; i < NB_PHY; i++) {
++		phy = devm_phy_create(dev, &armada375_usb_phy_ops, NULL);
++		if (IS_ERR(phy))
++			dev_err(dev, "failed to create PHY n%d\n", i);
++
++		usb_cluster_phy[i].phy = phy;
++		usb_cluster_phy[i].reg = usb_cluster_base;
++		usb_cluster_phy[i].enable = false;
++		phy_set_drvdata(phy, &usb_cluster_phy[i]);
++	}
++
++	usb_cluster_phy[PHY_USB2].use_usb3 = false;
++	usb_cluster_phy[PHY_USB3].use_usb3 = true;
++
++	/*
++	 * We can't use the first usb2 unit and usb3@the same time
++	 * to manage a USB2 device, so let's disable usb2 if usb3 is
++	 * slelected. In this case USB2 device will be managed by the
++	 * xhci controller.
++	 */
++
++	xhci_node = of_find_compatible_node(NULL, NULL,
++					"marvell,armada-375-xhci");
++
++	if (xhci_node && of_device_is_available(xhci_node)) {
++		usb_cluster_phy[PHY_USB3].enable = true;
++	} else {
++		struct device_node *ehci_node;
++		ehci_node = of_find_compatible_node(NULL, NULL,
++					"marvell,orion-ehci");
++		if (ehci_node && of_device_is_available(ehci_node))
++			usb_cluster_phy[PHY_USB2].enable = true;
++		of_node_put(ehci_node);
++	}
++
++	of_node_put(xhci_node);
++
++	phy_provider = devm_of_phy_provider_register(&pdev->dev,
++						     armada375_usb_phy_xlate);
++	if (IS_ERR(phy_provider))
++		return PTR_ERR(phy_provider);
++
 +	return 0;
 +}
-+#endif
-+#endif /* __LINUX_XHCI_MVEBU_H */
-diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-index bb37b941c8ec..d12ba56f52da 100644
---- a/drivers/usb/host/xhci-plat.c
-+++ b/drivers/usb/host/xhci-plat.c
-@@ -19,6 +19,7 @@
- #include <linux/slab.h>
- 
- #include "xhci.h"
-+#include "xhci-mvebu.h"
- 
- struct xhci_plat_priv {
- 	struct clk *clk;
-@@ -147,6 +148,10 @@ static int xhci_plat_probe(struct platform_device *pdev)
- 	if (!res)
- 		return -ENODEV;
- 
-+	if (of_device_is_compatible(pdev->dev.of_node,
-+					"marvell,armada-380-xhci"))
-+		xhci_mvebu_mbus_init_quirk(pdev);
 +
- 	/* Initialize dma_mask and coherent_dma_mask to 32-bits */
- 	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
- 	if (ret)
-@@ -282,6 +287,7 @@ static const struct dev_pm_ops xhci_plat_pm_ops = {
- static const struct of_device_id usb_xhci_of_match[] = {
- 	{ .compatible = "generic-xhci" },
- 	{ .compatible = "xhci-platform" },
-+	{ .compatible = "marvell,armada-380-xhci"},
- 	{ },
- };
- MODULE_DEVICE_TABLE(of, usb_xhci_of_match);
++static const struct of_device_id of_usb_cluster_table[] = {
++	{ .compatible = "marvell,armada-375-usb-cluster", },
++	{ /* end of list */ },
++};
++MODULE_DEVICE_TABLE(of, of_usb_cluster_table);
++
++static struct platform_driver armada375_usb_phy_driver = {
++	.probe	= armada375_usb_phy_probe,
++	.driver = {
++		.of_match_table	= of_usb_cluster_table,
++		.name  = "armada-375-usb-cluster",
++		.owner = THIS_MODULE,
++	}
++};
++module_platform_driver(armada375_usb_phy_driver);
++
++MODULE_DESCRIPTION("Armada 375 USB cluster driver");
++MODULE_AUTHOR("Gregory CLEMENT <gregory.clement@free-electrons.com>");
++MODULE_LICENSE("GPL");
 -- 
 1.8.1.2
