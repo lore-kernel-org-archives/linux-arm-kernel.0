@@ -1,235 +1,188 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Tue, 06 May 2014 17:51:17 +0900
-Subject: [PATCH v2 1/6] i2c: s3c2410: Moving I2C interrupt re-configuration
- code into i2c driver
+Date: Tue, 06 May 2014 17:51:18 +0900
+Subject: [PATCH v2 2/6] ARM: EXYNOS: Move SYS_I2C_CFG register save/restore to
+ i2c driver
 In-Reply-To: <1399366282-4191-1-git-send-email-pankaj.dubey@samsung.com>
 References: <1399366282-4191-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1399366282-4191-2-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1399366282-4191-3-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let's move I2C interrupt re-configuration code from machine
-file exynos.c to I2C driver. Since only Exynos5250, and
-Exynos5420 need to do this, added syscon based phandle to
-i2c device nodes of respective SoC DT files.
+Let's move SYS_I2C_CFG register save/restore during s2r into i2c driver.
+This will help in removing static iodesc based mapping from exynos.c.
+Also will help in removing SoC specific checks in pm.c making it
+more independent of such macros.
 
-CC: Rob Herring <robh+dt@kernel.org>
-CC: Randy Dunlap <rdunlap@infradead.org>
 CC: Wolfram Sang <wsa@the-dreams.de>
 CC: Russell King <linux@arm.linux.org.uk>
-CC: devicetree at vger.kernel.org
-CC: linux-doc at vger.kernel.org
 CC: linux-i2c at vger.kernel.org
 Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 ---
- .../devicetree/bindings/arm/samsung/sysreg.txt     |    1 +
- arch/arm/boot/dts/exynos5.dtsi                     |    5 ++++
- arch/arm/boot/dts/exynos5250.dtsi                  |    4 +++
- arch/arm/boot/dts/exynos5420.dtsi                  |    4 +++
- arch/arm/mach-exynos/exynos.c                      |   26 -------------------
- drivers/i2c/busses/i2c-s3c2410.c                   |   27 ++++++++++++++++++++
- 6 files changed, 41 insertions(+), 26 deletions(-)
+ arch/arm/mach-exynos/exynos.c           |   12 +-----------
+ arch/arm/mach-exynos/include/mach/map.h |    3 ---
+ arch/arm/mach-exynos/pm.c               |   10 ----------
+ arch/arm/mach-exynos/regs-sys.h         |   22 ----------------------
+ drivers/i2c/busses/i2c-s3c2410.c        |    8 ++++++++
+ 5 files changed, 9 insertions(+), 46 deletions(-)
+ delete mode 100644 arch/arm/mach-exynos/regs-sys.h
 
-diff --git a/Documentation/devicetree/bindings/arm/samsung/sysreg.txt b/Documentation/devicetree/bindings/arm/samsung/sysreg.txt
-index 0ab3251..fd71581 100644
---- a/Documentation/devicetree/bindings/arm/samsung/sysreg.txt
-+++ b/Documentation/devicetree/bindings/arm/samsung/sysreg.txt
-@@ -3,6 +3,7 @@ SAMSUNG S5P/Exynos SoC series System Registers (SYSREG)
- Properties:
-  - compatible : should contain "samsung,<chip name>-sysreg", "syscon";
-    For Exynos4 SoC series it should be "samsung,exynos4-sysreg", "syscon";
-+   For Exynos5 SoC series it should be "samsung,exynos5-sysreg", "syscon";
-  - reg : offset and length of the register set.
- 
- Example:
-diff --git a/arch/arm/boot/dts/exynos5.dtsi b/arch/arm/boot/dts/exynos5.dtsi
-index 79d0608..3027e37 100644
---- a/arch/arm/boot/dts/exynos5.dtsi
-+++ b/arch/arm/boot/dts/exynos5.dtsi
-@@ -99,4 +99,9 @@
- 		#size-cells = <0>;
- 		status = "disabled";
- 	};
-+
-+	sys_reg: syscon at 10050000 {
-+		compatible = "samsung,exynos5-sysreg", "syscon";
-+		reg = <0x10050000 0x400>;
-+	};
- };
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index 8d724d5..46f0233 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -285,6 +285,7 @@
- 		clock-names = "i2c";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&i2c0_bus>;
-+		samsung,syscon-phandle = <&sys_reg>;
- 		status = "disabled";
- 	};
- 
-@@ -298,6 +299,7 @@
- 		clock-names = "i2c";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&i2c1_bus>;
-+		samsung,syscon-phandle = <&sys_reg>;
- 		status = "disabled";
- 	};
- 
-@@ -311,6 +313,7 @@
- 		clock-names = "i2c";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&i2c2_bus>;
-+		samsung,syscon-phandle = <&sys_reg>;
- 		status = "disabled";
- 	};
- 
-@@ -324,6 +327,7 @@
- 		clock-names = "i2c";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&i2c3_bus>;
-+		samsung,syscon-phandle = <&sys_reg>;
- 		status = "disabled";
- 	};
- 
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index ff496ad..762128c 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -517,6 +517,7 @@
- 		clock-names = "i2c";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&i2c0_bus>;
-+		samsung,syscon-phandle = <&sys_reg>;
- 		status = "disabled";
- 	};
- 
-@@ -530,6 +531,7 @@
- 		clock-names = "i2c";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&i2c1_bus>;
-+		samsung,syscon-phandle = <&sys_reg>;
- 		status = "disabled";
- 	};
- 
-@@ -543,6 +545,7 @@
- 		clock-names = "i2c";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&i2c2_bus>;
-+		samsung,syscon-phandle = <&sys_reg>;
- 		status = "disabled";
- 	};
- 
-@@ -556,6 +559,7 @@
- 		clock-names = "i2c";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&i2c3_bus>;
-+		samsung,syscon-phandle = <&sys_reg>;
- 		status = "disabled";
- 	};
- 
 diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-index 59eb1f1..54ae2e1 100644
+index 54ae2e1..09063ee 100644
 --- a/arch/arm/mach-exynos/exynos.c
 +++ b/arch/arm/mach-exynos/exynos.c
-@@ -293,32 +293,6 @@ void __init exynos_map_pmu(void)
+@@ -29,11 +29,11 @@
+ #include <asm/memory.h>
  
- static void __init exynos_dt_machine_init(void)
- {
--	struct device_node *i2c_np;
--	const char *i2c_compat = "samsung,s3c2440-i2c";
--	unsigned int tmp;
--	int id;
--
--	/*
--	 * Exynos5's legacy i2c controller and new high speed i2c
--	 * controller have muxed interrupt sources. By default the
--	 * interrupts for 4-channel HS-I2C controller are enabled.
--	 * If node for first four channels of legacy i2c controller
--	 * are available then re-configure the interrupts via the
--	 * system register.
--	 */
--	if (soc_is_exynos5()) {
--		for_each_compatible_node(i2c_np, NULL, i2c_compat) {
--			if (of_device_is_available(i2c_np)) {
--				id = of_alias_get_id(i2c_np, "i2c");
--				if (id < 4) {
--					tmp = readl(EXYNOS5_SYS_I2C_CFG);
--					writel(tmp & ~(0x1 << id),
--							EXYNOS5_SYS_I2C_CFG);
--				}
--			}
--		}
--	}
--
- 	exynos_map_pmu();
+ #include <plat/cpu.h>
++#include <mach/map.h>
  
- 	if (!soc_is_exynos5440())
+ #include "common.h"
+ #include "mfc.h"
+ #include "regs-pmu.h"
+-#include "regs-sys.h"
+ 
+ #define L2_AUX_VAL 0x7C470001
+ #define L2_AUX_MASK 0xC200ffff
+@@ -42,11 +42,6 @@ static struct regmap *exynos_pmu_regmap;
+ 
+ static struct map_desc exynos4_iodesc[] __initdata = {
+ 	{
+-		.virtual	= (unsigned long)S3C_VA_SYS,
+-		.pfn		= __phys_to_pfn(EXYNOS4_PA_SYSCON),
+-		.length		= SZ_64K,
+-		.type		= MT_DEVICE,
+-	}, {
+ 		.virtual	= (unsigned long)S3C_VA_TIMER,
+ 		.pfn		= __phys_to_pfn(EXYNOS4_PA_TIMER),
+ 		.length		= SZ_16K,
+@@ -116,11 +111,6 @@ static struct map_desc exynos4_iodesc[] __initdata = {
+ 
+ static struct map_desc exynos5_iodesc[] __initdata = {
+ 	{
+-		.virtual	= (unsigned long)S3C_VA_SYS,
+-		.pfn		= __phys_to_pfn(EXYNOS5_PA_SYSCON),
+-		.length		= SZ_64K,
+-		.type		= MT_DEVICE,
+-	}, {
+ 		.virtual	= (unsigned long)S3C_VA_TIMER,
+ 		.pfn		= __phys_to_pfn(EXYNOS5_PA_TIMER),
+ 		.length		= SZ_16K,
+diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
+index 34eee6e..bd4a320 100644
+--- a/arch/arm/mach-exynos/include/mach/map.h
++++ b/arch/arm/mach-exynos/include/mach/map.h
+@@ -25,9 +25,6 @@
+ 
+ #define EXYNOS_PA_CHIPID		0x10000000
+ 
+-#define EXYNOS4_PA_SYSCON		0x10010000
+-#define EXYNOS5_PA_SYSCON		0x10050100
+-
+ #define EXYNOS4_PA_CMU			0x10030000
+ #define EXYNOS5_PA_CMU			0x10010000
+ 
+diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+index a7a1b7f..59e5604 100644
+--- a/arch/arm/mach-exynos/pm.c
++++ b/arch/arm/mach-exynos/pm.c
+@@ -37,7 +37,6 @@
+ 
+ #include "common.h"
+ #include "regs-pmu.h"
+-#include "regs-sys.h"
+ #include "exynos-pmu.h"
+ 
+ static struct regmap *pmu_regmap;
+@@ -52,10 +51,6 @@ struct exynos_wkup_irq {
+ 	u32 mask;
+ };
+ 
+-static struct sleep_save exynos5_sys_save[] = {
+-	SAVE_ITEM(EXYNOS5_SYS_I2C_CFG),
+-};
+-
+ static struct sleep_save exynos_core_save[] = {
+ 	/* SROM side */
+ 	SAVE_ITEM(S5P_SROM_BW),
+@@ -211,7 +206,6 @@ static void exynos_pm_prepare(void)
+ 	s3c_pm_do_save(exynos_core_save, ARRAY_SIZE(exynos_core_save));
+ 
+ 	if (soc_is_exynos5250()) {
+-		s3c_pm_do_save(exynos5_sys_save, ARRAY_SIZE(exynos5_sys_save));
+ 		/* Disable USE_RETENTION of JPEG_MEM_OPTION */
+ 		regmap_read(pmu_regmap, EXYNOS5_JPEG_MEM_OPTION, &tmp);
+ 		tmp &= ~EXYNOS5_OPTION_USE_RETENTION;
+@@ -296,10 +290,6 @@ static void exynos_pm_resume(void)
+ 	regmap_write(pmu_regmap, S5P_PAD_RET_EBIA_OPTION, (1 << 28));
+ 	regmap_write(pmu_regmap, S5P_PAD_RET_EBIB_OPTION, (1 << 28));
+ 
+-	if (soc_is_exynos5250())
+-		s3c_pm_do_restore(exynos5_sys_save,
+-			ARRAY_SIZE(exynos5_sys_save));
+-
+ 	s3c_pm_do_restore_core(exynos_core_save, ARRAY_SIZE(exynos_core_save));
+ 
+ 	if (!soc_is_exynos5250())
+diff --git a/arch/arm/mach-exynos/regs-sys.h b/arch/arm/mach-exynos/regs-sys.h
+deleted file mode 100644
+index 84332b0..0000000
+--- a/arch/arm/mach-exynos/regs-sys.h
++++ /dev/null
+@@ -1,22 +0,0 @@
+-/*
+- * Copyright (c) 2014 Samsung Electronics Co., Ltd.
+- *             http://www.samsung.com
+- *
+- * EXYNOS - system register definition
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
+-
+-#ifndef __ASM_ARCH_REGS_SYS_H
+-#define __ASM_ARCH_REGS_SYS_H __FILE__
+-
+-#include <mach/map.h>
+-
+-#define S5P_SYSREG(x)                          (S3C_VA_SYS + (x))
+-
+-/* For EXYNOS5 */
+-#define EXYNOS5_SYS_I2C_CFG                    S5P_SYSREG(0x0234)
+-
+-#endif /* __ASM_ARCH_REGS_SYS_H */
 diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
-index ae44910..0420150 100644
+index 0420150..2095a01 100644
 --- a/drivers/i2c/busses/i2c-s3c2410.c
 +++ b/drivers/i2c/busses/i2c-s3c2410.c
-@@ -39,6 +39,8 @@
- #include <linux/of.h>
- #include <linux/of_gpio.h>
- #include <linux/pinctrl/consumer.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/regmap.h>
- 
- #include <asm/irq.h>
- 
-@@ -91,6 +93,9 @@
- /* Max time to wait for bus to become idle after a xfer (in us) */
- #define S3C2410_IDLE_TIMEOUT	5000
- 
-+/* Exynos5 Sysreg offset */
-+#define EXYNOS5_SYS_I2C_CFG	0x0234
-+
- /* i2c controller state */
- enum s3c24xx_i2c_state {
- 	STATE_IDLE,
-@@ -127,6 +132,7 @@ struct s3c24xx_i2c {
- #if defined(CONFIG_ARM_S3C24XX_CPUFREQ)
+@@ -133,6 +133,7 @@ struct s3c24xx_i2c {
  	struct notifier_block	freq_transition;
  #endif
-+	struct regmap		*sysreg;
+ 	struct regmap		*sysreg;
++	unsigned int		syc_cfg;
  };
  
  static struct platform_device_id s3c24xx_driver_ids[] = {
-@@ -1075,6 +1081,8 @@ static void
- s3c24xx_i2c_parse_dt(struct device_node *np, struct s3c24xx_i2c *i2c)
- {
- 	struct s3c2410_platform_i2c *pdata = i2c->pdata;
-+	unsigned int tmp;
-+	int id;
+@@ -1293,6 +1294,9 @@ static int s3c24xx_i2c_suspend_noirq(struct device *dev)
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct s3c24xx_i2c *i2c = platform_get_drvdata(pdev);
  
- 	if (!np)
- 		return;
-@@ -1084,6 +1092,25 @@ s3c24xx_i2c_parse_dt(struct device_node *np, struct s3c24xx_i2c *i2c)
- 	of_property_read_u32(np, "samsung,i2c-slave-addr", &pdata->slave_addr);
- 	of_property_read_u32(np, "samsung,i2c-max-bus-freq",
- 				(u32 *)&pdata->frequency);
-+	/*
-+	 * Exynos5's legacy i2c controller and new high speed i2c
-+	 * controller have muxed interrupt sources. By default the
-+	 * interrupts for 4-channel HS-I2C controller are enabled.
-+	 * If node for first four channels of legacy i2c controller
-+	 * are available then re-configure the interrupts via the
-+	 * system register.
-+	 */
-+	id = of_alias_get_id(np, "i2c");
-+	i2c->sysreg = syscon_regmap_lookup_by_phandle(np,
-+			"samsung,syscon-phandle");
-+	if (IS_ERR(i2c->sysreg)) {
-+		i2c->sysreg = NULL;
-+		/* As this is not compulsary do not return error */
-+		pr_info("i2c-%d skipping re-configuration of interrutps\n", id);
-+		return;
-+	}
-+	regmap_read(i2c->sysreg, EXYNOS5_SYS_I2C_CFG, &tmp);
-+	regmap_write(i2c->sysreg, EXYNOS5_SYS_I2C_CFG, tmp & ~(0x1 << id));
- }
- #else
- static void
++	if (i2c->sysreg)
++		regmap_read(i2c->sysreg, EXYNOS5_SYS_I2C_CFG, &i2c->syc_cfg);
++
+ 	i2c->suspended = 1;
+ 
+ 	return 0;
+@@ -1304,6 +1308,10 @@ static int s3c24xx_i2c_resume(struct device *dev)
+ 	struct s3c24xx_i2c *i2c = platform_get_drvdata(pdev);
+ 
+ 	i2c->suspended = 0;
++
++	if (i2c->sysreg)
++		regmap_write(i2c->sysreg, i2c->syc_cfg, EXYNOS5_SYS_I2C_CFG);
++
+ 	clk_prepare_enable(i2c->clk);
+ 	s3c24xx_i2c_init(i2c);
+ 	clk_disable_unprepare(i2c->clk);
 -- 
 1.7.10.4
