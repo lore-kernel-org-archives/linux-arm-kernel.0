@@ -1,148 +1,191 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue,  6 May 2014 02:14:00 +0200
-Subject: [PATCH v3 05/20] usb: host: xhci-plat: Add clocks support
+Date: Tue,  6 May 2014 02:14:01 +0200
+Subject: [PATCH v3 06/20] usb: host: xhci-plat: Add support for the Armada 38x
 In-Reply-To: <1399335255-589-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1399335255-589-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1399335255-589-6-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1399335255-589-7-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some platform (such as the Armada 38x ones) can gate the clock of
-their USB controller. This patch add the support for the clock, by
-enabling them during probe and disabling them on remove.
-
-As not all platforms have clock support then enabling and disabling
-the clocks have been placed in separate functions. Then if the clocks
-are not supported we still can use the same calls, and there is no
+For the Armada 38x SoCs which come with an xhci controller, specific
+initialization must be done during probe related to the MBus windows
+configuration. This patch adds the support of this quirk.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/usb/host/xhci-plat.c | 57 +++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 54 insertions(+), 3 deletions(-)
+ drivers/usb/host/Kconfig      |  7 +++++
+ drivers/usb/host/Makefile     |  1 +
+ drivers/usb/host/xhci-mvebu.c | 71 +++++++++++++++++++++++++++++++++++++++++++
+ drivers/usb/host/xhci-mvebu.h | 21 +++++++++++++
+ drivers/usb/host/xhci-plat.c  |  6 ++++
+ 5 files changed, 106 insertions(+)
+ create mode 100644 drivers/usb/host/xhci-mvebu.c
+ create mode 100644 drivers/usb/host/xhci-mvebu.h
 
-diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-index f5351af4b2c5..bb37b941c8ec 100644
---- a/drivers/usb/host/xhci-plat.c
-+++ b/drivers/usb/host/xhci-plat.c
-@@ -11,6 +11,7 @@
-  * version 2 as published by the Free Software Foundation.
-  */
+diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+index 3d9e54062d62..e70943fac4a1 100644
+--- a/drivers/usb/host/Kconfig
++++ b/drivers/usb/host/Kconfig
+@@ -29,6 +29,13 @@ if USB_XHCI_HCD
+ config USB_XHCI_PLATFORM
+ 	tristate
  
-+#include <linux/clk.h>
- #include <linux/dma-mapping.h>
- #include <linux/module.h>
- #include <linux/of.h>
-@@ -19,6 +20,10 @@
- 
- #include "xhci.h"
- 
-+struct xhci_plat_priv {
-+	struct clk *clk;
-+};
++config USB_XHCI_MVEBU
++	tristate "xHCI support for Marvell Armada 38x"
++	select USB_XHCI_PLATFORM
++	---help---
++	  Say 'Y' to enable the support for the xHCI host controller
++	  found in Marvell Armada 38x ARM SOCs.
 +
- static void xhci_plat_quirks(struct device *dev, struct xhci_hcd *xhci)
- {
- 	/*
-@@ -38,7 +43,8 @@ static int xhci_plat_setup(struct usb_hcd *hcd)
- static const struct hc_driver xhci_plat_xhci_driver = {
- 	.description =		"xhci-hcd",
- 	.product_desc =		"xHCI Host Controller",
--	.hcd_priv_size =	sizeof(struct xhci_hcd *),
-+	.hcd_priv_size =	sizeof(struct xhci_hcd *) +
-+				sizeof(struct xhci_plat_priv),
+ endif # USB_XHCI_HCD
  
- 	/*
- 	 * generic hardware linkage
-@@ -85,6 +91,40 @@ static const struct hc_driver xhci_plat_xhci_driver = {
- 	.bus_resume =		xhci_bus_resume,
- };
+ config USB_EHCI_HCD
+diff --git a/drivers/usb/host/Makefile b/drivers/usb/host/Makefile
+index 7530468c9a4f..7a8db7f7dc01 100644
+--- a/drivers/usb/host/Makefile
++++ b/drivers/usb/host/Makefile
+@@ -19,6 +19,7 @@ xhci-hcd-$(CONFIG_PCI)	+= xhci-pci.o
  
-+static int xhci_plat_enable_clk(struct platform_device *pdev)
+ ifneq ($(CONFIG_USB_XHCI_PLATFORM), )
+ 	xhci-hcd-y		+= xhci-plat.o
++	xhci-hcd-$(CONFIG_USB_XHCI_MVEBU)	+= xhci-mvebu.o
+ endif
+ 
+ obj-$(CONFIG_USB_WHCI_HCD)	+= whci/
+diff --git a/drivers/usb/host/xhci-mvebu.c b/drivers/usb/host/xhci-mvebu.c
+new file mode 100644
+index 000000000000..bcfa61a13f5d
+--- /dev/null
++++ b/drivers/usb/host/xhci-mvebu.c
+@@ -0,0 +1,71 @@
++/*
++ * Copyright (C) 2014 Marvell
++ * Author: Gregory CLEMENT <gregory.clement@free-electrons.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * version 2 as published by the Free Software Foundation.
++ */
++
++#include <linux/io.h>
++#include <linux/mbus.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++
++#define USB3_MAX_WINDOWS	4
++#define USB3_WIN_CTRL(w)	(0x0 + ((w) * 8))
++#define USB3_WIN_BASE(w)	(0x4 + ((w) * 8))
++
++static void __init xhci_mvebu_mbus_config(void __iomem *base,
++			const struct mbus_dram_target_info *dram)
 +{
-+	struct usb_hcd *hcd = platform_get_drvdata(pdev);
-+	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
-+	struct xhci_plat_priv *priv = (struct xhci_plat_priv *) xhci->priv;
++	int win;
 +
-+	priv->clk = devm_clk_get(&pdev->dev, NULL);
-+
-+	/*
-+	 * Not all platforms have a clk so it is not an error if the
-+	 * clock does not exists.
-+	 */
-+	if (IS_ERR(priv->clk))
-+		return 0;
-+
-+	return clk_prepare_enable(priv->clk);
-+}
-+
-+static void xhci_plat_disable_clk(struct platform_device *pdev)
-+{
-+	struct usb_hcd *hcd = platform_get_drvdata(pdev);
-+	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
-+	struct xhci_plat_priv *priv = (struct xhci_plat_priv *) xhci->priv;
-+
-+	/*
-+	 * Not all platforms have a clk so it is not an error if the
-+	 * clock does not exists.
-+	 */
-+	if (IS_ERR(priv->clk))
-+		return;
-+
-+	clk_disable_unprepare(priv->clk);
-+}
-+
- static int xhci_plat_probe(struct platform_device *pdev)
- {
- 	const struct hc_driver	*driver;
-@@ -118,7 +158,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
- 
- 	hcd = usb_create_hcd(driver, &pdev->dev, dev_name(&pdev->dev));
- 	if (!hcd)
--		return -ENOMEM;
-+		ret = -ENOMEM;
- 
- 	hcd->rsrc_start = res->start;
- 	hcd->rsrc_len = resource_size(res);
-@@ -140,6 +180,13 @@ static int xhci_plat_probe(struct platform_device *pdev)
- 	ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
- 	if (ret)
- 		goto unmap_registers;
-+
-+	ret = xhci_plat_enable_clk(pdev);
-+	if (ret) {
-+		dev_dbg(&pdev->dev, "error enabling clocks\n");
-+		goto dealloc_usb2_hcd;
++	/* Clear all existing windows */
++	for (win = 0; win < USB3_MAX_WINDOWS; win++) {
++		writel(0, base + USB3_WIN_CTRL(win));
++		writel(0, base + USB3_WIN_BASE(win));
 +	}
 +
- 	device_wakeup_enable(hcd->self.controller);
- 
- 	/* USB 2.0 roothub is stored in the platform_device now. */
-@@ -149,7 +196,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
- 			dev_name(&pdev->dev), hcd);
- 	if (!xhci->shared_hcd) {
- 		ret = -ENOMEM;
--		goto dealloc_usb2_hcd;
-+		goto disable_clk;
- 	}
- 
- 	/*
-@@ -170,6 +217,9 @@ static int xhci_plat_probe(struct platform_device *pdev)
- put_usb3_hcd:
- 	usb_put_hcd(xhci->shared_hcd);
- 
-+disable_clk:
-+	xhci_plat_disable_clk(pdev);
++	/* Program each DRAM CS in a seperate window */
++	for (win = 0; win < dram->num_cs; win++) {
++		const struct mbus_dram_window *cs = dram->cs + win;
 +
- dealloc_usb2_hcd:
- 	usb_remove_hcd(hcd);
++		writel(((cs->size - 1) & 0xffff0000) | (cs->mbus_attr << 8) |
++		       (dram->mbus_dram_target_id << 4) | 1,
++		       base + USB3_WIN_CTRL(win));
++
++		writel((cs->base & 0xffff0000), base + USB3_WIN_BASE(win));
++	}
++}
++
++int xhci_mvebu_mbus_init_quirk(struct platform_device *pdev)
++{
++	struct resource	*res;
++	void __iomem	*base;
++	const struct mbus_dram_target_info *dram;
++	int ret = 0;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
++	if (!res)
++		return -ENODEV;
++
++	/*
++	 * We don't use devm_ioremap() because this mapping should
++	 * only exists for the duration of this probe function.
++	 */
++	base = ioremap(res->start, resource_size(res));
++	if (!base)
++		return -ENODEV;
++
++	dram = mv_mbus_dram_info();
++	xhci_mvebu_mbus_config(base, dram);
++
++	/*
++	 * This memory area was only needed to configure the MBus
++	 * windows, and is therefore no longer useful.
++	 */
++	iounmap(base);
++
++	return ret;
++}
+diff --git a/drivers/usb/host/xhci-mvebu.h b/drivers/usb/host/xhci-mvebu.h
+new file mode 100644
+index 000000000000..61d09b6e8443
+--- /dev/null
++++ b/drivers/usb/host/xhci-mvebu.h
+@@ -0,0 +1,21 @@
++/*
++ * Copyright (C) 2014 Marvell
++ *
++ * Gregory Clement <gregory.clement@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifndef __LINUX_XHCI_MVEBU_H
++#define __LINUX_XHCI_MVEBU_H
++#if IS_ENABLED(CONFIG_USB_XHCI_MVEBU)
++int xhci_mvebu_mbus_init_quirk(struct platform_device *pdev);
++#else
++static inline int xhci_mvebu_mbus_init_quirk(struct device dev)
++{
++	return 0;
++}
++#endif
++#endif /* __LINUX_XHCI_MVEBU_H */
+diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+index bb37b941c8ec..d12ba56f52da 100644
+--- a/drivers/usb/host/xhci-plat.c
++++ b/drivers/usb/host/xhci-plat.c
+@@ -19,6 +19,7 @@
+ #include <linux/slab.h>
  
-@@ -193,6 +243,7 @@ static int xhci_plat_remove(struct platform_device *dev)
- 	usb_remove_hcd(xhci->shared_hcd);
- 	usb_put_hcd(xhci->shared_hcd);
+ #include "xhci.h"
++#include "xhci-mvebu.h"
  
-+	xhci_plat_disable_clk(dev);
- 	usb_remove_hcd(hcd);
- 	iounmap(hcd->regs);
- 	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
+ struct xhci_plat_priv {
+ 	struct clk *clk;
+@@ -147,6 +148,10 @@ static int xhci_plat_probe(struct platform_device *pdev)
+ 	if (!res)
+ 		return -ENODEV;
+ 
++	if (of_device_is_compatible(pdev->dev.of_node,
++					"marvell,armada-380-xhci"))
++		xhci_mvebu_mbus_init_quirk(pdev);
++
+ 	/* Initialize dma_mask and coherent_dma_mask to 32-bits */
+ 	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
+ 	if (ret)
+@@ -282,6 +287,7 @@ static const struct dev_pm_ops xhci_plat_pm_ops = {
+ static const struct of_device_id usb_xhci_of_match[] = {
+ 	{ .compatible = "generic-xhci" },
+ 	{ .compatible = "xhci-platform" },
++	{ .compatible = "marvell,armada-380-xhci"},
+ 	{ },
+ };
+ MODULE_DEVICE_TABLE(of, usb_xhci_of_match);
 -- 
 1.8.1.2
