@@ -1,91 +1,40 @@
-From: jean.pihet@linaro.org (Jean Pihet)
-Date: Tue,  6 May 2014 17:26:19 +0200
-Subject: [PATCH 3/3] perf tools: Add libdw DWARF post unwind support for ARM
-In-Reply-To: <1399389979-11279-1-git-send-email-jean.pihet@linaro.org>
-References: <1399389979-11279-1-git-send-email-jean.pihet@linaro.org>
-Message-ID: <1399389979-11279-4-git-send-email-jean.pihet@linaro.org>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 06 May 2014 16:27:25 +0100
+Subject: ACPI vs DT at runtime
+In-Reply-To: <53673866.9000105@ahsoftware.de>
+References: <20131115095717.GC1709@e106331-lin.cambridge.arm.com>
+ <20131118150052.GC24408@sirena.org.uk> <20131119091216.GA4412@netboy>
+ <20131120064056.GB5272@netboy>
+ <20131121192136.GA16735@n2100.arm.linux.org.uk>
+ <20131121204704.E4487C40753@trevor.secretlab.ca>
+ <CAHkRjk5MstjD9JFk+co8k89i8geJBmSF6uObhGdmWSe0GJHo8g@mail.gmail.com>
+ <97692EF2-013E-4E4B-BC16-E0915D67EFEC@antoniou-consulting.com>
+ <53673866.9000105@ahsoftware.de>
+Message-ID: <20140506152725.E5B90C40959@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding libdw DWARF post unwind support, which is part
-of elfutils-devel/libdw-dev package from version 0.158.
+On Mon, 05 May 2014 09:06:14 +0200, Alexander Holler <holler@ahsoftware.de> wrote:
+> Am 22.11.2013 13:00, schrieb Pantelis Antoniou:
+> 
+> > As one that's going to be dealing with this, please don't take the DTS
+> > files from the kernel.
+> >
+> > If you do this, I can guarantee that within a year almost no ARM board using DT
+> > will boot a mainline kernel.
+> >
+> > The reason is that vendors have enough trouble (and failing) tracking a single
+> > tree, adding yet another will just end to the vendor trees as far as the eye can see.
+> >
+> > Maybe, maybe, EVMs from silicon vendors will still boot, but I doubt any other
+> > customer board will work.
+> 
+> A bit late (I don't follow the ML (or what happens in the ARM world) 
+> closely, but as I've recently read that ARM64 will go UEFI and ACPI, I 
+> wonder what was the reasoning behind that decision.
 
-The new code is contained in unwin-libdw.c object, and
-implements unwind__get_entries unwind interface function.
+ARM64 will include support for UEFI an ACPI, but U-Boot and DT are not
+going away. Really the only market segment that will care about ACPI is
+ARM servers. Nobody else (embedded, mobile) needs to worry about it.
 
-Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
-Cc: Jiri Olsa <jolsa@redhat.com>
-Cc: Corey Ashford <cjashfor@linux.vnet.ibm.com>
-Cc: Frederic Weisbecker <fweisbec@gmail.com>
-Cc: Ingo Molnar <mingo@kernel.org>
-Cc: Namhyung Kim <namhyung@kernel.org>
-Cc: Paul Mackerras <paulus@samba.org>
-Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
-Cc: Arnaldo Carvalho de Melo <acme@infradead.org>
-Cc: David Ahern <dsahern@gmail.com>
----
- tools/perf/arch/arm/Makefile            |  5 +++++
- tools/perf/arch/arm/util/unwind-libdw.c | 36 +++++++++++++++++++++++++++++++++
- 2 files changed, 41 insertions(+)
- create mode 100644 tools/perf/arch/arm/util/unwind-libdw.c
-
-diff --git a/tools/perf/arch/arm/Makefile b/tools/perf/arch/arm/Makefile
-index 221f21d..09d6215 100644
---- a/tools/perf/arch/arm/Makefile
-+++ b/tools/perf/arch/arm/Makefile
-@@ -4,6 +4,11 @@ LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/dwarf-regs.o
- endif
- ifndef NO_LIBUNWIND
- LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/unwind-libunwind.o
-+endif
-+ifndef NO_LIBDW_DWARF_UNWIND
-+LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/unwind-libdw.o
-+endif
-+ifndef NO_DWARF_UNWIND
- LIB_OBJS += $(OUTPUT)arch/$(ARCH)/tests/regs_load.o
- LIB_OBJS += $(OUTPUT)arch/$(ARCH)/tests/dwarf-unwind.o
- endif
-diff --git a/tools/perf/arch/arm/util/unwind-libdw.c b/tools/perf/arch/arm/util/unwind-libdw.c
-new file mode 100644
-index 0000000..b4176c6
---- /dev/null
-+++ b/tools/perf/arch/arm/util/unwind-libdw.c
-@@ -0,0 +1,36 @@
-+#include <elfutils/libdwfl.h>
-+#include "../../util/unwind-libdw.h"
-+#include "../../util/perf_regs.h"
-+
-+bool libdw__arch_set_initial_registers(Dwfl_Thread *thread, void *arg)
-+{
-+	struct unwind_info *ui = arg;
-+	struct regs_dump *user_regs = &ui->sample->user_regs;
-+	Dwarf_Word dwarf_regs[PERF_REG_ARM_MAX];
-+
-+#define REG(r) ({						\
-+	Dwarf_Word val = 0;					\
-+	perf_reg_value(&val, user_regs, PERF_REG_ARM_##r);	\
-+	val;							\
-+})
-+
-+	dwarf_regs[0]  = REG(R0);
-+	dwarf_regs[1]  = REG(R1);
-+	dwarf_regs[2]  = REG(R2);
-+	dwarf_regs[3]  = REG(R3);
-+	dwarf_regs[4]  = REG(R4);
-+	dwarf_regs[5]  = REG(R5);
-+	dwarf_regs[6]  = REG(R6);
-+	dwarf_regs[7]  = REG(R7);
-+	dwarf_regs[8]  = REG(R8);
-+	dwarf_regs[9]  = REG(R9);
-+	dwarf_regs[10] = REG(R10);
-+	dwarf_regs[11] = REG(FP);
-+	dwarf_regs[12] = REG(IP);
-+	dwarf_regs[13] = REG(SP);
-+	dwarf_regs[14] = REG(LR);
-+	dwarf_regs[15] = REG(PC);
-+
-+	return dwfl_thread_state_registers(thread, 0, PERF_REG_ARM_MAX,
-+					   dwarf_regs);
-+}
--- 
-1.7.11.7
+g.
