@@ -1,42 +1,36 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 06 May 2014 17:24:33 +0200
-Subject: [E1000-devel] ARM support for igb driver
-In-Reply-To: <201405061718.54012.arnd@arndb.de>
-References: <CAHH3p5KAwyMOY=ai_h0eM+JwYLtTO8d4jVaVOWVtOakhqPRTew@mail.gmail.com>
- <20140505223839.45778902@skate> <536800A8.7090801@intel.com>
- <201405061718.54012.arnd@arndb.de>
-Message-ID: <1399389873.29530.3.camel@weser.hi.pengutronix.de>
+From: jean.pihet@linaro.org (Jean Pihet)
+Date: Tue,  6 May 2014 17:26:16 +0200
+Subject: [PATCH 0/3] perf tools: Add libdw DWARF post unwind support for ARM
+Message-ID: <1399389979-11279-1-git-send-email-jean.pihet@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 06.05.2014, 17:18 +0200 schrieb Arnd Bergmann:
-> On Monday 05 May 2014, Alexander Duyck wrote:
-> > Glad to hear that this is working on your ARM platform as expected.
-> > 
-> > I believe the issue Shiv is having is due to a problem with the specific
-> > platform as the IGB device is reporting a Data Link Protocol error via
-> > AER and I believe this is what is causing his platform issues.  On
-> > enabling BME the device is likely signalling a Fatal Error message in
-> > response to the DLP error.  The original error he was seeing was:
-> > 
-> > Unhandled fault: imprecise external abort (0x1406) at 0x00000000
-> 
-> This isn't too uncommon. There are a couple of traditional PCI host drivers
-> that register an imprecise external abort handler to catch this and
-> then look at the host controller registers.
-> 
-> Out of the pcie hosts, only drivers/pci/host/pci-imx6.c catches
-> this error, but it then goes on to ignore it, not even printing
-> a message about it.
-> 
-I think this handler is mostly there to handle the imprecise external
-abort happening on DW pcie IP if the bus scan tries to access an
-non-existent device. That's why it silently ignores this error.
+Adding libdw DWARF post unwind support, which is part
+of elfutils-devel/libdw-dev package from version 0.158.
 
-BTW: I can confirm that igb i350 works on i.MX6.
+Also includes the test suite for dwarf unwinding, by adding the
+arch specific test code and the perf_regs_load function.
 
-Regards,
-Lucas
+Jean Pihet (3):
+  perf tests: Introduce perf_regs_load function on ARM
+  perf tests: Add dwarf unwind test on ARM
+  perf tools: Add libdw DWARF post unwind support for ARM
+
+ tools/perf/Makefile.perf                 |  2 +-
+ tools/perf/arch/arm/Makefile             |  7 ++++
+ tools/perf/arch/arm/include/perf_regs.h  |  5 +++
+ tools/perf/arch/arm/tests/dwarf-unwind.c | 59 +++++++++++++++++++++++++++++++
+ tools/perf/arch/arm/tests/regs_load.S    | 60 ++++++++++++++++++++++++++++++++
+ tools/perf/arch/arm/util/unwind-libdw.c  | 36 +++++++++++++++++++
+ tools/perf/tests/builtin-test.c          |  2 +-
+ tools/perf/tests/tests.h                 |  2 +-
+ 8 files changed, 170 insertions(+), 3 deletions(-)
+ create mode 100644 tools/perf/arch/arm/tests/dwarf-unwind.c
+ create mode 100644 tools/perf/arch/arm/tests/regs_load.S
+ create mode 100644 tools/perf/arch/arm/util/unwind-libdw.c
+
+---
+Rebased on the latest jolsa/perf/core
+
 -- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+1.7.11.7
