@@ -1,59 +1,68 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 06 May 2014 13:34:46 +0200
-Subject: [PATCH v3 06/20] usb: host: xhci-plat: Add support for the Armada
- 38x
-In-Reply-To: <1399335255-589-7-git-send-email-gregory.clement@free-electrons.com>
-References: <1399335255-589-1-git-send-email-gregory.clement@free-electrons.com>
- <1399335255-589-7-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1584794.IM1uiSkBdk@amdc1032>
+From: bevenson@melinkcorp.com (Bryan Evenson)
+Date: Tue, 6 May 2014 11:36:30 +0000
+Subject: [PATCH] rtc: rtc-at91rm9200: fix lost ACKUPD interrupt
+In-Reply-To: <1399321388-15148-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <55cab9fba2ea4eed8f73591b37cc874b@BLUPR05MB037.namprd05.prod.outlook.com>
+ <1399321388-15148-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <7bc7c23d3bd541b2a021065f9fed174e@BLUPR05MB037.namprd05.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Boris,
 
-Hi,
-
-On Tuesday, May 06, 2014 02:14:01 AM Gregory CLEMENT wrote:
-> For the Armada 38x SoCs which come with an xhci controller, specific
-> initialization must be done during probe related to the MBus windows
-> configuration. This patch adds the support of this quirk.
+> -----Original Message-----
+> From: Boris BREZILLON [mailto:boris.brezillon at free-electrons.com]
+> Sent: Monday, May 05, 2014 4:23 PM
+> To: Bryan Evenson
+> Cc: Andrew Victor; Nicolas Ferre; Jean-Christophe Plagniol-Villard; linux-arm-
+> kernel at lists.infradead.org; Alessandro Zummo; rtc-
+> linux at googlegroups.com; linux-kernel at vger.kernel.org; Boris BREZILLON
+> Subject: [PATCH] rtc: rtc-at91rm9200: fix lost ACKUPD interrupt
 > 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> If an alarm interrupt raises just after the CR register is written and before the
+> ACKUPD is unmasked the ACKUPD bit might be cleaned up without waking
+> up the waiting thread.
+> 
+> Unmask the ACKUPD interrupt before writing the CR register so that the
+> ACKUPD cannot be lost.
+> 
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> Reported-by: Bryan Evenson <bevenson@melinkcorp.com>
 > ---
->  drivers/usb/host/Kconfig      |  7 +++++
->  drivers/usb/host/Makefile     |  1 +
->  drivers/usb/host/xhci-mvebu.c | 71 +++++++++++++++++++++++++++++++++++++++++++
->  drivers/usb/host/xhci-mvebu.h | 21 +++++++++++++
->  drivers/usb/host/xhci-plat.c  |  6 ++++
->  5 files changed, 106 insertions(+)
->  create mode 100644 drivers/usb/host/xhci-mvebu.c
->  create mode 100644 drivers/usb/host/xhci-mvebu.h
+> Hello Bryan,
 > 
-> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-> index 3d9e54062d62..e70943fac4a1 100644
-> --- a/drivers/usb/host/Kconfig
-> +++ b/drivers/usb/host/Kconfig
-> @@ -29,6 +29,13 @@ if USB_XHCI_HCD
->  config USB_XHCI_PLATFORM
->  	tristate
->  
-> +config USB_XHCI_MVEBU
-> +	tristate "xHCI support for Marvell Armada 38x"
+> Could you try to apply this patch and tell me if it fixes your bug ?
+> 
 
-Please limit this driver to mvebu arch and compile testing, i.e.
+I tried the patch and it didn't help.  I still have the same issue.  Do you see this problem on your end?  Is there debug output that would be helpful to see?
 
-	depends on ARCH_MVEBU || COMPILE_TEST
+Regards,
+Bryan
 
-> +	select USB_XHCI_PLATFORM
-> +	---help---
-> +	  Say 'Y' to enable the support for the xHCI host controller
-> +	  found in Marvell Armada 38x ARM SOCs.
-> +
->  endif # USB_XHCI_HCD
->  
->  config USB_EHCI_HCD
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+> Best Regards,
+> 
+> Boris
+> 
+>  drivers/rtc/rtc-at91rm9200.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/rtc/rtc-at91rm9200.c b/drivers/rtc/rtc-at91rm9200.c index
+> 3281c90..c16c423 100644
+> --- a/drivers/rtc/rtc-at91rm9200.c
+> +++ b/drivers/rtc/rtc-at91rm9200.c
+> @@ -163,9 +163,9 @@ static int at91_rtc_settime(struct device *dev, struct
+> rtc_time *tm)
+> 
+>  	/* Stop Time/Calendar from counting */
+>  	cr = at91_rtc_read(AT91_RTC_CR);
+> +	at91_rtc_write_ier(AT91_RTC_ACKUPD);
+>  	at91_rtc_write(AT91_RTC_CR, cr | AT91_RTC_UPDCAL |
+> AT91_RTC_UPDTIM);
+> 
+> -	at91_rtc_write_ier(AT91_RTC_ACKUPD);
+>  	wait_for_completion(&at91_rtc_updated);	/* wait for ACKUPD
+> interrupt */
+>  	at91_rtc_write_idr(AT91_RTC_ACKUPD);
+> 
+> --
+> 1.8.3.2
