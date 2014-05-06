@@ -1,68 +1,55 @@
-From: bevenson@melinkcorp.com (Bryan Evenson)
-Date: Tue, 6 May 2014 11:36:30 +0000
-Subject: [PATCH] rtc: rtc-at91rm9200: fix lost ACKUPD interrupt
-In-Reply-To: <1399321388-15148-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <55cab9fba2ea4eed8f73591b37cc874b@BLUPR05MB037.namprd05.prod.outlook.com>
- <1399321388-15148-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <7bc7c23d3bd541b2a021065f9fed174e@BLUPR05MB037.namprd05.prod.outlook.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 06 May 2014 13:37:04 +0200
+Subject: [PATCH v3 17/20] phy: Add support for USB cluster on the Armada
+ 375 SoC
+In-Reply-To: <1399335255-589-18-git-send-email-gregory.clement@free-electrons.com>
+References: <1399335255-589-1-git-send-email-gregory.clement@free-electrons.com>
+ <1399335255-589-18-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <2511421.HV0z8e3QV0@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Boris,
 
-> -----Original Message-----
-> From: Boris BREZILLON [mailto:boris.brezillon at free-electrons.com]
-> Sent: Monday, May 05, 2014 4:23 PM
-> To: Bryan Evenson
-> Cc: Andrew Victor; Nicolas Ferre; Jean-Christophe Plagniol-Villard; linux-arm-
-> kernel at lists.infradead.org; Alessandro Zummo; rtc-
-> linux at googlegroups.com; linux-kernel at vger.kernel.org; Boris BREZILLON
-> Subject: [PATCH] rtc: rtc-at91rm9200: fix lost ACKUPD interrupt
+Hi,
+
+On Tuesday, May 06, 2014 02:14:12 AM Gregory CLEMENT wrote:
+> The Armada 375 SoC comes with an USB2 host and device controller and
+> an USB3 controller. The USB cluster control register allows to manage
+> common features of both USB controllers. It uses the generic PHY
+> framework
 > 
-> If an alarm interrupt raises just after the CR register is written and before the
-> ACKUPD is unmasked the ACKUPD bit might be cleaned up without waking
-> up the waiting thread.
-> 
-> Unmask the ACKUPD interrupt before writing the CR register so that the
-> ACKUPD cannot be lost.
-> 
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> Reported-by: Bryan Evenson <bevenson@melinkcorp.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 > ---
-> Hello Bryan,
+>  drivers/phy/Kconfig              |   5 ++
+>  drivers/phy/Makefile             |   1 +
+>  drivers/phy/phy-armada375-usb2.c | 154 +++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 160 insertions(+)
+>  create mode 100644 drivers/phy/phy-armada375-usb2.c
 > 
-> Could you try to apply this patch and tell me if it fixes your bug ?
-> 
+> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+> index 3bb05f17b9b4..cdf3e2c24e3a 100644
+> --- a/drivers/phy/Kconfig
+> +++ b/drivers/phy/Kconfig
+> @@ -15,6 +15,11 @@ config GENERIC_PHY
+>  	  phy users can obtain reference to the PHY. All the users of this
+>  	  framework should select this config.
+>  
+> +config ARMADA375_USBCLUSTER_PHY
+> +	def_bool y
+> +	depends on OF
 
-I tried the patch and it didn't help.  I still have the same issue.  Do you see this problem on your end?  Is there debug output that would be helpful to see?
+Please limit this driver to Armada 375 or compile testing, i.e. add additional
 
-Regards,
-Bryan
+	depends on (ARCH_MVEBU && MACH_ARMADA_375) || COMPILE_TEST
 
-> Best Regards,
-> 
-> Boris
-> 
->  drivers/rtc/rtc-at91rm9200.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/rtc/rtc-at91rm9200.c b/drivers/rtc/rtc-at91rm9200.c index
-> 3281c90..c16c423 100644
-> --- a/drivers/rtc/rtc-at91rm9200.c
-> +++ b/drivers/rtc/rtc-at91rm9200.c
-> @@ -163,9 +163,9 @@ static int at91_rtc_settime(struct device *dev, struct
-> rtc_time *tm)
-> 
->  	/* Stop Time/Calendar from counting */
->  	cr = at91_rtc_read(AT91_RTC_CR);
-> +	at91_rtc_write_ier(AT91_RTC_ACKUPD);
->  	at91_rtc_write(AT91_RTC_CR, cr | AT91_RTC_UPDCAL |
-> AT91_RTC_UPDTIM);
-> 
-> -	at91_rtc_write_ier(AT91_RTC_ACKUPD);
->  	wait_for_completion(&at91_rtc_updated);	/* wait for ACKUPD
-> interrupt */
->  	at91_rtc_write_idr(AT91_RTC_ACKUPD);
-> 
-> --
-> 1.8.3.2
+> +	select GENERIC_PHY
+> +
+>  config PHY_EXYNOS_MIPI_VIDEO
+>  	tristate "S5P/EXYNOS SoC series MIPI CSI-2/DSI PHY driver"
+>  	depends on HAS_IOMEM
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
