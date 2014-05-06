@@ -1,43 +1,39 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 6 May 2014 13:30:20 +0100
-Subject: [PATCH] arm64: Support arch_irq_work_raise() via self IPIs
-In-Reply-To: <1399322907-21280-1-git-send-email-larry.bassel@linaro.org>
-References: <1399322907-21280-1-git-send-email-larry.bassel@linaro.org>
-Message-ID: <20140506123020.GC30234@arm.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Tue, 06 May 2014 13:39:34 +0100
+Subject: [PATCH 0/4] Enable ST Keyscan driver
+In-Reply-To: <1399304320-18197-1-git-send-email-gabriel.fernandez@linaro.org>
+References: <1399304320-18197-1-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <5368D806.8050609@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 05, 2014 at 09:48:27PM +0100, Larry Bassel wrote:
-> Support for arch_irq_work_raise() was missing from
-> arm64 (a prerequisite for FULL_NOHZ).
-> 
-> This patch is based on the arm32 patch ARM 7872/1
-> which ports cleanly.
-> 
-> commit bf18525fd793101df42a1344ecc48b49b62e48c9
-> Author: Stephen Boyd <sboyd@codeaurora.org>
-> Date:   Tue Oct 29 20:32:56 2013 +0100
-> 
->     ARM: 7872/1: Support arch_irq_work_raise() via self IPIs
-> 
->     By default, IRQ work is run from the tick interrupt (see
->     irq_work_run() in update_process_times()). When we're in full
->     NOHZ mode, restarting the tick requires the use of IRQ work and
->     if the only place we run IRQ work is in the tick interrupt we
->     have an unbreakable cycle. Implement arch_irq_work_raise() via
->     self IPIs to break this cycle and get the tick started again.
->     Note that we implement this via IPIs which are only available on
->     SMP builds. This shouldn't be a problem because full NOHZ is only
->     supported on SMP builds anyway.
-> 
->     Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->     Reviewed-by: Kevin Hilman <khilman@linaro.org>
->     Cc: Frederic Weisbecker <fweisbec@gmail.com>
->     Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> 
-> Signed-off-by: Larry Bassel <larry.bassel@linaro.org>
-> Reviewed-by: Kevin Hilman <khilman@linaro.org>
+All the DT patches look good for me.
+Acked-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 
-Looks fine to me, thanks.
+I think It will be better to send a pull request to Arnd/Olof including 
+other reviewed DT patches.
 
-Will
+thanks,
+srini
+
+
+On 05/05/14 16:38, Gabriel FERNANDEZ wrote:
+> The goal of this series is to enable ST Keyscan support to ST SoCs.
+> The DT definition is added for STiH415 and STiH416 SoCs on
+> B2000 board.
+> Tested on B2000 sti board.
+>
+> Gabriel Fernandez (4):
+>    ARM: STi: DT: add keyscan for stih415
+>    ARM: STi: DT: add keyscan for stih416
+>    ARM: STi: DT: add keyscan for stih41x-b2000
+>    ARM: multi_v7_defconfig: add ST Keyscan driver
+>
+>   arch/arm/boot/dts/stih415-pinctrl.dtsi | 16 ++++++++++++++++
+>   arch/arm/boot/dts/stih415.dtsi         | 12 ++++++++++++
+>   arch/arm/boot/dts/stih416-pinctrl.dtsi | 16 ++++++++++++++++
+>   arch/arm/boot/dts/stih416.dtsi         | 12 ++++++++++++
+>   arch/arm/boot/dts/stih41x-b2000.dtsi   | 23 +++++++++++++++++++++++
+>   arch/arm/configs/multi_v7_defconfig    |  1 +
+>   6 files changed, 80 insertions(+)
+>
