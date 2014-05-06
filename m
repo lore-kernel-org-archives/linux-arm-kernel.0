@@ -1,32 +1,47 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 6 May 2014 09:51:44 +0100
-Subject: [PATCH 1/3] perf tests: Introduce perf_regs_load function on ARM64
-In-Reply-To: <CAORVsuV5qYKLd21YSJhLy7Ovi5s4sXUEgbNot7LJspNnbdBpFw@mail.gmail.com>
-References: <CAFrcx1nfkDWTu9vF+a7UGjd1fzHpXS44pzqKLZS9ej7KJwqkOg@mail.gmail.com>
- <1398690730-5454-1-git-send-email-jean.pihet@linaro.org>
- <CAFrcx1kQO5i+kQwDizT1F4asbFNGiDSDWt0ubnpS92fU1PBiHw@mail.gmail.com>
- <20140502165105.GD20642@arm.com>
- <CAORVsuV5qYKLd21YSJhLy7Ovi5s4sXUEgbNot7LJspNnbdBpFw@mail.gmail.com>
-Message-ID: <20140506085144.GA26592@arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 6 May 2014 01:58:10 -0700
+Subject: [PATCH] ARM: at91: localize GPIO header
+In-Reply-To: <20140505035609.GA11035@quad.lixom.net>
+References: <1395924553-5387-1-git-send-email-linus.walleij@linaro.org>
+ <20140505035609.GA11035@quad.lixom.net>
+Message-ID: <5368A422.2000100@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 05, 2014 at 08:07:11AM +0100, Jean Pihet wrote:
-> Hi Will,
+On 04/05/2014 20:56, Olof Johansson :
+> On Thu, Mar 27, 2014 at 01:49:13PM +0100, Linus Walleij wrote:
+>> This moves the <mach/gpio.h> header in the AT91 platform down
+>> into the machine directory and removes the reliance on
+>> MACH_NEED_GPIO_H from the AT91.
+>>
+>> This does not move the platform to GENERIC_GPIO but localize
+>> the remaining work to be done for this to the mach-at91
+>> folder.
+>>
+>> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>> ---
+>> This version is rebased on top of the timex-remove branch in
+>> the ARM SoC tree. I have done a few trial compilations with the
+>> defconfigs after rebasing but more may still be needed. IIRC
+>> one of the board files is now removed from the mainline kernel
+>> so there will be some simple merge conflict wherever it gets
+>> merged.
+>>
+>> If you're happy with this I'd suggest applying it directly in
+>> the ARM SoC tree.
 > 
-> On Fri, May 2, 2014 at 6:51 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Fri, May 02, 2014 at 10:19:38AM +0100, Jean Pihet wrote:
-> >> Hi WIll, Mark,
-> >>
-> >> Ping on this series. Can you please check? Is the refreshed patch OK?
-> >
-> > Fine by me, as long as it's not reused outside of this test :)
-> Great! Is there some precaution to avoid a mis-reuse?
+> Looks like this one didn't make it for 3.15 given timing. Want to respin for
+> 3.16 to handle the above conflicts and send to Nicolas?
 
-Hopefully your comment will be enough.
+I already did it actually no need to worry Linus: It sits in my
+at91-3.16-cleanup branch that I didn't send to arm-soc yet.
 
-> Other than that, which tree are the patches going to?
+I'll try to collect all "cleanup" stuff today or tomorrow and send the
+pull-request soon.
 
-They're all under perf/tools/, so they should go via that tree.
+Thanks for the heads-up Olof.
 
-Will
+Bye,
+-- 
+Nicolas Ferre
