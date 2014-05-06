@@ -1,78 +1,91 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 6 May 2014 09:58:13 +0200
-Subject: [PATCH/RFC 3/4] of/clk: Register clocks suitable for Runtime PM
- with the PM core
-In-Reply-To: <CAMuHMdWLfKcKLORPJ9f-0TLoWM5EfCZ0G5MfxjUiJCRJG555Sg@mail.gmail.com>
-References: <1398334403-26181-1-git-send-email-geert+renesas@glider.be>
- <1398334403-26181-4-git-send-email-geert+renesas@glider.be>
- <CAPDyKFr02yyhGNncYX2AgBXTA3Sc0AGQcExjtLvQ5QU0_=YJwg@mail.gmail.com>
- <535B130C.1000007@gmail.com>
- <CAPDyKFqG0dV+-y2=t=d3w6_hxWsYi+sOmNdvS6ECPOuoQ61Pmw@mail.gmail.com>
- <CAMuHMdWLfKcKLORPJ9f-0TLoWM5EfCZ0G5MfxjUiJCRJG555Sg@mail.gmail.com>
-Message-ID: <CAPDyKFoqGr=ED3v_yubL8sqcsAy8xxRXhn30pm40=dV1skFEaQ@mail.gmail.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Tue, 6 May 2014 10:03:19 +0200
+Subject: [linux-sunxi] Re: [PATCH 0/2] ARM: sunxi: Enable syscon for the
+ system controller
+In-Reply-To: <CAGb2v66JBM_Rv8ie=7iuTPrXGPJECTeevnf9LLXNS=FSYs1+Tg@mail.gmail.com>
+References: <1399212160-26934-1-git-send-email-carlo@caione.org>
+ <20140505225517.GE9464@lukather>
+ <CAGb2v66JBM_Rv8ie=7iuTPrXGPJECTeevnf9LLXNS=FSYs1+Tg@mail.gmail.com>
+Message-ID: <CAOQ7t2akOEr7o4Q5ze5QPr_RHj6MWmA-u5NTuq2q1epy2LBr8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 May 2014 16:58, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
-> Hi Ulf, Tomasz,
->
-> On Fri, May 2, 2014 at 10:13 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>>>> +static int of_clk_register(struct device *dev, struct clk *clk)
->>>>> +{
->>>>> +       int error;
->>>>> +
->>>>> +       if (!dev->pm_domain) {
->>>>> +               error = pm_clk_create(dev);
->>>>> +               if (error)
->>>>> +                       return error;
->>>>> +
->>>>> +               dev->pm_domain = &of_clk_pm_domain;
->>>>
->>>>
->>>> I am concerned about how this will work in conjunction with the
->>>> generic power domain.
->>>>
->>>> A device can't reside in more than one pm_domain; thus I think it
->>>> would be better to always use the generic power domain and not have a
->>>> specific one for clocks. Typically the genpd should invoke
->>>> pm_clk_resume|suspend from it's runtime PM callbacks.
+On Tue, May 6, 2014 at 8:36 AM, Chen-Yu Tsai <wens@csie.org> wrote:
+> Hi,
+
+Hi,
+
+> On Tue, May 6, 2014 at 6:55 AM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+>> On Sun, May 04, 2014 at 04:02:38PM +0200, Carlo Caione wrote:
+>>> The so called "system controller" in Allwinner A20 and A31 SoCs is
+>>> multi-purpose controller that tries to add misc functionality to one
+>>> memory region.
+>>> In these SoCs it controls the internal SRAM partitioning but it also
+>>> includes registers for chip versioning and NMI control.
+>>> This patch adds the proper nodes in the DTS files and enable the syscon
+>>> in the defconfig files.
 >>>
->>> I'm not sure about this. A typical use case would be to gate clocks ASAP and
->>> then wait until device is idle long enough to consider turning off the power
->>> domain worthwhile. Also sometimes we may want to gate the clocks, but
->>> prevent power domain from being powered off to retain hardware state (e.g.
->>> because there is no way to read it and restore later).
+>>> Even though the system controller includes also register for managing the
+>>> NMI controller, these register are not mapped in the syscon since they
+>>> are directly used and mapped by the NMI controller itself.
 >>
->> So, in principle you prefer to have driver's handle clock gating to
->> save power from their runtime PM callbacks, instead of from the power
->> domain, right? Just to clarify, that's my view as well.
+>> Hmmm, what exactly do you want to achieve with this?
+>>
+>> The NMI controller won't be able to use it, since it's initialized
+>> much earlier than syscon and regmap.
+
+This is what I meant with that phrase. NMI controller doesn't use the
+syscon but we can use it for several other drivers. In fact the
+registers for NMI controller are excluded from the range of syscon
+registers.
+
+> I believe this will be used for toggling the SRAM mappings. (Am I right?)
+
+Definitely right.
+
+> The second register toggles mappings for MUSB FIFO, EMAC, and a few of
+> the other IP blocks we currently don't support.
+
+Not yet :)
+
+>> Moreover, the A31 doesn't seem to have this system controller, or at
+>> least this overlap.
+
+I admit that I didn't check the A31 manual but I trusted the wiki page
+at http://linux-sunxi.org/SRAM_Controller and
+http://linux-sunxi.org/A31/Memory_map
+
+> There should be something similar, as does the A23. There is no overlap AFAIK.
+
+I agree and will check also A23.
+
+>> And since on the A20, registers seem to have one usage only, so I
+>> guess we can just split this IP into several nodes, just like we did
+>> with the NMI.
 >
-> If there's both a gate clock and a power domain, and the driver's Runtime PM
-> callbacks handle clock gating, who's handling the power domain?
-
-This is my view, not sure everybody agrees :-)
-
-1. If you have a hardware power domain you need to implement a
-pm_domain (preferably use the generic power domain).
-
-2. If you don't have a hardware power domain, but still cares about
-having a centralized solution for dev_pm_qos - you may use the generic
-power domain, since it supports this.
-
-3. If none of the above, you don't need a pm_domain at all.
-
-Kind regards
-Ulf Hansson
-
+> As stated above, the second register toggles SRAM mappings for at most
+> 4 SRAM blocks (for EMAC, MUSB, ACE, ISP).
 >
-> Gr{oetje,eeting}s,
+> syscon would be a good way to share this register among the various drivers.
+> We do not toggle it in the current EMAC driver. The driver seems to assume
+> it is setup by the bootloader, and on the A20, it seems to be mapped to
+> EMAC by default.
 >
->                         Geert (still trying to fit all pieces of the
-> puzzle together)
->
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
->
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
+> The MUSB glue layer driver must toggle this.
+
+This is exactly why I wrote these patches. I started hacking /
+studying your MUSB driver and I think that using syscon is a better
+way to manage these registers instead of mapping them in several
+drivers also because most of the time a single register has to be used
+by multiple drivers (i.e. SRAM_CTL1_CFG is used for USB,  EMAC,
+etc...)
+
+> I think this approach is better than all the individual drivers mapping
+> the registers and toggling a single bit. In fact I did something similar
+> when working on preliminary musb support.
+
+Thanks,
+
+-- 
+Carlo Caione
