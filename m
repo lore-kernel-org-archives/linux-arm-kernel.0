@@ -1,83 +1,112 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 6 May 2014 10:35:08 -0600
-Subject: [PATCH 05/17] pci: host: pcie-dra7xx: add support for
- pcie-dra7xx controller
-In-Reply-To: <1399383244-14556-6-git-send-email-kishon@ti.com>
-References: <1399383244-14556-1-git-send-email-kishon@ti.com>
- <1399383244-14556-6-git-send-email-kishon@ti.com>
-Message-ID: <20140506163507.GA15542@obsidianresearch.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 06 May 2014 10:35:33 -0600
+Subject: arm64: Fix machine_shutdown() definition
+In-Reply-To: <1399391708-13442-1-git-send-email-arunks.linux@gmail.com>
+References: <1399391708-13442-1-git-send-email-arunks.linux@gmail.com>
+Message-ID: <53690F55.6030504@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 06, 2014 at 07:03:51PM +0530, Kishon Vijay Abraham I wrote:
-> +Example:
-> +pcie at 51000000 {
-> +	compatible = "ti,dra7xx-pcie";
-> +	reg = <0x51002000 0x14c>, <0x51000000 0x2000>;
-> +	reg-names = "ti_conf", "rc_dbics";
-> +	interrupts = <0 232 0x4>, <0 233 0x4>;
-> +	#address-cells = <3>;
-> +	#size-cells = <2>;
-> +	device_type = "pci";
-> +	ti,device_type = <3>;
-> +	ranges = <0x00000800 0 0x20001000 0x20001000 0 0x00002000  /* Configuration Space */
+On 05/06/2014 09:55 AM, arunks.linux at gmail.com wrote:
+> From: Arun KS <arun.linux@gmail.com>
+> 
+> machine_shutdown() is a hook for kexec. Add a comment saying so, since
+> it isn't obvious from the function name.
+> 
+> Halt, power-off, and restart have different requirements re: stopping
+> secondary CPUs than kexec has. The former simply require the secondary
+> CPUs to be quiesced somehow, whereas kexec requires them to be
+> completely non-operational, so that no matter where the kexec target
+> images are written in RAM, they won't influence operation of the
+> secondary CPUS,which could happen if the CPUs were still executing some
+> kind of pin loop. To this end, modify machine_halt, power_off, and
+> restart to call smp_send_stop() directly, rather than calling
+> machine_shutdown().
+> 
+> In machine_shutdown(), replace the call to smp_send_stop() with a call
+> to disable_nonboot_cpus(). This completely disables all but one CPU,
+> thus satisfying the kexec requirements a couple paragraphs above.
+> 
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> Signed-off-by: Arun KS <getarunks@gmail.com>
+> Signed-off-by: Arun KS <arunks.linux@gmail.com>
 
-Configuration space should not show up in the ranges, please don't
-copy that mistake from other drivers, put it in reg.
+It's a bit odd to include my s-o-b here when I didn't actually write
+this particular patch. No doubt it's included because I wrote an
+identical patch for arch/arm/.
 
-> +	interrupt-map-mask = <0 0 0 0>;
-> +	interrupt-map = <0x0 0 &gic 134>;
+Rather than including my s-o-b here, perhaps simply including the
+following paragraph in the commit decription would be better:
 
-The HW cannot decode INTA/B/C/D?
+This patch ports most of commit 19ab428f4b79 "ARM: 7759/1: decouple CPU
+offlining from reboot/shutdown" by Stephen Warren from arch/arm to
+arch/arm64.
 
-> +#define	PCIECTRL_DRA7XX_CONF_IRQSTATUS_MSI		0x0034
-> +#define	PCIECTRL_DRA7XX_CONF_IRQENABLE_SET_MSI		0x0038
-> +#define	INTA						BIT(0)
-> +#define	INTB						BIT(1)
-> +#define	INTC						BIT(2)
-> +#define	INTD						BIT(3)
-> +#define	MSI						BIT(4)
-> +#define	LEG_EP_INTERRUPTS (INTA | INTB | INTC | INTD)
+Or, I sometimes use the following tag instead of s-o-b:
 
-Oh, it can, it would be wise to export this from the driver. Look at
-the latest patches from Srikanth Thokala for the Xilinx PCI driver to
-see how this should look
+Based-on-work-by: Stephen Warren <swarren@nvidia.com>
 
-> +static int dra7xx_pcie_establish_link(struct pcie_port *pp)
-> +{
-> +	u32 reg;
-> +	int retries = 1000;
-> +	struct dra7xx_pcie *dra7xx = to_dra7xx_pcie(pp);
-> +
-> +	if (dw_pcie_link_up(pp)) {
-> +		dev_err(pp->dev, "link is already up\n");
-> +		return 0;
-> +	}
-> +
-> +	reg = dra7xx_pcie_readl(dra7xx->base, PCIECTRL_DRA7XX_CONF_DEVICE_CMD);
-> +	reg |= LTSSM_EN;
-> +	dra7xx_pcie_writel(dra7xx->base, PCIECTRL_DRA7XX_CONF_DEVICE_CMD, reg);
-> +
-> +	while (--retries) {
-> +		reg = dra7xx_pcie_readl(dra7xx->base,
-> +					PCIECTRL_DRA7XX_CONF_PHY_CS);
-> +		if (reg & LINK_UP)
-> +			break;
-> +		usleep_range(10, 20);
-> +	}
-> +
-> +	if (retries <= 0) {
-> +		dev_err(pp->dev, "link is not up\n");
-> +		return -ETIMEDOUT;
-> +	}
-> +
-> +	return 0;
-> +}
+Including two s-o-b for yourself probably isn't necesary.
 
-It would be really nice to see the link bring up process live in the
-PCI core, every driver seems to have its own take on this.
+Do you need to include an equivalent of the following from my original
+patch to arch/arm/?
 
-The PCI-E spec requires a 100ms delay after link bring up (aka hot
-reset) before sending any configuration TLPs.
-
-Jason
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 239fa96c12bb..2651b1da1c56 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -2016,7 +2016,7 @@ config XIP_PHYS_ADDR
+>  
+>  config KEXEC
+>         bool "Kexec system call (EXPERIMENTAL)"
+> -       depends on (!SMP || HOTPLUG_CPU)
+> +       depends on (!SMP || PM_SLEEP_SMP)
+>         help
+>           kexec is a system call that implements the ability to shutdown your
+>           current kernel, and to start another kernel.  It is like a reboot
+> diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
+> index 8ef8c9337809..4fb074c446bf 100644
+> --- a/arch/arm/kernel/machine_kexec.c
+> +++ b/arch/arm/kernel/machine_kexec.c
+> @@ -134,6 +134,10 @@ void machine_kexec(struct kimage *image)
+>         unsigned long reboot_code_buffer_phys;
+>         void *reboot_code_buffer;
+>  
+> +       if (num_online_cpus() > 1) {
+> +               pr_err("kexec: error: multiple CPUs still online\n");
+> +               return;
+> +       }
+>  
+>         page_list = image->head & PAGE_MASK;
+>  
+> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> index 550d63cef68e..5919eb451bb9 100644
+> --- a/arch/arm/kernel/smp.c
+> +++ b/arch/arm/kernel/smp.c
+> @@ -651,17 +651,6 @@ void smp_send_reschedule(int cpu)
+>         smp_cross_call(cpumask_of(cpu), IPI_RESCHEDULE);
+>  }
+>  
+> -#ifdef CONFIG_HOTPLUG_CPU
+> -static void smp_kill_cpus(cpumask_t *mask)
+> -{
+> -       unsigned int cpu;
+> -       for_each_cpu(cpu, mask)
+> -               platform_cpu_kill(cpu);
+> -}
+> -#else
+> -static void smp_kill_cpus(cpumask_t *mask) { }
+> -#endif
+> -
+>  void smp_send_stop(void)
+>  {
+>         unsigned long timeout;
+> @@ -679,8 +668,6 @@ void smp_send_stop(void)
+>  
+>         if (num_online_cpus() > 1)
+>                 pr_warning("SMP: failed to stop secondary CPUs\n");
+> -
+> -       smp_kill_cpus(&mask);
+>  }
+>  
+>  /*
