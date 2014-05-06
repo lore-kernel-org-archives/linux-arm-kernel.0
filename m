@@ -1,151 +1,39 @@
-From: dmurphy@ti.com (Dan Murphy)
-Date: Tue, 6 May 2014 08:18:37 -0500
-Subject: [RFC] [v2 Patch 2/6] ARM: TI: Describe the ti reset DT entries
-In-Reply-To: <20140505220155.GI25949@atomide.com>
-References: <1399320567-3639-1-git-send-email-dmurphy@ti.com>
- <1399320567-3639-3-git-send-email-dmurphy@ti.com>
- <20140505220155.GI25949@atomide.com>
-Message-ID: <5368E12D.1060706@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 6 May 2014 09:32:17 -0400
+Subject: [PATCHv3 5/5] ARM: configs: add ahci_mvebu to multi_v7_defconfig
+In-Reply-To: <20140505215121.GG29245@quad.lixom.net>
+References: <1397574006-5868-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1397574006-5868-6-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140426002518.GL28159@titan.lakedaemon.net>
+ <20140505215121.GG29245@quad.lixom.net>
+Message-ID: <20140506133217.GT28159@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony
+On Mon, May 05, 2014 at 02:51:21PM -0700, Olof Johansson wrote:
+> On Fri, Apr 25, 2014 at 08:25:18PM -0400, Jason Cooper wrote:
+> > Arnd, Olof, Kevin,
+> > 
+> > On Tue, Apr 15, 2014 at 05:00:06PM +0200, Thomas Petazzoni wrote:
+> > > The Marvell Armada 38x platform needs the ahci_mvebu driver enabled
+> > > for the AHCI interfaces, so this commit enables the corresponding
+> > > Kconfig option in multi_v7_defconfig.
+> > > 
+> > > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > > ---
+> > >  arch/arm/configs/multi_v7_defconfig | 1 +
+> > >  1 file changed, 1 insertion(+)
+> > 
+> > Conflict-ridden file, please take directly.
+> > 
+> > Acked-by: Jason Cooper <jason@lakedaemon.net>
+> 
+> Just like many other maintainers, just getting added on cc on the ack doesn't
+> fit our work flows very well.
 
-Thanks for the comments
+gah, yes of course.  I was being lazy.  I'll bounce or resend in the
+future.
 
-On 05/05/2014 05:01 PM, Tony Lindgren wrote:
-> * Dan Murphy <dmurphy@ti.com> [140505 13:10]:
->> +
->> +Required parent properties:
->> +- compatible : Should be one of,
->> +		"ti,omap4-prm" for OMAP4 PRM instances
->> +		"ti,omap5-prm" for OMAP5 PRM instances
->> +		"ti,dra7-prm" for DRA7xx PRM instances
->> +		"ti,am4-prcm" for AM43xx PRCM instances
->> +		"ti,am3-prcm" for AM33xx PRCM instances
->> +
->> +Required child reset property:
->> +- compatible : Should be
->> +		"resets" for All TI SoCs
->> +
->> +example:
->> +		prm: prm at 4ae06000 {
->> +			compatible = "ti,omap5-prm";
->> +			reg = <0x4ae06000 0x3000>;
->> +
->> +			prm_resets: resets {
->> +				#address-cells = <1>;
->> +				#size-cells = <1>;
->> +				#reset-cells = <1>;
->> +			};
->> +		};
-> The reg entries you have in the example below has different format
-> compared to this?
+thx,
 
-This is the parent to the resets.  The reg entries below are for
-the child reset signals.
-
->
->> +Reset node declaration
->> +==============================================
->> +The reset node is declared in a parent child relationship.  The main parent
->> +is the PRCM module which contains the base address.  The first child within
->> +the reset parent declares the target modules reset name.  This is followed by
->> +the control and status offsets.
->> +
->> +Within the first reset child node is a secondary child node which declares the
->> +reset signal of interest.  Under this node the control and status bits
->> +are declared.  These bits declare the bit mask for the target reset.
->> +
->> +
->> +Required properties:
->> +reg - This is the register offset from the PRCM parent.
->> +	This must be declared as:
->> +
->> +	reg = <control register offset>,
->> +		  <status register offset>;
->> +
->> +control-bit - This is the bit within the register which controls the reset
->> +	of the target module.  This is declared as a bit mask for the register.
->> +status-bit - This is the bit within the register which contains the status of
->> +	the reset of the target module.
->> +	This is declared as a bit mask for the register.
->> +
->> +example:
->> +&prm_resets {
->> +	dsp_rstctrl {
->> +		reg = <0x1c00>,
->> +			  <0x1c04>;
-> Shouldn't this be start and size instead of start and end here?
-
-I could do start and size.  But the size will be the same for each register.
-AM33xx really hurts the consistency model here as the other patches in the series
-it appears that the control and status are consistent but AM33xx the registers are all over
-the place.
-
-I have not looked at OMAP2->4 yet for control and status register offsets.
-
->> +		dsp_reset: dsp_reset {
->> +			control-bit = <0x01>;
->> +			status-bit = <0x01>;
->> +		};
->> +	};
->> +};
-> Are the control-bit and status-bit always the same? If so, you can
-> keep that knowlede private to the the driver.
-
-No there is a case in the am33xx resets file where the status and control bits are not the same.
-
->
-> And maybe you can have the bit offset in a reg property here to
-> avoid adding any custom properties? Something like:
->
-> 	dsp_reset: reset at 1 {
-> 		reg = 1;
-> 	};
->
-> If reg is not suitable for that, it seems that some generic property
-> to describe the bit offset is needed by quite a few drivers
-> anyways, for things like clocks and regulators. 
-
-I will have to look into this.  Maybe a generic entry called bit-offset
-that defines the bit or a mask for the registers.  It can mimic the reg
-entry.
-
->> +Client Node Declaration
->> +==============================================
->> +This is the consumer of the parent node to declare what resets this
->> +particular module is interested in.
->> +
->> +example:
->> +	src: src at 55082000 {
->> +		    resets = <&reset_src phandle>;
->> +			reset-names = "<reset_name>";
->> +	};
->> +
->> +Required Properties:
->> +reset_src - This is the parent DT entry for the reset controller
->> +phandle - This is the phandle of the specific reset to be used by the clien
->> +	driver.
->> +reset-names - This is the reset name of module that the device driver
->> +	needs to be able to reset.  This value must correspond to a value within
->> +	the reset controller array.
->> +
->> +example:
->> +resets = <&prm_resets &dsp_mmu_reset>;
->> +reset-names = "dsp_mmu_reset";
-> This part looks OK to me, not sure if we need the reset-names property
-> if we have one already why not.
-
-reset-names are part of the reset.txt file.  I could probably drop the resets and reset-name information here
-and point to the reset.txt file for further explanation.
-
->
-> Regards,
->
-> Tony
-
-
--- 
-------------------
-Dan Murphy
+Jason.
