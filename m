@@ -1,68 +1,153 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 6 May 2014 07:26:07 -0700
-Subject: [RFC 2/4] ARM: dts: Add ctrl-core DT node for DRA7
-In-Reply-To: <53687198.60405@ti.com>
-References: <1397654063-8055-1-git-send-email-archit@ti.com>
- <1397654063-8055-2-git-send-email-archit@ti.com>
- <20140418171854.GJ5354@atomide.com> <5354A970.8040605@ti.com>
- <20140421151034.GA23945@atomide.com> <53687198.60405@ti.com>
-Message-ID: <20140506142606.GA18474@atomide.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 06 May 2014 16:27:02 +0200
+Subject: [PATCH v7 1/2] phy: Add new Exynos5 USB 3.0 PHY driver
+In-Reply-To: <1398665874-31238-1-git-send-email-gautam.vivek@samsung.com>
+References: <1398665874-31238-1-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <5368F136.6070804@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Archit Taneja <archit@ti.com> [140505 22:24]:
-> Hi,
+On 28/04/14 08:17, Vivek Gautam wrote:
+> Add a new driver for the USB 3.0 PHY on Exynos5 series of SoCs.
+> The new driver uses the generic PHY framework and will interact
+> with DWC3 controller present on Exynos5 series of SoCs.
+> Thereby, removing old phy-samsung-usb3 driver and related code
+> used untill now which was based on usb/phy framework.
 > 
-> On Monday 21 April 2014 08:40 PM, Tony Lindgren wrote:
-> >* Archit Taneja <archit@ti.com> [140420 22:16]:
-> >>Hi,
-> >>
-> >>On Friday 18 April 2014 10:48 PM, Tony Lindgren wrote:
-> >>>* Archit Taneja <archit@ti.com> [140416 06:20]:
-> >>>>Add DT node for the ctrl-core sub module of the DRA7 control module. We map the
-> >>>>CTRL_MODULE_CORE address region up to 0x4a002d60, this region contains register
-> >>>>fields which configure clocks. The remainder of the registers are related to
-> >>>>pad configurations or cross-bar configurations, and therefore aren't mapped.
-> >>>
-> >>>Can you please check if this can just use the existing
-> >>>regmap syscon mapping:
-> >>>
-> >>>syscon = <&dra7_ctrl_general>;
-> >>>
-> >>>See how the drivers/regulator/pbias-regulator.c is using the
-> >>>syscon to initialize a regulator and then omap_hsmmc.c just does
-> >>>the standard regulator calls.
-> >>
-> >>The thing is that this bit needs to be set before the the DSS hwmods are
-> >>reset, and that happens very early. If we don't do this, DSS won't reset
-> >>properly, and not get back to an idle state.
-> >>
-> >>I am not sure where I can configure the syscon register early enough that it
-> >>happens before the hwmods are reset. With a syscon mapping, I guess we would
-> >>access the register when the DSS driver is probed. But that's too late for
-> >>us.
-> >>
-> >>Ideally, it would be much better to have a syscon mapping. Do you have any
-> >>suggestions how this can be achieved very early in boot?
-> >
-> >It's best to move the reset and initialization of DSS happen later. I believe
-> >we already are resetting only some of the hwmods early on.
-> >
+> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+> ---
 > 
-> I looked at this in some more detail. With the current hwmod
-> flags(HWMOD_INIT_NO_RESET/NO_IDLE), we still try to enable the IP, it's just
-> the reset part(ocp reset/custom reset and sysc register) or the disable part
-> that is skipped. hwmod still tries to enable the IP.
+> Changes from v6:
+>  - Addressed review comments:
+>    -- Sorted config entries in Kconfig and Makefile
+>    -- Made #define to_usbdrd_phy(inst) to a static inline routine.
+>    -- Restructured exynos5_rate_to_clk() as suggested.
+>    -- Amended 'val' field for regmap_update_bits() in the routine
+>       exynos5_usbdrd_phy_isol().
+>    -- Removed sentinel entry from exynos5_usbdrd_phy_cfg[] struct.
+>    -- Removed check for 'match' entry in probe().
 > 
-> This again results in the same issue.
+>  .../devicetree/bindings/phy/samsung-phy.txt        |   40 ++
+>  drivers/phy/Kconfig                                |   11 +
+>  drivers/phy/Makefile                               |    1 +
+>  drivers/phy/phy-exynos5-usbdrd.c                   |  627 ++++++++++++++++++++
+>  4 files changed, 679 insertions(+)
+>  create mode 100644 drivers/phy/phy-exynos5-usbdrd.c
 > 
-> One thing which wasn't clear was that why do we enable a hwmod in the first
-> place, if we know that we are going to skip reset?
+> diff --git a/Documentation/devicetree/bindings/phy/samsung-phy.txt b/Documentation/devicetree/bindings/phy/samsung-phy.txt
+> index b422e38..51efe4c 100644
+> --- a/Documentation/devicetree/bindings/phy/samsung-phy.txt
+> +++ b/Documentation/devicetree/bindings/phy/samsung-phy.txt
+> @@ -114,3 +114,43 @@ Example:
+>  		compatible = "samsung,exynos-sataphy-i2c";
+>  		reg = <0x38>;
+>  	};
+> +
+> +Samsung Exynos5 SoC series USB DRD PHY controller
+> +--------------------------------------------------
+> +
+> +Required properties:
+> +- compatible : Should be set to one of the following supported values:
+> +	- "samsung,exynos5250-usbdrd-phy" - for exynos5250 SoC,
+> +	- "samsung,exynos5420-usbdrd-phy" - for exynos5420 SoC.
+> +- reg : Register offset and length of USB DRD PHY register set;
+> +- clocks: Clock IDs array as required by the controller
+> +- clock-names: names of clocks correseponding to IDs in the clock property;
+> +	       Required clocks:
+> +	- phy: main PHY clock (same as USB DRD controller i.e. DWC3 IP clock),
+> +	       used for register access.
+> +	- ref: PHY's reference clock (usually crystal clock), used for
+> +	       PHY operations, associated by phy name. It is used to
+> +	       determine bit values for clock settings register.
+> +	       For Exynos5420 this is given as 'sclk_usbphy30' in CMU.
+> +- samsung,pmu-syscon: phandle for PMU system controller interface, used to
+> +		      control pmu registers for power isolation.
+> +- samsung,pmu-offset: phy power control register offset to pmu-system-controller
+> +		      base.
 
-Probably to configure the idle bits. In general, we should configure the
-modules lazily as the driver probes as requested, and then idle the
-unused modules with a late_initcall.
+It doesn't seem right to have register offset encoded in the device tree
+like this. I think it'd be more appropriate to associate such an offset
+with the compatible string's value in the driver.
 
-Regards,
+Also it might be sensible to create a new header file in include/linux/mfd/
+syscon/ for Exynos5 SoCs and put any required PMU offset definitions there. 
+Instead having them scattered and possibly duplicated in various drivers.
 
-Tony
+> +- #phy-cells : from the generic PHY bindings, must be 1;
+> +
+> +For "samsung,exynos5250-usbdrd-phy" and "samsung,exynos5420-usbdrd-phy"
+> +compatible PHYs, the second cell in the PHY specifier identifies the
+> +PHY id, which is interpreted as follows:
+> +  0 - UTMI+ type phy,
+> +  1 - PIPE3 type phy,
+> +
+> +Example:
+> +	usb3_phy: usbphy at 12100000 {
+> +		compatible = "samsung,exynos5250-usbdrd-phy";
+> +		reg = <0x12100000 0x100>;
+> +		clocks = <&clock 286>, <&clock 1>;
+> +		clock-names = "phy", "ref";
+> +		samsung,pmu-syscon = <&pmu_system_controller>;
+> +		samsung,pmu-offset = <0x704>;
+> +		#phy-cells = <1>;
+> +	};
+[...]
+> +struct usbdrd_phy_config {
+
+Isn't name of this data structure too generic ? 
+Perhaps rename it to exynos_usbdrd_phy_config ?
+
+> +	u32 id;
+> +	void (*phy_isol)(struct phy_usb_instance *inst, u32 on);
+> +	void (*phy_init)(struct exynos5_usbdrd_phy *phy_drd);
+> +	unsigned int (*set_refclk)(struct phy_usb_instance *inst);
+> +};
+> +
+> +struct exynos5_usbdrd_phy_drvdata {
+> +	const struct usbdrd_phy_config *phy_cfg;
+> +};
+> +
+[...]
+> +const struct exynos5_usbdrd_phy_drvdata exynos5420_usbdrd_phy = {
+> +	.phy_cfg		= exynos5_usbdrd_phy_cfg,
+> +};
+> +
+> +const struct exynos5_usbdrd_phy_drvdata exynos5250_usbdrd_phy = {
+> +	.phy_cfg		= exynos5_usbdrd_phy_cfg,
+> +};
+> +
+> +static const struct of_device_id exynos5_usbdrd_phy_of_match[] = {
+> +	{
+> +		.compatible = "samsung,exynos5250-usbdrd-phy",
+> +		.data = &exynos5250_usbdrd_phy
+> +	}, {
+> +		.compatible = "samsung,exynos5420-usbdrd-phy",
+> +		.data = &exynos5420_usbdrd_phy
+> +	},
+> +	{ },
+> +};
+> +
+> +static int exynos5_usbdrd_phy_probe(struct platform_device *pdev)
+> +{
+[...]
+> +	reg_pmu = syscon_regmap_lookup_by_phandle(dev->of_node,
+> +						   "samsung,pmu-syscon");
+> +	if (IS_ERR(reg_pmu)) {
+> +		dev_err(dev, "Failed to map PMU register (via syscon)\n");
+
+nit: Maybe change it to: "Failed to lookup PMU regmap\n" ?
+
+> +		return PTR_ERR(reg_pmu);
+> +	}
+> +
+> +	ret = of_property_read_u32(node, "samsung,pmu-offset", &pmu_offset);
+> +	if (ret) {
+> +		dev_err(dev, "Missing pmu-offset for phy isolation\n");
+> +		return ret;
+> +	}
+
+Otherwise the patch looks good.
+
+--
+Thanks,
+Sylwester
