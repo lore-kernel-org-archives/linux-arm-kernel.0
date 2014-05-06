@@ -1,37 +1,69 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 6 May 2014 17:42:42 -0300
-Subject: [RESEND/PATCH v4 0/9] Watchdog support for Armada 375/38x SoC
-In-Reply-To: <20140424110636.GA1735@arch.cereza>
-References: <1397481813-4962-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20140424045153.GU28159@titan.lakedaemon.net>
- <20140424110636.GA1735@arch.cereza>
-Message-ID: <20140506204242.GA26972@arch.cereza>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Tue, 06 May 2014 22:43:36 +0200
+Subject: [PATCH] rtc: rtc-at91rm9200: fix infinite wait for ACKUPD irq
+In-Reply-To: <aed75d16aa46476eb6f6c5b0d4bef30d@BLUPR05MB037.namprd05.prod.outlook.com>
+References: <94c06375c1b44c8eb5233b0ccf2e4b13@BY2PR05MB048.namprd05.prod.outlook.com>
+ <1399386481-18643-1-git-send-email-boris.brezillon@free-electrons.com>
+ <aed75d16aa46476eb6f6c5b0d4bef30d@BLUPR05MB037.namprd05.prod.outlook.com>
+Message-ID: <53694978.3050303@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 Apr 08:06 AM, Ezequiel Garcia wrote:
-> On Apr 24, Jason Cooper wrote:
-> > On Mon, Apr 14, 2014 at 10:23:24AM -0300, Ezequiel Garcia wrote:
-> > > 
-> > > Tested on A375-DB, A385-DB, A370-RD and Dove Cubox. Sebastian did more tests
-> > > on Dove, and Jason Gunthorpe on Kirkwood.
-> > 
-> > Applied patches 7 and 8 to mvebu/dt.  For the rest,
-> > 
-> > Acked-by: Jason Cooper <jason@lakedaemon.net>
-> > 
-> 
-> Wim,
-> 
-> Can you take the rest of the patches throught your tree, with Jason's ack?
-> 
+Hi,
 
-Hi Wim,
+On 06/05/2014 21:06, Bryan Evenson wrote:
+> Boris,
+>
+>> -----Original Message-----
+>> From: Boris BREZILLON [mailto:boris.brezillon at free-electrons.com]
+>> Sent: Tuesday, May 06, 2014 10:28 AM
+>> To: Bryan Evenson
+>> Cc: Andrew Victor; Nicolas Ferre; Jean-Christophe Plagniol-Villard; linux-arm-
+>> kernel at lists.infradead.org; Alessandro Zummo; rtc-
+>> linux at googlegroups.com; linux-kernel at vger.kernel.org; Boris BREZILLON
+>> Subject: [PATCH] rtc: rtc-at91rm9200: fix infinite wait for ACKUPD irq
+>>
+>> The rtc user must wait at least 1 sec between each time/calandar update
+>> (see atmel's datasheet chapter "Updating Time/Calendar").
+>>
+>> Use the 1Hz interrupt to update the at91_rtc_upd_rdy flag and wait for
+>> the at91_rtc_wait_upd_rdy event if the rtc is not ready.
+>>
+>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+>> Reported-by: Bryan Evenson <bevenson@melinkcorp.com>
+>> ---
+>> Hello Bryan,
+>>
+>> I reproduced your bug (using your script) and this patch seems to fix the
+>> problem.
+>>
+>> Could you try it and let me know if it works for you ?
+> Looks good to me.  I modified the test script as follows:
+>
+> ----------
+> #!/bin/sh
+> i=0
+> while [ 1 ]; do
+>   hwclock -w -u > /dev/null 2>&1
+>   echo $$ $i $?
+>   : $((i++))
+> done
+> ----------
+>
+> This version then attempts to write to the RTC as often as possible (script change was due to a suggestion on the Busybox mailing list).  I ran two instances of the script, which each looped through about 60,000 times over a 30 minute run.  At no point has access to the RTC been permanently locked out on my system.  I'd call this fixed.
 
-Do you have comments about this?
+Great!
 
-Thanks!
+> I'd assume this patch would be backported to the longterm releases?
+
+I'd like to wait for Nicolas' ack before asking for a backport to stable
+releases.
+
+Best Regards,
+
+Boris
+
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
 http://free-electrons.com
