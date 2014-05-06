@@ -1,44 +1,33 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue,  6 May 2014 02:14:08 +0200
-Subject: [PATCH v3 13/20] usb: host: xhci-plat: Add support for the Armada 375
+Date: Tue,  6 May 2014 02:14:07 +0200
+Subject: [PATCH v3 12/20] ARM: configs: Add usb_xhci_mvebu to
+ multi_v7_defconfig
 In-Reply-To: <1399335255-589-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1399335255-589-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1399335255-589-14-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1399335255-589-13-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the Armada 375 SoC which comes with an xhci controller. Currently
-the quirk is the same that the Armada 380/385 one, but by introducing
-a new compatible string it will allow to make the driver evolve
-seamless.
+The Marvell Armada 38x platform needs the xhci_mvebu driver enabled
+for the xHCI USB hosts, so this commit enables the corresponding
+Kconfig option in multi_v7_defconfig.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/usb/host/xhci-plat.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-index d12ba56f52da..09639962c0bb 100644
---- a/drivers/usb/host/xhci-plat.c
-+++ b/drivers/usb/host/xhci-plat.c
-@@ -152,6 +152,10 @@ static int xhci_plat_probe(struct platform_device *pdev)
- 					"marvell,armada-380-xhci"))
- 		xhci_mvebu_mbus_init_quirk(pdev);
- 
-+	if (of_device_is_compatible(pdev->dev.of_node,
-+					"marvell,armada-375-xhci"))
-+		xhci_mvebu_mbus_init_quirk(pdev);
-+
- 	/* Initialize dma_mask and coherent_dma_mask to 32-bits */
- 	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
- 	if (ret)
-@@ -288,6 +292,7 @@ static const struct of_device_id usb_xhci_of_match[] = {
- 	{ .compatible = "generic-xhci" },
- 	{ .compatible = "xhci-platform" },
- 	{ .compatible = "marvell,armada-380-xhci"},
-+	{ .compatible = "marvell,armada-375-xhci"},
- 	{ },
- };
- MODULE_DEVICE_TABLE(of, usb_xhci_of_match);
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index d4e8a47a2f7c..820cc35d40cf 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -254,6 +254,7 @@ CONFIG_SND_SOC_TEGRA_ALC5632=y
+ CONFIG_SND_SOC_TEGRA_MAX98090=y
+ CONFIG_USB=y
+ CONFIG_USB_XHCI_HCD=y
++CONFIG_USB_XHCI_MVEBU=y
+ CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_EHCI_TEGRA=y
+ CONFIG_USB_EHCI_HCD_PLATFORM=y
 -- 
 1.8.1.2
