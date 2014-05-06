@@ -1,86 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 06 May 2014 21:11:48 +0200
-Subject: [RESEND PATCH 2/3] PCI: ARM: add support for generic PCI host
- controller
-In-Reply-To: <20140506183811.GI13677@arm.com>
-References: <1399048876-11862-1-git-send-email-will.deacon@arm.com>
- <12080862.flQZBvPba4@wuerfel> <20140506183811.GI13677@arm.com>
-Message-ID: <12021375.dFzSuv1Afb@wuerfel>
+From: eric@eukrea.com (Eric =?ISO-8859-1?B?QuluYXJk?=)
+Date: Tue, 6 May 2014 21:15:45 +0200
+Subject: [PATCH v3 1/2] ARM: dts: imx51-eukrea-mbimxsd51-baseboard: Add
+ CAN support
+In-Reply-To: <1399384466.762807575@f343.i.mail.ru>
+References: <1399380998-4277-1-git-send-email-fabio.estevam@freescale.com>
+ <1399384466.762807575@f343.i.mail.ru>
+Message-ID: <20140506211545.37b92848@e6520eb>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 06 May 2014 19:38:12 Will Deacon wrote:
-> Ok, I've respun the patch and included it below. It's turned probe() into a
-> bit of a beast, but the cleanup is a lot simpler (unless I'm missing
-> something).
+Hi,
 
-Let's see if we can make it a bit more readable. None of these are important,
-but together they could improve readability.
+Le Tue, 06 May 2014 17:54:26 +0400,
+Alexander Shiyan <shc_work@mail.ru> a ?crit :
 
-> +static int gen_pci_probe(struct platform_device *pdev)
-> +{
-> +       struct gen_pci *pci;
-> +       int err, res_valid;
-> +       struct pci_host_bridge_window *win;
-> +       struct resource *bus_range;
-> +       resource_size_t busn;
-> +       const char *type;
-> +       struct of_pci_range range;
-> +       struct of_pci_range_parser parser;
-> +       struct hw_pci hw;
-> +       const struct of_device_id *of_id;
-> +       const int *prop;
-> +       u8 bus_max;
-> +       struct device *dev = &pdev->dev;
-> +       struct device_node *np = dev->of_node;
-> +
-> +       if (!dev->of_node)
-> +               return -ENODEV;
+> Tue, 6 May 2014 09:56:37 -0300 ?? Fabio Estevam <fabio.estevam@freescale.com>:
+> > +&ecspi1 {
+> > +	pinctrl-names = "default";
+> > +	pinctrl-0 = <&pinctrl_ecspi1>;
+> > +	fsl,spi-num-chipselects = <1>;
+> > +	cs-gpios = <&gpio4 24 GPIO_ACTIVE_LOW>;
+> > +	status = "okay";
+> > +
+> > +	can0: can at 0 {
+> > +		compatible = "microchip,mcp2515";
+> > +		reg = <0>;
+> > +		clocks = <&clks IMX5_CLK_OSC>;
+> 
+> I would recommend using a separate fixed clock for this, if not actually OSC
+> frequency is used. Eric?
+> 
+true, the MCP is using its own 24MHz crystal and not the i.MX51's one.
 
-This check can go away: you don't get here without an of node.
-
-> +       pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
-> +       if (!pci)
-> +               return -ENOMEM;
-> +
-> +       pci->host.dev.parent = dev;
-> +       hw = (struct hw_pci) {
-> +               .nr_controllers = 1,
-> +               .private_data   = (void **)&pci,
-> +               .setup          = gen_pci_setup,
-> +               .map_irq        = of_irq_parse_and_map_pci,
-> +               .ops            = &gen_pci_ops,
-> +       };
-
-C constructors are actually a gcc extension, I think it would be more
-common to turn this into an initializer by moving it to the declaration:
-
-	struct gen_pci *pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
-	struct hw_pci hw = {
-               .nr_controllers = 1,
-               .private_data   = (void **)&pci,
-               .setup          = gen_pci_setup,
-               .map_irq        = of_irq_parse_and_map_pci,
-               .ops            = &gen_pci_ops,
-       };
-
-
-> +       if (of_pci_range_parser_init(&parser, np)) {
-> +               dev_err(dev, "missing \"ranges\" property\n");
-> +               return -EINVAL;
-> +       }
-
-If you move everything related to the range parser into a separate function,
-you end up with two more compact parts. 
-
-> +       /* Create and register resources from the ranges property */
-> +       res_valid = 0;
-> +       for_each_of_pci_range(&parser, &range) {
-> +               struct resource *parent, *res;
-> +               resource_size_t offset;
-> +               u32 restype = range.flags & IORESOURCE_TYPE_BITS;
-
-You could also move the body of the for loop into another function, or
-both.
-
-	Arnd
+Eric
