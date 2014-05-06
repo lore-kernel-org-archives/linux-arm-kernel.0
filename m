@@ -1,61 +1,50 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 6 May 2014 15:33:41 +0200
-Subject: [PATCH v3 02/20] usb: ehci-orion: Add the optional PHY support
-In-Reply-To: <1399335255-589-3-git-send-email-gregory.clement@free-electrons.com>
-References: <1399335255-589-1-git-send-email-gregory.clement@free-electrons.com>
- <1399335255-589-3-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140506133341.GE6503@lunn.ch>
+From: dmurphy@ti.com (Dan Murphy)
+Date: Tue, 6 May 2014 08:40:40 -0500
+Subject: [TEMP PATCH 17/17] ARM: dts: dra7: Add *resets* property for
+ PCIe dt node
+In-Reply-To: <1399383244-14556-18-git-send-email-kishon@ti.com>
+References: <1399383244-14556-1-git-send-email-kishon@ti.com>
+ <1399383244-14556-18-git-send-email-kishon@ti.com>
+Message-ID: <5368E658.1040209@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 06, 2014 at 02:13:57AM +0200, Gregory CLEMENT wrote:
-> This commit allows to use the PHY provided through the device tree. It
-> will be useful for the Armada 375 SoCs. if no PHY is provided then the
-> behavior of the driver is unchanged.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+On 05/06/2014 08:34 AM, Kishon Vijay Abraham I wrote:
+> Added *resets* and *reset-names* properies for PCIe dt node.
+> The documention for this node can be found @ ../bindings/pci/ti-pci.txt.
+>
+> Cc: Dan Murphy <dmurphy@ti.com>
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 > ---
->  drivers/usb/host/ehci-orion.c | 25 +++++++++++++++++++++++--
->  1 file changed, 23 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/usb/host/ehci-orion.c b/drivers/usb/host/ehci-orion.c
-> index d6c19c37c76b..f6d9eb2e33cd 100644
-> --- a/drivers/usb/host/ehci-orion.c
-> +++ b/drivers/usb/host/ehci-orion.c
-> @@ -15,6 +15,7 @@
->  #include <linux/clk.h>
->  #include <linux/platform_data/usb-ehci-orion.h>
->  #include <linux/of.h>
-> +#include <linux/phy/phy.h>
->  #include <linux/of_device.h>
->  #include <linux/of_irq.h>
->  #include <linux/usb.h>
-> @@ -46,6 +47,7 @@
->  
->  struct orion_ehci_hcd {
->  	struct clk *clk;
-> +	struct phy *phy;
->  };
->  
->  static const char hcd_name[] = "ehci-orion";
-> @@ -224,6 +226,18 @@ static int ehci_orion_drv_probe(struct platform_device *pdev)
->  	if (!IS_ERR(priv->clk))
->  		clk_prepare_enable(priv->clk);
->  
-> +
-> +	priv->phy = devm_phy_get(&pdev->dev, "usb");
-> +	if (!IS_ERR(priv->phy)) {
-> +		err = phy_init(priv->phy);
-> +		if (err)
-> +			goto err2;
-> +
-> +		err = phy_power_on(priv->phy);
-> +		if (err)
-> +			goto err3;
-> +	}
+>  arch/arm/boot/dts/dra7.dtsi |    2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+> index 20b1a09..7bc0555 100644
+> --- a/arch/arm/boot/dts/dra7.dtsi
+> +++ b/arch/arm/boot/dts/dra7.dtsi
+> @@ -1031,6 +1031,8 @@
+>  			ti,hwmods = "pcie1";
+>  			phys = <&pcie1_phy>;
+>  			phy-names = "pcie-phy";
+> +			resets = <&prm_resets &device_reset>;
 
-Hi Gregory
+If you look @ v2 of the reset framework patchset your phandle should be
 
-What about EPROBE_DEFERRED?
+resets = <&prm_resets &pcie1_reset>;
 
-     Andrew
+If you call the device_reset phandle you will reset the SoC.
+
+
+> +			reset-names = "reset";
+
+This needs to be more descriptive.
+
+>  		};
+>  
+>  		sata: sata at 4a141100 {
+
+
+-- 
+------------------
+Dan Murphy
