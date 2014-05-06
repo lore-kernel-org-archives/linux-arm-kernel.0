@@ -1,40 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 06 May 2014 15:59 +0200
-Subject: [PATCH 06/17] pci: host: pcie-designware: Use *base-mask* for
- configuring the iATU
-In-Reply-To: <1399383244-14556-7-git-send-email-kishon@ti.com>
-References: <1399383244-14556-1-git-send-email-kishon@ti.com>
- <1399383244-14556-7-git-send-email-kishon@ti.com>
-Message-ID: <4764413.ZAEU5S5p0p@wuerfel>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 6 May 2014 15:08:59 +0100
+Subject: [PATCH] arm64: Clean up the default pgprot setting
+In-Reply-To: <20140502170745.GF20642@arm.com>
+References: <1399045919-5615-1-git-send-email-catalin.marinas@arm.com>
+ <20140502170745.GF20642@arm.com>
+Message-ID: <20140506140857.GB23957@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 06 May 2014 19:03:52 Kishon Vijay Abraham I wrote:
-> In DRA7, the cpu sees 32bit address, but the pcie controller can see only 28bit
-> address. So whenever the cpu issues a read/write request, the 4 most
-> significant bits are used by L3 to determine the target controller.
-> For example, the cpu reserves 0x2000_0000 - 0x2FFF_FFFF for PCIe controller but
-> the PCIe controller will see only (0x000_0000 - 0xFFF_FFF). So for programming
-> the outbound translation window the *base* should be programmed as 0x000_0000.
-> Whenever we try to write to say 0x2000_0000, it will be translated to whatever
-> we have programmed in the translation window with base as 0x000_0000.
+On Fri, May 02, 2014 at 06:07:45PM +0100, Will Deacon wrote:
+> On Fri, May 02, 2014 at 04:51:59PM +0100, Catalin Marinas wrote:
+> > The primary aim of this patchset is to remove the pgprot_default and
+> > prot_sect_default global variables and rely strictly on predefined
+> > values. The original goal was to be able to run SMP kernels on UP
+> > hardware by not setting the Shareability bit. However, it is unlikely to
+> > see UP ARMv8 hardware and even if we do, the Shareability bit is no
+> > longer assumed to disable cacheable accesses.
+> > 
+> > A side effect is that the device mappings now have the Shareability
+> > attribute set. The hardware, however, should ignore it since Device
+> > accesses are always Outer Shareable.
+> > 
+> > Following the removal of the two global variables, there is some PROT_*
+> > macro reshuffling and cleanup, including the __PAGE_* macros (replaced
+> > by PAGE_*).
 > 
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Marek Vasut <marex@denx.de>
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> Acked-by: Jingoo Han <jg1.han@samsung.com>
-> Acked-by: Mohit Kumar <mohit.kumar@st.com>
+> [...]
+> 
+> > +#define PAGE_NONE		__pgprot(((_PAGE_DEFAULT) & ~PTE_TYPE_MASK) | PTE_PROT_NONE | PTE_PXN | PTE_UXN)
+> > +#define PAGE_SHARED		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN | PTE_WRITE)
+> > +#define PAGE_SHARED_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_WRITE)
+> > +#define PAGE_COPY		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
+> > +#define PAGE_COPY_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN)
+> > +#define PAGE_READONLY		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
+> > +#define PAGE_READONLY_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN)
+> > +#define PAGE_EXECONLY		__pgprot(_PAGE_DEFAULT | PTE_NG | PTE_PXN)
+> 
+> Could you build the non-exec versions in terms of the exec versions? The
+> difference is just the addition of PTE_UXN, and it would make this easier to
+> read.
 
-Sorry, but NAK.
+I think it still looks nicer this way. If we are writing one in terms of
+the other we have to use pgprot_val() to decompose the __pgprot()
+returned type.
 
-We have a standard 'dma-ranges' property to handle this, so use it.
-
-See the x-gene PCIe driver patches for an example. Please also talk
-to Santosh about it, as he is implementing generic support for
-parsing dma-ranges in platform devices at the moment.
-
-I also suspect you will have to implement swiotlb support to make
-generic PCI devices work behind this bridge. Otherwise you end up
-with random physical addresses passed into DMA registers.
-
-	Arnd
+-- 
+Catalin
