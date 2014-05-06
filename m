@@ -1,39 +1,64 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Tue, 6 May 2014 10:42:11 +0200
-Subject: [linux-sunxi] Re: [PATCH 0/2] ARM: sunxi: Enable syscon for the
- system controller
-In-Reply-To: <CAGb2v64nm2i+XivDO8drHSkUUJvGr_=HaWMB26rbytVZAdTQFw@mail.gmail.com>
-References: <1399212160-26934-1-git-send-email-carlo@caione.org>
- <20140505225517.GE9464@lukather>
- <CAGb2v66JBM_Rv8ie=7iuTPrXGPJECTeevnf9LLXNS=FSYs1+Tg@mail.gmail.com>
- <CAOQ7t2akOEr7o4Q5ze5QPr_RHj6MWmA-u5NTuq2q1epy2LBr8w@mail.gmail.com>
- <CAGb2v64nm2i+XivDO8drHSkUUJvGr_=HaWMB26rbytVZAdTQFw@mail.gmail.com>
-Message-ID: <CAOQ7t2aAUESX5X6n2PLKfctzNEqjDEbncDHZZL+Ew_29s1WM+g@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 06 May 2014 10:44:01 +0200
+Subject: [PATCH v2 0/4] ARM: S3C24XX: cleanup debug macro/earlyprintk
+In-Reply-To: <0cc401cf68e1$eb87f580$c297e080$@samsung.com>
+References: <1856986.kkQFKFg1L2@phil>
+ <0cc401cf68e1$eb87f580$c297e080$@samsung.com>
+Message-ID: <2586347.kOddnpvo1Z@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 6, 2014 at 10:27 AM, Chen-Yu Tsai <wens@csie.org> wrote:
+Am Dienstag, 6. Mai 2014, 13:16:14 schrieb Kukjin Kim:
+> Heiko St?bner wrote:
+> > This series tries to simplify the s3c24xx debug macro, removing
+> > dependencies
+> > on mach/ includes, static mappings and finally moving it into
+> > include/debug.
+> 
+> I think, it's good way :)
+> 
+> > The one slightly invasive change is the need for the developer to select
+> > the uart type by himself, which gets rid of the debug macro trying to
+> > determine the uart type itself.
+> > 
+> > But as usage of the debug-uart is not the common case - especially in a
+> > multiplatform scenario - I didn't worry to much.
+> 
+> Yeah, I also don't want s3c24xx to support multiplatform in near future.
+> 
+> > Based on 3.15-rc1 and tested on a S3C2442 Openmoko Freerunner (GTA02)
+> > 
+> > changes since v1:
+> > - do not introduce a secondary choice option, instead implement the
+> > 
+> >   s3c2410 debug uarts as separate options
+> > 
+> > Heiko Stuebner (4):
+> >   ARM: compressed/head.S: remove s3c24xx special case
+> >   ARM: S3C24XX: trim down debug uart handling
+> >   ARM: S3C24XX: use generic DEBUG_UART_PHY/_VIRT in debug macro
+> >   ARM: S3C24XX: move debug-macro.S into the common space
+> >  
+> >  arch/arm/Kconfig.debug                           |  54 +++++++++++-
+> >  arch/arm/boot/compressed/head.S                  |   5 --
+> >  arch/arm/include/debug/s3c24xx.S                 |  46 +++++++++++
+> >  arch/arm/mach-s3c24xx/Kconfig                    |  28 -------
+> >  arch/arm/mach-s3c24xx/include/mach/debug-macro.S | 101 ------------------
+> > 
+> > -----
+> > 
+> >  5 files changed, 98 insertions(+), 136 deletions(-)
+> >  create mode 100644 arch/arm/include/debug/s3c24xx.S
+> >  delete mode 100644 arch/arm/mach-s3c24xx/include/mach/debug-macro.S
+> > 
+> > --
+> > 1.9.0
+> 
+> Basically I'm OK on this series but need to get review from Russell?
 
-<snip>
+Russell pointed out a bad decision on my part in v1, so I guess he is aware of 
+this series :-) . I've also added arm at kernel.org now, so they can complain, if 
+anything is done wrong [should've probably done that from the beginning].
 
-> I came to the same conclusion, though I somehow forgot to update my tree
-> on github. Here it is:
->
->   https://github.com/wens/linux/tree/wip/sunxi-musb
->
-> This also has the bit definitions:
->
->   https://github.com/wens/linux/commit/3db9c184df5e5b3e1ddef59926e88fc2d03b4de9
 
-Oh, I missed that wip branch. I'll add your SoB also and I'll add the
-bit definitions in v2 (if Maxime ACKs it)
-
-> Beware musb in my tree doesn't work. I was focused on getting the phy driver
-> and port controller correct.
-
-No prob, still scouting around :)
-
-Thanks,
-
--- 
-Carlo Caione
+Heiko
