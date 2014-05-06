@@ -1,109 +1,167 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 06 May 2014 11:24:52 -0600
-Subject: [PATCH v3 1/3] base: power: Add generic OF-based power domain
- look-up
-In-Reply-To: <536918A9.6050502@gmail.com>
-References: <1398271618-28932-1-git-send-email-t.figa@samsung.com>	<1398271618-28932-2-git-send-email-t.figa@samsung.com>	<535E9163.3070305@wwwdotorg.org>
- <CAPDyKFoGOcScsaGWkw9bVh=gpGTApRK48AczaMiSmLah+YOSXQ@mail.gmail.com>
- <53690D21.8080807@wwwdotorg.org> <536918A9.6050502@gmail.com>
-Message-ID: <53691AE4.10206@wwwdotorg.org>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 06 May 2014 19:36:14 +0200
+Subject: [PATCH v4 08/15] clk: exynos5420: update clocks for PERIS and
+ GEN blocks
+In-Reply-To: <1399393610-23394-9-git-send-email-shaik.ameer@samsung.com>
+References: <1399393610-23394-1-git-send-email-shaik.ameer@samsung.com>
+ <1399393610-23394-9-git-send-email-shaik.ameer@samsung.com>
+Message-ID: <53691D8E.8080102@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/06/2014 11:15 AM, Tomasz Figa wrote:
-> 
-> 
-> On 06.05.2014 18:26, Stephen Warren wrote:
->> On 05/06/2014 02:22 AM, Ulf Hansson wrote:
->>> On 28 April 2014 19:35, Stephen Warren <swarren@wwwdotorg.org> wrote:
->>>> On 04/23/2014 10:46 AM, Tomasz Figa wrote:
->>>>> This patch introduces generic code to perform power domain look-up
->>>>> using
->>>>> device tree and automatically bind devices to their power domains.
->>>>> Generic device tree binding is introduced to specify power domains of
->>>>> devices in their device tree nodes.
->>>>>
->>>>> Backwards compatibility with legacy Samsung-specific power domain
->>>>> bindings is provided, but for now the new code is not compiled when
->>>>> CONFIG_ARCH_EXYNOS is selected to avoid collision with legacy code.
->>>>> This
->>>>> will change as soon as Exynos power domain code gets converted to use
->>>>> the generic framework in further patch.
->>>>
->>>>> diff --git
->>>>> a/Documentation/devicetree/bindings/power/power_domain.txt
->>>>> b/Documentation/devicetree/bindings/power/power_domain.txt
->>>>
->>>>> +==Power domain consumers==
->>>>> +
->>>>> +Required properties:
->>>>> + - power-domain : A phandle and power domain specifier as defined
->>>>> by bindings
->>>>> +                  of power controller specified by phandle.
->>>>
->>>> It seems quite likely that a single logical device could have
->>>> components
->>>> in multiple power domains. Consider an HDMI controller with different
->>>> power domains for the HDMI core, CEC communication, DDC/I2C
->>>> communication, and the I/O pads, with no clear separation between those
->>>> two components of the module (no separate register spaces, but the
->>>> bits/registers are interleaved all together).
->>>>
->>>> As such, I think that rather than a "power-domain" property, we need a
->>>> pair of "power-domains", and "power-domain-names" properties, and
->>>> preferably with mandatory usage of name-based lookups, rather than
->>>> allowing a random mix of name-based and index-based lookups like we
->>>> have
->>>> with some existing resource bindings.
->>>
->>> Each struct device have only one dev_pm_domain pointer, thus a device
->>> are not able to reside in more than one power domain.
->>>
->>> Therefore I doubt this will be very useful, unless I missed your
->>> point. :-)
->>
->> A struct device is a Linux-internal concept. DT is supposed to represent
->> the HW in an OS-agnostic fashion, not according to the limitations of
->> any one OS's driver model.
->>
->> It's certainly true that a single logical HW module (represented by a
->> single DT node) can have parts in multiple power domains.
-> 
-> AFAIK a single DT node is supposed to represent a single _physical_ HW
-> module. It all depends on description granularity, though. A physical
-> chip (or IP block) might be further divided into multiple blocks, so I
-> can imagine some of them being in different power domains than another.
+Shaik,
 
-Physical-vs-logical probably means different things to different people.
-What I mean is that DT should represent the HW modules at the
-granularity that the HW documentation or designers describe the HW.
+On 06.05.2014 18:26, Shaik Ameer Basha wrote:
+> This patch fixes some parent-child relationships according
+> to the latest datasheet and adds more clocks related to
+> PERIS and GEN blocks.
+>
+> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+> Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
+> Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
+> ---
+>   drivers/clk/samsung/clk-exynos5420.c   |   81 ++++++++++++++++++++------------
+>   include/dt-bindings/clock/exynos5420.h |    5 ++
+>   2 files changed, 55 insertions(+), 31 deletions(-)
+>
+> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+> index c86ecbb..af13e6c 100644
+> --- a/drivers/clk/samsung/clk-exynos5420.c
+> +++ b/drivers/clk/samsung/clk-exynos5420.c
+> @@ -83,6 +83,7 @@
+>   #define SCLK_DIV_ISP1		0x10584
+>   #define DIV2_RATIO0		0x10590
+>   #define GATE_BUS_TOP		0x10700
+> +#define GATE_BUS_GEN		0x1073c
+>   #define GATE_BUS_FSYS0		0x10740
+>   #define GATE_BUS_PERIC		0x10750
+>   #define GATE_BUS_PERIC1		0x10754
+> @@ -96,6 +97,7 @@
+>   #define GATE_IP_G3D		0x10930
+>   #define GATE_IP_GEN		0x10934
+>   #define GATE_IP_PERIC		0x10950
+> +#define GATE_IP_PERIS		0x10960
+>   #define GATE_IP_MSCL		0x10970
+>   #define GATE_TOP_SCLK_GSCL	0x10820
+>   #define GATE_TOP_SCLK_DISP1	0x10828
+> @@ -172,6 +174,7 @@ static unsigned long exynos5420_clk_regs[] __initdata = {
+>   	SCLK_DIV_ISP1,
+>   	DIV2_RATIO0,
+>   	GATE_BUS_TOP,
+> +	GATE_BUS_GEN,
+>   	GATE_BUS_FSYS0,
+>   	GATE_BUS_PERIC,
+>   	GATE_BUS_PERIC1,
+> @@ -185,6 +188,7 @@ static unsigned long exynos5420_clk_regs[] __initdata = {
+>   	GATE_IP_G3D,
+>   	GATE_IP_GEN,
+>   	GATE_IP_PERIC,
+> +	GATE_IP_PERIS,
+>   	GATE_IP_MSCL,
+>   	GATE_TOP_SCLK_GSCL,
+>   	GATE_TOP_SCLK_DISP1,
+> @@ -608,6 +612,10 @@ static struct samsung_div_clock exynos5420_div_clks[] __initdata = {
+>   	/* MSCL Block */
+>   	DIV(0, "dout_mscl_blk", "aclk400_mscl", DIV2_RATIO0, 28, 2),
+>
+> +	/* PSGEN */
+> +	DIV(0, "dout_gen_blk", "mout_user_aclk266", DIV2_RATIO0, 8, 1),
+> +	DIV(0, "dout_jpg_blk", "aclk166", DIV2_RATIO0, 20, 1),
+> +
+>   	/* ISP Block */
+>   	DIV(0, "dout_isp_sensor0", "mout_isp_sensor", SCLK_DIV_ISP0, 8, 8),
+>   	DIV(0, "dout_isp_sensor1", "mout_isp_sensor", SCLK_DIV_ISP0, 16, 8),
+> @@ -623,10 +631,6 @@ static struct samsung_div_clock exynos5420_div_clks[] __initdata = {
+>   };
+>
+>   static struct samsung_gate_clock exynos5420_gate_clks[] __initdata = {
+> -	/* TODO: Re-verify the CG bits for all the gate clocks */
+> -	GATE_A(CLK_MCT, "pclk_st", "aclk66_psgen", GATE_BUS_PERIS1, 2, 0, 0,
+> -		"mct"),
+> -
+>   	GATE(0, "aclk200_fsys", "mout_user_aclk200_fsys",
+>   			GATE_BUS_FSYS0, 9, CLK_IGNORE_UNUSED, 0),
+>   	GATE(0, "aclk200_fsys2", "mout_user_aclk200_fsys2",
+> @@ -776,28 +780,51 @@ static struct samsung_gate_clock exynos5420_gate_clks[] __initdata = {
+>
+>   	GATE(CLK_KEYIF, "keyif", "aclk66_peric", GATE_BUS_PERIC, 22, 0, 0),
+>
+> +	/* PERIS Block */
+>   	GATE(CLK_CHIPID, "chipid", "aclk66_psgen",
+> -			GATE_BUS_PERIS0, 12, CLK_IGNORE_UNUSED, 0),
+> +			GATE_IP_PERIS, 0, CLK_IGNORE_UNUSED, 0),
+>   	GATE(CLK_SYSREG, "sysreg", "aclk66_psgen",
+> -			GATE_BUS_PERIS0, 13, CLK_IGNORE_UNUSED, 0),
+> -	GATE(CLK_TZPC0, "tzpc0", "aclk66_psgen", GATE_BUS_PERIS0, 18, 0, 0),
+> -	GATE(CLK_TZPC1, "tzpc1", "aclk66_psgen", GATE_BUS_PERIS0, 19, 0, 0),
+> -	GATE(CLK_TZPC2, "tzpc2", "aclk66_psgen", GATE_BUS_PERIS0, 20, 0, 0),
+> -	GATE(CLK_TZPC3, "tzpc3", "aclk66_psgen", GATE_BUS_PERIS0, 21, 0, 0),
+> -	GATE(CLK_TZPC4, "tzpc4", "aclk66_psgen", GATE_BUS_PERIS0, 22, 0, 0),
+> -	GATE(CLK_TZPC5, "tzpc5", "aclk66_psgen", GATE_BUS_PERIS0, 23, 0, 0),
+> -	GATE(CLK_TZPC6, "tzpc6", "aclk66_psgen", GATE_BUS_PERIS0, 24, 0, 0),
+> -	GATE(CLK_TZPC7, "tzpc7", "aclk66_psgen", GATE_BUS_PERIS0, 25, 0, 0),
+> -	GATE(CLK_TZPC8, "tzpc8", "aclk66_psgen", GATE_BUS_PERIS0, 26, 0, 0),
+> -	GATE(CLK_TZPC9, "tzpc9", "aclk66_psgen", GATE_BUS_PERIS0, 27, 0, 0),
+> -
+> -	GATE(CLK_HDMI_CEC, "hdmi_cec", "aclk66_psgen", GATE_BUS_PERIS1, 0, 0,
+> -		0),
+> +			GATE_IP_PERIS, 1, CLK_IGNORE_UNUSED, 0),
+> +	GATE(CLK_TZPC0, "tzpc0", "aclk66_psgen", GATE_IP_PERIS, 6, 0, 0),
+> +	GATE(CLK_TZPC1, "tzpc1", "aclk66_psgen", GATE_IP_PERIS, 7, 0, 0),
+> +	GATE(CLK_TZPC2, "tzpc2", "aclk66_psgen", GATE_IP_PERIS, 8, 0, 0),
+> +	GATE(CLK_TZPC3, "tzpc3", "aclk66_psgen", GATE_IP_PERIS, 9, 0, 0),
+> +	GATE(CLK_TZPC4, "tzpc4", "aclk66_psgen", GATE_IP_PERIS, 10, 0, 0),
+> +	GATE(CLK_TZPC5, "tzpc5", "aclk66_psgen", GATE_IP_PERIS, 11, 0, 0),
+> +	GATE(CLK_TZPC6, "tzpc6", "aclk66_psgen", GATE_IP_PERIS, 12, 0, 0),
+> +	GATE(CLK_TZPC7, "tzpc7", "aclk66_psgen", GATE_IP_PERIS, 13, 0, 0),
+> +	GATE(CLK_TZPC8, "tzpc8", "aclk66_psgen", GATE_IP_PERIS, 14, 0, 0),
+> +	GATE(CLK_TZPC9, "tzpc9", "aclk66_psgen", GATE_IP_PERIS, 15, 0, 0),
+> +	GATE(CLK_HDMI_CEC, "hdmi_cec", "aclk66_psgen", GATE_IP_PERIS, 16, 0, 0),
+> +	GATE(CLK_MCT, "mct", "aclk66_psgen", GATE_IP_PERIS, 18, 0, 0),
+> +	GATE(CLK_WDT, "wdt", "aclk66_psgen", GATE_IP_PERIS, 19, 0, 0),
+> +	GATE(CLK_RTC, "rtc", "aclk66_psgen", GATE_IP_PERIS, 20, 0, 0),
+> +	GATE(CLK_TMU, "tmu", "aclk66_psgen", GATE_IP_PERIS, 21, 0, 0),
+> +	GATE(CLK_TMU_GPU, "tmu_gpu", "aclk66_psgen", GATE_IP_PERIS, 22, 0, 0),
+> +
+>   	GATE(CLK_SECKEY, "seckey", "aclk66_psgen", GATE_BUS_PERIS1, 1, 0, 0),
 
-> Still, based on the fact that in Linux we never needed to specify
-> multiple power domains for a device, is this really a real use case?
+What about this one?
 
-a) Linux has absolutely nothing to do with this. Again, DT is purely a
-HW description that should not be influenced by OS limitations.
+> -	GATE(CLK_WDT, "wdt", "aclk66_psgen", GATE_BUS_PERIS1, 3, 0, 0),
+> -	GATE(CLK_RTC, "rtc", "aclk66_psgen", GATE_BUS_PERIS1, 4, 0, 0),
+> -	GATE(CLK_TMU, "tmu", "aclk66_psgen", GATE_BUS_PERIS1, 5, 0, 0),
+> -	GATE(CLK_TMU_GPU, "tmu_gpu", "aclk66_psgen", GATE_BUS_PERIS1, 6, 0, 0),
+> +
+> +	/* GATE_IP_PERIS doesn't list TZPC10,11 */
+> +	GATE(CLK_TZPC10, "tzpc10", "aclk66_psgen", GATE_BUS_GEN, 30, 0, 0),
+> +	GATE(CLK_TZPC11, "tzpc11", "aclk66_psgen", GATE_BUS_GEN, 31, 0, 0),
 
-b) Linux does have to deal with this. HW exists which uses multiple
-power domains per DT device node.
+Hmm, this patch is essentially adding these two clocks, as they were not 
+present before. Maybe this is just an error in the documentation and 
+there are just 10 TZPC blocks?
 
-The fact that Linux forces the driver internals to create a separate
-struct device for each part of the actual device that's in a different
-power domain should not force us into representing the HW incorrectly in DT.
+> +
+> +	/* GEN Block */
+> +	GATE(CLK_ROTATOR, "rotator", "mout_user_aclk266", GATE_IP_GEN, 1, 0, 0),
+> +	GATE(CLK_JPEG, "jpeg", "aclk300_jpeg", GATE_IP_GEN, 2, 0, 0),
+> +	GATE(CLK_JPEG2, "jpeg2", "aclk300_jpeg", GATE_IP_GEN, 3, 0, 0),
+> +	GATE(CLK_MDMA1, "mdma1", "mout_user_aclk266", GATE_IP_GEN, 4, 0, 0),
+> +	GATE(CLK_TOP_RTC, "top_rtc", "aclk66_psgen", GATE_IP_GEN, 5, 0, 0),
+> +	GATE(CLK_SMMU_ROTATOR, "smmu_rotator", "dout_gen_blk",
+> +			GATE_IP_GEN, 6, CLK_SET_RATE_PARENT, 0),
+> +	GATE(CLK_SMMU_JPEG, "smmu_jpeg", "dout_jpg_blk",
+> +			GATE_IP_GEN, 7, CLK_SET_RATE_PARENT, 0),
+> +	GATE(CLK_SMMU_MDMA1, "smmu_mdma1", "dout_gen_blk",
+> +			GATE_IP_GEN, 9, CLK_SET_RATE_PARENT, 0),
 
-> Anyway, the binding is defined in a way that lets you simply turn the
-> single phandle+specifier into a list of them, if such need ever shows up.
+Why CLK_SET_RATE_PARENT (for all 3 clocks above)?
 
-In my opinion, for all new resource bindings, we need to *exclusively*
-support named-based lookup. That's the only way to ensure a simple
-forward-compatible path to extensible DT bindings in the face of
-multiple instances of a certain type of resource, where some are
-optional. If resource lookups start out by index, and then later
-(missing information when the DT binding was written, extending the DT
-binding to a new HW revision/model) we find we need to add more
-instances of that resource, some of which are optional, then anything
-but purely name-based lookup makes the situation very complex.
+> +
+> +	/* GATE_IP_GEN doesn't list gates for smmu_jpeg2 and mc */
+> +	GATE(CLK_SMMU_JPEG2, "smmu_jpeg2", "dout_jpg_blk",
+> +			GATE_BUS_GEN, 28, CLK_SET_RATE_PARENT, 0),
 
-We should solve this by simply using named-based lookup from the start
-in all cases. That's my point here. Hence, we need to addm and enforce
-usage of, a power-domain-names property.
+Ditto.
+
+Best regards,
+Tomasz
