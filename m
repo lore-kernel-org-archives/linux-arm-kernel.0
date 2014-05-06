@@ -1,44 +1,93 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Tue, 6 May 2014 10:06:52 -0700
-Subject: [Patch v2 1/4] soc: Placeholder files for drivers/soc
-In-Reply-To: <53593D89.1020703@ti.com>
-References: <1398357082-5102-1-git-send-email-agross@codeaurora.org>
- <1398357082-5102-2-git-send-email-agross@codeaurora.org>
- <53593D89.1020703@ti.com>
-Message-ID: <655E240A-D6B1-4750-AC3A-09BA9D0C084E@codeaurora.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 6 May 2014 19:09:23 +0200
+Subject: [PATCH resend 04/15] arm64: add support for kernel mode NEON in
+ interrupt context
+In-Reply-To: <20140506164918.GK23957@arm.com>
+References: <1398959381-8126-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1398959381-8126-5-git-send-email-ard.biesheuvel@linaro.org>
+ <20140506164918.GK23957@arm.com>
+Message-ID: <CAKv+Gu89KOcBnUgktw-vCogqn5VTcOSsZCer6Qty3rXf4-9zyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 6 May 2014 18:49, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Thu, May 01, 2014 at 04:49:36PM +0100, Ard Biesheuvel wrote:
+>> diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+>> index 7a900142dbc8..05e1b24aca4c 100644
+>> --- a/arch/arm64/include/asm/fpsimd.h
+>> +++ b/arch/arm64/include/asm/fpsimd.h
+>> @@ -41,6 +41,17 @@ struct fpsimd_state {
+>>       unsigned int cpu;
+>>  };
+>>
+>> +/*
+>> + * Struct for stacking the bottom 'n' FP/SIMD registers.
+>> + */
+>> +struct fpsimd_partial_state {
+>> +     u32             num_regs;
+>> +     u32             fpsr;
+>> +     u32             fpcr;
+>> +     __uint128_t     vregs[32] __aligned(16);
+>> +} __aligned(16);
+>
+> Do we need this explicit alignment here?
+>
 
-On Apr 24, 2014, at 9:36 AM, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
+Without it, the implied alignment is 8 bytes, I suppose, but I haven't
+checked carefully.
+I will check and remove this if 8 bytes is the default.
 
-> On Thursday 24 April 2014 12:31 PM, Andy Gross wrote:
->> Add placeholder Kconfig and linkage for driver/soc.
->> 
->> The first patch set that implemented this was authored by Santosh Shilimkar:
->> https://lkml.org/lkml/2014/2/28/567
->> 
->> Signed-off-by: Andy Gross <agross@codeaurora.org>
->> ---
-> Good to see these patches on the list. Me and Kumar spoke about it
-> many times before.
-> 
-> BTW, I just posted updated version. Feel free to use the from it instead
-> of 4subject one.
-> 
-> Regards,
-> Santosh
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> diff --git a/arch/arm64/include/asm/fpsimdmacros.h b/arch/arm64/include/asm/fpsimdmacros.h
+>> index bbec599c96bd..69e75134689d 100644
+>> --- a/arch/arm64/include/asm/fpsimdmacros.h
+>> +++ b/arch/arm64/include/asm/fpsimdmacros.h
+>> @@ -62,3 +62,38 @@
+>>       ldr     w\tmpnr, [\state, #16 * 2 + 4]
+>>       msr     fpcr, x\tmpnr
+>>  .endm
+>> +
+>> +.altmacro
+>> +.macro fpsimd_save_partial state, numnr, tmpnr1, tmpnr2
+>> +     mrs     x\tmpnr1, fpsr
+>> +     str     w\numnr, [\state]
+>> +     mrs     x\tmpnr2, fpcr
+>> +     stp     w\tmpnr1, w\tmpnr2, [\state, #4]
+>> +     adr     x\tmpnr1, 0f
+>> +     add     \state, \state, x\numnr, lsl #4
+>> +     sub     x\tmpnr1, x\tmpnr1, x\numnr, lsl #1
+>> +     br      x\tmpnr1
+>> +     .irp    qa, 30, 28, 26, 24, 22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 2, 0
+>> +     .irp    qb, %(qa + 1)
+>> +     stp     q\qa, q\qb, [\state, # -16 * \qa - 16]
+>> +     .endr
+>> +     .endr
+>> +0:
+>> +.endm
+>> +
+>> +.macro fpsimd_restore_partial state, tmpnr1, tmpnr2
+>> +     ldp     w\tmpnr1, w\tmpnr2, [\state, #4]
+>> +     msr     fpsr, x\tmpnr1
+>> +     msr     fpcr, x\tmpnr2
+>> +     adr     x\tmpnr1, 0f
+>> +     ldr     w\tmpnr2, [\state]
+>> +     add     \state, \state, x\tmpnr2, lsl #4
+>> +     sub     x\tmpnr1, x\tmpnr1, x\tmpnr2, lsl #1
+>> +     br      x\tmpnr1
+>> +     .irp    qa, 30, 28, 26, 24, 22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 2, 0
+>> +     .irp    qb, %(qa + 1)
+>> +     ldp     q\qa, q\qb, [\state, # -16 * \qa - 16]
+>> +     .endr
+>> +     .endr
+>> +0:
+>> +.endm
+>
+> BTW, it may be better if num_regs is placed at the end of the structure,
+> especially since you use stp to store both fpsr and fpcr (though I
+> haven't rewritten the above to see how they look).
+>
 
-Paul,
-
-Did you have any other thoughts on this, do we want to add more to Santosh?s patch w/regards to comments or MAINTAINERs?
-
-- k
+I suppose you mean in the middle, i.e., after fpsr and fpcr?
+Yes that makes sense, I will change that.
 
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Ard.
