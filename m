@@ -1,57 +1,35 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 6 May 2014 14:40:55 -0500
-Subject: [PATCH V5 1/3] arm: dts: dra7: Add crossbar device binding
-In-Reply-To: <1399384579-25620-2-git-send-email-r.sricharan@ti.com>
-References: <1399384579-25620-1-git-send-email-r.sricharan@ti.com>
- <1399384579-25620-2-git-send-email-r.sricharan@ti.com>
-Message-ID: <20140506194055.GA6962@saruman.home>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 6 May 2014 12:41:46 -0700
+Subject: [PATCH] ARM: debug: qcom: make UART address selection
+ configuration option
+In-Reply-To: <1397483254-3612-1-git-send-email-iivanov@mm-sol.com>
+References: <53458708.40702@codeaurora.org>
+ <1397483254-3612-1-git-send-email-iivanov@mm-sol.com>
+Message-ID: <20140506194146.GG20486@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 06, 2014 at 07:26:17PM +0530, Sricharan R wrote:
-> This adds the irq crossbar device node.
+On 04/14, Ivan T. Ivanov wrote:
+> From: "Ivan T. Ivanov" <iivanov@mm-sol.com>
 > 
-> There is a IRQ crossbar device in the soc, which
-> maps the irq requests from the peripherals to the
-> mpu interrupt controller's inputs. The Peripheral irq
-> requests are connected to only one crossbar
-> input and the output of the crossbar is connected to only one
-> controller's input line. The crossbar device is used to map
-> a peripheral input to a free mpu's interrupt controller line.
+> Separate Qualcomm low-level debugging UART to two options.
 > 
-> Cc: Benoit Cousson <bcousson@baylibre.com>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Rajendra Nayak <rnayak@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Sricharan R <r.sricharan@ti.com>
-> Signed-off-by: Nishanth Menon <nm@ti.com>
+> DEBUG_MSM_UART is used in earlier non-multi platform arches,
+> like MSM7X00A, QSD8X50 and MSM7X30.
+> 
+> DEBUG_QCOM_UARTDM is used in multi-plafrom arches and have
+> embedded data mover.
+> 
+> Make DEBUG_UART_PHYS and DEBUG_UART_BASE user adjustable by
+> Kconfig menu.
+> 
+> Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
 > ---
-> [V5] Rebased on top of 3.15-rc4 and corrected the
->      irqs-reserved list
-> 
->  arch/arm/boot/dts/dra7.dtsi |    8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-> index 149b550..0274a86 100644
-> --- a/arch/arm/boot/dts/dra7.dtsi
-> +++ b/arch/arm/boot/dts/dra7.dtsi
-> @@ -790,6 +790,14 @@
->  			status = "disabled";
->  		};
->  	};
-> +
-> +	crossbar_mpu: crossbar at 4a020000 {
 
-shouldn't this be "status = disabled"; so that boards enable this
-on-demand ??
+Finally got around to testing this out.
+
+Tested-by: Stephen Boyd <sboyd@codeaurora.org>
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140506/e593d66e/attachment.sig>
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
