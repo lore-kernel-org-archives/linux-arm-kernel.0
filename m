@@ -1,80 +1,38 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 6 May 2014 11:16:53 -0500
-Subject: [PATCH 3/4] ARM: dts: am335x-evmsk: use phandles for USB and DMA
- refs
-In-Reply-To: <1398693512-5355-3-git-send-email-guido@vanguardiasur.com.ar>
-References: <1398693512-5355-1-git-send-email-guido@vanguardiasur.com.ar>
- <1398693512-5355-3-git-send-email-guido@vanguardiasur.com.ar>
-Message-ID: <20140506161653.GL25849@saruman.home>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 6 May 2014 13:17:15 -0300
+Subject: mx6qsabresd hangs on linux-next
+In-Reply-To: <5369081D.5030400@st.com>
+References: <CAOMZO5DMEqs=zzNGqgKjK7wTJdiNPgEqxsX=TtqKrnpLMzpbDw@mail.gmail.com>
+ <20140506141310.GA2794@dragon>
+ <CAOMZO5DH5d_L-deVu=XmBo9ekq+-g704p7cyayLvp=43bnEccQ@mail.gmail.com>
+ <CAOMZO5Dx0JMj3dZ7BSgaYSZZ=ZKRqQHEYWj5sb6z_9jc+cpsEw@mail.gmail.com>
+ <5369081D.5030400@st.com>
+Message-ID: <CAOMZO5CSp5JVy+at0H2Ory21t0ySLNGMM1WExOTkbLOt-r7mqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 10:58:31AM -0300, Guido Mart?nez wrote:
-> Use phandles instead of unit adresses to reference usb and dma nodes.
-> This makes the DT more robust and readable.
-> 
-> Signed-off-by: Guido Mart?nez <guido@vanguardiasur.com.ar>
+On Tue, May 6, 2014 at 1:04 PM, Maxime Coquelin <maxime.coquelin@st.com> wrote:
 
-Acked-by: Felipe Balbi <balbi@ti.com>
+> i is incremented in _next_div():
 
-> ---
->  arch/arm/boot/dts/am335x-evmsk.dts | 12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
-> index ab23885..44b8d75 100644
-> --- a/arch/arm/boot/dts/am335x-evmsk.dts
-> +++ b/arch/arm/boot/dts/am335x-evmsk.dts
-> @@ -364,28 +364,28 @@
->  &usb {
->  	status = "okay";
->  
-> -	control at 44e10620 {
-> +	&usb_ctrl_mod {
->  		status = "okay";
->  	};
->  
-> -	usb-phy at 47401300 {
-> +	&usb0_phy {
->  		status = "okay";
->  	};
->  
-> -	usb-phy at 47401b00 {
-> +	&usb1_phy {
->  		status = "okay";
->  	};
->  
-> -	usb at 47401000 {
-> +	&usb0 {
->  		status = "okay";
->  	};
->  
-> -	usb at 47401800 {
-> +	&usb1 {
->  		status = "okay";
->  		dr_mode = "host";
->  	};
->  
-> -	dma-controller at 47402000  {
-> +	&cppi41dma  {
->  		status = "okay";
->  	};
->  };
-> -- 
-> 1.9.2
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Yes, I see it now.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140506/85ae0024/attachment-0001.sig>
+> +static int _next_div(struct clk_divider *divider, int div)
+> +{
+> +       div++;
+> +
+> +       if (divider->flags & CLK_DIVIDER_POWER_OF_TWO)
+> +               return __roundup_pow_of_two(div);
+> +       if (divider->table)
+> +               return _round_up_table(divider->table, div);
+> +
+> +       return div;
+> +}
+>
+> Could you tell me which kind of divider it is? pow2, table, linear?
+
+table divider.
+
+Regards,
+
+Fabio Estevam
