@@ -1,59 +1,48 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Tue, 6 May 2014 10:42:59 -0500
-Subject: [PATCHv3 3/3] edac: altera: Add EDAC support for Altera SDRAM
-In-Reply-To: <1399330337-16748-4-git-send-email-tthayer@altera.com>
-References: <1399330337-16748-1-git-send-email-tthayer@altera.com>
- <1399330337-16748-4-git-send-email-tthayer@altera.com>
-Message-ID: <1399390979.11533.6.camel@linux-builds1>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Tue, 6 May 2014 17:48:05 +0200
+Subject: [PATCH 0/4] Enable ST Keyscan driver
+In-Reply-To: <5368D806.8050609@linaro.org>
+References: <1399304320-18197-1-git-send-email-gabriel.fernandez@linaro.org>
+ <5368D806.8050609@linaro.org>
+Message-ID: <53690435.5040602@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-05-05 at 17:52 -0500, Thor Thayer wrote:
-> From: Thor Thayer <tthayer@altera.com>
-> 
-> ---
-> v2: Use the SDRAM controller registers to calculate memory size
->     instead of the Device Tree. Update To & Cc list. Add maintainer
->     information.
-> 
-> v3: EDAC driver cleanup based on comments from Mailing list.
-> 
-> Signed-off-by: Thor Thayer <tthayer@altera.com>
-> ---
->  MAINTAINERS                |    5 +
->  drivers/edac/Kconfig       |    9 +
->  drivers/edac/Makefile      |    2 +
->  drivers/edac/altera_edac.c |  411 ++++++++++++++++++++++++++++++++++++++++++++
->  4 files changed, 427 insertions(+)
->  create mode 100644 drivers/edac/altera_edac.c
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index e67ea24..ecd1277 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1290,6 +1290,11 @@ M:	Dinh Nguyen <dinguyen@altera.com>
->  S:	Maintained
->  F:	drivers/clk/socfpga/
->  
-> +ARM/SOCFPGA SDRAM EDAC SUPPORT
-> +M:	Thor Thayer <tthayer@altera.com>
-> +S:	Maintained
-> +F:	drivers/edac/altera_edac.c
-> +
->  ARM/STI ARCHITECTURE
->  M:	Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
->  M:	Maxime Coquelin <maxime.coquelin@st.com>
-> diff --git a/drivers/edac/Kconfig b/drivers/edac/Kconfig
-> index 878f090..4f4d379 100644
-> --- a/drivers/edac/Kconfig
-> +++ b/drivers/edac/Kconfig
-> @@ -368,4 +368,13 @@ config EDAC_OCTEON_PCI
->  	  Support for error detection and correction on the
->  	  Cavium Octeon family of SOCs.
->  
-> +config EDAC_ALTERA_MC
-> +	bool "Altera SDRAM Memory Controller EDAC"
+Hi Srini,
 
-Can this be tristate?
+	I will prepare the branch next week for the pull request.
 
-Dinh
+Thanks,
+Maxime
+
+On 05/06/2014 02:39 PM, Srinivas Kandagatla wrote:
+> All the DT patches look good for me.
+> Acked-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>
+> I think It will be better to send a pull request to Arnd/Olof including
+> other reviewed DT patches.
+>
+> thanks,
+> srini
+>
+>
+> On 05/05/14 16:38, Gabriel FERNANDEZ wrote:
+>> The goal of this series is to enable ST Keyscan support to ST SoCs.
+>> The DT definition is added for STiH415 and STiH416 SoCs on
+>> B2000 board.
+>> Tested on B2000 sti board.
+>>
+>> Gabriel Fernandez (4):
+>>    ARM: STi: DT: add keyscan for stih415
+>>    ARM: STi: DT: add keyscan for stih416
+>>    ARM: STi: DT: add keyscan for stih41x-b2000
+>>    ARM: multi_v7_defconfig: add ST Keyscan driver
+>>
+>>   arch/arm/boot/dts/stih415-pinctrl.dtsi | 16 ++++++++++++++++
+>>   arch/arm/boot/dts/stih415.dtsi         | 12 ++++++++++++
+>>   arch/arm/boot/dts/stih416-pinctrl.dtsi | 16 ++++++++++++++++
+>>   arch/arm/boot/dts/stih416.dtsi         | 12 ++++++++++++
+>>   arch/arm/boot/dts/stih41x-b2000.dtsi   | 23 +++++++++++++++++++++++
+>>   arch/arm/configs/multi_v7_defconfig    |  1 +
+>>   6 files changed, 80 insertions(+)
+>>
