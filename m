@@ -1,126 +1,61 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Tue,  6 May 2014 17:36:34 +0200
-Subject: [PATCH] netdev: add support for interface name retrieval from DT
- aliases
-Message-ID: <1399390594-1409-1-git-send-email-boris.brezillon@free-electrons.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 6 May 2014 12:36:39 -0300
+Subject: mx6qsabresd hangs on linux-next
+In-Reply-To: <20140506141310.GA2794@dragon>
+References: <CAOMZO5DMEqs=zzNGqgKjK7wTJdiNPgEqxsX=TtqKrnpLMzpbDw@mail.gmail.com>
+ <20140506141310.GA2794@dragon>
+Message-ID: <CAOMZO5DH5d_L-deVu=XmBo9ekq+-g704p7cyayLvp=43bnEccQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is currently no proper way to bind a net interface to a specific
-name. The interface name is chosen based on the interface type (eth,
-wlan, ...) and the interfaces already registered (the core codes takes
-the first unused interface id of the given type).
+On Tue, May 6, 2014 at 11:13 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
+> On Mon, May 05, 2014 at 07:50:24PM -0300, Fabio Estevam wrote:
+>> Hi,
+>>
+>> I am running linux-next 20140505 on a mx6qsabresd and I am getting the
+>> following hang after ldb is bound:
+>>
+>> imx-ipuv3 2400000.ipu: IPUv3H probed
+>> imx-ipuv3 2800000.ipu: IPUv3H probed
+>> [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
+>> [drm] No driver support for vblank timestamp query.
+>> imx-drm display-subsystem.11: bound imx-ipuv3-crtc.0 (ops ipu_crtc_ops)
+>> imx-drm display-subsystem.11: bound imx-ipuv3-crtc.1 (ops ipu_crtc_ops)
+>> mmc1: new SDHC card at address e7ac
+>> mmcblk0: mmc1:e7ac SD04G 3.69 GiB
+>> imx-drm display-subsystem.11: bound imx-ipuv3-crtc.2 (ops ipu_crtc_ops)
+>>  mmcblk0: unknown partition table
+>> imx-drm display-subsystem.11: bound imx-ipuv3-crtc.3 (ops ipu_crtc_ops)
+>> imx-hdmi 120000.hdmi: Detected HDMI controller 0x13:0xa:0xa0:0xc1
+>> imx-drm display-subsystem.11: bound 120000.hdmi (ops hdmi_ops)
+>> imx-drm display-subsystem.11: bound ldb.10 (ops imx_ldb_ops)
+>>
+>> (... system hangs)
+>
+> I'm seeing the same issue here.  It seems to be caused by some clk
+> divider code change.  I'm looking into it further.
 
-Add support for DT retrieval of the interface id based on DT aliases.
-The alias name must match the interface type (e.g. ethX if you're defining
-an ethernet dev alias).
+Indeed, if I revert:
 
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
----
- net/core/dev.c | 45 +++++++++++++++++++++++++++++++++++++++++----
- 1 file changed, 41 insertions(+), 4 deletions(-)
+commit e7489693b3a853ab6dfad52f7e6af553ae8d3f28
+Author: Maxime COQUELIN <maxime.coquelin@st.com>
+Date:   Wed Jan 29 17:24:08 2014 +0100
 
-diff --git a/net/core/dev.c b/net/core/dev.c
-index d2c8a06..8f30cb8 100644
---- a/net/core/dev.c
-+++ b/net/core/dev.c
-@@ -132,6 +132,7 @@
- #include <linux/hashtable.h>
- #include <linux/vmalloc.h>
- #include <linux/if_macvlan.h>
-+#include <linux/of.h>
- 
- #include "net-sysfs.h"
- 
-@@ -960,13 +961,19 @@ EXPORT_SYMBOL(dev_valid_name);
-  *	Returns the number of the unit assigned or a negative errno code.
-  */
- 
--static int __dev_alloc_name(struct net *net, const char *name, char *buf)
-+static int __dev_alloc_name(struct net *net, struct net_device *dev,
-+			    const char *name, char *buf)
- {
- 	int i = 0;
-+	int of_id = -EINVAL;
- 	const char *p;
- 	const int max_netdevices = 8*PAGE_SIZE;
- 	unsigned long *inuse;
- 	struct net_device *d;
-+	struct device_node *np = NULL;
-+
-+	if (dev->dev.parent)
-+		np = dev->dev.parent->of_node;
- 
- 	p = strnchr(name, IFNAMSIZ-1, '%');
- 	if (p) {
-@@ -978,11 +985,38 @@ static int __dev_alloc_name(struct net *net, const char *name, char *buf)
- 		if (p[1] != 'd' || strchr(p + 2, '%'))
- 			return -EINVAL;
- 
-+		if (np) {
-+			strlcpy(buf, name, (size_t)(p + 1 - name));
-+			of_id = of_alias_get_id(np, buf);
-+		}
-+
- 		/* Use one page as a bit array of possible slots */
- 		inuse = (unsigned long *) get_zeroed_page(GFP_ATOMIC);
- 		if (!inuse)
- 			return -ENOMEM;
- 
-+#ifdef CONFIG_OF
-+		/* iterate over aliases to reserve interfaces names */
-+		np = of_find_node_by_path("/aliases");
-+		if (np) {
-+			struct property *pp;
-+			for_each_property_of_node(np, pp) {
-+				if (!sscanf(pp->name, name, &i))
-+					continue;
-+				if (i < 0 || i >= max_netdevices)
-+					continue;
-+
-+				/* avoid cases where sscanf is not exact
-+				 * inverse of printf
-+				 */
-+				snprintf(buf, IFNAMSIZ, name, i);
-+				if (!strncmp(buf, pp->name, IFNAMSIZ) &&
-+				    i != of_id)
-+					set_bit(i, inuse);
-+			}
-+		}
-+#endif
-+
- 		for_each_netdev(net, d) {
- 			if (!sscanf(d->name, name, &i))
- 				continue;
-@@ -995,7 +1029,10 @@ static int __dev_alloc_name(struct net *net, const char *name, char *buf)
- 				set_bit(i, inuse);
- 		}
- 
--		i = find_first_zero_bit(inuse, max_netdevices);
-+		if (of_id >= 0 && !test_bit(of_id, inuse))
-+			i = of_id;
-+		else
-+			i = find_first_zero_bit(inuse, max_netdevices);
- 		free_page((unsigned long) inuse);
- 	}
- 
-@@ -1033,7 +1070,7 @@ int dev_alloc_name(struct net_device *dev, const char *name)
- 
- 	BUG_ON(!dev_net(dev));
- 	net = dev_net(dev);
--	ret = __dev_alloc_name(net, name, buf);
-+	ret = __dev_alloc_name(net, dev, name, buf);
- 	if (ret >= 0)
- 		strlcpy(dev->name, buf, IFNAMSIZ);
- 	return ret;
-@@ -1047,7 +1084,7 @@ static int dev_alloc_name_ns(struct net *net,
- 	char buf[IFNAMSIZ];
- 	int ret;
- 
--	ret = __dev_alloc_name(net, name, buf);
-+	ret = __dev_alloc_name(net, dev, name, buf);
- 	if (ret >= 0)
- 		strlcpy(dev->name, buf, IFNAMSIZ);
- 	return ret;
--- 
-1.8.3.2
+    clk: divider: Optimize clk_divider_bestdiv loop
+
+    Currently, the for-loop used to try all the different dividers to find the
+    one that best fit tries all the values from 1 to max_div,
+incrementing by one.
+    In case of power-of-two, or table based divider, the loop isn't optimal.
+
+    Instead of incrementing by one, this patch provides directly the
+next divider.
+
+    Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
+    Signed-off-by: Mike Turquette <mturquette@linaro.org>
+
+Then the board does not hang.
+
+Maxime, Mike
+
+Any suggestion?
