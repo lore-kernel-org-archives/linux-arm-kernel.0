@@ -1,41 +1,40 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Tue, 6 May 2014 19:26:19 +0530
-Subject: [PATCH V5 3/3] arm: dts: dra7: Add routable-irqs property for gic node
-In-Reply-To: <1399384579-25620-1-git-send-email-r.sricharan@ti.com>
-References: <1399384579-25620-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <1399384579-25620-4-git-send-email-r.sricharan@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 06 May 2014 15:59 +0200
+Subject: [PATCH 06/17] pci: host: pcie-designware: Use *base-mask* for
+ configuring the iATU
+In-Reply-To: <1399383244-14556-7-git-send-email-kishon@ti.com>
+References: <1399383244-14556-1-git-send-email-kishon@ti.com>
+ <1399383244-14556-7-git-send-email-kishon@ti.com>
+Message-ID: <4764413.ZAEU5S5p0p@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is a IRQ crossbar device in the soc, which maps the
-irq requests from the peripherals to the mpu interrupt
-controller's inputs. The gic provides the support for such
-IPs in the form of routable-irqs. So adding the property
-here to gic node.
+On Tuesday 06 May 2014 19:03:52 Kishon Vijay Abraham I wrote:
+> In DRA7, the cpu sees 32bit address, but the pcie controller can see only 28bit
+> address. So whenever the cpu issues a read/write request, the 4 most
+> significant bits are used by L3 to determine the target controller.
+> For example, the cpu reserves 0x2000_0000 - 0x2FFF_FFFF for PCIe controller but
+> the PCIe controller will see only (0x000_0000 - 0xFFF_FFF). So for programming
+> the outbound translation window the *base* should be programmed as 0x000_0000.
+> Whenever we try to write to say 0x2000_0000, it will be translated to whatever
+> we have programmed in the translation window with base as 0x000_0000.
+> 
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Marek Vasut <marex@denx.de>
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> Acked-by: Jingoo Han <jg1.han@samsung.com>
+> Acked-by: Mohit Kumar <mohit.kumar@st.com>
 
-Cc: Benoit Cousson <bcousson@baylibre.com>
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Rajendra Nayak <rnayak@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Sricharan R <r.sricharan@ti.com>
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
-[V5] Rebased and corrected routable irqs from 160 to 192
+Sorry, but NAK.
 
- arch/arm/boot/dts/dra7.dtsi |    1 +
- 1 file changed, 1 insertion(+)
+We have a standard 'dma-ranges' property to handle this, so use it.
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 52e4bd0..cec826f 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -72,6 +72,7 @@
- 		compatible = "arm,cortex-a15-gic";
- 		interrupt-controller;
- 		#interrupt-cells = <3>;
-+		arm,routable-irqs = <192>;
- 		reg = <0x48211000 0x1000>,
- 		      <0x48212000 0x1000>,
- 		      <0x48214000 0x2000>,
--- 
-1.7.9.5
+See the x-gene PCIe driver patches for an example. Please also talk
+to Santosh about it, as he is implementing generic support for
+parsing dma-ranges in platform devices at the moment.
+
+I also suspect you will have to implement swiotlb support to make
+generic PCI devices work behind this bridge. Otherwise you end up
+with random physical addresses passed into DMA registers.
+
+	Arnd
