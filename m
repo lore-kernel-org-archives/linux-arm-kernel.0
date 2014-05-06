@@ -1,126 +1,79 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 6 May 2014 13:04:22 +0200
-Subject: [PATCH] ARM: zynq: dt: Clean up device tree
-In-Reply-To: <1399310168-6099-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1399310168-6099-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <cb504244-1639-4ad9-97c3-4258507fb647@CO9EHSMHS026.ehs.local>
+From: b.galvani@gmail.com (Beniamino Galvani)
+Date: Tue, 6 May 2014 13:13:46 +0200
+Subject: [PATCH 1/2] of: add bq and radxa vendor prefixes
+In-Reply-To: <CABuKBe+fFCU2__rEHfiU+XPQwKE613VBxQ4=8xiA3PXQkBiMDQ@mail.gmail.com>
+References: <1398973835-26303-1-git-send-email-b.galvani@gmail.com>
+ <2225372.rvnmuAdhHE@phil>
+ <CABuKBe+fFCU2__rEHfiU+XPQwKE613VBxQ4=8xiA3PXQkBiMDQ@mail.gmail.com>
+Message-ID: <20140506111345.GB22196@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/05/2014 07:16 PM, Soren Brinkmann wrote:
->  - Use generic node names
->  - Fix up some weird formatting and white spaces
->  - Update copyright info
+On Sun, May 04, 2014 at 02:57:52PM +0200, Matthias Brugger wrote:
+> 2014-05-02 1:32 GMT+02:00 Heiko St?bner <heiko@sntech.de>:
+> > Hi Beniamino,
+> >
+> > Am Donnerstag, 1. Mai 2014, 21:50:34 schrieb Beniamino Galvani:
+> >> Add new vendor prefixes for:
+> >>
+> >>     * bq, a company that sells multimedia devices and 3D printers
+> >
+> > bq is actually only a brandname. The company itself is "Mundo Reader S.L.".
+> > I'm not sure what the actual policy is concerning the vendor prefix, i.e. if it
+> > should use the visible brand name or the actual company name.
+> >
+> > I.e. another possibility would be to add the vendor prefix
+> >         mundoreader     Mundo Reader S.L.
+> > and name the currie
+> >         mundoreader,bq-curie2
 > 
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> ---
-> 
->  arch/arm/boot/dts/zynq-7000.dtsi | 29 +++++++++++++++--------------
->  1 file changed, 15 insertions(+), 14 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-> index c1176abc34d9..bed6e0aed00a 100644
-> --- a/arch/arm/boot/dts/zynq-7000.dtsi
-> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
-> @@ -1,5 +1,5 @@
->  /*
-> - *  Copyright (C) 2011 Xilinx
-> + *  Copyright (C) 2011 - 2014 Xilinx
->   *
->   * This software is licensed under the terms of the GNU General Public
->   * License version 2, as published by the Free Software Foundation, and
-> @@ -55,7 +55,7 @@
->  		interrupt-parent = <&intc>;
->  		ranges;
->  
-> -		i2c0: zynq-i2c at e0004000 {
-> +		i2c0: i2c at e0004000 {
->  			compatible = "cdns,i2c-r1p10";
->  			status = "disabled";
->  			clocks = <&clkc 38>;
-> @@ -66,7 +66,7 @@
->  			#size-cells = <0>;
->  		};
->  
-> -		i2c1: zynq-i2c at e0005000 {
-> +		i2c1: i2c at e0005000 {
->  			compatible = "cdns,i2c-r1p10";
->  			status = "disabled";
->  			clocks = <&clkc 39>;
-> @@ -95,7 +95,7 @@
->  			cache-level = <2>;
->  		};
->  
-> -		uart0: uart at e0000000 {
-> +		uart0: serial at e0000000 {
->  			compatible = "xlnx,xuartps";
->  			status = "disabled";
->  			clocks = <&clkc 23>, <&clkc 40>;
-> @@ -104,7 +104,7 @@
->  			interrupts = <0 27 4>;
->  		};
->  
-> -		uart1: uart at e0001000 {
-> +		uart1: serial at e0001000 {
->  			compatible = "xlnx,xuartps";
->  			status = "disabled";
->  			clocks = <&clkc 24>, <&clkc 41>;
-> @@ -131,7 +131,7 @@
->  			clock-names = "pclk", "hclk", "tx_clk";
->  		};
->  
-> -		sdhci0: ps7-sdhci at e0100000 {
-> +		sdhci0: sdhci at e0100000 {
->  			compatible = "arasan,sdhci-8.9a";
->  			status = "disabled";
->  			clock-names = "clk_xin", "clk_ahb";
-> @@ -141,7 +141,7 @@
->  			reg = <0xe0100000 0x1000>;
->  		} ;
->  
-> -		sdhci1: ps7-sdhci at e0101000 {
-> +		sdhci1: sdhci at e0101000 {
->  			compatible = "arasan,sdhci-8.9a";
->  			status = "disabled";
->  			clock-names = "clk_xin", "clk_ahb";
-> @@ -185,26 +185,27 @@
->  			clocks = <&clkc 4>;
->  		};
->  
-> -		ttc0: ttc0 at f8001000 {
-> +		ttc0: timer at f8001000 {
->  			interrupt-parent = <&intc>;
-> -			interrupts = < 0 10 4 0 11 4 0 12 4 >;
-> +			interrupts = <0 10 4>, <0 11 4>, <0 12 4>;
->  			compatible = "cdns,ttc";
->  			clocks = <&clkc 6>;
->  			reg = <0xF8001000 0x1000>;
->  		};
->  
-> -		ttc1: ttc1 at f8002000 {
-> +		ttc1: timer at f8002000 {
->  			interrupt-parent = <&intc>;
-> -			interrupts = < 0 37 4 0 38 4 0 39 4 >;
-> +			interrupts = <0 37 4>, <0 38 4>, <0 39 4>;
->  			compatible = "cdns,ttc";
->  			clocks = <&clkc 6>;
->  			reg = <0xF8002000 0x1000>;
->  		};
-> -		scutimer: scutimer at f8f00600 {
-> +
-> +		scutimer: timer at f8f00600 {
->  			interrupt-parent = <&intc>;
-> -			interrupts = < 1 13 0x301 >;
-> +			interrupts = <1 13 0x301>;
->  			compatible = "arm,cortex-a9-twd-timer";
-> -			reg = < 0xf8f00600 0x20 >;
-> +			reg = <0xf8f00600 0x20>;
->  			clocks = <&clkc 4>;
->  		} ;
->  	};
-> 
+> I think we should stick to the brand name, as this is the name people know.
 
-Looks good to me. Applied to zynq/dt branch.
+Personally I don't have a strong preference, so either of the two.
 
-Thanks,
-Michal
+Beniamino
+
+> 
+> >
+> >
+> > Heiko
+> >
+> >>     * Radxa, manufacturer of ARM boards
+> >>
+> >> Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
+> >> ---
+> >>  Documentation/devicetree/bindings/vendor-prefixes.txt |    2 ++
+> >>  1 file changed, 2 insertions(+)
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> >> b/Documentation/devicetree/bindings/vendor-prefixes.txt index
+> >> abc3080..6f8177c 100644
+> >> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> >> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> >> @@ -21,6 +21,7 @@ atmel       Atmel Corporation
+> >>  auo  AU Optronics Corporation
+> >>  avago        Avago Technologies
+> >>  bosch        Bosch Sensortec GmbH
+> >> +bq   bq
+> >>  brcm Broadcom Corporation
+> >>  buffalo      Buffalo, Inc.
+> >>  calxeda      Calxeda
+> >> @@ -98,6 +99,7 @@ powervr     PowerVR (deprecated, use img)
+> >>  qca  Qualcomm Atheros, Inc.
+> >>  qcom Qualcomm Technologies, Inc
+> >>  qnap QNAP Systems, Inc.
+> >> +radxa        Radxa
+> >>  raidsonic    RaidSonic Technology GmbH
+> >>  ralink       Mediatek/Ralink Technology Corp.
+> >>  ramtron      Ramtron International
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> 
+> 
+> -- 
+> motzblog.wordpress.com
