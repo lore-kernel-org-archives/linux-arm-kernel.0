@@ -1,54 +1,55 @@
-From: schmitzmic@gmail.com (Michael Schmitz)
-Date: Wed, 7 May 2014 08:16:33 +1200
-Subject: [PATCH] MAINTAINERS: add an entry for all the NCR5380 drivers
-In-Reply-To: <alpine.LNX.2.00.1405051458460.16664@nippy.intranet>
-References: <alpine.LNX.2.00.1405051458460.16664@nippy.intranet>
-Message-ID: <CAOmrzkKFiEW6sMXr6nxgjGW=Bf2EUbBoBC=sXVLPH=r8iY8BCg@mail.gmail.com>
+From: vincent.stehle@laposte.net (=?UTF-8?q?Vincent=20Stehl=C3=A9?=)
+Date: Tue,  6 May 2014 22:23:02 +0200
+Subject: [PATCH linux-next] ARM: mvebu: Fix pmsu compilation when ARMv6 is
+ selected
+Message-ID: <1399407782-29091-1-git-send-email-vincent.stehle@laposte.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Michael Schmitz <schmitzmic@gmail.com>
+When compiling for multiplatform for both ARMv6 and ARMv7, the default compiler
+flags are for ARMv6, and we will get:
 
-On Mon, May 5, 2014 at 5:35 PM, Finn Thain <fthain@telegraphics.com.au> wrote:
->
-> Signed-off-by: Finn Thain <fthain@telegraphics.com.au>
-> Cc: Michael Schmitz <schmitzmic@gmail.com>
->
-> ---
->
-> As requested:
-> http://marc.info/?l=linux-arm-kernel&m=139853302724112&w=2
->
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index e67ea24..60ea600 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -5996,6 +5996,28 @@ M:       Petr Vandrovec <petr@vandrovec.name>
->  S:     Odd Fixes
->  F:     fs/ncpfs/
->
-> +NCR 5380 SCSI DRIVERS
-> +M:     Finn Thain <fthain@telegraphics.com.au>
-> +M:     Michael Schmitz <schmitzmic@gmail.com>
-> +L:     linux-scsi at vger.kernel.org
-> +S:     Maintained
-> +F:     Documentation/scsi/g_NCR5380.txt
-> +F:     drivers/scsi/NCR5380.*
-> +F:     drivers/scsi/arm/cumana_1.c
-> +F:     drivers/scsi/arm/oak.c
-> +F:     drivers/scsi/atari_NCR5380.c
-> +F:     drivers/scsi/atari_scsi.*
-> +F:     drivers/scsi/dmx3191d.c
-> +F:     drivers/scsi/dtc.*
-> +F:     drivers/scsi/g_NCR5380.*
-> +F:     drivers/scsi/g_NCR5380_mmio.c
-> +F:     drivers/scsi/mac_scsi.*
-> +F:     drivers/scsi/pas16.*
-> +F:     drivers/scsi/sun3_NCR5380.c
-> +F:     drivers/scsi/sun3_scsi.*
-> +F:     drivers/scsi/sun3_scsi_vme.c
-> +F:     drivers/scsi/t128.*
-> +
->  NCR DUAL 700 SCSI DRIVER (MICROCHANNEL)
->  M:     "James E.J. Bottomley" <James.Bottomley@HansenPartnership.com>
->  L:     linux-scsi at vger.kernel.org
+  /tmp/ccwDEzd0.s: Assembler messages:
+  /tmp/ccwDEzd0.s:639: Error: selected processor does not support ARM mode `isb '
+  /tmp/ccwDEzd0.s:645: Error: selected processor does not support ARM mode `isb '
+  /tmp/ccwDEzd0.s:646: Error: selected processor does not support ARM mode `dsb '
+  /tmp/ccwDEzd0.s:695: Error: selected processor does not support ARM mode `isb '
+  make[1]: *** [arch/arm/mach-mvebu/pmsu.o] Error 1
+
+Fix this in a similar manner than done previously in commit
+72533b77d30c2be02672e26b5dde1263d7b4c2be, by specifying ARMv7 flags for pmsu.o.
+
+Signed-off-by: Vincent Stehl? <vincent.stehle@laposte.net>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+---
+
+Hi,
+
+This build issue can be seen with e.g. Linux next-20140506, ARCH=arm and
+allmodconfig.
+
+Best regards,
+
+V.
+
+ arch/arm/mach-mvebu/Makefile | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
+index 854b72a..2ecb828 100644
+--- a/arch/arm/mach-mvebu/Makefile
++++ b/arch/arm/mach-mvebu/Makefile
+@@ -2,6 +2,7 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
+ 	-I$(srctree)/arch/arm/plat-orion/include
+ 
+ AFLAGS_coherency_ll.o		:= -Wa,-march=armv7-a
++CFLAGS_pmsu.o			:= -march=armv7-a
+ 
+ obj-y				 += system-controller.o mvebu-soc-id.o
+ 
+-- 
+1.9.2
