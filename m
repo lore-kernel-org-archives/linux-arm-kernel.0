@@ -1,31 +1,40 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 6 May 2014 17:04:44 -0300
-Subject: [PATCH v4 1/2] ARM: dts: imx51-eukrea-mbimxsd51-baseboard: Add
- CAN support
-In-Reply-To: <1399404776.560722294@f389.i.mail.ru>
-References: <1399404113-29207-1-git-send-email-fabio.estevam@freescale.com>
- <1399404776.560722294@f389.i.mail.ru>
-Message-ID: <CAOMZO5DZFfC1NTF3gWGpCVwkOnzUi9npsLkPZioYrvDSKbFVGw@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 6 May 2014 13:51:31 -0500
+Subject: [PATCH v10 01/15] clk: sunxi: factors: automatic reparenting
+ support
+In-Reply-To: <1399046249-19472-2-git-send-email-hdegoede@redhat.com>
+References: <1399046249-19472-1-git-send-email-hdegoede@redhat.com>
+ <1399046249-19472-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <20140506185131.GI9464@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 6, 2014 at 4:32 PM, Alexander Shiyan <shc_work@mail.ru> wrote:
->> +     can0: can at 0 {
->> +             pinctrl-names = "default";
->> +             pinctrl-0 = <&pinctrl_can>;
->> +             compatible = "microchip,mcp2515";
->> +             reg = <0>;
->> +             clocks = <&clk24M>;
->> +             spi-max-frequency = <1000000>;
->
-> This should be of course 10000000, or removed completely
-> since driver already applies such limitation to the SPI bus.
-> I think Shawn can fix this during commit.
+Hi Emilio,
 
-Yes, this should be 10MHz.
+On Fri, May 02, 2014 at 05:57:15PM +0200, Hans de Goede wrote:
+> From: Emilio L?pez <emilio@elopez.com.ar>
+> 
+> This commit implements .determine_rate, so that our factor clocks can be
+> reparented when needed.
+> 
+> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Thanks for the review.
+Any chance you merge this? Since it's pretty consensual, needed by
+other drivers, and that you are the author, I can it can go in.
 
-Eric,
+Thanks,
+Maxime
 
-I forgot to Cc you on v4. Besides the 10MHz error above, does it look good?
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140506/6bd053c0/attachment.sig>
