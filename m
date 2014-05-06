@@ -1,61 +1,39 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 6 May 2014 09:32:26 -0700
-Subject: ACPI vs DT at runtime
-In-Reply-To: <20140506152725.E5B90C40959@trevor.secretlab.ca>
-References: <20131115095717.GC1709@e106331-lin.cambridge.arm.com>
- <20131118150052.GC24408@sirena.org.uk>
- <20131119091216.GA4412@netboy> <20131120064056.GB5272@netboy>
- <20131121192136.GA16735@n2100.arm.linux.org.uk>
- <20131121204704.E4487C40753@trevor.secretlab.ca>
- <CAHkRjk5MstjD9JFk+co8k89i8geJBmSF6uObhGdmWSe0GJHo8g@mail.gmail.com>
- <97692EF2-013E-4E4B-BC16-E0915D67EFEC@antoniou-consulting.com>
- <53673866.9000105@ahsoftware.de>
- <20140506152725.E5B90C40959@trevor.secretlab.ca>
-Message-ID: <CAOesGMi9vGT8hQ-e+nSgM2atg82JZkeCKEDPnM0BdgsWNBGW+A@mail.gmail.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Tue, 06 May 2014 09:33:42 -0700
+Subject: [PATCHv5 2/2] arm: Get rid of meminfo
+In-Reply-To: <20140501130849.C093DC409DA@trevor.secretlab.ca>
+References: <1396544698-15596-1-git-send-email-lauraa@codeaurora.org>
+ <1396544698-15596-3-git-send-email-lauraa@codeaurora.org>
+ <20140501130849.C093DC409DA@trevor.secretlab.ca>
+Message-ID: <53690EE6.2020909@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 6, 2014 at 8:27 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Mon, 05 May 2014 09:06:14 +0200, Alexander Holler <holler@ahsoftware.de> wrote:
->> Am 22.11.2013 13:00, schrieb Pantelis Antoniou:
+On 5/1/2014 6:08 AM, Grant Likely wrote:
+> On Thu,  3 Apr 2014 10:04:58 -0700, Laura Abbott <lauraa@codeaurora.org> wrote:
+>> memblock is now fully integrated into the kernel and is the prefered
+>> method for tracking memory. Rather than reinvent the wheel with
+>> meminfo, migrate to using memblock directly instead of meminfo as
+>> an intermediate.
 >>
->> > As one that's going to be dealing with this, please don't take the DTS
->> > files from the kernel.
->> >
->> > If you do this, I can guarantee that within a year almost no ARM board using DT
->> > will boot a mainline kernel.
->> >
->> > The reason is that vendors have enough trouble (and failing) tracking a single
->> > tree, adding yet another will just end to the vendor trees as far as the eye can see.
->> >
->> > Maybe, maybe, EVMs from silicon vendors will still boot, but I doubt any other
->> > customer board will work.
->>
->> A bit late (I don't follow the ML (or what happens in the ARM world)
->> closely, but as I've recently read that ARM64 will go UEFI and ACPI, I
->> wonder what was the reasoning behind that decision.
->
-> ARM64 will include support for UEFI an ACPI, but U-Boot and DT are not
-> going away. Really the only market segment that will care about ACPI is
-> ARM servers. Nobody else (embedded, mobile) needs to worry about it.
+>> Change-Id: I9d04e636f43bf939e13b4934dc23da0c076811d2
+>> Acked-by: Jason Cooper <jason@lakedaemon.net>
+>> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+>> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> Tested-by: Leif Lindholm <leif.lindholm@linaro.org>
+>> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> 
+> Tested-by: Grant Likely <grant.likely@linaro.org>
+> 
+> Tiny nit-picking comment below, but this patch looks really good.
+> What's the state on merging this?
+> 
 
-I do find it quite interesting to see what is actually launched by
-vendors though. The "enterprise" chipsets have not yet shown up. Or,
-rather, the only one that is out is X-Gene and it's not SBSA compliant
-and thus doesn't fall into the ACPI category.
+I put this into the patch system as 8025/1 a few weeks ago. I've been
+busy/on vacation so I haven't had a chance to follow up since then.
 
-The AMD announcements yesterday clearly targets their chip to much
-broader markets than just enterprise ("high density servers" was the
-only market segment that overlaps somewhat with "enterprise" in their
-announcements).
+Laura
 
-So, as Arnd and others have said for a while, it's definitely not a
-black and white picture we're looking at. The AMD chips, in
-particular, are targeted at mobile and embedded, but they share the
-non-CPU part of the SoC with x86. It'd be really interesting to hear
-what their plans are for software support of that, but they are so far
-absent from any discussions. I really hope they can crawl out of the
-woodwork and participate now that the roadmap is made public.
-
-
--Olof
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
