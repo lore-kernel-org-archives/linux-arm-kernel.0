@@ -1,112 +1,48 @@
-From: nikolay.borisov@arm.com (Nikolay Borisov)
-Date: Tue, 6 May 2014 10:02:02 +0100
-Subject: [PATCH v2] ARM: unwinder: Fix handling of 'fp' in thumb2 mode
-In-Reply-To: <CAPoNrtvm18NVj7SKJBs01g2wWggC13Gd2eOoTJOKoOQqQCE7hA@mail.gmail.com>
-References: <1399045056-26751-1-git-send-email-Nikolay.Borisov@arm.com>
- <CAPoNrtvm18NVj7SKJBs01g2wWggC13Gd2eOoTJOKoOQqQCE7hA@mail.gmail.com>
-Message-ID: <000101cf6909$d8bf46b0$8a3dd410$@borisov@arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 6 May 2014 11:31:12 +0200
+Subject: [PATCH] i2c: nomadik: Fixup system suspend
+In-Reply-To: <CACRpkdb8VJ_Qqype4uP_YJ5=RncJndFUZv_yDxmZwq5S=_yZ2g@mail.gmail.com>
+References: <1397138376-28427-1-git-send-email-ulf.hansson@linaro.org>
+ <CACRpkdb8VJ_Qqype4uP_YJ5=RncJndFUZv_yDxmZwq5S=_yZ2g@mail.gmail.com>
+Message-ID: <CAPDyKFo6K-mbtKcs8wPmc=E-t=Djs-ufi_+SLLpCKej+bEwbDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, 
-> -----Original Message-----
-> From: Anurag Aggarwal [mailto:anurag19aggarwal at gmail.com]
-> Sent: 03 May 2014 07:57
-> To: Nikolay Borisov
-> Cc: linux-arm-kernel at lists.infradead.org; Dave P Martin; Catalin
-> Marinas
-> Subject: Re: [PATCH v2] ARM: unwinder: Fix handling of 'fp' in thumb2
-> mode
-> 
-> Seems good.
-> 
-> I would like to know what kind of testing you have done that for this,
-> Other than that you can add my review statement
+On 10 April 2014 20:49, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Thu, Apr 10, 2014 at 3:59 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
 >
+>> For !CONFIG_PM_RUNTIME, the device were never put back into active
+>> state while resuming.
+>>
+>> For CONFIG_PM_RUNTIME, we blindly trusted the device to be inactive
+>> while we were about to handle it at suspend late, which is just too
+>> optimistic.
+>>
+>> Even if the driver uses pm_runtime_put_sync() after each tranfer to
+>> return it's runtime PM resources, there are no guarantees this will
+>> actually mean the device will inactivated. The reason is that the PM
+>> core will prevent runtime suspend during system suspend, and thus when
+>> a transfer occurs during the early phases of system suspend the device
+>> will be kept active after the transfer.
+>>
+>> To handle both issues above, use pm_runtime_force_suspend|resume() from
+>> the system suspend|resume callbacks.
+>>
+>> Cc: Alessandro Rubini <rubini@unipv.it>
+>> Cc: Linus Walleij <linus.walleij@linaro.org>
+>> Cc: Wolfram Sang <wsa@the-dreams.de>
+>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Without this patch if you use the magic sysrq to print backtrace of all
-the running tasks in the system those that are sleeping would not print 
-a backtrace. With the patch this works correctly. Another case where you
-can observe the change is in the invocation of the "ps -Al" which shows
-(among other things) which function the sleeping task is blocked in. 
+Hi Wolfram,
 
-> On Fri, May 2, 2014 at 9:07 PM, Nikolay Borisov
-> <Nikolay.Borisov@arm.com> wrote:
-> > The thread_save_fp macro has been defined so that it always reads the
-> fp member
-> > of the cpu_context_save struct. However, in the case of THUMB2 the fp
-> is saved
-> > not in the fp (r11) member but rather in r7.
-> >
-> > This patch changes the way the macro is defined such that FP is read
-> from the
-> > correct place depending on whether we are a THUMB2 kernel or not.
-> This enables
-> > the backtrace in sitaution such as "echo t > /proc/sysrq-trigger" or
-> the
-> > function in which a process sleeping when "ps -Al" is invoked.
-> >
-> > Another place where similar change is requried is when working with
-> pt_reg.
-> > regs->ARM_fp is defined such that r11 is always referenced as the
-> frame pointer,
-> > so the definition of ARM_fp needs to change depending on the type of
-> kernel we
-> > are running.
-> >
-> > Changes since v1:
-> > * Added changes for the pt_reg structure.
-> >
-> > Signed-off-by: Nikolay Borisov <Nikolay.Borisov@arm.com>
-> 
-> Reviewed-by: Anurag Aggarwal <anurag19aggarwal@gmail.com>
-> 
-> >
-> > handle the case when we've got regs present
-> > ---
-> >  arch/arm/include/asm/thread_info.h | 6 ++++++
-> >  arch/arm/include/uapi/asm/ptrace.h | 4 ++++
-> >  2 files changed, 10 insertions(+)
-> >
-> > diff --git a/arch/arm/include/asm/thread_info.h
-> b/arch/arm/include/asm/thread_info.h
-> > index f989d7c..e4e4208 100644
-> > --- a/arch/arm/include/asm/thread_info.h
-> > +++ b/arch/arm/include/asm/thread_info.h
-> > @@ -114,8 +114,14 @@ static inline struct thread_info
-> *current_thread_info(void)
-> >         ((unsigned long)(task_thread_info(tsk)->cpu_context.pc))
-> >  #define thread_saved_sp(tsk)   \
-> >         ((unsigned long)(task_thread_info(tsk)->cpu_context.sp))
-> > +
-> > +#ifndef CONFIG_THUMB2_KERNEL
-> >  #define thread_saved_fp(tsk)   \
-> >         ((unsigned long)(task_thread_info(tsk)->cpu_context.fp))
-> > +#else
-> > +#define thread_saved_fp(tsk)   \
-> > +       ((unsigned long)(task_thread_info(tsk)->cpu_context.r7))
-> > +#endif
-> >
-> >  extern void crunch_task_disable(struct thread_info *);
-> >  extern void crunch_task_copy(struct thread_info *, void *);
-> > diff --git a/arch/arm/include/uapi/asm/ptrace.h
-> b/arch/arm/include/uapi/asm/ptrace.h
-> > index 5af0ed1..92e1bae 100644
-> > --- a/arch/arm/include/uapi/asm/ptrace.h
-> > +++ b/arch/arm/include/uapi/asm/ptrace.h
-> > @@ -131,7 +131,11 @@ struct pt_regs {
-> >  #define ARM_lr         uregs[14]
-> >  #define ARM_sp         uregs[13]
-> >  #define ARM_ip         uregs[12]
-> > +#ifndef CONFIG_THUMB2_KERNEL
-> >  #define ARM_fp         uregs[11]
-> > +#else
-> > +#define ARM_fp         uregs[7]
-> > +#endif
-> >  #define ARM_r10                uregs[10]
-> >  #define ARM_r9         uregs[9]
-> >  #define ARM_r8         uregs[8]
-> > --
-> > 1.8.1.5
-> >
-> >
+This patch as has been around for a while (in some other versions as
+well), would you mind picking it up for 3.16?
+
+Kind regards
+Ulf Hansson
+
+>
+> Yours,
+> Linus Walleij
