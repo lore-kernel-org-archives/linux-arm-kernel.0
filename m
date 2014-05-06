@@ -1,33 +1,36 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue,  6 May 2014 15:12:28 +0100
-Subject: [PATCH] arm: Describe required sort order for textofs-y (TEXT_OFFSET)
-Message-ID: <1399385548-17892-1-git-send-email-daniel.thompson@linaro.org>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 6 May 2014 22:13:12 +0800
+Subject: mx6qsabresd hangs on linux-next
+In-Reply-To: <CAOMZO5DMEqs=zzNGqgKjK7wTJdiNPgEqxsX=TtqKrnpLMzpbDw@mail.gmail.com>
+References: <CAOMZO5DMEqs=zzNGqgKjK7wTJdiNPgEqxsX=TtqKrnpLMzpbDw@mail.gmail.com>
+Message-ID: <20140506141310.GA2794@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The section of the makefile that determines the TEXT_OFFSET is sorted
-by address so that, in multi-arch kernel builds, the architecture with the
-most stringent requirements for the kernel base address gets to define
-TEXT_OFFSET. The comment should reflect that.
+On Mon, May 05, 2014 at 07:50:24PM -0300, Fabio Estevam wrote:
+> Hi,
+> 
+> I am running linux-next 20140505 on a mx6qsabresd and I am getting the
+> following hang after ldb is bound:
+> 
+> imx-ipuv3 2400000.ipu: IPUv3H probed
+> imx-ipuv3 2800000.ipu: IPUv3H probed
+> [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
+> [drm] No driver support for vblank timestamp query.
+> imx-drm display-subsystem.11: bound imx-ipuv3-crtc.0 (ops ipu_crtc_ops)
+> imx-drm display-subsystem.11: bound imx-ipuv3-crtc.1 (ops ipu_crtc_ops)
+> mmc1: new SDHC card at address e7ac
+> mmcblk0: mmc1:e7ac SD04G 3.69 GiB
+> imx-drm display-subsystem.11: bound imx-ipuv3-crtc.2 (ops ipu_crtc_ops)
+>  mmcblk0: unknown partition table
+> imx-drm display-subsystem.11: bound imx-ipuv3-crtc.3 (ops ipu_crtc_ops)
+> imx-hdmi 120000.hdmi: Detected HDMI controller 0x13:0xa:0xa0:0xc1
+> imx-drm display-subsystem.11: bound 120000.hdmi (ops hdmi_ops)
+> imx-drm display-subsystem.11: bound ldb.10 (ops imx_ldb_ops)
+> 
+> (... system hangs)
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
----
- arch/arm/Makefile | 3 +++
- 1 file changed, 3 insertions(+)
+I'm seeing the same issue here.  It seems to be caused by some clk
+divider code change.  I'm looking into it further.
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 41c1931..6857fec 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -127,6 +127,9 @@ CHECKFLAGS	+= -D__arm__
- 
- #Default value
- head-y		:= arch/arm/kernel/head$(MMUEXT).o
-+
-+# Text offset. This list is sorted numerically by address in order to
-+# provide a means to avoid/resolve conflicts in multi-arch kernels.
- textofs-y	:= 0x00008000
- textofs-$(CONFIG_ARCH_CLPS711X) := 0x00028000
- # We don't want the htc bootloader to corrupt kernel during resume
--- 
-1.9.0
+Shawn
