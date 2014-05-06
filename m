@@ -1,83 +1,52 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Tue, 06 May 2014 06:46:41 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCAxLzJdIEFSTTogZHRzOiBpbXg1MS1ldWtyZWEtbWJpbXhz?=
- =?UTF-8?B?ZDUxLWJhc2Vib2FyZDogQWRkIENBTiBzdXBwb3J0?=
-In-Reply-To: <1399327248-17887-1-git-send-email-festevam@gmail.com>
-References: <1399327248-17887-1-git-send-email-festevam@gmail.com>
-Message-ID: <1399344401.373980656@f157.i.mail.ru>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 5 May 2014 22:52:45 -0400 (EDT)
+Subject: CPU performance counters not working on big.LITTLE switcher
+In-Reply-To: <CAPz6YkXsig6XornqoMyn5DtRd9NECyc+qgQo39RQK0sDeat34Q@mail.gmail.com>
+References: <CAPz6YkXsig6XornqoMyn5DtRd9NECyc+qgQo39RQK0sDeat34Q@mail.gmail.com>
+Message-ID: <alpine.LFD.2.11.1405052238230.980@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mon,  5 May 2014 19:00:47 -0300 ?? Fabio Estevam <festevam@gmail.com>:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
+On Mon, 5 May 2014, Sonny Rao wrote:
+
+> Hi, we have the problem today that cpu based performance counters don't
+> work when we're using the big.LITTLE switcher on Exynos 5420, and it
+> doesn't look like code exists to deal with this in the switcher.
 > 
-> Add support for CAN based on a MPC2515 connected to ECSPI1.
+> As it stands right now, if you put an A-15 or A-7 PMU node into your
+> device-tree on an bl_switcher system it's very broken.  At the minimum, I
+> think it should disable performance counters until there's some kind of
+> proper implementation.
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> Eric/Denis,
+> I looked into trying to make this work, but it turned out to not be as
+> simple as just context switching counters from A-15 to A-7.  The biggest
+> problem is that the PMUs are not architecturally compatible.  There are
+> different events and differing numbers of counters on these two cores.
+>  There's also the tangential issue of representing this in the device tree,
+> but that's far less important.
 > 
-> I don't have the hardware to test it. Please give it a test.
-> 
->  .../boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts  | 34 ++++++++++++++++++++++
->  1 file changed, 34 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
-> index 8b1098e..f0067e9 100644
-> --- a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
-> +++ b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
-> @@ -86,6 +86,24 @@
->  	status = "okay";
->  };
->  
-> +&ecspi1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_ecspi1>;
-> +	fsl,spi-num-chipselects = <1>;
-> +	cs-gpios = <&gpio4 24 GPIO_ACTIVE_HIGH>;
+> My guess as to how to fix this is to create an "architectural" PMU which
+> contains the intersection of the two performance monitor units with the
+> minimum number of counters supported by either core (which in this case
+> looks to be 4 on the A7).  However, I don't really have the bandwidth to
+> work on this at  the moment.  I was mostly wondering, have other people run
+> into this limitation and is there any sort of plan to work on it?
 
-Really CS High for this?
-I think this is wrong.
+The Linaro kernel release from a year ago or so contained a hack to make 
+PMUs available and cope with the switcher.
 
-> +	status = "okay";
-> +
-> +	can0: can at 0 {
-> +		compatible = "microchip,mcp2515";
-> +		reg = <0>;
-> +		clocks = <&clks IMX5_CLK_OSC>;
-> +		spi-max-frequency = <1000000>;
-> +		spi-cs-high;
+However, the ultimate solution is to add multi-PMU support in a generic 
+way to the kernel and let user space see both A15 and A7 counters.  It 
+is then up to the analysis tools to consolidate (some of) them if 
+wanted.  And this would work whether the switcher is used, or even when 
+the scheduler has learned to do proper task placement for b.L systems 
+where tasks may migrate across clusters.
 
-Ditto.
+Someone at ARM indicated they'd be working on the multi-PMU support if I 
+remember correctly.  For that reason, Linaro stopped maintaining the 
+initial hack since it was a lot of work to keep it working on top of 
+later kernels and a better solution was coming anyway.  I don't know 
+what the status of that work is though.
 
-> +		interrupt-parent = <&gpio1>;
-> +		interrupts = <1 IRQ_TYPE_EDGE_FALLING>;
-> +	};
-> +};
-> +
->  &i2c1 {
->  	tlv320aic23: codec at 1a {
->  		compatible = "ti,tlv320aic23";
-> @@ -104,6 +122,22 @@
->  			>;
->  		};
->  
-> +		pinctrl_ecspi1: ecspi1grp {
-> +			fsl,pins = <
-> +				MX51_PAD_CSPI1_MISO__ECSPI1_MISO	0x185
-> +				MX51_PAD_CSPI1_MOSI__ECSPI1_MOSI	0x185
-> +				MX51_PAD_CSPI1_SCLK__ECSPI1_SCLK	0x185
-> +				MX51_PAD_CSPI1_SS0__GPIO4_24		0x80000000 	/* CS0 */
 
-...
-> +				MX51_PAD_CSI2_PIXCLK__GPIO4_15		0x80000000	/* nReset */
-> +				MX51_PAD_GPIO1_1__GPIO1_1		0x80000000	/* IRQ */
-> +				MX51_PAD_GPIO1_4__GPIO1_4		0x80000000	/* Control signals */
-> +				MX51_PAD_GPIO1_6__GPIO1_6		0x80000000
-> +				MX51_PAD_GPIO1_7__GPIO1_7		0x80000000
-> +				MX51_PAD_GPIO1_8__GPIO1_8		0x80000000
-> +				MX51_PAD_GPIO1_9__GPIO1_9		0x80000000
-
-Unknown GPIOs.
-
----
+Nicolas
