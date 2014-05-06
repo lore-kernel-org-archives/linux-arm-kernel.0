@@ -1,81 +1,90 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue,  6 May 2014 02:13:55 +0200
-Subject: [PATCH v3 00/20] USB support for Armada 38x and Armada 375
-Message-ID: <1399335255-589-1-git-send-email-gregory.clement@free-electrons.com>
+Date: Tue,  6 May 2014 02:13:57 +0200
+Subject: [PATCH v3 02/20] usb: ehci-orion: Add the optional PHY support
+In-Reply-To: <1399335255-589-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1399335255-589-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1399335255-589-3-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set adds the USB support for the Armada 38x Armada
-375. These SoCs use an xHCI but still need specific initialization,
-mainly to setup the windows memory on the mbus. They also use the same
-controller that the other mvebu SoC for EHCI.
+This commit allows to use the PHY provided through the device tree. It
+will be useful for the Armada 375 SoCs. if no PHY is provided then the
+behavior of the driver is unchanged.
 
-Since the 2nd version I converted the usb cluster driver in a PHY
-driver. While I was working on it I found a bug on ehci-orion which I
-fixed in the 1st patch.
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/usb/host/ehci-orion.c | 25 +++++++++++++++++++++++--
+ 1 file changed, 23 insertions(+), 2 deletions(-)
 
-The other noticeable change was that in order to be able to use the
-clocks I also added private platform data for xHCI.
-
-In the meantime I also received the A0 version of the Armada 375 so I
-removed all the workaround related to the very earlier version of the
-SoC, indeed there were very few boards with this version of the SoC.
-
-
-This series is also available in
-the branch USB-375-38x-3.15-rc1-V3
-https://github.com/MISL-EBU-System-SW/mainline-public.git
-
-Thanks,
-
-Gregory CLEMENT (20):
-  usb: ehci-orion: Fix clock reference leaking
-  usb: ehci-orion: Add the optional PHY support
-  usb: host: xhci-plat: Sort the headers in alphabetic order
-  usb: xhci: add a platform-private field
-  usb: host: xhci-plat: Add clocks support
-  usb: host: xhci-plat: Add support for the Armada 38x
-  xhci-platform: Add a new controller using xhci: Armada 38x
-  ARM: mvebu: Add Device Tree description of xHCI hosts on Armada 38x
-  ARM: mvebu: Add Device Tree description of the EHCI host on Armada 38x
-  ARM: mvebu: Add USB3 support for Armada 38x
-  ARM: configs: Add usb_xhci_mvebu to mvebu_v7_defconfig
-  ARM: configs: Add usb_xhci_mvebu to multi_v7_defconfig
-  usb: host: xhci-plat: Add support for the Armada 375
-  xhci-platform: Add a new controller using xHCI: Armada 375
-  ARM: mvebu: Add Device Tree description of USB cluster controller on
-    Armada 375
-  dt: binding: Armada 375 USB cluster
-  phy: Add support for USB cluster on the Armada 375 SoC
-  ARM: mvebu: Add USB3 support for Armada 375
-  ARM: mvebu: Add Device Tree description of the xHCI host on Armada 375
-  ARM: mvebu: Add Device Tree description of the EHCI host on Armada 375
-
- .../bindings/phy/armada-375-usb-phy-cluster.txt    |  19 +++
- Documentation/devicetree/bindings/usb/usb-xhci.txt |   4 +-
- arch/arm/boot/dts/armada-375-db.dts                |   8 ++
- arch/arm/boot/dts/armada-375.dtsi                  |  34 +++++
- arch/arm/boot/dts/armada-385-db.dts                |  12 ++
- arch/arm/boot/dts/armada-385-rd.dts                |   4 +
- arch/arm/boot/dts/armada-38x.dtsi                  |  25 ++++
- arch/arm/configs/multi_v7_defconfig                |   1 +
- arch/arm/configs/mvebu_v7_defconfig                |   1 +
- arch/arm/mach-mvebu/Kconfig                        |   2 +
- drivers/phy/Kconfig                                |   5 +
- drivers/phy/Makefile                               |   1 +
- drivers/phy/phy-armada375-usb2.c                   | 154 +++++++++++++++++++++
- drivers/usb/host/Kconfig                           |   7 +
- drivers/usb/host/Makefile                          |   1 +
- drivers/usb/host/ehci-orion.c                      |  68 ++++++---
- drivers/usb/host/xhci-mvebu.c                      |  71 ++++++++++
- drivers/usb/host/xhci-mvebu.h                      |  21 +++
- drivers/usb/host/xhci-plat.c                       |  74 +++++++++-
- drivers/usb/host/xhci.h                            |   3 +
- 20 files changed, 491 insertions(+), 24 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/phy/armada-375-usb-phy-cluster.txt
- create mode 100644 drivers/phy/phy-armada375-usb2.c
- create mode 100644 drivers/usb/host/xhci-mvebu.c
- create mode 100644 drivers/usb/host/xhci-mvebu.h
-
+diff --git a/drivers/usb/host/ehci-orion.c b/drivers/usb/host/ehci-orion.c
+index d6c19c37c76b..f6d9eb2e33cd 100644
+--- a/drivers/usb/host/ehci-orion.c
++++ b/drivers/usb/host/ehci-orion.c
+@@ -15,6 +15,7 @@
+ #include <linux/clk.h>
+ #include <linux/platform_data/usb-ehci-orion.h>
+ #include <linux/of.h>
++#include <linux/phy/phy.h>
+ #include <linux/of_device.h>
+ #include <linux/of_irq.h>
+ #include <linux/usb.h>
+@@ -46,6 +47,7 @@
+ 
+ struct orion_ehci_hcd {
+ 	struct clk *clk;
++	struct phy *phy;
+ };
+ 
+ static const char hcd_name[] = "ehci-orion";
+@@ -224,6 +226,18 @@ static int ehci_orion_drv_probe(struct platform_device *pdev)
+ 	if (!IS_ERR(priv->clk))
+ 		clk_prepare_enable(priv->clk);
+ 
++
++	priv->phy = devm_phy_get(&pdev->dev, "usb");
++	if (!IS_ERR(priv->phy)) {
++		err = phy_init(priv->phy);
++		if (err)
++			goto err2;
++
++		err = phy_power_on(priv->phy);
++		if (err)
++			goto err3;
++	}
++
+ 	/*
+ 	 * (Re-)program MBUS remapping windows if we are asked to.
+ 	 */
+@@ -253,14 +267,18 @@ static int ehci_orion_drv_probe(struct platform_device *pdev)
+ 
+ 	err = usb_add_hcd(hcd, irq, IRQF_SHARED);
+ 	if (err)
+-		goto err2;
++		goto err4;
+ 
+ 	device_wakeup_enable(hcd->self.controller);
+ 	return 0;
+ 
+-err2:
++err4:
+ 	usb_put_hcd(hcd);
+ 
++err3:
++	phy_exit(priv->phy);
++
++err2:
+ 	if (!IS_ERR(priv->clk))
+ 		clk_disable_unprepare(priv->clk);
+ err1:
+@@ -278,6 +296,9 @@ static int ehci_orion_drv_remove(struct platform_device *pdev)
+ 	usb_remove_hcd(hcd);
+ 	usb_put_hcd(hcd);
+ 
++	if (!IS_ERR(priv->phy))
++		phy_exit(priv->phy);
++
+ 	if (!IS_ERR(priv->clk))
+ 		clk_disable_unprepare(priv->clk);
+ 
 -- 
 1.8.1.2
