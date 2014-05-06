@@ -1,32 +1,54 @@
 From: elder@linaro.org (Alex Elder)
-Date: Tue,  6 May 2014 17:18:31 -0500
-Subject: [PATCH v3 3/5] ARM: configs: enable SMP in bcm_defconfig
-In-Reply-To: <1399414713-19206-1-git-send-email-elder@linaro.org>
-References: <1399414713-19206-1-git-send-email-elder@linaro.org>
-Message-ID: <1399414713-19206-4-git-send-email-elder@linaro.org>
+Date: Tue,  6 May 2014 17:18:28 -0500
+Subject: [PATCH v3 0/5] ARM: SMP: support Broadcom mobile SoCs
+Message-ID: <1399414713-19206-1-git-send-email-elder@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Also explicitly set CONFIG_NR_CPUS to 2, limiting it to the most we
-currently need.
+This series adds SMP support for two Broadcom mobile SoC families.
+It uses CPU_METHOD_OF_DECLARE() so that SMP operations are assigned
+using device tree rather than adding it to a machine definition in a
+board file.
 
-Signed-off-by: Ray Jui <rjui@broadcom.com>
-Signed-off-by: Alex Elder <elder@linaro.org>
----
- arch/arm/configs/bcm_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+The enable method starts a secondary core by writing to a register
+monitored by CPUs spinning in a ROM-based holding pen loop.  The
+address of this register is recorded as a property in the "cpus"
+node of the device tree.
 
-diff --git a/arch/arm/configs/bcm_defconfig b/arch/arm/configs/bcm_defconfig
-index 3df3f3a..626f077 100644
---- a/arch/arm/configs/bcm_defconfig
-+++ b/arch/arm/configs/bcm_defconfig
-@@ -24,6 +24,7 @@ CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
- CONFIG_PARTITION_ADVANCED=y
-+CONFIG_SMP=y
- CONFIG_ARCH_BCM=y
- CONFIG_ARCH_BCM_MOBILE=y
- CONFIG_ARM_THUMBEE=y
+					-Alex
+
+Note:
+This series is based on v3.15-rc4, plus one more recently-posted patch:
+    http://permalink.gmane.org/gmane.linux.kernel/1683693
+
+History
+v3: - Dropped definition and use of CPU_METHOD_OF_DECLARE_SETUP()
+    - Added documentation for "enable-method"
+    - Rebased onto v3.15-rc4
+v2: - Fixed a Makefile error (:= should have been +=)
+    - No longer set CONFIG_NR_CPUS in bcm_defconfig
+    - Rebased onto v3.15-rc1
+
+This series is available here:
+    http://git.linaro.org/landing-teams/working/broadcom/kernel.git
+    Branch review/bcm-smp-v3
+
+Alex Elder (5):
+  devicetree: bindings: document Broadcom CPU enable method
+  ARM: add SMP support for Broadcom mobile SoCs
+  ARM: configs: enable SMP in bcm_defconfig
+  ARM: dts: enable SMP support for bcm28155
+  ARM: dts: enable SMP support for bcm21664
+
+ Documentation/devicetree/bindings/arm/cpus.txt |  12 ++
+ arch/arm/boot/dts/bcm11351.dtsi                |  19 +++
+ arch/arm/boot/dts/bcm21664.dtsi                |  19 +++
+ arch/arm/configs/bcm_defconfig                 |   1 +
+ arch/arm/mach-bcm/Kconfig                      |  18 ++-
+ arch/arm/mach-bcm/Makefile                     |   3 +
+ arch/arm/mach-bcm/platsmp.c                    | 201 +++++++++++++++++++++++++
+ 7 files changed, 270 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/mach-bcm/platsmp.c
+
 -- 
 1.9.1
