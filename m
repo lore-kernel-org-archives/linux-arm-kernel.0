@@ -1,66 +1,38 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Tue,  6 May 2014 13:40:24 +0530
-Subject: [PATCH v2 2/2] Documentation: DT: Exynos: Bind SRAM though DT
-In-Reply-To: <1399363824-23543-1-git-send-email-sachin.kamat@linaro.org>
-References: <1399363824-23543-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <1399363824-23543-2-git-send-email-sachin.kamat@linaro.org>
+From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
+Date: Tue, 6 May 2014 10:20:27 +0200
+Subject: [PATCH 1/9] ARM: STi: DT: STiH416: 416 DT Entry for clockgen
+ A0/1/10/11/12
+In-Reply-To: <20140506071843.GD5206@lee--X1>
+References: <1399305223-18703-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1399305223-18703-2-git-send-email-gabriel.fernandez@linaro.org>
+ <20140506071843.GD5206@lee--X1>
+Message-ID: <CAG374jD+msPPbPtFS+ji=8jS9+D-YHu31k7zzzC7Ty7jw9n7jQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add SRAM binding documentation.
+Hi Lee,
 
-Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
----
-No changes since v1.
----
- .../devicetree/bindings/arm/exynos/smp-sram.txt    |   38 ++++++++++++++++++++
- 1 file changed, 38 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/exynos/smp-sram.txt
+On 6 May 2014 09:18, Lee Jones <lee.jones@linaro.org> wrote:
+>> Patch adds DT entries for clockgen A0/1/10/11/12
+>>
+>> Signed-off-by: Pankaj Dev <pankaj.dev@st.com>
+>> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+>> ---
+>>  arch/arm/boot/dts/stih416-clks.h     |  15 ++
+>
+> This should live in include/dt-bindings/clk
+>
+include/dt-bindings/clk or  include/dt-bindings/clock ?
 
-diff --git a/Documentation/devicetree/bindings/arm/exynos/smp-sram.txt b/Documentation/devicetree/bindings/arm/exynos/smp-sram.txt
-new file mode 100644
-index 000000000000..c9ff2f58f9b6
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/exynos/smp-sram.txt
-@@ -0,0 +1,38 @@
-+Samsung Exynos SRAM for SMP bringup:
-+------------------------------------
-+
-+Samsung SMP-capable Exynos SoCs use part of the SRAM for the bringup
-+of the secondary cores. Once the core gets powered up it executes the
-+code that is residing at some specific location of the SRAM.
-+
-+Therefore reserved section sub-nodes have to be added to the mmio-sram
-+declaration. These nodes are of two types depending upon secure or
-+non-secure execution environment.
-+
-+Required sub-node properties:
-+- compatible : depending upon boot mode, should be
-+		"samsung,exynos4210-sram" : for Secure SYSRAM
-+		"samsung,exynos4210-sram-ns" : for Non-secure SYSRAM
-+
-+The rest of the properties should follow the generic mmio-sram discription
-+found in ../../misc/sram.txt
-+
-+Example:
-+
-+	sram at 02020000 {
-+		compatible = "mmio-sram";
-+		reg = <0x02020000 0x54000>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0 0x02020000 0x54000>;
-+
-+		smp-sram at 0 {
-+			compatible = "samsung,exynos4210-sram";
-+			reg = <0x0 0x1000>;
-+		};
-+
-+		smp-sram at 53000 {
-+			compatible = "samsung,exynos4210-sram-ns";
-+			reg = <0x53000 0x1000>;
-+		};
-+	};
--- 
-1.7.9.5
+>>  arch/arm/boot/dts/stih416-clock.dtsi | 477 ++++++++++++++++++++++++++++++++++
+>>  arch/arm/boot/dts/stih416.dtsi       |  10 +-
+>>  3 files changed, 497 insertions(+), 5 deletions(-)
+>>  create mode 100644 arch/arm/boot/dts/stih416-clks.h
+>
+> --
+> Lee Jones
+> Linaro STMicroelectronics Landing Team Lead
+> Linaro.org ? Open source software for ARM SoCs
+> Follow Linaro: Facebook | Twitter | Blog
+
+Best regards
