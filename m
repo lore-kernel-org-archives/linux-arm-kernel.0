@@ -1,256 +1,414 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 06 May 2014 20:36:58 +0200
-Subject: [PATCH v2 1/6] i2c: s3c2410: Moving I2C interrupt re-configuration
- code into i2c driver
-In-Reply-To: <1399366282-4191-2-git-send-email-pankaj.dubey@samsung.com>
-References: <1399366282-4191-1-git-send-email-pankaj.dubey@samsung.com>
- <1399366282-4191-2-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <53692BCA.4070601@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 6 May 2014 19:38:12 +0100
+Subject: [RESEND PATCH 2/3] PCI: ARM: add support for generic PCI host
+ controller
+In-Reply-To: <12080862.flQZBvPba4@wuerfel>
+References: <1399048876-11862-1-git-send-email-will.deacon@arm.com>
+ <20140502184421.GF14645@arm.com>
+ <20140502190318.GE3179@obsidianresearch.com>
+ <12080862.flQZBvPba4@wuerfel>
+Message-ID: <20140506183811.GI13677@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pankaj,
+On Fri, May 02, 2014 at 08:29:30PM +0100, Arnd Bergmann wrote:
+> On Friday 02 May 2014 13:03:18 Jason Gunthorpe wrote:
+> > > Given that the idea was to separate setup() and probe(), I didn't want to
+> > > make the assumption that I was called in probe context.
+> > 
+> > It doesn't matter for this driver, but look at mvebu, you cannot move
+> > the interrupt, gpio and clock acquisitions from probe() to setup(), as
+> > they could all trigger a defered probe. Better to be consistent,
+> > especially if this is the golden reference driver we want everyone to
+> > follow (sorry Will)
+> 
+> Fair enough. It shouldn't be hard to move.
 
-On 06.05.2014 10:51, Pankaj Dubey wrote:
-> Let's move I2C interrupt re-configuration code from machine
-> file exynos.c to I2C driver. Since only Exynos5250, and
-> Exynos5420 need to do this, added syscon based phandle to
-> i2c device nodes of respective SoC DT files.
->
-> CC: Rob Herring <robh+dt@kernel.org>
-> CC: Randy Dunlap <rdunlap@infradead.org>
-> CC: Wolfram Sang <wsa@the-dreams.de>
-> CC: Russell King <linux@arm.linux.org.uk>
-> CC: devicetree at vger.kernel.org
-> CC: linux-doc at vger.kernel.org
-> CC: linux-i2c at vger.kernel.org
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
->   .../devicetree/bindings/arm/samsung/sysreg.txt     |    1 +
->   arch/arm/boot/dts/exynos5.dtsi                     |    5 ++++
->   arch/arm/boot/dts/exynos5250.dtsi                  |    4 +++
->   arch/arm/boot/dts/exynos5420.dtsi                  |    4 +++
->   arch/arm/mach-exynos/exynos.c                      |   26 -------------------
->   drivers/i2c/busses/i2c-s3c2410.c                   |   27 ++++++++++++++++++++
->   6 files changed, 41 insertions(+), 26 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/arm/samsung/sysreg.txt b/Documentation/devicetree/bindings/arm/samsung/sysreg.txt
-> index 0ab3251..fd71581 100644
-> --- a/Documentation/devicetree/bindings/arm/samsung/sysreg.txt
-> +++ b/Documentation/devicetree/bindings/arm/samsung/sysreg.txt
-> @@ -3,6 +3,7 @@ SAMSUNG S5P/Exynos SoC series System Registers (SYSREG)
->   Properties:
->    - compatible : should contain "samsung,<chip name>-sysreg", "syscon";
->      For Exynos4 SoC series it should be "samsung,exynos4-sysreg", "syscon";
-> +   For Exynos5 SoC series it should be "samsung,exynos5-sysreg", "syscon";
->    - reg : offset and length of the register set.
->
->   Example:
-> diff --git a/arch/arm/boot/dts/exynos5.dtsi b/arch/arm/boot/dts/exynos5.dtsi
-> index 79d0608..3027e37 100644
-> --- a/arch/arm/boot/dts/exynos5.dtsi
-> +++ b/arch/arm/boot/dts/exynos5.dtsi
-> @@ -99,4 +99,9 @@
->   		#size-cells = <0>;
->   		status = "disabled";
->   	};
-> +
-> +	sys_reg: syscon at 10050000 {
-> +		compatible = "samsung,exynos5-sysreg", "syscon";
-> +		reg = <0x10050000 0x400>;
-> +	};
->   };
-> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-> index 8d724d5..46f0233 100644
-> --- a/arch/arm/boot/dts/exynos5250.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> @@ -285,6 +285,7 @@
->   		clock-names = "i2c";
->   		pinctrl-names = "default";
->   		pinctrl-0 = <&i2c0_bus>;
-> +		samsung,syscon-phandle = <&sys_reg>;
->   		status = "disabled";
->   	};
->
-> @@ -298,6 +299,7 @@
->   		clock-names = "i2c";
->   		pinctrl-names = "default";
->   		pinctrl-0 = <&i2c1_bus>;
-> +		samsung,syscon-phandle = <&sys_reg>;
->   		status = "disabled";
->   	};
->
-> @@ -311,6 +313,7 @@
->   		clock-names = "i2c";
->   		pinctrl-names = "default";
->   		pinctrl-0 = <&i2c2_bus>;
-> +		samsung,syscon-phandle = <&sys_reg>;
->   		status = "disabled";
->   	};
->
-> @@ -324,6 +327,7 @@
->   		clock-names = "i2c";
->   		pinctrl-names = "default";
->   		pinctrl-0 = <&i2c3_bus>;
-> +		samsung,syscon-phandle = <&sys_reg>;
->   		status = "disabled";
->   	};
->
-> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-> index ff496ad..762128c 100644
-> --- a/arch/arm/boot/dts/exynos5420.dtsi
-> +++ b/arch/arm/boot/dts/exynos5420.dtsi
-> @@ -517,6 +517,7 @@
->   		clock-names = "i2c";
->   		pinctrl-names = "default";
->   		pinctrl-0 = <&i2c0_bus>;
-> +		samsung,syscon-phandle = <&sys_reg>;
->   		status = "disabled";
->   	};
->
-> @@ -530,6 +531,7 @@
->   		clock-names = "i2c";
->   		pinctrl-names = "default";
->   		pinctrl-0 = <&i2c1_bus>;
-> +		samsung,syscon-phandle = <&sys_reg>;
->   		status = "disabled";
->   	};
->
-> @@ -543,6 +545,7 @@
->   		clock-names = "i2c";
->   		pinctrl-names = "default";
->   		pinctrl-0 = <&i2c2_bus>;
-> +		samsung,syscon-phandle = <&sys_reg>;
->   		status = "disabled";
->   	};
->
-> @@ -556,6 +559,7 @@
->   		clock-names = "i2c";
->   		pinctrl-names = "default";
->   		pinctrl-0 = <&i2c3_bus>;
-> +		samsung,syscon-phandle = <&sys_reg>;
->   		status = "disabled";
->   	};
->
-> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-> index 59eb1f1..54ae2e1 100644
-> --- a/arch/arm/mach-exynos/exynos.c
-> +++ b/arch/arm/mach-exynos/exynos.c
-> @@ -293,32 +293,6 @@ void __init exynos_map_pmu(void)
->
->   static void __init exynos_dt_machine_init(void)
->   {
-> -	struct device_node *i2c_np;
-> -	const char *i2c_compat = "samsung,s3c2440-i2c";
-> -	unsigned int tmp;
-> -	int id;
-> -
-> -	/*
-> -	 * Exynos5's legacy i2c controller and new high speed i2c
-> -	 * controller have muxed interrupt sources. By default the
-> -	 * interrupts for 4-channel HS-I2C controller are enabled.
-> -	 * If node for first four channels of legacy i2c controller
-> -	 * are available then re-configure the interrupts via the
-> -	 * system register.
-> -	 */
-> -	if (soc_is_exynos5()) {
-> -		for_each_compatible_node(i2c_np, NULL, i2c_compat) {
-> -			if (of_device_is_available(i2c_np)) {
-> -				id = of_alias_get_id(i2c_np, "i2c");
-> -				if (id < 4) {
-> -					tmp = readl(EXYNOS5_SYS_I2C_CFG);
-> -					writel(tmp & ~(0x1 << id),
-> -							EXYNOS5_SYS_I2C_CFG);
-> -				}
-> -			}
-> -		}
-> -	}
-> -
->   	exynos_map_pmu();
->
->   	if (!soc_is_exynos5440())
-> diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
-> index ae44910..0420150 100644
-> --- a/drivers/i2c/busses/i2c-s3c2410.c
-> +++ b/drivers/i2c/busses/i2c-s3c2410.c
-> @@ -39,6 +39,8 @@
->   #include <linux/of.h>
->   #include <linux/of_gpio.h>
->   #include <linux/pinctrl/consumer.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/regmap.h>
->
->   #include <asm/irq.h>
->
-> @@ -91,6 +93,9 @@
->   /* Max time to wait for bus to become idle after a xfer (in us) */
->   #define S3C2410_IDLE_TIMEOUT	5000
->
-> +/* Exynos5 Sysreg offset */
-> +#define EXYNOS5_SYS_I2C_CFG	0x0234
-> +
->   /* i2c controller state */
->   enum s3c24xx_i2c_state {
->   	STATE_IDLE,
-> @@ -127,6 +132,7 @@ struct s3c24xx_i2c {
->   #if defined(CONFIG_ARM_S3C24XX_CPUFREQ)
->   	struct notifier_block	freq_transition;
->   #endif
-> +	struct regmap		*sysreg;
->   };
->
->   static struct platform_device_id s3c24xx_driver_ids[] = {
-> @@ -1075,6 +1081,8 @@ static void
->   s3c24xx_i2c_parse_dt(struct device_node *np, struct s3c24xx_i2c *i2c)
->   {
->   	struct s3c2410_platform_i2c *pdata = i2c->pdata;
-> +	unsigned int tmp;
-> +	int id;
->
->   	if (!np)
->   		return;
-> @@ -1084,6 +1092,25 @@ s3c24xx_i2c_parse_dt(struct device_node *np, struct s3c24xx_i2c *i2c)
->   	of_property_read_u32(np, "samsung,i2c-slave-addr", &pdata->slave_addr);
->   	of_property_read_u32(np, "samsung,i2c-max-bus-freq",
->   				(u32 *)&pdata->frequency);
-> +	/*
-> +	 * Exynos5's legacy i2c controller and new high speed i2c
-> +	 * controller have muxed interrupt sources. By default the
-> +	 * interrupts for 4-channel HS-I2C controller are enabled.
-> +	 * If node for first four channels of legacy i2c controller
-> +	 * are available then re-configure the interrupts via the
-> +	 * system register.
-> +	 */
-> +	id = of_alias_get_id(np, "i2c");
-> +	i2c->sysreg = syscon_regmap_lookup_by_phandle(np,
-> +			"samsung,syscon-phandle");
-> +	if (IS_ERR(i2c->sysreg)) {
-> +		i2c->sysreg = NULL;
+[...]
 
-NULL shouldn't be considered for pointers using the ERR_PTR() 
-convention, so you should just preserve the value returned by 
-syscon_regmap_lookup_by_phandle() here.
+> It should be fine to have a trivial setup function like this
+> 
+> static int gen_pci_setup(int nr, struct pci_sys_data *sys)
+> {
+> 	struct gen_pci *pci = sys->private_data;
+> 	list_splice_init(pci->resource, sys->resources);
+> 	return 1;
+> }
+> 
+> and do everything in probe().
 
-Also, the driver seems to do this only once in probe, so maybe you 
-should simply use a local variable here, without storing the regmap in 
-i2c struct.
+Ok, I've respun the patch and included it below. It's turned probe() into a
+bit of a beast, but the cleanup is a lot simpler (unless I'm missing
+something).
 
-> +		/* As this is not compulsary do not return error */
+Will
 
-Is it? Will the driver work normally without interrupts in this case?
+--->8
 
-Also, typo: s/compulsary/compulsory/
-
-> +		pr_info("i2c-%d skipping re-configuration of interrutps\n", id);
-> +		return;
-> +	}
-> +	regmap_read(i2c->sysreg, EXYNOS5_SYS_I2C_CFG, &tmp);
-> +	regmap_write(i2c->sysreg, EXYNOS5_SYS_I2C_CFG, tmp & ~(0x1 << id));
-
-You could use regmap_update_bits() [1] here instead, with mask set to 
-BIT(id) and val set to 0.
-
-[1] http://lxr.free-electrons.com/source/drivers/base/regmap/regmap.c#L1977
-
-Best regards,
-Tomasz
+diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+new file mode 100644
+index 000000000000..199a8795cb77
+--- /dev/null
++++ b/drivers/pci/host/pci-host-generic.c
+@@ -0,0 +1,361 @@
++/*
++ * Simple, generic PCI host controller driver targetting firmware-initialised
++ * systems and virtual machines (e.g. the PCI emulation provided by kvmtool).
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ * Copyright (C) 2014 ARM Limited
++ *
++ * Author: Will Deacon <will.deacon@arm.com>
++ */
++
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/of_address.h>
++#include <linux/of_pci.h>
++#include <linux/platform_device.h>
++
++struct gen_pci_cfg_bus_ops {
++	u32 bus_shift;
++	void __iomem *(*map_bus)(struct pci_bus *, unsigned int, int);
++};
++
++struct gen_pci_cfg_windows {
++	struct resource				res;
++	struct resource				bus_range;
++	void __iomem				**win;
++
++	const struct gen_pci_cfg_bus_ops	*ops;
++};
++
++struct gen_pci {
++	struct pci_host_bridge			host;
++	struct gen_pci_cfg_windows		cfg;
++	struct list_head			resources;
++};
++
++static void __iomem *gen_pci_map_cfg_bus_cam(struct pci_bus *bus,
++					     unsigned int devfn,
++					     int where)
++{
++	struct pci_sys_data *sys = bus->sysdata;
++	struct gen_pci *pci = sys->private_data;
++	resource_size_t idx = bus->number - pci->cfg.bus_range.start;
++
++	return pci->cfg.win[idx] + ((devfn << 8) | where);
++}
++
++static struct gen_pci_cfg_bus_ops gen_pci_cfg_cam_bus_ops = {
++	.bus_shift	= 16,
++	.map_bus	= gen_pci_map_cfg_bus_cam,
++};
++
++static void __iomem *gen_pci_map_cfg_bus_ecam(struct pci_bus *bus,
++					      unsigned int devfn,
++					      int where)
++{
++	struct pci_sys_data *sys = bus->sysdata;
++	struct gen_pci *pci = sys->private_data;
++	resource_size_t idx = bus->number - pci->cfg.bus_range.start;
++
++	return pci->cfg.win[idx] + ((devfn << 12) | where);
++}
++
++static struct gen_pci_cfg_bus_ops gen_pci_cfg_ecam_bus_ops = {
++	.bus_shift	= 20,
++	.map_bus	= gen_pci_map_cfg_bus_ecam,
++};
++
++static int gen_pci_config_read(struct pci_bus *bus, unsigned int devfn,
++				int where, int size, u32 *val)
++{
++	void __iomem *addr;
++	struct pci_sys_data *sys = bus->sysdata;
++	struct gen_pci *pci = sys->private_data;
++
++	addr = pci->cfg.ops->map_bus(bus, devfn, where);
++
++	switch (size) {
++	case 1:
++		*val = readb(addr);
++		break;
++	case 2:
++		*val = readw(addr);
++		break;
++	default:
++		*val = readl(addr);
++	}
++
++	return PCIBIOS_SUCCESSFUL;
++}
++
++static int gen_pci_config_write(struct pci_bus *bus, unsigned int devfn,
++				 int where, int size, u32 val)
++{
++	void __iomem *addr;
++	struct pci_sys_data *sys = bus->sysdata;
++	struct gen_pci *pci = sys->private_data;
++
++	addr = pci->cfg.ops->map_bus(bus, devfn, where);
++
++	switch (size) {
++	case 1:
++		writeb(val, addr);
++		break;
++	case 2:
++		writew(val, addr);
++		break;
++	default:
++		writel(val, addr);
++	}
++
++	return PCIBIOS_SUCCESSFUL;
++}
++
++static struct pci_ops gen_pci_ops = {
++	.read	= gen_pci_config_read,
++	.write	= gen_pci_config_write,
++};
++
++static int gen_pci_calc_io_offset(struct device *dev,
++				  struct of_pci_range *range,
++				  struct resource *res,
++				  resource_size_t *offset)
++{
++	static atomic_t wins = ATOMIC_INIT(0);
++	int err, idx, max_win;
++	unsigned int window;
++
++	if (!PAGE_ALIGNED(range->cpu_addr))
++		return -EINVAL;
++
++	max_win = (IO_SPACE_LIMIT + 1) / SZ_64K;
++	idx = atomic_inc_return(&wins);
++	if (idx >= max_win)
++		return -ENOSPC;
++
++	window = (idx - 1) * SZ_64K;
++	err = pci_ioremap_io(window, range->cpu_addr);
++	if (err)
++		return err;
++
++	of_pci_range_to_resource(range, dev->of_node, res);
++	res->start = window;
++	res->end = res->start + range->size - 1;
++	*offset = window - range->pci_addr;
++	return 0;
++}
++
++static int gen_pci_calc_mem_offset(struct device *dev,
++				   struct of_pci_range *range,
++				   struct resource *res,
++				   resource_size_t *offset)
++{
++	of_pci_range_to_resource(range, dev->of_node, res);
++	*offset = range->cpu_addr - range->pci_addr;
++	return 0;
++}
++
++static const struct of_device_id gen_pci_of_match[] = {
++	{ .compatible = "pci-host-cam-generic",
++	  .data = &gen_pci_cfg_cam_bus_ops },
++
++	{ .compatible = "pci-host-ecam-generic",
++	  .data = &gen_pci_cfg_ecam_bus_ops },
++
++	{ },
++};
++MODULE_DEVICE_TABLE(of, gen_pci_of_match);
++
++static int gen_pci_setup(int nr, struct pci_sys_data *sys)
++{
++	struct gen_pci *pci = sys->private_data;
++	list_splice_init(&pci->resources, &sys->resources);
++	return 1;
++}
++
++static int gen_pci_probe(struct platform_device *pdev)
++{
++	struct gen_pci *pci;
++	int err, res_valid;
++	struct pci_host_bridge_window *win;
++	struct resource *bus_range;
++	resource_size_t busn;
++	const char *type;
++	struct of_pci_range range;
++	struct of_pci_range_parser parser;
++	struct hw_pci hw;
++	const struct of_device_id *of_id;
++	const int *prop;
++	u8 bus_max;
++	struct device *dev = &pdev->dev;
++	struct device_node *np = dev->of_node;
++
++	if (!dev->of_node)
++		return -ENODEV;
++
++	pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
++	if (!pci)
++		return -ENOMEM;
++
++	pci->host.dev.parent = dev;
++	hw = (struct hw_pci) {
++		.nr_controllers	= 1,
++		.private_data	= (void **)&pci,
++		.setup		= gen_pci_setup,
++		.map_irq	= of_irq_parse_and_map_pci,
++		.ops		= &gen_pci_ops,
++	};
++
++	type = of_get_property(np, "device_type", NULL);
++	if (!type || strcmp(type, "pci")) {
++		dev_err(dev, "invalid \"device_type\" %s\n", type);
++		return -EINVAL;
++	}
++
++	if (of_pci_range_parser_init(&parser, np)) {
++		dev_err(dev, "missing \"ranges\" property\n");
++		return -EINVAL;
++	}
++
++	prop = of_get_property(of_chosen, "linux,pci-probe-only", NULL);
++	if (prop) {
++		if (*prop)
++			pci_add_flags(PCI_PROBE_ONLY);
++		else
++			pci_clear_flags(PCI_PROBE_ONLY);
++	}
++
++	if (of_pci_parse_bus_range(np, &pci->cfg.bus_range))
++		pci->cfg.bus_range = (struct resource) {
++			.name	= np->name,
++			.start	= 0,
++			.end	= 0xff,
++			.flags	= IORESOURCE_BUS,
++		};
++
++	err = of_address_to_resource(np, 0, &pci->cfg.res);
++	if (err) {
++		dev_err(dev, "missing \"reg\" property\n");
++		return err;
++	}
++
++	pci->cfg.win = devm_kcalloc(dev, resource_size(&pci->cfg.bus_range),
++				    sizeof(*pci->cfg.win), GFP_KERNEL);
++	if (!pci->cfg.win)
++		return -ENOMEM;
++
++	of_id = of_match_node(gen_pci_of_match, np);
++	pci->cfg.ops = of_id->data;
++	INIT_LIST_HEAD(&pci->host.windows);
++	INIT_LIST_HEAD(&pci->resources);
++
++	/* Limit the bus-range to fit within reg */
++	bus_max = pci->cfg.bus_range.start +
++		  (resource_size(&pci->cfg.res) >> pci->cfg.ops->bus_shift) - 1;
++	pci->cfg.bus_range.end = min_t(resource_size_t, pci->cfg.bus_range.end,
++				       bus_max);
++
++	/* Create and register resources from the ranges property */
++	res_valid = 0;
++	for_each_of_pci_range(&parser, &range) {
++		struct resource *parent, *res;
++		resource_size_t offset;
++		u32 restype = range.flags & IORESOURCE_TYPE_BITS;
++
++		res = devm_kmalloc(dev, sizeof(*res), GFP_KERNEL);
++		if (!res) {
++			err = -ENOMEM;
++			goto out_release_res;
++		}
++
++		switch (restype) {
++		case IORESOURCE_IO:
++			parent = &ioport_resource;
++			err = gen_pci_calc_io_offset(dev, &range, res, &offset);
++			break;
++		case IORESOURCE_MEM:
++			parent = &iomem_resource;
++			err = gen_pci_calc_mem_offset(dev, &range, res, &offset);
++			res_valid |= !(res->flags & IORESOURCE_PREFETCH || err);
++			break;
++		default:
++			err = -EINVAL;
++			continue;
++		}
++
++		if (err) {
++			dev_warn(dev,
++				 "error %d: failed to add resource [type 0x%x, %lld bytes]\n",
++				 err, restype, range.size);
++			continue;
++		}
++
++		err = request_resource(parent, res);
++		if (err)
++			goto out_release_res;
++
++		pci_add_resource_offset(&pci->resources, res, offset);
++	}
++
++	if (!res_valid) {
++		dev_err(dev, "non-prefetchable memory resource required\n");
++		err = -EINVAL;
++		goto out_release_res;
++	}
++
++	/* Map our Configuration Space windows */
++	err = -ENOMEM;
++	if (!devm_request_mem_region(dev, pci->cfg.res.start,
++				     resource_size(&pci->cfg.res),
++				     "Configuration Space"))
++		goto out_release_res;
++
++	bus_range = &pci->cfg.bus_range;
++	for (busn = bus_range->start; busn <= bus_range->end; ++busn) {
++		u32 idx = busn - bus_range->start;
++		u32 sz = 1 << pci->cfg.ops->bus_shift;
++
++		pci->cfg.win[idx] = devm_ioremap(dev,
++						 pci->cfg.res.start + busn * sz,
++						 sz);
++		if (!pci->cfg.win[idx])
++			goto out_release_res;
++	}
++
++	/* Register bus resource */
++	pci_add_resource(&pci->resources, bus_range);
++	pci_common_init_dev(dev, &hw);
++	return 0;
++
++out_release_res:
++	list_for_each_entry(win, &pci->resources, list)
++		release_resource(win->res);
++
++	pci_free_resource_list(&pci->resources);
++	return err;
++}
++
++static struct platform_driver gen_pci_driver = {
++	.driver = {
++		.name = "pci-host-generic",
++		.owner = THIS_MODULE,
++		.of_match_table = gen_pci_of_match,
++	},
++	.probe = gen_pci_probe,
++};
++module_platform_driver(gen_pci_driver);
++
++MODULE_DESCRIPTION("Generic PCI host driver");
++MODULE_AUTHOR("Will Deacon <will.deacon@arm.com>");
++MODULE_LICENSE("GPLv2");
