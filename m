@@ -1,68 +1,25 @@
-From: tthayer.linux@gmail.com (Thor Thayer)
-Date: Tue, 6 May 2014 16:00:10 -0500
-Subject: [PATCHv3 3/3] edac: altera: Add EDAC support for Altera SDRAM
-In-Reply-To: <1399390979.11533.6.camel@linux-builds1>
-References: <1399330337-16748-1-git-send-email-tthayer@altera.com>
- <1399330337-16748-4-git-send-email-tthayer@altera.com>
- <1399390979.11533.6.camel@linux-builds1>
-Message-ID: <CAF03EBfSxBnB+yfD-vki2e1d_kE1kCCczuOyQ4XJ+ZbCnL51dQ@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 6 May 2014 23:10:41 +0200
+Subject: [PATCH] rtc: rtc-at91rm9200: fix infinite wait for ACKUPD irq
+In-Reply-To: <aed75d16aa46476eb6f6c5b0d4bef30d@BLUPR05MB037.namprd05.prod.outlook.com>
+References: <94c06375c1b44c8eb5233b0ccf2e4b13@BY2PR05MB048.namprd05.prod.outlook.com>
+ <1399386481-18643-1-git-send-email-boris.brezillon@free-electrons.com>
+ <aed75d16aa46476eb6f6c5b0d4bef30d@BLUPR05MB037.namprd05.prod.outlook.com>
+Message-ID: <20140506211040.GF11243@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 6, 2014 at 10:42 AM, Dinh Nguyen <dinguyen@altera.com> wrote:
-> On Mon, 2014-05-05 at 17:52 -0500, Thor Thayer wrote:
->> From: Thor Thayer <tthayer@altera.com>
->>
->> ---
->> v2: Use the SDRAM controller registers to calculate memory size
->>     instead of the Device Tree. Update To & Cc list. Add maintainer
->>     information.
->>
->> v3: EDAC driver cleanup based on comments from Mailing list.
->>
->> Signed-off-by: Thor Thayer <tthayer@altera.com>
->> ---
->>  MAINTAINERS                |    5 +
->>  drivers/edac/Kconfig       |    9 +
->>  drivers/edac/Makefile      |    2 +
->>  drivers/edac/altera_edac.c |  411 ++++++++++++++++++++++++++++++++++++++++++++
->>  4 files changed, 427 insertions(+)
->>  create mode 100644 drivers/edac/altera_edac.c
->>
->> diff --git a/MAINTAINERS b/MAINTAINERS
->> index e67ea24..ecd1277 100644
->> --- a/MAINTAINERS
->> +++ b/MAINTAINERS
->> @@ -1290,6 +1290,11 @@ M:     Dinh Nguyen <dinguyen@altera.com>
->>  S:   Maintained
->>  F:   drivers/clk/socfpga/
->>
->> +ARM/SOCFPGA SDRAM EDAC SUPPORT
->> +M:   Thor Thayer <tthayer@altera.com>
->> +S:   Maintained
->> +F:   drivers/edac/altera_edac.c
->> +
->>  ARM/STI ARCHITECTURE
->>  M:   Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
->>  M:   Maxime Coquelin <maxime.coquelin@st.com>
->> diff --git a/drivers/edac/Kconfig b/drivers/edac/Kconfig
->> index 878f090..4f4d379 100644
->> --- a/drivers/edac/Kconfig
->> +++ b/drivers/edac/Kconfig
->> @@ -368,4 +368,13 @@ config EDAC_OCTEON_PCI
->>         Support for error detection and correction on the
->>         Cavium Octeon family of SOCs.
->>
->> +config EDAC_ALTERA_MC
->> +     bool "Altera SDRAM Memory Controller EDAC"
->
-> Can this be tristate?
->
-> Dinh
->
-Hi Dinh,
+Hi,
 
-We elected to make this a compile time option because it requires a
-special preloader to setup the SDRAM for EDAC.
+On 06/05/2014 at 19:06:56 +0000, Bryan Evenson wrote :
+> 
+> I'd assume this patch would be backported to the longterm releases?
+> 
 
-Thor
+If by longterm, you mean the linux4sam tree, 3.10 branch, it is up to
+Nicolas to take it. I believe it will be pretty easy to convince him ;)
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
