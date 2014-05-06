@@ -1,35 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 06 May 2014 20:21:48 +0200
-Subject: [PATCH v12 00/31] iommu/exynos: Fixes and Enhancements of System
- MMU driver with DT
-In-Reply-To: <20140506175904.GB12376@8bytes.org>
-References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
- <CAOD6ATqZ5UwRwSKiPDQLrgmX=UUrJVE7ybM_RhXz_CEUjM3W7w@mail.gmail.com>
- <20140506175904.GB12376@8bytes.org>
-Message-ID: <4231522.iA1YhEv1iL@wuerfel>
+From: tthayer.linux@gmail.com (Thor Thayer)
+Date: Tue, 6 May 2014 13:34:36 -0500
+Subject: [PATCHv3 1/3] dts: socfpga: Add bindings for Altera SoC SDRAM
+ controller
+In-Reply-To: <ba35254f-4ba5-4b2c-8056-cde5c693b0ff@CH1EHSMHS009.ehs.local>
+References: <1399330337-16748-1-git-send-email-tthayer@altera.com>
+ <1399330337-16748-2-git-send-email-tthayer@altera.com>
+ <ba35254f-4ba5-4b2c-8056-cde5c693b0ff@CH1EHSMHS009.ehs.local>
+Message-ID: <CAF03EBfO9JELqJim10r7dJnmLH41i_VxZt_vnRKaOOO96eH_JA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 06 May 2014 19:59:05 Joerg Roedel wrote:
-> On Wed, Apr 30, 2014 at 04:27:10PM +0530, Shaik Ameer Basha wrote:
-> > This series is going on for quite a long time and most of the patches here
-> > doesn't depend on dt bindings. As Exynos IOMMU h/w is introducing new versions
-> > very frequently, maintaining and reviewing all these patches again and
-> > again is quite a hard job.
-> > 
-> > If it is acceptable, I can post one more series with the subset of
-> > above patches,
-> > which doesn't depend on dt-bindings. As all the patches which doesn't depend on
-> > DT bindings are already tested,  I hope merging these subset of patches may help
-> > in reducing the rework and review effort every time.
-> > 
-> > Once we finalize the generic DT bindings for the IOMMU devices, the driver
-> > can be updated with the proposed DT bindings in mind.
-> 
-> Sounds reasonable to me if the patch subset is self-contained. When
-> Arnd is OK with that and no one else has objections I can take the
-> dt-independend parts.
+Hi S?ren
 
-Sounds good to me.
-
-	Arnd
+On Mon, May 5, 2014 at 6:16 PM, S?ren Brinkmann
+<soren.brinkmann@xilinx.com> wrote:
+>
+> Hi Thor,
+>
+> On Mon, 2014-05-05 at 05:52PM -0500, tthayer at altera.com wrote:
+> > From: Thor Thayer <tthayer@altera.com>
+> >
+> > Addition of the Altera SDRAM controller bindings and device
+> > tree changes to the Altera SoC project. The "syscon" parameter
+> > is included here because the SDRAM EDAC bits are shared with the SDRAM
+> > configuration bits.
+> > ---
+> > v2: Changes to SoC SDRAM EDAC code.
+> >
+> > V3: Implement code suggestions for SDRAM EDAC code.
+> >
+> > Signed-off-by: Thor Thayer <tthayer@altera.com>
+> > ---
+> >  .../bindings/arm/altera/socfpga-sdram.txt          |   14 ++++++++++++++
+> >  arch/arm/boot/dts/socfpga.dtsi                     |    5 +++++
+> >  2 files changed, 19 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
+> >
+> > diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
+> > new file mode 100644
+> > index 0000000..525cb76
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
+> > @@ -0,0 +1,14 @@
+> > +Altera SOCFPGA SDRAM Controller
+> > +
+> > +Required properties:
+> > +- compatible : "altr,sdr-ctl", "syscon";
+> > +                Note that syscon is invoked for this device to support the FPGA
+> > +             bridge driver, EDAC driver and other devices that share the
+> > +             registers.
+>
+> This sounds like implementation specifics, which shouldn't be part of
+> the bindings.
+>
+>         S?ren
+>
+I see your point and will remove. Thanks!
