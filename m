@@ -1,108 +1,141 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 6 May 2014 15:44:28 +0200
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 06 May 2014 15:54:49 +0200
 Subject: [PATCH 05/17] pci: host: pcie-dra7xx: add support for pcie-dra7xx
  controller
 In-Reply-To: <1399383244-14556-6-git-send-email-kishon@ti.com>
 References: <1399383244-14556-1-git-send-email-kishon@ti.com>
  <1399383244-14556-6-git-send-email-kishon@ti.com>
-Message-ID: <201405061544.28738.marex@denx.de>
+Message-ID: <4300084.bc6ByDTk7W@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, May 06, 2014 at 03:33:51 PM, Kishon Vijay Abraham I wrote:
+On Tuesday 06 May 2014 19:03:51 Kishon Vijay Abraham I wrote:
 > Added support for pcie controller in dra7xx. This driver re-uses
 > the designware core code that is already present in kernel.
+> 
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Mohit Kumar <mohit.kumar@st.com>
+> Cc: Jingoo Han <jg1.han@samsung.com>
+> Cc: Marek Vasut <marex@denx.de>
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 
-[...]
+Looks pretty good overall, just a few details I noticed:
 
-> +#define to_dra7xx_pcie(x)	container_of((x), struct dra7xx_pcie, pp)
+> diff --git a/Documentation/devicetree/bindings/pci/ti-pci.txt b/Documentation/devicetree/bindings/pci/ti-pci.txt
+> new file mode 100644
+> index 0000000..6cb6f09
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pci/ti-pci.txt
+> @@ -0,0 +1,33 @@
+> +TI PCI Controllers
 > +
-> +static inline u32 dra7xx_pcie_readl(void __iomem *base, u32 offset)
+> +PCIe Designware Controller
+> +This node should have the properties described in "designware-pcie.txt".
+> + - compatible: Should be "ti,dra7xx-pcie""
 
-Just pass struct dra7xx_pcie * instead of *base here , it will make the code 
-below shorter.
+No "xx" in compatible strings please. Just make name this after the first
+chip to use this particular interface.
 
+> + - reg : Address and length of the register set for the device.
+> + - reg-names : "ti_conf" for the TI specific registers and rc_dbics for the
+> +   "designware" registers.
+
+The description uses inconsistent quotation marks. You should also have
+a fixed order in the binding, such as
+
+ - reg : Two register ranges as listed in the reg-names property
+ - reg-names : The first entry must be "ti-conf" for the TI specific registers
+	       The second entry must be "rc-dbics" for the designware pcie registers.
+
+> + - phys : the phandle for the PHY device (used by generic PHY framework)
+> + - phy-names : the names of the PHY corresponding to the PHYs present in the
+> +   *phy* phandle.
+
+It's not just a phandle, it can be any phy specifier including additional
+argument cells.
+
+The second line should just read
+
+ - phy-names : must be "pcie-phy"
+
+> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+> index a6f67ec..7be6393 100644
+> --- a/drivers/pci/host/Kconfig
+> +++ b/drivers/pci/host/Kconfig
+> @@ -1,6 +1,16 @@
+>  menu "PCI host controller drivers"
+>  	depends on PCI
+>  
+> +config PCI_DRA7XX
+> +	bool "TI DRA7xx PCIe controller"
+> +	select PCIE_DW
+> +	depends on OF || HAS_IOMEM || TI_PIPE3
+
+I think you mean &&, not || here.
+
+> +static inline u32 x(void __iomem *base, u32 offset)
 > +{
 > +	return readl(base + offset);
 > +}
 > +
-> +static inline void dra7xx_pcie_writel(void __iomem *base, u32 offset, u32
-> value) +{
-
-DTTO.
-
+> +static inline void dra7xx_pcie_writel(void __iomem *base, u32 offset, u32 value)
+> +{
 > +	writel(value, base + offset);
 > +}
-> +
-> +static int dra7xx_pcie_link_up(struct pcie_port *pp)
+
+These don't actually seem to add any value, you need more characters
+to call the inline function than to open-code it.
+
+> +static void dra7xx_pcie_enable_interrupts(struct pcie_port *pp)
 > +{
 > +	struct dra7xx_pcie *dra7xx = to_dra7xx_pcie(pp);
-> +	u32 reg = dra7xx_pcie_readl(dra7xx->base, PCIECTRL_DRA7XX_CONF_PHY_CS);
 > +
-> +	if (reg & LINK_UP)
-> +		return true;
-> +	return false;
-
-return reg & LINK_UP;
-
-> +}
+> +	dra7xx_pcie_writel(dra7xx->base, PCIECTRL_DRA7XX_CONF_IRQSTATUS_MAIN,
+> +			   ~INTERRUPTS);
+> +	dra7xx_pcie_writel(dra7xx->base,
+> +			   PCIECTRL_DRA7XX_CONF_IRQENABLE_SET_MAIN, INTERRUPTS);
+> +	dra7xx_pcie_writel(dra7xx->base, PCIECTRL_DRA7XX_CONF_IRQSTATUS_MSI,
+> +			   ~LEG_EP_INTERRUPTS & ~MSI);
 > +
-> +static int dra7xx_pcie_establish_link(struct pcie_port *pp)
+> +	if (IS_ENABLED(CONFIG_PCI_MSI))
+> +		dra7xx_pcie_writel(dra7xx->base,
+> +				   PCIECTRL_DRA7XX_CONF_IRQENABLE_SET_MSI, MSI);
+> +	else
+> +		dra7xx_pcie_writel(dra7xx->base,
+> +				   PCIECTRL_DRA7XX_CONF_IRQENABLE_SET_MSI,
+> +				   LEG_EP_INTERRUPTS);
+
+Doesn't this just enable one or the other? In general I'd assume you need
+both INTx and MSI, at least if MSI is available.
+
+It probably doesn't hurt to always turn them all on.
+
+> +static int add_pcie_port(struct dra7xx_pcie *dra7xx,
+> +			  struct platform_device *pdev)
 > +{
-> +	u32 reg;
-> +	int retries = 1000;
-> +	struct dra7xx_pcie *dra7xx = to_dra7xx_pcie(pp);
-> +
-> +	if (dw_pcie_link_up(pp)) {
-> +		dev_err(pp->dev, "link is already up\n");
-
-This will spew, since the .link_up (and thus this function) can be called 
-repeatedly. The subsystem will query if the link is up via this function.
-
-> +		return 0;
-> +	}
-> +
-> +	reg = dra7xx_pcie_readl(dra7xx->base, PCIECTRL_DRA7XX_CONF_DEVICE_CMD);
-> +	reg |= LTSSM_EN;
-> +	dra7xx_pcie_writel(dra7xx->base, PCIECTRL_DRA7XX_CONF_DEVICE_CMD, reg);
-> +
-> +	while (--retries) {
-
-Use retries--
-
-> +		reg = dra7xx_pcie_readl(dra7xx->base,
-> +					PCIECTRL_DRA7XX_CONF_PHY_CS);
-> +		if (reg & LINK_UP)
-> +			break;
-> +		usleep_range(10, 20);
-> +	}
-> +
-> +	if (retries <= 0) {
-
-Then check if retries == 0 and retries can be unsigned int.
-
-> +		dev_err(pp->dev, "link is not up\n");
-> +		return -ETIMEDOUT;
-> +	}
-> +
-> +	return 0;
-> +}
-[...]
-> +static int __init dra7xx_pcie_probe(struct platform_device *pdev)
-> +{
-> +	u32 reg;
 > +	int ret;
-> +	int irq;
-> +	struct phy *phy;
-> +	void __iomem *base;
+> +	struct pcie_port *pp;
 > +	struct resource *res;
-> +	struct dra7xx_pcie *dra7xx;
 > +	struct device *dev = &pdev->dev;
 > +
-> +	dra7xx = devm_kzalloc(&pdev->dev, sizeof(*dra7xx), GFP_KERNEL);
-> +	if (!dra7xx)
-> +		return -ENOMEM;
+> +	pp = &dra7xx->pp;
+> +	pp->dev = dev;
+> +	pp->ops = &dra7xx_pcie_host_ops;
 > +
+> +	spin_lock_init(&pp->conf_lock);
+> +
+> +	pp->irq = platform_get_irq(pdev, 1);
+> +	if (pp->irq < 0) {
+> +		dev_err(dev, "missing IRQ resource\n");
+> +		return -EINVAL;
+> +	}
+>
+
+The binding does not list a mandatory "interrupts" property, so
+this should not be treated as an error.
+
+> +static int __init dra7xx_pcie_probe(struct platform_device *pdev)
+> +{
 > +	irq = platform_get_irq(pdev, 0);
 > +	if (irq < 0) {
 > +		dev_err(dev, "missing IRQ resource\n");
@@ -115,45 +148,16 @@ Then check if retries == 0 and retries can be unsigned int.
 > +		dev_err(&pdev->dev, "failed to request irq\n");
 > +		return ret;
 > +	}
+
+Same here.
+
 > +
 > +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "ti_conf");
 > +	base = devm_ioremap_nocache(dev, res->start, resource_size(res));
-> +	if (!base)
-> +		return -ENOMEM;
-> +
-> +	phy = devm_phy_get(dev, "pcie-phy");
-> +	if (IS_ERR(phy))
-> +		return PTR_ERR(phy);
-> +
-> +	ret = phy_init(phy);
-> +	if (ret < 0)
-> +		return ret;
-> +
-> +	ret = phy_power_on(phy);
-> +	if (ret < 0)
-> +		goto err_power_on;
-> +
-> +	dra7xx->base = base;
-> +	dra7xx->phy = phy;
-> +	dra7xx->dev = dev;
-> +
-> +	pm_runtime_enable(&pdev->dev);
-> +	ret = pm_runtime_get_sync(&pdev->dev);
-> +	if (IS_ERR_VALUE(ret)) {
-> +		dev_err(dev, "pm_runtime_get_sync failed\n");
-> +		goto err_runtime_get;
-> +	}
-> +
-> +	reg = dra7xx_pcie_readl(dra7xx->base, PCIECTRL_DRA7XX_CONF_DEVICE_CMD);
-> +	reg &= ~LTSSM_EN;
-> +	dra7xx_pcie_writel(dra7xx->base, PCIECTRL_DRA7XX_CONF_DEVICE_CMD, reg);
 
-platform_set_drvdata() should be here, before you add the port.
+Just use devm_ioremap() instead of devm_ioremap_nocache(). The second
+one is just there for historic reasons, and they always do the same
+thing.
 
-> +	ret = add_pcie_port(dra7xx, pdev);
-> +	if (ret < 0)
-> +		goto err_add_port;
-> +
-> +	platform_set_drvdata(pdev, dra7xx);
-> +	return 0;
-[...]
+
+	Arnd
