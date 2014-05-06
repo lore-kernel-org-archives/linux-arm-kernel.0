@@ -1,51 +1,63 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 6 May 2014 11:15:29 +0530
-Subject: [PATCH v4 0/5] ARM: DRA7: Add support for DRA72x devices
-In-Reply-To: <1398769513-8736-1-git-send-email-rnayak@ti.com>
-References: <1398769513-8736-1-git-send-email-rnayak@ti.com>
-Message-ID: <536876F9.7000707@ti.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 6 May 2014 14:36:33 +0800
+Subject: [linux-sunxi] Re: [PATCH 0/2] ARM: sunxi: Enable syscon for the
+ system controller
+In-Reply-To: <20140505225517.GE9464@lukather>
+References: <1399212160-26934-1-git-send-email-carlo@caione.org>
+ <20140505225517.GE9464@lukather>
+Message-ID: <CAGb2v66JBM_Rv8ie=7iuTPrXGPJECTeevnf9LLXNS=FSYs1+Tg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 April 2014 04:35 PM, Rajendra Nayak wrote:
-> changes in v4:
-> -1- used full SoC names in compatibles eg "ti,dra742" and "ti,dra722"
-> -2- Created a seperate patch for replacing __initdata with __initconst
-> 
-> changes in v3:
-> Removed wildcards from compatible strings and duplicates from
-> .dt_compat strings as suggested by Arnd
-> 
-> DRA72x devices are single core Cortex A15 devices belonging to the
-> DRA7 family (Similar to the DRA74x devices which are dual core Cortex
-> A15 based)
-> 
-> The patches (based off 3.15-rc3) add minimal DT/kernel modifications to add
-> boot support on DRA722 device reusing all the kernel data for DRA742 device.
+Hi,
 
-Tony, Can this series be pulled in for 3.16? Patch 2/5 and 4/5 are acked by Arnd.
-Patch 5/5 can be dropped since there are no users for soc_is_dra7**() at the moment.
+On Tue, May 6, 2014 at 6:55 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Sun, May 04, 2014 at 04:02:38PM +0200, Carlo Caione wrote:
+>> The so called "system controller" in Allwinner A20 and A31 SoCs is
+>> multi-purpose controller that tries to add misc functionality to one
+>> memory region.
+>> In these SoCs it controls the internal SRAM partitioning but it also
+>> includes registers for chip versioning and NMI control.
+>> This patch adds the proper nodes in the DTS files and enable the syscon
+>> in the defconfig files.
+>>
+>> Even though the system controller includes also register for managing the
+>> NMI controller, these register are not mapped in the syscon since they
+>> are directly used and mapped by the NMI controller itself.
+>
+> Hmmm, what exactly do you want to achieve with this?
+>
+> The NMI controller won't be able to use it, since it's initialized
+> much earlier than syscon and regmap.
 
-> 
-> Rajendra Nayak (5):
->   ARM: dts: dra7-evm: Remove the wrong and undocumented compatible
->   ARM: dts: Add support for DRA72x family of devices
->   ARM: OMAP2+: Replace all __initdata with __initconst for const init
->   ARM: OMAP2+: Add machine entry for dra72x devices
->   ARM: DRA7: Add support for soc_is_dra74x() and soc_is_dra72x()
->     varients
-> 
->  .../devicetree/bindings/arm/omap/omap.txt          |   12 ++++--
->  arch/arm/boot/dts/Makefile                         |    3 +-
->  arch/arm/boot/dts/dra7-evm.dts                     |    6 +--
->  arch/arm/boot/dts/dra7.dtsi                        |   27 ------------
->  arch/arm/boot/dts/dra72-evm.dts                    |   24 +++++++++++
->  arch/arm/boot/dts/dra72x.dtsi                      |   25 +++++++++++
->  arch/arm/boot/dts/dra74x.dtsi                      |   41 ++++++++++++++++++
->  arch/arm/mach-omap2/board-generic.c                |   45 ++++++++++++++------
->  arch/arm/mach-omap2/soc.h                          |    7 +++
->  9 files changed, 142 insertions(+), 48 deletions(-)
->  create mode 100644 arch/arm/boot/dts/dra72-evm.dts
->  create mode 100644 arch/arm/boot/dts/dra72x.dtsi
->  create mode 100644 arch/arm/boot/dts/dra74x.dtsi
-> 
+I believe this will be used for toggling the SRAM mappings. (Am I right?)
+The second register toggles mappings for MUSB FIFO, EMAC, and a few of
+the other IP blocks we currently don't support.
+
+> Moreover, the A31 doesn't seem to have this system controller, or at
+> least this overlap.
+
+There should be something similar, as does the A23. There is no overlap AFAIK.
+
+> And since on the A20, registers seem to have one usage only, so I
+> guess we can just split this IP into several nodes, just like we did
+> with the NMI.
+
+As stated above, the second register toggles SRAM mappings for at most
+4 SRAM blocks (for EMAC, MUSB, ACE, ISP).
+
+syscon would be a good way to share this register among the various drivers.
+We do not toggle it in the current EMAC driver. The driver seems to assume
+it is setup by the bootloader, and on the A20, it seems to be mapped to
+EMAC by default.
+
+The MUSB glue layer driver must toggle this.
+
+I think this approach is better than all the individual drivers mapping
+the registers and toggling a single bit. In fact I did something similar
+when working on preliminary musb support.
+
+
+Cheers
+ChenYu
