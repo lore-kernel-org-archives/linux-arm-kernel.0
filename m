@@ -1,42 +1,68 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 6 May 2014 09:32:10 -0400
-Subject: [PATCH v3 4/7] of: configure the platform device dma parameters
-In-Reply-To: <5699845.615YLDid8d@wuerfel>
-References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
- <CAErSpo6gYT34-sOvNgEdV+3wxv=Fdqtx7c1d-4577mFydLtZMg@mail.gmail.com>
- <1399347878.20388.96.camel@pasglop> <5699845.615YLDid8d@wuerfel>
-Message-ID: <5368E45A.1000205@ti.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 6 May 2014 19:03:46 +0530
+Subject: [PATCH 00/17] PCIe support for DRA7xx
+Message-ID: <1399383244-14556-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 06 May 2014 05:54 AM, Arnd Bergmann wrote:
-> On Tuesday 06 May 2014 13:44:38 Benjamin Herrenschmidt wrote:
->> On Mon, 2014-05-05 at 16:28 -0600, Bjorn Helgaas wrote:
->>> I still wonder whether arm, powerpc, and tile (and I just noticed
->>> microblaze also has a similar dma_direct_map_page()) could all be
->>> handled by attaching devices to a generic trivial IOMMU driver
->>> parameterized with the appropriate constant offset.
-> 
+This patch series adds support for PCIe in DRA7xx including drivers and dt
+data. PCIe in DRA7xx uses desingware IP and hence this re-uses the
+pcie desingware driver (pcie-designware.c) by Jingoo.
 
-[..]
+The last couple of patches are marked as *TEMP* since the TI reset driver [1]
+is not yet merged and is in RFC.
 
-> It may be easier to replace set_arch_dma_coherent_ops() with
-> a generic function that handles all cases:
-> 
-> int set_arch_dma_ops(struct device *dev, bool coherent,
-> 		phys_addr_t offset, struct device_node *iommu);
-> 
-> and let the architecture handle the cases it needs.
-> 
->> On powerpc, the offset is not constant, it can be per-device.
-> 
-> I think that's the case on all of them. The code under review here
-> is what parses the dma-ranges property in order to put the correct
-> value into the per-device structure.
-> 
-Yep. The per-device property need is one of the reason, we added the
-information to struct device. The constant need not be same though
-on keystone it is same for all devices.
+Tested broadcom PCIe card and XIO2000 bridge along with DGE530T ethernet
+card.
 
-Regards,
-Santosh
+Changes from RFC:
+* Added external clock support for PCIE APLL
+* Miscellaneous cleanups in Documentation, macro naming etc..
+
+[1] -> http://www.spinics.net/lists/linux-omap/msg106411.html
+
+Keerthy (2):
+  ARM: dts: DRA7: Add divider table to optfclk_pciephy_div clock
+  ARM: dts: DRA7: Change the parent of apll_pcie_in_clk_mux to
+    dpll_pcie_ref_m2ldo_ck
+
+Kishon Vijay Abraham I (15):
+  phy: phy-omap-pipe3: Add support for PCIe PHY
+  phy: omap-control: add external clock support for PCIe PHY
+  phy: ti-pipe3: add external clock support for PCIe PHY
+  phy: pipe3: insert delay to enumerate in GEN2 mode
+  pci: host: pcie-dra7xx: add support for pcie-dra7xx controller
+  pci: host: pcie-designware: Use *base-mask* for configuring the iATU
+  arm: dra7xx: Add hwmod data for pcie1 phy and pcie2 phy
+  arm: dra7xx: Add hwmod data for pcie1 and pcie2 subsystems
+  ARM: dts: dra7xx-clocks: Add missing 32khz clocks used for PHY
+  ARM: dts: dra7: Add dt data for PCIe PHY control module
+  ARM: dts: dra7: Add dt data for PCIe PHY
+  ARM: dts: dra7: Add dt data for PCIe controller
+  ARM: OMAP: Enable PCI for DRA7
+  pci: host: pcie-dra7xx: use reset framework APIs to reset PCIe
+  ARM: dts: dra7: Add *resets* property for PCIe dt node
+
+ .../devicetree/bindings/pci/designware-pcie.txt    |    1 +
+ Documentation/devicetree/bindings/pci/ti-pci.txt   |   35 ++
+ Documentation/devicetree/bindings/phy/ti-phy.txt   |   21 +-
+ arch/arm/boot/dts/dra7.dtsi                        |   55 +++
+ arch/arm/boot/dts/dra7xx-clocks.dtsi               |   11 +-
+ arch/arm/mach-omap2/Kconfig                        |    2 +
+ arch/arm/mach-omap2/cm2_7xx.h                      |    4 +
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c          |  112 ++++++
+ arch/arm/mach-omap2/prm7xx.h                       |    4 +
+ drivers/pci/host/Kconfig                           |   10 +
+ drivers/pci/host/Makefile                          |    1 +
+ drivers/pci/host/pci-dra7xx.c                      |  395 ++++++++++++++++++++
+ drivers/pci/host/pcie-designware.c                 |   39 +-
+ drivers/pci/host/pcie-designware.h                 |    1 +
+ drivers/phy/phy-omap-control.c                     |   92 ++++-
+ drivers/phy/phy-ti-pipe3.c                         |  142 +++++--
+ include/linux/phy/omap_control_phy.h               |   23 ++
+ 17 files changed, 898 insertions(+), 50 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pci/ti-pci.txt
+ create mode 100644 drivers/pci/host/pci-dra7xx.c
+
+-- 
+1.7.9.5
