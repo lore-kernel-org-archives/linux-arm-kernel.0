@@ -1,27 +1,27 @@
-From: baohua@kernel.org (Barry Song)
-Date: Tue, 6 May 2014 09:10:32 +0800
-Subject: [PATCH v2 2/2] spi: sirf: decrease the interrupt count and
- latency of PIO mode
-In-Reply-To: <20140505192344.GL22111@sirena.org.uk>
-References: <1399185156-521-1-git-send-email-swingboard@gmail.com>
- <20140505192344.GL22111@sirena.org.uk>
-Message-ID: <CAGsJ_4zN6mpa1_auXAiV5RsEPkgB7924MDZvfvh5AqGgZAizgw@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 5 May 2014 18:13:10 -0700
+Subject: linux-next: manual merge of the mvebu tree with the arm-soc tree
+In-Reply-To: <20140506110758.9ddcae1a0fa3b9548e37bc58@canb.auug.org.au>
+References: <20140506110758.9ddcae1a0fa3b9548e37bc58@canb.auug.org.au>
+Message-ID: <CAOesGMgLemvWtzN=eBwKerYxcVddx=Uc6O+5aLfL2Yg9GqPTBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-05-06 3:23 GMT+08:00 Mark Brown <broonie@kernel.org>:
-> On Sun, May 04, 2014 at 02:32:36PM +0800, Qipan Li wrote:
->> From: Qipan Li <Qipan.Li@csr.com>
->>
->> current PIO tranfer method be described as follows:
+On Mon, May 5, 2014 at 6:07 PM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+> Hi all,
 >
-> I'm missing patch 1 here.
+> Today's linux-next merge of the mvebu tree got a conflict in
+> arch/arm/mach-mvebu/Kconfig between commit 55400f3a1f89 ("ARM: mvebu:
+> clean-up unneeded kconfig selects") from the arm-soc tree and commit
+> 8e6ac2033822 ("ARM: mvebu: enable the ARM SCU on Armada 375 and Armada
+> 38x") from the mvebu tree.
+>
+> I fixed it up (see below) and can carry the fix as necessary (no action
+> is required).
 
-this is a follow of "[PATCH 2/2] spi: sirf: decrease the interrupt
-count and latency of PIO mode", as you have applied 1/2 - [PATCH 1/2]
-spi: sirf: refactor spi transfer functions, so there is no patch 1/2
-here.
-qipan made a typo , this should be directly a patch but not a 2/2. so
-pls take it as a separate patch.
+Thanks for the heads up. This will be resolved permanently once we
+merge the mvebu contents into arm-soc (since that'll go on top of the
+kconfig select cleanup).
 
--barry
+
+-Olof
