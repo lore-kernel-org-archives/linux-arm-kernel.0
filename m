@@ -1,61 +1,45 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 6 May 2014 12:36:39 -0300
-Subject: mx6qsabresd hangs on linux-next
-In-Reply-To: <20140506141310.GA2794@dragon>
-References: <CAOMZO5DMEqs=zzNGqgKjK7wTJdiNPgEqxsX=TtqKrnpLMzpbDw@mail.gmail.com>
- <20140506141310.GA2794@dragon>
-Message-ID: <CAOMZO5DH5d_L-deVu=XmBo9ekq+-g704p7cyayLvp=43bnEccQ@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 06 May 2014 16:37:05 +0100
+Subject: ACPI vs DT at runtime
+In-Reply-To: <5367AE6B.3010105@ahsoftware.de>
+References: <20131115095717.GC1709@e106331-lin.cambridge.arm.com>
+ <97692EF2-013E-4E4B-BC16-E0915D67EFEC@antoniou-consulting.com>
+ <53673866.9000105@ahsoftware.de> <69387177.zGLDjZS0ln@wuerfel>
+ <5367AE6B.3010105@ahsoftware.de>
+Message-ID: <20140506153705.75C55C40A19@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 6, 2014 at 11:13 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
-> On Mon, May 05, 2014 at 07:50:24PM -0300, Fabio Estevam wrote:
->> Hi,
->>
->> I am running linux-next 20140505 on a mx6qsabresd and I am getting the
->> following hang after ldb is bound:
->>
->> imx-ipuv3 2400000.ipu: IPUv3H probed
->> imx-ipuv3 2800000.ipu: IPUv3H probed
->> [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
->> [drm] No driver support for vblank timestamp query.
->> imx-drm display-subsystem.11: bound imx-ipuv3-crtc.0 (ops ipu_crtc_ops)
->> imx-drm display-subsystem.11: bound imx-ipuv3-crtc.1 (ops ipu_crtc_ops)
->> mmc1: new SDHC card at address e7ac
->> mmcblk0: mmc1:e7ac SD04G 3.69 GiB
->> imx-drm display-subsystem.11: bound imx-ipuv3-crtc.2 (ops ipu_crtc_ops)
->>  mmcblk0: unknown partition table
->> imx-drm display-subsystem.11: bound imx-ipuv3-crtc.3 (ops ipu_crtc_ops)
->> imx-hdmi 120000.hdmi: Detected HDMI controller 0x13:0xa:0xa0:0xc1
->> imx-drm display-subsystem.11: bound 120000.hdmi (ops hdmi_ops)
->> imx-drm display-subsystem.11: bound ldb.10 (ops imx_ldb_ops)
->>
->> (... system hangs)
->
-> I'm seeing the same issue here.  It seems to be caused by some clk
-> divider code change.  I'm looking into it further.
+On Mon, 05 May 2014 17:29:47 +0200, Alexander Holler <holler@ahsoftware.de> wrote:
+> Am 05.05.2014 16:41, schrieb Arnd Bergmann:
+> > On Monday 05 May 2014 09:06:14 Alexander Holler wrote:
+> >>
+> >> A bit late (I don't follow the ML (or what happens in the ARM world)
+> >> closely, but as I've recently read that ARM64 will go UEFI and ACPI, I
+> >> wonder what was the reasoning behind that decision.
+> >>
+> >> Does anyone really assume we will become high quality UEFI and ACPI
+> >> blobs from vendors? And such with reasonable support/update periods?
+> >>
+> >> For me that sounds like someone asked dreamers and was unable to adjust
+> >> those answers in regard to reality.
+> >
+> > Where did you read that? It's simply not true and we should make sure
+> > people stop spreading dangerous misinformation.
+> 
+> I've recently read Grant Likely's blog entry about armv8 servers: 
+> http://www.secretlab.ca/archives/27 (I've read the disclaimer too ;) )
 
-Indeed, if I revert:
+The purpose of that blog post was to address the questions around ARM
+server architecture requirements including ACPI and UEFI, but there is a
+big gap between the requrement and what actually works now. ARM server
+hardware is going to be available well before UEFI and ACPI
+(especially ACPI) infrastructure has stablized. I was trying to lay a
+roadmap that acknowledges the gap and provides a way for vendors to ship
+hardware now that is supported by the mainline kernel.
 
-commit e7489693b3a853ab6dfad52f7e6af553ae8d3f28
-Author: Maxime COQUELIN <maxime.coquelin@st.com>
-Date:   Wed Jan 29 17:24:08 2014 +0100
+The constraints that are driving all of this on servers simply don't
+exist on embedded and mobile. There really is zero advantage to using
+ACPI if the only OS that will ever run on the device is Linux.
 
-    clk: divider: Optimize clk_divider_bestdiv loop
-
-    Currently, the for-loop used to try all the different dividers to find the
-    one that best fit tries all the values from 1 to max_div,
-incrementing by one.
-    In case of power-of-two, or table based divider, the loop isn't optimal.
-
-    Instead of incrementing by one, this patch provides directly the
-next divider.
-
-    Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
-    Signed-off-by: Mike Turquette <mturquette@linaro.org>
-
-Then the board does not hang.
-
-Maxime, Mike
-
-Any suggestion?
+g.
