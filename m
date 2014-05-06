@@ -1,38 +1,32 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 6 May 2014 16:14:11 +0100
-Subject: [PATCH resend 01/15] asm-generic: allow generic unaligned access
- if the arch supports it
-In-Reply-To: <CAKv+Gu_YAd=0gsB=XG0syR+aEJerunvr_SQKtMopMPr5WOQ66w@mail.gmail.com>
-References: <1398959381-8126-1-git-send-email-ard.biesheuvel@linaro.org>
- <1398959381-8126-2-git-send-email-ard.biesheuvel@linaro.org>
- <20140506143120.GD23957@arm.com>
- <CAKv+Gu_YAd=0gsB=XG0syR+aEJerunvr_SQKtMopMPr5WOQ66w@mail.gmail.com>
-Message-ID: <20140506151410.GG23957@arm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue,  6 May 2014 17:16:07 +0200
+Subject: [PATCH] usb: gadget: atmel_usba: always test udc->driver
+Message-ID: <1399389367-15456-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 06, 2014 at 03:34:23PM +0100, Ard Biesheuvel wrote:
-> On 6 May 2014 16:31, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Thu, May 01, 2014 at 04:49:33PM +0100, Ard Biesheuvel wrote:
-> >> Switch the default unaligned access method to 'hardware implemented'
-> >> if HAVE_EFFICIENT_UNALIGNED_ACCESS is set.
-> >>
-> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> >> ---
-> >>  include/asm-generic/unaligned.h | 21 +++++++++++++--------
-> >>  1 file changed, 13 insertions(+), 8 deletions(-)
-> >
-> > I'm happy to take this patch via the arm64 tree. But arm is affected as
-> > well, so it would be good to know if Russell has any objections (cc'ed).
-> >
-> > Patch below for reference. Thanks.
-> >
-> 
-> Russell has already replied to that:
-> http://marc.info/?l=linux-arm-kernel&m=139696976302889&w=2
+Found using smatch: drivers/usb/gadget/atmel_usba_udc.c:1689 usba_udc_irq()
+error: we previously assumed 'udc->driver' could be null (see line 1636)
 
-Thanks.
+Always test udc->driver before using its members.
 
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ drivers/usb/gadget/atmel_usba_udc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/usb/gadget/atmel_usba_udc.c b/drivers/usb/gadget/atmel_usba_udc.c
+index 9f65324f9ae0..76023ce449a3 100644
+--- a/drivers/usb/gadget/atmel_usba_udc.c
++++ b/drivers/usb/gadget/atmel_usba_udc.c
+@@ -1686,7 +1686,7 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
+ 		reset_all_endpoints(udc);
+ 
+ 		if (udc->gadget.speed != USB_SPEED_UNKNOWN
+-				&& udc->driver->disconnect) {
++				&& udc->driver && udc->driver->disconnect) {
+ 			udc->gadget.speed = USB_SPEED_UNKNOWN;
+ 			spin_unlock(&udc->lock);
+ 			udc->driver->disconnect(&udc->gadget);
 -- 
-Catalin
+1.9.1
