@@ -1,155 +1,146 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 6 May 2014 19:03:50 +0530
-Subject: [PATCH 04/17] phy: pipe3: insert delay to enumerate in GEN2 mode
+Date: Tue, 6 May 2014 19:03:49 +0530
+Subject: [PATCH 03/17] phy: ti-pipe3: add external clock support for PCIe PHY
 In-Reply-To: <1399383244-14556-1-git-send-email-kishon@ti.com>
 References: <1399383244-14556-1-git-send-email-kishon@ti.com>
-Message-ID: <1399383244-14556-5-git-send-email-kishon@ti.com>
+Message-ID: <1399383244-14556-4-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-8-bit delay value (0xF1) is required for GEN2 devices to be enumerated
-consistently. Added an API to be called from PHY drivers to set this delay
-value and called it from PIPE3 driver to set the delay value.
+APLL used by PCIE phy can either use external clock as input or the clock
+from DPLL. Added support for the APLL to use external clock as input here.
 
+Cc: Rajendra Nayak <rnayak@ti.com>
+Cc: Tero Kristo <t-kristo@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- Documentation/devicetree/bindings/phy/ti-phy.txt |    4 +--
- drivers/phy/phy-omap-control.c                   |   41 ++++++++++++++++++++++
- drivers/phy/phy-ti-pipe3.c                       |    4 ++-
- include/linux/phy/omap_control_phy.h             |    9 +++++
- 4 files changed, 55 insertions(+), 3 deletions(-)
+ Documentation/devicetree/bindings/phy/ti-phy.txt |    4 ++
+ drivers/phy/phy-ti-pipe3.c                       |   75 ++++++++++++++--------
+ 2 files changed, 52 insertions(+), 27 deletions(-)
 
 diff --git a/Documentation/devicetree/bindings/phy/ti-phy.txt b/Documentation/devicetree/bindings/phy/ti-phy.txt
-index d50f8ee..5653dc4 100644
+index bc9afb5..d50f8ee 100644
 --- a/Documentation/devicetree/bindings/phy/ti-phy.txt
 +++ b/Documentation/devicetree/bindings/phy/ti-phy.txt
-@@ -18,9 +18,9 @@ Required properties:
-                         AM437 platform.
-  - reg : Address and length of the register set for the device. It contains
-    the address of "otghs_control" for control-phy-otghs or "power" register
--   for other types and "control_sma" for control-phy-pcie
-+   for other types and "control_sma", "pcie_pcs" for control-phy-pcie
-  - reg-names: should be "otghs_control" for control-phy-otghs,
--  "control_sma" for control-phy-pcie and "power" for other types.
-+  "control_sma", "pcie_pcs" for control-phy-pcie and "power" for other types.
+@@ -76,6 +76,10 @@ Required properties:
+    * "dpll_ref_m2" - external dpll ref clk
+    * "phy-div" - divider for apll
+    * "div-clk" - apll clock
++   * "apll_mux" - mux for pcie apll
++   * "refclk_ext" - external reference clock for pcie apll
++ - ti,ext-clk: To specifiy if PCIE apll should use external clock. Applicable
++   only to PCIE PHY.
  
- omap_control_usb: omap-control-usb at 4a002300 {
-         compatible = "ti,control-phy-otghs";
-diff --git a/drivers/phy/phy-omap-control.c b/drivers/phy/phy-omap-control.c
-index 47a1b6c..6ba551b 100644
---- a/drivers/phy/phy-omap-control.c
-+++ b/drivers/phy/phy-omap-control.c
-@@ -61,6 +61,41 @@ void omap_control_pcie_tx_rx_control(struct device *dev, u8 ctrl)
- EXPORT_SYMBOL_GPL(omap_control_pcie_tx_rx_control);
- 
- /**
-+ * omap_control_pcie_pcs - set the PCS delay count
-+ * @dev: the control module device
-+ * @id: index of the pcie PHY (should be 1 or 2)
-+ * @delay: 8 bit delay value
-+ */
-+void omap_control_pcie_pcs(struct device *dev, u8 id, u8 delay)
-+{
-+	u32 val;
-+	struct omap_control_phy	*control_phy;
-+
-+	if (IS_ERR(dev) || !dev) {
-+		pr_err("%s: invalid device\n", __func__);
-+		return;
-+	}
-+
-+	control_phy = dev_get_drvdata(dev);
-+	if (!control_phy) {
-+		dev_err(dev, "%s: invalid control phy device\n", __func__);
-+		return;
-+	}
-+
-+	if (control_phy->type != OMAP_CTRL_TYPE_PCIE) {
-+		dev_err(dev, "%s: unsupported operation\n", __func__);
-+		return;
-+	}
-+
-+	val = readl(control_phy->pcie_pcs);
-+	val &= ~(OMAP_CTRL_PCIE_PCS_MASK <<
-+		(id * OMAP_CTRL_PCIE_PCS_DELAY_COUNT_SHIFT));
-+	val |= delay << (id * OMAP_CTRL_PCIE_PCS_DELAY_COUNT_SHIFT);
-+	writel(val, control_phy->pcie_pcs);
-+}
-+EXPORT_SYMBOL_GPL(omap_control_pcie_pcs);
-+
-+/**
-  * omap_control_phy_power - power on/off the phy using control module reg
-  * @dev: the control module device
-  * @on: 0 or 1, based on powering on or off the PHY
-@@ -335,6 +370,12 @@ static int omap_control_phy_probe(struct platform_device *pdev)
- 		control_phy->ctrl_sma = devm_ioremap_resource(&pdev->dev, res);
- 		if (IS_ERR(control_phy->ctrl_sma))
- 			return PTR_ERR(control_phy->ctrl_sma);
-+
-+		res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-+						   "pcie_pcs");
-+		control_phy->pcie_pcs = devm_ioremap_resource(&pdev->dev, res);
-+		if (IS_ERR(control_phy->pcie_pcs))
-+			return PTR_ERR(control_phy->pcie_pcs);
- 	}
- 
- 	dev_set_drvdata(control_phy->dev, control_phy);
+ Optional properties:
+  - ctrl-module : phandle of the control module used by PHY driver to power on
 diff --git a/drivers/phy/phy-ti-pipe3.c b/drivers/phy/phy-ti-pipe3.c
-index 5513aa0..a1a0e35 100644
+index d43019d..5513aa0 100644
 --- a/drivers/phy/phy-ti-pipe3.c
 +++ b/drivers/phy/phy-ti-pipe3.c
-@@ -216,8 +216,10 @@ static int ti_pipe3_init(struct phy *x)
- 	u32 val;
- 	int ret = 0;
+@@ -293,7 +293,7 @@ static int ti_pipe3_probe(struct platform_device *pdev)
+ 	struct device_node *control_node;
+ 	struct platform_device *control_pdev;
+ 	const struct of_device_id *match;
+-	struct clk *clk;
++	struct clk *clk, *pclk;
  
--	if (of_device_is_compatible(phy->dev->of_node, "ti,phy-pipe3-pcie"))
-+	if (of_device_is_compatible(phy->dev->of_node, "ti,phy-pipe3-pcie")) {
-+		omap_control_pcie_pcs(phy->control_dev, 0x1, 0xF1);
- 		return 0;
+ 	phy = devm_kzalloc(&pdev->dev, sizeof(*phy), GFP_KERNEL);
+ 	if (!phy) {
+@@ -302,6 +302,20 @@ static int ti_pipe3_probe(struct platform_device *pdev)
+ 	}
+ 	phy->dev		= &pdev->dev;
+ 
++	control_node = of_parse_phandle(node, "ctrl-module", 0);
++	if (!control_node) {
++		dev_err(&pdev->dev, "Failed to get control device phandle\n");
++		return -EINVAL;
 +	}
- 
- 	/* Bring it out of IDLE if it is IDLE */
- 	val = ti_pipe3_readl(phy->pll_ctrl_base, PLL_CONFIGURATION2);
-diff --git a/include/linux/phy/omap_control_phy.h b/include/linux/phy/omap_control_phy.h
-index 15cfbfe..6127c04 100644
---- a/include/linux/phy/omap_control_phy.h
-+++ b/include/linux/phy/omap_control_phy.h
-@@ -35,6 +35,7 @@ struct omap_control_phy {
- 	u32 __iomem *power;
- 	u32 __iomem *power_aux;
- 	u32 __iomem *ctrl_sma;
-+	u32 __iomem *pcie_pcs;
- 
- 	struct clk *sys_clk;
- 
-@@ -68,6 +69,9 @@ enum omap_control_usb_mode {
- #define	OMAP_CTRL_PCIE_TX_RX_CONTROL_SHIFT	0x10
- #define	OMAP_CTRL_PCIE_TX_RX_CONTROL_MASK	0x3
- 
-+#define	OMAP_CTRL_PCIE_PCS_MASK			0xff
-+#define	OMAP_CTRL_PCIE_PCS_DELAY_COUNT_SHIFT	0x8
 +
- #define	OMAP_CTRL_PCIE_PHY_TX_ACSPCIE		0x1
- #define	OMAP_CTRL_PCIE_PHY_RX_ACSPCIE		0x2
- #define	OMAP_CTRL_PCIE_PHY_TX_RX_ACSPCIE	0x3
-@@ -84,6 +88,7 @@ void omap_control_phy_power(struct device *dev, int on);
- void omap_control_usb_set_mode(struct device *dev,
- 			       enum omap_control_usb_mode mode);
- void omap_control_pcie_tx_rx_control(struct device *dev, u8 ctrl);
-+void omap_control_pcie_pcs(struct device *dev, u8 id, u8 delay);
- #else
- 
- static inline void omap_control_phy_power(struct device *dev, int on)
-@@ -98,6 +103,10 @@ static inline void omap_control_usb_set_mode(struct device *dev,
- static inline void omap_control_pcie_tx_rx_control(struct device *dev, u8 ctrl)
- {
- }
++	control_pdev = of_find_device_by_node(control_node);
++	if (!control_pdev) {
++		dev_err(&pdev->dev, "Failed to get control device\n");
++		return -EINVAL;
++	}
 +
-+static inline void omap_control_pcie_pcs(struct device *dev, u8 id, u8 delay)
-+{
-+}
- #endif
++	phy->control_dev = &control_pdev->dev;
++
+ 	if (!of_device_is_compatible(node, "ti,phy-pipe3-pcie")) {
+ 		match = of_match_device(of_match_ptr(ti_pipe3_id_table),
+ 					&pdev->dev);
+@@ -345,19 +359,40 @@ static int ti_pipe3_probe(struct platform_device *pdev)
+ 	}
  
- #endif	/* __OMAP_CONTROL_PHY_H__ */
+ 	if (of_device_is_compatible(node, "ti,phy-pipe3-pcie")) {
+-		clk = devm_clk_get(phy->dev, "dpll_ref");
+-		if (IS_ERR(clk)) {
+-			dev_err(&pdev->dev, "unable to get dpll ref clk\n");
+-			return PTR_ERR(clk);
++		if (!of_property_read_bool(node, "ti,ext-clk")) {
++			clk = devm_clk_get(phy->dev, "dpll_ref");
++			if (IS_ERR(clk)) {
++				dev_err(&pdev->dev,
++					"unable to get dpll ref clk\n");
++				return PTR_ERR(clk);
++			}
++			clk_set_rate(clk, 1500000000);
++
++			clk = devm_clk_get(phy->dev, "dpll_ref_m2");
++			if (IS_ERR(clk)) {
++				dev_err(&pdev->dev,
++					"unable to get dpll ref m2 clk\n");
++				return PTR_ERR(clk);
++			}
++			clk_set_rate(clk, 100000000);
++		} else {
++			omap_control_pcie_tx_rx_control(phy->control_dev,
++						OMAP_CTRL_PCIE_PHY_RX_ACSPCIE);
++
++			clk = clk_get(phy->dev, "apll_mux");
++			if (IS_ERR(clk)) {
++				dev_err(&pdev->dev, "unable to get apll mux clk\n");
++				return PTR_ERR(clk);
++			}
++
++			pclk = clk_get(phy->dev, "refclk_ext");
++			if (IS_ERR(pclk)) {
++				dev_err(&pdev->dev, "unable to get ext ref clk for apll\n");
++				return PTR_ERR(pclk);
++			}
++
++			clk_set_parent(clk, pclk);
+ 		}
+-		clk_set_rate(clk, 1500000000);
+-
+-		clk = devm_clk_get(phy->dev, "dpll_ref_m2");
+-		if (IS_ERR(clk)) {
+-			dev_err(&pdev->dev, "unable to get dpll ref m2 clk\n");
+-			return PTR_ERR(clk);
+-		}
+-		clk_set_rate(clk, 100000000);
+ 
+ 		clk = devm_clk_get(phy->dev, "phy-div");
+ 		if (IS_ERR(clk)) {
+@@ -375,20 +410,6 @@ static int ti_pipe3_probe(struct platform_device *pdev)
+ 		phy->div_clk = ERR_PTR(-ENODEV);
+ 	}
+ 
+-	control_node = of_parse_phandle(node, "ctrl-module", 0);
+-	if (!control_node) {
+-		dev_err(&pdev->dev, "Failed to get control device phandle\n");
+-		return -EINVAL;
+-	}
+-
+-	control_pdev = of_find_device_by_node(control_node);
+-	if (!control_pdev) {
+-		dev_err(&pdev->dev, "Failed to get control device\n");
+-		return -EINVAL;
+-	}
+-
+-	phy->control_dev = &control_pdev->dev;
+-
+ 	omap_control_phy_power(phy->control_dev, 0);
+ 
+ 	platform_set_drvdata(pdev, phy);
 -- 
 1.7.9.5
