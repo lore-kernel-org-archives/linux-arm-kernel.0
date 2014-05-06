@@ -1,39 +1,39 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 5 May 2014 17:35:20 -0700
-Subject: [PATCH] ARM: OMAP2+: free use_gptimer_clksrc variable after boot
-In-Reply-To: <1397494170-3111-1-git-send-email-ghorbel@pivasoftware.com>
-References: <1397494170-3111-1-git-send-email-ghorbel@pivasoftware.com>
-Message-ID: <20140506003520.GN25949@atomide.com>
+Date: Mon, 5 May 2014 17:37:34 -0700
+Subject: [PATCH] ARM: dts: am335x-boneblack: remove use of
+ ti,vcc-aux-disable-is-sleep
+In-Reply-To: <1398432986-30585-1-git-send-email-jhovold@gmail.com>
+References: <1398432986-30585-1-git-send-email-jhovold@gmail.com>
+Message-ID: <20140506003734.GO25949@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Oussama Ghorbel <ghorbel@pivasoftware.com> [140414 09:50]:
-> The variable use_gptimer_clksrc is only used by two __init functions,
-> So we can freely free it after boot.
+* Johan Hovold <jhovold@gmail.com> [140425 06:37]:
+> Remove use of property ti,vcc-aux-disable-is-sleep, which does not
+> exist.
 > 
-> Signed-off-by: Oussama Ghorbel <ghorbel@pivasoftware.com>
+> Signed-off-by: Johan Hovold <jhovold@gmail.com>
 
 Thanks applying into omap-for-v3.16/fixes-not-urgent.
 
 Tony
 
 > ---
->  arch/arm/mach-omap2/timer.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  arch/arm/boot/dts/am335x-boneblack.dts | 1 -
+>  1 file changed, 1 deletion(-)
 > 
-> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> index 74044aa..d4a6abd 100644
-> --- a/arch/arm/mach-omap2/timer.c
-> +++ b/arch/arm/mach-omap2/timer.c
-> @@ -361,7 +361,7 @@ static void __init omap2_gp_clockevent_init(int gptimer_id,
+> diff --git a/arch/arm/boot/dts/am335x-boneblack.dts b/arch/arm/boot/dts/am335x-boneblack.dts
+> index 6b71ad95a5cf..305975d3f531 100644
+> --- a/arch/arm/boot/dts/am335x-boneblack.dts
+> +++ b/arch/arm/boot/dts/am335x-boneblack.dts
+> @@ -26,7 +26,6 @@
+>  	pinctrl-0 = <&emmc_pins>;
+>  	bus-width = <8>;
+>  	status = "okay";
+> -	ti,vcc-aux-disable-is-sleep;
+>  };
 >  
->  /* Clocksource code */
->  static struct omap_dm_timer clksrc;
-> -static bool use_gptimer_clksrc;
-> +static bool use_gptimer_clksrc __initdata;
->  
->  /*
->   * clocksource
+>  &am33xx_pinmux {
 > -- 
 > 1.8.3.2
 > 
