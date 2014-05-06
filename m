@@ -1,90 +1,50 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 06 May 2014 19:47:04 +0200
-Subject: [PATCH v4 13/15] clk: exynos5420: update clocks for MAU Block
-In-Reply-To: <1399393610-23394-14-git-send-email-shaik.ameer@samsung.com>
+Date: Tue, 06 May 2014 19:49:25 +0200
+Subject: [PATCH v4 14/15] clk: exynos5420: add misc clocks
+In-Reply-To: <1399393610-23394-15-git-send-email-shaik.ameer@samsung.com>
 References: <1399393610-23394-1-git-send-email-shaik.ameer@samsung.com>
- <1399393610-23394-14-git-send-email-shaik.ameer@samsung.com>
-Message-ID: <53692018.9020707@gmail.com>
+ <1399393610-23394-15-git-send-email-shaik.ameer@samsung.com>
+Message-ID: <536920A5.1090502@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Shaik,
 
 On 06.05.2014 18:26, Shaik Ameer Basha wrote:
-> This patch adds the missing MAU block specific clocks.
+> This patch adds some missing miscellaneous clocks specific
+> to exynos5420.
 >
 > Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
 > Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
 > ---
->   drivers/clk/samsung/clk-exynos5420.c   |   14 +++++++++++++-
+>   drivers/clk/samsung/clk-exynos5420.c   |   14 +++++++++++---
 >   include/dt-bindings/clock/exynos5420.h |    2 ++
->   2 files changed, 15 insertions(+), 1 deletion(-)
+>   2 files changed, 13 insertions(+), 3 deletions(-)
 >
 > diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
-> index ba7273a..e0e749d 100644
+> index e0e749d..e69e820 100644
 > --- a/drivers/clk/samsung/clk-exynos5420.c
 > +++ b/drivers/clk/samsung/clk-exynos5420.c
-> @@ -62,7 +62,9 @@
->   #define SRC_TOP11		0x10284
->   #define SRC_TOP12		0x10288
->   #define SRC_MASK_TOP2		0x10308
-> +#define SRC_MASK_TOP7		0x1031c
->   #define SRC_MASK_DISP10		0x1032c
-> +#define SRC_MASK_MAU		0x10334
->   #define SRC_MASK_FSYS		0x10340
->   #define SRC_MASK_PERIC0		0x10350
->   #define SRC_MASK_PERIC1		0x10354
-> @@ -155,6 +157,7 @@ static unsigned long exynos5420_clk_regs[] __initdata = {
->   	SRC_TOP11,
->   	SRC_TOP12,
->   	SRC_MASK_TOP2,
-> +	SRC_MASK_TOP7,
->   	SRC_MASK_DISP10,
->   	SRC_MASK_FSYS,
->   	SRC_MASK_PERIC0,
-> @@ -351,6 +354,8 @@ PNAME(mout_hdmi_p) = {"dout_hdmi_pixel", "sclk_hdmiphy"};
->   PNAME(mout_maudio0_p) = {"fin_pll", "maudio_clk", "mout_sclk_dpll",
->   			 "mout_sclk_mpll", "mout_sclk_spll", "mout_sclk_ipll",
->   			 "mout_sclk_epll", "mout_sclk_rpll"};
-> +PNAME(mout_mau_epll_clk_p) = {"mout_sclk_epll", "mout_sclk_dpll",
-> +				"mout_sclk_mpll", "mout_sclk_spll"};
+> @@ -273,7 +273,8 @@ PNAME(mout_group5_p) = {"mout_sclk_vpll", "mout_sclk_dpll"};
 >
->   /* fixed rate clocks generated outside the soc */
->   static struct samsung_fixed_rate_clock exynos5420_fixed_rate_ext_clks[] __initdata = {
-> @@ -373,6 +378,9 @@ static struct samsung_fixed_factor_clock exynos5420_fixed_factor_clks[] __initda
->   static struct samsung_mux_clock exynos5420_mux_clks[] __initdata = {
->   	MUX(0, "mout_mspll_kfc", mout_mspll_cpu_p, SRC_TOP7, 8, 2),
->   	MUX(0, "mout_mspll_cpu", mout_mspll_cpu_p, SRC_TOP7, 12, 2),
-> +	MUX_F(0, "mout_mau_epll_clk", mout_mau_epll_clk_p,
-> +			SRC_TOP7, 20, 2, CLK_SET_RATE_PARENT, 0),
-
-Again, the CLK_SET_RATE_PARENT doesn't seem to be correct here.
-
-> +
->   	MUX(0, "mout_apll", mout_apll_p, SRC_CPU, 0, 1),
->   	MUX(0, "mout_cpu", mout_cpu_p, SRC_CPU, 16, 1),
->   	MUX(0, "mout_kpll", mout_kpll_p, SRC_KFC, 0, 1),
-> @@ -520,7 +528,8 @@ static struct samsung_mux_clock exynos5420_mux_clks[] __initdata = {
->   			TOP_SPARE2, 8, 1, CLK_SET_RATE_PARENT, 0),
+>   PNAME(mout_fimd1_final_p) = {"mout_fimd1", "mout_fimd1_opt"};
+>   PNAME(mout_sw_aclk66_p)	= {"dout_aclk66", "mout_sclk_spll"};
+> -PNAME(mout_user_aclk66_peric_p)	= { "fin_pll", "mout_sw_aclk66" };
+> +PNAME(mout_user_aclk66_peric_p)	= { "fin_pll", "mout_sw_aclk66"};
+> +PNAME(mout_user_pclk66_gpio_p) = {"mout_sw_aclk66", "ffactor_sw_aclk66"};
 >
->   	/* MAU Block */
-> -	MUX(0, "mout_maudio0", mout_maudio0_p, SRC_MAU, 28, 3),
-> +	MUX_F(CLK_MOUT_MAUDIO0, "mout_maudio0", mout_maudio0_p, SRC_MAU, 28, 3,
-> +						CLK_SET_RATE_PARENT, 0),
-
-Ditto.
-
+>   PNAME(mout_sw_aclk200_fsys_p) = {"dout_aclk200_fsys", "mout_sclk_spll"};
+>   PNAME(mout_sw_pclk200_fsys_p) = {"dout_pclk200_fsys", "mout_sclk_spll"};
+> @@ -372,10 +373,13 @@ static struct samsung_fixed_rate_clock exynos5420_fixed_rate_clks[] __initdata =
+>   };
 >
->   	/* FSYS Block */
->   	MUX(0, "mout_usbd301", mout_group2_p, SRC_FSYS, 4, 3),
-> @@ -713,6 +722,9 @@ static struct samsung_gate_clock exynos5420_gate_clks[] __initdata = {
->   	GATE(CLK_ACLK300_DISP1, "aclk300_disp1", "mout_user_aclk300_disp1",
->   			SRC_MASK_TOP2, 24, CLK_IGNORE_UNUSED, 0),
->
-> +	GATE(CLK_MAU_EPLL, "mau_epll", "mout_mau_epll_clk",
-> +			SRC_MASK_TOP7, 20, CLK_IGNORE_UNUSED, 0),
+>   static struct samsung_fixed_factor_clock exynos5420_fixed_factor_clks[] __initdata = {
+> -	FFACTOR(0, "sclk_hsic_12m", "fin_pll", 1, 2, 0),
+> +	FFACTOR(0, "ffactor_hsic_12m", "fin_pll", 1, 2, 0),
+> +	FFACTOR(0, "ffactor_sw_aclk66", "mout_sw_aclk66", 1, 2, 0),
 
-What is the reason for CLK_IGNORE_UNUSED flag here?
+Is the "ffactor_" prefix also present in the datasheet? If not, it 
+should be removed from clock names as well.
 
 Best regards,
 Tomasz
