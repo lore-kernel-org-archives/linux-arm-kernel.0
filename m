@@ -1,46 +1,44 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 6 May 2014 10:05:26 -0700
-Subject: [PATCH 1/5] ARM: defconfigs: add MTD_SPI_NOR (new dependency for
- M25P80)
-In-Reply-To: <CAOesGMh09AQ3Y-cdXFov3-+RZHDYTVw=MWngRumHc0hnB-CGOg@mail.gmail.com>
-References: <1397719309-2022-1-git-send-email-computersforpeace@gmail.com>
- <1397719309-2022-2-git-send-email-computersforpeace@gmail.com>
- <535A8FC9.8040707@wwwdotorg.org>
- <20140429190603.GB9418@norris-Latitude-E6410>
- <20140430114548.GQ28159@titan.lakedaemon.net>
- <CAOesGMi0zK8H=Ok81ZLhssvG5gsbvanY4dct_PF95Exq6p3tfg@mail.gmail.com>
- <20140504174216.GV28159@titan.lakedaemon.net>
- <CAOesGMh09AQ3Y-cdXFov3-+RZHDYTVw=MWngRumHc0hnB-CGOg@mail.gmail.com>
-Message-ID: <20140506170526.GA28907@ld-irv-0074>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Tue, 6 May 2014 10:06:52 -0700
+Subject: [Patch v2 1/4] soc: Placeholder files for drivers/soc
+In-Reply-To: <53593D89.1020703@ti.com>
+References: <1398357082-5102-1-git-send-email-agross@codeaurora.org>
+ <1398357082-5102-2-git-send-email-agross@codeaurora.org>
+ <53593D89.1020703@ti.com>
+Message-ID: <655E240A-D6B1-4750-AC3A-09BA9D0C084E@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 04, 2014 at 11:53:22AM -0700, Olof Johansson wrote:
-> On Sun, May 4, 2014 at 10:42 AM, Jason Cooper <jason@lakedaemon.net> wrote:
-> > On Sat, May 03, 2014 at 03:51:11PM -0700, Olof Johansson wrote:
-> >> Cases like these are easiest that we just take the patch directly in
-> >> an early-merge branch (i.e. cleanup or fixes-non-critical, or a
-> >> generic depends branch), and if there's conflicts as topics are merged
-> >> in from subplatforms we can deal with it then.
-> >
-> > Are you referring to basing on -rc1, or the series being split up to
-> > the individual sub-arch maintainers?
-> >
-> > *slightly* confused,
+
+On Apr 24, 2014, at 9:36 AM, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
+
+> On Thursday 24 April 2014 12:31 PM, Andy Gross wrote:
+>> Add placeholder Kconfig and linkage for driver/soc.
+>> 
+>> The first patch set that implemented this was authored by Santosh Shilimkar:
+>> https://lkml.org/lkml/2014/2/28/567
+>> 
+>> Signed-off-by: Andy Gross <agross@codeaurora.org>
+>> ---
+> Good to see these patches on the list. Me and Kumar spoke about it
+> many times before.
 > 
-> I'm referring to us taking the patch into something like our cleanup
-> branch, and any branches that come in from you or other subplatforms
-> will be merged on top, so we can resolve conflicts there and then.
-> We'll merge in the cleanup branch into other next/* branches as needed
-> to resolve the conflicts in our tree instead of percolating them all
-> the way up.
+> BTW, I just posted updated version. Feel free to use the from it instead
+> of 4subject one.
+> 
+> Regards,
+> Santosh
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-In case you didn't notice, I already had split up the patch series a
-little more for v2 (based on -rc1 still), and most of it seems to be
-going through the sub-arch trees, I think. There is one patch targeted
-directly at arm-soc (that's you, Olof?).
+Paul,
 
-Let me know if v2 has any problems.
+Did you have any other thoughts on this, do we want to add more to Santosh?s patch w/regards to comments or MAINTAINERs?
 
-Thanks,
-Brian
+- k
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
