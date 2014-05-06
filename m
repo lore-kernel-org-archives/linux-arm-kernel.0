@@ -1,74 +1,57 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 6 May 2014 11:04:48 -0700
-Subject: [PATCH 2/2] ARM: KVM: user_mem_abort: support stage 2 MMIO page
- mapping
-In-Reply-To: <1395785294-2545-2-git-send-email-kim.phillips@linaro.org>
-References: <1395785294-2545-1-git-send-email-kim.phillips@linaro.org>
- <1395785294-2545-2-git-send-email-kim.phillips@linaro.org>
-Message-ID: <20140506180448.GH3066@lvm>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 06 May 2014 20:05:14 +0200
+Subject: [PATCH v12 18/31] iommu/exynos: allow having multiple System
+ MMUs for a master H/W
+In-Reply-To: <1398584283-22846-19-git-send-email-shaik.ameer@samsung.com>
+References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
+ <1398584283-22846-19-git-send-email-shaik.ameer@samsung.com>
+Message-ID: <5369245A.1060001@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 25, 2014 at 05:08:14PM -0500, Kim Phillips wrote:
-> Use the correct memory type for device MMIO mappings: PAGE_S2_DEVICE.
-> 
-> Signed-off-by: Kim Phillips <kim.phillips@linaro.org>
+On 27.04.2014 09:37, Shaik Ameer Basha wrote:
+> From: Cho KyongHo <pullip.cho@samsung.com>
+>
+> Some master device descriptor like fimc-is which is an abstraction
+> of very complex H/W may have multiple System MMUs. For those devices,
+> the design of the link between System MMU and its master H/W is needed
+> to be reconsidered.
+>
+> A link structure, sysmmu_list_data is introduced that provides a link
+> to master H/W and that has a pointer to the device descriptor of a
+> System MMU. Given a device descriptor of a master H/W, it is possible
+> to traverse all System MMUs that must be controlled along with the
+> master H/W.
+>
+> Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
 > ---
->  arch/arm/kvm/mmu.c | 11 ++++++++---
->  1 file changed, 8 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index 7789857..a354610 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -652,6 +652,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->  	struct kvm_mmu_memory_cache *memcache = &vcpu->arch.mmu_page_cache;
->  	struct vm_area_struct *vma;
->  	pfn_t pfn;
-> +	pgprot_t mem_type = PAGE_S2;
->  
->  	write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
->  	if (fault_status == FSC_PERM && !write_fault) {
-> @@ -702,6 +703,9 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->  	if (is_error_pfn(pfn))
->  		return -EFAULT;
->  
-> +	if (kvm_is_mmio_pfn(pfn))
-> +		mem_type = PAGE_S2_DEVICE;
-> +
->  	spin_lock(&kvm->mmu_lock);
->  	if (mmu_notifier_retry(kvm, mmu_seq))
->  		goto out_unlock;
-> @@ -709,7 +713,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->  		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
->  
->  	if (hugetlb) {
-> -		pmd_t new_pmd = pfn_pmd(pfn, PAGE_S2);
-> +		pmd_t new_pmd = pfn_pmd(pfn, mem_type);
->  		new_pmd = pmd_mkhuge(new_pmd);
->  		if (writable) {
->  			kvm_set_s2pmd_writable(&new_pmd);
-> @@ -718,13 +722,14 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->  		coherent_icache_guest_page(kvm, hva & PMD_MASK, PMD_SIZE);
->  		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
->  	} else {
-> -		pte_t new_pte = pfn_pte(pfn, PAGE_S2);
-> +		pte_t new_pte = pfn_pte(pfn, mem_type);
->  		if (writable) {
->  			kvm_set_s2pte_writable(&new_pte);
->  			kvm_set_pfn_dirty(pfn);
->  		}
->  		coherent_icache_guest_page(kvm, hva, PAGE_SIZE);
-> -		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, false);
-> +		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte,
-> +				     mem_type == PAGE_S2_DEVICE);
->  	}
->  
->  
-> -- 
-> 1.9.1
-> 
+>   drivers/iommu/exynos-iommu.c |  545 ++++++++++++++++++++++++++----------------
+>   1 file changed, 335 insertions(+), 210 deletions(-)
+>
+> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+> index fefedec3..c2e6365 100755
+> --- a/drivers/iommu/exynos-iommu.c
+> +++ b/drivers/iommu/exynos-iommu.c
+> @@ -117,6 +117,10 @@
+>   #define REG_PB1_EADDR		0x058
+>
+>   #define has_sysmmu(dev)		(dev->archdata.iommu != NULL)
+> +#define for_each_sysmmu_list(dev, list_data)				\
+> +	list_for_each_entry(list_data,					\
+> +		&((struct exynos_iommu_owner *)dev->archdata.iommu)->mmu_list, \
+> +		entry)
 
-I think this looks reasonable.
+Sorry, NAK.
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Please don't add this kind of complexity and business logic to low level 
+code. We want the configuration functions to be simple, easy to read, 
+maintain and extend.
+
+The proper way to do it is to let the IOMMUs be grouped together on 
+IOMMU subsystem level, so that each IOMMU consumer driver would see just 
+one IOMMU, but then IOMMU driver callbacks would handle just particular 
+instances of the IOMMU IP blocks, without any loops, lists and other 
+crazy code...
+
+Best regards,
+Tomasz
