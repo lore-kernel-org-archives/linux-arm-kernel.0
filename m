@@ -1,202 +1,95 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue,  6 May 2014 19:04:41 +0100
-Subject: [PATCH RFC v3 4/6] arm64: add PSCI CPU_SUSPEND based cpu_suspend
- support
-In-Reply-To: <1399399483-17112-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1399399483-17112-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1399399483-17112-5-git-send-email-lorenzo.pieralisi@arm.com>
+Date: Tue,  6 May 2014 19:04:37 +0100
+Subject: [PATCH RFC v3 0/6] ARM generic idle states
+Message-ID: <1399399483-17112-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements the cpu_suspend cpu operations method through
-the PSCI CPU_SUSPEND API. The PSCI implementation translates the idle state
-index passed by the cpu_suspend core call into a valid PSCI state according to
-the PSCI states initialized at boot by the PSCI suspend backend.
+This patch is v3 of a previous posting:
 
-Entry point is set to cpu_resume physical address, that represents the
-default kernel execution address following a CPU reset.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/248084.html
 
-Idle state indices missing a DT node description are initialized to power
-state standby WFI so that if called by the idle driver they provide the
-default behaviour.
+Changes in v3:
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
----
- arch/arm64/include/asm/psci.h |   4 ++
- arch/arm64/kernel/psci.c      | 102 ++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 106 insertions(+)
+- Streamlined the idle states bindings and added them to the series
+  http://www.spinics.net/lists/arm-kernel/msg316299.html
+- Sorting states through min-residency+exit-latency
+- Added debug strings formatting
+- Reworded min-residency-us idle state property
+- Removed power-domain properties from idle states waiting for code
+  examples requiring them to be defined
 
-diff --git a/arch/arm64/include/asm/psci.h b/arch/arm64/include/asm/psci.h
-index d15ab8b4..9a4b663 100644
---- a/arch/arm64/include/asm/psci.h
-+++ b/arch/arm64/include/asm/psci.h
-@@ -14,6 +14,10 @@
- #ifndef __ASM_PSCI_H
- #define __ASM_PSCI_H
- 
-+struct cpuidle_driver;
- void psci_init(void);
- 
-+int __init psci_dt_register_idle_states(struct cpuidle_driver *,
-+					struct device_node *[]);
-+
- #endif /* __ASM_PSCI_H */
-diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-index ea4828a..0e32ab4 100644
---- a/arch/arm64/kernel/psci.c
-+++ b/arch/arm64/kernel/psci.c
-@@ -15,15 +15,18 @@
- 
- #define pr_fmt(fmt) "psci: " fmt
- 
-+#include <linux/cpuidle.h>
- #include <linux/init.h>
- #include <linux/of.h>
- #include <linux/smp.h>
-+#include <linux/slab.h>
- 
- #include <asm/compiler.h>
- #include <asm/cpu_ops.h>
- #include <asm/errno.h>
- #include <asm/psci.h>
- #include <asm/smp_plat.h>
-+#include <asm/suspend.h>
- 
- #define PSCI_POWER_STATE_TYPE_STANDBY		0
- #define PSCI_POWER_STATE_TYPE_POWER_DOWN	1
-@@ -54,6 +57,8 @@ enum psci_function {
- 	PSCI_FN_MAX,
- };
- 
-+static DEFINE_PER_CPU_READ_MOSTLY(struct psci_power_state *, psci_power_state);
-+
- static u32 psci_function_id[PSCI_FN_MAX];
- 
- #define PSCI_RET_SUCCESS		0
-@@ -94,6 +99,17 @@ static u32 psci_power_state_pack(struct psci_power_state state)
- 			<< PSCI_POWER_STATE_AFFL_SHIFT);
- }
- 
-+static void psci_power_state_unpack(u32 power_state,
-+				    struct psci_power_state *state)
-+{
-+	state->id = (power_state >> PSCI_POWER_STATE_ID_SHIFT)
-+			& PSCI_POWER_STATE_ID_MASK;
-+	state->type = (power_state >> PSCI_POWER_STATE_TYPE_SHIFT)
-+			& PSCI_POWER_STATE_TYPE_MASK;
-+	state->affinity_level = (power_state >> PSCI_POWER_STATE_AFFL_SHIFT)
-+			& PSCI_POWER_STATE_AFFL_MASK;
-+}
-+
- /*
-  * The following two functions are invoked via the invoke_psci_fn pointer
-  * and will not be inlined, allowing us to piggyback on the AAPCS.
-@@ -176,6 +192,77 @@ static const struct of_device_id psci_of_match[] __initconst = {
- 	{},
- };
- 
-+int __init psci_dt_register_idle_states(struct cpuidle_driver *drv,
-+					struct device_node *state_nodes[])
-+{
-+	int cpu, i;
-+	struct psci_power_state *psci_states;
-+	const struct cpu_operations *cpu_ops_ptr;
-+
-+	if (!state_nodes)
-+		return -EINVAL;
-+	/*
-+	 * This is belt-and-braces: make sure that if the idle
-+	 * specified protocol is psci, the cpu_ops have been
-+	 * initialized to psci operations. Anything else is
-+	 * a recipe for mayhem.
-+	 */
-+	for_each_cpu(cpu, drv->cpumask) {
-+		cpu_ops_ptr = cpu_ops[cpu];
-+		if (WARN_ON(!cpu_ops_ptr || strcmp(cpu_ops_ptr->name, "psci")))
-+			return -EOPNOTSUPP;
-+	}
-+
-+	psci_states = kcalloc(drv->state_count, sizeof(*psci_states),
-+			      GFP_KERNEL);
-+
-+	if (!psci_states) {
-+		pr_warn("psci idle state allocation failed\n");
-+		return -ENOMEM;
-+	}
-+
-+	for_each_cpu(cpu, drv->cpumask) {
-+		if (per_cpu(psci_power_state, cpu)) {
-+			pr_warn("idle states already initialized on cpu %u\n",
-+				cpu);
-+			continue;
-+		}
-+		per_cpu(psci_power_state, cpu) = psci_states;
-+	}
-+
-+
-+	for (i = 0; i < drv->state_count; i++) {
-+		u32 psci_power_state;
-+
-+		if (!state_nodes[i]) {
-+			/*
-+			 * An index with a missing node pointer falls back to
-+			 * simple STANDBYWFI
-+			 */
-+			psci_states[i].type = PSCI_POWER_STATE_TYPE_STANDBY;
-+			continue;
-+		}
-+
-+		if (of_property_read_u32(state_nodes[i], "entry-method-param",
-+					 &psci_power_state)) {
-+			pr_warn(" * %s missing entry-method-param property\n",
-+				state_nodes[i]->full_name);
-+			/*
-+			 * If entry-method-param property is missing, fall
-+			 * back to STANDBYWFI state
-+			 */
-+			psci_states[i].type = PSCI_POWER_STATE_TYPE_STANDBY;
-+			continue;
-+		}
-+
-+		pr_debug("psci-power-state %#x index %u\n",
-+			 psci_power_state, i);
-+		psci_power_state_unpack(psci_power_state, &psci_states[i]);
-+	}
-+
-+	return 0;
-+}
-+
- void __init psci_init(void)
- {
- 	struct device_node *np;
-@@ -279,6 +366,18 @@ static void cpu_psci_cpu_die(unsigned int cpu)
- }
- #endif
- 
-+#ifdef CONFIG_ARM64_CPU_SUSPEND
-+static int cpu_psci_cpu_suspend(unsigned long index)
-+{
-+	struct psci_power_state *state = __get_cpu_var(psci_power_state);
-+
-+	if (!state)
-+		return -EOPNOTSUPP;
-+
-+	return psci_ops.cpu_suspend(state[index], virt_to_phys(cpu_resume));
-+}
-+#endif
-+
- const struct cpu_operations cpu_psci_ops = {
- 	.name		= "psci",
- 	.cpu_init	= cpu_psci_cpu_init,
-@@ -288,6 +387,9 @@ const struct cpu_operations cpu_psci_ops = {
- 	.cpu_disable	= cpu_psci_cpu_disable,
- 	.cpu_die	= cpu_psci_cpu_die,
- #endif
-+#ifdef CONFIG_ARM64_CPU_SUSPEND
-+	.cpu_suspend	= cpu_psci_cpu_suspend,
-+#endif
- };
- 
- #endif
+Changes in v2:
+
+- Moved OF parsing code to drivers/cpuidle
+- Improved states detection and sorting through linked list
+- Split code in generic and ARM64 specific bits
+- Moved idle enter function into ARM64 idle driver
+- Refactored PSCI idle states register function
+- Renamed suspend operations and moved detection to ARM64 idle driver
+- Changed the way CPUIDLE_FLAG_TIMER_STOP is handled
+- Simplified idle state nodes parsing since according to the latest
+  bindings idle state nodes are a flat list, not hierarchical anymore
+- Used min-residency-us to sort the states, to be further discussed
+
+Idle states on most ARM platforms can be characterized by a set of
+parameters that are platform agnostic and describe the HW idle states
+features. So far, CPU idle drivers for ARM platforms required the definition
+of parameters through static tables, duplicating control data for different
+platforms. Moreover, the lack of standardization on firmware interfaces
+hampered any standardization effort, resulting in CPU idle drivers for ARM
+platforms containing duplicated code and platform specific power down routines.
+
+The introduction of the PSCI firmware interface, and more in general, well
+defined suspend back-ends, allows the definition of generic idle states and
+the respective kernel infrastructure to support them.
+
+Building on top of DT idle states bindings, that standardize idle states
+parameters and corresponding suspend back-ends, this patchset provides code
+that parses DT idle states nodes and builds at run-time the control data
+infrastructure required by the ARM CPU idle drivers.
+
+Idle states define an entry method (eg PSCI), that requires the respective
+ARM64 kernel back-end to be invoked to initialize idle states parameters, so
+that when the idle driver executes the back-end specific entry method a table
+look-up can be carried out to retrieve the corresponding idle state parameter.
+
+On legacy ARM platforms, the OF idle states are just used to initialize
+states data.
+
+The idle states bindings can be extended with new back-ends; the ARM64 CPUidle
+driver must be updated accordingly so that the corresponding back
+end initializer can be invoked at boot time for parameters initialization.
+
+Patchset has been tested on AEM v8 models, on top of bootwrapper PSCI CPU
+SUSPEND implementation which provides simulated core power gating.
+
+Lorenzo Pieralisi (6):
+  Documentation: arm: define DT idle states bindings
+  Documentation: devicetree: psci: define CPU suspend parameter
+  drivers: cpuidle: implement OF based idle states infrastructure
+  arm64: add PSCI CPU_SUSPEND based cpu_suspend support
+  drivers: cpuidle: CPU idle ARM64 driver
+  arm64: boot: dts: update rtsm aemv8 dts with PSCI and idle states
+
+ Documentation/devicetree/bindings/arm/cpus.txt     |   8 +
+ .../devicetree/bindings/arm/idle-states.txt        | 508 +++++++++++++++++++++
+ Documentation/devicetree/bindings/arm/psci.txt     |  11 +
+ arch/arm64/boot/dts/rtsm_ve-aemv8a.dts             |  49 +-
+ arch/arm64/include/asm/psci.h                      |   4 +
+ arch/arm64/kernel/psci.c                           | 102 +++++
+ drivers/cpuidle/Kconfig                            |  14 +
+ drivers/cpuidle/Kconfig.arm64                      |  13 +
+ drivers/cpuidle/Makefile                           |   5 +
+ drivers/cpuidle/cpuidle-arm64.c                    | 161 +++++++
+ drivers/cpuidle/of_idle_states.c                   | 293 ++++++++++++
+ drivers/cpuidle/of_idle_states.h                   |   8 +
+ 12 files changed, 1168 insertions(+), 8 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/idle-states.txt
+ create mode 100644 drivers/cpuidle/Kconfig.arm64
+ create mode 100644 drivers/cpuidle/cpuidle-arm64.c
+ create mode 100644 drivers/cpuidle/of_idle_states.c
+ create mode 100644 drivers/cpuidle/of_idle_states.h
+
 -- 
 1.8.4
