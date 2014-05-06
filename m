@@ -1,51 +1,104 @@
 From: jean.pihet@linaro.org (Jean Pihet)
-Date: Tue,  6 May 2014 17:55:30 +0200
-Subject: [PATCH 0/3] perf tools: Add libdw DWARF post unwind support for ARM64
-Message-ID: <1399391733-11927-1-git-send-email-jean.pihet@linaro.org>
+Date: Tue,  6 May 2014 17:55:31 +0200
+Subject: [PATCH 1/3] perf tests: Introduce perf_regs_load function on ARM64
+In-Reply-To: <1399391733-11927-1-git-send-email-jean.pihet@linaro.org>
+References: <1399391733-11927-1-git-send-email-jean.pihet@linaro.org>
+Message-ID: <1399391733-11927-2-git-send-email-jean.pihet@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding libdw DWARF post unwind support, which is part
-of elfutils-devel/libdw-dev package from version 0.158.
+Introducing perf_regs_load function, which is going
+to be used for dwarf unwind test in following patches.
 
-Also includes the test suite for dwarf unwinding, by adding the
-arch specific test code and the perf_regs_load function.
+It takes single argument as a pointer to the regs dump
+buffer and populates it with current registers values, as
+expected by the perf built-in unwinding test.
 
-This series depends on the following kernel patches series:
-- AARCH64 unwinding support [1]. Already mainlined.
-- ARM libdw integration [2],
-and on the changes from the branch for:
-- libdw AARCH64 unwinding support [3].
-
-[1] http://www.spinics.net/lists/arm-kernel/msg304483.html
-[2] https://lkml.org/lkml/2014/5/6/366
-[3] https://git.fedorahosted.org/cgit/elfutils.git/log/?h=mjw/aarch64-unwind
-
-ToDo: investigate the libdw unwinding problem with compat binaries (i.e.
-ARMv7 binaries running on ARMv8). Since this functionality works ok with
-libunwind, the problem should be in libdw compat support [3].
-
-
-Jean Pihet (3):
-  perf tests: Introduce perf_regs_load function on ARM64
-  perf tests: Add dwarf unwind test on ARM64
-  perf tools: Add libdw DWARF post unwind support for ARM64
-
- tools/perf/Makefile.perf                   |  2 +-
- tools/perf/arch/arm64/Makefile             |  7 ++++
- tools/perf/arch/arm64/include/perf_regs.h  |  5 +++
- tools/perf/arch/arm64/tests/dwarf-unwind.c | 59 ++++++++++++++++++++++++++++++
- tools/perf/arch/arm64/tests/regs_load.S    | 39 ++++++++++++++++++++
- tools/perf/arch/arm64/util/unwind-libdw.c  | 53 +++++++++++++++++++++++++++
- tools/perf/tests/builtin-test.c            |  3 +-
- tools/perf/tests/tests.h                   |  3 +-
- 8 files changed, 168 insertions(+), 3 deletions(-)
- create mode 100644 tools/perf/arch/arm64/tests/dwarf-unwind.c
- create mode 100644 tools/perf/arch/arm64/tests/regs_load.S
- create mode 100644 tools/perf/arch/arm64/util/unwind-libdw.c
-
+Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
+Cc: Steve Capper <steve.capper@linaro.org>
+Cc: Corey Ashford <cjashfor@linux.vnet.ibm.com>
+Cc: Frederic Weisbecker <fweisbec@gmail.com>
+Cc: Ingo Molnar <mingo@kernel.org>
+Cc: Namhyung Kim <namhyung@kernel.org>
+Cc: Paul Mackerras <paulus@samba.org>
+Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
+Cc: Arnaldo Carvalho de Melo <acme@infradead.org>
+Cc: David Ahern <dsahern@gmail.com>
+Cc: Jiri Olsa <jolsa@redhat.com>
 ---
-Rebased on the latest jolsa/perf/core
+ tools/perf/arch/arm64/Makefile            |  1 +
+ tools/perf/arch/arm64/include/perf_regs.h |  2 ++
+ tools/perf/arch/arm64/tests/regs_load.S   | 39 +++++++++++++++++++++++++++++++
+ 3 files changed, 42 insertions(+)
+ create mode 100644 tools/perf/arch/arm64/tests/regs_load.S
 
+diff --git a/tools/perf/arch/arm64/Makefile b/tools/perf/arch/arm64/Makefile
+index 67e9b3d..9b8f87e 100644
+--- a/tools/perf/arch/arm64/Makefile
++++ b/tools/perf/arch/arm64/Makefile
+@@ -4,4 +4,5 @@ LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/dwarf-regs.o
+ endif
+ ifndef NO_LIBUNWIND
+ LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/unwind-libunwind.o
++LIB_OBJS += $(OUTPUT)arch/$(ARCH)/tests/regs_load.o
+ endif
+diff --git a/tools/perf/arch/arm64/include/perf_regs.h b/tools/perf/arch/arm64/include/perf_regs.h
+index 2359546..1e052f1 100644
+--- a/tools/perf/arch/arm64/include/perf_regs.h
++++ b/tools/perf/arch/arm64/include/perf_regs.h
+@@ -9,6 +9,8 @@
+ #define PERF_REG_IP	PERF_REG_ARM64_PC
+ #define PERF_REG_SP	PERF_REG_ARM64_SP
+ 
++void perf_regs_load(u64 *regs);
++
+ static inline const char *perf_reg_name(int id)
+ {
+ 	switch (id) {
+diff --git a/tools/perf/arch/arm64/tests/regs_load.S b/tools/perf/arch/arm64/tests/regs_load.S
+new file mode 100644
+index 0000000..92ab968
+--- /dev/null
++++ b/tools/perf/arch/arm64/tests/regs_load.S
+@@ -0,0 +1,39 @@
++#include <linux/linkage.h>
++
++/*
++ * Implementation of void perf_regs_load(u64 *regs);
++ *
++ * This functions fills in the 'regs' buffer from the actual registers values,
++ * in the way the perf built-in unwinding test expects them:
++ * - the PC at the time at the call to this function. Since this function
++ *   is called using a bl instruction, the PC value is taken from LR,
++ * - the current SP (not touched by this function),
++ * - the current value of LR is merely retrieved and stored because the
++ *   value before the call to this function is unknown at this time; it will
++ *   be unwound from the dwarf information in unwind__get_entries.
++ */
++
++.text
++.type perf_regs_load,%function
++ENTRY(perf_regs_load)
++	stp x0,  x1,  [x0], #16	// store x0..x29
++	stp x2,  x3,  [x0], #16
++	stp x4,  x5,  [x0], #16
++	stp x6,  x7,  [x0], #16
++	stp x8,  x9,  [x0], #16
++	stp x10, x11, [x0], #16
++	stp x12, x13, [x0], #16
++	stp x14, x15, [x0], #16
++	stp x16, x17, [x0], #16
++	stp x18, x19, [x0], #16
++	stp x20, x21, [x0], #16
++	stp x22, x23, [x0], #16
++	stp x24, x25, [x0], #16
++	stp x26, x27, [x0], #16
++	stp x28, x29, [x0], #16
++	mov x1,  sp
++	stp x30, x1,  [x0], #16	// store lr and sp
++	str x30, [x0]		// store pc as lr in order to skip the call
++				//  to this function
++	ret
++ENDPROC(perf_regs_load)
 -- 
 1.7.11.7
