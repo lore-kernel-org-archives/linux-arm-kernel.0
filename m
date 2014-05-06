@@ -1,91 +1,59 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 06 May 2014 13:31:24 +0200
-Subject: [PATCH 1/2] of: add bq and radxa vendor prefixes
-In-Reply-To: <20140506111345.GB22196@gmail.com>
-References: <1398973835-26303-1-git-send-email-b.galvani@gmail.com>
- <CABuKBe+fFCU2__rEHfiU+XPQwKE613VBxQ4=8xiA3PXQkBiMDQ@mail.gmail.com>
- <20140506111345.GB22196@gmail.com>
-Message-ID: <3107321.XJc3MCHyeC@diego>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 06 May 2014 13:34:46 +0200
+Subject: [PATCH v3 06/20] usb: host: xhci-plat: Add support for the Armada
+ 38x
+In-Reply-To: <1399335255-589-7-git-send-email-gregory.clement@free-electrons.com>
+References: <1399335255-589-1-git-send-email-gregory.clement@free-electrons.com>
+ <1399335255-589-7-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1584794.IM1uiSkBdk@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 6. Mai 2014, 13:13:46 schrieb Beniamino Galvani:
-> On Sun, May 04, 2014 at 02:57:52PM +0200, Matthias Brugger wrote:
-> > 2014-05-02 1:32 GMT+02:00 Heiko St?bner <heiko@sntech.de>:
-> > > Hi Beniamino,
-> > > 
-> > > Am Donnerstag, 1. Mai 2014, 21:50:34 schrieb Beniamino Galvani:
-> > >> Add new vendor prefixes for:
-> > >>     * bq, a company that sells multimedia devices and 3D printers
-> > > 
-> > > bq is actually only a brandname. The company itself is "Mundo Reader
-> > > S.L.".
-> > > I'm not sure what the actual policy is concerning the vendor prefix,
-> > > i.e. if it should use the visible brand name or the actual company
-> > > name.
-> > > 
-> > > I.e. another possibility would be to add the vendor prefix
-> > > 
-> > >         mundoreader     Mundo Reader S.L.
-> > > 
-> > > and name the currie
-> > > 
-> > >         mundoreader,bq-curie2
-> > 
-> > I think we should stick to the brand name, as this is the name people
-> > know.
+
+Hi,
+
+On Tuesday, May 06, 2014 02:14:01 AM Gregory CLEMENT wrote:
+> For the Armada 38x SoCs which come with an xhci controller, specific
+> initialization must be done during probe related to the MBus windows
+> configuration. This patch adds the support of this quirk.
 > 
-> Personally I don't have a strong preference, so either of the two.
-
-According to an IRC conversation I just had, it is supposed to be the real 
-company name ... so I guess my option above would be the correct one.
-
-
-Heiko
-
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  drivers/usb/host/Kconfig      |  7 +++++
+>  drivers/usb/host/Makefile     |  1 +
+>  drivers/usb/host/xhci-mvebu.c | 71 +++++++++++++++++++++++++++++++++++++++++++
+>  drivers/usb/host/xhci-mvebu.h | 21 +++++++++++++
+>  drivers/usb/host/xhci-plat.c  |  6 ++++
+>  5 files changed, 106 insertions(+)
+>  create mode 100644 drivers/usb/host/xhci-mvebu.c
+>  create mode 100644 drivers/usb/host/xhci-mvebu.h
 > 
-> Beniamino
-> 
-> > > Heiko
-> > > 
-> > >>     * Radxa, manufacturer of ARM boards
-> > >> 
-> > >> Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
-> > >> ---
-> > >> 
-> > >>  Documentation/devicetree/bindings/vendor-prefixes.txt |    2 ++
-> > >>  1 file changed, 2 insertions(+)
-> > >> 
-> > >> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> > >> b/Documentation/devicetree/bindings/vendor-prefixes.txt index
-> > >> abc3080..6f8177c 100644
-> > >> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> > >> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> > >> @@ -21,6 +21,7 @@ atmel       Atmel Corporation
-> > >> 
-> > >>  auo  AU Optronics Corporation
-> > >>  avago        Avago Technologies
-> > >>  bosch        Bosch Sensortec GmbH
-> > >> 
-> > >> +bq   bq
-> > >> 
-> > >>  brcm Broadcom Corporation
-> > >>  buffalo      Buffalo, Inc.
-> > >>  calxeda      Calxeda
-> > >> 
-> > >> @@ -98,6 +99,7 @@ powervr     PowerVR (deprecated, use img)
-> > >> 
-> > >>  qca  Qualcomm Atheros, Inc.
-> > >>  qcom Qualcomm Technologies, Inc
-> > >>  qnap QNAP Systems, Inc.
-> > >> 
-> > >> +radxa        Radxa
-> > >> 
-> > >>  raidsonic    RaidSonic Technology GmbH
-> > >>  ralink       Mediatek/Ralink Technology Corp.
-> > >>  ramtron      Ramtron International
-> > > 
-> > > _______________________________________________
-> > > linux-arm-kernel mailing list
-> > > linux-arm-kernel at lists.infradead.org
-> > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+> index 3d9e54062d62..e70943fac4a1 100644
+> --- a/drivers/usb/host/Kconfig
+> +++ b/drivers/usb/host/Kconfig
+> @@ -29,6 +29,13 @@ if USB_XHCI_HCD
+>  config USB_XHCI_PLATFORM
+>  	tristate
+>  
+> +config USB_XHCI_MVEBU
+> +	tristate "xHCI support for Marvell Armada 38x"
+
+Please limit this driver to mvebu arch and compile testing, i.e.
+
+	depends on ARCH_MVEBU || COMPILE_TEST
+
+> +	select USB_XHCI_PLATFORM
+> +	---help---
+> +	  Say 'Y' to enable the support for the xHCI host controller
+> +	  found in Marvell Armada 38x ARM SOCs.
+> +
+>  endif # USB_XHCI_HCD
+>  
+>  config USB_EHCI_HCD
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
