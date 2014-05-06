@@ -1,51 +1,83 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Tue, 6 May 2014 13:34:19 -0300
-Subject: [PATCH] ARM: dts: imx6q-udoo: Add HDMI support
-Message-ID: <1399394059-21635-1-git-send-email-fabio.estevam@freescale.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 6 May 2014 10:35:08 -0600
+Subject: [PATCH 05/17] pci: host: pcie-dra7xx: add support for
+ pcie-dra7xx controller
+In-Reply-To: <1399383244-14556-6-git-send-email-kishon@ti.com>
+References: <1399383244-14556-1-git-send-email-kishon@ti.com>
+ <1399383244-14556-6-git-send-email-kishon@ti.com>
+Message-ID: <20140506163507.GA15542@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx6q-udoo.dts | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+On Tue, May 06, 2014 at 07:03:51PM +0530, Kishon Vijay Abraham I wrote:
+> +Example:
+> +pcie at 51000000 {
+> +	compatible = "ti,dra7xx-pcie";
+> +	reg = <0x51002000 0x14c>, <0x51000000 0x2000>;
+> +	reg-names = "ti_conf", "rc_dbics";
+> +	interrupts = <0 232 0x4>, <0 233 0x4>;
+> +	#address-cells = <3>;
+> +	#size-cells = <2>;
+> +	device_type = "pci";
+> +	ti,device_type = <3>;
+> +	ranges = <0x00000800 0 0x20001000 0x20001000 0 0x00002000  /* Configuration Space */
 
-diff --git a/arch/arm/boot/dts/imx6q-udoo.dts b/arch/arm/boot/dts/imx6q-udoo.dts
-index ed397d1..5f2206a 100644
---- a/arch/arm/boot/dts/imx6q-udoo.dts
-+++ b/arch/arm/boot/dts/imx6q-udoo.dts
-@@ -28,6 +28,18 @@
- 	status = "okay";
- };
- 
-+&hdmi {
-+	ddc-i2c-bus = <&i2c2>;
-+	status = "okay";
-+};
-+
-+&i2c2 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c2>;
-+	status = "okay";
-+};
-+
- &iomuxc {
- 	imx6q-udoo {
- 		pinctrl_enet: enetgrp {
-@@ -51,6 +63,13 @@
- 			>;
- 		};
- 
-+		pinctrl_i2c2: i2c2grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_KEY_COL3__I2C2_SCL		0x4001b8b1
-+				MX6QDL_PAD_KEY_ROW3__I2C2_SDA		0x4001b8b1
-+			>;
-+		};
-+
- 		pinctrl_uart2: uart2grp {
- 			fsl,pins = <
- 				MX6QDL_PAD_EIM_D26__UART2_TX_DATA	0x1b0b1
--- 
-1.8.3.2
+Configuration space should not show up in the ranges, please don't
+copy that mistake from other drivers, put it in reg.
+
+> +	interrupt-map-mask = <0 0 0 0>;
+> +	interrupt-map = <0x0 0 &gic 134>;
+
+The HW cannot decode INTA/B/C/D?
+
+> +#define	PCIECTRL_DRA7XX_CONF_IRQSTATUS_MSI		0x0034
+> +#define	PCIECTRL_DRA7XX_CONF_IRQENABLE_SET_MSI		0x0038
+> +#define	INTA						BIT(0)
+> +#define	INTB						BIT(1)
+> +#define	INTC						BIT(2)
+> +#define	INTD						BIT(3)
+> +#define	MSI						BIT(4)
+> +#define	LEG_EP_INTERRUPTS (INTA | INTB | INTC | INTD)
+
+Oh, it can, it would be wise to export this from the driver. Look at
+the latest patches from Srikanth Thokala for the Xilinx PCI driver to
+see how this should look
+
+> +static int dra7xx_pcie_establish_link(struct pcie_port *pp)
+> +{
+> +	u32 reg;
+> +	int retries = 1000;
+> +	struct dra7xx_pcie *dra7xx = to_dra7xx_pcie(pp);
+> +
+> +	if (dw_pcie_link_up(pp)) {
+> +		dev_err(pp->dev, "link is already up\n");
+> +		return 0;
+> +	}
+> +
+> +	reg = dra7xx_pcie_readl(dra7xx->base, PCIECTRL_DRA7XX_CONF_DEVICE_CMD);
+> +	reg |= LTSSM_EN;
+> +	dra7xx_pcie_writel(dra7xx->base, PCIECTRL_DRA7XX_CONF_DEVICE_CMD, reg);
+> +
+> +	while (--retries) {
+> +		reg = dra7xx_pcie_readl(dra7xx->base,
+> +					PCIECTRL_DRA7XX_CONF_PHY_CS);
+> +		if (reg & LINK_UP)
+> +			break;
+> +		usleep_range(10, 20);
+> +	}
+> +
+> +	if (retries <= 0) {
+> +		dev_err(pp->dev, "link is not up\n");
+> +		return -ETIMEDOUT;
+> +	}
+> +
+> +	return 0;
+> +}
+
+It would be really nice to see the link bring up process live in the
+PCI core, every driver seems to have its own take on this.
+
+The PCI-E spec requires a 100ms delay after link bring up (aka hot
+reset) before sending any configuration TLPs.
+
+Jason
