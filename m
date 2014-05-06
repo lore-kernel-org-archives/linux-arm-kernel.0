@@ -1,54 +1,42 @@
-From: loeliger@gmail.com (Jon Loeliger)
-Date: Tue, 6 May 2014 10:23:16 -0500
-Subject: [PATCH] irqchip: sirf: fix 'line over 80 characters'
-In-Reply-To: <1399388316-19465-1-git-send-email-21cnbao@gmail.com>
-References: <1399388316-19465-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <CAJgR-BikPVzi1bKpBwk-vvrDv9cwFgjWcg-NmH8SKsEOWDnxcg@mail.gmail.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 06 May 2014 17:24:33 +0200
+Subject: [E1000-devel] ARM support for igb driver
+In-Reply-To: <201405061718.54012.arnd@arndb.de>
+References: <CAHH3p5KAwyMOY=ai_h0eM+JwYLtTO8d4jVaVOWVtOakhqPRTew@mail.gmail.com>
+ <20140505223839.45778902@skate> <536800A8.7090801@intel.com>
+ <201405061718.54012.arnd@arndb.de>
+Message-ID: <1399389873.29530.3.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> fix "line line over 80 characters" for the below:
-> static int __init sirfsoc_irq_init(struct device_node *np, struct device_node *parent)
->
-> the users of the codes - key customers really care about that.
+Am Dienstag, den 06.05.2014, 17:18 +0200 schrieb Arnd Bergmann:
+> On Monday 05 May 2014, Alexander Duyck wrote:
+> > Glad to hear that this is working on your ARM platform as expected.
+> > 
+> > I believe the issue Shiv is having is due to a problem with the specific
+> > platform as the IGB device is reporting a Data Link Protocol error via
+> > AER and I believe this is what is causing his platform issues.  On
+> > enabling BME the device is likely signalling a Fatal Error message in
+> > response to the DLP error.  The original error he was seeing was:
+> > 
+> > Unhandled fault: imprecise external abort (0x1406) at 0x00000000
+> 
+> This isn't too uncommon. There are a couple of traditional PCI host drivers
+> that register an imprecise external abort handler to catch this and
+> then look at the host controller registers.
+> 
+> Out of the pcie hosts, only drivers/pci/host/pci-imx6.c catches
+> this error, but it then goes on to ignore it, not even printing
+> a message about it.
+> 
+I think this handler is mostly there to handle the imprecise external
+abort happening on DW pcie IP if the bus scan tries to access an
+non-existent device. That's why it silently ignores this error.
 
-And readers of the Linux logs - key developers really care about snark.
+BTW: I can confirm that igb i350 works on i.MX6.
 
-jdl
-
-On Tue, May 6, 2014 at 9:58 AM, Barry Song <21cnbao@gmail.com> wrote:
-> From: Bin Shi <Bin.Shi@csr.com>
->
-> fix "line line over 80 characters" for the below:
-> static int __init sirfsoc_irq_init(struct device_node *np, struct device_node *parent)
->
-> the users of the codes - key customers really care about that.
->
-> Signed-off-by: Bin Shi <Bin.Shi@csr.com>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> ---
->  drivers/irqchip/irq-sirfsoc.c |    3 ++-
->  1 files changed, 2 insertions(+), 1 deletions(-)
->
-> diff --git a/drivers/irqchip/irq-sirfsoc.c b/drivers/irqchip/irq-sirfsoc.c
-> index 581eefe..5e54f6d 100644
-> --- a/drivers/irqchip/irq-sirfsoc.c
-> +++ b/drivers/irqchip/irq-sirfsoc.c
-> @@ -58,7 +58,8 @@ static void __exception_irq_entry sirfsoc_handle_irq(struct pt_regs *regs)
->         handle_IRQ(irqnr, regs);
->  }
->
-> -static int __init sirfsoc_irq_init(struct device_node *np, struct device_node *parent)
-> +static int __init sirfsoc_irq_init(struct device_node *np,
-> +       struct device_node *parent)
->  {
->         void __iomem *base = of_iomap(np, 0);
->         if (!base)
-> --
-> 1.7.5.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Regards,
+Lucas
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
