@@ -1,67 +1,44 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 6 May 2014 17:53:30 -0300
-Subject: [PATCH v3 17/20] phy: Add support for USB cluster on the Armada
- 375 SoC
-In-Reply-To: <1399335255-589-18-git-send-email-gregory.clement@free-electrons.com>
-References: <1399335255-589-1-git-send-email-gregory.clement@free-electrons.com>
- <1399335255-589-18-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140506205330.GA27308@arch.cereza>
+From: eric@eukrea.com (Eric =?ISO-8859-1?B?QuluYXJk?=)
+Date: Tue, 6 May 2014 22:59:17 +0200
+Subject: [PATCH v4 1/2] ARM: dts: imx51-eukrea-mbimxsd51-baseboard: Add
+ CAN support
+In-Reply-To: <CAOMZO5DZFfC1NTF3gWGpCVwkOnzUi9npsLkPZioYrvDSKbFVGw@mail.gmail.com>
+References: <1399404113-29207-1-git-send-email-fabio.estevam@freescale.com>
+ <1399404776.560722294@f389.i.mail.ru>
+ <CAOMZO5DZFfC1NTF3gWGpCVwkOnzUi9npsLkPZioYrvDSKbFVGw@mail.gmail.com>
+Message-ID: <20140506225917.6a291373@e6520eb>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+Hi Fabio,
 
-On 06 May 02:14 AM, Gregory CLEMENT wrote:
-> +
-> +#define USB2_PHY_CONFIG_ENABLE BIT(0) /* active low */
-> +
+Le Tue, 6 May 2014 17:04:44 -0300,
+Fabio Estevam <festevam@gmail.com> a ?crit :
 
-I still think it's more readable to use USB2_PHY_CONFIG_DISABLE.
-It's just a nitpick, though.
+> 
+> On Tue, May 6, 2014 at 4:32 PM, Alexander Shiyan <shc_work@mail.ru> wrote:
+> >> +     can0: can at 0 {
+> >> +             pinctrl-names = "default";
+> >> +             pinctrl-0 = <&pinctrl_can>;
+> >> +             compatible = "microchip,mcp2515";
+> >> +             reg = <0>;
+> >> +             clocks = <&clk24M>;
+> >> +             spi-max-frequency = <1000000>;
+> >
+> > This should be of course 10000000, or removed completely
+> > since driver already applies such limitation to the SPI bus.
+> > I think Shawn can fix this during commit.
+> 
+> Yes, this should be 10MHz.
+> 
+> Thanks for the review.
+> 
+> Eric,
+> 
+> I forgot to Cc you on v4. Besides the 10MHz error above, does it look good?
 
-> +static int armada375_usb_phy_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct phy *phy;
-> +	struct device_node *np = dev->of_node;
-> +	struct phy_provider *phy_provider;
-> +	void __iomem *usb_cluster_base;
-> +	struct device_node *xhci_node;
-> +	int i;
-> +
-> +	usb_cluster_base = of_iomap(np, 0);
-> +	BUG_ON(!usb_cluster_base);
-> +
+seems fine. We will test asap.
 
-Isn't a bit extreme to call BUG_ON (and thus bring down the whole system)
-in a phy driver?
+Thanks,
 
-> +	for (i = 0; i < NB_PHY; i++) {
-> +		phy = devm_phy_create(dev, &armada375_usb_phy_ops, NULL);
-> +		if (IS_ERR(phy))
-> +			dev_err(dev, "failed to create PHY n%d\n", i);
-> +
-
-I think you're missing a continue/break here.
-
-> +		usb_cluster_phy[i].phy = phy;
-> +		usb_cluster_phy[i].reg = usb_cluster_base;
-> +		usb_cluster_phy[i].enable = false;
-> +		phy_set_drvdata(phy, &usb_cluster_phy[i]);
-> +	}
-> +
-> +	usb_cluster_phy[PHY_USB2].use_usb3 = false;
-> +	usb_cluster_phy[PHY_USB3].use_usb3 = true;
-> +
-[..]
-> +
-> +MODULE_DESCRIPTION("Armada 375 USB cluster driver");
-> +MODULE_AUTHOR("Gregory CLEMENT <gregory.clement@free-electrons.com>");
-> +MODULE_LICENSE("GPL");
-
-GPL v2 ?
-
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Eric
