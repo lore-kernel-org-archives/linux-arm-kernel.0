@@ -1,37 +1,61 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 06 May 2014 13:30:45 +0900
-Subject: [PATCH] ARM: S3C24XX: remove SAMSUNG_CLOCK remnants after ccf
- conversion
-In-Reply-To: <1615843.xdRuLnoxgD@phil>
-References: <1615843.xdRuLnoxgD@phil>
-Message-ID: <0e4f01cf68e3$f2a63f00$d7f2bd00$@samsung.com>
+From: archit@ti.com (Archit Taneja)
+Date: Tue, 6 May 2014 10:52:32 +0530
+Subject: [RFC 2/4] ARM: dts: Add ctrl-core DT node for DRA7
+In-Reply-To: <20140421151034.GA23945@atomide.com>
+References: <1397654063-8055-1-git-send-email-archit@ti.com>
+ <1397654063-8055-2-git-send-email-archit@ti.com>
+ <20140418171854.GJ5354@atomide.com> <5354A970.8040605@ti.com>
+ <20140421151034.GA23945@atomide.com>
+Message-ID: <53687198.60405@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko St?bner wrote:
-> 
-> This finally removes all remaining SAMSUNG_CLOCK conditional code
-> from s3c24xx architectures.
-> 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
-> This is of course meant to go on top of the s3c2410 ccf conversion
-> 
->  arch/arm/mach-s3c24xx/Kconfig         |  5 -----
->  arch/arm/mach-s3c24xx/common.c        | 17 -----------------
->  arch/arm/mach-s3c24xx/cpufreq-utils.c |  6 ------
->  arch/arm/mach-s3c24xx/mach-anubis.c   | 27 ---------------------------
->  arch/arm/mach-s3c24xx/mach-bast.c     | 27 ---------------------------
->  arch/arm/mach-s3c24xx/mach-osiris.c   | 27 ---------------------------
->  arch/arm/mach-s3c24xx/mach-rx1950.c   | 14 --------------
->  arch/arm/mach-s3c24xx/mach-vr1000.c   | 27 ---------------------------
->  arch/arm/mach-s3c24xx/pm.c            | 12 ------------
->  9 files changed, 162 deletions(-)
-> 
-At last, we're supporting common clock framework for s3c24xx.
+Hi,
 
-Heiko, very thanks for your effort.
+On Monday 21 April 2014 08:40 PM, Tony Lindgren wrote:
+> * Archit Taneja <archit@ti.com> [140420 22:16]:
+>> Hi,
+>>
+>> On Friday 18 April 2014 10:48 PM, Tony Lindgren wrote:
+>>> * Archit Taneja <archit@ti.com> [140416 06:20]:
+>>>> Add DT node for the ctrl-core sub module of the DRA7 control module. We map the
+>>>> CTRL_MODULE_CORE address region up to 0x4a002d60, this region contains register
+>>>> fields which configure clocks. The remainder of the registers are related to
+>>>> pad configurations or cross-bar configurations, and therefore aren't mapped.
+>>>
+>>> Can you please check if this can just use the existing
+>>> regmap syscon mapping:
+>>>
+>>> syscon = <&dra7_ctrl_general>;
+>>>
+>>> See how the drivers/regulator/pbias-regulator.c is using the
+>>> syscon to initialize a regulator and then omap_hsmmc.c just does
+>>> the standard regulator calls.
+>>
+>> The thing is that this bit needs to be set before the the DSS hwmods are
+>> reset, and that happens very early. If we don't do this, DSS won't reset
+>> properly, and not get back to an idle state.
+>>
+>> I am not sure where I can configure the syscon register early enough that it
+>> happens before the hwmods are reset. With a syscon mapping, I guess we would
+>> access the register when the DSS driver is probed. But that's too late for
+>> us.
+>>
+>> Ideally, it would be much better to have a syscon mapping. Do you have any
+>> suggestions how this can be achieved very early in boot?
+>
+> It's best to move the reset and initialization of DSS happen later. I believe
+> we already are resetting only some of the hwmods early on.
+>
 
-Will apply with your previous s3c24xx ccf series.
+I looked at this in some more detail. With the current hwmod 
+flags(HWMOD_INIT_NO_RESET/NO_IDLE), we still try to enable the IP, it's 
+just the reset part(ocp reset/custom reset and sysc register) or the 
+disable part that is skipped. hwmod still tries to enable the IP.
 
-- Kukjin
+This again results in the same issue.
+
+One thing which wasn't clear was that why do we enable a hwmod in the 
+first place, if we know that we are going to skip reset?
+
+Archit
