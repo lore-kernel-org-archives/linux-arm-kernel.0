@@ -1,64 +1,56 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 06 May 2014 20:01:11 +0200
-Subject: [PATCH v4 01/15] clk: exynos5420: Rename mux parent arrays
-In-Reply-To: <1399393610-23394-2-git-send-email-shaik.ameer@samsung.com>
-References: <1399393610-23394-1-git-send-email-shaik.ameer@samsung.com>
- <1399393610-23394-2-git-send-email-shaik.ameer@samsung.com>
-Message-ID: <53692367.30907@gmail.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Tue, 6 May 2014 20:02:52 +0200
+Subject: [PATCH v2 0/4] Support for Variscite OM44 modules and boards
+In-Reply-To: <20140506001530.GL25949@atomide.com>
+References: <1398971269-20515-1-git-send-email-manabian@gmail.com>
+ <20140506001530.GL25949@atomide.com>
+Message-ID: <CAGhQ9VystybERsiPUX4ESNBcKPKBN44GvuPUtTM+jpywUqON3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shaik,
-
-On 06.05.2014 18:26, Shaik Ameer Basha wrote:
-> This patch renames the mux parent arrays as per the naming
-> convension followed by the other exynos specific clock drivers.
+1On 6 May 2014 02:15, Tony Lindgren <tony@atomide.com> wrote:
+> * Joachim Eastwood <manabian@gmail.com> [140501 12:08]:
+>> Hello,
+>>
+>> This patch set adds support for Variscite OM44 series of system on modules and boards.
+>>
+>> There weren't many comments on v1 of this patch set so I hope this can make it into 3.16.
+>> Changes since v2:
+>>  * Use OMAP IOPAD macros
+>>
+>> Patch 1: Add support for the SoM itself and the reference carrier board. Together these make the VAR-STK-OM44 dev kit.
+>> Patch 2: Add support for VAR-DVK-OM44 which is just the STK with a LCD display.
+>> Patch 3: Nodes for WLAN/BT support.
+>> Patch 4: Add quirks so that WLAN can be used. Still waiting for proper DT bindings.
+>>
+>> Since this patch set now uses the IOPAD macros a fix from Tony is need.
+>> See: https://patchwork.kernel.org/patch/4025421/
 >
-> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
-> Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
-> Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
-> ---
->   drivers/clk/samsung/clk-exynos5420.c |  359 ++++++++++++++++++----------------
->   1 file changed, 186 insertions(+), 173 deletions(-)
+> Just noted that the macro won't work while was about to
+> apply these, sorry. So we're back to either using the
+> existing OMAP4_WKUP_IOPAD or raw offset from the padconf
+> area unless you have some great macro ideas.
+
+I see. I'll take another look at the macro's and see what I can come up with.
+
+>> Note that patch 1 relies upon a patch from Tomi Valkeinen add hpd-gpio (hotplug detect) to the "hdmi-connector".
+>> See: http://marc.info/?l=linux-omap&m=139771947508021&w=2
+>>
+>> Patch 2 also relies upon a patch from Tomi that adds DT support to panel-dpi.
+>> See: http://marc.info/?l=devicetree&m=139030201815380&w=2
 >
-> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
-> index 7a9e3b4..831670d 100644
-> --- a/drivers/clk/samsung/clk-exynos5420.c
-> +++ b/drivers/clk/samsung/clk-exynos5420.c
+> Maybe also leave out the DSS changes until Tomi has confirmed
+> those?
 
-[snip]
+I can split the patch set and put a patch with the DSS DT nodes at the
+end. Maybe this last patch can go through Tomi if he has a DSS DT
+branch. I don't want to drop it entirely from the patch set because
+some other people has expressed interest in testing it with full
+display and hdmi support.
 
->   static struct samsung_mux_clock exynos5420_mux_clks[] __initdata = {
-> -	MUX(0, "mout_mspll_kfc", mspll_cpu_p, SRC_TOP7, 8, 2),
-> -	MUX(0, "mout_mspll_cpu", mspll_cpu_p, SRC_TOP7, 12, 2),
-> -	MUX(0, "mout_apll", apll_p, SRC_CPU, 0, 1),
-> -	MUX(0, "mout_cpu", cpu_p, SRC_CPU, 16, 1),
-> -	MUX(0, "mout_kpll", kpll_p, SRC_KFC, 0, 1),
-> -	MUX(0, "mout_cpu_kfc", kfc_p, SRC_KFC, 16, 1),
-> +	MUX(0, "mout_mspll_kfc", mout_mspll_cpu_p, SRC_TOP7, 8, 2),
-> +	MUX(0, "mout_mspll_cpu", mout_mspll_cpu_p, SRC_TOP7, 12, 2),
-> +	MUX(0, "mout_apll", mout_apll_p, SRC_CPU, 0, 1),
-> +	MUX(0, "mout_cpu", mout_cpu_p, SRC_CPU, 16, 1),
-> +	MUX(0, "mout_kpll", mout_kpll_p, SRC_KFC, 0, 1),
-> +	MUX(0, "mout_kfc", mout_kfc_p, SRC_KFC, 16, 1),
+I am traveling right now and don't have access to my development
+machine. So I won't be able to rework the patch set until early next
+week.
 
-Here the clock name is also changed, but I'll just fix the commit 
-message when applying, assuming that this change doesn't break anything.
-
->
-> -	MUX(0, "sclk_bpll", bpll_p, SRC_CDREX, 0, 1),
-> +	MUX(0, "sclk_bpll", mout_bpll_p, SRC_CDREX, 0, 1),
-
-[snip]
-
->   static struct samsung_div_clock exynos5420_div_clks[] __initdata = {
->   	DIV(0, "div_arm", "mout_cpu", DIV_CPU0, 0, 3),
->   	DIV(0, "sclk_apll", "mout_apll", DIV_CPU0, 24, 3),
->   	DIV(0, "armclk2", "div_arm", DIV_CPU0, 28, 3),
-> -	DIV(0, "div_kfc", "mout_cpu_kfc", DIV_KFC0, 0, 3),
-> +	DIV(0, "div_kfc", "mout_kfc", DIV_KFC0, 0, 3),
-
-Same here.
-
-Best regards,
-Tomasz
+regards
+Joachim Eastwood
