@@ -1,36 +1,63 @@
-From: Li.Xiubo@freescale.com (Xiubo Li)
-Date: Tue, 6 May 2014 07:40:56 +0800
-Subject: [PATCH] ARM: LPAE: Update the comment to support the LPAE
-Message-ID: <1399333256-10471-1-git-send-email-Li.Xiubo@freescale.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 5 May 2014 17:32:58 -0700
+Subject: [PATCH] ARM: OMAP5: Redo THUMB mode switch on secondary CPU
+In-Reply-To: <1398826427-17200-1-git-send-email-joelf@ti.com>
+References: <1398826427-17200-1-git-send-email-joelf@ti.com>
+Message-ID: <20140506003257.GM25949@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the LPAE maybe enabled, so we should update the comment
-to support it.
+* Joel Fernandes <joelf@ti.com> [140429 19:54]:
+> Here's a redo of the patch [1] that effectively does the same
+> thing but is the right way to do things by using ENDPROC instead.
+> The firmware correctly switches to THUMB before entry.
+> 
+> The patch applies ontop of the earlier patch [1].
+> 
+> [1] https://lkml.org/lkml/2014/4/22/1044
+> 
+> Suggested-by: Dave Martin <Dave.Martin@arm.com>
+> Cc: Dave Martin <Dave.Martin@arm.com>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Nishanth Menon <nm@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Joel Fernandes <joelf@ti.com>
+> ---
+> 
+> Tony, the earlier patch went into your fixes, and can remain. This patch is just a simple redo of the same and can go in for v3.16, no problem. Thanks.
 
-Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
----
- arch/arm/kernel/head.S | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+OK thanks, applying into omap-for-v3.16/fixes-not-urgent.
 
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index 914616e..005af2d 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -29,10 +29,10 @@
+Tony
  
- /*
-  * swapper_pg_dir is the virtual address of the initial page table.
-- * We place the page tables 16K below KERNEL_RAM_VADDR.  Therefore, we must
-- * make sure that KERNEL_RAM_VADDR is correctly set.  Currently, we expect
-- * the least significant 16 bits to be 0x8000, but we could probably
-- * relax this restriction to KERNEL_RAM_VADDR >= PAGE_OFFSET + 0x4000.
-+ * We place the page tables PG_DIR_SIZE below KERNEL_RAM_VADDR. Therefore,
-+ * we must make sure that KERNEL_RAM_VADDR is correctly set. Currently,
-+ * we expect the least significant 16 bits to be 0x8000, but we could probably
-+ * relax this restriction to KERNEL_RAM_VADDR >= PAGE_OFFSET + PG_DIR_SIZE.
-  */
- #define KERNEL_RAM_VADDR	(PAGE_OFFSET + TEXT_OFFSET)
- #if (KERNEL_RAM_VADDR & 0xffff) != 0x8000
--- 
-1.8.4
+>  arch/arm/mach-omap2/omap-headsmp.S |    6 +-----
+>  1 file changed, 1 insertion(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/omap-headsmp.S b/arch/arm/mach-omap2/omap-headsmp.S
+> index 1809dce..bf36f26 100644
+> --- a/arch/arm/mach-omap2/omap-headsmp.S
+> +++ b/arch/arm/mach-omap2/omap-headsmp.S
+> @@ -31,10 +31,6 @@
+>   * register AuxCoreBoot0.
+>   */
+>  ENTRY(omap5_secondary_startup)
+> -.arm
+> -THUMB( adr     r9, BSYM(wait)  )       @ CPU may be entered in ARM mode.
+> -THUMB( bx      r9              )       @ If this is a Thumb-2 kernel,
+> -THUMB( .thumb                  )       @ switch to Thumb now.
+>  wait:	ldr	r2, =AUX_CORE_BOOT0_PA	@ read from AuxCoreBoot0
+>  	ldr	r0, [r2]
+>  	mov	r0, r0, lsr #5
+> @@ -43,7 +39,7 @@ wait:	ldr	r2, =AUX_CORE_BOOT0_PA	@ read from AuxCoreBoot0
+>  	cmp	r0, r4
+>  	bne	wait
+>  	b	secondary_startup
+> -END(omap5_secondary_startup)
+> +ENDPROC(omap5_secondary_startup)
+>  /*
+>   * OMAP4 specific entry point for secondary CPU to jump from ROM
+>   * code.  This routine also provides a holding flag into which
+> -- 
+> 1.7.9.5
+> 
