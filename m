@@ -1,46 +1,43 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue,  6 May 2014 02:14:11 +0200
-Subject: [PATCH v3 16/20] dt: binding: Armada 375 USB cluster
-In-Reply-To: <1399335255-589-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1399335255-589-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1399335255-589-17-git-send-email-gregory.clement@free-electrons.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 5 May 2014 17:15:30 -0700
+Subject: [PATCH v2 0/4] Support for Variscite OM44 modules and boards
+In-Reply-To: <1398971269-20515-1-git-send-email-manabian@gmail.com>
+References: <1398971269-20515-1-git-send-email-manabian@gmail.com>
+Message-ID: <20140506001530.GL25949@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Armada 375 comes with an USB2 host and device controller and an USB3
-controller. The USB cluster control register allows to manage common
-features of both USB controllers.
+* Joachim Eastwood <manabian@gmail.com> [140501 12:08]:
+> Hello,
+> 
+> This patch set adds support for Variscite OM44 series of system on modules and boards.
+> 
+> There weren't many comments on v1 of this patch set so I hope this can make it into 3.16.
+> Changes since v2:
+>  * Use OMAP IOPAD macros
+> 
+> Patch 1: Add support for the SoM itself and the reference carrier board. Together these make the VAR-STK-OM44 dev kit.
+> Patch 2: Add support for VAR-DVK-OM44 which is just the STK with a LCD display.
+> Patch 3: Nodes for WLAN/BT support.
+> Patch 4: Add quirks so that WLAN can be used. Still waiting for proper DT bindings.
+> 
+> Since this patch set now uses the IOPAD macros a fix from Tony is need.
+> See: https://patchwork.kernel.org/patch/4025421/
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- .../bindings/phy/armada-375-usb-phy-cluster.txt       | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/phy/armada-375-usb-phy-cluster.txt
+Just noted that the macro won't work while was about to
+apply these, sorry. So we're back to either using the
+existing OMAP4_WKUP_IOPAD or raw offset from the padconf
+area unless you have some great macro ideas.
+ 
+> Note that patch 1 relies upon a patch from Tomi Valkeinen add hpd-gpio (hotplug detect) to the "hdmi-connector".
+> See: http://marc.info/?l=linux-omap&m=139771947508021&w=2
+> 
+> Patch 2 also relies upon a patch from Tomi that adds DT support to panel-dpi.
+> See: http://marc.info/?l=devicetree&m=139030201815380&w=2
 
-diff --git a/Documentation/devicetree/bindings/phy/armada-375-usb-phy-cluster.txt b/Documentation/devicetree/bindings/phy/armada-375-usb-phy-cluster.txt
-new file mode 100644
-index 000000000000..258407c5ab90
---- /dev/null
-+++ b/Documentation/devicetree/bindings/phy/armada-375-usb-phy-cluster.txt
-@@ -0,0 +1,19 @@
-+Armada 375 USB cluster
-+----------------------
-+
-+Armada 375 comes with an USB2 host and device controller and an USB3
-+controller. The USB cluster control register allows to manage common
-+features of both USB controllers.
-+
-+Required properties:
-+
-+- compatible: "marvell,armada-375-usb-cluster"
-+- reg: Should contain usb cluster register location and length.
-+- #phy-cells : from the generic phy bindings, must be 1
-+
-+Example:
-+	usbcluster: usb-cluster at 18400 {
-+		compatible = "marvell,armada-375-usb-cluster";
-+		reg = <0x18400 0x4>;
-+		#phy-cells = <1>
-+	};
--- 
-1.8.1.2
+Maybe also leave out the DSS changes until Tomi has confirmed
+those?
+
+Regards,
+
+Tony
