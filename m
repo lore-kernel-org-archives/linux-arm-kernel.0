@@ -1,45 +1,45 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 6 May 2014 13:43:33 +0200
-Subject: [PATCH] clk: shmobile: clk-mstp: change to using clock-indices
-In-Reply-To: <20140505225013.5739.23946@quantum>
-References: <1397577994-12061-1-git-send-email-ben.dooks@codethink.co.uk>
- <20140505225013.5739.23946@quantum>
-Message-ID: <CAMuHMdXO=WJjNSsWbKx5KxrF3w9VgEyEj3kdiSN1AyxaHFKpFw@mail.gmail.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Tue, 6 May 2014 13:49:43 +0200
+Subject: [PATCH] ARM: dts: i.MX53: Fix ipu register space size
+In-Reply-To: <1399374094-32451-1-git-send-email-s.hauer@pengutronix.de>
+References: <1399374094-32451-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20140506134943.4d87a726@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Hi,
 
-On Tue, May 6, 2014 at 12:50 AM, Mike Turquette <mturquette@linaro.org> wrote:
-> Quoting Ben Dooks (2014-04-15 09:06:34)
->> With the addition of clock-indices, we need to change the renesas
->> clock implementation to use these instead of the local definition
->> of "renesas,clock-indices".
->>
->> Since this will break booting with older device trees, we add a
->> simple auto-detection of which properties are present.
->>
->> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+Sascha Hauer wrote:
+> The IPU register space is 128MB, not 2GB.
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  arch/arm/boot/dts/imx53.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+> index 9c2bff2..6a1bf4f 100644
+> --- a/arch/arm/boot/dts/imx53.dtsi
+> +++ b/arch/arm/boot/dts/imx53.dtsi
+> @@ -115,7 +115,7 @@
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+>  			compatible = "fsl,imx53-ipu";
+> -			reg = <0x18000000 0x080000000>;
+> +			reg = <0x18000000 0x08000000>;
 >
-> I'm fine to take this into clk-fixes, destined for 3.15-rc5. Does that
+IMO this should be either 0x00800000 or 0x800000
+while I prefer the first notation.
 
-Thanks!
 
-> solve the issues on your end? Do you still need me to host a stable
-> topic branch for you? I'm happy to do that if needed.
+Lothar Wa?mann
+-- 
+___________________________________________________________
 
-As Simon will be on holidays until rc5, I think he can just use rc5 as the
-stable base for further fixes.
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
 
-Thanks again!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
