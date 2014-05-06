@@ -1,36 +1,90 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 6 May 2014 10:15:57 -0700
-Subject: [PATCH v2 05/12] ARM: lpc32xx: add MTD_SPI_NOR (new dependency
- for M25P80)
-In-Reply-To: <53628282.10201@antcom.de>
-References: <1398925607-7482-1-git-send-email-computersforpeace@gmail.com>
- <1398925607-7482-6-git-send-email-computersforpeace@gmail.com>
- <53628282.10201@antcom.de>
-Message-ID: <20140506171557.GB28907@ld-irv-0074>
+From: b.galvani@gmail.com (Beniamino Galvani)
+Date: Tue, 6 May 2014 19:15:42 +0200
+Subject: [PATCH 1/2] of: add bq and radxa vendor prefixes
+In-Reply-To: <3107321.XJc3MCHyeC@diego>
+References: <1398973835-26303-1-git-send-email-b.galvani@gmail.com>
+ <CABuKBe+fFCU2__rEHfiU+XPQwKE613VBxQ4=8xiA3PXQkBiMDQ@mail.gmail.com>
+ <20140506111345.GB22196@gmail.com> <3107321.XJc3MCHyeC@diego>
+Message-ID: <20140506171538.GA23762@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 01, 2014 at 07:21:06PM +0200, Roland Stigge wrote:
-> On 01/05/14 08:26, Brian Norris wrote:
-> > This defconfig contains the CONFIG_M25P80 symbol, which is now
-> > dependent on the MTD_SPI_NOR symbol. Add CONFIG_MTD_SPI_NOR to satisfy
-> > the new dependency.
+On Tue, May 06, 2014 at 01:31:24PM +0200, Heiko St?bner wrote:
+> Am Dienstag, 6. Mai 2014, 13:13:46 schrieb Beniamino Galvani:
+> > On Sun, May 04, 2014 at 02:57:52PM +0200, Matthias Brugger wrote:
+> > > 2014-05-02 1:32 GMT+02:00 Heiko St?bner <heiko@sntech.de>:
+> > > > Hi Beniamino,
+> > > > 
+> > > > Am Donnerstag, 1. Mai 2014, 21:50:34 schrieb Beniamino Galvani:
+> > > >> Add new vendor prefixes for:
+> > > >>     * bq, a company that sells multimedia devices and 3D printers
+> > > > 
+> > > > bq is actually only a brandname. The company itself is "Mundo Reader
+> > > > S.L.".
+> > > > I'm not sure what the actual policy is concerning the vendor prefix,
+> > > > i.e. if it should use the visible brand name or the actual company
+> > > > name.
+> > > > 
+> > > > I.e. another possibility would be to add the vendor prefix
+> > > > 
+> > > >         mundoreader     Mundo Reader S.L.
+> > > > 
+> > > > and name the currie
+> > > > 
+> > > >         mundoreader,bq-curie2
+> > > 
+> > > I think we should stick to the brand name, as this is the name people
+> > > know.
+> > 
+> > Personally I don't have a strong preference, so either of the two.
 > 
-> Can't the CONFIG_M25P80 declare its dependency on CONFIG_MTD_SPI_NOR
-> itself, or put CONFIG_M25P80 etc. into a submenu under CONFIG_MTD_SPI_NOR?
+> According to an IRC conversation I just had, it is supposed to be the real 
+> company name ... so I guess my option above would be the correct one.
 
-It does declared the dependency already. And I plan to move it under the
-SPI-NOR submenu too.
+Thanks, I updated the patches.
 
-But as I stated in the cover letter (I'm not sure if it made it through
-to all the cross-posted ML's):
+Beniamino
 
-  http://article.gmane.org/gmane.linux.ports.ppc.embedded/69885
-
-  "Note that without the new CONFIG_MTD_SPI_NOR symbol in your
-  defconfig, Kconfig will automatically drop M25P80 for you."
-
-So declaring the dependency is half the battle, but you still have to
-include your dependencies in your defconfig.
-
-Brian
+> > > > 
+> > > >>     * Radxa, manufacturer of ARM boards
+> > > >> 
+> > > >> Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
+> > > >> ---
+> > > >> 
+> > > >>  Documentation/devicetree/bindings/vendor-prefixes.txt |    2 ++
+> > > >>  1 file changed, 2 insertions(+)
+> > > >> 
+> > > >> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> > > >> b/Documentation/devicetree/bindings/vendor-prefixes.txt index
+> > > >> abc3080..6f8177c 100644
+> > > >> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> > > >> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> > > >> @@ -21,6 +21,7 @@ atmel       Atmel Corporation
+> > > >> 
+> > > >>  auo  AU Optronics Corporation
+> > > >>  avago        Avago Technologies
+> > > >>  bosch        Bosch Sensortec GmbH
+> > > >> 
+> > > >> +bq   bq
+> > > >> 
+> > > >>  brcm Broadcom Corporation
+> > > >>  buffalo      Buffalo, Inc.
+> > > >>  calxeda      Calxeda
+> > > >> 
+> > > >> @@ -98,6 +99,7 @@ powervr     PowerVR (deprecated, use img)
+> > > >> 
+> > > >>  qca  Qualcomm Atheros, Inc.
+> > > >>  qcom Qualcomm Technologies, Inc
+> > > >>  qnap QNAP Systems, Inc.
+> > > >> 
+> > > >> +radxa        Radxa
+> > > >> 
+> > > >>  raidsonic    RaidSonic Technology GmbH
+> > > >>  ralink       Mediatek/Ralink Technology Corp.
+> > > >>  ramtron      Ramtron International
+> > > > 
+> > > > _______________________________________________
+> > > > linux-arm-kernel mailing list
+> > > > linux-arm-kernel at lists.infradead.org
+> > > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
