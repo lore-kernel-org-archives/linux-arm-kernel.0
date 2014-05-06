@@ -1,56 +1,48 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 7 May 2014 00:07:52 +0800
-Subject: [PATCH] irqchip: sirf: fix 'line over 80 characters'
-In-Reply-To: <CAJgR-BikPVzi1bKpBwk-vvrDv9cwFgjWcg-NmH8SKsEOWDnxcg@mail.gmail.com>
-References: <1399388316-19465-1-git-send-email-21cnbao@gmail.com>
- <CAJgR-BikPVzi1bKpBwk-vvrDv9cwFgjWcg-NmH8SKsEOWDnxcg@mail.gmail.com>
-Message-ID: <CAGsJ_4xYY-RkHQpek0i2BdcwFEn7NVK-Gt3jonf_yjHVgHRUZw@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 6 May 2014 17:08:26 +0100
+Subject: [PATCH resend 03/15] arm64: defer reloading a task's FPSIMD
+ state to userland resume
+In-Reply-To: <1398959381-8126-4-git-send-email-ard.biesheuvel@linaro.org>
+References: <1398959381-8126-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1398959381-8126-4-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20140506160826.GI23957@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-05-06 23:23 GMT+08:00 Jon Loeliger <loeliger@gmail.com>:
->> fix "line line over 80 characters" for the below:
->> static int __init sirfsoc_irq_init(struct device_node *np, struct device_node *parent)
->>
->> the users of the codes - key customers really care about that.
->
-> And readers of the Linux logs - key developers really care about snark.
->
-> jdl
+On Thu, May 01, 2014 at 04:49:35PM +0100, Ard Biesheuvel wrote:
+> @@ -153,12 +252,11 @@ static int fpsimd_cpu_pm_notifier(struct notifier_block *self,
+>  {
+>         switch (cmd) {
+>         case CPU_PM_ENTER:
+> -               if (current->mm)
+> +               if (current->mm && !test_thread_flag(TIF_FOREIGN_FPSTATE))
+>                         fpsimd_save_state(&current->thread.fpsimd_state);
+>                 break;
+>         case CPU_PM_EXIT:
+> -               if (current->mm)
+> -                       fpsimd_load_state(&current->thread.fpsimd_state);
+> +               set_thread_flag(TIF_FOREIGN_FPSTATE);
 
-i have no choice since the key customer consist on that. i don't want
-the local codes lose sync with the mainline.
+I think we could enter a PM state on a kernel thread (idle), so we
+should preserve the current->mm check as well.
 
->
-> On Tue, May 6, 2014 at 9:58 AM, Barry Song <21cnbao@gmail.com> wrote:
->> From: Bin Shi <Bin.Shi@csr.com>
->>
->> fix "line line over 80 characters" for the below:
->> static int __init sirfsoc_irq_init(struct device_node *np, struct device_node *parent)
->>
->> the users of the codes - key customers really care about that.
->>
->> Signed-off-by: Bin Shi <Bin.Shi@csr.com>
->> Signed-off-by: Barry Song <Baohua.Song@csr.com>
->> ---
->>  drivers/irqchip/irq-sirfsoc.c |    3 ++-
->>  1 files changed, 2 insertions(+), 1 deletions(-)
->>
->> diff --git a/drivers/irqchip/irq-sirfsoc.c b/drivers/irqchip/irq-sirfsoc.c
->> index 581eefe..5e54f6d 100644
->> --- a/drivers/irqchip/irq-sirfsoc.c
->> +++ b/drivers/irqchip/irq-sirfsoc.c
->> @@ -58,7 +58,8 @@ static void __exception_irq_entry sirfsoc_handle_irq(struct pt_regs *regs)
->>         handle_IRQ(irqnr, regs);
->>  }
->>
->> -static int __init sirfsoc_irq_init(struct device_node *np, struct device_node *parent)
->> +static int __init sirfsoc_irq_init(struct device_node *np,
->> +       struct device_node *parent)
->>  {
->>         void __iomem *base = of_iomap(np, 0);
->>         if (!base)
->> --
->> 1.7.5.4
+>                 break;
+>         case CPU_PM_ENTER_FAILED:
+>         default:
+> diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+> index 06448a77ff53..882f01774365 100644
+> --- a/arch/arm64/kernel/signal.c
+> +++ b/arch/arm64/kernel/signal.c
+> @@ -413,4 +413,8 @@ asmlinkage void do_notify_resume(struct pt_regs *regs,
+>                 clear_thread_flag(TIF_NOTIFY_RESUME);
+>                 tracehook_notify_resume(regs);
+>         }
+> +
+> +       if (thread_flags & _TIF_FOREIGN_FPSTATE)
+> +               fpsimd_restore_current_state();
 
--barry
+I think this should be safe. Even if we get preempted here, ret_to_user
+would loop over TI_FLAGS with interrupts disabled until no work pending.
+
+-- 
+Catalin
