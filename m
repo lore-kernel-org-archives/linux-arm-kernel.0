@@ -1,77 +1,53 @@
-From: detheridge@ti.com (Darren Etheridge)
-Date: Tue, 6 May 2014 15:07:50 -0500
-Subject: [PATCH V5 1/3] arm: dts: dra7: Add crossbar device binding
-In-Reply-To: <20140506195804.GD2626@ti.com>
-References: <1399384579-25620-1-git-send-email-r.sricharan@ti.com>
- <1399384579-25620-2-git-send-email-r.sricharan@ti.com>
- <20140506194055.GA6962@saruman.home> <53693C02.2090305@ti.com>
- <20140506195804.GD2626@ti.com>
-Message-ID: <20140506200750.GE2626@ti.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 6 May 2014 16:13:24 -0400 (EDT)
+Subject: [PATCHv2] arm: put_user: fix possible data corruption in put_user
+In-Reply-To: <1399360312-13843-1-git-send-email-a.ryabinin@samsung.com>
+References: <alpine.LFD.2.11.1405050950410.980@knanqh.ubzr>
+ <1399360312-13843-1-git-send-email-a.ryabinin@samsung.com>
+Message-ID: <alpine.LFD.2.11.1405061610450.980@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Darren Etheridge <detheridge@ti.com> wrote on Tue [2014-May-06 14:58:04 -0500]:
-> Nishanth Menon <nm@ti.com> wrote on Tue [2014-May-06 14:46:10 -0500]:
-> > On 05/06/2014 02:40 PM, Felipe Balbi wrote:
-> > > On Tue, May 06, 2014 at 07:26:17PM +0530, Sricharan R wrote:
-> > >> This adds the irq crossbar device node.
-> > >>
-> > >> There is a IRQ crossbar device in the soc, which
-> > >> maps the irq requests from the peripherals to the
-> > >> mpu interrupt controller's inputs. The Peripheral irq
-> > >> requests are connected to only one crossbar
-> > >> input and the output of the crossbar is connected to only one
-> > >> controller's input line. The crossbar device is used to map
-> > >> a peripheral input to a free mpu's interrupt controller line.
-> > >>
-> > >> Cc: Benoit Cousson <bcousson@baylibre.com>
-> > >> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > >> Cc: Rajendra Nayak <rnayak@ti.com>
-> > >> Cc: Tony Lindgren <tony@atomide.com>
-> > >> Signed-off-by: Sricharan R <r.sricharan@ti.com>
-> > >> Signed-off-by: Nishanth Menon <nm@ti.com>
-> > >> ---
-> > >> [V5] Rebased on top of 3.15-rc4 and corrected the
-> > >>      irqs-reserved list
-> > >>
-> > >>  arch/arm/boot/dts/dra7.dtsi |    8 ++++++++
-> > >>  1 file changed, 8 insertions(+)
-> > >>
-> > >> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-> > >> index 149b550..0274a86 100644
-> > >> --- a/arch/arm/boot/dts/dra7.dtsi
-> > >> +++ b/arch/arm/boot/dts/dra7.dtsi
-> > >> @@ -790,6 +790,14 @@
-> > >>  			status = "disabled";
-> > >>  		};
-> > >>  	};
-> > >> +
-> > >> +	crossbar_mpu: crossbar at 4a020000 {
-> > > 
-> > > shouldn't this be "status = disabled"; so that boards enable this
-> > > on-demand ??
-> > > 
-> > It cannot be and does not need to be. crossbar is an SoC feature. by
-> > defining crossbar, the IRQ numbers we provide in DTS now becomes
-> > crossbar numbers which get mapped to GIC interrupt numbers dynamically.
-> > 
-> > further crossbar is not a board feature. it is as ingrained in DRA7
-> > behavior as GIC is. we are fortunate that we have some default mapping
-> > of crossbar that allows the current peripherals to work, with this
-> > support, we dont have to depend any longer on "we are lucky that is
-> > mapped".
-> > 
-> > That said, in hindsight, patch #1 and 2 should be squashed IMHO. else
-> > we have a bisectability problem here.
-> > 
-> Yes the bisectability problem is completely true - I was just testing
-> that as your email came in.  In fact I think all three patches need to
-> be squashed into one, I can't boot the dra7-EVM unless I have all three
-> patches applied.
+On Tue, 6 May 2014, Andrey Ryabinin wrote:
+
+> According to arm procedure call standart r2 register is call-cloberred.
+> So after the result of x expression was put into r2 any following
+> function call in p may overwrite r2. To fix this, the result of p
+> expression must be saved to the temporary variable before the
+> assigment x expression to __r2.
 > 
+> Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
+> Reviewed-by: Nicolas Pitre <nico@linaro.org>
+> Cc: stable at vger.kernel.org
 
-Or I just tried reordering, so patch 3/3 becomes patch 1 and then squash
-patch 1/3 and patch 2/3 together to form patch 2.  That seems to at
-least let the kernel boot to completion.
+Please push this patch into Russell's patch system.
 
-Darren
+Thanks.
+
+> ---
+> Since v1:
+>  - tmp_p variable renamed to __tmp_p
+>  - added Reviewed-by tag
+>  - added Cc: stable at vger.kernel.org
+> 
+>  arch/arm/include/asm/uaccess.h | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
+> index 12c3a5d..75d9579 100644
+> --- a/arch/arm/include/asm/uaccess.h
+> +++ b/arch/arm/include/asm/uaccess.h
+> @@ -171,8 +171,9 @@ extern int __put_user_8(void *, unsigned long long);
+>  #define __put_user_check(x,p)							\
+>  	({								\
+>  		unsigned long __limit = current_thread_info()->addr_limit - 1; \
+> +		const typeof(*(p)) __user *__tmp_p = (p);		\
+>  		register const typeof(*(p)) __r2 asm("r2") = (x);	\
+> -		register const typeof(*(p)) __user *__p asm("r0") = (p);\
+> +		register const typeof(*(p)) __user *__p asm("r0") = __tmp_p; \
+>  		register unsigned long __l asm("r1") = __limit;		\
+>  		register int __e asm("r0");				\
+>  		switch (sizeof(*(__p))) {				\
+> -- 
+> 1.8.5.5
+> 
