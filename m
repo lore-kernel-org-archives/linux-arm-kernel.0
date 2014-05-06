@@ -1,80 +1,50 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 6 May 2014 11:17:03 -0500
-Subject: [PATCH 4/4] ARM: dts: am335x-igep0033: use phandles for USB and
- DMA refs
-In-Reply-To: <1398693512-5355-4-git-send-email-guido@vanguardiasur.com.ar>
-References: <1398693512-5355-1-git-send-email-guido@vanguardiasur.com.ar>
- <1398693512-5355-4-git-send-email-guido@vanguardiasur.com.ar>
-Message-ID: <20140506161703.GM25849@saruman.home>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 6 May 2014 13:17:17 -0300
+Subject: [PATCH 1/7] net: mv643xx_eth: Simplify mv643xx_eth_adjust_link()
+In-Reply-To: <20140505.154004.1134814253503467382.davem@davemloft.net>
+References: <1399141622-30654-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1399141622-30654-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20140505.154004.1134814253503467382.davem@davemloft.net>
+Message-ID: <20140506161717.GA24264@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 10:58:32AM -0300, Guido Mart?nez wrote:
-> Use phandles instead of unit adresses to reference usb and dma nodes.
-> This makes the DT more robust and readable.
+On 05 May 03:40 PM, David Miller wrote:
+> From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> Date: Sat,  3 May 2014 15:26:56 -0300
 > 
-> Signed-off-by: Guido Mart?nez <guido@vanguardiasur.com.ar>
-
-Acked-by: Felipe Balbi <balbi@ti.com>
-
-> ---
->  arch/arm/boot/dts/am335x-igep0033.dtsi | 12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
+> > Currently, mv643xx_eth_adjust_link() is only used to call mv643xx_adjust_pscr().
+> > This commit renames the latter to the former, and therefore removes the extra
+> > and useless function.
+> > 
+> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > ---
+> >  drivers/net/ethernet/marvell/mv643xx_eth.c | 15 +++++----------
+> >  1 file changed, 5 insertions(+), 10 deletions(-)
+> > 
+> > diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
+> > index b7b8d74..1e63c63 100644
+> > --- a/drivers/net/ethernet/marvell/mv643xx_eth.c
+> > +++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
+> > @@ -1010,8 +1010,10 @@ static void txq_set_fixed_prio_mode(struct tx_queue *txq)
+> >  
+> >  
+> >  /* mii management interface *************************************************/
+> > -static void mv643xx_adjust_pscr(struct mv643xx_eth_private *mp)
+> > +static void mv643xx_eth_adjust_link(struct net_device *dev)
+> >  {
+> > +	struct mv643xx_eth_private *mp = netdev_priv(dev);
+> > +
+> >  	u32 pscr = rdlp(mp, PORT_SERIAL_CONTROL);
+> >  	u32 autoneg_disable = FORCE_LINK_PASS |
+> >  	             DISABLE_AUTO_NEG_SPEED_GMII |
 > 
-> diff --git a/arch/arm/boot/dts/am335x-igep0033.dtsi b/arch/arm/boot/dts/am335x-igep0033.dtsi
-> index 9f22c18..81cf68b 100644
-> --- a/arch/arm/boot/dts/am335x-igep0033.dtsi
-> +++ b/arch/arm/boot/dts/am335x-igep0033.dtsi
-> @@ -201,28 +201,28 @@
->  &usb {
->  	status = "okay";
->  
-> -	control at 44e10620 {
-> +	&usb_ctrl_mod {
->  		status = "okay";
->  	};
->  
-> -	usb-phy at 47401300 {
-> +	&usb0_phy {
->  		status = "okay";
->  	};
->  
-> -	usb-phy at 47401b00 {
-> +	&usb1_phy {
->  		status = "okay";
->  	};
->  
-> -	usb at 47401000 {
-> +	&usb0 {
->  		status = "okay";
->  	};
->  
-> -	usb at 47401800 {
-> +	&usb1 {
->  		status = "okay";
->  		dr_mode = "host";
->  	};
->  
-> -	dma-controller at 47402000  {
-> +	&cppi41dma  {
->  		status = "okay";
->  	};
->  };
-> -- 
-> 1.9.2
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> Please do not add empty lines in the middle of the function local variable declarations.
 
+Argh, I missed this.
+
+Thanks for the catch,
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140506/b28fe452/attachment.sig>
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
