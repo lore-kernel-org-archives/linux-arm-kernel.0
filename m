@@ -1,96 +1,57 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Tue, 06 May 2014 23:32:56 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCB2NCAxLzJdIEFSTTogZHRzOiBpbXg1MS1ldWtyZWEtbWJp?=
- =?UTF-8?B?bXhzZDUxLWJhc2Vib2FyZDogQWRkIENBTiBzdXBwb3J0?=
-In-Reply-To: <1399404113-29207-1-git-send-email-fabio.estevam@freescale.com>
-References: <1399404113-29207-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <1399404776.560722294@f389.i.mail.ru>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 6 May 2014 14:40:55 -0500
+Subject: [PATCH V5 1/3] arm: dts: dra7: Add crossbar device binding
+In-Reply-To: <1399384579-25620-2-git-send-email-r.sricharan@ti.com>
+References: <1399384579-25620-1-git-send-email-r.sricharan@ti.com>
+ <1399384579-25620-2-git-send-email-r.sricharan@ti.com>
+Message-ID: <20140506194055.GA6962@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tue, 6 May 2014 16:21:52 -0300 ?? Fabio Estevam <fabio.estevam@freescale.com>:
-> Add support for CAN based on a MCP2515 connected to ECSPI1.
+On Tue, May 06, 2014 at 07:26:17PM +0530, Sricharan R wrote:
+> This adds the irq crossbar device node.
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> There is a IRQ crossbar device in the soc, which
+> maps the irq requests from the peripherals to the
+> mpu interrupt controller's inputs. The Peripheral irq
+> requests are connected to only one crossbar
+> input and the output of the crossbar is connected to only one
+> controller's input line. The crossbar device is used to map
+> a peripheral input to a free mpu's interrupt controller line.
+> 
+> Cc: Benoit Cousson <bcousson@baylibre.com>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Rajendra Nayak <rnayak@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Sricharan R <r.sricharan@ti.com>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
 > ---
-> Changes since v3:
-> - Provide a fixed-clock for CAN
-> - Separate escpi from CAN control pin groups
-> - Use vdd-supply for mcp2515
-> - Fix typo on commit log
+> [V5] Rebased on top of 3.15-rc4 and corrected the
+>      irqs-reserved list
 > 
-> Changes since v2:
-> - None
-> Changes since v1:
-> - Use active low for spi chipselect
-> - Remove unused GPIOs for CAN
->  .../boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts  | 62 ++++++++++++++++++++++
->  1 file changed, 62 insertions(+)
+>  arch/arm/boot/dts/dra7.dtsi |    8 ++++++++
+>  1 file changed, 8 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
-> index 8b1098e..c1f32f9 100644
-> --- a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
-> +++ b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
-> @@ -24,6 +24,14 @@
->  	model = "Eukrea CPUIMX51";
->  	compatible = "eukrea,mbimxsd51","eukrea,cpuimx51", "fsl,imx51";
->  
-> +	clocks {
-> +		clk24M: can_clock {
-> +			compatible = "fixed-clock";
-> +			#clock-cells = <0>;
-> +			clock-frequency = <24000000>;
-> +		};
-> +	};
-> +
->  	gpio_keys {
->  		compatible = "gpio-keys";
->  		pinctrl-names = "default";
-> @@ -50,6 +58,23 @@
+> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+> index 149b550..0274a86 100644
+> --- a/arch/arm/boot/dts/dra7.dtsi
+> +++ b/arch/arm/boot/dts/dra7.dtsi
+> @@ -790,6 +790,14 @@
+>  			status = "disabled";
 >  		};
 >  	};
->  
-> +	regulators {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
 > +
-> +		reg_can: regulator at 0 {
-> +			compatible = "regulator-fixed";
-> +			reg = <0>;
-> +			regulator-name = "3V3";
-> +			regulator-min-microvolt = <3300000>;
-> +			regulator-max-microvolt = <3300000>;
-> +			gpio = <&gpio4 15 GPIO_ACTIVE_HIGH>;
-> +			startup-delay-us = <20000>;
-> +			enable-active-high;
-> +		};
-> +	};
-> +
->  	sound {
->  		compatible = "eukrea,asoc-tlv320";
->  		eukrea,model = "imx51-eukrea-tlv320aic23";
-> @@ -86,6 +111,26 @@
->  	status = "okay";
->  };
->  
-> +&ecspi1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_ecspi1>;
-> +	fsl,spi-num-chipselects = <1>;
-> +	cs-gpios = <&gpio4 24 GPIO_ACTIVE_LOW>;
-> +	status = "okay";
-> +
-> +	can0: can at 0 {
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_can>;
-> +		compatible = "microchip,mcp2515";
-> +		reg = <0>;
-> +		clocks = <&clk24M>;
-> +		spi-max-frequency = <1000000>;
+> +	crossbar_mpu: crossbar at 4a020000 {
 
-This should be of course 10000000, or removed completely
-since driver already applies such limitation to the SPI bus.
-I think Shawn can fix this during commit.
+shouldn't this be "status = disabled"; so that boards enable this
+on-demand ??
 
----
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140506/e593d66e/attachment.sig>
