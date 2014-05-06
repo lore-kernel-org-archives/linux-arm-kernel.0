@@ -1,105 +1,70 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 6 May 2014 10:30:57 -0400 (EDT)
-Subject: [PATCH v3 01/20] usb: ehci-orion: Fix clock reference leaking
-In-Reply-To: <1399335255-589-2-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <Pine.LNX.4.44L0.1405061027490.1312-100000@iolanthe.rowland.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 6 May 2014 15:31:20 +0100
+Subject: [PATCH resend 01/15] asm-generic: allow generic unaligned access
+ if the arch supports it
+In-Reply-To: <1398959381-8126-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1398959381-8126-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1398959381-8126-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20140506143120.GD23957@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 6 May 2014, Gregory CLEMENT wrote:
-
-> In order to disable the clock while the module was removing, a call to
-> devm_clk_get() was made. This was wrong and lead to a leak module
-> ref-counts.
+On Thu, May 01, 2014 at 04:49:33PM +0100, Ard Biesheuvel wrote:
+> Switch the default unaligned access method to 'hardware implemented'
+> if HAVE_EFFICIENT_UNALIGNED_ACCESS is set.
 > 
-> In order to have a reference of the clock get, a private structure was
-> added using the override mechanism provided by the ehci framework.
-> 
-> The bug was introduced in v3.6, however the ehci framework allowing to
-> use the override mechanism have only been introduced in v3.8, so this
-> patch won't apply before it.
-> 
-> Fixes: 8c869edaee07c623066266827371235fb9c12e01 ('ARM: Orion: EHCI: Add support for enabling clocks')
-> Cc: <stable@vger.kernel.org> # v3.8+
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  include/asm-generic/unaligned.h | 21 +++++++++++++--------
+>  1 file changed, 13 insertions(+), 8 deletions(-)
 
+I'm happy to take this patch via the arm64 tree. But arm is affected as
+well, so it would be good to know if Russell has any objections (cc'ed).
 
->  	hcd = usb_create_hcd(&ehci_orion_hc_driver,
->  			&pdev->dev, dev_name(&pdev->dev));
->  	if (!hcd) {
->  		err = -ENOMEM;
-> -		goto err2;
-> +		goto err1;
->  	}
+Patch below for reference. Thanks.
+
+Catalin
+
+> diff --git a/include/asm-generic/unaligned.h b/include/asm-generic/unaligned.h
+> index 03cf5936bad6..1ac097279db1 100644
+> --- a/include/asm-generic/unaligned.h
+> +++ b/include/asm-generic/unaligned.h
+> @@ -4,22 +4,27 @@
+>  /*
+>   * This is the most generic implementation of unaligned accesses
+>   * and should work almost anywhere.
+> - *
+> - * If an architecture can handle unaligned accesses in hardware,
+> - * it may want to use the linux/unaligned/access_ok.h implementation
+> - * instead.
+>   */
+>  #include <asm/byteorder.h>
 >  
->  	hcd->rsrc_start = res->start;
-> @@ -211,6 +215,15 @@ static int ehci_orion_drv_probe(struct platform_device *pdev)
->  	ehci->caps = hcd->regs + 0x100;
->  	hcd->has_tt = 1;
->  
-> +	priv = hcd_to_orion_priv(hcd);
-> +	/*
-> +	 * Not all platforms can gate the clock, so it is not an error if
-> +	 * the clock does not exists.
-> +	 */
-> +	priv->clk = devm_clk_get(&pdev->dev, NULL);
-> +	if (!IS_ERR(priv->clk))
-> +		clk_prepare_enable(priv->clk);
+> +/* Set by the arch if it can handle unaligned accesses in hardware. */
+> +#ifdef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
+> +# include <linux/unaligned/access_ok.h>
+> +#endif
 > +
->  	/*
->  	 * (Re-)program MBUS remapping windows if we are asked to.
->  	 */
-> @@ -240,16 +253,16 @@ static int ehci_orion_drv_probe(struct platform_device *pdev)
->  
->  	err = usb_add_hcd(hcd, irq, IRQF_SHARED);
->  	if (err)
-> -		goto err3;
-> +		goto err2;
->  
->  	device_wakeup_enable(hcd->self.controller);
->  	return 0;
->  
-> -err3:
-> -	usb_put_hcd(hcd);
->  err2:
-> -	if (!IS_ERR(clk))
-> -		clk_disable_unprepare(clk);
-> +	usb_put_hcd(hcd);
-
-At this point, priv has just become a dangling pointer, because it
-points to something that was allocated along with hcd.
-
-> +
-> +	if (!IS_ERR(priv->clk))
-> +		clk_disable_unprepare(priv->clk);
-
-And now you are dereferencing memory that has been deallocated.  The
-real problem is that you get and enable the clock _after_ creating hcd,
-but you don't disable it _before_ deallocating hcd.
-
->  err1:
->  	dev_err(&pdev->dev, "init %s fail, %d\n",
->  		dev_name(&pdev->dev), err);
-> @@ -260,14 +273,14 @@ err1:
->  static int ehci_orion_drv_remove(struct platform_device *pdev)
->  {
->  	struct usb_hcd *hcd = platform_get_drvdata(pdev);
-> -	struct clk *clk;
-> +	struct orion_ehci_hcd *priv = hcd_to_orion_priv(hcd);
->  
->  	usb_remove_hcd(hcd);
->  	usb_put_hcd(hcd);
->  
-> -	clk = devm_clk_get(&pdev->dev, NULL);
-> -	if (!IS_ERR(clk))
-> -		clk_disable_unprepare(clk);
-> +	if (!IS_ERR(priv->clk))
-> +		clk_disable_unprepare(priv->clk);
-
-This has the same problem as above.
-
-Also, for both this patch and 02/20, it would be better to replace the
-"errN" labels with something more descriptive, so that it's not
-necessary to renumber them every time something changes.
-
-Alan Stern
+>  #if defined(__LITTLE_ENDIAN)
+> -# include <linux/unaligned/le_struct.h>
+> -# include <linux/unaligned/be_byteshift.h>
+> +# ifndef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
+> +#  include <linux/unaligned/le_struct.h>
+> +#  include <linux/unaligned/be_byteshift.h>
+> +# endif
+>  # include <linux/unaligned/generic.h>
+>  # define get_unaligned	__get_unaligned_le
+>  # define put_unaligned	__put_unaligned_le
+>  #elif defined(__BIG_ENDIAN)
+> -# include <linux/unaligned/be_struct.h>
+> -# include <linux/unaligned/le_byteshift.h>
+> +# ifndef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
+> +#  include <linux/unaligned/be_struct.h>
+> +#  include <linux/unaligned/le_byteshift.h>
+> +# endif
+>  # include <linux/unaligned/generic.h>
+>  # define get_unaligned	__get_unaligned_be
+>  # define put_unaligned	__put_unaligned_be
+> -- 
+> 1.8.3.2
