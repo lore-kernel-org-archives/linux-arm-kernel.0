@@ -1,161 +1,42 @@
-From: bevenson@melinkcorp.com (Bryan Evenson)
-Date: Tue, 6 May 2014 12:22:07 +0000
-Subject: [PATCH] rtc: rtc-at91rm9200: fix lost ACKUPD interrupt
-In-Reply-To: <1399321388-15148-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <55cab9fba2ea4eed8f73591b37cc874b@BLUPR05MB037.namprd05.prod.outlook.com>
- <1399321388-15148-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <94c06375c1b44c8eb5233b0ccf2e4b13@BY2PR05MB048.namprd05.prod.outlook.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 06 May 2014 14:21:55 +0200
+Subject: [PATCH v3 06/20] usb: host: xhci-plat: Add support for the Armada
+ 38x
+In-Reply-To: <20140506141023.715b932d@skate>
+References: <1399335255-589-1-git-send-email-gregory.clement@free-electrons.com>
+ <61061197.hLhKsFqJLF@wuerfel> <20140506141023.715b932d@skate>
+Message-ID: <4660313.evfclGtT1x@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Boris,
+On Tuesday 06 May 2014 14:10:23 Thomas Petazzoni wrote:
+> On Tue, 06 May 2014 13:57:44 +0200, Arnd Bergmann wrote:
+> 
+> > > Please limit this driver to mvebu arch and compile testing, i.e.
+> > > 
+> > >         depends on ARCH_MVEBU || COMPILE_TEST
+> > 
+> > I think it actually needs a dependency on MVEBU_MBUS.
+> 
+> That's not what we do for any of the other drivers that use the
+> MVEBU_MBUS functions.
 
-> -----Original Message-----
-> From: Boris BREZILLON [mailto:boris.brezillon at free-electrons.com]
-> Sent: Monday, May 05, 2014 4:23 PM
-> To: Bryan Evenson
-> Cc: Andrew Victor; Nicolas Ferre; Jean-Christophe Plagniol-Villard; linux-arm-
-> kernel at lists.infradead.org; Alessandro Zummo; rtc-
-> linux at googlegroups.com; linux-kernel at vger.kernel.org; Boris BREZILLON
-> Subject: [PATCH] rtc: rtc-at91rm9200: fix lost ACKUPD interrupt
-> 
-> If an alarm interrupt raises just after the CR register is written and before the
-> ACKUPD is unmasked the ACKUPD bit might be cleaned up without waking
-> up the waiting thread.
-> 
-> Unmask the ACKUPD interrupt before writing the CR register so that the
-> ACKUPD cannot be lost.
-> 
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> Reported-by: Bryan Evenson <bevenson@melinkcorp.com>
-> ---
-> Hello Bryan,
-> 
-> Could you try to apply this patch and tell me if it fixes your bug ?
-> 
+Fair enough. I guess using ARCH_MVEBU as the dependency works as well
+because it implies MVEBU_MBUS. However, you can't use COMPILE_TEST
+then because the driver itself needs the interfaces provided by MBUS.
 
-I have a little more information for you.  On my system hwclock is part of Busybox (version 1.20.2 of Busybox).  On my build I do not have CONFIG_ENABLE_FEATURE_CLEAN_UP enabled for Busybox, so it does not close the file descriptor to the RTC after it is done with it.  Here is the relevant section in the Busybox code that is setting the RTC time: http://git.busybox.net/busybox/tree/util-linux/hwclock.c?h=1_20_stable#n224.  Per a suggestion from someone on the Busybox forum, I applied a patch which added a flock() with LOCK_EX on the file descriptor and I still had the same issue.  Running two instances of the previously mentioned test scripts in the background, here are the two strace outputs from the point when one access hung:
+It could be
 
-Instance #1
-----------
-1256  execve("/sbin/hwclock", ["/sbin/hwclock", "-w", "-u"], [/* 13 vars */]) = 0
-1256  brk(0)                            = 0x9c000
-1256  uname({sys="Linux", node="at91sam9x5ek", ...}) = 0
-1256  access("/etc/ld.so.preload", R_OK) = -1 ENOENT (No such file or directory)
-1256  open("/etc/ld.so.cache", O_RDONLY|O_CLOEXEC) = 3
-1256  fstat64(3, {st_mode=S_IFREG|0644, st_size=7053, ...}) = 0
-1256  mmap2(NULL, 7053, PROT_READ, MAP_PRIVATE, 3, 0) = 0xb6f47000
-1256  close(3)                          = 0
-1256  open("/lib/libc.so.6", O_RDONLY|O_CLOEXEC) = 3
-1256  read(3, "\177ELF\1\1\1\0\0\0\0\0\0\0\0\0\3\0(\0\1\0\0\0\354\225JJ4\0\0\0"..., 512) = 512
-1256  fstat64(3, {st_mode=S_IFREG|0755, st_size=1245200, ...}) = 0
-1256  mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb6f46000
-1256  mmap2(0x4a490000, 1284496, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x4a490000
-1256  mprotect(0x4a5bc000, 32768, PROT_NONE) = 0
-1256  mmap2(0x4a5c4000, 16384, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x12c) = 0x4a5c4000
-1256  mmap2(0x4a5c8000, 6544, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0x4a5c8000
-1256  close(3)                          = 0
-1256  mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb6f45000
-1256  set_tls(0xb6f454c0, 0xb6f45b98, 0x4a487058, 0xb6f454c0, 0x4a487058) = 0
-1256  mprotect(0x4a5c4000, 8192, PROT_READ) = 0
-1256  mprotect(0x4a486000, 4096, PROT_READ) = 0
-1256  munmap(0xb6f47000, 7053)          = 0
-1256  getuid32()                        = 0
-1256  open("/dev/rtc", O_WRONLY|O_LARGEFILE) = 3
-1256  gettimeofday({1399376901, 241610}, NULL) = 0
-1256  brk(0)                            = 0x9c000
-1256  brk(0xbd000)                      = 0xbd000
-1256  open("/etc/localtime", O_RDONLY|O_CLOEXEC) = 4
-1256  fcntl64(4, F_GETFD)               = 0x1 (flags FD_CLOEXEC)
-1256  fstat64(4, {st_mode=S_IFREG|0644, st_size=3519, ...}) = 0
-1256  fstat64(4, {st_mode=S_IFREG|0644, st_size=3519, ...}) = 0
-1256  mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb6f48000
-1256  read(4, "TZif2\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\4\0\0\0\4\0\0\0\0"..., 4096) = 3519
-1256  _llseek(4, -24, [3495], SEEK_CUR) = 0
-1256  read(4, "\nEST5EDT,M3.2.0,M11.1.0\n", 4096) = 24
-1256  close(4)                          = 0
-1256  munmap(0xb6f48000, 4096)          = 0
-1256  flock(3, LOCK_EX)                 = 0
-1256  ioctl(3, RTC_SET_TIME, {tm_sec=21, tm_min=48, tm_hour=11, tm_mday=6, tm_mon=4, tm_year=114, ...}) = 0
-1256  flock(3, LOCK_UN)                 = 0
-1256  exit_group(0)                     = ?
-1256  +++ exited with 0 +++
-----------
+	depends on ARCH_MVEBU || (MVEBU_MBUS && COMPILE_TEST)
 
-Instance #2
-----------
-1261  execve("/sbin/hwclock", ["/sbin/hwclock", "-w", "-u"], [/* 13 vars */]) = 0
-1261  brk(0)                            = 0x9c000
-1261  uname({sys="Linux", node="at91sam9x5ek", ...}) = 0
-1261  access("/etc/ld.so.preload", R_OK) = -1 ENOENT (No such file or directory)
-1261  open("/etc/ld.so.cache", O_RDONLY|O_CLOEXEC) = 3
-1261  fstat64(3, {st_mode=S_IFREG|0644, st_size=7053, ...}) = 0
-1261  mmap2(NULL, 7053, PROT_READ, MAP_PRIVATE, 3, 0) = 0xb6f4b000
-1261  close(3)                          = 0
-1261  open("/lib/libc.so.6", O_RDONLY|O_CLOEXEC) = 3
-1261  read(3, "\177ELF\1\1\1\0\0\0\0\0\0\0\0\0\3\0(\0\1\0\0\0\354\225JJ4\0\0\0"..., 512) = 512
-1261  fstat64(3, {st_mode=S_IFREG|0755, st_size=1245200, ...}) = 0
-1261  mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb6f4a000
-1261  mmap2(0x4a490000, 1284496, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x4a490000
-1261  mprotect(0x4a5bc000, 32768, PROT_NONE) = 0
-1261  mmap2(0x4a5c4000, 16384, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x12c) = 0x4a5c4000
-1261  mmap2(0x4a5c8000, 6544, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0x4a5c8000
-1261  close(3)                          = 0
-1261  mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb6f49000
-1261  set_tls(0xb6f494c0, 0xb6f49b98, 0x4a487058, 0xb6f494c0, 0x4a487058) = 0
-1261  mprotect(0x4a5c4000, 8192, PROT_READ) = 0
-1261  mprotect(0x4a486000, 4096, PROT_READ) = 0
-1261  munmap(0xb6f4b000, 7053)          = 0
-1261  getuid32()                        = 0
-1261  open("/dev/rtc", O_WRONLY|O_LARGEFILE) = 3
-1261  gettimeofday({1399376901, 655559}, NULL) = 0
-1261  brk(0)                            = 0x9c000
-1261  brk(0xbd000)                      = 0xbd000
-1261  open("/etc/localtime", O_RDONLY|O_CLOEXEC) = 4
-1261  fcntl64(4, F_GETFD)               = 0x1 (flags FD_CLOEXEC)
-1261  fstat64(4, {st_mode=S_IFREG|0644, st_size=3519, ...}) = 0
-1261  fstat64(4, {st_mode=S_IFREG|0644, st_size=3519, ...}) = 0
-1261  mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb6f4c000
-1261  read(4, "TZif2\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\4\0\0\0\4\0\0\0\0"..., 4096) = 3519
-1261  _llseek(4, -24, [3495], SEEK_CUR) = 0
-1261  read(4, "\nEST5EDT,M3.2.0,M11.1.0\n", 4096) = 24
-1261  close(4)                          = 0
-1261  munmap(0xb6f4c000, 4096)          = 0
-1261  flock(3, LOCK_EX)                 = 0
-1261  ioctl(3, RTC_SET_TIME, {tm_sec=21, tm_min=48, tm_hour=11, tm_mday=6, tm_mon=4, tm_year=114, ...}
-----------
+to describe the dependency most accurately.
 
-For the second instance, I had to "cat" the file that is still open by the strace process that has not yet returned.  If I open the strace output file with vi, the ioctl() call is not present.  If I understand flock() correctly, I think we can assume one ioctl() completes before the other ioctl() begins.  Is it possible there is something else going on in which the RTC is not yet ready for time to be set again?  Or is it a problem with setting the RTC to the same time twice?
+> > You probably need something like
+> > 
+> >       depends on MVEBU_MBUS=y || (MVEBU_MBUS=m && USB_XHCI=m)
+> 
+> MVEBU_MBUS is a bool, so there is no way is can be =m.
 
-If there is a different kernel version you would like me to try, or if you would like my kernel binary for your testing, let me know.
+Yes, that helps.
 
-Regards,
-Bryan
-
-> Best Regards,
-> 
-> Boris
-> 
->  drivers/rtc/rtc-at91rm9200.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/rtc/rtc-at91rm9200.c b/drivers/rtc/rtc-at91rm9200.c index
-> 3281c90..c16c423 100644
-> --- a/drivers/rtc/rtc-at91rm9200.c
-> +++ b/drivers/rtc/rtc-at91rm9200.c
-> @@ -163,9 +163,9 @@ static int at91_rtc_settime(struct device *dev, struct
-> rtc_time *tm)
-> 
->  	/* Stop Time/Calendar from counting */
->  	cr = at91_rtc_read(AT91_RTC_CR);
-> +	at91_rtc_write_ier(AT91_RTC_ACKUPD);
->  	at91_rtc_write(AT91_RTC_CR, cr | AT91_RTC_UPDCAL |
-> AT91_RTC_UPDTIM);
-> 
-> -	at91_rtc_write_ier(AT91_RTC_ACKUPD);
->  	wait_for_completion(&at91_rtc_updated);	/* wait for ACKUPD
-> interrupt */
->  	at91_rtc_write_idr(AT91_RTC_ACKUPD);
-> 
-> --
-> 1.8.3.2
+	Arnd
