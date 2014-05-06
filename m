@@ -1,100 +1,73 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 6 May 2014 17:05:05 +0100
-Subject: [RESEND PATCH 2/3] PCI: ARM: add support for generic PCI host
- controller
-In-Reply-To: <20140502190318.GE3179@obsidianresearch.com>
-References: <1399048876-11862-1-git-send-email-will.deacon@arm.com>
- <1399048876-11862-3-git-send-email-will.deacon@arm.com>
- <20140502172317.GC3179@obsidianresearch.com>
- <5644412.ouY7G25ZK8@wuerfel> <20140502184421.GF14645@arm.com>
- <20140502190318.GE3179@obsidianresearch.com>
-Message-ID: <20140506160504.GM30234@arm.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Tue, 6 May 2014 18:04:45 +0200
+Subject: mx6qsabresd hangs on linux-next
+In-Reply-To: <CAOMZO5Dx0JMj3dZ7BSgaYSZZ=ZKRqQHEYWj5sb6z_9jc+cpsEw@mail.gmail.com>
+References: <CAOMZO5DMEqs=zzNGqgKjK7wTJdiNPgEqxsX=TtqKrnpLMzpbDw@mail.gmail.com>	<20140506141310.GA2794@dragon>	<CAOMZO5DH5d_L-deVu=XmBo9ekq+-g704p7cyayLvp=43bnEccQ@mail.gmail.com>
+ <CAOMZO5Dx0JMj3dZ7BSgaYSZZ=ZKRqQHEYWj5sb6z_9jc+cpsEw@mail.gmail.com>
+Message-ID: <5369081D.5030400@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 02, 2014 at 08:03:18PM +0100, Jason Gunthorpe wrote:
-> On Fri, May 02, 2014 at 07:44:21PM +0100, Will Deacon wrote:
-> > > > > +       bus_range = &pci->cfg.bus_range;
-> > > > > +       for (busn = bus_range->start; busn <= bus_range->end; ++busn) {
-> > > > > +               u32 idx = busn - bus_range->start;
-> > > > > +               u32 sz = 1 << pci->cfg.ops->bus_shift;
-> > > > > +
-> > > > > +               pci->cfg.win[idx] = devm_ioremap(dev,
-> > > > > +                                                pci->cfg.res.start + busn * sz,
-> > > > > +                                                sz);
-> > > > 
-> > > > Why map each bus individually? Both CAM and ECAM define consecutive
-> > > > busses consecutively in the address space, and I though ioremap was OK
-> > > > with unaligned stuff?
-> > > 
-> > > One optimization we discussed before was to do this ioremap on the first
-> > > access to any config space register in one bus, so we don't actually have
-> > > to map all of them but only the ones that are in use.
-> > 
-> > Right, and this optimisation is because we don't have a lot of virtual
-> > address space on 32-bit ARM, so blowing away 256M on ECAM isn't viable.
-> 
-> But why not just
-> 
-> devm_ioremap(dev, pci->cfg.res.start + bus_range->start * sz,
-> 		  resource_size(&bus_range) * sz);
-> 
-> ?
+Hi Fabio,
 
-I was just trying to avoid the need for a single, virtually contiguous range
-where it's not actually required. If the driver is loaded as a module, we
-could already have a bunch of fragmentation in the vmalloc space.
+On 05/06/2014 05:49 PM, Fabio Estevam wrote:
+> On Tue, May 6, 2014 at 12:36 PM, Fabio Estevam <festevam@gmail.com> wrote:
+>
+>> Indeed, if I revert:
+>>
+>> commit e7489693b3a853ab6dfad52f7e6af553ae8d3f28
+>> Author: Maxime COQUELIN <maxime.coquelin@st.com>
+>> Date:   Wed Jan 29 17:24:08 2014 +0100
+>>
+>>      clk: divider: Optimize clk_divider_bestdiv loop
+>>
+>>      Currently, the for-loop used to try all the different dividers to find the
+>>      one that best fit tries all the values from 1 to max_div,
+>> incrementing by one.
+>>      In case of power-of-two, or table based divider, the loop isn't optimal.
+>>
+>>      Instead of incrementing by one, this patch provides directly the
+>> next divider.
+>>
+>>      Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
+>>      Signed-off-by: Mike Turquette <mturquette@linaro.org>
+>>
+>> Then the board does not hang.
+>
+> Isn't the increment of i missing?
 
-> > > Setup is called from probe, through pci_common_init_dev(), so that shouldn't
-> > > make a difference.
-> > 
-> > Given that the idea was to separate setup() and probe(), I didn't want to
-> > make the assumption that I was called in probe context.
-> 
-> IMHO, we need to have clear purposes for setup() and probe().
-> 
-> Probe is well defined already, it requests resources, claims the
-> device, puts it in reset and then does some subsystem specific thing.
-> The interaction with probe and devm is also already well specified.
-> 
-> It doesn't matter for this driver, but look at mvebu, you cannot move
-> the interrupt, gpio and clock acquisitions from probe() to setup(), as
-> they could all trigger a defered probe. Better to be consistent,
-> especially if this is the golden reference driver we want everyone to
-> follow (sorry Will)
+i is incremented in _next_div():
 
-Groan!
++static int _next_div(struct clk_divider *divider, int div)
++{
++	div++;
++
++	if (divider->flags & CLK_DIVIDER_POWER_OF_TWO)
++		return __roundup_pow_of_two(div);
++	if (divider->table)
++		return _round_up_table(divider->table, div);
++
++	return div;
++}
 
-> To me setup() is more like netdev open(), so it should just do that
-> final step to enable the links and bring up the PCI network and be
-> ready to run PCI discovery. Consider, someday we might have an
-> unsetup() for power mangement reasons, just like we have a close() in
-> netdev.
+Could you tell me which kind of divider it is? pow2, table, linear?
 
-That's what I did originally! Anyway, this is just refactoring so shouldn't
-be too much work. After reading Arnd's reply,  I'll move the bulk into
-->probe().
+>
+> --- a/drivers/clk/clk-divider.c
+> +++ b/drivers/clk/clk-divider.c
+> @@ -279,7 +279,7 @@ static int clk_divider_bestdiv(struct clk_hw *hw,
+> unsigned long rate,
+>           */
+>          maxdiv = min(ULONG_MAX / rate, maxdiv);
+>
+> -       for (i = 1; i <= maxdiv; i = _next_div(divider, i)) {
+> +       for (i = 1; i <= maxdiv; i +=_next_div(divider, i)) {
+This would break power-of-two, and table based dividers.
 
-> If the long term plan is to keep probe() then I don't think it makes
-> sense to move probe() duties into setup(). That just restricts what we
-> can do with the setup() call if setup() is now required to always
-> handle defered probe and so forth.
-> 
-> Will, don't forget this q:
+>                  if (!_is_valid_div(divider, i))
+>                          continue;
+>                  if (rate * i == parent_rate_saved) {
+>
 
-Sorry, that got chopped off somehow...
-
-> ------
-> > +out_release_res:
-> > +     release_child_resources(&iomem_resource);
-> > +     release_child_resources(&ioport_resource);
-> 
-> This looks really off to me, doesn't this free all resources in the
-> system?
-
-... yes, I suppose that would cause problems if we have multiple instances
-of the driver. I could probably just release_resource(win->res) instead
-of freeing the resources and use devm_request_mem_region for configuration
-space.
-
-Will
+Regards,
+Maxime
