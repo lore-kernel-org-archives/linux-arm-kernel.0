@@ -1,126 +1,64 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 06 May 2014 19:59:10 +0200
-Subject: [PATCH v3 1/3] base: power: Add generic OF-based power domain
- look-up
-In-Reply-To: <53691AE4.10206@wwwdotorg.org>
-References: <1398271618-28932-1-git-send-email-t.figa@samsung.com>	<1398271618-28932-2-git-send-email-t.figa@samsung.com>	<535E9163.3070305@wwwdotorg.org>
- <CAPDyKFoGOcScsaGWkw9bVh=gpGTApRK48AczaMiSmLah+YOSXQ@mail.gmail.com>
- <53690D21.8080807@wwwdotorg.org> <536918A9.6050502@gmail.com>
- <53691AE4.10206@wwwdotorg.org>
-Message-ID: <536922EE.6080000@gmail.com>
+Date: Tue, 06 May 2014 20:01:11 +0200
+Subject: [PATCH v4 01/15] clk: exynos5420: Rename mux parent arrays
+In-Reply-To: <1399393610-23394-2-git-send-email-shaik.ameer@samsung.com>
+References: <1399393610-23394-1-git-send-email-shaik.ameer@samsung.com>
+ <1399393610-23394-2-git-send-email-shaik.ameer@samsung.com>
+Message-ID: <53692367.30907@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06.05.2014 19:24, Stephen Warren wrote:
-> On 05/06/2014 11:15 AM, Tomasz Figa wrote:
->>
->>
->> On 06.05.2014 18:26, Stephen Warren wrote:
->>> On 05/06/2014 02:22 AM, Ulf Hansson wrote:
->>>> On 28 April 2014 19:35, Stephen Warren <swarren@wwwdotorg.org> wrote:
->>>>> On 04/23/2014 10:46 AM, Tomasz Figa wrote:
->>>>>> This patch introduces generic code to perform power domain look-up
->>>>>> using
->>>>>> device tree and automatically bind devices to their power domains.
->>>>>> Generic device tree binding is introduced to specify power domains of
->>>>>> devices in their device tree nodes.
->>>>>>
->>>>>> Backwards compatibility with legacy Samsung-specific power domain
->>>>>> bindings is provided, but for now the new code is not compiled when
->>>>>> CONFIG_ARCH_EXYNOS is selected to avoid collision with legacy code.
->>>>>> This
->>>>>> will change as soon as Exynos power domain code gets converted to use
->>>>>> the generic framework in further patch.
->>>>>
->>>>>> diff --git
->>>>>> a/Documentation/devicetree/bindings/power/power_domain.txt
->>>>>> b/Documentation/devicetree/bindings/power/power_domain.txt
->>>>>
->>>>>> +==Power domain consumers==
->>>>>> +
->>>>>> +Required properties:
->>>>>> + - power-domain : A phandle and power domain specifier as defined
->>>>>> by bindings
->>>>>> +                  of power controller specified by phandle.
->>>>>
->>>>> It seems quite likely that a single logical device could have
->>>>> components
->>>>> in multiple power domains. Consider an HDMI controller with different
->>>>> power domains for the HDMI core, CEC communication, DDC/I2C
->>>>> communication, and the I/O pads, with no clear separation between those
->>>>> two components of the module (no separate register spaces, but the
->>>>> bits/registers are interleaved all together).
->>>>>
->>>>> As such, I think that rather than a "power-domain" property, we need a
->>>>> pair of "power-domains", and "power-domain-names" properties, and
->>>>> preferably with mandatory usage of name-based lookups, rather than
->>>>> allowing a random mix of name-based and index-based lookups like we
->>>>> have
->>>>> with some existing resource bindings.
->>>>
->>>> Each struct device have only one dev_pm_domain pointer, thus a device
->>>> are not able to reside in more than one power domain.
->>>>
->>>> Therefore I doubt this will be very useful, unless I missed your
->>>> point. :-)
->>>
->>> A struct device is a Linux-internal concept. DT is supposed to represent
->>> the HW in an OS-agnostic fashion, not according to the limitations of
->>> any one OS's driver model.
->>>
->>> It's certainly true that a single logical HW module (represented by a
->>> single DT node) can have parts in multiple power domains.
->>
->> AFAIK a single DT node is supposed to represent a single _physical_ HW
->> module. It all depends on description granularity, though. A physical
->> chip (or IP block) might be further divided into multiple blocks, so I
->> can imagine some of them being in different power domains than another.
->
-> Physical-vs-logical probably means different things to different people.
-> What I mean is that DT should represent the HW modules at the
-> granularity that the HW documentation or designers describe the HW.
->
->> Still, based on the fact that in Linux we never needed to specify
->> multiple power domains for a device, is this really a real use case?
->
-> a) Linux has absolutely nothing to do with this. Again, DT is purely a
-> HW description that should not be influenced by OS limitations.
->
-> b) Linux does have to deal with this. HW exists which uses multiple
-> power domains per DT device node.
->
-> The fact that Linux forces the driver internals to create a separate
-> struct device for each part of the actual device that's in a different
-> power domain should not force us into representing the HW incorrectly in DT.
->
->> Anyway, the binding is defined in a way that lets you simply turn the
->> single phandle+specifier into a list of them, if such need ever shows up.
->
-> In my opinion, for all new resource bindings, we need to *exclusively*
-> support named-based lookup. That's the only way to ensure a simple
-> forward-compatible path to extensible DT bindings in the face of
-> multiple instances of a certain type of resource, where some are
-> optional. If resource lookups start out by index, and then later
-> (missing information when the DT binding was written, extending the DT
-> binding to a new HW revision/model) we find we need to add more
-> instances of that resource, some of which are optional, then anything
-> but purely name-based lookup makes the situation very complex.
->
-> We should solve this by simply using named-based lookup from the start
-> in all cases. That's my point here. Hence, we need to addm and enforce
-> usage of, a power-domain-names property.
+Shaik,
 
-Majority of use cases will need just a single power domain. Until a real 
-user of multiple power domains shows up along with a developer willing 
-to extend Linux PM code to account for this, I'd keep this as is.
+On 06.05.2014 18:26, Shaik Ameer Basha wrote:
+> This patch renames the mux parent arrays as per the naming
+> convension followed by the other exynos specific clock drivers.
+>
+> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+> Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
+> Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
+> ---
+>   drivers/clk/samsung/clk-exynos5420.c |  359 ++++++++++++++++++----------------
+>   1 file changed, 186 insertions(+), 173 deletions(-)
+>
+> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+> index 7a9e3b4..831670d 100644
+> --- a/drivers/clk/samsung/clk-exynos5420.c
+> +++ b/drivers/clk/samsung/clk-exynos5420.c
 
-The one thing to make the binding more future-proof would be probably 
-changing name of the property to "power-domains" for consistency with 
-other bindings using *-names.
+[snip]
 
-For now, the Linux power domain implementation would simply use the 
-first available entry in "power-domains" property, but it could be 
-extended in future with code to perform name-based look-up.
+>   static struct samsung_mux_clock exynos5420_mux_clks[] __initdata = {
+> -	MUX(0, "mout_mspll_kfc", mspll_cpu_p, SRC_TOP7, 8, 2),
+> -	MUX(0, "mout_mspll_cpu", mspll_cpu_p, SRC_TOP7, 12, 2),
+> -	MUX(0, "mout_apll", apll_p, SRC_CPU, 0, 1),
+> -	MUX(0, "mout_cpu", cpu_p, SRC_CPU, 16, 1),
+> -	MUX(0, "mout_kpll", kpll_p, SRC_KFC, 0, 1),
+> -	MUX(0, "mout_cpu_kfc", kfc_p, SRC_KFC, 16, 1),
+> +	MUX(0, "mout_mspll_kfc", mout_mspll_cpu_p, SRC_TOP7, 8, 2),
+> +	MUX(0, "mout_mspll_cpu", mout_mspll_cpu_p, SRC_TOP7, 12, 2),
+> +	MUX(0, "mout_apll", mout_apll_p, SRC_CPU, 0, 1),
+> +	MUX(0, "mout_cpu", mout_cpu_p, SRC_CPU, 16, 1),
+> +	MUX(0, "mout_kpll", mout_kpll_p, SRC_KFC, 0, 1),
+> +	MUX(0, "mout_kfc", mout_kfc_p, SRC_KFC, 16, 1),
+
+Here the clock name is also changed, but I'll just fix the commit 
+message when applying, assuming that this change doesn't break anything.
+
+>
+> -	MUX(0, "sclk_bpll", bpll_p, SRC_CDREX, 0, 1),
+> +	MUX(0, "sclk_bpll", mout_bpll_p, SRC_CDREX, 0, 1),
+
+[snip]
+
+>   static struct samsung_div_clock exynos5420_div_clks[] __initdata = {
+>   	DIV(0, "div_arm", "mout_cpu", DIV_CPU0, 0, 3),
+>   	DIV(0, "sclk_apll", "mout_apll", DIV_CPU0, 24, 3),
+>   	DIV(0, "armclk2", "div_arm", DIV_CPU0, 28, 3),
+> -	DIV(0, "div_kfc", "mout_cpu_kfc", DIV_KFC0, 0, 3),
+> +	DIV(0, "div_kfc", "mout_kfc", DIV_KFC0, 0, 3),
+
+Same here.
 
 Best regards,
 Tomasz
