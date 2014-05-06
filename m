@@ -1,56 +1,48 @@
 From: elder@linaro.org (Alex Elder)
-Date: Tue,  6 May 2014 17:18:29 -0500
-Subject: [PATCH v3 1/5] devicetree: bindings: document Broadcom CPU enable
- method
+Date: Tue,  6 May 2014 17:18:33 -0500
+Subject: [PATCH v3 5/5] ARM: dts: enable SMP support for bcm21664
 In-Reply-To: <1399414713-19206-1-git-send-email-elder@linaro.org>
 References: <1399414713-19206-1-git-send-email-elder@linaro.org>
-Message-ID: <1399414713-19206-2-git-send-email-elder@linaro.org>
+Message-ID: <1399414713-19206-6-git-send-email-elder@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Broadcom mobile SoCs use a ROM-implemented holding pen for
-controlled boot of secondary cores.  A special register is
-used to communicate to the ROM that a secondary core should
-start executing kernel code.  This enable method is currently
-used for members of the bcm281xx and bcm21664 SoC families.
-
-The use of an enable method also allows the SMP operation vector to
-be assigned as a result of device tree content for these SoCs.
+Define nodes representing the two Cortex A9 CPUs in a bcm21644 SoC.
 
 Signed-off-by: Alex Elder <elder@linaro.org>
 ---
- Documentation/devicetree/bindings/arm/cpus.txt | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/boot/dts/bcm21664.dtsi | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-index 333f4ae..c6a2411 100644
---- a/Documentation/devicetree/bindings/arm/cpus.txt
-+++ b/Documentation/devicetree/bindings/arm/cpus.txt
-@@ -185,6 +185,7 @@ nodes to be present and contain the properties described below.
- 			    "qcom,gcc-msm8660"
- 			    "qcom,kpss-acc-v1"
- 			    "qcom,kpss-acc-v2"
-+			    "brcm,bcm11351-cpu-method"
+diff --git a/arch/arm/boot/dts/bcm21664.dtsi b/arch/arm/boot/dts/bcm21664.dtsi
+index 08a44d4..a37ded1 100644
+--- a/arch/arm/boot/dts/bcm21664.dtsi
++++ b/arch/arm/boot/dts/bcm21664.dtsi
+@@ -25,6 +25,25 @@
+ 		bootargs = "console=ttyS0,115200n8";
+ 	};
  
- 	- cpu-release-addr
- 		Usage: required for systems that have an "enable-method"
-@@ -209,6 +210,17 @@ nodes to be present and contain the properties described below.
- 		Value type: <phandle>
- 		Definition: Specifies the ACC[2] node associated with this CPU.
- 
-+	- secondary-boot-reg
-+		Usage:
-+			Required for systems that have an "enable-method"
-+			property value of "brcm,bcm11351-cpu-method".
-+		Value type: <u32>
-+		Definition:
-+			Specifies the physical address of the register used to
-+			request the ROM holding pen code release a secondary
-+			CPU.  The value written to the register is formed by
-+			encoding the target CPU id into the low bits of the
-+			physical start address it should jump to.
- 
- Example 1 (dual-cluster big.LITTLE system 32-bit):
- 
++       cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		enable-method = "brcm,bcm11351-cpu-method";
++		secondary-boot-reg = <0x35004178>;
++
++		cpu0: cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <0>;
++		};
++
++		cpu1: cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <1>;
++		};
++	};
++
+ 	gic: interrupt-controller at 3ff00100 {
+ 		compatible = "arm,cortex-a9-gic";
+ 		#interrupt-cells = <3>;
 -- 
 1.9.1
