@@ -1,33 +1,66 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue,  6 May 2014 02:14:07 +0200
-Subject: [PATCH v3 12/20] ARM: configs: Add usb_xhci_mvebu to
- multi_v7_defconfig
+Date: Tue,  6 May 2014 02:14:15 +0200
+Subject: [PATCH v3 20/20] ARM: mvebu: Add Device Tree description of the EHCI
+ host on Armada 375
 In-Reply-To: <1399335255-589-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1399335255-589-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1399335255-589-13-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1399335255-589-21-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Marvell Armada 38x platform needs the xhci_mvebu driver enabled
-for the xHCI USB hosts, so this commit enables the corresponding
-Kconfig option in multi_v7_defconfig.
+The Marvell Armada 375 SoCs contains one EHCI host. This commit adds
+the Device Tree description of this interfaces at the SoC level, and
+also enables the USB2 port on the Armada 375 DB platform.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/armada-375-db.dts |  4 ++++
+ arch/arm/boot/dts/armada-375.dtsi   | 18 ++++++++++++++++++
+ 2 files changed, 22 insertions(+)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index d4e8a47a2f7c..820cc35d40cf 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -254,6 +254,7 @@ CONFIG_SND_SOC_TEGRA_ALC5632=y
- CONFIG_SND_SOC_TEGRA_MAX98090=y
- CONFIG_USB=y
- CONFIG_USB_XHCI_HCD=y
-+CONFIG_USB_XHCI_MVEBU=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_TEGRA=y
- CONFIG_USB_EHCI_HCD_PLATFORM=y
+diff --git a/arch/arm/boot/dts/armada-375-db.dts b/arch/arm/boot/dts/armada-375-db.dts
+index 0453d69e6433..01bc5e87898b 100644
+--- a/arch/arm/boot/dts/armada-375-db.dts
++++ b/arch/arm/boot/dts/armada-375-db.dts
+@@ -102,6 +102,10 @@
+ 				};
+ 			};
+ 
++			usb at 54000 {
++				status = "okay";
++			};
++
+ 			usb3 at 58000 {
+ 				status = "okay";
+ 			};
+diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
+index 1b81d1e33510..d2b19bfe7496 100644
+--- a/arch/arm/boot/dts/armada-375.dtsi
++++ b/arch/arm/boot/dts/armada-375.dtsi
+@@ -320,6 +320,24 @@
+ 				clocks = <&coreclk 0>;
+ 			};
+ 
++			usb at 50000 {
++				compatible = "marvell,orion-ehci";
++				reg = <0x50000 0x500>;
++				interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&gateclk 18>;
++				phys = <&usbcluster 0>;
++				phy-names="usb";
++				status = "disabled";
++			};
++
++			usb at 54000 {
++				compatible = "marvell,orion-ehci";
++				reg = <0x54000 0x500>;
++				interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&gateclk 26>;
++				status = "disabled";
++			};
++
+ 			usb3 at 58000 {
+ 				compatible = "marvell,armada-375-xhci";
+ 				reg = <0x58000 0x20000>,<0x5b880 0x80>;
 -- 
 1.8.1.2
