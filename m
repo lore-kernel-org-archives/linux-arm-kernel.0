@@ -1,77 +1,233 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Mon, 5 May 2014 22:51:25 -0500
-Subject: [GIT PULL] SOCFPGA DTS updates for 3.16, v3
-Message-ID: <1399348285-6757-1-git-send-email-dinguyen@altera.com>
+From: elder@linaro.org (Alex Elder)
+Date: Mon, 05 May 2014 23:05:18 -0500
+Subject: [PATCH 2/5] ARM: add SMP support for Broadcom mobile SoCs
+In-Reply-To: <53683E40.1060909@codeaurora.org>
+References: <1396577891-2713-1-git-send-email-elder@linaro.org>
+ <1396577891-2713-3-git-send-email-elder@linaro.org>
+ <533EF21C.6000909@codeaurora.org> <53680A5B.4060208@linaro.org>
+ <53683E40.1060909@codeaurora.org>
+Message-ID: <53685F7E.2000100@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin and Olof,
+On 05/05/2014 08:43 PM, Stephen Boyd wrote:
+> On 05/05/14 15:02, Alex Elder wrote:
+>> On 04/04/2014 12:55 PM, Stephen Boyd wrote:
+>>> On 04/03/14 19:18, Alex Elder wrote:
+>>>> +
+>>>> +/*
+>>>> + * Secondary startup method setup routine to extract the location of
+>>>> + * the secondary boot register from a "cpu" or "cpus" device tree
+>>>> + * node.  Only the first seen secondary boot register value is used;
+>>>> + * any others are ignored.  The secondary boot register value must be
+>>>> + * non-zero.
+>>>> + *
+>>>> + * Returns 0 if successful or an error code otherwise.
+>>>> + */
+>>>> +static int __init of_enable_method_setup(struct device_node *node)
+>>>> +{
+>>>> +	int ret;
+>>>> +
+>>>> +	/* Ignore all but the first one specified */
+>>>> +	if (secondary_boot)
+>>>> +		return 0;
+>>>> +
+>>>> +	ret = of_property_read_u32(node, OF_SECONDARY_BOOT, &secondary_boot);
+>>>> +	if (ret)
+>>>> +		pr_err("%s: missing/invalid " OF_SECONDARY_BOOT " property\n",
+>>>> +			node->name);
+>>>> +
+>>>> +	return ret;
+>>>> +}
+>>> I don't understand why we need this. Why can't we get the secondary boot
+>>> address from the /cpus node in the smp_prepare_cpus op. It isn't that
+>>> hard to get access to the cpus node there via of_find_node_by_path().
+>>> Then we don't need patch 1 at all. If it turns out to be common stuff,
+>>> we can always have the common function live in arm common code or maybe
+>>> even be a devicetree API.
+>> I already responded to this, but never got any response.  I
+>> was preparing to re-send this series and wanted to try to
+>> pull the added feature (patch 1) out and not be dependent on
+>> it.  But I think it's a bit ugly so I'm hoping to get a
+>> blessing to proceed with what I originally proposed.  For
+>> reference, here's the thread:
+>>     https://lkml.org/lkml/2014/4/3/421
+>>
+>> What I'm trying to do is get the value of a "secondary-boot-reg"
+>> property from a node known to have an "enable-method" property
+>> that matches the method name supplied in CPU_METHOD_OF_DECLARE().
+> 
+> I don't recall seeing any documentation about the secondary-boot-reg
+> property. Please make sure it is documented in the next patch series.
 
-Please consider pulling in these patches for v3.16. This is version 3 of the
-original SOCFPGA DTS pull request for v3.16. This new tag omits the following
-patches:
+I omitted the documentation, hoping to get some input about how
+best to go about it.  I talked with Mark Rutland last week and
+agreed to split off the "enable-method" descriptions into a file
+separate from "Documentation/devicetree/bindings/arm/cpus.txt"
+because it seemed like there might be a proliferation of them.
+I will definitely include it this time around.
 
-ARM: dts: socfpga: add gpio pieces -> Pending further discussion.
-dt: bindings: Typo s/clocks-names/clock-names/g -> Already in Grant Likely's tree.
+>> Using the callback function as I originally proposed, this is
+>> very easy.  When arm_dt_init_cpu_maps() parses the "cpus" portion
+>> of the device tree it calls set_smp_ops_by_method() for a
+>> matching "cpu" or "cpus" node, and that function supplies
+>> the node to the callback function. The callback can extract
+>> additional property values if needed.
+>>
+>> If I hold off until smp_prepare_cpus() is called, I have to
+>> re-parse the device tree to find the "cpus" node (this is
+>> in itself trivial).  I then need to re-parse that node to
+>> verify the matching "enable-method" property is found before
+>> looking for the parameter information I need for that enable
+>> method.  I would really prefer not to re-do this parsing
+>> step.  It's imprecise and a little inefficient, and it
+>> duplicates (but not exactly) logic that's already performed
+>> by arm_dt_init_cpu_maps().
+> 
+> Do you have any devices where the enable-method and secondary-boot-reg
+> isn't the same across all CPUs? A lot of the complexity comes from
 
-Also removes the artifact from a rebase that occurred in v2. So sorry about that.
-I have also compile tested this tag.
+To be clear, my discussion here is thinking more broadly than
+this specific case--beyond the Broadcom SoCs I'm adding support for.
 
-Thanks,
+But to answer your question, I am not aware of any such devices.
 
-The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+> broken DTs that don't specify a secondary-boot-reg along with the
+> enable-method. From the description and the code it seems that we should
+> just always put these two properties in the cpus node to make things
+> simple and precise. I agree it's a minor duplication to read the DT
 
-  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+Yes, I agree that specifying it only in "cpus" is preferable
+in general, and specifically that was how I was going to
+describe this binding.
 
-are available in the git repository at:
+I could imagine a big.LITTLE machine could have different
+methods but I have no experience with that.  It seems we should
+just dictate using the "cpus" node (not "cpu" nodes) unless/until
+there comes along a real machine that requires multiple methods.
+(But as the code now stands, only the first matching "cpu" node
+is ever used--any others are ignored--so it wouldn't support such
+a theoretical case anyway.)
 
-  git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga-dt-updates-for-3.16_v3
+> again to get the /cpus node and read a property out of it, but I doubt
+> you could even measure the difference.
 
-for you to fetch changes up to 8cb289ed60668d3350dda5aa19b4fa1dce1c07f1:
+No, that's why I said "a little inefficient."
 
-  ARM: socfpga: dts: Add div-reg to the main_pll clocks (2014-05-05 22:33:18 -0500)
+My bigger issue has to do with the fact that arm_dt_init_cpu_maps()
+already does a comprehensive job of parsing device tree nodes and
+finding matching "enable-method" entries.  I view this extra
+"secondary-boot-reg" property as a *parameter* of this particular
+enable method.
 
-----------------------------------------------------------------
-dts: socfpga: general updates for the socfpga platform
+With this view I think the parameter properties (if any) should
+be parsed in the same context that the "enable-method" was found.
+Having it get parsed much later, in a separate pass through the
+device tree just seems like splitting up something that should be
+logically grouped.
 
-Mostly DTS additions to the SOCFPGA platform from Steffan Trumtrar, and a
-couple of device tree documentation updates/typo fix.
+A different enable method might require a different parameter.
+So for a specific example, I might define a setup function to
+get the "cpu-release-address" property for a "spin-table"
+enable method, if one were to be defined.
 
-This one does not the GPIO binding patch, as that is pending further
-discussion. Also, v3 fixes a rebase artifact and compile tested.
+If we were restricted to the single "cpus" node this would
+be much simpler, but I'd still argue the enable method and
+its related properties should be treated together.
 
-----------------------------------------------------------------
-Dinh Nguyen (4):
-      ARM: socfpga: dts: add eeprom and rtc on i2c0
-      ARM: socfpga: dts: Remove hard coded clock-frequency property
-      ARM: socfpga: dts: Add DTS entries for USB
-      ARM: socfpga: dts: Add div-reg to the main_pll clocks
+>> One more point of clarification.  This "secondary-boot-reg"
+>> value is *not* the secondary boot address--that is, it's
+>> not the address secondary cores jump to when they are
+>> activated.  Instead, this is the address of a register
+>> that's used to request the ROM code release a core from
+>> its ROM-implemented holding pen.  For this machine,
+>> control jumps at that point to secondary_startup(),
+>> defined in arch/arm/kernel/head.S.
+> 
+> Yes it wouldn't be possible to specify the entry address in DT (depends
+> on compile time factors). How is this different from cpu-release-addr
 
-Steffen Trumtrar (10):
-      ARM: socfpga: dts: fix pdma interrupt
-      ARM: socfpga: dts: add remaining interrupts for pdma
-      ARM: socfpga: dts: add i2c busses
-      ARM: socfpga: dts: add can0+1
-      ARM: socfpga: dts: add support for EBV SOCrates
-      ARM: socfpga: dts: add rtc on i2c0 to socrates
-      ARM: socfpga: dts: convert to preprocessor includes
-      Documentation: dt: socfpga: add reset-cells property
-      Documentation: dt: reset: move socfpga-reset
-      ARM: socfpga: dts: add reset-controller
+Sorry, I misstated that.  I meant it's not the cpu-release-addr
+(which is the location of the register into which the secondary
+boot address should be written).
 
- .../devicetree/bindings/clock/altr_socfpga.txt     |    4 +-
- .../{arm/altera => reset}/socfpga-reset.txt        |    2 +
- arch/arm/boot/dts/Makefile                         |    1 +
- arch/arm/boot/dts/socfpga.dtsi                     |  118 +++++++++++++++++++-
- arch/arm/boot/dts/socfpga_arria5.dtsi              |   26 +----
- arch/arm/boot/dts/socfpga_arria5_socdk.dts         |   21 +++-
- arch/arm/boot/dts/socfpga_cyclone5.dtsi            |   26 +----
- arch/arm/boot/dts/socfpga_cyclone5_socdk.dts       |   21 +++-
- arch/arm/boot/dts/socfpga_cyclone5_sockit.dts      |    6 +-
- arch/arm/boot/dts/socfpga_cyclone5_socrates.dts    |   50 +++++++++
- arch/arm/boot/dts/socfpga_vt.dts                   |    2 +-
- include/dt-bindings/reset/altr,rst-mgr.h           |   90 +++++++++++++++
- 12 files changed, 305 insertions(+), 62 deletions(-)
- rename Documentation/devicetree/bindings/{arm/altera => reset}/socfpga-reset.txt (85%)
- create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_socrates.dts
- create mode 100644 include/dt-bindings/reset/altr,rst-mgr.h
+> though? It looks like it describes something similar to what ePAPR
+> describes and how arm64 uses it (although those two slightly differ).
+> Assuming it's paired with a different enable-method than spin-table I
+> don't see a problem reusing the same name.
+
+I suppose.  I hate to use the same name for something whose
+use is semantically different.  I'm not sure why there's value
+to reusing the name.
+
+To be honest I don't think the set_smp_ops_by_method() call(s)
+necessarily belongs in arm_dt_init_cpu_maps().  It seems like
+it could just as easily be done inside smp_init_cpus().  I
+don't think the smp_operations vector needs to be set at that
+early stage, and it was done where it is as more a matter of
+convenience.
+
+Note that arm64 uses cpu_operations rather than smp_operations
+and there are some differences.  The cpu_init() method gets
+called from smp_init_cpus(), right after the "enable-method"
+property is parsed.  That method passes the matching device
+node, so it really does something very much like what I'm
+proposing.
+
+>>
+>> So...
+>>
+>> Stephen, I'd like to hear from you whether my explanation
+>> is adequate, and whether you think my addition and use of
+>> CPU_METHOD_OF_DECLARE_SETUP() is reasonable.  (If you have
+>> a suggestion for a better name, I'm open.)
+>>
+>> If you still don't like it, I'll follow up with a
+>> new version of the patches, this time parsing the
+>> device tree in the smp_prepare_cpus() method as
+>> you suggested.  I don't want this to hold up getting
+>> this SMP support into the kernel.
+>>
+> 
+> This was my train of thought. It annoys me that we have smp ops at two
+> levels. We already have SMP ops that deal with SMP things and now we
+> have another level that is associated with the enable-method. If we
+
+I could add the callback as a new member of the smp_operations
+struct but it doesn't really fit there (like you said, it's tied
+to the enable method more than SMP).
+
+> really need this callback why couldn't we just collapse it with the
+> smp_ops we already have? When we do that we realize that
+> smp_prepare_cpus() is a fairly similar place to do this sort of thing,
+> but changing that callback to take the node is annoying to propagate to
+
+I have no problem making such a change if it's the right thing
+to do.  I found the existing interfaces didn't support what
+I wanted to do so I tried to make them more flexible.
+
+> all users. But do we really need that node? It seems simple enough to
+> just get the cpus node and then read out the property we care about and
+> we can do all that in smp_prepare_cpus() one time (and keep the mapping
+> around forever) without requiring any core ARM changes.
+
+(I don't really like leaking mappings either, trivial as
+that may seem.)
+
+> Do you have any more complicated use cases for this setup hook? RIght
+> now I'm not convinced that we need to add all this framework for
+> something that looks like it could be done in a couple lines in the
+> prepare_cpus() step.
+> 
+> 	cpus = of_find_node_by_path("/cpus")
+> 	ret = of_property_read_u32(cpus, "secondary-boot-reg", &addr);
+
+For the case of these Broadcom SoCs, I think this is sufficient.
+I'll put together a new version of the series in the morning.
+I think I can do what you suggest or very similar.
+
+I think there's more improvement that can be made in this
+SMP setup code though, so I think this is good discussion.
+I appreciate your responses.
+
+					-Alex
