@@ -1,88 +1,83 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 06 May 2014 11:35:38 +0900
-Subject: [PATCH] arm: dts: exynos4: add missing pinctrls for I2C
- controllers
-In-Reply-To: <534E7F1A.8080502@samsung.com>
-References: <534E7A3F.7050406@samsung.com> <534E7F1A.8080502@samsung.com>
-Message-ID: <099a01cf68d3$de1044b0$9a30ce10$@samsung.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Tue, 06 May 2014 06:46:41 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCAxLzJdIEFSTTogZHRzOiBpbXg1MS1ldWtyZWEtbWJpbXhz?=
+ =?UTF-8?B?ZDUxLWJhc2Vib2FyZDogQWRkIENBTiBzdXBwb3J0?=
+In-Reply-To: <1399327248-17887-1-git-send-email-festevam@gmail.com>
+References: <1399327248-17887-1-git-send-email-festevam@gmail.com>
+Message-ID: <1399344401.373980656@f157.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa wrote:
+Mon,  5 May 2014 19:00:47 -0300 ?? Fabio Estevam <festevam@gmail.com>:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> Hi Tomasz,
+> Add support for CAN based on a MPC2515 connected to ECSPI1.
 > 
-> On 16.04.2014 14:40, Tomasz Stanislawski wrote:
-> > This patch adds missing pinctrls for I2C controllers 2-7.
-> >
-> > Signed-off-by: Tomasz Stanislawski <t.stanislaws@samsung.com>
-> > ---
-> >   arch/arm/boot/dts/exynos4.dtsi |   12 ++++++++++++
-> >   1 file changed, 12 insertions(+)
-> >
-> > diff --git a/arch/arm/boot/dts/exynos4.dtsi
-> b/arch/arm/boot/dts/exynos4.dtsi
-> > index 0401f4d..288aa81 100644
-> > --- a/arch/arm/boot/dts/exynos4.dtsi
-> > +++ b/arch/arm/boot/dts/exynos4.dtsi
-> > @@ -357,6 +357,8 @@
-> >   		interrupts = <0 60 0>;
-> >   		clocks = <&clock CLK_I2C2>;
-> >   		clock-names = "i2c";
-> > +		pinctrl-names = "default";
-> > +		pinctrl-0 = <&i2c2_bus>;
-> >   		status = "disabled";
-> >   	};
-> >
-> > @@ -368,6 +370,8 @@
-> >   		interrupts = <0 61 0>;
-> >   		clocks = <&clock CLK_I2C3>;
-> >   		clock-names = "i2c";
-> > +		pinctrl-names = "default";
-> > +		pinctrl-0 = <&i2c3_bus>;
-> >   		status = "disabled";
-> >   	};
-> >
-> > @@ -379,6 +383,8 @@
-> >   		interrupts = <0 62 0>;
-> >   		clocks = <&clock CLK_I2C4>;
-> >   		clock-names = "i2c";
-> > +		pinctrl-names = "default";
-> > +		pinctrl-0 = <&i2c4_bus>;
-> >   		status = "disabled";
-> >   	};
-> >
-> > @@ -390,6 +396,8 @@
-> >   		interrupts = <0 63 0>;
-> >   		clocks = <&clock CLK_I2C5>;
-> >   		clock-names = "i2c";
-> > +		pinctrl-names = "default";
-> > +		pinctrl-0 = <&i2c5_bus>;
-> >   		status = "disabled";
-> >   	};
-> >
-> > @@ -401,6 +409,8 @@
-> >   		interrupts = <0 64 0>;
-> >   		clocks = <&clock CLK_I2C6>;
-> >   		clock-names = "i2c";
-> > +		pinctrl-names = "default";
-> > +		pinctrl-0 = <&i2c6_bus>;
-> >   		status = "disabled";
-> >   	};
-> >
-> > @@ -412,6 +422,8 @@
-> >   		interrupts = <0 65 0>;
-> >   		clocks = <&clock CLK_I2C7>;
-> >   		clock-names = "i2c";
-> > +		pinctrl-names = "default";
-> > +		pinctrl-0 = <&i2c7_bus>;
-> >   		status = "disabled";
-> >   	};
-> >
-> >
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+> Eric/Denis,
 > 
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> I don't have the hardware to test it. Please give it a test.
 > 
-Applied, thanks.
+>  .../boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts  | 34 ++++++++++++++++++++++
+>  1 file changed, 34 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
+> index 8b1098e..f0067e9 100644
+> --- a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
+> +++ b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
+> @@ -86,6 +86,24 @@
+>  	status = "okay";
+>  };
+>  
+> +&ecspi1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_ecspi1>;
+> +	fsl,spi-num-chipselects = <1>;
+> +	cs-gpios = <&gpio4 24 GPIO_ACTIVE_HIGH>;
 
-- Kukjin
+Really CS High for this?
+I think this is wrong.
+
+> +	status = "okay";
+> +
+> +	can0: can at 0 {
+> +		compatible = "microchip,mcp2515";
+> +		reg = <0>;
+> +		clocks = <&clks IMX5_CLK_OSC>;
+> +		spi-max-frequency = <1000000>;
+> +		spi-cs-high;
+
+Ditto.
+
+> +		interrupt-parent = <&gpio1>;
+> +		interrupts = <1 IRQ_TYPE_EDGE_FALLING>;
+> +	};
+> +};
+> +
+>  &i2c1 {
+>  	tlv320aic23: codec at 1a {
+>  		compatible = "ti,tlv320aic23";
+> @@ -104,6 +122,22 @@
+>  			>;
+>  		};
+>  
+> +		pinctrl_ecspi1: ecspi1grp {
+> +			fsl,pins = <
+> +				MX51_PAD_CSPI1_MISO__ECSPI1_MISO	0x185
+> +				MX51_PAD_CSPI1_MOSI__ECSPI1_MOSI	0x185
+> +				MX51_PAD_CSPI1_SCLK__ECSPI1_SCLK	0x185
+> +				MX51_PAD_CSPI1_SS0__GPIO4_24		0x80000000 	/* CS0 */
+
+...
+> +				MX51_PAD_CSI2_PIXCLK__GPIO4_15		0x80000000	/* nReset */
+> +				MX51_PAD_GPIO1_1__GPIO1_1		0x80000000	/* IRQ */
+> +				MX51_PAD_GPIO1_4__GPIO1_4		0x80000000	/* Control signals */
+> +				MX51_PAD_GPIO1_6__GPIO1_6		0x80000000
+> +				MX51_PAD_GPIO1_7__GPIO1_7		0x80000000
+> +				MX51_PAD_GPIO1_8__GPIO1_8		0x80000000
+> +				MX51_PAD_GPIO1_9__GPIO1_9		0x80000000
+
+Unknown GPIOs.
+
+---
