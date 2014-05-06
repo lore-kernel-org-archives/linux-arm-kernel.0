@@ -1,45 +1,80 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 06 May 2014 16:37:05 +0100
-Subject: ACPI vs DT at runtime
-In-Reply-To: <5367AE6B.3010105@ahsoftware.de>
-References: <20131115095717.GC1709@e106331-lin.cambridge.arm.com>
- <97692EF2-013E-4E4B-BC16-E0915D67EFEC@antoniou-consulting.com>
- <53673866.9000105@ahsoftware.de> <69387177.zGLDjZS0ln@wuerfel>
- <5367AE6B.3010105@ahsoftware.de>
-Message-ID: <20140506153705.75C55C40A19@trevor.secretlab.ca>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 6 May 2014 10:39:53 -0500
+Subject: [PATCH v3 06/20] usb: host: xhci-plat: Add support for the
+ Armada 38x
+In-Reply-To: <1399335255-589-7-git-send-email-gregory.clement@free-electrons.com>
+References: <1399335255-589-1-git-send-email-gregory.clement@free-electrons.com>
+ <1399335255-589-7-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20140506153953.GF25849@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 05 May 2014 17:29:47 +0200, Alexander Holler <holler@ahsoftware.de> wrote:
-> Am 05.05.2014 16:41, schrieb Arnd Bergmann:
-> > On Monday 05 May 2014 09:06:14 Alexander Holler wrote:
-> >>
-> >> A bit late (I don't follow the ML (or what happens in the ARM world)
-> >> closely, but as I've recently read that ARM64 will go UEFI and ACPI, I
-> >> wonder what was the reasoning behind that decision.
-> >>
-> >> Does anyone really assume we will become high quality UEFI and ACPI
-> >> blobs from vendors? And such with reasonable support/update periods?
-> >>
-> >> For me that sounds like someone asked dreamers and was unable to adjust
-> >> those answers in regard to reality.
-> >
-> > Where did you read that? It's simply not true and we should make sure
-> > people stop spreading dangerous misinformation.
+Hi,
+
+On Tue, May 06, 2014 at 02:14:01AM +0200, Gregory CLEMENT wrote:
+> For the Armada 38x SoCs which come with an xhci controller, specific
+> initialization must be done during probe related to the MBus windows
+> configuration. This patch adds the support of this quirk.
 > 
-> I've recently read Grant Likely's blog entry about armv8 servers: 
-> http://www.secretlab.ca/archives/27 (I've read the disclaimer too ;) )
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  drivers/usb/host/Kconfig      |  7 +++++
+>  drivers/usb/host/Makefile     |  1 +
+>  drivers/usb/host/xhci-mvebu.c | 71 +++++++++++++++++++++++++++++++++++++++++++
+>  drivers/usb/host/xhci-mvebu.h | 21 +++++++++++++
+>  drivers/usb/host/xhci-plat.c  |  6 ++++
+>  5 files changed, 106 insertions(+)
+>  create mode 100644 drivers/usb/host/xhci-mvebu.c
+>  create mode 100644 drivers/usb/host/xhci-mvebu.h
+> 
+> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+> index 3d9e54062d62..e70943fac4a1 100644
+> --- a/drivers/usb/host/Kconfig
+> +++ b/drivers/usb/host/Kconfig
+> @@ -29,6 +29,13 @@ if USB_XHCI_HCD
+>  config USB_XHCI_PLATFORM
+>  	tristate
+>  
+> +config USB_XHCI_MVEBU
+> +	tristate "xHCI support for Marvell Armada 38x"
+> +	select USB_XHCI_PLATFORM
+> +	---help---
+> +	  Say 'Y' to enable the support for the xHCI host controller
+> +	  found in Marvell Armada 38x ARM SOCs.
+> +
+>  endif # USB_XHCI_HCD
+>  
+>  config USB_EHCI_HCD
+> diff --git a/drivers/usb/host/Makefile b/drivers/usb/host/Makefile
+> index 7530468c9a4f..7a8db7f7dc01 100644
+> --- a/drivers/usb/host/Makefile
+> +++ b/drivers/usb/host/Makefile
+> @@ -19,6 +19,7 @@ xhci-hcd-$(CONFIG_PCI)	+= xhci-pci.o
+>  
+>  ifneq ($(CONFIG_USB_XHCI_PLATFORM), )
+>  	xhci-hcd-y		+= xhci-plat.o
+> +	xhci-hcd-$(CONFIG_USB_XHCI_MVEBU)	+= xhci-mvebu.o
 
-The purpose of that blog post was to address the questions around ARM
-server architecture requirements including ACPI and UEFI, but there is a
-big gap between the requrement and what actually works now. ARM server
-hardware is going to be available well before UEFI and ACPI
-(especially ACPI) infrastructure has stablized. I was trying to lay a
-roadmap that acknowledges the gap and provides a way for vendors to ship
-hardware now that is supported by the mainline kernel.
+hmm, this has the potential of resulting in:
 
-The constraints that are driving all of this on servers simply don't
-exist on embedded and mobile. There really is zero advantage to using
-ACPI if the only OS that will ever run on the device is Linux.
+	xhci-hcd-m += xhci-mvebu.o
 
-g.
+I guess it's best to turn this into:
+
+ifneq ($(CONFIG_USB_XHCI_PLATFORM), )
+	xhci-hcd-y += xhci-mvebu.o
+endif
+
+no ? Other than this comment:
+
+Acked-by: Felipe Balbi <balbi@ti.com>
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140506/e9db2c71/attachment.sig>
