@@ -1,62 +1,54 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 6 May 2014 08:20:08 -0700
-Subject: [PATCH 10/19] arm: dts: add cooling properties on omap4430 cpu
- node
-In-Reply-To: <1395744572-20014-11-git-send-email-alex.shi@linaro.org>
-References: <1395744572-20014-1-git-send-email-alex.shi@linaro.org>
- <1395744572-20014-11-git-send-email-alex.shi@linaro.org>
-Message-ID: <20140506152007.GC18474@atomide.com>
+From: loeliger@gmail.com (Jon Loeliger)
+Date: Tue, 6 May 2014 10:23:16 -0500
+Subject: [PATCH] irqchip: sirf: fix 'line over 80 characters'
+In-Reply-To: <1399388316-19465-1-git-send-email-21cnbao@gmail.com>
+References: <1399388316-19465-1-git-send-email-21cnbao@gmail.com>
+Message-ID: <CAJgR-BikPVzi1bKpBwk-vvrDv9cwFgjWcg-NmH8SKsEOWDnxcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Alex Shi <alex.shi@linaro.org> [140325 03:54]:
-> From: Eduardo Valentin <eduardo.valentin@ti.com>
-> 
-> OMAP4430 devices can reach high temperatures and thus
-> needs to have cpufreq-cooling on systems running on it.
-> 
-> This patch adds the required cooling device properties
-> so that cpufreq-cpu0 driver loads the cooling device.
+> fix "line line over 80 characters" for the below:
+> static int __init sirfsoc_irq_init(struct device_node *np, struct device_node *parent)
+>
+> the users of the codes - key customers really care about that.
 
-Alex, what's the status of this series? I could not find
-the complete thread, so wondering what to do with patches
-09 - 13?
+And readers of the Linux logs - key developers really care about snark.
 
-Regards,
+jdl
 
-Tony
- 
-> Cc: "Beno?t Cousson" <bcousson@baylibre.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: linux-omap at vger.kernel.org
-> Cc: devicetree-discuss at lists.ozlabs.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
-> (cherry picked from commit 72af5e6d0c3e01655c1c1fc7c7ca94a2b663611e)
-> 
-> Signed-off-by: Alex Shi <alex.shi@linaro.org>
+On Tue, May 6, 2014 at 9:58 AM, Barry Song <21cnbao@gmail.com> wrote:
+> From: Bin Shi <Bin.Shi@csr.com>
+>
+> fix "line line over 80 characters" for the below:
+> static int __init sirfsoc_irq_init(struct device_node *np, struct device_node *parent)
+>
+> the users of the codes - key customers really care about that.
+>
+> Signed-off-by: Bin Shi <Bin.Shi@csr.com>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
 > ---
->  arch/arm/boot/dts/omap443x.dtsi | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/omap443x.dtsi b/arch/arm/boot/dts/omap443x.dtsi
-> index cccf39a..d2deba0 100644
-> --- a/arch/arm/boot/dts/omap443x.dtsi
-> +++ b/arch/arm/boot/dts/omap443x.dtsi
-> @@ -22,6 +22,11 @@
->  				1008000 1375000
->  			>;
->  			clock-latency = <300000>; /* From legacy driver */
-> +
-> +			/* cooling options */
-> +			cooling-min-level = <0>;
-> +			cooling-max-level = <3>;
-> +			#cooling-cells = <2>; /* min followed by max */
->  		};
->  	};
->  };
-> -- 
-> 1.8.1.2
-> 
+>  drivers/irqchip/irq-sirfsoc.c |    3 ++-
+>  1 files changed, 2 insertions(+), 1 deletions(-)
+>
+> diff --git a/drivers/irqchip/irq-sirfsoc.c b/drivers/irqchip/irq-sirfsoc.c
+> index 581eefe..5e54f6d 100644
+> --- a/drivers/irqchip/irq-sirfsoc.c
+> +++ b/drivers/irqchip/irq-sirfsoc.c
+> @@ -58,7 +58,8 @@ static void __exception_irq_entry sirfsoc_handle_irq(struct pt_regs *regs)
+>         handle_IRQ(irqnr, regs);
+>  }
+>
+> -static int __init sirfsoc_irq_init(struct device_node *np, struct device_node *parent)
+> +static int __init sirfsoc_irq_init(struct device_node *np,
+> +       struct device_node *parent)
+>  {
+>         void __iomem *base = of_iomap(np, 0);
+>         if (!base)
+> --
+> 1.7.5.4
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
