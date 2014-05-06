@@ -1,44 +1,61 @@
-From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
-Date: Tue, 06 May 2014 17:24:08 -0300
-Subject: [PATCH v10 01/15] clk: sunxi: factors: automatic reparenting
- support
-In-Reply-To: <20140506185131.GI9464@lukather>
-References: <1399046249-19472-1-git-send-email-hdegoede@redhat.com>
- <1399046249-19472-2-git-send-email-hdegoede@redhat.com>
- <20140506185131.GI9464@lukather>
-Message-ID: <536944E8.5060300@elopez.com.ar>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue,  6 May 2014 17:26:45 -0300
+Subject: [PATCH] clk: clk-divider: Fix infinite loop for table divider
+Message-ID: <1399408005-4209-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-El 06/05/14 15:51, Maxime Ripard escribi?:
-> Hi Emilio,
->
-> On Fri, May 02, 2014 at 05:57:15PM +0200, Hans de Goede wrote:
->> From: Emilio L?pez <emilio@elopez.com.ar>
->>
->> This commit implements .determine_rate, so that our factor clocks can be
->> reparented when needed.
->>
->> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->
-> Any chance you merge this? Since it's pretty consensual, needed by
-> other drivers, and that you are the author, I can it can go in.
+Since commit e7489693b3 (clk: divider: Optimize clk_divider_bestdiv loop) we 
+notice a system hang on mx6qboard.
 
-I merged it on my tree for Mike on April 22nd
+The cause for the hang is well explained by Sascha Hauer [1]:
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/249259.html
+"This cannot work. _round_up_table is implemented like this:
 
-It seems Mike has taken another copy for 3.16 though
+static int _round_up_table(const struct clk_div_table *table, int div)
+{
+        const struct clk_div_table *clkt;
+        int up = _get_table_maxdiv(table);
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/253661.html
+        for (clkt = table; clkt->div; clkt++) {
+                if (clkt->div == div)
+                        return clkt->div;
+                ...
+        }
+        ...
+}
 
-Mike, do you want to drop the patches and have me take both of them, or 
-would you prefer it if I dropped my copy?
+Here when a table entry matches the input div this function will return
+exactly the input div. This means _next_div() will always return the
+same value and clk_divider_bestdiv() has an infinite loop:
 
-Cheers,
+        for (i = 1; i <= maxdiv; i = _next_div(divider, i)) {
+                ...
+        } 
+"
+[1] http://marc.info/?l=linux-arm-kernel&m=139940658726253&w=2
 
-Emilio
+Remove the 'return _round_up_table' so that the system can work normally again.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ drivers/clk/clk-divider.c | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+index b3c8396..fc3e344 100644
+--- a/drivers/clk/clk-divider.c
++++ b/drivers/clk/clk-divider.c
+@@ -246,8 +246,6 @@ static int _next_div(struct clk_divider *divider, int div)
+ 
+ 	if (divider->flags & CLK_DIVIDER_POWER_OF_TWO)
+ 		return __roundup_pow_of_two(div);
+-	if (divider->table)
+-		return _round_up_table(divider->table, div);
+ 
+ 	return div;
+ }
+-- 
+1.8.3.2
