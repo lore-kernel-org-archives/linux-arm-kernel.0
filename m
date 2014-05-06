@@ -1,42 +1,76 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 6 May 2014 18:23:34 +0100
-Subject: [GIT PULL] iommu/arm-smmu: updates for 3.16
-Message-ID: <20140506172333.GD13677@arm.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 6 May 2014 12:23:43 -0500
+Subject: [PATCH v2 2/2] ARM: dts: rockchip: add root compatible properties
+In-Reply-To: <1399396211-25353-2-git-send-email-b.galvani@gmail.com>
+References: <1399396211-25353-1-git-send-email-b.galvani@gmail.com>
+ <1399396211-25353-2-git-send-email-b.galvani@gmail.com>
+Message-ID: <CAL_JsqJ0k2ke91oZwrDUS3YMq6rDE4n7qbnTidThJKMvEZ94mg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+On Tue, May 6, 2014 at 12:10 PM, Beniamino Galvani <b.galvani@gmail.com> wrote:
+> Add the missing 'compatible' property to device tree root node of
+>
+>  - rk3066a-bqcurie2.dts
+>  - rk3188-radxarock.dts
+>
+> and document the new values.
+>
+> Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
 
-Please can you pull the following arm-smmu changes for 3.16?
+Acked-by: Rob Herring <robh@kernel.org>
 
-There's not a lot here, but a non-essential fix (removing a extra shift by
-0) and replacing a hard-coded constant with its corresponding definition
-(which actually means we can support up to 42-bit addresses into stage-2).
-
-Cheers,
-
-Will
-
---->8
-
-The following changes since commit d1db0eea852497762cab43b905b879dfcd3b8987:
-
-  Linux 3.15-rc3 (2014-04-27 19:29:27 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/arm-smmu/updates
-
-for you to fetch changes up to 6069d23ce0e568909d847f28af0257b085e8e77a:
-
-  iommu/arm-smmu: fix incorrect use of S2CR_TYPE_SHIFT (2014-05-02 16:49:37 +0100)
-
-----------------------------------------------------------------
-Kefeng Wang (1):
-      iommu/arm-smmu: fix incorrect use of S2CR_TYPE_SHIFT
-
-Will Deacon (1):
-      iommu/arm-smmu: allow 42-bit stage-1 output size with 64K pages
-
- drivers/iommu/arm-smmu.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+> ---
+>
+> v2:
+>  - use mundoreader prefix instead of bq as suggested by Heiko Stuebner
+>
+>  Documentation/devicetree/bindings/arm/rockchip.txt |   10 ++++++++++
+>  arch/arm/boot/dts/rk3066a-bqcurie2.dts             |    1 +
+>  arch/arm/boot/dts/rk3188-radxarock.dts             |    1 +
+>  3 files changed, 12 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/rockchip.txt
+>
+> diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
+> new file mode 100644
+> index 0000000..857f126
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/rockchip.txt
+> @@ -0,0 +1,10 @@
+> +Rockchip platforms device tree bindings
+> +---------------------------------------
+> +
+> +- bq Curie 2 tablet:
+> +    Required root node properties:
+> +      - compatible = "mundoreader,bq-curie2", "rockchip,rk3066a";
+> +
+> +- Radxa Rock board:
+> +    Required root node properties:
+> +      - compatible = "radxa,rock", "rockchip,rk3188";
+> diff --git a/arch/arm/boot/dts/rk3066a-bqcurie2.dts b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
+> index 035df40..afb3273 100644
+> --- a/arch/arm/boot/dts/rk3066a-bqcurie2.dts
+> +++ b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
+> @@ -18,6 +18,7 @@
+>
+>  / {
+>         model = "bq Curie 2";
+> +       compatible = "mundoreader,bq-curie2", "rockchip,rk3066a";
+>
+>         memory {
+>                 reg = <0x60000000 0x40000000>;
+> diff --git a/arch/arm/boot/dts/rk3188-radxarock.dts b/arch/arm/boot/dts/rk3188-radxarock.dts
+> index 3ba1968..a5eee55 100644
+> --- a/arch/arm/boot/dts/rk3188-radxarock.dts
+> +++ b/arch/arm/boot/dts/rk3188-radxarock.dts
+> @@ -17,6 +17,7 @@
+>
+>  / {
+>         model = "Radxa Rock";
+> +       compatible = "radxa,rock", "rockchip,rk3188";
+>
+>         memory {
+>                 reg = <0x60000000 0x80000000>;
+> --
+> 1.7.10.4
+>
