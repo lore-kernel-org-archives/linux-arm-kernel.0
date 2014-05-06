@@ -1,36 +1,68 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue,  6 May 2014 22:58:36 +0800
-Subject: [PATCH] irqchip: sirf: fix 'line over 80 characters'
-Message-ID: <1399388316-19465-1-git-send-email-21cnbao@gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue,  6 May 2014 17:04:11 +0200
+Subject: [PATCH] ARM: tegra: Support reboot modes
+Message-ID: <1399388651-12819-1-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bin Shi <Bin.Shi@csr.com>
+From: Thierry Reding <treding@nvidia.com>
 
-fix "line line over 80 characters" for the below:
-static int __init sirfsoc_irq_init(struct device_node *np, struct device_node *parent)
+The boot ROM on Tegra SoCs supports booting into forced recovery mode
+(RCM) by setting a bit in the PMC scratch register 0. Similarily, the
+Android bootloader examines some of the bits in this register to disable
+autoboot or enter recovery mode.
 
-the users of the codes - key customers really care about that.
+Support these modes by setting the corresponding bits depending on the
+specified reboot command (forced-recovery, bootloader, recovery). Recent
+systemd-based distributions allow this to be specified using an optional
+argument to the reboot command.
 
-Signed-off-by: Bin Shi <Bin.Shi@csr.com>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
+Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
- drivers/irqchip/irq-sirfsoc.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+ arch/arm/mach-tegra/pmc.c | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/drivers/irqchip/irq-sirfsoc.c b/drivers/irqchip/irq-sirfsoc.c
-index 581eefe..5e54f6d 100644
---- a/drivers/irqchip/irq-sirfsoc.c
-+++ b/drivers/irqchip/irq-sirfsoc.c
-@@ -58,7 +58,8 @@ static void __exception_irq_entry sirfsoc_handle_irq(struct pt_regs *regs)
- 	handle_IRQ(irqnr, regs);
- }
+diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
+index fb7920201ab4..7c7123e7557b 100644
+--- a/arch/arm/mach-tegra/pmc.c
++++ b/arch/arm/mach-tegra/pmc.c
+@@ -41,6 +41,14 @@
+ #define PMC_REMOVE_CLAMPING		0x34
+ #define PMC_PWRGATE_STATUS		0x38
  
--static int __init sirfsoc_irq_init(struct device_node *np, struct device_node *parent)
-+static int __init sirfsoc_irq_init(struct device_node *np,
-+	struct device_node *parent)
++#define PMC_SCRATCH0			0x50
++#define PMC_SCRATCH0_MODE_RECOVERY	(1 << 31)
++#define PMC_SCRATCH0_MODE_BOOTLOADER	(1 << 30)
++#define PMC_SCRATCH0_MODE_RCM		(1 << 1)
++#define PMC_SCRATCH0_MODE_MASK		(PMC_SCRATCH0_MODE_RECOVERY | \
++					 PMC_SCRATCH0_MODE_BOOTLOADER | \
++					 PMC_SCRATCH0_MODE_RCM)
++
+ #define PMC_CPUPWRGOOD_TIMER	0xc8
+ #define PMC_CPUPWROFF_TIMER	0xcc
+ 
+@@ -165,6 +173,22 @@ void tegra_pmc_restart(enum reboot_mode mode, const char *cmd)
  {
- 	void __iomem *base = of_iomap(np, 0);
- 	if (!base)
+ 	u32 val;
+ 
++	val = tegra_pmc_readl(PMC_SCRATCH0);
++	val &= ~PMC_SCRATCH0_MODE_MASK;
++
++	if (cmd) {
++		if (strcmp(cmd, "recovery") == 0)
++			val |= PMC_SCRATCH0_MODE_RECOVERY;
++
++		if (strcmp(cmd, "bootloader") == 0)
++			val |= PMC_SCRATCH0_MODE_BOOTLOADER;
++
++		if (strcmp(cmd, "forced-recovery") == 0)
++			val |= PMC_SCRATCH0_MODE_RCM;
++	}
++
++	tegra_pmc_writel(val, PMC_SCRATCH0);
++
+ 	val = tegra_pmc_readl(0);
+ 	val |= 0x10;
+ 	tegra_pmc_writel(val, 0);
 -- 
-1.7.5.4
+1.9.2
