@@ -1,40 +1,56 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue,  6 May 2014 02:13:58 +0200
-Subject: [PATCH v3 03/20] usb: host: xhci-plat: Sort the headers in alphabetic
- order
+Date: Tue,  6 May 2014 02:14:04 +0200
+Subject: [PATCH v3 09/20] ARM: mvebu: Add Device Tree description of the EHCI
+ host on Armada 38x
 In-Reply-To: <1399335255-589-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1399335255-589-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1399335255-589-4-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1399335255-589-10-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorting the headers in alphabetic order will help to reduce the conflict
-when adding new headers later.
+The Marvell Armada 38x SoCs contains one EHCI host. This commit adds
+the Device Tree description of this interface at the SoC level, and
+also enables the USB2 port on the Armada 385 DB platform.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Acked-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/usb/host/xhci-plat.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/armada-385-db.dts | 4 ++++
+ arch/arm/boot/dts/armada-38x.dtsi   | 8 ++++++++
+ 2 files changed, 12 insertions(+)
 
-diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-index 151901ce1ba9..f5351af4b2c5 100644
---- a/drivers/usb/host/xhci-plat.c
-+++ b/drivers/usb/host/xhci-plat.c
-@@ -11,11 +11,11 @@
-  * version 2 as published by the Free Software Foundation.
-  */
+diff --git a/arch/arm/boot/dts/armada-385-db.dts b/arch/arm/boot/dts/armada-385-db.dts
+index d5db1466da82..91e3e449067f 100644
+--- a/arch/arm/boot/dts/armada-385-db.dts
++++ b/arch/arm/boot/dts/armada-385-db.dts
+@@ -65,6 +65,10 @@
+ 				phy-mode = "rgmii-id";
+ 			};
  
--#include <linux/platform_device.h>
-+#include <linux/dma-mapping.h>
- #include <linux/module.h>
--#include <linux/slab.h>
- #include <linux/of.h>
--#include <linux/dma-mapping.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
++			usb at 50000 {
++				status = "ok";
++			};
++
+ 			ethernet at 70000 {
+ 				status = "okay";
+ 				phy = <&phy0>;
+diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+index 5913ce1cc601..11f1f9e28cbc 100644
+--- a/arch/arm/boot/dts/armada-38x.dtsi
++++ b/arch/arm/boot/dts/armada-38x.dtsi
+@@ -283,6 +283,14 @@
+ 				status = "disabled";
+ 			};
  
- #include "xhci.h"
- 
++			usb at 50000 {
++				compatible = "marvell,orion-ehci";
++				reg = <0x58000 0x500>;
++				interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&gateclk 18>;
++				status = "disabled";
++			};
++
+ 			xor at 60800 {
+ 				compatible = "marvell,orion-xor";
+ 				reg = <0x60800 0x100
 -- 
 1.8.1.2
