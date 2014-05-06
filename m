@@ -1,80 +1,59 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 6 May 2014 11:16:27 -0500
-Subject: [PATCH 2/4] ARM: dts: am335x-evm: use phandles for USB and DMA
- refs
-In-Reply-To: <1398693512-5355-2-git-send-email-guido@vanguardiasur.com.ar>
-References: <1398693512-5355-1-git-send-email-guido@vanguardiasur.com.ar>
- <1398693512-5355-2-git-send-email-guido@vanguardiasur.com.ar>
-Message-ID: <20140506161627.GJ25849@saruman.home>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 6 May 2014 18:25:14 +0200
+Subject: [PATCH resend 03/15] arm64: defer reloading a task's FPSIMD state
+ to userland resume
+In-Reply-To: <20140506160826.GI23957@arm.com>
+References: <1398959381-8126-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1398959381-8126-4-git-send-email-ard.biesheuvel@linaro.org>
+ <20140506160826.GI23957@arm.com>
+Message-ID: <CAKv+Gu9ogEHb6rOT6KgPMDXjTwR5Krz0s7pkiaW_7vtZipu2Hw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 10:58:30AM -0300, Guido Mart?nez wrote:
-> Use phandles instead of unit adresses to reference usb and dma nodes.
-> This makes the DT more robust and readable.
-> 
-> Signed-off-by: Guido Mart?nez <guido@vanguardiasur.com.ar>
+On 6 May 2014 18:08, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Thu, May 01, 2014 at 04:49:35PM +0100, Ard Biesheuvel wrote:
+>> @@ -153,12 +252,11 @@ static int fpsimd_cpu_pm_notifier(struct notifier_block *self,
+>>  {
+>>         switch (cmd) {
+>>         case CPU_PM_ENTER:
+>> -               if (current->mm)
+>> +               if (current->mm && !test_thread_flag(TIF_FOREIGN_FPSTATE))
+>>                         fpsimd_save_state(&current->thread.fpsimd_state);
+>>                 break;
+>>         case CPU_PM_EXIT:
+>> -               if (current->mm)
+>> -                       fpsimd_load_state(&current->thread.fpsimd_state);
+>> +               set_thread_flag(TIF_FOREIGN_FPSTATE);
+>
+> I think we could enter a PM state on a kernel thread (idle), so we
+> should preserve the current->mm check as well.
+>
 
-Acked-by: Felipe Balbi <balbi@ti.com>
+OK
 
-> ---
->  arch/arm/boot/dts/am335x-evm.dts | 12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-> index 6028217..e802627 100644
-> --- a/arch/arm/boot/dts/am335x-evm.dts
-> +++ b/arch/arm/boot/dts/am335x-evm.dts
-> @@ -331,28 +331,28 @@
->  &usb {
->  	status = "okay";
->  
-> -	control at 44e10620 {
-> +	&usb_ctrl_mod {
->  		status = "okay";
->  	};
->  
-> -	usb-phy at 47401300 {
-> +	&usb0_phy {
->  		status = "okay";
->  	};
->  
-> -	usb-phy at 47401b00 {
-> +	&usb1_phy {
->  		status = "okay";
->  	};
->  
-> -	usb at 47401000 {
-> +	&usb0 {
->  		status = "okay";
->  	};
->  
-> -	usb at 47401800 {
-> +	&usb1 {
->  		status = "okay";
->  		dr_mode = "host";
->  	};
->  
-> -	dma-controller at 47402000  {
-> +	&cppi41dma  {
->  		status = "okay";
->  	};
->  };
-> -- 
-> 1.9.2
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+>>                 break;
+>>         case CPU_PM_ENTER_FAILED:
+>>         default:
+>> diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+>> index 06448a77ff53..882f01774365 100644
+>> --- a/arch/arm64/kernel/signal.c
+>> +++ b/arch/arm64/kernel/signal.c
+>> @@ -413,4 +413,8 @@ asmlinkage void do_notify_resume(struct pt_regs *regs,
+>>                 clear_thread_flag(TIF_NOTIFY_RESUME);
+>>                 tracehook_notify_resume(regs);
+>>         }
+>> +
+>> +       if (thread_flags & _TIF_FOREIGN_FPSTATE)
+>> +               fpsimd_restore_current_state();
+>
+> I think this should be safe. Even if we get preempted here, ret_to_user
+> would loop over TI_FLAGS with interrupts disabled until no work pending.
+>
+
+I don't follow. Do you think I should change something here?
+
+Anyway, inside fpsimd_restore_current_state() the TIF_FOREIGN_FPSTATE
+is checked again, but this time with preemption disabled.
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140506/5da5333c/attachment.sig>
+Ard.
