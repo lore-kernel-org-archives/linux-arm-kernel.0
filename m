@@ -1,56 +1,54 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Tue, 6 May 2014 20:02:52 +0200
-Subject: [PATCH v2 0/4] Support for Variscite OM44 modules and boards
-In-Reply-To: <20140506001530.GL25949@atomide.com>
-References: <1398971269-20515-1-git-send-email-manabian@gmail.com>
- <20140506001530.GL25949@atomide.com>
-Message-ID: <CAGhQ9VystybERsiPUX4ESNBcKPKBN44GvuPUtTM+jpywUqON3A@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue,  6 May 2014 19:04:39 +0100
+Subject: [PATCH RFC v3 2/6] Documentation: devicetree: psci: define CPU
+ suspend parameter
+In-Reply-To: <1399399483-17112-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1399399483-17112-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1399399483-17112-3-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1On 6 May 2014 02:15, Tony Lindgren <tony@atomide.com> wrote:
-> * Joachim Eastwood <manabian@gmail.com> [140501 12:08]:
->> Hello,
->>
->> This patch set adds support for Variscite OM44 series of system on modules and boards.
->>
->> There weren't many comments on v1 of this patch set so I hope this can make it into 3.16.
->> Changes since v2:
->>  * Use OMAP IOPAD macros
->>
->> Patch 1: Add support for the SoM itself and the reference carrier board. Together these make the VAR-STK-OM44 dev kit.
->> Patch 2: Add support for VAR-DVK-OM44 which is just the STK with a LCD display.
->> Patch 3: Nodes for WLAN/BT support.
->> Patch 4: Add quirks so that WLAN can be used. Still waiting for proper DT bindings.
->>
->> Since this patch set now uses the IOPAD macros a fix from Tony is need.
->> See: https://patchwork.kernel.org/patch/4025421/
->
-> Just noted that the macro won't work while was about to
-> apply these, sorry. So we're back to either using the
-> existing OMAP4_WKUP_IOPAD or raw offset from the padconf
-> area unless you have some great macro ideas.
+OS layers built on top of PSCI to enter low-power states require the
+power_state parameter to be passed to the PSCI CPU suspend method.
 
-I see. I'll take another look at the macro's and see what I can come up with.
+This parameter is specific to a power state and platform specific,
+therefore must be provided by firmware to the OS in order to enable
+proper call sequence.
 
->> Note that patch 1 relies upon a patch from Tomi Valkeinen add hpd-gpio (hotplug detect) to the "hdmi-connector".
->> See: http://marc.info/?l=linux-omap&m=139771947508021&w=2
->>
->> Patch 2 also relies upon a patch from Tomi that adds DT support to panel-dpi.
->> See: http://marc.info/?l=devicetree&m=139030201815380&w=2
->
-> Maybe also leave out the DSS changes until Tomi has confirmed
-> those?
+This patch adds a property in the PSCI bindings that describes how
+the CPU suspend power_state parameter should be defined in DT in
+all device nodes that rely on PSCI CPU suspend method usage.
 
-I can split the patch set and put a patch with the DSS DT nodes at the
-end. Maybe this last patch can go through Tomi if he has a DSS DT
-branch. I don't want to drop it entirely from the patch set because
-some other people has expressed interest in testing it with full
-display and hdmi support.
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+---
+ Documentation/devicetree/bindings/arm/psci.txt | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-I am traveling right now and don't have access to my development
-machine. So I won't be able to rework the patch set until early next
-week.
-
-regards
-Joachim Eastwood
+diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
+index 433afe9..797c48f 100644
+--- a/Documentation/devicetree/bindings/arm/psci.txt
++++ b/Documentation/devicetree/bindings/arm/psci.txt
+@@ -42,6 +42,14 @@ Main node optional properties:
+ 
+  - migrate       : Function ID for MIGRATE operation
+ 
++Device tree nodes that require usage of PSCI CPU_SUSPEND function (ie idle
++states bindings[1]) must specify the following properties:
++
++- entry-method-param
++		Usage: Required for idle states bindings [1].
++		Value type: <u32>
++		Definition: power_state parameter to pass to the PSCI
++			    suspend call.
+ 
+ Example:
+ 
+@@ -53,3 +61,6 @@ Example:
+ 		cpu_on		= <0x95c10002>;
+ 		migrate		= <0x95c10003>;
+ 	};
++
++[1] Kernel documentation - ARM idle states bindings
++    Documentation/devicetree/bindings/arm/idle-states.txt
+-- 
+1.8.4
