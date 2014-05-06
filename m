@@ -1,38 +1,53 @@
-From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
-Date: Tue, 6 May 2014 10:20:27 +0200
-Subject: [PATCH 1/9] ARM: STi: DT: STiH416: 416 DT Entry for clockgen
- A0/1/10/11/12
-In-Reply-To: <20140506071843.GD5206@lee--X1>
-References: <1399305223-18703-1-git-send-email-gabriel.fernandez@linaro.org>
- <1399305223-18703-2-git-send-email-gabriel.fernandez@linaro.org>
- <20140506071843.GD5206@lee--X1>
-Message-ID: <CAG374jD+msPPbPtFS+ji=8jS9+D-YHu31k7zzzC7Ty7jw9n7jQ@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 6 May 2014 10:22:42 +0200
+Subject: [PATCH v3 1/3] base: power: Add generic OF-based power domain
+ look-up
+In-Reply-To: <535E9163.3070305@wwwdotorg.org>
+References: <1398271618-28932-1-git-send-email-t.figa@samsung.com>
+ <1398271618-28932-2-git-send-email-t.figa@samsung.com>
+ <535E9163.3070305@wwwdotorg.org>
+Message-ID: <CAPDyKFoGOcScsaGWkw9bVh=gpGTApRK48AczaMiSmLah+YOSXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
-
-On 6 May 2014 09:18, Lee Jones <lee.jones@linaro.org> wrote:
->> Patch adds DT entries for clockgen A0/1/10/11/12
+On 28 April 2014 19:35, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 04/23/2014 10:46 AM, Tomasz Figa wrote:
+>> This patch introduces generic code to perform power domain look-up using
+>> device tree and automatically bind devices to their power domains.
+>> Generic device tree binding is introduced to specify power domains of
+>> devices in their device tree nodes.
 >>
->> Signed-off-by: Pankaj Dev <pankaj.dev@st.com>
->> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
->> ---
->>  arch/arm/boot/dts/stih416-clks.h     |  15 ++
+>> Backwards compatibility with legacy Samsung-specific power domain
+>> bindings is provided, but for now the new code is not compiled when
+>> CONFIG_ARCH_EXYNOS is selected to avoid collision with legacy code. This
+>> will change as soon as Exynos power domain code gets converted to use
+>> the generic framework in further patch.
 >
-> This should live in include/dt-bindings/clk
+>> diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
 >
-include/dt-bindings/clk or  include/dt-bindings/clock ?
+>> +==Power domain consumers==
+>> +
+>> +Required properties:
+>> + - power-domain : A phandle and power domain specifier as defined by bindings
+>> +                  of power controller specified by phandle.
+>
+> It seems quite likely that a single logical device could have components
+> in multiple power domains. Consider an HDMI controller with different
+> power domains for the HDMI core, CEC communication, DDC/I2C
+> communication, and the I/O pads, with no clear separation between those
+> two components of the module (no separate register spaces, but the
+> bits/registers are interleaved all together).
+>
+> As such, I think that rather than a "power-domain" property, we need a
+> pair of "power-domains", and "power-domain-names" properties, and
+> preferably with mandatory usage of name-based lookups, rather than
+> allowing a random mix of name-based and index-based lookups like we have
+> with some existing resource bindings.
 
->>  arch/arm/boot/dts/stih416-clock.dtsi | 477 ++++++++++++++++++++++++++++++++++
->>  arch/arm/boot/dts/stih416.dtsi       |  10 +-
->>  3 files changed, 497 insertions(+), 5 deletions(-)
->>  create mode 100644 arch/arm/boot/dts/stih416-clks.h
->
-> --
-> Lee Jones
-> Linaro STMicroelectronics Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
+Each struct device have only one dev_pm_domain pointer, thus a device
+are not able to reside in more than one power domain.
 
-Best regards
+Therefore I doubt this will be very useful, unless I missed your point. :-)
+
+Kind regards
+Ulf Hansson
