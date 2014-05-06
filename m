@@ -1,59 +1,69 @@
-From: shaik.ameer@samsung.com (Shaik Ameer Basha)
-Date: Tue, 06 May 2014 21:56:50 +0530
-Subject: [PATCH v4 15/15] clk: exynos5420: add more registers to restore list
-In-Reply-To: <1399393610-23394-1-git-send-email-shaik.ameer@samsung.com>
-References: <1399393610-23394-1-git-send-email-shaik.ameer@samsung.com>
-Message-ID: <1399393610-23394-16-git-send-email-shaik.ameer@samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 6 May 2014 17:31:33 +0100
+Subject: [PATCH resend 03/15] arm64: defer reloading a task's FPSIMD
+ state to userland resume
+In-Reply-To: <CAKv+Gu9ogEHb6rOT6KgPMDXjTwR5Krz0s7pkiaW_7vtZipu2Hw@mail.gmail.com>
+References: <1398959381-8126-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1398959381-8126-4-git-send-email-ard.biesheuvel@linaro.org>
+ <20140506160826.GI23957@arm.com>
+ <CAKv+Gu9ogEHb6rOT6KgPMDXjTwR5Krz0s7pkiaW_7vtZipu2Hw@mail.gmail.com>
+Message-ID: <20140506163133.GJ23957@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds more register offsets to the list for
-preserving their values during S2R.
+On Tue, May 06, 2014 at 05:25:14PM +0100, Ard Biesheuvel wrote:
+> On 6 May 2014 18:08, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Thu, May 01, 2014 at 04:49:35PM +0100, Ard Biesheuvel wrote:
+> >> @@ -153,12 +252,11 @@ static int fpsimd_cpu_pm_notifier(struct notifier_block *self,
+> >>  {
+> >>         switch (cmd) {
+> >>         case CPU_PM_ENTER:
+> >> -               if (current->mm)
+> >> +               if (current->mm && !test_thread_flag(TIF_FOREIGN_FPSTATE))
+> >>                         fpsimd_save_state(&current->thread.fpsimd_state);
+> >>                 break;
+> >>         case CPU_PM_EXIT:
+> >> -               if (current->mm)
+> >> -                       fpsimd_load_state(&current->thread.fpsimd_state);
+> >> +               set_thread_flag(TIF_FOREIGN_FPSTATE);
+> >
+> > I think we could enter a PM state on a kernel thread (idle), so we
+> > should preserve the current->mm check as well.
+> 
+> OK
+> 
+> >>                 break;
+> >>         case CPU_PM_ENTER_FAILED:
+> >>         default:
+> >> diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+> >> index 06448a77ff53..882f01774365 100644
+> >> --- a/arch/arm64/kernel/signal.c
+> >> +++ b/arch/arm64/kernel/signal.c
+> >> @@ -413,4 +413,8 @@ asmlinkage void do_notify_resume(struct pt_regs *regs,
+> >>                 clear_thread_flag(TIF_NOTIFY_RESUME);
+> >>                 tracehook_notify_resume(regs);
+> >>         }
+> >> +
+> >> +       if (thread_flags & _TIF_FOREIGN_FPSTATE)
+> >> +               fpsimd_restore_current_state();
+> >
+> > I think this should be safe. Even if we get preempted here, ret_to_user
+> > would loop over TI_FLAGS with interrupts disabled until no work pending.
+> 
+> I don't follow. Do you think I should change something here?
 
-Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
-Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
-Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
----
- drivers/clk/samsung/clk-exynos5420.c |   12 ++++++++++++
- 1 file changed, 12 insertions(+)
+No, I think it's safe (just thinking out loud). That's assuming
+TIF_FOREIGN_FPSTATE is never set in interrupt context but a brief look
+at subsequent patch shows that it doesn't.
 
-diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
-index e69e820..566d351 100644
---- a/drivers/clk/samsung/clk-exynos5420.c
-+++ b/drivers/clk/samsung/clk-exynos5420.c
-@@ -27,6 +27,7 @@
- #define DIV_CPU1		0x504
- #define GATE_BUS_CPU		0x700
- #define GATE_SCLK_CPU		0x800
-+#define CLKOUT_CMU_CPU		0xa00
- #define GATE_IP_G2D		0x8800
- #define CPLL_LOCK		0x10020
- #define DPLL_LOCK		0x10030
-@@ -39,7 +40,11 @@
- #define CPLL_CON0		0x10120
- #define DPLL_CON0		0x10128
- #define EPLL_CON0		0x10130
-+#define EPLL_CON1		0x10134
-+#define EPLL_CON2		0x10138
- #define RPLL_CON0		0x10140
-+#define RPLL_CON1		0x10144
-+#define RPLL_CON2		0x10148
- #define IPLL_CON0		0x10150
- #define SPLL_CON0		0x10160
- #define VPLL_CON0		0x10170
-@@ -140,6 +145,13 @@ static unsigned long exynos5420_clk_regs[] __initdata = {
- 	DIV_CPU1,
- 	GATE_BUS_CPU,
- 	GATE_SCLK_CPU,
-+	CLKOUT_CMU_CPU,
-+	EPLL_CON0,
-+	EPLL_CON1,
-+	EPLL_CON2,
-+	RPLL_CON0,
-+	RPLL_CON1,
-+	RPLL_CON2,
- 	SRC_TOP0,
- 	SRC_TOP1,
- 	SRC_TOP2,
+> Anyway, inside fpsimd_restore_current_state() the TIF_FOREIGN_FPSTATE
+> is checked again, but this time with preemption disabled.
+
+Yes. I was thinking about the scenario where we get to
+do_notify_resume() because of other work but with TIF_FOREIGN_FPSTATE
+cleared. In the meantime, we get preempted and TIF_FOREIGN_FPSTATE gets
+set when switching back to this thread. In this case, ret_to_user loops
+again over TI_FLAGS.
+
 -- 
-1.7.9.5
+Catalin
