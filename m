@@ -1,70 +1,75 @@
-From: b.galvani@gmail.com (Beniamino Galvani)
-Date: Tue,  6 May 2014 19:10:11 +0200
-Subject: [PATCH v2 2/2] ARM: dts: rockchip: add root compatible properties
-In-Reply-To: <1399396211-25353-1-git-send-email-b.galvani@gmail.com>
-References: <1399396211-25353-1-git-send-email-b.galvani@gmail.com>
-Message-ID: <1399396211-25353-2-git-send-email-b.galvani@gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 06 May 2014 19:15:21 +0200
+Subject: [PATCH v3 1/3] base: power: Add generic OF-based power domain
+ look-up
+In-Reply-To: <53690D21.8080807@wwwdotorg.org>
+References: <1398271618-28932-1-git-send-email-t.figa@samsung.com>	<1398271618-28932-2-git-send-email-t.figa@samsung.com>	<535E9163.3070305@wwwdotorg.org>
+ <CAPDyKFoGOcScsaGWkw9bVh=gpGTApRK48AczaMiSmLah+YOSXQ@mail.gmail.com>
+ <53690D21.8080807@wwwdotorg.org>
+Message-ID: <536918A9.6050502@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the missing 'compatible' property to device tree root node of
 
- - rk3066a-bqcurie2.dts
- - rk3188-radxarock.dts
 
-and document the new values.
+On 06.05.2014 18:26, Stephen Warren wrote:
+> On 05/06/2014 02:22 AM, Ulf Hansson wrote:
+>> On 28 April 2014 19:35, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>> On 04/23/2014 10:46 AM, Tomasz Figa wrote:
+>>>> This patch introduces generic code to perform power domain look-up using
+>>>> device tree and automatically bind devices to their power domains.
+>>>> Generic device tree binding is introduced to specify power domains of
+>>>> devices in their device tree nodes.
+>>>>
+>>>> Backwards compatibility with legacy Samsung-specific power domain
+>>>> bindings is provided, but for now the new code is not compiled when
+>>>> CONFIG_ARCH_EXYNOS is selected to avoid collision with legacy code. This
+>>>> will change as soon as Exynos power domain code gets converted to use
+>>>> the generic framework in further patch.
+>>>
+>>>> diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
+>>>
+>>>> +==Power domain consumers==
+>>>> +
+>>>> +Required properties:
+>>>> + - power-domain : A phandle and power domain specifier as defined by bindings
+>>>> +                  of power controller specified by phandle.
+>>>
+>>> It seems quite likely that a single logical device could have components
+>>> in multiple power domains. Consider an HDMI controller with different
+>>> power domains for the HDMI core, CEC communication, DDC/I2C
+>>> communication, and the I/O pads, with no clear separation between those
+>>> two components of the module (no separate register spaces, but the
+>>> bits/registers are interleaved all together).
+>>>
+>>> As such, I think that rather than a "power-domain" property, we need a
+>>> pair of "power-domains", and "power-domain-names" properties, and
+>>> preferably with mandatory usage of name-based lookups, rather than
+>>> allowing a random mix of name-based and index-based lookups like we have
+>>> with some existing resource bindings.
+>>
+>> Each struct device have only one dev_pm_domain pointer, thus a device
+>> are not able to reside in more than one power domain.
+>>
+>> Therefore I doubt this will be very useful, unless I missed your point. :-)
+>
+> A struct device is a Linux-internal concept. DT is supposed to represent
+> the HW in an OS-agnostic fashion, not according to the limitations of
+> any one OS's driver model.
+>
+> It's certainly true that a single logical HW module (represented by a
+> single DT node) can have parts in multiple power domains.
+>
 
-Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
----
+AFAIK a single DT node is supposed to represent a single _physical_ HW 
+module. It all depends on description granularity, though. A physical 
+chip (or IP block) might be further divided into multiple blocks, so I 
+can imagine some of them being in different power domains than another. 
+Still, based on the fact that in Linux we never needed to specify 
+multiple power domains for a device, is this really a real use case?
 
-v2:
- - use mundoreader prefix instead of bq as suggested by Heiko Stuebner
+Anyway, the binding is defined in a way that lets you simply turn the 
+single phandle+specifier into a list of them, if such need ever shows up.
 
- Documentation/devicetree/bindings/arm/rockchip.txt |   10 ++++++++++
- arch/arm/boot/dts/rk3066a-bqcurie2.dts             |    1 +
- arch/arm/boot/dts/rk3188-radxarock.dts             |    1 +
- 3 files changed, 12 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/rockchip.txt
-
-diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
-new file mode 100644
-index 0000000..857f126
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/rockchip.txt
-@@ -0,0 +1,10 @@
-+Rockchip platforms device tree bindings
-+---------------------------------------
-+
-+- bq Curie 2 tablet:
-+    Required root node properties:
-+      - compatible = "mundoreader,bq-curie2", "rockchip,rk3066a";
-+
-+- Radxa Rock board:
-+    Required root node properties:
-+      - compatible = "radxa,rock", "rockchip,rk3188";
-diff --git a/arch/arm/boot/dts/rk3066a-bqcurie2.dts b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-index 035df40..afb3273 100644
---- a/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-+++ b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-@@ -18,6 +18,7 @@
- 
- / {
- 	model = "bq Curie 2";
-+	compatible = "mundoreader,bq-curie2", "rockchip,rk3066a";
- 
- 	memory {
- 		reg = <0x60000000 0x40000000>;
-diff --git a/arch/arm/boot/dts/rk3188-radxarock.dts b/arch/arm/boot/dts/rk3188-radxarock.dts
-index 3ba1968..a5eee55 100644
---- a/arch/arm/boot/dts/rk3188-radxarock.dts
-+++ b/arch/arm/boot/dts/rk3188-radxarock.dts
-@@ -17,6 +17,7 @@
- 
- / {
- 	model = "Radxa Rock";
-+	compatible = "radxa,rock", "rockchip,rk3188";
- 
- 	memory {
- 		reg = <0x60000000 0x80000000>;
--- 
-1.7.10.4
+Best regards,
+Tomasz
