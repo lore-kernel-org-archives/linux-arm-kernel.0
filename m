@@ -1,34 +1,37 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 06 May 2014 13:27:58 +0900
-Subject: [PATCH v2 1/9] ARM: S3C24XX: cpufreq-utils: don't write raw values
- to MPLLCON when using ccf
-In-Reply-To: <1538030.0aVnFA3MgQ@phil>
-References: <2104342.rkElQpXtvM@phil> <535825AB.8060802@cogentembedded.com>
- <535828D7.3080301@gmail.com> <1538030.0aVnFA3MgQ@phil>
-Message-ID: <0e4501cf68e3$8f6612d0$ae323870$@samsung.com>
+Date: Tue, 06 May 2014 13:30:45 +0900
+Subject: [PATCH] ARM: S3C24XX: remove SAMSUNG_CLOCK remnants after ccf
+ conversion
+In-Reply-To: <1615843.xdRuLnoxgD@phil>
+References: <1615843.xdRuLnoxgD@phil>
+Message-ID: <0e4f01cf68e3$f2a63f00$d7f2bd00$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Heiko St?bner wrote:
 > 
-
-[...]
-
-> > Anyway, Heiko, thanks for working on this. I'll try to review rest of
-> > the series soon. (I'm attending the ELC next week, though, so I'm not
-> > sure if I find some time then, though.)
+> This finally removes all remaining SAMSUNG_CLOCK conditional code
+> from s3c24xx architectures.
 > 
-Yeah, this series is really good to us.
-
-> Just as a reminder, there isn't this much to still review, as you
-> Acked/Reviewed most of the series in v1 and only this patch as well as 2
-> and 5
-> still need a review/ack - and the only changes are fixes for your
-> comments ;-)
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+> This is of course meant to go on top of the s3c2410 ccf conversion
 > 
-I think so. Since I will apply this series in this week, if any big
-comments, please let us know.
+>  arch/arm/mach-s3c24xx/Kconfig         |  5 -----
+>  arch/arm/mach-s3c24xx/common.c        | 17 -----------------
+>  arch/arm/mach-s3c24xx/cpufreq-utils.c |  6 ------
+>  arch/arm/mach-s3c24xx/mach-anubis.c   | 27 ---------------------------
+>  arch/arm/mach-s3c24xx/mach-bast.c     | 27 ---------------------------
+>  arch/arm/mach-s3c24xx/mach-osiris.c   | 27 ---------------------------
+>  arch/arm/mach-s3c24xx/mach-rx1950.c   | 14 --------------
+>  arch/arm/mach-s3c24xx/mach-vr1000.c   | 27 ---------------------------
+>  arch/arm/mach-s3c24xx/pm.c            | 12 ------------
+>  9 files changed, 162 deletions(-)
+> 
+At last, we're supporting common clock framework for s3c24xx.
 
-Heiko, thanks for the v2.1 as well.
+Heiko, very thanks for your effort.
+
+Will apply with your previous s3c24xx ccf series.
 
 - Kukjin
