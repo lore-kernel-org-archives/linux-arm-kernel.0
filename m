@@ -1,90 +1,154 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue,  6 May 2014 02:13:57 +0200
-Subject: [PATCH v3 02/20] usb: ehci-orion: Add the optional PHY support
+Date: Tue,  6 May 2014 02:13:56 +0200
+Subject: [PATCH v3 01/20] usb: ehci-orion: Fix clock reference leaking
 In-Reply-To: <1399335255-589-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1399335255-589-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1399335255-589-3-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1399335255-589-2-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit allows to use the PHY provided through the device tree. It
-will be useful for the Armada 375 SoCs. if no PHY is provided then the
-behavior of the driver is unchanged.
+In order to disable the clock while the module was removing, a call to
+devm_clk_get() was made. This was wrong and lead to a leak module
+ref-counts.
 
+In order to have a reference of the clock get, a private structure was
+added using the override mechanism provided by the ehci framework.
+
+The bug was introduced in v3.6, however the ehci framework allowing to
+use the override mechanism have only been introduced in v3.8, so this
+patch won't apply before it.
+
+Fixes: 8c869edaee07c623066266827371235fb9c12e01 ('ARM: Orion: EHCI: Add support for enabling clocks')
+Cc: <stable@vger.kernel.org> # v3.8+
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/usb/host/ehci-orion.c | 25 +++++++++++++++++++++++--
- 1 file changed, 23 insertions(+), 2 deletions(-)
+ drivers/usb/host/ehci-orion.c | 49 +++++++++++++++++++++++++++----------------
+ 1 file changed, 31 insertions(+), 18 deletions(-)
 
 diff --git a/drivers/usb/host/ehci-orion.c b/drivers/usb/host/ehci-orion.c
-index d6c19c37c76b..f6d9eb2e33cd 100644
+index 30d35e5e503a..d6c19c37c76b 100644
 --- a/drivers/usb/host/ehci-orion.c
 +++ b/drivers/usb/host/ehci-orion.c
-@@ -15,6 +15,7 @@
- #include <linux/clk.h>
- #include <linux/platform_data/usb-ehci-orion.h>
- #include <linux/of.h>
-+#include <linux/phy/phy.h>
- #include <linux/of_device.h>
- #include <linux/of_irq.h>
- #include <linux/usb.h>
-@@ -46,6 +47,7 @@
+@@ -42,6 +42,12 @@
  
- struct orion_ehci_hcd {
- 	struct clk *clk;
-+	struct phy *phy;
- };
+ #define DRIVER_DESC "EHCI orion driver"
  
++#define hcd_to_orion_priv(h) ((struct orion_ehci_hcd *)hcd_to_ehci(h)->priv)
++
++struct orion_ehci_hcd {
++	struct clk *clk;
++};
++
  static const char hcd_name[] = "ehci-orion";
-@@ -224,6 +226,18 @@ static int ehci_orion_drv_probe(struct platform_device *pdev)
- 	if (!IS_ERR(priv->clk))
- 		clk_prepare_enable(priv->clk);
  
+ static struct hc_driver __read_mostly ehci_orion_hc_driver;
+@@ -137,6 +143,10 @@ ehci_orion_conf_mbus_windows(struct usb_hcd *hcd,
+ 	}
+ }
+ 
++static const struct ehci_driver_overrides orion_overrides __initdata = {
++	.extra_priv_size =	sizeof(struct orion_ehci_hcd),
++};
 +
-+	priv->phy = devm_phy_get(&pdev->dev, "usb");
-+	if (!IS_ERR(priv->phy)) {
-+		err = phy_init(priv->phy);
-+		if (err)
-+			goto err2;
-+
-+		err = phy_power_on(priv->phy);
-+		if (err)
-+			goto err3;
-+	}
+ static int ehci_orion_drv_probe(struct platform_device *pdev)
+ {
+ 	struct orion_ehci_data *pd = dev_get_platdata(&pdev->dev);
+@@ -144,10 +154,10 @@ static int ehci_orion_drv_probe(struct platform_device *pdev)
+ 	struct resource *res;
+ 	struct usb_hcd *hcd;
+ 	struct ehci_hcd *ehci;
+-	struct clk *clk;
+ 	void __iomem *regs;
+ 	int irq, err;
+ 	enum orion_ehci_phy_ver phy_version;
++	struct orion_ehci_hcd *priv;
+ 
+ 	if (usb_disabled())
+ 		return -ENODEV;
+@@ -190,17 +200,11 @@ static int ehci_orion_drv_probe(struct platform_device *pdev)
+ 		goto err1;
+ 	}
+ 
+-	/* Not all platforms can gate the clock, so it is not
+-	   an error if the clock does not exists. */
+-	clk = devm_clk_get(&pdev->dev, NULL);
+-	if (!IS_ERR(clk))
+-		clk_prepare_enable(clk);
+-
+ 	hcd = usb_create_hcd(&ehci_orion_hc_driver,
+ 			&pdev->dev, dev_name(&pdev->dev));
+ 	if (!hcd) {
+ 		err = -ENOMEM;
+-		goto err2;
++		goto err1;
+ 	}
+ 
+ 	hcd->rsrc_start = res->start;
+@@ -211,6 +215,15 @@ static int ehci_orion_drv_probe(struct platform_device *pdev)
+ 	ehci->caps = hcd->regs + 0x100;
+ 	hcd->has_tt = 1;
+ 
++	priv = hcd_to_orion_priv(hcd);
++	/*
++	 * Not all platforms can gate the clock, so it is not an error if
++	 * the clock does not exists.
++	 */
++	priv->clk = devm_clk_get(&pdev->dev, NULL);
++	if (!IS_ERR(priv->clk))
++		clk_prepare_enable(priv->clk);
 +
  	/*
  	 * (Re-)program MBUS remapping windows if we are asked to.
  	 */
-@@ -253,14 +267,18 @@ static int ehci_orion_drv_probe(struct platform_device *pdev)
+@@ -240,16 +253,16 @@ static int ehci_orion_drv_probe(struct platform_device *pdev)
  
  	err = usb_add_hcd(hcd, irq, IRQF_SHARED);
  	if (err)
--		goto err2;
-+		goto err4;
+-		goto err3;
++		goto err2;
  
  	device_wakeup_enable(hcd->self.controller);
  	return 0;
  
--err2:
-+err4:
- 	usb_put_hcd(hcd);
- 
-+err3:
-+	phy_exit(priv->phy);
+-err3:
+-	usb_put_hcd(hcd);
+ err2:
+-	if (!IS_ERR(clk))
+-		clk_disable_unprepare(clk);
++	usb_put_hcd(hcd);
 +
-+err2:
- 	if (!IS_ERR(priv->clk))
- 		clk_disable_unprepare(priv->clk);
++	if (!IS_ERR(priv->clk))
++		clk_disable_unprepare(priv->clk);
  err1:
-@@ -278,6 +296,9 @@ static int ehci_orion_drv_remove(struct platform_device *pdev)
+ 	dev_err(&pdev->dev, "init %s fail, %d\n",
+ 		dev_name(&pdev->dev), err);
+@@ -260,14 +273,14 @@ err1:
+ static int ehci_orion_drv_remove(struct platform_device *pdev)
+ {
+ 	struct usb_hcd *hcd = platform_get_drvdata(pdev);
+-	struct clk *clk;
++	struct orion_ehci_hcd *priv = hcd_to_orion_priv(hcd);
+ 
  	usb_remove_hcd(hcd);
  	usb_put_hcd(hcd);
  
-+	if (!IS_ERR(priv->phy))
-+		phy_exit(priv->phy);
+-	clk = devm_clk_get(&pdev->dev, NULL);
+-	if (!IS_ERR(clk))
+-		clk_disable_unprepare(clk);
++	if (!IS_ERR(priv->clk))
++		clk_disable_unprepare(priv->clk);
 +
- 	if (!IS_ERR(priv->clk))
- 		clk_disable_unprepare(priv->clk);
+ 	return 0;
+ }
  
+@@ -295,7 +308,7 @@ static int __init ehci_orion_init(void)
+ 
+ 	pr_info("%s: " DRIVER_DESC "\n", hcd_name);
+ 
+-	ehci_init_driver(&ehci_orion_hc_driver, NULL);
++	ehci_init_driver(&ehci_orion_hc_driver, &orion_overrides);
+ 	return platform_driver_register(&ehci_orion_driver);
+ }
+ module_init(ehci_orion_init);
 -- 
 1.8.1.2
