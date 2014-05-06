@@ -1,31 +1,37 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue,  6 May 2014 02:14:05 +0200
-Subject: [PATCH v3 10/20] ARM: mvebu: Add USB3 support for Armada 38x
+Date: Tue,  6 May 2014 02:14:10 +0200
+Subject: [PATCH v3 15/20] ARM: mvebu: Add Device Tree description of USB
+ cluster controller on Armada 375
 In-Reply-To: <1399335255-589-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1399335255-589-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1399335255-589-11-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1399335255-589-16-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add the selection of the config symbol to build the USB3
-support for Armada 38x.
+On Armada 375, the USB cluster allows to control the cluster composed
+of the USB2 and USB3 host controllers.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/mach-mvebu/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/armada-375.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-index 3f73eecbcfb0..7960f218702b 100644
---- a/arch/arm/mach-mvebu/Kconfig
-+++ b/arch/arm/mach-mvebu/Kconfig
-@@ -54,6 +54,7 @@ config MACH_ARMADA_38X
- 	select CPU_V7
- 	select MACH_MVEBU_V7
- 	select PINCTRL_ARMADA_38X
-+	select USB_ARCH_HAS_XHCI
- 	help
- 	  Say 'Y' here if you want your kernel to support boards based
- 	  on the Marvell Armada 380/385 SoC with device tree.
+diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
+index 3877693fb2d8..6724c10a8862 100644
+--- a/arch/arm/boot/dts/armada-375.dtsi
++++ b/arch/arm/boot/dts/armada-375.dtsi
+@@ -320,6 +320,12 @@
+ 				clocks = <&coreclk 0>;
+ 			};
+ 
++			usbcluster: usb-cluster at 18400 {
++				compatible = "marvell,armada-375-usb-cluster";
++				reg = <0x18400 0x4>;
++				#phy-cells = <1>;
++			};
++
+ 			xor at 60800 {
+ 				compatible = "marvell,orion-xor";
+ 				reg = <0x60800 0x100
 -- 
 1.8.1.2
