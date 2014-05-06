@@ -1,47 +1,112 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 6 May 2014 01:58:10 -0700
-Subject: [PATCH] ARM: at91: localize GPIO header
-In-Reply-To: <20140505035609.GA11035@quad.lixom.net>
-References: <1395924553-5387-1-git-send-email-linus.walleij@linaro.org>
- <20140505035609.GA11035@quad.lixom.net>
-Message-ID: <5368A422.2000100@atmel.com>
+From: nikolay.borisov@arm.com (Nikolay Borisov)
+Date: Tue, 6 May 2014 10:02:02 +0100
+Subject: [PATCH v2] ARM: unwinder: Fix handling of 'fp' in thumb2 mode
+In-Reply-To: <CAPoNrtvm18NVj7SKJBs01g2wWggC13Gd2eOoTJOKoOQqQCE7hA@mail.gmail.com>
+References: <1399045056-26751-1-git-send-email-Nikolay.Borisov@arm.com>
+ <CAPoNrtvm18NVj7SKJBs01g2wWggC13Gd2eOoTJOKoOQqQCE7hA@mail.gmail.com>
+Message-ID: <000101cf6909$d8bf46b0$8a3dd410$@borisov@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/05/2014 20:56, Olof Johansson :
-> On Thu, Mar 27, 2014 at 01:49:13PM +0100, Linus Walleij wrote:
->> This moves the <mach/gpio.h> header in the AT91 platform down
->> into the machine directory and removes the reliance on
->> MACH_NEED_GPIO_H from the AT91.
->>
->> This does not move the platform to GENERIC_GPIO but localize
->> the remaining work to be done for this to the mach-at91
->> folder.
->>
->> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->> ---
->> This version is rebased on top of the timex-remove branch in
->> the ARM SoC tree. I have done a few trial compilations with the
->> defconfigs after rebasing but more may still be needed. IIRC
->> one of the board files is now removed from the mainline kernel
->> so there will be some simple merge conflict wherever it gets
->> merged.
->>
->> If you're happy with this I'd suggest applying it directly in
->> the ARM SoC tree.
+Hi, 
+> -----Original Message-----
+> From: Anurag Aggarwal [mailto:anurag19aggarwal at gmail.com]
+> Sent: 03 May 2014 07:57
+> To: Nikolay Borisov
+> Cc: linux-arm-kernel at lists.infradead.org; Dave P Martin; Catalin
+> Marinas
+> Subject: Re: [PATCH v2] ARM: unwinder: Fix handling of 'fp' in thumb2
+> mode
 > 
-> Looks like this one didn't make it for 3.15 given timing. Want to respin for
-> 3.16 to handle the above conflicts and send to Nicolas?
+> Seems good.
+> 
+> I would like to know what kind of testing you have done that for this,
+> Other than that you can add my review statement
+>
 
-I already did it actually no need to worry Linus: It sits in my
-at91-3.16-cleanup branch that I didn't send to arm-soc yet.
+Without this patch if you use the magic sysrq to print backtrace of all
+the running tasks in the system those that are sleeping would not print 
+a backtrace. With the patch this works correctly. Another case where you
+can observe the change is in the invocation of the "ps -Al" which shows
+(among other things) which function the sleeping task is blocked in. 
 
-I'll try to collect all "cleanup" stuff today or tomorrow and send the
-pull-request soon.
-
-Thanks for the heads-up Olof.
-
-Bye,
--- 
-Nicolas Ferre
+> On Fri, May 2, 2014 at 9:07 PM, Nikolay Borisov
+> <Nikolay.Borisov@arm.com> wrote:
+> > The thread_save_fp macro has been defined so that it always reads the
+> fp member
+> > of the cpu_context_save struct. However, in the case of THUMB2 the fp
+> is saved
+> > not in the fp (r11) member but rather in r7.
+> >
+> > This patch changes the way the macro is defined such that FP is read
+> from the
+> > correct place depending on whether we are a THUMB2 kernel or not.
+> This enables
+> > the backtrace in sitaution such as "echo t > /proc/sysrq-trigger" or
+> the
+> > function in which a process sleeping when "ps -Al" is invoked.
+> >
+> > Another place where similar change is requried is when working with
+> pt_reg.
+> > regs->ARM_fp is defined such that r11 is always referenced as the
+> frame pointer,
+> > so the definition of ARM_fp needs to change depending on the type of
+> kernel we
+> > are running.
+> >
+> > Changes since v1:
+> > * Added changes for the pt_reg structure.
+> >
+> > Signed-off-by: Nikolay Borisov <Nikolay.Borisov@arm.com>
+> 
+> Reviewed-by: Anurag Aggarwal <anurag19aggarwal@gmail.com>
+> 
+> >
+> > handle the case when we've got regs present
+> > ---
+> >  arch/arm/include/asm/thread_info.h | 6 ++++++
+> >  arch/arm/include/uapi/asm/ptrace.h | 4 ++++
+> >  2 files changed, 10 insertions(+)
+> >
+> > diff --git a/arch/arm/include/asm/thread_info.h
+> b/arch/arm/include/asm/thread_info.h
+> > index f989d7c..e4e4208 100644
+> > --- a/arch/arm/include/asm/thread_info.h
+> > +++ b/arch/arm/include/asm/thread_info.h
+> > @@ -114,8 +114,14 @@ static inline struct thread_info
+> *current_thread_info(void)
+> >         ((unsigned long)(task_thread_info(tsk)->cpu_context.pc))
+> >  #define thread_saved_sp(tsk)   \
+> >         ((unsigned long)(task_thread_info(tsk)->cpu_context.sp))
+> > +
+> > +#ifndef CONFIG_THUMB2_KERNEL
+> >  #define thread_saved_fp(tsk)   \
+> >         ((unsigned long)(task_thread_info(tsk)->cpu_context.fp))
+> > +#else
+> > +#define thread_saved_fp(tsk)   \
+> > +       ((unsigned long)(task_thread_info(tsk)->cpu_context.r7))
+> > +#endif
+> >
+> >  extern void crunch_task_disable(struct thread_info *);
+> >  extern void crunch_task_copy(struct thread_info *, void *);
+> > diff --git a/arch/arm/include/uapi/asm/ptrace.h
+> b/arch/arm/include/uapi/asm/ptrace.h
+> > index 5af0ed1..92e1bae 100644
+> > --- a/arch/arm/include/uapi/asm/ptrace.h
+> > +++ b/arch/arm/include/uapi/asm/ptrace.h
+> > @@ -131,7 +131,11 @@ struct pt_regs {
+> >  #define ARM_lr         uregs[14]
+> >  #define ARM_sp         uregs[13]
+> >  #define ARM_ip         uregs[12]
+> > +#ifndef CONFIG_THUMB2_KERNEL
+> >  #define ARM_fp         uregs[11]
+> > +#else
+> > +#define ARM_fp         uregs[7]
+> > +#endif
+> >  #define ARM_r10                uregs[10]
+> >  #define ARM_r9         uregs[9]
+> >  #define ARM_r8         uregs[8]
+> > --
+> > 1.8.1.5
+> >
+> >
