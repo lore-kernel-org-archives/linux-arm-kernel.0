@@ -1,55 +1,44 @@
-From: vincent.stehle@laposte.net (=?UTF-8?q?Vincent=20Stehl=C3=A9?=)
-Date: Tue,  6 May 2014 22:23:02 +0200
-Subject: [PATCH linux-next] ARM: mvebu: Fix pmsu compilation when ARMv6 is
- selected
-Message-ID: <1399407782-29091-1-git-send-email-vincent.stehle@laposte.net>
+From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
+Date: Tue, 06 May 2014 17:24:08 -0300
+Subject: [PATCH v10 01/15] clk: sunxi: factors: automatic reparenting
+ support
+In-Reply-To: <20140506185131.GI9464@lukather>
+References: <1399046249-19472-1-git-send-email-hdegoede@redhat.com>
+ <1399046249-19472-2-git-send-email-hdegoede@redhat.com>
+ <20140506185131.GI9464@lukather>
+Message-ID: <536944E8.5060300@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When compiling for multiplatform for both ARMv6 and ARMv7, the default compiler
-flags are for ARMv6, and we will get:
-
-  /tmp/ccwDEzd0.s: Assembler messages:
-  /tmp/ccwDEzd0.s:639: Error: selected processor does not support ARM mode `isb '
-  /tmp/ccwDEzd0.s:645: Error: selected processor does not support ARM mode `isb '
-  /tmp/ccwDEzd0.s:646: Error: selected processor does not support ARM mode `dsb '
-  /tmp/ccwDEzd0.s:695: Error: selected processor does not support ARM mode `isb '
-  make[1]: *** [arch/arm/mach-mvebu/pmsu.o] Error 1
-
-Fix this in a similar manner than done previously in commit
-72533b77d30c2be02672e26b5dde1263d7b4c2be, by specifying ARMv7 flags for pmsu.o.
-
-Signed-off-by: Vincent Stehl? <vincent.stehle@laposte.net>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Gregory Clement <gregory.clement@free-electrons.com>
-Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Cc: Russell King <linux@arm.linux.org.uk>
----
-
 Hi,
 
-This build issue can be seen with e.g. Linux next-20140506, ARCH=arm and
-allmodconfig.
+El 06/05/14 15:51, Maxime Ripard escribi?:
+> Hi Emilio,
+>
+> On Fri, May 02, 2014 at 05:57:15PM +0200, Hans de Goede wrote:
+>> From: Emilio L?pez <emilio@elopez.com.ar>
+>>
+>> This commit implements .determine_rate, so that our factor clocks can be
+>> reparented when needed.
+>>
+>> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>
+> Any chance you merge this? Since it's pretty consensual, needed by
+> other drivers, and that you are the author, I can it can go in.
 
-Best regards,
+I merged it on my tree for Mike on April 22nd
 
-V.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/249259.html
 
- arch/arm/mach-mvebu/Makefile | 1 +
- 1 file changed, 1 insertion(+)
+It seems Mike has taken another copy for 3.16 though
 
-diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
-index 854b72a..2ecb828 100644
---- a/arch/arm/mach-mvebu/Makefile
-+++ b/arch/arm/mach-mvebu/Makefile
-@@ -2,6 +2,7 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
- 	-I$(srctree)/arch/arm/plat-orion/include
- 
- AFLAGS_coherency_ll.o		:= -Wa,-march=armv7-a
-+CFLAGS_pmsu.o			:= -march=armv7-a
- 
- obj-y				 += system-controller.o mvebu-soc-id.o
- 
--- 
-1.9.2
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/253661.html
+
+Mike, do you want to drop the patches and have me take both of them, or 
+would you prefer it if I dropped my copy?
+
+Cheers,
+
+Emilio
