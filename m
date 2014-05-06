@@ -1,73 +1,86 @@
-From: detheridge@ti.com (Darren Etheridge)
-Date: Tue, 6 May 2014 14:58:04 -0500
-Subject: [PATCH V5 1/3] arm: dts: dra7: Add crossbar device binding
-In-Reply-To: <53693C02.2090305@ti.com>
-References: <1399384579-25620-1-git-send-email-r.sricharan@ti.com>
- <1399384579-25620-2-git-send-email-r.sricharan@ti.com>
- <20140506194055.GA6962@saruman.home> <53693C02.2090305@ti.com>
-Message-ID: <20140506195804.GD2626@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 6 May 2014 22:00:29 +0200
+Subject: mx6qsabresd hangs on linux-next
+In-Reply-To: <5369081D.5030400@st.com>
+References: <CAOMZO5DMEqs=zzNGqgKjK7wTJdiNPgEqxsX=TtqKrnpLMzpbDw@mail.gmail.com>
+ <20140506141310.GA2794@dragon>
+ <CAOMZO5DH5d_L-deVu=XmBo9ekq+-g704p7cyayLvp=43bnEccQ@mail.gmail.com>
+ <CAOMZO5Dx0JMj3dZ7BSgaYSZZ=ZKRqQHEYWj5sb6z_9jc+cpsEw@mail.gmail.com>
+ <5369081D.5030400@st.com>
+Message-ID: <20140506200029.GD5858@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nishanth Menon <nm@ti.com> wrote on Tue [2014-May-06 14:46:10 -0500]:
-> On 05/06/2014 02:40 PM, Felipe Balbi wrote:
-> > On Tue, May 06, 2014 at 07:26:17PM +0530, Sricharan R wrote:
-> >> This adds the irq crossbar device node.
-> >>
-> >> There is a IRQ crossbar device in the soc, which
-> >> maps the irq requests from the peripherals to the
-> >> mpu interrupt controller's inputs. The Peripheral irq
-> >> requests are connected to only one crossbar
-> >> input and the output of the crossbar is connected to only one
-> >> controller's input line. The crossbar device is used to map
-> >> a peripheral input to a free mpu's interrupt controller line.
-> >>
-> >> Cc: Benoit Cousson <bcousson@baylibre.com>
-> >> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> >> Cc: Rajendra Nayak <rnayak@ti.com>
-> >> Cc: Tony Lindgren <tony@atomide.com>
-> >> Signed-off-by: Sricharan R <r.sricharan@ti.com>
-> >> Signed-off-by: Nishanth Menon <nm@ti.com>
-> >> ---
-> >> [V5] Rebased on top of 3.15-rc4 and corrected the
-> >>      irqs-reserved list
-> >>
-> >>  arch/arm/boot/dts/dra7.dtsi |    8 ++++++++
-> >>  1 file changed, 8 insertions(+)
-> >>
-> >> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-> >> index 149b550..0274a86 100644
-> >> --- a/arch/arm/boot/dts/dra7.dtsi
-> >> +++ b/arch/arm/boot/dts/dra7.dtsi
-> >> @@ -790,6 +790,14 @@
-> >>  			status = "disabled";
-> >>  		};
-> >>  	};
-> >> +
-> >> +	crossbar_mpu: crossbar at 4a020000 {
-> > 
-> > shouldn't this be "status = disabled"; so that boards enable this
-> > on-demand ??
-> > 
-> It cannot be and does not need to be. crossbar is an SoC feature. by
-> defining crossbar, the IRQ numbers we provide in DTS now becomes
-> crossbar numbers which get mapped to GIC interrupt numbers dynamically.
+On Tue, May 06, 2014 at 06:04:45PM +0200, Maxime Coquelin wrote:
+> Hi Fabio,
 > 
-> further crossbar is not a board feature. it is as ingrained in DRA7
-> behavior as GIC is. we are fortunate that we have some default mapping
-> of crossbar that allows the current peripherals to work, with this
-> support, we dont have to depend any longer on "we are lucky that is
-> mapped".
+> On 05/06/2014 05:49 PM, Fabio Estevam wrote:
+> >On Tue, May 6, 2014 at 12:36 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> >
+> >>Indeed, if I revert:
+> >>
+> >>commit e7489693b3a853ab6dfad52f7e6af553ae8d3f28
+> >>Author: Maxime COQUELIN <maxime.coquelin@st.com>
+> >>Date:   Wed Jan 29 17:24:08 2014 +0100
+> >>
+> >>     clk: divider: Optimize clk_divider_bestdiv loop
+> >>
+> >>     Currently, the for-loop used to try all the different dividers to find the
+> >>     one that best fit tries all the values from 1 to max_div,
+> >>incrementing by one.
+> >>     In case of power-of-two, or table based divider, the loop isn't optimal.
+> >>
+> >>     Instead of incrementing by one, this patch provides directly the
+> >>next divider.
+> >>
+> >>     Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
+> >>     Signed-off-by: Mike Turquette <mturquette@linaro.org>
+> >>
+> >>Then the board does not hang.
+> >
+> >Isn't the increment of i missing?
 > 
-> That said, in hindsight, patch #1 and 2 should be squashed IMHO. else
-> we have a bisectability problem here.
+> i is incremented in _next_div():
 > 
-Yes the bisectability problem is completely true - I was just testing
-that as your email came in.  In fact I think all three patches need to
-be squashed into one, I can't boot the dra7-EVM unless I have all three
-patches applied.
+> +static int _next_div(struct clk_divider *divider, int div)
+> +{
+> +	div++;
+> +
+> +	if (divider->flags & CLK_DIVIDER_POWER_OF_TWO)
+> +		return __roundup_pow_of_two(div);
+> +	if (divider->table)
+> +		return _round_up_table(divider->table, div);
+> +
+> +	return div;
+> +}
 
-With all three patches applied, basic boot is looking good.  I will
-reply with my tested-by once I have got VIP, etc up and running.
+This cannot work. _round_up_table is implemented like this:
 
-Darren
+static int _round_up_table(const struct clk_div_table *table, int div)
+{
+	const struct clk_div_table *clkt;
+	int up = _get_table_maxdiv(table);
+
+	for (clkt = table; clkt->div; clkt++) {
+		if (clkt->div == div)
+			return clkt->div;
+		...
+	}
+	...
+}
+
+Here when a table entry matches the input div this function will return
+exactly the input div. This means _next_div() will always return the
+same value and clk_divider_bestdiv() has an infinite loop:
+
+	for (i = 1; i <= maxdiv; i = _next_div(divider, i)) {
+		...
+	}
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
