@@ -1,50 +1,58 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 06 May 2014 19:49:25 +0200
-Subject: [PATCH v4 14/15] clk: exynos5420: add misc clocks
-In-Reply-To: <1399393610-23394-15-git-send-email-shaik.ameer@samsung.com>
-References: <1399393610-23394-1-git-send-email-shaik.ameer@samsung.com>
- <1399393610-23394-15-git-send-email-shaik.ameer@samsung.com>
-Message-ID: <536920A5.1090502@gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 6 May 2014 19:52:47 +0200
+Subject: [PATCH v3 1/3] base: power: Add generic OF-based power domain
+ look-up
+In-Reply-To: <CAPDyKFpvtRpgg-Ohv2Yi--_5mnp3ghpj7_4xyM7SjJvYCFzS6Q@mail.gmail.com>
+References: <1398271618-28932-1-git-send-email-t.figa@samsung.com>
+ <1398271618-28932-2-git-send-email-t.figa@samsung.com>
+ <CAPDyKFpvtRpgg-Ohv2Yi--_5mnp3ghpj7_4xyM7SjJvYCFzS6Q@mail.gmail.com>
+Message-ID: <CAPDyKFqtW1pV3xv1E8fhtPS99eVezGJqKq_JM4Mrq2ewJyTpog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shaik,
+On 24 April 2014 11:40, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 23 April 2014 18:46, Tomasz Figa <t.figa@samsung.com> wrote:
+>> This patch introduces generic code to perform power domain look-up using
+>> device tree and automatically bind devices to their power domains.
+>> Generic device tree binding is introduced to specify power domains of
+>> devices in their device tree nodes.
+>>
+>> Backwards compatibility with legacy Samsung-specific power domain
+>> bindings is provided, but for now the new code is not compiled when
+>> CONFIG_ARCH_EXYNOS is selected to avoid collision with legacy code. This
+>> will change as soon as Exynos power domain code gets converted to use
+>> the generic framework in further patch.
+>>
+>> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+>> Reviewed-by: Mark Brown <broonie@linaro.org>
+>> Reviewed-by: Kevin Hilman <khilman@linaro.org>
+>> Reviewed-by: Philipp Zabel <philipp.zabel@gmail.com>
+>> [on i.MX6 GK802]
+>> Tested-by: Philipp Zabel <philipp.zabel@gmail.com>
 
-On 06.05.2014 18:26, Shaik Ameer Basha wrote:
-> This patch adds some missing miscellaneous clocks specific
-> to exynos5420.
->
-> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
-> Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
-> ---
->   drivers/clk/samsung/clk-exynos5420.c   |   14 +++++++++++---
->   include/dt-bindings/clock/exynos5420.h |    2 ++
->   2 files changed, 13 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
-> index e0e749d..e69e820 100644
-> --- a/drivers/clk/samsung/clk-exynos5420.c
-> +++ b/drivers/clk/samsung/clk-exynos5420.c
-> @@ -273,7 +273,8 @@ PNAME(mout_group5_p) = {"mout_sclk_vpll", "mout_sclk_dpll"};
->
->   PNAME(mout_fimd1_final_p) = {"mout_fimd1", "mout_fimd1_opt"};
->   PNAME(mout_sw_aclk66_p)	= {"dout_aclk66", "mout_sclk_spll"};
-> -PNAME(mout_user_aclk66_peric_p)	= { "fin_pll", "mout_sw_aclk66" };
-> +PNAME(mout_user_aclk66_peric_p)	= { "fin_pll", "mout_sw_aclk66"};
-> +PNAME(mout_user_pclk66_gpio_p) = {"mout_sw_aclk66", "ffactor_sw_aclk66"};
->
->   PNAME(mout_sw_aclk200_fsys_p) = {"dout_aclk200_fsys", "mout_sclk_spll"};
->   PNAME(mout_sw_pclk200_fsys_p) = {"dout_pclk200_fsys", "mout_sclk_spll"};
-> @@ -372,10 +373,13 @@ static struct samsung_fixed_rate_clock exynos5420_fixed_rate_clks[] __initdata =
->   };
->
->   static struct samsung_fixed_factor_clock exynos5420_fixed_factor_clks[] __initdata = {
-> -	FFACTOR(0, "sclk_hsic_12m", "fin_pll", 1, 2, 0),
-> +	FFACTOR(0, "ffactor_hsic_12m", "fin_pll", 1, 2, 0),
-> +	FFACTOR(0, "ffactor_sw_aclk66", "mout_sw_aclk66", 1, 2, 0),
+Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-Is the "ffactor_" prefix also present in the datasheet? If not, it 
-should be removed from clock names as well.
+I also implemented some test-support for genpd for a ux500 SOC as well
+- tested passed successfully. :-)
 
-Best regards,
-Tomasz
+[snip]
+
+>> +
+>> +#ifdef CONFIG_PM_GENERIC_DOMAINS_OF
+>
+> I remember we discussed this earlier, but I don't think we should add
+> another Kconfig for this. CONFIG_OF should be enough.
+>
+> I realize that we need to handle "Samsung-specific bindings", to not
+> break the Exynos pm domain. Maybe adding the parsing of them into the
+> generic power domain in the same patch as when we switch Exynos to the
+> new API would do the trick?
+
+I realized that there already exists CONFIG_PM_GENERIC_DOMAINS_SLEEP
+and CONFIG_PM_GENERIC_DOMAINS_RUNTIME, which serves similar purpose as
+CONFIG_PM_GENERIC_DOMAINS_OF would.
+
+So, let's ignore my previous comment and move on.
+
+Kind regards
+Ulf Hansson
