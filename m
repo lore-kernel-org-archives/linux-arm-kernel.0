@@ -1,104 +1,51 @@
-From: arunks.linux@gmail.com (arunks.linux at gmail.com)
-Date: Tue,  6 May 2014 21:25:07 +0530
-Subject: arm64: Fix machine_shutdown() definition
-Message-ID: <1399391708-13442-1-git-send-email-arunks.linux@gmail.com>
+From: jean.pihet@linaro.org (Jean Pihet)
+Date: Tue,  6 May 2014 17:55:30 +0200
+Subject: [PATCH 0/3] perf tools: Add libdw DWARF post unwind support for ARM64
+Message-ID: <1399391733-11927-1-git-send-email-jean.pihet@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arun KS <arun.linux@gmail.com>
+Adding libdw DWARF post unwind support, which is part
+of elfutils-devel/libdw-dev package from version 0.158.
 
-machine_shutdown() is a hook for kexec. Add a comment saying so, since
-it isn't obvious from the function name.
+Also includes the test suite for dwarf unwinding, by adding the
+arch specific test code and the perf_regs_load function.
 
-Halt, power-off, and restart have different requirements re: stopping
-secondary CPUs than kexec has. The former simply require the secondary
-CPUs to be quiesced somehow, whereas kexec requires them to be
-completely non-operational, so that no matter where the kexec target
-images are written in RAM, they won't influence operation of the
-secondary CPUS,which could happen if the CPUs were still executing some
-kind of pin loop. To this end, modify machine_halt, power_off, and
-restart to call smp_send_stop() directly, rather than calling
-machine_shutdown().
+This series depends on the following kernel patches series:
+- AARCH64 unwinding support [1]. Already mainlined.
+- ARM libdw integration [2],
+and on the changes from the branch for:
+- libdw AARCH64 unwinding support [3].
 
-In machine_shutdown(), replace the call to smp_send_stop() with a call
-to disable_nonboot_cpus(). This completely disables all but one CPU,
-thus satisfying the kexec requirements a couple paragraphs above.
+[1] http://www.spinics.net/lists/arm-kernel/msg304483.html
+[2] https://lkml.org/lkml/2014/5/6/366
+[3] https://git.fedorahosted.org/cgit/elfutils.git/log/?h=mjw/aarch64-unwind
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
-Signed-off-by: Arun KS <getarunks@gmail.com>
-Signed-off-by: Arun KS <arunks.linux@gmail.com>
+ToDo: investigate the libdw unwinding problem with compat binaries (i.e.
+ARMv7 binaries running on ARMv8). Since this functionality works ok with
+libunwind, the problem should be in libdw compat support [3].
+
+
+Jean Pihet (3):
+  perf tests: Introduce perf_regs_load function on ARM64
+  perf tests: Add dwarf unwind test on ARM64
+  perf tools: Add libdw DWARF post unwind support for ARM64
+
+ tools/perf/Makefile.perf                   |  2 +-
+ tools/perf/arch/arm64/Makefile             |  7 ++++
+ tools/perf/arch/arm64/include/perf_regs.h  |  5 +++
+ tools/perf/arch/arm64/tests/dwarf-unwind.c | 59 ++++++++++++++++++++++++++++++
+ tools/perf/arch/arm64/tests/regs_load.S    | 39 ++++++++++++++++++++
+ tools/perf/arch/arm64/util/unwind-libdw.c  | 53 +++++++++++++++++++++++++++
+ tools/perf/tests/builtin-test.c            |  3 +-
+ tools/perf/tests/tests.h                   |  3 +-
+ 8 files changed, 168 insertions(+), 3 deletions(-)
+ create mode 100644 tools/perf/arch/arm64/tests/dwarf-unwind.c
+ create mode 100644 tools/perf/arch/arm64/tests/regs_load.S
+ create mode 100644 tools/perf/arch/arm64/util/unwind-libdw.c
+
 ---
- arch/arm64/kernel/process.c |   41 +++++++++++++++++++++++++++++++++++------
- 1 files changed, 35 insertions(+), 6 deletions(-)
+Rebased on the latest jolsa/perf/core
 
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index 6391485..2d43614 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -113,29 +113,58 @@ void arch_cpu_idle_dead(void)
- }
- #endif
- 
-+/*
-+ * Called by kexec, immediately prior to machine_kexec().
-+ *
-+ * This must completely disable all secondary CPUs; simply causing those CPUs
-+ * to execute e.g. a RAM-based pin loop is not sufficient. This allows the
-+ * kexec'd kernel to use any and all RAM as it sees fit, without having to
-+ * avoid any code or data used by any SW CPU pin loop. The CPU hotplug
-+ * functionality embodied in disable_nonboot_cpus() to achieve this.
-+ */
- void machine_shutdown(void)
- {
--#ifdef CONFIG_SMP
--	smp_send_stop();
--#endif
-+	disable_nonboot_cpus();
- }
- 
-+/*
-+ * Halting simply requires that the secondary CPUs stop performing any
-+ * activity (executing tasks, handling interrupts). smp_send_stop()
-+ * achieves this.
-+ */
- void machine_halt(void)
- {
--	machine_shutdown();
-+	smp_send_stop();
- 	while (1);
- }
- 
-+/*
-+ * Power-off simply requires that the secondary CPUs stop performing any
-+ * activity (executing tasks, handling interrupts). smp_send_stop()
-+ * achieves this. When the system power is turned off, it will take all CPUs
-+ * with it.
-+ */
- void machine_power_off(void)
- {
--	machine_shutdown();
-+	smp_send_stop();
- 	if (pm_power_off)
- 		pm_power_off();
- }
- 
-+/*
-+ * Restart requires that the secondary CPUs stop performing any activity
-+ * while the primary CPU resets the system. Systems with a single CPU can
-+ * use soft_restart() as their machine descriptor's .restart hook, since that
-+ * will cause the only available CPU to reset. Systems with multiple CPUs must
-+ * provide a HW restart implementation, to ensure that all CPUs reset at once.
-+ * This is required so that any code running after reset on the primary CPU
-+ * doesn't have to co-ordinate with other CPUs to ensure they aren't still
-+ * executing pre-reset code, and using RAM that the primary CPU's code wishes
-+ * to use. Implementing such co-ordination would be essentially impossible.
-+ */
- void machine_restart(char *cmd)
- {
--	machine_shutdown();
-+	smp_send_stop();
- 
- 	/* Disable interrupts first */
- 	local_irq_disable();
 -- 
-1.7.6
+1.7.11.7
