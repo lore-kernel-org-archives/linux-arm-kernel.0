@@ -1,57 +1,65 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 06 May 2014 10:26:09 -0600
-Subject: [PATCH v3 1/3] base: power: Add generic OF-based power domain
- look-up
-In-Reply-To: <CAPDyKFoGOcScsaGWkw9bVh=gpGTApRK48AczaMiSmLah+YOSXQ@mail.gmail.com>
-References: <1398271618-28932-1-git-send-email-t.figa@samsung.com>	<1398271618-28932-2-git-send-email-t.figa@samsung.com>	<535E9163.3070305@wwwdotorg.org>
- <CAPDyKFoGOcScsaGWkw9bVh=gpGTApRK48AczaMiSmLah+YOSXQ@mail.gmail.com>
-Message-ID: <53690D21.8080807@wwwdotorg.org>
+From: shaik.ameer@samsung.com (Shaik Ameer Basha)
+Date: Tue, 06 May 2014 21:56:35 +0530
+Subject: [PATCH v4 00/15] exynos5420: clock file cleanup
+Message-ID: <1399393610-23394-1-git-send-email-shaik.ameer@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/06/2014 02:22 AM, Ulf Hansson wrote:
-> On 28 April 2014 19:35, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 04/23/2014 10:46 AM, Tomasz Figa wrote:
->>> This patch introduces generic code to perform power domain look-up using
->>> device tree and automatically bind devices to their power domains.
->>> Generic device tree binding is introduced to specify power domains of
->>> devices in their device tree nodes.
->>>
->>> Backwards compatibility with legacy Samsung-specific power domain
->>> bindings is provided, but for now the new code is not compiled when
->>> CONFIG_ARCH_EXYNOS is selected to avoid collision with legacy code. This
->>> will change as soon as Exynos power domain code gets converted to use
->>> the generic framework in further patch.
->>
->>> diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
->>
->>> +==Power domain consumers==
->>> +
->>> +Required properties:
->>> + - power-domain : A phandle and power domain specifier as defined by bindings
->>> +                  of power controller specified by phandle.
->>
->> It seems quite likely that a single logical device could have components
->> in multiple power domains. Consider an HDMI controller with different
->> power domains for the HDMI core, CEC communication, DDC/I2C
->> communication, and the I/O pads, with no clear separation between those
->> two components of the module (no separate register spaces, but the
->> bits/registers are interleaved all together).
->>
->> As such, I think that rather than a "power-domain" property, we need a
->> pair of "power-domains", and "power-domain-names" properties, and
->> preferably with mandatory usage of name-based lookups, rather than
->> allowing a random mix of name-based and index-based lookups like we have
->> with some existing resource bindings.
-> 
-> Each struct device have only one dev_pm_domain pointer, thus a device
-> are not able to reside in more than one power domain.
-> 
-> Therefore I doubt this will be very useful, unless I missed your point. :-)
+Many changes/fixes have been identified for clock file for exynos5420.
+These include correct parents, bit fields, new clocks etc. Existing
+files needs some correction in terms of names of the clock and
+indentation. These issues are addressed in this patch series.
 
-A struct device is a Linux-internal concept. DT is supposed to represent
-the HW in an OS-agnostic fashion, not according to the limitations of
-any one OS's driver model.
+This patch series is rebased on,
+git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git:3.15-rc3
 
-It's certainly true that a single logical HW module (represented by a
-single DT node) can have parts in multiple power domains.
+This patch is also dependent on the following patch.
+clk: exynos5420: Add clock IDs needed by GPU
+    -- http://www.spinics.net/lists/arm-kernel/msg326461.html
+
+This patch series is tested on Exynos5420 based peach-pit board.
+[PATCH v4 0/2] Add peach-pit board support
+
+Changes since v3:
+-----------------
+Addressed review comments from Tomasz Figa and Alim Akhtar
+Some of the changes includes,
+1] Adding clock IDs for all the added gate clocks.
+2] Followed bit ordering while defining new clocks.
+3] Adding SET_RATE_PARENT flag for all the clocks having
+   dividers as parents.
+
+Changes since v2:
+-----------------
+1] Addressed review comments from Gerhard Sittig and Tomasz Figa.
+
+Changes since v1:
+-----------------
+1] Addressed review comments from Tomasz Figa.
+    http://www.spinics.net/lists/devicetree/msg16759.html
+    http://www.spinics.net/lists/devicetree/msg16760.html
+
+Shaik Ameer Basha (15):
+  clk: exynos5420: Rename mux parent arrays
+  clk: exynos5420: add clocks for ISP block
+  clk: exynos5420: update clocks for GSCL and MSCL blocks
+  clk: exynos5420: fix parent clocks for mscl sysmmu
+  clk: exynos5420: update clocks for G2D and G3D blocks
+  clk: exynos5420: update clocks for DISP1 block
+  clk: exynos5420: update clocks for PERIC block
+  clk: exynos5420: update clocks for PERIS and GEN blocks
+  clk: exynos5420: clk: exynos5420: update clocks for WCORE block
+  clk: exynos5420: update clocks for FSYS and FSYS2 blocks
+  clk: exynos5420: correct sysmmu-mfc parent clocks
+  clk: exynos5420: fix register offset for sclk_bpll
+  clk: exynos5420: update clocks for MAU Block
+  clk: exynos5420: add misc clocks
+  clk: exynos5420: add more registers to restore list
+
+ arch/arm/boot/dts/exynos5420.dtsi      |   14 +-
+ drivers/clk/samsung/clk-exynos5420.c   |  876 ++++++++++++++++++++------------
+ include/dt-bindings/clock/exynos5420.h |   39 +-
+ 3 files changed, 597 insertions(+), 332 deletions(-)
+
+-- 
+1.7.9.5
