@@ -1,70 +1,68 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 6 May 2014 15:14:08 +0100
-Subject: [PATCH] arm64: Introduce execute-only page access permissions
-In-Reply-To: <20140502180706.GB14645@arm.com>
-References: <1399045792-5490-1-git-send-email-catalin.marinas@arm.com>
- <20140502170027.GE20642@arm.com> <20140502171336.GA5341@arm.com>
- <20140502180706.GB14645@arm.com>
-Message-ID: <20140506141408.GC23957@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 6 May 2014 07:26:07 -0700
+Subject: [RFC 2/4] ARM: dts: Add ctrl-core DT node for DRA7
+In-Reply-To: <53687198.60405@ti.com>
+References: <1397654063-8055-1-git-send-email-archit@ti.com>
+ <1397654063-8055-2-git-send-email-archit@ti.com>
+ <20140418171854.GJ5354@atomide.com> <5354A970.8040605@ti.com>
+ <20140421151034.GA23945@atomide.com> <53687198.60405@ti.com>
+Message-ID: <20140506142606.GA18474@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 02, 2014 at 07:07:07PM +0100, Will Deacon wrote:
-> On Fri, May 02, 2014 at 06:13:37PM +0100, Catalin Marinas wrote:
-> > On Fri, May 02, 2014 at 06:00:28PM +0100, Will Deacon wrote:
-> > > On Fri, May 02, 2014 at 04:49:52PM +0100, Catalin Marinas wrote:
-> > > > The ARMv8 architecture allows execute-only user permissions by clearing
-> > > > the PTE_UXN and PTE_USER bits. The kernel, however, can still access
-> > > > such page.
-> > > > 
-> > > > This patch changes the arm64 __P100 and __S100 protection_map[] macros
-> > > > to the new __PAGE_EXECONLY attributes. A side effect is that
-> > > > pte_valid_user() no longer triggers for __PAGE_EXECONLY since PTE_USER
-> > > > isn't set. To work around this, the check is done on the PTE_NG bit via
-> > > > the pte_valid_ng() macro. VM_READ is also checked now for page faults.
-> > > 
-> > > How does this interact with things like ptrace and pipes? Can I get the
-> > > kernel to read my text for me?
-> > 
-> > access_process_vm() would work fine since this is done using the kernel
-> > linear mapping (and get_user_pages). Also, if you get_user etc. it would
-> > still work since LDR/STR in EL1 mode would not be restricted (only
-> > LDRT/STRT but we don't use them).
+* Archit Taneja <archit@ti.com> [140505 22:24]:
+> Hi,
 > 
-> Depends on how you define `work fine'!
-
-My definition of "working fine" is that they are not affected ;).
-
+> On Monday 21 April 2014 08:40 PM, Tony Lindgren wrote:
+> >* Archit Taneja <archit@ti.com> [140420 22:16]:
+> >>Hi,
+> >>
+> >>On Friday 18 April 2014 10:48 PM, Tony Lindgren wrote:
+> >>>* Archit Taneja <archit@ti.com> [140416 06:20]:
+> >>>>Add DT node for the ctrl-core sub module of the DRA7 control module. We map the
+> >>>>CTRL_MODULE_CORE address region up to 0x4a002d60, this region contains register
+> >>>>fields which configure clocks. The remainder of the registers are related to
+> >>>>pad configurations or cross-bar configurations, and therefore aren't mapped.
+> >>>
+> >>>Can you please check if this can just use the existing
+> >>>regmap syscon mapping:
+> >>>
+> >>>syscon = <&dra7_ctrl_general>;
+> >>>
+> >>>See how the drivers/regulator/pbias-regulator.c is using the
+> >>>syscon to initialize a regulator and then omap_hsmmc.c just does
+> >>>the standard regulator calls.
+> >>
+> >>The thing is that this bit needs to be set before the the DSS hwmods are
+> >>reset, and that happens very early. If we don't do this, DSS won't reset
+> >>properly, and not get back to an idle state.
+> >>
+> >>I am not sure where I can configure the syscon register early enough that it
+> >>happens before the hwmods are reset. With a syscon mapping, I guess we would
+> >>access the register when the DSS driver is probed. But that's too late for
+> >>us.
+> >>
+> >>Ideally, it would be much better to have a syscon mapping. Do you have any
+> >>suggestions how this can be achieved very early in boot?
+> >
+> >It's best to move the reset and initialization of DSS happen later. I believe
+> >we already are resetting only some of the hwmods early on.
+> >
 > 
-> > But note that this is only for pages explicitly marked PROT_EXEC only.
-> > Standard user apps just use r-x mappings, so not affected.
+> I looked at this in some more detail. With the current hwmod
+> flags(HWMOD_INIT_NO_RESET/NO_IDLE), we still try to enable the IP, it's just
+> the reset part(ocp reset/custom reset and sysc register) or the disable part
+> that is skipped. hwmod still tries to enable the IP.
 > 
-> Ok, but it does mean that any task being subjected to --x permissions can
-> trivially read from that mapping via a syscall, so this patch only makes
-> sense in the context of something like seccomp, where you additionally
-> restrict the set of syscalls available to the target.
-
-Yes. For copy_from_user etc. we could (with a specific config option)
-use LDRT/STRT and some pointer indirection changed by set_fs() but I
-wouldn't bother for now.
-
-> > > Also: do we really want to differ from x86 here?
-> > 
-> > x86 has a hardware limitation IIUC, same as ARMv7. This was a request
-> > from security people and they claim it's a feature they would like
-> > (apparently on Chrome OS). Of course, they have to adapt their tools/JIT
-> > to avoid literal pools on such mappings but there is ongoing work
-> > already.
-> > 
-> > We could make it configurable, though assume that it doesn't break any
-> > user ABI (so far OK but it needs more testing), we could make it the
-> > default.
+> This again results in the same issue.
 > 
-> Why not make it depend on SECCOMP or AUDIT? I don't think it's at all
-> useful without them.
+> One thing which wasn't clear was that why do we enable a hwmod in the first
+> place, if we know that we are going to skip reset?
 
-That's potentially a user ABI change, so we should make sure we spot any
-abuse of the --x permission independent of the kernel config options.
+Probably to configure the idle bits. In general, we should configure the
+modules lazily as the driver probes as requested, and then idle the
+unused modules with a late_initcall.
 
--- 
-Catalin
+Regards,
+
+Tony
