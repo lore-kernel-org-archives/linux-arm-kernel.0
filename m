@@ -1,117 +1,81 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 5 May 2014 17:51:39 -0500
-Subject: [linux-sunxi] Re: [PATCH v5 8/8] ARM: sun7i/sun4i: dt: Add
- AXP209 support to various boards
-In-Reply-To: <CAOQ7t2Z6rLAMGXocPNcKgOUp9iy6XZkh4O6jThPkdm5M6UMGtw@mail.gmail.com>
-References: <1398947374-3115-1-git-send-email-carlo@caione.org>
- <1398947374-3115-9-git-send-email-carlo@caione.org>
- <20140503010936.GF4090@lukather>
- <CAOQ7t2Z6rLAMGXocPNcKgOUp9iy6XZkh4O6jThPkdm5M6UMGtw@mail.gmail.com>
-Message-ID: <20140505225139.GD9464@lukather>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue,  6 May 2014 02:13:55 +0200
+Subject: [PATCH v3 00/20] USB support for Armada 38x and Armada 375
+Message-ID: <1399335255-589-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 03, 2014 at 02:21:06PM +0200, Carlo Caione wrote:
-> On Sat, May 3, 2014 at 3:09 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Hi,
-> >
-> > On Thu, May 01, 2014 at 02:29:34PM +0200, Carlo Caione wrote:
-> >> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> >> Signed-off-by: Carlo Caione <carlo@caione.org>
-> >> ---
-> >>  arch/arm/boot/dts/sun4i-a10-a1000.dts           | 58 ++++++++++++++++++++++
-> >>  arch/arm/boot/dts/sun4i-a10-cubieboard.dts      | 58 ++++++++++++++++++++++
-> >>  arch/arm/boot/dts/sun4i-a10-hackberry.dts       | 64 ++++++++++++++++++++++++
-> >>  arch/arm/boot/dts/sun4i-a10-inet97fv2.dts       | 58 ++++++++++++++++++++++
-> >>  arch/arm/boot/dts/sun4i-a10-mini-xplus.dts      | 65 +++++++++++++++++++++++++
-> >>  arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts  | 64 ++++++++++++++++++++++++
-> >>  arch/arm/boot/dts/sun4i-a10-pcduino.dts         | 58 ++++++++++++++++++++++
-> >>  arch/arm/boot/dts/sun7i-a20-cubieboard2.dts     | 59 ++++++++++++++++++++++
-> >>  arch/arm/boot/dts/sun7i-a20-cubietruck.dts      | 59 ++++++++++++++++++++++
-> >>  arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 59 ++++++++++++++++++++++
-> >>  10 files changed, 602 insertions(+)
-> >>
-> >> diff --git a/arch/arm/boot/dts/sun4i-a10-a1000.dts b/arch/arm/boot/dts/sun4i-a10-a1000.dts
-> >> index fa746aea..57d3fb4 100644
-> >> --- a/arch/arm/boot/dts/sun4i-a10-a1000.dts
-> >> +++ b/arch/arm/boot/dts/sun4i-a10-a1000.dts
-> >> @@ -88,6 +88,56 @@
-> >>                       pinctrl-names = "default";
-> >>                       pinctrl-0 = <&i2c0_pins_a>;
-> >>                       status = "okay";
-> >> +
-> >> +                     axp209: pmic at 34 {
-> >> +                             compatible = "x-powers,axp209";
-> >> +                             reg = <0x34>;
-> >> +                             interrupts = <0>;
-> >> +
-> >> +                             interrupt-controller;
-> >> +                             #interrupt-cells = <1>;
-> >> +
-> >> +                             acin-supply = <&reg_axp_ipsout>;
-> >> +                             vin2-supply = <&reg_axp_ipsout>;
-> >> +                             vin3-supply = <&reg_axp_ipsout>;
-> >> +                             ldo24in-supply = <&reg_axp_ipsout>;
-> >> +                             ldo3in-supply = <&reg_axp_ipsout>;
-> >> +                             ldo5in-supply = <&reg_axp_ipsout>;
-> >> +
-> >> +                             regulators {
-> >> +                                     x-powers,dcdc-freq = <1500>;
-> >> +
-> >> +                                     axp_vcore_reg: dcdc2 {
-> >> +                                             regulator-min-microvolt = <700000>;
-> >> +                                             regulator-max-microvolt = <2275000>;
-> >> +                                             regulator-always-on;
-> >> +                                     };
-> >> +
-> >> +                                     axp_ddr_reg: dcdc3 {
-> >> +                                             regulator-always-on;
-> >> +                                     };
-> >> +
-> >> +                                     axp_rtc_reg: ldo1 {
-> >> +                                             regulator-always-on;
-> >> +                                     };
-> >> +
-> >> +                                     axp_analog_reg: ldo2 {
-> >> +                                             regulator-always-on;
-> >> +                                     };
-> >> +
-> >> +                                     axp_pll_reg: ldo3 {
-> >> +                                             regulator-always-on;
-> >> +                                     };
-> >> +
-> >> +                                     axp_hdmi_reg: ldo4 {
-> >> +                                             regulator-always-on;
-> >> +                                     };
-> >> +
-> >> +                                     axp_mic_reg: ldo5 {
-> >> +                                             regulator-always-on;
-> >
-> > Do all these regulators need to be always on? It makes sense for the
-> > pll and vcore, but I don't get why the mic and hdmi regulators need
-> > this.
-> 
-> I did this way because I don't have the schematics for all the board
-> so I thought it was safer to leave all the regulators enabled
+This patch set adds the USB support for the Armada 38x Armada
+375. These SoCs use an xHCI but still need specific initialization,
+mainly to setup the windows memory on the mbus. They also use the same
+controller that the other mvebu SoC for EHCI.
 
-Well, we have the schematics for most of these boards (at least all
-the cubie and olinuxinos).
+Since the 2nd version I converted the usb cluster driver in a PHY
+driver. While I was working on it I found a bug on ehci-orion which I
+fixed in the 1st patch.
 
-As far as the other boards are concerned, if we don't have that
-information, I'd say leave them alone until someone has access to
-these informations.
+The other noticeable change was that in order to be able to use the
+clocks I also added private platform data for xHCI.
 
-Maxime
+In the meantime I also received the A0 version of the Armada 375 so I
+removed all the workaround related to the very earlier version of the
+SoC, indeed there were very few boards with this version of the SoC.
+
+
+This series is also available in
+the branch USB-375-38x-3.15-rc1-V3
+https://github.com/MISL-EBU-System-SW/mainline-public.git
+
+Thanks,
+
+Gregory CLEMENT (20):
+  usb: ehci-orion: Fix clock reference leaking
+  usb: ehci-orion: Add the optional PHY support
+  usb: host: xhci-plat: Sort the headers in alphabetic order
+  usb: xhci: add a platform-private field
+  usb: host: xhci-plat: Add clocks support
+  usb: host: xhci-plat: Add support for the Armada 38x
+  xhci-platform: Add a new controller using xhci: Armada 38x
+  ARM: mvebu: Add Device Tree description of xHCI hosts on Armada 38x
+  ARM: mvebu: Add Device Tree description of the EHCI host on Armada 38x
+  ARM: mvebu: Add USB3 support for Armada 38x
+  ARM: configs: Add usb_xhci_mvebu to mvebu_v7_defconfig
+  ARM: configs: Add usb_xhci_mvebu to multi_v7_defconfig
+  usb: host: xhci-plat: Add support for the Armada 375
+  xhci-platform: Add a new controller using xHCI: Armada 375
+  ARM: mvebu: Add Device Tree description of USB cluster controller on
+    Armada 375
+  dt: binding: Armada 375 USB cluster
+  phy: Add support for USB cluster on the Armada 375 SoC
+  ARM: mvebu: Add USB3 support for Armada 375
+  ARM: mvebu: Add Device Tree description of the xHCI host on Armada 375
+  ARM: mvebu: Add Device Tree description of the EHCI host on Armada 375
+
+ .../bindings/phy/armada-375-usb-phy-cluster.txt    |  19 +++
+ Documentation/devicetree/bindings/usb/usb-xhci.txt |   4 +-
+ arch/arm/boot/dts/armada-375-db.dts                |   8 ++
+ arch/arm/boot/dts/armada-375.dtsi                  |  34 +++++
+ arch/arm/boot/dts/armada-385-db.dts                |  12 ++
+ arch/arm/boot/dts/armada-385-rd.dts                |   4 +
+ arch/arm/boot/dts/armada-38x.dtsi                  |  25 ++++
+ arch/arm/configs/multi_v7_defconfig                |   1 +
+ arch/arm/configs/mvebu_v7_defconfig                |   1 +
+ arch/arm/mach-mvebu/Kconfig                        |   2 +
+ drivers/phy/Kconfig                                |   5 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-armada375-usb2.c                   | 154 +++++++++++++++++++++
+ drivers/usb/host/Kconfig                           |   7 +
+ drivers/usb/host/Makefile                          |   1 +
+ drivers/usb/host/ehci-orion.c                      |  68 ++++++---
+ drivers/usb/host/xhci-mvebu.c                      |  71 ++++++++++
+ drivers/usb/host/xhci-mvebu.h                      |  21 +++
+ drivers/usb/host/xhci-plat.c                       |  74 +++++++++-
+ drivers/usb/host/xhci.h                            |   3 +
+ 20 files changed, 491 insertions(+), 24 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/phy/armada-375-usb-phy-cluster.txt
+ create mode 100644 drivers/phy/phy-armada375-usb2.c
+ create mode 100644 drivers/usb/host/xhci-mvebu.c
+ create mode 100644 drivers/usb/host/xhci-mvebu.h
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140505/d94d5b5e/attachment.sig>
+1.8.1.2
