@@ -1,78 +1,76 @@
-From: dmurphy@ti.com (Dan Murphy)
-Date: Tue, 6 May 2014 08:41:39 -0500
-Subject: [TEMP PATCH 16/17] pci: host: pcie-dra7xx: use reset framework
- APIs to reset PCIe
-In-Reply-To: <1399383244-14556-17-git-send-email-kishon@ti.com>
-References: <1399383244-14556-1-git-send-email-kishon@ti.com>
- <1399383244-14556-17-git-send-email-kishon@ti.com>
-Message-ID: <5368E693.1060201@ti.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 6 May 2014 15:42:51 +0200
+Subject: [PATCH v3 08/20] ARM: mvebu: Add Device Tree description of xHCI
+ hosts on Armada 38x
+In-Reply-To: <1399335255-589-9-git-send-email-gregory.clement@free-electrons.com>
+References: <1399335255-589-1-git-send-email-gregory.clement@free-electrons.com>
+ <1399335255-589-9-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20140506134251.GF6503@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/06/2014 08:34 AM, Kishon Vijay Abraham I wrote:
-> Get reset nodes from dt and use reset framework APIs to reset PCIe.
-> This is needed since reset is handled by the SoC.
->
-> Cc: Dan Murphy <dmurphy@ti.com>
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+On Tue, May 06, 2014 at 02:14:03AM +0200, Gregory CLEMENT wrote:
+> The Marvell Armada 38x SoCs contains two xHCI host. This commit adds
+> the Device Tree description of those interfaces at the SoC level, and
+> also enables the two USB3 ports on the Armada 385 DB platform and one
+> USB3 port on the Armada 385 RD platform.
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 > ---
->  Documentation/devicetree/bindings/pci/ti-pci.txt |    2 ++
->  drivers/pci/host/pci-dra7xx.c                    |   10 ++++++++++
->  2 files changed, 12 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/pci/ti-pci.txt b/Documentation/devicetree/bindings/pci/ti-pci.txt
-> index 6cb6f09..cfb95c0 100644
-> --- a/Documentation/devicetree/bindings/pci/ti-pci.txt
-> +++ b/Documentation/devicetree/bindings/pci/ti-pci.txt
-> @@ -9,6 +9,8 @@ This node should have the properties described in "designware-pcie.txt".
->   - phys : the phandle for the PHY device (used by generic PHY framework)
->   - phy-names : the names of the PHY corresponding to the PHYs present in the
->     *phy* phandle.
-> + - resets: phandle used if reset is handled be soc
-> + - reset-names: name given to the phandle
-
-You should just refer to the ti,reset.txt document for this.
-
->  
->  Example:
->  pcie at 51000000 {
-> diff --git a/drivers/pci/host/pci-dra7xx.c b/drivers/pci/host/pci-dra7xx.c
-> index a37c25c..17d64ee 100644
-> --- a/drivers/pci/host/pci-dra7xx.c
-> +++ b/drivers/pci/host/pci-dra7xx.c
-> @@ -20,6 +20,7 @@
->  #include <linux/platform_device.h>
->  #include <linux/pm_runtime.h>
->  #include <linux/resource.h>
-> +#include <linux/reset.h>
->  #include <linux/types.h>
->  
->  #include "pcie-designware.h"
-> @@ -281,6 +282,7 @@ static int __init dra7xx_pcie_probe(struct platform_device *pdev)
->  	struct resource *res;
->  	struct dra7xx_pcie *dra7xx;
->  	struct device *dev = &pdev->dev;
-> +	struct reset_control *rstc;
->  
->  	dra7xx = devm_kzalloc(&pdev->dev, sizeof(*dra7xx), GFP_KERNEL);
->  	if (!dra7xx)
-> @@ -304,6 +306,14 @@ static int __init dra7xx_pcie_probe(struct platform_device *pdev)
->  	if (!base)
->  		return -ENOMEM;
->  
-> +	rstc = devm_reset_control_get(dev, "reset");
-> +	if (IS_ERR(rstc))
-> +		return PTR_ERR(rstc);
+>  arch/arm/boot/dts/armada-385-db.dts |  8 ++++++++
+>  arch/arm/boot/dts/armada-385-rd.dts |  4 ++++
+>  arch/arm/boot/dts/armada-38x.dtsi   | 17 +++++++++++++++++
+>  3 files changed, 29 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/armada-385-db.dts b/arch/arm/boot/dts/armada-385-db.dts
+> index 6828d77696a6..d5db1466da82 100644
+> --- a/arch/arm/boot/dts/armada-385-db.dts
+> +++ b/arch/arm/boot/dts/armada-385-db.dts
+> @@ -101,6 +101,14 @@
+>  					reg = <0x1000000 0x3f000000>;
+>  				};
+>  			};
 > +
-> +	ret = reset_control_deassert(rstc);
-> +	if (ret)
-> +		return ret;
+> +			usb3 at f0000 {
+> +				status = "okay";
+> +			};
 > +
->  	phy = devm_phy_get(dev, "pcie-phy");
->  	if (IS_ERR(phy))
->  		return PTR_ERR(phy);
+> +			usb3 at f8000 {
+> +				status = "okay";
+> +			};
+>  		};
+>  
+>  		pcie-controller {
+> diff --git a/arch/arm/boot/dts/armada-385-rd.dts b/arch/arm/boot/dts/armada-385-rd.dts
+> index 45250c88814b..a505fe94ff37 100644
+> --- a/arch/arm/boot/dts/armada-385-rd.dts
+> +++ b/arch/arm/boot/dts/armada-385-rd.dts
+> @@ -77,6 +77,10 @@
+>  					reg = <1>;
+>  				};
+>  			};
+> +
+> +			usb3 at f0000 {
+> +				status = "okay";
+> +			};
+>  		};
+>  
+>  		pcie-controller {
+> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+> index a064f59da02d..5913ce1cc601 100644
+> --- a/arch/arm/boot/dts/armada-38x.dtsi
+> +++ b/arch/arm/boot/dts/armada-38x.dtsi
+> @@ -355,6 +355,23 @@
+>  				clocks = <&coredivclk 0>;
+>  				status = "disabled";
+>  			};
+> +
+> +			usb3 at f0000 {
+> +				compatible = "marvell,armada-380-xhci";
+> +				reg = <0xf0000 0x3fff>,<0xf4000 0x3fff>;
 
+0x3fff?
 
--- 
-------------------
-Dan Murphy
+I would expect that to be 0x4000.
+
+	Andrew
