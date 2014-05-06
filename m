@@ -1,73 +1,31 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 6 May 2014 16:48:08 +0200
-Subject: [PATCH resend 02/15] arm64: add abstractions for FPSIMD state
- manipulation
-In-Reply-To: <20140506144340.GE23957@arm.com>
-References: <1398959381-8126-1-git-send-email-ard.biesheuvel@linaro.org>
- <1398959381-8126-3-git-send-email-ard.biesheuvel@linaro.org>
- <20140506144340.GE23957@arm.com>
-Message-ID: <CAKv+Gu_3876kGtFOauLK4Uz=-74aSGq4a-m=9MmsVVzgsdYG3g@mail.gmail.com>
+From: alexander.h.duyck@intel.com (Alexander Duyck)
+Date: Tue, 06 May 2014 07:58:32 -0700
+Subject: [E1000-devel] ARM support for igb driver
+In-Reply-To: <CAHH3p5L4DaORYJ8_6zMEY3ikEnABU1L0B2C6Fezb_g6dCjtr5Q@mail.gmail.com>
+References: <CAHH3p5KAwyMOY=ai_h0eM+JwYLtTO8d4jVaVOWVtOakhqPRTew@mail.gmail.com>	<CF7EA37A.4676A%matthew.vick@intel.com>	<CAHH3p5JFc3jgeK7OFd1rtgDS3gjRdjiPr3LwwqfyKMPGSTwMWA@mail.gmail.com>	<CF7FD060.46A87%matthew.vick@intel.com>	<CAHH3p5J8V6uWEzbCoT+x-6_2x1q=nc=_oMn0qnnj113FmeuW6A@mail.gmail.com>	<9B4A1B1917080E46B64F07F2989DADD6533627A5@ORSMSX114.amr.corp.intel.com>	<CAHH3p5KEPXw5mxP-13evd774nyO5C13ky0=fCaZPCNVx1gh3Ow@mail.gmail.com>	<CAHH3p5LaRwgdECxsO4OZSdWEhGt232yj-3347kYEStP6NLg2xg@mail.gmail.com>	<5360041A.7030005@intel.com>	<CAHH3p5L6WM3FaZ19Tw9vUcsk+kERfBKnGC2BRtnftJR1pbSF7g@mail.gmail.com>	<5367AE02.8030802@intel.com>	<20140505223839.45778902@skate>	<536800A8.7090801@intel.com>
+ <CAHH3p5L4DaORYJ8_6zMEY3ikEnABU1L0B2C6Fezb_g6dCjtr5Q@mail.gmail.com>
+Message-ID: <5368F898.2000803@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 May 2014 16:43, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Thu, May 01, 2014 at 04:49:34PM +0100, Ard Biesheuvel wrote:
->> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
->> index 4aef42a04bdc..86ac6a9bc86a 100644
->> --- a/arch/arm64/kernel/fpsimd.c
->> +++ b/arch/arm64/kernel/fpsimd.c
->> @@ -87,6 +87,39 @@ void fpsimd_flush_thread(void)
->>       preempt_enable();
->>  }
->>
->> +/*
->> + * Save the userland FPSIMD state of 'current' to memory
->> + */
->> +void fpsimd_preserve_current_state(void)
->> +{
->> +     fpsimd_save_state(&current->thread.fpsimd_state);
->> +}
->> +
->> +/*
->> + * Load the userland FPSIMD state of 'current' from memory
->> + */
->> +void fpsimd_restore_current_state(void)
->> +{
->> +     fpsimd_load_state(&current->thread.fpsimd_state);
->> +}
->> +
->> +/*
->> + * Load an updated userland FPSIMD state for 'current' from memory
->> + */
->> +void fpsimd_update_current_state(struct fpsimd_state *state)
->> +{
->> +     preempt_disable();
->> +     fpsimd_load_state(state);
->> +     preempt_enable();
->> +}
->
-> Minor - please update the comment above the functions to state that
-> preemption needs to be disabled by the caller.
->
+Shiv,
 
-Do you mean in all three cases? And, by implication, that the
-preempt_disable()/enable() pair should be moved to the call site for
-fpsimd_update_current_state() ?
+I think we are at the limits of what we can do from the Intel end.
+Based on the comments from Thomas it sounds like there shouldn't be any
+issues specifically with ARM that prevent the use of IGB PCIe devices,
+and the fact is the error your are seeing "Unhandled fault: imprecise
+external abort (0x1406) at 0x00000000" can indicate some sort of bus
+fault.  It would probably be best to work with someone more familiar
+with the inner workings of ARM CPUs as they might be able to work out
+some other workarounds for the external abort.
 
+The fact that the Data Link Protocol error was there as well points to
+some sort of hardware bus fault.  My advice would be to explore the
+reason for why you are getting the Data Link Protocol error as this is
+likely the source of the external abort you are seeing.  Beyond that
+there isn't much more debugging we can do since this is likely a bus
+issue related to your platform configuration.
 
->> +/*
->> + * Invalidate live CPU copies of task t's FPSIMD state
->> + */
->> +void fpsimd_flush_task_state(struct task_struct *t)
->> +{
->> +}
->
-> I guess this will be added in a subsequent patch. You could either move
-> it there or add a comment in the commit log that it is a dummy function
-> for now (I prefer the former).
->
+Thanks,
 
-OK
-
--- 
-Ard.
+Alex
