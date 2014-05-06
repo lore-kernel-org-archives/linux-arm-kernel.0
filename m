@@ -1,44 +1,34 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue,  6 May 2014 17:43:26 +0200
-Subject: [PATCH] mmc: atmel: don't test host->data
-Message-ID: <1399391006-16007-1-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Tue,  6 May 2014 17:44:41 +0200
+Subject: [PATCH] spi: atmel: fix incorrect comparison
+Message-ID: <1399391081-16095-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Found using smatch:
-drivers/mmc/host/atmel-mci.c:827 atmci_pdc_complete() warn: variable
-dereferenced before check 'host->data' (see line 807)
-
-Stop testing host->data as it is not NULL at that point.
+drivers/spi/spi-atmel.c:878 atmel_spi_pump_pio_data() warn: unsigned
+'as->current_remaining_bytes' is never less than zero.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- drivers/mmc/host/atmel-mci.c | 13 +++----------
- 1 file changed, 3 insertions(+), 10 deletions(-)
+ drivers/spi/spi-atmel.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-index 42706ea0ba85..aece7cafbb97 100644
---- a/drivers/mmc/host/atmel-mci.c
-+++ b/drivers/mmc/host/atmel-mci.c
-@@ -820,16 +820,9 @@ static void atmci_pdc_complete(struct atmel_mci *host)
- 
- 	atmci_pdc_cleanup(host);
- 
--	/*
--	 * If the card was removed, data will be NULL. No point trying
--	 * to send the stop command or waiting for NBUSY in this case.
--	 */
--	if (host->data) {
--		dev_dbg(&host->pdev->dev,
--		        "(%s) set pending xfer complete\n", __func__);
--		atmci_set_pending(host, EVENT_XFER_COMPLETE);
--		tasklet_schedule(&host->tasklet);
--	}
-+	dev_dbg(&host->pdev->dev, "(%s) set pending xfer complete\n", __func__);
-+	atmci_set_pending(host, EVENT_XFER_COMPLETE);
-+	tasklet_schedule(&host->tasklet);
- }
- 
- static void atmci_dma_cleanup(struct atmel_mci *host)
+diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+index 079e6b1b0cdb..39417fd8462f 100644
+--- a/drivers/spi/spi-atmel.c
++++ b/drivers/spi/spi-atmel.c
+@@ -874,8 +874,9 @@ atmel_spi_pump_pio_data(struct atmel_spi *as, struct spi_transfer *xfer)
+ 		spi_readl(as, RDR);
+ 	}
+ 	if (xfer->bits_per_word > 8) {
+-		as->current_remaining_bytes -= 2;
+-		if (as->current_remaining_bytes < 0)
++		if (as->current_remaining_bytes > 2)
++			as->current_remaining_bytes -= 2;
++		else
+ 			as->current_remaining_bytes = 0;
+ 	} else {
+ 		as->current_remaining_bytes--;
 -- 
 1.9.1
