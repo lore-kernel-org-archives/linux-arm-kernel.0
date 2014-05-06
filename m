@@ -1,39 +1,51 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Tue, 06 May 2014 09:33:42 -0700
-Subject: [PATCHv5 2/2] arm: Get rid of meminfo
-In-Reply-To: <20140501130849.C093DC409DA@trevor.secretlab.ca>
-References: <1396544698-15596-1-git-send-email-lauraa@codeaurora.org>
- <1396544698-15596-3-git-send-email-lauraa@codeaurora.org>
- <20140501130849.C093DC409DA@trevor.secretlab.ca>
-Message-ID: <53690EE6.2020909@codeaurora.org>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Tue, 6 May 2014 13:34:19 -0300
+Subject: [PATCH] ARM: dts: imx6q-udoo: Add HDMI support
+Message-ID: <1399394059-21635-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/1/2014 6:08 AM, Grant Likely wrote:
-> On Thu,  3 Apr 2014 10:04:58 -0700, Laura Abbott <lauraa@codeaurora.org> wrote:
->> memblock is now fully integrated into the kernel and is the prefered
->> method for tracking memory. Rather than reinvent the wheel with
->> meminfo, migrate to using memblock directly instead of meminfo as
->> an intermediate.
->>
->> Change-Id: I9d04e636f43bf939e13b4934dc23da0c076811d2
->> Acked-by: Jason Cooper <jason@lakedaemon.net>
->> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
->> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> Tested-by: Leif Lindholm <leif.lindholm@linaro.org>
->> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-> 
-> Tested-by: Grant Likely <grant.likely@linaro.org>
-> 
-> Tiny nit-picking comment below, but this patch looks really good.
-> What's the state on merging this?
-> 
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx6q-udoo.dts | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-I put this into the patch system as 8025/1 a few weeks ago. I've been
-busy/on vacation so I haven't had a chance to follow up since then.
-
-Laura
-
+diff --git a/arch/arm/boot/dts/imx6q-udoo.dts b/arch/arm/boot/dts/imx6q-udoo.dts
+index ed397d1..5f2206a 100644
+--- a/arch/arm/boot/dts/imx6q-udoo.dts
++++ b/arch/arm/boot/dts/imx6q-udoo.dts
+@@ -28,6 +28,18 @@
+ 	status = "okay";
+ };
+ 
++&hdmi {
++	ddc-i2c-bus = <&i2c2>;
++	status = "okay";
++};
++
++&i2c2 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2>;
++	status = "okay";
++};
++
+ &iomuxc {
+ 	imx6q-udoo {
+ 		pinctrl_enet: enetgrp {
+@@ -51,6 +63,13 @@
+ 			>;
+ 		};
+ 
++		pinctrl_i2c2: i2c2grp {
++			fsl,pins = <
++				MX6QDL_PAD_KEY_COL3__I2C2_SCL		0x4001b8b1
++				MX6QDL_PAD_KEY_ROW3__I2C2_SDA		0x4001b8b1
++			>;
++		};
++
+ 		pinctrl_uart2: uart2grp {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_EIM_D26__UART2_TX_DATA	0x1b0b1
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.8.3.2
