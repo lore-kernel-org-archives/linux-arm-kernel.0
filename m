@@ -1,32 +1,26 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 6 May 2014 17:18:53 +0200
-Subject: [E1000-devel] ARM support for igb driver
-In-Reply-To: <536800A8.7090801@intel.com>
-References: <CAHH3p5KAwyMOY=ai_h0eM+JwYLtTO8d4jVaVOWVtOakhqPRTew@mail.gmail.com>
- <20140505223839.45778902@skate> <536800A8.7090801@intel.com>
-Message-ID: <201405061718.54012.arnd@arndb.de>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 06 May 2014 17:19:02 +0200
+Subject: [ATTN] Re: [PATCH v2 4/9] dt-bindings: add documentation for s3c2410
+ clock controller
+In-Reply-To: <2506219.ti6q3JWVMf@phil>
+References: <2104342.rkElQpXtvM@phil> <2506219.ti6q3JWVMf@phil>
+Message-ID: <5368FD66.9090400@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 05 May 2014, Alexander Duyck wrote:
-> Glad to hear that this is working on your ARM platform as expected.
-> 
-> I believe the issue Shiv is having is due to a problem with the specific
-> platform as the IGB device is reporting a Data Link Protocol error via
-> AER and I believe this is what is causing his platform issues.  On
-> enabling BME the device is likely signalling a Fatal Error message in
-> response to the DLP error.  The original error he was seeing was:
-> 
-> Unhandled fault: imprecise external abort (0x1406) at 0x00000000
+Rob, Pawel, Mark, Ian, Kumar,
 
-This isn't too uncommon. There are a couple of traditional PCI host drivers
-that register an imprecise external abort handler to catch this and
-then look at the host controller registers.
+On 23.04.2014 21:36, Heiko St?bner wrote:
+> Describe the clock controller of s3c2410, s3c2440 and s3c2442.
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> Acked-by: Tomasz Figa <t.figa@samsung.com>
+> ---
+>   .../bindings/clock/samsung,s3c2410-clock.txt       | 50 ++++++++++++++++++++++
+>   1 file changed, 50 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/clock/samsung,s3c2410-clock.txt
 
-Out of the pcie hosts, only drivers/pci/host/pci-imx6.c catches
-this error, but it then goes on to ignore it, not even printing
-a message about it.
+Might we ask you to take a look, please?
 
-Shiv, which host controller driver are you using?
-
-	Arnd
+Best regards,
+Tomasz
