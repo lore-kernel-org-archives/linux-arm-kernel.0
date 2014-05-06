@@ -1,47 +1,32 @@
-From: b.brezillon.dev@gmail.com (Boris BREZILLON)
-Date: Tue, 06 May 2014 17:17:04 +0200
-Subject: [PATCH] net: macb: set interface name based on DT aliases
-In-Reply-To: <20140505204022.GA27961@quad.lixom.net>
-References: <1394620196-6295-1-git-send-email-b.brezillon.dev@gmail.com>
- <20140505204022.GA27961@quad.lixom.net>
-Message-ID: <5368FCF0.90508@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 6 May 2014 17:18:53 +0200
+Subject: [E1000-devel] ARM support for igb driver
+In-Reply-To: <536800A8.7090801@intel.com>
+References: <CAHH3p5KAwyMOY=ai_h0eM+JwYLtTO8d4jVaVOWVtOakhqPRTew@mail.gmail.com>
+ <20140505223839.45778902@skate> <536800A8.7090801@intel.com>
+Message-ID: <201405061718.54012.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+On Monday 05 May 2014, Alexander Duyck wrote:
+> Glad to hear that this is working on your ARM platform as expected.
+> 
+> I believe the issue Shiv is having is due to a problem with the specific
+> platform as the IGB device is reporting a Data Link Protocol error via
+> AER and I believe this is what is causing his platform issues.  On
+> enabling BME the device is likely signalling a Fatal Error message in
+> response to the DLP error.  The original error he was seeing was:
+> 
+> Unhandled fault: imprecise external abort (0x1406) at 0x00000000
 
-On 05/05/2014 22:40, Olof Johansson wrote:
-> On Wed, Mar 12, 2014 at 11:29:56AM +0100, Boris BREZILLON wrote:
->> Use aliases to set the interface name (ethX) instead of automatic
->> assignement.
->>
->> Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
->> ---
->>
->> Hello Nicolas, Jean-Christophe,
->>
->> This is an example on how we could set the ethernet interface id based on DT
->> aliases.
->> As you can see this patch is not properly separated.
->>
->> I'm still not happy with this approach for several reasons:
->> 1) If another ethernet iface has already been registered with the same id the
->>    net dev registration will fail.
->> 2) We bypass the ethernet macros/functions and directly use the net device
->>    functions which IMHO is not future proof.
-> [Sorry for the late reply, going through old backlog of unread email]
->
-> Looks like this should live in networking core instead of in the driver, it's
-> how we handle it in other subsystems.
+This isn't too uncommon. There are a couple of traditional PCI host drivers
+that register an imprecise external abort handler to catch this and
+then look at the host controller registers.
 
-Sure.
-This version was just a quick an dirty hack, but I'll send a new version
-integrating this functionality in netdev core.
+Out of the pcie hosts, only drivers/pci/host/pci-imx6.c catches
+this error, but it then goes on to ignore it, not even printing
+a message about it.
 
-> I don't know what DaveM's opinions on that is though.
+Shiv, which host controller driver are you using?
 
-I'll put him in Cc of the next version.
-
-Best Regards,
-
-Boris
+	Arnd
