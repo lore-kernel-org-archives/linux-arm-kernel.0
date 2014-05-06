@@ -1,37 +1,36 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 6 May 2014 12:07:22 +0200
-Subject: [PATCH 2/3] ARM: mm: add support for HW coherent systems in PL310
-In-Reply-To: <20140409140625.GI13737@arm.com>
-References: <1395677872-32741-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1395677872-32741-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140408172424.GE16373@arm.com> <20140408201212.067d526d@skate>
- <20140409140625.GI13737@arm.com>
-Message-ID: <20140506120722.61bef801@skate>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Tue, 6 May 2014 11:16:19 +0100
+Subject: [PATCH V2] arm64: mm: Create gigabyte kernel logical mappings
+ where possible
+In-Reply-To: <20140506095850.GA23957@arm.com>
+References: <1399043829-9036-1-git-send-email-steve.capper@linaro.org>
+ <20140506095850.GA23957@arm.com>
+Message-ID: <20140506101618.GA20232@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Catalin Marinas,
-
-On Wed, 9 Apr 2014 15:06:25 +0100, Catalin Marinas wrote:
-
-> > In fact, I'm not sure using a separate compatible string is possible,
-> > because there are situations where the hardware platform may be I/O
-> > coherent, and some situations where it is not the case. For example, in
-> > the current kernel, the platform is I/O coherent when CONFIG_SMP is
-> > enabled, but not I/O coherent when CONFIG_SMP is disabled. And it's the
-> > same hardware platform, so same Device Tree in both cases.
+On Tue, May 06, 2014 at 10:58:53AM +0100, Catalin Marinas wrote:
+> On Fri, May 02, 2014 at 04:17:09PM +0100, Steve Capper wrote:
+> > We have the capability to map 1GB level 1 blocks when using a 4K
+> > granule.
+> > 
+> > This patch adjusts the create_mapping logic s.t. when mapping physical
+> > memory on boot, we attempt to use a 1GB block if both the VA and PA
+> > start and end are 1GB aligned. This both reduces the levels of lookup
+> > required to resolve a kernel logical address, as well as reduces TLB
+> > pressure on cores that support 1GB TLB entries.
+> > 
+> > Signed-off-by: Steve Capper <steve.capper@linaro.org>
 > 
-> I think Russell has a better solution in his L2 cache cleanup series.
-> Patch 18/44 introduces a .fixup function which takes the outer_cache_fns
-> pointer and that's a place where your code can check whether coherency
-> is present or not (and turn .sync into NULL).
+> I think you need to patch kern_addr_valid as well for this (we recently
+> pushed a patch to detect pmd block mappings).
 
-I had a look at the .fixup proposal, but I don't see how a .fixup
-function, which is completely internal to the L2 cache driver, could
-guess whether the system is coherent or not.
+Ahh, I see it, thanks. I will amend the logic.
 
-Thomas
+Cheers,
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Steve
+
+> 
+> -- 
+> Catalin
