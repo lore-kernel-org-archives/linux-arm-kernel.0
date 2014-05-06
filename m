@@ -1,55 +1,45 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 06 May 2014 13:37:04 +0200
-Subject: [PATCH v3 17/20] phy: Add support for USB cluster on the Armada
- 375 SoC
-In-Reply-To: <1399335255-589-18-git-send-email-gregory.clement@free-electrons.com>
-References: <1399335255-589-1-git-send-email-gregory.clement@free-electrons.com>
- <1399335255-589-18-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <2511421.HV0z8e3QV0@amdc1032>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 6 May 2014 13:43:33 +0200
+Subject: [PATCH] clk: shmobile: clk-mstp: change to using clock-indices
+In-Reply-To: <20140505225013.5739.23946@quantum>
+References: <1397577994-12061-1-git-send-email-ben.dooks@codethink.co.uk>
+ <20140505225013.5739.23946@quantum>
+Message-ID: <CAMuHMdXO=WJjNSsWbKx5KxrF3w9VgEyEj3kdiSN1AyxaHFKpFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Mike,
 
-Hi,
+On Tue, May 6, 2014 at 12:50 AM, Mike Turquette <mturquette@linaro.org> wrote:
+> Quoting Ben Dooks (2014-04-15 09:06:34)
+>> With the addition of clock-indices, we need to change the renesas
+>> clock implementation to use these instead of the local definition
+>> of "renesas,clock-indices".
+>>
+>> Since this will break booting with older device trees, we add a
+>> simple auto-detection of which properties are present.
+>>
+>> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+>
+> I'm fine to take this into clk-fixes, destined for 3.15-rc5. Does that
 
-On Tuesday, May 06, 2014 02:14:12 AM Gregory CLEMENT wrote:
-> The Armada 375 SoC comes with an USB2 host and device controller and
-> an USB3 controller. The USB cluster control register allows to manage
-> common features of both USB controllers. It uses the generic PHY
-> framework
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  drivers/phy/Kconfig              |   5 ++
->  drivers/phy/Makefile             |   1 +
->  drivers/phy/phy-armada375-usb2.c | 154 +++++++++++++++++++++++++++++++++++++++
->  3 files changed, 160 insertions(+)
->  create mode 100644 drivers/phy/phy-armada375-usb2.c
-> 
-> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-> index 3bb05f17b9b4..cdf3e2c24e3a 100644
-> --- a/drivers/phy/Kconfig
-> +++ b/drivers/phy/Kconfig
-> @@ -15,6 +15,11 @@ config GENERIC_PHY
->  	  phy users can obtain reference to the PHY. All the users of this
->  	  framework should select this config.
->  
-> +config ARMADA375_USBCLUSTER_PHY
-> +	def_bool y
-> +	depends on OF
+Thanks!
 
-Please limit this driver to Armada 375 or compile testing, i.e. add additional
+> solve the issues on your end? Do you still need me to host a stable
+> topic branch for you? I'm happy to do that if needed.
 
-	depends on (ARCH_MVEBU && MACH_ARMADA_375) || COMPILE_TEST
+As Simon will be on holidays until rc5, I think he can just use rc5 as the
+stable base for further fixes.
 
-> +	select GENERIC_PHY
-> +
->  config PHY_EXYNOS_MIPI_VIDEO
->  	tristate "S5P/EXYNOS SoC series MIPI CSI-2/DSI PHY driver"
->  	depends on HAS_IOMEM
+Thanks again!
 
-Best regards,
+Gr{oetje,eeting}s,
+
+                        Geert
+
 --
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
