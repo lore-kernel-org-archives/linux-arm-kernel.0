@@ -1,48 +1,48 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Tue, 6 May 2014 17:48:05 +0200
-Subject: [PATCH 0/4] Enable ST Keyscan driver
-In-Reply-To: <5368D806.8050609@linaro.org>
-References: <1399304320-18197-1-git-send-email-gabriel.fernandez@linaro.org>
- <5368D806.8050609@linaro.org>
-Message-ID: <53690435.5040602@st.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 6 May 2014 12:49:13 -0300
+Subject: mx6qsabresd hangs on linux-next
+In-Reply-To: <CAOMZO5DH5d_L-deVu=XmBo9ekq+-g704p7cyayLvp=43bnEccQ@mail.gmail.com>
+References: <CAOMZO5DMEqs=zzNGqgKjK7wTJdiNPgEqxsX=TtqKrnpLMzpbDw@mail.gmail.com>
+ <20140506141310.GA2794@dragon>
+ <CAOMZO5DH5d_L-deVu=XmBo9ekq+-g704p7cyayLvp=43bnEccQ@mail.gmail.com>
+Message-ID: <CAOMZO5Dx0JMj3dZ7BSgaYSZZ=ZKRqQHEYWj5sb6z_9jc+cpsEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srini,
+On Tue, May 6, 2014 at 12:36 PM, Fabio Estevam <festevam@gmail.com> wrote:
 
-	I will prepare the branch next week for the pull request.
+> Indeed, if I revert:
+>
+> commit e7489693b3a853ab6dfad52f7e6af553ae8d3f28
+> Author: Maxime COQUELIN <maxime.coquelin@st.com>
+> Date:   Wed Jan 29 17:24:08 2014 +0100
+>
+>     clk: divider: Optimize clk_divider_bestdiv loop
+>
+>     Currently, the for-loop used to try all the different dividers to find the
+>     one that best fit tries all the values from 1 to max_div,
+> incrementing by one.
+>     In case of power-of-two, or table based divider, the loop isn't optimal.
+>
+>     Instead of incrementing by one, this patch provides directly the
+> next divider.
+>
+>     Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
+>     Signed-off-by: Mike Turquette <mturquette@linaro.org>
+>
+> Then the board does not hang.
 
-Thanks,
-Maxime
+Isn't the increment of i missing?
 
-On 05/06/2014 02:39 PM, Srinivas Kandagatla wrote:
-> All the DT patches look good for me.
-> Acked-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->
-> I think It will be better to send a pull request to Arnd/Olof including
-> other reviewed DT patches.
->
-> thanks,
-> srini
->
->
-> On 05/05/14 16:38, Gabriel FERNANDEZ wrote:
->> The goal of this series is to enable ST Keyscan support to ST SoCs.
->> The DT definition is added for STiH415 and STiH416 SoCs on
->> B2000 board.
->> Tested on B2000 sti board.
->>
->> Gabriel Fernandez (4):
->>    ARM: STi: DT: add keyscan for stih415
->>    ARM: STi: DT: add keyscan for stih416
->>    ARM: STi: DT: add keyscan for stih41x-b2000
->>    ARM: multi_v7_defconfig: add ST Keyscan driver
->>
->>   arch/arm/boot/dts/stih415-pinctrl.dtsi | 16 ++++++++++++++++
->>   arch/arm/boot/dts/stih415.dtsi         | 12 ++++++++++++
->>   arch/arm/boot/dts/stih416-pinctrl.dtsi | 16 ++++++++++++++++
->>   arch/arm/boot/dts/stih416.dtsi         | 12 ++++++++++++
->>   arch/arm/boot/dts/stih41x-b2000.dtsi   | 23 +++++++++++++++++++++++
->>   arch/arm/configs/multi_v7_defconfig    |  1 +
->>   6 files changed, 80 insertions(+)
->>
+--- a/drivers/clk/clk-divider.c
++++ b/drivers/clk/clk-divider.c
+@@ -279,7 +279,7 @@ static int clk_divider_bestdiv(struct clk_hw *hw,
+unsigned long rate,
+         */
+        maxdiv = min(ULONG_MAX / rate, maxdiv);
+
+-       for (i = 1; i <= maxdiv; i = _next_div(divider, i)) {
++       for (i = 1; i <= maxdiv; i +=_next_div(divider, i)) {
+                if (!_is_valid_div(divider, i))
+                        continue;
+                if (rate * i == parent_rate_saved) {
