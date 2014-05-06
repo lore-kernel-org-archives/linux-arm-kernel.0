@@ -1,46 +1,46 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 06 May 2014 11:04:45 -0600
-Subject: [PATCH] ARM: tegra: add SD wp-gpios to Venice2 DT
-In-Reply-To: <20140429133449.GA23699@ulmo>
-References: <1398711219-23029-1-git-send-email-swarren@wwwdotorg.org>
- <20140429133449.GA23699@ulmo>
-Message-ID: <5369162D.9010600@wwwdotorg.org>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 6 May 2014 10:05:26 -0700
+Subject: [PATCH 1/5] ARM: defconfigs: add MTD_SPI_NOR (new dependency for
+ M25P80)
+In-Reply-To: <CAOesGMh09AQ3Y-cdXFov3-+RZHDYTVw=MWngRumHc0hnB-CGOg@mail.gmail.com>
+References: <1397719309-2022-1-git-send-email-computersforpeace@gmail.com>
+ <1397719309-2022-2-git-send-email-computersforpeace@gmail.com>
+ <535A8FC9.8040707@wwwdotorg.org>
+ <20140429190603.GB9418@norris-Latitude-E6410>
+ <20140430114548.GQ28159@titan.lakedaemon.net>
+ <CAOesGMi0zK8H=Ok81ZLhssvG5gsbvanY4dct_PF95Exq6p3tfg@mail.gmail.com>
+ <20140504174216.GV28159@titan.lakedaemon.net>
+ <CAOesGMh09AQ3Y-cdXFov3-+RZHDYTVw=MWngRumHc0hnB-CGOg@mail.gmail.com>
+Message-ID: <20140506170526.GA28907@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/29/2014 07:34 AM, Thierry Reding wrote:
-> On Mon, Apr 28, 2014 at 12:53:39PM -0600, Stephen Warren wrote:
->> From: Stephen Warren <swarren@nvidia.com>
->>
->> Venice2 can detect write-protect on the SD card. Add the required
->> DT entries to allow this.
->>
->> Signed-off-by: Stephen Warren <swarren@nvidia.com>
->> ---
->> Thierry, could you test this for me; my Venice2 has been sent away for
->> a few days for some rework. You should find that if you write-protect
->> your SD card, the kernel fails/panics trying to mount it as a r/w root
->> fs, whereas if the card is not write-protected, everything still works
->> fine. Thanks.
->> ---
->>  arch/arm/boot/dts/tegra124-venice2.dts | 1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/arch/arm/boot/dts/tegra124-venice2.dts b/arch/arm/boot/dts/tegra124-venice2.dts
->> index 84a6ec039e1d..00e741ba6927 100644
->> --- a/arch/arm/boot/dts/tegra124-venice2.dts
->> +++ b/arch/arm/boot/dts/tegra124-venice2.dts
->> @@ -943,6 +943,7 @@
->>  	sdhci at 0,700b0400 {
->>  		cd-gpios = <&gpio TEGRA_GPIO(V, 2) GPIO_ACTIVE_HIGH>;
->>  		power-gpios = <&gpio TEGRA_GPIO(R, 0) GPIO_ACTIVE_HIGH>;
->> +		wp-gpios = <&gpio TEGRA_GPIO(Q, 4) GPIO_ACTIVE_HIGH>;
+On Sun, May 04, 2014 at 11:53:22AM -0700, Olof Johansson wrote:
+> On Sun, May 4, 2014 at 10:42 AM, Jason Cooper <jason@lakedaemon.net> wrote:
+> > On Sat, May 03, 2014 at 03:51:11PM -0700, Olof Johansson wrote:
+> >> Cases like these are easiest that we just take the patch directly in
+> >> an early-merge branch (i.e. cleanup or fixes-non-critical, or a
+> >> generic depends branch), and if there's conflicts as topics are merged
+> >> in from subplatforms we can deal with it then.
+> >
+> > Are you referring to basing on -rc1, or the series being split up to
+> > the individual sub-arch maintainers?
+> >
+> > *slightly* confused,
 > 
-> I need to make this GPIO_ACTIVE_LOW for this to work properly on my
-> Venice2.
+> I'm referring to us taking the patch into something like our cleanup
+> branch, and any branches that come in from you or other subplatforms
+> will be merged on top, so we can resolve conflicts there and then.
+> We'll merge in the cleanup branch into other next/* branches as needed
+> to resolve the conflicts in our tree instead of percolating them all
+> the way up.
 
-Ah yes, I need that too. The other kernel I was using as a reference
-evidently doesn't use the GPIO flags for inversion, but rather a
-separate wp-inverted property, which I hadn't noticed.
+In case you didn't notice, I already had split up the patch series a
+little more for v2 (based on -rc1 still), and most of it seems to be
+going through the sub-arch trees, I think. There is one patch targeted
+directly at arm-soc (that's you, Olof?).
 
-With the polarity fixed, I have applied this to Tegra's for-3.16/dt branch.
+Let me know if v2 has any problems.
+
+Thanks,
+Brian
