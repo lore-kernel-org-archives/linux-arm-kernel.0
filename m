@@ -1,48 +1,33 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 6 May 2014 15:08:59 +0100
-Subject: [PATCH] arm64: Clean up the default pgprot setting
-In-Reply-To: <20140502170745.GF20642@arm.com>
-References: <1399045919-5615-1-git-send-email-catalin.marinas@arm.com>
- <20140502170745.GF20642@arm.com>
-Message-ID: <20140506140857.GB23957@arm.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Tue,  6 May 2014 15:12:28 +0100
+Subject: [PATCH] arm: Describe required sort order for textofs-y (TEXT_OFFSET)
+Message-ID: <1399385548-17892-1-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 02, 2014 at 06:07:45PM +0100, Will Deacon wrote:
-> On Fri, May 02, 2014 at 04:51:59PM +0100, Catalin Marinas wrote:
-> > The primary aim of this patchset is to remove the pgprot_default and
-> > prot_sect_default global variables and rely strictly on predefined
-> > values. The original goal was to be able to run SMP kernels on UP
-> > hardware by not setting the Shareability bit. However, it is unlikely to
-> > see UP ARMv8 hardware and even if we do, the Shareability bit is no
-> > longer assumed to disable cacheable accesses.
-> > 
-> > A side effect is that the device mappings now have the Shareability
-> > attribute set. The hardware, however, should ignore it since Device
-> > accesses are always Outer Shareable.
-> > 
-> > Following the removal of the two global variables, there is some PROT_*
-> > macro reshuffling and cleanup, including the __PAGE_* macros (replaced
-> > by PAGE_*).
-> 
-> [...]
-> 
-> > +#define PAGE_NONE		__pgprot(((_PAGE_DEFAULT) & ~PTE_TYPE_MASK) | PTE_PROT_NONE | PTE_PXN | PTE_UXN)
-> > +#define PAGE_SHARED		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN | PTE_WRITE)
-> > +#define PAGE_SHARED_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_WRITE)
-> > +#define PAGE_COPY		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
-> > +#define PAGE_COPY_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN)
-> > +#define PAGE_READONLY		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
-> > +#define PAGE_READONLY_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN)
-> > +#define PAGE_EXECONLY		__pgprot(_PAGE_DEFAULT | PTE_NG | PTE_PXN)
-> 
-> Could you build the non-exec versions in terms of the exec versions? The
-> difference is just the addition of PTE_UXN, and it would make this easier to
-> read.
+The section of the makefile that determines the TEXT_OFFSET is sorted
+by address so that, in multi-arch kernel builds, the architecture with the
+most stringent requirements for the kernel base address gets to define
+TEXT_OFFSET. The comment should reflect that.
 
-I think it still looks nicer this way. If we are writing one in terms of
-the other we have to use pgprot_val() to decompose the __pgprot()
-returned type.
+Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+---
+ arch/arm/Makefile | 3 +++
+ 1 file changed, 3 insertions(+)
 
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 41c1931..6857fec 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -127,6 +127,9 @@ CHECKFLAGS	+= -D__arm__
+ 
+ #Default value
+ head-y		:= arch/arm/kernel/head$(MMUEXT).o
++
++# Text offset. This list is sorted numerically by address in order to
++# provide a means to avoid/resolve conflicts in multi-arch kernels.
+ textofs-y	:= 0x00008000
+ textofs-$(CONFIG_ARCH_CLPS711X) := 0x00028000
+ # We don't want the htc bootloader to corrupt kernel during resume
 -- 
-Catalin
+1.9.0
