@@ -1,45 +1,57 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 6 May 2014 14:00:02 +0200
-Subject: [PATCH] ARM: dts: i.MX53: Fix ipu register space size
-In-Reply-To: <20140506134943.4d87a726@ipc1.ka-ro>
-References: <1399374094-32451-1-git-send-email-s.hauer@pengutronix.de>
- <20140506134943.4d87a726@ipc1.ka-ro>
-Message-ID: <20140506120002.GC5918@pengutronix.de>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Tue, 6 May 2014 13:01:32 +0100
+Subject: [PATCH v5 5/6] arm64: mm: Implement 4 levels of translation tables
+In-Reply-To: <000501cf64e5$d92ae870$8b80b950$@samsung.com>
+References: <000501cf64e5$d92ae870$8b80b950$@samsung.com>
+Message-ID: <20140506120131.GA26776@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 06, 2014 at 01:49:43PM +0200, Lothar Wa?mann wrote:
-> Hi,
+On Thu, May 01, 2014 at 11:34:16AM +0900, Jungseok Lee wrote:
+> This patch implements 4 levels of translation tables since 3 levels
+> of page tables with 4KB pages cannot support 40-bit physical address
+> space described in [1] due to the following issue.
 > 
-> Sascha Hauer wrote:
-> > The IPU register space is 128MB, not 2GB.
-> > 
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > ---
-> >  arch/arm/boot/dts/imx53.dtsi | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-> > index 9c2bff2..6a1bf4f 100644
-> > --- a/arch/arm/boot/dts/imx53.dtsi
-> > +++ b/arch/arm/boot/dts/imx53.dtsi
-> > @@ -115,7 +115,7 @@
-> >  			#address-cells = <1>;
-> >  			#size-cells = <0>;
-> >  			compatible = "fsl,imx53-ipu";
-> > -			reg = <0x18000000 0x080000000>;
-> > +			reg = <0x18000000 0x08000000>;
-> >
-> IMO this should be either 0x00800000 or 0x800000
-> while I prefer the first notation.
+> It is a restriction that kernel logical memory map with 4KB + 3 levels
+> (0xffffffc000000000-0xffffffffffffffff) cannot cover RAM region from
+> 544GB to 1024GB in [1]. Specifically, ARM64 kernel fails to create
+> mapping for this region in map_mem function since __phys_to_virt for
+> this region reaches to address overflow.
+> 
+> If SoC design follows the document, [1], over 32GB RAM would be placed
+> from 544GB. Even 64GB system is supposed to use the region from 544GB
+> to 576GB for only 32GB RAM. Naturally, it would reach to enable 4 levels
+> of page tables to avoid hacking __virt_to_phys and __phys_to_virt.
+> 
+> However, it is recommended 4 levels of page table should be only enabled
+> if memory map is too sparse or there is about 512GB RAM.
+> 
 
-Look again, the original size is 9 digits wide: 0x0_8000_0000. I
-changed this to 0x_08000_0000 which is 8 digits wide.
+Hi Jungseok,
+One comment below:
 
-Sascha
+[ ... ]
 
+> diff --git a/arch/arm64/include/asm/tlb.h b/arch/arm64/include/asm/tlb.h
+> index bc19101..086112b 100644
+> --- a/arch/arm64/include/asm/tlb.h
+> +++ b/arch/arm64/include/asm/tlb.h
+> @@ -100,6 +100,15 @@ static inline void __pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmdp,
+>  }
+>  #endif
+>  
+> +#ifdef CONFIG_ARM64_4_LEVELS
+> +static inline void __pud_free_tlb(struct mmu_gather *tlb, pmd_t *pudp,
+> +				  unsigned long addr)
+
+The second parameter needs to be a pointer to pud_t ?
+(this fires up a warning with STRICT_MM_TYPECHECKS).
+
+With that and Christoffer's feedback about expanding the comments on
+create_pud_entry addressed:
+
+Reviewed-by: Steve Capper <steve.capper@linaro.org>
+
+Cheers,
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Steve
