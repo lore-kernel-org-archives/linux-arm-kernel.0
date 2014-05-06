@@ -1,36 +1,36 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 6 May 2014 18:00:39 +0100
-Subject: [PATCH 3/3] perf tools: Add libdw DWARF post unwind support for
- ARM64
-In-Reply-To: <1399391733-11927-4-git-send-email-jean.pihet@linaro.org>
-References: <1399391733-11927-1-git-send-email-jean.pihet@linaro.org>
- <1399391733-11927-4-git-send-email-jean.pihet@linaro.org>
-Message-ID: <20140506170039.GB13677@arm.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 06 May 2014 10:04:37 -0700
+Subject: [PATCH v10 00/15] ARM: sunxi: Add driver for SD/MMC hosts found on
+ Allwinner sunxi SoCs
+In-Reply-To: <1399046249-19472-1-git-send-email-hdegoede@redhat.com>
+References: <1399046249-19472-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20140506170437.5739.402@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean,
+Quoting Hans de Goede (2014-05-02 08:57:14)
+> The first 2 patches are depenencies which should go in through the clk tree,
+> Mike can you pick these 2 up please ?  :
 
-On Tue, May 06, 2014 at 04:55:33PM +0100, Jean Pihet wrote:
-> Adding libdw DWARF post unwind support, which is part
-> of elfutils-devel/libdw-dev package from version 0.158.
+Taken into clk-next.
+
 > 
-> Note: the libdw code needs some support for dwarf unwinding
-> on ARM64, this code is submitted seperately on the elfutils
-> ML.
+> "clk: sunxi: factors: automatic reparenting support"
+> Is uncontroversial and has been favorably reviewed by various people.
 > 
-> The new code is contained in unwin-libdw.c object, and
-> implements unwind__get_entries unwind interface function.
+> "clk: sunxi: Implement MMC phase control"
+> Is somewhat more controversial as there has been lots of discussion about
+> adding a generic phase control method to the clk framework. The problem is
+> that there has been a lot of talk about such a generic phase control method
+> but not a single patch. Therefor I would like to move forwards with using
+> a platform specific method for now. I hereby promise that once we've a generic
+> method I'll write patches to convert the sunxi code to that method.
 
-Are you planning to implement support for 32-bit ARM too? If so, we'll need
-compat handling here again (your favourite!).
+Thanks for the promise. I will hold you to it once the set_phase api is
+sorted ;-)
 
-> +bool libdw__arch_set_initial_registers(Dwfl_Thread *thread, void *arg)
-> +{
-> +	struct unwind_info *ui = arg;
-> +	struct regs_dump *user_regs = &ui->sample->user_regs;
-> +	Dwarf_Word dwarf_regs[PERF_REG_ARM64_MAX];
+Also thanks for the clear and concise cover letter. It is very helpful
+when going through the tenth iteration of a series.
 
-Shouldn't this be PERF_REG_ARM64_MAX - 1?
-
-Will
+Regards,
+Mike
