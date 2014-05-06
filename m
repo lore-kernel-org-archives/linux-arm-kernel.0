@@ -1,59 +1,57 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 6 May 2014 18:25:14 +0200
-Subject: [PATCH resend 03/15] arm64: defer reloading a task's FPSIMD state
- to userland resume
-In-Reply-To: <20140506160826.GI23957@arm.com>
-References: <1398959381-8126-1-git-send-email-ard.biesheuvel@linaro.org>
- <1398959381-8126-4-git-send-email-ard.biesheuvel@linaro.org>
- <20140506160826.GI23957@arm.com>
-Message-ID: <CAKv+Gu9ogEHb6rOT6KgPMDXjTwR5Krz0s7pkiaW_7vtZipu2Hw@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 06 May 2014 10:26:09 -0600
+Subject: [PATCH v3 1/3] base: power: Add generic OF-based power domain
+ look-up
+In-Reply-To: <CAPDyKFoGOcScsaGWkw9bVh=gpGTApRK48AczaMiSmLah+YOSXQ@mail.gmail.com>
+References: <1398271618-28932-1-git-send-email-t.figa@samsung.com>	<1398271618-28932-2-git-send-email-t.figa@samsung.com>	<535E9163.3070305@wwwdotorg.org>
+ <CAPDyKFoGOcScsaGWkw9bVh=gpGTApRK48AczaMiSmLah+YOSXQ@mail.gmail.com>
+Message-ID: <53690D21.8080807@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 May 2014 18:08, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Thu, May 01, 2014 at 04:49:35PM +0100, Ard Biesheuvel wrote:
->> @@ -153,12 +252,11 @@ static int fpsimd_cpu_pm_notifier(struct notifier_block *self,
->>  {
->>         switch (cmd) {
->>         case CPU_PM_ENTER:
->> -               if (current->mm)
->> +               if (current->mm && !test_thread_flag(TIF_FOREIGN_FPSTATE))
->>                         fpsimd_save_state(&current->thread.fpsimd_state);
->>                 break;
->>         case CPU_PM_EXIT:
->> -               if (current->mm)
->> -                       fpsimd_load_state(&current->thread.fpsimd_state);
->> +               set_thread_flag(TIF_FOREIGN_FPSTATE);
->
-> I think we could enter a PM state on a kernel thread (idle), so we
-> should preserve the current->mm check as well.
->
+On 05/06/2014 02:22 AM, Ulf Hansson wrote:
+> On 28 April 2014 19:35, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 04/23/2014 10:46 AM, Tomasz Figa wrote:
+>>> This patch introduces generic code to perform power domain look-up using
+>>> device tree and automatically bind devices to their power domains.
+>>> Generic device tree binding is introduced to specify power domains of
+>>> devices in their device tree nodes.
+>>>
+>>> Backwards compatibility with legacy Samsung-specific power domain
+>>> bindings is provided, but for now the new code is not compiled when
+>>> CONFIG_ARCH_EXYNOS is selected to avoid collision with legacy code. This
+>>> will change as soon as Exynos power domain code gets converted to use
+>>> the generic framework in further patch.
+>>
+>>> diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
+>>
+>>> +==Power domain consumers==
+>>> +
+>>> +Required properties:
+>>> + - power-domain : A phandle and power domain specifier as defined by bindings
+>>> +                  of power controller specified by phandle.
+>>
+>> It seems quite likely that a single logical device could have components
+>> in multiple power domains. Consider an HDMI controller with different
+>> power domains for the HDMI core, CEC communication, DDC/I2C
+>> communication, and the I/O pads, with no clear separation between those
+>> two components of the module (no separate register spaces, but the
+>> bits/registers are interleaved all together).
+>>
+>> As such, I think that rather than a "power-domain" property, we need a
+>> pair of "power-domains", and "power-domain-names" properties, and
+>> preferably with mandatory usage of name-based lookups, rather than
+>> allowing a random mix of name-based and index-based lookups like we have
+>> with some existing resource bindings.
+> 
+> Each struct device have only one dev_pm_domain pointer, thus a device
+> are not able to reside in more than one power domain.
+> 
+> Therefore I doubt this will be very useful, unless I missed your point. :-)
 
-OK
+A struct device is a Linux-internal concept. DT is supposed to represent
+the HW in an OS-agnostic fashion, not according to the limitations of
+any one OS's driver model.
 
->>                 break;
->>         case CPU_PM_ENTER_FAILED:
->>         default:
->> diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
->> index 06448a77ff53..882f01774365 100644
->> --- a/arch/arm64/kernel/signal.c
->> +++ b/arch/arm64/kernel/signal.c
->> @@ -413,4 +413,8 @@ asmlinkage void do_notify_resume(struct pt_regs *regs,
->>                 clear_thread_flag(TIF_NOTIFY_RESUME);
->>                 tracehook_notify_resume(regs);
->>         }
->> +
->> +       if (thread_flags & _TIF_FOREIGN_FPSTATE)
->> +               fpsimd_restore_current_state();
->
-> I think this should be safe. Even if we get preempted here, ret_to_user
-> would loop over TI_FLAGS with interrupts disabled until no work pending.
->
-
-I don't follow. Do you think I should change something here?
-
-Anyway, inside fpsimd_restore_current_state() the TIF_FOREIGN_FPSTATE
-is checked again, but this time with preemption disabled.
-
--- 
-Ard.
+It's certainly true that a single logical HW module (represented by a
+single DT node) can have parts in multiple power domains.
