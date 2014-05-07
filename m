@@ -1,47 +1,125 @@
-From: pullip.cho@samsung.com (Cho KyongHo)
-Date: Wed, 07 May 2014 09:44:53 +0900
-Subject: [PATCH v12 00/31] iommu/exynos: Fixes and Enhancements of System
- MMU driver with DT
-In-Reply-To: <5369252F.4070402@gmail.com>
-References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
- <26065037.GxQQuIURPg@wuerfel>
- <CAOD6ATqZ5UwRwSKiPDQLrgmX=UUrJVE7ybM_RhXz_CEUjM3W7w@mail.gmail.com>
- <20140506175904.GB12376@8bytes.org> <5369252F.4070402@gmail.com>
-Message-ID: <20140507094453.28f0429152e5b59a5dda9fd8@samsung.com>
+From: arunks.linux@gmail.com (Arun KS)
+Date: Wed, 7 May 2014 07:01:44 +0530
+Subject: arm64: Fix machine_shutdown() definition
+In-Reply-To: <53690F55.6030504@wwwdotorg.org>
+References: <1399391708-13442-1-git-send-email-arunks.linux@gmail.com>
+ <53690F55.6030504@wwwdotorg.org>
+Message-ID: <CAKZGPANMv_SNVyRBPc1KDhpAYFXnuXBX+PyovbMgN9ZTAs=EUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 06 May 2014 20:08:47 +0200, Tomasz Figa wrote:
-> On 06.05.2014 19:59, Joerg Roedel wrote:
-> > On Wed, Apr 30, 2014 at 04:27:10PM +0530, Shaik Ameer Basha wrote:
-> >> This series is going on for quite a long time and most of the patches here
-> >> doesn't depend on dt bindings. As Exynos IOMMU h/w is introducing new versions
-> >> very frequently, maintaining and reviewing all these patches again and
-> >> again is quite a hard job.
-> >>
-> >> If it is acceptable, I can post one more series with the subset of
-> >> above patches,
-> >> which doesn't depend on dt-bindings. As all the patches which doesn't depend on
-> >> DT bindings are already tested,  I hope merging these subset of patches may help
-> >> in reducing the rework and review effort every time.
-> >>
-> >> Once we finalize the generic DT bindings for the IOMMU devices, the driver
-> >> can be updated with the proposed DT bindings in mind.
-> >
-> > Sounds reasonable to me if the patch subset is self-contained. When
-> > Arnd is OK with that and no one else has objections I can take the
-> > dt-independend parts.
-> 
-> +1.
-> 
-> I would also suggest dropping patch 18/31, for the reasons I mentioned 
-> in my reply to it.
-> 
+Hi Stephen,
 
-Great.
+On Tue, May 6, 2014 at 10:05 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 05/06/2014 09:55 AM, arunks.linux at gmail.com wrote:
+>> From: Arun KS <arun.linux@gmail.com>
+>>
+>> machine_shutdown() is a hook for kexec. Add a comment saying so, since
+>> it isn't obvious from the function name.
+>>
+>> Halt, power-off, and restart have different requirements re: stopping
+>> secondary CPUs than kexec has. The former simply require the secondary
+>> CPUs to be quiesced somehow, whereas kexec requires them to be
+>> completely non-operational, so that no matter where the kexec target
+>> images are written in RAM, they won't influence operation of the
+>> secondary CPUS,which could happen if the CPUs were still executing some
+>> kind of pin loop. To this end, modify machine_halt, power_off, and
+>> restart to call smp_send_stop() directly, rather than calling
+>> machine_shutdown().
+>>
+>> In machine_shutdown(), replace the call to smp_send_stop() with a call
+>> to disable_nonboot_cpus(). This completely disables all but one CPU,
+>> thus satisfying the kexec requirements a couple paragraphs above.
+>>
+>> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+>> Signed-off-by: Arun KS <getarunks@gmail.com>
+>> Signed-off-by: Arun KS <arunks.linux@gmail.com>
+>
+> It's a bit odd to include my s-o-b here when I didn't actually write
+> this particular patch. No doubt it's included because I wrote an
+> identical patch for arch/arm/.
+>
+> Rather than including my s-o-b here, perhaps simply including the
+> following paragraph in the commit decription would be better:
+>
+> This patch ports most of commit 19ab428f4b79 "ARM: 7759/1: decouple CPU
+> offlining from reboot/shutdown" by Stephen Warren from arch/arm to
+> arch/arm64.
 
-We will prepare the next patch series that are independent upon DT bindings soon.
+Okey. I ll re-spin this patch.
 
-Thank you.
+>
+> Or, I sometimes use the following tag instead of s-o-b:
+>
+> Based-on-work-by: Stephen Warren <swarren@nvidia.com>
+>
+> Including two s-o-b for yourself probably isn't necesary.
+>
+> Do you need to include an equivalent of the following from my original
+> patch to arch/arm/?
 
-KyongHo
+Rest of the things are already taken care in arm64.
+
+Thanks,
+Arun
+>
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index 239fa96c12bb..2651b1da1c56 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -2016,7 +2016,7 @@ config XIP_PHYS_ADDR
+>>
+>>  config KEXEC
+>>         bool "Kexec system call (EXPERIMENTAL)"
+>> -       depends on (!SMP || HOTPLUG_CPU)
+>> +       depends on (!SMP || PM_SLEEP_SMP)
+>>         help
+>>           kexec is a system call that implements the ability to shutdown your
+>>           current kernel, and to start another kernel.  It is like a reboot
+>> diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
+>> index 8ef8c9337809..4fb074c446bf 100644
+>> --- a/arch/arm/kernel/machine_kexec.c
+>> +++ b/arch/arm/kernel/machine_kexec.c
+>> @@ -134,6 +134,10 @@ void machine_kexec(struct kimage *image)
+>>         unsigned long reboot_code_buffer_phys;
+>>         void *reboot_code_buffer;
+>>
+>> +       if (num_online_cpus() > 1) {
+>> +               pr_err("kexec: error: multiple CPUs still online\n");
+>> +               return;
+>> +       }
+>>
+>>         page_list = image->head & PAGE_MASK;
+>>
+>> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+>> index 550d63cef68e..5919eb451bb9 100644
+>> --- a/arch/arm/kernel/smp.c
+>> +++ b/arch/arm/kernel/smp.c
+>> @@ -651,17 +651,6 @@ void smp_send_reschedule(int cpu)
+>>         smp_cross_call(cpumask_of(cpu), IPI_RESCHEDULE);
+>>  }
+>>
+>> -#ifdef CONFIG_HOTPLUG_CPU
+>> -static void smp_kill_cpus(cpumask_t *mask)
+>> -{
+>> -       unsigned int cpu;
+>> -       for_each_cpu(cpu, mask)
+>> -               platform_cpu_kill(cpu);
+>> -}
+>> -#else
+>> -static void smp_kill_cpus(cpumask_t *mask) { }
+>> -#endif
+>> -
+>>  void smp_send_stop(void)
+>>  {
+>>         unsigned long timeout;
+>> @@ -679,8 +668,6 @@ void smp_send_stop(void)
+>>
+>>         if (num_online_cpus() > 1)
+>>                 pr_warning("SMP: failed to stop secondary CPUs\n");
+>> -
+>> -       smp_kill_cpus(&mask);
+>>  }
+>>
+>>  /*
+>
