@@ -1,33 +1,44 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 08 May 2014 08:32:47 +0900
-Subject: [PATCH 03/04] ARM: shmobile: Use r8a7740 DT CPU Frequency for
- Armadillo DT Ref
+Date: Thu, 08 May 2014 08:32:56 +0900
+Subject: [PATCH 04/04] ARM: shmobile: Remove unused r8a7740_init_delay()
 In-Reply-To: <20140507233219.29712.9253.sendpatchset@w520>
 References: <20140507233219.29712.9253.sendpatchset@w520>
-Message-ID: <20140507233247.29712.21368.sendpatchset@w520>
+Message-ID: <20140507233256.29712.54976.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm+renesas@opensource.se>
 
-Convert the Armadillo r8a7740 DT reference board support
-to use shmobile_init_delay() to be able to migrate away
-from per-SoC delay setup functions.
+Remove the now unused r8a7740_init_delay() function.
 
 Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 ---
 
- arch/arm/mach-shmobile/board-armadillo800eva-reference.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-shmobile/include/mach/r8a7740.h |    1 -
+ arch/arm/mach-shmobile/setup-r8a7740.c        |    5 -----
+ 2 files changed, 6 deletions(-)
 
---- 0001/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
-+++ work/arch/arm/mach-shmobile/board-armadillo800eva-reference.c	2014-04-24 17:59:55.000000000 +0900
-@@ -187,7 +187,7 @@ static const char *eva_boards_compat_dt[
+--- 0001/arch/arm/mach-shmobile/include/mach/r8a7740.h
++++ work/arch/arm/mach-shmobile/include/mach/r8a7740.h	2014-04-24 18:02:10.000000000 +0900
+@@ -47,7 +47,6 @@ enum {
+ };
  
- DT_MACHINE_START(ARMADILLO800EVA_DT, "armadillo800eva-reference")
- 	.map_io		= r8a7740_map_io,
--	.init_early	= r8a7740_init_delay,
-+	.init_early	= shmobile_init_delay,
- 	.init_irq	= r8a7740_init_irq_of,
- 	.init_machine	= eva_init,
- 	.init_late	= shmobile_init_late,
+ extern void r8a7740_meram_workaround(void);
+-extern void r8a7740_init_delay(void);
+ extern void r8a7740_init_irq_of(void);
+ extern void r8a7740_map_io(void);
+ extern void r8a7740_add_early_devices(void);
+--- 0004/arch/arm/mach-shmobile/setup-r8a7740.c
++++ work/arch/arm/mach-shmobile/setup-r8a7740.c	2014-04-24 18:01:54.000000000 +0900
+@@ -876,11 +876,6 @@ void __init r8a7740_add_standard_devices
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
+-void __init r8a7740_init_delay(void)
+-{
+-	shmobile_setup_delay(800, 1, 3); /* Cortex-A9 @ 800MHz */
+-};
+-
+ void __init r8a7740_init_irq_of(void)
+ {
+ 	void __iomem *intc_prio_base = ioremap_nocache(0xe6900010, 0x10);
