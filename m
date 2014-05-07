@@ -1,36 +1,35 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Thu, 8 May 2014 06:33:44 +0800
-Subject: [PATCH v5 02/14] ARM: add V7_NONLPAE && V7_LPAE sub config
-In-Reply-To: <20140507164614.GA12692@quad.lixom.net>
-References: <1399473888-12947-1-git-send-email-haojian.zhuang@linaro.org>
- <1399473888-12947-3-git-send-email-haojian.zhuang@linaro.org>
- <20140507164614.GA12692@quad.lixom.net>
-Message-ID: <CAD6h2NQ1agokeqPQSe2rvKVM4szg2wYQw_c_36Nu0SDefmKE0g@mail.gmail.com>
+From: b.galvani@gmail.com (Beniamino Galvani)
+Date: Thu,  8 May 2014 01:08:32 +0200
+Subject: [PATCH 0/3] Add Rockchip PWM driver
+Message-ID: <1399504115-16257-1-git-send-email-b.galvani@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 May 2014 00:46, Olof Johansson <olof@lixom.net> wrote:
-> On Wed, May 07, 2014 at 10:44:36PM +0800, Haojian Zhuang wrote:
->> Since CONFIG_ARM_LPAE could be set in ARM V7, add new two configurations
->> CONFIG_ARCH_MULTI_V7_NONLPAE & CONFIG_ARCH_MULTI_V7_LPAE.
->>
->> If we want to enable CONFIG_ARM_LPAE configuration, we should enable
->> CONFIG_ARCH_MULTI_V7 & disable both CONFIG_ARCH_MULTI_V6 and
->> CONFIG_ARCH_MULTI_V7_NONLPAE.
->>
->> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
->
-> I don't like this. Platforms should just depend on CONFIG_ARCH_MULTI_V7 &&
-> LPAE (or && !LPAE) instead.
->
-> Platforms that _can_ boot without LPAE should not require it, even if
-> they boot with less available memory.
->
->
-> -Olof
+This series adds support for the PWM controller found on Rockchip
+RK29, RK30 and RK31 SoCs. It is based on the documentation publicly
+available [0] and kernel sources from Rockchip [1].
 
-Do you mean that I should remove CONFIG_ARCH_MULTI_V7_NONLPAE &
-CONFIG_ARCH_MULTI_V7_LPAE & multi_v7_lpae_defconfig?
+The last patch, which adds device tree nodes in the dts, depends on
+the clocks introduced by Heiko in his recent submission of a clk
+driver for Rockchip RK3188.
 
-Regards
-Haojian
+[0] http://dl.radxa.com/rock/docs/hw/ds/Rockchip%20RK30xx%20TRM%20V2.0.pdf
+[1] https://github.com/rkchrome/kernel
+
+Beniamino Galvani (3):
+  pwm: add Rockchip SoC PWM support
+  pwm: rockchip: document device tree bindings
+  ARM: dts: rk3xxx: add PWM nodes
+
+ .../devicetree/bindings/pwm/pwm-rockchip.txt       |   17 ++
+ arch/arm/boot/dts/rk3188.dtsi                      |   40 +++++
+ arch/arm/boot/dts/rk3xxx.dtsi                      |   32 ++++
+ drivers/pwm/Kconfig                                |    8 +
+ drivers/pwm/Makefile                               |    1 +
+ drivers/pwm/pwm-rockchip.c                         |  180 ++++++++++++++++++++
+ 6 files changed, 278 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pwm/pwm-rockchip.txt
+ create mode 100644 drivers/pwm/pwm-rockchip.c
+
+-- 
+1.7.10.4
