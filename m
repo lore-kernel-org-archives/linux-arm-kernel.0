@@ -1,169 +1,60 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 7 May 2014 13:51:57 +0530
-Subject: [PATCH 05/17] pci: host: pcie-dra7xx: add support for pcie-dra7xx
- controller
-In-Reply-To: <201405061544.28738.marex@denx.de>
-References: <1399383244-14556-1-git-send-email-kishon@ti.com>
- <1399383244-14556-6-git-send-email-kishon@ti.com>
- <201405061544.28738.marex@denx.de>
-Message-ID: <5369ED25.70101@ti.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 07 May 2014 10:25:37 +0200
+Subject: [PATCH 0/7] Add Allwinner A31 USB support
+In-Reply-To: <1399434623-20383-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1399434623-20383-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <5369EE01.1090909@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Tuesday 06 May 2014 07:14 PM, Marek Vasut wrote:
-> On Tuesday, May 06, 2014 at 03:33:51 PM, Kishon Vijay Abraham I wrote:
->> Added support for pcie controller in dra7xx. This driver re-uses
->> the designware core code that is already present in kernel.
+On 05/07/2014 05:50 AM, Maxime Ripard wrote:
+> Hi everyone,
 > 
-> [...]
+> This patchset adds support for the USB controllers found in the
+> Allwinner A31.
 > 
->> +#define to_dra7xx_pcie(x)	container_of((x), struct dra7xx_pcie, pp)
->> +
->> +static inline u32 dra7xx_pcie_readl(void __iomem *base, u32 offset)
+> While the design is similar to the earlier Allwinner SoCs that are
+> already supported, a few details here and there change, like the fact
+> that the PHYs now have one clock per phy, while it used to be only one
+> for all the PHYs.
 > 
-> Just pass struct dra7xx_pcie * instead of *base here , it will make the code 
-> below shorter.
-> 
->> +{
->> +	return readl(base + offset);
->> +}
->> +
->> +static inline void dra7xx_pcie_writel(void __iomem *base, u32 offset, u32
->> value) +{
-> 
-> DTTO.
-> 
->> +	writel(value, base + offset);
->> +}
->> +
->> +static int dra7xx_pcie_link_up(struct pcie_port *pp)
->> +{
->> +	struct dra7xx_pcie *dra7xx = to_dra7xx_pcie(pp);
->> +	u32 reg = dra7xx_pcie_readl(dra7xx->base, PCIECTRL_DRA7XX_CONF_PHY_CS);
->> +
->> +	if (reg & LINK_UP)
->> +		return true;
->> +	return false;
-> 
-> return reg & LINK_UP;
-> 
->> +}
->> +
->> +static int dra7xx_pcie_establish_link(struct pcie_port *pp)
->> +{
->> +	u32 reg;
->> +	int retries = 1000;
->> +	struct dra7xx_pcie *dra7xx = to_dra7xx_pcie(pp);
->> +
->> +	if (dw_pcie_link_up(pp)) {
->> +		dev_err(pp->dev, "link is already up\n");
-> 
-> This will spew, since the .link_up (and thus this function) can be called 
-> repeatedly. The subsystem will query if the link is up via this function.
+> Thanks,
+> Maxime
 
-*dra7xx_pcie_establish_link* is not the callback for link_up function, so it's
-actually called only once.
-> 
->> +		return 0;
->> +	}
->> +
->> +	reg = dra7xx_pcie_readl(dra7xx->base, PCIECTRL_DRA7XX_CONF_DEVICE_CMD);
->> +	reg |= LTSSM_EN;
->> +	dra7xx_pcie_writel(dra7xx->base, PCIECTRL_DRA7XX_CONF_DEVICE_CMD, reg);
->> +
->> +	while (--retries) {
-> 
-> Use retries--
-> 
->> +		reg = dra7xx_pcie_readl(dra7xx->base,
->> +					PCIECTRL_DRA7XX_CONF_PHY_CS);
->> +		if (reg & LINK_UP)
->> +			break;
->> +		usleep_range(10, 20);
->> +	}
->> +
->> +	if (retries <= 0) {
-> 
-> Then check if retries == 0 and retries can be unsigned int.
-> 
->> +		dev_err(pp->dev, "link is not up\n");
->> +		return -ETIMEDOUT;
->> +	}
->> +
->> +	return 0;
->> +}
-> [...]
->> +static int __init dra7xx_pcie_probe(struct platform_device *pdev)
->> +{
->> +	u32 reg;
->> +	int ret;
->> +	int irq;
->> +	struct phy *phy;
->> +	void __iomem *base;
->> +	struct resource *res;
->> +	struct dra7xx_pcie *dra7xx;
->> +	struct device *dev = &pdev->dev;
->> +
->> +	dra7xx = devm_kzalloc(&pdev->dev, sizeof(*dra7xx), GFP_KERNEL);
->> +	if (!dra7xx)
->> +		return -ENOMEM;
->> +
->> +	irq = platform_get_irq(pdev, 0);
->> +	if (irq < 0) {
->> +		dev_err(dev, "missing IRQ resource\n");
->> +		return -EINVAL;
->> +	}
->> +
->> +	ret = devm_request_irq(&pdev->dev, irq, dra7xx_pcie_irq_handler,
->> +			       IRQF_SHARED, "dra7xx-pcie-main", dra7xx);
->> +	if (ret) {
->> +		dev_err(&pdev->dev, "failed to request irq\n");
->> +		return ret;
->> +	}
->> +
->> +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "ti_conf");
->> +	base = devm_ioremap_nocache(dev, res->start, resource_size(res));
->> +	if (!base)
->> +		return -ENOMEM;
->> +
->> +	phy = devm_phy_get(dev, "pcie-phy");
->> +	if (IS_ERR(phy))
->> +		return PTR_ERR(phy);
->> +
->> +	ret = phy_init(phy);
->> +	if (ret < 0)
->> +		return ret;
->> +
->> +	ret = phy_power_on(phy);
->> +	if (ret < 0)
->> +		goto err_power_on;
->> +
->> +	dra7xx->base = base;
->> +	dra7xx->phy = phy;
->> +	dra7xx->dev = dev;
->> +
->> +	pm_runtime_enable(&pdev->dev);
->> +	ret = pm_runtime_get_sync(&pdev->dev);
->> +	if (IS_ERR_VALUE(ret)) {
->> +		dev_err(dev, "pm_runtime_get_sync failed\n");
->> +		goto err_runtime_get;
->> +	}
->> +
->> +	reg = dra7xx_pcie_readl(dra7xx->base, PCIECTRL_DRA7XX_CONF_DEVICE_CMD);
->> +	reg &= ~LTSSM_EN;
->> +	dra7xx_pcie_writel(dra7xx->base, PCIECTRL_DRA7XX_CONF_DEVICE_CMD, reg);
-> 
-> platform_set_drvdata() should be here, before you add the port.
-> 
->> +	ret = add_pcie_port(dra7xx, pdev);
->> +	if (ret < 0)
->> +		goto err_add_port;
->> +
->> +	platform_set_drvdata(pdev, dra7xx);
+Thanks for working on this.
 
-Al-right. Will fix this and all your other comments.
+Looks good, the entire series is:
 
-Thanks
-Kishon
+Reviewed-by: Hans de Goede <hdegoede@redhat.com>
+
+Regards,
+
+Hans
+
+
+> 
+> Boris BREZILLON (2):
+>   usb: ehci-platform: add optional reset controller retrieval
+>   ARM: sunxi: dt: add APP4-EVB1 board support
+> 
+> Maxime Ripard (5):
+>   clk: sunxi: Implement A31 USB clock
+>   ARM: sun6i: Add the USB clocks to the DTSI.
+>   phy: usb: sunxi: Introduce Allwinner A31 USB PHY support
+>   usb: ohci-platform: Enable optional use of reset controller
+>   ARM: sun6i: dt: Add support for the USB controllers
+> 
+>  Documentation/devicetree/bindings/usb/usb-ehci.txt |  1 +
+>  Documentation/devicetree/bindings/usb/usb-ohci.txt |  1 +
+>  arch/arm/boot/dts/Makefile                         |  1 +
+>  arch/arm/boot/dts/sun6i-a31-app4-evb1.dts          | 63 ++++++++++++++++
+>  arch/arm/boot/dts/sun6i-a31.dtsi                   | 88 ++++++++++++++++++++++
+>  drivers/clk/sunxi/clk-sunxi.c                      |  6 ++
+>  drivers/phy/phy-sun4i-usb.c                        | 35 ++++++---
+>  drivers/usb/host/ehci-platform.c                   | 25 +++++-
+>  drivers/usb/host/ohci-platform.c                   | 25 +++++-
+>  9 files changed, 234 insertions(+), 11 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
+> 
