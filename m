@@ -1,51 +1,39 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed,  7 May 2014 17:07:16 +0100
-Subject: [PATCH v6 0/3] Support for Generic PCI Host Controller
-Message-ID: <1399478839-3564-1-git-send-email-will.deacon@arm.com>
+Date: Wed,  7 May 2014 17:07:19 +0100
+Subject: [PATCH v6 3/3] MAINTAINERS: add entry for generic PCI host controller
+ driver
+In-Reply-To: <1399478839-3564-1-git-send-email-will.deacon@arm.com>
+References: <1399478839-3564-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1399478839-3564-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello again,
+Add myself as the maintainer for the generic PCI host controller driver.
 
-This is version 6 of the generic PCI host controller series that has
-previously been posted here:
+Cc: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ MAINTAINERS | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-  v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-February/229679.html
-  v2: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-February/232213.html
-  v3: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-February/233491.html
-  v4: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-February/235468.html
-  v5: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/237540.html
-      http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/252915.html
-
-Changes since v5 include:
-
-  - Moved most of ->setup() into ->probe() (via two new function calls)
-
-  - Improved cleanup (we can now rely on devm_* doing its job for us)
-
-  - Moved Kconfig option under ARCH_MULTIPLATFORM
-
-All feedback welcome.
-
-Cheers,
-
-Will
-
-
-Will Deacon (3):
-  ARM: kconfig: allow PCI support to be selected with ARCH_MULTIPLATFORM
-  PCI: ARM: add support for generic PCI host controller
-  MAINTAINERS: add entry for generic PCI host controller driver
-
- .../devicetree/bindings/pci/host-generic-pci.txt   | 100 ++++++
- MAINTAINERS                                        |   8 +
- arch/arm/Kconfig                                   |   1 +
- drivers/pci/host/Kconfig                           |   7 +
- drivers/pci/host/Makefile                          |   1 +
- drivers/pci/host/pci-host-generic.c                | 388 +++++++++++++++++++++
- 6 files changed, 505 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pci/host-generic-pci.txt
- create mode 100644 drivers/pci/host/pci-host-generic.c
-
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 106626442124..424874c9a692 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -6751,6 +6751,14 @@ L:	linux-pci at vger.kernel.org
+ S:	Maintained
+ F:	drivers/pci/host/*designware*
+ 
++PCI DRIVER FOR GENERIC OF HOSTS
++M:	Will Deacon <will.deacon@arm.com>
++L:	linux-pci at vger.kernel.org
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++S:	Maintained
++F:	Documentation/devicetree/bindings/pci/host-generic-pci.txt
++F:	drivers/pci/host/pci-host-generic.c
++
+ PCMCIA SUBSYSTEM
+ P:	Linux PCMCIA Team
+ L:	linux-pcmcia at lists.infradead.org
 -- 
 1.9.2
