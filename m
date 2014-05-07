@@ -1,30 +1,30 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed,  7 May 2014 11:03:57 +0200
-Subject: [PATCH] dma: ste_dma40: Convert to the late system PM callbacks
-Message-ID: <1399453437-24195-1-git-send-email-ulf.hansson@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 7 May 2014 10:18:23 +0100
+Subject: [RESEND PATCH 2/3] PCI: ARM: add support for generic PCI host
+ controller
+In-Reply-To: <12021375.dFzSuv1Afb@wuerfel>
+References: <1399048876-11862-1-git-send-email-will.deacon@arm.com>
+ <12080862.flQZBvPba4@wuerfel> <20140506183811.GI13677@arm.com>
+ <12021375.dFzSuv1Afb@wuerfel>
+Message-ID: <20140507091822.GA18456@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clients may still be active in the early phase of system PM, thus we
-need to move the suspend operations to the late system PM phase.
+Hi Arnd,
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/dma/ste_dma40.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On Tue, May 06, 2014 at 08:11:48PM +0100, Arnd Bergmann wrote:
+> On Tuesday 06 May 2014 19:38:12 Will Deacon wrote:
+> > Ok, I've respun the patch and included it below. It's turned probe() into a
+> > bit of a beast, but the cleanup is a lot simpler (unless I'm missing
+> > something).
+> 
+> Let's see if we can make it a bit more readable. None of these are important,
+> but together they could improve readability.
 
-diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-index b539fc9..c798445 100644
---- a/drivers/dma/ste_dma40.c
-+++ b/drivers/dma/ste_dma40.c
-@@ -3051,7 +3051,7 @@ static int dma40_runtime_resume(struct device *dev)
- #endif
- 
- static const struct dev_pm_ops dma40_pm_ops = {
--	SET_SYSTEM_SLEEP_PM_OPS(dma40_suspend, dma40_resume)
-+	SET_LATE_SYSTEM_SLEEP_PM_OPS(dma40_suspend, dma40_resume)
- 	SET_PM_RUNTIME_PM_OPS(dma40_runtime_suspend,
- 				dma40_runtime_resume,
- 				NULL)
--- 
-1.7.9.5
+Sure, I managed to incorporate most of your ideas, but ended up splitting
+probe into two other functions; one for dealing with the ranges and the
+other for dealing with config space. I'll send a v6 later on.
+
+Cheers,
+
+Will
