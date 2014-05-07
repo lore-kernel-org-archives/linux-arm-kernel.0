@@ -1,106 +1,54 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  6 May 2014 22:50:22 -0500
-Subject: [PATCH 6/7] ARM: sun6i: dt: Add support for the USB controllers
-In-Reply-To: <1399434623-20383-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1399434623-20383-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1399434623-20383-7-git-send-email-maxime.ripard@free-electrons.com>
+From: jays.lee@samsung.com (Jungseok Lee)
+Date: Wed, 07 May 2014 12:59:12 +0900
+Subject: [PATCH v5 2/6] arm64: Introduce VA_BITS and translation level
+ options
+In-Reply-To: <20140502111648.GA3002@lvm>
+References: <000201cf64e5$cd3366a0$679a33e0$@samsung.com>
+ <20140501100628.GB2848@lvm> <000a01cf65a9$d3cbf030$7b63d090$@samsung.com>
+ <20140502111648.GA3002@lvm>
+Message-ID: <001b01cf69a8$b49e5010$1ddaf030$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A31 has two ECHI/OHCI controllers, and one OHCI-only phy-less controller.
+On Friday, May 02, 2014 8:17 PM, Christoffer Dall wrote:
+> On Fri, May 02, 2014 at 10:57:09AM +0900, Jungseok Lee wrote:
+> > On Thursday, May 01, 2014 7:06 PM, Christoffer Dall wrote:
+> > > On Thu, May 01, 2014 at 11:33:56AM +0900, Jungseok Lee wrote:
+> 
+> [...]
+> 
+> > > > +
+> > > > +choice
+> > > > +	prompt "Virtual address space size"
+> > > > +	default ARM64_VA_BITS_39 if ARM64_4K_PAGES
+> > > > +	default ARM64_VA_BITS_42 if ARM64_64K_PAGES
+> > > > +	help
+> > > > +	  Allows virtual address space size. A level of translation
+> > > > +tables
+> > >
+> > > What does "Allows virtual address space size" mean exactly?
+> >
+> > It means that VA space size can be chosen. For example, there are two
+> > VA size options, 39-bit and 48-bit, with 4KB pages. If 39-bit VA space
+> > is not enough, 48-bit can be selected instead. The 5th patch adds a
+> > 48-bit option to this choice blocks.
+> >
+> > If 16KB pages are supported with both 47-bit and 48-bit VA size,
+> > people could configure it in menuconfig.
+> >
+> > In this context, I've written it down like page size.
+> >
+> > I think Catalin's comment would be helpful.
+> > http://www.spinics.net/linux/lists/arm-kernel/msg319552.html
+> >
+> I didn't have problems understanding the concept, I was questioning the language.  The way it is
+> written now it suggests having a virtual address space size, as opposed to not having a size at all,
+> which doesn't make sense.
+> 
+> I think you want to say something along the lines of "Allows choosing a virtual address space size",
+> or "Allows choosing one of multiple possible virtual address space sizes".
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/sun6i-a31.dtsi | 77 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 77 insertions(+)
+Ahh... I see. I will revise the sentence clearly.
+Thanks!
 
-diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index 13aa56ed5858..5e9f01af6d99 100644
---- a/arch/arm/boot/dts/sun6i-a31.dtsi
-+++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-@@ -341,6 +341,83 @@
- 			status = "disabled";
- 		};
- 
-+		usbphy: phy at 01c19400 {
-+			compatible = "allwinner,sun6i-a31-usb-phy";
-+			reg = <0x01c19400 0x10>,
-+			      <0x01c1a800 0x4>,
-+			      <0x01c1b800 0x4>;
-+			reg-names = "phy_ctrl",
-+				    "pmu1",
-+				    "pmu2";
-+			clocks = <&usb_clk 8>,
-+				 <&usb_clk 9>,
-+				 <&usb_clk 10>;
-+			clock-names = "usb0_phy",
-+				      "usb1_phy",
-+				      "usb2_phy";
-+			resets = <&usb_clk 0>,
-+				 <&usb_clk 1>,
-+				 <&usb_clk 2>;
-+			reset-names = "usb0_reset",
-+				      "usb1_reset",
-+				      "usb2_reset";
-+			status = "disabled";
-+			#phy-cells = <1>;
-+		};
-+
-+		ehci0: usb at 01c1a000 {
-+			compatible = "allwinner,sun6i-a31-ehci", "generic-ehci";
-+			reg = <0x01c1a000 0x100>;
-+			interrupts = <0 72 4>;
-+			clocks = <&ahb1_gates 26>;
-+			resets = <&ahb1_rst 26>;
-+			phys = <&usbphy 1>;
-+			phy-names = "usb";
-+			status = "disabled";
-+		};
-+
-+		ohci0: usb at 01c1a400 {
-+			compatible = "allwinner,sun6i-a31-ohci", "generic-ohci";
-+			reg = <0x01c1a400 0x100>;
-+			interrupts = <0 73 4>;
-+			clocks = <&ahb1_gates 29>, <&usb_clk 16>;
-+			resets = <&ahb1_rst 29>;
-+			phys = <&usbphy 1>;
-+			phy-names = "usb";
-+			status = "disabled";
-+		};
-+
-+		ehci1: usb at 01c1b000 {
-+			compatible = "allwinner,sun6i-a31-ehci", "generic-ehci";
-+			reg = <0x01c1b000 0x100>;
-+			interrupts = <0 74 4>;
-+			clocks = <&ahb1_gates 27>;
-+			resets = <&ahb1_rst 27>;
-+			phys = <&usbphy 2>;
-+			phy-names = "usb";
-+			status = "disabled";
-+		};
-+
-+		ohci1: usb at 01c1b400 {
-+			compatible = "allwinner,sun6i-a31-ohci", "generic-ohci";
-+			reg = <0x01c1b400 0x100>;
-+			interrupts = <0 75 4>;
-+			clocks = <&ahb1_gates 30>, <&usb_clk 17>;
-+			resets = <&ahb1_rst 30>;
-+			phys = <&usbphy 2>;
-+			phy-names = "usb";
-+			status = "disabled";
-+		};
-+
-+		ohci2: usb at 01c1c000 {
-+			compatible = "allwinner,sun6i-a31-ohci", "generic-ohci";
-+			reg = <0x01c1c400 0x100>;
-+			interrupts = <0 77 4>;
-+			clocks = <&ahb1_gates 31>, <&usb_clk 18>;
-+			resets = <&ahb1_rst 31>;
-+			status = "disabled";
-+		};
-+
- 		pio: pinctrl at 01c20800 {
- 			compatible = "allwinner,sun6i-a31-pinctrl";
- 			reg = <0x01c20800 0x400>;
--- 
-1.9.1
+- Jungseok Lee
