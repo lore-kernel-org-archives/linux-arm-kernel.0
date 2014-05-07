@@ -1,17 +1,20 @@
 From: r.sricharan@ti.com (Sricharan R)
-Date: Wed, 7 May 2014 17:46:37 +0530
-Subject: [PATCH V6 1/2] arm: dts: dra7: Add routable-irqs property for gic node
-In-Reply-To: <1399464998-23216-1-git-send-email-r.sricharan@ti.com>
-References: <1399464998-23216-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <1399464998-23216-2-git-send-email-r.sricharan@ti.com>
+Date: Wed, 7 May 2014 17:51:17 +0530
+Subject: [PATCH V6 2/2] arm: dts: dra7: Add crossbar device binding
+Message-ID: <1399465277-23296-1-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is a IRQ crossbar device in the soc, which maps the
-irq requests from the peripherals to the mpu interrupt
-controller's inputs. The gic provides the support for such
-IPs in the form of routable-irqs. So adding the property
-here to gic node.
+There is a IRQ crossbar device in the soc, which
+maps the irq requests from the peripherals to the
+mpu interrupt controller's inputs. The Peripheral irq
+requests are connected to only one crossbar
+input and the output of the crossbar is connected to only one
+controller's input line. The crossbar device is used to map
+a peripheral input to a free mpu's interrupt controller line.
+
+Here, adding a new crossbar device node and replacing all the peripheral
+interrupt numbers with its fixed crossbar input lines.
 
 Signed-off-by: Sricharan R <r.sricharan@ti.com>
 Signed-off-by: Nishanth Menon <nm@ti.com>
@@ -22,22 +25,473 @@ Cc: Tony Lindgren <tony@atomide.com>
 Tested-by: Darren Etheridge <detheridge@ti.com>
 Tested-by: Roger Quadros <rogerq@ti.com>
 ---
-[V6] Reordered patch 3 from V5 to patch 1
+[V6] Squashed patch 2 and 3 from V5 in to this.
 
- arch/arm/boot/dts/dra7.dtsi |    1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/dra7.dtsi |  108 +++++++++++++++++++++++++------------------
+ 1 file changed, 62 insertions(+), 46 deletions(-)
 
 diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 149b550..52df16a 100644
+index 52df16a..cec826f 100644
 --- a/arch/arm/boot/dts/dra7.dtsi
 +++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -72,6 +72,7 @@
- 		compatible = "arm,cortex-a15-gic";
- 		interrupt-controller;
- 		#interrupt-cells = <3>;
-+		arm,routable-irqs = <192>;
- 		reg = <0x48211000 0x1000>,
- 		      <0x48212000 0x1000>,
- 		      <0x48214000 0x2000>,
+@@ -107,8 +107,8 @@
+ 		ti,hwmods = "l3_main_1", "l3_main_2";
+ 		reg = <0x44000000 0x2000>,
+ 		      <0x44800000 0x3000>;
+-		interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>,
+-			     <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
++		interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
+ 
+ 		prm: prm at 4ae06000 {
+ 			compatible = "ti,dra7-prm";
+@@ -183,10 +183,10 @@
+ 		sdma: dma-controller at 4a056000 {
+ 			compatible = "ti,omap4430-sdma";
+ 			reg = <0x4a056000 0x1000>;
+-			interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
+-				     <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
+-				     <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>,
+-				     <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
+ 			#dma-cells = <1>;
+ 			#dma-channels = <32>;
+ 			#dma-requests = <127>;
+@@ -195,7 +195,7 @@
+ 		gpio1: gpio at 4ae10000 {
+ 			compatible = "ti,omap4-gpio";
+ 			reg = <0x4ae10000 0x200>;
+-			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "gpio1";
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -206,7 +206,7 @@
+ 		gpio2: gpio at 48055000 {
+ 			compatible = "ti,omap4-gpio";
+ 			reg = <0x48055000 0x200>;
+-			interrupts = <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "gpio2";
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -217,7 +217,7 @@
+ 		gpio3: gpio at 48057000 {
+ 			compatible = "ti,omap4-gpio";
+ 			reg = <0x48057000 0x200>;
+-			interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "gpio3";
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -228,7 +228,7 @@
+ 		gpio4: gpio at 48059000 {
+ 			compatible = "ti,omap4-gpio";
+ 			reg = <0x48059000 0x200>;
+-			interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "gpio4";
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -239,7 +239,7 @@
+ 		gpio5: gpio at 4805b000 {
+ 			compatible = "ti,omap4-gpio";
+ 			reg = <0x4805b000 0x200>;
+-			interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "gpio5";
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -250,7 +250,7 @@
+ 		gpio6: gpio at 4805d000 {
+ 			compatible = "ti,omap4-gpio";
+ 			reg = <0x4805d000 0x200>;
+-			interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "gpio6";
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -261,7 +261,7 @@
+ 		gpio7: gpio at 48051000 {
+ 			compatible = "ti,omap4-gpio";
+ 			reg = <0x48051000 0x200>;
+-			interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "gpio7";
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -272,7 +272,7 @@
+ 		gpio8: gpio at 48053000 {
+ 			compatible = "ti,omap4-gpio";
+ 			reg = <0x48053000 0x200>;
+-			interrupts = <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "gpio8";
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -283,7 +283,7 @@
+ 		uart1: serial at 4806a000 {
+ 			compatible = "ti,omap4-uart";
+ 			reg = <0x4806a000 0x100>;
+-			interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "uart1";
+ 			clock-frequency = <48000000>;
+ 			status = "disabled";
+@@ -292,7 +292,7 @@
+ 		uart2: serial at 4806c000 {
+ 			compatible = "ti,omap4-uart";
+ 			reg = <0x4806c000 0x100>;
+-			interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "uart2";
+ 			clock-frequency = <48000000>;
+ 			status = "disabled";
+@@ -301,7 +301,7 @@
+ 		uart3: serial at 48020000 {
+ 			compatible = "ti,omap4-uart";
+ 			reg = <0x48020000 0x100>;
+-			interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "uart3";
+ 			clock-frequency = <48000000>;
+ 			status = "disabled";
+@@ -310,7 +310,7 @@
+ 		uart4: serial at 4806e000 {
+ 			compatible = "ti,omap4-uart";
+ 			reg = <0x4806e000 0x100>;
+-			interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "uart4";
+ 			clock-frequency = <48000000>;
+                         status = "disabled";
+@@ -319,7 +319,7 @@
+ 		uart5: serial at 48066000 {
+ 			compatible = "ti,omap4-uart";
+ 			reg = <0x48066000 0x100>;
+-			interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "uart5";
+ 			clock-frequency = <48000000>;
+ 			status = "disabled";
+@@ -328,7 +328,7 @@
+ 		uart6: serial at 48068000 {
+ 			compatible = "ti,omap4-uart";
+ 			reg = <0x48068000 0x100>;
+-			interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "uart6";
+ 			clock-frequency = <48000000>;
+ 			status = "disabled";
+@@ -337,6 +337,7 @@
+ 		uart7: serial at 48420000 {
+ 			compatible = "ti,omap4-uart";
+ 			reg = <0x48420000 0x100>;
++			interrupts = <GIC_SPI 218 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "uart7";
+ 			clock-frequency = <48000000>;
+ 			status = "disabled";
+@@ -345,6 +346,7 @@
+ 		uart8: serial at 48422000 {
+ 			compatible = "ti,omap4-uart";
+ 			reg = <0x48422000 0x100>;
++			interrupts = <GIC_SPI 219 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "uart8";
+ 			clock-frequency = <48000000>;
+ 			status = "disabled";
+@@ -353,6 +355,7 @@
+ 		uart9: serial at 48424000 {
+ 			compatible = "ti,omap4-uart";
+ 			reg = <0x48424000 0x100>;
++			interrupts = <GIC_SPI 220 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "uart9";
+ 			clock-frequency = <48000000>;
+ 			status = "disabled";
+@@ -361,6 +364,7 @@
+ 		uart10: serial at 4ae2b000 {
+ 			compatible = "ti,omap4-uart";
+ 			reg = <0x4ae2b000 0x100>;
++			interrupts = <GIC_SPI 221 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "uart10";
+ 			clock-frequency = <48000000>;
+ 			status = "disabled";
+@@ -369,7 +373,7 @@
+ 		timer1: timer at 4ae18000 {
+ 			compatible = "ti,omap5430-timer";
+ 			reg = <0x4ae18000 0x80>;
+-			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "timer1";
+ 			ti,timer-alwon;
+ 		};
+@@ -377,28 +381,28 @@
+ 		timer2: timer at 48032000 {
+ 			compatible = "ti,omap5430-timer";
+ 			reg = <0x48032000 0x80>;
+-			interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "timer2";
+ 		};
+ 
+ 		timer3: timer at 48034000 {
+ 			compatible = "ti,omap5430-timer";
+ 			reg = <0x48034000 0x80>;
+-			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "timer3";
+ 		};
+ 
+ 		timer4: timer at 48036000 {
+ 			compatible = "ti,omap5430-timer";
+ 			reg = <0x48036000 0x80>;
+-			interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "timer4";
+ 		};
+ 
+ 		timer5: timer at 48820000 {
+ 			compatible = "ti,omap5430-timer";
+ 			reg = <0x48820000 0x80>;
+-			interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "timer5";
+ 			ti,timer-dsp;
+ 		};
+@@ -406,7 +410,7 @@
+ 		timer6: timer at 48822000 {
+ 			compatible = "ti,omap5430-timer";
+ 			reg = <0x48822000 0x80>;
+-			interrupts = <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "timer6";
+ 			ti,timer-dsp;
+ 			ti,timer-pwm;
+@@ -415,7 +419,7 @@
+ 		timer7: timer at 48824000 {
+ 			compatible = "ti,omap5430-timer";
+ 			reg = <0x48824000 0x80>;
+-			interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "timer7";
+ 			ti,timer-dsp;
+ 		};
+@@ -423,7 +427,7 @@
+ 		timer8: timer at 48826000 {
+ 			compatible = "ti,omap5430-timer";
+ 			reg = <0x48826000 0x80>;
+-			interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "timer8";
+ 			ti,timer-dsp;
+ 			ti,timer-pwm;
+@@ -432,21 +436,21 @@
+ 		timer9: timer at 4803e000 {
+ 			compatible = "ti,omap5430-timer";
+ 			reg = <0x4803e000 0x80>;
+-			interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "timer9";
+ 		};
+ 
+ 		timer10: timer at 48086000 {
+ 			compatible = "ti,omap5430-timer";
+ 			reg = <0x48086000 0x80>;
+-			interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "timer10";
+ 		};
+ 
+ 		timer11: timer at 48088000 {
+ 			compatible = "ti,omap5430-timer";
+ 			reg = <0x48088000 0x80>;
+-			interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "timer11";
+ 			ti,timer-pwm;
+ 		};
+@@ -454,6 +458,7 @@
+ 		timer13: timer at 48828000 {
+ 			compatible = "ti,omap5430-timer";
+ 			reg = <0x48828000 0x80>;
++			interrupts = <GIC_SPI 339 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "timer13";
+ 			status = "disabled";
+ 		};
+@@ -461,6 +466,7 @@
+ 		timer14: timer at 4882a000 {
+ 			compatible = "ti,omap5430-timer";
+ 			reg = <0x4882a000 0x80>;
++			interrupts = <GIC_SPI 340 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "timer14";
+ 			status = "disabled";
+ 		};
+@@ -468,6 +474,7 @@
+ 		timer15: timer at 4882c000 {
+ 			compatible = "ti,omap5430-timer";
+ 			reg = <0x4882c000 0x80>;
++			interrupts = <GIC_SPI 341 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "timer15";
+ 			status = "disabled";
+ 		};
+@@ -475,6 +482,7 @@
+ 		timer16: timer at 4882e000 {
+ 			compatible = "ti,omap5430-timer";
+ 			reg = <0x4882e000 0x80>;
++			interrupts = <GIC_SPI 342 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "timer16";
+ 			status = "disabled";
+ 		};
+@@ -482,7 +490,7 @@
+ 		wdt2: wdt at 4ae14000 {
+ 			compatible = "ti,omap4-wdt";
+ 			reg = <0x4ae14000 0x80>;
+-			interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "wd_timer2";
+ 		};
+ 
+@@ -496,14 +504,14 @@
+ 		dmm at 4e000000 {
+ 			compatible = "ti,omap5-dmm";
+ 			reg = <0x4e000000 0x800>;
+-			interrupts = <0 113 0x4>;
++			interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "dmm";
+ 		};
+ 
+ 		i2c1: i2c at 48070000 {
+ 			compatible = "ti,omap4-i2c";
+ 			reg = <0x48070000 0x100>;
+-			interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			ti,hwmods = "i2c1";
+@@ -513,7 +521,7 @@
+ 		i2c2: i2c at 48072000 {
+ 			compatible = "ti,omap4-i2c";
+ 			reg = <0x48072000 0x100>;
+-			interrupts = <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			ti,hwmods = "i2c2";
+@@ -523,7 +531,7 @@
+ 		i2c3: i2c at 48060000 {
+ 			compatible = "ti,omap4-i2c";
+ 			reg = <0x48060000 0x100>;
+-			interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			ti,hwmods = "i2c3";
+@@ -533,7 +541,7 @@
+ 		i2c4: i2c at 4807a000 {
+ 			compatible = "ti,omap4-i2c";
+ 			reg = <0x4807a000 0x100>;
+-			interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			ti,hwmods = "i2c4";
+@@ -543,7 +551,7 @@
+ 		i2c5: i2c at 4807c000 {
+ 			compatible = "ti,omap4-i2c";
+ 			reg = <0x4807c000 0x100>;
+-			interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			ti,hwmods = "i2c5";
+@@ -553,7 +561,7 @@
+ 		mmc1: mmc at 4809c000 {
+ 			compatible = "ti,omap4-hsmmc";
+ 			reg = <0x4809c000 0x400>;
+-			interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "mmc1";
+ 			ti,dual-volt;
+ 			ti,needs-special-reset;
+@@ -566,7 +574,7 @@
+ 		mmc2: mmc at 480b4000 {
+ 			compatible = "ti,omap4-hsmmc";
+ 			reg = <0x480b4000 0x400>;
+-			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 81 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "mmc2";
+ 			ti,needs-special-reset;
+ 			dmas = <&sdma 47>, <&sdma 48>;
+@@ -577,7 +585,7 @@
+ 		mmc3: mmc at 480ad000 {
+ 			compatible = "ti,omap4-hsmmc";
+ 			reg = <0x480ad000 0x400>;
+-			interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "mmc3";
+ 			ti,needs-special-reset;
+ 			dmas = <&sdma 77>, <&sdma 78>;
+@@ -588,7 +596,7 @@
+ 		mmc4: mmc at 480d1000 {
+ 			compatible = "ti,omap4-hsmmc";
+ 			reg = <0x480d1000 0x400>;
+-			interrupts = <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "mmc4";
+ 			ti,needs-special-reset;
+ 			dmas = <&sdma 57>, <&sdma 58>;
+@@ -731,7 +739,7 @@
+ 		mcspi1: spi at 48098000 {
+ 			compatible = "ti,omap4-mcspi";
+ 			reg = <0x48098000 0x200>;
+-			interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			ti,hwmods = "mcspi1";
+@@ -752,7 +760,7 @@
+ 		mcspi2: spi at 4809a000 {
+ 			compatible = "ti,omap4-mcspi";
+ 			reg = <0x4809a000 0x200>;
+-			interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			ti,hwmods = "mcspi2";
+@@ -768,7 +776,7 @@
+ 		mcspi3: spi at 480b8000 {
+ 			compatible = "ti,omap4-mcspi";
+ 			reg = <0x480b8000 0x200>;
+-			interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			ti,hwmods = "mcspi3";
+@@ -781,7 +789,7 @@
+ 		mcspi4: spi at 480ba000 {
+ 			compatible = "ti,omap4-mcspi";
+ 			reg = <0x480ba000 0x200>;
+-			interrupts = <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			ti,hwmods = "mcspi4";
+@@ -791,6 +799,14 @@
+ 			status = "disabled";
+ 		};
+ 	};
++
++	crossbar_mpu: crossbar at 4a020000 {
++		compatible = "ti,irq-crossbar";
++		reg = <0x4a002a48 0x130>;
++		ti,max-irqs = <160>;
++		ti,reg-size = <2>;
++		ti,irqs-reserved = <0 1 2 3 5 6 131 132>;
++	};
+ };
+ 
+ /include/ "dra7xx-clocks.dtsi"
 -- 
 1.7.9.5
