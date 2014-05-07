@@ -1,53 +1,18 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Wed, 7 May 2014 16:43:06 +0200
-Subject: [PATCH] mmc: atmel: don't test host->data
-In-Reply-To: <1399391006-16007-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1399391006-16007-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20140507144306.GO7438@ldesroches-Latitude-E6320>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 7 May 2014 11:43:05 -0300
+Subject: [PATCH] clk: clk-divider: Fix infinite loop for table divider
+In-Reply-To: <5369F0D6.3080503@st.com>
+References: <1399408005-4209-1-git-send-email-festevam@gmail.com>
+ <5369F0D6.3080503@st.com>
+Message-ID: <CAOMZO5CoSJB1kqBMoE6_8WL_WektBC0RXWbk60wPi=tbYJK_Og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 06, 2014 at 05:43:26PM +0200, Alexandre Belloni wrote:
-> Found using smatch:
-> drivers/mmc/host/atmel-mci.c:827 atmci_pdc_complete() warn: variable
-> dereferenced before check 'host->data' (see line 807)
-> 
-> Stop testing host->data as it is not NULL at that point.
+On Wed, May 7, 2014 at 5:37 AM, Maxime Coquelin <maxime.coquelin@st.com> wrote:
 
-I agree
+> Couldn't we initialize "up" variable to INT_MAX in _round_up_table() as I
+> just proposed in mail thread reporting the regression?
 
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Yes, it works fine. Please submit your version.
 
-> ---
->  drivers/mmc/host/atmel-mci.c | 13 +++----------
->  1 file changed, 3 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-> index 42706ea0ba85..aece7cafbb97 100644
-> --- a/drivers/mmc/host/atmel-mci.c
-> +++ b/drivers/mmc/host/atmel-mci.c
-> @@ -820,16 +820,9 @@ static void atmci_pdc_complete(struct atmel_mci *host)
->  
->  	atmci_pdc_cleanup(host);
->  
-> -	/*
-> -	 * If the card was removed, data will be NULL. No point trying
-> -	 * to send the stop command or waiting for NBUSY in this case.
-> -	 */
-> -	if (host->data) {
-> -		dev_dbg(&host->pdev->dev,
-> -		        "(%s) set pending xfer complete\n", __func__);
-> -		atmci_set_pending(host, EVENT_XFER_COMPLETE);
-> -		tasklet_schedule(&host->tasklet);
-> -	}
-> +	dev_dbg(&host->pdev->dev, "(%s) set pending xfer complete\n", __func__);
-> +	atmci_set_pending(host, EVENT_XFER_COMPLETE);
-> +	tasklet_schedule(&host->tasklet);
->  }
->  
->  static void atmci_dma_cleanup(struct atmel_mci *host)
-> -- 
-> 1.9.1
-> 
+Thanks
