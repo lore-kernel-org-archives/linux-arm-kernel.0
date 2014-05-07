@@ -1,216 +1,72 @@
 From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Wed,  7 May 2014 19:25:50 +0200
-Subject: [PATCH v2 3/7] mfd: add support for sun6i PRCM (Power/Reset/Clock
- Management) unit
+Date: Wed,  7 May 2014 19:25:54 +0200
+Subject: [PATCH v2 7/7] ARM: sunxi: dt: add PRCM clk and reset controller
+ subdevices
 In-Reply-To: <1399483554-8824-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1399483554-8824-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1399483554-8824-4-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1399483554-8824-8-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PRCM (Power/Reset/Clock Management) block exposes several subdevices
-in different subsystems (clk, reset ...)
-
-Add basic support for the PRCM unit with clk (AR100, AHB0, and APB0 clks)
-and reset controller subdevices.
-
-Other subdevices might be added later (if needed).
+Add DT definitions for PRCM (Power/Reset/Clock Management) clock and reset
+controller subdevices.
 
 Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 ---
- drivers/mfd/Kconfig      |   8 +++
- drivers/mfd/Makefile     |   1 +
- drivers/mfd/sun6i-prcm.c | 151 +++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 160 insertions(+)
- create mode 100644 drivers/mfd/sun6i-prcm.c
+ arch/arm/boot/dts/sun6i-a31.dtsi | 39 ++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 38 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-index 2d347c9..56794fe 100644
---- a/drivers/mfd/Kconfig
-+++ b/drivers/mfd/Kconfig
-@@ -731,6 +731,14 @@ config MFD_STA2X11
- 	select MFD_CORE
- 	select REGMAP_MMIO
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index ec3253a..b69be0b 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -498,9 +498,46 @@
+ 			reg = <0x01f01c00 0x300>;
+ 		};
  
-+config MFD_SUN6I_PRCM
-+	bool "Allwinner A31 PRCM controller"
-+	depends on ARCH_SUNXI
-+	select MFD_CORE
-+	help
-+	  Support for the PRCM (Power/Reset/Clock Management) unit available
-+	  in A31 SoC.
+-		prcm at 01f01c00 {
++		prcm at 01f01400 {
+ 			compatible = "allwinner,sun6i-a31-prcm";
+ 			reg = <0x01f01400 0x200>;
 +
- config MFD_SYSCON
- 	bool "System Controller Register R/W Based on Regmap"
- 	select REGMAP_MMIO
-diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-index 1efecf2..df7823c 100644
---- a/drivers/mfd/Makefile
-+++ b/drivers/mfd/Makefile
-@@ -29,6 +29,7 @@ obj-$(CONFIG_MFD_STA2X11)	+= sta2x11-mfd.o
- obj-$(CONFIG_MFD_STMPE)		+= stmpe.o
- obj-$(CONFIG_STMPE_I2C)		+= stmpe-i2c.o
- obj-$(CONFIG_STMPE_SPI)		+= stmpe-spi.o
-+obj-$(CONFIG_MFD_SUN6I_PRCM)	+= sun6i-prcm.o
- obj-$(CONFIG_MFD_TC3589X)	+= tc3589x.o
- obj-$(CONFIG_MFD_T7L66XB)	+= t7l66xb.o tmio_core.o
- obj-$(CONFIG_MFD_TC6387XB)	+= tc6387xb.o tmio_core.o
-diff --git a/drivers/mfd/sun6i-prcm.c b/drivers/mfd/sun6i-prcm.c
-new file mode 100644
-index 0000000..0156bcb
---- /dev/null
-+++ b/drivers/mfd/sun6i-prcm.c
-@@ -0,0 +1,151 @@
-+/*
-+ * Copyright (C) 2014 Free Electrons
-+ *
-+ * License Terms: GNU General Public License v2
-+ * Author: Boris BREZILLON <boris.brezillon@free-electrons.com>
-+ *
-+ * Allwinner PRCM (Power/Reset/Clock Management) driver
-+ *
-+ */
++			ar100: ar100_clk {
++				compatible = "allwinner,sun6i-a31-ar100-clk";
++				#clock-cells = <0>;
++				clocks = <&osc32k>, <&osc24M>, <&pll6>, <&pll6>;
++			};
 +
-+#include <linux/module.h>
-+#include <linux/kernel.h>
-+#include <linux/errno.h>
-+#include <linux/err.h>
-+#include <linux/spinlock.h>
-+#include <linux/io.h>
-+#include <linux/slab.h>
-+#include <linux/mutex.h>
-+#include <linux/completion.h>
-+#include <linux/irq.h>
-+#include <linux/jiffies.h>
-+#include <linux/bitops.h>
-+#include <linux/fs.h>
-+#include <linux/of.h>
-+#include <linux/of_irq.h>
-+#include <linux/platform_device.h>
-+#include <linux/uaccess.h>
-+#include <linux/mfd/core.h>
++			ahb0: ahb0_clk {
++				compatible = "fixed-factor-clock";
++				#clock-cells = <0>;
++				clock-div = <1>;
++				clock-mult = <1>;
++				clocks = <&ar100>;
++				clock-output-names = "ahb0";
++			};
 +
-+struct prcm_data {
-+	int nsubdevs;
-+	const struct mfd_cell *subdevs;
-+};
++			apb0: apb0_clk {
++				compatible = "allwinner,sun6i-a31-apb0-clk";
++				#clock-cells = <0>;
++				clocks = <&ahb0>;
++				clock-output-names = "apb0";
++			};
 +
-+static const struct resource sun6i_a31_ar100_clk_res[] = {
-+	{
-+		.start = 0x0,
-+		.end = 0x3,
-+		.flags = IORESOURCE_MEM,
-+	},
-+};
++			apb0_gates: apb0_gates_clk {
++				compatible = "allwinner,sun6i-a31-apb0-gates-clk";
++				#clock-cells = <1>;
++				clocks = <&apb0>;
++				clock-output-names = "apb0_pio", "apb0_ir",
++						"apb0_timer01", "apb0_p2wi",
++						"apb0_uart", "apb0_1wire",
++						"apb0_i2c";
++			};
 +
-+static const struct resource sun6i_a31_apb0_clk_res[] = {
-+	{
-+		.start = 0xc,
-+		.end = 0xf,
-+		.flags = IORESOURCE_MEM,
-+	},
-+};
-+
-+static const struct resource sun6i_a31_apb0_gates_clk_res[] = {
-+	{
-+		.start = 0x28,
-+		.end = 0x2b,
-+		.flags = IORESOURCE_MEM,
-+	},
-+};
-+
-+static const struct resource sun6i_a31_apb0_rstc_res[] = {
-+	{
-+		.start = 0xb0,
-+		.end = 0xb3,
-+		.flags = IORESOURCE_MEM,
-+	},
-+};
-+
-+static const struct mfd_cell sun6i_a31_prcm_subdevs[] = {
-+	{
-+		.name = "sun6i-a31-ar100-clk",
-+		.of_compatible = "allwinner,sun6i-a31-ar100-clk",
-+		.num_resources = ARRAY_SIZE(sun6i_a31_ar100_clk_res),
-+		.resources = sun6i_a31_ar100_clk_res,
-+	},
-+	{
-+		.name = "sun6i-a31-apb0-clk",
-+		.of_compatible = "allwinner,sun6i-a31-apb0-clk",
-+		.num_resources = ARRAY_SIZE(sun6i_a31_apb0_clk_res),
-+		.resources = sun6i_a31_apb0_clk_res,
-+	},
-+	{
-+		.name = "sun6i-a31-apb0-gates-clk",
-+		.of_compatible = "allwinner,sun6i-a31-apb0-gates-clk",
-+		.num_resources = ARRAY_SIZE(sun6i_a31_apb0_gates_clk_res),
-+		.resources = sun6i_a31_apb0_gates_clk_res,
-+	},
-+	{
-+		.name = "sun6i-a31-apb0-clock-reset",
-+		.of_compatible = "allwinner,sun6i-a31-clock-reset",
-+		.num_resources = ARRAY_SIZE(sun6i_a31_apb0_rstc_res),
-+		.resources = sun6i_a31_apb0_rstc_res,
-+	},
-+};
-+
-+static const struct prcm_data sun6i_a31_prcm_data = {
-+	.nsubdevs = ARRAY_SIZE(sun6i_a31_prcm_subdevs),
-+	.subdevs = sun6i_a31_prcm_subdevs,
-+};
-+
-+static const struct of_device_id sun6i_prcm_dt_ids[] = {
-+	{
-+		.compatible = "allwinner,sun6i-a31-prcm",
-+		.data = &sun6i_a31_prcm_data,
-+	},
-+	{ /* sentinel */ },
-+};
-+
-+static int sun6i_prcm_probe(struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	const struct of_device_id *match;
-+	const struct prcm_data *data;
-+	struct resource *res;
-+	int ret;
-+
-+	match = of_match_node(sun6i_prcm_dt_ids, np);
-+	if (!match)
-+		return -EINVAL;
-+
-+	data = match->data;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		dev_err(&pdev->dev, "no prcm memory region provided\n");
-+		return -ENOENT;
-+	}
-+
-+	ret = mfd_add_devices(&pdev->dev, 0, data->subdevs, data->nsubdevs,
-+			      res, -1, NULL);
-+	if (ret) {
-+		dev_err(&pdev->dev, "failed to add subdevices\n");
-+		return ret;
-+	}
-+
-+	dev_info(&pdev->dev, "PRCM initialized\n");
-+
-+	return 0;
-+}
-+
-+static struct platform_driver sun6i_prcm_driver = {
-+	.driver = {
-+		.name = "sun6i-prcm",
-+		.owner = THIS_MODULE,
-+		.of_match_table = sun6i_prcm_dt_ids,
-+	},
-+	.probe = sun6i_prcm_probe,
-+};
-+module_platform_driver(sun6i_prcm_driver);
-+
-+MODULE_AUTHOR("Boris BREZILLON <boris.brezillon@free-electrons.com>");
-+MODULE_DESCRIPTION("Allwinner sun6i PRCM driver");
-+MODULE_LICENSE("GPL v2");
++			apb0_rst: apb0_rst {
++				compatible = "allwinner,sun6i-a31-clock-reset";
++				#reset-cells = <1>;
++			};
+ 		};
+ 	};
+ };
 -- 
 1.8.3.2
