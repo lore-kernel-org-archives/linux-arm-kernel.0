@@ -1,57 +1,61 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  6 May 2014 22:50:21 -0500
-Subject: [PATCH 5/7] usb: ohci-platform: Enable optional use of reset
- controller
+Date: Tue,  6 May 2014 22:50:20 -0500
+Subject: [PATCH 4/7] usb: ehci-platform: add optional reset controller
+ retrieval
 In-Reply-To: <1399434623-20383-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1399434623-20383-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1399434623-20383-6-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1399434623-20383-5-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OHCI controllers used in the Allwinner A31 are asserted in reset using a
-global reset controller.
+From: Boris BREZILLON <boris.brezillon@free-electrons.com>
 
-Add optional support for such a controller in the OHCI platform driver.
+On the Allwinner's A31 SoC the reset line connected to the EHCI IP has to
+be deasserted for the EHCI block to be usable.
 
+Add support for an optional reset controller that will be deasserted on
+power off and asserted on power on.
+
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- Documentation/devicetree/bindings/usb/usb-ohci.txt |  1 +
- drivers/usb/host/ohci-platform.c                   | 25 +++++++++++++++++++++-
+ Documentation/devicetree/bindings/usb/usb-ehci.txt |  1 +
+ drivers/usb/host/ehci-platform.c                   | 25 +++++++++++++++++++++-
  2 files changed, 25 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/usb/usb-ohci.txt b/Documentation/devicetree/bindings/usb/usb-ohci.txt
-index 45f67d91e888..b968a1aea995 100644
---- a/Documentation/devicetree/bindings/usb/usb-ohci.txt
-+++ b/Documentation/devicetree/bindings/usb/usb-ohci.txt
-@@ -12,6 +12,7 @@ Optional properties:
- - clocks : a list of phandle + clock specifier pairs
- - phys : phandle + phy specifier pair
- - phy-names : "usb"
-+- resets : phandle + reset specifier pair
+diff --git a/Documentation/devicetree/bindings/usb/usb-ehci.txt b/Documentation/devicetree/bindings/usb/usb-ehci.txt
+index ff151ec084c4..43c1a4e06767 100644
+--- a/Documentation/devicetree/bindings/usb/usb-ehci.txt
++++ b/Documentation/devicetree/bindings/usb/usb-ehci.txt
+@@ -15,6 +15,7 @@ Optional properties:
+  - clocks : a list of phandle + clock specifier pairs
+  - phys : phandle + phy specifier pair
+  - phy-names : "usb"
++ - resets : phandle + reset specifier pair
  
- Example:
- 
-diff --git a/drivers/usb/host/ohci-platform.c b/drivers/usb/host/ohci-platform.c
-index b6002c951c5c..55f6c87628eb 100644
---- a/drivers/usb/host/ohci-platform.c
-+++ b/drivers/usb/host/ohci-platform.c
-@@ -24,6 +24,7 @@
- #include <linux/err.h>
+ Example (Sequoia 440EPx):
+     ehci at e0000300 {
+diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
+index c7dd93aad20c..4ee67728e443 100644
+--- a/drivers/usb/host/ehci-platform.c
++++ b/drivers/usb/host/ehci-platform.c
+@@ -29,6 +29,7 @@
+ #include <linux/of.h>
  #include <linux/phy/phy.h>
  #include <linux/platform_device.h>
 +#include <linux/reset.h>
- #include <linux/usb/ohci_pdriver.h>
  #include <linux/usb.h>
  #include <linux/usb/hcd.h>
-@@ -36,6 +37,7 @@
+ #include <linux/usb/ehci_pdriver.h>
+@@ -41,6 +42,7 @@
  
- struct ohci_platform_priv {
- 	struct clk *clks[OHCI_MAX_CLKS];
+ struct ehci_platform_priv {
+ 	struct clk *clks[EHCI_MAX_CLKS];
 +	struct reset_control *rst;
  	struct phy *phy;
  };
  
-@@ -67,10 +69,16 @@ static int ohci_platform_power_on(struct platform_device *dev)
+@@ -84,10 +86,16 @@ static int ehci_platform_power_on(struct platform_device *dev)
  			goto err_disable_clks;
  	}
  
@@ -69,7 +73,7 @@ index b6002c951c5c..55f6c87628eb 100644
  
  		ret = phy_power_on(priv->phy);
  		if (ret)
-@@ -81,6 +89,9 @@ static int ohci_platform_power_on(struct platform_device *dev)
+@@ -98,6 +106,9 @@ static int ehci_platform_power_on(struct platform_device *dev)
  
  err_exit_phy:
  	phy_exit(priv->phy);
@@ -79,17 +83,17 @@ index b6002c951c5c..55f6c87628eb 100644
  err_disable_clks:
  	while (--clk >= 0)
  		clk_disable_unprepare(priv->clks[clk]);
-@@ -99,6 +110,9 @@ static void ohci_platform_power_off(struct platform_device *dev)
- 		phy_exit(priv->phy);
- 	}
- 
-+	if (priv->rst)
-+		reset_control_assert(priv->rst);
-+
- 	for (clk = OHCI_MAX_CLKS - 1; clk >= 0; clk--)
+@@ -119,6 +130,9 @@ static void ehci_platform_power_off(struct platform_device *dev)
+ 	for (clk = EHCI_MAX_CLKS - 1; clk >= 0; clk--)
  		if (priv->clks[clk])
  			clk_disable_unprepare(priv->clks[clk]);
-@@ -191,6 +205,15 @@ static int ohci_platform_probe(struct platform_device *dev)
++
++	if (priv->rst)
++		reset_control_assert(priv->rst);
+ }
+ 
+ static struct hc_driver __read_mostly ehci_platform_hc_driver;
+@@ -206,6 +220,15 @@ static int ehci_platform_probe(struct platform_device *dev)
  				break;
  			}
  		}
