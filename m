@@ -1,30 +1,63 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 7 May 2014 06:09:52 -0700
-Subject: [GIT PULL] Versatile LEDs conversion
-In-Reply-To: <201405061458.22231.arnd@arndb.de>
-References: <CACRpkdb4VhN5Dt6ZoUNgwphxUD7Q69waF9vfO_=SenbvA=WSeA@mail.gmail.com>
- <20140505041156.GB11035@quad.lixom.net>
- <201405061458.22231.arnd@arndb.de>
-Message-ID: <CACRpkdaAVMf1t03jRZFa2qbTDnJZB2XBvOaeWBgwTSqvfLo2Aw@mail.gmail.com>
+From: luis.henriques@canonical.com (Luis Henriques)
+Date: Wed,  7 May 2014 14:12:15 +0100
+Subject: [PATCH 3.11 12/70] irqchip: Gic: Support forced affinity setting
+In-Reply-To: <1399468393-10140-1-git-send-email-luis.henriques@canonical.com>
+References: <1399468393-10140-1-git-send-email-luis.henriques@canonical.com>
+Message-ID: <1399468393-10140-13-git-send-email-luis.henriques@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 6, 2014 at 5:58 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+3.11.10.10 -stable review patch.  If anyone has any objections, please let me know.
 
-> I got a build error today, since LEDS_VERSATILE can be built-in while LEDS_CLASS
-> is a module:
->
-> drivers/built-in.o: In function `versatile_leds_probe':
-> :(.text+0x155020): undefined reference to `led_classdev_register'
->
-> I suggest we turn this option into 'tristate' so that the dependency
-> tracking works correctly.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+------------------
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+From: Thomas Gleixner <tglx@linutronix.de>
 
-Quite tricky these bool/tristate things :-/
+commit ffde1de64012c406dfdda8690918248b472f24e4 upstream.
 
-Yours,
-Linus Walleij
+To support the affinity setting of per cpu timers in the early startup
+of a not yet online cpu, implement the force logic, which disables the
+cpu online check.
+
+Tagged for stable to allow a simple fix of the affected SoC clock
+event drivers.
+
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Cc: Kyungmin Park <kyungmin.park@samsung.com>
+Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Cc: Tomasz Figa <t.figa@samsung.com>,
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>,
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: linux-arm-kernel at lists.infradead.org,
+Link: http://lkml.kernel.org/r/20140416143315.916984416 at linutronix.de
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Luis Henriques <luis.henriques@canonical.com>
+---
+ drivers/irqchip/irq-gic.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index ee7c503..0ebd24d 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -246,10 +246,14 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+ 			    bool force)
+ {
+ 	void __iomem *reg = gic_dist_base(d) + GIC_DIST_TARGET + (gic_irq(d) & ~3);
+-	unsigned int shift = (gic_irq(d) % 4) * 8;
+-	unsigned int cpu = cpumask_any_and(mask_val, cpu_online_mask);
++	unsigned int cpu, shift = (gic_irq(d) % 4) * 8;
+ 	u32 val, mask, bit;
+ 
++	if (!force)
++		cpu = cpumask_any_and(mask_val, cpu_online_mask);
++	else
++		cpu = cpumask_first(mask_val);
++
+ 	if (cpu >= NR_GIC_CPU_IF || cpu >= nr_cpu_ids)
+ 		return -EINVAL;
+ 
+-- 
+1.9.1
