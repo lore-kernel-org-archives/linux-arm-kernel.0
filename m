@@ -1,158 +1,50 @@
-From: fkan@apm.com (Feng Kan)
-Date: Wed,  7 May 2014 09:18:03 -0700
-Subject: [PATCH V6 4/5] power: reset: Remove X-Gene reboot driver
-In-Reply-To: <1399479484-2605-1-git-send-email-fkan@apm.com>
-References: <1399479484-2605-1-git-send-email-fkan@apm.com>
-Message-ID: <1399479484-2605-5-git-send-email-fkan@apm.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Wed,  7 May 2014 18:20:49 +0200
+Subject: [PATCH] ARM: at91: fix rtc irq mask for sam9x5 SoCs
+In-Reply-To: <957b209589094df48ddedbc57c6ccdfd@BLUPR05MB037.namprd05.prod.outlook.com>
+References: <957b209589094df48ddedbc57c6ccdfd@BLUPR05MB037.namprd05.prod.outlook.com>
+Message-ID: <1399479649-3247-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove X-Gene reboot driver.
+The RTC IMR register is not reliable on sam9x5 SoCs, hence why me have to
+mask all interrupts no matter what IMR claims about already masked irqs.
 
-Signed-off-by: Feng Kan <fkan@apm.com>
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+Reported-by: Bryan Evenson <bevenson@melinkcorp.com>
 ---
- drivers/power/reset/Kconfig        |    7 ---
- drivers/power/reset/Makefile       |    1 -
- drivers/power/reset/xgene-reboot.c |  103 ------------------------------------
- 3 files changed, 0 insertions(+), 111 deletions(-)
- delete mode 100644 drivers/power/reset/xgene-reboot.c
+Hello Bryan,
 
-diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
-index 9931b61..7a8424b 100644
---- a/drivers/power/reset/Kconfig
-+++ b/drivers/power/reset/Kconfig
-@@ -51,13 +51,6 @@ config POWER_RESET_VEXPRESS
- 	  Power off and reset support for the ARM Ltd. Versatile
- 	  Express boards.
+Yet another patch for you ;-).
+
+As usual, could you tell me if it fixes your bug.
+
+BTW, thanks for your tests.
+
+Best Regards,
+
+Boris
+
+ arch/arm/mach-at91/sysirq_mask.c | 7 +------
+ 1 file changed, 1 insertion(+), 6 deletions(-)
+
+diff --git a/arch/arm/mach-at91/sysirq_mask.c b/arch/arm/mach-at91/sysirq_mask.c
+index 2ba694f..eb3d2a5 100644
+--- a/arch/arm/mach-at91/sysirq_mask.c
++++ b/arch/arm/mach-at91/sysirq_mask.c
+@@ -37,12 +37,7 @@ void __init at91_sysirq_mask_rtc(u32 rtc_base)
+ 	if (!base)
+ 		return;
  
--config POWER_RESET_XGENE
--	bool "APM SoC X-Gene reset driver"
--	depends on ARM64
--	depends on POWER_RESET
--	help
--	  Reboot support for the APM SoC X-Gene Eval boards.
--
- config POWER_RESET_SYSCON
- 	bool "Generic SYSCON regmap reset driver"
- 	depends on MFD_SYSCON
-diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
-index 94883ed..ae1711a 100644
---- a/drivers/power/reset/Makefile
-+++ b/drivers/power/reset/Makefile
-@@ -4,5 +4,4 @@ obj-$(CONFIG_POWER_RESET_MSM) += msm-poweroff.o
- obj-$(CONFIG_POWER_RESET_QNAP) += qnap-poweroff.o
- obj-$(CONFIG_POWER_RESET_RESTART) += restart-poweroff.o
- obj-$(CONFIG_POWER_RESET_VEXPRESS) += vexpress-poweroff.o
--obj-$(CONFIG_POWER_RESET_XGENE) += xgene-reboot.o
- obj-$(CONFIG_POWER_RESET_SYSCON) += syscon-reboot.o
-diff --git a/drivers/power/reset/xgene-reboot.c b/drivers/power/reset/xgene-reboot.c
-deleted file mode 100644
-index ecd55f8..0000000
---- a/drivers/power/reset/xgene-reboot.c
-+++ /dev/null
-@@ -1,103 +0,0 @@
--/*
-- * AppliedMicro X-Gene SoC Reboot Driver
-- *
-- * Copyright (c) 2013, Applied Micro Circuits Corporation
-- * Author: Feng Kan <fkan@apm.com>
-- * Author: Loc Ho <lho@apm.com>
-- *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License as
-- * published by the Free Software Foundation; either version 2 of
-- * the License, or (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
-- * MA 02111-1307 USA
-- *
-- * This driver provides system reboot functionality for APM X-Gene SoC.
-- * For system shutdown, this is board specify. If a board designer
-- * implements GPIO shutdown, use the gpio-poweroff.c driver.
-- */
--#include <linux/io.h>
--#include <linux/of_device.h>
--#include <linux/of_address.h>
--#include <linux/platform_device.h>
--#include <linux/stat.h>
--#include <linux/slab.h>
--#include <asm/system_misc.h>
--
--struct xgene_reboot_context {
--	struct platform_device *pdev;
--	void *csr;
--	u32 mask;
--};
--
--static struct xgene_reboot_context *xgene_restart_ctx;
--
--static void xgene_restart(char str, const char *cmd)
--{
--	struct xgene_reboot_context *ctx = xgene_restart_ctx;
--	unsigned long timeout;
--
--	/* Issue the reboot */
--	if (ctx)
--		writel(ctx->mask, ctx->csr);
--
--	timeout = jiffies + HZ;
--	while (time_before(jiffies, timeout))
--		cpu_relax();
--
--	dev_emerg(&ctx->pdev->dev, "Unable to restart system\n");
--}
--
--static int xgene_reboot_probe(struct platform_device *pdev)
--{
--	struct xgene_reboot_context *ctx;
--
--	ctx = devm_kzalloc(&pdev->dev, sizeof(*ctx), GFP_KERNEL);
--	if (!ctx) {
--		dev_err(&pdev->dev, "out of memory for context\n");
--		return -ENODEV;
+-	mask = readl_relaxed(base + AT91_RTC_IMR);
+-	if (mask) {
+-		pr_info("AT91: Disabling rtc irq\n");
+-		writel_relaxed(mask, base + AT91_RTC_IDR);
+-		(void)readl_relaxed(base + AT91_RTC_IMR);	/* flush */
 -	}
--
--	ctx->csr = of_iomap(pdev->dev.of_node, 0);
--	if (!ctx->csr) {
--		devm_kfree(&pdev->dev, ctx);
--		dev_err(&pdev->dev, "can not map resource\n");
--		return -ENODEV;
--	}
--
--	if (of_property_read_u32(pdev->dev.of_node, "mask", &ctx->mask))
--		ctx->mask = 0xFFFFFFFF;
--
--	ctx->pdev = pdev;
--	arm_pm_restart = xgene_restart;
--	xgene_restart_ctx = ctx;
--
--	return 0;
--}
--
--static struct of_device_id xgene_reboot_of_match[] = {
--	{ .compatible = "apm,xgene-reboot" },
--	{}
--};
--
--static struct platform_driver xgene_reboot_driver = {
--	.probe = xgene_reboot_probe,
--	.driver = {
--		.name = "xgene-reboot",
--		.of_match_table = xgene_reboot_of_match,
--	},
--};
--
--static int __init xgene_reboot_init(void)
--{
--	return platform_driver_register(&xgene_reboot_driver);
--}
--device_initcall(xgene_reboot_init);
++	writel_relaxed(0x1f, base + AT91_RTC_IDR);
+ 
+ 	iounmap(base);
+ }
 -- 
-1.7.6.1
+1.8.3.2
