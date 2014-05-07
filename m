@@ -1,28 +1,29 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 08 May 2014 08:32:19 +0900
-Subject: [PATCH 00/04] ARM: shmobile: Use shmobile_init_delay() on r8a7740
-Message-ID: <20140507233219.29712.9253.sendpatchset@w520>
+Date: Thu, 08 May 2014 08:32:29 +0900
+Subject: [PATCH 01/04] ARM: shmobile: Add r8a7740 Maximum CPU Frequency to DTS
+In-Reply-To: <20140507233219.29712.9253.sendpatchset@w520>
+References: <20140507233219.29712.9253.sendpatchset@w520>
+Message-ID: <20140507233229.29712.29821.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM: shmobile: Use shmobile_init_delay() on r8a7740
+From: Magnus Damm <damm+renesas@opensource.se>
 
-[PATCH 01/04] ARM: shmobile: Add r8a7740 Maximum CPU Frequency to DTS
-[PATCH 02/04] ARM: shmobile: Use r8a7740 DT CPU Frequency in common case	
-[PATCH 03/04] ARM: shmobile: Use r8a7740 DT CPU Frequency for Armadillo DT Ref
-[PATCH 04/04] ARM: shmobile: Remove unused r8a7740_init_delay()
-
-Convert r8a7740 to rely on shmobile_init_delay() instead of using a per-SoC
-delay setup function. This is a cleanup towards enabling Multiplatform support
-for the r8a7740 SoC.
+Add 800 MHz to the r8a7740 DTS to describe the maximum CPU frequency.
 
 Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 ---
 
- Written against renesas-devel-v3.15-rc3-20140502
+ arch/arm/boot/dts/r8a7740.dtsi |    1 +
+ 1 file changed, 1 insertion(+)
 
- arch/arm/boot/dts/r8a7740.dtsi                           |    1 +
- arch/arm/mach-shmobile/board-armadillo800eva-reference.c |    2 +-
- arch/arm/mach-shmobile/include/mach/r8a7740.h            |    1 -
- arch/arm/mach-shmobile/setup-r8a7740.c                   |    7 +------
- 4 files changed, 3 insertions(+), 8 deletions(-)
+--- 0001/arch/arm/boot/dts/r8a7740.dtsi
++++ work/arch/arm/boot/dts/r8a7740.dtsi	2014-04-24 17:50:40.000000000 +0900
+@@ -22,6 +22,7 @@
+ 			compatible = "arm,cortex-a9";
+ 			device_type = "cpu";
+ 			reg = <0x0>;
++			clock-frequency = <800000000>;
+ 		};
+ 	};
+ 
