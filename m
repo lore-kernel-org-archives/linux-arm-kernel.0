@@ -1,82 +1,59 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 7 May 2014 09:04:02 -0500
-Subject: [PATCH] ARM: dt: fix up PL011 device tree bindings
-In-Reply-To: <1399470109-8021-1-git-send-email-linus.walleij@linaro.org>
-References: <1399470109-8021-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <CAL_JsqJaRpTcFTe9D-CL6gCzyvWAuT-g7e18isnqMSen3i=yAA@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 7 May 2014 10:05:10 -0400
+Subject: [GIT PULL] DT dma proprties support and ARM arch updates for 3.16
+Message-ID: <1399471510-22382-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 7, 2014 at 8:41 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> Make the map match the reality, the current binding text is
-> nonsense:
->
-> - The clock required for the clocking of the serial port
->   must come first and is not optional (as the driver will
->   otherwise proceed to grab and use the apb_pclk as uartclk),
->   and the apb_pclk that clocks the logic must come second
->   as the code will retrieve the first clock by index,
->   whereas the PrimeCell but will explicitly look for
->   "apb_pclk" so this can be specified later, as it is
->   looked up by name.
->
-> - The pin control state "default" is the only mandated
->   state, the sleep state is entirely optional.
->
-> We also add an example to avoid further confusion.
->
-> Reported-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  Documentation/devicetree/bindings/serial/pl011.txt | 25 ++++++++++++++++++----
->  1 file changed, 21 insertions(+), 4 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/serial/pl011.txt b/Documentation/devicetree/bindings/serial/pl011.txt
-> index 5d2e840ae65c..7a33d67c8349 100644
-> --- a/Documentation/devicetree/bindings/serial/pl011.txt
-> +++ b/Documentation/devicetree/bindings/serial/pl011.txt
-> @@ -6,12 +6,29 @@ Required properties:
->  - interrupts: exactly one interrupt specifier
->
->  Optional properties:
-> -- pinctrl: When present, must have one state named "sleep"
-> -          and one state named "default"
-> -- clocks:  When present, must refer to exactly one clock named
-> -          "apb_pclk"
-> +- pinctrl: When present, must have one state named "default",
-> +          and may contain a second name named "sleep". The former
-> +          state sets up pins for ordinary operation whereas
-> +          the latter state will put the associated pins to sleep
-> +          when the UART is unused
-> +- clocks:  When present, the first clock listed must be named
-> +          "uartclk" and clock the external serial line, and the
-> +          second clock listed must be named "amba_pclk" and clocks
+Russell and ARM-SOC folks,
 
-s/amba_pclk/apb_pclk/
+Please pull below series which adds device tree support for dma
+properties (dma-ranges and dma-coherent) and respective ARM
+architecture updates. As aligned, this series needs to be pulled in
+RMK's tree as well as ARM-SOC tree to avoid any merge conflicts with
+other changes. Rob H has already acked the dt part to be merged via above
+trees. Once the series is pulled in ARM-SOC tree, I will send Keystone
+SOC update which makes use of it.
 
-Admittedly, highbank is wrong, but it only has 1 clock. You need to
-allow for that here, but can say it is deprecated. The driver has to
-use the first clock and not use the names. Speaking of names, you
-should list the clock-names property separately.
+The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
 
-> +          the internal logic of the serial core
->  - dmas:           When present, may have one or two dma channels.
->            The first one must be named "rx", the second one
->            must be named "tx".
->
->  See also bindings/arm/primecell.txt
-> +
-> +Example:
-> +
-> +uart at 80120000 {
-> +       compatible = "arm,pl011", "arm,primecell";
-> +       reg = <0x80120000 0x1000>;
-> +       interrupts = <0 11 IRQ_TYPE_LEVEL_HIGH>;
-> +       dmas = <&dma 13 0 0x2>, <&dma 13 0 0x0>;
-> +       dma-names = "rx", "tx";
-> +       clocks = <&foo_clk>, <&bar_clk>;
-> +       clock-names = "uartclk", "apb_pclk";
-> +};
-> --
-> 1.9.0
->
+  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/dt-dma-properties-for-arm
+
+for you to fetch changes up to 2161c2485d03520060f6094359b22f33913eefa2:
+
+  ARM: dma: use phys_addr_t in __dma_page_[cpu_to_dev/dev_to_cpu] (2014-05-07 09:21:45 -0400)
+
+----------------------------------------------------------------
+DT support for 'dma-ranges'and 'dma-coherent' properties with ARM updates
+
+- The 'dma-ranges' helps to take care of few DMAable system memory
+        restrictions by use of dma_pfn_offset which is maintained per
+        device. Arch code then uses it for dma address translations for such
+        cases. We update the dma_pfn_offset accordingly during DT the device
+        creation process.
+- The 'dma-coherent' property is used to setup arch's coherent dma_ops.
+
+----------------------------------------------------------------
+Grygorii Strashko (2):
+      of: introduce of_dma_get_range() helper
+      ARM: dma: Use dma_pfn_offset for dma address translation
+
+Santosh Shilimkar (5):
+      device: introduce per device dma_pfn_offset
+      of: introduce of_dma_is_coherent() helper
+      of: configure the platform device dma parameters
+      ARM: dma: implement set_arch_dma_coherent_ops()
+      ARM: dma: use phys_addr_t in __dma_page_[cpu_to_dev/dev_to_cpu]
+
+ arch/arm/include/asm/dma-mapping.h |   25 +++++++-
+ arch/arm/mm/dma-mapping.c          |    4 +-
+ drivers/of/address.c               |  110 ++++++++++++++++++++++++++++++++++++
+ drivers/of/platform.c              |   65 +++++++++++++++++++--
+ include/linux/device.h             |    2 +
+ include/linux/dma-mapping.h        |    7 +++
+ include/linux/of_address.h         |   14 +++++
+ 7 files changed, 218 insertions(+), 9 deletions(-)
