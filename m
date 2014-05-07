@@ -1,41 +1,125 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 7 May 2014 16:54:21 +1200
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Updates for v3.16
-In-Reply-To: <20140506014623.GB4701@quad.lixom.net>
-References: <cover.1398737681.git.horms+renesas@verge.net.au>
- <20140506014623.GB4701@quad.lixom.net>
-Message-ID: <20140507045421.GB14157@verge.net.au>
+From: koen@dominion.thruhere.net (Koen Kooi)
+Date: Wed, 7 May 2014 07:10:21 +0200
+Subject: [linux-sunxi] [PATCH 7/7] ARM: sunxi: dt: add APP4-EVB1 board
+ support
+In-Reply-To: <1399434623-20383-8-git-send-email-maxime.ripard@free-electrons.com>
+References: <1399434623-20383-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1399434623-20383-8-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <EEF98E4B-881E-469C-A1C7-8B4EB8825467@dominion.thruhere.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 05, 2014 at 06:46:23PM -0700, Olof Johansson wrote:
-> On Tue, Apr 29, 2014 at 11:15:38AM +0900, Simon Horman wrote:
-> > Hi Olof, Hi Kevin, Hi Arnd,
-> > 
-> > Please consider these second round of Renesas ARM based SoC updates for v3.16.
-> > 
-> > This pull request is based on the previous round of
-> > such requests, tagged as renesas-soc-for-v3.16,
-> > which I have already sent a pull-request for.
-> > 
-> > 
-> > The following changes since commit e35db38d66d1e4007cfc1bb90a05e11b4aaee2a8:
-> > 
-> >   ARM: shmobile: r8a7778/bockw: Move "select RENESAS_INTC_IRQPIN" under SoC (2014-04-14 11:28:43 +0900)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc2-for-v3.16
-> > 
-> > for you to fetch changes up to ab496b9d259e754f5d646219e4f032b274b9fffe:
-> > 
-> >   ARM: shmobile: Ignore callbacks for subsys generic_pm_domain_data (2014-04-25 10:01:43 +0900)
+
+Op 7 mei 2014, om 05:50 heeft Maxime Ripard <maxime.ripard@free-electrons.com> het volgende geschreven:
+
+> From: Boris BREZILLON <boris.brezillon@free-electrons.com>
 > 
-> Merged into next/soc. It's OK to keep it here, but pure removals like
-> these usually go in the cleanup branch. It can be tricky when there's
-> dependencies on new code though, which you might have had in this
-> case. Either way, no need to respin, etc.
+> The APP4 EVB1 development boards embeds an A31, together with some NAND, one SD
+> card slot, and one SDIO + UART WiFi and Bluetooth chip, a few I2C buses, USB,
+> and a LCD display.
+> 
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+> arch/arm/boot/dts/Makefile                |  1 +
+> arch/arm/boot/dts/sun6i-a31-app4-evb1.dts | 63 +++++++++++++++++++++++++++++++
+> 2 files changed, 64 insertions(+)
+> create mode 100644 arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index ffa3f5ef27d3..d50c0895a9d5 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -343,6 +343,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += \
+> 	sun5i-a10s-olinuxino-micro.dtb \
+> 	sun5i-a13-olinuxino.dtb \
+> 	sun5i-a13-olinuxino-micro.dtb \
+> +	sun6i-a31-app4-evb1.dtb \
+> 	sun6i-a31-colombus.dtb \
+> 	sun6i-a31-m9.dtb \
+> 	sun7i-a20-cubieboard2.dtb \
+> diff --git a/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts b/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
+> new file mode 100644
+> index 000000000000..270ab978f858
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
+> @@ -0,0 +1,63 @@
+> +/*
+> + * Copyright 2014 Boris Brezillon
+> + *
+> + * Boris Brezillon <boris.brezillon@free-electrons.com>
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
 
-Thanks, noted.
+Doesn't the kernel try to avoid the 'or later' clause?
 
-In this case I think that there aren't any awkward dependencies.
+regards,
+
+Koen
+
+
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +/dts-v1/;
+> +/include/ "sun6i-a31.dtsi"
+> +
+> +/ {
+> +	model = "Allwinner A31 APP4 EVB1 Evaluation Board";
+> +	compatible = "allwinner,app4-evb1", "allwinner,sun6i-a31";
+> +
+> +	chosen {
+> +		bootargs = "earlyprintk console=ttyS0,115200";
+> +	};
+> +
+> +	soc at 01c00000 {
+> +		pio: pinctrl at 01c20800 {
+> +			usb1_vbus_pin_a: usb1_vbus_pin at 0 {
+> +				allwinner,pins = "PH27";
+> +				allwinner,function = "gpio_out";
+> +				allwinner,drive = <0>;
+> +				allwinner,pull = <0>;
+> +			};
+> +		};
+> +
+> +		usbphy: phy at 01c19400 {
+> +			usb1_vbus-supply = <&reg_usb1_vbus>;
+> +			status = "okay";
+> +		};
+> +
+> +		ehci0: usb at 01c1a000 {
+> +			status = "okay";
+> +		};
+> +
+> +		uart0: serial at 01c28000 {
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&uart0_pins_a>;
+> +			status = "okay";
+> +		};
+> +	};
+> +
+> +	reg_usb1_vbus: usb1-vbus {
+> +		compatible = "regulator-fixed";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&usb1_vbus_pin_a>;
+> +		regulator-name = "usb1-vbus";
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +		enable-active-high;
+> +		gpio = <&pio 7 27 0>;
+> +		status = "okay";
+> +	};
+> +
+> +};
+> -- 
+> 1.9.1
+> 
+> -- 
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
+> 
