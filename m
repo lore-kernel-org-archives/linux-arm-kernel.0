@@ -1,38 +1,26 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Wed, 7 May 2014 16:34:19 +0100
-Subject: [PATCH 1/9] arm64: KVM: rename pm_fake handler to trap_wi_raz
-In-Reply-To: <1399476054-21571-2-git-send-email-marc.zyngier@arm.com>
-References: <1399476054-21571-1-git-send-email-marc.zyngier@arm.com>
- <1399476054-21571-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <CAFEAcA-v4ek1+JDKDfE3n+HSigutqfv1aU=VdxTtxFAd25S6fg@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 7 May 2014 17:37:13 +0200
+Subject: [PATCH v7 2/2] ARM hibernation / suspend-to-disk
+In-Reply-To: <CADHgK6uCQT2iAfL+oQvwN7f65u4musKP-AX-E6j1i2OL6ZMJwA@mail.gmail.com>
+References: <1394016605-24120-1-git-send-email-sebastian.capella@linaro.org>
+ <1394016605-24120-3-git-send-email-sebastian.capella@linaro.org>
+ <20140416101243.GA6952@n2100.arm.linux.org.uk>
+ <CADHgK6vyWU1HCueN=F5D0JxzknV==h-jOG9JmcXeOrH_RGV4JQ@mail.gmail.com>
+ <CADHgK6v43=KSpe2FRG374nbHSMOt9hb+xEhO7z20vhEAQsx0tQ@mail.gmail.com>
+ <CADHgK6tg=7JpYgc0LBmpQzJS-TjK5v_0FQeKRxuFNTqy=QSQzA@mail.gmail.com>
+ <CADHgK6uCQT2iAfL+oQvwN7f65u4musKP-AX-E6j1i2OL6ZMJwA@mail.gmail.com>
+Message-ID: <20140507153713.GA23775@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 May 2014 16:20, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> pm_fake doesn't quite describe what the handler does (ignoring writes
-> and returning 0 for reads).
->
-> As we're about to use it (a lot) in a different context, rename it
-> with a (admitedly cryptic) name that make sense for all users.
+On Wed 2014-04-23 09:39:48, Sebastian Capella wrote:
+> Hi Russell,
+> 
+> Ran this overnight and no failures on >1000 hibernations.
 
-> -/*
-> - * We could trap ID_DFR0 and tell the guest we don't support performance
-> - * monitoring.  Unfortunately the patch to make the kernel check ID_DFR0 was
-> - * NAKed, so it will read the PMCR anyway.
-> - *
-> - * Therefore we tell the guest we have 0 counters.  Unfortunately, we
-> - * must always support PMCCNTR (the cycle counter): we just RAZ/WI for
-> - * all PM registers, which doesn't crash the guest kernel at least.
-> - */
-> -static bool pm_fake(struct kvm_vcpu *vcpu,
-> -                   const struct sys_reg_params *p,
-> -                   const struct sys_reg_desc *r)
-> +static bool trap_wi_raz(struct kvm_vcpu *vcpu,
-> +                       const struct sys_reg_params *p,
-> +                       const struct sys_reg_desc *r)
+Congratulations. Looking forward to hibernate n900 on battery low :-).
 
-The standard term for this is "RAZ/WI", not "WI/RAZ", so
-why not "trap_raz_wi" ?
-
-thanks
--- PMM
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
