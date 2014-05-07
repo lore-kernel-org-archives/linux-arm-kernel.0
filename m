@@ -1,37 +1,53 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 7 May 2014 11:39:43 -0300
-Subject: mx6qsabresd hangs on linux-next
-In-Reply-To: <5369EFA3.8070908@st.com>
-References: <CAOMZO5DMEqs=zzNGqgKjK7wTJdiNPgEqxsX=TtqKrnpLMzpbDw@mail.gmail.com>
- <20140506141310.GA2794@dragon>
- <CAOMZO5DH5d_L-deVu=XmBo9ekq+-g704p7cyayLvp=43bnEccQ@mail.gmail.com>
- <CAOMZO5Dx0JMj3dZ7BSgaYSZZ=ZKRqQHEYWj5sb6z_9jc+cpsEw@mail.gmail.com>
- <5369081D.5030400@st.com> <20140506200029.GD5858@pengutronix.de>
- <20140507020950.GB2794@dragon> <20140507033223.GB2798@dragon>
- <5369EFA3.8070908@st.com>
-Message-ID: <CAOMZO5B2QCDmdFxNmcg3ow1p2CeodE43pSSqEN+Ye0Rtm3sW=g@mail.gmail.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Wed, 7 May 2014 16:43:06 +0200
+Subject: [PATCH] mmc: atmel: don't test host->data
+In-Reply-To: <1399391006-16007-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1399391006-16007-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20140507144306.GO7438@ldesroches-Latitude-E6320>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+On Tue, May 06, 2014 at 05:43:26PM +0200, Alexandre Belloni wrote:
+> Found using smatch:
+> drivers/mmc/host/atmel-mci.c:827 atmci_pdc_complete() warn: variable
+> dereferenced before check 'host->data' (see line 807)
+> 
+> Stop testing host->data as it is not NULL at that point.
 
-On Wed, May 7, 2014 at 5:32 AM, Maxime Coquelin <maxime.coquelin@st.com> wrote:
+I agree
 
-> You are right. Sorry for the regression.
->
-> I thought I tested it, as I had some table-based dividers in my test setup.
-> After checking again, it appears that I didn't had the CLK_SET_RATE_PARENT
-> flag set on these clocks, so I didn't entered the for loop...
->
-> Could the fix be to initialize "up" variable to INT_MAX in _round_up_table
-> (see below)?
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-This works fine for me:
-
-Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
-
-> I can send the patch if you are fine with it.
-> I have no hardware to test on this week, I only have compiled this patch,
-> not tested it.
-
-Please submit your patch, thanks.
+> ---
+>  drivers/mmc/host/atmel-mci.c | 13 +++----------
+>  1 file changed, 3 insertions(+), 10 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+> index 42706ea0ba85..aece7cafbb97 100644
+> --- a/drivers/mmc/host/atmel-mci.c
+> +++ b/drivers/mmc/host/atmel-mci.c
+> @@ -820,16 +820,9 @@ static void atmci_pdc_complete(struct atmel_mci *host)
+>  
+>  	atmci_pdc_cleanup(host);
+>  
+> -	/*
+> -	 * If the card was removed, data will be NULL. No point trying
+> -	 * to send the stop command or waiting for NBUSY in this case.
+> -	 */
+> -	if (host->data) {
+> -		dev_dbg(&host->pdev->dev,
+> -		        "(%s) set pending xfer complete\n", __func__);
+> -		atmci_set_pending(host, EVENT_XFER_COMPLETE);
+> -		tasklet_schedule(&host->tasklet);
+> -	}
+> +	dev_dbg(&host->pdev->dev, "(%s) set pending xfer complete\n", __func__);
+> +	atmci_set_pending(host, EVENT_XFER_COMPLETE);
+> +	tasklet_schedule(&host->tasklet);
+>  }
+>  
+>  static void atmci_dma_cleanup(struct atmel_mci *host)
+> -- 
+> 1.9.1
+> 
