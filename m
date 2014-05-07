@@ -1,63 +1,73 @@
-From: jays.lee@samsung.com (Jungseok Lee)
-Date: Wed, 07 May 2014 13:27:40 +0900
-Subject: [PATCH v5 5/6] arm64: mm: Implement 4 levels of translation tables
-In-Reply-To: <20140506120131.GA26776@linaro.org>
-References: <000501cf64e5$d92ae870$8b80b950$@samsung.com>
- <20140506120131.GA26776@linaro.org>
-Message-ID: <001d01cf69ac$aedeeb90$0c9cc2b0$@samsung.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 07 May 2014 13:37:34 +0900
+Subject: [PATCHv5] ARM: EXYNOS: Support secondary CPU boot of Exynos4212
+In-Reply-To: <1398735462-1938-1-git-send-email-cw00.choi@samsung.com>
+References: <1398735462-1938-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <5369B88E.9030901@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, May 06, 2014 9:02 PM, Steve Capper wrote:
-> On Thu, May 01, 2014 at 11:34:16AM +0900, Jungseok Lee wrote:
-> > This patch implements 4 levels of translation tables since 3 levels of
-> > page tables with 4KB pages cannot support 40-bit physical address
-> > space described in [1] due to the following issue.
-> >
-> > It is a restriction that kernel logical memory map with 4KB + 3 levels
-> > (0xffffffc000000000-0xffffffffffffffff) cannot cover RAM region from
-> > 544GB to 1024GB in [1]. Specifically, ARM64 kernel fails to create
-> > mapping for this region in map_mem function since __phys_to_virt for
-> > this region reaches to address overflow.
-> >
-> > If SoC design follows the document, [1], over 32GB RAM would be placed
-> > from 544GB. Even 64GB system is supposed to use the region from 544GB
-> > to 576GB for only 32GB RAM. Naturally, it would reach to enable 4
-> > levels of page tables to avoid hacking __virt_to_phys and __phys_to_virt.
-> >
-> > However, it is recommended 4 levels of page table should be only
-> > enabled if memory map is too sparse or there is about 512GB RAM.
-> >
+Dear Kukjin,
+
+Could you please pick this patch?
+
+Best Regards,
+Chanwoo Choi
+
+On 04/29/2014 10:37 AM, Chanwoo Choi wrote:
+> From: Kyungmin Park <kyungmin.park@samsung.com>
 > 
-> Hi Jungseok,
-> One comment below:
-
-Hi Steve.
-
-> [ ... ]
+> This patch fix the offset of CPU boot address and change parameter of smc call
+> of SMC_CMD_CPU1BOOT command for Exynos4212.
 > 
-> > diff --git a/arch/arm64/include/asm/tlb.h
-> > b/arch/arm64/include/asm/tlb.h index bc19101..086112b 100644
-> > --- a/arch/arm64/include/asm/tlb.h
-> > +++ b/arch/arm64/include/asm/tlb.h
-> > @@ -100,6 +100,15 @@ static inline void __pmd_free_tlb(struct
-> > mmu_gather *tlb, pmd_t *pmdp,  }  #endif
-> >
-> > +#ifdef CONFIG_ARM64_4_LEVELS
-> > +static inline void __pud_free_tlb(struct mmu_gather *tlb, pmd_t *pudp,
-> > +				  unsigned long addr)
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> ---
+> Changes from v4:
+> - Post only this patch separated from following patchset[1]
+> [1] https://lkml.org/lkml/2014/4/24/873
 > 
-> The second parameter needs to be a pointer to pud_t ?
-> (this fires up a warning with STRICT_MM_TYPECHECKS).
-
-You're right. My fault...
-
-> With that and Christoffer's feedback about expanding the comments on create_pud_entry addressed:
-
-Okay. I will add it.
-
-> Reviewed-by: Steve Capper <steve.capper@linaro.org>
-
-Thanks for review!
-
-- Jungseok Lee
+>  arch/arm/mach-exynos/firmware.c | 15 ++++++++++++++-
+>  1 file changed, 14 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
+> index 932129e..aa01c42 100644
+> --- a/arch/arm/mach-exynos/firmware.c
+> +++ b/arch/arm/mach-exynos/firmware.c
+> @@ -18,6 +18,8 @@
+>  
+>  #include <mach/map.h>
+>  
+> +#include <plat/cpu.h>
+> +
+>  #include "smc.h"
+>  
+>  static int exynos_do_idle(void)
+> @@ -28,13 +30,24 @@ static int exynos_do_idle(void)
+>  
+>  static int exynos_cpu_boot(int cpu)
+>  {
+> +	/*
+> +	 * The second parameter of SMC_CMD_CPU1BOOT command means CPU id.
+> +	 * But, Exynos4212 has only one secondary CPU so second parameter
+> +	 * isn't used for informing secure firmware about CPU id.
+> +	 */
+> +	if (soc_is_exynos4212())
+> +		cpu = 0;
+> +
+>  	exynos_smc(SMC_CMD_CPU1BOOT, cpu, 0, 0);
+>  	return 0;
+>  }
+>  
+>  static int exynos_set_cpu_boot_addr(int cpu, unsigned long boot_addr)
+>  {
+> -	void __iomem *boot_reg = S5P_VA_SYSRAM_NS + 0x1c + 4*cpu;
+> +	void __iomem *boot_reg = S5P_VA_SYSRAM_NS + 0x1c;
+> +
+> +	if (!soc_is_exynos4212())
+> +		boot_reg += 4*cpu;
+>  
+>  	__raw_writel(boot_addr, boot_reg);
+>  	return 0;
+> 
