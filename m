@@ -1,460 +1,296 @@
-From: agust@denx.de (Anatolij Gustschin)
-Date: Wed, 7 May 2014 01:33:02 +0200
-Subject: [PATCH v2] watchdog: imx2_wdt: convert to watchdog core api
-In-Reply-To: <1397199434-6551-1-git-send-email-agust@denx.de>
-References: <1397199434-6551-1-git-send-email-agust@denx.de>
-Message-ID: <20140507013302.2f0ef27c@crub>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Wed, 07 May 2014 09:36:52 +0900
+Subject: [PATCH v2 1/6] i2c: s3c2410: Moving I2C interrupt re-configuration
+ code into i2c driver
+In-Reply-To: <53692BCA.4070601@gmail.com>
+References: <1399366282-4191-1-git-send-email-pankaj.dubey@samsung.com>
+ <1399366282-4191-2-git-send-email-pankaj.dubey@samsung.com>
+ <53692BCA.4070601@gmail.com>
+Message-ID: <53698024.4040406@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Apr 2014 08:57:14 +0200
-Anatolij Gustschin <agust@denx.de> wrote:
+Hi Tomasz,
 
-> Convert the imx2_wdt driver to the new watchdog core api.
-> 
-> Signed-off-by: Anatolij Gustschin <agust@denx.de>
-> Cc: Wolfram Sang <wsa@the-dreams.de>
-> Cc: Wim Van Sebroeck <wim@iguana.be>
+Thanks for review.
 
-Ping. Will this patch be queued for next?
+On 05/07/2014 03:36 AM, Tomasz Figa wrote:
+> Hi Pankaj,
+>
+> On 06.05.2014 10:51, Pankaj Dubey wrote:
+>> Let's move I2C interrupt re-configuration code from machine
+>> file exynos.c to I2C driver. Since only Exynos5250, and
+>> Exynos5420 need to do this, added syscon based phandle to
+>> i2c device nodes of respective SoC DT files.
+>>
+>> CC: Rob Herring <robh+dt@kernel.org>
+>> CC: Randy Dunlap <rdunlap@infradead.org>
+>> CC: Wolfram Sang <wsa@the-dreams.de>
+>> CC: Russell King <linux@arm.linux.org.uk>
+>> CC: devicetree at vger.kernel.org
+>> CC: linux-doc at vger.kernel.org
+>> CC: linux-i2c at vger.kernel.org
+>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+>> ---
+>>   .../devicetree/bindings/arm/samsung/sysreg.txt     |    1 +
+>>   arch/arm/boot/dts/exynos5.dtsi                     |    5 ++++
+>>   arch/arm/boot/dts/exynos5250.dtsi                  |    4 +++
+>>   arch/arm/boot/dts/exynos5420.dtsi                  |    4 +++
+>>   arch/arm/mach-exynos/exynos.c                      |   26 
+>> -------------------
+>>   drivers/i2c/busses/i2c-s3c2410.c                   |   27 
+>> ++++++++++++++++++++
+>>   6 files changed, 41 insertions(+), 26 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/samsung/sysreg.txt 
+>> b/Documentation/devicetree/bindings/arm/samsung/sysreg.txt
+>> index 0ab3251..fd71581 100644
+>> --- a/Documentation/devicetree/bindings/arm/samsung/sysreg.txt
+>> +++ b/Documentation/devicetree/bindings/arm/samsung/sysreg.txt
+>> @@ -3,6 +3,7 @@ SAMSUNG S5P/Exynos SoC series System Registers (SYSREG)
+>>   Properties:
+>>    - compatible : should contain "samsung,<chip name>-sysreg", "syscon";
+>>      For Exynos4 SoC series it should be "samsung,exynos4-sysreg", 
+>> "syscon";
+>> +   For Exynos5 SoC series it should be "samsung,exynos5-sysreg", "syscon";
+>>    - reg : offset and length of the register set.
+>>
+>>   Example:
+>> diff --git a/arch/arm/boot/dts/exynos5.dtsi 
+>> b/arch/arm/boot/dts/exynos5.dtsi
+>> index 79d0608..3027e37 100644
+>> --- a/arch/arm/boot/dts/exynos5.dtsi
+>> +++ b/arch/arm/boot/dts/exynos5.dtsi
+>> @@ -99,4 +99,9 @@
+>>           #size-cells = <0>;
+>>           status = "disabled";
+>>       };
+>> +
+>> +    sys_reg: syscon at 10050000 {
+>> +        compatible = "samsung,exynos5-sysreg", "syscon";
+>> +        reg = <0x10050000 0x400>;
+>> +    };
+>>   };
+>> diff --git a/arch/arm/boot/dts/exynos5250.dtsi 
+>> b/arch/arm/boot/dts/exynos5250.dtsi
+>> index 8d724d5..46f0233 100644
+>> --- a/arch/arm/boot/dts/exynos5250.dtsi
+>> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+>> @@ -285,6 +285,7 @@
+>>           clock-names = "i2c";
+>>           pinctrl-names = "default";
+>>           pinctrl-0 = <&i2c0_bus>;
+>> +        samsung,syscon-phandle = <&sys_reg>;
+>>           status = "disabled";
+>>       };
+>>
+>> @@ -298,6 +299,7 @@
+>>           clock-names = "i2c";
+>>           pinctrl-names = "default";
+>>           pinctrl-0 = <&i2c1_bus>;
+>> +        samsung,syscon-phandle = <&sys_reg>;
+>>           status = "disabled";
+>>       };
+>>
+>> @@ -311,6 +313,7 @@
+>>           clock-names = "i2c";
+>>           pinctrl-names = "default";
+>>           pinctrl-0 = <&i2c2_bus>;
+>> +        samsung,syscon-phandle = <&sys_reg>;
+>>           status = "disabled";
+>>       };
+>>
+>> @@ -324,6 +327,7 @@
+>>           clock-names = "i2c";
+>>           pinctrl-names = "default";
+>>           pinctrl-0 = <&i2c3_bus>;
+>> +        samsung,syscon-phandle = <&sys_reg>;
+>>           status = "disabled";
+>>       };
+>>
+>> diff --git a/arch/arm/boot/dts/exynos5420.dtsi 
+>> b/arch/arm/boot/dts/exynos5420.dtsi
+>> index ff496ad..762128c 100644
+>> --- a/arch/arm/boot/dts/exynos5420.dtsi
+>> +++ b/arch/arm/boot/dts/exynos5420.dtsi
+>> @@ -517,6 +517,7 @@
+>>           clock-names = "i2c";
+>>           pinctrl-names = "default";
+>>           pinctrl-0 = <&i2c0_bus>;
+>> +        samsung,syscon-phandle = <&sys_reg>;
+>>           status = "disabled";
+>>       };
+>>
+>> @@ -530,6 +531,7 @@
+>>           clock-names = "i2c";
+>>           pinctrl-names = "default";
+>>           pinctrl-0 = <&i2c1_bus>;
+>> +        samsung,syscon-phandle = <&sys_reg>;
+>>           status = "disabled";
+>>       };
+>>
+>> @@ -543,6 +545,7 @@
+>>           clock-names = "i2c";
+>>           pinctrl-names = "default";
+>>           pinctrl-0 = <&i2c2_bus>;
+>> +        samsung,syscon-phandle = <&sys_reg>;
+>>           status = "disabled";
+>>       };
+>>
+>> @@ -556,6 +559,7 @@
+>>           clock-names = "i2c";
+>>           pinctrl-names = "default";
+>>           pinctrl-0 = <&i2c3_bus>;
+>> +        samsung,syscon-phandle = <&sys_reg>;
+>>           status = "disabled";
+>>       };
+>>
+>> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+>> index 59eb1f1..54ae2e1 100644
+>> --- a/arch/arm/mach-exynos/exynos.c
+>> +++ b/arch/arm/mach-exynos/exynos.c
+>> @@ -293,32 +293,6 @@ void __init exynos_map_pmu(void)
+>>
+>>   static void __init exynos_dt_machine_init(void)
+>>   {
+>> -    struct device_node *i2c_np;
+>> -    const char *i2c_compat = "samsung,s3c2440-i2c";
+>> -    unsigned int tmp;
+>> -    int id;
+>> -
+>> -    /*
+>> -     * Exynos5's legacy i2c controller and new high speed i2c
+>> -     * controller have muxed interrupt sources. By default the
+>> -     * interrupts for 4-channel HS-I2C controller are enabled.
+>> -     * If node for first four channels of legacy i2c controller
+>> -     * are available then re-configure the interrupts via the
+>> -     * system register.
+>> -     */
+>> -    if (soc_is_exynos5()) {
+>> -        for_each_compatible_node(i2c_np, NULL, i2c_compat) {
+>> -            if (of_device_is_available(i2c_np)) {
+>> -                id = of_alias_get_id(i2c_np, "i2c");
+>> -                if (id < 4) {
+>> -                    tmp = readl(EXYNOS5_SYS_I2C_CFG);
+>> -                    writel(tmp & ~(0x1 << id),
+>> -                            EXYNOS5_SYS_I2C_CFG);
+>> -                }
+>> -            }
+>> -        }
+>> -    }
+>> -
+>>       exynos_map_pmu();
+>>
+>>       if (!soc_is_exynos5440())
+>> diff --git a/drivers/i2c/busses/i2c-s3c2410.c 
+>> b/drivers/i2c/busses/i2c-s3c2410.c
+>> index ae44910..0420150 100644
+>> --- a/drivers/i2c/busses/i2c-s3c2410.c
+>> +++ b/drivers/i2c/busses/i2c-s3c2410.c
+>> @@ -39,6 +39,8 @@
+>>   #include <linux/of.h>
+>>   #include <linux/of_gpio.h>
+>>   #include <linux/pinctrl/consumer.h>
+>> +#include <linux/mfd/syscon.h>
+>> +#include <linux/regmap.h>
+>>
+>>   #include <asm/irq.h>
+>>
+>> @@ -91,6 +93,9 @@
+>>   /* Max time to wait for bus to become idle after a xfer (in us) */
+>>   #define S3C2410_IDLE_TIMEOUT    5000
+>>
+>> +/* Exynos5 Sysreg offset */
+>> +#define EXYNOS5_SYS_I2C_CFG    0x0234
+>> +
+>>   /* i2c controller state */
+>>   enum s3c24xx_i2c_state {
+>>       STATE_IDLE,
+>> @@ -127,6 +132,7 @@ struct s3c24xx_i2c {
+>>   #if defined(CONFIG_ARM_S3C24XX_CPUFREQ)
+>>       struct notifier_block    freq_transition;
+>>   #endif
+>> +    struct regmap        *sysreg;
+>>   };
+>>
+>>   static struct platform_device_id s3c24xx_driver_ids[] = {
+>> @@ -1075,6 +1081,8 @@ static void
+>>   s3c24xx_i2c_parse_dt(struct device_node *np, struct s3c24xx_i2c *i2c)
+>>   {
+>>       struct s3c2410_platform_i2c *pdata = i2c->pdata;
+>> +    unsigned int tmp;
+>> +    int id;
+>>
+>>       if (!np)
+>>           return;
+>> @@ -1084,6 +1092,25 @@ s3c24xx_i2c_parse_dt(struct device_node *np, 
+>> struct s3c24xx_i2c *i2c)
+>>       of_property_read_u32(np, "samsung,i2c-slave-addr", 
+>> &pdata->slave_addr);
+>>       of_property_read_u32(np, "samsung,i2c-max-bus-freq",
+>>                   (u32 *)&pdata->frequency);
+>> +    /*
+>> +     * Exynos5's legacy i2c controller and new high speed i2c
+>> +     * controller have muxed interrupt sources. By default the
+>> +     * interrupts for 4-channel HS-I2C controller are enabled.
+>> +     * If node for first four channels of legacy i2c controller
+>> +     * are available then re-configure the interrupts via the
+>> +     * system register.
+>> +     */
+>> +    id = of_alias_get_id(np, "i2c");
+>> +    i2c->sysreg = syscon_regmap_lookup_by_phandle(np,
+>> +            "samsung,syscon-phandle");
+>> +    if (IS_ERR(i2c->sysreg)) {
+>> +        i2c->sysreg = NULL;
+>
+> NULL shouldn't be considered for pointers using the ERR_PTR() convention, 
+> so you should just preserve the value returned by 
+> syscon_regmap_lookup_by_phandle() here.
 
-Thanks,
+OK.
 
-Anatolij
+>
+> Also, the driver seems to do this only once in probe, so maybe you should 
+> simply use a local variable here, without storing the regmap in i2c struct.
 
-> ---
-> NOTE: This patch applies on top of the imx2_wdt regmap-mmio support
-> patch series http://comments.gmane.org/gmane.linux.kernel/1677735
-> 
-> Changes since first version:
->  - simplify return in imx2_wdt_is_running()
->  - fix "WARNING: quoted string split across lines"
-> 
->  drivers/watchdog/Kconfig    |    1 +
->  drivers/watchdog/imx2_wdt.c |  292 ++++++++++++++++++-------------------------
->  2 files changed, 123 insertions(+), 170 deletions(-)
-> 
-> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-> index f2a15f4..5e78c77c 100644
-> --- a/drivers/watchdog/Kconfig
-> +++ b/drivers/watchdog/Kconfig
-> @@ -379,6 +379,7 @@ config IMX2_WDT
->  	tristate "IMX2+ Watchdog"
->  	depends on ARCH_MXC
->  	select REGMAP_MMIO
-> +	select WATCHDOG_CORE
->  	help
->  	  This is the driver for the hardware watchdog
->  	  on the Freescale IMX2 and later processors.
-> diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
-> index 76fa724..9d4874f 100644
-> --- a/drivers/watchdog/imx2_wdt.c
-> +++ b/drivers/watchdog/imx2_wdt.c
-> @@ -22,18 +22,15 @@
->   */
->  
->  #include <linux/clk.h>
-> -#include <linux/fs.h>
->  #include <linux/init.h>
->  #include <linux/io.h>
->  #include <linux/jiffies.h>
->  #include <linux/kernel.h>
-> -#include <linux/miscdevice.h>
->  #include <linux/module.h>
->  #include <linux/moduleparam.h>
->  #include <linux/platform_device.h>
->  #include <linux/regmap.h>
->  #include <linux/timer.h>
-> -#include <linux/uaccess.h>
->  #include <linux/watchdog.h>
->  
->  #define DRIVER_NAME "imx2-wdt"
-> @@ -56,19 +53,12 @@
->  
->  #define WDOG_SEC_TO_COUNT(s)	((s * 2 - 1) << 8)
->  
-> -#define IMX2_WDT_STATUS_OPEN	0
-> -#define IMX2_WDT_STATUS_STARTED	1
-> -#define IMX2_WDT_EXPECT_CLOSE	2
-> -
-> -static struct {
-> +struct imx2_wdt_device {
->  	struct clk *clk;
->  	struct regmap *regmap;
-> -	unsigned timeout;
-> -	unsigned long status;
->  	struct timer_list timer;	/* Pings the watchdog when closed */
-> -} imx2_wdt;
-> -
-> -static struct miscdevice imx2_wdt_miscdev;
-> +	struct watchdog_device wdog;
-> +};
->  
->  static bool nowayout = WATCHDOG_NOWAYOUT;
->  module_param(nowayout, bool, 0);
-> @@ -86,11 +76,12 @@ static const struct watchdog_info imx2_wdt_info = {
->  	.options = WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE,
->  };
->  
-> -static inline void imx2_wdt_setup(void)
-> +static inline void imx2_wdt_setup(struct watchdog_device *wdog)
->  {
-> +	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
->  	u32 val;
->  
-> -	regmap_read(imx2_wdt.regmap, IMX2_WDT_WCR, &val);
-> +	regmap_read(wdev->regmap, IMX2_WDT_WCR, &val);
->  
->  	/* Suspend timer in low power mode, write once-only */
->  	val |= IMX2_WDT_WCR_WDZST;
-> @@ -101,157 +92,93 @@ static inline void imx2_wdt_setup(void)
->  	/* Keep Watchdog Disabled */
->  	val &= ~IMX2_WDT_WCR_WDE;
->  	/* Set the watchdog's Time-Out value */
-> -	val |= WDOG_SEC_TO_COUNT(imx2_wdt.timeout);
-> +	val |= WDOG_SEC_TO_COUNT(wdog->timeout);
->  
-> -	regmap_write(imx2_wdt.regmap, IMX2_WDT_WCR, val);
-> +	regmap_write(wdev->regmap, IMX2_WDT_WCR, val);
->  
->  	/* enable the watchdog */
->  	val |= IMX2_WDT_WCR_WDE;
-> -	regmap_write(imx2_wdt.regmap, IMX2_WDT_WCR, val);
-> +	regmap_write(wdev->regmap, IMX2_WDT_WCR, val);
->  }
->  
-> -static inline void imx2_wdt_ping(void)
-> +static inline bool imx2_wdt_is_running(struct imx2_wdt_device *wdev)
->  {
-> -	regmap_write(imx2_wdt.regmap, IMX2_WDT_WSR, IMX2_WDT_SEQ1);
-> -	regmap_write(imx2_wdt.regmap, IMX2_WDT_WSR, IMX2_WDT_SEQ2);
-> -}
-> +	u32 val;
->  
-> -static void imx2_wdt_timer_ping(unsigned long arg)
-> -{
-> -	/* ping it every imx2_wdt.timeout / 2 seconds to prevent reboot */
-> -	imx2_wdt_ping();
-> -	mod_timer(&imx2_wdt.timer, jiffies + imx2_wdt.timeout * HZ / 2);
-> +	regmap_read(wdev->regmap, IMX2_WDT_WCR, &val);
-> +
-> +	return val & IMX2_WDT_WCR_WDE;
->  }
->  
-> -static void imx2_wdt_start(void)
-> +static int imx2_wdt_ping(struct watchdog_device *wdog)
->  {
-> -	if (!test_and_set_bit(IMX2_WDT_STATUS_STARTED, &imx2_wdt.status)) {
-> -		/* at our first start we enable clock and do initialisations */
-> -		clk_prepare_enable(imx2_wdt.clk);
-> -
-> -		imx2_wdt_setup();
-> -	} else	/* delete the timer that pings the watchdog after close */
-> -		del_timer_sync(&imx2_wdt.timer);
-> +	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
->  
-> -	/* Watchdog is enabled - time to reload the timeout value */
-> -	imx2_wdt_ping();
-> +	regmap_write(wdev->regmap, IMX2_WDT_WSR, IMX2_WDT_SEQ1);
-> +	regmap_write(wdev->regmap, IMX2_WDT_WSR, IMX2_WDT_SEQ2);
-> +	return 0;
->  }
->  
-> -static void imx2_wdt_stop(void)
-> +static void imx2_wdt_timer_ping(unsigned long arg)
->  {
-> -	/* we don't need a clk_disable, it cannot be disabled once started.
-> -	 * We use a timer to ping the watchdog while /dev/watchdog is closed */
-> -	imx2_wdt_timer_ping(0);
-> +	struct watchdog_device *wdog = (struct watchdog_device *)arg;
-> +	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
-> +
-> +	/* ping it every wdog->timeout / 2 seconds to prevent reboot */
-> +	imx2_wdt_ping(wdog);
-> +	mod_timer(&wdev->timer, jiffies + wdog->timeout * HZ / 2);
->  }
->  
-> -static void imx2_wdt_set_timeout(int new_timeout)
-> +static int imx2_wdt_set_timeout(struct watchdog_device *wdog,
-> +				unsigned int new_timeout)
->  {
-> -	regmap_update_bits(imx2_wdt.regmap, IMX2_WDT_WCR, IMX2_WDT_WCR_WT,
-> +	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
-> +
-> +	regmap_update_bits(wdev->regmap, IMX2_WDT_WCR, IMX2_WDT_WCR_WT,
->  			   WDOG_SEC_TO_COUNT(new_timeout));
-> +	return 0;
->  }
->  
-> -static int imx2_wdt_open(struct inode *inode, struct file *file)
-> +static int imx2_wdt_start(struct watchdog_device *wdog)
->  {
-> -	if (test_and_set_bit(IMX2_WDT_STATUS_OPEN, &imx2_wdt.status))
-> -		return -EBUSY;
-> +	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
->  
-> -	imx2_wdt_start();
-> -	return nonseekable_open(inode, file);
-> +	if (imx2_wdt_is_running(wdev)) {
-> +		/* delete the timer that pings the watchdog after close */
-> +		del_timer_sync(&wdev->timer);
-> +		imx2_wdt_set_timeout(wdog, wdog->timeout);
-> +	} else
-> +		imx2_wdt_setup(wdog);
-> +
-> +	return imx2_wdt_ping(wdog);
->  }
->  
-> -static int imx2_wdt_close(struct inode *inode, struct file *file)
-> +static int imx2_wdt_stop(struct watchdog_device *wdog)
->  {
-> -	if (test_bit(IMX2_WDT_EXPECT_CLOSE, &imx2_wdt.status) && !nowayout)
-> -		imx2_wdt_stop();
-> -	else {
-> -		dev_crit(imx2_wdt_miscdev.parent,
-> -			"Unexpected close: Expect reboot!\n");
-> -		imx2_wdt_ping();
-> -	}
-> -
-> -	clear_bit(IMX2_WDT_EXPECT_CLOSE, &imx2_wdt.status);
-> -	clear_bit(IMX2_WDT_STATUS_OPEN, &imx2_wdt.status);
-> +	/*
-> +	 * We don't need a clk_disable, it cannot be disabled once started.
-> +	 * We use a timer to ping the watchdog while /dev/watchdog is closed
-> +	 */
-> +	imx2_wdt_timer_ping((unsigned long)wdog);
->  	return 0;
->  }
->  
-> -static long imx2_wdt_ioctl(struct file *file, unsigned int cmd,
-> -							unsigned long arg)
-> +static inline void imx2_wdt_ping_if_active(struct watchdog_device *wdog)
->  {
-> -	void __user *argp = (void __user *)arg;
-> -	int __user *p = argp;
-> -	int new_value;
-> -	u32 val;
-> +	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
->  
-> -	switch (cmd) {
-> -	case WDIOC_GETSUPPORT:
-> -		return copy_to_user(argp, &imx2_wdt_info,
-> -			sizeof(struct watchdog_info)) ? -EFAULT : 0;
-> -
-> -	case WDIOC_GETSTATUS:
-> -		return put_user(0, p);
-> -
-> -	case WDIOC_GETBOOTSTATUS:
-> -		regmap_read(imx2_wdt.regmap, IMX2_WDT_WRSR, &val);
-> -		new_value = val & IMX2_WDT_WRSR_TOUT ? WDIOF_CARDRESET : 0;
-> -		return put_user(new_value, p);
-> -
-> -	case WDIOC_KEEPALIVE:
-> -		imx2_wdt_ping();
-> -		return 0;
-> -
-> -	case WDIOC_SETTIMEOUT:
-> -		if (get_user(new_value, p))
-> -			return -EFAULT;
-> -		if ((new_value < 1) || (new_value > IMX2_WDT_MAX_TIME))
-> -			return -EINVAL;
-> -		imx2_wdt_set_timeout(new_value);
-> -		imx2_wdt.timeout = new_value;
-> -		imx2_wdt_ping();
-> -
-> -		/* Fallthrough to return current value */
-> -	case WDIOC_GETTIMEOUT:
-> -		return put_user(imx2_wdt.timeout, p);
-> -
-> -	default:
-> -		return -ENOTTY;
-> +	if (imx2_wdt_is_running(wdev)) {
-> +		imx2_wdt_set_timeout(wdog, wdog->timeout);
-> +		imx2_wdt_timer_ping((unsigned long)wdog);
->  	}
->  }
->  
-> -static ssize_t imx2_wdt_write(struct file *file, const char __user *data,
-> -						size_t len, loff_t *ppos)
-> -{
-> -	size_t i;
-> -	char c;
-> -
-> -	if (len == 0)	/* Can we see this even ? */
-> -		return 0;
-> -
-> -	clear_bit(IMX2_WDT_EXPECT_CLOSE, &imx2_wdt.status);
-> -	/* scan to see whether or not we got the magic character */
-> -	for (i = 0; i != len; i++) {
-> -		if (get_user(c, data + i))
-> -			return -EFAULT;
-> -		if (c == 'V')
-> -			set_bit(IMX2_WDT_EXPECT_CLOSE, &imx2_wdt.status);
-> -	}
-> -
-> -	imx2_wdt_ping();
-> -	return len;
-> -}
-> -
-> -static const struct file_operations imx2_wdt_fops = {
-> +static struct watchdog_ops imx2_wdt_ops = {
->  	.owner = THIS_MODULE,
-> -	.llseek = no_llseek,
-> -	.unlocked_ioctl = imx2_wdt_ioctl,
-> -	.open = imx2_wdt_open,
-> -	.release = imx2_wdt_close,
-> -	.write = imx2_wdt_write,
-> -};
-> -
-> -static struct miscdevice imx2_wdt_miscdev = {
-> -	.minor = WATCHDOG_MINOR,
-> -	.name = "watchdog",
-> -	.fops = &imx2_wdt_fops,
-> +	.start = imx2_wdt_start,
-> +	.stop = imx2_wdt_stop,
-> +	.ping = imx2_wdt_ping,
-> +	.set_timeout = imx2_wdt_set_timeout,
->  };
->  
->  static struct regmap_config imx2_wdt_regmap_config = {
-> @@ -263,76 +190,101 @@ static struct regmap_config imx2_wdt_regmap_config = {
->  
->  static int __init imx2_wdt_probe(struct platform_device *pdev)
->  {
-> +	struct imx2_wdt_device *wdev;
-> +	struct watchdog_device *wdog;
->  	struct resource *res;
->  	void __iomem *base;
->  	int ret;
-> +	u32 val;
-> +
-> +	wdev = devm_kzalloc(&pdev->dev, sizeof(*wdev), GFP_KERNEL);
-> +	if (!wdev)
-> +		return -ENOMEM;
->  
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	base = devm_ioremap_resource(&pdev->dev, res);
->  	if (IS_ERR(base))
->  		return PTR_ERR(base);
->  
-> -	imx2_wdt.regmap = devm_regmap_init_mmio_clk(&pdev->dev, NULL, base,
-> -						    &imx2_wdt_regmap_config);
-> -	if (IS_ERR(imx2_wdt.regmap)) {
-> +	wdev->regmap = devm_regmap_init_mmio_clk(&pdev->dev, NULL, base,
-> +						 &imx2_wdt_regmap_config);
-> +	if (IS_ERR(wdev->regmap)) {
->  		dev_err(&pdev->dev, "regmap init failed\n");
-> -		return PTR_ERR(imx2_wdt.regmap);
-> +		return PTR_ERR(wdev->regmap);
->  	}
->  
-> -	imx2_wdt.clk = devm_clk_get(&pdev->dev, NULL);
-> -	if (IS_ERR(imx2_wdt.clk)) {
-> +	wdev->clk = devm_clk_get(&pdev->dev, NULL);
-> +	if (IS_ERR(wdev->clk)) {
->  		dev_err(&pdev->dev, "can't get Watchdog clock\n");
-> -		return PTR_ERR(imx2_wdt.clk);
-> +		return PTR_ERR(wdev->clk);
->  	}
->  
-> -	imx2_wdt.timeout = clamp_t(unsigned, timeout, 1, IMX2_WDT_MAX_TIME);
-> -	if (imx2_wdt.timeout != timeout)
-> -		dev_warn(&pdev->dev, "Initial timeout out of range! "
-> -			"Clamped from %u to %u\n", timeout, imx2_wdt.timeout);
-> +	wdog			= &wdev->wdog;
-> +	wdog->info		= &imx2_wdt_info;
-> +	wdog->ops		= &imx2_wdt_ops;
-> +	wdog->min_timeout	= 1;
-> +	wdog->max_timeout	= IMX2_WDT_MAX_TIME;
->  
-> -	setup_timer(&imx2_wdt.timer, imx2_wdt_timer_ping, 0);
-> +	clk_prepare_enable(wdev->clk);
->  
-> -	imx2_wdt_miscdev.parent = &pdev->dev;
-> -	ret = misc_register(&imx2_wdt_miscdev);
-> -	if (ret)
-> -		goto fail;
-> +	regmap_read(wdev->regmap, IMX2_WDT_WRSR, &val);
-> +	wdog->bootstatus = val & IMX2_WDT_WRSR_TOUT ? WDIOF_CARDRESET : 0;
->  
-> -	dev_info(&pdev->dev,
-> -		"IMX2+ Watchdog Timer enabled. timeout=%ds (nowayout=%d)\n",
-> -						imx2_wdt.timeout, nowayout);
-> -	return 0;
-> +	wdog->timeout = clamp_t(unsigned, timeout, 1, IMX2_WDT_MAX_TIME);
-> +	if (wdog->timeout != timeout)
-> +		dev_warn(&pdev->dev, "Initial timeout out of range! Clamped from %u to %u\n",
-> +			 timeout, wdog->timeout);
-> +
-> +	platform_set_drvdata(pdev, wdog);
-> +	watchdog_set_drvdata(wdog, wdev);
-> +	watchdog_set_nowayout(wdog, nowayout);
-> +	watchdog_init_timeout(wdog, timeout, &pdev->dev);
-> +
-> +	setup_timer(&wdev->timer, imx2_wdt_timer_ping, (unsigned long)wdog);
->  
-> -fail:
-> -	imx2_wdt_miscdev.parent = NULL;
-> -	return ret;
-> +	imx2_wdt_ping_if_active(wdog);
-> +
-> +	ret = watchdog_register_device(wdog);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "cannot register watchdog device\n");
-> +		return ret;
-> +	}
-> +
-> +	dev_info(&pdev->dev, "timeout %d sec (nowayout=%d)\n",
-> +		 wdog->timeout, nowayout);
-> +
-> +	return 0;
->  }
->  
->  static int __exit imx2_wdt_remove(struct platform_device *pdev)
->  {
-> -	misc_deregister(&imx2_wdt_miscdev);
-> +	struct watchdog_device *wdog = platform_get_drvdata(pdev);
-> +	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
->  
-> -	if (test_bit(IMX2_WDT_STATUS_STARTED, &imx2_wdt.status)) {
-> -		del_timer_sync(&imx2_wdt.timer);
-> +	watchdog_unregister_device(wdog);
->  
-> -		dev_crit(imx2_wdt_miscdev.parent,
-> -			"Device removed: Expect reboot!\n");
-> +	if (imx2_wdt_is_running(wdev)) {
-> +		del_timer_sync(&wdev->timer);
-> +		imx2_wdt_ping(wdog);
-> +		dev_crit(&pdev->dev, "Device removed: Expect reboot!\n");
->  	}
-> -
-> -	imx2_wdt_miscdev.parent = NULL;
->  	return 0;
->  }
->  
->  static void imx2_wdt_shutdown(struct platform_device *pdev)
->  {
-> -	if (test_bit(IMX2_WDT_STATUS_STARTED, &imx2_wdt.status)) {
-> -		/* we are running, we need to delete the timer but will give
-> -		 * max timeout before reboot will take place */
-> -		del_timer_sync(&imx2_wdt.timer);
-> -		imx2_wdt_set_timeout(IMX2_WDT_MAX_TIME);
-> -		imx2_wdt_ping();
-> -
-> -		dev_crit(imx2_wdt_miscdev.parent,
-> -			"Device shutdown: Expect reboot!\n");
-> +	struct watchdog_device *wdog = platform_get_drvdata(pdev);
-> +	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
-> +
-> +	if (imx2_wdt_is_running(wdev)) {
-> +		/*
-> +		 * We are running, we need to delete the timer but will
-> +		 * give max timeout before reboot will take place
-> +		 */
-> +		del_timer_sync(&wdev->timer);
-> +		imx2_wdt_set_timeout(wdog, IMX2_WDT_MAX_TIME);
-> +		imx2_wdt_ping(wdog);
-> +		dev_crit(&pdev->dev, "Device shutdown: Expect reboot!\n");
->  	}
->  }
->  
+It will be used in suspend/resume in next patch.
+
+>
+>> +        /* As this is not compulsary do not return error */
+>
+> Is it? Will the driver work normally without interrupts in this case?
+>
+
+If you see original code in exynos.c and also comment just before this code 
+section
+this needs to be taken care only for first four i2c channels and for 
+Exynos5 SoC family.
+So accordingly I added phandle property only to first four i2c device nodes 
+in DT. So
+for rest i2c channels it is not required.
+
+> Also, typo: s/compulsary/compulsory/
+Will correct.
+>
+>> +        pr_info("i2c-%d skipping re-configuration of interrutps\n", id);
+>> +        return;
+>> +    }
+>> +    regmap_read(i2c->sysreg, EXYNOS5_SYS_I2C_CFG, &tmp);
+>> +    regmap_write(i2c->sysreg, EXYNOS5_SYS_I2C_CFG, tmp & ~(0x1 << id));
+>
+> You could use regmap_update_bits() [1] here instead, with mask set to 
+> BIT(id) and val set to 0.
+>
+> [1] http://lxr.free-electrons.com/source/drivers/base/regmap/regmap.c#L1977
+
+Thanks for suggestion will use this.
+
+>
+> Best regards,
+> Tomasz
+>
+
+
+-- 
+Best Regards,
+Pankaj Dubey
