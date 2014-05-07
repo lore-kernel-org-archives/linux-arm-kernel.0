@@ -1,35 +1,73 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Wed, 07 May 2014 16:49:04 -0700
-Subject: [PATCH v2 2/2] arm64: enable context tracking
-In-Reply-To: <20140507101709.GE18456@arm.com> (Will Deacon's message of "Wed,
- 7 May 2014 11:17:09 +0100")
-References: <1399419149-26685-1-git-send-email-larry.bassel@linaro.org>
- <1399419149-26685-3-git-send-email-larry.bassel@linaro.org>
- <20140507101709.GE18456@arm.com>
-Message-ID: <7hr445w3nz.fsf@paris.lan>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 7 May 2014 23:55:32 +0000 (UTC)
+Subject: [PATCH] ARM: AM33xx: hwmod: Add INIT_NO_IDLE flag for debugss
+ hwmod
+In-Reply-To: <534B9C66.9020007@ti.com>
+References: <1397022467-6166-1-git-send-email-lokeshvutla@ti.com>
+ <alpine.DEB.2.02.1404111800430.14347@utopia.booyaka.com>
+ <alpine.DEB.2.02.1404111807210.14347@utopia.booyaka.com>
+ <534B9C66.9020007@ti.com>
+Message-ID: <alpine.DEB.2.02.1405072348330.23579@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Hi Lokesh
 
-Will Deacon <will.deacon@arm.com> writes:
+On Mon, 14 Apr 2014, Lokesh Vutla wrote:
 
-> On Wed, May 07, 2014 at 12:32:29AM +0100, Larry Bassel wrote:
->> Make calls to ct_user_enter when the kernel is exited
->> and ct_user_exit when the kernel is entered (in el0_da,
->> el0_ia, el0_svc, el0_irq).
->
-> Why only these entry points? I can reschedule after any exception from EL0,
-> so I'd expect all exceptions from userspace to need annotating, no?
+> On Friday 11 April 2014 11:39 PM, Paul Walmsley wrote:
+> > On Fri, 11 Apr 2014, Paul Walmsley wrote:
+> > 
+> >> On Wed, 9 Apr 2014, Lokesh Vutla wrote:
+> >>
+> >>> During boot, when hwmod tries to cut clocks for debugss it always
+> >>> gets stuck in transition state and throws the following warning:
+> >>>
+> >>> [    0.139581] omap_hwmod: debugss: _wait_target_disable failed
+> >>>
+> >>> As per the information provided by folks, clocks to debugss cannot be cut.
+> >>> So adding HWMOD_INIT_NO_IDLE flag to debugss hwmod.
+> >>>
+> >>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> >>
+> >> Thanks, queued for v3.15-rc.
+> > 
+> > Hmmm.  On second thought, this doesn't look like the right fix.  Could 
+> > you please comment on the issues raised here:
+> > 
+> > https://patchwork.kernel.org/patch/2212111/
+> Yes, I initially created a driver for enabling and disabling clocks for DEBUGSS.
+> But I always see that DEBUGSS is always stuck in transition whenever clocks are cut
+> to DEBUGSS. 
+> During boot also when hwmod tries to cut clocks the following warning comes:
+>   [    0.139581] omap_hwmod: debugss: _wait_target_disable failed.
+> 
+> As confirmed by the hardware team that this is a bug in silicon that clocks cannot
+> be cut to DEBUGSS.
+> So I am just adding HWMOD_INIT_NO_IDLE flag to debugss hwmod. 
+> 
+> I have also tested suspend-resume with $subject patch with TI internal tree.
+> 
+> Please let me know if I am not clear.
 
-In my initial approach to this, you might recall (though it was over a
-year ago now) was to just instrument kernel_enter rather than sprinkle
-the instrumentaion in cl0_*.  However, your concern at the time was that
-since it was before debugging was enabled it would complicate debugging
-these paths.
+OK, here's my question.  Does the DEBUGSS module correctly enter a 
+low-power state when going to suspend, even when the DEBUGSS is still 
+enabled?  Or is it the case that we should still disable it in the hwmod 
+code and simply skip the call to _wait_target_disable()?
 
-Any chance you have any other suggestion on how we might do this in
-kernel_entry rather than sprinkling them all over cl0_*?  or is the
-sprinkling the only good way to handle this.
+If the former, then please repost your patch with some comments in the 
+hwmod data to describe this case, and note that the module will still 
+enter a low-power state appropriately when the MPUSS goes into standby (if 
+that is indeed the behavior).
 
-Kevin
+If the latter, then it seems like the right approach is to add a hwmod 
+flag to indicate that we should still disable it, but not wait for the 
+disable to complete.
+
+I guess the most direct way to test this would be to pull out a ammeter 
+and verify that the idle current is the same in both cases.
+
+How does that sound?
+
+
+- Paul
