@@ -1,88 +1,72 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 7 May 2014 10:06:50 +0200
-Subject: [PATCH] ARM: zImage: Allow DTB to override broken ATAG_MEM
-In-Reply-To: <1399439776-18535-1-git-send-email-bjorn.andersson@sonymobile.com>
-References: <1399439776-18535-1-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <20140507080650.GA28564@pengutronix.de>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 7 May 2014 11:12:23 +0300
+Subject: [PATCH 3/4] OMAPDSS: panel-sharp-ls037v7dw01: add device tree
+ support
+In-Reply-To: <1398815562-24113-4-git-send-email-tony@atomide.com>
+References: <1398815562-24113-1-git-send-email-tony@atomide.com>
+ <1398815562-24113-4-git-send-email-tony@atomide.com>
+Message-ID: <5369EAE7.3030705@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 06, 2014 at 10:16:16PM -0700, Bjorn Andersson wrote:
-> Support overriding ATAG_MEM, by specifying non-zero content of the /memory/reg
-> property in the appended DTB. This is needed to work around bootloaders passing
-> broken tags.
-This feels wrong. I think it's quite usual that the device tree
-specifies a non-0 /memory/reg property. I checked four more or less
-random dts files[1], and three of them have this property set with
-actual values.
-
-So I wouldn't be surprised if this patch results in more damage than
-it's worth. The optimal fix would be to make the bootloader do the right
-thing. And if you trust your dtb more than your bootloader, disable
-ARM_ATAG_DTB_COMPAT.
-
-Best regards
-Uwe
-
-[1]
-arch/arm/boot/dts/am335x-bone-common.dtsi
-arch/arm/boot/dts/exynos5440-sd5v1.dts
-arch/arm/boot/dts/imx6q-wandboard.dts
-arch/arm/boot/dts/tegra30-cardhu.dtsi
+On 30/04/14 02:52, Tony Lindgren wrote:
+> We can pass the GPIO configuration for ls037v7dw01 in a standard
+> gpios property.
 > 
-> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 > ---
->  arch/arm/boot/compressed/atags_to_fdt.c |   18 +++++++++++++++++-
->  1 file changed, 17 insertions(+), 1 deletion(-)
+>  .../bindings/panel/sharp,ls037v7dw01.txt           | 53 ++++++++++++++
+>  .../omap2/displays-new/panel-sharp-ls037v7dw01.c   | 84 ++++++++++++++++++++--
+>  2 files changed, 133 insertions(+), 4 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/panel/sharp,ls037v7dw01.txt
 > 
-> diff --git a/arch/arm/boot/compressed/atags_to_fdt.c b/arch/arm/boot/compressed/atags_to_fdt.c
-> index d1153c8..b534cd6 100644
-> --- a/arch/arm/boot/compressed/atags_to_fdt.c
-> +++ b/arch/arm/boot/compressed/atags_to_fdt.c
-> @@ -95,6 +95,22 @@ static void merge_fdt_bootargs(void *fdt, const char *fdt_cmdline)
->  	setprop_string(fdt, "/chosen", "bootargs", cmdline);
->  }
->  
-> +static int fdt_overrides_atag_mem(void *fdt)
-> +{
-> +	const char *memory;
-> +	int len = 0;
+> diff --git a/Documentation/devicetree/bindings/panel/sharp,ls037v7dw01.txt b/Documentation/devicetree/bindings/panel/sharp,ls037v7dw01.txt
+> new file mode 100644
+> index 0000000..7f6f5e1
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/panel/sharp,ls037v7dw01.txt
+> @@ -0,0 +1,53 @@
+> +SHARP LS037V7DW01 TFT-LCD panel
 > +
-> +	memory = getprop(fdt, "/memory", "reg", &len);
-> +	if (memory) {
-> +		while (len--) {
-> +			if (*memory++ != '\0')
-[added fixup noted in follow-up-mail]
+> +Required properties:
+> +- compatible: should be "sharp,ls037v7dw01"
+> +
+> +Optional properties:
+> +- reset-gpios: a GPIO spec for the optional reset pin
+> +- enable-gpios: a GPIO array for the optional configuration GPIOs
+> +  ordered MO, LR, UD, INI as specified in the LS037V7DW01.pdf file.
+> +
+> +This binding is compatible with the simple-panel binding, which is specified
+> +in simple-panel.txt in this directory.
+> +
+> +This panel can have zero to five GPIOs to configure
+> +to change configuration between QVGA and VGA mode
+> +and the scan direction. As these pins can be also
+> +configured with external pulls, all the GPIOs are
+> +considered optional with holes in the array.
+> +
+> +Example when connected to a omap2+ based device:
+> +
+> +	lcd0: display {
+> +		compatible = "sharp,ls037v7dw01";
+> +		power-supply = <&lcd_3v3>;
+> +		reset-gpios = <&gpio5 27 GPIO_ACTIVE_HIGH>;	/* gpio155, lcd RESB */
+> +		enable-gpios = <&gpio5 26 GPIO_ACTIVE_HIGH	/* gpio154, lcd MO */
+> +				&gpio1 2 GPIO_ACTIVE_HIGH	/* gpio2, lcd LR */
+> +				&gpio1 3 GPIO_ACTIVE_HIGH	/* gpio3, lcd UD */
+> +				&gpio5 24 GPIO_ACTIVE_HIGH>;	/* gpio152, lcd INI */
 
-> +				return 1;
-> +		}
-> +	}
-> +
-> +	return 0;
-> +}
-> +
->  /*
->   * Convert and fold provided ATAGs into the provided FDT.
->   *
-> @@ -180,7 +196,7 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
->  		}
->  	}
->  
-> -	if (memcount) {
-> +	if (memcount && !fdt_overrides_atag_mem(fdt)) {
->  		setprop(fdt, "/memory", "reg", mem_reg_property,
->  			4 * memcount * memsize);
->  	}
-> -- 
-> 1.7.9.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Why are most of the gpios in 'enable-gpios'? MO, LR and UD don't really
+have anything to do with enabling the panel. Why not just have one
+'gpios' array with all the gpios, as they are quite a mixed bunch?
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140507/0847648a/attachment.sig>
