@@ -1,35 +1,59 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 7 May 2014 11:00:54 +0100
-Subject: [PATCH 3/3] perf tools: Add libdw DWARF post unwind support for
- ARM
-In-Reply-To: <CAFrcx1=aS+dmM05Zk_ioL_0vE+ot+9=LJ=WsmExRtDyZgMtetA@mail.gmail.com>
-References: <1399389979-11279-1-git-send-email-jean.pihet@linaro.org>
- <1399389979-11279-4-git-send-email-jean.pihet@linaro.org>
- <20140506175616.GH13677@arm.com>
- <CAFrcx1=aS+dmM05Zk_ioL_0vE+ot+9=LJ=WsmExRtDyZgMtetA@mail.gmail.com>
-Message-ID: <20140507100054.GD18456@arm.com>
+From: max.schwarz@online.de (Max Schwarz)
+Date: Wed, 07 May 2014 12:04:36 +0200
+Subject: [PATCH v2 0/8] pinctrl-rockchip: Change wrong initial assumptions
+In-Reply-To: <11862890.WUjscWaP3U@diego>
+References: <11862890.WUjscWaP3U@diego>
+Message-ID: <4611044.dLc2GHPYxV@xq-nb>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 07, 2014 at 10:52:05AM +0100, Jean Pihet wrote:
-> On 6 May 2014 19:56, Will Deacon <will.deacon@arm.com> wrote:
-> > On Tue, May 06, 2014 at 04:26:19PM +0100, Jean Pihet wrote:
-> >> Adding libdw DWARF post unwind support, which is part
-> >> of elfutils-devel/libdw-dev package from version 0.158.
-> >>
-> >> The new code is contained in unwin-libdw.c object, and
-> >> implements unwind__get_entries unwind interface function.
-> >
-> >   Reviewed-by: Will Deacon <will.deacon@arm.com>
+Am Montag, 5. Mai 2014, 13:57:31 schrieb Heiko St?bner:
+> Initially due to lack of documentation and (personal) understanding
+> I assumed that the area holding the iomux settings would be separate
+> from everything else, while in fact the grf registers contain not only
+> pinctrl stuff but also dma, usb-phy and general soc-status settings.
+> Also things like drive-strength we do not support currently are intermixed.
 > 
-> Ok, thx!
+> The same is true for the pmu, which does not only contain power domains
+> but also the system reset as well as well as general registers surviving
+> system-resets. Additionally the rk3188 moved parts of the pull-setting
+> registers into the pmu space.
 > 
-> Jiri, Arnaldo,
-> Can you take the series for ARM and ARM64?
+> While this wasn't a problem until now, the upcoming rk3288 introduces
+> additional changes to both the grf and pmu areas. On it even part of
+> the pinmux registers move into the pmu space.
+> 
+> The code in it's current form supports both the old as well as the
+> changed bindings.
+> 
+> As stated in the v1 thread, this is also a first step to deprecate the
+> wrongly included gpio-controllers which now duplicate the recently added
+> gpio-dwapb, that should be used instead.
+> 
+> 
+> changes since v1:
+> - add select MFD_SYSCON as suggested by Max
+> 
+> Heiko Stuebner (8):
+>   pinctrl: rockchip: do not require 2nd register area
+>   pinctrl: rockchip: use regmaps instead of raw mappings
+>   pinctrl: rockchip: rockchip_pinctrl in rockchip_get_bank_data
+>   pinctrl: rockchip: let pmu registers be supplied by a syscon
+>   pinctrl: rockchip: only map bank0-pull-region when pmu regmap missing
+>   pinctrl: rockchip: base regmap supplied by a syscon
+>   dt-bindings: adapt rockchip-pinctrl doc to changed bindings
+>   ARM: dts: rockchip: convert pinctrl nodes to new bindings
+> 
+>  .../bindings/pinctrl/rockchip,pinctrl.txt          |  28 +++-
+>  arch/arm/boot/dts/rk3066a.dtsi                     |   2 +-
+>  arch/arm/boot/dts/rk3188.dtsi                      |   9 +-
+>  arch/arm/boot/dts/rk3xxx.dtsi                      |   9 +-
+>  drivers/pinctrl/Kconfig                            |   1 +
+>  drivers/pinctrl/pinctrl-rockchip.c                 | 178
+> +++++++++++++++------ 6 files changed, 165 insertions(+), 62 deletions(-)
 
-Wait: I thought you were going to add compat support for arm64? I haven't
-acked that patch yet, because it's lacking those changes.
+This series
+Acked-by: Max Schwarz <max.schwarz@online.de>
 
-The 32-bit ARM patches look fine though.
-
-Will
+Cheers,
+  Max
