@@ -1,61 +1,35 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 7 May 2014 19:02:40 +0300
-Subject: [PATCH 3/4] OMAPDSS: panel-sharp-ls037v7dw01: add device tree
- support
-In-Reply-To: <20140507150343.GA9502@atomide.com>
-References: <1398815562-24113-1-git-send-email-tony@atomide.com>
- <1398815562-24113-4-git-send-email-tony@atomide.com>
- <5369EAE7.3030705@ti.com> <20140507150343.GA9502@atomide.com>
-Message-ID: <536A5920.1020908@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed,  7 May 2014 17:07:17 +0100
+Subject: [PATCH v6 1/3] ARM: kconfig: allow PCI support to be selected with
+ ARCH_MULTIPLATFORM
+In-Reply-To: <1399478839-3564-1-git-send-email-will.deacon@arm.com>
+References: <1399478839-3564-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1399478839-3564-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/05/14 18:03, Tony Lindgren wrote:
+When targetting ARCH_MULTIPLATFORM, we may include support for SoCs with
+PCI-capable devices (e.g. mach-virt with virtio-pci).
 
->>> +	lcd0: display {
->>> +		compatible = "sharp,ls037v7dw01";
->>> +		power-supply = <&lcd_3v3>;
->>> +		reset-gpios = <&gpio5 27 GPIO_ACTIVE_HIGH>;	/* gpio155, lcd RESB */
->>> +		enable-gpios = <&gpio5 26 GPIO_ACTIVE_HIGH	/* gpio154, lcd MO */
->>> +				&gpio1 2 GPIO_ACTIVE_HIGH	/* gpio2, lcd LR */
->>> +				&gpio1 3 GPIO_ACTIVE_HIGH	/* gpio3, lcd UD */
->>> +				&gpio5 24 GPIO_ACTIVE_HIGH>;	/* gpio152, lcd INI */
->>
->> Why are most of the gpios in 'enable-gpios'? MO, LR and UD don't really
->> have anything to do with enabling the panel. Why not just have one
->> 'gpios' array with all the gpios, as they are quite a mixed bunch?
-> 
-> Yeah that's what I had initially, but reading simple-panel.txt noticed
-> there are some standardized GPIOs for reset and enable.
+This patch allows PCI support to be selected for these SoCs by selecting
+CONFIG_MIGHT_HAVE_PCI when CONFIG_ARCH_MULTIPLATFORM=y.
 
-I'm not sure if it's worth to try to make it compatible with
-simple-panel. simple-panel bindings do not work with omapdss anyway, and
-simple-panel doesn't have the support for input ports/endpoints.
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Can the panel be used with only one gpio (I guess that would be INI or
-RESB)? If not, simple-panel doesn't work.
-
-> How about we set up one reset-gpios, one enable-gpios and an array of
-> three unlabelled GPIOs?
-> 
-> Or if we want to add something generic, we could add new mode-gpios
-> property that other panels might be able to use too?
-> 
-> BTW, I'm also personally fine with all five gpios showing in a single
-> gpios property, I'm not too exited about naming anything in DT..
-
-I don't have a strong opinion here. I don't have much experience with
-DT, especially with making bindings compatible with other ones.
-
-I'd just forget the simple-panel, and have single gpio array.
-
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140507/30440e74/attachment.sig>
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index db3c5414223e..860bea828ac4 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -314,6 +314,7 @@ config ARCH_MULTIPLATFORM
+ 	select CLKSRC_OF
+ 	select COMMON_CLK
+ 	select GENERIC_CLOCKEVENTS
++	select MIGHT_HAVE_PCI
+ 	select MULTI_IRQ_HANDLER
+ 	select SPARSE_IRQ
+ 	select USE_OF
+-- 
+1.9.2
