@@ -1,69 +1,74 @@
 From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Wed, 7 May 2014 10:32:35 +0200
-Subject: mx6qsabresd hangs on linux-next
-In-Reply-To: <20140507033223.GB2798@dragon>
-References: <CAOMZO5DMEqs=zzNGqgKjK7wTJdiNPgEqxsX=TtqKrnpLMzpbDw@mail.gmail.com>
- <20140506141310.GA2794@dragon>
- <CAOMZO5DH5d_L-deVu=XmBo9ekq+-g704p7cyayLvp=43bnEccQ@mail.gmail.com>
- <CAOMZO5Dx0JMj3dZ7BSgaYSZZ=ZKRqQHEYWj5sb6z_9jc+cpsEw@mail.gmail.com>
- <5369081D.5030400@st.com> <20140506200029.GD5858@pengutronix.de>
- <20140507020950.GB2794@dragon> <20140507033223.GB2798@dragon>
-Message-ID: <5369EFA3.8070908@st.com>
+Date: Wed, 7 May 2014 10:37:42 +0200
+Subject: [PATCH] clk: clk-divider: Fix infinite loop for table divider
+In-Reply-To: <1399408005-4209-1-git-send-email-festevam@gmail.com>
+References: <1399408005-4209-1-git-send-email-festevam@gmail.com>
+Message-ID: <5369F0D6.3080503@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Hi Fabio,
 
-On 05/07/2014 05:32 AM, Shawn Guo wrote:
-...
->>>
->>> Here when a table entry matches the input div this function will return
->>> exactly the input div. This means _next_div() will always return the
->>> same value and clk_divider_bestdiv() has an infinite loop:
->>>
->>> 	for (i = 1; i <= maxdiv; i = _next_div(divider, i)) {
->>> 		...
->>> 	}
->>
->> Hmmm, isn't the first thing that _next_div() does to increment the input
->> div?
+On 05/06/2014 10:26 PM, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 >
-> I think the infinite loop happens in this case because "i" will never
-> exceed maxdiv for a table divider.
+> Since commit e7489693b3 (clk: divider: Optimize clk_divider_bestdiv loop) we
+> notice a system hang on mx6qboard.
+>
+> The cause for the hang is well explained by Sascha Hauer [1]:
+>
+> "This cannot work. _round_up_table is implemented like this:
+>
+> static int _round_up_table(const struct clk_div_table *table, int div)
+> {
+>          const struct clk_div_table *clkt;
+>          int up = _get_table_maxdiv(table);
+>
+>          for (clkt = table; clkt->div; clkt++) {
+>                  if (clkt->div == div)
+>                          return clkt->div;
+>                  ...
+>          }
+>          ...
+> }
+>
+> Here when a table entry matches the input div this function will return
+> exactly the input div. This means _next_div() will always return the
+> same value and clk_divider_bestdiv() has an infinite loop:
+>
+>          for (i = 1; i <= maxdiv; i = _next_div(divider, i)) {
+>                  ...
+>          }
+> "
+> [1] http://marc.info/?l=linux-arm-kernel&m=139940658726253&w=2
+>
+> Remove the 'return _round_up_table' so that the system can work normally again.
+>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>   drivers/clk/clk-divider.c | 2 --
+>   1 file changed, 2 deletions(-)
+>
+> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+> index b3c8396..fc3e344 100644
+> --- a/drivers/clk/clk-divider.c
+> +++ b/drivers/clk/clk-divider.c
+> @@ -246,8 +246,6 @@ static int _next_div(struct clk_divider *divider, int div)
+>
+>   	if (divider->flags & CLK_DIVIDER_POWER_OF_TWO)
+>   		return __roundup_pow_of_two(div);
+> -	if (divider->table)
+> -		return _round_up_table(divider->table, div);
 
-You are right. Sorry for the regression.
+Couldn't we initialize "up" variable to INT_MAX in _round_up_table() as 
+I just proposed in mail thread reporting the regression?
 
-I thought I tested it, as I had some table-based dividers in my test setup.
-After checking again, it appears that I didn't had the 
-CLK_SET_RATE_PARENT flag set on these clocks, so I didn't entered the 
-for loop...
+See http://marc.info/?l=linux-arm-kernel&m=139945172905130&w=2
 
-Could the fix be to initialize "up" variable to INT_MAX in 
-_round_up_table (see below)?
-
-I can send the patch if you are fine with it.
-I have no hardware to test on this week, I only have compiled this 
-patch, not tested it.
-
-Thanks,
+Regards,
 Maxime
 
 >
-> Shawn
+>   	return div;
+>   }
 >
-
-
-diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-index b3c8396..cf9114a 100644
---- a/drivers/clk/clk-divider.c
-+++ b/drivers/clk/clk-divider.c
-@@ -158,7 +158,7 @@ static bool _is_valid_div(struct clk_divider 
-*divider, unsigned int div)
-  static int _round_up_table(const struct clk_div_table *table, int div)
-  {
-         const struct clk_div_table *clkt;
--       int up = _get_table_maxdiv(table);
-+       int up = INT_MAX;
-
-         for (clkt = table; clkt->div; clkt++) {
-                 if (clkt->div == div)
