@@ -1,69 +1,55 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 7 May 2014 08:25:22 -0700
-Subject: [PATCH 04/26] ARM: OMAP: dmtimer: Add function to check if timer
- is running
-In-Reply-To: <1398375849-6017-5-git-send-email-joelf@ti.com>
-References: <1398375849-6017-1-git-send-email-joelf@ti.com>
- <1398375849-6017-5-git-send-email-joelf@ti.com>
-Message-ID: <20140507152521.GE9502@atomide.com>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Wed, 7 May 2014 08:29:17 -0700
+Subject: [PATCH] ARM: zImage: Allow DTB to override broken ATAG_MEM
+In-Reply-To: <20140507080650.GA28564@pengutronix.de>
+References: <1399439776-18535-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <20140507080650.GA28564@pengutronix.de>
+Message-ID: <CAJAp7OiVrz+epys3Ko79GmMr6ahv8ii8XphVHE77NSM+wK2mOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Joel Fernandes <joelf@ti.com> [140424 14:44]:
-> Inorder to move non-DM timer specific code that modifies the "idlect"
-> mask on OMAP1, from dmtimer code, to OMAP1 specific timer initialization code,
-> we introduce a new function that can possibly be reused for other purposes in
-> the future. The function just checks if a timer is running based on the timer ID
-> which should be same as pdev->id. This allows us to cleanly separate the timer vs
-> non-timer bits and keep the timer bits in the dmtimer code.
-> 
-> Signed-off-by: Joel Fernandes <joelf@ti.com>
-> ---
->  arch/arm/plat-omap/dmtimer.c              |   29 +++++++++++++++++++++++++++++
->  arch/arm/plat-omap/include/plat/dmtimer.h |    2 ++
->  2 files changed, 31 insertions(+)
-> 
-> diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
-> index 4debb3d..86b2641 100644
-> --- a/arch/arm/plat-omap/dmtimer.c
-> +++ b/arch/arm/plat-omap/dmtimer.c
-> @@ -187,6 +187,35 @@ int omap_dm_timer_reserve_systimer(int id)
->  	return 0;
->  }
->  
-> +/*
-> + * Check if a timer is running based on timer_id, used for OMAP1 currently.
-> + */
-> +int omap_dm_timer_is_running(int timer_id)
-> +{
-> +	int i = 1, ret = 0;
-> +	struct omap_dm_timer *timer = NULL;
-> +	unsigned long flags;
-> +
-> +	spin_lock_irqsave(&dm_timer_lock, flags);
-> +	list_for_each_entry(timer, &omap_timer_list, node) {
-> +		if (i == timer_id) {
-> +			u32 l;
-> +			l = omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
-> +			if (l & OMAP_TIMER_CTRL_ST) {
-> +				ret = 1;
-> +				goto done;
-> +			} else {
-> +				goto done;
-> +			}
-> +		}
-> +		i++;
-> +	}
-> +done:
-> +	spin_unlock_irqrestore(&dm_timer_lock, flags);
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL_GPL(omap_dm_timer_is_running);
+On Wed, May 7, 2014 at 1:06 AM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> On Tue, May 06, 2014 at 10:16:16PM -0700, Bjorn Andersson wrote:
+>> Support overriding ATAG_MEM, by specifying non-zero content of the /memory/reg
+>> property in the appended DTB. This is needed to work around bootloaders passing
+>> broken tags.
+> This feels wrong. I think it's quite usual that the device tree
+> specifies a non-0 /memory/reg property. I checked four more or less
+> random dts files[1], and three of them have this property set with
+> actual values.
 
-Let's not add new exported custom functions, let's instead try to get
-rid of them. What needs to use this one?
+I thought u-boot did something like this, but after checking the code
+it seems that I
+was wrong.
+
+But if that's not the case then you're right; we have to continue to
+be bug-compatible
+with all those dtbs out there.
+
+>
+> So I wouldn't be surprised if this patch results in more damage than
+> it's worth. The optimal fix would be to make the bootloader do the right
+> thing. And if you trust your dtb more than your bootloader, disable
+> ARM_ATAG_DTB_COMPAT.
+
+I unfortunately have a boot loader passing information in ATAG_CMDLINE that I
+need, so I can't disable ARM_ATAG_DTB_COMPAT.
+
+
+My problem is that the boot loader on every shipped Qualcomm MSM8x60, MSM8960
+and APQ8064 based device passes ATAG_MEM with the incorrect start address. There
+is no way to update the boot loader for these.
+
+For development I have a .init_meminfo in my board file patching the
+meminfo; this looks
+really bad so I'm hoping we can find some alternative solution.
+
+The proposed solution from some of the people working on this is to
+(post build) patch the
+zImage to inject code that corrects the ATAG_MEM before jumping to the
+kernel; but I am
+hoping we can find some sane way instead...
 
 Regards,
-
-
-Tony
+Bjorn
