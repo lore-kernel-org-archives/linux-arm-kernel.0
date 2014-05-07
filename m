@@ -1,60 +1,86 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 7 May 2014 16:57:39 -0500
-Subject: [PATCH 3/7] phy: usb: sunxi: Introduce Allwinner A31 USB PHY
- support
-In-Reply-To: <536A36A2.5030109@ti.com>
-References: <1399434623-20383-1-git-send-email-maxime.ripard@free-electrons.com>
- <1399434623-20383-4-git-send-email-maxime.ripard@free-electrons.com>
- <536A36A2.5030109@ti.com>
-Message-ID: <20140507215739.GB7047@lukather>
+From: joelf@ti.com (Joel Fernandes)
+Date: Wed, 7 May 2014 17:00:22 -0500
+Subject: [PATCH 04/26] ARM: OMAP: dmtimer: Add function to check if timer
+ is running
+In-Reply-To: <20140507152521.GE9502@atomide.com>
+References: <1398375849-6017-1-git-send-email-joelf@ti.com>
+ <1398375849-6017-5-git-send-email-joelf@ti.com>
+ <20140507152521.GE9502@atomide.com>
+Message-ID: <536AACF6.9070204@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 07, 2014 at 07:05:30PM +0530, Kishon Vijay Abraham I wrote:
-> Hi,
+On 05/07/2014 10:25 AM, Tony Lindgren wrote:
+> * Joel Fernandes <joelf@ti.com> [140424 14:44]:
+>> Inorder to move non-DM timer specific code that modifies the "idlect"
+>> mask on OMAP1, from dmtimer code, to OMAP1 specific timer initialization code,
+>> we introduce a new function that can possibly be reused for other purposes in
+>> the future. The function just checks if a timer is running based on the timer ID
+>> which should be same as pdev->id. This allows us to cleanly separate the timer vs
+>> non-timer bits and keep the timer bits in the dmtimer code.
+>>
+>> Signed-off-by: Joel Fernandes <joelf@ti.com>
+>> ---
+>>  arch/arm/plat-omap/dmtimer.c              |   29 +++++++++++++++++++++++++++++
+>>  arch/arm/plat-omap/include/plat/dmtimer.h |    2 ++
+>>  2 files changed, 31 insertions(+)
+>>
+>> diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
+>> index 4debb3d..86b2641 100644
+>> --- a/arch/arm/plat-omap/dmtimer.c
+>> +++ b/arch/arm/plat-omap/dmtimer.c
+>> @@ -187,6 +187,35 @@ int omap_dm_timer_reserve_systimer(int id)
+>>  	return 0;
+>>  }
+>>  
+>> +/*
+>> + * Check if a timer is running based on timer_id, used for OMAP1 currently.
+>> + */
+>> +int omap_dm_timer_is_running(int timer_id)
+>> +{
+>> +	int i = 1, ret = 0;
+>> +	struct omap_dm_timer *timer = NULL;
+>> +	unsigned long flags;
+>> +
+>> +	spin_lock_irqsave(&dm_timer_lock, flags);
+>> +	list_for_each_entry(timer, &omap_timer_list, node) {
+>> +		if (i == timer_id) {
+>> +			u32 l;
+>> +			l = omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
+>> +			if (l & OMAP_TIMER_CTRL_ST) {
+>> +				ret = 1;
+>> +				goto done;
+>> +			} else {
+>> +				goto done;
+>> +			}
+>> +		}
+>> +		i++;
+>> +	}
+>> +done:
+>> +	spin_unlock_irqrestore(&dm_timer_lock, flags);
+>> +	return ret;
+>> +}
+>> +EXPORT_SYMBOL_GPL(omap_dm_timer_is_running);
 > 
-> On Wednesday 07 May 2014 09:20 AM, Maxime Ripard wrote:
-> > The USB phy controller in the A31 differs mostly from the older controllers
-> > because it has a clock dedicated for each phy, while the older ones were having
-> > a single clock for all the phys.
-> > 
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  drivers/phy/phy-sun4i-usb.c | 35 ++++++++++++++++++++++++++---------
-> >  1 file changed, 26 insertions(+), 9 deletions(-)
-> > 
-> > diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-> > index e6e6c4ba7145..1d83abe07a29 100644
-> > --- a/drivers/phy/phy-sun4i-usb.c
-> > +++ b/drivers/phy/phy-sun4i-usb.c
-> > @@ -61,16 +61,17 @@
-> >  #define MAX_PHYS			3
-> >  
-> >  struct sun4i_usb_phy_data {
-> > -	struct clk *clk;
-> >  	void __iomem *base;
-> >  	struct mutex mutex;
-> >  	int num_phys;
-> >  	u32 disc_thresh;
-> > +	bool dedicated_clocks;
-> 
-> Don't think we need this structure member as it's been used only in probe.
+> Let's not add new exported custom functions, let's instead try to get
+> rid of them. What needs to use this one?
 
-Ah, right.
+This piece of code was entangled with OMAP1 specific logic.
 
-I'll change this in the next version.
+The OMAP1 specific logic is moved into a new function in the OMAP1 timer
+layer called: omap_dm_timer_modify_idlect_mask
 
-Thanks!
-Maxime
+What's left is code that needs to iterate over all the timers by
+checking the OMAP_TIMER_CTRL_ST bit in the control register. This is
+left back into the dmtimer code but needs to be exported since we
+ultimately will move dmtimer into clock source.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140507/18a492da/attachment.sig>
+If you notice, I removed export of omap_dm_timer_modify_idlect_mask
+since it is moved to omap1 layer and is local there, so it should be OK
+to export this symbol instead. We are not adding more exports, and its
+still an improvement over the old code as the OMAP1 specific logic is
+decoupled from the generic dmtimer code.
+
+thanks,
+
+-Joel
