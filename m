@@ -1,113 +1,27 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed,  7 May 2014 15:08:21 +0800
-Subject: [PATCH] ARM: prima2: rstc: fix some minor checkpatch issues
-Message-ID: <1399446501-22346-1-git-send-email-21cnbao@gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 7 May 2014 12:34:32 +0530
+Subject: [PATCH RESEND] dma: mmp_pdma: add support for residue reporting
+In-Reply-To: <53641C2E.8020101@zonque.org>
+References: <534576C3.2020409@zonque.org> <20140416064534.GL32284@intel.com>
+ <534E3F3D.5080003@zonque.org> <20140416082326.GM32284@intel.com>
+ <534E4172.8030401@zonque.org> <20140416090923.GR32284@intel.com>
+ <534E9AC1.1040706@zonque.org> <20140416160109.GU32284@intel.com>
+ <534EB276.4000408@zonque.org> <53641C2E.8020101@zonque.org>
+Message-ID: <20140507070432.GK28638@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Xianglong Du <Xianglong.Du@csr.com>
-
-this patch fixes the below minor issues:
-
-WARNING: line over 80 characters
-39: FILE: arch/arm/mach-prima2/rstc.c:39:
-+                * Writing 1 to this bit resets corresponding block. Writing 0 to this
-
-WARNING: line over 80 characters
-41: FILE: arch/arm/mach-prima2/rstc.c:41:
-+                * datasheet doesn't require explicit delay between the set and clear
-
-WARNING: line over 80 characters
-44: FILE: arch/arm/mach-prima2/rstc.c:44:
-+               writel(readl(sirfsoc_rstc_base + (reset_bit / 32) * 4) | (1 << reset_bit),
-
-WARNING: msleep < 20ms can sleep for up to 20ms; see Documentation/timers/timers-howto.txt
-46: FILE: arch/arm/mach-prima2/rstc.c:46:
-+               msleep(10);
-
-WARNING: line over 80 characters
-47: FILE: arch/arm/mach-prima2/rstc.c:47:
-+               writel(readl(sirfsoc_rstc_base + (reset_bit / 32) * 4) & ~(1 << reset_bit),
-
-WARNING: line over 80 characters
-52: FILE: arch/arm/mach-prima2/rstc.c:52:
-+                * Writing 1 to SET register resets corresponding block. Writing 1 to CLEAR
-
-WARNING: line over 80 characters
-54: FILE: arch/arm/mach-prima2/rstc.c:54:
-+                * datasheet doesn't require explicit delay between the set and clear
-
-WARNING: line over 80 characters
-57: FILE: arch/arm/mach-prima2/rstc.c:57:
-+               writel(1 << reset_bit, sirfsoc_rstc_base + (reset_bit / 32) * 8);
-
-WARNING: msleep < 20ms can sleep for up to 20ms; see Documentation/timers/timers-howto.txt
-58: FILE: arch/arm/mach-prima2/rstc.c:58:
-+               msleep(10);
-
-WARNING: line over 80 characters
-59: FILE: arch/arm/mach-prima2/rstc.c:59:
-+               writel(1 << reset_bit, sirfsoc_rstc_base + (reset_bit / 32) * 8 + 4);
-
-total: 0 errors, 10 warnings, 120 lines checked
-
-Signed-off-by: Xianglong Du <Xianglong.Du@csr.com>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- arch/arm/mach-prima2/rstc.c |   34 ++++++++++++++++++++--------------
- 1 files changed, 20 insertions(+), 14 deletions(-)
-
-diff --git a/arch/arm/mach-prima2/rstc.c b/arch/arm/mach-prima2/rstc.c
-index 4887a2a..3dffcb2 100644
---- a/arch/arm/mach-prima2/rstc.c
-+++ b/arch/arm/mach-prima2/rstc.c
-@@ -36,27 +36,33 @@ static int sirfsoc_reset_module(struct reset_controller_dev *rcdev,
+On Sat, May 03, 2014 at 12:29:02AM +0200, Daniel Mack wrote:
+> Hi Vinod,
+> 
+> On 04/16/2014 06:40 PM, Daniel Mack wrote:
  
- 	if (of_device_is_compatible(rcdev->of_node, "sirf,prima2-rstc")) {
- 		/*
--		 * Writing 1 to this bit resets corresponding block. Writing 0 to this
--		 * bit de-asserts reset signal of the corresponding block.
--		 * datasheet doesn't require explicit delay between the set and clear
--		 * of reset bit. it could be shorter if tests pass.
-+		 * Writing 1 to this bit resets corresponding block.
-+		 * Writing 0 to this bit de-asserts reset signal of the
-+		 * corresponding block. datasheet doesn't require explicit
-+		 * delay between the set and clear of reset bit. it could
-+		 * be shorter if tests pass.
- 		 */
--		writel(readl(sirfsoc_rstc_base + (reset_bit / 32) * 4) | (1 << reset_bit),
-+		writel(readl(sirfsoc_rstc_base +
-+			(reset_bit / 32) * 4) | (1 << reset_bit),
- 			sirfsoc_rstc_base + (reset_bit / 32) * 4);
--		msleep(10);
--		writel(readl(sirfsoc_rstc_base + (reset_bit / 32) * 4) & ~(1 << reset_bit),
-+		msleep(20);
-+		writel(readl(sirfsoc_rstc_base +
-+			(reset_bit / 32) * 4) & ~(1 << reset_bit),
- 			sirfsoc_rstc_base + (reset_bit / 32) * 4);
- 	} else {
- 		/*
- 		 * For MARCO and POLO
--		 * Writing 1 to SET register resets corresponding block. Writing 1 to CLEAR
--		 * register de-asserts reset signal of the corresponding block.
--		 * datasheet doesn't require explicit delay between the set and clear
--		 * of reset bit. it could be shorter if tests pass.
-+		 * Writing 1 to SET register resets corresponding block.
-+		 * Writing 1 to CLEAR register de-asserts reset signal of the
-+		 * corresponding block.
-+		 * datasheet doesn't require explicit delay between the set and
-+		 * clear of reset bit. it could be shorter if tests pass.
- 		 */
--		writel(1 << reset_bit, sirfsoc_rstc_base + (reset_bit / 32) * 8);
--		msleep(10);
--		writel(1 << reset_bit, sirfsoc_rstc_base + (reset_bit / 32) * 8 + 4);
-+		writel(1 << reset_bit,
-+			sirfsoc_rstc_base + (reset_bit / 32) * 8);
-+		msleep(20);
-+		writel(1 << reset_bit,
-+			sirfsoc_rstc_base + (reset_bit / 32) * 8 + 4);
- 	}
- 
- 	mutex_unlock(&rstc_lock);
+> Just in case you missed that over the other mmp_pdma patches: as pointed
+> out above, dma_set_residue() already does the NULL pointer check you
+> asked for, so there's nothing to fix up here. IIRC, we were eventually
+> on the same page regarding all the other details, right?
+Yes and now i have applied the patch.
+
+Thanks
 -- 
-1.7.0.4
+~Vinod
