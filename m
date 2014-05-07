@@ -1,17 +1,23 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 07 May 2014 09:57:46 -0600
-Subject: [PATCH] ARM: tegra: enable console framebuffer rotation
-In-Reply-To: <1399432682-677-1-git-send-email-acourbot@nvidia.com>
-References: <1399432682-677-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <536A57FA.2090608@wwwdotorg.org>
+Date: Wed, 07 May 2014 09:58:33 -0600
+Subject: [PATCH] ARM: tegra: Support reboot modes
+In-Reply-To: <1399388651-12819-1-git-send-email-thierry.reding@gmail.com>
+References: <1399388651-12819-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <536A5829.5030702@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/06/2014 09:18 PM, Alexandre Courbot wrote:
-> Console rotation is needed for devices like Tegra Note 7 and NVIDIA
-> SHIELD to get the boot console in the expected orientation.
+On 05/06/2014 09:04 AM, Thierry Reding wrote:
+> From: Thierry Reding <treding@nvidia.com>
+> 
+> The boot ROM on Tegra SoCs supports booting into forced recovery mode
+> (RCM) by setting a bit in the PMC scratch register 0. Similarily, the
+> Android bootloader examines some of the bits in this register to disable
+> autoboot or enter recovery mode.
+> 
+> Support these modes by setting the corresponding bits depending on the
+> specified reboot command (forced-recovery, bootloader, recovery). Recent
+> systemd-based distributions allow this to be specified using an optional
+> argument to the reboot command.
 
-I've squashed this into Tegra's for-3.16/defconfig branch.
-
-Can you please also update multi_v7_defconfig, and send that change to
-arm-soc (arm at kernel.org) to be applied. Thanks.
+Applied to Tegra's for-3.16/soc branch.
