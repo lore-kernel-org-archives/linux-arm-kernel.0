@@ -1,70 +1,84 @@
-From: arunks.linux@gmail.com (arunks.linux at gmail.com)
-Date: Wed,  7 May 2014 07:11:23 +0530
-Subject: [PATCH v1 2/2] arm64: Fix deadlock scenario with smp_send_stop()
-In-Reply-To: <1399426883-13779-1-git-send-email-arunks.linux@gmail.com>
-References: <1399426883-13779-1-git-send-email-arunks.linux@gmail.com>
-Message-ID: <1399426883-13779-2-git-send-email-arunks.linux@gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 7 May 2014 10:09:51 +0800
+Subject: mx6qsabresd hangs on linux-next
+In-Reply-To: <20140506200029.GD5858@pengutronix.de>
+References: <CAOMZO5DMEqs=zzNGqgKjK7wTJdiNPgEqxsX=TtqKrnpLMzpbDw@mail.gmail.com>
+ <20140506141310.GA2794@dragon>
+ <CAOMZO5DH5d_L-deVu=XmBo9ekq+-g704p7cyayLvp=43bnEccQ@mail.gmail.com>
+ <CAOMZO5Dx0JMj3dZ7BSgaYSZZ=ZKRqQHEYWj5sb6z_9jc+cpsEw@mail.gmail.com>
+ <5369081D.5030400@st.com> <20140506200029.GD5858@pengutronix.de>
+Message-ID: <20140507020950.GB2794@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arun KS <arunks.linux@gmail.com>
+On Tue, May 06, 2014 at 10:00:29PM +0200, Sascha Hauer wrote:
+> On Tue, May 06, 2014 at 06:04:45PM +0200, Maxime Coquelin wrote:
+> > Hi Fabio,
+> > 
+> > On 05/06/2014 05:49 PM, Fabio Estevam wrote:
+> > >On Tue, May 6, 2014 at 12:36 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> > >
+> > >>Indeed, if I revert:
+> > >>
+> > >>commit e7489693b3a853ab6dfad52f7e6af553ae8d3f28
+> > >>Author: Maxime COQUELIN <maxime.coquelin@st.com>
+> > >>Date:   Wed Jan 29 17:24:08 2014 +0100
+> > >>
+> > >>     clk: divider: Optimize clk_divider_bestdiv loop
+> > >>
+> > >>     Currently, the for-loop used to try all the different dividers to find the
+> > >>     one that best fit tries all the values from 1 to max_div,
+> > >>incrementing by one.
+> > >>     In case of power-of-two, or table based divider, the loop isn't optimal.
+> > >>
+> > >>     Instead of incrementing by one, this patch provides directly the
+> > >>next divider.
+> > >>
+> > >>     Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
+> > >>     Signed-off-by: Mike Turquette <mturquette@linaro.org>
+> > >>
+> > >>Then the board does not hang.
+> > >
+> > >Isn't the increment of i missing?
+> > 
+> > i is incremented in _next_div():
+> > 
+> > +static int _next_div(struct clk_divider *divider, int div)
+> > +{
+> > +	div++;
+> > +
+> > +	if (divider->flags & CLK_DIVIDER_POWER_OF_TWO)
+> > +		return __roundup_pow_of_two(div);
+> > +	if (divider->table)
+> > +		return _round_up_table(divider->table, div);
+> > +
+> > +	return div;
+> > +}
+> 
+> This cannot work. _round_up_table is implemented like this:
+> 
+> static int _round_up_table(const struct clk_div_table *table, int div)
+> {
+> 	const struct clk_div_table *clkt;
+> 	int up = _get_table_maxdiv(table);
+> 
+> 	for (clkt = table; clkt->div; clkt++) {
+> 		if (clkt->div == div)
+> 			return clkt->div;
+> 		...
+> 	}
+> 	...
+> }
+> 
+> Here when a table entry matches the input div this function will return
+> exactly the input div. This means _next_div() will always return the
+> same value and clk_divider_bestdiv() has an infinite loop:
+> 
+> 	for (i = 1; i <= maxdiv; i = _next_div(divider, i)) {
+> 		...
+> 	}
 
-If one process calls sys_reboot and that process then stops other
-CPUs while those CPUs are within a spin_lock() region we can
-potentially encounter a deadlock scenario like below.
+Hmmm, isn't the first thing that _next_div() does to increment the input
+div?
 
-CPU 0                   CPU 1
------                   -----
-                        spin_lock(my_lock)
-smp_send_stop()
- <send IPI>             handle_IPI()
-                         disable_preemption/irqs
-                          while(1);
- <PREEMPT>
-spin_lock(my_lock) <--- Waits forever
-
-We shouldn't attempt to run any other tasks after we send a stop
-IPI to a CPU so disable preemption so that this task runs to
-completion. We use local_irq_disable() here for cross-arch
-consistency with x86.
-
-Based-on-work-by: Stephen Boyd <sboyd@codeaurora.org>
-Signed-off-by: Arun KS <getarunks@gmail.com>
----
- arch/arm64/kernel/process.c |    5 +++--
- 1 files changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index 2d43614..abe57e0 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -134,6 +134,7 @@ void machine_shutdown(void)
-  */
- void machine_halt(void)
- {
-+	local_irq_disable();
- 	smp_send_stop();
- 	while (1);
- }
-@@ -146,6 +147,7 @@ void machine_halt(void)
-  */
- void machine_power_off(void)
- {
-+	local_irq_disable();
- 	smp_send_stop();
- 	if (pm_power_off)
- 		pm_power_off();
-@@ -164,10 +166,9 @@ void machine_power_off(void)
-  */
- void machine_restart(char *cmd)
- {
--	smp_send_stop();
--
- 	/* Disable interrupts first */
- 	local_irq_disable();
-+	smp_send_stop();
- 
- 	/* Now call the architecture specific reboot code. */
- 	if (arm_pm_restart)
--- 
-1.7.6
+Shawn
