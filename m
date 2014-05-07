@@ -1,52 +1,60 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Wed, 7 May 2014 16:52:28 -0500
-Subject: [PATCH 09/26] ARM: OMAP: dmtimer: Get rid of check for mem
- resource error
-In-Reply-To: <20140507152426.GD9502@atomide.com>
-References: <1398375849-6017-1-git-send-email-joelf@ti.com>
- <1398375849-6017-10-git-send-email-joelf@ti.com>
- <20140507152426.GD9502@atomide.com>
-Message-ID: <536AAB1C.6010301@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 7 May 2014 16:57:39 -0500
+Subject: [PATCH 3/7] phy: usb: sunxi: Introduce Allwinner A31 USB PHY
+ support
+In-Reply-To: <536A36A2.5030109@ti.com>
+References: <1399434623-20383-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1399434623-20383-4-git-send-email-maxime.ripard@free-electrons.com>
+ <536A36A2.5030109@ti.com>
+Message-ID: <20140507215739.GB7047@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/07/2014 10:24 AM, Tony Lindgren wrote:
-> * Joel Fernandes <joelf@ti.com> [140424 14:44]:
->> The subsequent devm_ioremap_resource will catch it and print an error, let it
->> be checked there.
->>
->> Signed-off-by: Joel Fernandes <joelf@ti.com>
->> ---
->>  arch/arm/plat-omap/dmtimer.c |    4 ----
->>  1 file changed, 4 deletions(-)
->>
->> diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
->> index 7e806f9..1fd30fa 100644
->> --- a/arch/arm/plat-omap/dmtimer.c
->> +++ b/arch/arm/plat-omap/dmtimer.c
->> @@ -810,10 +810,6 @@ static int omap_dm_timer_probe(struct platform_device *pdev)
->>  	}
->>  
->>  	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> -	if (unlikely(!mem)) {
->> -		dev_err(dev, "%s: no memory resource.\n", __func__);
->> -		return -ENODEV;
->> -	}
->>  
->>  	timer = devm_kzalloc(dev, sizeof(struct omap_dm_timer), GFP_KERNEL);
->>  	if (!timer) {
+On Wed, May 07, 2014 at 07:05:30PM +0530, Kishon Vijay Abraham I wrote:
+> Hi,
 > 
-> We still need to return an error here and not try to continue though.
+> On Wednesday 07 May 2014 09:20 AM, Maxime Ripard wrote:
+> > The USB phy controller in the A31 differs mostly from the older controllers
+> > because it has a clock dedicated for each phy, while the older ones were having
+> > a single clock for all the phys.
+> > 
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  drivers/phy/phy-sun4i-usb.c | 35 ++++++++++++++++++++++++++---------
+> >  1 file changed, 26 insertions(+), 9 deletions(-)
+> > 
+> > diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+> > index e6e6c4ba7145..1d83abe07a29 100644
+> > --- a/drivers/phy/phy-sun4i-usb.c
+> > +++ b/drivers/phy/phy-sun4i-usb.c
+> > @@ -61,16 +61,17 @@
+> >  #define MAX_PHYS			3
+> >  
+> >  struct sun4i_usb_phy_data {
+> > -	struct clk *clk;
+> >  	void __iomem *base;
+> >  	struct mutex mutex;
+> >  	int num_phys;
+> >  	u32 disc_thresh;
+> > +	bool dedicated_clocks;
+> 
+> Don't think we need this structure member as it's been used only in probe.
 
-We are returning an error if mem is NULL so the redundant check is
-unnecessary:
+Ah, right.
 
-...
-        timer->io_base = devm_ioremap_resource(dev, mem);
-        if (IS_ERR(timer->io_base))
-                return PTR_ERR(timer->io_base);
+I'll change this in the next version.
 
+Thanks!
+Maxime
 
-thanks,
-
--Joel
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140507/18a492da/attachment.sig>
