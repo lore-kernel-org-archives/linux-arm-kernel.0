@@ -1,73 +1,49 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 07 May 2014 13:37:34 +0900
-Subject: [PATCHv5] ARM: EXYNOS: Support secondary CPU boot of Exynos4212
-In-Reply-To: <1398735462-1938-1-git-send-email-cw00.choi@samsung.com>
-References: <1398735462-1938-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <5369B88E.9030901@samsung.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Wed, 7 May 2014 10:08:10 +0530
+Subject: [PATCH v4 5/5] ARM: DRA7: Add support for soc_is_dra74x() and
+ soc_is_dra72x() varients
+In-Reply-To: <20140506162800.GJ18474@atomide.com>
+References: <1398769513-8736-1-git-send-email-rnayak@ti.com>
+ <1398769513-8736-6-git-send-email-rnayak@ti.com> <4792826.emf6IohHd6@wuerfel>
+ <535F8ADF.6090702@ti.com> <20140506162800.GJ18474@atomide.com>
+Message-ID: <5369B8B2.3090902@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Kukjin,
+On Tuesday 06 May 2014 09:58 PM, Tony Lindgren wrote:
+> * Rajendra Nayak <rnayak@ti.com> [140429 04:22]:
+>> On Tuesday 29 April 2014 04:48 PM, Arnd Bergmann wrote:
+>>> On Tuesday 29 April 2014 16:35:13 Rajendra Nayak wrote:
+>>>> @@ -393,7 +395,12 @@ IS_OMAP_TYPE(3430, 0x3430)
+>>>>  
+>>>>  #if defined(CONFIG_SOC_DRA7XX)
+>>>>  #undef soc_is_dra7xx
+>>>> +#undef soc_is_dra74x
+>>>> +#undef soc_is_dra72x
+>>>>  #define soc_is_dra7xx()        (of_machine_is_compatible("ti,dra7"))
+>>>> +#define soc_is_dra74x()        (of_machine_is_compatible("ti,dra74"))
+>>>> +#define soc_is_dra72x()        (of_machine_is_compatible("ti,dra72"))
+>>>> +
+>>>
+>>> You shouldn't normally have to define these. Why are they needed?
+>>>
+>>> Maybe it's better to wait for a user to show up, and then we can decide
+>>> whether we actually want to have them this way, or if there is a better
+>>> solution for the particular use case.
+>>>
+>>> Normally, we'd want to make run-time decisions based on properties
+>>> of the nodes a driver is working on, not the global machine compatible
+>>> string.
+>>
+>> Yeah, actually this can be dropped. There is no user for it now.
+> 
+> OK applying all but the last patch into omap-for-v3.16/dt branch,
+> it seems there's no need to separate out the fixes in this case.
 
-Could you please pick this patch?
+Thanks Tony.
 
-Best Regards,
-Chanwoo Choi
-
-On 04/29/2014 10:37 AM, Chanwoo Choi wrote:
-> From: Kyungmin Park <kyungmin.park@samsung.com>
 > 
-> This patch fix the offset of CPU boot address and change parameter of smc call
-> of SMC_CMD_CPU1BOOT command for Exynos4212.
+> Regards,
 > 
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> ---
-> Changes from v4:
-> - Post only this patch separated from following patchset[1]
-> [1] https://lkml.org/lkml/2014/4/24/873
-> 
->  arch/arm/mach-exynos/firmware.c | 15 ++++++++++++++-
->  1 file changed, 14 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
-> index 932129e..aa01c42 100644
-> --- a/arch/arm/mach-exynos/firmware.c
-> +++ b/arch/arm/mach-exynos/firmware.c
-> @@ -18,6 +18,8 @@
->  
->  #include <mach/map.h>
->  
-> +#include <plat/cpu.h>
-> +
->  #include "smc.h"
->  
->  static int exynos_do_idle(void)
-> @@ -28,13 +30,24 @@ static int exynos_do_idle(void)
->  
->  static int exynos_cpu_boot(int cpu)
->  {
-> +	/*
-> +	 * The second parameter of SMC_CMD_CPU1BOOT command means CPU id.
-> +	 * But, Exynos4212 has only one secondary CPU so second parameter
-> +	 * isn't used for informing secure firmware about CPU id.
-> +	 */
-> +	if (soc_is_exynos4212())
-> +		cpu = 0;
-> +
->  	exynos_smc(SMC_CMD_CPU1BOOT, cpu, 0, 0);
->  	return 0;
->  }
->  
->  static int exynos_set_cpu_boot_addr(int cpu, unsigned long boot_addr)
->  {
-> -	void __iomem *boot_reg = S5P_VA_SYSRAM_NS + 0x1c + 4*cpu;
-> +	void __iomem *boot_reg = S5P_VA_SYSRAM_NS + 0x1c;
-> +
-> +	if (!soc_is_exynos4212())
-> +		boot_reg += 4*cpu;
->  
->  	__raw_writel(boot_addr, boot_reg);
->  	return 0;
+> Tony
 > 
