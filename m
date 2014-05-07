@@ -1,57 +1,54 @@
-From: sw0312.kim@samsung.com (Seung-Woo Kim)
-Date: Wed, 07 May 2014 14:14:36 +0900
-Subject: [PATCH 2/4] drm/exynos/mixer: use MXR_GRP_SXY_SY
-In-Reply-To: <1399217181-26442-3-git-send-email-djkurtz@chromium.org>
-References: <1399217181-26442-1-git-send-email-djkurtz@chromium.org>
- <1399217181-26442-3-git-send-email-djkurtz@chromium.org>
-Message-ID: <5369C13C.3080506@samsung.com>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Tue, 6 May 2014 22:16:16 -0700
+Subject: [PATCH] ARM: zImage: Allow DTB to override broken ATAG_MEM
+Message-ID: <1399439776-18535-1-git-send-email-bjorn.andersson@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+Support overriding ATAG_MEM, by specifying non-zero content of the /memory/reg
+property in the appended DTB. This is needed to work around bootloaders passing
+broken tags.
 
-On 2014? 05? 05? 00:26, Daniel Kurtz wrote:
-> Mixer hardware supports offsetting dma from start of source buffer using
-> the MXR_GRP_SXY register.
-> 
-> Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
-> ---
->  drivers/gpu/drm/exynos/exynos_mixer.c | 8 +++-----
->  1 file changed, 3 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/exynos/exynos_mixer.c b/drivers/gpu/drm/exynos/exynos_mixer.c
-> index 475eb49..40cf39b 100644
-> --- a/drivers/gpu/drm/exynos/exynos_mixer.c
-> +++ b/drivers/gpu/drm/exynos/exynos_mixer.c
-> @@ -529,13 +529,11 @@ static void mixer_graph_buffer(struct mixer_context *ctx, int win)
->  
->  	dst_x_offset = win_data->crtc_x;
->  	dst_y_offset = win_data->crtc_y;
-> +	src_x_offset = win_data->fb_x;
-> +	src_y_offset = win_data->fb_y;
->  
->  	/* converting dma address base and source offset */
-> -	dma_addr = win_data->dma_addr
-> -		+ (win_data->fb_x * win_data->bpp >> 3)
-> -		+ (win_data->fb_y * win_data->fb_width * win_data->bpp >> 3);
-> -	src_x_offset = 0;
-> -	src_y_offset = 0;
-> +	dma_addr = win_data->dma_addr;
+Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+---
+ arch/arm/boot/compressed/atags_to_fdt.c |   18 +++++++++++++++++-
+ 1 file changed, 17 insertions(+), 1 deletion(-)
 
-Basically, you are right and source offset register can be used. But
-because of limitation of resolution for mixer up to 1920x1080, I
-considered modified soruce dma address to set one frame buffer, which is
-bigger than 1920x1080, on to both fimd and hdmi.
-
-Regards,
-- Seung-Woo Kim
-
->  
->  	if (win_data->scan_flags & DRM_MODE_FLAG_INTERLACE)
->  		ctx->interlace = true;
-> 
-
+diff --git a/arch/arm/boot/compressed/atags_to_fdt.c b/arch/arm/boot/compressed/atags_to_fdt.c
+index d1153c8..b534cd6 100644
+--- a/arch/arm/boot/compressed/atags_to_fdt.c
++++ b/arch/arm/boot/compressed/atags_to_fdt.c
+@@ -95,6 +95,22 @@ static void merge_fdt_bootargs(void *fdt, const char *fdt_cmdline)
+ 	setprop_string(fdt, "/chosen", "bootargs", cmdline);
+ }
+ 
++static int fdt_overrides_atag_mem(void *fdt)
++{
++	const char *memory;
++	int len = 0;
++
++	memory = getprop(fdt, "/memory", "reg", &len);
++	if (memory) {
++		while (len--) {
++			if (*memory != '\0')
++				return 1;
++		}
++	}
++
++	return 0;
++}
++
+ /*
+  * Convert and fold provided ATAGs into the provided FDT.
+  *
+@@ -180,7 +196,7 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
+ 		}
+ 	}
+ 
+-	if (memcount) {
++	if (memcount && !fdt_overrides_atag_mem(fdt)) {
+ 		setprop(fdt, "/memory", "reg", mem_reg_property,
+ 			4 * memcount * memsize);
+ 	}
 -- 
-Seung-Woo Kim
-Samsung Software R&D Center
---
+1.7.9.5
