@@ -1,90 +1,68 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 7 May 2014 17:58:21 +0100
-Subject: [PATCH] arm/xen: Remove definiition of virt_to_pfn in
- asm/xen/page.h
-In-Reply-To: <536A1CF8.5000309@citrix.com>
-References: <1397836474-10478-1-git-send-email-julien.grall@linaro.org>
- <535901F0.3010908@citrix.com> <53590845.1090405@linaro.org>
- <53591B8F.8070300@citrix.com>
- <alpine.DEB.2.02.1404251801060.8072@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1405071234010.14596@kaball.uk.xensource.com>
- <536A1CF8.5000309@citrix.com>
-Message-ID: <alpine.DEB.2.02.1405071758070.14596@kaball.uk.xensource.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 7 May 2014 12:59:00 -0400 (EDT)
+Subject: [PATCH v5 06/14] ARM: mcpm: support 4 clusters
+In-Reply-To: <1399473888-12947-7-git-send-email-haojian.zhuang@linaro.org>
+References: <1399473888-12947-1-git-send-email-haojian.zhuang@linaro.org>
+ <1399473888-12947-7-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <alpine.LFD.2.11.1405071256280.980@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 7 May 2014, David Vrabel wrote:
-> On 07/05/14 12:41, Stefano Stabellini wrote:
-> > On Fri, 25 Apr 2014, Stefano Stabellini wrote:
-> >> On Thu, 24 Apr 2014, David Vrabel wrote:
-> >>> On 24/04/14 13:49, Julien Grall wrote:
-> >>>> Hi David,
-> >>>>
-> >>>> On 04/24/2014 01:22 PM, David Vrabel wrote:
-> >>>>> On 18/04/14 16:54, Julien Grall wrote:
-> >>>>>> virt_to_pfn has been defined in asm/memory.h by the commit e26a9e0 "ARM: Better
-> >>>>>> virt_to_page() handling"
-> >>>>>>
-> >>>>>> This will result of a compilation warning when CONFIG_XEN is enabled.
-> >>>>>>
-> >>>>>> arch/arm/include/asm/xen/page.h:80:0: warning: "virt_to_pfn" redefined [enabled by default]
-> >>>>>>  #define virt_to_pfn(v)          (PFN_DOWN(__pa(v)))
-> >>>>>>  ^
-> >>>>>> In file included from arch/arm/include/asm/page.h:163:0,
-> >>>>>>                  from arch/arm/include/asm/xen/page.h:4,
-> >>>>>>                  from include/xen/page.h:4,
-> >>>>>>                  from arch/arm/xen/grant-table.c:33:
-> >>>>>>
-> >>>>>> The definition in memory.h is nearly the same (it directly expand PFN_DOWN),
-> >>>>>> so we can safely drop virt_to_pfn in xen include.
-> >>>>>
-> >>>>>
-> >>>>> This breaks the arm build for me.
-> >>>>>
-> >>>>> /local/davidvr/work/k.org/tip/drivers/block/xen-blkfront.c: In function
-> >>>>> ?setup_blkring?:
-> >>>>> /local/davidvr/work/k.org/tip/drivers/block/xen-blkfront.c:1236:2:
-> >>>>> error: implicit declaration of function ?virt_to_pfn?
-> >>>>> [-Werror=implicit-function-declaration]
-> >>>>>   err = xenbus_grant_ring(dev, virt_to_mfn(info->ring.sring));
-> >>>>>   ^
-> >>>>
-> >>>> I don't have any issue to build the following branch with this patch on:
-> >>>> 	- v3.15-rc2
-> >>>> 	- xentip master
-> >>>> 	- xentip for-linus-3.16
-> >>>
-> >>> Applied to devel/for-linus-3.16.
-> >>>
-> >>> If something else turns up for 3.15 (and I remember) I'll take it for
-> >>> 3.15 instead.
-> >>
-> >> David,
-> >> thank you very much for taking the patch in my absence.
-> >>
-> >> Considering that the problem is affecting everybody enabling CONFIG_XEN
-> >> on ARM on v3.15, I don't think we can wait for the next merge window to
-> >> send this fix upstream.
-> >> Too many warnings for too many people.
-> > 
-> > Unfortunately this commit breaks arm64 compilation, as virt_to_pfn has
-> > not been introduced to arm64/include/asm/memory.h.
-> > Has the patch been sent upstream yet?
-> 
-> No.
-> 
-> > We need this additional change for arm64:
-> > 
-> > diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-> > index e94f945..993bce5 100644
-> > --- a/arch/arm64/include/asm/memory.h
-> > +++ b/arch/arm64/include/asm/memory.h
-> > @@ -138,6 +138,7 @@ static inline void *phys_to_virt(phys_addr_t x)
-> >  #define __pa(x)			__virt_to_phys((unsigned long)(x))
-> >  #define __va(x)			((void *)__phys_to_virt((phys_addr_t)(x)))
-> >  #define pfn_to_kaddr(pfn)	__va((pfn) << PAGE_SHIFT)
-> > +#define virt_to_pfn(x)      __phys_to_pfn(__virt_to_phys(x))
-> 
-> This would need an ack from an arm64 maintainer.
+On Wed, 7 May 2014, Haojian Zhuang wrote:
 
-Certainly. Catalin is in CC.
+> Add the CONFIG_MCPM_QUAD_CLUSTER configuration to enlarge cluster number
+> from 2 to 4.
+> 
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> ---
+>  arch/arm/Kconfig            | 9 +++++++++
+>  arch/arm/include/asm/mcpm.h | 5 +++++
+>  2 files changed, 14 insertions(+)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 0e52a2c..624829f 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1575,6 +1575,15 @@ config MCPM
+>  	  for (multi-)cluster based systems, such as big.LITTLE based
+>  	  systems.
+>  
+> +config MCPM_QUAD_CLUSTER
+> +	bool "Enable Quad clusters in MCPM"
+
+Please remove the prompt string, keeping only the bool alone.  This 
+config option shouldn't be visible to users.  After that you may add:
+
+Reviewed-by: Nicolas Pitre <nico@linaro.org>
+
+
+> +	depends on MCPM
+> +	help
+> +	  To avoid wasting resources unnecessarily, MCPM only supports up
+> +	  to 2 clusters by default.
+> +	  Platforms with 3 or 4 clusters that use MCPM must select this
+> +	  option to allow the additional clusters to be managed.
+> +
+>  config BIG_LITTLE
+>  	bool "big.LITTLE support (Experimental)"
+>  	depends on CPU_V7 && SMP
+> diff --git a/arch/arm/include/asm/mcpm.h b/arch/arm/include/asm/mcpm.h
+> index 608516e..fc8d70d 100644
+> --- a/arch/arm/include/asm/mcpm.h
+> +++ b/arch/arm/include/asm/mcpm.h
+> @@ -20,7 +20,12 @@
+>   * to consider dynamic allocation.
+>   */
+>  #define MAX_CPUS_PER_CLUSTER	4
+> +
+> +#ifdef CONFIG_MCPM_QUAD_CLUSTER
+> +#define MAX_NR_CLUSTERS		4
+> +#else
+>  #define MAX_NR_CLUSTERS		2
+> +#endif
+>  
+>  #ifndef __ASSEMBLY__
+>  
+> -- 
+> 1.9.1
+> 
