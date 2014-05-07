@@ -1,62 +1,60 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 7 May 2014 10:59:20 -0700
-Subject: [PATCH 3/4] OMAPDSS: panel-sharp-ls037v7dw01: add device tree
- support
-In-Reply-To: <536A5920.1020908@ti.com>
-References: <1398815562-24113-1-git-send-email-tony@atomide.com>
- <1398815562-24113-4-git-send-email-tony@atomide.com>
- <5369EAE7.3030705@ti.com> <20140507150343.GA9502@atomide.com>
- <536A5920.1020908@ti.com>
-Message-ID: <20140507175919.GH9502@atomide.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 7 May 2014 14:00:51 -0400 (EDT)
+Subject: [PATCH v5 06/14] ARM: mcpm: support 4 clusters
+In-Reply-To: <20140507164816.GB12692@quad.lixom.net>
+References: <1399473888-12947-1-git-send-email-haojian.zhuang@linaro.org>
+ <1399473888-12947-7-git-send-email-haojian.zhuang@linaro.org>
+ <20140507164816.GB12692@quad.lixom.net>
+Message-ID: <alpine.LFD.2.11.1405071345540.980@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tomi Valkeinen <tomi.valkeinen@ti.com> [140507 09:03]:
-> On 07/05/14 18:03, Tony Lindgren wrote:
-> 
-> >>> +	lcd0: display {
-> >>> +		compatible = "sharp,ls037v7dw01";
-> >>> +		power-supply = <&lcd_3v3>;
-> >>> +		reset-gpios = <&gpio5 27 GPIO_ACTIVE_HIGH>;	/* gpio155, lcd RESB */
-> >>> +		enable-gpios = <&gpio5 26 GPIO_ACTIVE_HIGH	/* gpio154, lcd MO */
-> >>> +				&gpio1 2 GPIO_ACTIVE_HIGH	/* gpio2, lcd LR */
-> >>> +				&gpio1 3 GPIO_ACTIVE_HIGH	/* gpio3, lcd UD */
-> >>> +				&gpio5 24 GPIO_ACTIVE_HIGH>;	/* gpio152, lcd INI */
-> >>
-> >> Why are most of the gpios in 'enable-gpios'? MO, LR and UD don't really
-> >> have anything to do with enabling the panel. Why not just have one
-> >> 'gpios' array with all the gpios, as they are quite a mixed bunch?
+On Wed, 7 May 2014, Olof Johansson wrote:
+
+> On Wed, May 07, 2014 at 10:44:40PM +0800, Haojian Zhuang wrote:
+> > Add the CONFIG_MCPM_QUAD_CLUSTER configuration to enlarge cluster number
+> > from 2 to 4.
 > > 
-> > Yeah that's what I had initially, but reading simple-panel.txt noticed
-> > there are some standardized GPIOs for reset and enable.
-> 
-> I'm not sure if it's worth to try to make it compatible with
-> simple-panel. simple-panel bindings do not work with omapdss anyway, and
-> simple-panel doesn't have the support for input ports/endpoints.
-> 
-> Can the panel be used with only one gpio (I guess that would be INI or
-> RESB)? If not, simple-panel doesn't work.
-
-I guess in theory yes.
- 
-> > How about we set up one reset-gpios, one enable-gpios and an array of
-> > three unlabelled GPIOs?
+> > Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> > ---
+> >  arch/arm/Kconfig            | 9 +++++++++
+> >  arch/arm/include/asm/mcpm.h | 5 +++++
+> >  2 files changed, 14 insertions(+)
 > > 
-> > Or if we want to add something generic, we could add new mode-gpios
-> > property that other panels might be able to use too?
-> > 
-> > BTW, I'm also personally fine with all five gpios showing in a single
-> > gpios property, I'm not too exited about naming anything in DT..
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index 0e52a2c..624829f 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -1575,6 +1575,15 @@ config MCPM
+> >  	  for (multi-)cluster based systems, such as big.LITTLE based
+> >  	  systems.
+> >  
+> > +config MCPM_QUAD_CLUSTER
+> > +	bool "Enable Quad clusters in MCPM"
+> > +	depends on MCPM
+> > +	help
+> > +	  To avoid wasting resources unnecessarily, MCPM only supports up
+> > +	  to 2 clusters by default.
+> > +	  Platforms with 3 or 4 clusters that use MCPM must select this
+> > +	  option to allow the additional clusters to be managed.
+> > +
 > 
-> I don't have a strong opinion here. I don't have much experience with
-> DT, especially with making bindings compatible with other ones.
-> 
-> I'd just forget the simple-panel, and have single gpio array.
+> Why don't you add an integer config instead, i.e. MCPM_MAX_CLUSTERS, and let
+> that set MAX_NR_CLUSTERS?
 
-Well if it's a don't care flag for both of us, let's try to use
-the existing standard for simple-panel.txt and add mode-gpios
-property. I'll post a patch for that.
+I requested for this config symbol not to be visible to users (the 
+prompt string should be removed) and be selected by those platforms that 
+need it instead.  And there is no way to specify an actual value with 
+'select'. And that wouldn't work in a multi-platform config where 
+different platforms could fight over a different value anyway.
 
-Regards,
+I also prefer to keep some control on the actual number that can be used 
+here so not to let people go overboard with it.  If this grows too big 
+we'll have to consider some dynamic allocation instead.
 
-Tony
+See previous discussion here:
+
+http://article.gmane.org/gmane.linux.ports.arm.kernel/315228
+
+
+Nicolas
