@@ -1,89 +1,113 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 7 May 2014 11:32:24 +0800
-Subject: mx6qsabresd hangs on linux-next
-In-Reply-To: <20140507020950.GB2794@dragon>
-References: <CAOMZO5DMEqs=zzNGqgKjK7wTJdiNPgEqxsX=TtqKrnpLMzpbDw@mail.gmail.com>
- <20140506141310.GA2794@dragon>
- <CAOMZO5DH5d_L-deVu=XmBo9ekq+-g704p7cyayLvp=43bnEccQ@mail.gmail.com>
- <CAOMZO5Dx0JMj3dZ7BSgaYSZZ=ZKRqQHEYWj5sb6z_9jc+cpsEw@mail.gmail.com>
- <5369081D.5030400@st.com> <20140506200029.GD5858@pengutronix.de>
- <20140507020950.GB2794@dragon>
-Message-ID: <20140507033223.GB2798@dragon>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 6 May 2014 22:25:02 -0500
+Subject: [linux-sunxi] Re: [PATCH 0/2] ARM: sunxi: Enable syscon for the
+ system controller
+In-Reply-To: <CAOQ7t2akOEr7o4Q5ze5QPr_RHj6MWmA-u5NTuq2q1epy2LBr8w@mail.gmail.com>
+References: <1399212160-26934-1-git-send-email-carlo@caione.org>
+ <20140505225517.GE9464@lukather>
+ <CAGb2v66JBM_Rv8ie=7iuTPrXGPJECTeevnf9LLXNS=FSYs1+Tg@mail.gmail.com>
+ <CAOQ7t2akOEr7o4Q5ze5QPr_RHj6MWmA-u5NTuq2q1epy2LBr8w@mail.gmail.com>
+Message-ID: <20140507032502.GM9464@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 07, 2014 at 10:09:51AM +0800, Shawn Guo wrote:
-> On Tue, May 06, 2014 at 10:00:29PM +0200, Sascha Hauer wrote:
-> > On Tue, May 06, 2014 at 06:04:45PM +0200, Maxime Coquelin wrote:
-> > > Hi Fabio,
-> > > 
-> > > On 05/06/2014 05:49 PM, Fabio Estevam wrote:
-> > > >On Tue, May 6, 2014 at 12:36 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> > > >
-> > > >>Indeed, if I revert:
-> > > >>
-> > > >>commit e7489693b3a853ab6dfad52f7e6af553ae8d3f28
-> > > >>Author: Maxime COQUELIN <maxime.coquelin@st.com>
-> > > >>Date:   Wed Jan 29 17:24:08 2014 +0100
-> > > >>
-> > > >>     clk: divider: Optimize clk_divider_bestdiv loop
-> > > >>
-> > > >>     Currently, the for-loop used to try all the different dividers to find the
-> > > >>     one that best fit tries all the values from 1 to max_div,
-> > > >>incrementing by one.
-> > > >>     In case of power-of-two, or table based divider, the loop isn't optimal.
-> > > >>
-> > > >>     Instead of incrementing by one, this patch provides directly the
-> > > >>next divider.
-> > > >>
-> > > >>     Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
-> > > >>     Signed-off-by: Mike Turquette <mturquette@linaro.org>
-> > > >>
-> > > >>Then the board does not hang.
-> > > >
-> > > >Isn't the increment of i missing?
-> > > 
-> > > i is incremented in _next_div():
-> > > 
-> > > +static int _next_div(struct clk_divider *divider, int div)
-> > > +{
-> > > +	div++;
-> > > +
-> > > +	if (divider->flags & CLK_DIVIDER_POWER_OF_TWO)
-> > > +		return __roundup_pow_of_two(div);
-> > > +	if (divider->table)
-> > > +		return _round_up_table(divider->table, div);
-> > > +
-> > > +	return div;
-> > > +}
-> > 
-> > This cannot work. _round_up_table is implemented like this:
-> > 
-> > static int _round_up_table(const struct clk_div_table *table, int div)
-> > {
-> > 	const struct clk_div_table *clkt;
-> > 	int up = _get_table_maxdiv(table);
-> > 
-> > 	for (clkt = table; clkt->div; clkt++) {
-> > 		if (clkt->div == div)
-> > 			return clkt->div;
-> > 		...
-> > 	}
-> > 	...
-> > }
-> > 
-> > Here when a table entry matches the input div this function will return
-> > exactly the input div. This means _next_div() will always return the
-> > same value and clk_divider_bestdiv() has an infinite loop:
-> > 
-> > 	for (i = 1; i <= maxdiv; i = _next_div(divider, i)) {
-> > 		...
-> > 	}
+On Tue, May 06, 2014 at 10:03:19AM +0200, Carlo Caione wrote:
+> On Tue, May 6, 2014 at 8:36 AM, Chen-Yu Tsai <wens@csie.org> wrote:
+> > Hi,
 > 
-> Hmmm, isn't the first thing that _next_div() does to increment the input
-> div?
+> Hi,
+> 
+> > On Tue, May 6, 2014 at 6:55 AM, Maxime Ripard
+> > <maxime.ripard@free-electrons.com> wrote:
+> >> On Sun, May 04, 2014 at 04:02:38PM +0200, Carlo Caione wrote:
+> >>> The so called "system controller" in Allwinner A20 and A31 SoCs is
+> >>> multi-purpose controller that tries to add misc functionality to one
+> >>> memory region.
+> >>> In these SoCs it controls the internal SRAM partitioning but it also
+> >>> includes registers for chip versioning and NMI control.
+> >>> This patch adds the proper nodes in the DTS files and enable the syscon
+> >>> in the defconfig files.
+> >>>
+> >>> Even though the system controller includes also register for managing the
+> >>> NMI controller, these register are not mapped in the syscon since they
+> >>> are directly used and mapped by the NMI controller itself.
+> >>
+> >> Hmmm, what exactly do you want to achieve with this?
+> >>
+> >> The NMI controller won't be able to use it, since it's initialized
+> >> much earlier than syscon and regmap.
+> 
+> This is what I meant with that phrase. NMI controller doesn't use the
+> syscon but we can use it for several other drivers.
 
-I think the infinite loop happens in this case because "i" will never
-exceed maxdiv for a table divider.
+I'm sorry, but I believe this should be more handled by the soon-to-be
+drivers/soc "framework".
 
-Shawn
+> In fact the registers for NMI controller are excluded from the range
+> of syscon registers.
+
+Then you are lying in the DT :)
+
+> > I believe this will be used for toggling the SRAM mappings. (Am I right?)
+> 
+> Definitely right.
+> 
+> > The second register toggles mappings for MUSB FIFO, EMAC, and a few of
+> > the other IP blocks we currently don't support.
+> 
+> Not yet :)
+
+I wonder how other SoCs are actually handling this mapping between CPU
+& DMA vs device of some SRAMs. Did you look at this?
+
+> >> Moreover, the A31 doesn't seem to have this system controller, or at
+> >> least this overlap.
+> 
+> I admit that I didn't check the A31 manual but I trusted the wiki page
+> at http://linux-sunxi.org/SRAM_Controller and
+> http://linux-sunxi.org/A31/Memory_map
+> 
+> > There should be something similar, as does the A23. There is no overlap AFAIK.
+> 
+> I agree and will check also A23.
+> 
+> >> And since on the A20, registers seem to have one usage only, so I
+> >> guess we can just split this IP into several nodes, just like we did
+> >> with the NMI.
+> >
+> > As stated above, the second register toggles SRAM mappings for at most
+> > 4 SRAM blocks (for EMAC, MUSB, ACE, ISP).
+> >
+> > syscon would be a good way to share this register among the various drivers.
+> > We do not toggle it in the current EMAC driver. The driver seems to assume
+> > it is setup by the bootloader, and on the A20, it seems to be mapped to
+> > EMAC by default.
+> >
+> > The MUSB glue layer driver must toggle this.
+> 
+> This is exactly why I wrote these patches. I started hacking /
+> studying your MUSB driver and I think that using syscon is a better
+> way to manage these registers instead of mapping them in several
+> drivers also because most of the time a single register has to be used
+> by multiple drivers (i.e. SRAM_CTL1_CFG is used for USB,  EMAC,
+> etc...)
+> 
+> > I think this approach is better than all the individual drivers mapping
+> > the registers and toggling a single bit. In fact I did something similar
+> > when working on preliminary musb support.
+
+I agree with that.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140506/ff272595/attachment.sig>
