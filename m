@@ -1,80 +1,76 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 7 May 2014 21:58:31 +0200
-Subject: [PATCH resend 00/15] arm64 crypto roundup
-In-Reply-To: <20140507144554.GC17253@arm.com>
-References: <1398959381-8126-1-git-send-email-ard.biesheuvel@linaro.org>
- <20140507144554.GC17253@arm.com>
-Message-ID: <CAKv+Gu_4ehnjeRxSHZ6EbV_Ppwc3eLL_yerh3g6GprEFhW32oQ@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 7 May 2014 17:14:52 -0300
+Subject: Adding esdhc4 eMMC support on mx6sabresd
+Message-ID: <CAOMZO5CJEoe_fGLH-Uu9uVwNdWPp940k3WGAkjzkCiGmjAPAXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 May 2014 16:45, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Thu, May 01, 2014 at 04:49:32PM +0100, Ard Biesheuvel wrote:
->> This is a repost of the arm64 crypto patches that I have posted to the LAKML
->> over the past months. They have now been verified on actual hardware
->> (Cortex-A57) so if there are no remaining issues I would like to propose them
->> for 3.16.
->>
->> Ard Biesheuvel (15):
->>   asm-generic: allow generic unaligned access if the arch supports it
->>   arm64: add abstractions for FPSIMD state manipulation
->>   arm64: defer reloading a task's FPSIMD state to userland resume
->>   arm64: add support for kernel mode NEON in interrupt context
->>   arm64/crypto: SHA-1 using ARMv8 Crypto Extensions
->>   arm64/crypto: SHA-224/SHA-256 using ARMv8 Crypto Extensions
->>   arm64/crypto: GHASH secure hash using ARMv8 Crypto Extensions
->>   arm64/crypto: AES using ARMv8 Crypto Extensions
->>   arm64/crypto: AES in CCM mode using ARMv8 Crypto Extensions
->>   arm64: pull in <asm/simd.h> from asm-generic
->>   arm64/crypto: AES-ECB/CBC/CTR/XTS using ARMv8 NEON and Crypto
->>     Extensions
->>   arm64/crypto: add shared macro to test for NEED_RESCHED
->>   arm64/crypto: add voluntary preemption to Crypto Extensions SHA1
->>   arm64/crypto: add voluntary preemption to Crypto Extensions SHA2
->>   arm64/crypto: add voluntary preemption to Crypto Extensions GHASH
->
-> There are about 5 patches that make sense to me ;) and apart from a few
-> minor comments they look fine.
->
-> There are the other 10 crypto patches that are beyond my knowledge. Do
-> you know anyone who could do a sanity check on them? Are there any tests
-> that would show the correctness of the implementation?
->
+Hi Dong,
 
-The core ciphers and hashes are always tested automatically at each
-insmod (unles CONFIG_CRYPTO_MANAGER_DISABLE_TESTS is set)
-This applies to plain AES, SHA1, SHA-224/256 and GHASH.
+I have tested the following patch to add support for the emmc port on
+mx6qsabresd:
 
-For the remaining modules, there is the tcrypt.ko module which can be
-used to explicitly invoke the builtin crypto tests:
+--- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+@@ -444,6 +444,21 @@
+                                MX6QDL_PAD_SD3_DAT7__SD3_DATA7          0x17059
+                        >;
+                };
++
++               pinctrl_usdhc4: usdhc4grp {
++                       fsl,pins = <
++                               MX6QDL_PAD_SD4_CMD__SD4_CMD             0x17059
++                               MX6QDL_PAD_SD4_CLK__SD4_CLK             0x10059
++                               MX6QDL_PAD_SD4_DAT0__SD4_DATA0          0x17059
++                               MX6QDL_PAD_SD4_DAT1__SD4_DATA1          0x17059
++                               MX6QDL_PAD_SD4_DAT2__SD4_DATA2          0x17059
++                               MX6QDL_PAD_SD4_DAT3__SD4_DATA3          0x17059
++                               MX6QDL_PAD_SD4_DAT4__SD4_DATA4          0x17059
++                               MX6QDL_PAD_SD4_DAT5__SD4_DATA5          0x17059
++                               MX6QDL_PAD_SD4_DAT6__SD4_DATA6          0x17059
++                               MX6QDL_PAD_SD4_DAT7__SD4_DATA7          0x17059
++                       >;
++               };
+        };
 
-modprobe tcrypt.ko mode=xx
+        gpio_leds {
+@@ -535,3 +550,11 @@
+        wp-gpios = <&gpio2 1 0>;
+        status = "okay";
+ };
++
++&usdhc4 {
++       pinctrl-names = "default";
++       pinctrl-0 = <&pinctrl_usdhc4>;
++       bus-width = <8>;
++       non-removable;
++       status = "okay";
++};
 
-with xx in
 
-AES-ECB/CBC/CTR/XTS: 10
-AES-CCM: 37
+,and this is the result:
 
-There are also builtin benchmarks:
+mmc2: new high speed DDR MMC card at address 0001
+mmcblk1: mmc2:0001 SEM08G 7.39 GiB
+mmcblk1boot0: mmc2:0001 SEM08G partition 1 2.00 MiB
+mmcblk1boot1: mmc2:0001 SEM08G partition 2 2.00 MiB
+mmcblk1rpmb: mmc2:0001 SEM08G partition 3 128 KiB
+mmcblk1: error -110 sending stop command, original cmd response 0x900, card sta0
+mmcblk1: error -84 transferring data, sector 0, nr 8, cmd response 0x900, card 0
+mmcblk1: retrying using single block read
+mmcblk1: error -84 transferring data, sector 0, nr 8, cmd response 0x900, card 0
+end_request: I/O error, dev mmcblk1, sector 0
+mmcblk1: error -84 transferring data, sector 1, nr 7, cmd response 0x900, card 0
+end_request: I/O error, dev mmcblk1, sector 1
+mmcblk1: error -84 transferring data, sector 2, nr 6, cmd response 0x900, card 0
+end_request: I/O error, dev mmcblk1, sector 2
+mmcblk1: error -84 transferring data, sector 3, nr 5, cmd response 0x900, card 0
+end_request: I/O error, dev mmcblk1, sector 3
+mmcblk1: error -84 transferring data, sector 4, nr 4, cmd response 0x900, card 0
+....
 
-AES-ECB/CBC/CTR/XTS: 500
-SHA1: 303
-SHA256: 304
+Is there any extra patch I need to apply? I am running linux-next 20140506.
 
-Consult crypto/tcrypt.c for an exhaustive list.
+Thanks,
 
-Note that the modprobe of tcrypt.ko always fails: that is intentional
-as the test and/or benchmark runs in the init() function so there is
-no reason to keep the module loaded afterwards.
-
-As far as the relative performance is concerned. these implementations
-are all significantly faster than their generic C counterparts, as
-they mostly use dedicated instructions. The NEON implementation of AES
-is also significantly faster, at least on Cortex-A57. Mileage may vary
-for other implementations.
-
->From a security pov, note that these algorithms are all time
-invariant, i.e., there are no data dependent lookups.
-
-Regards,
-Ard.
+Fabio Estevam
