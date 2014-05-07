@@ -1,37 +1,88 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 7 May 2014 10:03:18 +0200
-Subject: [PATCH] rtc: rtc-at91rm9200: fix infinite wait for ACKUPD irq
-In-Reply-To: <20140506211040.GF11243@piout.net>
-References: <94c06375c1b44c8eb5233b0ccf2e4b13@BY2PR05MB048.namprd05.prod.outlook.com>
- <1399386481-18643-1-git-send-email-boris.brezillon@free-electrons.com>
- <aed75d16aa46476eb6f6c5b0d4bef30d@BLUPR05MB037.namprd05.prod.outlook.com>
- <20140506211040.GF11243@piout.net>
-Message-ID: <5369E8C6.1070409@atmel.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 7 May 2014 10:06:50 +0200
+Subject: [PATCH] ARM: zImage: Allow DTB to override broken ATAG_MEM
+In-Reply-To: <1399439776-18535-1-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1399439776-18535-1-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <20140507080650.GA28564@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/05/2014 23:10, Alexandre Belloni :
-> Hi,
+On Tue, May 06, 2014 at 10:16:16PM -0700, Bjorn Andersson wrote:
+> Support overriding ATAG_MEM, by specifying non-zero content of the /memory/reg
+> property in the appended DTB. This is needed to work around bootloaders passing
+> broken tags.
+This feels wrong. I think it's quite usual that the device tree
+specifies a non-0 /memory/reg property. I checked four more or less
+random dts files[1], and three of them have this property set with
+actual values.
+
+So I wouldn't be surprised if this patch results in more damage than
+it's worth. The optimal fix would be to make the bootloader do the right
+thing. And if you trust your dtb more than your bootloader, disable
+ARM_ATAG_DTB_COMPAT.
+
+Best regards
+Uwe
+
+[1]
+arch/arm/boot/dts/am335x-bone-common.dtsi
+arch/arm/boot/dts/exynos5440-sd5v1.dts
+arch/arm/boot/dts/imx6q-wandboard.dts
+arch/arm/boot/dts/tegra30-cardhu.dtsi
 > 
-> On 06/05/2014 at 19:06:56 +0000, Bryan Evenson wrote :
->>
->> I'd assume this patch would be backported to the longterm releases?
->>
+> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> ---
+>  arch/arm/boot/compressed/atags_to_fdt.c |   18 +++++++++++++++++-
+>  1 file changed, 17 insertions(+), 1 deletion(-)
 > 
-> If by longterm, you mean the linux4sam tree, 3.10 branch, it is up to
-> Nicolas to take it. I believe it will be pretty easy to convince him ;)
+> diff --git a/arch/arm/boot/compressed/atags_to_fdt.c b/arch/arm/boot/compressed/atags_to_fdt.c
+> index d1153c8..b534cd6 100644
+> --- a/arch/arm/boot/compressed/atags_to_fdt.c
+> +++ b/arch/arm/boot/compressed/atags_to_fdt.c
+> @@ -95,6 +95,22 @@ static void merge_fdt_bootargs(void *fdt, const char *fdt_cmdline)
+>  	setprop_string(fdt, "/chosen", "bootargs", cmdline);
+>  }
+>  
+> +static int fdt_overrides_atag_mem(void *fdt)
+> +{
+> +	const char *memory;
+> +	int len = 0;
+> +
+> +	memory = getprop(fdt, "/memory", "reg", &len);
+> +	if (memory) {
+> +		while (len--) {
+> +			if (*memory++ != '\0')
+[added fixup noted in follow-up-mail]
 
-Absolutely, it is always easy to convince me with:
-- good commit message
-- script to reproduce the issue
-- follow-up of the patch plus testing
-- dialogue between skilled kernel developers
+> +				return 1;
+> +		}
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+>  /*
+>   * Convert and fold provided ATAGs into the provided FDT.
+>   *
+> @@ -180,7 +196,7 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
+>  		}
+>  	}
+>  
+> -	if (memcount) {
+> +	if (memcount && !fdt_overrides_atag_mem(fdt)) {
+>  		setprop(fdt, "/memory", "reg", mem_reg_property,
+>  			4 * memcount * memsize);
+>  	}
+> -- 
+> 1.7.9.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
-So, yes, I will "ack" the patch and immediately integrate it in our
-linux4sam 3.10 branch.
-
-On the other hand, I let Boris add the "stable" tag to his original patch.
-
-Thanks to all of you for this fix. Bye,
 -- 
-Nicolas Ferre
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
