@@ -1,39 +1,64 @@
-From: detheridge@ti.com (Darren Etheridge)
-Date: Wed, 7 May 2014 09:56:56 -0500
-Subject: [PATCH V6 0/2] arm: dts: dra7: Updates for adding crossbar device
-In-Reply-To: <1399464998-23216-1-git-send-email-r.sricharan@ti.com>
-References: <1399464998-23216-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <20140507145656.GG2626@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 07 May 2014 15:58:48 +0100
+Subject: [PATCH v3] pcie: Add Xilinx PCIe Host Bridge IP driver
+In-Reply-To: <20140507145327.GB2563@arm.com> (Will Deacon's message of "Wed, 7
+ May 2014 15:53:27 +0100")
+References: <1397561911-11647-1-git-send-email-sthokal@xilinx.com>
+ <201404301734.14478.arnd@arndb.de>
+ <CA+mB=1K_AU5cLsW0J9OhVXmpvc+nYSZwpS5iyNXVTFpibfHq6g@mail.gmail.com>
+ <4288313.uDFYZQS3W7@wuerfel> <20140507145327.GB2563@arm.com>
+Message-ID: <87d2fpoct3.fsf@approximate.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sricharan R <r.sricharan@ti.com> wrote on Wed [2014-May-07 17:46:36 +0530]:
-> Some socs have a large number of interrupts requests to service
-> the needs of its many peripherals and subsystems. All of the interrupt
-> requests lines from the subsystems are not needed at the same
-> time, so they have to be muxed to the controllers appropriately.
-> In such places a interrupt controllers are preceded by an
-> IRQ CROSSBAR that provides flexibility in muxing the device interrupt
-> requests to the controller inputs.
-> 
-> The dts file update to support the crossbar device and convert
-> peripheral irq numbers to crossbar number are added here.
-> 
-> This is a rebase on top of 3.15-rc4
-> 
-> This series depends on crossbar-driver-fixes sent below
-> http://marc.info/?l=linux-omap&m=139929963420299&w=2
-> 
-> [V6] Reordered patch 3 to patch 1 and
->      squashed patch 2 and 3 from V5 in to patch 2
-> 
-> Sricharan R (2):
->   arm: dts: dra7: Add routable-irqs property for gic node
->   arm: dts: dra7: Add crossbar device binding
-> 
+On Wed, May 07 2014 at  3:53:27 pm BST, Will Deacon <will.deacon@arm.com> wrote:
+> Hi all,
+>
+> Thanks for CC'ing me, Arnd.
+>
+> On Wed, May 07, 2014 at 03:35:48PM +0100, Arnd Bergmann wrote:
+>> On Wednesday 07 May 2014 17:21:13 Srikanth Thokala wrote:
+>> > On Wed, Apr 30, 2014 at 9:04 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > > Would it be possible to split the config space access out into
+>> > > a separate file? It would be nice to share that with the generic
+>> > > ECAM driver that Will Deacon has sent.
+>> > 
+>> > Yes, it should be possible.  Is it ok, if I work on top of this driver?
+>> 
+>> Do you mean as a follow-on patch? My feeling is that since we are trying
+>> to merge both for 3.16, it would be good to get it done right away if
+>> it doesn't cause too much extra work.
+>
+> Do you mean something as simple as a helper for base + offset ECAM
+> addressing, or something more involved that handles the mapping as well? The
+> latter would need some alignment on sys->private_data, I think.
+>
+> Srikanth: I'll CC you on the next version of my patches (I'll send them
+> now).
+>
+>> > > As a general comment about the MSI implementation, I wonder if
+>> > > this is actually
+>> > > generic enough to be shared with other host controllers. It could be moved
+>> > > into a separate file like the config space access in that case.
+>> > 
+>> > I feel the MSI implementation is not generic by looking into the other
+>> > host controllers,
+>> > it is more specific to the hardware.  Correct me, if am wrong.
+>> 
+>> The other host controllers are certainly incompatible, but this one looks
+>> like it could be used on other controllers easily.
+>> 
+>> Splitting it out would also make it easier to use another MSI implementation
+>> like the one in the GIC.
+>
+> Actually, MarcZ and I already have my driver working with GICv3 + MSI. The
+> code basically amounts to implementing {add,remove}_bus callbacks to set
+> the msi_chip for the pci_bus, based on what we got out of the devicetree.
+> I don't think we needed anything else... Marc?
 
-Just for thoroughness I dropped the previous 3 patch series from my
-build and replaced with this two patch series.  Everything still works
-with my test setup so I consider these patches good.
+No, that's it, really. I use the "msi-parent" property to find the
+msi_chip, which should have been registered as a "msi-controller".
 
-Darren
+	M.
+-- 
+Jazz is not dead. It just smells funny.
