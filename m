@@ -1,336 +1,67 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 07 May 2014 09:40:12 +0200
-Subject: [PATCH] ARM: Kirkwood: DT versions of OpenRD boards
-In-Reply-To: <1399416504-19140-1-git-send-email-andrew@lunn.ch>
-References: <1399416504-19140-1-git-send-email-andrew@lunn.ch>
-Message-ID: <5369E35C.2020006@gmail.com>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Wed, 7 May 2014 09:40:30 +0200
+Subject: [PATCH 3/3] perf tools: Add libdw DWARF post unwind support for
+ ARM64
+In-Reply-To: <20140506175216.GG13677@arm.com>
+References: <1399391733-11927-1-git-send-email-jean.pihet@linaro.org>
+ <1399391733-11927-4-git-send-email-jean.pihet@linaro.org>
+ <20140506170039.GB13677@arm.com>
+ <CAFrcx1n923=fw6L=OnrDbRhWc9WGTc-FWRFeDCVtnJjKaPwyDw@mail.gmail.com>
+ <20140506175216.GG13677@arm.com>
+Message-ID: <CAORVsuUFzf3eBvMLWnJNdhYK4CHEvwNbSYNpOYOfNa5_enp7bA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/07/2014 12:48 AM, Andrew Lunn wrote:
-> Create DTS files to describe the Marvell OpenRD boards.
-> 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> Tested-by: Francois Lorrain <francois.lorrain@gmail.com>
-> ---
-[...]
-> diff --git a/arch/arm/boot/dts/kirkwood-openrd-base.dts b/arch/arm/boot/dts/kirkwood-openrd-base.dts
-> new file mode 100644
-> index 000000000000..03cb87cd4bbe
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/kirkwood-openrd-base.dts
-> @@ -0,0 +1,42 @@
-> +/*
-> + * Marvell OpenRD Base Board descrition
+Hi Will,
 
-s/descrition/description/
+On Tue, May 6, 2014 at 7:52 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, May 06, 2014 at 06:41:55PM +0100, Jean Pihet wrote:
+>> Hi Will,
+>>
+>> On 6 May 2014 19:00, Will Deacon <will.deacon@arm.com> wrote:
+>> > Hi Jean,
+>> >
+>> > On Tue, May 06, 2014 at 04:55:33PM +0100, Jean Pihet wrote:
+>> >> Adding libdw DWARF post unwind support, which is part
+>> >> of elfutils-devel/libdw-dev package from version 0.158.
+>> >>
+>> >> Note: the libdw code needs some support for dwarf unwinding
+>> >> on ARM64, this code is submitted seperately on the elfutils
+>> >> ML.
+>> >>
+>> >> The new code is contained in unwin-libdw.c object, and
+>> >> implements unwind__get_entries unwind interface function.
+>> >
+>> > Are you planning to implement support for 32-bit ARM too? If so, we'll need
+>> > compat handling here again (your favourite!).
+>> Yes! Another patch set (sent just before this one) targets ARM. There
+>> is a nice ToDo in the cover letter: handle compat mode correctly. In
+>> fact I sent a patch to libdw, so it supports it already but is
+>> somewhat broken for compat mode. This is on my prefered ToDo list ;-)
+>>
+>> >
+>> >> +bool libdw__arch_set_initial_registers(Dwfl_Thread *thread, void *arg)
+>> >> +{
+>> >> +     struct unwind_info *ui = arg;
+>> >> +     struct regs_dump *user_regs = &ui->sample->user_regs;
+>> >> +     Dwarf_Word dwarf_regs[PERF_REG_ARM64_MAX];
+>> >
+>> > Shouldn't this be PERF_REG_ARM64_MAX - 1?
+>> Ah, well spotted! I will change although it shouldn't harm, right?
+>
+> Actually, looking again, I think I'm wrong and your code was right first
+> time! It looks like dwfl_thread_state_registers takes the limit too, so I
+> don't think you need to change anything (except for adding compat support).
+>
+> Sorry about that,
+My bad, I haven't checked carefully enough before replying.
 
-> + * Andrew Lunn <andrew@lunn.ch>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + *
-> + * This file contains the definitions that are specific to OpenRD
-> + * base variant of the Marvell Kirkwood Development Board.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "kirkwood-openrd.dtsi"
-> +
-> +/ {
-> +	model = "OpenRD Base";
-> +	compatible = "marvell,openrd-base", "marvell,openrd", "marvell,kirkwood-88f6281", "marvell,kirkwood";
-> +
-> +	ocp at f1000000 {
-> +		serial at 12100 {
-> +			status = "okay";
-
-Andrew,
-
-I see you used the "good template" this time ;) I again have some nits,
-that either you can take care of or me in the cleanup patches. I guess
-it depends on whatever goes in first. ;)
-
-> +		};
-> +	};
-> +};
-> +
-> +&mdio {
-> +	status = "okay";
-> +
-> +	ethphy0: ethernet-phy at 8 {
-> +		reg = <8>;
-> +	};
-> +};
-> +
-> +&eth0 {
-> +	status = "okay";
-> +	ethernet0-port at 0 {
-> +		phy-handle = <&ethphy0>;
-> +	};
-> +};
-> diff --git a/arch/arm/boot/dts/kirkwood-openrd-client.dts b/arch/arm/boot/dts/kirkwood-openrd-client.dts
-> new file mode 100644
-> index 000000000000..6179542c860f
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/kirkwood-openrd-client.dts
-> @@ -0,0 +1,75 @@
-> +/*
-> + * Marvell OpenRD Client Board descrition
-
-s/descrition/description/
-
-> + * Andrew Lunn <andrew@lunn.ch>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + *
-> + * This file contains the definitions that are specific to OpenRD
-> + * client variant of the Marvell Kirkwood Development Board.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "kirkwood-openrd.dtsi"
-> +
-> +/ {
-> +	model = "OpenRD Client";
-> +	compatible = "marvell,openrd-client", "marvell,openrd", "marvell,kirkwood-88f6281", "marvell,kirkwood";
-> +
-> +	ocp at f1000000 {
-> +		i2c at 11000 {
-> +			status = "okay";
-> +			clock-frequency = <400000>;
-> +			pinctrl-0 = <&pmx_twsi0>;
-> +			pinctrl-names = "default";
-
-The default pinctrl should have been set by the SoC dtsi already.
-
-> +			cs42l51: cs42l51 at 4a {
-> +				compatible = "cirrus,cs42l51";
-> +				reg = <0x4a>;
-> +			};
-> +		};
-> +	};
-> +
-> +	sound {
-> +		compatible = "simple-audio-card";
-> +		simple-audio-card,format = "i2s";
-> +		simple-audio-card,mclk-fs = <256>;
-> +
-> +		simple-audio-card,cpu {
-> +			sound-dai = <&audio0>;
-> +		};
-> +
-> +		simple-audio-card,codec {
-> +			sound-dai = <&cs42l51>;
-> +		};
-> +	};
-> +};
-> +
-> +&mdio {
-> +	status = "okay";
-> +
-> +	ethphy0: ethernet-phy at 8 {
-> +		reg = <8>;
-> +	};
-> +	ethphy1: ethernet-phy at 24 {
-> +		reg = <24>;
-> +	};
-> +};
-> +
-> +&eth0 {
-> +	status = "okay";
-> +	ethernet0-port at 0 {
-> +		phy-handle = <&ethphy0>;
-> +	};
-> +};
-> +
-> +&eth1 {
-> +	status = "okay";
-> +	ethernet1-port at 0 {
-> +		phy-handle = <&ethphy1>;
-> +	};
-> +};
-> +
-> diff --git a/arch/arm/boot/dts/kirkwood-openrd-ultimate.dts b/arch/arm/boot/dts/kirkwood-openrd-ultimate.dts
-> new file mode 100644
-> index 000000000000..7a233d7f4701
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/kirkwood-openrd-ultimate.dts
-> @@ -0,0 +1,60 @@
-> +/*
-> + * Marvell OpenRD Ultimate Board descrition
-
-s/descrition/description/
-
-> + * Andrew Lunn <andrew@lunn.ch>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + *
-> + * This file contains the definitions that are specific to OpenRD
-> + * ultimate variant of the Marvell Kirkwood Development Board.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "kirkwood-openrd.dtsi"
-> +
-> +/ {
-> +	model = "OpenRD Ultimate";
-> +	compatible = "marvell,openrd-ultimate", "marvell,openrd", "marvell,kirkwood-88f6281", "marvell,kirkwood";
-> +
-> +	ocp at f1000000 {
-> +		i2c at 11000 {
-> +			status = "okay";
-> +			clock-frequency = <400000>;
-> +			pinctrl-0 = <&pmx_twsi0>;
-> +			pinctrl-names = "default";
-
-ditto.
-
-> +			cs42l51: cs42l51 at 4a {
-> +				compatible = "cirrus,cs42l51";
-> +				reg = <0x4a>;
-> +			};
-> +		};
-> +	};
-> +};
-> +
-> +&mdio {
-> +	status = "okay";
-> +
-> +	ethphy0: ethernet-phy at 0 {
-> +		reg = <0>;
-> +	};
-> +	ethphy1: ethernet-phy at 1 {
-> +		reg = <1>;
-> +	};
-> +};
-> +
-> +&eth0 {
-> +	status = "okay";
-> +	ethernet0-port at 0 {
-> +		phy-handle = <&ethphy0>;
-> +	};
-> +};
-> +
-> +&eth1 {
-> +	status = "okay";
-> +	ethernet1-port at 0 {
-> +		phy-handle = <&ethphy1>;
-> +	};
-> +};
-> diff --git a/arch/arm/boot/dts/kirkwood-openrd.dtsi b/arch/arm/boot/dts/kirkwood-openrd.dtsi
-> new file mode 100644
-> index 000000000000..30e0f38a1a37
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/kirkwood-openrd.dtsi
-> @@ -0,0 +1,91 @@
-> +/*
-> + * Marvell OpenRD (Base|Client|Ultimate) Board descrition
-
-s/descrition/description/
-
-> + *
-> + * Andrew Lunn <andrew@lunn.ch>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + *
-> + * This file contains the definitions that are common between the three
-> + * variants of the Marvell Kirkwood Development Board.
-> + */
-> +
-> +#include "kirkwood.dtsi"
-> +#include "kirkwood-6281.dtsi"
-> +
-> +/ {
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0x00000000 0x20000000>;
-> +	};
-> +
-> +	chosen {
-> +		bootargs = "console=ttyS0,115200n8";
-> +		stdout-path = &uart0;
-> +	};
-> +
-> +	mbus {
-> +		pcie-controller {
-> +			status = "okay";
-> +
-> +			pcie at 1,0 {
-> +				status = "okay";
-> +			};
-> +		};
-> +	};
-> +
-> +	ocp at f1000000 {
-> +		pinctrl: pin-controller at 10000 {
-> +			pinctrl-0 = <&pmx_select28 &pmx_sdio_cd &pmx_select34>;
-> +			pinctrl-names = "default";
-> +
-> +			pmx_select28: pmx-select-uart-sd {
-> +				marvell,pins = "mpp28";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_sdio_cd: pmx-sdio-cd {
-> +				marvell,pins = "mpp29";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_select34: pmx-select-rs232-rs484 {
-> +				marvell,pins = "mpp34";
-> +				marvell,function = "gpio";
-> +			};
-> +		};
-> +		serial at 12000 {
-> +			status = "okay";
-> +
-> +		};
-> +		sata at 80000 {
-> +			status = "okay";
-> +			nr-ports = <2>;
-> +		};
-> +		mvsdio at 90000 {
-> +			status = "okay";
-> +			cd-gpios = <&gpio0 29 9>;
-> +			status = "disabled";
-
-Any reason not to enable sdio?
-
-Besides the nits above,
-
-Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-
-> +		};
-> +	};
-> +};
-> +
-> +&nand {
-> +	status = "okay";
-> +	pinctrl-0 = <&pmx_nand>;
-> +	pinctrl-names = "default";
-> +
-> +	partition at 0 {
-> +		label = "u-boot";
-> +		reg = <0x0000000 0x100000>;
-> +	};
-> +
-> +	partition at 100000 {
-> +		label = "uImage";
-> +		reg = <0x0100000 0x400000>;
-> +	};
-> +
-> +	partition at 600000 {
-> +		label = "root";
-> +		reg = <0x0600000 0x1FA00000>;
-> +	};
-> +};
-> 
+Thx!
+Jean
+>
+> Will
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
