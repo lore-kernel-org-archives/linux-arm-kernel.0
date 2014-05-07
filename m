@@ -1,48 +1,281 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  7 May 2014 16:20:45 +0100
-Subject: [PATCH 0/9] arm64: KVM: debug infrastructure support
-Message-ID: <1399476054-21571-1-git-send-email-marc.zyngier@arm.com>
+Date: Wed,  7 May 2014 16:20:49 +0100
+Subject: [PATCH 4/9] arm64: KVM: common infrastructure for handling AArch32
+ CP14/CP15
+In-Reply-To: <1399476054-21571-1-git-send-email-marc.zyngier@arm.com>
+References: <1399476054-21571-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1399476054-21571-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds debug support, a key feature missing from the
-KVM/arm64 port.
+As we're about to trap a bunch of CP14 registers, let's rework
+the CP15 handling so it can be generalized and work with multiple
+tables.
 
-The main idea is to keep track of whether the debug registers are
-"dirty" (changed by the guest) or not. In this case, perform the usual
-save/restore dance, for one run only. It means we only have a penalty
-if a guest is actually using the debug registers.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/include/asm/kvm_asm.h    |   2 +-
+ arch/arm64/include/asm/kvm_coproc.h |   3 +-
+ arch/arm64/include/asm/kvm_host.h   |   9 ++-
+ arch/arm64/kvm/handle_exit.c        |   4 +-
+ arch/arm64/kvm/sys_regs.c           | 121 +++++++++++++++++++++++++++++-------
+ 5 files changed, 111 insertions(+), 28 deletions(-)
 
-The huge amount of registers is properly frightening, but CPUs
-actually only implement a subset of them. Also, there is a number of
-registers we don't bother emulating (things having to do with external
-debug and OSlock).
-
-This has been tested on a Cortex-A57 platform, running both 32 and
-64bit guests, on top of 3.15-rc4. This code also lives in my tree in
-the kvm-arm64/debug-trap branch.
-
-Marc Zyngier (9):
-  arm64: KVM: rename pm_fake handler to trap_wi_raz
-  arm64: move DBG_MDSCR_* to asm/debug-monitors.h
-  arm64: KVM: add trap handlers for AArch64 debug registers
-  arm64: KVM: common infrastructure for handling AArch32 CP14/CP15
-  arm64: KVM: use separate tables for AArch32 32 and 64bit traps
-  arm64: KVM: check ordering of all system register tables
-  arm64: KVM: add trap handlers for AArch32 debug registers
-  arm64: KVM: implement lazy world switch for debug registers
-  arm64: KVM: enable trapping of all debug registers
-
- arch/arm64/include/asm/debug-monitors.h |  19 +-
- arch/arm64/include/asm/kvm_asm.h        |  39 ++-
- arch/arm64/include/asm/kvm_coproc.h     |   3 +-
- arch/arm64/include/asm/kvm_host.h       |  12 +-
- arch/arm64/kernel/asm-offsets.c         |   1 +
- arch/arm64/kernel/debug-monitors.c      |   9 -
- arch/arm64/kvm/handle_exit.c            |   4 +-
- arch/arm64/kvm/hyp.S                    | 457 ++++++++++++++++++++++++++++-
- arch/arm64/kvm/sys_regs.c               | 494 +++++++++++++++++++++++++++-----
- 9 files changed, 940 insertions(+), 98 deletions(-)
-
+diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+index e6b159a..12f9dd7 100644
+--- a/arch/arm64/include/asm/kvm_asm.h
++++ b/arch/arm64/include/asm/kvm_asm.h
+@@ -93,7 +93,7 @@
+ #define c10_AMAIR0	(AMAIR_EL1 * 2)	/* Aux Memory Attr Indirection Reg */
+ #define c10_AMAIR1	(c10_AMAIR0 + 1)/* Aux Memory Attr Indirection Reg */
+ #define c14_CNTKCTL	(CNTKCTL_EL1 * 2) /* Timer Control Register (PL1) */
+-#define NR_CP15_REGS	(NR_SYS_REGS * 2)
++#define NR_COPRO_REGS	(NR_SYS_REGS * 2)
+ 
+ #define ARM_EXCEPTION_IRQ	  0
+ #define ARM_EXCEPTION_TRAP	  1
+diff --git a/arch/arm64/include/asm/kvm_coproc.h b/arch/arm64/include/asm/kvm_coproc.h
+index 9a59301..0b52377 100644
+--- a/arch/arm64/include/asm/kvm_coproc.h
++++ b/arch/arm64/include/asm/kvm_coproc.h
+@@ -39,7 +39,8 @@ void kvm_register_target_sys_reg_table(unsigned int target,
+ 				       struct kvm_sys_reg_target_table *table);
+ 
+ int kvm_handle_cp14_load_store(struct kvm_vcpu *vcpu, struct kvm_run *run);
+-int kvm_handle_cp14_access(struct kvm_vcpu *vcpu, struct kvm_run *run);
++int kvm_handle_cp14_32(struct kvm_vcpu *vcpu, struct kvm_run *run);
++int kvm_handle_cp14_64(struct kvm_vcpu *vcpu, struct kvm_run *run);
+ int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run);
+ int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run);
+ int kvm_handle_sys_reg(struct kvm_vcpu *vcpu, struct kvm_run *run);
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 4737961..31cff7a 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -86,7 +86,7 @@ struct kvm_cpu_context {
+ 	struct kvm_regs	gp_regs;
+ 	union {
+ 		u64 sys_regs[NR_SYS_REGS];
+-		u32 cp15[NR_CP15_REGS];
++		u32 copro[NR_COPRO_REGS];
+ 	};
+ };
+ 
+@@ -141,7 +141,12 @@ struct kvm_vcpu_arch {
+ 
+ #define vcpu_gp_regs(v)		(&(v)->arch.ctxt.gp_regs)
+ #define vcpu_sys_reg(v,r)	((v)->arch.ctxt.sys_regs[(r)])
+-#define vcpu_cp15(v,r)		((v)->arch.ctxt.cp15[(r)])
++/*
++ * CP14 and CP15 live in the same array, as they are backed by the
++ * same system registers.
++ */
++#define vcpu_cp14(v,r)		((v)->arch.ctxt.copro[(r)])
++#define vcpu_cp15(v,r)		((v)->arch.ctxt.copro[(r)])
+ 
+ struct kvm_vm_stat {
+ 	u32 remote_tlb_flush;
+diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+index 7bc41ea..f0ca49f 100644
+--- a/arch/arm64/kvm/handle_exit.c
++++ b/arch/arm64/kvm/handle_exit.c
+@@ -69,9 +69,9 @@ static exit_handle_fn arm_exit_handlers[] = {
+ 	[ESR_EL2_EC_WFI]	= kvm_handle_wfx,
+ 	[ESR_EL2_EC_CP15_32]	= kvm_handle_cp15_32,
+ 	[ESR_EL2_EC_CP15_64]	= kvm_handle_cp15_64,
+-	[ESR_EL2_EC_CP14_MR]	= kvm_handle_cp14_access,
++	[ESR_EL2_EC_CP14_MR]	= kvm_handle_cp14_32,
+ 	[ESR_EL2_EC_CP14_LS]	= kvm_handle_cp14_load_store,
+-	[ESR_EL2_EC_CP14_64]	= kvm_handle_cp14_access,
++	[ESR_EL2_EC_CP14_64]	= kvm_handle_cp14_64,
+ 	[ESR_EL2_EC_HVC32]	= handle_hvc,
+ 	[ESR_EL2_EC_SMC32]	= handle_smc,
+ 	[ESR_EL2_EC_HVC64]	= handle_hvc,
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 618d4fb..feafd8d 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -474,6 +474,10 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 	  NULL, reset_val, FPEXC32_EL2, 0x70 },
+ };
+ 
++/* Trapped cp14 registers */
++static const struct sys_reg_desc cp14_regs[] = {
++};
++
+ /*
+  * Trapped cp15 registers. TTBR0/TTBR1 get a double encoding,
+  * depending on the way they are accessed (as a 32bit or a 64bit
+@@ -581,26 +585,19 @@ int kvm_handle_cp14_load_store(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	return 1;
+ }
+ 
+-int kvm_handle_cp14_access(struct kvm_vcpu *vcpu, struct kvm_run *run)
+-{
+-	kvm_inject_undefined(vcpu);
+-	return 1;
+-}
+-
+-static void emulate_cp15(struct kvm_vcpu *vcpu,
+-			 const struct sys_reg_params *params)
++static int emulate_cp(struct kvm_vcpu *vcpu,
++		      const struct sys_reg_params *params,
++		      const struct sys_reg_desc *table,
++		      size_t num)
+ {
+-	size_t num;
+-	const struct sys_reg_desc *table, *r;
++	const struct sys_reg_desc *r;
+ 
+-	table = get_target_table(vcpu->arch.target, false, &num);
++	if (!table)
++		return -1;	/* Not handled */
+ 
+-	/* Search target-specific then generic table. */
+ 	r = find_reg(params, table, num);
+-	if (!r)
+-		r = find_reg(params, cp15_regs, ARRAY_SIZE(cp15_regs));
+ 
+-	if (likely(r)) {
++	if (r) {
+ 		/*
+ 		 * Not having an accessor means that we have
+ 		 * configured a trap that we don't know how to
+@@ -612,12 +609,37 @@ static void emulate_cp15(struct kvm_vcpu *vcpu,
+ 		if (likely(r->access(vcpu, params, r))) {
+ 			/* Skip instruction, since it was emulated */
+ 			kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
+-			return;
+ 		}
+-		/* If access function fails, it should complain. */
++
++		/* Handled */
++		return 0;
+ 	}
+ 
+-	kvm_err("Unsupported guest CP15 access at: %08lx\n", *vcpu_pc(vcpu));
++	/* Not handled */
++	return -1;
++}
++
++static void unhandled_cp_access(struct kvm_vcpu *vcpu,
++				struct sys_reg_params *params)
++{
++	u8 hsr_ec = kvm_vcpu_trap_get_class(vcpu);
++	int cp;
++
++	switch(hsr_ec) {
++	case ESR_EL2_EC_CP15_32:
++	case ESR_EL2_EC_CP15_64:
++		cp = 15;
++		break;
++	case ESR_EL2_EC_CP14_MR:
++	case ESR_EL2_EC_CP14_64:
++		cp = 14;
++		break;
++	default:
++		WARN_ON((cp = -1));
++	}
++
++	kvm_err("Unsupported guest CP%d access at: %08lx\n",
++		cp, *vcpu_pc(vcpu));
+ 	print_sys_reg_instr(params);
+ 	kvm_inject_undefined(vcpu);
+ }
+@@ -627,7 +649,11 @@ static void emulate_cp15(struct kvm_vcpu *vcpu,
+  * @vcpu: The VCPU pointer
+  * @run:  The kvm_run struct
+  */
+-int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
++static int kvm_handle_cp_64(struct kvm_vcpu *vcpu,
++			    const struct sys_reg_desc *global,
++			    size_t nr_global,
++			    const struct sys_reg_desc *target_specific,
++			    size_t nr_specific)
+ {
+ 	struct sys_reg_params params;
+ 	u32 hsr = kvm_vcpu_get_hsr(vcpu);
+@@ -656,8 +682,14 @@ int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		*vcpu_reg(vcpu, params.Rt) = val;
+ 	}
+ 
+-	emulate_cp15(vcpu, &params);
++	if (!emulate_cp(vcpu, &params, target_specific, nr_specific))
++		goto out;
++	if (!emulate_cp(vcpu, &params, global, nr_global))
++		goto out;
++
++	unhandled_cp_access(vcpu, &params);
+ 
++out:
+ 	/* Do the opposite hack for the read side */
+ 	if (!params.is_write) {
+ 		u64 val = *vcpu_reg(vcpu, params.Rt);
+@@ -673,7 +705,11 @@ int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
+  * @vcpu: The VCPU pointer
+  * @run:  The kvm_run struct
+  */
+-int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
++static int kvm_handle_cp_32(struct kvm_vcpu *vcpu,
++			    const struct sys_reg_desc *global,
++			    size_t nr_global,
++			    const struct sys_reg_desc *target_specific,
++			    size_t nr_specific)
+ {
+ 	struct sys_reg_params params;
+ 	u32 hsr = kvm_vcpu_get_hsr(vcpu);
+@@ -688,10 +724,51 @@ int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	params.Op1 = (hsr >> 14) & 0x7;
+ 	params.Op2 = (hsr >> 17) & 0x7;
+ 
+-	emulate_cp15(vcpu, &params);
++	if (!emulate_cp(vcpu, &params, target_specific, nr_specific))
++		return 1;
++	if (!emulate_cp(vcpu, &params, global, nr_global))
++		return 1;
++
++	unhandled_cp_access(vcpu, &params);
+ 	return 1;
+ }
+ 
++int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
++{
++	const struct sys_reg_desc *target_specific;
++	size_t num;
++
++	target_specific = get_target_table(vcpu->arch.target, false, &num);
++	return kvm_handle_cp_64(vcpu,
++				cp15_regs, ARRAY_SIZE(cp15_regs),
++				target_specific, num);
++}
++
++int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
++{
++	const struct sys_reg_desc *target_specific;
++	size_t num;
++
++	target_specific = get_target_table(vcpu->arch.target, false, &num);
++	return kvm_handle_cp_32(vcpu,
++				cp15_regs, ARRAY_SIZE(cp15_regs),
++				target_specific, num);
++}
++
++int kvm_handle_cp14_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
++{
++	return kvm_handle_cp_64(vcpu,
++				cp14_regs, ARRAY_SIZE(cp14_regs),
++				NULL, 0);
++}
++
++int kvm_handle_cp14_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
++{
++	return kvm_handle_cp_32(vcpu,
++				cp14_regs, ARRAY_SIZE(cp14_regs),
++				NULL, 0);
++}
++
+ static int emulate_sys_reg(struct kvm_vcpu *vcpu,
+ 			   const struct sys_reg_params *params)
+ {
 -- 
 1.8.3.4
