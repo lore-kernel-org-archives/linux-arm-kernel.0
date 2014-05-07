@@ -1,64 +1,79 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 07 May 2014 15:58:48 +0100
-Subject: [PATCH v3] pcie: Add Xilinx PCIe Host Bridge IP driver
-In-Reply-To: <20140507145327.GB2563@arm.com> (Will Deacon's message of "Wed, 7
- May 2014 15:53:27 +0100")
-References: <1397561911-11647-1-git-send-email-sthokal@xilinx.com>
- <201404301734.14478.arnd@arndb.de>
- <CA+mB=1K_AU5cLsW0J9OhVXmpvc+nYSZwpS5iyNXVTFpibfHq6g@mail.gmail.com>
- <4288313.uDFYZQS3W7@wuerfel> <20140507145327.GB2563@arm.com>
-Message-ID: <87d2fpoct3.fsf@approximate.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 7 May 2014 08:03:43 -0700
+Subject: [PATCH 3/4] OMAPDSS: panel-sharp-ls037v7dw01: add device tree
+ support
+In-Reply-To: <5369EAE7.3030705@ti.com>
+References: <1398815562-24113-1-git-send-email-tony@atomide.com>
+ <1398815562-24113-4-git-send-email-tony@atomide.com>
+ <5369EAE7.3030705@ti.com>
+Message-ID: <20140507150343.GA9502@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 07 2014 at  3:53:27 pm BST, Will Deacon <will.deacon@arm.com> wrote:
-> Hi all,
->
-> Thanks for CC'ing me, Arnd.
->
-> On Wed, May 07, 2014 at 03:35:48PM +0100, Arnd Bergmann wrote:
->> On Wednesday 07 May 2014 17:21:13 Srikanth Thokala wrote:
->> > On Wed, Apr 30, 2014 at 9:04 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > > Would it be possible to split the config space access out into
->> > > a separate file? It would be nice to share that with the generic
->> > > ECAM driver that Will Deacon has sent.
->> > 
->> > Yes, it should be possible.  Is it ok, if I work on top of this driver?
->> 
->> Do you mean as a follow-on patch? My feeling is that since we are trying
->> to merge both for 3.16, it would be good to get it done right away if
->> it doesn't cause too much extra work.
->
-> Do you mean something as simple as a helper for base + offset ECAM
-> addressing, or something more involved that handles the mapping as well? The
-> latter would need some alignment on sys->private_data, I think.
->
-> Srikanth: I'll CC you on the next version of my patches (I'll send them
-> now).
->
->> > > As a general comment about the MSI implementation, I wonder if
->> > > this is actually
->> > > generic enough to be shared with other host controllers. It could be moved
->> > > into a separate file like the config space access in that case.
->> > 
->> > I feel the MSI implementation is not generic by looking into the other
->> > host controllers,
->> > it is more specific to the hardware.  Correct me, if am wrong.
->> 
->> The other host controllers are certainly incompatible, but this one looks
->> like it could be used on other controllers easily.
->> 
->> Splitting it out would also make it easier to use another MSI implementation
->> like the one in the GIC.
->
-> Actually, MarcZ and I already have my driver working with GICv3 + MSI. The
-> code basically amounts to implementing {add,remove}_bus callbacks to set
-> the msi_chip for the pci_bus, based on what we got out of the devicetree.
-> I don't think we needed anything else... Marc?
+* Tomi Valkeinen <tomi.valkeinen@ti.com> [140507 01:13]:
+> On 30/04/14 02:52, Tony Lindgren wrote:
+> > We can pass the GPIO configuration for ls037v7dw01 in a standard
+> > gpios property.
+> > 
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > ---
+> >  .../bindings/panel/sharp,ls037v7dw01.txt           | 53 ++++++++++++++
+> >  .../omap2/displays-new/panel-sharp-ls037v7dw01.c   | 84 ++++++++++++++++++++--
+> >  2 files changed, 133 insertions(+), 4 deletions(-)
+> >  create mode 100644 Documentation/devicetree/bindings/panel/sharp,ls037v7dw01.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/panel/sharp,ls037v7dw01.txt b/Documentation/devicetree/bindings/panel/sharp,ls037v7dw01.txt
+> > new file mode 100644
+> > index 0000000..7f6f5e1
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/panel/sharp,ls037v7dw01.txt
+> > @@ -0,0 +1,53 @@
+> > +SHARP LS037V7DW01 TFT-LCD panel
+> > +
+> > +Required properties:
+> > +- compatible: should be "sharp,ls037v7dw01"
+> > +
+> > +Optional properties:
+> > +- reset-gpios: a GPIO spec for the optional reset pin
+> > +- enable-gpios: a GPIO array for the optional configuration GPIOs
+> > +  ordered MO, LR, UD, INI as specified in the LS037V7DW01.pdf file.
+> > +
+> > +This binding is compatible with the simple-panel binding, which is specified
+> > +in simple-panel.txt in this directory.
+> > +
+> > +This panel can have zero to five GPIOs to configure
+> > +to change configuration between QVGA and VGA mode
+> > +and the scan direction. As these pins can be also
+> > +configured with external pulls, all the GPIOs are
+> > +considered optional with holes in the array.
+> > +
+> > +Example when connected to a omap2+ based device:
+> > +
+> > +	lcd0: display {
+> > +		compatible = "sharp,ls037v7dw01";
+> > +		power-supply = <&lcd_3v3>;
+> > +		reset-gpios = <&gpio5 27 GPIO_ACTIVE_HIGH>;	/* gpio155, lcd RESB */
+> > +		enable-gpios = <&gpio5 26 GPIO_ACTIVE_HIGH	/* gpio154, lcd MO */
+> > +				&gpio1 2 GPIO_ACTIVE_HIGH	/* gpio2, lcd LR */
+> > +				&gpio1 3 GPIO_ACTIVE_HIGH	/* gpio3, lcd UD */
+> > +				&gpio5 24 GPIO_ACTIVE_HIGH>;	/* gpio152, lcd INI */
+> 
+> Why are most of the gpios in 'enable-gpios'? MO, LR and UD don't really
+> have anything to do with enabling the panel. Why not just have one
+> 'gpios' array with all the gpios, as they are quite a mixed bunch?
 
-No, that's it, really. I use the "msi-parent" property to find the
-msi_chip, which should have been registered as a "msi-controller".
+Yeah that's what I had initially, but reading simple-panel.txt noticed
+there are some standardized GPIOs for reset and enable.
 
-	M.
--- 
-Jazz is not dead. It just smells funny.
+How about we set up one reset-gpios, one enable-gpios and an array of
+three unlabelled GPIOs?
+
+Or if we want to add something generic, we could add new mode-gpios
+property that other panels might be able to use too?
+
+BTW, I'm also personally fine with all five gpios showing in a single
+gpios property, I'm not too exited about naming anything in DT..
+
+Regards,
+
+Tony
