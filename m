@@ -1,17 +1,28 @@
 From: jolsa@redhat.com (Jiri Olsa)
-Date: Wed, 7 May 2014 14:05:21 +0200
-Subject: [PATCH 2/3] perf tests: Add dwarf unwind test on ARM64
-In-Reply-To: <1399391733-11927-3-git-send-email-jean.pihet@linaro.org>
-References: <1399391733-11927-1-git-send-email-jean.pihet@linaro.org>
- <1399391733-11927-3-git-send-email-jean.pihet@linaro.org>
-Message-ID: <20140507120521.GB2019@krava.brq.redhat.com>
+Date: Wed, 7 May 2014 14:06:03 +0200
+Subject: [PATCH 2/3] perf tests: Add dwarf unwind test on ARM
+In-Reply-To: <1399389979-11279-3-git-send-email-jean.pihet@linaro.org>
+References: <1399389979-11279-1-git-send-email-jean.pihet@linaro.org>
+ <1399389979-11279-3-git-send-email-jean.pihet@linaro.org>
+Message-ID: <20140507120603.GC2019@krava.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 06, 2014 at 05:55:32PM +0200, Jean Pihet wrote:
+On Tue, May 06, 2014 at 05:26:18PM +0200, Jean Pihet wrote:
 
 SNIP
 
+> diff --git a/tools/perf/arch/arm/tests/dwarf-unwind.c b/tools/perf/arch/arm/tests/dwarf-unwind.c
+> new file mode 100644
+> index 0000000..d618f5f
+> --- /dev/null
+> +++ b/tools/perf/arch/arm/tests/dwarf-unwind.c
+> @@ -0,0 +1,59 @@
+> +#include <string.h>
+> +#include "perf_regs.h"
+> +#include "thread.h"
+> +#include "map.h"
+> +#include "event.h"
 > +#include "tests/tests.h"
 > +
 > +#define STACK_SIZE 8192
@@ -30,7 +41,7 @@ SNIP
 > +		return -1;
 > +	}
 > +
-> +	sp = (unsigned long) regs[PERF_REG_ARM64_SP];
+> +	sp = (unsigned long) regs[PERF_REG_ARM_SP];
 > +
 > +	map = map_groups__find(&thread->mg, MAP__FUNCTION, (u64) sp);
 > +	if (!map) {
