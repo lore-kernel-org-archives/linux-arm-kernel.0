@@ -1,172 +1,393 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 7 May 2014 19:39:35 +0200
-Subject: [GIT PULL] at91: cleanup for 3.16 #1
-In-Reply-To: <1399484042-27432-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1399484042-27432-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <536A6FD7.40402@atmel.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 7 May 2014 13:44:54 -0400 (EDT)
+Subject: [PATCH v5 08/14] ARM: hisi: add hip04 SoC support
+In-Reply-To: <1399473888-12947-9-git-send-email-haojian.zhuang@linaro.org>
+References: <1399473888-12947-1-git-send-email-haojian.zhuang@linaro.org>
+ <1399473888-12947-9-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <alpine.LFD.2.11.1405071259300.980@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/05/2014 19:34, Nicolas Ferre :
-> Arnd, Olof, Kevin,
-> 
-> This is the first cleanup pull-request for 3.16. It is pretty big because it
-> integrates the work from Boris about CCF and Alexandre about IIO/ADC. I
-> integrated them in this cleanup topic because they both touch the core at91
-> code, the clk and IIO drivers as well as the DT. The concerned maintainers
-> added their tags.
-> 
-> The patch by Linus is a move of at91 specific GPIO definitions out of the
-> include/mach directory which is an step towards single zImage.
-> 
-> Thanks, best regards,
-> 
-> The following changes since commit 89ca3b881987f5a4be4c5dbaa7f0df12bbdde2fd:
-> 
->   Linux 3.15-rc4 (2014-05-04 18:14:42 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://github.com/at91linux/linux-at91.git tags/at91-cleanup
+On Wed, 7 May 2014, Haojian Zhuang wrote:
 
-There is a little conflict with at91-3.16-dt that you already pulled in
-arm-soc: here is the branch that resolves it:
+> Hisilicon Hi3xxx is based on Cortex A9 Core. Now HiP04 SoC is based on
+> Cortex A15 Core. Since multiple clusters is used in HiP04 SoC, it could
+> be based on MCPM.
+> 
+> And HiP04 supports LPAE to support large memory.
 
-https://github.com/at91linux/linux-at91/commits/at91-3.16-resolved
+This makes for a large patch with multiple things mixed together (DT 
+bindings, MCPM backend, etc.)  That might help reviewing if split into 
+separate patches.
 
-Best regards,
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> ---
+>  .../bindings/arm/hisilicon/hisilicon.txt           |  19 ++
+>  .../devicetree/bindings/clock/hip04-clock.txt      |  20 ++
+>  arch/arm/mach-hisi/Kconfig                         |  10 +-
+>  arch/arm/mach-hisi/Makefile                        |   1 +
+>  arch/arm/mach-hisi/core.h                          |   2 +
+>  arch/arm/mach-hisi/hisilicon.c                     |  12 +
+>  arch/arm/mach-hisi/platmcpm.c                      | 314 +++++++++++++++++++++
+>  7 files changed, 377 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/hip04-clock.txt
+>  create mode 100644 arch/arm/mach-hisi/platmcpm.c
 
-> for you to fetch changes up to 138e8f1c4e99cd349e50fd8b18aebbd2716ceb87:
-> 
->   ARM: at91/dt: at91-cosino_mega2560 remove useless tsadcc node (2014-05-07 18:28:41 +0200)
-> 
-> ----------------------------------------------------------------
-> First cleanup series for 3.15
-> - localize GPIO header in mach-at91 directory
-> - big update on the CCF front with main and slow clocks
-> - a cleanup of ADC and touchscreen driver with unification on IIO and
->   removal of old driver
-> 
-> ----------------------------------------------------------------
-> Alexandre Belloni (15):
->       ARM: at91: sam9g45: remove unused platform_data
->       ARM: at91: sam9260: remove unused platform_data
->       iio: adc: at91: cleanup platform_data
->       iio: adc: at91_adc: Add support for touchscreens without TSMR
->       ARM: at91: sam9m10g45ek: Add touchscreen support through at91_adc
->       iio: adc: at91: remove unused include from include/mach
->       iio: adc: at91: add sam9rl support
->       ARM: at91: sam9rl: add at91_adc to support adc and touchscreen
->       ARM: at91: sam9rlek add touchscreen support through at91_adc
->       ARM: at91: sam9g45: switch from atmel_tsadcc to at91_adc
->       ARM: at91: sam9rl: switch from atmel_tsadcc to at91_adc
->       ARM: at91: remove atmel_tsadcc from sama5_defconfig
->       Input: atmel_tsadcc: remove driver
->       ARM: at91: remove atmel_tsadcc platform_data
->       ARM: at91/dt: at91-cosino_mega2560 remove useless tsadcc node
-> 
-> Boris BREZILLON (11):
->       clk: at91: rework main clk implementation
->       clk: at91: update main clk documentation
->       clk: at91: add slow clks driver
->       clk: at91: add slow clk documentation
->       ARM: at91/dt: move sama5d3 SoC to the new main/slow clk model
->       ARM: at91/dt: add xtal frequencies to sama5d3xcm boards
->       ARM: at91/dt: add xtal frequencies to sama5d3 xplained board
->       ARM: at91/dt: move at91sam9261 SoC to the new main clock model
->       ARM: at91/dt: define main xtal frequency of the at91sam9261ek board
->       ARM: at91/dt: move at91sam9rl SoC to the new slow/main clock models
->       ARM: at91/dt: define sam9rlek crystal frequencies
-> 
-> Linus Walleij (1):
->       ARM: at91: localize GPIO header
-> 
-> Nicolas Ferre (1):
->       ASoC: sam9g20_wm8731: remove useless mach/gpio.h
-> 
->  .../devicetree/bindings/clock/at91-clock.txt       | 128 ++++-
->  MAINTAINERS                                        |   6 -
->  arch/arm/Kconfig                                   |   1 -
->  arch/arm/boot/dts/at91-cosino_mega2560.dts         |   5 -
->  arch/arm/boot/dts/at91-sama5d3_xplained.dts        |   8 +
->  arch/arm/boot/dts/at91sam9261.dtsi                 |  23 +-
->  arch/arm/boot/dts/at91sam9261ek.dts                |   4 +
->  arch/arm/boot/dts/at91sam9rl.dtsi                  |  46 +-
->  arch/arm/boot/dts/at91sam9rlek.dts                 |   9 +
->  arch/arm/boot/dts/sama5d3.dtsi                     |  61 ++-
->  arch/arm/boot/dts/sama5d3xcm.dtsi                  |   8 +
->  arch/arm/configs/at91sam9g45_defconfig             |   3 +-
->  arch/arm/configs/at91sam9rl_defconfig              |   3 +-
->  arch/arm/configs/sama5_defconfig                   |   1 -
->  arch/arm/mach-at91/at91rm9200_devices.c            |   1 +
->  arch/arm/mach-at91/at91sam9260_devices.c           |  12 +-
->  arch/arm/mach-at91/at91sam9261_devices.c           |   2 +-
->  arch/arm/mach-at91/at91sam9263_devices.c           |   1 +
->  arch/arm/mach-at91/at91sam9g45.c                   |   2 +-
->  arch/arm/mach-at91/at91sam9g45_devices.c           |  64 +--
->  arch/arm/mach-at91/at91sam9rl.c                    |   7 +
->  arch/arm/mach-at91/at91sam9rl_devices.c            |  84 ++-
->  arch/arm/mach-at91/board-1arm.c                    |   2 +-
->  arch/arm/mach-at91/board-afeb-9260v1.c             |   1 +
->  arch/arm/mach-at91/board-cam60.c                   |   1 +
->  arch/arm/mach-at91/board-carmeva.c                 |   1 +
->  arch/arm/mach-at91/board-cpu9krea.c                |   1 +
->  arch/arm/mach-at91/board-cpuat91.c                 |   2 +
->  arch/arm/mach-at91/board-csb337.c                  |   2 +-
->  arch/arm/mach-at91/board-csb637.c                  |   1 +
->  arch/arm/mach-at91/board-eb9200.c                  |   1 +
->  arch/arm/mach-at91/board-ecbat91.c                 |   1 +
->  arch/arm/mach-at91/board-eco920.c                  |   2 +
->  arch/arm/mach-at91/board-flexibity.c               |   1 +
->  arch/arm/mach-at91/board-foxg20.c                  |   1 +
->  arch/arm/mach-at91/board-gsia18s.c                 |   1 +
->  arch/arm/mach-at91/board-kafa.c                    |   1 +
->  arch/arm/mach-at91/board-kb9202.c                  |   1 +
->  arch/arm/mach-at91/board-pcontrol-g20.c            |   1 +
->  arch/arm/mach-at91/board-picotux200.c              |   1 +
->  arch/arm/mach-at91/board-rm9200ek.c                |   1 +
->  arch/arm/mach-at91/board-rsi-ews.c                 |   1 +
->  arch/arm/mach-at91/board-sam9-l9260.c              |   1 +
->  arch/arm/mach-at91/board-sam9260ek.c               |   1 +
->  arch/arm/mach-at91/board-sam9261ek.c               |   1 +
->  arch/arm/mach-at91/board-sam9263ek.c               |   1 +
->  arch/arm/mach-at91/board-sam9g20ek.c               |   1 +
->  arch/arm/mach-at91/board-sam9m10g45ek.c            |  17 +-
->  arch/arm/mach-at91/board-sam9rlek.c                |  17 +-
->  arch/arm/mach-at91/board-snapper9260.c             |   1 +
->  arch/arm/mach-at91/board-stamp9g20.c               |   1 +
->  arch/arm/mach-at91/board-yl-9200.c                 |   1 +
->  arch/arm/mach-at91/board.h                         |   3 -
->  arch/arm/mach-at91/gpio.c                          |   1 +
->  arch/arm/mach-at91/{include/mach => }/gpio.h       |   8 -
->  arch/arm/mach-at91/include/mach/at91_adc.h         | 107 ----
->  arch/arm/mach-at91/include/mach/hardware.h         |  15 +
->  arch/arm/mach-at91/leds.c                          |   1 +
->  arch/arm/mach-at91/pm.c                            |   1 +
->  drivers/clk/at91/Makefile                          |   4 +-
->  drivers/clk/at91/clk-main.c                        | 577 ++++++++++++++++++---
->  drivers/clk/at91/clk-slow.c                        | 467 +++++++++++++++++
->  drivers/clk/at91/pmc.c                             |  17 +
->  drivers/clk/at91/pmc.h                             |   9 +
->  drivers/clk/at91/sckc.c                            |  57 ++
->  drivers/clk/at91/sckc.h                            |  22 +
->  drivers/iio/adc/at91_adc.c                         | 340 ++++++++++--
->  drivers/input/touchscreen/Kconfig                  |  12 -
->  drivers/input/touchscreen/Makefile                 |   1 -
->  drivers/input/touchscreen/atmel_tsadcc.c           | 358 -------------
->  include/linux/clk/at91_pmc.h                       |   1 +
->  include/linux/platform_data/at91_adc.h             |  27 +-
->  include/linux/platform_data/atmel.h                |   7 -
->  sound/soc/atmel/sam9g20_wm8731.c                   |   1 -
->  74 files changed, 1790 insertions(+), 791 deletions(-)
->  rename arch/arm/mach-at91/{include/mach => }/gpio.h (96%)
->  delete mode 100644 arch/arm/mach-at91/include/mach/at91_adc.h
->  create mode 100644 drivers/clk/at91/clk-slow.c
->  create mode 100644 drivers/clk/at91/sckc.c
->  create mode 100644 drivers/clk/at91/sckc.h
->  delete mode 100644 drivers/input/touchscreen/atmel_tsadcc.c
-> 
+[...]
+
+> diff --git a/arch/arm/mach-hisi/platmcpm.c b/arch/arm/mach-hisi/platmcpm.c
+> new file mode 100644
+> index 0000000..e0d7afd
+> --- /dev/null
+> +++ b/arch/arm/mach-hisi/platmcpm.c
+> @@ -0,0 +1,314 @@
+> +/*
+> + * Copyright (c) 2013-2014 Linaro Ltd.
+> + * Copyright (c) 2013-2014 Hisilicon Limited.
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + */
+> +#include <linux/delay.h>
+> +#include <linux/io.h>
+> +#include <linux/memblock.h>
+> +#include <linux/of_address.h>
+> +
+> +#include <asm/cputype.h>
+> +#include <asm/cp15.h>
+> +#include <asm/mcpm.h>
+> +
+> +#include "core.h"
+> +
+> +/* bits definition in SC_CPU_RESET_REQ[x]/SC_CPU_RESET_DREQ[x]
+> + * 1 -- unreset; 0 -- reset
+> + */
+> +#define CORE_RESET_BIT(x)		(1 << x)
+> +#define NEON_RESET_BIT(x)		(1 << (x + 4))
+> +#define CORE_DEBUG_RESET_BIT(x)		(1 << (x + 9))
+> +#define CLUSTER_L2_RESET_BIT		(1 << 8)
+> +#define CLUSTER_DEBUG_RESET_BIT		(1 << 13)
+> +
+> +/*
+> + * bits definition in SC_CPU_RESET_STATUS[x]
+> + * 1 -- reset status; 0 -- unreset status
+> + */
+> +#define CORE_RESET_STATUS(x)		(1 << x)
+> +#define NEON_RESET_STATUS(x)		(1 << (x + 4))
+> +#define CORE_DEBUG_RESET_STATUS(x)	(1 << (x + 9))
+> +#define CLUSTER_L2_RESET_STATUS		(1 << 8)
+> +#define CLUSTER_DEBUG_RESET_STATUS	(1 << 13)
+> +#define CORE_WFI_STATUS(x)		(1 << (x + 16))
+> +#define CORE_WFE_STATUS(x)		(1 << (x + 20))
+> +#define CORE_DEBUG_ACK(x)		(1 << (x + 24))
+> +
+> +#define SC_CPU_RESET_REQ(x)		(0x520 + (x << 3))	/* reset */
+> +#define SC_CPU_RESET_DREQ(x)		(0x524 + (x << 3))	/* unreset */
+> +#define SC_CPU_RESET_STATUS(x)		(0x1520 + (x << 3))
+> +
+> +#define FAB_SF_MODE			0x0c
+> +#define FAB_SF_INVLD			0x10
+> +
+> +/* bits definition in FB_SF_INVLD */
+> +#define FB_SF_INVLD_START		(1 << 8)
+> +
+> +#define HIP04_MAX_CLUSTERS		4
+> +#define HIP04_MAX_CPUS_PER_CLUSTER	4
+> +
+> +#define POLL_MSEC	10
+> +#define TIMEOUT_MSEC	1000
+> +
+> +struct hip04_secondary_cpu_data {
+> +	u32	bootwrapper_phys;
+> +	u32	bootwrapper_size;
+> +	u32	bootwrapper_magic;
+> +	u32	relocation_entry;
+> +	u32	relocation_size;
+> +};
+> +
+> +static void __iomem *relocation, *sysctrl, *fabric;
+> +static int hip04_cpu_table[HIP04_MAX_CLUSTERS][HIP04_MAX_CPUS_PER_CLUSTER];
+> +static DEFINE_SPINLOCK(boot_lock);
+> +static struct hip04_secondary_cpu_data hip04_boot;
+> +
+> +static bool hip04_cluster_down(unsigned int cluster)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < HIP04_MAX_CPUS_PER_CLUSTER; i++)
+> +		if (hip04_cpu_table[cluster][i])
+> +			return false;
+> +	return true;
+> +}
+> +
+> +static void hip04_set_snoop_filter(unsigned int cluster, unsigned int on)
+> +{
+> +	unsigned long data;
+> +
+> +	if (!fabric)
+> +		return;
+> +	data = readl_relaxed(fabric + FAB_SF_MODE);
+> +	if (on)
+> +		data |= 1 << cluster;
+> +	else
+> +		data &= ~(1 << cluster);
+> +	writel_relaxed(data, fabric + FAB_SF_MODE);
+> +	while (1) {
+> +		if (data == readl_relaxed(fabric + FAB_SF_MODE))
+> +			break;
+> +	}
+> +}
+> +
+> +static int hip04_mcpm_power_up(unsigned int cpu, unsigned int cluster)
+> +{
+> +	unsigned long data, mask;
+> +
+> +	if (!relocation || !sysctrl)
+> +		return -ENODEV;
+> +	if (cluster >= HIP04_MAX_CLUSTERS || cpu >= HIP04_MAX_CPUS_PER_CLUSTER)
+> +		return -EINVAL;
+> +
+> +	spin_lock_irq(&boot_lock);
+> +	writel_relaxed(hip04_boot.bootwrapper_phys, relocation);
+> +	writel_relaxed(hip04_boot.bootwrapper_magic, relocation + 4);
+> +	writel_relaxed(virt_to_phys(mcpm_entry_point), relocation + 8);
+> +	writel_relaxed(0, relocation + 12);
+> +
+> +	if (hip04_cluster_down(cluster)) {
+> +		data = CLUSTER_DEBUG_RESET_BIT;
+> +		writel_relaxed(data, sysctrl + SC_CPU_RESET_DREQ(cluster));
+> +		do {
+> +			mask = CLUSTER_DEBUG_RESET_STATUS;
+> +			data = readl_relaxed(sysctrl + \
+> +					     SC_CPU_RESET_STATUS(cluster));
+> +		} while (data & mask);
+> +		hip04_set_snoop_filter(cluster, 1);
+> +	}
+
+Isn't this racy?  What if the new CPU starts executing code before 
+snoops are enabled for it?
+
+Normally we solve this race by letting the waking-up CPU turn on its 
+snoops by itself from an assembly code callback provided as argument to 
+mcpm_sync_init().  This is also the only way to eventually support deep 
+C-states with cpuidle.
+
+> +
+> +	hip04_cpu_table[cluster][cpu]++;
+> +
+> +	data = CORE_RESET_BIT(cpu) | NEON_RESET_BIT(cpu) | \
+> +	       CORE_DEBUG_RESET_BIT(cpu);
+> +	writel_relaxed(data, sysctrl + SC_CPU_RESET_DREQ(cluster));
+> +	spin_unlock_irq(&boot_lock);
+> +	msleep(POLL_MSEC);
+
+What is that msleep() for?
+
+> +	return 0;
+> +}
+> +
+> +static void hip04_mcpm_power_down(void)
+> +{
+> +	unsigned int mpidr, cpu, cluster;
+> +	bool skip_wfi = false;
+> +
+> +	mpidr = read_cpuid_mpidr();
+> +	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+> +	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+> +
+> +	__mcpm_cpu_going_down(cpu, cluster);
+> +
+> +	spin_lock(&boot_lock);
+> +	BUG_ON(__mcpm_cluster_state(cluster) != CLUSTER_UP);
+> +	hip04_cpu_table[cluster][cpu]--;
+> +	if (hip04_cpu_table[cluster][cpu] == 1) {
+> +		/* A power_up request went ahead of us. */
+> +		skip_wfi = true;
+> +	} else if (hip04_cpu_table[cluster][cpu] > 1) {
+> +		pr_err("Cluster %d CPU%d is still running\n", cluster, cpu);
+> +		BUG();
+> +	}
+> +
+> +	spin_unlock(&boot_lock);
+> +
+> +	v7_exit_coherency_flush(louis);
+
+Don't you have to turn off snoop filters in the case of a complete 
+cluster down as well?
+
+> +
+> +	__mcpm_cpu_down(cpu, cluster);
+> +
+> +	isb();
+> +	dsb();
+
+Those isb/dsb are redundant here.  They're implicit from 
+__mcpm_cpu_down().
+
+> +
+> +	if (!skip_wfi)
+> +		wfi();
+> +}
+> +
+> +static int hip04_mcpm_wait_for_powerdown(unsigned int cpu, unsigned int cluster)
+> +{
+> +	unsigned int data, tries;
+> +
+> +	BUG_ON(cluster >= HIP04_MAX_CLUSTERS ||
+> +	       cpu >= HIP04_MAX_CPUS_PER_CLUSTER);
+> +
+> +	for (tries = 0; tries < TIMEOUT_MSEC / POLL_MSEC; tries++) {
+> +		data = readl_relaxed(sysctrl + SC_CPU_RESET_STATUS(cluster));
+> +		if (!(data & CORE_WFI_STATUS(cpu))) {
+> +			msleep(POLL_MSEC);
+> +			continue;
+> +		}
+> +		data = CORE_RESET_BIT(cpu) | NEON_RESET_BIT(cpu) | \
+> +		       CORE_DEBUG_RESET_BIT(cpu);
+> +		writel_relaxed(data, sysctrl + SC_CPU_RESET_REQ(cluster));
+
+You are not supposed to perform any changes here.  This method is there 
+only to wait for given CPU to be down.  It is not guaranteed it will be 
+called.  Furthermore this can race with the power_up method.
+
+Normally you should perform this reset business from 
+hip04_mcpm_power_down() while the lock is held.  Now... this assumes 
+that any power/reset would be effective only when the CPU executes a 
+WFI.  Is this the case on this hardware?  If not then we'll have to 
+think about a different strategy.
+
+> +		return 0;
+> +	}
+> +
+> +	return -ETIMEDOUT;
+> +}
+> +
+> +static void hip04_mcpm_powered_up(void)
+> +{
+> +	if (!relocation)
+> +		return;
+> +	spin_lock(&boot_lock);
+> +	writel_relaxed(0, relocation);
+> +	writel_relaxed(0, relocation + 4);
+> +	writel_relaxed(0, relocation + 8);
+> +	writel_relaxed(0, relocation + 12);
+> +	spin_unlock(&boot_lock);
+> +}
+> +
+> +static const struct mcpm_platform_ops hip04_mcpm_ops = {
+> +	.power_up		= hip04_mcpm_power_up,
+> +	.power_down		= hip04_mcpm_power_down,
+> +	.wait_for_powerdown	= hip04_mcpm_wait_for_powerdown,
+> +	.powered_up		= hip04_mcpm_powered_up,
+> +};
+> +
+> +static bool __init hip04_cpu_table_init(void)
+> +{
+> +	unsigned int mpidr, cpu, cluster;
+> +
+> +	mpidr = read_cpuid_mpidr();
+> +	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+> +	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+> +
+> +	if (cluster >= HIP04_MAX_CLUSTERS ||
+> +	    cpu >= HIP04_MAX_CPUS_PER_CLUSTER) {
+> +		pr_err("%s: boot CPU is out of bound!\n", __func__);
+> +		return false;
+> +	}
+> +	hip04_set_snoop_filter(cluster, 1);
+> +	hip04_cpu_table[cluster][cpu] = 1;
+> +	return true;
+> +}
+> +
+> +static int __init hip04_mcpm_init(void)
+> +{
+> +	struct device_node *np, *np_fab;
+> +	int ret = -ENODEV;
+> +
+> +	np = of_find_compatible_node(NULL, NULL, "hisilicon,sysctrl");
+> +	if (!np)
+> +		goto err;
+> +	np_fab = of_find_compatible_node(NULL, NULL, "hisilicon,hip04-fabric");
+> +	if (!np_fab)
+> +		goto err;
+> +
+> +	if (of_property_read_u32(np, "bootwrapper-phys",
+> +				 &hip04_boot.bootwrapper_phys)) {
+> +		pr_err("failed to get bootwrapper-phys\n");
+> +		ret = -EINVAL;
+> +		goto err;
+> +	}
+> +	if (of_property_read_u32(np, "bootwrapper-size",
+> +				 &hip04_boot.bootwrapper_size)) {
+> +		pr_err("failed to get bootwrapper-size\n");
+> +		ret = -EINVAL;
+> +		goto err;
+> +	}
+> +	if (of_property_read_u32(np, "bootwrapper-magic",
+> +				 &hip04_boot.bootwrapper_magic)) {
+> +		pr_err("failed to get bootwrapper-magic\n");
+> +		ret = -EINVAL;
+> +		goto err;
+> +	}
+> +	if (of_property_read_u32(np, "relocation-entry",
+> +				 &hip04_boot.relocation_entry)) {
+> +		pr_err("failed to get relocation-entry\n");
+> +		ret = -EINVAL;
+> +		goto err;
+> +	}
+> +	if (of_property_read_u32(np, "relocation-size",
+> +				 &hip04_boot.relocation_size)) {
+> +		pr_err("failed to get relocation-size\n");
+> +		ret = -EINVAL;
+> +		goto err;
+> +	}
+> +
+> +	relocation = ioremap(hip04_boot.relocation_entry,
+> +			     hip04_boot.relocation_size);
+> +	if (!relocation) {
+> +		pr_err("failed to map relocation space\n");
+> +		ret = -ENOMEM;
+> +		goto err;
+> +	}
+> +	sysctrl = of_iomap(np, 0);
+> +	if (!sysctrl) {
+> +		pr_err("failed to get sysctrl base\n");
+> +		ret = -ENOMEM;
+> +		goto err_sysctrl;
+> +	}
+> +	fabric = of_iomap(np_fab, 0);
+> +	if (!fabric) {
+> +		pr_err("failed to get fabric base\n");
+> +		ret = -ENOMEM;
+> +		goto err_fabric;
+> +	}
+> +
+> +	if (!hip04_cpu_table_init())
+> +		return -EINVAL;
+> +	ret = mcpm_platform_register(&hip04_mcpm_ops);
+> +	if (!ret) {
+> +		mcpm_sync_init(NULL);
+> +		pr_info("HiP04 MCPM initialized\n");
+> +	}
+> +	return ret;
+> +err_fabric:
+> +	iounmap(sysctrl);
+> +err_sysctrl:
+> +	iounmap(relocation);
+> +err:
+> +	return ret;
+> +}
+> +early_initcall(hip04_mcpm_init);
+> +
+> +bool __init hip04_smp_init_ops(void)
+> +{
+> +	mcpm_smp_set_ops();
+> +	return true;
+> +}
+
+You should be able to call mcpm_smp_set_ops() directly from 
+hip04_mcpm_init(), and only if there was no errors.
 
 
--- 
-Nicolas Ferre
+Nicolas
