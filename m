@@ -1,35 +1,51 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed,  7 May 2014 17:07:17 +0100
-Subject: [PATCH v6 1/3] ARM: kconfig: allow PCI support to be selected with
- ARCH_MULTIPLATFORM
-In-Reply-To: <1399478839-3564-1-git-send-email-will.deacon@arm.com>
-References: <1399478839-3564-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1399478839-3564-2-git-send-email-will.deacon@arm.com>
+Date: Wed,  7 May 2014 17:07:16 +0100
+Subject: [PATCH v6 0/3] Support for Generic PCI Host Controller
+Message-ID: <1399478839-3564-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When targetting ARCH_MULTIPLATFORM, we may include support for SoCs with
-PCI-capable devices (e.g. mach-virt with virtio-pci).
+Hello again,
 
-This patch allows PCI support to be selected for these SoCs by selecting
-CONFIG_MIGHT_HAVE_PCI when CONFIG_ARCH_MULTIPLATFORM=y.
+This is version 6 of the generic PCI host controller series that has
+previously been posted here:
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+  v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-February/229679.html
+  v2: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-February/232213.html
+  v3: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-February/233491.html
+  v4: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-February/235468.html
+  v5: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/237540.html
+      http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/252915.html
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index db3c5414223e..860bea828ac4 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -314,6 +314,7 @@ config ARCH_MULTIPLATFORM
- 	select CLKSRC_OF
- 	select COMMON_CLK
- 	select GENERIC_CLOCKEVENTS
-+	select MIGHT_HAVE_PCI
- 	select MULTI_IRQ_HANDLER
- 	select SPARSE_IRQ
- 	select USE_OF
+Changes since v5 include:
+
+  - Moved most of ->setup() into ->probe() (via two new function calls)
+
+  - Improved cleanup (we can now rely on devm_* doing its job for us)
+
+  - Moved Kconfig option under ARCH_MULTIPLATFORM
+
+All feedback welcome.
+
+Cheers,
+
+Will
+
+
+Will Deacon (3):
+  ARM: kconfig: allow PCI support to be selected with ARCH_MULTIPLATFORM
+  PCI: ARM: add support for generic PCI host controller
+  MAINTAINERS: add entry for generic PCI host controller driver
+
+ .../devicetree/bindings/pci/host-generic-pci.txt   | 100 ++++++
+ MAINTAINERS                                        |   8 +
+ arch/arm/Kconfig                                   |   1 +
+ drivers/pci/host/Kconfig                           |   7 +
+ drivers/pci/host/Makefile                          |   1 +
+ drivers/pci/host/pci-host-generic.c                | 388 +++++++++++++++++++++
+ 6 files changed, 505 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/host-generic-pci.txt
+ create mode 100644 drivers/pci/host/pci-host-generic.c
+
 -- 
 1.9.2
