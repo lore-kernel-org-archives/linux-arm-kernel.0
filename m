@@ -1,28 +1,44 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 07 May 2014 17:35:54 -0600
-Subject: [PATCH] ARM: tegra: enable console framebuffer rotation
-In-Reply-To: <536AC45F.6080608@nvidia.com>
-References: <1399432682-677-1-git-send-email-acourbot@nvidia.com>
- <536A57FA.2090608@wwwdotorg.org> <536AC45F.6080608@nvidia.com>
-Message-ID: <536AC35A.3000103@wwwdotorg.org>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Thu, 08 May 2014 08:37:53 +0900
+Subject: [PATCH] ARM: shmobile: Minor cleanup of the Armadillo legacy board
+ code
+Message-ID: <20140507233753.29842.55463.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/07/2014 05:40 PM, Alex Courbot wrote:
-> On 05/08/2014 12:57 AM, Stephen Warren wrote:
->> On 05/06/2014 09:18 PM, Alexandre Courbot wrote:
->>> Console rotation is needed for devices like Tegra Note 7 and NVIDIA
->>> SHIELD to get the boot console in the expected orientation.
->>
->> I've squashed this into Tegra's for-3.16/defconfig branch.
->>
->> Can you please also update multi_v7_defconfig, and send that change to
->> arm-soc (arm at kernel.org) to be applied. Thanks.
-> 
-> I omitted doing this for now because the devices that require this
-> option (TN7/SHIELD) need a custom build with appended DTB and/or
-> command-line anyway. Therefore they cannot use a multi-mach kernel and
-> might as well be built against Tegra's defconfig. Does your remark above
-> still apply in spite of this?
+From: Magnus Damm <damm+renesas@opensource.se>
 
-Ah right, I guess we don't need it there then.
+Cleanup the legacy Armadillo board code slightly by
+removing the pointless eva_add_early_devices() function
+
+Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+---
+
+ Written against renesas-devel-v3.15-rc3-20140502
+
+ arch/arm/mach-shmobile/board-armadillo800eva.c |    7 +------
+ 1 file changed, 1 insertion(+), 6 deletions(-)
+
+--- 0001/arch/arm/mach-shmobile/board-armadillo800eva.c
++++ work/arch/arm/mach-shmobile/board-armadillo800eva.c	2014-04-24 18:11:16.000000000 +0900
+@@ -1300,11 +1300,6 @@ static void __init eva_earlytimer_init(v
+ 	eva_clock_init();
+ }
+ 
+-static void __init eva_add_early_devices(void)
+-{
+-	r8a7740_add_early_devices();
+-}
+-
+ #define RESCNT2 IOMEM(0xe6188020)
+ static void eva_restart(enum reboot_mode mode, const char *cmd)
+ {
+@@ -1319,7 +1314,7 @@ static const char *eva_boards_compat_dt[
+ 
+ DT_MACHINE_START(ARMADILLO800EVA_DT, "armadillo800eva")
+ 	.map_io		= r8a7740_map_io,
+-	.init_early	= eva_add_early_devices,
++	.init_early	= r8a7740_add_early_devices,
+ 	.init_irq	= r8a7740_init_irq_of,
+ 	.init_machine	= eva_init,
+ 	.init_late	= shmobile_init_late,
