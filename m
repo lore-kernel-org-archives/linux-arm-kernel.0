@@ -1,40 +1,50 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Wed,  7 May 2014 19:25:53 +0200
-Subject: [PATCH v2 6/7] clk: sunxi: document PRCM clock compatible strings
-In-Reply-To: <1399483554-8824-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1399483554-8824-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1399483554-8824-7-git-send-email-boris.brezillon@free-electrons.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed,  7 May 2014 19:45:48 +0200
+Subject: [PATCH] ARM: at91: sam9260: fix compilation issues
+Message-ID: <1399484748-32718-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document new compatible strings for clock provided by the PRCM
-(Power/Reset/Clock Management) unit.
+Use the hexadecimal values for the triggers to match what is done for the device
+tree. This also fixes compilation issues as the defines have been moved
+elsewhere.
 
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- Documentation/devicetree/bindings/clock/sunxi.txt | 4 ++++
- 1 file changed, 4 insertions(+)
+I believe that at some point, we may want to reintroduce defines for those
+values but we should probably do that in a dt-bindings include and choose better
+names as the meaning differ between SoCs.
 
-diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-index a5160d8..d154d9d 100644
---- a/Documentation/devicetree/bindings/clock/sunxi.txt
-+++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-@@ -20,12 +20,16 @@ Required properties:
- 	"allwinner,sun5i-a13-ahb-gates-clk" - for the AHB gates on A13
- 	"allwinner,sun5i-a10s-ahb-gates-clk" - for the AHB gates on A10s
- 	"allwinner,sun7i-a20-ahb-gates-clk" - for the AHB gates on A20
-+	"allwinner,sun6i-a31-ar100-clk" - for the AR100 on A31
-+	"allwinner,sun6i-a31-ahb0-clk" - for the AHB0 multiplexer on A31
- 	"allwinner,sun6i-a31-ahb1-mux-clk" - for the AHB1 multiplexer on A31
- 	"allwinner,sun6i-a31-ahb1-gates-clk" - for the AHB1 gates on A31
- 	"allwinner,sun4i-a10-apb0-clk" - for the APB0 clock
-+	"allwinner,sun6i-a31-apb0-clk" - for the APB0 clock on A31
- 	"allwinner,sun4i-a10-apb0-gates-clk" - for the APB0 gates on A10
- 	"allwinner,sun5i-a13-apb0-gates-clk" - for the APB0 gates on A13
- 	"allwinner,sun5i-a10s-apb0-gates-clk" - for the APB0 gates on A10s
-+	"allwinner,sun6i-a31-apb0-gates-clk" - for the APB0 gates on A31
- 	"allwinner,sun7i-a20-apb0-gates-clk" - for the APB0 gates on A20
- 	"allwinner,sun4i-a10-apb1-clk" - for the APB1 clock
- 	"allwinner,sun4i-a10-apb1-mux-clk" - for the APB1 clock muxing
+ arch/arm/mach-at91/at91sam9260_devices.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
+index fffcd09ac878..a8d0d9cb1bca 100644
+--- a/arch/arm/mach-at91/at91sam9260_devices.c
++++ b/arch/arm/mach-at91/at91sam9260_devices.c
+@@ -1307,19 +1307,19 @@ static struct platform_device at91_adc_device = {
+ static struct at91_adc_trigger at91_adc_triggers[] = {
+ 	[0] = {
+ 		.name = "timer-counter-0",
+-		.value = AT91_ADC_TRGSEL_TC0 | AT91_ADC_TRGEN,
++		.value = 0x1,
+ 	},
+ 	[1] = {
+ 		.name = "timer-counter-1",
+-		.value = AT91_ADC_TRGSEL_TC1 | AT91_ADC_TRGEN,
++		.value = 0x3,
+ 	},
+ 	[2] = {
+ 		.name = "timer-counter-2",
+-		.value = AT91_ADC_TRGSEL_TC2 | AT91_ADC_TRGEN,
++		.value = 0x5,
+ 	},
+ 	[3] = {
+ 		.name = "external",
+-		.value = AT91_ADC_TRGSEL_EXTERNAL | AT91_ADC_TRGEN,
++		.value = 0xd,
+ 		.is_external = true,
+ 	},
+ };
 -- 
-1.8.3.2
+1.9.1
