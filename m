@@ -1,92 +1,47 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Wed,  7 May 2014 12:28:10 +0200
-Subject: [PATCH v2] rtc: rtc-at91rm9200: fix uninterruptible wait for ACKUPD
-Message-ID: <1399458490-11870-1-git-send-email-boris.brezillon@free-electrons.com>
+From: pavel@denx.de (Pavel Machek)
+Date: Wed, 7 May 2014 12:45:18 +0200
+Subject: socfpga/sockit ethernet problems
+Message-ID: <20140507104518.GB18139@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rtc user must wait at least 1 sec between each time/calandar update
-(see atmel's datasheet chapter "Updating Time/Calendar").
+Hi!
 
-Use the SECEV interrupt (as suggested by the datasheet) to wait for the
-RTC to be ready for new updates.
+It seems we have some problems with Ethernet on socfpga boards.
 
-Cc: <stable@vger.kernel.org> # v3.10+
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-Reported-by: Bryan Evenson <bevenson@melinkcorp.com>
----
-Hello,
+Like, "stmmac: Energy-Efficient Ethernet initialized" repeated way too
+often. Or machine failing to boot because NFS server can not be
+accessed. (And then working on next try). Or link going up and down
+and up and down. Or link taking 3 seconds, 10 seconds to estabilish.
 
-This patch fixes a deadlock in an uninterruptible wait when the RTC is
-updated more than once every second.
-AFAICT the bug is here from the beginning, but I think we should at least
-backport this fix to 3.10 and the following longterm and stable releases.
+It also seems to be picky about hubs it wants to talk to.
 
-Best Regards,
+This time it mounted root; on last boot it just hung.
 
-Boris
+Mounts root 31.394855 Waiting 5 sec before mounting root device...
+Mounts root 33.331379 stmmaceth ff702000.ethernet eth0: Link is Up -
+100Mbps/Full - flow control rx/tx
+Mounts root 36.418308 VFS: Mounted root (nfs filesystem) on device
+0:12.
+### Milestone reached:  Mounts root
+Userland boots 51.455751 nfs: server 192.168.1.1 not responding, still
+trying
+Userland boots 52.552075 nfs: server 192.168.1.1 OK
+Userland boots 52.555110 devtmpfs: mounted
+Userland boots 52.566032 Freeing unused kernel memory: 264K (80597000
+- 805d9000)
+Userland boots 61.395175 nfs: server 192.168.1.1 not responding, still
+trying
+Userland boots 61.401301 nfs: server 192.168.1.1 OK
 
-Changes since v1:
-- disable SECEV interrupt when the RTC is ready to accept new time updates
+U-boot seems to configure phy timing:
 
- drivers/rtc/rtc-at91rm9200.c | 16 ++++++++++++++--
- 1 file changed, 14 insertions(+), 2 deletions(-)
+u-boot talk 12.033741 Configuring PHY skew timing for Micrel ksz9021
 
-diff --git a/drivers/rtc/rtc-at91rm9200.c b/drivers/rtc/rtc-at91rm9200.c
-index 3281c90..44fe83e 100644
---- a/drivers/rtc/rtc-at91rm9200.c
-+++ b/drivers/rtc/rtc-at91rm9200.c
-@@ -48,6 +48,7 @@ struct at91_rtc_config {
- 
- static const struct at91_rtc_config *at91_rtc_config;
- static DECLARE_COMPLETION(at91_rtc_updated);
-+static DECLARE_COMPLETION(at91_rtc_upd_rdy);
- static unsigned int at91_alarm_year = AT91_RTC_EPOCH;
- static void __iomem *at91_rtc_regs;
- static int irq;
-@@ -161,6 +162,8 @@ static int at91_rtc_settime(struct device *dev, struct rtc_time *tm)
- 		1900 + tm->tm_year, tm->tm_mon, tm->tm_mday,
- 		tm->tm_hour, tm->tm_min, tm->tm_sec);
- 
-+	wait_for_completion(&at91_rtc_upd_rdy);
-+
- 	/* Stop Time/Calendar from counting */
- 	cr = at91_rtc_read(AT91_RTC_CR);
- 	at91_rtc_write(AT91_RTC_CR, cr | AT91_RTC_UPDCAL | AT91_RTC_UPDTIM);
-@@ -183,7 +186,9 @@ static int at91_rtc_settime(struct device *dev, struct rtc_time *tm)
- 
- 	/* Restart Time/Calendar */
- 	cr = at91_rtc_read(AT91_RTC_CR);
-+	at91_rtc_write(AT91_RTC_SCCR, AT91_RTC_SECEV);
- 	at91_rtc_write(AT91_RTC_CR, cr & ~(AT91_RTC_UPDCAL | AT91_RTC_UPDTIM));
-+	at91_rtc_write_ier(AT91_RTC_SECEV);
- 
- 	return 0;
- }
-@@ -290,8 +295,10 @@ static irqreturn_t at91_rtc_interrupt(int irq, void *dev_id)
- 	if (rtsr) {		/* this interrupt is shared!  Is it ours? */
- 		if (rtsr & AT91_RTC_ALARM)
- 			events |= (RTC_AF | RTC_IRQF);
--		if (rtsr & AT91_RTC_SECEV)
--			events |= (RTC_UF | RTC_IRQF);
-+		if (rtsr & AT91_RTC_SECEV) {
-+			complete(&at91_rtc_upd_rdy);
-+			at91_rtc_write_idr(AT91_RTC_SECEV);
-+		}
- 		if (rtsr & AT91_RTC_ACKUPD)
- 			complete(&at91_rtc_updated);
- 
-@@ -413,6 +420,11 @@ static int __init at91_rtc_probe(struct platform_device *pdev)
- 		return PTR_ERR(rtc);
- 	platform_set_drvdata(pdev, rtc);
- 
-+	/* enable SECEV interrupt in order to initialize at91_rtc_upd_rdy
-+	 * completion.
-+	 */
-+	at91_rtc_write_ier(AT91_RTC_SECEV);
-+
- 	dev_info(&pdev->dev, "AT91 Real Time Clock driver.\n");
- 	return 0;
- }
+is there something similar that needs to be done at Linux layer.
+
+Any ideas? Thanks,
+									Pavel
 -- 
-1.8.3.2
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
