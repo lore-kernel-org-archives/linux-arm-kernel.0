@@ -1,35 +1,22 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 7 May 2014 08:15:10 +0200
-Subject: mx6qsabresd hangs on linux-next
-In-Reply-To: <20140507020950.GB2794@dragon>
-References: <CAOMZO5DMEqs=zzNGqgKjK7wTJdiNPgEqxsX=TtqKrnpLMzpbDw@mail.gmail.com>
- <20140506141310.GA2794@dragon>
- <CAOMZO5DH5d_L-deVu=XmBo9ekq+-g704p7cyayLvp=43bnEccQ@mail.gmail.com>
- <CAOMZO5Dx0JMj3dZ7BSgaYSZZ=ZKRqQHEYWj5sb6z_9jc+cpsEw@mail.gmail.com>
- <5369081D.5030400@st.com> <20140506200029.GD5858@pengutronix.de>
- <20140507020950.GB2794@dragon>
-Message-ID: <20140507061510.GE5858@pengutronix.de>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 7 May 2014 11:52:15 +0530
+Subject: [PATCH 1/4] dma: ste_dma40: Maintain spinlock order while
+ handling pause
+In-Reply-To: <1398282724-2607-1-git-send-email-ulf.hansson@linaro.org>
+References: <1398282724-2607-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <20140507062215.GH28638@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 07, 2014 at 10:09:51AM +0800, Shawn Guo wrote:
-> > Here when a table entry matches the input div this function will return
-> > exactly the input div. This means _next_div() will always return the
-> > same value and clk_divider_bestdiv() has an infinite loop:
-> > 
-> > 	for (i = 1; i <= maxdiv; i = _next_div(divider, i)) {
-> > 		...
-> > 	}
-> 
-> Hmmm, isn't the first thing that _next_div() does to increment the input
-> div?
+On Wed, Apr 23, 2014 at 09:52:01PM +0200, Ulf Hansson wrote:
+> The runtime PM resume callback needs to be executed while holding the
+> spinlock, make sure to maintain this for the pause operation as well.
 
-Sorry, yes. You're right.
+Applied, all thanks.
 
-Sascha
+Though we need to change the driver to use SET_LATE_SYSTEM_SLEEP_PM_OPS as
+all dmaengine drivers should suspend late as clients can be active while
+suspending
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+~Vinod
