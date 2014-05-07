@@ -1,75 +1,103 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 7 May 2014 14:55:36 +0200
-Subject: [PATCH v3 17/20] phy: Add support for USB cluster on the Armada
- 375 SoC
-In-Reply-To: <20140506205330.GA27308@arch.cereza>
-References: <1399335255-589-1-git-send-email-gregory.clement@free-electrons.com>
- <1399335255-589-18-git-send-email-gregory.clement@free-electrons.com>
- <20140506205330.GA27308@arch.cereza>
-Message-ID: <20140507145536.29003dfa@free-electrons.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 07 May 2014 06:01:31 -0700
+Subject: [RFC PATCH 1/5] watchdog: Add API to trigger reboots
+In-Reply-To: <1399463549.4536.10.camel@weser.hi.pengutronix.de>
+References: <1398958893-30049-1-git-send-email-linux@roeck-us.net>	
+ <1398958893-30049-2-git-send-email-linux@roeck-us.net>	
+ <20140503012243.GG4090@lukather> <20140503042925.GB5882@roeck-us.net>
+ <1399463549.4536.10.camel@weser.hi.pengutronix.de>
+Message-ID: <536A2EAB.4000605@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Ezequiel Garcia,
+On 05/07/2014 04:52 AM, Lucas Stach wrote:
+> Hi Guenter,
+>
+> Am Freitag, den 02.05.2014, 21:29 -0700 schrieb Guenter Roeck:
+>> On Fri, May 02, 2014 at 06:22:43PM -0700, Maxime Ripard wrote:
+>>> Hi Guenter,
+>>>
+>>> On Thu, May 01, 2014 at 08:41:29AM -0700, Guenter Roeck wrote:
+>>>> Some hardware implements reboot through its watchdog hardware,
+>>>> for example by triggering a watchdog timeout. Platform specific
+>>>> code starts to spread into watchdog drivers, typically by setting
+>>>> pointers to a callback functions which is then called from the
+>>>> platform reset handler.
+>>>>
+>>>> To simplify code and provide a unified API to trigger reboots by
+>>>> watchdog drivers, provide a single API to trigger such reboots
+>>>> through the watchdog subsystem.
+>>>>
+>>>> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+>>>> ---
+>>>>   drivers/watchdog/watchdog_core.c |   17 +++++++++++++++++
+>>>>   include/linux/watchdog.h         |   11 +++++++++++
+>>>>   2 files changed, 28 insertions(+)
+>>>>
+>>>> diff --git a/drivers/watchdog/watchdog_core.c b/drivers/watchdog/watchdog_core.c
+>>>> index cec9b55..4ec6e2f 100644
+>>>> --- a/drivers/watchdog/watchdog_core.c
+>>>> +++ b/drivers/watchdog/watchdog_core.c
+>>>> @@ -43,6 +43,17 @@
+>>>>   static DEFINE_IDA(watchdog_ida);
+>>>>   static struct class *watchdog_class;
+>>>>
+>>>> +static struct watchdog_device *wdd_reboot_dev;
+>>>> +
+>>>> +void watchdog_do_reboot(enum reboot_mode mode, const char *cmd)
+>>>> +{
+>>>> +	if (wdd_reboot_dev) {
+>>>> +		if (wdd_reboot_dev->ops->reboot)
+>>>> +			wdd_reboot_dev->ops->reboot(wdd_reboot_dev, mode, cmd);
+>>>> +	}
+>>>> +}
+>>>> +EXPORT_SYMBOL(watchdog_do_reboot);
+>>>> +
+>>>>   static void watchdog_check_min_max_timeout(struct watchdog_device *wdd)
+>>>>   {
+>>>>   	/*
+>>>> @@ -162,6 +173,9 @@ int watchdog_register_device(struct watchdog_device *wdd)
+>>>>   		return ret;
+>>>>   	}
+>>>>
+>>>> +	if (wdd->ops->reboot)
+>>>> +		wdd_reboot_dev = wdd;
+>>>> +
+>>>
+>>> Overall, it looks really great, but I guess we can make it a
+>>> list. Otherwise, we might end up in a situation where we could not
+>>> reboot anymore, like this one for example:
+>>>    - a first watchdog is probed, registers a reboot function
+>>>    - a second watchdog is probed, registers a reboot function that
+>>>      overwrites the first one.
+>>>    - then, the second watchdog disappears for some reason, and the
+>>>      reboot is set to NULL
+>>>
+>> I thought about that, but how likely (or unlikely) is that to ever happen ?
+>> So I figured it is not worth the effort, and would just add complexity without
+>> real gain. We could always add the list later if we ever encounter a situation
+>> where two watchdogs in the same system provide a reboot callback.
+>>
+>
+> While this is not directly related to the issue you are fixing with this
+> series, I would like to have it considered when talking about a watchdog
+> system reboot API.
+>
+> On i.MX we have the same situation where we have to reboot through the
+> SoC watchdog. This works, but may leave the external components of the
+> system (those not integrated in the SoC) in an undefined state. So if we
+> have a PMIC with integrated watchdog we would rather like to this one to
+> reboot the system, as it the reset is then much more closer to a
+> power-on-reset.
+>
+> This means we could have multiple watchdogs in the system, where we
+> really want a specific one (maybe designated through a DT property) to
+> do the reset. This isn't compatible with the "last watchdog that
+> registers a handler wins the system reset" logic in your patch.
+>
 
-On Tue, 6 May 2014 17:53:30 -0300, Ezequiel Garcia wrote:
+Wouldn't the order in which watchdogs are configured in dt define that ?
+The last one wins.
 
-> > +#define USB2_PHY_CONFIG_ENABLE BIT(0) /* active low */
-> > +
-> 
-> I still think it's more readable to use USB2_PHY_CONFIG_DISABLE.
-> It's just a nitpick, though.
-
-Yes, fixed.
-
-> > +static int armada375_usb_phy_probe(struct platform_device *pdev)
-> > +{
-> > +	struct device *dev = &pdev->dev;
-> > +	struct phy *phy;
-> > +	struct device_node *np = dev->of_node;
-> > +	struct phy_provider *phy_provider;
-> > +	void __iomem *usb_cluster_base;
-> > +	struct device_node *xhci_node;
-> > +	int i;
-> > +
-> > +	usb_cluster_base = of_iomap(np, 0);
-> > +	BUG_ON(!usb_cluster_base);
-> > +
-> 
-> Isn't a bit extreme to call BUG_ON (and thus bring down the whole system)
-> in a phy driver?
-
-Indeed, fixed by a more normal error return.
-
-> > +	for (i = 0; i < NB_PHY; i++) {
-> > +		phy = devm_phy_create(dev, &armada375_usb_phy_ops, NULL);
-> > +		if (IS_ERR(phy))
-> > +			dev_err(dev, "failed to create PHY n%d\n", i);
-> > +
-> 
-> I think you're missing a continue/break here.
-
-Indeed, fixed, I just do a return from the ->probe() function if
-creating the PHY fails.
-
-> > +MODULE_DESCRIPTION("Armada 375 USB cluster driver");
-> > +MODULE_AUTHOR("Gregory CLEMENT <gregory.clement@free-electrons.com>");
-> > +MODULE_LICENSE("GPL");
-> 
-> GPL v2 ?
-
-Well, using just "GPL" seems to be the more common usage through the
-kernel:
-
-linux/drivers $ git grep MODULE_LICENSE | grep "\"GPL\"" | wc -l
-4276
-linux/drivers $ git grep MODULE_LICENSE | grep "\"GPLv2\"" | wc -l
-5
-linux/drivers $ git grep MODULE_LICENSE | grep "\"GPL v2\"" | wc -l
-841
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Thanks,
+Guenter
