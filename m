@@ -1,35 +1,111 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 07 May 2014 09:43:29 -0600
-Subject: [PATCH v1 1/2] arm64: Fix machine_shutdown() definition
-In-Reply-To: <1399426883-13779-1-git-send-email-arunks.linux@gmail.com>
-References: <1399426883-13779-1-git-send-email-arunks.linux@gmail.com>
-Message-ID: <536A54A1.8060405@wwwdotorg.org>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 07 May 2014 17:49:14 +0200
+Subject: [RFC PATCH 1/5] watchdog: Add API to trigger reboots
+In-Reply-To: <536A2EAB.4000605@roeck-us.net>
+References: <1398958893-30049-1-git-send-email-linux@roeck-us.net>
+ <1398958893-30049-2-git-send-email-linux@roeck-us.net>
+ <20140503012243.GG4090@lukather> <20140503042925.GB5882@roeck-us.net>
+ <1399463549.4536.10.camel@weser.hi.pengutronix.de>
+ <536A2EAB.4000605@roeck-us.net>
+Message-ID: <1399477754.4536.13.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/06/2014 07:41 PM, arunks.linux at gmail.com wrote:
-> From: Arun KS <arun.linux@gmail.com>
+Am Mittwoch, den 07.05.2014, 06:01 -0700 schrieb Guenter Roeck:
+> On 05/07/2014 04:52 AM, Lucas Stach wrote:
+> > Hi Guenter,
+> >
+> > Am Freitag, den 02.05.2014, 21:29 -0700 schrieb Guenter Roeck:
+> >> On Fri, May 02, 2014 at 06:22:43PM -0700, Maxime Ripard wrote:
+> >>> Hi Guenter,
+> >>>
+> >>> On Thu, May 01, 2014 at 08:41:29AM -0700, Guenter Roeck wrote:
+> >>>> Some hardware implements reboot through its watchdog hardware,
+> >>>> for example by triggering a watchdog timeout. Platform specific
+> >>>> code starts to spread into watchdog drivers, typically by setting
+> >>>> pointers to a callback functions which is then called from the
+> >>>> platform reset handler.
+> >>>>
+> >>>> To simplify code and provide a unified API to trigger reboots by
+> >>>> watchdog drivers, provide a single API to trigger such reboots
+> >>>> through the watchdog subsystem.
+> >>>>
+> >>>> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+> >>>> ---
+> >>>>   drivers/watchdog/watchdog_core.c |   17 +++++++++++++++++
+> >>>>   include/linux/watchdog.h         |   11 +++++++++++
+> >>>>   2 files changed, 28 insertions(+)
+> >>>>
+> >>>> diff --git a/drivers/watchdog/watchdog_core.c b/drivers/watchdog/watchdog_core.c
+> >>>> index cec9b55..4ec6e2f 100644
+> >>>> --- a/drivers/watchdog/watchdog_core.c
+> >>>> +++ b/drivers/watchdog/watchdog_core.c
+> >>>> @@ -43,6 +43,17 @@
+> >>>>   static DEFINE_IDA(watchdog_ida);
+> >>>>   static struct class *watchdog_class;
+> >>>>
+> >>>> +static struct watchdog_device *wdd_reboot_dev;
+> >>>> +
+> >>>> +void watchdog_do_reboot(enum reboot_mode mode, const char *cmd)
+> >>>> +{
+> >>>> +	if (wdd_reboot_dev) {
+> >>>> +		if (wdd_reboot_dev->ops->reboot)
+> >>>> +			wdd_reboot_dev->ops->reboot(wdd_reboot_dev, mode, cmd);
+> >>>> +	}
+> >>>> +}
+> >>>> +EXPORT_SYMBOL(watchdog_do_reboot);
+> >>>> +
+> >>>>   static void watchdog_check_min_max_timeout(struct watchdog_device *wdd)
+> >>>>   {
+> >>>>   	/*
+> >>>> @@ -162,6 +173,9 @@ int watchdog_register_device(struct watchdog_device *wdd)
+> >>>>   		return ret;
+> >>>>   	}
+> >>>>
+> >>>> +	if (wdd->ops->reboot)
+> >>>> +		wdd_reboot_dev = wdd;
+> >>>> +
+> >>>
+> >>> Overall, it looks really great, but I guess we can make it a
+> >>> list. Otherwise, we might end up in a situation where we could not
+> >>> reboot anymore, like this one for example:
+> >>>    - a first watchdog is probed, registers a reboot function
+> >>>    - a second watchdog is probed, registers a reboot function that
+> >>>      overwrites the first one.
+> >>>    - then, the second watchdog disappears for some reason, and the
+> >>>      reboot is set to NULL
+> >>>
+> >> I thought about that, but how likely (or unlikely) is that to ever happen ?
+> >> So I figured it is not worth the effort, and would just add complexity without
+> >> real gain. We could always add the list later if we ever encounter a situation
+> >> where two watchdogs in the same system provide a reboot callback.
+> >>
+> >
+> > While this is not directly related to the issue you are fixing with this
+> > series, I would like to have it considered when talking about a watchdog
+> > system reboot API.
+> >
+> > On i.MX we have the same situation where we have to reboot through the
+> > SoC watchdog. This works, but may leave the external components of the
+> > system (those not integrated in the SoC) in an undefined state. So if we
+> > have a PMIC with integrated watchdog we would rather like to this one to
+> > reboot the system, as it the reset is then much more closer to a
+> > power-on-reset.
+> >
+> > This means we could have multiple watchdogs in the system, where we
+> > really want a specific one (maybe designated through a DT property) to
+> > do the reset. This isn't compatible with the "last watchdog that
+> > registers a handler wins the system reset" logic in your patch.
+> >
 > 
-> This patch ports most of commit 19ab428f4b79 "ARM: 7759/1: decouple CPU
-> offlining from reboot/shutdown" by Stephen Warren from arch/arm to
-> arch/arm64.
-> 
-> machine_shutdown() is a hook for kexec. Add a comment saying so, since
-> it isn't obvious from the function name.
-> 
-> Halt, power-off, and restart have different requirements re: stopping
-> secondary CPUs than kexec has. The former simply require the secondary
-> CPUs to be quiesced somehow, whereas kexec requires them to be
-> completely non-operational, so that no matter where the kexec target
-> images are written in RAM, they won't influence operation of the
-> secondary CPUS,which could happen if the CPUs were still executing some
-> kind of pin loop. To this end, modify machine_halt, power_off, and
-> restart to call smp_send_stop() directly, rather than calling
-> machine_shutdown().
-> 
-> In machine_shutdown(), replace the call to smp_send_stop() with a call
-> to disable_nonboot_cpus(). This completely disables all but one CPU,
-> thus satisfying the kexec requirements a couple paragraphs above.
+> Wouldn't the order in which watchdogs are configured in dt define that ?
+> The last one wins.
 
-I assume the code changes apply equally well to arm64 so,
-Acked-by: Stephen Warren <swarren@nvidia.com>
+That sounds rather fragile to me. I would like to have a more explicit
+property to control this behavior.
+
+Regards,
+Lucas
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
