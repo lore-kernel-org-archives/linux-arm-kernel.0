@@ -1,30 +1,45 @@
-From: jsm@jsolano.com (Juan Solano)
-Date: Wed,  7 May 2014 17:09:59 +0200
-Subject: [PATCH] ARM: i.MX27 pca100: remove deprecated IRQF_DISABLED
-Message-ID: <1399475399-8770-1-git-send-email-jsm@jsolano.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 7 May 2014 17:14:56 +0200
+Subject: [PATCH v3 06/20] usb: host: xhci-plat: Add support for the
+ Armada 38x
+In-Reply-To: <20140507151008.GD769@saruman.home>
+References: <1399335255-589-1-git-send-email-gregory.clement@free-electrons.com>
+ <1399335255-589-7-git-send-email-gregory.clement@free-electrons.com>
+ <20140506153953.GF25849@saruman.home>
+ <20140507122326.54f3febc@free-electrons.com>
+ <20140507151008.GD769@saruman.home>
+Message-ID: <20140507171456.3124ec71@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This flag is a NOOP and can be removed now.
+Dear Felipe Balbi,
 
-Signed-off-by: Juan Solano <jsm@jsolano.com>
----
- arch/arm/mach-imx/mach-pca100.c |    3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+On Wed, 7 May 2014 10:10:08 -0500, Felipe Balbi wrote:
 
-diff --git a/arch/arm/mach-imx/mach-pca100.c b/arch/arm/mach-imx/mach-pca100.c
-index bf3ac51..20e7c33 100644
---- a/arch/arm/mach-imx/mach-pca100.c
-+++ b/arch/arm/mach-imx/mach-pca100.c
-@@ -245,8 +245,7 @@ static int pca100_sdhc2_init(struct device *dev, irq_handler_t detect_irq,
- 	int ret;
- 
- 	ret = request_irq(gpio_to_irq(IMX_GPIO_NR(3, 29)), detect_irq,
--			  IRQF_DISABLED | IRQF_TRIGGER_FALLING,
--			  "imx-mmc-detect", data);
-+			  IRQF_TRIGGER_FALLING, "imx-mmc-detect", data);
- 	if (ret)
- 		printk(KERN_ERR
- 			"pca100: Failed to request irq for sd/mmc detection\n");
+> > ifneq ($(CONFIG_USB_XHCI_MVEBU), )
+> > 	xhci-hcd-y += xhci-mvebu.o
+> > endif
+> > 
+> > Right?
+> 
+> correct :-)
+> 
+> > If so, then what about instead making CONFIG_USB_XHCI_MVEBU a bool
+> > instead of a tristate? It's more an option for the xhci-platform
+> > driver than an additional separate module, IMO. What do you think?
+> 
+> fine by me too. It simply adds a quirk callback to xhci-plat.
+
+In the end, I settled on keeping the tristate, and used your
+suggestion. Because since xhci-plat itself is a blind option, and
+xhci-mvebu selects it, if xhci-mvebu is a bool, there would no longer
+be a way to have xhci-plat as a module. At least that's my
+understanding of the kconfig stuff :)
+
+Thanks!
+
+Thomas
 -- 
-1.7.9.5
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
