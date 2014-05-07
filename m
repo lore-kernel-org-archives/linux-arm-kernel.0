@@ -1,69 +1,106 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Wed, 7 May 2014 09:35:20 +0530
-Subject: [PATCH v2 1/2] ARM: EXYNOS: Map SYSRAM through generic SRAM
- bindings
-In-Reply-To: <CAK9yfHz6PVT2C-TZkFHqtdj4rT-R8w+aU=jTTnLMF5k4JOXGxg@mail.gmail.com>
-References: <1399363824-23543-1-git-send-email-sachin.kamat@linaro.org>
- <53691187.80101@gmail.com>
- <CAK9yfHz6PVT2C-TZkFHqtdj4rT-R8w+aU=jTTnLMF5k4JOXGxg@mail.gmail.com>
-Message-ID: <CAK9yfHwXC1rc71-GiP3JxF2hpQGkA-GVv-1=MT9+GsA+Vq3o4w@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue,  6 May 2014 22:50:23 -0500
+Subject: [PATCH 7/7] ARM: sunxi: dt: add APP4-EVB1 board support
+In-Reply-To: <1399434623-20383-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1399434623-20383-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1399434623-20383-8-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+From: Boris BREZILLON <boris.brezillon@free-electrons.com>
 
-On 6 May 2014 23:39, Sachin Kamat <sachin.kamat@linaro.org> wrote:
-> Hi Tomasz,
->
-> On 6 May 2014 22:14, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->> Hi Sachin,
->>
->> Thanks for addressing the comments. I need to verify few things on Universal
->> C210 board first, before I could give my Reviewed-by tag or further
->> comments.
->>
->> I also have some general comments that I missed before, due to limited time
->> for review. Please see inline.
->
-> Thanks for your review.
->
->>
->>
->> On 06.05.2014 10:10, Sachin Kamat wrote:
->>>
->>> Instead of hardcoding the SYSRAM details for each SoC,
->>> pass this information through device tree (DT) and make
->>> the code SoC agnostic. Generic SRAM bindings are used
->>> for achieving this.
->>>
->>> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
->>> Acked-by: Arnd Bergmann <arnd@arndb.de>
->>> Acked-by: Heiko Stuebner <heiko@sntech.de>
->>> ---
-[snip]
+The APP4 EVB1 development boards embeds an A31, together with some NAND, one SD
+card slot, and one SDIO + UART WiFi and Bluetooth chip, a few I2C buses, USB,
+and a LCD display.
 
->>>
->>>   static int exynos_set_cpu_boot_addr(int cpu, unsigned long boot_addr)
->>>   {
->>> -       void __iomem *boot_reg = S5P_VA_SYSRAM_NS + 0x1c + 4*cpu;
->>> +       void __iomem *boot_reg;
->>> +
->>> +       if (!sram_ns_base_addr)
->>> +               return 0;
->>
->>
->> Shouldn't this return an error instead? I'm not sure which one would be
->> appropriate, though, probably one of -ENODEV, -ENXIO or -EFAULT.
->
-> IIRC, returning error here causes the system to hang and even primary
-> cpu does not boot.
-> Since any error or absence of sram nodes should atleast boot the
-> primary CPU, I thought
-> this is better.
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/Makefile                |  1 +
+ arch/arm/boot/dts/sun6i-a31-app4-evb1.dts | 63 +++++++++++++++++++++++++++++++
+ 2 files changed, 64 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
 
-Small correction. The above explanation was for the absence of the check.
-Sorry about the confusion. Will add -ENODEV here.
-
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index ffa3f5ef27d3..d50c0895a9d5 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -343,6 +343,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += \
+ 	sun5i-a10s-olinuxino-micro.dtb \
+ 	sun5i-a13-olinuxino.dtb \
+ 	sun5i-a13-olinuxino-micro.dtb \
++	sun6i-a31-app4-evb1.dtb \
+ 	sun6i-a31-colombus.dtb \
+ 	sun6i-a31-m9.dtb \
+ 	sun7i-a20-cubieboard2.dtb \
+diff --git a/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts b/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
+new file mode 100644
+index 000000000000..270ab978f858
+--- /dev/null
++++ b/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
+@@ -0,0 +1,63 @@
++/*
++ * Copyright 2014 Boris Brezillon
++ *
++ * Boris Brezillon <boris.brezillon@free-electrons.com>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/dts-v1/;
++/include/ "sun6i-a31.dtsi"
++
++/ {
++	model = "Allwinner A31 APP4 EVB1 Evaluation Board";
++	compatible = "allwinner,app4-evb1", "allwinner,sun6i-a31";
++
++	chosen {
++		bootargs = "earlyprintk console=ttyS0,115200";
++	};
++
++	soc at 01c00000 {
++		pio: pinctrl at 01c20800 {
++			usb1_vbus_pin_a: usb1_vbus_pin at 0 {
++				allwinner,pins = "PH27";
++				allwinner,function = "gpio_out";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
++		};
++
++		usbphy: phy at 01c19400 {
++			usb1_vbus-supply = <&reg_usb1_vbus>;
++			status = "okay";
++		};
++
++		ehci0: usb at 01c1a000 {
++			status = "okay";
++		};
++
++		uart0: serial at 01c28000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&uart0_pins_a>;
++			status = "okay";
++		};
++	};
++
++	reg_usb1_vbus: usb1-vbus {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&usb1_vbus_pin_a>;
++		regulator-name = "usb1-vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		enable-active-high;
++		gpio = <&pio 7 27 0>;
++		status = "okay";
++	};
++
++};
 -- 
-With warm regards,
-Sachin
+1.9.1
