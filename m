@@ -1,57 +1,44 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Wed,  7 May 2014 22:44:40 +0800
-Subject: [PATCH v5 06/14] ARM: mcpm: support 4 clusters
-In-Reply-To: <1399473888-12947-1-git-send-email-haojian.zhuang@linaro.org>
-References: <1399473888-12947-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1399473888-12947-7-git-send-email-haojian.zhuang@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 7 May 2014 15:45:54 +0100
+Subject: [PATCH resend 00/15] arm64 crypto roundup
+In-Reply-To: <1398959381-8126-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1398959381-8126-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20140507144554.GC17253@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the CONFIG_MCPM_QUAD_CLUSTER configuration to enlarge cluster number
-from 2 to 4.
+On Thu, May 01, 2014 at 04:49:32PM +0100, Ard Biesheuvel wrote:
+> This is a repost of the arm64 crypto patches that I have posted to the LAKML
+> over the past months. They have now been verified on actual hardware
+> (Cortex-A57) so if there are no remaining issues I would like to propose them
+> for 3.16.
+> 
+> Ard Biesheuvel (15):
+>   asm-generic: allow generic unaligned access if the arch supports it
+>   arm64: add abstractions for FPSIMD state manipulation
+>   arm64: defer reloading a task's FPSIMD state to userland resume
+>   arm64: add support for kernel mode NEON in interrupt context
+>   arm64/crypto: SHA-1 using ARMv8 Crypto Extensions
+>   arm64/crypto: SHA-224/SHA-256 using ARMv8 Crypto Extensions
+>   arm64/crypto: GHASH secure hash using ARMv8 Crypto Extensions
+>   arm64/crypto: AES using ARMv8 Crypto Extensions
+>   arm64/crypto: AES in CCM mode using ARMv8 Crypto Extensions
+>   arm64: pull in <asm/simd.h> from asm-generic
+>   arm64/crypto: AES-ECB/CBC/CTR/XTS using ARMv8 NEON and Crypto
+>     Extensions
+>   arm64/crypto: add shared macro to test for NEED_RESCHED
+>   arm64/crypto: add voluntary preemption to Crypto Extensions SHA1
+>   arm64/crypto: add voluntary preemption to Crypto Extensions SHA2
+>   arm64/crypto: add voluntary preemption to Crypto Extensions GHASH
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
----
- arch/arm/Kconfig            | 9 +++++++++
- arch/arm/include/asm/mcpm.h | 5 +++++
- 2 files changed, 14 insertions(+)
+There are about 5 patches that make sense to me ;) and apart from a few
+minor comments they look fine.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 0e52a2c..624829f 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1575,6 +1575,15 @@ config MCPM
- 	  for (multi-)cluster based systems, such as big.LITTLE based
- 	  systems.
- 
-+config MCPM_QUAD_CLUSTER
-+	bool "Enable Quad clusters in MCPM"
-+	depends on MCPM
-+	help
-+	  To avoid wasting resources unnecessarily, MCPM only supports up
-+	  to 2 clusters by default.
-+	  Platforms with 3 or 4 clusters that use MCPM must select this
-+	  option to allow the additional clusters to be managed.
-+
- config BIG_LITTLE
- 	bool "big.LITTLE support (Experimental)"
- 	depends on CPU_V7 && SMP
-diff --git a/arch/arm/include/asm/mcpm.h b/arch/arm/include/asm/mcpm.h
-index 608516e..fc8d70d 100644
---- a/arch/arm/include/asm/mcpm.h
-+++ b/arch/arm/include/asm/mcpm.h
-@@ -20,7 +20,12 @@
-  * to consider dynamic allocation.
-  */
- #define MAX_CPUS_PER_CLUSTER	4
-+
-+#ifdef CONFIG_MCPM_QUAD_CLUSTER
-+#define MAX_NR_CLUSTERS		4
-+#else
- #define MAX_NR_CLUSTERS		2
-+#endif
- 
- #ifndef __ASSEMBLY__
- 
+There are the other 10 crypto patches that are beyond my knowledge. Do
+you know anyone who could do a sanity check on them? Are there any tests
+that would show the correctness of the implementation?
+
+Thanks.
+
 -- 
-1.9.1
+Catalin
