@@ -1,24 +1,18 @@
 From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Wed, 7 May 2014 19:06:45 +0530
-Subject: [PATCH 3/5] ARM: dts: enable dp-controller for exynos5250 based
- snow board
-In-Reply-To: <1397994525-18537-4-git-send-email-rahul.sharma@samsung.com>
+Date: Wed, 7 May 2014 19:11:36 +0530
+Subject: [PATCH 5/5] ARM: dts: enable dp-controller for exynos5420 based
+ peach-pit board
+In-Reply-To: <1397994525-18537-6-git-send-email-rahul.sharma@samsung.com>
 References: <1397994525-18537-1-git-send-email-rahul.sharma@samsung.com>
- <1397994525-18537-4-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <CAPdUM4PLdY+qQF3zs2CYF9SP8E2W4sDESD6jYD9uF+WwhVX3pg@mail.gmail.com>
+ <1397994525-18537-6-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <CAPdUM4PZLAOfdtH8xO9C4x0CKhWmX2PstqNkAE2cffTnn45VfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Kukjin,
 
-The only dependency for this patch is new property "samsung,hpd-gpio" which
-is acked by Jingoo Han, Maintainer, exynos DP at
-http://oascentral.opensubscriber.com/message/dri-devel at lists.freedesktop.org/17150750.html.
-
-All remaining properties are as per existing DT bindings.
-
-@Jingoo, I want to request you to review the dp-controller nodes for
-exynos5420 and 5250.
+I have same update for this patch. The new DT property is Acked at
+http://oascentral.opensubscriber.com/message/dri-devel at lists.freedesktop.org/17150750.html
 
 Please consider it for merge.
 
@@ -28,19 +22,33 @@ Rahul Sharma.
 On 20 April 2014 17:18, Rahul Sharma <rahul.sharma@samsung.com> wrote:
 > From: Rahul Sharma <Rahul.Sharma@samsung.com>
 >
-> Ennable dp-controller for snow board.
+> Enable dp-controller for peach-pit board.
 >
 > Signed-off-by: Rahul Sharma <Rahul.Sharma@samsung.com>
 > ---
->  arch/arm/boot/dts/exynos5250-snow.dts |   27 +++++++++++++++++++++++++++
->  1 file changed, 27 insertions(+)
+>  arch/arm/boot/dts/exynos5420-peach-pit.dts |   34 ++++++++++++++++++++++++++++
+>  1 file changed, 34 insertions(+)
 >
-> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-> index 09f363d..60cc2a8 100644
-> --- a/arch/arm/boot/dts/exynos5250-snow.dts
-> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
-> @@ -344,6 +344,33 @@
+> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> index d6eaa1f..e6199e1 100644
+> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> @@ -61,6 +61,13 @@
+>                         samsung,pin-pud = <1>;
+>                         samsung,pin-drv = <0>;
 >                 };
+> +
+> +               dp_hpd: dp_hpd {
+> +                       samsung,pins = "gpx2-6";
+> +                       samsung,pin-function = <0>;
+> +                       samsung,pin-pud = <3>;
+> +                       samsung,pin-drv = <0>;
+> +               };
+>         };
+>
+>         pinctrl at 14010000 {
+> @@ -249,6 +256,33 @@
+>                 status = "okay";
 >         };
 >
 > +       dp-controller at 145B0000 {
@@ -51,9 +59,9 @@ On 20 April 2014 17:18, Rahul Sharma <rahul.sharma@samsung.com> wrote:
 > +               samsung,dynamic-range = <0>;
 > +               samsung,ycbcr-coeff = <0>;
 > +               samsung,color-depth = <1>;
-> +               samsung,link-rate = <0x0a>;
+> +               samsung,link-rate = <0x06>;
 > +               samsung,lane-count = <2>;
-> +               samsung,hpd-gpio = <&gpx0 7 0>;
+> +               samsung,hpd-gpio = <&gpx2 6 0>;
 > +               display-timings {
 > +                       native-mode = <&timing1>;
 > +                       timing1: timing at 1 {
