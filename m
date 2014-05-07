@@ -1,122 +1,169 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Wed, 7 May 2014 10:19:19 +0200
-Subject: [linux-sunxi] Re: [PATCH 0/2] ARM: sunxi: Enable syscon for the
- system controller
-In-Reply-To: <20140507032502.GM9464@lukather>
-References: <1399212160-26934-1-git-send-email-carlo@caione.org>
- <20140505225517.GE9464@lukather>
- <CAGb2v66JBM_Rv8ie=7iuTPrXGPJECTeevnf9LLXNS=FSYs1+Tg@mail.gmail.com>
- <CAOQ7t2akOEr7o4Q5ze5QPr_RHj6MWmA-u5NTuq2q1epy2LBr8w@mail.gmail.com>
- <20140507032502.GM9464@lukather>
-Message-ID: <CAOQ7t2byRX3HmVjUKYZ-VEocR3S2ATLpSTPV8bdFD98_Q2sY9Q@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 7 May 2014 13:51:57 +0530
+Subject: [PATCH 05/17] pci: host: pcie-dra7xx: add support for pcie-dra7xx
+ controller
+In-Reply-To: <201405061544.28738.marex@denx.de>
+References: <1399383244-14556-1-git-send-email-kishon@ti.com>
+ <1399383244-14556-6-git-send-email-kishon@ti.com>
+ <201405061544.28738.marex@denx.de>
+Message-ID: <5369ED25.70101@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 7, 2014 at 5:25 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Tue, May 06, 2014 at 10:03:19AM +0200, Carlo Caione wrote:
->> On Tue, May 6, 2014 at 8:36 AM, Chen-Yu Tsai <wens@csie.org> wrote:
->> > Hi,
->>
->> Hi,
->>
->> > On Tue, May 6, 2014 at 6:55 AM, Maxime Ripard
->> > <maxime.ripard@free-electrons.com> wrote:
->> >> On Sun, May 04, 2014 at 04:02:38PM +0200, Carlo Caione wrote:
->> >>> The so called "system controller" in Allwinner A20 and A31 SoCs is
->> >>> multi-purpose controller that tries to add misc functionality to one
->> >>> memory region.
->> >>> In these SoCs it controls the internal SRAM partitioning but it also
->> >>> includes registers for chip versioning and NMI control.
->> >>> This patch adds the proper nodes in the DTS files and enable the syscon
->> >>> in the defconfig files.
->> >>>
->> >>> Even though the system controller includes also register for managing the
->> >>> NMI controller, these register are not mapped in the syscon since they
->> >>> are directly used and mapped by the NMI controller itself.
->> >>
->> >> Hmmm, what exactly do you want to achieve with this?
->> >>
->> >> The NMI controller won't be able to use it, since it's initialized
->> >> much earlier than syscon and regmap.
->>
->> This is what I meant with that phrase. NMI controller doesn't use the
->> syscon but we can use it for several other drivers.
->
-> I'm sorry, but I believe this should be more handled by the soon-to-be
-> drivers/soc "framework".
+Hi,
 
-Oh, didn't know of this framework. Is it supposed to replace syscon?
+On Tuesday 06 May 2014 07:14 PM, Marek Vasut wrote:
+> On Tuesday, May 06, 2014 at 03:33:51 PM, Kishon Vijay Abraham I wrote:
+>> Added support for pcie controller in dra7xx. This driver re-uses
+>> the designware core code that is already present in kernel.
+> 
+> [...]
+> 
+>> +#define to_dra7xx_pcie(x)	container_of((x), struct dra7xx_pcie, pp)
+>> +
+>> +static inline u32 dra7xx_pcie_readl(void __iomem *base, u32 offset)
+> 
+> Just pass struct dra7xx_pcie * instead of *base here , it will make the code 
+> below shorter.
+> 
+>> +{
+>> +	return readl(base + offset);
+>> +}
+>> +
+>> +static inline void dra7xx_pcie_writel(void __iomem *base, u32 offset, u32
+>> value) +{
+> 
+> DTTO.
+> 
+>> +	writel(value, base + offset);
+>> +}
+>> +
+>> +static int dra7xx_pcie_link_up(struct pcie_port *pp)
+>> +{
+>> +	struct dra7xx_pcie *dra7xx = to_dra7xx_pcie(pp);
+>> +	u32 reg = dra7xx_pcie_readl(dra7xx->base, PCIECTRL_DRA7XX_CONF_PHY_CS);
+>> +
+>> +	if (reg & LINK_UP)
+>> +		return true;
+>> +	return false;
+> 
+> return reg & LINK_UP;
+> 
+>> +}
+>> +
+>> +static int dra7xx_pcie_establish_link(struct pcie_port *pp)
+>> +{
+>> +	u32 reg;
+>> +	int retries = 1000;
+>> +	struct dra7xx_pcie *dra7xx = to_dra7xx_pcie(pp);
+>> +
+>> +	if (dw_pcie_link_up(pp)) {
+>> +		dev_err(pp->dev, "link is already up\n");
+> 
+> This will spew, since the .link_up (and thus this function) can be called 
+> repeatedly. The subsystem will query if the link is up via this function.
 
->> In fact the registers for NMI controller are excluded from the range
->> of syscon registers.
->
-> Then you are lying in the DT :)
+*dra7xx_pcie_establish_link* is not the callback for link_up function, so it's
+actually called only once.
+> 
+>> +		return 0;
+>> +	}
+>> +
+>> +	reg = dra7xx_pcie_readl(dra7xx->base, PCIECTRL_DRA7XX_CONF_DEVICE_CMD);
+>> +	reg |= LTSSM_EN;
+>> +	dra7xx_pcie_writel(dra7xx->base, PCIECTRL_DRA7XX_CONF_DEVICE_CMD, reg);
+>> +
+>> +	while (--retries) {
+> 
+> Use retries--
+> 
+>> +		reg = dra7xx_pcie_readl(dra7xx->base,
+>> +					PCIECTRL_DRA7XX_CONF_PHY_CS);
+>> +		if (reg & LINK_UP)
+>> +			break;
+>> +		usleep_range(10, 20);
+>> +	}
+>> +
+>> +	if (retries <= 0) {
+> 
+> Then check if retries == 0 and retries can be unsigned int.
+> 
+>> +		dev_err(pp->dev, "link is not up\n");
+>> +		return -ETIMEDOUT;
+>> +	}
+>> +
+>> +	return 0;
+>> +}
+> [...]
+>> +static int __init dra7xx_pcie_probe(struct platform_device *pdev)
+>> +{
+>> +	u32 reg;
+>> +	int ret;
+>> +	int irq;
+>> +	struct phy *phy;
+>> +	void __iomem *base;
+>> +	struct resource *res;
+>> +	struct dra7xx_pcie *dra7xx;
+>> +	struct device *dev = &pdev->dev;
+>> +
+>> +	dra7xx = devm_kzalloc(&pdev->dev, sizeof(*dra7xx), GFP_KERNEL);
+>> +	if (!dra7xx)
+>> +		return -ENOMEM;
+>> +
+>> +	irq = platform_get_irq(pdev, 0);
+>> +	if (irq < 0) {
+>> +		dev_err(dev, "missing IRQ resource\n");
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	ret = devm_request_irq(&pdev->dev, irq, dra7xx_pcie_irq_handler,
+>> +			       IRQF_SHARED, "dra7xx-pcie-main", dra7xx);
+>> +	if (ret) {
+>> +		dev_err(&pdev->dev, "failed to request irq\n");
+>> +		return ret;
+>> +	}
+>> +
+>> +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "ti_conf");
+>> +	base = devm_ioremap_nocache(dev, res->start, resource_size(res));
+>> +	if (!base)
+>> +		return -ENOMEM;
+>> +
+>> +	phy = devm_phy_get(dev, "pcie-phy");
+>> +	if (IS_ERR(phy))
+>> +		return PTR_ERR(phy);
+>> +
+>> +	ret = phy_init(phy);
+>> +	if (ret < 0)
+>> +		return ret;
+>> +
+>> +	ret = phy_power_on(phy);
+>> +	if (ret < 0)
+>> +		goto err_power_on;
+>> +
+>> +	dra7xx->base = base;
+>> +	dra7xx->phy = phy;
+>> +	dra7xx->dev = dev;
+>> +
+>> +	pm_runtime_enable(&pdev->dev);
+>> +	ret = pm_runtime_get_sync(&pdev->dev);
+>> +	if (IS_ERR_VALUE(ret)) {
+>> +		dev_err(dev, "pm_runtime_get_sync failed\n");
+>> +		goto err_runtime_get;
+>> +	}
+>> +
+>> +	reg = dra7xx_pcie_readl(dra7xx->base, PCIECTRL_DRA7XX_CONF_DEVICE_CMD);
+>> +	reg &= ~LTSSM_EN;
+>> +	dra7xx_pcie_writel(dra7xx->base, PCIECTRL_DRA7XX_CONF_DEVICE_CMD, reg);
+> 
+> platform_set_drvdata() should be here, before you add the port.
+> 
+>> +	ret = add_pcie_port(dra7xx, pdev);
+>> +	if (ret < 0)
+>> +		goto err_add_port;
+>> +
+>> +	platform_set_drvdata(pdev, dra7xx);
 
-Uhm, in DT I have:
+Al-right. Will fix this and all your other comments.
 
-reg = <0x01c00000 0x27>;
-
-that is I'm mapping the first three registers: SRAM_CTRL_REG0,
-SRAM_CTRL_REG1, VER_REG, leaving out the three register (from offset
-0x30) of the NMI controller.
-I'm not lying :)
-
->> > I believe this will be used for toggling the SRAM mappings. (Am I right?)
->>
->> Definitely right.
->>
->> > The second register toggles mappings for MUSB FIFO, EMAC, and a few of
->> > the other IP blocks we currently don't support.
->>
->> Not yet :)
->
-> I wonder how other SoCs are actually handling this mapping between CPU
-> & DMA vs device of some SRAMs. Did you look at this?
-
-It seems quite a few grepping for syscon
-
->> >> Moreover, the A31 doesn't seem to have this system controller, or at
->> >> least this overlap.
->>
->> I admit that I didn't check the A31 manual but I trusted the wiki page
->> at http://linux-sunxi.org/SRAM_Controller and
->> http://linux-sunxi.org/A31/Memory_map
->>
->> > There should be something similar, as does the A23. There is no overlap AFAIK.
->>
->> I agree and will check also A23.
->>
->> >> And since on the A20, registers seem to have one usage only, so I
->> >> guess we can just split this IP into several nodes, just like we did
->> >> with the NMI.
->> >
->> > As stated above, the second register toggles SRAM mappings for at most
->> > 4 SRAM blocks (for EMAC, MUSB, ACE, ISP).
->> >
->> > syscon would be a good way to share this register among the various drivers.
->> > We do not toggle it in the current EMAC driver. The driver seems to assume
->> > it is setup by the bootloader, and on the A20, it seems to be mapped to
->> > EMAC by default.
->> >
->> > The MUSB glue layer driver must toggle this.
->>
->> This is exactly why I wrote these patches. I started hacking /
->> studying your MUSB driver and I think that using syscon is a better
->> way to manage these registers instead of mapping them in several
->> drivers also because most of the time a single register has to be used
->> by multiple drivers (i.e. SRAM_CTL1_CFG is used for USB,  EMAC,
->> etc...)
->>
->> > I think this approach is better than all the individual drivers mapping
->> > the registers and toggling a single bit. In fact I did something similar
->> > when working on preliminary musb support.
->
-> I agree with that.
-
-So do you suggest to drop the syscon idea waiting for the new soc framework?
-
-Thanks,
-
--- 
-Carlo Caione
+Thanks
+Kishon
