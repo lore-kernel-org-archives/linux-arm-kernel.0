@@ -1,30 +1,61 @@
-From: jean.pihet@linaro.org (Jean Pihet)
-Date: Wed, 7 May 2014 11:52:05 +0200
-Subject: [PATCH 3/3] perf tools: Add libdw DWARF post unwind support for
- ARM
-In-Reply-To: <20140506175616.GH13677@arm.com>
-References: <1399389979-11279-1-git-send-email-jean.pihet@linaro.org>
- <1399389979-11279-4-git-send-email-jean.pihet@linaro.org>
- <20140506175616.GH13677@arm.com>
-Message-ID: <CAFrcx1=aS+dmM05Zk_ioL_0vE+ot+9=LJ=WsmExRtDyZgMtetA@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed,  7 May 2014 10:51:55 +0100
+Subject: [PATCH 0/2] arm: alignment trap tweaks
+Message-ID: <cover.1399028497.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 May 2014 19:56, Will Deacon <will.deacon@arm.com> wrote:
-> On Tue, May 06, 2014 at 04:26:19PM +0100, Jean Pihet wrote:
->> Adding libdw DWARF post unwind support, which is part
->> of elfutils-devel/libdw-dev package from version 0.158.
->>
->> The new code is contained in unwin-libdw.c object, and
->> implements unwind__get_entries unwind interface function.
->
->   Reviewed-by: Will Deacon <will.deacon@arm.com>
+Hi all,
 
-Ok, thx!
+Revisiting the alignment trap again thanks to an obscure corner case
+with NEON alignment hints - patch 1 is a repost from a while back as a
+ping, because modern userspaces really should just get a resounding
+"Don't do that!" if they manage to step outside the architecture.
+Patch 2 is the fix for cases where fixup does need to be turned back on
+for whatever reason.
 
-Jiri, Arnaldo,
-Can you take the series for ARM and ARM64?
+The following testcase compiled with -marm illustrates the problem:
+with fixup enabled, when the VLD1 instruction with the alignment hint
+set faults by performing a misaligned access, it fails to load the NEON
+registers as expected and eventually writes back nonsense to the base
+register, resulting in a misleading segfault on the next iteration.
 
-Jean
->
-> Will
+--->8---
+
+#include <stdint.h>
+#include <stdio.h>
+
+static uint8_t buffer[256], got[256];
+
+int main() {
+	uint8_t *base = (uint8_t *)((intptr_t)buffer + 0x7 & ~0x7);
+	void *p = base, *q = got;
+	int i;
+
+	for (i=0; i<64; i++)
+		base[i] = i;
+	for (i=0; i<4; i++) {
+		asm volatile ("vld1.8 {d0,d1}, [%0]\n vst1.8 {d0,d1}, [%1]\n"
+				: "=r"(p),"=r"(q) : "0"(p),"1"(q) : "d0","d1");
+		printf("unaligned: %p [%d,%d,%d,...]\n", p++, got[0], got[1], got[2]);
+	}
+	p = base;
+	for (i=0; i<4; i++) {
+		asm volatile ("vld1.8 {d0,d1}, [%0:64]\n vst1.8 {d0,d1}, [%1]\n"
+				: "=r"(p),"=r"(q) : "0"(p),"1"(q) : "d0","d1");
+		printf("misaligned: %p [%d,%d,%d,...]\n", p++, got[0], got[1], got[2]);
+	}
+	return 0;
+}
+
+--->8---
+
+Robin Murphy (2):
+  arm: SIGBUS on unsupported ARMv6 unaligned accesses
+  arm: don't break misaligned NEON load/store
+
+ arch/arm/mm/alignment.c |    9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+--
+1.7.9.5
