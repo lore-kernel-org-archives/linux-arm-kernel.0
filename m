@@ -1,74 +1,35 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Wed, 7 May 2014 10:37:42 +0200
-Subject: [PATCH] clk: clk-divider: Fix infinite loop for table divider
-In-Reply-To: <1399408005-4209-1-git-send-email-festevam@gmail.com>
-References: <1399408005-4209-1-git-send-email-festevam@gmail.com>
-Message-ID: <5369F0D6.3080503@st.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 7 May 2014 10:41:22 +0200
+Subject: [PATCH 1/4] dma: ste_dma40: Maintain spinlock order while
+ handling pause
+In-Reply-To: <20140507062215.GH28638@intel.com>
+References: <1398282724-2607-1-git-send-email-ulf.hansson@linaro.org>
+ <20140507062215.GH28638@intel.com>
+Message-ID: <CAPDyKFoitAjagRPp1Pb4uZT1-F=ZMy81TVDFA4pbB6EGDp7OMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+On 7 May 2014 08:22, Vinod Koul <vinod.koul@intel.com> wrote:
+> On Wed, Apr 23, 2014 at 09:52:01PM +0200, Ulf Hansson wrote:
+>> The runtime PM resume callback needs to be executed while holding the
+>> spinlock, make sure to maintain this for the pause operation as well.
+>
+> Applied, all thanks.
+>
+> Though we need to change the driver to use SET_LATE_SYSTEM_SLEEP_PM_OPS as
+> all dmaengine drivers should suspend late as clients can be active while
+> suspending
 
-On 05/06/2014 10:26 PM, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
->
-> Since commit e7489693b3 (clk: divider: Optimize clk_divider_bestdiv loop) we
-> notice a system hang on mx6qboard.
->
-> The cause for the hang is well explained by Sascha Hauer [1]:
->
-> "This cannot work. _round_up_table is implemented like this:
->
-> static int _round_up_table(const struct clk_div_table *table, int div)
-> {
->          const struct clk_div_table *clkt;
->          int up = _get_table_maxdiv(table);
->
->          for (clkt = table; clkt->div; clkt++) {
->                  if (clkt->div == div)
->                          return clkt->div;
->                  ...
->          }
->          ...
-> }
->
-> Here when a table entry matches the input div this function will return
-> exactly the input div. This means _next_div() will always return the
-> same value and clk_divider_bestdiv() has an infinite loop:
->
->          for (i = 1; i <= maxdiv; i = _next_div(divider, i)) {
->                  ...
->          }
-> "
-> [1] http://marc.info/?l=linux-arm-kernel&m=139940658726253&w=2
->
-> Remove the 'return _round_up_table' so that the system can work normally again.
->
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->   drivers/clk/clk-divider.c | 2 --
->   1 file changed, 2 deletions(-)
->
-> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-> index b3c8396..fc3e344 100644
-> --- a/drivers/clk/clk-divider.c
-> +++ b/drivers/clk/clk-divider.c
-> @@ -246,8 +246,6 @@ static int _next_div(struct clk_divider *divider, int div)
->
->   	if (divider->flags & CLK_DIVIDER_POWER_OF_TWO)
->   		return __roundup_pow_of_two(div);
-> -	if (divider->table)
-> -		return _round_up_table(divider->table, div);
+Right, I suspected that as well - even if I did ran some tests to
+verify this not to happen in practice for ux500.
 
-Couldn't we initialize "up" variable to INT_MAX in _round_up_table() as 
-I just proposed in mail thread reporting the regression?
+Anyway, I will send a patch which converts to
+SET_LATE_SYSTEM_SLEEP_PM_OPS, since for sure it makes sense.
 
-See http://marc.info/?l=linux-arm-kernel&m=139945172905130&w=2
-
-Regards,
-Maxime
+Kind regards
+Ulf Hansson
 
 >
->   	return div;
->   }
+> --
+> ~Vinod
 >
