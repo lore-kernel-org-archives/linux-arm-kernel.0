@@ -1,59 +1,589 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  7 May 2014 16:20:51 +0100
-Subject: [PATCH 6/9] arm64: KVM: check ordering of all system register tables
+Date: Wed,  7 May 2014 16:20:53 +0100
+Subject: [PATCH 8/9] arm64: KVM: implement lazy world switch for debug
+ registers
 In-Reply-To: <1399476054-21571-1-git-send-email-marc.zyngier@arm.com>
 References: <1399476054-21571-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1399476054-21571-7-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1399476054-21571-9-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We now have multiple tables for the various system registers
-we trap. Make sure we check the order of all of them, as it is
-critical that we get the order right (been there, done that...).
+Implement switching of the debug registers. While the number
+of registers is massive, CPUs usually don't implement them all
+(A57 has 6 breakpoints and 4 watchpoints, which gives us a total
+of 22 registers "only").
+
+Also, we only save/restore them when MDSCR_EL1 has debug enabled,
+or when we've flagged the debug registers as dirty. It means that
+most of the time, we only save/restore MDSCR_EL1.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/sys_regs.c | 22 ++++++++++++++++++++--
- 1 file changed, 20 insertions(+), 2 deletions(-)
+ arch/arm64/kernel/asm-offsets.c |   1 +
+ arch/arm64/kvm/hyp.S            | 449 +++++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 444 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 91ca0e4..c27a5cd 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -1280,14 +1280,32 @@ int kvm_arm_copy_sys_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
- 	return write_demux_regids(uindices);
- }
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index 646f888..ae73a83 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -120,6 +120,7 @@ int main(void)
+   DEFINE(VCPU_ESR_EL2,		offsetof(struct kvm_vcpu, arch.fault.esr_el2));
+   DEFINE(VCPU_FAR_EL2,		offsetof(struct kvm_vcpu, arch.fault.far_el2));
+   DEFINE(VCPU_HPFAR_EL2,	offsetof(struct kvm_vcpu, arch.fault.hpfar_el2));
++  DEFINE(VCPU_DEBUG_FLAGS,	offsetof(struct kvm_vcpu, arch.debug_flags));
+   DEFINE(VCPU_HCR_EL2,		offsetof(struct kvm_vcpu, arch.hcr_el2));
+   DEFINE(VCPU_IRQ_LINES,	offsetof(struct kvm_vcpu, arch.irq_lines));
+   DEFINE(VCPU_HOST_CONTEXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index 2c56012..f9d5a1d 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -21,6 +21,7 @@
+ #include <asm/assembler.h>
+ #include <asm/memory.h>
+ #include <asm/asm-offsets.h>
++#include <asm/debug-monitors.h>
+ #include <asm/fpsimdmacros.h>
+ #include <asm/kvm.h>
+ #include <asm/kvm_asm.h>
+@@ -215,6 +216,7 @@ __kvm_hyp_code_start:
+ 	mrs	x22, 	amair_el1
+ 	mrs	x23, 	cntkctl_el1
+ 	mrs	x24,	par_el1
++	mrs	x25,	mdscr_el1
  
-+static int check_sysreg_table(const struct sys_reg_desc *table, unsigned int n)
-+{
-+	unsigned int i;
+ 	stp	x4, x5, [x3]
+ 	stp	x6, x7, [x3, #16]
+@@ -226,7 +228,202 @@ __kvm_hyp_code_start:
+ 	stp	x18, x19, [x3, #112]
+ 	stp	x20, x21, [x3, #128]
+ 	stp	x22, x23, [x3, #144]
+-	str	x24, [x3, #160]
++	stp	x24, x25, [x3, #160]
++.endm
 +
-+	for (i = 1; i < n; i++) {
-+		if (cmp_sys_reg(&table[i-1], &table[i]) >= 0) {
-+			kvm_err("sys_reg table %p out of order (%d)\n", table, i - 1);
-+			return 1;
-+		}
-+	}
++.macro save_debug
++	// x2: base address for cpu context
++	// x3: tmp register
 +
-+	return 0;
-+}
++	mrs	x26, id_aa64dfr0_el1
++	ubfx	x24, x26, #12, #4	// Extract BRPs
++	ubfx	x25, x26, #20, #4	// Extract WRPs
++	mov	w26, #15
++	sub	w24, w26, w24		// How many BPs to skip
++	sub	w25, w26, w25		// How many WPs to skip
 +
- void kvm_sys_reg_table_init(void)
- {
- 	unsigned int i;
- 	struct sys_reg_desc clidr;
++	add	x3, x2, #CPU_SYSREG_OFFSET(DBGBCR0_EL1)
++
++	adr	x26, 1f
++	add	x26, x26, x24, lsl #2
++	br	x26
++1:
++	mrs	x20, dbgbcr15_el1
++	mrs	x19, dbgbcr14_el1
++	mrs	x18, dbgbcr13_el1
++	mrs	x17, dbgbcr12_el1
++	mrs	x16, dbgbcr11_el1
++	mrs	x15, dbgbcr10_el1
++	mrs	x14, dbgbcr9_el1
++	mrs	x13, dbgbcr8_el1
++	mrs	x12, dbgbcr7_el1
++	mrs	x11, dbgbcr6_el1
++	mrs	x10, dbgbcr5_el1
++	mrs	x9, dbgbcr4_el1
++	mrs	x8, dbgbcr3_el1
++	mrs	x7, dbgbcr2_el1
++	mrs	x6, dbgbcr1_el1
++	mrs	x5, dbgbcr0_el1
++
++	adr	x26, 1f
++	add	x26, x26, x24, lsl #2
++	br	x26
++
++1:
++	str	x20, [x3, #(15 * 8)]
++	str	x19, [x3, #(14 * 8)]
++	str	x18, [x3, #(13 * 8)]
++	str	x17, [x3, #(12 * 8)]
++	str	x16, [x3, #(11 * 8)]
++	str	x15, [x3, #(10 * 8)]
++	str	x14, [x3, #(9 * 8)]
++	str	x13, [x3, #(8 * 8)]
++	str	x12, [x3, #(7 * 8)]
++	str	x11, [x3, #(6 * 8)]
++	str	x10, [x3, #(5 * 8)]
++	str	x9, [x3, #(4 * 8)]
++	str	x8, [x3, #(3 * 8)]
++	str	x7, [x3, #(2 * 8)]
++	str	x6, [x3, #(1 * 8)]
++	str	x5, [x3, #(0 * 8)]
++
++	add	x3, x2, #CPU_SYSREG_OFFSET(DBGBVR0_EL1)
++
++	adr	x26, 1f
++	add	x26, x26, x24, lsl #2
++	br	x26
++1:
++	mrs	x20, dbgbvr15_el1
++	mrs	x19, dbgbvr14_el1
++	mrs	x18, dbgbvr13_el1
++	mrs	x17, dbgbvr12_el1
++	mrs	x16, dbgbvr11_el1
++	mrs	x15, dbgbvr10_el1
++	mrs	x14, dbgbvr9_el1
++	mrs	x13, dbgbvr8_el1
++	mrs	x12, dbgbvr7_el1
++	mrs	x11, dbgbvr6_el1
++	mrs	x10, dbgbvr5_el1
++	mrs	x9, dbgbvr4_el1
++	mrs	x8, dbgbvr3_el1
++	mrs	x7, dbgbvr2_el1
++	mrs	x6, dbgbvr1_el1
++	mrs	x5, dbgbvr0_el1
++
++	adr	x26, 1f
++	add	x26, x26, x24, lsl #2
++	br	x26
++
++1:
++	str	x20, [x3, #(15 * 8)]
++	str	x19, [x3, #(14 * 8)]
++	str	x18, [x3, #(13 * 8)]
++	str	x17, [x3, #(12 * 8)]
++	str	x16, [x3, #(11 * 8)]
++	str	x15, [x3, #(10 * 8)]
++	str	x14, [x3, #(9 * 8)]
++	str	x13, [x3, #(8 * 8)]
++	str	x12, [x3, #(7 * 8)]
++	str	x11, [x3, #(6 * 8)]
++	str	x10, [x3, #(5 * 8)]
++	str	x9, [x3, #(4 * 8)]
++	str	x8, [x3, #(3 * 8)]
++	str	x7, [x3, #(2 * 8)]
++	str	x6, [x3, #(1 * 8)]
++	str	x5, [x3, #(0 * 8)]
++
++	add	x3, x2, #CPU_SYSREG_OFFSET(DBGWCR0_EL1)
++
++	adr	x26, 1f
++	add	x26, x26, x25, lsl #2
++	br	x26
++1:
++	mrs	x20, dbgwcr15_el1
++	mrs	x19, dbgwcr14_el1
++	mrs	x18, dbgwcr13_el1
++	mrs	x17, dbgwcr12_el1
++	mrs	x16, dbgwcr11_el1
++	mrs	x15, dbgwcr10_el1
++	mrs	x14, dbgwcr9_el1
++	mrs	x13, dbgwcr8_el1
++	mrs	x12, dbgwcr7_el1
++	mrs	x11, dbgwcr6_el1
++	mrs	x10, dbgwcr5_el1
++	mrs	x9, dbgwcr4_el1
++	mrs	x8, dbgwcr3_el1
++	mrs	x7, dbgwcr2_el1
++	mrs	x6, dbgwcr1_el1
++	mrs	x5, dbgwcr0_el1
++
++	adr	x26, 1f
++	add	x26, x26, x25, lsl #2
++	br	x26
++
++1:
++	str	x20, [x3, #(15 * 8)]
++	str	x19, [x3, #(14 * 8)]
++	str	x18, [x3, #(13 * 8)]
++	str	x17, [x3, #(12 * 8)]
++	str	x16, [x3, #(11 * 8)]
++	str	x15, [x3, #(10 * 8)]
++	str	x14, [x3, #(9 * 8)]
++	str	x13, [x3, #(8 * 8)]
++	str	x12, [x3, #(7 * 8)]
++	str	x11, [x3, #(6 * 8)]
++	str	x10, [x3, #(5 * 8)]
++	str	x9, [x3, #(4 * 8)]
++	str	x8, [x3, #(3 * 8)]
++	str	x7, [x3, #(2 * 8)]
++	str	x6, [x3, #(1 * 8)]
++	str	x5, [x3, #(0 * 8)]
++
++	add	x3, x2, #CPU_SYSREG_OFFSET(DBGWVR0_EL1)
++
++	adr	x26, 1f
++	add	x26, x26, x25, lsl #2
++	br	x26
++1:
++	mrs	x20, dbgwvr15_el1
++	mrs	x19, dbgwvr14_el1
++	mrs	x18, dbgwvr13_el1
++	mrs	x17, dbgwvr12_el1
++	mrs	x16, dbgwvr11_el1
++	mrs	x15, dbgwvr10_el1
++	mrs	x14, dbgwvr9_el1
++	mrs	x13, dbgwvr8_el1
++	mrs	x12, dbgwvr7_el1
++	mrs	x11, dbgwvr6_el1
++	mrs	x10, dbgwvr5_el1
++	mrs	x9, dbgwvr4_el1
++	mrs	x8, dbgwvr3_el1
++	mrs	x7, dbgwvr2_el1
++	mrs	x6, dbgwvr1_el1
++	mrs	x5, dbgwvr0_el1
++
++	adr	x26, 1f
++	add	x26, x26, x25, lsl #2
++	br	x26
++
++1:
++	str	x20, [x3, #(15 * 8)]
++	str	x19, [x3, #(14 * 8)]
++	str	x18, [x3, #(13 * 8)]
++	str	x17, [x3, #(12 * 8)]
++	str	x16, [x3, #(11 * 8)]
++	str	x15, [x3, #(10 * 8)]
++	str	x14, [x3, #(9 * 8)]
++	str	x13, [x3, #(8 * 8)]
++	str	x12, [x3, #(7 * 8)]
++	str	x11, [x3, #(6 * 8)]
++	str	x10, [x3, #(5 * 8)]
++	str	x9, [x3, #(4 * 8)]
++	str	x8, [x3, #(3 * 8)]
++	str	x7, [x3, #(2 * 8)]
++	str	x6, [x3, #(1 * 8)]
++	str	x5, [x3, #(0 * 8)]
++
++	mrs	x21, mdccint_el1
++	str	x21, [x2, #CPU_SYSREG_OFFSET(MDCCINT_EL1)]
+ .endm
  
- 	/* Make sure tables are unique and in order. */
--	for (i = 1; i < ARRAY_SIZE(sys_reg_descs); i++)
--		BUG_ON(cmp_sys_reg(&sys_reg_descs[i-1], &sys_reg_descs[i]) >= 0);
-+	BUG_ON(check_sysreg_table(sys_reg_descs, ARRAY_SIZE(sys_reg_descs)));
-+	BUG_ON(check_sysreg_table(cp14_regs, ARRAY_SIZE(cp14_regs)));
-+	BUG_ON(check_sysreg_table(cp14_64_regs, ARRAY_SIZE(cp14_64_regs)));
-+	BUG_ON(check_sysreg_table(cp15_regs, ARRAY_SIZE(cp15_regs)));
-+	BUG_ON(check_sysreg_table(cp15_64_regs, ARRAY_SIZE(cp15_64_regs)));
-+	BUG_ON(check_sysreg_table(invariant_sys_regs, ARRAY_SIZE(invariant_sys_regs)));
+ .macro restore_sysregs
+@@ -245,7 +442,7 @@ __kvm_hyp_code_start:
+ 	ldp	x18, x19, [x3, #112]
+ 	ldp	x20, x21, [x3, #128]
+ 	ldp	x22, x23, [x3, #144]
+-	ldr	x24, [x3, #160]
++	ldp	x24, x25, [x3, #160]
  
- 	/* We abuse the reset function to overwrite the table itself. */
- 	for (i = 0; i < ARRAY_SIZE(invariant_sys_regs); i++)
+ 	msr	vmpidr_el2,	x4
+ 	msr	csselr_el1,	x5
+@@ -268,6 +465,198 @@ __kvm_hyp_code_start:
+ 	msr	amair_el1,	x22
+ 	msr	cntkctl_el1,	x23
+ 	msr	par_el1,	x24
++	msr	mdscr_el1,	x25
++.endm
++
++.macro restore_debug
++	// x2: base address for cpu context
++	// x3: tmp register
++
++	mrs	x26, id_aa64dfr0_el1
++	ubfx	x24, x26, #12, #4	// Extract BRPs
++	ubfx	x25, x26, #20, #4	// Extract WRPs
++	mov	w26, #15
++	sub	w24, w26, w24		// How many BPs to skip
++	sub	w25, w26, w25		// How many WPs to skip
++
++	add	x3, x2, #CPU_SYSREG_OFFSET(DBGBCR0_EL1)
++
++	adr	x26, 1f
++	add	x26, x26, x24, lsl #2
++	br	x26
++1:
++	ldr	x20, [x3, #(15 * 8)]
++	ldr	x19, [x3, #(14 * 8)]
++	ldr	x18, [x3, #(13 * 8)]
++	ldr	x17, [x3, #(12 * 8)]
++	ldr	x16, [x3, #(11 * 8)]
++	ldr	x15, [x3, #(10 * 8)]
++	ldr	x14, [x3, #(9 * 8)]
++	ldr	x13, [x3, #(8 * 8)]
++	ldr	x12, [x3, #(7 * 8)]
++	ldr	x11, [x3, #(6 * 8)]
++	ldr	x10, [x3, #(5 * 8)]
++	ldr	x9, [x3, #(4 * 8)]
++	ldr	x8, [x3, #(3 * 8)]
++	ldr	x7, [x3, #(2 * 8)]
++	ldr	x6, [x3, #(1 * 8)]
++	ldr	x5, [x3, #(0 * 8)]
++
++	adr	x26, 1f
++	add	x26, x26, x24, lsl #2
++	br	x26
++1:
++	msr	dbgbcr15_el1, x20
++	msr	dbgbcr14_el1, x19
++	msr	dbgbcr13_el1, x18
++	msr	dbgbcr12_el1, x17
++	msr	dbgbcr11_el1, x16
++	msr	dbgbcr10_el1, x15
++	msr	dbgbcr9_el1, x14
++	msr	dbgbcr8_el1, x13
++	msr	dbgbcr7_el1, x12
++	msr	dbgbcr6_el1, x11
++	msr	dbgbcr5_el1, x10
++	msr	dbgbcr4_el1, x9
++	msr	dbgbcr3_el1, x8
++	msr	dbgbcr2_el1, x7
++	msr	dbgbcr1_el1, x6
++	msr	dbgbcr0_el1, x5
++
++	add	x3, x2, #CPU_SYSREG_OFFSET(DBGBVR0_EL1)
++
++	adr	x26, 1f
++	add	x26, x26, x24, lsl #2
++	br	x26
++1:
++	ldr	x20, [x3, #(15 * 8)]
++	ldr	x19, [x3, #(14 * 8)]
++	ldr	x18, [x3, #(13 * 8)]
++	ldr	x17, [x3, #(12 * 8)]
++	ldr	x16, [x3, #(11 * 8)]
++	ldr	x15, [x3, #(10 * 8)]
++	ldr	x14, [x3, #(9 * 8)]
++	ldr	x13, [x3, #(8 * 8)]
++	ldr	x12, [x3, #(7 * 8)]
++	ldr	x11, [x3, #(6 * 8)]
++	ldr	x10, [x3, #(5 * 8)]
++	ldr	x9, [x3, #(4 * 8)]
++	ldr	x8, [x3, #(3 * 8)]
++	ldr	x7, [x3, #(2 * 8)]
++	ldr	x6, [x3, #(1 * 8)]
++	ldr	x5, [x3, #(0 * 8)]
++
++	adr	x26, 1f
++	add	x26, x26, x24, lsl #2
++	br	x26
++1:
++	msr	dbgbvr15_el1, x20
++	msr	dbgbvr14_el1, x19
++	msr	dbgbvr13_el1, x18
++	msr	dbgbvr12_el1, x17
++	msr	dbgbvr11_el1, x16
++	msr	dbgbvr10_el1, x15
++	msr	dbgbvr9_el1, x14
++	msr	dbgbvr8_el1, x13
++	msr	dbgbvr7_el1, x12
++	msr	dbgbvr6_el1, x11
++	msr	dbgbvr5_el1, x10
++	msr	dbgbvr4_el1, x9
++	msr	dbgbvr3_el1, x8
++	msr	dbgbvr2_el1, x7
++	msr	dbgbvr1_el1, x6
++	msr	dbgbvr0_el1, x5
++
++	add	x3, x2, #CPU_SYSREG_OFFSET(DBGWCR0_EL1)
++
++	adr	x26, 1f
++	add	x26, x26, x25, lsl #2
++	br	x26
++1:
++	ldr	x20, [x3, #(15 * 8)]
++	ldr	x19, [x3, #(14 * 8)]
++	ldr	x18, [x3, #(13 * 8)]
++	ldr	x17, [x3, #(12 * 8)]
++	ldr	x16, [x3, #(11 * 8)]
++	ldr	x15, [x3, #(10 * 8)]
++	ldr	x14, [x3, #(9 * 8)]
++	ldr	x13, [x3, #(8 * 8)]
++	ldr	x12, [x3, #(7 * 8)]
++	ldr	x11, [x3, #(6 * 8)]
++	ldr	x10, [x3, #(5 * 8)]
++	ldr	x9, [x3, #(4 * 8)]
++	ldr	x8, [x3, #(3 * 8)]
++	ldr	x7, [x3, #(2 * 8)]
++	ldr	x6, [x3, #(1 * 8)]
++	ldr	x5, [x3, #(0 * 8)]
++
++	adr	x26, 1f
++	add	x26, x26, x25, lsl #2
++	br	x26
++1:
++	msr	dbgwcr15_el1, x20
++	msr	dbgwcr14_el1, x19
++	msr	dbgwcr13_el1, x18
++	msr	dbgwcr12_el1, x17
++	msr	dbgwcr11_el1, x16
++	msr	dbgwcr10_el1, x15
++	msr	dbgwcr9_el1, x14
++	msr	dbgwcr8_el1, x13
++	msr	dbgwcr7_el1, x12
++	msr	dbgwcr6_el1, x11
++	msr	dbgwcr5_el1, x10
++	msr	dbgwcr4_el1, x9
++	msr	dbgwcr3_el1, x8
++	msr	dbgwcr2_el1, x7
++	msr	dbgwcr1_el1, x6
++	msr	dbgwcr0_el1, x5
++
++	add	x3, x2, #CPU_SYSREG_OFFSET(DBGWVR0_EL1)
++
++	adr	x26, 1f
++	add	x26, x26, x25, lsl #2
++	br	x26
++1:
++	ldr	x20, [x3, #(15 * 8)]
++	ldr	x19, [x3, #(14 * 8)]
++	ldr	x18, [x3, #(13 * 8)]
++	ldr	x17, [x3, #(12 * 8)]
++	ldr	x16, [x3, #(11 * 8)]
++	ldr	x15, [x3, #(10 * 8)]
++	ldr	x14, [x3, #(9 * 8)]
++	ldr	x13, [x3, #(8 * 8)]
++	ldr	x12, [x3, #(7 * 8)]
++	ldr	x11, [x3, #(6 * 8)]
++	ldr	x10, [x3, #(5 * 8)]
++	ldr	x9, [x3, #(4 * 8)]
++	ldr	x8, [x3, #(3 * 8)]
++	ldr	x7, [x3, #(2 * 8)]
++	ldr	x6, [x3, #(1 * 8)]
++	ldr	x5, [x3, #(0 * 8)]
++
++	adr	x26, 1f
++	add	x26, x26, x25, lsl #2
++	br	x26
++1:
++	msr	dbgwvr15_el1, x20
++	msr	dbgwvr14_el1, x19
++	msr	dbgwvr13_el1, x18
++	msr	dbgwvr12_el1, x17
++	msr	dbgwvr11_el1, x16
++	msr	dbgwvr10_el1, x15
++	msr	dbgwvr9_el1, x14
++	msr	dbgwvr8_el1, x13
++	msr	dbgwvr7_el1, x12
++	msr	dbgwvr6_el1, x11
++	msr	dbgwvr5_el1, x10
++	msr	dbgwvr4_el1, x9
++	msr	dbgwvr3_el1, x8
++	msr	dbgwvr2_el1, x7
++	msr	dbgwvr1_el1, x6
++	msr	dbgwvr0_el1, x5
++
++	ldr	x21, [x2, #CPU_SYSREG_OFFSET(MDCCINT_EL1)]
++	msr	mdccint_el1, x21
+ .endm
+ 
+ .macro skip_32bit_state tmp, target
+@@ -282,6 +671,11 @@ __kvm_hyp_code_start:
+ 	tbz	\tmp, #12, \target
+ .endm
+ 
++.macro skip_clean_debug_state tmp, target
++	ldr	\tmp, [x0, #VCPU_DEBUG_FLAGS]
++	tbz	\tmp, #KVM_ARM64_DEBUG_DIRTY_SHIFT, \target
++.endm
++
+ .macro save_guest_32bit_state
+ 	skip_32bit_state x3, 1f
+ 
+@@ -297,10 +691,13 @@ __kvm_hyp_code_start:
+ 	mrs	x4, dacr32_el2
+ 	mrs	x5, ifsr32_el2
+ 	mrs	x6, fpexc32_el2
+-	mrs	x7, dbgvcr32_el2
+ 	stp	x4, x5, [x3]
+-	stp	x6, x7, [x3, #16]
++	str	x6, [x3, #16]
+ 
++	skip_clean_debug_state x8, 2f
++	mrs	x7, dbgvcr32_el2
++	str	x7, [x3, #24]
++2:
+ 	skip_tee_state x8, 1f
+ 
+ 	add	x3, x2, #CPU_SYSREG_OFFSET(TEECR32_EL1)
+@@ -323,12 +720,15 @@ __kvm_hyp_code_start:
+ 
+ 	add	x3, x2, #CPU_SYSREG_OFFSET(DACR32_EL2)
+ 	ldp	x4, x5, [x3]
+-	ldp	x6, x7, [x3, #16]
++	ldr	x6, [x3, #16]
+ 	msr	dacr32_el2, x4
+ 	msr	ifsr32_el2, x5
+ 	msr	fpexc32_el2, x6
+-	msr	dbgvcr32_el2, x7
+ 
++	skip_clean_debug_state x8, 2f
++	ldr	x7, [x3, #24]
++	msr	dbgvcr32_el2, x7
++2:
+ 	skip_tee_state x8, 1f
+ 
+ 	add	x3, x2, #CPU_SYSREG_OFFSET(TEECR32_EL1)
+@@ -537,6 +937,14 @@ __restore_sysregs:
+ 	restore_sysregs
+ 	ret
+ 
++__save_debug:
++	save_debug
++	ret
++
++__restore_debug:
++	restore_debug
++	ret
++
+ __save_fpsimd:
+ 	save_fpsimd
+ 	ret
+@@ -568,6 +976,21 @@ ENTRY(__kvm_vcpu_run)
+ 	bl __save_fpsimd
+ 	bl __save_sysregs
+ 
++	// Compute debug state: If any of KDE, MDE or KVM_ARM64_DEBUG_DIRTY
++	// is set, we do a full save/restore cycle and disable trapping.
++	add	x25, x0, #VCPU_CONTEXT
++	ldr	x25, [x25, #CPU_SYSREG_OFFSET(MDSCR_EL1)]
++	and	x26, x25, #DBG_MDSCR_KDE
++	and	x25, x25, #DBG_MDSCR_MDE
++	adds	xzr, x25, x26
++	mov	x26, #KVM_ARM64_DEBUG_DIRTY
++	csel	x25, x26, xzr, ne
++	ldr	x26, [x0, #VCPU_DEBUG_FLAGS]
++	orr	x26, x26, x25
++	cbz	x26, 1f
++	str	x26, [x0, #VCPU_DEBUG_FLAGS]
++	bl	__save_debug
++1:
+ 	activate_traps
+ 	activate_vm
+ 
+@@ -579,6 +1002,10 @@ ENTRY(__kvm_vcpu_run)
+ 
+ 	bl __restore_sysregs
+ 	bl __restore_fpsimd
++
++	skip_clean_debug_state x3, 1f
++	bl	__restore_debug
++1:
+ 	restore_guest_32bit_state
+ 	restore_guest_regs
+ 
+@@ -595,6 +1022,10 @@ __kvm_vcpu_return:
+ 	save_guest_regs
+ 	bl __save_fpsimd
+ 	bl __save_sysregs
++
++	skip_clean_debug_state x3, 1f
++	bl	__save_debug
++1:
+ 	save_guest_32bit_state
+ 
+ 	save_timer_state
+@@ -609,6 +1040,12 @@ __kvm_vcpu_return:
+ 
+ 	bl __restore_sysregs
+ 	bl __restore_fpsimd
++
++	skip_clean_debug_state x3, 1f
++	// Clear the dirty flag for the next run
++	str	xzr, [x0, #VCPU_DEBUG_FLAGS]
++	bl	__restore_debug
++1:
+ 	restore_host_regs
+ 
+ 	mov	x0, x1
 -- 
 1.8.3.4
