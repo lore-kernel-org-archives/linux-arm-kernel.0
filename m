@@ -1,142 +1,43 @@
-From: sebastian.capella@linaro.org (Sebastian Capella)
-Date: Wed, 07 May 2014 16:43:04 -0700
-Subject: [PATCH RFC v3 1/6] Documentation: arm: define DT idle states
- bindings
-In-Reply-To: <1399399483-17112-2-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1399399483-17112-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1399399483-17112-2-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <536ac4ef.6ae7440a.511a.ffffdef8@mx.google.com>
+From: afzal.mohd.ma@gmail.com (Afzal Mohammed)
+Date: Thu, 8 May 2014 05:12:56 +0530
+Subject: [PATCH] arm: memset: zero out upper bytes in r1
+In-Reply-To: <1399273875-8403-1-git-send-email-a.ryabinin@samsung.com>
+References: <1399273875-8403-1-git-send-email-a.ryabinin@samsung.com>
+Message-ID: <20140507234255.GA2050@afzal-ThinkPad-R50e>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Lorenzo Pieralisi (2014-05-06 11:04:38)
-> diff --git a/Documentation/devicetree/bindings/arm/idle-states.txt b/Documentation/devicetree/bindings/arm/idle-states.txt
-> new file mode 100644
-> index 0000000..196ef52
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/idle-states.txt
-> @@ -0,0 +1,508 @@
-...
-> +===========================================
-> +2 - idle-states node
-> +===========================================
-> +
-> +ARM processor idle states are defined within the idle-states node, which is
-> +a direct child of the cpus node [1] and provides a container where the
-> +processor idle states, defined as device tree nodes, are listed.
-> +
-> +- idle-states node
-> +
-> +       Usage: Optional - On ARM systems, is a container of processor idle
-> +                         states nodes. If the system does not provide CPU
-> +                         power management capabilities or the processor just
-> +                         supports idle_standby an idle-states node is not
-> +                         required.
-> +
-> +       Description: idle-states node is a container node, where its
-> +                    subnodes describe the CPU idle states.
-> +
-> +       Node name must be "idle-states".
-> +
-> +       The idle-states node's parent node must be the cpus node.
-> +
-> +       The idle-states node's child nodes can be:
-> +
-> +       - one or more state nodes
-> +
-> +       Any other configuration is considered invalid.
-> +
-> +       An idle-states node defines the following properties:
-> +
-> +       - entry-method
-> +               Usage: Required
-> +               Value type: <stringlist>
-> +               Definition: Describes the method by which a CPU enters the
-> +                           idle states. This property is required and must be
-> +                           one of:
-> +
-> +                           - "arm,psci"
-> +                             ARM PSCI firmware interface [2].
-> +
-> +                           - "[vendor],[method]"
-> +                             An implementation dependent string with
-> +                             format "vendor,method", where vendor is a string
-> +                             denoting the name of the manufacturer and
-> +                             method is a string specifying the mechanism
-> +                             used to enter the idle state.
-> +
-> +The nodes describing the idle states (state) can only be defined within the
-> +idle-states node.
-> +
-> +Any other configuration is consider invalid and therefore must be ignored.
+Hi Andrey,
 
-consider -> considered
-must be -> shall?
+On Mon, May 05, 2014 at 11:11:13AM +0400, Andrey Ryabinin wrote:
 
-Is the reference to "any other configuration" referring to state nodes
-not in the idle states node?  If so, maybe this sentence should go
-together with that one.
+> memset doesn't work right for following example:
+> 
+> 	signed char c = 0xF0;
+> 	memset(addr, c, size);
+> 
+> Variable c is signed, so after typcasting to int the value will be 0xFFFFFFF0.
+> This value will be passed through r1 regitster to memset function.
+> memset doesn't zero out upper bytes in r1, so memory will be filled
+> with 0xFFFFFFF0 instead of expected 0xF0F0F0F0.
 
-> +===========================================
-> +4 - Examples
-> +===========================================
-> +
-> +Example 1 (ARM 64-bit, 16-cpu system):
-> +
-> +cpus {
-> +       #size-cells = <0>;
-> +       #address-cells = <2>;
-> +
-> +       idle-states {
-> +               entry-method = "arm,psci";
-> +
-> +               CPU_RETENTION_0_0: cpu-retention-0-0 {
-> +                       compatible = "arm,idle-state";
-> +                       cache-state-retained;
-> +                       entry-method-param = <0x0010000>;
-> +                       entry-latency-us = <20>;
-> +                       exit-latency-us = <40>;
-> +                       min-residency-us = <30>;
-> +               };
-> +
-> +               CLUSTER_RETENTION_0: cluster-retention-0 {
-> +                       compatible = "arm,idle-state";
-> +                       logic-state-retained;
-> +                       cache-state-retained;
-> +                       entry-method-param = <0x1010000>;
-> +                       entry-latency-us = <50>;
-> +                       exit-latency-us = <100>;
-> +                       min-residency-us = <250>;
-> +               };
-                  ...
-> +       };
-> +
-> +       CPU0: cpu at 0 {
-> +               device_type = "cpu";
-> +               compatible = "arm,cortex-a57";
-> +               reg = <0x0 0x0>;
-> +               enable-method = "psci";
-> +               cpu-idle-states = <&CPU_RETENTION_0_0 &CPU_SLEEP_0_0
-> +                                  &CLUSTER_RETENTION_0 &CLUSTER_SLEEP_0>;
-> +       };
-> +
-> +       CPU1: cpu at 1 {
-> +               device_type = "cpu";
-> +               compatible = "arm,cortex-a57";
-> +               reg = <0x0 0x1>;
-> +               enable-method = "psci";
-> +               cpu-idle-states = <&CPU_RETENTION_0_0 &CPU_SLEEP_0_0
-> +                                  &CLUSTER_RETENTION_0 &CLUSTER_SLEEP_0>;
-> +       };
+> --- a/arch/arm/lib/memset.S
+> +++ b/arch/arm/lib/memset.S
+> @@ -22,7 +22,8 @@ ENTRY(memset)
+>  /*
+>   * we know that the pointer in ip is aligned to a word boundary.
+>   */
+> -1:	orr	r1, r1, r1, lsl #8
+> +1:	and	r1, r1, #0xff
+> +	orr	r1, r1, r1, lsl #8
 
-How can we specify what states are entered together vs. those that
-are independent (since they also share the entry-method-param)?
-CPU_SLEEP_0_0 is used for both CPU0 and CPU1, yet each cpu can enter
-it without waiting for the other.  Whereas CLUSTER_RETENTION_0 should
-not be entered until all CPUs sharing it enter.
+int is to be converted to unsigned char in memset, would having above
+change immediately upon entry to memset rather than at a place where it
+won't always execute make intention clearer ? (although it doesn't make
+difference)
 
-Is the idea to define separate CPU_SLEEP/CPU_RETENTION nodes for each cpu?
+ubfx r1, r1, #0, #8 would have given the needed typecasting, but seems
+it is available only on ARMv6T2 & above.
 
-Thanks!
-
-Sebastian
+Regards
+Afzal
