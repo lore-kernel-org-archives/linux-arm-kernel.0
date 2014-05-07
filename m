@@ -1,60 +1,69 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 07 May 2014 10:25:37 +0200
-Subject: [PATCH 0/7] Add Allwinner A31 USB support
-In-Reply-To: <1399434623-20383-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1399434623-20383-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <5369EE01.1090909@redhat.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Wed, 7 May 2014 10:32:35 +0200
+Subject: mx6qsabresd hangs on linux-next
+In-Reply-To: <20140507033223.GB2798@dragon>
+References: <CAOMZO5DMEqs=zzNGqgKjK7wTJdiNPgEqxsX=TtqKrnpLMzpbDw@mail.gmail.com>
+ <20140506141310.GA2794@dragon>
+ <CAOMZO5DH5d_L-deVu=XmBo9ekq+-g704p7cyayLvp=43bnEccQ@mail.gmail.com>
+ <CAOMZO5Dx0JMj3dZ7BSgaYSZZ=ZKRqQHEYWj5sb6z_9jc+cpsEw@mail.gmail.com>
+ <5369081D.5030400@st.com> <20140506200029.GD5858@pengutronix.de>
+ <20140507020950.GB2794@dragon> <20140507033223.GB2798@dragon>
+Message-ID: <5369EFA3.8070908@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Shawn,
 
-On 05/07/2014 05:50 AM, Maxime Ripard wrote:
-> Hi everyone,
-> 
-> This patchset adds support for the USB controllers found in the
-> Allwinner A31.
-> 
-> While the design is similar to the earlier Allwinner SoCs that are
-> already supported, a few details here and there change, like the fact
-> that the PHYs now have one clock per phy, while it used to be only one
-> for all the PHYs.
-> 
-> Thanks,
-> Maxime
+On 05/07/2014 05:32 AM, Shawn Guo wrote:
+...
+>>>
+>>> Here when a table entry matches the input div this function will return
+>>> exactly the input div. This means _next_div() will always return the
+>>> same value and clk_divider_bestdiv() has an infinite loop:
+>>>
+>>> 	for (i = 1; i <= maxdiv; i = _next_div(divider, i)) {
+>>> 		...
+>>> 	}
+>>
+>> Hmmm, isn't the first thing that _next_div() does to increment the input
+>> div?
+>
+> I think the infinite loop happens in this case because "i" will never
+> exceed maxdiv for a table divider.
 
-Thanks for working on this.
+You are right. Sorry for the regression.
 
-Looks good, the entire series is:
+I thought I tested it, as I had some table-based dividers in my test setup.
+After checking again, it appears that I didn't had the 
+CLK_SET_RATE_PARENT flag set on these clocks, so I didn't entered the 
+for loop...
 
-Reviewed-by: Hans de Goede <hdegoede@redhat.com>
+Could the fix be to initialize "up" variable to INT_MAX in 
+_round_up_table (see below)?
 
-Regards,
+I can send the patch if you are fine with it.
+I have no hardware to test on this week, I only have compiled this 
+patch, not tested it.
 
-Hans
+Thanks,
+Maxime
+
+>
+> Shawn
+>
 
 
-> 
-> Boris BREZILLON (2):
->   usb: ehci-platform: add optional reset controller retrieval
->   ARM: sunxi: dt: add APP4-EVB1 board support
-> 
-> Maxime Ripard (5):
->   clk: sunxi: Implement A31 USB clock
->   ARM: sun6i: Add the USB clocks to the DTSI.
->   phy: usb: sunxi: Introduce Allwinner A31 USB PHY support
->   usb: ohci-platform: Enable optional use of reset controller
->   ARM: sun6i: dt: Add support for the USB controllers
-> 
->  Documentation/devicetree/bindings/usb/usb-ehci.txt |  1 +
->  Documentation/devicetree/bindings/usb/usb-ohci.txt |  1 +
->  arch/arm/boot/dts/Makefile                         |  1 +
->  arch/arm/boot/dts/sun6i-a31-app4-evb1.dts          | 63 ++++++++++++++++
->  arch/arm/boot/dts/sun6i-a31.dtsi                   | 88 ++++++++++++++++++++++
->  drivers/clk/sunxi/clk-sunxi.c                      |  6 ++
->  drivers/phy/phy-sun4i-usb.c                        | 35 ++++++---
->  drivers/usb/host/ehci-platform.c                   | 25 +++++-
->  drivers/usb/host/ohci-platform.c                   | 25 +++++-
->  9 files changed, 234 insertions(+), 11 deletions(-)
->  create mode 100644 arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
-> 
+diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+index b3c8396..cf9114a 100644
+--- a/drivers/clk/clk-divider.c
++++ b/drivers/clk/clk-divider.c
+@@ -158,7 +158,7 @@ static bool _is_valid_div(struct clk_divider 
+*divider, unsigned int div)
+  static int _round_up_table(const struct clk_div_table *table, int div)
+  {
+         const struct clk_div_table *clkt;
+-       int up = _get_table_maxdiv(table);
++       int up = INT_MAX;
+
+         for (clkt = table; clkt->div; clkt++) {
+                 if (clkt->div == div)
