@@ -1,53 +1,31 @@
 From: fkan@apm.com (Feng Kan)
-Date: Wed,  7 May 2014 09:17:59 -0700
-Subject: [PATCH V6 0/5] Generic syscon reboot driver for APM X-Gene platforms
-Message-ID: <1399479484-2605-1-git-send-email-fkan@apm.com>
+Date: Wed,  7 May 2014 09:18:04 -0700
+Subject: [PATCH V6 5/5] arm64: Select reboot driver for X-Gene platform
+In-Reply-To: <1399479484-2605-1-git-send-email-fkan@apm.com>
+References: <1399479484-2605-1-git-send-email-fkan@apm.com>
+Message-ID: <1399479484-2605-6-git-send-email-fkan@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable reboot driver for the X-Gene platform. Add generic syscon reboot
-driver.
+Select reboot driver for X-Gene platform.
 
-V6 Change:
-	- Added reference in documenation for reference phandle
+Signed-off-by: Feng Kan <fkan@apm.com>
+---
+ arch/arm64/Kconfig |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-V5 Change:
-	- Documentation update, endian and access size.
-
-V4 Change:
-	- Remove old X-Gene reboot driver
-	- Add generic syscon reboot driver
-	- Add DTS and Kconfig for X-Gene reboot using syscon method
-
-V3 Change:
-	- Remove the reboot driver's use of acpi resource patch.
-	- Change the reboot driver to use syscon to parse out 
-	  system clock register. Remove the old method of getting
-	  register from the reboot driver directly.
-	- Remove documentation since its now simple.
-
-V2 Change:
-	- Add support for using ACPI resource.
-
-Feng Kan (5):
-  power: reset: Add generic SYSCON register mapped reset
-  power: reset: Remove X-Gene reboot driver
-  arm64: dts: Add X-Gene reboot driver dts node
-  arm64: Select reboot driver for X-Gene platform
-  Documentation: power: reset: Add documentation for generic SYSCON
-    reboot driver
-
- .../bindings/power/reset/syscon-reboot.txt         |   27 +++++
- arch/arm64/Kconfig                                 |    2 +
- arch/arm64/boot/dts/apm-storm.dtsi                 |   13 +++
- drivers/power/reset/Kconfig                        |    8 +-
- drivers/power/reset/Makefile                       |    2 +-
- drivers/power/reset/syscon-reboot.c                |  100 +++++++++++++++++++
- drivers/power/reset/xgene-reboot.c                 |  103 --------------------
- 7 files changed, 147 insertions(+), 108 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
- create mode 100644 drivers/power/reset/syscon-reboot.c
- delete mode 100644 drivers/power/reset/xgene-reboot.c
-
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 9711a5f..007f340 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -129,6 +129,8 @@ config ARCH_VEXPRESS
+ 
+ config ARCH_XGENE
+ 	bool "AppliedMicro X-Gene SOC Family"
++	select MFD_SYSCON
++	select POWER_RESET_SYSCON
+ 	help
+ 	  This enables support for AppliedMicro X-Gene SOC Family
+ 
 -- 
 1.7.6.1
