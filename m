@@ -1,80 +1,82 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 07 May 2014 16:01:39 +0200
-Subject: [PATCH] ARM: Kirkwood: DT versions of OpenRD boards
-In-Reply-To: <20140507132950.GB23936@lunn.ch>
-References: <1399416504-19140-1-git-send-email-andrew@lunn.ch>
- <5369E35C.2020006@gmail.com> <20140507132950.GB23936@lunn.ch>
-Message-ID: <536A3CC3.6070600@gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 7 May 2014 09:04:02 -0500
+Subject: [PATCH] ARM: dt: fix up PL011 device tree bindings
+In-Reply-To: <1399470109-8021-1-git-send-email-linus.walleij@linaro.org>
+References: <1399470109-8021-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CAL_JsqJaRpTcFTe9D-CL6gCzyvWAuT-g7e18isnqMSen3i=yAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/07/2014 03:29 PM, Andrew Lunn wrote:
-> On Wed, May 07, 2014 at 09:40:12AM +0200, Sebastian Hesselbarth wrote:
->> On 05/07/2014 12:48 AM, Andrew Lunn wrote:
->>> Create DTS files to describe the Marvell OpenRD boards.
->>>
->>> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
->>> Tested-by: Francois Lorrain <francois.lorrain@gmail.com>
->>> ---
->> [...]
->>> +/dts-v1/;
->>> +
->>> +#include "kirkwood-openrd.dtsi"
->>> +
->>> +/ {
->>> +	model = "OpenRD Base";
->>> +	compatible = "marvell,openrd-base", "marvell,openrd", "marvell,kirkwood-88f6281", "marvell,kirkwood";
->>> +
->>> +	ocp at f1000000 {
->>> +		serial at 12100 {
->>> +			status = "okay";
->>
->> I see you used the "good template" this time ;) I again have some nits,
->> that either you can take care of or me in the cleanup patches. I guess
->> it depends on whatever goes in first. ;)
+On Wed, May 7, 2014 at 8:41 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> Make the map match the reality, the current binding text is
+> nonsense:
 >
-> The patch already depends on your patches, so i may as well do the
-> cleanup. I need to fix "description" anyway.
-
-Right, I noticed that after I sent the mail. As you already have some
-fixes, you should take care of it.
-
-[...]
->>> +/dts-v1/;
->>> +
->>> +#include "kirkwood-openrd.dtsi"
->>> +
->>> +/ {
->>> +	model = "OpenRD Client";
->>> +	compatible = "marvell,openrd-client", "marvell,openrd", "marvell,kirkwood-88f6281", "marvell,kirkwood";
->>> +
->>> +	ocp at f1000000 {
->>> +		i2c at 11000 {
->>> +			status = "okay";
->>> +			clock-frequency = <400000>;
->>> +			pinctrl-0 = <&pmx_twsi0>;
->>> +			pinctrl-names = "default";
->>
->> The default pinctrl should have been set by the SoC dtsi already.
+> - The clock required for the clocking of the serial port
+>   must come first and is not optional (as the driver will
+>   otherwise proceed to grab and use the apb_pclk as uartclk),
+>   and the apb_pclk that clocks the logic must come second
+>   as the code will retrieve the first clock by index,
+>   whereas the PrimeCell but will explicitly look for
+>   "apb_pclk" so this can be specified later, as it is
+>   looked up by name.
 >
-> You only pointed this out for i2c. What else is it true for? I should
-> go look at your patches.
-
-KW DT cleanup sets default pinctrl for GBE1, UART0, UART1, SPI0, NAND,
-I2C0 and I2C1 on 6282.
-
->>> +		mvsdio at 90000 {
->>> +			status = "okay";
->>> +			cd-gpios = <&gpio0 29 9>;
->>> +			status = "disabled";
->>
->> Any reason not to enable sdio?
+> - The pin control state "default" is the only mandated
+>   state, the sleep state is entirely optional.
 >
-> Only client and ultimate have an SD slot. Base does not. If i have it
-> right, client.dts and ultimate.dts should be enabling it. I will
-> double check.
+> We also add an example to avoid further confusion.
+>
+> Reported-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/serial/pl011.txt | 25 ++++++++++++++++++----
+>  1 file changed, 21 insertions(+), 4 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/serial/pl011.txt b/Documentation/devicetree/bindings/serial/pl011.txt
+> index 5d2e840ae65c..7a33d67c8349 100644
+> --- a/Documentation/devicetree/bindings/serial/pl011.txt
+> +++ b/Documentation/devicetree/bindings/serial/pl011.txt
+> @@ -6,12 +6,29 @@ Required properties:
+>  - interrupts: exactly one interrupt specifier
+>
+>  Optional properties:
+> -- pinctrl: When present, must have one state named "sleep"
+> -          and one state named "default"
+> -- clocks:  When present, must refer to exactly one clock named
+> -          "apb_pclk"
+> +- pinctrl: When present, must have one state named "default",
+> +          and may contain a second name named "sleep". The former
+> +          state sets up pins for ordinary operation whereas
+> +          the latter state will put the associated pins to sleep
+> +          when the UART is unused
+> +- clocks:  When present, the first clock listed must be named
+> +          "uartclk" and clock the external serial line, and the
+> +          second clock listed must be named "amba_pclk" and clocks
 
-Ah, ok. So it is an "odd man out"-situation again, i.e. there is one
-out of the tree different again? I am fine with it.
+s/amba_pclk/apb_pclk/
 
-Sebastian
+Admittedly, highbank is wrong, but it only has 1 clock. You need to
+allow for that here, but can say it is deprecated. The driver has to
+use the first clock and not use the names. Speaking of names, you
+should list the clock-names property separately.
+
+> +          the internal logic of the serial core
+>  - dmas:           When present, may have one or two dma channels.
+>            The first one must be named "rx", the second one
+>            must be named "tx".
+>
+>  See also bindings/arm/primecell.txt
+> +
+> +Example:
+> +
+> +uart at 80120000 {
+> +       compatible = "arm,pl011", "arm,primecell";
+> +       reg = <0x80120000 0x1000>;
+> +       interrupts = <0 11 IRQ_TYPE_LEVEL_HIGH>;
+> +       dmas = <&dma 13 0 0x2>, <&dma 13 0 0x0>;
+> +       dma-names = "rx", "tx";
+> +       clocks = <&foo_clk>, <&bar_clk>;
+> +       clock-names = "uartclk", "apb_pclk";
+> +};
+> --
+> 1.9.0
+>
