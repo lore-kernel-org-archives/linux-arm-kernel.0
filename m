@@ -1,26 +1,41 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 7 May 2014 09:53:31 -0700
-Subject: [PATCH v5 13/14] ARM: dts: Add PMU support in HiP04
-In-Reply-To: <1399473888-12947-14-git-send-email-haojian.zhuang@linaro.org>
-References: <1399473888-12947-1-git-send-email-haojian.zhuang@linaro.org>
- <1399473888-12947-14-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <20140507165331.GE12692@quad.lixom.net>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Wed, 7 May 2014 18:54:17 +0200
+Subject: mx6qsabresd hangs on linux-next
+In-Reply-To: <CAOMZO5B2QCDmdFxNmcg3ow1p2CeodE43pSSqEN+Ye0Rtm3sW=g@mail.gmail.com>
+References: <CAOMZO5DMEqs=zzNGqgKjK7wTJdiNPgEqxsX=TtqKrnpLMzpbDw@mail.gmail.com>	<20140506141310.GA2794@dragon>	<CAOMZO5DH5d_L-deVu=XmBo9ekq+-g704p7cyayLvp=43bnEccQ@mail.gmail.com>	<CAOMZO5Dx0JMj3dZ7BSgaYSZZ=ZKRqQHEYWj5sb6z_9jc+cpsEw@mail.gmail.com>	<5369081D.5030400@st.com>	<20140506200029.GD5858@pengutronix.de>	<20140507020950.GB2794@dragon>	<20140507033223.GB2798@dragon>	<5369EFA3.8070908@st.com>
+ <CAOMZO5B2QCDmdFxNmcg3ow1p2CeodE43pSSqEN+Ye0Rtm3sW=g@mail.gmail.com>
+Message-ID: <536A6539.7010904@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 07, 2014 at 10:44:47PM +0800, Haojian Zhuang wrote:
-> From: Kefeng Wang <kefeng.wang@linaro.org>
-> 
-> ARM Performance Monitor Units are available on the HiP04.
-> So add the support in the dtsi.
-> 
-> Simply tested with perf.
-> 
-> Signed-off-by: Kefeng Wang <kefeng.wang@linaro.org>
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+Hi Fabio,
 
-This should be squashed into the original dts introduction patch, no need
-to add these separately.
+On 05/07/2014 04:39 PM, Fabio Estevam wrote:
+> Hi Maxime,
+>
+> On Wed, May 7, 2014 at 5:32 AM, Maxime Coquelin <maxime.coquelin@st.com> wrote:
+>
+>> You are right. Sorry for the regression.
+>>
+>> I thought I tested it, as I had some table-based dividers in my test setup.
+>> After checking again, it appears that I didn't had the CLK_SET_RATE_PARENT
+>> flag set on these clocks, so I didn't entered the for loop...
+>>
+>> Could the fix be to initialize "up" variable to INT_MAX in _round_up_table
+>> (see below)?
+>
+> This works fine for me:
+>
+> Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
+>
+>> I can send the patch if you are fine with it.
+>> I have no hardware to test on this week, I only have compiled this patch,
+>> not tested it.
+>
+> Please submit your patch, thanks.
+Thanks for testing it, patch sent.
 
+Regards,
+Maxime
 
--Olof
+>
