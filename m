@@ -1,50 +1,74 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed,  7 May 2014 19:45:48 +0200
-Subject: [PATCH] ARM: at91: sam9260: fix compilation issues
-Message-ID: <1399484748-32718-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Wed,  7 May 2014 19:58:34 +0200
+Subject: [PATCH v2 1/2] i2c: sunxi: add P2WI DT bindings documentation
+In-Reply-To: <1399485515-11243-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1399485515-11243-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1399485515-11243-2-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the hexadecimal values for the triggers to match what is done for the device
-tree. This also fixes compilation issues as the defines have been moved
-elsewhere.
+P2WI (Push/Pull 2 Wire Interface) is an SMBus like bus used to communicate
+with some PMICs (like the AXP221).
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Document P2WI DT bindings which are pretty much the same as the one defined
+for the marvell's mv64xxx controller.
+
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 ---
-I believe that at some point, we may want to reintroduce defines for those
-values but we should probably do that in a dt-bindings include and choose better
-names as the meaning differ between SoCs.
+ .../devicetree/bindings/i2c/i2c-sunxi-p2wi.txt     | 45 ++++++++++++++++++++++
+ 1 file changed, 45 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-sunxi-p2wi.txt
 
- arch/arm/mach-at91/at91sam9260_devices.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
-index fffcd09ac878..a8d0d9cb1bca 100644
---- a/arch/arm/mach-at91/at91sam9260_devices.c
-+++ b/arch/arm/mach-at91/at91sam9260_devices.c
-@@ -1307,19 +1307,19 @@ static struct platform_device at91_adc_device = {
- static struct at91_adc_trigger at91_adc_triggers[] = {
- 	[0] = {
- 		.name = "timer-counter-0",
--		.value = AT91_ADC_TRGSEL_TC0 | AT91_ADC_TRGEN,
-+		.value = 0x1,
- 	},
- 	[1] = {
- 		.name = "timer-counter-1",
--		.value = AT91_ADC_TRGSEL_TC1 | AT91_ADC_TRGEN,
-+		.value = 0x3,
- 	},
- 	[2] = {
- 		.name = "timer-counter-2",
--		.value = AT91_ADC_TRGSEL_TC2 | AT91_ADC_TRGEN,
-+		.value = 0x5,
- 	},
- 	[3] = {
- 		.name = "external",
--		.value = AT91_ADC_TRGSEL_EXTERNAL | AT91_ADC_TRGEN,
-+		.value = 0xd,
- 		.is_external = true,
- 	},
- };
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-sunxi-p2wi.txt b/Documentation/devicetree/bindings/i2c/i2c-sunxi-p2wi.txt
+new file mode 100644
+index 0000000..2574219
+--- /dev/null
++++ b/Documentation/devicetree/bindings/i2c/i2c-sunxi-p2wi.txt
+@@ -0,0 +1,45 @@
++
++* Allwinner P2WI (Push/Pull 2 Wire Interface) controller
++
++Required properties :
++
++ - reg             : Offset and length of the register set for the device.
++ - compatible      : Should one of the following:
++                     - "allwinner,sun6i-a31-p2wi"
++ - interrupts      : The interrupt line connected to the P2WI peripheral.
++ - clocks          : The gate clk connected to the P2WI peripheral.
++ - resets          : The reset line connected to the P2WI peripheral.
++
++Optional properties :
++
++ - clock-frequency : Desired P2WI bus clock frequency in Hz. If not set the
++default frequency is 100kHz
++
++A P2WI may contain one child node encoding a P2WI slave device.
++
++Slave device properties:
++  Required properties:
++   - reg                    : the I2C slave address used during the
++                              initialization process to switch from I2C to
++                              P2WI mode
++
++  Optional:
++   - allwinner,p2wi-mode-reg: the slave register used to select the device
++                              mode (either I2C or P2WI)
++   - allwinner,p2wi-mode-val: the P2WI mode val to set in the P2WI mode
++                              register in order to switch from I2C to P2WI
++                              mode
++
++   If one these optional properties is not specified, the driver assumes the
++   slave device is already configured in P2WI mode.
++
++Example:
++
++	p2wi at 01f03400 {
++		compatible = "allwinner,sun6i-a31-p2wi";
++		reg = <0x01f03400 0x400>;
++		interrupts = <0 39 4>;
++		clocks = <&apb0_gates 3>;
++		clock-frequency = <6000000>;
++		resets = <&apb0_rst 3>;
++	};
 -- 
-1.9.1
+1.8.3.2
