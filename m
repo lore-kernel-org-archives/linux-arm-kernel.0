@@ -1,44 +1,28 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 08 May 2014 08:32:56 +0900
-Subject: [PATCH 04/04] ARM: shmobile: Remove unused r8a7740_init_delay()
-In-Reply-To: <20140507233219.29712.9253.sendpatchset@w520>
-References: <20140507233219.29712.9253.sendpatchset@w520>
-Message-ID: <20140507233256.29712.54976.sendpatchset@w520>
+From: acourbot@nvidia.com (Alex Courbot)
+Date: Thu, 8 May 2014 08:40:15 +0900
+Subject: [PATCH] ARM: tegra: enable console framebuffer rotation
+In-Reply-To: <536A57FA.2090608@wwwdotorg.org>
+References: <1399432682-677-1-git-send-email-acourbot@nvidia.com>
+ <536A57FA.2090608@wwwdotorg.org>
+Message-ID: <536AC45F.6080608@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm+renesas@opensource.se>
+On 05/08/2014 12:57 AM, Stephen Warren wrote:
+> On 05/06/2014 09:18 PM, Alexandre Courbot wrote:
+>> Console rotation is needed for devices like Tegra Note 7 and NVIDIA
+>> SHIELD to get the boot console in the expected orientation.
+>
+> I've squashed this into Tegra's for-3.16/defconfig branch.
+>
+> Can you please also update multi_v7_defconfig, and send that change to
+> arm-soc (arm at kernel.org) to be applied. Thanks.
 
-Remove the now unused r8a7740_init_delay() function.
+I omitted doing this for now because the devices that require this 
+option (TN7/SHIELD) need a custom build with appended DTB and/or 
+command-line anyway. Therefore they cannot use a multi-mach kernel and 
+might as well be built against Tegra's defconfig. Does your remark above 
+still apply in spite of this?
 
-Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
----
-
- arch/arm/mach-shmobile/include/mach/r8a7740.h |    1 -
- arch/arm/mach-shmobile/setup-r8a7740.c        |    5 -----
- 2 files changed, 6 deletions(-)
-
---- 0001/arch/arm/mach-shmobile/include/mach/r8a7740.h
-+++ work/arch/arm/mach-shmobile/include/mach/r8a7740.h	2014-04-24 18:02:10.000000000 +0900
-@@ -47,7 +47,6 @@ enum {
- };
- 
- extern void r8a7740_meram_workaround(void);
--extern void r8a7740_init_delay(void);
- extern void r8a7740_init_irq_of(void);
- extern void r8a7740_map_io(void);
- extern void r8a7740_add_early_devices(void);
---- 0004/arch/arm/mach-shmobile/setup-r8a7740.c
-+++ work/arch/arm/mach-shmobile/setup-r8a7740.c	2014-04-24 18:01:54.000000000 +0900
-@@ -876,11 +876,6 @@ void __init r8a7740_add_standard_devices
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
--void __init r8a7740_init_delay(void)
--{
--	shmobile_setup_delay(800, 1, 3); /* Cortex-A9 @ 800MHz */
--};
--
- void __init r8a7740_init_irq_of(void)
- {
- 	void __iomem *intc_prio_base = ioremap_nocache(0xe6900010, 0x10);
+Thanks,
+Alex.
