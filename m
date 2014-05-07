@@ -1,28 +1,64 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 7 May 2014 11:09:21 -0400 (EDT)
-Subject: [PATCHv4 01/20] usb: ehci-orion: use platform_get_irq() for DT
- probing
-In-Reply-To: <1399470746-2948-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <Pine.LNX.4.44L0.1405071108540.1325-100000@iolanthe.rowland.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 7 May 2014 10:10:08 -0500
+Subject: [PATCH v3 06/20] usb: host: xhci-plat: Add support for the
+ Armada 38x
+In-Reply-To: <20140507122326.54f3febc@free-electrons.com>
+References: <1399335255-589-1-git-send-email-gregory.clement@free-electrons.com>
+ <1399335255-589-7-git-send-email-gregory.clement@free-electrons.com>
+ <20140506153953.GF25849@saruman.home>
+ <20140507122326.54f3febc@free-electrons.com>
+Message-ID: <20140507151008.GD769@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 7 May 2014, Thomas Petazzoni wrote:
-
-> Commit 77dae54ab385033e488d8b07045bc7f8d931740f ('ARM: Kirkwood:
-> ehci-orion: Add device tree binding') added the Device Tree binding
-> for the ehci-orion driver. To achieve that with the irq, it used the
-> irq_of_parse_and_map() function when probed in DT-mode, and
-> platform_get_irq() when probed in non-DT mode.
+On Wed, May 07, 2014 at 12:23:26PM +0200, Thomas Petazzoni wrote:
+> Dear Felipe Balbi,
 > 
-> This is not necessary: platform_get_irq() works just as fine in
-> DT-mode, since the conversion from DT information to 'struct resource'
-> is done by the generic layers of the kernel.
+> On Tue, 6 May 2014 10:39:53 -0500, Felipe Balbi wrote:
 > 
-> Therefore, this commit switches back to use just platform_get_irq().
+> > >  config USB_EHCI_HCD
+> > > diff --git a/drivers/usb/host/Makefile b/drivers/usb/host/Makefile
+> > > index 7530468c9a4f..7a8db7f7dc01 100644
+> > > --- a/drivers/usb/host/Makefile
+> > > +++ b/drivers/usb/host/Makefile
+> > > @@ -19,6 +19,7 @@ xhci-hcd-$(CONFIG_PCI)	+= xhci-pci.o
+> > >  
+> > >  ifneq ($(CONFIG_USB_XHCI_PLATFORM), )
+> > >  	xhci-hcd-y		+= xhci-plat.o
+> > > +	xhci-hcd-$(CONFIG_USB_XHCI_MVEBU)	+= xhci-mvebu.o
+> > 
+> > hmm, this has the potential of resulting in:
+> > 
+> > 	xhci-hcd-m += xhci-mvebu.o
+> > 
+> > I guess it's best to turn this into:
+> > 
+> > ifneq ($(CONFIG_USB_XHCI_PLATFORM), )
+> > 	xhci-hcd-y += xhci-mvebu.o
+> > endif
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> I guess you meant:
+> 
+> ifneq ($(CONFIG_USB_XHCI_MVEBU), )
+> 	xhci-hcd-y += xhci-mvebu.o
+> endif
+> 
+> Right?
 
-For patches 1 - 4:
+correct :-)
 
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
+> If so, then what about instead making CONFIG_USB_XHCI_MVEBU a bool
+> instead of a tristate? It's more an option for the xhci-platform
+> driver than an additional separate module, IMO. What do you think?
+
+fine by me too. It simply adds a quirk callback to xhci-plat.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140507/c4edbf17/attachment.sig>
