@@ -1,87 +1,48 @@
-From: shaik.samsung@gmail.com (Shaik Ameer Basha)
-Date: Wed, 7 May 2014 17:31:35 +0530
-Subject: [PATCH v4 01/15] clk: exynos5420: Rename mux parent arrays
-In-Reply-To: <53692367.30907@gmail.com>
-References: <1399393610-23394-1-git-send-email-shaik.ameer@samsung.com>
- <1399393610-23394-2-git-send-email-shaik.ameer@samsung.com>
- <53692367.30907@gmail.com>
-Message-ID: <CAOD6ATqEyVWBAAFt+GsGCb=8v0pqKfvwQ4ikjd9SW2Y6irW+Tw@mail.gmail.com>
+From: jolsa@redhat.com (Jiri Olsa)
+Date: Wed, 7 May 2014 14:05:21 +0200
+Subject: [PATCH 2/3] perf tests: Add dwarf unwind test on ARM64
+In-Reply-To: <1399391733-11927-3-git-send-email-jean.pihet@linaro.org>
+References: <1399391733-11927-1-git-send-email-jean.pihet@linaro.org>
+ <1399391733-11927-3-git-send-email-jean.pihet@linaro.org>
+Message-ID: <20140507120521.GB2019@krava.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+On Tue, May 06, 2014 at 05:55:32PM +0200, Jean Pihet wrote:
 
-Thanks for the review.
+SNIP
 
-On Tue, May 6, 2014 at 11:31 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> Shaik,
->
->
-> On 06.05.2014 18:26, Shaik Ameer Basha wrote:
->>
->> This patch renames the mux parent arrays as per the naming
->> convension followed by the other exynos specific clock drivers.
->>
->> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
->> Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
->> Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
->> ---
->>   drivers/clk/samsung/clk-exynos5420.c |  359
->> ++++++++++++++++++----------------
->>   1 file changed, 186 insertions(+), 173 deletions(-)
->>
->> diff --git a/drivers/clk/samsung/clk-exynos5420.c
->> b/drivers/clk/samsung/clk-exynos5420.c
->> index 7a9e3b4..831670d 100644
->> --- a/drivers/clk/samsung/clk-exynos5420.c
->> +++ b/drivers/clk/samsung/clk-exynos5420.c
->
->
-> [snip]
->
->
->>   static struct samsung_mux_clock exynos5420_mux_clks[] __initdata = {
->> -       MUX(0, "mout_mspll_kfc", mspll_cpu_p, SRC_TOP7, 8, 2),
->> -       MUX(0, "mout_mspll_cpu", mspll_cpu_p, SRC_TOP7, 12, 2),
->> -       MUX(0, "mout_apll", apll_p, SRC_CPU, 0, 1),
->> -       MUX(0, "mout_cpu", cpu_p, SRC_CPU, 16, 1),
->> -       MUX(0, "mout_kpll", kpll_p, SRC_KFC, 0, 1),
->> -       MUX(0, "mout_cpu_kfc", kfc_p, SRC_KFC, 16, 1),
->> +       MUX(0, "mout_mspll_kfc", mout_mspll_cpu_p, SRC_TOP7, 8, 2),
->> +       MUX(0, "mout_mspll_cpu", mout_mspll_cpu_p, SRC_TOP7, 12, 2),
->> +       MUX(0, "mout_apll", mout_apll_p, SRC_CPU, 0, 1),
->> +       MUX(0, "mout_cpu", mout_cpu_p, SRC_CPU, 16, 1),
->> +       MUX(0, "mout_kpll", mout_kpll_p, SRC_KFC, 0, 1),
->> +       MUX(0, "mout_kfc", mout_kfc_p, SRC_KFC, 16, 1),
->
->
-> Here the clock name is also changed, but I'll just fix the commit message
-> when applying, assuming that this change doesn't break anything.
+> +#include "tests/tests.h"
+> +
+> +#define STACK_SIZE 8192
+> +
+> +static int sample_ustack(struct perf_sample *sample,
+> +			 struct thread *thread, u64 *regs)
+> +{
+> +	struct stack_dump *stack = &sample->user_stack;
+> +	struct map *map;
+> +	unsigned long sp;
+> +	u64 stack_size, *buf;
+> +
+> +	buf = malloc(STACK_SIZE);
+> +	if (!buf) {
+> +		pr_debug("failed to allocate sample uregs data\n");
+> +		return -1;
+> +	}
+> +
+> +	sp = (unsigned long) regs[PERF_REG_ARM64_SP];
+> +
+> +	map = map_groups__find(&thread->mg, MAP__FUNCTION, (u64) sp);
+> +	if (!map) {
+> +		pr_debug("failed to get stack map\n");
+> +		return -1;
+> +	}
 
-Ok. anyways I will try to update the commit message in the next series.
+there's a memory leak of 'buf' already fixed fox x86:
 
-Regards,
-Shaik
+  perf tests x86: Fix memory leak in sample_ustack()
+  commit 763d7f5f2718f085bab5a9e63308349728f3ad12
+  Author: Masanari Iida <standby24x7@gmail.com>
+  Date:   Sun Apr 20 00:16:41 2014 +0900
 
->
->
->>
->> -       MUX(0, "sclk_bpll", bpll_p, SRC_CDREX, 0, 1),
->> +       MUX(0, "sclk_bpll", mout_bpll_p, SRC_CDREX, 0, 1),
->
->
-> [snip]
->
->
->>   static struct samsung_div_clock exynos5420_div_clks[] __initdata = {
->>         DIV(0, "div_arm", "mout_cpu", DIV_CPU0, 0, 3),
->>         DIV(0, "sclk_apll", "mout_apll", DIV_CPU0, 24, 3),
->>         DIV(0, "armclk2", "div_arm", DIV_CPU0, 28, 3),
->> -       DIV(0, "div_kfc", "mout_cpu_kfc", DIV_KFC0, 0, 3),
->> +       DIV(0, "div_kfc", "mout_kfc", DIV_KFC0, 0, 3),
->
->
-> Same here.
->
-> Best regards,
-> Tomasz
+jirka
