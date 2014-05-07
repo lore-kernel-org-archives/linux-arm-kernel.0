@@ -1,193 +1,47 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 6 May 2014 19:24:21 -0500
-Subject: [PATCH] power: twl4030_charger: clear IRQs after handling them
-In-Reply-To: <20140425210036.GO29632@saruman.home>
-References: <1397661299-31342-1-git-send-email-balbi@ti.com>
- <20140416163526.GA3049@atomide.com> <535ACC62.102@ti.com>
- <20140425210036.GO29632@saruman.home>
-Message-ID: <20140507002421.GA19711@kahuna>
+From: pullip.cho@samsung.com (Cho KyongHo)
+Date: Wed, 07 May 2014 09:44:53 +0900
+Subject: [PATCH v12 00/31] iommu/exynos: Fixes and Enhancements of System
+ MMU driver with DT
+In-Reply-To: <5369252F.4070402@gmail.com>
+References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
+ <26065037.GxQQuIURPg@wuerfel>
+ <CAOD6ATqZ5UwRwSKiPDQLrgmX=UUrJVE7ybM_RhXz_CEUjM3W7w@mail.gmail.com>
+ <20140506175904.GB12376@8bytes.org> <5369252F.4070402@gmail.com>
+Message-ID: <20140507094453.28f0429152e5b59a5dda9fd8@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16:00-20140425, Felipe Balbi wrote:
-> On Fri, Apr 25, 2014 at 03:58:10PM -0500, Nishanth Menon wrote:
-> > On 04/16/2014 11:35 AM, Tony Lindgren wrote:
-> > > * Felipe Balbi <balbi@ti.com> [140416 08:18]:
-> > >> TRM says we *must* write 1 to each bit we're handling
-> > >> in order to clear the IRQ status and bring IRQ line
-> > >> low. This patch implements that.
-> > >>
-> > >> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> > >> ---
-> > >>
-> > >> Russell, I don't have HW to test, but this should
-> > >> solve the problem you saw when not using battery
-> > >> with Zoom board. Let me know if it doesn't.
-> > > 
-> > > BTW, looks like we're enabling BCI automatically in twl4030.dtsi
-> > > while the legacy booting does not have TWL_COMMON_PDATA_BCI
-> > > enabled for LDP. Anyways, for LDP BCI should be enabled for
-> > > sure, that's the only way to power at least the earlier LDP
-> > > revisions.
-> > > 
-> > I picked up https://patchwork.kernel.org/patch/4002371/ for testing.
-> > 
-> > Unfortunately, it does not seem to work in my tests:
+On Tue, 06 May 2014 20:08:47 +0200, Tomasz Figa wrote:
+> On 06.05.2014 19:59, Joerg Roedel wrote:
+> > On Wed, Apr 30, 2014 at 04:27:10PM +0530, Shaik Ameer Basha wrote:
+> >> This series is going on for quite a long time and most of the patches here
+> >> doesn't depend on dt bindings. As Exynos IOMMU h/w is introducing new versions
+> >> very frequently, maintaining and reviewing all these patches again and
+> >> again is quite a hard job.
+> >>
+> >> If it is acceptable, I can post one more series with the subset of
+> >> above patches,
+> >> which doesn't depend on dt-bindings. As all the patches which doesn't depend on
+> >> DT bindings are already tested,  I hope merging these subset of patches may help
+> >> in reducing the rework and review effort every time.
+> >>
+> >> Once we finalize the generic DT bindings for the IOMMU devices, the driver
+> >> can be updated with the proposed DT bindings in mind.
+> >
+> > Sounds reasonable to me if the patch subset is self-contained. When
+> > Arnd is OK with that and no one else has objections I can take the
+> > dt-independend parts.
 > 
-> alright, I'll have a look after I get this other issue out of the way.
-> Probably not until next week.
+> +1.
+> 
+> I would also suggest dropping patch 18/31, for the reasons I mentioned 
+> in my reply to it.
+> 
 
-I dug a bit more into this earlier today. It makes a little sense
-considering that TWL4030 was created in a world where mobile devices did
-not consider battery was hot pluggable entity.. 
+Great.
 
-Long story short:
-a) the BCI interrupt status register is read-on-clear (see
-drivers/mfd/twl4030-irq.c set_cor is set to true for bci) - so the patch
-https://patchwork.kernel.org/patch/4002371/ is practically a NOP.
-b) BATSTS is a result of MADC monitoring the thermistor and is
-continually generated. I tried a bunch of tricks that I could come up
-with to try to do a hotplug support, but either we have infinite
-interrupts (due to regeneration of event) or I loose detection ability.
+We will prepare the next patch series that are independent upon DT bindings soon.
 
-So, to keep things simple I created the following patch that seems to
-handle:
-a) no battery connected, powered off charger - bci disabled
-b) battery connected, powered off charger - bci active
-c) battery connected, no charger - bci active
+Thank you.
 
-note: if battery was connected, and booted and we hotplug battery out,
-we still have the spam of messages.. that is a seperate patch
-(basically do an orderly shutdown - I cant think of anything else we
-could possible do there)
-
-Let me know your views.. if this approach is fine, I can post out formal
-patches for the same.
------8<----
->From 9474c7f37990b97c57b72eed917b9153595133ff Mon Sep 17 00:00:00 2001
-From: Nishanth Menon <nm@ti.com>
-Date: Tue, 6 May 2014 19:02:49 -0500
-Subject: [PATCH] power: twl4030_charger: detect battery presence prior to
- enabling charger
-
-TWL4030's Battery Charger seems to be designed for non-hotpluggable
-batteries.
-
-If battery is not present in the system, BATSTS is always set with the
-expectation that software will take actions to move to a required safe
-state (could be power down or disable various charger paths).
-
-It does not seem possible even by manipulating the edge detection
-of the event (using BCIEDR2 register) to have a consistent hotplug
-handling. This seems to be the result of BATSTS interrupt generated
-when the thermistor of the battery pack is disconnected from the
-dedicated ADIN1 pin. Clearing the status just results in the status
-being regenerated by the monitoring ADC(MADC) and disabling the
-edges of event just makes hotplug no longer function. The only
-other option is to disable the detection of the MADC by disabling
-BCIMFEN4::BATSTSMCHGEN (battery presence detector) - but then, we can
-never again detect battery reconnection.
-
-So, detect battery presence based on precharge(which is hardware
-automatic state) or default main charger configuration at the time of
-probe and enable charger logic only if battery was present.
-
-Reported-by: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- drivers/power/twl4030_charger.c |   43 ++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 42 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/power/twl4030_charger.c b/drivers/power/twl4030_charger.c
-index f141088..14ec220 100644
---- a/drivers/power/twl4030_charger.c
-+++ b/drivers/power/twl4030_charger.c
-@@ -28,10 +28,13 @@
- #define TWL4030_BCIICHG		0x08
- #define TWL4030_BCIVAC		0x0a
- #define TWL4030_BCIVBUS		0x0c
-+#define TWL4030_BCIMFSTS3	0x0F
- #define TWL4030_BCIMFSTS4	0x10
- #define TWL4030_BCICTL1		0x23
- #define TWL4030_BB_CFG		0x12
- 
-+#define TWL4030_BCIMFSTS1	0x01
-+
- #define TWL4030_BCIAUTOWEN	BIT(5)
- #define TWL4030_CONFIG_DONE	BIT(4)
- #define TWL4030_BCIAUTOUSB	BIT(1)
-@@ -52,6 +55,9 @@
- #define TWL4030_BBISEL_500uA	0x02
- #define TWL4030_BBISEL_1000uA	0x03
- 
-+#define TWL4030_BATSTSPCHG	BIT(2)
-+#define TWL4030_BATSTSMCHG	BIT(6)
-+
- /* BCI interrupts */
- #define TWL4030_WOVF		BIT(0) /* Watchdog overflow */
- #define TWL4030_TMOVF		BIT(1) /* Timer overflow */
-@@ -145,6 +151,34 @@ static int twl4030bci_read_adc_val(u8 reg)
- }
- 
- /*
-+ * Check if Battery Pack was present
-+ */
-+static int twl4030_is_battery_present(struct twl4030_bci *bci)
-+{
-+	int ret;
-+	u8 val = 0;
-+
-+	/* Battery presence in Main charge? */
-+	ret = twl_i2c_read_u8(TWL_MODULE_MAIN_CHARGE, &val, TWL4030_BCIMFSTS3);
-+	if (ret)
-+		return ret;
-+	if (val & TWL4030_BATSTSMCHG)
-+		return 0;
-+
-+	/*
-+	 * OK, It could be that bootloader did not enable main charger,
-+	 * pre-charge is h/w auto. So, Battery presence in Pre-charge?
-+	 */
-+	ret = twl_i2c_read_u8(TWL4030_MODULE_PRECHARGE, &val, TWL4030_BCIMFSTS1);
-+	if (ret)
-+		return ret;
-+	if (val & TWL4030_BATSTSPCHG)
-+		return 0;
-+
-+	return -ENODEV;
-+}
-+
-+/*
-  * Check if VBUS power is present
-  */
- static int twl4030_bci_have_vbus(struct twl4030_bci *bci)
-@@ -541,8 +575,14 @@ static int __init twl4030_bci_probe(struct platform_device *pdev)
- 	bci->irq_chg = platform_get_irq(pdev, 0);
- 	bci->irq_bci = platform_get_irq(pdev, 1);
- 
--	platform_set_drvdata(pdev, bci);
-+	/* Only proceed further *IF* battery is physically present */
-+	ret = twl4030_is_battery_present(bci);
-+	if  (ret) {
-+		dev_crit(&pdev->dev, "Battery was not detected:%d\n", ret);
-+		goto fail_no_battery;
-+	}
- 
-+	platform_set_drvdata(pdev, bci);
- 	bci->ac.name = "twl4030_ac";
- 	bci->ac.type = POWER_SUPPLY_TYPE_MAINS;
- 	bci->ac.properties = twl4030_charger_props;
-@@ -633,6 +673,7 @@ fail_chg_irq:
- fail_register_usb:
- 	power_supply_unregister(&bci->ac);
- fail_register_ac:
-+fail_no_battery:
- 	kfree(bci);
- 
- 	return ret;
--- 
-1.7.9.5
-
--- 
-Regards,
-Nishanth Menon
+KyongHo
