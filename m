@@ -1,55 +1,56 @@
-From: bjorn@kryo.se (Bjorn Andersson)
-Date: Wed, 7 May 2014 08:29:17 -0700
-Subject: [PATCH] ARM: zImage: Allow DTB to override broken ATAG_MEM
-In-Reply-To: <20140507080650.GA28564@pengutronix.de>
-References: <1399439776-18535-1-git-send-email-bjorn.andersson@sonymobile.com>
- <20140507080650.GA28564@pengutronix.de>
-Message-ID: <CAJAp7OiVrz+epys3Ko79GmMr6ahv8ii8XphVHE77NSM+wK2mOA@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 7 May 2014 10:29:35 -0500
+Subject: [PATCH V6 0/2] arm: dts: dra7: Updates for adding crossbar device
+In-Reply-To: <20140507145656.GG2626@ti.com>
+References: <1399464998-23216-1-git-send-email-r.sricharan@ti.com>
+ <20140507145656.GG2626@ti.com>
+Message-ID: <536A515F.3010402@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 7, 2014 at 1:06 AM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-> On Tue, May 06, 2014 at 10:16:16PM -0700, Bjorn Andersson wrote:
->> Support overriding ATAG_MEM, by specifying non-zero content of the /memory/reg
->> property in the appended DTB. This is needed to work around bootloaders passing
->> broken tags.
-> This feels wrong. I think it's quite usual that the device tree
-> specifies a non-0 /memory/reg property. I checked four more or less
-> random dts files[1], and three of them have this property set with
-> actual values.
+Tony,
 
-I thought u-boot did something like this, but after checking the code
-it seems that I
-was wrong.
+On 05/07/2014 09:56 AM, Darren Etheridge wrote:
+> Sricharan R <r.sricharan@ti.com> wrote on Wed [2014-May-07 17:46:36 +0530]:
+>> Some socs have a large number of interrupts requests to service
+>> the needs of its many peripherals and subsystems. All of the interrupt
+>> requests lines from the subsystems are not needed at the same
+>> time, so they have to be muxed to the controllers appropriately.
+>> In such places a interrupt controllers are preceded by an
+>> IRQ CROSSBAR that provides flexibility in muxing the device interrupt
+>> requests to the controller inputs.
+>>
+>> The dts file update to support the crossbar device and convert
+>> peripheral irq numbers to crossbar number are added here.
+>>
+>> This is a rebase on top of 3.15-rc4
+>>
+>> This series depends on crossbar-driver-fixes sent below
+>> http://marc.info/?l=linux-omap&m=139929963420299&w=2
+>>
+>> [V6] Reordered patch 3 to patch 1 and
+>>      squashed patch 2 and 3 from V5 in to patch 2
+>>
+>> Sricharan R (2):
+>>   arm: dts: dra7: Add routable-irqs property for gic node
+>>   arm: dts: dra7: Add crossbar device binding
+>>
+> 
+> Just for thoroughness I dropped the previous 3 patch series from my
+> build and replaced with this two patch series.  Everything still works
+> with my test setup so I consider these patches good.
+> 
 
-But if that's not the case then you're right; we have to continue to
-be bug-compatible
-with all those dtbs out there.
+It looks like in further tests, there may be more interrupts like irq
+10 which are not documented properly and if mapped results in the
+feature not working. It does seem that we might need more detailed
+validation as this seems to have skipped our "non-OS validation" flow
+unfortunately. we are in discussion with silicon folks on these
+"undocumented behavior" we are discovering :(.
 
->
-> So I wouldn't be surprised if this patch results in more damage than
-> it's worth. The optimal fix would be to make the bootloader do the right
-> thing. And if you trust your dtb more than your bootloader, disable
-> ARM_ATAG_DTB_COMPAT.
+I suggest holding the series till we have done complete validation of
+the same and explanation for the behavior we see.
 
-I unfortunately have a boot loader passing information in ATAG_CMDLINE that I
-need, so I can't disable ARM_ATAG_DTB_COMPAT.
-
-
-My problem is that the boot loader on every shipped Qualcomm MSM8x60, MSM8960
-and APQ8064 based device passes ATAG_MEM with the incorrect start address. There
-is no way to update the boot loader for these.
-
-For development I have a .init_meminfo in my board file patching the
-meminfo; this looks
-really bad so I'm hoping we can find some alternative solution.
-
-The proposed solution from some of the people working on this is to
-(post build) patch the
-zImage to inject code that corrects the ATAG_MEM before jumping to the
-kernel; but I am
-hoping we can find some sane way instead...
-
+-- 
 Regards,
-Bjorn
+Nishanth Menon
