@@ -1,68 +1,148 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 7 May 2014 12:59:00 -0400 (EDT)
-Subject: [PATCH v5 06/14] ARM: mcpm: support 4 clusters
-In-Reply-To: <1399473888-12947-7-git-send-email-haojian.zhuang@linaro.org>
-References: <1399473888-12947-1-git-send-email-haojian.zhuang@linaro.org>
- <1399473888-12947-7-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <alpine.LFD.2.11.1405071256280.980@knanqh.ubzr>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 07 May 2014 19:03:27 +0200
+Subject: [PATCH v2 1/2] ARM: EXYNOS: Map SYSRAM through generic SRAM
+ bindings
+In-Reply-To: <CAK9yfHz6PVT2C-TZkFHqtdj4rT-R8w+aU=jTTnLMF5k4JOXGxg@mail.gmail.com>
+References: <1399363824-23543-1-git-send-email-sachin.kamat@linaro.org>
+ <53691187.80101@gmail.com>
+ <CAK9yfHz6PVT2C-TZkFHqtdj4rT-R8w+aU=jTTnLMF5k4JOXGxg@mail.gmail.com>
+Message-ID: <536A675F.9040204@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 7 May 2014, Haojian Zhuang wrote:
-
-> Add the CONFIG_MCPM_QUAD_CLUSTER configuration to enlarge cluster number
-> from 2 to 4.
+On 06.05.2014 20:09, Sachin Kamat wrote:
+[snip]
+> On 6 May 2014 22:14, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+[snip]
+>> On 06.05.2014 10:10, Sachin Kamat wrote:
+[snip]
+>>> diff --git a/arch/arm/mach-exynos/platsmp.c
+>>> b/arch/arm/mach-exynos/platsmp.c
+>>> index 03e5e9f94705..ccbcdd7b8a86 100644
+>>> --- a/arch/arm/mach-exynos/platsmp.c
+>>> +++ b/arch/arm/mach-exynos/platsmp.c
+>>> @@ -20,6 +20,7 @@
+>>>   #include <linux/jiffies.h>
+>>>   #include <linux/smp.h>
+>>>   #include <linux/io.h>
+>>> +#include <linux/of_address.h>
+>>>
+>>>   #include <asm/cacheflush.h>
+>>>   #include <asm/smp_plat.h>
+>>> @@ -33,11 +34,35 @@
+>>>
+>>>   extern void exynos4_secondary_startup(void);
+>>>
+>>> +static void __iomem *sram_base_addr;
+>>> +void __iomem *sram_ns_base_addr;
+>>
+>>
+>> This is probably just a matter of preference, but I'd make this static and
+>> provide a getter function, like exynos_get_sram_ns_base();
+>>
+>> Also this address seems to be used by the firmware code exclusively. If we
+>> want to make the firmware code more self-contained, maybe the mapping of
+>> firmware-specific SRAM region could be handled there, instead? This would
+>> also eliminate the need for having an exported variable or getter function.
+>> What do you think?
 > 
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
-> ---
->  arch/arm/Kconfig            | 9 +++++++++
->  arch/arm/include/asm/mcpm.h | 5 +++++
->  2 files changed, 14 insertions(+)
+> I thought of the same. However 2 reasons prevented me from implementing this.
 > 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 0e52a2c..624829f 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1575,6 +1575,15 @@ config MCPM
->  	  for (multi-)cluster based systems, such as big.LITTLE based
->  	  systems.
->  
-> +config MCPM_QUAD_CLUSTER
-> +	bool "Enable Quad clusters in MCPM"
+> 1. Code duplication
+> 2. This code should be executed only once. I put it in exynos_firmware_init.
+> However it gave a crash while doing of_iomap. So moved it back to the current
+> location.
+>
 
-Please remove the prompt string, keeping only the bool alone.  This 
-config option shouldn't be visible to users.  After that you may add:
+Right, exynos_firmware_init() is called too early, before ioremap() is
+available, so there is no good place to put this in firmware code. So,
+let's keep this as is for now and eventually move it to firmware if
+needed and/or a proper method of initialization is available.
 
-Reviewed-by: Nicolas Pitre <nico@linaro.org>
-
-
-> +	depends on MCPM
-> +	help
-> +	  To avoid wasting resources unnecessarily, MCPM only supports up
-> +	  to 2 clusters by default.
-> +	  Platforms with 3 or 4 clusters that use MCPM must select this
-> +	  option to allow the additional clusters to be managed.
-> +
->  config BIG_LITTLE
->  	bool "big.LITTLE support (Experimental)"
->  	depends on CPU_V7 && SMP
-> diff --git a/arch/arm/include/asm/mcpm.h b/arch/arm/include/asm/mcpm.h
-> index 608516e..fc8d70d 100644
-> --- a/arch/arm/include/asm/mcpm.h
-> +++ b/arch/arm/include/asm/mcpm.h
-> @@ -20,7 +20,12 @@
->   * to consider dynamic allocation.
->   */
->  #define MAX_CPUS_PER_CLUSTER	4
-> +
-> +#ifdef CONFIG_MCPM_QUAD_CLUSTER
-> +#define MAX_NR_CLUSTERS		4
-> +#else
->  #define MAX_NR_CLUSTERS		2
-> +#endif
->  
->  #ifndef __ASSEMBLY__
->  
-> -- 
-> 1.9.1
+>>
+>>
+>>> +
+>>> +static void __init exynos_smp_prepare_sram(void)
+>>> +{
+>>> +       struct device_node *node;
+>>> +
+>>> +       for_each_compatible_node(node, NULL, "samsung,exynos4210-sram") {
+>>> +               if (of_device_is_available(node)) {
+>>> +                       sram_base_addr = of_iomap(node, 0);
+>>> +                       if (!sram_base_addr)
+>>> +                               pr_err("Secondary CPU boot address not
+>>> found\n");
+>>
+>>
+>> I don't think this is an error at this stage. Some platforms might not have
+>> either of these SRAM reserved regions (such as those using INFORM registers
+>> instead). Instead, the base address should be checked whenever it is needed
+>> and errors should be handled then, like in exynos_set_cpu_boot_addr().
 > 
+> Yes. This is more from an information perspective. Probably pr_warn or
+> pr_info would
+> be better?
+> 
+
+IMHO this shouldn't produce any messages at this stage. Just whenever
+either of addresses is actually needed and is not initialized a message
+should be printed.
+
+>>> +}
+>>> +
+>>>   static inline void __iomem *cpu_boot_reg_base(void)
+>>>   {
+>>>         if (soc_is_exynos4210() && samsung_rev() == EXYNOS4210_REV_1_1)
+>>>                 return S5P_INFORM5;
+>>> -       return S5P_VA_SYSRAM;
+>>> +       return sram_base_addr;
+>>>   }
+>>>
+>>>   static inline void __iomem *cpu_boot_reg(int cpu)
+>>> @@ -147,7 +172,8 @@ static int exynos_boot_secondary(unsigned int cpu,
+>>> struct task_struct *idle)
+>>>                  * and fall back to boot register if it fails.
+>>>                  */
+>>>                 if (call_firmware_op(set_cpu_boot_addr, phys_cpu,
+>>> boot_addr))
+>>> -                       __raw_writel(boot_addr, cpu_boot_reg(phys_cpu));
+>>> +                       if (cpu_boot_reg_base())
+>>> +                               __raw_writel(boot_addr,
+>>> cpu_boot_reg(phys_cpu));
+>>
+>>
+>> I'd rework this for proper error handling, e.g.
+>>
+>>         int ret;
+>>
+>>         /* ... */
+>>
+>>         ret = call_firmware_op(set_cpu_boot_addr, phys_cpu, boot_addr);
+>>         if (ret && ret != -ENOSYS)
+>>                 goto fail;
+>>         if (ret == -ENOSYS) {
+>>                 /* Fall back to firmware-less way. */
+>>                 void __iomem *boot_reg = cpu_boot_reg(phys_cpu);
+>>
+>>                 if (IS_ERR(boot_reg)) {
+>>                         ret = PTR_ERR(boot_reg);
+>>                         goto fail;
+>>                 }
+>>         }
+>>
+>>         /* ... */
+>>
+>> fail:
+>>         /* Clean-up after error */
+>>
+>> Of course, cpu_boot_reg() will need to be converted to follow the ERR_PTR()
+>> model, but IMHO proper error handling is a good reason to do so.
+> 
+> How about handling this separately outside this patch?
+> 
+
+This patch is already changing surroundings of this code, so I'd say it
+should do it the right way from the start.
+
+Best regards,
+Tomasz
