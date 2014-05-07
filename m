@@ -1,71 +1,38 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 7 May 2014 15:04:27 -0700
-Subject: [PATCH 01/26] ARM: OMAP: dmtimer: Remove setting of clk parent
- indirectly through platform hook
-In-Reply-To: <536AA900.4040200@ti.com>
-References: <1398375849-6017-1-git-send-email-joelf@ti.com>
- <1398375849-6017-2-git-send-email-joelf@ti.com>
- <20140507151907.GB9502@atomide.com> <536AA900.4040200@ti.com>
-Message-ID: <20140507220426.GC19102@atomide.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 7 May 2014 17:03:17 -0500
+Subject: [PATCH 5/7] usb: ohci-platform: Enable optional use of reset
+ controller
+In-Reply-To: <536A5EBF.10309@cogentembedded.com>
+References: <1399434623-20383-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1399434623-20383-6-git-send-email-maxime.ripard@free-electrons.com>
+ <536A5EBF.10309@cogentembedded.com>
+Message-ID: <20140507220317.GD7047@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Joel Fernandes <joelf@ti.com> [140507 14:44]:
-> On 05/07/2014 10:19 AM, Tony Lindgren wrote:
-> > * Joel Fernandes <joelf@ti.com> [140424 14:44]:
-> >> There is a platform specific hook just for OMAP1 to set its clk parent.  Remove
-> >> this hook and have OMAP1 set its parent in omap1_dm_timer_init.  If OMAP1 is
-> >> ever migrated to clock framework, the correct way to do this would be through
-> >> clk_set_parent like other platforms.
-> >>
-> >> Signed-off-by: Joel Fernandes <joelf@ti.com>
-> >> ---
-> >>  arch/arm/mach-omap1/timer.c                |    8 +++++++-
-> >>  arch/arm/plat-omap/dmtimer.c               |    8 +++-----
-> >>  include/linux/platform_data/dmtimer-omap.h |    2 --
-> >>  3 files changed, 10 insertions(+), 8 deletions(-)
-> >>
-> >> diff --git a/arch/arm/mach-omap1/timer.c b/arch/arm/mach-omap1/timer.c
-> >> index bde7a35..4b9c604 100644
-> >> --- a/arch/arm/mach-omap1/timer.c
-> >> +++ b/arch/arm/mach-omap1/timer.c
-> >> @@ -140,7 +140,13 @@ static int __init omap1_dm_timer_init(void)
-> >>  			goto err_free_pdata;
-> >>  		}
-> >>  
-> >> -		pdata->set_timer_src = omap1_dm_timer_set_src;
-> >> +		/*
-> >> +		 * Since OMAP1 doesn't support clock framework, set timer clock
-> >> +		 * source to 32KHz here instead of expecting it to be set by
-> >> +		 * dmtimer code.
-> >> +		 */
-> >> +		omap1_dm_timer_set_src(pdev, 0x01);
-> >> +
-> >>  		pdata->timer_capability = OMAP_TIMER_ALWON |
-> >>  				OMAP_TIMER_NEEDS_RESET | OMAP_TIMER_HAS_DSP_IRQ;
-> >>  
-> > 
-> > This does not sound right, omap1 does support clock framework just fine.
-> > It is not using the common clock framework though.
-> > 
-> > This breaks omap_dm_timer_set_source() for sure. Setting the source
-> > during init is not a right solution here. Probably best to keep the
-> > pdata hook around, drivers can support pdata and DT data together
-> > just fine.
+On Wed, May 07, 2014 at 08:26:39PM +0400, Sergei Shtylyov wrote:
+> Hello.
 > 
-> Actually pdata hook in this case is used only in 1 place, and is OMAP1
-> specific so I felt its better to clean it up.
+> On 07-05-2014 7:50, Maxime Ripard wrote:
 > 
-> Can you elaborate a bit more on why it breaks? I have no way of testing
-> OMAP1 without hardware.
+> >The OHCI controllers used in the Allwinner A31 are asserted in reset using a
 > 
-> What difference is it to set MOD_CONF_CTRL_1 in omap1's
-> arch_initcall(omap1_dm_timer_init)  versus doing so later?
+>    s/asserted/powered up/?
 
-You're making a driver behave in a different way for omap1
-compared to omap2+ where selecting the clock source won't work
-for omap1.
+No. There's an external reset controller that maintains these devices
+into reset. It's not only a power on thing, it can also be put back
+into reset later in the life of the system.
 
-Regards,
+Maxime
 
-Tony
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140507/1cc9568f/attachment.sig>
