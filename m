@@ -1,45 +1,55 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 7 May 2014 17:14:56 +0200
-Subject: [PATCH v3 06/20] usb: host: xhci-plat: Add support for the
- Armada 38x
-In-Reply-To: <20140507151008.GD769@saruman.home>
-References: <1399335255-589-1-git-send-email-gregory.clement@free-electrons.com>
- <1399335255-589-7-git-send-email-gregory.clement@free-electrons.com>
- <20140506153953.GF25849@saruman.home>
- <20140507122326.54f3febc@free-electrons.com>
- <20140507151008.GD769@saruman.home>
-Message-ID: <20140507171456.3124ec71@free-electrons.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 7 May 2014 08:19:08 -0700
+Subject: [PATCH 01/26] ARM: OMAP: dmtimer: Remove setting of clk parent
+ indirectly through platform hook
+In-Reply-To: <1398375849-6017-2-git-send-email-joelf@ti.com>
+References: <1398375849-6017-1-git-send-email-joelf@ti.com>
+ <1398375849-6017-2-git-send-email-joelf@ti.com>
+Message-ID: <20140507151907.GB9502@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Felipe Balbi,
-
-On Wed, 7 May 2014 10:10:08 -0500, Felipe Balbi wrote:
-
-> > ifneq ($(CONFIG_USB_XHCI_MVEBU), )
-> > 	xhci-hcd-y += xhci-mvebu.o
-> > endif
-> > 
-> > Right?
+* Joel Fernandes <joelf@ti.com> [140424 14:44]:
+> There is a platform specific hook just for OMAP1 to set its clk parent.  Remove
+> this hook and have OMAP1 set its parent in omap1_dm_timer_init.  If OMAP1 is
+> ever migrated to clock framework, the correct way to do this would be through
+> clk_set_parent like other platforms.
 > 
-> correct :-)
+> Signed-off-by: Joel Fernandes <joelf@ti.com>
+> ---
+>  arch/arm/mach-omap1/timer.c                |    8 +++++++-
+>  arch/arm/plat-omap/dmtimer.c               |    8 +++-----
+>  include/linux/platform_data/dmtimer-omap.h |    2 --
+>  3 files changed, 10 insertions(+), 8 deletions(-)
 > 
-> > If so, then what about instead making CONFIG_USB_XHCI_MVEBU a bool
-> > instead of a tristate? It's more an option for the xhci-platform
-> > driver than an additional separate module, IMO. What do you think?
-> 
-> fine by me too. It simply adds a quirk callback to xhci-plat.
+> diff --git a/arch/arm/mach-omap1/timer.c b/arch/arm/mach-omap1/timer.c
+> index bde7a35..4b9c604 100644
+> --- a/arch/arm/mach-omap1/timer.c
+> +++ b/arch/arm/mach-omap1/timer.c
+> @@ -140,7 +140,13 @@ static int __init omap1_dm_timer_init(void)
+>  			goto err_free_pdata;
+>  		}
+>  
+> -		pdata->set_timer_src = omap1_dm_timer_set_src;
+> +		/*
+> +		 * Since OMAP1 doesn't support clock framework, set timer clock
+> +		 * source to 32KHz here instead of expecting it to be set by
+> +		 * dmtimer code.
+> +		 */
+> +		omap1_dm_timer_set_src(pdev, 0x01);
+> +
+>  		pdata->timer_capability = OMAP_TIMER_ALWON |
+>  				OMAP_TIMER_NEEDS_RESET | OMAP_TIMER_HAS_DSP_IRQ;
+>  
 
-In the end, I settled on keeping the tristate, and used your
-suggestion. Because since xhci-plat itself is a blind option, and
-xhci-mvebu selects it, if xhci-mvebu is a bool, there would no longer
-be a way to have xhci-plat as a module. At least that's my
-understanding of the kconfig stuff :)
+This does not sound right, omap1 does support clock framework just fine.
+It is not using the common clock framework though.
 
-Thanks!
+This breaks omap_dm_timer_set_source() for sure. Setting the source
+during init is not a right solution here. Probably best to keep the
+pdata hook around, drivers can support pdata and DT data together
+just fine.
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Regards,
+
+Tony
