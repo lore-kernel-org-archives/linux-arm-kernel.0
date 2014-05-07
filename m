@@ -1,100 +1,36 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Wed,  7 May 2014 22:44:44 +0800
-Subject: [PATCH v5 10/14] ARM: config: append hip04_defconfig
+Date: Wed,  7 May 2014 22:44:45 +0800
+Subject: [PATCH v5 11/14] ARM: config: select ARCH_HISI in hi3xxx_defconfig
 In-Reply-To: <1399473888-12947-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1399473888-12947-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1399473888-12947-11-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1399473888-12947-12-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Select HiP04 SoC configuration by hip04_defconfig.
+Since ARCH_HISI is added as common configuration of both ARCH_HI3xxx and
+ARCH_HIP04, update it into hi3xxx_defconfig.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- arch/arm/configs/hip04_defconfig | 75 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 75 insertions(+)
- create mode 100644 arch/arm/configs/hip04_defconfig
+ arch/arm/configs/hi3xxx_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/configs/hip04_defconfig b/arch/arm/configs/hip04_defconfig
-new file mode 100644
-index 0000000..96073b5
---- /dev/null
-+++ b/arch/arm/configs/hip04_defconfig
-@@ -0,0 +1,75 @@
-+CONFIG_SYSVIPC=y
-+CONFIG_POSIX_MQUEUE=y
-+CONFIG_IRQ_DOMAIN_DEBUG=y
-+CONFIG_NO_HZ=y
-+CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_BSD_PROCESS_ACCT=y
-+CONFIG_BLK_DEV_INITRD=y
-+CONFIG_RD_GZIP=y
-+# CONFIG_ARCH_MULTI_V6 is not set
-+CONFIG_ARCH_MULTI_V7=y
-+# CONFIG_ARCH_MULTI_V7_NONLPAE is not set
-+CONFIG_ARCH_MULTI_V7_LPAE=y
+diff --git a/arch/arm/configs/hi3xxx_defconfig b/arch/arm/configs/hi3xxx_defconfig
+index f186bdf..553e1b6 100644
+--- a/arch/arm/configs/hi3xxx_defconfig
++++ b/arch/arm/configs/hi3xxx_defconfig
+@@ -3,10 +3,12 @@ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_BLK_DEV_INITRD=y
+ CONFIG_RD_LZMA=y
 +CONFIG_ARCH_HISI=y
-+CONFIG_ARCH_HIP04=y
-+CONFIG_SMP=y
-+CONFIG_NR_CPUS=16
-+CONFIG_MCPM=y
-+CONFIG_MCPM_QUAD_CLUSTER=y
-+CONFIG_PREEMPT=y
-+CONFIG_AEABI=y
-+CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_ARM_ATAG_DTB_COMPAT=y
-+CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_FROM_BOOTLOADER=y
+ CONFIG_ARCH_HI3xxx=y
+ CONFIG_SMP=y
+ CONFIG_PREEMPT=y
+ CONFIG_AEABI=y
 +CONFIG_HIGHMEM=y
-+CONFIG_VFP=y
-+CONFIG_NEON=y
-+CONFIG_NET=y
-+CONFIG_UNIX=y
-+CONFIG_INET=y
-+CONFIG_IP_PNP=y
-+CONFIG_IP_PNP_DHCP=y
-+CONFIG_DEVTMPFS=y
-+CONFIG_DEVTMPFS_MOUNT=y
-+CONFIG_BLK_DEV=y
-+CONFIG_BLK_DEV_LOOP=y
-+CONFIG_BLK_DEV_LOOP_MIN_COUNT=8
-+CONFIG_BLK_DEV_RAM=y
-+CONFIG_BLK_DEV_RAM_COUNT=16
-+CONFIG_BLK_DEV_RAM_SIZE=4096
-+CONFIG_BLK_DEV_SD=y
-+CONFIG_ATA=y
-+CONFIG_SATA_AHCI_PLATFORM=y
-+CONFIG_NETDEVICES=y
-+CONFIG_SERIAL_8250=y
-+CONFIG_SERIAL_8250_CONSOLE=y
-+CONFIG_SERIAL_8250_NR_UARTS=2
-+CONFIG_SERIAL_8250_RUNTIME_UARTS=2
-+CONFIG_SERIAL_8250_DW=y
-+CONFIG_SERIAL_OF_PLATFORM=y
-+CONFIG_I2C_DESIGNWARE_PLATFORM=y
-+CONFIG_PINCTRL_SINGLE=y
-+CONFIG_GPIO_GENERIC_PLATFORM=y
-+CONFIG_REGULATOR_GPIO=y
-+CONFIG_DRM=y
-+CONFIG_FB_SIMPLE=y
-+CONFIG_RTC_CLASS=y
-+CONFIG_EXT4_FS=y
-+CONFIG_TMPFS=y
-+CONFIG_NFS_FS=y
-+CONFIG_NFS_V3_ACL=y
-+CONFIG_NFS_V4=y
-+CONFIG_ROOT_NFS=y
-+CONFIG_PRINTK_TIME=y
-+CONFIG_DEBUG_FS=y
-+CONFIG_DEBUG_KERNEL=y
-+CONFIG_DEBUG_LL=y
-+CONFIG_DEBUG_UART_8250=y
-+CONFIG_EARLY_PRINTK=y
-+CONFIG_LOCKUP_DETECTOR=y
-+CONFIG_DEBUG_USER=y
-+CONFIG_VIRTUALIZATION=y
-+CONFIG_KVM=y
-+CONFIG_KVM_ARM_HOST=y
-+CONFIG_KVM_ARM_MAX_VCPUS=4
-+CONFIG_KVM_ARM_VGIC=y
+ CONFIG_ARM_APPENDED_DTB=y
+ CONFIG_NET=y
+ CONFIG_UNIX=y
 -- 
 1.9.1
