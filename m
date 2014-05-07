@@ -1,54 +1,28 @@
-From: marek.belisko@gmail.com (Belisko Marek)
-Date: Wed, 7 May 2014 07:35:26 +0200
-Subject: [PATCH v2 0/3] Add display support for gta04 device
-In-Reply-To: <1398284120-4986-1-git-send-email-marek@goldelico.com>
-References: <1398284120-4986-1-git-send-email-marek@goldelico.com>
-Message-ID: <CAAfyv34a3FfKUzwz7UDt-77V692eLdJL+h4c0pve2V+g351Weg@mail.gmail.com>
+From: zhangwm@marvell.com (Neil Zhang)
+Date: Wed, 7 May 2014 13:50:23 +0800
+Subject: [PATCH] ARM: remove redundant code in machine_halt
+Message-ID: <1399441823-9907-1-git-send-email-zhangwm@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomi,
+There is no need to call local_irq_disable twice.
 
-any objections to this patch set? If not can you please take it? Thanks.
+Signed-off-by: Neil Zhang <zhangwm@marvell.com>
+---
+ arch/arm/kernel/process.c |    1 -
+ 1 file changed, 1 deletion(-)
 
-On Wed, Apr 23, 2014 at 10:15 PM, Marek Belisko <marek@goldelico.com> wrote:
-> This 3 patches adding display support for openmoko gta04 device.
-> First patch add DT bindings for topolly td028 panel. Second add description for
-> dss + panel and third fix panel probing when panel is compiled as module.
->
-> Changes from v1:
-> - extend panel compatible string by 'omapdss'
-> - add tpo-td028 panel to dss_compat_conv_list
-> - add MODULE_ALIAS macro to properly probe panel when is compiled as module
->
-> Marek Belisko (3):
->   omapdss: panel-tpo-td028ec1: Add DT support.
->   ARM: dts: oma3-gta04: Add display support
->   omapdss: panel-tpo-td028ec1: Add module alias
->
->  .../bindings/video/toppoly,td028ttec1.txt          | 30 ++++++++
->  arch/arm/boot/dts/omap3-gta04.dts                  | 86 ++++++++++++++++++++++
->  arch/arm/mach-omap2/display.c                      |  1 +
->  .../omap2/displays-new/panel-tpo-td028ttec1.c      | 33 ++++++++-
->  4 files changed, 149 insertions(+), 1 deletion(-)
->  create mode 100644 Documentation/devicetree/bindings/video/toppoly,td028ttec1.txt
->
-> --
-> 1.8.3.2
->
-
-BR,
-
-marek
-
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 81ef686..18cfce4 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -195,7 +195,6 @@ void machine_halt(void)
+ 	local_irq_disable();
+ 	smp_send_stop();
+ 
+-	local_irq_disable();
+ 	while (1);
+ }
+ 
 -- 
-as simple and primitive as possible
--------------------------------------------------
-Marek Belisko - OPEN-NANDRA
-Freelance Developer
-
-Ruska Nova Ves 219 | Presov, 08005 Slovak Republic
-Tel: +421 915 052 184
-skype: marekwhite
-twitter: #opennandra
-web: http://open-nandra.com
+1.7.9.5
