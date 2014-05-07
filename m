@@ -1,111 +1,45 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 07 May 2014 17:49:14 +0200
-Subject: [RFC PATCH 1/5] watchdog: Add API to trigger reboots
-In-Reply-To: <536A2EAB.4000605@roeck-us.net>
-References: <1398958893-30049-1-git-send-email-linux@roeck-us.net>
- <1398958893-30049-2-git-send-email-linux@roeck-us.net>
- <20140503012243.GG4090@lukather> <20140503042925.GB5882@roeck-us.net>
- <1399463549.4536.10.camel@weser.hi.pengutronix.de>
- <536A2EAB.4000605@roeck-us.net>
-Message-ID: <1399477754.4536.13.camel@weser.hi.pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 07 May 2014 16:57:36 +0100
+Subject: [PATCH 0/9] arm64: KVM: debug infrastructure support
+In-Reply-To: <CAFEAcA8XwVLevHhAZXPijoSk3Dw=BaoUT+qUNj3QkQZm2n5EPA@mail.gmail.com>
+References: <1399476054-21571-1-git-send-email-marc.zyngier@arm.com>
+ <CAFEAcA8XwVLevHhAZXPijoSk3Dw=BaoUT+qUNj3QkQZm2n5EPA@mail.gmail.com>
+Message-ID: <536A57F0.7050806@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 07.05.2014, 06:01 -0700 schrieb Guenter Roeck:
-> On 05/07/2014 04:52 AM, Lucas Stach wrote:
-> > Hi Guenter,
-> >
-> > Am Freitag, den 02.05.2014, 21:29 -0700 schrieb Guenter Roeck:
-> >> On Fri, May 02, 2014 at 06:22:43PM -0700, Maxime Ripard wrote:
-> >>> Hi Guenter,
-> >>>
-> >>> On Thu, May 01, 2014 at 08:41:29AM -0700, Guenter Roeck wrote:
-> >>>> Some hardware implements reboot through its watchdog hardware,
-> >>>> for example by triggering a watchdog timeout. Platform specific
-> >>>> code starts to spread into watchdog drivers, typically by setting
-> >>>> pointers to a callback functions which is then called from the
-> >>>> platform reset handler.
-> >>>>
-> >>>> To simplify code and provide a unified API to trigger reboots by
-> >>>> watchdog drivers, provide a single API to trigger such reboots
-> >>>> through the watchdog subsystem.
-> >>>>
-> >>>> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
-> >>>> ---
-> >>>>   drivers/watchdog/watchdog_core.c |   17 +++++++++++++++++
-> >>>>   include/linux/watchdog.h         |   11 +++++++++++
-> >>>>   2 files changed, 28 insertions(+)
-> >>>>
-> >>>> diff --git a/drivers/watchdog/watchdog_core.c b/drivers/watchdog/watchdog_core.c
-> >>>> index cec9b55..4ec6e2f 100644
-> >>>> --- a/drivers/watchdog/watchdog_core.c
-> >>>> +++ b/drivers/watchdog/watchdog_core.c
-> >>>> @@ -43,6 +43,17 @@
-> >>>>   static DEFINE_IDA(watchdog_ida);
-> >>>>   static struct class *watchdog_class;
-> >>>>
-> >>>> +static struct watchdog_device *wdd_reboot_dev;
-> >>>> +
-> >>>> +void watchdog_do_reboot(enum reboot_mode mode, const char *cmd)
-> >>>> +{
-> >>>> +	if (wdd_reboot_dev) {
-> >>>> +		if (wdd_reboot_dev->ops->reboot)
-> >>>> +			wdd_reboot_dev->ops->reboot(wdd_reboot_dev, mode, cmd);
-> >>>> +	}
-> >>>> +}
-> >>>> +EXPORT_SYMBOL(watchdog_do_reboot);
-> >>>> +
-> >>>>   static void watchdog_check_min_max_timeout(struct watchdog_device *wdd)
-> >>>>   {
-> >>>>   	/*
-> >>>> @@ -162,6 +173,9 @@ int watchdog_register_device(struct watchdog_device *wdd)
-> >>>>   		return ret;
-> >>>>   	}
-> >>>>
-> >>>> +	if (wdd->ops->reboot)
-> >>>> +		wdd_reboot_dev = wdd;
-> >>>> +
-> >>>
-> >>> Overall, it looks really great, but I guess we can make it a
-> >>> list. Otherwise, we might end up in a situation where we could not
-> >>> reboot anymore, like this one for example:
-> >>>    - a first watchdog is probed, registers a reboot function
-> >>>    - a second watchdog is probed, registers a reboot function that
-> >>>      overwrites the first one.
-> >>>    - then, the second watchdog disappears for some reason, and the
-> >>>      reboot is set to NULL
-> >>>
-> >> I thought about that, but how likely (or unlikely) is that to ever happen ?
-> >> So I figured it is not worth the effort, and would just add complexity without
-> >> real gain. We could always add the list later if we ever encounter a situation
-> >> where two watchdogs in the same system provide a reboot callback.
-> >>
-> >
-> > While this is not directly related to the issue you are fixing with this
-> > series, I would like to have it considered when talking about a watchdog
-> > system reboot API.
-> >
-> > On i.MX we have the same situation where we have to reboot through the
-> > SoC watchdog. This works, but may leave the external components of the
-> > system (those not integrated in the SoC) in an undefined state. So if we
-> > have a PMIC with integrated watchdog we would rather like to this one to
-> > reboot the system, as it the reset is then much more closer to a
-> > power-on-reset.
-> >
-> > This means we could have multiple watchdogs in the system, where we
-> > really want a specific one (maybe designated through a DT property) to
-> > do the reset. This isn't compatible with the "last watchdog that
-> > registers a handler wins the system reset" logic in your patch.
-> >
+On 07/05/14 16:42, Peter Maydell wrote:
+> On 7 May 2014 16:20, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> This patch series adds debug support, a key feature missing from the
+>> KVM/arm64 port.
+>>
+>> The main idea is to keep track of whether the debug registers are
+>> "dirty" (changed by the guest) or not. In this case, perform the usual
+>> save/restore dance, for one run only. It means we only have a penalty
+>> if a guest is actually using the debug registers.
+>>
+>> The huge amount of registers is properly frightening, but CPUs
+>> actually only implement a subset of them. Also, there is a number of
+>> registers we don't bother emulating (things having to do with external
+>> debug and OSlock).
 > 
-> Wouldn't the order in which watchdogs are configured in dt define that ?
-> The last one wins.
+> Presumably these registers now appear in the userspace
+> interface too, yes? Did you check that they all cope with
+> the "migration reads all register values on the source and then
+> writes them on the destination in arbitrary order" semantics without
+> further fiddling? (I have a note that says that at least
+> OSLAR_EL1/OSLSR_EL1 won't work that way, for instance.)
 
-That sounds rather fragile to me. I would like to have a more explicit
-property to control this behavior.
+The only registers that are exported to userspace are MDSCR_EL1,
+DBG{BW}{CV}Rn_EL1 and MDCCINT_EL1 (and their 32bit counterparts). They
+should be fine being saved/restored in any order, as long as you're not
+running the vcpu in between.
 
-Regards,
-Lucas
+The OSL*_EL1 registers are just ignored so far. So far, it is unclear
+how they would be supported in a guest, and I don't have any test
+environment for them. Should the need arise, support can be added on top
+of what we have now.
+
+	M.
 -- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+Jazz is not dead. It just smells funny...
