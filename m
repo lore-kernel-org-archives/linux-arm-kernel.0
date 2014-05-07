@@ -1,242 +1,207 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 7 May 2014 12:47:43 +0100
-Subject: [Xen-devel] [PATCH] Xen: hibernation is x86-only at the moment
-In-Reply-To: <536A1198.8030406@citrix.com>
-References: <5165529.jneGVBC5b5@wuerfel> <5360C1A7.8060401@citrix.com>
- <alpine.DEB.2.02.1405061402520.14596@kaball.uk.xensource.com>
- <536905B5.6040900@citrix.com>
- <alpine.DEB.2.02.1405071133240.14596@kaball.uk.xensource.com>
- <536A1198.8030406@citrix.com>
-Message-ID: <alpine.DEB.2.02.1405071242010.14596@kaball.uk.xensource.com>
+From: sthokal@xilinx.com (Srikanth Thokala)
+Date: Wed, 7 May 2014 17:21:13 +0530
+Subject: [PATCH v3] pcie: Add Xilinx PCIe Host Bridge IP driver
+In-Reply-To: <201404301734.14478.arnd@arndb.de>
+References: <1397561911-11647-1-git-send-email-sthokal@xilinx.com>
+ <201404301734.14478.arnd@arndb.de>
+Message-ID: <CA+mB=1K_AU5cLsW0J9OhVXmpvc+nYSZwpS5iyNXVTFpibfHq6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 7 May 2014, David Vrabel wrote:
-> On 07/05/14 11:45, Stefano Stabellini wrote:
-> > On Tue, 6 May 2014, David Vrabel wrote:
-> >> On 06/05/14 14:35, Stefano Stabellini wrote:
-> >>> On Wed, 30 Apr 2014, David Vrabel wrote:
-> >>>> On 29/04/14 21:00, Arnd Bergmann wrote:
-> >>>>> In commit 603fb42a66499ab "ARM: 8011/1: ARM hibernation / suspend-to-disk",
-> >>>>> currently in linux-next, the ARM architecture gains support for
-> >>>>> hibernation (suspend-to-disk). Xen supports this in principle, but only
-> >>>>> has an architecture specific hypercall defined on x86, which leads
-> >>>>> to a build error when both hibernation and Xen support are enabled:
-> >>>>>
-> >>>>> drivers/xen/manage.c:105:2: error: implicit declaration of function 'HYPERVISOR_suspend' [-Werror=implicit-function-declaration]
-> >>>>>   si->cancelled = HYPERVISOR_suspend(si->arg);
-> >>>>>
-> >>>>> It is probably a good idea to define this hypercall on ARM as well
-> >>>>> and provide an implementation in the host, but until that is done,
-> >>>>> this patch helps disable the broken code in the Xen guest by making
-> >>>>> it depend on CONFIG_X86.
-> >>>
-> >>> Thanks Arnd.
-> >>>
-> >>>
-> >>>> Since this isn't a regression in 3.15-rcX can you provide the
-> >>>> appropriate hypercall on ARM.  This does not require that there is an
-> >>>> implementation on Xen.
-> >>>>
-> >>>> When the Xen implementation exists it will be easier to use if the
-> >>>> support already exists in Linux.
-> >>>
-> >>>
-> >>> The sched_on hypercall is already implemented on ARM.
-> >>> However SCHEDOP_shutdown, defined as it is now, is unusable on ARM:
-> >>>
-> >>> /*
-> >>>  * Halt execution of this domain (all VCPUs) and notify the system controller.
-> >>>  * @arg == pointer to sched_shutdown_t structure.
-> >>>  *
-> >>>  * If the sched_shutdown_t reason is SHUTDOWN_suspend then this
-> >>>  * hypercall takes an additional extra argument which should be the
-> >>>  * MFN of the guest's start_info_t.
-> >>>  *
-> >>>  * In addition, which reason is SHUTDOWN_suspend this hypercall
-> >>>  * returns 1 if suspend was cancelled or the domain was merely
-> >>>  * checkpointed, and 0 if it is resuming in a new domain.
-> >>>  */
-> >>> #define SCHEDOP_shutdown    2
-> >>>
-> >>>
-> >>> We don't have a start_info, and even if we had, we wouldn't know the
-> >>> MFN.
-> >>> I think we should make it available on ARM only if we change the
-> >>> interface making the third argument x86 only.  Of course that would
-> >>> impact the linux side implementation too.
-> >>
-> >> We do not want a different number of arguments to this hypercall.  Just
-> >> pass 0 for the MFN.  This hypercall docs should be updated to say this.
-> >>
-> >> This doesn't seem any different to x86 HVM where the start_info_mfn
-> >> parameter is also not relevant.
-> >>
-> >> 	if (xen_hvm_domain()) {
-> >> 		si.arg = 0UL;
-> >> 		si.pre = NULL;
-> >> 		si.post = &xen_hvm_post_suspend;
-> >> 	} else {
-> >> 		si.arg = virt_to_mfn(xen_start_info);
-> >> 		si.pre = &xen_pre_suspend;
-> >> 		si.post = &xen_post_suspend;
-> >> 	}
-> >>
-> >> Changing this to be !xen_pv_domain() would then do the right thing for arm.
-> > 
-> > xen_hvm_domain returns true on arm so that's not needed.
-> > Unfortunately the patch turns out a bit ugly because of the way
-> > hypercalls are implemented in assembly on arm and arm64.
-> > Also I needed to provide quite a few empty stubs for other xen arch
-> > specific functions.
-> 
-> Thanks.  If you want to add a commit message and apply to
-> devel/for-linus-3.16:
-> 
-> Reviewed-by: David Vrabel <david.vrabel@citrix.com>
-> 
-> > --- a/arch/arm/include/asm/xen/hypercall.h
-> > +++ b/arch/arm/include/asm/xen/hypercall.h
-> > @@ -34,6 +34,7 @@
-> >  #define _ASM_ARM_XEN_HYPERCALL_H
-> >  
-> >  #include <xen/interface/xen.h>
-> > +#include <xen/interface/sched.h>
-> >  
-> >  long privcmd_call(unsigned call, unsigned long a1,
-> >  		unsigned long a2, unsigned long a3,
-> > @@ -48,6 +49,16 @@ int HYPERVISOR_memory_op(unsigned int cmd, void *arg);
-> >  int HYPERVISOR_physdev_op(int cmd, void *arg);
-> >  int HYPERVISOR_vcpu_op(int cmd, int vcpuid, void *extra_args);
-> >  int HYPERVISOR_tmem_op(void *arg);
-> > +int HYPERVISOR_sched_op_shutdown(int cmd, void *arg, unsigned long unused);
-> > +
-> > +static inline int
-> > +HYPERVISOR_suspend(unsigned long start_info_mfn)
-> > +{
-> > +	struct sched_shutdown r = { .reason = SHUTDOWN_suspend };
-> > +
-> > +	/* start_info_mfn is unused on ARM, pass 0 instead */
-> > +	return HYPERVISOR_sched_op_shutdown(SCHEDOP_shutdown, &r, 0);
-> > +}
-> >  
-> >  static inline void
-> >  MULTI_update_va_mapping(struct multicall_entry *mcl, unsigned long va,
-> > diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> > index b96723e..6d88c18 100644
-> > --- a/arch/arm/xen/enlighten.c
-> > +++ b/arch/arm/xen/enlighten.c
-> > @@ -339,6 +339,17 @@ static int __init xen_pm_init(void)
-> >  }
-> >  late_initcall(xen_pm_init);
-> >  
-> > +
-> > +/* empty stubs */
-> > +void xen_arch_pre_suspend(void) { }
-> > +void xen_arch_post_suspend(int suspend_cancelled) { }
-> > +void xen_arch_hvm_post_suspend(int suspend_cancelled) { }
-> > +void xen_mm_pin_all(void) { }
-> > +void xen_mm_unpin_all(void) { }
-> 
-> I wonder if the calls to xen_mm_pin_all() and xen_mm_unpin_all() could
-> be moved into the arch_pre_suspend() and arch_post_suspend() calls
-> instead. So there wouldn't need to be stubs provided for arm.
+On Wed, Apr 30, 2014 at 9:04 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 15 April 2014, Srikanth Thokala wrote:
+>> +Required properties:
+>> +- #address-cells: Address representation for root ports, set to <3>
+>> +- #size-cells: Size representation for root ports, set to <2>
+>> +- #interrupt-cells: specifies the number of cells needed to encode an
+>> +     interrupt source. The value must be 1.
+>> +- compatible: Should contain "xlnx,axi-pcie-host-1.00.a"
+>> +- reg: Should contain AXI PCIe registers location and length
+>> +- device_type: must be "pci"
+>> +- interrupts: Should contain AXI PCIe interrupt
+>> +- interrupt-map-mask,
+>> +  interrupt-map: standard PCI properties to define the mapping of the
+>> +     PCI interface to interrupt numbers.
+>> +- ranges: ranges for the PCI memory regions (I/O space region is noti
+>
+> typo: noti -> not
 
-This is how it looks, including the arm64 change:
+Ok, will fix.
 
----
+>
+>> +     supported by hardware)
+>> +     Please refer to the standard PCI bus binding document for a more
+>> +     detailed explanation
+>> +
+>> +Optional properties:
+>> +- bus-range: PCI bus numbers covered
+>> +
+>> +Interrupt controller child node
+>> ++++++++++++++++++++++++++++++++
+>> +Required properties:
+>> +- interrupt-controller: identifies the node as an interrupt controller
+>> +- #address-cells: specifies the number of cells needed to encode an
+>> +     address. The value must be 0.
+>> +- #interrupt-cells: specifies the number of cells needed to encode an
+>> +     interrupt source. The value must be 1.
+>> +
+>> +NOTE:
+>> +The core provides a single interrupt for both INTx/MSI messages. So,
+>> +created a interrupt controller node to support 'interrupt-map' DT
+>> +functionality.  The driver will create an IRQ domain for this map, decode
+>> +the four INTx interrupts in ISR and route them to this domain.
+>
+> How does this work if the pci core is combined with a GIC version that
+> also has MSI support. Presumably you'd want to use that for performance
+> reason rather than the integrated MSI chip.
+>
+> Shouldn't there be a way to pick between the two?
 
-arm,arm64/xen: introduce HYPERVISOR_suspend
+I will check and come back to you on this.
 
-Introduce HYPERVISOR_suspend: it is a call to sched_op with an
-additional argument that is always 0 on arm and arm64.
+>
+>> +/**
+>> + * xilinx_pcie_get_config_base - Get configuration base
+>> + * @bus: Bus structure of current bus
+>> + * @devfn: Device/function
+>> + * @where: Offset from base
+>> + *
+>> + * Return: Base address of the configuration space needed to be
+>> + *      accessed.
+>> + */
+>> +static void __iomem *xilinx_pcie_get_config_base(struct pci_bus *bus,
+>> +                                              unsigned int devfn,
+>> +                                              int where)
+>> +{
+>> +     struct xilinx_pcie_port *port = sys_to_pcie(bus->sysdata);
+>> +     int relbus;
+>> +
+>> +     relbus = (bus->number << ECAM_BUS_NUM_SHIFT) |
+>> +              (devfn << ECAM_DEV_NUM_SHIFT);
+>> +
+>> +     return port->reg_base + relbus + where;
+>> +}
+>
+> Does this mean you have an ECAM-compliant config space? Nice!
+>
+> Would it be possible to split the config space access out into
+> a separate file? It would be nice to share that with the generic
+> ECAM driver that Will Deacon has sent.
 
-Introduce a few additional empty stubs for Xen arch specific functions
-called by drivers/xen/manage.c.
+Yes, it should be possible.  Is it ok, if I work on top of this driver?
 
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+>
+>> +
+>> +     msg.address_hi = 0;
+>> +     msg.address_lo = virt_to_phys((void *)port->msg_addr);
+>> +     msg.data = irq;
+>> +
+>> +     write_msi_msg(irq, &msg);
+>
+> It seems strange to pass the msg_addr as an integer referring to
+> a virtual address. I'd suggest using phys_addr_t for the type
+> and converting it at the point the page gets allocated, and then
+> always assigning both the high and low part here. You'll need
+> that anyway for 64-bit operation.
 
-diff --git a/arch/arm/include/asm/xen/hypercall.h b/arch/arm/include/asm/xen/hypercall.h
-index 7658150..b5827e6 100644
---- a/arch/arm/include/asm/xen/hypercall.h
-+++ b/arch/arm/include/asm/xen/hypercall.h
-@@ -34,6 +34,7 @@
- #define _ASM_ARM_XEN_HYPERCALL_H
- 
- #include <xen/interface/xen.h>
-+#include <xen/interface/sched.h>
- 
- long privcmd_call(unsigned call, unsigned long a1,
- 		unsigned long a2, unsigned long a3,
-@@ -49,6 +50,16 @@ int HYPERVISOR_physdev_op(int cmd, void *arg);
- int HYPERVISOR_vcpu_op(int cmd, int vcpuid, void *extra_args);
- int HYPERVISOR_tmem_op(void *arg);
- int HYPERVISOR_multicall(struct multicall_entry *calls, uint32_t nr);
-+int HYPERVISOR_sched_op_shutdown(int cmd, void *arg, unsigned long unused);
-+
-+static inline int
-+HYPERVISOR_suspend(unsigned long start_info_mfn)
-+{
-+	struct sched_shutdown r = { .reason = SHUTDOWN_suspend };
-+
-+	/* start_info_mfn is unused on ARM, pass 0 instead */
-+	return HYPERVISOR_sched_op_shutdown(SCHEDOP_shutdown, &r, 0);
-+}
- 
- static inline void
- MULTI_update_va_mapping(struct multicall_entry *mcl, unsigned long va,
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index b96723e..6d88c18 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -339,6 +339,17 @@ static int __init xen_pm_init(void)
- }
- late_initcall(xen_pm_init);
- 
-+
-+/* empty stubs */
-+void xen_arch_pre_suspend(void) { }
-+void xen_arch_post_suspend(int suspend_cancelled) { }
-+void xen_arch_hvm_post_suspend(int suspend_cancelled) { }
-+void xen_mm_pin_all(void) { }
-+void xen_mm_unpin_all(void) { }
-+void xen_timer_resume(void) { }
-+void xen_arch_resume(void) { }
-+
-+
- /* In the hypervisor.S file. */
- EXPORT_SYMBOL_GPL(HYPERVISOR_event_channel_op);
- EXPORT_SYMBOL_GPL(HYPERVISOR_grant_table_op);
-@@ -351,3 +362,4 @@ EXPORT_SYMBOL_GPL(HYPERVISOR_physdev_op);
- EXPORT_SYMBOL_GPL(HYPERVISOR_vcpu_op);
- EXPORT_SYMBOL_GPL(HYPERVISOR_tmem_op);
- EXPORT_SYMBOL_GPL(privcmd_call);
-+EXPORT_SYMBOL_GPL(HYPERVISOR_sched_op_shutdown);
-diff --git a/arch/arm/xen/hypercall.S b/arch/arm/xen/hypercall.S
-index 44e3a5f..2bec3fc 100644
---- a/arch/arm/xen/hypercall.S
-+++ b/arch/arm/xen/hypercall.S
-@@ -103,3 +103,9 @@ ENTRY(privcmd_call)
- 	ldm sp!, {r4}
- 	mov pc, lr
- ENDPROC(privcmd_call);
-+
-+ENTRY(HYPERVISOR_sched_op_shutdown)
-+	mov r12, #__HYPERVISOR_sched_op
-+	__HVC(XEN_IMM)
-+	mov pc, lr
-+ENDPROC(HYPERVISOR_sched_op_shutdown)
-diff --git a/arch/arm64/xen/hypercall.S b/arch/arm64/xen/hypercall.S
-index 8bbe940..1fb8cab 100644
---- a/arch/arm64/xen/hypercall.S
-+++ b/arch/arm64/xen/hypercall.S
-@@ -92,3 +92,9 @@ ENTRY(privcmd_call)
- 	hvc XEN_IMM
- 	ret
- ENDPROC(privcmd_call);
-+
-+ENTRY(HYPERVISOR_sched_op_shutdown)
-+	mov x16, #__HYPERVISOR_sched_op
-+	hvc XEN_IMM
-+	ret
-+ENDPROC(HYPERVISOR_sched_op_shutdown)
+Ok, I will fix it. Thanks.
+
+>
+>> +/**
+>> + * xilinx_pcie_enable_msi - Enable MSI support
+>> + * @port: PCIe port information
+>> + */
+>> +static void xilinx_pcie_enable_msi(struct xilinx_pcie_port *port)
+>> +{
+>> +     port->msg_addr = __get_free_pages(GFP_KERNEL, 0);
+>> +
+>> +     pcie_write(port, 0x0, XILINX_PCIE_REG_MSIBASE1);
+>> +     pcie_write(port, virt_to_phys((void *)port->msg_addr),
+>> +                XILINX_PCIE_REG_MSIBASE2);
+>> +}
+>
+> here too.
+>
+> As a general comment about the MSI implementation, I wonder if this is actually
+> generic enough to be shared with other host controllers. It could be moved
+> into a separate file like the config space access in that case.
+
+I feel the MSI implementation is not generic by looking into the other
+host controllers,
+it is more specific to the hardware.  Correct me, if am wrong.
+
+>
+>> +/**
+>> + * xilinx_pcie_init_irq_domain - Initialize IRQ domain
+>> + * @port: PCIe port information
+>> + *
+>> + * Return: '0' on success and error value on failure
+>> + */
+>> +static int xilinx_pcie_init_irq_domain(struct xilinx_pcie_port *port)
+>> +{
+>> +     struct device *dev = port->dev;
+>> +     struct device_node *node = dev->of_node;
+>> +
+>> +     if (IS_ENABLED(CONFIG_PCI_MSI)) {
+>> +             /* Setup MSI */
+>> +             int i;
+>> +
+>> +             port->irq_domain = irq_domain_add_linear(node,
+>> +                                                      XILINX_NUM_MSI_IRQS,
+>> +                                                      &msi_domain_ops,
+>> +                                                      &xilinx_pcie_msi_chip);
+>> +             if (!port->irq_domain) {
+>> +                     dev_err(dev, "Failed to get a MSI IRQ domain\n");
+>> +                     return PTR_ERR(port->irq_domain);
+>> +             }
+>> +
+>> +             for (i = 0; i < XILINX_NUM_MSI_IRQS; i++)
+>> +                     irq_create_mapping(port->irq_domain, i);
+>
+> I'm still not that familiar with the irqdomain code, but shouldn't you
+> do the irq_create_mapping() in xilinx_pcie_assign_msi()?
+>
+> It seems wasteful to create all 128 mappings upfront.
+
+Ok, I agree with you.  I will fix it.
+
+>
+>> +/**
+>> + * xilinx_pcie_setup - Setup memory resources
+>> + * @nr: Bus number
+>> + * @sys: Per controller structure
+>> + *
+>> + * Return: '1' on success and error value on failure
+>> + */
+>> +static int xilinx_pcie_setup(int nr, struct pci_sys_data *sys)
+>> +{
+>
+> I think if you move most of the code from this function into the probe()
+> function, it will be easier later to add arm64 support, and you can handle
+> errors better.
+>
+> AFAICT, the only thing you need here is to list_move() the resources
+> from the xilinx_pcie_port to sys->resources. Ideally, the entire range
+> parsing can go away soon, once we have generic infrastructure for that.
+
+Sure.  I will do.
+
+>
+>
+>> +     /* Register the device */
+>> +     pci_common_init_dev(dev, &hw);
+>> +
+>> +     platform_set_drvdata(pdev, port);
+>
+> Don't you have to do the platform_set_drvdata() before pci_common_init_dev()?
+
+It should be fine, as I don't see any dependencies.
+
+Srikanth
+
+>
+>         Arnd
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
