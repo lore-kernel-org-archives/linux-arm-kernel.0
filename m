@@ -1,38 +1,64 @@
-From: larry.bassel@linaro.org (Larry Bassel)
-Date: Wed, 7 May 2014 14:35:51 -0700
-Subject: [PATCH v2 2/2] arm64: enable context tracking
-In-Reply-To: <20140507101709.GE18456@arm.com>
-References: <1399419149-26685-1-git-send-email-larry.bassel@linaro.org>
- <1399419149-26685-3-git-send-email-larry.bassel@linaro.org>
- <20140507101709.GE18456@arm.com>
-Message-ID: <20140507213550.GA10142@ubuette>
+From: joelf@ti.com (Joel Fernandes)
+Date: Wed, 7 May 2014 16:43:28 -0500
+Subject: [PATCH 01/26] ARM: OMAP: dmtimer: Remove setting of clk parent
+ indirectly through platform hook
+In-Reply-To: <20140507151907.GB9502@atomide.com>
+References: <1398375849-6017-1-git-send-email-joelf@ti.com>
+ <1398375849-6017-2-git-send-email-joelf@ti.com>
+ <20140507151907.GB9502@atomide.com>
+Message-ID: <536AA900.4040200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07 May 14 11:17, Will Deacon wrote:
-> On Wed, May 07, 2014 at 12:32:29AM +0100, Larry Bassel wrote:
-> > Make calls to ct_user_enter when the kernel is exited
-> > and ct_user_exit when the kernel is entered (in el0_da,
-> > el0_ia, el0_svc, el0_irq).
+On 05/07/2014 10:19 AM, Tony Lindgren wrote:
+> * Joel Fernandes <joelf@ti.com> [140424 14:44]:
+>> There is a platform specific hook just for OMAP1 to set its clk parent.  Remove
+>> this hook and have OMAP1 set its parent in omap1_dm_timer_init.  If OMAP1 is
+>> ever migrated to clock framework, the correct way to do this would be through
+>> clk_set_parent like other platforms.
+>>
+>> Signed-off-by: Joel Fernandes <joelf@ti.com>
+>> ---
+>>  arch/arm/mach-omap1/timer.c                |    8 +++++++-
+>>  arch/arm/plat-omap/dmtimer.c               |    8 +++-----
+>>  include/linux/platform_data/dmtimer-omap.h |    2 --
+>>  3 files changed, 10 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap1/timer.c b/arch/arm/mach-omap1/timer.c
+>> index bde7a35..4b9c604 100644
+>> --- a/arch/arm/mach-omap1/timer.c
+>> +++ b/arch/arm/mach-omap1/timer.c
+>> @@ -140,7 +140,13 @@ static int __init omap1_dm_timer_init(void)
+>>  			goto err_free_pdata;
+>>  		}
+>>  
+>> -		pdata->set_timer_src = omap1_dm_timer_set_src;
+>> +		/*
+>> +		 * Since OMAP1 doesn't support clock framework, set timer clock
+>> +		 * source to 32KHz here instead of expecting it to be set by
+>> +		 * dmtimer code.
+>> +		 */
+>> +		omap1_dm_timer_set_src(pdev, 0x01);
+>> +
+>>  		pdata->timer_capability = OMAP_TIMER_ALWON |
+>>  				OMAP_TIMER_NEEDS_RESET | OMAP_TIMER_HAS_DSP_IRQ;
+>>  
 > 
-> Why only these entry points? I can reschedule after any exception from EL0,
-> so I'd expect all exceptions from userspace to need annotating, no?
+> This does not sound right, omap1 does support clock framework just fine.
+> It is not using the common clock framework though.
 > 
-> > These macros expand to function calls which will only work
-> > properly if el0_sync and related code has been rearranged
-> > (in a previous patch of this series).
-> > 
-> > In order to avoid saving registers, the slow syscall path
-> > is forced (as x86 does).
-> 
-> ... and if you decide to handle undef exceptions, I think you'll need
-> the register saving too, in case the kernel needs to perform emulation.
+> This breaks omap_dm_timer_set_source() for sure. Setting the source
+> during init is not a right solution here. Probably best to keep the
+> pdata hook around, drivers can support pdata and DT data together
+> just fine.
 
-These are excellent points, I will rework the patch and submit v3.
+Actually pdata hook in this case is used only in 1 place, and is OMAP1
+specific so I felt its better to clean it up.
 
-Thanks for the feedback.
+Can you elaborate a bit more on why it breaks? I have no way of testing
+OMAP1 without hardware.
 
-> 
-> Will
+What difference is it to set MOD_CONF_CTRL_1 in omap1's
+arch_initcall(omap1_dm_timer_init)  versus doing so later?
 
-Larry
+-Joel
