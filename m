@@ -1,143 +1,39 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Wed, 7 May 2014 11:57:28 +0100
-Subject: [Xen-devel] [PATCH] Xen: hibernation is x86-only at the moment
-In-Reply-To: <alpine.DEB.2.02.1405071133240.14596@kaball.uk.xensource.com>
-References: <5165529.jneGVBC5b5@wuerfel> <5360C1A7.8060401@citrix.com>
- <alpine.DEB.2.02.1405061402520.14596@kaball.uk.xensource.com>
- <536905B5.6040900@citrix.com>
- <alpine.DEB.2.02.1405071133240.14596@kaball.uk.xensource.com>
-Message-ID: <536A1198.8030406@citrix.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 07 May 2014 13:01:07 +0200
+Subject: [RFC PATCH 0/5] watchdog: Add reboot API
+In-Reply-To: <1398958893-30049-1-git-send-email-linux@roeck-us.net>
+References: <1398958893-30049-1-git-send-email-linux@roeck-us.net>
+Message-ID: <1510930.uYSL31jzkj@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/05/14 11:45, Stefano Stabellini wrote:
-> On Tue, 6 May 2014, David Vrabel wrote:
->> On 06/05/14 14:35, Stefano Stabellini wrote:
->>> On Wed, 30 Apr 2014, David Vrabel wrote:
->>>> On 29/04/14 21:00, Arnd Bergmann wrote:
->>>>> In commit 603fb42a66499ab "ARM: 8011/1: ARM hibernation / suspend-to-disk",
->>>>> currently in linux-next, the ARM architecture gains support for
->>>>> hibernation (suspend-to-disk). Xen supports this in principle, but only
->>>>> has an architecture specific hypercall defined on x86, which leads
->>>>> to a build error when both hibernation and Xen support are enabled:
->>>>>
->>>>> drivers/xen/manage.c:105:2: error: implicit declaration of function 'HYPERVISOR_suspend' [-Werror=implicit-function-declaration]
->>>>>   si->cancelled = HYPERVISOR_suspend(si->arg);
->>>>>
->>>>> It is probably a good idea to define this hypercall on ARM as well
->>>>> and provide an implementation in the host, but until that is done,
->>>>> this patch helps disable the broken code in the Xen guest by making
->>>>> it depend on CONFIG_X86.
->>>
->>> Thanks Arnd.
->>>
->>>
->>>> Since this isn't a regression in 3.15-rcX can you provide the
->>>> appropriate hypercall on ARM.  This does not require that there is an
->>>> implementation on Xen.
->>>>
->>>> When the Xen implementation exists it will be easier to use if the
->>>> support already exists in Linux.
->>>
->>>
->>> The sched_on hypercall is already implemented on ARM.
->>> However SCHEDOP_shutdown, defined as it is now, is unusable on ARM:
->>>
->>> /*
->>>  * Halt execution of this domain (all VCPUs) and notify the system controller.
->>>  * @arg == pointer to sched_shutdown_t structure.
->>>  *
->>>  * If the sched_shutdown_t reason is SHUTDOWN_suspend then this
->>>  * hypercall takes an additional extra argument which should be the
->>>  * MFN of the guest's start_info_t.
->>>  *
->>>  * In addition, which reason is SHUTDOWN_suspend this hypercall
->>>  * returns 1 if suspend was cancelled or the domain was merely
->>>  * checkpointed, and 0 if it is resuming in a new domain.
->>>  */
->>> #define SCHEDOP_shutdown    2
->>>
->>>
->>> We don't have a start_info, and even if we had, we wouldn't know the
->>> MFN.
->>> I think we should make it available on ARM only if we change the
->>> interface making the third argument x86 only.  Of course that would
->>> impact the linux side implementation too.
->>
->> We do not want a different number of arguments to this hypercall.  Just
->> pass 0 for the MFN.  This hypercall docs should be updated to say this.
->>
->> This doesn't seem any different to x86 HVM where the start_info_mfn
->> parameter is also not relevant.
->>
->> 	if (xen_hvm_domain()) {
->> 		si.arg = 0UL;
->> 		si.pre = NULL;
->> 		si.post = &xen_hvm_post_suspend;
->> 	} else {
->> 		si.arg = virt_to_mfn(xen_start_info);
->> 		si.pre = &xen_pre_suspend;
->> 		si.post = &xen_post_suspend;
->> 	}
->>
->> Changing this to be !xen_pv_domain() would then do the right thing for arm.
+Am Donnerstag, 1. Mai 2014, 08:41:28 schrieb Guenter Roeck:
+> Some hardware implements reboot through its watchdog hardware, for example
+> by triggering a watchdog timeout or by writing into its watchdog register
+> set. Platform specific code starts to spread into watchdog drivers,
+> typically by setting pointers to a callback function which is then called
+> from the architecture's reset handler.
 > 
-> xen_hvm_domain returns true on arm so that's not needed.
-> Unfortunately the patch turns out a bit ugly because of the way
-> hypercalls are implemented in assembly on arm and arm64.
-> Also I needed to provide quite a few empty stubs for other xen arch
-> specific functions.
+> While global and exported callback function pointers (such as
+> arm_pm_restart) may be acceptable as long as they are used from platform
+> and/or architecture code, using such a mechanism across subsystems and
+> drivers is less than desirable. Ultimately, we'll need a better solution.
+> 
+> This patch series is an attempt to provide such a solution. It extends
+> the watchdog subsystem to support reboot functionality, provides an
+> API function call to trigger reboots, adds support for the new API
+> to arm and arm64, and converts the drivers providing reboot functionality
+> to use the new infrastructure.
+> 
+> The first patch in the series implements the new API. The second and third
+> patch modify the arm and arm64 architecture reset handlers to call the
+> added API function. The final two patches register the reboot handlers
+> in the sunxi and moxart watchdog drivers with the watchdog subsystem.
+> 
+> The sunxi patche depends on the most recent patch series sumitted by
+> Maxime Ripard.
 
-Thanks.  If you want to add a commit message and apply to
-devel/for-linus-3.16:
+a lot of Samsung architectures use a watchdog based reset too (among them some 
+of the s3c24xx I care about) and this series looks really great for this, so
 
-Reviewed-by: David Vrabel <david.vrabel@citrix.com>
-
-> --- a/arch/arm/include/asm/xen/hypercall.h
-> +++ b/arch/arm/include/asm/xen/hypercall.h
-> @@ -34,6 +34,7 @@
->  #define _ASM_ARM_XEN_HYPERCALL_H
->  
->  #include <xen/interface/xen.h>
-> +#include <xen/interface/sched.h>
->  
->  long privcmd_call(unsigned call, unsigned long a1,
->  		unsigned long a2, unsigned long a3,
-> @@ -48,6 +49,16 @@ int HYPERVISOR_memory_op(unsigned int cmd, void *arg);
->  int HYPERVISOR_physdev_op(int cmd, void *arg);
->  int HYPERVISOR_vcpu_op(int cmd, int vcpuid, void *extra_args);
->  int HYPERVISOR_tmem_op(void *arg);
-> +int HYPERVISOR_sched_op_shutdown(int cmd, void *arg, unsigned long unused);
-> +
-> +static inline int
-> +HYPERVISOR_suspend(unsigned long start_info_mfn)
-> +{
-> +	struct sched_shutdown r = { .reason = SHUTDOWN_suspend };
-> +
-> +	/* start_info_mfn is unused on ARM, pass 0 instead */
-> +	return HYPERVISOR_sched_op_shutdown(SCHEDOP_shutdown, &r, 0);
-> +}
->  
->  static inline void
->  MULTI_update_va_mapping(struct multicall_entry *mcl, unsigned long va,
-> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> index b96723e..6d88c18 100644
-> --- a/arch/arm/xen/enlighten.c
-> +++ b/arch/arm/xen/enlighten.c
-> @@ -339,6 +339,17 @@ static int __init xen_pm_init(void)
->  }
->  late_initcall(xen_pm_init);
->  
-> +
-> +/* empty stubs */
-> +void xen_arch_pre_suspend(void) { }
-> +void xen_arch_post_suspend(int suspend_cancelled) { }
-> +void xen_arch_hvm_post_suspend(int suspend_cancelled) { }
-> +void xen_mm_pin_all(void) { }
-> +void xen_mm_unpin_all(void) { }
-
-I wonder if the calls to xen_mm_pin_all() and xen_mm_unpin_all() could
-be moved into the arch_pre_suspend() and arch_post_suspend() calls
-instead. So there wouldn't need to be stubs provided for arm.
-
-David
+Acked-by: Heiko Stuebner <heiko@sntech.de>
