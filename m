@@ -1,43 +1,41 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 7 May 2014 09:48:16 -0700
-Subject: [PATCH v5 06/14] ARM: mcpm: support 4 clusters
-In-Reply-To: <1399473888-12947-7-git-send-email-haojian.zhuang@linaro.org>
-References: <1399473888-12947-1-git-send-email-haojian.zhuang@linaro.org>
- <1399473888-12947-7-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <20140507164816.GB12692@quad.lixom.net>
+From: maxime.coquelin@st.com (Maxime COQUELIN)
+Date: Wed,  7 May 2014 18:48:52 +0200
+Subject: [PATCH] clk: divider: Fix table round up function
+Message-ID: <1399481332-9550-1-git-send-email-maxime.coquelin@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 07, 2014 at 10:44:40PM +0800, Haojian Zhuang wrote:
-> Add the CONFIG_MCPM_QUAD_CLUSTER configuration to enlarge cluster number
-> from 2 to 4.
-> 
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
-> ---
->  arch/arm/Kconfig            | 9 +++++++++
->  arch/arm/include/asm/mcpm.h | 5 +++++
->  2 files changed, 14 insertions(+)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 0e52a2c..624829f 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1575,6 +1575,15 @@ config MCPM
->  	  for (multi-)cluster based systems, such as big.LITTLE based
->  	  systems.
->  
-> +config MCPM_QUAD_CLUSTER
-> +	bool "Enable Quad clusters in MCPM"
-> +	depends on MCPM
-> +	help
-> +	  To avoid wasting resources unnecessarily, MCPM only supports up
-> +	  to 2 clusters by default.
-> +	  Platforms with 3 or 4 clusters that use MCPM must select this
-> +	  option to allow the additional clusters to be managed.
-> +
+Commit 1d9fe6b97 ("clk: divider: Fix best div calculation for power-of-two and
+table dividers") introduces a regression in its _table_round_up function.
 
-Why don't you add an integer config instead, i.e. MCPM_MAX_CLUSTERS, and let
-that set MAX_NR_CLUSTERS?
+When the divider passed to this function is greater than the max divider
+available in the table, this function returns table's max divider.
+Problem is that it causes an infinite loop in clk_divider_bestdiv() because
+_next_div() will never return a value greater than maxdiv.
 
+Instead of returning table's max divider, this patch returns INT_MAX.
 
--Olof
+Reported-by: Fabio Estevam <festevam@gmail.com>
+Reported-by: Shawn Guo <shawn.guo@freescale.com>
+Tested-by: Fabio Estevam <festevam@gmail.com>
+Cc: Mike Turquette <mike.turquette@linaro.org>
+Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
+---
+ drivers/clk/clk-divider.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+index b3c8396..cf9114a 100644
+--- a/drivers/clk/clk-divider.c
++++ b/drivers/clk/clk-divider.c
+@@ -158,7 +158,7 @@ static bool _is_valid_div(struct clk_divider *divider, unsigned int div)
+ static int _round_up_table(const struct clk_div_table *table, int div)
+ {
+ 	const struct clk_div_table *clkt;
+-	int up = _get_table_maxdiv(table);
++	int up = INT_MAX;
+ 
+ 	for (clkt = table; clkt->div; clkt++) {
+ 		if (clkt->div == div)
+-- 
+1.9.1
