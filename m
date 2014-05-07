@@ -1,45 +1,29 @@
-From: jays.lee@samsung.com (Jungseok Lee)
-Date: Wed, 07 May 2014 12:10:37 +0900
-Subject: [PATH V3] arm64: mm: Create gigabyte kernel logical mappings where
- possible
-In-Reply-To: <1399381347-28676-1-git-send-email-steve.capper@linaro.org>
-References: <1399381347-28676-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <001901cf69a1$eb1fe1a0$c15fa4e0$@samsung.com>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Wed, 7 May 2014 12:18:02 +0900
+Subject: [PATCH] ARM: tegra: enable console framebuffer rotation
+Message-ID: <1399432682-677-1-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, May 06, 2014 10:02 PM, Steve Capper wrote:
-> We have the capability to map 1GB level 1 blocks when using a 4K
-> granule.
-> 
-> This patch adjusts the create_mapping logic s.t. when mapping physical
-> memory on boot, we attempt to use a 1GB block if both the VA and PA
-> start and end are 1GB aligned. This both reduces the levels of lookup
-> required to resolve a kernel logical address, as well as reduces TLB
-> pressure on cores that support 1GB TLB entries.
-> 
-> Signed-off-by: Steve Capper <steve.capper@linaro.org>
+Console rotation is needed for devices like Tegra Note 7 and NVIDIA
+SHIELD to get the boot console in the expected orientation.
 
-I've tried it on top of 3.15-rc4 with A57 Fastmodel. It works well.
+Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+---
+ arch/arm/configs/tegra_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Tested-by: Jungseok Lee <jays.lee@samsung.com>
-
-> ---
-> Changed in V3: added awareness of 1GB blocks to kern_addr_valid.
-> This was tested via gdb:
-> gdb ./vmlinux /proc/kcore
-> disassemble kern_addr_valid
-> 
-> The output looked valid.
-> In V2 of the patch, I got an oops.
-> 
-> I've defined constants with pgdval_t type. Ideally, I would like to
-> define pudval_t types, but due to the way folding works this does not
-> exist for <4 levels. I'm not sure if it would be better to define
-> pudval_t for <4 levels or leave this as is?
-
-I got the same question when I wrote 4 level patches.
-Although my choice was pgdval_t, I still cannot tell which one
-is better.
-
-- Jungseok Lee
+diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
+index c706d399557b..e2441e286822 100644
+--- a/arch/arm/configs/tegra_defconfig
++++ b/arch/arm/configs/tegra_defconfig
+@@ -183,6 +183,7 @@ CONFIG_BACKLIGHT_CLASS_DEVICE=y
+ # CONFIG_BACKLIGHT_GENERIC is not set
+ CONFIG_BACKLIGHT_PWM=y
+ CONFIG_FRAMEBUFFER_CONSOLE=y
++CONFIG_FRAMEBUFFER_CONSOLE_ROTATION=y
+ CONFIG_LOGO=y
+ CONFIG_SOUND=y
+ CONFIG_SND=y
+-- 
+1.9.2
