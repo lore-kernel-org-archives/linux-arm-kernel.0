@@ -1,113 +1,106 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  6 May 2014 22:50:20 -0500
-Subject: [PATCH 4/7] usb: ehci-platform: add optional reset controller
- retrieval
+Date: Tue,  6 May 2014 22:50:22 -0500
+Subject: [PATCH 6/7] ARM: sun6i: dt: Add support for the USB controllers
 In-Reply-To: <1399434623-20383-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1399434623-20383-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1399434623-20383-5-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1399434623-20383-7-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Boris BREZILLON <boris.brezillon@free-electrons.com>
+The A31 has two ECHI/OHCI controllers, and one OHCI-only phy-less controller.
 
-On the Allwinner's A31 SoC the reset line connected to the EHCI IP has to
-be deasserted for the EHCI block to be usable.
-
-Add support for an optional reset controller that will be deasserted on
-power off and asserted on power on.
-
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- Documentation/devicetree/bindings/usb/usb-ehci.txt |  1 +
- drivers/usb/host/ehci-platform.c                   | 25 +++++++++++++++++++++-
- 2 files changed, 25 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/sun6i-a31.dtsi | 77 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 77 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/usb/usb-ehci.txt b/Documentation/devicetree/bindings/usb/usb-ehci.txt
-index ff151ec084c4..43c1a4e06767 100644
---- a/Documentation/devicetree/bindings/usb/usb-ehci.txt
-+++ b/Documentation/devicetree/bindings/usb/usb-ehci.txt
-@@ -15,6 +15,7 @@ Optional properties:
-  - clocks : a list of phandle + clock specifier pairs
-  - phys : phandle + phy specifier pair
-  - phy-names : "usb"
-+ - resets : phandle + reset specifier pair
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index 13aa56ed5858..5e9f01af6d99 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -341,6 +341,83 @@
+ 			status = "disabled";
+ 		};
  
- Example (Sequoia 440EPx):
-     ehci at e0000300 {
-diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
-index c7dd93aad20c..4ee67728e443 100644
---- a/drivers/usb/host/ehci-platform.c
-+++ b/drivers/usb/host/ehci-platform.c
-@@ -29,6 +29,7 @@
- #include <linux/of.h>
- #include <linux/phy/phy.h>
- #include <linux/platform_device.h>
-+#include <linux/reset.h>
- #include <linux/usb.h>
- #include <linux/usb/hcd.h>
- #include <linux/usb/ehci_pdriver.h>
-@@ -41,6 +42,7 @@
- 
- struct ehci_platform_priv {
- 	struct clk *clks[EHCI_MAX_CLKS];
-+	struct reset_control *rst;
- 	struct phy *phy;
- };
- 
-@@ -84,10 +86,16 @@ static int ehci_platform_power_on(struct platform_device *dev)
- 			goto err_disable_clks;
- 	}
- 
-+	if (priv->rst) {
-+		ret = reset_control_deassert(priv->rst);
-+		if (ret)
-+			goto err_disable_clks;
-+	}
++		usbphy: phy at 01c19400 {
++			compatible = "allwinner,sun6i-a31-usb-phy";
++			reg = <0x01c19400 0x10>,
++			      <0x01c1a800 0x4>,
++			      <0x01c1b800 0x4>;
++			reg-names = "phy_ctrl",
++				    "pmu1",
++				    "pmu2";
++			clocks = <&usb_clk 8>,
++				 <&usb_clk 9>,
++				 <&usb_clk 10>;
++			clock-names = "usb0_phy",
++				      "usb1_phy",
++				      "usb2_phy";
++			resets = <&usb_clk 0>,
++				 <&usb_clk 1>,
++				 <&usb_clk 2>;
++			reset-names = "usb0_reset",
++				      "usb1_reset",
++				      "usb2_reset";
++			status = "disabled";
++			#phy-cells = <1>;
++		};
 +
- 	if (priv->phy) {
- 		ret = phy_init(priv->phy);
- 		if (ret)
--			goto err_disable_clks;
-+			goto err_assert_rst;
- 
- 		ret = phy_power_on(priv->phy);
- 		if (ret)
-@@ -98,6 +106,9 @@ static int ehci_platform_power_on(struct platform_device *dev)
- 
- err_exit_phy:
- 	phy_exit(priv->phy);
-+err_assert_rst:
-+	if (priv->rst)
-+		reset_control_assert(priv->rst);
- err_disable_clks:
- 	while (--clk >= 0)
- 		clk_disable_unprepare(priv->clks[clk]);
-@@ -119,6 +130,9 @@ static void ehci_platform_power_off(struct platform_device *dev)
- 	for (clk = EHCI_MAX_CLKS - 1; clk >= 0; clk--)
- 		if (priv->clks[clk])
- 			clk_disable_unprepare(priv->clks[clk]);
++		ehci0: usb at 01c1a000 {
++			compatible = "allwinner,sun6i-a31-ehci", "generic-ehci";
++			reg = <0x01c1a000 0x100>;
++			interrupts = <0 72 4>;
++			clocks = <&ahb1_gates 26>;
++			resets = <&ahb1_rst 26>;
++			phys = <&usbphy 1>;
++			phy-names = "usb";
++			status = "disabled";
++		};
 +
-+	if (priv->rst)
-+		reset_control_assert(priv->rst);
- }
- 
- static struct hc_driver __read_mostly ehci_platform_hc_driver;
-@@ -206,6 +220,15 @@ static int ehci_platform_probe(struct platform_device *dev)
- 				break;
- 			}
- 		}
++		ohci0: usb at 01c1a400 {
++			compatible = "allwinner,sun6i-a31-ohci", "generic-ohci";
++			reg = <0x01c1a400 0x100>;
++			interrupts = <0 73 4>;
++			clocks = <&ahb1_gates 29>, <&usb_clk 16>;
++			resets = <&ahb1_rst 29>;
++			phys = <&usbphy 1>;
++			phy-names = "usb";
++			status = "disabled";
++		};
 +
-+		priv->rst = devm_reset_control_get_optional(&dev->dev,
-+							    NULL);
-+		if (IS_ERR(priv->rst)) {
-+			err = PTR_ERR(priv->rst);
-+			if (err ==  -EPROBE_DEFER)
-+				goto err_put_clks;
-+			priv->rst = NULL;
-+		}
- 	}
- 
- 	if (pdata->big_endian_desc)
++		ehci1: usb at 01c1b000 {
++			compatible = "allwinner,sun6i-a31-ehci", "generic-ehci";
++			reg = <0x01c1b000 0x100>;
++			interrupts = <0 74 4>;
++			clocks = <&ahb1_gates 27>;
++			resets = <&ahb1_rst 27>;
++			phys = <&usbphy 2>;
++			phy-names = "usb";
++			status = "disabled";
++		};
++
++		ohci1: usb at 01c1b400 {
++			compatible = "allwinner,sun6i-a31-ohci", "generic-ohci";
++			reg = <0x01c1b400 0x100>;
++			interrupts = <0 75 4>;
++			clocks = <&ahb1_gates 30>, <&usb_clk 17>;
++			resets = <&ahb1_rst 30>;
++			phys = <&usbphy 2>;
++			phy-names = "usb";
++			status = "disabled";
++		};
++
++		ohci2: usb at 01c1c000 {
++			compatible = "allwinner,sun6i-a31-ohci", "generic-ohci";
++			reg = <0x01c1c400 0x100>;
++			interrupts = <0 77 4>;
++			clocks = <&ahb1_gates 31>, <&usb_clk 18>;
++			resets = <&ahb1_rst 31>;
++			status = "disabled";
++		};
++
+ 		pio: pinctrl at 01c20800 {
+ 			compatible = "allwinner,sun6i-a31-pinctrl";
+ 			reg = <0x01c20800 0x400>;
 -- 
 1.9.1
