@@ -1,50 +1,113 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 7 May 2014 10:03:34 +0300
-Subject: [PATCH v2 2/3] ARM: dts: oma3-gta04: Add display support
-In-Reply-To: <1398284120-4986-3-git-send-email-marek@goldelico.com>
-References: <1398284120-4986-1-git-send-email-marek@goldelico.com>
- <1398284120-4986-3-git-send-email-marek@goldelico.com>
-Message-ID: <5369DAC6.6050608@ti.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed,  7 May 2014 15:08:21 +0800
+Subject: [PATCH] ARM: prima2: rstc: fix some minor checkpatch issues
+Message-ID: <1399446501-22346-1-git-send-email-21cnbao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/04/14 23:15, Marek Belisko wrote:
-> This patch add support for lcd display on gta04 board. Display control
-> is connected on spi (used spi bitbang driver).
-> 
-> Signed-off-by: Marek Belisko <marek@goldelico.com>
-> ---
->  arch/arm/boot/dts/omap3-gta04.dts | 86 +++++++++++++++++++++++++++++++++++++++
->  1 file changed, 86 insertions(+)
+From: Xianglong Du <Xianglong.Du@csr.com>
 
-<snip>
+this patch fixes the below minor issues:
 
-> +&dss {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = < &dss_dpi_pins >;
-> +
-> +	status = "okay";
-> +
-> +	vdds_dsi-supply = <&vpll2>;
-> +
-> +	dpi_out: endpoint {
-> +               remote-endpoint = <&lcd_in>;
-> +               data-lines = <24>;
-> +       };
-> +
-> +};
-> 
+WARNING: line over 80 characters
+39: FILE: arch/arm/mach-prima2/rstc.c:39:
++                * Writing 1 to this bit resets corresponding block. Writing 0 to this
 
-Did you try this on 3.15-rc? The above is not right, and I don't think
-it works. You need 'port' node for the dpi_out endpoint.
+WARNING: line over 80 characters
+41: FILE: arch/arm/mach-prima2/rstc.c:41:
++                * datasheet doesn't require explicit delay between the set and clear
 
- Tomi
+WARNING: line over 80 characters
+44: FILE: arch/arm/mach-prima2/rstc.c:44:
++               writel(readl(sirfsoc_rstc_base + (reset_bit / 32) * 4) | (1 << reset_bit),
 
+WARNING: msleep < 20ms can sleep for up to 20ms; see Documentation/timers/timers-howto.txt
+46: FILE: arch/arm/mach-prima2/rstc.c:46:
++               msleep(10);
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140507/7c0d2181/attachment.sig>
+WARNING: line over 80 characters
+47: FILE: arch/arm/mach-prima2/rstc.c:47:
++               writel(readl(sirfsoc_rstc_base + (reset_bit / 32) * 4) & ~(1 << reset_bit),
+
+WARNING: line over 80 characters
+52: FILE: arch/arm/mach-prima2/rstc.c:52:
++                * Writing 1 to SET register resets corresponding block. Writing 1 to CLEAR
+
+WARNING: line over 80 characters
+54: FILE: arch/arm/mach-prima2/rstc.c:54:
++                * datasheet doesn't require explicit delay between the set and clear
+
+WARNING: line over 80 characters
+57: FILE: arch/arm/mach-prima2/rstc.c:57:
++               writel(1 << reset_bit, sirfsoc_rstc_base + (reset_bit / 32) * 8);
+
+WARNING: msleep < 20ms can sleep for up to 20ms; see Documentation/timers/timers-howto.txt
+58: FILE: arch/arm/mach-prima2/rstc.c:58:
++               msleep(10);
+
+WARNING: line over 80 characters
+59: FILE: arch/arm/mach-prima2/rstc.c:59:
++               writel(1 << reset_bit, sirfsoc_rstc_base + (reset_bit / 32) * 8 + 4);
+
+total: 0 errors, 10 warnings, 120 lines checked
+
+Signed-off-by: Xianglong Du <Xianglong.Du@csr.com>
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ arch/arm/mach-prima2/rstc.c |   34 ++++++++++++++++++++--------------
+ 1 files changed, 20 insertions(+), 14 deletions(-)
+
+diff --git a/arch/arm/mach-prima2/rstc.c b/arch/arm/mach-prima2/rstc.c
+index 4887a2a..3dffcb2 100644
+--- a/arch/arm/mach-prima2/rstc.c
++++ b/arch/arm/mach-prima2/rstc.c
+@@ -36,27 +36,33 @@ static int sirfsoc_reset_module(struct reset_controller_dev *rcdev,
+ 
+ 	if (of_device_is_compatible(rcdev->of_node, "sirf,prima2-rstc")) {
+ 		/*
+-		 * Writing 1 to this bit resets corresponding block. Writing 0 to this
+-		 * bit de-asserts reset signal of the corresponding block.
+-		 * datasheet doesn't require explicit delay between the set and clear
+-		 * of reset bit. it could be shorter if tests pass.
++		 * Writing 1 to this bit resets corresponding block.
++		 * Writing 0 to this bit de-asserts reset signal of the
++		 * corresponding block. datasheet doesn't require explicit
++		 * delay between the set and clear of reset bit. it could
++		 * be shorter if tests pass.
+ 		 */
+-		writel(readl(sirfsoc_rstc_base + (reset_bit / 32) * 4) | (1 << reset_bit),
++		writel(readl(sirfsoc_rstc_base +
++			(reset_bit / 32) * 4) | (1 << reset_bit),
+ 			sirfsoc_rstc_base + (reset_bit / 32) * 4);
+-		msleep(10);
+-		writel(readl(sirfsoc_rstc_base + (reset_bit / 32) * 4) & ~(1 << reset_bit),
++		msleep(20);
++		writel(readl(sirfsoc_rstc_base +
++			(reset_bit / 32) * 4) & ~(1 << reset_bit),
+ 			sirfsoc_rstc_base + (reset_bit / 32) * 4);
+ 	} else {
+ 		/*
+ 		 * For MARCO and POLO
+-		 * Writing 1 to SET register resets corresponding block. Writing 1 to CLEAR
+-		 * register de-asserts reset signal of the corresponding block.
+-		 * datasheet doesn't require explicit delay between the set and clear
+-		 * of reset bit. it could be shorter if tests pass.
++		 * Writing 1 to SET register resets corresponding block.
++		 * Writing 1 to CLEAR register de-asserts reset signal of the
++		 * corresponding block.
++		 * datasheet doesn't require explicit delay between the set and
++		 * clear of reset bit. it could be shorter if tests pass.
+ 		 */
+-		writel(1 << reset_bit, sirfsoc_rstc_base + (reset_bit / 32) * 8);
+-		msleep(10);
+-		writel(1 << reset_bit, sirfsoc_rstc_base + (reset_bit / 32) * 8 + 4);
++		writel(1 << reset_bit,
++			sirfsoc_rstc_base + (reset_bit / 32) * 8);
++		msleep(20);
++		writel(1 << reset_bit,
++			sirfsoc_rstc_base + (reset_bit / 32) * 8 + 4);
+ 	}
+ 
+ 	mutex_unlock(&rstc_lock);
+-- 
+1.7.0.4
