@@ -1,136 +1,42 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 7 May 2014 15:29:50 +0200
-Subject: [PATCH] ARM: Kirkwood: DT versions of OpenRD boards
-In-Reply-To: <5369E35C.2020006@gmail.com>
-References: <1399416504-19140-1-git-send-email-andrew@lunn.ch>
- <5369E35C.2020006@gmail.com>
-Message-ID: <20140507132950.GB23936@lunn.ch>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 7 May 2014 19:05:30 +0530
+Subject: [PATCH 3/7] phy: usb: sunxi: Introduce Allwinner A31 USB PHY
+ support
+In-Reply-To: <1399434623-20383-4-git-send-email-maxime.ripard@free-electrons.com>
+References: <1399434623-20383-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1399434623-20383-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <536A36A2.5030109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 07, 2014 at 09:40:12AM +0200, Sebastian Hesselbarth wrote:
-> On 05/07/2014 12:48 AM, Andrew Lunn wrote:
-> > Create DTS files to describe the Marvell OpenRD boards.
-> > 
-> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> > Tested-by: Francois Lorrain <francois.lorrain@gmail.com>
-> > ---
-> [...]
-> > diff --git a/arch/arm/boot/dts/kirkwood-openrd-base.dts b/arch/arm/boot/dts/kirkwood-openrd-base.dts
-> > new file mode 100644
-> > index 000000000000..03cb87cd4bbe
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/kirkwood-openrd-base.dts
-> > @@ -0,0 +1,42 @@
-> > +/*
-> > + * Marvell OpenRD Base Board descrition
-> 
-> s/descrition/description/
-> 
-> > + * Andrew Lunn <andrew@lunn.ch>
-> > + *
-> > + * This file is licensed under the terms of the GNU General Public
-> > + * License version 2.  This program is licensed "as is" without any
-> > + * warranty of any kind, whether express or implied.
-> > + *
-> > + * This file contains the definitions that are specific to OpenRD
-> > + * base variant of the Marvell Kirkwood Development Board.
-> > + */
-> > +
-> > +/dts-v1/;
-> > +
-> > +#include "kirkwood-openrd.dtsi"
-> > +
-> > +/ {
-> > +	model = "OpenRD Base";
-> > +	compatible = "marvell,openrd-base", "marvell,openrd", "marvell,kirkwood-88f6281", "marvell,kirkwood";
-> > +
-> > +	ocp at f1000000 {
-> > +		serial at 12100 {
-> > +			status = "okay";
-> 
-> Andrew,
-> 
-> I see you used the "good template" this time ;) I again have some nits,
-> that either you can take care of or me in the cleanup patches. I guess
-> it depends on whatever goes in first. ;)
+Hi,
 
-The patch already depends on your patches, so i may as well do the
-cleanup. I need to fix "description" anyway.
-
-
+On Wednesday 07 May 2014 09:20 AM, Maxime Ripard wrote:
+> The USB phy controller in the A31 differs mostly from the older controllers
+> because it has a clock dedicated for each phy, while the older ones were having
+> a single clock for all the phys.
 > 
-> > +		};
-> > +	};
-> > +};
-> > +
-> > +&mdio {
-> > +	status = "okay";
-> > +
-> > +	ethphy0: ethernet-phy at 8 {
-> > +		reg = <8>;
-> > +	};
-> > +};
-> > +
-> > +&eth0 {
-> > +	status = "okay";
-> > +	ethernet0-port at 0 {
-> > +		phy-handle = <&ethphy0>;
-> > +	};
-> > +};
-> > diff --git a/arch/arm/boot/dts/kirkwood-openrd-client.dts b/arch/arm/boot/dts/kirkwood-openrd-client.dts
-> > new file mode 100644
-> > index 000000000000..6179542c860f
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/kirkwood-openrd-client.dts
-> > @@ -0,0 +1,75 @@
-> > +/*
-> > + * Marvell OpenRD Client Board descrition
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/phy/phy-sun4i-usb.c | 35 ++++++++++++++++++++++++++---------
+>  1 file changed, 26 insertions(+), 9 deletions(-)
 > 
-> s/descrition/description/
-> 
-> > + * Andrew Lunn <andrew@lunn.ch>
-> > + *
-> > + * This file is licensed under the terms of the GNU General Public
-> > + * License version 2.  This program is licensed "as is" without any
-> > + * warranty of any kind, whether express or implied.
-> > + *
-> > + * This file contains the definitions that are specific to OpenRD
-> > + * client variant of the Marvell Kirkwood Development Board.
-> > + */
-> > +
-> > +/dts-v1/;
-> > +
-> > +#include "kirkwood-openrd.dtsi"
-> > +
-> > +/ {
-> > +	model = "OpenRD Client";
-> > +	compatible = "marvell,openrd-client", "marvell,openrd", "marvell,kirkwood-88f6281", "marvell,kirkwood";
-> > +
-> > +	ocp at f1000000 {
-> > +		i2c at 11000 {
-> > +			status = "okay";
-> > +			clock-frequency = <400000>;
-> > +			pinctrl-0 = <&pmx_twsi0>;
-> > +			pinctrl-names = "default";
-> 
-> The default pinctrl should have been set by the SoC dtsi already.
+> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+> index e6e6c4ba7145..1d83abe07a29 100644
+> --- a/drivers/phy/phy-sun4i-usb.c
+> +++ b/drivers/phy/phy-sun4i-usb.c
+> @@ -61,16 +61,17 @@
+>  #define MAX_PHYS			3
+>  
+>  struct sun4i_usb_phy_data {
+> -	struct clk *clk;
+>  	void __iomem *base;
+>  	struct mutex mutex;
+>  	int num_phys;
+>  	u32 disc_thresh;
+> +	bool dedicated_clocks;
 
-You only pointed this out for i2c. What else is it true for? I should
-go look at your patches.
-
-> > +		mvsdio at 90000 {
-> > +			status = "okay";
-> > +			cd-gpios = <&gpio0 29 9>;
-> > +			status = "disabled";
-> 
-> Any reason not to enable sdio?
-
-Only client and ultimate have an SD slot. Base does not. If i have it
-right, client.dts and ultimate.dts should be enabling it. I will
-double check.
-
-> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Don't think we need this structure member as it's been used only in probe.
 
 Thanks
-	Andrew
+Kishon
