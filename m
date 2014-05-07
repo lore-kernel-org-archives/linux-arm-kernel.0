@@ -1,207 +1,100 @@
-From: sthokal@xilinx.com (Srikanth Thokala)
-Date: Wed, 7 May 2014 17:21:13 +0530
-Subject: [PATCH v3] pcie: Add Xilinx PCIe Host Bridge IP driver
-In-Reply-To: <201404301734.14478.arnd@arndb.de>
-References: <1397561911-11647-1-git-send-email-sthokal@xilinx.com>
- <201404301734.14478.arnd@arndb.de>
-Message-ID: <CA+mB=1K_AU5cLsW0J9OhVXmpvc+nYSZwpS5iyNXVTFpibfHq6g@mail.gmail.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 07 May 2014 13:52:29 +0200
+Subject: [RFC PATCH 1/5] watchdog: Add API to trigger reboots
+In-Reply-To: <20140503042925.GB5882@roeck-us.net>
+References: <1398958893-30049-1-git-send-email-linux@roeck-us.net>
+ <1398958893-30049-2-git-send-email-linux@roeck-us.net>
+ <20140503012243.GG4090@lukather> <20140503042925.GB5882@roeck-us.net>
+Message-ID: <1399463549.4536.10.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 30, 2014 at 9:04 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 15 April 2014, Srikanth Thokala wrote:
->> +Required properties:
->> +- #address-cells: Address representation for root ports, set to <3>
->> +- #size-cells: Size representation for root ports, set to <2>
->> +- #interrupt-cells: specifies the number of cells needed to encode an
->> +     interrupt source. The value must be 1.
->> +- compatible: Should contain "xlnx,axi-pcie-host-1.00.a"
->> +- reg: Should contain AXI PCIe registers location and length
->> +- device_type: must be "pci"
->> +- interrupts: Should contain AXI PCIe interrupt
->> +- interrupt-map-mask,
->> +  interrupt-map: standard PCI properties to define the mapping of the
->> +     PCI interface to interrupt numbers.
->> +- ranges: ranges for the PCI memory regions (I/O space region is noti
->
-> typo: noti -> not
+Hi Guenter,
 
-Ok, will fix.
+Am Freitag, den 02.05.2014, 21:29 -0700 schrieb Guenter Roeck:
+> On Fri, May 02, 2014 at 06:22:43PM -0700, Maxime Ripard wrote:
+> > Hi Guenter,
+> > 
+> > On Thu, May 01, 2014 at 08:41:29AM -0700, Guenter Roeck wrote:
+> > > Some hardware implements reboot through its watchdog hardware,
+> > > for example by triggering a watchdog timeout. Platform specific
+> > > code starts to spread into watchdog drivers, typically by setting
+> > > pointers to a callback functions which is then called from the
+> > > platform reset handler.
+> > > 
+> > > To simplify code and provide a unified API to trigger reboots by
+> > > watchdog drivers, provide a single API to trigger such reboots
+> > > through the watchdog subsystem.
+> > > 
+> > > Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+> > > ---
+> > >  drivers/watchdog/watchdog_core.c |   17 +++++++++++++++++
+> > >  include/linux/watchdog.h         |   11 +++++++++++
+> > >  2 files changed, 28 insertions(+)
+> > > 
+> > > diff --git a/drivers/watchdog/watchdog_core.c b/drivers/watchdog/watchdog_core.c
+> > > index cec9b55..4ec6e2f 100644
+> > > --- a/drivers/watchdog/watchdog_core.c
+> > > +++ b/drivers/watchdog/watchdog_core.c
+> > > @@ -43,6 +43,17 @@
+> > >  static DEFINE_IDA(watchdog_ida);
+> > >  static struct class *watchdog_class;
+> > >  
+> > > +static struct watchdog_device *wdd_reboot_dev;
+> > > +
+> > > +void watchdog_do_reboot(enum reboot_mode mode, const char *cmd)
+> > > +{
+> > > +	if (wdd_reboot_dev) {
+> > > +		if (wdd_reboot_dev->ops->reboot)
+> > > +			wdd_reboot_dev->ops->reboot(wdd_reboot_dev, mode, cmd);
+> > > +	}
+> > > +}
+> > > +EXPORT_SYMBOL(watchdog_do_reboot);
+> > > +
+> > >  static void watchdog_check_min_max_timeout(struct watchdog_device *wdd)
+> > >  {
+> > >  	/*
+> > > @@ -162,6 +173,9 @@ int watchdog_register_device(struct watchdog_device *wdd)
+> > >  		return ret;
+> > >  	}
+> > >  
+> > > +	if (wdd->ops->reboot)
+> > > +		wdd_reboot_dev = wdd;
+> > > +
+> > 
+> > Overall, it looks really great, but I guess we can make it a
+> > list. Otherwise, we might end up in a situation where we could not
+> > reboot anymore, like this one for example:
+> >   - a first watchdog is probed, registers a reboot function
+> >   - a second watchdog is probed, registers a reboot function that
+> >     overwrites the first one.
+> >   - then, the second watchdog disappears for some reason, and the
+> >     reboot is set to NULL
+> > 
+> I thought about that, but how likely (or unlikely) is that to ever happen ?
+> So I figured it is not worth the effort, and would just add complexity without
+> real gain. We could always add the list later if we ever encounter a situation
+> where two watchdogs in the same system provide a reboot callback.
+> 
 
->
->> +     supported by hardware)
->> +     Please refer to the standard PCI bus binding document for a more
->> +     detailed explanation
->> +
->> +Optional properties:
->> +- bus-range: PCI bus numbers covered
->> +
->> +Interrupt controller child node
->> ++++++++++++++++++++++++++++++++
->> +Required properties:
->> +- interrupt-controller: identifies the node as an interrupt controller
->> +- #address-cells: specifies the number of cells needed to encode an
->> +     address. The value must be 0.
->> +- #interrupt-cells: specifies the number of cells needed to encode an
->> +     interrupt source. The value must be 1.
->> +
->> +NOTE:
->> +The core provides a single interrupt for both INTx/MSI messages. So,
->> +created a interrupt controller node to support 'interrupt-map' DT
->> +functionality.  The driver will create an IRQ domain for this map, decode
->> +the four INTx interrupts in ISR and route them to this domain.
->
-> How does this work if the pci core is combined with a GIC version that
-> also has MSI support. Presumably you'd want to use that for performance
-> reason rather than the integrated MSI chip.
->
-> Shouldn't there be a way to pick between the two?
+While this is not directly related to the issue you are fixing with this
+series, I would like to have it considered when talking about a watchdog
+system reboot API.
 
-I will check and come back to you on this.
+On i.MX we have the same situation where we have to reboot through the
+SoC watchdog. This works, but may leave the external components of the
+system (those not integrated in the SoC) in an undefined state. So if we
+have a PMIC with integrated watchdog we would rather like to this one to
+reboot the system, as it the reset is then much more closer to a
+power-on-reset.
 
->
->> +/**
->> + * xilinx_pcie_get_config_base - Get configuration base
->> + * @bus: Bus structure of current bus
->> + * @devfn: Device/function
->> + * @where: Offset from base
->> + *
->> + * Return: Base address of the configuration space needed to be
->> + *      accessed.
->> + */
->> +static void __iomem *xilinx_pcie_get_config_base(struct pci_bus *bus,
->> +                                              unsigned int devfn,
->> +                                              int where)
->> +{
->> +     struct xilinx_pcie_port *port = sys_to_pcie(bus->sysdata);
->> +     int relbus;
->> +
->> +     relbus = (bus->number << ECAM_BUS_NUM_SHIFT) |
->> +              (devfn << ECAM_DEV_NUM_SHIFT);
->> +
->> +     return port->reg_base + relbus + where;
->> +}
->
-> Does this mean you have an ECAM-compliant config space? Nice!
->
-> Would it be possible to split the config space access out into
-> a separate file? It would be nice to share that with the generic
-> ECAM driver that Will Deacon has sent.
+This means we could have multiple watchdogs in the system, where we
+really want a specific one (maybe designated through a DT property) to
+do the reset. This isn't compatible with the "last watchdog that
+registers a handler wins the system reset" logic in your patch.
 
-Yes, it should be possible.  Is it ok, if I work on top of this driver?
-
->
->> +
->> +     msg.address_hi = 0;
->> +     msg.address_lo = virt_to_phys((void *)port->msg_addr);
->> +     msg.data = irq;
->> +
->> +     write_msi_msg(irq, &msg);
->
-> It seems strange to pass the msg_addr as an integer referring to
-> a virtual address. I'd suggest using phys_addr_t for the type
-> and converting it at the point the page gets allocated, and then
-> always assigning both the high and low part here. You'll need
-> that anyway for 64-bit operation.
-
-Ok, I will fix it. Thanks.
-
->
->> +/**
->> + * xilinx_pcie_enable_msi - Enable MSI support
->> + * @port: PCIe port information
->> + */
->> +static void xilinx_pcie_enable_msi(struct xilinx_pcie_port *port)
->> +{
->> +     port->msg_addr = __get_free_pages(GFP_KERNEL, 0);
->> +
->> +     pcie_write(port, 0x0, XILINX_PCIE_REG_MSIBASE1);
->> +     pcie_write(port, virt_to_phys((void *)port->msg_addr),
->> +                XILINX_PCIE_REG_MSIBASE2);
->> +}
->
-> here too.
->
-> As a general comment about the MSI implementation, I wonder if this is actually
-> generic enough to be shared with other host controllers. It could be moved
-> into a separate file like the config space access in that case.
-
-I feel the MSI implementation is not generic by looking into the other
-host controllers,
-it is more specific to the hardware.  Correct me, if am wrong.
-
->
->> +/**
->> + * xilinx_pcie_init_irq_domain - Initialize IRQ domain
->> + * @port: PCIe port information
->> + *
->> + * Return: '0' on success and error value on failure
->> + */
->> +static int xilinx_pcie_init_irq_domain(struct xilinx_pcie_port *port)
->> +{
->> +     struct device *dev = port->dev;
->> +     struct device_node *node = dev->of_node;
->> +
->> +     if (IS_ENABLED(CONFIG_PCI_MSI)) {
->> +             /* Setup MSI */
->> +             int i;
->> +
->> +             port->irq_domain = irq_domain_add_linear(node,
->> +                                                      XILINX_NUM_MSI_IRQS,
->> +                                                      &msi_domain_ops,
->> +                                                      &xilinx_pcie_msi_chip);
->> +             if (!port->irq_domain) {
->> +                     dev_err(dev, "Failed to get a MSI IRQ domain\n");
->> +                     return PTR_ERR(port->irq_domain);
->> +             }
->> +
->> +             for (i = 0; i < XILINX_NUM_MSI_IRQS; i++)
->> +                     irq_create_mapping(port->irq_domain, i);
->
-> I'm still not that familiar with the irqdomain code, but shouldn't you
-> do the irq_create_mapping() in xilinx_pcie_assign_msi()?
->
-> It seems wasteful to create all 128 mappings upfront.
-
-Ok, I agree with you.  I will fix it.
-
->
->> +/**
->> + * xilinx_pcie_setup - Setup memory resources
->> + * @nr: Bus number
->> + * @sys: Per controller structure
->> + *
->> + * Return: '1' on success and error value on failure
->> + */
->> +static int xilinx_pcie_setup(int nr, struct pci_sys_data *sys)
->> +{
->
-> I think if you move most of the code from this function into the probe()
-> function, it will be easier later to add arm64 support, and you can handle
-> errors better.
->
-> AFAICT, the only thing you need here is to list_move() the resources
-> from the xilinx_pcie_port to sys->resources. Ideally, the entire range
-> parsing can go away soon, once we have generic infrastructure for that.
-
-Sure.  I will do.
-
->
->
->> +     /* Register the device */
->> +     pci_common_init_dev(dev, &hw);
->> +
->> +     platform_set_drvdata(pdev, port);
->
-> Don't you have to do the platform_set_drvdata() before pci_common_init_dev()?
-
-It should be fine, as I don't see any dependencies.
-
-Srikanth
-
->
->         Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Regards,
+Lucas
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
