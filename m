@@ -1,28 +1,43 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 7 May 2014 17:03:17 -0500
-Subject: [PATCH 5/7] usb: ohci-platform: Enable optional use of reset
- controller
-In-Reply-To: <536A5EBF.10309@cogentembedded.com>
-References: <1399434623-20383-1-git-send-email-maxime.ripard@free-electrons.com>
- <1399434623-20383-6-git-send-email-maxime.ripard@free-electrons.com>
- <536A5EBF.10309@cogentembedded.com>
-Message-ID: <20140507220317.GD7047@lukather>
+Date: Wed, 7 May 2014 17:00:49 -0500
+Subject: [PATCH 4/7] usb: ehci-platform: add optional reset controller
+ retrieval
+In-Reply-To: <Pine.LNX.4.44L0.1405071020490.1325-100000@iolanthe.rowland.org>
+References: <1399434623-20383-5-git-send-email-maxime.ripard@free-electrons.com>
+ <Pine.LNX.4.44L0.1405071020490.1325-100000@iolanthe.rowland.org>
+Message-ID: <20140507220049.GC7047@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 07, 2014 at 08:26:39PM +0400, Sergei Shtylyov wrote:
-> Hello.
+On Wed, May 07, 2014 at 10:25:55AM -0400, Alan Stern wrote:
+> On Tue, 6 May 2014, Maxime Ripard wrote:
 > 
-> On 07-05-2014 7:50, Maxime Ripard wrote:
+> > From: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> > 
+> > On the Allwinner's A31 SoC the reset line connected to the EHCI IP has to
+> > be deasserted for the EHCI block to be usable.
+> > 
+> > Add support for an optional reset controller that will be deasserted on
+> > power off and asserted on power on.
+> > 
+> > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > 
-> >The OHCI controllers used in the Allwinner A31 are asserted in reset using a
-> 
->    s/asserted/powered up/?
+> Is this really a _reset_ line?  That is, when you assert the reset 
+> line, does it actually reset the EHCI controller, or does it merely 
+> leave the controller in a partially powered-down state?
 
-No. There's an external reset controller that maintains these devices
-into reset. It's not only a power on thing, it can also be put back
-into reset later in the life of the system.
+It actually resets the whole controller.
 
+> The difference is important.  During suspend, the controller is
+> supposed to remember the state of the port connections as well as other
+> settings.  If it doesn't, the controller and all attached USB devices
+> will have to be reinitialized every time the controller resumes, which
+> will increase the latency.
+
+So you're saying that we should move this to the probe then?
+
+Thanks,
 Maxime
 
 -- 
@@ -35,4 +50,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140507/1cc9568f/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140507/e2a372ab/attachment.sig>
