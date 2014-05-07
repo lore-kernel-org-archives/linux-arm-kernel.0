@@ -1,54 +1,137 @@
-From: jays.lee@samsung.com (Jungseok Lee)
-Date: Wed, 07 May 2014 12:59:12 +0900
-Subject: [PATCH v5 2/6] arm64: Introduce VA_BITS and translation level
- options
-In-Reply-To: <20140502111648.GA3002@lvm>
-References: <000201cf64e5$cd3366a0$679a33e0$@samsung.com>
- <20140501100628.GB2848@lvm> <000a01cf65a9$d3cbf030$7b63d090$@samsung.com>
- <20140502111648.GA3002@lvm>
-Message-ID: <001b01cf69a8$b49e5010$1ddaf030$@samsung.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue,  6 May 2014 22:50:19 -0500
+Subject: [PATCH 3/7] phy: usb: sunxi: Introduce Allwinner A31 USB PHY support
+In-Reply-To: <1399434623-20383-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1399434623-20383-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1399434623-20383-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, May 02, 2014 8:17 PM, Christoffer Dall wrote:
-> On Fri, May 02, 2014 at 10:57:09AM +0900, Jungseok Lee wrote:
-> > On Thursday, May 01, 2014 7:06 PM, Christoffer Dall wrote:
-> > > On Thu, May 01, 2014 at 11:33:56AM +0900, Jungseok Lee wrote:
-> 
-> [...]
-> 
-> > > > +
-> > > > +choice
-> > > > +	prompt "Virtual address space size"
-> > > > +	default ARM64_VA_BITS_39 if ARM64_4K_PAGES
-> > > > +	default ARM64_VA_BITS_42 if ARM64_64K_PAGES
-> > > > +	help
-> > > > +	  Allows virtual address space size. A level of translation
-> > > > +tables
-> > >
-> > > What does "Allows virtual address space size" mean exactly?
-> >
-> > It means that VA space size can be chosen. For example, there are two
-> > VA size options, 39-bit and 48-bit, with 4KB pages. If 39-bit VA space
-> > is not enough, 48-bit can be selected instead. The 5th patch adds a
-> > 48-bit option to this choice blocks.
-> >
-> > If 16KB pages are supported with both 47-bit and 48-bit VA size,
-> > people could configure it in menuconfig.
-> >
-> > In this context, I've written it down like page size.
-> >
-> > I think Catalin's comment would be helpful.
-> > http://www.spinics.net/linux/lists/arm-kernel/msg319552.html
-> >
-> I didn't have problems understanding the concept, I was questioning the language.  The way it is
-> written now it suggests having a virtual address space size, as opposed to not having a size at all,
-> which doesn't make sense.
-> 
-> I think you want to say something along the lines of "Allows choosing a virtual address space size",
-> or "Allows choosing one of multiple possible virtual address space sizes".
+The USB phy controller in the A31 differs mostly from the older controllers
+because it has a clock dedicated for each phy, while the older ones were having
+a single clock for all the phys.
 
-Ahh... I see. I will revise the sentence clearly.
-Thanks!
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/phy/phy-sun4i-usb.c | 35 ++++++++++++++++++++++++++---------
+ 1 file changed, 26 insertions(+), 9 deletions(-)
 
-- Jungseok Lee
+diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+index e6e6c4ba7145..1d83abe07a29 100644
+--- a/drivers/phy/phy-sun4i-usb.c
++++ b/drivers/phy/phy-sun4i-usb.c
+@@ -61,16 +61,17 @@
+ #define MAX_PHYS			3
+ 
+ struct sun4i_usb_phy_data {
+-	struct clk *clk;
+ 	void __iomem *base;
+ 	struct mutex mutex;
+ 	int num_phys;
+ 	u32 disc_thresh;
++	bool dedicated_clocks;
+ 	struct sun4i_usb_phy {
+ 		struct phy *phy;
+ 		void __iomem *pmu;
+ 		struct regulator *vbus;
+ 		struct reset_control *reset;
++		struct clk *clk;
+ 		int index;
+ 	} phys[MAX_PHYS];
+ };
+@@ -146,13 +147,13 @@ static int sun4i_usb_phy_init(struct phy *_phy)
+ 	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
+ 	int ret;
+ 
+-	ret = clk_prepare_enable(data->clk);
++	ret = clk_prepare_enable(phy->clk);
+ 	if (ret)
+ 		return ret;
+ 
+ 	ret = reset_control_deassert(phy->reset);
+ 	if (ret) {
+-		clk_disable_unprepare(data->clk);
++		clk_disable_unprepare(phy->clk);
+ 		return ret;
+ 	}
+ 
+@@ -170,11 +171,10 @@ static int sun4i_usb_phy_init(struct phy *_phy)
+ static int sun4i_usb_phy_exit(struct phy *_phy)
+ {
+ 	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
+-	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
+ 
+ 	sun4i_usb_phy_passby(phy, 0);
+ 	reset_control_assert(phy->reset);
+-	clk_disable_unprepare(data->clk);
++	clk_disable_unprepare(phy->clk);
+ 
+ 	return 0;
+ }
+@@ -230,6 +230,7 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 	struct regulator *vbus;
+ 	struct resource *res;
+ 	struct phy *phy;
++	struct clk *clk;
+ 	char name[16];
+ 	int i;
+ 
+@@ -249,15 +250,20 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 	else
+ 		data->disc_thresh = 2;
+ 
++	if (of_device_is_compatible(np, "allwinner,sun6i-a31-usb-phy"))
++		data->dedicated_clocks = true;
++
+ 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "phy_ctrl");
+ 	data->base = devm_ioremap_resource(dev, res);
+ 	if (IS_ERR(data->base))
+ 		return PTR_ERR(data->base);
+ 
+-	data->clk = devm_clk_get(dev, "usb_phy");
+-	if (IS_ERR(data->clk)) {
+-		dev_err(dev, "could not get usb_phy clock\n");
+-		return PTR_ERR(data->clk);
++	if (!data->dedicated_clocks) {
++		clk = devm_clk_get(dev, "usb_phy");
++		if (IS_ERR(clk)) {
++			dev_err(dev, "could not get usb_phy clock\n");
++			return PTR_ERR(clk);
++		}
+ 	}
+ 
+ 	/* Skip 0, 0 is the phy for otg which is not yet supported. */
+@@ -270,6 +276,15 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 			vbus = NULL;
+ 		}
+ 
++		if (data->dedicated_clocks) {
++			snprintf(name, sizeof(name), "usb%d_phy", i);
++			clk = devm_clk_get(dev, name);
++			if (IS_ERR(clk)) {
++				dev_err(dev, "failed to get clock %s\n", name);
++				return PTR_ERR(clk);
++			}
++		}
++
+ 		snprintf(name, sizeof(name), "usb%d_reset", i);
+ 		reset = devm_reset_control_get(dev, name);
+ 		if (IS_ERR(reset)) {
+@@ -296,6 +311,7 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 		data->phys[i].pmu = pmu;
+ 		data->phys[i].vbus = vbus;
+ 		data->phys[i].reset = reset;
++		data->phys[i].clk = clk;
+ 		data->phys[i].index = i;
+ 		phy_set_drvdata(phy, &data->phys[i]);
+ 	}
+@@ -311,6 +327,7 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ static const struct of_device_id sun4i_usb_phy_of_match[] = {
+ 	{ .compatible = "allwinner,sun4i-a10-usb-phy" },
+ 	{ .compatible = "allwinner,sun5i-a13-usb-phy" },
++	{ .compatible = "allwinner,sun6i-a31-usb-phy" },
+ 	{ .compatible = "allwinner,sun7i-a20-usb-phy" },
+ 	{ },
+ };
+-- 
+1.9.1
