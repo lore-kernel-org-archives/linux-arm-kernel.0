@@ -1,69 +1,40 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  7 May 2014 15:52:26 +0200
-Subject: [PATCHv4 20/20] ARM: mvebu: add Device Tree description of the EHCI
- controller on Armada 375
-In-Reply-To: <1399470746-2948-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1399470746-2948-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1399470746-2948-21-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Wed, 7 May 2014 15:56:03 +0200
+Subject: [PATCH v3 02/20] usb: ehci-orion: Add the optional PHY support
+In-Reply-To: <20140507132150.GA23936@lunn.ch>
+References: <1399335255-589-1-git-send-email-gregory.clement@free-electrons.com>
+ <1399335255-589-3-git-send-email-gregory.clement@free-electrons.com>
+ <20140506133341.GE6503@lunn.ch>
+ <20140507114006.466347a0@free-electrons.com>
+ <20140507132150.GA23936@lunn.ch>
+Message-ID: <20140507155603.4496b9e0@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Dear Andrew Lunn,
 
-The Marvell Armada 375 SoCs contains one EHCI controller. This commit
-adds the Device Tree description of this interfaces at the SoC level,
-and also enables the USB2 port on the Armada 375 DB platform.
+On Wed, 7 May 2014 15:21:50 +0200, Andrew Lunn wrote:
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/boot/dts/armada-375-db.dts |  4 ++++
- arch/arm/boot/dts/armada-375.dtsi   | 18 ++++++++++++++++++
- 2 files changed, 22 insertions(+)
+> > Thanks to devm_phy_optional_get(), the fact of not having a PHY in the
+> > DT is not considered an error. So on any error from
+> > devm_phy_optional_get() (including -EPROBE_DEFER), we simply bail out.
+> > Does this looks good?
+> 
+> Hi Thomas
+> 
+> That looks good.
+> 
+> To avoid the SATA phy problems we had last time, i would like to test
+> this on a few systems. Please could you let me know what branch v4 is
+> in when it is ready.
 
-diff --git a/arch/arm/boot/dts/armada-375-db.dts b/arch/arm/boot/dts/armada-375-db.dts
-index 0453d69..01bc5e8 100644
---- a/arch/arm/boot/dts/armada-375-db.dts
-+++ b/arch/arm/boot/dts/armada-375-db.dts
-@@ -102,6 +102,10 @@
- 				};
- 			};
- 
-+			usb at 54000 {
-+				status = "okay";
-+			};
-+
- 			usb3 at 58000 {
- 				status = "okay";
- 			};
-diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
-index 1b81d1e..945df89 100644
---- a/arch/arm/boot/dts/armada-375.dtsi
-+++ b/arch/arm/boot/dts/armada-375.dtsi
-@@ -320,6 +320,24 @@
- 				clocks = <&coreclk 0>;
- 			};
- 
-+			usb at 50000 {
-+				compatible = "marvell,orion-ehci";
-+				reg = <0x50000 0x500>;
-+				interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&gateclk 18>;
-+				phys = <&usbcluster 0>;
-+				phy-names = "usb";
-+				status = "disabled";
-+			};
-+
-+			usb at 54000 {
-+				compatible = "marvell,orion-ehci";
-+				reg = <0x54000 0x500>;
-+				interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&gateclk 26>;
-+				status = "disabled";
-+			};
-+
- 			usb3 at 58000 {
- 				compatible = "marvell,armada-375-xhci";
- 				reg = <0x58000 0x20000>,<0x5b880 0x80>;
+Sure. It's now up at
+https://github.com/MISL-EBU-System-SW/mainline-public/tree/USB-375-38x-3.15-rc1-V4.
+
+Thanks!
+
+Thomas
 -- 
-1.9.2
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
