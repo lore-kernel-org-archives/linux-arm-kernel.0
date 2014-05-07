@@ -1,70 +1,40 @@
-From: bevenson@melinkcorp.com (Bryan Evenson)
-Date: Wed, 7 May 2014 18:44:33 +0000
-Subject: [PATCH] ARM: at91: fix rtc irq mask for sam9x5 SoCs
-In-Reply-To: <1399479649-3247-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <957b209589094df48ddedbc57c6ccdfd@BLUPR05MB037.namprd05.prod.outlook.com>
- <1399479649-3247-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <edaf5835a7b14b9a8c053dcd40f2b591@BLUPR05MB037.namprd05.prod.outlook.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 7 May 2014 14:15:01 -0500
+Subject: [RFC PATCH 1/5] watchdog: Add API to trigger reboots
+In-Reply-To: <536A2EAB.4000605@roeck-us.net>
+References: <1398958893-30049-1-git-send-email-linux@roeck-us.net>
+ <1398958893-30049-2-git-send-email-linux@roeck-us.net>
+ <20140503012243.GG4090@lukather>
+ <20140503042925.GB5882@roeck-us.net>
+ <1399463549.4536.10.camel@weser.hi.pengutronix.de>
+ <536A2EAB.4000605@roeck-us.net>
+Message-ID: <20140507191501.GA7047@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Boris,
+On Wed, May 07, 2014 at 06:01:31AM -0700, Guenter Roeck wrote:
+> >This means we could have multiple watchdogs in the system, where we
+> >really want a specific one (maybe designated through a DT property) to
+> >do the reset. This isn't compatible with the "last watchdog that
+> >registers a handler wins the system reset" logic in your patch.
+> >
+> 
+> Wouldn't the order in which watchdogs are configured in dt define that ?
+> The last one wins.
 
-> -----Original Message-----
-> From: Boris BREZILLON [mailto:boris.brezillon at free-electrons.com]
-> Sent: Wednesday, May 07, 2014 12:21 PM
-> To: Bryan Evenson
-> Cc: Andrew Victor; Nicolas Ferre; Jean-Christophe Plagniol-Villard; linux-arm-
-> kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Boris BREZILLON
-> Subject: [PATCH] ARM: at91: fix rtc irq mask for sam9x5 SoCs
-> 
-> The RTC IMR register is not reliable on sam9x5 SoCs, hence why me have to
-> mask all interrupts no matter what IMR claims about already masked irqs.
-> 
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> Reported-by: Bryan Evenson <bevenson@melinkcorp.com>
-> ---
-> Hello Bryan,
-> 
-> Yet another patch for you ;-).
-> 
-> As usual, could you tell me if it fixes your bug.
-> 
-> BTW, thanks for your tests.
-> 
-> Best Regards,
-> 
-> Boris
+It doesn't work, because the DT nodes are usually ordered by physical
+address.
 
-This fixes the issue on my system.  I disconnected my system from the network to guarantee ntp didn't adjust the time.  I power cycled my system 15 times with the RTC backup battery in place, and each time it booted without issue and the RTC kept the correct time.  Before this patch my system would never complete booting with the RTC battery installed.  I also used my previous test script for the previous patch to verify that I could not lockup access to the RTC.
+Maxime
 
-Tested-by: Bryan Evenson <bevenson@melinkcorp.com>
-
-Regards,
-Bryan
-
-> 
->  arch/arm/mach-at91/sysirq_mask.c | 7 +------
->  1 file changed, 1 insertion(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/mach-at91/sysirq_mask.c b/arch/arm/mach-
-> at91/sysirq_mask.c
-> index 2ba694f..eb3d2a5 100644
-> --- a/arch/arm/mach-at91/sysirq_mask.c
-> +++ b/arch/arm/mach-at91/sysirq_mask.c
-> @@ -37,12 +37,7 @@ void __init at91_sysirq_mask_rtc(u32 rtc_base)
->  	if (!base)
->  		return;
-> 
-> -	mask = readl_relaxed(base + AT91_RTC_IMR);
-> -	if (mask) {
-> -		pr_info("AT91: Disabling rtc irq\n");
-> -		writel_relaxed(mask, base + AT91_RTC_IDR);
-> -		(void)readl_relaxed(base + AT91_RTC_IMR);	/* flush */
-> -	}
-> +	writel_relaxed(0x1f, base + AT91_RTC_IDR);
-> 
->  	iounmap(base);
->  }
-> --
-> 1.8.3.2
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140507/9e08ff51/attachment.sig>
