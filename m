@@ -1,70 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed,  7 May 2014 15:41:49 +0200
-Subject: [PATCH] ARM: dt: fix up PL011 device tree bindings
-Message-ID: <1399470109-8021-1-git-send-email-linus.walleij@linaro.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed,  7 May 2014 15:52:07 +0200
+Subject: [PATCHv4 01/20] usb: ehci-orion: use platform_get_irq() for DT probing
+In-Reply-To: <1399470746-2948-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1399470746-2948-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1399470746-2948-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make the map match the reality, the current binding text is
-nonsense:
+Commit 77dae54ab385033e488d8b07045bc7f8d931740f ('ARM: Kirkwood:
+ehci-orion: Add device tree binding') added the Device Tree binding
+for the ehci-orion driver. To achieve that with the irq, it used the
+irq_of_parse_and_map() function when probed in DT-mode, and
+platform_get_irq() when probed in non-DT mode.
 
-- The clock required for the clocking of the serial port
-  must come first and is not optional (as the driver will
-  otherwise proceed to grab and use the apb_pclk as uartclk),
-  and the apb_pclk that clocks the logic must come second
-  as the code will retrieve the first clock by index,
-  whereas the PrimeCell but will explicitly look for
-  "apb_pclk" so this can be specified later, as it is
-  looked up by name.
+This is not necessary: platform_get_irq() works just as fine in
+DT-mode, since the conversion from DT information to 'struct resource'
+is done by the generic layers of the kernel.
 
-- The pin control state "default" is the only mandated
-  state, the sleep state is entirely optional.
+Therefore, this commit switches back to use just platform_get_irq().
 
-We also add an example to avoid further confusion.
-
-Reported-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- Documentation/devicetree/bindings/serial/pl011.txt | 25 ++++++++++++++++++----
- 1 file changed, 21 insertions(+), 4 deletions(-)
+ drivers/usb/host/ehci-orion.c | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/serial/pl011.txt b/Documentation/devicetree/bindings/serial/pl011.txt
-index 5d2e840ae65c..7a33d67c8349 100644
---- a/Documentation/devicetree/bindings/serial/pl011.txt
-+++ b/Documentation/devicetree/bindings/serial/pl011.txt
-@@ -6,12 +6,29 @@ Required properties:
- - interrupts: exactly one interrupt specifier
+diff --git a/drivers/usb/host/ehci-orion.c b/drivers/usb/host/ehci-orion.c
+index 30d35e5..7728e83 100644
+--- a/drivers/usb/host/ehci-orion.c
++++ b/drivers/usb/host/ehci-orion.c
+@@ -154,10 +154,7 @@ static int ehci_orion_drv_probe(struct platform_device *pdev)
  
- Optional properties:
--- pinctrl: When present, must have one state named "sleep"
--	   and one state named "default"
--- clocks:  When present, must refer to exactly one clock named
--	   "apb_pclk"
-+- pinctrl: When present, must have one state named "default",
-+	   and may contain a second name named "sleep". The former
-+	   state sets up pins for ordinary operation whereas
-+	   the latter state will put the associated pins to sleep
-+	   when the UART is unused
-+- clocks:  When present, the first clock listed must be named
-+	   "uartclk" and clock the external serial line, and the
-+	   second clock listed must be named "amba_pclk" and clocks
-+	   the internal logic of the serial core
- - dmas:	   When present, may have one or two dma channels.
- 	   The first one must be named "rx", the second one
- 	   must be named "tx".
+ 	pr_debug("Initializing Orion-SoC USB Host Controller\n");
  
- See also bindings/arm/primecell.txt
-+
-+Example:
-+
-+uart at 80120000 {
-+	compatible = "arm,pl011", "arm,primecell";
-+	reg = <0x80120000 0x1000>;
-+	interrupts = <0 11 IRQ_TYPE_LEVEL_HIGH>;
-+	dmas = <&dma 13 0 0x2>, <&dma 13 0 0x0>;
-+	dma-names = "rx", "tx";
-+	clocks = <&foo_clk>, <&bar_clk>;
-+	clock-names = "uartclk", "apb_pclk";
-+};
+-	if (pdev->dev.of_node)
+-		irq = irq_of_parse_and_map(pdev->dev.of_node, 0);
+-	else
+-		irq = platform_get_irq(pdev, 0);
++	irq = platform_get_irq(pdev, 0);
+ 	if (irq <= 0) {
+ 		dev_err(&pdev->dev,
+ 			"Found HC with no IRQ. Check %s setup!\n",
 -- 
-1.9.0
+1.9.2
