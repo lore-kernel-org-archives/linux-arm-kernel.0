@@ -1,64 +1,30 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 7 May 2014 10:10:08 -0500
-Subject: [PATCH v3 06/20] usb: host: xhci-plat: Add support for the
- Armada 38x
-In-Reply-To: <20140507122326.54f3febc@free-electrons.com>
-References: <1399335255-589-1-git-send-email-gregory.clement@free-electrons.com>
- <1399335255-589-7-git-send-email-gregory.clement@free-electrons.com>
- <20140506153953.GF25849@saruman.home>
- <20140507122326.54f3febc@free-electrons.com>
-Message-ID: <20140507151008.GD769@saruman.home>
+From: jsm@jsolano.com (Juan Solano)
+Date: Wed,  7 May 2014 17:09:59 +0200
+Subject: [PATCH] ARM: i.MX27 pca100: remove deprecated IRQF_DISABLED
+Message-ID: <1399475399-8770-1-git-send-email-jsm@jsolano.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 07, 2014 at 12:23:26PM +0200, Thomas Petazzoni wrote:
-> Dear Felipe Balbi,
-> 
-> On Tue, 6 May 2014 10:39:53 -0500, Felipe Balbi wrote:
-> 
-> > >  config USB_EHCI_HCD
-> > > diff --git a/drivers/usb/host/Makefile b/drivers/usb/host/Makefile
-> > > index 7530468c9a4f..7a8db7f7dc01 100644
-> > > --- a/drivers/usb/host/Makefile
-> > > +++ b/drivers/usb/host/Makefile
-> > > @@ -19,6 +19,7 @@ xhci-hcd-$(CONFIG_PCI)	+= xhci-pci.o
-> > >  
-> > >  ifneq ($(CONFIG_USB_XHCI_PLATFORM), )
-> > >  	xhci-hcd-y		+= xhci-plat.o
-> > > +	xhci-hcd-$(CONFIG_USB_XHCI_MVEBU)	+= xhci-mvebu.o
-> > 
-> > hmm, this has the potential of resulting in:
-> > 
-> > 	xhci-hcd-m += xhci-mvebu.o
-> > 
-> > I guess it's best to turn this into:
-> > 
-> > ifneq ($(CONFIG_USB_XHCI_PLATFORM), )
-> > 	xhci-hcd-y += xhci-mvebu.o
-> > endif
-> 
-> I guess you meant:
-> 
-> ifneq ($(CONFIG_USB_XHCI_MVEBU), )
-> 	xhci-hcd-y += xhci-mvebu.o
-> endif
-> 
-> Right?
+This flag is a NOOP and can be removed now.
 
-correct :-)
+Signed-off-by: Juan Solano <jsm@jsolano.com>
+---
+ arch/arm/mach-imx/mach-pca100.c |    3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-> If so, then what about instead making CONFIG_USB_XHCI_MVEBU a bool
-> instead of a tristate? It's more an option for the xhci-platform
-> driver than an additional separate module, IMO. What do you think?
-
-fine by me too. It simply adds a quirk callback to xhci-plat.
-
+diff --git a/arch/arm/mach-imx/mach-pca100.c b/arch/arm/mach-imx/mach-pca100.c
+index bf3ac51..20e7c33 100644
+--- a/arch/arm/mach-imx/mach-pca100.c
++++ b/arch/arm/mach-imx/mach-pca100.c
+@@ -245,8 +245,7 @@ static int pca100_sdhc2_init(struct device *dev, irq_handler_t detect_irq,
+ 	int ret;
+ 
+ 	ret = request_irq(gpio_to_irq(IMX_GPIO_NR(3, 29)), detect_irq,
+-			  IRQF_DISABLED | IRQF_TRIGGER_FALLING,
+-			  "imx-mmc-detect", data);
++			  IRQF_TRIGGER_FALLING, "imx-mmc-detect", data);
+ 	if (ret)
+ 		printk(KERN_ERR
+ 			"pca100: Failed to request irq for sd/mmc detection\n");
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140507/c4edbf17/attachment.sig>
+1.7.9.5
