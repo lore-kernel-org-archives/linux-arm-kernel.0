@@ -1,9 +1,10 @@
 From: luis.henriques@canonical.com (Luis Henriques)
-Date: Wed,  7 May 2014 14:12:14 +0100
-Subject: [PATCH 3.11 11/70] genirq: Allow forcing cpu affinity of interrupts
+Date: Wed,  7 May 2014 14:12:16 +0100
+Subject: [PATCH 3.11 13/70] clocksource: Exynos_mct: Register clock event
+ after request_irq()
 In-Reply-To: <1399468393-10140-1-git-send-email-luis.henriques@canonical.com>
 References: <1399468393-10140-1-git-send-email-luis.henriques@canonical.com>
-Message-ID: <1399468393-10140-12-git-send-email-luis.henriques@canonical.com>
+Message-ID: <1399468393-10140-14-git-send-email-luis.henriques@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,38 +12,20 @@ List-Id: linux-arm-kernel.lists.infradead.org
 
 ------------------
 
-From: Thomas Gleixner <tglx@linutronix.de>
+From: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-commit 01f8fa4f01d8362358eb90e412bd7ae18a3ec1ad upstream.
+commit 8db6e5104b77de5d0b7002b95069da0992a34be9 upstream.
 
-The current implementation of irq_set_affinity() refuses rightfully to
-route an interrupt to an offline cpu.
+After hotplugging CPU1 the first call of interrupt handler for CPU1
+oneshot timer was called on CPU0 because it fired before setting IRQ
+affinity. Affected are SoCs where Multi Core Timer interrupts are
+shared (SPI), e.g. Exynos 4210.
 
-But there is a special case, where this is actually desired. Some of
-the ARM SoCs have per cpu timers which require setting the affinity
-during cpu startup where the cpu is not yet in the online mask.
+During setup of the MCT timers the clock event device should be
+registered after setting the affinity for interrupt. This will prevent
+starting the timer too early.
 
-If we can't do that, then the local timer interrupt for the about to
-become online cpu is routed to some random online cpu.
-
-The developers of the affected machines tried to work around that
-issue, but that results in a massive mess in that timer code.
-
-We have a yet unused argument in the set_affinity callbacks of the irq
-chips, which I added back then for a similar reason. It was never
-required so it got not used. But I'm happy that I never removed it.
-
-That allows us to implement a sane handling of the above scenario. So
-the affected SoC drivers can add the required force handling to their
-interrupt chip, switch the timer code to irq_force_affinity() and
-things just work.
-
-This does not affect any existing user of irq_set_affinity().
-
-Tagged for stable to allow a simple fix of the affected SoC clock
-event drivers.
-
-Reported-and-tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
 Cc: Kyungmin Park <kyungmin.park@samsung.com>
 Cc: Marek Szyprowski <m.szyprowski@samsung.com>
@@ -51,144 +34,34 @@ Cc: Tomasz Figa <t.figa@samsung.com>,
 Cc: Daniel Lezcano <daniel.lezcano@linaro.org>,
 Cc: Kukjin Kim <kgene.kim@samsung.com>
 Cc: linux-arm-kernel at lists.infradead.org,
-Link: http://lkml.kernel.org/r/20140416143315.717251504 at linutronix.de
+Link: http://lkml.kernel.org/r/20140416143316.299247848 at linutronix.de
 Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Luis Henriques <luis.henriques@canonical.com>
 ---
- arch/mips/cavium-octeon/octeon-irq.c |  2 +-
- include/linux/interrupt.h            | 35 ++++++++++++++++++++++++++++++++++-
- include/linux/irq.h                  |  3 ++-
- kernel/irq/manage.c                  | 17 ++++++-----------
- 4 files changed, 43 insertions(+), 14 deletions(-)
+ drivers/clocksource/exynos_mct.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/mips/cavium-octeon/octeon-irq.c b/arch/mips/cavium-octeon/octeon-irq.c
-index 9d36774..011e704 100644
---- a/arch/mips/cavium-octeon/octeon-irq.c
-+++ b/arch/mips/cavium-octeon/octeon-irq.c
-@@ -635,7 +635,7 @@ static void octeon_irq_cpu_offline_ciu(struct irq_data *data)
- 		cpumask_clear(&new_affinity);
- 		cpumask_set_cpu(cpumask_first(cpu_online_mask), &new_affinity);
- 	}
--	__irq_set_affinity_locked(data, &new_affinity);
-+	irq_set_affinity_locked(data, &new_affinity, false);
- }
+diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+index b2bbc41..14bc622 100644
+--- a/drivers/clocksource/exynos_mct.c
++++ b/drivers/clocksource/exynos_mct.c
+@@ -417,8 +417,6 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
+ 	evt->set_mode = exynos4_tick_set_mode;
+ 	evt->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
+ 	evt->rating = 450;
+-	clockevents_config_and_register(evt, clk_rate / (TICK_BASE_CNT + 1),
+-					0xf, 0x7fffffff);
  
- static int octeon_irq_ciu_set_affinity(struct irq_data *data,
-diff --git a/include/linux/interrupt.h b/include/linux/interrupt.h
-index 5fa5afe..e8401d0 100644
---- a/include/linux/interrupt.h
-+++ b/include/linux/interrupt.h
-@@ -239,7 +239,40 @@ static inline int check_wakeup_irqs(void) { return 0; }
+ 	exynos4_mct_write(TICK_BASE_CNT, mevt->base + MCT_L_TCNTB_OFFSET);
  
- extern cpumask_var_t irq_default_affinity;
- 
--extern int irq_set_affinity(unsigned int irq, const struct cpumask *cpumask);
-+/* Internal implementation. Use the helpers below */
-+extern int __irq_set_affinity(unsigned int irq, const struct cpumask *cpumask,
-+			      bool force);
-+
-+/**
-+ * irq_set_affinity - Set the irq affinity of a given irq
-+ * @irq:	Interrupt to set affinity
-+ * @mask:	cpumask
-+ *
-+ * Fails if cpumask does not contain an online CPU
-+ */
-+static inline int
-+irq_set_affinity(unsigned int irq, const struct cpumask *cpumask)
-+{
-+	return __irq_set_affinity(irq, cpumask, false);
-+}
-+
-+/**
-+ * irq_force_affinity - Force the irq affinity of a given irq
-+ * @irq:	Interrupt to set affinity
-+ * @mask:	cpumask
-+ *
-+ * Same as irq_set_affinity, but without checking the mask against
-+ * online cpus.
-+ *
-+ * Solely for low level cpu hotplug code, where we need to make per
-+ * cpu interrupts affine before the cpu becomes online.
-+ */
-+static inline int
-+irq_force_affinity(unsigned int irq, const struct cpumask *cpumask)
-+{
-+	return __irq_set_affinity(irq, cpumask, true);
-+}
-+
- extern int irq_can_set_affinity(unsigned int irq);
- extern int irq_select_affinity(unsigned int irq);
- 
-diff --git a/include/linux/irq.h b/include/linux/irq.h
-index f04d3ba..04b979c 100644
---- a/include/linux/irq.h
-+++ b/include/linux/irq.h
-@@ -380,7 +380,8 @@ extern void remove_percpu_irq(unsigned int irq, struct irqaction *act);
- 
- extern void irq_cpu_online(void);
- extern void irq_cpu_offline(void);
--extern int __irq_set_affinity_locked(struct irq_data *data,  const struct cpumask *cpumask);
-+extern int irq_set_affinity_locked(struct irq_data *data,
-+				   const struct cpumask *cpumask, bool force);
- 
- #ifdef CONFIG_GENERIC_HARDIRQS
- 
-diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
-index 4c84746..9e31fa7 100644
---- a/kernel/irq/manage.c
-+++ b/kernel/irq/manage.c
-@@ -150,7 +150,7 @@ int irq_do_set_affinity(struct irq_data *data, const struct cpumask *mask,
- 	struct irq_chip *chip = irq_data_get_irq_chip(data);
- 	int ret;
- 
--	ret = chip->irq_set_affinity(data, mask, false);
-+	ret = chip->irq_set_affinity(data, mask, force);
- 	switch (ret) {
- 	case IRQ_SET_MASK_OK:
- 		cpumask_copy(data->affinity, mask);
-@@ -162,7 +162,8 @@ int irq_do_set_affinity(struct irq_data *data, const struct cpumask *mask,
- 	return ret;
- }
- 
--int __irq_set_affinity_locked(struct irq_data *data, const struct cpumask *mask)
-+int irq_set_affinity_locked(struct irq_data *data, const struct cpumask *mask,
-+			    bool force)
- {
- 	struct irq_chip *chip = irq_data_get_irq_chip(data);
- 	struct irq_desc *desc = irq_data_to_desc(data);
-@@ -172,7 +173,7 @@ int __irq_set_affinity_locked(struct irq_data *data, const struct cpumask *mask)
- 		return -EINVAL;
- 
- 	if (irq_can_move_pcntxt(data)) {
--		ret = irq_do_set_affinity(data, mask, false);
-+		ret = irq_do_set_affinity(data, mask, force);
+@@ -435,6 +433,8 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
  	} else {
- 		irqd_set_move_pending(data);
- 		irq_copy_pending(desc, mask);
-@@ -187,13 +188,7 @@ int __irq_set_affinity_locked(struct irq_data *data, const struct cpumask *mask)
- 	return ret;
- }
+ 		enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
+ 	}
++	clockevents_config_and_register(evt, clk_rate / (TICK_BASE_CNT + 1),
++					0xf, 0x7fffffff);
  
--/**
-- *	irq_set_affinity - Set the irq affinity of a given irq
-- *	@irq:		Interrupt to set affinity
-- *	@mask:		cpumask
-- *
-- */
--int irq_set_affinity(unsigned int irq, const struct cpumask *mask)
-+int __irq_set_affinity(unsigned int irq, const struct cpumask *mask, bool force)
- {
- 	struct irq_desc *desc = irq_to_desc(irq);
- 	unsigned long flags;
-@@ -203,7 +198,7 @@ int irq_set_affinity(unsigned int irq, const struct cpumask *mask)
- 		return -EINVAL;
- 
- 	raw_spin_lock_irqsave(&desc->lock, flags);
--	ret =  __irq_set_affinity_locked(irq_desc_get_irq_data(desc), mask);
-+	ret = irq_set_affinity_locked(irq_desc_get_irq_data(desc), mask, force);
- 	raw_spin_unlock_irqrestore(&desc->lock, flags);
- 	return ret;
+ 	return 0;
  }
 -- 
 1.9.1
