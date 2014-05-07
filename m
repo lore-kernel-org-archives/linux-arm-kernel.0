@@ -1,56 +1,92 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 7 May 2014 12:23:26 +0200
-Subject: [PATCH v3 06/20] usb: host: xhci-plat: Add support for the
- Armada 38x
-In-Reply-To: <20140506153953.GF25849@saruman.home>
-References: <1399335255-589-1-git-send-email-gregory.clement@free-electrons.com>
- <1399335255-589-7-git-send-email-gregory.clement@free-electrons.com>
- <20140506153953.GF25849@saruman.home>
-Message-ID: <20140507122326.54f3febc@free-electrons.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Wed,  7 May 2014 12:28:10 +0200
+Subject: [PATCH v2] rtc: rtc-at91rm9200: fix uninterruptible wait for ACKUPD
+Message-ID: <1399458490-11870-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Felipe Balbi,
+The rtc user must wait at least 1 sec between each time/calandar update
+(see atmel's datasheet chapter "Updating Time/Calendar").
 
-On Tue, 6 May 2014 10:39:53 -0500, Felipe Balbi wrote:
+Use the SECEV interrupt (as suggested by the datasheet) to wait for the
+RTC to be ready for new updates.
 
-> >  config USB_EHCI_HCD
-> > diff --git a/drivers/usb/host/Makefile b/drivers/usb/host/Makefile
-> > index 7530468c9a4f..7a8db7f7dc01 100644
-> > --- a/drivers/usb/host/Makefile
-> > +++ b/drivers/usb/host/Makefile
-> > @@ -19,6 +19,7 @@ xhci-hcd-$(CONFIG_PCI)	+= xhci-pci.o
-> >  
-> >  ifneq ($(CONFIG_USB_XHCI_PLATFORM), )
-> >  	xhci-hcd-y		+= xhci-plat.o
-> > +	xhci-hcd-$(CONFIG_USB_XHCI_MVEBU)	+= xhci-mvebu.o
-> 
-> hmm, this has the potential of resulting in:
-> 
-> 	xhci-hcd-m += xhci-mvebu.o
-> 
-> I guess it's best to turn this into:
-> 
-> ifneq ($(CONFIG_USB_XHCI_PLATFORM), )
-> 	xhci-hcd-y += xhci-mvebu.o
-> endif
+Cc: <stable@vger.kernel.org> # v3.10+
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+Reported-by: Bryan Evenson <bevenson@melinkcorp.com>
+---
+Hello,
 
-I guess you meant:
+This patch fixes a deadlock in an uninterruptible wait when the RTC is
+updated more than once every second.
+AFAICT the bug is here from the beginning, but I think we should at least
+backport this fix to 3.10 and the following longterm and stable releases.
 
-ifneq ($(CONFIG_USB_XHCI_MVEBU), )
-	xhci-hcd-y += xhci-mvebu.o
-endif
+Best Regards,
 
-Right?
+Boris
 
-If so, then what about instead making CONFIG_USB_XHCI_MVEBU a bool
-instead of a tristate? It's more an option for the xhci-platform
-driver than an additional separate module, IMO. What do you think?
+Changes since v1:
+- disable SECEV interrupt when the RTC is ready to accept new time updates
 
-Thanks,
+ drivers/rtc/rtc-at91rm9200.c | 16 ++++++++++++++--
+ 1 file changed, 14 insertions(+), 2 deletions(-)
 
-Thomas
+diff --git a/drivers/rtc/rtc-at91rm9200.c b/drivers/rtc/rtc-at91rm9200.c
+index 3281c90..44fe83e 100644
+--- a/drivers/rtc/rtc-at91rm9200.c
++++ b/drivers/rtc/rtc-at91rm9200.c
+@@ -48,6 +48,7 @@ struct at91_rtc_config {
+ 
+ static const struct at91_rtc_config *at91_rtc_config;
+ static DECLARE_COMPLETION(at91_rtc_updated);
++static DECLARE_COMPLETION(at91_rtc_upd_rdy);
+ static unsigned int at91_alarm_year = AT91_RTC_EPOCH;
+ static void __iomem *at91_rtc_regs;
+ static int irq;
+@@ -161,6 +162,8 @@ static int at91_rtc_settime(struct device *dev, struct rtc_time *tm)
+ 		1900 + tm->tm_year, tm->tm_mon, tm->tm_mday,
+ 		tm->tm_hour, tm->tm_min, tm->tm_sec);
+ 
++	wait_for_completion(&at91_rtc_upd_rdy);
++
+ 	/* Stop Time/Calendar from counting */
+ 	cr = at91_rtc_read(AT91_RTC_CR);
+ 	at91_rtc_write(AT91_RTC_CR, cr | AT91_RTC_UPDCAL | AT91_RTC_UPDTIM);
+@@ -183,7 +186,9 @@ static int at91_rtc_settime(struct device *dev, struct rtc_time *tm)
+ 
+ 	/* Restart Time/Calendar */
+ 	cr = at91_rtc_read(AT91_RTC_CR);
++	at91_rtc_write(AT91_RTC_SCCR, AT91_RTC_SECEV);
+ 	at91_rtc_write(AT91_RTC_CR, cr & ~(AT91_RTC_UPDCAL | AT91_RTC_UPDTIM));
++	at91_rtc_write_ier(AT91_RTC_SECEV);
+ 
+ 	return 0;
+ }
+@@ -290,8 +295,10 @@ static irqreturn_t at91_rtc_interrupt(int irq, void *dev_id)
+ 	if (rtsr) {		/* this interrupt is shared!  Is it ours? */
+ 		if (rtsr & AT91_RTC_ALARM)
+ 			events |= (RTC_AF | RTC_IRQF);
+-		if (rtsr & AT91_RTC_SECEV)
+-			events |= (RTC_UF | RTC_IRQF);
++		if (rtsr & AT91_RTC_SECEV) {
++			complete(&at91_rtc_upd_rdy);
++			at91_rtc_write_idr(AT91_RTC_SECEV);
++		}
+ 		if (rtsr & AT91_RTC_ACKUPD)
+ 			complete(&at91_rtc_updated);
+ 
+@@ -413,6 +420,11 @@ static int __init at91_rtc_probe(struct platform_device *pdev)
+ 		return PTR_ERR(rtc);
+ 	platform_set_drvdata(pdev, rtc);
+ 
++	/* enable SECEV interrupt in order to initialize at91_rtc_upd_rdy
++	 * completion.
++	 */
++	at91_rtc_write_ier(AT91_RTC_SECEV);
++
+ 	dev_info(&pdev->dev, "AT91 Real Time Clock driver.\n");
+ 	return 0;
+ }
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.8.3.2
