@@ -1,40 +1,80 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 7 May 2014 15:56:03 +0200
-Subject: [PATCH v3 02/20] usb: ehci-orion: Add the optional PHY support
-In-Reply-To: <20140507132150.GA23936@lunn.ch>
-References: <1399335255-589-1-git-send-email-gregory.clement@free-electrons.com>
- <1399335255-589-3-git-send-email-gregory.clement@free-electrons.com>
- <20140506133341.GE6503@lunn.ch>
- <20140507114006.466347a0@free-electrons.com>
- <20140507132150.GA23936@lunn.ch>
-Message-ID: <20140507155603.4496b9e0@free-electrons.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 07 May 2014 16:01:39 +0200
+Subject: [PATCH] ARM: Kirkwood: DT versions of OpenRD boards
+In-Reply-To: <20140507132950.GB23936@lunn.ch>
+References: <1399416504-19140-1-git-send-email-andrew@lunn.ch>
+ <5369E35C.2020006@gmail.com> <20140507132950.GB23936@lunn.ch>
+Message-ID: <536A3CC3.6070600@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
+On 05/07/2014 03:29 PM, Andrew Lunn wrote:
+> On Wed, May 07, 2014 at 09:40:12AM +0200, Sebastian Hesselbarth wrote:
+>> On 05/07/2014 12:48 AM, Andrew Lunn wrote:
+>>> Create DTS files to describe the Marvell OpenRD boards.
+>>>
+>>> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+>>> Tested-by: Francois Lorrain <francois.lorrain@gmail.com>
+>>> ---
+>> [...]
+>>> +/dts-v1/;
+>>> +
+>>> +#include "kirkwood-openrd.dtsi"
+>>> +
+>>> +/ {
+>>> +	model = "OpenRD Base";
+>>> +	compatible = "marvell,openrd-base", "marvell,openrd", "marvell,kirkwood-88f6281", "marvell,kirkwood";
+>>> +
+>>> +	ocp at f1000000 {
+>>> +		serial at 12100 {
+>>> +			status = "okay";
+>>
+>> I see you used the "good template" this time ;) I again have some nits,
+>> that either you can take care of or me in the cleanup patches. I guess
+>> it depends on whatever goes in first. ;)
+>
+> The patch already depends on your patches, so i may as well do the
+> cleanup. I need to fix "description" anyway.
 
-On Wed, 7 May 2014 15:21:50 +0200, Andrew Lunn wrote:
+Right, I noticed that after I sent the mail. As you already have some
+fixes, you should take care of it.
 
-> > Thanks to devm_phy_optional_get(), the fact of not having a PHY in the
-> > DT is not considered an error. So on any error from
-> > devm_phy_optional_get() (including -EPROBE_DEFER), we simply bail out.
-> > Does this looks good?
-> 
-> Hi Thomas
-> 
-> That looks good.
-> 
-> To avoid the SATA phy problems we had last time, i would like to test
-> this on a few systems. Please could you let me know what branch v4 is
-> in when it is ready.
+[...]
+>>> +/dts-v1/;
+>>> +
+>>> +#include "kirkwood-openrd.dtsi"
+>>> +
+>>> +/ {
+>>> +	model = "OpenRD Client";
+>>> +	compatible = "marvell,openrd-client", "marvell,openrd", "marvell,kirkwood-88f6281", "marvell,kirkwood";
+>>> +
+>>> +	ocp at f1000000 {
+>>> +		i2c at 11000 {
+>>> +			status = "okay";
+>>> +			clock-frequency = <400000>;
+>>> +			pinctrl-0 = <&pmx_twsi0>;
+>>> +			pinctrl-names = "default";
+>>
+>> The default pinctrl should have been set by the SoC dtsi already.
+>
+> You only pointed this out for i2c. What else is it true for? I should
+> go look at your patches.
 
-Sure. It's now up at
-https://github.com/MISL-EBU-System-SW/mainline-public/tree/USB-375-38x-3.15-rc1-V4.
+KW DT cleanup sets default pinctrl for GBE1, UART0, UART1, SPI0, NAND,
+I2C0 and I2C1 on 6282.
 
-Thanks!
+>>> +		mvsdio at 90000 {
+>>> +			status = "okay";
+>>> +			cd-gpios = <&gpio0 29 9>;
+>>> +			status = "disabled";
+>>
+>> Any reason not to enable sdio?
+>
+> Only client and ultimate have an SD slot. Base does not. If i have it
+> right, client.dts and ultimate.dts should be enabling it. I will
+> double check.
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Ah, ok. So it is an "odd man out"-situation again, i.e. there is one
+out of the tree different again? I am fine with it.
+
+Sebastian
