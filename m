@@ -1,20 +1,197 @@
-From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Wed, 07 May 2014 17:19:29 +0400
-Subject: [PATCHv2] arm: put_user: fix possible data corruption in put_user
-In-Reply-To: <alpine.LFD.2.11.1405061610450.980@knanqh.ubzr>
-References: <alpine.LFD.2.11.1405050950410.980@knanqh.ubzr>
- <1399360312-13843-1-git-send-email-a.ryabinin@samsung.com>
- <alpine.LFD.2.11.1405061610450.980@knanqh.ubzr>
-Message-ID: <536A32E1.7090003@samsung.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 7 May 2014 09:24:09 -0400
+Subject: [PATCH v3 4/7] of: configure the platform device dma parameters
+In-Reply-To: <536949B8.3030106@ti.com>
+References: <1398353407-2345-1-git-send-email-santosh.shilimkar@ti.com>
+ <CAL_Jsq+nh26NZXx-9Y5FTxWZdVrG7aLTOBhC4j9P8mPPvUu2ag@mail.gmail.com>
+ <536806F4.1090904@ti.com> <7182186.5Q53eQg77F@wuerfel>
+ <536949B8.3030106@ti.com>
+Message-ID: <536A33F9.3040406@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/07/14 00:13, Nicolas Pitre wrote:
-> Please push this patch into Russell's patch system.
+On Tuesday 06 May 2014 04:44 PM, Santosh Shilimkar wrote:
+> On Tuesday 06 May 2014 05:40 AM, Arnd Bergmann wrote:
+>> On Monday 05 May 2014 17:47:32 Santosh Shilimkar wrote:
+>>
+>>> +       dev->coherent_dma_mask = DMA_BIT_MASK(32);
+>>> +       if (!dev->dma_mask)
+>>> +               dev->dma_mask = &dev->coherent_dma_mask;
+>>> +
+>>> +       /*
+>>> +        * if dma-ranges property doesn't exist - just return else
+>>> +        * setup the dma offset
+>>> +        */
+>>> +       ret = of_dma_get_range(dev->of_node, &dma_addr, &paddr, &size);
+>>> +       if (ret < 0) {
+>>> +               dev_dbg(dev, "no dma range information to setup\n");
+>>> +               return;
+>>> +       }
+>>> +
+>>> +       /* DMA ranges found. Calculate and set dma_pfn_offset */
+>>> +       dev->dma_pfn_offset = PFN_DOWN(paddr - dma_addr);
+>>> +       dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", dev->dma_pfn_offset);
+>>> +}
+>>
+>> I think there should at least be a comment about why we are computing
+>> the correct DMA mask here and then ignore that and just use DMA_BIT_MASK(32)
+>> instead. I understand that Russell and Rob prefer it that way and I'm not
+>> going to argue, but I find it counterintuitive and I think it deserves
+>> an explanation in the source code for anybody who is trying to figure
+>> out how things fit together.
+>>
+> In this patch, the dma_mask related code is just moved. We are not calculating
+> dma_mask either. I was looking for the history of how DMA_BIT_MASK(32)
+> landed up but couldn't trace it down apart from the fact that the code was
+> carried from powerPC. May be Rob knows.
 > 
-> Thanks.
+> How about below comment ? I didn't delibratly added point about bus
+> intercepting drivers dma_set_*mask() call etc.
 > 
+> /*
+>  * Set default dma-mask to 32 bit. Drivers are expected to setup
+>  * the correct supported dma_mask.
+>  */  
+> +       dev->coherent_dma_mask = DMA_BIT_MASK(32);
+> +       if (!dev->dma_mask)
+> +               dev->dma_mask = &dev->coherent_dma_mask;
+> 
+Updated patch below for records.
 
-Done - http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8051/1
+>From 591c1ee465ce5372385dbc41e7d3e36cbb477bd8 Mon Sep 17 00:00:00 2001
+From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Date: Thu, 24 Apr 2014 11:30:04 -0400
+Subject: [PATCH v3 4/7] of: configure the platform device dma parameters
 
-Thanks.
+Retrieve DMA configuration from DT and setup platform device's DMA
+parameters. The DMA configuration in DT has to be specified using
+"dma-ranges" and "dma-coherent" properties if supported.
+
+We setup dma_pfn_offset using "dma-ranges" and dma_coherent_ops
+using "dma-coherent" device tree properties.
+
+The set_arch_dma_coherent_ops macro has to be defined by arch if
+it supports coherent dma_ops. Otherwise, set_arch_dma_coherent_ops() is
+declared as nop.
+
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Olof Johansson <olof@lixom.net>
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ drivers/of/platform.c       |   65 +++++++++++++++++++++++++++++++++++++++----
+ include/linux/dma-mapping.h |    7 +++++
+ 2 files changed, 66 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index 404d1da..91fa983 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -187,6 +187,64 @@ struct platform_device *of_device_alloc(struct device_node *np,
+ EXPORT_SYMBOL(of_device_alloc);
+ 
+ /**
++ * of_dma_configure - Setup DMA configuration
++ * @dev:	Device to apply DMA configuration
++ *
++ * Try to get devices's DMA configuration from DT and update it
++ * accordingly.
++ *
++ * In case if platform code need to use own special DMA configuration,it
++ * can use Platform bus notifier and handle BUS_NOTIFY_ADD_DEVICE event
++ * to fix up DMA configuration.
++ */
++static void of_dma_configure(struct platform_device *pdev)
++{
++	u64 dma_addr, paddr, size;
++	int ret;
++	struct device *dev = &pdev->dev;
++
++#if defined(CONFIG_MICROBLAZE)
++	pdev->archdata.dma_mask = 0xffffffffUL;
++#endif
++
++	/*
++	 * Set default dma-mask to 32 bit. Drivers are expected to setup
++	 * the correct supported dma_mask.
++	 */
++	dev->coherent_dma_mask = DMA_BIT_MASK(32);
++
++	/*
++	 * Set it to coherent_dma_mask by default if the architecture
++	 * code has not set it.
++	 */
++	if (!dev->dma_mask)
++		dev->dma_mask = &dev->coherent_dma_mask;
++
++	/*
++	 * if dma-coherent property exist, call arch hook to setup
++	 * dma coherent operations.
++	 */
++	if (of_dma_is_coherent(dev->of_node)) {
++		set_arch_dma_coherent_ops(dev);
++		dev_dbg(dev, "device is dma coherent\n");
++	}
++
++	/*
++	 * if dma-ranges property doesn't exist - just return else
++	 * setup the dma offset
++	 */
++	ret = of_dma_get_range(dev->of_node, &dma_addr, &paddr, &size);
++	if (ret < 0) {
++		dev_dbg(dev, "no dma range information to setup\n");
++		return;
++	}
++
++	/* DMA ranges found. Calculate and set dma_pfn_offset */
++	dev->dma_pfn_offset = PFN_DOWN(paddr - dma_addr);
++	dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", dev->dma_pfn_offset);
++}
++
++/**
+  * of_platform_device_create_pdata - Alloc, initialize and register an of_device
+  * @np: pointer to node to create device for
+  * @bus_id: name to assign device
+@@ -211,12 +269,7 @@ static struct platform_device *of_platform_device_create_pdata(
+ 	if (!dev)
+ 		return NULL;
+ 
+-#if defined(CONFIG_MICROBLAZE)
+-	dev->archdata.dma_mask = 0xffffffffUL;
+-#endif
+-	dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+-	if (!dev->dev.dma_mask)
+-		dev->dev.dma_mask = &dev->dev.coherent_dma_mask;
++	of_dma_configure(dev);
+ 	dev->dev.bus = &platform_bus_type;
+ 	dev->dev.platform_data = platform_data;
+ 
+diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+index fd4aee2..c7d9b1b 100644
+--- a/include/linux/dma-mapping.h
++++ b/include/linux/dma-mapping.h
+@@ -123,6 +123,13 @@ static inline int dma_coerce_mask_and_coherent(struct device *dev, u64 mask)
+ 
+ extern u64 dma_get_required_mask(struct device *dev);
+ 
++#ifndef set_arch_dma_coherent_ops
++static inline int set_arch_dma_coherent_ops(struct device *dev)
++{
++	return 0;
++}
++#endif
++
+ static inline unsigned int dma_get_max_seg_size(struct device *dev)
+ {
+ 	return dev->dma_parms ? dev->dma_parms->max_segment_size : 65536;
+-- 
+1.7.9.5
+
+
+ 
