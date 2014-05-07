@@ -1,77 +1,72 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 7 May 2014 14:52:39 +0200
+Date: Wed, 7 May 2014 14:55:36 +0200
 Subject: [PATCH v3 17/20] phy: Add support for USB cluster on the Armada
  375 SoC
-In-Reply-To: <20140506135427.GG6503@lunn.ch>
+In-Reply-To: <20140506205330.GA27308@arch.cereza>
 References: <1399335255-589-1-git-send-email-gregory.clement@free-electrons.com>
  <1399335255-589-18-git-send-email-gregory.clement@free-electrons.com>
- <20140506135427.GG6503@lunn.ch>
-Message-ID: <20140507145239.433acdf4@free-electrons.com>
+ <20140506205330.GA27308@arch.cereza>
+Message-ID: <20140507145536.29003dfa@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
+Dear Ezequiel Garcia,
 
-On Tue, 6 May 2014 15:54:27 +0200, Andrew Lunn wrote:
+On Tue, 6 May 2014 17:53:30 -0300, Ezequiel Garcia wrote:
 
-> > +enum {
-> > +	PHY_USB2 = 0,
-> > +	PHY_USB3 = 1,
-> > +};
+> > +#define USB2_PHY_CONFIG_ENABLE BIT(0) /* active low */
 > > +
-> > +struct armada375_cluster_phy {
+> 
+> I still think it's more readable to use USB2_PHY_CONFIG_DISABLE.
+> It's just a nitpick, though.
+
+Yes, fixed.
+
+> > +static int armada375_usb_phy_probe(struct platform_device *pdev)
+> > +{
+> > +	struct device *dev = &pdev->dev;
 > > +	struct phy *phy;
-> > +	void __iomem *reg;
-> > +	bool enable;
-> > +	bool use_usb3;
-> 
-> Hi Gregory
-> 
-> nit: How about using the enum you just defined?
-
-Nope, I don't think it's a good idea, because they mean different
-things. The enum is used to index the arrays of two PHYs: PHY_USB2 is
-the first one, PHY_USB3 is the second one.
-
-On the other hand, the 'use_usb3' field indicates in which mode is a
-particular PHY. So it could apply on either of the PHYs, and is
-therefore not related to the index of the PHYs in the array.
-
-
+> > +	struct device_node *np = dev->of_node;
+> > +	struct phy_provider *phy_provider;
+> > +	void __iomem *usb_cluster_base;
+> > +	struct device_node *xhci_node;
+> > +	int i;
+> > +
 > > +	usb_cluster_base = of_iomap(np, 0);
-> 
-> devm_ API?
-> 
-> Check the return value for an error?
-
-Indeed, I'll use devm_ioremap_resource() here.
-
 > > +	BUG_ON(!usb_cluster_base);
 > > +
+> 
+> Isn't a bit extreme to call BUG_ON (and thus bring down the whole system)
+> in a phy driver?
+
+Indeed, fixed by a more normal error return.
+
 > > +	for (i = 0; i < NB_PHY; i++) {
 > > +		phy = devm_phy_create(dev, &armada375_usb_phy_ops, NULL);
 > > +		if (IS_ERR(phy))
 > > +			dev_err(dev, "failed to create PHY n%d\n", i);
 > > +
-> > +		usb_cluster_phy[i].phy = phy;
-> > +		usb_cluster_phy[i].reg = usb_cluster_base;
-> > +		usb_cluster_phy[i].enable = false;
-> > +		phy_set_drvdata(phy, &usb_cluster_phy[i]);
-> > +	}
-> > +
-> > +	usb_cluster_phy[PHY_USB2].use_usb3 = false;
-> > +	usb_cluster_phy[PHY_USB3].use_usb3 = true;
-> > +
-> > +	/*
-> > +	 * We can't use the first usb2 unit and usb3 at the same time
-> > +	 * to manage a USB2 device, so let's disable usb2 if usb3 is
-> > +	 * slelected. In this case USB2 device will be managed by the
 > 
-> selected
+> I think you're missing a continue/break here.
 
-Fixed.
+Indeed, fixed, I just do a return from the ->probe() function if
+creating the PHY fails.
 
-Thanks,
+> > +MODULE_DESCRIPTION("Armada 375 USB cluster driver");
+> > +MODULE_AUTHOR("Gregory CLEMENT <gregory.clement@free-electrons.com>");
+> > +MODULE_LICENSE("GPL");
+> 
+> GPL v2 ?
+
+Well, using just "GPL" seems to be the more common usage through the
+kernel:
+
+linux/drivers $ git grep MODULE_LICENSE | grep "\"GPL\"" | wc -l
+4276
+linux/drivers $ git grep MODULE_LICENSE | grep "\"GPLv2\"" | wc -l
+5
+linux/drivers $ git grep MODULE_LICENSE | grep "\"GPL v2\"" | wc -l
+841
 
 Thomas
 -- 
