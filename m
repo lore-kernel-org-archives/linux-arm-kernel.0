@@ -1,24 +1,20 @@
-From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
-Date: Wed, 07 May 2014 23:24:18 +0200
-Subject: [PATCH] ARM: zImage: Allow DTB to override broken ATAG_MEM
-In-Reply-To: <CAJAp7OiVrz+epys3Ko79GmMr6ahv8ii8XphVHE77NSM+wK2mOA@mail.gmail.com>
-References: <1399439776-18535-1-git-send-email-bjorn.andersson@sonymobile.com>	<20140507080650.GA28564@pengutronix.de>
- <CAJAp7OiVrz+epys3Ko79GmMr6ahv8ii8XphVHE77NSM+wK2mOA@mail.gmail.com>
-Message-ID: <536AA482.8040506@suse.de>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 7 May 2014 14:33:18 -0700
+Subject: [PATCH v2 1/6] wdt: sunxi: Move restart code to the watchdog
+ driver
+In-Reply-To: <1399430664-29091-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1399430664-29091-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1399430664-29091-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20140507213318.GA2105@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 07.05.2014 17:29, schrieb Bjorn Andersson:
-> My problem is that the boot loader on every shipped Qualcomm MSM8x60, MSM8960
-> and APQ8064 based device passes ATAG_MEM with the incorrect start address. There
-> is no way to update the boot loader for these.
+On Tue, May 06, 2014 at 09:44:19PM -0500, Maxime Ripard wrote:
+> Most of the watchdog code is duplicated between the machine restart code and
+> the watchdog driver. Add the restart hook to the watchdog driver, to be able to
+> remove it from the machine code eventually.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-Chaining bootloaders comes to mind. This is being done on the Exynos5
-based Chromebooks, for instance.
-
-Regards,
-Andreas
-
--- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
