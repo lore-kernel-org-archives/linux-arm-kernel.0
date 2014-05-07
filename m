@@ -1,38 +1,76 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 07 May 2014 11:25:45 +0200
+Date: Wed, 07 May 2014 11:30:35 +0200
 Subject: [PATCH 05/17] pci: host: pcie-dra7xx: add support for pcie-dra7xx
  controller
-In-Reply-To: <5369FB67.6040905@ti.com>
+In-Reply-To: <5369F287.6000103@ti.com>
 References: <1399383244-14556-1-git-send-email-kishon@ti.com>
- <20140506163507.GA15542@obsidianresearch.com> <5369FB67.6040905@ti.com>
-Message-ID: <5525000.bPgPLB3ZrT@wuerfel>
+ <4300084.bc6ByDTk7W@wuerfel> <5369F287.6000103@ti.com>
+Message-ID: <6485683.q96o7U6vf8@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 07 May 2014 14:52:47 Kishon Vijay Abraham I wrote:
-> On Tuesday 06 May 2014 10:05 PM, Jason Gunthorpe wrote:
-> > On Tue, May 06, 2014 at 07:03:51PM +0530, Kishon Vijay Abraham I wrote:
-> >> +Example:
-> >> +pcie at 51000000 {
-> >> +    compatible = "ti,dra7xx-pcie";
-> >> +    reg = <0x51002000 0x14c>, <0x51000000 0x2000>;
-> >> +    reg-names = "ti_conf", "rc_dbics";
-> >> +    interrupts = <0 232 0x4>, <0 233 0x4>;
-> >> +    #address-cells = >;
-> >> +    #size-cells = <2>;
-> >> +    device_type = "pci";
-> >> +    ti,device_type = >;
-> >> +    ranges = <0x00000800 0 0x20001000 0x20001000 0 0x00002000  /* Configuration Space */
+On Wednesday 07 May 2014 14:14:55 Kishon Vijay Abraham I wrote:
+> >> +static void dra7xx_pcie_enable_interrupts(struct pcie_port *pp)
+> >> +{
+> >> +    struct dra7xx_pcie *dra7xx = to_dra7xx_pcie(pp);
+> >> +
+> >> +    dra7xx_pcie_writel(dra7xx->base, PCIECTRL_DRA7XX_CONF_IRQSTATUS_MAIN,
+> >> +                       ~INTERRUPTS);
+> >> +    dra7xx_pcie_writel(dra7xx->base,
+> >> +                       PCIECTRL_DRA7XX_CONF_IRQENABLE_SET_MAIN, INTERRUPTS);
+> >> +    dra7xx_pcie_writel(dra7xx->base, PCIECTRL_DRA7XX_CONF_IRQSTATUS_MSI,
+> >> +                       ~LEG_EP_INTERRUPTS & ~MSI);
+> >> +
+> >> +    if (IS_ENABLED(CONFIG_PCI_MSI))
+> >> +            dra7xx_pcie_writel(dra7xx->base,
+> >> +                               PCIECTRL_DRA7XX_CONF_IRQENABLE_SET_MSI, MSI);
+> >> +    else
+> >> +            dra7xx_pcie_writel(dra7xx->base,
+> >> +                               PCIECTRL_DRA7XX_CONF_IRQENABLE_SET_MSI,
+> >> +                               LEG_EP_INTERRUPTS);
 > > 
-> > Configuration space should not show up in the ranges, please don't
-> > copy that mistake from other drivers, put it in reg.
+> > Doesn't this just enable one or the other? In general I'd assume you need
+> > both INTx and MSI, at least if MSI is available.
 > 
-> But then it needs pcie-designware.c to be modified and it will be breaking
-> other platforms no?
+> Not sure since the programming sequence in the TRM explicitly states either
+> legacy interrupts or MSI interrupts should be enabled but not both.
 
-I think the pcie-designware driver should be changed to allow either way.
-Ideally we would deprecate the existing method in a way that for new front-ends
-it doesn't work, but the old front-ends can still deal with it but also work
-if you put it into the reg property.
+Hmm, I think that means you can't have MSI at all. You have to support
+legacy PCI devices that can't do MSI.
+
+Do you know if you have a modern GIC implementation with MSI support
+in these SoCs? It would be better anyway to use the GIC for doing
+MSI, so you can just ignore the internal MSI controller here.
+
+> >> +static int add_pcie_port(struct dra7xx_pcie *dra7xx,
+> >> +                      struct platform_device *pdev)
+> >> +{
+> >> +    int ret;
+> >> +    struct pcie_port *pp;
+> >> +    struct resource *res;
+> >> +    struct device *dev = &pdev->dev;
+> >> +
+> >> +    pp = &dra7xx->pp;
+> >> +    pp->dev = dev;
+> >> +    pp->ops = &dra7xx_pcie_host_ops;
+> >> +
+> >> +    spin_lock_init(&pp->conf_lock);
+> >> +
+> >> +    pp->irq = platform_get_irq(pdev, 1);
+> >> +    if (pp->irq < 0) {
+> >> +            dev_err(dev, "missing IRQ resource\n");
+> >> +            return -EINVAL;
+> >> +    }
+> >>
+> > 
+> > The binding does not list a mandatory "interrupts" property, so
+> > this should not be treated as an error.
+> 
+> actually the 'interrupts' property is documented in pci/designware-pcie.txt.
+
+Hmm, but you don't seem to use it the same way as documented there.
+I'm not sure what 'level interrupt, pulse interrupt, special interrupt'
+in the parent binding are, but they don't seem to be the ones you use
+here.
 
 	Arnd
