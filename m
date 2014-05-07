@@ -1,67 +1,37 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 07 May 2014 08:46:12 +0200
-Subject: [linux-sunxi] [PATCH 7/7] ARM: sunxi: dt: add APP4-EVB1 board
- support
-In-Reply-To: <EEF98E4B-881E-469C-A1C7-8B4EB8825467@dominion.thruhere.net>
-References: <1399434623-20383-1-git-send-email-maxime.ripard@free-electrons.com>
- <1399434623-20383-8-git-send-email-maxime.ripard@free-electrons.com>
- <EEF98E4B-881E-469C-A1C7-8B4EB8825467@dominion.thruhere.net>
-Message-ID: <5369D6B4.3080305@redhat.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed,  7 May 2014 14:46:44 +0800
+Subject: [PATCH] clocksource: marco: fix the affinity set for local timer of
+ CPU1
+Message-ID: <1399445204-22159-1-git-send-email-21cnbao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Zhiwu Song <Zhiwu.Song@csr.com>
 
-On 05/07/2014 07:10 AM, Koen Kooi wrote:
-> 
-> Op 7 mei 2014, om 05:50 heeft Maxime Ripard <maxime.ripard@free-electrons.com> het volgende geschreven:
-> 
->> From: Boris BREZILLON <boris.brezillon@free-electrons.com>
->>
->> The APP4 EVB1 development boards embeds an A31, together with some NAND, one SD
->> card slot, and one SDIO + UART WiFi and Bluetooth chip, a few I2C buses, USB,
->> and a LCD display.
->>
->> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
->> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> ---
->> arch/arm/boot/dts/Makefile                |  1 +
->> arch/arm/boot/dts/sun6i-a31-app4-evb1.dts | 63 +++++++++++++++++++++++++++++++
->> 2 files changed, 64 insertions(+)
->> create mode 100644 arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
->>
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index ffa3f5ef27d3..d50c0895a9d5 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -343,6 +343,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += \
->> 	sun5i-a10s-olinuxino-micro.dtb \
->> 	sun5i-a13-olinuxino.dtb \
->> 	sun5i-a13-olinuxino-micro.dtb \
->> +	sun6i-a31-app4-evb1.dtb \
->> 	sun6i-a31-colombus.dtb \
->> 	sun6i-a31-m9.dtb \
->> 	sun7i-a20-cubieboard2.dtb \
->> diff --git a/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts b/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
->> new file mode 100644
->> index 000000000000..270ab978f858
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
->> @@ -0,0 +1,63 @@
->> +/*
->> + * Copyright 2014 Boris Brezillon
->> + *
->> + * Boris Brezillon <boris.brezillon@free-electrons.com>
->> + *
->> + * The code contained herein is licensed under the GNU General Public
->> + * License. You may obtain a copy of the GNU General Public License
->> + * Version 2 or later at the following locations:
-> 
-> Doesn't the kernel try to avoid the 'or later' clause?
+irqchip will reject the affinity set to CPUs which is not online
+yet. but in the CPU1 wakeup stage, OS only sets CPU1 to be online
+after local timer is set, so that causes the irq_set_affinity not
+work. this patch moves to irq_force_affinity() for the low level
+boot stage.
 
-The kernel as a whole is just "version 2", but for individual files /
-drivers it is left up to the author whether to add "or later " or not.
+Signed-off-by: Zhiwu Song <Zhiwu.Song@csr.com>
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ drivers/clocksource/timer-marco.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Regards,
-
-Hans
+diff --git a/drivers/clocksource/timer-marco.c b/drivers/clocksource/timer-marco.c
+index 571d109..dbd3039 100644
+--- a/drivers/clocksource/timer-marco.c
++++ b/drivers/clocksource/timer-marco.c
+@@ -199,7 +199,7 @@ static int sirfsoc_local_timer_setup(struct clock_event_device *ce)
+ 
+ 	action->dev_id = ce;
+ 	BUG_ON(setup_irq(ce->irq, action));
+-	irq_set_affinity(action->irq, cpumask_of(cpu));
++	irq_force_affinity(action->irq, cpumask_of(cpu));
+ 
+ 	clockevents_register_device(ce);
+ 	return 0;
+-- 
+1.7.5.4
