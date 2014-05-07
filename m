@@ -1,53 +1,66 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Wed,  7 May 2014 22:44:35 +0800
-Subject: [PATCH v5 01/14] ARM: debug: add HiP04 debug uart
+Date: Wed,  7 May 2014 22:44:36 +0800
+Subject: [PATCH v5 02/14] ARM: add V7_NONLPAE && V7_LPAE sub config
 In-Reply-To: <1399473888-12947-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1399473888-12947-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1399473888-12947-2-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1399473888-12947-3-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the support of Hisilicon HiP04 debug uart.
+Since CONFIG_ARM_LPAE could be set in ARM V7, add new two configurations
+CONFIG_ARCH_MULTI_V7_NONLPAE & CONFIG_ARCH_MULTI_V7_LPAE.
+
+If we want to enable CONFIG_ARM_LPAE configuration, we should enable
+CONFIG_ARCH_MULTI_V7 & disable both CONFIG_ARCH_MULTI_V6 and
+CONFIG_ARCH_MULTI_V7_NONLPAE.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- arch/arm/Kconfig.debug | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/Kconfig    | 13 ++++++++++++-
+ arch/arm/mm/Kconfig |  2 +-
+ 2 files changed, 13 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 4a2fc0b..5a311af 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -223,6 +223,14 @@ choice
- 		  Say Y here if you want kernel low-level debugging support
- 		  on HI3716 UART.
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index ab438cb..0e52a2c 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -918,12 +918,23 @@ config ARCH_MULTI_V6
+ 	select CPU_V6K
  
-+	config DEBUG_HIP04_UART
-+		bool "Hisilicon HiP04 Debug UART"
-+		depends on ARCH_HIP04
-+		select DEBUG_UART_8250
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on HIP04 UART.
+ config ARCH_MULTI_V7
+-	bool "ARMv7 based platforms (Cortex-A, PJ4, Scorpion, Krait)"
++	bool "ARMv7 based platforms"
+ 	default y
+ 	select ARCH_MULTI_V6_V7
+ 	select CPU_V7
+ 	select HAVE_SMP
+ 
++config ARCH_MULTI_V7_NONLPAE
++	bool "ARMv7 non-LPAE based platforms (Cortex-A5/A8/A9, PJ4, PJ4B, Scorpion)"
++	depends on ARCH_MULTI_V7
++	default y
 +
- 	config DEBUG_HIGHBANK_UART
- 		bool "Kernel low-level debugging messages via Highbank UART"
- 		depends on ARCH_HIGHBANK
-@@ -1044,6 +1052,7 @@ config DEBUG_UART_PHYS
- 	default 0xd4017000 if DEBUG_MMP_UART2
- 	default 0xd4018000 if DEBUG_MMP_UART3
- 	default 0xe0000000 if ARCH_SPEAR13XX
-+	default 0xe4007000 if DEBUG_HIP04_UART
- 	default 0xf0000be0 if ARCH_EBSA110
- 	default 0xf1012000 if DEBUG_MVEBU_UART_ALTERNATE
- 	default 0xf1012000 if ARCH_DOVE || ARCH_KIRKWOOD || ARCH_MV78XX0 || \
-@@ -1076,6 +1085,7 @@ config DEBUG_UART_VIRT
- 	default 0xf4090000 if ARCH_LPC32XX
- 	default 0xf4200000 if ARCH_GEMINI
- 	default 0xf7fc9000 if DEBUG_BERLIN_UART
-+	default 0xf8007000 if DEBUG_HIP04_UART
- 	default 0xf8009000 if DEBUG_VEXPRESS_UART0_CA9
- 	default 0xf8090000 if DEBUG_VEXPRESS_UART0_RS1
- 	default 0xfb009000 if DEBUG_REALVIEW_STD_PORT
++config ARCH_MULTI_V7_LPAE
++	bool "ARMv7 LPAE based platforms (Cortex-A7/A12/A15/A17, Brahma-B15, PJ4B-MP, Krait)"
++	depends on ARCH_MULTI_V7
++	default y
++	select ARM_LPAE if !(ARCH_MULTI_V6 || ARCH_MULTI_V7_NONLPAE)
++
+ config ARCH_MULTI_V6_V7
+ 	bool
+ 	select MIGHT_HAVE_CACHE_L2X0
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index f5ad9ee..1c1576c 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -615,7 +615,7 @@ comment "Processor Features"
+ config ARM_LPAE
+ 	bool "Support for the Large Physical Address Extension"
+ 	depends on MMU && CPU_32v7 && !CPU_32v6 && !CPU_32v5 && \
+-		!CPU_32v4 && !CPU_32v3
++		!CPU_32v4 && !CPU_32v3 && !ARCH_MULTI_V7_NONLPAE
+ 	help
+ 	  Say Y if you have an ARMv7 processor supporting the LPAE page
+ 	  table format and you would like to access memory beyond the
 -- 
 1.9.1
