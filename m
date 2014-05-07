@@ -1,37 +1,49 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  7 May 2014 15:52:11 +0200
-Subject: [PATCHv4 05/20] Documentation: dt-bindings: update ehci-orion binding
- documentation
+Date: Wed,  7 May 2014 15:52:15 +0200
+Subject: [PATCHv4 09/20] Documentation: dt-bindings: update xhci-platform DT
+ binding
 In-Reply-To: <1399470746-2948-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1399470746-2948-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1399470746-2948-6-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1399470746-2948-10-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit updates the Device Tree binding documentation of
-ehci-orion to take into account the fact that we can now optionally
-pass a clock and a PHY reference.
+From: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
+This commit extends the compatible string list of the xhci-platform
+binding with the new "armada-375-xhci" and "armada-380-xhci"
+compatible strings. It is used to describe the XHCI controller which
+is available in the Armada 375 and 38x SoCs.
+
+It also indicates that an optional 'clocks' property is now supported.
+
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- Documentation/devicetree/bindings/usb/ehci-orion.txt | 5 +++++
- 1 file changed, 5 insertions(+)
+ Documentation/devicetree/bindings/usb/usb-xhci.txt | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/usb/ehci-orion.txt b/Documentation/devicetree/bindings/usb/ehci-orion.txt
-index 6bc09ec..17c3bc8 100644
---- a/Documentation/devicetree/bindings/usb/ehci-orion.txt
-+++ b/Documentation/devicetree/bindings/usb/ehci-orion.txt
-@@ -6,6 +6,11 @@ Required properties:
-   region.
- - interrupts: The EHCI interrupt
+diff --git a/Documentation/devicetree/bindings/usb/usb-xhci.txt b/Documentation/devicetree/bindings/usb/usb-xhci.txt
+index 90f8f60..999be5c 100644
+--- a/Documentation/devicetree/bindings/usb/usb-xhci.txt
++++ b/Documentation/devicetree/bindings/usb/usb-xhci.txt
+@@ -1,11 +1,16 @@
+ USB xHCI controllers
  
-+Optional properties:
-+- clocks: reference to the clock
-+- phys: reference to the USB PHY
-+- phy-names: name of the USB PHY, should be "usb"
+ Required properties:
+-  - compatible: should be "generic-xhci" (deprecated: "xhci-platform").
++  - compatible: should be one of "generic-xhci",
++    "marvell,armada-375-xhci", "marvell,armada-380-xhci" (deprecated:
++    "xhci-platform").
+   - reg: should contain address and length of the standard XHCI
+     register set for the device.
+   - interrupts: one XHCI interrupt should be described here.
+ 
++Optional property:
++  - clocks: reference to a clock
 +
  Example:
- 
- 	ehci at 50000 {
+ 	usb at f0931000 {
+ 		compatible = "generic-xhci";
 -- 
 1.9.2
