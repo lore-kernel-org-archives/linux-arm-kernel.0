@@ -1,42 +1,59 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed,  7 May 2014 10:51:57 +0100
-Subject: [PATCH 2/2] arm: don't break misaligned NEON load/store
+Date: Wed,  7 May 2014 10:51:56 +0100
+Subject: [PATCH RESEND 1/2] arm: SIGBUS on unsupported ARMv6 unaligned accesses
 In-Reply-To: <cover.1399028497.git.robin.murphy@arm.com>
 References: <cover.1399028497.git.robin.murphy@arm.com>
-Message-ID: <68eafcc6692acd552dd3b490d7c2a45e32604142.1399028497.git.robin.murphy@arm.com>
+Message-ID: <6c89b740173398578fa999c99237858b7680a84e.1399028497.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The alignment fixup incorrectly decodes faulting ARM VLDn/VSTn
-instructions as LDR/STR, leading to register corruption. Detect these
-and correctly treat them as unhandled.
+This patch changes the default behaviour for userspace alignment faults
+on v6 from silent fixup to SIGBUS. This only affects code that violates
+the v6 unaligned access model - bad assembly/JIT code or high-level
+language code in violation of the relevant language spec - which should
+be corrected rather than unwittingly relying on performance-degrading
+fixups. Fixup behaviour can still be controlled from boot parameters or
+at runtime for compatibility with existing incorrect software.
 
-Reported-by: Simon Hosie <simon.hosie@arm.com>
+There will be no impact for v5 and earlier.
+
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
 ---
- arch/arm/mm/alignment.c |    3 +++
- 1 file changed, 3 insertions(+)
+
+This one is already in the patch system as 7944/1, since nobody objected
+to the original RFC or patch postings.
+Russell: any news on whether you're happy to take this?
+
+ arch/arm/mm/alignment.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
-index 9a93315..5812e0c 100644
+index 9240364..9a93315 100644
 --- a/arch/arm/mm/alignment.c
 +++ b/arch/arm/mm/alignment.c
-@@ -40,6 +40,7 @@
-  * This code is not portable to processors with late data abort handling.
-  */
- #define CODING_BITS(i)	(i & 0x0e000000)
-+#define COND_BITS(i)	(i & 0xf0000000)
-
- #define LDST_I_BIT(i)	(i & (1 << 26))		/* Immediate constant	*/
- #define LDST_P_BIT(i)	(i & (1 << 24))		/* Preindex		*/
-@@ -817,6 +818,8 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
- 		break;
-
- 	case 0x04000000:	/* ldr or str immediate */
-+		if (COND_BITS(instr) == 0xf0000000) /* NEON VLDn, VSTn */
-+			goto bad;
- 		offset.un = OFFSET_BITS(instr);
- 		handler = do_alignment_ldrstr;
- 		break;
---
+@@ -106,10 +106,10 @@ static int safe_usermode(int new_usermode, bool warn)
+ 	 * making any progress.
+ 	 */
+ 	if (cpu_is_v6_unaligned() && !(new_usermode & (UM_FIXUP | UM_SIGNAL))) {
+-		new_usermode |= UM_FIXUP;
++		new_usermode |= UM_SIGNAL;
+ 
+ 		if (warn)
+-			printk(KERN_WARNING "alignment: ignoring faults is unsafe on this CPU.  Defaulting to fixup mode.\n");
++			printk(KERN_WARNING "alignment: ignoring faults is unsafe on this CPU.  Defaulting to signal mode.\n");
+ 	}
+ 
+ 	return new_usermode;
+@@ -971,7 +971,7 @@ static int __init alignment_init(void)
+ 		cr_alignment &= ~CR_A;
+ 		cr_no_alignment &= ~CR_A;
+ 		set_cr(cr_alignment);
+-		ai_usermode = safe_usermode(ai_usermode, false);
++		ai_usermode = safe_usermode(ai_usermode | UM_WARN, false);
+ 	}
+ #endif
+ 
+-- 
 1.7.9.5
