@@ -1,179 +1,101 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 07 May 2014 23:13:05 +0200
-Subject: [PATCH v2 05/11] clk: rockchip: add reset controller
+Date: Wed, 07 May 2014 23:14:10 +0200
+Subject: [PATCH v2 06/11] dt-bindings: add documentation for rk3188 clock and
+ reset unit
 In-Reply-To: <3477211.Gkyeur83TV@diego>
 References: <3477211.Gkyeur83TV@diego>
-Message-ID: <19175708.GYirOpr0Nh@diego>
+Message-ID: <2003795.Fases3iJaR@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All Rockchip SoCs at least down to the ARM9-based RK28xx include the reset-
-controller for SoC peripherals in their clock controller.
-While the older SoCs (ARM9 and Cortex-A8) use a regular scheme to change
-register values, the Cortex-A9 SoCs use a hiword-mask making locking unecessary.
-To be compatible with both schemes the reset controller takes a flag to
-decide which scheme to use.
+This add bindings documentation for the clock and reset unit found on
+rk3188 SoCs from Rockchip.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- drivers/clk/rockchip/Makefile  |   1 +
- drivers/clk/rockchip/clk.h     |  14 +++++
- drivers/clk/rockchip/softrst.c | 115 +++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 130 insertions(+)
- create mode 100644 drivers/clk/rockchip/softrst.c
+ .../bindings/clock/rockchip,rk3188-cru.txt         | 74 ++++++++++++++++++++++
+ 1 file changed, 74 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/rockchip,rk3188-cru.txt
 
-diff --git a/drivers/clk/rockchip/Makefile b/drivers/clk/rockchip/Makefile
-index 7748062..7e4a296 100644
---- a/drivers/clk/rockchip/Makefile
-+++ b/drivers/clk/rockchip/Makefile
-@@ -6,3 +6,4 @@ obj-y	+= clk-rockchip.o
- obj-y	+= clk.o
- obj-y	+= clk-pll.o
- obj-y	+= clk-cpu.o
-+obj-$(CONFIG_RESET_CONTROLLER)	+= softrst.o
-diff --git a/drivers/clk/rockchip/clk.h b/drivers/clk/rockchip/clk.h
-index 7d1c76c..b52e4c2 100644
---- a/drivers/clk/rockchip/clk.h
-+++ b/drivers/clk/rockchip/clk.h
-@@ -234,4 +234,18 @@ void rockchip_clk_register_armclk(unsigned int lookup_id,
- 			unsigned int num_parents, void __iomem *reg_base,
- 			struct device_node *np);
- 
-+#define ROCKCHIP_SOFTRST_HIWORD_MASK	BIT(0)
-+
-+#ifdef CONFIG_RESET_CONTROLLER
-+void rockchip_register_softrst(struct device_node *np,
-+			       unsigned int num_regs,
-+			       void __iomem *base, u8 flags);
-+#else
-+static inline void rockchip_register_softrst(struct device_node *np,
-+			       unsigned int num_regs,
-+			       void __iomem *base, u8 flags)
-+{
-+}
-+#endif
-+
- #endif
-diff --git a/drivers/clk/rockchip/softrst.c b/drivers/clk/rockchip/softrst.c
+diff --git a/Documentation/devicetree/bindings/clock/rockchip,rk3188-cru.txt b/Documentation/devicetree/bindings/clock/rockchip,rk3188-cru.txt
 new file mode 100644
-index 0000000..e981f6c
+index 0000000..8165c0c
 --- /dev/null
-+++ b/drivers/clk/rockchip/softrst.c
-@@ -0,0 +1,115 @@
-+/*
-+ * Copyright (c) 2014 MundoReader S.L.
-+ * Author: Heiko Stuebner <heiko@sntech.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
++++ b/Documentation/devicetree/bindings/clock/rockchip,rk3188-cru.txt
+@@ -0,0 +1,74 @@
++* Rockchip RK3188 Clock and Reset Unit
 +
-+#include <linux/slab.h>
-+#include <linux/io.h>
-+#include <linux/reset-controller.h>
-+#include <linux/spinlock.h>
-+#include "clk.h"
++The RK3188 clock controller generates and supplies clock to various controllers
++within the SoC and also implements a reset controller for SoC peripherals.
++There exist two variants of the rk3188 SoC, the rk3188 and rk3188a, with
++slight differences in the pll handling.
 +
-+struct rockchip_softrst {
-+	struct reset_controller_dev	rcdev;
-+	void __iomem			*reg_base;
-+	int				num_regs;
-+	int				num_per_reg;
-+	u8				flags;
-+	spinlock_t			lock;
-+};
++Required Properties:
 +
-+static int rockchip_softrst_assert(struct reset_controller_dev *rcdev,
-+			      unsigned long id)
-+{
-+	struct rockchip_softrst *softrst = container_of(rcdev,
-+						     struct rockchip_softrst,
-+						     rcdev);
-+	int bank = id / softrst->num_per_reg;
-+	int offset = id % softrst->num_per_reg;
++- compatible: should be "rockchip,rk3188-cru" or "rockchip,rk3188a-cru"
++- reg: physical base address of the controller and length of memory mapped
++  region. The first element should be the cru register space and the second
++  element should be the address of the GRF_SOC_STATUS register providing the
++  pll lock status.
++- #clock-cells: should be 1.
++- #reset-cells: should be 1.
 +
-+	if (softrst->flags & ROCKCHIP_SOFTRST_HIWORD_MASK) {
-+		writel(BIT(offset) | (BIT(offset) << 16),
-+		       softrst->reg_base + (bank * 4));
-+	} else {
-+		unsigned long flags;
-+		u32 reg;
++- rockchip,armclk-divider-table: when the frequency of the APLL is changed
++  some core divider clocks also need to be updated. These divider clocks have
++  SoC specific divider clock output requirements for a specific APLL clock
++  speeds. When APLL clock rate is changed, these divider clocks are
++  reprogrammed with pre-determined values in order to maintain the SoC
++  specific divider clock outputs. This property lists the divider values
++  for these clocks for supported APLL clock speeds.
++  The format of each entry included in the arm-frequency-table should be
++  defined as
 +
-+		spin_lock_irqsave(&softrst->lock, flags);
++      cell #1: arm clock parent frequency
++      cell #2 ~ cell 3#: value of clock divider of core_peri and aclk_core.
 +
-+		reg = readl(softrst->reg_base + (bank * 4));
-+		writel(reg | BIT(offset), softrst->reg_base + (bank * 4));
++- #rockchip,armclk-cells: defines the number of cells in
++  rockchip,armclk-divider-table property. The value of this property depends on
++  the SoC type. For RK3188 SoCs it should be 3.
 +
-+		spin_unlock_irqrestore(&softrst->lock, flags);
-+	}
++Each clock is assigned an identifier and client nodes can use this identifier
++to specify the clock which they consume. All available clocks are defined as
++preprocessor macros in dt-bindings/clock/rk3188-cru.h header and can be used
++in device tree sources.
 +
-+	return 0;
-+}
++External clocks:
 +
-+static int rockchip_softrst_deassert(struct reset_controller_dev *rcdev,
-+				unsigned long id)
-+{
-+	struct rockchip_softrst *softrst = container_of(rcdev,
-+						     struct rockchip_softrst,
-+						     rcdev);
-+	int bank = id / BITS_PER_LONG;
-+	int offset = id % BITS_PER_LONG;
++The basic input clock is generated outside the SoC. It is expected that it is
++defined using standard clock bindings with a clock-output-name of "xin24m".
 +
-+	if (softrst->flags & ROCKCHIP_SOFTRST_HIWORD_MASK) {
-+		writel((BIT(offset) << 16), softrst->reg_base + (bank * 4));
-+	} else {
-+		unsigned long flags;
-+		u32 reg;
++Example: Clock controller node:
 +
-+		spin_lock_irqsave(&softrst->lock, flags);
++	cru: cru at 20000000 {
++		compatible = "rockchip,rk3188-cru";
++		reg = <0x20000000 0x1000>,
++		      <0x200080ac 0x4>;
 +
-+		reg = readl(softrst->reg_base + (bank * 4));
-+		writel(reg & ~BIT(offset), softrst->reg_base + (bank * 4));
++		#clock-cells = <1>;
 +
-+		spin_unlock_irqrestore(&softrst->lock, flags);
-+	}
++		#rockchip,armclk-cells = <3>;
++		rockchip,armclk-divider-table =	<1608000 2 3>,
++						<1416000 2 3>,
++						<1200000 2 3>,
++						<1008000 2 3>,
++						< 816000 2 3>,
++						< 504000 1 3>,
++						< 312000 0 1>;
++	};
 +
-+	return 0;
-+}
++Example: UART controller node that consumes the clock generated by the clock
++  controller:
 +
-+static struct reset_control_ops rockchip_softrst_ops = {
-+	.assert		= rockchip_softrst_assert,
-+	.deassert	= rockchip_softrst_deassert,
-+};
-+
-+void __init rockchip_register_softrst(struct device_node *np,
-+				      unsigned int num_regs,
-+				      void __iomem *base, u8 flags)
-+{
-+	struct rockchip_softrst *softrst;
-+	int ret;
-+
-+	softrst = kzalloc(sizeof(*softrst), GFP_KERNEL);
-+	if (!softrst)
-+		return;
-+
-+	softrst->reg_base = base;
-+	softrst->num_regs = num_regs;
-+	softrst->num_per_reg = (flags & ROCKCHIP_SOFTRST_HIWORD_MASK) ? 16
-+								      : 32;
-+
-+	softrst->rcdev.owner = THIS_MODULE;
-+	softrst->rcdev.nr_resets =  num_regs * softrst->num_per_reg;
-+	softrst->rcdev.ops = &rockchip_softrst_ops;
-+	softrst->rcdev.of_node = np;
-+	ret = reset_controller_register(&softrst->rcdev);
-+	if (ret) {
-+		pr_err("%s: could not register reset controller, %d\n",
-+		       __func__, ret);
-+		kfree(softrst);
-+	}
-+};
++	uart0: serial at 10124000 {
++		compatible = "snps,dw-apb-uart";
++		reg = <0x10124000 0x400>;
++		interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
++		reg-shift = <2>;
++		reg-io-width = <1>;
++		clocks = <&cru SCLK_UART0>;
++	};
 -- 
 1.9.0
