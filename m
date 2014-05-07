@@ -1,86 +1,70 @@
-From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Wed, 7 May 2014 19:11:36 +0530
-Subject: [PATCH 5/5] ARM: dts: enable dp-controller for exynos5420 based
- peach-pit board
-In-Reply-To: <1397994525-18537-6-git-send-email-rahul.sharma@samsung.com>
-References: <1397994525-18537-1-git-send-email-rahul.sharma@samsung.com>
- <1397994525-18537-6-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <CAPdUM4PZLAOfdtH8xO9C4x0CKhWmX2PstqNkAE2cffTnn45VfQ@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed,  7 May 2014 15:41:49 +0200
+Subject: [PATCH] ARM: dt: fix up PL011 device tree bindings
+Message-ID: <1399470109-8021-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+Make the map match the reality, the current binding text is
+nonsense:
 
-I have same update for this patch. The new DT property is Acked at
-http://oascentral.opensubscriber.com/message/dri-devel at lists.freedesktop.org/17150750.html
+- The clock required for the clocking of the serial port
+  must come first and is not optional (as the driver will
+  otherwise proceed to grab and use the apb_pclk as uartclk),
+  and the apb_pclk that clocks the logic must come second
+  as the code will retrieve the first clock by index,
+  whereas the PrimeCell but will explicitly look for
+  "apb_pclk" so this can be specified later, as it is
+  looked up by name.
 
-Please consider it for merge.
+- The pin control state "default" is the only mandated
+  state, the sleep state is entirely optional.
 
-Regards,
-Rahul Sharma.
+We also add an example to avoid further confusion.
 
-On 20 April 2014 17:18, Rahul Sharma <rahul.sharma@samsung.com> wrote:
-> From: Rahul Sharma <Rahul.Sharma@samsung.com>
->
-> Enable dp-controller for peach-pit board.
->
-> Signed-off-by: Rahul Sharma <Rahul.Sharma@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos5420-peach-pit.dts |   34 ++++++++++++++++++++++++++++
->  1 file changed, 34 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-> index d6eaa1f..e6199e1 100644
-> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-> @@ -61,6 +61,13 @@
->                         samsung,pin-pud = <1>;
->                         samsung,pin-drv = <0>;
->                 };
-> +
-> +               dp_hpd: dp_hpd {
-> +                       samsung,pins = "gpx2-6";
-> +                       samsung,pin-function = <0>;
-> +                       samsung,pin-pud = <3>;
-> +                       samsung,pin-drv = <0>;
-> +               };
->         };
->
->         pinctrl at 14010000 {
-> @@ -249,6 +256,33 @@
->                 status = "okay";
->         };
->
-> +       dp-controller at 145B0000 {
-> +               status = "okay";
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&dp_hpd>;
-> +               samsung,color-space = <0>;
-> +               samsung,dynamic-range = <0>;
-> +               samsung,ycbcr-coeff = <0>;
-> +               samsung,color-depth = <1>;
-> +               samsung,link-rate = <0x06>;
-> +               samsung,lane-count = <2>;
-> +               samsung,hpd-gpio = <&gpx2 6 0>;
-> +               display-timings {
-> +                       native-mode = <&timing1>;
-> +                       timing1: timing at 1 {
-> +                               clock-frequency = <70589280>;
-> +                               hactive = <1366>;
-> +                               vactive = <768>;
-> +                               hfront-porch = <40>;
-> +                               hback-porch = <40>;
-> +                               hsync-len = <32>;
-> +                               vback-porch = <10>;
-> +                               vfront-porch = <12>;
-> +                               vsync-len = <6>;
-> +                       };
-> +               };
-> +       };
-> +
->         fimd at 14400000 {
->                 status = "okay";
->                 samsung,invert-vclk;
-> --
-> 1.7.9.5
->
+Reported-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ Documentation/devicetree/bindings/serial/pl011.txt | 25 ++++++++++++++++++----
+ 1 file changed, 21 insertions(+), 4 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/serial/pl011.txt b/Documentation/devicetree/bindings/serial/pl011.txt
+index 5d2e840ae65c..7a33d67c8349 100644
+--- a/Documentation/devicetree/bindings/serial/pl011.txt
++++ b/Documentation/devicetree/bindings/serial/pl011.txt
+@@ -6,12 +6,29 @@ Required properties:
+ - interrupts: exactly one interrupt specifier
+ 
+ Optional properties:
+-- pinctrl: When present, must have one state named "sleep"
+-	   and one state named "default"
+-- clocks:  When present, must refer to exactly one clock named
+-	   "apb_pclk"
++- pinctrl: When present, must have one state named "default",
++	   and may contain a second name named "sleep". The former
++	   state sets up pins for ordinary operation whereas
++	   the latter state will put the associated pins to sleep
++	   when the UART is unused
++- clocks:  When present, the first clock listed must be named
++	   "uartclk" and clock the external serial line, and the
++	   second clock listed must be named "amba_pclk" and clocks
++	   the internal logic of the serial core
+ - dmas:	   When present, may have one or two dma channels.
+ 	   The first one must be named "rx", the second one
+ 	   must be named "tx".
+ 
+ See also bindings/arm/primecell.txt
++
++Example:
++
++uart at 80120000 {
++	compatible = "arm,pl011", "arm,primecell";
++	reg = <0x80120000 0x1000>;
++	interrupts = <0 11 IRQ_TYPE_LEVEL_HIGH>;
++	dmas = <&dma 13 0 0x2>, <&dma 13 0 0x0>;
++	dma-names = "rx", "tx";
++	clocks = <&foo_clk>, <&bar_clk>;
++	clock-names = "uartclk", "apb_pclk";
++};
+-- 
+1.9.0
