@@ -1,84 +1,146 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 7 May 2014 10:09:51 +0800
-Subject: mx6qsabresd hangs on linux-next
-In-Reply-To: <20140506200029.GD5858@pengutronix.de>
-References: <CAOMZO5DMEqs=zzNGqgKjK7wTJdiNPgEqxsX=TtqKrnpLMzpbDw@mail.gmail.com>
- <20140506141310.GA2794@dragon>
- <CAOMZO5DH5d_L-deVu=XmBo9ekq+-g704p7cyayLvp=43bnEccQ@mail.gmail.com>
- <CAOMZO5Dx0JMj3dZ7BSgaYSZZ=ZKRqQHEYWj5sb6z_9jc+cpsEw@mail.gmail.com>
- <5369081D.5030400@st.com> <20140506200029.GD5858@pengutronix.de>
-Message-ID: <20140507020950.GB2794@dragon>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue,  6 May 2014 21:44:20 -0500
+Subject: [PATCH v2 2/6] power: reset: Add Allwinner A31 reset code
+In-Reply-To: <1399430664-29091-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1399430664-29091-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1399430664-29091-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 06, 2014 at 10:00:29PM +0200, Sascha Hauer wrote:
-> On Tue, May 06, 2014 at 06:04:45PM +0200, Maxime Coquelin wrote:
-> > Hi Fabio,
-> > 
-> > On 05/06/2014 05:49 PM, Fabio Estevam wrote:
-> > >On Tue, May 6, 2014 at 12:36 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> > >
-> > >>Indeed, if I revert:
-> > >>
-> > >>commit e7489693b3a853ab6dfad52f7e6af553ae8d3f28
-> > >>Author: Maxime COQUELIN <maxime.coquelin@st.com>
-> > >>Date:   Wed Jan 29 17:24:08 2014 +0100
-> > >>
-> > >>     clk: divider: Optimize clk_divider_bestdiv loop
-> > >>
-> > >>     Currently, the for-loop used to try all the different dividers to find the
-> > >>     one that best fit tries all the values from 1 to max_div,
-> > >>incrementing by one.
-> > >>     In case of power-of-two, or table based divider, the loop isn't optimal.
-> > >>
-> > >>     Instead of incrementing by one, this patch provides directly the
-> > >>next divider.
-> > >>
-> > >>     Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
-> > >>     Signed-off-by: Mike Turquette <mturquette@linaro.org>
-> > >>
-> > >>Then the board does not hang.
-> > >
-> > >Isn't the increment of i missing?
-> > 
-> > i is incremented in _next_div():
-> > 
-> > +static int _next_div(struct clk_divider *divider, int div)
-> > +{
-> > +	div++;
-> > +
-> > +	if (divider->flags & CLK_DIVIDER_POWER_OF_TWO)
-> > +		return __roundup_pow_of_two(div);
-> > +	if (divider->table)
-> > +		return _round_up_table(divider->table, div);
-> > +
-> > +	return div;
-> > +}
-> 
-> This cannot work. _round_up_table is implemented like this:
-> 
-> static int _round_up_table(const struct clk_div_table *table, int div)
-> {
-> 	const struct clk_div_table *clkt;
-> 	int up = _get_table_maxdiv(table);
-> 
-> 	for (clkt = table; clkt->div; clkt++) {
-> 		if (clkt->div == div)
-> 			return clkt->div;
-> 		...
-> 	}
-> 	...
-> }
-> 
-> Here when a table entry matches the input div this function will return
-> exactly the input div. This means _next_div() will always return the
-> same value and clk_divider_bestdiv() has an infinite loop:
-> 
-> 	for (i = 1; i <= maxdiv; i = _next_div(divider, i)) {
-> 		...
-> 	}
+That code used to be in the machine code, but it's more fit here with other
+restart hooks.
 
-Hmmm, isn't the first thing that _next_div() does to increment the input
-div?
+That will allow to cleanup the machine directory, while waiting for a proper
+watchdog driver for the A31.
 
-Shawn
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/power/reset/Kconfig        |  7 ++++
+ drivers/power/reset/Makefile       |  1 +
+ drivers/power/reset/sun6i-reboot.c | 85 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 93 insertions(+)
+ create mode 100644 drivers/power/reset/sun6i-reboot.c
+
+diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
+index fa0e4e057b99..67aeb6ec08f9 100644
+--- a/drivers/power/reset/Kconfig
++++ b/drivers/power/reset/Kconfig
+@@ -43,6 +43,13 @@ config POWER_RESET_RESTART
+ 	  Instead they restart, and u-boot holds the SoC until the
+ 	  user presses a key. u-boot then boots into Linux.
+ 
++config POWER_RESET_SUN6I
++	bool "Allwinner A31 SoC reset driver"
++	depends on ARCH_SUNXI
++	depends on POWER_RESET
++	help
++	  Reboot support for the Allwinner A31 SoCs.
++
+ config POWER_RESET_VEXPRESS
+ 	bool "ARM Versatile Express power-off and reset driver"
+ 	depends on ARM || ARM64
+diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
+index a5b4a77d1a41..950fdc011c7a 100644
+--- a/drivers/power/reset/Makefile
++++ b/drivers/power/reset/Makefile
+@@ -3,5 +3,6 @@ obj-$(CONFIG_POWER_RESET_GPIO) += gpio-poweroff.o
+ obj-$(CONFIG_POWER_RESET_MSM) += msm-poweroff.o
+ obj-$(CONFIG_POWER_RESET_QNAP) += qnap-poweroff.o
+ obj-$(CONFIG_POWER_RESET_RESTART) += restart-poweroff.o
++obj-$(CONFIG_POWER_RESET_SUN6I) += sun6i-reboot.o
+ obj-$(CONFIG_POWER_RESET_VEXPRESS) += vexpress-poweroff.o
+ obj-$(CONFIG_POWER_RESET_XGENE) += xgene-reboot.o
+diff --git a/drivers/power/reset/sun6i-reboot.c b/drivers/power/reset/sun6i-reboot.c
+new file mode 100644
+index 000000000000..af2cd7ff2fe8
+--- /dev/null
++++ b/drivers/power/reset/sun6i-reboot.c
+@@ -0,0 +1,85 @@
++/*
++ * Allwinner A31 SoCs reset code
++ *
++ * Copyright (C) 2012-2014 Maxime Ripard
++ *
++ * Maxime Ripard <maxime.ripard@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/delay.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/of_address.h>
++#include <linux/platform_device.h>
++#include <linux/reboot.h>
++
++#include <asm/system_misc.h>
++
++#define SUN6I_WATCHDOG1_IRQ_REG		0x00
++#define SUN6I_WATCHDOG1_CTRL_REG	0x10
++#define SUN6I_WATCHDOG1_CTRL_RESTART		BIT(0)
++#define SUN6I_WATCHDOG1_CONFIG_REG	0x14
++#define SUN6I_WATCHDOG1_CONFIG_RESTART		BIT(0)
++#define SUN6I_WATCHDOG1_CONFIG_IRQ		BIT(1)
++#define SUN6I_WATCHDOG1_MODE_REG	0x18
++#define SUN6I_WATCHDOG1_MODE_ENABLE		BIT(0)
++
++static void __iomem *wdt_base;
++
++static void sun6i_wdt_restart(enum reboot_mode mode, const char *cmd)
++{
++	if (!wdt_base)
++		return;
++
++	/* Disable interrupts */
++	writel(0, wdt_base + SUN6I_WATCHDOG1_IRQ_REG);
++
++	/* We want to disable the IRQ and just reset the whole system */
++	writel(SUN6I_WATCHDOG1_CONFIG_RESTART,
++		wdt_base + SUN6I_WATCHDOG1_CONFIG_REG);
++
++	/* Enable timer. The default and lowest interval value is 0.5s */
++	writel(SUN6I_WATCHDOG1_MODE_ENABLE,
++		wdt_base + SUN6I_WATCHDOG1_MODE_REG);
++
++	/* Restart the watchdog. */
++	writel(SUN6I_WATCHDOG1_CTRL_RESTART,
++		wdt_base + SUN6I_WATCHDOG1_CTRL_REG);
++
++	while (1) {
++		mdelay(5);
++		writel(SUN6I_WATCHDOG1_MODE_ENABLE,
++			wdt_base + SUN6I_WATCHDOG1_MODE_REG);
++	}
++}
++
++static int sun6i_reboot_probe(struct platform_device *pdev)
++{
++	wdt_base = of_iomap(pdev->dev.of_node, 0);
++	if (!wdt_base) {
++		WARN(1, "failed to map watchdog base address");
++		return -ENODEV;
++	}
++
++	arm_pm_restart = sun6i_wdt_restart;
++
++	return 0;
++}
++
++static struct of_device_id sun6i_reboot_of_match[] = {
++	{ .compatible = "allwinner,sun6i-a31-wdt" },
++	{}
++};
++
++static struct platform_driver sun6i_reboot_driver = {
++	.probe = sun6i_reboot_probe,
++	.driver = {
++		.name = "sun6i-reboot",
++		.of_match_table = sun6i_reboot_of_match,
++	},
++};
++module_platform_driver(sun6i_reboot_driver);
+-- 
+1.9.1
