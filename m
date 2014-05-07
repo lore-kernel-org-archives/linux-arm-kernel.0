@@ -1,121 +1,193 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Wed, 07 May 2014 09:42:25 +0900
-Subject: [PATCH v2 2/6] ARM: EXYNOS: Move SYS_I2C_CFG register save/restore
- to i2c driver
-In-Reply-To: <53693229.3080705@gmail.com>
-References: <1399366282-4191-1-git-send-email-pankaj.dubey@samsung.com>
- <1399366282-4191-3-git-send-email-pankaj.dubey@samsung.com>
- <53693229.3080705@gmail.com>
-Message-ID: <53698171.9070501@samsung.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 6 May 2014 19:24:21 -0500
+Subject: [PATCH] power: twl4030_charger: clear IRQs after handling them
+In-Reply-To: <20140425210036.GO29632@saruman.home>
+References: <1397661299-31342-1-git-send-email-balbi@ti.com>
+ <20140416163526.GA3049@atomide.com> <535ACC62.102@ti.com>
+ <20140425210036.GO29632@saruman.home>
+Message-ID: <20140507002421.GA19711@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/07/2014 04:04 AM, Tomasz Figa wrote:
-> Hi Pankaj,
->
-> On 06.05.2014 10:51, Pankaj Dubey wrote:
->> Let's move SYS_I2C_CFG register save/restore during s2r into i2c driver.
->> This will help in removing static iodesc based mapping from exynos.c.
->> Also will help in removing SoC specific checks in pm.c making it
->> more independent of such macros.
->>
->> CC: Wolfram Sang <wsa@the-dreams.de>
->> CC: Russell King <linux@arm.linux.org.uk>
->> CC: linux-i2c at vger.kernel.org
->> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->> ---
->>   arch/arm/mach-exynos/exynos.c           |   12 +-----------
->>   arch/arm/mach-exynos/include/mach/map.h |    3 ---
->>   arch/arm/mach-exynos/pm.c               |   10 ----------
->>   arch/arm/mach-exynos/regs-sys.h         |   22 ----------------------
->>   drivers/i2c/busses/i2c-s3c2410.c        |    8 ++++++++
->>   5 files changed, 9 insertions(+), 46 deletions(-)
->>   delete mode 100644 arch/arm/mach-exynos/regs-sys.h
->
-> [snip]
->
->> diff --git a/drivers/i2c/busses/i2c-s3c2410.c 
->> b/drivers/i2c/busses/i2c-s3c2410.c
->> index 0420150..2095a01 100644
->> --- a/drivers/i2c/busses/i2c-s3c2410.c
->> +++ b/drivers/i2c/busses/i2c-s3c2410.c
->> @@ -133,6 +133,7 @@ struct s3c24xx_i2c {
->>       struct notifier_block    freq_transition;
->>   #endif
->>       struct regmap        *sysreg;
->> +    unsigned int        syc_cfg;
->
-> I suspect this is a typo, as the name syc_cfg looks a bit strange. 
-> Shouldn't it be sys_i2c_cfg?
-Oops. Will correct it in next version.
->
->>   };
->>
->>   static struct platform_device_id s3c24xx_driver_ids[] = {
->> @@ -1293,6 +1294,9 @@ static int s3c24xx_i2c_suspend_noirq(struct device 
->> *dev)
->>       struct platform_device *pdev = to_platform_device(dev);
->>       struct s3c24xx_i2c *i2c = platform_get_drvdata(pdev);
->>
->> +    if (i2c->sysreg)
->
-> IS_ERR() should be used.
->
->> +        regmap_read(i2c->sysreg, EXYNOS5_SYS_I2C_CFG, &i2c->syc_cfg);
->
-> Aha, so this is where the reference to the regmap gets used outside the 
-> probe. I'd say that changes to the i2c driver from this patch should be 
-> squashed with previous patch and this patch should contain only arch 
-> changes to remove old code.
+On 16:00-20140425, Felipe Balbi wrote:
+> On Fri, Apr 25, 2014 at 03:58:10PM -0500, Nishanth Menon wrote:
+> > On 04/16/2014 11:35 AM, Tony Lindgren wrote:
+> > > * Felipe Balbi <balbi@ti.com> [140416 08:18]:
+> > >> TRM says we *must* write 1 to each bit we're handling
+> > >> in order to clear the IRQ status and bring IRQ line
+> > >> low. This patch implements that.
+> > >>
+> > >> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > >> ---
+> > >>
+> > >> Russell, I don't have HW to test, but this should
+> > >> solve the problem you saw when not using battery
+> > >> with Zoom board. Let me know if it doesn't.
+> > > 
+> > > BTW, looks like we're enabling BCI automatically in twl4030.dtsi
+> > > while the legacy booting does not have TWL_COMMON_PDATA_BCI
+> > > enabled for LDP. Anyways, for LDP BCI should be enabled for
+> > > sure, that's the only way to power at least the earlier LDP
+> > > revisions.
+> > > 
+> > I picked up https://patchwork.kernel.org/patch/4002371/ for testing.
+> > 
+> > Unfortunately, it does not seem to work in my tests:
+> 
+> alright, I'll have a look after I get this other issue out of the way.
+> Probably not until next week.
 
-OK, in next version I will update accordingly.
+I dug a bit more into this earlier today. It makes a little sense
+considering that TWL4030 was created in a world where mobile devices did
+not consider battery was hot pluggable entity.. 
 
->
-> However, I wonder if this is really the right approach to this, as now 
-> you have save and restore duplicated for every instance of s3c24xx-i2c IP 
-> block. If there are no bits other than interrupt mux selectors in this 
-> registers then I guess this is fine (I can't look it up in the 
-> documentation at the moment), but otherwise you can end-up with multiple 
-> paths doing read-modify-write to this register in parallel possibly with 
-> different values.
+Long story short:
+a) the BCI interrupt status register is read-on-clear (see
+drivers/mfd/twl4030-irq.c set_cor is set to true for bci) - so the patch
+https://patchwork.kernel.org/patch/4002371/ is practically a NOP.
+b) BATSTS is a result of MADC monitoring the thermistor and is
+continually generated. I tried a bunch of tricks that I could come up
+with to try to do a hotplug support, but either we have infinite
+interrupts (due to regeneration of event) or I loose detection ability.
 
-SYS_I2C_CFG for exynos5250 has only bits for mux selectors for i2c.
+So, to keep things simple I created the following patch that seems to
+handle:
+a) no battery connected, powered off charger - bci disabled
+b) battery connected, powered off charger - bci active
+c) battery connected, no charger - bci active
 
->
-> Needless to say, this isn't very elegant, but I'm not opposed too much, 
-> as I can't really think of anything better right now.
->
->> +
->>       i2c->suspended = 1;
->>
->>       return 0;
->> @@ -1304,6 +1308,10 @@ static int s3c24xx_i2c_resume(struct device *dev)
->>       struct s3c24xx_i2c *i2c = platform_get_drvdata(pdev);
->>
->>       i2c->suspended = 0;
->> +
->> +    if (i2c->sysreg)
->> +        regmap_write(i2c->sysreg, i2c->syc_cfg, EXYNOS5_SYS_I2C_CFG);
->> +
->
-> I'd say this should be happening before setting i2c->suspended to 0 to 
-> account for possible i2c transfers being requested in parallel. Also see 
-> patch [1].
->
-> [1] https://lkml.org/lkml/2014/4/11/632
+note: if battery was connected, and booted and we hotplug battery out,
+we still have the spam of messages.. that is a seperate patch
+(basically do an orderly shutdown - I cant think of anything else we
+could possible do there)
 
-OK, will move this before i2c->suspended = 0.
+Let me know your views.. if this approach is fine, I can post out formal
+patches for the same.
+-----8<----
+>From 9474c7f37990b97c57b72eed917b9153595133ff Mon Sep 17 00:00:00 2001
+From: Nishanth Menon <nm@ti.com>
+Date: Tue, 6 May 2014 19:02:49 -0500
+Subject: [PATCH] power: twl4030_charger: detect battery presence prior to
+ enabling charger
 
-If possible please review other patches also in this series so that I can 
-update
-whole series with addressing all review comments.
+TWL4030's Battery Charger seems to be designed for non-hotpluggable
+batteries.
 
->
-> Best regards,
-> Tomasz
->
+If battery is not present in the system, BATSTS is always set with the
+expectation that software will take actions to move to a required safe
+state (could be power down or disable various charger paths).
 
+It does not seem possible even by manipulating the edge detection
+of the event (using BCIEDR2 register) to have a consistent hotplug
+handling. This seems to be the result of BATSTS interrupt generated
+when the thermistor of the battery pack is disconnected from the
+dedicated ADIN1 pin. Clearing the status just results in the status
+being regenerated by the monitoring ADC(MADC) and disabling the
+edges of event just makes hotplug no longer function. The only
+other option is to disable the detection of the MADC by disabling
+BCIMFEN4::BATSTSMCHGEN (battery presence detector) - but then, we can
+never again detect battery reconnection.
+
+So, detect battery presence based on precharge(which is hardware
+automatic state) or default main charger configuration at the time of
+probe and enable charger logic only if battery was present.
+
+Reported-by: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ drivers/power/twl4030_charger.c |   43 ++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 42 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/power/twl4030_charger.c b/drivers/power/twl4030_charger.c
+index f141088..14ec220 100644
+--- a/drivers/power/twl4030_charger.c
++++ b/drivers/power/twl4030_charger.c
+@@ -28,10 +28,13 @@
+ #define TWL4030_BCIICHG		0x08
+ #define TWL4030_BCIVAC		0x0a
+ #define TWL4030_BCIVBUS		0x0c
++#define TWL4030_BCIMFSTS3	0x0F
+ #define TWL4030_BCIMFSTS4	0x10
+ #define TWL4030_BCICTL1		0x23
+ #define TWL4030_BB_CFG		0x12
+ 
++#define TWL4030_BCIMFSTS1	0x01
++
+ #define TWL4030_BCIAUTOWEN	BIT(5)
+ #define TWL4030_CONFIG_DONE	BIT(4)
+ #define TWL4030_BCIAUTOUSB	BIT(1)
+@@ -52,6 +55,9 @@
+ #define TWL4030_BBISEL_500uA	0x02
+ #define TWL4030_BBISEL_1000uA	0x03
+ 
++#define TWL4030_BATSTSPCHG	BIT(2)
++#define TWL4030_BATSTSMCHG	BIT(6)
++
+ /* BCI interrupts */
+ #define TWL4030_WOVF		BIT(0) /* Watchdog overflow */
+ #define TWL4030_TMOVF		BIT(1) /* Timer overflow */
+@@ -145,6 +151,34 @@ static int twl4030bci_read_adc_val(u8 reg)
+ }
+ 
+ /*
++ * Check if Battery Pack was present
++ */
++static int twl4030_is_battery_present(struct twl4030_bci *bci)
++{
++	int ret;
++	u8 val = 0;
++
++	/* Battery presence in Main charge? */
++	ret = twl_i2c_read_u8(TWL_MODULE_MAIN_CHARGE, &val, TWL4030_BCIMFSTS3);
++	if (ret)
++		return ret;
++	if (val & TWL4030_BATSTSMCHG)
++		return 0;
++
++	/*
++	 * OK, It could be that bootloader did not enable main charger,
++	 * pre-charge is h/w auto. So, Battery presence in Pre-charge?
++	 */
++	ret = twl_i2c_read_u8(TWL4030_MODULE_PRECHARGE, &val, TWL4030_BCIMFSTS1);
++	if (ret)
++		return ret;
++	if (val & TWL4030_BATSTSPCHG)
++		return 0;
++
++	return -ENODEV;
++}
++
++/*
+  * Check if VBUS power is present
+  */
+ static int twl4030_bci_have_vbus(struct twl4030_bci *bci)
+@@ -541,8 +575,14 @@ static int __init twl4030_bci_probe(struct platform_device *pdev)
+ 	bci->irq_chg = platform_get_irq(pdev, 0);
+ 	bci->irq_bci = platform_get_irq(pdev, 1);
+ 
+-	platform_set_drvdata(pdev, bci);
++	/* Only proceed further *IF* battery is physically present */
++	ret = twl4030_is_battery_present(bci);
++	if  (ret) {
++		dev_crit(&pdev->dev, "Battery was not detected:%d\n", ret);
++		goto fail_no_battery;
++	}
+ 
++	platform_set_drvdata(pdev, bci);
+ 	bci->ac.name = "twl4030_ac";
+ 	bci->ac.type = POWER_SUPPLY_TYPE_MAINS;
+ 	bci->ac.properties = twl4030_charger_props;
+@@ -633,6 +673,7 @@ fail_chg_irq:
+ fail_register_usb:
+ 	power_supply_unregister(&bci->ac);
+ fail_register_ac:
++fail_no_battery:
+ 	kfree(bci);
+ 
+ 	return ret;
+-- 
+1.7.9.5
 
 -- 
-Best Regards,
-Pankaj Dubey
+Regards,
+Nishanth Menon
