@@ -1,125 +1,489 @@
-From: arunks.linux@gmail.com (Arun KS)
-Date: Wed, 7 May 2014 07:01:44 +0530
-Subject: arm64: Fix machine_shutdown() definition
-In-Reply-To: <53690F55.6030504@wwwdotorg.org>
-References: <1399391708-13442-1-git-send-email-arunks.linux@gmail.com>
- <53690F55.6030504@wwwdotorg.org>
-Message-ID: <CAKZGPANMv_SNVyRBPc1KDhpAYFXnuXBX+PyovbMgN9ZTAs=EUg@mail.gmail.com>
+From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
+Date: Wed, 7 May 2014 01:32:16 +0000
+Subject: [PATCH v2] watchdog: imx2_wdt: convert to watchdog core api
+In-Reply-To: <20140507013302.2f0ef27c@crub>
+References: <1397199434-6551-1-git-send-email-agust@denx.de>
+ <20140507013302.2f0ef27c@crub>
+Message-ID: <68a00ade5d044b23a4b2f9439740967e@BY2PR03MB505.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+> Subject: Re: [PATCH v2] watchdog: imx2_wdt: convert to watchdog core api
+> 
+> On Fri, 11 Apr 2014 08:57:14 +0200
+> Anatolij Gustschin <agust@denx.de> wrote:
+> 
+> > Convert the imx2_wdt driver to the new watchdog core api.
+> >
+> > Signed-off-by: Anatolij Gustschin <agust@denx.de>
+> > Cc: Wolfram Sang <wsa@the-dreams.de>
+> > Cc: Wim Van Sebroeck <wim@iguana.be>
+> 
+> Ping. Will this patch be queued for next?
+> 
 
-On Tue, May 6, 2014 at 10:05 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 05/06/2014 09:55 AM, arunks.linux at gmail.com wrote:
->> From: Arun KS <arun.linux@gmail.com>
->>
->> machine_shutdown() is a hook for kexec. Add a comment saying so, since
->> it isn't obvious from the function name.
->>
->> Halt, power-off, and restart have different requirements re: stopping
->> secondary CPUs than kexec has. The former simply require the secondary
->> CPUs to be quiesced somehow, whereas kexec requires them to be
->> completely non-operational, so that no matter where the kexec target
->> images are written in RAM, they won't influence operation of the
->> secondary CPUS,which could happen if the CPUs were still executing some
->> kind of pin loop. To this end, modify machine_halt, power_off, and
->> restart to call smp_send_stop() directly, rather than calling
->> machine_shutdown().
->>
->> In machine_shutdown(), replace the call to smp_send_stop() with a call
->> to disable_nonboot_cpus(). This completely disables all but one CPU,
->> thus satisfying the kexec requirements a couple paragraphs above.
->>
->> Signed-off-by: Stephen Warren <swarren@nvidia.com>
->> Signed-off-by: Arun KS <getarunks@gmail.com>
->> Signed-off-by: Arun KS <arunks.linux@gmail.com>
->
-> It's a bit odd to include my s-o-b here when I didn't actually write
-> this particular patch. No doubt it's included because I wrote an
-> identical patch for arch/arm/.
->
-> Rather than including my s-o-b here, perhaps simply including the
-> following paragraph in the commit decription would be better:
->
-> This patch ports most of commit 19ab428f4b79 "ARM: 7759/1: decouple CPU
-> offlining from reboot/shutdown" by Stephen Warren from arch/arm to
-> arch/arm64.
+@Anatolij,
 
-Okey. I ll re-spin this patch.
+Not yet...
 
->
-> Or, I sometimes use the following tag instead of s-o-b:
->
-> Based-on-work-by: Stephen Warren <swarren@nvidia.com>
->
-> Including two s-o-b for yourself probably isn't necesary.
->
-> Do you need to include an equivalent of the following from my original
-> patch to arch/arm/?
+And the newest version is v5.
 
-Rest of the things are already taken care in arm64.
+@Wim,
+
+Ping :)
 
 Thanks,
-Arun
->
->> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->> index 239fa96c12bb..2651b1da1c56 100644
->> --- a/arch/arm/Kconfig
->> +++ b/arch/arm/Kconfig
->> @@ -2016,7 +2016,7 @@ config XIP_PHYS_ADDR
->>
->>  config KEXEC
->>         bool "Kexec system call (EXPERIMENTAL)"
->> -       depends on (!SMP || HOTPLUG_CPU)
->> +       depends on (!SMP || PM_SLEEP_SMP)
->>         help
->>           kexec is a system call that implements the ability to shutdown your
->>           current kernel, and to start another kernel.  It is like a reboot
->> diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
->> index 8ef8c9337809..4fb074c446bf 100644
->> --- a/arch/arm/kernel/machine_kexec.c
->> +++ b/arch/arm/kernel/machine_kexec.c
->> @@ -134,6 +134,10 @@ void machine_kexec(struct kimage *image)
->>         unsigned long reboot_code_buffer_phys;
->>         void *reboot_code_buffer;
->>
->> +       if (num_online_cpus() > 1) {
->> +               pr_err("kexec: error: multiple CPUs still online\n");
->> +               return;
->> +       }
->>
->>         page_list = image->head & PAGE_MASK;
->>
->> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
->> index 550d63cef68e..5919eb451bb9 100644
->> --- a/arch/arm/kernel/smp.c
->> +++ b/arch/arm/kernel/smp.c
->> @@ -651,17 +651,6 @@ void smp_send_reschedule(int cpu)
->>         smp_cross_call(cpumask_of(cpu), IPI_RESCHEDULE);
->>  }
->>
->> -#ifdef CONFIG_HOTPLUG_CPU
->> -static void smp_kill_cpus(cpumask_t *mask)
->> -{
->> -       unsigned int cpu;
->> -       for_each_cpu(cpu, mask)
->> -               platform_cpu_kill(cpu);
->> -}
->> -#else
->> -static void smp_kill_cpus(cpumask_t *mask) { }
->> -#endif
->> -
->>  void smp_send_stop(void)
->>  {
->>         unsigned long timeout;
->> @@ -679,8 +668,6 @@ void smp_send_stop(void)
->>
->>         if (num_online_cpus() > 1)
->>                 pr_warning("SMP: failed to stop secondary CPUs\n");
->> -
->> -       smp_kill_cpus(&mask);
->>  }
->>
->>  /*
->
+
+BRs
+Xiubo
+
+
+
+
+
+
+
+
+> Thanks,
+> 
+> Anatolij
+> 
+> > ---
+> > NOTE: This patch applies on top of the imx2_wdt regmap-mmio support
+> > patch series http://comments.gmane.org/gmane.linux.kernel/1677735
+> >
+> > Changes since first version:
+> >  - simplify return in imx2_wdt_is_running()
+> >  - fix "WARNING: quoted string split across lines"
+> >
+> >  drivers/watchdog/Kconfig    |    1 +
+> >  drivers/watchdog/imx2_wdt.c |  292 ++++++++++++++++++----------------------
+> ---
+> >  2 files changed, 123 insertions(+), 170 deletions(-)
+> >
+> > diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+> > index f2a15f4..5e78c77c 100644
+> > --- a/drivers/watchdog/Kconfig
+> > +++ b/drivers/watchdog/Kconfig
+> > @@ -379,6 +379,7 @@ config IMX2_WDT
+> >  	tristate "IMX2+ Watchdog"
+> >  	depends on ARCH_MXC
+> >  	select REGMAP_MMIO
+> > +	select WATCHDOG_CORE
+> >  	help
+> >  	  This is the driver for the hardware watchdog
+> >  	  on the Freescale IMX2 and later processors.
+> > diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
+> > index 76fa724..9d4874f 100644
+> > --- a/drivers/watchdog/imx2_wdt.c
+> > +++ b/drivers/watchdog/imx2_wdt.c
+> > @@ -22,18 +22,15 @@
+> >   */
+> >
+> >  #include <linux/clk.h>
+> > -#include <linux/fs.h>
+> >  #include <linux/init.h>
+> >  #include <linux/io.h>
+> >  #include <linux/jiffies.h>
+> >  #include <linux/kernel.h>
+> > -#include <linux/miscdevice.h>
+> >  #include <linux/module.h>
+> >  #include <linux/moduleparam.h>
+> >  #include <linux/platform_device.h>
+> >  #include <linux/regmap.h>
+> >  #include <linux/timer.h>
+> > -#include <linux/uaccess.h>
+> >  #include <linux/watchdog.h>
+> >
+> >  #define DRIVER_NAME "imx2-wdt"
+> > @@ -56,19 +53,12 @@
+> >
+> >  #define WDOG_SEC_TO_COUNT(s)	((s * 2 - 1) << 8)
+> >
+> > -#define IMX2_WDT_STATUS_OPEN	0
+> > -#define IMX2_WDT_STATUS_STARTED	1
+> > -#define IMX2_WDT_EXPECT_CLOSE	2
+> > -
+> > -static struct {
+> > +struct imx2_wdt_device {
+> >  	struct clk *clk;
+> >  	struct regmap *regmap;
+> > -	unsigned timeout;
+> > -	unsigned long status;
+> >  	struct timer_list timer;	/* Pings the watchdog when closed */
+> > -} imx2_wdt;
+> > -
+> > -static struct miscdevice imx2_wdt_miscdev;
+> > +	struct watchdog_device wdog;
+> > +};
+> >
+> >  static bool nowayout = WATCHDOG_NOWAYOUT;
+> >  module_param(nowayout, bool, 0);
+> > @@ -86,11 +76,12 @@ static const struct watchdog_info imx2_wdt_info = {
+> >  	.options = WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE,
+> >  };
+> >
+> > -static inline void imx2_wdt_setup(void)
+> > +static inline void imx2_wdt_setup(struct watchdog_device *wdog)
+> >  {
+> > +	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
+> >  	u32 val;
+> >
+> > -	regmap_read(imx2_wdt.regmap, IMX2_WDT_WCR, &val);
+> > +	regmap_read(wdev->regmap, IMX2_WDT_WCR, &val);
+> >
+> >  	/* Suspend timer in low power mode, write once-only */
+> >  	val |= IMX2_WDT_WCR_WDZST;
+> > @@ -101,157 +92,93 @@ static inline void imx2_wdt_setup(void)
+> >  	/* Keep Watchdog Disabled */
+> >  	val &= ~IMX2_WDT_WCR_WDE;
+> >  	/* Set the watchdog's Time-Out value */
+> > -	val |= WDOG_SEC_TO_COUNT(imx2_wdt.timeout);
+> > +	val |= WDOG_SEC_TO_COUNT(wdog->timeout);
+> >
+> > -	regmap_write(imx2_wdt.regmap, IMX2_WDT_WCR, val);
+> > +	regmap_write(wdev->regmap, IMX2_WDT_WCR, val);
+> >
+> >  	/* enable the watchdog */
+> >  	val |= IMX2_WDT_WCR_WDE;
+> > -	regmap_write(imx2_wdt.regmap, IMX2_WDT_WCR, val);
+> > +	regmap_write(wdev->regmap, IMX2_WDT_WCR, val);
+> >  }
+> >
+> > -static inline void imx2_wdt_ping(void)
+> > +static inline bool imx2_wdt_is_running(struct imx2_wdt_device *wdev)
+> >  {
+> > -	regmap_write(imx2_wdt.regmap, IMX2_WDT_WSR, IMX2_WDT_SEQ1);
+> > -	regmap_write(imx2_wdt.regmap, IMX2_WDT_WSR, IMX2_WDT_SEQ2);
+> > -}
+> > +	u32 val;
+> >
+> > -static void imx2_wdt_timer_ping(unsigned long arg)
+> > -{
+> > -	/* ping it every imx2_wdt.timeout / 2 seconds to prevent reboot */
+> > -	imx2_wdt_ping();
+> > -	mod_timer(&imx2_wdt.timer, jiffies + imx2_wdt.timeout * HZ / 2);
+> > +	regmap_read(wdev->regmap, IMX2_WDT_WCR, &val);
+> > +
+> > +	return val & IMX2_WDT_WCR_WDE;
+> >  }
+> >
+> > -static void imx2_wdt_start(void)
+> > +static int imx2_wdt_ping(struct watchdog_device *wdog)
+> >  {
+> > -	if (!test_and_set_bit(IMX2_WDT_STATUS_STARTED, &imx2_wdt.status)) {
+> > -		/* at our first start we enable clock and do initialisations */
+> > -		clk_prepare_enable(imx2_wdt.clk);
+> > -
+> > -		imx2_wdt_setup();
+> > -	} else	/* delete the timer that pings the watchdog after close */
+> > -		del_timer_sync(&imx2_wdt.timer);
+> > +	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
+> >
+> > -	/* Watchdog is enabled - time to reload the timeout value */
+> > -	imx2_wdt_ping();
+> > +	regmap_write(wdev->regmap, IMX2_WDT_WSR, IMX2_WDT_SEQ1);
+> > +	regmap_write(wdev->regmap, IMX2_WDT_WSR, IMX2_WDT_SEQ2);
+> > +	return 0;
+> >  }
+> >
+> > -static void imx2_wdt_stop(void)
+> > +static void imx2_wdt_timer_ping(unsigned long arg)
+> >  {
+> > -	/* we don't need a clk_disable, it cannot be disabled once started.
+> > -	 * We use a timer to ping the watchdog while /dev/watchdog is closed */
+> > -	imx2_wdt_timer_ping(0);
+> > +	struct watchdog_device *wdog = (struct watchdog_device *)arg;
+> > +	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
+> > +
+> > +	/* ping it every wdog->timeout / 2 seconds to prevent reboot */
+> > +	imx2_wdt_ping(wdog);
+> > +	mod_timer(&wdev->timer, jiffies + wdog->timeout * HZ / 2);
+> >  }
+> >
+> > -static void imx2_wdt_set_timeout(int new_timeout)
+> > +static int imx2_wdt_set_timeout(struct watchdog_device *wdog,
+> > +				unsigned int new_timeout)
+> >  {
+> > -	regmap_update_bits(imx2_wdt.regmap, IMX2_WDT_WCR, IMX2_WDT_WCR_WT,
+> > +	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
+> > +
+> > +	regmap_update_bits(wdev->regmap, IMX2_WDT_WCR, IMX2_WDT_WCR_WT,
+> >  			   WDOG_SEC_TO_COUNT(new_timeout));
+> > +	return 0;
+> >  }
+> >
+> > -static int imx2_wdt_open(struct inode *inode, struct file *file)
+> > +static int imx2_wdt_start(struct watchdog_device *wdog)
+> >  {
+> > -	if (test_and_set_bit(IMX2_WDT_STATUS_OPEN, &imx2_wdt.status))
+> > -		return -EBUSY;
+> > +	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
+> >
+> > -	imx2_wdt_start();
+> > -	return nonseekable_open(inode, file);
+> > +	if (imx2_wdt_is_running(wdev)) {
+> > +		/* delete the timer that pings the watchdog after close */
+> > +		del_timer_sync(&wdev->timer);
+> > +		imx2_wdt_set_timeout(wdog, wdog->timeout);
+> > +	} else
+> > +		imx2_wdt_setup(wdog);
+> > +
+> > +	return imx2_wdt_ping(wdog);
+> >  }
+> >
+> > -static int imx2_wdt_close(struct inode *inode, struct file *file)
+> > +static int imx2_wdt_stop(struct watchdog_device *wdog)
+> >  {
+> > -	if (test_bit(IMX2_WDT_EXPECT_CLOSE, &imx2_wdt.status) && !nowayout)
+> > -		imx2_wdt_stop();
+> > -	else {
+> > -		dev_crit(imx2_wdt_miscdev.parent,
+> > -			"Unexpected close: Expect reboot!\n");
+> > -		imx2_wdt_ping();
+> > -	}
+> > -
+> > -	clear_bit(IMX2_WDT_EXPECT_CLOSE, &imx2_wdt.status);
+> > -	clear_bit(IMX2_WDT_STATUS_OPEN, &imx2_wdt.status);
+> > +	/*
+> > +	 * We don't need a clk_disable, it cannot be disabled once started.
+> > +	 * We use a timer to ping the watchdog while /dev/watchdog is closed
+> > +	 */
+> > +	imx2_wdt_timer_ping((unsigned long)wdog);
+> >  	return 0;
+> >  }
+> >
+> > -static long imx2_wdt_ioctl(struct file *file, unsigned int cmd,
+> > -							unsigned long arg)
+> > +static inline void imx2_wdt_ping_if_active(struct watchdog_device *wdog)
+> >  {
+> > -	void __user *argp = (void __user *)arg;
+> > -	int __user *p = argp;
+> > -	int new_value;
+> > -	u32 val;
+> > +	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
+> >
+> > -	switch (cmd) {
+> > -	case WDIOC_GETSUPPORT:
+> > -		return copy_to_user(argp, &imx2_wdt_info,
+> > -			sizeof(struct watchdog_info)) ? -EFAULT : 0;
+> > -
+> > -	case WDIOC_GETSTATUS:
+> > -		return put_user(0, p);
+> > -
+> > -	case WDIOC_GETBOOTSTATUS:
+> > -		regmap_read(imx2_wdt.regmap, IMX2_WDT_WRSR, &val);
+> > -		new_value = val & IMX2_WDT_WRSR_TOUT ? WDIOF_CARDRESET : 0;
+> > -		return put_user(new_value, p);
+> > -
+> > -	case WDIOC_KEEPALIVE:
+> > -		imx2_wdt_ping();
+> > -		return 0;
+> > -
+> > -	case WDIOC_SETTIMEOUT:
+> > -		if (get_user(new_value, p))
+> > -			return -EFAULT;
+> > -		if ((new_value < 1) || (new_value > IMX2_WDT_MAX_TIME))
+> > -			return -EINVAL;
+> > -		imx2_wdt_set_timeout(new_value);
+> > -		imx2_wdt.timeout = new_value;
+> > -		imx2_wdt_ping();
+> > -
+> > -		/* Fallthrough to return current value */
+> > -	case WDIOC_GETTIMEOUT:
+> > -		return put_user(imx2_wdt.timeout, p);
+> > -
+> > -	default:
+> > -		return -ENOTTY;
+> > +	if (imx2_wdt_is_running(wdev)) {
+> > +		imx2_wdt_set_timeout(wdog, wdog->timeout);
+> > +		imx2_wdt_timer_ping((unsigned long)wdog);
+> >  	}
+> >  }
+> >
+> > -static ssize_t imx2_wdt_write(struct file *file, const char __user *data,
+> > -						size_t len, loff_t *ppos)
+> > -{
+> > -	size_t i;
+> > -	char c;
+> > -
+> > -	if (len == 0)	/* Can we see this even ? */
+> > -		return 0;
+> > -
+> > -	clear_bit(IMX2_WDT_EXPECT_CLOSE, &imx2_wdt.status);
+> > -	/* scan to see whether or not we got the magic character */
+> > -	for (i = 0; i != len; i++) {
+> > -		if (get_user(c, data + i))
+> > -			return -EFAULT;
+> > -		if (c == 'V')
+> > -			set_bit(IMX2_WDT_EXPECT_CLOSE, &imx2_wdt.status);
+> > -	}
+> > -
+> > -	imx2_wdt_ping();
+> > -	return len;
+> > -}
+> > -
+> > -static const struct file_operations imx2_wdt_fops = {
+> > +static struct watchdog_ops imx2_wdt_ops = {
+> >  	.owner = THIS_MODULE,
+> > -	.llseek = no_llseek,
+> > -	.unlocked_ioctl = imx2_wdt_ioctl,
+> > -	.open = imx2_wdt_open,
+> > -	.release = imx2_wdt_close,
+> > -	.write = imx2_wdt_write,
+> > -};
+> > -
+> > -static struct miscdevice imx2_wdt_miscdev = {
+> > -	.minor = WATCHDOG_MINOR,
+> > -	.name = "watchdog",
+> > -	.fops = &imx2_wdt_fops,
+> > +	.start = imx2_wdt_start,
+> > +	.stop = imx2_wdt_stop,
+> > +	.ping = imx2_wdt_ping,
+> > +	.set_timeout = imx2_wdt_set_timeout,
+> >  };
+> >
+> >  static struct regmap_config imx2_wdt_regmap_config = {
+> > @@ -263,76 +190,101 @@ static struct regmap_config imx2_wdt_regmap_config =
+> {
+> >
+> >  static int __init imx2_wdt_probe(struct platform_device *pdev)
+> >  {
+> > +	struct imx2_wdt_device *wdev;
+> > +	struct watchdog_device *wdog;
+> >  	struct resource *res;
+> >  	void __iomem *base;
+> >  	int ret;
+> > +	u32 val;
+> > +
+> > +	wdev = devm_kzalloc(&pdev->dev, sizeof(*wdev), GFP_KERNEL);
+> > +	if (!wdev)
+> > +		return -ENOMEM;
+> >
+> >  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> >  	base = devm_ioremap_resource(&pdev->dev, res);
+> >  	if (IS_ERR(base))
+> >  		return PTR_ERR(base);
+> >
+> > -	imx2_wdt.regmap = devm_regmap_init_mmio_clk(&pdev->dev, NULL, base,
+> > -						    &imx2_wdt_regmap_config);
+> > -	if (IS_ERR(imx2_wdt.regmap)) {
+> > +	wdev->regmap = devm_regmap_init_mmio_clk(&pdev->dev, NULL, base,
+> > +						 &imx2_wdt_regmap_config);
+> > +	if (IS_ERR(wdev->regmap)) {
+> >  		dev_err(&pdev->dev, "regmap init failed\n");
+> > -		return PTR_ERR(imx2_wdt.regmap);
+> > +		return PTR_ERR(wdev->regmap);
+> >  	}
+> >
+> > -	imx2_wdt.clk = devm_clk_get(&pdev->dev, NULL);
+> > -	if (IS_ERR(imx2_wdt.clk)) {
+> > +	wdev->clk = devm_clk_get(&pdev->dev, NULL);
+> > +	if (IS_ERR(wdev->clk)) {
+> >  		dev_err(&pdev->dev, "can't get Watchdog clock\n");
+> > -		return PTR_ERR(imx2_wdt.clk);
+> > +		return PTR_ERR(wdev->clk);
+> >  	}
+> >
+> > -	imx2_wdt.timeout = clamp_t(unsigned, timeout, 1, IMX2_WDT_MAX_TIME);
+> > -	if (imx2_wdt.timeout != timeout)
+> > -		dev_warn(&pdev->dev, "Initial timeout out of range! "
+> > -			"Clamped from %u to %u\n", timeout, imx2_wdt.timeout);
+> > +	wdog			= &wdev->wdog;
+> > +	wdog->info		= &imx2_wdt_info;
+> > +	wdog->ops		= &imx2_wdt_ops;
+> > +	wdog->min_timeout	= 1;
+> > +	wdog->max_timeout	= IMX2_WDT_MAX_TIME;
+> >
+> > -	setup_timer(&imx2_wdt.timer, imx2_wdt_timer_ping, 0);
+> > +	clk_prepare_enable(wdev->clk);
+> >
+> > -	imx2_wdt_miscdev.parent = &pdev->dev;
+> > -	ret = misc_register(&imx2_wdt_miscdev);
+> > -	if (ret)
+> > -		goto fail;
+> > +	regmap_read(wdev->regmap, IMX2_WDT_WRSR, &val);
+> > +	wdog->bootstatus = val & IMX2_WDT_WRSR_TOUT ? WDIOF_CARDRESET : 0;
+> >
+> > -	dev_info(&pdev->dev,
+> > -		"IMX2+ Watchdog Timer enabled. timeout=%ds (nowayout=%d)\n",
+> > -						imx2_wdt.timeout, nowayout);
+> > -	return 0;
+> > +	wdog->timeout = clamp_t(unsigned, timeout, 1, IMX2_WDT_MAX_TIME);
+> > +	if (wdog->timeout != timeout)
+> > +		dev_warn(&pdev->dev, "Initial timeout out of range! Clamped
+> from %u to %u\n",
+> > +			 timeout, wdog->timeout);
+> > +
+> > +	platform_set_drvdata(pdev, wdog);
+> > +	watchdog_set_drvdata(wdog, wdev);
+> > +	watchdog_set_nowayout(wdog, nowayout);
+> > +	watchdog_init_timeout(wdog, timeout, &pdev->dev);
+> > +
+> > +	setup_timer(&wdev->timer, imx2_wdt_timer_ping, (unsigned long)wdog);
+> >
+> > -fail:
+> > -	imx2_wdt_miscdev.parent = NULL;
+> > -	return ret;
+> > +	imx2_wdt_ping_if_active(wdog);
+> > +
+> > +	ret = watchdog_register_device(wdog);
+> > +	if (ret) {
+> > +		dev_err(&pdev->dev, "cannot register watchdog device\n");
+> > +		return ret;
+> > +	}
+> > +
+> > +	dev_info(&pdev->dev, "timeout %d sec (nowayout=%d)\n",
+> > +		 wdog->timeout, nowayout);
+> > +
+> > +	return 0;
+> >  }
+> >
+> >  static int __exit imx2_wdt_remove(struct platform_device *pdev)
+> >  {
+> > -	misc_deregister(&imx2_wdt_miscdev);
+> > +	struct watchdog_device *wdog = platform_get_drvdata(pdev);
+> > +	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
+> >
+> > -	if (test_bit(IMX2_WDT_STATUS_STARTED, &imx2_wdt.status)) {
+> > -		del_timer_sync(&imx2_wdt.timer);
+> > +	watchdog_unregister_device(wdog);
+> >
+> > -		dev_crit(imx2_wdt_miscdev.parent,
+> > -			"Device removed: Expect reboot!\n");
+> > +	if (imx2_wdt_is_running(wdev)) {
+> > +		del_timer_sync(&wdev->timer);
+> > +		imx2_wdt_ping(wdog);
+> > +		dev_crit(&pdev->dev, "Device removed: Expect reboot!\n");
+> >  	}
+> > -
+> > -	imx2_wdt_miscdev.parent = NULL;
+> >  	return 0;
+> >  }
+> >
+> >  static void imx2_wdt_shutdown(struct platform_device *pdev)
+> >  {
+> > -	if (test_bit(IMX2_WDT_STATUS_STARTED, &imx2_wdt.status)) {
+> > -		/* we are running, we need to delete the timer but will give
+> > -		 * max timeout before reboot will take place */
+> > -		del_timer_sync(&imx2_wdt.timer);
+> > -		imx2_wdt_set_timeout(IMX2_WDT_MAX_TIME);
+> > -		imx2_wdt_ping();
+> > -
+> > -		dev_crit(imx2_wdt_miscdev.parent,
+> > -			"Device shutdown: Expect reboot!\n");
+> > +	struct watchdog_device *wdog = platform_get_drvdata(pdev);
+> > +	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
+> > +
+> > +	if (imx2_wdt_is_running(wdev)) {
+> > +		/*
+> > +		 * We are running, we need to delete the timer but will
+> > +		 * give max timeout before reboot will take place
+> > +		 */
+> > +		del_timer_sync(&wdev->timer);
+> > +		imx2_wdt_set_timeout(wdog, IMX2_WDT_MAX_TIME);
+> > +		imx2_wdt_ping(wdog);
+> > +		dev_crit(&pdev->dev, "Device shutdown: Expect reboot!\n");
+> >  	}
+> >  }
+> >
