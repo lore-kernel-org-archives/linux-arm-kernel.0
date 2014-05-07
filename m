@@ -1,76 +1,72 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 07 May 2014 11:30:35 +0200
-Subject: [PATCH 05/17] pci: host: pcie-dra7xx: add support for pcie-dra7xx
- controller
-In-Reply-To: <5369F287.6000103@ti.com>
-References: <1399383244-14556-1-git-send-email-kishon@ti.com>
- <4300084.bc6ByDTk7W@wuerfel> <5369F287.6000103@ti.com>
-Message-ID: <6485683.q96o7U6vf8@wuerfel>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 7 May 2014 11:38:48 +0200
+Subject: [PATCH v3 01/20] usb: ehci-orion: Fix clock reference leaking
+In-Reply-To: <Pine.LNX.4.44L0.1405061027490.1312-100000@iolanthe.rowland.org>
+References: <1399335255-589-2-git-send-email-gregory.clement@free-electrons.com>
+ <Pine.LNX.4.44L0.1405061027490.1312-100000@iolanthe.rowland.org>
+Message-ID: <20140507113848.037bb94d@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 07 May 2014 14:14:55 Kishon Vijay Abraham I wrote:
-> >> +static void dra7xx_pcie_enable_interrupts(struct pcie_port *pp)
-> >> +{
-> >> +    struct dra7xx_pcie *dra7xx = to_dra7xx_pcie(pp);
-> >> +
-> >> +    dra7xx_pcie_writel(dra7xx->base, PCIECTRL_DRA7XX_CONF_IRQSTATUS_MAIN,
-> >> +                       ~INTERRUPTS);
-> >> +    dra7xx_pcie_writel(dra7xx->base,
-> >> +                       PCIECTRL_DRA7XX_CONF_IRQENABLE_SET_MAIN, INTERRUPTS);
-> >> +    dra7xx_pcie_writel(dra7xx->base, PCIECTRL_DRA7XX_CONF_IRQSTATUS_MSI,
-> >> +                       ~LEG_EP_INTERRUPTS & ~MSI);
-> >> +
-> >> +    if (IS_ENABLED(CONFIG_PCI_MSI))
-> >> +            dra7xx_pcie_writel(dra7xx->base,
-> >> +                               PCIECTRL_DRA7XX_CONF_IRQENABLE_SET_MSI, MSI);
-> >> +    else
-> >> +            dra7xx_pcie_writel(dra7xx->base,
-> >> +                               PCIECTRL_DRA7XX_CONF_IRQENABLE_SET_MSI,
-> >> +                               LEG_EP_INTERRUPTS);
-> > 
-> > Doesn't this just enable one or the other? In general I'd assume you need
-> > both INTx and MSI, at least if MSI is available.
+Dear Alan Stern,
+
+On Tue, 6 May 2014 10:30:57 -0400 (EDT), Alan Stern wrote:
+
+> >  err2:
+> > -	if (!IS_ERR(clk))
+> > -		clk_disable_unprepare(clk);
+> > +	usb_put_hcd(hcd);
 > 
-> Not sure since the programming sequence in the TRM explicitly states either
-> legacy interrupts or MSI interrupts should be enabled but not both.
+> At this point, priv has just become a dangling pointer, because it
+> points to something that was allocated along with hcd.
 
-Hmm, I think that means you can't have MSI at all. You have to support
-legacy PCI devices that can't do MSI.
+Right.
 
-Do you know if you have a modern GIC implementation with MSI support
-in these SoCs? It would be better anyway to use the GIC for doing
-MSI, so you can just ignore the internal MSI controller here.
-
-> >> +static int add_pcie_port(struct dra7xx_pcie *dra7xx,
-> >> +                      struct platform_device *pdev)
-> >> +{
-> >> +    int ret;
-> >> +    struct pcie_port *pp;
-> >> +    struct resource *res;
-> >> +    struct device *dev = &pdev->dev;
-> >> +
-> >> +    pp = &dra7xx->pp;
-> >> +    pp->dev = dev;
-> >> +    pp->ops = &dra7xx_pcie_host_ops;
-> >> +
-> >> +    spin_lock_init(&pp->conf_lock);
-> >> +
-> >> +    pp->irq = platform_get_irq(pdev, 1);
-> >> +    if (pp->irq < 0) {
-> >> +            dev_err(dev, "missing IRQ resource\n");
-> >> +            return -EINVAL;
-> >> +    }
-> >>
-> > 
-> > The binding does not list a mandatory "interrupts" property, so
-> > this should not be treated as an error.
+> > +
+> > +	if (!IS_ERR(priv->clk))
+> > +		clk_disable_unprepare(priv->clk);
 > 
-> actually the 'interrupts' property is documented in pci/designware-pcie.txt.
+> And now you are dereferencing memory that has been deallocated.  The
+> real problem is that you get and enable the clock _after_ creating hcd,
+> but you don't disable it _before_ deallocating hcd.
 
-Hmm, but you don't seem to use it the same way as documented there.
-I'm not sure what 'level interrupt, pulse interrupt, special interrupt'
-in the parent binding are, but they don't seem to be the ones you use
-here.
+Correct.
 
-	Arnd
+> 
+> >  err1:
+> >  	dev_err(&pdev->dev, "init %s fail, %d\n",
+> >  		dev_name(&pdev->dev), err);
+> > @@ -260,14 +273,14 @@ err1:
+> >  static int ehci_orion_drv_remove(struct platform_device *pdev)
+> >  {
+> >  	struct usb_hcd *hcd = platform_get_drvdata(pdev);
+> > -	struct clk *clk;
+> > +	struct orion_ehci_hcd *priv = hcd_to_orion_priv(hcd);
+> >  
+> >  	usb_remove_hcd(hcd);
+> >  	usb_put_hcd(hcd);
+> >  
+> > -	clk = devm_clk_get(&pdev->dev, NULL);
+> > -	if (!IS_ERR(clk))
+> > -		clk_disable_unprepare(clk);
+> > +	if (!IS_ERR(priv->clk))
+> > +		clk_disable_unprepare(priv->clk);
+> 
+> This has the same problem as above.
+
+Indeed. Will fix in v4.
+
+> Also, for both this patch and 02/20, it would be better to replace the
+> "errN" labels with something more descriptive, so that it's not
+> necessary to renumber them every time something changes.
+
+Sure. I've added an additional commit prior to this patch that renames
+the goto labels to something more meaningful. This will be part of v4.
+
+Thanks for the review!
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
