@@ -1,62 +1,81 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 08 May 2014 19:32:52 +0200
-Subject: [PATCH] clk: exynos5420: Add clock IDs needed by GPU
-In-Reply-To: <1398680444-12400-1-git-send-email-arun.kk@samsung.com>
-References: <1398680444-12400-1-git-send-email-arun.kk@samsung.com>
-Message-ID: <536BBFC4.2030103@samsung.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Thu, 08 May 2014 21:32:56 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCB2Ml0gQVJNOiBkdHM6IGlteDY6IGFkZCBuZXcgYm9hcmQg?=
+ =?UTF-8?B?UklvVGJvYXJk?=
+In-Reply-To: <536BBAE2.7060203@gmail.com>
+References: <53695C34.5000604@gmail.com> <1399560632.547109991@f294.i.mail.ru>
+ <536BBAE2.7060203@gmail.com>
+Message-ID: <1399570376.88508577@f371.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arun,
-
-On 28.04.2014 12:20, Arun Kumar K wrote:
-> Adds IDs for the clocks needed by the ARM Mali GPU
-> in exynos5420.
+Thu, 08 May 2014 18:12:02 +0100 ?? Iain Paton <ipaton0@gmail.com>:
+> On 08/05/14 15:50, Alexander Shiyan wrote:
 > 
-> Signed-off-by: Arun Kumar K <arun.kk@samsung.com>
-> ---
->  drivers/clk/samsung/clk-exynos5420.c   |    4 ++--
->  include/dt-bindings/clock/exynos5420.h |    2 ++
->  2 files changed, 4 insertions(+), 2 deletions(-)
+> > I think you should make patch series:
+> > 1. Add missing clock into imx6dl.dtsi
+> > 2. Add label to AIPS2 to imx6qdl.dtsi and use this label in imx6dl.dtsi
+> > 3. This patch
 > 
-> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
-> index 60b2681..7a9e3b4 100644
-> --- a/drivers/clk/samsung/clk-exynos5420.c
-> +++ b/drivers/clk/samsung/clk-exynos5420.c
-> @@ -362,7 +362,7 @@ static struct samsung_mux_clock exynos5420_mux_clks[] __initdata = {
->  	MUX(0, "mout_aclk66_psgen", aclk66_peric_p, SRC_TOP5, 4, 1),
->  	MUX(0, "mout_user_aclk333_g2d", user_aclk333_g2d_p, SRC_TOP5, 8, 1),
->  	MUX(0, "mout_user_aclk266_g2d", user_aclk266_g2d_p, SRC_TOP5, 12, 1),
-> -	MUX_A(0, "mout_user_aclk_g3d", user_aclk_g3d_p,
-> +	MUX_A(CLK_MOUT_G3D, "mout_user_aclk_g3d", user_aclk_g3d_p,
->  			SRC_TOP5, 16, 1, "aclkg3d"),
->  	MUX(0, "mout_user_aclk300_jpeg", user_aclk300_jpeg_p,
->  			SRC_TOP5, 20, 1),
-> @@ -372,7 +372,7 @@ static struct samsung_mux_clock exynos5420_mux_clks[] __initdata = {
->  			SRC_TOP5, 28, 1),
->  
->  	MUX(0, "sclk_mpll", mpll_p, SRC_TOP6, 0, 1),
-> -	MUX(0, "sclk_vpll", vpll_p, SRC_TOP6, 4, 1),
-> +	MUX(CLK_MOUT_VPLL, "sclk_vpll", vpll_p, SRC_TOP6, 4, 1),
->  	MUX(0, "sclk_spll", spll_p, SRC_TOP6, 8, 1),
->  	MUX(0, "sclk_ipll", ipll_p, SRC_TOP6, 12, 1),
->  	MUX(0, "sclk_rpll", rpll_p, SRC_TOP6, 16, 1),
-> diff --git a/include/dt-bindings/clock/exynos5420.h b/include/dt-bindings/clock/exynos5420.h
-> index 5eefd88..54db8b3 100644
-> --- a/include/dt-bindings/clock/exynos5420.h
-> +++ b/include/dt-bindings/clock/exynos5420.h
-> @@ -178,6 +178,8 @@
->  
->  /* mux clocks */
->  #define CLK_MOUT_HDMI		640
-> +#define CLK_MOUT_G3D		641
-> +#define CLK_MOUT_VPLL		642
->  
->  /* divider clocks */
->  #define CLK_DOUT_PIXEL		768
+> I'm not sure I follow 1/2.  You mean something like this 
 > 
+> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+> index eca0971..0645069 100644
+> --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> @@ -767,7 +767,7 @@
+>                         };
+>                 };
+>  
+> -               aips-bus at 02100000 { /* AIPS2 */
+> +               aips2: aips-bus at 02100000 { /* AIPS2 */
+>                         compatible = "fsl,aips-bus", "simple-bus";
+>                         #address-cells = <1>;
+>                         #size-cells = <1>;
+> 
+> followed by 
+> 
+> 
+> diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
+> index 5c5f574..81b7501 100644
+> --- a/arch/arm/boot/dts/imx6dl.dtsi
+> +++ b/arch/arm/boot/dts/imx6dl.dtsi
+> @@ -80,16 +80,6 @@
+>                         };
+>                 };
+>  
+> -               aips2: aips-bus at 02100000 {
+> -                       i2c4: i2c at 021f8000 {
+> -                               #address-cells = <1>;
+> -                               #size-cells = <0>;
+> -                               compatible = "fsl,imx1-i2c";
+> -                               reg = <0x021f8000 0x4000>;
+> -                               interrupts = <0 35 IRQ_TYPE_LEVEL_HIGH>;
+> -                               status = "disabled";
+> -                       };
+> -               };
+>         };
+>  
+>         display-subsystem {
+> @@ -98,6 +88,18 @@
+>         };
+>  };
+>  
+> +&aips2 {
+> +        i2c4: i2c at 021f8000 {
+> +                #address-cells = <1>;
+> +                #size-cells = <0>;
+> +                compatible = "fsl,imx1-i2c";
 
-Applied to samsung-clk/samsung-next.
+Are you sure about use "fsl,imx1-i2c" instead of  "fsl,imx21-i2c"?
+In any case you should add "fsl-imx6dl-i2c" as first compatible string.
+The rest looks good.
 
-Best regards,
-Tomasz
+> +                reg = <0x021f8000 0x4000>;
+> +                interrupts = <0 35 IRQ_TYPE_LEVEL_HIGH>;
+> +                clocks = <&clks 116>;
+> +                status = "disabled";
+> +        };
+> +};
+
+---
