@@ -1,48 +1,58 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 8 May 2014 10:57:03 -0400
-Subject: [GIT PULL] clk: mvebu: changes for v3.16
-Message-ID: <20140508145703.GC12708@titan.lakedaemon.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu,  8 May 2014 16:56:15 +0200
+Subject: [PATCH 2/2] mtd: orion-nand: fix build error with ARMv4
+In-Reply-To: <1399560990-1402858-1-git-send-email-arnd@arndb.de>
+References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
+ <1399560990-1402858-1-git-send-email-arnd@arndb.de>
+Message-ID: <1399560990-1402858-4-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mike,
+orion_nand_read_buf uses an inline assembly with the "ldrd"
+instruction, which is only available from ARMv5 upwards. This
+used to be fine, since all users have an ARMv5 or ARMv7 CPU,
+but now we can also build a multiplatform kernel with ARMv4
+support enabled in addition to the "kirkwood" (mvebu) platform.
 
-Here are the mvebu clock changes this time around.  Pretty easy, just
-one brand new driver.  This has been in -next for a while and is part of
-the awesome series by Thomas converting the legacy orion5x platform to
-devicetree.
+This provides an alternative to call the readsl() function that
+is supposed to have the same effect and is also optimized for
+performance.
 
-Please pull.
+This patch is untested, and it would be worthwhile to check
+if there is any performance impact, especially in case the readsl
+version is actually faster.
 
-thx,
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: David Woodhouse <dwmw2@infradead.org>
+Cc: Brian Norris <computersforpeace@gmail.com>
+Cc: Jingoo Han <jg1.han@samsung.com>
+Cc: linux-mtd at lists.infradead.org
+---
+ drivers/mtd/nand/orion_nand.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-Jason.
-
-
-The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
-
-  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/clk-mvebu-3.16
-
-for you to fetch changes up to 66ecbfea762ad28bd108db76775483b491068b92:
-
-  clk: mvebu: add Orion5x clock driver (2014-04-26 01:03:55 +0000)
-
-----------------------------------------------------------------
-clk mvebu changes for v3.16
-
- - orion5x: brand new driver
-
-----------------------------------------------------------------
-Thomas Petazzoni (1):
-      clk: mvebu: add Orion5x clock driver
-
- .../devicetree/bindings/clock/mvebu-core-clock.txt |   8 +
- drivers/clk/mvebu/Kconfig                          |   4 +
- drivers/clk/mvebu/Makefile                         |   1 +
- drivers/clk/mvebu/orion.c                          | 210 +++++++++++++++++++++
- 4 files changed, 223 insertions(+)
- create mode 100644 drivers/clk/mvebu/orion.c
+diff --git a/drivers/mtd/nand/orion_nand.c b/drivers/mtd/nand/orion_nand.c
+index dd7fe81..c7b5e8a 100644
+--- a/drivers/mtd/nand/orion_nand.c
++++ b/drivers/mtd/nand/orion_nand.c
+@@ -56,6 +56,7 @@ static void orion_nand_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
+ 		*buf++ = readb(io_base);
+ 		len--;
+ 	}
++#if __LINUX_ARM_ARCH__ >= 5
+ 	buf64 = (uint64_t *)buf;
+ 	while (i < len/8) {
+ 		/*
+@@ -68,6 +69,10 @@ static void orion_nand_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
+ 		asm volatile ("ldrd\t%0, [%1]" : "=&r" (x) : "r" (io_base));
+ 		buf64[i++] = x;
+ 	}
++#else
++	readsl(io_base, buf, len/8);
++	i = len / 8 * 8;
++#endif
+ 	i *= 8;
+ 	while (i < len)
+ 		buf[i++] = readb(io_base);
+-- 
+1.8.3.2
