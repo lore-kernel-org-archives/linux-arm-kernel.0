@@ -1,41 +1,92 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 8 May 2014 15:02:04 +0800
-Subject: [PATCH] ARM: imx: add HDMI support for SolidRun HummingBoard and
- Cubox-i
-In-Reply-To: <20140419054134.GV2523@dragon>
-References: <E1Wb5br-0002ZE-T3@rmk-PC.arm.linux.org.uk>
- <20140419054134.GV2523@dragon>
-Message-ID: <20140508070203.GC2798@dragon>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 8 May 2014 12:36:22 +0530
+Subject: [PATCH 1/2] gpio: omap: prepare and unprepare the debounce clock
+In-Reply-To: <1398233465-8845-2-git-send-email-rnayak@ti.com>
+References: <1398233465-8845-1-git-send-email-rnayak@ti.com>
+ <1398233465-8845-2-git-send-email-rnayak@ti.com>
+Message-ID: <536B2CEE.4010809@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 19, 2014 at 01:41:35PM +0800, Shawn Guo wrote:
-> On Fri, Apr 18, 2014 at 11:01:27AM +0100, Russell King wrote:
-> > Add the HDMI DT configuration for the SolidRun HummingBoard and Cubox-i.
-> > 
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > ---
-> >  arch/arm/boot/dts/imx6dl-hummingboard.dts | 28 ++++++++++++++++++++++++++++
-> >  arch/arm/boot/dts/imx6qdl-cubox-i.dtsi    | 28 ++++++++++++++++++++++++++++
-> >  2 files changed, 56 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/imx6dl-hummingboard.dts b/arch/arm/boot/dts/imx6dl-hummingboard.dts
-> > index 5bfae54fb780..d3095f58bf7b 100644
-> > --- a/arch/arm/boot/dts/imx6dl-hummingboard.dts
-> > +++ b/arch/arm/boot/dts/imx6dl-hummingboard.dts
-> > @@ -67,6 +67,14 @@
-> >  	status = "okay";
-> >  };
-> >  
-> > +&hdmi {
-> > +	pinctrl-names = "default";
-> > +	pinctrl-0 = <&pinctrl_hummingboard_hdmi>;
-> > +	ddc-i2c-bus = <&i2c2>;
-> > +	status = "okay";
-> > +	crtcs = <&ipu1 0>;
+On Wednesday 23 April 2014 11:41 AM, Rajendra Nayak wrote:
+> Replace the clk_enable()s with a clk_prepare_enable() and
+> the clk_disables()s with a clk_disable_unprepare()
 > 
-> The 'crtcs' should be dropped now, right?
+> This never showed issues due to the OMAP platform code (hwmod)
+> leaving these clocks in clk_prepare()ed state by default.
+> 
+> Reported-by: Kishon Vijay Abraham I <kishon@ti.com>
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> Cc: linux-gpio at vger.kernel.org
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Kevin Hilman <khilman@deeprootsystems.com>
 
-Dropped the crtcs line and applied the patch, thanks.
+Linus,
 
-Shawn
+Do you mind picking this fix up via the GPIO tree? Alternatively you could
+Ack this if you are fine and we can take both Patch 1/2 and Patch 2/2 from this
+series via the OMAP tree.
+
+Patch 2/2 has a dependency on Patch 1/2 and they need to go in in that order else
+gpio would break. More discussions are here [1].
+Let us know what you think. Thanks.
+
+regards,
+Rajendra
+
+[1] http://www.mail-archive.com/linux-gpio at vger.kernel.org/msg02801.html
+
+> ---
+>  drivers/gpio/gpio-omap.c |   10 +++++-----
+>  1 file changed, 5 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+> index 19b886c..78bc5a4 100644
+> --- a/drivers/gpio/gpio-omap.c
+> +++ b/drivers/gpio/gpio-omap.c
+> @@ -180,7 +180,7 @@ static inline void _gpio_rmw(void __iomem *base, u32 reg, u32 mask, bool set)
+>  static inline void _gpio_dbck_enable(struct gpio_bank *bank)
+>  {
+>  	if (bank->dbck_enable_mask && !bank->dbck_enabled) {
+> -		clk_enable(bank->dbck);
+> +		clk_prepare_enable(bank->dbck);
+>  		bank->dbck_enabled = true;
+>  
+>  		writel_relaxed(bank->dbck_enable_mask,
+> @@ -198,7 +198,7 @@ static inline void _gpio_dbck_disable(struct gpio_bank *bank)
+>  		 */
+>  		writel_relaxed(0, bank->base + bank->regs->debounce_en);
+>  
+> -		clk_disable(bank->dbck);
+> +		clk_disable_unprepare(bank->dbck);
+>  		bank->dbck_enabled = false;
+>  	}
+>  }
+> @@ -231,7 +231,7 @@ static void _set_gpio_debounce(struct gpio_bank *bank, unsigned gpio,
+>  
+>  	l = GPIO_BIT(bank, gpio);
+>  
+> -	clk_enable(bank->dbck);
+> +	clk_prepare_enable(bank->dbck);
+>  	reg = bank->base + bank->regs->debounce;
+>  	writel_relaxed(debounce, reg);
+>  
+> @@ -245,7 +245,7 @@ static void _set_gpio_debounce(struct gpio_bank *bank, unsigned gpio,
+>  	bank->dbck_enable_mask = val;
+>  
+>  	writel_relaxed(val, reg);
+> -	clk_disable(bank->dbck);
+> +	clk_disable_unprepare(bank->dbck);
+>  	/*
+>  	 * Enable debounce clock per module.
+>  	 * This call is mandatory because in omap_gpio_request() when
+> @@ -290,7 +290,7 @@ static void _clear_gpio_debounce(struct gpio_bank *bank, unsigned gpio)
+>  		bank->context.debounce = 0;
+>  		writel_relaxed(bank->context.debounce, bank->base +
+>  			     bank->regs->debounce);
+> -		clk_disable(bank->dbck);
+> +		clk_disable_unprepare(bank->dbck);
+>  		bank->dbck_enabled = false;
+>  	}
+>  }
+> 
