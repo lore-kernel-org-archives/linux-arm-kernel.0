@@ -1,185 +1,198 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Thu, 8 May 2014 14:04:44 +0200
-Subject: [PATCH 1/2] gpio: omap: prepare and unprepare the debounce clock
-In-Reply-To: <536B660B.7080200@ti.com>
-References: <1398233465-8845-1-git-send-email-rnayak@ti.com>
- <1398233465-8845-2-git-send-email-rnayak@ti.com>
- <536B2CEE.4010809@ti.com>
- <CABxcv==5cwnk4aiZ+AVuAoMf9YnZJsfiJKRkZTYHFuP2-DmnnQ@mail.gmail.com>
- <536B660B.7080200@ti.com>
-Message-ID: <CABxcv=mOYUDKFNHT=wtS-G3dOWXve_Wy1TpxFwkBddPu4i2XXA@mail.gmail.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Thu, 8 May 2014 14:05:24 +0200
+Subject: [PATCHv3 3/3] edac: altera: Add EDAC support for Altera SDRAM
+In-Reply-To: <1399330337-16748-4-git-send-email-tthayer@altera.com>
+References: <1399330337-16748-1-git-send-email-tthayer@altera.com>
+ <1399330337-16748-4-git-send-email-tthayer@altera.com>
+Message-ID: <20140508120524.GF12548@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Rajendra,
+On Mon, May 05, 2014 at 05:52:17PM -0500, tthayer at altera.com wrote:
+> From: Thor Thayer <tthayer@altera.com>
 
-On Thu, May 8, 2014 at 1:10 PM, Rajendra Nayak <rnayak@ti.com> wrote:
-> On Thursday 08 May 2014 02:56 PM, Javier Martinez Canillas wrote:
->> Hello Rajendra,
->>
->> On Thu, May 8, 2014 at 9:06 AM, Rajendra Nayak <rnayak@ti.com> wrote:
->>> On Wednesday 23 April 2014 11:41 AM, Rajendra Nayak wrote:
->>>> Replace the clk_enable()s with a clk_prepare_enable() and
->>>> the clk_disables()s with a clk_disable_unprepare()
->>>>
->>>> This never showed issues due to the OMAP platform code (hwmod)
->>>> leaving these clocks in clk_prepare()ed state by default.
->>>>
->>>> Reported-by: Kishon Vijay Abraham I <kishon@ti.com>
->>>> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
->>>> Cc: linux-gpio at vger.kernel.org
->>>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>> Cc: Kevin Hilman <khilman@deeprootsystems.com>
->>>
->>> Linus,
->>>
->>> Do you mind picking this fix up via the GPIO tree? Alternatively you could
->>> Ack this if you are fine and we can take both Patch 1/2 and Patch 2/2 from this
->>> series via the OMAP tree.
->>>
->>> Patch 2/2 has a dependency on Patch 1/2 and they need to go in in that order else
->>> gpio would break. More discussions are here [1].
->>> Let us know what you think. Thanks.
->>>
->>
->> I wonder if that is really the case. Your Patch 2/2 removes the call
->> to clk_prepare on _init_opt_clks() but it also replaces
->> clk_{enable,disable} with clk_prepare_enable()/clk_disable_unprepare()
->> on _enable_optional_clocks() and _disable_optional_clocks()
->> respectively.
->
-> Right, the difference being, by the time hwmod is done enabling/disabling
-> the opt clocks, without patch 2/2, the prepare count is 1, with patch 2/2
-> prepare count is 0.
->
+Missing commit message.
 
-Ok, got it now.
+> ---
+> v2: Use the SDRAM controller registers to calculate memory size
+>     instead of the Device Tree. Update To & Cc list. Add maintainer
+>     information.
+> 
+> v3: EDAC driver cleanup based on comments from Mailing list.
+> 
+> Signed-off-by: Thor Thayer <tthayer@altera.com>
+> ---
+>  MAINTAINERS                |    5 +
+>  drivers/edac/Kconfig       |    9 +
+>  drivers/edac/Makefile      |    2 +
+>  drivers/edac/altera_edac.c |  411 ++++++++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 427 insertions(+)
+>  create mode 100644 drivers/edac/altera_edac.c
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index e67ea24..ecd1277 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1290,6 +1290,11 @@ M:	Dinh Nguyen <dinguyen@altera.com>
+>  S:	Maintained
+>  F:	drivers/clk/socfpga/
+>  
+> +ARM/SOCFPGA SDRAM EDAC SUPPORT
+> +M:	Thor Thayer <tthayer@altera.com>
+> +S:	Maintained
+> +F:	drivers/edac/altera_edac.c
+> +
+>  ARM/STI ARCHITECTURE
+>  M:	Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
+>  M:	Maxime Coquelin <maxime.coquelin@st.com>
+> diff --git a/drivers/edac/Kconfig b/drivers/edac/Kconfig
+> index 878f090..4f4d379 100644
+> --- a/drivers/edac/Kconfig
+> +++ b/drivers/edac/Kconfig
+> @@ -368,4 +368,13 @@ config EDAC_OCTEON_PCI
+>  	  Support for error detection and correction on the
+>  	  Cavium Octeon family of SOCs.
+>  
+> +config EDAC_ALTERA_MC
+> +	bool "Altera SDRAM Memory Controller EDAC"
+> +	depends on EDAC_MM_EDAC && ARCH_SOCFPGA
+> +	help
+> +	  Support for error detection and correction on the
+> +	  Altera SDRAM memory controller. Note that the
+> +	  preloader must initialize the SDRAM before loading
+> +	  the kernel.
+> +
+>  endif # EDAC
+> diff --git a/drivers/edac/Makefile b/drivers/edac/Makefile
+> index 4154ed6..9741336 100644
+> --- a/drivers/edac/Makefile
+> +++ b/drivers/edac/Makefile
+> @@ -64,3 +64,5 @@ obj-$(CONFIG_EDAC_OCTEON_PC)		+= octeon_edac-pc.o
+>  obj-$(CONFIG_EDAC_OCTEON_L2C)		+= octeon_edac-l2c.o
+>  obj-$(CONFIG_EDAC_OCTEON_LMC)		+= octeon_edac-lmc.o
+>  obj-$(CONFIG_EDAC_OCTEON_PCI)		+= octeon_edac-pci.o
+> +
+> +obj-$(CONFIG_EDAC_ALTERA_MC)	        += altera_edac.o
+> diff --git a/drivers/edac/altera_edac.c b/drivers/edac/altera_edac.c
+> new file mode 100644
+> index 0000000..e8a3de7
+> --- /dev/null
+> +++ b/drivers/edac/altera_edac.c
+> @@ -0,0 +1,411 @@
+> +/*
+> + *  Copyright Altera Corporation (C) 2014. All rights reserved.
+> + *  Copyright 2011-2012 Calxeda, Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + * This file is subject to the terms and conditions of the GNU General Public
+> + * License.  See the file "COPYING" in the main directory of this archive
+> + * for more details.
 
->>
->> And GPIO banks are reset by hwmod on init which as far as I know
->> happen very early before the GPIO OMAP driver is even probed so by the
->> time clk_enable() is called on the GPIO driver the clock will already
->> be prepared by _enable_optional_clocks(). I tested linux-gpio/devel
->
-> and unprepared by _disable_optional_clocks()?
->
+I'm guessing your lawyers want this boilerplate after all?
 
-I see that _disable_optional_clocks() is called as well so the clock
-is left unprepared as you said.
+...
 
->> branch + only your Patch 2/2 and the GPIOs were working correctly on a
->> OMAP3 board.
->
-> Did gpio_debounce() ever get called for any of the gpios?
->
+> +static irqreturn_t altr_sdram_mc_err_handler(int irq, void *dev_id)
+> +{
+> +	struct mem_ctl_info *mci = dev_id;
+> +	struct altr_sdram_mc_data *drvdata = mci->pvt_info;
+> +	u32 status = 0, err_count = 0, err_addr = 0;
+> +
+> +	/* Error Address is shared by both SBE & DBE */
+> +	regmap_read(drvdata->mc_vbase, ERRADDR, &err_addr);
+> +
+> +	regmap_read(drvdata->mc_vbase, DRAMSTS, &status);
+> +
+> +	if (status & DRAMSTS_DBEERR) {
+> +		regmap_read(drvdata->mc_vbase, DBECOUNT, &err_count);
+> +		edac_mc_handle_error(HW_EVENT_ERR_UNCORRECTED, mci, err_count,
+> +				     err_addr >> PAGE_SHIFT,
+> +				     err_addr & ~PAGE_MASK, 0,
+> +				     0, 0, -1, mci->ctl_name, "");
 
-I don't see gpio_debounce() to be called indeed.
+So, are we setting edac_mc_panic_on_ue now or what are we planning to do
+for uncorrectable errors?
 
-omap_gpio_runtime_resume() is executed and calls
-_gpio_dbck_enable(bank) but clk_enable(bank->dbck) is not called since
-bank->dbck_enable_mask is 0, that was my confusion since I thought
-that clk_enable() was called.
+> +	if (status & DRAMSTS_SBEERR) {
+> +		regmap_read(drvdata->mc_vbase, SBECOUNT, &err_count);
+> +		edac_mc_handle_error(HW_EVENT_ERR_CORRECTED, mci, err_count,
+> +				     err_addr >> PAGE_SHIFT,
+> +				     err_addr & ~PAGE_MASK, 0,
+> +				     0, 0, -1, mci->ctl_name, "");
+> +	}
+> +
+> +	regmap_write(drvdata->mc_vbase,	DRAMINTR,
+> +		     (DRAMINTR_INTRCLR | DRAMINTR_INTREN));
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +#ifdef CONFIG_EDAC_DEBUG
+> +static ssize_t altr_sdr_mc_err_inject_write(struct file *file,
+> +					    const char __user *data,
+> +					    size_t count, loff_t *ppos)
+> +{
+> +	struct mem_ctl_info *mci = file->private_data;
+> +	struct altr_sdram_mc_data *drvdata = mci->pvt_info;
+> +	u32 *ptemp;
+> +	dma_addr_t dma_handle;
+> +	u32 reg, read_reg = 0;
+> +
+> +	ptemp = dma_alloc_coherent(mci->pdev, 16, &dma_handle, GFP_KERNEL);
+> +	if (IS_ERR(ptemp)) {
+> +		dma_free_coherent(mci->pdev, 16, ptemp, dma_handle);
+> +		edac_printk(KERN_ERR, EDAC_MC,
+> +			    "EDAC Inject: Buffer Allocation error\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	regmap_read(drvdata->mc_vbase, CTLCFG, &read_reg);
+> +	read_reg &= ~(CTLCFG_GEN_SB_ERR | CTLCFG_GEN_DB_ERR);
+> +
+> +	if (count == 3) {
+> +		edac_printk(KERN_ALERT, EDAC_MC,
+> +			    "EDAC Inject Double bit error\n");
+> +		regmap_write(drvdata->mc_vbase, CTLCFG,
+> +			     (read_reg | CTLCFG_GEN_DB_ERR));
+> +	} else {
+> +		edac_printk(KERN_ALERT, EDAC_MC,
+> +			    "EDAC Inject Single bit error\n");
+> +		regmap_write(drvdata->mc_vbase,	CTLCFG,
+> +			     (read_reg | CTLCFG_GEN_SB_ERR));
 
-Now I understand the dependency between the two patches.
+You can remove the "EDAC " string from those printks above as
+edac_printk already adds the prefix.
 
->>
->> So I think that there isn't a strict dependency between these two
->> patches or am I missing something?
->>
->> In fact now that I think about it I wonder what's the functional
->> change of your Patch 2/2 since hwmod is still calling clk_prepare()
->> before the driver. If the clocks should actually be controlled by the
->
-> I don't understand why you say 'before the driver'. Hwmod needs to control
-> optional clocks for some devices in order to do a ocp reset. So it does
-> touch these optional clocks, but if you look at the code it subsequently
-> also disables (and unprepares with patch 2/2) these clocks before returning
-> the control to the driver.
->
+> +	}
+> +
+> +	ptemp[0] = 0x5A5A5A5A;
+> +	ptemp[1] = 0xA5A5A5A5;
+> +	regmap_write(drvdata->mc_vbase,	CTLCFG, read_reg);
+> +	/* Ensure it has been written out */
+> +	wmb();
+> +
+> +	reg = ptemp[0];
+> +	read_reg = ptemp[1];
+> +	/* Force Read */
+> +	rmb();
 
-Right, it was just me getting confused by the interaction between
-hwmod and the GPIO driver. Thanks a lot for the explanation and sorry
-for the noise.
+Have you checked whether those reads don't get optimized away by the
+compiler? I know, you need them for triggering the error condition.
 
-Feel free to add my:
+Also, you should add a comment here to explain why the reads are being
+done.
 
-Acked-by: Javier Martinez Canillas <javier@dowhile0.org>
+-- 
+Regards/Gruss,
+    Boris.
 
-Best regards,
-Javier
-
->> drivers like you said then I think that we should remove
->> _{enable,disable}_optional_clocks() completely and let the drivers do
->> the clock prepare and enable like is made on your Patch 1/2 for the
->> GPIO driver.
->>
->> What do you think about it?
->>
->> Best regards,
->> Javier
->>
->>> regards,
->>> Rajendra
->>>
->>> [1] http://www.mail-archive.com/linux-gpio at vger.kernel.org/msg02801.html
->>>
->>>> ---
->>>>  drivers/gpio/gpio-omap.c |   10 +++++-----
->>>>  1 file changed, 5 insertions(+), 5 deletions(-)
->>>>
->>>> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
->>>> index 19b886c..78bc5a4 100644
->>>> --- a/drivers/gpio/gpio-omap.c
->>>> +++ b/drivers/gpio/gpio-omap.c
->>>> @@ -180,7 +180,7 @@ static inline void _gpio_rmw(void __iomem *base, u32 reg, u32 mask, bool set)
->>>>  static inline void _gpio_dbck_enable(struct gpio_bank *bank)
->>>>  {
->>>>       if (bank->dbck_enable_mask && !bank->dbck_enabled) {
->>>> -             clk_enable(bank->dbck);
->>>> +             clk_prepare_enable(bank->dbck);
->>>>               bank->dbck_enabled = true;
->>>>
->>>>               writel_relaxed(bank->dbck_enable_mask,
->>>> @@ -198,7 +198,7 @@ static inline void _gpio_dbck_disable(struct gpio_bank *bank)
->>>>                */
->>>>               writel_relaxed(0, bank->base + bank->regs->debounce_en);
->>>>
->>>> -             clk_disable(bank->dbck);
->>>> +             clk_disable_unprepare(bank->dbck);
->>>>               bank->dbck_enabled = false;
->>>>       }
->>>>  }
->>>> @@ -231,7 +231,7 @@ static void _set_gpio_debounce(struct gpio_bank *bank, unsigned gpio,
->>>>
->>>>       l = GPIO_BIT(bank, gpio);
->>>>
->>>> -     clk_enable(bank->dbck);
->>>> +     clk_prepare_enable(bank->dbck);
->>>>       reg = bank->base + bank->regs->debounce;
->>>>       writel_relaxed(debounce, reg);
->>>>
->>>> @@ -245,7 +245,7 @@ static void _set_gpio_debounce(struct gpio_bank *bank, unsigned gpio,
->>>>       bank->dbck_enable_mask = val;
->>>>
->>>>       writel_relaxed(val, reg);
->>>> -     clk_disable(bank->dbck);
->>>> +     clk_disable_unprepare(bank->dbck);
->>>>       /*
->>>>        * Enable debounce clock per module.
->>>>        * This call is mandatory because in omap_gpio_request() when
->>>> @@ -290,7 +290,7 @@ static void _clear_gpio_debounce(struct gpio_bank *bank, unsigned gpio)
->>>>               bank->context.debounce = 0;
->>>>               writel_relaxed(bank->context.debounce, bank->base +
->>>>                            bank->regs->debounce);
->>>> -             clk_disable(bank->dbck);
->>>> +             clk_disable_unprepare(bank->dbck);
->>>>               bank->dbck_enabled = false;
->>>>       }
->>>>  }
->>>>
->>>
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe linux-gpio" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+Sent from a fat crate under my desk. Formatting is fine.
+--
