@@ -1,77 +1,105 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 08 May 2014 18:37:49 +0200
-Subject: [PATCH] of: Add of_device_destroy_children() function
-Message-ID: <1399567069-3174-1-git-send-email-s.nawrocki@samsung.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 8 May 2014 09:41:00 -0700
+Subject: [PATCH] ARM: Don't ever downscale loops_per_jiffy in SMP systems
+In-Reply-To: <alpine.LFD.2.11.1405081149190.980@knanqh.ubzr>
+References: <1399504982-31181-1-git-send-email-dianders@chromium.org>
+ <CAOh2x=kwaoSdj8JO0Vo08Y0dX2UfKFiF3pBV-qtp-YTyN=8H8Q@mail.gmail.com>
+ <CAD=FV=UEGJGHrdcXgs3EZ_wFXT8GnNeCOMt7CgdiiUzBzZ5Y0A@mail.gmail.com>
+ <alpine.LFD.2.11.1405081149190.980@knanqh.ubzr>
+Message-ID: <CAD=FV=VtcLOh51LCmafzRMdqtDrwKXCqK6gE6V7OOOUe4gjwbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a helper function to unregister devices which
-were created by an of_platform_populate() call. The pattern
-used here can already be found in multiple drivers. This helper
-can now be used instead of repeating similar code in drivers.
+Nicolas,
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
----
+On Thu, May 8, 2014 at 9:04 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Thu, 8 May 2014, Doug Anderson wrote:
+>
+>> 1. Initially CPU1 and CPU2 at 200MHz.  Pretend loops_per_jiffy is 1000.
+>>
+>> 2. CPU1 starts a delay.  It reads global lpj (1000) and sets up its
+>> local registers up for the loop.
+>>
+>> 3. At the same time, CPU2 is transitioning the system to 2000MHz.
+>> Right after CPU1 reads lpj CPU2 stores it as 10000.
+>>
+>> 4. Now CPU1 and CPU2 are running at 2000MHz but CPU1 is only looping
+>> 1000 times.  It will complete too fast.
+>>
+>> ...you could possibly try to account for this in the delay loop code
+>> (being careful to handle all of the corner cases and races).  ...or we
+>> could make the delay loop super conservative and suggest that people
+>> should be using a real timer.
+>
+> I don't see how you can possibly solve this issue without a timer based
+> delay.  Even if you scale the loop count in only one direction, it will
+> still have this problem even though the window for the race would happen
+> much less often.  Yet having a delay which is way longer than expected
+> might cause problems in some cases.
 
-This patch has been tested on ARM only (on Exynos4412 Trats2 board).
+You could possibly try to do something excessively clever by checking
+the loops per jiffy after the loop was done (and perhaps register for
+cpufreq changes so you know if it changed and then changed back)?  As
+I said, I don't think it's a good use of anyone's time.
 
- drivers/of/device.c       |   24 ++++++++++++++++++++++++
- include/linux/of_device.h |    3 +++
- 2 files changed, 27 insertions(+)
+Longer delays aren't very good, but IMHO having some delays of 100 =>
+1000 is better than having delays of 100 => 75.  The former will cause
+mostly performance problems and the later will cause real correctness
+problems.
 
-diff --git a/drivers/of/device.c b/drivers/of/device.c
-index dafb973..9303197 100644
---- a/drivers/of/device.c
-+++ b/drivers/of/device.c
-@@ -190,3 +190,27 @@ int of_device_uevent_modalias(struct device *dev, struct kobj_uevent_env *env)
+I'm not saying that 100 => 1000 is good, it's just less bad.
+Specifically even in a timer-based system you can't guarantee that a
+udelay(100) won't end up a udelay(1000) if the kernel finds something
+better to do than to run your code.  I agree that there might be code
+that breaks when a udelay(100) becomes a udelay(1000), but probably
+that code needs to be fixed to be more tolerant anyway.
 
- 	return 0;
- }
-+
-+static int __remove_child_device(struct device *dev, void *unused)
-+{
-+	if (of_match_node(of_default_bus_match_table, dev->of_node))
-+		of_device_destroy_children(dev);
-+
-+	device_unregister(dev);
-+	return 0;
-+}
-+
-+/**
-+ * of_device_destroy_children - unregister @parent's child devices
-+ * @parent: the parent device to start with
-+ *
-+ * Destroy all child devices of the @parent device, any grandchildren
-+ * compatible with values listed in the of_default_bus_match_table will
-+ * also be unregistered recursively.  This function can be used to
-+ * destroy devices created by an of_platform_populate() call.
-+ */
-+void of_device_destroy_children(struct device *parent)
-+{
-+	device_for_each_child(parent, NULL, __remove_child_device);
-+}
-+EXPORT_SYMBOL(of_device_destroy_children);
-diff --git a/include/linux/of_device.h b/include/linux/of_device.h
-index ef37021..0c41e0b 100644
---- a/include/linux/of_device.h
-+++ b/include/linux/of_device.h
-@@ -32,6 +32,7 @@ extern void of_dev_put(struct platform_device *dev);
- extern int of_device_add(struct platform_device *pdev);
- extern int of_device_register(struct platform_device *ofdev);
- extern void of_device_unregister(struct platform_device *ofdev);
-+extern void of_device_destroy_children(struct device *parent);
+When you've got a udelay(100) => udelay(75) then suddenly you're
+returning from regulator code before the regulator has fully ramped up
+to its final voltage.  You're talking to peripherals faster than they
+were intended to be talked to.  ...etc.
 
- extern ssize_t of_device_get_modalias(struct device *dev,
- 					char *str, ssize_t len);
-@@ -64,6 +65,8 @@ static inline int of_driver_match_device(struct device *dev,
- static inline void of_device_uevent(struct device *dev,
- 			struct kobj_uevent_env *env) { }
 
-+static inline void of_device_destroy_children(struct device *parent) { }
-+
- static inline int of_device_get_modalias(struct device *dev,
- 				   char *str, ssize_t len)
- {
---
-1.7.9.5
+> Yet clock frequency changes with the kind of magnitude you give in your
+> example are usually not instantaneous.  Given udelay should be used for
+> very short delays, it is likely that CPU1 will complete its count before
+> the higher clock frequency is effective in most cases.
+
+In practice we found that the frequency changed fast enough in a real
+system that we were seeing real problems, at least with a udelay(50).
+If you've got a system using lpj-based udelay() that supports cpufreq,
+grab David's test patches and try for yourself.  Perhaps I was
+mistaken?
+
+
+>> How exactly do you do this in a generic way?  I know that our systems
+>> don't always boot up at full speed.  The HP Chromebook 11 might boot
+>> up at 900MHz and stay that way for a while until the battery gets
+>> enough juice.  The Samsung Chromebook 2 will boot up at 1.8GHz
+>> although some of them can go to 1.9GHz and others to 2.0GHz.  Waiting
+>> to actually see the cpufreq transition is a safe way, though it does
+>> end up with some extra function calls.
+>
+> The Samsung Chromebook uses an A15 which does use a timer based udelay.
+> What about the others?  IOW is this a real problem in practice or a
+> theoretical one?
+
+Correct, the Samsung Chromebook uses a timer-based udelay upstream (it
+still doesn't in our tree BTW, but we're working to rectify that).
+...that's why I didn't send the patch up initially.  I sent it up at
+the request of John Stultz in a discussion about David's test code.
+
+
+> SMP with shared clock for DVFS simply doesn't allow pure loop counts to
+> always be accurate.  Trying to fix a broken implementation with
+> something that is still broken to some extent, and maybe more in
+> some cases, doesn't look like much progress to me.
+
+I totally agree that this doesn't really fix the problem nicely which
+is why I didn't send it initially.
+
+I will make the argument that this patch makes things less broken
+overall on any systems that actually end up running this code, but if
+you want NAK it then it won't cause me any heartache.  ;)
+
+-Doug
