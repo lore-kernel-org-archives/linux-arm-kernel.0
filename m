@@ -1,67 +1,78 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Thu, 08 May 2014 10:28:41 -0500
-Subject: socfpga/sockit ethernet problems
-In-Reply-To: <20140507104518.GB18139@amd.pavel.ucw.cz>
-References: <20140507104518.GB18139@amd.pavel.ucw.cz>
-Message-ID: <536BA2A9.2080908@gmail.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Thu, 8 May 2014 11:30:13 -0400
+Subject: [PATCH] mpilib: use 'static inline' for mpi-inline.h
+In-Reply-To: <1399560990-1402858-9-git-send-email-arnd@arndb.de>
+References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
+ <1399560990-1402858-1-git-send-email-arnd@arndb.de>
+ <1399560990-1402858-9-git-send-email-arnd@arndb.de>
+Message-ID: <20140508113013.74b2eb9d@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu,  8 May 2014 16:56:20 +0200
+Arnd Bergmann <arnd@arndb.de> wrote:
 
+> Four functions of mpilib are defined as 'extern inline' at the
+> moment, which is generally not the correct way to do inline functions
+> using gcc.
 
-On 05/07/2014 05:45 AM, Pavel Machek wrote:
-> Hi!
->
-> It seems we have some problems with Ethernet on socfpga boards.
->
-> Like, "stmmac: Energy-Efficient Ethernet initialized" repeated way too
-> often. Or machine failing to boot because NFS server can not be
+I think clang would appreciate this too.
 
-There's a patch that already mainlined that fixes this:
+-- Steve
 
-83bf79b6bb stmmac: disable at run-time the EEE if not supported
-
-
-> accessed. (And then working on next try). Or link going up and down
-> and up and down. Or link taking 3 seconds, 10 seconds to estabilish.
->
-> It also seems to be picky about hubs it wants to talk to.
->
-> This time it mounted root; on last boot it just hung.
->
-> Mounts root 31.394855 Waiting 5 sec before mounting root device...
-> Mounts root 33.331379 stmmaceth ff702000.ethernet eth0: Link is Up -
-> 100Mbps/Full - flow control rx/tx
-> Mounts root 36.418308 VFS: Mounted root (nfs filesystem) on device
-> 0:12.
-> ### Milestone reached:  Mounts root
-> Userland boots 51.455751 nfs: server 192.168.1.1 not responding, still
-> trying
-> Userland boots 52.552075 nfs: server 192.168.1.1 OK
-> Userland boots 52.555110 devtmpfs: mounted
-> Userland boots 52.566032 Freeing unused kernel memory: 264K (80597000
-> - 805d9000)
-> Userland boots 61.395175 nfs: server 192.168.1.1 not responding, still
-> trying
-> Userland boots 61.401301 nfs: server 192.168.1.1 OK
->
-> U-boot seems to configure phy timing:
->
-> u-boot talk 12.033741 Configuring PHY skew timing for Micrel ksz9021
->
-> is there something similar that needs to be done at Linux layer.
-
-I haven't tested in the sockit, but I have been testing on the devkit, 
-and I am able to NFS mount just fine everytime.
-
-I have a branch at:
-
-git://git.rocketboards.org/linux-socfpga-next.git  for-next
-
-that you can test.
-
-Dinh
->
-> Any ideas? Thanks,
-> 									Pavel
->
+> 
+> While this is usually harmless, it shows up as a warning in combination
+> with the CONFIG_PROFILE_ALL_BRANCHES, resulting in very many lines
+> like:
+> 
+> /git/arm-soc/lib/mpi/mpi-inline.h:70:182: warning: '______f' is static but declared in inline function 'mpihelp_add' which is not static [enabled by default]
+> 
+> Using static inline makes the code behave as expected and gets
+> rid of the warning
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Steven Rostedt <rostedt@goodmis.org>
+> Cc: Dmitry Kasatkin <dmitry.kasatkin@intel.com>
+> ---
+>  lib/mpi/mpi-inline.h   | 2 +-
+>  lib/mpi/mpi-internal.h | 8 --------
+>  2 files changed, 1 insertion(+), 9 deletions(-)
+> 
+> diff --git a/lib/mpi/mpi-inline.h b/lib/mpi/mpi-inline.h
+> index e2b3985..c245ea3 100644
+> --- a/lib/mpi/mpi-inline.h
+> +++ b/lib/mpi/mpi-inline.h
+> @@ -30,7 +30,7 @@
+>  #define G10_MPI_INLINE_H
+>  
+>  #ifndef G10_MPI_INLINE_DECL
+> -#define G10_MPI_INLINE_DECL  extern inline
+> +#define G10_MPI_INLINE_DECL  static inline
+>  #endif
+>  
+>  G10_MPI_INLINE_DECL mpi_limb_t
+> diff --git a/lib/mpi/mpi-internal.h b/lib/mpi/mpi-internal.h
+> index 60cf765..54c1e97 100644
+> --- a/lib/mpi/mpi-internal.h
+> +++ b/lib/mpi/mpi-internal.h
+> @@ -168,20 +168,12 @@ void mpi_rshift_limbs(MPI a, unsigned int count);
+>  int mpi_lshift_limbs(MPI a, unsigned int count);
+>  
+>  /*-- mpihelp-add.c --*/
+> -mpi_limb_t mpihelp_add_1(mpi_ptr_t res_ptr, mpi_ptr_t s1_ptr,
+> -			 mpi_size_t s1_size, mpi_limb_t s2_limb);
+>  mpi_limb_t mpihelp_add_n(mpi_ptr_t res_ptr, mpi_ptr_t s1_ptr,
+>  			 mpi_ptr_t s2_ptr, mpi_size_t size);
+> -mpi_limb_t mpihelp_add(mpi_ptr_t res_ptr, mpi_ptr_t s1_ptr, mpi_size_t s1_size,
+> -		       mpi_ptr_t s2_ptr, mpi_size_t s2_size);
+>  
+>  /*-- mpihelp-sub.c --*/
+> -mpi_limb_t mpihelp_sub_1(mpi_ptr_t res_ptr, mpi_ptr_t s1_ptr,
+> -			 mpi_size_t s1_size, mpi_limb_t s2_limb);
+>  mpi_limb_t mpihelp_sub_n(mpi_ptr_t res_ptr, mpi_ptr_t s1_ptr,
+>  			 mpi_ptr_t s2_ptr, mpi_size_t size);
+> -mpi_limb_t mpihelp_sub(mpi_ptr_t res_ptr, mpi_ptr_t s1_ptr, mpi_size_t s1_size,
+> -		       mpi_ptr_t s2_ptr, mpi_size_t s2_size);
+>  
+>  /*-- mpihelp-cmp.c --*/
+>  int mpihelp_cmp(mpi_ptr_t op1_ptr, mpi_ptr_t op2_ptr, mpi_size_t size);
