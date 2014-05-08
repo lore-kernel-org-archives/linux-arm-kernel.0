@@ -1,90 +1,118 @@
-From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Thu, 08 May 2014 16:07:58 +0530
-Subject: [PATCH v2 3/4] ARM: dts: enable hdmi for exynos5420 based peach-pit
- board
-In-Reply-To: <1399545479-20086-1-git-send-email-rahul.sharma@samsung.com>
-References: <1399545479-20086-1-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <1399545479-20086-4-git-send-email-rahul.sharma@samsung.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 8 May 2014 16:11:00 +0530
+Subject: [PATCH] ARM: Don't ever downscale loops_per_jiffy in SMP systems
+In-Reply-To: <1399504982-31181-1-git-send-email-dianders@chromium.org>
+References: <1399504982-31181-1-git-send-email-dianders@chromium.org>
+Message-ID: <CAOh2x=kwaoSdj8JO0Vo08Y0dX2UfKFiF3pBV-qtp-YTyN=8H8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rahul Sharma <Rahul.Sharma@samsung.com>
+Fixing Rafael's id.
 
-Enable hdmi for exynos5420 based peach-pit board.
+On Thu, May 8, 2014 at 4:53 AM, Doug Anderson <dianders@chromium.org> wrote:
+> Downscaling loops_per_jiffy on SMP ARM systems really doesn't work.
+> You could really only do this if:
+>
+> * Each CPU is has independent frequency changes (changing one CPU
+>   doesn't affect another).
+> * We change the generic ARM udelay() code to actually look at percpu
+>   loops_per_jiffy.
 
-Signed-off-by: Rahul Sharma <Rahul.Sharma@samsung.com>
----
- arch/arm/boot/dts/exynos5420-peach-pit.dts |   19 +++++++++++++++++++
- arch/arm/boot/dts/exynos5420-pinctrl.dtsi  |    7 +++++++
- arch/arm/boot/dts/exynos5420.dtsi          |    5 +++++
- 3 files changed, 31 insertions(+)
+There is one more case I believe:
+All CPUs share a single clock line and generic udelay() uses global
+loops_per_jiffy, as it would never happen that some other CPU is running
+faster and udelay would complete early
 
-diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-index fae33dd..8248255 100644
---- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-+++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-@@ -137,6 +137,25 @@
- 	};
- };
- 
-+&i2c_2	{
-+	status = "okay";
-+	samsung,i2c-sda-delay = <100>;
-+	samsung,i2c-max-bus-freq = <66000>;
-+	samsung,i2c-slave-addr = <0x50>;
-+
-+	hdmiddc at 50 {
-+		reg = <0x50>;
-+	};
-+};
-+
-+&hdmi {
-+	status = "okay";
-+	hpd-gpio = <&gpx3 7 2>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&hdmi_hpd_irq>;
-+	ddc = <&i2c_2>;
-+};
-+
- /*
-  * Use longest HW watchdog in SoC (32 seconds) since the hardware
-  * watchdog provides no debugging information (compared to soft/hard
-diff --git a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-index ba686e4..fc17797 100644
---- a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-@@ -66,6 +66,13 @@
- 			samsung,pin-pud = <0>;
- 			samsung,pin-drv = <0>;
- 		};
-+
-+		hdmi_hpd_irq: hdmi-hpd-irq {
-+			samsung,pins = "gpx3-7";
-+			samsung,pin-function = <0>;
-+			samsung,pin-pud = <1>;
-+			samsung,pin-drv = <0>;
-+		};
- 	};
- 
- 	pinctrl at 13410000 {
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index f1f6a06..ae1b9c0 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -641,9 +641,14 @@
- 			 <&clock CLK_MOUT_HDMI>;
- 		clock-names = "hdmi", "sclk_hdmi", "sclk_pixel",
- 			"sclk_hdmiphy", "mout_hdmi";
-+		phy = <&hdmiphy>;
- 		status = "disabled";
- 	};
- 
-+	hdmiphy: hdmiphy at 145D0000 {
-+		reg = <0x145D0000 0x20>;
-+	};
-+
- 	mixer: mixer at 14450000 {
- 		compatible = "samsung,exynos5420-mixer";
- 		reg = <0x14450000 0x10000>;
--- 
-1.7.9.5
+> I don't know of any ARM CPUs that are totally independent that don't
+> just use a timer-based delay anyway.  For those that don't have a
+> timer-based delay, we should be conservative and overestimate
+> loops_per_jiffy.
+>
+> Note that on some systems you might sometimes see (in the extreme case
+> when we're all the way downclocked) a udelay(100) become a
+> udelay(1000) now.
+>
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+
+> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> index 7c4fada..9d944f6 100644
+> --- a/arch/arm/kernel/smp.c
+> +++ b/arch/arm/kernel/smp.c
+> @@ -649,39 +649,50 @@ int setup_profiling_timer(unsigned int multiplier)
+>
+>  #ifdef CONFIG_CPU_FREQ
+>
+> -static DEFINE_PER_CPU(unsigned long, l_p_j_ref);
+> -static DEFINE_PER_CPU(unsigned long, l_p_j_ref_freq);
+>  static unsigned long global_l_p_j_ref;
+>  static unsigned long global_l_p_j_ref_freq;
+> +static unsigned long global_l_p_j_max_freq;
+> +
+> +/**
+> + * cpufreq_callback - Adjust loops_per_jiffies when frequency changes
+> + *
+> + * When the CPU frequency changes we need to adjust loops_per_jiffies, which
+> + * we assume scales linearly with frequency.
+> + *
+> + * This function is fairly castrated and only ever adjust loops_per_jiffies
+> + * upward.  It also doesn't adjust the PER_CPU loops_per_jiffies.  Here's why:
+> + * 1. The ARM udelay only ever looks at the global loops_per_jiffy not the
+> + *    percpu one.  If your CPUs _are not_ changed in lockstep you could run
+> + *    into problems by decreasing loops_per_jiffies since one of the other
+> + *    processors might still be running slower.
+> + * 2. The ARM udelay reads the loops_per_jiffy at the beginning of its loop and
+> + *    no other times.  If your CPUs _are_ changed in lockstep you could run
+> + *    into a race where one CPU has started its loop with old (slower)
+> + *    loops_per_jiffy and then suddenly is running faster.
+> + *
+> + * Anyone who wants a good udelay() should be using a timer-based solution
+> + * anyway.  If you don't have a timer solution, you just gotta be conservative.
+> + */
+>
+>  static int cpufreq_callback(struct notifier_block *nb,
+>                                         unsigned long val, void *data)
+>  {
+>         struct cpufreq_freqs *freq = data;
+> -       int cpu = freq->cpu;
+>
+>         if (freq->flags & CPUFREQ_CONST_LOOPS)
+>                 return NOTIFY_OK;
+>
+> -       if (!per_cpu(l_p_j_ref, cpu)) {
+> -               per_cpu(l_p_j_ref, cpu) =
+> -                       per_cpu(cpu_data, cpu).loops_per_jiffy;
+> -               per_cpu(l_p_j_ref_freq, cpu) = freq->old;
+> -               if (!global_l_p_j_ref) {
+> -                       global_l_p_j_ref = loops_per_jiffy;
+> -                       global_l_p_j_ref_freq = freq->old;
+> -               }
+> +       if (!global_l_p_j_ref) {
+> +               global_l_p_j_ref = loops_per_jiffy;
+> +               global_l_p_j_ref_freq = freq->old;
+> +               global_l_p_j_max_freq = freq->old;
+>         }
+>
+> -       if ((val == CPUFREQ_PRECHANGE  && freq->old < freq->new) ||
+> -           (val == CPUFREQ_POSTCHANGE && freq->old > freq->new)) {
+> +       if (freq->new > global_l_p_j_max_freq) {
+>                 loops_per_jiffy = cpufreq_scale(global_l_p_j_ref,
+>                                                 global_l_p_j_ref_freq,
+>                                                 freq->new);
+> -               per_cpu(cpu_data, cpu).loops_per_jiffy =
+> -                       cpufreq_scale(per_cpu(l_p_j_ref, cpu),
+> -                                       per_cpu(l_p_j_ref_freq, cpu),
+> -                                       freq->new);
+> +               global_l_p_j_max_freq = freq->new;
+>         }
+>         return NOTIFY_OK;
+>  }
+
+So, the end of this will happen when a CPU is set to its highest frequency
+for the first time. After that this routine will simply be noise and nothing
+more. Isn't it?
+
+And if that's the case, why don't we get rid of it completely and set
+global-loop-per-jiffy for the max freq at boot ?
+
+--
+viresh
