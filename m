@@ -1,139 +1,298 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Thu, 8 May 2014 22:14:03 +0200 (CEST)
-Subject: s_ctrl V4l2 device driver does not work
-In-Reply-To: <B43D69CB-FE7A-4168-B203-02A7934215F4@netopen.com.br>
-References: <B43D69CB-FE7A-4168-B203-02A7934215F4@netopen.com.br>
-Message-ID: <Pine.LNX.4.64.1405082211240.14834@axis700.grange>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu,  8 May 2014 22:16:51 +0200
+Subject: [PATCH RFC 2/3] clk: berlin: add driver for BG2x complex divider cells
+In-Reply-To: <1399580212-30183-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1399580212-30183-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1399580212-30183-3-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcio,
+There is some awkward ASCII-art describing the basic structure
+of the cell.
 
-Firstly, please direct all V4L related questions to the linux-media list 
-(added to CC), secondly, your problem will have much better chances to 
-attract attention if you use a current kernel, thirdly, please, specify 
-which camera host driver / which ARM platform you're dealing with.
-
-Thanks
-Guennadi
-
-On Thu, 8 May 2014, Marcio Campos de Lima wrote:
-
-> Hi
-> 
-> Can anybody tell me why the set control function is not working in Linux 3.6.9? Thanks.
-> 
-> ?? APPLICATION CALL ??
->  struct v4l2_control controle;
->     controle.id = VIDIOC_AVANCA_ZOOM;
->     controle.value = time;
->     if (-1 == xioctl(fd_camera, VIDIOC_S_CTRL,&controle))
-> 	{
-> 	printf ("%s erro\n",__FUNCTION__);
-> 	perror ("erro iotcl");
-> 	}
-> 
-> The ioctl call returns with invalid argument. It is amazing because the first time the ioctl is called it is executed ok. Then no more call is allowed and return the invalid 
-> 
-> below is the device driver  code I think may be relevant.
-> 
->   v4l2_ctrl_handler_init(&priv->ctrls, ARRAY_SIZE(ov5642_ctrls));
->     printk ("handler_init\n");
->     v4l2_ctrl_new_std(&priv->ctrls, &ov5642_ctrl_ops,V4L2_CID_ZOOM_RELATIVE, -1000, 1000, 1, 500);
->     v4l2_ctrl_new_std(&priv->ctrls, &ov5642_ctrl_ops,V4L2_CID_FLASH_STROBE, -100, 100, 1, 5);
-> 
-> 
->     priv->subdev.ctrl_handler=&priv->ctrls;
->     v4l2_i2c_subdev_init(&priv->subdev, client, &ov5642_subdev_ops);
->     return ov5642_video_probe(client);
-> 
-> static int ov5642_s_ctrl(struct v4l2_ctrl *ctrl)
-> {
-> 	struct ov5642 *ov5642 =
-> 			container_of(ctrl->handler, struct ov5642, ctrls);
-> 	struct i2c_client *client = v4l2_get_subdevdata(&ov5642->subdev);
-> 	u16 data;
-> 	int ret;
-> 	printk ("%s: id=%08x val=%d\n",__FUNCTION__, ctrl->id, ctrl->val);
-> 	switch (ctrl->id) {
-> 	case V4L2_CID_DO_WHITE_BALANCE:
-> 		ov5640_set_wb_oem(client, ctrl->val);
-> 		break;
-> 	case V4L2_CID_EXPOSURE:
-> 
-> 		break;
-> 	case V4L2_CID_GAIN:
-> 		/* Gain is controlled by 2 analog stages and a digital stage.
-> 		 * Valid values for the 3 stages are
-> 		 *
-> 		 * Stage                Min     Max     Step
-> 		 * ------------------------------------------
-> 		 * First analog stage   x1      x2      1
-> 		 * Second analog stage  x1      x4      0.125
-> 		 * Digital stage        x1      x16     0.125
-> 		 *
-> 		 * To minimize noise, the gain stages should be used in the
-> 		 * second analog stage, first analog stage, digital stage order.
-> 		 * Gain from a previous stage should be pushed to its maximum
-> 		 * value before the next stage is used.
-> 		 */
-> 		if (ctrl->val <= 32) {
-> 			data = ctrl->val;
-> 		} else if (ctrl->val <= 64) {
-> 			ctrl->val &= ~1;
-> 			data = (1 << 6) | (ctrl->val >> 1);
-> 		} else {
-> 			ctrl->val &= ~7;
-> 			data = ((ctrl->val - 64) << 5) | (1 << 6) | 32;
-> 		}
-> 		break;
-> 	case V4L2_CID_ZOOM_RELATIVE:
-> 		if (ctrl->val>0)
-> 			avanca_zoom(sysPriv.v4l2_int_device, ctrl->val);
-> 		else
-> 			recua_zoom(sysPriv.v4l2_int_device, ctrl->val);
-> 
-> 		break;
-> 	case V4L2_CID_BRIGHTNESS:
-> 		 ov5640_set_brightness(client, ctrl->val);
-> 		 break;
-> 	case V4L2_CID_CONTRAST:
-> 		ov5640_set_contrast(client, ctrl->val);
-> 		break;
-> 	case V4L2_CID_FLASH_STROBE:
-> 		ativa_flash (sysPriv.v4l2_int_device, ctrl->val);
-> 		break;
-> 	case V4L2_CID_VFLIP:
-> 
-> 	case V4L2_CID_TEST_PATTERN:
-> 
-> 
-> 
-> 	case V4L2_CID_BLC_AUTO:
-> 
-> 	case V4L2_CID_BLC_TARGET_LEVEL:
-> 
-> 	case V4L2_CID_BLC_ANALOG_OFFSET:
-> 
-> 	case V4L2_CID_BLC_DIGITAL_OFFSET:
-> 		return 1;
-> 			}
-> 
-> 	return 0;
-> }
-> 
-> static struct v4l2_ctrl_ops ov5642_ctrl_ops = {
-> 	.s_ctrl = ov5642_s_ctrl,
-> };
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Cc: Antoine Tenart <antoine.tenart@free-electrons.com>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: devicetree at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ drivers/clk/berlin/berlin2-div.c | 261 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 261 insertions(+)
+ create mode 100644 drivers/clk/berlin/berlin2-div.c
+
+diff --git a/drivers/clk/berlin/berlin2-div.c b/drivers/clk/berlin/berlin2-div.c
+new file mode 100644
+index 000000000000..ef8f7583a78f
+--- /dev/null
++++ b/drivers/clk/berlin/berlin2-div.c
+@@ -0,0 +1,261 @@
++/*
++ * Copyright (c) 2014 Marvell Technology Group Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#include <linux/bitops.h>
++#include <linux/clk-provider.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/slab.h>
++#include <linux/spinlock.h>
++
++#include "common.h"
++
++/*
++ * Clock dividers in Berlin2 SoCs comprise a complex cell to select
++ * input pll and divider. The virtual structure as it is used in Marvell
++ * BSP code can be seen as:
++ *
++ *                      +---+
++ * pll0 --------------->| 0 |                   +---+
++ *           +---+      |(B)|--+--------------->| 0 |      +---+
++ * pll1.0 -->| 0 |  +-->| 1 |  |   +--------+   |(E)|----->| 0 |   +---+
++ * pll1.1 -->| 1 |  |   +---+  +-->|(C) 1:M |-->| 1 |      |(F)|-->|(G)|->
++ * ...    -->|(A)|--+          |   +--------+   +---+  +-->| 1 |   +---+
++ * ...    -->|   |             +-->|(D) 1:3 |----------+   +---+
++ * pll1.N -->| N |                 +---------
++ *           +---+
++ *
++ * (A) input pll clock mux controlled by               <PllSelect[1:n]>
++ * (B) input pll bypass mux controlled by              <PllSwitch>
++ * (C) programmable clock divider controlled by        <Select[1:n]>
++ * (D) constant div-by-3 clock divider
++ * (E) programmable clock divider bypass controlled by <Switch>
++ * (F) constant div-by-3 clock mux controlled by       <D3Switch>
++ * (G) clock gate controlled by                        <Enable>
++ *
++ * For whatever reason, above control signals come in two flavors:
++ * - single register dividers with all bits in one register
++ * - shared register dividers with bits spread over multiple registers
++ *   (including signals for the same cell spread over consecutive registers)
++ *
++ * Also, clock gate and pll mux is not available on every div cell, so
++ * we have to deal with those, too.
++ */
++
++#define PLL_SELECT_MASK	0x7
++#define DIV_SELECT_MASK	0x7
++
++struct berlin2_div {
++	struct clk_hw hw;
++	void __iomem *base;
++	struct berlin2_div_map map;
++	spinlock_t *lock;
++};
++
++#define to_berlin2_div(hw) container_of(hw, struct berlin2_div, hw)
++
++static u8 clk_div[] = { 1, 2, 4, 6, 8, 12, 1, 1 };
++
++static int berlin2_div_is_enabled(struct clk_hw *hw)
++{
++	struct berlin2_div *div = to_berlin2_div(hw);
++	struct berlin2_div_map *map = &div->map;
++	u32 reg;
++
++	spin_lock(div->lock);
++
++	reg = readl_relaxed(div->base + map->gate_offs);
++	reg >>= map->gate_shift;
++
++	spin_unlock(div->lock);
++
++	return (reg & 0x1);
++}
++
++static int berlin2_div_enable(struct clk_hw *hw)
++{
++	struct berlin2_div *div = to_berlin2_div(hw);
++	struct berlin2_div_map *map = &div->map;
++	u32 reg;
++
++	spin_lock(div->lock);
++
++	reg = readl_relaxed(div->base + map->gate_offs);
++	reg |= BIT(map->gate_shift);
++	writel_relaxed(reg, div->base + map->gate_offs);
++
++	spin_unlock(div->lock);
++
++	return 0;
++}
++
++static void berlin2_div_disable(struct clk_hw *hw)
++{
++	struct berlin2_div *div = to_berlin2_div(hw);
++	struct berlin2_div_map *map = &div->map;
++	u32 reg;
++
++	spin_lock(div->lock);
++
++	reg = readl_relaxed(div->base + map->gate_offs);
++	reg &= ~BIT(map->gate_shift);
++	writel_relaxed(reg, div->base + map->gate_offs);
++
++	spin_unlock(div->lock);
++}
++
++static int berlin2_div_set_parent(struct clk_hw *hw, u8 index)
++{
++	struct berlin2_div *div = to_berlin2_div(hw);
++	struct berlin2_div_map *map = &div->map;
++	u32 reg;
++
++	spin_lock(div->lock);
++
++	/* index == 0 is PLL_SWITCH */
++	reg = readl_relaxed(div->base + map->pll_switch_offs);
++	if (index == 0)
++		reg &= ~BIT(map->pll_switch_shift);
++	else
++		reg |= BIT(map->pll_switch_shift);
++	writel_relaxed(reg, div->base + map->pll_switch_offs);
++
++	/* index > 0 is PLL_SELECT */
++	if (index > 0) {
++		reg = readl_relaxed(div->base + map->pll_select_offs);
++		reg &= ~(PLL_SELECT_MASK << map->pll_select_shift);
++		reg |= (index - 1) << map->pll_select_shift;
++		writel_relaxed(reg, div->base + map->pll_select_offs);
++	}
++
++	spin_unlock(div->lock);
++
++	return 0;
++}
++
++static u8 berlin2_div_get_parent(struct clk_hw *hw)
++{
++	struct berlin2_div *div = to_berlin2_div(hw);
++	struct berlin2_div_map *map = &div->map;
++	u32 reg;
++	u8 index = 0;
++
++	spin_lock(div->lock);
++
++	/* PLL_SWITCH == 0 is index 0 */
++	reg = readl_relaxed(div->base + map->pll_switch_offs);
++	reg &= BIT(map->pll_switch_shift);
++	if (reg) {
++		reg = readl_relaxed(div->base + map->pll_select_offs);
++		reg >>= map->pll_select_shift;
++		reg &= PLL_SELECT_MASK;
++		index = 1 + reg;
++	}
++
++	spin_unlock(div->lock);
++
++	return index;
++}
++
++static unsigned long berlin2_div_recalc_rate(struct clk_hw *hw,
++					     unsigned long parent_rate)
++{
++	struct berlin2_div *div = to_berlin2_div(hw);
++	struct berlin2_div_map *map = &div->map;
++	u32 divsw, div3sw, divider = 1;
++
++	spin_lock(div->lock);
++
++	divsw = readl_relaxed(div->base + map->div_switch_offs) &
++		(1 << map->div_switch_shift);
++	div3sw = readl_relaxed(div->base + map->div3_switch_offs) &
++		(1 << map->div3_switch_shift);
++
++	/* constant divide-by-3 (dominant) */
++	if (div3sw == 1) {
++		divider = 3;
++	/* divider can be bypassed with DIV_SWITCH == 0 */
++	} else if (divsw == 0) {
++		divider = 1;
++	/* clock divider determined by DIV_SELECT */
++	} else {
++		u32 reg;
++		reg = readl_relaxed(div->base + map->div_select_offs);
++		reg >>= map->div_select_shift;
++		reg &= DIV_SELECT_MASK;
++		divider = clk_div[reg];
++	}
++
++	spin_unlock(div->lock);
++
++	return parent_rate / divider;
++}
++
++static const struct clk_ops berlin2_div_full_ops = {
++	.is_enabled	= berlin2_div_is_enabled,
++	.enable		= berlin2_div_enable,
++	.disable	= berlin2_div_disable,
++	.recalc_rate	= berlin2_div_recalc_rate,
++	.set_parent	= berlin2_div_set_parent,
++	.get_parent	= berlin2_div_get_parent,
++};
++
++static const struct clk_ops berlin2_div_no_gate_ops = {
++	.recalc_rate	= berlin2_div_recalc_rate,
++	.set_parent	= berlin2_div_set_parent,
++	.get_parent	= berlin2_div_get_parent,
++};
++
++static const struct clk_ops berlin2_div_no_pll_mux_ops = {
++	.is_enabled	= berlin2_div_is_enabled,
++	.enable		= berlin2_div_enable,
++	.disable	= berlin2_div_disable,
++	.recalc_rate	= berlin2_div_recalc_rate,
++};
++
++struct clk * __init
++berlin2_div_register(const struct berlin2_div_map *map,
++		     void __iomem *base, const char *name,
++		     const char **parent_names, int num_parents,
++		     unsigned long flags, spinlock_t *lock)
++{
++	struct clk_init_data init;
++	struct berlin2_div *div;
++
++	div = kzalloc(sizeof(*div), GFP_KERNEL);
++	if (!div)
++		return ERR_PTR(-ENOMEM);
++
++	/* copy div_map to allow __initconst */
++	memcpy(&div->map, map, sizeof(*map));
++
++	init.name = name;
++	init.parent_names = parent_names;
++	init.num_parents = num_parents;
++	init.flags = flags;
++
++	if (!map->has_gate)
++		init.ops = &berlin2_div_no_gate_ops;
++	else if (!map->has_pll_switch || !map->has_pll_select)
++		init.ops = &berlin2_div_no_pll_mux_ops;
++	else
++		init.ops = &berlin2_div_full_ops;
++
++	div->base = base;
++	div->lock = lock;
++	div->hw.init = &init;
++
++	return clk_register(NULL, &div->hw);
++}
+-- 
+1.9.1
