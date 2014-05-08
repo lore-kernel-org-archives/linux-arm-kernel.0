@@ -1,66 +1,70 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 8 May 2014 12:54:30 -0400
-Subject: [PATCH v2 0/5] ARM: mvebu: fixes and improvements for 375 support
-In-Reply-To: <1399302326-6917-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1399302326-6917-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140508165430.GI12708@titan.lakedaemon.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 8 May 2014 09:55:59 -0700
+Subject: omap4-panda-es boot issues with v3.15-rc4
+In-Reply-To: <CAGa+x84VB3CXDm71JWxHx1-Qk1xVNeXdwUjZnb42_wg+piOzzA@mail.gmail.com>
+References: <536B7E44.2040303@ti.com> <7hppjos2w2.fsf@paris.lan>
+ <CAGa+x84VB3CXDm71JWxHx1-Qk1xVNeXdwUjZnb42_wg+piOzzA@mail.gmail.com>
+Message-ID: <20140508165558.GB2198@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 05, 2014 at 05:05:21PM +0200, Thomas Petazzoni wrote:
-> Hello Jason,
+* Kevin Hilman <khilman@linaro.org> [140508 08:40]:
+> On Thu, May 8, 2014 at 8:31 AM, Kevin Hilman <khilman@linaro.org> wrote:
+> > Roger Quadros <rogerq@ti.com> writes:
+> >
+> >> Hi,
+> >>
+> >> Nishant pointed me to a booting issue with omap4-panda-es on linux-next but I'm observing
+> >> similar issues, although less frequent, with v3.15-rc4 as well.
+> >>
+> >> Configuration:
+> >>
+> >> - kernel v3.15-rc4 or linux-next (20140507)
+> >> - multi_v7_defconfig with LEDS_TRIGGER_HEARTBEAT and LEDS_GPIO enabled
+> >> - u-boot/master       173d294b94cf
+> >>
+> >> Observations:
+> >>
+> >> - Out of 10 boots a few may not succeed and hang midway without any warnings. Heartbeat LED stops.
+> >> e.g. http://www.hastebin.com/ebumojegoq.vhdl
+> >>
+> >> - Hang more noticeable on linux-next (20140507) than on v3.15-rc4
+> >
+> > I've beeen noticing the same thing for awhile with my boot tests.  For
+> > me, next-20140508 is failing most of the time now.
+> >
+> >> - Hang more noticeable with USB_EHCI_HCD enabled but hang observed even without USB_EHCI_HCD.
+> >> Maybe related to when high speed interrupts occur in the boot process.
+> >>
+> >> - On successful boots following warning is seen
+> >> [    4.010375] gic_timer_retrigger: lost localtimer interrupt
+> >>
+> >> - On successful boots heartbeat LED stops blinking after boot process and left idle. LED can remain stuck in
+> >> ON state as well. It does blink again when doing activity on console.
+> >>
+> >> Workaround:
+> >>
+> >> - Disabling CPU_IDLE or even just disabling C3 (MPU OSWR) seems to fix all the above issues.
+> >>
+> >> I don't really know what exactly is the issue but it seems to be specific to OMAP4, GIC, MPU OSWR.
+> >
+> > I can confirm that disabling CONFIG_CPU_IDLE seems to make the problem
+> > go away.  Hmm....
 > 
-> Here are five patches making fixes and improvements to the Armada 375
-> support. They are related to the fact that we now have access to
-> Armada 375 A0 boards (however, Ezequiel still only has access to a Z1
-> platform, so we would like to keep Z1 support for now).
-> 
->  * Patch 1 is really a fix. It fixes the thermal related quirk that
->    was added by Ezequiel, to make sure it really works on A0 revision.
-> 
->  * Patch 2 to 5 make the SMP and coherency workarounds conditional on
->    the Armada 375 Z1. The condition on SMP is really mandatory to get
->    SMP working on A0. For coherency, the WA could be used on A0, but
->    it is useless and hurt performance.
-> 
-> The series is based on your mvebu/soc branch.
-> 
-> Changes since v1:
-> 
->  * Made the dev and rev variable local to the appropriate if() block
->    in PATCH 5.
-> 
->  * Re-added the "Booting CPU" message in PATCH 4, which was
->    mistakently removed in v1.
-> 
->  * Extended the git commit message of PATCH 4 to explain why we're
->    moving things from ->smp_prepare_cpus() to ->smp_boot_secondary().
-> 
->  * Added Ezequiel's Acked-by on PATCH 1.
-> 
-> Thanks,
-> 
-> Thomas
-> 
-> Thomas Petazzoni (5):
->   ARM: mvebu: fix thermal quirk SoC revision check
->   ARM: mvebu: initialize mvebu-soc-id earlier
->   ARM: mvebu: add Armada 375 A0 revision definition
->   ARM: mvebu: conditionalize Armada 375 SMP workaround
->   ARM: mvebu: conditionalize Armada 375 coherency workaround
-> 
->  arch/arm/mach-mvebu/board-v7.c     |  2 +-
->  arch/arm/mach-mvebu/coherency.c    | 10 ++++++++--
->  arch/arm/mach-mvebu/mvebu-soc-id.c |  2 +-
->  arch/arm/mach-mvebu/mvebu-soc-id.h |  1 +
->  arch/arm/mach-mvebu/platsmp-a9.c   | 20 +++++++++++---------
->  5 files changed, 22 insertions(+), 13 deletions(-)
+> Another finger pointing in the same direction: omap2plus_defconfig +
+> CONFIG_CPU_IDLE=y also fails to boot rather consistently in today's
+> -next.
 
-Whole series applied to mvebu/soc
+Booting today's next with multi_v7_defconfig (so cpuidle enabled) on
+omap4 sdp seems to boot reliably. And it's not producing these:
 
-I've not Cc'd stable for the first patch since the problem is only in
-mvebu/soc atm. :)
+gic_timer_retrigger: lost localtimer interrupt 
 
-thx,
+while panda is producing those errors like Roger mentioned.
 
-Jason.
+It seems that the USB networking is the main difference between
+omap4 sdp and panda?
+
+Regards,
+
+Tony
