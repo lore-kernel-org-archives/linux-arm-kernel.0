@@ -1,52 +1,704 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Thu, 08 May 2014 14:39:42 +0900
-Subject: [PATCH 0/5] ARM: dts: enable display for peach-pit and snow boards
-In-Reply-To: <1397994525-18537-1-git-send-email-rahul.sharma@samsung.com>
-References: <1397994525-18537-1-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <001e01cf6a7f$e9965c90$bcc315b0$%han@samsung.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 8 May 2014 13:41:13 +0800
+Subject: [RFC PATCH] ARM: dts: imx6: add new board RIoTboard
+In-Reply-To: <53695C34.5000604@gmail.com>
+References: <53695C34.5000604@gmail.com>
+Message-ID: <20140508054106.GH2794@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, April 20, 2014 8:49 PM, Rahul Sharma wrote:
+On Tue, May 06, 2014 at 11:03:32PM +0100, Iain Paton wrote:
+> add element14s RIoTboard http://www.riotboard.org which is an i.MX6Solo
+> based design targeted at makers.
 > 
-> From: Rahul Sharma <Rahul.Sharma@samsung.com>
+> Where upstream drivers exist I've enabled them, the only exception being i2c3
+> which has been sacrificed for the fec interrupt workaround. i2c3 is only 
+> currently being used for element14s LCD8000-97C lvds connected touch screen, 
+> but as no upstream driver exists for the touch controller I deem this to be
+> an acceptable compromise for now.
+> I've also left out enabling ldb due to current problems to coexist with hdmi
+> although I have tested that it can work on the board with hdmi disabled.
 > 
-> Add nodes for fimd and dp controller for exynos5250 based snow
-> and exynos5420 based peach-pit board.
-> 
-> This series is based on Kukjin Kims, for-next branch.
-> 
-> It is dependent on
-> 1) Andrew Bresticker's patch for hpd gpio addition, avilable at
-> http://www.spinics.net/lists/linux-samsung-soc/msg28827.html
-> 2) Arun's patch for adding peach-pit board dts file at
-> http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg28846.html.
+> The fec interrupt errata seems to suggest that a different gpio could be used
+> but I can't find any documentation or example dts that does so. Suggestions
+> welcome.
 
-One more thing. These patches were based against the following patches.
-
-3) Rahul Sharma's patch for hdmi support for exynos5 based dt files.
-([PATCH 0/7] ARM: dts: enable hdmi for exynos5 based peach and snow boards)
-http://www.spinics.net/lists/linux-samsung-soc/msg29011.html
-
-Please check the dependency.
-Anyone does not want to waste the time, due to patch breakage.
-
-Best regards,
-Jingoo Han
+Take a look at commit 6261c4c (ARM: dts: imx6qdl-sabrelite: use GPIO_6
+for FEC interrupt.).  It seems you already has it for your board.
 
 > 
-> Rahul Sharma (5):
->   ARM: dts: move dp hpd line to the board file for exynos5420
->   ARM: dts: enable fimd for exynos5250 based snow board
->   ARM: dts: enable dp-controller for exynos5250 based snow board
->   ARM: dts: enable fimd for exynos5420 based peach-pit board
->   ARM: dts: enable dp-controller for exynos5420 based peach-pit board
 > 
->  arch/arm/boot/dts/exynos5250-snow.dts      |   32 +++++++++++++++++++++++
->  arch/arm/boot/dts/exynos5420-peach-pit.dts |   39 ++++++++++++++++++++++++++++
->  arch/arm/boot/dts/exynos5420-pinctrl.dtsi  |    7 -----
->  arch/arm/boot/dts/exynos5420-smdk5420.dts  |    7 +++++
->  4 files changed, 78 insertions(+), 7 deletions(-)
+> ---
+>  arch/arm/boot/dts/Makefile               |   1 +
+>  arch/arm/boot/dts/imx6s-riotboard.dts    |  23 ++
+>  arch/arm/boot/dts/imx6sdl-riotboard.dtsi | 588 +++++++++++++++++++++++++++++++
+
+We do not use imx6s as a SoC name in the kernel tree.  It's just an
+imx6dl with the second CPU core fused out.  So please name the file
+imx6dl-riotboard.dts.
+
+Also, I'm not sure why you need an additional level with that .dtsi
+file, if it will only be soldered with imx6dl.  We have that .dtsi for
+boards like sabresd, because the board support both imx6q and imx6dl.
+
+>  3 files changed, 612 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx6s-riotboard.dts
+>  create mode 100644 arch/arm/boot/dts/imx6sdl-riotboard.dtsi
 > 
-> --
-> 1.7.9.5
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 377b7c3..fa955af 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -202,6 +202,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
+>  	imx6q-sbc6x.dtb \
+>  	imx6q-udoo.dtb \
+>  	imx6q-wandboard.dtb \
+> +	imx6s-riotboard.dtb \
+>  	imx6sl-evk.dtb \
+>  	vf610-cosmic.dtb \
+>  	vf610-twr.dtb
+> diff --git a/arch/arm/boot/dts/imx6s-riotboard.dts b/arch/arm/boot/dts/imx6s-riotboard.dts
+> new file mode 100644
+> index 0000000..ed1c9e4
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx6s-riotboard.dts
+> @@ -0,0 +1,23 @@
+> +/*
+> + * Copyright 2014 Iain Paton <ipaton0@gmail.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + */
+> +
+> +/dts-v1/;
+> +#include "imx6dl.dtsi"
+> +#include "imx6sdl-riotboard.dtsi"
+> +
+> +/ {
+> +	model = "RIoTboard i.MX6S";
+> +	compatible = "riot,imx6s-riotboard", "fsl,imx6dl";
+> +
+> +	memory {
+> +		reg = <0x10000000 0x40000000>;
+> +	};
+> +
+> +};
+> +
+> diff --git a/arch/arm/boot/dts/imx6sdl-riotboard.dtsi b/arch/arm/boot/dts/imx6sdl-riotboard.dtsi
+> new file mode 100644
+> index 0000000..b7bf58c
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx6sdl-riotboard.dtsi
+> @@ -0,0 +1,588 @@
+> +/*
+> + * Copyright 2014 Iain Paton <ipaton0@gmail.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + */
+> +#include <dt-bindings/gpio/gpio.h>
+> +
+> +/ {
+> +	regulators {
+> +		compatible = "simple-bus";
+> +
+> +		reg_2p5v: 2p5v {
+
+Please follow commit 56160e3 (ARM: dts: imx6: use generic node name for
+fixed regulator) to code fixed regulators.
+
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "2P5V";
+> +			regulator-min-microvolt = <2500000>;
+> +			regulator-max-microvolt = <2500000>;
+> +			regulator-always-on;
+> +		};
+> +
+> +		reg_3p3v: 3p3v {
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "3P3V";
+> +			regulator-min-microvolt = <3300000>;
+> +			regulator-max-microvolt = <3300000>;
+> +			regulator-always-on;
+> +		};
+> +
+> +		reg_usb_otg_vbus: usb_otg_vbus {
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "usb_otg_vbus";
+> +			regulator-min-microvolt = <5000000>;
+> +			regulator-max-microvolt = <5000000>;
+> +			gpio = <&gpio3 22 0>;
+> +			enable-active-high;
+> +		};
+> +
+> +	};
+> +
+> +	leds {
+> +		compatible = "gpio-leds";
+> +
+> +		led0: user1 {
+> +			label = "user1";
+> +			gpios = <&gpio5 2 GPIO_ACTIVE_LOW>;
+> +			default-state = "on";
+> +			linux,default-trigger = "heartbeat";
+> +		};
+> +
+> +		led1: user2 {
+> +			label = "user2";
+> +			gpios = <&gpio3 28 GPIO_ACTIVE_LOW>;
+> +			default-state = "off";
+> +		};
+> +	};
+> +
+> +	sound {
+> +		compatible = "fsl,imx-audio-sgtl5000";
+> +		model = "imx6-riotboard-sgtl5000";
+> +		ssi-controller = <&ssi1>;
+> +		audio-codec = <&codec>;
+> +		audio-routing =
+> +			"MIC_IN", "Mic Jack",
+> +			"Mic Jack", "Mic Bias",
+> +			"Headphone Jack", "HP_OUT";
+> +			mux-int-port = <1>;
+> +			mux-ext-port = <3>;
+> +	};
+> +
+> +};
+> +
+> +
+> +&audmux {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_audmux>;
+> +	status = "okay";
+> +};
+> +
+> +
+> +
+> +&ecspi1 {
+> +	fsl,spi-num-chipselects = <1>;
+> +	cs-gpios = <&gpio5 17 0>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_ecspi1>;
+> +	status = "okay";
+> +
+> +	spidev at 1 {
+> +		spi-max-frequency = <24000000>;
+> +		reg = <0>;
+> +		compatible = "spidev";
+> +	};
+> +};
+> +  
+> +&ecspi2 {
+> +	fsl,spi-num-chipselects = <2>;
+> +	cs-gpios = <&gpio5 9 0>, <&gpio5 12 0>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_ecspi2>;
+> +	status = "okay";
+> +
+> +	spidev at 1 {
+> +		spi-max-frequency = <24000000>;
+> +		reg = <0>;
+> +		compatible = "spidev";
+> +	};
+> +	spidev at 2 {
+> +		spi-max-frequency = <24000000>;
+> +		reg = <1>;
+> +		compatible = "spidev";
+> +	};
+> +};
+> +  
+> +&ecspi3 {
+> +	fsl,spi-num-chipselects = <2>;
+> +	cs-gpios = <&gpio4 24 0>, <&gpio4 25 0>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_ecspi3>;
+> +	status = "okay";
+> +
+> +	spidev at 1 {
+> +		spi-max-frequency = <24000000>;
+> +		reg = <0>;
+> +		compatible = "spidev";
+> +	};
+> +	spidev at 2 {
+> +		spi-max-frequency = <24000000>;
+> +		reg = <1>;
+> +		compatible = "spidev";
+> +	};
+> +};
+> +
+> +&fec {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_enet>;
+> +	phy-mode = "rgmii";
+> +	phy-reset-gpios = <&gpio3 31 0>;
+> +	interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
+> +			      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
+> +	status = "okay";
+> +};
+> +
+> +&hdmi {
+> +	compatible = "fsl,imx6dl-hdmi";
+> +	ddc-i2c-bus = <&i2c2>;
+> +	status = "okay";
+> +};
+> +
+> +&i2c1 {
+> +	clock-frequency = <100000>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_i2c1>;
+> +	status = "okay";  
+> +
+> +	codec: sgtl5000 at 0a {
+> +		compatible = "fsl,sgtl5000";
+> +		reg = <0x0a>;
+> +		clocks = <&clks 201>;
+> +		VDDA-supply = <&reg_2p5v>;
+> +		VDDIO-supply = <&reg_3p3v>;
+> +	};
+> +
+> +	pmic: pf0100 at 08 {
+> +		compatible = "fsl,pfuze100";
+> +		reg = <0x08>;
+> +		interrupt-parent = <&gpio5>;
+> +		interrupts = <16 8>;
+> +
+> +		regulators {
+> +
+> +			reg_vddcore: sw1ab {				/* VDDARM_IN */
+> +				regulator-min-microvolt = <300000>;
+> +				regulator-max-microvolt = <1875000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			reg_vddsoc: sw1c {				/* VDDSOC_IN */
+> +				regulator-min-microvolt = <300000>;
+> +				regulator-max-microvolt = <1875000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			reg_gen_3v3: sw2 {				/* VDDHIGH_IN */
+> +				regulator-min-microvolt = <800000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			reg_ddr_1v5a: sw3a {				/* NVCC_DRAM, NVCC_RGMII */
+> +				regulator-min-microvolt = <400000>;
+> +				regulator-max-microvolt = <1975000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			reg_ddr_1v5b: sw3b {				/* NVCC_DRAM, NVCC_RGMII */
+> +				regulator-min-microvolt = <400000>;
+> +				regulator-max-microvolt = <1975000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			reg_ddr_vtt: sw4 {				/* MIPI conn */
+> +				regulator-min-microvolt = <400000>;
+> +				regulator-max-microvolt = <1975000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			reg_5v_600mA: swbst {				/* not used */
+> +				regulator-min-microvolt = <5000000>;
+> +				regulator-max-microvolt = <5150000>;
+> +			};
+> +
+> +			reg_snvs_3v: vsnvs {				/* VDD_SNVS_IN */
+> +				regulator-min-microvolt = <1500000>;
+> +				regulator-max-microvolt = <3000000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			vref_reg: vrefddr {				/* VREF_DDR */
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			reg_vgen1_1v5: vgen1 {				/* not used */
+> +				regulator-min-microvolt = <800000>;
+> +				regulator-max-microvolt = <1550000>;
+> +			};
+> +
+> +			reg_vgen2_1v2_eth: vgen2 {			/* pcie ? */
+> +				regulator-min-microvolt = <800000>;
+> +				regulator-max-microvolt = <1550000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			reg_vgen3_2v8: vgen3 {				/* not used */
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <3300000>;
+> +			};
+> +			reg_vgen4_1v8: vgen4 {				/* NVCC_SD3 */
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			reg_vgen5_2v5_sgtl: vgen5 {			/* Pwr LED & 5V0_delayed enable */
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			reg_vgen6_3v3: vgen6 {				/* #V#_DELAYED enable, MIPI */
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-always-on;
+> +			};
+> +		};
+> +	};
+> +};
+> +
+> +&i2c2 {
+> +	clock-frequency = <100000>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_i2c2>;
+> +	status = "okay";
+> +};
+> +
+> +&i2c4 {
+> +	clock-frequency = <100000>;
+> +	pinctrl-names = "default"; 
+> +	pinctrl-0 = <&pinctrl_i2c4>;
+> +	clocks = <&clks 116>;
+> +	status = "okay";
+> +};
+> +
+> +
+> +&iomuxc {
+
+Putting this iomuxc node which has a big mount of data at the bottom of
+the file can slightly make the dts file more readable. 
+
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_hog>;
+> +
+> +	imx6-embest {
+
+Why 'embest'?  It's more sensible to use 'riotboard'?
+
+> +	      pinctrl_hog: hoggrp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_EIM_A25__GPIO5_IO02		0x80000000	/* user led0 */
+> +				MX6QDL_PAD_EIM_D28__GPIO3_IO28		0x80000000	/* user led1 */
+
+These should be in a pinctrl entry for led rather than hog group.
+
+> +			>;
+> +		};
+> +
+> +		pinctrl_audmux: audmuxgrp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_CSI0_DAT7__AUD3_RXD		0x8000000
+> +				MX6QDL_PAD_CSI0_DAT4__AUD3_TXC		0x8000000
+> +				MX6QDL_PAD_CSI0_DAT5__AUD3_TXD		0x8000000
+> +				MX6QDL_PAD_CSI0_DAT6__AUD3_TXFS		0x8000000
+> +				MX6QDL_PAD_GPIO_0__CCM_CLKO1		0x130b0		/* CAM_MCLK */
+> +			>;
+> +		};
+> +
+> +		pinctrl_ecspi1: ecspi1grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_EIM_D16__ECSPI1_SCLK		0x100b1
+> +				MX6QDL_PAD_EIM_D17__ECSPI1_MISO		0x100b1
+> +				MX6QDL_PAD_EIM_D18__ECSPI1_MOSI		0x100b1
+> +				MX6QDL_PAD_DISP0_DAT23__GPIO5_IO17	0x000b1		/* CS0 */
+> +			>;
+> +		};
+> +
+> +		pinctrl_ecspi2: ecspi2grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_DISP0_DAT15__GPIO5_IO09	0x000b1		/* CS1 */
+> +				MX6QDL_PAD_DISP0_DAT16__ECSPI2_MOSI	0x100b1
+> +				MX6QDL_PAD_DISP0_DAT17__ECSPI2_MISO	0x100b1
+> +				MX6QDL_PAD_DISP0_DAT18__GPIO5_IO12	0x000b1		/* CS0 */
+> +				MX6QDL_PAD_DISP0_DAT19__ECSPI2_SCLK	0x100b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_ecspi3: ecspi3grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_DISP0_DAT0__ECSPI3_SCLK	0x100b1
+> +				MX6QDL_PAD_DISP0_DAT1__ECSPI3_MOSI	0x100b1
+> +				MX6QDL_PAD_DISP0_DAT2__ECSPI3_MISO	0x100b1
+> +				MX6QDL_PAD_DISP0_DAT3__GPIO4_IO24	0x000b1		/* CS0 */
+> +				MX6QDL_PAD_DISP0_DAT4__GPIO4_IO25	0x000b1		/* CS1 */
+> +			>;
+> +		};
+> +
+> +		pinctrl_enet: enetgrp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
+> +				MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
+> +				MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x80000000
+> +				MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x1b0b0
+> +				MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x1b0b0
+> +				MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x1b0b0
+> +				MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x1b0b0
+> +				MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x1b0b0
+> +				MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x0a0b1		/* AR8035 CLK_25M --> ENET_REF_CLK (V22) */
+> +				MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b0b0		/* AR8035 pin strapping: IO voltage: pull up */
+> +				MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x130b0		/* AR8035 pin strapping: PHYADDR#0: pull down */
+> +				MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x130b0		/* AR8035 pin strapping: PHYADDR#1: pull down */
+> +				MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b0b0		/* AR8035 pin strapping: MODE#1: pull up */
+> +				MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b0b0		/* AR8035 pin strapping: MODE#3: pull up */
+> +				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x130b0		/* AR8035 pin strapping: MODE#0: pull down */
+> +				MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0xc0000000	/* GPIO16 -> AR8035 25MHz */
+> +			        MX6QDL_PAD_EIM_D31__GPIO3_IO31		0x130b0		/* RGMII_nRST */
+> +				MX6QDL_PAD_ENET_TX_EN__GPIO1_IO28	0x80000000	/* AR8035 interrupt */
+> +				MX6QDL_PAD_GPIO_6__ENET_IRQ		0x000b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_i2c1: i2c1grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_CSI0_DAT8__I2C1_SDA		0x4001b8b1
+> +				MX6QDL_PAD_CSI0_DAT9__I2C1_SCL		0x4001b8b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_i2c2: i2c2grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_KEY_COL3__I2C2_SCL		0x4001b8b1
+> +				MX6QDL_PAD_KEY_ROW3__I2C2_SDA		0x4001b8b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_i2c3: i2c3grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_GPIO_5__I2C3_SCL		0x4001b8b1
+> +				MX6QDL_PAD_GPIO_6__I2C3_SDA		0x4001b8b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_i2c4: i2c4grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_GPIO_7__I2C4_SCL             0x4001b8b1
+> +				MX6QDL_PAD_GPIO_8__I2C4_SDA             0x4001b8b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_pwm1: pwm1grp {
+> +			fsl,pins = <   
+> +				MX6QDL_PAD_DISP0_DAT8__PWM1_OUT		0x1b0b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_pwm2: pwm2grp {
+> +			fsl,pins = <   
+> +				MX6QDL_PAD_DISP0_DAT9__PWM2_OUT		0x1b0b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_pwm3: pwm3grp {
+> +			fsl,pins = <   
+> +				MX6QDL_PAD_SD1_DAT1__PWM3_OUT		0x1b0b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_pwm4: pwm4grp {
+> +			fsl,pins = <   
+> +				MX6QDL_PAD_SD1_CMD__PWM4_OUT		0x1b0b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_uart1: uart1grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_CSI0_DAT10__UART1_TX_DATA	0x1b0b1
+> +				MX6QDL_PAD_CSI0_DAT11__UART1_RX_DATA	0x1b0b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_uart2: uart2grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_EIM_D26__UART2_TX_DATA	0x1b0b1
+> +				MX6QDL_PAD_EIM_D27__UART2_RX_DATA	0x1b0b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_uart3: uart3grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_EIM_D24__UART3_TX_DATA	0x1b0b1
+> +				MX6QDL_PAD_EIM_D25__UART3_RX_DATA	0x1b0b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_uart4: uart4grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_KEY_COL0__UART4_TX_DATA	0x1b0b1
+> +				MX6QDL_PAD_KEY_ROW0__UART4_RX_DATA	0x1b0b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_uart5: uart5grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_KEY_COL1__UART5_TX_DATA	0x1b0b1
+> +				MX6QDL_PAD_KEY_ROW1__UART5_RX_DATA	0x1b0b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_usbotg: usbotggrp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_ENET_RX_ER__USB_OTG_ID	0x17059
+> +				MX6QDL_PAD_EIM_D22__GPIO3_IO22		0x80000000	/* MX6QDL_PAD_EIM_D22__USB_OTG_PWR */
+> +				MX6QDL_PAD_EIM_D21__USB_OTG_OC		0x80000000
+> +			>;
+> +		};
+> +
+> +		pinctrl_usdhc2: usdhc2grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_SD2_CMD__SD2_CMD		0x17059
+> +				MX6QDL_PAD_SD2_CLK__SD2_CLK		0x10059
+> +				MX6QDL_PAD_SD2_DAT0__SD2_DATA0		0x17059
+> +				MX6QDL_PAD_SD2_DAT1__SD2_DATA1		0x17059
+> +				MX6QDL_PAD_SD2_DAT2__SD2_DATA2		0x17059
+> +				MX6QDL_PAD_SD2_DAT3__SD2_DATA3		0x17059
+> +				MX6QDL_PAD_GPIO_4__GPIO1_IO04		0x80000000	/* SD2 CD */
+> +				MX6QDL_PAD_GPIO_2__GPIO1_IO02		0x80000000	/* SD2 WP */
+> +			>;
+> +		};
+> +
+> +		pinctrl_usdhc3: usdhc3grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_SD3_CMD__SD3_CMD		0x17059
+> +				MX6QDL_PAD_SD3_CLK__SD3_CLK		0x10059
+> +				MX6QDL_PAD_SD3_DAT0__SD3_DATA0		0x17059
+> +				MX6QDL_PAD_SD3_DAT1__SD3_DATA1		0x17059
+> +				MX6QDL_PAD_SD3_DAT2__SD3_DATA2		0x17059
+> +				MX6QDL_PAD_SD3_DAT3__SD3_DATA3		0x17059
+> +				MX6QDL_PAD_SD3_DAT5__GPIO7_IO00		0x80000000	/* SD3 CD */
+> +				MX6QDL_PAD_SD3_DAT4__GPIO7_IO01		0x80000000	/* SD3 WP */
+> +			>;
+> +		};
+> +
+> +		pinctrl_usdhc4: usdhc4grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_SD4_CMD__SD4_CMD		0x17059
+> +				MX6QDL_PAD_SD4_CLK__SD4_CLK		0x10059
+> +				MX6QDL_PAD_SD4_DAT0__SD4_DATA0		0x17059
+> +				MX6QDL_PAD_SD4_DAT1__SD4_DATA1		0x17059
+> +				MX6QDL_PAD_SD4_DAT2__SD4_DATA2		0x17059
+> +				MX6QDL_PAD_SD4_DAT3__SD4_DATA3		0x17059
+> +				MX6QDL_PAD_NANDF_ALE__GPIO6_IO08	0x80000000	/* SD4 RST (eMMC) */
+> +			>;
+> +		};
+> +
+> +	};
+> +};
+> +
+> +
+> +
+> +&pwm1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_pwm1>;
+> +	status = "okay";
+> +};
+> +
+> +&pwm2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_pwm2>;
+> +	status = "okay";
+> +};
+> +
+> +&pwm3 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_pwm3>;
+> +	status = "okay";
+> +};
+> +
+> +&pwm4 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_pwm4>;
+> +	status = "okay";
+> +};
+> +
+> +&ssi1 {
+> +	fsl,mode = "i2s-slave";
+> +	status = "okay";
+> +};
+> +
+> +&uart1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart1>;
+> +	status = "okay";
+> +};
+> +
+> +&uart2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart2>;
+> +	status = "okay";
+> +};
+> +
+> +&uart3 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart3>;
+> +	status = "okay";
+> +};
+> +
+> +&uart4 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart4>;
+> +	status = "okay";
+> +};
+> +
+> +&uart5 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart5>;
+> +	status = "okay";
+> +};
+> +
+> +&usbh1 {
+> +	status = "okay";
+
+Add 'status' at the end of the property list.
+
+Shawn
+
+> +	dr_mode = "host";
+> +	disable-over-current;
+> +};
+> +
+> +&usbotg {
+> +	vbus-supply = <&reg_usb_otg_vbus>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usbotg>;
+> +	disable-over-current;
+> +	dr_mode = "otg";
+> +	status = "okay";
+> +};
+> +
+> +&usdhc2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usdhc2>;
+> +	cd-gpios = <&gpio1 4 0>;
+> +	wp-gpios = <&gpio1 2 0>;
+> +	vmmc-supply = <&reg_3p3v>;
+> +	status = "okay";
+> +};
+> +
+> +&usdhc3 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usdhc3>;
+> +	cd-gpios = <&gpio7 0 0>;
+> +	wp-gpios = <&gpio7 1 0>;
+> +	vmmc-supply = <&reg_3p3v>;
+> +	status = "okay";
+> +};
+> +
+> +&usdhc4 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usdhc4>;
+> +	vmmc-supply = <&reg_3p3v>;
+> +	non-removable;
+> +	status = "okay";
+> +};
+> -- 
+> 1.8.5.1
+> 
