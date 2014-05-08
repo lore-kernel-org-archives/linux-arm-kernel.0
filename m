@@ -1,58 +1,80 @@
-From: shaik.ameer@samsung.com (Shaik Ameer Basha)
-Date: Thu, 08 May 2014 16:58:04 +0530
-Subject: [PATCH v5 15/15] clk: exynos5420: add more registers to restore list
-In-Reply-To: <1399548484-20626-1-git-send-email-shaik.ameer@samsung.com>
-References: <1399548484-20626-1-git-send-email-shaik.ameer@samsung.com>
-Message-ID: <1399548484-20626-16-git-send-email-shaik.ameer@samsung.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Thu, 8 May 2014 18:17:32 +0800
+Subject: Adding esdhc4 eMMC support on mx6sabresd
+In-Reply-To: <20140508091835.78daafbe@ipc1.ka-ro>
+References: <CAOMZO5CJEoe_fGLH-Uu9uVwNdWPp940k3WGAkjzkCiGmjAPAXA@mail.gmail.com>
+ <20140508091835.78daafbe@ipc1.ka-ro>
+Message-ID: <20140508101730.GA28787@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds more register offsets to the list for
-preserving their values during S2R.
+On Thu, May 08, 2014 at 09:18:35AM +0200, Lothar Wa?mann wrote:
+> Hi,
+> 
+> Fabio Estevam wrote:
+> > Hi Dong,
+> > 
+> > I have tested the following patch to add support for the emmc port on
+> > mx6qsabresd:
+> > 
+> > --- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> > +++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> > @@ -444,6 +444,21 @@
+> >                                 MX6QDL_PAD_SD3_DAT7__SD3_DATA7          0x17059
+> >                         >;
+> >                 };
+> > +
+> > +               pinctrl_usdhc4: usdhc4grp {
+> > +                       fsl,pins = <
+> > +                               MX6QDL_PAD_SD4_CMD__SD4_CMD             0x17059
+> > +                               MX6QDL_PAD_SD4_CLK__SD4_CLK             0x10059
+> > +                               MX6QDL_PAD_SD4_DAT0__SD4_DATA0          0x17059
+> > +                               MX6QDL_PAD_SD4_DAT1__SD4_DATA1          0x17059
+> > +                               MX6QDL_PAD_SD4_DAT2__SD4_DATA2          0x17059
+> > +                               MX6QDL_PAD_SD4_DAT3__SD4_DATA3          0x17059
+> > +                               MX6QDL_PAD_SD4_DAT4__SD4_DATA4          0x17059
+> > +                               MX6QDL_PAD_SD4_DAT5__SD4_DATA5          0x17059
+> > +                               MX6QDL_PAD_SD4_DAT6__SD4_DATA6          0x17059
+> > +                               MX6QDL_PAD_SD4_DAT7__SD4_DATA7          0x17059
+> [...]
+> > 
+> > Is there any extra patch I need to apply? I am running linux-next 20140506.
+> > 
+> I'm using the pad settings 0x070b1 for our i.MX6 module with eMMC.
+> At least you should probably drop the HYS setting (0x10000), since
+> according to my experience the SD interface works much better with
+> hysteresis disabled.
+> 
 
-Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
-Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
----
- drivers/clk/samsung/clk-exynos5420.c |   12 ++++++++++++
- 1 file changed, 12 insertions(+)
+I'm not very sure about HYS bit, but it should not be pad setting issue.
+This pad setting was tested ok with FSL internal tree.
 
-diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
-index dd9e98d..4014e86 100644
---- a/drivers/clk/samsung/clk-exynos5420.c
-+++ b/drivers/clk/samsung/clk-exynos5420.c
-@@ -27,6 +27,7 @@
- #define DIV_CPU1		0x504
- #define GATE_BUS_CPU		0x700
- #define GATE_SCLK_CPU		0x800
-+#define CLKOUT_CMU_CPU		0xa00
- #define GATE_IP_G2D		0x8800
- #define CPLL_LOCK		0x10020
- #define DPLL_LOCK		0x10030
-@@ -39,7 +40,11 @@
- #define CPLL_CON0		0x10120
- #define DPLL_CON0		0x10128
- #define EPLL_CON0		0x10130
-+#define EPLL_CON1		0x10134
-+#define EPLL_CON2		0x10138
- #define RPLL_CON0		0x10140
-+#define RPLL_CON1		0x10144
-+#define RPLL_CON2		0x10148
- #define IPLL_CON0		0x10150
- #define SPLL_CON0		0x10160
- #define VPLL_CON0		0x10170
-@@ -140,6 +145,13 @@ static unsigned long exynos5420_clk_regs[] __initdata = {
- 	DIV_CPU1,
- 	GATE_BUS_CPU,
- 	GATE_SCLK_CPU,
-+	CLKOUT_CMU_CPU,
-+	EPLL_CON0,
-+	EPLL_CON1,
-+	EPLL_CON2,
-+	RPLL_CON0,
-+	RPLL_CON1,
-+	RPLL_CON2,
- 	SRC_TOP0,
- 	SRC_TOP1,
- 	SRC_TOP2,
--- 
-1.7.9.5
+I just tested an old Chris/mmc-next tree which is 3.14 rc2 with the top commit is b42b9b.
+The eMMC works well on SabreSD boards.
+But it failed and got the same issue with latest chris/mmc-next tree.
+I noticed there's no changes on sdhci-esdhc-imx.c
+Probably some other changes breaks this function.
+
+Fabio,
+You may bisect it yourself or i will do it later when i'm a bit free.
+
+Shawn,
+I remember this patch should have been upstream through your tree long time ago.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/206446.html
+It seems somehow missed.
+
+Regards
+Dong Aisheng
+
+> 
+> Lothar Wa?mann
+> -- 
+> ___________________________________________________________
+> 
+> Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+> Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+> Gesch?ftsf?hrer: Matthias Kaussen
+> Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+> 
+> www.karo-electronics.de | info at karo-electronics.de
+> ___________________________________________________________
