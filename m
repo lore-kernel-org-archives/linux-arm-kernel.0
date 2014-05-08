@@ -1,65 +1,58 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 7 May 2014 22:19:49 -0500
-Subject: [PATCH v7] DMA: sun6i: Add driver for the Allwinner A31 DMA
- controller
-In-Reply-To: <20140502163429.GA32284@intel.com>
-References: <20140430070408.GR32284@intel.com> <20140430215322.GH3000@lukather>
- <20140502163429.GA32284@intel.com>
-Message-ID: <20140508031949.GQ7047@lukather>
+From: rahul.sharma@samsung.com (Rahul Sharma)
+Date: Thu, 8 May 2014 08:54:45 +0530
+Subject: [PATCH 5/7] ARM: dts: enable hdmi for exynos5250 based snow board
+In-Reply-To: <535DF57B.5030301@linaro.org>
+References: <1397993044-14564-1-git-send-email-rahul.sharma@samsung.com>
+ <1397993044-14564-6-git-send-email-rahul.sharma@samsung.com>
+ <535DF57B.5030301@linaro.org>
+Message-ID: <CAPdUM4MX-ZmqQaEhEJYJG7tjw7uMqaBWWuFQFa0sJoHYR8pQRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 02, 2014 at 10:04:29PM +0530, Vinod Koul wrote:
-> On Wed, Apr 30, 2014 at 02:53:22PM -0700, Maxime Ripard wrote:
-> > Hi Vinod,
-> > 
-> > On Wed, Apr 30, 2014 at 12:34:08PM +0530, Vinod Koul wrote:
-> > > On Thu, Apr 24, 2014 at 04:22:44PM +0200, Maxime Ripard wrote:
-> > > > +static inline void sun6i_dma_free(struct sun6i_dma_dev *sdc)
-> > > > +{
-> > > > +	int i;
-> > > > +
-> > > > +	for (i = 0; i < NR_MAX_VCHANS; i++) {
-> > > > +		struct sun6i_vchan *vchan = &sdc->vchans[i];
-> > > > +
-> > > > +		list_del(&vchan->vc.chan.device_node);
-> > > > +		tasklet_kill(&vchan->vc.task);
-> > > > +	}
-> > > > +
-> > > > +	tasklet_kill(&sdc->task);
-> > > This is again not good. see http://lwn.net/Articles/588457/
-> > > At this point HW can still generate interrupts or you can have irq running!
-> > 
-> > I'm not sure to fully understand the issue here, but what is not good?
-> > the first or the second tasklet_kill calls, or both?
-> > 
-> > From what I understood, the issue is only there whenever you are
-> > calling tasklet_disable without making sure that no one will schedule
-> > your tasklet before disabling it.
-> > 
-> > But the point is I don't actually use either _enable/_disable. I might
-> > be wrong in not using those functions, but I don't really see how I
-> > can be impacted.
-> 
-> Well that was one part of it. How do you ensure the tasklet is not scheduled
-> while and after you are killing it. You need to ensure irq is disabled and pending irqs
-> have finished processing. I dont see that bit.
+Thanks Tushar,
 
-Ok. I'll change that.
+On 28 April 2014 12:00, Tushar Behera <tushar.behera@linaro.org> wrote:
+> On 04/20/2014 04:54 PM, Rahul Sharma wrote:
+>> From: Rahul Sharma <Rahul.Sharma@samsung.com>
+>>
+>> Enable support for HDMI for exynos5250 based Snow board.
+>>
+>> Signed-off-by: Rahul Sharma <Rahul.Sharma@samsung.com>
+>> ---
+>>  arch/arm/boot/dts/exynos5250-cros-common.dtsi |   13 ++++++++++++-
+>>  arch/arm/boot/dts/exynos5250-snow.dts         |    7 +++++++
+>>  2 files changed, 19 insertions(+), 1 deletion(-)
+>
+> [ ... ]
+>
+>> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+>> index 52ae335..586cd38 100644
+>> --- a/arch/arm/boot/dts/exynos5250-snow.dts
+>> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
+>> @@ -343,4 +343,11 @@
+>>                       pinctrl-0 = <&ptn3460_gpios>;
+>>               };
+>>       };
+>> +
+>> +     hdmi {
+>> +             hdmi-en-supply = <&tps65090_fet7>;
+>
+> Looks like tps65090_fet7 is not defined yet or might be not mentioned as
+> dependency.
+>
 
-Do you want me to use tasklet_enable and tasklet_disable as well?
+I should have mentioned one more dependency on Sachin's patches for
+snow DTS.( https://patches.linaro.org/28325/ ). Sorry for confusion.
 
-Thanks!
-Maxime
+Regards,
+Rahul Sharma.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140507/86ae662c/attachment.sig>
+>> +             vdd-supply = <&ldo8_reg>;
+>> +             vdd_osc-supply = <&ldo10_reg>;
+>> +             vdd_pll-supply = <&ldo8_reg>;
+>> +     };
+>>  };
+>>
+>
+> --
+> Tushar Behera
