@@ -1,14 +1,16 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu,  8 May 2014 22:16:51 +0200
-Subject: [PATCH RFC 2/3] clk: berlin: add driver for BG2x complex divider cells
+Date: Thu,  8 May 2014 22:16:52 +0200
+Subject: [PATCH RFC 3/3] clk: berlin: add driver for BG2x simple PLLs
 In-Reply-To: <1399580212-30183-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1399580212-30183-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1399580212-30183-3-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1399580212-30183-4-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is some awkward ASCII-art describing the basic structure
-of the cell.
+This is a clock driver for the simple PLLs found on Berlin SoCs.
+With repect to PLL registers and features, BG2/BG2CD and BG2Q are
+slightly different, e.g. different allowed VCO dividers and bit
+shifts.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
@@ -23,16 +25,16 @@ Cc: devicetree at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/clk/berlin/berlin2-div.c | 261 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 261 insertions(+)
- create mode 100644 drivers/clk/berlin/berlin2-div.c
+ drivers/clk/berlin/berlin2-pll.c | 104 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 104 insertions(+)
+ create mode 100644 drivers/clk/berlin/berlin2-pll.c
 
-diff --git a/drivers/clk/berlin/berlin2-div.c b/drivers/clk/berlin/berlin2-div.c
+diff --git a/drivers/clk/berlin/berlin2-pll.c b/drivers/clk/berlin/berlin2-pll.c
 new file mode 100644
-index 000000000000..ef8f7583a78f
+index 000000000000..aef4ddd8db10
 --- /dev/null
-+++ b/drivers/clk/berlin/berlin2-div.c
-@@ -0,0 +1,261 @@
++++ b/drivers/clk/berlin/berlin2-pll.c
+@@ -0,0 +1,104 @@
 +/*
 + * Copyright (c) 2014 Marvell Technology Group Ltd.
 + *
@@ -48,251 +50,94 @@ index 000000000000..ef8f7583a78f
 + * You should have received a copy of the GNU General Public License along with
 + * this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+#include <linux/bitops.h>
 +#include <linux/clk-provider.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
 +#include <linux/slab.h>
-+#include <linux/spinlock.h>
++#include <asm/div64.h>
 +
 +#include "common.h"
 +
-+/*
-+ * Clock dividers in Berlin2 SoCs comprise a complex cell to select
-+ * input pll and divider. The virtual structure as it is used in Marvell
-+ * BSP code can be seen as:
-+ *
-+ *                      +---+
-+ * pll0 --------------->| 0 |                   +---+
-+ *           +---+      |(B)|--+--------------->| 0 |      +---+
-+ * pll1.0 -->| 0 |  +-->| 1 |  |   +--------+   |(E)|----->| 0 |   +---+
-+ * pll1.1 -->| 1 |  |   +---+  +-->|(C) 1:M |-->| 1 |      |(F)|-->|(G)|->
-+ * ...    -->|(A)|--+          |   +--------+   +---+  +-->| 1 |   +---+
-+ * ...    -->|   |             +-->|(D) 1:3 |----------+   +---+
-+ * pll1.N -->| N |                 +---------
-+ *           +---+
-+ *
-+ * (A) input pll clock mux controlled by               <PllSelect[1:n]>
-+ * (B) input pll bypass mux controlled by              <PllSwitch>
-+ * (C) programmable clock divider controlled by        <Select[1:n]>
-+ * (D) constant div-by-3 clock divider
-+ * (E) programmable clock divider bypass controlled by <Switch>
-+ * (F) constant div-by-3 clock mux controlled by       <D3Switch>
-+ * (G) clock gate controlled by                        <Enable>
-+ *
-+ * For whatever reason, above control signals come in two flavors:
-+ * - single register dividers with all bits in one register
-+ * - shared register dividers with bits spread over multiple registers
-+ *   (including signals for the same cell spread over consecutive registers)
-+ *
-+ * Also, clock gate and pll mux is not available on every div cell, so
-+ * we have to deal with those, too.
-+ */
-+
-+#define PLL_SELECT_MASK	0x7
-+#define DIV_SELECT_MASK	0x7
-+
-+struct berlin2_div {
++struct berlin2_pll {
 +	struct clk_hw hw;
 +	void __iomem *base;
-+	struct berlin2_div_map map;
-+	spinlock_t *lock;
++	struct berlin2_pll_map map;
 +};
 +
-+#define to_berlin2_div(hw) container_of(hw, struct berlin2_div, hw)
++#define to_berlin2_pll(hw) container_of(hw, struct berlin2_pll, hw)
 +
-+static u8 clk_div[] = { 1, 2, 4, 6, 8, 12, 1, 1 };
++#define SPLL_CTRL0	0x00
++#define SPLL_CTRL1	0x04
++#define SPLL_CTRL2	0x08
++#define SPLL_CTRL3	0x0c
++#define SPLL_CTRL4	0x10
 +
-+static int berlin2_div_is_enabled(struct clk_hw *hw)
++#define FBDIV_MASK	0x1ff
++#define RFDIV_MASK	0x1f
++#define DIVSEL_MASK	0xf
++
++/*
++ * The output frequency formula for the pll is:
++ * clkout = fbdiv / refdiv * parent / vcodiv
++ */
++static unsigned long
++berlin2_pll_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
 +{
-+	struct berlin2_div *div = to_berlin2_div(hw);
-+	struct berlin2_div_map *map = &div->map;
-+	u32 reg;
++	struct berlin2_pll *pll = to_berlin2_pll(hw);
++	struct berlin2_pll_map *map = &pll->map;
++	u32 val, fbdiv, rfdiv, vcodivsel, vcodiv;
++	u64 rate = parent_rate;
 +
-+	spin_lock(div->lock);
-+
-+	reg = readl_relaxed(div->base + map->gate_offs);
-+	reg >>= map->gate_shift;
-+
-+	spin_unlock(div->lock);
-+
-+	return (reg & 0x1);
-+}
-+
-+static int berlin2_div_enable(struct clk_hw *hw)
-+{
-+	struct berlin2_div *div = to_berlin2_div(hw);
-+	struct berlin2_div_map *map = &div->map;
-+	u32 reg;
-+
-+	spin_lock(div->lock);
-+
-+	reg = readl_relaxed(div->base + map->gate_offs);
-+	reg |= BIT(map->gate_shift);
-+	writel_relaxed(reg, div->base + map->gate_offs);
-+
-+	spin_unlock(div->lock);
-+
-+	return 0;
-+}
-+
-+static void berlin2_div_disable(struct clk_hw *hw)
-+{
-+	struct berlin2_div *div = to_berlin2_div(hw);
-+	struct berlin2_div_map *map = &div->map;
-+	u32 reg;
-+
-+	spin_lock(div->lock);
-+
-+	reg = readl_relaxed(div->base + map->gate_offs);
-+	reg &= ~BIT(map->gate_shift);
-+	writel_relaxed(reg, div->base + map->gate_offs);
-+
-+	spin_unlock(div->lock);
-+}
-+
-+static int berlin2_div_set_parent(struct clk_hw *hw, u8 index)
-+{
-+	struct berlin2_div *div = to_berlin2_div(hw);
-+	struct berlin2_div_map *map = &div->map;
-+	u32 reg;
-+
-+	spin_lock(div->lock);
-+
-+	/* index == 0 is PLL_SWITCH */
-+	reg = readl_relaxed(div->base + map->pll_switch_offs);
-+	if (index == 0)
-+		reg &= ~BIT(map->pll_switch_shift);
-+	else
-+		reg |= BIT(map->pll_switch_shift);
-+	writel_relaxed(reg, div->base + map->pll_switch_offs);
-+
-+	/* index > 0 is PLL_SELECT */
-+	if (index > 0) {
-+		reg = readl_relaxed(div->base + map->pll_select_offs);
-+		reg &= ~(PLL_SELECT_MASK << map->pll_select_shift);
-+		reg |= (index - 1) << map->pll_select_shift;
-+		writel_relaxed(reg, div->base + map->pll_select_offs);
++	val = readl_relaxed(pll->base + SPLL_CTRL0);
++	fbdiv = (val >> map->fbdiv_shift) & FBDIV_MASK;
++	rfdiv = (val >> map->rfdiv_shift) & RFDIV_MASK;
++	if (rfdiv == 0) {
++		pr_warn("%s has zero rfdiv\n", __clk_get_name(hw->clk));
++		rfdiv = 1;
 +	}
 +
-+	spin_unlock(div->lock);
-+
-+	return 0;
-+}
-+
-+static u8 berlin2_div_get_parent(struct clk_hw *hw)
-+{
-+	struct berlin2_div *div = to_berlin2_div(hw);
-+	struct berlin2_div_map *map = &div->map;
-+	u32 reg;
-+	u8 index = 0;
-+
-+	spin_lock(div->lock);
-+
-+	/* PLL_SWITCH == 0 is index 0 */
-+	reg = readl_relaxed(div->base + map->pll_switch_offs);
-+	reg &= BIT(map->pll_switch_shift);
-+	if (reg) {
-+		reg = readl_relaxed(div->base + map->pll_select_offs);
-+		reg >>= map->pll_select_shift;
-+		reg &= PLL_SELECT_MASK;
-+		index = 1 + reg;
++	val = readl_relaxed(pll->base + SPLL_CTRL1);
++	vcodivsel = (val >> map->divsel_shift) & DIVSEL_MASK;
++	vcodiv = map->vcodiv[vcodivsel];
++	if (vcodiv == 0) {
++		pr_warn("%s has zero vcodiv (index %d)\n",
++			__clk_get_name(hw->clk), vcodivsel);
++		vcodiv = 1;
 +	}
 +
-+	spin_unlock(div->lock);
++	rate *= fbdiv * map->mult;
++	do_div(rate, rfdiv * vcodiv);
 +
-+	return index;
++	return (unsigned long)rate;
 +}
 +
-+static unsigned long berlin2_div_recalc_rate(struct clk_hw *hw,
-+					     unsigned long parent_rate)
-+{
-+	struct berlin2_div *div = to_berlin2_div(hw);
-+	struct berlin2_div_map *map = &div->map;
-+	u32 divsw, div3sw, divider = 1;
-+
-+	spin_lock(div->lock);
-+
-+	divsw = readl_relaxed(div->base + map->div_switch_offs) &
-+		(1 << map->div_switch_shift);
-+	div3sw = readl_relaxed(div->base + map->div3_switch_offs) &
-+		(1 << map->div3_switch_shift);
-+
-+	/* constant divide-by-3 (dominant) */
-+	if (div3sw == 1) {
-+		divider = 3;
-+	/* divider can be bypassed with DIV_SWITCH == 0 */
-+	} else if (divsw == 0) {
-+		divider = 1;
-+	/* clock divider determined by DIV_SELECT */
-+	} else {
-+		u32 reg;
-+		reg = readl_relaxed(div->base + map->div_select_offs);
-+		reg >>= map->div_select_shift;
-+		reg &= DIV_SELECT_MASK;
-+		divider = clk_div[reg];
-+	}
-+
-+	spin_unlock(div->lock);
-+
-+	return parent_rate / divider;
-+}
-+
-+static const struct clk_ops berlin2_div_full_ops = {
-+	.is_enabled	= berlin2_div_is_enabled,
-+	.enable		= berlin2_div_enable,
-+	.disable	= berlin2_div_disable,
-+	.recalc_rate	= berlin2_div_recalc_rate,
-+	.set_parent	= berlin2_div_set_parent,
-+	.get_parent	= berlin2_div_get_parent,
-+};
-+
-+static const struct clk_ops berlin2_div_no_gate_ops = {
-+	.recalc_rate	= berlin2_div_recalc_rate,
-+	.set_parent	= berlin2_div_set_parent,
-+	.get_parent	= berlin2_div_get_parent,
-+};
-+
-+static const struct clk_ops berlin2_div_no_pll_mux_ops = {
-+	.is_enabled	= berlin2_div_is_enabled,
-+	.enable		= berlin2_div_enable,
-+	.disable	= berlin2_div_disable,
-+	.recalc_rate	= berlin2_div_recalc_rate,
++static const struct clk_ops berlin2_pll_ops = {
++	.recalc_rate	= berlin2_pll_recalc_rate,
 +};
 +
 +struct clk * __init
-+berlin2_div_register(const struct berlin2_div_map *map,
++berlin2_pll_register(const struct berlin2_pll_map *map,
 +		     void __iomem *base, const char *name,
-+		     const char **parent_names, int num_parents,
-+		     unsigned long flags, spinlock_t *lock)
++		     const char *parent_name, unsigned long flags)
 +{
 +	struct clk_init_data init;
-+	struct berlin2_div *div;
++	struct berlin2_pll *pll;
 +
-+	div = kzalloc(sizeof(*div), GFP_KERNEL);
-+	if (!div)
++	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
++	if (!pll)
 +		return ERR_PTR(-ENOMEM);
 +
-+	/* copy div_map to allow __initconst */
-+	memcpy(&div->map, map, sizeof(*map));
-+
++	/* copy pll_map to allow __initconst */
++	memcpy(&pll->map, map, sizeof(*map));
++	pll->base = base;
++	pll->hw.init = &init;
 +	init.name = name;
-+	init.parent_names = parent_names;
-+	init.num_parents = num_parents;
++	init.ops = &berlin2_pll_ops;
++	init.parent_names = &parent_name;
++	init.num_parents = 1;
 +	init.flags = flags;
 +
-+	if (!map->has_gate)
-+		init.ops = &berlin2_div_no_gate_ops;
-+	else if (!map->has_pll_switch || !map->has_pll_select)
-+		init.ops = &berlin2_div_no_pll_mux_ops;
-+	else
-+		init.ops = &berlin2_div_full_ops;
-+
-+	div->base = base;
-+	div->lock = lock;
-+	div->hw.init = &init;
-+
-+	return clk_register(NULL, &div->hw);
++	return clk_register(NULL, &pll->hw);
 +}
 -- 
 1.9.1
