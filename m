@@ -1,58 +1,43 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu,  8 May 2014 16:56:15 +0200
-Subject: [PATCH 2/2] mtd: orion-nand: fix build error with ARMv4
+Date: Thu,  8 May 2014 16:56:21 +0200
+Subject: [PATCH] ata: pata_at91 only works on sam9
 In-Reply-To: <1399560990-1402858-1-git-send-email-arnd@arndb.de>
 References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
  <1399560990-1402858-1-git-send-email-arnd@arndb.de>
-Message-ID: <1399560990-1402858-4-git-send-email-arnd@arndb.de>
+Message-ID: <1399560990-1402858-10-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-orion_nand_read_buf uses an inline assembly with the "ldrd"
-instruction, which is only available from ARMv5 upwards. This
-used to be fine, since all users have an ARMv5 or ARMv7 CPU,
-but now we can also build a multiplatform kernel with ARMv4
-support enabled in addition to the "kirkwood" (mvebu) platform.
+The smc driver used by pata_at91 is at91sam9 specific, so building
+this driver on another at91 platform results in this error:
 
-This provides an alternative to call the readsl() function that
-is supposed to have the same effect and is also optimized for
-performance.
+ERROR: "sam9_smc_configure" [drivers/ata/pata_at91.ko] undefined!
+ERROR: "sam9_smc_write_mode" [drivers/ata/pata_at91.ko] undefined!
+ERROR: "sam9_smc_read_mode" [drivers/ata/pata_at91.ko] undefined!
 
-This patch is untested, and it would be worthwhile to check
-if there is any performance impact, especially in case the readsl
-version is actually faster.
+This patch changes the Kconfig dependency to ensure it always works.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: David Woodhouse <dwmw2@infradead.org>
-Cc: Brian Norris <computersforpeace@gmail.com>
-Cc: Jingoo Han <jg1.han@samsung.com>
-Cc: linux-mtd at lists.infradead.org
+Cc: Tejun Heo <tj@kernel.org>
+Cc: linux-ide at vger.kernel.org
+Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- drivers/mtd/nand/orion_nand.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/ata/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mtd/nand/orion_nand.c b/drivers/mtd/nand/orion_nand.c
-index dd7fe81..c7b5e8a 100644
---- a/drivers/mtd/nand/orion_nand.c
-+++ b/drivers/mtd/nand/orion_nand.c
-@@ -56,6 +56,7 @@ static void orion_nand_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
- 		*buf++ = readb(io_base);
- 		len--;
- 	}
-+#if __LINUX_ARM_ARCH__ >= 5
- 	buf64 = (uint64_t *)buf;
- 	while (i < len/8) {
- 		/*
-@@ -68,6 +69,10 @@ static void orion_nand_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
- 		asm volatile ("ldrd\t%0, [%1]" : "=&r" (x) : "r" (io_base));
- 		buf64[i++] = x;
- 	}
-+#else
-+	readsl(io_base, buf, len/8);
-+	i = len / 8 * 8;
-+#endif
- 	i *= 8;
- 	while (i < len)
- 		buf[i++] = readb(io_base);
+diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
+index a91bf47..7671dba 100644
+--- a/drivers/ata/Kconfig
++++ b/drivers/ata/Kconfig
+@@ -824,7 +824,7 @@ config PATA_AT32
+ 
+ config PATA_AT91
+ 	tristate "PATA support for AT91SAM9260"
+-	depends on ARM && ARCH_AT91
++	depends on ARM && SOC_AT91SAM9
+ 	help
+ 	  This option enables support for IDE devices on the Atmel AT91SAM9260 SoC.
+ 
 -- 
 1.8.3.2
