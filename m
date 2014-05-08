@@ -1,45 +1,50 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 8 May 2014 20:44:30 +0200
-Subject: [PATCH] ARM: mvebu: fix mis-merge in coherency.c
-In-Reply-To: <20140508163124.GG12708@titan.lakedaemon.net>
-References: <1399299428-30690-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1399299428-30690-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140508163124.GG12708@titan.lakedaemon.net>
-Message-ID: <20140508204430.50f4928e@free-electrons.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Thu, 08 May 2014 20:46:10 +0200
+Subject: [PATCH 2/2] phy: exynos: fix SATA phy license typo
+In-Reply-To: <1399560433-1402630-4-git-send-email-arnd@arndb.de>
+References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
+ <1399560433-1402630-4-git-send-email-arnd@arndb.de>
+Message-ID: <1399574770.4085.7.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
-
-On Thu, 8 May 2014 12:31:24 -0400, Jason Cooper wrote:
-> On Mon, May 05, 2014 at 04:17:08PM +0200, Thomas Petazzoni wrote:
-> > Commit 31dd716233e066146d651889f7b01e8da9963bd7 lead to a conflict
-> > between the "Armada 375/38x I/O coherency" patch series and the
-> > "Armada XP cpuidle" patch series. Unfortunately, the conflict was
-> > improperly resolved, and leads to incorrect code in the
-> > coherency_type() function in arch/arm/mach-mvebu/coherency.c.
-> > 
-> > This commit fixes this mis-merge by restoring the appropriate code in
-> > coherency_type().
-> > 
-> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > ---
-> >  arch/arm/mach-mvebu/coherency.c | 28 +++++++++++++---------------
-> >  1 file changed, 13 insertions(+), 15 deletions(-)
+On Thu, 2014-05-08 at 16:46 +0200, Arnd Bergmann wrote:
+> If the license string doesn't match exactly, the module refuses
+> to load.
 > 
-> I've squashed this in to mvebu/soc-cpuidle, please see:
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Kishon Vijay Abraham I <kishon@ti.com>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: linux-samsung-soc at vger.kernel.org
+> ---
+>  drivers/phy/phy-exynos5250-sata.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
->   b41375f71ace ARM: mvebu: ll_set_cpu_coherent always uses the current CPU
+> diff --git a/drivers/phy/phy-exynos5250-sata.c b/drivers/phy/phy-exynos5250-sata.c
+> index c9361b7..0568945 100644
+> --- a/drivers/phy/phy-exynos5250-sata.c
+> +++ b/drivers/phy/phy-exynos5250-sata.c
+> @@ -246,6 +246,6 @@ static struct platform_driver exynos_sata_phy_driver = {
+>  module_platform_driver(exynos_sata_phy_driver);
+>  
+>  MODULE_DESCRIPTION("Samsung SerDes PHY driver");
+> -MODULE_LICENSE("GPL V2");
+> +MODULE_LICENSE("GPL v2");
+>  MODULE_AUTHOR("Girish K S <ks.giri@samsung.com>");
+>  MODULE_AUTHOR("Yuvaraj C D <yuvaraj.cd@samsung.com>");
 
->From a quick look, looks good.
+A bit of grepping the tree showed me
+    Documentation/blackfin/gptimers-example.c:83:MODULE_LICENSE("BSD");
+    drivers/dma/dma-jz4740.c:617:MODULE_LICENSE("GPLv2");
+    drivers/input/misc/sirfsoc-onkey.c:216:MODULE_LICENSE("GPLv2");
+    drivers/pci/host/pci-mvebu.c:1042:MODULE_LICENSE("GPLv2");
+    drivers/pci/host/pci-tegra.c:1719:MODULE_LICENSE("GPLv2");
+    drivers/power/reset/restart-poweroff.c:65:MODULE_LICENSE("GPLv2");
 
-> I'll let this sit for a night in -next before I send the pull request
-> for mvebu/soc.  Which includes mvebu/soc-cpuidle now.
+It seems these need to be changed too. But, except for dma-jz4740.c,
+these are all files that can't be built as (part of) a module. Which
+explains why no one noticed. Maybe I'll submit some trivial patches, in
+a few days, to clean this up.
 
-Perfect!
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Paul Bolle
