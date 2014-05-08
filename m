@@ -1,58 +1,42 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Thu, 8 May 2014 13:41:45 +0300
-Subject: [PATCH] video: exynos: Add a dependency to the menu
-In-Reply-To: <20140408120056.57556a00@endymion.delvare>
-References: <20140408120056.57556a00@endymion.delvare>
-Message-ID: <536B5F69.9000707@ti.com>
+From: vikas.sajjan@samsung.com (Vikas Sajjan)
+Date: Thu, 08 May 2014 16:15:31 +0530
+Subject: [PATCH V3 0/3] Add PMU and S2R support for exynos5420
+Message-ID: <1399545934-29674-1-git-send-email-vikas.sajjan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/04/14 13:00, Jean Delvare wrote:
-> All drivers under menu EXYNOS_VIDEO depend on either ARCH_S5PV210 or
-> ARCH_EXYNOS, so add these as dependencies to the menu itself. This
-> avoids presenting an empty and useless menu on other architectures.
-> 
-> Then drivers under the menu only need a dependency if they depend on
-> one of the supported architectures specifically.
-> 
-> Signed-off-by: Jean Delvare <jdelvare@suse.de>
-> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> ---
->  drivers/video/exynos/Kconfig |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> --- linux-3.15-rc0.orig/drivers/video/exynos/Kconfig	2014-04-07 10:23:07.316226676 +0200
-> +++ linux-3.15-rc0/drivers/video/exynos/Kconfig	2014-04-08 11:50:17.406723187 +0200
-> @@ -4,6 +4,7 @@
->  
->  menuconfig EXYNOS_VIDEO
->  	bool "Exynos Video driver support"
-> +	depends on ARCH_S5PV210 || ARCH_EXYNOS
->  	help
->  	  This enables support for EXYNOS Video device.
->  
-> @@ -15,7 +16,6 @@ if EXYNOS_VIDEO
->  
->  config EXYNOS_MIPI_DSI
->  	bool "EXYNOS MIPI DSI driver support."
-> -	depends on ARCH_S5PV210 || ARCH_EXYNOS
->  	select GENERIC_PHY
->  	help
->  	  This enables support for MIPI-DSI device.
-> 
-> 
+Adds PMU and S2R support for exynos5420.
 
-I've applied this for 3.16.
+rebased on
+1] kgene tree for-next branch 
+https://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/log/?h=for-next
+2] and Pankaj's V3 patchset https://lkml.org/lkml/2014/5/2/612
 
- Tomi
+changes since v2:
+	- Addressed comments from Tomasz figa
+	- rebased on Pankaj's V3 patchset https://lkml.org/lkml/2014/5/2/612
+	- dropped patch "ARM: dts: Add node for GPIO keys on SMDK5420",
+	  will be sent separately.
 
+changes since v1:
+	- Addressed comments from Tomasz figa.
+	- restructured/consolidated as per Tomasz figa's PM consolidations for exynos 
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140508/99244fbd/attachment.sig>
+Tested on peach-pit board on top of shaik ameer basha's CLK v3 patchset
+http://www.spinics.net/lists/arm-kernel/msg325313.html 
+
+Vikas Sajjan (3):
+  ARM: EXYNOS5: PMU support for 5420
+  ARM: EXYNOS5: Add Suspend-to-RAM support for 5420
+  CLK: EXYNOS: Add clk save/restore registers for 5420
+
+ arch/arm/mach-exynos/common.h        |    9 +
+ arch/arm/mach-exynos/exynos.c        |    1 +
+ arch/arm/mach-exynos/pm.c            |  163 +++++++++++++++--
+ arch/arm/mach-exynos/pmu.c           |  325 ++++++++++++++++++++++++++++++++++
+ arch/arm/mach-exynos/regs-pmu.h      |  233 ++++++++++++++++++++++++
+ drivers/clk/samsung/clk-exynos5420.c |   30 ++++
+ 6 files changed, 742 insertions(+), 19 deletions(-)
+
+-- 
+1.7.9.5
