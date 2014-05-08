@@ -1,75 +1,92 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 8 May 2014 15:59:40 -0400 (EDT)
-Subject: [PATCH] ARM: Don't ever downscale loops_per_jiffy in SMP systems
-In-Reply-To: <CAD=FV=X4h0nfO7a10NXe+d76xj5ttBJx=q1pAvW4aPzrc22BoQ@mail.gmail.com>
-References: <1399504982-31181-1-git-send-email-dianders@chromium.org>
- <CAOh2x=kwaoSdj8JO0Vo08Y0dX2UfKFiF3pBV-qtp-YTyN=8H8Q@mail.gmail.com>
- <CAD=FV=UEGJGHrdcXgs3EZ_wFXT8GnNeCOMt7CgdiiUzBzZ5Y0A@mail.gmail.com>
- <alpine.LFD.2.11.1405081149190.980@knanqh.ubzr>
- <CAD=FV=VtcLOh51LCmafzRMdqtDrwKXCqK6gE6V7OOOUe4gjwbA@mail.gmail.com>
- <alpine.LFD.2.11.1405081329010.980@knanqh.ubzr>
- <CAD=FV=X4h0nfO7a10NXe+d76xj5ttBJx=q1pAvW4aPzrc22BoQ@mail.gmail.com>
-Message-ID: <alpine.LFD.2.11.1405081540460.980@knanqh.ubzr>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Thu, 08 May 2014 22:04:54 +0200
+Subject: [PATCH v2 3/7] mfd: add support for sun6i PRCM (Power/Reset/Clock
+ Management) unit
+In-Reply-To: <20140508110205.GB5767@lee--X1>
+References: <1399483554-8824-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1399483554-8824-4-git-send-email-boris.brezillon@free-electrons.com>
+ <20140508110205.GB5767@lee--X1>
+Message-ID: <536BE366.8080907@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 8 May 2014, Doug Anderson wrote:
 
-> Nicolas,
-> 
-> On Thu, May 8, 2014 at 10:43 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > On Thu, 8 May 2014, Doug Anderson wrote:
-> 
-> >> Longer delays aren't very good, but IMHO having some delays of 100 =>
-> >> 1000 is better than having delays of 100 => 75.  The former will cause
-> >> mostly performance problems and the later will cause real correctness
-> >> problems.
-> >> I'm not saying that 100 => 1000 is good, it's just less bad.
-> >
-> > There might be some cases where precise timing is needed though.
-> > I thought I came across one such case in the past but I can't remember
-> > which.
-> 
-> If precise timing is needed, shouldn't it be using ktime?
+On 08/05/2014 13:02, Lee Jones wrote:
+>> The PRCM (Power/Reset/Clock Management) block exposes several subdevices
+>> in different subsystems (clk, reset ...)
+>>
+>> Add basic support for the PRCM unit with clk (AR100, AHB0, and APB0 clks)
+>> and reset controller subdevices.
+>>
+>> Other subdevices might be added later (if needed).
+>>
+>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+>> ---
+>>  drivers/mfd/Kconfig      |   8 +++
+>>  drivers/mfd/Makefile     |   1 +
+>>  drivers/mfd/sun6i-prcm.c | 151 +++++++++++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 160 insertions(+)
+>>  create mode 100644 drivers/mfd/sun6i-prcm.c
+> [...]
+>
+>> +#include <linux/module.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/errno.h>
+>> +#include <linux/err.h>
+>> +#include <linux/spinlock.h>
+>> +#include <linux/io.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/mutex.h>
+>> +#include <linux/completion.h>
+>> +#include <linux/irq.h>
+>> +#include <linux/jiffies.h>
+>> +#include <linux/bitops.h>
+>> +#include <linux/fs.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_irq.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/uaccess.h>
+>> +#include <linux/mfd/core.h>
+> I'm pretty sure you don't need half of these.  Please only add the
+> ones you make use of.
 
-I meant "precise" in the sense that you might have to poke at some 
-hardware within some deadline e.g. set bit, wait 13us, clear bit, and 
-not exceed 15us between both bit events.  Arguably this is best hangled 
-with actual FIQs (when they're available).  But I don't have any actual 
-case of this to bring as example.
+Sure (this is what happens when you copy/paste from another driver :-))
 
-> >> I will make the argument that this patch makes things less broken
-> >> overall on any systems that actually end up running this code, but if
-> >> you want NAK it then it won't cause me any heartache.  ;)
-> >
-> > What I insist on is for this issue to be solved using a stable counter
-> > such a timer when available.  It _is_ available on one of the target you
-> > mentioned so that is the solution you should add to your tree.
-> 
-> Yup, we're working on it.
-> 
-> 
-> > Investigating a similar solution for your other target should be
-> > preferred to hacking the udelay loop. This way you're guaranteed to
-> > solve this problem fully.
-> 
-> I have no other target in mind.  I'm merely sending this up there just
-> in case there is some cpufreq running ARM board that is SMP and has no
-> timer-based udelay.  Those are the only boards that could possibly be
-> running this code anyway.
-> 
-> I guess I would say that my patch is unhacking the this code.  The
-> code after my patch is simpler.  I would perhaps argue that (ec971ea
-> ARM: add cpufreq transiton notifier to adjust loops_per_jiffy for smp)
-> should never have landed to begin with.
+>
+> [...]
+>
+>> +	dev_info(&pdev->dev, "PRCM initialized\n");
+> Please remove this from here.
 
-I would agree to qualify your patch as brokenness mitigation and that 
-might be better than nothing.  But this should probably print a warning 
-to that effect.
+Okay.
 
-Yet, wouldn't using ktime to implement udelay() a better solution in 
-that case?  Suffice to make sure a clock source with microsecs 
-resolution is available.
+>
+> [...]
+>
+>> +static struct platform_driver sun6i_prcm_driver = {
+>> +	.driver = {
+>> +		.name = "sun6i-prcm",
+>> +		.owner = THIS_MODULE,
+>> +		.of_match_table = sun6i_prcm_dt_ids,
+>> +	},
+>> +	.probe = sun6i_prcm_probe,
+> You need a .remove() call-back.
 
+This driver cannot be compiled as module (see the Kconfig definition)
+and the devices are not hotpluggable, as a result a probed device will
+never be removed.
 
-Nicolas
+Do you still want me to implement the remove function ?
+
+>
+>> +};
+>> +module_platform_driver(sun6i_prcm_driver);
+>> +
+>> +MODULE_AUTHOR("Boris BREZILLON <boris.brezillon@free-electrons.com>");
+>> +MODULE_DESCRIPTION("Allwinner sun6i PRCM driver");
+>> +MODULE_LICENSE("GPL v2");
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
