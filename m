@@ -1,78 +1,52 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Thu, 8 May 2014 11:30:13 -0400
-Subject: [PATCH] mpilib: use 'static inline' for mpi-inline.h
-In-Reply-To: <1399560990-1402858-9-git-send-email-arnd@arndb.de>
-References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-9-git-send-email-arnd@arndb.de>
-Message-ID: <20140508113013.74b2eb9d@gandalf.local.home>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 08 May 2014 08:31:41 -0700
+Subject: omap4-panda-es boot issues with v3.15-rc4
+In-Reply-To: <536B7E44.2040303@ti.com> (Roger Quadros's message of "Thu, 8 May
+ 2014 15:53:24 +0300")
+References: <536B7E44.2040303@ti.com>
+Message-ID: <7hppjos2w2.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu,  8 May 2014 16:56:20 +0200
-Arnd Bergmann <arnd@arndb.de> wrote:
+Roger Quadros <rogerq@ti.com> writes:
 
-> Four functions of mpilib are defined as 'extern inline' at the
-> moment, which is generally not the correct way to do inline functions
-> using gcc.
+> Hi,
+>
+> Nishant pointed me to a booting issue with omap4-panda-es on linux-next but I'm observing
+> similar issues, although less frequent, with v3.15-rc4 as well.
+>
+> Configuration:
+>
+> - kernel v3.15-rc4 or linux-next (20140507)
+> - multi_v7_defconfig with LEDS_TRIGGER_HEARTBEAT and LEDS_GPIO enabled
+> - u-boot/master	173d294b94cf
+>
+> Observations:
+>
+> - Out of 10 boots a few may not succeed and hang midway without any warnings. Heartbeat LED stops.
+> e.g. http://www.hastebin.com/ebumojegoq.vhdl
+>
+> - Hang more noticeable on linux-next (20140507) than on v3.15-rc4
 
-I think clang would appreciate this too.
+I've beeen noticing the same thing for awhile with my boot tests.  For
+me, next-20140508 is failing most of the time now.
 
--- Steve
+> - Hang more noticeable with USB_EHCI_HCD enabled but hang observed even without USB_EHCI_HCD.
+> Maybe related to when high speed interrupts occur in the boot process.
+>
+> - On successful boots following warning is seen
+> [    4.010375] gic_timer_retrigger: lost localtimer interrupt
+>
+> - On successful boots heartbeat LED stops blinking after boot process and left idle. LED can remain stuck in
+> ON state as well. It does blink again when doing activity on console.
+>
+> Workaround:
+>
+> - Disabling CPU_IDLE or even just disabling C3 (MPU OSWR) seems to fix all the above issues.
+>
+> I don't really know what exactly is the issue but it seems to be specific to OMAP4, GIC, MPU OSWR.
 
-> 
-> While this is usually harmless, it shows up as a warning in combination
-> with the CONFIG_PROFILE_ALL_BRANCHES, resulting in very many lines
-> like:
-> 
-> /git/arm-soc/lib/mpi/mpi-inline.h:70:182: warning: '______f' is static but declared in inline function 'mpihelp_add' which is not static [enabled by default]
-> 
-> Using static inline makes the code behave as expected and gets
-> rid of the warning
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Steven Rostedt <rostedt@goodmis.org>
-> Cc: Dmitry Kasatkin <dmitry.kasatkin@intel.com>
-> ---
->  lib/mpi/mpi-inline.h   | 2 +-
->  lib/mpi/mpi-internal.h | 8 --------
->  2 files changed, 1 insertion(+), 9 deletions(-)
-> 
-> diff --git a/lib/mpi/mpi-inline.h b/lib/mpi/mpi-inline.h
-> index e2b3985..c245ea3 100644
-> --- a/lib/mpi/mpi-inline.h
-> +++ b/lib/mpi/mpi-inline.h
-> @@ -30,7 +30,7 @@
->  #define G10_MPI_INLINE_H
->  
->  #ifndef G10_MPI_INLINE_DECL
-> -#define G10_MPI_INLINE_DECL  extern inline
-> +#define G10_MPI_INLINE_DECL  static inline
->  #endif
->  
->  G10_MPI_INLINE_DECL mpi_limb_t
-> diff --git a/lib/mpi/mpi-internal.h b/lib/mpi/mpi-internal.h
-> index 60cf765..54c1e97 100644
-> --- a/lib/mpi/mpi-internal.h
-> +++ b/lib/mpi/mpi-internal.h
-> @@ -168,20 +168,12 @@ void mpi_rshift_limbs(MPI a, unsigned int count);
->  int mpi_lshift_limbs(MPI a, unsigned int count);
->  
->  /*-- mpihelp-add.c --*/
-> -mpi_limb_t mpihelp_add_1(mpi_ptr_t res_ptr, mpi_ptr_t s1_ptr,
-> -			 mpi_size_t s1_size, mpi_limb_t s2_limb);
->  mpi_limb_t mpihelp_add_n(mpi_ptr_t res_ptr, mpi_ptr_t s1_ptr,
->  			 mpi_ptr_t s2_ptr, mpi_size_t size);
-> -mpi_limb_t mpihelp_add(mpi_ptr_t res_ptr, mpi_ptr_t s1_ptr, mpi_size_t s1_size,
-> -		       mpi_ptr_t s2_ptr, mpi_size_t s2_size);
->  
->  /*-- mpihelp-sub.c --*/
-> -mpi_limb_t mpihelp_sub_1(mpi_ptr_t res_ptr, mpi_ptr_t s1_ptr,
-> -			 mpi_size_t s1_size, mpi_limb_t s2_limb);
->  mpi_limb_t mpihelp_sub_n(mpi_ptr_t res_ptr, mpi_ptr_t s1_ptr,
->  			 mpi_ptr_t s2_ptr, mpi_size_t size);
-> -mpi_limb_t mpihelp_sub(mpi_ptr_t res_ptr, mpi_ptr_t s1_ptr, mpi_size_t s1_size,
-> -		       mpi_ptr_t s2_ptr, mpi_size_t s2_size);
->  
->  /*-- mpihelp-cmp.c --*/
->  int mpihelp_cmp(mpi_ptr_t op1_ptr, mpi_ptr_t op2_ptr, mpi_size_t size);
+I can confirm that disabling CONFIG_CPU_IDLE seems to make the problem
+go away.  Hmm....
+
+Kevin
