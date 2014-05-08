@@ -1,46 +1,58 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 8 May 2014 11:25:14 +0100
-Subject: [PATCH v2 2/2] arm64: enable context tracking
-In-Reply-To: <7hr445w3nz.fsf@paris.lan>
-References: <1399419149-26685-1-git-send-email-larry.bassel@linaro.org>
- <1399419149-26685-3-git-send-email-larry.bassel@linaro.org>
- <20140507101709.GE18456@arm.com> <7hr445w3nz.fsf@paris.lan>
-Message-ID: <20140508102514.GA6942@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 8 May 2014 12:27:50 +0200
+Subject: [PATCH] ARM: realview: basic device tree implementation
+In-Reply-To: <CAL_JsqKYR1aujNhOASivsg-ED6xDPCsSCcGVnQn5vy4sD1PhAQ@mail.gmail.com>
+References: <1395826060-26662-1-git-send-email-linus.walleij@linaro.org>
+ <CAL_JsqKYR1aujNhOASivsg-ED6xDPCsSCcGVnQn5vy4sD1PhAQ@mail.gmail.com>
+Message-ID: <CACRpkdZ7WoBMBMJjpKcsOeOA5E1erSioOeSDt1xOG=W04RoeCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 08, 2014 at 12:49:04AM +0100, Kevin Hilman wrote:
-> Hi Will,
+On Wed, Mar 26, 2014 at 6:59 AM, Rob Herring <robh@kernel.org> wrote:
+> On Wed, Mar 26, 2014 at 4:27 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
 
-Hello Kevin,
+>> +       if (of_machine_is_compatible("arm,realview-eb"))
+>> +               /*
+>> +                * 1MB (128KB/way), 8-way associativity,
+>> +                * evmon/parity/share enabled
+>> +                * Bits:  .... ...0 0111 1001 0000 .... .... ....
+>> +                */
+>> +               l2x0_of_init(0x00790000, 0xfe000fff);
+>> +       else if (of_machine_is_compatible("arm,realview-pb1176"))
+>> +               /*
+>> +                * 128Kb (16Kb/way) 8-way associativity.
+>> +                * evmon/parity/share enabled.
+>> +                */
+>> +               l2x0_of_init(0x00730000, 0xfe000fff);
+>> +       else if (of_machine_is_compatible("arm,realview-pb11mp"))
+>> +               /*
+>> +                * 1MB (128KB/way), 8-way associativity,
+>> +                * evmon/parity/share enabled
+>> +                * Bits:  .... ...0 0111 1001 0000 .... .... ....
+>> +                */
+>> +               l2x0_of_init(0x00730000, 0xfe000fff);
+>> +       else if (of_machine_is_compatible("arm,realview-pbx"))
+>> +               /*
+>> +                * 16KB way size, 8-way associativity, parity disabled
+>> +                * Bits:  .. 0 0 0 0 1 00 1 0 1 001 0 000 0 .... .... ....
+>> +                */
+>> +               l2x0_of_init(0x02520000, 0xc0000fff);
+>> +#endif
+>
+> As Arnd pointed out, see Russell's recent L2x0 emails. Since these are
+> L220s, you do need the way size and associativity to be initialized at
+> least. There are standard ePAPR definitions for these which should be
+> used.
+>
+> Documenting the initial and final aux ctrl values on these platforms
+> would be helpful for Russell's clean-up.
 
-> Will Deacon <will.deacon@arm.com> writes:
-> > On Wed, May 07, 2014 at 12:32:29AM +0100, Larry Bassel wrote:
-> >> Make calls to ct_user_enter when the kernel is exited
-> >> and ct_user_exit when the kernel is entered (in el0_da,
-> >> el0_ia, el0_svc, el0_irq).
-> >
-> > Why only these entry points? I can reschedule after any exception from EL0,
-> > so I'd expect all exceptions from userspace to need annotating, no?
-> 
-> In my initial approach to this, you might recall (though it was over a
-> year ago now) was to just instrument kernel_enter rather than sprinkle
-> the instrumentaion in cl0_*.  However, your concern at the time was that
-> since it was before debugging was enabled it would complicate debugging
-> these paths.
-> 
-> Any chance you have any other suggestion on how we might do this in
-> kernel_entry rather than sprinkling them all over cl0_*?  or is the
-> sprinkling the only good way to handle this.
+The PB1176 board has the initial value:
+L2X0_AUX_CTRL = 0x02020fff
 
-Unfortunately, different exceptions do subtly different things before
-invoking the main handler. For example:
+I don't know how I can help out best here unfortunately, it's a little
+bit of a moving target I guess and admittedly my understanding of
+l2x0 is pretty shallow. :-/
 
- - Stashing the far
- - Enabling IRQs
- - Enabling debug
- - All the stuff on the syscall path
-
-so putting the logic in kernel_entry isn't really do-able, unfortunately.
-
-Will
+Yours,
+Linus Walleij
