@@ -1,48 +1,35 @@
-From: ipaton0@gmail.com (Iain Paton)
-Date: Thu, 08 May 2014 10:10:39 +0100
-Subject: [RFC PATCH] ARM: dts: imx6: add new board RIoTboard
-In-Reply-To: <CAOMZO5C=Yph-Rtor1v_PpPw68J=GwozWW6=mPux2d3f97mi3+g@mail.gmail.com>
-References: <53695C34.5000604@gmail.com>
- <CAOMZO5C=Yph-Rtor1v_PpPw68J=GwozWW6=mPux2d3f97mi3+g@mail.gmail.com>
-Message-ID: <536B4A0F.709@gmail.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Thu, 8 May 2014 11:11:22 +0200
+Subject: OMAP baseline test results for v3.15-rc4
+In-Reply-To: <alpine.DEB.2.02.1405080417150.23579@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1405080417150.23579@utopia.booyaka.com>
+Message-ID: <CAGhQ9Vx_dJTn20S1OngAks1KvZkH=MUWEh-4bv5ciM7PhofJ8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/14 03:27, Fabio Estevam wrote:
-> On Tue, May 6, 2014 at 7:03 PM, Iain Paton <ipaton0@gmail.com> wrote:
-> 
+On 8 May 2014 06:23, Paul Walmsley <paul@pwsan.com> wrote:
+>
+> Here are some basic OMAP test results for Linux v3.15-rc4.
+> Logs and other details at:
+>
+>     http://www.pwsan.com/omap/testlogs/test_v3.15-rc4/20140505112251/
+>
+>
+> Test summary
+> ------------
+<snip>
+>
+> The eMMC on the 4460 VAR-SOM-OM has failed; I guess it's run out of
+> reserve blocks to reallocate.  Now it's time to find yet another way
+> to boot it.
 
-Fabio, I'll address all your comments and resend. Thanks for reviewing!
+I have some patches for u-boot which makes it possible to use the
+on-board LAN7500 USB Ethernet controller for tftp.
 
->> +
->> +               pinctrl_usdhc4: usdhc4grp {
->> +                       fsl,pins = <
->> +                               MX6QDL_PAD_SD4_CMD__SD4_CMD             0x17059
->> +                               MX6QDL_PAD_SD4_CLK__SD4_CLK             0x10059
->> +                               MX6QDL_PAD_SD4_DAT0__SD4_DATA0          0x17059
->> +                               MX6QDL_PAD_SD4_DAT1__SD4_DATA1          0x17059
->> +                               MX6QDL_PAD_SD4_DAT2__SD4_DATA2          0x17059
->> +                               MX6QDL_PAD_SD4_DAT3__SD4_DATA3          0x17059
->> +                               MX6QDL_PAD_NANDF_ALE__GPIO6_IO08        0x80000000      /* SD4 RST (eMMC) */
-> 
-> Just curious: do you get eMMC working? I tried it on mx6qsabresd and
-> it is not working for me.
+Since you have a VAR-SOM-OM44 module maybe you could test my dts patches for it?
+I will post a new version of the patch set early next week. I can cc you.
 
-Yes, it works on the RIoTboard.
+Do you have the VAR-DVK-OM44 eval board?
 
-The other element14/embest design, MarSboard uses an i.MX6 Dual, has it's
-eMMC on usdhc3 instead of 4 and I've been completely unsuccessful getting it
-to work, have tried most combination of pad settings.
-
-Different vendor of eMMC on the MarS from the RIoTboard. 
-
-What's interesting is that on MarS the eMMC works in u-boot with the same pad 
-settings and the MarS eMMC does appear to work in the 3.0.35 BSP, so perhaps it's
-something in the mmc layer.
-
-I have a note to have a look at http://article.gmane.org/gmane.linux.kernel.mmc/26407
-since what Markus reports seeing on RIoT looks very similar to what I see on MarS.
-
-Unfortunately I haven't had time to investigate further.
-
-Iain
+regards
+Joachim Eastwood
