@@ -1,60 +1,65 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu,  8 May 2014 16:56:17 +0200
-Subject: [PATCH] bus/omap_l3: avoid sync initcall for modules
+Date: Thu,  8 May 2014 16:56:14 +0200
+Subject: [PATCH 1/2] mtd/onenand: fix build warning for dma type
 In-Reply-To: <1399560990-1402858-1-git-send-email-arnd@arndb.de>
 References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
  <1399560990-1402858-1-git-send-email-arnd@arndb.de>
-Message-ID: <1399560990-1402858-6-git-send-email-arnd@arndb.de>
+Message-ID: <1399560990-1402858-3-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The postcore_initcall_sync() macro is only defined for built-in
-code, but the omap_l3 bus code can be built as a module, which
-currently causes a build failure.
+The samsung onenand driver passes around a dma address token
+through a void pointer, which is incorrect and leads to
+warnings like this one:
 
-This works around the problem by using #ifdef MODULE to decide
-whether to use a regular module_init() function or not.
+onenand/samsung.c:548:2: warning: passing argument 1 of '__fswab32' makes integer from pointer without a cast [enabled by default]
+  writel(src, base + S5PC110_DMA_SRC_ADDR);
+  ^
+
+This patch makes it use dma_addr_t here, which is more appropriate.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Kishon Vijay Abraham I <kishon@ti.com>
-Cc: Felipe Balbi <balbi@ti.com>
+Cc: Kyungmin Park <kyungmin.park@samsung.com>
+Cc: David Woodhouse <dwmw2@infradead.org>
+Cc: Brian Norris <computersforpeace@gmail.com>
+Cc: linux-mtd at lists.infradead.org
 ---
- drivers/bus/omap_l3_noc.c | 4 ++++
- drivers/bus/omap_l3_smx.c | 4 ++++
- 2 files changed, 8 insertions(+)
+ drivers/mtd/onenand/samsung.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/bus/omap_l3_noc.c b/drivers/bus/omap_l3_noc.c
-index feeecae..648f158 100644
---- a/drivers/bus/omap_l3_noc.c
-+++ b/drivers/bus/omap_l3_noc.c
-@@ -257,7 +257,11 @@ static int __init omap4_l3_init(void)
- {
- 	return platform_driver_register(&omap4_l3_driver);
+diff --git a/drivers/mtd/onenand/samsung.c b/drivers/mtd/onenand/samsung.c
+index b1a792f..efb819c 100644
+--- a/drivers/mtd/onenand/samsung.c
++++ b/drivers/mtd/onenand/samsung.c
+@@ -537,9 +537,9 @@ static int onenand_write_bufferram(struct mtd_info *mtd, int area,
+ 	return 0;
  }
-+#ifdef MODULE
-+module_init(omap4_l3_init);
-+#else
- postcore_initcall_sync(omap4_l3_init);
-+#endif
  
- static void __exit omap4_l3_exit(void)
+-static int (*s5pc110_dma_ops)(void *dst, void *src, size_t count, int direction);
++static int (*s5pc110_dma_ops)(dma_addr_t dst, dma_addr_t src, size_t count, int direction);
+ 
+-static int s5pc110_dma_poll(void *dst, void *src, size_t count, int direction)
++static int s5pc110_dma_poll(dma_addr_t dst, dma_addr_t src, size_t count, int direction)
  {
-diff --git a/drivers/bus/omap_l3_smx.c b/drivers/bus/omap_l3_smx.c
-index acc2164..f752d1b 100644
---- a/drivers/bus/omap_l3_smx.c
-+++ b/drivers/bus/omap_l3_smx.c
-@@ -288,7 +288,11 @@ static int __init omap3_l3_init(void)
- {
- 	return platform_driver_probe(&omap3_l3_driver, omap3_l3_probe);
+ 	void __iomem *base = onenand->dma_addr;
+ 	int status;
+@@ -605,7 +605,7 @@ static irqreturn_t s5pc110_onenand_irq(int irq, void *data)
+ 	return IRQ_HANDLED;
  }
-+#ifdef MODULE
-+module_init(omap3_l3_init);
-+#else
- postcore_initcall_sync(omap3_l3_init);
-+#endif
  
- static void __exit omap3_l3_exit(void)
+-static int s5pc110_dma_irq(void *dst, void *src, size_t count, int direction)
++static int s5pc110_dma_irq(dma_addr_t dst, dma_addr_t src, size_t count, int direction)
  {
+ 	void __iomem *base = onenand->dma_addr;
+ 	int status;
+@@ -686,7 +686,7 @@ static int s5pc110_read_bufferram(struct mtd_info *mtd, int area,
+ 		dev_err(dev, "Couldn't map a %d byte buffer for DMA\n", count);
+ 		goto normal;
+ 	}
+-	err = s5pc110_dma_ops((void *) dma_dst, (void *) dma_src,
++	err = s5pc110_dma_ops(dma_dst, dma_src,
+ 			count, S5PC110_DMA_DIR_READ);
+ 
+ 	if (page_dma)
 -- 
 1.8.3.2
