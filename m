@@ -1,69 +1,88 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 8 May 2014 10:35:25 -0500
-Subject: [PATCH v10 03/15] ARM: sunxi: Add driver for SD/MMC hosts found
- on Allwinner sunxi SoCs
-In-Reply-To: <536B78FF.2020808@redhat.com>
-References: <1399046249-19472-1-git-send-email-hdegoede@redhat.com>
- <1399046249-19472-4-git-send-email-hdegoede@redhat.com>
- <CAPDyKFoinhyob7GZLgH4Dm7KdHCxj1+OpuZYKDK3OkU8RFsY8A@mail.gmail.com>
- <53678DB4.60209@redhat.com>
- <CAPDyKFpAGNLaKagJ_RPt1vbz70pNWJzo-s6Ao50Mh0gFrRLN0g@mail.gmail.com>
- <536B69FA.5090600@redhat.com>
- <CAPDyKFqbN61EgiTbktL-vm+L7q06OTeedCTVXJsP16ZZZd8g8A@mail.gmail.com>
- <536B78FF.2020808@redhat.com>
-Message-ID: <20140508153525.GW7047@lukather>
+Date: Thu, 8 May 2014 10:36:23 -0500
+Subject: [PATCH] pinctrl: sunxi Ensure the correct pinctrl drivers are
+ enabled
+In-Reply-To: <536B9631.2090401@redhat.com>
+References: <1399556216-7590-1-git-send-email-hdegoede@redhat.com>
+ <20140508142101.GT7047@lukather> <536B9631.2090401@redhat.com>
+Message-ID: <20140508153623.GX7047@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 08, 2014 at 02:30:55PM +0200, Hans de Goede wrote:
+On Thu, May 08, 2014 at 04:35:29PM +0200, Hans de Goede wrote:
 > Hi,
 > 
-> On 05/08/2014 02:17 PM, Ulf Hansson wrote:
-> > On 8 May 2014 13:26, Hans de Goede <hdegoede@redhat.com> wrote:
-> >> Hi,
-> >>
-> >> On 05/05/2014 10:33 PM, Ulf Hansson wrote:
-> >>> [snip]
-> >>>
-> >>>> On 05/05/2014 02:41 PM, Ulf Hansson wrote:
-> >>>>>> +struct sunxi_mmc_host {
-> >>>>>> +       struct mmc_host *mmc;
-> >>>>>> +       struct regulator *vmmc;
-> >>>>>
-> >>>>> Instead of having a specific regulator for this driver, please use the
-> >>>>> mmc_regulator_get_supply API.
-> >>>>
-> >>>> We cannot use mmc_regulator_get_supply because for the sunxi mmc controller
-> >>>> not only vqmmc but also vmmc itself is optional, and mmc_regulator_get_supply
-> >>>> calls devm_regulator_get rather then devm_regulator_get_optional for vmmc.
-> >>>
-> >>> Is that because the mmc controller handle the power to the card or
-> >>> because you have a fixed supply?
-> >>>
-> >>> Having a fixed regulator supply could easily be set up in DT, which
-> >>> then also dynamically gives you the ocr mask instead of having a them
-> >>> "hard coded".
-> >>
-> >> It is because the sdcard slot power tends to be hooked directly to the 3.3V
-> >> of the board. So in a sense this is a fixed regulator, but I really, REALLY
-> >> don't want to add fixed regulator boilerplate to all sunxi dts files for this.
+> On 05/08/2014 04:21 PM, Maxime Ripard wrote:
+> > Hi Hans,
 > > 
-> > So, how would you then distinguish between let's say a 3.1V and 3.3V
-> > fixed regulator? That is something that is board specific, thus I
-> > don't think you can get away from not adding them to DT.
+> > On Thu, May 08, 2014 at 03:36:56PM +0200, Hans de Goede wrote:
+> >> The commit titled: "pinctrl: sunxi: Introduce per-driver Kconfig options"
+> >> adds a bunch of new Kconfig options, but nothing sets them resulting in a
+> >> non working kernel. Since they are per sunxi family, and we already have
+> >> sunxi family Kconfig options, make those options select the necessary
+> >> Kconfig options.
+> >>
+> >> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> >> ---
+> >>  arch/arm/mach-sunxi/Kconfig | 6 +++++-
+> >>  1 file changed, 5 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+> >> index 3aff966..beab32e 100644
+> >> --- a/arch/arm/mach-sunxi/Kconfig
+> >> +++ b/arch/arm/mach-sunxi/Kconfig
+> >> @@ -4,7 +4,6 @@ menuconfig ARCH_SUNXI
+> >>  	select CLKSRC_MMIO
+> >>  	select GENERIC_IRQ_CHIP
+> >>  	select PINCTRL
+> >> -	select PINCTRL_SUNXI
+> >>  	select SUN4I_TIMER
+> >>  
+> >>  if ARCH_SUNXI
+> >> @@ -12,11 +11,14 @@ if ARCH_SUNXI
+> >>  config MACH_SUN4I
+> >>  	bool "Allwinner A10 (sun4i) SoCs support"
+> >>  	default ARCH_SUNXI
+> >> +	select PINCTRL_SUN4I_A10
+> >>  
+> >>  config MACH_SUN5I
+> >>  	bool "Allwinner A10s / A13 (sun5i) SoCs support"
+> >>  	default ARCH_SUNXI
+> >>  	select SUN5I_HSTIMER
+> >> +	select PINCTRL_SUN5I_A10S
+> >> +	select PINCTRL_SUN5I_A13
+> >>  
+> >>  config MACH_SUN6I
+> >>  	bool "Allwinner A31 (sun6i) SoCs support"
+> >> @@ -25,6 +27,7 @@ config MACH_SUN6I
+> >>  	select ARM_GIC
+> >>  	select RESET_CONTROLLER
+> >>  	select SUN5I_HSTIMER
+> >> +	select PINCTRL_SUN6I_A31
+> >>  
+> >>  config MACH_SUN7I
+> >>  	bool "Allwinner A20 (sun7i) SoCs support"
+> >> @@ -33,5 +36,6 @@ config MACH_SUN7I
+> >>  	select ARM_PSCI
+> >>  	select HAVE_ARM_ARCH_TIMER
+> >>  	select SUN5I_HSTIMER
+> >> +	select PINCTRL_SUN7I_A20
+> >>  
+> >>  endif
+> > 
+> > I already posted a similar patch that is still pending. I was only
+> > waiting for Linus to merge the branch I gave him to merge it in my
+> > tree.
+> > 
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/251704.html
+> > 
+> > I don't think he actually merged the branch yet. How did you
+> > encounter such breakage?
 > 
-> All boards I've seen sofar use 3.3V which seems sensible since that is
-> what the spec says you must supply to SDSC cards. I agree that if a board
-> differs from the standard 3.3V, a fixed regulator node specifying the
-> voltage should be added.
+> I've been sucking up various branches and posted patches for the next
+> sunxi-devel, including your sunxi/pinctrl-for-3.16 branch.
 
-I think we introduced the sunxi-regulators DTSI just for this :)
-
-I'd really like to start stabilizing a bit the DT and at least
-consider being able to use an older DT on a newer kernel. If we take
-such approach, I'm afraid it will break at some point.
-
-Maxime
+Ok, so yes, you need such a patch :)
 
 -- 
 Maxime Ripard, Free Electrons
@@ -75,4 +94,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140508/5011128a/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140508/d57c0973/attachment.sig>
