@@ -1,69 +1,55 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Thu, 8 May 2014 14:27:42 +0200
-Subject: [PATCH 5/6] ARM: dts: Karo TX25: Add phy reset gpio and supply
- for FEC
-In-Reply-To: <1399469489-22788-6-git-send-email-s.hauer@pengutronix.de>
-References: <1399469489-22788-1-git-send-email-s.hauer@pengutronix.de>
- <1399469489-22788-6-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20140508142742.23e78575@ipc1.ka-ro>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 08 May 2014 14:30:55 +0200
+Subject: [PATCH v10 03/15] ARM: sunxi: Add driver for SD/MMC hosts found
+ on Allwinner sunxi SoCs
+In-Reply-To: <CAPDyKFqbN61EgiTbktL-vm+L7q06OTeedCTVXJsP16ZZZd8g8A@mail.gmail.com>
+References: <1399046249-19472-1-git-send-email-hdegoede@redhat.com>	<1399046249-19472-4-git-send-email-hdegoede@redhat.com>	<CAPDyKFoinhyob7GZLgH4Dm7KdHCxj1+OpuZYKDK3OkU8RFsY8A@mail.gmail.com>	<53678DB4.60209@redhat.com>	<CAPDyKFpAGNLaKagJ_RPt1vbz70pNWJzo-s6Ao50Mh0gFrRLN0g@mail.gmail.com>	<536B69FA.5090600@redhat.com>
+ <CAPDyKFqbN61EgiTbktL-vm+L7q06OTeedCTVXJsP16ZZZd8g8A@mail.gmail.com>
+Message-ID: <536B78FF.2020808@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Sascha Hauer wrote:
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  arch/arm/boot/dts/imx25-karo-tx25.dts | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
+On 05/08/2014 02:17 PM, Ulf Hansson wrote:
+> On 8 May 2014 13:26, Hans de Goede <hdegoede@redhat.com> wrote:
+>> Hi,
+>>
+>> On 05/05/2014 10:33 PM, Ulf Hansson wrote:
+>>> [snip]
+>>>
+>>>> On 05/05/2014 02:41 PM, Ulf Hansson wrote:
+>>>>>> +struct sunxi_mmc_host {
+>>>>>> +       struct mmc_host *mmc;
+>>>>>> +       struct regulator *vmmc;
+>>>>>
+>>>>> Instead of having a specific regulator for this driver, please use the
+>>>>> mmc_regulator_get_supply API.
+>>>>
+>>>> We cannot use mmc_regulator_get_supply because for the sunxi mmc controller
+>>>> not only vqmmc but also vmmc itself is optional, and mmc_regulator_get_supply
+>>>> calls devm_regulator_get rather then devm_regulator_get_optional for vmmc.
+>>>
+>>> Is that because the mmc controller handle the power to the card or
+>>> because you have a fixed supply?
+>>>
+>>> Having a fixed regulator supply could easily be set up in DT, which
+>>> then also dynamically gives you the ocr mask instead of having a them
+>>> "hard coded".
+>>
+>> It is because the sdcard slot power tends to be hooked directly to the 3.3V
+>> of the board. So in a sense this is a fixed regulator, but I really, REALLY
+>> don't want to add fixed regulator boilerplate to all sunxi dts files for this.
 > 
-> diff --git a/arch/arm/boot/dts/imx25-karo-tx25.dts b/arch/arm/boot/dts/imx25-karo-tx25.dts
-> index aeb1fce..ea7dddc 100644
-> --- a/arch/arm/boot/dts/imx25-karo-tx25.dts
-> +++ b/arch/arm/boot/dts/imx25-karo-tx25.dts
-> @@ -16,6 +16,21 @@
->  	model = "Ka-Ro TX25";
->  	compatible = "karo,imx25-tx25", "fsl,imx25";
->  
-> +	regulators {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		reg_fec_phy: regulator at 0 {
-> +			compatible = "regulator-fixed";
-> +			reg = <0>;
-> +			regulator-name = "fec-phy";
-> +			regulator-min-microvolt = <3300000>;
-> +			regulator-max-microvolt = <3300000>;
-> +			gpio = <&gpio4 9 0>;
->
-			enable-active-high;
-missing here.
+> So, how would you then distinguish between let's say a 3.1V and 3.3V
+> fixed regulator? That is something that is board specific, thus I
+> don't think you can get away from not adding them to DT.
 
-> +		};
-> +	};
-> +
->  	memory {
->  		reg = <0x80000000 0x02000000 0x90000000 0x02000000>;
->  	};
-> @@ -77,7 +92,9 @@
->  &fec {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_fec>;
-> +	phy-reset-gpios = <&gpio4 7 0>;
->
-This must be: <&gpio3 7 0>;
+All boards I've seen sofar use 3.3V which seems sensible since that is
+what the spec says you must supply to SDSC cards. I agree that if a board
+differs from the standard 3.3V, a fixed regulator node specifying the
+voltage should be added.
 
+Regards,
 
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Hans
