@@ -1,43 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu,  8 May 2014 16:56:21 +0200
-Subject: [PATCH] ata: pata_at91 only works on sam9
-In-Reply-To: <1399560990-1402858-1-git-send-email-arnd@arndb.de>
-References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-1-git-send-email-arnd@arndb.de>
-Message-ID: <1399560990-1402858-10-git-send-email-arnd@arndb.de>
+From: iivanov@mm-sol.com (Ivan T. Ivanov)
+Date: Thu, 08 May 2014 17:58:44 +0300
+Subject: [PATCH 5/8] usb: phy: msm: reset controller is mandatory now
+In-Reply-To: <63604204.8DeBUXOvCl@wuerfel>
+References: <1399557141-1346645-1-git-send-email-arnd@arndb.de>
+ <1399557141-1346645-6-git-send-email-arnd@arndb.de>
+ <1399558909.8165.8.camel@iivanov-dev> <63604204.8DeBUXOvCl@wuerfel>
+Message-ID: <1399561124.8165.13.camel@iivanov-dev>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The smc driver used by pata_at91 is at91sam9 specific, so building
-this driver on another at91 platform results in this error:
+On Thu, 2014-05-08 at 16:27 +0200, Arnd Bergmann wrote:
+> On Thursday 08 May 2014 17:21:49 Ivan T. Ivanov wrote:
+> > > @@ -168,7 +168,7 @@ config USB_EHCI_HCD_AT91
+> > >  
+> > >  config USB_EHCI_MSM
+> > >       tristate "Support for Qualcomm QSD/MSM on-chip EHCI USB controller"
+> > > -     depends on ARCH_MSM
+> > > +     depends on ARCH_MSM && RESET_CONTROLLER
+> > 
+> > This driver did not use reset controller API.
+> > 
+> > >       select USB_EHCI_ROOT_HUB_TT
+> > >       select USB_MSM_OTG
+> 
+> It does select USB_MSM_OTG though, which uses it:
+> 
+> Maybe that 'select' is wrong?
 
-ERROR: "sam9_smc_configure" [drivers/ata/pata_at91.ko] undefined!
-ERROR: "sam9_smc_write_mode" [drivers/ata/pata_at91.ko] undefined!
-ERROR: "sam9_smc_read_mode" [drivers/ata/pata_at91.ko] undefined!
+Driver have run time dependency to USB_PHY framework.
+Probably just removing  select line will be fine?
 
-This patch changes the Kconfig dependency to ensure it always works.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Tejun Heo <tj@kernel.org>
-Cc: linux-ide at vger.kernel.org
-Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- drivers/ata/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
-index a91bf47..7671dba 100644
---- a/drivers/ata/Kconfig
-+++ b/drivers/ata/Kconfig
-@@ -824,7 +824,7 @@ config PATA_AT32
- 
- config PATA_AT91
- 	tristate "PATA support for AT91SAM9260"
--	depends on ARM && ARCH_AT91
-+	depends on ARM && SOC_AT91SAM9
- 	help
- 	  This option enables support for IDE devices on the Atmel AT91SAM9260 SoC.
- 
--- 
-1.8.3.2
+Regards,
+Ivan
