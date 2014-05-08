@@ -1,68 +1,38 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu,  8 May 2014 08:17:30 +0200
-Subject: [PATCH] ARM: dts: i.MX51 babbage: Fix FEC pad ctrl settings
-Message-ID: <1399529850-20186-1-git-send-email-s.hauer@pengutronix.de>
+From: rahul.sharma@samsung.com (Rahul Sharma)
+Date: Thu, 08 May 2014 11:49:50 +0530
+Subject: [PATCH v2 0/5] ARM: dts: enable display for peach-pit and snow boards
+Message-ID: <1399529995-8656-1-git-send-email-rahul.sharma@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dts relied on the FEC pad ctrl settings from the bootloader by
-using the NO_PAD_CTRL option. This breaks once the bootloader starts
-initializing the pad ctrl settings from the same dts file. Change
-to real pad ctrl settings taken from the platform based babbage
-support.
+From: Rahul Sharma <Rahul.Sharma@samsung.com>
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/boot/dts/imx51-babbage.dts | 37 +++++++++++++++++++------------------
- 1 file changed, 19 insertions(+), 18 deletions(-)
+Add nodes for fimd and dp controller for exynos5250 based snow
+and exynos5420 based peach-pit board.
 
-diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-index 9e9deb2..be75342 100644
---- a/arch/arm/boot/dts/imx51-babbage.dts
-+++ b/arch/arm/boot/dts/imx51-babbage.dts
-@@ -352,24 +352,25 @@
- 
- 		pinctrl_fec: fecgrp {
- 			fsl,pins = <
--				MX51_PAD_EIM_EB2__FEC_MDIO		0x80000000
--				MX51_PAD_EIM_EB3__FEC_RDATA1		0x80000000
--				MX51_PAD_EIM_CS2__FEC_RDATA2		0x80000000
--				MX51_PAD_EIM_CS3__FEC_RDATA3		0x80000000
--				MX51_PAD_EIM_CS4__FEC_RX_ER		0x80000000
--				MX51_PAD_EIM_CS5__FEC_CRS		0x80000000
--				MX51_PAD_NANDF_RB2__FEC_COL		0x80000000
--				MX51_PAD_NANDF_RB3__FEC_RX_CLK		0x80000000
--				MX51_PAD_NANDF_D9__FEC_RDATA0		0x80000000
--				MX51_PAD_NANDF_D8__FEC_TDATA0		0x80000000
--				MX51_PAD_NANDF_CS2__FEC_TX_ER		0x80000000
--				MX51_PAD_NANDF_CS3__FEC_MDC		0x80000000
--				MX51_PAD_NANDF_CS4__FEC_TDATA1		0x80000000
--				MX51_PAD_NANDF_CS5__FEC_TDATA2		0x80000000
--				MX51_PAD_NANDF_CS6__FEC_TDATA3		0x80000000
--				MX51_PAD_NANDF_CS7__FEC_TX_EN		0x80000000
--				MX51_PAD_NANDF_RDY_INT__FEC_TX_CLK	0x80000000
--				MX51_PAD_EIM_A20__GPIO2_14 0x85 /* Reset */
-+				MX51_PAD_EIM_EB2__FEC_MDIO		0x000001f5
-+				MX51_PAD_EIM_EB3__FEC_RDATA1		0x00000085
-+				MX51_PAD_EIM_CS2__FEC_RDATA2		0x00000085
-+				MX51_PAD_EIM_CS3__FEC_RDATA3		0x00000085
-+				MX51_PAD_EIM_CS4__FEC_RX_ER		0x00000180
-+				MX51_PAD_EIM_CS5__FEC_CRS		0x00000180
-+				MX51_PAD_NANDF_RB2__FEC_COL		0x00000180
-+				MX51_PAD_NANDF_RB3__FEC_RX_CLK		0x00000180
-+				MX51_PAD_NANDF_D9__FEC_RDATA0		0x00002180
-+				MX51_PAD_NANDF_D8__FEC_TDATA0		0x00002004
-+				MX51_PAD_NANDF_CS2__FEC_TX_ER		0x00002004
-+				MX51_PAD_NANDF_CS3__FEC_MDC		0x00002004
-+				MX51_PAD_NANDF_CS4__FEC_TDATA1		0x00002004
-+				MX51_PAD_NANDF_CS5__FEC_TDATA2		0x00002004
-+				MX51_PAD_NANDF_CS6__FEC_TDATA3		0x00002004
-+				MX51_PAD_NANDF_CS7__FEC_TX_EN		0x00002004
-+				MX51_PAD_NANDF_RDY_INT__FEC_TX_CLK	0x00002180
-+				MX51_PAD_NANDF_D11__FEC_RX_DV		0x000020a4
-+				MX51_PAD_EIM_A20__GPIO2_14		0x00000085 /* Phy Reset */
- 			>;
- 		};
- 
+This series is based on Kukjin Kims, for-next branch.
+
+V2:
+1) Rebase on Peach-pit dependent patches.
+
+It is dependent on
+1) Andrew Bresticker's patch for hpd gpio addition, avilable at
+http://www.spinics.net/lists/linux-samsung-soc/msg28827.html [Patch is 'ACK'ed.]
+2) Arun's patch for adding peach-pit board dts file at
+http://www.spinics.net/lists/linux-samsung-soc/msg30103.html. [Patch is 'ACK'ed.]
+
+Rahul Sharma (5):
+  ARM: dts: move dp hpd line to the board file for exynos5420
+  ARM: dts: enable fimd for exynos5250 based snow board
+  ARM: dts: enable dp-controller for exynos5250 based snow board
+  ARM: dts: enable fimd for exynos5420 based peach-pit board
+  ARM: dts: enable dp-controller for exynos5420 based peach-pit board
+
+ arch/arm/boot/dts/exynos5250-snow.dts      |   33 +++++++++++++++++++++++
+ arch/arm/boot/dts/exynos5420-peach-pit.dts |   39 ++++++++++++++++++++++++++++
+ arch/arm/boot/dts/exynos5420-pinctrl.dtsi  |    7 -----
+ arch/arm/boot/dts/exynos5420-smdk5420.dts  |    7 +++++
+ 4 files changed, 79 insertions(+), 7 deletions(-)
+
 -- 
-2.0.0.rc0
+1.7.9.5
