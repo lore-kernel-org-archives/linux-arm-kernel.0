@@ -1,39 +1,43 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu,  8 May 2014 16:56:23 +0200
-Subject: [PATCH 1/2] iio: always select ANON_INODES
+Date: Thu,  8 May 2014 16:56:19 +0200
+Subject: [PATCH] watchdog: iop_wdt only builds for mach-iop13xx
 In-Reply-To: <1399560990-1402858-1-git-send-email-arnd@arndb.de>
 References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
  <1399560990-1402858-1-git-send-email-arnd@arndb.de>
-Message-ID: <1399560990-1402858-12-git-send-email-arnd@arndb.de>
+Message-ID: <1399560990-1402858-8-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without ANON_INODES, we get this build error:
+All three iop variants we support in Linux (iop32x, iop33x and
+iop13xx) seem to have support for the watchdog hardware, but this
+driver fails to build for the first two of these because it
+uses the IOP13XX_WDTCR_IB_RESET macro that is only defined for
+iop13xx.
 
-drivers/built-in.o: In function `iio_event_getfd':
-:(.text+0x14bf18): undefined reference to `anon_inode_getfd'
-
-All other users explicitly select this symbol, so we should
-do the same thing here.
+This clarifies the dependency in Kconfig to avoid randconfig
+build errors. It is unlikely that anyone will ever miss support
+for this driver on the ancient iop3xx platforms, so we don't
+need to bother trying to fix it properly.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Jonathan Cameron <jic23@kernel.org>
-Cc: linux-iio at vger.kernel.org
+Cc: Wim Van Sebroeck <wim@iguana.be>
+Cc: linux-watchdog at vger.kernel.org
 ---
- drivers/iio/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/watchdog/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/iio/Kconfig b/drivers/iio/Kconfig
-index 743485e..345395e 100644
---- a/drivers/iio/Kconfig
-+++ b/drivers/iio/Kconfig
-@@ -4,6 +4,7 @@
+diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+index 2b4c1fc..e244548 100644
+--- a/drivers/watchdog/Kconfig
++++ b/drivers/watchdog/Kconfig
+@@ -272,7 +272,7 @@ config PNX4008_WATCHDOG
  
- menuconfig IIO
- 	tristate "Industrial I/O support"
-+	select ANON_INODES
+ config IOP_WATCHDOG
+ 	tristate "IOP Watchdog"
+-	depends on PLAT_IOP
++	depends on ARCH_IOP13XX
+ 	select WATCHDOG_NOWAYOUT if (ARCH_IOP32X || ARCH_IOP33X)
  	help
- 	  The industrial I/O subsystem provides a unified framework for
- 	  drivers for many different types of embedded sensors using a
+ 	  Say Y here if to include support for the watchdog timer
 -- 
 1.8.3.2
