@@ -1,48 +1,52 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 8 May 2014 01:19:46 +0000 (UTC)
-Subject: [RFC 1/4] ARM: OMAP2+: Add CTRL_MODULE_CORE as a master clock
- provider for DRA7
-In-Reply-To: <1397654063-8055-1-git-send-email-archit@ti.com>
-References: <1397654063-8055-1-git-send-email-archit@ti.com>
-Message-ID: <alpine.DEB.2.02.1405080117370.23579@utopia.booyaka.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 8 May 2014 10:21:38 +0800
+Subject: [PATCH] clk: divider: Fix table round up function
+In-Reply-To: <1399481332-9550-1-git-send-email-maxime.coquelin@st.com>
+References: <1399481332-9550-1-git-send-email-maxime.coquelin@st.com>
+Message-ID: <20140508022135.GC2794@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-
-On Wed, 16 Apr 2014, Archit Taneja wrote:
-
-> The control module isn't actually a clock management module, but there are a few
-> register bits which perform gating and muxing of clocks.
+On Wed, May 07, 2014 at 06:48:52PM +0200, Maxime COQUELIN wrote:
+> Commit 1d9fe6b97 ("clk: divider: Fix best div calculation for power-of-two and
+> table dividers") introduces a regression in its _table_round_up function.
 > 
-> Add CTRL_MODULE_CORE sub block as a clock provider for DRA7. The control module
-> has 2 sub modules: CTRL_MODULE_CORE, and CTRL_MODULE_WKUP. Out of these, only
-> the CORE sub module has clock related register fields. We ignore the WKUP sub
-> module.
+> When the divider passed to this function is greater than the max divider
+> available in the table, this function returns table's max divider.
+> Problem is that it causes an infinite loop in clk_divider_bestdiv() because
+> _next_div() will never return a value greater than maxdiv.
 > 
-> Signed-off-by: Archit Taneja <archit@ti.com>
+> Instead of returning table's max divider, this patch returns INT_MAX.
+> 
+> Reported-by: Fabio Estevam <festevam@gmail.com>
+> Reported-by: Shawn Guo <shawn.guo@freescale.com>
+> Tested-by: Fabio Estevam <festevam@gmail.com>
+> Cc: Mike Turquette <mike.turquette@linaro.org>
+> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
+
+Tested-by: Shawn Guo <shawn.guo@freescale.com>
+
+Thanks for the fix.
+
+Shawn
+
 > ---
->  arch/arm/mach-omap2/prm_common.c | 1 +
->  1 file changed, 1 insertion(+)
+>  drivers/clk/clk-divider.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
-> index b4c4ab9..f86029a 100644
-> --- a/arch/arm/mach-omap2/prm_common.c
-> +++ b/arch/arm/mach-omap2/prm_common.c
-> @@ -489,6 +489,7 @@ static struct of_device_id omap_prcm_dt_match_table[] = {
->  	{ .compatible = "ti,dra7-prm" },
->  	{ .compatible = "ti,dra7-cm-core-aon" },
->  	{ .compatible = "ti,dra7-cm-core" },
-> +	{ .compatible = "ti,dra7-ctrl-core" },
->  	{ }
->  };
-
-So, based on a quick glance, and without the benefit of any 
-documentation, it makes general sense to add the DRA7 CTRL module as a 
-clock provider, but it does not make any sense to associate it with the 
-PRCM.  Please find a control module-specific piece of code to register as 
-a clock provider, not prm_common.c.
-
-
-
-- Paul
+> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+> index b3c8396..cf9114a 100644
+> --- a/drivers/clk/clk-divider.c
+> +++ b/drivers/clk/clk-divider.c
+> @@ -158,7 +158,7 @@ static bool _is_valid_div(struct clk_divider *divider, unsigned int div)
+>  static int _round_up_table(const struct clk_div_table *table, int div)
+>  {
+>  	const struct clk_div_table *clkt;
+> -	int up = _get_table_maxdiv(table);
+> +	int up = INT_MAX;
+>  
+>  	for (clkt = table; clkt->div; clkt++) {
+>  		if (clkt->div == div)
+> -- 
+> 1.9.1
+> 
