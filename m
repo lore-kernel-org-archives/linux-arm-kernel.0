@@ -1,39 +1,34 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu,  8 May 2014 15:52:17 +0200
-Subject: [PATCH 4/8] usb: phy: fix isp1301-omap dependency on tps65010
+Date: Thu,  8 May 2014 15:52:16 +0200
+Subject: [PATCH 3/8] usb: musb: omap2plus bus glue needs USB host support
 In-Reply-To: <1399557141-1346645-1-git-send-email-arnd@arndb.de>
 References: <1399557141-1346645-1-git-send-email-arnd@arndb.de>
-Message-ID: <1399557141-1346645-5-git-send-email-arnd@arndb.de>
+Message-ID: <1399557141-1346645-4-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The isp1301-omap driver cannot be built-in if the tps65010 driver
-is a module, otherwise we get a link error from the reference to
-the tps65010_set_vbus_draw function.
-
-There is already a hack in the driver to work around the problem
-of tps65010 being not available at all. This patch extends that
-hack to ensure that the real tps65010_set_vbus_draw() function
-is only called when it's avaiable.
+The musb/omap2430.c bus glue driver calls usb_hcd_poll_rh_status,
+which is only available if CONFIG_USB is also set, i.e. we
+are building USB host mode and not just endpoint mode.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Cc: linux-omap at vger.kernel.org
 ---
- drivers/usb/phy/phy-isp1301-omap.c | 2 +-
+ drivers/usb/musb/Kconfig | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/usb/phy/phy-isp1301-omap.c b/drivers/usb/phy/phy-isp1301-omap.c
-index 6e146d7..35a0dd2 100644
---- a/drivers/usb/phy/phy-isp1301-omap.c
-+++ b/drivers/usb/phy/phy-isp1301-omap.c
-@@ -94,7 +94,7 @@ struct isp1301 {
+diff --git a/drivers/usb/musb/Kconfig b/drivers/usb/musb/Kconfig
+index 618b152..fce762c 100644
+--- a/drivers/usb/musb/Kconfig
++++ b/drivers/usb/musb/Kconfig
+@@ -76,7 +76,7 @@ config USB_MUSB_TUSB6010
  
- #if defined(CONFIG_MACH_OMAP_H2) || defined(CONFIG_MACH_OMAP_H3)
+ config USB_MUSB_OMAP2PLUS
+ 	tristate "OMAP2430 and onwards"
+-	depends on ARCH_OMAP2PLUS
++	depends on ARCH_OMAP2PLUS && USB
+ 	select GENERIC_PHY
  
--#if	defined(CONFIG_TPS65010) || defined(CONFIG_TPS65010_MODULE)
-+#if	defined(CONFIG_TPS65010) || (defined(CONFIG_TPS65010_MODULE) && defined(MODULE))
- 
- #include <linux/i2c/tps65010.h>
- 
+ config USB_MUSB_AM35X
 -- 
 1.8.3.2
