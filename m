@@ -1,59 +1,101 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Thu,  8 May 2014 17:23:37 -0500
-Subject: [PATCH 0/6] DT early console initialization
-Message-ID: <1399587823-17701-1-git-send-email-robherring2@gmail.com>
+Date: Thu,  8 May 2014 17:23:42 -0500
+Subject: [PATCH 5/6] of/fdt: add FDT serial scanning for earlycon
+In-Reply-To: <1399587823-17701-1-git-send-email-robherring2@gmail.com>
+References: <1399587823-17701-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1399587823-17701-6-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <robh@kernel.org>
 
-This series adds support for early serial console initialization using 
-DT. This enables determining the serial port type and address using the 
-FDT and allows enabling the console before platform specific 
-initialization runs. I've tested this on arm64. ARM support is dependent 
-on adding fixmap support.
+This adds FDT parsing of {linux,}stdout-path to setup an early serial
+console. Enabling of the early console is triggered with "earlycon"
+(with no options) on the kernel command line.
 
-Currently, the earlycon is only enabled if "earlycon" is present on the 
-kernel command line. The FDT needs to have /chosen/stdout-path set to 
-the path of the serial port.
+Platforms must either have fixmap permanent mapping support,
+have a functioning ioremap when early params are parsed, or explicitly
+call early_init_dt_scan_chosen_serial from architecture code.
 
-This series is dependent on generic earlycon[1], libfdt support[2], and 
-vmlinux.lds.h clean-ups[3]. The first 2 are in linux-next already. A git 
-branch is available here:
+Signed-off-by: Rob Herring <robh@kernel.org>
+Cc: Grant Likely <grant.likely@linaro.org>
+---
+ drivers/of/fdt.c | 56 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 56 insertions(+)
 
-git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git earlycon-dt
-
-Rob
-
-[1] https://lkml.org/lkml/2014/4/18/573
-[2] https://lkml.org/lkml/2014/4/22/1202
-[3] https://lkml.org/lkml/2014/3/27/285
-
-Rob Herring (6):
-  of: align RESERVEDMEM_OF_DECLARE function callbacks to other callbacks
-  of: consolidate linker section OF match table declarations
-  serial: earlycon: add DT support
-  of/fdt: add FDT address translation support
-  of/fdt: add FDT serial scanning for earlycon
-  tty/serial: pl011: add DT based earlycon support
-
- drivers/clocksource/clksrc-of.c   |   2 +-
- drivers/irqchip/irqchip.h         |   7 +-
- drivers/of/Makefile               |   2 +
- drivers/of/fdt.c                  |  56 +++++++++
- drivers/of/fdt_address.c          | 241 ++++++++++++++++++++++++++++++++++++++
- drivers/of/of_reserved_mem.c      |   2 +-
- drivers/tty/serial/amba-pl011.c   |   1 +
- drivers/tty/serial/earlycon.c     |  27 +++++
- include/asm-generic/vmlinux.lds.h |   4 +-
- include/linux/clk-provider.h      |   5 +-
- include/linux/clocksource.h       |  16 +--
- include/linux/of.h                |  22 ++++
- include/linux/of_fdt.h            |   1 +
- include/linux/of_reserved_mem.h   |  22 +---
- include/linux/serial_core.h       |   6 +
- 15 files changed, 372 insertions(+), 42 deletions(-)
- create mode 100644 drivers/of/fdt_address.c
-
+diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+index a6f83ea..1fbeab2 100644
+--- a/drivers/of/fdt.c
++++ b/drivers/of/fdt.c
+@@ -21,6 +21,7 @@
+ #include <linux/slab.h>
+ #include <linux/libfdt.h>
+ #include <linux/debugfs.h>
++#include <linux/serial_core.h>
+ 
+ #include <asm/setup.h>  /* for COMMAND_LINE_SIZE */
+ #include <asm/page.h>
+@@ -696,6 +697,61 @@ static inline void early_init_dt_check_for_initrd(unsigned long node)
+ }
+ #endif /* CONFIG_BLK_DEV_INITRD */
+ 
++#ifdef CONFIG_SERIAL_EARLYCON
++extern struct of_device_id __earlycon_of_table[];
++
++int __init early_init_dt_scan_chosen_serial(void)
++{
++	int offset;
++	const char *p;
++	int l;
++	const struct of_device_id *match = __earlycon_of_table;
++	const void *fdt = initial_boot_params;
++
++	offset = fdt_path_offset(fdt, "/chosen");
++	if (offset < 0)
++		offset = fdt_path_offset(fdt, "/chosen@0");
++	if (offset < 0)
++		return -ENOENT;
++
++	p = fdt_getprop(fdt, offset, "stdout-path", &l);
++	if (!p)
++		p = fdt_getprop(fdt, offset, "linux,stdout-path", &l);
++	if (!p || !l)
++		return -ENOENT;
++
++	/* Get the node specified by stdout-path */
++	offset = fdt_path_offset(fdt, p);
++	if (offset < 0)
++		return -ENODEV;
++
++	while (match->compatible) {
++		unsigned long addr;
++		if (fdt_node_check_compatible(fdt, offset, match->compatible)) {
++			match++;
++			continue;
++		}
++
++		addr = fdt_translate_address(fdt, offset);
++		if (!addr)
++			return -ENXIO;
++
++		of_setup_earlycon(addr, match->data);
++		return 0;
++	}
++	return -ENODEV;
++}
++
++static int __init setup_of_earlycon(char *buf)
++{
++	if (buf)
++		return 0;
++
++	return early_init_dt_scan_chosen_serial();
++}
++early_param("earlycon", setup_of_earlycon);
++#endif
++
+ /**
+  * early_init_dt_scan_root - fetch the top level address and size cells
+  */
 -- 
 1.9.1
