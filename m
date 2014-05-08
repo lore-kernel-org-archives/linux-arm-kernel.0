@@ -1,44 +1,61 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu,  8 May 2014 16:56:12 +0200
-Subject: [PATCH 1/2] dmaengine: omap: hide filter_fn for built-in drivers
-In-Reply-To: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
+Date: Thu,  8 May 2014 16:56:13 +0200
+Subject: [PATCH 2/2] dmaengine: sa11x0: remove broken #ifdef
+In-Reply-To: <1399560990-1402858-1-git-send-email-arnd@arndb.de>
 References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
-Message-ID: <1399560990-1402858-1-git-send-email-arnd@arndb.de>
+ <1399560990-1402858-1-git-send-email-arnd@arndb.de>
+Message-ID: <1399560990-1402858-2-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is not possible to reference the omap_dma_filter_fn filter
-function from a built-in driver if the dmaengine driver itself
-is a loadable module, which is a valid configuration otherwise.
+The sa11x0_dma_pm_ops unconditionally reference sa11x0_dma_resume
+and sa11x0_dma_suspend, which currently breaks if CONFIG_PM_SLEEP
+is disabled.
 
-This provides only the dummy alternative if the function
-is referenced by a built-in driver to allow a successful
-build. The filter function is only required by ATAGS based
-platforms, which will continue to be broken after this change
-for the bogus configuration. When booting from DT, with the
-dma channels correctly listed there, it will work fine.
+There is probably a better way to remove the reference in this
+case, but the safe choice is to have the suspend/resume code always
+built in the driver.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Vinod Koul <vinod.koul@intel.com>
+Cc: Russell King <linux@arm.linux.org.uk>
 Cc: dmaengine at vger.kernel.org
+Cc: Vinod Koul <vinod.koul@intel.com>
+Cc: Dan Williams <dan.j.williams@intel.com>
 ---
- include/linux/omap-dma.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/dma/sa11x0-dma.c | 4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/include/linux/omap-dma.h b/include/linux/omap-dma.h
-index 0a1a2e2..c29a6de 100644
---- a/include/linux/omap-dma.h
-+++ b/include/linux/omap-dma.h
-@@ -10,7 +10,7 @@
+diff --git a/drivers/dma/sa11x0-dma.c b/drivers/dma/sa11x0-dma.c
+index ab26d46..5ebdfbc 100644
+--- a/drivers/dma/sa11x0-dma.c
++++ b/drivers/dma/sa11x0-dma.c
+@@ -113,11 +113,9 @@ struct sa11x0_dma_phy {
+ 	struct sa11x0_dma_desc	*txd_load;
+ 	unsigned		sg_done;
+ 	struct sa11x0_dma_desc	*txd_done;
+-#ifdef CONFIG_PM_SLEEP
+ 	u32			dbs[2];
+ 	u32			dbt[2];
+ 	u32			dcsr;
+-#endif
+ };
  
- struct dma_chan;
+ struct sa11x0_dma_dev {
+@@ -984,7 +982,6 @@ static int sa11x0_dma_remove(struct platform_device *pdev)
+ 	return 0;
+ }
  
--#if defined(CONFIG_DMA_OMAP) || defined(CONFIG_DMA_OMAP_MODULE)
-+#if defined(CONFIG_DMA_OMAP) || (defined(CONFIG_DMA_OMAP_MODULE) && defined(MODULE))
- bool omap_dma_filter_fn(struct dma_chan *, void *);
- #else
- static inline bool omap_dma_filter_fn(struct dma_chan *c, void *d)
+-#ifdef CONFIG_PM_SLEEP
+ static int sa11x0_dma_suspend(struct device *dev)
+ {
+ 	struct sa11x0_dma_dev *d = dev_get_drvdata(dev);
+@@ -1054,7 +1051,6 @@ static int sa11x0_dma_resume(struct device *dev)
+ 
+ 	return 0;
+ }
+-#endif
+ 
+ static const struct dev_pm_ops sa11x0_dma_pm_ops = {
+ 	.suspend_noirq = sa11x0_dma_suspend,
 -- 
 1.8.3.2
