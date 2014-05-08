@@ -1,32 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 8 May 2014 14:49:10 +0100
-Subject: ARM: Disable preemption along with interrupts during shutdown
-In-Reply-To: <1399555411-15330-1-git-send-email-arunks.linux@gmail.com>
-References: <1399555411-15330-1-git-send-email-arunks.linux@gmail.com>
-Message-ID: <20140508134910.GF3693@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu,  8 May 2014 15:52:17 +0200
+Subject: [PATCH 4/8] usb: phy: fix isp1301-omap dependency on tps65010
+In-Reply-To: <1399557141-1346645-1-git-send-email-arnd@arndb.de>
+References: <1399557141-1346645-1-git-send-email-arnd@arndb.de>
+Message-ID: <1399557141-1346645-5-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 08, 2014 at 06:53:31PM +0530, arunks.linux at gmail.com wrote:
-> From: Arun KS <arunks.linux@gmail.com>
-> 
-> 'irqs disabled' is funtamentally unsafe way of disabling preemption.
-> Any spin_unlock() decreasing the preemption count to 0 might trigger
-> a reschedule. A simple printk() might trigger a reschedule.
-> 
-> To be on safe side disable preemption as well using preempt_disable()
+The isp1301-omap driver cannot be built-in if the tps65010 driver
+is a module, otherwise we get a link error from the reference to
+the tps65010_set_vbus_draw function.
 
-NAK.
+There is already a hack in the driver to work around the problem
+of tps65010 being not available at all. This patch extends that
+hack to ensure that the real tps65010_set_vbus_draw() function
+is only called when it's avaiable.
 
-asmlinkage void __sched notrace preempt_schedule(void)
-{
-        /*
-         * If there is a non-zero preempt_count or interrupts are disabled,
-         * we do not want to preempt the current task. Just return..
-         */
-        if (likely(!preemptible()))
-                return;
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: linux-omap at vger.kernel.org
+---
+ drivers/usb/phy/phy-isp1301-omap.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/drivers/usb/phy/phy-isp1301-omap.c b/drivers/usb/phy/phy-isp1301-omap.c
+index 6e146d7..35a0dd2 100644
+--- a/drivers/usb/phy/phy-isp1301-omap.c
++++ b/drivers/usb/phy/phy-isp1301-omap.c
+@@ -94,7 +94,7 @@ struct isp1301 {
+ 
+ #if defined(CONFIG_MACH_OMAP_H2) || defined(CONFIG_MACH_OMAP_H3)
+ 
+-#if	defined(CONFIG_TPS65010) || defined(CONFIG_TPS65010_MODULE)
++#if	defined(CONFIG_TPS65010) || (defined(CONFIG_TPS65010_MODULE) && defined(MODULE))
+ 
+ #include <linux/i2c/tps65010.h>
+ 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.8.3.2
