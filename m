@@ -1,59 +1,85 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 8 May 2014 12:04:33 -0400 (EDT)
-Subject: [PATCH] ARM: Don't ever downscale loops_per_jiffy in SMP systems
-In-Reply-To: <CAD=FV=UEGJGHrdcXgs3EZ_wFXT8GnNeCOMt7CgdiiUzBzZ5Y0A@mail.gmail.com>
-References: <1399504982-31181-1-git-send-email-dianders@chromium.org>
- <CAOh2x=kwaoSdj8JO0Vo08Y0dX2UfKFiF3pBV-qtp-YTyN=8H8Q@mail.gmail.com>
- <CAD=FV=UEGJGHrdcXgs3EZ_wFXT8GnNeCOMt7CgdiiUzBzZ5Y0A@mail.gmail.com>
-Message-ID: <alpine.LFD.2.11.1405081149190.980@knanqh.ubzr>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 08 May 2014 18:07:09 +0200
+Subject: [PATCH 1/2] ARM: dts: Enable USB 3503 hub on exynos5250-snow
+In-Reply-To: <1399293056-17143-1-git-send-email-gautam.vivek@samsung.com>
+References: <1399293056-17143-1-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <536BABAD.5030605@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 8 May 2014, Doug Anderson wrote:
+Hi Vivek,
 
-> 1. Initially CPU1 and CPU2 at 200MHz.  Pretend loops_per_jiffy is 1000.
+On 05.05.2014 14:30, Vivek Gautam wrote:
+> The exynos5250-snow has a SMSC USB3503 connected in
+> hardware only mode like a PHY. Enable support for it,
+> and add necessary 'reset-gpio' for it.
 > 
-> 2. CPU1 starts a delay.  It reads global lpj (1000) and sets up its
-> local registers up for the loop.
+> This is in correspondance to similar patch by Mark Brown
+> 7c1b0ec ARM: dts: Enable USB hub on Arndale
 > 
-> 3. At the same time, CPU2 is transitioning the system to 2000MHz.
-> Right after CPU1 reads lpj CPU2 stores it as 10000.
+> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+> ---
 > 
-> 4. Now CPU1 and CPU2 are running at 2000MHz but CPU1 is only looping
-> 1000 times.  It will complete too fast.
+> Based on 'for-next' branch of kgene's linux-samsung tree.
 > 
-> ...you could possibly try to account for this in the delay loop code
-> (being careful to handle all of the corner cases and races).  ...or we
-> could make the delay loop super conservative and suggest that people
-> should be using a real timer.
+>  arch/arm/boot/dts/exynos5250-pinctrl.dtsi |    7 +++++++
+>  arch/arm/boot/dts/exynos5250-snow.dts     |   14 ++++++++++++++
+>  2 files changed, 21 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5250-pinctrl.dtsi b/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
+> index 9a49e68..bd8c8f1 100644
+> --- a/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
+> +++ b/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
+> @@ -706,6 +706,13 @@
+>  			samsung,pin-pud = <0>;
+>  			samsung,pin-drv = <0>;
+>  		};
+> +
+> +		usb_hub_reset: usb-hub-reset {
+> +			samsung,pins = "gpe1-0";
+> +			samsung,pin-function = <1>;
+> +			samsung,pin-pud = <0>;
+> +			samsung,pin-drv = <0>;
+> +		};
 
-I don't see how you can possibly solve this issue without a timer based 
-delay.  Even if you scale the loop count in only one direction, it will 
-still have this problem even though the window for the race would happen 
-much less often.  Yet having a delay which is way longer than expected 
-might cause problems in some cases.
+This is not a generic pin config group and should not be added to this
+file. Btw. it just sets the pin to output, which is what the consumer
+driver can do as well by calling gpio_direction_output. Do you really
+need this?
 
-Yet clock frequency changes with the kind of magnitude you give in your 
-example are usually not instantaneous.  Given udelay should be used for 
-very short delays, it is likely that CPU1 will complete its count before 
-the higher clock frequency is effective in most cases.
+>  	};
+>  
+>  	pinctrl at 10d10000 {
+> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+> index 1ce1088..2e48f27 100644
+> --- a/arch/arm/boot/dts/exynos5250-snow.dts
+> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
+> @@ -200,6 +200,20 @@
+>  		samsung,vbus-gpio = <&gpx1 1 0>;
+>  	};
+>  
+> +	usb_hub_bus {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
 
-> How exactly do you do this in a generic way?  I know that our systems
-> don't always boot up at full speed.  The HP Chromebook 11 might boot
-> up at 900MHz and stay that way for a while until the battery gets
-> enough juice.  The Samsung Chromebook 2 will boot up at 1.8GHz
-> although some of them can go to 1.9GHz and others to 2.0GHz.  Waiting
-> to actually see the cpufreq transition is a safe way, though it does
-> end up with some extra function calls.
+Why do you need this bus?
 
-The Samsung Chromebook uses an A15 which does use a timer based udelay.  
-What about the others?  IOW is this a real problem in practice or a 
-theoretical one?
+> +
+> +		// SMSC USB3503 connected in hardware only mode as a PHY
 
-SMP with shared clock for DVFS simply doesn't allow pure loop counts to 
-always be accurate.  Trying to fix a broken implementation with 
-something that is still broken to some extent, and maybe more in 
-some cases, doesn't look like much progress to me.
+Wrong comment style. Also basically the comment says exactly the same as
+could be inferred from the node below.
 
+> +		usb_hub {
+> +			compatible = "smsc,usb3503a";
+> +			reset-gpios = <&gpe1 0 1>;
+> +			pinctrl-0 = <&usb_hub_reset>;
+> +			pinctrl-names = "default";
 
-Nicolas
+As above, do you really need to use pinctrl here?
+
+I believe the same comments apply for patch 2/2 as well.
+
+Best regards,
+Tomasz
