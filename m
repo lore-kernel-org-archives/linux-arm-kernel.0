@@ -1,75 +1,108 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 8 May 2014 19:05:40 -0400
-Subject: [PATCH 3/5] irqchip: crossbar: Skip some irqs from getting mapped
- to crossbar
-In-Reply-To: <CAD=GYpbQQxQgKd3oZcAuWrxoD4VrkKzpybd11qwxs405HSUVGw@mail.gmail.com>
-References: <1399299527-10955-1-git-send-email-r.sricharan@ti.com>	<1399299527-10955-4-git-send-email-r.sricharan@ti.com>	<536BD9D8.4080905@ti.com>	<20140508203659.GA5620@kahuna>
- <CAD=GYpbQQxQgKd3oZcAuWrxoD4VrkKzpybd11qwxs405HSUVGw@mail.gmail.com>
-Message-ID: <536C0DC4.7090309@ti.com>
+From: sebastian.capella@linaro.org (Sebastian Capella)
+Date: Thu, 08 May 2014 16:12:19 -0700
+Subject: [PATCH RFC v3 3/6] drivers: cpuidle: implement OF based idle
+ states infrastructure
+In-Reply-To: <1399399483-17112-4-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1399399483-17112-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1399399483-17112-4-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <536c0f39.90ab420a.3da7.ffff86ca@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 May 2014 06:43 PM, Joel Fernandes wrote:
-> On Thu, May 8, 2014 at 3:37 PM, Nishanth Menon <nm@ti.com> wrote:
->> On 14:24-20140508, Joel Fernandes wrote:
->>> On 05/05/2014 09:18 AM, Sricharan R wrote:
->>>> From: Nishanth Menon <nm@ti.com>
->>>>
->>>> When, in the system due to varied reasons, interrupts might be unusable
->>>> due to hardware behavior, but register maps do exist, then those interrupts
->>>> should be skipped while mapping irq to crossbars.
->>>>
->>>
->>> Just wondering, instead of hardcoding this data in the code, and
->>> introducing additional flags (IRQ_SKIP), why not just put these GIC IRQs
->>> in the ti,irq-reserved property in DTS for platforms where such IRQs are
->>> not usable. That way you're skipping these IRQs anyway.
->>>
->>> Also that would avoid adding more hard coded data for future SoCs into
->>> the source for such IRQs that must be skipped, and also reduces LOC.
->>>
->>
->> Good question - lets try to explain the hardware a little here ->
->> obviously a driver that cannot use the hardware is useless compared to
->> reducing LOC count ;).. and apologies about the long reply..
->>
->> Basic understanding:
->> GIC has 160 SPIs and number of hardware block interrupt sources is around or
->> more than 400. So, in comes crossbar - which is basically a mapper by
->> allowing us to select an hardware block interrupt source (identified as
->> crossbar_number or cb_no in code). So all we have to do is to write to a
->> register in crossbar corresponding to GIC and viola, we now routed the
->> interrupt source to a GIC interrupt of our choice. At least the
->> Specification reads so.... until you drill down to the details.
-> 
-> Thanks for the long explanation and the diagrams!
-> 
-> Yes, I feel there is no other way and with so many HW bugs, I think it
-> makes sense to make it a real irqchip driver.
->
-It doesn't because its not an irqchip. 
- 
-> Further since not everything goes through the crossbar and some are
-> direct mapped like your diagram, the correct fix is probably making it
-> an irqchip and doing the interrupt controller parenting correctly in
-> DT.
-> 
-> That would take care of A), because users of such direct mapped
-> interrupts will go through the GIC interrupt controller directly.
-> 
-> It will also take care of B), because if writing to cross bar has no
-> effect for a particular IRQ, or if those IRQs are hard-wired to
-> something, as you said, then that something should go through the GIC
-> directly.
-> 
-> I can try to whip up something like this if it makes sense, let me know...
-> 
-I have been ignoring this series considering they were just fixes
-but you comments are like re-inventing wheel. Please read all
-the old threads and comments from Thomas and me on why we took
-approach and why it is not an irqchip. There is no need to complicate
-it further.
+Quoting Lorenzo Pieralisi (2014-05-06 11:04:40)
 
+> diff --git a/drivers/cpuidle/of_idle_states.c b/drivers/cpuidle/of_idle_states.c
+> new file mode 100644
+> index 0000000..360b7ad
+> --- /dev/null
+> +++ b/drivers/cpuidle/of_idle_states.c
+> @@ -0,0 +1,293 @@
+...
+> +static int __init add_state_node(cpumask_t *cpumask,
+> +                                struct device_node *state_node)
+> +{
+> +       struct state_elem *el;
+> +       u32 tmp, val = 0;
+> +
+> +       pr_debug(" * %s...\n", state_node->full_name);
+> +
+> +       if (!state_cpus_valid(cpumask, state_node))
+> +               return -EINVAL;
+> +       /*
+> +        * Parse just the properties required to sort the states.
+> +        * Since we are missing a value defining the energy
+> +        * efficiency of a state, for now the sorting code uses
+> +        *
+> +        * min-residency-us+exit-latency-us
+> +        *
+> +        * as sorting rank.
+> +        */
+> +       if (of_property_read_u32(state_node, "min-residency-us",
+> +                                &tmp)) {
+> +               pr_debug(" * %s missing min-residency-us property\n",
+> +                        state_node->full_name);
+> +               return -EINVAL;
+> +       }
+> +
+> +       val += tmp;
+> +
+> +       if (of_property_read_u32(state_node, "exit-latency-us",
+> +                                &tmp)) {
+> +               pr_debug(" * %s missing exit-latency-us property\n",
+> +                            state_node->full_name);
+> +               return -EINVAL;
+> +       }
+> +
+> +       val += tmp;
 
-Regards,
-Santosh
+Sorry if i'm rehashing old stuff, but I prefer not to use the
+min-residency + exit-latency to sort.  I saw Rob's comment suggesting it
+and your reply.  I'm not sure when it was decided.
+
+Would it be possible to sort instead based on the order in the
+cpus->cpu-idle-states?  If not, my preference would be to either use
+index like you had before, or specify another sort order / rank value.
+
+I think there's potential for us to create lower power states that
+have lower min-residencies (reduced power consumption in the state,
+allowing us to more quickly recover the higher entrance cost)
+with higher exit latencies in such a way that the formula would not
+sort as we expect.  Having a separate value would allow us to control
+the sorting in those cases.
+
+> +
+> +/*
+
+For kernel-doc, I think you need a /** here, and a () after the
+of_init_idle_driver below.  Also maybe Return: instead of Returns:
+and I think the return paragraph goes at the end, but am not positive.
+
+kernel-doc-nano-HOWTO.txt
+
+> + * of_init_idle_driver - Parse the DT idle states and initialize the
+> + *                      idle driver states array
+> + *
+> + * @drv:         Pointer to CPU idle driver to be initialized
+> + * @state_nodes:  Array of struct device_nodes to be initialized if
+> + *               init_nodes == true. Must be sized CPUIDLE_STATE_MAX
+> + * @start_idx:    First idle state index to be initialized
+> + * @init_nodes:   Boolean to request device nodes initialization
+> + *
+> + * Returns:
+> + *     0 on success
+> + *     <0 on failure
+> + *
+> + *     On success the states array in the cpuidle driver contains
+> + *     initialized entries in the states array, starting from index start_idx.
+> + *     If init_nodes == true, on success the state_nodes array is initialized
+> + *     with idle state DT node pointers, starting from index start_idx,
+> + *     in a 1:1 relation with the idle driver states array.
+> + */
+> +int __init of_init_idle_driver(struct cpuidle_driver *drv,
+> +                              struct device_node *state_nodes[],
+> +                              unsigned int start_idx, bool init_nodes)
+> +{
+
+Thanks!
+
+Sebastian
