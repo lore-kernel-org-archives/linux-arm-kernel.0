@@ -1,66 +1,41 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 8 May 2014 12:29:51 +0530
-Subject: [PATCH 0/2] OMAP2+: optional clock handling fixes
-In-Reply-To: <alpine.DEB.2.02.1405080000400.23579@utopia.booyaka.com>
-References: <1398233465-8845-1-git-send-email-rnayak@ti.com>
- <alpine.DEB.2.02.1405080000400.23579@utopia.booyaka.com>
-Message-ID: <536B2B67.9070808@ti.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 8 May 2014 15:02:04 +0800
+Subject: [PATCH] ARM: imx: add HDMI support for SolidRun HummingBoard and
+ Cubox-i
+In-Reply-To: <20140419054134.GV2523@dragon>
+References: <E1Wb5br-0002ZE-T3@rmk-PC.arm.linux.org.uk>
+ <20140419054134.GV2523@dragon>
+Message-ID: <20140508070203.GC2798@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 May 2014 05:38 AM, Paul Walmsley wrote:
-> Hi Rajendra,
+On Sat, Apr 19, 2014 at 01:41:35PM +0800, Shawn Guo wrote:
+> On Fri, Apr 18, 2014 at 11:01:27AM +0100, Russell King wrote:
+> > Add the HDMI DT configuration for the SolidRun HummingBoard and Cubox-i.
+> > 
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > ---
+> >  arch/arm/boot/dts/imx6dl-hummingboard.dts | 28 ++++++++++++++++++++++++++++
+> >  arch/arm/boot/dts/imx6qdl-cubox-i.dtsi    | 28 ++++++++++++++++++++++++++++
+> >  2 files changed, 56 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/imx6dl-hummingboard.dts b/arch/arm/boot/dts/imx6dl-hummingboard.dts
+> > index 5bfae54fb780..d3095f58bf7b 100644
+> > --- a/arch/arm/boot/dts/imx6dl-hummingboard.dts
+> > +++ b/arch/arm/boot/dts/imx6dl-hummingboard.dts
+> > @@ -67,6 +67,14 @@
+> >  	status = "okay";
+> >  };
+> >  
+> > +&hdmi {
+> > +	pinctrl-names = "default";
+> > +	pinctrl-0 = <&pinctrl_hummingboard_hdmi>;
+> > +	ddc-i2c-bus = <&i2c2>;
+> > +	status = "okay";
+> > +	crtcs = <&ipu1 0>;
 > 
-> On Wed, 23 Apr 2014, Rajendra Nayak wrote:
-> 
->> The patches fix some opt clock handling in gpio and in
->> hwmod.
->>
->> Rajendra Nayak (2):
->>   gpio: omap: prepare and unprepare the debounce clock
->>   ARM: OMAP2+: hwmod: Don't leave the optional clocks in
->>     clk_prepare()ed state
->>
->>  arch/arm/mach-omap2/omap_hwmod.c |   13 ++-----------
->>  drivers/gpio/gpio-omap.c         |   10 +++++-----
->>  2 files changed, 7 insertions(+), 16 deletions(-)
-> 
-> Can these patches be merged separately?  Looks to me that the two options 
-> are either to:
-> 
-> A. to merge them together, or 
-> 
-> B. to merge patch 1 first, then patch 2
+> The 'crtcs' should be dropped now, right?
 
-Thats right.
+Dropped the crtcs line and applied the patch, thanks.
 
-> 
-> Or will things break if only patch 1 is merged?
-
-Things will break if only patch 2 is merged as gpios clk_enable()
-request would fail. Merging only patch 1 has no issues.
-
-> 
-> 
-> If we merge them together, I'd say the best situation would be to take 
-> them through the OMAP tree, since the changes are all OMAP-specific.  In 
-> that case we'll want an ack for the first patch from the GPIO maintainers, 
-> Linus Walleij <linus.walleij@linaro.org> and Alexandre Courbot 
-> <gnurou@gmail.com>.
-> 
-> Otherwise the path of least resistance would be (B) - you can get patch 1 
-> merged via the GPIO tree.  The GPIO maintainers can then provide a 
-> stable branch for us to base our changes on, or we can wait until the 
-> change reaches Linus.  Then we can subsequently merge patch 2 via the  
-> OMAP side.
-> 
-> Thoughts?
-
-I am fine either way. I will check with Linus W. what he prefers. Thanks.
-
-regards,
-Rajendra
-> 
-> 
-> - Paul
-> 
+Shawn
