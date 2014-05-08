@@ -1,33 +1,42 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 8 May 2014 11:05:20 -0300
-Subject: Adding esdhc4 eMMC support on mx6sabresd
-In-Reply-To: <20140508101730.GA28787@shlinux1.ap.freescale.net>
-References: <CAOMZO5CJEoe_fGLH-Uu9uVwNdWPp940k3WGAkjzkCiGmjAPAXA@mail.gmail.com>
- <20140508091835.78daafbe@ipc1.ka-ro>
- <20140508101730.GA28787@shlinux1.ap.freescale.net>
-Message-ID: <CAOMZO5AdS=X93MCeS54_A4hKe=rBHHph+ed_qkw9BFJ3+XJJMw@mail.gmail.com>
+From: arunks.linux@gmail.com (Arun KS)
+Date: Thu, 8 May 2014 19:46:21 +0530
+Subject: ARM: Disable preemption along with interrupts during shutdown
+In-Reply-To: <20140508134910.GF3693@n2100.arm.linux.org.uk>
+References: <1399555411-15330-1-git-send-email-arunks.linux@gmail.com>
+ <20140508134910.GF3693@n2100.arm.linux.org.uk>
+Message-ID: <CAKZGPAMwqWP44Cv7V11Q+8Ykdt=3huFCRi-eKKSt5d9zPp8H+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 8, 2014 at 7:17 AM, Dong Aisheng <b29396@freescale.com> wrote:
-
-> I'm not very sure about HYS bit, but it should not be pad setting issue.
-> This pad setting was tested ok with FSL internal tree.
+On Thu, May 8, 2014 at 7:19 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, May 08, 2014 at 06:53:31PM +0530, arunks.linux at gmail.com wrote:
+>> From: Arun KS <arunks.linux@gmail.com>
+>>
+>> 'irqs disabled' is funtamentally unsafe way of disabling preemption.
+>> Any spin_unlock() decreasing the preemption count to 0 might trigger
+>> a reschedule. A simple printk() might trigger a reschedule.
+>>
+>> To be on safe side disable preemption as well using preempt_disable()
 >
-> I just tested an old Chris/mmc-next tree which is 3.14 rc2 with the top commit is b42b9b.
-> The eMMC works well on SabreSD boards.
-> But it failed and got the same issue with latest chris/mmc-next tree.
-> I noticed there's no changes on sdhci-esdhc-imx.c
-> Probably some other changes breaks this function.
+> NAK.
 >
-> Fabio,
-> You may bisect it yourself or i will do it later when i'm a bit free.
+> asmlinkage void __sched notrace preempt_schedule(void)
+> {
+>         /*
+>          * If there is a non-zero preempt_count or interrupts are disabled,
+>          * we do not want to preempt the current task. Just return..
+>          */
+>         if (likely(!preemptible()))
+>                 return;
 
-Ok, I have just tested with Shawn's branch and the mmc error does not
-happen, so it must be something in linux-next that causes the issue.
+What if we fall in a path which calls spin_unlock_irq().
+Interrupts will get enabled and only preempt_count will help to bail
+out early from preempt_schedule().
+I recently hit a similar situation.
 
-Will submit the dts change.
-
-Regards,
-
-Fabio Estevam
+Thanks,
+>
+> --
+> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+> improving, and getting towards what was expected from it.
