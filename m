@@ -1,304 +1,122 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Thu,  8 May 2014 17:23:41 -0500
-Subject: [PATCH 4/6] of/fdt: add FDT address translation support
+Date: Thu,  8 May 2014 17:23:40 -0500
+Subject: [PATCH 3/6] serial: earlycon: add DT support
 In-Reply-To: <1399587823-17701-1-git-send-email-robherring2@gmail.com>
 References: <1399587823-17701-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1399587823-17701-5-git-send-email-robherring2@gmail.com>
+Message-ID: <1399587823-17701-4-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <robh@kernel.org>
 
-Copy u-boot's FDT address translation code from common/fdt_support. This
-code was originally based on the kernel's unflattened DT address parsing
-code.
-
-This commit can be reverted once relicensing of this code to GPLv2/BSD
-is done and it is added to libfdt.
+This adds the infrastructure to generic earlycon for earlycon setup
+using DT. The actual setup is not enabled until a following commit to
+add the FDT parsing.
 
 Signed-off-by: Rob Herring <robh@kernel.org>
-Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Jiri Slaby <jslaby@suse.cz>
+Cc: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/of/Makefile      |   2 +
- drivers/of/fdt_address.c | 241 +++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/of_fdt.h   |   1 +
- 3 files changed, 244 insertions(+)
- create mode 100644 drivers/of/fdt_address.c
+ drivers/tty/serial/earlycon.c     | 27 +++++++++++++++++++++++++++
+ include/asm-generic/vmlinux.lds.h |  4 +++-
+ include/linux/serial_core.h       |  6 ++++++
+ 3 files changed, 36 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/of/Makefile b/drivers/of/Makefile
-index 9891232..099b1fb 100644
---- a/drivers/of/Makefile
-+++ b/drivers/of/Makefile
-@@ -1,5 +1,6 @@
- obj-y = base.o device.o platform.o
- obj-$(CONFIG_OF_FLATTREE) += fdt.o
-+obj-$(CONFIG_OF_EARLY_FLATTREE) += fdt_address.o
- obj-$(CONFIG_OF_PROMTREE) += pdt.o
- obj-$(CONFIG_OF_ADDRESS)  += address.o
- obj-$(CONFIG_OF_IRQ)    += irq.o
-@@ -12,3 +13,4 @@ obj-$(CONFIG_OF_MTD)	+= of_mtd.o
- obj-$(CONFIG_OF_RESERVED_MEM) += of_reserved_mem.o
+diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
+index c92e830..021fe5f 100644
+--- a/drivers/tty/serial/earlycon.c
++++ b/drivers/tty/serial/earlycon.c
+@@ -15,6 +15,7 @@
+ #include <linux/init.h>
+ #include <linux/io.h>
+ #include <linux/serial_core.h>
++#include <linux/mod_devicetable.h>
  
- CFLAGS_fdt.o = -I$(src)/../../scripts/dtc/libfdt
-+CFLAGS_fdt_address.o = -I$(src)/../../scripts/dtc/libfdt
-diff --git a/drivers/of/fdt_address.c b/drivers/of/fdt_address.c
-new file mode 100644
-index 0000000..8d3dc6f
---- /dev/null
-+++ b/drivers/of/fdt_address.c
-@@ -0,0 +1,241 @@
-+/*
-+ * FDT Address translation based on u-boot fdt_support.c which in turn was
-+ * based on the kernel unflattened DT address translation code.
-+ *
-+ * (C) Copyright 2007
-+ * Gerald Van Baren, Custom IDEAS, vanbaren at cideas.com
-+ *
-+ * Copyright 2010-2011 Freescale Semiconductor, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2, or (at your option)
-+ * any later version.
-+ */
-+#include <linux/kernel.h>
-+#include <linux/libfdt.h>
-+#include <linux/of.h>
-+#include <linux/of_fdt.h>
-+#include <linux/sizes.h>
+ #ifdef CONFIG_FIX_EARLYCON_MEM
+ #include <asm/fixmap.h>
+@@ -32,6 +33,9 @@ static struct earlycon_device early_console_dev = {
+ 	.con = &early_con,
+ };
+ 
++static const struct of_device_id __earlycon_of_table_sentinel
++	__used __section(__earlycon_of_table_end);
 +
-+/* Max address size we deal with */
-+#define OF_MAX_ADDR_CELLS	4
-+#define OF_CHECK_COUNTS(na, ns)	((na) > 0 && (na) <= OF_MAX_ADDR_CELLS && \
-+			(ns) > 0)
+ static void __iomem * __init earlycon_map(unsigned long paddr, size_t size)
+ {
+ 	void __iomem *base;
+@@ -142,3 +146,26 @@ int __init setup_earlycon(char *buf, const char *match,
+ 	register_console(early_console_dev.con);
+ 	return 0;
+ }
 +
-+/* Debug utility */
-+#ifdef DEBUG
-+static void __init of_dump_addr(const char *s, const __be32 *addr, int na)
++int __init of_setup_earlycon(unsigned long addr,
++			     int (*setup)(struct earlycon_device *, const char *))
 +{
-+	pr_debug("%s", s);
-+	while(na--)
-+		pr_cont(" %08x", *(addr++));
-+	pr_debug("\n");
-+}
-+#else
-+static void __init of_dump_addr(const char *s, const __be32 *addr, int na) { }
-+#endif
++	int err;
++	struct uart_port *port = &early_console_dev.port;
 +
-+/* Callbacks for bus specific translators */
-+struct of_bus {
-+	void		(*count_cells)(const void *blob, int parentoffset,
-+				int *addrc, int *sizec);
-+	u64		(*map)(__be32 *addr, const __be32 *range,
-+				int na, int ns, int pna);
-+	int		(*translate)(__be32 *addr, u64 offset, int na);
-+};
++	port->iotype = UPIO_MEM;
++	port->mapbase = addr;
++	port->uartclk = BASE_BAUD * 16;
++	port->membase = earlycon_map(addr, SZ_4K);
 +
-+/* Default translator (generic bus) */
-+static void __init fdt_bus_default_count_cells(const void *blob, int parentoffset,
-+					       int *addrc, int *sizec)
-+{
-+	const __be32 *prop;
++	early_console_dev.con->data = &early_console_dev;
++	err = setup(&early_console_dev, NULL);
++	if (err < 0)
++		return err;
++	if (!early_console_dev.con->write)
++		return -ENODEV;
 +
-+	if (addrc) {
-+		prop = fdt_getprop(blob, parentoffset, "#address-cells", NULL);
-+		if (prop)
-+			*addrc = be32_to_cpup(prop);
-+		else
-+			*addrc = dt_root_addr_cells;
-+	}
 +
-+	if (sizec) {
-+		prop = fdt_getprop(blob, parentoffset, "#size-cells", NULL);
-+		if (prop)
-+			*sizec = be32_to_cpup(prop);
-+		else
-+			*sizec = dt_root_size_cells;
-+	}
-+}
-+
-+static u64 __init fdt_bus_default_map(__be32 *addr, const __be32 *range,
-+				      int na, int ns, int pna)
-+{
-+	u64 cp, s, da;
-+
-+	cp = of_read_number(range, na);
-+	s  = of_read_number(range + na + pna, ns);
-+	da = of_read_number(addr, na);
-+
-+	pr_debug("FDT: default map, cp=%llx, s=%llx, da=%llx\n",
-+	    cp, s, da);
-+
-+	if (da < cp || da >= (cp + s))
-+		return OF_BAD_ADDR;
-+	return da - cp;
-+}
-+
-+static int __init fdt_bus_default_translate(__be32 *addr, u64 offset, int na)
-+{
-+	u64 a = of_read_number(addr, na);
-+	memset(addr, 0, na * 4);
-+	a += offset;
-+	if (na > 1)
-+		addr[na - 2] = cpu_to_fdt32(a >> 32);
-+	addr[na - 1] = cpu_to_fdt32(a & 0xffffffffu);
-+
++	register_console(early_console_dev.con);
 +	return 0;
 +}
+diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
+index 120ccb9..f5249c4 100644
+--- a/include/asm-generic/vmlinux.lds.h
++++ b/include/asm-generic/vmlinux.lds.h
+@@ -129,6 +129,7 @@
+ #define CLK_OF_TABLES()		OF_TABLE(CONFIG_COMMON_CLK, clk)
+ #define RESERVEDMEM_OF_TABLES()	OF_TABLE(CONFIG_OF_RESERVED_MEM, reservedmem)
+ #define CPU_METHOD_OF_TABLES()	OF_TABLE(CONFIG_SMP, cpu_method)
++#define EARLYCON_OF_TABLES()	OF_TABLE(CONFIG_SERIAL_EARLYCON, earlycon)
+ 
+ #define KERNEL_DTB()							\
+ 	STRUCT_ALIGN();							\
+@@ -458,7 +459,8 @@
+ 	CLKSRC_OF_TABLES()						\
+ 	CPU_METHOD_OF_TABLES()						\
+ 	KERNEL_DTB()							\
+-	IRQCHIP_OF_MATCH_TABLE()
++	IRQCHIP_OF_MATCH_TABLE()					\
++	EARLYCON_OF_TABLES()
+ 
+ #define INIT_TEXT							\
+ 	*(.init.text)							\
+diff --git a/include/linux/serial_core.h b/include/linux/serial_core.h
+index 7a15b5b..5bbb809 100644
+--- a/include/linux/serial_core.h
++++ b/include/linux/serial_core.h
+@@ -294,6 +294,9 @@ struct earlycon_device {
+ int setup_earlycon(char *buf, const char *match,
+ 		   int (*setup)(struct earlycon_device *, const char *));
+ 
++extern int of_setup_earlycon(unsigned long addr,
++			     int (*setup)(struct earlycon_device *, const char *));
 +
-+/* Array of bus specific translators */
-+static const struct of_bus of_busses[] __initconst = {
-+	/* Default */
-+	{
-+		.count_cells = fdt_bus_default_count_cells,
-+		.map = fdt_bus_default_map,
-+		.translate = fdt_bus_default_translate,
-+	},
-+};
+ #define EARLYCON_DECLARE(name, func) \
+ static int __init name ## _setup_earlycon(char *buf) \
+ { \
+@@ -301,6 +304,9 @@ static int __init name ## _setup_earlycon(char *buf) \
+ } \
+ early_param("earlycon", name ## _setup_earlycon);
+ 
++#define OF_EARLYCON_DECLARE(name, compat, fn)				\
++	_OF_DECLARE(earlycon, name, compat, fn, void *)
 +
-+static int __init fdt_translate_one(const void *blob, int parent,
-+				    const struct of_bus *bus,
-+				    const struct of_bus *pbus, __be32 *addr,
-+				    int na, int ns, int pna, const char *rprop)
-+{
-+	const __be32 *ranges;
-+	int rlen;
-+	int rone;
-+	u64 offset = OF_BAD_ADDR;
-+
-+	ranges = fdt_getprop(blob, parent, rprop, &rlen);
-+	if (!ranges)
-+		return 1;
-+	if (rlen == 0) {
-+		offset = of_read_number(addr, na);
-+		memset(addr, 0, pna * 4);
-+		pr_debug("FDT: empty ranges, 1:1 translation\n");
-+		goto finish;
-+	}
-+
-+	pr_debug("FDT: walking ranges...\n");
-+
-+	/* Now walk through the ranges */
-+	rlen /= 4;
-+	rone = na + pna + ns;
-+	for (; rlen >= rone; rlen -= rone, ranges += rone) {
-+		offset = bus->map(addr, ranges, na, ns, pna);
-+		if (offset != OF_BAD_ADDR)
-+			break;
-+	}
-+	if (offset == OF_BAD_ADDR) {
-+		pr_debug("FDT: not found !\n");
-+		return 1;
-+	}
-+	memcpy(addr, ranges + na, 4 * pna);
-+
-+ finish:
-+	of_dump_addr("FDT: parent translation for:", addr, pna);
-+	pr_debug("FDT: with offset: %llx\n", offset);
-+
-+	/* Translate it into parent bus space */
-+	return pbus->translate(addr, offset, pna);
-+}
-+
-+/*
-+ * Translate an address from the device-tree into a CPU physical address,
-+ * this walks up the tree and applies the various bus mappings on the
-+ * way.
-+ *
-+ * Note: We consider that crossing any level with #size-cells == 0 to mean
-+ * that translation is impossible (that is we are not dealing with a value
-+ * that can be mapped to a cpu physical address). This is not really specified
-+ * that way, but this is traditionally the way IBM at least do things
-+ */
-+u64 __init fdt_translate_address(const void *blob, int node_offset)
-+{
-+	int parent, len;
-+	const struct of_bus *bus, *pbus;
-+	const __be32 *reg;
-+	__be32 addr[OF_MAX_ADDR_CELLS];
-+	int na, ns, pna, pns;
-+	u64 result = OF_BAD_ADDR;
-+
-+	pr_debug("FDT: ** translation for device %s **\n",
-+		 fdt_get_name(blob, node_offset, NULL));
-+
-+	reg = fdt_getprop(blob, node_offset, "reg", &len);
-+	if (!reg) {
-+		pr_err("FDT: warning: device tree node '%s' has no address.\n",
-+			fdt_get_name(blob, node_offset, NULL));
-+		goto bail;
-+	}
-+
-+	/* Get parent & match bus type */
-+	parent = fdt_parent_offset(blob, node_offset);
-+	if (parent < 0)
-+		goto bail;
-+	bus = &of_busses[0];
-+
-+	/* Cound address cells & copy address locally */
-+	bus->count_cells(blob, parent, &na, &ns);
-+	if (!OF_CHECK_COUNTS(na, ns)) {
-+		pr_err("FDT: Bad cell count for %s\n",
-+		       fdt_get_name(blob, node_offset, NULL));
-+		goto bail;
-+	}
-+	memcpy(addr, reg, na * 4);
-+
-+	pr_debug("FDT: bus (na=%d, ns=%d) on %s\n",
-+		 na, ns, fdt_get_name(blob, parent, NULL));
-+	of_dump_addr("OF: translating address:", addr, na);
-+
-+	/* Translate */
-+	for (;;) {
-+		/* Switch to parent bus */
-+		node_offset = parent;
-+		parent = fdt_parent_offset(blob, node_offset);
-+
-+		/* If root, we have finished */
-+		if (parent < 0) {
-+			pr_debug("FDT: reached root node\n");
-+			result = of_read_number(addr, na);
-+			break;
-+		}
-+
-+		/* Get new parent bus and counts */
-+		pbus = &of_busses[0];
-+		pbus->count_cells(blob, parent, &pna, &pns);
-+		if (!OF_CHECK_COUNTS(pna, pns)) {
-+			pr_err("FDT: Bad cell count for %s\n",
-+				fdt_get_name(blob, node_offset, NULL));
-+			break;
-+		}
-+
-+		pr_debug("FDT: parent bus (na=%d, ns=%d) on %s\n",
-+			 pna, pns, fdt_get_name(blob, parent, NULL));
-+
-+		/* Apply bus translation */
-+		if (fdt_translate_one(blob, node_offset, bus, pbus,
-+					addr, na, ns, pna, "ranges"))
-+			break;
-+
-+		/* Complete the move up one level */
-+		na = pna;
-+		ns = pns;
-+		bus = pbus;
-+
-+		of_dump_addr("FDT: one level translation:", addr, na);
-+	}
-+ bail:
-+	return result;
-+}
-diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
-index 5c0ab05..0511789 100644
---- a/include/linux/of_fdt.h
-+++ b/include/linux/of_fdt.h
-@@ -83,6 +83,7 @@ extern void unflatten_device_tree(void);
- extern void unflatten_and_copy_device_tree(void);
- extern void early_init_devtree(void *);
- extern void early_get_first_memblock_info(void *, phys_addr_t *);
-+extern u64 fdt_translate_address(const void *blob, int node_offset);
- #else /* CONFIG_OF_FLATTREE */
- static inline void early_init_fdt_scan_reserved_mem(void) {}
- static inline const char *of_flat_dt_get_machine_name(void) { return NULL; }
+ struct uart_port *uart_get_console(struct uart_port *ports, int nr,
+ 				   struct console *c);
+ void uart_parse_options(char *options, int *baud, int *parity, int *bits,
 -- 
 1.9.1
