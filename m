@@ -1,39 +1,45 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 8 May 2014 09:03:44 +0100
-Subject: [PATCH 1/9] ARM: STi: DT: STiH416: 416 DT Entry for clockgen
- A0/1/10/11/12
-In-Reply-To: <CAG374jD+msPPbPtFS+ji=8jS9+D-YHu31k7zzzC7Ty7jw9n7jQ@mail.gmail.com>
-References: <1399305223-18703-1-git-send-email-gabriel.fernandez@linaro.org>
- <1399305223-18703-2-git-send-email-gabriel.fernandez@linaro.org>
- <20140506071843.GD5206@lee--X1>
- <CAG374jD+msPPbPtFS+ji=8jS9+D-YHu31k7zzzC7Ty7jw9n7jQ@mail.gmail.com>
-Message-ID: <20140508080344.GE5307@lee--X1>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 8 May 2014 10:04:02 +0200
+Subject: [PATCH 1/6] ARM: dts: i.MX25: Add mmc aliases
+In-Reply-To: <CAOMZO5DFnw_m+NLnGsworx_Pe4mQ+QZo+oX9+V3hGMSwuxiCxg@mail.gmail.com>
+References: <1399469489-22788-1-git-send-email-s.hauer@pengutronix.de>
+ <1399469489-22788-2-git-send-email-s.hauer@pengutronix.de>
+ <CAOMZO5DFnw_m+NLnGsworx_Pe4mQ+QZo+oX9+V3hGMSwuxiCxg@mail.gmail.com>
+Message-ID: <20140508080402.GN5858@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >> Patch adds DT entries for clockgen A0/1/10/11/12
-> >>
-> >> Signed-off-by: Pankaj Dev <pankaj.dev@st.com>
-> >> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
-> >> ---
-> >>  arch/arm/boot/dts/stih416-clks.h     |  15 ++
+On Wed, May 07, 2014 at 11:46:19AM -0300, Fabio Estevam wrote:
+> On Wed, May 7, 2014 at 10:31 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > ---
+> >  arch/arm/boot/dts/imx25.dtsi | 2 ++
+> >  1 file changed, 2 insertions(+)
 > >
-> > This should live in include/dt-bindings/clk
-> >
-> include/dt-bindings/clk or  include/dt-bindings/clock ?
+> > diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+> > index ea323f0..680486a 100644
+> > --- a/arch/arm/boot/dts/imx25.dtsi
+> > +++ b/arch/arm/boot/dts/imx25.dtsi
+> > @@ -21,6 +21,8 @@
+> >                 i2c0 = &i2c1;
+> >                 i2c1 = &i2c2;
+> >                 i2c2 = &i2c3;
+> > +               mmc0 = &esdhc1;
+> > +               mmc2 = &esdhc2;
+> 
+> Shouldn't this be:
+>                    mmc1 = &esdhc2;
+> 
+> instead?
 
-I have no idea what the difference between the two are.  I guess you
-are in a better position to answer that.  My point was just that the
-includes should be in the include directory, rather than being held
-locally in the 'dts' directory.
+Yes, sure.
 
-> >>  arch/arm/boot/dts/stih416-clock.dtsi | 477 ++++++++++++++++++++++++++++++++++
-> >>  arch/arm/boot/dts/stih416.dtsi       |  10 +-
-> >>  3 files changed, 497 insertions(+), 5 deletions(-)
-> >>  create mode 100644 arch/arm/boot/dts/stih416-clks.h
+Shawn, Lothar, is this series otherwise ok?
+
+Sascha
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
