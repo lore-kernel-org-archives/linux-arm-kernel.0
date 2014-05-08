@@ -1,221 +1,136 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  8 May 2014 13:23:04 +0200
-Subject: [PATCH 3/3] arm64: add support for kernel mode NEON in interrupt
- context
-In-Reply-To: <1399548184-9534-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1399548184-9534-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1399548184-9534-3-git-send-email-ard.biesheuvel@linaro.org>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 08 May 2014 13:26:50 +0200
+Subject: [PATCH v10 03/15] ARM: sunxi: Add driver for SD/MMC hosts found
+ on Allwinner sunxi SoCs
+In-Reply-To: <CAPDyKFpAGNLaKagJ_RPt1vbz70pNWJzo-s6Ao50Mh0gFrRLN0g@mail.gmail.com>
+References: <1399046249-19472-1-git-send-email-hdegoede@redhat.com>	<1399046249-19472-4-git-send-email-hdegoede@redhat.com>	<CAPDyKFoinhyob7GZLgH4Dm7KdHCxj1+OpuZYKDK3OkU8RFsY8A@mail.gmail.com>	<53678DB4.60209@redhat.com>
+ <CAPDyKFpAGNLaKagJ_RPt1vbz70pNWJzo-s6Ao50Mh0gFrRLN0g@mail.gmail.com>
+Message-ID: <536B69FA.5090600@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch modifies kernel_neon_begin() and kernel_neon_end(), so
-they may be called from any context. To address the case where only
-a couple of registers are needed, kernel_neon_begin_partial(u32) is
-introduced which takes as a parameter the number of bottom 'n' NEON
-q-registers required. To mark the end of such a partial section, the
-regular kernel_neon_end() should be used.
+Hi,
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-Changes relative to previous version:
-- removed explicit __aligned(16) from struct fpsimd_partial_state
-- moved num_regs from offset #0 to offset #8
+On 05/05/2014 10:33 PM, Ulf Hansson wrote:
+> [snip]
+> 
+>> On 05/05/2014 02:41 PM, Ulf Hansson wrote:
+>>>> +struct sunxi_mmc_host {
+>>>> +       struct mmc_host *mmc;
+>>>> +       struct regulator *vmmc;
+>>>
+>>> Instead of having a specific regulator for this driver, please use the
+>>> mmc_regulator_get_supply API.
+>>
+>> We cannot use mmc_regulator_get_supply because for the sunxi mmc controller
+>> not only vqmmc but also vmmc itself is optional, and mmc_regulator_get_supply
+>> calls devm_regulator_get rather then devm_regulator_get_optional for vmmc.
+> 
+> Is that because the mmc controller handle the power to the card or
+> because you have a fixed supply?
+> 
+> Having a fixed regulator supply could easily be set up in DT, which
+> then also dynamically gives you the ocr mask instead of having a them
+> "hard coded".
 
- arch/arm64/include/asm/fpsimd.h       | 15 ++++++++++++
- arch/arm64/include/asm/fpsimdmacros.h | 35 ++++++++++++++++++++++++++++
- arch/arm64/include/asm/neon.h         |  6 ++++-
- arch/arm64/kernel/entry-fpsimd.S      | 24 +++++++++++++++++++
- arch/arm64/kernel/fpsimd.c            | 44 ++++++++++++++++++++++++-----------
- 5 files changed, 109 insertions(+), 15 deletions(-)
+It is because the sdcard slot power tends to be hooked directly to the 3.3V
+of the board. So in a sense this is a fixed regulator, but I really, REALLY
+don't want to add fixed regulator boilerplate to all sunxi dts files for this.
 
-diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-index 7a900142dbc8..50f559f574fe 100644
---- a/arch/arm64/include/asm/fpsimd.h
-+++ b/arch/arm64/include/asm/fpsimd.h
-@@ -41,6 +41,17 @@ struct fpsimd_state {
- 	unsigned int cpu;
- };
- 
-+/*
-+ * Struct for stacking the bottom 'n' FP/SIMD registers.
-+ */
-+struct fpsimd_partial_state {
-+	u32		fpsr;
-+	u32		fpcr;
-+	u32		num_regs;
-+	__uint128_t	vregs[32];
-+};
-+
-+
- #if defined(__KERNEL__) && defined(CONFIG_COMPAT)
- /* Masks for extracting the FPSR and FPCR from the FPSCR */
- #define VFP_FPSCR_STAT_MASK	0xf800009f
-@@ -66,6 +77,10 @@ extern void fpsimd_update_current_state(struct fpsimd_state *state);
- 
- extern void fpsimd_flush_task_state(struct task_struct *target);
- 
-+extern void fpsimd_save_partial_state(struct fpsimd_partial_state *state,
-+				      u32 num_regs);
-+extern void fpsimd_load_partial_state(struct fpsimd_partial_state *state);
-+
- #endif
- 
- #endif
-diff --git a/arch/arm64/include/asm/fpsimdmacros.h b/arch/arm64/include/asm/fpsimdmacros.h
-index bbec599c96bd..768414d55e64 100644
---- a/arch/arm64/include/asm/fpsimdmacros.h
-+++ b/arch/arm64/include/asm/fpsimdmacros.h
-@@ -62,3 +62,38 @@
- 	ldr	w\tmpnr, [\state, #16 * 2 + 4]
- 	msr	fpcr, x\tmpnr
- .endm
-+
-+.altmacro
-+.macro fpsimd_save_partial state, numnr, tmpnr1, tmpnr2
-+	mrs	x\tmpnr1, fpsr
-+	str	w\numnr, [\state, #8]
-+	mrs	x\tmpnr2, fpcr
-+	stp	w\tmpnr1, w\tmpnr2, [\state]
-+	adr	x\tmpnr1, 0f
-+	add	\state, \state, x\numnr, lsl #4
-+	sub	x\tmpnr1, x\tmpnr1, x\numnr, lsl #1
-+	br	x\tmpnr1
-+	.irp	qa, 30, 28, 26, 24, 22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 2, 0
-+	.irp	qb, %(qa + 1)
-+	stp	q\qa, q\qb, [\state, # -16 * \qa - 16]
-+	.endr
-+	.endr
-+0:
-+.endm
-+
-+.macro fpsimd_restore_partial state, tmpnr1, tmpnr2
-+	ldp	w\tmpnr1, w\tmpnr2, [\state]
-+	msr	fpsr, x\tmpnr1
-+	msr	fpcr, x\tmpnr2
-+	adr	x\tmpnr1, 0f
-+	ldr	w\tmpnr2, [\state, #8]
-+	add	\state, \state, x\tmpnr2, lsl #4
-+	sub	x\tmpnr1, x\tmpnr1, x\tmpnr2, lsl #1
-+	br	x\tmpnr1
-+	.irp	qa, 30, 28, 26, 24, 22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 2, 0
-+	.irp	qb, %(qa + 1)
-+	ldp	q\qa, q\qb, [\state, # -16 * \qa - 16]
-+	.endr
-+	.endr
-+0:
-+.endm
-diff --git a/arch/arm64/include/asm/neon.h b/arch/arm64/include/asm/neon.h
-index b0cc58a97780..13ce4cc18e26 100644
---- a/arch/arm64/include/asm/neon.h
-+++ b/arch/arm64/include/asm/neon.h
-@@ -8,7 +8,11 @@
-  * published by the Free Software Foundation.
-  */
- 
-+#include <linux/types.h>
-+
- #define cpu_has_neon()		(1)
- 
--void kernel_neon_begin(void);
-+#define kernel_neon_begin()	kernel_neon_begin_partial(32)
-+
-+void kernel_neon_begin_partial(u32 num_regs);
- void kernel_neon_end(void);
-diff --git a/arch/arm64/kernel/entry-fpsimd.S b/arch/arm64/kernel/entry-fpsimd.S
-index 6a27cd6dbfa6..d358ccacfc00 100644
---- a/arch/arm64/kernel/entry-fpsimd.S
-+++ b/arch/arm64/kernel/entry-fpsimd.S
-@@ -41,3 +41,27 @@ ENTRY(fpsimd_load_state)
- 	fpsimd_restore x0, 8
- 	ret
- ENDPROC(fpsimd_load_state)
-+
-+#ifdef CONFIG_KERNEL_MODE_NEON
-+
-+/*
-+ * Save the bottom n FP registers.
-+ *
-+ * x0 - pointer to struct fpsimd_partial_state
-+ */
-+ENTRY(fpsimd_save_partial_state)
-+	fpsimd_save_partial x0, 1, 8, 9
-+	ret
-+ENDPROC(fpsimd_load_partial_state)
-+
-+/*
-+ * Load the bottom n FP registers.
-+ *
-+ * x0 - pointer to struct fpsimd_partial_state
-+ */
-+ENTRY(fpsimd_load_partial_state)
-+	fpsimd_restore_partial x0, 8, 9
-+	ret
-+ENDPROC(fpsimd_load_partial_state)
-+
-+#endif
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 5ae89303c3ab..ad8aebb1cdef 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -218,29 +218,45 @@ void fpsimd_flush_task_state(struct task_struct *t)
- 
- #ifdef CONFIG_KERNEL_MODE_NEON
- 
-+static DEFINE_PER_CPU(struct fpsimd_partial_state, hardirq_fpsimdstate);
-+static DEFINE_PER_CPU(struct fpsimd_partial_state, softirq_fpsimdstate);
-+
- /*
-  * Kernel-side NEON support functions
-  */
--void kernel_neon_begin(void)
-+void kernel_neon_begin_partial(u32 num_regs)
- {
--	/* Avoid using the NEON in interrupt context */
--	BUG_ON(in_interrupt());
--	preempt_disable();
-+	if (in_interrupt()) {
-+		struct fpsimd_partial_state *s = this_cpu_ptr(
-+			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
- 
--	/*
--	 * Save the userland FPSIMD state if we have one and if we haven't done
--	 * so already. Clear fpsimd_last_state to indicate that there is no
--	 * longer userland FPSIMD state in the registers.
--	 */
--	if (current->mm && !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
--		fpsimd_save_state(&current->thread.fpsimd_state);
--	this_cpu_write(fpsimd_last_state, NULL);
-+		BUG_ON(num_regs > 32);
-+		fpsimd_save_partial_state(s, roundup(num_regs, 2));
-+	} else {
-+		/*
-+		 * Save the userland FPSIMD state if we have one and if we
-+		 * haven't done so already. Clear fpsimd_last_state to indicate
-+		 * that there is no longer userland FPSIMD state in the
-+		 * registers.
-+		 */
-+		preempt_disable();
-+		if (current->mm &&
-+		    !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
-+			fpsimd_save_state(&current->thread.fpsimd_state);
-+		this_cpu_write(fpsimd_last_state, NULL);
-+	}
- }
--EXPORT_SYMBOL(kernel_neon_begin);
-+EXPORT_SYMBOL(kernel_neon_begin_partial);
- 
- void kernel_neon_end(void)
- {
--	preempt_enable();
-+	if (in_interrupt()) {
-+		struct fpsimd_partial_state *s = this_cpu_ptr(
-+			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
-+		fpsimd_load_partial_state(s);
-+	} else {
-+		preempt_enable();
-+	}
- }
- EXPORT_SYMBOL(kernel_neon_end);
- 
--- 
-1.8.3.2
+In other subsystems where there are similar cases (ie ahci-platform, supply for
+various ethernet phys), the regulator is always optional and does not need
+to be specified in the dts when the device is just hardwired to the power.
+
+> 
+>>
+>> Using mmc_regulator_get_supply would lead to false postive errors being logged
+>> on 99/100 boards.
+> 
+> I was kind of expecting a response like this. :-) Actually I would
+> prefer if we could make the API suit drivers like this one as well.
+> 
+> For reference, there are currently a patch being discussed which
+> relates to this topic.
+> "mmc: core: Improve support for deferred regulators"
+
+Ok, so that patch seems to replace the somewhat alarming message
+reported by devm_regulator_get by an acceptable:
+
+dev_info(dev, "No vmmc regulator found\n");
+
+I can live with that, so I'm going to assume that something like that
+patch will get merged in the near future and I'll switch to mmc_regulator_get_supply
+in the next version and just live with the error messages this causes for now.
+
+>>>> +       struct reset_control *reset;
+>>>> +
+>>>> +       /* IO mapping base */
+>>>> +       void __iomem    *reg_base;
+>>>> +
+>>>> +       spinlock_t      lock;
+>>>> +       struct tasklet_struct manual_stop_tasklet;
+>>>
+>>> Any reason why you can't use a threaded IRQ handler instead of a tasklet?
+>>
+>> AFAIK IRQ threaded handlers always have the highest priority. When
+>> the manual_stop_tasklet runs we disable irqs and start polling to
+>> recover from an error condition, which is nothing something I want
+>> todo with the highest priority on the system.
+> 
+> To me, that seems like a good match for a threaded irq handler.
+
+Ok, I've done some reading up on threaded irq handlers and I'll
+I'll convert this to a threaded irq handler (only using the thread for the error
+handling case).
+
+<snip>
+
+>>>> +               if (err) {
+>>>> +                       host->ferror = 1;
+>>>> +                       return;
+>>>> +               }
+>>>> +
+>>>> +               enable_irq(host->irq);
+> 
+> Just realize that I also think you should move the enable|disable_irq
+> to ->probe|remove().
+> 
+> That will mean you will be better prepared to implement runtime PM
+> support and thus make it possible to disable irqs during request
+> inactivity.
+
+Ok.
+
+<snip>
+
+>>>> +       /* set up clock */
+>>>> +       if (ios->clock && ios->power_mode) {
+>>>> +               dev_dbg(mmc_dev(host->mmc), "ios->clock: %d\n", ios->clock);
+>>>> +               sunxi_mmc_clk_set_rate(host, ios->clock);
+>>>> +               usleep_range(50000, 55000);
+>>>
+>>> Is those values for usleep really correct? I am not sure how many
+>>> times we execute this path while detecting/powering the card, but
+>>> quite a few.
+>>> Detecting/powering the card is also done during each system
+>>> suspend/resume cycle - thus this will heavily affect these cycles.
+>>
+>> The problem is we've no docs, so this is all based on android code, the
+>> android code has 2 drivers, lets call them the old and the new one.
+>>
+>> This works is based on the new driver as that one was significantly
+>> cleaner then the old driver. This bit comes directly from the new driver,
+>> but it seems that the old driver has no delay at all. And clk_set_rate
+>> already does a busy-wait waiting for the hardware to acknowledge the
+>> clock rate change, so I think this is not really necessary. I'll run
+>> some tests with it removed and if everything still works I'll drop it.
+> 
+> Okay, great!
+> 
+> Maybe we could add some comments, no matter what!?
+
+Yeah I'll add a comment that there used to be a usleep there :)
+
+Regards,
+
+Hans
