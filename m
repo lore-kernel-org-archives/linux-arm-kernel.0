@@ -1,82 +1,39 @@
-From: andriy.shevchenko@intel.com (Shevchenko, Andriy)
-Date: Thu, 8 May 2014 16:08:37 +0000
-Subject: [PATCH 2/2] dmaengine: sa11x0: remove broken #ifdef
-In-Reply-To: <1399560990-1402858-2-git-send-email-arnd@arndb.de>
-References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-2-git-send-email-arnd@arndb.de>
-Message-ID: <1399565317.9018.4.camel@smile.fi.intel.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 08 May 2014 18:09:24 +0200
+Subject: [PATCH 1/5] ARM: S5PV210: Remove camera support from mach-goni.c
+In-Reply-To: <081001cf65cc$cbef8700$63ce9500$@samsung.com>
+References: <1397583272-28295-1-git-send-email-s.nawrocki@samsung.com>
+ <1397583272-28295-2-git-send-email-s.nawrocki@samsung.com>
+ <081001cf65cc$cbef8700$63ce9500$@samsung.com>
+Message-ID: <536BAC34.2020904@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-05-08 at 16:56 +0200, Arnd Bergmann wrote:
-> The sa11x0_dma_pm_ops unconditionally reference sa11x0_dma_resume
-> and sa11x0_dma_suspend, which currently breaks if CONFIG_PM_SLEEP
-> is disabled.
+On 02/05/14 08:07, Kukjin Kim wrote:
+> Sylwester Nawrocki wrote:
+>> > 
+>> > S5PV210 is going to get DT support, so we can remove the camera
+>> > bits from the only board using camera on S5PV210. This allows to
+>> > clean the exynos4-is driver by dropping code for non-dt platforms.
+>> > This patch can be dropped if a patch removing the whole board
+>> > file is applied first.
+>> > 
+>> > Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>> > Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+>
+> Hi Sylwester,
 > 
-> There is probably a better way to remove the reference in this
-> case, but the safe choice is to have the suspend/resume code always
-> built in the driver.
-
-Maybe you could create a macro in pm.h for *_noirq version of
-suspend/resume? However, like we discussed with Vinod it's much better
-to use suspend_late/resume_early for DMAC device drivers, though I have
-no idea if it works for sa11x0.
-
+> Cleanup is always welcome ;-)
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: dmaengine at vger.kernel.org
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> Cc: Dan Williams <dan.j.williams@intel.com>
-> ---
->  drivers/dma/sa11x0-dma.c | 4 ----
->  1 file changed, 4 deletions(-)
+> I think, when this series is ready for mainline, this will be handled in
+> media tree. So,
 > 
-> diff --git a/drivers/dma/sa11x0-dma.c b/drivers/dma/sa11x0-dma.c
-> index ab26d46..5ebdfbc 100644
-> --- a/drivers/dma/sa11x0-dma.c
-> +++ b/drivers/dma/sa11x0-dma.c
-> @@ -113,11 +113,9 @@ struct sa11x0_dma_phy {
->  	struct sa11x0_dma_desc	*txd_load;
->  	unsigned		sg_done;
->  	struct sa11x0_dma_desc	*txd_done;
-> -#ifdef CONFIG_PM_SLEEP
->  	u32			dbs[2];
->  	u32			dbt[2];
->  	u32			dcsr;
-> -#endif
->  };
->  
->  struct sa11x0_dma_dev {
-> @@ -984,7 +982,6 @@ static int sa11x0_dma_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> -#ifdef CONFIG_PM_SLEEP
->  static int sa11x0_dma_suspend(struct device *dev)
->  {
->  	struct sa11x0_dma_dev *d = dev_get_drvdata(dev);
-> @@ -1054,7 +1051,6 @@ static int sa11x0_dma_resume(struct device *dev)
->  
->  	return 0;
->  }
-> -#endif
->  
->  static const struct dev_pm_ops sa11x0_dma_pm_ops = {
->  	.suspend_noirq = sa11x0_dma_suspend,
+> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
+Hi Kukjin,
 
--- 
-Andy Shevchenko <andriy.shevchenko@intel.com>
-Intel Finland Oy
----------------------------------------------------------------------
-Intel Finland Oy
-Registered Address: PL 281, 00181 Helsinki 
-Business Identity Code: 0357606 - 4 
-Domiciled in Helsinki 
+Thank you, patch queued up for the media tree!
 
-This e-mail and any attachments may contain confidential material for
-the sole use of the intended recipient(s). Any review or distribution
-by others is strictly prohibited. If you are not the intended
-recipient, please contact the sender and delete all copies.
+--
+Regards,
+Sylwester
