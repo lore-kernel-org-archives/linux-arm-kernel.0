@@ -1,87 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 8 May 2014 11:40:56 -0700
-Subject: omap4-panda-es boot issues with v3.15-rc4
-In-Reply-To: <20140508165558.GB2198@atomide.com>
-References: <536B7E44.2040303@ti.com> <7hppjos2w2.fsf@paris.lan>
- <CAGa+x84VB3CXDm71JWxHx1-Qk1xVNeXdwUjZnb42_wg+piOzzA@mail.gmail.com>
- <20140508165558.GB2198@atomide.com>
-Message-ID: <20140508184055.GC2198@atomide.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 8 May 2014 20:44:30 +0200
+Subject: [PATCH] ARM: mvebu: fix mis-merge in coherency.c
+In-Reply-To: <20140508163124.GG12708@titan.lakedaemon.net>
+References: <1399299428-30690-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1399299428-30690-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140508163124.GG12708@titan.lakedaemon.net>
+Message-ID: <20140508204430.50f4928e@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added few cpuidle people to Cc on this regression.
+Dear Jason Cooper,
 
-* Tony Lindgren <tony@atomide.com> [140508 09:57]:
-> * Kevin Hilman <khilman@linaro.org> [140508 08:40]:
-> > On Thu, May 8, 2014 at 8:31 AM, Kevin Hilman <khilman@linaro.org> wrote:
-> > > Roger Quadros <rogerq@ti.com> writes:
-> > >
-> > >> Hi,
-> > >>
-> > >> Nishant pointed me to a booting issue with omap4-panda-es on linux-next but I'm observing
-> > >> similar issues, although less frequent, with v3.15-rc4 as well.
-> > >>
-> > >> Configuration:
-> > >>
-> > >> - kernel v3.15-rc4 or linux-next (20140507)
-> > >> - multi_v7_defconfig with LEDS_TRIGGER_HEARTBEAT and LEDS_GPIO enabled
-> > >> - u-boot/master       173d294b94cf
-> > >>
-> > >> Observations:
-> > >>
-> > >> - Out of 10 boots a few may not succeed and hang midway without any warnings. Heartbeat LED stops.
-> > >> e.g. http://www.hastebin.com/ebumojegoq.vhdl
-> > >>
-> > >> - Hang more noticeable on linux-next (20140507) than on v3.15-rc4
-> > >
-> > > I've beeen noticing the same thing for awhile with my boot tests.  For
-> > > me, next-20140508 is failing most of the time now.
-> > >
-> > >> - Hang more noticeable with USB_EHCI_HCD enabled but hang observed even without USB_EHCI_HCD.
-> > >> Maybe related to when high speed interrupts occur in the boot process.
-> > >>
-> > >> - On successful boots following warning is seen
-> > >> [    4.010375] gic_timer_retrigger: lost localtimer interrupt
-> > >>
-> > >> - On successful boots heartbeat LED stops blinking after boot process and left idle. LED can remain stuck in
-> > >> ON state as well. It does blink again when doing activity on console.
-> > >>
-> > >> Workaround:
-> > >>
-> > >> - Disabling CPU_IDLE or even just disabling C3 (MPU OSWR) seems to fix all the above issues.
-> > >>
-> > >> I don't really know what exactly is the issue but it seems to be specific to OMAP4, GIC, MPU OSWR.
-> > >
-> > > I can confirm that disabling CONFIG_CPU_IDLE seems to make the problem
-> > > go away.  Hmm....
+On Thu, 8 May 2014 12:31:24 -0400, Jason Cooper wrote:
+> On Mon, May 05, 2014 at 04:17:08PM +0200, Thomas Petazzoni wrote:
+> > Commit 31dd716233e066146d651889f7b01e8da9963bd7 lead to a conflict
+> > between the "Armada 375/38x I/O coherency" patch series and the
+> > "Armada XP cpuidle" patch series. Unfortunately, the conflict was
+> > improperly resolved, and leads to incorrect code in the
+> > coherency_type() function in arch/arm/mach-mvebu/coherency.c.
 > > 
-> > Another finger pointing in the same direction: omap2plus_defconfig +
-> > CONFIG_CPU_IDLE=y also fails to boot rather consistently in today's
-> > -next.
+> > This commit fixes this mis-merge by restoring the appropriate code in
+> > coherency_type().
+> > 
+> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > ---
+> >  arch/arm/mach-mvebu/coherency.c | 28 +++++++++++++---------------
+> >  1 file changed, 13 insertions(+), 15 deletions(-)
 > 
-> Booting today's next with multi_v7_defconfig (so cpuidle enabled) on
-> omap4 sdp seems to boot reliably. And it's not producing these:
+> I've squashed this in to mvebu/soc-cpuidle, please see:
 > 
-> gic_timer_retrigger: lost localtimer interrupt 
+>   b41375f71ace ARM: mvebu: ll_set_cpu_coherent always uses the current CPU
 
-Still seeing the above, looks like the lost localtimer interrupt
-above is a separate issue..
- 
-> while panda is producing those errors like Roger mentioned.
-> 
-> It seems that the USB networking is the main difference between
-> omap4 sdp and panda?
+>From a quick look, looks good.
 
-..but I think I found the cause for recent hangs on panda, just a wild
-guess based on looking at the recent cpuidle patches after v3.14.
+> I'll let this sit for a night in -next before I send the pull request
+> for mvebu/soc.  Which includes mvebu/soc-cpuidle now.
 
-Looks like reverting 0b89e9aa2856 (cpuidle: delay enabling interrupts
-until all coupled CPUs leave idle) makes booting work reliably again
-on panda.
+Perfect!
 
-Can you guys confirm, so far no issues here after few boot tests,
-but it might be too early to tell.
-
-Regards,
-
-Tony
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
