@@ -1,142 +1,47 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Thu, 8 May 2014 14:24:08 -0500
-Subject: [PATCH 3/5] irqchip: crossbar: Skip some irqs from getting mapped
- to crossbar
-In-Reply-To: <1399299527-10955-4-git-send-email-r.sricharan@ti.com>
-References: <1399299527-10955-1-git-send-email-r.sricharan@ti.com>
- <1399299527-10955-4-git-send-email-r.sricharan@ti.com>
-Message-ID: <536BD9D8.4080905@ti.com>
+From: ipaton0@gmail.com (Iain Paton)
+Date: Thu, 08 May 2014 20:27:55 +0100
+Subject: [PATCH v2] ARM: dts: imx6: add new board RIoTboard
+In-Reply-To: <1399570376.88508577@f371.i.mail.ru>
+References: <53695C34.5000604@gmail.com> <1399560632.547109991@f294.i.mail.ru>
+ <536BBAE2.7060203@gmail.com> <1399570376.88508577@f371.i.mail.ru>
+Message-ID: <536BDABB.7090101@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/05/2014 09:18 AM, Sricharan R wrote:
-> From: Nishanth Menon <nm@ti.com>
+On 08/05/14 18:32, Alexander Shiyan wrote:
+> Thu, 08 May 2014 18:12:02 +0100 ?? Iain Paton <ipaton0@gmail.com>:
+>> +&aips2 {
+>> +        i2c4: i2c at 021f8000 {
+>> +                #address-cells = <1>;
+>> +                #size-cells = <0>;
+>> +                compatible = "fsl,imx1-i2c";
 > 
-> When, in the system due to varied reasons, interrupts might be unusable
-> due to hardware behavior, but register maps do exist, then those interrupts
-> should be skipped while mapping irq to crossbars.
-> 
+> Are you sure about use "fsl,imx1-i2c" instead of  "fsl,imx21-i2c"?
+> In any case you should add "fsl-imx6dl-i2c" as first compatible string.
+> The rest looks good.
 
-Just wondering, instead of hardcoding this data in the code, and
-introducing additional flags (IRQ_SKIP), why not just put these GIC IRQs
-in the ti,irq-reserved property in DTS for platforms where such IRQs are
-not usable. That way you're skipping these IRQs anyway.
+Sure?  No.  However that's what currently exists in imx6dl.dtsi for i2c4.
 
-Also that would avoid adding more hard coded data for future SoCs into
-the source for such IRQs that must be skipped, and also reduces LOC.
+looking at the other i2c interfaces in imx6qdl.dtsi, they're using
+fsl,imx6q-i2c as the first compatible string. So I think I should use
+either fsl,imx6dl-i2c or fsl,imx6q-i2c. 
+What's the difference between that and your suggested fsl-imx6dl-i2c?
+If we assume can assume the i2c4 block is functionally identical to
+i2c[123] then shouldn't I use an identical compatible string?
 
-thanks,
+The driver has the following compatible strings:
+fsl,imx1-i2c
+fsl,imx21-i2c
+fsl,vf610-i2c
 
--Joel
+the difference between imx1-i2c and imx21-i2c seems to be an added delay
+before generating the stop bit to workaround a hardware bug.
 
+As it seems likely I'm the first to be trying to enable i2c4 I'd want to
+check that the hardware bug doesn't apply here and that there's no 
+negative effect. 
+I think you're probably correct and I should change it, but I'll do the 
+tests anyway and post the series if I don't see any problems.
 
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> Signed-off-by: Sricharan R <r.sricharan@ti.com>
-> ---
->  drivers/irqchip/irq-crossbar.c |   47 ++++++++++++++++++++++++++++++++++++----
->  1 file changed, 43 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
-> index 51d4b87..847f6e3 100644
-> --- a/drivers/irqchip/irq-crossbar.c
-> +++ b/drivers/irqchip/irq-crossbar.c
-> @@ -13,11 +13,13 @@
->  #include <linux/io.h>
->  #include <linux/of_address.h>
->  #include <linux/of_irq.h>
-> +#include <linux/of_device.h>
->  #include <linux/slab.h>
->  #include <linux/irqchip/arm-gic.h>
->  
->  #define IRQ_FREE	-1
->  #define IRQ_RESERVED	-2
-> +#define IRQ_SKIP	-3
->  #define GIC_IRQ_START	32
->  
->  /*
-> @@ -34,6 +36,16 @@ struct crossbar_device {
->  	void (*write) (int, int);
->  };
->  
-> +/**
-> + * struct crossbar_data: Platform specific data
-> + * @irqs_unused: array of irqs that cannot be used because of hw erratas
-> + * @size: size of the irqs_unused array
-> + */
-> +struct crossbar_data {
-> +	const uint *irqs_unused;
-> +	const uint size;
-> +};
-> +
->  static struct crossbar_device *cb;
->  
->  static inline void crossbar_writel(int irq_no, int cb_no)
-> @@ -119,10 +131,12 @@ const struct irq_domain_ops routable_irq_domain_ops = {
->  	.xlate = crossbar_domain_xlate
->  };
->  
-> -static int __init crossbar_of_init(struct device_node *node)
-> +static int __init crossbar_of_init(struct device_node *node,
-> +				   const struct crossbar_data *data)
->  {
->  	int i, size, max, reserved = 0, entry;
->  	const __be32 *irqsr;
-> +	const int *irqsk = NULL;
->  
->  	cb = kzalloc(sizeof(*cb), GFP_KERNEL);
->  
-> @@ -194,6 +208,22 @@ static int __init crossbar_of_init(struct device_node *node)
->  		reserved += size;
->  	}
->  
-> +	/* Skip the ones marked as unused */
-> +	if (data) {
-> +		irqsk = data->irqs_unused;
-> +		size = data->size;
-> +
-> +		for (i = 0; i < size; i++) {
-> +			entry = irqsk[i];
-> +
-> +			if (entry > max) {
-> +				pr_err("Invalid skip entry\n");
-> +				goto err3;
-> +			}
-> +			cb->irq_map[entry] = IRQ_SKIP;
-> +		}
-> +	}
-> +
->  	register_routable_domain_ops(&routable_irq_domain_ops);
->  	return 0;
->  
-> @@ -208,18 +238,27 @@ err1:
->  	return -ENOMEM;
->  }
->  
-> +/* irq number 10 cannot be used because of hw bug */
-> +int dra_irqs_unused[] = { 10 };
-> +struct crossbar_data cb_dra_data = { dra_irqs_unused,
-> +				     ARRAY_SIZE(dra_irqs_unused) };
-> +
->  static const struct of_device_id crossbar_match[] __initconst = {
-> -	{ .compatible = "ti,irq-crossbar" },
-> +	{ .compatible = "ti,irq-crossbar", .data = &cb_dra_data },
->  	{}
->  };
->  
->  int __init irqcrossbar_init(void)
->  {
->  	struct device_node *np;
-> -	np = of_find_matching_node(NULL, crossbar_match);
-> +	const struct of_device_id *of_id;
-> +	const struct crossbar_data *cdata;
-> +
-> +	np = of_find_matching_node_and_match(NULL, crossbar_match, &of_id);
->  	if (!np)
->  		return -ENODEV;
->  
-> -	crossbar_of_init(np);
-> +	cdata = of_id->data;
-> +	crossbar_of_init(np, cdata);
->  	return 0;
->  }
-> 
+Thanks,
+Iain
