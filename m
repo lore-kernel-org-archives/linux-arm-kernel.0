@@ -1,41 +1,34 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu,  8 May 2014 16:46:53 +0200
-Subject: [PATCH 1/2] phy: kona2: use 'select GENERIC_PHY' in Kconfig
+Date: Thu,  8 May 2014 16:46:54 +0200
+Subject: [PATCH 2/2] phy: exynos: fix SATA phy license typo
 In-Reply-To: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
 References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
-Message-ID: <1399560433-1402630-3-git-send-email-arnd@arndb.de>
+Message-ID: <1399560433-1402630-4-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All other phy drivers use 'select', while this one is
-the only one to use 'depends on'. This is not a bug, just
-slightly inconsistent, so let's change it to do things the
-same way as everyone else.
-
-We may also want to turn GENERIC_PHY into a silent option
-that only ever gets turned on if another driver needs it.
+If the license string doesn't match exactly, the module refuses
+to load.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Cc: Kishon Vijay Abraham I <kishon@ti.com>
-Cc: Matt Porter <mporter@linaro.org>
-Cc: Felipe Balbi <balbi@ti.com>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: linux-samsung-soc at vger.kernel.org
 ---
- drivers/phy/Kconfig | 2 +-
+ drivers/phy/phy-exynos5250-sata.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-index 4906c27..071b763 100644
---- a/drivers/phy/Kconfig
-+++ b/drivers/phy/Kconfig
-@@ -89,8 +89,8 @@ config PHY_EXYNOS_DP_VIDEO
+diff --git a/drivers/phy/phy-exynos5250-sata.c b/drivers/phy/phy-exynos5250-sata.c
+index c9361b7..0568945 100644
+--- a/drivers/phy/phy-exynos5250-sata.c
++++ b/drivers/phy/phy-exynos5250-sata.c
+@@ -246,6 +246,6 @@ static struct platform_driver exynos_sata_phy_driver = {
+ module_platform_driver(exynos_sata_phy_driver);
  
- config BCM_KONA_USB2_PHY
- 	tristate "Broadcom Kona USB2 PHY Driver"
--	depends on GENERIC_PHY
- 	depends on HAS_IOMEM
-+	select GENERIC_PHY
- 	help
- 	  Enable this to support the Broadcom Kona USB 2.0 PHY.
- 
+ MODULE_DESCRIPTION("Samsung SerDes PHY driver");
+-MODULE_LICENSE("GPL V2");
++MODULE_LICENSE("GPL v2");
+ MODULE_AUTHOR("Girish K S <ks.giri@samsung.com>");
+ MODULE_AUTHOR("Yuvaraj C D <yuvaraj.cd@samsung.com>");
 -- 
 1.8.3.2
