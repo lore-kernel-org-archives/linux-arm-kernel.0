@@ -1,42 +1,61 @@
-From: arunks.linux@gmail.com (Arun KS)
-Date: Thu, 8 May 2014 19:46:21 +0530
-Subject: ARM: Disable preemption along with interrupts during shutdown
-In-Reply-To: <20140508134910.GF3693@n2100.arm.linux.org.uk>
-References: <1399555411-15330-1-git-send-email-arunks.linux@gmail.com>
- <20140508134910.GF3693@n2100.arm.linux.org.uk>
-Message-ID: <CAKZGPAMwqWP44Cv7V11Q+8Ykdt=3huFCRi-eKKSt5d9zPp8H+w@mail.gmail.com>
+From: iivanov@mm-sol.com (Ivan T. Ivanov)
+Date: Thu, 08 May 2014 17:21:49 +0300
+Subject: [PATCH 5/8] usb: phy: msm: reset controller is mandatory now
+In-Reply-To: <1399557141-1346645-6-git-send-email-arnd@arndb.de>
+References: <1399557141-1346645-1-git-send-email-arnd@arndb.de>
+ <1399557141-1346645-6-git-send-email-arnd@arndb.de>
+Message-ID: <1399558909.8165.8.camel@iivanov-dev>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 8, 2014 at 7:19 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, May 08, 2014 at 06:53:31PM +0530, arunks.linux at gmail.com wrote:
->> From: Arun KS <arunks.linux@gmail.com>
->>
->> 'irqs disabled' is funtamentally unsafe way of disabling preemption.
->> Any spin_unlock() decreasing the preemption count to 0 might trigger
->> a reschedule. A simple printk() might trigger a reschedule.
->>
->> To be on safe side disable preemption as well using preempt_disable()
->
-> NAK.
->
-> asmlinkage void __sched notrace preempt_schedule(void)
-> {
->         /*
->          * If there is a non-zero preempt_count or interrupts are disabled,
->          * we do not want to preempt the current task. Just return..
->          */
->         if (likely(!preemptible()))
->                 return;
 
-What if we fall in a path which calls spin_unlock_irq().
-Interrupts will get enabled and only preempt_count will help to bail
-out early from preempt_schedule().
-I recently hit a similar situation.
+Hi Arnd, 
 
-Thanks,
->
-> --
-> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-> improving, and getting towards what was expected from it.
+On Thu, 2014-05-08 at 15:52 +0200, Arnd Bergmann wrote:
+> Commit a27345434134 "usb: phy: msm: Use reset framework for LINK
+> and PHY resets" introduced a mandatory call to reset_control_get
+> into the msm usb phy driver, which means we have to add a Kconfig
+> dependency on the API to avoid this build error:
+> 
+> phy/phy-msm-usb.c: In function 'msm_otg_read_dt':
+> phy/phy-msm-usb.c:1461:2: error: implicit declaration of function 'devm_reset_control_get' [-Werror=implicit-function-declaration]
+>   motg->link_rst = devm_reset_control_get(&pdev->dev, "link");
+>   ^
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: "Ivan T. Ivanov" <iivanov@mm-sol.com>
+> ---
+>  drivers/usb/host/Kconfig | 2 +-
+>  drivers/usb/phy/Kconfig  | 1 +
+>  2 files changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+> index 3d9e540..890fc8c 100644
+> --- a/drivers/usb/host/Kconfig
+> +++ b/drivers/usb/host/Kconfig
+> @@ -168,7 +168,7 @@ config USB_EHCI_HCD_AT91
+>  
+>  config USB_EHCI_MSM
+>  	tristate "Support for Qualcomm QSD/MSM on-chip EHCI USB controller"
+> -	depends on ARCH_MSM
+> +	depends on ARCH_MSM && RESET_CONTROLLER
+
+This driver did not use reset controller API.
+
+>  	select USB_EHCI_ROOT_HUB_TT
+>  	select USB_MSM_OTG
+>  	---help---
+> diff --git a/drivers/usb/phy/Kconfig b/drivers/usb/phy/Kconfig
+> index 359a6c1..65bec8f 100644
+> --- a/drivers/usb/phy/Kconfig
+> +++ b/drivers/usb/phy/Kconfig
+> @@ -165,6 +165,7 @@ config USB_ISP1301
+>  config USB_MSM_OTG
+>  	tristate "Qualcomm on-chip USB OTG controller support"
+>  	depends on (USB || USB_GADGET) && (ARCH_MSM || ARCH_QCOM)
+> +	depends on RESET_CONTROLLER
+
+This is fine. 
+
+Thank you.
+Ivan
