@@ -1,37 +1,42 @@
 From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Thu, 08 May 2014 16:07:57 +0530
-Subject: [PATCH v2 2/4] ARM: dts: change to correct compatible string for
- exynos5420 hdmi
+Date: Thu, 08 May 2014 16:07:59 +0530
+Subject: [PATCH v2 4/4] ARM: dts: remove chip specific hdmi hpd pin from board
 In-Reply-To: <1399545479-20086-1-git-send-email-rahul.sharma@samsung.com>
 References: <1399545479-20086-1-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <1399545479-20086-3-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <1399545479-20086-5-git-send-email-rahul.sharma@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rahul Sharma <Rahul.Sharma@samsung.com>
 
-Replace compatible string for HDMI node in Exynos5420. Since
-latest restructring in Drm hdmi driver, it is agreed to use
-a seperate compatible string for Exynos5420 HDMI IP siince it
-uses APB mapped Phy.
+"gpx3-7" is chip specific pin in Exynos5420 for hdmi
+hotplug. This pin is moved to exynos5420-pinctrl.dts
+and removed from the board file.
 
 Signed-off-by: Rahul Sharma <Rahul.Sharma@samsung.com>
 ---
- arch/arm/boot/dts/exynos5420.dtsi |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/exynos5420-smdk5420.dts |    9 ---------
+ 1 file changed, 9 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index 0d1dea8..f1f6a06 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -633,7 +633,7 @@
+diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+index 6910485..11cd9bf 100644
+--- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
++++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+@@ -131,15 +131,6 @@
+ 		};
  	};
  
- 	hdmi: hdmi at 14530000 {
--		compatible = "samsung,exynos4212-hdmi";
-+		compatible = "samsung,exynos5420-hdmi";
- 		reg = <0x14530000 0x70000>;
- 		interrupts = <0 95 0>;
- 		clocks = <&clock CLK_HDMI>, <&clock CLK_SCLK_HDMI>,
+-	pinctrl at 13400000 {
+-		hdmi_hpd_irq: hdmi-hpd-irq {
+-			samsung,pins = "gpx3-7";
+-			samsung,pin-function = <0>;
+-			samsung,pin-pud = <1>;
+-			samsung,pin-drv = <0>;
+-		};
+-	};
+-
+ 	hdmi at 14530000 {
+ 		status = "okay";
+ 		hpd-gpio = <&gpx3 7 0>;
 -- 
 1.7.9.5
