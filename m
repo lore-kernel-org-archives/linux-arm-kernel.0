@@ -1,48 +1,60 @@
 From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Thu, 8 May 2014 14:45:08 +0530
-Subject: [PATCH v2 2/5] ARM: dts: enable fimd for exynos5250 based snow
- board
-In-Reply-To: <002701cf6a8d$ef7b4540$ce71cfc0$%han@samsung.com>
+Date: Thu, 8 May 2014 14:46:13 +0530
+Subject: [PATCH v2 3/5] ARM: dts: enable dp-controller for exynos5250
+ based snow board
+In-Reply-To: <002801cf6a91$1a891f70$4f9b5e50$%han@samsung.com>
 References: <1399529995-8656-1-git-send-email-rahul.sharma@samsung.com>
- <1399529995-8656-3-git-send-email-rahul.sharma@samsung.com>
- <002701cf6a8d$ef7b4540$ce71cfc0$%han@samsung.com>
-Message-ID: <CAPdUM4N-vYkN_hjT1oW_pXL83nMqFHv8ADohSVMLk9iSP_6bsQ@mail.gmail.com>
+ <1399529995-8656-4-git-send-email-rahul.sharma@samsung.com>
+ <002801cf6a91$1a891f70$4f9b5e50$%han@samsung.com>
+Message-ID: <CAPdUM4MDYe5s=_8v3o85bALOzK1d_8Qr8xSTW=8A381Ps4qLyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 May 2014 12:50, Jingoo Han <jg1.han@samsung.com> wrote:
+On 8 May 2014 13:12, Jingoo Han <jg1.han@samsung.com> wrote:
 > On Thursday, May 08, 2014 3:20 PM, Rahul Sharma wrote:
 >>
 >> From: Rahul Sharma <Rahul.Sharma@samsung.com>
 >>
->> Enable fimd node for snow board.
+>> Enable dp-controller for snow board.
 >>
 >> Signed-off-by: Rahul Sharma <Rahul.Sharma@samsung.com>
 >> ---
->>  arch/arm/boot/dts/exynos5250-snow.dts |    6 ++++++
->>  1 file changed, 6 insertions(+)
+>>  arch/arm/boot/dts/exynos5250-snow.dts |   27 +++++++++++++++++++++++++++
+>>  1 file changed, 27 insertions(+)
 >>
 >> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
->> index 1ce1088..796954c 100644
+>> index 796954c..28a755f 100644
 >> --- a/arch/arm/boot/dts/exynos5250-snow.dts
 >> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
->> @@ -206,4 +206,10 @@
->>                       clock-frequency = <24000000>;
+>> @@ -207,6 +207,33 @@
 >>               };
 >>       };
->> +
->> +     fimd at 14400000 {
+>>
+>> +     dp-controller at 145B0000 {
 >> +             status = "okay";
+>> +             pinctrl-names = "default";
+>> +             pinctrl-0 = <&dp_hpd>;
+>> +             samsung,color-space = <0>;
+>> +             samsung,dynamic-range = <0>;
+>> +             samsung,ycbcr-coeff = <0>;
+>> +             samsung,color-depth = <1>;
+>> +             samsung,link-rate = <0x0a>;
+>> +             samsung,lane-count = <2>;
+>> +             samsung,hpd-gpio = <&gpx0 7 0>;
+>> +             display-timings {
 >
-> (+cc Sachin Kamat, Tomasz Figa)
+> For readability, please insert one line as below.
 >
-> For readability, how about moving 'status' to the last entry of
-> the node? The same comment applies to other patches, too.
+> +               samsung,hpd-gpio = <&gpx0 7 0>;
+> +
+> +               display-timings {
+>
+> The same comment applies to the 5th patch.
+> ([PATCH v2 5/5] ARM: dts: enable dp-controller for exynos5420
+> based peach-pit board)
 >
 
-I just followed the nodes in rest of the file for peach and snow. This
-looks consistent to me. But let me know if you want me to change
-this.
+Ok. Will do that.
 
 Regards,
 Rahul Sharma.
@@ -50,11 +62,24 @@ Rahul Sharma.
 > Best regards,
 > Jingoo Han
 >
->> +             samsung,invert-vclk;
+>> +                     native-mode = <&timing1>;
+>> +                     timing1: timing at 1 {
+>> +                             clock-frequency = <70589280>;
+>> +                             hactive = <1366>;
+>> +                             vactive = <768>;
+>> +                             hfront-porch = <40>;
+>> +                             hback-porch = <40>;
+>> +                             hsync-len = <32>;
+>> +                             vback-porch = <10>;
+>> +                             vfront-porch = <12>;
+>> +                             vsync-len = <6>;
+>> +                     };
+>> +             };
 >> +     };
 >> +
->>  };
+>>       fimd at 14400000 {
+>>               status = "okay";
+>>               samsung,invert-vclk;
 >> --
 >> 1.7.9.5
->
 >
