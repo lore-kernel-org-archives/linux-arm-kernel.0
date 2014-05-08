@@ -1,73 +1,51 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 08 May 2014 15:55:41 +0200
-Subject: [PATCH v5 0/3] ARM: sunxi: Add support for consumer infrared
- devices
-In-Reply-To: <1398871010-30681-1-git-send-email-bay@hackerdom.ru>
-References: <1398871010-30681-1-git-send-email-bay@hackerdom.ru>
-Message-ID: <536B8CDD.7040600@redhat.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 8 May 2014 10:07:25 -0400 (EDT)
+Subject: [PATCH 4/7] usb: ehci-platform: add optional reset controller
+ retrieval
+In-Reply-To: <536B324C.1040806@redhat.com>
+Message-ID: <Pine.LNX.4.44L0.1405081002190.1087-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 8 May 2014, Hans de Goede wrote:
 
-On 04/30/2014 05:16 PM, Alexander Bersenev wrote:
-> This patch introduces Consumer IR(CIR) support for sunxi boards.
+> Hi,
 > 
-> This is based on Alexsey Shestacov's work based on the original driver 
-> supplied by Allwinner.
+> On 05/08/2014 12:00 AM, Maxime Ripard wrote:
+> > On Wed, May 07, 2014 at 10:25:55AM -0400, Alan Stern wrote:
+> >> On Tue, 6 May 2014, Maxime Ripard wrote:
+> >>
+> >>> From: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> >>>
+> >>> On the Allwinner's A31 SoC the reset line connected to the EHCI IP has to
+> >>> be deasserted for the EHCI block to be usable.
+> >>>
+> >>> Add support for an optional reset controller that will be deasserted on
+> >>> power off and asserted on power on.
+> >>>
+> >>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> >>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> >>
+> >> Is this really a _reset_ line?  That is, when you assert the reset 
+> >> line, does it actually reset the EHCI controller, or does it merely 
+> >> leave the controller in a partially powered-down state?
+> > 
+> > It actually resets the whole controller.
+> > 
+> >> The difference is important.  During suspend, the controller is
+> >> supposed to remember the state of the port connections as well as other
+> >> settings.  If it doesn't, the controller and all attached USB devices
+> >> will have to be reinitialized every time the controller resumes, which
+> >> will increase the latency.
+> > 
+> > So you're saying that we should move this to the probe then?
 > 
-> Signed-off-by: Alexander Bersenev <bay@hackerdom.ru>
-> Signed-off-by: Alexsey Shestacov <wingrime@linux-sunxi.org>
+> Yes.
 
-Alexander, v5 still has various issues which need fixing,
-do you plan to do a v6 soon ?
+That's right.  The controller should not be reset during suspend, if
+you can possibly avoid it.
 
-Regards,
+There isn't any real benefit to asserting the reset signal during 
+suspend, is there?  I mean, it won't use any less power, right?
 
-Hans
-
-> 
-> ---
-> Changes since version 1: 
->  - Fix timer memory leaks 
->  - Fix race condition when driver unloads while interrupt handler is active
->  - Support Cubieboard 2(need testing)
-> 
-> Changes since version 2:
-> - More reliable keydown events
-> - Documentation fixes
-> - Rename registers accurding to A20 user manual
-> - Remove some includes, order includes alphabetically
-> - Use BIT macro
-> - Typo fixes
-> 
-> Changes since version 3:
-> - Split the patch on smaller parts
-> - More documentation fixes
-> - Add clock-names in DT
-> - Use devm_clk_get function to get the clocks
-> - Removed gpios property from ir's DT
-> - Changed compatible from allwinner,sunxi-ir to allwinner,sun7i-a20-ir in DT
-> - Use spin_lock_irq instead spin_lock_irqsave in interrupt handler
-> - Add myself in the copyright ;)
-> - Coding style and indentation fixes
-> 
-> Changes since version 4:
-> - Try to fix indentation errors by sending patches with git send-mail
-> 
-> Alexander Bersenev (3):
->   ARM: sunxi: Add documentation for sunxi consumer infrared devices
->   ARM: sunxi: Add driver for sunxi IR controller
->   ARM: sunxi: Add IR controller support in DT on A20
-> 
->  .../devicetree/bindings/media/sunxi-ir.txt         |  23 ++
->  arch/arm/boot/dts/sun7i-a20-cubieboard2.dts        |   6 +
->  arch/arm/boot/dts/sun7i-a20-cubietruck.dts         |   6 +
->  arch/arm/boot/dts/sun7i-a20.dtsi                   |  31 +++
->  drivers/media/rc/Kconfig                           |  10 +
->  drivers/media/rc/Makefile                          |   1 +
->  drivers/media/rc/sunxi-ir.c                        | 303 +++++++++++++++++++++
->  7 files changed, 380 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/sunxi-ir.txt
->  create mode 100644 drivers/media/rc/sunxi-ir.c
-> 
+Alan Stern
