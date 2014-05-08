@@ -1,50 +1,68 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu,  8 May 2014 16:56:16 +0200
-Subject: [PATCH] clk/versatile: export symbols for impd1
+Date: Thu,  8 May 2014 16:56:26 +0200
+Subject: [PATCH 1/2] input: fix ps2/serio module dependency
 In-Reply-To: <1399560990-1402858-1-git-send-email-arnd@arndb.de>
 References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
  <1399560990-1402858-1-git-send-email-arnd@arndb.de>
-Message-ID: <1399560990-1402858-5-git-send-email-arnd@arndb.de>
+Message-ID: <1399560990-1402858-15-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The impd1 code on mach-integrator can be a loadable module,
-so we have to export icst_clk_register, integrator_impd1_clk_init
-and integrator_impd1_clk_exit.
+The ps2 mouse and keyboard drivers use the "serio" framework that
+they correctly select in Kconfig, and that in turn depends on the
+i8042 driver, which is also allowed to be disabled for architectures
+that don't have an i8042.
+
+However, Kconfig also allows i8042 to be built as a module while
+the serio framework is built-in, which causes this link error:
+
+drivers/built-in.o: In function `ps2_begin_command':
+:(.text+0x26b6cc): undefined reference to `i8042_check_port_owner'
+:(.text+0x26b6d4): undefined reference to `i8042_lock_chip'
+drivers/built-in.o: In function `ps2_end_command':
+:(.text+0x26b734): undefined reference to `i8042_check_port_owner'
+:(.text+0x26b73c): undefined reference to `i8042_unlock_chip'
+
+On x86, a specific 'select SERIO_I8042' takes care of it, but
+not on the other architecture that potentially have a u8042.
+
+This patch changes the Kconfig logic to ensure that whenever
+there is an i8042, it does get used for the serio driver, avoiding
+the link error above.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Mike Turquette <mturquette@linaro.org>
-Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+Cc: linux-input at vger.kernel.org
 ---
- drivers/clk/versatile/clk-icst.c  | 1 +
- drivers/clk/versatile/clk-impd1.c | 2 ++
- 2 files changed, 3 insertions(+)
+ drivers/input/keyboard/Kconfig | 2 +-
+ drivers/input/mouse/Kconfig    | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/versatile/clk-icst.c b/drivers/clk/versatile/clk-icst.c
-index a820b0c..7f3868a 100644
---- a/drivers/clk/versatile/clk-icst.c
-+++ b/drivers/clk/versatile/clk-icst.c
-@@ -160,3 +160,4 @@ struct clk *icst_clk_register(struct device *dev,
- 
- 	return clk;
- }
-+EXPORT_SYMBOL_GPL(icst_clk_register);
-diff --git a/drivers/clk/versatile/clk-impd1.c b/drivers/clk/versatile/clk-impd1.c
-index 31b44f0..264d8d5 100644
---- a/drivers/clk/versatile/clk-impd1.c
-+++ b/drivers/clk/versatile/clk-impd1.c
-@@ -133,6 +133,7 @@ void integrator_impd1_clk_init(void __iomem *base, unsigned int id)
- 	for (i = 0; i < ARRAY_SIZE(imc->clks); i++)
- 		clkdev_add(imc->clks[i]);
- }
-+EXPORT_SYMBOL_GPL(integrator_impd1_clk_init);
- 
- void integrator_impd1_clk_exit(unsigned int id)
- {
-@@ -155,3 +156,4 @@ void integrator_impd1_clk_exit(unsigned int id)
- 	kfree(imc->vco2name);
- 	kfree(imc->vco1name);
- }
-+EXPORT_SYMBOL_GPL(integrator_impd1_clk_exit);
+diff --git a/drivers/input/keyboard/Kconfig b/drivers/input/keyboard/Kconfig
+index 4f115db..dd2435a 100644
+--- a/drivers/input/keyboard/Kconfig
++++ b/drivers/input/keyboard/Kconfig
+@@ -71,7 +71,7 @@ config KEYBOARD_ATKBD
+ 	default y
+ 	select SERIO
+ 	select SERIO_LIBPS2
+-	select SERIO_I8042 if X86
++	select SERIO_I8042 if X86 || ARCH_MIGHT_HAVE_PC_SERIO
+ 	select SERIO_GSCPS2 if GSC
+ 	help
+ 	  Say Y here if you want to use a standard AT or PS/2 keyboard. Usually
+diff --git a/drivers/input/mouse/Kconfig b/drivers/input/mouse/Kconfig
+index effa9c5..cf534ee 100644
+--- a/drivers/input/mouse/Kconfig
++++ b/drivers/input/mouse/Kconfig
+@@ -17,7 +17,7 @@ config MOUSE_PS2
+ 	default y
+ 	select SERIO
+ 	select SERIO_LIBPS2
+-	select SERIO_I8042 if X86
++	select SERIO_I8042 if X86 || ARCH_MIGHT_HAVE_PC_SERIO
+ 	select SERIO_GSCPS2 if GSC
+ 	help
+ 	  Say Y here if you have a PS/2 mouse connected to your system. This
 -- 
 1.8.3.2
