@@ -1,49 +1,56 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 08 May 2014 18:12:53 +0200
-Subject: [PATCH 1/2] ARM: dts: Enable USB 3503 hub on exynos5250-snow
-In-Reply-To: <536BA9E8.2030306@suse.de>
-References: <1399293056-17143-1-git-send-email-gautam.vivek@samsung.com>
- <536BA9E8.2030306@suse.de>
-Message-ID: <536BAD05.9070401@samsung.com>
+Date: Thu, 08 May 2014 18:18:01 +0200
+Subject: [PATCH v3 1/2] ARM: EXYNOS: Map SYSRAM through generic SRAM
+ bindings
+In-Reply-To: <1399522592-23618-1-git-send-email-sachin.kamat@linaro.org>
+References: <1399522592-23618-1-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <536BAE39.70504@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08.05.2014 17:59, Andreas F?rber wrote:
-> Hello,
+Hi Sachin,
+
+On 08.05.2014 06:16, Sachin Kamat wrote:
+> Instead of hardcoding the SYSRAM details for each SoC,
+> pass this information through device tree (DT) and make
+> the code SoC agnostic. Generic SRAM bindings are used
+> for achieving this.
 > 
-> Am 05.05.2014 14:30, schrieb Vivek Gautam:
->> The exynos5250-snow has a SMSC USB3503 connected in
->> hardware only mode like a PHY. Enable support for it,
->> and add necessary 'reset-gpio' for it.
->>
->> This is in correspondance to similar patch by Mark Brown
->> 7c1b0ec ARM: dts: Enable USB hub on Arndale
->>
->> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
->> ---
->>
->> Based on 'for-next' branch of kgene's linux-samsung tree.
->>
->>  arch/arm/boot/dts/exynos5250-pinctrl.dtsi |    7 +++++++
->>  arch/arm/boot/dts/exynos5250-snow.dts     |   14 ++++++++++++++
->>  2 files changed, 21 insertions(+)
+> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Acked-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+> Changes since v2.
+> * Updated sysram node for Universal C210 board - Thanks to
+> Tomasz Figa for testing and updating the same.
+> * Added error handling code.
+> * Break if matching node found.
+> * Remove unnecessary error messages.
 > 
-> The same snippet as for snow also fixed my USB issues on spring.
-> Should it go into exynos5250-cros-common.dtsi instead?
+> This patch is based on linux next (next-20140501) on top of
+> my Kconfig consolidation patch
+> http://comments.gmane.org/gmane.linux.kernel.samsung-soc/28642
+> 
+> Tested on 4210/4412 Origen, 5250/5420 Arndale and SMDK5420 boards.
+> ---
+>  arch/arm/Kconfig                                |    1 +
+>  arch/arm/boot/dts/exynos4210-universal_c210.dts |   15 ++++++
+>  arch/arm/boot/dts/exynos4210.dtsi               |   18 +++++++
+>  arch/arm/boot/dts/exynos4x12.dtsi               |   18 +++++++
+>  arch/arm/boot/dts/exynos5250.dtsi               |   18 +++++++
+>  arch/arm/boot/dts/exynos5420.dtsi               |   18 +++++++
+>  arch/arm/mach-exynos/common.h                   |    1 +
+>  arch/arm/mach-exynos/exynos.c                   |   64 -----------------------
+>  arch/arm/mach-exynos/firmware.c                 |    8 ++-
+>  arch/arm/mach-exynos/include/mach/map.h         |    7 ---
+>  arch/arm/mach-exynos/platsmp.c                  |   56 ++++++++++++++++++--
+>  11 files changed, 148 insertions(+), 76 deletions(-)
+> 
 
-The GPIO pins used are different, so I don't think the hub node added by
-these patches could be shared.
+Looks good, thanks.
 
-Also, I believe all you need to add is a simple node as follows
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 
-usb_hub {
-	compatible = "smsc,usb3503a";
-	reset-gpios = <&gpe1 0 1>;
-};
-
-at root level (see my comments to this patch in another reply), which is
-affordable to be duplicated for every platform that requires it,
-especially if the reset-gpios property differs between boards.
-
+--
 Best regards,
 Tomasz
