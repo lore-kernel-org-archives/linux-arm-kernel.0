@@ -1,350 +1,221 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  8 May 2014 13:23:03 +0200
-Subject: [PATCH 2/3] arm64: defer reloading a task's FPSIMD state to userland
- resume
+Date: Thu,  8 May 2014 13:23:04 +0200
+Subject: [PATCH 3/3] arm64: add support for kernel mode NEON in interrupt
+ context
 In-Reply-To: <1399548184-9534-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1399548184-9534-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1399548184-9534-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1399548184-9534-3-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a task gets scheduled out and back in again and nothing has touched
-its FPSIMD state in the mean time, there is really no reason to reload
-it from memory. Similarly, repeated calls to kernel_neon_begin() and
-kernel_neon_end() will preserve and restore the FPSIMD state every time.
-
-This patch defers the FPSIMD state restore to the last possible moment,
-i.e., right before the task returns to userland. If a task does not return to
-userland at all (for any reason), the existing FPSIMD state is preserved
-and may be reused by the owning task if it gets scheduled in again on the
-same CPU.
-
-This patch adds two more functions to abstract away from straight FPSIMD
-register file saves and restores:
-- fpsimd_restore_current_state -> ensure current's FPSIMD state is loaded
-- fpsimd_flush_task_state -> invalidate live copies of a task's FPSIMD state
+This patch modifies kernel_neon_begin() and kernel_neon_end(), so
+they may be called from any context. To address the case where only
+a couple of registers are needed, kernel_neon_begin_partial(u32) is
+introduced which takes as a parameter the number of bottom 'n' NEON
+q-registers required. To mark the end of such a partial section, the
+regular kernel_neon_end() should be used.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
 Changes relative to previous version:
-- introduce fpsimd_restore_current_state() and fpsimd_flush_task_state() in
-  this patch because here is where they are first used
-- retained 'if (current->mm)' in CPU_PM_EXIT case
+- removed explicit __aligned(16) from struct fpsimd_partial_state
+- moved num_regs from offset #0 to offset #8
 
- arch/arm64/include/asm/fpsimd.h      |   5 ++
- arch/arm64/include/asm/thread_info.h |   4 +-
- arch/arm64/kernel/entry.S            |   2 +-
- arch/arm64/kernel/fpsimd.c           | 144 +++++++++++++++++++++++++++++++----
- arch/arm64/kernel/ptrace.c           |   2 +
- arch/arm64/kernel/signal.c           |   4 +
- 6 files changed, 143 insertions(+), 18 deletions(-)
+ arch/arm64/include/asm/fpsimd.h       | 15 ++++++++++++
+ arch/arm64/include/asm/fpsimdmacros.h | 35 ++++++++++++++++++++++++++++
+ arch/arm64/include/asm/neon.h         |  6 ++++-
+ arch/arm64/kernel/entry-fpsimd.S      | 24 +++++++++++++++++++
+ arch/arm64/kernel/fpsimd.c            | 44 ++++++++++++++++++++++++-----------
+ 5 files changed, 109 insertions(+), 15 deletions(-)
 
 diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-index f4e524b67e91..7a900142dbc8 100644
+index 7a900142dbc8..50f559f574fe 100644
 --- a/arch/arm64/include/asm/fpsimd.h
 +++ b/arch/arm64/include/asm/fpsimd.h
-@@ -37,6 +37,8 @@ struct fpsimd_state {
- 			u32 fpcr;
- 		};
- 	};
-+	/* the id of the last cpu to have restored this state */
-+	unsigned int cpu;
+@@ -41,6 +41,17 @@ struct fpsimd_state {
+ 	unsigned int cpu;
  };
  
++/*
++ * Struct for stacking the bottom 'n' FP/SIMD registers.
++ */
++struct fpsimd_partial_state {
++	u32		fpsr;
++	u32		fpcr;
++	u32		num_regs;
++	__uint128_t	vregs[32];
++};
++
++
  #if defined(__KERNEL__) && defined(CONFIG_COMPAT)
-@@ -59,8 +61,11 @@ extern void fpsimd_thread_switch(struct task_struct *next);
- extern void fpsimd_flush_thread(void);
+ /* Masks for extracting the FPSR and FPCR from the FPSCR */
+ #define VFP_FPSCR_STAT_MASK	0xf800009f
+@@ -66,6 +77,10 @@ extern void fpsimd_update_current_state(struct fpsimd_state *state);
  
- extern void fpsimd_preserve_current_state(void);
-+extern void fpsimd_restore_current_state(void);
- extern void fpsimd_update_current_state(struct fpsimd_state *state);
+ extern void fpsimd_flush_task_state(struct task_struct *target);
  
-+extern void fpsimd_flush_task_state(struct task_struct *target);
++extern void fpsimd_save_partial_state(struct fpsimd_partial_state *state,
++				      u32 num_regs);
++extern void fpsimd_load_partial_state(struct fpsimd_partial_state *state);
 +
  #endif
  
  #endif
-diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-index 720e70b66ffd..4a1ca1cfb2f8 100644
---- a/arch/arm64/include/asm/thread_info.h
-+++ b/arch/arm64/include/asm/thread_info.h
-@@ -100,6 +100,7 @@ static inline struct thread_info *current_thread_info(void)
- #define TIF_SIGPENDING		0
- #define TIF_NEED_RESCHED	1
- #define TIF_NOTIFY_RESUME	2	/* callback before returning to user */
-+#define TIF_FOREIGN_FPSTATE	3	/* CPU's FP state is not current's */
- #define TIF_SYSCALL_TRACE	8
- #define TIF_POLLING_NRFLAG	16
- #define TIF_MEMDIE		18	/* is terminating due to OOM killer */
-@@ -112,10 +113,11 @@ static inline struct thread_info *current_thread_info(void)
- #define _TIF_SIGPENDING		(1 << TIF_SIGPENDING)
- #define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
- #define _TIF_NOTIFY_RESUME	(1 << TIF_NOTIFY_RESUME)
-+#define _TIF_FOREIGN_FPSTATE	(1 << TIF_FOREIGN_FPSTATE)
- #define _TIF_32BIT		(1 << TIF_32BIT)
+diff --git a/arch/arm64/include/asm/fpsimdmacros.h b/arch/arm64/include/asm/fpsimdmacros.h
+index bbec599c96bd..768414d55e64 100644
+--- a/arch/arm64/include/asm/fpsimdmacros.h
++++ b/arch/arm64/include/asm/fpsimdmacros.h
+@@ -62,3 +62,38 @@
+ 	ldr	w\tmpnr, [\state, #16 * 2 + 4]
+ 	msr	fpcr, x\tmpnr
+ .endm
++
++.altmacro
++.macro fpsimd_save_partial state, numnr, tmpnr1, tmpnr2
++	mrs	x\tmpnr1, fpsr
++	str	w\numnr, [\state, #8]
++	mrs	x\tmpnr2, fpcr
++	stp	w\tmpnr1, w\tmpnr2, [\state]
++	adr	x\tmpnr1, 0f
++	add	\state, \state, x\numnr, lsl #4
++	sub	x\tmpnr1, x\tmpnr1, x\numnr, lsl #1
++	br	x\tmpnr1
++	.irp	qa, 30, 28, 26, 24, 22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 2, 0
++	.irp	qb, %(qa + 1)
++	stp	q\qa, q\qb, [\state, # -16 * \qa - 16]
++	.endr
++	.endr
++0:
++.endm
++
++.macro fpsimd_restore_partial state, tmpnr1, tmpnr2
++	ldp	w\tmpnr1, w\tmpnr2, [\state]
++	msr	fpsr, x\tmpnr1
++	msr	fpcr, x\tmpnr2
++	adr	x\tmpnr1, 0f
++	ldr	w\tmpnr2, [\state, #8]
++	add	\state, \state, x\tmpnr2, lsl #4
++	sub	x\tmpnr1, x\tmpnr1, x\tmpnr2, lsl #1
++	br	x\tmpnr1
++	.irp	qa, 30, 28, 26, 24, 22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 2, 0
++	.irp	qb, %(qa + 1)
++	ldp	q\qa, q\qb, [\state, # -16 * \qa - 16]
++	.endr
++	.endr
++0:
++.endm
+diff --git a/arch/arm64/include/asm/neon.h b/arch/arm64/include/asm/neon.h
+index b0cc58a97780..13ce4cc18e26 100644
+--- a/arch/arm64/include/asm/neon.h
++++ b/arch/arm64/include/asm/neon.h
+@@ -8,7 +8,11 @@
+  * published by the Free Software Foundation.
+  */
  
- #define _TIF_WORK_MASK		(_TIF_NEED_RESCHED | _TIF_SIGPENDING | \
--				 _TIF_NOTIFY_RESUME)
-+				 _TIF_NOTIFY_RESUME | _TIF_FOREIGN_FPSTATE)
++#include <linux/types.h>
++
+ #define cpu_has_neon()		(1)
  
- #endif /* __KERNEL__ */
- #endif /* __ASM_THREAD_INFO_H */
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 39ac630d83de..80464e2fb1a5 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -576,7 +576,7 @@ fast_work_pending:
- 	str	x0, [sp, #S_X0]			// returned x0
- work_pending:
- 	tbnz	x1, #TIF_NEED_RESCHED, work_resched
--	/* TIF_SIGPENDING or TIF_NOTIFY_RESUME case */
-+	/* TIF_SIGPENDING, TIF_NOTIFY_RESUME or TIF_FOREIGN_FPSTATE case */
- 	ldr	x2, [sp, #S_PSTATE]
- 	mov	x0, sp				// 'regs'
- 	tst	x2, #PSR_MODE_MASK		// user mode regs?
+-void kernel_neon_begin(void);
++#define kernel_neon_begin()	kernel_neon_begin_partial(32)
++
++void kernel_neon_begin_partial(u32 num_regs);
+ void kernel_neon_end(void);
+diff --git a/arch/arm64/kernel/entry-fpsimd.S b/arch/arm64/kernel/entry-fpsimd.S
+index 6a27cd6dbfa6..d358ccacfc00 100644
+--- a/arch/arm64/kernel/entry-fpsimd.S
++++ b/arch/arm64/kernel/entry-fpsimd.S
+@@ -41,3 +41,27 @@ ENTRY(fpsimd_load_state)
+ 	fpsimd_restore x0, 8
+ 	ret
+ ENDPROC(fpsimd_load_state)
++
++#ifdef CONFIG_KERNEL_MODE_NEON
++
++/*
++ * Save the bottom n FP registers.
++ *
++ * x0 - pointer to struct fpsimd_partial_state
++ */
++ENTRY(fpsimd_save_partial_state)
++	fpsimd_save_partial x0, 1, 8, 9
++	ret
++ENDPROC(fpsimd_load_partial_state)
++
++/*
++ * Load the bottom n FP registers.
++ *
++ * x0 - pointer to struct fpsimd_partial_state
++ */
++ENTRY(fpsimd_load_partial_state)
++	fpsimd_restore_partial x0, 8, 9
++	ret
++ENDPROC(fpsimd_load_partial_state)
++
++#endif
 diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 8a97163debc7..5ae89303c3ab 100644
+index 5ae89303c3ab..ad8aebb1cdef 100644
 --- a/arch/arm64/kernel/fpsimd.c
 +++ b/arch/arm64/kernel/fpsimd.c
-@@ -35,6 +35,60 @@
- #define FPEXC_IDF	(1 << 7)
+@@ -218,29 +218,45 @@ void fpsimd_flush_task_state(struct task_struct *t)
  
- /*
-+ * In order to reduce the number of times the FPSIMD state is needlessly saved
-+ * and restored, we need to keep track of two things:
-+ * (a) for each task, we need to remember which CPU was the last one to have
-+ *     the task's FPSIMD state loaded into its FPSIMD registers;
-+ * (b) for each CPU, we need to remember which task's userland FPSIMD state has
-+ *     been loaded into its FPSIMD registers most recently, or whether it has
-+ *     been used to perform kernel mode NEON in the meantime.
-+ *
-+ * For (a), we add a 'cpu' field to struct fpsimd_state, which gets updated to
-+ * the id of the current CPU everytime the state is loaded onto a CPU. For (b),
-+ * we add the per-cpu variable 'fpsimd_last_state' (below), which contains the
-+ * address of the userland FPSIMD state of the task that was loaded onto the CPU
-+ * the most recently, or NULL if kernel mode NEON has been performed after that.
-+ *
-+ * With this in place, we no longer have to restore the next FPSIMD state right
-+ * when switching between tasks. Instead, we can defer this check to userland
-+ * resume,@which time we verify whether the CPU's fpsimd_last_state and the
-+ * task's fpsimd_state.cpu are still mutually in sync. If this is the case, we
-+ * can omit the FPSIMD restore.
-+ *
-+ * As an optimization, we use the thread_info flag TIF_FOREIGN_FPSTATE to
-+ * indicate whether or not the userland FPSIMD state of the current task is
-+ * present in the registers. The flag is set unless the FPSIMD registers of this
-+ * CPU currently contain the most recent userland FPSIMD state of the current
-+ * task.
-+ *
-+ * For a certain task, the sequence may look something like this:
-+ * - the task gets scheduled in; if both the task's fpsimd_state.cpu field
-+ *   contains the id of the current CPU, and the CPU's fpsimd_last_state per-cpu
-+ *   variable points to the task's fpsimd_state, the TIF_FOREIGN_FPSTATE flag is
-+ *   cleared, otherwise it is set;
-+ *
-+ * - the task returns to userland; if TIF_FOREIGN_FPSTATE is set, the task's
-+ *   userland FPSIMD state is copied from memory to the registers, the task's
-+ *   fpsimd_state.cpu field is set to the id of the current CPU, the current
-+ *   CPU's fpsimd_last_state pointer is set to this task's fpsimd_state and the
-+ *   TIF_FOREIGN_FPSTATE flag is cleared;
-+ *
-+ * - the task executes an ordinary syscall; upon return to userland, the
-+ *   TIF_FOREIGN_FPSTATE flag will still be cleared, so no FPSIMD state is
-+ *   restored;
-+ *
-+ * - the task executes a syscall which executes some NEON instructions; this is
-+ *   preceded by a call to kernel_neon_begin(), which copies the task's FPSIMD
-+ *   register contents to memory, clears the fpsimd_last_state per-cpu variable
-+ *   and sets the TIF_FOREIGN_FPSTATE flag;
-+ *
-+ * - the task gets preempted after kernel_neon_end() is called; as we have not
-+ *   returned from the 2nd syscall yet, TIF_FOREIGN_FPSTATE is still set so
-+ *   whatever is in the FPSIMD registers is not saved to memory, but discarded.
-+ */
-+static DEFINE_PER_CPU(struct fpsimd_state *, fpsimd_last_state);
-+
-+/*
-  * Trapped FP/ASIMD access.
-  */
- void do_fpsimd_acc(unsigned int esr, struct pt_regs *regs)
-@@ -72,41 +126,96 @@ void do_fpsimd_exc(unsigned int esr, struct pt_regs *regs)
- 
- void fpsimd_thread_switch(struct task_struct *next)
- {
--	/* check if not kernel threads */
--	if (current->mm)
-+	/*
-+	 * Save the current FPSIMD state to memory, but only if whatever is in
-+	 * the registers is in fact the most recent userland FPSIMD state of
-+	 * 'current'.
-+	 */
-+	if (current->mm && !test_thread_flag(TIF_FOREIGN_FPSTATE))
- 		fpsimd_save_state(&current->thread.fpsimd_state);
--	if (next->mm)
--		fpsimd_load_state(&next->thread.fpsimd_state);
-+
-+	if (next->mm) {
-+		/*
-+		 * If we are switching to a task whose most recent userland
-+		 * FPSIMD state is already in the registers of *this* cpu,
-+		 * we can skip loading the state from memory. Otherwise, set
-+		 * the TIF_FOREIGN_FPSTATE flag so the state will be loaded
-+		 * upon the next return to userland.
-+		 */
-+		struct fpsimd_state *st = &next->thread.fpsimd_state;
-+
-+		if (__this_cpu_read(fpsimd_last_state) == st
-+		    && st->cpu == smp_processor_id())
-+			clear_ti_thread_flag(task_thread_info(next),
-+					     TIF_FOREIGN_FPSTATE);
-+		else
-+			set_ti_thread_flag(task_thread_info(next),
-+					   TIF_FOREIGN_FPSTATE);
-+	}
- }
- 
- void fpsimd_flush_thread(void)
- {
--	preempt_disable();
- 	memset(&current->thread.fpsimd_state, 0, sizeof(struct fpsimd_state));
--	fpsimd_load_state(&current->thread.fpsimd_state);
--	preempt_enable();
-+	set_thread_flag(TIF_FOREIGN_FPSTATE);
- }
- 
- /*
-- * Save the userland FPSIMD state of 'current' to memory
-+ * Save the userland FPSIMD state of 'current' to memory, but only if the state
-+ * currently held in the registers does in fact belong to 'current'
-  */
- void fpsimd_preserve_current_state(void)
- {
- 	preempt_disable();
--	fpsimd_save_state(&current->thread.fpsimd_state);
-+	if (!test_thread_flag(TIF_FOREIGN_FPSTATE))
-+		fpsimd_save_state(&current->thread.fpsimd_state);
- 	preempt_enable();
- }
- 
- /*
-- * Load an updated userland FPSIMD state for 'current' from memory
-+ * Load the userland FPSIMD state of 'current' from memory, but only if the
-+ * FPSIMD state already held in the registers is /not/ the most recent FPSIMD
-+ * state of 'current'
-+ */
-+void fpsimd_restore_current_state(void)
-+{
-+	preempt_disable();
-+	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
-+		struct fpsimd_state *st = &current->thread.fpsimd_state;
-+
-+		fpsimd_load_state(st);
-+		this_cpu_write(fpsimd_last_state, st);
-+		st->cpu = smp_processor_id();
-+	}
-+	preempt_enable();
-+}
-+
-+/*
-+ * Load an updated userland FPSIMD state for 'current' from memory and set the
-+ * flag that indicates that the FPSIMD register contents are the most recent
-+ * FPSIMD state of 'current'
-  */
- void fpsimd_update_current_state(struct fpsimd_state *state)
- {
- 	preempt_disable();
- 	fpsimd_load_state(state);
-+	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
-+		struct fpsimd_state *st = &current->thread.fpsimd_state;
-+
-+		this_cpu_write(fpsimd_last_state, st);
-+		st->cpu = smp_processor_id();
-+	}
- 	preempt_enable();
- }
- 
-+/*
-+ * Invalidate live CPU copies of task t's FPSIMD state
-+ */
-+void fpsimd_flush_task_state(struct task_struct *t)
-+{
-+	t->thread.fpsimd_state.cpu = NR_CPUS;
-+}
-+
  #ifdef CONFIG_KERNEL_MODE_NEON
  
++static DEFINE_PER_CPU(struct fpsimd_partial_state, hardirq_fpsimdstate);
++static DEFINE_PER_CPU(struct fpsimd_partial_state, softirq_fpsimdstate);
++
  /*
-@@ -118,16 +227,19 @@ void kernel_neon_begin(void)
- 	BUG_ON(in_interrupt());
- 	preempt_disable();
+  * Kernel-side NEON support functions
+  */
+-void kernel_neon_begin(void)
++void kernel_neon_begin_partial(u32 num_regs)
+ {
+-	/* Avoid using the NEON in interrupt context */
+-	BUG_ON(in_interrupt());
+-	preempt_disable();
++	if (in_interrupt()) {
++		struct fpsimd_partial_state *s = this_cpu_ptr(
++			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
  
--	if (current->mm)
-+	/*
-+	 * Save the userland FPSIMD state if we have one and if we haven't done
-+	 * so already. Clear fpsimd_last_state to indicate that there is no
-+	 * longer userland FPSIMD state in the registers.
-+	 */
-+	if (current->mm && !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
- 		fpsimd_save_state(&current->thread.fpsimd_state);
-+	this_cpu_write(fpsimd_last_state, NULL);
+-	/*
+-	 * Save the userland FPSIMD state if we have one and if we haven't done
+-	 * so already. Clear fpsimd_last_state to indicate that there is no
+-	 * longer userland FPSIMD state in the registers.
+-	 */
+-	if (current->mm && !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
+-		fpsimd_save_state(&current->thread.fpsimd_state);
+-	this_cpu_write(fpsimd_last_state, NULL);
++		BUG_ON(num_regs > 32);
++		fpsimd_save_partial_state(s, roundup(num_regs, 2));
++	} else {
++		/*
++		 * Save the userland FPSIMD state if we have one and if we
++		 * haven't done so already. Clear fpsimd_last_state to indicate
++		 * that there is no longer userland FPSIMD state in the
++		 * registers.
++		 */
++		preempt_disable();
++		if (current->mm &&
++		    !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
++			fpsimd_save_state(&current->thread.fpsimd_state);
++		this_cpu_write(fpsimd_last_state, NULL);
++	}
  }
- EXPORT_SYMBOL(kernel_neon_begin);
+-EXPORT_SYMBOL(kernel_neon_begin);
++EXPORT_SYMBOL(kernel_neon_begin_partial);
  
  void kernel_neon_end(void)
  {
--	if (current->mm)
--		fpsimd_load_state(&current->thread.fpsimd_state);
--
- 	preempt_enable();
+-	preempt_enable();
++	if (in_interrupt()) {
++		struct fpsimd_partial_state *s = this_cpu_ptr(
++			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
++		fpsimd_load_partial_state(s);
++	} else {
++		preempt_enable();
++	}
  }
  EXPORT_SYMBOL(kernel_neon_end);
-@@ -140,12 +252,12 @@ static int fpsimd_cpu_pm_notifier(struct notifier_block *self,
- {
- 	switch (cmd) {
- 	case CPU_PM_ENTER:
--		if (current->mm)
-+		if (current->mm && !test_thread_flag(TIF_FOREIGN_FPSTATE))
- 			fpsimd_save_state(&current->thread.fpsimd_state);
- 		break;
- 	case CPU_PM_EXIT:
- 		if (current->mm)
--			fpsimd_load_state(&current->thread.fpsimd_state);
-+			set_thread_flag(TIF_FOREIGN_FPSTATE);
- 		break;
- 	case CPU_PM_ENTER_FAILED:
- 	default:
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index 6a8928bba03c..f8700eca24e7 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -517,6 +517,7 @@ static int fpr_set(struct task_struct *target, const struct user_regset *regset,
- 		return ret;
  
- 	target->thread.fpsimd_state.user_fpsimd = newstate;
-+	fpsimd_flush_task_state(target);
- 	return ret;
- }
- 
-@@ -764,6 +765,7 @@ static int compat_vfp_set(struct task_struct *target,
- 		uregs->fpcr = fpscr & VFP_FPSCR_CTRL_MASK;
- 	}
- 
-+	fpsimd_flush_task_state(target);
- 	return ret;
- }
- 
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index 06448a77ff53..882f01774365 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -413,4 +413,8 @@ asmlinkage void do_notify_resume(struct pt_regs *regs,
- 		clear_thread_flag(TIF_NOTIFY_RESUME);
- 		tracehook_notify_resume(regs);
- 	}
-+
-+	if (thread_flags & _TIF_FOREIGN_FPSTATE)
-+		fpsimd_restore_current_state();
-+
- }
 -- 
 1.8.3.2
