@@ -1,27 +1,46 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 8 May 2014 12:12:29 +0200
-Subject: [PATCH v4] drivers: sh: compile drivers/sh/pm_runtime.c if
- ARCH_SHMOBILE_MULTI
-In-Reply-To: <1399411579-10681-1-git-send-email-geert+renesas@glider.be>
-References: <1399411579-10681-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <CAMuHMdWwenyU1RS4c8spFcb7M0oCXP9z8zbGQ0VACKj7EbvvkA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 8 May 2014 11:25:14 +0100
+Subject: [PATCH v2 2/2] arm64: enable context tracking
+In-Reply-To: <7hr445w3nz.fsf@paris.lan>
+References: <1399419149-26685-1-git-send-email-larry.bassel@linaro.org>
+ <1399419149-26685-3-git-send-email-larry.bassel@linaro.org>
+ <20140507101709.GE18456@arm.com> <7hr445w3nz.fsf@paris.lan>
+Message-ID: <20140508102514.GA6942@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 6, 2014 at 11:26 PM, Geert Uytterhoeven
-<geert+renesas@glider.be> wrote:
-> Tested on Koelsch (legacy, reference, shmobile, and shmobile+bbb kernels)
-> and BeagleBone Black (shmobile+bbb). Will test on more hardware tomorrow.
+On Thu, May 08, 2014 at 12:49:04AM +0100, Kevin Hilman wrote:
+> Hi Will,
 
-Tested on genmai with Wolfram's CCF support.
+Hello Kevin,
 
-Gr{oetje,eeting}s,
+> Will Deacon <will.deacon@arm.com> writes:
+> > On Wed, May 07, 2014 at 12:32:29AM +0100, Larry Bassel wrote:
+> >> Make calls to ct_user_enter when the kernel is exited
+> >> and ct_user_exit when the kernel is entered (in el0_da,
+> >> el0_ia, el0_svc, el0_irq).
+> >
+> > Why only these entry points? I can reschedule after any exception from EL0,
+> > so I'd expect all exceptions from userspace to need annotating, no?
+> 
+> In my initial approach to this, you might recall (though it was over a
+> year ago now) was to just instrument kernel_enter rather than sprinkle
+> the instrumentaion in cl0_*.  However, your concern at the time was that
+> since it was before debugging was enabled it would complicate debugging
+> these paths.
+> 
+> Any chance you have any other suggestion on how we might do this in
+> kernel_entry rather than sprinkling them all over cl0_*?  or is the
+> sprinkling the only good way to handle this.
 
-                        Geert
+Unfortunately, different exceptions do subtly different things before
+invoking the main handler. For example:
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+ - Stashing the far
+ - Enabling IRQs
+ - Enabling debug
+ - All the stuff on the syscall path
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+so putting the logic in kernel_entry isn't really do-able, unfortunately.
+
+Will
