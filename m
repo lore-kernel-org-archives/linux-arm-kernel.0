@@ -1,32 +1,49 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 08 May 2014 09:08:25 -0600
-Subject: [PATCH v6 1/3] ARM: kconfig: allow PCI support to be selected
- with ARCH_MULTIPLATFORM
-In-Reply-To: <1399478839-3564-2-git-send-email-will.deacon@arm.com>
-References: <1399478839-3564-1-git-send-email-will.deacon@arm.com>
- <1399478839-3564-2-git-send-email-will.deacon@arm.com>
-Message-ID: <536B9DE9.80100@wwwdotorg.org>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu,  8 May 2014 17:13:37 +0200
+Subject: [PATCH 1/3] ARM: zynq: Sort Kconfig options
+Message-ID: <5e4fb08db4f6a436fc4593b22c3ae611ba545967.1399562009.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/07/2014 10:07 AM, Will Deacon wrote:
-> When targetting ARCH_MULTIPLATFORM, we may include support for SoCs with
-> PCI-capable devices (e.g. mach-virt with virtio-pci).
-> 
-> This patch allows PCI support to be selected for these SoCs by selecting
-> CONFIG_MIGHT_HAVE_PCI when CONFIG_ARCH_MULTIPLATFORM=y.
+Keep options sorted.
 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
 
-> @@ -314,6 +314,7 @@ config ARCH_MULTIPLATFORM
->  	select CLKSRC_OF
->  	select COMMON_CLK
->  	select GENERIC_CLOCKEVENTS
-> +	select MIGHT_HAVE_PCI
+ arch/arm/mach-zynq/Kconfig | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
-Doesn't ARCH_MULTIPLATFORM allow ARCH_$soc to be selected, and ARCH_$soc
-selects MIGHT_HAVE_PCI?
+diff --git a/arch/arm/mach-zynq/Kconfig b/arch/arm/mach-zynq/Kconfig
+index 58c2b844e0a3..1daa5c220d1d 100644
+--- a/arch/arm/mach-zynq/Kconfig
++++ b/arch/arm/mach-zynq/Kconfig
+@@ -1,14 +1,15 @@
+ config ARCH_ZYNQ
+ 	bool "Xilinx Zynq ARM Cortex A9 Platform" if ARCH_MULTI_V7
+-	select ARM_AMBA
+-	select ARM_GIC
+ 	select ARCH_HAS_CPUFREQ
+ 	select ARCH_HAS_OPP
++	select ARM_AMBA
++	select ARM_GIC
++	select ARM_GLOBAL_TIMER if !CPU_FREQ
++	select CADENCE_TTC_TIMER
++	select GENERIC_ALLOCATOR
+ 	select HAVE_ARM_SCU if SMP
+ 	select HAVE_ARM_TWD if SMP
+ 	select ICST
+-	select CADENCE_TTC_TIMER
+-	select ARM_GLOBAL_TIMER if !CPU_FREQ
+ 	select MFD_SYSCON
+ 	help
+ 	  Support for Xilinx Zynq ARM Cortex A9 Platform
+--
+1.8.2.3
 
-That way, you can only enable PCI support if you have actually enabled
-an SoC that has PCI, and equally ARCH_$soc selects MIGHT_HAVE_PCI just
-like it always used to work before ARCH_MULTIPLATFORM.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140508/4e70a55c/attachment.sig>
