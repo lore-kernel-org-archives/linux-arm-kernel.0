@@ -1,122 +1,175 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu,  8 May 2014 17:23:40 -0500
-Subject: [PATCH 3/6] serial: earlycon: add DT support
-In-Reply-To: <1399587823-17701-1-git-send-email-robherring2@gmail.com>
-References: <1399587823-17701-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1399587823-17701-4-git-send-email-robherring2@gmail.com>
+From: agnel.joel@gmail.com (Joel Fernandes)
+Date: Thu, 8 May 2014 17:43:12 -0500
+Subject: [PATCH 3/5] irqchip: crossbar: Skip some irqs from getting mapped
+ to crossbar
+In-Reply-To: <20140508203659.GA5620@kahuna>
+References: <1399299527-10955-1-git-send-email-r.sricharan@ti.com>
+ <1399299527-10955-4-git-send-email-r.sricharan@ti.com>
+ <536BD9D8.4080905@ti.com> <20140508203659.GA5620@kahuna>
+Message-ID: <CAD=GYpbQQxQgKd3oZcAuWrxoD4VrkKzpybd11qwxs405HSUVGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <robh@kernel.org>
+On Thu, May 8, 2014 at 3:37 PM, Nishanth Menon <nm@ti.com> wrote:
+> On 14:24-20140508, Joel Fernandes wrote:
+>> On 05/05/2014 09:18 AM, Sricharan R wrote:
+>> > From: Nishanth Menon <nm@ti.com>
+>> >
+>> > When, in the system due to varied reasons, interrupts might be unusable
+>> > due to hardware behavior, but register maps do exist, then those interrupts
+>> > should be skipped while mapping irq to crossbars.
+>> >
+>>
+>> Just wondering, instead of hardcoding this data in the code, and
+>> introducing additional flags (IRQ_SKIP), why not just put these GIC IRQs
+>> in the ti,irq-reserved property in DTS for platforms where such IRQs are
+>> not usable. That way you're skipping these IRQs anyway.
+>>
+>> Also that would avoid adding more hard coded data for future SoCs into
+>> the source for such IRQs that must be skipped, and also reduces LOC.
+>>
+>
+> Good question - lets try to explain the hardware a little here ->
+> obviously a driver that cannot use the hardware is useless compared to
+> reducing LOC count ;).. and apologies about the long reply..
+>
+> Basic understanding:
+> GIC has 160 SPIs and number of hardware block interrupt sources is around or
+> more than 400. So, in comes crossbar - which is basically a mapper by
+> allowing us to select an hardware block interrupt source (identified as
+> crossbar_number or cb_no in code). So all we have to do is to write to a
+> register in crossbar corresponding to GIC and viola, we now routed the
+> interrupt source to a GIC interrupt of our choice. At least the
+> Specification reads so.... until you drill down to the details.
 
-This adds the infrastructure to generic earlycon for earlycon setup
-using DT. The actual setup is not enabled until a following commit to
-add the FDT parsing.
+Thanks for the long explanation and the diagrams!
 
-Signed-off-by: Rob Herring <robh@kernel.org>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Jiri Slaby <jslaby@suse.cz>
-Cc: Arnd Bergmann <arnd@arndb.de>
----
- drivers/tty/serial/earlycon.c     | 27 +++++++++++++++++++++++++++
- include/asm-generic/vmlinux.lds.h |  4 +++-
- include/linux/serial_core.h       |  6 ++++++
- 3 files changed, 36 insertions(+), 1 deletion(-)
+Yes, I feel there is no other way and with so many HW bugs, I think it
+makes sense to make it a real irqchip driver.
 
-diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
-index c92e830..021fe5f 100644
---- a/drivers/tty/serial/earlycon.c
-+++ b/drivers/tty/serial/earlycon.c
-@@ -15,6 +15,7 @@
- #include <linux/init.h>
- #include <linux/io.h>
- #include <linux/serial_core.h>
-+#include <linux/mod_devicetable.h>
- 
- #ifdef CONFIG_FIX_EARLYCON_MEM
- #include <asm/fixmap.h>
-@@ -32,6 +33,9 @@ static struct earlycon_device early_console_dev = {
- 	.con = &early_con,
- };
- 
-+static const struct of_device_id __earlycon_of_table_sentinel
-+	__used __section(__earlycon_of_table_end);
-+
- static void __iomem * __init earlycon_map(unsigned long paddr, size_t size)
- {
- 	void __iomem *base;
-@@ -142,3 +146,26 @@ int __init setup_earlycon(char *buf, const char *match,
- 	register_console(early_console_dev.con);
- 	return 0;
- }
-+
-+int __init of_setup_earlycon(unsigned long addr,
-+			     int (*setup)(struct earlycon_device *, const char *))
-+{
-+	int err;
-+	struct uart_port *port = &early_console_dev.port;
-+
-+	port->iotype = UPIO_MEM;
-+	port->mapbase = addr;
-+	port->uartclk = BASE_BAUD * 16;
-+	port->membase = earlycon_map(addr, SZ_4K);
-+
-+	early_console_dev.con->data = &early_console_dev;
-+	err = setup(&early_console_dev, NULL);
-+	if (err < 0)
-+		return err;
-+	if (!early_console_dev.con->write)
-+		return -ENODEV;
-+
-+
-+	register_console(early_console_dev.con);
-+	return 0;
-+}
-diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
-index 120ccb9..f5249c4 100644
---- a/include/asm-generic/vmlinux.lds.h
-+++ b/include/asm-generic/vmlinux.lds.h
-@@ -129,6 +129,7 @@
- #define CLK_OF_TABLES()		OF_TABLE(CONFIG_COMMON_CLK, clk)
- #define RESERVEDMEM_OF_TABLES()	OF_TABLE(CONFIG_OF_RESERVED_MEM, reservedmem)
- #define CPU_METHOD_OF_TABLES()	OF_TABLE(CONFIG_SMP, cpu_method)
-+#define EARLYCON_OF_TABLES()	OF_TABLE(CONFIG_SERIAL_EARLYCON, earlycon)
- 
- #define KERNEL_DTB()							\
- 	STRUCT_ALIGN();							\
-@@ -458,7 +459,8 @@
- 	CLKSRC_OF_TABLES()						\
- 	CPU_METHOD_OF_TABLES()						\
- 	KERNEL_DTB()							\
--	IRQCHIP_OF_MATCH_TABLE()
-+	IRQCHIP_OF_MATCH_TABLE()					\
-+	EARLYCON_OF_TABLES()
- 
- #define INIT_TEXT							\
- 	*(.init.text)							\
-diff --git a/include/linux/serial_core.h b/include/linux/serial_core.h
-index 7a15b5b..5bbb809 100644
---- a/include/linux/serial_core.h
-+++ b/include/linux/serial_core.h
-@@ -294,6 +294,9 @@ struct earlycon_device {
- int setup_earlycon(char *buf, const char *match,
- 		   int (*setup)(struct earlycon_device *, const char *));
- 
-+extern int of_setup_earlycon(unsigned long addr,
-+			     int (*setup)(struct earlycon_device *, const char *));
-+
- #define EARLYCON_DECLARE(name, func) \
- static int __init name ## _setup_earlycon(char *buf) \
- { \
-@@ -301,6 +304,9 @@ static int __init name ## _setup_earlycon(char *buf) \
- } \
- early_param("earlycon", name ## _setup_earlycon);
- 
-+#define OF_EARLYCON_DECLARE(name, compat, fn)				\
-+	_OF_DECLARE(earlycon, name, compat, fn, void *)
-+
- struct uart_port *uart_get_console(struct uart_port *ports, int nr,
- 				   struct console *c);
- void uart_parse_options(char *options, int *baud, int *parity, int *bits,
--- 
-1.9.1
+Further since not everything goes through the crossbar and some are
+direct mapped like your diagram, the correct fix is probably making it
+an irqchip and doing the interrupt controller parenting correctly in
+DT.
+
+That would take care of A), because users of such direct mapped
+interrupts will go through the GIC interrupt controller directly.
+
+It will also take care of B), because if writing to cross bar has no
+effect for a particular IRQ, or if those IRQs are hard-wired to
+something, as you said, then that something should go through the GIC
+directly.
+
+I can try to whip up something like this if it makes sense, let me know...
+
+thanks,
+
+-Joel
+
+
+>
+> A) You have 160 SPI GIC, and 152 crossbar registers. So, you have 8 GIC SPI
+> interrupts that are hardwired. the reserved mapping basically marks
+> these to indicate that we dont have registers. Example: 0 1 2 3 5
+> 6 131 and 132
+>         - Limitation today - if you want to use PMU for CPU0, SPI
+>         interrupt is 131, then if you define, in dts:
+>         interrupts = <GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH>
+>         driver assumes it is crossbar number 131(reserved), Similarly:
+>         GIC CS_CTI_MPU_C0_IRQ (SPI 1) is ELM_IRQ (crossbar 1)
+>         GIC CS_CTI_MPU_C1_IRQ (SPI 2) is EXT_SYS_IRQ_1 (crossbar 2)
+>         GIC MPU_CLUSTER_IRQ_AXIERR (SPI 3) is reserved (crossbar 3)
+>         GIC WD_TIMER_MPU_C0_IRQ_WARN (SPI 5) is L3_MAIN_IRQ_APP_ERR (crossbar 5)
+>         GIC WD_TIMER_MPU_C1_IRQ_WARN (SPI 6) is PRM_IRQ_MPU (crossbar 6)
+>         GIC MPU_CLUSTER_IRQ_PMU_C0 (SPI 131) is reserved (crossbar 131)
+>         GIC MPU_CLUSTER_IRQ_PMU_C1 (SPI 132) is reserved (crossbar 132)
+>
+>         As of today, we cannot differentiate in DTS if it is one of
+>         these "direct map" interrupts we are requesting or crossbar
+>         number we are requesting.
+>
+> B) among the 152 cross bar registers, you have three sets:
+> B.1) The ones like Crossbar register 1 which maps to SPI4 - no problem -
+>      you write the crossbar number you want to map, bingo, job done.
+>      - The driver works brilliantly here. and this is true for 148 GIC
+>      SPIs.
+> B.2) The ones like 10 139 140 - these are interesting, because we have
+>      crossbar registers corresponding to these, However writing anything
+>      to them has no impact - at least 10 is confirmed to have been
+>      hardwired to L3_APP_IRQ (but not documented), we are trying to get
+>      explanations for 139 and 140. - but there is strong indication
+>      based on testing performed that the registers are NOPs and GIC is
+>      hardwired in.
+>
+>      I had originally discovered 10, but only a day or so back did we
+>      understand what is going on, others we dont know yet.
+> B.3) 133 is a variation to B.2 - There is an magical efuse register
+>     which controls if the GIC is hardwired or not. when the efuse bit is
+>     0, it behaves like B.1(program and it works), but almost all silicon
+>     have it set to "hardwired mode" :(
+>
+> The following you wont find in any TRM, and is based on tests performed
+> during the last few days - primarily meant to illustrate this.
+>
+>                       MPU Crossbar
+>                       152 registers
+>    +-------+         +------+
+>    |       |    +----+C1    |
+>    | PPI.. |    |    +------+
+>    | 0..32 |    | <--+C2    |
+>    |       |    |    +------+     +------------+
+>    +-------+    | +--+C5    |     |            +---+
+>    |  SPI1 |    | |  +------+   <-+ L3 APP IRQ |   |
+>    |       |    | |  |      |     ++-------+---+   |
+>    +-------+    | |  |      |      +-------+       |
+>    |  SPI3 |    | |  +------+      | CPU0  |       |
+>    |       |    | |  |      |      | PMU   +----+  |
+>    +-------+    | |  +------+      +-------+    |  |
+>    | SPI4  | <--+ |  |      |                   |  |
+>    |       |      |  |      |                   |  |
+>    +-------+      |  |      |    +---------+    |  |
+>    | SPI10 | <----+  |      |    | External|    |  |
+> +> |       |         |      |    | NMI     |    |  |
+> |  +-------+         +------+    +-+-----+-++   |  |
+> |  | SPI131|         |      |      +-----+  |   |  |
+> |  |       | <+      +------+      | Efuse  |   |  |
+> |  +-------+  |      |C126  | <--+-----+-+  |   |  |
+> |  | SPI133| <---+   +------+    +-----+    |   |  |
+> |  +-------+  |  | +-+C132  |    |CPU0 |    |   |  |
+> |  | SPI139| <-----+ +------+    |WDT  |    |   |  |
+> |  +-------+  |  | | +------+    +--+--+    |   |  |
+> |  | ..... |  |  | |                |       |   |  |
+> |  +-------+  |  | +----------------+       |   |  |
+> |  | SPI159|  |  |                          |   |  |
+> |  +-------+  |  +--------------------------+   |  |
+> |             |                                 |  |
+> |    GIC      +---------------------------------+  |
+> |  160 SPI                                         |
+> |                                                  |
+> +--------------------------------------------------+
+>
+>
+> So, to answer your question - I hope this explains skip and reserved.
+> Now, we happily can handle case B.1 (148 SPI interrupts) - However,
+>
+> The reason I requested this series to be blocked is:
+> a) We dont completely (yet) have explanation about hardware for B.2 139
+>    and 140.
+> b) we definitely need to be able to request the interrupts of A, B.2,
+>    B.3 - and our framework as it stands right now fails.
+>
+> NOTE:
+> obviously we claim dra7 compatibility. dra742 and 744 seem similar - but
+> we dont have confirmation for the same yet. following device tree
+> maintainer recommendations of having dts compatibility closely match
+> with SoC behavior. yeah, we could make the driver too generic and move
+> everything to dts.. but that does not seem to be the way we do things with dt.
+>
+> --
+> Regards,
+> Nishanth Menon
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
