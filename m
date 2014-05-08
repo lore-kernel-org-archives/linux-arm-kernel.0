@@ -1,42 +1,46 @@
 From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Thu, 08 May 2014 16:07:59 +0530
-Subject: [PATCH v2 4/4] ARM: dts: remove chip specific hdmi hpd pin from board
-In-Reply-To: <1399545479-20086-1-git-send-email-rahul.sharma@samsung.com>
-References: <1399545479-20086-1-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <1399545479-20086-5-git-send-email-rahul.sharma@samsung.com>
+Date: Thu, 08 May 2014 16:07:55 +0530
+Subject: [PATCH v2 0/4] ARM: dts: enable hdmi for exynos5 based peach and snow
+ boards
+Message-ID: <1399545479-20086-1-git-send-email-rahul.sharma@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rahul Sharma <Rahul.Sharma@samsung.com>
 
-"gpx3-7" is chip specific pin in Exynos5420 for hdmi
-hotplug. This pin is moved to exynos5420-pinctrl.dts
-and removed from the board file.
+Enable hdmi for exynos5250 based snow board and exynos5420
+based peach pit board. It also adds properties to hdmi nodes
+for accessing hdmiphy as simple phys.
 
-Signed-off-by: Rahul Sharma <Rahul.Sharma@samsung.com>
----
- arch/arm/boot/dts/exynos5420-smdk5420.dts |    9 ---------
- 1 file changed, 9 deletions(-)
+V2:
+1) Re-spin on dependent patches.
+2) Added patch to remove chip specific hdmi hpd gpio from
+board file top SoC file.
 
-diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-index 6910485..11cd9bf 100644
---- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
-+++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-@@ -131,15 +131,6 @@
- 		};
- 	};
- 
--	pinctrl at 13400000 {
--		hdmi_hpd_irq: hdmi-hpd-irq {
--			samsung,pins = "gpx3-7";
--			samsung,pin-function = <0>;
--			samsung,pin-pud = <1>;
--			samsung,pin-drv = <0>;
--		};
--	};
--
- 	hdmi at 14530000 {
- 		status = "okay";
- 		hpd-gpio = <&gpx3 7 0>;
+This series is based on Kukjin Kims, for-next branch.
+
+It is dependent on
+1) Arun's patch for adding peach-pit board dts file at
+http://www.spinics.net/lists/linux-samsung-soc/msg30103.html. [Patch is 'ACK'ed.]
+2) Sachin's patch for snow board dts file at
+https://patches.linaro.org/28325/
+3) DRM Hdmi driver patch which is changing the DT bioding at
+http://www.spinics.net/lists/linux-samsung-soc/msg28052.html
+
+Rahul Sharma (4):
+  ARM: dts: enable hdmi for exynos5250 based snow board
+  ARM: dts: change to correct compatible string for exynos5420 hdmi
+  ARM: dts: enable hdmi for exynos5420 based peach-pit board
+  ARM: dts: remove chip specific hdmi hpd pin from board
+
+ arch/arm/boot/dts/exynos5250-cros-common.dtsi |    6 +++++-
+ arch/arm/boot/dts/exynos5250-pinctrl.dtsi     |    7 +++++++
+ arch/arm/boot/dts/exynos5250-snow.dts         |    7 +++++++
+ arch/arm/boot/dts/exynos5420-peach-pit.dts    |   19 +++++++++++++++++++
+ arch/arm/boot/dts/exynos5420-pinctrl.dtsi     |    7 +++++++
+ arch/arm/boot/dts/exynos5420-smdk5420.dts     |    9 ---------
+ arch/arm/boot/dts/exynos5420.dtsi             |    7 ++++++-
+ 7 files changed, 51 insertions(+), 11 deletions(-)
+
 -- 
 1.7.9.5
