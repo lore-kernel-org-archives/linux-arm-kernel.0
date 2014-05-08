@@ -1,175 +1,101 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Thu, 8 May 2014 11:35:13 +0530
-Subject: [PATCH v7 1/2] phy: Add new Exynos5 USB 3.0 PHY driver
-In-Reply-To: <5368F136.6070804@samsung.com>
-References: <1398665874-31238-1-git-send-email-gautam.vivek@samsung.com>
- <5368F136.6070804@samsung.com>
-Message-ID: <CAFp+6iHN-W-k6ow5YykK_QWgBJ+GgzXwPX6suWtizxwJWOiGtg@mail.gmail.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Thu, 8 May 2014 08:14:45 +0200
+Subject: [linux-sunxi] Re: [PATCH 0/2] ARM: sunxi: Enable syscon for the
+ system controller
+In-Reply-To: <20140508030425.GJ7047@lukather>
+References: <1399212160-26934-1-git-send-email-carlo@caione.org>
+ <20140505225517.GE9464@lukather>
+ <CAGb2v66JBM_Rv8ie=7iuTPrXGPJECTeevnf9LLXNS=FSYs1+Tg@mail.gmail.com>
+ <CAOQ7t2akOEr7o4Q5ze5QPr_RHj6MWmA-u5NTuq2q1epy2LBr8w@mail.gmail.com>
+ <20140507032502.GM9464@lukather>
+ <CAOQ7t2byRX3HmVjUKYZ-VEocR3S2ATLpSTPV8bdFD98_Q2sY9Q@mail.gmail.com>
+ <20140508030425.GJ7047@lukather>
+Message-ID: <CAOQ7t2b6hv_qUL2wRzo8=LMc99Gb7TsHA8-z4xBCkAZU6Z6o_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester,
+On Thu, May 8, 2014 at 5:04 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
 
+<snip>
 
-On Tue, May 6, 2014 at 7:57 PM, Sylwester Nawrocki
-<s.nawrocki@samsung.com> wrote:
-> On 28/04/14 08:17, Vivek Gautam wrote:
->> Add a new driver for the USB 3.0 PHY on Exynos5 series of SoCs.
->> The new driver uses the generic PHY framework and will interact
->> with DWC3 controller present on Exynos5 series of SoCs.
->> Thereby, removing old phy-samsung-usb3 driver and related code
->> used untill now which was based on usb/phy framework.
+>> >> > I believe this will be used for toggling the SRAM mappings. (Am I right?)
+>> >>
+>> >> Definitely right.
+>> >>
+>> >> > The second register toggles mappings for MUSB FIFO, EMAC, and a few of
+>> >> > the other IP blocks we currently don't support.
+>> >>
+>> >> Not yet :)
+>> >
+>> > I wonder how other SoCs are actually handling this mapping between CPU
+>> > & DMA vs device of some SRAMs. Did you look at this?
 >>
->> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
->> ---
+>> It seems quite a few grepping for syscon
+>
+> ??
+>
+> What do you mean?
+>
+> I wasn't really talking about syscon itself, just how other SoCs
+> usually deals with this kind of remapping usually.
+
+Ho, sorry. In general for what I have seen the drivers use syscon or
+just map directly the register they need to use.
+Probably there is something smarter that I'm not aware of.
+
+>> >> >> Moreover, the A31 doesn't seem to have this system controller, or at
+>> >> >> least this overlap.
+>> >>
+>> >> I admit that I didn't check the A31 manual but I trusted the wiki page
+>> >> at http://linux-sunxi.org/SRAM_Controller and
+>> >> http://linux-sunxi.org/A31/Memory_map
+>> >>
+>> >> > There should be something similar, as does the A23. There is no overlap AFAIK.
+>> >>
+>> >> I agree and will check also A23.
+>> >>
+>> >> >> And since on the A20, registers seem to have one usage only, so I
+>> >> >> guess we can just split this IP into several nodes, just like we did
+>> >> >> with the NMI.
+>> >> >
+>> >> > As stated above, the second register toggles SRAM mappings for at most
+>> >> > 4 SRAM blocks (for EMAC, MUSB, ACE, ISP).
+>> >> >
+>> >> > syscon would be a good way to share this register among the various drivers.
+>> >> > We do not toggle it in the current EMAC driver. The driver seems to assume
+>> >> > it is setup by the bootloader, and on the A20, it seems to be mapped to
+>> >> > EMAC by default.
+>> >> >
+>> >> > The MUSB glue layer driver must toggle this.
+>> >>
+>> >> This is exactly why I wrote these patches. I started hacking /
+>> >> studying your MUSB driver and I think that using syscon is a better
+>> >> way to manage these registers instead of mapping them in several
+>> >> drivers also because most of the time a single register has to be used
+>> >> by multiple drivers (i.e. SRAM_CTL1_CFG is used for USB,  EMAC,
+>> >> etc...)
+>> >>
+>> >> > I think this approach is better than all the individual drivers mapping
+>> >> > the registers and toggling a single bit. In fact I did something similar
+>> >> > when working on preliminary musb support.
+>> >
+>> > I agree with that.
 >>
->> Changes from v6:
->>  - Addressed review comments:
->>    -- Sorted config entries in Kconfig and Makefile
->>    -- Made #define to_usbdrd_phy(inst) to a static inline routine.
->>    -- Restructured exynos5_rate_to_clk() as suggested.
->>    -- Amended 'val' field for regmap_update_bits() in the routine
->>       exynos5_usbdrd_phy_isol().
->>    -- Removed sentinel entry from exynos5_usbdrd_phy_cfg[] struct.
->>    -- Removed check for 'match' entry in probe().
->>
->>  .../devicetree/bindings/phy/samsung-phy.txt        |   40 ++
->>  drivers/phy/Kconfig                                |   11 +
->>  drivers/phy/Makefile                               |    1 +
->>  drivers/phy/phy-exynos5-usbdrd.c                   |  627 ++++++++++++++++++++
->>  4 files changed, 679 insertions(+)
->>  create mode 100644 drivers/phy/phy-exynos5-usbdrd.c
->>
->> diff --git a/Documentation/devicetree/bindings/phy/samsung-phy.txt b/Documentation/devicetree/bindings/phy/samsung-phy.txt
->> index b422e38..51efe4c 100644
->> --- a/Documentation/devicetree/bindings/phy/samsung-phy.txt
->> +++ b/Documentation/devicetree/bindings/phy/samsung-phy.txt
->> @@ -114,3 +114,43 @@ Example:
->>               compatible = "samsung,exynos-sataphy-i2c";
->>               reg = <0x38>;
->>       };
->> +
->> +Samsung Exynos5 SoC series USB DRD PHY controller
->> +--------------------------------------------------
->> +
->> +Required properties:
->> +- compatible : Should be set to one of the following supported values:
->> +     - "samsung,exynos5250-usbdrd-phy" - for exynos5250 SoC,
->> +     - "samsung,exynos5420-usbdrd-phy" - for exynos5420 SoC.
->> +- reg : Register offset and length of USB DRD PHY register set;
->> +- clocks: Clock IDs array as required by the controller
->> +- clock-names: names of clocks correseponding to IDs in the clock property;
->> +            Required clocks:
->> +     - phy: main PHY clock (same as USB DRD controller i.e. DWC3 IP clock),
->> +            used for register access.
->> +     - ref: PHY's reference clock (usually crystal clock), used for
->> +            PHY operations, associated by phy name. It is used to
->> +            determine bit values for clock settings register.
->> +            For Exynos5420 this is given as 'sclk_usbphy30' in CMU.
->> +- samsung,pmu-syscon: phandle for PMU system controller interface, used to
->> +                   control pmu registers for power isolation.
->> +- samsung,pmu-offset: phy power control register offset to pmu-system-controller
->> +                   base.
+>> So do you suggest to drop the syscon idea waiting for the new soc
+>> framework?
 >
-> It doesn't seem right to have register offset encoded in the device tree
-> like this. I think it'd be more appropriate to associate such an offset
-> with the compatible string's value in the driver.
-
-Ok, it makes more sense.
-Just out of curiosity, what difference would this make ?
-
+> To be honest, I don't really know what to think of it. I'd need to see
+> some code that uses this. Maybe we can just postpone the decision to
+> whenever we will actually have some code submitted that make any use
+> of this?
 >
-> Also it might be sensible to create a new header file in include/linux/mfd/
-> syscon/ for Exynos5 SoCs and put any required PMU offset definitions there.
-> Instead having them scattered and possibly duplicated in various drivers.
->
->> +- #phy-cells : from the generic PHY bindings, must be 1;
->> +
->> +For "samsung,exynos5250-usbdrd-phy" and "samsung,exynos5420-usbdrd-phy"
->> +compatible PHYs, the second cell in the PHY specifier identifies the
->> +PHY id, which is interpreted as follows:
->> +  0 - UTMI+ type phy,
->> +  1 - PIPE3 type phy,
->> +
->> +Example:
->> +     usb3_phy: usbphy at 12100000 {
->> +             compatible = "samsung,exynos5250-usbdrd-phy";
->> +             reg = <0x12100000 0x100>;
->> +             clocks = <&clock 286>, <&clock 1>;
->> +             clock-names = "phy", "ref";
->> +             samsung,pmu-syscon = <&pmu_system_controller>;
->> +             samsung,pmu-offset = <0x704>;
->> +             #phy-cells = <1>;
->> +     };
-> [...]
->> +struct usbdrd_phy_config {
->
-> Isn't name of this data structure too generic ?
-> Perhaps rename it to exynos_usbdrd_phy_config ?
+> If it's easier for you to keep the syscon at the moment for whateever
+> driver you're working on before submitting it, I'm fine with it, but
+> I'm not going to merge it right now either.
 
-Sure, will change this name, and thereby change the names of its instances.
-
->
->> +     u32 id;
->> +     void (*phy_isol)(struct phy_usb_instance *inst, u32 on);
->> +     void (*phy_init)(struct exynos5_usbdrd_phy *phy_drd);
->> +     unsigned int (*set_refclk)(struct phy_usb_instance *inst);
->> +};
->> +
->> +struct exynos5_usbdrd_phy_drvdata {
->> +     const struct usbdrd_phy_config *phy_cfg;
->> +};
->> +
-> [...]
->> +const struct exynos5_usbdrd_phy_drvdata exynos5420_usbdrd_phy = {
->> +     .phy_cfg                = exynos5_usbdrd_phy_cfg,
->> +};
->> +
->> +const struct exynos5_usbdrd_phy_drvdata exynos5250_usbdrd_phy = {
->> +     .phy_cfg                = exynos5_usbdrd_phy_cfg,
->> +};
->> +
->> +static const struct of_device_id exynos5_usbdrd_phy_of_match[] = {
->> +     {
->> +             .compatible = "samsung,exynos5250-usbdrd-phy",
->> +             .data = &exynos5250_usbdrd_phy
->> +     }, {
->> +             .compatible = "samsung,exynos5420-usbdrd-phy",
->> +             .data = &exynos5420_usbdrd_phy
->> +     },
->> +     { },
->> +};
->> +
->> +static int exynos5_usbdrd_phy_probe(struct platform_device *pdev)
->> +{
-> [...]
->> +     reg_pmu = syscon_regmap_lookup_by_phandle(dev->of_node,
->> +                                                "samsung,pmu-syscon");
->> +     if (IS_ERR(reg_pmu)) {
->> +             dev_err(dev, "Failed to map PMU register (via syscon)\n");
->
-> nit: Maybe change it to: "Failed to lookup PMU regmap\n" ?
-
-Sure, will change this.
-
->
->> +             return PTR_ERR(reg_pmu);
->> +     }
->> +
->> +     ret = of_property_read_u32(node, "samsung,pmu-offset", &pmu_offset);
->> +     if (ret) {
->> +             dev_err(dev, "Missing pmu-offset for phy isolation\n");
->> +             return ret;
->> +     }
->
-> Otherwise the patch looks good.
-
-Thanks for the review.
-
-
+It's fine with me.
+Thank you for your review,
 
 -- 
-Best Regards
-Vivek Gautam
-Samsung R&D Institute, Bangalore
-India
+Carlo Caione
