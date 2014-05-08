@@ -1,33 +1,58 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 8 May 2014 18:38:53 +0100
-Subject: [PATCH] ARM: mm: Add workaround for erratum 763126
-In-Reply-To: <CAD=FV=XeYdgqk3-CpS2NNXFAnn+uGDC6844d-L6vfS=SYEuw-Q@mail.gmail.com>
-References: <1399528508-2806-1-git-send-email-arjun.kv@samsung.com>
- <CAD=FV=XeYdgqk3-CpS2NNXFAnn+uGDC6844d-L6vfS=SYEuw-Q@mail.gmail.com>
-Message-ID: <20140508173853.GG8981@arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 8 May 2014 19:37:48 +0200
+Subject: [PATCH v2 0/9] DT instantiation of sound on T5325
+In-Reply-To: <1399141819-23924-1-git-send-email-andrew@lunn.ch>
+References: <1399141819-23924-1-git-send-email-andrew@lunn.ch>
+Message-ID: <20140508173748.GK27377@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi guys,
+On Sat, May 03, 2014 at 08:30:10PM +0200, Andrew Lunn wrote:
+> This patchset uses DT to instantiate sound on the T5325. It adds a DT
+> binding to the codec, then removes the platform device for the codec
+> and adds a DT node. simple-card is extended to support mlck_fs. The
+> platform device for the audio device is then replaced with a DT node.
+> Lastly, two _defconfig's are updated to build the needed modules.
 
-On Thu, May 08, 2014 at 05:57:03PM +0100, Doug Anderson wrote:
-> On Wed, May 7, 2014 at 10:55 PM, Arjun.K.V <arjun.kv@samsung.com> wrote:
-> > From: "Arjun.K.V" <arjun.kv@samsung.com>
-> >
-> > Three processor exclusive access livelock.
-> > In a system with three or more coherent masters that all use
-> > the ldrex/strex synchronization primitives to access a semaphore
-> > in coherent cacheable memory, there is a possibility of a
-> > livelock condition where two masters continuously attempt
-> > and fail to get the lock while the third master
-> > continuously reads the lock.
+Hi Folks
 
-Tentative NAK. You're paraphrasing the bug to make it sound worse than it
-is -- whilst two of the cores need to be in a ldrex/strex loop, the third
-needs to be issuing snoops from a normal load (to get the line into a shared
-state). Please can you point me at the code in Linux which is triggering
-this issue?
+The ARM mvebu maintainer is happy with these patches. Does anybody
+have any comments on the sound/soc parts? Mark, will you take the
+alc5623 and simple-card patches?
 
-Cheers,
+Thanks
+	Andrew
 
-Will
+> 
+> Andrew Lunn (9):
+>   ASoC: alc5623: Add device tree binding
+>   ARM: Kirkwood: Remove platform driver for codec
+>   ARM: Kirkwood: Add node for audio codec
+>   ARM: Kirkwood: DT: Add missing #sound-dai-cells property
+>   ASoC: simple-card: Support setting mclk via a fixed factor
+>   ARM: Kirkwood: t5325: Remove platform device to instantiate audio
+>   ARM: Kirkwood: t5325: Use simple card to instantiate audio
+>   ARM: mvebu_v5_defconfig: Enable sound modules needed for t5325
+>   ARM: multi_v5_defconfig: Enable sound modules needed for t5325
+> 
+>  .../devicetree/bindings/sound/alc5623.txt          | 25 +++++++++++++
+>  .../devicetree/bindings/sound/simple-card.txt      |  2 ++
+>  arch/arm/boot/dts/kirkwood-t5325.dts               | 33 +++++++++++++++++
+>  arch/arm/boot/dts/kirkwood.dtsi                    |  1 +
+>  arch/arm/configs/multi_v5_defconfig                |  3 +-
+>  arch/arm/configs/mvebu_v5_defconfig                |  3 +-
+>  arch/arm/mach-mvebu/Kconfig                        |  7 ----
+>  arch/arm/mach-mvebu/Makefile                       |  1 -
+>  arch/arm/mach-mvebu/board-t5325.c                  | 41 ----------------------
+>  arch/arm/mach-mvebu/board.h                        |  6 ----
+>  arch/arm/mach-mvebu/kirkwood.c                     |  3 --
+>  sound/soc/codecs/Kconfig                           |  2 +-
+>  sound/soc/codecs/alc5623.c                         | 20 +++++++++++
+>  sound/soc/generic/simple-card.c                    | 28 +++++++++++++++
+>  14 files changed, 114 insertions(+), 61 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/sound/alc5623.txt
+>  delete mode 100644 arch/arm/mach-mvebu/board-t5325.c
+> 
+> -- 
+> 2.0.0.rc0
+> 
