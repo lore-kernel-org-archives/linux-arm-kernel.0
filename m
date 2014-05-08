@@ -1,49 +1,51 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 8 May 2014 08:04:18 -0700
-Subject: [GIT PULL #2/2] ARM: dts: DRA7/AM437x l3noc dts updates
-In-Reply-To: <20140505200635.GB9863@kahuna>
-References: <1397492726-17203-1-git-send-email-nm@ti.com>
- <1398698101-25513-1-git-send-email-nm@ti.com>
- <20140505200322.GA9863@kahuna> <20140505200635.GB9863@kahuna>
-Message-ID: <20140508150417.GC26833@atomide.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Thu, 08 May 2014 16:06:32 +0100
+Subject: [PATCH] pci: rcar host needs OF
+In-Reply-To: <1399560990-1402858-14-git-send-email-arnd@arndb.de>
+References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
+ <1399560990-1402858-1-git-send-email-arnd@arndb.de>
+ <1399560990-1402858-14-git-send-email-arnd@arndb.de>
+Message-ID: <536B9D78.5000602@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [140505 13:07]:
-> Hi Tony,
-> 
->    Please pull the following to the dts support of AM437x and DRA7
->    support for l3_noc for the upcoming 3.16 window. This series was posted
->    http://marc.info/?l=linux-omap&m=139750288003978&w=2 and the
->    functionality enabled by the first pull request for driver.
-> 
-> The following changes since commit 455c6fdbd219161bd09b1165f11699d6d73de11c:
-> 
->   Linux 3.14 (2014-03-30 20:40:15 -0700)
-> 
-> are available in the git repository at:
-> 
->   https://github.com/nmenon/linux-2.6-playground.git pull/l3noc/dts-fixes
-> 
-> for you to fetch changes up to 2eeddb8a5356e088021a8dd84de870de89bf793d:
-> 
->   ARM: dts: AM4372: add l3-noc information (2014-05-05 14:35:29 -0500)
+On 08/05/14 15:56, Arnd Bergmann wrote:
+> The pci-rcar driver is enabled for compile tests, and this has
+> now shown that the driver cannot build without CONFIG_OF,
+> following the inclusion of f8f2fe7355fb "PCI: rcar: Use new OF
+> interrupt mapping when possible":
+>
+> drivers/built-in.o: In function `rcar_pci_map_irq':
+> :(.text+0x1cc7c): undefined reference to `of_irq_parse_and_map_pci'
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Magnus Damm <damm@opensource.se>
+> Cc: linux-pci at vger.kernel.org
+> Cc: linux-sh at vger.kernel.org
+> ---
+>   drivers/pci/host/Kconfig | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+> index fbbef0b..4675f47 100644
+> --- a/drivers/pci/host/Kconfig
+> +++ b/drivers/pci/host/Kconfig
+> @@ -27,7 +27,7 @@ config PCI_TEGRA
+>
+>   config PCI_RCAR_GEN2
+>   	bool "Renesas R-Car Gen2 Internal PCI controller"
+> -	depends on ARCH_SHMOBILE || (ARM && COMPILE_TEST)
+> +	depends on ARCH_SHMOBILE || (ARM && OF && COMPILE_TEST)
+>   	help
+>   	  Say Y here if you want internal PCI support on R-Car Gen2 SoC.
+>   	  There are 3 internal PCI controllers available with a single
+>
 
-Thanks pulling into omap-for-v3.16/fixes-not-urgent.
+This driver /should/ be able to be built for just the platform case
+so it sounds like f8f2fe7355fb stopped this but no-one has yet to
+notice.
 
-Tony
- 
-> ----------------------------------------------------------------
-> Afzal Mohammed (1):
->       ARM: dts: AM4372: add l3-noc information
-> 
-> Rajendra Nayak (1):
->       ARM: dts: DRA7: Use dra7-l3-noc instead of omap4-l3-noc
-> 
->  arch/arm/boot/dts/am4372.dtsi |    6 +++++-
->  arch/arm/boot/dts/dra7.dtsi   |    6 +++---
->  2 files changed, 8 insertions(+), 4 deletions(-)
-> -- 
-> Regards,
-> Nishanth Menon
-> 
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
