@@ -1,59 +1,142 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 8 May 2014 20:22:09 +0100
-Subject: [PATCH] ARM: Don't ever downscale loops_per_jiffy in SMP systems
-In-Reply-To: <alpine.LFD.2.11.1405081329010.980@knanqh.ubzr>
-References: <1399504982-31181-1-git-send-email-dianders@chromium.org>
- <CAOh2x=kwaoSdj8JO0Vo08Y0dX2UfKFiF3pBV-qtp-YTyN=8H8Q@mail.gmail.com>
- <CAD=FV=UEGJGHrdcXgs3EZ_wFXT8GnNeCOMt7CgdiiUzBzZ5Y0A@mail.gmail.com>
- <alpine.LFD.2.11.1405081149190.980@knanqh.ubzr>
- <CAD=FV=VtcLOh51LCmafzRMdqtDrwKXCqK6gE6V7OOOUe4gjwbA@mail.gmail.com>
- <alpine.LFD.2.11.1405081329010.980@knanqh.ubzr>
-Message-ID: <20140508192209.GH3693@n2100.arm.linux.org.uk>
+From: joelf@ti.com (Joel Fernandes)
+Date: Thu, 8 May 2014 14:24:08 -0500
+Subject: [PATCH 3/5] irqchip: crossbar: Skip some irqs from getting mapped
+ to crossbar
+In-Reply-To: <1399299527-10955-4-git-send-email-r.sricharan@ti.com>
+References: <1399299527-10955-1-git-send-email-r.sricharan@ti.com>
+ <1399299527-10955-4-git-send-email-r.sricharan@ti.com>
+Message-ID: <536BD9D8.4080905@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 08, 2014 at 01:43:29PM -0400, Nicolas Pitre wrote:
-> There might be some cases where precise timing is needed though.
-> I thought I came across one such case in the past but I can't remember 
-> which.
+On 05/05/2014 09:18 AM, Sricharan R wrote:
+> From: Nishanth Menon <nm@ti.com>
+> 
+> When, in the system due to varied reasons, interrupts might be unusable
+> due to hardware behavior, but register maps do exist, then those interrupts
+> should be skipped while mapping irq to crossbars.
+> 
 
-Anything which is expecting precise timings from udelay() is broken.
-Firstly, udelay() does _not_ guarantee to give you a delay of at least
-the requested period - it tries to give an _approximate_ delay.
+Just wondering, instead of hardcoding this data in the code, and
+introducing additional flags (IRQ_SKIP), why not just put these GIC IRQs
+in the ti,irq-reserved property in DTS for platforms where such IRQs are
+not usable. That way you're skipping these IRQs anyway.
 
-The first thing to realise is that loops_per_jiffy is calibrated with
-interrupts _on_, which means that the calculated loops_per_jiffy is
-the number of iterations in a jiffy _minus_ the time it takes for the
-timer interrupt to be processed.  This means loops_per_jiffy will
-always be smaller than the number of loops that would be executed
-within the same period.
+Also that would avoid adding more hard coded data for future SoCs into
+the source for such IRQs that must be skipped, and also reduces LOC.
 
-This leads to udelay() always producing slightly shorter than
-requested delays - this is quite measurable.
+thanks,
 
-It gets worse when you consider the utter mess that the L2 cache code
-is in - where on many platforms we calibrate udelay() with the cache
-off, which results in loops_per_jiffy being smaller than it would
-otherwise be (meaning shorter delays.)
+-Joel
 
-So, that's two reasons there why loops_per_jiffy will be smaller than
-it should be at boot, and therefore udelay() will be inaccurate.
 
-Another reason udelay() can be unaccurate is if interrupts are on, and
-you have USB present.  USB interrupt processing can take on the order
-of 10s of milliseconds even on 800MHz or faster ARM CPUs.  If you
-receive one of those mid-udelay(), your CPU will be occupied elsewhere.
-
-Another reason is preempt.  If the kernel can preempt during udelay(),
-your delay will also be much longer than you requested.  No, disabling
-preemption in udelay() is not on, that would increase preemption
-latency.
-
-So, the only /real/ solution if you want proper delays is for udelay()
-to use a timer or counter, and this is should always the preferred
-method where it's available.  Quite rightly, we're not hacking udelay()
-stuff to work around not having that, or if someone configures it out.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> Signed-off-by: Sricharan R <r.sricharan@ti.com>
+> ---
+>  drivers/irqchip/irq-crossbar.c |   47 ++++++++++++++++++++++++++++++++++++----
+>  1 file changed, 43 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
+> index 51d4b87..847f6e3 100644
+> --- a/drivers/irqchip/irq-crossbar.c
+> +++ b/drivers/irqchip/irq-crossbar.c
+> @@ -13,11 +13,13 @@
+>  #include <linux/io.h>
+>  #include <linux/of_address.h>
+>  #include <linux/of_irq.h>
+> +#include <linux/of_device.h>
+>  #include <linux/slab.h>
+>  #include <linux/irqchip/arm-gic.h>
+>  
+>  #define IRQ_FREE	-1
+>  #define IRQ_RESERVED	-2
+> +#define IRQ_SKIP	-3
+>  #define GIC_IRQ_START	32
+>  
+>  /*
+> @@ -34,6 +36,16 @@ struct crossbar_device {
+>  	void (*write) (int, int);
+>  };
+>  
+> +/**
+> + * struct crossbar_data: Platform specific data
+> + * @irqs_unused: array of irqs that cannot be used because of hw erratas
+> + * @size: size of the irqs_unused array
+> + */
+> +struct crossbar_data {
+> +	const uint *irqs_unused;
+> +	const uint size;
+> +};
+> +
+>  static struct crossbar_device *cb;
+>  
+>  static inline void crossbar_writel(int irq_no, int cb_no)
+> @@ -119,10 +131,12 @@ const struct irq_domain_ops routable_irq_domain_ops = {
+>  	.xlate = crossbar_domain_xlate
+>  };
+>  
+> -static int __init crossbar_of_init(struct device_node *node)
+> +static int __init crossbar_of_init(struct device_node *node,
+> +				   const struct crossbar_data *data)
+>  {
+>  	int i, size, max, reserved = 0, entry;
+>  	const __be32 *irqsr;
+> +	const int *irqsk = NULL;
+>  
+>  	cb = kzalloc(sizeof(*cb), GFP_KERNEL);
+>  
+> @@ -194,6 +208,22 @@ static int __init crossbar_of_init(struct device_node *node)
+>  		reserved += size;
+>  	}
+>  
+> +	/* Skip the ones marked as unused */
+> +	if (data) {
+> +		irqsk = data->irqs_unused;
+> +		size = data->size;
+> +
+> +		for (i = 0; i < size; i++) {
+> +			entry = irqsk[i];
+> +
+> +			if (entry > max) {
+> +				pr_err("Invalid skip entry\n");
+> +				goto err3;
+> +			}
+> +			cb->irq_map[entry] = IRQ_SKIP;
+> +		}
+> +	}
+> +
+>  	register_routable_domain_ops(&routable_irq_domain_ops);
+>  	return 0;
+>  
+> @@ -208,18 +238,27 @@ err1:
+>  	return -ENOMEM;
+>  }
+>  
+> +/* irq number 10 cannot be used because of hw bug */
+> +int dra_irqs_unused[] = { 10 };
+> +struct crossbar_data cb_dra_data = { dra_irqs_unused,
+> +				     ARRAY_SIZE(dra_irqs_unused) };
+> +
+>  static const struct of_device_id crossbar_match[] __initconst = {
+> -	{ .compatible = "ti,irq-crossbar" },
+> +	{ .compatible = "ti,irq-crossbar", .data = &cb_dra_data },
+>  	{}
+>  };
+>  
+>  int __init irqcrossbar_init(void)
+>  {
+>  	struct device_node *np;
+> -	np = of_find_matching_node(NULL, crossbar_match);
+> +	const struct of_device_id *of_id;
+> +	const struct crossbar_data *cdata;
+> +
+> +	np = of_find_matching_node_and_match(NULL, crossbar_match, &of_id);
+>  	if (!np)
+>  		return -ENODEV;
+>  
+> -	crossbar_of_init(np);
+> +	cdata = of_id->data;
+> +	crossbar_of_init(np, cdata);
+>  	return 0;
+>  }
+> 
