@@ -1,90 +1,62 @@
 From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Thu, 08 May 2014 22:04:54 +0200
-Subject: [PATCH v2 3/7] mfd: add support for sun6i PRCM (Power/Reset/Clock
- Management) unit
-In-Reply-To: <20140508110205.GB5767@lee--X1>
+Date: Thu, 08 May 2014 22:05:59 +0200
+Subject: [PATCH v2 2/7] reset: sunxi: allow MFD subdevices probe
+In-Reply-To: <20140508030722.GL7047@lukather>
 References: <1399483554-8824-1-git-send-email-boris.brezillon@free-electrons.com>
- <1399483554-8824-4-git-send-email-boris.brezillon@free-electrons.com>
- <20140508110205.GB5767@lee--X1>
-Message-ID: <536BE366.8080907@free-electrons.com>
+ <1399483554-8824-3-git-send-email-boris.brezillon@free-electrons.com>
+ <20140508030722.GL7047@lukather>
+Message-ID: <536BE3A7.8030402@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On 08/05/2014 13:02, Lee Jones wrote:
->> The PRCM (Power/Reset/Clock Management) block exposes several subdevices
->> in different subsystems (clk, reset ...)
+On 08/05/2014 05:07, Maxime Ripard wrote:
+> On Wed, May 07, 2014 at 07:25:49PM +0200, Boris BREZILLON wrote:
+>> The current implementation uses sunxi_reset_init function for both early
+>> init and platform device probe.
 >>
->> Add basic support for the PRCM unit with clk (AR100, AHB0, and APB0 clks)
->> and reset controller subdevices.
+>> The sunxi_reset_init function uses DT to retrieve device resources, which
+>> will be an issue if reset controllers are registered from an MFD device
+>> that define resources from mfd_cell definition.
 >>
->> Other subdevices might be added later (if needed).
+>> Moreover, we can make of devm functions when we're in the probe context.
 >>
 >> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 >> ---
->>  drivers/mfd/Kconfig      |   8 +++
->>  drivers/mfd/Makefile     |   1 +
->>  drivers/mfd/sun6i-prcm.c | 151 +++++++++++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 160 insertions(+)
->>  create mode 100644 drivers/mfd/sun6i-prcm.c
-> [...]
->
->> +#include <linux/module.h>
->> +#include <linux/kernel.h>
->> +#include <linux/errno.h>
->> +#include <linux/err.h>
->> +#include <linux/spinlock.h>
->> +#include <linux/io.h>
->> +#include <linux/slab.h>
->> +#include <linux/mutex.h>
->> +#include <linux/completion.h>
->> +#include <linux/irq.h>
->> +#include <linux/jiffies.h>
->> +#include <linux/bitops.h>
->> +#include <linux/fs.h>
->> +#include <linux/of.h>
->> +#include <linux/of_irq.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/uaccess.h>
->> +#include <linux/mfd/core.h>
-> I'm pretty sure you don't need half of these.  Please only add the
-> ones you make use of.
-
-Sure (this is what happens when you copy/paste from another driver :-))
-
->
-> [...]
->
->> +	dev_info(&pdev->dev, "PRCM initialized\n");
-> Please remove this from here.
-
-Okay.
-
->
-> [...]
->
->> +static struct platform_driver sun6i_prcm_driver = {
->> +	.driver = {
->> +		.name = "sun6i-prcm",
->> +		.owner = THIS_MODULE,
->> +		.of_match_table = sun6i_prcm_dt_ids,
->> +	},
->> +	.probe = sun6i_prcm_probe,
-> You need a .remove() call-back.
-
-This driver cannot be compiled as module (see the Kconfig definition)
-and the devices are not hotpluggable, as a result a probed device will
-never be removed.
-
-Do you still want me to implement the remove function ?
-
->
->> +};
->> +module_platform_driver(sun6i_prcm_driver);
+>>  drivers/reset/reset-sunxi.c | 21 ++++++++++++++++++---
+>>  1 file changed, 18 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/reset/reset-sunxi.c b/drivers/reset/reset-sunxi.c
+>> index 695bd34..1b5fea6 100644
+>> --- a/drivers/reset/reset-sunxi.c
+>> +++ b/drivers/reset/reset-sunxi.c
+>> @@ -145,7 +145,24 @@ MODULE_DEVICE_TABLE(of, sunxi_reset_dt_ids);
+>>  
+>>  static int sunxi_reset_probe(struct platform_device *pdev)
+>>  {
+>> -	return sunxi_reset_init(pdev->dev.of_node);
+>> +	struct sunxi_reset_data *data;
+>> +	struct resource *res;
 >> +
->> +MODULE_AUTHOR("Boris BREZILLON <boris.brezillon@free-electrons.com>");
->> +MODULE_DESCRIPTION("Allwinner sun6i PRCM driver");
->> +MODULE_LICENSE("GPL v2");
+>> +	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+>> +	if (!data)
+>> +		return -ENOMEM;
+>> +
+>> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +	data->membase = devm_request_and_ioremap(&pdev->dev, res);
+>> +	if (!data->membase)
+>> +		return -ENOMEM;
+> You'd probably be better off using devm_ioremap_resource so that you
+> get a meaningful error code.
+
+Oh, I missed this one. I'll fix it for the next version.
+
+> Apart from this, you have my 
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>
+> Thanks!
+> Maxime
+>
 
 -- 
 Boris Brezillon, Free Electrons
