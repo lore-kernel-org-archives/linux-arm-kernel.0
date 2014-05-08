@@ -1,158 +1,135 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 8 May 2014 09:57:43 +0100
-Subject: [PATCH RFC v3 1/6] Documentation: arm: define DT idle states
- bindings
-In-Reply-To: <536ac4ef.6ae7440a.511a.ffffdef8@mx.google.com>
-References: <1399399483-17112-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1399399483-17112-2-git-send-email-lorenzo.pieralisi@arm.com>
- <536ac4ef.6ae7440a.511a.ffffdef8@mx.google.com>
-Message-ID: <20140508085743.GA12860@e102568-lin.cambridge.arm.com>
+From: jhovold@gmail.com (Johan Hovold)
+Date: Thu,  8 May 2014 10:57:36 +0200
+Subject: [PATCH] ARM: dts: AM33XX: fix ethernet and mdio default state
+Message-ID: <1399539456-555-1-git-send-email-jhovold@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 08, 2014 at 12:43:04AM +0100, Sebastian Capella wrote:
-> Quoting Lorenzo Pieralisi (2014-05-06 11:04:38)
-> > diff --git a/Documentation/devicetree/bindings/arm/idle-states.txt b/Documentation/devicetree/bindings/arm/idle-states.txt
-> > new file mode 100644
-> > index 0000000..196ef52
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/arm/idle-states.txt
-> > @@ -0,0 +1,508 @@
-> ...
-> > +===========================================
-> > +2 - idle-states node
-> > +===========================================
-> > +
-> > +ARM processor idle states are defined within the idle-states node, which is
-> > +a direct child of the cpus node [1] and provides a container where the
-> > +processor idle states, defined as device tree nodes, are listed.
-> > +
-> > +- idle-states node
-> > +
-> > +       Usage: Optional - On ARM systems, is a container of processor idle
-> > +                         states nodes. If the system does not provide CPU
-> > +                         power management capabilities or the processor just
-> > +                         supports idle_standby an idle-states node is not
-> > +                         required.
-> > +
-> > +       Description: idle-states node is a container node, where its
-> > +                    subnodes describe the CPU idle states.
-> > +
-> > +       Node name must be "idle-states".
-> > +
-> > +       The idle-states node's parent node must be the cpus node.
-> > +
-> > +       The idle-states node's child nodes can be:
-> > +
-> > +       - one or more state nodes
-> > +
-> > +       Any other configuration is considered invalid.
-> > +
-> > +       An idle-states node defines the following properties:
-> > +
-> > +       - entry-method
-> > +               Usage: Required
-> > +               Value type: <stringlist>
-> > +               Definition: Describes the method by which a CPU enters the
-> > +                           idle states. This property is required and must be
-> > +                           one of:
-> > +
-> > +                           - "arm,psci"
-> > +                             ARM PSCI firmware interface [2].
-> > +
-> > +                           - "[vendor],[method]"
-> > +                             An implementation dependent string with
-> > +                             format "vendor,method", where vendor is a string
-> > +                             denoting the name of the manufacturer and
-> > +                             method is a string specifying the mechanism
-> > +                             used to enter the idle state.
-> > +
-> > +The nodes describing the idle states (state) can only be defined within the
-> > +idle-states node.
-> > +
-> > +Any other configuration is consider invalid and therefore must be ignored.
-> 
-> consider -> considered
-> must be -> shall?
-> 
-> Is the reference to "any other configuration" referring to state nodes
-> not in the idle states node?  If so, maybe this sentence should go
-> together with that one.
+Make sure ethernet and mdio nodes are disabled by default and enable
+them explicitly only on boards that actually use them.
 
-Yes, it makes sense.
+Signed-off-by: Johan Hovold <jhovold@gmail.com>
+---
+ arch/arm/boot/dts/am335x-bone-common.dtsi | 3 ++-
+ arch/arm/boot/dts/am335x-evm.dts          | 2 ++
+ arch/arm/boot/dts/am335x-evmsk.dts        | 2 ++
+ arch/arm/boot/dts/am335x-igep0033.dtsi    | 8 ++++++++
+ arch/arm/boot/dts/am335x-nano.dts         | 5 +++++
+ arch/arm/boot/dts/am33xx.dtsi             | 2 ++
+ 6 files changed, 21 insertions(+), 1 deletion(-)
 
-> > +===========================================
-> > +4 - Examples
-> > +===========================================
-> > +
-> > +Example 1 (ARM 64-bit, 16-cpu system):
-> > +
-> > +cpus {
-> > +       #size-cells = <0>;
-> > +       #address-cells = <2>;
-> > +
-> > +       idle-states {
-> > +               entry-method = "arm,psci";
-> > +
-> > +               CPU_RETENTION_0_0: cpu-retention-0-0 {
-> > +                       compatible = "arm,idle-state";
-> > +                       cache-state-retained;
-> > +                       entry-method-param = <0x0010000>;
-> > +                       entry-latency-us = <20>;
-> > +                       exit-latency-us = <40>;
-> > +                       min-residency-us = <30>;
-> > +               };
-> > +
-> > +               CLUSTER_RETENTION_0: cluster-retention-0 {
-> > +                       compatible = "arm,idle-state";
-> > +                       logic-state-retained;
-> > +                       cache-state-retained;
-> > +                       entry-method-param = <0x1010000>;
-> > +                       entry-latency-us = <50>;
-> > +                       exit-latency-us = <100>;
-> > +                       min-residency-us = <250>;
-> > +               };
->                   ...
-> > +       };
-> > +
-> > +       CPU0: cpu at 0 {
-> > +               device_type = "cpu";
-> > +               compatible = "arm,cortex-a57";
-> > +               reg = <0x0 0x0>;
-> > +               enable-method = "psci";
-> > +               cpu-idle-states = <&CPU_RETENTION_0_0 &CPU_SLEEP_0_0
-> > +                                  &CLUSTER_RETENTION_0 &CLUSTER_SLEEP_0>;
-> > +       };
-> > +
-> > +       CPU1: cpu at 1 {
-> > +               device_type = "cpu";
-> > +               compatible = "arm,cortex-a57";
-> > +               reg = <0x0 0x1>;
-> > +               enable-method = "psci";
-> > +               cpu-idle-states = <&CPU_RETENTION_0_0 &CPU_SLEEP_0_0
-> > +                                  &CLUSTER_RETENTION_0 &CLUSTER_SLEEP_0>;
-> > +       };
-> 
-> How can we specify what states are entered together vs. those that
-> are independent (since they also share the entry-method-param)?
-> CPU_SLEEP_0_0 is used for both CPU0 and CPU1, yet each cpu can enter
-> it without waiting for the other.  Whereas CLUSTER_RETENTION_0 should
-> not be entered until all CPUs sharing it enter.
-
-We do not specify that. That can be solved with power-domains but I
-removed them from the bindings since I want to merge bindings that are
-required by current code, and PSCI does not need this information, since
-the power state parameter to PSCI suspend call (and the related SMC
-implementation) caters for it.
-
-When I see implementations requiring these bits of info, we will add
-them to the bindings.
-
-> Is the idea to define separate CPU_SLEEP/CPU_RETENTION nodes for each cpu?
-
-On big.LITTLE systems you might want to have different states (eg CPU
-core gatng) for big and little CPUs, and that's doable with the current
-bindings since each CPU can point at idle states in its cpu node.
-
-Thanks for having a look,
-Lorenzo
+diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
+index 2e7d932887b5..26a1fa958f37 100644
+--- a/arch/arm/boot/dts/am335x-bone-common.dtsi
++++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
+@@ -280,13 +280,14 @@
+ 	pinctrl-names = "default", "sleep";
+ 	pinctrl-0 = <&cpsw_default>;
+ 	pinctrl-1 = <&cpsw_sleep>;
+-
++	status = "okay";
+ };
+ 
+ &davinci_mdio {
+ 	pinctrl-names = "default", "sleep";
+ 	pinctrl-0 = <&davinci_mdio_default>;
+ 	pinctrl-1 = <&davinci_mdio_sleep>;
++	status = "okay";
+ };
+ 
+ &mmc1 {
+diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
+index 6028217ace0f..44c63d1c4f12 100644
+--- a/arch/arm/boot/dts/am335x-evm.dts
++++ b/arch/arm/boot/dts/am335x-evm.dts
+@@ -614,12 +614,14 @@
+ 	pinctrl-names = "default", "sleep";
+ 	pinctrl-0 = <&cpsw_default>;
+ 	pinctrl-1 = <&cpsw_sleep>;
++	status = "okay";
+ };
+ 
+ &davinci_mdio {
+ 	pinctrl-names = "default", "sleep";
+ 	pinctrl-0 = <&davinci_mdio_default>;
+ 	pinctrl-1 = <&davinci_mdio_sleep>;
++	status = "okay";
+ };
+ 
+ &cpsw_emac0 {
+diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
+index ab238850a7b2..365383f7f617 100644
+--- a/arch/arm/boot/dts/am335x-evmsk.dts
++++ b/arch/arm/boot/dts/am335x-evmsk.dts
+@@ -484,12 +484,14 @@
+ 	pinctrl-0 = <&cpsw_default>;
+ 	pinctrl-1 = <&cpsw_sleep>;
+ 	dual_emac = <1>;
++	status = "okay";
+ };
+ 
+ &davinci_mdio {
+ 	pinctrl-names = "default", "sleep";
+ 	pinctrl-0 = <&davinci_mdio_default>;
+ 	pinctrl-1 = <&davinci_mdio_sleep>;
++	status = "okay";
+ };
+ 
+ &cpsw_emac0 {
+diff --git a/arch/arm/boot/dts/am335x-igep0033.dtsi b/arch/arm/boot/dts/am335x-igep0033.dtsi
+index 9f22c189f636..27445d07f953 100644
+--- a/arch/arm/boot/dts/am335x-igep0033.dtsi
++++ b/arch/arm/boot/dts/am335x-igep0033.dtsi
+@@ -95,6 +95,14 @@
+ 	};
+ };
+ 
++&mac {
++	status = "okay";
++};
++
++&davinci_mdio {
++	status = "okay";
++};
++
+ &cpsw_emac0 {
+ 	phy_id = <&davinci_mdio>, <0>;
+ };
+diff --git a/arch/arm/boot/dts/am335x-nano.dts b/arch/arm/boot/dts/am335x-nano.dts
+index 9907b494b99c..a3466455b171 100644
+--- a/arch/arm/boot/dts/am335x-nano.dts
++++ b/arch/arm/boot/dts/am335x-nano.dts
+@@ -344,6 +344,11 @@
+ 
+ &mac {
+ 	dual_emac = <1>;
++	status = "okay";
++};
++
++&davinci_mdio {
++	status = "okay";
+ };
+ 
+ &cpsw_emac0 {
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index cb6811e5ae5a..0fb5df4ad498 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -688,6 +688,7 @@
+ 			 */
+ 			interrupts = <40 41 42 43>;
+ 			ranges;
++			status = "disabled";
+ 
+ 			davinci_mdio: mdio at 4a101000 {
+ 				compatible = "ti,davinci_mdio";
+@@ -696,6 +697,7 @@
+ 				ti,hwmods = "davinci_mdio";
+ 				bus_freq = <1000000>;
+ 				reg = <0x4a101000 0x100>;
++				status = "disabled";
+ 			};
+ 
+ 			cpsw_emac0: slave at 4a100200 {
+-- 
+1.8.3.2
