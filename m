@@ -1,42 +1,180 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Thu, 08 May 2014 19:31:36 +0200
-Subject: [PATCH 2/2] iio:adc: at91 requires the input subsystem
-In-Reply-To: <20140508172243.GC6095@piout.net>
-References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-13-git-send-email-arnd@arndb.de>
- <20140508172243.GC6095@piout.net>
-Message-ID: <536BBF78.7080100@metafoo.de>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 08 May 2014 19:32:03 +0200
+Subject: [PATCH v6] clk: Exynos5250: Add clocks for G3D
+In-Reply-To: <CALt3h79N63-bPCoRpXyam7DjiUjAZjM7GZApDHaT-3EjD0Q1cg@mail.gmail.com>
+References: <1398677821-11529-1-git-send-email-arun.kk@samsung.com>
+ <53617DD6.60507@gmail.com> <5362712C.3070803@gmail.com>
+ <CALt3h79N63-bPCoRpXyam7DjiUjAZjM7GZApDHaT-3EjD0Q1cg@mail.gmail.com>
+Message-ID: <536BBF93.6020106@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/08/2014 07:22 PM, Alexandre Belloni wrote:
-> Hi,
->
-> On 08/05/2014 at 16:56:24 +0200, Arnd Bergmann wrote :
->> Building the at91 adc driver with CONFIG_INPUT disabled results in this
->> build error:
+On 02.05.2014 05:57, Arun Kumar K wrote:
+> Hi Tomasz,
+> 
+> On Thu, May 1, 2014 at 9:37 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+>> Hi Arun,
 >>
->> ERROR: "input_event" [drivers/iio/adc/at91_adc.ko] undefined!
->> ERROR: "input_unregister_device" [drivers/iio/adc/at91_adc.ko] undefined!
->> ERROR: "input_free_device" [drivers/iio/adc/at91_adc.ko] undefined!
->> ERROR: "input_register_device" [drivers/iio/adc/at91_adc.ko] undefined!
->> ERROR: "input_set_abs_params" [drivers/iio/adc/at91_adc.ko] undefined!
->> ERROR: "input_allocate_device" [drivers/iio/adc/at91_adc.ko] undefined!
 >>
->> To make sure we can build random configurations, this turns on CONFIG_INPUT
->> whenever CONFIG_AT91_ADC is enabled.
+>> On 01.05.2014 00:48, Tomasz Figa wrote:
+>>>
+>>> On 28.04.2014 11:37, Arun Kumar K wrote:
+>>>>
+>>>> This patch adds the required clocks for ARM Mali IP
+>>>> in Exynos5250.
+>>>>
+>>>> Signed-off-by: Arun Kumar K <arun.kk@samsung.com>
+>>>> ---
+>>>> Changes from v5
+>>>> - Addressed comments from Tomasz Figa
+>>>>    http://www.spinics.net/lists/arm-kernel/msg326118.html
+>>>> Changes from v4
+>>>> - Rebased on latest kernel
+>>>> - Added macros
+>>>> Changes from v3
+>>>> - Renamed some clocks as per Tomasz Figa's comments
+>>>> Changes from v2
+>>>> - Rebased on clk-next
+>>>> Changes from v1
+>>>> - Removed exporting of parent DIV clock for g3d
+>>>>    as per Tomsz Figa's comment.
+>>>> ---
+>>>>   drivers/clk/samsung/clk-exynos5250.c   |   15 ++++++++++++++-
+>>>>   include/dt-bindings/clock/exynos5250.h |    4 +++-
+>>>>   2 files changed, 17 insertions(+), 2 deletions(-)
+>>>>
+>>>> diff --git a/drivers/clk/samsung/clk-exynos5250.c
+>>>> b/drivers/clk/samsung/clk-exynos5250.c
+>>>> index e7ee442..df02526 100644
+>>>> --- a/drivers/clk/samsung/clk-exynos5250.c
+>>>> +++ b/drivers/clk/samsung/clk-exynos5250.c
+>>>> @@ -37,6 +37,7 @@
+>>>>   #define VPLL_CON0        0x10140
+>>>>   #define GPLL_CON0        0x10150
+>>>>   #define SRC_TOP0        0x10210
+>>>> +#define SRC_TOP1        0x10214
+>>>>   #define SRC_TOP2        0x10218
+>>>>   #define SRC_TOP3        0x1021c
+>>>>   #define SRC_GSCL        0x10220
+>>>> @@ -71,6 +72,7 @@
+>>>>   #define GATE_IP_GSCL        0x10920
+>>>>   #define GATE_IP_DISP1        0x10928
+>>>>   #define GATE_IP_MFC        0x1092c
+>>>> +#define GATE_IP_G3D        0x10930
+>>>>   #define GATE_IP_GEN        0x10934
+>>>>   #define GATE_IP_FSYS        0x10944
+>>>>   #define GATE_IP_PERIC        0x10950
+>>>> @@ -100,6 +102,7 @@ static unsigned long exynos5250_clk_regs[]
+>>>> __initdata = {
+>>>>       DIV_CPU0,
+>>>>       SRC_CORE1,
+>>>>       SRC_TOP0,
+>>>> +    SRC_TOP1,
+>>>>       SRC_TOP2,
+>>>>       SRC_TOP3,
+>>>>       SRC_GSCL,
+>>>> @@ -133,6 +136,7 @@ static unsigned long exynos5250_clk_regs[]
+>>>> __initdata = {
+>>>>       DIV_PERIC5,
+>>>>       GATE_IP_GSCL,
+>>>>       GATE_IP_MFC,
+>>>> +    GATE_IP_G3D,
+>>>>       GATE_IP_GEN,
+>>>>       GATE_IP_FSYS,
+>>>>       GATE_IP_PERIC,
+>>>> @@ -189,10 +193,12 @@ PNAME(mout_vpllsrc_p)    = { "fin_pll",
+>>>> "sclk_hdmi27m" };
+>>>>   PNAME(mout_vpll_p)    = { "mout_vpllsrc", "fout_vpll" };
+>>>>   PNAME(mout_cpll_p)    = { "fin_pll", "fout_cpll" };
+>>>>   PNAME(mout_epll_p)    = { "fin_pll", "fout_epll" };
+>>>> +PNAME(mout_gpll_p)    = { "fin_pll", "fout_gpll" };
+>>>>   PNAME(mout_mpll_user_p)    = { "fin_pll", "mout_mpll" };
+>>>>   PNAME(mout_bpll_user_p)    = { "fin_pll", "mout_bpll" };
+>>>>   PNAME(mout_aclk166_p)    = { "mout_cpll", "mout_mpll_user" };
+>>>>   PNAME(mout_aclk200_p)    = { "mout_mpll_user", "mout_bpll_user" };
+>>>> +PNAME(mout_aclk400_p)    = { "mout_aclk400_g3d_mid", "mout_gpll" };
+>>>>   PNAME(mout_aclk200_sub_p) = { "fin_pll", "div_aclk200" };
+>>>>   PNAME(mout_aclk266_sub_p) = { "fin_pll", "div_aclk266" };
+>>>>   PNAME(mout_aclk333_sub_p) = { "fin_pll", "div_aclk333" };
+>>>> @@ -273,12 +279,16 @@ static struct samsung_mux_clock
+>>>> exynos5250_mux_clks[] __initdata = {
+>>>>       MUX(0, "mout_aclk166", mout_aclk166_p, SRC_TOP0, 8, 1),
+>>>>       MUX(0, "mout_aclk200", mout_aclk200_p, SRC_TOP0, 12, 1),
+>>>>       MUX(0, "mout_aclk333", mout_aclk166_p, SRC_TOP0, 16, 1),
+>>>> +    MUX(0, "mout_aclk400_g3d_mid", mout_aclk200_p, SRC_TOP0, 20, 1),
+>>>> +
+>>>> +    MUX(0, "mout_aclk400_g3d", mout_aclk400_p, SRC_TOP1, 28, 1),
+>>>>
+>>>>       MUX(0, "mout_cpll", mout_cpll_p, SRC_TOP2, 8, 1),
+>>>>       MUX(0, "mout_epll", mout_epll_p, SRC_TOP2, 12, 1),
+>>>>       MUX(0, "mout_vpll", mout_vpll_p, SRC_TOP2, 16, 1),
+>>>>       MUX(0, "mout_mpll_user", mout_mpll_user_p, SRC_TOP2, 20, 1),
+>>>>       MUX(0, "mout_bpll_user", mout_bpll_user_p, SRC_TOP2, 24, 1),
+>>>> +    MUX(CLK_MOUT_GPLL, "mout_gpll", mout_gpll_p, SRC_TOP2, 28, 1),
+>>>>
+>>>>       MUX(0, "mout_aclk200_disp1_sub", mout_aclk200_sub_p, SRC_TOP3,
+>>>> 4, 1),
+>>>>       MUX(0, "mout_aclk266_gscl_sub", mout_aclk266_sub_p, SRC_TOP3, 8,
+>>>> 1),
+>>>> @@ -351,6 +361,8 @@ static struct samsung_div_clock
+>>>> exynos5250_div_clks[] __initdata = {
+>>>>       DIV(0, "div_aclk200", "mout_aclk200", DIV_TOP0, 12, 3),
+>>>>       DIV(0, "div_aclk266", "mout_mpll_user", DIV_TOP0, 16, 3),
+>>>>       DIV(0, "div_aclk333", "mout_aclk333", DIV_TOP0, 20, 3),
+>>>> +    DIV(0, "div_aclk400_g3d", "mout_aclk400_g3d", DIV_TOP0,
+>>>> +                            24, 3),
+>>>>
+>>>>       DIV(0, "div_aclk66_pre", "mout_mpll_user", DIV_TOP1, 24, 3),
+>>>>
+>>>> @@ -533,7 +545,8 @@ static struct samsung_gate_clock
+>>>> exynos5250_gate_clks[] __initdata = {
+>>>>           0),
+>>>>       GATE(CLK_SMMU_MFCL, "smmu_mfcl", "mout_aclk333_sub",
+>>>> GATE_IP_MFC, 2, 0,
+>>>>           0),
+>>>> -
+>>>> +    GATE(CLK_G3D, "g3d", "div_aclk400_g3d", GATE_IP_G3D, 0,
+>>>> +                    CLK_SET_RATE_PARENT, 0),
+>>>>       GATE(CLK_ROTATOR, "rotator", "div_aclk266", GATE_IP_GEN, 1, 0, 0),
+>>>>       GATE(CLK_JPEG, "jpeg", "div_aclk166", GATE_IP_GEN, 2, 0, 0),
+>>>>       GATE(CLK_MDMA1, "mdma1", "div_aclk266", GATE_IP_GEN, 4, 0, 0),
+>>>> diff --git a/include/dt-bindings/clock/exynos5250.h
+>>>> b/include/dt-bindings/clock/exynos5250.h
+>>>> index 922f2dc..a3c6777 100644
+>>>> --- a/include/dt-bindings/clock/exynos5250.h
+>>>> +++ b/include/dt-bindings/clock/exynos5250.h
+>>>> @@ -150,11 +150,13 @@
+>>>>   #define CLK_G2D            345
+>>>>   #define CLK_MDMA0        346
+>>>>   #define CLK_SMMU_MDMA0        347
+>>>> +#define CLK_G3D            348
+>>>>
+>>>>   /* mux clocks */
+>>>>   #define CLK_MOUT_HDMI        1024
+>>>> +#define CLK_MOUT_GPLL        1025
+>>>>
+>>>>   /* must be greater than maximal clock id */
+>>>> -#define CLK_NR_CLKS        1025
+>>>> +#define CLK_NR_CLKS        1026
+>>>>
+>>>>   #endif /* _DT_BINDINGS_CLOCK_EXYNOS_5250_H */
+>>>>
+>>>
+>>> Applied.
 >>
->
-> I'm wondering wether we should make part of the driver compile only if
-> CONFIG_INPUT is defined. Maybe some user will want to use the ADC and
-> not have any input on their board.
->
-> What do you think ?
->
+>>
+>> Uhm, actually not applied, as we seem to have a numbering clash with
+>> previous patch adding gate clock for SSS block
+>> (clk: samsung exynos5250/5420: Add gate clock for SSS module).
+>>
+>> I can change this to 349 when applying, but you would need to make sure that
+>> you reflect this in your internal trees and rebuild your DTBs. Is it fine
+>> for you?
+>>
+> 
+> Yes it is fine with me. You can change the number to 349.
 
-This typically just leads to more build errors. E.g. if INPUT is defined as 
-a module, but AT91_ADC is build in. I think it is very rare to see a 
-configuration without INPUT set, other then a randconfig.
+OK, applied to samsung-clk/samsung-next.
 
-- Lars
+Best regards,
+Tomasz
