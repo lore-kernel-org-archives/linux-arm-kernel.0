@@ -1,58 +1,87 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 8 May 2014 11:06:24 -0700
-Subject: [PATCH] ARM: Don't ever downscale loops_per_jiffy in SMP systems
-In-Reply-To: <alpine.LFD.2.11.1405081329010.980@knanqh.ubzr>
-References: <1399504982-31181-1-git-send-email-dianders@chromium.org>
- <CAOh2x=kwaoSdj8JO0Vo08Y0dX2UfKFiF3pBV-qtp-YTyN=8H8Q@mail.gmail.com>
- <CAD=FV=UEGJGHrdcXgs3EZ_wFXT8GnNeCOMt7CgdiiUzBzZ5Y0A@mail.gmail.com>
- <alpine.LFD.2.11.1405081149190.980@knanqh.ubzr>
- <CAD=FV=VtcLOh51LCmafzRMdqtDrwKXCqK6gE6V7OOOUe4gjwbA@mail.gmail.com>
- <alpine.LFD.2.11.1405081329010.980@knanqh.ubzr>
-Message-ID: <CAD=FV=X4h0nfO7a10NXe+d76xj5ttBJx=q1pAvW4aPzrc22BoQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 8 May 2014 11:40:56 -0700
+Subject: omap4-panda-es boot issues with v3.15-rc4
+In-Reply-To: <20140508165558.GB2198@atomide.com>
+References: <536B7E44.2040303@ti.com> <7hppjos2w2.fsf@paris.lan>
+ <CAGa+x84VB3CXDm71JWxHx1-Qk1xVNeXdwUjZnb42_wg+piOzzA@mail.gmail.com>
+ <20140508165558.GB2198@atomide.com>
+Message-ID: <20140508184055.GC2198@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas,
+Added few cpuidle people to Cc on this regression.
 
-On Thu, May 8, 2014 at 10:43 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Thu, 8 May 2014, Doug Anderson wrote:
+* Tony Lindgren <tony@atomide.com> [140508 09:57]:
+> * Kevin Hilman <khilman@linaro.org> [140508 08:40]:
+> > On Thu, May 8, 2014 at 8:31 AM, Kevin Hilman <khilman@linaro.org> wrote:
+> > > Roger Quadros <rogerq@ti.com> writes:
+> > >
+> > >> Hi,
+> > >>
+> > >> Nishant pointed me to a booting issue with omap4-panda-es on linux-next but I'm observing
+> > >> similar issues, although less frequent, with v3.15-rc4 as well.
+> > >>
+> > >> Configuration:
+> > >>
+> > >> - kernel v3.15-rc4 or linux-next (20140507)
+> > >> - multi_v7_defconfig with LEDS_TRIGGER_HEARTBEAT and LEDS_GPIO enabled
+> > >> - u-boot/master       173d294b94cf
+> > >>
+> > >> Observations:
+> > >>
+> > >> - Out of 10 boots a few may not succeed and hang midway without any warnings. Heartbeat LED stops.
+> > >> e.g. http://www.hastebin.com/ebumojegoq.vhdl
+> > >>
+> > >> - Hang more noticeable on linux-next (20140507) than on v3.15-rc4
+> > >
+> > > I've beeen noticing the same thing for awhile with my boot tests.  For
+> > > me, next-20140508 is failing most of the time now.
+> > >
+> > >> - Hang more noticeable with USB_EHCI_HCD enabled but hang observed even without USB_EHCI_HCD.
+> > >> Maybe related to when high speed interrupts occur in the boot process.
+> > >>
+> > >> - On successful boots following warning is seen
+> > >> [    4.010375] gic_timer_retrigger: lost localtimer interrupt
+> > >>
+> > >> - On successful boots heartbeat LED stops blinking after boot process and left idle. LED can remain stuck in
+> > >> ON state as well. It does blink again when doing activity on console.
+> > >>
+> > >> Workaround:
+> > >>
+> > >> - Disabling CPU_IDLE or even just disabling C3 (MPU OSWR) seems to fix all the above issues.
+> > >>
+> > >> I don't really know what exactly is the issue but it seems to be specific to OMAP4, GIC, MPU OSWR.
+> > >
+> > > I can confirm that disabling CONFIG_CPU_IDLE seems to make the problem
+> > > go away.  Hmm....
+> > 
+> > Another finger pointing in the same direction: omap2plus_defconfig +
+> > CONFIG_CPU_IDLE=y also fails to boot rather consistently in today's
+> > -next.
+> 
+> Booting today's next with multi_v7_defconfig (so cpuidle enabled) on
+> omap4 sdp seems to boot reliably. And it's not producing these:
+> 
+> gic_timer_retrigger: lost localtimer interrupt 
 
->> Longer delays aren't very good, but IMHO having some delays of 100 =>
->> 1000 is better than having delays of 100 => 75.  The former will cause
->> mostly performance problems and the later will cause real correctness
->> problems.
->> I'm not saying that 100 => 1000 is good, it's just less bad.
->
-> There might be some cases where precise timing is needed though.
-> I thought I came across one such case in the past but I can't remember
-> which.
+Still seeing the above, looks like the lost localtimer interrupt
+above is a separate issue..
+ 
+> while panda is producing those errors like Roger mentioned.
+> 
+> It seems that the USB networking is the main difference between
+> omap4 sdp and panda?
 
-If precise timing is needed, shouldn't it be using ktime?
+..but I think I found the cause for recent hangs on panda, just a wild
+guess based on looking at the recent cpuidle patches after v3.14.
 
+Looks like reverting 0b89e9aa2856 (cpuidle: delay enabling interrupts
+until all coupled CPUs leave idle) makes booting work reliably again
+on panda.
 
->> I will make the argument that this patch makes things less broken
->> overall on any systems that actually end up running this code, but if
->> you want NAK it then it won't cause me any heartache.  ;)
->
-> What I insist on is for this issue to be solved using a stable counter
-> such a timer when available.  It _is_ available on one of the target you
-> mentioned so that is the solution you should add to your tree.
+Can you guys confirm, so far no issues here after few boot tests,
+but it might be too early to tell.
 
-Yup, we're working on it.
+Regards,
 
-
-> Investigating a similar solution for your other target should be
-> preferred to hacking the udelay loop. This way you're guaranteed to
-> solve this problem fully.
-
-I have no other target in mind.  I'm merely sending this up there just
-in case there is some cpufreq running ARM board that is SMP and has no
-timer-based udelay.  Those are the only boards that could possibly be
-running this code anyway.
-
-I guess I would say that my patch is unhacking the this code.  The
-code after my patch is simpler.  I would perhaps argue that (ec971ea
-ARM: add cpufreq transiton notifier to adjust loops_per_jiffy for smp)
-should never have landed to begin with.
-
--Doug
+Tony
