@@ -1,110 +1,139 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 8 May 2014 04:23:09 +0000 (UTC)
-Subject: OMAP baseline test results for v3.15-rc4
-Message-ID: <alpine.DEB.2.02.1405080417150.23579@utopia.booyaka.com>
+From: sw0312.kim@samsung.com (Seung-Woo Kim)
+Date: Thu, 08 May 2014 13:33:04 +0900
+Subject: [PATCH 2/4] drm/exynos/mixer: use MXR_GRP_SXY_SY
+In-Reply-To: <CAGS+omAbuzRpNDvB6eTw67Dcv3WMdWF3yz+bU5p3j5JRourOyw@mail.gmail.com>
+References: <1399217181-26442-1-git-send-email-djkurtz@chromium.org>
+ <1399217181-26442-3-git-send-email-djkurtz@chromium.org>
+ <5369C13C.3080506@samsung.com>
+ <CAGS+omAbuzRpNDvB6eTw67Dcv3WMdWF3yz+bU5p3j5JRourOyw@mail.gmail.com>
+Message-ID: <536B0900.10204@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Daniel,
 
-Here are some basic OMAP test results for Linux v3.15-rc4.
-Logs and other details at:
+On 2014? 05? 07? 23:14, Daniel Kurtz wrote:
+> On Wed, May 7, 2014 at 1:14 PM, Seung-Woo Kim <sw0312.kim@samsung.com> wrote:
+>> Hi Daniel,
+>>
+>> On 2014? 05? 05? 00:26, Daniel Kurtz wrote:
+>>> Mixer hardware supports offsetting dma from start of source buffer using
+>>> the MXR_GRP_SXY register.
+>>>
+>>> Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+>>> ---
+>>>  drivers/gpu/drm/exynos/exynos_mixer.c | 8 +++-----
+>>>  1 file changed, 3 insertions(+), 5 deletions(-)
+>>>
+>>> diff --git a/drivers/gpu/drm/exynos/exynos_mixer.c b/drivers/gpu/drm/exynos/exynos_mixer.c
+>>> index 475eb49..40cf39b 100644
+>>> --- a/drivers/gpu/drm/exynos/exynos_mixer.c
+>>> +++ b/drivers/gpu/drm/exynos/exynos_mixer.c
+>>> @@ -529,13 +529,11 @@ static void mixer_graph_buffer(struct mixer_context *ctx, int win)
+>>>
+>>>       dst_x_offset = win_data->crtc_x;
+>>>       dst_y_offset = win_data->crtc_y;
+>>> +     src_x_offset = win_data->fb_x;
+>>> +     src_y_offset = win_data->fb_y;
+>>>
+>>>       /* converting dma address base and source offset */
+>>> -     dma_addr = win_data->dma_addr
+>>> -             + (win_data->fb_x * win_data->bpp >> 3)
+>>> -             + (win_data->fb_y * win_data->fb_width * win_data->bpp >> 3);
+>>> -     src_x_offset = 0;
+>>> -     src_y_offset = 0;
+>>> +     dma_addr = win_data->dma_addr;
+>>
+>> Basically, you are right and source offset register can be used. But
+>> because of limitation of resolution for mixer up to 1920x1080, I
+>> considered modified soruce dma address to set one frame buffer, which is
+>> bigger than 1920x1080, on to both fimd and hdmi.
+> 
+> Hi Seung-Woo,
+> 
+> I do not see why the maximum MIXER resolution matters for choosing
+> between offsetting BASE or using SXY.
+> 
+> Let's say you have one big 1920x1908 framebuffer, with a span of 1920,
+> starting at dma_addr (there is no extra padding at the end of the
+> line).
+> Let's say you wanted the mixer to scan out 1920x1080 pixels starting
+> from (0, 800) in the framebuffer, and start drawing them at (0,0) on
+> the screen.
+> 
+> What we currently do is:
+>   BASE = dma_addr + (800 * 1080 * 4)
+>   SPAN = 1920
+>   SXY = SX(0) | SY(0)
+>   WH = W(1920) | H(1080)
+>   DXY = DX(0) | DY(0)
+> 
+> I am proposing we do:
+>   BASE = dma_addr
+>   SPAN = 1920
+>   SXY = SX(0) | SY(800)
+>   WH = W(1920) | H(1080)
+>   DXY = DX(0) | DY(0)
+> 
+> In both cases, the mixer resolution is 1920x1080.
 
-    http://www.pwsan.com/omap/testlogs/test_v3.15-rc4/20140505112251/
+In my test to show each half of big one framebuffer (3840 x 1080) to
+FIMD from 0 to 1079 and MIXER from 1080 to 3839 with exynos4210 and
+exynos4412, it was failed to show proper hdmi display. Also it is same
+for framebuffer (1920 x 2160). AFAIK, it is mainly because mixer dma has
+limitation of dma memory size.
 
+In this case, I set register as like:
+  BASE = dma_addr /* 3840 x 1080 x 4 */
+  SPAN = 3840
+  SXY = SX(1920) | SY(0)
+  WH = W(1920) | H(1080)
+  DXY = DX(0) | DY(0)
+or:
+  BASE = dma_addr /* 1920 x 2160 x 4 */
+  SPAN = 1920
+  SXY = SX(0) | SY(1080)
+  WH = W(1920) | H(1080)
+  DXY = DX(0) | DY(0)
+but these two setting did not show hdmi display as I expected. So I used
+modified dma address.
 
-Test summary
-------------
+> 
+> My motivation for wanting to program an un-modified dma_addr into BASE
+> is so we can then just check BASE_S to determine from which buffer the
+> mixer is actively being scanned out without worrying about the source
+> offset, since the source offset can change for a given framebuffer
+> (for example, when doing panning, or if an overlay is used for a HW
+> cursor).
 
-Build: uImage+dtb:
-    Pass ( 9/ 9): omap2plus_defconfig_am33xx_only/am335x-bone,
-                  omap2plus_defconfig/omap4-panda,
-                  omap2plus_defconfig/omap4-panda-es,
-                  omap2plus_defconfig/am3517-evm,
-                  omap2plus_defconfig/omap2430-sdp,
-                  omap2plus_defconfig/omap3-beagle,
-                  omap2plus_defconfig/omap3-beagle-xm,
-                  omap2plus_defconfig/omap3-evm-37xx,
-                  omap2plus_defconfig/omap4-var-som
+Actually, this patch is exactly same with my first implementation, so I
+completely understand your motivation. Anyway, I was focus on extended
+displays with one buffer, so I wrote modified dma base address.
 
-Build: zImage:
-    Pass (14/14): multi_v7_defconfig, omap2plus_defconfig,
-                  omap2plus_defconfig_am33xx_only,
-                  omap2plus_defconfig_2430sdp_only,
-                  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-                  omap2plus_defconfig_n800_only_a,
-                  omap2plus_defconfig_n800_multi_omap2xxx,
-                  omap2plus_defconfig_omap2_4_only,
-                  omap2plus_defconfig_omap3_4_only,
-                  rmk_omap3430_ldp_allnoconfig,
-                  rmk_omap3430_ldp_oldconfig,
-                  rmk_omap4430_sdp_allnoconfig,
-                  rmk_omap4430_sdp_oldconfig
+Thanks and Regards,
+- Seung-Woo Kim
 
-Build: uImage:
-    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
-                  omap1_defconfig_5912osk_only
+> 
+> Best Regards,
+> -Daniel
+> 
+>>
+>> Regards,
+>> - Seung-Woo Kim
+>>
+>>>
+>>>       if (win_data->scan_flags & DRM_MODE_FLAG_INTERLACE)
+>>>               ctx->interlace = true;
+>>>
+>>
+>> --
+>> Seung-Woo Kim
+>> Samsung Software R&D Center
+>> --
+>>
+> 
 
-Boot to userspace:
-    FAIL ( 1/12): 2430sdp
-    skip ( 3/12): 5912osk, cmt3517, 4460varsomom
-    Pass ( 8/12): 3517evm, 3530es3beagle, 3730beaglexm, 37xxevm,
-                  4430es2panda, 4460pandaes, am335xbone, am335xbonelt
-
-PM: chip retention via suspend:
-    skip ( 1/ 7): 4460varsomom
-    FAIL ( 2/ 7): 2430sdp, 4430es2panda
-    Pass ( 4/ 7): 3530es3beagle, 3730beaglexm, 37xxevm, 4460pandaes
-
-PM: chip retention via dynamic idle:
-    skip ( 1/ 7): 4460varsomom
-    FAIL ( 6/ 7): 2430sdp, 3530es3beagle, 3730beaglexm, 37xxevm,
-                  4430es2panda, 4460pandaes
-
-PM: chip off except CORE via suspend:
-    FAIL ( 1/ 1): 3730beaglexm
-
-PM: chip off except CORE via dynamic idle:
-    FAIL ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    skip ( 1/ 5): 4460varsomom
-    FAIL ( 4/ 5): 3530es3beagle, 37xxevm, 4430es2panda, 4460pandaes
-
-PM: chip off via dynamic idle:
-    skip ( 1/ 5): 4460varsomom
-    FAIL ( 4/ 5): 3530es3beagle, 37xxevm, 4430es2panda, 4460pandaes
-
-
-vmlinux object size
-(delta in bytes from test_v3.15-rc3 (d1db0eea852497762cab43b905b879dfcd3b8987)):
-   text     data      bss    total  kernel
-   +216        0        0     +216  omap1_defconfig
-   +248        0        0     +248  omap1_defconfig_1510innovator_only
-   +216        0        0     +216  omap1_defconfig_5912osk_only
-   +364       +8        0     +372  multi_v7_defconfig
-   +448        0        0     +448  omap2plus_defconfig
-   +304        0        0     +304  omap2plus_defconfig_2430sdp_only
-   +512       +8        0     +520  omap2plus_defconfig_am33xx_only
-   +512       +8        0     +520  omap2plus_defconfig_am43xx_only
-   +448        0        0     +448  omap2plus_defconfig_cpupm
-   +512       +8        0     +520  omap2plus_defconfig_dra7xx_only
-   +420       +8       +4     +432  omap2plus_defconfig_n800_multi_omap2xxx
-   +388        0       +4     +392  omap2plus_defconfig_n800_only_a
-   +512       +8        0     +520  omap2plus_defconfig_no_pm
-   +384        0        0     +384  omap2plus_defconfig_omap2_4_only
-   +512        0        0     +512  omap2plus_defconfig_omap3_4_only
-   +512        0        0     +512  omap2plus_defconfig_omap5_only
-   +336        0        0     +336  rmk_omap3430_ldp_allnoconfig
-   +352       +8        0     +360  rmk_omap3430_ldp_oldconfig
-   +352        0      -16     +336  rmk_omap4430_sdp_allnoconfig
-   +392       -8        0     +384  rmk_omap4430_sdp_oldconfig
-
-Boot-time memory difference
-(delta in bytes from test_v3.15-rc3 (d1db0eea852497762cab43b905b879dfcd3b8987))
-  avail  rsrvd   high  freed  board          kconfig
- -1007432k -40120k -269312k  -388k  4460varsomom   omap2plus_defconfig
-
-
-The eMMC on the 4460 VAR-SOM-OM has failed; I guess it's run out of 
-reserve blocks to reallocate.  Now it's time to find yet another way 
-to boot it.
+-- 
+Seung-Woo Kim
+Samsung Software R&D Center
+--
