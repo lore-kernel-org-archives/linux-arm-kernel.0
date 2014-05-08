@@ -1,95 +1,85 @@
 From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Wed, 07 May 2014 17:40:13 -0700
-Subject: [PATCH v5 1/4] add ARMv7 HYP API to flush VM TLBs without address
- param
+Date: Wed, 07 May 2014 17:40:16 -0700
+Subject: [PATCH v5 4/4] add 2nd stage page fault handling during live migration
 In-Reply-To: <1399509616-4632-1-git-send-email-m.smarduch@samsung.com>
 References: <1399509616-4632-1-git-send-email-m.smarduch@samsung.com>
-Message-ID: <1399509616-4632-2-git-send-email-m.smarduch@samsung.com>
+Message-ID: <1399509616-4632-5-git-send-email-m.smarduch@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch adds HYP interface for global VM TLB invalidation without address
-parameter. 
-
-- Added ARM version of kvm_flush_remote_tlbs()
-
+This patch adds support for handling 2nd stage page faults during migration,
+it disables faulting in huge pages, and splits up existing huge pages.
 
 Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
 ---
- arch/arm/include/asm/kvm_asm.h  |    1 +
- arch/arm/include/asm/kvm_host.h |    2 ++
- arch/arm/kvm/interrupts.S       |    5 +++++
- arch/arm/kvm/mmu.c              |   10 ++++++++++
- 4 files changed, 18 insertions(+)
+ arch/arm/kvm/mmu.c |   30 ++++++++++++++++++++++++++++--
+ 1 file changed, 28 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-index 53b3c4a..21bc519 100644
---- a/arch/arm/include/asm/kvm_asm.h
-+++ b/arch/arm/include/asm/kvm_asm.h
-@@ -78,6 +78,7 @@ extern char __kvm_hyp_code_end[];
- 
- extern void __kvm_flush_vm_context(void);
- extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
-+extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
- 
- extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
- #endif
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 193ceaf..ac3bb65 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -231,4 +231,6 @@ int kvm_perf_teardown(void);
- u64 kvm_arm_timer_get_reg(struct kvm_vcpu *, u64 regid);
- int kvm_arm_timer_set_reg(struct kvm_vcpu *, u64 regid, u64 value);
- 
-+void kvm_tlb_flush_vmid(struct kvm *kvm);
-+
- #endif /* __ARM_KVM_HOST_H__ */
-diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
-index 0d68d40..8620280 100644
---- a/arch/arm/kvm/interrupts.S
-+++ b/arch/arm/kvm/interrupts.S
-@@ -45,8 +45,12 @@ __kvm_hyp_code_start:
-  *
-  * As v7 does not support flushing per IPA, just nuke the whole TLB
-  * instead, ignoring the ipa value.
-+ *
-+ * void __kvm_tlb_flush_vm(struct kvm *kvm) - alias on ARMv7 for global VM TLB
-+ * flush with no address parameters.
-  */
- ENTRY(__kvm_tlb_flush_vmid_ipa)
-+ENTRY(__kvm_tlb_flush_vmid)
- 	push	{r2, r3}
- 
- 	dsb	ishst
-@@ -65,6 +69,7 @@ ENTRY(__kvm_tlb_flush_vmid_ipa)
- 	pop	{r2, r3}
- 	bx	lr
- ENDPROC(__kvm_tlb_flush_vmid_ipa)
-+ENDPROC(__kvm_tlb_flush_vmid)
- 
- /********************************************************************
-  * Flush TLBs and instruction caches of all CPUs inside the inner-shareable
 diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 80bb1e6..95c172a 100644
+index 1458b6e..b0633dc 100644
 --- a/arch/arm/kvm/mmu.c
 +++ b/arch/arm/kvm/mmu.c
-@@ -56,6 +56,16 @@ static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
- 		kvm_call_hyp(__kvm_tlb_flush_vmid_ipa, kvm, ipa);
- }
+@@ -1034,6 +1034,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 	struct kvm_mmu_memory_cache *memcache = &vcpu->arch.mmu_page_cache;
+ 	struct vm_area_struct *vma;
+ 	pfn_t pfn;
++	bool migration_active;
  
-+/* Function reuses __kvm_tlb_flush_vmid_ipa() HYP interface without additional
-+ * address argument to flush entire VM TLBs.
-+ */
-+void kvm_flush_remote_tlbs(struct kvm *kvm)
-+{
-+	if (kvm)
-+		kvm_call_hyp(__kvm_tlb_flush_vmid, kvm);
-+}
+ 	write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
+ 	if (fault_status == FSC_PERM && !write_fault) {
+@@ -1085,12 +1086,22 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 		return -EFAULT;
+ 
+ 	spin_lock(&kvm->mmu_lock);
 +
++	/* place inside lock to prevent race condition when whole VM is being
++	 * write proteced. Prevent race of huge page install when migration is
++	 * active.
++	 */
++	migration_active = vcpu->kvm->arch.migration_in_progress;
 +
- static int mmu_topup_memory_cache(struct kvm_mmu_memory_cache *cache,
- 				  int min, int max)
- {
+ 	if (mmu_notifier_retry(kvm, mmu_seq))
+ 		goto out_unlock;
+-	if (!hugetlb && !force_pte)
++
++	/* During migration no need rebuild huge pages */
++	if (!hugetlb && !force_pte && !migration_active)
+ 		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
+ 
+-	if (hugetlb) {
++	/* During migration don't install new huge pages */
++	if (hugetlb && !migration_active) {
+ 		pmd_t new_pmd = pfn_pmd(pfn, PAGE_S2);
+ 		new_pmd = pmd_mkhuge(new_pmd);
+ 		if (writable) {
+@@ -1102,6 +1113,19 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 	} else {
+ 		pte_t new_pte = pfn_pte(pfn, PAGE_S2);
+ 		if (writable) {
++			/* First convert huge page pfn to small page pfn,
++			 * while  migration is in progress.
++			 * Second if pmd is  mapping a huge page then
++			 * clear pmd so stage2_set_pte() can split the pmd.
++			 */
++			if (migration_active && hugetlb) {
++				pmd_t *pmd;
++				pfn += pte_index(fault_ipa);
++				new_pte = pfn_pte(pfn, PAGE_S2);
++				pmd = stage2_get_pmd(kvm, NULL, fault_ipa);
++				if (pmd && kvm_pmd_huge(*pmd))
++					clear_pmd_entry(kvm, pmd, fault_ipa);
++			}
+ 			kvm_set_s2pte_writable(&new_pte);
+ 			kvm_set_pfn_dirty(pfn);
+ 		}
+@@ -1109,6 +1133,8 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, false);
+ 	}
+ 
++	if (writable)
++		mark_page_dirty(kvm, gfn);
+ 
+ out_unlock:
+ 	spin_unlock(&kvm->mmu_lock);
 -- 
 1.7.9.5
