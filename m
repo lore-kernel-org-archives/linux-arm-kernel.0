@@ -1,82 +1,42 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 08 May 2014 14:50:44 +0200
-Subject: [PATCH v4 0/3] Generic Device Tree based power domain look-up
-In-Reply-To: <1399553109-6487-1-git-send-email-t.figa@samsung.com>
-References: <1399553109-6487-1-git-send-email-t.figa@samsung.com>
-Message-ID: <536B7DA4.5060008@samsung.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 8 May 2014 15:53:24 +0300
+Subject: omap4-panda-es boot issues with v3.15-rc4
+Message-ID: <536B7E44.2040303@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sent with wrong Rafael's address, please ignore this thread. Just resent
-with correct address. Sorry for the noise.
+Hi,
 
-Best regards,
-Tomasz
+Nishant pointed me to a booting issue with omap4-panda-es on linux-next but I'm observing
+similar issues, although less frequent, with v3.15-rc4 as well.
 
-On 08.05.2014 14:45, Tomasz Figa wrote:
-> Up till now there was no single generic method to bind devices to their
-> power domains using Device Tree. Each platform has been doing this using
-> its own way, example of which are Exynos power domain bindings [1] and
-> look-up code [2].
-> 
-> This series is intended to change this and provide generic DT bindings for
-> power domain specification and generic code performing look-up of power
-> domains and binding them to devices.
-> 
-> First two patches are the most important part of this series, as they
-> introduce $subject. Patch 3 converts mach-exynos to use the new generic
-> method. Further patches are adding one more user of the new code,
-> mach-s3c64xx, with first 3 patches (4-6) required to clean-up its power
-> domain driver a bit and last 3 patches (9-11) adding display support for
-> Mini6410 board, including a node for display controller (FIMD) which is
-> a power domain consumer.
-> 
-> The design of DT bindings and provider code is heavily inspired by
-> implementation of clock providers in Common Clock Framework, while
-> the code binding devices to power domains by my Exynos power domain
-> implementation (now removed by this series ;)).
-> 
-> Successfully tested on Exynos4210-based Trats and Exynos4412-based Trats2
-> boards using MFC, 
-> 
-> [1] Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-> [2] arch/arm/mach-exynos/pm_domains.c
-> 
-> Changes since v3:
-> (http://thread.gmane.org/gmane.linux.power-management.general/44571)
->  - rebased onto current Rafael's linux-pm bleeding-edge branch (0a112bf),
->  - renamed "power-domain" property to "power-domains" to facilitate further
->    extension to support multiple power domains per device in future.
-> 
-> Changes since v2:
-> (http://thread.gmane.org/gmane.linux.kernel/1658926)
->  - rebased onto current Rafael's linux-pm bleeding-edge branch,
->  - dropped patches for s3c64xx for now. I will send them in separate series,
->  - do not call pm_genpd_dev_need_restore(true) in genpd_bind_domain(),
->  - fixed various stylistic issues reported in review comments.
-> 
-> Changes since v1 (RFC):
-> [https://lkml.org/lkml/2014/1/11/141]
->  - rebased onto current Rafael's linux-pm bleeding-edge branch,
->  - reordered the patches a bit (to have the generic ones first),
->  - dropped renaming of S3C64xx power domains (as suggested by Mark Brown),
->  - added support for deferred probing (as suggested by Stephen Boyd),
->  - fixed several minor issues pointed by Stephen Boyd,
->  - replaced notifiers with direct hooks in driver core to make power domain
->    support independent from specific bus type and allow error handling.
-> 
-> Tomasz Figa (3):
->   base: power: Add generic OF-based power domain look-up
->   drivercore: Bind/unbind power domain on probe/remove
->   ARM: exynos: Move to generic power domain bindings
-> 
->  .../bindings/arm/exynos/power_domain.txt           |  12 +-
->  .../devicetree/bindings/power/power_domain.txt     |  51 ++++
->  arch/arm/mach-exynos/pm_domains.c                  |  81 +-----
->  drivers/base/dd.c                                  |   9 +-
->  drivers/base/power/domain.c                        | 283 +++++++++++++++++++++
->  include/linux/pm_domain.h                          |  46 ++++
->  kernel/power/Kconfig                               |   4 +
->  7 files changed, 398 insertions(+), 88 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/power/power_domain.txt
-> 
+Configuration:
+
+- kernel v3.15-rc4 or linux-next (20140507)
+- multi_v7_defconfig with LEDS_TRIGGER_HEARTBEAT and LEDS_GPIO enabled
+- u-boot/master	173d294b94cf
+
+Observations:
+
+- Out of 10 boots a few may not succeed and hang midway without any warnings. Heartbeat LED stops.
+e.g. http://www.hastebin.com/ebumojegoq.vhdl
+
+- Hang more noticeable on linux-next (20140507) than on v3.15-rc4
+
+- Hang more noticeable with USB_EHCI_HCD enabled but hang observed even without USB_EHCI_HCD.
+Maybe related to when high speed interrupts occur in the boot process.
+
+- On successful boots following warning is seen
+[    4.010375] gic_timer_retrigger: lost localtimer interrupt
+
+- On successful boots heartbeat LED stops blinking after boot process and left idle. LED can remain stuck in
+ON state as well. It does blink again when doing activity on console.
+
+Workaround:
+
+- Disabling CPU_IDLE or even just disabling C3 (MPU OSWR) seems to fix all the above issues.
+
+I don't really know what exactly is the issue but it seems to be specific to OMAP4, GIC, MPU OSWR.
+
+cheers,
+-roger
