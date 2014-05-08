@@ -1,28 +1,34 @@
 From: lho@apm.com (Loc Ho)
-Date: Thu,  8 May 2014 17:03:15 -0600
-Subject: [PATCH 0/4] edac: Add APM X-Gene SoC EDAC driver
-Message-ID: <1399590199-12256-1-git-send-email-lho@apm.com>
+Date: Thu,  8 May 2014 17:03:16 -0600
+Subject: [PATCH 1/4] edac: Fix MC scrub mode comparsion bug for correctable
+ error
+In-Reply-To: <1399590199-12256-1-git-send-email-lho@apm.com>
+References: <1399590199-12256-1-git-send-email-lho@apm.com>
+Message-ID: <1399590199-12256-2-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the APM X-Gene SoC EDAC driver.
+This patch fixes the MC scrub mode comparsion bug by replacing
+'&' with '=='. The MC structure field scrub_mode is integer
+type - not bit field.
 
-Signed-off-by: Feng Kan <fkan@apm.com>
 Signed-off-by: Loc Ho <lho@apm.com>
 ---
-Loc Ho (4):
-  edac: Fix MC scrub mode comparsion bug for correctable error
-  Documentation: Add documentation for the APM X-Gene SoC EDAC DTS
-    binding
-  edac: Add APM X-Gene SoC EDAC driver
-  arm64: Add APM X-Gene SoC EDAC DTS entries
+ drivers/edac/edac_mc.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
- .../devicetree/bindings/edac/apm-xgene-edac.txt    |   70 +
- arch/arm64/boot/dts/apm-storm.dtsi                 |   89 +
- drivers/edac/Kconfig                               |    9 +-
- drivers/edac/Makefile                              |    3 +
- drivers/edac/edac_mc.c                             |    2 +-
- drivers/edac/xgene_edac.c                          | 1915 ++++++++++++++++++++
- 6 files changed, 2086 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
- create mode 100644 drivers/edac/xgene_edac.c
+diff --git a/drivers/edac/edac_mc.c b/drivers/edac/edac_mc.c
+index 33edd67..2c694b5 100644
+--- a/drivers/edac/edac_mc.c
++++ b/drivers/edac/edac_mc.c
+@@ -1018,7 +1018,7 @@ static void edac_ce_error(struct mem_ctl_info *mci,
+ 	}
+ 	edac_inc_ce_error(mci, enable_per_layer_report, pos, error_count);
+ 
+-	if (mci->scrub_mode & SCRUB_SW_SRC) {
++	if (mci->scrub_mode == SCRUB_SW_SRC) {
+ 		/*
+ 			* Some memory controllers (called MCs below) can remap
+ 			* memory so that it is still available at a different
+-- 
+1.5.5
