@@ -1,42 +1,71 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu,  8 May 2014 16:56:30 +0200
-Subject: [PATCH] regulator: arizona-ldo1: add missing #include
+Date: Thu,  8 May 2014 16:56:20 +0200
+Subject: [PATCH] mpilib: use 'static inline' for mpi-inline.h
 In-Reply-To: <1399560990-1402858-1-git-send-email-arnd@arndb.de>
 References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
  <1399560990-1402858-1-git-send-email-arnd@arndb.de>
-Message-ID: <1399560990-1402858-19-git-send-email-arnd@arndb.de>
+Message-ID: <1399560990-1402858-9-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 2cce4be9e6b8 "regulator: arizona-ldo1: Add processing of init_data
-from device tree" added a call to of_get_child_by_name() but
-did not add an #include to the header file declaring that function.
+Four functions of mpilib are defined as 'extern inline' at the
+moment, which is generally not the correct way to do inline functions
+using gcc.
 
-I got a build error when doing randconfig testing on this, which
-is fixed by this patch to include of.h.
+While this is usually harmless, it shows up as a warning in combination
+with the CONFIG_PROFILE_ALL_BRANCHES, resulting in very many lines
+like:
 
-drivers/regulator/arizona-ldo1.c:192:2: error: implicit declaration of function 'of_get_child_by_name' [-Werror=implicit-function-declaration]
-drivers/regulator/arizona-ldo1.c:193:2: error: implicit declaration of function 'of_parse_phandle' [-Werror=implicit-function-declaration]
-drivers/regulator/arizona-ldo1.c:213:2: error: implicit declaration of function 'of_node_put' [-Werror=implicit-function-declaration]
+/git/arm-soc/lib/mpi/mpi-inline.h:70:182: warning: '______f' is static but declared in inline function 'mpihelp_add' which is not static [enabled by default]
+
+Using static inline makes the code behave as expected and gets
+rid of the warning
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
-Cc: Mark Brown <broonie@linaro.org>
+Cc: Steven Rostedt <rostedt@goodmis.org>
+Cc: Dmitry Kasatkin <dmitry.kasatkin@intel.com>
 ---
- drivers/regulator/arizona-ldo1.c | 1 +
- 1 file changed, 1 insertion(+)
+ lib/mpi/mpi-inline.h   | 2 +-
+ lib/mpi/mpi-internal.h | 8 --------
+ 2 files changed, 1 insertion(+), 9 deletions(-)
 
-diff --git a/drivers/regulator/arizona-ldo1.c b/drivers/regulator/arizona-ldo1.c
-index d3787e1..04f262a 100644
---- a/drivers/regulator/arizona-ldo1.c
-+++ b/drivers/regulator/arizona-ldo1.c
-@@ -16,6 +16,7 @@
- #include <linux/init.h>
- #include <linux/bitops.h>
- #include <linux/err.h>
-+#include <linux/of.h>
- #include <linux/platform_device.h>
- #include <linux/regulator/driver.h>
- #include <linux/regulator/machine.h>
+diff --git a/lib/mpi/mpi-inline.h b/lib/mpi/mpi-inline.h
+index e2b3985..c245ea3 100644
+--- a/lib/mpi/mpi-inline.h
++++ b/lib/mpi/mpi-inline.h
+@@ -30,7 +30,7 @@
+ #define G10_MPI_INLINE_H
+ 
+ #ifndef G10_MPI_INLINE_DECL
+-#define G10_MPI_INLINE_DECL  extern inline
++#define G10_MPI_INLINE_DECL  static inline
+ #endif
+ 
+ G10_MPI_INLINE_DECL mpi_limb_t
+diff --git a/lib/mpi/mpi-internal.h b/lib/mpi/mpi-internal.h
+index 60cf765..54c1e97 100644
+--- a/lib/mpi/mpi-internal.h
++++ b/lib/mpi/mpi-internal.h
+@@ -168,20 +168,12 @@ void mpi_rshift_limbs(MPI a, unsigned int count);
+ int mpi_lshift_limbs(MPI a, unsigned int count);
+ 
+ /*-- mpihelp-add.c --*/
+-mpi_limb_t mpihelp_add_1(mpi_ptr_t res_ptr, mpi_ptr_t s1_ptr,
+-			 mpi_size_t s1_size, mpi_limb_t s2_limb);
+ mpi_limb_t mpihelp_add_n(mpi_ptr_t res_ptr, mpi_ptr_t s1_ptr,
+ 			 mpi_ptr_t s2_ptr, mpi_size_t size);
+-mpi_limb_t mpihelp_add(mpi_ptr_t res_ptr, mpi_ptr_t s1_ptr, mpi_size_t s1_size,
+-		       mpi_ptr_t s2_ptr, mpi_size_t s2_size);
+ 
+ /*-- mpihelp-sub.c --*/
+-mpi_limb_t mpihelp_sub_1(mpi_ptr_t res_ptr, mpi_ptr_t s1_ptr,
+-			 mpi_size_t s1_size, mpi_limb_t s2_limb);
+ mpi_limb_t mpihelp_sub_n(mpi_ptr_t res_ptr, mpi_ptr_t s1_ptr,
+ 			 mpi_ptr_t s2_ptr, mpi_size_t size);
+-mpi_limb_t mpihelp_sub(mpi_ptr_t res_ptr, mpi_ptr_t s1_ptr, mpi_size_t s1_size,
+-		       mpi_ptr_t s2_ptr, mpi_size_t s2_size);
+ 
+ /*-- mpihelp-cmp.c --*/
+ int mpihelp_cmp(mpi_ptr_t op1_ptr, mpi_ptr_t op2_ptr, mpi_size_t size);
 -- 
 1.8.3.2
