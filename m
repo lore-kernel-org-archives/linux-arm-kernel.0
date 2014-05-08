@@ -1,33 +1,82 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Thu, 8 May 2014 11:00:42 -0400
-Subject: [PATCH] ata: pata_at91 only works on sam9
-In-Reply-To: <1399560990-1402858-10-git-send-email-arnd@arndb.de>
-References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-10-git-send-email-arnd@arndb.de>
-Message-ID: <20140508150042.GD5229@htj.dyndns.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 8 May 2014 08:03:58 -0700
+Subject: [GIT PULL #1/2] bus: omap_l3_noc: driver fixes and DRA7/AM437x
+ support
+In-Reply-To: <20140505200322.GA9863@kahuna>
+References: <1397492726-17203-1-git-send-email-nm@ti.com>
+ <1398698101-25513-1-git-send-email-nm@ti.com>
+ <20140505200322.GA9863@kahuna>
+Message-ID: <20140508150357.GB26833@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 08, 2014 at 04:56:21PM +0200, Arnd Bergmann wrote:
-> The smc driver used by pata_at91 is at91sam9 specific, so building
-> this driver on another at91 platform results in this error:
+* Nishanth Menon <nm@ti.com> [140505 13:03]:
+> Hi Tony,
 > 
-> ERROR: "sam9_smc_configure" [drivers/ata/pata_at91.ko] undefined!
-> ERROR: "sam9_smc_write_mode" [drivers/ata/pata_at91.ko] undefined!
-> ERROR: "sam9_smc_read_mode" [drivers/ata/pata_at91.ko] undefined!
+>    Please pull the following driver fixes based on V3 of l3noc fixes and
+>    support for DRA7 and AM437x for upcoming 3.16 window.
+>    http://marc.info/?l=linux-omap&m=139869922030493&w=2
 > 
-> This patch changes the Kconfig dependency to ensure it always works.
+>    This is part 1 of the pull request containing purely the driver
+>    updates.
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Tejun Heo <tj@kernel.org>
-> Cc: linux-ide at vger.kernel.org
-> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> The following changes since commit 455c6fdbd219161bd09b1165f11699d6d73de11c:
+> 
+>   Linux 3.14 (2014-03-30 20:40:15 -0700)
+> 
+> are available in the git repository at:
+> 
+>   https://github.com/nmenon/linux-2.6-playground.git pull/l3noc/driver-fixes
+> 
+> for you to fetch changes up to 27b7d5f3cc49f2e5cd6c005d73696058b7140c5c:
+> 
+>   bus: omap_l3_noc: Add AM4372 interconnect error data (2014-05-05 14:34:37 -0500)
 
-Applied to libata/for-3.15-fixes.
+Thanks pulling this into omap-for-v3.16/l3-noc.
 
-Thanks.
-
--- 
-tejun
+Tony
+ 
+> ----------------------------------------------------------------
+> Afzal Mohammed (2):
+>       bus: omap_l3_noc: ignore masked out unclearable targets
+>       bus: omap_l3_noc: Add AM4372 interconnect error data
+> 
+> Nishanth Menon (14):
+>       bus: omap_l3_noc: Fix copyright information
+>       bus: omap_l3_noc: remove iclk from omap_l3 struct
+>       bus: omap_l3_noc: populate l3->dev and use it
+>       bus: omap_l3_noc: switch over to relaxed variants of readl/writel
+>       bus: omap_l3_noc: un-obfuscate l3_targ address computation
+>       bus: omap_l3_noc: move L3 master data structure out
+>       bus: omap_l3_noc: convert target information into a structure
+>       bus: omap_l3_noc: convert flagmux information into a structure
+>       bus: omap_l3_noc: fix masterid detection
+>       bus: omap_l3_noc: make error reporting and handling common
+>       bus: omap_l3_noc: improve readability by using helper for slave event parsing
+>       bus: omap_l3_noc: add information about the type of operation
+>       bus: omap_l3_noc: Add information about the context of operation
+>       bus: omap_l3_noc: introduce concept of submodule
+> 
+> Peter Ujfalusi (5):
+>       drivers: bus: omap_l3: Convert to use devm_kzalloc
+>       drivers: bus: omap_l3: Convert to use devm_ioremap_resource()
+>       drivers: bus: omap_l3: Convert to use devm_request_irq()
+>       drivers: bus: omap_l3: Remove the platform driver's remove function
+>       drivers: bus: omap_l3: Change pr_crit() to dev_err() when IRQ request fails
+> 
+> Rajendra Nayak (2):
+>       bus: omap_l3_noc: Add support for discountinous flag mux input numbers
+>       bus: omap_l3_noc: Add DRA7 interconnect error data
+> 
+> Sricharan R (2):
+>       bus: omap_l3_noc: rename functions and data to omap_l3
+>       bus: omap_l3_noc: use of_match_data to pick up SoC information
+> 
+>  .../devicetree/bindings/arm/omap/l3-noc.txt        |    2 +
+>  drivers/bus/omap_l3_noc.c                          |  406 ++++++++-------
+>  drivers/bus/omap_l3_noc.h                          |  545 +++++++++++++++-----
+>  3 files changed, 653 insertions(+), 300 deletions(-)
+> -- 
+> Regards,
+> Nishanth Menon
+> 
