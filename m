@@ -1,70 +1,158 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Thu, 08 May 2014 17:56:38 +0900
-Subject: [PATCH 05/17] pci: host: pcie-dra7xx: add support for pcie-dra7xx
- controller
-In-Reply-To: <5525000.bPgPLB3ZrT@wuerfel>
-References: <1399383244-14556-1-git-send-email-kishon@ti.com>
- <20140506163507.GA15542@obsidianresearch.com> <5369FB67.6040905@ti.com>
- <5525000.bPgPLB3ZrT@wuerfel>
-Message-ID: <000101cf6a9b$6c96c8d0$45c45a70$%han@samsung.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 8 May 2014 09:57:43 +0100
+Subject: [PATCH RFC v3 1/6] Documentation: arm: define DT idle states
+ bindings
+In-Reply-To: <536ac4ef.6ae7440a.511a.ffffdef8@mx.google.com>
+References: <1399399483-17112-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1399399483-17112-2-git-send-email-lorenzo.pieralisi@arm.com>
+ <536ac4ef.6ae7440a.511a.ffffdef8@mx.google.com>
+Message-ID: <20140508085743.GA12860@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, May 07, 2014 6:26 PM, Arnd Bergmann wrote:
-> On Wednesday 07 May 2014 14:52:47 Kishon Vijay Abraham I wrote:
-> > On Tuesday 06 May 2014 10:05 PM, Jason Gunthorpe wrote:
-> > > On Tue, May 06, 2014 at 07:03:51PM +0530, Kishon Vijay Abraham I wrote:
-> > >> +Example:
-> > >> +pcie at 51000000 {
-> > >> +    compatible = "ti,dra7xx-pcie";
-> > >> +    reg = <0x51002000 0x14c>, <0x51000000 0x2000>;
-> > >> +    reg-names = "ti_conf", "rc_dbics";
-> > >> +    interrupts = <0 232 0x4>, <0 233 0x4>;
-> > >> +    #address-cells = >;
-> > >> +    #size-cells = <2>;
-> > >> +    device_type = "pci";
-> > >> +    ti,device_type = >;
-> > >> +    ranges = <0x00000800 0 0x20001000 0x20001000 0 0x00002000  /* Configuration Space */
-> > >
-> > > Configuration space should not show up in the ranges, please don't
-> > > copy that mistake from other drivers, put it in reg.
-> >
-> > But then it needs pcie-designware.c to be modified and it will be breaking
-> > other platforms no?
+On Thu, May 08, 2014 at 12:43:04AM +0100, Sebastian Capella wrote:
+> Quoting Lorenzo Pieralisi (2014-05-06 11:04:38)
+> > diff --git a/Documentation/devicetree/bindings/arm/idle-states.txt b/Documentation/devicetree/bindings/arm/idle-states.txt
+> > new file mode 100644
+> > index 0000000..196ef52
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/arm/idle-states.txt
+> > @@ -0,0 +1,508 @@
+> ...
+> > +===========================================
+> > +2 - idle-states node
+> > +===========================================
+> > +
+> > +ARM processor idle states are defined within the idle-states node, which is
+> > +a direct child of the cpus node [1] and provides a container where the
+> > +processor idle states, defined as device tree nodes, are listed.
+> > +
+> > +- idle-states node
+> > +
+> > +       Usage: Optional - On ARM systems, is a container of processor idle
+> > +                         states nodes. If the system does not provide CPU
+> > +                         power management capabilities or the processor just
+> > +                         supports idle_standby an idle-states node is not
+> > +                         required.
+> > +
+> > +       Description: idle-states node is a container node, where its
+> > +                    subnodes describe the CPU idle states.
+> > +
+> > +       Node name must be "idle-states".
+> > +
+> > +       The idle-states node's parent node must be the cpus node.
+> > +
+> > +       The idle-states node's child nodes can be:
+> > +
+> > +       - one or more state nodes
+> > +
+> > +       Any other configuration is considered invalid.
+> > +
+> > +       An idle-states node defines the following properties:
+> > +
+> > +       - entry-method
+> > +               Usage: Required
+> > +               Value type: <stringlist>
+> > +               Definition: Describes the method by which a CPU enters the
+> > +                           idle states. This property is required and must be
+> > +                           one of:
+> > +
+> > +                           - "arm,psci"
+> > +                             ARM PSCI firmware interface [2].
+> > +
+> > +                           - "[vendor],[method]"
+> > +                             An implementation dependent string with
+> > +                             format "vendor,method", where vendor is a string
+> > +                             denoting the name of the manufacturer and
+> > +                             method is a string specifying the mechanism
+> > +                             used to enter the idle state.
+> > +
+> > +The nodes describing the idle states (state) can only be defined within the
+> > +idle-states node.
+> > +
+> > +Any other configuration is consider invalid and therefore must be ignored.
 > 
-> I think the pcie-designware driver should be changed to allow either way.
-> Ideally we would deprecate the existing method in a way that for new front-ends
-> it doesn't work, but the old front-ends can still deal with it but also work
-> if you put it into the reg property.
+> consider -> considered
+> must be -> shall?
+> 
+> Is the reference to "any other configuration" referring to state nodes
+> not in the idle states node?  If so, maybe this sentence should go
+> together with that one.
 
-(+cc Pratyush Anand, Thierry Reding)
+Yes, it makes sense.
 
-Hi Arnd,
+> > +===========================================
+> > +4 - Examples
+> > +===========================================
+> > +
+> > +Example 1 (ARM 64-bit, 16-cpu system):
+> > +
+> > +cpus {
+> > +       #size-cells = <0>;
+> > +       #address-cells = <2>;
+> > +
+> > +       idle-states {
+> > +               entry-method = "arm,psci";
+> > +
+> > +               CPU_RETENTION_0_0: cpu-retention-0-0 {
+> > +                       compatible = "arm,idle-state";
+> > +                       cache-state-retained;
+> > +                       entry-method-param = <0x0010000>;
+> > +                       entry-latency-us = <20>;
+> > +                       exit-latency-us = <40>;
+> > +                       min-residency-us = <30>;
+> > +               };
+> > +
+> > +               CLUSTER_RETENTION_0: cluster-retention-0 {
+> > +                       compatible = "arm,idle-state";
+> > +                       logic-state-retained;
+> > +                       cache-state-retained;
+> > +                       entry-method-param = <0x1010000>;
+> > +                       entry-latency-us = <50>;
+> > +                       exit-latency-us = <100>;
+> > +                       min-residency-us = <250>;
+> > +               };
+>                   ...
+> > +       };
+> > +
+> > +       CPU0: cpu at 0 {
+> > +               device_type = "cpu";
+> > +               compatible = "arm,cortex-a57";
+> > +               reg = <0x0 0x0>;
+> > +               enable-method = "psci";
+> > +               cpu-idle-states = <&CPU_RETENTION_0_0 &CPU_SLEEP_0_0
+> > +                                  &CLUSTER_RETENTION_0 &CLUSTER_SLEEP_0>;
+> > +       };
+> > +
+> > +       CPU1: cpu at 1 {
+> > +               device_type = "cpu";
+> > +               compatible = "arm,cortex-a57";
+> > +               reg = <0x0 0x1>;
+> > +               enable-method = "psci";
+> > +               cpu-idle-states = <&CPU_RETENTION_0_0 &CPU_SLEEP_0_0
+> > +                                  &CLUSTER_RETENTION_0 &CLUSTER_SLEEP_0>;
+> > +       };
+> 
+> How can we specify what states are entered together vs. those that
+> are independent (since they also share the entry-method-param)?
+> CPU_SLEEP_0_0 is used for both CPU0 and CPU1, yet each cpu can enter
+> it without waiting for the other.  Whereas CLUSTER_RETENTION_0 should
+> not be entered until all CPUs sharing it enter.
 
-Thank you for your comment.
-Do you mean the case of Tegra PCIe as below?
+We do not specify that. That can be solved with power-domains but I
+removed them from the bindings since I want to merge bindings that are
+required by current code, and PSCI does not need this information, since
+the power state parameter to PSCI suspend call (and the related SMC
+implementation) caters for it.
 
-./arch/arm/boot/dts/tegra20.dts
-	pcie-controller at 80003000 {
-		...
-		reg = <0x80003000 0x00000800   /* PADS registers */
-			 0x80003800 0x00000200   /* AFI registers */
-			 0x90000000 0x10000000>; /* configuration space */
-		...
-		ranges = <0x82000000 0 0x80000000 0x80000000 0 0x00001000   /* port 0 registers */
-			0x82000000 0 0x80001000 0x80001000 0 0x00001000   /* port 1 registers */
-			0x81000000 0 0          0x82000000 0 0x00010000   /* downstream I/O */
-			0x82000000 0 0xa0000000 0xa0000000 0 0x08000000   /* non-prefetchable memory */
-			0xc2000000 0 0xa8000000 0xa8000000 0 0x18000000>; /* prefetchable memory */
-		...
+When I see implementations requiring these bits of info, we will add
+them to the bindings.
 
-./drivers/pci/host/pci-tegra.c
-	/* request configuration space, but remap later, on demand */
-	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "cs");
-	...
-	pcie->cs = devm_request_mem_region(pcie->dev, res->start,
-						resource_size(res), res->name);
+> Is the idea to define separate CPU_SLEEP/CPU_RETENTION nodes for each cpu?
 
+On big.LITTLE systems you might want to have different states (eg CPU
+core gatng) for big and little CPUs, and that's doable with the current
+bindings since each CPU can point at idle states in its cpu node.
 
-Best regards,
-Jingoo Han
+Thanks for having a look,
+Lorenzo
