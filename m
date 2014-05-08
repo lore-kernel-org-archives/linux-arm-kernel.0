@@ -1,81 +1,90 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 8 May 2014 07:23:58 -0700
-Subject: [RESEND PATCH 0/4] ARM: OMAP: raw read and write endian fix
-In-Reply-To: <1397583469-14457-1-git-send-email-taras.kondratiuk@linaro.org>
-References: <1397583469-14457-1-git-send-email-taras.kondratiuk@linaro.org>
-Message-ID: <20140508142357.GA26833@atomide.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 8 May 2014 09:21:02 -0500
+Subject: [PATCH] pinctrl: sunxi Ensure the correct pinctrl drivers are
+ enabled
+In-Reply-To: <1399556216-7590-1-git-send-email-hdegoede@redhat.com>
+References: <1399556216-7590-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20140508142101.GT7047@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Taras Kondratiuk <taras.kondratiuk@linaro.org> [140415 10:38]:
-> This series does trivial replacement of __raw_xxx functions with xxx_relaxed
-> endian-neutral variants in 'mach-omap2' and 'plat-omap' directories.
-> Some code here most probably won't be used in BE mode (like debug-leds for
-> OMAP1 boards), but changes are made anyway to remove __raw_xxx() functions
-> completely and simplify future grep'ing for new __raw_xxx() entries.
-> 
-> This is a part of RFC series [1].
-> It was missed in previous merge window [2].
-> 
-> Based on v3.15-rc1.
+Hi Hans,
 
-Thanks applying these into omap-for-v3.16/be.
+On Thu, May 08, 2014 at 03:36:56PM +0200, Hans de Goede wrote:
+> The commit titled: "pinctrl: sunxi: Introduce per-driver Kconfig options"
+> adds a bunch of new Kconfig options, but nothing sets them resulting in a
+> non working kernel. Since they are per sunxi family, and we already have
+> sunxi family Kconfig options, make those options select the necessary
+> Kconfig options.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  arch/arm/mach-sunxi/Kconfig | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+> index 3aff966..beab32e 100644
+> --- a/arch/arm/mach-sunxi/Kconfig
+> +++ b/arch/arm/mach-sunxi/Kconfig
+> @@ -4,7 +4,6 @@ menuconfig ARCH_SUNXI
+>  	select CLKSRC_MMIO
+>  	select GENERIC_IRQ_CHIP
+>  	select PINCTRL
+> -	select PINCTRL_SUNXI
+>  	select SUN4I_TIMER
+>  
+>  if ARCH_SUNXI
+> @@ -12,11 +11,14 @@ if ARCH_SUNXI
+>  config MACH_SUN4I
+>  	bool "Allwinner A10 (sun4i) SoCs support"
+>  	default ARCH_SUNXI
+> +	select PINCTRL_SUN4I_A10
+>  
+>  config MACH_SUN5I
+>  	bool "Allwinner A10s / A13 (sun5i) SoCs support"
+>  	default ARCH_SUNXI
+>  	select SUN5I_HSTIMER
+> +	select PINCTRL_SUN5I_A10S
+> +	select PINCTRL_SUN5I_A13
+>  
+>  config MACH_SUN6I
+>  	bool "Allwinner A31 (sun6i) SoCs support"
+> @@ -25,6 +27,7 @@ config MACH_SUN6I
+>  	select ARM_GIC
+>  	select RESET_CONTROLLER
+>  	select SUN5I_HSTIMER
+> +	select PINCTRL_SUN6I_A31
+>  
+>  config MACH_SUN7I
+>  	bool "Allwinner A20 (sun7i) SoCs support"
+> @@ -33,5 +36,6 @@ config MACH_SUN7I
+>  	select ARM_PSCI
+>  	select HAVE_ARM_ARCH_TIMER
+>  	select SUN5I_HSTIMER
+> +	select PINCTRL_SUN7I_A20
+>  
+>  endif
 
-Regards,
+I already posted a similar patch that is still pending. I was only
+waiting for Linus to merge the branch I gave him to merge it in my
+tree.
 
-Tony
- 
-> [1] http://www.spinics.net/lists/linux-omap/msg99927.html
-> [2] https://lkml.org/lkml/2014/4/2/292
-> 
-> Victor Kamensky (4):
->   ARM: OMAP2+: raw read and write endian fix
->   ARM: OMAP: dmtimer: raw read and write endian fix
->   ARM: OMAP: counter-32k: raw read and write endian fix
->   ARM: OMAP: debug-leds: raw read and write endian fix
-> 
->  arch/arm/mach-omap2/board-flash.c         |    4 +--
->  arch/arm/mach-omap2/clkt2xxx_dpllcore.c   |    2 +-
->  arch/arm/mach-omap2/clkt2xxx_osc.c        |    8 +++---
->  arch/arm/mach-omap2/clkt2xxx_sys.c        |    2 +-
->  arch/arm/mach-omap2/cm2xxx_3xxx.h         |    4 +--
->  arch/arm/mach-omap2/cm33xx.c              |    4 +--
->  arch/arm/mach-omap2/cm3xxx.c              |    8 +++---
->  arch/arm/mach-omap2/cm44xx.c              |    8 +++---
->  arch/arm/mach-omap2/cminst44xx.c          |    4 +--
->  arch/arm/mach-omap2/control.c             |   20 +++++++-------
->  arch/arm/mach-omap2/dma.c                 |    4 +--
->  arch/arm/mach-omap2/gpmc.c                |    8 +++---
->  arch/arm/mach-omap2/id.c                  |    2 +-
->  arch/arm/mach-omap2/irq.c                 |    4 +--
->  arch/arm/mach-omap2/mux.c                 |    8 +++---
->  arch/arm/mach-omap2/omap-hotplug.c        |    4 +--
->  arch/arm/mach-omap2/omap-mpuss-lowpower.c |   18 ++++++-------
->  arch/arm/mach-omap2/omap-smp.c            |    6 ++---
->  arch/arm/mach-omap2/omap-wakeupgen.c      |   42 ++++++++++++++---------------
->  arch/arm/mach-omap2/omap4-common.c        |   18 ++++++-------
->  arch/arm/mach-omap2/omap_hwmod.c          |   10 +++----
->  arch/arm/mach-omap2/omap_phy_internal.c   |    6 ++---
->  arch/arm/mach-omap2/prcm_mpu44xx.c        |    4 +--
->  arch/arm/mach-omap2/prm2xxx.h             |    2 +-
->  arch/arm/mach-omap2/prm2xxx_3xxx.h        |    4 +--
->  arch/arm/mach-omap2/prm33xx.c             |    4 +--
->  arch/arm/mach-omap2/prm3xxx.h             |    2 +-
->  arch/arm/mach-omap2/prm44xx.c             |    4 +--
->  arch/arm/mach-omap2/prminst44xx.c         |    4 +--
->  arch/arm/mach-omap2/sdrc.h                |    8 +++---
->  arch/arm/mach-omap2/sdrc2xxx.c            |    4 +--
->  arch/arm/mach-omap2/sr_device.c           |    2 +-
->  arch/arm/mach-omap2/sram.c                |   16 +++++------
->  arch/arm/mach-omap2/timer.c               |    8 +++---
->  arch/arm/mach-omap2/vc.c                  |    4 +--
->  arch/arm/mach-omap2/wd_timer.c            |    8 +++---
->  arch/arm/plat-omap/counter_32k.c          |    6 ++---
->  arch/arm/plat-omap/debug-leds.c           |   14 +++++-----
->  arch/arm/plat-omap/dmtimer.c              |    8 +++---
->  arch/arm/plat-omap/include/plat/dmtimer.h |   16 +++++------
->  40 files changed, 156 insertions(+), 156 deletions(-)
-> 
-> -- 
-> 1.7.9.5
-> 
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/251704.html
+
+I don't think he actually merged the branch yet. How did you
+encounter such breakage?
+
+Thanks,
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140508/3920d05f/attachment.sig>
