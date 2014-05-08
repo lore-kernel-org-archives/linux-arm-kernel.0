@@ -1,57 +1,48 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Thu, 8 May 2014 09:18:35 +0200
-Subject: Adding esdhc4 eMMC support on mx6sabresd
-In-Reply-To: <CAOMZO5CJEoe_fGLH-Uu9uVwNdWPp940k3WGAkjzkCiGmjAPAXA@mail.gmail.com>
-References: <CAOMZO5CJEoe_fGLH-Uu9uVwNdWPp940k3WGAkjzkCiGmjAPAXA@mail.gmail.com>
-Message-ID: <20140508091835.78daafbe@ipc1.ka-ro>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 08 May 2014 09:29:16 +0200
+Subject: [PATCH 4/7] usb: ehci-platform: add optional reset controller
+ retrieval
+In-Reply-To: <20140507220049.GC7047@lukather>
+References: <1399434623-20383-5-git-send-email-maxime.ripard@free-electrons.com>
+ <Pine.LNX.4.44L0.1405071020490.1325-100000@iolanthe.rowland.org>
+ <20140507220049.GC7047@lukather>
+Message-ID: <536B324C.1040806@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Fabio Estevam wrote:
-> Hi Dong,
+On 05/08/2014 12:00 AM, Maxime Ripard wrote:
+> On Wed, May 07, 2014 at 10:25:55AM -0400, Alan Stern wrote:
+>> On Tue, 6 May 2014, Maxime Ripard wrote:
+>>
+>>> From: Boris BREZILLON <boris.brezillon@free-electrons.com>
+>>>
+>>> On the Allwinner's A31 SoC the reset line connected to the EHCI IP has to
+>>> be deasserted for the EHCI block to be usable.
+>>>
+>>> Add support for an optional reset controller that will be deasserted on
+>>> power off and asserted on power on.
+>>>
+>>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+>>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>>
+>> Is this really a _reset_ line?  That is, when you assert the reset 
+>> line, does it actually reset the EHCI controller, or does it merely 
+>> leave the controller in a partially powered-down state?
 > 
-> I have tested the following patch to add support for the emmc port on
-> mx6qsabresd:
+> It actually resets the whole controller.
 > 
-> --- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> @@ -444,6 +444,21 @@
->                                 MX6QDL_PAD_SD3_DAT7__SD3_DATA7          0x17059
->                         >;
->                 };
-> +
-> +               pinctrl_usdhc4: usdhc4grp {
-> +                       fsl,pins = <
-> +                               MX6QDL_PAD_SD4_CMD__SD4_CMD             0x17059
-> +                               MX6QDL_PAD_SD4_CLK__SD4_CLK             0x10059
-> +                               MX6QDL_PAD_SD4_DAT0__SD4_DATA0          0x17059
-> +                               MX6QDL_PAD_SD4_DAT1__SD4_DATA1          0x17059
-> +                               MX6QDL_PAD_SD4_DAT2__SD4_DATA2          0x17059
-> +                               MX6QDL_PAD_SD4_DAT3__SD4_DATA3          0x17059
-> +                               MX6QDL_PAD_SD4_DAT4__SD4_DATA4          0x17059
-> +                               MX6QDL_PAD_SD4_DAT5__SD4_DATA5          0x17059
-> +                               MX6QDL_PAD_SD4_DAT6__SD4_DATA6          0x17059
-> +                               MX6QDL_PAD_SD4_DAT7__SD4_DATA7          0x17059
-[...]
+>> The difference is important.  During suspend, the controller is
+>> supposed to remember the state of the port connections as well as other
+>> settings.  If it doesn't, the controller and all attached USB devices
+>> will have to be reinitialized every time the controller resumes, which
+>> will increase the latency.
 > 
-> Is there any extra patch I need to apply? I am running linux-next 20140506.
-> 
-I'm using the pad settings 0x070b1 for our i.MX6 module with eMMC.
-At least you should probably drop the HYS setting (0x10000), since
-according to my experience the SD interface works much better with
-hysteresis disabled.
+> So you're saying that we should move this to the probe then?
 
+Yes.
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+Regards,
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Hans
