@@ -1,35 +1,182 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 08 May 2014 15:15:23 -0700
-Subject: omap4-panda-es boot issues with v3.15-rc4
-In-Reply-To: <20140508184055.GC2198@atomide.com> (Tony Lindgren's message of
- "Thu, 8 May 2014 11:40:56 -0700")
-References: <536B7E44.2040303@ti.com> <7hppjos2w2.fsf@paris.lan>
- <CAGa+x84VB3CXDm71JWxHx1-Qk1xVNeXdwUjZnb42_wg+piOzzA@mail.gmail.com>
- <20140508165558.GB2198@atomide.com>
- <20140508184055.GC2198@atomide.com>
-Message-ID: <7hha4zsyro.fsf@paris.lan>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu,  8 May 2014 17:23:39 -0500
+Subject: [PATCH 2/6] of: consolidate linker section OF match table declarations
+In-Reply-To: <1399587823-17701-1-git-send-email-robherring2@gmail.com>
+References: <1399587823-17701-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1399587823-17701-3-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren <tony@atomide.com> writes:
+From: Rob Herring <robh@kernel.org>
 
-[...]
+We now have several OF match tables using linker sections that are
+nearly the same definition. The only variation is the callback function
+prototype. Create a common define for creating linker section OF match
+table entries which each table declaration can use.
 
-> ..but I think I found the cause for recent hangs on panda, just a wild
-> guess based on looking at the recent cpuidle patches after v3.14.
->
-> Looks like reverting 0b89e9aa2856 (cpuidle: delay enabling interrupts
-> until all coupled CPUs leave idle) makes booting work reliably again
-> on panda.
->
-> Can you guys confirm, so far no issues here after few boot tests,
-> but it might be too early to tell.
+Cc: Grant Likely <grant.likely@linaro.org>
+Signed-off-by: Rob Herring <robh@kernel.org>
+---
+ drivers/clocksource/clksrc-of.c |  2 +-
+ drivers/irqchip/irqchip.h       |  7 +++----
+ include/linux/clk-provider.h    |  5 +----
+ include/linux/clocksource.h     | 16 +++-------------
+ include/linux/of.h              | 22 ++++++++++++++++++++++
+ include/linux/of_reserved_mem.h | 18 ++----------------
+ 6 files changed, 32 insertions(+), 38 deletions(-)
 
-Reverting that makes things a bit more stable, but it still eventually
-fails in the same way.  For me it took 8 boots for it to eventually
-fail.
-
-However, if I build with CONFIG_CPU_IDLE=n, it becomes much more stable
-(20+ boots in a row and still going.)
-
-Kevin
+diff --git a/drivers/clocksource/clksrc-of.c b/drivers/clocksource/clksrc-of.c
+index ae2e427..0093a8e 100644
+--- a/drivers/clocksource/clksrc-of.c
++++ b/drivers/clocksource/clksrc-of.c
+@@ -27,7 +27,7 @@ void __init clocksource_of_init(void)
+ {
+ 	struct device_node *np;
+ 	const struct of_device_id *match;
+-	clocksource_of_init_fn init_func;
++	of_init_fn_1 init_func;
+ 	unsigned clocksources = 0;
+ 
+ 	for_each_matching_node_and_match(np, __clksrc_of_table, &match) {
+diff --git a/drivers/irqchip/irqchip.h b/drivers/irqchip/irqchip.h
+index e445ba2..0f6486d 100644
+--- a/drivers/irqchip/irqchip.h
++++ b/drivers/irqchip/irqchip.h
+@@ -11,6 +11,8 @@
+ #ifndef _IRQCHIP_H
+ #define _IRQCHIP_H
+ 
++#include <linux/of.h>
++
+ /*
+  * This macro must be used by the different irqchip drivers to declare
+  * the association between their DT compatible string and their
+@@ -21,9 +23,6 @@
+  * @compstr: compatible string of the irqchip driver
+  * @fn: initialization function
+  */
+-#define IRQCHIP_DECLARE(name,compstr,fn)				\
+-	static const struct of_device_id irqchip_of_match_##name	\
+-	__used __section(__irqchip_of_table)				\
+-	= { .compatible = compstr, .data = fn }
++#define IRQCHIP_DECLARE(name, compat, fn) OF_DECLARE_2(irqchip, name, compat, fn)
+ 
+ #endif
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 59e2eb5..3429929 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -501,10 +501,7 @@ struct clk_onecell_data {
+ 
+ extern struct of_device_id __clk_of_table;
+ 
+-#define CLK_OF_DECLARE(name, compat, fn)			\
+-	static const struct of_device_id __clk_of_table_##name	\
+-		__used __section(__clk_of_table)		\
+-		= { .compatible = compat, .data = fn };
++#define CLK_OF_DECLARE(name, compat, fn) OF_DECLARE_1(clk, name, compat, fn)
+ 
+ #ifdef CONFIG_OF
+ int of_clk_add_provider(struct device_node *np,
+diff --git a/include/linux/clocksource.h b/include/linux/clocksource.h
+index 67301a4..a16b497 100644
+--- a/include/linux/clocksource.h
++++ b/include/linux/clocksource.h
+@@ -339,23 +339,13 @@ extern int clocksource_mmio_init(void __iomem *, const char *,
+ 
+ extern int clocksource_i8253_init(void);
+ 
+-struct device_node;
+-typedef void(*clocksource_of_init_fn)(struct device_node *);
++#define CLOCKSOURCE_OF_DECLARE(name, compat, fn) \
++	OF_DECLARE_1(clksrc, name, compat, fn)
++
+ #ifdef CONFIG_CLKSRC_OF
+ extern void clocksource_of_init(void);
+-
+-#define CLOCKSOURCE_OF_DECLARE(name, compat, fn)			\
+-	static const struct of_device_id __clksrc_of_table_##name	\
+-		__used __section(__clksrc_of_table)			\
+-		 = { .compatible = compat,				\
+-		     .data = (fn == (clocksource_of_init_fn)NULL) ? fn : fn }
+ #else
+ static inline void clocksource_of_init(void) {}
+-#define CLOCKSOURCE_OF_DECLARE(name, compat, fn)			\
+-	static const struct of_device_id __clksrc_of_table_##name	\
+-		__attribute__((unused))					\
+-		 = { .compatible = compat,				\
+-		     .data = (fn == (clocksource_of_init_fn)NULL) ? fn : fn }
+ #endif
+ 
+ #endif /* _LINUX_CLOCKSOURCE_H */
+diff --git a/include/linux/of.h b/include/linux/of.h
+index 3bad8d1..6fb2185 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -757,4 +757,26 @@ static inline int of_get_available_child_count(const struct device_node *np)
+ 	return num;
+ }
+ 
++#ifdef CONFIG_OF
++#define _OF_DECLARE(table, name, compat, fn, fn_type)			\
++	static const struct of_device_id __of_table_##name		\
++		__used __section(__##table##_of_table)			\
++		 = { .compatible = compat,				\
++		     .data = (fn == (fn_type)NULL) ? fn : fn  }
++#else
++#define _OF_DECLARE(name, compat, fn, fn_type)					\
++	static const struct of_device_id __of_table_##name		\
++		__attribute__((unused))					\
++		 = { .compatible = compat,				\
++		     .data = (fn == (fn_type)NULL) ? fn : fn }
++#endif
++
++typedef int (*of_init_fn_2)(struct device_node *, struct device_node *);
++typedef void (*of_init_fn_1)(struct device_node *);
++
++#define OF_DECLARE_1(table, name, compat, fn) \
++		_OF_DECLARE(table, name, compat, fn, of_init_fn_1)
++#define OF_DECLARE_2(table, name, compat, fn) \
++		_OF_DECLARE(table, name, compat, fn, of_init_fn_2)
++
+ #endif /* _LINUX_OF_H */
+diff --git a/include/linux/of_reserved_mem.h b/include/linux/of_reserved_mem.h
+index 4c81b84..4669ddf 100644
+--- a/include/linux/of_reserved_mem.h
++++ b/include/linux/of_reserved_mem.h
+@@ -23,31 +23,17 @@ struct reserved_mem_ops {
+ 
+ typedef int (*reservedmem_of_init_fn)(struct reserved_mem *rmem);
+ 
++#define RESERVEDMEM_OF_DECLARE(name, compat, init)			\
++	_OF_DECLARE(reservedmem, name, compat, init, reservedmem_of_init_fn)
+ 
+ #ifdef CONFIG_OF_RESERVED_MEM
+ void fdt_init_reserved_mem(void);
+ void fdt_reserved_mem_save_node(unsigned long node, const char *uname,
+ 			       phys_addr_t base, phys_addr_t size);
+-
+-#define RESERVEDMEM_OF_DECLARE(name, compat, init)			\
+-	static const struct of_device_id __reservedmem_of_table_##name	\
+-		__used __section(__reservedmem_of_table)		\
+-		 = { .compatible = compat,				\
+-		     .data = (init == (reservedmem_of_init_fn)NULL) ?	\
+-				init : init }
+-
+ #else
+ static inline void fdt_init_reserved_mem(void) { }
+ static inline void fdt_reserved_mem_save_node(unsigned long node,
+ 		const char *uname, phys_addr_t base, phys_addr_t size) { }
+-
+-#define RESERVEDMEM_OF_DECLARE(name, compat, init)			\
+-	static const struct of_device_id __reservedmem_of_table_##name	\
+-		__attribute__((unused))					\
+-		 = { .compatible = compat,				\
+-		     .data = (init == (reservedmem_of_init_fn)NULL) ?	\
+-				init : init }
+-
+ #endif
+ 
+ #endif /* __OF_RESERVED_MEM_H */
+-- 
+1.9.1
