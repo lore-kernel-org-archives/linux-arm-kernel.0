@@ -1,37 +1,75 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Thu, 08 May 2014 23:37:58 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCB2Ml0gQVJNOiBkdHM6IGlteDY6IGFkZCBuZXcgYm9hcmQg?=
- =?UTF-8?B?UklvVGJvYXJk?=
-In-Reply-To: <536BDABB.7090101@gmail.com>
-References: <53695C34.5000604@gmail.com> <1399570376.88508577@f371.i.mail.ru>
- <536BDABB.7090101@gmail.com>
-Message-ID: <1399577878.472924335@f261.i.mail.ru>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 8 May 2014 15:59:40 -0400 (EDT)
+Subject: [PATCH] ARM: Don't ever downscale loops_per_jiffy in SMP systems
+In-Reply-To: <CAD=FV=X4h0nfO7a10NXe+d76xj5ttBJx=q1pAvW4aPzrc22BoQ@mail.gmail.com>
+References: <1399504982-31181-1-git-send-email-dianders@chromium.org>
+ <CAOh2x=kwaoSdj8JO0Vo08Y0dX2UfKFiF3pBV-qtp-YTyN=8H8Q@mail.gmail.com>
+ <CAD=FV=UEGJGHrdcXgs3EZ_wFXT8GnNeCOMt7CgdiiUzBzZ5Y0A@mail.gmail.com>
+ <alpine.LFD.2.11.1405081149190.980@knanqh.ubzr>
+ <CAD=FV=VtcLOh51LCmafzRMdqtDrwKXCqK6gE6V7OOOUe4gjwbA@mail.gmail.com>
+ <alpine.LFD.2.11.1405081329010.980@knanqh.ubzr>
+ <CAD=FV=X4h0nfO7a10NXe+d76xj5ttBJx=q1pAvW4aPzrc22BoQ@mail.gmail.com>
+Message-ID: <alpine.LFD.2.11.1405081540460.980@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thu, 08 May 2014 20:27:55 +0100 ?? Iain Paton <ipaton0@gmail.com>:
-> On 08/05/14 18:32, Alexander Shiyan wrote:
-> > Thu, 08 May 2014 18:12:02 +0100 ?? Iain Paton <ipaton0@gmail.com>:
-> >> +&aips2 {
-> >> +        i2c4: i2c at 021f8000 {
-> >> +                #address-cells = <1>;
-> >> +                #size-cells = <0>;
-> >> +                compatible = "fsl,imx1-i2c";
-> > 
-> > Are you sure about use "fsl,imx1-i2c" instead of  "fsl,imx21-i2c"?
-> > In any case you should add "fsl-imx6dl-i2c" as first compatible string.
-> > The rest looks good.
-> 
-> Sure?  No.  However that's what currently exists in imx6dl.dtsi for i2c4.
-> 
-> looking at the other i2c interfaces in imx6qdl.dtsi, they're using
-> fsl,imx6q-i2c as the first compatible string. So I think I should use
-> either fsl,imx6dl-i2c or fsl,imx6q-i2c. 
-> What's the difference between that and your suggested fsl-imx6dl-i2c?
-> If we assume can assume the i2c4 block is functionally identical to
-> i2c[123] then shouldn't I use an identical compatible string?
+On Thu, 8 May 2014, Doug Anderson wrote:
 
-Yes. This is just my typo. If all I2C-interfaces is identical in the datasheet,
-the same compatible string (fsl,imx6q-i2c) should be used.
+> Nicolas,
+> 
+> On Thu, May 8, 2014 at 10:43 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > On Thu, 8 May 2014, Doug Anderson wrote:
+> 
+> >> Longer delays aren't very good, but IMHO having some delays of 100 =>
+> >> 1000 is better than having delays of 100 => 75.  The former will cause
+> >> mostly performance problems and the later will cause real correctness
+> >> problems.
+> >> I'm not saying that 100 => 1000 is good, it's just less bad.
+> >
+> > There might be some cases where precise timing is needed though.
+> > I thought I came across one such case in the past but I can't remember
+> > which.
+> 
+> If precise timing is needed, shouldn't it be using ktime?
 
----
+I meant "precise" in the sense that you might have to poke at some 
+hardware within some deadline e.g. set bit, wait 13us, clear bit, and 
+not exceed 15us between both bit events.  Arguably this is best hangled 
+with actual FIQs (when they're available).  But I don't have any actual 
+case of this to bring as example.
+
+> >> I will make the argument that this patch makes things less broken
+> >> overall on any systems that actually end up running this code, but if
+> >> you want NAK it then it won't cause me any heartache.  ;)
+> >
+> > What I insist on is for this issue to be solved using a stable counter
+> > such a timer when available.  It _is_ available on one of the target you
+> > mentioned so that is the solution you should add to your tree.
+> 
+> Yup, we're working on it.
+> 
+> 
+> > Investigating a similar solution for your other target should be
+> > preferred to hacking the udelay loop. This way you're guaranteed to
+> > solve this problem fully.
+> 
+> I have no other target in mind.  I'm merely sending this up there just
+> in case there is some cpufreq running ARM board that is SMP and has no
+> timer-based udelay.  Those are the only boards that could possibly be
+> running this code anyway.
+> 
+> I guess I would say that my patch is unhacking the this code.  The
+> code after my patch is simpler.  I would perhaps argue that (ec971ea
+> ARM: add cpufreq transiton notifier to adjust loops_per_jiffy for smp)
+> should never have landed to begin with.
+
+I would agree to qualify your patch as brokenness mitigation and that 
+might be better than nothing.  But this should probably print a warning 
+to that effect.
+
+Yet, wouldn't using ktime to implement udelay() a better solution in 
+that case?  Suffice to make sure a clock source with microsecs 
+resolution is available.
+
+
+Nicolas
