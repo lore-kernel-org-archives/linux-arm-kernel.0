@@ -1,66 +1,52 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 8 May 2014 16:01:44 +0000 (UTC)
-Subject: [PATCH] ARM: OMAP5: DSS hwmod data
-In-Reply-To: <536B1A9C.7050006@ti.com>
-References: <1394619996-3525-1-git-send-email-tomi.valkeinen@ti.com>
- <alpine.DEB.2.02.1405080432570.23579@utopia.booyaka.com>
- <536B1A9C.7050006@ti.com>
-Message-ID: <alpine.DEB.2.02.1405081558570.23579@utopia.booyaka.com>
+Date: Thu, 8 May 2014 16:03:08 +0000 (UTC)
+Subject: [PATCH 1/2] ARM: omap5: hwmod_data: Update McPDM hwmod's flags
+In-Reply-To: <536B5790.1050800@ti.com>
+References: <1398858208-1346-1-git-send-email-peter.ujfalusi@ti.com>
+ <alpine.DEB.2.02.1405080018490.23579@utopia.booyaka.com>
+ <536B5790.1050800@ti.com>
+Message-ID: <alpine.DEB.2.02.1405081602220.23579@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Archit,
-
-On Thu, 8 May 2014, Archit Taneja wrote:
+On Thu, 8 May 2014, Peter Ujfalusi wrote:
 
 > Hi Paul,
 > 
-> On Thursday 08 May 2014 10:07 AM, Paul Walmsley wrote:
-> > Hi,
+> On 05/08/2014 03:20 AM, Paul Walmsley wrote:
+> > Hi P?ter,
 > > 
-> > On Wed, 12 Mar 2014, Tomi Valkeinen wrote:
+> > On Wed, 30 Apr 2014, Peter Ujfalusi wrote:
 > > 
-> > > This patch adds hwmod data for omap5 display subsystem. I have tested this
-> > > on
-> > > omap5-uevm with a DSI panel. I cannot test omap5-uevm's hdmi output yet,
-> > > as the
-> > > mainline is missing omap5 HDMI driver.
-> > > 
-> > > I do see this when booting:
-> > > 
-> > >    omap_hwmod: dss_dispc: cannot be enabled for reset (3)
-> > >    omap_hwmod: dss_dsi1: cannot be enabled for reset (3)
-> > >    omap_hwmod: dss_dsi2: cannot be enabled for reset (3)
-> > >    omap_hwmod: dss_hdmi: cannot be enabled for reset (3)
-> > >    omap_hwmod: dss_rfbi: cannot be enabled for reset (3)
-> > > 
-> > > But at least DSI works just fine.
+> >> Add HWMOD_SWSUP_SIDLE to flags.
+> >>
+> >> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 > > 
-> > Am looking at this for v3.16.  But I think someone needs to take a look at
-> > those warnings and figure out why they are happening.
+> > This patch could use a better changelog.  It would be ideal to understand 
+> > _why_ HWMOD_SWSUP_SIDLE is needed.  Is there a known hardware bug?  Or is 
+> > this simply based on practical observation, e.g., something bad happens if 
+> > the McPDM is not software-idled?
 > 
-> We associate DSS clock domain's MODULEMODE bits only with the dss_core hwmod.
-> The rest of the dss hwmods don't touch MODULEMODE.
+> The same issue exists on OMAP5 as on OMAP4:
 > 
-> Therefore, these hwmods cannot be enabled independently, and reset.
+> commit 12d82e4b0aa6c71f38b668a372f9a13f243207da
+> Author: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> Date:   Fri Jan 18 16:48:16 2013 -0700
 > 
-> We don't face this issue in the omapdss driver since the platform devices
-> corresponding to these hwmods have their parent as the platform device
-> corresponding to 'dss_core'. This parent child-relation ensures that
-> 'dss_core' is enabled when the a child calls a pm_runtime_get function.
+>     ARM: OMAP4: hwmod_data: Correct IDLEMODE for McPDM
 > 
-> The problem is that we have multiple hwmods which use the same MODULEMODE bit.
-> There is no use-counting done when it comes to enabling/disabling modulemode.
-> If there was such a thing, we could have provided MODULEMODE flags even for
-> the children hwmods.
+>     McPDM need to be configured to NO_IDLE mode when it is in used otherwise
+>     vital clocks will be gated which results 'slow motion' audio playback.
+> 
+>     Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+>     [paul at pwsan.com: copy patch description into hwmod data comments]
+>     Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> 
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
 
-Thanks for the summary.  This is indeed a long-overdue item for the hwmod 
-core code.  Can you please patch the hwmod core code to add this?  I'd 
-suggest making the use-counting functionality conditional on a hwmod flag 
-that you can set for all of the DSS hwmods.  (Ideally, the core code would 
-detect that several modules share the same MODULEMODE bits, and 
-automatically set it for those cases, but that seems a bit too complex for 
-a first cut.)
+Thanks, could you please resend the patch with an updated commit message?  
+Then I'll take it.  I assume this is -rc material?
 
 
 - Paul
