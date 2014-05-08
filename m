@@ -1,28 +1,66 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 8 May 2014 09:42:47 -0700
-Subject: [PATCH] watchdog: iop_wdt only builds for mach-iop13xx
-In-Reply-To: <1399560990-1402858-8-git-send-email-arnd@arndb.de>
-References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-8-git-send-email-arnd@arndb.de>
-Message-ID: <20140508164247.GB22224@roeck-us.net>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 8 May 2014 12:54:30 -0400
+Subject: [PATCH v2 0/5] ARM: mvebu: fixes and improvements for 375 support
+In-Reply-To: <1399302326-6917-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1399302326-6917-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140508165430.GI12708@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 08, 2014 at 04:56:19PM +0200, Arnd Bergmann wrote:
-> All three iop variants we support in Linux (iop32x, iop33x and
-> iop13xx) seem to have support for the watchdog hardware, but this
-> driver fails to build for the first two of these because it
-> uses the IOP13XX_WDTCR_IB_RESET macro that is only defined for
-> iop13xx.
+On Mon, May 05, 2014 at 05:05:21PM +0200, Thomas Petazzoni wrote:
+> Hello Jason,
 > 
-> This clarifies the dependency in Kconfig to avoid randconfig
-> build errors. It is unlikely that anyone will ever miss support
-> for this driver on the ancient iop3xx platforms, so we don't
-> need to bother trying to fix it properly.
+> Here are five patches making fixes and improvements to the Armada 375
+> support. They are related to the fact that we now have access to
+> Armada 375 A0 boards (however, Ezequiel still only has access to a Z1
+> platform, so we would like to keep Z1 support for now).
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Wim Van Sebroeck <wim@iguana.be>
-> Cc: linux-watchdog at vger.kernel.org
+>  * Patch 1 is really a fix. It fixes the thermal related quirk that
+>    was added by Ezequiel, to make sure it really works on A0 revision.
+> 
+>  * Patch 2 to 5 make the SMP and coherency workarounds conditional on
+>    the Armada 375 Z1. The condition on SMP is really mandatory to get
+>    SMP working on A0. For coherency, the WA could be used on A0, but
+>    it is useless and hurt performance.
+> 
+> The series is based on your mvebu/soc branch.
+> 
+> Changes since v1:
+> 
+>  * Made the dev and rev variable local to the appropriate if() block
+>    in PATCH 5.
+> 
+>  * Re-added the "Booting CPU" message in PATCH 4, which was
+>    mistakently removed in v1.
+> 
+>  * Extended the git commit message of PATCH 4 to explain why we're
+>    moving things from ->smp_prepare_cpus() to ->smp_boot_secondary().
+> 
+>  * Added Ezequiel's Acked-by on PATCH 1.
+> 
+> Thanks,
+> 
+> Thomas
+> 
+> Thomas Petazzoni (5):
+>   ARM: mvebu: fix thermal quirk SoC revision check
+>   ARM: mvebu: initialize mvebu-soc-id earlier
+>   ARM: mvebu: add Armada 375 A0 revision definition
+>   ARM: mvebu: conditionalize Armada 375 SMP workaround
+>   ARM: mvebu: conditionalize Armada 375 coherency workaround
+> 
+>  arch/arm/mach-mvebu/board-v7.c     |  2 +-
+>  arch/arm/mach-mvebu/coherency.c    | 10 ++++++++--
+>  arch/arm/mach-mvebu/mvebu-soc-id.c |  2 +-
+>  arch/arm/mach-mvebu/mvebu-soc-id.h |  1 +
+>  arch/arm/mach-mvebu/platsmp-a9.c   | 20 +++++++++++---------
+>  5 files changed, 22 insertions(+), 13 deletions(-)
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+Whole series applied to mvebu/soc
+
+I've not Cc'd stable for the first patch since the problem is only in
+mvebu/soc atm. :)
+
+thx,
+
+Jason.
