@@ -1,79 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu,  8 May 2014 15:52:20 +0200
-Subject: [PATCH 7/8] usb: ohci: sort out dependencies for lpc32xx and omap
-In-Reply-To: <1399557141-1346645-1-git-send-email-arnd@arndb.de>
-References: <1399557141-1346645-1-git-send-email-arnd@arndb.de>
-Message-ID: <1399557141-1346645-8-git-send-email-arnd@arndb.de>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Thu, 08 May 2014 17:54:35 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCB2Ml0gQVJNOiBkdHM6IGlteDY6IGFkZCBuZXcgYm9hcmQg?=
+ =?UTF-8?B?UklvVGJvYXJk?=
+In-Reply-To: <CAOMZO5AMf74btETX9zM97B-rCRAVh9-s=N4=xqTMifuucwqURg@mail.gmail.com>
+References: <53695C34.5000604@gmail.com> <536B4ACD.30001@gmail.com>
+ <CAOMZO5AMf74btETX9zM97B-rCRAVh9-s=N4=xqTMifuucwqURg@mail.gmail.com>
+Message-ID: <1399557275.583926987@f142.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dependency on the isp1301 driver is not something that
-should be in the main OHCI driver but rather the SoC specific
-part of it.
+Thu, 8 May 2014 10:45:39 -0300 ?? Fabio Estevam <festevam@gmail.com>:
+> On Thu, May 8, 2014 at 6:13 AM, Iain Paton <ipaton0@gmail.com> wrote:
+> > add element14s RIoTboard http://www.riotboard.org which is an i.MX6Solo
+> > based design targeted at makers.
+> >
+> > Signed-off-by: Iain Paton<ipaton0@gmail.com>
+> 
+> Looks good. One comment only:
+> 
+> 
+> > +&i2c4 {
+> > +       clock-frequency = <100000>;
+> > +       pinctrl-names = "default";
+> > +       pinctrl-0 = <&pinctrl_i2c4>;
+> > +       clocks = <&clks 116>;
+> 
+> You could remove this 'clocks' line.
 
-This moves the dependency for LPC32xx into USB_OHCI_HCD_LPC32XX,
-and changes the 'select ISP1301_OMAP' to a similar 'depends on'.
-Since the same dependency exists for the client driver, do the
-same change there.
+As well as "clock-frequency", since 100 kHz is default value.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: linux-omap at vger.kernel.org
-Cc: Alan Stern <stern@rowland.harvard.edu>
 ---
- drivers/usb/gadget/Kconfig | 4 ++--
- drivers/usb/host/Kconfig   | 4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/usb/gadget/Kconfig b/drivers/usb/gadget/Kconfig
-index 7fca52b..ba18e9c 100644
---- a/drivers/usb/gadget/Kconfig
-+++ b/drivers/usb/gadget/Kconfig
-@@ -157,7 +157,7 @@ config USB_AT91
- 
- config USB_LPC32XX
- 	tristate "LPC32XX USB Peripheral Controller"
--	depends on ARCH_LPC32XX
-+	depends on ARCH_LPC32XX && I2C
- 	select USB_ISP1301
- 	help
- 	   This option selects the USB device controller in the LPC32xx SoC.
-@@ -226,7 +226,7 @@ config USB_GR_UDC
- config USB_OMAP
- 	tristate "OMAP USB Device Controller"
- 	depends on ARCH_OMAP1
--	select ISP1301_OMAP if MACH_OMAP_H2 || MACH_OMAP_H3
-+	depends on ISP1301_OMAP || !(MACH_OMAP_H2 || MACH_OMAP_H3)
- 	help
- 	   Many Texas Instruments OMAP processors have flexible full
- 	   speed USB device controllers, with support for up to 30
-diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index 890fc8c..e229a47 100644
---- a/drivers/usb/host/Kconfig
-+++ b/drivers/usb/host/Kconfig
-@@ -345,8 +345,6 @@ config USB_FOTG210_HCD
- 
- config USB_OHCI_HCD
- 	tristate "OHCI HCD (USB 1.1) support"
--	select ISP1301_OMAP if MACH_OMAP_H2 || MACH_OMAP_H3
--	depends on USB_ISP1301 || !ARCH_LPC32XX
- 	---help---
- 	  The Open Host Controller Interface (OHCI) is a standard for accessing
- 	  USB 1.1 host controller hardware.  It does more in hardware than Intel's
-@@ -365,6 +363,7 @@ if USB_OHCI_HCD
- config USB_OHCI_HCD_OMAP1
- 	tristate "OHCI support for OMAP1/2 chips"
- 	depends on ARCH_OMAP1
-+	depends on ISP1301_OMAP || !(MACH_OMAP_H2 || MACH_OMAP_H3)
- 	default y
- 	---help---
- 	  Enables support for the OHCI controller on OMAP1/2 chips.
-@@ -388,6 +387,7 @@ config USB_OHCI_HCD_S3C2410
- config USB_OHCI_HCD_LPC32XX
- 	tristate "Support for LPC on-chip OHCI USB controller"
- 	depends on USB_OHCI_HCD && ARCH_LPC32XX
-+	depends on USB_ISP1301
- 	default y
- 	---help---
-           Enables support for the on-chip OHCI controller on
--- 
-1.8.3.2
