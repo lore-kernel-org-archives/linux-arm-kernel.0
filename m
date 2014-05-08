@@ -1,279 +1,161 @@
 From: amit.daniel@samsung.com (Amit Daniel Kachhap)
-Date: Thu,  8 May 2014 20:07:56 +0530
-Subject: [RFC PATCH 1/5] thermal: cpu_cooling: Support passing driver private
- data.
+Date: Thu,  8 May 2014 20:07:58 +0530
+Subject: [RFC PATCH 3/5] thermal: cpu_cooling: Add support to find nearby
+ frequency levels.
 In-Reply-To: <1399559880-20562-1-git-send-email-amit.daniel@samsung.com>
 References: <1399559880-20562-1-git-send-email-amit.daniel@samsung.com>
-Message-ID: <1399559880-20562-2-git-send-email-amit.daniel@samsung.com>
+Message-ID: <1399559880-20562-4-git-send-email-amit.daniel@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is in preparation to add notfication support for cpufrequency
-cooling changes. This change also removes the unnecessary exposing of
-internal housekeeping structure via thermal_cooling_device->devdata to the
-users of cpufreq cooling APIs.
+This patch adds suuport to get P state ceil/floor level for nearest frequency.
+This will be used for consolidating ACPI cpufreq cooling via the generic cpu
+cooling framework.
 
 Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
 ---
- drivers/thermal/cpu_cooling.c                      |   79 +++++++++++++++----
- drivers/thermal/db8500_cpufreq_cooling.c           |    2 +-
- drivers/thermal/samsung/exynos_thermal_common.c    |    2 +-
- drivers/thermal/ti-soc-thermal/ti-thermal-common.c |    2 +-
- include/linux/cpu_cooling.h                        |    5 +-
- 5 files changed, 68 insertions(+), 22 deletions(-)
+ drivers/thermal/cpu_cooling.c                   |   42 +++++++++++++++++------
+ drivers/thermal/samsung/exynos_thermal_common.c |    3 +-
+ include/linux/cpu_cooling.h                     |   23 ++++++++++++-
+ 3 files changed, 55 insertions(+), 13 deletions(-)
 
 diff --git a/drivers/thermal/cpu_cooling.c b/drivers/thermal/cpu_cooling.c
-index 4246262..21f44d4 100644
+index e2aeb36..6f5430e 100644
 --- a/drivers/thermal/cpu_cooling.c
 +++ b/drivers/thermal/cpu_cooling.c
-@@ -50,16 +50,18 @@ struct cpufreq_cooling_device {
- 	unsigned int cpufreq_state;
- 	unsigned int cpufreq_val;
- 	struct cpumask allowed_cpus;
-+	struct list_head node;
- };
- static DEFINE_IDR(cpufreq_idr);
- static DEFINE_MUTEX(cooling_cpufreq_lock);
+@@ -120,12 +120,7 @@ static int is_cpufreq_valid(int cpu)
+ 	return !cpufreq_get_policy(&policy, cpu);
+ }
  
--static unsigned int cpufreq_dev_count;
+-enum cpufreq_cooling_property {
+-	GET_LEVEL,
+-	GET_FREQ,
+-	GET_MAXL,
+-};
 -
- /* notify_table passes value to the CPUFREQ_ADJUST callback function. */
- #define NOTIFY_INVALID NULL
- static struct cpufreq_cooling_device *notify_device;
- 
-+/* A list to hold all the cpufreq cooling devices registered */
-+static LIST_HEAD(cpufreq_cooling_list);
-+
++#define GET_FREQ (GET_MAXL + 1)
  /**
-  * get_idr - function to get a unique id.
-  * @idr: struct idr * handle used to create a id.
-@@ -357,12 +359,23 @@ static int cpufreq_thermal_notifier(struct notifier_block *nb,
- static int cpufreq_get_max_state(struct thermal_cooling_device *cdev,
- 				 unsigned long *state)
- {
--	struct cpufreq_cooling_device *cpufreq_device = cdev->devdata;
--	struct cpumask *mask = &cpufreq_device->allowed_cpus;
-+	struct cpufreq_cooling_device *cpufreq_device = NULL;
-+	struct cpumask *mask = NULL;
- 	unsigned int cpu;
- 	unsigned int count = 0;
- 	int ret;
+  * get_property - fetch a property of interest for a give cpu.
+  * @cpu: cpu for which the property is required
+@@ -207,15 +202,37 @@ static int get_property(unsigned int cpu, unsigned long input,
+ 		/* now we have a valid frequency entry */
+ 		freq = table[i].frequency;
  
-+	mutex_lock(&cooling_cpufreq_lock);
-+	list_for_each_entry(cpufreq_device, &cpufreq_cooling_list, node)
-+		if (cpufreq_device->cool_dev == cdev)
-+			break;
-+	mutex_unlock(&cooling_cpufreq_lock);
-+	if (!cpufreq_device) {
-+		/* Cooling device pointer not found */
-+		return -EINVAL;
-+	}
-+
-+	mask = &cpufreq_device->allowed_cpus;
- 	cpu = cpumask_any(mask);
- 
- 	ret = get_property(cpu, 0, &count, GET_MAXL);
-@@ -386,7 +399,17 @@ static int cpufreq_get_max_state(struct thermal_cooling_device *cdev,
- static int cpufreq_get_cur_state(struct thermal_cooling_device *cdev,
- 				 unsigned long *state)
- {
--	struct cpufreq_cooling_device *cpufreq_device = cdev->devdata;
-+	struct cpufreq_cooling_device *cpufreq_device = NULL;
-+
-+	mutex_lock(&cooling_cpufreq_lock);
-+	list_for_each_entry(cpufreq_device, &cpufreq_cooling_list, node)
-+		if (cpufreq_device->cool_dev == cdev)
-+			break;
-+	mutex_unlock(&cooling_cpufreq_lock);
-+	if (!cpufreq_device) {
-+		/* Cooling device pointer not found */
-+		return -EINVAL;
-+	}
- 
- 	*state = cpufreq_device->cpufreq_state;
- 
-@@ -406,7 +429,17 @@ static int cpufreq_get_cur_state(struct thermal_cooling_device *cdev,
- static int cpufreq_set_cur_state(struct thermal_cooling_device *cdev,
- 				 unsigned long state)
- {
--	struct cpufreq_cooling_device *cpufreq_device = cdev->devdata;
-+	struct cpufreq_cooling_device *cpufreq_device = NULL;
-+
-+	mutex_lock(&cooling_cpufreq_lock);
-+	list_for_each_entry(cpufreq_device, &cpufreq_cooling_list, node)
-+		if (cpufreq_device->cool_dev == cdev)
-+			break;
-+	mutex_unlock(&cooling_cpufreq_lock);
-+	if (!cpufreq_device) {
-+		/* Cooling device pointer not found */
-+		return -EINVAL;
-+	}
- 
- 	return cpufreq_apply_cooling(cpufreq_device, state);
- }
-@@ -427,6 +460,7 @@ static struct notifier_block thermal_cpufreq_notifier_block = {
-  * __cpufreq_cooling_register - helper function to create cpufreq cooling device
-  * @np: a valid struct device_node to the cooling device device tree node
-  * @clip_cpus: cpumask of cpus where the frequency constraints will happen.
-+ * @devdata: driver data pointer
+-		if (property == GET_LEVEL && (unsigned int)input == freq) {
++		if (property == GET_LEVEL_EXACT &&
++					(unsigned int)input == freq) {
+ 			/* get level by frequency */
+ 			*output = descend ? j : (max_level - j);
+ 			return 0;
+-		}
+-		if (property == GET_FREQ && level == j) {
++		} else if (property == GET_FREQ && level == j) {
+ 			/* get frequency by level */
+ 			*output = freq;
+ 			return 0;
++		} else if (property == GET_LEVEL_FLOOR) {
++			/* get minimum possible level by frequency */
++			if (descend && freq <= input) {
++				*output = j;
++				return 0;
++			} else if (!descend) {
++				if (freq <= input)
++					*output = (max_level - j);
++				else
++					return 0;
++			}
++		} else if (property == GET_LEVEL_CEIL) {
++			/* get maximum possible level by frequency */
++			if (!descend && freq >= input) {
++				*output = (max_level - j);
++				return 0;
++			} else if (descend) {
++				if (freq >= input)
++					*output = j;
++				else
++					return 0;
++			}
+ 		}
+ 		j++;
+ 	}
+@@ -227,6 +244,8 @@ static int get_property(unsigned int cpu, unsigned long input,
+  * cpufreq_cooling_get_level - for a give cpu, return the cooling level.
+  * @cpu: cpu for which the level is required
+  * @freq: the frequency of interest
++ * @property: can be GET_LEVEL_CEIL, GET_LEVEL_FLOOR, GET_LEVEL_EXACT or
++ * GET_MAXL
   *
-  * This interface function registers the cpufreq cooling device with the name
-  * "thermal-cpufreq-%x". This api can support multiple instances of cpufreq
-@@ -438,7 +472,7 @@ static struct notifier_block thermal_cpufreq_notifier_block = {
+  * This function will match the cooling level corresponding to the
+  * requested @freq and return it.
+@@ -234,11 +253,12 @@ static int get_property(unsigned int cpu, unsigned long input,
+  * Return: The matched cooling level on success or THERMAL_CSTATE_INVALID
+  * otherwise.
   */
- static struct thermal_cooling_device *
- __cpufreq_cooling_register(struct device_node *np,
--			   const struct cpumask *clip_cpus)
-+			   const struct cpumask *clip_cpus, void *devdata)
+-unsigned long cpufreq_cooling_get_level(unsigned int cpu, unsigned int freq)
++unsigned long cpufreq_cooling_get_level(unsigned int cpu, unsigned int freq,
++			enum cpufreq_cooling_property property)
  {
- 	struct thermal_cooling_device *cool_dev;
- 	struct cpufreq_cooling_device *cpufreq_dev = NULL;
-@@ -477,7 +511,7 @@ __cpufreq_cooling_register(struct device_node *np,
- 	snprintf(dev_name, sizeof(dev_name), "thermal-cpufreq-%d",
- 		 cpufreq_dev->id);
+ 	unsigned int val;
  
--	cool_dev = thermal_of_cooling_device_register(np, dev_name, cpufreq_dev,
-+	cool_dev = thermal_of_cooling_device_register(np, dev_name, devdata,
- 						      &cpufreq_cooling_ops);
- 	if (IS_ERR(cool_dev)) {
- 		release_idr(&cpufreq_idr, cpufreq_dev->id);
-@@ -489,10 +523,11 @@ __cpufreq_cooling_register(struct device_node *np,
- 	mutex_lock(&cooling_cpufreq_lock);
+-	if (get_property(cpu, (unsigned long)freq, &val, GET_LEVEL))
++	if (get_property(cpu, (unsigned long)freq, &val, property))
+ 		return THERMAL_CSTATE_INVALID;
  
- 	/* Register the notifier for first cpufreq cooling device */
--	if (cpufreq_dev_count == 0)
-+	if (list_empty(&cpufreq_cooling_list))
- 		cpufreq_register_notifier(&thermal_cpufreq_notifier_block,
- 					  CPUFREQ_POLICY_NOTIFIER);
--	cpufreq_dev_count++;
-+
-+	list_add(&cpufreq_dev->node, &cpufreq_cooling_list);
- 
- 	mutex_unlock(&cooling_cpufreq_lock);
- 
-@@ -502,6 +537,7 @@ __cpufreq_cooling_register(struct device_node *np,
- /**
-  * cpufreq_cooling_register - function to create cpufreq cooling device.
-  * @clip_cpus: cpumask of cpus where the frequency constraints will happen.
-+ * @devdata: driver data pointer
-  *
-  * This interface function registers the cpufreq cooling device with the name
-  * "thermal-cpufreq-%x". This api can support multiple instances of cpufreq
-@@ -511,9 +547,9 @@ __cpufreq_cooling_register(struct device_node *np,
-  * on failure, it returns a corresponding ERR_PTR().
-  */
- struct thermal_cooling_device *
--cpufreq_cooling_register(const struct cpumask *clip_cpus)
-+cpufreq_cooling_register(const struct cpumask *clip_cpus, void *devdata)
- {
--	return __cpufreq_cooling_register(NULL, clip_cpus);
-+	return __cpufreq_cooling_register(NULL, clip_cpus, devdata);
- }
- EXPORT_SYMBOL_GPL(cpufreq_cooling_register);
- 
-@@ -537,7 +573,7 @@ of_cpufreq_cooling_register(struct device_node *np,
- 	if (!np)
- 		return ERR_PTR(-EINVAL);
- 
--	return __cpufreq_cooling_register(np, clip_cpus);
-+	return __cpufreq_cooling_register(np, clip_cpus, NULL);
- }
- EXPORT_SYMBOL_GPL(of_cpufreq_cooling_register);
- 
-@@ -554,17 +590,26 @@ void cpufreq_cooling_unregister(struct thermal_cooling_device *cdev)
- 	if (!cdev)
- 		return;
- 
--	cpufreq_dev = cdev->devdata;
- 	mutex_lock(&cooling_cpufreq_lock);
--	cpufreq_dev_count--;
-+
-+	list_for_each_entry(cpufreq_dev, &cpufreq_cooling_list, node)
-+		if (cpufreq_dev->cool_dev == cdev)
-+			break;
-+
-+	if (!cpufreq_dev) {
-+		/* Cooling device pointer not found */
-+		mutex_unlock(&cooling_cpufreq_lock);
-+		return;
-+	}
-+	thermal_cooling_device_unregister(cpufreq_dev->cool_dev);
-+	list_del(&cpufreq_dev->node);
- 
- 	/* Unregister the notifier for the last cpufreq cooling device */
--	if (cpufreq_dev_count == 0)
-+	if (list_empty(&cpufreq_cooling_list))
- 		cpufreq_unregister_notifier(&thermal_cpufreq_notifier_block,
- 					    CPUFREQ_POLICY_NOTIFIER);
- 	mutex_unlock(&cooling_cpufreq_lock);
- 
--	thermal_cooling_device_unregister(cpufreq_dev->cool_dev);
- 	release_idr(&cpufreq_idr, cpufreq_dev->id);
- 	kfree(cpufreq_dev);
- }
-diff --git a/drivers/thermal/db8500_cpufreq_cooling.c b/drivers/thermal/db8500_cpufreq_cooling.c
-index 786d192..abb9bdd 100644
---- a/drivers/thermal/db8500_cpufreq_cooling.c
-+++ b/drivers/thermal/db8500_cpufreq_cooling.c
-@@ -35,7 +35,7 @@ static int db8500_cpufreq_cooling_probe(struct platform_device *pdev)
- 		return -EPROBE_DEFER;
- 
- 	cpumask_set_cpu(0, &mask_val);
--	cdev = cpufreq_cooling_register(&mask_val);
-+	cdev = cpufreq_cooling_register(&mask_val, NULL);
- 
- 	if (IS_ERR(cdev)) {
- 		dev_err(&pdev->dev, "Failed to register cooling device\n");
+ 	return (unsigned long)val;
 diff --git a/drivers/thermal/samsung/exynos_thermal_common.c b/drivers/thermal/samsung/exynos_thermal_common.c
-index 3f5ad25..a7306fa 100644
+index a7306fa..aa4696b 100644
 --- a/drivers/thermal/samsung/exynos_thermal_common.c
 +++ b/drivers/thermal/samsung/exynos_thermal_common.c
-@@ -369,7 +369,7 @@ int exynos_register_thermal(struct thermal_sensor_conf *sensor_conf)
- 	if (sensor_conf->cooling_data.freq_clip_count > 0) {
- 		cpumask_set_cpu(0, &mask_val);
- 		th_zone->cool_dev[th_zone->cool_dev_size] =
--					cpufreq_cooling_register(&mask_val);
-+				cpufreq_cooling_register(&mask_val, NULL);
- 		if (IS_ERR(th_zone->cool_dev[th_zone->cool_dev_size])) {
- 			dev_err(sensor_conf->dev,
- 				"Failed to register cpufreq cooling device\n");
-diff --git a/drivers/thermal/ti-soc-thermal/ti-thermal-common.c b/drivers/thermal/ti-soc-thermal/ti-thermal-common.c
-index 9eec26d..7809db6 100644
---- a/drivers/thermal/ti-soc-thermal/ti-thermal-common.c
-+++ b/drivers/thermal/ti-soc-thermal/ti-thermal-common.c
-@@ -409,7 +409,7 @@ int ti_thermal_register_cpu_cooling(struct ti_bandgap *bgp, int id)
- 	}
- 
- 	/* Register cooling device */
--	data->cool_dev = cpufreq_cooling_register(cpu_present_mask);
-+	data->cool_dev = cpufreq_cooling_register(cpu_present_mask, NULL);
- 	if (IS_ERR(data->cool_dev)) {
- 		dev_err(bgp->dev,
- 			"Failed to register cpufreq cooling device\n");
+@@ -156,7 +156,8 @@ static int exynos_bind(struct thermal_zone_device *thermal,
+ 	/* Bind the thermal zone to the cpufreq cooling device */
+ 	for (i = 0; i < tab_size; i++) {
+ 		clip_data = (struct freq_clip_table *)&(tab_ptr[i]);
+-		level = cpufreq_cooling_get_level(0, clip_data->freq_clip_max);
++		level = cpufreq_cooling_get_level(0, clip_data->freq_clip_max,
++						GET_LEVEL_EXACT);
+ 		if (level == THERMAL_CSTATE_INVALID)
+ 			return 0;
+ 		switch (GET_ZONE(i)) {
 diff --git a/include/linux/cpu_cooling.h b/include/linux/cpu_cooling.h
-index c303d38..aaef7d8 100644
+index f786935..f4d2b0e 100644
 --- a/include/linux/cpu_cooling.h
 +++ b/include/linux/cpu_cooling.h
-@@ -32,9 +32,10 @@
+@@ -44,6 +44,13 @@ struct cpufreq_cooling_status {
+ 	void *devdata;
+ };
+ 
++enum cpufreq_cooling_property {
++	GET_LEVEL_CEIL,
++	GET_LEVEL_FLOOR,
++	GET_LEVEL_EXACT,
++	GET_MAXL,
++};
++
+ #ifdef CONFIG_CPU_THERMAL
  /**
   * cpufreq_cooling_register - function to create cpufreq cooling device.
-  * @clip_cpus: cpumask of cpus where the frequency constraints will happen
-+ * @devdata: driver data pointer
+@@ -77,7 +84,21 @@ of_cpufreq_cooling_register(struct device_node *np,
   */
- struct thermal_cooling_device *
--cpufreq_cooling_register(const struct cpumask *clip_cpus);
-+cpufreq_cooling_register(const struct cpumask *clip_cpus, void *devdata);
+ void cpufreq_cooling_unregister(struct thermal_cooling_device *cdev);
+ 
+-unsigned long cpufreq_cooling_get_level(unsigned int cpu, unsigned int freq);
++/**
++ * cpufreq_cooling_get_level - for a give cpu, return the cooling level.
++ * @cpu: cpu for which the level is required
++ * @freq: the frequency of interest
++ * @property: can be GET_LEVEL_CEIL, GET_LEVEL_FLOOR, GET_LEVEL_EXACT or
++ * GET_MAXL
++ *
++ * This function will match the cooling level corresponding to the
++ * requested @freq and return it.
++ *
++ * Return: The matched cooling level on success or THERMAL_CSTATE_INVALID
++ * otherwise.
++ */
++unsigned long cpufreq_cooling_get_level(unsigned int cpu, unsigned int freq,
++					enum cpufreq_cooling_property);
  
  /**
-  * of_cpufreq_cooling_register - create cpufreq cooling device based on DT.
-@@ -63,7 +64,7 @@ void cpufreq_cooling_unregister(struct thermal_cooling_device *cdev);
- unsigned long cpufreq_cooling_get_level(unsigned int cpu, unsigned int freq);
- #else /* !CONFIG_CPU_THERMAL */
- static inline struct thermal_cooling_device *
--cpufreq_cooling_register(const struct cpumask *clip_cpus)
-+cpufreq_cooling_register(const struct cpumask *clip_cpus, void *devdata)
- {
- 	return NULL;
- }
+  * cpufreq_cooling_register_notifier - register a driver with cpufreq cooling.
 -- 
 1.7.1
