@@ -1,79 +1,178 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 08 May 2014 14:49:14 +0200
-Subject: [PATCH v4 2/3] drivercore: Bind/unbind power domain on probe/remove
+Date: Thu, 08 May 2014 14:49:15 +0200
+Subject: [PATCH v4 3/3] ARM: exynos: Move to generic power domain bindings
 In-Reply-To: <1399553355-6615-1-git-send-email-t.figa@samsung.com>
 References: <1399553355-6615-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1399553355-6615-3-git-send-email-t.figa@samsung.com>
+Message-ID: <1399553355-6615-4-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On a number of platforms, devices are part of controllable power
-domains, which need to be enabled before such devices can be accessed
-and may be powered down when the device is idle to save some power.
-This means that on systems that support power domain control using
-generic power domains subsystem, it is necessary to add device to its
-power domain before binding a driver to it and remove it from its power
-domain after its driver is unbound to make sure that an unused device
-does not affect power domain state.
-
-Since this is not limited to particular busses and specific
-archs/platforms, it is more convenient to do the above directly in
-driver core, just as done with pinctrl default configuration. This patch
-adds necessary code to really_probe() and __device_release_driver() to
-achieve this and maintain consistent stack-like ordering of operations
-happening when binding and unbinding a driver.
+This patch moves Exynos power domain code to use the new generic power
+domain look-up framework introduced by previous patch, allowing the new
+code to be compiled with CONFIG_ARCH_EXYNOS selected as well.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
-Reviewed-by: Philipp Zabel <philipp.zabel@gmail.com>
-[on i.MX6 GK802]
-Tested-by: Philipp Zabel <philipp.zabel@gmail.com>
-Reviewed-by: Mark Brown <broonie@linaro.org>
 Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/base/dd.c | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ .../bindings/arm/exynos/power_domain.txt           | 12 ++--
+ arch/arm/mach-exynos/pm_domains.c                  | 81 +---------------------
+ kernel/power/Kconfig                               |  2 +-
+ 3 files changed, 7 insertions(+), 88 deletions(-)
 
-diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-index 62ec61e..9489b3a 100644
---- a/drivers/base/dd.c
-+++ b/drivers/base/dd.c
-@@ -23,6 +23,7 @@
- #include <linux/kthread.h>
- #include <linux/wait.h>
- #include <linux/async.h>
-+#include <linux/pm_domain.h>
- #include <linux/pm_runtime.h>
- #include <linux/pinctrl/devinfo.h>
+diff --git a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+index 5216b41..60f26a8 100644
+--- a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
++++ b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+@@ -8,6 +8,8 @@ Required Properties:
+     * samsung,exynos4210-pd - for exynos4210 type power domain.
+ - reg: physical base address of the controller and length of memory mapped
+     region.
++- #power-domain-cells: number of cells in power domain specifier;
++    must be 0.
  
-@@ -287,6 +288,11 @@ static int really_probe(struct device *dev, struct device_driver *drv)
+ Node of a device using power domains must have a samsung,power-domain property
+ defined with a phandle to respective power domain.
+@@ -17,12 +19,8 @@ Example:
+ 	lcd0: power-domain-lcd0 {
+ 		compatible = "samsung,exynos4210-pd";
+ 		reg = <0x10023C00 0x10>;
++		#power-domain-cells = <0>;
+ 	};
  
- 	dev->driver = drv;
- 
-+	/* If using genpd, bind power domain now before probing */
-+	ret = genpd_bind_domain(dev);
-+	if (ret)
-+		goto probe_failed;
-+
- 	/* If using pinctrl, bind pins now before probing */
- 	ret = pinctrl_bind_pins(dev);
- 	if (ret)
-@@ -317,6 +323,7 @@ static int really_probe(struct device *dev, struct device_driver *drv)
- probe_failed:
- 	devres_release_all(dev);
- 	driver_sysfs_remove(dev);
-+	genpd_unbind_domain(dev);
- 	dev->driver = NULL;
- 	dev_set_drvdata(dev, NULL);
- 
-@@ -530,7 +537,7 @@ static void __device_release_driver(struct device *dev)
- 			blocking_notifier_call_chain(&dev->bus->p->bus_notifier,
- 						     BUS_NOTIFY_UNBOUND_DRIVER,
- 						     dev);
+-Example of the node using power domain:
 -
-+		genpd_unbind_domain(dev);
- 	}
+-	node {
+-		/* ... */
+-		samsung,power-domain = <&lcd0>;
+-		/* ... */
+-	};
++See Documentation/devicetree/bindings/power/power_domain.txt for description
++of consumer-side bindings.
+diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
+index fe6570e..9cad3c6 100644
+--- a/arch/arm/mach-exynos/pm_domains.c
++++ b/arch/arm/mach-exynos/pm_domains.c
+@@ -73,89 +73,14 @@ static int exynos_pd_power_off(struct generic_pm_domain *domain)
+ 	return exynos_pd_power(domain, false);
  }
  
+-static void exynos_add_device_to_domain(struct exynos_pm_domain *pd,
+-					 struct device *dev)
+-{
+-	int ret;
+-
+-	dev_dbg(dev, "adding to power domain %s\n", pd->pd.name);
+-
+-	while (1) {
+-		ret = pm_genpd_add_device(&pd->pd, dev);
+-		if (ret != -EAGAIN)
+-			break;
+-		cond_resched();
+-	}
+-
+-	pm_genpd_dev_need_restore(dev, true);
+-}
+-
+-static void exynos_remove_device_from_domain(struct device *dev)
+-{
+-	struct generic_pm_domain *genpd = dev_to_genpd(dev);
+-	int ret;
+-
+-	dev_dbg(dev, "removing from power domain %s\n", genpd->name);
+-
+-	while (1) {
+-		ret = pm_genpd_remove_device(genpd, dev);
+-		if (ret != -EAGAIN)
+-			break;
+-		cond_resched();
+-	}
+-}
+-
+-static void exynos_read_domain_from_dt(struct device *dev)
+-{
+-	struct platform_device *pd_pdev;
+-	struct exynos_pm_domain *pd;
+-	struct device_node *node;
+-
+-	node = of_parse_phandle(dev->of_node, "samsung,power-domain", 0);
+-	if (!node)
+-		return;
+-	pd_pdev = of_find_device_by_node(node);
+-	if (!pd_pdev)
+-		return;
+-	pd = platform_get_drvdata(pd_pdev);
+-	exynos_add_device_to_domain(pd, dev);
+-}
+-
+-static int exynos_pm_notifier_call(struct notifier_block *nb,
+-				    unsigned long event, void *data)
+-{
+-	struct device *dev = data;
+-
+-	switch (event) {
+-	case BUS_NOTIFY_BIND_DRIVER:
+-		if (dev->of_node)
+-			exynos_read_domain_from_dt(dev);
+-
+-		break;
+-
+-	case BUS_NOTIFY_UNBOUND_DRIVER:
+-		exynos_remove_device_from_domain(dev);
+-
+-		break;
+-	}
+-	return NOTIFY_DONE;
+-}
+-
+-static struct notifier_block platform_nb = {
+-	.notifier_call = exynos_pm_notifier_call,
+-};
+-
+ static __init int exynos4_pm_init_power_domain(void)
+ {
+-	struct platform_device *pdev;
+ 	struct device_node *np;
+ 
+ 	for_each_compatible_node(np, NULL, "samsung,exynos4210-pd") {
+ 		struct exynos_pm_domain *pd;
+ 		int on;
+ 
+-		pdev = of_find_device_by_node(np);
+-
+ 		pd = kzalloc(sizeof(*pd), GFP_KERNEL);
+ 		if (!pd) {
+ 			pr_err("%s: failed to allocate memory for domain\n",
+@@ -168,17 +93,13 @@ static __init int exynos4_pm_init_power_domain(void)
+ 		pd->base = of_iomap(np, 0);
+ 		pd->pd.power_off = exynos_pd_power_off;
+ 		pd->pd.power_on = exynos_pd_power_on;
+-		pd->pd.of_node = np;
+-
+-		platform_set_drvdata(pdev, pd);
+ 
+ 		on = __raw_readl(pd->base + 0x4) & S5P_INT_LOCAL_PWR_EN;
+ 
+ 		pm_genpd_init(&pd->pd, NULL, !on);
++		of_genpd_add_provider(np, of_genpd_xlate_simple, &pd->pd);
+ 	}
+ 
+-	bus_register_notifier(&platform_bus_type, &platform_nb);
+-
+ 	return 0;
+ }
+ arch_initcall(exynos4_pm_init_power_domain);
+diff --git a/kernel/power/Kconfig b/kernel/power/Kconfig
+index 45aa98e..b17588c 100644
+--- a/kernel/power/Kconfig
++++ b/kernel/power/Kconfig
+@@ -308,7 +308,7 @@ config PM_GENERIC_DOMAINS_RUNTIME
+ 
+ config PM_GENERIC_DOMAINS_OF
+ 	def_bool y
+-	depends on PM_GENERIC_DOMAINS && OF && !ARCH_EXYNOS
++	depends on PM_GENERIC_DOMAINS && OF
+ 
+ config CPU_PM
+ 	bool
 -- 
 1.9.2
