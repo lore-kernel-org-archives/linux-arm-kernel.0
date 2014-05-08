@@ -1,99 +1,58 @@
 From: shaik.ameer@samsung.com (Shaik Ameer Basha)
-Date: Thu, 08 May 2014 16:58:02 +0530
-Subject: [PATCH v5 13/15] clk: exynos5420: update clocks for MAU Block
+Date: Thu, 08 May 2014 16:58:04 +0530
+Subject: [PATCH v5 15/15] clk: exynos5420: add more registers to restore list
 In-Reply-To: <1399548484-20626-1-git-send-email-shaik.ameer@samsung.com>
 References: <1399548484-20626-1-git-send-email-shaik.ameer@samsung.com>
-Message-ID: <1399548484-20626-14-git-send-email-shaik.ameer@samsung.com>
+Message-ID: <1399548484-20626-16-git-send-email-shaik.ameer@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the missing MAU block specific clocks.
+This patch adds more register offsets to the list for
+preserving their values during S2R.
 
 Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
 Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
 ---
- drivers/clk/samsung/clk-exynos5420.c   |   12 +++++++++++-
- include/dt-bindings/clock/exynos5420.h |    2 ++
- 2 files changed, 13 insertions(+), 1 deletion(-)
+ drivers/clk/samsung/clk-exynos5420.c |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
 diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
-index c7928ae..c046e7a 100644
+index dd9e98d..4014e86 100644
 --- a/drivers/clk/samsung/clk-exynos5420.c
 +++ b/drivers/clk/samsung/clk-exynos5420.c
-@@ -62,7 +62,9 @@
- #define SRC_TOP11		0x10284
- #define SRC_TOP12		0x10288
- #define SRC_MASK_TOP2		0x10308
-+#define SRC_MASK_TOP7		0x1031c
- #define SRC_MASK_DISP10		0x1032c
-+#define SRC_MASK_MAU		0x10334
- #define SRC_MASK_FSYS		0x10340
- #define SRC_MASK_PERIC0		0x10350
- #define SRC_MASK_PERIC1		0x10354
-@@ -155,6 +157,7 @@ static unsigned long exynos5420_clk_regs[] __initdata = {
- 	SRC_TOP11,
- 	SRC_TOP12,
- 	SRC_MASK_TOP2,
-+	SRC_MASK_TOP7,
- 	SRC_MASK_DISP10,
- 	SRC_MASK_FSYS,
- 	SRC_MASK_PERIC0,
-@@ -351,6 +354,8 @@ PNAME(mout_hdmi_p) = {"dout_hdmi_pixel", "sclk_hdmiphy"};
- PNAME(mout_maudio0_p) = {"fin_pll", "maudio_clk", "mout_sclk_dpll",
- 			 "mout_sclk_mpll", "mout_sclk_spll", "mout_sclk_ipll",
- 			 "mout_sclk_epll", "mout_sclk_rpll"};
-+PNAME(mout_mau_epll_clk_p) = {"mout_sclk_epll", "mout_sclk_dpll",
-+				"mout_sclk_mpll", "mout_sclk_spll"};
- 
- /* fixed rate clocks generated outside the soc */
- static struct samsung_fixed_rate_clock exynos5420_fixed_rate_ext_clks[] __initdata = {
-@@ -373,6 +378,8 @@ static struct samsung_fixed_factor_clock exynos5420_fixed_factor_clks[] __initda
- static struct samsung_mux_clock exynos5420_mux_clks[] __initdata = {
- 	MUX(0, "mout_mspll_kfc", mout_mspll_cpu_p, SRC_TOP7, 8, 2),
- 	MUX(0, "mout_mspll_cpu", mout_mspll_cpu_p, SRC_TOP7, 12, 2),
-+	MUX(0, "mout_mau_epll_clk", mout_mau_epll_clk_p, SRC_TOP7, 20, 2),
-+
- 	MUX(0, "mout_apll", mout_apll_p, SRC_CPU, 0, 1),
- 	MUX(0, "mout_cpu", mout_cpu_p, SRC_CPU, 16, 1),
- 	MUX(0, "mout_kpll", mout_kpll_p, SRC_KFC, 0, 1),
-@@ -518,7 +525,7 @@ static struct samsung_mux_clock exynos5420_mux_clks[] __initdata = {
- 	MUX(0, "mout_fimd1_final", mout_fimd1_final_p, TOP_SPARE2, 8, 1),
- 
- 	/* MAU Block */
--	MUX(0, "mout_maudio0", mout_maudio0_p, SRC_MAU, 28, 3),
-+	MUX(CLK_MOUT_MAUDIO0, "mout_maudio0", mout_maudio0_p, SRC_MAU, 28, 3),
- 
- 	/* FSYS Block */
- 	MUX(0, "mout_usbd301", mout_group2_p, SRC_FSYS, 4, 3),
-@@ -711,6 +718,9 @@ static struct samsung_gate_clock exynos5420_gate_clks[] __initdata = {
- 	GATE(0, "aclk300_disp1", "mout_user_aclk300_disp1",
- 			SRC_MASK_TOP2, 24, 0, 0),
- 
-+	GATE(CLK_MAU_EPLL, "mau_epll", "mout_mau_epll_clk",
-+			SRC_MASK_TOP7, 20, 0, 0),
-+
- 	/* sclk */
- 	GATE(CLK_SCLK_UART0, "sclk_uart0", "dout_uart0",
- 		GATE_TOP_SCLK_PERIC, 0, CLK_SET_RATE_PARENT, 0),
-diff --git a/include/dt-bindings/clock/exynos5420.h b/include/dt-bindings/clock/exynos5420.h
-index 16262da..128fb97 100644
---- a/include/dt-bindings/clock/exynos5420.h
-+++ b/include/dt-bindings/clock/exynos5420.h
-@@ -58,6 +58,7 @@
- #define CLK_SCLK_GSCL_WA	156
- #define CLK_SCLK_GSCL_WB	157
- #define CLK_SCLK_HDMIPHY	158
-+#define CLK_MAU_EPLL		159
- 
- /* gate clocks */
- #define CLK_ACLK66_PERIC	256
-@@ -195,6 +196,7 @@
- #define CLK_MOUT_HDMI		640
- #define CLK_MOUT_G3D		641
- #define CLK_MOUT_VPLL		642
-+#define CLK_MOUT_MAUDIO0	643
- 
- /* divider clocks */
- #define CLK_DOUT_PIXEL		768
+@@ -27,6 +27,7 @@
+ #define DIV_CPU1		0x504
+ #define GATE_BUS_CPU		0x700
+ #define GATE_SCLK_CPU		0x800
++#define CLKOUT_CMU_CPU		0xa00
+ #define GATE_IP_G2D		0x8800
+ #define CPLL_LOCK		0x10020
+ #define DPLL_LOCK		0x10030
+@@ -39,7 +40,11 @@
+ #define CPLL_CON0		0x10120
+ #define DPLL_CON0		0x10128
+ #define EPLL_CON0		0x10130
++#define EPLL_CON1		0x10134
++#define EPLL_CON2		0x10138
+ #define RPLL_CON0		0x10140
++#define RPLL_CON1		0x10144
++#define RPLL_CON2		0x10148
+ #define IPLL_CON0		0x10150
+ #define SPLL_CON0		0x10160
+ #define VPLL_CON0		0x10170
+@@ -140,6 +145,13 @@ static unsigned long exynos5420_clk_regs[] __initdata = {
+ 	DIV_CPU1,
+ 	GATE_BUS_CPU,
+ 	GATE_SCLK_CPU,
++	CLKOUT_CMU_CPU,
++	EPLL_CON0,
++	EPLL_CON1,
++	EPLL_CON2,
++	RPLL_CON0,
++	RPLL_CON1,
++	RPLL_CON2,
+ 	SRC_TOP0,
+ 	SRC_TOP1,
+ 	SRC_TOP2,
 -- 
 1.7.9.5
