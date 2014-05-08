@@ -1,44 +1,74 @@
-From: yoshihiro.shimoda.uh@renesas.com (Shimoda, Yoshihiro)
-Date: Thu, 8 May 2014 11:44:48 +0900
-Subject: [PATCHv4 08/20] usb: host: xhci-plat: add support for the Armada
- 375/38x XHCI controllers
-In-Reply-To: <1399470746-2948-9-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1399470746-2948-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1399470746-2948-9-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <536AEFA0.3070806@renesas.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 7 May 2014 21:45:20 -0500
+Subject: [PATCH 5/7] clk: sunxi: add PRCM (Power/Reset/Clock Management)
+ clks support
+In-Reply-To: <536A697E.5000107@free-electrons.com>
+References: <1398697130-8338-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1398697130-8338-6-git-send-email-boris.brezillon@free-electrons.com>
+ <20140428234039.GT3134@lukather>
+ <536A697E.5000107@free-electrons.com>
+Message-ID: <20140508024520.GH7047@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, May 07, 2014 at 07:12:30PM +0200, Boris BREZILLON wrote:
+> 
+> On 29/04/2014 01:40, Maxime Ripard wrote:
+> > On Mon, Apr 28, 2014 at 04:58:48PM +0200, Boris BREZILLON wrote:
+> >> The PRCM (Power/Reset/Clock Management) unit provides several clock
+> >> devices:
+> >> - AR100 clk: used to clock the Power Management co-processor
+> >> - AHB0 clk: used to clock the AHB0 bus
+> >> - APB0 clk and gates: used to clk
+> > Used to clk?
+> "Used to clk peripherals connected on the APB0 bus"
+> 
+> I'll add the missing words in the next version :-).
+> 
+> >
+> [...]
+> > Ditto.
+> >
+> > And you'll probably want to use devm_ioremap_resource when you'll have
+> > a single clock for the AR100.
+> 
+> Absolutely.
+> 
+> >
+> >> +
+> >> +	clk_parent = of_clk_get_parent_name(np, 0);
+> >> +	if (!clk_parent)
+> >> +		return -EINVAL;
+> [...]
+> >> +
+> >> +static struct platform_driver sun6i_a31_prcm_clk_driver = {
+> >> +	.driver = {
+> >> +		.name = "sun6i-a31-prcm-clk",
+> >> +		.owner = THIS_MODULE,
+> >> +		.of_match_table = sun6i_a31_prcm_clk_dt_ids,
+> >> +	},
+> >> +	.probe = sun6i_a31_prcm_clk_probe,
+> > You're not calling the of_clk_del_provider, and you should probably
+> > unregister your clocks too.
+> 
+> This driver cannot be compiled as a module, and as a result the probed
+> clks will never be removed.
+> 
+> Do you really want to support clk removal for this HW block ?
 
-(2014/05/07 22:52), Thomas Petazzoni wrote:
-> diff --git a/drivers/usb/host/xhci-mvebu.h b/drivers/usb/host/xhci-mvebu.h
-> new file mode 100644
-> index 0000000..61d09b6
-> --- /dev/null
-> +++ b/drivers/usb/host/xhci-mvebu.h
-> @@ -0,0 +1,21 @@
-> +/*
-> + * Copyright (C) 2014 Marvell
-> + *
-> + * Gregory Clement <gregory.clement@free-electrons.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#ifndef __LINUX_XHCI_MVEBU_H
-> +#define __LINUX_XHCI_MVEBU_H
-> +#if IS_ENABLED(CONFIG_USB_XHCI_MVEBU)
-> +int xhci_mvebu_mbus_init_quirk(struct platform_device *pdev);
-> +#else
-> +static inline int xhci_mvebu_mbus_init_quirk(struct device dev)
+Hmm, no, then it's fine.
 
-I could not compile this code when I disabled CONFIG_USB_XHCI_MVEBU:
-	incompatible type for argument 1 of 'xhci_mvebu_mbus_init_quirk'.
+Thanks!
+Maxime
 
-So, the "struct device dev" should be changed to "struct platform_device *pdev".
-
-Best regards,
-Yoshihiro Shimoda
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140507/51f6d003/attachment.sig>
