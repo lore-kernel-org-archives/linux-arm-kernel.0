@@ -1,92 +1,48 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 8 May 2014 12:36:22 +0530
-Subject: [PATCH 1/2] gpio: omap: prepare and unprepare the debounce clock
-In-Reply-To: <1398233465-8845-2-git-send-email-rnayak@ti.com>
-References: <1398233465-8845-1-git-send-email-rnayak@ti.com>
- <1398233465-8845-2-git-send-email-rnayak@ti.com>
-Message-ID: <536B2CEE.4010809@ti.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Thu, 08 May 2014 16:20:05 +0900
+Subject: [PATCH v2 2/5] ARM: dts: enable fimd for exynos5250 based snow
+ board
+In-Reply-To: <1399529995-8656-3-git-send-email-rahul.sharma@samsung.com>
+References: <1399529995-8656-1-git-send-email-rahul.sharma@samsung.com>
+ <1399529995-8656-3-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <002701cf6a8d$ef7b4540$ce71cfc0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 23 April 2014 11:41 AM, Rajendra Nayak wrote:
-> Replace the clk_enable()s with a clk_prepare_enable() and
-> the clk_disables()s with a clk_disable_unprepare()
+On Thursday, May 08, 2014 3:20 PM, Rahul Sharma wrote:
 > 
-> This never showed issues due to the OMAP platform code (hwmod)
-> leaving these clocks in clk_prepare()ed state by default.
+> From: Rahul Sharma <Rahul.Sharma@samsung.com>
 > 
-> Reported-by: Kishon Vijay Abraham I <kishon@ti.com>
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> Cc: linux-gpio at vger.kernel.org
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Kevin Hilman <khilman@deeprootsystems.com>
-
-Linus,
-
-Do you mind picking this fix up via the GPIO tree? Alternatively you could
-Ack this if you are fine and we can take both Patch 1/2 and Patch 2/2 from this
-series via the OMAP tree.
-
-Patch 2/2 has a dependency on Patch 1/2 and they need to go in in that order else
-gpio would break. More discussions are here [1].
-Let us know what you think. Thanks.
-
-regards,
-Rajendra
-
-[1] http://www.mail-archive.com/linux-gpio at vger.kernel.org/msg02801.html
-
+> Enable fimd node for snow board.
+> 
+> Signed-off-by: Rahul Sharma <Rahul.Sharma@samsung.com>
 > ---
->  drivers/gpio/gpio-omap.c |   10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
+>  arch/arm/boot/dts/exynos5250-snow.dts |    6 ++++++
+>  1 file changed, 6 insertions(+)
 > 
-> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-> index 19b886c..78bc5a4 100644
-> --- a/drivers/gpio/gpio-omap.c
-> +++ b/drivers/gpio/gpio-omap.c
-> @@ -180,7 +180,7 @@ static inline void _gpio_rmw(void __iomem *base, u32 reg, u32 mask, bool set)
->  static inline void _gpio_dbck_enable(struct gpio_bank *bank)
->  {
->  	if (bank->dbck_enable_mask && !bank->dbck_enabled) {
-> -		clk_enable(bank->dbck);
-> +		clk_prepare_enable(bank->dbck);
->  		bank->dbck_enabled = true;
->  
->  		writel_relaxed(bank->dbck_enable_mask,
-> @@ -198,7 +198,7 @@ static inline void _gpio_dbck_disable(struct gpio_bank *bank)
->  		 */
->  		writel_relaxed(0, bank->base + bank->regs->debounce_en);
->  
-> -		clk_disable(bank->dbck);
-> +		clk_disable_unprepare(bank->dbck);
->  		bank->dbck_enabled = false;
->  	}
->  }
-> @@ -231,7 +231,7 @@ static void _set_gpio_debounce(struct gpio_bank *bank, unsigned gpio,
->  
->  	l = GPIO_BIT(bank, gpio);
->  
-> -	clk_enable(bank->dbck);
-> +	clk_prepare_enable(bank->dbck);
->  	reg = bank->base + bank->regs->debounce;
->  	writel_relaxed(debounce, reg);
->  
-> @@ -245,7 +245,7 @@ static void _set_gpio_debounce(struct gpio_bank *bank, unsigned gpio,
->  	bank->dbck_enable_mask = val;
->  
->  	writel_relaxed(val, reg);
-> -	clk_disable(bank->dbck);
-> +	clk_disable_unprepare(bank->dbck);
->  	/*
->  	 * Enable debounce clock per module.
->  	 * This call is mandatory because in omap_gpio_request() when
-> @@ -290,7 +290,7 @@ static void _clear_gpio_debounce(struct gpio_bank *bank, unsigned gpio)
->  		bank->context.debounce = 0;
->  		writel_relaxed(bank->context.debounce, bank->base +
->  			     bank->regs->debounce);
-> -		clk_disable(bank->dbck);
-> +		clk_disable_unprepare(bank->dbck);
->  		bank->dbck_enabled = false;
->  	}
->  }
-> 
+> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+> index 1ce1088..796954c 100644
+> --- a/arch/arm/boot/dts/exynos5250-snow.dts
+> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
+> @@ -206,4 +206,10 @@
+>  			clock-frequency = <24000000>;
+>  		};
+>  	};
+> +
+> +	fimd at 14400000 {
+> +		status = "okay";
+
+(+cc Sachin Kamat, Tomasz Figa)
+
+For readability, how about moving 'status' to the last entry of
+the node? The same comment applies to other patches, too.
+
+Best regards,
+Jingoo Han
+
+> +		samsung,invert-vclk;
+> +	};
+> +
+>  };
+> --
+> 1.7.9.5
