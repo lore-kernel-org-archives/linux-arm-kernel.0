@@ -1,52 +1,49 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Thu, 8 May 2014 20:01:47 +0300
-Subject: [PATCH] mdio_bus: fix devm_mdiobus_alloc_size export
-In-Reply-To: <1399560433-1402630-2-git-send-email-arnd@arndb.de>
-References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
- <1399560433-1402630-2-git-send-email-arnd@arndb.de>
-Message-ID: <536BB87B.5050808@ti.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 08 May 2014 18:12:53 +0200
+Subject: [PATCH 1/2] ARM: dts: Enable USB 3503 hub on exynos5250-snow
+In-Reply-To: <536BA9E8.2030306@suse.de>
+References: <1399293056-17143-1-git-send-email-gautam.vivek@samsung.com>
+ <536BA9E8.2030306@suse.de>
+Message-ID: <536BAD05.9070401@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On 08.05.2014 17:59, Andreas F?rber wrote:
+> Hello,
+> 
+> Am 05.05.2014 14:30, schrieb Vivek Gautam:
+>> The exynos5250-snow has a SMSC USB3503 connected in
+>> hardware only mode like a PHY. Enable support for it,
+>> and add necessary 'reset-gpio' for it.
+>>
+>> This is in correspondance to similar patch by Mark Brown
+>> 7c1b0ec ARM: dts: Enable USB hub on Arndale
+>>
+>> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+>> ---
+>>
+>> Based on 'for-next' branch of kgene's linux-samsung tree.
+>>
+>>  arch/arm/boot/dts/exynos5250-pinctrl.dtsi |    7 +++++++
+>>  arch/arm/boot/dts/exynos5250-snow.dts     |   14 ++++++++++++++
+>>  2 files changed, 21 insertions(+)
+> 
+> The same snippet as for snow also fixed my USB issues on spring.
+> Should it go into exynos5250-cros-common.dtsi instead?
 
-On 05/08/2014 05:46 PM, Arnd Bergmann wrote:
-> commit 6d48f44b7b2 "mdio_bus: implement devm_mdiobus_alloc/devm_mdiobus_free"
-> introduced a new function devm_mdiobus_alloc_size() but added an export
-> for a different function devm_mdiobus_alloc(), which was obviously
-> a simple mistake that leads to  build error whenever this function is
-> used from a loadable module:
->
-> ERROR: "devm_mdiobus_alloc_size" [drivers/net/ethernet/ti/davinci_mdio.ko] undefined!
+The GPIO pins used are different, so I don't think the hub node added by
+these patches could be shared.
 
-Sorry for that, and thanks a lot for the fix.
+Also, I believe all you need to add is a simple node as follows
 
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Grygorii Strashko <grygorii.strashko@ti.com>
-> Cc: Florian Fainelli <f.fainelli@gmail.com>
-> Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Cc: Lad, Prabhakar <prabhakar.csengg@gmail.com>
-> Cc: David S. Miller <davem@davemloft.net>
-> Cc: netdev at vger.kernel.org
-> ---
->   drivers/net/phy/mdio_bus.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/net/phy/mdio_bus.c b/drivers/net/phy/mdio_bus.c
-> index 68a9a38..a628496 100644
-> --- a/drivers/net/phy/mdio_bus.c
-> +++ b/drivers/net/phy/mdio_bus.c
-> @@ -117,7 +117,7 @@ struct mii_bus *devm_mdiobus_alloc_size(struct device *dev, int sizeof_priv)
->
->   	return bus;
->   }
-> -EXPORT_SYMBOL_GPL(devm_mdiobus_alloc);
-> +EXPORT_SYMBOL_GPL(devm_mdiobus_alloc_size);
->
->   /**
->    * devm_mdiobus_free - Resource-managed mdiobus_free()
->
+usb_hub {
+	compatible = "smsc,usb3503a";
+	reset-gpios = <&gpe1 0 1>;
+};
 
-Regards,
--grygorii
+at root level (see my comments to this patch in another reply), which is
+affordable to be duplicated for every platform that requires it,
+especially if the reset-gpios property differs between boards.
+
+Best regards,
+Tomasz
