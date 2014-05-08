@@ -1,48 +1,76 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 08 May 2014 09:29:16 +0200
-Subject: [PATCH 4/7] usb: ehci-platform: add optional reset controller
- retrieval
-In-Reply-To: <20140507220049.GC7047@lukather>
-References: <1399434623-20383-5-git-send-email-maxime.ripard@free-electrons.com>
- <Pine.LNX.4.44L0.1405071020490.1325-100000@iolanthe.rowland.org>
- <20140507220049.GC7047@lukather>
-Message-ID: <536B324C.1040806@redhat.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Thu, 08 May 2014 16:42:46 +0900
+Subject: [PATCH v2 3/5] ARM: dts: enable dp-controller for exynos5250 based
+ snow board
+In-Reply-To: <1399529995-8656-4-git-send-email-rahul.sharma@samsung.com>
+References: <1399529995-8656-1-git-send-email-rahul.sharma@samsung.com>
+ <1399529995-8656-4-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <002801cf6a91$1a891f70$4f9b5e50$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 05/08/2014 12:00 AM, Maxime Ripard wrote:
-> On Wed, May 07, 2014 at 10:25:55AM -0400, Alan Stern wrote:
->> On Tue, 6 May 2014, Maxime Ripard wrote:
->>
->>> From: Boris BREZILLON <boris.brezillon@free-electrons.com>
->>>
->>> On the Allwinner's A31 SoC the reset line connected to the EHCI IP has to
->>> be deasserted for the EHCI block to be usable.
->>>
->>> Add support for an optional reset controller that will be deasserted on
->>> power off and asserted on power on.
->>>
->>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
->>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->>
->> Is this really a _reset_ line?  That is, when you assert the reset 
->> line, does it actually reset the EHCI controller, or does it merely 
->> leave the controller in a partially powered-down state?
+On Thursday, May 08, 2014 3:20 PM, Rahul Sharma wrote:
 > 
-> It actually resets the whole controller.
+> From: Rahul Sharma <Rahul.Sharma@samsung.com>
 > 
->> The difference is important.  During suspend, the controller is
->> supposed to remember the state of the port connections as well as other
->> settings.  If it doesn't, the controller and all attached USB devices
->> will have to be reinitialized every time the controller resumes, which
->> will increase the latency.
+> Enable dp-controller for snow board.
 > 
-> So you're saying that we should move this to the probe then?
+> Signed-off-by: Rahul Sharma <Rahul.Sharma@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos5250-snow.dts |   27 +++++++++++++++++++++++++++
+>  1 file changed, 27 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+> index 796954c..28a755f 100644
+> --- a/arch/arm/boot/dts/exynos5250-snow.dts
+> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
+> @@ -207,6 +207,33 @@
+>  		};
+>  	};
+> 
+> +	dp-controller at 145B0000 {
+> +		status = "okay";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&dp_hpd>;
+> +		samsung,color-space = <0>;
+> +		samsung,dynamic-range = <0>;
+> +		samsung,ycbcr-coeff = <0>;
+> +		samsung,color-depth = <1>;
+> +		samsung,link-rate = <0x0a>;
+> +		samsung,lane-count = <2>;
+> +		samsung,hpd-gpio = <&gpx0 7 0>;
+> +		display-timings {
 
-Yes.
+For readability, please insert one line as below.
 
-Regards,
++		samsung,hpd-gpio = <&gpx0 7 0>;
++
++		display-timings {
 
-Hans
+The same comment applies to the 5th patch.
+([PATCH v2 5/5] ARM: dts: enable dp-controller for exynos5420
+based peach-pit board)
+
+Best regards,
+Jingoo Han
+
+> +			native-mode = <&timing1>;
+> +			timing1: timing at 1 {
+> +				clock-frequency = <70589280>;
+> +				hactive = <1366>;
+> +				vactive = <768>;
+> +				hfront-porch = <40>;
+> +				hback-porch = <40>;
+> +				hsync-len = <32>;
+> +				vback-porch = <10>;
+> +				vfront-porch = <12>;
+> +				vsync-len = <6>;
+> +			};
+> +		};
+> +	};
+> +
+>  	fimd at 14400000 {
+>  		status = "okay";
+>  		samsung,invert-vclk;
+> --
+> 1.7.9.5
