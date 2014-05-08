@@ -1,68 +1,42 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu,  8 May 2014 16:56:26 +0200
-Subject: [PATCH 1/2] input: fix ps2/serio module dependency
+Date: Thu,  8 May 2014 16:56:18 +0200
+Subject: [PATCH] bus/arm-cci: add dependency on OF && CPU_V7
 In-Reply-To: <1399560990-1402858-1-git-send-email-arnd@arndb.de>
 References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
  <1399560990-1402858-1-git-send-email-arnd@arndb.de>
-Message-ID: <1399560990-1402858-15-git-send-email-arnd@arndb.de>
+Message-ID: <1399560990-1402858-7-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ps2 mouse and keyboard drivers use the "serio" framework that
-they correctly select in Kconfig, and that in turn depends on the
-i8042 driver, which is also allowed to be disabled for architectures
-that don't have an i8042.
+The arm-cci code uses device tree helpers for initialization
+that don't work on kernels built without CONFIG_OF. Further,
+it contains an inline assembly in cci_enable_port_for_self()
+that uses ARMv7 instructions and fails to build when targetting
+other ARM instruction set versions.
 
-However, Kconfig also allows i8042 to be built as a module while
-the serio framework is built-in, which causes this link error:
-
-drivers/built-in.o: In function `ps2_begin_command':
-:(.text+0x26b6cc): undefined reference to `i8042_check_port_owner'
-:(.text+0x26b6d4): undefined reference to `i8042_lock_chip'
-drivers/built-in.o: In function `ps2_end_command':
-:(.text+0x26b734): undefined reference to `i8042_check_port_owner'
-:(.text+0x26b73c): undefined reference to `i8042_unlock_chip'
-
-On x86, a specific 'select SERIO_I8042' takes care of it, but
-not on the other architecture that potentially have a u8042.
-
-This patch changes the Kconfig logic to ensure that whenever
-there is an i8042, it does get used for the serio driver, avoiding
-the link error above.
+This works around both issues by limiting the scope of the
+Kconfig symbol to platforms that can actually build this driver
+cleanly.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-Cc: linux-input at vger.kernel.org
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
- drivers/input/keyboard/Kconfig | 2 +-
- drivers/input/mouse/Kconfig    | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/bus/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/input/keyboard/Kconfig b/drivers/input/keyboard/Kconfig
-index 4f115db..dd2435a 100644
---- a/drivers/input/keyboard/Kconfig
-+++ b/drivers/input/keyboard/Kconfig
-@@ -71,7 +71,7 @@ config KEYBOARD_ATKBD
- 	default y
- 	select SERIO
- 	select SERIO_LIBPS2
--	select SERIO_I8042 if X86
-+	select SERIO_I8042 if X86 || ARCH_MIGHT_HAVE_PC_SERIO
- 	select SERIO_GSCPS2 if GSC
+diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+index 552373c..d53417e 100644
+--- a/drivers/bus/Kconfig
++++ b/drivers/bus/Kconfig
+@@ -37,7 +37,7 @@ config OMAP_INTERCONNECT
+ 
+ config ARM_CCI
+ 	bool "ARM CCI driver support"
+-	depends on ARM
++	depends on ARM && OF && CPU_V7
  	help
- 	  Say Y here if you want to use a standard AT or PS/2 keyboard. Usually
-diff --git a/drivers/input/mouse/Kconfig b/drivers/input/mouse/Kconfig
-index effa9c5..cf534ee 100644
---- a/drivers/input/mouse/Kconfig
-+++ b/drivers/input/mouse/Kconfig
-@@ -17,7 +17,7 @@ config MOUSE_PS2
- 	default y
- 	select SERIO
- 	select SERIO_LIBPS2
--	select SERIO_I8042 if X86
-+	select SERIO_I8042 if X86 || ARCH_MIGHT_HAVE_PC_SERIO
- 	select SERIO_GSCPS2 if GSC
- 	help
- 	  Say Y here if you have a PS/2 mouse connected to your system. This
+ 	  Driver supporting the CCI cache coherent interconnect for ARM
+ 	  platforms.
 -- 
 1.8.3.2
