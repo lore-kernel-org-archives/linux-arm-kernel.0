@@ -1,36 +1,74 @@
-From: ckeepax@opensource.wolfsonmicro.com (Charles Keepax)
-Date: Thu, 8 May 2014 17:19:14 +0100
-Subject: [PATCH] regulator: arizona-ldo1: add missing #include
-In-Reply-To: <1399560990-1402858-19-git-send-email-arnd@arndb.de>
-References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-19-git-send-email-arnd@arndb.de>
-Message-ID: <20140508161914.GC25203@opensource.wolfsonmicro.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Thu, 8 May 2014 20:12:21 +0300
+Subject: omap4-panda-es boot issues with v3.15-rc4
+In-Reply-To: <CAGa+x84VB3CXDm71JWxHx1-Qk1xVNeXdwUjZnb42_wg+piOzzA@mail.gmail.com>
+References: <536B7E44.2040303@ti.com>	<7hppjos2w2.fsf@paris.lan>
+ <CAGa+x84VB3CXDm71JWxHx1-Qk1xVNeXdwUjZnb42_wg+piOzzA@mail.gmail.com>
+Message-ID: <536BBAF5.8070906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 08, 2014 at 04:56:30PM +0200, Arnd Bergmann wrote:
-> commit 2cce4be9e6b8 "regulator: arizona-ldo1: Add processing of init_data
-> from device tree" added a call to of_get_child_by_name() but
-> did not add an #include to the header file declaring that function.
-> 
-> I got a build error when doing randconfig testing on this, which
-> is fixed by this patch to include of.h.
-> 
-> drivers/regulator/arizona-ldo1.c:192:2: error: implicit declaration of function 'of_get_child_by_name' [-Werror=implicit-function-declaration]
-> drivers/regulator/arizona-ldo1.c:193:2: error: implicit declaration of function 'of_parse_phandle' [-Werror=implicit-function-declaration]
-> drivers/regulator/arizona-ldo1.c:213:2: error: implicit declaration of function 'of_node_put' [-Werror=implicit-function-declaration]
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
-> Cc: Mark Brown <broonie@linaro.org>
-> ---
+Hi,
 
-Thanks, yeah seems that is getting implicitly through another
-header included in my config. Will need a similar fix for
-arizona-micsupp, I will get one out for that.
+On 05/08/2014 06:40 PM, Kevin Hilman wrote:
+> On Thu, May 8, 2014 at 8:31 AM, Kevin Hilman <khilman@linaro.org> wrote:
+>> Roger Quadros <rogerq@ti.com> writes:
+>>
+>>> Hi,
+>>>
+>>> Nishant pointed me to a booting issue with omap4-panda-es on linux-next but I'm observing
+>>> similar issues, although less frequent, with v3.15-rc4 as well.
+>>>
+>>> Configuration:
+>>>
+>>> - kernel v3.15-rc4 or linux-next (20140507)
+>>> - multi_v7_defconfig with LEDS_TRIGGER_HEARTBEAT and LEDS_GPIO enabled
+>>> - u-boot/master       173d294b94cf
+>>>
+>>> Observations:
+>>>
+>>> - Out of 10 boots a few may not succeed and hang midway without any warnings. Heartbeat LED stops.
+>>> e.g. http://www.hastebin.com/ebumojegoq.vhdl
+>>>
+>>> - Hang more noticeable on linux-next (20140507) than on v3.15-rc4
+>>
+>> I've beeen noticing the same thing for awhile with my boot tests.  For
+>> me, next-20140508 is failing most of the time now.
+>>
+>>> - Hang more noticeable with USB_EHCI_HCD enabled but hang observed even without USB_EHCI_HCD.
+>>> Maybe related to when high speed interrupts occur in the boot process.
+>>>
+>>> - On successful boots following warning is seen
+>>> [    4.010375] gic_timer_retrigger: lost localtimer interrupt
+>>>
+>>> - On successful boots heartbeat LED stops blinking after boot process and left idle. LED can remain stuck in
+>>> ON state as well. It does blink again when doing activity on console.
+>>>
+>>> Workaround:
+>>>
+>>> - Disabling CPU_IDLE or even just disabling C3 (MPU OSWR) seems to fix all the above issues.
+>>>
+>>> I don't really know what exactly is the issue but it seems to be specific to OMAP4, GIC, MPU OSWR.
+>>
+>> I can confirm that disabling CONFIG_CPU_IDLE seems to make the problem
+>> go away.  Hmm....
+> 
+> Another finger pointing in the same direction: omap2plus_defconfig +
+> CONFIG_CPU_IDLE=y also fails to boot rather consistently in today's
+> -next.
 
-Reviewed-by: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
+Is it observed on OMAP4460 only?
+if no - it's smth new.
+if yes - may be some racing condition is still present.
 
-Thanks,
-Charles
+Roger, is it possible to connect debugger and check GIC distributor status
+(gic_dist_base_addr + GIC_DIST_CTRL) in case of failure?
+
+According to the current code (OMAP4460) it's possible that CPU0 will stuck only in case
+if CPU1 is kicked off from PWRDM_POWER_OFF state somehow but not by CPU0. 
+Code assumes that CPU1 can exit from PWRDM_POWER_OFF state only when CPU0 calls clkdm_wakeup(cpu_clkdm[1]); 
+
+Sorry, but I'm not able to debug it now.
+
+Regards,
+-grygorii
