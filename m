@@ -1,192 +1,81 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu,  8 May 2014 17:13:38 +0200
-Subject: [PATCH 2/3] clocksource: cadence_ttc: Use readl/writel_relaxed
- instead of __raw
+Date: Thu,  8 May 2014 17:13:39 +0200
+Subject: [PATCH 3/3] ARM: zynq: Enable big-endian
 In-Reply-To: <5e4fb08db4f6a436fc4593b22c3ae611ba545967.1399562009.git.michal.simek@xilinx.com>
 References: <5e4fb08db4f6a436fc4593b22c3ae611ba545967.1399562009.git.michal.simek@xilinx.com>
-Message-ID: <b8e5801e5f833aa180b020807ef91e0c568e99fa.1399562009.git.michal.simek@xilinx.com>
+Message-ID: <c0fa40614e2bec826fe825f75d00ae927d1197c4.1399562009.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For supporting ARM big-endian is necessary to use
-proper IO endianess accessors.
+Enable ARCH_SUPPORTS_BIG_ENDIAN in Kconfig.
 
-Based on Ben Dooks BE guide.
-Similar conversion is done here:
-"mv_xor: use {readl, writel}_relaxed instead of __raw_{readl, writel}"
-(sha1: 5733c38ae3473115ac7df3fe19bd2502149d8c51)
+zynq_secondary_trampoline is the first function
+that is called on secondary CPU.
+Reference:
+"ARM: mcpm: fix big endian issue in mcpm startup code"
+(sha1: 519ceb9fd10cd7e836d0aa97b2068cc9e97f463b)
+
+Fix early printk support. Based on:
+"ARM: pl01x debug code endian fix"
+(sha1: 76e3faf156fa95b6465e747d702b94faf67117fc)
 
 Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
 
- drivers/clocksource/cadence_ttc_timer.c | 54 ++++++++++++++++-----------------
- 1 file changed, 27 insertions(+), 27 deletions(-)
+ arch/arm/include/debug/zynq.S | 2 ++
+ arch/arm/mach-zynq/Kconfig    | 1 +
+ arch/arm/mach-zynq/headsmp.S  | 5 ++++-
+ 3 files changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clocksource/cadence_ttc_timer.c b/drivers/clocksource/cadence_ttc_timer.c
-index 49fbe2847c84..7a08811df9aa 100644
---- a/drivers/clocksource/cadence_ttc_timer.c
-+++ b/drivers/clocksource/cadence_ttc_timer.c
-@@ -118,11 +118,11 @@ static void ttc_set_interval(struct ttc_timer *timer,
- 	u32 ctrl_reg;
+diff --git a/arch/arm/include/debug/zynq.S b/arch/arm/include/debug/zynq.S
+index 0b762fafa758..3895146341f3 100644
+--- a/arch/arm/include/debug/zynq.S
++++ b/arch/arm/include/debug/zynq.S
+@@ -43,12 +43,14 @@
 
- 	/* Disable the counter, set the counter value  and re-enable counter */
--	ctrl_reg = __raw_readl(timer->base_addr + TTC_CNT_CNTRL_OFFSET);
-+	ctrl_reg = readl_relaxed(timer->base_addr + TTC_CNT_CNTRL_OFFSET);
- 	ctrl_reg |= TTC_CNT_CNTRL_DISABLE_MASK;
--	__raw_writel(ctrl_reg, timer->base_addr + TTC_CNT_CNTRL_OFFSET);
-+	writel_relaxed(ctrl_reg, timer->base_addr + TTC_CNT_CNTRL_OFFSET);
+ 		.macro	waituart,rd,rx
+ 1001:		ldr	\rd, [\rx, #UART_SR_OFFSET]
++ARM_BE8(	rev	\rd, \rd )
+ 		tst	\rd, #UART_SR_TXEMPTY
+ 		beq	1001b
+ 		.endm
 
--	__raw_writel(cycles, timer->base_addr + TTC_INTR_VAL_OFFSET);
-+	writel_relaxed(cycles, timer->base_addr + TTC_INTR_VAL_OFFSET);
+ 		.macro	busyuart,rd,rx
+ 1002:		ldr	\rd, [\rx, #UART_SR_OFFSET]	@ get status register
++ARM_BE8(	rev	\rd, \rd )
+ 		tst	\rd, #UART_SR_TXFULL		@
+ 		bne	1002b			@ wait if FIFO is full
+ 		.endm
+diff --git a/arch/arm/mach-zynq/Kconfig b/arch/arm/mach-zynq/Kconfig
+index 1daa5c220d1d..ff03a71bb9a3 100644
+--- a/arch/arm/mach-zynq/Kconfig
++++ b/arch/arm/mach-zynq/Kconfig
+@@ -2,6 +2,7 @@ config ARCH_ZYNQ
+ 	bool "Xilinx Zynq ARM Cortex A9 Platform" if ARCH_MULTI_V7
+ 	select ARCH_HAS_CPUFREQ
+ 	select ARCH_HAS_OPP
++	select ARCH_SUPPORTS_BIG_ENDIAN
+ 	select ARM_AMBA
+ 	select ARM_GIC
+ 	select ARM_GLOBAL_TIMER if !CPU_FREQ
+diff --git a/arch/arm/mach-zynq/headsmp.S b/arch/arm/mach-zynq/headsmp.S
+index 57a32869f0aa..dd8c071941e7 100644
+--- a/arch/arm/mach-zynq/headsmp.S
++++ b/arch/arm/mach-zynq/headsmp.S
+@@ -8,9 +8,12 @@
+  */
+ #include <linux/linkage.h>
+ #include <linux/init.h>
++#include <asm/assembler.h>
 
- 	/*
- 	 * Reset the counter (0x10) so that it starts from 0, one-shot
-@@ -130,7 +130,7 @@ static void ttc_set_interval(struct ttc_timer *timer,
- 	 */
- 	ctrl_reg |= CNT_CNTRL_RESET;
- 	ctrl_reg &= ~TTC_CNT_CNTRL_DISABLE_MASK;
--	__raw_writel(ctrl_reg, timer->base_addr + TTC_CNT_CNTRL_OFFSET);
-+	writel_relaxed(ctrl_reg, timer->base_addr + TTC_CNT_CNTRL_OFFSET);
- }
-
- /**
-@@ -147,7 +147,7 @@ static irqreturn_t ttc_clock_event_interrupt(int irq, void *dev_id)
- 	struct ttc_timer *timer = &ttce->ttc;
-
- 	/* Acknowledge the interrupt and call event handler */
--	__raw_readl(timer->base_addr + TTC_ISR_OFFSET);
-+	readl_relaxed(timer->base_addr + TTC_ISR_OFFSET);
-
- 	ttce->ce.event_handler(&ttce->ce);
-
-@@ -163,13 +163,13 @@ static cycle_t __ttc_clocksource_read(struct clocksource *cs)
- {
- 	struct ttc_timer *timer = &to_ttc_timer_clksrc(cs)->ttc;
-
--	return (cycle_t)__raw_readl(timer->base_addr +
-+	return (cycle_t)readl_relaxed(timer->base_addr +
- 				TTC_COUNT_VAL_OFFSET);
- }
-
- static u64 notrace ttc_sched_clock_read(void)
- {
--	return __raw_readl(ttc_sched_clock_val_reg);
-+	return readl_relaxed(ttc_sched_clock_val_reg);
- }
-
- /**
-@@ -211,17 +211,17 @@ static void ttc_set_mode(enum clock_event_mode mode,
- 	case CLOCK_EVT_MODE_ONESHOT:
- 	case CLOCK_EVT_MODE_UNUSED:
- 	case CLOCK_EVT_MODE_SHUTDOWN:
--		ctrl_reg = __raw_readl(timer->base_addr +
-+		ctrl_reg = readl_relaxed(timer->base_addr +
- 					TTC_CNT_CNTRL_OFFSET);
- 		ctrl_reg |= TTC_CNT_CNTRL_DISABLE_MASK;
--		__raw_writel(ctrl_reg,
-+		writel_relaxed(ctrl_reg,
- 				timer->base_addr + TTC_CNT_CNTRL_OFFSET);
- 		break;
- 	case CLOCK_EVT_MODE_RESUME:
--		ctrl_reg = __raw_readl(timer->base_addr +
-+		ctrl_reg = readl_relaxed(timer->base_addr +
- 					TTC_CNT_CNTRL_OFFSET);
- 		ctrl_reg &= ~TTC_CNT_CNTRL_DISABLE_MASK;
--		__raw_writel(ctrl_reg,
-+		writel_relaxed(ctrl_reg,
- 				timer->base_addr + TTC_CNT_CNTRL_OFFSET);
- 		break;
- 	}
-@@ -266,8 +266,8 @@ static int ttc_rate_change_clocksource_cb(struct notifier_block *nb,
- 		 * of an abort.
- 		 */
- 		ttccs->scale_clk_ctrl_reg_old =
--			__raw_readl(ttccs->ttc.base_addr +
--					TTC_CLK_CNTRL_OFFSET);
-+			readl_relaxed(ttccs->ttc.base_addr +
-+			TTC_CLK_CNTRL_OFFSET);
-
- 		psv = (ttccs->scale_clk_ctrl_reg_old &
- 				TTC_CLK_CNTRL_PSV_MASK) >>
-@@ -291,8 +291,8 @@ static int ttc_rate_change_clocksource_cb(struct notifier_block *nb,
- 			return NOTIFY_DONE;
-
- 		/* scale up: adjust divider now - before frequency change */
--		__raw_writel(ttccs->scale_clk_ctrl_reg_new,
--				ttccs->ttc.base_addr + TTC_CLK_CNTRL_OFFSET);
-+		writel_relaxed(ttccs->scale_clk_ctrl_reg_new,
-+			       ttccs->ttc.base_addr + TTC_CLK_CNTRL_OFFSET);
- 		break;
- 	}
- 	case POST_RATE_CHANGE:
-@@ -301,8 +301,8 @@ static int ttc_rate_change_clocksource_cb(struct notifier_block *nb,
- 			return NOTIFY_OK;
-
- 		/* scale down: adjust divider now - after frequency change */
--		__raw_writel(ttccs->scale_clk_ctrl_reg_new,
--				ttccs->ttc.base_addr + TTC_CLK_CNTRL_OFFSET);
-+		writel_relaxed(ttccs->scale_clk_ctrl_reg_new,
-+			       ttccs->ttc.base_addr + TTC_CLK_CNTRL_OFFSET);
- 		break;
-
- 	case ABORT_RATE_CHANGE:
-@@ -311,8 +311,8 @@ static int ttc_rate_change_clocksource_cb(struct notifier_block *nb,
- 			return NOTIFY_OK;
-
- 		/* restore original register value */
--		__raw_writel(ttccs->scale_clk_ctrl_reg_old,
--				ttccs->ttc.base_addr + TTC_CLK_CNTRL_OFFSET);
-+		writel_relaxed(ttccs->scale_clk_ctrl_reg_old,
-+			       ttccs->ttc.base_addr + TTC_CLK_CNTRL_OFFSET);
- 		/* fall through */
- 	default:
- 		return NOTIFY_DONE;
-@@ -359,10 +359,10 @@ static void __init ttc_setup_clocksource(struct clk *clk, void __iomem *base)
- 	 * with no interrupt and it rolls over at 0xFFFF. Pre-scale
- 	 * it by 32 also. Let it start running now.
- 	 */
--	__raw_writel(0x0,  ttccs->ttc.base_addr + TTC_IER_OFFSET);
--	__raw_writel(CLK_CNTRL_PRESCALE | CLK_CNTRL_PRESCALE_EN,
-+	writel_relaxed(0x0,  ttccs->ttc.base_addr + TTC_IER_OFFSET);
-+	writel_relaxed(CLK_CNTRL_PRESCALE | CLK_CNTRL_PRESCALE_EN,
- 		     ttccs->ttc.base_addr + TTC_CLK_CNTRL_OFFSET);
--	__raw_writel(CNT_CNTRL_RESET,
-+	writel_relaxed(CNT_CNTRL_RESET,
- 		     ttccs->ttc.base_addr + TTC_CNT_CNTRL_OFFSET);
-
- 	err = clocksource_register_hz(&ttccs->cs, ttccs->ttc.freq / PRESCALE);
-@@ -438,10 +438,10 @@ static void __init ttc_setup_clockevent(struct clk *clk,
- 	 * is prescaled by 32 using the interval interrupt. Leave it
- 	 * disabled for now.
- 	 */
--	__raw_writel(0x23, ttcce->ttc.base_addr + TTC_CNT_CNTRL_OFFSET);
--	__raw_writel(CLK_CNTRL_PRESCALE | CLK_CNTRL_PRESCALE_EN,
-+	writel_relaxed(0x23, ttcce->ttc.base_addr + TTC_CNT_CNTRL_OFFSET);
-+	writel_relaxed(CLK_CNTRL_PRESCALE | CLK_CNTRL_PRESCALE_EN,
- 		     ttcce->ttc.base_addr + TTC_CLK_CNTRL_OFFSET);
--	__raw_writel(0x1,  ttcce->ttc.base_addr + TTC_IER_OFFSET);
-+	writel_relaxed(0x1,  ttcce->ttc.base_addr + TTC_IER_OFFSET);
-
- 	err = request_irq(irq, ttc_clock_event_interrupt,
- 			  IRQF_TIMER, ttcce->ce.name, ttcce);
-@@ -490,7 +490,7 @@ static void __init ttc_timer_init(struct device_node *timer)
- 		BUG();
- 	}
-
--	clksel = __raw_readl(timer_baseaddr + TTC_CLK_CNTRL_OFFSET);
-+	clksel = readl_relaxed(timer_baseaddr + TTC_CLK_CNTRL_OFFSET);
- 	clksel = !!(clksel & TTC_CLK_CNTRL_CSRC_MASK);
- 	clk_cs = of_clk_get(timer, clksel);
- 	if (IS_ERR(clk_cs)) {
-@@ -498,7 +498,7 @@ static void __init ttc_timer_init(struct device_node *timer)
- 		BUG();
- 	}
-
--	clksel = __raw_readl(timer_baseaddr + 4 + TTC_CLK_CNTRL_OFFSET);
-+	clksel = readl_relaxed(timer_baseaddr + 4 + TTC_CLK_CNTRL_OFFSET);
- 	clksel = !!(clksel & TTC_CLK_CNTRL_CSRC_MASK);
- 	clk_ce = of_clk_get(timer, clksel);
- 	if (IS_ERR(clk_ce)) {
+ ENTRY(zynq_secondary_trampoline)
+-	ldr	r0, [pc]
++ARM_BE8(setend	be)				@ ensure we are in BE8 mode
++	ldr	r0, zynq_secondary_trampoline_jump
++ARM_BE8(rev	r0, r0)
+ 	bx	r0
+ .globl zynq_secondary_trampoline_jump
+ zynq_secondary_trampoline_jump:
 --
 1.8.2.3
 
@@ -196,4 +85,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140508/5db0fdb4/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140508/622da53b/attachment.sig>
