@@ -1,97 +1,65 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 8 May 2014 10:36:23 -0500
-Subject: [PATCH] pinctrl: sunxi Ensure the correct pinctrl drivers are
- enabled
-In-Reply-To: <536B9631.2090401@redhat.com>
-References: <1399556216-7590-1-git-send-email-hdegoede@redhat.com>
- <20140508142101.GT7047@lukather> <536B9631.2090401@redhat.com>
-Message-ID: <20140508153623.GX7047@lukather>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 8 May 2014 11:47:43 -0400 (EDT)
+Subject: [PATCH 8/8] usb: ohci-da8xx can only be built-in
+In-Reply-To: <1399557141-1346645-9-git-send-email-arnd@arndb.de>
+Message-ID: <Pine.LNX.4.44L0.1405081147320.1087-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 08, 2014 at 04:35:29PM +0200, Hans de Goede wrote:
-> Hi,
-> 
-> On 05/08/2014 04:21 PM, Maxime Ripard wrote:
-> > Hi Hans,
-> > 
-> > On Thu, May 08, 2014 at 03:36:56PM +0200, Hans de Goede wrote:
-> >> The commit titled: "pinctrl: sunxi: Introduce per-driver Kconfig options"
-> >> adds a bunch of new Kconfig options, but nothing sets them resulting in a
-> >> non working kernel. Since they are per sunxi family, and we already have
-> >> sunxi family Kconfig options, make those options select the necessary
-> >> Kconfig options.
-> >>
-> >> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> >> ---
-> >>  arch/arm/mach-sunxi/Kconfig | 6 +++++-
-> >>  1 file changed, 5 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
-> >> index 3aff966..beab32e 100644
-> >> --- a/arch/arm/mach-sunxi/Kconfig
-> >> +++ b/arch/arm/mach-sunxi/Kconfig
-> >> @@ -4,7 +4,6 @@ menuconfig ARCH_SUNXI
-> >>  	select CLKSRC_MMIO
-> >>  	select GENERIC_IRQ_CHIP
-> >>  	select PINCTRL
-> >> -	select PINCTRL_SUNXI
-> >>  	select SUN4I_TIMER
-> >>  
-> >>  if ARCH_SUNXI
-> >> @@ -12,11 +11,14 @@ if ARCH_SUNXI
-> >>  config MACH_SUN4I
-> >>  	bool "Allwinner A10 (sun4i) SoCs support"
-> >>  	default ARCH_SUNXI
-> >> +	select PINCTRL_SUN4I_A10
-> >>  
-> >>  config MACH_SUN5I
-> >>  	bool "Allwinner A10s / A13 (sun5i) SoCs support"
-> >>  	default ARCH_SUNXI
-> >>  	select SUN5I_HSTIMER
-> >> +	select PINCTRL_SUN5I_A10S
-> >> +	select PINCTRL_SUN5I_A13
-> >>  
-> >>  config MACH_SUN6I
-> >>  	bool "Allwinner A31 (sun6i) SoCs support"
-> >> @@ -25,6 +27,7 @@ config MACH_SUN6I
-> >>  	select ARM_GIC
-> >>  	select RESET_CONTROLLER
-> >>  	select SUN5I_HSTIMER
-> >> +	select PINCTRL_SUN6I_A31
-> >>  
-> >>  config MACH_SUN7I
-> >>  	bool "Allwinner A20 (sun7i) SoCs support"
-> >> @@ -33,5 +36,6 @@ config MACH_SUN7I
-> >>  	select ARM_PSCI
-> >>  	select HAVE_ARM_ARCH_TIMER
-> >>  	select SUN5I_HSTIMER
-> >> +	select PINCTRL_SUN7I_A20
-> >>  
-> >>  endif
-> > 
-> > I already posted a similar patch that is still pending. I was only
-> > waiting for Linus to merge the branch I gave him to merge it in my
-> > tree.
-> > 
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/251704.html
-> > 
-> > I don't think he actually merged the branch yet. How did you
-> > encounter such breakage?
-> 
-> I've been sucking up various branches and posted patches for the next
-> sunxi-devel, including your sunxi/pinctrl-for-3.16 branch.
+On Thu, 8 May 2014, Arnd Bergmann wrote:
 
-Ok, so yes, you need such a patch :)
+> The PHY setup code of the TI DaVinci DA8xx OHCI controller
+> uses ad-hoc register access using a pointer that is meant to
+> be used only by the DaVinci platform implementation and that
+> is intentionally not exported to loadable modules. This results
+> in a link error on configurations that use a modular OHCI
+> code on this platform.
+> 
+> While the proper solution for this problem would be to
+> implement a real PHY driver shared by ohci-da8xx and musb-da8xx,
+> this patch for now just works around the build error by
+> only allowing the ohci-da8xx code to be built-in.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> ---
+>  drivers/usb/host/Kconfig    | 10 ++++++++++
+>  drivers/usb/host/ohci-hcd.c |  2 +-
+>  2 files changed, 11 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+> index e229a47..3af10b7 100644
+> --- a/drivers/usb/host/Kconfig
+> +++ b/drivers/usb/host/Kconfig
+> @@ -417,6 +417,16 @@ config USB_OHCI_HCD_OMAP3
+>  	  Enables support for the on-chip OHCI controller on
+>  	  OMAP3 and later chips.
+>  
+> +config USB_OHCI_HCD_DAVINCI
+> +	bool "OHCI support for TI DaVinci DA8xx"
+> +	depends on ARCH_DAVINCI_DA8XX
+> +	depends on USB_OHCI_HCD=y
+> +	default y
+> +	help
+> +	  Enables support for the DaVinci DA8xx integrated OHCI
+> +	  controller. This driver cannot currently be a loadable
+> +	  module because it lacks a proper PHY abstraction.
+> +
+>  config USB_OHCI_ATH79
+>  	bool "USB OHCI support for the Atheros AR71XX/AR7240 SoCs (DEPRECATED)"
+>  	depends on (SOC_AR71XX || SOC_AR724X)
+> diff --git a/drivers/usb/host/ohci-hcd.c b/drivers/usb/host/ohci-hcd.c
+> index 3586460..f98d03f 100644
+> --- a/drivers/usb/host/ohci-hcd.c
+> +++ b/drivers/usb/host/ohci-hcd.c
+> @@ -1178,7 +1178,7 @@ MODULE_LICENSE ("GPL");
+>  #define SA1111_DRIVER		ohci_hcd_sa1111_driver
+>  #endif
+>  
+> -#ifdef CONFIG_ARCH_DAVINCI_DA8XX
+> +#ifdef CONFIG_USB_OHCI_HCD_DAVINCI
+>  #include "ohci-da8xx.c"
+>  #define DAVINCI_PLATFORM_DRIVER	ohci_hcd_da8xx_driver
+>  #endif
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140508/d57c0973/attachment.sig>
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
