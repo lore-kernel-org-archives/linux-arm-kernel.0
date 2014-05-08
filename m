@@ -1,189 +1,156 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 8 May 2014 17:36:41 +0530
-Subject: [PATCH 1/2] gpio: omap: prepare and unprepare the debounce clock
-In-Reply-To: <CABxcv=mOYUDKFNHT=wtS-G3dOWXve_Wy1TpxFwkBddPu4i2XXA@mail.gmail.com>
-References: <1398233465-8845-1-git-send-email-rnayak@ti.com>
- <1398233465-8845-2-git-send-email-rnayak@ti.com> <536B2CEE.4010809@ti.com>
- <CABxcv==5cwnk4aiZ+AVuAoMf9YnZJsfiJKRkZTYHFuP2-DmnnQ@mail.gmail.com>
- <536B660B.7080200@ti.com>
- <CABxcv=mOYUDKFNHT=wtS-G3dOWXve_Wy1TpxFwkBddPu4i2XXA@mail.gmail.com>
-Message-ID: <536B7351.2060201@ti.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 8 May 2014 14:17:04 +0200
+Subject: [PATCH v10 03/15] ARM: sunxi: Add driver for SD/MMC hosts found
+ on Allwinner sunxi SoCs
+In-Reply-To: <536B69FA.5090600@redhat.com>
+References: <1399046249-19472-1-git-send-email-hdegoede@redhat.com>
+ <1399046249-19472-4-git-send-email-hdegoede@redhat.com>
+ <CAPDyKFoinhyob7GZLgH4Dm7KdHCxj1+OpuZYKDK3OkU8RFsY8A@mail.gmail.com>
+ <53678DB4.60209@redhat.com>
+ <CAPDyKFpAGNLaKagJ_RPt1vbz70pNWJzo-s6Ao50Mh0gFrRLN0g@mail.gmail.com>
+ <536B69FA.5090600@redhat.com>
+Message-ID: <CAPDyKFqbN61EgiTbktL-vm+L7q06OTeedCTVXJsP16ZZZd8g8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 May 2014 05:34 PM, Javier Martinez Canillas wrote:
-> Hello Rajendra,
-> 
-> On Thu, May 8, 2014 at 1:10 PM, Rajendra Nayak <rnayak@ti.com> wrote:
->> On Thursday 08 May 2014 02:56 PM, Javier Martinez Canillas wrote:
->>> Hello Rajendra,
->>>
->>> On Thu, May 8, 2014 at 9:06 AM, Rajendra Nayak <rnayak@ti.com> wrote:
->>>> On Wednesday 23 April 2014 11:41 AM, Rajendra Nayak wrote:
->>>>> Replace the clk_enable()s with a clk_prepare_enable() and
->>>>> the clk_disables()s with a clk_disable_unprepare()
->>>>>
->>>>> This never showed issues due to the OMAP platform code (hwmod)
->>>>> leaving these clocks in clk_prepare()ed state by default.
->>>>>
->>>>> Reported-by: Kishon Vijay Abraham I <kishon@ti.com>
->>>>> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
->>>>> Cc: linux-gpio at vger.kernel.org
->>>>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>>> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+On 8 May 2014 13:26, Hans de Goede <hdegoede@redhat.com> wrote:
+> Hi,
+>
+> On 05/05/2014 10:33 PM, Ulf Hansson wrote:
+>> [snip]
+>>
+>>> On 05/05/2014 02:41 PM, Ulf Hansson wrote:
+>>>>> +struct sunxi_mmc_host {
+>>>>> +       struct mmc_host *mmc;
+>>>>> +       struct regulator *vmmc;
 >>>>
->>>> Linus,
->>>>
->>>> Do you mind picking this fix up via the GPIO tree? Alternatively you could
->>>> Ack this if you are fine and we can take both Patch 1/2 and Patch 2/2 from this
->>>> series via the OMAP tree.
->>>>
->>>> Patch 2/2 has a dependency on Patch 1/2 and they need to go in in that order else
->>>> gpio would break. More discussions are here [1].
->>>> Let us know what you think. Thanks.
->>>>
+>>>> Instead of having a specific regulator for this driver, please use the
+>>>> mmc_regulator_get_supply API.
 >>>
->>> I wonder if that is really the case. Your Patch 2/2 removes the call
->>> to clk_prepare on _init_opt_clks() but it also replaces
->>> clk_{enable,disable} with clk_prepare_enable()/clk_disable_unprepare()
->>> on _enable_optional_clocks() and _disable_optional_clocks()
->>> respectively.
+>>> We cannot use mmc_regulator_get_supply because for the sunxi mmc controller
+>>> not only vqmmc but also vmmc itself is optional, and mmc_regulator_get_supply
+>>> calls devm_regulator_get rather then devm_regulator_get_optional for vmmc.
 >>
->> Right, the difference being, by the time hwmod is done enabling/disabling
->> the opt clocks, without patch 2/2, the prepare count is 1, with patch 2/2
->> prepare count is 0.
+>> Is that because the mmc controller handle the power to the card or
+>> because you have a fixed supply?
 >>
-> 
-> Ok, got it now.
-> 
->>>
->>> And GPIO banks are reset by hwmod on init which as far as I know
->>> happen very early before the GPIO OMAP driver is even probed so by the
->>> time clk_enable() is called on the GPIO driver the clock will already
->>> be prepared by _enable_optional_clocks(). I tested linux-gpio/devel
->>
->> and unprepared by _disable_optional_clocks()?
->>
-> 
-> I see that _disable_optional_clocks() is called as well so the clock
-> is left unprepared as you said.
-> 
->>> branch + only your Patch 2/2 and the GPIOs were working correctly on a
->>> OMAP3 board.
->>
->> Did gpio_debounce() ever get called for any of the gpios?
->>
-> 
-> I don't see gpio_debounce() to be called indeed.
-> 
-> omap_gpio_runtime_resume() is executed and calls
-> _gpio_dbck_enable(bank) but clk_enable(bank->dbck) is not called since
-> bank->dbck_enable_mask is 0, that was my confusion since I thought
-> that clk_enable() was called.
-> 
-> Now I understand the dependency between the two patches.
-> 
->>>
->>> So I think that there isn't a strict dependency between these two
->>> patches or am I missing something?
->>>
->>> In fact now that I think about it I wonder what's the functional
->>> change of your Patch 2/2 since hwmod is still calling clk_prepare()
->>> before the driver. If the clocks should actually be controlled by the
->>
->> I don't understand why you say 'before the driver'. Hwmod needs to control
->> optional clocks for some devices in order to do a ocp reset. So it does
->> touch these optional clocks, but if you look at the code it subsequently
->> also disables (and unprepares with patch 2/2) these clocks before returning
->> the control to the driver.
->>
-> 
-> Right, it was just me getting confused by the interaction between
-> hwmod and the GPIO driver. Thanks a lot for the explanation and sorry
-> for the noise.
+>> Having a fixed regulator supply could easily be set up in DT, which
+>> then also dynamically gives you the ocr mask instead of having a them
+>> "hard coded".
+>
+> It is because the sdcard slot power tends to be hooked directly to the 3.3V
+> of the board. So in a sense this is a fixed regulator, but I really, REALLY
+> don't want to add fixed regulator boilerplate to all sunxi dts files for this.
 
-No issues, thanks for the review and ack.
+So, how would you then distinguish between let's say a 3.1V and 3.3V
+fixed regulator? That is something that is board specific, thus I
+don't think you can get away from not adding them to DT.
 
-> 
-> Feel free to add my:
-> 
-> Acked-by: Javier Martinez Canillas <javier@dowhile0.org>
-> 
-> Best regards,
-> Javier
-> 
->>> drivers like you said then I think that we should remove
->>> _{enable,disable}_optional_clocks() completely and let the drivers do
->>> the clock prepare and enable like is made on your Patch 1/2 for the
->>> GPIO driver.
->>>
->>> What do you think about it?
->>>
->>> Best regards,
->>> Javier
->>>
->>>> regards,
->>>> Rajendra
->>>>
->>>> [1] http://www.mail-archive.com/linux-gpio at vger.kernel.org/msg02801.html
->>>>
->>>>> ---
->>>>>  drivers/gpio/gpio-omap.c |   10 +++++-----
->>>>>  1 file changed, 5 insertions(+), 5 deletions(-)
->>>>>
->>>>> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
->>>>> index 19b886c..78bc5a4 100644
->>>>> --- a/drivers/gpio/gpio-omap.c
->>>>> +++ b/drivers/gpio/gpio-omap.c
->>>>> @@ -180,7 +180,7 @@ static inline void _gpio_rmw(void __iomem *base, u32 reg, u32 mask, bool set)
->>>>>  static inline void _gpio_dbck_enable(struct gpio_bank *bank)
->>>>>  {
->>>>>       if (bank->dbck_enable_mask && !bank->dbck_enabled) {
->>>>> -             clk_enable(bank->dbck);
->>>>> +             clk_prepare_enable(bank->dbck);
->>>>>               bank->dbck_enabled = true;
->>>>>
->>>>>               writel_relaxed(bank->dbck_enable_mask,
->>>>> @@ -198,7 +198,7 @@ static inline void _gpio_dbck_disable(struct gpio_bank *bank)
->>>>>                */
->>>>>               writel_relaxed(0, bank->base + bank->regs->debounce_en);
->>>>>
->>>>> -             clk_disable(bank->dbck);
->>>>> +             clk_disable_unprepare(bank->dbck);
->>>>>               bank->dbck_enabled = false;
->>>>>       }
->>>>>  }
->>>>> @@ -231,7 +231,7 @@ static void _set_gpio_debounce(struct gpio_bank *bank, unsigned gpio,
->>>>>
->>>>>       l = GPIO_BIT(bank, gpio);
->>>>>
->>>>> -     clk_enable(bank->dbck);
->>>>> +     clk_prepare_enable(bank->dbck);
->>>>>       reg = bank->base + bank->regs->debounce;
->>>>>       writel_relaxed(debounce, reg);
->>>>>
->>>>> @@ -245,7 +245,7 @@ static void _set_gpio_debounce(struct gpio_bank *bank, unsigned gpio,
->>>>>       bank->dbck_enable_mask = val;
->>>>>
->>>>>       writel_relaxed(val, reg);
->>>>> -     clk_disable(bank->dbck);
->>>>> +     clk_disable_unprepare(bank->dbck);
->>>>>       /*
->>>>>        * Enable debounce clock per module.
->>>>>        * This call is mandatory because in omap_gpio_request() when
->>>>> @@ -290,7 +290,7 @@ static void _clear_gpio_debounce(struct gpio_bank *bank, unsigned gpio)
->>>>>               bank->context.debounce = 0;
->>>>>               writel_relaxed(bank->context.debounce, bank->base +
->>>>>                            bank->regs->debounce);
->>>>> -             clk_disable(bank->dbck);
->>>>> +             clk_disable_unprepare(bank->dbck);
->>>>>               bank->dbck_enabled = false;
->>>>>       }
->>>>>  }
->>>>>
->>>>
->>>> --
->>>> To unsubscribe from this list: send the line "unsubscribe linux-gpio" in
->>>> the body of a message to majordomo at vger.kernel.org
->>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Don't forget, the ocr mask is needed to be able negotiate the voltage
+level with the card at initialization.
+
+>
+> In other subsystems where there are similar cases (ie ahci-platform, supply for
+> various ethernet phys), the regulator is always optional and does not need
+> to be specified in the dts when the device is just hardwired to the power.
+
+Maybe because the voltage level is not needed to be negotiated during
+initialization?
+
+>
 >>
+>>>
+>>> Using mmc_regulator_get_supply would lead to false postive errors being logged
+>>> on 99/100 boards.
+>>
+>> I was kind of expecting a response like this. :-) Actually I would
+>> prefer if we could make the API suit drivers like this one as well.
+>>
+>> For reference, there are currently a patch being discussed which
+>> relates to this topic.
+>> "mmc: core: Improve support for deferred regulators"
+>
+> Ok, so that patch seems to replace the somewhat alarming message
+> reported by devm_regulator_get by an acceptable:
+>
+> dev_info(dev, "No vmmc regulator found\n");
+>
+> I can live with that, so I'm going to assume that something like that
+> patch will get merged in the near future and I'll switch to mmc_regulator_get_supply
+> in the next version and just live with the error messages this causes for now.
+
+Great! :-)
+
+>
+>>>>> +       struct reset_control *reset;
+>>>>> +
+>>>>> +       /* IO mapping base */
+>>>>> +       void __iomem    *reg_base;
+>>>>> +
+>>>>> +       spinlock_t      lock;
+>>>>> +       struct tasklet_struct manual_stop_tasklet;
+>>>>
+>>>> Any reason why you can't use a threaded IRQ handler instead of a tasklet?
+>>>
+>>> AFAIK IRQ threaded handlers always have the highest priority. When
+>>> the manual_stop_tasklet runs we disable irqs and start polling to
+>>> recover from an error condition, which is nothing something I want
+>>> todo with the highest priority on the system.
+>>
+>> To me, that seems like a good match for a threaded irq handler.
+>
+> Ok, I've done some reading up on threaded irq handlers and I'll
+> I'll convert this to a threaded irq handler (only using the thread for the error
+> handling case).
+>
+> <snip>
+>
+>>>>> +               if (err) {
+>>>>> +                       host->ferror = 1;
+>>>>> +                       return;
+>>>>> +               }
+>>>>> +
+>>>>> +               enable_irq(host->irq);
+>>
+>> Just realize that I also think you should move the enable|disable_irq
+>> to ->probe|remove().
+>>
+>> That will mean you will be better prepared to implement runtime PM
+>> support and thus make it possible to disable irqs during request
+>> inactivity.
+>
+> Ok.
+>
+> <snip>
+>
+>>>>> +       /* set up clock */
+>>>>> +       if (ios->clock && ios->power_mode) {
+>>>>> +               dev_dbg(mmc_dev(host->mmc), "ios->clock: %d\n", ios->clock);
+>>>>> +               sunxi_mmc_clk_set_rate(host, ios->clock);
+>>>>> +               usleep_range(50000, 55000);
+>>>>
+>>>> Is those values for usleep really correct? I am not sure how many
+>>>> times we execute this path while detecting/powering the card, but
+>>>> quite a few.
+>>>> Detecting/powering the card is also done during each system
+>>>> suspend/resume cycle - thus this will heavily affect these cycles.
+>>>
+>>> The problem is we've no docs, so this is all based on android code, the
+>>> android code has 2 drivers, lets call them the old and the new one.
+>>>
+>>> This works is based on the new driver as that one was significantly
+>>> cleaner then the old driver. This bit comes directly from the new driver,
+>>> but it seems that the old driver has no delay at all. And clk_set_rate
+>>> already does a busy-wait waiting for the hardware to acknowledge the
+>>> clock rate change, so I think this is not really necessary. I'll run
+>>> some tests with it removed and if everything still works I'll drop it.
+>>
+>> Okay, great!
+>>
+>> Maybe we could add some comments, no matter what!?
+>
+> Yeah I'll add a comment that there used to be a usleep there :)
+>
+> Regards,
+>
+> Hans
