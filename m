@@ -1,46 +1,33 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 08 May 2014 19:37:39 +0200
-Subject: [PATCH V2 4/4] ARM: dts: exynos4: Remove simple-bus compatibles from
- the camera subsystem
-Message-ID: <1399570659-29864-1-git-send-email-s.nawrocki@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 8 May 2014 18:38:53 +0100
+Subject: [PATCH] ARM: mm: Add workaround for erratum 763126
+In-Reply-To: <CAD=FV=XeYdgqk3-CpS2NNXFAnn+uGDC6844d-L6vfS=SYEuw-Q@mail.gmail.com>
+References: <1399528508-2806-1-git-send-email-arjun.kv@samsung.com>
+ <CAD=FV=XeYdgqk3-CpS2NNXFAnn+uGDC6844d-L6vfS=SYEuw-Q@mail.gmail.com>
+Message-ID: <20140508173853.GG8981@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The usage of "simple-bus" was incorrect and the drivers now will also
-work without it so remove it.
+Hi guys,
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/boot/dts/exynos4.dtsi    |    2 +-
- arch/arm/boot/dts/exynos4x12.dtsi |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+On Thu, May 08, 2014 at 05:57:03PM +0100, Doug Anderson wrote:
+> On Wed, May 7, 2014 at 10:55 PM, Arjun.K.V <arjun.kv@samsung.com> wrote:
+> > From: "Arjun.K.V" <arjun.kv@samsung.com>
+> >
+> > Three processor exclusive access livelock.
+> > In a system with three or more coherent masters that all use
+> > the ldrex/strex synchronization primitives to access a semaphore
+> > in coherent cacheable memory, there is a possibility of a
+> > livelock condition where two masters continuously attempt
+> > and fail to get the lock while the third master
+> > continuously reads the lock.
 
-diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-index 2f8bcd0..bfb0e73 100644
---- a/arch/arm/boot/dts/exynos4.dtsi
-+++ b/arch/arm/boot/dts/exynos4.dtsi
-@@ -125,7 +125,7 @@
- 	};
- 
- 	camera {
--		compatible = "samsung,fimc", "simple-bus";
-+		compatible = "samsung,fimc";
- 		status = "disabled";
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
-index c4a9306..0cabb74 100644
---- a/arch/arm/boot/dts/exynos4x12.dtsi
-+++ b/arch/arm/boot/dts/exynos4x12.dtsi
-@@ -188,7 +188,7 @@
- 		};
- 
- 		fimc_is: fimc-is at 12000000 {
--			compatible = "samsung,exynos4212-fimc-is", "simple-bus";
-+			compatible = "samsung,exynos4212-fimc-is";
- 			reg = <0x12000000 0x260000>;
- 			interrupts = <0 90 0>, <0 95 0>;
- 			samsung,power-domain = <&pd_isp>;
--- 
-1.7.9.5
+Tentative NAK. You're paraphrasing the bug to make it sound worse than it
+is -- whilst two of the cores need to be in a ldrex/strex loop, the third
+needs to be issuing snoops from a normal load (to get the line into a shared
+state). Please can you point me at the code in Linux which is triggering
+this issue?
+
+Cheers,
+
+Will
