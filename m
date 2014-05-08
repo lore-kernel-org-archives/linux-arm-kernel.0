@@ -1,42 +1,30 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 8 May 2014 15:53:24 +0300
-Subject: omap4-panda-es boot issues with v3.15-rc4
-Message-ID: <536B7E44.2040303@ti.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 08 May 2014 17:11:07 +0400
+Subject: [PATCH 5/7] usb: ohci-platform: Enable optional use of reset
+ controller
+In-Reply-To: <20140507220317.GD7047@lukather>
+References: <1399434623-20383-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1399434623-20383-6-git-send-email-maxime.ripard@free-electrons.com>
+ <536A5EBF.10309@cogentembedded.com> <20140507220317.GD7047@lukather>
+Message-ID: <536B826B.7010908@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello.
 
-Nishant pointed me to a booting issue with omap4-panda-es on linux-next but I'm observing
-similar issues, although less frequent, with v3.15-rc4 as well.
+On 05/08/2014 02:03 AM, Maxime Ripard wrote:
 
-Configuration:
+>>> The OHCI controllers used in the Allwinner A31 are asserted in reset using a
 
-- kernel v3.15-rc4 or linux-next (20140507)
-- multi_v7_defconfig with LEDS_TRIGGER_HEARTBEAT and LEDS_GPIO enabled
-- u-boot/master	173d294b94cf
+>>     s/asserted/powered up/?
 
-Observations:
+> No. There's an external reset controller that maintains these devices
+> into reset. It's not only a power on thing, it can also be put back
+> into reset later in the life of the system.
 
-- Out of 10 boots a few may not succeed and hang midway without any warnings. Heartbeat LED stops.
-e.g. http://www.hastebin.com/ebumojegoq.vhdl
+    However, the expression that "the OHCI controllers are asserted in reset" 
+still seems dubious to me...
 
-- Hang more noticeable on linux-next (20140507) than on v3.15-rc4
+> Maxime
 
-- Hang more noticeable with USB_EHCI_HCD enabled but hang observed even without USB_EHCI_HCD.
-Maybe related to when high speed interrupts occur in the boot process.
-
-- On successful boots following warning is seen
-[    4.010375] gic_timer_retrigger: lost localtimer interrupt
-
-- On successful boots heartbeat LED stops blinking after boot process and left idle. LED can remain stuck in
-ON state as well. It does blink again when doing activity on console.
-
-Workaround:
-
-- Disabling CPU_IDLE or even just disabling C3 (MPU OSWR) seems to fix all the above issues.
-
-I don't really know what exactly is the issue but it seems to be specific to OMAP4, GIC, MPU OSWR.
-
-cheers,
--roger
+WBR, Sergei
