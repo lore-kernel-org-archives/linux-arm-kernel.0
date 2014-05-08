@@ -1,37 +1,66 @@
-From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
-Date: Thu, 08 May 2014 17:59:36 +0200
-Subject: [PATCH 1/2] ARM: dts: Enable USB 3503 hub on exynos5250-snow
-In-Reply-To: <1399293056-17143-1-git-send-email-gautam.vivek@samsung.com>
-References: <1399293056-17143-1-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <536BA9E8.2030306@suse.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 8 May 2014 16:01:44 +0000 (UTC)
+Subject: [PATCH] ARM: OMAP5: DSS hwmod data
+In-Reply-To: <536B1A9C.7050006@ti.com>
+References: <1394619996-3525-1-git-send-email-tomi.valkeinen@ti.com>
+ <alpine.DEB.2.02.1405080432570.23579@utopia.booyaka.com>
+ <536B1A9C.7050006@ti.com>
+Message-ID: <alpine.DEB.2.02.1405081558570.23579@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Archit,
 
-Am 05.05.2014 14:30, schrieb Vivek Gautam:
-> The exynos5250-snow has a SMSC USB3503 connected in
-> hardware only mode like a PHY. Enable support for it,
-> and add necessary 'reset-gpio' for it.
-> 
-> This is in correspondance to similar patch by Mark Brown
-> 7c1b0ec ARM: dts: Enable USB hub on Arndale
-> 
-> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
-> ---
-> 
-> Based on 'for-next' branch of kgene's linux-samsung tree.
-> 
->  arch/arm/boot/dts/exynos5250-pinctrl.dtsi |    7 +++++++
->  arch/arm/boot/dts/exynos5250-snow.dts     |   14 ++++++++++++++
->  2 files changed, 21 insertions(+)
+On Thu, 8 May 2014, Archit Taneja wrote:
 
-The same snippet as for snow also fixed my USB issues on spring.
-Should it go into exynos5250-cros-common.dtsi instead?
+> Hi Paul,
+> 
+> On Thursday 08 May 2014 10:07 AM, Paul Walmsley wrote:
+> > Hi,
+> > 
+> > On Wed, 12 Mar 2014, Tomi Valkeinen wrote:
+> > 
+> > > This patch adds hwmod data for omap5 display subsystem. I have tested this
+> > > on
+> > > omap5-uevm with a DSI panel. I cannot test omap5-uevm's hdmi output yet,
+> > > as the
+> > > mainline is missing omap5 HDMI driver.
+> > > 
+> > > I do see this when booting:
+> > > 
+> > >    omap_hwmod: dss_dispc: cannot be enabled for reset (3)
+> > >    omap_hwmod: dss_dsi1: cannot be enabled for reset (3)
+> > >    omap_hwmod: dss_dsi2: cannot be enabled for reset (3)
+> > >    omap_hwmod: dss_hdmi: cannot be enabled for reset (3)
+> > >    omap_hwmod: dss_rfbi: cannot be enabled for reset (3)
+> > > 
+> > > But at least DSI works just fine.
+> > 
+> > Am looking at this for v3.16.  But I think someone needs to take a look at
+> > those warnings and figure out why they are happening.
+> 
+> We associate DSS clock domain's MODULEMODE bits only with the dss_core hwmod.
+> The rest of the dss hwmods don't touch MODULEMODE.
+> 
+> Therefore, these hwmods cannot be enabled independently, and reset.
+> 
+> We don't face this issue in the omapdss driver since the platform devices
+> corresponding to these hwmods have their parent as the platform device
+> corresponding to 'dss_core'. This parent child-relation ensures that
+> 'dss_core' is enabled when the a child calls a pm_runtime_get function.
+> 
+> The problem is that we have multiple hwmods which use the same MODULEMODE bit.
+> There is no use-counting done when it comes to enabling/disabling modulemode.
+> If there was such a thing, we could have provided MODULEMODE flags even for
+> the children hwmods.
 
-Regards,
-Andreas
+Thanks for the summary.  This is indeed a long-overdue item for the hwmod 
+core code.  Can you please patch the hwmod core code to add this?  I'd 
+suggest making the use-counting functionality conditional on a hwmod flag 
+that you can set for all of the DSS hwmods.  (Ideally, the core code would 
+detect that several modules share the same MODULEMODE bits, and 
+automatically set it for those cases, but that seems a bit too complex for 
+a first cut.)
 
--- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+
+- Paul
