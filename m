@@ -1,61 +1,48 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu,  8 May 2014 16:56:13 +0200
-Subject: [PATCH 2/2] dmaengine: sa11x0: remove broken #ifdef
+Date: Thu,  8 May 2014 16:56:22 +0200
+Subject: [PATCH] i2c/nuc900: fix ancient build error
 In-Reply-To: <1399560990-1402858-1-git-send-email-arnd@arndb.de>
 References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
  <1399560990-1402858-1-git-send-email-arnd@arndb.de>
-Message-ID: <1399560990-1402858-2-git-send-email-arnd@arndb.de>
+Message-ID: <1399560990-1402858-11-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sa11x0_dma_pm_ops unconditionally reference sa11x0_dma_resume
-and sa11x0_dma_suspend, which currently breaks if CONFIG_PM_SLEEP
-is disabled.
+As far as I can tell, this driver must have produced this error
+for as long as it has been merged into the mainline kernel, but
+it was never part of the normal build tests:
 
-There is probably a better way to remove the reference in this
-case, but the safe choice is to have the suspend/resume code always
-built in the driver.
+drivers/i2c/busses/i2c-nuc900.c: In function 'nuc900_i2c_probe':
+drivers/i2c/busses/i2c-nuc900.c:601:17: error: request for member 'apbfreq' in something not a structure or union
+  ret = (i2c->clk.apbfreq)/(pdata->bus_freq * 5) - 1;
+                 ^
+
+This is an attempt to get the driver to build and possibly
+work correctly, although I do wonder whether we should just
+remove it, as it has clearly never worked.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: dmaengine at vger.kernel.org
-Cc: Vinod Koul <vinod.koul@intel.com>
-Cc: Dan Williams <dan.j.williams@intel.com>
+Cc: Wolfram Sang <wsa@the-dreams.de>
+Cc: linux-i2c at vger.kernel.org
+Cc: Wan ZongShun <mcuos.com@gmail.org>
+Cc: Marek Vasut <marek.vasut@gmail.com>
+Cc: Baruch Siach <baruch@tkos.co.il>
 ---
- drivers/dma/sa11x0-dma.c | 4 ----
- 1 file changed, 4 deletions(-)
+ drivers/i2c/busses/i2c-nuc900.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/dma/sa11x0-dma.c b/drivers/dma/sa11x0-dma.c
-index ab26d46..5ebdfbc 100644
---- a/drivers/dma/sa11x0-dma.c
-+++ b/drivers/dma/sa11x0-dma.c
-@@ -113,11 +113,9 @@ struct sa11x0_dma_phy {
- 	struct sa11x0_dma_desc	*txd_load;
- 	unsigned		sg_done;
- 	struct sa11x0_dma_desc	*txd_done;
--#ifdef CONFIG_PM_SLEEP
- 	u32			dbs[2];
- 	u32			dbt[2];
- 	u32			dcsr;
--#endif
- };
+diff --git a/drivers/i2c/busses/i2c-nuc900.c b/drivers/i2c/busses/i2c-nuc900.c
+index 36394d7..e3e9f95 100644
+--- a/drivers/i2c/busses/i2c-nuc900.c
++++ b/drivers/i2c/busses/i2c-nuc900.c
+@@ -598,7 +598,7 @@ static int nuc900_i2c_probe(struct platform_device *pdev)
  
- struct sa11x0_dma_dev {
-@@ -984,7 +982,6 @@ static int sa11x0_dma_remove(struct platform_device *pdev)
- 	return 0;
- }
+ 	clk_get_rate(i2c->clk);
  
--#ifdef CONFIG_PM_SLEEP
- static int sa11x0_dma_suspend(struct device *dev)
- {
- 	struct sa11x0_dma_dev *d = dev_get_drvdata(dev);
-@@ -1054,7 +1051,6 @@ static int sa11x0_dma_resume(struct device *dev)
+-	ret = (i2c->clk.apbfreq)/(pdata->bus_freq * 5) - 1;
++	ret = clk_get_rate(i2c->clk)/(pdata->bus_freq * 5) - 1;
+ 	writel(ret & 0xffff, i2c->regs + DIVIDER);
  
- 	return 0;
- }
--#endif
- 
- static const struct dev_pm_ops sa11x0_dma_pm_ops = {
- 	.suspend_noirq = sa11x0_dma_suspend,
+ 	/* find the IRQ for this unit (note, this relies on the init call to
 -- 
 1.8.3.2
