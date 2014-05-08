@@ -1,47 +1,33 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 8 May 2014 15:00:41 +0000 (UTC)
-Subject: OMAP baseline test results for v3.15-rc4
-In-Reply-To: <CAGhQ9Vx_dJTn20S1OngAks1KvZkH=MUWEh-4bv5ciM7PhofJ8Q@mail.gmail.com>
-References: <alpine.DEB.2.02.1405080417150.23579@utopia.booyaka.com>
- <CAGhQ9Vx_dJTn20S1OngAks1KvZkH=MUWEh-4bv5ciM7PhofJ8Q@mail.gmail.com>
-Message-ID: <alpine.DEB.2.02.1405081456560.23579@utopia.booyaka.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Thu, 8 May 2014 11:00:42 -0400
+Subject: [PATCH] ata: pata_at91 only works on sam9
+In-Reply-To: <1399560990-1402858-10-git-send-email-arnd@arndb.de>
+References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
+ <1399560990-1402858-1-git-send-email-arnd@arndb.de>
+ <1399560990-1402858-10-git-send-email-arnd@arndb.de>
+Message-ID: <20140508150042.GD5229@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Joachim,
-
-On Thu, 8 May 2014, Joachim Eastwood wrote:
-
-> On 8 May 2014 06:23, Paul Walmsley <paul@pwsan.com> wrote:
-> >
-> > Here are some basic OMAP test results for Linux v3.15-rc4.
-> > Logs and other details at:
-> >
-> >     http://www.pwsan.com/omap/testlogs/test_v3.15-rc4/20140505112251/
-> >
-> >
-> > Test summary
-> > ------------
-> <snip>
-> >
-> > The eMMC on the 4460 VAR-SOM-OM has failed; I guess it's run out of
-> > reserve blocks to reallocate.  Now it's time to find yet another way
-> > to boot it.
+On Thu, May 08, 2014 at 04:56:21PM +0200, Arnd Bergmann wrote:
+> The smc driver used by pata_at91 is at91sam9 specific, so building
+> this driver on another at91 platform results in this error:
 > 
-> I have some patches for u-boot which makes it possible to use the
-> on-board LAN7500 USB Ethernet controller for tftp.
+> ERROR: "sam9_smc_configure" [drivers/ata/pata_at91.ko] undefined!
+> ERROR: "sam9_smc_write_mode" [drivers/ata/pata_at91.ko] undefined!
+> ERROR: "sam9_smc_read_mode" [drivers/ata/pata_at91.ko] undefined!
+> 
+> This patch changes the Kconfig dependency to ensure it always works.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Tejun Heo <tj@kernel.org>
+> Cc: linux-ide at vger.kernel.org
+> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-That's great!
+Applied to libata/for-3.15-fixes.
 
-> Since you have a VAR-SOM-OM44 module maybe you could test my dts patches for it?
-> I will post a new version of the patch set early next week. I can cc you.
+Thanks.
 
-I'd like to load the rootfs off the external SD slot.  Looks like you 
-might be adding support for that with your recent DT patches?
-
-> Do you have the VAR-DVK-OM44 eval board?
-
-Yes.
-
-
-- Paul
+-- 
+tejun
