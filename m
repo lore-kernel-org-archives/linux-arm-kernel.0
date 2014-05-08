@@ -1,85 +1,82 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 08 May 2014 18:07:09 +0200
-Subject: [PATCH 1/2] ARM: dts: Enable USB 3503 hub on exynos5250-snow
-In-Reply-To: <1399293056-17143-1-git-send-email-gautam.vivek@samsung.com>
-References: <1399293056-17143-1-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <536BABAD.5030605@samsung.com>
+From: andriy.shevchenko@intel.com (Shevchenko, Andriy)
+Date: Thu, 8 May 2014 16:08:37 +0000
+Subject: [PATCH 2/2] dmaengine: sa11x0: remove broken #ifdef
+In-Reply-To: <1399560990-1402858-2-git-send-email-arnd@arndb.de>
+References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
+ <1399560990-1402858-1-git-send-email-arnd@arndb.de>
+ <1399560990-1402858-2-git-send-email-arnd@arndb.de>
+Message-ID: <1399565317.9018.4.camel@smile.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vivek,
+On Thu, 2014-05-08 at 16:56 +0200, Arnd Bergmann wrote:
+> The sa11x0_dma_pm_ops unconditionally reference sa11x0_dma_resume
+> and sa11x0_dma_suspend, which currently breaks if CONFIG_PM_SLEEP
+> is disabled.
+> 
+> There is probably a better way to remove the reference in this
+> case, but the safe choice is to have the suspend/resume code always
+> built in the driver.
 
-On 05.05.2014 14:30, Vivek Gautam wrote:
-> The exynos5250-snow has a SMSC USB3503 connected in
-> hardware only mode like a PHY. Enable support for it,
-> and add necessary 'reset-gpio' for it.
+Maybe you could create a macro in pm.h for *_noirq version of
+suspend/resume? However, like we discussed with Vinod it's much better
+to use suspend_late/resume_early for DMAC device drivers, though I have
+no idea if it works for sa11x0.
+
 > 
-> This is in correspondance to similar patch by Mark Brown
-> 7c1b0ec ARM: dts: Enable USB hub on Arndale
-> 
-> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: dmaengine at vger.kernel.org
+> Cc: Vinod Koul <vinod.koul@intel.com>
+> Cc: Dan Williams <dan.j.williams@intel.com>
 > ---
+>  drivers/dma/sa11x0-dma.c | 4 ----
+>  1 file changed, 4 deletions(-)
 > 
-> Based on 'for-next' branch of kgene's linux-samsung tree.
-> 
->  arch/arm/boot/dts/exynos5250-pinctrl.dtsi |    7 +++++++
->  arch/arm/boot/dts/exynos5250-snow.dts     |   14 ++++++++++++++
->  2 files changed, 21 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5250-pinctrl.dtsi b/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
-> index 9a49e68..bd8c8f1 100644
-> --- a/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
-> @@ -706,6 +706,13 @@
->  			samsung,pin-pud = <0>;
->  			samsung,pin-drv = <0>;
->  		};
-> +
-> +		usb_hub_reset: usb-hub-reset {
-> +			samsung,pins = "gpe1-0";
-> +			samsung,pin-function = <1>;
-> +			samsung,pin-pud = <0>;
-> +			samsung,pin-drv = <0>;
-> +		};
-
-This is not a generic pin config group and should not be added to this
-file. Btw. it just sets the pin to output, which is what the consumer
-driver can do as well by calling gpio_direction_output. Do you really
-need this?
-
->  	};
+> diff --git a/drivers/dma/sa11x0-dma.c b/drivers/dma/sa11x0-dma.c
+> index ab26d46..5ebdfbc 100644
+> --- a/drivers/dma/sa11x0-dma.c
+> +++ b/drivers/dma/sa11x0-dma.c
+> @@ -113,11 +113,9 @@ struct sa11x0_dma_phy {
+>  	struct sa11x0_dma_desc	*txd_load;
+>  	unsigned		sg_done;
+>  	struct sa11x0_dma_desc	*txd_done;
+> -#ifdef CONFIG_PM_SLEEP
+>  	u32			dbs[2];
+>  	u32			dbt[2];
+>  	u32			dcsr;
+> -#endif
+>  };
 >  
->  	pinctrl at 10d10000 {
-> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-> index 1ce1088..2e48f27 100644
-> --- a/arch/arm/boot/dts/exynos5250-snow.dts
-> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
-> @@ -200,6 +200,20 @@
->  		samsung,vbus-gpio = <&gpx1 1 0>;
->  	};
+>  struct sa11x0_dma_dev {
+> @@ -984,7 +982,6 @@ static int sa11x0_dma_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
 >  
-> +	usb_hub_bus {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
+> -#ifdef CONFIG_PM_SLEEP
+>  static int sa11x0_dma_suspend(struct device *dev)
+>  {
+>  	struct sa11x0_dma_dev *d = dev_get_drvdata(dev);
+> @@ -1054,7 +1051,6 @@ static int sa11x0_dma_resume(struct device *dev)
+>  
+>  	return 0;
+>  }
+> -#endif
+>  
+>  static const struct dev_pm_ops sa11x0_dma_pm_ops = {
+>  	.suspend_noirq = sa11x0_dma_suspend,
 
-Why do you need this bus?
 
-> +
-> +		// SMSC USB3503 connected in hardware only mode as a PHY
+-- 
+Andy Shevchenko <andriy.shevchenko@intel.com>
+Intel Finland Oy
+---------------------------------------------------------------------
+Intel Finland Oy
+Registered Address: PL 281, 00181 Helsinki 
+Business Identity Code: 0357606 - 4 
+Domiciled in Helsinki 
 
-Wrong comment style. Also basically the comment says exactly the same as
-could be inferred from the node below.
-
-> +		usb_hub {
-> +			compatible = "smsc,usb3503a";
-> +			reset-gpios = <&gpe1 0 1>;
-> +			pinctrl-0 = <&usb_hub_reset>;
-> +			pinctrl-names = "default";
-
-As above, do you really need to use pinctrl here?
-
-I believe the same comments apply for patch 2/2 as well.
-
-Best regards,
-Tomasz
+This e-mail and any attachments may contain confidential material for
+the sole use of the intended recipient(s). Any review or distribution
+by others is strictly prohibited. If you are not the intended
+recipient, please contact the sender and delete all copies.
