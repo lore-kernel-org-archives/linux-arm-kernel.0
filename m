@@ -1,113 +1,113 @@
-From: marcio@netopen.com.br (Marcio Campos de Lima)
-Date: Thu, 8 May 2014 14:56:50 -0300
-Subject: s_ctrl V4l2 device driver does not work
-Message-ID: <B43D69CB-FE7A-4168-B203-02A7934215F4@netopen.com.br>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 8 May 2014 14:02:49 -0400
+Subject: [GIT PULL] ARM: mvebu: SoC orion5x DT conversion for v3.16
+Message-ID: <20140508180249.GL12708@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+guys,
 
-Can anybody tell me why the set control function is not working in Linux 3.6.9? Thanks.
+This is a great series by Thomas that gets orion5x well on it's way to
+happy devicetree land. :)
 
-?? APPLICATION CALL ??
- struct v4l2_control controle;
-    controle.id = VIDIOC_AVANCA_ZOOM;
-    controle.value = time;
-    if (-1 == xioctl(fd_camera, VIDIOC_S_CTRL,&controle))
-	{
-	printf ("%s erro\n",__FUNCTION__);
-	perror ("erro iotcl");
-	}
+This series crosses quite a few subdirectories, but the changes are
+isolated to orion5x-specific files and legacy platform code.  iow, any
+conflicts are going to be internal to mvebu.  This branch has been up in
+-next for over a week without problems.
 
-The ioctl call returns with invalid argument. It is amazing because the first time the ioctl is called it is executed ok. Then no more call is allowed and return the invalid 
+I chose to keep the series together to keep orion5x bootable during
+bisection.  If you have any trouble with this branch, please let me
+know.
 
-below is the device driver  code I think may be relevant.
+Please pull.
 
-  v4l2_ctrl_handler_init(&priv->ctrls, ARRAY_SIZE(ov5642_ctrls));
-    printk ("handler_init\n");
-    v4l2_ctrl_new_std(&priv->ctrls, &ov5642_ctrl_ops,V4L2_CID_ZOOM_RELATIVE, -1000, 1000, 1, 500);
-    v4l2_ctrl_new_std(&priv->ctrls, &ov5642_ctrl_ops,V4L2_CID_FLASH_STROBE, -100, 100, 1, 5);
+thx,
+
+Jason.
 
 
-    priv->subdev.ctrl_handler=&priv->ctrls;
-    v4l2_i2c_subdev_init(&priv->subdev, client, &ov5642_subdev_ops);
-    return ov5642_video_probe(client);
+The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
 
-static int ov5642_s_ctrl(struct v4l2_ctrl *ctrl)
-{
-	struct ov5642 *ov5642 =
-			container_of(ctrl->handler, struct ov5642, ctrls);
-	struct i2c_client *client = v4l2_get_subdevdata(&ov5642->subdev);
-	u16 data;
-	int ret;
-	printk ("%s: id=%08x val=%d\n",__FUNCTION__, ctrl->id, ctrl->val);
-	switch (ctrl->id) {
-	case V4L2_CID_DO_WHITE_BALANCE:
-		ov5640_set_wb_oem(client, ctrl->val);
-		break;
-	case V4L2_CID_EXPOSURE:
+  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
 
-		break;
-	case V4L2_CID_GAIN:
-		/* Gain is controlled by 2 analog stages and a digital stage.
-		 * Valid values for the 3 stages are
-		 *
-		 * Stage                Min     Max     Step
-		 * ------------------------------------------
-		 * First analog stage   x1      x2      1
-		 * Second analog stage  x1      x4      0.125
-		 * Digital stage        x1      x16     0.125
-		 *
-		 * To minimize noise, the gain stages should be used in the
-		 * second analog stage, first analog stage, digital stage order.
-		 * Gain from a previous stage should be pushed to its maximum
-		 * value before the next stage is used.
-		 */
-		if (ctrl->val <= 32) {
-			data = ctrl->val;
-		} else if (ctrl->val <= 64) {
-			ctrl->val &= ~1;
-			data = (1 << 6) | (ctrl->val >> 1);
-		} else {
-			ctrl->val &= ~7;
-			data = ((ctrl->val - 64) << 5) | (1 << 6) | 32;
-		}
-		break;
-	case V4L2_CID_ZOOM_RELATIVE:
-		if (ctrl->val>0)
-			avanca_zoom(sysPriv.v4l2_int_device, ctrl->val);
-		else
-			recua_zoom(sysPriv.v4l2_int_device, ctrl->val);
+are available in the git repository at:
 
-		break;
-	case V4L2_CID_BRIGHTNESS:
-		 ov5640_set_brightness(client, ctrl->val);
-		 break;
-	case V4L2_CID_CONTRAST:
-		ov5640_set_contrast(client, ctrl->val);
-		break;
-	case V4L2_CID_FLASH_STROBE:
-		ativa_flash (sysPriv.v4l2_int_device, ctrl->val);
-		break;
-	case V4L2_CID_VFLIP:
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-soc-orion5x-3.16
 
-	case V4L2_CID_TEST_PATTERN:
+for you to fetch changes up to 19e00f20e90e349cdeef3d7b63e6179215c9ff9d:
 
+  ARM: orion: remove no longer needed gpio DT code (2014-04-26 19:45:28 +0000)
 
+----------------------------------------------------------------
+mvebu SoC orion5x DT conversion for v3.16
 
-	case V4L2_CID_BLC_AUTO:
+ - orion5x
+    - convert to DT
 
-	case V4L2_CID_BLC_TARGET_LEVEL:
+----------------------------------------------------------------
+Thomas Petazzoni (29):
+      ARM: orion5x: move interrupt controller node into ocp
+      ARM: orion5x: switch to preprocessor includes in DT
+      ARM: orion5x: use existing dt-bindings include for Device Tree files
+      ARM: orion5x: convert DT to use the mvebu-mbus driver
+      ARM: orion5x: add node labels in Orion5x SoC Device Tree file
+      ARM: orion5x: use gpio-keys and gpio-leds instead of gpio_keys/gpio_leds in edmini_v2
+      ARM: orion5x: add linux,stdout-path to edmini_v2
+      ARM: orion5x: use node labels for UART and SATA on edmini_v2
+      ARM: orion5x: rename XOR node to dma-controller@<address>
+      ARM: orion5x: add interrupt for Ethernet in Device Tree
+      ARM: orion5x: switch to use the clock driver for DT platforms
+      ARM: orion5x: convert to use 'clocks' property for UART controllers
+      ARM: orion: switch to a per-platform handle_irq() function
+      ARM: orion5x: switch to DT interrupts and timer
+      ARM: orion5x: enable pinctrl driver at SoC level
+      ARM: orion5x: update I2C description at SoC level
+      ARM: orion5x: add Device Bus description at SoC level
+      ARM: orion5x: add standard pinctrl configs for sata0 and sata1
+      ARM: orion5x: convert edmini_v2 to DT pinctrl
+      ARM: orion5x: use DT to describe I2C devices on edmini_v2
+      ARM: orion5x: use DT to describe EHCI on edmini_v2
+      ARM: orion5x: use DT to describe NOR on edmini_v2
+      ARM: orion5x: keep TODO list in edmini_v2 DT
+      ARM: orion5x: remove unneeded code for edmini_v2
+      ARM: orion5x: convert RD-88F5182 to Device Tree
+      ARM: orion5x: convert d2net to Device Tree
+      ARM: orion5x: convert Maxtor Shared Storage II to the Device Tree
+      ARM: orion: remove no longer needed DT IRQ code
+      ARM: orion: remove no longer needed gpio DT code
 
-	case V4L2_CID_BLC_ANALOG_OFFSET:
-
-	case V4L2_CID_BLC_DIGITAL_OFFSET:
-		return 1;
-			}
-
-	return 0;
-}
-
-static struct v4l2_ctrl_ops ov5642_ctrl_ops = {
-	.s_ctrl = ov5642_s_ctrl,
-};
+ arch/arm/boot/dts/Makefile                         |   5 +-
+ arch/arm/boot/dts/orion5x-lacie-d2-network.dts     | 236 +++++++++++++
+ .../dts/orion5x-lacie-ethernet-disk-mini-v2.dts    | 141 ++++++--
+ .../boot/dts/orion5x-maxtor-shared-storage-2.dts   | 178 ++++++++++
+ arch/arm/boot/dts/orion5x-mv88f5182.dtsi           |  45 +++
+ arch/arm/boot/dts/orion5x-rd88f5182-nas.dts        | 177 ++++++++++
+ arch/arm/boot/dts/orion5x.dtsi                     | 289 +++++++++-------
+ arch/arm/mach-dove/irq.c                           |  36 ++
+ arch/arm/mach-kirkwood/irq.c                       |  37 +++
+ arch/arm/mach-orion5x/Kconfig                      |  37 +--
+ arch/arm/mach-orion5x/Makefile                     |   7 +-
+ arch/arm/mach-orion5x/board-d2net.c                | 109 ++++++
+ arch/arm/mach-orion5x/board-dt.c                   |  18 +-
+ arch/arm/mach-orion5x/board-mss2.c                 |  90 +++++
+ arch/arm/mach-orion5x/board-rd88f5182.c            | 116 +++++++
+ arch/arm/mach-orion5x/common.h                     |  13 +-
+ arch/arm/mach-orion5x/d2net-setup.c                | 365 ---------------------
+ arch/arm/mach-orion5x/edmini_v2-setup.c            | 169 ----------
+ arch/arm/mach-orion5x/irq.c                        |  28 ++
+ arch/arm/mach-orion5x/mss2-setup.c                 | 274 ----------------
+ arch/arm/plat-orion/gpio.c                         |  48 ---
+ arch/arm/plat-orion/include/plat/irq.h             |   1 -
+ arch/arm/plat-orion/include/plat/orion-gpio.h      |   1 -
+ arch/arm/plat-orion/irq.c                          |  77 -----
+ 24 files changed, 1393 insertions(+), 1104 deletions(-)
+ create mode 100644 arch/arm/boot/dts/orion5x-lacie-d2-network.dts
+ create mode 100644 arch/arm/boot/dts/orion5x-maxtor-shared-storage-2.dts
+ create mode 100644 arch/arm/boot/dts/orion5x-mv88f5182.dtsi
+ create mode 100644 arch/arm/boot/dts/orion5x-rd88f5182-nas.dts
+ create mode 100644 arch/arm/mach-orion5x/board-d2net.c
+ create mode 100644 arch/arm/mach-orion5x/board-mss2.c
+ create mode 100644 arch/arm/mach-orion5x/board-rd88f5182.c
+ delete mode 100644 arch/arm/mach-orion5x/d2net-setup.c
+ delete mode 100644 arch/arm/mach-orion5x/edmini_v2-setup.c
+ delete mode 100644 arch/arm/mach-orion5x/mss2-setup.c
