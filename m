@@ -1,87 +1,38 @@
-From: ipaton0@gmail.com (Iain Paton)
-Date: Thu, 08 May 2014 18:12:02 +0100
-Subject: [PATCH v2] ARM: dts: imx6: add new board RIoTboard
-In-Reply-To: <1399560632.547109991@f294.i.mail.ru>
-References: <53695C34.5000604@gmail.com>
- <CAOMZO5AMf74btETX9zM97B-rCRAVh9-s=N4=xqTMifuucwqURg@mail.gmail.com>
- <536B9654.7020509@gmail.com> <1399560632.547109991@f294.i.mail.ru>
-Message-ID: <536BBAE2.7060203@gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 8 May 2014 19:22:43 +0200
+Subject: [PATCH 2/2] iio:adc: at91 requires the input subsystem
+In-Reply-To: <1399560990-1402858-13-git-send-email-arnd@arndb.de>
+References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
+ <1399560990-1402858-1-git-send-email-arnd@arndb.de>
+ <1399560990-1402858-13-git-send-email-arnd@arndb.de>
+Message-ID: <20140508172243.GC6095@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/14 15:50, Alexander Shiyan wrote:
+Hi,
 
-> I think you should make patch series:
-> 1. Add missing clock into imx6dl.dtsi
-> 2. Add label to AIPS2 to imx6qdl.dtsi and use this label in imx6dl.dtsi
-> 3. This patch
+On 08/05/2014 at 16:56:24 +0200, Arnd Bergmann wrote :
+> Building the at91 adc driver with CONFIG_INPUT disabled results in this
+> build error:
+> 
+> ERROR: "input_event" [drivers/iio/adc/at91_adc.ko] undefined!
+> ERROR: "input_unregister_device" [drivers/iio/adc/at91_adc.ko] undefined!
+> ERROR: "input_free_device" [drivers/iio/adc/at91_adc.ko] undefined!
+> ERROR: "input_register_device" [drivers/iio/adc/at91_adc.ko] undefined!
+> ERROR: "input_set_abs_params" [drivers/iio/adc/at91_adc.ko] undefined!
+> ERROR: "input_allocate_device" [drivers/iio/adc/at91_adc.ko] undefined!
+> 
+> To make sure we can build random configurations, this turns on CONFIG_INPUT
+> whenever CONFIG_AT91_ADC is enabled.
+> 
 
-I'm not sure I follow 1/2.  You mean something like this 
+I'm wondering wether we should make part of the driver compile only if
+CONFIG_INPUT is defined. Maybe some user will want to use the ADC and
+not have any input on their board.
 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index eca0971..0645069 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -767,7 +767,7 @@
-                        };
-                };
- 
--               aips-bus at 02100000 { /* AIPS2 */
-+               aips2: aips-bus at 02100000 { /* AIPS2 */
-                        compatible = "fsl,aips-bus", "simple-bus";
-                        #address-cells = <1>;
-                        #size-cells = <1>;
+What do you think ?
 
-followed by 
-
-
-diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
-index 5c5f574..81b7501 100644
---- a/arch/arm/boot/dts/imx6dl.dtsi
-+++ b/arch/arm/boot/dts/imx6dl.dtsi
-@@ -80,16 +80,6 @@
-                        };
-                };
- 
--               aips2: aips-bus at 02100000 {
--                       i2c4: i2c at 021f8000 {
--                               #address-cells = <1>;
--                               #size-cells = <0>;
--                               compatible = "fsl,imx1-i2c";
--                               reg = <0x021f8000 0x4000>;
--                               interrupts = <0 35 IRQ_TYPE_LEVEL_HIGH>;
--                               status = "disabled";
--                       };
--               };
-        };
- 
-        display-subsystem {
-@@ -98,6 +88,18 @@
-        };
- };
- 
-+&aips2 {
-+        i2c4: i2c at 021f8000 {
-+                #address-cells = <1>;
-+                #size-cells = <0>;
-+                compatible = "fsl,imx1-i2c";
-+                reg = <0x021f8000 0x4000>;
-+                interrupts = <0 35 IRQ_TYPE_LEVEL_HIGH>;
-+                clocks = <&clks 116>;
-+                status = "disabled";
-+        };
-+};
-+
- &hdmi {
-        compatible = "fsl,imx6dl-hdmi";
- };
-
-
-then the riotboard patch with clock-frequency lines dropped from all i2c 
-sections and clocks line dropped from i2c4?
-
-Ok, I can see how that works, if it's acceptable to everyone I'll post 
-the series shortly.
-
-Thanks,
-Iain
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
