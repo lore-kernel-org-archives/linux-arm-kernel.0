@@ -1,43 +1,41 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu,  8 May 2014 16:46:52 +0200
-Subject: [PATCH] mdio_bus: fix devm_mdiobus_alloc_size export
+Date: Thu,  8 May 2014 16:46:53 +0200
+Subject: [PATCH 1/2] phy: kona2: use 'select GENERIC_PHY' in Kconfig
 In-Reply-To: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
 References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
-Message-ID: <1399560433-1402630-2-git-send-email-arnd@arndb.de>
+Message-ID: <1399560433-1402630-3-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 6d48f44b7b2 "mdio_bus: implement devm_mdiobus_alloc/devm_mdiobus_free"
-introduced a new function devm_mdiobus_alloc_size() but added an export
-for a different function devm_mdiobus_alloc(), which was obviously
-a simple mistake that leads to  build error whenever this function is
-used from a loadable module:
+All other phy drivers use 'select', while this one is
+the only one to use 'depends on'. This is not a bug, just
+slightly inconsistent, so let's change it to do things the
+same way as everyone else.
 
-ERROR: "devm_mdiobus_alloc_size" [drivers/net/ethernet/ti/davinci_mdio.ko] undefined!
+We may also want to turn GENERIC_PHY into a silent option
+that only ever gets turned on if another driver needs it.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Grygorii Strashko <grygorii.strashko@ti.com>
-Cc: Florian Fainelli <f.fainelli@gmail.com>
-Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Cc: Lad, Prabhakar <prabhakar.csengg@gmail.com>
-Cc: David S. Miller <davem@davemloft.net>
-Cc: netdev at vger.kernel.org
+Cc: Kishon Vijay Abraham I <kishon@ti.com>
+Cc: Matt Porter <mporter@linaro.org>
+Cc: Felipe Balbi <balbi@ti.com>
 ---
- drivers/net/phy/mdio_bus.c | 2 +-
+ drivers/phy/Kconfig | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/net/phy/mdio_bus.c b/drivers/net/phy/mdio_bus.c
-index 68a9a38..a628496 100644
---- a/drivers/net/phy/mdio_bus.c
-+++ b/drivers/net/phy/mdio_bus.c
-@@ -117,7 +117,7 @@ struct mii_bus *devm_mdiobus_alloc_size(struct device *dev, int sizeof_priv)
+diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+index 4906c27..071b763 100644
+--- a/drivers/phy/Kconfig
++++ b/drivers/phy/Kconfig
+@@ -89,8 +89,8 @@ config PHY_EXYNOS_DP_VIDEO
  
- 	return bus;
- }
--EXPORT_SYMBOL_GPL(devm_mdiobus_alloc);
-+EXPORT_SYMBOL_GPL(devm_mdiobus_alloc_size);
+ config BCM_KONA_USB2_PHY
+ 	tristate "Broadcom Kona USB2 PHY Driver"
+-	depends on GENERIC_PHY
+ 	depends on HAS_IOMEM
++	select GENERIC_PHY
+ 	help
+ 	  Enable this to support the Broadcom Kona USB 2.0 PHY.
  
- /**
-  * devm_mdiobus_free - Resource-managed mdiobus_free()
 -- 
 1.8.3.2
