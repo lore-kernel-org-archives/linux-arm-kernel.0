@@ -1,129 +1,99 @@
-From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Thu, 8 May 2014 14:38:17 +0530
-Subject: [PATCH 1/5] ARM: dts: move dp hpd line to the board file for
- exynos5420
-In-Reply-To: <001f01cf6a87$56a86740$03f935c0$%han@samsung.com>
-References: <1397994525-18537-1-git-send-email-rahul.sharma@samsung.com>
- <1397994525-18537-2-git-send-email-rahul.sharma@samsung.com>
- <001f01cf6a87$56a86740$03f935c0$%han@samsung.com>
-Message-ID: <CAPdUM4N1Y_hQikf47yijMqbNrecfJQuy3C-M10J5oaUuodPmaw@mail.gmail.com>
+From: ipaton0@gmail.com (Iain Paton)
+Date: Thu, 08 May 2014 10:09:29 +0100
+Subject: [RFC PATCH] ARM: dts: imx6: add new board RIoTboard
+In-Reply-To: <20140508054106.GH2794@dragon>
+References: <53695C34.5000604@gmail.com> <20140508054106.GH2794@dragon>
+Message-ID: <536B49C9.8020700@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Jingoo,
+On 08/05/14 06:41, Shawn Guo wrote:
+> On Tue, May 06, 2014 at 11:03:32PM +0100, Iain Paton wrote:
+>> The fec interrupt errata seems to suggest that a different gpio could be used
+>> but I can't find any documentation or example dts that does so. Suggestions
+>> welcome.
+> 
+> Take a look at commit 6261c4c (ARM: dts: imx6qdl-sabrelite: use GPIO_6
+> for FEC interrupt.).  It seems you already has it for your board.
 
-On 8 May 2014 12:02, Jingoo Han <jg1.han@samsung.com> wrote:
-> On Sunday, April 20, 2014 8:49 PM, Rahul Sharma wrote:
->>
->> From: Rahul Sharma <Rahul.Sharma@samsung.com>
->>
->> Display controller HPD Gpio line is board specific. This patch
->> is moving the pinctrl for hpd gpio line to the respective board
->> file.
->>
->> Signed-off-by: Rahul Sharma <Rahul.Sharma@samsung.com>
->> ---
->>  arch/arm/boot/dts/exynos5420-pinctrl.dtsi |    7 -------
->>  arch/arm/boot/dts/exynos5420-smdk5420.dts |    7 +++++++
->>  2 files changed, 7 insertions(+), 7 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
->> index e62c8eb..5848c42 100644
->> --- a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
->> +++ b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
->> @@ -59,13 +59,6 @@
->>                       interrupt-controller;
->>                       #interrupt-cells = <2>;
->>               };
->> -
->> -             dp_hpd: dp_hpd {
->> -                     samsung,pins = "gpx0-7";
->> -                     samsung,pin-function = <3>;
->> -                     samsung,pin-pud = <0>;
->> -                     samsung,pin-drv = <0>;
->> -             };
->>       };
->
-> (+cc Doug Anderson, Tomasz Figa)
->
-> 'gpx0-7' pin is assigned for standard HPD pin. This is chip specific.
-> So, there should be "gpx0-7" part on chip specific dts file such as
-> 'exynos5420-pinctrl.dtsi'.
->
-> However, some boards use GPIO as HPD pin, instead of 'gpx0-7' pin.
-> This is board specific. In my opinion, the following would look
-> better. In this way, this patch is not necessary.
->
-> 1. case: Standard HPD pin is used. (smdk5420)
-> arch/arm/boot/dts/exynos5420-pinctrl.dts
->         pinctrl at 13400000 {
->                 dp_hpd: dp_hpd {
->                         samsung,pins = "gpx0-7";
->                         samsung,pin-function = <3>;
->                         samsung,pin-pud = <0>;
->                         samsung,pin-drv = <0>;
->                 };
-> arch/arm/boot/dts/exynos5420-smdk5420.dts
->         dp-controller at 145B0000 {
->                 pinctrl-names = "default";
->                 pinctrl-0 = <&dp_hpd>;
->                 ...
->
->
-> 2. case: non-standard HPD pin such as GPIO is used. (peach pit)
-> arch/arm/boot/dts/exynos5420-peach-pit.dts
->         pinctrl at 13400000 {
->                 dp_hpd: dp_hpd {
->                         samsung,pins = "gpx2-6";
->                         samsung,pin-function = <0>;
->                         samsung,pin-pud = <3>;
->                         samsung,pin-drv = <0>;
->                 };
->         dp-controller at 145B0000 {
->                 pinctrl-names = "default";
->                 pinctrl-0 = <&dp_hpd>;
->                 ...
->                 samsung,hpd-gpio = <&gpx2 6 0>;
->
-> Even though, there is 'dp_hpd' in exynos5420-pinctrl.dts,
-> 'smdk5420' and 'peach pit' can use "gpx0-7" and "gpx2-6",
-> respectively.
->
-> A year ago, Doug Anderson and me agreed that standard HPD pin
-> part should be included to 'exynos5250-pinctrl.dtsi'.
-> (https://lkml.org/lkml/2013/5/11/134)
->
+Yep, I'd had a look at those and added it.  I'm assuming that using 
+GPIO_6 for this means I can't also use that pad for i2c3 at the same 
+time?
+The pad is wired to the lvds connector for use with a touchscreen 
+when configured as i2c3
 
-I wasn't aware of this discussion. It make sense. I will drop this patch.
-I need to choose some other name for this pin, say "peach_dp_hpd".
-Let me know if any concern.
 
-Regards,
-Rahul Sharma.
+> We do not use imx6s as a SoC name in the kernel tree.  It's just an
+> imx6dl with the second CPU core fused out.  So please name the file
+> imx6dl-riotboard.dts.
 
-> Best regards,
-> Jingoo Han
->
->>
->>       pinctrl at 13410000 {
->> diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
->> index 6910485..62d38c8 100644
->> --- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
->> +++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
->> @@ -138,6 +138,13 @@
->>                       samsung,pin-pud = <1>;
->>                       samsung,pin-drv = <0>;
->>               };
+Ok.
+
+> Also, I'm not sure why you need an additional level with that .dtsi
+> file, if it will only be soldered with imx6dl.  We have that .dtsi for
+> boards like sabresd, because the board support both imx6q and imx6dl.
+
+I probably don't need it then. I believe the board can support both,
+but I don't know if the manufacturer will ever build any like that.
+
+There's another highly similar board from the same manufacturer that
+uses a dual.  So my thinking was that there's a possibility to have
+a dtsi with all of the common parts and only differences in the dts.
+
+I'll remove the additional level.
+
+
+>> +	regulators {
+>> +		compatible = "simple-bus";
 >> +
->> +             dp_hpd: dp_hpd {
->> +                     samsung,pins = "gpx0-7";
->> +                     samsung,pin-function = <3>;
->> +                     samsung,pin-pud = <0>;
->> +                     samsung,pin-drv = <0>;
->> +             };
->>       };
->>
->>       hdmi at 14530000 {
->> --
->> 1.7.9.5
->
+>> +		reg_2p5v: 2p5v {
+> 
+> Please follow commit 56160e3 (ARM: dts: imx6: use generic node name for
+> fixed regulator) to code fixed regulators.
+
+Will do.
+
+>> +
+>> +&iomuxc {
+> 
+> Putting this iomuxc node which has a big mount of data at the bottom of
+> the file can slightly make the dts file more readable. 
+
+
+Ok, wasn't sure of the convention so just ordered them alphabetically.
+
+
+>> +	imx6-embest {
+> 
+> Why 'embest'?  It's more sensible to use 'riotboard'?
+
+Throwback to a previous iteration.  There are two boards with a shared 
+history, RIoTboard and MarSboard, both manufactured by Embest which is
+subsiduary of element14.
+I originally had the common parts of this in a shared dtsi used by both
+boards.
+
+I'll change it here.
+
+> 
+>> +	      pinctrl_hog: hoggrp {
+>> +			fsl,pins = <
+>> +				MX6QDL_PAD_EIM_A25__GPIO5_IO02		0x80000000	/* user led0 */
+>> +				MX6QDL_PAD_EIM_D28__GPIO3_IO28		0x80000000	/* user led1 */
+> 
+> These should be in a pinctrl entry for led rather than hog group.
+
+Ok.
+
+>> +&usbh1 {
+>> +	status = "okay";
+> 
+> Add 'status' at the end of the property list.
+
+Ok.
+
+I'll fix up these and Fabios comments and resend.
+
+Thanks for the review!
+
+Iain
