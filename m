@@ -1,84 +1,25 @@
-From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Thu, 8 May 2014 23:33:37 +0300
-Subject: [PATCH] ARM: dts: k2e-evm: add AEMIF/NAND device entry
-In-Reply-To: <1399581089-2505-1-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1399575560-31090-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1399581089-2505-1-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <536BEA21.8020603@ti.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 8 May 2014 14:33:39 -0600
+Subject: [PATCH] of: Add of_device_destroy_children() function
+In-Reply-To: <1399567069-3174-1-git-send-email-s.nawrocki@samsung.com>
+References: <1399567069-3174-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <20140508203339.GA542@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ignore this
+On Thu, May 08, 2014 at 06:37:49PM +0200, Sylwester Nawrocki wrote:
+> This patch adds a helper function to unregister devices which
+> were created by an of_platform_populate() call. The pattern
+> used here can already be found in multiple drivers. This helper
+> can now be used instead of repeating similar code in drivers.
 
-On 05/08/2014 11:31 PM, Ivan Khoronzhuk wrote:
-> Add AEMIF/NAND device entry.
->
-> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
-> ---
->   arch/arm/boot/dts/k2e-evm.dts | 52 +++++++++++++++++++++++++++++++++++++++++++
->   1 file changed, 52 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/k2e-evm.dts b/arch/arm/boot/dts/k2e-evm.dts
-> index 74b3b63..0370e2f 100644
-> --- a/arch/arm/boot/dts/k2e-evm.dts
-> +++ b/arch/arm/boot/dts/k2e-evm.dts
-> @@ -58,3 +58,55 @@
->   &usb1 {
->   	status = "okay";
->   };
-> +
-> +&aemif {
-> +	cs0 {
-> +		#address-cells = <2>;
-> +		#size-cells = <1>;
-> +		clock-ranges;
-> +		ranges;
-> +
-> +		ti,cs-chipselect = <0>;
-> +		/* all timings in nanoseconds */
-> +		ti,cs-min-turnaround-ns = <12>;
-> +		ti,cs-read-hold-ns = <6>;
-> +		ti,cs-read-strobe-ns = <23>;
-> +		ti,cs-read-setup-ns = <9>;
-> +		ti,cs-write-hold-ns = <8>;
-> +		ti,cs-write-strobe-ns = <23>;
-> +		ti,cs-write-setup-ns = <8>;
-> +
-> +		nand at 0,0 {
-> +			compatible = "ti,keystone-nand","ti,davinci-nand";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			reg = <0 0 0x4000000
-> +			       1 0 0x0000100>;
-> +
-> +			ti,davinci-chipselect = <0>;
-> +			ti,davinci-mask-ale = <0x2000>;
-> +			ti,davinci-mask-cle = <0x4000>;
-> +			ti,davinci-mask-chipsel = <0>;
-> +			nand-ecc-mode = "hw";
-> +			ti,davinci-ecc-bits = <4>;
-> +			nand-on-flash-bbt;
-> +
-> +			partition at 0 {
-> +				label = "u-boot";
-> +				reg = <0x0 0x100000>;
-> +				read-only;
-> +			};
-> +
-> +			partition at 100000 {
-> +				label = "params";
-> +				reg = <0x100000 0x80000>;
-> +				read-only;
-> +			};
-> +
-> +			partition at 180000 {
-> +				label = "ubifs";
-> +				reg = <0x180000 0x7E80000>;
-> +			};
-> +		};
-> +	};
-> +};
+I have a driver that does this as well, and what I found is that the
+remove must be in reverse order from the create or things explode, and
+that assumes the DT is topologically sorted according to dependency
+(so no deferred probe).
 
--- 
-Regards,
-Ivan Khoronzhuk
+AFAIK, there is no analog to deferred probe for removal, and
+attempting to remove, say, a GPIO driver while an I2C bit bang is using
+it just fails.
+
+Jason
