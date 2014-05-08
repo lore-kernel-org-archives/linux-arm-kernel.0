@@ -1,53 +1,38 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu,  8 May 2014 15:52:18 +0200
-Subject: [PATCH 5/8] usb: phy: msm: reset controller is mandatory now
-In-Reply-To: <1399557141-1346645-1-git-send-email-arnd@arndb.de>
-References: <1399557141-1346645-1-git-send-email-arnd@arndb.de>
-Message-ID: <1399557141-1346645-6-git-send-email-arnd@arndb.de>
+Date: Thu,  8 May 2014 15:52:13 +0200
+Subject: [PATCH 0/8] usb: various fixes for ARM randconfig failures
+Message-ID: <1399557141-1346645-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit a27345434134 "usb: phy: msm: Use reset framework for LINK
-and PHY resets" introduced a mandatory call to reset_control_get
-into the msm usb phy driver, which means we have to add a Kconfig
-dependency on the API to avoid this build error:
+These is the usb part of my longer ARM randconfig build bug
+series. None of these are actually needed for 3.15 as far as
+I can tell, but it would be good to have them included in the
+next merge window.
 
-phy/phy-msm-usb.c: In function 'msm_otg_read_dt':
-phy/phy-msm-usb.c:1461:2: error: implicit declaration of function 'devm_reset_control_get' [-Werror=implicit-function-declaration]
-  motg->link_rst = devm_reset_control_get(&pdev->dev, "link");
-  ^
+The xhci patch is only for a build warning, not a failure, but
+we see this one all the time because it happens in one of the
+defconfigs.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: "Ivan T. Ivanov" <iivanov@mm-sol.com>
----
- drivers/usb/host/Kconfig | 2 +-
- drivers/usb/phy/Kconfig  | 1 +
- 2 files changed, 2 insertions(+), 1 deletion(-)
+Arnd Bergmann (8):
+  usb/gadget: s3c2410_udc: don't use pr_debug return value
+  usb: musb: tusb-dma can't be built-in if tusb is not
+  usb: musb: omap2plus bus glue needs USB host support
+  usb: phy: fix isp1301-omap dependency on tps65010
+  usb: phy: msm: reset controller is mandatory now
+  usb: xhci: avoid warning for !PM_SLEEP
+  usb: ohci: sort out dependencies for lpc32xx and omap
+  usb: ohci-da8xx can only be built-in
 
-diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index 3d9e540..890fc8c 100644
---- a/drivers/usb/host/Kconfig
-+++ b/drivers/usb/host/Kconfig
-@@ -168,7 +168,7 @@ config USB_EHCI_HCD_AT91
- 
- config USB_EHCI_MSM
- 	tristate "Support for Qualcomm QSD/MSM on-chip EHCI USB controller"
--	depends on ARCH_MSM
-+	depends on ARCH_MSM && RESET_CONTROLLER
- 	select USB_EHCI_ROOT_HUB_TT
- 	select USB_MSM_OTG
- 	---help---
-diff --git a/drivers/usb/phy/Kconfig b/drivers/usb/phy/Kconfig
-index 359a6c1..65bec8f 100644
---- a/drivers/usb/phy/Kconfig
-+++ b/drivers/usb/phy/Kconfig
-@@ -165,6 +165,7 @@ config USB_ISP1301
- config USB_MSM_OTG
- 	tristate "Qualcomm on-chip USB OTG controller support"
- 	depends on (USB || USB_GADGET) && (ARCH_MSM || ARCH_QCOM)
-+	depends on RESET_CONTROLLER
- 	select USB_PHY
- 	help
- 	  Enable this to support the USB OTG transceiver on Qualcomm chips. It
+ drivers/usb/gadget/Kconfig         |  4 ++--
+ drivers/usb/gadget/s3c2410_udc.c   |  3 ++-
+ drivers/usb/host/Kconfig           | 16 +++++++++++++---
+ drivers/usb/host/ohci-hcd.c        |  2 +-
+ drivers/usb/host/xhci-plat.c       |  2 +-
+ drivers/usb/musb/Kconfig           |  4 ++--
+ drivers/usb/phy/Kconfig            |  1 +
+ drivers/usb/phy/phy-isp1301-omap.c |  2 +-
+ 8 files changed, 23 insertions(+), 11 deletions(-)
+
 -- 
 1.8.3.2
