@@ -1,82 +1,44 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 8 May 2014 15:52:39 +0100
-Subject: [PATCH v2] ARM: unwinder: Fix handling of 'fp' in thumb2 mode
-In-Reply-To: <1399045056-26751-1-git-send-email-Nikolay.Borisov@arm.com>
-References: <1399045056-26751-1-git-send-email-Nikolay.Borisov@arm.com>
-Message-ID: <20140508145232.GA4955@e103592.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu,  8 May 2014 16:56:28 +0200
+Subject: [PATCH] misc: atmel_pwm: only build for supported platforms
+In-Reply-To: <1399560990-1402858-1-git-send-email-arnd@arndb.de>
+References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
+ <1399560990-1402858-1-git-send-email-arnd@arndb.de>
+Message-ID: <1399560990-1402858-17-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 02, 2014 at 04:37:36PM +0100, Nikolay Borisov wrote:
-> The thread_save_fp macro has been defined so that it always reads the fp member
-> of the cpu_context_save struct. However, in the case of THUMB2 the fp is saved
-> not in the fp (r11) member but rather in r7.
-> 
-> This patch changes the way the macro is defined such that FP is read from the
-> correct place depending on whether we are a THUMB2 kernel or not. This enables
-> the backtrace in sitaution such as "echo t > /proc/sysrq-trigger" or the
-> function in which a process sleeping when "ps -Al" is invoked.
-> 
-> Another place where similar change is requried is when working with pt_reg.
-> regs->ARM_fp is defined such that r11 is always referenced as the frame pointer,
-> so the definition of ARM_fp needs to change depending on the type of kernel we
-> are running.
+There is architecture code in mach-at91 that depends on the
+CONFIG_ATMEL_PWM symbol in order to call the soc-specific
+at91_add_device_pwm function. While all of this is about code
+that will be removed in the future, using DT probing and
+the PWM framework, we currently get a build failure:
 
-(Keep your S-o-b line here, but move the "change log" stuff after the
---- tearoff line so it doesn't form part of the commit message.)
+arch/arm/mach-at91/built-in.o: In function `at91_pwm_leds':
+arch/arm/mach-at91/leds.c:88: undefined reference to `at91_add_device_pwm'
 
-> Changes since v1:
-> * Added changes for the pt_reg structure.
-> 
-> Signed-off-by: Nikolay Borisov <Nikolay.Borisov@arm.com>
-> 
-> handle the case when we've got regs present
-> ---
->  arch/arm/include/asm/thread_info.h | 6 ++++++
->  arch/arm/include/uapi/asm/ptrace.h | 4 ++++
->  2 files changed, 10 insertions(+)
-> 
-> diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
-> index f989d7c..e4e4208 100644
-> --- a/arch/arm/include/asm/thread_info.h
-> +++ b/arch/arm/include/asm/thread_info.h
-> @@ -114,8 +114,14 @@ static inline struct thread_info *current_thread_info(void)
->  	((unsigned long)(task_thread_info(tsk)->cpu_context.pc))
->  #define thread_saved_sp(tsk)	\
->  	((unsigned long)(task_thread_info(tsk)->cpu_context.sp))
-> +
-> +#ifndef CONFIG_THUMB2_KERNEL
->  #define thread_saved_fp(tsk)	\
->  	((unsigned long)(task_thread_info(tsk)->cpu_context.fp))
-> +#else
-> +#define thread_saved_fp(tsk)	\
-> +	((unsigned long)(task_thread_info(tsk)->cpu_context.r7))
-> +#endif
->  
->  extern void crunch_task_disable(struct thread_info *);
->  extern void crunch_task_copy(struct thread_info *, void *);
-> diff --git a/arch/arm/include/uapi/asm/ptrace.h b/arch/arm/include/uapi/asm/ptrace.h
-> index 5af0ed1..92e1bae 100644
-> --- a/arch/arm/include/uapi/asm/ptrace.h
-> +++ b/arch/arm/include/uapi/asm/ptrace.h
-> @@ -131,7 +131,11 @@ struct pt_regs {
->  #define ARM_lr		uregs[14]
->  #define ARM_sp		uregs[13]
->  #define ARM_ip		uregs[12]
-> +#ifndef CONFIG_THUMB2_KERNEL
->  #define ARM_fp		uregs[11]
-> +#else
-> +#define ARM_fp		uregs[7]
-> +#endif
+This patch ensures we only try to build this driver on
+platforms on which it will build and work.
 
-I'm not sure about this.  There seem to be other bits of code that
-assume the ARM_fp name maps to the fixed register defined by the PCS,
-i.e. always r11 and not the "frame pointer".  For example, see
-arch/arm/kernel/kgdb.c: I think we'll end up passing the wrong regs to
-gdb in this case.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+---
+ drivers/misc/Kconfig | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-It may be better to work around the usage of these #defines locally in
-the unwinder code instead.
-
-Cheers
----Dave 
+diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
+index fe2230c..ce29342 100644
+--- a/drivers/misc/Kconfig
++++ b/drivers/misc/Kconfig
+@@ -53,7 +53,8 @@ config AD525X_DPOT_SPI
+ 
+ config ATMEL_PWM
+ 	tristate "Atmel AT32/AT91 PWM support"
+-	depends on HAVE_CLK && (AVR32 || ARCH_AT91 || COMPILE_TEST)
++	depends on HAVE_CLK
++	depends on AVR32 || AT91SAM9263 || AT91SAM9RL || AT91SAM9G45
+ 	help
+ 	  This option enables device driver support for the PWM channels
+ 	  on certain Atmel processors.  Pulse Width Modulation is used for
+-- 
+1.8.3.2
