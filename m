@@ -1,38 +1,44 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 8 May 2014 17:21:30 -0400
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Fri, 9 May 2014 00:25:45 +0300
 Subject: [PATCH] ARM: dts: k2e-evm: add AEMIF/NAND device entry
-In-Reply-To: <536BE875.2070005@ti.com>
+In-Reply-To: <536BF55A.6030406@ti.com>
 References: <1399575560-31090-1-git-send-email-ivan.khoronzhuk@ti.com>
- <536BD85E.8090505@ti.com> <536BE875.2070005@ti.com>
-Message-ID: <536BF55A.6030406@ti.com>
+ <536BD85E.8090505@ti.com> <536BE875.2070005@ti.com> <536BF55A.6030406@ti.com>
+Message-ID: <536BF659.5040706@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 May 2014 04:26 PM, Ivan Khoronzhuk wrote:
-> 
-> On 05/08/2014 10:17 PM, Santosh Shilimkar wrote:
->> On Thursday 08 May 2014 02:59 PM, Ivan Khoronzhuk wrote:
->>> Add AEMIF/NAND device entry.
+
+On 05/09/2014 12:21 AM, Santosh Shilimkar wrote:
+> On Thursday 08 May 2014 04:26 PM, Ivan Khoronzhuk wrote:
+>> On 05/08/2014 10:17 PM, Santosh Shilimkar wrote:
+>>> On Thursday 08 May 2014 02:59 PM, Ivan Khoronzhuk wrote:
+>>>> Add AEMIF/NAND device entry.
+>>>>
+>>>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+>>>> ---
+>>>>    arch/arm/boot/dts/k2e-evm.dts | 52 +++++++++++++++++++++++++++++++++++++++++++
+>>>>    1 file changed, 52 insertions(+)
+>>>>
+>>> Thanks. Will pick this up for 3.16
 >>>
->>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->>> ---
->>>   arch/arm/boot/dts/k2e-evm.dts | 52 +++++++++++++++++++++++++++++++++++++++++++
->>>   1 file changed, 52 insertions(+)
->>>
->> Thanks. Will pick this up for 3.16
+>> Ups. Seems I've not changed ubifs partition size, always think about 128 Mb, but here 512 Mb.
+>> I will send updated version with correct partition size.
 >>
-> 
-> Ups. Seems I've not changed ubifs partition size, always think about 128 Mb, but here 512 Mb.
-> I will send updated version with correct partition size.
-> 
-> 
-I was about to reply that patch wasn't applying cleanly. V2 applied
-to for_3.16/dts branch.
+>>
+> I was about to reply that patch wasn't applying cleanly. V2 applied
+> to for_3.16/dts branch.
+>
+> Can you also rebase the ke2 patch against the dts branch and
+> repost it ?
+>
+> Thanks !!
+>
+> regards,
+> Santosh
 
-Can you also rebase the ke2 patch against the dts branch and
-repost it ?
+Sure
 
-Thanks !!
-
-regards,
-Santosh
+-- 
+Regards,
+Ivan Khoronzhuk
