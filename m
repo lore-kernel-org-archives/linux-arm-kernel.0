@@ -1,42 +1,113 @@
-From: dianders@google.com (Doug Anderson)
-Date: Thu, 8 May 2014 10:57:10 -0700
-Subject: [PATCH] ARM: mm: Add workaround for erratum 763126
-In-Reply-To: <20140508173853.GG8981@arm.com>
-References: <1399528508-2806-1-git-send-email-arjun.kv@samsung.com>
- <CAD=FV=XeYdgqk3-CpS2NNXFAnn+uGDC6844d-L6vfS=SYEuw-Q@mail.gmail.com>
- <20140508173853.GG8981@arm.com>
-Message-ID: <CAD=FV=X0jQvmA07XZEKT-3FAOaE3p0qCLPUCJKR8Ux1=o46cVQ@mail.gmail.com>
+From: marcio@netopen.com.br (Marcio Campos de Lima)
+Date: Thu, 8 May 2014 14:56:50 -0300
+Subject: s_ctrl V4l2 device driver does not work
+Message-ID: <B43D69CB-FE7A-4168-B203-02A7934215F4@netopen.com.br>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will,
+Hi
 
-On Thu, May 8, 2014 at 10:38 AM, Will Deacon <will.deacon@arm.com> wrote:
-> Hi guys,
->
-> On Thu, May 08, 2014 at 05:57:03PM +0100, Doug Anderson wrote:
->> On Wed, May 7, 2014 at 10:55 PM, Arjun.K.V <arjun.kv@samsung.com> wrote:
->> > From: "Arjun.K.V" <arjun.kv@samsung.com>
->> >
->> > Three processor exclusive access livelock.
->> > In a system with three or more coherent masters that all use
->> > the ldrex/strex synchronization primitives to access a semaphore
->> > in coherent cacheable memory, there is a possibility of a
->> > livelock condition where two masters continuously attempt
->> > and fail to get the lock while the third master
->> > continuously reads the lock.
->
-> Tentative NAK. You're paraphrasing the bug to make it sound worse than it
-> is -- whilst two of the cores need to be in a ldrex/strex loop, the third
-> needs to be issuing snoops from a normal load (to get the line into a shared
-> state). Please can you point me at the code in Linux which is triggering
-> this issue?
+Can anybody tell me why the set control function is not working in Linux 3.6.9? Thanks.
 
-Arjun can correct me if I'm wrong, but I don't think there is any
-known way to trigger the issue.  We haven't landed this fix locally in
-our tree because there has been no evidence showing that it increases
-stability.  If you guys say that it's a correct fix then we'll still
-land it, but if (as you say) it's impossible to trigger in Linux then
-it's a good reason to skip it!  :)
+?? APPLICATION CALL ??
+ struct v4l2_control controle;
+    controle.id = VIDIOC_AVANCA_ZOOM;
+    controle.value = time;
+    if (-1 == xioctl(fd_camera, VIDIOC_S_CTRL,&controle))
+	{
+	printf ("%s erro\n",__FUNCTION__);
+	perror ("erro iotcl");
+	}
 
--Doug
+The ioctl call returns with invalid argument. It is amazing because the first time the ioctl is called it is executed ok. Then no more call is allowed and return the invalid 
+
+below is the device driver  code I think may be relevant.
+
+  v4l2_ctrl_handler_init(&priv->ctrls, ARRAY_SIZE(ov5642_ctrls));
+    printk ("handler_init\n");
+    v4l2_ctrl_new_std(&priv->ctrls, &ov5642_ctrl_ops,V4L2_CID_ZOOM_RELATIVE, -1000, 1000, 1, 500);
+    v4l2_ctrl_new_std(&priv->ctrls, &ov5642_ctrl_ops,V4L2_CID_FLASH_STROBE, -100, 100, 1, 5);
+
+
+    priv->subdev.ctrl_handler=&priv->ctrls;
+    v4l2_i2c_subdev_init(&priv->subdev, client, &ov5642_subdev_ops);
+    return ov5642_video_probe(client);
+
+static int ov5642_s_ctrl(struct v4l2_ctrl *ctrl)
+{
+	struct ov5642 *ov5642 =
+			container_of(ctrl->handler, struct ov5642, ctrls);
+	struct i2c_client *client = v4l2_get_subdevdata(&ov5642->subdev);
+	u16 data;
+	int ret;
+	printk ("%s: id=%08x val=%d\n",__FUNCTION__, ctrl->id, ctrl->val);
+	switch (ctrl->id) {
+	case V4L2_CID_DO_WHITE_BALANCE:
+		ov5640_set_wb_oem(client, ctrl->val);
+		break;
+	case V4L2_CID_EXPOSURE:
+
+		break;
+	case V4L2_CID_GAIN:
+		/* Gain is controlled by 2 analog stages and a digital stage.
+		 * Valid values for the 3 stages are
+		 *
+		 * Stage                Min     Max     Step
+		 * ------------------------------------------
+		 * First analog stage   x1      x2      1
+		 * Second analog stage  x1      x4      0.125
+		 * Digital stage        x1      x16     0.125
+		 *
+		 * To minimize noise, the gain stages should be used in the
+		 * second analog stage, first analog stage, digital stage order.
+		 * Gain from a previous stage should be pushed to its maximum
+		 * value before the next stage is used.
+		 */
+		if (ctrl->val <= 32) {
+			data = ctrl->val;
+		} else if (ctrl->val <= 64) {
+			ctrl->val &= ~1;
+			data = (1 << 6) | (ctrl->val >> 1);
+		} else {
+			ctrl->val &= ~7;
+			data = ((ctrl->val - 64) << 5) | (1 << 6) | 32;
+		}
+		break;
+	case V4L2_CID_ZOOM_RELATIVE:
+		if (ctrl->val>0)
+			avanca_zoom(sysPriv.v4l2_int_device, ctrl->val);
+		else
+			recua_zoom(sysPriv.v4l2_int_device, ctrl->val);
+
+		break;
+	case V4L2_CID_BRIGHTNESS:
+		 ov5640_set_brightness(client, ctrl->val);
+		 break;
+	case V4L2_CID_CONTRAST:
+		ov5640_set_contrast(client, ctrl->val);
+		break;
+	case V4L2_CID_FLASH_STROBE:
+		ativa_flash (sysPriv.v4l2_int_device, ctrl->val);
+		break;
+	case V4L2_CID_VFLIP:
+
+	case V4L2_CID_TEST_PATTERN:
+
+
+
+	case V4L2_CID_BLC_AUTO:
+
+	case V4L2_CID_BLC_TARGET_LEVEL:
+
+	case V4L2_CID_BLC_ANALOG_OFFSET:
+
+	case V4L2_CID_BLC_DIGITAL_OFFSET:
+		return 1;
+			}
+
+	return 0;
+}
+
+static struct v4l2_ctrl_ops ov5642_ctrl_ops = {
+	.s_ctrl = ov5642_s_ctrl,
+};
