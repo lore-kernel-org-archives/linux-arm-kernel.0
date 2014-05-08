@@ -1,29 +1,39 @@
-From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Thu, 08 May 2014 11:59:02 +0400
-Subject: [PATCH] arm: memset: zero out upper bytes in r1
-In-Reply-To: <20140507234255.GA2050@afzal-ThinkPad-R50e>
-References: <1399273875-8403-1-git-send-email-a.ryabinin@samsung.com>
- <20140507234255.GA2050@afzal-ThinkPad-R50e>
-Message-ID: <536B3946.9070106@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 8 May 2014 09:03:44 +0100
+Subject: [PATCH 1/9] ARM: STi: DT: STiH416: 416 DT Entry for clockgen
+ A0/1/10/11/12
+In-Reply-To: <CAG374jD+msPPbPtFS+ji=8jS9+D-YHu31k7zzzC7Ty7jw9n7jQ@mail.gmail.com>
+References: <1399305223-18703-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1399305223-18703-2-git-send-email-gabriel.fernandez@linaro.org>
+ <20140506071843.GD5206@lee--X1>
+ <CAG374jD+msPPbPtFS+ji=8jS9+D-YHu31k7zzzC7Ty7jw9n7jQ@mail.gmail.com>
+Message-ID: <20140508080344.GE5307@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/08/14 03:42, Afzal Mohammed wrote:
-> 
-> int is to be converted to unsigned char in memset, would having above
-> change immediately upon entry to memset rather than at a place where it
-> won't always execute make intention clearer ? (although it doesn't make
-> difference)
-> 
+> >> Patch adds DT entries for clockgen A0/1/10/11/12
+> >>
+> >> Signed-off-by: Pankaj Dev <pankaj.dev@st.com>
+> >> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+> >> ---
+> >>  arch/arm/boot/dts/stih416-clks.h     |  15 ++
+> >
+> > This should live in include/dt-bindings/clk
+> >
+> include/dt-bindings/clk or  include/dt-bindings/clock ?
 
-I think it's better to keep it near other manipulations with r1.
-Plus this will save us from executing extra instruction on 'memset -> 6 -> 5 -> return'
-path (memset for size <= 3).
+I have no idea what the difference between the two are.  I guess you
+are in a better position to answer that.  My point was just that the
+includes should be in the include directory, rather than being held
+locally in the 'dts' directory.
 
+> >>  arch/arm/boot/dts/stih416-clock.dtsi | 477 ++++++++++++++++++++++++++++++++++
+> >>  arch/arm/boot/dts/stih416.dtsi       |  10 +-
+> >>  3 files changed, 497 insertions(+), 5 deletions(-)
+> >>  create mode 100644 arch/arm/boot/dts/stih416-clks.h
 
-> ubfx r1, r1, #0, #8 would have given the needed typecasting, but seems
-> it is available only on ARMv6T2 & above.
-> 
-
-Indeed. It might be wrapped it with #if #else, but it will be a bit ugly,
-probably not worth to do.
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
