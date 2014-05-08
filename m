@@ -1,59 +1,64 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 8 May 2014 11:16:19 -0400
-Subject: [GIT PULL] ARM: mvebu: driver changes for v3.16
-Message-ID: <20140508151619.GD12708@titan.lakedaemon.net>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 8 May 2014 17:16:32 +0200
+Subject: [PATCH] pci: rcar host needs OF
+In-Reply-To: <536B9D78.5000602@codethink.co.uk>
+References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
+ <1399560990-1402858-1-git-send-email-arnd@arndb.de>
+ <1399560990-1402858-14-git-send-email-arnd@arndb.de>
+ <536B9D78.5000602@codethink.co.uk>
+Message-ID: <CAMuHMdWBzBneDqyDxK5HU3Bt_5CyRfTM_f_6YGJHokG_v17_sw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-guys,
+On Thu, May 8, 2014 at 5:06 PM, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
+> On 08/05/14 15:56, Arnd Bergmann wrote:
+>>
+>> The pci-rcar driver is enabled for compile tests, and this has
+>> now shown that the driver cannot build without CONFIG_OF,
+>> following the inclusion of f8f2fe7355fb "PCI: rcar: Use new OF
+>> interrupt mapping when possible":
+>>
+>> drivers/built-in.o: In function `rcar_pci_map_irq':
+>> :(.text+0x1cc7c): undefined reference to `of_irq_parse_and_map_pci'
+>>
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> Cc: Bjorn Helgaas <bhelgaas@google.com>
+>> Cc: Magnus Damm <damm@opensource.se>
+>> Cc: linux-pci at vger.kernel.org
+>> Cc: linux-sh at vger.kernel.org
+>> ---
+>>   drivers/pci/host/Kconfig | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+>> index fbbef0b..4675f47 100644
+>> --- a/drivers/pci/host/Kconfig
+>> +++ b/drivers/pci/host/Kconfig
+>> @@ -27,7 +27,7 @@ config PCI_TEGRA
+>>
+>>   config PCI_RCAR_GEN2
+>>         bool "Renesas R-Car Gen2 Internal PCI controller"
+>> -       depends on ARCH_SHMOBILE || (ARM && COMPILE_TEST)
+>> +       depends on ARCH_SHMOBILE || (ARM && OF && COMPILE_TEST)
+>>         help
+>>           Say Y here if you want internal PCI support on R-Car Gen2 SoC.
+>>           There are 3 internal PCI controllers available with a single
+>>
+>
+> This driver /should/ be able to be built for just the platform case
+> so it sounds like f8f2fe7355fb stopped this but no-one has yet to
+> notice.
 
-Here a round of mvebu-devbus changes for v3.16 that add support for
-orion5x.  This is part of the series Thomas did converting orion5x to
-devicetree. sweet!
+You mean include/linux/of_pci.h should provide a dummy version of
+of_irq_parse_and_map_pci() returning 0 in case OF=n?
 
-These changes have been in -next for over a week.  They are based on
-v3.15-rc1 with mvebu/fixes merged in.  This branch does have a
-dependency on mvebu/fixes as outlined in the tag message.
+Gr{oetje,eeting}s,
 
-Please pull.
+                        Geert
 
-thx,
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-Jason.
-
-
-The following changes since commit 1cc9d48145b81e307fab94a5cf6ee66ec2f0de60:
-
-  ARM: orion5x: fix target ID for crypto SRAM window (2014-04-17 04:52:26 +0000)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-drivers-3.16
-
-for you to fetch changes up to 0456d3300edba52e47c6b5582cfe9d87756f5590:
-
-  memory: mvebu-devbus: add a devbus, keep-config property (2014-04-29 13:17:10 +0000)
-
-----------------------------------------------------------------
-mvebu driver changes for v3.16
-
- - mvebu-devbus
-    - changes need to add support for the orion5x platform
-
-Depends:
-
-  - tags/mvebu-fixes-3.15 in the mvebu/fixes branch for:
-
-     ce965c3d2e68 memory: mvebu-devbus: fix the conversion of the bus width
-
-----------------------------------------------------------------
-Thomas Petazzoni (5):
-      memory: mvebu-devbus: use ARMADA_ prefix in defines
-      memory: mvebu-devbus: use _SHIFT suffixes instead of _BIT
-      memory: mvebu-devbus: split functions
-      memory: mvebu-devbus: add Orion5x support
-      memory: mvebu-devbus: add a devbus, keep-config property
-
- .../bindings/memory-controllers/mvebu-devbus.txt   |  32 ++-
- drivers/memory/mvebu-devbus.c                      | 229 ++++++++++++++-------
- 2 files changed, 181 insertions(+), 80 deletions(-)
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
