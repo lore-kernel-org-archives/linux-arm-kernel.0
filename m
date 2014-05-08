@@ -1,24 +1,72 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 8 May 2014 00:20:49 +0000 (UTC)
-Subject: [PATCH 1/2] ARM: omap5: hwmod_data: Update McPDM hwmod's flags
-In-Reply-To: <1398858208-1346-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1398858208-1346-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <alpine.DEB.2.02.1405080018490.23579@utopia.booyaka.com>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Wed, 07 May 2014 17:40:12 -0700
+Subject: [PATCH v5 0/4] live migration dirty bitmap support for ARMv7
+Message-ID: <1399509616-4632-1-git-send-email-m.smarduch@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi P?ter,
+Hi,
+  This v5 patchset of live mgiration support for ARMv7.
 
-On Wed, 30 Apr 2014, Peter Ujfalusi wrote:
+- Tested on two 4-way A15 hardware, QEMU 2-way/4-way SMP guest upto 2GB
+- Various dirty data rates tested - 2GB/1s ... 2048 pgs/5ms
+- validated source/destination memory image integrity
+- No issues, v4 time skip due to test harness.
 
-> Add HWMOD_SWSUP_SIDLE to flags.
-> 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Changes since v1:
+- add unlock of VM mmu_lock to prevent a deadlock
+- moved migratiion active inside mmu_lock acquire for visibility in 2nd stage
+  data abort handler
+- Added comments
 
-This patch could use a better changelog.  It would be ideal to understand 
-_why_ HWMOD_SWSUP_SIDLE is needed.  Is there a known hardware bug?  Or is 
-this simply based on practical observation, e.g., something bad happens if 
-the McPDM is not software-idled?
+Changes since v2:
+- move initial VM write protect to memory region architecture prepare function
+  (needed to make dirty logging function generic) 
+- added stage2_mark_pte_ro() - to mark ptes ro - Marc's comment
+- optimized initial VM memory region write protect to do fewer table lookups -
+  applied Marc's comment for walking dirty bitmap mask
+- added pud_addr_end() for stage2 tables, to make the walk 4-level
+- added kvm_flush_remote_tlbs() to use ARM TLB invalidation, made the generic
+  one weak, Marc's comment to for generic dirty bitmap log function
+- optimized walking dirty bit map mask to skip upper tables - Marc's comment
+- deleted x86,arm kvm_vm_ioctl_get_dirty_log(), moved to kvm_main.c tagged 
+  the function weak - Marc's comment
+- changed Data Abort handler pte index handling - Marc's comment
+
+Changes since v3:
+- changed pte updates to reset write bit instead of setting default 
+  value for existing pte's - Steve's comment 
+- In addition to PUD add 2nd stage >4GB range functions - Steves
+  suggestion
+- Restructured initial memory slot write protect function for PGD, PUD, PMD
+  table walking - Steves suggestion
+- Renamed variable types to resemble their use - Steves suggestions
+- Added couple pte helpers for 2nd stage tables - Steves suggestion
+- Updated unmap_range() that handles 2nd stage tables and identity mappings
+  to handle 2nd stage addresses >4GB. Left ARMv8 unchanged.
+
+Changes since v4:
+- rebased to 3.15.0-rc1 - 'next' to pickup p*addr_end patches - Gavins comment
+- Update PUD address end function to support 4-level page table walk
+- Elimiated 5th patch of the series that fixed unmap_range(), since it was
+  fixed by Marcs patches.
 
 
-- Paul
+Mario Smarduch (4):
+  add ARMv7 HYP API to flush VM TLBs without address param
+  live migration support for initial write protect of VM
+  live migration support for VM dirty log management
+  add 2nd stage page fault handling during live migration
+
+ arch/arm/include/asm/kvm_asm.h  |    1 +
+ arch/arm/include/asm/kvm_host.h |   12 ++
+ arch/arm/include/asm/kvm_mmu.h  |   16 +-
+ arch/arm/kvm/arm.c              |    8 +-
+ arch/arm/kvm/interrupts.S       |    5 +
+ arch/arm/kvm/mmu.c              |  318 ++++++++++++++++++++++++++++++++++++++-
+ arch/x86/kvm/x86.c              |   86 -----------
+ virt/kvm/kvm_main.c             |   89 ++++++++++-
+ 8 files changed, 440 insertions(+), 95 deletions(-)
+
+-- 
+1.7.9.5
