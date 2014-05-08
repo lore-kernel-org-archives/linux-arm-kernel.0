@@ -1,138 +1,128 @@
 From: marek@goldelico.com (Marek Belisko)
-Date: Thu,  8 May 2014 22:16:50 +0200
-Subject: [PATCH v3 1/3] omapdss: panel-tpo-td028ec1: Add DT support.
+Date: Thu,  8 May 2014 22:16:51 +0200
+Subject: [PATCH v3 2/3] ARM: dts: oma3-gta04: Add display support
 In-Reply-To: <1399580212-5183-1-git-send-email-marek@goldelico.com>
 References: <1399580212-5183-1-git-send-email-marek@goldelico.com>
-Message-ID: <1399580212-5183-2-git-send-email-marek@goldelico.com>
+Message-ID: <1399580212-5183-3-git-send-email-marek@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch add support for lcd display on gta04 board. Display control
+is connected to spi (used spi bitbang driver).
+
 Signed-off-by: Marek Belisko <marek@goldelico.com>
 ---
- .../bindings/video/toppoly,td028ttec1.txt          | 30 ++++++++++++++++++++
- arch/arm/mach-omap2/display.c                      |  1 +
- .../omap2/displays-new/panel-tpo-td028ttec1.c      | 32 +++++++++++++++++++++-
- 3 files changed, 62 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/video/toppoly,td028ttec1.txt
+ arch/arm/boot/dts/omap3-gta04.dts | 87 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 87 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/video/toppoly,td028ttec1.txt b/Documentation/devicetree/bindings/video/toppoly,td028ttec1.txt
-new file mode 100644
-index 0000000..7175dc3
---- /dev/null
-+++ b/Documentation/devicetree/bindings/video/toppoly,td028ttec1.txt
-@@ -0,0 +1,30 @@
-+Toppoly TD028TTEC1 Panel
-+========================
+diff --git a/arch/arm/boot/dts/omap3-gta04.dts b/arch/arm/boot/dts/omap3-gta04.dts
+index f8ad125..eb9ab1a 100644
+--- a/arch/arm/boot/dts/omap3-gta04.dts
++++ b/arch/arm/boot/dts/omap3-gta04.dts
+@@ -44,6 +44,36 @@
+ 		ti,mcbsp = <&mcbsp2>;
+ 		ti,codec = <&twl_audio>;
+ 	};
 +
-+Required properties:
-+- compatible: "toppoly,td028ttec1"
++	spi_lcd {
++		compatible = "spi-gpio";
++		#address-cells = <0x1>;
++		#size-cells = <0x0>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&spi_gpio_pins>;
 +
-+Optional properties:
-+- label: a symbolic name for the panel
++		gpio-sck = <&gpio1 12 0>;
++		gpio-miso = <&gpio1 18 0>;
++		gpio-mosi = <&gpio1 20 0>;
++		cs-gpios = <&gpio1 19 0>;
++		num-chipselects = <1>;
 +
-+Required nodes:
-+- Video port for DPI input
++		/* lcd panel */
++		lcd: td028ttec1 at 0 {
++			compatible = "toppoly,td028ttec1";
++			reg = <0>;
++			spi-max-frequency = <100000>;
++			spi-cpol;
++			spi-cpha;
 +
-+Example
-+-------
++			label = "lcd";
++			port {
++				lcd_in: endpoint {
++					remote-endpoint = <&dpi_out>;
++				};
++			};
++		};
++	};
+ };
+ 
+ &omap3_pmx_core {
+@@ -78,6 +108,47 @@
+ 			0x11e (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc1_dat3.sdmmc1_dat3 */
+ 		>;
+ 	};
 +
-+lcd-panel: td028ttec1 at 0 {
-+	compatible = "toppoly,td028ttec1";
-+	reg = <0>;
-+	spi-max-frequency = <100000>;
-+	spi-cpol;
-+	spi-cpha;
++	dss_dpi_pins: pinmux_dss_dpi_pins {
++               pinctrl-single,pins = <
++                       0x0a4 (PIN_OUTPUT | MUX_MODE0)   /* dss_pclk.dss_pclk */
++                       0x0a6 (PIN_OUTPUT | MUX_MODE0)   /* dss_hsync.dss_hsync */
++                       0x0a8 (PIN_OUTPUT | MUX_MODE0)   /* dss_vsync.dss_vsync */
++                       0x0aa (PIN_OUTPUT | MUX_MODE0)   /* dss_acbias.dss_acbias */
++                       0x0ac (PIN_OUTPUT | MUX_MODE0)   /* dss_data0.dss_data0 */
++                       0x0ae (PIN_OUTPUT | MUX_MODE0)   /* dss_data1.dss_data1 */
++                       0x0b0 (PIN_OUTPUT | MUX_MODE0)   /* dss_data2.dss_data2 */
++                       0x0b2 (PIN_OUTPUT | MUX_MODE0)   /* dss_data3.dss_data3 */
++                       0x0b4 (PIN_OUTPUT | MUX_MODE0)   /* dss_data4.dss_data4 */
++                       0x0b6 (PIN_OUTPUT | MUX_MODE0)   /* dss_data5.dss_data5 */
++                       0x0b8 (PIN_OUTPUT | MUX_MODE0)   /* dss_data6.dss_data6 */
++                       0x0ba (PIN_OUTPUT | MUX_MODE0)   /* dss_data7.dss_data7 */
++                       0x0bc (PIN_OUTPUT | MUX_MODE0)   /* dss_data8.dss_data8 */
++                       0x0be (PIN_OUTPUT | MUX_MODE0)   /* dss_data9.dss_data9 */
++                       0x0c0 (PIN_OUTPUT | MUX_MODE0)   /* dss_data10.dss_data10 */
++                       0x0c2 (PIN_OUTPUT | MUX_MODE0)   /* dss_data11.dss_data11 */
++                       0x0c4 (PIN_OUTPUT | MUX_MODE0)   /* dss_data12.dss_data12 */
++                       0x0c6 (PIN_OUTPUT | MUX_MODE0)   /* dss_data13.dss_data13 */
++                       0x0c8 (PIN_OUTPUT | MUX_MODE0)   /* dss_data14.dss_data14 */
++                       0x0ca (PIN_OUTPUT | MUX_MODE0)   /* dss_data15.dss_data15 */
++                       0x0cc (PIN_OUTPUT | MUX_MODE0)   /* dss_data16.dss_data16 */
++                       0x0ce (PIN_OUTPUT | MUX_MODE0)   /* dss_data17.dss_data17 */
++                       0x0d0 (PIN_OUTPUT | MUX_MODE0)   /* dss_data18.dss_data18 */
++                       0x0d2 (PIN_OUTPUT | MUX_MODE0)   /* dss_data19.dss_data19 */
++                       0x0d4 (PIN_OUTPUT | MUX_MODE0)   /* dss_data20.dss_data20 */
++                       0x0d6 (PIN_OUTPUT | MUX_MODE0)   /* dss_data21.dss_data21 */
++                       0x0d8 (PIN_OUTPUT | MUX_MODE0)   /* dss_data22.dss_data22 */
++                       0x0da (PIN_OUTPUT | MUX_MODE0)   /* dss_data23.dss_data23 */
++               >;
++       };
 +
-+	label = "lcd";
++	spi_gpio_pins: spi_gpio_pinmux {
++		pinctrl-single,pins = <0x5a8 (PIN_OUTPUT | MUX_MODE4) /* clk */
++			0x5b6 (PIN_OUTPUT | MUX_MODE4) /* cs */
++			0x5b8 (PIN_OUTPUT | MUX_MODE4) /* tx */
++			0x5b4 (PIN_INPUT | MUX_MODE4) /* rx */
++		>;
++	};
+ };
+ 
+ &i2c1 {
+@@ -219,3 +290,19 @@
+ 	regulator-min-microvolt = <2800000>;
+ 	regulator-max-microvolt = <3150000>;
+ };
++
++&dss {
++	pinctrl-names = "default";
++	pinctrl-0 = < &dss_dpi_pins >;
++
++	status = "okay";
++
++	vdds_dsi-supply = <&vpll2>;
++
 +	port {
-+		lcd_in: endpoint {
-+			remote-endpoint = <&dpi_out>;
++		dpi_out: endpoint {
++			remote-endpoint = <&lcd_in>;
++			data-lines = <24>;
 +		};
 +	};
 +};
-+
-diff --git a/arch/arm/mach-omap2/display.c b/arch/arm/mach-omap2/display.c
-index 16d33d8..66a2ee0 100644
---- a/arch/arm/mach-omap2/display.c
-+++ b/arch/arm/mach-omap2/display.c
-@@ -566,6 +566,7 @@ static const char * const dss_compat_conv_list[] __initconst = {
- 	"svideo-connector",
- 	"ti,tfp410",
- 	"ti,tpd12s015",
-+	"toppoly,td028ttec1",
- };
- 
- /* prepend compatible string with "omapdss," */
-diff --git a/drivers/video/fbdev/omap2/displays-new/panel-tpo-td028ttec1.c b/drivers/video/fbdev/omap2/displays-new/panel-tpo-td028ttec1.c
-index fae6adc..5b3466e 100644
---- a/drivers/video/fbdev/omap2/displays-new/panel-tpo-td028ttec1.c
-+++ b/drivers/video/fbdev/omap2/displays-new/panel-tpo-td028ttec1.c
-@@ -206,7 +206,8 @@ static int td028ttec1_panel_enable(struct omap_dss_device *dssdev)
- 	if (omapdss_device_is_enabled(dssdev))
- 		return 0;
- 
--	in->ops.dpi->set_data_lines(in, ddata->data_lines);
-+	if (ddata->data_lines)
-+		in->ops.dpi->set_data_lines(in, ddata->data_lines);
- 	in->ops.dpi->set_timings(in, &ddata->videomode);
- 
- 	r = in->ops.dpi->enable(in);
-@@ -389,6 +390,23 @@ static int td028ttec1_panel_probe_pdata(struct spi_device *spi)
- 	return 0;
- }
- 
-+static int td028ttec1_probe_of(struct spi_device *spi)
-+{
-+	struct device_node *node = spi->dev.of_node;
-+	struct panel_drv_data *ddata = dev_get_drvdata(&spi->dev);
-+	struct omap_dss_device *in;
-+
-+	in = omapdss_of_find_source_for_first_ep(node);
-+	if (IS_ERR(in)) {
-+		dev_err(&spi->dev, "failed to find video source\n");
-+		return PTR_ERR(in);
-+	}
-+
-+	ddata->in = in;
-+
-+	return 0;
-+}
-+
- static int td028ttec1_panel_probe(struct spi_device *spi)
- {
- 	struct panel_drv_data *ddata;
-@@ -418,6 +436,10 @@ static int td028ttec1_panel_probe(struct spi_device *spi)
- 		r = td028ttec1_panel_probe_pdata(spi);
- 		if (r)
- 			return r;
-+	} else if (spi->dev.of_node) {
-+		r = td028ttec1_probe_of(spi);
-+		if (r)
-+			return r;
- 	} else {
- 		return -ENODEV;
- 	}
-@@ -463,6 +485,13 @@ static int td028ttec1_panel_remove(struct spi_device *spi)
- 	return 0;
- }
- 
-+static const struct of_device_id td028ttec1_of_match[] = {
-+	{ .compatible = "omapdss,toppoly,td028ttec1", },
-+	{},
-+};
-+
-+MODULE_DEVICE_TABLE(of, td028ttec1_of_match);
-+
- static struct spi_driver td028ttec1_spi_driver = {
- 	.probe		= td028ttec1_panel_probe,
- 	.remove		= td028ttec1_panel_remove,
-@@ -470,6 +499,7 @@ static struct spi_driver td028ttec1_spi_driver = {
- 	.driver         = {
- 		.name   = "panel-tpo-td028ttec1",
- 		.owner  = THIS_MODULE,
-+		.of_match_table = td028ttec1_of_match,
- 	},
- };
- 
 -- 
 1.9.1
