@@ -1,87 +1,114 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 9 May 2014 19:22:45 +0100
-Subject: [PATCH] ARM: Don't ever downscale loops_per_jiffy in SMP systems#
-In-Reply-To: <alpine.LFD.2.11.1405091245070.980@knanqh.ubzr>
-References: <CAD=FV=UEGJGHrdcXgs3EZ_wFXT8GnNeCOMt7CgdiiUzBzZ5Y0A@mail.gmail.com>
- <alpine.LFD.2.11.1405081149190.980@knanqh.ubzr>
- <CAD=FV=VtcLOh51LCmafzRMdqtDrwKXCqK6gE6V7OOOUe4gjwbA@mail.gmail.com>
- <alpine.LFD.2.11.1405081329010.980@knanqh.ubzr>
- <20140508192209.GH3693@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1405081600260.980@knanqh.ubzr>
- <20140508205223.GI3693@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1405082058130.980@knanqh.ubzr>
- <20140509091824.GL3693@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1405091245070.980@knanqh.ubzr>
-Message-ID: <20140509182245.GM3693@n2100.arm.linux.org.uk>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Fri, 9 May 2014 15:45:05 -0300
+Subject: [PATCH 2/2] mtd: orion-nand: fix build error with ARMv4
+In-Reply-To: <1399560990-1402858-4-git-send-email-arnd@arndb.de>
+References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
+ <1399560990-1402858-1-git-send-email-arnd@arndb.de>
+ <1399560990-1402858-4-git-send-email-arnd@arndb.de>
+Message-ID: <20140509184505.GA30330@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 09, 2014 at 02:00:54PM -0400, Nicolas Pitre wrote:
-> On Fri, 9 May 2014, Russell King - ARM Linux wrote:
+On 08 May 04:56 PM, Arnd Bergmann wrote:
+> orion_nand_read_buf uses an inline assembly with the "ldrd"
+> instruction, which is only available from ARMv5 upwards. This
+> used to be fine, since all users have an ARMv5 or ARMv7 CPU,
+> but now we can also build a multiplatform kernel with ARMv4
+> support enabled in addition to the "kirkwood" (mvebu) platform.
 > 
-> > On Thu, May 08, 2014 at 09:37:15PM -0400, Nicolas Pitre wrote:
-> > > On Thu, 8 May 2014, Russell King - ARM Linux wrote:
-> > > 
-> > > > If you're in a preempt or SMP environment, provide a timer for udelay().
-> > > > IF you're in an environment with IRQs which can take a long time, use
-> > > > a timer for udelay().  If you're in an environment where the CPU clock
-> > > > can change unexpectedly, use a timer for udelay().
-> > > 
-> > > Longer delays are normally not a problem.  If they are, then simply 
-> > > disabling IRQs may solve it if absolutely required.  With much shorter 
-> > > delays than expected this is another story.
-> > > 
-> > > What about the following:
-> > > 
-> > > diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-> > > index 7c4fada440..10030cc5a0 100644
-> > > --- a/arch/arm/kernel/smp.c
-> > > +++ b/arch/arm/kernel/smp.c
-> > > @@ -682,6 +682,15 @@ static int cpufreq_callback(struct notifier_block *nb,
-> > >  			cpufreq_scale(per_cpu(l_p_j_ref, cpu),
-> > >  					per_cpu(l_p_j_ref_freq, cpu),
-> > >  					freq->new);
-> > > +		/*
-> > > +		 * Another CPU might have called udelay() just before LPJ
-> > > +		 * and a shared CPU clock is increased.  That other CPU still
-> > > +		 * looping on the old LPJ value would return significantly
-> > > +		 * sooner than expected.  The actual fix is to provide a
-> > > +		 * timer based udelay() implementation instead.
-> > > +		 */
-> > > +		if (freq->old < freq->new)
-> > > +			pr_warn_once("*** udelay() on SMP is racy and may be much shorter than expected ***\n");
-> > >  	}
-> > >  	return NOTIFY_OK;
-> > >  }
-> > 
-> > No, because you're assuming this is just a SMP problem.  What about
-> > preempt, where you could preempt away from a udelay loop to change
-> > the CPU frequency, and then back again, possibly resulting in the
-> > CPU clock rate increasing and maybe a shorter delay if the switch
-> > from-change-clock-and-back is fast enough?  Remember that udelay()
-> > can be used for up to 2ms delays.
+> This provides an alternative to call the readsl() function that
+> is supposed to have the same effect and is also optimized for
+> performance.
 > 
-> Well... that would be somewhat less likely but still possible yes.
+> This patch is untested, and it would be worthwhile to check
+> if there is any performance impact, especially in case the readsl
+> version is actually faster.
 > 
-> So the only way to "solve" this might look similar in spirit to what 
-> Doug alluded to earlier i.e. increase a sequence number on 
-> CPUFREQ_PRECHANGE and increase it again on CPUFREQ_POSTCHANGE, and have 
-> udelay() compare the count sampled before reading lpj and after 
-> returning from the loop code.  When the sequence count doesn't match 
-> then suffice to perform some arbitrarily large extra loops.
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: David Woodhouse <dwmw2@infradead.org>
+> Cc: Brian Norris <computersforpeace@gmail.com>
+> Cc: Jingoo Han <jg1.han@samsung.com>
+> Cc: linux-mtd at lists.infradead.org
+> ---
+>  drivers/mtd/nand/orion_nand.c | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/drivers/mtd/nand/orion_nand.c b/drivers/mtd/nand/orion_nand.c
+> index dd7fe81..c7b5e8a 100644
+> --- a/drivers/mtd/nand/orion_nand.c
+> +++ b/drivers/mtd/nand/orion_nand.c
+> @@ -56,6 +56,7 @@ static void orion_nand_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
+>  		*buf++ = readb(io_base);
+>  		len--;
+>  	}
+> +#if __LINUX_ARM_ARCH__ >= 5
+>  	buf64 = (uint64_t *)buf;
+>  	while (i < len/8) {
+>  		/*
+> @@ -68,6 +69,10 @@ static void orion_nand_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
+>  		asm volatile ("ldrd\t%0, [%1]" : "=&r" (x) : "r" (io_base));
+>  		buf64[i++] = x;
+>  	}
+> +#else
+> +	readsl(io_base, buf, len/8);
 
-I'd much prefer just printing a warning at kernel boot time to report
-that the kernel is running with features which would make udelay() less
-than accurate.
+I gave this a try in order to answer Arnd's performance question. First of all,
+the patch seems wrong. I guess it's because readsl reads 4-bytes pieces, instead of
+8-bytes.
 
-Remember, it should be usable for _short_ delays on slow machines as
-well as other stuff, and if we're going to start throwing stuff like
-the above at it, it's going to become very inefficient.
+This patch below is tested (but not completely, see below) and works:
 
-And... I go back to what I've been saying all along: use a timer in
-this situation, don't rely on the loops-based udelay if you have
-preempt, USB interrupts, SMP etc.
+diff --git a/drivers/mtd/nand/orion_nand.c b/drivers/mtd/nand/orion_nand.c
+index dd7fe81..7a78cc5 100644
+--- a/drivers/mtd/nand/orion_nand.c
++++ b/drivers/mtd/nand/orion_nand.c
+@@ -52,6 +52,7 @@ static void orion_nand_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
+ 	uint64_t *buf64;
+ 	int i = 0;
+ 
++#if __LINUX_ARM_ARCH__ >= 5
+ 	while (len && (unsigned long)buf & 7) {
+ 		*buf++ = readb(io_base);
+ 		len--;
+@@ -69,6 +70,14 @@ static void orion_nand_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
+ 		buf64[i++] = x;
+ 	}
+ 	i *= 8;
++#else
++	while (len && (unsigned long)buf & 3) {
++		*buf++ = readb(io_base);
++		len--;
++	}
++	readsl(io_base, buf, len/4);
++	i = (len / 4 * 4) * 4;
++#endif
+ 	while (i < len)
+ 		buf[i++] = readb(io_base);
+ }
 
+However, all the reads are nicely aligned (in both the buffer and the
+length) which means the only 'read' performed in the readsl() one.
+
+In other words, the patch is still half-untested. Therefore, and given
+this is meant only to coherce a build, maybe we'd rather just loop over
+readb and stay on the safe side?
+
+And now, answering Arnd's question:
+
+# Using ldrd
+# time nanddump /dev/mtd5 -f /dev/null -q
+real	0m 5.90s
+user	0m 0.22s
+sys	0m 5.67s
+
+# Using readsl
+# time nanddump /dev/mtd5 -f /dev/null -q
+real	0m 6.39s
+user	0m 0.17s
+sys	0m 6.20s
+
+So I'd say, let's stick to the ldrd magic.
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
