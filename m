@@ -1,77 +1,32 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 09 May 2014 13:43:57 +0200
-Subject: [PATCH v2 2/2] iio:adc: at91 requires the input subsystem
-In-Reply-To: <536CA78C.5070603@atmel.com>
+Date: Fri, 9 May 2014 13:48:49 +0200
+Subject: [PATCH 00/22] Random ARM randconfig fixes in drivers
+In-Reply-To: <20140508164157.GA22224@roeck-us.net>
 References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-13-git-send-email-arnd@arndb.de>
- <536CA78C.5070603@atmel.com>
-Message-ID: <4163305.otOGv8yVK1@wuerfel>
+ <20140508164157.GA22224@roeck-us.net>
+Message-ID: <201405091348.49713.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 09 May 2014 12:01:48 Nicolas Ferre wrote:
-> On 08/05/2014 16:56, Arnd Bergmann :
-> > Building the at91 adc driver with CONFIG_INPUT disabled results in this
-> > build error:
+On Thursday 08 May 2014, Guenter Roeck wrote:
+> On Thu, May 08, 2014 at 04:46:51PM +0200, Arnd Bergmann wrote:
+> > These are a bunch of fixes I had to do to get all randconfig
+> > configurations on ARM working. Most of these are really old
+> > bugs, but there are also some new ones. I don't think any of
+> > them require a backport to linux-stable.
 > > 
-> > ERROR: "input_event" [drivers/iio/adc/at91_adc.ko] undefined!
-> > ERROR: "input_unregister_device" [drivers/iio/adc/at91_adc.ko] undefined!
-> > ERROR: "input_free_device" [drivers/iio/adc/at91_adc.ko] undefined!
-> > ERROR: "input_register_device" [drivers/iio/adc/at91_adc.ko] undefined!
-> > ERROR: "input_set_abs_params" [drivers/iio/adc/at91_adc.ko] undefined!
-> > ERROR: "input_allocate_device" [drivers/iio/adc/at91_adc.ko] undefined!
+> > I have checked that they are all still required on yesterday's
+> > linux-next kernel. Please apply on the appropriate trees unless
+> > there are objections.
 > > 
-> > To make sure we can build random configurations, this turns on CONFIG_INPUT
-> > whenever CONFIG_AT91_ADC is enabled.
-> 
-> Isn't it a "select" instead of "depends" that is required then?
+> Is this series of patches also going to fix arm:allmodconfig ?
 
-It seems I fixed the patch at some point but didn't update the message.
+Possibly, I haven't checked in a while. I'm unfortunately sitting on
+about 200 other patches in the same branch, which together fix all
+build errors in any configuration I encountered.
 
-In general, we should not mix 'depends on' and 'select' for the same symbol,
-since that causes extra confusion.
-
-In case of CONFIG_INPUT, almost all the users do 'depends on INPUT', with
-a few exceptions that seem to be done in error.
-Updated patch below.
+I should really do some allmodconfig/allnoconfig/allyesconfig
+builds without my series again, and prioritize sending out the
+ones required for that.
 
 	Arnd
-
-8<----
-
->From 4679d63b24a681d9c6afcfdde266bae0f940e90b Mon Sep 17 00:00:00 2001
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Wed, 9 Apr 2014 17:18:10 +0200
-Subject: [PATCH] [SUBMITTED] iio:adc: at91 requires the input subsystem
-
-Building the at91 adc driver with CONFIG_INPUT disabled results in this
-build error:
-
-ERROR: "input_event" [drivers/iio/adc/at91_adc.ko] undefined!
-ERROR: "input_unregister_device" [drivers/iio/adc/at91_adc.ko] undefined!
-ERROR: "input_free_device" [drivers/iio/adc/at91_adc.ko] undefined!
-ERROR: "input_register_device" [drivers/iio/adc/at91_adc.ko] undefined!
-ERROR: "input_set_abs_params" [drivers/iio/adc/at91_adc.ko] undefined!
-ERROR: "input_allocate_device" [drivers/iio/adc/at91_adc.ko] undefined!
-
-To make sure we can build random configurations, this adds a Kconfig
-dependency on CONFIG_INPUT, as we do for other similar drivers.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: linux-iio at vger.kernel.org
-Cc: Josh Wu <josh.wu@atmel.com>
-Cc: Jonathan Cameron <jic23@kernel.org>
-Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-
-diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
-index 90f596d..a80d236 100644
---- a/drivers/iio/adc/Kconfig
-+++ b/drivers/iio/adc/Kconfig
-@@ -110,6 +110,7 @@ config AD799X
- config AT91_ADC
- 	tristate "Atmel AT91 ADC"
- 	depends on ARCH_AT91
-+	depends on INPUT
- 	select IIO_BUFFER
- 	select IIO_TRIGGERED_BUFFER
- 	select SYSFS
