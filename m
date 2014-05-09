@@ -1,27 +1,28 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sat, 10 May 2014 00:57:09 +0200
-Subject: [PATCH v2.1 3/9] ARM: S3C24XX: enable usage of common dclk if
- common clock framework is enabled
-In-Reply-To: <1399654181.19276.2.camel@x220>
-References: <2104342.rkElQpXtvM@phil> <3835735.0k9HAgQHzN@phil>
- <1399654181.19276.2.camel@x220>
-Message-ID: <1454194.ZOZn9c4lf4@phil>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 10 May 2014 02:59:15 +0400
+Subject: [PATCH V2 2/2] ARM: shmobile: r8a7791: add i2c2 bus to koelsch dt
+In-Reply-To: <20140509050610.GB2624@katana>
+References: <1392633882-12142-1-git-send-email-wsa@the-dreams.de>
+ <1392633882-12142-2-git-send-email-wsa@the-dreams.de>
+ <536C1945.1000601@cogentembedded.com> <20140509050610.GB2624@katana>
+Message-ID: <536D5DC3.3070409@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 9. Mai 2014, 18:49:41 schrieb Paul Bolle:
-> > @@ -643,7 +654,8 @@ config MACH_RX1950
-> > 
-> >  	select PM_H1940 if PM
-> >  	select S3C2410_IOTIMING if ARM_S3C2440_CPUFREQ
-> >  	select S3C2440_XTAL_16934400
-> > 
-> > -	select S3C24XX_DCLK
-> > +	select S3C24XX_DCLK if SAMSUNG_CLOCK
-> > +	select S3C24XX_COMMON_DCLK if COMMON_CLK
-> 
-> This looks like a typo. Did you mean S3C2410_COMMON_DCLK?
+Hello.
 
-yep that is a typo, S3C2410_COMMON_DCLK is the correct one.
+On 05/09/2014 09:06 AM, Wolfram Sang wrote:
 
-Heiko
+>>> +	eeprom at 50 {
+>>> +		compatible = "renesas,24c02";
+
+>>     This is not quite right: Renesas' part is called differently, and
+>> you're carrying the other vendor's naming onto Renesas parts. I'd
+>> just say "24c02" (which I'll do in the Henninger board patch).
+
+> What about "generic"?
+
+    I don't know, really. However, you're right in that there should be some 
+vendor prefix -- I've just seen Documentation/devicetree/bindings/eeprom.txt.
+
+WBR, Sergei
