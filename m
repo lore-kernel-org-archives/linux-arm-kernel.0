@@ -1,55 +1,77 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 8 May 2014 21:43:04 -0700
-Subject: [PATCH] ARM: Don't ever downscale loops_per_jiffy in SMP systems
-In-Reply-To: <alpine.LFD.2.11.1405082058130.980@knanqh.ubzr>
-References: <1399504982-31181-1-git-send-email-dianders@chromium.org>
- <CAOh2x=kwaoSdj8JO0Vo08Y0dX2UfKFiF3pBV-qtp-YTyN=8H8Q@mail.gmail.com>
- <CAD=FV=UEGJGHrdcXgs3EZ_wFXT8GnNeCOMt7CgdiiUzBzZ5Y0A@mail.gmail.com>
- <alpine.LFD.2.11.1405081149190.980@knanqh.ubzr>
- <CAD=FV=VtcLOh51LCmafzRMdqtDrwKXCqK6gE6V7OOOUe4gjwbA@mail.gmail.com>
- <alpine.LFD.2.11.1405081329010.980@knanqh.ubzr>
- <20140508192209.GH3693@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1405081600260.980@knanqh.ubzr>
- <20140508205223.GI3693@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1405082058130.980@knanqh.ubzr>
-Message-ID: <CAD=FV=XmcGETtRbFDVseLZnyfjrG6q5+2nEFq6oYVucEhFrPjA@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 09 May 2014 06:49:04 +0200
+Subject: [PATCH v3 1/2] ARM: EXYNOS: Map SYSRAM through generic SRAM
+ bindings
+In-Reply-To: <034b01cf6b2c$5b5d06b0$12171410$@samsung.com>
+References: <1399522592-23618-1-git-send-email-sachin.kamat@linaro.org>
+ <536BAE39.70504@samsung.com> <034b01cf6b2c$5b5d06b0$12171410$@samsung.com>
+Message-ID: <536C5E40.90405@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas,
+Hi Kukjin,
 
-On Thu, May 8, 2014 at 6:37 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Thu, 8 May 2014, Russell King - ARM Linux wrote:
+On 09.05.2014 04:14, Kukjin Kim wrote:
+> Tomasz Figa wrote:
+>>
+>> Hi Sachin,
+>>
+>> On 08.05.2014 06:16, Sachin Kamat wrote:
+>>> Instead of hardcoding the SYSRAM details for each SoC,
+>>> pass this information through device tree (DT) and make
+>>> the code SoC agnostic. Generic SRAM bindings are used
+>>> for achieving this.
+>>>
+>>> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+>>> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>>> Acked-by: Heiko Stuebner <heiko@sntech.de>
+>>> ---
+>>> Changes since v2.
+>>> * Updated sysram node for Universal C210 board - Thanks to
+>>> Tomasz Figa for testing and updating the same.
+>>> * Added error handling code.
+>>> * Break if matching node found.
+>>> * Remove unnecessary error messages.
+>>>
+>>> This patch is based on linux next (next-20140501) on top of
+>>> my Kconfig consolidation patch
+>>> http://comments.gmane.org/gmane.linux.kernel.samsung-soc/28642
+>>>
+>>> Tested on 4210/4412 Origen, 5250/5420 Arndale and SMDK5420 boards.
+>>> ---
+>>>   arch/arm/Kconfig                                |    1 +
+>>>   arch/arm/boot/dts/exynos4210-universal_c210.dts |   15 ++++++
+>>>   arch/arm/boot/dts/exynos4210.dtsi               |   18 +++++++
+>>>   arch/arm/boot/dts/exynos4x12.dtsi               |   18 +++++++
+>>>   arch/arm/boot/dts/exynos5250.dtsi               |   18 +++++++
+>>>   arch/arm/boot/dts/exynos5420.dtsi               |   18 +++++++
+>>>   arch/arm/mach-exynos/common.h                   |    1 +
+>>>   arch/arm/mach-exynos/exynos.c                   |   64
+> ----------------------
+>> -
+>>>   arch/arm/mach-exynos/firmware.c                 |    8 ++-
+>>>   arch/arm/mach-exynos/include/mach/map.h         |    7 ---
+>>>   arch/arm/mach-exynos/platsmp.c                  |   56
+> ++++++++++++++++++--
+>>>   11 files changed, 148 insertions(+), 76 deletions(-)
+>>>
+>>
+>> Looks good, thanks.
+>>
+>> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+>>
+> Looks good to me but I think, we need to change the name of 'sram' because
+> it can cause some confusing, actually it is not matching _real_ sram area on
+> the SoCs. When we upstreamed regarding patch, I decided the name to use
+> 'SYSRAM', it was called another name in datasheet though. So, I'd like to
+> use 'sysram' instead of 'sram' as we used before.
 >
->> If you're in a preempt or SMP environment, provide a timer for udelay().
->> IF you're in an environment with IRQs which can take a long time, use
->> a timer for udelay().  If you're in an environment where the CPU clock
->> can change unexpectedly, use a timer for udelay().
->
-> Longer delays are normally not a problem.  If they are, then simply
-> disabling IRQs may solve it if absolutely required.  With much shorter
-> delays than expected this is another story.
->
-> What about the following:
->
-> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-> index 7c4fada440..10030cc5a0 100644
-> --- a/arch/arm/kernel/smp.c
-> +++ b/arch/arm/kernel/smp.c
-> @@ -682,6 +682,15 @@ static int cpufreq_callback(struct notifier_block *nb,
->                         cpufreq_scale(per_cpu(l_p_j_ref, cpu),
->                                         per_cpu(l_p_j_ref_freq, cpu),
->                                         freq->new);
-> +               /*
-> +                * Another CPU might have called udelay() just before LPJ
-> +                * and a shared CPU clock is increased.  That other CPU still
-> +                * looping on the old LPJ value would return significantly
-> +                * sooner than expected.  The actual fix is to provide a
-> +                * timer based udelay() implementation instead.
-> +                */
-> +               if (freq->old < freq->new)
-> +                       pr_warn_once("*** udelay() on SMP is racy and may be much shorter than expected ***\n");
+> I will change the name when I apply this series in this weekend, if you guys
+> have no objection.
 
-I would be OK with that.  At least someone would have a clue what to do.
+You mean s/sram/sysram/ in compatible strings of Exynos-specific 
+reserved areas? If yes, I'm fine, it might be even better. Just remember 
+to update documentation in patch 2/2 as well.
 
--Doug
+Best regards,
+Tomasz
