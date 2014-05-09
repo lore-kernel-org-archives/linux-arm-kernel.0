@@ -1,19 +1,27 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 9 May 2014 14:01:13 +0800
-Subject: [PATCH] ARM: dts: i.MX51 babbage: Fix FEC pad ctrl settings
-In-Reply-To: <1399529850-20186-1-git-send-email-s.hauer@pengutronix.de>
-References: <1399529850-20186-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20140509060111.GE2870@dragon>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri,  9 May 2014 08:11:13 +0200
+Subject: [PATCH v2] i.MX25 dts updates
+Message-ID: <1399615879-30781-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 08, 2014 at 08:17:30AM +0200, Sascha Hauer wrote:
-> The dts relied on the FEC pad ctrl settings from the bootloader by
-> using the NO_PAD_CTRL option. This breaks once the bootloader starts
-> initializing the pad ctrl settings from the same dts file. Change
-> to real pad ctrl settings taken from the platform based babbage
-> support.
-> 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Changes since v1:
 
-Applied, thanks.
+- Fix mmc1 alias name
+- Add enable-active-high to FEC phy regulator
+- Fix gpio number for FEC phy reset
+
+Sascha
+
+----------------------------------------------------------------
+Sascha Hauer (6):
+      ARM: dts: i.MX25: Add mmc aliases
+      ARM: dts: i.MX25: remove disabled property of usbmisc unit
+      ARM: dts: i.MX25: Add IRAM node
+      ARM: dts: Karo TX25: Add pinctrl nodes
+      ARM: dts: Karo TX25: Add phy reset gpio and supply for FEC
+      ARM: dts: Karo TX25: use hardware ecc
+
+ arch/arm/boot/dts/imx25-karo-tx25.dts | 73 +++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx25.dtsi          |  8 +++-
+ 2 files changed, 80 insertions(+), 1 deletion(-)
