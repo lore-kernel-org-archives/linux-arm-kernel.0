@@ -1,51 +1,43 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 9 May 2014 11:01:52 +0300
-Subject: [PATCH 1/4] OMAPDSS: Fix DSS clock multiplier issue on 3703 and
- probably 3630
-In-Reply-To: <20140508232006.GG2198@atomide.com>
-References: <1398815562-24113-1-git-send-email-tony@atomide.com>
- <1398815562-24113-2-git-send-email-tony@atomide.com>
- <20140508232006.GG2198@atomide.com>
-Message-ID: <536C8B70.1000306@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 9 May 2014 09:08:07 +0100
+Subject: [PATCH v2 3/7] mfd: add support for sun6i PRCM
+ (Power/Reset/Clock Management) unit
+In-Reply-To: <536C84F6.2050701@redhat.com>
+References: <1399483554-8824-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1399483554-8824-4-git-send-email-boris.brezillon@free-electrons.com>
+ <20140508110205.GB5767@lee--X1>
+ <536BE366.8080907@free-electrons.com>
+ <20140509071246.GE5767@lee--X1> <536C84F6.2050701@redhat.com>
+Message-ID: <20140509080807.GH5767@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/05/14 02:20, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [140429 16:53]:
->> Otherwise we can get often errors like the following and the
->> display won't come on:
->>
->> omapdss APPLY error: FIFO UNDERFLOW on gfx, disabling the overlay
->> omapdss APPLY error: SYNC_LOST on channel lcd, restarting
->> the output with video overlays disabled
->>
->> There are some earlier references to this issue:
->>
->> http://www.spinics.net/lists/linux-omap/msg59511.html
->> http://www.spinics.net/lists/linux-omap/msg59724.html
->>
->> It seems that it's safe to set the lower values even for 3630.
->> If we can confirm that 3630 works with the higher values
->> reliably we can add further detection.
+> >>>> +static struct platform_driver sun6i_prcm_driver = {
+> >>>> +	.driver = {
+> >>>> +		.name = "sun6i-prcm",
+> >>>> +		.owner = THIS_MODULE,
+> >>>> +		.of_match_table = sun6i_prcm_dt_ids,
+> >>>> +	},
+> >>>> +	.probe = sun6i_prcm_probe,
+> >>> You need a .remove() call-back.
+> >>
+> >> This driver cannot be compiled as module (see the Kconfig definition)
+> >> and the devices are not hotpluggable, as a result a probed device will
+> >> never be removed.
+> >>
+> >> Do you still want me to implement the remove function ?
+> > 
+> > .remove() also be run on shut down.
 > 
-> BTW, I'm also seeing this warning on 3730-evm it may be related:
-> 
-> [    3.523101] ------------[ cut here ]------------
-> [    3.528015] WARNING: CPU: 0 PID: 6 at drivers/video/fbdev/omap2/dss/dss.c:483 dss_set_fck_rate+0x6c/0x8c()
-> [    3.538360] clk rate mismatch: 108000000 != 115200000
-> [    3.543518] Modules linked in:
+> That is not true, if your device needs to do anything special at shutdown
+> you need to add a shutdown callback. Devices are kept as is (not torn down)
+> on shutdown.
 
-Hmm... Can you paste the clk_summary from debugfs? Somehow the clock
-framework calculates the clock rate differently than the dss. Or do we
-have different clock.dts files used for 3730 and 3630?
+Ah okay, I'll bow to your knowledge.  So there's no reason for this
+driver to ever call mfd_remove_devices() then?
 
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140509/b346dde8/attachment.sig>
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
