@@ -1,84 +1,54 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 9 May 2014 13:04:19 +0100
-Subject: [PATCH RFC v3 3/6] drivers: cpuidle: implement OF based idle
- states infrastructure
-In-Reply-To: <536c0f39.90ab420a.3da7.ffff86ca@mx.google.com>
-References: <1399399483-17112-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1399399483-17112-4-git-send-email-lorenzo.pieralisi@arm.com>
- <536c0f39.90ab420a.3da7.ffff86ca@mx.google.com>
-Message-ID: <20140509120419.GA5040@e102568-lin.cambridge.arm.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 9 May 2014 20:08:47 +0800
+Subject: [PATCH v2] ARM: dts: imx6: add new board RIoTboard
+In-Reply-To: <536C8837.9090802@gmail.com>
+References: <53695C34.5000604@gmail.com> <20140508054106.GH2794@dragon>
+ <536B4ACD.30001@gmail.com> <20140509030938.GK2794@dragon>
+ <536C8837.9090802@gmail.com>
+Message-ID: <20140509120845.GO2794@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 09, 2014 at 12:12:19AM +0100, Sebastian Capella wrote:
-> Quoting Lorenzo Pieralisi (2014-05-06 11:04:40)
+On Fri, May 09, 2014 at 08:48:07AM +0100, Iain Paton wrote:
+> On 09/05/14 04:09, Shawn Guo wrote:
+> > On Thu, May 08, 2014 at 10:13:49AM +0100, Iain Paton wrote:
 > 
-> > diff --git a/drivers/cpuidle/of_idle_states.c b/drivers/cpuidle/of_idle_states.c
-> > new file mode 100644
-> > index 0000000..360b7ad
-> > --- /dev/null
-> > +++ b/drivers/cpuidle/of_idle_states.c
-> > @@ -0,0 +1,293 @@
-> ...
-> > +static int __init add_state_node(cpumask_t *cpumask,
-> > +                                struct device_node *state_node)
-> > +{
-> > +       struct state_elem *el;
-> > +       u32 tmp, val = 0;
-> > +
-> > +       pr_debug(" * %s...\n", state_node->full_name);
-> > +
-> > +       if (!state_cpus_valid(cpumask, state_node))
-> > +               return -EINVAL;
-> > +       /*
-> > +        * Parse just the properties required to sort the states.
-> > +        * Since we are missing a value defining the energy
-> > +        * efficiency of a state, for now the sorting code uses
-> > +        *
-> > +        * min-residency-us+exit-latency-us
-> > +        *
-> > +        * as sorting rank.
-> > +        */
-> > +       if (of_property_read_u32(state_node, "min-residency-us",
-> > +                                &tmp)) {
-> > +               pr_debug(" * %s missing min-residency-us property\n",
-> > +                        state_node->full_name);
-> > +               return -EINVAL;
-> > +       }
-> > +
-> > +       val += tmp;
-> > +
-> > +       if (of_property_read_u32(state_node, "exit-latency-us",
-> > +                                &tmp)) {
-> > +               pr_debug(" * %s missing exit-latency-us property\n",
-> > +                            state_node->full_name);
-> > +               return -EINVAL;
-> > +       }
-> > +
-> > +       val += tmp;
+> >> +&ecspi1 {
+> >> +	fsl,spi-num-chipselects = <1>;
+> >> +	cs-gpios = <&gpio5 17 0>;
+> >> +	pinctrl-names = "default";
+> >> +	pinctrl-0 = <&pinctrl_ecspi1>;
+> >> +	status = "okay";
+> >> +
+> >> +	spidev at 0 {
+> >> +		spi-max-frequency = <24000000>;
+> >> +		reg = <0>;
+> >> +		compatible = "spidev";
+> >> +	};
+> > 
+> > What's this?  Is this the common way we code spi devices in device tree?
 > 
-> Sorry if i'm rehashing old stuff, but I prefer not to use the
-> min-residency + exit-latency to sort.  I saw Rob's comment suggesting it
-> and your reply.  I'm not sure when it was decided.
+> I'd appreciate your guidance here, what would you prefer?
 > 
-> Would it be possible to sort instead based on the order in the
-> cpus->cpu-idle-states?  If not, my preference would be to either use
-> index like you had before, or specify another sort order / rank value.
+> My reasons for adding spidev were as follows:
 > 
-> I think there's potential for us to create lower power states that
-> have lower min-residencies (reduced power consumption in the state,
-> allowing us to more quickly recover the higher entrance cost)
-> with higher exit latencies in such a way that the formula would not
-> sort as we expect.  Having a separate value would allow us to control
-> the sorting in those cases.
+> 1. The SPI pins are not used on the board, they go to an expansion header.
+> 2. Board is targeted at makers who are likely to want to attach 
+>    external devices.
+> 3. Experience has been that if they don't find an easy and already 
+>    configured way to use something they reach for devmem2 or similar.
+> 4. devicetree is often seen as being too hard by people who come to these
+>    boards from things like arduino
+> 
+> I've already had questions on how to find the physical address of /dev/i2c-0 
+> seemingly due to some of the above.
+> 
+> I'm happy to drop the spidev entries if that's what you'd prefer, but if I
+> do that I'm undecided if I should then just drop the ecspi sections as well 
+> and free up more gpio pins on the expansion header for other uses.
 
-Ok, so adding to my previous comment, would exit_latency by itself be
-enough ? Can we think of a system where ranking by exit_latency is wrong ?
+You can decide if you want to drop or keep the ecspi sections.  I prefer
+to drop those spidev nodes, before we're not sure this is the right way
+to go.
 
-If yes, we need a power rank, and this patch is wrong too:
-
-http://marc.info/?l=linux-kernel&m=139924292401056&w=2
-
-If answer is not, I can just rely on exit_latency to sort the states.
-
-Lorenzo
+Shawn
