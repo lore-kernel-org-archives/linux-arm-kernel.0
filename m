@@ -1,83 +1,99 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 09 May 2014 11:14:49 +0900
-Subject: [PATCHv5] ARM: EXYNOS: Support secondary CPU boot of Exynos4212
-In-Reply-To: <5369B88E.9030901@samsung.com>
-References: <1398735462-1938-1-git-send-email-cw00.choi@samsung.com>
- <5369B88E.9030901@samsung.com>
-Message-ID: <034d01cf6b2c$748bdd50$5da397f0$@samsung.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 9 May 2014 10:19:09 +0800
+Subject: [PATCH v2] ARM: dts: imx6: add new board RIoTboard
+In-Reply-To: <536BBAE2.7060203@gmail.com>
+References: <53695C34.5000604@gmail.com>
+ <CAOMZO5AMf74btETX9zM97B-rCRAVh9-s=N4=xqTMifuucwqURg@mail.gmail.com>
+ <536B9654.7020509@gmail.com> <1399560632.547109991@f294.i.mail.ru>
+ <536BBAE2.7060203@gmail.com>
+Message-ID: <20140509021908.GJ2794@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chanwoo Choi wrote:
+On Thu, May 08, 2014 at 06:12:02PM +0100, Iain Paton wrote:
+> On 08/05/14 15:50, Alexander Shiyan wrote:
 > 
-> Dear Kukjin,
+> > I think you should make patch series:
+> > 1. Add missing clock into imx6dl.dtsi
+> > 2. Add label to AIPS2 to imx6qdl.dtsi and use this label in imx6dl.dtsi
+> > 3. This patch
 > 
-> Could you please pick this patch?
+> I'm not sure I follow 1/2.  You mean something like this 
 > 
-I've applied.
+> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+> index eca0971..0645069 100644
+> --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> @@ -767,7 +767,7 @@
+>                         };
+>                 };
+>  
+> -               aips-bus at 02100000 { /* AIPS2 */
+> +               aips2: aips-bus at 02100000 { /* AIPS2 */
+>                         compatible = "fsl,aips-bus", "simple-bus";
+>                         #address-cells = <1>;
+>                         #size-cells = <1>;
+> 
+> followed by 
+> 
+> 
+> diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
+> index 5c5f574..81b7501 100644
+> --- a/arch/arm/boot/dts/imx6dl.dtsi
+> +++ b/arch/arm/boot/dts/imx6dl.dtsi
+> @@ -80,16 +80,6 @@
+>                         };
+>                 };
+>  
+> -               aips2: aips-bus at 02100000 {
+> -                       i2c4: i2c at 021f8000 {
+> -                               #address-cells = <1>;
+> -                               #size-cells = <0>;
+> -                               compatible = "fsl,imx1-i2c";
+> -                               reg = <0x021f8000 0x4000>;
+> -                               interrupts = <0 35 IRQ_TYPE_LEVEL_HIGH>;
+> -                               status = "disabled";
+> -                       };
+> -               };
+>         };
+>  
+>         display-subsystem {
+> @@ -98,6 +88,18 @@
+>         };
+>  };
+>  
+> +&aips2 {
+> +        i2c4: i2c at 021f8000 {
+> +                #address-cells = <1>;
+> +                #size-cells = <0>;
+> +                compatible = "fsl,imx1-i2c";
+> +                reg = <0x021f8000 0x4000>;
+> +                interrupts = <0 35 IRQ_TYPE_LEVEL_HIGH>;
+> +                clocks = <&clks 116>;
+> +                status = "disabled";
+> +        };
+> +};
+> +
+>  &hdmi {
+>         compatible = "fsl,imx6dl-hdmi";
+>  };
 
-Thanks,
-Kukjin
+I do not think we need so many changes.  The only necessary changes
+would be something like below.
 
-> Best Regards,
-> Chanwoo Choi
-> 
-> On 04/29/2014 10:37 AM, Chanwoo Choi wrote:
-> > From: Kyungmin Park <kyungmin.park@samsung.com>
-> >
-> > This patch fix the offset of CPU boot address and change parameter of
-> smc call
-> > of SMC_CMD_CPU1BOOT command for Exynos4212.
-> >
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> > Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> > ---
-> > Changes from v4:
-> > - Post only this patch separated from following patchset[1]
-> > [1] https://lkml.org/lkml/2014/4/24/873
-> >
-> >  arch/arm/mach-exynos/firmware.c | 15 ++++++++++++++-
-> >  1 file changed, 14 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-
-> exynos/firmware.c
-> > index 932129e..aa01c42 100644
-> > --- a/arch/arm/mach-exynos/firmware.c
-> > +++ b/arch/arm/mach-exynos/firmware.c
-> > @@ -18,6 +18,8 @@
-> >
-> >  #include <mach/map.h>
-> >
-> > +#include <plat/cpu.h>
-> > +
-> >  #include "smc.h"
-> >
-> >  static int exynos_do_idle(void)
-> > @@ -28,13 +30,24 @@ static int exynos_do_idle(void)
-> >
-> >  static int exynos_cpu_boot(int cpu)
-> >  {
-> > +	/*
-> > +	 * The second parameter of SMC_CMD_CPU1BOOT command means CPU id.
-> > +	 * But, Exynos4212 has only one secondary CPU so second parameter
-> > +	 * isn't used for informing secure firmware about CPU id.
-> > +	 */
-> > +	if (soc_is_exynos4212())
-> > +		cpu = 0;
-> > +
-> >  	exynos_smc(SMC_CMD_CPU1BOOT, cpu, 0, 0);
-> >  	return 0;
-> >  }
-> >
-> >  static int exynos_set_cpu_boot_addr(int cpu, unsigned long boot_addr)
-> >  {
-> > -	void __iomem *boot_reg = S5P_VA_SYSRAM_NS + 0x1c + 4*cpu;
-> > +	void __iomem *boot_reg = S5P_VA_SYSRAM_NS + 0x1c;
-> > +
-> > +	if (!soc_is_exynos4212())
-> > +		boot_reg += 4*cpu;
-> >
-> >  	__raw_writel(boot_addr, boot_reg);
-> >  	return 0;
-> >
+diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
+index 5c5f574..12d582a 100644
+--- a/arch/arm/boot/dts/imx6dl.dtsi
++++ b/arch/arm/boot/dts/imx6dl.dtsi
+@@ -84,9 +84,10 @@
+                        i2c4: i2c at 021f8000 {
+                                #address-cells = <1>;
+                                #size-cells = <0>;
+-                               compatible = "fsl,imx1-i2c";
++                               compatible = "fsl,imx6q-i2c", "fsl,imx21-i2c";
+                                reg = <0x021f8000 0x4000>;
+                                interrupts = <0 35 IRQ_TYPE_LEVEL_HIGH>;
++                               clocks = <&clks 116>;
+                                status = "disabled";
+                        };
+                };
