@@ -1,54 +1,36 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 9 May 2014 15:54:25 +0100
-Subject: [PATCH] i2c: exynos5: Initialise Samsung High Speed I2C
- controller early
-In-Reply-To: <CAHfPSqDSTyQXPT-NCZ2hE01qpdmaR54tbWCUYC_zSDGFp58+7g@mail.gmail.com>
-References: <1398350916-885-1-git-send-email-ch.naveen@samsung.com>
- <20140424162558.GB12304@sirena.org.uk>
- <CAHfPSqB5+mLiC07jbEpeUgW63pZVk700SkYGxToO7GRAsFm_nQ@mail.gmail.com>
- <20140509135153.GM12304@sirena.org.uk>
- <CAHfPSqDSTyQXPT-NCZ2hE01qpdmaR54tbWCUYC_zSDGFp58+7g@mail.gmail.com>
-Message-ID: <20140509145425.GP12304@sirena.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 9 May 2014 15:57:45 +0100
+Subject: [RFC][PATCH 6/8] sched,idle: Avoid spurious wakeup IPIs
+In-Reply-To: <20140509145002.GW2844@laptop.programming.kicks-ass.net>
+References: <20140411134243.160989490@infradead.org>
+ <20140411135218.478299389@infradead.org>
+ <CAAG0J9_q1KsUx10-XAb7AJnxv2ehctg6q1KME7ahsk1OZV8vZQ@mail.gmail.com>
+ <20140509141520.GV2844@laptop.programming.kicks-ass.net>
+ <20140509144034.GF7950@arm.com>
+ <20140509145002.GW2844@laptop.programming.kicks-ass.net>
+Message-ID: <20140509145745.GI7950@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 09, 2014 at 08:12:47PM +0530, Naveen Krishna Ch wrote:
-> On 9 May 2014 19:21, Mark Brown <broonie@kernel.org> wrote:
-> > On Fri, May 09, 2014 at 05:50:00PM +0530, Naveen Krishna Ch wrote:
+On Fri, May 09, 2014 at 03:50:02PM +0100, Peter Zijlstra wrote:
+> On Fri, May 09, 2014 at 03:40:34PM +0100, Catalin Marinas wrote:
+> 
+> > I wonder why we still need TIF_POLLING_NRFLAG for arm64. It was on arm
+> > until commit 16a8016372c42c7628eb (sanitize tsk_is_polling()). On arm64
+> > we use wfi for idle or a firmware call but in both cases the assumption
+> > is that we need an interrupt for waking up.
+> > 
+> > So I think we should remove this macro for arm64.
+> 
+> Does ARM64 support idle=poll? If so, you could keep it for that,
+> otherwise it does indeed appear to be pointless.
 
-> >> DRM related drivers like DP, FIMD, HDMI, Mixer wants to be probed ASAP
-> >> during the boot.
-> >> The real problem comes when, one of these drivers do a regulator_get().
+We don't support idle=poll either.
 
-> >> If the physical supply  is not enabled/hookedup the regulator_get() call
-> >> assumes that physical supply is present and returns a
-> >> "dummy_regulator" (But, not an error).
+> As to 32bit ARM, are there SMP chips which do not have WFI?
 
-> >> Because of which, Display and several other devices fails to work.
+No. WFI is even used for the secondary booting protocol (we need to send
+an IPI to get them going).
 
-> > These drivers are buggy, if they geniunely expect and handle a missing
-> > supply then they should be using regulator_get_optional() to request the
-> > regulator and even if they don't the use of subsys_initcall() is not
-> > going to fix anything here - if a dummy regulator is going to be
-> > returned the time things are probed won't make a difference.
-
-...
-
-> If all the I2C, SPI, DMA, I2C_TUNNEL, DRM based LCD are all mod_probes()
-> DRM drivers are probing a head of the PMIC probe. Which is causing the
-> display drivers to get "dummy_regulators" instead of the real supplies.
-
-No, it really won't - I have no idea what you are doing but it's not
-mainline.  If you are getting dummy regulators then you don't have a
-supply present at all and probe ordering isn't going to make a blind
-bit of difference.
-
-Please provide a specific technical description of the problem you are
-seeing in mainline.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140509/79947d24/attachment-0001.sig>
+-- 
+Catalin
