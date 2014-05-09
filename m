@@ -1,40 +1,63 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 09 May 2014 19:53:21 +0200
-Subject: [PATCH v2.1 3/9] ARM: S3C24XX: enable usage of common dclk if
- common clock framework is enabled
-In-Reply-To: <1399654181.19276.2.camel@x220>
-References: <2104342.rkElQpXtvM@phil> <3888936.TSFL3ZW3mv@phil>
- <3835735.0k9HAgQHzN@phil> <1399654181.19276.2.camel@x220>
-Message-ID: <536D1611.4010301@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 9 May 2014 18:55:05 +0100
+Subject: [PATCH v3] arm64: enable EDAC on arm64
+In-Reply-To: <20140509173340.GO7950@arm.com>
+References: <1398096556-26799-1-git-send-email-robherring2@gmail.com>
+ <20140422102455.GD7484@arm.com>
+ <CAL_JsqKS_NZbxq_nFBnsQvj51TtraEeFm0aY=j=N3DwJ+bTL6g@mail.gmail.com>
+ <20140422132624.GC9820@arm.com>
+ <CAL_JsqJEwUu0ooEcL+hniD8vxjBW5571ea3u3JmPN3x1MfXW3w@mail.gmail.com>
+ <20140422160100.GH9820@arm.com>
+ <CAL_Jsq+pcK4XvSyahaK8zoxNMWrebqsU+funBqzR9MBfK2ABYA@mail.gmail.com>
+ <20140423170445.GI5649@arm.com> <20140509173340.GO7950@arm.com>
+Message-ID: <20140509175505.GC23083@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09.05.2014 18:49, Paul Bolle wrote:
-> On Wed, 2014-04-23 at 22:09 +0200, Heiko St?bner wrote:
->> Add platform device and select the correct implementation automatically
->> depending on wether the old samsung_clock or the common clock framework
->> is enabled.
->>
->> This is only done for machines already using the old dclk implementation,
->> as everybody else should move to use dt anyway.
->>
->> The machine-specific settings for the external clocks will have to be set
->> by somebody with knowledge about the specific hardware.
->>
->> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
->> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
->
-> It seems this one just hit linux-next (in next-20140509).
->
+On Fri, May 09, 2014 at 06:33:40PM +0100, Catalin Marinas wrote:
+> On Wed, Apr 23, 2014 at 06:04:45PM +0100, Will Deacon wrote:
+> > On Tue, Apr 22, 2014 at 05:29:52PM +0100, Rob Herring wrote:
+> > > On Tue, Apr 22, 2014 at 11:01 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > > > Looking at the edac_mc_scrub_block code, atomic_scrub is always called with
+> > > > a normal, cacheable mapping (kmap_atomic) so that doesn't help us (although
+> > > > it means the exclusives will at least succeed).
+> > > >
+> > > > The problem of speculative reads by the CPU could be solved by unmapped the
+> > > > DMA buffer when we transfer the ownership over to the device (instead of
+> > > > invalidating it after the transfer). However, I'm now slightly confused as
+> > > > to how atomic_scrub fixes errors reported at any cache level higher than
+> > > > L1. Do we need cache-flushing to ensure that the exclusive-store propagates
+> > > > to the point of failure?
+> > > 
+> > > The whole point of scrubbing is to stop repeated error reporting of
+> > > correctable errors. For example, you do a write to memory and the ECC
+> > > code is added to it. Suppose the data stored in the memory gets
+> > > corrupted either on the write or some time later you get a bit flip in
+> > > the memory cell. Then when the data is read from memory, the memory
+> > > controller will detect the error, correct it, and trigger and ECC
+> > > correctable error interrupt. It will do this every time you read that
+> > > memory location because the error occurred on the write. The only way
+> > > to clear the error is re-writing memory.
+> > 
+> > Thanks for the explanation.
+> > 
+> > > As long as that cache line is dirty, no reads from that memory location
+> > > will occur as other readers will get the line from other cores, the L2, or
+> > > the line will get pushed out to memory first.
+> > 
+> > Agreed, if all of the readers are coherent.
+> 
+> Just to get things moving on this patch, do we agree that it is only safe
+> for coherent DMA? If so, do we merge it on the grounds that people
+> needing EDAC only use it with DMA-coherent memory? The comment for
+> atomic_scrub should be updated to state coherent DMA only.
+> 
+> We could check the dma_ops in atomic_scrub but I don't think it's worth
+> it.
 
-Which is bad, because:
-a) it conflicts with patches already applied in samsung-clk tree,
-b) the DT binding added by patch 4/9 has not been acked .
+Well, I think we should do *something* for the non-coherent case, otherwise
+we're going to have fun debugging random buffer corruption. Could we disable
+scrubbing from the dma_bus_notifier the moment we find a non-coherent
+device?
 
-Kukjin, might I ask you to drop this series from your tree and let me 
-send you a pull request with necessary dependencies and this series 
-applied properly to resolve merge conflicts, as I suggested before in 
-one of my replies to this thread?
-
-Best regards,
-Tomasz
+Will
