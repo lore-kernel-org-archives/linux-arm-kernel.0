@@ -1,36 +1,36 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 9 May 2014 15:57:45 +0100
-Subject: [RFC][PATCH 6/8] sched,idle: Avoid spurious wakeup IPIs
-In-Reply-To: <20140509145002.GW2844@laptop.programming.kicks-ass.net>
-References: <20140411134243.160989490@infradead.org>
- <20140411135218.478299389@infradead.org>
- <CAAG0J9_q1KsUx10-XAb7AJnxv2ehctg6q1KME7ahsk1OZV8vZQ@mail.gmail.com>
- <20140509141520.GV2844@laptop.programming.kicks-ass.net>
- <20140509144034.GF7950@arm.com>
- <20140509145002.GW2844@laptop.programming.kicks-ass.net>
-Message-ID: <20140509145745.GI7950@arm.com>
+From: grundler@chromium.org (Grant Grundler)
+Date: Fri, 9 May 2014 07:59:44 -0700
+Subject: [RFC] Describing arbitrary bus mastering relationships in DT
+In-Reply-To: <20140509103309.GA3875@e103592.cambridge.arm.com>
+References: <20140501173248.GD3732@e103592.cambridge.arm.com>
+ <6555552.UqkKQIAsih@wuerfel>
+ <20140502174301.GE3805@e103592.cambridge.arm.com>
+ <4735818.FvYoTFuExd@wuerfel>
+ <20140509103309.GA3875@e103592.cambridge.arm.com>
+Message-ID: <CANEJEGuBD7RH32=YTjPmBt=Ykq21bSQ6gMtfU4H1qTbFPcWLYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 09, 2014 at 03:50:02PM +0100, Peter Zijlstra wrote:
-> On Fri, May 09, 2014 at 03:40:34PM +0100, Catalin Marinas wrote:
-> 
-> > I wonder why we still need TIF_POLLING_NRFLAG for arm64. It was on arm
-> > until commit 16a8016372c42c7628eb (sanitize tsk_is_polling()). On arm64
-> > we use wfi for idle or a firmware call but in both cases the assumption
-> > is that we need an interrupt for waking up.
-> > 
-> > So I think we should remove this macro for arm64.
-> 
-> Does ARM64 support idle=poll? If so, you could keep it for that,
-> otherwise it does indeed appear to be pointless.
+Dave,
+Mostly agree with your assessment. My $0.02 on one comment:
 
-We don't support idle=poll either.
 
-> As to 32bit ARM, are there SMP chips which do not have WFI?
+On Fri, May 9, 2014 at 3:33 AM, Dave Martin <Dave.Martin@arm.com> wrote:
+....
+> The downside is that is any path flows through a dynamically
+> configurable component, such as an IOMMU or a bridge that can be
+> remapped, turned off etc., then unless we describe how the path is
+> really linked together the kernel will need all sorts of baked-in
+> knowledge in order to manage the system safely.
 
-No. WFI is even used for the secondary booting protocol (we need to send
-an IPI to get them going).
+Absolutely. Some knowledge (assumptions) will be "baked in" as code
+and some knowledge (explicit parameters) as device tree.
 
--- 
-Catalin
+My understanding of device tree is it essentially specifies
+"parameters" and "methods" (code provided in the kernel). All methods
+make some assumptions about the behavior of the HW it's operating on
+and as long as all users of a method share that assumption, all is
+well. We don't need device tree to describe those assumptions.
+
+cheers,
+grant
