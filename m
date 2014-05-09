@@ -1,33 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 09 May 2014 09:34:26 +0200
-Subject: [PATCH 1/2] input: fix ps2/serio module dependency
-In-Reply-To: <20140508155931.GA11672@core.coreip.homeip.net>
-References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-15-git-send-email-arnd@arndb.de>
- <20140508155931.GA11672@core.coreip.homeip.net>
-Message-ID: <4385062.1bvKsSrGCq@wuerfel>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 09 May 2014 09:34:14 +0200
+Subject: [PATCH v2 3/7] mfd: add support for sun6i PRCM (Power/Reset/Clock
+ Management) unit
+In-Reply-To: <20140509071246.GE5767@lee--X1>
+References: <1399483554-8824-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1399483554-8824-4-git-send-email-boris.brezillon@free-electrons.com>
+ <20140508110205.GB5767@lee--X1> <536BE366.8080907@free-electrons.com>
+ <20140509071246.GE5767@lee--X1>
+Message-ID: <536C84F6.2050701@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 May 2014 08:59:31 Dmitry Torokhov wrote:
-> Hi Arnd,
-> 
-> On Thu, May 08, 2014 at 04:56:26PM +0200, Arnd Bergmann wrote:
-> > @@ -71,7 +71,7 @@ config KEYBOARD_ATKBD
-> >       default y
-> >       select SERIO
-> >       select SERIO_LIBPS2
-> > -     select SERIO_I8042 if X86
-> > +     select SERIO_I8042 if X86 || ARCH_MIGHT_HAVE_PC_SERIO
-> 
-> x86 also selects ARCH_MIGHT_HAVE_PC_SERIO so shouldn't this be
-> 
->         select SERIO_I8042 if ARCH_MIGHT_HAVE_PC_SERIO
-> 
-> ?
-> 
-> I can fix it up on my side if you agree.
+Hi,
 
-Yes, sounds good, thanks!
+On 05/09/2014 09:12 AM, Lee Jones wrote:
+>>>> +static struct platform_driver sun6i_prcm_driver = {
+>>>> +	.driver = {
+>>>> +		.name = "sun6i-prcm",
+>>>> +		.owner = THIS_MODULE,
+>>>> +		.of_match_table = sun6i_prcm_dt_ids,
+>>>> +	},
+>>>> +	.probe = sun6i_prcm_probe,
+>>> You need a .remove() call-back.
+>>
+>> This driver cannot be compiled as module (see the Kconfig definition)
+>> and the devices are not hotpluggable, as a result a probed device will
+>> never be removed.
+>>
+>> Do you still want me to implement the remove function ?
+> 
+> .remove() also be run on shut down.
 
-	Arnd
+That is not true, if your device needs to do anything special at shutdown
+you need to add a shutdown callback. Devices are kept as is (not torn down)
+on shutdown.
+
+> It's best practice to have one.
+> 
+>>>> +module_platform_driver(sun6i_prcm_driver);
+>>>> +
+>>>> +MODULE_AUTHOR("Boris BREZILLON <boris.brezillon@free-electrons.com>");
+>>>> +MODULE_DESCRIPTION("Allwinner sun6i PRCM driver");
+>>>> +MODULE_LICENSE("GPL v2");
+>>
+> 
+
+Regards,
+
+Hans
