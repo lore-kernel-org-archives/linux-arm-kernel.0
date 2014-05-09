@@ -1,137 +1,38 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 09 May 2014 17:01:04 +0200
-Subject: [PATCH v2 2/2] i2c: sunxi: add P2WI (Push/Pull 2 Wire Interface)
- controller support
-In-Reply-To: <536CEB1A.2060206@free-electrons.com>
-References: <1399485515-11243-1-git-send-email-boris.brezillon@free-electrons.com>
- <1399485515-11243-3-git-send-email-boris.brezillon@free-electrons.com>
- <20140509143116.GD7047@lukather> <536CEB1A.2060206@free-electrons.com>
-Message-ID: <536CEDB0.40301@redhat.com>
+From: ipaton0@gmail.com (Iain Paton)
+Date: Fri, 09 May 2014 16:01:56 +0100
+Subject: [PATCH v3 1/2] ARM: dts: imx6: i2c4 cleanup
+In-Reply-To: <20140509142118.GQ2794@dragon>
+References: <53695C34.5000604@gmail.com> <20140508054106.GH2794@dragon>
+ <536B4ACD.30001@gmail.com> <20140509030938.GK2794@dragon>
+ <536C8837.9090802@gmail.com> <20140509120845.GO2794@dragon>
+ <536CE331.7030001@gmail.com> <20140509142118.GQ2794@dragon>
+Message-ID: <536CEDE4.40002@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+add missing i2c4 clock and correct the compatible string to match other
+imx6 i2c blocks
 
-On 05/09/2014 04:50 PM, Boris BREZILLON wrote:
-> 
-> On 09/05/2014 16:31, Maxime Ripard wrote:
->> Hi Boris,
->>
->> On Wed, May 07, 2014 at 07:58:35PM +0200, Boris BREZILLON wrote:
->>
-> [...]
->> +
->> +	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +	p2wi->regs = devm_ioremap_resource(dev, r);
->> +	if (IS_ERR(p2wi->regs)) {
->> +		dev_err(dev, "failed to retrieve iomem resource\n");
->> +		return PTR_ERR(p2wi->regs);
->> You seem to be returning the error code in the next error messages. It
->> would probably be a good idea to put it there too.
-> 
-> Yes, I'll print the err code in the error message.
-> 
->>
->>> +	}
->>> +
->>> +	snprintf(p2wi->adapter.name, sizeof(p2wi->adapter.name), pdev->name);
->>> +	ret = platform_get_irq(pdev, 0);
->>> +	if (ret < 0) {
->>> +		dev_err(dev, "failed to retrieve irq: %d\n", ret);
->>> +		return ret;
->>> +	}
->>> +	p2wi->irq = ret;
->>> +
->>> +	p2wi->clk = devm_clk_get(dev, NULL);
->>> +	if (IS_ERR(p2wi->clk)) {
->>> +		ret = PTR_ERR(p2wi->clk);
->>> +		dev_err(dev, "failed to retrieve clk: %d\n",
->>> +			ret);
->>> +		return ret;
->>> +	}
->>> +
->>> +	ret = clk_prepare_enable(p2wi->clk);
->>> +	if (ret) {
->>> +		dev_err(dev, "failed to enable clk: %d\n", ret);
->>> +		return ret;
->>> +	}
->>> +
->>> +	parent_clk_freq = clk_get_rate(p2wi->clk);
->>> +
->>> +	p2wi->rstc = devm_reset_control_get(dev, NULL);
->>> +	if (IS_ERR(p2wi->rstc)) {
->>> +		ret = PTR_ERR(p2wi->rstc);
->>> +		dev_err(dev, "failed to retrieve reset controller: %d\n",
->>> +			ret);
->>> +		goto err_clk_disable;
->>> +	}
->>> +
->>> +	ret = reset_control_deassert(p2wi->rstc);
->>> +	if (ret) {
->>> +		dev_err(dev, "failed to deassert reset line: %d\n",
->>> +			ret);
->>> +		goto err_clk_disable;
->>> +	}
->>> +
->>> +	init_completion(&p2wi->complete);
->>> +	p2wi->adapter.dev.parent = dev;
->>> +	p2wi->adapter.algo = &p2wi_algo;
->>> +	p2wi->adapter.owner = THIS_MODULE;
->>> +	p2wi->adapter.dev.of_node = pdev->dev.of_node;
->>> +	platform_set_drvdata(pdev, p2wi);
->>> +	i2c_set_adapdata(&p2wi->adapter, p2wi);
->>> +
->>> +	ret = devm_request_irq(dev, p2wi->irq, p2wi_interrupt, 0, pdev->name,
->>> +			       p2wi);
->>> +	if (ret) {
->>> +		dev_err(dev, "can't register interrupt handler irq%d: %d\n",
->>> +			p2wi->irq, ret);
->>> +		goto err_reset_assert;
->>> +	}
->>> +
->>> +	writel(P2WI_CTRL_SOFT_RST, p2wi->regs + P2WI_CTRL);
->>> +
->>> +	clk_div = parent_clk_freq / clk_freq;
->>> +	if (!clk_div) {
->>> +		dev_warn(dev,
->>> +			 "clock-frequency is too high, setting it to %lu Hz\n",
->>> +			 parent_clk_freq);
->>> +		clk_div = 1;
->>> +	} else if (clk_div > P2WI_CCR_MAX_CLK_DIV) {
->>> +		dev_warn(dev,
->>> +			 "clock-frequency is too low, setting it to %lu Hz\n",
->>> +			 parent_clk_freq / P2WI_CCR_MAX_CLK_DIV);
->>> +		clk_div = P2WI_CCR_MAX_CLK_DIV;
->>> +	}
->>> +
->>> +	writel(P2WI_CCR_SDA_OUT_DELAY(1) | P2WI_CCR_CLK_DIV(clk_div),
->>> +	       p2wi->regs + P2WI_CCR);
->>> +
->>> +	if (p2wi_mode_reg >= 0 && p2wi_mode_val >= 0) {
->>> +		writel(P2WI_PMCR_PMU_INIT_SEND |
->>> +		       P2WI_PMCR_PMU_MODE_REG(p2wi_mode_reg) |
->>> +		       P2WI_PMCR_PMU_INIT_DATA(p2wi_mode_val) |
->>> +		       P2WI_PMCR_PMU_DEV_ADDR(p2wi->slave_addr),
->>> +		       p2wi->regs + P2WI_PMCR);
->>> +
->>> +		while (readl(p2wi->regs + P2WI_PMCR) &
->>> +		       P2WI_PMCR_PMU_INIT_SEND)
->>> +			cpu_relax();
->>> +	}
->> Did we actually encounter such a case? From what I've seen so far,
->> both community's u-boot and Allwinner's bootloader already do this.
->>
->> As you know, I'm really not fond of putting random values and
->> registers offsets into the DT itself. Making the assumption that the
->> PMIC is already switched to P2WI by the bootloader seems pretty safe
->> to me.
-> 
-> Hans, any opinion ?
+Signed-off-by: Iain Paton<ipaton0@gmail.com>
+---
+ arch/arm/boot/dts/imx6dl.dtsi | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-I think that Maxime is right, any bootloader will need to kick the
-pmic to set dram voltage, etc. So it is pretty safe to assume this is
-already done and just remove the code.
-
-Regards,
-
-Hans
+diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
+index 5c5f574..0a9c49d 100644
+--- a/arch/arm/boot/dts/imx6dl.dtsi
++++ b/arch/arm/boot/dts/imx6dl.dtsi
+@@ -84,9 +84,10 @@
+ 			i2c4: i2c at 021f8000 {
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+-				compatible = "fsl,imx1-i2c";
++				compatible = "fsl,imx6q-i2c", "fsl,imx21-i2c";
+ 				reg = <0x021f8000 0x4000>;
+ 				interrupts = <0 35 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks 116>;
+ 				status = "disabled";
+ 			};
+ 		};
+-- 
+1.8.5.1
