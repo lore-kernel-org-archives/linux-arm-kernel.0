@@ -1,125 +1,133 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 09 May 2014 19:57:55 +0100
-Subject: [PATCH 2/3] arm64: Add big.LITTLE switcher stub
-In-Reply-To: <20140509175005.GT12304@sirena.org.uk>
-References: <1399653631-4938-1-git-send-email-broonie@kernel.org>
- <1399653631-4938-2-git-send-email-broonie@kernel.org>
- <536D0AF4.1040705@arm.com> <20140509175005.GT12304@sirena.org.uk>
-Message-ID: <536D2533.6050100@arm.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 9 May 2014 14:04:38 -0500
+Subject: [PATCH] ARM: OMAP2+: Remove suspend_set_ops from common pm late
+ init
+In-Reply-To: <1399661580-54599-1-git-send-email-d-gerlach@ti.com>
+References: <1399661580-54599-1-git-send-email-d-gerlach@ti.com>
+Message-ID: <536D26C6.1060903@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 05/09/2014 01:53 PM, Dave Gerlach wrote:
+> In omap2_common_pm_late_init suspend_set_ops was called to set common
+> suspend handling functions for all omap platforms. This created two
+> problems. First, these suspend ops were being set for all platforms,
+> regardless of whether or not suspend support has been integrated so in
+> the case of AM33XX, suspend to mem was presented as available but
+> failed every time. Second, some platforms will need to define a
+> completely separate set of suspend ops, such as AM33XX, due to
+> differences from previous omap platforms so there is no need to
+> always set the common omap ops.
+> 
+> This patch moves the suspend_set_ops call from omap2_common_pm_late_init
+> into a separate function that then gets called in the omap*_pm_init
+> functions for each platform.
+> 
+> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> ---
+>  arch/arm/mach-omap2/common.h | 8 ++++++++
+>  arch/arm/mach-omap2/pm.c     | 8 ++++----
+>  arch/arm/mach-omap2/pm24xx.c | 1 +
+>  arch/arm/mach-omap2/pm34xx.c | 1 +
+>  arch/arm/mach-omap2/pm44xx.c | 1 +
+>  5 files changed, 15 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+> index d88aff7..091e1c7 100644
+> --- a/arch/arm/mach-omap2/common.h
+> +++ b/arch/arm/mach-omap2/common.h
+> @@ -162,6 +162,14 @@ static inline void omap44xx_restart(enum reboot_mode mode, const char *cmd)
+>  }
+>  #endif
+>  
+> +#ifdef CONFIG_SUSPEND
+> +void omap_common_suspend_init(void);
+> +#else
+> +static inline void omap_common_suspend_init(void)
+> +{
+> +}
+> +#endif
+> +
+push this off to this pm.h?
 
-On 09/05/14 18:50, Mark Brown wrote:
-> On Fri, May 09, 2014 at 06:05:56PM +0100, Sudeep Holla wrote:
->> On 09/05/14 17:40, Mark Brown wrote:
->
->>> From: Mark Brown <broonie@linaro.org>
->
->>> The big.LITTLE cpufreq driver is useful on arm64 big.LITTLE systems even
->>> without IKS support since it implements support for clusters with shared
->>> clocks (a common big.LITTLE configuration). In order to allow it to be
->>> built provide the non-IKS stubs for arm64, enabling cpufreq with all the
->>> cores available.
->
->> I am in process of using this driver for ARM64 and hit the same issue.
->> I don't like this approach at all. I too did similar changes/hacks which are
->> good for quick testing but not for upstream.
->
-> I'm not a big fan of this either, but then as I indicated on the cpufreq
-> bit of the series I'm not a massive fan of the way this is handled in
-> the first place on either ARM or ARMv8.  This at least gives us parity
-> between the two architectures (modulo IKS implementation) which is
-> progress especially given the fact that much of the work done on this
-> stuff is being done on 32 bit due to hardware availability.
->
+>  /* This gets called from mach-omap2/io.c, do not call this */
+>  void __init omap2_set_globals_tap(u32 class, void __iomem *tap);
+>  
+> diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
+> index e1b4141..c9b36fb 100644
+> --- a/arch/arm/mach-omap2/pm.c
+> +++ b/arch/arm/mach-omap2/pm.c
+> @@ -243,6 +243,10 @@ static const struct platform_suspend_ops omap_pm_ops = {
+>  	.valid		= suspend_valid_only_mem,
+>  };
+>  
+> +void __init omap_common_suspend_init(void)
+provide kernel doc please? and do we need __init?
 
-OK good to know that you too agree that this is not a good approach.
+> +{
+> +	suspend_set_ops(&omap_pm_ops);
+> +}
+>  #endif /* CONFIG_SUSPEND */
+>  
+>  static void __init omap3_init_voltages(void)
+> @@ -310,9 +314,5 @@ int __init omap2_common_pm_late_init(void)
+>  	/* cpufreq dummy device instantiation */
+>  	omap_init_cpufreq();
+>  
+> -#ifdef CONFIG_SUSPEND
+> -	suspend_set_ops(&omap_pm_ops);
+> -#endif
+> -
+>  	return 0;
+>  }
+> diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
+> index 8c07594..8cd2408 100644
+> --- a/arch/arm/mach-omap2/pm24xx.c
+> +++ b/arch/arm/mach-omap2/pm24xx.c
+> @@ -231,6 +231,7 @@ static void __init prcm_setup_regs(void)
+>  
+>  #ifdef CONFIG_SUSPEND
+>  	omap_pm_suspend = omap2_enter_full_retention;
+> +	omap_common_suspend_init();
+>  #endif
+>  
+>  	/* REVISIT: Configure number of 32 kHz clock cycles for sys_clk
+> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+> index 87099bb..32b2597 100644
+> --- a/arch/arm/mach-omap2/pm34xx.c
+> +++ b/arch/arm/mach-omap2/pm34xx.c
+> @@ -707,6 +707,7 @@ int __init omap3_pm_init(void)
+>  
+>  #ifdef CONFIG_SUSPEND
+>  	omap_pm_suspend = omap3_pm_suspend;
+> +	omap_common_suspend_init();
+>  #endif
+>  
+>  	arm_pm_idle = omap3_pm_idle;
+> diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+> index eefb30c..58d7cd7 100644
+> --- a/arch/arm/mach-omap2/pm44xx.c
+> +++ b/arch/arm/mach-omap2/pm44xx.c
+> @@ -253,6 +253,7 @@ int __init omap4_pm_init(void)
+>  
+>  #ifdef CONFIG_SUSPEND
+>  	omap_pm_suspend = omap4_pm_suspend;
+> +	omap_common_suspend_init();
 
-> Given that the code isn't invasive I think the expediency tradeoff is OK
-> for mainline, it's easy enough to get rid of when we come up with
-> something better but in the meaintine it helps actual systems work
-> better in mainline - if we didn't have the ARM implementation already I
-> think it'd be different but we do.
->
+do we need to expose omap_pm_suspend anymore with this since the
+original purpose was to make pm.c know about the suspend function?
+How about:
+omap_common_suspend_init(omap4_pm_suspend);
+should do the job, right? and with that, you dont need the #ifdef
+CONFIG_SUSPEND either in each of the pmxxx.c files since you already
+deal with it in header.
 
-I disagree, I don't see a real urgency for this on ARM64. Even on ARM32, no
-single platform other than TC2 is using this(at least as I see in the mainline).
+>  #endif
+>  
+>  	/* Overwrite the default cpu_do_idle() */
+> 
 
-If some real platform that needs this support urgently, then we can think of
-similar short-term solution as part of adding support for cpufreq on that
-platform. Do you know any platform that needs this right now ?
 
-> Perfect can be the enemy of good (or at least adequate), one of the
-> problems I'm seeing right now with convincing people to work with
-> mainline is that people are missing lots of important functionality when
-> they look at mainline.
->
-
-Ok fair enough. But we can take some time and see if we can workout better
-solution rather than jumping to add interim solutions when is unlikely to be
-used on any real platform.
-
->> I would like to move all the switcher code out of the driver as extension.
->> Also the core driver should be made to work with any multi-clsuter platform not
->> just big-little(bL). bL is one of them and bL switcher support should an
->> extension of it.
->
->> The main reason for this is I see some non-bL multi-cluster platform support
->> getting added, this driver should ideally support that.
->
-> It is not entirely clear to me what you mean by "this driver" or "the
-> core driver" in all the above, sorry.
->
-
-I meant the core arm-big-little cpufreq driver.
-
-> Personally the solution I'd rather see is cpufreq-cpu0 extended to
-> handle shared clocks which would remove the need to use the big.LITTLE
-
-Ideally yes. IIUC it has dependencies on CPU0 and I have not looked that
-driver and all of its users to judge how feasible is that. At-least we can
-have cpufreq-cpu0 for all single cluster systems w/o support for per-CPU DVFS
-and another which can handle multi-cluster systems(with or w/o per-CPU DVFS).
-
-Just a thought...
-
-> driver on systems not doing IKS.  It isn't at all clear to me that
-> cpufreq should understand clusters (or much of anything other than
-> clocks) in the non-IKS case, the sharing of clocks between cores is not
-
-Yes I agree, I had brought up this in one of the discussions around extending
-OPP bindings. The cluster dependency needs to be removed and it should be
-derived from the clocks.
-
-> directly connected to their clustering.  Clustering is important to the
-> scheduler and an understanding of the power and clock sharing
-> constraints that come along with clusters is going to be required there
-> as part of energy aware scheduling but I'm not seeing any obvious reason
-> for the frequency scaling driver to know about this, even with cpufreq
-> governors it's mostly the clock sharing.
->
-
-Both CPUFreq and Energy aware scheduling need understanding of clock sharing. 
-Both have similar goals(save power with little or no performance degradation), 
-but EA scheduler will be more efficient(both in terms of power and performance).
-
-Governors need this knowledge of sharing as it affects the load calculation.
-(IIRC maximum load of all the cpu sharing clocks is taken)
-
-> For IKS where we're pairing the CPUs up and telling the kernel that
-> switching between the physical clusters is part of scaling the
-> "frequency" of the virtual cluster presented to the rest of the system
-> things are of course different and cpufreq does need to understand the
-> physical clusters.
->
-> Having multiple generic frequency scaling drivers feels wrong; there's
-> going to be code duplication between them and it doesn't seem like there
-> should be anything going on that we can't automatically figure out at
-> runtime.
->
-
-Completely agree with you.
-
+-- 
 Regards,
-Sudeep
+Nishanth Menon
