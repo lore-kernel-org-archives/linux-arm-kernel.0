@@ -1,75 +1,89 @@
-From: schnitzeltony@googlemail.com (=?UTF-8?Q?Andreas_M=C3=BCller?=)
-Date: Fri, 9 May 2014 23:06:55 +0200
-Subject: [PATCH 1/4] OMAPDSS: Fix DSS clock multiplier issue on 3703 and
- probably 3630
-In-Reply-To: <536C860E.1000501@ti.com>
-References: <1398815562-24113-1-git-send-email-tony@atomide.com>
- <1398815562-24113-2-git-send-email-tony@atomide.com>
- <536C860E.1000501@ti.com>
-Message-ID: <CALbNGRR3U1veFgXmOWpfG3yNVESdxi2t79WDrJwOZ1oShuG1yA@mail.gmail.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Fri, 9 May 2014 15:28:10 -0600
+Subject: [PATCH 2/2] mtd: orion-nand: fix build error with ARMv4
+In-Reply-To: <20140509184505.GA30330@arch.cereza>
+References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
+ <1399560990-1402858-1-git-send-email-arnd@arndb.de>
+ <1399560990-1402858-4-git-send-email-arnd@arndb.de>
+ <20140509184505.GA30330@arch.cereza>
+Message-ID: <20140509212810.GF18257@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 9, 2014 at 9:38 AM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
-> On 30/04/14 02:52, Tony Lindgren wrote:
->> Otherwise we can get often errors like the following and the
->> display won't come on:
->>
->> omapdss APPLY error: FIFO UNDERFLOW on gfx, disabling the overlay
->> omapdss APPLY error: SYNC_LOST on channel lcd, restarting
->> the output with video overlays disabled
->>
->> There are some earlier references to this issue:
->>
->> http://www.spinics.net/lists/linux-omap/msg59511.html
->> http://www.spinics.net/lists/linux-omap/msg59724.html
->
-resend - my client had HTML enabled...
+On Fri, May 09, 2014 at 03:45:05PM -0300, Ezequiel Garcia wrote:
 
-FWIW: I have had issues long time ago [1]. With mainline 3.14.3 I had
-still the reboot problem on old 600MHz OMAP 3530. Applying this patch
-solved the issues. For other versions I had no chance to reproduce the
-original wakup issue mentioned in old thread
+> I gave this a try in order to answer Arnd's performance
+> question. First of all, the patch seems wrong. I guess it's because
+> readsl reads 4-bytes pieces, instead of 8-bytes.
+> 
+> This patch below is tested (but not completely, see below) and works:
 
-[1] http://marc.info/?l=linux-omap&m=136250904607413&w=2
+Compilers are better now, I think you can just ditch the weirdness:
 
-Andreas
-> Those don't sound like the same issue, but it's hard to say. What kind
-> of clock rates do you get? Cat you paste debugfs/omapdss/clk, with and
-> without this patch?
->
-> What resolution do you have? If it's a very high resolution (say, DVI
-> output to a monitor), it could just be an issue of
-> not-enough-memory-bandwidth.
->
->> It seems that it's safe to set the lower values even for 3630.
->> If we can confirm that 3630 works with the higher values
->> reliably we can add further detection.
->>
->> Signed-off-by: Tony Lindgren <tony@atomide.com>
->> ---
->>  drivers/video/fbdev/omap2/dss/dss.c | 5 +++--
->>  1 file changed, 3 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/video/fbdev/omap2/dss/dss.c b/drivers/video/fbdev/omap2/dss/dss.c
->> index d55266c..ad6561f 100644
->> --- a/drivers/video/fbdev/omap2/dss/dss.c
->> +++ b/drivers/video/fbdev/omap2/dss/dss.c
->> @@ -707,9 +707,10 @@ static const struct dss_features omap34xx_dss_feats __initconst = {
->>       .dpi_select_source      =       &dss_dpi_select_source_omap2_omap3,
->>  };
->>
->> +/* Supposedly 3630 can use div 32 mult 2, but that needs to be rechecked */
->>  static const struct dss_features omap3630_dss_feats __initconst = {
->> -     .fck_div_max            =       32,
->> -     .dss_fck_multiplier     =       1,
->> +     .fck_div_max            =       16,
->> +     .dss_fck_multiplier     =       2,
->
-> These values tell about the clock hardware, they are not settings that
-> can be changed to change the clock. OMAP3630 has a fixed x2 multiplier
-> and a divider with maximum value of 16.
->
->  Tomi
->
->
+uint64_t *from;
+uint64_t *to;
+void foo()
+{
+	for (unsigned int I = 0; I != 1000; I++)
+		*to++ = *from;
+}
+
+Using even gcc 4.6.3 gives good code:
+
+(v6)
+.L2:
+        ldrd    r2, [ip]
+        strd    r2, [r1], #8
+        cmp     r1, r0
+
+(v4)
+.L2:
+        ldmia   ip, {r0-r1}
+        stmia   r3!, {r0-r1}
+        cmp     r3, r2
+
+For correctness this v4 version does require that the cpu executes the
+ldmia reads in increasing address order, and never in any other
+order. AFAIK the periphal is just a simple fifo that basically ignores
+the address.
+
+memcpy_fromio is not as good since it will never align if the buffer
+is unaligned, while this version does.
+
+The below gives:
+
+  c8:   ea000002        b       d8 <orion_nand_read_buf+0x84>
+  cc:   e5dc0000        ldrb    r0, [ip]
+  d0:   e7c30001        strb    r0, [r3, r1]
+  d4:   e2811001        add     r1, r1, #1
+  d8:   e1510002        cmp     r1, r2
+
+Which looks the same as the asm version to me.
+
+diff --git a/drivers/mtd/nand/orion_nand.c b/drivers/mtd/nand/orion_nand.c
+index dc9d07f34b8a..fea1597f623e 100644
+--- a/drivers/mtd/nand/orion_nand.c
++++ b/drivers/mtd/nand/orion_nand.c
+@@ -95,16 +95,13 @@ static void orion_nand_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
+ 	}
+ 	buf64 = (uint64_t *)buf;
+ 	while (i < len/8) {
+-		/*
+-		 * Since GCC has no proper constraint (PR 43518)
+-		 * force x variable to r2/r3 registers as ldrd instruction
+-		 * requires first register to be even.
+-		 */
+-		register uint64_t x asm ("r2");
+-
+-		asm volatile ("ldrd\t%0, [%1]" : "=&r" (x) : "r" (io_base));
+-		buf64[i++] = x;
++#ifdef CONFIG_64BIT
++		buf64[i++] = readq_relaxed(io_base);
++#else
++		buf64[i++] = *(const volatile u64 __force *)io_base;
++#endif
+ 	}
++
+ 	i *= 8;
+ 	while (i < len)
+ 		buf[i++] = readb(io_base);
