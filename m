@@ -1,56 +1,145 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 09 May 2014 22:12:32 +0200
-Subject: [PATCH 2/2] mtd: orion-nand: fix build error with ARMv4
-In-Reply-To: <20140509184505.GA30330@arch.cereza>
-References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-4-git-send-email-arnd@arndb.de>
- <20140509184505.GA30330@arch.cereza>
-Message-ID: <28202282.tsYsyDGHCL@wuerfel>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Fri, 9 May 2014 15:17:04 -0500
+Subject: [PATCH] ARM: OMAP2+: Remove suspend_set_ops from common pm late
+ init
+In-Reply-To: <536D26C6.1060903@ti.com>
+References: <1399661580-54599-1-git-send-email-d-gerlach@ti.com>
+ <536D26C6.1060903@ti.com>
+Message-ID: <536D37C0.1000704@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 09 May 2014 15:45:05 Ezequiel Garcia wrote:
-> On 08 May 04:56 PM, Arnd Bergmann wrote:
-> 
-> I gave this a try in order to answer Arnd's performance question.
+On 05/09/2014 02:04 PM, Nishanth Menon wrote:
+> On 05/09/2014 01:53 PM, Dave Gerlach wrote:
+>> In omap2_common_pm_late_init suspend_set_ops was called to set common
+>> suspend handling functions for all omap platforms. This created two
+>> problems. First, these suspend ops were being set for all platforms,
+>> regardless of whether or not suspend support has been integrated so in
+>> the case of AM33XX, suspend to mem was presented as available but
+>> failed every time. Second, some platforms will need to define a
+>> completely separate set of suspend ops, such as AM33XX, due to
+>> differences from previous omap platforms so there is no need to
+>> always set the common omap ops.
+>>
+>> This patch moves the suspend_set_ops call from omap2_common_pm_late_init
+>> into a separate function that then gets called in the omap*_pm_init
+>> functions for each platform.
+>>
+>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+>> ---
+>>   arch/arm/mach-omap2/common.h | 8 ++++++++
+>>   arch/arm/mach-omap2/pm.c     | 8 ++++----
+>>   arch/arm/mach-omap2/pm24xx.c | 1 +
+>>   arch/arm/mach-omap2/pm34xx.c | 1 +
+>>   arch/arm/mach-omap2/pm44xx.c | 1 +
+>>   5 files changed, 15 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+>> index d88aff7..091e1c7 100644
+>> --- a/arch/arm/mach-omap2/common.h
+>> +++ b/arch/arm/mach-omap2/common.h
+>> @@ -162,6 +162,14 @@ static inline void omap44xx_restart(enum reboot_mode mode, const char *cmd)
+>>   }
+>>   #endif
+>>
+>> +#ifdef CONFIG_SUSPEND
+>> +void omap_common_suspend_init(void);
+>> +#else
+>> +static inline void omap_common_suspend_init(void)
+>> +{
+>> +}
+>> +#endif
+>> +
+> push this off to this pm.h?
 
-Thanks a lot for testing!
+I could, I had just put it in the same spot as 
+omap2_common_pm_late_init. I agree it makes sense to move it though.
 
-> First of all,
-> the patch seems wrong. I guess it's because readsl reads 4-bytes pieces, instead of
-> 8-bytes.
+>
+>>   /* This gets called from mach-omap2/io.c, do not call this */
+>>   void __init omap2_set_globals_tap(u32 class, void __iomem *tap);
+>>
+>> diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
+>> index e1b4141..c9b36fb 100644
+>> --- a/arch/arm/mach-omap2/pm.c
+>> +++ b/arch/arm/mach-omap2/pm.c
+>> @@ -243,6 +243,10 @@ static const struct platform_suspend_ops omap_pm_ops = {
+>>   	.valid		= suspend_valid_only_mem,
+>>   };
+>>
+>> +void __init omap_common_suspend_init(void)
+> provide kernel doc please? and do we need __init?
 
-Oops. I guess I was thinking of a 64-bit system and didn't even notice
-the difference between 4 and 8 byte accesses here. I wonder where I have
-my mind sometimes.
+Added and no.
 
-> In other words, the patch is still half-untested. Therefore, and given
-> this is meant only to coherce a build, maybe we'd rather just loop over
-> readb and stay on the safe side?
+>
+>> +{
+>> +	suspend_set_ops(&omap_pm_ops);
+>> +}
+>>   #endif /* CONFIG_SUSPEND */
+>>
+>>   static void __init omap3_init_voltages(void)
+>> @@ -310,9 +314,5 @@ int __init omap2_common_pm_late_init(void)
+>>   	/* cpufreq dummy device instantiation */
+>>   	omap_init_cpufreq();
+>>
+>> -#ifdef CONFIG_SUSPEND
+>> -	suspend_set_ops(&omap_pm_ops);
+>> -#endif
+>> -
+>>   	return 0;
+>>   }
+>> diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
+>> index 8c07594..8cd2408 100644
+>> --- a/arch/arm/mach-omap2/pm24xx.c
+>> +++ b/arch/arm/mach-omap2/pm24xx.c
+>> @@ -231,6 +231,7 @@ static void __init prcm_setup_regs(void)
+>>
+>>   #ifdef CONFIG_SUSPEND
+>>   	omap_pm_suspend = omap2_enter_full_retention;
+>> +	omap_common_suspend_init();
+>>   #endif
+>>
+>>   	/* REVISIT: Configure number of 32 kHz clock cycles for sys_clk
+>> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+>> index 87099bb..32b2597 100644
+>> --- a/arch/arm/mach-omap2/pm34xx.c
+>> +++ b/arch/arm/mach-omap2/pm34xx.c
+>> @@ -707,6 +707,7 @@ int __init omap3_pm_init(void)
+>>
+>>   #ifdef CONFIG_SUSPEND
+>>   	omap_pm_suspend = omap3_pm_suspend;
+>> +	omap_common_suspend_init();
+>>   #endif
+>>
+>>   	arm_pm_idle = omap3_pm_idle;
+>> diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+>> index eefb30c..58d7cd7 100644
+>> --- a/arch/arm/mach-omap2/pm44xx.c
+>> +++ b/arch/arm/mach-omap2/pm44xx.c
+>> @@ -253,6 +253,7 @@ int __init omap4_pm_init(void)
+>>
+>>   #ifdef CONFIG_SUSPEND
+>>   	omap_pm_suspend = omap4_pm_suspend;
+>> +	omap_common_suspend_init();
+>
+> do we need to expose omap_pm_suspend anymore with this since the
+> original purpose was to make pm.c know about the suspend function?
+> How about:
+> omap_common_suspend_init(omap4_pm_suspend);
+> should do the job, right? and with that, you dont need the #ifdef
+> CONFIG_SUSPEND either in each of the pmxxx.c files since you already
+> deal with it in header.
 
-I guess that would be equal to calling memcpy_fromio().
+Yes, I like this idea myself.
 
-> And now, answering Arnd's question:
-> 
-> # Using ldrd
-> # time nanddump /dev/mtd5 -f /dev/null -q
-> real	0m 5.90s
-> user	0m 0.22s
-> sys	0m 5.67s
-> 
-> # Using readsl
-> # time nanddump /dev/mtd5 -f /dev/null -q
-> real	0m 6.39s
-> user	0m 0.17s
-> sys	0m 6.20s
-> 
-> So I'd say, let's stick to the ldrd magic.
+Thanks for the comments,
+Dave
 
-Ok, that is a noticeable difference. For scale, what is the size of that partition?
-If this is something that actually affects people, it might be worth also trying
-memcpy(), which should be better at saturating the bus, but might be wrong here
-(if alignment the alignment requirements on the external bus are stricter than
-what memcpy does) or it might not make a difference at all if the code is already
-ideal.
-
-	Arnd
+>
+>>   #endif
+>>
+>>   	/* Overwrite the default cpu_do_idle() */
+>>
+>
+>
