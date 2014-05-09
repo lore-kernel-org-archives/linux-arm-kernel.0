@@ -1,63 +1,62 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 9 May 2014 01:23:35 +0100
-Subject: [PATCH] ARM: Don't ever downscale loops_per_jiffy in SMP systems
-In-Reply-To: <CAD=FV=ViOie+E_mxgcE51oNL0HY1zF9KYG_TDSbKjMzE2GZZMw@mail.gmail.com>
-References: <1399504982-31181-1-git-send-email-dianders@chromium.org>
- <CAOh2x=kwaoSdj8JO0Vo08Y0dX2UfKFiF3pBV-qtp-YTyN=8H8Q@mail.gmail.com>
- <CAD=FV=UEGJGHrdcXgs3EZ_wFXT8GnNeCOMt7CgdiiUzBzZ5Y0A@mail.gmail.com>
- <alpine.LFD.2.11.1405081149190.980@knanqh.ubzr>
- <CAD=FV=VtcLOh51LCmafzRMdqtDrwKXCqK6gE6V7OOOUe4gjwbA@mail.gmail.com>
- <alpine.LFD.2.11.1405081329010.980@knanqh.ubzr>
- <CAD=FV=X4h0nfO7a10NXe+d76xj5ttBJx=q1pAvW4aPzrc22BoQ@mail.gmail.com>
- <20140508205556.GJ3693@n2100.arm.linux.org.uk>
- <CAD=FV=ViOie+E_mxgcE51oNL0HY1zF9KYG_TDSbKjMzE2GZZMw@mail.gmail.com>
-Message-ID: <20140509002334.GK3693@n2100.arm.linux.org.uk>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 8 May 2014 20:25:21 -0400
+Subject: [PATCH 3/5] irqchip: crossbar: Skip some irqs from getting mapped
+ to crossbar
+In-Reply-To: <CAD=GYpav4mHaqo4jfb0ePchf3cvuvSnFKj_+osbrt_8-tYRRrQ@mail.gmail.com>
+References: <1399299527-10955-1-git-send-email-r.sricharan@ti.com>	<1399299527-10955-4-git-send-email-r.sricharan@ti.com>	<536BD9D8.4080905@ti.com>	<20140508203659.GA5620@kahuna>	<CAD=GYpbQQxQgKd3oZcAuWrxoD4VrkKzpybd11qwxs405HSUVGw@mail.gmail.com>	<536C0DC4.7090309@ti.com>
+ <CAD=GYpav4mHaqo4jfb0ePchf3cvuvSnFKj_+osbrt_8-tYRRrQ@mail.gmail.com>
+Message-ID: <536C2071.8040502@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 08, 2014 at 05:02:02PM -0700, Doug Anderson wrote:
-> Russel,
+On Thursday 08 May 2014 08:13 PM, Joel Fernandes wrote:
+> On Thu, May 8, 2014 at 6:05 PM, Santosh Shilimkar
+> <santosh.shilimkar@ti.com> wrote:
+> [..]
+>>> Further since not everything goes through the crossbar and some are
+>>> direct mapped like your diagram, the correct fix is probably making it
+>>> an irqchip and doing the interrupt controller parenting correctly in
+>>> DT.
+>>>
+>>> That would take care of A), because users of such direct mapped
+>>> interrupts will go through the GIC interrupt controller directly.
+>>>
+>>> It will also take care of B), because if writing to cross bar has no
+>>> effect for a particular IRQ, or if those IRQs are hard-wired to
+>>> something, as you said, then that something should go through the GIC
+>>> directly.
+>>>
+>>> I can try to whip up something like this if it makes sense, let me know...
+>>>
+>> I have been ignoring this series considering they were just fixes
+>> but you comments are like re-inventing wheel. Please read all
+>> the old threads and comments from Thomas and me on why we took
+>> approach and why it is not an irqchip. There is no need to complicate
+>> it further.
 > 
-> On Thu, May 8, 2014 at 1:55 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Thu, May 08, 2014 at 11:06:24AM -0700, Doug Anderson wrote:
-> >> I guess I would say that my patch is unhacking the this code.  The
-> >> code after my patch is simpler.  I would perhaps argue that (ec971ea
-> >> ARM: add cpufreq transiton notifier to adjust loops_per_jiffy for smp)
-> >> should never have landed to begin with.
-> >
-> > That depends on your point of view.  As I've already pointed out through
-> > the examples of why udelay() is inaccurate, for driver authors, they
-> > should assume that udelay() just gives you an "approximate" delay and
-> > it has no accuracy.
+> Are you talking about the discussion on this thread?
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/194318.html
 > 
-> That disagrees with what Thomas Gleixner says at
-> <http://lkml.iu.edu//hypermail/linux/kernel/1203.1/01034.html>.  It
-> also seems like perhaps the regulator core is broken, then...  If a
-> udelay(30) can end up as a udelay(20) then we may return from a
-> regulator code 10us earlier than we should and we'll assume that a
-> regulator is ramped before it really is...
+> I didn't really get a sense that there was a common agreement that
+> irqchip is not the way to go there. I can stand corrected if there was
+> a common consensus that irqchip is not the right solution (with any
+> specific comments why). There was a concern in the thread that making
+> it irqchip doesn't help dma reuse the infrastructure, but that concern
+> seems moot now that the driver is proposed to live in drivers/irqchip.
 > 
-> I'm out tomorrow but I can confirm on Monday that I was really seeing
-> udelay(30) be a udelay(20) without this patch.
+Obviously you haven't read all the threads... Please read [1]. There
+was a reason I said read *all* the threads. Because anyone who looks
+at this hardware IP block thinks it can be irqchip. You are not the
+first one who said that.
 
-Thomas is wrong - when I researched this topic, I ended up finding
-that udelay() does delay _less_ than requested, and I mailed Linus
-about it...  This is whe way udelay() is - it's an approximate delay,
-it's *not* accurate.
+The concern was really not where the code resides but what the actual
+hardware is and how can it fit into Linux. The whole reason I was
+actually against irqhcip from beginning of crossbar series was the
+hardware is not irqchip rather just a router. Thomas the formally
+NAKed that approach on thread [1]. If there are bugs, doesn't mean
+we can make fit the hardware into some subsystem where it can't be
+described.
 
-It's also fairly obvious when you stop and consider how it's calibrated.
-
-Take a moment to wonder when we used to recalibrate each CPU individally,
-why the boot CPU bogomips would be slightly lower than the secondary
-CPU bogomips.  This is all down to the boot CPU having to run timer
-interrupts while the secondary CPUs weren't at the time they calibrated.
-
-Linus doesn't give a damn about udelay() being slightly short in this
-way.  Neither do I.
-
-Let me repeat again: use a timer.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Regards,
+Santosh
+[1] https://lkml.org/lkml/2013/9/13/413
