@@ -1,12 +1,12 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Fri, 9 May 2014 08:37:44 -0500
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 9 May 2014 08:38:50 -0500
 Subject: [PATCH 3/5] irqchip: crossbar: Skip some irqs from getting mapped
  to crossbar
 In-Reply-To: <536CD9CE.9040504@ti.com>
 References: <1399299527-10955-1-git-send-email-r.sricharan@ti.com>	<1399299527-10955-4-git-send-email-r.sricharan@ti.com>	<536BD9D8.4080905@ti.com>	<20140508203659.GA5620@kahuna>	<CAD=GYpbQQxQgKd3oZcAuWrxoD4VrkKzpybd11qwxs405HSUVGw@mail.gmail.com>	<536C0DC4.7090309@ti.com>	<CAD=GYpav4mHaqo4jfb0ePchf3cvuvSnFKj_+osbrt_8-tYRRrQ@mail.gmail.com>	<536C2071.8040502@ti.com>
  <CAD=GYpbRn=LEthpAUX9LNBGTB4iDs7TGiSSgLJuuS0tSatRRJQ@mail.gmail.com>
  <536CD01F.2070506@ti.com> <536CD9CE.9040504@ti.com>
-Message-ID: <536CDA28.40307@ti.com>
+Message-ID: <536CDA6A.1080508@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -68,5 +68,17 @@ On 05/09/2014 08:36 AM, Joel Fernandes wrote:
 > 0'ing bit 31. Then how will map/unmap decide if it needs to be crossbar
 > mapped/unmapped or GIC?
 > 
+> Perhaps, the info in bit 31 should be stored somewhere and reused later
+> during map time, or I am missing something.
 
-Correcting myself here, I meant "IRQ number is GIC cross bar skipped".
+no, you did not miss anything -> I did mention in my mail precisely
+that "But then, crossbar_domain_map and crossbar_domain_unmap need
+hints as well to know that there is no corresponding crossbar
+registers. Have'nt thought through that yet."
+
+Lets discuss hardware description problem(dts) first and then solve
+the driver problem next.
+
+-- 
+Regards,
+Nishanth Menon
