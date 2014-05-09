@@ -1,57 +1,85 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 9 May 2014 12:24:55 +0100
-Subject: [PATCH 04/10] mfd: vexpress: Define the device as MFD cells
-In-Reply-To: <1398707877-22596-5-git-send-email-pawel.moll@arm.com>
-References: <1398707877-22596-1-git-send-email-pawel.moll@arm.com>
- <1398707877-22596-5-git-send-email-pawel.moll@arm.com>
-Message-ID: <20140509112455.GU5767@lee--X1>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 9 May 2014 16:59:04 +0530
+Subject: [PATCH 05/17] pci: host: pcie-dra7xx: add support for pcie-dra7xx
+ controller
+In-Reply-To: <6485683.q96o7U6vf8@wuerfel>
+References: <1399383244-14556-1-git-send-email-kishon@ti.com>
+ <4300084.bc6ByDTk7W@wuerfel> <5369F287.6000103@ti.com>
+ <6485683.q96o7U6vf8@wuerfel>
+Message-ID: <536CBC00.6000709@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 28 Apr 2014, Pawel Moll wrote:
+Hi Arnd,
 
-> This patch - finally, after over 6 months! :-( - addresses
-> Samuel's request to split the vexpress-sysreg driver into
-> smaller portions and define the device in a form of MFD
-> cells:
+On Wednesday 07 May 2014 03:00 PM, Arnd Bergmann wrote:
+> On Wednesday 07 May 2014 14:14:55 Kishon Vijay Abraham I wrote:
+>>>> +static void dra7xx_pcie_enable_interrupts(struct pcie_port *pp)
+>>>> +{
+>>>> +    struct dra7xx_pcie *dra7xx = to_dra7xx_pcie(pp);
+>>>> +
+>>>> +    dra7xx_pcie_writel(dra7xx->base, PCIECTRL_DRA7XX_CONF_IRQSTATUS_MAIN,
+>>>> +                       ~INTERRUPTS);
+>>>> +    dra7xx_pcie_writel(dra7xx->base,
+>>>> +                       PCIECTRL_DRA7XX_CONF_IRQENABLE_SET_MAIN, INTERRUPTS);
+>>>> +    dra7xx_pcie_writel(dra7xx->base, PCIECTRL_DRA7XX_CONF_IRQSTATUS_MSI,
+>>>> +                       ~LEG_EP_INTERRUPTS & ~MSI);
+>>>> +
+>>>> +    if (IS_ENABLED(CONFIG_PCI_MSI))
+>>>> +            dra7xx_pcie_writel(dra7xx->base,
+>>>> +                               PCIECTRL_DRA7XX_CONF_IRQENABLE_SET_MSI, MSI);
+>>>> +    else
+>>>> +            dra7xx_pcie_writel(dra7xx->base,
+>>>> +                               PCIECTRL_DRA7XX_CONF_IRQENABLE_SET_MSI,
+>>>> +                               LEG_EP_INTERRUPTS);
+>>>
+>>> Doesn't this just enable one or the other? In general I'd assume you need
+>>> both INTx and MSI, at least if MSI is available.
+>>
+>> Not sure since the programming sequence in the TRM explicitly states either
+>> legacy interrupts or MSI interrupts should be enabled but not both.
 > 
-> * LEDs code has been completely removed and replaced with
->   "gpio-leds" nodes in the tree (referencing dedicated
->   GPIO subnodes in sysreg - bindings documentation updated);
->   this also better fits the reality as some variants of the
->   motherboard don't have all the LEDs populated
+> Hmm, I think that means you can't have MSI at all. You have to support
+> legacy PCI devices that can't do MSI.
 > 
-> * syscfg bridge code has been extracted into a separate
->   driver (placed in drivers/misc for no better place)
-> 
-> * all the ID & MISC registers are defined as sysconf
->   making them available for other drivers should they need
->   to use them (and also to the user via /sys/kernel/debug/regmap
->   which can be helpful in platform debugging)
-> 
-> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-> ---
->  .../devicetree/bindings/arm/vexpress-sysreg.txt    |  36 +-
->  arch/arm/boot/dts/vexpress-v2m-rs1.dtsi            |  76 ++-
->  arch/arm/boot/dts/vexpress-v2m.dtsi                |  76 ++-
->  arch/arm/mach-vexpress/ct-ca9x4.c                  |   2 +-
->  arch/arm/mach-vexpress/v2m.c                       |  15 +-
->  drivers/mfd/Kconfig                                |  15 +-
->  drivers/mfd/Makefile                               |   2 +-
->  drivers/mfd/vexpress-sysreg.c                      | 533 ++++++---------------
->  drivers/misc/Kconfig                               |   9 +
->  drivers/misc/Makefile                              |   1 +
->  drivers/misc/vexpress-syscfg.c                     | 324 +++++++++++++
->  include/linux/vexpress.h                           |  16 +-
->  12 files changed, 667 insertions(+), 438 deletions(-)
->  create mode 100644 drivers/misc/vexpress-syscfg.c
+> Do you know if you have a modern GIC implementation with MSI support
+> in these SoCs? It would be better anyway to use the GIC for doing
 
-MFD changes look reasonable to me, and remove a hell of a lot of code.
+In DRA7 it is not there. I'm not sure in other platforms.
+> MSI, so you can just ignore the internal MSI controller here.
+> 
+>>>> +static int add_pcie_port(struct dra7xx_pcie *dra7xx,
+>>>> +                      struct platform_device *pdev)
+>>>> +{
+>>>> +    int ret;
+>>>> +    struct pcie_port *pp;
+>>>> +    struct resource *res;
+>>>> +    struct device *dev = &pdev->dev;
+>>>> +
+>>>> +    pp = &dra7xx->pp;
+>>>> +    pp->dev = dev;
+>>>> +    pp->ops = &dra7xx_pcie_host_ops;
+>>>> +
+>>>> +    spin_lock_init(&pp->conf_lock);
+>>>> +
+>>>> +    pp->irq = platform_get_irq(pdev, 1);
+>>>> +    if (pp->irq < 0) {
+>>>> +            dev_err(dev, "missing IRQ resource\n");
+>>>> +            return -EINVAL;
+>>>> +    }
+>>>>
+>>>
+>>> The binding does not list a mandatory "interrupts" property, so
+>>> this should not be treated as an error.
+>>
+>> actually the 'interrupts' property is documented in pci/designware-pcie.txt.
+> 
+> Hmm, but you don't seem to use it the same way as documented there.
+> I'm not sure what 'level interrupt, pulse interrupt, special interrupt'
+> in the parent binding are, but they don't seem to be the ones you use
+> here.
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
+Yeah. I'll update my Documentation. Thanks for pointing this out.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks
+Kishon
