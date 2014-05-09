@@ -1,136 +1,72 @@
-From: james.hogan@imgtec.com (James Hogan)
-Date: Fri, 9 May 2014 14:37:27 +0100
-Subject: [RFC][PATCH 6/8] sched,idle: Avoid spurious wakeup IPIs
-In-Reply-To: <20140411135218.478299389@infradead.org>
-References: <20140411134243.160989490@infradead.org>
- <20140411135218.478299389@infradead.org>
-Message-ID: <CAAG0J9_q1KsUx10-XAb7AJnxv2ehctg6q1KME7ahsk1OZV8vZQ@mail.gmail.com>
+From: joelf@ti.com (Joel Fernandes)
+Date: Fri, 9 May 2014 08:37:44 -0500
+Subject: [PATCH 3/5] irqchip: crossbar: Skip some irqs from getting mapped
+ to crossbar
+In-Reply-To: <536CD9CE.9040504@ti.com>
+References: <1399299527-10955-1-git-send-email-r.sricharan@ti.com>	<1399299527-10955-4-git-send-email-r.sricharan@ti.com>	<536BD9D8.4080905@ti.com>	<20140508203659.GA5620@kahuna>	<CAD=GYpbQQxQgKd3oZcAuWrxoD4VrkKzpybd11qwxs405HSUVGw@mail.gmail.com>	<536C0DC4.7090309@ti.com>	<CAD=GYpav4mHaqo4jfb0ePchf3cvuvSnFKj_+osbrt_8-tYRRrQ@mail.gmail.com>	<536C2071.8040502@ti.com>
+ <CAD=GYpbRn=LEthpAUX9LNBGTB4iDs7TGiSSgLJuuS0tSatRRJQ@mail.gmail.com>
+ <536CD01F.2070506@ti.com> <536CD9CE.9040504@ti.com>
+Message-ID: <536CDA28.40307@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+On 05/09/2014 08:36 AM, Joel Fernandes wrote:
+> Hi Nishanth,
+> 
+> On 05/09/2014 07:54 AM, Nishanth Menon wrote:
+> [..]
+>> Yep - thanks Santosh for clarifying this. Now, we still have the
+>> issues that I pointed out in [1] - without resolving which, we should
+>> not enable crossbar for dra74x/72x.
+>>
+>> A. taking example of PMU
+>> 	interrupts = <GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH>
+>> this wont work. instead the crossbar driver needs some sort of a hint
+>> to know that it should not map these on crossbar register instead
+>> assign GIC mapping directly.
+>>
+>> I propose doing the following
+>> #define GIC_CROSSBAR_PASSTHROUGH(irq_no) ((irq_no) | (0x1 << 31))
+>>
+>> and dts will define the following:
+>> interrupts = <GIC_SPI GIC_CROSSBAR_PASSTHROUGH(131) IRQ_TYPE_LEVEL_HIGH>
+> 
+> I would pick something smaller like GIC_SKIP_CROSSBAR.
+> 
+>> This will also work for the other cases (B.2, B.3)
+>>
+>> For B.2: L3_APP_IRQ:
+>> instead of:
+>> interrupts = <GIC_SPI  5 IRQ_TYPE_LEVEL_HIGH>
+>> we do:
+>> interrupts = <GIC_SPI GIC_CROSSBAR_PASSTHROUGH(10) IRQ_TYPE_LEVEL_HIGH>
+>>
+>> For B.3: NMI
+>> interrupts = <GIC_SPI GIC_CROSSBAR_PASSTHROUGH(133) IRQ_TYPE_LEVEL_HIGH>
+>>
+>> xlate is easy ->
+>>
+>> diff --git a/drivers/irqchip/irq-crossbar.c
+>> b/drivers/irqchip/irq-crossbar.c
+>> index de021638..fd09ab4 100644
+>> --- a/drivers/irqchip/irq-crossbar.c
+>> +++ b/drivers/irqchip/irq-crossbar.c
+>> @@ -112,6 +112,10 @@ static int crossbar_domain_xlate(struct
+>> irq_domain *d,
+>>  {
+>>         unsigned long ret;
+>>
+>> +       /* Check to see if direct GIC mapping is required */
+>> +       if (intspec[1] & BIT(31))
+>> +               return intspec[1] & ~BIT[31];
+>> +
+>>         ret = get_prev_map_irq(intspec[1]);
+>>         if (!IS_ERR_VALUE(ret))
+> 
+> Sounds good, one problem I see here though is once you do the xlate, the
+> information that the IRQ number is GIC cross bar is lost because you are
+> 0'ing bit 31. Then how will map/unmap decide if it needs to be crossbar
+> mapped/unmapped or GIC?
+> 
 
-On 11 April 2014 14:42, Peter Zijlstra <peterz@infradead.org> wrote:
-> Because mwait_idle_with_hints() gets called from !idle context it must
-> call current_clr_polling(). This however means that resched_task() is
-> very likely to send an IPI even when we were polling:
->
->   CPU0                                  CPU1
->
->   if (current_set_polling_and_test())
->     goto out;
->
->   __monitor(&ti->flags);
->   if (!need_resched())
->     __mwait(eax, ecx);
->                                         set_tsk_need_resched(p);
->                                         smp_mb();
-> out:
->   current_clr_polling();
->                                         if (!tsk_is_polling(p))
->                                           smp_send_reschedule(cpu);
->
->
-> So while it is correct (extra IPIs aren't a problem, whereas a missed
-> IPI would be) it is a performance problem (for some).
->
-> Avoid this issue by using fetch_or() to atomically set NEED_RESCHED
-> and test if POLLING_NRFLAG is set.
->
-> Since a CPU stuck in mwait is unlikely to modify the flags word,
-> contention on the cmpxchg is unlikely and thus we should mostly
-> succeed in a single go.
->
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Andy Lutomirski <luto@amacapital.net>
-> Signed-off-by: Peter Zijlstra <peterz@infradead.org>
-> ---
->  kernel/sched/core.c |   41 ++++++++++++++++++++++++++++++++++++-----
->  1 file changed, 36 insertions(+), 5 deletions(-)
->
-> --- a/kernel/sched/core.c
-> +++ b/kernel/sched/core.c
-> @@ -505,6 +505,39 @@ static inline void init_hrtick(void)
->  #endif /* CONFIG_SCHED_HRTICK */
->
->  /*
-> + * cmpxchg based fetch_or, macro so it works for different integer types
-> + */
-> +#define fetch_or(ptr, val)                                             \
-> +({     typeof(*(ptr)) __old, __val = *(ptr);                           \
-> +       for (;;) {                                                      \
-> +               __old = cmpxchg((ptr), __val, __val | (val));           \
-> +               if (__old == __val)                                     \
-> +                       break;                                          \
-> +               __val = __old;                                          \
-> +       }                                                               \
-> +       __old;                                                          \
-> +})
-> +
-> +#ifdef TIF_POLLING_NRFLAG
-> +/*
-> + * Atomically set TIF_NEED_RESCHED and test for TIF_POLLING_NRFLAG,
-> + * this avoids any races wrt polling state changes and thereby avoids
-> + * spurious IPIs.
-> + */
-> +static bool set_nr_and_not_polling(struct task_struct *p)
-> +{
-> +       struct thread_info *ti = task_thread_info(p);
-> +       return !(fetch_or(&ti->flags, _TIF_NEED_RESCHED) & _TIF_POLLING_NRFLAG);
-
-This breaks the build on metag, and I suspect arm64 too:
-
-kernel/sched/core.c In function ?set_nr_and_not_polling?:
-kernel/sched/core.c +531 : error: ?_TIF_POLLING_NRFLAG? undeclared
-
-since metag/arm64 define TIF_POLLING_NRFLAG but not
-_TIF_POLLING_NRFLAG. Could you please fix that prior to your patch to
-avoid breaking bisection?
-
-BTW what is it that determines whether an arch needs TIF_POLLING_NRFLAG?
-
-Thanks
-James
-
-
-> +}
-> +#else
-> +static bool set_nr_and_not_polling(struct task_struct *p)
-> +{
-> +       set_tsk_need_resched(p);
-> +       return true;
-> +}
-> +#endif
-> +
-> +/*
->   * resched_task - mark a task 'to be rescheduled now'.
->   *
->   * On UP this means the setting of the need_resched flag, on SMP it
-> @@ -520,17 +553,15 @@ void resched_task(struct task_struct *p)
->         if (test_tsk_need_resched(p))
->                 return;
->
-> -       set_tsk_need_resched(p);
-> -
->         cpu = task_cpu(p);
-> +
->         if (cpu == smp_processor_id()) {
-> +               set_tsk_need_resched(p);
->                 set_preempt_need_resched();
->                 return;
->         }
->
-> -       /* NEED_RESCHED must be visible before we test polling */
-> -       smp_mb();
-> -       if (!tsk_is_polling(p))
-> +       if (set_nr_and_not_polling(p))
->                 smp_send_reschedule(cpu);
->  }
->
->
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Correcting myself here, I meant "IRQ number is GIC cross bar skipped".
