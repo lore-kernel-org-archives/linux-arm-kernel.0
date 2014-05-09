@@ -1,41 +1,48 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Fri, 09 May 2014 16:29:22 +0100
-Subject: [PATCH 2/5] arm64: dts: APM X-Gene SoC Ethernet device tree nodes
-In-Reply-To: <CAKh23FmGYGkCbeh4DbL4_NO6ypkw4F70J0X__KxFyHTo-=WtKg@mail.gmail.com>
-References: <1387597376-29303-1-git-send-email-isubramanian@apm.com>
- <1387597376-29303-3-git-send-email-isubramanian@apm.com>
- <1390582906.12454.26.camel@deneb.redhat.com>
- <CAKh23FmGYGkCbeh4DbL4_NO6ypkw4F70J0X__KxFyHTo-=WtKg@mail.gmail.com>
-Message-ID: <87ppjnc6nh.fsf@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 9 May 2014 08:30:09 -0700
+Subject: [PATCH 3/4] OMAPDSS: panel-sharp-ls037v7dw01: add device tree
+ support
+In-Reply-To: <536C924E.5000307@ti.com>
+References: <1398815562-24113-1-git-send-email-tony@atomide.com>
+ <1398815562-24113-4-git-send-email-tony@atomide.com>
+ <5369EAE7.3030705@ti.com> <20140507150343.GA9502@atomide.com>
+ <536A5920.1020908@ti.com> <20140507175919.GH9502@atomide.com>
+ <20140508233300.GI2198@atomide.com> <536C924E.5000307@ti.com>
+Message-ID: <20140509153008.GC17814@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+* Tomi Valkeinen <tomi.valkeinen@ti.com> [140509 01:31]:
+> On 09/05/14 02:33, Tony Lindgren wrote:
+> > * Tony Lindgren <tony@atomide.com> [140507 11:00]:
+> >> * Tomi Valkeinen <tomi.valkeinen@ti.com> [140507 09:03]:
+> >>> On 07/05/14 18:03, Tony Lindgren wrote:
+> >>>>
+> >>>> BTW, I'm also personally fine with all five gpios showing in a single
+> >>>> gpios property, I'm not too exited about naming anything in DT..
+> >>>
+> >>> I don't have a strong opinion here. I don't have much experience with
+> >>> DT, especially with making bindings compatible with other ones.
+> >>>
+> >>> I'd just forget the simple-panel, and have single gpio array.
+> >>
+> >> Well if it's a don't care flag for both of us, let's try to use
+> >> the existing standard for simple-panel.txt and add mode-gpios
+> >> property. I'll post a patch for that.
+> > 
+> > Here's an updated version using enable-gpios, reset-gpios and
+> > mode-gpios. So it follows simple-panel.txt and adds mode-gpios
+> > that's currently specific to this panel only.
+> > 
+> > Also updated for -EPROBE_DEFER handling, tested that by changing
+> > one of the GPIOs to be a twl4030 GPIO.
+> 
+> To speed things up a bit, I made the changes I suggested. Compile tested
+> only.
 
-Iyappan Subramanian <isubramanian@apm.com> writes:
+OK thanks did not get the penguin with it so need to look at it a bit
+more.
 
-> Hi Mark,
->
-> Thanks for the review comment and I apologize for not replying sooner.
->
-> We are completely redesigning the ethernet driver to make it simple
-> and cleaner and will be posted shortly.
+Regards,
 
-Hi Iyappan,
-
-Did this ever get posted? I'm trying to get a close-to-HEAD kernel up
-and running on our APM hardware but have run afoul of the differences
-between the latest XGENE_MBOX patch set and the older NET_XGENE patch
-set.
-
-If it's not long away then I shall wait a bit otherwise I'll see if the
-missing bits can be forward ported from our working
-3.8.0-mustang_sw_1.08.12-beta_rc.jcm15 kernel (purely for testing
-purposes).
-
-Do you have a public tree where your latest kernels are visible?
-
-Cheers,
-
---
-Alex Benn?e
-QEMU/KVM Hacker for Linaro
+Tony
