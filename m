@@ -1,22 +1,97 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 9 May 2014 13:56:18 +0100
-Subject: [PATCHv2 0/6] arm64:lib: the optimized string library routines
- for armv8 processors
-In-Reply-To: <1398661895-5559-1-git-send-email-zhichang.yuan@linaro.org>
-References: <1398661895-5559-1-git-send-email-zhichang.yuan@linaro.org>
-Message-ID: <20140509125617.GD7950@arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 9 May 2014 14:57:45 +0200
+Subject: [PATCH v2 2/2] iio:adc: at91 requires the input subsystem
+In-Reply-To: <4163305.otOGv8yVK1@wuerfel>
+References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
+ <1399560990-1402858-13-git-send-email-arnd@arndb.de>
+ <536CA78C.5070603@atmel.com> <4163305.otOGv8yVK1@wuerfel>
+Message-ID: <536CD0C9.4040603@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 06:11:28AM +0100, zhichang.yuan at linaro.org wrote:
-> * Done LTP on big-endian and little-endian system according to
-> maintianers' requirement. The test results can be found at
-> https://wiki.linaro.org/WorkingGroups/Kernel/ARMv8/CortexStringsTests.
+On 09/05/2014 13:43, Arnd Bergmann :
+> On Friday 09 May 2014 12:01:48 Nicolas Ferre wrote:
+>> On 08/05/2014 16:56, Arnd Bergmann :
+>>> Building the at91 adc driver with CONFIG_INPUT disabled results in this
+>>> build error:
+>>>
+>>> ERROR: "input_event" [drivers/iio/adc/at91_adc.ko] undefined!
+>>> ERROR: "input_unregister_device" [drivers/iio/adc/at91_adc.ko] undefined!
+>>> ERROR: "input_free_device" [drivers/iio/adc/at91_adc.ko] undefined!
+>>> ERROR: "input_register_device" [drivers/iio/adc/at91_adc.ko] undefined!
+>>> ERROR: "input_set_abs_params" [drivers/iio/adc/at91_adc.ko] undefined!
+>>> ERROR: "input_allocate_device" [drivers/iio/adc/at91_adc.ko] undefined!
+>>>
+>>> To make sure we can build random configurations, this turns on CONFIG_INPUT
+>>> whenever CONFIG_AT91_ADC is enabled.
+>>
+>> Isn't it a "select" instead of "depends" that is required then?
+> 
+> It seems I fixed the patch at some point but didn't update the message.
+> 
+> In general, we should not mix 'depends on' and 'select' for the same symbol,
+> since that causes extra confusion.
+> 
+> In case of CONFIG_INPUT, almost all the users do 'depends on INPUT', with
+> a few exceptions that seem to be done in error.
 
-It's not clear to me from the above page but have you done a compat
-(AArch32) LTP test as well?
+Ok, that makes sense.
 
-Thanks.
+
+> Updated patch below.
+
+Thanks Arnd.
+
+> 	Arnd
+> 
+> 8<----
+> 
+>>From 4679d63b24a681d9c6afcfdde266bae0f940e90b Mon Sep 17 00:00:00 2001
+> From: Arnd Bergmann <arnd@arndb.de>
+> Date: Wed, 9 Apr 2014 17:18:10 +0200
+> Subject: [PATCH] [SUBMITTED] iio:adc: at91 requires the input subsystem
+> 
+> Building the at91 adc driver with CONFIG_INPUT disabled results in this
+> build error:
+> 
+> ERROR: "input_event" [drivers/iio/adc/at91_adc.ko] undefined!
+> ERROR: "input_unregister_device" [drivers/iio/adc/at91_adc.ko] undefined!
+> ERROR: "input_free_device" [drivers/iio/adc/at91_adc.ko] undefined!
+> ERROR: "input_register_device" [drivers/iio/adc/at91_adc.ko] undefined!
+> ERROR: "input_set_abs_params" [drivers/iio/adc/at91_adc.ko] undefined!
+> ERROR: "input_allocate_device" [drivers/iio/adc/at91_adc.ko] undefined!
+> 
+> To make sure we can build random configurations, this adds a Kconfig
+> dependency on CONFIG_INPUT, as we do for other similar drivers.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: linux-iio at vger.kernel.org
+> Cc: Josh Wu <josh.wu@atmel.com>
+> Cc: Jonathan Cameron <jic23@kernel.org>
+> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Bye,
+
+> 
+> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
+> index 90f596d..a80d236 100644
+> --- a/drivers/iio/adc/Kconfig
+> +++ b/drivers/iio/adc/Kconfig
+> @@ -110,6 +110,7 @@ config AD799X
+>  config AT91_ADC
+>  	tristate "Atmel AT91 ADC"
+>  	depends on ARCH_AT91
+> +	depends on INPUT
+>  	select IIO_BUFFER
+>  	select IIO_TRIGGERED_BUFFER
+>  	select SYSFS
+> 
+> 
+> 
+
 
 -- 
-Catalin
+Nicolas Ferre
