@@ -1,48 +1,20 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 9 May 2014 08:30:09 -0700
-Subject: [PATCH 3/4] OMAPDSS: panel-sharp-ls037v7dw01: add device tree
- support
-In-Reply-To: <536C924E.5000307@ti.com>
-References: <1398815562-24113-1-git-send-email-tony@atomide.com>
- <1398815562-24113-4-git-send-email-tony@atomide.com>
- <5369EAE7.3030705@ti.com> <20140507150343.GA9502@atomide.com>
- <536A5920.1020908@ti.com> <20140507175919.GH9502@atomide.com>
- <20140508233300.GI2198@atomide.com> <536C924E.5000307@ti.com>
-Message-ID: <20140509153008.GC17814@atomide.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 9 May 2014 12:30:14 -0300
+Subject: [PATCH v3 1/2] ARM: dts: imx6: i2c4 cleanup
+In-Reply-To: <536CEDE4.40002@gmail.com>
+References: <53695C34.5000604@gmail.com> <20140508054106.GH2794@dragon>
+ <536B4ACD.30001@gmail.com> <20140509030938.GK2794@dragon>
+ <536C8837.9090802@gmail.com> <20140509120845.GO2794@dragon>
+ <536CE331.7030001@gmail.com> <20140509142118.GQ2794@dragon>
+ <536CEDE4.40002@gmail.com>
+Message-ID: <CAOMZO5CQkjqF_5XcGqJK5XjdV+UZa=dbnZMFR4a-V5S5RyRR0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tomi Valkeinen <tomi.valkeinen@ti.com> [140509 01:31]:
-> On 09/05/14 02:33, Tony Lindgren wrote:
-> > * Tony Lindgren <tony@atomide.com> [140507 11:00]:
-> >> * Tomi Valkeinen <tomi.valkeinen@ti.com> [140507 09:03]:
-> >>> On 07/05/14 18:03, Tony Lindgren wrote:
-> >>>>
-> >>>> BTW, I'm also personally fine with all five gpios showing in a single
-> >>>> gpios property, I'm not too exited about naming anything in DT..
-> >>>
-> >>> I don't have a strong opinion here. I don't have much experience with
-> >>> DT, especially with making bindings compatible with other ones.
-> >>>
-> >>> I'd just forget the simple-panel, and have single gpio array.
-> >>
-> >> Well if it's a don't care flag for both of us, let's try to use
-> >> the existing standard for simple-panel.txt and add mode-gpios
-> >> property. I'll post a patch for that.
-> > 
-> > Here's an updated version using enable-gpios, reset-gpios and
-> > mode-gpios. So it follows simple-panel.txt and adds mode-gpios
-> > that's currently specific to this panel only.
-> > 
-> > Also updated for -EPROBE_DEFER handling, tested that by changing
-> > one of the GPIOs to be a twl4030 GPIO.
-> 
-> To speed things up a bit, I made the changes I suggested. Compile tested
-> only.
+On Fri, May 9, 2014 at 12:01 PM, Iain Paton <ipaton0@gmail.com> wrote:
+> add missing i2c4 clock and correct the compatible string to match other
+> imx6 i2c blocks
+>
+> Signed-off-by: Iain Paton<ipaton0@gmail.com>
 
-OK thanks did not get the penguin with it so need to look at it a bit
-more.
-
-Regards,
-
-Tony
+Reviewed-by: Fabio Estevam <fabio.estevam@freescale.com>
