@@ -1,33 +1,40 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 9 May 2014 15:46:20 +0100
-Subject: [PATCH] arm64: Define _TIF_POLLING_NRFLAG
-In-Reply-To: <20140509140316.GU2844@laptop.programming.kicks-ass.net>
-References: <1399636665-4127-1-git-send-email-broonie@kernel.org>
- <20140509140316.GU2844@laptop.programming.kicks-ass.net>
-Message-ID: <20140509144619.GH7950@arm.com>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Fri, 9 May 2014 23:47:15 +0900
+Subject: [PATCH] ARM: tegra: enable console framebuffer rotation
+In-Reply-To: <536CE414.5030406@suse.de>
+References: <1399432682-677-1-git-send-email-acourbot@nvidia.com>
+ <536A57FA.2090608@wwwdotorg.org> <536AC45F.6080608@nvidia.com>
+ <536CE414.5030406@suse.de>
+Message-ID: <CAAVeFuJkdfYZdSvh4OuwqxiuyyoYtBnHH16L4gJrbAvo2F-w0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 09, 2014 at 03:03:16PM +0100, Peter Zijlstra wrote:
-> On Fri, May 09, 2014 at 12:57:45PM +0100, Mark Brown wrote:
-> > From: Mark Brown <broonie@linaro.org>
-> > 
-> > arm64 defines TIF_POLLING_NRFLAG but not the corresponding shifted version,
-> > breaking the build with next-20140509 due to fd99f91aa007b (sched/idle:
-> > Avoid spurious wakeup IPIs) which added a reference to the shifted version
-> > which is present on most arches.
-> 
-> Sorry about that,
-> 
-> Acked-by: Peter Zijlstra <peterz@infradead.org>
+On Fri, May 9, 2014 at 11:20 PM, Andreas F?rber <afaerber@suse.de> wrote:
+> Am 08.05.2014 01:40, schrieb Alex Courbot:
+>> On 05/08/2014 12:57 AM, Stephen Warren wrote:
+>>> On 05/06/2014 09:18 PM, Alexandre Courbot wrote:
+>>>> Console rotation is needed for devices like Tegra Note 7 and NVIDIA
+>>>> SHIELD to get the boot console in the expected orientation.
+>>>
+>>> I've squashed this into Tegra's for-3.16/defconfig branch.
+>>>
+>>> Can you please also update multi_v7_defconfig, and send that change to
+>>> arm-soc (arm at kernel.org) to be applied. Thanks.
+>>
+>> I omitted doing this for now because the devices that require this
+>> option (TN7/SHIELD) need a custom build with appended DTB and/or
+>> command-line anyway. Therefore they cannot use a multi-mach kernel
+>
+> What does appending a .dtb have to do with whether or not to use a
+> multi-mach kernel? We package zImage/uImage and .dtbs separately, so
+> surely the multi_v7_defconfig should be kept working with Tegra devices.
+> Appending a .dtb only comes into play for preparing installation images.
 
-I replied already in another thread. I don't think we need this bit at
-all.
+When appending a dtb the kernel image must also be built with
+CONFIG_ARM_APPENDED_DTB, which I guess is not an option we want to add
+by default to Tegra and probably even less to multi_v7. So since the
+kernel config needs to be changed anyway, I thought we would always
+want to use tegra_defconfig as a basis for these devices.
 
-> Should I get it in -tip so borkage and fix come in through the same
-> tree, or what's the preferred routing?
-
-Whatever it's easier for you.
-
--- 
-Catalin
+Not that adding CONFIG_FRAMEBUFFER_CONSOLE_ROTATION to multi_v7 would
+inflate the resulting kernel much, though.
