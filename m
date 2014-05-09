@@ -1,58 +1,125 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 9 May 2014 17:22:40 +0100
-Subject: [PATCH 0/8] arm64 kexec kernel patches
-In-Reply-To: <cover.1399594544.git.geoff@infradead.org>
-References: <cover.1399594544.git.geoff@infradead.org>
-Message-ID: <20140509162240.GC16418@e106331-lin.cambridge.arm.com>
+Date: Fri, 9 May 2014 17:32:43 +0100
+Subject: [PATCHv4 1/2] dt/bindings: Add the DT binding documentation
+ for endianness
+In-Reply-To: <1399601073-19278-2-git-send-email-Li.Xiubo@freescale.com>
+References: <1399601073-19278-1-git-send-email-Li.Xiubo@freescale.com>
+ <1399601073-19278-2-git-send-email-Li.Xiubo@freescale.com>
+Message-ID: <20140509163243.GD16418@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 09, 2014 at 01:48:17AM +0100, Geoff Levand wrote:
-> Hi Maintainers,
+On Fri, May 09, 2014 at 03:04:32AM +0100, Xiubo Li wrote:
+> Device-Tree binding for device endianness
 > 
-> This patchset adds support for kexec re-boots on arm64.  I have tested with the 
-> VE fast model using various kernel config options with both spin and psci enable 
-> methods.  I'll continue to test in the coming weeks.
+> The endianness mode of CPU & Device scenarios:
+> Index    CPU       Device     Endianness properties
+> ------------------------------------------------------------
+> 1        LE        LE         -
+> 2        LE        BE         'big-endian{,-*}'
+> 3        BE        BE         -
+> 4        BE        LE         'little-endian{,-*}'
 > 
-> I tried to re-use the existing hot plug cpu_ops support for the secondary CPU 
-> shutdown as much as possible, but needed to do some things specific to kexec 
-> that I couldn't do with what was already there.  A significant change is in 
-> [PATCH 4/8] (arm64: Add smp_spin_table_set_die) where I add the ability to setup 
-> a custom cpu_die handler.
-> 
-> To get the the spin-table secondary CPUs into the proper state described in 
-> Documentation/arm64/booting.txt I use a three step spin loop.  First in the 
-> kernel's virtual address space, then to the identity mapped address, then jump 
-> to the final spin code in the 2nd stage kernel's /memreserve/ area.  To support 
-> this three step spin I needed [PATCH 5/8] (arm64: Split soft_restart into two 
-> stages).  Please see the patch comments for more info.  If we added the 2nd 
-> stage kernel's /memreserve/ area to the identity map we could eliminate the 
-> middle step and go from the VA space to the /memreserve/ area directly.
+> {big,little}-endian{,-*}: these are boolean properties, if absent
+> meaning that the CPU and the Device are in the same endianness mode.
 
-As I've covered in my reply to patch 7 [1] I don't think this is a good
-approach. I think a vastly better approach is to make kexec depend on
-cpu hotplug support in SMP, and enable a simple hotplug-capable boot
-protocol (e.g. extend spin-table with a cpu-return-addr).
+That's not really true though. A device might usually be little-endian,
+regardless of the endianness of a CPU. Some vendors may integrate it as
+big-endian after a binding is added, and in the absence of a specified
+endianness a driver is likely to assume LE.
 
-That way the in-kernel portions of kexec can use the existing
-infrastructure without tonnes of point hacks, and we enable a generic
-hotplug capable mechanism for those systems which cannot implement PSCI.
+I am not keen on stating in such a generic document that the device is
+the same endianness as the CPU. As some CPUs can change endianness
+dynamically it's meaningless to say so.
 
 > 
-> Please consider all patches for inclusion.  Any comments or suggestions on how 
-> to improve would be very welcome.
+> Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
+> ---
+>  .../devicetree/bindings/endianness/endianness.txt  | 48 ++++++++++++++++++++++
+>  1 file changed, 48 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/endianness/endianness.txt
 > 
-> To load a kexec kernel and execute a kexec re-boot on arm64 my patches to
-> kexec-tools, which have not yet been merged upstream, are needed:
-> 
->   https://git.linaro.org/people/geoff.levand/kexec-tools.git
+> diff --git a/Documentation/devicetree/bindings/endianness/endianness.txt b/Documentation/devicetree/bindings/endianness/endianness.txt
+> new file mode 100644
+> index 0000000..cc5f7f8
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/endianness/endianness.txt
+> @@ -0,0 +1,48 @@
+> +Device-Tree binding for device endianness
+> +
+> +The endianness mode of CPU & Device scenarios:
+> +Index    CPU       Device     Endianness properties
+> +------------------------------------------------------------
+> +1        LE        LE         -
+> +2        LE        BE         'big-endian{,-*}'
+> +3        BE        BE         -
+> +4        BE        LE         'little-endian{,-*}'
+> +
+> +For one device driver, which will run in different scenarios above
+> +on different SoCs using the devicetree, we need one way to simplify
+> +this.
+> +
+> +Required properties:
+> +- {big,little}-endian{,-*}: these are boolean properties, if absent
+> +  meaning that the CPU and the Device are in the same endianness mode.
 
-Is the master branch up-to-date?  The commit dates on all branches I can
-see imply they haven't been updated in a while, and the code looks like
-it needs some cleanup (there are some unused functions, hard-coded
-values, etc).
+As stated above, I disagree with this statement.
+
+The endianness of the CPU should have nothing to do with the device
+description. The DT should not consider the endianness of the CPU at all
+because this can be a dynamic property of the system.  The kernel knows
+which endianness the CPU is in, and in some cases the kernel will have
+explicitly changed the endianness of the CPU.
+
+All this document needs to say is that if a device may be integrated
+with little-endian or big-endian registers, the preferred way to
+distinguish between these cases is with a boolean big-endian or
+little-endian property. Whether this is required and what the default
+happens to be is entirely binding specific.
+
+For those cases where the endianness of sub-componenets may vary (i.e. a
+single regsiter may vary endianness, or a whole sub-block), then
+big-endian-* and little-endian-* properties are the preferred way to
+describe this.
+
+This definitely cannot be required in general. We already have bindings
+which optionally use this style of property.
 
 Cheers,
 Mark.
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/254819.html
+> +
+> +Examples:
+> +Scenario 1 : CPU in LE mode & device in LE mode.
+> +dev: dev at 40031000 {
+> +	      compatible = "name";
+> +	      reg = <0x40031000 0x1000>;
+> +	      ...
+> +};
+> +
+> +Scenario 2 : CPU in LE mode & device in BE mode.
+> +dev: dev at 40031000 {
+> +	      compatible = "name";
+> +	      reg = <0x40031000 0x1000>;
+> +	      ...
+> +	      big-endian{,-*};
+> +};
+> +
+> +Scenario 3 : CPU in BE mode & device in BE mode.
+> +dev: dev at 40031000 {
+> +	      compatible = "name";
+> +	      reg = <0x40031000 0x1000>;
+> +	      ...
+> +};
+> +
+> +Scenario 4 : CPU in BE mode & device in LE mode.
+> +dev: dev at 40031000 {
+> +	      compatible = "name";
+> +	      reg = <0x40031000 0x1000>;
+> +	      ...
+> +	      little-endian{,-*};
+> +};
+> -- 
+> 1.8.4
+> 
+> 
