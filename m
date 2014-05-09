@@ -1,116 +1,42 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 9 May 2014 14:56:19 +0300
-Subject: [PATCH 11/11] ARM: dts: omap5-uevm.dts: add display nodes
-In-Reply-To: <1399636579-8062-1-git-send-email-tomi.valkeinen@ti.com>
-References: <1399636579-8062-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1399636579-8062-12-git-send-email-tomi.valkeinen@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 9 May 2014 19:56:56 +0800
+Subject: [PATCH 2/6] ARM: dts: i.MX25: remove disabled property of
+ usbmisc unit
+In-Reply-To: <1399615879-30781-3-git-send-email-s.hauer@pengutronix.de>
+References: <1399615879-30781-1-git-send-email-s.hauer@pengutronix.de>
+ <1399615879-30781-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20140509115654.GF2870@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-omap5-uevm has a single HDMI output. Add the necessary display
-information, including pinmuxing.
+On Fri, May 09, 2014 at 08:11:15AM +0200, Sascha Hauer wrote:
+> It's a unit only used by the usb devices. No need to enable them
+> manually.
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  arch/arm/boot/dts/imx25.dtsi | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+> index 83fdda3..bd3ac9b 100644
+> --- a/arch/arm/boot/dts/imx25.dtsi
+> +++ b/arch/arm/boot/dts/imx25.dtsi
+> @@ -520,7 +520,6 @@
+>  				clocks = <&clks 9>, <&clks 70>, <&clks 8>;
+>  				clock-names = "ipg", "ahb", "per";
+>  				reg = <0x53ff4600 0x00f>;
+> -				status = "disabled";
 
-Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
----
- arch/arm/boot/dts/omap5-uevm.dts | 82 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 82 insertions(+)
+I already queued a patch from Fabio, which has this change.
 
-diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
-index 76877516f6df..9ffbe71b88c3 100644
---- a/arch/arm/boot/dts/omap5-uevm.dts
-+++ b/arch/arm/boot/dts/omap5-uevm.dts
-@@ -183,6 +183,19 @@
- 		>;
- 	};
- 
-+	dss_hdmi_pins: pinmux_dss_hdmi_pins {
-+		pinctrl-single,pins = <
-+			0x0fc (PIN_INPUT_PULLUP | MUX_MODE0)	/* hdmi_cec.hdmi_cec */
-+			0x100 (PIN_INPUT | MUX_MODE0)	/* hdmi_ddc_scl.hdmi_ddc_scl */
-+			0x102 (PIN_INPUT | MUX_MODE0)	/* hdmi_ddc_sda.hdmi_ddc_sda */
-+		>;
-+	};
-+
-+	tpd12s015_pins: pinmux_tpd12s015_pins {
-+		pinctrl-single,pins = <
-+			0x0fe (PIN_INPUT_PULLDOWN | MUX_MODE6)	/* hdmi_hpd.gpio7_193 */
-+		>;
-+	};
- };
- 
- &omap5_pmx_wkup {
-@@ -498,3 +511,72 @@
- &cpu0 {
- 	cpu0-supply = <&smps123_reg>;
- };
-+
-+/ {
-+	aliases {
-+		display0 = &hdmi0;
-+	};
-+
-+	tpd12s015: encoder at 0 {
-+		compatible = "ti,tpd12s015";
-+
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&tpd12s015_pins>;
-+
-+		gpios = <&gpio9 0 GPIO_ACTIVE_HIGH>,	/* TCA6424A P01, CT CP HPD */
-+			<&gpio9 1 GPIO_ACTIVE_HIGH>,	/* TCA6424A P00, LS OE */
-+			<&gpio7 1 GPIO_ACTIVE_HIGH>;	/* GPIO 193, HPD */
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+
-+				tpd12s015_in: endpoint at 0 {
-+					remote-endpoint = <&hdmi_out>;
-+				};
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+
-+				tpd12s015_out: endpoint at 0 {
-+					remote-endpoint = <&hdmi_connector_in>;
-+				};
-+			};
-+		};
-+	};
-+
-+	hdmi0: connector at 0 {
-+		compatible = "hdmi-connector";
-+		label = "hdmi";
-+
-+		type = "b";
-+
-+		port {
-+			hdmi_connector_in: endpoint {
-+				remote-endpoint = <&tpd12s015_out>;
-+			};
-+		};
-+	};
-+};
-+
-+&dss {
-+	status = "ok";
-+};
-+
-+&hdmi {
-+	status = "ok";
-+	vdda-supply = <&ldo4_reg>;
-+
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&dss_hdmi_pins>;
-+
-+	port {
-+		hdmi_out: endpoint {
-+			remote-endpoint = <&tpd12s015_in>;
-+		};
-+	};
-+};
--- 
-1.9.1
+https://git.kernel.org/cgit/linux/kernel/git/shawnguo/linux.git/commit/?h=imx/dt&id=f415153c0ecaae1f4515df35d2c6d055ed97909c
+
+Shawn
+
+>  			};
+>  
+>  			dryice at 53ffc000 {
+> -- 
+> 2.0.0.rc0
+> 
