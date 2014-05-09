@@ -1,32 +1,36 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 9 May 2014 14:56:16 +0300
-Subject: [PATCH 08/11] ARM: dts: omap5-clocks.dtsi: add ti,
- set-rate-parent to dss_dss_clk
+Date: Fri, 9 May 2014 14:56:18 +0300
+Subject: [PATCH 10/11] ARM: dts: omap5-uevm.dts: add tca6424a
 In-Reply-To: <1399636579-8062-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1399636579-8062-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1399636579-8062-9-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1399636579-8062-11-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ti,set-rate-parent to dss_dss_clk so that the DSS driver can
-set the rate.
+omap5-uevm has a tca6424a I/O expander. Add it to the .dts file.
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 ---
- arch/arm/boot/dts/omap54xx-clocks.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/omap5-uevm.dts | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap54xx-clocks.dtsi b/arch/arm/boot/dts/omap54xx-clocks.dtsi
-index 26c02f9e92c4..b53ca885c021 100644
---- a/arch/arm/boot/dts/omap54xx-clocks.dtsi
-+++ b/arch/arm/boot/dts/omap54xx-clocks.dtsi
-@@ -859,6 +859,7 @@
- 		clocks = <&dpll_per_h12x2_ck>;
- 		ti,bit-shift = <8>;
- 		reg = <0x1420>;
-+		ti,set-rate-parent;
- 	};
+diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
+index 3b99ec25b748..76877516f6df 100644
+--- a/arch/arm/boot/dts/omap5-uevm.dts
++++ b/arch/arm/boot/dts/omap5-uevm.dts
+@@ -434,6 +434,13 @@
+ 	pinctrl-0 = <&i2c5_pins>;
  
- 	dss_sys_clk: dss_sys_clk {
+ 	clock-frequency = <400000>;
++
++	gpio9: gpio at 22 {
++		compatible = "ti,tca6424";
++		reg = <0x22>;
++		gpio-controller;
++		#gpio-cells = <2>;
++	};
+ };
+ 
+ &mcbsp3 {
 -- 
 1.9.1
