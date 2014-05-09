@@ -1,47 +1,101 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Fri,  9 May 2014 18:30:10 +0530
-Subject: [PATCH 4/4] ARM: dts: Add pmu-syscon handle for Exynos5420/Exynos5250
- clock
-In-Reply-To: <1399640410-30957-1-git-send-email-tushar.behera@linaro.org>
-References: <1399640410-30957-1-git-send-email-tushar.behera@linaro.org>
-Message-ID: <1399640410-30957-5-git-send-email-tushar.behera@linaro.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 9 May 2014 15:03:11 +0200
+Subject: [PATCH v3] ARM: at91: fix startup rtc irq mask for sam9g25 and
+ sam9g35 SoCs
+In-Reply-To: <1399633297-6813-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1399633297-6813-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <536CD20F.2000704@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-XCLKOUT in Exynos5420/Exynos5250 is controlled through a register in
-PMU domain. Pass pmu-syscon handle to the clock driver so that XCLKOUT
-can be properly configured.
+On 09/05/2014 13:01, Boris BREZILLON :
+> The sam9g25 and sam9g35 have the following errata:
 
-Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
-CC: Kukjin Kim <kgene.kim@samsung.com>
----
- arch/arm/boot/dts/exynos5250.dtsi |    1 +
- arch/arm/boot/dts/exynos5420.dtsi |    1 +
- 2 files changed, 2 insertions(+)
+Cf. below...
 
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index 3742331..214db94 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -86,6 +86,7 @@
- 		compatible = "samsung,exynos5250-clock";
- 		reg = <0x10010000 0x30000>;
- 		#clock-cells = <1>;
-+		samsung,pmu-syscon = <&pmu_system_controller>;
- 	};
- 
- 	clock_audss: audss-clock-controller at 3810000 {
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index c3a9a66..489bd08 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -114,6 +114,7 @@
- 		compatible = "samsung,exynos5420-clock";
- 		reg = <0x10010000 0x30000>;
- 		#clock-cells = <1>;
-+		samsung,pmu-syscon = <&pmu_system_controller>;
- 	};
- 
- 	clock_audss: audss-clock-controller at 3810000 {
+> "RTC: Interrupt Mask Register cannot be used
+>  Interrupt Mask Register read always returns 0."
+> 
+> Hence we should not rely on what IMR claims about already masked irqs
+> and just disable all the IRQs.
+> 
+> Cc: Andrew Morton <akpm@linux-foundation.org>
+> Cc: <stable@vger.kernel.org> # v3.10+
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> ---
+> Hello,
+> 
+> Sorry for the noise, I just forgot to remove the mask variable in my
+> previous version.
+> 
+> Best Regards,
+> 
+> Boris
+> 
+> Changes since v2:
+> - removed unused variable 'mask'
+> Changes since v1:
+> - use a macro to define IRQs bitmask
+> - read IMR register to ensure the write to IDR has been flushed
+> - quote atmel's datasheet errata in commit message
+> - comment the code to describe why we're not using IMR to disable
+>   the interrupts
+> 
+>  arch/arm/mach-at91/sysirq_mask.c | 22 +++++++++++++---------
+>  1 file changed, 13 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/sysirq_mask.c b/arch/arm/mach-at91/sysirq_mask.c
+> index 2ba694f..1527dda 100644
+> --- a/arch/arm/mach-at91/sysirq_mask.c
+> +++ b/arch/arm/mach-at91/sysirq_mask.c
+> @@ -25,24 +25,28 @@
+>  
+>  #include "generic.h"
+>  
+> -#define AT91_RTC_IDR	0x24	/* Interrupt Disable Register */
+> -#define AT91_RTC_IMR	0x28	/* Interrupt Mask Register */
+> +#define AT91_RTC_IDR		0x24	/* Interrupt Disable Register */
+> +#define AT91_RTC_IMR		0x28	/* Interrupt Mask Register */
+> +#define AT91_RTC_IRQ_MASK	0x1f	/* Available IRQs mask */
+>  
+>  void __init at91_sysirq_mask_rtc(u32 rtc_base)
+>  {
+>  	void __iomem *base;
+> -	u32 mask;
+>  
+>  	base = ioremap(rtc_base, 64);
+>  	if (!base)
+>  		return;
+>  
+> -	mask = readl_relaxed(base + AT91_RTC_IMR);
+> -	if (mask) {
+> -		pr_info("AT91: Disabling rtc irq\n");
+> -		writel_relaxed(mask, base + AT91_RTC_IDR);
+> -		(void)readl_relaxed(base + AT91_RTC_IMR);	/* flush */
+> -	}
+> +	/*
+> +	 * The sam9g25 and sam9g35 have the following errata:
+
+Actually all chips in what we call the "5 series" or "sam9x5" (sam9g15,
+sam9g25, sam9x25, sam9g35 and sam9x35). And... no, the sam9g45 is not
+part of that series ;-)
+
+> +	 * "RTC: Interrupt Mask Register cannot be used
+> +	 *  Interrupt Mask Register read always returns 0."
+> +	 *
+> +	 * Hence we're not relying on IMR values to disable
+> +	 * interrupts.
+> +	 */
+> +	writel_relaxed(AT91_RTC_IRQ_MASK, base + AT91_RTC_IDR);
+> +	(void)readl_relaxed(base + AT91_RTC_IMR);	/* flush */
+>  
+>  	iounmap(base);
+>  }
+
+Okay for me (maybe change the comment as it can puzzle some users):
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Thanks, bye,
 -- 
-1.7.9.5
+Nicolas Ferre
