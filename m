@@ -1,52 +1,67 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Fri, 9 May 2014 12:36:20 +0530
-Subject: [PATCH] mdio_bus: fix devm_mdiobus_alloc_size export
-In-Reply-To: <1399560433-1402630-2-git-send-email-arnd@arndb.de>
-References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
- <1399560433-1402630-2-git-send-email-arnd@arndb.de>
-Message-ID: <CA+V-a8vt5=MB8SipxRKc99hLaXt8m=3UmSBLRCX20M0c1jcJLA@mail.gmail.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 9 May 2014 10:07:19 +0300
+Subject: [PATCH 4/4] ARM: dts: Add LCD panel sharp ls037v7dw01 support
+ for omap3-evm and ldp
+In-Reply-To: <20140508233628.GJ2198@atomide.com>
+References: <1398815562-24113-1-git-send-email-tony@atomide.com>
+ <1398815562-24113-5-git-send-email-tony@atomide.com>
+ <CAGhQ9Vwa8xXQEo5dNEKAvmaS9DoBjVSthtd8=owk+atVdFuiiA@mail.gmail.com>
+ <20140430174751.GA12362@atomide.com> <20140505183919.GA15463@atomide.com>
+ <20140508233628.GJ2198@atomide.com>
+Message-ID: <536C7EA7.5000306@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 8, 2014 at 8:16 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> commit 6d48f44b7b2 "mdio_bus: implement devm_mdiobus_alloc/devm_mdiobus_free"
-> introduced a new function devm_mdiobus_alloc_size() but added an export
-> for a different function devm_mdiobus_alloc(), which was obviously
-> a simple mistake that leads to  build error whenever this function is
-> used from a loadable module:
->
-> ERROR: "devm_mdiobus_alloc_size" [drivers/net/ethernet/ti/davinci_mdio.ko] undefined!
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Grygorii Strashko <grygorii.strashko@ti.com>
-> Cc: Florian Fainelli <f.fainelli@gmail.com>
-> Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Cc: Lad, Prabhakar <prabhakar.csengg@gmail.com>
-> Cc: David S. Miller <davem@davemloft.net>
-> Cc: netdev at vger.kernel.org
+On 09/05/14 02:36, Tony Lindgren wrote:
 
-Acked-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/omap-panel-sharp-ls037v7dw01.dtsi
+> @@ -0,0 +1,82 @@
+> +/*
+> + * Common file for omap dpi panels with QVGA and reset pins
+> + *
+> + * Note that the board specifc DTS file needs to specify
+> + * at minimum the GPIO enable-gpios for display, and
+> + * gpios for gpio-backlight.
+> + */
 
-Thanks,
---Prabhakar Lad
+This looks very board specific to me... The regulator and the use of
+mcspi1 depend on the board, so this file can't be used on just any omap
+board with the same panel. And this can (probably) only be used on
+boards with a single display. Do those boards have tv-out?
 
-> ---
->  drivers/net/phy/mdio_bus.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/net/phy/mdio_bus.c b/drivers/net/phy/mdio_bus.c
-> index 68a9a38..a628496 100644
-> --- a/drivers/net/phy/mdio_bus.c
-> +++ b/drivers/net/phy/mdio_bus.c
-> @@ -117,7 +117,7 @@ struct mii_bus *devm_mdiobus_alloc_size(struct device *dev, int sizeof_priv)
->
->         return bus;
->  }
-> -EXPORT_SYMBOL_GPL(devm_mdiobus_alloc);
-> +EXPORT_SYMBOL_GPL(devm_mdiobus_alloc_size);
->
->  /**
->   * devm_mdiobus_free - Resource-managed mdiobus_free()
-> --
-> 1.8.3.2
->
+So I have nothing against having common files, but shouldn't this be
+named something more specific? If the boards involved are TI's OMAP3
+development boards, maybe this should be something like...
+omap3-ti-dev-panel-sharp-ls037v7dw01.dtsi. Well, that's a quite long one.
+
+> +/ {
+> +	aliases {
+> +		display0 = &lcd0;
+> +	};
+> +
+> +	backlight0: backlight {
+> +		compatible = "gpio-backlight";
+> +	};
+> +
+> +	/* 3.3V GPIO controlled regulator for LCD_ENVDD */
+> +	lcd_3v3: regulator-lcd-3v3 {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "lcd_3v3";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		startup-delay-us = <70000>;
+> +		regulator-always-on;
+
+Why always-on?
+
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140509/5a61a5c8/attachment.sig>
