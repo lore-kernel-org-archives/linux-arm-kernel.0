@@ -1,33 +1,30 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 9 May 2014 18:09:46 +0100
-Subject: [RFC][PATCH 6/8] sched,idle: Avoid spurious wakeup IPIs
-In-Reply-To: <20140509170649.GG13658@twins.programming.kicks-ass.net>
-References: <20140411134243.160989490@infradead.org>
- <20140411135218.478299389@infradead.org>
- <CAAG0J9_q1KsUx10-XAb7AJnxv2ehctg6q1KME7ahsk1OZV8vZQ@mail.gmail.com>
- <20140509141520.GV2844@laptop.programming.kicks-ass.net>
- <20140509144034.GF7950@arm.com>
- <20140509145002.GW2844@laptop.programming.kicks-ass.net>
- <20140509145745.GI7950@arm.com>
- <20140509170234.GZ30445@twins.programming.kicks-ass.net>
- <20140509170649.GG13658@twins.programming.kicks-ass.net>
-Message-ID: <20140509170946.GN7950@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 9 May 2014 18:11:20 +0100
+Subject: [PATCH 1/3] arm64: Enable OPP
+In-Reply-To: <CAGo_u6rGEWwywQ5JKh1ROhkOjrkWrM35PdWAooed26oak=1irA@mail.gmail.com>
+References: <1399653631-4938-1-git-send-email-broonie@kernel.org>
+ <CAGo_u6rGEWwywQ5JKh1ROhkOjrkWrM35PdWAooed26oak=1irA@mail.gmail.com>
+Message-ID: <20140509171120.GS12304@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 09, 2014 at 06:06:49PM +0100, Peter Zijlstra wrote:
-> Subject: arm64: Remove TIF_POLLING_NRFLAG
-> From: Peter Zijlstra <peterz@infradead.org>
-> Date: Fri May  9 19:04:00 CEST 2014
-> 
-> The only idle method for arm64 is WFI and it therefore
-> unconditionally requires the reschedule interrupt when idle.
-> 
-> Suggested-by: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Peter Zijlstra <peterz@infradead.org>
+On Fri, May 09, 2014 at 12:02:12PM -0500, menon.nishanth at gmail.com wrote:
+> On Fri, May 9, 2014 at 11:40 AM, Mark Brown <broonie@kernel.org> wrote:
 
-There's a tag with my name already but just in case you need another:
+> > Some of the generic drivers used on ARM class systems use OPP so allow it
+> > to be selected in Kconfig. No code is required for this, it is not clear
+> > to me why there is config for this option.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> If you mean why we have ARCH_HAS_OPP,
+> http://lists-archives.com/linux-kernel/27401148-pm-hide-opp-configuration-when-socs-do-not-provide-an-implementation.html
 
-Thanks.
+That's for the user visible symbol but OPP is also enableable via select
+- the fix here may be to remove both the visibility check and the
+dependency.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140509/c78456a9/attachment.sig>
