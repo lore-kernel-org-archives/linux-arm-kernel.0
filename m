@@ -1,58 +1,29 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri, 09 May 2014 16:55:36 +0100
-Subject: [PATCH 1/4] mmc: sdhci: add a driver for Berlin SoCs
-In-Reply-To: <1397652011-21284-2-git-send-email-antoine.tenart@free-electrons.com>
-References: <1397652011-21284-1-git-send-email-antoine.tenart@free-electrons.com>
- <1397652011-21284-2-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <536CFA78.9050609@codethink.co.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 9 May 2014 16:57:26 +0100
+Subject: [PATCH] arm64: Support arch_irq_work_raise() via self IPIs
+In-Reply-To: <1399322907-21280-1-git-send-email-larry.bassel@linaro.org>
+References: <1399322907-21280-1-git-send-email-larry.bassel@linaro.org>
+Message-ID: <20140509155726.GK7950@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/04/14 13:40, Antoine T?nart wrote:
-> Add a Driver to support the SDHCI controller of the Marvell Berlin SoCs.
-> This controller supports 3 sockets.
+On Mon, May 05, 2014 at 09:48:27PM +0100, Larry Bassel wrote:
+> Support for arch_irq_work_raise() was missing from
+> arm64 (a prerequisite for FULL_NOHZ).
+> 
+> This patch is based on the arm32 patch ARM 7872/1
+> which ports cleanly.
+[...]
+> +#ifdef CONFIG_IRQ_WORK
+> +void arch_irq_work_raise(void)
+> +{
+> +	smp_cross_call(cpumask_of(smp_processor_id()), IPI_IRQ_WORK);
+> +}
+> +#endif
 
-[snip]
-
-> +
-> +static struct sdhci_ops sdhci_berlin_ops = {
-> +	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
-> +};
-> +
-> +static struct sdhci_pltfm_data sdhci_berlin2_pdata = {
-> +	.quirks	= SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN |
-> +		  SDHCI_QUIRK_BROKEN_ADMA |
-> +		  SDHCI_QUIRK_BROKEN_TIMEOUT_VAL,
-> +	.ops = &sdhci_berlin_ops,
-> +};
-> +
-> +static struct sdhci_pltfm_data sdhci_berlin2q_pdata = {
-> +	.quirks	= SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN |
-> +		  SDHCI_QUIRK_INVERTED_WRITE_PROTECT |
-> +		  SDHCI_QUIRK_BROKEN_TIMEOUT_VAL,
-> +	.ops = &sdhci_berlin_ops,
-> +};
-> +
-> +static const struct of_device_id sdhci_berlin_of_match_table[] = {
-> +	{
-> +		.compatible = "marvell,berlin2-sdhci",
-> +		.data = &sdhci_berlin2_pdata,
-> +	},
-> +	{
-> +		.compatible = "marvell,berlin2cd-sdhci",
-> +		.data = &sdhci_berlin2_pdata,
-> +	},
-> +	{
-> +		.compatible = "marvell,berlin2q-sdhci",
-> +		.data = &sdhci_berlin2q_pdata,
-> +	},
-> +	{}
-
-I think the hardware names should be used instead of the
-quirks the hardware has (broken wp / broken adma)
-
-
+There was a subsequent patch adding is_smp() check here (c682e51dbc98
+ARM: 7887/1: Don't smp_cross_call() on UP devices in
+arch_irq_work_raise()). Don't we need it?
 
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Catalin
