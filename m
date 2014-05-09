@@ -1,35 +1,38 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 9 May 2014 14:56:12 +0300
-Subject: [PATCH 04/11] ARM: dts: am437x-gp-evm: add LCD data
+Date: Fri, 9 May 2014 14:56:13 +0300
+Subject: [PATCH 05/11] ARM: dts: am43x-epos-evm: add LCD data
 In-Reply-To: <1399636579-8062-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1399636579-8062-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1399636579-8062-5-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1399636579-8062-6-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sathya Prakash M R <sathyap@ti.com>
+Add DT data for am43x-epos-evm's LCD panel.
 
-Add DT data for am437x-gp-evm's LCD panel.
-
-Signed-off-by: Sathya Prakash M R <sathyap@ti.com>
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 ---
- arch/arm/boot/dts/am437x-gp-evm.dts | 97 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 97 insertions(+)
+ arch/arm/boot/dts/am43x-epos-evm.dts | 101 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 101 insertions(+)
 
-diff --git a/arch/arm/boot/dts/am437x-gp-evm.dts b/arch/arm/boot/dts/am437x-gp-evm.dts
-index df8798e8bd25..350e896a0d89 100644
---- a/arch/arm/boot/dts/am437x-gp-evm.dts
-+++ b/arch/arm/boot/dts/am437x-gp-evm.dts
-@@ -53,6 +53,48 @@
- 				0x02000069      /* LEFT */
- 				0x0201006c>;      /* DOWN */
- 		};
-+
+diff --git a/arch/arm/boot/dts/am43x-epos-evm.dts b/arch/arm/boot/dts/am43x-epos-evm.dts
+index 167dbc8494de..9aa5af71f96f 100644
+--- a/arch/arm/boot/dts/am43x-epos-evm.dts
++++ b/arch/arm/boot/dts/am43x-epos-evm.dts
+@@ -19,6 +19,10 @@
+ 	model = "TI AM43x EPOS EVM";
+ 	compatible = "ti,am43x-epos-evm","ti,am4372","ti,am43";
+ 
 +	aliases {
 +		display0 = &lcd0;
 +	};
 +
+ 	vmmcsd_fixed: fixedregulator-sd {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "vmmcsd_fixed";
+@@ -27,6 +31,44 @@
+ 		enable-active-high;
+ 	};
+ 
 +	lcd0: display {
 +		compatible = "osddisplays,osd057T0559-34ts", "panel-dpi";
 +		label = "lcd";
@@ -43,7 +46,7 @@ index df8798e8bd25..350e896a0d89 100644
 +		 * support to switch between two displays, so using this gpio as
 +		 * panel's enable should be safe.
 +		 */
-+		enable-gpios = <&gpio5 8 GPIO_ACTIVE_HIGH>;
++		enable-gpios = <&gpio2 1 GPIO_ACTIVE_HIGH>;
 +
 +		panel-timing {
 +			clock-frequency = <33000000>;
@@ -67,61 +70,73 @@ index df8798e8bd25..350e896a0d89 100644
 +			};
 +		};
 +	};
- };
- 
- &am43xx_pinmux {
-@@ -81,6 +123,47 @@
- 			0x164 MUX_MODE0       /* eCAP0_in_PWM0_out.eCAP0_in_PWM0_out MODE0 */
- 		>;
++
+ 	am43xx_pinmux: pinmux at 44e10800 {
+ 		cpsw_default: cpsw_default {
+ 			pinctrl-single,pins = <
+@@ -138,6 +180,46 @@
+ 				0x160 (PIN_INPUT | MUX_MODE7) /* spi0_cs1.gpio0_6 */
+ 			>;
+ 		};
++
++		dss_pins: dss_pins {
++			pinctrl-single,pins = <
++				0x020 (PIN_OUTPUT_PULLUP | MUX_MODE1) /*gpmc ad 8 -> DSS DATA 23 */
++				0x024 (PIN_OUTPUT_PULLUP | MUX_MODE1)
++				0x028 (PIN_OUTPUT_PULLUP | MUX_MODE1)
++				0x02C (PIN_OUTPUT_PULLUP | MUX_MODE1)
++				0x030 (PIN_OUTPUT_PULLUP | MUX_MODE1)
++				0x034 (PIN_OUTPUT_PULLUP | MUX_MODE1)
++				0x038 (PIN_OUTPUT_PULLUP | MUX_MODE1)
++				0x03C (PIN_OUTPUT_PULLUP | MUX_MODE1) /*gpmc ad 15 -> DSS DATA 16 */
++				0x0A0 (PIN_OUTPUT_PULLUP | MUX_MODE0) /* DSS DATA 0 */
++				0x0A4 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++				0x0A8 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++				0x0AC (PIN_OUTPUT_PULLUP | MUX_MODE0)
++				0x0B0 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++				0x0B4 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++				0x0B8 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++				0x0BC (PIN_OUTPUT_PULLUP | MUX_MODE0)
++				0x0C0 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++				0x0C4 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++				0x0C8 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++				0x0CC (PIN_OUTPUT_PULLUP | MUX_MODE0)
++				0x0D0 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++				0x0D4 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++				0x0D8 (PIN_OUTPUT_PULLUP | MUX_MODE0)
++				0x0DC (PIN_OUTPUT_PULLUP | MUX_MODE0) /* DSS DATA 15 */
++				0x0E0 (PIN_OUTPUT_PULLUP | MUX_MODE0) /* DSS VSYNC */
++				0x0E4 (PIN_OUTPUT_PULLUP | MUX_MODE0) /* DSS HSYNC */
++				0x0E8 (PIN_OUTPUT_PULLUP | MUX_MODE0) /* DSS PCLK */
++				0x0EC (PIN_OUTPUT_PULLUP | MUX_MODE0) /* DSS AC BIAS EN */
++			>;
++		};
++
++		lcd_pins: lcd_pins {
++			pinctrl-single,pins = <
++				/* GPMC CLK -> GPIO 2_1 to select LCD / HDMI */
++				0x08C (PIN_OUTPUT_PULLUP | MUX_MODE7)
++			>;
++		};
  	};
-+
-+	dss_pins: dss_pins {
-+		pinctrl-single,pins = <
-+			0x020 (PIN_OUTPUT_PULLUP | MUX_MODE1) /*gpmc ad 8 -> DSS DATA 23 */
-+			0x024 (PIN_OUTPUT_PULLUP | MUX_MODE1)
-+			0x028 (PIN_OUTPUT_PULLUP | MUX_MODE1)
-+			0x02c (PIN_OUTPUT_PULLUP | MUX_MODE1)
-+			0x030 (PIN_OUTPUT_PULLUP | MUX_MODE1)
-+			0x034 (PIN_OUTPUT_PULLUP | MUX_MODE1)
-+			0x038 (PIN_OUTPUT_PULLUP | MUX_MODE1)
-+			0x03c (PIN_OUTPUT_PULLUP | MUX_MODE1) /*gpmc ad 15 -> DSS DATA 16 */
-+			0x0a0 (PIN_OUTPUT_PULLUP | MUX_MODE0) /* DSS DATA 0 */
-+			0x0a4 (PIN_OUTPUT_PULLUP | MUX_MODE0)
-+			0x0a8 (PIN_OUTPUT_PULLUP | MUX_MODE0)
-+			0x0ac (PIN_OUTPUT_PULLUP | MUX_MODE0)
-+			0x0b0 (PIN_OUTPUT_PULLUP | MUX_MODE0)
-+			0x0b4 (PIN_OUTPUT_PULLUP | MUX_MODE0)
-+			0x0b8 (PIN_OUTPUT_PULLUP | MUX_MODE0)
-+			0x0bc (PIN_OUTPUT_PULLUP | MUX_MODE0)
-+			0x0c0 (PIN_OUTPUT_PULLUP | MUX_MODE0)
-+			0x0c4 (PIN_OUTPUT_PULLUP | MUX_MODE0)
-+			0x0c8 (PIN_OUTPUT_PULLUP | MUX_MODE0)
-+			0x0cc (PIN_OUTPUT_PULLUP | MUX_MODE0)
-+			0x0d0 (PIN_OUTPUT_PULLUP | MUX_MODE0)
-+			0x0d4 (PIN_OUTPUT_PULLUP | MUX_MODE0)
-+			0x0d8 (PIN_OUTPUT_PULLUP | MUX_MODE0)
-+			0x0dc (PIN_OUTPUT_PULLUP | MUX_MODE0) /* DSS DATA 15 */
-+			0x0e0 (PIN_OUTPUT_PULLUP | MUX_MODE0) /* DSS VSYNC */
-+			0x0e4 (PIN_OUTPUT_PULLUP | MUX_MODE0) /* DSS HSYNC */
-+			0x0e8 (PIN_OUTPUT_PULLUP | MUX_MODE0) /* DSS PCLK */
-+			0x0ec (PIN_OUTPUT_PULLUP | MUX_MODE0) /* DSS AC BIAS EN */
-+
-+		>;
-+	};
-+
-+	lcd_pins: lcd_pins {
-+		pinctrl-single,pins = <
-+			/* GPIO 5_8 to select LCD / HDMI */
-+			0x238 (PIN_OUTPUT_PULLUP | MUX_MODE7)
-+		>;
-+	};
+ 
+ 	matrix_keypad: matrix_keypad at 0 {
+@@ -260,6 +342,10 @@
+ 	status = "okay";
  };
  
- &i2c0 {
-@@ -125,3 +208,17 @@
- 	pinctrl-0 = <&mmc1_pins>;
- 	cd-gpios = <&gpio0 6 GPIO_ACTIVE_HIGH>;
++&gpio5 {
++	status = "okay";
++};
++
+ &elm {
+ 	status = "okay";
  };
+@@ -367,3 +453,18 @@
+ 	pinctrl-0 = <&spi1_pins>;
+ 	status = "okay";
+ };
++
 +
 +&dss {
 +	status = "ok";
