@@ -1,105 +1,141 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Fri,  9 May 2014 19:27:57 +0530
-Subject: [PATCH v8 2/2] phy: exynos5-usbdrd: Add facility for VBUS supply
-In-Reply-To: <1399643877-14528-1-git-send-email-gautam.vivek@samsung.com>
-References: <1399643877-14528-1-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <1399643877-14528-2-git-send-email-gautam.vivek@samsung.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 9 May 2014 09:00:52 -0500
+Subject: [PATCH 3/5] irqchip: crossbar: Skip some irqs from getting mapped
+ to crossbar
+In-Reply-To: <536CDBDF.10600@ti.com>
+References: <1399299527-10955-1-git-send-email-r.sricharan@ti.com>	<1399299527-10955-4-git-send-email-r.sricharan@ti.com>	<536BD9D8.4080905@ti.com>	<20140508203659.GA5620@kahuna>	<CAD=GYpbQQxQgKd3oZcAuWrxoD4VrkKzpybd11qwxs405HSUVGw@mail.gmail.com>	<536C0DC4.7090309@ti.com>	<CAD=GYpav4mHaqo4jfb0ePchf3cvuvSnFKj_+osbrt_8-tYRRrQ@mail.gmail.com>	<536C2071.8040502@ti.com>
+ <CAD=GYpbRn=LEthpAUX9LNBGTB4iDs7TGiSSgLJuuS0tSatRRJQ@mail.gmail.com>
+ <536CD01F.2070506@ti.com> <536CD7BE.5020407@ti.com> <536CD9DB.4010508@ti.com>
+ <536CDBDF.10600@ti.com>
+Message-ID: <536CDF94.7000900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding support to enable/disable VBUS controlled by a
-regulator, to enable vbus supply on the port.
+On 05/09/2014 08:45 AM, Santosh Shilimkar wrote:
+> On Friday 09 May 2014 09:36 AM, Nishanth Menon wrote:
+>> On 05/09/2014 08:27 AM, Santosh Shilimkar wrote:
+>>> On Friday 09 May 2014 08:54 AM, Nishanth Menon wrote:
+>>>> On 05/08/2014 11:22 PM, Joel Fernandes wrote:
+>>>>> On Thu, May 8, 2014 at 7:25 PM, Santosh Shilimkar
+>>>>> <santosh.shilimkar@ti.com> wrote:
+>>>> [...]
+>>>>> Ok, thanks for pointing to the post.
+>>>>>
+>>>>
+>>>>
+>>>> Yep - thanks Santosh for clarifying this. Now, we still have the
+>>>> issues that I pointed out in [1] - without resolving which, we should
+>>>> not enable crossbar for dra74x/72x.
+>>>>
+>>>> A. taking example of PMU
+>>>> 	interrupts = <GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH>
+>>>> this wont work. instead the crossbar driver needs some sort of a hint
+>>>> to know that it should not map these on crossbar register instead
+>>>> assign GIC mapping directly.
+>>>>
+>>>> I propose doing the following
+>>>> #define GIC_CROSSBAR_PASSTHROUGH(irq_no) ((irq_no) | (0x1 << 31))
+>>>>
+>>>> and dts will define the following:
+>>>> interrupts = <GIC_SPI GIC_CROSSBAR_PASSTHROUGH(131) IRQ_TYPE_LEVEL_HIGH>
+>>>>
+>>>> This will also work for the other cases (B.2, B.3)
+>>>>
+>>>> For B.2: L3_APP_IRQ:
+>>>> instead of:
+>>>> interrupts = <GIC_SPI  5 IRQ_TYPE_LEVEL_HIGH>
+>>>> we do:
+>>>> interrupts = <GIC_SPI GIC_CROSSBAR_PASSTHROUGH(10) IRQ_TYPE_LEVEL_HIGH>
+>>>>
+>>>> For B.3: NMI
+>>>> interrupts = <GIC_SPI GIC_CROSSBAR_PASSTHROUGH(133) IRQ_TYPE_LEVEL_HIGH>
+>>>>
+>>> We can't do add a flag to generic interrupt controller flags since its
+>>> very specific to cross-bar.
+>>>
+>>>> xlate is easy ->
+>>>>
+>>>> diff --git a/drivers/irqchip/irq-crossbar.c
+>>>> b/drivers/irqchip/irq-crossbar.c
+>>>> index de021638..fd09ab4 100644
+>>>> --- a/drivers/irqchip/irq-crossbar.c
+>>>> +++ b/drivers/irqchip/irq-crossbar.c
+>>>> @@ -112,6 +112,10 @@ static int crossbar_domain_xlate(struct
+>>>> irq_domain *d,
+>>>>  {
+>>>>         unsigned long ret;
+>>>>
+>>>> +       /* Check to see if direct GIC mapping is required */
+>>>> +       if (intspec[1] & BIT(31))
+>>>> +               return intspec[1] & ~BIT[31];
+>>>> +
+>>>>         ret = get_prev_map_irq(intspec[1]);
+>>>>         if (!IS_ERR_VALUE(ret))
+>>>>                 goto found;
+>>>>
+>>>> But then, crossbar_domain_map and crossbar_domain_unmap need hints as
+>>>> well to know that there is no corresponding crossbar registers.
+>>>> Have'nt thought through that yet. Looking to hear about opinions here.
+>>>>
+>>>>
+>>> May be we need additional property like reserved to take care of 1:1
+>>> map.
+>>>
+>>> ti,irqs-direct-map = <131 132>;
+>>>
+>> We already have equivalents for these -> reserved and skip. Problem is
+>> how does crossbar driver know the difference between direct maps and
+>> crossbar value?
+>>
+>> 6 is one of those reserved ones. dts for a device says:
+>> interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>
+>>
+>>
+>> Now, xlate gets intspec[1] = 6.  6 is valid crossbar number
+>> PRM_IRQ_MPU, however GIC 6 is mapped to WD_TIMER_MPU_C1_IRQ_WARN ->
+>> you need to be able to get a hint that this is direct mapping dts
+>> intended.
+>>
+>> in the "6" example:
+>>
+>> How do i get PRM_IRQ_MPU?
+>> interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>
+>>
+>> How do I get WD_TIMER_MPU_C1_IRQ_WARN?
+>> interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH> ????? - that wont work as
+>> crossbar driver thinks it is crossbar 6 (PRM_IRQ_MPU)
+>>
+> Looks like I am missing something. Is the issue because of SPI offset (32)
+> which makes above confusion ?
 
-Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
----
+The way we modelled crossbar is that the irqchip is GIC and routable
+mapper is crossbar - which makes sense. now for every "interrupts"
+description we try to find a map using the crossbar driver as the irq
+framework rightly identifies that peripheral interrupts are routable
+and crossbar driver is the guy who knows how to map these to a proper
+GIC interrupt number. So far, we are good.
 
-Changes from v7:
- - Rebased on top of [PATCH v8 1/2] phy: Add new Exynos5 USB 3.0 PHY driver.
+Now the trouble starts when our hardware description in dts assumes
+that every peripheral interrupt is a routable interrupt - as this
+thread describes - that is NOT the case.
 
- drivers/phy/phy-exynos5-usbdrd.c |   32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+Now the question is how do you differentiate?
 
-diff --git a/drivers/phy/phy-exynos5-usbdrd.c b/drivers/phy/phy-exynos5-usbdrd.c
-index 8fcdd94..76d862b 100644
---- a/drivers/phy/phy-exynos5-usbdrd.c
-+++ b/drivers/phy/phy-exynos5-usbdrd.c
-@@ -24,6 +24,7 @@
- #include <linux/mfd/syscon.h>
- #include <linux/mfd/syscon/exynos5-pmu.h>
- #include <linux/regmap.h>
-+#include <linux/regulator/consumer.h>
- 
- /* Exynos USB PHY registers */
- #define EXYNOS5_FSEL_9MHZ6		0x0
-@@ -170,6 +171,7 @@ struct exynos5_usbdrd_phy {
- 	} phys[EXYNOS5_DRDPHYS_NUM];
- 	u32 extrefclk;
- 	struct clk *ref_clk;
-+	struct regulator *vbus;
- };
- 
- static inline
-@@ -438,6 +440,7 @@ static int exynos5_usbdrd_phy_exit(struct phy *phy)
- 
- static int exynos5_usbdrd_phy_power_on(struct phy *phy)
- {
-+	int ret;
- 	struct phy_usb_instance *inst = phy_get_drvdata(phy);
- 	struct exynos5_usbdrd_phy *phy_drd = to_usbdrd_phy(inst);
- 
-@@ -445,10 +448,24 @@ static int exynos5_usbdrd_phy_power_on(struct phy *phy)
- 
- 	clk_prepare_enable(phy_drd->ref_clk);
- 
-+	/* Enable VBUS supply */
-+	if (phy_drd->vbus) {
-+		ret = regulator_enable(phy_drd->vbus);
-+		if (ret) {
-+			dev_err(phy_drd->dev, "Failed to enable VBUS supply\n");
-+			goto fail_vbus;
-+		}
-+	}
-+
- 	/* Power-on PHY*/
- 	inst->phy_cfg->phy_isol(inst, 0);
- 
- 	return 0;
-+
-+fail_vbus:
-+	clk_disable_unprepare(phy_drd->ref_clk);
-+
-+	return ret;
- }
- 
- static int exynos5_usbdrd_phy_power_off(struct phy *phy)
-@@ -461,6 +478,10 @@ static int exynos5_usbdrd_phy_power_off(struct phy *phy)
- 	/* Power-off the PHY */
- 	inst->phy_cfg->phy_isol(inst, 1);
- 
-+	/* Disable VBUS supply */
-+	if (phy_drd->vbus)
-+		regulator_disable(phy_drd->vbus);
-+
- 	clk_disable_unprepare(phy_drd->ref_clk);
- 
- 	return 0;
-@@ -600,6 +621,17 @@ static int exynos5_usbdrd_phy_probe(struct platform_device *pdev)
- 		break;
- 	}
- 
-+	/* Get Vbus regulator */
-+	phy_drd->vbus = devm_regulator_get(dev, "vbus");
-+	if (IS_ERR(phy_drd->vbus)) {
-+		ret = PTR_ERR(phy_drd->vbus);
-+		if (ret == -EPROBE_DEFER)
-+			return ret;
-+
-+		dev_warn(dev, "Failed to get VBUS supply regulator\n");
-+		phy_drd->vbus = NULL;
-+	}
-+
- 	dev_vdbg(dev, "Creating usbdrd_phy phy\n");
- 
- 	for (i = 0; i < EXYNOS5_DRDPHYS_NUM; i++) {
+interrupts = <GIC_SPI Number Level>
+
+GIC_SPI is correct since we are attempting to describe the SPI
+interrupt (offset what ever it is, is a NOP from conceptual discussion).
+
+Level is fine as well.
+
+Number: what does this indicate? crossbar number is what we have
+assumed so far. however, then you loose the ability to describe
+interrupts on GIC SPI which dont have crossbar interrupts.
+
+Question is how do we differentiate between the two?
+
+
+
 -- 
-1.7.10.4
+Regards,
+Nishanth Menon
