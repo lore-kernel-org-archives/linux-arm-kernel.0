@@ -1,42 +1,30 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 9 May 2014 19:12:11 +0100
-Subject: [PATCHv4 1/2] dt/bindings: Add the DT binding documentation
- for endianness
-In-Reply-To: <20140509170255.GR12304@sirena.org.uk>
-References: <1399601073-19278-1-git-send-email-Li.Xiubo@freescale.com>
- <1399601073-19278-2-git-send-email-Li.Xiubo@freescale.com>
- <20140509163243.GD16418@e106331-lin.cambridge.arm.com>
- <20140509170255.GR12304@sirena.org.uk>
-Message-ID: <20140509181211.GF16418@e106331-lin.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 9 May 2014 19:18:55 +0100
+Subject: [PATCH 1/3] arm64: Enable OPP
+In-Reply-To: <CAGo_u6oL06G7jk8_X-SH73oWCAHX5vTj7ViC1AyaDhDLJEvWmw@mail.gmail.com>
+References: <1399653631-4938-1-git-send-email-broonie@kernel.org>
+ <CAGo_u6rGEWwywQ5JKh1ROhkOjrkWrM35PdWAooed26oak=1irA@mail.gmail.com>
+ <20140509171120.GS12304@sirena.org.uk>
+ <CAGo_u6oL06G7jk8_X-SH73oWCAHX5vTj7ViC1AyaDhDLJEvWmw@mail.gmail.com>
+Message-ID: <20140509181855.GW12304@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 09, 2014 at 06:02:55PM +0100, Mark Brown wrote:
-> On Fri, May 09, 2014 at 05:32:43PM +0100, Mark Rutland wrote:
-> > On Fri, May 09, 2014 at 03:04:32AM +0100, Xiubo Li wrote:
-> 
-> > > {big,little}-endian{,-*}: these are boolean properties, if absent
-> > > meaning that the CPU and the Device are in the same endianness mode.
-> 
-> > That's not really true though. A device might usually be little-endian,
-> > regardless of the endianness of a CPU. Some vendors may integrate it as
-> > big-endian after a binding is added, and in the absence of a specified
-> > endianness a driver is likely to assume LE.
-> 
-> The default should be device specific rather than binding specific.
+On Fri, May 09, 2014 at 12:17:23PM -0500, menon.nishanth at gmail.com wrote:
+> On Fri, May 9, 2014 at 12:11 PM, Mark Brown <broonie@kernel.org> wrote:
 
-I'm taking binding here to mean the binding for a praticular device
-rather than a class binding, so there's only a subtle distinction
-between the two.
+> > That's for the user visible symbol but OPP is also enableable via select
+> > - the fix here may be to remove both the visibility check and the
+> > dependency.
 
-It's entirely possible that two developers independently come up with
-bindings for something that is later realised to be the same device
-(just integrated differently), for which they choose opposite defaults.
+> That is reasonable.
 
-In that case the default is binding-specific rather than device
-specific, though I would hope that in the vast majority of cases there
-is only one binding per device, at which point the distinction is
-meaningless.
-
-Cheers,
-Mark.
+OK, I've sent a patch - now I look at what the OPP stuff is doing that
+definitely seems like a better approach.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140509/f08e7fb9/attachment.sig>
