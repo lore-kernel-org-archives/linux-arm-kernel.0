@@ -1,41 +1,43 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 09 May 2014 11:53:23 +0200
-Subject: [PATCH] of: Add of_device_destroy_children() function
-In-Reply-To: <20140508203339.GA542@obsidianresearch.com>
-References: <1399567069-3174-1-git-send-email-s.nawrocki@samsung.com>
- <20140508203339.GA542@obsidianresearch.com>
-Message-ID: <536CA593.3070907@samsung.com>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Fri,  9 May 2014 13:59:02 +0400
+Subject: [PATCH 3/3] ARM: i.MX1 clk: Remove clk_register_clkdev() for unused
+ clocks
+In-Reply-To: <1399629542-32387-1-git-send-email-shc_work@mail.ru>
+References: <1399629542-32387-1-git-send-email-shc_work@mail.ru>
+Message-ID: <1399629542-32387-3-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/14 22:33, Jason Gunthorpe wrote:
-> On Thu, May 08, 2014 at 06:37:49PM +0200, Sylwester Nawrocki wrote:
->> This patch adds a helper function to unregister devices which
->> were created by an of_platform_populate() call. The pattern
->> used here can already be found in multiple drivers. This helper
->> can now be used instead of repeating similar code in drivers.
-> 
-> I have a driver that does this as well, and what I found is that the
-> remove must be in reverse order from the create or things explode, and
-> that assumes the DT is topologically sorted according to dependency
-> (so no deferred probe).
-> 
-> AFAIK, there is no analog to deferred probe for removal, and
-> attempting to remove, say, a GPIO driver while an I2C bit bang is using
-> it just fails.
+This patch removes clk_register_clkdev() for the clocks that do not
+have any users for non-DT boards and drivers.
 
-Thanks for the feedback, I knew I could be missing some of nasty
-details like this. Looks like we need a complete implementation
-of of_platform_unpopulate(). Since the are cases where the remove
-order is insignificant, I'm wondering whether it still would be
-useful to have a helper like device_unregister_children() which
-would remove only direct children of a device ? At least this
-solves my current problem.
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/mach-imx/clk-imx1.c | 5 -----
+ 1 file changed, 5 deletions(-)
 
-Since the dependencies will likely never be fully described in DT
-I guess we would need to create a list while actually creating
-devices, to be able to walk in reverse order while destroying them.
-
---
-Regards,
-Sylwester
+diff --git a/arch/arm/mach-imx/clk-imx1.c b/arch/arm/mach-imx/clk-imx1.c
+index d13dce4..2f37896 100644
+--- a/arch/arm/mach-imx/clk-imx1.c
++++ b/arch/arm/mach-imx/clk-imx1.c
+@@ -94,7 +94,6 @@ int __init mx1_clocks_init(unsigned long fref)
+ 	clk_register_clkdev(clk[dma_gate], "ahb", "imx1-dma");
+ 	clk_register_clkdev(clk[hclk], "ipg", "imx1-dma");
+ 	clk_register_clkdev(clk[csi_gate], NULL, "mx1-camera.0");
+-	clk_register_clkdev(clk[mma_gate], "mma", NULL);
+ 	clk_register_clkdev(clk[usbd_gate], NULL, "imx_udc.0");
+ 	clk_register_clkdev(clk[per1], "per", "imx-gpt.0");
+ 	clk_register_clkdev(clk[hclk], "ipg", "imx-gpt.0");
+@@ -113,10 +112,6 @@ int __init mx1_clocks_init(unsigned long fref)
+ 	clk_register_clkdev(clk[per2], "per", "imx1-fb.0");
+ 	clk_register_clkdev(clk[dummy], "ipg", "imx1-fb.0");
+ 	clk_register_clkdev(clk[dummy], "ahb", "imx1-fb.0");
+-	clk_register_clkdev(clk[hclk], "mshc", NULL);
+-	clk_register_clkdev(clk[per3], "ssi", NULL);
+-	clk_register_clkdev(clk[clk32], NULL, "imx1-rtc.0");
+-	clk_register_clkdev(clk[clko], "clko", NULL);
+ 
+ 	mxc_timer_init(MX1_IO_ADDRESS(MX1_TIM1_BASE_ADDR), MX1_TIM1_INT);
+ 
+-- 
+1.8.3.2
