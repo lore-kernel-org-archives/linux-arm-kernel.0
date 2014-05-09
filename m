@@ -1,166 +1,75 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 9 May 2014 17:05:43 -0400 (EDT)
-Subject: [PATCH] ARM: Don't ever downscale loops_per_jiffy in SMP systems#
-In-Reply-To: <20140509182245.GM3693@n2100.arm.linux.org.uk>
-References: <CAD=FV=UEGJGHrdcXgs3EZ_wFXT8GnNeCOMt7CgdiiUzBzZ5Y0A@mail.gmail.com>
- <alpine.LFD.2.11.1405081149190.980@knanqh.ubzr>
- <CAD=FV=VtcLOh51LCmafzRMdqtDrwKXCqK6gE6V7OOOUe4gjwbA@mail.gmail.com>
- <alpine.LFD.2.11.1405081329010.980@knanqh.ubzr>
- <20140508192209.GH3693@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1405081600260.980@knanqh.ubzr>
- <20140508205223.GI3693@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1405082058130.980@knanqh.ubzr>
- <20140509091824.GL3693@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1405091245070.980@knanqh.ubzr>
- <20140509182245.GM3693@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.11.1405091640090.980@knanqh.ubzr>
+From: schnitzeltony@googlemail.com (=?UTF-8?Q?Andreas_M=C3=BCller?=)
+Date: Fri, 9 May 2014 23:06:55 +0200
+Subject: [PATCH 1/4] OMAPDSS: Fix DSS clock multiplier issue on 3703 and
+ probably 3630
+In-Reply-To: <536C860E.1000501@ti.com>
+References: <1398815562-24113-1-git-send-email-tony@atomide.com>
+ <1398815562-24113-2-git-send-email-tony@atomide.com>
+ <536C860E.1000501@ti.com>
+Message-ID: <CALbNGRR3U1veFgXmOWpfG3yNVESdxi2t79WDrJwOZ1oShuG1yA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 9 May 2014, Russell King - ARM Linux wrote:
+On Fri, May 9, 2014 at 9:38 AM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
+> On 30/04/14 02:52, Tony Lindgren wrote:
+>> Otherwise we can get often errors like the following and the
+>> display won't come on:
+>>
+>> omapdss APPLY error: FIFO UNDERFLOW on gfx, disabling the overlay
+>> omapdss APPLY error: SYNC_LOST on channel lcd, restarting
+>> the output with video overlays disabled
+>>
+>> There are some earlier references to this issue:
+>>
+>> http://www.spinics.net/lists/linux-omap/msg59511.html
+>> http://www.spinics.net/lists/linux-omap/msg59724.html
+>
+resend - my client had HTML enabled...
 
-> I'd much prefer just printing a warning at kernel boot time to report
-> that the kernel is running with features which would make udelay() less
-> than accurate.
+FWIW: I have had issues long time ago [1]. With mainline 3.14.3 I had
+still the reboot problem on old 600MHz OMAP 3530. Applying this patch
+solved the issues. For other versions I had no chance to reproduce the
+original wakup issue mentioned in old thread
 
-What if there is simply no timer to rely upon, as in those cases where 
-interrupts are needed for time keeping to make progress?  We should do 
-better than simply saying "sorry your kernel should irradicate every 
-udelay() usage to be reliable".
+[1] http://marc.info/?l=linux-omap&m=136250904607413&w=2
 
-And I mean "reliable" which is not exactly the same as "accurate".  
-Reliable means "never *significantly* shorter".
-
-> Remember, it should be usable for _short_ delays on slow machines as
-> well as other stuff, and if we're going to start throwing stuff like
-> the above at it, it's going to become very inefficient.
-
-You said that udelay can be much longer than expected due to various 
-reasons.
-
-You also said that the IRQ handler overhead during udelay calibration 
-makes actual delays slightli shorter than expected.
-
-I'm suggesting the addition of a slight overhead that is much smaller 
-than the IRQ handler here.  That shouldn't impact things masurably.  
-I'd certainly like Doug to run his udelay timing test with the following 
-patch to see if it solves the problem.
-
-diff --git a/arch/arm/include/asm/delay.h b/arch/arm/include/asm/delay.h
-index dff714d886..74fb571a55 100644
---- a/arch/arm/include/asm/delay.h
-+++ b/arch/arm/include/asm/delay.h
-@@ -57,11 +57,6 @@ extern void __bad_udelay(void);
- 			__const_udelay((n) * UDELAY_MULT)) :		\
- 	  __udelay(n))
- 
--/* Loop-based definitions for assembly code. */
--extern void __loop_delay(unsigned long loops);
--extern void __loop_udelay(unsigned long usecs);
--extern void __loop_const_udelay(unsigned long);
--
- /* Delay-loop timer registration. */
- #define ARCH_HAS_READ_CURRENT_TIMER
- extern void register_current_timer_delay(const struct delay_timer *timer);
-diff --git a/arch/arm/lib/delay.c b/arch/arm/lib/delay.c
-index 5306de3501..9150d31c2d 100644
---- a/arch/arm/lib/delay.c
-+++ b/arch/arm/lib/delay.c
-@@ -25,6 +25,11 @@
- #include <linux/module.h>
- #include <linux/timex.h>
- 
-+/* Loop-based definitions for assembly code. */
-+extern void __loop_delay(unsigned long loops);
-+extern void __loop_udelay(unsigned long usecs);
-+extern void __loop_const_udelay(unsigned long);
-+
- /*
-  * Default to the loop-based delay implementation.
-  */
-@@ -34,6 +39,85 @@ struct arm_delay_ops arm_delay_ops = {
- 	.udelay		= __loop_udelay,
- };
- 
-+#if defined(CONFIG_CPU_FREQ) && (defined(CONFIG_SMP) || defined(CONFIG_PREEMPT))
-+
-+#include <linux/cpufreq.h>
-+
-+/*
-+ * Another CPU/thread might increase the CPU clock in the middle of
-+ * the loop based delay routine and the newly scaled LPJ value won't be
-+ * accounted for, resulting in a possibly significantly shorter delay than
-+ * expected.  Let's make sure this occurrence is trapped and compensated.
-+ */
-+
-+static int __loop_seq;
-+static unsigned int __loop_security_factor;
-+
-+#define __safe_loop_(type) \
-+static void __safe_loop_##type(unsigned long val) \
-+{ \
-+	int seq_count = __loop_seq; \
-+	__loop_##type(val); \
-+	if (seq_count != __loop_seq) \
-+		__loop_##type(val * __loop_security_factor); \
-+}
-+
-+__safe_loop_(delay)
-+__safe_loop_(const_udelay)
-+__safe_loop_(udelay)
-+
-+static int cpufreq_callback(struct notifier_block *nb,
-+			    unsigned long val, void *data)
-+{
-+	struct cpufreq_freqs *freq = data;
-+	unsigned int f;
-+
-+	if ((freq->flags & CPUFREQ_CONST_LOOPS) ||
-+	    freq->old >= freq->new)
-+		return NOTIFY_OK;
-+
-+	switch (val) {
-+	case CPUFREQ_PRECHANGE:
-+		/* Remember the largest security factor ever needed */
-+		f = DIV_ROUND_UP(freq->new, freq->old) - 1;
-+		if (__loop_security_factor < f)
-+			__loop_security_factor = f;
-+		/* fallthrough */
-+	case CPUFREQ_POSTCHANGE:
-+		__loop_seq++;
-+	}
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block cpufreq_notifier = {
-+	.notifier_call  = cpufreq_callback,
-+};
-+
-+static int __init init_safe_loop_delays(void)
-+{
-+	int err;
-+
-+	/*
-+	 * Bail out if the default loop based implementation has
-+	 * already been replaced by something better.
-+	 */
-+	if (arm_delay_ops.udelay != __loop_udelay)
-+		return 0;
-+
-+	__loop_security_factor = 1;
-+	err = cpufreq_register_notifier(&cpufreq_notifier,
-+					CPUFREQ_TRANSITION_NOTIFIER);
-+	if (!err) {
-+		arm_delay_ops.delay		= __safe_loop_delay;
-+		arm_delay_ops.const_udelay	= __safe_loop_const_udelay;
-+		arm_delay_ops.udelay		= __safe_loop_udelay;
-+	}
-+	return err;
-+}
-+core_initcall(init_safe_loop_delays);
-+
-+#endif
-+
- static const struct delay_timer *delay_timer;
- static bool delay_calibrated;
- 
+Andreas
+> Those don't sound like the same issue, but it's hard to say. What kind
+> of clock rates do you get? Cat you paste debugfs/omapdss/clk, with and
+> without this patch?
+>
+> What resolution do you have? If it's a very high resolution (say, DVI
+> output to a monitor), it could just be an issue of
+> not-enough-memory-bandwidth.
+>
+>> It seems that it's safe to set the lower values even for 3630.
+>> If we can confirm that 3630 works with the higher values
+>> reliably we can add further detection.
+>>
+>> Signed-off-by: Tony Lindgren <tony@atomide.com>
+>> ---
+>>  drivers/video/fbdev/omap2/dss/dss.c | 5 +++--
+>>  1 file changed, 3 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/video/fbdev/omap2/dss/dss.c b/drivers/video/fbdev/omap2/dss/dss.c
+>> index d55266c..ad6561f 100644
+>> --- a/drivers/video/fbdev/omap2/dss/dss.c
+>> +++ b/drivers/video/fbdev/omap2/dss/dss.c
+>> @@ -707,9 +707,10 @@ static const struct dss_features omap34xx_dss_feats __initconst = {
+>>       .dpi_select_source      =       &dss_dpi_select_source_omap2_omap3,
+>>  };
+>>
+>> +/* Supposedly 3630 can use div 32 mult 2, but that needs to be rechecked */
+>>  static const struct dss_features omap3630_dss_feats __initconst = {
+>> -     .fck_div_max            =       32,
+>> -     .dss_fck_multiplier     =       1,
+>> +     .fck_div_max            =       16,
+>> +     .dss_fck_multiplier     =       2,
+>
+> These values tell about the clock hardware, they are not settings that
+> can be changed to change the clock. OMAP3630 has a fixed x2 multiplier
+> and a divider with maximum value of 16.
+>
+>  Tomi
+>
+>
