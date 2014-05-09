@@ -1,25 +1,42 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 9 May 2014 21:00:47 +0800
-Subject: i.MX6 USB OTG support is broken on linux-next
-Message-ID: <20140509130046.GP2794@dragon>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Fri,  9 May 2014 18:30:06 +0530
+Subject: [PATCH 0/4] Add framework to support clkout
+Message-ID: <1399640410-30957-1-git-send-email-tushar.behera@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm running next-20140508 kernel on imx6q-sabresd board with USB
-mouse/keyboard connected to OTG port.  It  works well on 3.15-rc but
-is broken on recent linux-next kernel with the message like below.
+The MUX/GATE register for XCLKOUT doesn't resides within PMU domain,
+this can be accessed through a regmap provided by syscon driver. Adding
+another clock provider to handle regmap based handing of XCLKOUT.
 
-...
-usb 1-1: device v413c p2107 is not supported
-hub 1-0:1.0: unable to enumerate USB device on port 1
+Dependency:
+1. [PATCH v3] mfd: syscon: Support early initialization
+http://article.gmane.org/gmane.linux.kernel/1679446
 
-With the help from Peter, I found that the issue shows up only when
-CONFIG_USB_OTG_FSM is enabled.  The option is enabled by commit 8fd2f1f
-(ARM: imx_v6_v7_defconfig: Enable drivers for i.MX51 USB Host support.)
-from IMX tree.
+Also we need to find a suitable place to call early_syscon_init(), after
+the device tree has been unflattened and before clock initialization.
 
-I guess this is a sign that chipidea otg_fsm driver is buggy?  I do not
-think dropping CONFIG_USB_OTG_FSM selection from imx_v6_v7_defconfig is
-a solution, and we need to fix the issue in usb driver, right?
+While testing, I called this before of_clk_init() in arch/arm/kernel/time.c,
+but that place is too generic. Calling anywhere from exynos.c is not
+working ATM.
 
-Shawn
+Tushar Behera (4):
+  clk: samsung: out: Add infrastructure to register CLKOUT
+  clk: samsung: exynos5420: Add xclkout debug clock
+  clk: samsung: exynos5250: Add xclkout debug clock
+  ARM: dts: Add pmu-syscon handle for Exynos5420/Exynos5250 clock
+
+ arch/arm/boot/dts/exynos5250.dtsi      |    1 +
+ arch/arm/boot/dts/exynos5420.dtsi      |    1 +
+ drivers/clk/samsung/Makefile           |    2 +-
+ drivers/clk/samsung/clk-exynos5250.c   |   14 +++
+ drivers/clk/samsung/clk-exynos5420.c   |   14 +++
+ drivers/clk/samsung/clk-out.c          |  181 ++++++++++++++++++++++++++++++++
+ drivers/clk/samsung/clk.h              |   33 ++++++
+ include/dt-bindings/clock/exynos5250.h |    3 +
+ include/dt-bindings/clock/exynos5420.h |    5 +-
+ 9 files changed, 252 insertions(+), 2 deletions(-)
+ create mode 100644 drivers/clk/samsung/clk-out.c
+
+-- 
+1.7.9.5
