@@ -1,69 +1,37 @@
 From: dean_jenkins@mentor.com (dean_jenkins at mentor.com)
-Date: Fri,  9 May 2014 16:19:46 +0100
-Subject: [PATCH 3/5] serial: imx: avoid spinlock recursion deadlock
-In-Reply-To: <1399648788-26061-1-git-send-email-dean_jenkins@mentor.com>
-References: <1399648788-26061-1-git-send-email-dean_jenkins@mentor.com>
-Message-ID: <1399648788-26061-4-git-send-email-dean_jenkins@mentor.com>
+Date: Fri,  9 May 2014 16:19:43 +0100
+Subject: [PATCH 0/5] serial: imx: fixes
+Message-ID: <1399648788-26061-1-git-send-email-dean_jenkins@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andy Lowe <andy_lowe@mentor.com>
+From: Dean Jenkins <Dean_Jenkins@mentor.com>
 
-The following deadlock has been observed:
+The following set of patches were tested on an i.MX6 multi-core platform.
 
-imx_int() {
-  imx_txint() {
-    spin_lock_irqsave(&sport->port.lock,flags);
-    /* ^^^uart_port spinlock taken in imx_txint */
-    imx_transmit_buffer() {
-      uart_write_wakeup(&sport->port) {
-        tty_wakeup() {
-          hci_uart_tty_wakeup() {
-            hci_uart_tx_wakeup() {
-              uart_write() {
-                spin_lock_irqsave(&port->lock, flags);
-                /* ^^^deadlock here when spinlock is taken again */
-                  .
-                  .
-                  .
-                spin_unlock_irqrestore(&port->lock, flags);
-              }
-            }
-          }
-        }
-      }
-    }
-    spin_unlock_irqrestore(&sport->port.lock,flags);
-  }
-}
+Patches 1 to 4 were tested using a Bluetooth BCSP UART connection at 115.2kbps
+and 4Mbps. The fixes were needed because the i.MX6 UART driver caused spinlock
+deadlocks with the HCI TTY layer.
 
-To correct this call uart_write_wakeup() at the end of imx_txint() after
-the uart_port spinlock is unlocked.
+Patch 5 improves the i.MX6 UART driver for use with kdb.
 
-Signed-off-by: Andy Lowe <andy_lowe@mentor.com>
-Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
----
- drivers/tty/serial/imx.c |    7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+Patch 1: serial: imx: remove unneeded imx_transmit_buffer() from imx_start_tx()
+Patch 2: serial: imx: remove uart_write_wakeup() from imx_transmit_buffer()
+Patch 3: serial: imx: avoid spinlock recursion deadlock
+Patch 4: serial: imx: move imx_transmit_buffer() into imx_txint()
+Patch 5: serial: imx: clean up imx_poll_get_char()
 
-diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index abe31ad..cc79706 100644
---- a/drivers/tty/serial/imx.c
-+++ b/drivers/tty/serial/imx.c
-@@ -636,8 +636,13 @@ static irqreturn_t imx_txint(int irq, void *dev_id)
- 
- 	imx_transmit_buffer(sport);
- 
--	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
-+	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS) {
-+		spin_unlock_irqrestore(&sport->port.lock, flags);
- 		uart_write_wakeup(&sport->port);
-+	} else
-+		spin_unlock_irqrestore(&sport->port.lock, flags);
-+
-+	return IRQ_HANDLED;
- 
- out:
- 	spin_unlock_irqrestore(&sport->port.lock, flags);
--- 
-1.7.9.5
+The patches are based off 3.15-rc4.
+
+----------------------------------------------------------------
+Andy Lowe (1):
+      serial: imx: avoid spinlock recursion deadlock
+
+Dirk Behme (4):
+      serial: imx: remove unneeded imx_transmit_buffer() from imx_start_tx()
+      serial: imx: remove uart_write_wakeup() from imx_transmit_buffer()
+      serial: imx: move imx_transmit_buffer() into imx_txint()
+      serial: imx: clean up imx_poll_get_char()
+
+ drivers/tty/serial/imx.c |   73 ++++++++++++++--------------------------------
+ 1 file changed, 22 insertions(+), 51 deletions(-)
