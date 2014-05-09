@@ -1,125 +1,70 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 9 May 2014 17:32:43 +0100
-Subject: [PATCHv4 1/2] dt/bindings: Add the DT binding documentation
- for endianness
-In-Reply-To: <1399601073-19278-2-git-send-email-Li.Xiubo@freescale.com>
-References: <1399601073-19278-1-git-send-email-Li.Xiubo@freescale.com>
- <1399601073-19278-2-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <20140509163243.GD16418@e106331-lin.cambridge.arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri,  9 May 2014 17:37:44 +0100
+Subject: [PATCH] arm64: use cpu_online_mask when using forced irq_set_affinity
+Message-ID: <1399653464-21410-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 09, 2014 at 03:04:32AM +0100, Xiubo Li wrote:
-> Device-Tree binding for device endianness
-> 
-> The endianness mode of CPU & Device scenarios:
-> Index    CPU       Device     Endianness properties
-> ------------------------------------------------------------
-> 1        LE        LE         -
-> 2        LE        BE         'big-endian{,-*}'
-> 3        BE        BE         -
-> 4        BE        LE         'little-endian{,-*}'
-> 
-> {big,little}-endian{,-*}: these are boolean properties, if absent
-> meaning that the CPU and the Device are in the same endianness mode.
+From: Sudeep Holla <sudeep.holla@arm.com>
 
-That's not really true though. A device might usually be little-endian,
-regardless of the endianness of a CPU. Some vendors may integrate it as
-big-endian after a binding is added, and in the absence of a specified
-endianness a driver is likely to assume LE.
+Commit 01f8fa4f01d8("genirq: Allow forcing cpu affinity of interrupts")
+enabled the forced irq_set_affinity which previously refused to route an
+interrupt to an offline cpu.
 
-I am not keen on stating in such a generic document that the device is
-the same endianness as the CPU. As some CPUs can change endianness
-dynamically it's meaningless to say so.
+Commit ffde1de64012("irqchip: Gic: Support forced affinity setting")
+implements this force logic and disables the cpu online check for GIC
+interrupt controller.
 
-> 
-> Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
-> ---
->  .../devicetree/bindings/endianness/endianness.txt  | 48 ++++++++++++++++++++++
->  1 file changed, 48 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/endianness/endianness.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/endianness/endianness.txt b/Documentation/devicetree/bindings/endianness/endianness.txt
-> new file mode 100644
-> index 0000000..cc5f7f8
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/endianness/endianness.txt
-> @@ -0,0 +1,48 @@
-> +Device-Tree binding for device endianness
-> +
-> +The endianness mode of CPU & Device scenarios:
-> +Index    CPU       Device     Endianness properties
-> +------------------------------------------------------------
-> +1        LE        LE         -
-> +2        LE        BE         'big-endian{,-*}'
-> +3        BE        BE         -
-> +4        BE        LE         'little-endian{,-*}'
-> +
-> +For one device driver, which will run in different scenarios above
-> +on different SoCs using the devicetree, we need one way to simplify
-> +this.
-> +
-> +Required properties:
-> +- {big,little}-endian{,-*}: these are boolean properties, if absent
-> +  meaning that the CPU and the Device are in the same endianness mode.
+When __cpu_disable calls migrate_irqs, it disables the current cpu in
+cpu_online_mask and uses forced irq_set_affinity to migrate the IRQs
+away from the cpu but passes affinity mask with the cpu being offlined
+also included in it.
 
-As stated above, I disagree with this statement.
+When calling irq_set_affinity with force == true in a cpu hotplug path,
+the caller must ensure that the cpu being offlined is not present in the
+affinity mask or it may be selected as the target CPU, leading to the
+interrupt not being migrated.
 
-The endianness of the CPU should have nothing to do with the device
-description. The DT should not consider the endianness of the CPU at all
-because this can be a dynamic property of the system.  The kernel knows
-which endianness the CPU is in, and in some cases the kernel will have
-explicitly changed the endianness of the CPU.
+This patch uses cpu_online_mask when using forced irq_set_affinity so
+that the IRQs are properly migrated away.
 
-All this document needs to say is that if a device may be integrated
-with little-endian or big-endian registers, the preferred way to
-distinguish between these cases is with a boolean big-endian or
-little-endian property. Whether this is required and what the default
-happens to be is entirely binding specific.
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+Hi Catalin,
 
-For those cases where the endianness of sub-componenets may vary (i.e. a
-single regsiter may vary endianness, or a whole sub-block), then
-big-endian-* and little-endian-* properties are the preferred way to
-describe this.
+If you are fine with this change, can you pick up this fix ?
 
-This definitely cannot be required in general. We already have bindings
-which optionally use this style of property.
+Regards,
+Sudeep
 
-Cheers,
-Mark.
+ arch/arm64/kernel/irq.c | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
 
-> +
-> +Examples:
-> +Scenario 1 : CPU in LE mode & device in LE mode.
-> +dev: dev at 40031000 {
-> +	      compatible = "name";
-> +	      reg = <0x40031000 0x1000>;
-> +	      ...
-> +};
-> +
-> +Scenario 2 : CPU in LE mode & device in BE mode.
-> +dev: dev at 40031000 {
-> +	      compatible = "name";
-> +	      reg = <0x40031000 0x1000>;
-> +	      ...
-> +	      big-endian{,-*};
-> +};
-> +
-> +Scenario 3 : CPU in BE mode & device in BE mode.
-> +dev: dev at 40031000 {
-> +	      compatible = "name";
-> +	      reg = <0x40031000 0x1000>;
-> +	      ...
-> +};
-> +
-> +Scenario 4 : CPU in BE mode & device in LE mode.
-> +dev: dev at 40031000 {
-> +	      compatible = "name";
-> +	      reg = <0x40031000 0x1000>;
-> +	      ...
-> +	      little-endian{,-*};
-> +};
-> -- 
-> 1.8.4
-> 
-> 
+diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
+index 473e5db..0f08dfd 100644
+--- a/arch/arm64/kernel/irq.c
++++ b/arch/arm64/kernel/irq.c
+@@ -97,11 +97,15 @@ static bool migrate_one_irq(struct irq_desc *desc)
+ 	if (irqd_is_per_cpu(d) || !cpumask_test_cpu(smp_processor_id(), affinity))
+ 		return false;
+ 
+-	if (cpumask_any_and(affinity, cpu_online_mask) >= nr_cpu_ids) {
+-		affinity = cpu_online_mask;
++	if (cpumask_any_and(affinity, cpu_online_mask) >= nr_cpu_ids)
+ 		ret = true;
+-	}
+ 
++	/*
++	 * when using forced irq_set_affinity we must ensure that the cpu
++	 * being offlined is not present in the affinity mask, it may be
++	 * selected as the target CPU otherwise
++	 */
++	affinity = cpu_online_mask;
+ 	c = irq_data_get_irq_chip(d);
+ 	if (!c->irq_set_affinity)
+ 		pr_debug("IRQ%u: unable to set affinity\n", d->irq);
+-- 
+1.8.3.2
