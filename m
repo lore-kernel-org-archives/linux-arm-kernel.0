@@ -1,132 +1,123 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 9 May 2014 11:00:18 +0300
-Subject: [PATCH 2/2] ARM: omap5: hwmod_data: Add AESS related data
-In-Reply-To: <1398858208-1346-2-git-send-email-peter.ujfalusi@ti.com>
-References: <1398858208-1346-1-git-send-email-peter.ujfalusi@ti.com>
- <1398858208-1346-2-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <536C8B12.9030007@ti.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Fri, 09 May 2014 10:01:12 +0200
+Subject: [PATCHv4 7/7] ARM: dts: Add device tree sources for Exynos3250
+In-Reply-To: <536C7A96.3000906@samsung.com>
+References: <1398388572-30239-1-git-send-email-cw00.choi@samsung.com>
+ <1398388572-30239-8-git-send-email-cw00.choi@samsung.com>
+ <535B0324.50705@gmail.com> <535B9A98.3060206@gmail.com>
+ <536C7A96.3000906@samsung.com>
+Message-ID: <536C8B48.90706@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul,
-
-On 04/30/2014 02:43 PM, Peter Ujfalusi wrote:
-> Add the needed hwmod entries which is needed for AESS (Audio Engine
-> SubSystem) and ABE.
-
-please ignore this patch to add AESS to hwmod data. W/o addresses defined we
-will see warnings printed. So either I add the addresses to hwmod data or need
-to have aess also in DT.
-
--- 
-P?ter
-
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> ---
->  arch/arm/mach-omap2/omap_hwmod_54xx_data.c | 64 ++++++++++++++++++++++++++++++
->  1 file changed, 64 insertions(+)
+On 09.05.2014 08:49, Chanwoo Choi wrote:
+> Hi Tomasz,
 > 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-> index e829664e6a6c..3e20c025b5a4 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-> @@ -146,6 +146,7 @@ static struct omap_hwmod omap54xx_l4_abe_hwmod = {
->  	.prcm = {
->  		.omap4 = {
->  			.clkctrl_offs = OMAP54XX_CM_ABE_L4_ABE_CLKCTRL_OFFSET,
-> +			.context_offs = OMAP54XX_RM_ABE_AESS_CONTEXT_OFFSET,
->  			.flags = HWMOD_OMAP4_NO_CONTEXT_LOSS_BIT,
->  		},
->  	},
-> @@ -211,6 +212,42 @@ static struct omap_hwmod omap54xx_mpu_private_hwmod = {
->  };
->  
->  /*
-> + * 'aess' class
-> + * audio engine sub system
-> + */
-> +
-> +static struct omap_hwmod_class_sysconfig omap54xx_aess_sysc = {
-> +	.rev_offs	= 0x0000,
-> +	.sysc_offs	= 0x0010,
-> +	.sysc_flags	= (SYSC_HAS_MIDLEMODE | SYSC_HAS_SIDLEMODE),
-> +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
-> +			   MSTANDBY_FORCE | MSTANDBY_NO | MSTANDBY_SMART |
-> +			   MSTANDBY_SMART_WKUP),
-> +	.sysc_fields	= &omap_hwmod_sysc_type2,
-> +};
-> +
-> +static struct omap_hwmod_class omap54xx_aess_hwmod_class = {
-> +	.name	= "aess",
-> +	.sysc	= &omap54xx_aess_sysc,
-> +	.enable_preprogram = omap_hwmod_aess_preprogram,
-> +};
-> +
-> +/* aess */
-> +static struct omap_hwmod omap54xx_aess_hwmod = {
-> +	.name		= "aess",
-> +	.class		= &omap54xx_aess_hwmod_class,
-> +	.clkdm_name	= "abe_clkdm",
-> +	.main_clk	= "aess_fclk",
-> +	.prcm = {
-> +		.omap4 = {
-> +			.clkctrl_offs = OMAP54XX_CM_ABE_AESS_CLKCTRL_OFFSET,
-> +			.context_offs = OMAP54XX_RM_ABE_AESS_CONTEXT_OFFSET,
-> +			.modulemode   = MODULEMODE_SWCTRL,
-> +		},
-> +	},
-> +};
-> +
-> +/*
->   * 'counter' class
->   * 32-bit ordinary counter, clocked by the falling edge of the 32 khz clock
->   */
-> @@ -1892,6 +1929,14 @@ static struct omap_hwmod_ocp_if omap54xx_l4_cfg__l3_main_3 = {
->  	.user		= OCP_USER_MPU | OCP_USER_SDMA,
->  };
->  
-> +/* aess -> l4_abe */
-> +static struct omap_hwmod_ocp_if __maybe_unused omap54xx_aess__l4_abe = {
-> +	.master		= &omap54xx_aess_hwmod,
-> +	.slave		= &omap54xx_l4_abe_hwmod,
-> +	.clk		= "abe_iclk",
-> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-> +};
-> +
->  /* l3_main_1 -> l4_abe */
->  static struct omap_hwmod_ocp_if omap54xx_l3_main_1__l4_abe = {
->  	.master		= &omap54xx_l3_main_1_hwmod,
-> @@ -1966,6 +2011,22 @@ static struct omap_hwmod_ocp_if omap54xx_l4_cfg__dma_system = {
->  	.user		= OCP_USER_MPU | OCP_USER_SDMA,
->  };
->  
-> +/* l4_abe -> aess */
-> +static struct omap_hwmod_ocp_if __maybe_unused omap54xx_l4_abe__aess = {
-> +	.master		= &omap54xx_l4_abe_hwmod,
-> +	.slave		= &omap54xx_aess_hwmod,
-> +	.clk		= "abe_iclk",
-> +	.user		= OCP_USER_MPU,
-> +};
-> +
-> +/* l4_abe -> aess (dma) */
-> +static struct omap_hwmod_ocp_if __maybe_unused omap54xx_l4_abe__aess_dma = {
-> +	.master		= &omap54xx_l4_abe_hwmod,
-> +	.slave		= &omap54xx_aess_hwmod,
-> +	.clk		= "abe_iclk",
-> +	.user		= OCP_USER_SDMA,
-> +};
-> +
->  /* l4_abe -> dmic */
->  static struct omap_hwmod_ocp_if omap54xx_l4_abe__dmic = {
->  	.master		= &omap54xx_l4_abe_hwmod,
-> @@ -2417,6 +2478,9 @@ static struct omap_hwmod_ocp_if *omap54xx_hwmod_ocp_ifs[] __initdata = {
->  	&omap54xx_l3_main_1__l3_main_3,
->  	&omap54xx_l3_main_2__l3_main_3,
->  	&omap54xx_l4_cfg__l3_main_3,
-> +	&omap54xx_l4_abe__aess,
-> +	&omap54xx_l4_abe__aess_dma,
-> +	&omap54xx_aess__l4_abe,
->  	&omap54xx_l3_main_1__l4_abe,
->  	&omap54xx_mpu__l4_abe,
->  	&omap54xx_l3_main_1__l4_cfg,
+> On 04/26/2014 08:38 PM, Tomasz Figa wrote:
+>> On 26.04.2014 02:51, Tomasz Figa wrote:
+>>> Hi Chanwoo,
+>>>
+>>> On 25.04.2014 03:16, Chanwoo Choi wrote:
+>>>> From: Tomasz Figa <t.figa@samsung.com>
+>>>>
+>>>> This patch add new exynos3250.dtsi to support Exynos3250 SoC based on
+>>>> Cortex-A7
+>>>> dual core and includes following dt nodes:
+>>>>
+>>>> - GIC interrupt controller
+>>>> - Pinctrl to control GPIOs
+>>>> - Clock controller
+>>>> - CPU information (Cortex-A7 dual core)
+>>>> - UART to support serial port
+>>>> - MCT (Multi Core Timer)
+>>>> - ADC (Analog Digital Converter)
+>>>> - I2C/SPI bus
+>>>> - Power domain
+>>>> - PMU (Performance Monitoring Unit)
+>>>> - MSHC (Mobile Storage Host Controller)
+>>>> - PWM (Pluse Width Modulation)
+>>>> - AMBA bus
+>>>>
+>>>> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+>>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>>>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>>>> Signed-off-by: Inki Dae <inki.dae@samsung.com>
+>>>> Signed-off-by: Hyunhee Kim <hyunhee.kim@samsung.com>
+>>>> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
+>>>> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+>>>> Cc: Ben Dooks <ben-linux@fluff.org>
+>>>> Cc: Kukjin Kim <kgene.kim@samsung.com>
+>>>> Cc: Rob Herring <robh+dt@kernel.org>
+>>>> Cc: Pawel Moll <pawel.moll@arm.com>
+>>>> Cc: Mark Rutland <mark.rutland@arm.com>
+>>>> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+>>>> Cc: Kumar Gala <galak@codeaurora.org>
+>>>> Cc: Russell King <linux@arm.linux.org.uk>
+>>>> Cc: devicetree at vger.kernel.org
+>>>> ---
+>>>>   arch/arm/boot/dts/exynos3250-pinctrl.dtsi | 477 +++++++++++++++
+>>>>   arch/arm/boot/dts/exynos3250.dtsi         | 405 +++++++++++++
+>>>>   arch/arm/boot/dts/exynos4212-tizenw.dts   | 926
+>>>> ++++++++++++++++++++++++++++++
+>>>>   3 files changed, 1808 insertions(+)
+>>>>   create mode 100644 arch/arm/boot/dts/exynos3250-pinctrl.dtsi
+>>>>   create mode 100644 arch/arm/boot/dts/exynos3250.dtsi
+>>>>   create mode 100644 arch/arm/boot/dts/exynos4212-tizenw.dts
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/exynos3250-pinctrl.dtsi
+>>>> b/arch/arm/boot/dts/exynos3250-pinctrl.dtsi
+>>>> new file mode 100644
+>>>> index 0000000..976490b
+>>>> --- /dev/null
+>>>> +++ b/arch/arm/boot/dts/exynos3250-pinctrl.dtsi
+>>>> @@ -0,0 +1,477 @@
+>>>> +/*
+>>>> + * Samsung's Exynos3250 SoCs pin-mux and pin-config device tree source
+>>>> + *
+>>>> + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
+>>>> + *        http://www.samsung.com
+>>>> + *
+>>>> + * Samsung's Exynos3250 SoCs pin-mux and pin-config optiosn are
+>>>> listed as device
+>>>> + * tree nodes are listed in this file.
+>>>> + *
+>>>> + * This program is free software; you can redistribute it and/or modify
+>>>> + * it under the terms of the GNU General Public License version 2 as
+>>>> + * published by the Free Software Foundation.
+>>>> +*/
+>>>> +
+>>>> +/ {
+>>>> +    pinctrl at 11400000 {
+>>>
+>>> Could you use references instead of re-specifying the whole tree
+>>> hierarchy in every file a node is used?
+>>>
+>>> Instead of
+>>>
+>>> / {
+>>>      pinctrl at 11400000 {
+>>>
+>>>      };
+>>> };
+>>>
+>>> one may simply use
+>>>
+>>> &pinctrl_0 {
+>>>
+>>> };
+>>>
+>>> You might just need to change the location of #include
+>>> "exynos3250-pinctrl.dtsi" from top of exynos3250.dtsi to bottom of it.
+>>
+>> Oh, well, you also should move all nodes of on-SoC devices under a simple-bus node called soc. You can see the patch adding dts file for Exynos5260 for an example [1].
+>>
+>> [1] http://thread.gmane.org/gmane.linux.kernel.samsung-soc/29360/focus=29361
 > 
+> 
+> OK, I'll move nodes dependent on SoC under 'soc' dt node as example patch[1] except for 'amba-bus' dt node.
+
+I don't see any reason why amba-bus node shouldn't be under soc node as
+well. Any on-chip devices should be.
+
+Best regards,
+Tomasz
