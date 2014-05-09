@@ -1,108 +1,107 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Fri, 9 May 2014 08:43:01 -0500
-Subject: [PATCH 3/5] irqchip: crossbar: Skip some irqs from getting mapped
- to crossbar
-In-Reply-To: <536CD7BE.5020407@ti.com>
-References: <1399299527-10955-1-git-send-email-r.sricharan@ti.com>	<1399299527-10955-4-git-send-email-r.sricharan@ti.com>	<536BD9D8.4080905@ti.com>	<20140508203659.GA5620@kahuna>	<CAD=GYpbQQxQgKd3oZcAuWrxoD4VrkKzpybd11qwxs405HSUVGw@mail.gmail.com>	<536C0DC4.7090309@ti.com>	<CAD=GYpav4mHaqo4jfb0ePchf3cvuvSnFKj_+osbrt_8-tYRRrQ@mail.gmail.com>	<536C2071.8040502@ti.com>
- <CAD=GYpbRn=LEthpAUX9LNBGTB4iDs7TGiSSgLJuuS0tSatRRJQ@mail.gmail.com>
- <536CD01F.2070506@ti.com> <536CD7BE.5020407@ti.com>
-Message-ID: <536CDB65.9090609@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 9 May 2014 15:44:27 +0200
+Subject: [PATCH 1/2] ARM: at91: add PWM pinctrl to SAMA5D3
+Message-ID: <a5a0a9b8090f80f40daf3a13849b3961d9d617d6.1399642907.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/09/2014 08:27 AM, Santosh Shilimkar wrote:
-> On Friday 09 May 2014 08:54 AM, Nishanth Menon wrote:
->> On 05/08/2014 11:22 PM, Joel Fernandes wrote:
->>> On Thu, May 8, 2014 at 7:25 PM, Santosh Shilimkar
->>> <santosh.shilimkar@ti.com> wrote:
->> [...]
->>> Ok, thanks for pointing to the post.
->>>
->>
->>
->> Yep - thanks Santosh for clarifying this. Now, we still have the
->> issues that I pointed out in [1] - without resolving which, we should
->> not enable crossbar for dra74x/72x.
->>
->> A. taking example of PMU
->> 	interrupts = <GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH>
->> this wont work. instead the crossbar driver needs some sort of a hint
->> to know that it should not map these on crossbar register instead
->> assign GIC mapping directly.
->>
->> I propose doing the following
->> #define GIC_CROSSBAR_PASSTHROUGH(irq_no) ((irq_no) | (0x1 << 31))
->>
->> and dts will define the following:
->> interrupts = <GIC_SPI GIC_CROSSBAR_PASSTHROUGH(131) IRQ_TYPE_LEVEL_HIGH>
->>
->> This will also work for the other cases (B.2, B.3)
->>
->> For B.2: L3_APP_IRQ:
->> instead of:
->> interrupts = <GIC_SPI  5 IRQ_TYPE_LEVEL_HIGH>
->> we do:
->> interrupts = <GIC_SPI GIC_CROSSBAR_PASSTHROUGH(10) IRQ_TYPE_LEVEL_HIGH>
->>
->> For B.3: NMI
->> interrupts = <GIC_SPI GIC_CROSSBAR_PASSTHROUGH(133) IRQ_TYPE_LEVEL_HIGH>
->>
-> We can't do add a flag to generic interrupt controller flags since its
-> very specific to cross-bar.
-> 
->> xlate is easy ->
->>
->> diff --git a/drivers/irqchip/irq-crossbar.c
->> b/drivers/irqchip/irq-crossbar.c
->> index de021638..fd09ab4 100644
->> --- a/drivers/irqchip/irq-crossbar.c
->> +++ b/drivers/irqchip/irq-crossbar.c
->> @@ -112,6 +112,10 @@ static int crossbar_domain_xlate(struct
->> irq_domain *d,
->>  {
->>         unsigned long ret;
->>
->> +       /* Check to see if direct GIC mapping is required */
->> +       if (intspec[1] & BIT(31))
->> +               return intspec[1] & ~BIT[31];
->> +
->>         ret = get_prev_map_irq(intspec[1]);
->>         if (!IS_ERR_VALUE(ret))
->>                 goto found;
->>
->> But then, crossbar_domain_map and crossbar_domain_unmap need hints as
->> well to know that there is no corresponding crossbar registers.
->> Have'nt thought through that yet. Looking to hear about opinions here.
->>
->>
-> May be we need additional property like reserved to take care of 1:1
-> map.
-> 
-> ti,irqs-direct-map = <131 132>;
-> 
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/boot/dts/sama5d3.dtsi | 82 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 82 insertions(+)
 
-That wont work for cases where the cross bar has hardware bugs as
-Nishanth pointed in his example.
-
-For such cases, you need to differentiate between a "direct-map" GIC IRQ
-and a regular working logical cross-bar number.
-
-For example, what if IRQ no 10 has a crossbar bug? Does this mean you
-will also make crossbar number (not IRQ no, logical cross bar no) also
-suffer?
-
-The way to fix this is like Nishanth pointed by introducing some
-encoding or flag:
-
-For someone using the logical cross bar, they would say:
-interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>
-
-and in the same dts, for someone else who is using the direct-mapped
-buggy IRQ 10, they would use the the PASSTHROUGH flag:
-interrupts = <GIC_SPI GIC_CROSSBAR_PASSTHROUGH(10) IRQ_TYPE_LEVEL_HIGH>
-
-In this case, a "direct-map" list as you suggested doesn't work.
-
-thanks,
-
--Joel
+diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+index 9caa06b3641e..ed7943745f23 100644
+--- a/arch/arm/boot/dts/sama5d3.dtsi
++++ b/arch/arm/boot/dts/sama5d3.dtsi
+@@ -583,6 +583,88 @@
+ 					};
+ 				};
+ 
++				pwm0 {
++					pinctrl_pwm0_pwmh0_0: pwm0_pwmh0-0 {
++						atmel,pins =
++							<AT91_PIOA 20 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PA20 periph B, conflicts with ISI_D4 and LCDDAT20 */
++					};
++					pinctrl_pwm0_pwmh0_1: pwm0_pwmh0-1 {
++						atmel,pins =
++							<AT91_PIOB 0 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PB0 periph B, conflicts with GTX0 */
++					};
++
++					pinctrl_pwm0_pwmh1_0: pwm0_pwmh1-0 {
++						atmel,pins =
++							<AT91_PIOA 22 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PA22 periph B, conflicts with ISI_D6 and LCDDAT22 */
++					};
++					pinctrl_pwm0_pwmh1_1: pwm0_pwmh1-1 {
++						atmel,pins =
++							<AT91_PIOB 4 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PB4 periph B, conflicts with GRX0 */
++					};
++					pinctrl_pwm0_pwmh1_2: pwm0_pwmh1-2 {
++						atmel,pins =
++							<AT91_PIOB 27 AT91_PERIPH_C AT91_PINCTRL_NONE>;	/* PB27 periph C, conflicts with G125CKO and RTS1 */
++					};
++
++					pinctrl_pwm0_pwmh2_0: pwm0_pwmh2-0 {
++						atmel,pins =
++							<AT91_PIOB 8 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PB8 periph B, conflicts with GTXCK */
++					};
++					pinctrl_pwm0_pwmh2_1: pwm0_pwmh2-1 {
++						atmel,pins =
++							<AT91_PIOD 5 AT91_PERIPH_C AT91_PINCTRL_NONE>;	/* PD5 periph C, conflicts with MCI0_DA4 and TIOA0 */
++					};
++
++					pinctrl_pwm0_pwmh3_0: pwm0_pwmh3-0 {
++						atmel,pins =
++							<AT91_PIOB 12 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PB12 periph B, conflicts with GRXDV */
++					};
++					pinctrl_pwm0_pwmh3_1: pwm0_pwmh3-1 {
++						atmel,pins =
++							<AT91_PIOD 7 AT91_PERIPH_C AT91_PINCTRL_NONE>;	/* PD7 periph C, conflicts with MCI0_DA6 and TCLK0 */
++					};
++
++					pinctrl_pwm0_pwml0_0: pwm0_pwml0-0 {
++						atmel,pins =
++							<AT91_PIOA 21 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PA21 periph B, conflicts with ISI_D5 and LCDDAT21 */
++					};
++					pinctrl_pwm0_pwml0_1: pwm0_pwml0-1 {
++						atmel,pins =
++							<AT91_PIOB 1 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PB1 periph B, conflicts with GTX1 */
++					};
++
++					pinctrl_pwm0_pwml1_0: pwm0_pwml1-0 {
++						atmel,pins =
++							<AT91_PIOA 23 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PA23 periph B, conflicts with ISI_D7 and LCDDAT23 */
++					};
++					pinctrl_pwm0_pwml1_1: pwm0_pwml1-1 {
++						atmel,pins =
++							<AT91_PIOB 5 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PB5 periph B, conflicts with GRX1 */
++					};
++					pinctrl_pwm0_pwml1_2: pwm0_pwml1-2 {
++						atmel,pins =
++							<AT91_PIOE 31 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PE31 periph B, conflicts with IRQ */
++					};
++
++					pinctrl_pwm0_pwml2_0: pwm0_pwml2-0 {
++						atmel,pins =
++							<AT91_PIOB 9 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PB9 periph B, conflicts with GTXEN */
++					};
++					pinctrl_pwm0_pwml2_1: pwm0_pwml2-1 {
++						atmel,pins =
++							<AT91_PIOD 6 AT91_PERIPH_C AT91_PINCTRL_NONE>;	/* PD6 periph C, conflicts with MCI0_DA5 and TIOB0 */
++					};
++
++					pinctrl_pwm0_pwml3_0: pwm0_pwml3-0 {
++						atmel,pins =
++							<AT91_PIOB 13 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PB13 periph B, conflicts with GRXER */
++					};
++					pinctrl_pwm0_pwml3_1: pwm0_pwml3-1 {
++						atmel,pins =
++							<AT91_PIOD 8 AT91_PERIPH_C AT91_PINCTRL_NONE>;	/* PD8 periph C, conflicts with MCI0_DA7 */
++					};
++				};
++
+ 				spi0 {
+ 					pinctrl_spi0: spi0-0 {
+ 						atmel,pins =
+-- 
+1.8.2.2
