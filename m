@@ -1,67 +1,35 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 9 May 2014 10:07:19 +0300
-Subject: [PATCH 4/4] ARM: dts: Add LCD panel sharp ls037v7dw01 support
- for omap3-evm and ldp
-In-Reply-To: <20140508233628.GJ2198@atomide.com>
-References: <1398815562-24113-1-git-send-email-tony@atomide.com>
- <1398815562-24113-5-git-send-email-tony@atomide.com>
- <CAGhQ9Vwa8xXQEo5dNEKAvmaS9DoBjVSthtd8=owk+atVdFuiiA@mail.gmail.com>
- <20140430174751.GA12362@atomide.com> <20140505183919.GA15463@atomide.com>
- <20140508233628.GJ2198@atomide.com>
-Message-ID: <536C7EA7.5000306@ti.com>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Fri, 9 May 2014 12:39:35 +0530
+Subject: [PATCH v2] ARM: configs: drop CONFIG_COMMON_CLK_DEBUG
+In-Reply-To: <536BDB88.8090106@ti.com>
+References: <1398755224-7530-1-git-send-email-prabhakar.csengg@gmail.com>
+ <536BDB88.8090106@ti.com>
+Message-ID: <CA+V-a8s_vjvcX_BpLeg0tnBQx4+n2voQo_dz+EA_ZETTV_exyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/05/14 02:36, Tony Lindgren wrote:
+Hi Santosh,
 
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/omap-panel-sharp-ls037v7dw01.dtsi
-> @@ -0,0 +1,82 @@
-> +/*
-> + * Common file for omap dpi panels with QVGA and reset pins
-> + *
-> + * Note that the board specifc DTS file needs to specify
-> + * at minimum the GPIO enable-gpios for display, and
-> + * gpios for gpio-backlight.
-> + */
+On Fri, May 9, 2014 at 1:01 AM, Santosh Shilimkar
+<santosh.shilimkar@ti.com> wrote:
+> On Tuesday 29 April 2014 03:07 AM, Lad Prabhakar wrote:
+>> From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
+>>
+>> this patch removes COMMON_CLK_DEBUG config option
+>> from defconfig file as this config option is obsolete.
+>>
+>> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+>> ---
+>>  Changes for v2:
+>>  a> Dropped imx defconfig files as suggested by Shawn.
+>>
+>
+>>  arch/arm/configs/keystone_defconfig     |    1 -
+> Am picking the keystone part from this patch. Thanks.
+> You might want split this patch so that others can pick it
+> up
+>
+Thanks for picking it up.
 
-This looks very board specific to me... The regulator and the use of
-mcspi1 depend on the board, so this file can't be used on just any omap
-board with the same panel. And this can (probably) only be used on
-boards with a single display. Do those boards have tv-out?
-
-So I have nothing against having common files, but shouldn't this be
-named something more specific? If the boards involved are TI's OMAP3
-development boards, maybe this should be something like...
-omap3-ti-dev-panel-sharp-ls037v7dw01.dtsi. Well, that's a quite long one.
-
-> +/ {
-> +	aliases {
-> +		display0 = &lcd0;
-> +	};
-> +
-> +	backlight0: backlight {
-> +		compatible = "gpio-backlight";
-> +	};
-> +
-> +	/* 3.3V GPIO controlled regulator for LCD_ENVDD */
-> +	lcd_3v3: regulator-lcd-3v3 {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "lcd_3v3";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		startup-delay-us = <70000>;
-> +		regulator-always-on;
-
-Why always-on?
-
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140509/5a61a5c8/attachment.sig>
+Thanks,
+--Prabhakar Lad
