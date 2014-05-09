@@ -1,60 +1,34 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Fri, 9 May 2014 08:58:03 +0200
-Subject: OMAP baseline test results for v3.15-rc4
-In-Reply-To: <alpine.DEB.2.02.1405081456560.23579@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1405080417150.23579@utopia.booyaka.com>
- <CAGhQ9Vx_dJTn20S1OngAks1KvZkH=MUWEh-4bv5ciM7PhofJ8Q@mail.gmail.com>
- <alpine.DEB.2.02.1405081456560.23579@utopia.booyaka.com>
-Message-ID: <CAGhQ9VzP7doMPdNrX2O5aYuiicigi93KSq=Pg6FQFDS9kGeD_w@mail.gmail.com>
+From: prabhakar.csengg@gmail.com (Lad, Prabhakar)
+Date: Fri,  9 May 2014 12:27:47 +0530
+Subject: [PATCH v3 1/3] ARM: integrator: drop CONFIG_COMMON_CLK_DEBUG
+In-Reply-To: <1399618669-6830-1-git-send-email-prabhakar.csengg@gmail.com>
+References: <1399618669-6830-1-git-send-email-prabhakar.csengg@gmail.com>
+Message-ID: <1399618669-6830-2-git-send-email-prabhakar.csengg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 May 2014 17:00, Paul Walmsley <paul@pwsan.com> wrote:
-> Hello Joachim,
->
-> On Thu, 8 May 2014, Joachim Eastwood wrote:
->
->> On 8 May 2014 06:23, Paul Walmsley <paul@pwsan.com> wrote:
->> >
->> > Here are some basic OMAP test results for Linux v3.15-rc4.
->> > Logs and other details at:
->> >
->> >     http://www.pwsan.com/omap/testlogs/test_v3.15-rc4/20140505112251/
->> >
->> >
->> > Test summary
->> > ------------
->> <snip>
->> >
->> > The eMMC on the 4460 VAR-SOM-OM has failed; I guess it's run out of
->> > reserve blocks to reallocate.  Now it's time to find yet another way
->> > to boot it.
->>
->> I have some patches for u-boot which makes it possible to use the
->> on-board LAN7500 USB Ethernet controller for tftp.
->
-> That's great!
+From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
 
-I haven't had time to upstream it yet, but I'll send you a WIP version.
-These patches are also needed for USB in Linux since the on-board USB
-hub requires some special setup that I have put in u-boot.
+this patch drops CONFIG_COMMON_CLK_DEBUG option
+as this config option is now obsolete.
 
->> Since you have a VAR-SOM-OM44 module maybe you could test my dts patches for it?
->> I will post a new version of the patch set early next week. I can cc you.
->
-> I'd like to load the rootfs off the external SD slot.  Looks like you
-> might be adding support for that with your recent DT patches?
+CC: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+---
+ arch/arm/configs/integrator_defconfig |    1 -
+ 1 file changed, 1 deletion(-)
 
-Yes, the external SD slot (sdmmc5) is supported in the dts. It worked
-last time I tested it, but I haven't tried to use it for rootfs.
-
->> Do you have the VAR-DVK-OM44 eval board?
->
-> Yes.
-
-Nice :-)
-
-Then you see if the display stuff is working with DT also.
-
-regards
-Joachim Eastwood
+diff --git a/arch/arm/configs/integrator_defconfig b/arch/arm/configs/integrator_defconfig
+index 5bae195..c1f5adc 100644
+--- a/arch/arm/configs/integrator_defconfig
++++ b/arch/arm/configs/integrator_defconfig
+@@ -73,7 +73,6 @@ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+ CONFIG_LEDS_TRIGGER_CPU=y
+ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_PL030=y
+-CONFIG_COMMON_CLK_DEBUG=y
+ CONFIG_EXT2_FS=y
+ CONFIG_VFAT_FS=y
+ CONFIG_TMPFS=y
+-- 
+1.7.9.5
