@@ -1,43 +1,46 @@
-From: menon.nishanth@gmail.com (menon.nishanth at gmail.com)
-Date: Fri, 9 May 2014 12:02:12 -0500
-Subject: [PATCH 1/3] arm64: Enable OPP
-In-Reply-To: <1399653631-4938-1-git-send-email-broonie@kernel.org>
-References: <1399653631-4938-1-git-send-email-broonie@kernel.org>
-Message-ID: <CAGo_u6rGEWwywQ5JKh1ROhkOjrkWrM35PdWAooed26oak=1irA@mail.gmail.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 9 May 2014 19:02:34 +0200
+Subject: [RFC][PATCH 6/8] sched,idle: Avoid spurious wakeup IPIs
+In-Reply-To: <20140509145745.GI7950@arm.com>
+References: <20140411134243.160989490@infradead.org>
+ <20140411135218.478299389@infradead.org>
+ <CAAG0J9_q1KsUx10-XAb7AJnxv2ehctg6q1KME7ahsk1OZV8vZQ@mail.gmail.com>
+ <20140509141520.GV2844@laptop.programming.kicks-ass.net>
+ <20140509144034.GF7950@arm.com>
+ <20140509145002.GW2844@laptop.programming.kicks-ass.net>
+ <20140509145745.GI7950@arm.com>
+Message-ID: <20140509170234.GZ30445@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 9, 2014 at 11:40 AM, Mark Brown <broonie@kernel.org> wrote:
-> From: Mark Brown <broonie@linaro.org>
->
-> Some of the generic drivers used on ARM class systems use OPP so allow it
-> to be selected in Kconfig. No code is required for this, it is not clear
-> to me why there is config for this option.
-If you mean why we have ARCH_HAS_OPP,
-http://lists-archives.com/linux-kernel/27401148-pm-hide-opp-configuration-when-socs-do-not-provide-an-implementation.html
+On Fri, May 09, 2014 at 03:57:45PM +0100, Catalin Marinas wrote:
+> On Fri, May 09, 2014 at 03:50:02PM +0100, Peter Zijlstra wrote:
+> > On Fri, May 09, 2014 at 03:40:34PM +0100, Catalin Marinas wrote:
+> > 
+> > > I wonder why we still need TIF_POLLING_NRFLAG for arm64. It was on arm
+> > > until commit 16a8016372c42c7628eb (sanitize tsk_is_polling()). On arm64
+> > > we use wfi for idle or a firmware call but in both cases the assumption
+> > > is that we need an interrupt for waking up.
+> > > 
+> > > So I think we should remove this macro for arm64.
+> > 
+> > Does ARM64 support idle=poll? If so, you could keep it for that,
+> > otherwise it does indeed appear to be pointless.
+> 
+> We don't support idle=poll either.
+> 
+> > As to 32bit ARM, are there SMP chips which do not have WFI?
+> 
+> No. WFI is even used for the secondary booting protocol (we need to send
+> an IPI to get them going).
 
->
-> Signed-off-by: Mark Brown <broonie@linaro.org>
-> ---
->  arch/arm64/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 8ccdd2646ae3..8256d6d09d33 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -2,6 +2,7 @@ config ARM64
->         def_bool y
->         select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
->         select ARCH_USE_CMPXCHG_LOCKREF
-> +       select ARCH_HAS_OPP
->         select ARCH_HAS_SG_CHAIN
->         select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
->         select ARCH_WANT_OPTIONAL_GPIOLIB
-> --
-> 2.0.0.rc2
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+OK, so I'll queue a patch removing TIF_POLLING_NRFLAG for arm64.
+
+Thanks!
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140509/410edcd6/attachment.sig>
