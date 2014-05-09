@@ -1,54 +1,87 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 9 May 2014 19:25:15 +0100
-Subject: [PATCH 2/8] ARM: cache: remove redundant dsb instruction from
- v7_coherent_user_range
-In-Reply-To: <20140509161609.GM7950@arm.com>
-References: <1399044255-20435-1-git-send-email-will.deacon@arm.com>
- <1399044255-20435-3-git-send-email-will.deacon@arm.com>
- <20140509161609.GM7950@arm.com>
-Message-ID: <20140509182515.GG23083@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 9 May 2014 19:22:45 +0100
+Subject: [PATCH] ARM: Don't ever downscale loops_per_jiffy in SMP systems#
+In-Reply-To: <alpine.LFD.2.11.1405091245070.980@knanqh.ubzr>
+References: <CAD=FV=UEGJGHrdcXgs3EZ_wFXT8GnNeCOMt7CgdiiUzBzZ5Y0A@mail.gmail.com>
+ <alpine.LFD.2.11.1405081149190.980@knanqh.ubzr>
+ <CAD=FV=VtcLOh51LCmafzRMdqtDrwKXCqK6gE6V7OOOUe4gjwbA@mail.gmail.com>
+ <alpine.LFD.2.11.1405081329010.980@knanqh.ubzr>
+ <20140508192209.GH3693@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1405081600260.980@knanqh.ubzr>
+ <20140508205223.GI3693@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1405082058130.980@knanqh.ubzr>
+ <20140509091824.GL3693@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1405091245070.980@knanqh.ubzr>
+Message-ID: <20140509182245.GM3693@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 09, 2014 at 05:16:09PM +0100, Catalin Marinas wrote:
-> On Fri, May 02, 2014 at 04:24:09PM +0100, Will Deacon wrote:
-> > v7_coherent_user_range takes a virtual address range, cleans the D-side
-> > to PoU and then invalidates the I-side so that subsequent instruction
-> > fetches can see any new data written to the range in question.
-> > 
-> > Since cache maintenance by MVA is architected to execute in program
-> > order with respect to other cache maintenance operations specifying
-> > the same virtual address, we do not require a barrier between the
-> > D-side clean and the I-side invalidation.
-> > 
-> > This patch removes the redundant dsb.
-> > 
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm/mm/cache-v7.S | 1 -
-> >  1 file changed, 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
-> > index 615c99e38ba1..b040d3ca20ac 100644
-> > --- a/arch/arm/mm/cache-v7.S
-> > +++ b/arch/arm/mm/cache-v7.S
-> > @@ -282,7 +282,6 @@ ENTRY(v7_coherent_user_range)
-> >  	add	r12, r12, r2
-> >  	cmp	r12, r1
-> >  	blo	1b
-> > -	dsb	ishst
-> >  	icache_line_size r2, r3
-> >  	sub	r3, r2, #1
-> >  	bic	r12, r0, r3
+On Fri, May 09, 2014 at 02:00:54PM -0400, Nicolas Pitre wrote:
+> On Fri, 9 May 2014, Russell King - ARM Linux wrote:
 > 
-> The original implementation follows the ARMv7 ARM example for self
-> modifying code which has a DSB. I agree with you that the section B2.2.9
-> (ARMv7 ARM - Ordering of cache and branch predictor maintenance
-> operations) states that ops by MVA would be ordered with each-other.
+> > On Thu, May 08, 2014 at 09:37:15PM -0400, Nicolas Pitre wrote:
+> > > On Thu, 8 May 2014, Russell King - ARM Linux wrote:
+> > > 
+> > > > If you're in a preempt or SMP environment, provide a timer for udelay().
+> > > > IF you're in an environment with IRQs which can take a long time, use
+> > > > a timer for udelay().  If you're in an environment where the CPU clock
+> > > > can change unexpectedly, use a timer for udelay().
+> > > 
+> > > Longer delays are normally not a problem.  If they are, then simply 
+> > > disabling IRQs may solve it if absolutely required.  With much shorter 
+> > > delays than expected this is another story.
+> > > 
+> > > What about the following:
+> > > 
+> > > diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> > > index 7c4fada440..10030cc5a0 100644
+> > > --- a/arch/arm/kernel/smp.c
+> > > +++ b/arch/arm/kernel/smp.c
+> > > @@ -682,6 +682,15 @@ static int cpufreq_callback(struct notifier_block *nb,
+> > >  			cpufreq_scale(per_cpu(l_p_j_ref, cpu),
+> > >  					per_cpu(l_p_j_ref_freq, cpu),
+> > >  					freq->new);
+> > > +		/*
+> > > +		 * Another CPU might have called udelay() just before LPJ
+> > > +		 * and a shared CPU clock is increased.  That other CPU still
+> > > +		 * looping on the old LPJ value would return significantly
+> > > +		 * sooner than expected.  The actual fix is to provide a
+> > > +		 * timer based udelay() implementation instead.
+> > > +		 */
+> > > +		if (freq->old < freq->new)
+> > > +			pr_warn_once("*** udelay() on SMP is racy and may be much shorter than expected ***\n");
+> > >  	}
+> > >  	return NOTIFY_OK;
+> > >  }
+> > 
+> > No, because you're assuming this is just a SMP problem.  What about
+> > preempt, where you could preempt away from a udelay loop to change
+> > the CPU frequency, and then back again, possibly resulting in the
+> > CPU clock rate increasing and maybe a shorter delay if the switch
+> > from-change-clock-and-back is fast enough?  Remember that udelay()
+> > can be used for up to 2ms delays.
+> 
+> Well... that would be somewhat less likely but still possible yes.
+> 
+> So the only way to "solve" this might look similar in spirit to what 
+> Doug alluded to earlier i.e. increase a sequence number on 
+> CPUFREQ_PRECHANGE and increase it again on CPUFREQ_POSTCHANGE, and have 
+> udelay() compare the count sampled before reading lpj and after 
+> returning from the loop code.  When the sequence count doesn't match 
+> then suffice to perform some arbitrarily large extra loops.
 
-Those examples also don't make use of barrier options, so I wouldn't pay too
-much attention to them :)
+I'd much prefer just printing a warning at kernel boot time to report
+that the kernel is running with features which would make udelay() less
+than accurate.
 
-Still, I'll chase this up internally since the ARM ARM needs fixing.
+Remember, it should be usable for _short_ delays on slow machines as
+well as other stuff, and if we're going to start throwing stuff like
+the above at it, it's going to become very inefficient.
 
-Will
+And... I go back to what I've been saying all along: use a timer in
+this situation, don't rely on the loops-based udelay if you have
+preempt, USB interrupts, SMP etc.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
