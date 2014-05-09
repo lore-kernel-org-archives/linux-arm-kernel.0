@@ -1,80 +1,100 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 9 May 2014 09:27:26 -0400
-Subject: [PATCH 3/5] irqchip: crossbar: Skip some irqs from getting mapped
- to crossbar
-In-Reply-To: <536CD01F.2070506@ti.com>
-References: <1399299527-10955-1-git-send-email-r.sricharan@ti.com>	<1399299527-10955-4-git-send-email-r.sricharan@ti.com>	<536BD9D8.4080905@ti.com>	<20140508203659.GA5620@kahuna>	<CAD=GYpbQQxQgKd3oZcAuWrxoD4VrkKzpybd11qwxs405HSUVGw@mail.gmail.com>	<536C0DC4.7090309@ti.com>	<CAD=GYpav4mHaqo4jfb0ePchf3cvuvSnFKj_+osbrt_8-tYRRrQ@mail.gmail.com>	<536C2071.8040502@ti.com>
- <CAD=GYpbRn=LEthpAUX9LNBGTB4iDs7TGiSSgLJuuS0tSatRRJQ@mail.gmail.com>
- <536CD01F.2070506@ti.com>
-Message-ID: <536CD7BE.5020407@ti.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 09 May 2014 15:26:52 +0200
+Subject: [PATCH v5 0/3] ARM: sunxi: Add support for consumer infrared
+ devices
+In-Reply-To: <E54FF549-B53A-406B-9871-E2C3B1ED8157@hackerdom.ru>
+References: <1398871010-30681-1-git-send-email-bay@hackerdom.ru>
+ <536B8CDD.7040600@redhat.com>
+ <E54FF549-B53A-406B-9871-E2C3B1ED8157@hackerdom.ru>
+Message-ID: <536CD79C.8080800@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 09 May 2014 08:54 AM, Nishanth Menon wrote:
-> On 05/08/2014 11:22 PM, Joel Fernandes wrote:
->> On Thu, May 8, 2014 at 7:25 PM, Santosh Shilimkar
->> <santosh.shilimkar@ti.com> wrote:
-> [...]
->> Ok, thanks for pointing to the post.
+Hi,
+
+On 05/09/2014 03:21 PM, Alexander Bersenev wrote:
+> Hello, I am in Austria/Germany in 1-11 may. I plan to make v6 after returning back to Russia.
+
+Ok, when you do please also pick up this fix:
+https://github.com/jwrdegoede/linux-sunxi/commit/180a3e59361ceddeed26543529ca757cc8112fb0
+
+Which fixes an oops at startup.
+
+Other then needing that fix + coding style fixes it works well for me on
+the cubietruck. I'll try to also test it on sun4i and sun5i if I can find some
+time to do so.
+
+Regards,
+
+Hans
+
+
+> 
+> Best,
+> Alexander Bersenev
+> 
+>> 08 ??? 2014 ?., ? 15:55, Hans de Goede <hdegoede@redhat.com> ???????(?):
 >>
-> 
-> 
-> Yep - thanks Santosh for clarifying this. Now, we still have the
-> issues that I pointed out in [1] - without resolving which, we should
-> not enable crossbar for dra74x/72x.
-> 
-> A. taking example of PMU
-> 	interrupts = <GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH>
-> this wont work. instead the crossbar driver needs some sort of a hint
-> to know that it should not map these on crossbar register instead
-> assign GIC mapping directly.
-> 
-> I propose doing the following
-> #define GIC_CROSSBAR_PASSTHROUGH(irq_no) ((irq_no) | (0x1 << 31))
-> 
-> and dts will define the following:
-> interrupts = <GIC_SPI GIC_CROSSBAR_PASSTHROUGH(131) IRQ_TYPE_LEVEL_HIGH>
-> 
-> This will also work for the other cases (B.2, B.3)
-> 
-> For B.2: L3_APP_IRQ:
-> instead of:
-> interrupts = <GIC_SPI  5 IRQ_TYPE_LEVEL_HIGH>
-> we do:
-> interrupts = <GIC_SPI GIC_CROSSBAR_PASSTHROUGH(10) IRQ_TYPE_LEVEL_HIGH>
-> 
-> For B.3: NMI
-> interrupts = <GIC_SPI GIC_CROSSBAR_PASSTHROUGH(133) IRQ_TYPE_LEVEL_HIGH>
-> 
-We can't do add a flag to generic interrupt controller flags since its
-very specific to cross-bar.
-
-> xlate is easy ->
-> 
-> diff --git a/drivers/irqchip/irq-crossbar.c
-> b/drivers/irqchip/irq-crossbar.c
-> index de021638..fd09ab4 100644
-> --- a/drivers/irqchip/irq-crossbar.c
-> +++ b/drivers/irqchip/irq-crossbar.c
-> @@ -112,6 +112,10 @@ static int crossbar_domain_xlate(struct
-> irq_domain *d,
->  {
->         unsigned long ret;
-> 
-> +       /* Check to see if direct GIC mapping is required */
-> +       if (intspec[1] & BIT(31))
-> +               return intspec[1] & ~BIT[31];
-> +
->         ret = get_prev_map_irq(intspec[1]);
->         if (!IS_ERR_VALUE(ret))
->                 goto found;
-> 
-> But then, crossbar_domain_map and crossbar_domain_unmap need hints as
-> well to know that there is no corresponding crossbar registers.
-> Have'nt thought through that yet. Looking to hear about opinions here.
-> 
-> 
-May be we need additional property like reserved to take care of 1:1
-map.
-
-ti,irqs-direct-map = <131 132>;
+>> Hi,
+>>
+>>> On 04/30/2014 05:16 PM, Alexander Bersenev wrote:
+>>> This patch introduces Consumer IR(CIR) support for sunxi boards.
+>>>
+>>> This is based on Alexsey Shestacov's work based on the original driver 
+>>> supplied by Allwinner.
+>>>
+>>> Signed-off-by: Alexander Bersenev <bay@hackerdom.ru>
+>>> Signed-off-by: Alexsey Shestacov <wingrime@linux-sunxi.org>
+>>
+>> Alexander, v5 still has various issues which need fixing,
+>> do you plan to do a v6 soon ?
+>>
+>> Regards,
+>>
+>> Hans
+>>
+>>>
+>>> ---
+>>> Changes since version 1: 
+>>> - Fix timer memory leaks 
+>>> - Fix race condition when driver unloads while interrupt handler is active
+>>> - Support Cubieboard 2(need testing)
+>>>
+>>> Changes since version 2:
+>>> - More reliable keydown events
+>>> - Documentation fixes
+>>> - Rename registers accurding to A20 user manual
+>>> - Remove some includes, order includes alphabetically
+>>> - Use BIT macro
+>>> - Typo fixes
+>>>
+>>> Changes since version 3:
+>>> - Split the patch on smaller parts
+>>> - More documentation fixes
+>>> - Add clock-names in DT
+>>> - Use devm_clk_get function to get the clocks
+>>> - Removed gpios property from ir's DT
+>>> - Changed compatible from allwinner,sunxi-ir to allwinner,sun7i-a20-ir in DT
+>>> - Use spin_lock_irq instead spin_lock_irqsave in interrupt handler
+>>> - Add myself in the copyright ;)
+>>> - Coding style and indentation fixes
+>>>
+>>> Changes since version 4:
+>>> - Try to fix indentation errors by sending patches with git send-mail
+>>>
+>>> Alexander Bersenev (3):
+>>>  ARM: sunxi: Add documentation for sunxi consumer infrared devices
+>>>  ARM: sunxi: Add driver for sunxi IR controller
+>>>  ARM: sunxi: Add IR controller support in DT on A20
+>>>
+>>> .../devicetree/bindings/media/sunxi-ir.txt         |  23 ++
+>>> arch/arm/boot/dts/sun7i-a20-cubieboard2.dts        |   6 +
+>>> arch/arm/boot/dts/sun7i-a20-cubietruck.dts         |   6 +
+>>> arch/arm/boot/dts/sun7i-a20.dtsi                   |  31 +++
+>>> drivers/media/rc/Kconfig                           |  10 +
+>>> drivers/media/rc/Makefile                          |   1 +
+>>> drivers/media/rc/sunxi-ir.c                        | 303 +++++++++++++++++++++
+>>> 7 files changed, 380 insertions(+)
+>>> create mode 100644 Documentation/devicetree/bindings/media/sunxi-ir.txt
+>>> create mode 100644 drivers/media/rc/sunxi-ir.c
+>>>
