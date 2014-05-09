@@ -1,85 +1,51 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 09 May 2014 22:46:34 +0900
-Subject: [PATCH v3 1/2] ARM: EXYNOS: Map SYSRAM through generic SRAM
- bindings
-In-Reply-To: <536C5E40.90405@gmail.com>
-References: <1399522592-23618-1-git-send-email-sachin.kamat@linaro.org>
- <536BAE39.70504@samsung.com> <034b01cf6b2c$5b5d06b0$12171410$@samsung.com>
- <536C5E40.90405@gmail.com>
-Message-ID: <536CDC3A.4050700@samsung.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 9 May 2014 14:51:53 +0100
+Subject: [PATCH] i2c: exynos5: Initialise Samsung High Speed I2C
+ controller early
+In-Reply-To: <CAHfPSqB5+mLiC07jbEpeUgW63pZVk700SkYGxToO7GRAsFm_nQ@mail.gmail.com>
+References: <1398350916-885-1-git-send-email-ch.naveen@samsung.com>
+ <20140424162558.GB12304@sirena.org.uk>
+ <CAHfPSqB5+mLiC07jbEpeUgW63pZVk700SkYGxToO7GRAsFm_nQ@mail.gmail.com>
+Message-ID: <20140509135153.GM12304@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/09/14 13:49, Tomasz Figa wrote:
-> Hi Kukjin,
->
-Hi Tomasz,
+On Fri, May 09, 2014 at 05:50:00PM +0530, Naveen Krishna Ch wrote:
+> On 24 April 2014 21:55, Mark Brown <broonie@kernel.org> wrote:
 
-> On 09.05.2014 04:14, Kukjin Kim wrote:
->> Tomasz Figa wrote:
->>>
->>> Hi Sachin,
->>>
->>> On 08.05.2014 06:16, Sachin Kamat wrote:
->>>> Instead of hardcoding the SYSRAM details for each SoC,
->>>> pass this information through device tree (DT) and make
->>>> the code SoC agnostic. Generic SRAM bindings are used
->>>> for achieving this.
->>>>
->>>> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
->>>> Acked-by: Arnd Bergmann <arnd@arndb.de>
->>>> Acked-by: Heiko Stuebner <heiko@sntech.de>
->>>> ---
->>>> Changes since v2.
->>>> * Updated sysram node for Universal C210 board - Thanks to
->>>> Tomasz Figa for testing and updating the same.
->>>> * Added error handling code.
->>>> * Break if matching node found.
->>>> * Remove unnecessary error messages.
->>>>
->>>> This patch is based on linux next (next-20140501) on top of
->>>> my Kconfig consolidation patch
->>>> http://comments.gmane.org/gmane.linux.kernel.samsung-soc/28642
->>>>
->>>> Tested on 4210/4412 Origen, 5250/5420 Arndale and SMDK5420 boards.
->>>> ---
->>>> arch/arm/Kconfig | 1 +
->>>> arch/arm/boot/dts/exynos4210-universal_c210.dts | 15 ++++++
->>>> arch/arm/boot/dts/exynos4210.dtsi | 18 +++++++
->>>> arch/arm/boot/dts/exynos4x12.dtsi | 18 +++++++
->>>> arch/arm/boot/dts/exynos5250.dtsi | 18 +++++++
->>>> arch/arm/boot/dts/exynos5420.dtsi | 18 +++++++
->>>> arch/arm/mach-exynos/common.h | 1 +
->>>> arch/arm/mach-exynos/exynos.c | 64
->> ----------------------
->>> -
->>>> arch/arm/mach-exynos/firmware.c | 8 ++-
->>>> arch/arm/mach-exynos/include/mach/map.h | 7 ---
->>>> arch/arm/mach-exynos/platsmp.c | 56
->> ++++++++++++++++++--
->>>> 11 files changed, 148 insertions(+), 76 deletions(-)
->>>>
->>>
->>> Looks good, thanks.
->>>
->>> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
->>>
->> Looks good to me but I think, we need to change the name of 'sram'
->> because
->> it can cause some confusing, actually it is not matching _real_ sram
->> area on
->> the SoCs. When we upstreamed regarding patch, I decided the name to use
->> 'SYSRAM', it was called another name in datasheet though. So, I'd like to
->> use 'sysram' instead of 'sram' as we used before.
->>
->> I will change the name when I apply this series in this weekend, if
->> you guys
->> have no objection.
->
-> You mean s/sram/sysram/ in compatible strings of Exynos-specific
-> reserved areas? If yes, I'm fine, it might be even better. Just remember
-> to update documentation in patch 2/2 as well.
->
-Yes, of course ;-)
+> >> Such solution has been proposed by Mark Brown to fix the problem of
+> >> the regulators not beeing available on the peripheral device probe():
+> >> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-March/011971.html
 
-- Kukjin
+> > What specifically is this needed for?  We *should* be able to use
+> > deferred probe for most things, but I know that not all subsystems are
+> > able to yet.
+
+> DRM related drivers like DP, FIMD, HDMI, Mixer wants to be probed ASAP
+> during the boot.
+> The real problem comes when, one of these drivers do a regulator_get().
+
+> If the physical supply  is not enabled/hookedup the regulator_get() call
+> assumes that physical supply is present and returns a
+> "dummy_regulator" (But, not an error).
+
+> Because of which, Display and several other devices fails to work.
+
+These drivers are buggy, if they geniunely expect and handle a missing
+supply then they should be using regulator_get_optional() to request the
+regulator and even if they don't the use of subsys_initcall() is not
+going to fix anything here - if a dummy regulator is going to be
+returned the time things are probed won't make a difference.
+
+> I2C, I2C_TUNNEL, SPI and DMA drivers are required as subsys_initcall()
+> for similar reason.
+
+What makes you say this?  Typically those drivers don't use regulators
+at all.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140509/52180e66/attachment.sig>
