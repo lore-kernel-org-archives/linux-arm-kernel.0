@@ -1,30 +1,54 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 9 May 2014 19:18:55 +0100
-Subject: [PATCH 1/3] arm64: Enable OPP
-In-Reply-To: <CAGo_u6oL06G7jk8_X-SH73oWCAHX5vTj7ViC1AyaDhDLJEvWmw@mail.gmail.com>
-References: <1399653631-4938-1-git-send-email-broonie@kernel.org>
- <CAGo_u6rGEWwywQ5JKh1ROhkOjrkWrM35PdWAooed26oak=1irA@mail.gmail.com>
- <20140509171120.GS12304@sirena.org.uk>
- <CAGo_u6oL06G7jk8_X-SH73oWCAHX5vTj7ViC1AyaDhDLJEvWmw@mail.gmail.com>
-Message-ID: <20140509181855.GW12304@sirena.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 9 May 2014 19:25:15 +0100
+Subject: [PATCH 2/8] ARM: cache: remove redundant dsb instruction from
+ v7_coherent_user_range
+In-Reply-To: <20140509161609.GM7950@arm.com>
+References: <1399044255-20435-1-git-send-email-will.deacon@arm.com>
+ <1399044255-20435-3-git-send-email-will.deacon@arm.com>
+ <20140509161609.GM7950@arm.com>
+Message-ID: <20140509182515.GG23083@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 09, 2014 at 12:17:23PM -0500, menon.nishanth at gmail.com wrote:
-> On Fri, May 9, 2014 at 12:11 PM, Mark Brown <broonie@kernel.org> wrote:
+On Fri, May 09, 2014 at 05:16:09PM +0100, Catalin Marinas wrote:
+> On Fri, May 02, 2014 at 04:24:09PM +0100, Will Deacon wrote:
+> > v7_coherent_user_range takes a virtual address range, cleans the D-side
+> > to PoU and then invalidates the I-side so that subsequent instruction
+> > fetches can see any new data written to the range in question.
+> > 
+> > Since cache maintenance by MVA is architected to execute in program
+> > order with respect to other cache maintenance operations specifying
+> > the same virtual address, we do not require a barrier between the
+> > D-side clean and the I-side invalidation.
+> > 
+> > This patch removes the redundant dsb.
+> > 
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > ---
+> >  arch/arm/mm/cache-v7.S | 1 -
+> >  1 file changed, 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
+> > index 615c99e38ba1..b040d3ca20ac 100644
+> > --- a/arch/arm/mm/cache-v7.S
+> > +++ b/arch/arm/mm/cache-v7.S
+> > @@ -282,7 +282,6 @@ ENTRY(v7_coherent_user_range)
+> >  	add	r12, r12, r2
+> >  	cmp	r12, r1
+> >  	blo	1b
+> > -	dsb	ishst
+> >  	icache_line_size r2, r3
+> >  	sub	r3, r2, #1
+> >  	bic	r12, r0, r3
+> 
+> The original implementation follows the ARMv7 ARM example for self
+> modifying code which has a DSB. I agree with you that the section B2.2.9
+> (ARMv7 ARM - Ordering of cache and branch predictor maintenance
+> operations) states that ops by MVA would be ordered with each-other.
 
-> > That's for the user visible symbol but OPP is also enableable via select
-> > - the fix here may be to remove both the visibility check and the
-> > dependency.
+Those examples also don't make use of barrier options, so I wouldn't pay too
+much attention to them :)
 
-> That is reasonable.
+Still, I'll chase this up internally since the ARM ARM needs fixing.
 
-OK, I've sent a patch - now I look at what the OPP stuff is doing that
-definitely seems like a better approach.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140509/f08e7fb9/attachment.sig>
+Will
