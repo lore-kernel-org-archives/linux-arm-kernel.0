@@ -1,86 +1,277 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 9 May 2014 11:30:00 +0300
-Subject: omap4-panda-es boot issues with v3.15-rc4
-In-Reply-To: <536BBAF5.8070906@ti.com>
-References: <536B7E44.2040303@ti.com>	<7hppjos2w2.fsf@paris.lan>
- <CAGa+x84VB3CXDm71JWxHx1-Qk1xVNeXdwUjZnb42_wg+piOzzA@mail.gmail.com>
- <536BBAF5.8070906@ti.com>
-Message-ID: <536C9208.6000704@ti.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 9 May 2014 11:31:10 +0300
+Subject: [PATCH 3/4] OMAPDSS: panel-sharp-ls037v7dw01: add device tree
+ support
+In-Reply-To: <20140508233300.GI2198@atomide.com>
+References: <1398815562-24113-1-git-send-email-tony@atomide.com>
+ <1398815562-24113-4-git-send-email-tony@atomide.com>
+ <5369EAE7.3030705@ti.com> <20140507150343.GA9502@atomide.com>
+ <536A5920.1020908@ti.com> <20140507175919.GH9502@atomide.com>
+ <20140508233300.GI2198@atomide.com>
+Message-ID: <536C924E.5000307@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grygorii,
-
-On 05/08/2014 08:12 PM, Grygorii Strashko wrote:
-> Hi,
-> 
-> On 05/08/2014 06:40 PM, Kevin Hilman wrote:
->> On Thu, May 8, 2014 at 8:31 AM, Kevin Hilman <khilman@linaro.org> wrote:
->>> Roger Quadros <rogerq@ti.com> writes:
+On 09/05/14 02:33, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [140507 11:00]:
+>> * Tomi Valkeinen <tomi.valkeinen@ti.com> [140507 09:03]:
+>>> On 07/05/14 18:03, Tony Lindgren wrote:
+>>>>
+>>>> BTW, I'm also personally fine with all five gpios showing in a single
+>>>> gpios property, I'm not too exited about naming anything in DT..
 >>>
->>>> Hi,
->>>>
->>>> Nishant pointed me to a booting issue with omap4-panda-es on linux-next but I'm observing
->>>> similar issues, although less frequent, with v3.15-rc4 as well.
->>>>
->>>> Configuration:
->>>>
->>>> - kernel v3.15-rc4 or linux-next (20140507)
->>>> - multi_v7_defconfig with LEDS_TRIGGER_HEARTBEAT and LEDS_GPIO enabled
->>>> - u-boot/master       173d294b94cf
->>>>
->>>> Observations:
->>>>
->>>> - Out of 10 boots a few may not succeed and hang midway without any warnings. Heartbeat LED stops.
->>>> e.g. http://www.hastebin.com/ebumojegoq.vhdl
->>>>
->>>> - Hang more noticeable on linux-next (20140507) than on v3.15-rc4
+>>> I don't have a strong opinion here. I don't have much experience with
+>>> DT, especially with making bindings compatible with other ones.
 >>>
->>> I've beeen noticing the same thing for awhile with my boot tests.  For
->>> me, next-20140508 is failing most of the time now.
->>>
->>>> - Hang more noticeable with USB_EHCI_HCD enabled but hang observed even without USB_EHCI_HCD.
->>>> Maybe related to when high speed interrupts occur in the boot process.
->>>>
->>>> - On successful boots following warning is seen
->>>> [    4.010375] gic_timer_retrigger: lost localtimer interrupt
->>>>
->>>> - On successful boots heartbeat LED stops blinking after boot process and left idle. LED can remain stuck in
->>>> ON state as well. It does blink again when doing activity on console.
->>>>
->>>> Workaround:
->>>>
->>>> - Disabling CPU_IDLE or even just disabling C3 (MPU OSWR) seems to fix all the above issues.
->>>>
->>>> I don't really know what exactly is the issue but it seems to be specific to OMAP4, GIC, MPU OSWR.
->>>
->>> I can confirm that disabling CONFIG_CPU_IDLE seems to make the problem
->>> go away.  Hmm....
+>>> I'd just forget the simple-panel, and have single gpio array.
 >>
->> Another finger pointing in the same direction: omap2plus_defconfig +
->> CONFIG_CPU_IDLE=y also fails to boot rather consistently in today's
->> -next.
+>> Well if it's a don't care flag for both of us, let's try to use
+>> the existing standard for simple-panel.txt and add mode-gpios
+>> property. I'll post a patch for that.
 > 
-> Is it observed on OMAP4460 only?
-> if no - it's smth new.
-> if yes - may be some racing condition is still present.
-
-I could observe it on 4430 as well, but just less frequent. 2/10 times on 4430 vs 7/10 times on 4460.
-
+> Here's an updated version using enable-gpios, reset-gpios and
+> mode-gpios. So it follows simple-panel.txt and adds mode-gpios
+> that's currently specific to this panel only.
 > 
-> Roger, is it possible to connect debugger and check GIC distributor status
-> (gic_dist_base_addr + GIC_DIST_CTRL) in case of failure?
+> Also updated for -EPROBE_DEFER handling, tested that by changing
+> one of the GPIOs to be a twl4030 GPIO.
 
-Sorry, I do not have a debugger with me at the moment.
-> 
-> According to the current code (OMAP4460) it's possible that CPU0 will stuck only in case
-> if CPU1 is kicked off from PWRDM_POWER_OFF state somehow but not by CPU0. 
-> Code assumes that CPU1 can exit from PWRDM_POWER_OFF state only when CPU0 calls clkdm_wakeup(cpu_clkdm[1]); 
-> 
-> Sorry, but I'm not able to debug it now.
+To speed things up a bit, I made the changes I suggested. Compile tested
+only.
 
-Stupid question, is hearbeat LED even supposed to stop blinking in C3 state?
-It would make a user think that the board is dead.
 
-cheers,
--roger
+>From f8360778e8bc96096cbb1793a18a8c240376ca09 Mon Sep 17 00:00:00 2001
+From: Tony Lindgren <tony@atomide.com>
+Date: Mon, 28 Apr 2014 20:22:21 -0700
+Subject: [PATCH] OMAPDSS: panel-sharp-ls037v7dw01: add device tree support
+
+Add device tree support for sharp-ls037v7dw01 panel.
+
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+---
+ .../bindings/video/sharp,ls037v7dw01.txt           | 44 ++++++++++
+ .../omap2/displays-new/panel-sharp-ls037v7dw01.c   | 95 +++++++++++++++++++++-
+ 2 files changed, 136 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/video/sharp,ls037v7dw01.txt
+
+diff --git a/Documentation/devicetree/bindings/video/sharp,ls037v7dw01.txt b/Documentation/devicetree/bindings/video/sharp,ls037v7dw01.txt
+new file mode 100644
+index 000000000000..2a60fd9a2607
+--- /dev/null
++++ b/Documentation/devicetree/bindings/video/sharp,ls037v7dw01.txt
+@@ -0,0 +1,44 @@
++SHARP LS037V7DW01 TFT-LCD panel
++===================================
++
++Required properties:
++- compatible: "sharp,ls037v7dw01"
++
++Optional properties:
++- label: a symbolic name for the panel
++- enable-gpios: a GPIO spec for the optional enable pin
++  this pin is the INI pin as specified in the LS037V7DW01.pdf file.
++- reset-gpios: a GPIO spec for the optional reset pin
++  this pin is the RESB pin as specified in the LS037V7DW01.pdf file.
++- mode-gpios: a GPIO
++  ordered MO, LR, and UD as specified in the LS037V7DW01.pdf file.
++
++Required nodes:
++- Video port for DPI input
++
++This panel can have zero to five GPIOs to configure
++to change configuration between QVGA and VGA mode
++and the scan direction. As these pins can be also
++configured with external pulls, all the GPIOs are
++considered optional with holes in the array.
++
++Example
++-------
++
++Example when connected to a omap2+ based device:
++
++lcd0: display {
++	compatible = "sharp,ls037v7dw01";
++	power-supply = <&lcd_3v3>;
++	enable-gpios = <&gpio5 24 GPIO_ACTIVE_HIGH>;	/* gpio152, lcd INI */
++	reset-gpios = <&gpio5 27 GPIO_ACTIVE_HIGH>;	/* gpio155, lcd RESB */
++	mode-gpios = <&gpio5 26 GPIO_ACTIVE_HIGH	/* gpio154, lcd MO */
++		      &gpio1 2 GPIO_ACTIVE_HIGH		/* gpio2, lcd LR */
++		      &gpio1 3 GPIO_ACTIVE_HIGH>;	/* gpio3, lcd UD */
++
++	port {
++		lcd_in: endpoint {
++			remote-endpoint = <&dpi_out>;
++		};
++	};
++};
+diff --git a/drivers/video/fbdev/omap2/displays-new/panel-sharp-ls037v7dw01.c b/drivers/video/fbdev/omap2/displays-new/panel-sharp-ls037v7dw01.c
+index 8adde628ad38..91eeb2ec93a8 100644
+--- a/drivers/video/fbdev/omap2/displays-new/panel-sharp-ls037v7dw01.c
++++ b/drivers/video/fbdev/omap2/displays-new/panel-sharp-ls037v7dw01.c
+@@ -12,15 +12,18 @@
+ #include <linux/delay.h>
+ #include <linux/gpio.h>
+ #include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_gpio.h>
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
+-
++#include <linux/regulator/consumer.h>
+ #include <video/omapdss.h>
+ #include <video/omap-panel-data.h>
+ 
+ struct panel_drv_data {
+ 	struct omap_dss_device dssdev;
+ 	struct omap_dss_device *in;
++	struct regulator *vcc;
+ 
+ 	int data_lines;
+ 
+@@ -95,12 +98,21 @@ static int sharp_ls_enable(struct omap_dss_device *dssdev)
+ 	if (omapdss_device_is_enabled(dssdev))
+ 		return 0;
+ 
+-	in->ops.dpi->set_data_lines(in, ddata->data_lines);
++	if (ddata->data_lines)
++		in->ops.dpi->set_data_lines(in, ddata->data_lines);
+ 	in->ops.dpi->set_timings(in, &ddata->videomode);
+ 
++	if (ddata->vcc) {
++		r = regulator_enable(ddata->vcc);
++		if (r != 0)
++			return r;
++	}
++
+ 	r = in->ops.dpi->enable(in);
+-	if (r)
++	if (r) {
++		regulator_disable(ddata->vcc);
+ 		return r;
++	}
+ 
+ 	/* wait couple of vsyncs until enabling the LCD */
+ 	msleep(50);
+@@ -136,6 +148,9 @@ static void sharp_ls_disable(struct omap_dss_device *dssdev)
+ 
+ 	in->ops.dpi->disable(in);
+ 
++	if (ddata->vcc)
++		regulator_disable(ddata->vcc);
++
+ 	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
+ }
+ 
+@@ -243,6 +258,68 @@ static int sharp_ls_probe_pdata(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static struct gpio_desc *
++sharp_ls_get_gpio_of(struct device *dev, int index, int val, char *desc)
++{
++	struct gpio_desc *gpio;
++
++	gpio = devm_gpiod_get_index(dev, desc, index);
++	if (IS_ERR(gpio))
++		return gpio;
++
++	gpiod_direction_output(gpio, val);
++
++	return gpio;
++}
++
++static int sharp_ls_probe_of(struct platform_device *pdev)
++{
++	struct panel_drv_data *ddata = platform_get_drvdata(pdev);
++	struct device_node *node = pdev->dev.of_node;
++	struct omap_dss_device *in;
++
++	ddata->vcc = devm_regulator_get(&pdev->dev, "envdd");
++	if (IS_ERR(ddata->vcc)) {
++		dev_err(&pdev->dev, "failed to get regulator\n");
++		return PTR_ERR(ddata->vcc);
++	}
++
++	/* lcd INI */
++	ddata->ini_gpio = sharp_ls_get_gpio_of(&pdev->dev, 3, 0, "enable");
++	if (PTR_ERR(ddata->ini_gpio) == -EPROBE_DEFER)
++		return -EPROBE_DEFER;
++
++	/* lcd RESB */
++	ddata->resb_gpio = sharp_ls_get_gpio_of(&pdev->dev, 0, 0, "reset");
++	if (PTR_ERR(ddata->resb_gpio) == -EPROBE_DEFER)
++		return -EPROBE_DEFER;
++
++	/* lcd MO */
++	ddata->mo_gpio = sharp_ls_get_gpio_of(&pdev->dev, 0, 0, "mode");
++	if (PTR_ERR(ddata->mo_gpio) == -EPROBE_DEFER)
++		return -EPROBE_DEFER;
++
++	/* lcd LR */
++	ddata->lr_gpio = sharp_ls_get_gpio_of(&pdev->dev, 1, 1, "mode");
++	if (PTR_ERR(ddata->lr_gpio) == -EPROBE_DEFER)
++		return -EPROBE_DEFER;
++
++	/* lcd UD */
++	ddata->ud_gpio = sharp_ls_get_gpio_of(&pdev->dev, 2, 1, "mode");
++	if (PTR_ERR(ddata->ud_gpio) == -EPROBE_DEFER)
++		return -EPROBE_DEFER;
++
++	in = omapdss_of_find_source_for_first_ep(node);
++	if (IS_ERR(in)) {
++		dev_err(&pdev->dev, "failed to find video source\n");
++		return PTR_ERR(in);
++	}
++
++	ddata->in = in;
++
++	return 0;
++}
++
+ static int sharp_ls_probe(struct platform_device *pdev)
+ {
+ 	struct panel_drv_data *ddata;
+@@ -259,6 +336,10 @@ static int sharp_ls_probe(struct platform_device *pdev)
+ 		r = sharp_ls_probe_pdata(pdev);
+ 		if (r)
+ 			return r;
++	} else if (pdev->dev.of_node) {
++		r = sharp_ls_probe_of(pdev);
++		if (r)
++			return r;
+ 	} else {
+ 		return -ENODEV;
+ 	}
+@@ -302,12 +383,20 @@ static int __exit sharp_ls_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static const struct of_device_id sharp_ls_of_match[] = {
++	{ .compatible = "omapdss,sharp,ls037v7dw01", },
++	{},
++};
++
++MODULE_DEVICE_TABLE(of, sharp_ls_of_match);
++
+ static struct platform_driver sharp_ls_driver = {
+ 	.probe = sharp_ls_probe,
+ 	.remove = __exit_p(sharp_ls_remove),
+ 	.driver = {
+ 		.name = "panel-sharp-ls037v7dw01",
+ 		.owner = THIS_MODULE,
++		.of_match_table = sharp_ls_of_match,
+ 	},
+ };
+ 
+-- 
+1.9.1
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140509/b5256261/attachment-0001.sig>
