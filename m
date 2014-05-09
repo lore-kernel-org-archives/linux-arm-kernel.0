@@ -1,40 +1,35 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Fri, 9 May 2014 22:52:18 +0200
-Subject: [PATCHv3 3/3] edac: altera: Add EDAC support for Altera SDRAM
-In-Reply-To: <CAF03EBeKbXr-7+qeARkBRXjystMjs4yEWnmw7q8tgJv9-SPgXA@mail.gmail.com>
-References: <1399330337-16748-1-git-send-email-tthayer@altera.com>
- <1399330337-16748-4-git-send-email-tthayer@altera.com>
- <20140508120524.GF12548@pd.tnic>
- <CAF03EBecxtMr1670ktQKTAZX_kHeZWz1SwuEk373B99BoVjbDw@mail.gmail.com>
- <20140509135259.GC16260@pd.tnic>
- <CAF03EBeKbXr-7+qeARkBRXjystMjs4yEWnmw7q8tgJv9-SPgXA@mail.gmail.com>
-Message-ID: <20140509205218.GA16051@pd.tnic>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Fri, 9 May 2014 14:04:25 -0700
+Subject: [PATCH] RFT: pinctrl: msm: switch to using generic GPIO irqchip
+ helpers
+In-Reply-To: <CACRpkdb7ctDocntcPG_E4b_an2G8VNd+ei0N+Uk_7XtsFssiEA@mail.gmail.com>
+References: <1398794794-28920-1-git-send-email-linus.walleij@linaro.org>
+ <CACRpkdb7ctDocntcPG_E4b_an2G8VNd+ei0N+Uk_7XtsFssiEA@mail.gmail.com>
+Message-ID: <20140509210424.GA25733@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 09, 2014 at 03:31:53PM -0500, Thor Thayer wrote:
-> Yes, good point. Our hardware can't recover from Double Bit Errors so
-> I'll go back to the panic() in that path. I like the flexibility of
-> the command line parameter though...
+On Fri 09 May 01:33 PDT 2014, Linus Walleij wrote:
 
-Like to panic by default when the machine is booted normally but to be
-able to turn off the panicking with a module parameter?
+> On Tue, Apr 29, 2014 at 8:06 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> 
+> > This switches the Qualcomm MSM pin control driver over to using
+> > the generic GPIO irqchip helpers.
+> >
+> > Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> > Cc: Stephen Boyd <sboyd@codeaurora.org>
+> > Cc: Josh Cartwright <joshc@codeaurora.org>
+> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> Anyone up for testing this patch?
+> 
+> Bj?rn? Andy?
 
-If so, then you could probably implement a trivial setter called
+Sorry for the delay.
 
-edac_mc_set_panic_on_ue() in a separate patch.
+This looks good and seems to work fine on my 8974 board.
 
-Then, you call it at the end of altr_sdram_probe().
+Acked-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
 
-If you want to turn it off again, you do
-
-echo "0" > /sys/module/edac_core/parameters/edac_mc_panic_on_ue
-
-Something like that...
-
--- 
-Regards/Gruss,
-    Boris.
-
-Sent from a fat crate under my desk. Formatting is fine.
---
+Regards,
+Bjorn
