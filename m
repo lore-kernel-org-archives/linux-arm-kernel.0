@@ -1,39 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 09 May 2014 08:59:12 +0200
-Subject: [PATCH] pci: rcar host needs OF
-In-Reply-To: <9614403.Lyniq7F3TJ@wuerfel>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Fri, 9 May 2014 12:36:20 +0530
+Subject: [PATCH] mdio_bus: fix devm_mdiobus_alloc_size export
+In-Reply-To: <1399560433-1402630-2-git-send-email-arnd@arndb.de>
 References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
- <CAMuHMdWBzBneDqyDxK5HU3Bt_5CyRfTM_f_6YGJHokG_v17_sw@mail.gmail.com>
- <9614403.Lyniq7F3TJ@wuerfel>
-Message-ID: <13437915.HeCZ0zGaLk@wuerfel>
+ <1399560433-1402630-2-git-send-email-arnd@arndb.de>
+Message-ID: <CA+V-a8vt5=MB8SipxRKc99hLaXt8m=3UmSBLRCX20M0c1jcJLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 May 2014 17:21:54 Arnd Bergmann wrote:
-> On Thursday 08 May 2014 17:16:32 Geert Uytterhoeven wrote:
-> > On Thu, May 8, 2014 at 5:06 PM, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
-> > >> @@ -27,7 +27,7 @@ config PCI_TEGRA
-> > >>
-> > >>   config PCI_RCAR_GEN2
-> > >>         bool "Renesas R-Car Gen2 Internal PCI controller"
-> > >> -       depends on ARCH_SHMOBILE || (ARM && COMPILE_TEST)
-> > >> +       depends on ARCH_SHMOBILE || (ARM && OF && COMPILE_TEST)
-> > >>         help
-> > >>           Say Y here if you want internal PCI support on R-Car Gen2 SoC.
-> > >>           There are 3 internal PCI controllers available with a single
-> > >>
-> > >
-> > > This driver /should/ be able to be built for just the platform case
-> > > so it sounds like f8f2fe7355fb stopped this but no-one has yet to
-> > > notice.
-> > 
-> > You mean include/linux/of_pci.h should provide a dummy version of
-> > of_irq_parse_and_map_pci() returning 0 in case OF=n?
-> 
-> Good idea, I'll give this patch some testing in the randconfig builder,
-> replacing the one above.
+On Thu, May 8, 2014 at 8:16 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> commit 6d48f44b7b2 "mdio_bus: implement devm_mdiobus_alloc/devm_mdiobus_free"
+> introduced a new function devm_mdiobus_alloc_size() but added an export
+> for a different function devm_mdiobus_alloc(), which was obviously
+> a simple mistake that leads to  build error whenever this function is
+> used from a loadable module:
+>
+> ERROR: "devm_mdiobus_alloc_size" [drivers/net/ethernet/ti/davinci_mdio.ko] undefined!
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Grygorii Strashko <grygorii.strashko@ti.com>
+> Cc: Florian Fainelli <f.fainelli@gmail.com>
+> Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> Cc: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+> Cc: David S. Miller <davem@davemloft.net>
+> Cc: netdev at vger.kernel.org
 
-The first version was flawed, I submitted a new patch "[PATCH] of/irq:
-provide int of_irq_parse_and_map_pci wrapper" now.
+Acked-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
 
-	Arnd
+Thanks,
+--Prabhakar Lad
+
+> ---
+>  drivers/net/phy/mdio_bus.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/net/phy/mdio_bus.c b/drivers/net/phy/mdio_bus.c
+> index 68a9a38..a628496 100644
+> --- a/drivers/net/phy/mdio_bus.c
+> +++ b/drivers/net/phy/mdio_bus.c
+> @@ -117,7 +117,7 @@ struct mii_bus *devm_mdiobus_alloc_size(struct device *dev, int sizeof_priv)
+>
+>         return bus;
+>  }
+> -EXPORT_SYMBOL_GPL(devm_mdiobus_alloc);
+> +EXPORT_SYMBOL_GPL(devm_mdiobus_alloc_size);
+>
+>  /**
+>   * devm_mdiobus_free - Resource-managed mdiobus_free()
+> --
+> 1.8.3.2
+>
