@@ -1,33 +1,80 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Fri, 9 May 2014 14:36:21 +0800
-Subject: [PATCH v5 13/14] ARM: dts: Add PMU support in HiP04
-In-Reply-To: <20140507165331.GE12692@quad.lixom.net>
-References: <1399473888-12947-1-git-send-email-haojian.zhuang@linaro.org>
- <1399473888-12947-14-git-send-email-haojian.zhuang@linaro.org>
- <20140507165331.GE12692@quad.lixom.net>
-Message-ID: <CAD6h2NT7qqP3netdOn8wXA-_zjY1Kk2_W9uUBjOyO1gxkBwNCg@mail.gmail.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 9 May 2014 09:36:44 +0300
+Subject: [PATCH] ARM: OMAP5: DSS hwmod data
+In-Reply-To: <alpine.DEB.2.02.1405081558570.23579@utopia.booyaka.com>
+References: <1394619996-3525-1-git-send-email-tomi.valkeinen@ti.com>
+ <alpine.DEB.2.02.1405080432570.23579@utopia.booyaka.com>
+ <536B1A9C.7050006@ti.com>
+ <alpine.DEB.2.02.1405081558570.23579@utopia.booyaka.com>
+Message-ID: <536C777C.8000600@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 May 2014 00:53, Olof Johansson <olof@lixom.net> wrote:
-> On Wed, May 07, 2014 at 10:44:47PM +0800, Haojian Zhuang wrote:
->> From: Kefeng Wang <kefeng.wang@linaro.org>
+On 08/05/14 19:01, Paul Walmsley wrote:
+> Hi Archit,
+> 
+> On Thu, 8 May 2014, Archit Taneja wrote:
+> 
+>> Hi Paul,
 >>
->> ARM Performance Monitor Units are available on the HiP04.
->> So add the support in the dtsi.
+>> On Thursday 08 May 2014 10:07 AM, Paul Walmsley wrote:
+>>> Hi,
+>>>
+>>> On Wed, 12 Mar 2014, Tomi Valkeinen wrote:
+>>>
+>>>> This patch adds hwmod data for omap5 display subsystem. I have tested this
+>>>> on
+>>>> omap5-uevm with a DSI panel. I cannot test omap5-uevm's hdmi output yet,
+>>>> as the
+>>>> mainline is missing omap5 HDMI driver.
+>>>>
+>>>> I do see this when booting:
+>>>>
+>>>>    omap_hwmod: dss_dispc: cannot be enabled for reset (3)
+>>>>    omap_hwmod: dss_dsi1: cannot be enabled for reset (3)
+>>>>    omap_hwmod: dss_dsi2: cannot be enabled for reset (3)
+>>>>    omap_hwmod: dss_hdmi: cannot be enabled for reset (3)
+>>>>    omap_hwmod: dss_rfbi: cannot be enabled for reset (3)
+>>>>
+>>>> But at least DSI works just fine.
+>>>
+>>> Am looking at this for v3.16.  But I think someone needs to take a look at
+>>> those warnings and figure out why they are happening.
 >>
->> Simply tested with perf.
+>> We associate DSS clock domain's MODULEMODE bits only with the dss_core hwmod.
+>> The rest of the dss hwmods don't touch MODULEMODE.
 >>
->> Signed-off-by: Kefeng Wang <kefeng.wang@linaro.org>
->> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
->
-> This should be squashed into the original dts introduction patch, no need
-> to add these separately.
->
->
-> -Olof
+>> Therefore, these hwmods cannot be enabled independently, and reset.
+>>
+>> We don't face this issue in the omapdss driver since the platform devices
+>> corresponding to these hwmods have their parent as the platform device
+>> corresponding to 'dss_core'. This parent child-relation ensures that
+>> 'dss_core' is enabled when the a child calls a pm_runtime_get function.
+>>
+>> The problem is that we have multiple hwmods which use the same MODULEMODE bit.
+>> There is no use-counting done when it comes to enabling/disabling modulemode.
+>> If there was such a thing, we could have provided MODULEMODE flags even for
+>> the children hwmods.
+> 
+> Thanks for the summary.  This is indeed a long-overdue item for the hwmod 
+> core code.  Can you please patch the hwmod core code to add this?  I'd 
+> suggest making the use-counting functionality conditional on a hwmod flag 
+> that you can set for all of the DSS hwmods.  (Ideally, the core code would 
+> detect that several modules share the same MODULEMODE bits, and 
+> automatically set it for those cases, but that seems a bit too complex for 
+> a first cut.)
 
-OK.
+Can we still go forward with this patch as it is? As far as I
+understand, the warnings are harmless (more or less), but without this
+patch we won't have OMAP5 display support.
 
-Regards
-Haojian
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140509/67aef498/attachment.sig>
