@@ -1,31 +1,45 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 9 May 2014 18:02:55 +0100
-Subject: [PATCHv4 1/2] dt/bindings: Add the DT binding documentation for
- endianness
-In-Reply-To: <20140509163243.GD16418@e106331-lin.cambridge.arm.com>
-References: <1399601073-19278-1-git-send-email-Li.Xiubo@freescale.com>
- <1399601073-19278-2-git-send-email-Li.Xiubo@freescale.com>
- <20140509163243.GD16418@e106331-lin.cambridge.arm.com>
-Message-ID: <20140509170255.GR12304@sirena.org.uk>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 09 May 2014 18:05:56 +0100
+Subject: [PATCH 2/3] arm64: Add big.LITTLE switcher stub
+In-Reply-To: <1399653631-4938-2-git-send-email-broonie@kernel.org>
+References: <1399653631-4938-1-git-send-email-broonie@kernel.org>
+ <1399653631-4938-2-git-send-email-broonie@kernel.org>
+Message-ID: <536D0AF4.1040705@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 09, 2014 at 05:32:43PM +0100, Mark Rutland wrote:
-> On Fri, May 09, 2014 at 03:04:32AM +0100, Xiubo Li wrote:
+Hi Mark,
 
-> > {big,little}-endian{,-*}: these are boolean properties, if absent
-> > meaning that the CPU and the Device are in the same endianness mode.
+On 09/05/14 17:40, Mark Brown wrote:
+> From: Mark Brown <broonie@linaro.org>
+>
+> The big.LITTLE cpufreq driver is useful on arm64 big.LITTLE systems even
+> without IKS support since it implements support for clusters with shared
+> clocks (a common big.LITTLE configuration). In order to allow it to be
+> built provide the non-IKS stubs for arm64, enabling cpufreq with all the
+> cores available.
+>
 
-> That's not really true though. A device might usually be little-endian,
-> regardless of the endianness of a CPU. Some vendors may integrate it as
-> big-endian after a binding is added, and in the absence of a specified
-> endianness a driver is likely to assume LE.
+I am in process of using this driver for ARM64 and hit the same issue.
+I don't like this approach at all. I too did similar changes/hacks which are
+good for quick testing but not for upstream.
 
-The default should be device specific rather than binding specific.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140509/5806baf1/attachment.sig>
+I would like to move all the switcher code out of the driver as extension.
+Also the core driver should be made to work with any multi-clsuter platform not
+just big-little(bL). bL is one of them and bL switcher support should an
+extension of it.
+
+The main reason for this is I see some non-bL multi-cluster platform support
+getting added, this driver should ideally support that.
+
+> It may make sense to make an asm-generic version of these stubs instead but
+> given that there's only likely to be these two architectures using the code
+> and asm-generic stubs also need per architecture updates it's probably more
+> trouble than it's worth.
+>
+
+I would not take this approach too. As mentioned above if we can resolve it in
+that way we may not require this.
+
+Regards,
+Sudeep
