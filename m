@@ -1,43 +1,87 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 9 May 2014 16:06:16 +0100
-Subject: [PATH V3] arm64: mm: Create gigabyte kernel logical mappings
- where possible
-In-Reply-To: <1399381347-28676-1-git-send-email-steve.capper@linaro.org>
-References: <1399381347-28676-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <20140509150616.GJ7950@arm.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri,  9 May 2014 17:15:50 +0200
+Subject: [PATCH] ARM: dts: am335x-evm: fix comments for lcd pins
+Message-ID: <1399648580-14487-1-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 06, 2014 at 02:02:27PM +0100, Steve Capper wrote:
-> We have the capability to map 1GB level 1 blocks when using a 4K
-> granule.
-> 
-> This patch adjusts the create_mapping logic s.t. when mapping physical
-> memory on boot, we attempt to use a 1GB block if both the VA and PA
-> start and end are 1GB aligned. This both reduces the levels of lookup
-> required to resolve a kernel logical address, as well as reduces TLB
-> pressure on cores that support 1GB TLB entries.
-> 
-> Signed-off-by: Steve Capper <steve.capper@linaro.org>
-> ---
-> Changed in V3: added awareness of 1GB blocks to kern_addr_valid.
-> This was tested via gdb:
-> gdb ./vmlinux /proc/kcore
-> disassemble kern_addr_valid
-> 
-> The output looked valid.
-> In V2 of the patch, I got an oops.
-> 
-> I've defined constants with pgdval_t type. Ideally, I would like to
-> define pudval_t types, but due to the way folding works this does not
-> exist for <4 levels. I'm not sure if it would be better to define
-> pudval_t for <4 levels or leave this as is?
+From: Wolfram Sang <wsa@sang-engineering.com>
 
-I would leave it as is for now, PUD_TABLE_BIT is already defined as
-pgdval_t. I'll have a look Jungseok and maybe we can clean them up
-there.
+In the comments, LCD pins 16-23 were numbered in the wrong order.
+Fix this and use proper pinmux constants for all entries while we are
 
-Patch applied. Thanks.
+Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
+Cc: Benoit Parrot <bparrot@ti.com>
+---
+ arch/arm/boot/dts/am335x-evm.dts | 56 ++++++++++++++++++++--------------------
+ 1 file changed, 28 insertions(+), 28 deletions(-)
 
+diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
+index 6028217ace0f..1b642f1cd469 100644
+--- a/arch/arm/boot/dts/am335x-evm.dts
++++ b/arch/arm/boot/dts/am335x-evm.dts
+@@ -268,34 +268,34 @@
+ 
+ 	lcd_pins_s0: lcd_pins_s0 {
+ 		pinctrl-single,pins = <
+-			0x20 0x01	/* gpmc_ad8.lcd_data16, OUTPUT | MODE1 */
+-			0x24 0x01	/* gpmc_ad9.lcd_data17, OUTPUT | MODE1 */
+-			0x28 0x01	/* gpmc_ad10.lcd_data18, OUTPUT | MODE1 */
+-			0x2c 0x01	/* gpmc_ad11.lcd_data19, OUTPUT | MODE1 */
+-			0x30 0x01	/* gpmc_ad12.lcd_data20, OUTPUT | MODE1 */
+-			0x34 0x01	/* gpmc_ad13.lcd_data21, OUTPUT | MODE1 */
+-			0x38 0x01	/* gpmc_ad14.lcd_data22, OUTPUT | MODE1 */
+-			0x3c 0x01	/* gpmc_ad15.lcd_data23, OUTPUT | MODE1 */
+-			0xa0 0x00	/* lcd_data0.lcd_data0, OUTPUT | MODE0 */
+-			0xa4 0x00	/* lcd_data1.lcd_data1, OUTPUT | MODE0 */
+-			0xa8 0x00	/* lcd_data2.lcd_data2, OUTPUT | MODE0 */
+-			0xac 0x00	/* lcd_data3.lcd_data3, OUTPUT | MODE0 */
+-			0xb0 0x00	/* lcd_data4.lcd_data4, OUTPUT | MODE0 */
+-			0xb4 0x00	/* lcd_data5.lcd_data5, OUTPUT | MODE0 */
+-			0xb8 0x00	/* lcd_data6.lcd_data6, OUTPUT | MODE0 */
+-			0xbc 0x00	/* lcd_data7.lcd_data7, OUTPUT | MODE0 */
+-			0xc0 0x00	/* lcd_data8.lcd_data8, OUTPUT | MODE0 */
+-			0xc4 0x00	/* lcd_data9.lcd_data9, OUTPUT | MODE0 */
+-			0xc8 0x00	/* lcd_data10.lcd_data10, OUTPUT | MODE0 */
+-			0xcc 0x00	/* lcd_data11.lcd_data11, OUTPUT | MODE0 */
+-			0xd0 0x00	/* lcd_data12.lcd_data12, OUTPUT | MODE0 */
+-			0xd4 0x00	/* lcd_data13.lcd_data13, OUTPUT | MODE0 */
+-			0xd8 0x00	/* lcd_data14.lcd_data14, OUTPUT | MODE0 */
+-			0xdc 0x00	/* lcd_data15.lcd_data15, OUTPUT | MODE0 */
+-			0xe0 0x00	/* lcd_vsync.lcd_vsync, OUTPUT | MODE0 */
+-			0xe4 0x00	/* lcd_hsync.lcd_hsync, OUTPUT | MODE0 */
+-			0xe8 0x00	/* lcd_pclk.lcd_pclk, OUTPUT | MODE0 */
+-			0xec 0x00	/* lcd_ac_bias_en.lcd_ac_bias_en, OUTPUT | MODE0 */
++			0x20 (PIN_OUTPUT | MUX_MODE1)		/* gpmc_ad8.lcd_data23 */
++			0x24 (PIN_OUTPUT | MUX_MODE1)		/* gpmc_ad9.lcd_data22 */
++			0x28 (PIN_OUTPUT | MUX_MODE1)		/* gpmc_ad10.lcd_data21 */
++			0x2c (PIN_OUTPUT | MUX_MODE1)		/* gpmc_ad11.lcd_data20 */
++			0x30 (PIN_OUTPUT | MUX_MODE1)		/* gpmc_ad12.lcd_data19 */
++			0x34 (PIN_OUTPUT | MUX_MODE1)		/* gpmc_ad13.lcd_data18 */
++			0x38 (PIN_OUTPUT | MUX_MODE1)		/* gpmc_ad14.lcd_data17 */
++			0x3c (PIN_OUTPUT | MUX_MODE1)		/* gpmc_ad15.lcd_data16 */
++			0xa0 (PIN_OUTPUT | MUX_MODE0)		/* lcd_data0.lcd_data0 */
++			0xa4 (PIN_OUTPUT | MUX_MODE0)		/* lcd_data1.lcd_data1 */
++			0xa8 (PIN_OUTPUT | MUX_MODE0)		/* lcd_data2.lcd_data2 */
++			0xac (PIN_OUTPUT | MUX_MODE0)		/* lcd_data3.lcd_data3 */
++			0xb0 (PIN_OUTPUT | MUX_MODE0)		/* lcd_data4.lcd_data4 */
++			0xb4 (PIN_OUTPUT | MUX_MODE0)		/* lcd_data5.lcd_data5 */
++			0xb8 (PIN_OUTPUT | MUX_MODE0)		/* lcd_data6.lcd_data6 */
++			0xbc (PIN_OUTPUT | MUX_MODE0)		/* lcd_data7.lcd_data7 */
++			0xc0 (PIN_OUTPUT | MUX_MODE0)		/* lcd_data8.lcd_data8 */
++			0xc4 (PIN_OUTPUT | MUX_MODE0)		/* lcd_data9.lcd_data9 */
++			0xc8 (PIN_OUTPUT | MUX_MODE0)		/* lcd_data10.lcd_data10 */
++			0xcc (PIN_OUTPUT | MUX_MODE0)		/* lcd_data11.lcd_data11 */
++			0xd0 (PIN_OUTPUT | MUX_MODE0)		/* lcd_data12.lcd_data12 */
++			0xd4 (PIN_OUTPUT | MUX_MODE0)		/* lcd_data13.lcd_data13 */
++			0xd8 (PIN_OUTPUT | MUX_MODE0)		/* lcd_data14.lcd_data14 */
++			0xdc (PIN_OUTPUT | MUX_MODE0)		/* lcd_data15.lcd_data15 */
++			0xe0 (PIN_OUTPUT | MUX_MODE0)		/* lcd_vsync.lcd_vsync */
++			0xe4 (PIN_OUTPUT | MUX_MODE0)		/* lcd_hsync.lcd_hsync */
++			0xe8 (PIN_OUTPUT | MUX_MODE0)		/* lcd_pclk.lcd_pclk */
++			0xec (PIN_OUTPUT | MUX_MODE0)		/* lcd_ac_bias_en.lcd_ac_bias_en */
+ 		>;
+ 	};
+ 
 -- 
-Catalin
+1.9.2
