@@ -1,77 +1,58 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 09 May 2014 06:49:04 +0200
-Subject: [PATCH v3 1/2] ARM: EXYNOS: Map SYSRAM through generic SRAM
- bindings
-In-Reply-To: <034b01cf6b2c$5b5d06b0$12171410$@samsung.com>
-References: <1399522592-23618-1-git-send-email-sachin.kamat@linaro.org>
- <536BAE39.70504@samsung.com> <034b01cf6b2c$5b5d06b0$12171410$@samsung.com>
-Message-ID: <536C5E40.90405@gmail.com>
+From: plaes@plaes.org (Priit Laes)
+Date: Fri, 09 May 2014 08:05:09 +0300
+Subject: [linux-sunxi] Re: [PATCH v2 3/7] mfd: add support for sun6i
+ PRCM (Power/Reset/Clock Management) unit
+In-Reply-To: <536BE366.8080907@free-electrons.com>
+References: <1399483554-8824-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1399483554-8824-4-git-send-email-boris.brezillon@free-electrons.com>
+ <20140508110205.GB5767@lee--X1> <536BE366.8080907@free-electrons.com>
+Message-ID: <1399611909.13870.0.camel@chi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+?hel kenal p?eval, N, 08.05.2014 kell 22:04, kirjutas Boris BREZILLON:
+> On 08/05/2014 13:02, Lee Jones wrote:
+> >> The PRCM (Power/Reset/Clock Management) block exposes several subdevices
+> >> in different subsystems (clk, reset ...)
+> >>
+> >> Add basic support for the PRCM unit with clk (AR100, AHB0, and APB0 clks)
+> >> and reset controller subdevices.
+> >>
+> >> Other subdevices might be added later (if needed).
+> >>
+> >> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> >> ---
+> >>  drivers/mfd/Kconfig      |   8 +++
+> >>  drivers/mfd/Makefile     |   1 +
+> >>  drivers/mfd/sun6i-prcm.c | 151 +++++++++++++++++++++++++++++++++++++++++++++++
+> >>  3 files changed, 160 insertions(+)
+> >>  create mode 100644 drivers/mfd/sun6i-prcm.c
+> > [...]
+> >
+> >> +#include <linux/module.h>
+> >> +#include <linux/kernel.h>
+> >> +#include <linux/errno.h>
+> >> +#include <linux/err.h>
+> >> +#include <linux/spinlock.h>
+> >> +#include <linux/io.h>
+> >> +#include <linux/slab.h>
+> >> +#include <linux/mutex.h>
+> >> +#include <linux/completion.h>
+> >> +#include <linux/irq.h>
+> >> +#include <linux/jiffies.h>
+> >> +#include <linux/bitops.h>
+> >> +#include <linux/fs.h>
+> >> +#include <linux/of.h>
+> >> +#include <linux/of_irq.h>
+> >> +#include <linux/platform_device.h>
+> >> +#include <linux/uaccess.h>
+> >> +#include <linux/mfd/core.h>
+> > I'm pretty sure you don't need half of these.  Please only add the
+> > ones you make use of.
+> 
+> Sure (this is what happens when you copy/paste from another driver :-))
 
-On 09.05.2014 04:14, Kukjin Kim wrote:
-> Tomasz Figa wrote:
->>
->> Hi Sachin,
->>
->> On 08.05.2014 06:16, Sachin Kamat wrote:
->>> Instead of hardcoding the SYSRAM details for each SoC,
->>> pass this information through device tree (DT) and make
->>> the code SoC agnostic. Generic SRAM bindings are used
->>> for achieving this.
->>>
->>> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
->>> Acked-by: Arnd Bergmann <arnd@arndb.de>
->>> Acked-by: Heiko Stuebner <heiko@sntech.de>
->>> ---
->>> Changes since v2.
->>> * Updated sysram node for Universal C210 board - Thanks to
->>> Tomasz Figa for testing and updating the same.
->>> * Added error handling code.
->>> * Break if matching node found.
->>> * Remove unnecessary error messages.
->>>
->>> This patch is based on linux next (next-20140501) on top of
->>> my Kconfig consolidation patch
->>> http://comments.gmane.org/gmane.linux.kernel.samsung-soc/28642
->>>
->>> Tested on 4210/4412 Origen, 5250/5420 Arndale and SMDK5420 boards.
->>> ---
->>>   arch/arm/Kconfig                                |    1 +
->>>   arch/arm/boot/dts/exynos4210-universal_c210.dts |   15 ++++++
->>>   arch/arm/boot/dts/exynos4210.dtsi               |   18 +++++++
->>>   arch/arm/boot/dts/exynos4x12.dtsi               |   18 +++++++
->>>   arch/arm/boot/dts/exynos5250.dtsi               |   18 +++++++
->>>   arch/arm/boot/dts/exynos5420.dtsi               |   18 +++++++
->>>   arch/arm/mach-exynos/common.h                   |    1 +
->>>   arch/arm/mach-exynos/exynos.c                   |   64
-> ----------------------
->> -
->>>   arch/arm/mach-exynos/firmware.c                 |    8 ++-
->>>   arch/arm/mach-exynos/include/mach/map.h         |    7 ---
->>>   arch/arm/mach-exynos/platsmp.c                  |   56
-> ++++++++++++++++++--
->>>   11 files changed, 148 insertions(+), 76 deletions(-)
->>>
->>
->> Looks good, thanks.
->>
->> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
->>
-> Looks good to me but I think, we need to change the name of 'sram' because
-> it can cause some confusing, actually it is not matching _real_ sram area on
-> the SoCs. When we upstreamed regarding patch, I decided the name to use
-> 'SYSRAM', it was called another name in datasheet though. So, I'd like to
-> use 'sysram' instead of 'sram' as we used before.
->
-> I will change the name when I apply this series in this weekend, if you guys
-> have no objection.
+Also, alphabetic order would be nice.
 
-You mean s/sram/sysram/ in compatible strings of Exynos-specific 
-reserved areas? If yes, I'm fine, it might be even better. Just remember 
-to update documentation in patch 2/2 as well.
-
-Best regards,
-Tomasz
+P?ikest,
+Priit Laes :)
