@@ -1,212 +1,129 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 9 May 2014 11:11:31 +0300
-Subject: [PATCH] ARM: omap4: hwmod_data: Clean up audio related structures
- (remove/merge them)
-Message-ID: <1399623091-30636-1-git-send-email-peter.ujfalusi@ti.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Fri, 09 May 2014 17:15:12 +0900
+Subject: [PATCHv4 7/7] ARM: dts: Add device tree sources for Exynos3250
+In-Reply-To: <536C8B48.90706@samsung.com>
+References: <1398388572-30239-1-git-send-email-cw00.choi@samsung.com>
+ <1398388572-30239-8-git-send-email-cw00.choi@samsung.com>
+ <535B0324.50705@gmail.com> <535B9A98.3060206@gmail.com>
+ <536C7A96.3000906@samsung.com> <536C8B48.90706@samsung.com>
+Message-ID: <536C8E90.6030607@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All audio related omap_hwmod_ocp_if *_dma can be removed from the data since
-we can just add the user flag to the non dma structure.
+Hi Tomasz,
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c | 99 +++---------------------------
- 1 file changed, 9 insertions(+), 90 deletions(-)
+On 05/09/2014 05:01 PM, Tomasz Figa wrote:
+> On 09.05.2014 08:49, Chanwoo Choi wrote:
+>> Hi Tomasz,
+>>
+>> On 04/26/2014 08:38 PM, Tomasz Figa wrote:
+>>> On 26.04.2014 02:51, Tomasz Figa wrote:
+>>>> Hi Chanwoo,
+>>>>
+>>>> On 25.04.2014 03:16, Chanwoo Choi wrote:
+>>>>> From: Tomasz Figa <t.figa@samsung.com>
+>>>>>
+>>>>> This patch add new exynos3250.dtsi to support Exynos3250 SoC based on
+>>>>> Cortex-A7
+>>>>> dual core and includes following dt nodes:
+>>>>>
+>>>>> - GIC interrupt controller
+>>>>> - Pinctrl to control GPIOs
+>>>>> - Clock controller
+>>>>> - CPU information (Cortex-A7 dual core)
+>>>>> - UART to support serial port
+>>>>> - MCT (Multi Core Timer)
+>>>>> - ADC (Analog Digital Converter)
+>>>>> - I2C/SPI bus
+>>>>> - Power domain
+>>>>> - PMU (Performance Monitoring Unit)
+>>>>> - MSHC (Mobile Storage Host Controller)
+>>>>> - PWM (Pluse Width Modulation)
+>>>>> - AMBA bus
+>>>>>
+>>>>> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+>>>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>>>>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>>>>> Signed-off-by: Inki Dae <inki.dae@samsung.com>
+>>>>> Signed-off-by: Hyunhee Kim <hyunhee.kim@samsung.com>
+>>>>> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
+>>>>> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+>>>>> Cc: Ben Dooks <ben-linux@fluff.org>
+>>>>> Cc: Kukjin Kim <kgene.kim@samsung.com>
+>>>>> Cc: Rob Herring <robh+dt@kernel.org>
+>>>>> Cc: Pawel Moll <pawel.moll@arm.com>
+>>>>> Cc: Mark Rutland <mark.rutland@arm.com>
+>>>>> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+>>>>> Cc: Kumar Gala <galak@codeaurora.org>
+>>>>> Cc: Russell King <linux@arm.linux.org.uk>
+>>>>> Cc: devicetree at vger.kernel.org
+>>>>> ---
+>>>>>   arch/arm/boot/dts/exynos3250-pinctrl.dtsi | 477 +++++++++++++++
+>>>>>   arch/arm/boot/dts/exynos3250.dtsi         | 405 +++++++++++++
+>>>>>   arch/arm/boot/dts/exynos4212-tizenw.dts   | 926
+>>>>> ++++++++++++++++++++++++++++++
+>>>>>   3 files changed, 1808 insertions(+)
+>>>>>   create mode 100644 arch/arm/boot/dts/exynos3250-pinctrl.dtsi
+>>>>>   create mode 100644 arch/arm/boot/dts/exynos3250.dtsi
+>>>>>   create mode 100644 arch/arm/boot/dts/exynos4212-tizenw.dts
+>>>>>
+>>>>> diff --git a/arch/arm/boot/dts/exynos3250-pinctrl.dtsi
+>>>>> b/arch/arm/boot/dts/exynos3250-pinctrl.dtsi
+>>>>> new file mode 100644
+>>>>> index 0000000..976490b
+>>>>> --- /dev/null
+>>>>> +++ b/arch/arm/boot/dts/exynos3250-pinctrl.dtsi
+>>>>> @@ -0,0 +1,477 @@
+>>>>> +/*
+>>>>> + * Samsung's Exynos3250 SoCs pin-mux and pin-config device tree source
+>>>>> + *
+>>>>> + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
+>>>>> + *        http://www.samsung.com
+>>>>> + *
+>>>>> + * Samsung's Exynos3250 SoCs pin-mux and pin-config optiosn are
+>>>>> listed as device
+>>>>> + * tree nodes are listed in this file.
+>>>>> + *
+>>>>> + * This program is free software; you can redistribute it and/or modify
+>>>>> + * it under the terms of the GNU General Public License version 2 as
+>>>>> + * published by the Free Software Foundation.
+>>>>> +*/
+>>>>> +
+>>>>> +/ {
+>>>>> +    pinctrl at 11400000 {
+>>>>
+>>>> Could you use references instead of re-specifying the whole tree
+>>>> hierarchy in every file a node is used?
+>>>>
+>>>> Instead of
+>>>>
+>>>> / {
+>>>>      pinctrl at 11400000 {
+>>>>
+>>>>      };
+>>>> };
+>>>>
+>>>> one may simply use
+>>>>
+>>>> &pinctrl_0 {
+>>>>
+>>>> };
+>>>>
+>>>> You might just need to change the location of #include
+>>>> "exynos3250-pinctrl.dtsi" from top of exynos3250.dtsi to bottom of it.
+>>>
+>>> Oh, well, you also should move all nodes of on-SoC devices under a simple-bus node called soc. You can see the patch adding dts file for Exynos5260 for an example [1].
+>>>
+>>> [1] http://thread.gmane.org/gmane.linux.kernel.samsung-soc/29360/focus=29361
+>>
+>>
+>> OK, I'll move nodes dependent on SoC under 'soc' dt node as example patch[1] except for 'amba-bus' dt node.
+> 
+> I don't see any reason why amba-bus node shouldn't be under soc node as
+> well. Any on-chip devices should be.
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 1219280bb976..41e54f759934 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -3635,15 +3635,7 @@ static struct omap_hwmod_ocp_if omap44xx_l4_abe__dmic = {
- 	.master		= &omap44xx_l4_abe_hwmod,
- 	.slave		= &omap44xx_dmic_hwmod,
- 	.clk		= "ocp_abe_iclk",
--	.user		= OCP_USER_MPU,
--};
--
--/* l4_abe -> dmic (dma) */
--static struct omap_hwmod_ocp_if omap44xx_l4_abe__dmic_dma = {
--	.master		= &omap44xx_l4_abe_hwmod,
--	.slave		= &omap44xx_dmic_hwmod,
--	.clk		= "ocp_abe_iclk",
--	.user		= OCP_USER_SDMA,
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
- /* dsp -> iva */
-@@ -4209,15 +4201,7 @@ static struct omap_hwmod_ocp_if omap44xx_l4_abe__mcbsp1 = {
- 	.master		= &omap44xx_l4_abe_hwmod,
- 	.slave		= &omap44xx_mcbsp1_hwmod,
- 	.clk		= "ocp_abe_iclk",
--	.user		= OCP_USER_MPU,
--};
--
--/* l4_abe -> mcbsp1 (dma) */
--static struct omap_hwmod_ocp_if omap44xx_l4_abe__mcbsp1_dma = {
--	.master		= &omap44xx_l4_abe_hwmod,
--	.slave		= &omap44xx_mcbsp1_hwmod,
--	.clk		= "ocp_abe_iclk",
--	.user		= OCP_USER_SDMA,
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
- /* l4_abe -> mcbsp2 */
-@@ -4225,15 +4209,7 @@ static struct omap_hwmod_ocp_if omap44xx_l4_abe__mcbsp2 = {
- 	.master		= &omap44xx_l4_abe_hwmod,
- 	.slave		= &omap44xx_mcbsp2_hwmod,
- 	.clk		= "ocp_abe_iclk",
--	.user		= OCP_USER_MPU,
--};
--
--/* l4_abe -> mcbsp2 (dma) */
--static struct omap_hwmod_ocp_if omap44xx_l4_abe__mcbsp2_dma = {
--	.master		= &omap44xx_l4_abe_hwmod,
--	.slave		= &omap44xx_mcbsp2_hwmod,
--	.clk		= "ocp_abe_iclk",
--	.user		= OCP_USER_SDMA,
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
- /* l4_abe -> mcbsp3 */
-@@ -4241,15 +4217,7 @@ static struct omap_hwmod_ocp_if omap44xx_l4_abe__mcbsp3 = {
- 	.master		= &omap44xx_l4_abe_hwmod,
- 	.slave		= &omap44xx_mcbsp3_hwmod,
- 	.clk		= "ocp_abe_iclk",
--	.user		= OCP_USER_MPU,
--};
--
--/* l4_abe -> mcbsp3 (dma) */
--static struct omap_hwmod_ocp_if omap44xx_l4_abe__mcbsp3_dma = {
--	.master		= &omap44xx_l4_abe_hwmod,
--	.slave		= &omap44xx_mcbsp3_hwmod,
--	.clk		= "ocp_abe_iclk",
--	.user		= OCP_USER_SDMA,
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
- /* l4_per -> mcbsp4 */
-@@ -4265,15 +4233,7 @@ static struct omap_hwmod_ocp_if omap44xx_l4_abe__mcpdm = {
- 	.master		= &omap44xx_l4_abe_hwmod,
- 	.slave		= &omap44xx_mcpdm_hwmod,
- 	.clk		= "ocp_abe_iclk",
--	.user		= OCP_USER_MPU,
--};
--
--/* l4_abe -> mcpdm (dma) */
--static struct omap_hwmod_ocp_if omap44xx_l4_abe__mcpdm_dma = {
--	.master		= &omap44xx_l4_abe_hwmod,
--	.slave		= &omap44xx_mcpdm_hwmod,
--	.clk		= "ocp_abe_iclk",
--	.user		= OCP_USER_SDMA,
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
- /* l4_per -> mcspi1 */
-@@ -4575,15 +4535,7 @@ static struct omap_hwmod_ocp_if omap44xx_l4_abe__timer5 = {
- 	.master		= &omap44xx_l4_abe_hwmod,
- 	.slave		= &omap44xx_timer5_hwmod,
- 	.clk		= "ocp_abe_iclk",
--	.user		= OCP_USER_MPU,
--};
--
--/* l4_abe -> timer5 (dma) */
--static struct omap_hwmod_ocp_if omap44xx_l4_abe__timer5_dma = {
--	.master		= &omap44xx_l4_abe_hwmod,
--	.slave		= &omap44xx_timer5_hwmod,
--	.clk		= "ocp_abe_iclk",
--	.user		= OCP_USER_SDMA,
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
- /* l4_abe -> timer6 */
-@@ -4591,15 +4543,7 @@ static struct omap_hwmod_ocp_if omap44xx_l4_abe__timer6 = {
- 	.master		= &omap44xx_l4_abe_hwmod,
- 	.slave		= &omap44xx_timer6_hwmod,
- 	.clk		= "ocp_abe_iclk",
--	.user		= OCP_USER_MPU,
--};
--
--/* l4_abe -> timer6 (dma) */
--static struct omap_hwmod_ocp_if omap44xx_l4_abe__timer6_dma = {
--	.master		= &omap44xx_l4_abe_hwmod,
--	.slave		= &omap44xx_timer6_hwmod,
--	.clk		= "ocp_abe_iclk",
--	.user		= OCP_USER_SDMA,
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
- /* l4_abe -> timer7 */
-@@ -4607,15 +4551,7 @@ static struct omap_hwmod_ocp_if omap44xx_l4_abe__timer7 = {
- 	.master		= &omap44xx_l4_abe_hwmod,
- 	.slave		= &omap44xx_timer7_hwmod,
- 	.clk		= "ocp_abe_iclk",
--	.user		= OCP_USER_MPU,
--};
--
--/* l4_abe -> timer7 (dma) */
--static struct omap_hwmod_ocp_if omap44xx_l4_abe__timer7_dma = {
--	.master		= &omap44xx_l4_abe_hwmod,
--	.slave		= &omap44xx_timer7_hwmod,
--	.clk		= "ocp_abe_iclk",
--	.user		= OCP_USER_SDMA,
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
- /* l4_abe -> timer8 */
-@@ -4623,15 +4559,7 @@ static struct omap_hwmod_ocp_if omap44xx_l4_abe__timer8 = {
- 	.master		= &omap44xx_l4_abe_hwmod,
- 	.slave		= &omap44xx_timer8_hwmod,
- 	.clk		= "ocp_abe_iclk",
--	.user		= OCP_USER_MPU,
--};
--
--/* l4_abe -> timer8 (dma) */
--static struct omap_hwmod_ocp_if omap44xx_l4_abe__timer8_dma = {
--	.master		= &omap44xx_l4_abe_hwmod,
--	.slave		= &omap44xx_timer8_hwmod,
--	.clk		= "ocp_abe_iclk",
--	.user		= OCP_USER_SDMA,
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
- /* l4_per -> timer9 */
-@@ -4831,7 +4759,6 @@ static struct omap_hwmod_ocp_if *omap44xx_hwmod_ocp_ifs[] __initdata = {
- 	&omap44xx_l3_instr__debugss,
- 	&omap44xx_l4_cfg__dma_system,
- 	&omap44xx_l4_abe__dmic,
--	&omap44xx_l4_abe__dmic_dma,
- 	&omap44xx_dsp__iva,
- 	/* &omap44xx_dsp__sl2if, */
- 	&omap44xx_l4_cfg__dsp,
-@@ -4874,14 +4801,10 @@ static struct omap_hwmod_ocp_if *omap44xx_hwmod_ocp_ifs[] __initdata = {
- 	&omap44xx_l4_abe__mcasp,
- 	&omap44xx_l4_abe__mcasp_dma,
- 	&omap44xx_l4_abe__mcbsp1,
--	&omap44xx_l4_abe__mcbsp1_dma,
- 	&omap44xx_l4_abe__mcbsp2,
--	&omap44xx_l4_abe__mcbsp2_dma,
- 	&omap44xx_l4_abe__mcbsp3,
--	&omap44xx_l4_abe__mcbsp3_dma,
- 	&omap44xx_l4_per__mcbsp4,
- 	&omap44xx_l4_abe__mcpdm,
--	&omap44xx_l4_abe__mcpdm_dma,
- 	&omap44xx_l4_per__mcspi1,
- 	&omap44xx_l4_per__mcspi2,
- 	&omap44xx_l4_per__mcspi3,
-@@ -4913,13 +4836,9 @@ static struct omap_hwmod_ocp_if *omap44xx_hwmod_ocp_ifs[] __initdata = {
- 	&omap44xx_l4_per__timer3,
- 	&omap44xx_l4_per__timer4,
- 	&omap44xx_l4_abe__timer5,
--	&omap44xx_l4_abe__timer5_dma,
- 	&omap44xx_l4_abe__timer6,
--	&omap44xx_l4_abe__timer6_dma,
- 	&omap44xx_l4_abe__timer7,
--	&omap44xx_l4_abe__timer7_dma,
- 	&omap44xx_l4_abe__timer8,
--	&omap44xx_l4_abe__timer8_dma,
- 	&omap44xx_l4_per__timer9,
- 	&omap44xx_l4_per__timer10,
- 	&omap44xx_l4_per__timer11,
--- 
-1.9.2
+I didn't understand the correct meaning of 'simple-bus'.
+OK, I'll move 'amba-bus' dt node under 'soc' dt node.
+
+Best Regards,
+Chanwoo Choi
