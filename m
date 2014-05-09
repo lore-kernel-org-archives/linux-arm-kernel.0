@@ -1,42 +1,33 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 9 May 2014 19:56:56 +0800
-Subject: [PATCH 2/6] ARM: dts: i.MX25: remove disabled property of
- usbmisc unit
-In-Reply-To: <1399615879-30781-3-git-send-email-s.hauer@pengutronix.de>
-References: <1399615879-30781-1-git-send-email-s.hauer@pengutronix.de>
- <1399615879-30781-3-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20140509115654.GF2870@dragon>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri,  9 May 2014 12:57:45 +0100
+Subject: [PATCH] arm64: Define _TIF_POLLING_NRFLAG
+Message-ID: <1399636665-4127-1-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 09, 2014 at 08:11:15AM +0200, Sascha Hauer wrote:
-> It's a unit only used by the usb devices. No need to enable them
-> manually.
-> 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  arch/arm/boot/dts/imx25.dtsi | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
-> index 83fdda3..bd3ac9b 100644
-> --- a/arch/arm/boot/dts/imx25.dtsi
-> +++ b/arch/arm/boot/dts/imx25.dtsi
-> @@ -520,7 +520,6 @@
->  				clocks = <&clks 9>, <&clks 70>, <&clks 8>;
->  				clock-names = "ipg", "ahb", "per";
->  				reg = <0x53ff4600 0x00f>;
-> -				status = "disabled";
+From: Mark Brown <broonie@linaro.org>
 
-I already queued a patch from Fabio, which has this change.
+arm64 defines TIF_POLLING_NRFLAG but not the corresponding shifted version,
+breaking the build with next-20140509 due to fd99f91aa007b (sched/idle:
+Avoid spurious wakeup IPIs) which added a reference to the shifted version
+which is present on most arches.
 
-https://git.kernel.org/cgit/linux/kernel/git/shawnguo/linux.git/commit/?h=imx/dt&id=f415153c0ecaae1f4515df35d2c6d055ed97909c
+Signed-off-by: Mark Brown <broonie@linaro.org>
+---
+ arch/arm64/include/asm/thread_info.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-Shawn
-
->  			};
->  
->  			dryice at 53ffc000 {
-> -- 
-> 2.0.0.rc0
-> 
+diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+index 720e70b66ffd..40ff87437734 100644
+--- a/arch/arm64/include/asm/thread_info.h
++++ b/arch/arm64/include/asm/thread_info.h
+@@ -113,6 +113,7 @@ static inline struct thread_info *current_thread_info(void)
+ #define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
+ #define _TIF_NOTIFY_RESUME	(1 << TIF_NOTIFY_RESUME)
+ #define _TIF_32BIT		(1 << TIF_32BIT)
++#define _TIF_POLLING_NRFLAG	(1 << TIF_POLLING_NRFLAG)
+ 
+ #define _TIF_WORK_MASK		(_TIF_NEED_RESCHED | _TIF_SIGPENDING | \
+ 				 _TIF_NOTIFY_RESUME)
+-- 
+2.0.0.rc2
