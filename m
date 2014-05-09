@@ -1,74 +1,48 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 9 May 2014 14:00:54 -0400 (EDT)
-Subject: [PATCH] ARM: Don't ever downscale loops_per_jiffy in SMP systems#
-In-Reply-To: <20140509091824.GL3693@n2100.arm.linux.org.uk>
-References: <1399504982-31181-1-git-send-email-dianders@chromium.org>
- <CAOh2x=kwaoSdj8JO0Vo08Y0dX2UfKFiF3pBV-qtp-YTyN=8H8Q@mail.gmail.com>
- <CAD=FV=UEGJGHrdcXgs3EZ_wFXT8GnNeCOMt7CgdiiUzBzZ5Y0A@mail.gmail.com>
- <alpine.LFD.2.11.1405081149190.980@knanqh.ubzr>
- <CAD=FV=VtcLOh51LCmafzRMdqtDrwKXCqK6gE6V7OOOUe4gjwbA@mail.gmail.com>
- <alpine.LFD.2.11.1405081329010.980@knanqh.ubzr>
- <20140508192209.GH3693@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1405081600260.980@knanqh.ubzr>
- <20140508205223.GI3693@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1405082058130.980@knanqh.ubzr>
- <20140509091824.GL3693@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.11.1405091245070.980@knanqh.ubzr>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 9 May 2014 19:01:21 +0100
+Subject: [PATCH 2/3] arm64: Add big.LITTLE switcher stub
+In-Reply-To: <20140509174738.GP7950@arm.com>
+References: <1399653631-4938-1-git-send-email-broonie@kernel.org>
+ <1399653631-4938-2-git-send-email-broonie@kernel.org>
+ <20140509174738.GP7950@arm.com>
+Message-ID: <20140509180121.GU12304@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 9 May 2014, Russell King - ARM Linux wrote:
+On Fri, May 09, 2014 at 06:47:38PM +0100, Catalin Marinas wrote:
+> On Fri, May 09, 2014 at 05:40:30PM +0100, Mark Brown wrote:
 
-> On Thu, May 08, 2014 at 09:37:15PM -0400, Nicolas Pitre wrote:
-> > On Thu, 8 May 2014, Russell King - ARM Linux wrote:
-> > 
-> > > If you're in a preempt or SMP environment, provide a timer for udelay().
-> > > IF you're in an environment with IRQs which can take a long time, use
-> > > a timer for udelay().  If you're in an environment where the CPU clock
-> > > can change unexpectedly, use a timer for udelay().
-> > 
-> > Longer delays are normally not a problem.  If they are, then simply 
-> > disabling IRQs may solve it if absolutely required.  With much shorter 
-> > delays than expected this is another story.
-> > 
-> > What about the following:
-> > 
-> > diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-> > index 7c4fada440..10030cc5a0 100644
-> > --- a/arch/arm/kernel/smp.c
-> > +++ b/arch/arm/kernel/smp.c
-> > @@ -682,6 +682,15 @@ static int cpufreq_callback(struct notifier_block *nb,
-> >  			cpufreq_scale(per_cpu(l_p_j_ref, cpu),
-> >  					per_cpu(l_p_j_ref_freq, cpu),
-> >  					freq->new);
-> > +		/*
-> > +		 * Another CPU might have called udelay() just before LPJ
-> > +		 * and a shared CPU clock is increased.  That other CPU still
-> > +		 * looping on the old LPJ value would return significantly
-> > +		 * sooner than expected.  The actual fix is to provide a
-> > +		 * timer based udelay() implementation instead.
-> > +		 */
-> > +		if (freq->old < freq->new)
-> > +			pr_warn_once("*** udelay() on SMP is racy and may be much shorter than expected ***\n");
-> >  	}
-> >  	return NOTIFY_OK;
-> >  }
-> 
-> No, because you're assuming this is just a SMP problem.  What about
-> preempt, where you could preempt away from a udelay loop to change
-> the CPU frequency, and then back again, possibly resulting in the
-> CPU clock rate increasing and maybe a shorter delay if the switch
-> from-change-clock-and-back is fast enough?  Remember that udelay()
-> can be used for up to 2ms delays.
+> > The big.LITTLE cpufreq driver is useful on arm64 big.LITTLE systems even
+> > without IKS support since it implements support for clusters with shared
+> > clocks (a common big.LITTLE configuration). In order to allow it to be
+> > built provide the non-IKS stubs for arm64, enabling cpufreq with all the
+> > cores available.
 
-Well... that would be somewhat less likely but still possible yes.
+> Have you thought of patching the actual cpufreq driver? Are you adding
+> this code just to avoid compiler errors on arm64 with this driver?
 
-So the only way to "solve" this might look similar in spirit to what 
-Doug alluded to earlier i.e. increase a sequence number on 
-CPUFREQ_PRECHANGE and increase it again on CPUFREQ_POSTCHANGE, and have 
-udelay() compare the count sampled before reading lpj and after 
-returning from the loop code.  When the sequence count doesn't match 
-then suffice to perform some arbitrarily large extra loops.
+Yes, that was actually my first thought but I wasn't loving the
+ifdeferry - it's fairly easy to do IIRC but the general taste seems to
+be towards having stubs rather than ifdefs and the code seemed to be
+lending itself to that.  There was also the fact that ifdefs could have
+been done for the non-IKS case on 32 bit but instead stubs were
+provided.  If people prefer I can do an ifdeffed version though, it
+doesn't make much odds.
 
+This was purely to get the driver compiling and hopefully running on
+ARMv8, there is some user demand for deploying the driver on big.LITTLE
+systems.
 
-Nicolas
+> > It may make sense to make an asm-generic version of these stubs instead
+
+> asm-generic/bL_switcher.h? I take it as a good joke ;)
+
+Hey, perhaps other hardware architectures are implementing similar
+concepts even now in order to keep up!  :P
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140509/bf2274cf/attachment.sig>
