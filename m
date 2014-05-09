@@ -1,87 +1,76 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri,  9 May 2014 17:15:50 +0200
-Subject: [PATCH] ARM: dts: am335x-evm: fix comments for lcd pins
-Message-ID: <1399648580-14487-1-git-send-email-wsa@the-dreams.de>
+From: dean_jenkins@mentor.com (dean_jenkins at mentor.com)
+Date: Fri,  9 May 2014 16:19:47 +0100
+Subject: [PATCH 4/5] serial: imx: move imx_transmit_buffer() into imx_txint()
+In-Reply-To: <1399648788-26061-1-git-send-email-dean_jenkins@mentor.com>
+References: <1399648788-26061-1-git-send-email-dean_jenkins@mentor.com>
+Message-ID: <1399648788-26061-5-git-send-email-dean_jenkins@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wolfram Sang <wsa@sang-engineering.com>
+From: Dirk Behme <dirk.behme@de.bosch.com>
 
-In the comments, LCD pins 16-23 were numbered in the wrong order.
-Fix this and use proper pinmux constants for all entries while we are
+Move the code block of imx_transmit_buffer() into imx_txint() because
+imx_transmit_buffer() is only called from a single place now. In other words,
+having the inline function imx_transmit_buffer() for a single call is
+unnecessary and code refactoring to eliminate the imx_transmit_buffer()
+function call makes the code easier to read.
 
-Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
-Cc: Benoit Parrot <bparrot@ti.com>
+No functional change.
+
+Signed-off-by: Dean Jenkins <Dean_Jenkins@mentor.com>
+Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
 ---
- arch/arm/boot/dts/am335x-evm.dts | 56 ++++++++++++++++++++--------------------
- 1 file changed, 28 insertions(+), 28 deletions(-)
+ drivers/tty/serial/imx.c |   31 ++++++++++++-------------------
+ 1 file changed, 12 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-index 6028217ace0f..1b642f1cd469 100644
---- a/arch/arm/boot/dts/am335x-evm.dts
-+++ b/arch/arm/boot/dts/am335x-evm.dts
-@@ -268,34 +268,34 @@
+diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+index cc79706..7b0ef85 100644
+--- a/drivers/tty/serial/imx.c
++++ b/drivers/tty/serial/imx.c
+@@ -456,24 +456,6 @@ static void imx_enable_ms(struct uart_port *port)
+ 	mod_timer(&sport->timer, jiffies);
+ }
  
- 	lcd_pins_s0: lcd_pins_s0 {
- 		pinctrl-single,pins = <
--			0x20 0x01	/* gpmc_ad8.lcd_data16, OUTPUT | MODE1 */
--			0x24 0x01	/* gpmc_ad9.lcd_data17, OUTPUT | MODE1 */
--			0x28 0x01	/* gpmc_ad10.lcd_data18, OUTPUT | MODE1 */
--			0x2c 0x01	/* gpmc_ad11.lcd_data19, OUTPUT | MODE1 */
--			0x30 0x01	/* gpmc_ad12.lcd_data20, OUTPUT | MODE1 */
--			0x34 0x01	/* gpmc_ad13.lcd_data21, OUTPUT | MODE1 */
--			0x38 0x01	/* gpmc_ad14.lcd_data22, OUTPUT | MODE1 */
--			0x3c 0x01	/* gpmc_ad15.lcd_data23, OUTPUT | MODE1 */
--			0xa0 0x00	/* lcd_data0.lcd_data0, OUTPUT | MODE0 */
--			0xa4 0x00	/* lcd_data1.lcd_data1, OUTPUT | MODE0 */
--			0xa8 0x00	/* lcd_data2.lcd_data2, OUTPUT | MODE0 */
--			0xac 0x00	/* lcd_data3.lcd_data3, OUTPUT | MODE0 */
--			0xb0 0x00	/* lcd_data4.lcd_data4, OUTPUT | MODE0 */
--			0xb4 0x00	/* lcd_data5.lcd_data5, OUTPUT | MODE0 */
--			0xb8 0x00	/* lcd_data6.lcd_data6, OUTPUT | MODE0 */
--			0xbc 0x00	/* lcd_data7.lcd_data7, OUTPUT | MODE0 */
--			0xc0 0x00	/* lcd_data8.lcd_data8, OUTPUT | MODE0 */
--			0xc4 0x00	/* lcd_data9.lcd_data9, OUTPUT | MODE0 */
--			0xc8 0x00	/* lcd_data10.lcd_data10, OUTPUT | MODE0 */
--			0xcc 0x00	/* lcd_data11.lcd_data11, OUTPUT | MODE0 */
--			0xd0 0x00	/* lcd_data12.lcd_data12, OUTPUT | MODE0 */
--			0xd4 0x00	/* lcd_data13.lcd_data13, OUTPUT | MODE0 */
--			0xd8 0x00	/* lcd_data14.lcd_data14, OUTPUT | MODE0 */
--			0xdc 0x00	/* lcd_data15.lcd_data15, OUTPUT | MODE0 */
--			0xe0 0x00	/* lcd_vsync.lcd_vsync, OUTPUT | MODE0 */
--			0xe4 0x00	/* lcd_hsync.lcd_hsync, OUTPUT | MODE0 */
--			0xe8 0x00	/* lcd_pclk.lcd_pclk, OUTPUT | MODE0 */
--			0xec 0x00	/* lcd_ac_bias_en.lcd_ac_bias_en, OUTPUT | MODE0 */
-+			0x20 (PIN_OUTPUT | MUX_MODE1)		/* gpmc_ad8.lcd_data23 */
-+			0x24 (PIN_OUTPUT | MUX_MODE1)		/* gpmc_ad9.lcd_data22 */
-+			0x28 (PIN_OUTPUT | MUX_MODE1)		/* gpmc_ad10.lcd_data21 */
-+			0x2c (PIN_OUTPUT | MUX_MODE1)		/* gpmc_ad11.lcd_data20 */
-+			0x30 (PIN_OUTPUT | MUX_MODE1)		/* gpmc_ad12.lcd_data19 */
-+			0x34 (PIN_OUTPUT | MUX_MODE1)		/* gpmc_ad13.lcd_data18 */
-+			0x38 (PIN_OUTPUT | MUX_MODE1)		/* gpmc_ad14.lcd_data17 */
-+			0x3c (PIN_OUTPUT | MUX_MODE1)		/* gpmc_ad15.lcd_data16 */
-+			0xa0 (PIN_OUTPUT | MUX_MODE0)		/* lcd_data0.lcd_data0 */
-+			0xa4 (PIN_OUTPUT | MUX_MODE0)		/* lcd_data1.lcd_data1 */
-+			0xa8 (PIN_OUTPUT | MUX_MODE0)		/* lcd_data2.lcd_data2 */
-+			0xac (PIN_OUTPUT | MUX_MODE0)		/* lcd_data3.lcd_data3 */
-+			0xb0 (PIN_OUTPUT | MUX_MODE0)		/* lcd_data4.lcd_data4 */
-+			0xb4 (PIN_OUTPUT | MUX_MODE0)		/* lcd_data5.lcd_data5 */
-+			0xb8 (PIN_OUTPUT | MUX_MODE0)		/* lcd_data6.lcd_data6 */
-+			0xbc (PIN_OUTPUT | MUX_MODE0)		/* lcd_data7.lcd_data7 */
-+			0xc0 (PIN_OUTPUT | MUX_MODE0)		/* lcd_data8.lcd_data8 */
-+			0xc4 (PIN_OUTPUT | MUX_MODE0)		/* lcd_data9.lcd_data9 */
-+			0xc8 (PIN_OUTPUT | MUX_MODE0)		/* lcd_data10.lcd_data10 */
-+			0xcc (PIN_OUTPUT | MUX_MODE0)		/* lcd_data11.lcd_data11 */
-+			0xd0 (PIN_OUTPUT | MUX_MODE0)		/* lcd_data12.lcd_data12 */
-+			0xd4 (PIN_OUTPUT | MUX_MODE0)		/* lcd_data13.lcd_data13 */
-+			0xd8 (PIN_OUTPUT | MUX_MODE0)		/* lcd_data14.lcd_data14 */
-+			0xdc (PIN_OUTPUT | MUX_MODE0)		/* lcd_data15.lcd_data15 */
-+			0xe0 (PIN_OUTPUT | MUX_MODE0)		/* lcd_vsync.lcd_vsync */
-+			0xe4 (PIN_OUTPUT | MUX_MODE0)		/* lcd_hsync.lcd_hsync */
-+			0xe8 (PIN_OUTPUT | MUX_MODE0)		/* lcd_pclk.lcd_pclk */
-+			0xec (PIN_OUTPUT | MUX_MODE0)		/* lcd_ac_bias_en.lcd_ac_bias_en */
- 		>;
- 	};
+-static inline void imx_transmit_buffer(struct imx_port *sport)
+-{
+-	struct circ_buf *xmit = &sport->port.state->xmit;
+-
+-	while (!uart_circ_empty(xmit) &&
+-			!(readl(sport->port.membase + uts_reg(sport))
+-				& UTS_TXFULL)) {
+-		/* send xmit->buf[xmit->tail]
+-		 * out the port here */
+-		writel(xmit->buf[xmit->tail], sport->port.membase + URTX0);
+-		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
+-		sport->port.icount.tx++;
+-	}
+-
+-	if (uart_circ_empty(xmit))
+-		imx_stop_tx(&sport->port);
+-}
+-
+ static void dma_tx_callback(void *data)
+ {
+ 	struct imx_port *sport = data;
+@@ -634,7 +616,18 @@ static irqreturn_t imx_txint(int irq, void *dev_id)
+ 		goto out;
+ 	}
  
+-	imx_transmit_buffer(sport);
++	while (!uart_circ_empty(xmit) &&
++			!(readl(sport->port.membase + uts_reg(sport))
++				& UTS_TXFULL)) {
++		/* send xmit->buf[xmit->tail]
++		 * out the port here */
++		writel(xmit->buf[xmit->tail], sport->port.membase + URTX0);
++		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
++		sport->port.icount.tx++;
++	}
++
++	if (uart_circ_empty(xmit))
++		imx_stop_tx(&sport->port);
+ 
+ 	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS) {
+ 		spin_unlock_irqrestore(&sport->port.lock, flags);
 -- 
-1.9.2
+1.7.9.5
