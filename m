@@ -1,47 +1,47 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 09 May 2014 16:45:33 -0700
-Subject: omap4-panda-es boot issues with v3.15-rc4
-In-Reply-To: <536C9084.50209@ti.com> (Roger Quadros's message of "Fri, 9 May
- 2014 11:23:32 +0300")
-References: <536B7E44.2040303@ti.com> <7hppjos2w2.fsf@paris.lan>
- <CAGa+x84VB3CXDm71JWxHx1-Qk1xVNeXdwUjZnb42_wg+piOzzA@mail.gmail.com>
- <20140508165558.GB2198@atomide.com>
- <20140508184055.GC2198@atomide.com> <7hha4zsyro.fsf@paris.lan>
- <536C9084.50209@ti.com>
-Message-ID: <7heh02ms82.fsf@paris.lan>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Fri, 9 May 2014 20:55:06 -0300
+Subject: [PATCH 2/2] mtd: orion-nand: fix build error with ARMv4
+In-Reply-To: <4160510.VJSlHZLhNz@wuerfel>
+References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
+ <20140509212810.GF18257@obsidianresearch.com>
+ <20140509220915.GA391@arch.cereza> <4160510.VJSlHZLhNz@wuerfel>
+Message-ID: <20140509235506.GA792@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Roger Quadros <rogerq@ti.com> writes:
-
-> Kevin,
+On 10 May 12:24 AM, Arnd Bergmann wrote:
+> On Friday 09 May 2014 19:09:15 Ezequiel Garcia wrote:
+> > # time nanddump /dev/mtd5 -f /dev/null -q
+> > real    0m 5.82s
+> > user    0m 0.20s
+> > sys     0m 5.60s
+> > 
+> > Jason: Care to submit a proper patch?
+> > 
+> > On 08 May 04:56 PM, Arnd Bergmann wrote:
+> > > Ok, that is a noticeable difference. For scale, what is the size of that partition?
+> > 
+> > The board is Openblocks A6, running mainline.
+> > 
+> > # cat /proc/mtd 
+> > dev:    size   erasesize  name
+> > mtd0: 00090000 00004000 "uboot"
+> > mtd1: 00044000 00004000 "env"
+> > mtd2: 00024000 00004000 "test"
+> > mtd3: 00400000 00004000 "conf"
+> > mtd4: 01d20000 00004000 "linux"
+> > mtd5: 01dec000 00004000 "user"
+> 
+> Ok, so it takes 5.6 seconds in kernel mode to access 31MB, which comes down
+> to 5.60MB/s. That isn't very fast compared to the time the CPU should take
+> for those instructions, so I'm surprised it actually makes any difference
+> at all.
 >
-> On 05/09/2014 01:15 AM, Kevin Hilman wrote:
->> Tony Lindgren <tony@atomide.com> writes:
->> 
->> [...]
->> 
->>> ..but I think I found the cause for recent hangs on panda, just a wild
->>> guess based on looking at the recent cpuidle patches after v3.14.
->>>
->>> Looks like reverting 0b89e9aa2856 (cpuidle: delay enabling interrupts
->>> until all coupled CPUs leave idle) makes booting work reliably again
->>> on panda.
->>>
->>> Can you guys confirm, so far no issues here after few boot tests,
->>> but it might be too early to tell.
->> 
->> Reverting that makes things a bit more stable, but it still eventually
->> fails in the same way.  For me it took 8 boots for it to eventually
->> fail.
->> 
->> However, if I build with CONFIG_CPU_IDLE=n, it becomes much more stable
->> (20+ boots in a row and still going.)
->> 
->
-> Can you please test with CPU_IDLE enabled but C3 disabled as in below patch?
-> It worked for me 10/10 boots.
+> There isn't a usable slave DMA engine in Armada XP by chance?
+> 
 
-Yup, it worked for me too for 10/10 boots in a row.
-
-Kevin
+The Openblocks A6 is a Kirkwood, not Armada XP.
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
