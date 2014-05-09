@@ -1,36 +1,20 @@
-From: afaerber@suse.de (=?ISO-8859-1?Q?Andreas_F=E4rber?=)
-Date: Fri, 09 May 2014 16:20:04 +0200
-Subject: [PATCH] ARM: tegra: enable console framebuffer rotation
-In-Reply-To: <536AC45F.6080608@nvidia.com>
-References: <1399432682-677-1-git-send-email-acourbot@nvidia.com>
- <536A57FA.2090608@wwwdotorg.org> <536AC45F.6080608@nvidia.com>
-Message-ID: <536CE414.5030406@suse.de>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 9 May 2014 22:21:20 +0800
+Subject: [PATCH v2] ARM: dts: imx6: add new board RIoTboard
+In-Reply-To: <536CE331.7030001@gmail.com>
+References: <53695C34.5000604@gmail.com> <20140508054106.GH2794@dragon>
+ <536B4ACD.30001@gmail.com> <20140509030938.GK2794@dragon>
+ <536C8837.9090802@gmail.com> <20140509120845.GO2794@dragon>
+ <536CE331.7030001@gmail.com>
+Message-ID: <20140509142118.GQ2794@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 08.05.2014 01:40, schrieb Alex Courbot:
-> On 05/08/2014 12:57 AM, Stephen Warren wrote:
->> On 05/06/2014 09:18 PM, Alexandre Courbot wrote:
->>> Console rotation is needed for devices like Tegra Note 7 and NVIDIA
->>> SHIELD to get the boot console in the expected orientation.
->>
->> I've squashed this into Tegra's for-3.16/defconfig branch.
->>
->> Can you please also update multi_v7_defconfig, and send that change to
->> arm-soc (arm at kernel.org) to be applied. Thanks.
-> 
-> I omitted doing this for now because the devices that require this
-> option (TN7/SHIELD) need a custom build with appended DTB and/or
-> command-line anyway. Therefore they cannot use a multi-mach kernel
+On Fri, May 09, 2014 at 03:16:17PM +0100, Iain Paton wrote:
+> I'll likely drop them then.  Am I ok to leave the pin groups in the iomuxc
+> when nothing uses them, or would you prefer I only include what's actually 
+> being used ?
 
-What does appending a .dtb have to do with whether or not to use a
-multi-mach kernel? We package zImage/uImage and .dtbs separately, so
-surely the multi_v7_defconfig should be kept working with Tegra devices.
-Appending a .dtb only comes into play for preparing installation images.
+It's okay to keep the pin groups in there.
 
-Regards,
-Andreas
-
--- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+Shawn
