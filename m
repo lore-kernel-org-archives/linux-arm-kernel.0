@@ -1,32 +1,24 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Fri, 9 May 2014 08:42:39 +0200
-Subject: [PATCH v2] i.MX25 dts updates
-In-Reply-To: <1399615879-30781-1-git-send-email-s.hauer@pengutronix.de>
-References: <1399615879-30781-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20140509084239.46b323ba@ipc1.ka-ro>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 9 May 2014 08:48:15 +0200
+Subject: [GIT PULL] Allwinner Pinctrl changes for 3.16
+In-Reply-To: <20140508225209.GA13610@lukather>
+References: <20140508225209.GA13610@lukather>
+Message-ID: <CACRpkda7QT+sGs6wY6-fbcZ3k4sXfP=rmPimfqHjbUB5vQuO5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, May 9, 2014 at 12:52 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
 
-Sascha Hauer wrote:
-> Changes since v1:
-> 
-> - Fix mmc1 alias name
-> - Add enable-active-high to FEC phy regulator
-> - Fix gpio number for FEC phy reset
-> 
-for the karo-tx25 part:
-Acked-by: Lothar Wa?mann <LW@KARO-electronics.de>
+> The following changes since commit fd67f884782a281eb033e40b0f8eae623416035e:
+>
+>   pinctrl: mvebu: new driver for Orion platforms (2014-04-24 15:09:35 +0200)
+>
+> are available in the git repository at:
+>
+>   https://github.com/mripard/linux.git tags/sunxi-pinctrl-for-3.16
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+Thanks a lot Maxime, pulled into the pinctrl devel branch for v3.16.
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Yours,
+Linus Walleij
