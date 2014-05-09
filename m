@@ -1,34 +1,35 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 9 May 2014 11:38:46 +0100
-Subject: [RFC 13/47] mtd: nand: stm_nand_bch: provide Device Tree support
-In-Reply-To: <20980858CB6D3A4BAE95CA194937D5E73EACBC8F@DBDE04.ent.ti.com>
-References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
- <1395735604-26706-14-git-send-email-lee.jones@linaro.org>
- <20980858CB6D3A4BAE95CA194937D5E73EAB5C83@DBDE04.ent.ti.com>
- <20140430125406.GN29462@lee--X1>
- <20980858CB6D3A4BAE95CA194937D5E73EACA3F0@DBDE04.ent.ti.com>
- <20140509100304.GR5767@lee--X1>
- <20980858CB6D3A4BAE95CA194937D5E73EACBC8F@DBDE04.ent.ti.com>
-Message-ID: <20140509103846.GS5767@lee--X1>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 9 May 2014 11:39:37 +0100
+Subject: [PATCH] arm64: Make atomic64_t() return "long", not "long long"
+In-Reply-To: <20140508211347.18358.8154.stgit@bhelgaas-glaptop.roam.corp.google.com>
+References: <20140508211347.18358.8154.stgit@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20140509103937.GC7950@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >Ah, I see.  I will fixup, thanks for the explanation.
-> >
+On Thu, May 08, 2014 at 10:13:47PM +0100, Bjorn Helgaas wrote:
+> arm64 sets CONFIG_64BIT=y and hence uses the "long counter" atomic64_t
+> definition from include/linux/types.h.  Make atomic64_read() return "long",
+> not "long long".
 > 
-> Please wait, I'll review your [v2] series also, then you can further
-> send all fixes together. I'm bit caught in other commitments for 3.16,
-> so hopefully I'll be able to review your patches by next week.
+> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+> ---
+>  arch/arm64/include/asm/atomic.h |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/include/asm/atomic.h b/arch/arm64/include/asm/atomic.h
+> index 0237f0867e37..9c48d74652cb 100644
+> --- a/arch/arm64/include/asm/atomic.h
+> +++ b/arch/arm64/include/asm/atomic.h
+> @@ -162,7 +162,7 @@ static inline int __atomic_add_unless(atomic_t *v, int a, int u)
+>   */
+>  #define ATOMIC64_INIT(i) { (i) }
+>  
+> -#define atomic64_read(v)	(*(volatile long long *)&(v)->counter)
+> +#define atomic64_read(v)	(*(volatile long *)&(v)->counter)
+>  #define atomic64_set(v,i)	(((v)->counter) = (i))
 
-I have already fixed up, but I won't resubmit until you have
-reviewed.
-
-FYI: I have made some changes since v2 including moving over to the
-recently submitted core timing structure submitted by Boris Brezillon
-and removal bitflip_threshold as an internal variable.
+Applied, thanks.
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Catalin
