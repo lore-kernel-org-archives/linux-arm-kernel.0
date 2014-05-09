@@ -1,46 +1,31 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 9 May 2014 19:02:34 +0200
-Subject: [RFC][PATCH 6/8] sched,idle: Avoid spurious wakeup IPIs
-In-Reply-To: <20140509145745.GI7950@arm.com>
-References: <20140411134243.160989490@infradead.org>
- <20140411135218.478299389@infradead.org>
- <CAAG0J9_q1KsUx10-XAb7AJnxv2ehctg6q1KME7ahsk1OZV8vZQ@mail.gmail.com>
- <20140509141520.GV2844@laptop.programming.kicks-ass.net>
- <20140509144034.GF7950@arm.com>
- <20140509145002.GW2844@laptop.programming.kicks-ass.net>
- <20140509145745.GI7950@arm.com>
-Message-ID: <20140509170234.GZ30445@twins.programming.kicks-ass.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 9 May 2014 18:02:55 +0100
+Subject: [PATCHv4 1/2] dt/bindings: Add the DT binding documentation for
+ endianness
+In-Reply-To: <20140509163243.GD16418@e106331-lin.cambridge.arm.com>
+References: <1399601073-19278-1-git-send-email-Li.Xiubo@freescale.com>
+ <1399601073-19278-2-git-send-email-Li.Xiubo@freescale.com>
+ <20140509163243.GD16418@e106331-lin.cambridge.arm.com>
+Message-ID: <20140509170255.GR12304@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 09, 2014 at 03:57:45PM +0100, Catalin Marinas wrote:
-> On Fri, May 09, 2014 at 03:50:02PM +0100, Peter Zijlstra wrote:
-> > On Fri, May 09, 2014 at 03:40:34PM +0100, Catalin Marinas wrote:
-> > 
-> > > I wonder why we still need TIF_POLLING_NRFLAG for arm64. It was on arm
-> > > until commit 16a8016372c42c7628eb (sanitize tsk_is_polling()). On arm64
-> > > we use wfi for idle or a firmware call but in both cases the assumption
-> > > is that we need an interrupt for waking up.
-> > > 
-> > > So I think we should remove this macro for arm64.
-> > 
-> > Does ARM64 support idle=poll? If so, you could keep it for that,
-> > otherwise it does indeed appear to be pointless.
-> 
-> We don't support idle=poll either.
-> 
-> > As to 32bit ARM, are there SMP chips which do not have WFI?
-> 
-> No. WFI is even used for the secondary booting protocol (we need to send
-> an IPI to get them going).
+On Fri, May 09, 2014 at 05:32:43PM +0100, Mark Rutland wrote:
+> On Fri, May 09, 2014 at 03:04:32AM +0100, Xiubo Li wrote:
 
-OK, so I'll queue a patch removing TIF_POLLING_NRFLAG for arm64.
+> > {big,little}-endian{,-*}: these are boolean properties, if absent
+> > meaning that the CPU and the Device are in the same endianness mode.
 
-Thanks!
+> That's not really true though. A device might usually be little-endian,
+> regardless of the endianness of a CPU. Some vendors may integrate it as
+> big-endian after a binding is added, and in the absence of a specified
+> endianness a driver is likely to assume LE.
+
+The default should be device specific rather than binding specific.
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: not available
+Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140509/410edcd6/attachment.sig>
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140509/5806baf1/attachment.sig>
