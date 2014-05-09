@@ -1,65 +1,116 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 09 May 2014 12:46:07 +0200
-Subject: [PATCH 1/6] of: align RESERVEDMEM_OF_DECLARE function callbacks to
- other callbacks
-In-Reply-To: <1399587823-17701-2-git-send-email-robherring2@gmail.com>
-References: <1399587823-17701-1-git-send-email-robherring2@gmail.com>
- <1399587823-17701-2-git-send-email-robherring2@gmail.com>
-Message-ID: <536CB1EF.2090204@samsung.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 9 May 2014 14:56:19 +0300
+Subject: [PATCH 11/11] ARM: dts: omap5-uevm.dts: add display nodes
+In-Reply-To: <1399636579-8062-1-git-send-email-tomi.valkeinen@ti.com>
+References: <1399636579-8062-1-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1399636579-8062-12-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+omap5-uevm has a single HDMI output. Add the necessary display
+information, including pinmuxing.
 
-On 2014-05-09 00:23, Rob Herring wrote:
-> From: Rob Herring <robh@kernel.org>
->
-> All the parameters for RESERVEDMEM_OF_DECLARE function callbacks are
-> members of struct reserved_mem, so just pass the struct ptr to callback
-> functions so the function callback is more in line with other OF match
-> table callbacks.
->
-> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-> Cc: Grant Likely <grant.likely@linaro.org>
-> Signed-off-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+---
+ arch/arm/boot/dts/omap5-uevm.dts | 82 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 82 insertions(+)
 
-Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
-
-> ---
->   drivers/of/of_reserved_mem.c    | 2 +-
->   include/linux/of_reserved_mem.h | 4 ++--
->   2 files changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
-> index e420eb5..632aae8 100644
-> --- a/drivers/of/of_reserved_mem.c
-> +++ b/drivers/of/of_reserved_mem.c
-> @@ -188,7 +188,7 @@ static int __init __reserved_mem_init_node(struct reserved_mem *rmem)
->   		if (!of_flat_dt_is_compatible(rmem->fdt_node, compat))
->   			continue;
->   
-> -		if (initfn(rmem, rmem->fdt_node, rmem->name) == 0) {
-> +		if (initfn(rmem) == 0) {
->   			pr_info("Reserved memory: initialized node %s, compatible id %s\n",
->   				rmem->name, compat);
->   			return 0;
-> diff --git a/include/linux/of_reserved_mem.h b/include/linux/of_reserved_mem.h
-> index 9b1fbb7..4c81b84 100644
-> --- a/include/linux/of_reserved_mem.h
-> +++ b/include/linux/of_reserved_mem.h
-> @@ -21,8 +21,8 @@ struct reserved_mem_ops {
->   				  struct device *dev);
->   };
->   
-> -typedef int (*reservedmem_of_init_fn)(struct reserved_mem *rmem,
-> -				      unsigned long node, const char *uname);
-> +typedef int (*reservedmem_of_init_fn)(struct reserved_mem *rmem);
-> +
->   
->   #ifdef CONFIG_OF_RESERVED_MEM
->   void fdt_init_reserved_mem(void);
-
-Best regards
+diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
+index 76877516f6df..9ffbe71b88c3 100644
+--- a/arch/arm/boot/dts/omap5-uevm.dts
++++ b/arch/arm/boot/dts/omap5-uevm.dts
+@@ -183,6 +183,19 @@
+ 		>;
+ 	};
+ 
++	dss_hdmi_pins: pinmux_dss_hdmi_pins {
++		pinctrl-single,pins = <
++			0x0fc (PIN_INPUT_PULLUP | MUX_MODE0)	/* hdmi_cec.hdmi_cec */
++			0x100 (PIN_INPUT | MUX_MODE0)	/* hdmi_ddc_scl.hdmi_ddc_scl */
++			0x102 (PIN_INPUT | MUX_MODE0)	/* hdmi_ddc_sda.hdmi_ddc_sda */
++		>;
++	};
++
++	tpd12s015_pins: pinmux_tpd12s015_pins {
++		pinctrl-single,pins = <
++			0x0fe (PIN_INPUT_PULLDOWN | MUX_MODE6)	/* hdmi_hpd.gpio7_193 */
++		>;
++	};
+ };
+ 
+ &omap5_pmx_wkup {
+@@ -498,3 +511,72 @@
+ &cpu0 {
+ 	cpu0-supply = <&smps123_reg>;
+ };
++
++/ {
++	aliases {
++		display0 = &hdmi0;
++	};
++
++	tpd12s015: encoder at 0 {
++		compatible = "ti,tpd12s015";
++
++		pinctrl-names = "default";
++		pinctrl-0 = <&tpd12s015_pins>;
++
++		gpios = <&gpio9 0 GPIO_ACTIVE_HIGH>,	/* TCA6424A P01, CT CP HPD */
++			<&gpio9 1 GPIO_ACTIVE_HIGH>,	/* TCA6424A P00, LS OE */
++			<&gpio7 1 GPIO_ACTIVE_HIGH>;	/* GPIO 193, HPD */
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++
++				tpd12s015_in: endpoint at 0 {
++					remote-endpoint = <&hdmi_out>;
++				};
++			};
++
++			port at 1 {
++				reg = <1>;
++
++				tpd12s015_out: endpoint at 0 {
++					remote-endpoint = <&hdmi_connector_in>;
++				};
++			};
++		};
++	};
++
++	hdmi0: connector at 0 {
++		compatible = "hdmi-connector";
++		label = "hdmi";
++
++		type = "b";
++
++		port {
++			hdmi_connector_in: endpoint {
++				remote-endpoint = <&tpd12s015_out>;
++			};
++		};
++	};
++};
++
++&dss {
++	status = "ok";
++};
++
++&hdmi {
++	status = "ok";
++	vdda-supply = <&ldo4_reg>;
++
++	pinctrl-names = "default";
++	pinctrl-0 = <&dss_hdmi_pins>;
++
++	port {
++		hdmi_out: endpoint {
++			remote-endpoint = <&tpd12s015_in>;
++		};
++	};
++};
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+1.9.1
