@@ -1,43 +1,42 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 9 May 2014 09:08:07 +0100
-Subject: [PATCH v2 3/7] mfd: add support for sun6i PRCM
- (Power/Reset/Clock Management) unit
-In-Reply-To: <536C84F6.2050701@redhat.com>
-References: <1399483554-8824-1-git-send-email-boris.brezillon@free-electrons.com>
- <1399483554-8824-4-git-send-email-boris.brezillon@free-electrons.com>
- <20140508110205.GB5767@lee--X1>
- <536BE366.8080907@free-electrons.com>
- <20140509071246.GE5767@lee--X1> <536C84F6.2050701@redhat.com>
-Message-ID: <20140509080807.GH5767@lee--X1>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 9 May 2014 11:10:05 +0300
+Subject: [PATCH v2] ARM: omap5: hwmod_data: Correct IDLEMODE for McPDM
+In-Reply-To: <alpine.DEB.2.02.1405081602220.23579@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1405081602220.23579@utopia.booyaka.com>
+Message-ID: <1399623005-30581-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >>>> +static struct platform_driver sun6i_prcm_driver = {
-> >>>> +	.driver = {
-> >>>> +		.name = "sun6i-prcm",
-> >>>> +		.owner = THIS_MODULE,
-> >>>> +		.of_match_table = sun6i_prcm_dt_ids,
-> >>>> +	},
-> >>>> +	.probe = sun6i_prcm_probe,
-> >>> You need a .remove() call-back.
-> >>
-> >> This driver cannot be compiled as module (see the Kconfig definition)
-> >> and the devices are not hotpluggable, as a result a probed device will
-> >> never be removed.
-> >>
-> >> Do you still want me to implement the remove function ?
-> > 
-> > .remove() also be run on shut down.
-> 
-> That is not true, if your device needs to do anything special at shutdown
-> you need to add a shutdown callback. Devices are kept as is (not torn down)
-> on shutdown.
+McPDM need to be configured to NO_IDLE mode when it is in used otherwise
+vital clocks will be gated which results 'slow motion' audio playback.
 
-Ah okay, I'll bow to your knowledge.  So there's no reason for this
-driver to ever call mfd_remove_devices() then?
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
+Hi Paul,
 
+Changes since v1:
+- updated the commit message
+
+If this can still make it to 3.15, that would be great.
+
+Regards,
+Peter
+
+ arch/arm/mach-omap2/omap_hwmod_54xx_data.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
+index 892317294fdc..e829664e6a6c 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
+@@ -895,7 +895,7 @@ static struct omap_hwmod omap54xx_mcpdm_hwmod = {
+ 	 * current exception.
+ 	 */
+ 
+-	.flags		= HWMOD_EXT_OPT_MAIN_CLK,
++	.flags		= HWMOD_EXT_OPT_MAIN_CLK | HWMOD_SWSUP_SIDLE,
+ 	.main_clk	= "pad_clks_ck",
+ 	.prcm = {
+ 		.omap4 = {
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.9.2
