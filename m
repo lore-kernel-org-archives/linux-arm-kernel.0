@@ -1,231 +1,652 @@
-From: Li.Xiubo@freescale.com (Xiubo Li)
-Date: Fri, 9 May 2014 10:04:33 +0800
-Subject: [PATCHv4 2/2] regmap: add DT endianness binding support.
-In-Reply-To: <1399601073-19278-1-git-send-email-Li.Xiubo@freescale.com>
-References: <1399601073-19278-1-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <1399601073-19278-3-git-send-email-Li.Xiubo@freescale.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 9 May 2014 11:09:39 +0800
+Subject: [PATCH v2] ARM: dts: imx6: add new board RIoTboard
+In-Reply-To: <536B4ACD.30001@gmail.com>
+References: <53695C34.5000604@gmail.com> <20140508054106.GH2794@dragon>
+ <536B4ACD.30001@gmail.com>
+Message-ID: <20140509030938.GK2794@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For many drivers which will support rich endianness of CPU<-->Dev
-need define DT properties by itself without the binding support.
+On Thu, May 08, 2014 at 10:13:49AM +0100, Iain Paton wrote:
+> add element14s RIoTboard http://www.riotboard.org which is an i.MX6Solo
+> based design targeted at makers.
+> 
+> Signed-off-by: Iain Paton<ipaton0@gmail.com>
+> 
+> ---
+>  arch/arm/boot/dts/Makefile             |   1 +
+>  arch/arm/boot/dts/imx6dl-riotboard.dts | 593 +++++++++++++++++++++++++++++++++
+>  2 files changed, 594 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx6dl-riotboard.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 377b7c3..9df2721 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -179,6 +179,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
+>  	imx6dl-gw54xx.dtb \
+>  	imx6dl-hummingboard.dtb \
+>  	imx6dl-nitrogen6x.dtb \
+> +	imx6dl-riotboard.dtb \
+>  	imx6dl-sabreauto.dtb \
+>  	imx6dl-sabrelite.dtb \
+>  	imx6dl-sabresd.dtb \
+> diff --git a/arch/arm/boot/dts/imx6dl-riotboard.dts b/arch/arm/boot/dts/imx6dl-riotboard.dts
+> new file mode 100644
+> index 0000000..83a6b8c
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx6dl-riotboard.dts
+> @@ -0,0 +1,593 @@
+> +/*
+> + * Copyright 2014 Iain Paton <ipaton0@gmail.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + */
+> +
+> +/dts-v1/;
+> +#include "imx6dl.dtsi"
+> +#include <dt-bindings/gpio/gpio.h>
+> +
+> +/ {
+> +	model = "RIoTboard i.MX6S";
+> +	compatible = "riot,imx6s-riotboard", "fsl,imx6dl";
+> +
+> +	memory {
+> +		reg = <0x10000000 0x40000000>;
+> +	};
+> +
+> +	regulators {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		reg_2p5v: regulator at 0 {
+> +			compatible = "regulator-fixed";
+> +			reg = <0>;
+> +			regulator-name = "2P5V";
+> +			regulator-min-microvolt = <2500000>;
+> +			regulator-max-microvolt = <2500000>;
+> +		};
+> +
+> +		reg_3p3v: regulator at 1 {
+> +			compatible = "regulator-fixed";
+> +			reg = <1>;
+> +			regulator-name = "3P3V";
+> +			regulator-min-microvolt = <3300000>;
+> +			regulator-max-microvolt = <3300000>;
+> +		};
+> +
+> +		reg_usb_otg_vbus: regulator at 2 {
+> +			compatible = "regulator-fixed";
+> +			reg = <2>;
+> +			regulator-name = "usb_otg_vbus";
+> +			regulator-min-microvolt = <5000000>;
+> +			regulator-max-microvolt = <5000000>;
+> +			gpio = <&gpio3 22 0>;
+> +			enable-active-high;
+> +		};
+> +
 
-The endianness using regmap:
-Index    CPU       Device     Endianess flag for DT bool property
-------------------------------------------------------------
-1        LE        LE         -
-2        LE        BE         'big-endian-{val,reg}'
-3        BE        BE         -
-4        BE        LE         'little-endian-{val,reg}'
+Drop this new line.
 
-Please see the following documetation for detail:
-    Documentation/devicetree/bindings/endianness/endianness.txt
+> +	};
+> +
+> +	leds {
+> +		compatible = "gpio-leds";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_led>;
+> +
+> +		led0: user1 {
+> +			label = "user1";
+> +			gpios = <&gpio5 2 GPIO_ACTIVE_LOW>;
+> +			default-state = "on";
+> +			linux,default-trigger = "heartbeat";
+> +		};
+> +
+> +		led1: user2 {
+> +			label = "user2";
+> +			gpios = <&gpio3 28 GPIO_ACTIVE_LOW>;
+> +			default-state = "off";
+> +		};
+> +	};
+> +
+> +	sound {
+> +		compatible = "fsl,imx-audio-sgtl5000";
+> +		model = "imx6-riotboard-sgtl5000";
+> +		ssi-controller = <&ssi1>;
+> +		audio-codec = <&codec>;
+> +		audio-routing =
+> +			"MIC_IN", "Mic Jack",
+> +			"Mic Jack", "Mic Bias",
+> +			"Headphone Jack", "HP_OUT";
+> +			mux-int-port = <1>;
+> +			mux-ext-port = <3>;
+> +	};
+> +};
+> +
+> +&audmux {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_audmux>;
+> +	status = "okay";
+> +};
+> +
+> +&ecspi1 {
+> +	fsl,spi-num-chipselects = <1>;
+> +	cs-gpios = <&gpio5 17 0>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_ecspi1>;
+> +	status = "okay";
+> +
+> +	spidev at 0 {
+> +		spi-max-frequency = <24000000>;
+> +		reg = <0>;
+> +		compatible = "spidev";
+> +	};
 
-Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
----
- drivers/base/regmap/regmap-i2c.c |   2 +
- drivers/base/regmap/regmap-spi.c |   2 +
- drivers/base/regmap/regmap.c     | 148 ++++++++++++++++++++++++++++++++++++---
- 3 files changed, 141 insertions(+), 11 deletions(-)
+What's this?  Is this the common way we code spi devices in device tree?
 
-diff --git a/drivers/base/regmap/regmap-i2c.c b/drivers/base/regmap/regmap-i2c.c
-index ebd1895..9b0fbf9 100644
---- a/drivers/base/regmap/regmap-i2c.c
-+++ b/drivers/base/regmap/regmap-i2c.c
-@@ -95,6 +95,8 @@ static struct regmap_bus regmap_i2c = {
- 	.write = regmap_i2c_write,
- 	.gather_write = regmap_i2c_gather_write,
- 	.read = regmap_i2c_read,
-+	.reg_format_endian_default = REGMAP_ENDIAN_BIG,
-+	.val_format_endian_default = REGMAP_ENDIAN_BIG,
- };
- 
- /**
-diff --git a/drivers/base/regmap/regmap-spi.c b/drivers/base/regmap/regmap-spi.c
-index 0eb3097..53d1148 100644
---- a/drivers/base/regmap/regmap-spi.c
-+++ b/drivers/base/regmap/regmap-spi.c
-@@ -109,6 +109,8 @@ static struct regmap_bus regmap_spi = {
- 	.async_alloc = regmap_spi_async_alloc,
- 	.read = regmap_spi_read,
- 	.read_flag_mask = 0x80,
-+	.reg_format_endian_default = REGMAP_ENDIAN_BIG,
-+	.val_format_endian_default = REGMAP_ENDIAN_BIG,
- };
- 
- /**
-diff --git a/drivers/base/regmap/regmap.c b/drivers/base/regmap/regmap.c
-index 63e30ef..4805246 100644
---- a/drivers/base/regmap/regmap.c
-+++ b/drivers/base/regmap/regmap.c
-@@ -15,6 +15,7 @@
- #include <linux/export.h>
- #include <linux/mutex.h>
- #include <linux/err.h>
-+#include <linux/of.h>
- #include <linux/rbtree.h>
- #include <linux/sched.h>
- 
-@@ -402,6 +403,133 @@ int regmap_attach_dev(struct device *dev, struct regmap *map,
- }
- EXPORT_SYMBOL_GPL(regmap_attach_dev);
- 
-+enum regmap_endian_type {
-+	REGMAP_ENDIAN_REG,
-+	REGMAP_ENDIAN_VAL,
-+};
-+
-+/**
-+ * of_regmap_endian_by_type() - Parses and lookups the endianness referenced
-+ * by a device node
-+ * @np: pointer to the consumer device node
-+ * @type: endianness type for values or registers
-+ *
-+ * This function parses the device endianness properties, and uses them to
-+ * determine the endianness of the device's registers and values.
-+ */
-+static int of_regmap_endian_by_type(struct device_node *np,
-+					enum regmap_endian_type type,
-+					enum regmap_endian *endian)
-+{
-+	if (!endian)
-+		return -EINVAL;
-+
-+	switch (type) {
-+	case REGMAP_ENDIAN_REG:
-+		if (of_property_read_bool(np, "big-endian-reg"))
-+			*endian = REGMAP_ENDIAN_BIG;
-+		else if (of_property_read_bool(np, "little-endian-reg"))
-+			*endian = REGMAP_ENDIAN_LITTLE;
-+		else
-+			*endian = REGMAP_ENDIAN_NATIVE;
-+		break;
-+	case REGMAP_ENDIAN_VAL:
-+		if (of_property_read_bool(np, "big-endian-val"))
-+			*endian = REGMAP_ENDIAN_BIG;
-+		else if (of_property_read_bool(np, "little-endian-val"))
-+			*endian = REGMAP_ENDIAN_LITTLE;
-+		else
-+			*endian = REGMAP_ENDIAN_NATIVE;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
-+static int of_regmap_get_endian(struct device *dev,
-+				const struct regmap_bus *bus,
-+				const struct regmap_config *config,
-+				enum regmap_endian_type type,
-+				enum regmap_endian *endian)
-+{
-+	int ret;
-+
-+	if (!endian || !config)
-+		return -EINVAL;
-+
-+	/*
-+	 * Firstly, try to parse the endianness from driver's config,
-+	 * this is to be compatible with the none DT or the old drivers.
-+	 * From the driver's config the endianness value maybe:
-+	 *   REGMAP_ENDIAN_BIG,
-+	 *   REGMAP_ENDIAN_LITTLE,
-+	 *   REGMAP_ENDIAN_NATIVE,
-+	 *   REGMAP_ENDIAN_DEFAULT.
-+	 */
-+	switch (type) {
-+	case REGMAP_ENDIAN_REG:
-+		*endian = config->reg_format_endian;
-+		break;
-+	case REGMAP_ENDIAN_VAL:
-+		*endian = config->val_format_endian;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	/*
-+	 * If the endianness parsed from driver config is
-+	 * REGMAP_ENDIAN_DEFAULT, that means maybe we are using the DT
-+	 * node to specify the endianness information.
-+	 */
-+	if (*endian != REGMAP_ENDIAN_DEFAULT)
-+		return 0;
-+
-+	/*
-+	 * Secondly, try to parse the endianness from DT node if the
-+	 * driver config does not specify it.
-+	 * From the DT node the endianness value maybe:
-+	 *   REGMAP_ENDIAN_BIG,
-+	 *   REGMAP_ENDIAN_LITTLE,
-+	 *   REGMAP_ENDIAN_NATIVE,
-+	 */
-+	if (dev) {
-+		ret = of_regmap_endian_by_type(dev->of_node, type, endian);
-+		if (ret < 0)
-+			return ret;
-+	}
-+
-+	/*
-+	 * If the endianness parsed from DT node is REGMAP_ENDIAN_NATIVE, that
-+	 * maybe means the DT does not care the endianness or it should use
-+	 * the regmap bus's default endianness, then we should try to check
-+	 * whether the regmap bus has specified the default endianness.
-+	 */
-+	if (*endian != REGMAP_ENDIAN_NATIVE)
-+		return 0;
-+
-+	/*
-+	 * Finally, try to parse the endianness from regmap bus config
-+	 * if in device's DT node the endianness property is absent.
-+	 */
-+	switch (type) {
-+	case REGMAP_ENDIAN_REG:
-+		if (bus && bus->reg_format_endian_default)
-+			*endian = bus->reg_format_endian_default;
-+		break;
-+	case REGMAP_ENDIAN_VAL:
-+		if (bus && bus->val_format_endian_default)
-+			*endian = bus->val_format_endian_default;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
- /**
-  * regmap_init(): Initialise register map
-  *
-@@ -499,17 +627,15 @@ struct regmap *regmap_init(struct device *dev,
- 		map->reg_read  = _regmap_bus_read;
- 	}
- 
--	reg_endian = config->reg_format_endian;
--	if (reg_endian == REGMAP_ENDIAN_DEFAULT)
--		reg_endian = bus->reg_format_endian_default;
--	if (reg_endian == REGMAP_ENDIAN_DEFAULT)
--		reg_endian = REGMAP_ENDIAN_BIG;
--
--	val_endian = config->val_format_endian;
--	if (val_endian == REGMAP_ENDIAN_DEFAULT)
--		val_endian = bus->val_format_endian_default;
--	if (val_endian == REGMAP_ENDIAN_DEFAULT)
--		val_endian = REGMAP_ENDIAN_BIG;
-+	ret = of_regmap_get_endian(dev, bus, config, REGMAP_ENDIAN_REG,
-+				   &reg_endian);
-+	if (ret)
-+		return ERR_PTR(ret);
-+
-+	ret = of_regmap_get_endian(dev, bus, config, REGMAP_ENDIAN_VAL,
-+				   &val_endian);
-+	if (ret)
-+		return ERR_PTR(ret);
- 
- 	switch (config->reg_bits + map->reg_shift) {
- 	case 2:
--- 
-1.8.4
+> +};
+> +  
+> +&ecspi2 {
+> +	fsl,spi-num-chipselects = <2>;
+> +	cs-gpios = <&gpio5 9 0>, <&gpio5 12 0>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_ecspi2>;
+> +	status = "okay";
+> +
+> +	spidev at 0 {
+> +		spi-max-frequency = <24000000>;
+> +		reg = <0>;
+> +		compatible = "spidev";
+> +	};
+> +	spidev at 1 {
+> +		spi-max-frequency = <24000000>;
+> +		reg = <1>;
+> +		compatible = "spidev";
+> +	};
+> +};
+> +  
+> +&ecspi3 {
+> +	fsl,spi-num-chipselects = <2>;
+> +	cs-gpios = <&gpio4 24 0>, <&gpio4 25 0>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_ecspi3>;
+> +	status = "okay";
+> +
+> +	spidev at 0 {
+> +		spi-max-frequency = <24000000>;
+> +		reg = <0>;
+> +		compatible = "spidev";
+> +	};
+> +	spidev at 1 {
+> +		spi-max-frequency = <24000000>;
+> +		reg = <1>;
+> +		compatible = "spidev";
+> +	};
+> +};
+> +
+> +&fec {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_enet>;
+> +	phy-mode = "rgmii";
+> +	phy-reset-gpios = <&gpio3 31 0>;
+> +	interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
+> +			      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
+> +	status = "okay";
+> +};
+> +
+> +&hdmi {
+> +	ddc-i2c-bus = <&i2c2>;
+> +	status = "okay";
+> +};
+> +
+> +&i2c1 {
+> +	clock-frequency = <100000>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_i2c1>;
+> +	status = "okay";  
+> +
+> +	codec: sgtl5000 at 0a {
+> +		compatible = "fsl,sgtl5000";
+> +		reg = <0x0a>;
+> +		clocks = <&clks 201>;
+> +		VDDA-supply = <&reg_2p5v>;
+> +		VDDIO-supply = <&reg_3p3v>;
+> +	};
+> +
+> +	pmic: pf0100 at 08 {
+> +		compatible = "fsl,pfuze100";
+> +		reg = <0x08>;
+> +		interrupt-parent = <&gpio5>;
+> +		interrupts = <16 8>;
+> +
+> +		regulators {
+> +
+
+Drop this new line.
+
+> +			reg_vddcore: sw1ab {				/* VDDARM_IN */
+> +				regulator-min-microvolt = <300000>;
+> +				regulator-max-microvolt = <1875000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			reg_vddsoc: sw1c {				/* VDDSOC_IN */
+> +				regulator-min-microvolt = <300000>;
+> +				regulator-max-microvolt = <1875000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			reg_gen_3v3: sw2 {				/* VDDHIGH_IN */
+> +				regulator-min-microvolt = <800000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			reg_ddr_1v5a: sw3a {				/* NVCC_DRAM, NVCC_RGMII */
+> +				regulator-min-microvolt = <400000>;
+> +				regulator-max-microvolt = <1975000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			reg_ddr_1v5b: sw3b {				/* NVCC_DRAM, NVCC_RGMII */
+> +				regulator-min-microvolt = <400000>;
+> +				regulator-max-microvolt = <1975000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			reg_ddr_vtt: sw4 {				/* MIPI conn */
+> +				regulator-min-microvolt = <400000>;
+> +				regulator-max-microvolt = <1975000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			reg_5v_600mA: swbst {				/* not used */
+> +				regulator-min-microvolt = <5000000>;
+> +				regulator-max-microvolt = <5150000>;
+> +			};
+> +
+> +			reg_snvs_3v: vsnvs {				/* VDD_SNVS_IN */
+> +				regulator-min-microvolt = <1500000>;
+> +				regulator-max-microvolt = <3000000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			vref_reg: vrefddr {				/* VREF_DDR */
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			reg_vgen1_1v5: vgen1 {				/* not used */
+> +				regulator-min-microvolt = <800000>;
+> +				regulator-max-microvolt = <1550000>;
+> +			};
+> +
+> +			reg_vgen2_1v2_eth: vgen2 {			/* pcie ? */
+> +				regulator-min-microvolt = <800000>;
+> +				regulator-max-microvolt = <1550000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			reg_vgen3_2v8: vgen3 {				/* not used */
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <3300000>;
+> +			};
+> +			reg_vgen4_1v8: vgen4 {				/* NVCC_SD3 */
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			reg_vgen5_2v5_sgtl: vgen5 {			/* Pwr LED & 5V0_delayed enable */
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			reg_vgen6_3v3: vgen6 {				/* #V#_DELAYED enable, MIPI */
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-always-on;
+> +			};
+> +		};
+> +	};
+> +};
+> +
+> +&i2c2 {
+> +	clock-frequency = <100000>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_i2c2>;
+> +	status = "okay";
+> +};
+> +
+> +&i2c4 {
+> +	clock-frequency = <100000>;
+> +	pinctrl-names = "default"; 
+> +	pinctrl-0 = <&pinctrl_i2c4>;
+> +	clocks = <&clks 116>;
+> +	status = "okay";
+> +};
+> +
+> +&pwm1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_pwm1>;
+> +	status = "okay";
+> +};
+> +
+> +&pwm2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_pwm2>;
+> +	status = "okay";
+> +};
+> +
+> +&pwm3 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_pwm3>;
+> +	status = "okay";
+> +};
+> +
+> +&pwm4 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_pwm4>;
+> +	status = "okay";
+> +};
+> +
+> +&ssi1 {
+> +	fsl,mode = "i2s-slave";
+> +	status = "okay";
+> +};
+> +
+> +&uart1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart1>;
+> +	status = "okay";
+> +};
+> +
+> +&uart2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart2>;
+> +	status = "okay";
+> +};
+> +
+> +&uart3 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart3>;
+> +	status = "okay";
+> +};
+> +
+> +&uart4 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart4>;
+> +	status = "okay";
+> +};
+> +
+> +&uart5 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart5>;
+> +	status = "okay";
+> +};
+> +
+> +&usbh1 {
+> +	dr_mode = "host";
+> +	disable-over-current;
+> +	status = "okay";
+> +};
+> +
+> +&usbotg {
+> +	vbus-supply = <&reg_usb_otg_vbus>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usbotg>;
+> +	disable-over-current;
+> +	dr_mode = "otg";
+> +	status = "okay";
+> +};
+> +
+> +&usdhc2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usdhc2>;
+> +	cd-gpios = <&gpio1 4 0>;
+> +	wp-gpios = <&gpio1 2 0>;
+> +	vmmc-supply = <&reg_3p3v>;
+> +	status = "okay";
+> +};
+> +
+> +&usdhc3 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usdhc3>;
+> +	cd-gpios = <&gpio7 0 0>;
+> +	wp-gpios = <&gpio7 1 0>;
+> +	vmmc-supply = <&reg_3p3v>;
+> +	status = "okay";
+> +};
+> +
+> +&usdhc4 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usdhc4>;
+> +	vmmc-supply = <&reg_3p3v>;
+> +	non-removable;
+> +	status = "okay";
+> +};
+> +
+> +&iomuxc {
+> +	pinctrl-names = "default";
+> +
+> +	imx6-riotboard {
+> +		pinctrl_led: ledgrp {
+
+The pinctrl entries are all sorted alphabetically pretty good
+only except this one.
+
+Shawn
+
+> +			fsl,pins = <
+> +				MX6QDL_PAD_EIM_A25__GPIO5_IO02		0x80000000	/* user led0 */
+> +				MX6QDL_PAD_EIM_D28__GPIO3_IO28		0x80000000	/* user led1 */
+> +			>;
+> +		};
+> +
+> +		pinctrl_audmux: audmuxgrp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_CSI0_DAT7__AUD3_RXD		0x8000000
+> +				MX6QDL_PAD_CSI0_DAT4__AUD3_TXC		0x8000000
+> +				MX6QDL_PAD_CSI0_DAT5__AUD3_TXD		0x8000000
+> +				MX6QDL_PAD_CSI0_DAT6__AUD3_TXFS		0x8000000
+> +				MX6QDL_PAD_GPIO_0__CCM_CLKO1		0x130b0		/* CAM_MCLK */
+> +			>;
+> +		};
+> +
+> +		pinctrl_ecspi1: ecspi1grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_EIM_D16__ECSPI1_SCLK		0x100b1
+> +				MX6QDL_PAD_EIM_D17__ECSPI1_MISO		0x100b1
+> +				MX6QDL_PAD_EIM_D18__ECSPI1_MOSI		0x100b1
+> +				MX6QDL_PAD_DISP0_DAT23__GPIO5_IO17	0x000b1		/* CS0 */
+> +			>;
+> +		};
+> +
+> +		pinctrl_ecspi2: ecspi2grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_DISP0_DAT15__GPIO5_IO09	0x000b1		/* CS1 */
+> +				MX6QDL_PAD_DISP0_DAT16__ECSPI2_MOSI	0x100b1
+> +				MX6QDL_PAD_DISP0_DAT17__ECSPI2_MISO	0x100b1
+> +				MX6QDL_PAD_DISP0_DAT18__GPIO5_IO12	0x000b1		/* CS0 */
+> +				MX6QDL_PAD_DISP0_DAT19__ECSPI2_SCLK	0x100b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_ecspi3: ecspi3grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_DISP0_DAT0__ECSPI3_SCLK	0x100b1
+> +				MX6QDL_PAD_DISP0_DAT1__ECSPI3_MOSI	0x100b1
+> +				MX6QDL_PAD_DISP0_DAT2__ECSPI3_MISO	0x100b1
+> +				MX6QDL_PAD_DISP0_DAT3__GPIO4_IO24	0x000b1		/* CS0 */
+> +				MX6QDL_PAD_DISP0_DAT4__GPIO4_IO25	0x000b1		/* CS1 */
+> +			>;
+> +		};
+> +
+> +		pinctrl_enet: enetgrp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
+> +				MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
+> +				MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x80000000
+> +				MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x1b0b0
+> +				MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x1b0b0
+> +				MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x1b0b0
+> +				MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x1b0b0
+> +				MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x1b0b0
+> +				MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x0a0b1		/* AR8035 CLK_25M --> ENET_REF_CLK (V22) */
+> +				MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b0b0		/* AR8035 pin strapping: IO voltage: pull up */
+> +				MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x130b0		/* AR8035 pin strapping: PHYADDR#0: pull down */
+> +				MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x130b0		/* AR8035 pin strapping: PHYADDR#1: pull down */
+> +				MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b0b0		/* AR8035 pin strapping: MODE#1: pull up */
+> +				MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b0b0		/* AR8035 pin strapping: MODE#3: pull up */
+> +				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x130b0		/* AR8035 pin strapping: MODE#0: pull down */
+> +				MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0xc0000000	/* GPIO16 -> AR8035 25MHz */
+> +			        MX6QDL_PAD_EIM_D31__GPIO3_IO31		0x130b0		/* RGMII_nRST */
+> +				MX6QDL_PAD_ENET_TX_EN__GPIO1_IO28	0x80000000	/* AR8035 interrupt */
+> +				MX6QDL_PAD_GPIO_6__ENET_IRQ		0x000b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_i2c1: i2c1grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_CSI0_DAT8__I2C1_SDA		0x4001b8b1
+> +				MX6QDL_PAD_CSI0_DAT9__I2C1_SCL		0x4001b8b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_i2c2: i2c2grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_KEY_COL3__I2C2_SCL		0x4001b8b1
+> +				MX6QDL_PAD_KEY_ROW3__I2C2_SDA		0x4001b8b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_i2c3: i2c3grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_GPIO_5__I2C3_SCL		0x4001b8b1
+> +				MX6QDL_PAD_GPIO_6__I2C3_SDA		0x4001b8b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_i2c4: i2c4grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_GPIO_7__I2C4_SCL             0x4001b8b1
+> +				MX6QDL_PAD_GPIO_8__I2C4_SDA             0x4001b8b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_pwm1: pwm1grp {
+> +			fsl,pins = <   
+> +				MX6QDL_PAD_DISP0_DAT8__PWM1_OUT		0x1b0b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_pwm2: pwm2grp {
+> +			fsl,pins = <   
+> +				MX6QDL_PAD_DISP0_DAT9__PWM2_OUT		0x1b0b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_pwm3: pwm3grp {
+> +			fsl,pins = <   
+> +				MX6QDL_PAD_SD1_DAT1__PWM3_OUT		0x1b0b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_pwm4: pwm4grp {
+> +			fsl,pins = <   
+> +				MX6QDL_PAD_SD1_CMD__PWM4_OUT		0x1b0b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_uart1: uart1grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_CSI0_DAT10__UART1_TX_DATA	0x1b0b1
+> +				MX6QDL_PAD_CSI0_DAT11__UART1_RX_DATA	0x1b0b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_uart2: uart2grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_EIM_D26__UART2_TX_DATA	0x1b0b1
+> +				MX6QDL_PAD_EIM_D27__UART2_RX_DATA	0x1b0b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_uart3: uart3grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_EIM_D24__UART3_TX_DATA	0x1b0b1
+> +				MX6QDL_PAD_EIM_D25__UART3_RX_DATA	0x1b0b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_uart4: uart4grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_KEY_COL0__UART4_TX_DATA	0x1b0b1
+> +				MX6QDL_PAD_KEY_ROW0__UART4_RX_DATA	0x1b0b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_uart5: uart5grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_KEY_COL1__UART5_TX_DATA	0x1b0b1
+> +				MX6QDL_PAD_KEY_ROW1__UART5_RX_DATA	0x1b0b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_usbotg: usbotggrp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_ENET_RX_ER__USB_OTG_ID	0x17059
+> +				MX6QDL_PAD_EIM_D22__GPIO3_IO22		0x80000000	/* MX6QDL_PAD_EIM_D22__USB_OTG_PWR */
+> +				MX6QDL_PAD_EIM_D21__USB_OTG_OC		0x80000000
+> +			>;
+> +		};
+> +
+> +		pinctrl_usdhc2: usdhc2grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_SD2_CMD__SD2_CMD		0x17059
+> +				MX6QDL_PAD_SD2_CLK__SD2_CLK		0x10059
+> +				MX6QDL_PAD_SD2_DAT0__SD2_DATA0		0x17059
+> +				MX6QDL_PAD_SD2_DAT1__SD2_DATA1		0x17059
+> +				MX6QDL_PAD_SD2_DAT2__SD2_DATA2		0x17059
+> +				MX6QDL_PAD_SD2_DAT3__SD2_DATA3		0x17059
+> +				MX6QDL_PAD_GPIO_4__GPIO1_IO04		0x80000000	/* SD2 CD */
+> +				MX6QDL_PAD_GPIO_2__GPIO1_IO02		0x80000000	/* SD2 WP */
+> +			>;
+> +		};
+> +
+> +		pinctrl_usdhc3: usdhc3grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_SD3_CMD__SD3_CMD		0x17059
+> +				MX6QDL_PAD_SD3_CLK__SD3_CLK		0x10059
+> +				MX6QDL_PAD_SD3_DAT0__SD3_DATA0		0x17059
+> +				MX6QDL_PAD_SD3_DAT1__SD3_DATA1		0x17059
+> +				MX6QDL_PAD_SD3_DAT2__SD3_DATA2		0x17059
+> +				MX6QDL_PAD_SD3_DAT3__SD3_DATA3		0x17059
+> +				MX6QDL_PAD_SD3_DAT5__GPIO7_IO00		0x80000000	/* SD3 CD */
+> +				MX6QDL_PAD_SD3_DAT4__GPIO7_IO01		0x80000000	/* SD3 WP */
+> +			>;
+> +		};
+> +
+> +		pinctrl_usdhc4: usdhc4grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_SD4_CMD__SD4_CMD		0x17059
+> +				MX6QDL_PAD_SD4_CLK__SD4_CLK		0x10059
+> +				MX6QDL_PAD_SD4_DAT0__SD4_DATA0		0x17059
+> +				MX6QDL_PAD_SD4_DAT1__SD4_DATA1		0x17059
+> +				MX6QDL_PAD_SD4_DAT2__SD4_DATA2		0x17059
+> +				MX6QDL_PAD_SD4_DAT3__SD4_DATA3		0x17059
+> +				MX6QDL_PAD_NANDF_ALE__GPIO6_IO08	0x80000000	/* SD4 RST (eMMC) */
+> +			>;
+> +		};
+> +	};
+> +};
+> -- 
+> 1.8.5.1
+> 
+> 
