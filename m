@@ -1,35 +1,58 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 9 May 2014 08:55:43 -0700
-Subject: [PATCH 0/4] OMAPDSS: Add support for panel ls037v7dw01
-In-Reply-To: <536CA10B.9040702@ti.com>
-References: <1398815562-24113-1-git-send-email-tony@atomide.com>
- <20140505184138.GB15463@atomide.com> <536CA10B.9040702@ti.com>
-Message-ID: <20140509155542.GF17814@atomide.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Fri, 09 May 2014 16:55:36 +0100
+Subject: [PATCH 1/4] mmc: sdhci: add a driver for Berlin SoCs
+In-Reply-To: <1397652011-21284-2-git-send-email-antoine.tenart@free-electrons.com>
+References: <1397652011-21284-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1397652011-21284-2-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <536CFA78.9050609@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tomi Valkeinen <tomi.valkeinen@ti.com> [140509 02:34]:
-> On 05/05/14 21:41, Tony Lindgren wrote:
-> > * Tony Lindgren <tony@atomide.com> [140429 16:53]:
-> >> Hi all,
-> >>
-> >> Here are few patches to add devicetree support for panel ls037v7dw01
-> >> that's found on many omap3 boards. They seem to be often mis-configured
-> >> as various panel dpi entries, but really should be move to use panel
-> >> ls037v7dw01 instead. This panel is found at least on the omap3 sdp,
-> >> ldp, omap3 evm and few other development boards.
-> > 
-> > Tomi, assuming no more comments, do you want to pick up the first
-> > three patches of this series? I can queue the .dts changes or you
-> > can also set up a separate .dts changes branch for DSS that I can
-> > merge in too.
-> 
-> If it's all the same to you, I'd like to collect all display related
-> arch/arm/ patches into my tree, and I'll send you a merge request when
-> it's stable.
-> 
-> I already have OMAP5 and AM43xx stuff there.
+On 16/04/14 13:40, Antoine T?nart wrote:
+> Add a Driver to support the SDHCI controller of the Marvell Berlin SoCs.
+> This controller supports 3 sockets.
 
-Yes that works well for me.
+[snip]
 
-Tony
+> +
+> +static struct sdhci_ops sdhci_berlin_ops = {
+> +	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
+> +};
+> +
+> +static struct sdhci_pltfm_data sdhci_berlin2_pdata = {
+> +	.quirks	= SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN |
+> +		  SDHCI_QUIRK_BROKEN_ADMA |
+> +		  SDHCI_QUIRK_BROKEN_TIMEOUT_VAL,
+> +	.ops = &sdhci_berlin_ops,
+> +};
+> +
+> +static struct sdhci_pltfm_data sdhci_berlin2q_pdata = {
+> +	.quirks	= SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN |
+> +		  SDHCI_QUIRK_INVERTED_WRITE_PROTECT |
+> +		  SDHCI_QUIRK_BROKEN_TIMEOUT_VAL,
+> +	.ops = &sdhci_berlin_ops,
+> +};
+> +
+> +static const struct of_device_id sdhci_berlin_of_match_table[] = {
+> +	{
+> +		.compatible = "marvell,berlin2-sdhci",
+> +		.data = &sdhci_berlin2_pdata,
+> +	},
+> +	{
+> +		.compatible = "marvell,berlin2cd-sdhci",
+> +		.data = &sdhci_berlin2_pdata,
+> +	},
+> +	{
+> +		.compatible = "marvell,berlin2q-sdhci",
+> +		.data = &sdhci_berlin2q_pdata,
+> +	},
+> +	{}
+
+I think the hardware names should be used instead of the
+quirks the hardware has (broken wp / broken adma)
+
+
+
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
