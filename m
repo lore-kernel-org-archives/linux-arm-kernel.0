@@ -1,165 +1,123 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 9 May 2014 10:27:17 -0400
-Subject: [GIT PULL] ARM: mvebu: SoC changes for v3.16
-Message-ID: <20140509142717.GM12708@titan.lakedaemon.net>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 9 May 2014 15:29:56 +0100
+Subject: CPU performance counters not working on big.LITTLE switcher
+In-Reply-To: <alpine.LFD.2.11.1405061613590.980@knanqh.ubzr>
+References: <CAPz6YkXsig6XornqoMyn5DtRd9NECyc+qgQo39RQK0sDeat34Q@mail.gmail.com>
+ <alpine.LFD.2.11.1405052238230.980@knanqh.ubzr>
+ <CAPz6YkXFeoj5HyrpD3tETj+9mhesmvADNcxeQtMRhouWf3sXGg@mail.gmail.com>
+ <alpine.LFD.2.11.1405061613590.980@knanqh.ubzr>
+Message-ID: <20140509142956.GE3921@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-guys,
+On Tue, May 06, 2014 at 04:28:49PM -0400, Nicolas Pitre wrote:
+> On Mon, 5 May 2014, Sonny Rao wrote:
+> 
+> > On Mon, May 5, 2014 at 7:52 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > > On Mon, 5 May 2014, Sonny Rao wrote:
+> > >
+> > >> Hi, we have the problem today that cpu based performance counters don't
+> > >> work when we're using the big.LITTLE switcher on Exynos 5420, and it
+> > >> doesn't look like code exists to deal with this in the switcher.
+> > >>
+> > >> As it stands right now, if you put an A-15 or A-7 PMU node into your
+> > >> device-tree on an bl_switcher system it's very broken.  At the minimum, I
+> > >> think it should disable performance counters until there's some kind of
+> > >> proper implementation.
+> > >>
+> > >> I looked into trying to make this work, but it turned out to not be as
+> > >> simple as just context switching counters from A-15 to A-7.  The biggest
+> > >> problem is that the PMUs are not architecturally compatible.  There are
+> > >> different events and differing numbers of counters on these two cores.
+> > >>  There's also the tangential issue of representing this in the device tree,
+> > >> but that's far less important.
+> > >>
+> > >> My guess as to how to fix this is to create an "architectural" PMU which
+> > >> contains the intersection of the two performance monitor units with the
+> > >> minimum number of counters supported by either core (which in this case
+> > >> looks to be 4 on the A7).  However, I don't really have the bandwidth to
+> > >> work on this at  the moment.  I was mostly wondering, have other people run
+> > >> into this limitation and is there any sort of plan to work on it?
+> > >
+> > > The Linaro kernel release from a year ago or so contained a hack to make
+> > > PMUs available and cope with the switcher.
+> > 
+> > Ok, any pointers?  Like I mentioned, if one enables the A15 Counters
+> > with an upstream kernel that's using the switcher, I think things are
+> > very broken, and since the switcher code is upstream, it seems like at
+> > a minimum it would be good to deal with that somehow.  The big hammer
+> > would be just to make hardware PMU support incompatible with the
+> > switcher support, but maybe there are better solutions.
+> 
+> The problem is not specific to the switcher though.  Suppose you have 
+> all cores enabled and visible to the system.  In that case nothing 
+> prevents a task from being migrated around and therefore be subject to 
+> different PMUs already.
+> 
+> > > However, the ultimate solution is to add multi-PMU support in a generic
+> > > way to the kernel and let user space see both A15 and A7 counters.  It
+> > > is then up to the analysis tools to consolidate (some of) them if
+> > > wanted.
+> > 
+> > How is that meant to work?  I think you'd need the generic perf-event
+> > subsystem to properly support multiple CPU-type PMUs, which it
+> > currently does not.
+> 
+> Exact.  That's where a proper solution should start.
 
-Here's the bulk of the changes in mvebu-land this cycle.  A lot of new
-capability for Armada 375/38x, and a sprinkle of stuff for the other
-mvebu SoCs.  These changes have been in -next for almost two weeks, a
-couple of bugs were discovered during this period and fixed.
+Mark Rutland is actively working on this again AFAIK.
 
-As noted in the tag message, there is an external dependency on the
-mvebu/irqchip branch already pulled by tglx.  If you'd like to keep a
-copy locally you can pull:
+I believe there is nothing so special about the "CPU-style" PMU in perf,
+except for a load of supposedly generic event names that are not very
+portable between CPUs and need careful interpretation.   So, the current
+approach is to expose the CPU PMUs as additional PMU types.  The perf
+tool integration is not seamless yet, but should be usable when the
+patches land.
 
-DEP: git://git.infradead.org/linux-mvebu.git tags/irqchip-mvebu-3.16
+There's some additional work I wanted to do when things are ready so
+that the handling of PMUs across suspend/resume is compatible with IKS,
+though it would be down to Linaro folks to do the IKS side of the
+integration.
 
-(I'm hoping the 'DEP:' prevents your script for automagically pulling
-the wrong branch ;-) )
+> 
+> > In the case of a system using the switcher, would
+> > the events on a particular logical "cpu" just get inter-mingled from
+> > the different cores?  I think it would be difficult to make sense of
+> > data like that without extra information about when the logical cpu
+> > switched from one type to the other.
+> 
+> Sure, but that is not much different from a task migrating across 
+> different clusters even without the switcher.  The idea in that case 
+> would be for both PMU types to be tracked.  That way you'd get A7-cycles 
+> and A15-cycles, A7-cache_miss and A15_cache_miss, etc.  If you don't 
+> care about the split then the reporting tool would just have to sum 
+> them, but having split results might be very helpful.
 
-I've included the changes to the cpuidle driver in here because they
-depend on changes in mvebu/soc, and subsequent changes in mvebu/soc
-depend on the changes to the cpuidle driver. Not ideal, but better than
-complicated branch deps.
+The only sane approach is not to count "instructions", but, say,
+to "A15 instructions" and "A7 instructions" as separate events.
 
-The same goes for the mvebu-bus driver, but there is no assigned
-maintainer for drivers/bus, so we usually handle those ourselves.
+Aggregating the counts can be misleading because the two CPUs may not
+have precisely the same definition of an "instruction" for accounting
+purposes.
 
-Please pull.
+Treating the CPU PMUs as two distinct types of PMU should make it
+relatively easy to get separate counts for each kind of CPU.
 
-thx,
+Cheers
+---Dave
 
-Jason.
-
-The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
-
-  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-soc-3.16
-
-for you to fetch changes up to 9f0affcf3e21fc56d8bce625bb3d5800b7a7d284:
-
-  ARM: mvebu: Fix pmsu compilation when ARMv6 is selected (2014-05-08 16:55:55 +0000)
-
-----------------------------------------------------------------
-mvebu SoC changes for v3.16
-
- - Armada 375/38x coherency support
- - Armada 375/38x SMP support
- - mvebu PMSU and CPU reset support
- - Armada 370/XP cpuidle support
- - kirkwood remove platform init of audio device
- - small fixes and cleanup for new SoC (375/38x)
-
-Note:
- - due to complex deps, cpuidle changes Acked by appropriate maintainer for
-   going though arm-soc tree.
-
-Depends:
- - tags/irqchip-mvebu-3.16 in the mvebu/irqchip branch (tglx already pulled) for:
-
-    d7df84b3ceca irqchip: irq-armada-370-xp: Use cpu notifier to initialize secondary CPUs
-    ef37d337e1d3 irqchip: irq-armada-370-xp: Do the set_smp_cross_call() in the driver
-
-----------------------------------------------------------------
-Andrew Lunn (3):
-      ARM: mvebu: Add a SOC bus device entry
-      ARM: Kirkwood: Remove platform driver for codec
-      ARM: Kirkwood: t5325: Remove platform device to instantiate audio
-
-Ezequiel Garcia (2):
-      ARM: mvebu: Select HAVE_ARM_TWD only if SMP is enabled
-      ARM: mvebu: Add thermal quirk for the Armada 375 DB board
-
-Gregory CLEMENT (17):
-      ARM: mvebu: extend the PMSU registers
-      ARM: mvebu: use a separate function to set the boot address of CPUs
-      ARM: mvebu: add function to set the resume boot address for Armada 375
-      ARM: mvebu: add SMP support for Armada 375 and Armada 38x
-      ARM: mvebu: add workaround for SMP support for Armada 375 stepping Z1
-      ARM: mvebu: remove the address parameter for ll_set_cpu_coherent
-      ARM: mvebu: ll_set_cpu_coherent always uses the current CPU
-      ARM: mvebu: Remove the unused argument of set_cpu_coherent()
-      ARM: mvebu: Split low level functions to manipulate HW coherency
-      ARM: mvebu: Low level function to disable HW coherency support
-      ARM: mvebu: Allow to power down L2 cache controller in idle mode
-      ARM: mvebu: Add the PMSU related part of the cpu idle functions
-      ARM: mvebu: Register notifier callback for the cpuidle transition
-      cpuidle: mvebu: Add initial CPU idle support for Armada 370/XP SoC
-      ARM: mvebu: register the cpuidle driver for the Armada XP SoCs
-      ARM: mvebu: remove unnecessary ifdef around l2x0_of_init
-      ARM: mvebu: fix the name of the parameter used in mvebu_get_soc_id
-
-Jason Cooper (2):
-      Merge branch 'mvebu/soc-pmsu' into mvebu/soc
-      Merge branch 'mvebu/irqchip' into mvebu/soc
-
-Thomas Petazzoni (22):
-      ARM: mvebu: prepare coherency code to support more SOCs
-      ARM: mvebu: add a coherency_available() call
-      bus: mvebu: pass the coherency availability information at init time
-      ARM: mvebu: ARM: mvebu: use of_find_matching_node_and_match() in coherency.c
-      ARM: mvebu: enable the ARM SCU on Armada 375 and Armada 38x
-      ARM: mvebu: add Armada 375 support to the coherency code
-      ARM: mvebu: implement Armada 375 coherency workaround
-      ARM: mvebu: add Armada 38x support to the coherency code
-      ARM: mvebu: introduce CPU reset code
-      ARM: mvebu: start using the CPU reset driver
-      ARM: mvebu: improve PMSU driver to request its resource
-      ARM: mvebu: move Armada XP specific SMP initialization to platsmp.c
-      ARM: mvebu: use CPU_METHOD_OF_DECLARE for SMP on Armada XP
-      ARM: mvebu: add Armada 38x compatible string to pmsu
-      ARM: mvebu: refine which files are build in mach-mvebu
-      ARM: mvebu: fix thermal quirk SoC revision check
-      ARM: mvebu: initialize mvebu-soc-id earlier
-      ARM: mvebu: add Armada 375 A0 revision definition
-      ARM: mvebu: conditionalize Armada 375 SMP workaround
-      ARM: mvebu: conditionalize Armada 375 coherency workaround
-
-Vincent Stehl? (1):
-      ARM: mvebu: Fix pmsu compilation when ARMv6 is selected
-
- .../devicetree/bindings/arm/armada-370-xp-pmsu.txt |  19 +-
- .../devicetree/bindings/arm/armada-cpu-reset.txt   |  14 ++
- .../devicetree/bindings/arm/coherency-fabric.txt   |  32 ++-
- Documentation/devicetree/bindings/arm/cpus.txt     |   3 +
- arch/arm/mach-kirkwood/board-dt.c                  |   2 +-
- arch/arm/mach-mvebu/Kconfig                        |  14 +-
- arch/arm/mach-mvebu/Makefile                       |  13 +-
- arch/arm/mach-mvebu/armada-370-xp.h                |   2 -
- arch/arm/mach-mvebu/board-t5325.c                  |  41 ---
- arch/arm/mach-mvebu/board-v7.c                     |  82 +++++-
- arch/arm/mach-mvebu/board.h                        |   6 -
- arch/arm/mach-mvebu/coherency.c                    | 280 ++++++++++++++++++---
- arch/arm/mach-mvebu/coherency.h                    |   3 +-
- arch/arm/mach-mvebu/coherency_ll.S                 | 122 +++++++--
- arch/arm/mach-mvebu/common.h                       |   3 +
- arch/arm/mach-mvebu/cpu-reset.c                    | 103 ++++++++
- arch/arm/mach-mvebu/dove.c                         |   2 +-
- arch/arm/mach-mvebu/headsmp-a9.S                   |  34 +++
- arch/arm/mach-mvebu/headsmp.S                      |  15 +-
- arch/arm/mach-mvebu/kirkwood.c                     |   5 +-
- arch/arm/mach-mvebu/mvebu-soc-id.c                 |  32 ++-
- arch/arm/mach-mvebu/mvebu-soc-id.h                 |   4 +
- arch/arm/mach-mvebu/platsmp-a9.c                   | 102 ++++++++
- arch/arm/mach-mvebu/platsmp.c                      |  23 +-
- arch/arm/mach-mvebu/pmsu.c                         | 273 ++++++++++++++++++--
- arch/arm/mach-mvebu/system-controller.c            |  15 +-
- drivers/bus/mvebu-mbus.c                           |  11 +-
- drivers/cpuidle/Kconfig.arm                        |   5 +
- drivers/cpuidle/Makefile                           |   1 +
- drivers/cpuidle/cpuidle-armada-370-xp.c            |  93 +++++++
- include/linux/mbus.h                               |   2 +-
- 33 files changed, 1178 insertions(+), 206 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/armada-cpu-reset.txt
- delete mode 100644 arch/arm/mach-mvebu/board-t5325.c
- create mode 100644 arch/arm/mach-mvebu/cpu-reset.c
- create mode 100644 arch/arm/mach-mvebu/headsmp-a9.S
- create mode 100644 arch/arm/mach-mvebu/platsmp-a9.c
- create mode 100644 drivers/cpuidle/cpuidle-armada-370-xp.c
+> 
+> > > Someone at ARM indicated they'd be working on the multi-PMU support if I
+> > > remember correctly.  For that reason, Linaro stopped maintaining the
+> > > initial hack since it was a lot of work to keep it working on top of
+> > > later kernels and a better solution was coming anyway.  I don't know
+> > > what the status of that work is though.
+> > >
+> > >
+> > > Nicolas
+> > 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
