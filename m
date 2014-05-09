@@ -1,57 +1,110 @@
-From: pekon@ti.com (Gupta, Pekon)
-Date: Fri, 9 May 2014 10:32:02 +0000
-Subject: [RFC 13/47] mtd: nand: stm_nand_bch: provide Device Tree support
-In-Reply-To: <20140509100304.GR5767@lee--X1>
-References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
- <1395735604-26706-14-git-send-email-lee.jones@linaro.org>
- <20980858CB6D3A4BAE95CA194937D5E73EAB5C83@DBDE04.ent.ti.com>
- <20140430125406.GN29462@lee--X1>
- <20980858CB6D3A4BAE95CA194937D5E73EACA3F0@DBDE04.ent.ti.com>
- <20140509100304.GR5767@lee--X1>
-Message-ID: <20980858CB6D3A4BAE95CA194937D5E73EACBC8F@DBDE04.ent.ti.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 9 May 2014 11:33:18 +0100
+Subject: [RFC] Describing arbitrary bus mastering relationships in DT
+In-Reply-To: <4735818.FvYoTFuExd@wuerfel>
+References: <20140501173248.GD3732@e103592.cambridge.arm.com>
+ <6555552.UqkKQIAsih@wuerfel>
+ <20140502174301.GE3805@e103592.cambridge.arm.com>
+ <4735818.FvYoTFuExd@wuerfel>
+Message-ID: <20140509103309.GA3875@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From: Lee Jones [mailto:lee.jones at linaro.org]
->
->> >> >+	of_property_read_u32(np, "st,bch-bitflip-threshold",
->> >> >+			     &pdata->bch_bitflip_threshold);
->> >> >+
->> >> mtd->bitflip_threshold is by default set to ecc.strength (unless a driver initializes it).
->> >> And then can be re-configured for each MTD partition separately
->> >> 	/sys/class/mtd/mtdX/bitflip_threshold
->> >> 	Refer: $kernel/Documentation/ABI/testing/sysfs-class-mtd
->> >> So, I don't think this is a HW parameter, and so should not be passed from DT.
->> >
->> >I think the bit-flip threshold is/can be chip specific, and as we know
->> >which chip we're likely to be booting on, we can specify this via the
->> >hardware description.  Thus, I think it's perfectly viable for an
->> >option to pass through DT to exist.
->> >
->> I don't think that?s the correct interpretation of bitflip_threshold.
->>
->> (1) bitflip_threshold is dependent on ecc.strength (ECC scheme) of your driver.
->> MTD layers uses bitflip_threshold to warn above layers that number of
->> correctable bit-flips have reached a dangerous level beyond which driver's
->> ECC scheme may not be able to correct them. So above layers should start
->> taking additional corrective action like scrubbing.
->> 	@@drivers/mtd/mtdcore.c: mtd_read()
->> 		return ret_code >= mtd->bitflip_threshold ? -EUCLEAN : 0;
->>
->> (2) Also, user-space may control it based on how your device ages on field.
->> A fresh silicon may not show too many bitflips. But as device ages the
->> probability of simultaneous bitflips will increase. So user-space may lower
->> the bitflip_threshold to avoid accumulation of bitflips in a single page.
->>
->> Thus, bitflip_threshold should not be passed via DT.
->> It's neither a hardware parameter, nor it?s a static constant.
->
->Ah, I see.  I will fixup, thanks for the explanation.
->
+On Mon, May 05, 2014 at 05:14:44PM +0200, Arnd Bergmann wrote:
+> On Friday 02 May 2014 18:43:01 Dave Martin wrote:
+> > On Fri, May 02, 2014 at 05:19:44PM +0200, Arnd Bergmann wrote:
+> > > On Friday 02 May 2014 15:23:29 Thierry Reding wrote:
+> > > > To some degree this also depends on how we want to handle IOMMUs. If
+> > > > they should remain transparently handled via dma_map_ops, then it makes
+> > > > sense to set this up at device instantiation time. But how can we handle
+> > > > this in situations where one device needs to master on two IOMMUs at the
+> > > > same time? Or if the device needs physically contiguous memory for
+> > > > purposes other than device I/O. Using dma_map_ops we can't control which
+> > > > allocations get mapped via the IOMMU and which don't.
+> > > 
+> > > I still hope we can handle this in common code by selecting the right
+> > > dma_map_ops when the devices are instantiated, at least for 99% of the
+> > > cases. I'm not convinced we really need to handle the 'multiple IOMMUs
+> > > on one device' case in a generic way. If there are no common use cases
+> > > for that, we can probably get away with having multiple device nodes
+> > > and an ugly driver for the exception, instead of making life complicated
+> > > for everybody.
+> > 
+> > Multiple IOMMUs certainly seems an unusual case for now.
+> > 
+> > Being able to describe that in the DT doesn't necessarily mean the
+> > kernel has to support it: just as the kernel doesn't need to support
+> > all the features of a crazy hardware platform just someone was crazy
+> > enough to build it.
+> 
+> Right.
+> 
+> > My expectation was that we do some check when probing a device to figure
+> > out the path from the device to main memory, thus figuring out the dma
+> > mask, the IOMMU (if any) and any relevant device ID.  This is a bit more
+> > complex than the existing situation, but I still think we could have
+> > common code for the bulk of it.
+> 
+> I'd still prefer if we could keep following just "dma-ranges" to find
+> a path from device to memory, with an extension to handle IOMMUs etc,
+> but not describe the things to the extend that your proposal does.
 
-Please wait, I'll review your [v2] series also, then you can further
-send all fixes together. I'm bit caught in other commitments for 3.16,
-so hopefully I'll be able to review your patches by next week.
+This is really a simplification.  If we only had to consider the path
+from devices to memory, and if the pretence that the memory is at /
+works (almost always true, at least for general-purpose memory), then
+we often have a simpler problem.  It is still not always solvable
+though, since a device could still have a unique access path with
+unique mappings that cannot be described in terms of any of the other
+paths.
 
+However, this is not just about DMA any more.  Devices also master onto
+interrupt controllers to generate MSIs, onto IOMMUs to provide them
+with address space remapping, onto other devices via IOMMUs; and GPUs
+can master onto all kinds of things.
 
-with regards, pekon
+The alternative to a completely generic description of bus mastering
+would be to consider the specific things that we are interested in
+allowing devices to master on, and describe the whole end-to-end
+link for each in the bus master's node.
+
+ * memory
+ * interrupt controllers (for MSIs)
+ * IOMMUs
+
+This could lead to combinatorial blow-up as the number of target
+devices grows, since these linkages have to be re-described for
+every bus master -- especially for GPUs which could do a fair amount of
+device control by themselves.  It could also lead to fragmentation
+as each binding solves common problems in different ways.
+
+The downside is that is any path flows through a dynamically
+configurable component, such as an IOMMU or a bridge that can be
+remapped, turned off etc., then unless we describe how the path is
+really linked together the kernel will need all sorts of baked-in
+knowledge in order to manage the system safely.  The _effect_ of the
+problem component on the path is not static, so we can't describe 
+that effect directly in the DT.  For truly weird features that are
+unique to a particular platform that's OK, but "how devices are
+linked together" seems a much more general and useful concept than that.
+
+> We already pretend that things are a tree for the purposes of MMIO,
+> which is probably still close enough for the vast majority of cases.
+> For simplicity, I'd actually prefer keeping the illusion that MMIO
+> and DMA are two different things, which matches how operating systems
+> see things even if it's no longer true for the hardware.
+> 
+> > If a device has different roles with completely different paths to
+> > memory, one option could be for the driver to instantiate two devices in
+> > the kernel.  This puts the burden on the driver for the device, instead
+> > of the core framework.
+> 
+> Yes, this is what I suggested earlier as well.
+
+I may have missed your point slightly before.  Anyway, I think the
+"multiple master roles" issue is sufficiently unusual that describing 
+them using multiple device nodes in the DT is reasonable.  So I think
+I'm happy to get rid of the ability to specify and distinguish multiple
+roles within a single device node.
+
+Cheers
+---Dave
