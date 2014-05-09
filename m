@@ -1,99 +1,65 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 9 May 2014 14:56:17 +0300
-Subject: [PATCH 09/11] ARM: dts: omap5.dtsi: add DSS nodes
-In-Reply-To: <1399636579-8062-1-git-send-email-tomi.valkeinen@ti.com>
-References: <1399636579-8062-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1399636579-8062-10-git-send-email-tomi.valkeinen@ti.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 09 May 2014 12:46:07 +0200
+Subject: [PATCH 1/6] of: align RESERVEDMEM_OF_DECLARE function callbacks to
+ other callbacks
+In-Reply-To: <1399587823-17701-2-git-send-email-robherring2@gmail.com>
+References: <1399587823-17701-1-git-send-email-robherring2@gmail.com>
+ <1399587823-17701-2-git-send-email-robherring2@gmail.com>
+Message-ID: <536CB1EF.2090204@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add OMAP5 DSS nodes to omap5.dtsi.
+Hello,
 
-Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
----
- arch/arm/boot/dts/omap5.dtsi | 70 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 70 insertions(+)
+On 2014-05-09 00:23, Rob Herring wrote:
+> From: Rob Herring <robh@kernel.org>
+>
+> All the parameters for RESERVEDMEM_OF_DECLARE function callbacks are
+> members of struct reserved_mem, so just pass the struct ptr to callback
+> functions so the function callback is more in line with other OF match
+> table callbacks.
+>
+> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Signed-off-by: Rob Herring <robh@kernel.org>
 
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index f8c9855ce587..32c02cefa9a6 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -869,6 +869,76 @@
- 
- 			#thermal-sensor-cells = <1>;
- 		};
-+
-+		dss: dss at 58000000 {
-+			compatible = "ti,omap5-dss";
-+			reg = <0x58000000 0x80>;
-+			status = "disabled";
-+			ti,hwmods = "dss_core";
-+			clocks = <&dss_dss_clk>;
-+			clock-names = "fck";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+
-+			dispc at 58001000 {
-+				compatible = "ti,omap5-dispc";
-+				reg = <0x58001000 0x1000>;
-+				interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
-+				ti,hwmods = "dss_dispc";
-+				clocks = <&dss_dss_clk>;
-+				clock-names = "fck";
-+			};
-+
-+			rfbi: encoder at 58002000  {
-+				compatible = "ti,omap5-rfbi";
-+				reg = <0x58002000 0x100>;
-+				status = "disabled";
-+				ti,hwmods = "dss_rfbi";
-+				clocks = <&dss_dss_clk>, <&dss_l3_iclk>;
-+				clock-names = "fck", "ick";
-+			};
-+
-+			dsi1: encoder at 58004000 {
-+				compatible = "ti,omap5-dsi";
-+				reg = <0x58004000 0x200>,
-+				      <0x58004200 0x40>,
-+				      <0x58004300 0x40>;
-+				reg-names = "proto", "phy", "pll";
-+				interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>;
-+				status = "disabled";
-+				ti,hwmods = "dss_dsi1";
-+				clocks = <&dss_dss_clk>, <&dss_sys_clk>;
-+				clock-names = "fck", "sys_clk";
-+			};
-+
-+			dsi2: encoder at 58005000 {
-+				compatible = "ti,omap5-dsi";
-+				reg = <0x58009000 0x200>,
-+				      <0x58009200 0x40>,
-+				      <0x58009300 0x40>;
-+				reg-names = "proto", "phy", "pll";
-+				interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;
-+				status = "disabled";
-+				ti,hwmods = "dss_dsi2";
-+				clocks = <&dss_dss_clk>, <&dss_sys_clk>;
-+				clock-names = "fck", "sys_clk";
-+			};
-+
-+			hdmi: encoder at 58060000 {
-+				compatible = "ti,omap5-hdmi";
-+				reg = <0x58040000 0x400>,
-+				      <0x58040200 0x80>,
-+				      <0x58040300 0x80>,
-+				      <0x58060000 0x19000>;
-+				reg-names = "wp", "pll", "phy", "core";
-+				interrupts = <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
-+				status = "disabled";
-+				ti,hwmods = "dss_hdmi";
-+				clocks = <&dss_48mhz_clk>, <&dss_sys_clk>;
-+				clock-names = "fck", "sys_clk";
-+			};
-+		};
- 	};
- };
- 
+Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+
+> ---
+>   drivers/of/of_reserved_mem.c    | 2 +-
+>   include/linux/of_reserved_mem.h | 4 ++--
+>   2 files changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
+> index e420eb5..632aae8 100644
+> --- a/drivers/of/of_reserved_mem.c
+> +++ b/drivers/of/of_reserved_mem.c
+> @@ -188,7 +188,7 @@ static int __init __reserved_mem_init_node(struct reserved_mem *rmem)
+>   		if (!of_flat_dt_is_compatible(rmem->fdt_node, compat))
+>   			continue;
+>   
+> -		if (initfn(rmem, rmem->fdt_node, rmem->name) == 0) {
+> +		if (initfn(rmem) == 0) {
+>   			pr_info("Reserved memory: initialized node %s, compatible id %s\n",
+>   				rmem->name, compat);
+>   			return 0;
+> diff --git a/include/linux/of_reserved_mem.h b/include/linux/of_reserved_mem.h
+> index 9b1fbb7..4c81b84 100644
+> --- a/include/linux/of_reserved_mem.h
+> +++ b/include/linux/of_reserved_mem.h
+> @@ -21,8 +21,8 @@ struct reserved_mem_ops {
+>   				  struct device *dev);
+>   };
+>   
+> -typedef int (*reservedmem_of_init_fn)(struct reserved_mem *rmem,
+> -				      unsigned long node, const char *uname);
+> +typedef int (*reservedmem_of_init_fn)(struct reserved_mem *rmem);
+> +
+>   
+>   #ifdef CONFIG_OF_RESERVED_MEM
+>   void fdt_init_reserved_mem(void);
+
+Best regards
 -- 
-1.9.1
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
