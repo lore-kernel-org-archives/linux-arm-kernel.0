@@ -1,397 +1,152 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 9 May 2014 16:07:38 +0200
-Subject: [PATCH v3 19/19] arm64: KVM: vgic: add GICv3 world switch
-In-Reply-To: <1397655591-2761-20-git-send-email-marc.zyngier@arm.com>
-References: <1397655591-2761-1-git-send-email-marc.zyngier@arm.com>
- <1397655591-2761-20-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20140509140738.GT3362@lvm>
+From: joelf@ti.com (Joel Fernandes)
+Date: Fri, 9 May 2014 09:13:24 -0500
+Subject: [PATCH 3/5] irqchip: crossbar: Skip some irqs from getting mapped
+ to crossbar
+In-Reply-To: <536CDF94.7000900@ti.com>
+References: <1399299527-10955-1-git-send-email-r.sricharan@ti.com>	<1399299527-10955-4-git-send-email-r.sricharan@ti.com>	<536BD9D8.4080905@ti.com>	<20140508203659.GA5620@kahuna>	<CAD=GYpbQQxQgKd3oZcAuWrxoD4VrkKzpybd11qwxs405HSUVGw@mail.gmail.com>	<536C0DC4.7090309@ti.com>	<CAD=GYpav4mHaqo4jfb0ePchf3cvuvSnFKj_+osbrt_8-tYRRrQ@mail.gmail.com>	<536C2071.8040502@ti.com>
+ <CAD=GYpbRn=LEthpAUX9LNBGTB4iDs7TGiSSgLJuuS0tSatRRJQ@mail.gmail.com>
+ <536CD01F.2070506@ti.com> <536CD7BE.5020407@ti.com> <536CD9DB.4010508@ti.com>
+ <536CDBDF.10600@ti.com> <536CDF94.7000900@ti.com>
+Message-ID: <536CE284.9090209@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 16, 2014 at 02:39:51PM +0100, Marc Zyngier wrote:
-> Introduce the GICv3 world switch code and helper functions, enabling
-> GICv2 emulation on GICv3 hardware.
+On 05/09/2014 09:00 AM, Nishanth Menon wrote:
+> On 05/09/2014 08:45 AM, Santosh Shilimkar wrote:
+>> On Friday 09 May 2014 09:36 AM, Nishanth Menon wrote:
+>>> On 05/09/2014 08:27 AM, Santosh Shilimkar wrote:
+>>>> On Friday 09 May 2014 08:54 AM, Nishanth Menon wrote:
+>>>>> On 05/08/2014 11:22 PM, Joel Fernandes wrote:
+>>>>>> On Thu, May 8, 2014 at 7:25 PM, Santosh Shilimkar
+>>>>>> <santosh.shilimkar@ti.com> wrote:
+>>>>> [...]
+>>>>>> Ok, thanks for pointing to the post.
+>>>>>>
+>>>>>
+>>>>>
+>>>>> Yep - thanks Santosh for clarifying this. Now, we still have the
+>>>>> issues that I pointed out in [1] - without resolving which, we should
+>>>>> not enable crossbar for dra74x/72x.
+>>>>>
+>>>>> A. taking example of PMU
+>>>>> 	interrupts = <GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH>
+>>>>> this wont work. instead the crossbar driver needs some sort of a hint
+>>>>> to know that it should not map these on crossbar register instead
+>>>>> assign GIC mapping directly.
+>>>>>
+>>>>> I propose doing the following
+>>>>> #define GIC_CROSSBAR_PASSTHROUGH(irq_no) ((irq_no) | (0x1 << 31))
+>>>>>
+>>>>> and dts will define the following:
+>>>>> interrupts = <GIC_SPI GIC_CROSSBAR_PASSTHROUGH(131) IRQ_TYPE_LEVEL_HIGH>
+>>>>>
+>>>>> This will also work for the other cases (B.2, B.3)
+>>>>>
+>>>>> For B.2: L3_APP_IRQ:
+>>>>> instead of:
+>>>>> interrupts = <GIC_SPI  5 IRQ_TYPE_LEVEL_HIGH>
+>>>>> we do:
+>>>>> interrupts = <GIC_SPI GIC_CROSSBAR_PASSTHROUGH(10) IRQ_TYPE_LEVEL_HIGH>
+>>>>>
+>>>>> For B.3: NMI
+>>>>> interrupts = <GIC_SPI GIC_CROSSBAR_PASSTHROUGH(133) IRQ_TYPE_LEVEL_HIGH>
+>>>>>
+>>>> We can't do add a flag to generic interrupt controller flags since its
+>>>> very specific to cross-bar.
+>>>>
+>>>>> xlate is easy ->
+>>>>>
+>>>>> diff --git a/drivers/irqchip/irq-crossbar.c
+>>>>> b/drivers/irqchip/irq-crossbar.c
+>>>>> index de021638..fd09ab4 100644
+>>>>> --- a/drivers/irqchip/irq-crossbar.c
+>>>>> +++ b/drivers/irqchip/irq-crossbar.c
+>>>>> @@ -112,6 +112,10 @@ static int crossbar_domain_xlate(struct
+>>>>> irq_domain *d,
+>>>>>  {
+>>>>>         unsigned long ret;
+>>>>>
+>>>>> +       /* Check to see if direct GIC mapping is required */
+>>>>> +       if (intspec[1] & BIT(31))
+>>>>> +               return intspec[1] & ~BIT[31];
+>>>>> +
+>>>>>         ret = get_prev_map_irq(intspec[1]);
+>>>>>         if (!IS_ERR_VALUE(ret))
+>>>>>                 goto found;
+>>>>>
+>>>>> But then, crossbar_domain_map and crossbar_domain_unmap need hints as
+>>>>> well to know that there is no corresponding crossbar registers.
+>>>>> Have'nt thought through that yet. Looking to hear about opinions here.
+>>>>>
+>>>>>
+>>>> May be we need additional property like reserved to take care of 1:1
+>>>> map.
+>>>>
+>>>> ti,irqs-direct-map = <131 132>;
+>>>>
+>>> We already have equivalents for these -> reserved and skip. Problem is
+>>> how does crossbar driver know the difference between direct maps and
+>>> crossbar value?
+>>>
+>>> 6 is one of those reserved ones. dts for a device says:
+>>> interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>
+>>>
+>>>
+>>> Now, xlate gets intspec[1] = 6.  6 is valid crossbar number
+>>> PRM_IRQ_MPU, however GIC 6 is mapped to WD_TIMER_MPU_C1_IRQ_WARN ->
+>>> you need to be able to get a hint that this is direct mapping dts
+>>> intended.
+>>>
+>>> in the "6" example:
+>>>
+>>> How do i get PRM_IRQ_MPU?
+>>> interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>
+>>>
+>>> How do I get WD_TIMER_MPU_C1_IRQ_WARN?
+>>> interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH> ????? - that wont work as
+>>> crossbar driver thinks it is crossbar 6 (PRM_IRQ_MPU)
+>>>
+>> Looks like I am missing something. Is the issue because of SPI offset (32)
+>> which makes above confusion ?
 > 
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/include/asm/kvm_asm.h  |   4 +
->  arch/arm64/include/asm/kvm_host.h |   7 +
->  arch/arm64/kernel/asm-offsets.c   |   8 ++
->  arch/arm64/kvm/Makefile           |   2 +
->  arch/arm64/kvm/vgic-v3-switch.S   | 279 ++++++++++++++++++++++++++++++++++++++
->  5 files changed, 300 insertions(+)
->  create mode 100644 arch/arm64/kvm/vgic-v3-switch.S
+> The way we modelled crossbar is that the irqchip is GIC and routable
+> mapper is crossbar - which makes sense. now for every "interrupts"
+> description we try to find a map using the crossbar driver as the irq
+> framework rightly identifies that peripheral interrupts are routable
+> and crossbar driver is the guy who knows how to map these to a proper
+> GIC interrupt number. So far, we are good.
 > 
-> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-> index 6515a52..270ea13 100644
-> --- a/arch/arm64/include/asm/kvm_asm.h
-> +++ b/arch/arm64/include/asm/kvm_asm.h
-> @@ -105,8 +105,12 @@ extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
->  
->  extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
->  
-> +extern u64 __vgic_v3_get_ich_vtr_el2(void);
-> +
->  extern char __save_vgic_v2_state[];
->  extern char __restore_vgic_v2_state[];
-> +extern char __save_vgic_v3_state[];
-> +extern char __restore_vgic_v3_state[];
->  
->  #endif
->  
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index 65f0c43..a10803c 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -216,6 +216,13 @@ static inline void vgic_arch_setup(const struct vgic_params *vgic)
->  		__vgic_sr_vectors.restore_vgic	= __restore_vgic_v2_state;
->  		break;
->  
-> +#ifdef CONFIG_ARM_GIC_V3
-> +	case VGIC_V3:
-> +		__vgic_sr_vectors.save_vgic	= __save_vgic_v3_state;
-> +		__vgic_sr_vectors.restore_vgic	= __restore_vgic_v3_state;
-> +		break;
-> +#endif
-> +
->  	default:
->  		BUG();
->  	}
-> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-> index dafc415..e74654c 100644
-> --- a/arch/arm64/kernel/asm-offsets.c
-> +++ b/arch/arm64/kernel/asm-offsets.c
-> @@ -139,6 +139,14 @@ int main(void)
->    DEFINE(VGIC_V2_CPU_ELRSR,	offsetof(struct vgic_cpu, vgic_v2.vgic_elrsr));
->    DEFINE(VGIC_V2_CPU_APR,	offsetof(struct vgic_cpu, vgic_v2.vgic_apr));
->    DEFINE(VGIC_V2_CPU_LR,	offsetof(struct vgic_cpu, vgic_v2.vgic_lr));
-> +  DEFINE(VGIC_V3_CPU_HCR,	offsetof(struct vgic_cpu, vgic_v3.vgic_hcr));
-> +  DEFINE(VGIC_V3_CPU_VMCR,	offsetof(struct vgic_cpu, vgic_v3.vgic_vmcr));
-> +  DEFINE(VGIC_V3_CPU_MISR,	offsetof(struct vgic_cpu, vgic_v3.vgic_misr));
-> +  DEFINE(VGIC_V3_CPU_EISR,	offsetof(struct vgic_cpu, vgic_v3.vgic_eisr));
-> +  DEFINE(VGIC_V3_CPU_ELRSR,	offsetof(struct vgic_cpu, vgic_v3.vgic_elrsr));
-> +  DEFINE(VGIC_V3_CPU_AP0R,	offsetof(struct vgic_cpu, vgic_v3.vgic_ap0r));
-> +  DEFINE(VGIC_V3_CPU_AP1R,	offsetof(struct vgic_cpu, vgic_v3.vgic_ap1r));
-> +  DEFINE(VGIC_V3_CPU_LR,	offsetof(struct vgic_cpu, vgic_v3.vgic_lr));
->    DEFINE(VGIC_CPU_NR_LR,	offsetof(struct vgic_cpu, nr_lr));
->    DEFINE(KVM_VTTBR,		offsetof(struct kvm, arch.vttbr));
->    DEFINE(KVM_VGIC_VCTRL,	offsetof(struct kvm, arch.vgic.vctrl_base));
-> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-> index daf24dc..32a0961 100644
-> --- a/arch/arm64/kvm/Makefile
-> +++ b/arch/arm64/kvm/Makefile
-> @@ -22,4 +22,6 @@ kvm-$(CONFIG_KVM_ARM_HOST) += guest.o reset.o sys_regs.o sys_regs_generic_v8.o
->  kvm-$(CONFIG_KVM_ARM_VGIC) += $(KVM)/arm/vgic.o
->  kvm-$(CONFIG_KVM_ARM_VGIC) += $(KVM)/arm/vgic-v2.o
->  kvm-$(CONFIG_KVM_ARM_VGIC) += vgic-v2-switch.o
-> +kvm-$(CONFIG_KVM_ARM_VGIC) += $(KVM)/arm/vgic-v3.o
-> +kvm-$(CONFIG_KVM_ARM_VGIC) += vgic-v3-switch.o
->  kvm-$(CONFIG_KVM_ARM_TIMER) += $(KVM)/arm/arch_timer.o
-> diff --git a/arch/arm64/kvm/vgic-v3-switch.S b/arch/arm64/kvm/vgic-v3-switch.S
-> new file mode 100644
-> index 0000000..7d2bc86
-> --- /dev/null
-> +++ b/arch/arm64/kvm/vgic-v3-switch.S
-> @@ -0,0 +1,279 @@
-> +/*
-> + * Copyright (C) 2012,2013 - ARM Ltd
-> + * Author: Marc Zyngier <marc.zyngier@arm.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/linkage.h>
-> +#include <linux/irqchip/arm-gic-v3.h>
-> +
-> +#include <asm/assembler.h>
-> +#include <asm/memory.h>
-> +#include <asm/asm-offsets.h>
-> +#include <asm/kvm.h>
-> +#include <asm/kvm_asm.h>
-> +#include <asm/kvm_arm.h>
-> +
-> +	.text
-> +	.pushsection	.hyp.text, "ax"
-> +
-> +/*
-> + * Save the VGIC CPU state into memory
-> + * x0: Register pointing to VCPU struct
-> + * Do not corrupt x1!!!
-> + */
-> +.macro	save_vgic_v3_state
-> +	// Compute the address of struct vgic_cpu
-> +	add	x3, x0, #VCPU_VGIC_CPU
-> +
-> +	// Make sure stores to the GIC via the memory mapped interface
-> +	// are now visible to the system register interface
-> +	dsb	sy
-> +
-> +	// Save all interesting registers
-> +	mrs	x4, ICH_HCR_EL2
-> +	mrs	x5, ICH_VMCR_EL2
-> +	mrs	x6, ICH_MISR_EL2
-> +	mrs	x7, ICH_EISR_EL2
-> +	mrs	x8, ICH_ELSR_EL2
-> +
-> +	str	w4, [x3, #VGIC_V3_CPU_HCR]
-> +	str	w5, [x3, #VGIC_V3_CPU_VMCR]
-> +	str	w6, [x3, #VGIC_V3_CPU_MISR]
-> +	str	w7, [x3, #VGIC_V3_CPU_EISR]
-> +	str	w8, [x3, #VGIC_V3_CPU_ELRSR]
-> +
-> +	msr	ICH_HCR_EL2, xzr
-> +
-> +	mrs	x21, ICH_VTR_EL2
-> +	and	w22, w21, #0xf
-> +	mov	w23, #0xf
-> +	sub	w23, w23, w22	// How many regs we have to skip
-> +
-> +	adr	x24, 1f
-> +	add	x24, x24, x23, lsl #2
-> +	br	x24
-> +
-> +1:
-> +	mrs	x20, ICH_LR15_EL2
-> +	mrs	x19, ICH_LR14_EL2
-> +	mrs	x18, ICH_LR13_EL2
-> +	mrs	x17, ICH_LR12_EL2
-> +	mrs	x16, ICH_LR11_EL2
-> +	mrs	x15, ICH_LR10_EL2
-> +	mrs	x14, ICH_LR9_EL2
-> +	mrs	x13, ICH_LR8_EL2
-> +	mrs	x12, ICH_LR7_EL2
-> +	mrs	x11, ICH_LR6_EL2
-> +	mrs	x10, ICH_LR5_EL2
-> +	mrs	x9, ICH_LR4_EL2
-> +	mrs	x8, ICH_LR3_EL2
-> +	mrs	x7, ICH_LR2_EL2
-> +	mrs	x6, ICH_LR1_EL2
-> +	mrs	x5, ICH_LR0_EL2
-> +
-> +	adr	x24, 1f
-> +	add	x24, x24, x23, lsl #2	// adr(1f) + unimp_nr*4
-> +	br	x24
-> +
-> +1:
-> +	str	x20, [x3, #(VGIC_V3_CPU_LR + 15*8)]
-> +	str	x19, [x3, #(VGIC_V3_CPU_LR + 14*8)]
-> +	str	x18, [x3, #(VGIC_V3_CPU_LR + 13*8)]
-> +	str	x17, [x3, #(VGIC_V3_CPU_LR + 12*8)]
-> +	str	x16, [x3, #(VGIC_V3_CPU_LR + 11*8)]
-> +	str	x15, [x3, #(VGIC_V3_CPU_LR + 10*8)]
-> +	str	x14, [x3, #(VGIC_V3_CPU_LR + 9*8)]
-> +	str	x13, [x3, #(VGIC_V3_CPU_LR + 8*8)]
-> +	str	x12, [x3, #(VGIC_V3_CPU_LR + 7*8)]
-> +	str	x11, [x3, #(VGIC_V3_CPU_LR + 6*8)]
-> +	str	x10, [x3, #(VGIC_V3_CPU_LR + 5*8)]
-> +	str	x9, [x3, #(VGIC_V3_CPU_LR + 4*8)]
-> +	str	x8, [x3, #(VGIC_V3_CPU_LR + 3*8)]
-> +	str	x7, [x3, #(VGIC_V3_CPU_LR + 2*8)]
-> +	str	x6, [x3, #(VGIC_V3_CPU_LR + 1*8)]
-> +	str	x5, [x3, #VGIC_V3_CPU_LR]
-> +
-> +	lsr	w22, w21, #29	// Get PRIbits
-> +	cmp	w22, #4		// 5 bits
-> +	b.eq	5f
-> +	cmp	w22, #5		// 6 bits
-> +	b.eq	6f
-> +				// 7 bits
-> +	mrs	x20, ICH_AP0R3_EL2
-> +	str	w20, [x3, #(VGIC_V3_CPU_AP0R + 3*4)]
-> +	mrs	x19, ICH_AP0R2_EL2
-> +	str	w19, [x3, #(VGIC_V3_CPU_AP0R + 2*4)]
-> +6:	mrs	x18, ICH_AP0R1_EL2
-> +	str	w18, [x3, #(VGIC_V3_CPU_AP0R + 1*4)]
-> +5:	mrs	x17, ICH_AP0R0_EL2
-> +	str	w17, [x3, #VGIC_V3_CPU_AP0R]
-> +
-> +	cmp	w22, #4		// 5 bits
-> +	b.eq	5f
-> +	cmp	w22, #5		// 6 bits
-> +	b.eq	6f
-> +				// 7 bits
-> +	mrs	x20, ICH_AP1R3_EL2
-> +	str	w20, [x3, #(VGIC_V3_CPU_AP1R + 3*4)]
-> +	mrs	x19, ICH_AP1R2_EL2
-> +	str	w19, [x3, #(VGIC_V3_CPU_AP1R + 2*4)]
-> +6:	mrs	x18, ICH_AP1R1_EL2
-> +	str	w18, [x3, #(VGIC_V3_CPU_AP1R + 1*4)]
-> +5:	mrs	x17, ICH_AP1R0_EL2
-> +	str	w17, [x3, #VGIC_V3_CPU_AP1R]
-> +
-> +	// Restore SRE_EL1 access and re-enable SRE at EL1.
-> +	mrs	x5, ICC_SRE_EL2
-> +	orr	x5, x5, #(1 << 3)
-
-couldn't we define ICC_SRE_ENABLE (1 << 3)?
-
-> +	msr	ICC_SRE_EL2, x5
-> +	isb
-> +	mov	x5, #1
-> +	msr	ICC_SRE_EL1, x5
-
-the other bits are always read-only (WI), so you can safely just
-overwrite all other bits here?
-
-> +
-> +	mov	x2, #HCR_RW
-> +	msr	hcr_el2, x2
-> +.endm
-> +
-> +/*
-> + * Restore the VGIC CPU state from memory
-> + * x0: Register pointing to VCPU struct
-> + */
-> +.macro	restore_vgic_v3_state
-> +	ldr	x2, [x0, #VCPU_IRQ_LINES]
-
-again, what can this be used for with aarch64?
-
-> +	ldr	x1, [x0, #VCPU_HCR_EL2]
-> +	orr	x2, x2, x1
-> +	msr	hcr_el2, x2
-> +
-> +	// Disable SRE_EL1 access. Necessary, otherwise
-> +	// ICH_VMCR_EL2.VFIQEn becomes one, and FIQ happens...
-> +	msr	ICC_SRE_EL1, xzr
-> +	isb
-> +
-> +	// Compute the address of struct vgic_cpu
-> +	add	x3, x0, #VCPU_VGIC_CPU
-> +
-> +	// Restore all interesting registers
-> +	ldr	w4, [x3, #VGIC_V3_CPU_HCR]
-> +	ldr	w5, [x3, #VGIC_V3_CPU_VMCR]
-> +
-> +	msr	ICH_HCR_EL2, x4
-> +	msr	ICH_VMCR_EL2, x5
-> +
-> +	mrs	x21, ICH_VTR_EL2
-> +
-> +	lsr	w22, w21, #29	// Get PRIbits
-> +	cmp	w22, #4		// 5 bits
-> +	b.eq	5f
-> +	cmp	w22, #5		// 6 bits
-> +	b.eq	6f
-> +				// 7 bits
-> +	ldr	w20, [x3, #(VGIC_V3_CPU_AP1R + 3*4)]
-> +	msr	ICH_AP1R3_EL2, x20
-> +	ldr	w19, [x3, #(VGIC_V3_CPU_AP1R + 2*4)]
-> +	msr	ICH_AP1R2_EL2, x19
-> +6:	ldr	w18, [x3, #(VGIC_V3_CPU_AP1R + 1*4)]
-> +	msr	ICH_AP1R1_EL2, x18
-> +5:	ldr	w17, [x3, #VGIC_V3_CPU_AP1R]
-> +	msr	ICH_AP1R0_EL2, x17
-> +
-> +	cmp	w22, #4		// 5 bits
-> +	b.eq	5f
-> +	cmp	w22, #5		// 6 bits
-> +	b.eq	6f
-> +				// 7 bits
-> +	ldr	w20, [x3, #(VGIC_V3_CPU_AP0R + 3*4)]
-> +	msr	ICH_AP0R3_EL2, x20
-> +	ldr	w19, [x3, #(VGIC_V3_CPU_AP0R + 2*4)]
-> +	msr	ICH_AP0R2_EL2, x19
-> +6:	ldr	w18, [x3, #(VGIC_V3_CPU_AP0R + 1*4)]
-> +	msr	ICH_AP0R1_EL2, x18
-> +5:	ldr	w17, [x3, #VGIC_V3_CPU_AP0R]
-> +	msr	ICH_AP0R0_EL2, x17
-> +
-> +	and	w22, w21, #0xf
-> +	mov	w23, #0xf
-> +	sub	w23, w23, w22	// How many regs we have to skip
-> +
-> +	adr	x24, 1f
-> +	add	x24, x24, x23, lsl #2	// adr(1f) + unimp_nr*4
-> +	br	x24
-> +
-> +1:
-> +	ldr	x20, [x3, #(VGIC_V3_CPU_LR + 15*8)]
-> +	ldr	x19, [x3, #(VGIC_V3_CPU_LR + 14*8)]
-> +	ldr	x18, [x3, #(VGIC_V3_CPU_LR + 13*8)]
-> +	ldr	x17, [x3, #(VGIC_V3_CPU_LR + 12*8)]
-> +	ldr	x16, [x3, #(VGIC_V3_CPU_LR + 11*8)]
-> +	ldr	x15, [x3, #(VGIC_V3_CPU_LR + 10*8)]
-> +	ldr	x14, [x3, #(VGIC_V3_CPU_LR + 9*8)]
-> +	ldr	x13, [x3, #(VGIC_V3_CPU_LR + 8*8)]
-> +	ldr	x12, [x3, #(VGIC_V3_CPU_LR + 7*8)]
-> +	ldr	x11, [x3, #(VGIC_V3_CPU_LR + 6*8)]
-> +	ldr	x10, [x3, #(VGIC_V3_CPU_LR + 5*8)]
-> +	ldr	x9, [x3, #(VGIC_V3_CPU_LR + 4*8)]
-> +	ldr	x8, [x3, #(VGIC_V3_CPU_LR + 3*8)]
-> +	ldr	x7, [x3, #(VGIC_V3_CPU_LR + 2*8)]
-> +	ldr	x6, [x3, #(VGIC_V3_CPU_LR + 1*8)]
-> +	ldr	x5, [x3, #VGIC_V3_CPU_LR]
-> +
-> +	adr	x24, 1f
-> +	add	x24, x24, x23, lsl #2
-> +	br	x24
-> +
-> +1:
-> +	msr	ICH_LR15_EL2, x20
-> +	msr	ICH_LR14_EL2, x19
-> +	msr	ICH_LR13_EL2, x18
-> +	msr	ICH_LR12_EL2, x17
-> +	msr	ICH_LR11_EL2, x16
-> +	msr	ICH_LR10_EL2, x15
-> +	msr	ICH_LR9_EL2,  x14
-> +	msr	ICH_LR8_EL2,  x13
-> +	msr	ICH_LR7_EL2,  x12
-> +	msr	ICH_LR6_EL2,  x11
-> +	msr	ICH_LR5_EL2,  x10
-> +	msr	ICH_LR4_EL2,   x9
-> +	msr	ICH_LR3_EL2,   x8
-> +	msr	ICH_LR2_EL2,   x7
-> +	msr	ICH_LR1_EL2,   x6
-> +	msr	ICH_LR0_EL2,   x5
-> +
-> +	// Ensure that the above will be visible via the memory-mapped
-> +	// view of the CPU interface (GICV).
-> +	isb
-> +	dsb	sy
-> +
-> +	// Prevent the guest from touching the GIC system registers
-> +	mrs	x5, ICC_SRE_EL2
-> +	and	x5, x5, #~(1 << 3)
-
-ditto on the define
-
-> +	msr	ICC_SRE_EL2, x5
-
-I trust Will reviewed all the barriers etc., but you really don't
-need an ISB or anything here?
-
-> +.endm
-> +
-> +ENTRY(__save_vgic_v3_state)
-> +	save_vgic_v3_state
-> +	ret
-> +ENDPROC(__save_vgic_v3_state)
-> +
-> +ENTRY(__restore_vgic_v3_state)
-> +	restore_vgic_v3_state
-> +	ret
-> +ENDPROC(__restore_vgic_v3_state)
-> +
-> +ENTRY(__vgic_v3_get_ich_vtr_el2)
-> +	mrs	x0, ICH_VTR_EL2
-> +	ret
-> +ENDPROC(__vgic_v3_get_ich_vtr_el2)
-> +
-> +	.popsection
-> -- 
-> 1.8.3.4
+> Now the trouble starts when our hardware description in dts assumes
+> that every peripheral interrupt is a routable interrupt - as this
+> thread describes - that is NOT the case.
+> 
+> Now the question is how do you differentiate?
+> 
+> interrupts = <GIC_SPI Number Level>
+> 
+> GIC_SPI is correct since we are attempting to describe the SPI
+> interrupt (offset what ever it is, is a NOP from conceptual discussion).
+> 
+> Level is fine as well.
+> 
+> Number: what does this indicate? crossbar number is what we have
+> assumed so far. however, then you loose the ability to describe
+> interrupts on GIC SPI which dont have crossbar interrupts.
+> 
+> Question is how do we differentiate between the two?
 > 
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+IMO even the direct-mapped ones can go come from a list, trouble is with
+the buggy hardware hard-coded mappings which map some random crossbar to
+some random GIC and can't be changed.
+
+Only way to handle this is with a sort of an associative map in DT, not
+a list. But that's far more overkill than anyone could imagine, and the
+suggestion to set BIT 31 is cleaner without needing any lists at all,
+while hiding all the complexity within the crossbar driver. After xlate,
+the IRQ number is corrected, so the flag disappears, and the info that
+its DIRECT can be stored to retrieved later during map/unmap.
+
+thanks,
+
+-Joel
