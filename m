@@ -1,32 +1,33 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 9 May 2014 08:18:21 +0200
-Subject: [PATCH] ARM i.MX51: Add Efika MX Smartbook devicetree
-In-Reply-To: <CAOMZO5AbKxzre0vMNcAyk5u2Cmwt8fbiAUSgqVpiLkuigvXzpQ@mail.gmail.com>
-References: <1397641298-25392-1-git-send-email-shc_work@mail.ru>
- <20140508062616.GF5918@pengutronix.de>
- <CAOMZO5AbKxzre0vMNcAyk5u2Cmwt8fbiAUSgqVpiLkuigvXzpQ@mail.gmail.com>
-Message-ID: <20140509061821.GQ5858@pengutronix.de>
+From: archit@ti.com (Archit Taneja)
+Date: Fri, 9 May 2014 11:49:43 +0530
+Subject: [PATCH] ARM: OMAP5: DSS hwmod data
+In-Reply-To: <alpine.DEB.2.02.1405081558570.23579@utopia.booyaka.com>
+References: <1394619996-3525-1-git-send-email-tomi.valkeinen@ti.com>
+ <alpine.DEB.2.02.1405080432570.23579@utopia.booyaka.com>
+ <536B1A9C.7050006@ti.com>
+ <alpine.DEB.2.02.1405081558570.23579@utopia.booyaka.com>
+Message-ID: <536C737F.80205@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 09, 2014 at 12:11:32AM -0300, Fabio Estevam wrote:
-> On Thu, May 8, 2014 at 3:26 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> 
-> > From what I can see ulpi mode is not supported currently in the chipidea
-> > driver. I think that shouldn't block adding these device nodes, but
-> 
-> It works with usb nop transceiver. We got it running on mx27pdk,
-> mx51evk and other boards.
+Hi Paul,
 
-The ULPI phys need to be configured. I don't think that it works on the
-Efika without additional code. But now that the chipidea patches are
-flowing into the kernel again I may find some motivation to have a look
-into this issue.
+On Thursday 08 May 2014 09:31 PM, Paul Walmsley wrote:
+<snip>
 
-Sascha
+>> The problem is that we have multiple hwmods which use the same MODULEMODE bit.
+>> There is no use-counting done when it comes to enabling/disabling modulemode.
+>> If there was such a thing, we could have provided MODULEMODE flags even for
+>> the children hwmods.
+>
+> Thanks for the summary.  This is indeed a long-overdue item for the hwmod
+> core code.  Can you please patch the hwmod core code to add this?  I'd
+> suggest making the use-counting functionality conditional on a hwmod flag
+> that you can set for all of the DSS hwmods.  (Ideally, the core code would
+> detect that several modules share the same MODULEMODE bits, and
+> automatically set it for those cases, but that seems a bit too complex for
+> a first cut.)
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Sure, I can work on this.
+
+Archit
