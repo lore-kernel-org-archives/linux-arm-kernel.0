@@ -1,105 +1,81 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Fri,  9 May 2014 13:59:01 +0400
-Subject: [PATCH 2/3] ARM: i.MX1 clk: Add devicetree support
-In-Reply-To: <1399629542-32387-1-git-send-email-shc_work@mail.ru>
-References: <1399629542-32387-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1399629542-32387-2-git-send-email-shc_work@mail.ru>
+Date: Fri,  9 May 2014 13:59:00 +0400
+Subject: [PATCH 1/3] ARM: i.MX1 clk: Add missing clocks
+Message-ID: <1399629542-32387-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds devicetree support CCM module for i.MX1 (MC9328MX1) CPUs.
+This patch adds missing clocks for mpll_gate, spll_gate, uart3_gate,
+ssi2_gate and brom_gate. As an additional this fixes incorrect bit
+position for dma_gate clock.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- .../devicetree/bindings/clock/imx1-clock.txt       | 46 ++++++++++++++++++++++
- arch/arm/mach-imx/clk-imx1.c                       | 10 ++++-
- 2 files changed, 55 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/clock/imx1-clock.txt
+ arch/arm/mach-imx/clk-imx1.c | 33 ++++++++++++++++++++-------------
+ 1 file changed, 20 insertions(+), 13 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/imx1-clock.txt b/Documentation/devicetree/bindings/clock/imx1-clock.txt
-new file mode 100644
-index 0000000..f66fe37
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/imx1-clock.txt
-@@ -0,0 +1,46 @@
-+* Clock bindings for Freescale i.MX1
-+
-+Required properties:
-+- compatible: Should be "fsl,imx1-ccm".
-+- reg: Address and length of the register set.
-+- interrupts: Should contain CCM interrupt.
-+- #clock-cells: Should be <1>.
-+
-+The clock consumer should specify the desired clock by having the clock
-+ID in its "clocks" phandle cell. The following is a full list of i.MX1
-+clocks and IDs.
-+
-+	Clock			ID
-+	---------------------------
-+	dummy			0
-+	clk32			1
-+	clk16m_ext		2
-+	clk16m			3
-+	clk32_premult		4
-+	prem			5
-+	mpll			6
-+	mpll_gate		7
-+	spll			8
-+	spll_gate		9
-+	mcu			10
-+	fclk			11
-+	hclk			12
-+	clk48m			13
-+	per1			14
-+	per2			15
-+	per3			16
-+	clko			17
-+	uart3_gate		18
-+	ssi2_gate		19
-+	brom_gate		20
-+	dma_gate		21
-+	csi_gate		22
-+	mma_gate		23
-+	usbd_gate		24
-+
-+Examples:
-+	clks: ccm at 0021b000 {
-+		compatible = "fsl,imx1-ccm";
-+		reg = <0x0021b000 0x1000>;
-+		interrupts = <59>;
-+	};
 diff --git a/arch/arm/mach-imx/clk-imx1.c b/arch/arm/mach-imx/clk-imx1.c
-index 602b30a..d13dce4 100644
+index 15f9d22..602b30a 100644
 --- a/arch/arm/mach-imx/clk-imx1.c
 +++ b/arch/arm/mach-imx/clk-imx1.c
-@@ -20,7 +20,9 @@
- #include <linux/clk.h>
- #include <linux/io.h>
- #include <linux/clkdev.h>
-+#include <linux/clk-provider.h>
- #include <linux/err.h>
-+#include <linux/of.h>
+@@ -40,12 +40,14 @@
+ #define SCM_GCCR	IO_ADDR_SCM(0xc)
  
- #include "clk.h"
- #include "common.h"
-@@ -57,7 +59,7 @@ int __init mx1_clocks_init(unsigned long fref)
- 	int i;
- 
- 	clk[dummy] = imx_clk_fixed("dummy", 0);
--	clk[clk32] = imx_clk_fixed("clk32", fref);
-+	clk[clk32] = imx_obtain_fixed_clock("clk32", fref);
- 	clk[clk16m_ext] = imx_clk_fixed("clk16m_ext", 16000000);
- 	clk[clk16m] = imx_clk_gate("clk16m", "clk16m_ext", CCM_CSCR, 17);
- 	clk[clk32_premult] = imx_clk_fixed_factor("clk32_premult", "clk32", 512, 1);
-@@ -120,3 +122,9 @@ int __init mx1_clocks_init(unsigned long fref)
- 
- 	return 0;
- }
+ static const char *prem_sel_clks[] = { "clk32_premult", "clk16m", };
+-static const char *clko_sel_clks[] = { "per1", "hclk", "clk48m", "clk16m", "prem",
+-				"fclk", };
++static const char *clko_sel_clks[] = { "per1", "hclk", "clk48m", "clk16m",
++				       "prem", "fclk", };
 +
-+static void __init mx1_clocks_init_dt(struct device_node *np)
-+{
-+	mx1_clocks_init(32768);
-+}
-+CLK_OF_DECLARE(imx1_ccm, "fsl,imx1-ccm", mx1_clocks_init_dt);
+ enum imx1_clks {
+-	dummy, clk32, clk16m_ext, clk16m, clk32_premult, prem, mpll, spll, mcu,
+-	fclk, hclk, clk48m, per1, per2, per3, clko, dma_gate, csi_gate,
+-	mma_gate, usbd_gate, clk_max
++	dummy, clk32, clk16m_ext, clk16m, clk32_premult, prem, mpll, mpll_gate,
++	spll, spll_gate, mcu, fclk, hclk, clk48m, per1, per2, per3, clko,
++	uart3_gate, ssi2_gate, brom_gate, dma_gate, csi_gate, mma_gate,
++	usbd_gate, clk_max
+ };
+ 
+ static struct clk *clk[clk_max];
+@@ -62,17 +64,22 @@ int __init mx1_clocks_init(unsigned long fref)
+ 	clk[prem] = imx_clk_mux("prem", CCM_CSCR, 16, 1, prem_sel_clks,
+ 			ARRAY_SIZE(prem_sel_clks));
+ 	clk[mpll] = imx_clk_pllv1("mpll", "clk32_premult", CCM_MPCTL0);
++	clk[mpll_gate] = imx_clk_gate("mpll_gate", "mpll", CCM_CSCR, 0);
+ 	clk[spll] = imx_clk_pllv1("spll", "prem", CCM_SPCTL0);
++	clk[spll_gate] = imx_clk_gate("spll_gate", "spll", CCM_CSCR, 1);
+ 	clk[mcu] = imx_clk_divider("mcu", "clk32_premult", CCM_CSCR, 15, 1);
+-	clk[fclk] = imx_clk_divider("fclk", "mpll", CCM_CSCR, 15, 1);
+-	clk[hclk] = imx_clk_divider("hclk", "spll", CCM_CSCR, 10, 4);
+-	clk[clk48m] = imx_clk_divider("clk48m", "spll", CCM_CSCR, 26, 3);
+-	clk[per1] = imx_clk_divider("per1", "spll", CCM_PCDR, 0, 4);
+-	clk[per2] = imx_clk_divider("per2", "spll", CCM_PCDR, 4, 4);
+-	clk[per3] = imx_clk_divider("per3", "spll", CCM_PCDR, 16, 7);
++	clk[fclk] = imx_clk_divider("fclk", "mpll_gate", CCM_CSCR, 15, 1);
++	clk[hclk] = imx_clk_divider("hclk", "spll_gate", CCM_CSCR, 10, 4);
++	clk[clk48m] = imx_clk_divider("clk48m", "spll_gate", CCM_CSCR, 26, 3);
++	clk[per1] = imx_clk_divider("per1", "spll_gate", CCM_PCDR, 0, 4);
++	clk[per2] = imx_clk_divider("per2", "spll_gate", CCM_PCDR, 4, 4);
++	clk[per3] = imx_clk_divider("per3", "spll_gate", CCM_PCDR, 16, 7);
+ 	clk[clko] = imx_clk_mux("clko", CCM_CSCR, 29, 3, clko_sel_clks,
+ 			ARRAY_SIZE(clko_sel_clks));
+-	clk[dma_gate] = imx_clk_gate("dma_gate", "hclk", SCM_GCCR, 4);
++	clk[uart3_gate] = imx_clk_gate("uart3_gate", "hclk", SCM_GCCR, 6);
++	clk[ssi2_gate] = imx_clk_gate("ssi2_gate", "hclk", SCM_GCCR, 5);
++	clk[brom_gate] = imx_clk_gate("brom_gate", "hclk", SCM_GCCR, 4);
++	clk[dma_gate] = imx_clk_gate("dma_gate", "hclk", SCM_GCCR, 3);
+ 	clk[csi_gate] = imx_clk_gate("csi_gate", "hclk", SCM_GCCR, 2);
+ 	clk[mma_gate] = imx_clk_gate("mma_gate", "hclk", SCM_GCCR, 1);
+ 	clk[usbd_gate] = imx_clk_gate("usbd_gate", "clk48m", SCM_GCCR, 0);
+@@ -94,7 +101,7 @@ int __init mx1_clocks_init(unsigned long fref)
+ 	clk_register_clkdev(clk[per1], "per", "imx1-uart.1");
+ 	clk_register_clkdev(clk[hclk], "ipg", "imx1-uart.1");
+ 	clk_register_clkdev(clk[per1], "per", "imx1-uart.2");
+-	clk_register_clkdev(clk[hclk], "ipg", "imx1-uart.2");
++	clk_register_clkdev(clk[uart3_gate], "ipg", "imx1-uart.2");
+ 	clk_register_clkdev(clk[hclk], NULL, "imx1-i2c.0");
+ 	clk_register_clkdev(clk[per2], "per", "imx1-cspi.0");
+ 	clk_register_clkdev(clk[dummy], "ipg", "imx1-cspi.0");
 -- 
 1.8.3.2
