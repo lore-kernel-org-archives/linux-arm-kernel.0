@@ -1,47 +1,102 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 9 May 2014 12:37:24 +0300
-Subject: [PATCH v3 0/3] Add display support for gta04 device
-In-Reply-To: <1399580212-5183-1-git-send-email-marek@goldelico.com>
-References: <1399580212-5183-1-git-send-email-marek@goldelico.com>
-Message-ID: <536CA1D4.6010605@ti.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 9 May 2014 10:40:15 +0100
+Subject: [PATCH RFC v3 5/6] drivers: cpuidle: CPU idle ARM64 driver
+In-Reply-To: <536c25e8.82e6440a.6af4.ffffa583@mx.google.com>
+References: <1399399483-17112-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1399399483-17112-6-git-send-email-lorenzo.pieralisi@arm.com>
+ <536c25e8.82e6440a.6af4.ffffa583@mx.google.com>
+Message-ID: <20140509094015.GC32007@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/14 23:16, Marek Belisko wrote:
-> This 3 patches adding display support for openmoko gta04 device.
-> First patch add DT bindings for topolly td028 panel. Second add description for
-> dss + panel and third fix panel probing when panel is compiled as module.
+On Fri, May 09, 2014 at 01:48:38AM +0100, Sebastian Capella wrote:
+> Quoting Lorenzo Pieralisi (2014-05-06 11:04:42)
+> > diff --git a/drivers/cpuidle/cpuidle-arm64.c b/drivers/cpuidle/cpuidle-arm64.c
+> > new file mode 100644
+> > index 0000000..fef1fad
+> > --- /dev/null
+> > +++ b/drivers/cpuidle/cpuidle-arm64.c
+> > @@ -0,0 +1,161 @@
+> ...
+> > +/*
 > 
-> Changes from v2:
-> - add missing 'port' node for dpi_out endpoint (comment from Tomi Valkeinen)
-> 
-> Changes from v1:
-> - extend panel compatible string by 'omapdss'
-> - add tpo-td028 panel to dss_compat_conv_list
-> - add MODULE_ALIAS macro to properly probe panel when is compiled as module
-> 
-> Marek Belisko (3):
->   omapdss: panel-tpo-td028ec1: Add DT support.
->   ARM: dts: oma3-gta04: Add display support
->   omapdss: panel-tpo-td028ec1: Add module alias
-> 
->  .../bindings/video/toppoly,td028ttec1.txt          | 30 ++++++++
->  arch/arm/boot/dts/omap3-gta04.dts                  | 87 ++++++++++++++++++++++
->  arch/arm/mach-omap2/display.c                      |  1 +
->  .../omap2/displays-new/panel-tpo-td028ttec1.c      | 33 +++++++-
->  4 files changed, 150 insertions(+), 1 deletion(-)
->  create mode 100644 Documentation/devicetree/bindings/video/toppoly,td028ttec1.txt
-> 
+> Is this intended to be kernel-docs?  If so, should maybe use the /** and
+> () after the function below.  Otherwise, should you remove the @ in the
+> argument list below?
 
-I think this series looks fine. I'll pick it up.
+Changes done according to kernel-docs.
 
- Tomi
+> > + * arm_enter_idle_state - Programs CPU to enter the specified state
+> > + *
+> > + * @dev: cpuidle device
+> > + * @drv: cpuidle driver
+> > + * @idx: state index
+> > + *
+> > + * Called from the CPUidle framework to program the device to the
+> > + * specified target state selected by the governor.
+> > + */
+> > +static int arm_enter_idle_state(struct cpuidle_device *dev,
+> > +                               struct cpuidle_driver *drv, int idx)
+> 
+> ...
+> 
+> > +static int __init arm64_idle_init(void)
+> > +{
+> > +       int i, ret;
+> > +       const char *entry_method;
+> > +       struct device_node *idle_states_node;
+> > +       const struct cpu_suspend_ops *suspend_init;
+> > +       struct cpuidle_driver *drv = &arm64_idle_driver;
+> > +
+> > +       idle_states_node = of_find_node_by_path("/cpus/idle-states");
+> > +       if (!idle_states_node)
+> > +               return -ENOENT;
+> > +
+> > +       if (of_property_read_string(idle_states_node, "entry-method",
+> > +                                   &entry_method)) {
+> > +               pr_warn(" * %s missing entry-method property\n",
+> > +                           idle_states_node->full_name);
+> > +               of_node_put(idle_states_node);
+> > +               return -EOPNOTSUPP;
+> > +       }
+> > +
+> > +       suspend_init = get_suspend_ops(entry_method);
+> > +       if (!suspend_init) {
+> > +               pr_warn("Missing suspend initializer\n");
+> > +               of_node_put(idle_states_node);
+> > +               return -EOPNOTSUPP;
+> > +       }
+> > +
+> > +       /*
+> > +        * State at index 0 is standby wfi and considered standard
+> > +        * on all ARM platforms. If in some platforms simple wfi
+> > +        * can't be used as "state 0", DT bindings must be implemented
+> > +        * to work around this issue and allow installing a special
+> > +        * handler for idle state index 0.
+> > +        */
+> > +       drv->states[0].exit_latency = 1;
+> > +       drv->states[0].target_residency = 1;
+> > +       drv->states[0].flags = CPUIDLE_FLAG_TIME_VALID;
+> > +       strncpy(drv->states[0].name, "ARM WFI", CPUIDLE_NAME_LEN);
+> > +       strncpy(drv->states[0].desc, "ARM WFI", CPUIDLE_DESC_LEN);
+> > +
+> > +       drv->cpumask = (struct cpumask *) cpu_possible_mask;
+> > +       /*
+> > +        * Start at index 1, request idle state nodes to be filled
+> > +        */
+> > +       ret = of_init_idle_driver(drv, state_nodes, 1, true);
+> > +       if (ret)
+> > +               return ret;
+> > +
+> > +       if (suspend_init->init_fn(drv, state_nodes))
+> > +               return -EOPNOTSUPP;
+> > +
+> > +       for (i = 0; i < drv->state_count; i++)
+> > +               drv->states[i].enter = arm_enter_idle_state;
+> 
+> Is this missing an of_node_put(idle_states_node)?
 
+Yes, good catch, patched.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140509/24da857c/attachment.sig>
+Thanks !
+Lorenzo
