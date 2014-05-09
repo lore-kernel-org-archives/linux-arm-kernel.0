@@ -1,35 +1,69 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Fri, 9 May 2014 11:43:30 +0200
-Subject: [PATCH 05/17] pci: host: pcie-dra7xx: add support for
- pcie-dra7xx controller
-In-Reply-To: <201405061544.28738.marex@denx.de>
-References: <1399383244-14556-1-git-send-email-kishon@ti.com>
- <1399383244-14556-6-git-send-email-kishon@ti.com>
- <201405061544.28738.marex@denx.de>
-Message-ID: <20140509094330.GB4877@xo-6d-61-c0.localdomain>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 9 May 2014 12:44:11 +0300
+Subject: [PATCH v2 0/4] Support for Variscite OM44 modules and boards
+In-Reply-To: <CAGhQ9VystybERsiPUX4ESNBcKPKBN44GvuPUtTM+jpywUqON3A@mail.gmail.com>
+References: <1398971269-20515-1-git-send-email-manabian@gmail.com>	<20140506001530.GL25949@atomide.com>
+ <CAGhQ9VystybERsiPUX4ESNBcKPKBN44GvuPUtTM+jpywUqON3A@mail.gmail.com>
+Message-ID: <536CA36B.6000101@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > +	writel(value, base + offset);
-> > +}
-> > +
-> > +static int dra7xx_pcie_link_up(struct pcie_port *pp)
-> > +{
-> > +	struct dra7xx_pcie *dra7xx = to_dra7xx_pcie(pp);
-> > +	u32 reg = dra7xx_pcie_readl(dra7xx->base, PCIECTRL_DRA7XX_CONF_PHY_CS);
-> > +
-> > +	if (reg & LINK_UP)
-> > +		return true;
-> > +	return false;
+On 06/05/14 21:02, Joachim Eastwood wrote:
+> 1On 6 May 2014 02:15, Tony Lindgren <tony@atomide.com> wrote:
+>> * Joachim Eastwood <manabian@gmail.com> [140501 12:08]:
+>>> Hello,
+>>>
+>>> This patch set adds support for Variscite OM44 series of system on modules and boards.
+>>>
+>>> There weren't many comments on v1 of this patch set so I hope this can make it into 3.16.
+>>> Changes since v2:
+>>>  * Use OMAP IOPAD macros
+>>>
+>>> Patch 1: Add support for the SoM itself and the reference carrier board. Together these make the VAR-STK-OM44 dev kit.
+>>> Patch 2: Add support for VAR-DVK-OM44 which is just the STK with a LCD display.
+>>> Patch 3: Nodes for WLAN/BT support.
+>>> Patch 4: Add quirks so that WLAN can be used. Still waiting for proper DT bindings.
+>>>
+>>> Since this patch set now uses the IOPAD macros a fix from Tony is need.
+>>> See: https://patchwork.kernel.org/patch/4025421/
+>>
+>> Just noted that the macro won't work while was about to
+>> apply these, sorry. So we're back to either using the
+>> existing OMAP4_WKUP_IOPAD or raw offset from the padconf
+>> area unless you have some great macro ideas.
 > 
-> return reg & LINK_UP;
+> I see. I'll take another look at the macro's and see what I can come up with.
+> 
+>>> Note that patch 1 relies upon a patch from Tomi Valkeinen add hpd-gpio (hotplug detect) to the "hdmi-connector".
+>>> See: http://marc.info/?l=linux-omap&m=139771947508021&w=2
+>>>
+>>> Patch 2 also relies upon a patch from Tomi that adds DT support to panel-dpi.
+>>> See: http://marc.info/?l=devicetree&m=139030201815380&w=2
+>>
+>> Maybe also leave out the DSS changes until Tomi has confirmed
+>> those?
+> 
+> I can split the patch set and put a patch with the DSS DT nodes at the
+> end. Maybe this last patch can go through Tomi if he has a DSS DT
+> branch. I don't want to drop it entirely from the patch set because
+> some other people has expressed interest in testing it with full
+> display and hdmi support.
 
-Function int returning true. I'd change the prototype and would
-return !!(reg & ...);
+I have the HDMI and panel-dpi patches queued for 3.16. As this is a new
+board, and there's no compile time dependency on DSS stuff, I think all
+these patches can go through Tony.
 
-									Pavel
+For the display related parts in these patches:
+
+Acked-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+
+ Tomi
 
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140509/1ddeb4c1/attachment-0001.sig>
