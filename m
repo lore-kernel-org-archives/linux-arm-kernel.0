@@ -1,84 +1,58 @@
 From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Fri,  9 May 2014 13:01:37 +0200
-Subject: [PATCH v3] ARM: at91: fix startup rtc irq mask for sam9g25 and
- sam9g35 SoCs
-Message-ID: <1399633297-6813-1-git-send-email-boris.brezillon@free-electrons.com>
+Date: Fri,  9 May 2014 13:11:44 +0200
+Subject: [PATCH v3 0/7] mfd: add basic sun6i A31 PRCM support
+Message-ID: <1399633911-7094-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sam9g25 and sam9g35 have the following errata:
-"RTC: Interrupt Mask Register cannot be used
- Interrupt Mask Register read always returns 0."
-
-Hence we should not rely on what IMR claims about already masked irqs
-and just disable all the IRQs.
-
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: <stable@vger.kernel.org> # v3.10+
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
----
 Hello,
 
-Sorry for the noise, I just forgot to remove the mask variable in my
-previous version.
+This patch series adds support for some functions provided by the PRCM
+(Power/Reset/Clock Management) unit:
+- AR100, AHB0 and APB0 clocks
+- APB0 reset controller
+
+These functions are needed to get the P2WI driver working, but more
+subdevices might be added later.
 
 Best Regards,
 
 Boris
 
 Changes since v2:
-- removed unused variable 'mask'
+- use devm_ioremap_resource instead of devm_request_and_ioremap
+- remove unnecessary header inclusions
+- remove info trace when the probe succeed
+- rename apb0_timer01 clk into apb0_timer
 Changes since v1:
-- use a macro to define IRQs bitmask
-- read IMR register to ensure the write to IDR has been flushed
-- quote atmel's datasheet errata in commit message
-- comment the code to describe why we're not using IMR to disable
-  the interrupts
+- fix prcm and prcm-clks DT documentation
+- remove unneeded iounmap and kfree calls from sunxi_reset_remove function
+- rework the AR100 clk implementation
 
- arch/arm/mach-at91/sysirq_mask.c | 22 +++++++++++++---------
- 1 file changed, 13 insertions(+), 9 deletions(-)
+Boris BREZILLON (7):
+  reset: sunxi: document sunxi's reset controllers bindings
+  reset: sunxi: allow MFD subdevices probe
+  mfd: add support for sun6i PRCM (Power/Reset/Clock Management) unit
+  mfd: sun6i-prcm: document DT bindings
+  clk: sunxi: add PRCM (Power/Reset/Clock Management) clks support
+  clk: sunxi: document PRCM clock compatible strings
+  ARM: sunxi: dt: add PRCM clk and reset controller subdevices
 
-diff --git a/arch/arm/mach-at91/sysirq_mask.c b/arch/arm/mach-at91/sysirq_mask.c
-index 2ba694f..1527dda 100644
---- a/arch/arm/mach-at91/sysirq_mask.c
-+++ b/arch/arm/mach-at91/sysirq_mask.c
-@@ -25,24 +25,28 @@
- 
- #include "generic.h"
- 
--#define AT91_RTC_IDR	0x24	/* Interrupt Disable Register */
--#define AT91_RTC_IMR	0x28	/* Interrupt Mask Register */
-+#define AT91_RTC_IDR		0x24	/* Interrupt Disable Register */
-+#define AT91_RTC_IMR		0x28	/* Interrupt Mask Register */
-+#define AT91_RTC_IRQ_MASK	0x1f	/* Available IRQs mask */
- 
- void __init at91_sysirq_mask_rtc(u32 rtc_base)
- {
- 	void __iomem *base;
--	u32 mask;
- 
- 	base = ioremap(rtc_base, 64);
- 	if (!base)
- 		return;
- 
--	mask = readl_relaxed(base + AT91_RTC_IMR);
--	if (mask) {
--		pr_info("AT91: Disabling rtc irq\n");
--		writel_relaxed(mask, base + AT91_RTC_IDR);
--		(void)readl_relaxed(base + AT91_RTC_IMR);	/* flush */
--	}
-+	/*
-+	 * The sam9g25 and sam9g35 have the following errata:
-+	 * "RTC: Interrupt Mask Register cannot be used
-+	 *  Interrupt Mask Register read always returns 0."
-+	 *
-+	 * Hence we're not relying on IMR values to disable
-+	 * interrupts.
-+	 */
-+	writel_relaxed(AT91_RTC_IRQ_MASK, base + AT91_RTC_IDR);
-+	(void)readl_relaxed(base + AT91_RTC_IMR);	/* flush */
- 
- 	iounmap(base);
- }
+ Documentation/devicetree/bindings/clock/sunxi.txt  |   4 +
+ .../devicetree/bindings/mfd/sun6i-prcm.txt         |  59 ++++
+ .../bindings/reset/allwinner,sunxi-clock-reset.txt |  21 ++
+ arch/arm/boot/dts/sun6i-a31.dtsi                   |  37 +++
+ drivers/clk/sunxi/Makefile                         |   2 +
+ drivers/clk/sunxi/clk-sun6i-prcm.c                 | 343 +++++++++++++++++++++
+ drivers/mfd/Kconfig                                |   8 +
+ drivers/mfd/Makefile                               |   1 +
+ drivers/mfd/sun6i-prcm.c                           | 134 ++++++++
+ drivers/reset/reset-sunxi.c                        |  21 +-
+ 10 files changed, 627 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/sun6i-prcm.txt
+ create mode 100644 Documentation/devicetree/bindings/reset/allwinner,sunxi-clock-reset.txt
+ create mode 100644 drivers/clk/sunxi/clk-sun6i-prcm.c
+ create mode 100644 drivers/mfd/sun6i-prcm.c
+
 -- 
 1.8.3.2
