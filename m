@@ -1,80 +1,106 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 9 May 2014 11:45:26 +0100
-Subject: [RFC] Describing arbitrary bus mastering relationships in DT
-In-Reply-To: <4187263.LG1S8D1FYU@wuerfel>
-References: <20140501173248.GD3732@e103592.cambridge.arm.com>
- <6555552.UqkKQIAsih@wuerfel> <5363EA31.3000509@wwwdotorg.org>
- <4187263.LG1S8D1FYU@wuerfel>
-Message-ID: <20140509104506.GA3921@e103592.cambridge.arm.com>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Fri, 9 May 2014 16:21:19 +0530
+Subject: [PATCH v7 1/2] phy: Add new Exynos5 USB 3.0 PHY driver
+In-Reply-To: <536CAA4F.8050404@samsung.com>
+References: <1398665874-31238-1-git-send-email-gautam.vivek@samsung.com>
+ <5368F136.6070804@samsung.com>
+ <CAFp+6iHN-W-k6ow5YykK_QWgBJ+GgzXwPX6suWtizxwJWOiGtg@mail.gmail.com>
+ <CAFp+6iF=Z_dkd+YJm2-ODmvgZ6PCt+bUx+vSVm_5RtobVN0WfA@mail.gmail.com>
+ <536CAA4F.8050404@samsung.com>
+Message-ID: <CAFp+6iEGvy71s=-Vt37TKkVDUX1wO6GZdwL=uBfPjng78yE5-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 02, 2014 at 09:02:20PM +0200, Arnd Bergmann wrote:
-> On Friday 02 May 2014 12:55:45 Stephen Warren wrote:
-> > On 05/02/2014 09:19 AM, Arnd Bergmann wrote:
-> > > On Friday 02 May 2014 15:23:29 Thierry Reding wrote:
-> > ...
-> > >> To some degree this also depends on how we want to handle IOMMUs. If
-> > >> they should remain transparently handled via dma_map_ops, then it makes
-> > >> sense to set this up at device instantiation time. But how can we handle
-> > >> this in situations where one device needs to master on two IOMMUs at the
-> > >> same time? Or if the device needs physically contiguous memory for
-> > >> purposes other than device I/O. Using dma_map_ops we can't control which
-> > >> allocations get mapped via the IOMMU and which don't.
-> > > 
-> > > I still hope we can handle this in common code by selecting the right
-> > > dma_map_ops when the devices are instantiated, at least for 99% of the
-> > > cases. I'm not convinced we really need to handle the 'multiple IOMMUs
-> > > on one device' case in a generic way. If there are no common use cases
-> > > for that, we can probably get away with having multiple device nodes
-> > > and an ugly driver for the exception, instead of making life complicated
-> > > for everybody.
-> > 
-> > By "multiple device nodes", I assume you mean device tree nodes? I'm not
-> > sure I like the sound of that.
-> > 
-> > I believe that DT should represent the structure of the HW in terms of
-> > HW modules or blocks. If there's a single cohesive HW module that
-> > happens to talk to multiple MMUs, or indeed has any kind of unusual case
-> > at all, I don't think that should force the DT representation to be
-> > broken up into multiple nodes. We should have a DT node for that HW
-> > module, and it should be up to the device driver to make the internal SW
-> > representation work correctly.
+Hi Sylwester,
 
-This is rather fuzzy.  On-SoC, it is often non-obvious what counts as a
-single component and what counts as a collection of multiple components.
 
-For DT, we are concerned whether there is anything configurable in the
-relationship between the components, or how each component connects to
-the rest of the system that it is worthwhile to abstract.
+On Fri, May 9, 2014 at 3:43 PM, Sylwester Nawrocki
+<s.nawrocki@samsung.com> wrote:
+> Hi Vivek,
+>
+> On 08/05/14 11:03, Vivek Gautam wrote:
+>>>>> diff --git a/Documentation/devicetree/bindings/phy/samsung-phy.txt b/Documentation/devicetree/bindings/phy/samsung-phy.txt
+>>>>> >>> index b422e38..51efe4c 100644
+>>>>> >>> --- a/Documentation/devicetree/bindings/phy/samsung-phy.txt
+>>>>> >>> +++ b/Documentation/devicetree/bindings/phy/samsung-phy.txt
+>>>>> >>> @@ -114,3 +114,43 @@ Example:
+>>>>> >>>               compatible = "samsung,exynos-sataphy-i2c";
+>>>>> >>>               reg = <0x38>;
+>>>>> >>>       };
+>>>>> >>> +
+>>>>> >>> +Samsung Exynos5 SoC series USB DRD PHY controller
+>>>>> >>> +--------------------------------------------------
+>>>>> >>> +
+>>>>> >>> +Required properties:
+>>>>> >>> +- compatible : Should be set to one of the following supported values:
+>>>>> >>> +     - "samsung,exynos5250-usbdrd-phy" - for exynos5250 SoC,
+>>>>> >>> +     - "samsung,exynos5420-usbdrd-phy" - for exynos5420 SoC.
+>>>>> >>> +- reg : Register offset and length of USB DRD PHY register set;
+>>>>> >>> +- clocks: Clock IDs array as required by the controller
+>>>>> >>> +- clock-names: names of clocks correseponding to IDs in the clock property;
+>>>>> >>> +            Required clocks:
+>>>>> >>> +     - phy: main PHY clock (same as USB DRD controller i.e. DWC3 IP clock),
+>>>>> >>> +            used for register access.
+>>>>> >>> +     - ref: PHY's reference clock (usually crystal clock), used for
+>>>>> >>> +            PHY operations, associated by phy name. It is used to
+>>>>> >>> +            determine bit values for clock settings register.
+>>>>> >>> +            For Exynos5420 this is given as 'sclk_usbphy30' in CMU.
+>>>>> >>> +- samsung,pmu-syscon: phandle for PMU system controller interface, used to
+>>>>> >>> +                   control pmu registers for power isolation.
+>>>>> >>> +- samsung,pmu-offset: phy power control register offset to pmu-system-controller
+>>>>> >>> +                   base.
+>>>> >>
+>>>> >> It doesn't seem right to have register offset encoded in the device tree
+>>>> >> like this. I think it'd be more appropriate to associate such an offset
+>>>> >> with the compatible string's value in the driver.
+>>> >
+>>> > Ok, it makes more sense.
+>>> > Just out of curiosity, what difference would this make ?
+>>
+>> Moreover, in case of Exynos5420 (and may be in future SoCs), where we
+>> have 2 USB DRD PHY controllers,
+>> we will need to have a way around to deal with two separate offsets in
+>> the driver for one compatible string.
+>
+> It could be handled by creating a list of offsets per compatible string and
+> then adding some way to identify the PHY device instance. So I believe that's
+> not a big issue.
 
-> I agree we should in general try our best to have the DT representation
-> match exactly what the hardware looks like. However we already have some
-> areas where we violate that, typically when things are not trees.
+True, we had tried to make use of 'aliases' for multiple controllers
+on Exynos5420,
+in earlier version V3 of this patch, to handle the pmu-register
+offsets in _somewhat_ similar fashion. [1]
+But then we had to drop that as per the suggestions in the mailing list.
 
-The DT is an abstraction: it needs to describe all the OS-relevant
-aspects of platform *behaviour* that can vary between configurations.
+> Now you'd be encoding a list of registers offsets in the
+> device tree, without encoding bit layout of each register. It's unlikely that
+> each instance would have different bits layout, but describing individual
+> registers in DT I thought is something that we're not supposed to do.
 
-The most reliable way to describe behaviour perfectly is to describe the
-hardware exactly in every detail, but it's not much help to an OS
-because the useful information is spread all over the place and not in a
-usable form.
+Ok, so this is information to me, i was not very much aware of this.
+Thanks for explaining it here.
 
-I deliberately went hard down the "describe the hardware" route to
-get the discussion going, but this doesn't always mean it is the best
-answer.
+>
+>> Getting the offsets from DT seems a cleaner way to handle this case of
+>> multi controllers.
+>
+> I think it's easier from the driver POV, but isn't it violating the device
+> tree rules ?
+> Anyway. I'm just pointing this minor issue in the binding as it appears
+> to me. The final word of course belongs to a DT binding maintainer.
 
-We have to trade off the false economy of not describing enough against
-the pointless expense of describing too much...
+Thanks Sylwester, for pointing this out here.
+Meantime, please let me know if the approach using aliases is one
+possible solution for this or not ?
 
-> If there is no real use case but only a theoretical possibility, I don't
-> have a problem with being less strict about the general rule on hardware
-> representation.
 
-I agree that this is all a bit hypothetical -- good for batting ideas
-around, but not so good for reaching practical conclusions.
+[1] [PATCH v3] phy: Add new Exynos5 USB 3.0 PHY driver
+     https://lkml.org/lkml/2014/1/21/46
 
-I'll try to come up with something a bit more concrete.
 
-Cheers
----Dave
+
+-- 
+Best Regards
+Vivek Gautam
+Samsung R&D Institute, Bangalore
+India
