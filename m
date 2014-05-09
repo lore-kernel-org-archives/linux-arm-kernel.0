@@ -1,47 +1,61 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 9 May 2014 09:59:41 +0100
-Subject: [PATCH v2 3/7] mfd: add support for sun6i PRCM
- (Power/Reset/Clock Management) unit
-In-Reply-To: <536C91A6.6000500@free-electrons.com>
-References: <1399483554-8824-1-git-send-email-boris.brezillon@free-electrons.com>
- <1399483554-8824-4-git-send-email-boris.brezillon@free-electrons.com>
- <20140508110205.GB5767@lee--X1>
- <536BE366.8080907@free-electrons.com>
- <20140509071246.GE5767@lee--X1> <536C84F6.2050701@redhat.com>
- <20140509080807.GH5767@lee--X1> <536C8F71.5040604@redhat.com>
- <536C91A6.6000500@free-electrons.com>
-Message-ID: <20140509085941.GM5767@lee--X1>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 09 May 2014 11:05:23 +0200
+Subject: [linux-sunxi] Re: [PATCH] ARM: dts: sun6i-a31-app4-evb1.dts:
+ Use sunxi-common-regulators.dtsi
+In-Reply-To: <536C97FD.3070906@free-electrons.com>
+References: <1399624987-12381-1-git-send-email-hdegoede@redhat.com>
+ <536C97FD.3070906@free-electrons.com>
+Message-ID: <536C9A53.2060302@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >>>>>>> +static struct platform_driver sun6i_prcm_driver = {
-> >>>>>>> +	.driver = {
-> >>>>>>> +		.name = "sun6i-prcm",
-> >>>>>>> +		.owner = THIS_MODULE,
-> >>>>>>> +		.of_match_table = sun6i_prcm_dt_ids,
-> >>>>>>> +	},
-> >>>>>>> +	.probe = sun6i_prcm_probe,
-> >>>>>> You need a .remove() call-back.
-> >>>>> This driver cannot be compiled as module (see the Kconfig definition)
-> >>>>> and the devices are not hotpluggable, as a result a probed device will
-> >>>>> never be removed.
-> >>>>>
-> >>>>> Do you still want me to implement the remove function ?
-> >>>> .remove() also be run on shut down.
-> >>> That is not true, if your device needs to do anything special at shutdown
-> >>> you need to add a shutdown callback. Devices are kept as is (not torn down)
-> >>> on shutdown.
-> >> Ah okay, I'll bow to your knowledge.  So there's no reason for this
-> >> driver to ever call mfd_remove_devices() then?
-> > No, this is an integral part of the SOC, which never gets removed in any way.
+Hi,
+
+On 05/09/2014 10:55 AM, Boris BREZILLON wrote:
 > 
-> Lee, I'm about to send a 3rd version of this series, is it okay for you
-> if I leave the remove function unimplemented ?
+> On 09/05/2014 10:43, Hans de Goede wrote:
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>>  arch/arm/boot/dts/sun6i-a31-app4-evb1.dts | 8 +-------
+>>  1 file changed, 1 insertion(+), 7 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts b/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
+>> index 270ab97..2bbf886 100644
+>> --- a/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
+>> +++ b/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
+>> @@ -13,6 +13,7 @@
+>>  
+>>  /dts-v1/;
+>>  /include/ "sun6i-a31.dtsi"
+>> +/include/ "sunxi-common-regulators.dtsi"
+>>  
+>>  / {
+>>  	model = "Allwinner A31 APP4 EVB1 Evaluation Board";
+>> @@ -49,15 +50,8 @@
+>>  	};
+>>  
+>>  	reg_usb1_vbus: usb1-vbus {
+>> -		compatible = "regulator-fixed";
+>> -		pinctrl-names = "default";
+>>  		pinctrl-0 = <&usb1_vbus_pin_a>;
+>> -		regulator-name = "usb1-vbus";
+>> -		regulator-min-microvolt = <5000000>;
+>> -		regulator-max-microvolt = <5000000>;
+>> -		enable-active-high;
+>>  		gpio = <&pio 7 27 0>;
+>>  		status = "okay";
+>>  	};
+> 
+> I guess we could do the same for usb1_vbus_pin_a (keep the common
+> definition and change the allwinner,pins property).
 
-It is.
+Hmm, what we do with other boards when the pin does not match the
+default is change the node name to something baord specific, ie
+usb1_vbus_pin_app4_evb1
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Which is why I did not remove the common bits from the pin,
+I did not notice you did not use a board specific name here.
+
+Regards,
+
+Hans
