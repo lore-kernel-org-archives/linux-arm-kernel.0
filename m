@@ -1,141 +1,56 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 9 May 2014 09:00:52 -0500
-Subject: [PATCH 3/5] irqchip: crossbar: Skip some irqs from getting mapped
- to crossbar
-In-Reply-To: <536CDBDF.10600@ti.com>
-References: <1399299527-10955-1-git-send-email-r.sricharan@ti.com>	<1399299527-10955-4-git-send-email-r.sricharan@ti.com>	<536BD9D8.4080905@ti.com>	<20140508203659.GA5620@kahuna>	<CAD=GYpbQQxQgKd3oZcAuWrxoD4VrkKzpybd11qwxs405HSUVGw@mail.gmail.com>	<536C0DC4.7090309@ti.com>	<CAD=GYpav4mHaqo4jfb0ePchf3cvuvSnFKj_+osbrt_8-tYRRrQ@mail.gmail.com>	<536C2071.8040502@ti.com>
- <CAD=GYpbRn=LEthpAUX9LNBGTB4iDs7TGiSSgLJuuS0tSatRRJQ@mail.gmail.com>
- <536CD01F.2070506@ti.com> <536CD7BE.5020407@ti.com> <536CD9DB.4010508@ti.com>
- <536CDBDF.10600@ti.com>
-Message-ID: <536CDF94.7000900@ti.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Fri, 09 May 2014 16:01:18 +0200
+Subject: [PATCH v3 3/7] mfd: add support for sun6i PRCM (Power/Reset/Clock
+ Management) unit
+In-Reply-To: <20140509135251.GY5767@lee--X1>
+References: <1399633911-7094-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1399633911-7094-4-git-send-email-boris.brezillon@free-electrons.com>
+ <20140509135251.GY5767@lee--X1>
+Message-ID: <536CDFAE.8070208@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/09/2014 08:45 AM, Santosh Shilimkar wrote:
-> On Friday 09 May 2014 09:36 AM, Nishanth Menon wrote:
->> On 05/09/2014 08:27 AM, Santosh Shilimkar wrote:
->>> On Friday 09 May 2014 08:54 AM, Nishanth Menon wrote:
->>>> On 05/08/2014 11:22 PM, Joel Fernandes wrote:
->>>>> On Thu, May 8, 2014 at 7:25 PM, Santosh Shilimkar
->>>>> <santosh.shilimkar@ti.com> wrote:
->>>> [...]
->>>>> Ok, thanks for pointing to the post.
->>>>>
->>>>
->>>>
->>>> Yep - thanks Santosh for clarifying this. Now, we still have the
->>>> issues that I pointed out in [1] - without resolving which, we should
->>>> not enable crossbar for dra74x/72x.
->>>>
->>>> A. taking example of PMU
->>>> 	interrupts = <GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH>
->>>> this wont work. instead the crossbar driver needs some sort of a hint
->>>> to know that it should not map these on crossbar register instead
->>>> assign GIC mapping directly.
->>>>
->>>> I propose doing the following
->>>> #define GIC_CROSSBAR_PASSTHROUGH(irq_no) ((irq_no) | (0x1 << 31))
->>>>
->>>> and dts will define the following:
->>>> interrupts = <GIC_SPI GIC_CROSSBAR_PASSTHROUGH(131) IRQ_TYPE_LEVEL_HIGH>
->>>>
->>>> This will also work for the other cases (B.2, B.3)
->>>>
->>>> For B.2: L3_APP_IRQ:
->>>> instead of:
->>>> interrupts = <GIC_SPI  5 IRQ_TYPE_LEVEL_HIGH>
->>>> we do:
->>>> interrupts = <GIC_SPI GIC_CROSSBAR_PASSTHROUGH(10) IRQ_TYPE_LEVEL_HIGH>
->>>>
->>>> For B.3: NMI
->>>> interrupts = <GIC_SPI GIC_CROSSBAR_PASSTHROUGH(133) IRQ_TYPE_LEVEL_HIGH>
->>>>
->>> We can't do add a flag to generic interrupt controller flags since its
->>> very specific to cross-bar.
->>>
->>>> xlate is easy ->
->>>>
->>>> diff --git a/drivers/irqchip/irq-crossbar.c
->>>> b/drivers/irqchip/irq-crossbar.c
->>>> index de021638..fd09ab4 100644
->>>> --- a/drivers/irqchip/irq-crossbar.c
->>>> +++ b/drivers/irqchip/irq-crossbar.c
->>>> @@ -112,6 +112,10 @@ static int crossbar_domain_xlate(struct
->>>> irq_domain *d,
->>>>  {
->>>>         unsigned long ret;
->>>>
->>>> +       /* Check to see if direct GIC mapping is required */
->>>> +       if (intspec[1] & BIT(31))
->>>> +               return intspec[1] & ~BIT[31];
->>>> +
->>>>         ret = get_prev_map_irq(intspec[1]);
->>>>         if (!IS_ERR_VALUE(ret))
->>>>                 goto found;
->>>>
->>>> But then, crossbar_domain_map and crossbar_domain_unmap need hints as
->>>> well to know that there is no corresponding crossbar registers.
->>>> Have'nt thought through that yet. Looking to hear about opinions here.
->>>>
->>>>
->>> May be we need additional property like reserved to take care of 1:1
->>> map.
->>>
->>> ti,irqs-direct-map = <131 132>;
->>>
->> We already have equivalents for these -> reserved and skip. Problem is
->> how does crossbar driver know the difference between direct maps and
->> crossbar value?
+
+On 09/05/2014 15:52, Lee Jones wrote:
+>> The PRCM (Power/Reset/Clock Management) block exposes several subdevices
+>> in different subsystems (clk, reset ...)
 >>
->> 6 is one of those reserved ones. dts for a device says:
->> interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>
+>> Add basic support for the PRCM unit with clk (AR100, AHB0, and APB0 clks)
+>> and reset controller subdevices.
 >>
+>> Other subdevices might be added later (if needed).
 >>
->> Now, xlate gets intspec[1] = 6.  6 is valid crossbar number
->> PRM_IRQ_MPU, however GIC 6 is mapped to WD_TIMER_MPU_C1_IRQ_WARN ->
->> you need to be able to get a hint that this is direct mapping dts
->> intended.
->>
->> in the "6" example:
->>
->> How do i get PRM_IRQ_MPU?
->> interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>
->>
->> How do I get WD_TIMER_MPU_C1_IRQ_WARN?
->> interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH> ????? - that wont work as
->> crossbar driver thinks it is crossbar 6 (PRM_IRQ_MPU)
->>
-> Looks like I am missing something. Is the issue because of SPI offset (32)
-> which makes above confusion ?
+>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+>> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> ---
+>>  drivers/mfd/Kconfig      |   8 +++
+>>  drivers/mfd/Makefile     |   1 +
+>>  drivers/mfd/sun6i-prcm.c | 134 +++++++++++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 143 insertions(+)
+>>  create mode 100644 drivers/mfd/sun6i-prcm.c
+> [...]
+>
+>> +/*
+>> + * Copyright (C) 2014 Free Electrons
+>> + *
+>> + * License Terms: GNU General Public License v2
+>> + * Author: Boris BREZILLON <boris.brezillon@free-electrons.com>
+>> + *
+>> + * Allwinner PRCM (Power/Reset/Clock Management) driver
+>> + *
+>> + */
+>> +
+>> +#include <linux/mfd/core.h>
+>> +#include <linux/module.h>
+>> +#include <linux/of.h>
+> Ah, now isn't that better?
 
-The way we modelled crossbar is that the irqchip is GIC and routable
-mapper is crossbar - which makes sense. now for every "interrupts"
-description we try to find a map using the crossbar driver as the irq
-framework rightly identifies that peripheral interrupts are routable
-and crossbar driver is the guy who knows how to map these to a proper
-GIC interrupt number. So far, we are good.
+Absolutely :-).
 
-Now the trouble starts when our hardware description in dts assumes
-that every peripheral interrupt is a routable interrupt - as this
-thread describes - that is NOT the case.
-
-Now the question is how do you differentiate?
-
-interrupts = <GIC_SPI Number Level>
-
-GIC_SPI is correct since we are attempting to describe the SPI
-interrupt (offset what ever it is, is a NOP from conceptual discussion).
-
-Level is fine as well.
-
-Number: what does this indicate? crossbar number is what we have
-assumed so far. however, then you loose the ability to describe
-interrupts on GIC SPI which dont have crossbar interrupts.
-
-Question is how do we differentiate between the two?
-
-
+> Acked-by: Lee Jones <lee.jones@linaro.org>
+>
 
 -- 
-Regards,
-Nishanth Menon
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
