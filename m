@@ -1,112 +1,118 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Fri, 9 May 2014 13:53:00 -0500
-Subject: [PATCH] ARM: OMAP2+: Remove suspend_set_ops from common pm late init
-Message-ID: <1399661580-54599-1-git-send-email-d-gerlach@ti.com>
+From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
+Date: Fri,  9 May 2014 11:54:56 -0700
+Subject: [PATCH] ARM: DT: apq8064: Add sdcc support via mcci driver.
+Message-ID: <1399661696-11766-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In omap2_common_pm_late_init suspend_set_ops was called to set common
-suspend handling functions for all omap platforms. This created two
-problems. First, these suspend ops were being set for all platforms,
-regardless of whether or not suspend support has been integrated so in
-the case of AM33XX, suspend to mem was presented as available but
-failed every time. Second, some platforms will need to define a
-completely separate set of suspend ops, such as AM33XX, due to
-differences from previous omap platforms so there is no need to
-always set the common omap ops.
+From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 
-This patch moves the suspend_set_ops call from omap2_common_pm_late_init
-into a separate function that then gets called in the omap*_pm_init
-functions for each platform.
+This patch adds support to SD card controller using generic pl180 mmci driver.
+This patch also adds temporary fixed regulator to get it going till the actual
+regulator is mainlined.
 
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- arch/arm/mach-omap2/common.h | 8 ++++++++
- arch/arm/mach-omap2/pm.c     | 8 ++++----
- arch/arm/mach-omap2/pm24xx.c | 1 +
- arch/arm/mach-omap2/pm34xx.c | 1 +
- arch/arm/mach-omap2/pm44xx.c | 1 +
- 5 files changed, 15 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/qcom-apq8064-ifc6410.dts | 16 ++++++++++
+ arch/arm/boot/dts/qcom-apq8064.dtsi        | 50 ++++++++++++++++++++++++++++++
+ 2 files changed, 66 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-index d88aff7..091e1c7 100644
---- a/arch/arm/mach-omap2/common.h
-+++ b/arch/arm/mach-omap2/common.h
-@@ -162,6 +162,14 @@ static inline void omap44xx_restart(enum reboot_mode mode, const char *cmd)
- }
- #endif
+diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+index c5fda40..ea386bd 100644
+--- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
++++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+@@ -4,9 +4,25 @@
+ 	model = "Qualcomm APQ8064/IFC6410";
+ 	compatible = "qcom,apq8064-ifc6410", "qcom,apq8064";
  
-+#ifdef CONFIG_SUSPEND
-+void omap_common_suspend_init(void);
-+#else
-+static inline void omap_common_suspend_init(void)
-+{
-+}
-+#endif
++	aliases {
++		sdcc1 = &sdcc1;
++		sdcc3 = &sdcc3;
++	};
 +
- /* This gets called from mach-omap2/io.c, do not call this */
- void __init omap2_set_globals_tap(u32 class, void __iomem *tap);
- 
-diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
-index e1b4141..c9b36fb 100644
---- a/arch/arm/mach-omap2/pm.c
-+++ b/arch/arm/mach-omap2/pm.c
-@@ -243,6 +243,10 @@ static const struct platform_suspend_ops omap_pm_ops = {
- 	.valid		= suspend_valid_only_mem,
+ 	soc {
+ 		serial at 16640000 {
+ 			status = "ok";
+ 		};
++		amba {
++			/* eMMC */
++			sdcc1: sdcc at 12400000 {
++				status = "okay";
++			};
++
++			/* External micro SD card */
++			sdcc3: sdcc at 12180000 {
++				status = "okay";
++			};
++		};
+ 	};
  };
+diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
+index 60b89e5..640fb1d 100644
+--- a/arch/arm/boot/dts/qcom-apq8064.dtsi
++++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+@@ -2,6 +2,7 @@
  
-+void __init omap_common_suspend_init(void)
-+{
-+	suspend_set_ops(&omap_pm_ops);
-+}
- #endif /* CONFIG_SUSPEND */
+ /include/ "skeleton.dtsi"
  
- static void __init omap3_init_voltages(void)
-@@ -310,9 +314,5 @@ int __init omap2_common_pm_late_init(void)
- 	/* cpufreq dummy device instantiation */
- 	omap_init_cpufreq();
++#include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/clock/qcom,gcc-msm8960.h>
  
--#ifdef CONFIG_SUSPEND
--	suspend_set_ops(&omap_pm_ops);
--#endif
--
- 	return 0;
- }
-diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
-index 8c07594..8cd2408 100644
---- a/arch/arm/mach-omap2/pm24xx.c
-+++ b/arch/arm/mach-omap2/pm24xx.c
-@@ -231,6 +231,7 @@ static void __init prcm_setup_regs(void)
- 
- #ifdef CONFIG_SUSPEND
- 	omap_pm_suspend = omap2_enter_full_retention;
-+	omap_common_suspend_init();
- #endif
- 
- 	/* REVISIT: Configure number of 32 kHz clock cycles for sys_clk
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index 87099bb..32b2597 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -707,6 +707,7 @@ int __init omap3_pm_init(void)
- 
- #ifdef CONFIG_SUSPEND
- 	omap_pm_suspend = omap3_pm_suspend;
-+	omap_common_suspend_init();
- #endif
- 
- 	arm_pm_idle = omap3_pm_idle;
-diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
-index eefb30c..58d7cd7 100644
---- a/arch/arm/mach-omap2/pm44xx.c
-+++ b/arch/arm/mach-omap2/pm44xx.c
-@@ -253,6 +253,7 @@ int __init omap4_pm_init(void)
- 
- #ifdef CONFIG_SUSPEND
- 	omap_pm_suspend = omap4_pm_suspend;
-+	omap_common_suspend_init();
- #endif
- 
- 	/* Overwrite the default cpu_do_idle() */
+ / {
+@@ -147,5 +148,54 @@
+ 			#clock-cells = <1>;
+ 			#reset-cells = <1>;
+ 		};
++
++		/* Temporary fixed regulator */
++		vsdcc_fixed: vsdcc-regulator {
++			compatible = "regulator-fixed";
++			regulator-name = "SDCC Power";
++			regulator-min-microvolt = <2700000>;
++			regulator-max-microvolt = <2700000>;
++			regulator-always-on;
++		};
++
++		amba {
++			compatible = "arm,amba-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++			sdcc1: sdcc at 12400000 {
++				status		= "disabled";
++				compatible	= "arm,pl18x", "arm,primecell";
++				arm,primecell-periphid = <0x00051180>;
++				reg		= <0x12400000 0x8000>;
++				interrupts	= <GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>;
++				interrupt-names	= "cmd_irq";
++				clocks		= <&gcc SDC1_CLK>, <&gcc SDC1_H_CLK>;
++				clock-names	= "mclk", "apb_pclk";
++				bus-width	= <8>;
++				max-frequency	= <96000000>;
++				non-removable;
++				cap-sd-highspeed;
++				cap-mmc-highspeed;
++				vmmc-supply = <&vsdcc_fixed>;
++			};
++
++			sdcc3: sdcc at 12180000 {
++				compatible	= "arm,pl18x", "arm,primecell";
++				arm,primecell-periphid = <0x00051180>;
++				status		= "disabled";
++				reg		= <0x12180000 0x8000>;
++				interrupts	= <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>;
++				interrupt-names	= "cmd_irq";
++				clocks		= <&gcc SDC3_CLK>, <&gcc SDC3_H_CLK>;
++				clock-names	= "mclk", "apb_pclk";
++				bus-width	= <4>;
++				cap-sd-highspeed;
++				cap-mmc-highspeed;
++				max-frequency	= <192000000>;
++				no-1-8-v;
++				vmmc-supply = <&vsdcc_fixed>;
++			};
++		};
+ 	};
+ };
 -- 
-1.9.0
+1.9.1
