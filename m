@@ -1,54 +1,71 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 9 May 2014 20:08:47 +0800
-Subject: [PATCH v2] ARM: dts: imx6: add new board RIoTboard
-In-Reply-To: <536C8837.9090802@gmail.com>
-References: <53695C34.5000604@gmail.com> <20140508054106.GH2794@dragon>
- <536B4ACD.30001@gmail.com> <20140509030938.GK2794@dragon>
- <536C8837.9090802@gmail.com>
-Message-ID: <20140509120845.GO2794@dragon>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Fri, 09 May 2014 17:43:21 +0530
+Subject: [RFC PATCH v2 1/2] mfd: syscon: Support early initialization
+In-Reply-To: <fa3178534fcf4488fc45a9a24e44b2588acb38c6.1392807832.git.michal.simek@xilinx.com>
+References: <cover.1392807832.git.michal.simek@xilinx.com>
+ <fa3178534fcf4488fc45a9a24e44b2588acb38c6.1392807832.git.michal.simek@xilinx.com>
+Message-ID: <536CC661.7000706@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 09, 2014 at 08:48:07AM +0100, Iain Paton wrote:
-> On 09/05/14 04:09, Shawn Guo wrote:
-> > On Thu, May 08, 2014 at 10:13:49AM +0100, Iain Paton wrote:
-> 
-> >> +&ecspi1 {
-> >> +	fsl,spi-num-chipselects = <1>;
-> >> +	cs-gpios = <&gpio5 17 0>;
-> >> +	pinctrl-names = "default";
-> >> +	pinctrl-0 = <&pinctrl_ecspi1>;
-> >> +	status = "okay";
-> >> +
-> >> +	spidev at 0 {
-> >> +		spi-max-frequency = <24000000>;
-> >> +		reg = <0>;
-> >> +		compatible = "spidev";
-> >> +	};
-> > 
-> > What's this?  Is this the common way we code spi devices in device tree?
-> 
-> I'd appreciate your guidance here, what would you prefer?
-> 
-> My reasons for adding spidev were as follows:
-> 
-> 1. The SPI pins are not used on the board, they go to an expansion header.
-> 2. Board is targeted at makers who are likely to want to attach 
->    external devices.
-> 3. Experience has been that if they don't find an easy and already 
->    configured way to use something they reach for devmem2 or similar.
-> 4. devicetree is often seen as being too hard by people who come to these
->    boards from things like arduino
-> 
-> I've already had questions on how to find the physical address of /dev/i2c-0 
-> seemingly due to some of the above.
-> 
-> I'm happy to drop the spidev entries if that's what you'd prefer, but if I
-> do that I'm undecided if I should then just drop the ecspi sections as well 
-> and free up more gpio pins on the expansion header for other uses.
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-You can decide if you want to drop or keep the ecspi sections.  I prefer
-to drop those spidev nodes, before we're not sure this is the right way
-to go.
+On 02/19/2014 04:34 PM, Michal Simek wrote:
+> Some platforms need to get system controller ready as soon as
+> possible. The patch provides early_syscon_initialization which
+> create early mapping for all syscon compatible devices in
+> early_syscon_probe. Regmap is get via
+> syscon_early_regmap_lookup_by_phandle()
+> 
+> Regular device probes attach device to regmap via
+> regmap_attach_dev().
+> 
+> For early syscon initialization is necessary to extend struct
+> syscon and provide remove function which unmap all early init
+> structures.
+> 
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com> ---
+> 
 
-Shawn
+I don't have V3 in my mailbox, hence replying to this thread. The
+content is applicable to V3.
+
+[...]
+> @@ -95,6 +98,24 @@ struct regmap
+> *syscon_regmap_lookup_by_pdevname(const char *s) } 
+> EXPORT_SYMBOL_GPL(syscon_regmap_lookup_by_pdevname);
+> 
+> +struct regmap *syscon_early_regmap_lookup_by_phandle(struct
+> device_node *np, +						     const char *property) +{ +	struct
+> device_node *syscon_np; +	struct syscon *syscon; + +	syscon_np =
+> of_parse_phandle(np, property, 0); +	if (!syscon_np) +		return
+> ERR_PTR(-ENODEV); + +	syscon = syscon_np->data; + +
+> of_node_put(syscon_np); + +	return syscon->regmap;
+
+This fails while derefencing syscon if if early_syscon_init() has not
+yet been not yet been called. Something like this would be helpful.
+
+struct regmap *regmap = ERR_PTR(-ENODEV);
+
+syscon = syscon_np->data;
+if (syscon)
+	regmap = syscon->regmap;
+
+return regmap;
+
+
+- -- 
+Tushar Behera
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1
+Comment: Using GnuPG with Thunderbird - http://www.enigmail.net/
+
+iQEcBAEBAgAGBQJTbMZMAAoJELqclMPPkq4NoZEH/j/vTBLu0VmKm01jZqJUUC59
+siD+DvRclRcdRGCzsf7iN9Zjw2g+abDtEBynBNdC6swTJJUwDyMtkcguiHn/ytPN
+B/5bli3rKpRkDlg9i/Cfgqd2KmYh1U6Q2LJ3+pyRAQqe0zm+bI5+fp/cn1PGLBIW
+1R2rexJO98GhGO/Yhh62FD366rB15bgApC2+XjYb2Wcka3f8VY47gqkxnAwxZzvU
+ovG/rqXEuGW7H3o/+BLDtmQREEjKg20ggRo2FEj0WozhTo6Sn2YUJg70DKioguu0
+eteP+X4DsShluJfxq9/51bfFutlXPPYZIbLIZxwyiFSJiAIR8hjLO/Ed/GicybQ=
+=HCI5
+-----END PGP SIGNATURE-----
