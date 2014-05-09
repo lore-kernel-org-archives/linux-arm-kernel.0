@@ -1,45 +1,46 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 9 May 2014 07:37:49 -0700
-Subject: [PATCH 1/4] OMAPDSS: Fix DSS clock multiplier issue on 3703 and
- probably 3630
-In-Reply-To: <536C8B70.1000306@ti.com>
-References: <1398815562-24113-1-git-send-email-tony@atomide.com>
- <1398815562-24113-2-git-send-email-tony@atomide.com>
- <20140508232006.GG2198@atomide.com> <536C8B70.1000306@ti.com>
-Message-ID: <20140509143748.GB17814@atomide.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 9 May 2014 15:40:34 +0100
+Subject: [RFC][PATCH 6/8] sched,idle: Avoid spurious wakeup IPIs
+In-Reply-To: <20140509141520.GV2844@laptop.programming.kicks-ass.net>
+References: <20140411134243.160989490@infradead.org>
+ <20140411135218.478299389@infradead.org>
+ <CAAG0J9_q1KsUx10-XAb7AJnxv2ehctg6q1KME7ahsk1OZV8vZQ@mail.gmail.com>
+ <20140509141520.GV2844@laptop.programming.kicks-ass.net>
+Message-ID: <20140509144034.GF7950@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tomi Valkeinen <tomi.valkeinen@ti.com> [140509 01:02]:
-> On 09/05/14 02:20, Tony Lindgren wrote:
-> > * Tony Lindgren <tony@atomide.com> [140429 16:53]:
-> >> Otherwise we can get often errors like the following and the
-> >> display won't come on:
-> >>
-> >> omapdss APPLY error: FIFO UNDERFLOW on gfx, disabling the overlay
-> >> omapdss APPLY error: SYNC_LOST on channel lcd, restarting
-> >> the output with video overlays disabled
-> >>
-> >> There are some earlier references to this issue:
-> >>
-> >> http://www.spinics.net/lists/linux-omap/msg59511.html
-> >> http://www.spinics.net/lists/linux-omap/msg59724.html
-> >>
-> >> It seems that it's safe to set the lower values even for 3630.
-> >> If we can confirm that 3630 works with the higher values
-> >> reliably we can add further detection.
+Hi Peter,
+
+On Fri, May 09, 2014 at 03:15:20PM +0100, Peter Zijlstra wrote:
+> On Fri, May 09, 2014 at 02:37:27PM +0100, James Hogan wrote:
+> > On 11 April 2014 14:42, Peter Zijlstra <peterz@infradead.org> wrote:
+> > > +       return !(fetch_or(&ti->flags, _TIF_NEED_RESCHED) & _TIF_POLLING_NRFLAG);
 > > 
-> > BTW, I'm also seeing this warning on 3730-evm it may be related:
-> > 
-> > [    3.523101] ------------[ cut here ]------------
-> > [    3.528015] WARNING: CPU: 0 PID: 6 at drivers/video/fbdev/omap2/dss/dss.c:483 dss_set_fck_rate+0x6c/0x8c()
-> > [    3.538360] clk rate mismatch: 108000000 != 115200000
-> > [    3.543518] Modules linked in:
+> > This breaks the build on metag, and I suspect arm64 too:
 > 
-> Hmm... Can you paste the clk_summary from debugfs? Somehow the clock
-> framework calculates the clock rate differently than the dss. Or do we
-> have different clock.dts files used for 3730 and 3630?
+> Yep, I just got a patch for arm64.
 
-OK pasted to the other email in this thread.
+[...]
 
-Tony
+> Any SMP arch that has a polling idle function of any kind (including the
+> default cpu_idle_poll()).
+> 
+> That said, even if that's true, not having TIF_POLLING_NRFLAG isn't
+> fatal, just sub-optimal in that we'll send an unconditional IPI to wake
+> the CPU even though its polling TIF_NEED_RESCHED and doesn't need
+> anything other than that write to wake up.
+> 
+> Most archs have (x86) hlt or (arm) wfi like idle instructions, and if
+> that is your only possible idle function, you'll require the interrupt
+> to wake up and there's really no point to having the POLLING bit.
+
+I wonder why we still need TIF_POLLING_NRFLAG for arm64. It was on arm
+until commit 16a8016372c42c7628eb (sanitize tsk_is_polling()). On arm64
+we use wfi for idle or a firmware call but in both cases the assumption
+is that we need an interrupt for waking up.
+
+So I think we should remove this macro for arm64.
+
+-- 
+Catalin
