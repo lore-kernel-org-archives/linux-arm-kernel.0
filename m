@@ -1,36 +1,108 @@
-From: grundler@chromium.org (Grant Grundler)
-Date: Fri, 9 May 2014 07:59:44 -0700
-Subject: [RFC] Describing arbitrary bus mastering relationships in DT
-In-Reply-To: <20140509103309.GA3875@e103592.cambridge.arm.com>
-References: <20140501173248.GD3732@e103592.cambridge.arm.com>
- <6555552.UqkKQIAsih@wuerfel>
- <20140502174301.GE3805@e103592.cambridge.arm.com>
- <4735818.FvYoTFuExd@wuerfel>
- <20140509103309.GA3875@e103592.cambridge.arm.com>
-Message-ID: <CANEJEGuBD7RH32=YTjPmBt=Ykq21bSQ6gMtfU4H1qTbFPcWLYA@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Fri, 09 May 2014 17:00:00 +0200
+Subject: [RESEND PATCH v4] ARM: at91: fix at91_sysirq_mask_rtc for sam9x5
+ SoCs
+In-Reply-To: <20140509145125.GD6776@localhost>
+References: <1399646610-18816-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20140509145125.GD6776@localhost>
+Message-ID: <536CED70.3060908@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dave,
-Mostly agree with your assessment. My $0.02 on one comment:
 
+On 09/05/2014 16:51, Johan Hovold wrote:
+> On Fri, May 09, 2014 at 04:43:30PM +0200, Boris BREZILLON wrote:
+>> sam9x5 SoCs have the following errata:
+>> "RTC: Interrupt Mask Register cannot be used
+>>  Interrupt Mask Register read always returns 0."
+>>
+>> Hence we should not rely on what IMR claims about already masked IRQs
+>> and just disable all IRQs.
+>>
+>> Cc: Andrew Morton <akpm@linux-foundation.org>
+>> Cc: <stable@vger.kernel.org> # v3.10+
+>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+>> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Reviewed-by: Johan Hovold <jhovold@gmail.com>
+>
+> Looks good, but for the future: Why do you break the comment lines you
+> added at column 60?
 
-On Fri, May 9, 2014 at 3:33 AM, Dave Martin <Dave.Martin@arm.com> wrote:
-....
-> The downside is that is any path flows through a dynamically
-> configurable component, such as an IOMMU or a bridge that can be
-> remapped, turned off etc., then unless we describe how the path is
-> really linked together the kernel will need all sorts of baked-in
-> knowledge in order to manage the system safely.
+Oops, I guess I was influenced by the preceding lines (atmel's datasheet
+quote).
 
-Absolutely. Some knowledge (assumptions) will be "baked in" as code
-and some knowledge (explicit parameters) as device tree.
+>
+> Thanks,
+> Johan
+>
+>> ---
+>> Hello,
+>>
+>> Again, sorry for the noise, but I forgot to add Nicolas' ack and to keep
+>> Andrew and the stable ML in cc.
+>>
+>> Best Regards,
+>>
+>> Boris
+>>
+>> Changes since v3:
+>> - fix commit message and comment
+>> Changes since v2:
+>> - removed unused variable 'mask'
+>> Changes since v1:
+>> - use a macro to define IRQs bitmask
+>> - read IMR register to ensure the write to IDR has been flushed
+>> - quote atmel's datasheet errata in commit message
+>> - comment the code to describe why we're not using IMR to disable
+>>   the interrupts
+>>
+>>  arch/arm/mach-at91/sysirq_mask.c | 22 +++++++++++++---------
+>>  1 file changed, 13 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-at91/sysirq_mask.c b/arch/arm/mach-at91/sysirq_mask.c
+>> index 2ba694f..f8bc351 100644
+>> --- a/arch/arm/mach-at91/sysirq_mask.c
+>> +++ b/arch/arm/mach-at91/sysirq_mask.c
+>> @@ -25,24 +25,28 @@
+>>  
+>>  #include "generic.h"
+>>  
+>> -#define AT91_RTC_IDR	0x24	/* Interrupt Disable Register */
+>> -#define AT91_RTC_IMR	0x28	/* Interrupt Mask Register */
+>> +#define AT91_RTC_IDR		0x24	/* Interrupt Disable Register */
+>> +#define AT91_RTC_IMR		0x28	/* Interrupt Mask Register */
+>> +#define AT91_RTC_IRQ_MASK	0x1f	/* Available IRQs mask */
+>>  
+>>  void __init at91_sysirq_mask_rtc(u32 rtc_base)
+>>  {
+>>  	void __iomem *base;
+>> -	u32 mask;
+>>  
+>>  	base = ioremap(rtc_base, 64);
+>>  	if (!base)
+>>  		return;
+>>  
+>> -	mask = readl_relaxed(base + AT91_RTC_IMR);
+>> -	if (mask) {
+>> -		pr_info("AT91: Disabling rtc irq\n");
+>> -		writel_relaxed(mask, base + AT91_RTC_IDR);
+>> -		(void)readl_relaxed(base + AT91_RTC_IMR);	/* flush */
+>> -	}
+>> +	/*
+>> +	 * sam9x5 SoCs have the following errata:
+>> +	 * "RTC: Interrupt Mask Register cannot be used
+>> +	 *  Interrupt Mask Register read always returns 0."
+>> +	 *
+>> +	 * Hence we're not relying on IMR values to disable
+>> +	 * interrupts.
+>> +	 */
+>> +	writel_relaxed(AT91_RTC_IRQ_MASK, base + AT91_RTC_IDR);
+>> +	(void)readl_relaxed(base + AT91_RTC_IMR);	/* flush */
+>>  
+>>  	iounmap(base);
+>>  }
 
-My understanding of device tree is it essentially specifies
-"parameters" and "methods" (code provided in the kernel). All methods
-make some assumptions about the behavior of the HW it's operating on
-and as long as all users of a method share that assumption, all is
-well. We don't need device tree to describe those assumptions.
-
-cheers,
-grant
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
