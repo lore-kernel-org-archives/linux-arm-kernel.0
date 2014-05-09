@@ -1,201 +1,80 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 9 May 2014 12:44:01 +0200
-Subject: [PATCH v2] ARM: realview: basic device tree implementation
-In-Reply-To: <1399586896-16906-1-git-send-email-linus.walleij@linaro.org>
-References: <1399586896-16906-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <201405091244.02066.arnd@arndb.de>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 9 May 2014 11:45:26 +0100
+Subject: [RFC] Describing arbitrary bus mastering relationships in DT
+In-Reply-To: <4187263.LG1S8D1FYU@wuerfel>
+References: <20140501173248.GD3732@e103592.cambridge.arm.com>
+ <6555552.UqkKQIAsih@wuerfel> <5363EA31.3000509@wwwdotorg.org>
+ <4187263.LG1S8D1FYU@wuerfel>
+Message-ID: <20140509104506.GA3921@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 09 May 2014, Linus Walleij wrote:
+On Fri, May 02, 2014 at 09:02:20PM +0200, Arnd Bergmann wrote:
+> On Friday 02 May 2014 12:55:45 Stephen Warren wrote:
+> > On 05/02/2014 09:19 AM, Arnd Bergmann wrote:
+> > > On Friday 02 May 2014 15:23:29 Thierry Reding wrote:
+> > ...
+> > >> To some degree this also depends on how we want to handle IOMMUs. If
+> > >> they should remain transparently handled via dma_map_ops, then it makes
+> > >> sense to set this up at device instantiation time. But how can we handle
+> > >> this in situations where one device needs to master on two IOMMUs at the
+> > >> same time? Or if the device needs physically contiguous memory for
+> > >> purposes other than device I/O. Using dma_map_ops we can't control which
+> > >> allocations get mapped via the IOMMU and which don't.
+> > > 
+> > > I still hope we can handle this in common code by selecting the right
+> > > dma_map_ops when the devices are instantiated, at least for 99% of the
+> > > cases. I'm not convinced we really need to handle the 'multiple IOMMUs
+> > > on one device' case in a generic way. If there are no common use cases
+> > > for that, we can probably get away with having multiple device nodes
+> > > and an ugly driver for the exception, instead of making life complicated
+> > > for everybody.
+> > 
+> > By "multiple device nodes", I assume you mean device tree nodes? I'm not
+> > sure I like the sound of that.
+> > 
+> > I believe that DT should represent the structure of the HW in terms of
+> > HW modules or blocks. If there's a single cohesive HW module that
+> > happens to talk to multiple MMUs, or indeed has any kind of unusual case
+> > at all, I don't think that should force the DT representation to be
+> > broken up into multiple nodes. We should have a DT node for that HW
+> > module, and it should be up to the device driver to make the internal SW
+> > representation work correctly.
 
-> diff --git a/arch/arm/boot/dts/arm-realview-pb1176.dts b/arch/arm/boot/dts/arm-realview-pb1176.dts
-> new file mode 100644
-> index 000000000000..0eea0f4a7b39
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/arm-realview-pb1176.dts
+This is rather fuzzy.  On-SoC, it is often non-obvious what counts as a
+single component and what counts as a collection of multiple components.
 
-Can you split this up into an arm-realview.dtsi file for the common parts and
-a pb1176 specific file for the rest?
+For DT, we are concerned whether there is anything configurable in the
+relationship between the components, or how each component connects to
+the rest of the system that it is worthwhile to abstract.
 
-> +	soc {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		compatible = "simple-bus";
-> +		ranges;
-> +
-> +		syscon: syscon at 10000000 {
-> +			compatible = "arm,realview-pb1176-syscon", "syscon";
-> +			reg = <0x10000000 0x1000>;
-> +		};
+> I agree we should in general try our best to have the DT representation
+> match exactly what the hardware looks like. However we already have some
+> areas where we violate that, typically when things are not trees.
 
-Hmm, in order to have a proper reset driver, we probably want a separate
-node for the reset controller. I believe the x-gene people have just
-posted a generic reset driver based on syscon. Let's see if we can share
-that.
+The DT is an abstraction: it needs to describe all the OS-relevant
+aspects of platform *behaviour* that can vary between configurations.
 
-> +		pb1176_serial0: uart at 1010c000 {
-> +			compatible = "arm,pl011", "arm,primecell";
-> +			reg = <0x1010c000 0x1000>;
-> +			interrupt-parent = <&intc_dc1176>;
-> +			interrupts = <0 18 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&uartclk>, <&pclk>;
-> +			clock-names = "uartclk", "apb_pclk";
-> +		};
+The most reliable way to describe behaviour perfectly is to describe the
+hardware exactly in every detail, but it's not much help to an OS
+because the useful information is spread all over the place and not in a
+usable form.
 
-I believe the "official" name for a uart is serial at 1010c000, not uart at 1010c000.
-I know we are inconsistent with that.
+I deliberately went hard down the "describe the hardware" route to
+get the discussion going, but this doesn't always mean it is the best
+answer.
 
-> +
-> +/* Pointer to the system controller */
-> +struct regmap *syscon_regmap;
-> +u8 syscon_type;
-> +
-> +static struct map_desc realview_dt_io_desc[] __initdata = {
-> +	{
-> +		/* FIXME: static map needed for LED driver */
-> +		.virtual	= IO_ADDRESS(REALVIEW_SYS_BASE),
-> +		.pfn		= __phys_to_pfn(REALVIEW_SYS_BASE),
-> +		.length		= SZ_4K,
-> +		.type		= MT_DEVICE,
-> +	},
-> +};
+We have to trade off the false economy of not describing enough against
+the pointless expense of describing too much...
 
-I've looked at the driver and I don't see why this is required.
-The driver does a devm_ioremap_resource(), which should work with
-or without a static mapping.
+> If there is no real use case but only a theoretical possibility, I don't
+> have a problem with being less strict about the general rule on hardware
+> representation.
 
-> +/*
-> + * We detect the different syscon types from the compatible strings.
-> + */
-> +enum realview_syscon {
-> +	REALVIEW_SYSCON_EB,
-> +	REALVIEW_SYSCON_PB1176,
-> +	REALVIEW_SYSCON_PB11MP,
-> +	REALVIEW_SYSCON_PBA8,
-> +	REALVIEW_SYSCON_PBX,
-> +};
-> +
-> +static const struct of_device_id realview_syscon_match[] = {
-> +	{
-> +		.compatible = "arm,realview-eb-syscon",
-> +		.data = (void *)REALVIEW_SYSCON_EB,
-> +	},
-> +	{
-> +		.compatible = "arm,realview-pb1176-syscon",
-> +		.data = (void *)REALVIEW_SYSCON_PB1176,
-> +	},
-> +	{
-> +		.compatible = "arm,realview-pb11mp-syscon",
-> +		.data = (void *)REALVIEW_SYSCON_PB11MP,
-> +	},
-> +	{
-> +		.compatible = "arm,realview-pba8-syscon",
-> +		.data = (void *)REALVIEW_SYSCON_PBA8,
-> +	},
-> +	{
-> +		.compatible = "arm,realview-pbx-syscon",
-> +		.data = (void *)REALVIEW_SYSCON_PBX,
-> +	},
-> +};
+I agree that this is all a bit hypothetical -- good for batting ideas
+around, but not so good for reaching practical conclusions.
 
-If not the generic syscon reset driver, it should at least live in
-drivers/power/reset/ rather than here.
+I'll try to come up with something a bit more concrete.
 
-> +#if IS_ENABLED(CONFIG_CACHE_L2X0)
-> +	if (of_machine_is_compatible("arm,realview-eb"))
-> +		/*
-> +		 * 1MB (128KB/way), 8-way associativity,
-> +		 * evmon/parity/share enabled
-> +		 * Bits:  .... ...0 0111 1001 0000 .... .... ....
-> +		 */
-> +		l2x0_of_init(0x00790000, 0xfe000fff);
-> +	else if (of_machine_is_compatible("arm,realview-pb1176"))
-> +		/*
-> +		 * 128Kb (16Kb/way) 8-way associativity.
-> +		 * evmon/parity/share enabled.
-> +		 */
-> +		l2x0_of_init(0x00730000, 0xfe000fff);
-> +	else if (of_machine_is_compatible("arm,realview-pb11mp"))
-> +		/*
-> +		 * 1MB (128KB/way), 8-way associativity,
-> +		 * evmon/parity/share enabled
-> +		 * Bits:  .... ...0 0111 1001 0000 .... .... ....
-> +		 */
-> +		l2x0_of_init(0x00730000, 0xfe000fff);
-> +	else if (of_machine_is_compatible("arm,realview-pbx"))
-> +		/*
-> +		 * 16KB way size, 8-way associativity, parity disabled
-> +		 * Bits:  .. 0 0 0 0 1 00 1 0 1 001 0 000 0 .... .... ....
-> +		 */
-> +		l2x0_of_init(0x02520000, 0xc0000fff);
-> +#endif
-
-You wrote that you added the #if IS_ENABLED() here. Why?
-
-l2x0_of_init is already a nop if CONFIG_CACHE_L2X0 is not set. If you want to
-skip a bit of dead code here, you could make it an inline function and do
-
-	if (IS_ENABLED(CONFIG_CACHE_L2X0))
-		realview_setup_l2x0();
-
-Other than that, I still think we should avoid doing anything platform
-specific here at all, and move it all into the l2x0_of_init function,
-based on Russell's l2x0 patch series.
-
-> +	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
-> +	if (!soc_dev_attr)
-> +		return;
-> +	ret = of_property_read_string(root, "compatible",
-> +				      &soc_dev_attr->soc_id);
-> +	if (ret)
-> +		return;
-> +	ret = of_property_read_string(root, "model", &soc_dev_attr->machine);
-> +        if (ret)
-> +		return;
-> +	soc_dev_attr->family = "RealView";
-> +	soc_dev = soc_device_register(soc_dev_attr);
-> +	if (IS_ERR(soc_dev)) {
-> +		kfree(soc_dev_attr);
-> +		return;
-> +	}
-> +	parent = soc_device_to_device(soc_dev);
-> +	ret = of_platform_populate(root, of_default_bus_match_table,
-> +				   NULL, parent);
-> +	if (ret) {
-> +		pr_crit("could not populate device tree\n");
-> +		return;
-> +	}
-
-I wonder if there is a way to do this without having code in the platform.
-I would hate it if we get to the point where each platform is completely
-empty but still requires a copy of this code.
-
-We just faced the same discussion on the exynos chip id patches.
-
-I also noticed that you pass the DT root here, which isn't actually
-the intention of the soc device interface: you should pass the DT node
-that has the on-chip devices but not the board-level (top-level) nodes
-such as your fixed clocks.
-
-> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> index 5bf7c3c3b301..5461c4401ed6 100644
-> --- a/arch/arm/mm/Kconfig
-> +++ b/arch/arm/mm/Kconfig
-> @@ -928,7 +928,7 @@ config ARM_L1_CACHE_SHIFT
->  config ARM_DMA_MEM_BUFFERABLE
->  	bool "Use non-cacheable memory for DMA" if (CPU_V6 || CPU_V6K) && !CPU_V7
->  	depends on !(MACH_REALVIEW_PB1176 || REALVIEW_EB_ARM11MP || \
-> -		     MACH_REALVIEW_PB11MP)
-> +		     MACH_REALVIEW_PB11MP || REALVIEW_DT)
->  	default y if CPU_V6 || CPU_V6K || CPU_V7
->  	help
->  	  Historically, the kernel has used strongly ordered mappings to
-
-Do you have an explanation for why this is needed? I don't remember seeing
-this before, but I guess it gets in the way of multiplatform support.
-Is this just a performance optimization on realview, or is it actually
-required?
-
-
-	Arnd
+Cheers
+---Dave
