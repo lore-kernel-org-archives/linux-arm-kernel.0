@@ -1,107 +1,85 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 9 May 2014 09:45:03 -0400
-Subject: [PATCH 3/5] irqchip: crossbar: Skip some irqs from getting mapped
- to crossbar
-In-Reply-To: <536CD9DB.4010508@ti.com>
-References: <1399299527-10955-1-git-send-email-r.sricharan@ti.com>	<1399299527-10955-4-git-send-email-r.sricharan@ti.com>	<536BD9D8.4080905@ti.com>	<20140508203659.GA5620@kahuna>	<CAD=GYpbQQxQgKd3oZcAuWrxoD4VrkKzpybd11qwxs405HSUVGw@mail.gmail.com>	<536C0DC4.7090309@ti.com>	<CAD=GYpav4mHaqo4jfb0ePchf3cvuvSnFKj_+osbrt_8-tYRRrQ@mail.gmail.com>	<536C2071.8040502@ti.com>
- <CAD=GYpbRn=LEthpAUX9LNBGTB4iDs7TGiSSgLJuuS0tSatRRJQ@mail.gmail.com>
- <536CD01F.2070506@ti.com> <536CD7BE.5020407@ti.com> <536CD9DB.4010508@ti.com>
-Message-ID: <536CDBDF.10600@ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 09 May 2014 22:46:34 +0900
+Subject: [PATCH v3 1/2] ARM: EXYNOS: Map SYSRAM through generic SRAM
+ bindings
+In-Reply-To: <536C5E40.90405@gmail.com>
+References: <1399522592-23618-1-git-send-email-sachin.kamat@linaro.org>
+ <536BAE39.70504@samsung.com> <034b01cf6b2c$5b5d06b0$12171410$@samsung.com>
+ <536C5E40.90405@gmail.com>
+Message-ID: <536CDC3A.4050700@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 09 May 2014 09:36 AM, Nishanth Menon wrote:
-> On 05/09/2014 08:27 AM, Santosh Shilimkar wrote:
->> On Friday 09 May 2014 08:54 AM, Nishanth Menon wrote:
->>> On 05/08/2014 11:22 PM, Joel Fernandes wrote:
->>>> On Thu, May 8, 2014 at 7:25 PM, Santosh Shilimkar
->>>> <santosh.shilimkar@ti.com> wrote:
->>> [...]
->>>> Ok, thanks for pointing to the post.
+On 05/09/14 13:49, Tomasz Figa wrote:
+> Hi Kukjin,
+>
+Hi Tomasz,
+
+> On 09.05.2014 04:14, Kukjin Kim wrote:
+>> Tomasz Figa wrote:
+>>>
+>>> Hi Sachin,
+>>>
+>>> On 08.05.2014 06:16, Sachin Kamat wrote:
+>>>> Instead of hardcoding the SYSRAM details for each SoC,
+>>>> pass this information through device tree (DT) and make
+>>>> the code SoC agnostic. Generic SRAM bindings are used
+>>>> for achieving this.
+>>>>
+>>>> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+>>>> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>>>> Acked-by: Heiko Stuebner <heiko@sntech.de>
+>>>> ---
+>>>> Changes since v2.
+>>>> * Updated sysram node for Universal C210 board - Thanks to
+>>>> Tomasz Figa for testing and updating the same.
+>>>> * Added error handling code.
+>>>> * Break if matching node found.
+>>>> * Remove unnecessary error messages.
+>>>>
+>>>> This patch is based on linux next (next-20140501) on top of
+>>>> my Kconfig consolidation patch
+>>>> http://comments.gmane.org/gmane.linux.kernel.samsung-soc/28642
+>>>>
+>>>> Tested on 4210/4412 Origen, 5250/5420 Arndale and SMDK5420 boards.
+>>>> ---
+>>>> arch/arm/Kconfig | 1 +
+>>>> arch/arm/boot/dts/exynos4210-universal_c210.dts | 15 ++++++
+>>>> arch/arm/boot/dts/exynos4210.dtsi | 18 +++++++
+>>>> arch/arm/boot/dts/exynos4x12.dtsi | 18 +++++++
+>>>> arch/arm/boot/dts/exynos5250.dtsi | 18 +++++++
+>>>> arch/arm/boot/dts/exynos5420.dtsi | 18 +++++++
+>>>> arch/arm/mach-exynos/common.h | 1 +
+>>>> arch/arm/mach-exynos/exynos.c | 64
+>> ----------------------
+>>> -
+>>>> arch/arm/mach-exynos/firmware.c | 8 ++-
+>>>> arch/arm/mach-exynos/include/mach/map.h | 7 ---
+>>>> arch/arm/mach-exynos/platsmp.c | 56
+>> ++++++++++++++++++--
+>>>> 11 files changed, 148 insertions(+), 76 deletions(-)
 >>>>
 >>>
+>>> Looks good, thanks.
 >>>
->>> Yep - thanks Santosh for clarifying this. Now, we still have the
->>> issues that I pointed out in [1] - without resolving which, we should
->>> not enable crossbar for dra74x/72x.
+>>> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 >>>
->>> A. taking example of PMU
->>> 	interrupts = <GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH>
->>> this wont work. instead the crossbar driver needs some sort of a hint
->>> to know that it should not map these on crossbar register instead
->>> assign GIC mapping directly.
->>>
->>> I propose doing the following
->>> #define GIC_CROSSBAR_PASSTHROUGH(irq_no) ((irq_no) | (0x1 << 31))
->>>
->>> and dts will define the following:
->>> interrupts = <GIC_SPI GIC_CROSSBAR_PASSTHROUGH(131) IRQ_TYPE_LEVEL_HIGH>
->>>
->>> This will also work for the other cases (B.2, B.3)
->>>
->>> For B.2: L3_APP_IRQ:
->>> instead of:
->>> interrupts = <GIC_SPI  5 IRQ_TYPE_LEVEL_HIGH>
->>> we do:
->>> interrupts = <GIC_SPI GIC_CROSSBAR_PASSTHROUGH(10) IRQ_TYPE_LEVEL_HIGH>
->>>
->>> For B.3: NMI
->>> interrupts = <GIC_SPI GIC_CROSSBAR_PASSTHROUGH(133) IRQ_TYPE_LEVEL_HIGH>
->>>
->> We can't do add a flag to generic interrupt controller flags since its
->> very specific to cross-bar.
+>> Looks good to me but I think, we need to change the name of 'sram'
+>> because
+>> it can cause some confusing, actually it is not matching _real_ sram
+>> area on
+>> the SoCs. When we upstreamed regarding patch, I decided the name to use
+>> 'SYSRAM', it was called another name in datasheet though. So, I'd like to
+>> use 'sysram' instead of 'sram' as we used before.
 >>
->>> xlate is easy ->
->>>
->>> diff --git a/drivers/irqchip/irq-crossbar.c
->>> b/drivers/irqchip/irq-crossbar.c
->>> index de021638..fd09ab4 100644
->>> --- a/drivers/irqchip/irq-crossbar.c
->>> +++ b/drivers/irqchip/irq-crossbar.c
->>> @@ -112,6 +112,10 @@ static int crossbar_domain_xlate(struct
->>> irq_domain *d,
->>>  {
->>>         unsigned long ret;
->>>
->>> +       /* Check to see if direct GIC mapping is required */
->>> +       if (intspec[1] & BIT(31))
->>> +               return intspec[1] & ~BIT[31];
->>> +
->>>         ret = get_prev_map_irq(intspec[1]);
->>>         if (!IS_ERR_VALUE(ret))
->>>                 goto found;
->>>
->>> But then, crossbar_domain_map and crossbar_domain_unmap need hints as
->>> well to know that there is no corresponding crossbar registers.
->>> Have'nt thought through that yet. Looking to hear about opinions here.
->>>
->>>
->> May be we need additional property like reserved to take care of 1:1
->> map.
->>
->> ti,irqs-direct-map = <131 132>;
->>
-> We already have equivalents for these -> reserved and skip. Problem is
-> how does crossbar driver know the difference between direct maps and
-> crossbar value?
-> 
-> 6 is one of those reserved ones. dts for a device says:
-> interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>
-> 
-> 
-> Now, xlate gets intspec[1] = 6.  6 is valid crossbar number
-> PRM_IRQ_MPU, however GIC 6 is mapped to WD_TIMER_MPU_C1_IRQ_WARN ->
-> you need to be able to get a hint that this is direct mapping dts
-> intended.
-> 
-> in the "6" example:
-> 
-> How do i get PRM_IRQ_MPU?
-> interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>
-> 
-> How do I get WD_TIMER_MPU_C1_IRQ_WARN?
-> interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH> ????? - that wont work as
-> crossbar driver thinks it is crossbar 6 (PRM_IRQ_MPU)
-> 
-Looks like I am missing something. Is the issue because of SPI offset (32)
-which makes above confusion ?
+>> I will change the name when I apply this series in this weekend, if
+>> you guys
+>> have no objection.
+>
+> You mean s/sram/sysram/ in compatible strings of Exynos-specific
+> reserved areas? If yes, I'm fine, it might be even better. Just remember
+> to update documentation in patch 2/2 as well.
+>
+Yes, of course ;-)
+
+- Kukjin
