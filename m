@@ -1,41 +1,34 @@
 From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Fri, 09 May 2014 15:39:42 +0530
-Subject: [PATCH v3 0/4] ARM: dts: enable display for peach-pit and snow boards
-Message-ID: <1399630186-22610-1-git-send-email-rahul.sharma@samsung.com>
+Date: Fri, 09 May 2014 15:39:45 +0530
+Subject: [PATCH v3 3/4] ARM: dts: enable fimd for exynos5420 based peach-pit
+ board
+In-Reply-To: <1399630186-22610-1-git-send-email-rahul.sharma@samsung.com>
+References: <1399630186-22610-1-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <1399630186-22610-4-git-send-email-rahul.sharma@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rahul Sharma <Rahul.Sharma@samsung.com>
 
-Add nodes for fimd and dp controller for exynos5250 based snow
-and exynos5420 based peach-pit board.
+Enable fimd for peach-pit board.
 
-This series is based on Kukjin Kims, for-next branch.
+Signed-off-by: Rahul Sharma <Rahul.Sharma@samsung.com>
+---
+ arch/arm/boot/dts/exynos5420-peach-pit.dts |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-V3:
-1) Dropped 1 patch "ARM: dts: move dp hpd line to the board file for
- exynos5420".
-2) Extra blank lines for readability.
-3) dp hpd gpio name change (dp_hpd -> dp_hpd_gpio)
-
-V2:
-1) Rebase on Peach-pit dependent patches.
-
-It is dependent on
-1) Andrew Bresticker's patch for hpd gpio addition, avilable at
-http://www.spinics.net/lists/linux-samsung-soc/msg28827.html [Patch is 'ACK'ed.]
-2) Arun's patch for adding peach-pit board dts file at
-http://www.spinics.net/lists/linux-samsung-soc/msg30103.html. [Patch is 'ACK'ed.]
-
-Rahul Sharma (4):
-  ARM: dts: enable fimd for exynos5250 based snow board
-  ARM: dts: enable dp-controller for exynos5250 based snow board
-  ARM: dts: enable fimd for exynos5420 based peach-pit board
-  ARM: dts: enable dp-controller for exynos5420 based peach-pit board
-
- arch/arm/boot/dts/exynos5250-snow.dts      |   35 ++++++++++++++++++++++++
- arch/arm/boot/dts/exynos5420-peach-pit.dts |   41 ++++++++++++++++++++++++++++
- 2 files changed, 76 insertions(+)
-
+diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+index fae33dd..f75da5b 100644
+--- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
++++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+@@ -145,3 +145,8 @@
+ &watchdog {
+ 	timeout-sec = <32>;
+ };
++
++&fimd {
++	status = "okay";
++	samsung,invert-vclk;
++};
 -- 
 1.7.9.5
