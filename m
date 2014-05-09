@@ -1,89 +1,40 @@
-From: dean_jenkins@mentor.com (dean_jenkins at mentor.com)
-Date: Fri,  9 May 2014 16:19:48 +0100
-Subject: [PATCH 5/5] serial: imx: clean up imx_poll_get_char()
-In-Reply-To: <1399648788-26061-1-git-send-email-dean_jenkins@mentor.com>
-References: <1399648788-26061-1-git-send-email-dean_jenkins@mentor.com>
-Message-ID: <1399648788-26061-6-git-send-email-dean_jenkins@mentor.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 09 May 2014 09:24:42 -0600
+Subject: [PATCH] ARM: tegra: enable console framebuffer rotation
+In-Reply-To: <536CE414.5030406@suse.de>
+References: <1399432682-677-1-git-send-email-acourbot@nvidia.com>
+ <536A57FA.2090608@wwwdotorg.org> <536AC45F.6080608@nvidia.com>
+ <536CE414.5030406@suse.de>
+Message-ID: <536CF33A.3020906@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dirk Behme <dirk.behme@de.bosch.com>
+On 05/09/2014 08:20 AM, Andreas F?rber wrote:
+> Am 08.05.2014 01:40, schrieb Alex Courbot:
+>> On 05/08/2014 12:57 AM, Stephen Warren wrote:
+>>> On 05/06/2014 09:18 PM, Alexandre Courbot wrote:
+>>>> Console rotation is needed for devices like Tegra Note 7 and NVIDIA
+>>>> SHIELD to get the boot console in the expected orientation.
+>>>
+>>> I've squashed this into Tegra's for-3.16/defconfig branch.
+>>>
+>>> Can you please also update multi_v7_defconfig, and send that change to
+>>> arm-soc (arm at kernel.org) to be applied. Thanks.
+>>
+>> I omitted doing this for now because the devices that require this
+>> option (TN7/SHIELD) need a custom build with appended DTB and/or
+>> command-line anyway. Therefore they cannot use a multi-mach kernel
+> 
+> What does appending a .dtb have to do with whether or not to use a
+> multi-mach kernel? We package zImage/uImage and .dtbs separately, so
+> surely the multi_v7_defconfig should be kept working with Tegra devices.
+> Appending a .dtb only comes into play for preparing installation images.
 
-Looking at the get_poll_char() function of the 8250.c serial driver,
-we learn:
+That would be a reasonable argument if generic distro installers or
+kernel packages were likely to support the TN7 and SHIELD. However,
+given the bootloader situation there and the need for a custom kernel
+anyway for APPENDED_DTB, I assume that's not the case on this particular
+device?
 
-* poll_get_char() doesn't have to save/disable/restore the interrupt
-  registers. No interrupt handling is needed in this function at all.
-  Remove it.
-
-* Don't block in case there is no data available. So instead blocking
-  in the do {} while loop, just return with NO_POLL_CHAR, immediately .
-
-Additionally, while the i.MX6 register URXD[7-0] contain the RX_DATA,
-the upper bits of this register (URXD[15-10]) might contain some
-control flags. To ensure that these are not returned with the data
-read, just mask out URXD[7-0].
-
-These changes fix the 'hang' working with kdb:
-
-$ echo ttymxc3 > /sys/module/kgdboc/parameters/kgdboc
-$ echo g >/proc/sysrq-trigger
-[0]kdb> help
-...
-<hang>
-
-Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
----
- drivers/tty/serial/imx.c |   29 ++++-------------------------
- 1 file changed, 4 insertions(+), 25 deletions(-)
-
-diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index 7b0ef85..9d59354 100644
---- a/drivers/tty/serial/imx.c
-+++ b/drivers/tty/serial/imx.c
-@@ -80,6 +80,7 @@
- #define URXD_FRMERR	(1<<12)
- #define URXD_BRK	(1<<11)
- #define URXD_PRERR	(1<<10)
-+#define URXD_RX_DATA	(0xFF<<0)
- #define UCR1_ADEN	(1<<15) /* Auto detect interrupt */
- #define UCR1_ADBR	(1<<14) /* Auto detect baud rate */
- #define UCR1_TRDYEN	(1<<13) /* Transmitter ready interrupt enable */
-@@ -1502,32 +1503,10 @@ imx_verify_port(struct uart_port *port, struct serial_struct *ser)
- #if defined(CONFIG_CONSOLE_POLL)
- static int imx_poll_get_char(struct uart_port *port)
- {
--	struct imx_port_ucrs old_ucr;
--	unsigned int status;
--	unsigned char c;
--
--	/* save control registers */
--	imx_port_ucrs_save(port, &old_ucr);
--
--	/* disable interrupts */
--	writel(UCR1_UARTEN, port->membase + UCR1);
--	writel(old_ucr.ucr2 & ~(UCR2_ATEN | UCR2_RTSEN | UCR2_ESCI),
--	       port->membase + UCR2);
--	writel(old_ucr.ucr3 & ~(UCR3_DCD | UCR3_RI | UCR3_DTREN),
--	       port->membase + UCR3);
--
--	/* poll */
--	do {
--		status = readl(port->membase + USR2);
--	} while (~status & USR2_RDR);
--
--	/* read */
--	c = readl(port->membase + URXD0);
--
--	/* restore control registers */
--	imx_port_ucrs_restore(port, &old_ucr);
-+	if (!(readl(port->membase + USR2) & USR2_RDR))
-+		return NO_POLL_CHAR;
- 
--	return c;
-+	return readl(port->membase + URXD0) & URXD_RX_DATA;
- }
- 
- static void imx_poll_put_char(struct uart_port *port, unsigned char c)
--- 
-1.7.9.5
+If you do intend to support this device with SuSe installer and kernel
+packages, could you give an outline of how you do so?
