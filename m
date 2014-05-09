@@ -1,442 +1,101 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 9 May 2014 09:31:16 -0500
-Subject: [PATCH v2 2/2] i2c: sunxi: add P2WI (Push/Pull 2 Wire Interface)
- controller support
-In-Reply-To: <1399485515-11243-3-git-send-email-boris.brezillon@free-electrons.com>
-References: <1399485515-11243-1-git-send-email-boris.brezillon@free-electrons.com>
- <1399485515-11243-3-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20140509143116.GD7047@lukather>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 9 May 2014 07:37:03 -0700
+Subject: [PATCH 1/4] OMAPDSS: Fix DSS clock multiplier issue on 3703 and
+ probably 3630
+In-Reply-To: <536C860E.1000501@ti.com>
+References: <1398815562-24113-1-git-send-email-tony@atomide.com>
+ <1398815562-24113-2-git-send-email-tony@atomide.com>
+ <536C860E.1000501@ti.com>
+Message-ID: <20140509143703.GA17814@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
-
-On Wed, May 07, 2014 at 07:58:35PM +0200, Boris BREZILLON wrote:
-> The P2WI looks like an SMBus controller which only supports byte data
-> transfers. But, it differs from standard SMBus protocol on several
-> aspects:
-> - it supports only one slave device, and thus drop the address field
-> - it adds a parity bit every 8bits of data
-> - only one read access is required to read a byte (instead of a read
->   followed by a write access in standard SMBus protocol)
-> - there's no Ack bit after each byte transfer
+* Tomi Valkeinen <tomi.valkeinen@ti.com> [140509 00:39]:
+> On 30/04/14 02:52, Tony Lindgren wrote:
+> > Otherwise we can get often errors like the following and the
+> > display won't come on:
+> > 
+> > omapdss APPLY error: FIFO UNDERFLOW on gfx, disabling the overlay
+> > omapdss APPLY error: SYNC_LOST on channel lcd, restarting
+> > the output with video overlays disabled
+> > 
+> > There are some earlier references to this issue:
+> > 
+> > http://www.spinics.net/lists/linux-omap/msg59511.html
+> > http://www.spinics.net/lists/linux-omap/msg59724.html
 > 
-> This means this bus cannot be used to interface with standard SMBus
-> devices (the only known device to support this interface is the AXP221
-> PMIC).
+> Those don't sound like the same issue, but it's hard to say. What kind
+> of clock rates do you get? Cat you paste debugfs/omapdss/clk, with and
+> without this patch?
+
+Without this patch:
+# cat /sys/kernel/debug/omapdss/clk 
+[   24.833831] DSS: dss_runtime_get
+[   24.837554] DSS: dss_runtime_put
+[   24.840972] DISPC: dispc_runtime_get
+[   24.844757] DISPC: dispc_runtime_put
+- DSS -
+DSS_FCK (DSS1_ALWON_FCLK) = 57600000
+- DISPC -
+dispc fclk source = DSS_FCK (DSS1_ALWON_FCLK)
+fck             57600000        
+- LCD -
+LCD clk source = DSS_FCK (DSS1_ALWON_FCLK)
+lck             57600000        lck div 1
+pck             19200000        pck div 3
+
+
+With this patch:
+# cat /sys/kernel/debug/omapdss/clk 
+[   34.580688] DSS: dss_runtime_get
+[   34.584197] DSS: dss_runtime_put
+[   34.587768] DISPC: dispc_runtime_get
+[   34.591552] DISPC: dispc_runtime_put
+- DSS -
+DSS_FCK (DSS1_ALWON_FCLK) = 108000000
+- DISPC -
+dispc fclk source = DSS_FCK (DSS1_ALWON_FCLK)
+fck             108000000       
+- LCD -
+LCD clk source = DSS_FCK (DSS1_ALWON_FCLK)
+lck             108000000       lck div 1
+pck             18000000        pck div 6
+ 
+> What resolution do you have? If it's a very high resolution (say, DVI
+> output to a monitor), it could just be an issue of
+> not-enough-memory-bandwidth.
+
+This is just the 3730-evm with the Sharp VGA panel mentioned in
+this series.
+ 
+> > It seems that it's safe to set the lower values even for 3630.
+> > If we can confirm that 3630 works with the higher values
+> > reliably we can add further detection.
+> > 
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > ---
+> >  drivers/video/fbdev/omap2/dss/dss.c | 5 +++--
+> >  1 file changed, 3 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/video/fbdev/omap2/dss/dss.c b/drivers/video/fbdev/omap2/dss/dss.c
+> > index d55266c..ad6561f 100644
+> > --- a/drivers/video/fbdev/omap2/dss/dss.c
+> > +++ b/drivers/video/fbdev/omap2/dss/dss.c
+> > @@ -707,9 +707,10 @@ static const struct dss_features omap34xx_dss_feats __initconst = {
+> >  	.dpi_select_source	=	&dss_dpi_select_source_omap2_omap3,
+> >  };
+> >  
+> > +/* Supposedly 3630 can use div 32 mult 2, but that needs to be rechecked */
+> >  static const struct dss_features omap3630_dss_feats __initconst = {
+> > -	.fck_div_max		=	32,
+> > -	.dss_fck_multiplier	=	1,
+> > +	.fck_div_max		=	16,
+> > +	.dss_fck_multiplier	=	2,
 > 
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> ---
->  drivers/i2c/busses/Kconfig          |  12 ++
->  drivers/i2c/busses/Makefile         |   1 +
->  drivers/i2c/busses/i2c-sun6i-p2wi.c | 375 ++++++++++++++++++++++++++++++++++++
->  3 files changed, 388 insertions(+)
->  create mode 100644 drivers/i2c/busses/i2c-sun6i-p2wi.c
+> These values tell about the clock hardware, they are not settings that
+> can be changed to change the clock. OMAP3630 has a fixed x2 multiplier
+> and a divider with maximum value of 16.
 > 
-> diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
-> index c94db1c..09bce1c 100644
-> --- a/drivers/i2c/busses/Kconfig
-> +++ b/drivers/i2c/busses/Kconfig
-> @@ -771,6 +771,18 @@ config I2C_STU300
->  	  This driver can also be built as a module. If so, the module
->  	  will be called i2c-stu300.
->  
-> +config I2C_SUN6I_P2WI
-> +	tristate "Allwinner sun6i internal P2WI controller"
-> +	depends on ARCH_SUNXI
-> +	help
-> +	  If you say yes to this option, support will be included for the
-> +	  P2WI (Push/Pull 2 Wire Interface) controller embedded in some sunxi
-> +	  SOCs.
-> +	  The P2WI looks like an SMBus controller (which supports only byte
-> +	  accesses), except that it only supports one slave device.
-> +	  This interface is used to connect to specific PMIC devices (like the
-> +	  AXP221).
-> +
->  config I2C_TEGRA
->  	tristate "NVIDIA Tegra internal I2C controller"
->  	depends on ARCH_TEGRA
-> diff --git a/drivers/i2c/busses/Makefile b/drivers/i2c/busses/Makefile
-> index 18d18ff..58feeb9 100644
-> --- a/drivers/i2c/busses/Makefile
-> +++ b/drivers/i2c/busses/Makefile
-> @@ -75,6 +75,7 @@ obj-$(CONFIG_I2C_SIMTEC)	+= i2c-simtec.o
->  obj-$(CONFIG_I2C_SIRF)		+= i2c-sirf.o
->  obj-$(CONFIG_I2C_ST)		+= i2c-st.o
->  obj-$(CONFIG_I2C_STU300)	+= i2c-stu300.o
-> +obj-$(CONFIG_I2C_SUN6I_P2WI)	+= i2c-sun6i-p2wi.o
->  obj-$(CONFIG_I2C_TEGRA)		+= i2c-tegra.o
->  obj-$(CONFIG_I2C_VERSATILE)	+= i2c-versatile.o
->  obj-$(CONFIG_I2C_WMT)		+= i2c-wmt.o
-> diff --git a/drivers/i2c/busses/i2c-sun6i-p2wi.c b/drivers/i2c/busses/i2c-sun6i-p2wi.c
-> new file mode 100644
-> index 0000000..91c9b12
-> --- /dev/null
-> +++ b/drivers/i2c/busses/i2c-sun6i-p2wi.c
-> @@ -0,0 +1,375 @@
-> +/*
-> + * P2WI (Push-Pull Two Wire Interface) bus driver.
-> + *
-> + * Author: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public License
-> + * version 2.  This program is licensed "as is" without any warranty of any
-> + * kind, whether express or implied.
-> + */
-> +#include <linux/kernel.h>
-> +#include <linux/slab.h>
-> +#include <linux/module.h>
-> +#include <linux/spinlock.h>
-> +#include <linux/i2c.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/io.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/clk.h>
-> +#include <linux/err.h>
-> +#include <linux/delay.h>
-> +#include <linux/clk.h>
-> +#include <linux/reset.h>
-> +
-> +
-> +/* P2WI registers */
-> +#define P2WI_CTRL		0x0
-> +#define P2WI_CCR		0x4
-> +#define P2WI_INTE		0x8
-> +#define P2WI_INTS		0xc
-> +#define P2WI_DADDR0		0x10
-> +#define P2WI_DADDR1		0x14
-> +#define P2WI_DLEN		0x18
-> +#define P2WI_DATA0		0x1c
-> +#define P2WI_DATA1		0x20
-> +#define P2WI_LCR		0x24
-> +#define P2WI_PMCR		0x28
-> +
-> +/* CTRL fields */
-> +#define P2WI_CTRL_START_TRANS		BIT(7)
-> +#define P2WI_CTRL_ABORT_TRANS		BIT(6)
-> +#define P2WI_CTRL_GLOBAL_INT_ENB	BIT(1)
-> +#define P2WI_CTRL_SOFT_RST		BIT(0)
-> +
-> +/* CLK CTRL fields */
-> +#define P2WI_CCR_SDA_OUT_DELAY(v)	(((v) & 0x7) << 8)
-> +#define P2WI_CCR_MAX_CLK_DIV		0xff
-> +#define P2WI_CCR_CLK_DIV(v)		((v) & P2WI_CCR_MAX_CLK_DIV)
-> +
-> +/* STATUS fields */
-> +#define P2WI_INTS_TRANS_ERR_ID(v)	(((v) >> 8) & 0xff)
-> +#define P2WI_INTS_LOAD_BSY		BIT(2)
-> +#define P2WI_INTS_TRANS_ERR		BIT(1)
-> +#define P2WI_INTS_TRANS_OVER		BIT(0)
-> +
-> +/* DATA LENGTH fields*/
-> +#define P2WI_DLEN_READ			BIT(4)
-> +#define P2WI_DLEN_DATA_LENGTH(v)	((v - 1) & 0x7)
-> +
-> +/* LINE CTRL fields*/
-> +#define P2WI_LCR_SCL_STATE		BIT(5)
-> +#define P2WI_LCR_SDA_STATE		BIT(4)
-> +#define P2WI_LCR_SCL_CTL		BIT(3)
-> +#define P2WI_LCR_SCL_CTL_EN		BIT(2)
-> +#define P2WI_LCR_SDA_CTL		BIT(1)
-> +#define P2WI_LCR_SDA_CTL_EN		BIT(0)
-> +
-> +/* PMU MODE CTRL fields */
-> +#define P2WI_PMCR_PMU_INIT_SEND		BIT(31)
-> +#define P2WI_PMCR_PMU_INIT_DATA(v)	(((v) & 0xff) << 16)
-> +#define P2WI_PMCR_PMU_MODE_REG(v)	(((v) & 0xff) << 8)
-> +#define P2WI_PMCR_PMU_DEV_ADDR(v)	((v) & 0xff)
-> +
-> +#define P2WI_MAX_FREQ			6000000
-> +
-> +struct p2wi {
-> +	struct i2c_adapter adapter;
-> +	struct completion complete;
-> +	unsigned int irq;
-> +	unsigned int status;
-> +	void __iomem *regs;
-> +	struct clk *clk;
-> +	struct reset_control *rstc;
-> +	int slave_addr;
-> +};
-> +
-> +static irqreturn_t p2wi_interrupt(int irq, void *dev_id)
-> +{
-> +	struct p2wi *p2wi = dev_id;
-> +	unsigned long status;
-> +
-> +	status = readl(p2wi->regs + P2WI_INTS);
-> +	p2wi->status = status;
-> +
-> +	/* Clear interrupts */
-> +	status &= (P2WI_INTS_LOAD_BSY | P2WI_INTS_TRANS_ERR |
-> +		   P2WI_INTS_TRANS_OVER);
-> +	writel(status, p2wi->regs + P2WI_INTS);
-> +
-> +	complete(&p2wi->complete);
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static u32 p2wi_functionality(struct i2c_adapter *adap)
-> +{
-> +	return I2C_FUNC_SMBUS_BYTE_DATA;
-> +}
-> +
-> +static int p2wi_smbus_xfer(struct i2c_adapter *adap, u16 addr,
-> +			   unsigned short flags, char read_write,
-> +			   u8 command, int size, union i2c_smbus_data *data)
-> +{
-> +	struct p2wi *p2wi = i2c_get_adapdata(adap);
-> +	unsigned long dlen = P2WI_DLEN_DATA_LENGTH(1);
-> +
-> +	if (addr > 0xff ||
-> +	    (p2wi->slave_addr >= 0 && addr != p2wi->slave_addr)) {
-> +		dev_err(&adap->dev, "invalid P2WI address\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	if (!data)
-> +		return -EINVAL;
-> +
-> +	writel(command, p2wi->regs + P2WI_DADDR0);
-> +
-> +	if (read_write == I2C_SMBUS_READ)
-> +		dlen |= P2WI_DLEN_READ;
-> +	else
-> +		writel(data->byte, p2wi->regs + P2WI_DATA0);
-> +
-> +	writel(dlen, p2wi->regs + P2WI_DLEN);
-> +
-> +	if (readl(p2wi->regs + P2WI_CTRL) & P2WI_CTRL_START_TRANS) {
-> +		dev_err(&adap->dev, "P2WI bus busy\n");
-> +		return -EBUSY;
-> +	}
-> +
-> +	reinit_completion(&p2wi->complete);
-> +
-> +	writel(P2WI_INTS_LOAD_BSY | P2WI_INTS_TRANS_ERR | P2WI_INTS_TRANS_OVER,
-> +	       p2wi->regs + P2WI_INTE);
-> +
-> +	writel(P2WI_CTRL_START_TRANS | P2WI_CTRL_GLOBAL_INT_ENB,
-> +	       p2wi->regs + P2WI_CTRL);
-> +
-> +	wait_for_completion(&p2wi->complete);
-> +
-> +	if (p2wi->status & P2WI_INTS_LOAD_BSY) {
-> +		dev_err(&adap->dev, "P2WI bus busy\n");
-> +		return -EBUSY;
-> +	}
-> +
-> +	if (p2wi->status & P2WI_INTS_TRANS_ERR) {
-> +		dev_err(&adap->dev, "P2WI bus xfer error\n");
-> +		return -ENXIO;
-> +	}
-> +
-> +	if (read_write == I2C_SMBUS_READ)
-> +		data->byte = readl(p2wi->regs + P2WI_DATA0);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct i2c_algorithm p2wi_algo = {
-> +	.smbus_xfer = p2wi_smbus_xfer,
-> +	.functionality = p2wi_functionality,
-> +};
-> +
-> +static const struct of_device_id p2wi_of_match_table[] = {
-> +	{ .compatible = "allwinner,sun6i-a31-p2wi" },
-> +	{}
-> +};
-> +MODULE_DEVICE_TABLE(of, p2wi_of_match_table);
-> +
-> +static int p2wi_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct device_node *np = dev->of_node;
-> +	struct device_node *childnp;
-> +	unsigned long parent_clk_freq;
-> +	int p2wi_mode_reg = -EINVAL;
-> +	int p2wi_mode_val = -EINVAL;
-> +	u32 clk_freq = 100000;
-> +	struct resource *r;
-> +	struct p2wi *p2wi;
-> +	u32 slave_addr;
-> +	int clk_div;
-> +	int ret;
-> +
-> +	of_property_read_u32(np, "clock-frequency", &clk_freq);
-> +	if (clk_freq > P2WI_MAX_FREQ) {
-> +		dev_err(dev,
-> +			"required clock-frequency (%u Hz) is too high (max = 6MHz)",
-> +			clk_freq);
-> +		return -EINVAL;
-> +	}
-> +
-> +	if (of_get_child_count(np) > 1) {
-> +		dev_err(dev, "P2WI only supports one slave device\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	p2wi = devm_kzalloc(dev, sizeof(struct p2wi), GFP_KERNEL);
-> +	if (!p2wi) {
-> +		dev_err(dev, "failed to allocate p2wi struct\n");
-> +		return -ENOMEM;
-> +	}
-> +
-> +	p2wi->slave_addr = -1;
-> +
-> +	/*
-> +	 * Authorize a p2wi node without any children to be able to use an
-> +	 * i2c-dev from userpace.
-> +	 * In this case the slave_addr is set to -1 and won't be checked when
-> +	 * launching a P2WI transfer.
-> +	 *
-> +	 * If the p2wi node contains more than one child, the first one will
-> +	 * be considered as the only slave node.
-
-If the p2wi node has more than one child, you've already bailed out :)
-
-> +	 */
-> +	childnp = of_get_next_available_child(np, NULL);
-> +	if (childnp) {
-> +		u32 tmp;
-> +
-> +		ret = of_property_read_u32(childnp, "reg", &slave_addr);
-> +		if (ret || slave_addr > 0xff) {
-> +			dev_err(dev, "invalid slave address on node %s\n",
-> +				childnp->full_name);
-> +			return -EINVAL;
-> +		}
-> +
-> +		p2wi->slave_addr = slave_addr;
-> +
-> +		if (!of_property_read_u32(childnp, "allwinner,p2wi-mode-reg",
-> +					  &tmp) && tmp < 0xff)
-> +			p2wi_mode_reg = tmp;
-> +
-> +		if (!of_property_read_u32(childnp, "allwinner,p2wi-mode-val",
-> +					  &tmp) && tmp < 0xff)
-> +			p2wi_mode_val = tmp;
-> +	}
-> +
-> +	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	p2wi->regs = devm_ioremap_resource(dev, r);
-> +	if (IS_ERR(p2wi->regs)) {
-> +		dev_err(dev, "failed to retrieve iomem resource\n");
-> +		return PTR_ERR(p2wi->regs);
-
-You seem to be returning the error code in the next error messages. It
-would probably be a good idea to put it there too.
-
-> +	}
-> +
-> +	snprintf(p2wi->adapter.name, sizeof(p2wi->adapter.name), pdev->name);
-> +	ret = platform_get_irq(pdev, 0);
-> +	if (ret < 0) {
-> +		dev_err(dev, "failed to retrieve irq: %d\n", ret);
-> +		return ret;
-> +	}
-> +	p2wi->irq = ret;
-> +
-> +	p2wi->clk = devm_clk_get(dev, NULL);
-> +	if (IS_ERR(p2wi->clk)) {
-> +		ret = PTR_ERR(p2wi->clk);
-> +		dev_err(dev, "failed to retrieve clk: %d\n",
-> +			ret);
-> +		return ret;
-> +	}
-> +
-> +	ret = clk_prepare_enable(p2wi->clk);
-> +	if (ret) {
-> +		dev_err(dev, "failed to enable clk: %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	parent_clk_freq = clk_get_rate(p2wi->clk);
-> +
-> +	p2wi->rstc = devm_reset_control_get(dev, NULL);
-> +	if (IS_ERR(p2wi->rstc)) {
-> +		ret = PTR_ERR(p2wi->rstc);
-> +		dev_err(dev, "failed to retrieve reset controller: %d\n",
-> +			ret);
-> +		goto err_clk_disable;
-> +	}
-> +
-> +	ret = reset_control_deassert(p2wi->rstc);
-> +	if (ret) {
-> +		dev_err(dev, "failed to deassert reset line: %d\n",
-> +			ret);
-> +		goto err_clk_disable;
-> +	}
-> +
-> +	init_completion(&p2wi->complete);
-> +	p2wi->adapter.dev.parent = dev;
-> +	p2wi->adapter.algo = &p2wi_algo;
-> +	p2wi->adapter.owner = THIS_MODULE;
-> +	p2wi->adapter.dev.of_node = pdev->dev.of_node;
-> +	platform_set_drvdata(pdev, p2wi);
-> +	i2c_set_adapdata(&p2wi->adapter, p2wi);
-> +
-> +	ret = devm_request_irq(dev, p2wi->irq, p2wi_interrupt, 0, pdev->name,
-> +			       p2wi);
-> +	if (ret) {
-> +		dev_err(dev, "can't register interrupt handler irq%d: %d\n",
-> +			p2wi->irq, ret);
-> +		goto err_reset_assert;
-> +	}
-> +
-> +	writel(P2WI_CTRL_SOFT_RST, p2wi->regs + P2WI_CTRL);
-> +
-> +	clk_div = parent_clk_freq / clk_freq;
-> +	if (!clk_div) {
-> +		dev_warn(dev,
-> +			 "clock-frequency is too high, setting it to %lu Hz\n",
-> +			 parent_clk_freq);
-> +		clk_div = 1;
-> +	} else if (clk_div > P2WI_CCR_MAX_CLK_DIV) {
-> +		dev_warn(dev,
-> +			 "clock-frequency is too low, setting it to %lu Hz\n",
-> +			 parent_clk_freq / P2WI_CCR_MAX_CLK_DIV);
-> +		clk_div = P2WI_CCR_MAX_CLK_DIV;
-> +	}
-> +
-> +	writel(P2WI_CCR_SDA_OUT_DELAY(1) | P2WI_CCR_CLK_DIV(clk_div),
-> +	       p2wi->regs + P2WI_CCR);
-> +
-> +	if (p2wi_mode_reg >= 0 && p2wi_mode_val >= 0) {
-> +		writel(P2WI_PMCR_PMU_INIT_SEND |
-> +		       P2WI_PMCR_PMU_MODE_REG(p2wi_mode_reg) |
-> +		       P2WI_PMCR_PMU_INIT_DATA(p2wi_mode_val) |
-> +		       P2WI_PMCR_PMU_DEV_ADDR(p2wi->slave_addr),
-> +		       p2wi->regs + P2WI_PMCR);
-> +
-> +		while (readl(p2wi->regs + P2WI_PMCR) &
-> +		       P2WI_PMCR_PMU_INIT_SEND)
-> +			cpu_relax();
-> +	}
-
-Did we actually encounter such a case? From what I've seen so far,
-both community's u-boot and Allwinner's bootloader already do this.
-
-As you know, I'm really not fond of putting random values and
-registers offsets into the DT itself. Making the assumption that the
-PMIC is already switched to P2WI by the bootloader seems pretty safe
-to me.
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140509/359bdfbd/attachment.sig>
+>  Tomi
+> 
+> 
