@@ -1,92 +1,79 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Fri, 09 May 2014 17:47:19 +0200
-Subject: [PATCH v3 1/9] mtd: nand: define struct nand_timings
-In-Reply-To: <20140508142930.GC5767@lee--X1>
-References: <1394647664-8258-1-git-send-email-b.brezillon.dev@gmail.com>
- <1394647664-8258-2-git-send-email-b.brezillon.dev@gmail.com>
- <20140430175157.GB2497@norris-Latitude-E6410> <20140508142930.GC5767@lee--X1>
-Message-ID: <536CF887.7020903@free-electrons.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 9 May 2014 08:55:04 -0700
+Subject: [PATCH 3/4] OMAPDSS: panel-sharp-ls037v7dw01: add device tree
+ support
+In-Reply-To: <536C8293.4070506@ti.com>
+References: <1398815562-24113-1-git-send-email-tony@atomide.com>
+ <1398815562-24113-4-git-send-email-tony@atomide.com>
+ <5369EAE7.3030705@ti.com> <20140507150343.GA9502@atomide.com>
+ <536A5920.1020908@ti.com> <20140507175919.GH9502@atomide.com>
+ <20140508233300.GI2198@atomide.com> <536C8293.4070506@ti.com>
+Message-ID: <20140509155504.GE17814@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+* Tomi Valkeinen <tomi.valkeinen@ti.com> [140509 00:24]:
+> On 09/05/14 02:33, Tony Lindgren wrote:
+> > +Example when connected to a omap2+ based device:
+> > +
+> > +	lcd0: display {
+> > +		compatible = "sharp,ls037v7dw01";
+> > +		power-supply = <&lcd_3v3>;
+> > +		enable-gpios = <&gpio5 24 GPIO_ACTIVE_HIGH>;	/* gpio152, lcd INI */
+> > +		reset-gpios = <&gpio5 27 GPIO_ACTIVE_HIGH>;	/* gpio155, lcd RESB */
+> > +		mode-gpios = <&gpio5 26 GPIO_ACTIVE_HIGH	/* gpio154, lcd MO */
+> > +			      &gpio1 2 GPIO_ACTIVE_HIGH		/* gpio2, lcd LR */
+> > +			      &gpio1 3 GPIO_ACTIVE_HIGH>;	/* gpio3, lcd UD */
+> > +
+> > +		panel-timing {
+> > +			clock-frequency = <19200000>;
+> > +			hback-porch = <28>;
+> > +			hactive = <480>;
+> > +			hfront-porch = <1>;
+> > +			hsync-len = <2>;
+> > +			vback-porch = <1>;
+> > +			vactive = <640>;
+> > +			vfront-porch = <1>;
+> > +			vsync-len = <1>;
+> > +			hsync-active = <0>;
+> > +			vsync-active = <0>;
+> > +			de-active = <1>;
+> > +			pixelclk-active = <1>;
+> > +		};
+> 
+> I don't think we should define panel-timing here. We know it's
+> sharp,ls037v7dw01, so the driver knows the video timings. Also, if we
+> would extend the driver to support both resolution modes, it needs to
+> support two different timings, so the above doesn't work in that case
+> either.
 
-On 08/05/2014 16:29, Lee Jones wrote:
->>> Define a struct containing the standard NAND timings as described in NAND
->>> datasheets.
->>>
->>> Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
->>> ---
->>>  include/linux/mtd/nand.h |   49 ++++++++++++++++++++++++++++++++++++++++++++++
->>>  1 file changed, 49 insertions(+)
->>>
->>> diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
->>> index 389b3c5..f3ff3a3 100644
->>> --- a/include/linux/mtd/nand.h
->>> +++ b/include/linux/mtd/nand.h
-> [...]
->
->>> + * Parameters)
->> Please document the units for these fields here. It looks like you're
->> using picoseconds.
-> Can't we leave this open to interpretation?  For instance, it's more
-> convenient for our driver to handle these as nano second values.
->
->>> + *
->>> + */
->>> +
->> Extra blank line.
->>
->>> +struct nand_sdr_timings {
->>> +	u32 tALH_min;
->>> +	u32 tADL_min;
->>> +	u32 tALS_min;
->>> +	u32 tAR_min;
->>> +	u32 tCEA_max;
->>> +	u32 tCEH_min;
->>> +	u32 tCH_min;
->>> +	u32 tCHZ_max;
->>> +	u32 tCLH_min;
->>> +	u32 tCLR_min;
->>> +	u32 tCLS_min;
->>> +	u32 tCOH_min;
->>> +	u32 tCS_min;
-> 	u32 tCSD_min;
+OK. It seems we can have at least two different timings for this panel,
+the VGA timing above and the QVGA timings that LDP uses that are listed
+in the .dts changes.
+ 
+> Although if the MO gpio is not controlled by the driver, we should tell
+> the driver whether that gpio is high or low.
 
-This is related to ddr2 timings, and this structure only define sdr
-related timings.
+What do you have in mind for telling that? We should also tell the
+orientation of the panel:
 
->>> +	u32 tDH_min;
->>> +	u32 tDS_min;
->>> +	u32 tFEAT_max;
->>> +	u32 tIR_min;
->>> +	u32 tITC_max;
-> 	u32 tR_max;
+EVM	VGA	omapfb.rotate=3
+LDP	QVGA	omapfb.rotate=0
 
-Actually this one cannot be retrieved from the ONFI timing mode, you'll
-have to read bytes 137 and 138 in the parameter page.
-Hence I got rid of it in the first place. Then I considered adding all
-those missing timings in another structure (see [1]).
+Do you have something in mind for that?
+ 
+> At the moment our display drivers are OMAP specific, and for that reason
+> we should prefix the compatible strings with "omapdss,". For example,
+> drivers/video/fbdev/omap2/displays-new/panel-dsi-cm.c:
+> 
+> 	{ .compatible = "omapdss,panel-dsi-cm", },
+> 
+> But we should still have the right compatible string in the .dts, so we
+> convert the compatible name in arch/arm/mach-omap2/display.c, with
+> 'dss_compat_conv_list' array, to which this panel's name should be added.
 
-I noticed you posted something similar on the MTD mailing list (and
-Lucas was waiting for the feature too).
-Could we work together to propose something that fulfills all our needs ?
+Oh so what do you want to have in the .dts file then?
 
-Here's what I need:
-- get detailled timings to be able to configure the sunxi NAND
-controller appropriately
-- a way to get these timings on non-ONFi NANDs (the proposed solution is
-exposing the closest  supported ONFI timing mode in the NAND chip DT
-node, but I'm open to any new proposal).
+Regards,
 
-
-Best Regards,
-
-Boris
-
-[1] http://lists.infradead.org/pipermail/linux-mtd/2014-March/052525.html
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Tony 
