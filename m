@@ -1,69 +1,122 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 9 May 2014 12:44:11 +0300
-Subject: [PATCH v2 0/4] Support for Variscite OM44 modules and boards
-In-Reply-To: <CAGhQ9VystybERsiPUX4ESNBcKPKBN44GvuPUtTM+jpywUqON3A@mail.gmail.com>
-References: <1398971269-20515-1-git-send-email-manabian@gmail.com>	<20140506001530.GL25949@atomide.com>
- <CAGhQ9VystybERsiPUX4ESNBcKPKBN44GvuPUtTM+jpywUqON3A@mail.gmail.com>
-Message-ID: <536CA36B.6000101@ti.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 9 May 2014 10:47:19 +0100
+Subject: [PATCH RFC v3 3/6] drivers: cpuidle: implement OF based idle
+ states infrastructure
+In-Reply-To: <536c0f39.90ab420a.3da7.ffff86ca@mx.google.com>
+References: <1399399483-17112-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1399399483-17112-4-git-send-email-lorenzo.pieralisi@arm.com>
+ <536c0f39.90ab420a.3da7.ffff86ca@mx.google.com>
+Message-ID: <20140509094718.GD32007@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/05/14 21:02, Joachim Eastwood wrote:
-> 1On 6 May 2014 02:15, Tony Lindgren <tony@atomide.com> wrote:
->> * Joachim Eastwood <manabian@gmail.com> [140501 12:08]:
->>> Hello,
->>>
->>> This patch set adds support for Variscite OM44 series of system on modules and boards.
->>>
->>> There weren't many comments on v1 of this patch set so I hope this can make it into 3.16.
->>> Changes since v2:
->>>  * Use OMAP IOPAD macros
->>>
->>> Patch 1: Add support for the SoM itself and the reference carrier board. Together these make the VAR-STK-OM44 dev kit.
->>> Patch 2: Add support for VAR-DVK-OM44 which is just the STK with a LCD display.
->>> Patch 3: Nodes for WLAN/BT support.
->>> Patch 4: Add quirks so that WLAN can be used. Still waiting for proper DT bindings.
->>>
->>> Since this patch set now uses the IOPAD macros a fix from Tony is need.
->>> See: https://patchwork.kernel.org/patch/4025421/
->>
->> Just noted that the macro won't work while was about to
->> apply these, sorry. So we're back to either using the
->> existing OMAP4_WKUP_IOPAD or raw offset from the padconf
->> area unless you have some great macro ideas.
+On Fri, May 09, 2014 at 12:12:19AM +0100, Sebastian Capella wrote:
+> Quoting Lorenzo Pieralisi (2014-05-06 11:04:40)
 > 
-> I see. I'll take another look at the macro's and see what I can come up with.
+> > diff --git a/drivers/cpuidle/of_idle_states.c b/drivers/cpuidle/of_idle_states.c
+> > new file mode 100644
+> > index 0000000..360b7ad
+> > --- /dev/null
+> > +++ b/drivers/cpuidle/of_idle_states.c
+> > @@ -0,0 +1,293 @@
+> ...
+> > +static int __init add_state_node(cpumask_t *cpumask,
+> > +                                struct device_node *state_node)
+> > +{
+> > +       struct state_elem *el;
+> > +       u32 tmp, val = 0;
+> > +
+> > +       pr_debug(" * %s...\n", state_node->full_name);
+> > +
+> > +       if (!state_cpus_valid(cpumask, state_node))
+> > +               return -EINVAL;
+> > +       /*
+> > +        * Parse just the properties required to sort the states.
+> > +        * Since we are missing a value defining the energy
+> > +        * efficiency of a state, for now the sorting code uses
+> > +        *
+> > +        * min-residency-us+exit-latency-us
+> > +        *
+> > +        * as sorting rank.
+> > +        */
+> > +       if (of_property_read_u32(state_node, "min-residency-us",
+> > +                                &tmp)) {
+> > +               pr_debug(" * %s missing min-residency-us property\n",
+> > +                        state_node->full_name);
+> > +               return -EINVAL;
+> > +       }
+> > +
+> > +       val += tmp;
+> > +
+> > +       if (of_property_read_u32(state_node, "exit-latency-us",
+> > +                                &tmp)) {
+> > +               pr_debug(" * %s missing exit-latency-us property\n",
+> > +                            state_node->full_name);
+> > +               return -EINVAL;
+> > +       }
+> > +
+> > +       val += tmp;
 > 
->>> Note that patch 1 relies upon a patch from Tomi Valkeinen add hpd-gpio (hotplug detect) to the "hdmi-connector".
->>> See: http://marc.info/?l=linux-omap&m=139771947508021&w=2
->>>
->>> Patch 2 also relies upon a patch from Tomi that adds DT support to panel-dpi.
->>> See: http://marc.info/?l=devicetree&m=139030201815380&w=2
->>
->> Maybe also leave out the DSS changes until Tomi has confirmed
->> those?
+> Sorry if i'm rehashing old stuff, but I prefer not to use the
+> min-residency + exit-latency to sort.  I saw Rob's comment suggesting it
+> and your reply.  I'm not sure when it was decided.
 > 
-> I can split the patch set and put a patch with the DSS DT nodes at the
-> end. Maybe this last patch can go through Tomi if he has a DSS DT
-> branch. I don't want to drop it entirely from the patch set because
-> some other people has expressed interest in testing it with full
-> display and hdmi support.
+> Would it be possible to sort instead based on the order in the
+> cpus->cpu-idle-states?  If not, my preference would be to either use
+> index like you had before, or specify another sort order / rank value.
 
-I have the HDMI and panel-dpi patches queued for 3.16. As this is a new
-board, and there's no compile time dependency on DSS stuff, I think all
-these patches can go through Tony.
+"power-rank" property ? We can't rely on the DT state nodes ordering.
 
-For the display related parts in these patches:
+I am ok with adding a power-rank property, as long as it is not frowned
+upon by DT maintainers, I am running short of ideas for states sorting if
+I can't use idle state properties to pull that off.
 
-Acked-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> I think there's potential for us to create lower power states that
+> have lower min-residencies (reduced power consumption in the state,
+> allowing us to more quickly recover the higher entrance cost)
+> with higher exit latencies in such a way that the formula would not
+> sort as we expect.  Having a separate value would allow us to control
+> the sorting in those cases.
+> 
+> > +
+> > +/*
+> 
+> For kernel-doc, I think you need a /** here, and a () after the
+> of_init_idle_driver below.  Also maybe Return: instead of Returns:
+> and I think the return paragraph goes at the end, but am not positive.
+> 
+> kernel-doc-nano-HOWTO.txt
 
- Tomi
+Ok changes done.
 
+Thanks,
+Lorenzo
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140509/1ddeb4c1/attachment-0001.sig>
+> > + * of_init_idle_driver - Parse the DT idle states and initialize the
+> > + *                      idle driver states array
+> > + *
+> > + * @drv:         Pointer to CPU idle driver to be initialized
+> > + * @state_nodes:  Array of struct device_nodes to be initialized if
+> > + *               init_nodes == true. Must be sized CPUIDLE_STATE_MAX
+> > + * @start_idx:    First idle state index to be initialized
+> > + * @init_nodes:   Boolean to request device nodes initialization
+> > + *
+> > + * Returns:
+> > + *     0 on success
+> > + *     <0 on failure
+> > + *
+> > + *     On success the states array in the cpuidle driver contains
+> > + *     initialized entries in the states array, starting from index start_idx.
+> > + *     If init_nodes == true, on success the state_nodes array is initialized
+> > + *     with idle state DT node pointers, starting from index start_idx,
+> > + *     in a 1:1 relation with the idle driver states array.
+> > + */
+> > +int __init of_init_idle_driver(struct cpuidle_driver *drv,
+> > +                              struct device_node *state_nodes[],
+> > +                              unsigned int start_idx, bool init_nodes)
+> > +{
+> 
+> Thanks!
+> 
+> Sebastian
+> 
