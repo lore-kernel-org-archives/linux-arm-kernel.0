@@ -1,46 +1,79 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 9 May 2014 15:40:34 +0100
-Subject: [RFC][PATCH 6/8] sched,idle: Avoid spurious wakeup IPIs
-In-Reply-To: <20140509141520.GV2844@laptop.programming.kicks-ass.net>
-References: <20140411134243.160989490@infradead.org>
- <20140411135218.478299389@infradead.org>
- <CAAG0J9_q1KsUx10-XAb7AJnxv2ehctg6q1KME7ahsk1OZV8vZQ@mail.gmail.com>
- <20140509141520.GV2844@laptop.programming.kicks-ass.net>
-Message-ID: <20140509144034.GF7950@arm.com>
+From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
+Date: Fri, 9 May 2014 20:12:47 +0530
+Subject: [PATCH] i2c: exynos5: Initialise Samsung High Speed I2C
+ controller early
+In-Reply-To: <20140509135153.GM12304@sirena.org.uk>
+References: <1398350916-885-1-git-send-email-ch.naveen@samsung.com>
+ <20140424162558.GB12304@sirena.org.uk>
+ <CAHfPSqB5+mLiC07jbEpeUgW63pZVk700SkYGxToO7GRAsFm_nQ@mail.gmail.com>
+ <20140509135153.GM12304@sirena.org.uk>
+Message-ID: <CAHfPSqDSTyQXPT-NCZ2hE01qpdmaR54tbWCUYC_zSDGFp58+7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+Hello Mark,
 
-On Fri, May 09, 2014 at 03:15:20PM +0100, Peter Zijlstra wrote:
-> On Fri, May 09, 2014 at 02:37:27PM +0100, James Hogan wrote:
-> > On 11 April 2014 14:42, Peter Zijlstra <peterz@infradead.org> wrote:
-> > > +       return !(fetch_or(&ti->flags, _TIF_NEED_RESCHED) & _TIF_POLLING_NRFLAG);
-> > 
-> > This breaks the build on metag, and I suspect arm64 too:
-> 
-> Yep, I just got a patch for arm64.
+On 9 May 2014 19:21, Mark Brown <broonie@kernel.org> wrote:
+> On Fri, May 09, 2014 at 05:50:00PM +0530, Naveen Krishna Ch wrote:
+>> On 24 April 2014 21:55, Mark Brown <broonie@kernel.org> wrote:
+>
+>> >> Such solution has been proposed by Mark Brown to fix the problem of
+>> >> the regulators not beeing available on the peripheral device probe():
+>> >> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-March/011971.html
+>
+>> > What specifically is this needed for?  We *should* be able to use
+>> > deferred probe for most things, but I know that not all subsystems are
+>> > able to yet.
+>
+>> DRM related drivers like DP, FIMD, HDMI, Mixer wants to be probed ASAP
+>> during the boot.
+>> The real problem comes when, one of these drivers do a regulator_get().
+>
+>> If the physical supply  is not enabled/hookedup the regulator_get() call
+>> assumes that physical supply is present and returns a
+>> "dummy_regulator" (But, not an error).
+>
+>> Because of which, Display and several other devices fails to work.
+>
+> These drivers are buggy, if they geniunely expect and handle a missing
+> supply then they should be using regulator_get_optional() to request the
+> regulator and even if they don't the use of subsys_initcall() is not
+> going to fix anything here - if a dummy regulator is going to be
+> returned the time things are probed won't make a difference.
+We have a situation where.a PMIC is sitting under I2C_TUNNEL
+with I2C, SPI and SPI uses DMA.
 
-[...]
+PMIC --- I2C_TUNNEL ---- I2C/SPI ---- DMA
 
-> Any SMP arch that has a polling idle function of any kind (including the
-> default cpu_idle_poll()).
-> 
-> That said, even if that's true, not having TIF_POLLING_NRFLAG isn't
-> fatal, just sub-optimal in that we'll send an unconditional IPI to wake
-> the CPU even though its polling TIF_NEED_RESCHED and doesn't need
-> anything other than that write to wake up.
-> 
-> Most archs have (x86) hlt or (arm) wfi like idle instructions, and if
-> that is your only possible idle function, you'll require the interrupt
-> to wake up and there's really no point to having the POLLING bit.
+This PMIC is setting some FETS required for Backlight, LCD and G3D modules.
 
-I wonder why we still need TIF_POLLING_NRFLAG for arm64. It was on arm
-until commit 16a8016372c42c7628eb (sanitize tsk_is_polling()). On arm64
-we use wfi for idle or a firmware call but in both cases the assumption
-is that we need an interrupt for waking up.
+If all the I2C, SPI, DMA, I2C_TUNNEL, DRM based LCD are all mod_probes()
+DRM drivers are probing a head of the PMIC probe. Which is causing the
+display drivers to get "dummy_regulators" instead of the real supplies.
 
-So I think we should remove this macro for arm64.
+We couldn't implement -PROBE_DEFER because, the probes are not failing.
+
+Should we should check if the return value of regulator_get() is a
+"dummy_regulator"
+and then defer the probe /.
+
+>
+>> I2C, I2C_TUNNEL, SPI and DMA drivers are required as subsys_initcall()
+>> for similar reason.
+>
+> What makes you say this?  Typically those drivers don't use regulators
+> at all.
+I mean I2C, I2C_TUNNEL, SPI and DMA drivers have be to subsys_initcall()
+to get the PMIC up intime. so, that the system would use the real supplies.
+
+This looks like a board specific solution. I guess, this is quite
+frequent with the
+buses like I2C, SPI.
+
+Kindly, suggest a nicer way. Thanks
+
+
 
 -- 
-Catalin
+Shine bright,
+(: Nav :)
