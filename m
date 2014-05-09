@@ -1,54 +1,78 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 09 May 2014 10:20:08 +0200
-Subject: [PATCH v6 3/4] usb: ohci-exynos: Add facility to use phy provided
- by the generic phy framework
-In-Reply-To: <1399266177-31765-1-git-send-email-gautam.vivek@samsung.com>
-References: <5363D835.7010804@gmail.com>
- <1399266177-31765-1-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <536C8FB8.7020806@samsung.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Fri, 9 May 2014 11:20:33 +0300
+Subject: omap4-panda-es boot issues with v3.15-rc4
+In-Reply-To: <20140508165558.GB2198@atomide.com>
+References: <536B7E44.2040303@ti.com> <7hppjos2w2.fsf@paris.lan>
+ <CAGa+x84VB3CXDm71JWxHx1-Qk1xVNeXdwUjZnb42_wg+piOzzA@mail.gmail.com>
+ <20140508165558.GB2198@atomide.com>
+Message-ID: <536C8FD1.4050407@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vivek,
+On 05/08/2014 07:55 PM, Tony Lindgren wrote:
+> * Kevin Hilman <khilman@linaro.org> [140508 08:40]:
+>> On Thu, May 8, 2014 at 8:31 AM, Kevin Hilman <khilman@linaro.org> wrote:
+>>> Roger Quadros <rogerq@ti.com> writes:
+>>>
+>>>> Hi,
+>>>>
+>>>> Nishant pointed me to a booting issue with omap4-panda-es on linux-next but I'm observing
+>>>> similar issues, although less frequent, with v3.15-rc4 as well.
+>>>>
+>>>> Configuration:
+>>>>
+>>>> - kernel v3.15-rc4 or linux-next (20140507)
+>>>> - multi_v7_defconfig with LEDS_TRIGGER_HEARTBEAT and LEDS_GPIO enabled
+>>>> - u-boot/master       173d294b94cf
+>>>>
+>>>> Observations:
+>>>>
+>>>> - Out of 10 boots a few may not succeed and hang midway without any warnings. Heartbeat LED stops.
+>>>> e.g. http://www.hastebin.com/ebumojegoq.vhdl
+>>>>
+>>>> - Hang more noticeable on linux-next (20140507) than on v3.15-rc4
+>>>
+>>> I've beeen noticing the same thing for awhile with my boot tests.  For
+>>> me, next-20140508 is failing most of the time now.
+>>>
+>>>> - Hang more noticeable with USB_EHCI_HCD enabled but hang observed even without USB_EHCI_HCD.
+>>>> Maybe related to when high speed interrupts occur in the boot process.
+>>>>
+>>>> - On successful boots following warning is seen
+>>>> [    4.010375] gic_timer_retrigger: lost localtimer interrupt
+>>>>
+>>>> - On successful boots heartbeat LED stops blinking after boot process and left idle. LED can remain stuck in
+>>>> ON state as well. It does blink again when doing activity on console.
+>>>>
+>>>> Workaround:
+>>>>
+>>>> - Disabling CPU_IDLE or even just disabling C3 (MPU OSWR) seems to fix all the above issues.
+>>>>
+>>>> I don't really know what exactly is the issue but it seems to be specific to OMAP4, GIC, MPU OSWR.
+>>>
+>>> I can confirm that disabling CONFIG_CPU_IDLE seems to make the problem
+>>> go away.  Hmm....
+>>
+>> Another finger pointing in the same direction: omap2plus_defconfig +
+>> CONFIG_CPU_IDLE=y also fails to boot rather consistently in today's
+>> -next.
+> 
+> Booting today's next with multi_v7_defconfig (so cpuidle enabled) on
+> omap4 sdp seems to boot reliably. And it's not producing these:
+> 
+> gic_timer_retrigger: lost localtimer interrupt 
+> 
+> while panda is producing those errors like Roger mentioned.
+> 
+> It seems that the USB networking is the main difference between
+> omap4 sdp and panda?
 
-On 05.05.2014 07:02, Vivek Gautam wrote:
-> Add support to consume phy provided by Generic phy framework.
-> Keeping the support for older usb-phy intact right now, in order
-> to prevent any functionality break in absence of relevant
-> device tree side change for ohci-exynos.
-> Once we move to new phy in the device nodes for ohci, we can
-> remove the support for older phys.
-> 
-> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
-> Cc: Jingoo Han <jg1.han@samsung.com>
-> Acked-by: Alan Stern <stern@rowland.harvard.edu>
-> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
-> 
-> Changes from v5:
->  - Removed setting phy explicitly to error pointer.
->  - Changed error check to '-ENOSYS' instead of '-ENXIO' in failure case of
->    devm_of_phy_get().
-> 
-> Changes from v4:
->  - Removed 'phy-names' property from the bindings since we don't need it.
->  - Restructured exynos_ohci_get_phy() function to handle error codes as
->    well as return relevant error codes effectively.
->  - Added IS_ERR() check for PHYs in exynos_ohci_phy_enable()/disable().
-> 
-> Changes from v3:
->  - Calling usb_phy_shutdown() when exynos_ohci_phy_enable() is failing.
->  - Made exynos_ohci_phy_disable() return void, since its return value
->    did not serve any purpose.
->  - Calling clk_disable_unprepare() in exynos_ohci_resume() when
->    exynos_ohci_phy_enable() is failed.
-> 
->  .../devicetree/bindings/usb/exynos-usb.txt         |   16 +++
->  drivers/usb/host/ohci-exynos.c                     |  118 +++++++++++++++++---
->  2 files changed, 118 insertions(+), 16 deletions(-)
+Is your sdp using omap4430?
 
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+To confirm 4430 vs 4460 I ran 10 tests each on omap4430 panda and omap4460 panda.
 
---
-Best regards,
-Tomasz
+4430panda fails 2/10 times.
+4460panda fails 7/10 times.
+
+cheers,
+-roger
