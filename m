@@ -1,85 +1,77 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 9 May 2014 16:59:04 +0530
-Subject: [PATCH 05/17] pci: host: pcie-dra7xx: add support for pcie-dra7xx
- controller
-In-Reply-To: <6485683.q96o7U6vf8@wuerfel>
-References: <1399383244-14556-1-git-send-email-kishon@ti.com>
- <4300084.bc6ByDTk7W@wuerfel> <5369F287.6000103@ti.com>
- <6485683.q96o7U6vf8@wuerfel>
-Message-ID: <536CBC00.6000709@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 09 May 2014 13:43:57 +0200
+Subject: [PATCH v2 2/2] iio:adc: at91 requires the input subsystem
+In-Reply-To: <536CA78C.5070603@atmel.com>
+References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
+ <1399560990-1402858-13-git-send-email-arnd@arndb.de>
+ <536CA78C.5070603@atmel.com>
+Message-ID: <4163305.otOGv8yVK1@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On Wednesday 07 May 2014 03:00 PM, Arnd Bergmann wrote:
-> On Wednesday 07 May 2014 14:14:55 Kishon Vijay Abraham I wrote:
->>>> +static void dra7xx_pcie_enable_interrupts(struct pcie_port *pp)
->>>> +{
->>>> +    struct dra7xx_pcie *dra7xx = to_dra7xx_pcie(pp);
->>>> +
->>>> +    dra7xx_pcie_writel(dra7xx->base, PCIECTRL_DRA7XX_CONF_IRQSTATUS_MAIN,
->>>> +                       ~INTERRUPTS);
->>>> +    dra7xx_pcie_writel(dra7xx->base,
->>>> +                       PCIECTRL_DRA7XX_CONF_IRQENABLE_SET_MAIN, INTERRUPTS);
->>>> +    dra7xx_pcie_writel(dra7xx->base, PCIECTRL_DRA7XX_CONF_IRQSTATUS_MSI,
->>>> +                       ~LEG_EP_INTERRUPTS & ~MSI);
->>>> +
->>>> +    if (IS_ENABLED(CONFIG_PCI_MSI))
->>>> +            dra7xx_pcie_writel(dra7xx->base,
->>>> +                               PCIECTRL_DRA7XX_CONF_IRQENABLE_SET_MSI, MSI);
->>>> +    else
->>>> +            dra7xx_pcie_writel(dra7xx->base,
->>>> +                               PCIECTRL_DRA7XX_CONF_IRQENABLE_SET_MSI,
->>>> +                               LEG_EP_INTERRUPTS);
->>>
->>> Doesn't this just enable one or the other? In general I'd assume you need
->>> both INTx and MSI, at least if MSI is available.
->>
->> Not sure since the programming sequence in the TRM explicitly states either
->> legacy interrupts or MSI interrupts should be enabled but not both.
+On Friday 09 May 2014 12:01:48 Nicolas Ferre wrote:
+> On 08/05/2014 16:56, Arnd Bergmann :
+> > Building the at91 adc driver with CONFIG_INPUT disabled results in this
+> > build error:
+> > 
+> > ERROR: "input_event" [drivers/iio/adc/at91_adc.ko] undefined!
+> > ERROR: "input_unregister_device" [drivers/iio/adc/at91_adc.ko] undefined!
+> > ERROR: "input_free_device" [drivers/iio/adc/at91_adc.ko] undefined!
+> > ERROR: "input_register_device" [drivers/iio/adc/at91_adc.ko] undefined!
+> > ERROR: "input_set_abs_params" [drivers/iio/adc/at91_adc.ko] undefined!
+> > ERROR: "input_allocate_device" [drivers/iio/adc/at91_adc.ko] undefined!
+> > 
+> > To make sure we can build random configurations, this turns on CONFIG_INPUT
+> > whenever CONFIG_AT91_ADC is enabled.
 > 
-> Hmm, I think that means you can't have MSI at all. You have to support
-> legacy PCI devices that can't do MSI.
-> 
-> Do you know if you have a modern GIC implementation with MSI support
-> in these SoCs? It would be better anyway to use the GIC for doing
+> Isn't it a "select" instead of "depends" that is required then?
 
-In DRA7 it is not there. I'm not sure in other platforms.
-> MSI, so you can just ignore the internal MSI controller here.
-> 
->>>> +static int add_pcie_port(struct dra7xx_pcie *dra7xx,
->>>> +                      struct platform_device *pdev)
->>>> +{
->>>> +    int ret;
->>>> +    struct pcie_port *pp;
->>>> +    struct resource *res;
->>>> +    struct device *dev = &pdev->dev;
->>>> +
->>>> +    pp = &dra7xx->pp;
->>>> +    pp->dev = dev;
->>>> +    pp->ops = &dra7xx_pcie_host_ops;
->>>> +
->>>> +    spin_lock_init(&pp->conf_lock);
->>>> +
->>>> +    pp->irq = platform_get_irq(pdev, 1);
->>>> +    if (pp->irq < 0) {
->>>> +            dev_err(dev, "missing IRQ resource\n");
->>>> +            return -EINVAL;
->>>> +    }
->>>>
->>>
->>> The binding does not list a mandatory "interrupts" property, so
->>> this should not be treated as an error.
->>
->> actually the 'interrupts' property is documented in pci/designware-pcie.txt.
-> 
-> Hmm, but you don't seem to use it the same way as documented there.
-> I'm not sure what 'level interrupt, pulse interrupt, special interrupt'
-> in the parent binding are, but they don't seem to be the ones you use
-> here.
+It seems I fixed the patch at some point but didn't update the message.
 
-Yeah. I'll update my Documentation. Thanks for pointing this out.
+In general, we should not mix 'depends on' and 'select' for the same symbol,
+since that causes extra confusion.
 
-Thanks
-Kishon
+In case of CONFIG_INPUT, almost all the users do 'depends on INPUT', with
+a few exceptions that seem to be done in error.
+Updated patch below.
+
+	Arnd
+
+8<----
+
+>From 4679d63b24a681d9c6afcfdde266bae0f940e90b Mon Sep 17 00:00:00 2001
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Wed, 9 Apr 2014 17:18:10 +0200
+Subject: [PATCH] [SUBMITTED] iio:adc: at91 requires the input subsystem
+
+Building the at91 adc driver with CONFIG_INPUT disabled results in this
+build error:
+
+ERROR: "input_event" [drivers/iio/adc/at91_adc.ko] undefined!
+ERROR: "input_unregister_device" [drivers/iio/adc/at91_adc.ko] undefined!
+ERROR: "input_free_device" [drivers/iio/adc/at91_adc.ko] undefined!
+ERROR: "input_register_device" [drivers/iio/adc/at91_adc.ko] undefined!
+ERROR: "input_set_abs_params" [drivers/iio/adc/at91_adc.ko] undefined!
+ERROR: "input_allocate_device" [drivers/iio/adc/at91_adc.ko] undefined!
+
+To make sure we can build random configurations, this adds a Kconfig
+dependency on CONFIG_INPUT, as we do for other similar drivers.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: linux-iio at vger.kernel.org
+Cc: Josh Wu <josh.wu@atmel.com>
+Cc: Jonathan Cameron <jic23@kernel.org>
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
+index 90f596d..a80d236 100644
+--- a/drivers/iio/adc/Kconfig
++++ b/drivers/iio/adc/Kconfig
+@@ -110,6 +110,7 @@ config AD799X
+ config AT91_ADC
+ 	tristate "Atmel AT91 ADC"
+ 	depends on ARCH_AT91
++	depends on INPUT
+ 	select IIO_BUFFER
+ 	select IIO_TRIGGERED_BUFFER
+ 	select SYSFS
