@@ -1,40 +1,64 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 8 May 2014 17:02:02 -0700
-Subject: [PATCH] ARM: Don't ever downscale loops_per_jiffy in SMP systems
-In-Reply-To: <20140508205556.GJ3693@n2100.arm.linux.org.uk>
-References: <1399504982-31181-1-git-send-email-dianders@chromium.org>
- <CAOh2x=kwaoSdj8JO0Vo08Y0dX2UfKFiF3pBV-qtp-YTyN=8H8Q@mail.gmail.com>
- <CAD=FV=UEGJGHrdcXgs3EZ_wFXT8GnNeCOMt7CgdiiUzBzZ5Y0A@mail.gmail.com>
- <alpine.LFD.2.11.1405081149190.980@knanqh.ubzr>
- <CAD=FV=VtcLOh51LCmafzRMdqtDrwKXCqK6gE6V7OOOUe4gjwbA@mail.gmail.com>
- <alpine.LFD.2.11.1405081329010.980@knanqh.ubzr>
- <CAD=FV=X4h0nfO7a10NXe+d76xj5ttBJx=q1pAvW4aPzrc22BoQ@mail.gmail.com>
- <20140508205556.GJ3693@n2100.arm.linux.org.uk>
-Message-ID: <CAD=FV=ViOie+E_mxgcE51oNL0HY1zF9KYG_TDSbKjMzE2GZZMw@mail.gmail.com>
+From: agnel.joel@gmail.com (Joel Fernandes)
+Date: Thu, 8 May 2014 19:13:31 -0500
+Subject: [PATCH 3/5] irqchip: crossbar: Skip some irqs from getting mapped
+ to crossbar
+In-Reply-To: <536C0DC4.7090309@ti.com>
+References: <1399299527-10955-1-git-send-email-r.sricharan@ti.com>
+ <1399299527-10955-4-git-send-email-r.sricharan@ti.com>
+ <536BD9D8.4080905@ti.com> <20140508203659.GA5620@kahuna>
+ <CAD=GYpbQQxQgKd3oZcAuWrxoD4VrkKzpybd11qwxs405HSUVGw@mail.gmail.com>
+ <536C0DC4.7090309@ti.com>
+Message-ID: <CAD=GYpav4mHaqo4jfb0ePchf3cvuvSnFKj_+osbrt_8-tYRRrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russel,
+On Thu, May 8, 2014 at 6:05 PM, Santosh Shilimkar
+<santosh.shilimkar@ti.com> wrote:
+[..]
+>> Further since not everything goes through the crossbar and some are
+>> direct mapped like your diagram, the correct fix is probably making it
+>> an irqchip and doing the interrupt controller parenting correctly in
+>> DT.
+>>
+>> That would take care of A), because users of such direct mapped
+>> interrupts will go through the GIC interrupt controller directly.
+>>
+>> It will also take care of B), because if writing to cross bar has no
+>> effect for a particular IRQ, or if those IRQs are hard-wired to
+>> something, as you said, then that something should go through the GIC
+>> directly.
+>>
+>> I can try to whip up something like this if it makes sense, let me know...
+>>
+> I have been ignoring this series considering they were just fixes
+> but you comments are like re-inventing wheel. Please read all
+> the old threads and comments from Thomas and me on why we took
+> approach and why it is not an irqchip. There is no need to complicate
+> it further.
 
-On Thu, May 8, 2014 at 1:55 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, May 08, 2014 at 11:06:24AM -0700, Doug Anderson wrote:
->> I guess I would say that my patch is unhacking the this code.  The
->> code after my patch is simpler.  I would perhaps argue that (ec971ea
->> ARM: add cpufreq transiton notifier to adjust loops_per_jiffy for smp)
->> should never have landed to begin with.
->
-> That depends on your point of view.  As I've already pointed out through
-> the examples of why udelay() is inaccurate, for driver authors, they
-> should assume that udelay() just gives you an "approximate" delay and
-> it has no accuracy.
+Are you talking about the discussion on this thread?
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/194318.html
 
-That disagrees with what Thomas Gleixner says at
-<http://lkml.iu.edu//hypermail/linux/kernel/1203.1/01034.html>.  It
-also seems like perhaps the regulator core is broken, then...  If a
-udelay(30) can end up as a udelay(20) then we may return from a
-regulator code 10us earlier than we should and we'll assume that a
-regulator is ramped before it really is...
+I didn't really get a sense that there was a common agreement that
+irqchip is not the way to go there. I can stand corrected if there was
+a common consensus that irqchip is not the right solution (with any
+specific comments why). There was a concern in the thread that making
+it irqchip doesn't help dma reuse the infrastructure, but that concern
+seems moot now that the driver is proposed to live in drivers/irqchip.
 
-I'm out tomorrow but I can confirm on Monday that I was really seeing
-udelay(30) be a udelay(20) without this patch.
+Further, I don't think my comments are re-inventing anything because
+the brand-new bugs that are being found now weren't found then and my
+comments were more related to these bugs.
+
+As for complexity, it appears there will be signficant hacks coming up
+that are required to handle the corner cases by adding more lists and
+dt-properties. So its already on a complicated path.. Even with such
+hacks, Nishanth pointed out that the implementation can break. Its
+already like a deck of cards in my opinion and complicates things for
+everyone using it. You said you hadn't gone through the fixes in this
+series, you should go over them and see the new lists added to skip
+and reserve various things.
+
+thanks,
+
+  -Joel
