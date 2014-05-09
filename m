@@ -1,52 +1,39 @@
-From: ipaton0@gmail.com (Iain Paton)
-Date: Fri, 09 May 2014 08:48:07 +0100
-Subject: [PATCH v2] ARM: dts: imx6: add new board RIoTboard
-In-Reply-To: <20140509030938.GK2794@dragon>
-References: <53695C34.5000604@gmail.com> <20140508054106.GH2794@dragon>
- <536B4ACD.30001@gmail.com> <20140509030938.GK2794@dragon>
-Message-ID: <536C8837.9090802@gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 9 May 2014 09:54:58 +0200
+Subject: [PATCH 00/04] ARM: shmobile: Use shmobile_init_delay() on r8a7740
+In-Reply-To: <20140507233219.29712.9253.sendpatchset@w520>
+References: <20140507233219.29712.9253.sendpatchset@w520>
+Message-ID: <CAMuHMdWkZ=pTCs_HgBnjPPExLj-fU4ywZq-aHUrpdLXLGT3WSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/05/14 04:09, Shawn Guo wrote:
-> On Thu, May 08, 2014 at 10:13:49AM +0100, Iain Paton wrote:
+Hi Magnus,
 
->> +&ecspi1 {
->> +	fsl,spi-num-chipselects = <1>;
->> +	cs-gpios = <&gpio5 17 0>;
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&pinctrl_ecspi1>;
->> +	status = "okay";
->> +
->> +	spidev at 0 {
->> +		spi-max-frequency = <24000000>;
->> +		reg = <0>;
->> +		compatible = "spidev";
->> +	};
-> 
-> What's this?  Is this the common way we code spi devices in device tree?
+On Thu, May 8, 2014 at 1:32 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
+> ARM: shmobile: Use shmobile_init_delay() on r8a7740
+>
+> [PATCH 01/04] ARM: shmobile: Add r8a7740 Maximum CPU Frequency to DTS
+> [PATCH 02/04] ARM: shmobile: Use r8a7740 DT CPU Frequency in common case
+> [PATCH 03/04] ARM: shmobile: Use r8a7740 DT CPU Frequency for Armadillo DT Ref
+> [PATCH 04/04] ARM: shmobile: Remove unused r8a7740_init_delay()
+>
+> Convert r8a7740 to rely on shmobile_init_delay() instead of using a per-SoC
+> delay setup function. This is a cleanup towards enabling Multiplatform support
+> for the r8a7740 SoC.
 
-I'd appreciate your guidance here, what would you prefer?
+Thanks!
 
-My reasons for adding spidev were as follows:
+> Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 
-1. The SPI pins are not used on the board, they go to an expansion header.
-2. Board is targeted at makers who are likely to want to attach 
-   external devices.
-3. Experience has been that if they don't find an easy and already 
-   configured way to use something they reach for devmem2 or similar.
-4. devicetree is often seen as being too hard by people who come to these
-   boards from things like arduino
+Tested-by: Geert Uytterhoeven <geert@glider.be>
 
-I've already had questions on how to find the physical address of /dev/i2c-0 
-seemingly due to some of the above.
+Gr{oetje,eeting}s,
 
-I'm happy to drop the spidev entries if that's what you'd prefer, but if I
-do that I'm undecided if I should then just drop the ecspi sections as well 
-and free up more gpio pins on the expansion header for other uses.
+                        Geert
 
-I'll tidy up all the other comments, and use your suggested method for the 
-i2c4 changes.
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-Thanks,
-Iain
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
