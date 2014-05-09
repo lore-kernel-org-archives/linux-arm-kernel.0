@@ -1,106 +1,80 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Fri, 9 May 2014 16:21:19 +0530
-Subject: [PATCH v7 1/2] phy: Add new Exynos5 USB 3.0 PHY driver
-In-Reply-To: <536CAA4F.8050404@samsung.com>
-References: <1398665874-31238-1-git-send-email-gautam.vivek@samsung.com>
- <5368F136.6070804@samsung.com>
- <CAFp+6iHN-W-k6ow5YykK_QWgBJ+GgzXwPX6suWtizxwJWOiGtg@mail.gmail.com>
- <CAFp+6iF=Z_dkd+YJm2-ODmvgZ6PCt+bUx+vSVm_5RtobVN0WfA@mail.gmail.com>
- <536CAA4F.8050404@samsung.com>
-Message-ID: <CAFp+6iEGvy71s=-Vt37TKkVDUX1wO6GZdwL=uBfPjng78yE5-A@mail.gmail.com>
+From: pullip.cho@samsung.com (Cho KyongHo)
+Date: Fri, 09 May 2014 19:54:40 +0900
+Subject: [PATCH v12 18/31] iommu/exynos: allow having multiple System MMUs
+ for a master H/W
+In-Reply-To: <5369245A.1060001@gmail.com>
+References: <1398584283-22846-1-git-send-email-shaik.ameer@samsung.com>
+ <1398584283-22846-19-git-send-email-shaik.ameer@samsung.com>
+ <5369245A.1060001@gmail.com>
+Message-ID: <20140509195440.ae989be464cde24ade92eec2@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester,
+On Tue, 06 May 2014 20:05:14 +0200, Tomasz Figa wrote:
+> On 27.04.2014 09:37, Shaik Ameer Basha wrote:
+> > From: Cho KyongHo <pullip.cho@samsung.com>
+> >
+> > Some master device descriptor like fimc-is which is an abstraction
+> > of very complex H/W may have multiple System MMUs. For those devices,
+> > the design of the link between System MMU and its master H/W is needed
+> > to be reconsidered.
+> >
+> > A link structure, sysmmu_list_data is introduced that provides a link
+> > to master H/W and that has a pointer to the device descriptor of a
+> > System MMU. Given a device descriptor of a master H/W, it is possible
+> > to traverse all System MMUs that must be controlled along with the
+> > master H/W.
+> >
+> > Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
+> > ---
+> >   drivers/iommu/exynos-iommu.c |  545 ++++++++++++++++++++++++++----------------
+> >   1 file changed, 335 insertions(+), 210 deletions(-)
+> >
+> > diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+> > index fefedec3..c2e6365 100755
+> > --- a/drivers/iommu/exynos-iommu.c
+> > +++ b/drivers/iommu/exynos-iommu.c
+> > @@ -117,6 +117,10 @@
+> >   #define REG_PB1_EADDR		0x058
+> >
+> >   #define has_sysmmu(dev)		(dev->archdata.iommu != NULL)
+> > +#define for_each_sysmmu_list(dev, list_data)				\
+> > +	list_for_each_entry(list_data,					\
+> > +		&((struct exynos_iommu_owner *)dev->archdata.iommu)->mmu_list, \
+> > +		entry)
+> 
+> Sorry, NAK.
+> 
+> Please don't add this kind of complexity and business logic to low level 
+> code. We want the configuration functions to be simple, easy to read, 
+> maintain and extend.
+> 
+> The proper way to do it is to let the IOMMUs be grouped together on 
+> IOMMU subsystem level, so that each IOMMU consumer driver would see just 
+> one IOMMU, but then IOMMU driver callbacks would handle just particular 
+> instances of the IOMMU IP blocks, without any loops, lists and other 
+> crazy code...
+> 
 
+It is done in IOMMU driver internally.
+IOMMU consumer driver(IOMMU client device driver?) sees IOMMU domain
+but IOMMU itself. How to handle IOMMUs of the client device is just
+in charge of IOMMU driver according to the hardwired bus topology.
 
-On Fri, May 9, 2014 at 3:43 PM, Sylwester Nawrocki
-<s.nawrocki@samsung.com> wrote:
-> Hi Vivek,
->
-> On 08/05/14 11:03, Vivek Gautam wrote:
->>>>> diff --git a/Documentation/devicetree/bindings/phy/samsung-phy.txt b/Documentation/devicetree/bindings/phy/samsung-phy.txt
->>>>> >>> index b422e38..51efe4c 100644
->>>>> >>> --- a/Documentation/devicetree/bindings/phy/samsung-phy.txt
->>>>> >>> +++ b/Documentation/devicetree/bindings/phy/samsung-phy.txt
->>>>> >>> @@ -114,3 +114,43 @@ Example:
->>>>> >>>               compatible = "samsung,exynos-sataphy-i2c";
->>>>> >>>               reg = <0x38>;
->>>>> >>>       };
->>>>> >>> +
->>>>> >>> +Samsung Exynos5 SoC series USB DRD PHY controller
->>>>> >>> +--------------------------------------------------
->>>>> >>> +
->>>>> >>> +Required properties:
->>>>> >>> +- compatible : Should be set to one of the following supported values:
->>>>> >>> +     - "samsung,exynos5250-usbdrd-phy" - for exynos5250 SoC,
->>>>> >>> +     - "samsung,exynos5420-usbdrd-phy" - for exynos5420 SoC.
->>>>> >>> +- reg : Register offset and length of USB DRD PHY register set;
->>>>> >>> +- clocks: Clock IDs array as required by the controller
->>>>> >>> +- clock-names: names of clocks correseponding to IDs in the clock property;
->>>>> >>> +            Required clocks:
->>>>> >>> +     - phy: main PHY clock (same as USB DRD controller i.e. DWC3 IP clock),
->>>>> >>> +            used for register access.
->>>>> >>> +     - ref: PHY's reference clock (usually crystal clock), used for
->>>>> >>> +            PHY operations, associated by phy name. It is used to
->>>>> >>> +            determine bit values for clock settings register.
->>>>> >>> +            For Exynos5420 this is given as 'sclk_usbphy30' in CMU.
->>>>> >>> +- samsung,pmu-syscon: phandle for PMU system controller interface, used to
->>>>> >>> +                   control pmu registers for power isolation.
->>>>> >>> +- samsung,pmu-offset: phy power control register offset to pmu-system-controller
->>>>> >>> +                   base.
->>>> >>
->>>> >> It doesn't seem right to have register offset encoded in the device tree
->>>> >> like this. I think it'd be more appropriate to associate such an offset
->>>> >> with the compatible string's value in the driver.
->>> >
->>> > Ok, it makes more sense.
->>> > Just out of curiosity, what difference would this make ?
->>
->> Moreover, in case of Exynos5420 (and may be in future SoCs), where we
->> have 2 USB DRD PHY controllers,
->> we will need to have a way around to deal with two separate offsets in
->> the driver for one compatible string.
->
-> It could be handled by creating a list of offsets per compatible string and
-> then adding some way to identify the PHY device instance. So I believe that's
-> not a big issue.
+If a master and IOMMU device should be 1:1 relationship as you contend,
+the master device driver should be responsible for express the bus
+topology in its business logic. I think it is not good as I told earlier.
 
-True, we had tried to make use of 'aliases' for multiple controllers
-on Exynos5420,
-in earlier version V3 of this patch, to handle the pmu-register
-offsets in _somewhat_ similar fashion. [1]
-But then we had to drop that as per the suggestions in the mailing list.
+IOMMU group is different from the grouping System MMUs in Exynos IOMMU driver.
+IOMMU group is invented to group several IOMMUs on different bus with different
+masters to assign the same IOMMU domain.
+It is useful for user level virtualization but for expressing bus topology.
+Exynos IOMMU driver just groups System MMUs that have the same master device.
+Even though Exynos IOMMU driver implements IOMMU group which is already
+implemented by 20/31 patch, such looping is still required.
 
-> Now you'd be encoding a list of registers offsets in the
-> device tree, without encoding bit layout of each register. It's unlikely that
-> each instance would have different bits layout, but describing individual
-> registers in DT I thought is something that we're not supposed to do.
+However, I will consider other elegant way of interation of multiple System MMUs.
 
-Ok, so this is information to me, i was not very much aware of this.
-Thanks for explaining it here.
+Regards,
 
->
->> Getting the offsets from DT seems a cleaner way to handle this case of
->> multi controllers.
->
-> I think it's easier from the driver POV, but isn't it violating the device
-> tree rules ?
-> Anyway. I'm just pointing this minor issue in the binding as it appears
-> to me. The final word of course belongs to a DT binding maintainer.
-
-Thanks Sylwester, for pointing this out here.
-Meantime, please let me know if the approach using aliases is one
-possible solution for this or not ?
-
-
-[1] [PATCH v3] phy: Add new Exynos5 USB 3.0 PHY driver
-     https://lkml.org/lkml/2014/1/21/46
-
-
-
--- 
-Best Regards
-Vivek Gautam
-Samsung R&D Institute, Bangalore
-India
+KyongHo
