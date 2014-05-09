@@ -1,126 +1,53 @@
-From: sonnyrao@chromium.org (Sonny Rao)
-Date: Thu, 8 May 2014 18:34:23 -0700
-Subject: [PATCH] mmc: dw_mmc: change to use recommended reset procedure
-In-Reply-To: <536C2C31.8000209@samsung.com>
-References: <1395834374-1988-1-git-send-email-yuvaraj.cd@samsung.com>
- <CAKuRcOJYsC9OUOrYrvKg_iC5Z6dZ0mqW3-y=UXHtCr99=gQBXw@mail.gmail.com>
- <536C2C31.8000209@samsung.com>
-Message-ID: <CAPz6YkXGH96mjeePwUSRmPX4Y1YXYif+N+BRKsTwtNxtRq3xoQ@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 8 May 2014 21:37:15 -0400 (EDT)
+Subject: [PATCH] ARM: Don't ever downscale loops_per_jiffy in SMP systems
+In-Reply-To: <20140508205223.GI3693@n2100.arm.linux.org.uk>
+References: <1399504982-31181-1-git-send-email-dianders@chromium.org>
+ <CAOh2x=kwaoSdj8JO0Vo08Y0dX2UfKFiF3pBV-qtp-YTyN=8H8Q@mail.gmail.com>
+ <CAD=FV=UEGJGHrdcXgs3EZ_wFXT8GnNeCOMt7CgdiiUzBzZ5Y0A@mail.gmail.com>
+ <alpine.LFD.2.11.1405081149190.980@knanqh.ubzr>
+ <CAD=FV=VtcLOh51LCmafzRMdqtDrwKXCqK6gE6V7OOOUe4gjwbA@mail.gmail.com>
+ <alpine.LFD.2.11.1405081329010.980@knanqh.ubzr>
+ <20140508192209.GH3693@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1405081600260.980@knanqh.ubzr>
+ <20140508205223.GI3693@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.11.1405082058130.980@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 8, 2014 at 6:15 PM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
-> On 05/08/2014 06:40 PM, Yuvaraj Kumar wrote:
->> Any comments on this patch?
->>
->> On Wed, Mar 26, 2014 at 5:16 PM, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com> wrote:
->>> From: Sonny Rao <sonnyrao@chromium.org>
->>>
->>> This patch changes the fifo reset code to follow the reset procedure
->>> outlined in the documentation of Synopsys  Mobile storage host databook
->>> 7.2.13.
->>> Without this patch, we could able to see eMMC was not detected after
->>> multiple reboots due to driver hangs while eMMC tuning for HS200.
->>>
->>> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
->>> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.org>
->>> ---
->>>  drivers/mmc/host/dw_mmc.c |   48 ++++++++++++++++++++++++++++++++++++++++++++-
->>>  drivers/mmc/host/dw_mmc.h |    1 +
->>>  2 files changed, 48 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
->>> index 32dd81d..1d77431 100644
->>> --- a/drivers/mmc/host/dw_mmc.c
->>> +++ b/drivers/mmc/host/dw_mmc.c
->>> @@ -2220,7 +2220,53 @@ static inline bool dw_mci_fifo_reset(struct dw_mci *host)
->>>                 host->sg = NULL;
->>>         }
->>>
->>> -       return dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET);
->>> +       /*
->>> +        * The recommended method for resetting is to always reset the
->>> +        * controller and the fifo, but differs slightly depending on the mode.
->>> +        * Note that this doesn't handle the "generic DMA" (not IDMAC) case.
->>> +        */
->
-> "not IDMAC" is confused..
->
+On Thu, 8 May 2014, Russell King - ARM Linux wrote:
 
-The documentation describes three different possible modes.  There's a
-mode that doesn't use IDMAC but still does DMA.  But as far as I can
-tell this driver doesn't support that way.  We can just remove that
-wording if it's confusing.
+> If you're in a preempt or SMP environment, provide a timer for udelay().
+> IF you're in an environment with IRQs which can take a long time, use
+> a timer for udelay().  If you're in an environment where the CPU clock
+> can change unexpectedly, use a timer for udelay().
 
->>> +       if (dw_mci_ctrl_reset(host, SDMMC_CTRL_RESET | SDMMC_CTRL_FIFO_RESET)) {
->>> +               unsigned long timeout = jiffies + msecs_to_jiffies(500);
->>> +               u32 status, rint;
->>> +
->>> +               /* if using dma we wait for dma_req to clear */
->>> +               if (host->using_dma) {
->>> +                       do {
->>> +                               status = mci_readl(host, STATUS);
->>> +                               if (!(status & SDMMC_STATUS_DMA_REQ))
->>> +                                       break;
->>> +                               cpu_relax();
->>> +                       } while (time_before(jiffies, timeout));
->>> +
->>> +                       if (status & SDMMC_STATUS_DMA_REQ)
->>> +                               dev_err(host->dev,
->>> +                                       "%s: Timeout waiting for dma_req to "
->>> +                                       "clear during reset", __func__);
->>> +
->>> +                       /* when using DMA next we reset the fifo again */
->>> +                       dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET);
->>> +               }
->>> +               /*
->>> +                * In all cases we clear the RAWINTS register to clear any
->>> +                * interrupts.
->>> +                */
->>> +               rint = mci_readl(host, RINTSTS);
->>> +               rint = rint & (~mci_readl(host, MINTSTS));
->
-> Just clear the RINTSTS register? why do you add these?
->
+Longer delays are normally not a problem.  If they are, then simply 
+disabling IRQs may solve it if absolutely required.  With much shorter 
+delays than expected this is another story.
 
-This will look at what is not masked, and only clear those bits.
+What about the following:
 
->>> +               if (rint)
->>> +                       mci_writel(host, RINTSTS, rint);
->>> +
->>> +       } else
->>> +               dev_err(host->dev, "%s: Reset bits didn't clear", __func__);
->
-> Just display the error log? I didn't understand this.
-> If you displayed the error log, then it needs to return the error value.
->
->>> +
->>> + #ifdef CONFIG_MMC_DW_IDMAC
->>> +       /* It is also recommended that we reset and reprogram idmac */
->>> +       dw_mci_idmac_reset(host);
->>> + #endif
->>> +
->>> +       /* After a CTRL reset we need to have CIU set clock registers  */
->>> +       mci_send_cmd(host->cur_slot, SDMMC_CMD_UPD_CLK, 0);
->>> +
->>> +       return true;
->>>  }
->>>
->>>  static inline bool dw_mci_ctrl_all_reset(struct dw_mci *host)
->>> diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
->>> index 738fa24..037e47a 100644
->>> --- a/drivers/mmc/host/dw_mmc.h
->>> +++ b/drivers/mmc/host/dw_mmc.h
->>> @@ -129,6 +129,7 @@
->>>  #define SDMMC_CMD_INDX(n)              ((n) & 0x1F)
->>>  /* Status register defines */
->>>  #define SDMMC_GET_FCNT(x)              (((x)>>17) & 0x1FFF)
->>> +#define SDMMC_STATUS_DMA_REQ           BIT(31)
->>>  /* FIFOTH register defines */
->>>  #define SDMMC_SET_FIFOTH(m, r, t)      (((m) & 0x7) << 28 | \
->>>                                          ((r) & 0xFFF) << 16 | \
->>> --
->>> 1.7.10.4
->>>
->>
->
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 7c4fada440..10030cc5a0 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -682,6 +682,15 @@ static int cpufreq_callback(struct notifier_block *nb,
+ 			cpufreq_scale(per_cpu(l_p_j_ref, cpu),
+ 					per_cpu(l_p_j_ref_freq, cpu),
+ 					freq->new);
++		/*
++		 * Another CPU might have called udelay() just before LPJ
++		 * and a shared CPU clock is increased.  That other CPU still
++		 * looping on the old LPJ value would return significantly
++		 * sooner than expected.  The actual fix is to provide a
++		 * timer based udelay() implementation instead.
++		 */
++		if (freq->old < freq->new)
++			pr_warn_once("*** udelay() on SMP is racy and may be much shorter than expected ***\n");
+ 	}
+ 	return NOTIFY_OK;
+ }
+
+
+Nicolas
