@@ -1,47 +1,56 @@
-From: tthayer.linux@gmail.com (Thor Thayer)
-Date: Fri, 9 May 2014 15:04:47 -0500
-Subject: [PATCHv3 3/3] edac: altera: Add EDAC support for Altera SDRAM
-In-Reply-To: <536C08B6.2080309@gmail.com>
-References: <1399330337-16748-1-git-send-email-tthayer@altera.com>
- <1399330337-16748-4-git-send-email-tthayer@altera.com>
- <536C08B6.2080309@gmail.com>
-Message-ID: <CAF03EBdYhGvpNtw+vzRpxyMSxPQ=rM9Fy8rexg-BKFRmTg4o6Q@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 09 May 2014 22:12:32 +0200
+Subject: [PATCH 2/2] mtd: orion-nand: fix build error with ARMv4
+In-Reply-To: <20140509184505.GA30330@arch.cereza>
+References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
+ <1399560990-1402858-4-git-send-email-arnd@arndb.de>
+ <20140509184505.GA30330@arch.cereza>
+Message-ID: <28202282.tsYsyDGHCL@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 8, 2014 at 5:44 PM, Dinh Nguyen <dinh.linux@gmail.com> wrote:
->
-> On 5/5/14 5:52 PM, tthayer at altera.com wrote:
->> From: Thor Thayer <tthayer@altera.com>
->>
->> ---
->> v2: Use the SDRAM controller registers to calculate memory size
->>     instead of the Device Tree. Update To & Cc list. Add maintainer
->>     information.
+On Friday 09 May 2014 15:45:05 Ezequiel Garcia wrote:
+> On 08 May 04:56 PM, Arnd Bergmann wrote:
+> 
+> I gave this a try in order to answer Arnd's performance question.
 
-<snip>
+Thanks a lot for testing!
 
->> +
->> +err2er altr_sdram_edac_driver = {
->> +     .probe = altr_sdram_probe,
->> +     .remove = altr_sdram_remove,
->> +     .driver = {
->> +             .name = "altr_sdram_edac",
->> +             .of_match_table = of_match_ptr(altr_sdram_ctrl_of_match),
-> I don't think you need of_match_ptr here for this platform as SOCFPGA is
-> only a DT platform. All that of_match_ptr() does for a CONFIG_OF platform
-> is just return the pointer.
->
-> Dinh
+> First of all,
+> the patch seems wrong. I guess it's because readsl reads 4-bytes pieces, instead of
+> 8-bytes.
 
-Thanks Dinh. I'll remove it in my next submission.
+Oops. I guess I was thinking of a 64-bit system and didn't even notice
+the difference between 4 and 8 byte accesses here. I wonder where I have
+my mind sometimes.
 
->> +     },
->> +};
->> +
->> +module_platform_driver(altr_sdram_edac_driver);
->> +
->> +MODULE_LICENSE("GPL v2");
->> +MODULE_AUTHOR("Altera Corporation");
->> +MODULE_DESCRIPTION("EDAC Driver for Altera SDRAM Controller");
->
+> In other words, the patch is still half-untested. Therefore, and given
+> this is meant only to coherce a build, maybe we'd rather just loop over
+> readb and stay on the safe side?
+
+I guess that would be equal to calling memcpy_fromio().
+
+> And now, answering Arnd's question:
+> 
+> # Using ldrd
+> # time nanddump /dev/mtd5 -f /dev/null -q
+> real	0m 5.90s
+> user	0m 0.22s
+> sys	0m 5.67s
+> 
+> # Using readsl
+> # time nanddump /dev/mtd5 -f /dev/null -q
+> real	0m 6.39s
+> user	0m 0.17s
+> sys	0m 6.20s
+> 
+> So I'd say, let's stick to the ldrd magic.
+
+Ok, that is a noticeable difference. For scale, what is the size of that partition?
+If this is something that actually affects people, it might be worth also trying
+memcpy(), which should be better at saturating the bus, but might be wrong here
+(if alignment the alignment requirements on the external bus are stricter than
+what memcpy does) or it might not make a difference at all if the code is already
+ideal.
+
+	Arnd
