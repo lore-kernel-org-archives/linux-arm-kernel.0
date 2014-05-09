@@ -1,33 +1,72 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri,  9 May 2014 12:57:45 +0100
-Subject: [PATCH] arm64: Define _TIF_POLLING_NRFLAG
-Message-ID: <1399636665-4127-1-git-send-email-broonie@kernel.org>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Fri, 09 May 2014 14:02:14 +0200
+Subject: [PATCH V5 18/20] ARM: exynos: cpuidle: Pass the AFTR callback to
+ the platform_data
+In-Reply-To: <201405091256.54755.arnd@arndb.de>
+References: <1397212815-16068-1-git-send-email-daniel.lezcano@linaro.org>
+ <1397212815-16068-19-git-send-email-daniel.lezcano@linaro.org>
+ <201405091256.54755.arnd@arndb.de>
+Message-ID: <536CC3C6.6070804@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Brown <broonie@linaro.org>
+Hi Arnd,
 
-arm64 defines TIF_POLLING_NRFLAG but not the corresponding shifted version,
-breaking the build with next-20140509 due to fd99f91aa007b (sched/idle:
-Avoid spurious wakeup IPIs) which added a reference to the shifted version
-which is present on most arches.
+On 09.05.2014 12:56, Arnd Bergmann wrote:
+> On Friday 11 April 2014, Daniel Lezcano wrote:
+>> No more dependency on the arch code. The platform_data field is used to set the
+>> PM callback as the other cpuidle drivers.
+>>
+>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
+>> Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> 
+> This has just shown up in linux-next and broken randconfig builds.
+> 
+>> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+>> index fe8dac8..d22f0e4 100644
+>> --- a/arch/arm/mach-exynos/exynos.c
+>> +++ b/arch/arm/mach-exynos/exynos.c
+>> @@ -221,8 +221,9 @@ void exynos_restart(enum reboot_mode mode, const char *cmd)
+>>  }
+>>  
+>>  static struct platform_device exynos_cpuidle = {
+>> -       .name           = "exynos_cpuidle",
+>> -       .id             = -1,
+>> +       .name              = "exynos_cpuidle",
+>> +       .dev.platform_data = exynos_enter_aftr,
+>> +       .id                = -1,
+>>  };
+>>  
+> 
+> This is wrong on many levels, can we please do this properly?
+> 
+> * The exynos_enter_aftr function is compiled conditionally, so you can't just
+>   reference it from generic code, or you get a link error.
 
-Signed-off-by: Mark Brown <broonie@linaro.org>
----
- arch/arm64/include/asm/thread_info.h | 1 +
- 1 file changed, 1 insertion(+)
++1
 
-diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-index 720e70b66ffd..40ff87437734 100644
---- a/arch/arm64/include/asm/thread_info.h
-+++ b/arch/arm64/include/asm/thread_info.h
-@@ -113,6 +113,7 @@ static inline struct thread_info *current_thread_info(void)
- #define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
- #define _TIF_NOTIFY_RESUME	(1 << TIF_NOTIFY_RESUME)
- #define _TIF_32BIT		(1 << TIF_32BIT)
-+#define _TIF_POLLING_NRFLAG	(1 << TIF_POLLING_NRFLAG)
- 
- #define _TIF_WORK_MASK		(_TIF_NEED_RESCHED | _TIF_SIGPENDING | \
- 				 _TIF_NOTIFY_RESUME)
--- 
-2.0.0.rc2
+> * 'static struct platform_device ...' has been deprecated for at least a decade,
+>   stop doing that. For any platform devices that get registered, there is
+>   platform_device_register_simple().
+
++0.5
+
+The missing 0.5 is because you can't pass platform data using
+platform_device_register_simple(). There is
+platform_device_register_resndata(), though.
+
+> * There shouldn't need to be a platform_device to start with, this should all
+>   come from DT. We can't do this on arm64 anyway, so any code that may be
+>   shared between arm32 and arm64 should have proper abstractions.
+
+-1
+
+Exynos cpuidle is not a device on the SoC, so I don't think there is any
+way to represent it in DT. The only thing I could see this is matching
+root node with a central SoC driver that instantiates specific
+subdevices, such as cpufreq and cpuidle, but I don't see any available
+infrastructure for this.
+
+Best regards,
+Tomasz
