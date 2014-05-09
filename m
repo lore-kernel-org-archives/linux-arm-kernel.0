@@ -1,33 +1,101 @@
-From: agnel.joel@gmail.com (Joel Fernandes)
-Date: Thu, 8 May 2014 23:22:50 -0500
-Subject: [PATCH 3/5] irqchip: crossbar: Skip some irqs from getting mapped
- to crossbar
-In-Reply-To: <536C2071.8040502@ti.com>
-References: <1399299527-10955-1-git-send-email-r.sricharan@ti.com>
- <1399299527-10955-4-git-send-email-r.sricharan@ti.com>
- <536BD9D8.4080905@ti.com> <20140508203659.GA5620@kahuna>
- <CAD=GYpbQQxQgKd3oZcAuWrxoD4VrkKzpybd11qwxs405HSUVGw@mail.gmail.com>
- <536C0DC4.7090309@ti.com>
- <CAD=GYpav4mHaqo4jfb0ePchf3cvuvSnFKj_+osbrt_8-tYRRrQ@mail.gmail.com>
- <536C2071.8040502@ti.com>
-Message-ID: <CAD=GYpbRn=LEthpAUX9LNBGTB4iDs7TGiSSgLJuuS0tSatRRJQ@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 8 May 2014 21:41:27 -0700
+Subject: [PATCH] ARM: Don't ever downscale loops_per_jiffy in SMP systems
+In-Reply-To: <20140509002334.GK3693@n2100.arm.linux.org.uk>
+References: <1399504982-31181-1-git-send-email-dianders@chromium.org>
+ <CAOh2x=kwaoSdj8JO0Vo08Y0dX2UfKFiF3pBV-qtp-YTyN=8H8Q@mail.gmail.com>
+ <CAD=FV=UEGJGHrdcXgs3EZ_wFXT8GnNeCOMt7CgdiiUzBzZ5Y0A@mail.gmail.com>
+ <alpine.LFD.2.11.1405081149190.980@knanqh.ubzr>
+ <CAD=FV=VtcLOh51LCmafzRMdqtDrwKXCqK6gE6V7OOOUe4gjwbA@mail.gmail.com>
+ <alpine.LFD.2.11.1405081329010.980@knanqh.ubzr>
+ <CAD=FV=X4h0nfO7a10NXe+d76xj5ttBJx=q1pAvW4aPzrc22BoQ@mail.gmail.com>
+ <20140508205556.GJ3693@n2100.arm.linux.org.uk>
+ <CAD=FV=ViOie+E_mxgcE51oNL0HY1zF9KYG_TDSbKjMzE2GZZMw@mail.gmail.com>
+ <20140509002334.GK3693@n2100.arm.linux.org.uk>
+Message-ID: <CAD=FV=WkbGQ_F93rA6y7nPHcJ44UboH9vi_LiToCFeyL2b6btA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 8, 2014 at 7:25 PM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-[..]
-> The concern was really not where the code resides but what the actual
-> hardware is and how can it fit into Linux. The whole reason I was
-> actually against irqhcip from beginning of crossbar series was the
-> hardware is not irqchip rather just a router. Thomas the formally
-> NAKed that approach on thread [1]. If there are bugs, doesn't mean
-> we can make fit the hardware into some subsystem where it can't be
-> described.
->
-> Regards,
-> Santosh
-> [1] https://lkml.org/lkml/2013/9/13/413
->
+Russell,
 
-Ok, thanks for pointing to the post.
+On Thu, May 8, 2014 at 5:23 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, May 08, 2014 at 05:02:02PM -0700, Doug Anderson wrote:
+>> Russel,
+>>
+>> On Thu, May 8, 2014 at 1:55 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > On Thu, May 08, 2014 at 11:06:24AM -0700, Doug Anderson wrote:
+>> >> I guess I would say that my patch is unhacking the this code.  The
+>> >> code after my patch is simpler.  I would perhaps argue that (ec971ea
+>> >> ARM: add cpufreq transiton notifier to adjust loops_per_jiffy for smp)
+>> >> should never have landed to begin with.
+>> >
+>> > That depends on your point of view.  As I've already pointed out through
+>> > the examples of why udelay() is inaccurate, for driver authors, they
+>> > should assume that udelay() just gives you an "approximate" delay and
+>> > it has no accuracy.
+>>
+>> That disagrees with what Thomas Gleixner says at
+>> <http://lkml.iu.edu//hypermail/linux/kernel/1203.1/01034.html>.  It
+>> also seems like perhaps the regulator core is broken, then...  If a
+>> udelay(30) can end up as a udelay(20) then we may return from a
+>> regulator code 10us earlier than we should and we'll assume that a
+>> regulator is ramped before it really is...
+>>
+>> I'm out tomorrow but I can confirm on Monday that I was really seeing
+>> udelay(30) be a udelay(20) without this patch.
+>
+> Thomas is wrong - when I researched this topic, I ended up finding
+> that udelay() does delay _less_ than requested, and I mailed Linus
+> about it...  This is whe way udelay() is - it's an approximate delay,
+> it's *not* accurate.
+>
+> It's also fairly obvious when you stop and consider how it's calibrated.
+>
+> Take a moment to wonder when we used to recalibrate each CPU individally,
+> why the boot CPU bogomips would be slightly lower than the secondary
+> CPU bogomips.  This is all down to the boot CPU having to run timer
+> interrupts while the secondary CPUs weren't at the time they calibrated.
+>
+> Linus doesn't give a damn about udelay() being slightly short in this
+> way.  Neither do I.
+
+Can you define what you mean by "slightly"?  I'm personally not super
+concerned by udelay(50) becoming udelay(49), but...
+
+I've got a test that hammers on udelay and tests it against ktime.  It
+runs for _multiple minutes_ and give nearly spot on udelay(50) values.
+ Then, it gets unlucky and gives something like this (values reported
+in nanoseconds):
+
+[  467.034522] 0. want=50000, got=308708
+[  467.034522] 1. want=50000, got=51917
+[  467.034522] 2. want=50000, got=51167
+[  467.034522] 3. want=50000, got=76291
+[  467.034522] 4. want=50000, got=149959
+[  467.034522] 5. want=50000, got=76458
+[  467.034522] 6. want=50000, got=39583
+[  467.034522] 7. want=50000, got=19459
+[  467.034522] 8. want=50000, got=20625
+[  467.034522] 9. want=50000, got=20375
+
+It's things like "want 50000, got 19459" that concern me.  It's even
+more concerning that it only happens after multiple minutes, meaning
+that it will lead to random, impossible to reproduce bugs.
+
+NOTE: I haven't traced through to figure out exactly what scenario
+causes the above to happen.  In my case I'm simply looping over some
+test code using
+<https://chromium-review.googlesource.com/#/c/189760/8/init/calibrate.c>.
+ ...but if we stop screwing with loops_per_jiffy it definitely doesn't
+happen.
+
+
+> Let me repeat again: use a timer.
+
+Totally agree.  We are using a timer going forward.  I was posting
+this patch to help those less fortunate who happen to be running on a
+system where the timer isn't available for whatever reason.
+
+-Doug
