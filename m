@@ -1,44 +1,41 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 9 May 2014 12:09:59 +0200
-Subject: [PATCH] usb: gadget: atmel_usba: always test udc->driver
-In-Reply-To: <1399389367-15456-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1399389367-15456-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <536CA977.7080404@atmel.com>
+From: rahul.sharma@samsung.com (Rahul Sharma)
+Date: Fri, 09 May 2014 15:39:42 +0530
+Subject: [PATCH v3 0/4] ARM: dts: enable display for peach-pit and snow boards
+Message-ID: <1399630186-22610-1-git-send-email-rahul.sharma@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/05/2014 17:16, Alexandre Belloni :
-> Found using smatch: drivers/usb/gadget/atmel_usba_udc.c:1689 usba_udc_irq()
-> error: we previously assumed 'udc->driver' could be null (see line 1636)
-> 
-> Always test udc->driver before using its members.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+From: Rahul Sharma <Rahul.Sharma@samsung.com>
 
+Add nodes for fimd and dp controller for exynos5250 based snow
+and exynos5420 based peach-pit board.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+This series is based on Kukjin Kims, for-next branch.
 
-Thanks,
+V3:
+1) Dropped 1 patch "ARM: dts: move dp hpd line to the board file for
+ exynos5420".
+2) Extra blank lines for readability.
+3) dp hpd gpio name change (dp_hpd -> dp_hpd_gpio)
 
-> ---
->  drivers/usb/gadget/atmel_usba_udc.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/usb/gadget/atmel_usba_udc.c b/drivers/usb/gadget/atmel_usba_udc.c
-> index 9f65324f9ae0..76023ce449a3 100644
-> --- a/drivers/usb/gadget/atmel_usba_udc.c
-> +++ b/drivers/usb/gadget/atmel_usba_udc.c
-> @@ -1686,7 +1686,7 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
->  		reset_all_endpoints(udc);
->  
->  		if (udc->gadget.speed != USB_SPEED_UNKNOWN
-> -				&& udc->driver->disconnect) {
-> +				&& udc->driver && udc->driver->disconnect) {
->  			udc->gadget.speed = USB_SPEED_UNKNOWN;
->  			spin_unlock(&udc->lock);
->  			udc->driver->disconnect(&udc->gadget);
-> 
+V2:
+1) Rebase on Peach-pit dependent patches.
 
+It is dependent on
+1) Andrew Bresticker's patch for hpd gpio addition, avilable at
+http://www.spinics.net/lists/linux-samsung-soc/msg28827.html [Patch is 'ACK'ed.]
+2) Arun's patch for adding peach-pit board dts file at
+http://www.spinics.net/lists/linux-samsung-soc/msg30103.html. [Patch is 'ACK'ed.]
+
+Rahul Sharma (4):
+  ARM: dts: enable fimd for exynos5250 based snow board
+  ARM: dts: enable dp-controller for exynos5250 based snow board
+  ARM: dts: enable fimd for exynos5420 based peach-pit board
+  ARM: dts: enable dp-controller for exynos5420 based peach-pit board
+
+ arch/arm/boot/dts/exynos5250-snow.dts      |   35 ++++++++++++++++++++++++
+ arch/arm/boot/dts/exynos5420-peach-pit.dts |   41 ++++++++++++++++++++++++++++
+ 2 files changed, 76 insertions(+)
 
 -- 
-Nicolas Ferre
+1.7.9.5
