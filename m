@@ -1,65 +1,32 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri,  9 May 2014 17:40:40 +0100
-Subject: [PATCH] arm: use cpu_online_mask when using forced irq_set_affinity
-Message-ID: <1399653640-21559-1-git-send-email-sudeep.holla@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri,  9 May 2014 17:40:29 +0100
+Subject: [PATCH 1/3] arm64: Enable OPP
+Message-ID: <1399653631-4938-1-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sudeep Holla <sudeep.holla@arm.com>
+From: Mark Brown <broonie@linaro.org>
 
-Commit 01f8fa4f01d8("genirq: Allow forcing cpu affinity of interrupts")
-enabled the forced irq_set_affinity which previously refused to route an
-interrupt to an offline cpu.
+Some of the generic drivers used on ARM class systems use OPP so allow it
+to be selected in Kconfig. No code is required for this, it is not clear
+to me why there is config for this option.
 
-Commit ffde1de64012("irqchip: Gic: Support forced affinity setting")
-implements this force logic and disables the cpu online check for GIC
-interrupt controller.
-
-When __cpu_disable calls migrate_irqs, it disables the current cpu in
-cpu_online_mask and uses forced irq_set_affinity to migrate the IRQs
-away from the cpu but passes affinity mask with the cpu being offlined
-also included in it.
-
-When calling irq_set_affinity with force == true in a cpu hotplug path,
-the caller must ensure that the cpu being offlined is not present in the
-affinity mask or it may be selected as the target CPU, leading to the
-interrupt not being migrated.
-
-This patch uses cpu_online_mask when using forced irq_set_affinity so
-that the IRQs are properly migrated away.
-
-Tested on TC2 hotpluging CPU0 in and out. Without this patch the system
-locks up as the IRQs are not migrated away from CPU0.
-
-Cc: Russell King <linux@arm.linux.org.uk> 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+Signed-off-by: Mark Brown <broonie@linaro.org>
 ---
- arch/arm/kernel/irq.c | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
+ arch/arm64/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
-index 9723d17..1f216a5 100644
---- a/arch/arm/kernel/irq.c
-+++ b/arch/arm/kernel/irq.c
-@@ -155,11 +155,15 @@ static bool migrate_one_irq(struct irq_desc *desc)
- 	if (irqd_is_per_cpu(d) || !cpumask_test_cpu(smp_processor_id(), affinity))
- 		return false;
- 
--	if (cpumask_any_and(affinity, cpu_online_mask) >= nr_cpu_ids) {
--		affinity = cpu_online_mask;
-+	if (cpumask_any_and(affinity, cpu_online_mask) >= nr_cpu_ids)
- 		ret = true;
--	}
- 
-+	/*
-+	 * when using forced irq_set_affinity we must ensure that the cpu
-+	 * being offlined is not present in the affinity mask, it may be
-+	 * selected as the target CPU otherwise
-+	 */
-+	affinity = cpu_online_mask;
- 	c = irq_data_get_irq_chip(d);
- 	if (!c->irq_set_affinity)
- 		pr_debug("IRQ%u: unable to set affinity\n", d->irq);
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 8ccdd2646ae3..8256d6d09d33 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -2,6 +2,7 @@ config ARM64
+ 	def_bool y
+ 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+ 	select ARCH_USE_CMPXCHG_LOCKREF
++	select ARCH_HAS_OPP
+ 	select ARCH_HAS_SG_CHAIN
+ 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
 -- 
-1.8.3.2
+2.0.0.rc2
