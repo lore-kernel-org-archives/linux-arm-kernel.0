@@ -1,86 +1,30 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Fri,  9 May 2014 16:43:30 +0200
-Subject: [RESEND PATCH v4] ARM: at91: fix at91_sysirq_mask_rtc for sam9x5 SoCs
-Message-ID: <1399646610-18816-1-git-send-email-boris.brezillon@free-electrons.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 9 May 2014 15:44:39 +0100
+Subject: [PATCH] ARM: mm: Add workaround for erratum 763126
+In-Reply-To: <CAFY15YHPSLMh6iA1PQHjsneL_Kxarc0xL5uJ7_px71cbmJbrgQ@mail.gmail.com>
+References: <1399528508-2806-1-git-send-email-arjun.kv@samsung.com>
+ <CAD=FV=XeYdgqk3-CpS2NNXFAnn+uGDC6844d-L6vfS=SYEuw-Q@mail.gmail.com>
+ <20140508173853.GG8981@arm.com>
+ <CAD=FV=X0jQvmA07XZEKT-3FAOaE3p0qCLPUCJKR8Ux1=o46cVQ@mail.gmail.com>
+ <20140508180534.GI8981@arm.com>
+ <CAFY15YHPSLMh6iA1PQHjsneL_Kxarc0xL5uJ7_px71cbmJbrgQ@mail.gmail.com>
+Message-ID: <20140509144439.GG7950@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sam9x5 SoCs have the following errata:
-"RTC: Interrupt Mask Register cannot be used
- Interrupt Mask Register read always returns 0."
+On Fri, May 09, 2014 at 02:56:02PM +0100, arjun kv wrote:
+> As Doug already mentioned, we have not observed an issue which could have been
+> triggered by this erratum.
+> Nor do we have a method to actually trigger the livelock.
+> But if it improves the performance and has no real side effects, we could?at
+> least?land this in our local tree?
 
-Hence we should not rely on what IMR claims about already masked IRQs
-and just disable all IRQs.
+It's up to you, but do some benchmarks first.
 
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: <stable@vger.kernel.org> # v3.10+
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
-Hello,
+ACTLR bits that improve performance on specific SoCs should really be
+set by the firmware before booting the kernel. There is no way for the
+kernel to know what works best for your system, especially when we deal
+with implementation-defined registers.
 
-Again, sorry for the noise, but I forgot to add Nicolas' ack and to keep
-Andrew and the stable ML in cc.
-
-Best Regards,
-
-Boris
-
-Changes since v3:
-- fix commit message and comment
-Changes since v2:
-- removed unused variable 'mask'
-Changes since v1:
-- use a macro to define IRQs bitmask
-- read IMR register to ensure the write to IDR has been flushed
-- quote atmel's datasheet errata in commit message
-- comment the code to describe why we're not using IMR to disable
-  the interrupts
-
- arch/arm/mach-at91/sysirq_mask.c | 22 +++++++++++++---------
- 1 file changed, 13 insertions(+), 9 deletions(-)
-
-diff --git a/arch/arm/mach-at91/sysirq_mask.c b/arch/arm/mach-at91/sysirq_mask.c
-index 2ba694f..f8bc351 100644
---- a/arch/arm/mach-at91/sysirq_mask.c
-+++ b/arch/arm/mach-at91/sysirq_mask.c
-@@ -25,24 +25,28 @@
- 
- #include "generic.h"
- 
--#define AT91_RTC_IDR	0x24	/* Interrupt Disable Register */
--#define AT91_RTC_IMR	0x28	/* Interrupt Mask Register */
-+#define AT91_RTC_IDR		0x24	/* Interrupt Disable Register */
-+#define AT91_RTC_IMR		0x28	/* Interrupt Mask Register */
-+#define AT91_RTC_IRQ_MASK	0x1f	/* Available IRQs mask */
- 
- void __init at91_sysirq_mask_rtc(u32 rtc_base)
- {
- 	void __iomem *base;
--	u32 mask;
- 
- 	base = ioremap(rtc_base, 64);
- 	if (!base)
- 		return;
- 
--	mask = readl_relaxed(base + AT91_RTC_IMR);
--	if (mask) {
--		pr_info("AT91: Disabling rtc irq\n");
--		writel_relaxed(mask, base + AT91_RTC_IDR);
--		(void)readl_relaxed(base + AT91_RTC_IMR);	/* flush */
--	}
-+	/*
-+	 * sam9x5 SoCs have the following errata:
-+	 * "RTC: Interrupt Mask Register cannot be used
-+	 *  Interrupt Mask Register read always returns 0."
-+	 *
-+	 * Hence we're not relying on IMR values to disable
-+	 * interrupts.
-+	 */
-+	writel_relaxed(AT91_RTC_IRQ_MASK, base + AT91_RTC_IDR);
-+	(void)readl_relaxed(base + AT91_RTC_IMR);	/* flush */
- 
- 	iounmap(base);
- }
 -- 
-1.8.3.2
+Catalin
