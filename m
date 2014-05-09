@@ -1,57 +1,55 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 9 May 2014 11:23:32 +0300
-Subject: omap4-panda-es boot issues with v3.15-rc4
-In-Reply-To: <7hha4zsyro.fsf@paris.lan>
-References: <536B7E44.2040303@ti.com>
- <7hppjos2w2.fsf@paris.lan>	<CAGa+x84VB3CXDm71JWxHx1-Qk1xVNeXdwUjZnb42_wg+piOzzA@mail.gmail.com>	<20140508165558.GB2198@atomide.com>	<20140508184055.GC2198@atomide.com>
- <7hha4zsyro.fsf@paris.lan>
-Message-ID: <536C9084.50209@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 9 May 2014 09:24:40 +0100
+Subject: [PATCH 6/8] arm64/kexec: kexec needs cpu_die
+In-Reply-To: <4408c92fbc8f2f2a81054b9f2ac38331562e658a.1399594544.git.geoff@infradead.org>
+References: <cover.1399594544.git.geoff@infradead.org>
+ <4408c92fbc8f2f2a81054b9f2ac38331562e658a.1399594544.git.geoff@infradead.org>
+Message-ID: <20140509082439.GC4757@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin,
+Hi Geoff,
 
-On 05/09/2014 01:15 AM, Kevin Hilman wrote:
-> Tony Lindgren <tony@atomide.com> writes:
-> 
-> [...]
-> 
->> ..but I think I found the cause for recent hangs on panda, just a wild
->> guess based on looking at the recent cpuidle patches after v3.14.
->>
->> Looks like reverting 0b89e9aa2856 (cpuidle: delay enabling interrupts
->> until all coupled CPUs leave idle) makes booting work reliably again
->> on panda.
->>
->> Can you guys confirm, so far no issues here after few boot tests,
->> but it might be too early to tell.
-> 
-> Reverting that makes things a bit more stable, but it still eventually
-> fails in the same way.  For me it took 8 boots for it to eventually
-> fail.
-> 
-> However, if I build with CONFIG_CPU_IDLE=n, it becomes much more stable
-> (20+ boots in a row and still going.)
-> 
+On Fri, May 09, 2014 at 01:48:17AM +0100, Geoff Levand wrote:
+> Kexec uses the cpu_die method of struct cpu_operations, so add
+> defined(CONFIG_KEXEC) to the preprocessor conditional that enables cpu_die.
 
-Can you please test with CPU_IDLE enabled but C3 disabled as in below patch?
-It worked for me 10/10 boots.
+Why not make kexec depend on !CONFIG_SMP || CONFIG_HOTPLUG_CPU instead?
 
-diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
-index 01fc710..99362ff 100644
---- a/arch/arm/mach-omap2/cpuidle44xx.c
-+++ b/arch/arm/mach-omap2/cpuidle44xx.c
-@@ -206,7 +206,12 @@ static struct cpuidle_driver omap4_idle_driver = {
- 			.desc = "CPUx OFF, MPUSS OSWR",
- 		},
- 	},
--	.state_count = ARRAY_SIZE(omap4_idle_data),
-+/*
-+ * 	Disable C3 state since it is unstable
-+ *
-+ *	.state_count = ARRAY_SIZE(omap4_idle_data),
-+ */
-+	.state_count = 2,
- 	.safe_state_index = 0,
- };
- 
+>From the POV of the PSCI code in the kernel, it's hotplugging a CPU. Why
+it's performing the hotplug operation shouldn't matter.
+
+> 
+> Signed-off-by: Geoff Levand <geoff@infradead.org>
+> ---
+>  arch/arm64/kernel/psci.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
+> index ea4828a..0e5fa69 100644
+> --- a/arch/arm64/kernel/psci.c
+> +++ b/arch/arm64/kernel/psci.c
+> @@ -253,7 +253,7 @@ static int cpu_psci_cpu_boot(unsigned int cpu)
+>  	return err;
+>  }
+>  
+> -#ifdef CONFIG_HOTPLUG_CPU
+> +#if defined(CONFIG_HOTPLUG_CPU) || defined(CONFIG_KEXEC)
+>  static int cpu_psci_cpu_disable(unsigned int cpu)
+>  {
+>  	/* Fail early if we don't have CPU_OFF support */
+> @@ -284,7 +284,7 @@ const struct cpu_operations cpu_psci_ops = {
+>  	.cpu_init	= cpu_psci_cpu_init,
+>  	.cpu_prepare	= cpu_psci_cpu_prepare,
+>  	.cpu_boot	= cpu_psci_cpu_boot,
+> -#ifdef CONFIG_HOTPLUG_CPU
+> +#if defined(CONFIG_HOTPLUG_CPU) || defined(CONFIG_KEXEC)
+>  	.cpu_disable	= cpu_psci_cpu_disable,
+>  	.cpu_die	= cpu_psci_cpu_die,
+>  #endif
+
+Doesn't his cause the build to fail when KEXEC && !HOTPLUG_CPU? I didn't
+see cpu_ops.h updated similarly.
+
+Thanks,
+Mark.
