@@ -1,75 +1,74 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 9 May 2014 08:37:23 -0700
-Subject: [PATCH 4/4] ARM: dts: Add LCD panel sharp ls037v7dw01 support
- for omap3-evm and ldp
-In-Reply-To: <536C7EA7.5000306@ti.com>
-References: <1398815562-24113-1-git-send-email-tony@atomide.com>
- <1398815562-24113-5-git-send-email-tony@atomide.com>
- <CAGhQ9Vwa8xXQEo5dNEKAvmaS9DoBjVSthtd8=owk+atVdFuiiA@mail.gmail.com>
- <20140430174751.GA12362@atomide.com>
- <20140505183919.GA15463@atomide.com>
- <20140508233628.GJ2198@atomide.com> <536C7EA7.5000306@ti.com>
-Message-ID: <20140509153723.GD17814@atomide.com>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Fri, 9 May 2014 10:44:28 -0500
+Subject: [PATCH] ARM: socfpga: Remove static declaration for the SCU virtual
+ address
+Message-ID: <1399650268-30964-1-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tomi Valkeinen <tomi.valkeinen@ti.com> [140509 00:08]:
-> On 09/05/14 02:36, Tony Lindgren wrote:
-> 
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/omap-panel-sharp-ls037v7dw01.dtsi
-> > @@ -0,0 +1,82 @@
-> > +/*
-> > + * Common file for omap dpi panels with QVGA and reset pins
-> > + *
-> > + * Note that the board specifc DTS file needs to specify
-> > + * at minimum the GPIO enable-gpios for display, and
-> > + * gpios for gpio-backlight.
-> > + */
-> 
-> This looks very board specific to me... The regulator and the use of
-> mcspi1 depend on the board, so this file can't be used on just any omap
-> board with the same panel. And this can (probably) only be used on
-> boards with a single display. Do those boards have tv-out?
+From: Dinh Nguyen <dinguyen@altera.com>
 
-Yes there's also TV out and DVI on omap3-evm, LDP just has DVI.
+Use common scu_a9_get_base() to get the SCU base address and just
+use what scu_a9_get_base() returns as the virtual address.
 
-It seems that all omap3 boards using this are pretty much wired
-the same way.
+Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+---
+ arch/arm/mach-socfpga/core.h    |    2 --
+ arch/arm/mach-socfpga/socfpga.c |   15 +++++++++------
+ 2 files changed, 9 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm/mach-socfpga/core.h b/arch/arm/mach-socfpga/core.h
+index 572b8f7..6e2560c 100644
+--- a/arch/arm/mach-socfpga/core.h
++++ b/arch/arm/mach-socfpga/core.h
+@@ -42,6 +42,4 @@ extern char secondary_trampoline, secondary_trampoline_end;
  
-> So I have nothing against having common files, but shouldn't this be
-> named something more specific? If the boards involved are TI's OMAP3
-> development boards, maybe this should be something like...
-> omap3-ti-dev-panel-sharp-ls037v7dw01.dtsi. Well, that's a quite long one.
-
-Yeah let's use omap3-panel-sharp-ls037v7dw01.dtsi. Looking at the
-legacy board files that should cover quite a few of them.
-
-I guess it might also work on 2430sdp, but let's assume omap3
-for now.
+ extern unsigned long cpu1start_addr;
  
-> > +/ {
-> > +	aliases {
-> > +		display0 = &lcd0;
-> > +	};
-> > +
-> > +	backlight0: backlight {
-> > +		compatible = "gpio-backlight";
-> > +	};
-> > +
-> > +	/* 3.3V GPIO controlled regulator for LCD_ENVDD */
-> > +	lcd_3v3: regulator-lcd-3v3 {
-> > +		compatible = "regulator-fixed";
-> > +		regulator-name = "lcd_3v3";
-> > +		regulator-min-microvolt = <3300000>;
-> > +		regulator-max-microvolt = <3300000>;
-> > +		startup-delay-us = <70000>;
-> > +		regulator-always-on;
-> 
-> Why always-on?
-
-Oops, yeah that should not be there. The GPIO is board specific.
-
-Regards,
-
-Tony
+-#define SOCFPGA_SCU_VIRT_BASE   0xfffec000
+-
+ #endif
+diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
+index d86231e..5d65b41 100644
+--- a/arch/arm/mach-socfpga/socfpga.c
++++ b/arch/arm/mach-socfpga/socfpga.c
+@@ -23,16 +23,16 @@
+ #include <asm/hardware/cache-l2x0.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
++#include <asm/smp_scu.h>
+ 
+ #include "core.h"
+ 
+-void __iomem *socfpga_scu_base_addr = ((void __iomem *)(SOCFPGA_SCU_VIRT_BASE));
++void __iomem *socfpga_scu_base_addr;
+ void __iomem *sys_manager_base_addr;
+ void __iomem *rst_manager_base_addr;
+ unsigned long cpu1start_addr;
+ 
+ static struct map_desc scu_io_desc __initdata = {
+-	.virtual	= SOCFPGA_SCU_VIRT_BASE,
+ 	.pfn		= 0, /* run-time */
+ 	.length		= SZ_8K,
+ 	.type		= MT_DEVICE,
+@@ -49,11 +49,14 @@ static void __init socfpga_scu_map_io(void)
+ {
+ 	unsigned long base;
+ 
+-	/* Get SCU base */
+-	asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (base));
++	if (scu_a9_has_base()) {
++		base = scu_a9_get_base();
+ 
+-	scu_io_desc.pfn = __phys_to_pfn(base);
+-	iotable_init(&scu_io_desc, 1);
++		scu_io_desc.pfn = __phys_to_pfn(base);
++		scu_io_desc.virtual = base;
++		iotable_init(&scu_io_desc, 1);
++		socfpga_scu_base_addr = (void __iomem *)base;
++	}
+ }
+ 
+ static void __init socfpga_map_io(void)
+-- 
+1.7.9.5
