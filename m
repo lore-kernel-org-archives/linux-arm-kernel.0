@@ -1,81 +1,50 @@
-From: bay@hackerdom.ru (Alexander Bersenev)
-Date: Fri, 9 May 2014 15:21:29 +0200
-Subject: [PATCH v5 0/3] ARM: sunxi: Add support for consumer infrared
- devices
-In-Reply-To: <536B8CDD.7040600@redhat.com>
-References: <1398871010-30681-1-git-send-email-bay@hackerdom.ru>
- <536B8CDD.7040600@redhat.com>
-Message-ID: <E54FF549-B53A-406B-9871-E2C3B1ED8157@hackerdom.ru>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Fri,  9 May 2014 18:53:00 +0530
+Subject: [PATCH v2 0/4] dts: Add usb2phy to Exynos 5250/5420
+Message-ID: <1399641784-10833-1-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, I am in Austria/Germany in 1-11 may. I plan to make v6 after returning back to Russia.
+Based on 'for-next' branch of Kgene's linux-samsung tree.
+These patches are as per discussions on the driver side patches
+which have already been acked. [1]
 
-Best,
-Alexander Bersenev
+Changes from v1:
+ - Rebase on 'for-next' branch.
+ - Removed 'phy-names' property as per discuusion in the driver patches. [1]
 
-> 08 ??? 2014 ?., ? 15:55, Hans de Goede <hdegoede@redhat.com> ???????(?):
-> 
-> Hi,
-> 
->> On 04/30/2014 05:16 PM, Alexander Bersenev wrote:
->> This patch introduces Consumer IR(CIR) support for sunxi boards.
->> 
->> This is based on Alexsey Shestacov's work based on the original driver 
->> supplied by Allwinner.
->> 
->> Signed-off-by: Alexander Bersenev <bay@hackerdom.ru>
->> Signed-off-by: Alexsey Shestacov <wingrime@linux-sunxi.org>
-> 
-> Alexander, v5 still has various issues which need fixing,
-> do you plan to do a v6 soon ?
-> 
-> Regards,
-> 
-> Hans
-> 
->> 
->> ---
->> Changes since version 1: 
->> - Fix timer memory leaks 
->> - Fix race condition when driver unloads while interrupt handler is active
->> - Support Cubieboard 2(need testing)
->> 
->> Changes since version 2:
->> - More reliable keydown events
->> - Documentation fixes
->> - Rename registers accurding to A20 user manual
->> - Remove some includes, order includes alphabetically
->> - Use BIT macro
->> - Typo fixes
->> 
->> Changes since version 3:
->> - Split the patch on smaller parts
->> - More documentation fixes
->> - Add clock-names in DT
->> - Use devm_clk_get function to get the clocks
->> - Removed gpios property from ir's DT
->> - Changed compatible from allwinner,sunxi-ir to allwinner,sun7i-a20-ir in DT
->> - Use spin_lock_irq instead spin_lock_irqsave in interrupt handler
->> - Add myself in the copyright ;)
->> - Coding style and indentation fixes
->> 
->> Changes since version 4:
->> - Try to fix indentation errors by sending patches with git send-mail
->> 
->> Alexander Bersenev (3):
->>  ARM: sunxi: Add documentation for sunxi consumer infrared devices
->>  ARM: sunxi: Add driver for sunxi IR controller
->>  ARM: sunxi: Add IR controller support in DT on A20
->> 
->> .../devicetree/bindings/media/sunxi-ir.txt         |  23 ++
->> arch/arm/boot/dts/sun7i-a20-cubieboard2.dts        |   6 +
->> arch/arm/boot/dts/sun7i-a20-cubietruck.dts         |   6 +
->> arch/arm/boot/dts/sun7i-a20.dtsi                   |  31 +++
->> drivers/media/rc/Kconfig                           |  10 +
->> drivers/media/rc/Makefile                          |   1 +
->> drivers/media/rc/sunxi-ir.c                        | 303 +++++++++++++++++++++
->> 7 files changed, 380 insertions(+)
->> create mode 100644 Documentation/devicetree/bindings/media/sunxi-ir.txt
->> create mode 100644 drivers/media/rc/sunxi-ir.c
->> 
+V1 of this series was the next version for earlier patch-series:
+[PATCH v7 0/2] dts: Add usb2phy to Exynos 5250 [2]
+
+Changes from v7 series:
+ - Added patches to enable usb 2.0 support on exynos5420;
+   which include dt nodes for usb2phy as well as ehci and ohci
+   controllers.
+
+Changes from v6:
+ - Splitted the patch into two:
+    adding syscon nodes to Exynos5250 and Exynos5420 in first;
+    and phy entry change in the second.
+ - Changed the name of phandle for usb2phy from 'usb2_phy_new'
+   to 'usb2_phy_gen' indicating generic phy.
+ - Using clock macros in dt entries.
+
+[1] http://www.spinics.net/lists/linux-usb/msg106908.html
+    http://www.spinics.net/lists/linux-usb/msg106837.html
+[2] http://www.spinics.net/lists/linux-usb/msg106427.html
+
+Kamil Debski (1):
+  ARM: dts: Add usb2phy to Exynos 5250
+
+Vivek Gautam (3):
+  ARM: dts: Add sysreg sytem controller node to exynos5250 and
+    exynos5420
+  ARM: dts: Add usb2phy support on exynos5420
+  ARM: dts: Add usb 2.0 support on exynos5420
+
+ arch/arm/boot/dts/exynos5250.dtsi |   27 ++++++++++++++++++++++
+ arch/arm/boot/dts/exynos5420.dtsi |   45 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 72 insertions(+)
+
+-- 
+1.7.10.4
