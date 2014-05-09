@@ -1,41 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 10 May 2014 00:24:02 +0200
-Subject: [PATCH 2/2] mtd: orion-nand: fix build error with ARMv4
-In-Reply-To: <20140509220915.GA391@arch.cereza>
-References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
- <20140509212810.GF18257@obsidianresearch.com>
- <20140509220915.GA391@arch.cereza>
-Message-ID: <4160510.VJSlHZLhNz@wuerfel>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Sat, 10 May 2014 00:57:09 +0200
+Subject: [PATCH v2.1 3/9] ARM: S3C24XX: enable usage of common dclk if
+ common clock framework is enabled
+In-Reply-To: <1399654181.19276.2.camel@x220>
+References: <2104342.rkElQpXtvM@phil> <3835735.0k9HAgQHzN@phil>
+ <1399654181.19276.2.camel@x220>
+Message-ID: <1454194.ZOZn9c4lf4@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 09 May 2014 19:09:15 Ezequiel Garcia wrote:
-> # time nanddump /dev/mtd5 -f /dev/null -q
-> real    0m 5.82s
-> user    0m 0.20s
-> sys     0m 5.60s
+Am Freitag, 9. Mai 2014, 18:49:41 schrieb Paul Bolle:
+> > @@ -643,7 +654,8 @@ config MACH_RX1950
+> > 
+> >  	select PM_H1940 if PM
+> >  	select S3C2410_IOTIMING if ARM_S3C2440_CPUFREQ
+> >  	select S3C2440_XTAL_16934400
+> > 
+> > -	select S3C24XX_DCLK
+> > +	select S3C24XX_DCLK if SAMSUNG_CLOCK
+> > +	select S3C24XX_COMMON_DCLK if COMMON_CLK
 > 
-> Jason: Care to submit a proper patch?
-> 
-> On 08 May 04:56 PM, Arnd Bergmann wrote:
-> > Ok, that is a noticeable difference. For scale, what is the size of that partition?
-> 
-> The board is Openblocks A6, running mainline.
-> 
-> # cat /proc/mtd 
-> dev:    size   erasesize  name
-> mtd0: 00090000 00004000 "uboot"
-> mtd1: 00044000 00004000 "env"
-> mtd2: 00024000 00004000 "test"
-> mtd3: 00400000 00004000 "conf"
-> mtd4: 01d20000 00004000 "linux"
-> mtd5: 01dec000 00004000 "user"
+> This looks like a typo. Did you mean S3C2410_COMMON_DCLK?
 
-Ok, so it takes 5.6 seconds in kernel mode to access 31MB, which comes down
-to 5.60MB/s. That isn't very fast compared to the time the CPU should take
-for those instructions, so I'm surprised it actually makes any difference
-at all.
+yep that is a typo, S3C2410_COMMON_DCLK is the correct one.
 
-There isn't a usable slave DMA engine in Armada XP by chance?
-
-	Arnd
+Heiko
