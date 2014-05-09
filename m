@@ -1,62 +1,149 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 8 May 2014 20:25:21 -0400
-Subject: [PATCH 3/5] irqchip: crossbar: Skip some irqs from getting mapped
- to crossbar
-In-Reply-To: <CAD=GYpav4mHaqo4jfb0ePchf3cvuvSnFKj_+osbrt_8-tYRRrQ@mail.gmail.com>
-References: <1399299527-10955-1-git-send-email-r.sricharan@ti.com>	<1399299527-10955-4-git-send-email-r.sricharan@ti.com>	<536BD9D8.4080905@ti.com>	<20140508203659.GA5620@kahuna>	<CAD=GYpbQQxQgKd3oZcAuWrxoD4VrkKzpybd11qwxs405HSUVGw@mail.gmail.com>	<536C0DC4.7090309@ti.com>
- <CAD=GYpav4mHaqo4jfb0ePchf3cvuvSnFKj_+osbrt_8-tYRRrQ@mail.gmail.com>
-Message-ID: <536C2071.8040502@ti.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Fri, 09 May 2014 09:45:23 +0900
+Subject: [PATCH 1/5] ARM: dts: move dp hpd line to the board file for
+ exynos5420
+In-Reply-To: <CAPdUM4N1Y_hQikf47yijMqbNrecfJQuy3C-M10J5oaUuodPmaw@mail.gmail.com>
+References: <1397994525-18537-1-git-send-email-rahul.sharma@samsung.com>
+ <1397994525-18537-2-git-send-email-rahul.sharma@samsung.com>
+ <001f01cf6a87$56a86740$03f935c0$%han@samsung.com>
+ <CAPdUM4N1Y_hQikf47yijMqbNrecfJQuy3C-M10J5oaUuodPmaw@mail.gmail.com>
+Message-ID: <003d01cf6b1f$f5f9c9e0$e1ed5da0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 May 2014 08:13 PM, Joel Fernandes wrote:
-> On Thu, May 8, 2014 at 6:05 PM, Santosh Shilimkar
-> <santosh.shilimkar@ti.com> wrote:
-> [..]
->>> Further since not everything goes through the crossbar and some are
->>> direct mapped like your diagram, the correct fix is probably making it
->>> an irqchip and doing the interrupt controller parenting correctly in
->>> DT.
->>>
->>> That would take care of A), because users of such direct mapped
->>> interrupts will go through the GIC interrupt controller directly.
->>>
->>> It will also take care of B), because if writing to cross bar has no
->>> effect for a particular IRQ, or if those IRQs are hard-wired to
->>> something, as you said, then that something should go through the GIC
->>> directly.
->>>
->>> I can try to whip up something like this if it makes sense, let me know...
->>>
->> I have been ignoring this series considering they were just fixes
->> but you comments are like re-inventing wheel. Please read all
->> the old threads and comments from Thomas and me on why we took
->> approach and why it is not an irqchip. There is no need to complicate
->> it further.
+On Thursday, May 08, 2014 6:08 PM, Rahul Sharma wrote:
+> On 8 May 2014 12:02, Jingoo Han <jg1.han@samsung.com> wrote:
+> > On Sunday, April 20, 2014 8:49 PM, Rahul Sharma wrote:
+> >>
+> >> From: Rahul Sharma <Rahul.Sharma@samsung.com>
+> >>
+> >> Display controller HPD Gpio line is board specific. This patch
+> >> is moving the pinctrl for hpd gpio line to the respective board
+> >> file.
+> >>
+> >> Signed-off-by: Rahul Sharma <Rahul.Sharma@samsung.com>
+> >> ---
+> >>  arch/arm/boot/dts/exynos5420-pinctrl.dtsi |    7 -------
+> >>  arch/arm/boot/dts/exynos5420-smdk5420.dts |    7 +++++++
+> >>  2 files changed, 7 insertions(+), 7 deletions(-)
+> >>
+> >> diff --git a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
+> >> index e62c8eb..5848c42 100644
+> >> --- a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
+> >> +++ b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
+> >> @@ -59,13 +59,6 @@
+> >>                       interrupt-controller;
+> >>                       #interrupt-cells = <2>;
+> >>               };
+> >> -
+> >> -             dp_hpd: dp_hpd {
+> >> -                     samsung,pins = "gpx0-7";
+> >> -                     samsung,pin-function = <3>;
+> >> -                     samsung,pin-pud = <0>;
+> >> -                     samsung,pin-drv = <0>;
+> >> -             };
+> >>       };
+> >
+> > (+cc Doug Anderson, Tomasz Figa)
+> >
+> > 'gpx0-7' pin is assigned for standard HPD pin. This is chip specific.
+> > So, there should be "gpx0-7" part on chip specific dts file such as
+> > 'exynos5420-pinctrl.dtsi'.
+> >
+> > However, some boards use GPIO as HPD pin, instead of 'gpx0-7' pin.
+> > This is board specific. In my opinion, the following would look
+> > better. In this way, this patch is not necessary.
+> >
+> > 1. case: Standard HPD pin is used. (smdk5420)
+> > arch/arm/boot/dts/exynos5420-pinctrl.dts
+> >         pinctrl at 13400000 {
+> >                 dp_hpd: dp_hpd {
+> >                         samsung,pins = "gpx0-7";
+> >                         samsung,pin-function = <3>;
+> >                         samsung,pin-pud = <0>;
+> >                         samsung,pin-drv = <0>;
+> >                 };
+> > arch/arm/boot/dts/exynos5420-smdk5420.dts
+> >         dp-controller at 145B0000 {
+> >                 pinctrl-names = "default";
+> >                 pinctrl-0 = <&dp_hpd>;
+> >                 ...
+> >
+> >
+> > 2. case: non-standard HPD pin such as GPIO is used. (peach pit)
+> > arch/arm/boot/dts/exynos5420-peach-pit.dts
+> >         pinctrl at 13400000 {
+> >                 dp_hpd: dp_hpd {
+> >                         samsung,pins = "gpx2-6";
+> >                         samsung,pin-function = <0>;
+> >                         samsung,pin-pud = <3>;
+> >                         samsung,pin-drv = <0>;
+> >                 };
+> >         dp-controller at 145B0000 {
+> >                 pinctrl-names = "default";
+> >                 pinctrl-0 = <&dp_hpd>;
+> >                 ...
+> >                 samsung,hpd-gpio = <&gpx2 6 0>;
+> >
+> > Even though, there is 'dp_hpd' in exynos5420-pinctrl.dts,
+> > 'smdk5420' and 'peach pit' can use "gpx0-7" and "gpx2-6",
+> > respectively.
+> >
+> > A year ago, Doug Anderson and me agreed that standard HPD pin
+> > part should be included to 'exynos5250-pinctrl.dtsi'.
+> > (https://lkml.org/lkml/2013/5/11/134)
+> >
 > 
-> Are you talking about the discussion on this thread?
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/194318.html
-> 
-> I didn't really get a sense that there was a common agreement that
-> irqchip is not the way to go there. I can stand corrected if there was
-> a common consensus that irqchip is not the right solution (with any
-> specific comments why). There was a concern in the thread that making
-> it irqchip doesn't help dma reuse the infrastructure, but that concern
-> seems moot now that the driver is proposed to live in drivers/irqchip.
-> 
-Obviously you haven't read all the threads... Please read [1]. There
-was a reason I said read *all* the threads. Because anyone who looks
-at this hardware IP block thinks it can be irqchip. You are not the
-first one who said that.
+> I wasn't aware of this discussion. It make sense. I will drop this patch.
+> I need to choose some other name for this pin, say "peach_dp_hpd".
+> Let me know if any concern.
 
-The concern was really not where the code resides but what the actual
-hardware is and how can it fit into Linux. The whole reason I was
-actually against irqhcip from beginning of crossbar series was the
-hardware is not irqchip rather just a router. Thomas the formally
-NAKed that approach on thread [1]. If there are bugs, doesn't mean
-we can make fit the hardware into some subsystem where it can't be
-described.
+In my opinion, "dp_hpd_gpio" looks better as below.
 
-Regards,
-Santosh
-[1] https://lkml.org/lkml/2013/9/13/413
+arch/arm/boot/dts/exynos5420-peach-pit.dts
+	pinctrl at 13400000 {
+		dp_hpd_gpio: dp_hpd_gpio {
+			samsung,pins = "gpx2-6";
+			samsung,pin-function = <0>;
+			samsung,pin-pud = <3>;
+			samsung,pin-drv = <0>;
+		};
+	dp-controller at 145B0000 {
+		pinctrl-names = "default";
+		pinctrl-0 = <&dp_hpd_gpio>;
+		...
+		samsung,hpd-gpio = <&gpx2 6 0>;
+
+Best regards,
+Jingoo Han
+
+> 
+> Regards,
+> Rahul Sharma.
+> 
+> > Best regards,
+> > Jingoo Han
+> >
+> >>
+> >>       pinctrl at 13410000 {
+> >> diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+> >> index 6910485..62d38c8 100644
+> >> --- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
+> >> +++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+> >> @@ -138,6 +138,13 @@
+> >>                       samsung,pin-pud = <1>;
+> >>                       samsung,pin-drv = <0>;
+> >>               };
+> >> +
+> >> +             dp_hpd: dp_hpd {
+> >> +                     samsung,pins = "gpx0-7";
+> >> +                     samsung,pin-function = <3>;
+> >> +                     samsung,pin-pud = <0>;
+> >> +                     samsung,pin-drv = <0>;
+> >> +             };
+> >>       };
+> >>
+> >>       hdmi at 14530000 {
+> >> --
+> >> 1.7.9.5
+> >
