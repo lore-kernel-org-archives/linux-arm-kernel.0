@@ -1,53 +1,102 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 9 May 2014 12:01:48 +0200
-Subject: [PATCH 2/2] iio:adc: at91 requires the input subsystem
-In-Reply-To: <1399560990-1402858-13-git-send-email-arnd@arndb.de>
-References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-13-git-send-email-arnd@arndb.de>
-Message-ID: <536CA78C.5070603@atmel.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 9 May 2014 11:03:04 +0100
+Subject: [RFC 13/47] mtd: nand: stm_nand_bch: provide Device Tree support
+In-Reply-To: <20980858CB6D3A4BAE95CA194937D5E73EACA3F0@DBDE04.ent.ti.com>
+References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
+ <1395735604-26706-14-git-send-email-lee.jones@linaro.org>
+ <20980858CB6D3A4BAE95CA194937D5E73EAB5C83@DBDE04.ent.ti.com>
+ <20140430125406.GN29462@lee--X1>
+ <20980858CB6D3A4BAE95CA194937D5E73EACA3F0@DBDE04.ent.ti.com>
+Message-ID: <20140509100304.GR5767@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/2014 16:56, Arnd Bergmann :
-> Building the at91 adc driver with CONFIG_INPUT disabled results in this
-> build error:
+> >> >+	of_property_read_u32(np, "st,bch-bitflip-threshold",
+> >> >+			     &pdata->bch_bitflip_threshold);
+> >> >+
+> >> mtd->bitflip_threshold is by default set to ecc.strength (unless a driver initializes it).
+> >> And then can be re-configured for each MTD partition separately
+> >> 	/sys/class/mtd/mtdX/bitflip_threshold
+> >> 	Refer: $kernel/Documentation/ABI/testing/sysfs-class-mtd
+> >> So, I don't think this is a HW parameter, and so should not be passed from DT.
+> >
+> >I think the bit-flip threshold is/can be chip specific, and as we know
+> >which chip we're likely to be booting on, we can specify this via the
+> >hardware description.  Thus, I think it's perfectly viable for an
+> >option to pass through DT to exist.
+> >
+> I don't think that?s the correct interpretation of bitflip_threshold.
 > 
-> ERROR: "input_event" [drivers/iio/adc/at91_adc.ko] undefined!
-> ERROR: "input_unregister_device" [drivers/iio/adc/at91_adc.ko] undefined!
-> ERROR: "input_free_device" [drivers/iio/adc/at91_adc.ko] undefined!
-> ERROR: "input_register_device" [drivers/iio/adc/at91_adc.ko] undefined!
-> ERROR: "input_set_abs_params" [drivers/iio/adc/at91_adc.ko] undefined!
-> ERROR: "input_allocate_device" [drivers/iio/adc/at91_adc.ko] undefined!
+> (1) bitflip_threshold is dependent on ecc.strength (ECC scheme) of your driver.
+> MTD layers uses bitflip_threshold to warn above layers that number of
+> correctable bit-flips have reached a dangerous level beyond which driver's
+> ECC scheme may not be able to correct them. So above layers should start
+> taking additional corrective action like scrubbing.
+> 	@@drivers/mtd/mtdcore.c: mtd_read()
+> 		return ret_code >= mtd->bitflip_threshold ? -EUCLEAN : 0;
 > 
-> To make sure we can build random configurations, this turns on CONFIG_INPUT
-> whenever CONFIG_AT91_ADC is enabled.
+> (2) Also, user-space may control it based on how your device ages on field.
+> A fresh silicon may not show too many bitflips. But as device ages the
+> probability of simultaneous bitflips will increase. So user-space may lower
+> the bitflip_threshold to avoid accumulation of bitflips in a single page.
+>  
+> Thus, bitflip_threshold should not be passed via DT.
+> It's neither a hardware parameter, nor it?s a static constant.
 
-Isn't it a "select" instead of "depends" that is required then?
+Ah, I see.  I will fixup, thanks for the explanation.
 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: linux-iio at vger.kernel.org
-> Cc: Josh Wu <josh.wu@atmel.com>
-> Cc: Jonathan Cameron <jic23@kernel.org>
-> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/iio/adc/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
+> >> >+struct device_node *stm_of_get_partitions_node(struct device_node *np,
+> >> >+					       int bank_nr)
+> >> >+{
+> >> >+	struct device_node *banksnp, *banknp, *partsnp = NULL;
+> >> >+	char name[10];
+> >> >+
+> >> >+	banksnp = of_parse_phandle(np, "st,nand-banks", 0);
+> >> >+	if (!banksnp)
+> >> >+		return NULL;
+> >> >+
+> >> >+	sprintf(name, "bank%d", bank_nr);
+> >> >+	banknp = of_get_child_by_name(banksnp, name);
+> >> >+	if (banknp)
+> >> >+		return NULL;
+> >> >+
+> >> >+	partsnp = of_get_child_by_name(banknp, "partitions");
+> >> >+	of_node_put(banknp);
+> >> >+
+> >> Sorry, I'm bit confused here .. I think you don't need to find children of
+> >> Your bank node. This should already taken care in default parser
+> >> drivers/mtd/ofpart.c : parse_ofpart_partitions()
+> >> And all you need to pass is 'of_node' of bank (device).
+> >> Is my understanding correct ?
+> >
+> >We have 3 options here, you _can_ use parse_ofpart_partitions() if
+> >your partition information conforms to its schema, but said schema
+> >does not support banks and/or other information that we choose to
+> >place within the bank node.  The second option is to register a
+> >parser.  My personal view is that registering a parser is using the
+> >framework for 'using the framework's' sake i.e. doesn't actually
+> >achieve anything special.  We've chosen the third option, which is to
+> >parse and extract the information ourselves - which is actually fairly
+> >trivial, and pass the required partition data in through the
+> >mtd_device_parse_register() call - which is where the information
+> >would be parsed in the case of the first two options.
+> >
+> Do you really want to have *custom* partition format ?
+> If your previous code was non-DT (platform file based), then I think
+> It's good point to move to unified generic partition format which others
+> are following, as you make your driver DT compliant, and in mainline.
 > 
-> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
-> index 90f596d..a80d236 100644
-> --- a/drivers/iio/adc/Kconfig
-> +++ b/drivers/iio/adc/Kconfig
-> @@ -110,6 +110,7 @@ config AD799X
->  config AT91_ADC
->  	tristate "Atmel AT91 ADC"
->  	depends on ARCH_AT91
-> +	depends on INPUT
->  	select IIO_BUFFER
->  	select IIO_TRIGGERED_BUFFER
->  	select SYSFS
+> I understand you primary objective would be to get ST driver work
+> out of mainline asap, but if you upstream too many custom stuff you
+> are only adding maintenance burden for your code. This is where
+> most of my comments originate.
+> However, I leave it to Brian to decide, if he is okay with these.
 > 
-
+> 
+> with regards, pekon
 
 -- 
-Nicolas Ferre
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
