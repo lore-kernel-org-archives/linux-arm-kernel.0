@@ -1,36 +1,52 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 9 May 2014 09:48:00 +0200
-Subject: [PATCH] gpio: always enable GPIO_OMAP on ARCH_OMAP
-In-Reply-To: <5523458.JVZJJObMjC@wuerfel>
-References: <5523458.JVZJJObMjC@wuerfel>
-Message-ID: <CACRpkdYD+mSgkbUM+NXd9LQY+auTQMnvHFf7BZw_PUKbReYNcQ@mail.gmail.com>
+From: ipaton0@gmail.com (Iain Paton)
+Date: Fri, 09 May 2014 08:48:07 +0100
+Subject: [PATCH v2] ARM: dts: imx6: add new board RIoTboard
+In-Reply-To: <20140509030938.GK2794@dragon>
+References: <53695C34.5000604@gmail.com> <20140508054106.GH2794@dragon>
+ <536B4ACD.30001@gmail.com> <20140509030938.GK2794@dragon>
+Message-ID: <536C8837.9090802@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 28, 2014 at 11:07 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+On 09/05/14 04:09, Shawn Guo wrote:
+> On Thu, May 08, 2014 at 10:13:49AM +0100, Iain Paton wrote:
 
-> Commit 4df42de9d3e "gpio: omap: add a GPIO_OMAP option instead of using
-> ARCH_OMAP" made it possible to build OMAP kernels without the GPIO driver,
-> which at least on OMAP2 and OMAP3 causes build errors because of functions
-> used by the platform power management code:
->
-> arch/arm/mach-omap2/built-in.o: In function `omap_sram_idle':
-> arch/arm/mach-omap2/pm24xx.c:129: undefined reference to `omap2_gpio_prepare_for_idle'
-> arch/arm/mach-omap2/pm24xx.c:129: undefined reference to `omap2_gpio_resume_after_idle'
->
-> We presumably always want the GPIO driver on OMAP, so this adds a slightly
-> broader dependency and only allows disabling the driver only when no
-> OMAP2PLUS platform is selected.
->
-> However, it seems entirely reasonable to include the driver in build tests
-> on other platforms, so we should also allow building it for COMPILE_TEST
-> builds and select the required GENERIC_IRQ_CHIP that may not already be
-> enabled on other platforms.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> +&ecspi1 {
+>> +	fsl,spi-num-chipselects = <1>;
+>> +	cs-gpios = <&gpio5 17 0>;
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_ecspi1>;
+>> +	status = "okay";
+>> +
+>> +	spidev at 0 {
+>> +		spi-max-frequency = <24000000>;
+>> +		reg = <0>;
+>> +		compatible = "spidev";
+>> +	};
+> 
+> What's this?  Is this the common way we code spi devices in device tree?
 
-Patch applied to my devel branch, this is not a fix to Torvalds HEAD
-AFAICT, but a fix to v3.16? Else poke me.
+I'd appreciate your guidance here, what would you prefer?
 
-Yours,
-Linus Walleij
+My reasons for adding spidev were as follows:
+
+1. The SPI pins are not used on the board, they go to an expansion header.
+2. Board is targeted at makers who are likely to want to attach 
+   external devices.
+3. Experience has been that if they don't find an easy and already 
+   configured way to use something they reach for devmem2 or similar.
+4. devicetree is often seen as being too hard by people who come to these
+   boards from things like arduino
+
+I've already had questions on how to find the physical address of /dev/i2c-0 
+seemingly due to some of the above.
+
+I'm happy to drop the spidev entries if that's what you'd prefer, but if I
+do that I'm undecided if I should then just drop the ecspi sections as well 
+and free up more gpio pins on the expansion header for other uses.
+
+I'll tidy up all the other comments, and use your suggested method for the 
+i2c4 changes.
+
+Thanks,
+Iain
