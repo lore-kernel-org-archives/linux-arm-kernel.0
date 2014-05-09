@@ -1,56 +1,23 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Fri, 09 May 2014 16:01:18 +0200
-Subject: [PATCH v3 3/7] mfd: add support for sun6i PRCM (Power/Reset/Clock
- Management) unit
-In-Reply-To: <20140509135251.GY5767@lee--X1>
-References: <1399633911-7094-1-git-send-email-boris.brezillon@free-electrons.com>
- <1399633911-7094-4-git-send-email-boris.brezillon@free-electrons.com>
- <20140509135251.GY5767@lee--X1>
-Message-ID: <536CDFAE.8070208@free-electrons.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 9 May 2014 16:03:16 +0200
+Subject: [PATCH] arm64: Define _TIF_POLLING_NRFLAG
+In-Reply-To: <1399636665-4127-1-git-send-email-broonie@kernel.org>
+References: <1399636665-4127-1-git-send-email-broonie@kernel.org>
+Message-ID: <20140509140316.GU2844@laptop.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, May 09, 2014 at 12:57:45PM +0100, Mark Brown wrote:
+> From: Mark Brown <broonie@linaro.org>
+> 
+> arm64 defines TIF_POLLING_NRFLAG but not the corresponding shifted version,
+> breaking the build with next-20140509 due to fd99f91aa007b (sched/idle:
+> Avoid spurious wakeup IPIs) which added a reference to the shifted version
+> which is present on most arches.
 
-On 09/05/2014 15:52, Lee Jones wrote:
->> The PRCM (Power/Reset/Clock Management) block exposes several subdevices
->> in different subsystems (clk, reset ...)
->>
->> Add basic support for the PRCM unit with clk (AR100, AHB0, and APB0 clks)
->> and reset controller subdevices.
->>
->> Other subdevices might be added later (if needed).
->>
->> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
->> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> ---
->>  drivers/mfd/Kconfig      |   8 +++
->>  drivers/mfd/Makefile     |   1 +
->>  drivers/mfd/sun6i-prcm.c | 134 +++++++++++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 143 insertions(+)
->>  create mode 100644 drivers/mfd/sun6i-prcm.c
-> [...]
->
->> +/*
->> + * Copyright (C) 2014 Free Electrons
->> + *
->> + * License Terms: GNU General Public License v2
->> + * Author: Boris BREZILLON <boris.brezillon@free-electrons.com>
->> + *
->> + * Allwinner PRCM (Power/Reset/Clock Management) driver
->> + *
->> + */
->> +
->> +#include <linux/mfd/core.h>
->> +#include <linux/module.h>
->> +#include <linux/of.h>
-> Ah, now isn't that better?
+Sorry about that,
 
-Absolutely :-).
+Acked-by: Peter Zijlstra <peterz@infradead.org>
 
-> Acked-by: Lee Jones <lee.jones@linaro.org>
->
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Should I get it in -tip so borkage and fix come in through the same
+tree, or what's the preferred routing?
