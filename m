@@ -1,35 +1,72 @@
 From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Fri, 09 May 2014 15:39:43 +0530
-Subject: [PATCH v3 1/4] ARM: dts: enable fimd for exynos5250 based snow board
+Date: Fri, 09 May 2014 15:39:46 +0530
+Subject: [PATCH v3 4/4] ARM: dts: enable dp-controller for exynos5420 based
+ peach-pit board
 In-Reply-To: <1399630186-22610-1-git-send-email-rahul.sharma@samsung.com>
 References: <1399630186-22610-1-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <1399630186-22610-2-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <1399630186-22610-5-git-send-email-rahul.sharma@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rahul Sharma <Rahul.Sharma@samsung.com>
 
-Enable fimd node for snow board.
+Enable dp-controller for peach-pit board.
 
 Signed-off-by: Rahul Sharma <Rahul.Sharma@samsung.com>
 ---
- arch/arm/boot/dts/exynos5250-snow.dts |    6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/exynos5420-peach-pit.dts |   36 ++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-index 1ce1088..796954c 100644
---- a/arch/arm/boot/dts/exynos5250-snow.dts
-+++ b/arch/arm/boot/dts/exynos5250-snow.dts
-@@ -206,4 +206,10 @@
- 			clock-frequency = <24000000>;
- 		};
+diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+index f75da5b..0e79479 100644
+--- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
++++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+@@ -74,6 +74,13 @@
+ 		samsung,pin-pud = <0>;
+ 		samsung,pin-drv = <0>;
  	};
 +
-+	fimd at 14400000 {
-+		status = "okay";
-+		samsung,invert-vclk;
++	dp_hpd_gpio: dp_hpd_gpio {
++		samsung,pins = "gpx2-6";
++		samsung,pin-function = <0>;
++		samsung,pin-pud = <3>;
++		samsung,pin-drv = <0>;
 +	};
-+
  };
+ 
+ &rtc {
+@@ -150,3 +157,32 @@
+ 	status = "okay";
+ 	samsung,invert-vclk;
+ };
++
++&dp {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&dp_hpd_gpio>;
++	samsung,color-space = <0>;
++	samsung,dynamic-range = <0>;
++	samsung,ycbcr-coeff = <0>;
++	samsung,color-depth = <1>;
++	samsung,link-rate = <0x06>;
++	samsung,lane-count = <2>;
++	samsung,hpd-gpio = <&gpx2 6 0>;
++
++	display-timings {
++		native-mode = <&timing1>;
++
++		timing1: timing at 1 {
++			clock-frequency = <70589280>;
++			hactive = <1366>;
++			vactive = <768>;
++			hfront-porch = <40>;
++			hback-porch = <40>;
++			hsync-len = <32>;
++			vback-porch = <10>;
++			vfront-porch = <12>;
++			vsync-len = <6>;
++		};
++	};
++};
 -- 
 1.7.9.5
