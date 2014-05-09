@@ -1,71 +1,91 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 9 May 2014 21:29:18 +0200
-Subject: [PATCH v2] arm/dts: am335x-evmsk enable display and lcd panel
- support
-In-Reply-To: <1399661354-10022-1-git-send-email-detheridge@ti.com>
-References: <1399661354-10022-1-git-send-email-detheridge@ti.com>
-Message-ID: <20140509192918.GA18138@katana>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 9 May 2014 20:29:21 +0100
+Subject: [PATCH 2/3] arm64: Add big.LITTLE switcher stub
+In-Reply-To: <536D2533.6050100@arm.com>
+References: <1399653631-4938-1-git-send-email-broonie@kernel.org>
+ <1399653631-4938-2-git-send-email-broonie@kernel.org>
+ <536D0AF4.1040705@arm.com> <20140509175005.GT12304@sirena.org.uk>
+ <536D2533.6050100@arm.com>
+Message-ID: <20140509192921.GY12304@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 09, 2014 at 01:49:14PM -0500, Darren Etheridge wrote:
-> Add the necessary nodes to enable the LCD controller and the
-> LCD panel that is attached to the Texas Instruments AM335x
-> EVMSK platform.  Also setup the necessary pin mux within the
-> DT file to drive the LCD connector and add the correct
-> pinmux settings for the lcd pins to be configured to when
-> the SoC goes into sleep state for the minimum power
-> consumption.
-> 
-> For the sleep mode LCD pin settings, MUX_MODE7 is chosen as
-> this corresponds to switching the pins into input GPIO's with
-> an internal pulldown.  Which has been determined to offer the
-> lowest power solution vs leaving the pins configured in LCD
-> mode.
-> 
-> Signed-off-by: Darren Etheridge <detheridge@ti.com>
+On Fri, May 09, 2014 at 07:57:55PM +0100, Sudeep Holla wrote:
+> On 09/05/14 18:50, Mark Brown wrote:
 
-In general:
+> >Given that the code isn't invasive I think the expediency tradeoff is OK
+> >for mainline, it's easy enough to get rid of when we come up with
+> >something better but in the meaintine it helps actual systems work
+> >better in mainline - if we didn't have the ARM implementation already I
+> >think it'd be different but we do.
 
-Acked-by: Wolfram Sang <wsa@sang-engineering.com>
+> I disagree, I don't see a real urgency for this on ARM64. Even on ARM32, no
+> single platform other than TC2 is using this(at least as I see in the mainline).
 
-> +	lcd_pins_sleep: lcd_pins_sleep {
-> +		pinctrl-single,pins = <
-> +			0x20 (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* gpmc_ad8.lcd_data23 */
-> +			0x24 (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* gpmc_ad9.lcd_data22 */
-> +			0x28 (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* gpmc_ad10.lcd_data21 */
-> +			0x2c (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* gpmc_ad11.lcd_data20 */
-> +			0x30 (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* gpmc_ad12.lcd_data19 */
-> +			0x34 (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* gpmc_ad13.lcd_data18 */
-> +			0x38 (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* gpmc_ad14.lcd_data17 */
-> +			0x3c (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* gpmc_ad15.lcd_data16 */
-> +			0xa0 (PULL_DISABLE | MUX_MODE7)	/* lcd_data0.lcd_data0 */
-> +			0xa4 (PULL_DISABLE | MUX_MODE7)	/* lcd_data1.lcd_data1 */
-> +			0xa8 (PULL_DISABLE | MUX_MODE7)	/* lcd_data2.lcd_data2 */
-> +			0xac (PULL_DISABLE | MUX_MODE7)	/* lcd_data3.lcd_data3 */
-> +			0xb0 (PULL_DISABLE | MUX_MODE7)	/* lcd_data4.lcd_data4 */
-> +			0xb4 (PULL_DISABLE | MUX_MODE7)	/* lcd_data5.lcd_data5 */
-> +			0xb8 (PULL_DISABLE | MUX_MODE7)	/* lcd_data6.lcd_data6 */
-> +			0xbc (PULL_DISABLE | MUX_MODE7)	/* lcd_data7.lcd_data7 */
-> +			0xc0 (PULL_DISABLE | MUX_MODE7)	/* lcd_data8.lcd_data8 */
-> +			0xc4 (PULL_DISABLE | MUX_MODE7)	/* lcd_data9.lcd_data9 */
-> +			0xc8 (PULL_DISABLE | MUX_MODE7)	/* lcd_data10.lcd_data10 */
-> +			0xcc (PULL_DISABLE | MUX_MODE7)	/* lcd_data11.lcd_data11 */
-> +			0xd0 (PULL_DISABLE | MUX_MODE7)	/* lcd_data12.lcd_data12 */
-> +			0xd4 (PULL_DISABLE | MUX_MODE7)	/* lcd_data13.lcd_data13 */
-> +			0xd8 (PULL_DISABLE | MUX_MODE7)	/* lcd_data14.lcd_data14 */
-> +			0xdc (PULL_DISABLE | MUX_MODE7)	/* lcd_data15.lcd_data15 */
-> +			0xe0 (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* lcd_vsync.lcd_vsync */
-> +			0xe4 (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* lcd_hsync.lcd_hsync */
-> +			0xe8 (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* lcd_pclk.lcd_pclk */
-> +			0xec (PIN_INPUT_PULLDOWN | MUX_MODE7)	/* lcd_ac_bias_en.lcd_ac_bias_en */
+> If some real platform that needs this support urgently, then we can think of
+> similar short-term solution as part of adding support for cpufreq on that
+> platform. Do you know any platform that needs this right now ?
 
-Maybe a comment why LCD0-15 are handled differently?
+There's the big.LITTLE Exynos devices, at least the 5410 has shipped in
+product using IKS I believe and so should've been using the big.LITTLE
+cpufreq driver to do the cluster switching; I think some 5420 systems
+were doing the same.  Or reimplementing it which would just be sad.
+There's some other non-public devices I am aware of - the whole reason I
+wrote this series was for those.
 
+> >Perfect can be the enemy of good (or at least adequate), one of the
+> >problems I'm seeing right now with convincing people to work with
+> >mainline is that people are missing lots of important functionality when
+> >they look at mainline.
+
+> Ok fair enough. But we can take some time and see if we can workout better
+> solution rather than jumping to add interim solutions when is unlikely to be
+> used on any real platform.
+
+There are real users who want to use this fairly urgently.  I can't be
+specific, sorry.
+
+> >Personally the solution I'd rather see is cpufreq-cpu0 extended to
+> >handle shared clocks which would remove the need to use the big.LITTLE
+
+> Ideally yes. IIUC it has dependencies on CPU0 and I have not looked that
+> driver and all of its users to judge how feasible is that. At-least we can
+> have cpufreq-cpu0 for all single cluster systems w/o support for per-CPU DVFS
+> and another which can handle multi-cluster systems(with or w/o per-CPU DVFS).
+
+> Just a thought...
+
+It's not clear to me that having multiple clusters should require a
+different driver, the single cluster case is just a specialisation of
+the multicluster one as far as I can see.  It's possible I'm missing
+something though.
+
+I have to confess I didn't look in detail at cpufreq-cpu0 to make sure
+it's the best place to start from but it looks clean and does have the
+regulator stuff, though it's probably better to say that the goal is to
+merge that and the big.LITTLE driver.
+
+> >directly connected to their clustering.  Clustering is important to the
+> >scheduler and an understanding of the power and clock sharing
+> >constraints that come along with clusters is going to be required there
+> >as part of energy aware scheduling but I'm not seeing any obvious reason
+> >for the frequency scaling driver to know about this, even with cpufreq
+> >governors it's mostly the clock sharing.
+
+> Both CPUFreq and Energy aware scheduling need understanding of clock
+> sharing. Both have similar goals(save power with little or no performance
+> degradation), but EA scheduler will be more efficient(both in terms of power
+> and performance).
+
+> Governors need this knowledge of sharing as it affects the load calculation.
+> (IIRC maximum load of all the cpu sharing clocks is taken)
+
+Yes, definitely with respect to the clocks - my point was more about the
+clustering bit (which is related to but not 100% tied to clocks).
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140509/279ce322/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140509/02ca1d87/attachment.sig>
