@@ -1,77 +1,57 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 09 May 2014 12:13:35 +0200
-Subject: [PATCH v7 1/2] phy: Add new Exynos5 USB 3.0 PHY driver
-In-Reply-To: <CAFp+6iF=Z_dkd+YJm2-ODmvgZ6PCt+bUx+vSVm_5RtobVN0WfA@mail.gmail.com>
-References: <1398665874-31238-1-git-send-email-gautam.vivek@samsung.com>
- <5368F136.6070804@samsung.com>
- <CAFp+6iHN-W-k6ow5YykK_QWgBJ+GgzXwPX6suWtizxwJWOiGtg@mail.gmail.com>
- <CAFp+6iF=Z_dkd+YJm2-ODmvgZ6PCt+bUx+vSVm_5RtobVN0WfA@mail.gmail.com>
-Message-ID: <536CAA4F.8050404@samsung.com>
+From: pekon@ti.com (Gupta, Pekon)
+Date: Fri, 9 May 2014 10:32:02 +0000
+Subject: [RFC 13/47] mtd: nand: stm_nand_bch: provide Device Tree support
+In-Reply-To: <20140509100304.GR5767@lee--X1>
+References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
+ <1395735604-26706-14-git-send-email-lee.jones@linaro.org>
+ <20980858CB6D3A4BAE95CA194937D5E73EAB5C83@DBDE04.ent.ti.com>
+ <20140430125406.GN29462@lee--X1>
+ <20980858CB6D3A4BAE95CA194937D5E73EACA3F0@DBDE04.ent.ti.com>
+ <20140509100304.GR5767@lee--X1>
+Message-ID: <20980858CB6D3A4BAE95CA194937D5E73EACBC8F@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vivek,
-
-On 08/05/14 11:03, Vivek Gautam wrote:
->>>> diff --git a/Documentation/devicetree/bindings/phy/samsung-phy.txt b/Documentation/devicetree/bindings/phy/samsung-phy.txt
->>>> >>> index b422e38..51efe4c 100644
->>>> >>> --- a/Documentation/devicetree/bindings/phy/samsung-phy.txt
->>>> >>> +++ b/Documentation/devicetree/bindings/phy/samsung-phy.txt
->>>> >>> @@ -114,3 +114,43 @@ Example:
->>>> >>>               compatible = "samsung,exynos-sataphy-i2c";
->>>> >>>               reg = <0x38>;
->>>> >>>       };
->>>> >>> +
->>>> >>> +Samsung Exynos5 SoC series USB DRD PHY controller
->>>> >>> +--------------------------------------------------
->>>> >>> +
->>>> >>> +Required properties:
->>>> >>> +- compatible : Should be set to one of the following supported values:
->>>> >>> +     - "samsung,exynos5250-usbdrd-phy" - for exynos5250 SoC,
->>>> >>> +     - "samsung,exynos5420-usbdrd-phy" - for exynos5420 SoC.
->>>> >>> +- reg : Register offset and length of USB DRD PHY register set;
->>>> >>> +- clocks: Clock IDs array as required by the controller
->>>> >>> +- clock-names: names of clocks correseponding to IDs in the clock property;
->>>> >>> +            Required clocks:
->>>> >>> +     - phy: main PHY clock (same as USB DRD controller i.e. DWC3 IP clock),
->>>> >>> +            used for register access.
->>>> >>> +     - ref: PHY's reference clock (usually crystal clock), used for
->>>> >>> +            PHY operations, associated by phy name. It is used to
->>>> >>> +            determine bit values for clock settings register.
->>>> >>> +            For Exynos5420 this is given as 'sclk_usbphy30' in CMU.
->>>> >>> +- samsung,pmu-syscon: phandle for PMU system controller interface, used to
->>>> >>> +                   control pmu registers for power isolation.
->>>> >>> +- samsung,pmu-offset: phy power control register offset to pmu-system-controller
->>>> >>> +                   base.
->>> >>
->>> >> It doesn't seem right to have register offset encoded in the device tree
->>> >> like this. I think it'd be more appropriate to associate such an offset
->>> >> with the compatible string's value in the driver.
->> >
->> > Ok, it makes more sense.
->> > Just out of curiosity, what difference would this make ?
+>From: Lee Jones [mailto:lee.jones at linaro.org]
 >
-> Moreover, in case of Exynos5420 (and may be in future SoCs), where we
-> have 2 USB DRD PHY controllers,
-> we will need to have a way around to deal with two separate offsets in
-> the driver for one compatible string.
+>> >> >+	of_property_read_u32(np, "st,bch-bitflip-threshold",
+>> >> >+			     &pdata->bch_bitflip_threshold);
+>> >> >+
+>> >> mtd->bitflip_threshold is by default set to ecc.strength (unless a driver initializes it).
+>> >> And then can be re-configured for each MTD partition separately
+>> >> 	/sys/class/mtd/mtdX/bitflip_threshold
+>> >> 	Refer: $kernel/Documentation/ABI/testing/sysfs-class-mtd
+>> >> So, I don't think this is a HW parameter, and so should not be passed from DT.
+>> >
+>> >I think the bit-flip threshold is/can be chip specific, and as we know
+>> >which chip we're likely to be booting on, we can specify this via the
+>> >hardware description.  Thus, I think it's perfectly viable for an
+>> >option to pass through DT to exist.
+>> >
+>> I don't think that?s the correct interpretation of bitflip_threshold.
+>>
+>> (1) bitflip_threshold is dependent on ecc.strength (ECC scheme) of your driver.
+>> MTD layers uses bitflip_threshold to warn above layers that number of
+>> correctable bit-flips have reached a dangerous level beyond which driver's
+>> ECC scheme may not be able to correct them. So above layers should start
+>> taking additional corrective action like scrubbing.
+>> 	@@drivers/mtd/mtdcore.c: mtd_read()
+>> 		return ret_code >= mtd->bitflip_threshold ? -EUCLEAN : 0;
+>>
+>> (2) Also, user-space may control it based on how your device ages on field.
+>> A fresh silicon may not show too many bitflips. But as device ages the
+>> probability of simultaneous bitflips will increase. So user-space may lower
+>> the bitflip_threshold to avoid accumulation of bitflips in a single page.
+>>
+>> Thus, bitflip_threshold should not be passed via DT.
+>> It's neither a hardware parameter, nor it?s a static constant.
+>
+>Ah, I see.  I will fixup, thanks for the explanation.
+>
 
-It could be handled by creating a list of offsets per compatible string and
-then adding some way to identify the PHY device instance. So I believe that's
-not a big issue. Now you'd be encoding a list of registers offsets in the
-device tree, without encoding bit layout of each register. It's unlikely that
-each instance would have different bits layout, but describing individual 
-registers in DT I thought is something that we're not supposed to do.
- 
-> Getting the offsets from DT seems a cleaner way to handle this case of
-> multi controllers.
+Please wait, I'll review your [v2] series also, then you can further
+send all fixes together. I'm bit caught in other commitments for 3.16,
+so hopefully I'll be able to review your patches by next week.
 
-I think it's easier from the driver POV, but isn't it violating the device
-tree rules ?
-Anyway. I'm just pointing this minor issue in the binding as it appears
-to me. The final word of course belongs to a DT binding maintainer.
 
-Regards,
--- 
-Sylwester Nawrocki
-Samsung R&D Institute Poland
+with regards, pekon
