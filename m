@@ -1,31 +1,39 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 9 May 2014 18:09:02 +0200
-Subject: [PATCH] ARM: dts: am335x-evm: fix comments for lcd pins
-In-Reply-To: <20140509155929.GJ2626@ti.com>
-References: <1399648580-14487-1-git-send-email-wsa@the-dreams.de>
- <20140509155929.GJ2626@ti.com>
-Message-ID: <20140509160902.GA14250@katana>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Fri, 09 May 2014 09:10:22 -0700
+Subject: [PATCH 68/97] ARM: l2c: sti: remove cache size override
+In-Reply-To: <536CEBDF.2000307@st.com>
+References: <20140428192419.GV26756@n2100.arm.linux.org.uk>
+ <E1WerHT-0001YK-DL@rmk-PC.arm.linux.org.uk> <535F4B20.9090904@linaro.org>
+ <536CEBDF.2000307@st.com>
+Message-ID: <536CFDEE.8030405@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-> The same mistake is also in my EVMSK LCD enabling patch that is floating
-> around on this list at the moment.  I will fix that and resend it.
-> BeagleBone Black only uses the first 16 LCD pins so the dts for that is
-> correct.
+Hi Maxime,
+On 09/05/14 07:53, Maxime Coquelin wrote:
+> Hi Srini,
+>
+> On 04/29/2014 08:48 AM, Srinivas Kandagatla wrote:
+>> Hi Russell,
+>> Thankyou for the patch,
+>>
+>> The only issue I see is, on most of the STi SOCs the default value for
+>> AUXCTRL register is 0x0, so the waysize is not set.
+> I checked all the ARM SoCs we support currently.
+> Only STiH416 has its reset value at 0x0.
+>
+>>
+>> The way size is different on some SOCs in the same series.
+>>
+>> Where is the way-size mentioned in this new style?
+>
+> Then, I think it should be the role of the bootloaders to set it for
+> STiH416 (I have been told U-Boot already does it).
+> Does it sound acceptable for you?
 
-Well, even in the TI-based-3.2-kernel I originally got with the custom
-hardware, this mistake was present in mach-omap2/mux33xx.c. No wonder it
-spread from there :)
+That's great, so the gdb startup scripts should takecare of it too.
 
-> Thanks for finding and fixing it.
 
-Very welcome!
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140509/38e01059/attachment.sig>
+Thanks,
+srini
