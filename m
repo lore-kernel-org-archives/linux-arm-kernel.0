@@ -1,37 +1,24 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 9 May 2014 15:38:15 -0500
-Subject: [PATCH] ARM: OMAP2+: Remove suspend_set_ops from common pm late
- init
-In-Reply-To: <536D37C0.1000704@ti.com>
-References: <1399661580-54599-1-git-send-email-d-gerlach@ti.com>
- <536D26C6.1060903@ti.com> <536D37C0.1000704@ti.com>
-Message-ID: <CAGo_u6o8uWB7zycuYa=3BQU8K2=S1YPWqHA49-CopdSERxGiRw@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 09 May 2014 16:39:33 -0400 (EDT)
+Subject: [PATCH] mdio_bus: fix devm_mdiobus_alloc_size export
+In-Reply-To: <1399560433-1402630-2-git-send-email-arnd@arndb.de>
+References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
+ <1399560433-1402630-2-git-send-email-arnd@arndb.de>
+Message-ID: <20140509.163933.1063955800318301161.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 9, 2014 at 3:17 PM, Dave Gerlach <d-gerlach@ti.com> wrote:
-> On 05/09/2014 02:04 PM, Nishanth Menon wrote:
->>
->> On 05/09/2014 01:53 PM, Dave Gerlach wrote:
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Thu,  8 May 2014 16:46:52 +0200
 
->>> +#ifdef CONFIG_SUSPEND
->>> +void omap_common_suspend_init(void);
->>> +#else
->>> +static inline void omap_common_suspend_init(void)
->>> +{
->>> +}
->>> +#endif
->>> +
->>
->> push this off to this pm.h?
->
->
-> I could, I had just put it in the same spot as omap2_common_pm_late_init. I
-> agree it makes sense to move it though.
->
+> commit 6d48f44b7b2 "mdio_bus: implement devm_mdiobus_alloc/devm_mdiobus_free"
+> introduced a new function devm_mdiobus_alloc_size() but added an export
+> for a different function devm_mdiobus_alloc(), which was obviously
+> a simple mistake that leads to  build error whenever this function is
+> used from a loadable module:
+> 
+> ERROR: "devm_mdiobus_alloc_size" [drivers/net/ethernet/ti/davinci_mdio.ko] undefined!
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-yeah - the usage in the case of suspend_init is restricted solely to
-pm code.. generic code does not have to invoke it.
-
-Regards,
-Nishanth Menon
+Applied to net-next, thanks Arnd.
