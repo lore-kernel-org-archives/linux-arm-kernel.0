@@ -1,71 +1,99 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 9 May 2014 17:47:19 +0100
-Subject: [PATCHv4 2/2] regmap: add DT endianness binding support.
-In-Reply-To: <1399601073-19278-3-git-send-email-Li.Xiubo@freescale.com>
-References: <1399601073-19278-1-git-send-email-Li.Xiubo@freescale.com>
- <1399601073-19278-3-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <20140509164719.GE16418@e106331-lin.cambridge.arm.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Fri, 09 May 2014 18:49:41 +0200
+Subject: [PATCH v2.1 3/9] ARM: S3C24XX: enable usage of common dclk if
+ common clock framework is enabled
+In-Reply-To: <3835735.0k9HAgQHzN@phil>
+References: <2104342.rkElQpXtvM@phil> <3888936.TSFL3ZW3mv@phil>
+ <3835735.0k9HAgQHzN@phil>
+Message-ID: <1399654181.19276.2.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 09, 2014 at 03:04:33AM +0100, Xiubo Li wrote:
-> For many drivers which will support rich endianness of CPU<-->Dev
-> need define DT properties by itself without the binding support.
+On Wed, 2014-04-23 at 22:09 +0200, Heiko St?bner wrote:
+> Add platform device and select the correct implementation automatically
+> depending on wether the old samsung_clock or the common clock framework
+> is enabled.
 > 
-> The endianness using regmap:
-> Index    CPU       Device     Endianess flag for DT bool property
-> ------------------------------------------------------------
-> 1        LE        LE         -
-> 2        LE        BE         'big-endian-{val,reg}'
-> 3        BE        BE         -
-> 4        BE        LE         'little-endian-{val,reg}'
+> This is only done for machines already using the old dclk implementation,
+> as everybody else should move to use dt anyway.
+> 
+> The machine-specific settings for the external clocks will have to be set
+> by somebody with knowledge about the specific hardware.
+> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 
-Get rid of the CPU column. It has precisely _nothing_ to do with the
-device.
+It seems this one just hit linux-next (in next-20140509).
 
-If you happen to have a device that can be integrated with varying
-endianness, the endianness should be described regardless of whether
-this happens to be the same as the CPU endianness. The kernel can then
-choose to do the right thing regardless.
+> --- a/arch/arm/mach-s3c24xx/Kconfig
+> +++ b/arch/arm/mach-s3c24xx/Kconfig
+> @@ -18,6 +18,13 @@ config PLAT_S3C24XX
+>  	help
+>  	  Base platform code for any Samsung S3C24XX device
+>  
+> +config S3C2410_COMMON_DCLK
+> +	bool
+> +	select REGMAP_MMIO
+> +	help
+> +	  Temporary symbol to build the dclk driver based on the common clock
+> +	  framework.
+> +
+>  menu "SAMSUNG S3C24XX SoCs Support"
+>  
+>  comment "S3C24XX SoCs"
+> @@ -264,7 +271,8 @@ config ARCH_BAST
+>  	select ISA
+>  	select MACH_BAST_IDE
+>  	select S3C2410_IOTIMING if ARM_S3C2410_CPUFREQ
+> -	select S3C24XX_DCLK
+> +	select S3C24XX_DCLK if SAMSUNG_CLOCK
+> +	select S3C2410_COMMON_DCLK if COMMON_CLK
+>  	select S3C24XX_SIMTEC_NOR
+>  	select S3C24XX_SIMTEC_PM if PM
+>  	select S3C24XX_SIMTEC_USB
+> @@ -345,7 +353,8 @@ config MACH_TCT_HAMMER
+>  config MACH_VR1000
+>  	bool "Thorcom VR1000"
+>  	select MACH_BAST_IDE
+> -	select S3C24XX_DCLK
+> +	select S3C24XX_DCLK if SAMSUNG_CLOCK
+> +	select S3C2410_COMMON_DCLK if COMMON_CLK
+>  	select S3C24XX_SIMTEC_NOR
+>  	select S3C24XX_SIMTEC_PM if PM
+>  	select S3C24XX_SIMTEC_USB
+> @@ -530,7 +539,8 @@ config MACH_ANUBIS
+>  	bool "Simtec Electronics ANUBIS"
+>  	select HAVE_PATA_PLATFORM
+>  	select S3C2440_XTAL_12000000
+> -	select S3C24XX_DCLK
+> +	select S3C24XX_DCLK if SAMSUNG_CLOCK
+> +	select S3C2410_COMMON_DCLK if COMMON_CLK
+>  	select S3C24XX_SIMTEC_PM if PM
+>  	select S3C_DEV_USB_HOST
+>  	help
+> @@ -571,7 +581,8 @@ config MACH_OSIRIS
+>  	bool "Simtec IM2440D20 (OSIRIS) module"
+>  	select S3C2410_IOTIMING if ARM_S3C2440_CPUFREQ
+>  	select S3C2440_XTAL_12000000
+> -	select S3C24XX_DCLK
+> +	select S3C24XX_DCLK if SAMSUNG_CLOCK
+> +	select S3C2410_COMMON_DCLK if COMMON_CLK
+>  	select S3C24XX_SIMTEC_PM if PM
+>  	select S3C_DEV_NAND
+>  	select S3C_DEV_USB_HOST
+> @@ -643,7 +654,8 @@ config MACH_RX1950
+>  	select PM_H1940 if PM
+>  	select S3C2410_IOTIMING if ARM_S3C2440_CPUFREQ
+>  	select S3C2440_XTAL_16934400
+> -	select S3C24XX_DCLK
+> +	select S3C24XX_DCLK if SAMSUNG_CLOCK
+> +	select S3C24XX_COMMON_DCLK if COMMON_CLK
 
-Assuming LE or BE by default is sane if most implementations are one
-rather than the other. Probing and figuring it out dynamically is also
-fine. Assuming that it's the same as the kernel is broken in general,
-and should be avoided -- those cases _require_ a *-endian property to
-work if the CPU can function in either endianness.
+This looks like a typo. Did you mean S3C2410_COMMON_DCLK?
 
-> Please see the following documetation for detail:
->     Documentation/devicetree/bindings/endianness/endianness.txt
+>  	select S3C24XX_PWM
+>  	select S3C_DEV_NAND
+>  	help
 
-I don't think this is sufficient. That document describes the preferred
-idiom, not the meaning w.r.t. a specific binding.
 
-[...]
-
-> +	case REGMAP_ENDIAN_REG:
-> +		if (of_property_read_bool(np, "big-endian-reg"))
-> +			*endian = REGMAP_ENDIAN_BIG;
-> +		else if (of_property_read_bool(np, "little-endian-reg"))
-> +			*endian = REGMAP_ENDIAN_LITTLE;
-
-While this follows the guidelines you've added, context is still
-required to understand precisely what this means. We need a binding
-document describing what *-endian-reg means for this binding (i.e. what
-does -reg cover? All registers? some? buffers?).
-
-Imagine I added a little-endian-foo property. You'd be able to reason
-that something is little endian, but you'd have no idea of precisely
-what without reading documentation or code. As not everyone wants to
-read several thousand lines of Linux kernel code to write a dts we
-require documentation.
-
-> +	case REGMAP_ENDIAN_VAL:
-> +		if (of_property_read_bool(np, "big-endian-val"))
-> +			*endian = REGMAP_ENDIAN_BIG;
-> +		else if (of_property_read_bool(np, "little-endian-val"))
-> +			*endian = REGMAP_ENDIAN_LITTLE;
-
-Likewise.
-
-Cheers,
-Mark.
+Paul Bolle
