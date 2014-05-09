@@ -1,19 +1,41 @@
-From: mark.roszko@gmail.com (Mark Roszko)
-Date: Fri, 9 May 2014 18:23:07 -0400
-Subject: [PATCH] i2c/nuc900: fix ancient build error
-In-Reply-To: <1399560990-1402858-11-git-send-email-arnd@arndb.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 10 May 2014 00:24:02 +0200
+Subject: [PATCH 2/2] mtd: orion-nand: fix build error with ARMv4
+In-Reply-To: <20140509220915.GA391@arch.cereza>
 References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-11-git-send-email-arnd@arndb.de>
-Message-ID: <CAJjB1qKWDN8dThK+P6VT40_F1t3b5_EOgfY0PFOCbsQ66XNFXA@mail.gmail.com>
+ <20140509212810.GF18257@obsidianresearch.com>
+ <20140509220915.GA391@arch.cereza>
+Message-ID: <4160510.VJSlHZLhNz@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"[PATCH] NUC900: patch for implement clk_get_rate"
-https://lkml.org/lkml/2010/6/15/147
+On Friday 09 May 2014 19:09:15 Ezequiel Garcia wrote:
+> # time nanddump /dev/mtd5 -f /dev/null -q
+> real    0m 5.82s
+> user    0m 0.20s
+> sys     0m 5.60s
+> 
+> Jason: Care to submit a proper patch?
+> 
+> On 08 May 04:56 PM, Arnd Bergmann wrote:
+> > Ok, that is a noticeable difference. For scale, what is the size of that partition?
+> 
+> The board is Openblocks A6, running mainline.
+> 
+> # cat /proc/mtd 
+> dev:    size   erasesize  name
+> mtd0: 00090000 00004000 "uboot"
+> mtd1: 00044000 00004000 "env"
+> mtd2: 00024000 00004000 "test"
+> mtd3: 00400000 00004000 "conf"
+> mtd4: 01d20000 00004000 "linux"
+> mtd5: 01dec000 00004000 "user"
 
-This patch would have fixed the apbfreq not being a real struct member
-and would also explain why clk_get_rate is called without using it's
-return value in the line above what you have.
+Ok, so it takes 5.6 seconds in kernel mode to access 31MB, which comes down
+to 5.60MB/s. That isn't very fast compared to the time the CPU should take
+for those instructions, so I'm surprised it actually makes any difference
+at all.
 
->From 2010, so it got dropped somewhere and ignored/abandoned
+There isn't a usable slave DMA engine in Armada XP by chance?
+
+	Arnd
