@@ -1,47 +1,49 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Fri, 9 May 2014 15:52:59 +0200
-Subject: [PATCHv3 3/3] edac: altera: Add EDAC support for Altera SDRAM
-In-Reply-To: <CAF03EBecxtMr1670ktQKTAZX_kHeZWz1SwuEk373B99BoVjbDw@mail.gmail.com>
-References: <1399330337-16748-1-git-send-email-tthayer@altera.com>
- <1399330337-16748-4-git-send-email-tthayer@altera.com>
- <20140508120524.GF12548@pd.tnic>
- <CAF03EBecxtMr1670ktQKTAZX_kHeZWz1SwuEk373B99BoVjbDw@mail.gmail.com>
-Message-ID: <20140509135259.GC16260@pd.tnic>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Fri, 9 May 2014 21:53:39 +0800
+Subject: [GIT PULL]]ARM: sirf: dts update for 3.16
+Message-ID: <CAGsJ_4waeAPJjnKiuXBJXXF-bYud=uO_j1hrS9auBAGr8KcFiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 08, 2014 at 03:37:19PM -0500, Thor Thayer wrote:
-> Yes. Their reasoning is that they want to retain the rights and
-> warranty language with the file (just in case the COPYING file
-> changes).
+Hi Arnd, Olof, Kevin,
 
-Ok, thanks for checking up on this.
+The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
 
-> Yes. I tested using edac_core.edac_mc_panic_on_ue=1 from the command
-> line and it worked fine. I'll add a comment to clarify. BTW, thanks
-> for your help on that.
+  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
 
-Sure, but the question still remains: do you want to panic on
-uncorrectable errors by default or want the user to decide? I guess this
-is something you can answer for your hardware...
+are available in the git repository at:
 
-> I considered using "volatile" variables, but decided against it after
-> I read Documentation/volatile-considered-harmful.txt and my situation
-> doesn't fit into the exemptions. Is there a better way to handle this?
+  git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux.git
+tags/sirf-dts-for-3.16
 
-Off the top of my head, I'd first look at compiler asm output to
-check what my compiler does with those writes and then take a look at
-employing the ACCESS_ONCE macro or something similar where we use the
-asm volatile() as an optimization stop for the compiler, among others.
+for you to fetch changes up to b01c5905c29d7d5748a24267bb2486e4a1605fda:
 
-And then I'll look at asm again to make sure it does what it is supposed
-to do. Something to that effect, in any case...
+  ARM: dts: sirf: add resets for dspif, gps and dsp nodes (2014-05-08
+14:13:08 +0800)
 
-HTH.
+----------------------------------------------------------------
+some minor cleanup and add some missed nodes:
+1. move dma channel descriptions to generic dma properity;
+2. add resets properity for some nodes;
+3. add missed pinctrl groups.
 
--- 
-Regards/Gruss,
-    Boris.
+----------------------------------------------------------------
+Barry Song (1):
+      ARM: dts: sirf: move to use generic dma dt-binding for spi
 
-Sent from a fat crate under my desk. Formatting is fine.
---
+Rongjun Ying (1):
+      ARM: dts: sirf: add pin group for USP0 with only RX or TX frame
+sync for atlas6
+
+Tao Huang (1):
+      ARM: dts: sirf: add resets for dspif, gps and dsp nodes
+
+Ye He (1):
+      ARM: dts: atlas6: add cortex-a9-pmu compatible PMU node
+
+ arch/arm/boot/dts/atlas6.dtsi |   31 ++++++++++++++++++++++++++-----
+ arch/arm/boot/dts/prima2.dtsi |   10 ++++++----
+ 2 files changed, 32 insertions(+), 9 deletions(-)
+
+
+-barry
