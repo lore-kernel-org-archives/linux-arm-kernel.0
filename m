@@ -1,63 +1,47 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 9 May 2014 18:55:05 +0100
-Subject: [PATCH v3] arm64: enable EDAC on arm64
-In-Reply-To: <20140509173340.GO7950@arm.com>
-References: <1398096556-26799-1-git-send-email-robherring2@gmail.com>
- <20140422102455.GD7484@arm.com>
- <CAL_JsqKS_NZbxq_nFBnsQvj51TtraEeFm0aY=j=N3DwJ+bTL6g@mail.gmail.com>
- <20140422132624.GC9820@arm.com>
- <CAL_JsqJEwUu0ooEcL+hniD8vxjBW5571ea3u3JmPN3x1MfXW3w@mail.gmail.com>
- <20140422160100.GH9820@arm.com>
- <CAL_Jsq+pcK4XvSyahaK8zoxNMWrebqsU+funBqzR9MBfK2ABYA@mail.gmail.com>
- <20140423170445.GI5649@arm.com> <20140509173340.GO7950@arm.com>
-Message-ID: <20140509175505.GC23083@arm.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Fri, 9 May 2014 19:54:58 +0200
+Subject: [PATCH 68/97] ARM: l2c: sti: remove cache size override
+In-Reply-To: <536CFDEE.8030405@linaro.org>
+References: <20140428192419.GV26756@n2100.arm.linux.org.uk>
+ <E1WerHT-0001YK-DL@rmk-PC.arm.linux.org.uk> <535F4B20.9090904@linaro.org>
+ <536CEBDF.2000307@st.com> <536CFDEE.8030405@linaro.org>
+Message-ID: <536D1672.4000606@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 09, 2014 at 06:33:40PM +0100, Catalin Marinas wrote:
-> On Wed, Apr 23, 2014 at 06:04:45PM +0100, Will Deacon wrote:
-> > On Tue, Apr 22, 2014 at 05:29:52PM +0100, Rob Herring wrote:
-> > > On Tue, Apr 22, 2014 at 11:01 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > > > Looking at the edac_mc_scrub_block code, atomic_scrub is always called with
-> > > > a normal, cacheable mapping (kmap_atomic) so that doesn't help us (although
-> > > > it means the exclusives will at least succeed).
-> > > >
-> > > > The problem of speculative reads by the CPU could be solved by unmapped the
-> > > > DMA buffer when we transfer the ownership over to the device (instead of
-> > > > invalidating it after the transfer). However, I'm now slightly confused as
-> > > > to how atomic_scrub fixes errors reported at any cache level higher than
-> > > > L1. Do we need cache-flushing to ensure that the exclusive-store propagates
-> > > > to the point of failure?
-> > > 
-> > > The whole point of scrubbing is to stop repeated error reporting of
-> > > correctable errors. For example, you do a write to memory and the ECC
-> > > code is added to it. Suppose the data stored in the memory gets
-> > > corrupted either on the write or some time later you get a bit flip in
-> > > the memory cell. Then when the data is read from memory, the memory
-> > > controller will detect the error, correct it, and trigger and ECC
-> > > correctable error interrupt. It will do this every time you read that
-> > > memory location because the error occurred on the write. The only way
-> > > to clear the error is re-writing memory.
-> > 
-> > Thanks for the explanation.
-> > 
-> > > As long as that cache line is dirty, no reads from that memory location
-> > > will occur as other readers will get the line from other cores, the L2, or
-> > > the line will get pushed out to memory first.
-> > 
-> > Agreed, if all of the readers are coherent.
-> 
-> Just to get things moving on this patch, do we agree that it is only safe
-> for coherent DMA? If so, do we merge it on the grounds that people
-> needing EDAC only use it with DMA-coherent memory? The comment for
-> atomic_scrub should be updated to state coherent DMA only.
-> 
-> We could check the dma_ops in atomic_scrub but I don't think it's worth
-> it.
 
-Well, I think we should do *something* for the non-coherent case, otherwise
-we're going to have fun debugging random buffer corruption. Could we disable
-scrubbing from the dma_bus_notifier the moment we find a non-coherent
-device?
 
-Will
+On 05/09/2014 06:10 PM, Srinivas Kandagatla wrote:
+>
+> Hi Maxime,
+> On 09/05/14 07:53, Maxime Coquelin wrote:
+>> Hi Srini,
+>>
+>> On 04/29/2014 08:48 AM, Srinivas Kandagatla wrote:
+>>> Hi Russell,
+>>> Thankyou for the patch,
+>>>
+>>> The only issue I see is, on most of the STi SOCs the default value for
+>>> AUXCTRL register is 0x0, so the waysize is not set.
+>> I checked all the ARM SoCs we support currently.
+>> Only STiH416 has its reset value at 0x0.
+>>
+>>>
+>>> The way size is different on some SOCs in the same series.
+>>>
+>>> Where is the way-size mentioned in this new style?
+>>
+>> Then, I think it should be the role of the bootloaders to set it for
+>> STiH416 (I have been told U-Boot already does it).
+>> Does it sound acceptable for you?
+>
+> That's great, so the gdb startup scripts should takecare of it too.
+It's already in my ToDo list!
+
+Thanks,
+Maxime
+
+>
+>
+> Thanks,
+> srini
