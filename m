@@ -1,68 +1,150 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Fri, 9 May 2014 10:24:50 +0800
-Subject: Adding esdhc4 eMMC support on mx6sabresd
-In-Reply-To: <20140509031624.GL2794@dragon>
-References: <CAOMZO5CJEoe_fGLH-Uu9uVwNdWPp940k3WGAkjzkCiGmjAPAXA@mail.gmail.com>
- <20140508091835.78daafbe@ipc1.ka-ro>
- <20140508101730.GA28787@shlinux1.ap.freescale.net>
- <20140509031624.GL2794@dragon>
-Message-ID: <20140509022448.GA10730@shlinux1.ap.freescale.net>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Fri, 09 May 2014 13:27:54 +0900
+Subject: [PATCH] mmc: dw_mmc: change to use recommended reset procedure
+In-Reply-To: <CAPz6YkXGH96mjeePwUSRmPX4Y1YXYif+N+BRKsTwtNxtRq3xoQ@mail.gmail.com>
+References: <1395834374-1988-1-git-send-email-yuvaraj.cd@samsung.com>
+ <CAKuRcOJYsC9OUOrYrvKg_iC5Z6dZ0mqW3-y=UXHtCr99=gQBXw@mail.gmail.com>
+ <536C2C31.8000209@samsung.com>
+ <CAPz6YkXGH96mjeePwUSRmPX4Y1YXYif+N+BRKsTwtNxtRq3xoQ@mail.gmail.com>
+Message-ID: <536C594A.5080107@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 09, 2014 at 11:16:25AM +0800, Shawn Guo wrote:
-> On Thu, May 08, 2014 at 06:17:32PM +0800, Dong Aisheng wrote:
-> > I just tested an old Chris/mmc-next tree which is 3.14 rc2 with the top commit is b42b9b.
-> > The eMMC works well on SabreSD boards.
-> > But it failed and got the same issue with latest chris/mmc-next tree.
-> > I noticed there's no changes on sdhci-esdhc-imx.c
-> > Probably some other changes breaks this function.
-> > 
-> > Fabio,
-> > You may bisect it yourself or i will do it later when i'm a bit free.
-> 
-> The regression is caused by the following commit ...
-> 
-> commit 79f7ae7c45a6ccf04e2908337461dee615f6afb0
-> Author: Seungwon Jeon <tgih.jun@samsung.com>
-> Date:   Fri Mar 14 21:11:56 2014 +0900
-> 
->     mmc: clarify DDR timing mode between SD-UHS and eMMC
-> 
->     This change distinguishes DDR timing mode of current
->     mixed usage to clarify device type.
-> 
->     Signed-off-by: Seungwon Jeon <tgih.jun@samsung.com>
->     Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
->     Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->     Signed-off-by: Chris Ball <chris@printf.net>
-> 
-> ... and the line below.
->  
-> @@ -1264,7 +1264,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
->                                         goto err;
->                         }
->                         mmc_card_set_ddr_mode(card);
-> -                       mmc_set_timing(card->host, MMC_TIMING_UHS_DDR50);
-> +                       mmc_set_timing(card->host, MMC_TIMING_MMC_DDR52);
->                         mmc_set_bus_width(card->host, bus_width);
->                 }
->         }
-> 
+Hi, Sonny.
 
-Thanks for the info.
-The plat driver is still using UHS_DDR50 which may need update too.
-I will submit a patch to fix it ASAP.
+I have checked the Synopsys TRM..
 
-Regards
-Dong Aisheng
+On 05/09/2014 10:34 AM, Sonny Rao wrote:
+> On Thu, May 8, 2014 at 6:15 PM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+>> On 05/08/2014 06:40 PM, Yuvaraj Kumar wrote:
+>>> Any comments on this patch?
+>>>
+>>> On Wed, Mar 26, 2014 at 5:16 PM, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com> wrote:
+>>>> From: Sonny Rao <sonnyrao@chromium.org>
+>>>>
+>>>> This patch changes the fifo reset code to follow the reset procedure
+>>>> outlined in the documentation of Synopsys  Mobile storage host databook
+>>>> 7.2.13.
+>>>> Without this patch, we could able to see eMMC was not detected after
+>>>> multiple reboots due to driver hangs while eMMC tuning for HS200.
+>>>>
+>>>> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+>>>> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.org>
+>>>> ---
+>>>>  drivers/mmc/host/dw_mmc.c |   48 ++++++++++++++++++++++++++++++++++++++++++++-
+>>>>  drivers/mmc/host/dw_mmc.h |    1 +
+>>>>  2 files changed, 48 insertions(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+>>>> index 32dd81d..1d77431 100644
+>>>> --- a/drivers/mmc/host/dw_mmc.c
+>>>> +++ b/drivers/mmc/host/dw_mmc.c
+>>>> @@ -2220,7 +2220,53 @@ static inline bool dw_mci_fifo_reset(struct dw_mci *host)
+>>>>                 host->sg = NULL;
+>>>>         }
+>>>>
+>>>> -       return dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET);
+>>>> +       /*
+>>>> +        * The recommended method for resetting is to always reset the
+>>>> +        * controller and the fifo, but differs slightly depending on the mode.
+>>>> +        * Note that this doesn't handle the "generic DMA" (not IDMAC) case.
+>>>> +        */
+>>
+>> "not IDMAC" is confused..
+>>
+> 
+> The documentation describes three different possible modes.  There's a
+> mode that doesn't use IDMAC but still does DMA.  But as far as I can
+> tell this driver doesn't support that way.  We can just remove that
+> wording if it's confusing.
+> 
+>>>> +       if (dw_mci_ctrl_reset(host, SDMMC_CTRL_RESET | SDMMC_CTRL_FIFO_RESET)) {
+>>>> +               unsigned long timeout = jiffies + msecs_to_jiffies(500);
+>>>> +               u32 status, rint;
+>>>> +
+>>>> +               /* if using dma we wait for dma_req to clear */
+>>>> +               if (host->using_dma) {
+>>>> +                       do {
+>>>> +                               status = mci_readl(host, STATUS);
+>>>> +                               if (!(status & SDMMC_STATUS_DMA_REQ))
+>>>> +                                       break;
+>>>> +                               cpu_relax();
+>>>> +                       } while (time_before(jiffies, timeout));
+>>>> +
+>>>> +                       if (status & SDMMC_STATUS_DMA_REQ)
+>>>> +                               dev_err(host->dev,
+>>>> +                                       "%s: Timeout waiting for dma_req to "
+>>>> +                                       "clear during reset", __func__);
+>>>> +
+>>>> +                       /* when using DMA next we reset the fifo again */
+>>>> +                       dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET);
+>>>> +               }
+>>>> +               /*
+>>>> +                * In all cases we clear the RAWINTS register to clear any
+>>>> +                * interrupts.
+>>>> +                */
+>>>> +               rint = mci_readl(host, RINTSTS);
+>>>> +               rint = rint & (~mci_readl(host, MINTSTS));
+you use the "status or temp" instead of rint. (you can reuse the variable.)
+And can use "status &= ~mci_readl(host,MINTSTS);"
+
+>>
+>> Just clear the RINTSTS register? why do you add these?
+>>
+> 
+> This will look at what is not masked, and only clear those bits.
+Well, i known if clear the RINTSTS register, 
+recommended to use "0xfffffff" and set the value for interrupt.
 
 > 
-> > Shawn,
-> > I remember this patch should have been upstream through your tree long time ago.
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/206446.html
-> > It seems somehow missed.
+>>>> +               if (rint)
+>>>> +                       mci_writel(host, RINTSTS, rint);
+>>>> +
+>>>> +       } else
+>>>> +               dev_err(host->dev, "%s: Reset bits didn't clear", __func__);
+>>
+>> Just display the error log? I didn't understand this.
+>> If you displayed the error log, then it needs to return the error value.
+>>
+>>>> +
+>>>> + #ifdef CONFIG_MMC_DW_IDMAC
+>>>> +       /* It is also recommended that we reset and reprogram idmac */
+>>>> +       dw_mci_idmac_reset(host);
+>>>> + #endif
+>>>> +
+>>>> +       /* After a CTRL reset we need to have CIU set clock registers  */
+>>>> +       mci_send_cmd(host->cur_slot, SDMMC_CMD_UPD_CLK, 0);
+
+Well, why do you send the clock update command?
+I didn't see that update the value related with clock.
+
+Best Regards,
+Jaehoon Chung
+
+>>>> +
+>>>> +       return true;
+>>>>  }
+>>>>
+>>>>  static inline bool dw_mci_ctrl_all_reset(struct dw_mci *host)
+>>>> diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
+>>>> index 738fa24..037e47a 100644
+>>>> --- a/drivers/mmc/host/dw_mmc.h
+>>>> +++ b/drivers/mmc/host/dw_mmc.h
+>>>> @@ -129,6 +129,7 @@
+>>>>  #define SDMMC_CMD_INDX(n)              ((n) & 0x1F)
+>>>>  /* Status register defines */
+>>>>  #define SDMMC_GET_FCNT(x)              (((x)>>17) & 0x1FFF)
+>>>> +#define SDMMC_STATUS_DMA_REQ           BIT(31)
+>>>>  /* FIFOTH register defines */
+>>>>  #define SDMMC_SET_FIFOTH(m, r, t)      (((m) & 0x7) << 28 | \
+>>>>                                          ((r) & 0xFFF) << 16 | \
+>>>> --
+>>>> 1.7.10.4
+>>>>
+>>>
+>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
-> Ah, yes.  It got lost.
-> 
-> Shawn
