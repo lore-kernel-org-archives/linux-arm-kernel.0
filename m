@@ -1,46 +1,62 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 09 May 2014 10:18:57 +0200
-Subject: [PATCH v2 3/7] mfd: add support for sun6i PRCM (Power/Reset/Clock
- Management) unit
-In-Reply-To: <20140509080807.GH5767@lee--X1>
-References: <1399483554-8824-1-git-send-email-boris.brezillon@free-electrons.com>
- <1399483554-8824-4-git-send-email-boris.brezillon@free-electrons.com>
- <20140508110205.GB5767@lee--X1> <536BE366.8080907@free-electrons.com>
- <20140509071246.GE5767@lee--X1> <536C84F6.2050701@redhat.com>
- <20140509080807.GH5767@lee--X1>
-Message-ID: <536C8F71.5040604@redhat.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Fri, 09 May 2014 10:19:51 +0200
+Subject: [PATCH v12 4/4] usb: ehci-exynos: Change to use phy provided by
+ the generic phy framework
+In-Reply-To: <1399266148-31729-1-git-send-email-gautam.vivek@samsung.com>
+References: <1399034855-9686-5-git-send-email-gautam.vivek@samsung.com>
+ <1399266148-31729-1-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <536C8FA7.2040401@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Vivek,
 
-On 05/09/2014 10:08 AM, Lee Jones wrote:
->>>>>> +static struct platform_driver sun6i_prcm_driver = {
->>>>>> +	.driver = {
->>>>>> +		.name = "sun6i-prcm",
->>>>>> +		.owner = THIS_MODULE,
->>>>>> +		.of_match_table = sun6i_prcm_dt_ids,
->>>>>> +	},
->>>>>> +	.probe = sun6i_prcm_probe,
->>>>> You need a .remove() call-back.
->>>>
->>>> This driver cannot be compiled as module (see the Kconfig definition)
->>>> and the devices are not hotpluggable, as a result a probed device will
->>>> never be removed.
->>>>
->>>> Do you still want me to implement the remove function ?
->>>
->>> .remove() also be run on shut down.
->>
->> That is not true, if your device needs to do anything special at shutdown
->> you need to add a shutdown callback. Devices are kept as is (not torn down)
->> on shutdown.
+On 05.05.2014 07:02, Vivek Gautam wrote:
+> From: Kamil Debski <k.debski@samsung.com>
 > 
-> Ah okay, I'll bow to your knowledge.  So there's no reason for this
-> driver to ever call mfd_remove_devices() then?
+> Add the phy provider, supplied by new Exynos-usb2phy using
+> Generic phy framework.
+> Keeping the support for older USB phy intact right now, in order
+> to prevent any functionality break in absence of relevant
+> device tree side change for ehci-exynos.
+> Once we move to new phy in the device nodes for ehci, we can
+> remove the support for older phys.
+> 
+> Signed-off-by: Kamil Debski <k.debski@samsung.com>
+> [gautam.vivek at samsung.com: Addressed review comments from mailing list]
+> [gautam.vivek at samsung.com: Kept the code for old usb-phy, and just
+> added support for new exynos5-usb2phy in generic phy framework]
+> [gautam.vivek at samsung.com: Edited the commit message]
+> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+> Cc: Jingoo Han <jg1.han@samsung.com>
+> Acked-by: Alan Stern <stern@rowland.harvard.edu>
+> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+> 
+> Changes from v11:
+>  - Removed setting phy explicitly to error pointer.
+>  - Changed error check to '-ENOSYS' instead of '-ENXIO' in failure case of
+>    devm_of_phy_get().
+> 
+> Changes from v10:
+>  - Removed 'phy-names' property from the bindings since we don't need it.
+>  - Restructured exynos_ehci_get_phy() function to handle error codes as
+>    well as return relevant error codes effectively.
+>  - Added IS_ERR() check for PHYs in exynos_ehci_phy_enable()/disable().
+> 
+> Changes from v9:
+>  - Calling usb_phy_shutdown() when exynos_ehci_phy_enable() is failing.
+>  - Made exynos_ehci_phy_disable() return void, since its return value
+>    did not serve any purpose.
+>  - Calling clk_disable_unprepare() in exynos_ehci_resume() when
+>    exynos_ehci_phy_enable() is failed.
+> 
+>  .../devicetree/bindings/usb/exynos-usb.txt         |   15 +++
+>  drivers/usb/host/ehci-exynos.c                     |  129 +++++++++++++++++---
+>  2 files changed, 124 insertions(+), 20 deletions(-)
 
-No, this is an integral part of the SOC, which never gets removed in any way.
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 
-Regards,
-
-Hans
+--
+Best regards,
+Tomasz
