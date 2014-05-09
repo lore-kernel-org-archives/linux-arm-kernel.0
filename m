@@ -1,133 +1,83 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 09 May 2014 11:14:40 +0900
-Subject: [PATCH V2] ARM: EXYNOS: cpu hotplug: use v7_exit_coherency_flush
- macro for cache disabling
-In-Reply-To: <5360AE05.7020106@samsung.com>
-References: <1398232351-16280-1-git-send-email-leela.krishna@linaro.org>
- <5360AE05.7020106@samsung.com>
-Message-ID: <034c01cf6b2c$6f3dd510$4db97f30$@samsung.com>
+Date: Fri, 09 May 2014 11:14:49 +0900
+Subject: [PATCHv5] ARM: EXYNOS: Support secondary CPU boot of Exynos4212
+In-Reply-To: <5369B88E.9030901@samsung.com>
+References: <1398735462-1938-1-git-send-email-cw00.choi@samsung.com>
+ <5369B88E.9030901@samsung.com>
+Message-ID: <034d01cf6b2c$748bdd50$5da397f0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Chanwoo Choi wrote:
 > 
-> Hi,
+> Dear Kukjin,
 > 
-> On 04/23/2014 02:52 PM, Leela Krishna Amudala wrote:
-> > A common macro v7_exit_coherency_flush available which does the below
-> tasks in
-> > the seqeunce.
-> > -clearing C bit
-> > -clearing L1 cache
-> > -exit SMP
-> > -instruction and data synchronization
-> >
-> > So removing the local functions which does the same thing and use the
-> macro instead.
-> >
-> > Signed-off-by: Leela Krishna Amudala <leela.krishna@linaro.org>
-> > Acked-by: Nicolas Pitre <nico@linaro.org>
-> > ---
-> > Changes since V1:
-> > 	- removed unwanted primary_part variable in exynos_cpu_die()
-> > 	- given more description in commit message
-> > 	  suggested by Daniel Lezcano <daniel.lezcano@linaro.org>
-> >
-> >  arch/arm/mach-exynos/hotplug.c |   63
-+---------------------------------
-> ------
-> >  1 file changed, 1 insertion(+), 62 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-
-> exynos/hotplug.c
-> > index 5eead53..9ca692d 100644
-> > --- a/arch/arm/mach-exynos/hotplug.c
-> > +++ b/arch/arm/mach-exynos/hotplug.c
-> > @@ -24,56 +24,6 @@
-> >  #include "common.h"
-> >  #include "regs-pmu.h"
-> >
-> > -static inline void cpu_enter_lowpower_a9(void)
-> > -{
-> > -	unsigned int v;
-> > -
-> > -	asm volatile(
-> > -	"	mcr	p15, 0, %1, c7, c5, 0\n"
-> > -	"	mcr	p15, 0, %1, c7, c10, 4\n"
-> > -	/*
-> > -	 * Turn off coherency
-> > -	 */
-> > -	"	mrc	p15, 0, %0, c1, c0, 1\n"
-> > -	"	bic	%0, %0, %3\n"
-> > -	"	mcr	p15, 0, %0, c1, c0, 1\n"
-> > -	"	mrc	p15, 0, %0, c1, c0, 0\n"
-> > -	"	bic	%0, %0, %2\n"
-> > -	"	mcr	p15, 0, %0, c1, c0, 0\n"
-> > -	  : "=&r" (v)
-> > -	  : "r" (0), "Ir" (CR_C), "Ir" (0x40)
-> > -	  : "cc");
-> > -}
-> > -
-> > -static inline void cpu_enter_lowpower_a15(void)
-> > -{
-> > -	unsigned int v;
-> > -
-> > -	asm volatile(
-> > -	"	mrc	p15, 0, %0, c1, c0, 0\n"
-> > -	"	bic	%0, %0, %1\n"
-> > -	"	mcr	p15, 0, %0, c1, c0, 0\n"
-> > -	  : "=&r" (v)
-> > -	  : "Ir" (CR_C)
-> > -	  : "cc");
-> > -
-> > -	flush_cache_louis();
-> > -
-> > -	asm volatile(
-> > -	/*
-> > -	* Turn off coherency
-> > -	*/
-> > -	"	mrc	p15, 0, %0, c1, c0, 1\n"
-> > -	"	bic	%0, %0, %1\n"
-> > -	"	mcr	p15, 0, %0, c1, c0, 1\n"
-> > -	: "=&r" (v)
-> > -	: "Ir" (0x40)
-> > -	: "cc");
-> > -
-> > -	isb();
-> > -	dsb();
-> > -}
-> > -
-> >  static inline void cpu_leave_lowpower(void)
-> >  {
-> >  	unsigned int v;
-> > @@ -132,19 +82,8 @@ static inline void platform_do_lowpower(unsigned int
-> cpu, int *spurious)
-> >  void __ref exynos_cpu_die(unsigned int cpu)
-> >  {
-> >  	int spurious = 0;
-> > -	int primary_part = 0;
-> >
-> > -	/*
-> > -	 * we're ready for shutdown now, so do it.
-> > -	 * Exynos4 is A9 based while Exynos5 is A15; check the CPU part
-> > -	 * number by reading the Main ID register and then perform the
-> > -	 * appropriate sequence for entering low power.
-> > -	 */
-> > -	asm("mrc p15, 0, %0, c0, c0, 0" : "=r"(primary_part) : : "cc");
-> > -	if ((primary_part & 0xfff0) == 0xc0f0)
-> > -		cpu_enter_lowpower_a15();
-> > -	else
-> > -		cpu_enter_lowpower_a9();
-> > +	v7_exit_coherency_flush(louis);
-> >
-> >  	platform_do_lowpower(cpu, &spurious);
-> >
-> >
+> Could you please pick this patch?
 > 
-> I tested this patch on Exynos3250 based on Cortex-A7 dual core.
-> 
-> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
-> 
-OK, will apply, thanks.
+I've applied.
 
-- Kukjin
+Thanks,
+Kukjin
+
+> Best Regards,
+> Chanwoo Choi
+> 
+> On 04/29/2014 10:37 AM, Chanwoo Choi wrote:
+> > From: Kyungmin Park <kyungmin.park@samsung.com>
+> >
+> > This patch fix the offset of CPU boot address and change parameter of
+> smc call
+> > of SMC_CMD_CPU1BOOT command for Exynos4212.
+> >
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> > Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> > ---
+> > Changes from v4:
+> > - Post only this patch separated from following patchset[1]
+> > [1] https://lkml.org/lkml/2014/4/24/873
+> >
+> >  arch/arm/mach-exynos/firmware.c | 15 ++++++++++++++-
+> >  1 file changed, 14 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-
+> exynos/firmware.c
+> > index 932129e..aa01c42 100644
+> > --- a/arch/arm/mach-exynos/firmware.c
+> > +++ b/arch/arm/mach-exynos/firmware.c
+> > @@ -18,6 +18,8 @@
+> >
+> >  #include <mach/map.h>
+> >
+> > +#include <plat/cpu.h>
+> > +
+> >  #include "smc.h"
+> >
+> >  static int exynos_do_idle(void)
+> > @@ -28,13 +30,24 @@ static int exynos_do_idle(void)
+> >
+> >  static int exynos_cpu_boot(int cpu)
+> >  {
+> > +	/*
+> > +	 * The second parameter of SMC_CMD_CPU1BOOT command means CPU id.
+> > +	 * But, Exynos4212 has only one secondary CPU so second parameter
+> > +	 * isn't used for informing secure firmware about CPU id.
+> > +	 */
+> > +	if (soc_is_exynos4212())
+> > +		cpu = 0;
+> > +
+> >  	exynos_smc(SMC_CMD_CPU1BOOT, cpu, 0, 0);
+> >  	return 0;
+> >  }
+> >
+> >  static int exynos_set_cpu_boot_addr(int cpu, unsigned long boot_addr)
+> >  {
+> > -	void __iomem *boot_reg = S5P_VA_SYSRAM_NS + 0x1c + 4*cpu;
+> > +	void __iomem *boot_reg = S5P_VA_SYSRAM_NS + 0x1c;
+> > +
+> > +	if (!soc_is_exynos4212())
+> > +		boot_reg += 4*cpu;
+> >
+> >  	__raw_writel(boot_addr, boot_reg);
+> >  	return 0;
+> >
