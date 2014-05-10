@@ -1,55 +1,57 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sat, 10 May 2014 23:29:25 -0400 (EDT)
-Subject: [PATCH 2/3] arm64: Add big.LITTLE switcher stub
-In-Reply-To: <20140509180121.GU12304@sirena.org.uk>
-References: <1399653631-4938-1-git-send-email-broonie@kernel.org>
- <1399653631-4938-2-git-send-email-broonie@kernel.org>
- <20140509174738.GP7950@arm.com> <20140509180121.GU12304@sirena.org.uk>
-Message-ID: <alpine.LFD.2.11.1405102321290.980@knanqh.ubzr>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 10 May 2014 08:17:17 -0500
+Subject: [PATCH v11 2/6] ARM: dts: sunxi: Add reg_vmmc0 supply to
+ sunxi-common-regulators.dtsi
+In-Reply-To: <1399714443-12459-3-git-send-email-hdegoede@redhat.com>
+References: <1399714443-12459-1-git-send-email-hdegoede@redhat.com>
+ <1399714443-12459-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <20140510131717.GL7047@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 9 May 2014, Mark Brown wrote:
+Hi Hans,
 
-> On Fri, May 09, 2014 at 06:47:38PM +0100, Catalin Marinas wrote:
-> > On Fri, May 09, 2014 at 05:40:30PM +0100, Mark Brown wrote:
-> 
-> > > The big.LITTLE cpufreq driver is useful on arm64 big.LITTLE systems even
-> > > without IKS support since it implements support for clusters with shared
-> > > clocks (a common big.LITTLE configuration). In order to allow it to be
-> > > built provide the non-IKS stubs for arm64, enabling cpufreq with all the
-> > > cores available.
-> 
-> > Have you thought of patching the actual cpufreq driver? Are you adding
-> > this code just to avoid compiler errors on arm64 with this driver?
-> 
-> Yes, that was actually my first thought but I wasn't loving the
-> ifdeferry - it's fairly easy to do IIRC but the general taste seems to
-> be towards having stubs rather than ifdefs and the code seemed to be
-> lending itself to that.  There was also the fact that ifdefs could have
-> been done for the non-IKS case on 32 bit but instead stubs were
-> provided.  If people prefer I can do an ifdeffed version though, it
-> doesn't make much odds.
+Thanks for your follow up on this.
 
-I personally don't understand the b.L cpufreq driver fully, especially 
-with the IKS functionality bolted on top.  Obviously I didn't write that 
-part otherwise I would hopefully understand it better.  Still, I'd have 
-preferred for the IKS extension to the b.L cpufreq driver to be more 
-isolated in a separate file or the like.
-
-> This was purely to get the driver compiling and hopefully running on
-> ARMv8, there is some user demand for deploying the driver on big.LITTLE
-> systems.
+On Sat, May 10, 2014 at 11:33:59AM +0200, Hans de Goede wrote:
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  arch/arm/boot/dts/sunxi-common-regulators.dtsi | 8 ++++++++
+>  1 file changed, 8 insertions(+)
 > 
-> > > It may make sense to make an asm-generic version of these stubs instead
-> 
-> > asm-generic/bL_switcher.h? I take it as a good joke ;)
-> 
-> Hey, perhaps other hardware architectures are implementing similar
-> concepts even now in order to keep up!  
+> diff --git a/arch/arm/boot/dts/sunxi-common-regulators.dtsi b/arch/arm/boot/dts/sunxi-common-regulators.dtsi
+> index 18eeac0..ebbba39 100644
+> --- a/arch/arm/boot/dts/sunxi-common-regulators.dtsi
+> +++ b/arch/arm/boot/dts/sunxi-common-regulators.dtsi
+> @@ -72,4 +72,12 @@
+>  		gpio = <&pio 7 3 0>;
+>  		status = "disabled";
+>  	};
+> +
+> +	reg_vmmc0: vmmc0 {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "vmmc0";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		status = "disabled";
+> +	};
 
-Let's hope we won't need to rely on IKS any longer by the time support 
-for them land into mainline.
+I think you can rather define this as vcc-3.3v or something alike,
+that would always be enabled. That would allow to reuse this in some
+other nodes as well, you won't need to enable it on every board, and
+this is actually more accurate.
 
+Thanks!
+Maxime
 
-Nicolas
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140510/020f0683/attachment-0001.sig>
