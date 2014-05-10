@@ -1,101 +1,90 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 10 May 2014 07:56:59 -0500
-Subject: [PATCH v2 7/7] ARM: sunxi: dt: add APP4-EVB1 board support
+Date: Sat, 10 May 2014 07:56:56 -0500
+Subject: [PATCH v2 4/7] usb: ehci-platform: add optional reset controller
+ retrieval
 In-Reply-To: <1399726619-30150-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1399726619-30150-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1399726619-30150-8-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1399726619-30150-5-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Boris BREZILLON <boris.brezillon@free-electrons.com>
 
-The APP4 EVB1 development boards embeds an A31, together with some NAND, one SD
-card slot, and one SDIO + UART WiFi and Bluetooth chip, a few I2C buses, USB,
-and a LCD display.
+On the Allwinner's A31 SoC the reset line connected to the EHCI IP has to
+be deasserted for the EHCI block to be usable.
+
+Add support for an optional reset controller that will be deasserted on
+power off and asserted on power on.
 
 Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Reviewed-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/Makefile                |  1 +
- arch/arm/boot/dts/sun6i-a31-app4-evb1.dts | 57 +++++++++++++++++++++++++++++++
- 2 files changed, 58 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
+ Documentation/devicetree/bindings/usb/usb-ehci.txt |  1 +
+ drivers/usb/host/ehci-platform.c                   | 18 ++++++++++++++++++
+ 2 files changed, 19 insertions(+)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index ffa3f5ef27d3..d50c0895a9d5 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -343,6 +343,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += \
- 	sun5i-a10s-olinuxino-micro.dtb \
- 	sun5i-a13-olinuxino.dtb \
- 	sun5i-a13-olinuxino-micro.dtb \
-+	sun6i-a31-app4-evb1.dtb \
- 	sun6i-a31-colombus.dtb \
- 	sun6i-a31-m9.dtb \
- 	sun7i-a20-cubieboard2.dtb \
-diff --git a/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts b/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
-new file mode 100644
-index 000000000000..2bbf8867362b
---- /dev/null
-+++ b/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
-@@ -0,0 +1,57 @@
-+/*
-+ * Copyright 2014 Boris Brezillon
-+ *
-+ * Boris Brezillon <boris.brezillon@free-electrons.com>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
+diff --git a/Documentation/devicetree/bindings/usb/usb-ehci.txt b/Documentation/devicetree/bindings/usb/usb-ehci.txt
+index ff151ec084c4..43c1a4e06767 100644
+--- a/Documentation/devicetree/bindings/usb/usb-ehci.txt
++++ b/Documentation/devicetree/bindings/usb/usb-ehci.txt
+@@ -15,6 +15,7 @@ Optional properties:
+  - clocks : a list of phandle + clock specifier pairs
+  - phys : phandle + phy specifier pair
+  - phy-names : "usb"
++ - resets : phandle + reset specifier pair
+ 
+ Example (Sequoia 440EPx):
+     ehci at e0000300 {
+diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
+index c7dd93aad20c..da89f274aa76 100644
+--- a/drivers/usb/host/ehci-platform.c
++++ b/drivers/usb/host/ehci-platform.c
+@@ -29,6 +29,7 @@
+ #include <linux/of.h>
+ #include <linux/phy/phy.h>
+ #include <linux/platform_device.h>
++#include <linux/reset.h>
+ #include <linux/usb.h>
+ #include <linux/usb/hcd.h>
+ #include <linux/usb/ehci_pdriver.h>
+@@ -41,6 +42,7 @@
+ 
+ struct ehci_platform_priv {
+ 	struct clk *clks[EHCI_MAX_CLKS];
++	struct reset_control *rst;
+ 	struct phy *phy;
+ };
+ 
+@@ -206,6 +208,19 @@ static int ehci_platform_probe(struct platform_device *dev)
+ 				break;
+ 			}
+ 		}
 +
-+/dts-v1/;
-+/include/ "sun6i-a31.dtsi"
-+/include/ "sunxi-common-regulators.dtsi"
++		priv->rst = devm_reset_control_get_optional(&dev->dev,
++							    NULL);
++		if (IS_ERR(priv->rst)) {
++			err = PTR_ERR(priv->rst);
++			if (err == -EPROBE_DEFER)
++				goto err_put_clks;
++			priv->rst = NULL;
++		} else {
++			err = reset_control_deassert(priv->rst);
++			if (err)
++				goto err_put_clks;
++		}
+ 	}
+ 
+ 	if (pdata->big_endian_desc)
+@@ -280,6 +295,9 @@ static int ehci_platform_remove(struct platform_device *dev)
+ 	if (pdata->power_off)
+ 		pdata->power_off(dev);
+ 
++	if (priv->rst)
++		reset_control_assert(priv->rst);
 +
-+/ {
-+	model = "Allwinner A31 APP4 EVB1 Evaluation Board";
-+	compatible = "allwinner,app4-evb1", "allwinner,sun6i-a31";
-+
-+	chosen {
-+		bootargs = "earlyprintk console=ttyS0,115200";
-+	};
-+
-+	soc at 01c00000 {
-+		pio: pinctrl at 01c20800 {
-+			usb1_vbus_pin_a: usb1_vbus_pin at 0 {
-+				allwinner,pins = "PH27";
-+				allwinner,function = "gpio_out";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+		};
-+
-+		usbphy: phy at 01c19400 {
-+			usb1_vbus-supply = <&reg_usb1_vbus>;
-+			status = "okay";
-+		};
-+
-+		ehci0: usb at 01c1a000 {
-+			status = "okay";
-+		};
-+
-+		uart0: serial at 01c28000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&uart0_pins_a>;
-+			status = "okay";
-+		};
-+	};
-+
-+	reg_usb1_vbus: usb1-vbus {
-+		pinctrl-0 = <&usb1_vbus_pin_a>;
-+		gpio = <&pio 7 27 0>;
-+		status = "okay";
-+	};
-+};
+ 	for (clk = 0; clk < EHCI_MAX_CLKS && priv->clks[clk]; clk++)
+ 		clk_put(priv->clks[clk]);
+ 
 -- 
 1.9.1
