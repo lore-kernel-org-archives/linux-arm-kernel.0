@@ -1,35 +1,20 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Sat, 10 May 2014 15:46:23 +0900
-Subject: [PATCH v3 1/3] ARM: dts: Add PMU node to exynos4210
-In-Reply-To: <1399704385-12508-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1399704385-12508-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1399704385-12508-2-git-send-email-pankaj.dubey@samsung.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sat, 10 May 2014 14:28:16 +0800
+Subject: [PATCH v3 1/2] ARM: dts: imx6: i2c4 cleanup
+In-Reply-To: <536CEDE4.40002@gmail.com>
+References: <53695C34.5000604@gmail.com> <20140508054106.GH2794@dragon>
+ <536B4ACD.30001@gmail.com> <20140509030938.GK2794@dragon>
+ <536C8837.9090802@gmail.com> <20140509120845.GO2794@dragon>
+ <536CE331.7030001@gmail.com> <20140509142118.GQ2794@dragon>
+ <536CEDE4.40002@gmail.com>
+Message-ID: <20140510062812.GR2794@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds pmu regnode to exynos4210 dtsi to handle
-PMU register access via DT.
+On Fri, May 09, 2014 at 04:01:56PM +0100, Iain Paton wrote:
+> add missing i2c4 clock and correct the compatible string to match other
+> imx6 i2c blocks
+> 
+> Signed-off-by: Iain Paton<ipaton0@gmail.com>
 
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
----
- arch/arm/boot/dts/exynos4210.dtsi |    5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-index d3d727b..d23d3f0 100644
---- a/arch/arm/boot/dts/exynos4210.dtsi
-+++ b/arch/arm/boot/dts/exynos4210.dtsi
-@@ -99,6 +99,11 @@
- 		interrupts = <2 2>, <3 2>;
- 	};
- 
-+	pmu_system_controller: system-controller at 10020000 {
-+		compatible = "samsung,exynos4210-pmu", "syscon";
-+		reg = <0x10020000 0x5000>;
-+	};
-+
- 	pinctrl_0: pinctrl at 11400000 {
- 		compatible = "samsung,exynos4210-pinctrl";
- 		reg = <0x11400000 0x1000>;
--- 
-1.7.10.4
+Applied, thanks.
