@@ -1,55 +1,68 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Sat, 10 May 2014 19:10:05 +0800
-Subject: i.MX6 USB OTG support is broken on linux-next
-In-Reply-To: <20140509130046.GP2794@dragon>
-References: <20140509130046.GP2794@dragon>
-Message-ID: <20140510111003.GA1593@shlinux1.ap.freescale.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 10 May 2014 07:24:39 -0500
+Subject: [PATCH v3 1/2] input: Add new sun4i-ts driver for Allwinner
+ sunxi SoC's rtp controller
+In-Reply-To: <1399718826-16215-2-git-send-email-hdegoede@redhat.com>
+References: <1399718826-16215-1-git-send-email-hdegoede@redhat.com>
+ <1399718826-16215-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <20140510122439.GJ7047@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 09, 2014 at 09:00:47PM +0800, Shawn Guo wrote:
-> I'm running next-20140508 kernel on imx6q-sabresd board with USB
-> mouse/keyboard connected to OTG port.  It  works well on 3.15-rc but
-> is broken on recent linux-next kernel with the message like below.
+Hi Hans,
+
+Thanks a lot for reposting this.
+
+On Sat, May 10, 2014 at 12:47:05PM +0200, Hans de Goede wrote:
+> Note the sun4i-ts controller is capable of detecting a second touch, but when
+> a second touch is present then the accuracy becomes so bad the reported touch
+> location is not useable.
 > 
-> ...
-> usb 1-1: device v413c p2107 is not supported
-> hub 1-0:1.0: unable to enumerate USB device on port 1
+> The original android driver contains some complicated heuristics using the
+> aprox. distance between the 2 touches to see if the user is making a pinch
+> open / close movement, and then reports emulated multi-touch events around
+> the last touch coordinate (as the dual-touch coordinates are worthless).
 > 
-> With the help from Peter, I found that the issue shows up only when
-> CONFIG_USB_OTG_FSM is enabled.  The option is enabled by commit 8fd2f1f
-> (ARM: imx_v6_v7_defconfig: Enable drivers for i.MX51 USB Host support.)
-> from IMX tree.
+> These kinds of heuristics are just asking for trouble (and don't belong
+> in the kernel). So this driver offers straight forward, reliable single
+> touch functionality only.
 > 
-> I guess this is a sign that chipidea otg_fsm driver is buggy?  I do not
-> think dropping CONFIG_USB_OTG_FSM selection from imx_v6_v7_defconfig is
-> a solution, and we need to fix the issue in usb driver, right?
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  .../bindings/input/touchscreen/sun4i.txt           |  15 ++
+>  drivers/input/touchscreen/Kconfig                  |  10 +
+>  drivers/input/touchscreen/Makefile                 |   1 +
+>  drivers/input/touchscreen/sun4i-ts.c               | 262 +++++++++++++++++++++
+>  4 files changed, 288 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
+>  create mode 100644 drivers/input/touchscreen/sun4i-ts.c
 > 
+> diff --git a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
+> new file mode 100644
+> index 0000000..e45927e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
+> @@ -0,0 +1,15 @@
+> +sun4i resistive touchscreen controller
+> +--------------------------------------
+> +
+> +Required properties:
+> + - compatible: "allwinner,sun4i-ts"
 
-No, Shawn. The solution of this problem is drop CONFIG_USB_OTG_FSM, I
-guess Denis added it wrongly.
+In between, I changed the compatible of this driver to sun4i-a10-ts to
+match the pattern used everywhere else. You should probably update it
+in your driver as well :)
 
-According to Embedded Hosts & OTG spec, OTG devices and Embedded Hosts
-both have Targeted Host functionality, and each Targeted Host has
-its TPL (Targeted Peripheral List), only the devices are at TPL
-are supported by Targeted Host.
+Maxime
 
-Current Linux TPL only contains limited devices, each Targeted Host
-needs to update its TPL when it makes product, (The comments at
-otg_whitelist.h also mention it), and the devices are not at TPL
-will not be supported, and will report to user as "an unsupported
-device" error, at current Linux configuration, once the CONFIG_USB_OTG_FSM
-and CONFIG_USB_OTG are chosen, the host will be Targeted Host.
-
-The reason why Shawn met this problem is: the imx_v6_v7_defconfig set 
-CONFIG_USB_OTG_FSM, so the CONFIG_USB_OTG and CONFIG_USB_OTG_WHITELIST
-are set according to dependency, it makes imx6 device as Targeted Host,
-but the devices connected at Shawn's board are not at TPL, so they are
-not be supported.
-
-In a word the CONFIG_USB_OTG_FSM should not be chosen for
-defauly kernel configuration. The CONFIG_USB_OTG_FSM should only be chosen
-by default when this device goes to make product and the TPL is updated
-accordingly.
-
-Peter
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140510/a1d4ffc8/attachment.sig>
