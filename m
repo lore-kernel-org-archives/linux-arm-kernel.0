@@ -1,64 +1,55 @@
-From: mail@aurabindo.in (Jay Aurabind)
-Date: Sat, 10 May 2014 17:32:11 +0530
-Subject: [PATCH] mfd: abx500-core: Fix compiler warning larger stack frame
-Message-ID: <536E1543.3090107@aurabindo.in>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Sat, 10 May 2014 19:10:05 +0800
+Subject: i.MX6 USB OTG support is broken on linux-next
+In-Reply-To: <20140509130046.GP2794@dragon>
+References: <20140509130046.GP2794@dragon>
+Message-ID: <20140510111003.GA1593@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From 95f6ac368dbe352af0dfa2097b7d58b416447be5 Mon Sep 17 00:00:00 2001
-From: Aurabindo J <mail@aurabindo.in>
-Date: Sat, 10 May 2014 15:16:58 +0530
-Subject: [PATCH] mfd: abx500-core: Fix compiler warning larger stack frame
+On Fri, May 09, 2014 at 09:00:47PM +0800, Shawn Guo wrote:
+> I'm running next-20140508 kernel on imx6q-sabresd board with USB
+> mouse/keyboard connected to OTG port.  It  works well on 3.15-rc but
+> is broken on recent linux-next kernel with the message like below.
+> 
+> ...
+> usb 1-1: device v413c p2107 is not supported
+> hub 1-0:1.0: unable to enumerate USB device on port 1
+> 
+> With the help from Peter, I found that the issue shows up only when
+> CONFIG_USB_OTG_FSM is enabled.  The option is enabled by commit 8fd2f1f
+> (ARM: imx_v6_v7_defconfig: Enable drivers for i.MX51 USB Host support.)
+> from IMX tree.
+> 
+> I guess this is a sign that chipidea otg_fsm driver is buggy?  I do not
+> think dropping CONFIG_USB_OTG_FSM selection from imx_v6_v7_defconfig is
+> a solution, and we need to fix the issue in usb driver, right?
+> 
 
-On systems with CONFIG_FRAME_WARN=1024, compiler warns the allocation of
-an object of struct device on stack. Make the allocation dynamically to
-fix the warning.
+No, Shawn. The solution of this problem is drop CONFIG_USB_OTG_FSM, I
+guess Denis added it wrongly.
 
-drivers/mfd/abx500-core.c: In function ?abx500_dump_all_banks?:
-drivers/mfd/abx500-core.c:167:1: warning: the frame size of 1032 bytes
-is larger than 1024 bytes [-Wframe-larger-than=]
+According to Embedded Hosts & OTG spec, OTG devices and Embedded Hosts
+both have Targeted Host functionality, and each Targeted Host has
+its TPL (Targeted Peripheral List), only the devices are at TPL
+are supported by Targeted Host.
 
-Signed-off-by: Aurabindo J <mail@aurabindo.in>
----
- drivers/mfd/abx500-core.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+Current Linux TPL only contains limited devices, each Targeted Host
+needs to update its TPL when it makes product, (The comments at
+otg_whitelist.h also mention it), and the devices are not at TPL
+will not be supported, and will report to user as "an unsupported
+device" error, at current Linux configuration, once the CONFIG_USB_OTG_FSM
+and CONFIG_USB_OTG are chosen, the host will be Targeted Host.
 
-diff --git a/drivers/mfd/abx500-core.c b/drivers/mfd/abx500-core.c
-index f3a15aa..87d80c3 100644
---- a/drivers/mfd/abx500-core.c
-+++ b/drivers/mfd/abx500-core.c
-@@ -154,16 +154,19 @@ EXPORT_SYMBOL(abx500_startup_irq_enabled);
- void abx500_dump_all_banks(void)
- {
- 	struct abx500_ops *ops;
--	struct device dummy_child = {NULL};
-+	struct device *dummy_child;
- 	struct abx500_device_entry *dev_entry;
+The reason why Shawn met this problem is: the imx_v6_v7_defconfig set 
+CONFIG_USB_OTG_FSM, so the CONFIG_USB_OTG and CONFIG_USB_OTG_WHITELIST
+are set according to dependency, it makes imx6 device as Targeted Host,
+but the devices connected at Shawn's board are not at TPL, so they are
+not be supported.
 
-+	dummy_child = kzalloc(sizeof(struct device), GFP_KERNEL);
-+
- 	list_for_each_entry(dev_entry, &abx500_list, list) {
--		dummy_child.parent = dev_entry->dev;
-+		dummy_child->parent = dev_entry->dev;
- 		ops = &dev_entry->ops;
+In a word the CONFIG_USB_OTG_FSM should not be chosen for
+defauly kernel configuration. The CONFIG_USB_OTG_FSM should only be chosen
+by default when this device goes to make product and the TPL is updated
+accordingly.
 
- 		if ((ops != NULL) && (ops->dump_all_banks != NULL))
--			ops->dump_all_banks(&dummy_child);
-+			ops->dump_all_banks(dummy_child);
- 	}
-+	kfree(dummy_child);
- }
- EXPORT_SYMBOL(abx500_dump_all_banks);
-
--- 
-1.9.1
-
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 278 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140510/f96bad0f/attachment.sig>
+Peter
