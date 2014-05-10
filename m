@@ -1,93 +1,219 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Sat, 10 May 2014 16:20:13 +0900
-Subject: [PATCH v3 0/6] Introducing Exynos ChipId driver
-In-Reply-To: <1399706287-13919-1-git-send-email-y@samsung.com>
+Date: Sat, 10 May 2014 16:20:14 +0900
+Subject: [PATCH v3 1/6] i2c: s3c2410: Handle i2c sys_cfg register in i2c driver
+In-Reply-To: <1399706419-13976-1-git-send-email-pankaj.dubey@samsung.com>
 References: <1399706287-13919-1-git-send-email-y@samsung.com>
-Message-ID: <1399706419-13976-1-git-send-email-pankaj.dubey@samsung.com>
+ <1399706419-13976-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1399706419-13976-2-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series attempts to get rid of soc_is_exynosXXXX macros
-and eventually with the help of this series we can probably get
-rid of CONFIG_SOC_EXYNOSXXXX in near future.
-Each Exynos SoC has ChipID block which can give information about
-SoC's product Id and revision number. Currently we have single
-DT binding information for this as "samsung,exynos4210-chipid".
-But Exynos4 and Exynos5 SoC series have one small difference in
-chip Id, with resepect to product id bit-masks. So it means we
-should have separate compatible string for these different series
-of SoCs. So I have added second compatible string for handling
-this difference. 
-This patch series is based on Kukjin Kim's for-next (3.14_rc1 tag)
-and prepared on top of following patch series and it's dependent
-patch series.
+Let's handle i2c interrupt re-configuration in i2c driver. This will
+help us in removing some soc specific checks from machine files.
+Since only Exynos5250, and Exynos5420 need to do this, added syscon
+based phandle to i2c device nodes of respective SoC DT files.
+Also handle saving and restoring of SYS_I2C_CFG register during
+suspend and resume of i2c driver. This will help in removing soc
+specific check from mach-exynos/pm.c.
 
-[1]: Map SYSRAM through generic SRAM bindings by Sachin Kamat.
-	http://www.spinics.net/lists/arm-kernel/msg327677.html
-[2]: Exynos PMU cleanup and refactoring.
-	https://lkml.org/lkml/2014/4/30/44
-[3]: Introduce drivers/soc and add QCOM GSBI driver.
-	https://lkml.org/lkml/2014/4/24/520
-
-Revision 2 and it's discussion can be found here
- - https://lkml.org/lkml/2014/5/6/100
-
-Changes since v2:
- - Reorganized patches as suggested by Tomasz Figa.
- - Addressed review comments of Tomasz Figa in i2c-s3c2410.c file.
-
-Changes since v1:
- - Added patch to move i2c interrupt re-configuration code from exynos.c
-   to i2c driver, as suggested by Arnd.
- - After above patch only user of SYS_I2C_CFG register is pm.c so moving
-   save/restore of this register also into i2c driver.
- - Spiltted up exynos4 and exynos5 machine descriptors to get rid from
-   soc_is_exynos4/exynos5 kind of macros, as suggested by Arnd.
- - Changed location of chipid driver to "drivers/soc".
- - Added drivers/base/soc.c provided infrastructure to make SoC specific 
-   information avaible to user space via sysfs entry, as suggested by Arnd.
-
-
-Pankaj Dubey (6):
-  i2c: s3c2410: Handle i2c sys_cfg register in i2c driver
-  ARM: EXYNOS: Remove i2c sys configuration related code
-  ARM: EXYNOS: Remove soc_is_exynos4/5 from exynos.c
-  ARM:  EXYNOS: Remove unused header inclusion from hotplug.c
-  soc: samsung: exynos-chipid: Add Exynos Chipid driver support
-  ARM: EXYNOS: Refactoring to remove soc_is_exynos macros from exynos
-
- .../bindings/arm/samsung/exynos-chipid.txt         |   21 +++
+CC: Rob Herring <robh+dt@kernel.org>
+CC: Randy Dunlap <rdunlap@infradead.org>
+CC: Wolfram Sang <wsa@the-dreams.de>
+CC: Russell King <linux@arm.linux.org.uk>
+CC: devicetree at vger.kernel.org
+CC: linux-doc at vger.kernel.org
+CC: linux-i2c at vger.kernel.org
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+---
  .../devicetree/bindings/arm/samsung/sysreg.txt     |    1 +
- arch/arm/Kconfig                                   |    1 +
- arch/arm/boot/dts/exynos4.dtsi                     |    2 +-
- arch/arm/boot/dts/exynos5.dtsi                     |    7 +-
- arch/arm/boot/dts/exynos5250.dtsi                  |    4 +
- arch/arm/boot/dts/exynos5420.dtsi                  |    4 +
- arch/arm/mach-exynos/exynos.c                      |  119 ++++----------
- arch/arm/mach-exynos/hotplug.c                     |    2 -
- arch/arm/mach-exynos/include/mach/map.h            |    3 -
- arch/arm/mach-exynos/platsmp.c                     |   11 +-
- arch/arm/mach-exynos/pm.c                          |   36 ++---
- arch/arm/mach-exynos/regs-sys.h                    |   22 ---
- arch/arm/plat-samsung/include/plat/cpu.h           |   60 -------
- drivers/clk/samsung/clk-exynos4.c                  |    2 +-
- drivers/cpufreq/exynos-cpufreq.c                   |    9 +-
- drivers/cpufreq/exynos-cpufreq.h                   |    1 -
- drivers/cpufreq/exynos4x12-cpufreq.c               |    5 +-
- drivers/i2c/busses/i2c-s3c2410.c                   |   32 ++++
- drivers/soc/Kconfig                                |    1 +
- drivers/soc/Makefile                               |    1 +
- drivers/soc/samsung/Kconfig                        |   10 ++
- drivers/soc/samsung/Makefile                       |    1 +
- drivers/soc/samsung/exynos-chipid.c                |  166 ++++++++++++++++++++
- include/linux/exynos-soc.h                         |   46 ++++++
- 25 files changed, 357 insertions(+), 210 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/samsung/exynos-chipid.txt
- delete mode 100644 arch/arm/mach-exynos/regs-sys.h
- create mode 100644 drivers/soc/samsung/Kconfig
- create mode 100644 drivers/soc/samsung/Makefile
- create mode 100644 drivers/soc/samsung/exynos-chipid.c
- create mode 100644 include/linux/exynos-soc.h
+ arch/arm/boot/dts/exynos5.dtsi                     |    5 +++
+ arch/arm/boot/dts/exynos5250.dtsi                  |    4 +++
+ arch/arm/boot/dts/exynos5420.dtsi                  |    4 +++
+ drivers/i2c/busses/i2c-s3c2410.c                   |   32 ++++++++++++++++++++
+ 5 files changed, 46 insertions(+)
 
+diff --git a/Documentation/devicetree/bindings/arm/samsung/sysreg.txt b/Documentation/devicetree/bindings/arm/samsung/sysreg.txt
+index 0ab3251..fd71581 100644
+--- a/Documentation/devicetree/bindings/arm/samsung/sysreg.txt
++++ b/Documentation/devicetree/bindings/arm/samsung/sysreg.txt
+@@ -3,6 +3,7 @@ SAMSUNG S5P/Exynos SoC series System Registers (SYSREG)
+ Properties:
+  - compatible : should contain "samsung,<chip name>-sysreg", "syscon";
+    For Exynos4 SoC series it should be "samsung,exynos4-sysreg", "syscon";
++   For Exynos5 SoC series it should be "samsung,exynos5-sysreg", "syscon";
+  - reg : offset and length of the register set.
+ 
+ Example:
+diff --git a/arch/arm/boot/dts/exynos5.dtsi b/arch/arm/boot/dts/exynos5.dtsi
+index 79d0608..3027e37 100644
+--- a/arch/arm/boot/dts/exynos5.dtsi
++++ b/arch/arm/boot/dts/exynos5.dtsi
+@@ -99,4 +99,9 @@
+ 		#size-cells = <0>;
+ 		status = "disabled";
+ 	};
++
++	sys_reg: syscon at 10050000 {
++		compatible = "samsung,exynos5-sysreg", "syscon";
++		reg = <0x10050000 0x400>;
++	};
+ };
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index 8d724d5..46f0233 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -285,6 +285,7 @@
+ 		clock-names = "i2c";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&i2c0_bus>;
++		samsung,syscon-phandle = <&sys_reg>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -298,6 +299,7 @@
+ 		clock-names = "i2c";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&i2c1_bus>;
++		samsung,syscon-phandle = <&sys_reg>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -311,6 +313,7 @@
+ 		clock-names = "i2c";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&i2c2_bus>;
++		samsung,syscon-phandle = <&sys_reg>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -324,6 +327,7 @@
+ 		clock-names = "i2c";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&i2c3_bus>;
++		samsung,syscon-phandle = <&sys_reg>;
+ 		status = "disabled";
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+index ff496ad..762128c 100644
+--- a/arch/arm/boot/dts/exynos5420.dtsi
++++ b/arch/arm/boot/dts/exynos5420.dtsi
+@@ -517,6 +517,7 @@
+ 		clock-names = "i2c";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&i2c0_bus>;
++		samsung,syscon-phandle = <&sys_reg>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -530,6 +531,7 @@
+ 		clock-names = "i2c";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&i2c1_bus>;
++		samsung,syscon-phandle = <&sys_reg>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -543,6 +545,7 @@
+ 		clock-names = "i2c";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&i2c2_bus>;
++		samsung,syscon-phandle = <&sys_reg>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -556,6 +559,7 @@
+ 		clock-names = "i2c";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&i2c3_bus>;
++		samsung,syscon-phandle = <&sys_reg>;
+ 		status = "disabled";
+ 	};
+ 
+diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
+index ae44910..e707062 100644
+--- a/drivers/i2c/busses/i2c-s3c2410.c
++++ b/drivers/i2c/busses/i2c-s3c2410.c
+@@ -39,6 +39,8 @@
+ #include <linux/of.h>
+ #include <linux/of_gpio.h>
+ #include <linux/pinctrl/consumer.h>
++#include <linux/mfd/syscon.h>
++#include <linux/regmap.h>
+ 
+ #include <asm/irq.h>
+ 
+@@ -91,6 +93,9 @@
+ /* Max time to wait for bus to become idle after a xfer (in us) */
+ #define S3C2410_IDLE_TIMEOUT	5000
+ 
++/* Exynos5 Sysreg offset */
++#define EXYNOS5_SYS_I2C_CFG	0x0234
++
+ /* i2c controller state */
+ enum s3c24xx_i2c_state {
+ 	STATE_IDLE,
+@@ -127,6 +132,8 @@ struct s3c24xx_i2c {
+ #if defined(CONFIG_ARM_S3C24XX_CPUFREQ)
+ 	struct notifier_block	freq_transition;
+ #endif
++	struct regmap		*sysreg;
++	unsigned int		sys_i2s_cfg;
+ };
+ 
+ static struct platform_device_id s3c24xx_driver_ids[] = {
+@@ -1075,6 +1082,8 @@ static void
+ s3c24xx_i2c_parse_dt(struct device_node *np, struct s3c24xx_i2c *i2c)
+ {
+ 	struct s3c2410_platform_i2c *pdata = i2c->pdata;
++	u32 val = 0;
++	int id;
+ 
+ 	if (!np)
+ 		return;
+@@ -1084,6 +1093,23 @@ s3c24xx_i2c_parse_dt(struct device_node *np, struct s3c24xx_i2c *i2c)
+ 	of_property_read_u32(np, "samsung,i2c-slave-addr", &pdata->slave_addr);
+ 	of_property_read_u32(np, "samsung,i2c-max-bus-freq",
+ 				(u32 *)&pdata->frequency);
++	/*
++	 * Exynos5's legacy i2c controller and new high speed i2c
++	 * controller have muxed interrupt sources. By default the
++	 * interrupts for 4-channel HS-I2C controller are enabled.
++	 * If node for first four channels of legacy i2c controller
++	 * are available then re-configure the interrupts via the
++	 * system register.
++	 */
++	id = of_alias_get_id(np, "i2c");
++	i2c->sysreg = syscon_regmap_lookup_by_phandle(np,
++			"samsung,syscon-phandle");
++	if (IS_ERR(i2c->sysreg)) {
++		/* As this is not compulsory do not return error */
++		pr_info("i2c-%d skipping re-configuration of interrutps\n", id);
++		return;
++	}
++	regmap_update_bits(i2c->sysreg, EXYNOS5_SYS_I2C_CFG, BIT(id), val);
+ }
+ #else
+ static void
+@@ -1268,6 +1294,9 @@ static int s3c24xx_i2c_suspend_noirq(struct device *dev)
+ 
+ 	i2c->suspended = 1;
+ 
++	if (!IS_ERR(i2c->sysreg))
++		regmap_read(i2c->sysreg, EXYNOS5_SYS_I2C_CFG, &i2c->sys_i2s_cfg);
++
+ 	return 0;
+ }
+ 
+@@ -1276,6 +1305,9 @@ static int s3c24xx_i2c_resume(struct device *dev)
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct s3c24xx_i2c *i2c = platform_get_drvdata(pdev);
+ 
++	if (!IS_ERR(i2c->sysreg))
++		regmap_write(i2c->sysreg, i2c->sys_i2s_cfg, EXYNOS5_SYS_I2C_CFG);
++
+ 	i2c->suspended = 0;
+ 	clk_prepare_enable(i2c->clk);
+ 	s3c24xx_i2c_init(i2c);
 -- 
 1.7.10.4
