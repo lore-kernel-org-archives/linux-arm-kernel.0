@@ -1,101 +1,34 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sat, 10 May 2014 11:10:18 +0200
-Subject: [PATCH 1/2] ARM: at91: add PWM pinctrl to SAMA5D3
-In-Reply-To: <a5a0a9b8090f80f40daf3a13849b3961d9d617d6.1399642907.git.nicolas.ferre@atmel.com>
-References: <a5a0a9b8090f80f40daf3a13849b3961d9d617d6.1399642907.git.nicolas.ferre@atmel.com>
-Message-ID: <20140510091017.GA22329@piout.net>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sat, 10 May 2014 11:33:59 +0200
+Subject: [PATCH v11 2/6] ARM: dts: sunxi: Add reg_vmmc0 supply to
+ sunxi-common-regulators.dtsi
+In-Reply-To: <1399714443-12459-1-git-send-email-hdegoede@redhat.com>
+References: <1399714443-12459-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1399714443-12459-3-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ arch/arm/boot/dts/sunxi-common-regulators.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-On 09/05/2014 at 15:44:27 +0200, Nicolas Ferre wrote :
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
->  arch/arm/boot/dts/sama5d3.dtsi | 82 ++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 82 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-> index 9caa06b3641e..ed7943745f23 100644
-> --- a/arch/arm/boot/dts/sama5d3.dtsi
-> +++ b/arch/arm/boot/dts/sama5d3.dtsi
-> @@ -583,6 +583,88 @@
->  					};
->  				};
->  
-> +				pwm0 {
-> +					pinctrl_pwm0_pwmh0_0: pwm0_pwmh0-0 {
-> +						atmel,pins =
-> +							<AT91_PIOA 20 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PA20 periph B, conflicts with ISI_D4 and LCDDAT20 */
-
-Didn't we decide at some point to stop adding comments for the pinctrl ?
-At least, I would say that "PA20 periph B" doesn't add any useful
-information.
-
-> +					};
-> +					pinctrl_pwm0_pwmh0_1: pwm0_pwmh0-1 {
-> +						atmel,pins =
-> +							<AT91_PIOB 0 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PB0 periph B, conflicts with GTX0 */
-> +					};
-> +
-> +					pinctrl_pwm0_pwmh1_0: pwm0_pwmh1-0 {
-> +						atmel,pins =
-> +							<AT91_PIOA 22 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PA22 periph B, conflicts with ISI_D6 and LCDDAT22 */
-> +					};
-> +					pinctrl_pwm0_pwmh1_1: pwm0_pwmh1-1 {
-> +						atmel,pins =
-> +							<AT91_PIOB 4 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PB4 periph B, conflicts with GRX0 */
-> +					};
-> +					pinctrl_pwm0_pwmh1_2: pwm0_pwmh1-2 {
-> +						atmel,pins =
-> +							<AT91_PIOB 27 AT91_PERIPH_C AT91_PINCTRL_NONE>;	/* PB27 periph C, conflicts with G125CKO and RTS1 */
-> +					};
-> +
-> +					pinctrl_pwm0_pwmh2_0: pwm0_pwmh2-0 {
-> +						atmel,pins =
-> +							<AT91_PIOB 8 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PB8 periph B, conflicts with GTXCK */
-> +					};
-> +					pinctrl_pwm0_pwmh2_1: pwm0_pwmh2-1 {
-> +						atmel,pins =
-> +							<AT91_PIOD 5 AT91_PERIPH_C AT91_PINCTRL_NONE>;	/* PD5 periph C, conflicts with MCI0_DA4 and TIOA0 */
-> +					};
-> +
-> +					pinctrl_pwm0_pwmh3_0: pwm0_pwmh3-0 {
-> +						atmel,pins =
-> +							<AT91_PIOB 12 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PB12 periph B, conflicts with GRXDV */
-> +					};
-> +					pinctrl_pwm0_pwmh3_1: pwm0_pwmh3-1 {
-> +						atmel,pins =
-> +							<AT91_PIOD 7 AT91_PERIPH_C AT91_PINCTRL_NONE>;	/* PD7 periph C, conflicts with MCI0_DA6 and TCLK0 */
-> +					};
-> +
-> +					pinctrl_pwm0_pwml0_0: pwm0_pwml0-0 {
-> +						atmel,pins =
-> +							<AT91_PIOA 21 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PA21 periph B, conflicts with ISI_D5 and LCDDAT21 */
-> +					};
-> +					pinctrl_pwm0_pwml0_1: pwm0_pwml0-1 {
-> +						atmel,pins =
-> +							<AT91_PIOB 1 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PB1 periph B, conflicts with GTX1 */
-> +					};
-
-I would group pwm0_pwmhx and pwm0_pwmlx together.
-
-> +
-> +					pinctrl_pwm0_pwml1_0: pwm0_pwml1-0 {
-> +						atmel,pins =
-> +							<AT91_PIOA 23 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PA23 periph B, conflicts with ISI_D7 and LCDDAT23 */
-> +					};
-> +					pinctrl_pwm0_pwml1_1: pwm0_pwml1-1 {
-> +						atmel,pins =
-> +							<AT91_PIOB 5 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PB5 periph B, conflicts with GRX1 */
-> +					};
-> +					pinctrl_pwm0_pwml1_2: pwm0_pwml1-2 {
-> +						atmel,pins =
-> +							<AT91_PIOE 31 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PE31 periph B, conflicts with IRQ */
-> +					};
-> +
-
+diff --git a/arch/arm/boot/dts/sunxi-common-regulators.dtsi b/arch/arm/boot/dts/sunxi-common-regulators.dtsi
+index 18eeac0..ebbba39 100644
+--- a/arch/arm/boot/dts/sunxi-common-regulators.dtsi
++++ b/arch/arm/boot/dts/sunxi-common-regulators.dtsi
+@@ -72,4 +72,12 @@
+ 		gpio = <&pio 7 3 0>;
+ 		status = "disabled";
+ 	};
++
++	reg_vmmc0: vmmc0 {
++		compatible = "regulator-fixed";
++		regulator-name = "vmmc0";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		status = "disabled";
++	};
+ };
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.9.0
