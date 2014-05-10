@@ -1,78 +1,196 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 9 May 2014 20:06:34 -0500
-Subject: [linux-sunxi] Re: [PATCH v5 8/8] ARM: sun7i/sun4i: dt: Add
- AXP209 support to various boards
-In-Reply-To: <CAOQ7t2ay7UNiCZyUw4RrQ+4O1CYUht32U_OSYkbVWRLUq8_hZw@mail.gmail.com>
-References: <1398947374-3115-1-git-send-email-carlo@caione.org>
- <1398947374-3115-9-git-send-email-carlo@caione.org>
- <20140503010936.GF4090@lukather>
- <CAOQ7t2Z6rLAMGXocPNcKgOUp9iy6XZkh4O6jThPkdm5M6UMGtw@mail.gmail.com>
- <20140505225139.GD9464@lukather>
- <CAOQ7t2bg5jkeruVnO+9cXMxxh+SL+ANGz3R0ssSMwrHewRKyYQ@mail.gmail.com>
- <20140508025337.GI7047@lukather>
- <CAOQ7t2ay7UNiCZyUw4RrQ+4O1CYUht32U_OSYkbVWRLUq8_hZw@mail.gmail.com>
-Message-ID: <20140510010634.GG7047@lukather>
+From: s-anna@ti.com (Suman Anna)
+Date: Fri, 9 May 2014 20:17:12 -0500
+Subject: [PATCHv5 RFC 12/15] hwspinlock/core: add OF helper to parse
+ reserved locks
+In-Reply-To: <20140505215422.GD5546@joshc.qualcomm.com>
+References: <1398904476-26200-1-git-send-email-s-anna@ti.com>
+ <1398904476-26200-13-git-send-email-s-anna@ti.com> <53680639.1080405@ti.com>
+ <20140505215422.GD5546@joshc.qualcomm.com>
+Message-ID: <536D7E18.4040502@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 08, 2014 at 10:17:16AM +0200, Carlo Caione wrote:
-> On Thu, May 8, 2014 at 4:53 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
+Hi Josh,
+
+On 05/05/2014 04:54 PM, Josh Cartwright wrote:
+> On Mon, May 05, 2014 at 04:44:25PM -0500, Suman Anna wrote:
+>> Hi Rob,
+>>
+>> On 04/30/2014 07:34 PM, Suman Anna wrote:
+>>> The property 'hwlock-reserved-locks' will be used to represent
+>>> the number of locks to be reserved for clients that would need
+>>> to request/operate on specific locks. A new OF helper function,
+>>> of_hwspin_lock_get_num_reserved_locks(), is added to minimize
+>>> duplication in different platform implementations.
+>>>
+>>> The function will return a value of 0 if the property is not
+>>> defined, so as to support a default behavior of marking all
+>>> locks as unused and open for anonymous allocations.
+>>>
+>>> Signed-off-by: Suman Anna <s-anna@ti.com>
+>>> ---
+>>>  .../devicetree/bindings/hwlock/hwlock.txt          |  3 +++
+>>>  drivers/hwspinlock/hwspinlock_core.c               | 25 ++++++++++++++++++++++
+>>>  include/linux/hwspinlock.h                         |  1 +
+>>>  3 files changed, 29 insertions(+)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/hwlock/hwlock.txt b/Documentation/devicetree/bindings/hwlock/hwlock.txt
+>>> index d538a9b..88d16d2 100644
+>>> --- a/Documentation/devicetree/bindings/hwlock/hwlock.txt
+>>> +++ b/Documentation/devicetree/bindings/hwlock/hwlock.txt
+>>> @@ -18,6 +18,9 @@ Common properties:
+>>>  			property is needed on hwlock devices, where the number
+>>>  			of supported locks within a hwlock device cannot be
+>>>  			read from a register.
+>>> +- hwlock-reserved-locks: Number of locks to reserve for clients requiring
+>>> +			specific locks. This value cannot exceed the value of
+>>> +			hwlock-num-locks.
+>>
+>> Any suggestions here on the approach? This property falls into a gray
+>> area as well, as the current approach is somewhat limiting (it doesn't
+>> support sparse reserved locks, and expects them at the beginning of the
+>> lock range).
 > 
-> <snip>
+> Is it possible to implement a pinctrl-like hogging approach, whereby the
+> specific locks that need to be reserved are consumed by the controller
+> itself?
 > 
-> > What I mean is that no information is still better than wrong
-> > informations. If you don't have the schematics, then don't do anything
-> > on this boards. Hopefully, someone with more infos on this will know
-> > what to do.
-> 
-> I partially agree here. Not specifying the voltage range for the
-> regulators but only keeping them always-on from a practical point of
-> view means that we do nothing with those regulators (see also
-> https://www.mail-archive.com/linux-input at vger.kernel.org/msg09532.html
-> )
 
-But we don't even know if they are used on these boards or not in the
-first place..
+Thanks for the suggestion. I did take a look at pinctrl and while it is
+possible to implement something similar, I feel it is a bit heavy for
+hwspinlock framework with no added advantages. It requires that the
+controller and clients always need to be updated together. Ohad had
+already brought this up [1]. Here's an alternate approach that does not
+require any additional property to the controller itself, while the
+client node usage is as before. The logic is based on parsing through
+the DT blob and marking only those that are used by any clients. The RFC
+patch below is a replacement for Patches 11 to 15, and do not require
+any changes to platform implementations or additional DT properties.
 
-> > Moreover, I have the feeling that you just copy pasted all the
-> > informations on this patch. The first example I'm seeing is the
-> > cubieboard, for which we do have the schematics, and this patch says
-> > that ldo4 is used for HDMI, and that is required to stays always on,
-> > while LDO4 doesn't seem to be used at all, and that HDMI takes
-> > directly its input source from DC-5V.
-> 
-> The names for the regulators are taken from the original Allwinner
-> driver and (of course) they can have nothing to do with the function
-> they have in the board. I agree that this could be misleading so I'll
-> change them with more general names. Concerning LDO4 that is always
-> on, it was off until this v4, but I changed it back to have one common
-> DT representation among all the boards.
+It currently marks locks as reserved even for disabled client nodes
+(very easy to change that behavior). It will also impose a standard
+property name "hwlocks" on the client nodes. What do you think of this
+approach?
 
-I'm sorry, you did a great job on this PMIC driver, but this is just
-wrong. I'm completely fine with the names. What I'm not fine with is
-all this "one common DT representation across all boards". Pretty much
-all the boards are wired differently when it comes to regulators. Why
-do you want to just do some copy pasting without any checking on the
-schematics side if not just for the joy of duplicating code?
+regards
+Suman
 
-> > I guess you need some more refining on this patch.
-> 
-> Ok, I'll submit a v6 only for this patch.
+[1] http://marc.info/?l=linux-omap&m=139514977622964&w=2
 
-Please, please, *please* make sure that the informations you put in
-there are actually accurate.
+----
+>From 4f4cbe91e56c1be8faa6a3ee863add4df6e6714b Mon Sep 17 00:00:00 2001
+From: Suman Anna <s-anna@ti.com>
+Date: Fri, 9 May 2014 14:26:54 -0500
+Subject: [RFC PATCH] hwspinlock/core: add support for reserved locks
 
-Maxime
+The HwSpinlock core allows requesting either a specific lock or an
+available normal lock. The specific locks are usually reserved during
+board init time, while the normal available locks are intended to be
+assigned at runtime.
 
+The HwSpinlock core has been enhanced to mark certain locks as 'reserved'
+by parsing through the DT blob. Thes
+
+The HwSpinlock core has been enhanced to:
+  1. mark certain locks as 'reserved' by parsing the DT blob for any
+     locks used by client nodes.
+  2. restrict the anonymous hwspin_lock_request() API to allocate only
+     from non-reserved locks for DT boots.
+  3. limit these reserved locks to be allocated only using the
+     _request_specific() API variants for DT boots.
+
+Signed-off-by: Suman Anna <s-anna@ti.com>
+---
+ drivers/hwspinlock/hwspinlock_core.c | 50
+++++++++++++++++++++++++++++++++++--
+ 1 file changed, 48 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/hwspinlock/hwspinlock_core.c
+b/drivers/hwspinlock/hwspinlock_core.c
+index c2063bc..0c924c9 100644
+--- a/drivers/hwspinlock/hwspinlock_core.c
++++ b/drivers/hwspinlock/hwspinlock_core.c
+@@ -425,6 +425,42 @@ static int hwspinlock_device_add(struct
+hwspinlock_device *bank)
+        return ret;
+ }
+
++static void hwspin_mark_reserved_locks(struct hwspinlock_device *bank)
++{
++       struct device_node *np = bank->dev->of_node;
++       const char *prop_name = "hwlocks";
++       const char *cells_name = "#hwlock-cells";
++       struct device_node *node = NULL;
++       struct of_phandle_args args;
++       struct hwspinlock *hwlock;
++       int i, id, count, ret;
++
++       for_each_node_with_property(node, prop_name) {
++               count = of_count_phandle_with_args(node, prop_name,
+cells_name);
++               if (count <= 0)
++                       continue;
++
++               for (i = 0; i < count; i++) {
++                       ret = of_parse_phandle_with_args(node, prop_name,
++                                                        cells_name, i,
+&args);
++                       if (ret || np != args.np)
++                               continue;
++
++                       id = bank->ops->of_xlate(bank, &args);
++                       if (id < 0 || id >= bank->num_locks)
++                               continue;
++
++                       hwlock = &bank->lock[id];
++                       if (hwlock->type == HWSPINLOCK_RESERVED) {
++                               dev_err(bank->dev, "potential reuse of
+hwspinlock %d between multiple clients on %s\n",
++                                       id, np->full_name);
++                               continue;
++                       }
++                       hwlock->type = HWSPINLOCK_RESERVED;
++               }
++       }
++}
++
+ /**
+  * hwspin_lock_register() - register a new hw spinlock device
+  * @bank: the hwspinlock device, which usually provides numerous hw locks
+@@ -463,12 +499,16 @@ int hwspin_lock_register(struct hwspinlock_device
+*bank, struct device *dev,
+        if (ret)
+                return ret;
+
++       if (dev->of_node)
++               hwspin_mark_reserved_locks(bank);
++
+        for (i = 0; i < num_locks; i++) {
+                hwlock = &bank->lock[i];
+
+                spin_lock_init(&hwlock->lock);
+                hwlock->bank = bank;
+-               hwlock->type = HWSPINLOCK_UNUSED;
++               if (hwlock->type != HWSPINLOCK_RESERVED)
++                       hwlock->type = HWSPINLOCK_UNUSED;
+
+                ret = hwspin_lock_register_single(hwlock, base_id + i);
+                if (ret)
+@@ -651,7 +691,13 @@ struct hwspinlock
+*hwspin_lock_request_specific(unsigned int id)
+        /* sanity check (this shouldn't happen) */
+        WARN_ON(hwlock_to_id(hwlock) != id);
+
+-       /* make sure this hwspinlock is unused */
++       if (hwlock->type != HWSPINLOCK_RESERVED) {
++               pr_warn("hwspinlock %u is not a reserved lock\n", id);
++               hwlock = NULL;
++               goto out;
++       }
++
++       /* make sure this hwspinlock is an unused reserved lock */
+        ret = radix_tree_tag_get(&hwspinlock_tree, id, hwlock->type);
+        if (ret == 0) {
+                pr_warn("hwspinlock %u is already in use\n", id);
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140509/abd40966/attachment.sig>
+1.9.2
