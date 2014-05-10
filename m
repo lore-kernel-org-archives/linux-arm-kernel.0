@@ -1,47 +1,44 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 9 May 2014 20:55:06 -0300
-Subject: [PATCH 2/2] mtd: orion-nand: fix build error with ARMv4
-In-Reply-To: <4160510.VJSlHZLhNz@wuerfel>
-References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
- <20140509212810.GF18257@obsidianresearch.com>
- <20140509220915.GA391@arch.cereza> <4160510.VJSlHZLhNz@wuerfel>
-Message-ID: <20140509235506.GA792@arch.cereza>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri,  9 May 2014 17:31:18 -0700
+Subject: [PATCH v2 0/5] watchdog: Add reboot API
+Message-ID: <1399681883-891-1-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 May 12:24 AM, Arnd Bergmann wrote:
-> On Friday 09 May 2014 19:09:15 Ezequiel Garcia wrote:
-> > # time nanddump /dev/mtd5 -f /dev/null -q
-> > real    0m 5.82s
-> > user    0m 0.20s
-> > sys     0m 5.60s
-> > 
-> > Jason: Care to submit a proper patch?
-> > 
-> > On 08 May 04:56 PM, Arnd Bergmann wrote:
-> > > Ok, that is a noticeable difference. For scale, what is the size of that partition?
-> > 
-> > The board is Openblocks A6, running mainline.
-> > 
-> > # cat /proc/mtd 
-> > dev:    size   erasesize  name
-> > mtd0: 00090000 00004000 "uboot"
-> > mtd1: 00044000 00004000 "env"
-> > mtd2: 00024000 00004000 "test"
-> > mtd3: 00400000 00004000 "conf"
-> > mtd4: 01d20000 00004000 "linux"
-> > mtd5: 01dec000 00004000 "user"
-> 
-> Ok, so it takes 5.6 seconds in kernel mode to access 31MB, which comes down
-> to 5.60MB/s. That isn't very fast compared to the time the CPU should take
-> for those instructions, so I'm surprised it actually makes any difference
-> at all.
->
-> There isn't a usable slave DMA engine in Armada XP by chance?
-> 
+Some hardware implements reboot through its watchdog hardware, for example
+by triggering a watchdog timeout or by writing into its watchdog register
+set. Platform specific code starts to spread into watchdog drivers,
+typically by setting pointers to a callback function which is then called
+from the architecture's reset handler.
 
-The Openblocks A6 is a Kirkwood, not Armada XP.
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+While global and exported callback function pointers (such as arm_pm_restart)
+may be acceptable as long as they are used from platform and/or architecture
+code, using such a mechanism across subsystems and drivers is less than
+desirable. Ultimately, we'll need a better solution.
+
+This patch series provides such a solution. It extends the watchdog
+subsystem to support reboot functionality, provides an API function
+call to trigger reboots, adds support for the new API to arm and arm64,
+and converts the drivers providing reboot functionality to use the new
+infrastructure.
+
+The first patch in the series implements the new API. The second and third
+patch modify the arm and arm64 architecture reset handlers to call the
+added API function. The final two patches register the reboot handlers
+in the sunxi and moxart watchdog drivers with the watchdog subsystem.
+
+The sunxi patch depends on the most recent patch series sumitted by
+Maxime Ripard.
+
+Note that I did not address the comments asking for support of multiple
+watchdogs with reset handlers, nor the request to add a flag to provide
+'preferential' treatment for one of those watchdogs. This will require
+additional discussion and needs to be addressed with a later patch if needed.
+Key questions are how to add such support for non-DT systems, and if the
+scope of restart handling is a function of the driver or of the system.
+Also, if one of the watchdogs does not result in a complete system reset
+but another one does, it is not clear to me why the less-than-perfect
+watchdog would be configured in the first place (or how this situation
+would be handled today).
+
+Compile tested only for arm64. Tested on arm/moxart by Jonas Jensen.
