@@ -1,96 +1,20 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri,  9 May 2014 17:31:23 -0700
-Subject: [PATCH v2 5/5] watchdog: sunxi: Register reboot handler with watchdog
- subsystem
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Fri, 09 May 2014 17:37:55 -0700
+Subject: [PATCH v2 0/5] watchdog: Add reboot API
 In-Reply-To: <1399681883-891-1-git-send-email-linux@roeck-us.net>
 References: <1399681883-891-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1399681883-891-6-git-send-email-linux@roeck-us.net>
+Message-ID: <536D74E3.8010609@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The watchdog subsystem now provides an API to trigger a system reboot.
-Register with it.
+On 05/09/2014 05:31 PM, Guenter Roeck wrote:
+> Some hardware implements reboot through its watchdog hardware, for example
+> by triggering a watchdog timeout or by writing into its watchdog register
+> set. Platform specific code starts to spread into watchdog drivers,
+> typically by setting pointers to a callback function which is then called
+> from the architecture's reset handler.
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Signed-off-by: Guenter Roeck <linux@roeck-us.net>
----
-v2: Rebased to v2 of Maxime's patch adding reboot support
-    to the sunxi watchdog driver.
+No updates to Documentation/watchdog/ ?
 
- drivers/watchdog/sunxi_wdt.c | 22 +++++++++-------------
- 1 file changed, 9 insertions(+), 13 deletions(-)
-
-diff --git a/drivers/watchdog/sunxi_wdt.c b/drivers/watchdog/sunxi_wdt.c
-index 60deb9d..744b6f5 100644
---- a/drivers/watchdog/sunxi_wdt.c
-+++ b/drivers/watchdog/sunxi_wdt.c
-@@ -27,8 +27,6 @@
- #include <linux/types.h>
- #include <linux/watchdog.h>
- 
--#include <asm/system_misc.h>
--
- #define WDT_MAX_TIMEOUT         16
- #define WDT_MIN_TIMEOUT         1
- #define WDT_MODE_TIMEOUT(n)     ((n) << 3)
-@@ -74,23 +72,25 @@ static const int wdt_timeout_map[] = {
- 	[16] = 0xB, /* 16s */
- };
- 
--static void __iomem *reboot_wdt_base;
--
--static void sun4i_wdt_restart(enum reboot_mode mode, const char *cmd)
-+static void sunxi_wdt_reboot(struct watchdog_device *wdt_dev,
-+			     enum reboot_mode mode, const char *cmd)
- {
-+	struct sunxi_wdt_dev *sunxi_wdt = watchdog_get_drvdata(wdt_dev);
-+
- 	/* Enable timer and set reset bit in the watchdog */
--	writel(WDT_MODE_EN | WDT_MODE_RST_EN, reboot_wdt_base + WDT_MODE);
-+	writel(WDT_MODE_EN | WDT_MODE_RST_EN,
-+	       sunxi_wdt->wdt_base + WDT_MODE);
- 
- 	/*
- 	 * Restart the watchdog. The default (and lowest) interval
- 	 * value for the watchdog is 0.5s.
- 	 */
--	writel(WDT_CTRL_RELOAD, reboot_wdt_base + WDT_CTRL);
-+	writel(WDT_CTRL_RELOAD, sunxi_wdt->wdt_base + WDT_CTRL);
- 
- 	while (1) {
- 		mdelay(5);
- 		writel(WDT_MODE_EN | WDT_MODE_RST_EN,
--		       reboot_wdt_base + WDT_MODE);
-+		       sunxi_wdt->wdt_base + WDT_MODE);
- 	}
- }
- 
-@@ -167,6 +167,7 @@ static const struct watchdog_ops sunxi_wdt_ops = {
- 	.start		= sunxi_wdt_start,
- 	.stop		= sunxi_wdt_stop,
- 	.ping		= sunxi_wdt_ping,
-+	.reboot		= sunxi_wdt_reboot,
- 	.set_timeout	= sunxi_wdt_set_timeout,
- };
- 
-@@ -205,9 +206,6 @@ static int sunxi_wdt_probe(struct platform_device *pdev)
- 	if (unlikely(err))
- 		return err;
- 
--	reboot_wdt_base = sunxi_wdt->wdt_base;
--	arm_pm_restart = sun4i_wdt_restart;
--
- 	dev_info(&pdev->dev, "Watchdog enabled (timeout=%d sec, nowayout=%d)",
- 			sunxi_wdt->wdt_dev.timeout, nowayout);
- 
-@@ -218,8 +216,6 @@ static int sunxi_wdt_remove(struct platform_device *pdev)
- {
- 	struct sunxi_wdt_dev *sunxi_wdt = platform_get_drvdata(pdev);
- 
--	arm_pm_restart = NULL;
--
- 	watchdog_unregister_device(&sunxi_wdt->wdt_dev);
- 	watchdog_set_drvdata(&sunxi_wdt->wdt_dev, NULL);
- 
 -- 
-1.9.1
+~Randy
