@@ -1,50 +1,139 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 10 May 2014 07:56:52 -0500
-Subject: [PATCH v2 0/7] Add Allwinner A31 USB support
-Message-ID: <1399726619-30150-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Sat, 10 May 2014 07:56:55 -0500
+Subject: [PATCH v2 3/7] phy: usb: sunxi: Introduce Allwinner A31 USB PHY
+ support
+In-Reply-To: <1399726619-30150-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1399726619-30150-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1399726619-30150-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+The USB phy controller in the A31 differs mostly from the older controllers
+because it has a clock dedicated for each phy, while the older ones were having
+a single clock for all the phys.
 
-This patchset adds support for the USB controllers found in the
-Allwinner A31.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Reviewed-by: Hans de Goede <hdegoede@redhat.com>
+---
+ drivers/phy/phy-sun4i-usb.c | 35 ++++++++++++++++++++++++++---------
+ 1 file changed, 26 insertions(+), 9 deletions(-)
 
-While the design is similar to the earlier Allwinner SoCs that are
-already supported, a few details here and there change, like the fact
-that the PHYs now have one clock per phy, while it used to be only one
-for all the PHYs.
-
-Thanks,
-Maxime
-
-Changes from v1:
-  - Moved the reset assertion/deassertion to probe/remove
-  - Moved the dedicated_clocks to the probe function instead of the
-    private structure since it was the only user
-
-Boris BREZILLON (2):
-  usb: ehci-platform: add optional reset controller retrieval
-  ARM: sunxi: dt: add APP4-EVB1 board support
-
-Maxime Ripard (5):
-  clk: sunxi: Implement A31 USB clock
-  ARM: sun6i: Add the USB clocks to the DTSI.
-  phy: usb: sunxi: Introduce Allwinner A31 USB PHY support
-  usb: ohci-platform: Enable optional use of reset controller
-  ARM: sun6i: dt: Add support for the USB controllers
-
- Documentation/devicetree/bindings/usb/usb-ehci.txt |  1 +
- Documentation/devicetree/bindings/usb/usb-ohci.txt |  1 +
- arch/arm/boot/dts/Makefile                         |  1 +
- arch/arm/boot/dts/sun6i-a31-app4-evb1.dts          | 57 ++++++++++++++
- arch/arm/boot/dts/sun6i-a31.dtsi                   | 88 ++++++++++++++++++++++
- drivers/clk/sunxi/clk-sunxi.c                      |  6 ++
- drivers/phy/phy-sun4i-usb.c                        | 35 ++++++---
- drivers/usb/host/ehci-platform.c                   | 18 +++++
- drivers/usb/host/ohci-platform.c                   | 18 +++++
- 9 files changed, 216 insertions(+), 9 deletions(-)
- create mode 100644 arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
-
+diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+index e6e6c4ba7145..8bd89430d945 100644
+--- a/drivers/phy/phy-sun4i-usb.c
++++ b/drivers/phy/phy-sun4i-usb.c
+@@ -61,7 +61,6 @@
+ #define MAX_PHYS			3
+ 
+ struct sun4i_usb_phy_data {
+-	struct clk *clk;
+ 	void __iomem *base;
+ 	struct mutex mutex;
+ 	int num_phys;
+@@ -71,6 +70,7 @@ struct sun4i_usb_phy_data {
+ 		void __iomem *pmu;
+ 		struct regulator *vbus;
+ 		struct reset_control *reset;
++		struct clk *clk;
+ 		int index;
+ 	} phys[MAX_PHYS];
+ };
+@@ -146,13 +146,13 @@ static int sun4i_usb_phy_init(struct phy *_phy)
+ 	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
+ 	int ret;
+ 
+-	ret = clk_prepare_enable(data->clk);
++	ret = clk_prepare_enable(phy->clk);
+ 	if (ret)
+ 		return ret;
+ 
+ 	ret = reset_control_deassert(phy->reset);
+ 	if (ret) {
+-		clk_disable_unprepare(data->clk);
++		clk_disable_unprepare(phy->clk);
+ 		return ret;
+ 	}
+ 
+@@ -170,11 +170,10 @@ static int sun4i_usb_phy_init(struct phy *_phy)
+ static int sun4i_usb_phy_exit(struct phy *_phy)
+ {
+ 	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
+-	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
+ 
+ 	sun4i_usb_phy_passby(phy, 0);
+ 	reset_control_assert(phy->reset);
+-	clk_disable_unprepare(data->clk);
++	clk_disable_unprepare(phy->clk);
+ 
+ 	return 0;
+ }
+@@ -228,8 +227,10 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 	struct phy_provider *phy_provider;
+ 	struct reset_control *reset;
+ 	struct regulator *vbus;
++	bool dedicated_clocks;
+ 	struct resource *res;
+ 	struct phy *phy;
++	struct clk *clk;
+ 	char name[16];
+ 	int i;
+ 
+@@ -249,15 +250,20 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 	else
+ 		data->disc_thresh = 2;
+ 
++	if (of_device_is_compatible(np, "allwinner,sun6i-a31-usb-phy"))
++		dedicated_clocks = true;
++
+ 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "phy_ctrl");
+ 	data->base = devm_ioremap_resource(dev, res);
+ 	if (IS_ERR(data->base))
+ 		return PTR_ERR(data->base);
+ 
+-	data->clk = devm_clk_get(dev, "usb_phy");
+-	if (IS_ERR(data->clk)) {
+-		dev_err(dev, "could not get usb_phy clock\n");
+-		return PTR_ERR(data->clk);
++	if (!dedicated_clocks) {
++		clk = devm_clk_get(dev, "usb_phy");
++		if (IS_ERR(clk)) {
++			dev_err(dev, "could not get usb_phy clock\n");
++			return PTR_ERR(clk);
++		}
+ 	}
+ 
+ 	/* Skip 0, 0 is the phy for otg which is not yet supported. */
+@@ -270,6 +276,15 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 			vbus = NULL;
+ 		}
+ 
++		if (dedicated_clocks) {
++			snprintf(name, sizeof(name), "usb%d_phy", i);
++			clk = devm_clk_get(dev, name);
++			if (IS_ERR(clk)) {
++				dev_err(dev, "failed to get clock %s\n", name);
++				return PTR_ERR(clk);
++			}
++		}
++
+ 		snprintf(name, sizeof(name), "usb%d_reset", i);
+ 		reset = devm_reset_control_get(dev, name);
+ 		if (IS_ERR(reset)) {
+@@ -296,6 +311,7 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 		data->phys[i].pmu = pmu;
+ 		data->phys[i].vbus = vbus;
+ 		data->phys[i].reset = reset;
++		data->phys[i].clk = clk;
+ 		data->phys[i].index = i;
+ 		phy_set_drvdata(phy, &data->phys[i]);
+ 	}
+@@ -311,6 +327,7 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ static const struct of_device_id sun4i_usb_phy_of_match[] = {
+ 	{ .compatible = "allwinner,sun4i-a10-usb-phy" },
+ 	{ .compatible = "allwinner,sun5i-a13-usb-phy" },
++	{ .compatible = "allwinner,sun6i-a31-usb-phy" },
+ 	{ .compatible = "allwinner,sun7i-a20-usb-phy" },
+ 	{ },
+ };
 -- 
 1.9.1
