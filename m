@@ -1,43 +1,100 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 10 May 2014 11:40:21 +0100
-Subject: [PATCH 1/2] iio: always select ANON_INODES
-In-Reply-To: <1399560990-1402858-12-git-send-email-arnd@arndb.de>
+Date: Sat, 10 May 2014 11:42:53 +0100
+Subject: [PATCH v2 2/2] iio:adc: at91 requires the input subsystem
+In-Reply-To: <536CD0C9.4040603@atmel.com>
 References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-12-git-send-email-arnd@arndb.de>
-Message-ID: <536E0215.8070708@kernel.org>
+ <1399560990-1402858-13-git-send-email-arnd@arndb.de>
+ <536CA78C.5070603@atmel.com> <4163305.otOGv8yVK1@wuerfel>
+ <536CD0C9.4040603@atmel.com>
+Message-ID: <536E02AD.9000201@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/14 15:56, Arnd Bergmann wrote:
-> Without ANON_INODES, we get this build error:
+On 09/05/14 13:57, Nicolas Ferre wrote:
+> On 09/05/2014 13:43, Arnd Bergmann :
+>> On Friday 09 May 2014 12:01:48 Nicolas Ferre wrote:
+>>> On 08/05/2014 16:56, Arnd Bergmann :
+>>>> Building the at91 adc driver with CONFIG_INPUT disabled results in this
+>>>> build error:
+>>>>
+>>>> ERROR: "input_event" [drivers/iio/adc/at91_adc.ko] undefined!
+>>>> ERROR: "input_unregister_device" [drivers/iio/adc/at91_adc.ko] undefined!
+>>>> ERROR: "input_free_device" [drivers/iio/adc/at91_adc.ko] undefined!
+>>>> ERROR: "input_register_device" [drivers/iio/adc/at91_adc.ko] undefined!
+>>>> ERROR: "input_set_abs_params" [drivers/iio/adc/at91_adc.ko] undefined!
+>>>> ERROR: "input_allocate_device" [drivers/iio/adc/at91_adc.ko] undefined!
+>>>>
+>>>> To make sure we can build random configurations, this turns on CONFIG_INPUT
+>>>> whenever CONFIG_AT91_ADC is enabled.
+>>>
+>>> Isn't it a "select" instead of "depends" that is required then?
+>>
+>> It seems I fixed the patch at some point but didn't update the message.
+>>
+>> In general, we should not mix 'depends on' and 'select' for the same symbol,
+>> since that causes extra confusion.
+>>
+>> In case of CONFIG_INPUT, almost all the users do 'depends on INPUT', with
+>> a few exceptions that seem to be done in error.
 >
-> drivers/built-in.o: In function `iio_event_getfd':
-> :(.text+0x14bf18): undefined reference to `anon_inode_getfd'
+> Ok, that makes sense.
 >
-> All other users explicitly select this symbol, so we should
-> do the same thing here.
 >
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Jonathan Cameron <jic23@kernel.org>
-> Cc: linux-iio at vger.kernel.org
-Applied to the togreg branch of iio.git.
+>> Updated patch below.
+>
+> Thanks Arnd.
+>
+>> 	Arnd
+>>
+>> 8<----
+>>
+>> >From 4679d63b24a681d9c6afcfdde266bae0f940e90b Mon Sep 17 00:00:00 2001
+>> From: Arnd Bergmann <arnd@arndb.de>
+>> Date: Wed, 9 Apr 2014 17:18:10 +0200
+>> Subject: [PATCH] [SUBMITTED] iio:adc: at91 requires the input subsystem
+>>
+>> Building the at91 adc driver with CONFIG_INPUT disabled results in this
+>> build error:
+>>
+>> ERROR: "input_event" [drivers/iio/adc/at91_adc.ko] undefined!
+>> ERROR: "input_unregister_device" [drivers/iio/adc/at91_adc.ko] undefined!
+>> ERROR: "input_free_device" [drivers/iio/adc/at91_adc.ko] undefined!
+>> ERROR: "input_register_device" [drivers/iio/adc/at91_adc.ko] undefined!
+>> ERROR: "input_set_abs_params" [drivers/iio/adc/at91_adc.ko] undefined!
+>> ERROR: "input_allocate_device" [drivers/iio/adc/at91_adc.ko] undefined!
+>>
+>> To make sure we can build random configurations, this adds a Kconfig
+>> dependency on CONFIG_INPUT, as we do for other similar drivers.
+>>
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> Cc: linux-iio at vger.kernel.org
+>> Cc: Josh Wu <josh.wu@atmel.com>
+>> Cc: Jonathan Cameron <jic23@kernel.org>
+>> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+>
+>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>
+Applied to the togreg branch of iio.git.  Thanks,
 
-Thanks,
-> ---
->   drivers/iio/Kconfig | 1 +
->   1 file changed, 1 insertion(+)
+Jonathan
+> Bye,
 >
-> diff --git a/drivers/iio/Kconfig b/drivers/iio/Kconfig
-> index 743485e..345395e 100644
-> --- a/drivers/iio/Kconfig
-> +++ b/drivers/iio/Kconfig
-> @@ -4,6 +4,7 @@
+>>
+>> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
+>> index 90f596d..a80d236 100644
+>> --- a/drivers/iio/adc/Kconfig
+>> +++ b/drivers/iio/adc/Kconfig
+>> @@ -110,6 +110,7 @@ config AD799X
+>>   config AT91_ADC
+>>   	tristate "Atmel AT91 ADC"
+>>   	depends on ARCH_AT91
+>> +	depends on INPUT
+>>   	select IIO_BUFFER
+>>   	select IIO_TRIGGERED_BUFFER
+>>   	select SYSFS
+>>
+>>
+>>
 >
->   menuconfig IIO
->   	tristate "Industrial I/O support"
-> +	select ANON_INODES
->   	help
->   	  The industrial I/O subsystem provides a unified framework for
->   	  drivers for many different types of embedded sensors using a
 >
