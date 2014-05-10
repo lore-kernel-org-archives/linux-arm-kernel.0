@@ -1,103 +1,127 @@
-From: b47624@freescale.com (Li Jun)
-Date: Sat, 10 May 2014 21:57:39 +0800
-Subject: i.MX6 USB OTG support is broken on linux-next
-In-Reply-To: <20140510131815.GT2794@dragon>
-References: <20140509130046.GP2794@dragon>
- <20140510111003.GA1593@shlinux1.ap.freescale.net>
- <20140510131815.GT2794@dragon>
-Message-ID: <20140510135737.GA1878@shlinux1.ap.freescale.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 10 May 2014 12:47:35 -0300
+Subject: [PATCH v5 1/2] ARM: dts: imx51-eukrea-mbimxsd51-baseboard: Add CAN
+ support
+Message-ID: <1399736856-9489-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 10, 2014 at 09:18:36PM +0800, Shawn Guo wrote:
-> + Robin and David,
-> 
-> On Sat, May 10, 2014 at 07:10:05PM +0800, Peter Chen wrote:
-> > On Fri, May 09, 2014 at 09:00:47PM +0800, Shawn Guo wrote:
-> > > I'm running next-20140508 kernel on imx6q-sabresd board with USB
-> > > mouse/keyboard connected to OTG port.  It  works well on 3.15-rc but
-> > > is broken on recent linux-next kernel with the message like below.
-> > > 
-> > > ...
-> > > usb 1-1: device v413c p2107 is not supported
-> > > hub 1-0:1.0: unable to enumerate USB device on port 1
-> > > 
-> > > With the help from Peter, I found that the issue shows up only when
-> > > CONFIG_USB_OTG_FSM is enabled.  The option is enabled by commit 8fd2f1f
-> > > (ARM: imx_v6_v7_defconfig: Enable drivers for i.MX51 USB Host support.)
-> > > from IMX tree.
-> > > 
-> > > I guess this is a sign that chipidea otg_fsm driver is buggy?  I do not
-> > > think dropping CONFIG_USB_OTG_FSM selection from imx_v6_v7_defconfig is
-> > > a solution, and we need to fix the issue in usb driver, right?
-> > > 
-> > 
-> > No, Shawn. The solution of this problem is drop CONFIG_USB_OTG_FSM, I
-> > guess Denis added it wrongly.
-> > 
-> > According to Embedded Hosts & OTG spec, OTG devices and Embedded Hosts
-> > both have Targeted Host functionality, and each Targeted Host has
-> > its TPL (Targeted Peripheral List), only the devices are at TPL
-> > are supported by Targeted Host.
-> > 
-> > Current Linux TPL only contains limited devices, each Targeted Host
-> > needs to update its TPL when it makes product, (The comments at
-> > otg_whitelist.h also mention it), and the devices are not at TPL
-> > will not be supported, and will report to user as "an unsupported
-> > device" error, at current Linux configuration, once the CONFIG_USB_OTG_FSM
-> > and CONFIG_USB_OTG are chosen, the host will be Targeted Host.
-> > 
-> > The reason why Shawn met this problem is: the imx_v6_v7_defconfig set 
-> > CONFIG_USB_OTG_FSM, so the CONFIG_USB_OTG and CONFIG_USB_OTG_WHITELIST
-> > are set according to dependency, it makes imx6 device as Targeted Host,
-> > but the devices connected at Shawn's board are not at TPL, so they are
-> > not be supported.
-> > 
-> > In a word the CONFIG_USB_OTG_FSM should not be chosen for
-> > defauly kernel configuration. The CONFIG_USB_OTG_FSM should only be chosen
-> > by default when this device goes to make product and the TPL is updated
-> > accordingly.
-> 
-> Thanks for the explanation, Peter.
-> 
-> So this is what I see from USB Kconfig.
-> 
-> config USB_OTG_FSM
->         tristate "USB 2.0 OTG FSM implementation"
->         depends on USB
->         select USB_OTG
->         select USB_PHY
-> 
-> config USB_OTG_WHITELIST
->         bool "Rely on OTG Targeted Peripherals List"
->         depends on USB_OTG || EXPERT
->         default y if USB_OTG
-> 
-> I see that USB_OTG_FSM has a dependency on USB_OTG, and
-> USB_OTG_WHITELIST depends on USB_OTG, but USB_OTG does *not* depends
-> on USB_OTG_WHITELIST.
-> 
-> I'm not sure why we have 'default y if USB_OTG' for USB_OTG_WHITELIST,
-> when this option only makes sense for product producers per your
-> explanation.  So maybe dropping the 'default y' is the right fix?
-> 
-> diff --git a/drivers/usb/core/Kconfig b/drivers/usb/core/Kconfig
-> index cb8e991..9081757 100644
-> --- a/drivers/usb/core/Kconfig
-> +++ b/drivers/usb/core/Kconfig
-> @@ -65,7 +65,6 @@ config USB_OTG
->  config USB_OTG_WHITELIST
->         bool "Rely on OTG Targeted Peripherals List"
->         depends on USB_OTG || EXPERT
-> -       default y if USB_OTG
->         help
->           If you say Y here, the "otg_whitelist.h" file will be used as a
->           product whitelist, so USB peripherals not listed there will be
-> 
-> Shawn
-As Peter suggested, do not enable OTG_FSM in defconfig since there are very few
-HNP&SRP capable device in market. With OTG_FSM enabled, even USB_OTG_WHITELIST
-is not selected, the OTG port still can't work the same as before if you connect
-a normal usb device to it.
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Li Jun
+Add support for CAN based on a MCP2515 connected to ECSPI1.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v4:
+- Fix the SPI clock to 10MHz
+- Use CAN_RST as the regulator name
+Changes since v3:
+- Provide a fixed-clock for CAN
+- Separate escpi from CAN control pin groups
+- Use vdd-supply for mcp2515
+- Fix typo on commit log
+
+Changes since v2:
+- None
+Changes since v1:
+- Use active low for spi chipselect
+- Remove unused GPIOs for CAN
+ .../boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts  | 62 ++++++++++++++++++++++
+ 1 file changed, 62 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
+index 8b1098e..75e66c9 100644
+--- a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
++++ b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
+@@ -24,6 +24,14 @@
+ 	model = "Eukrea CPUIMX51";
+ 	compatible = "eukrea,mbimxsd51","eukrea,cpuimx51", "fsl,imx51";
+ 
++	clocks {
++		clk24M: can_clock {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <24000000>;
++		};
++	};
++
+ 	gpio_keys {
+ 		compatible = "gpio-keys";
+ 		pinctrl-names = "default";
+@@ -50,6 +58,23 @@
+ 		};
+ 	};
+ 
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		reg_can: regulator at 0 {
++			compatible = "regulator-fixed";
++			reg = <0>;
++			regulator-name = "CAN_RST";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			gpio = <&gpio4 15 GPIO_ACTIVE_HIGH>;
++			startup-delay-us = <20000>;
++			enable-active-high;
++		};
++	};
++
+ 	sound {
+ 		compatible = "eukrea,asoc-tlv320";
+ 		eukrea,model = "imx51-eukrea-tlv320aic23";
+@@ -86,6 +111,26 @@
+ 	status = "okay";
+ };
+ 
++&ecspi1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_ecspi1>;
++	fsl,spi-num-chipselects = <1>;
++	cs-gpios = <&gpio4 24 GPIO_ACTIVE_LOW>;
++	status = "okay";
++
++	can0: can at 0 {
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_can>;
++		compatible = "microchip,mcp2515";
++		reg = <0>;
++		clocks = <&clk24M>;
++		spi-max-frequency = <10000000>;
++		interrupt-parent = <&gpio1>;
++		interrupts = <1 IRQ_TYPE_EDGE_FALLING>;
++		vdd-supply = <&reg_can>;
++	};
++};
++
+ &i2c1 {
+ 	tlv320aic23: codec at 1a {
+ 		compatible = "ti,tlv320aic23";
+@@ -104,6 +149,23 @@
+ 			>;
+ 		};
+ 
++
++		pinctrl_can: cangrp {
++			fsl,pins = <
++				MX51_PAD_CSI2_PIXCLK__GPIO4_15		0x80000000	/* nReset */
++				MX51_PAD_GPIO1_1__GPIO1_1		0x80000000	/* IRQ */
++			>;
++		};
++
++		pinctrl_ecspi1: ecspi1grp {
++			fsl,pins = <
++				MX51_PAD_CSPI1_MISO__ECSPI1_MISO	0x185
++				MX51_PAD_CSPI1_MOSI__ECSPI1_MOSI	0x185
++				MX51_PAD_CSPI1_SCLK__ECSPI1_SCLK	0x185
++				MX51_PAD_CSPI1_SS0__GPIO4_24		0x80000000 	/* CS0 */
++			>;
++		};
++
+ 		pinctrl_esdhc1: esdhc1grp {
+ 			fsl,pins = <
+ 				MX51_PAD_SD1_CMD__SD1_CMD		0x400020d5
+-- 
+1.8.3.2
