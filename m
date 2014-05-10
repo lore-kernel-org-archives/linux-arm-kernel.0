@@ -1,48 +1,63 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 10 May 2014 23:43:10 +0400
-Subject: [PATCH 5/6] usb: host: ehci-tegra: Use devm_ioremap_resource
- instead of devm_ioremap
-In-Reply-To: <1399715823-19839-6-git-send-email-gautam.vivek@samsung.com>
-References: <1399715823-19839-1-git-send-email-gautam.vivek@samsung.com>
- <1399715823-19839-6-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <536E814E.4020805@cogentembedded.com>
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Sat, 10 May 2014 14:01:04 -0700
+Subject: [PATCH 6/5] watchdog: Document reboot API
+In-Reply-To: <20140510162329.GA19884@roeck-us.net>
+References: <1399681883-891-1-git-send-email-linux@roeck-us.net>
+ <536D74E3.8010609@infradead.org> <20140510162329.GA19884@roeck-us.net>
+Message-ID: <536E9390.5060404@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-On 05/10/2014 01:57 PM, Vivek Gautam wrote:
-
-> Using devm_ioremap_resource() API should actually be preferred over
-> devm_ioremap(), since the former request the mem region first and then
-> gives back the ioremap'ed memory pointer.
-> devm_ioremap_resource() calls request_mem_region(), therby preventing
-> other drivers to make any overlapping call to the same region.
-
-> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+On 05/10/2014 09:23 AM, Guenter Roeck wrote:
+> Document the new reboot API functionality.
+> 
+> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 > ---
->   drivers/usb/host/ehci-tegra.c |    3 +--
->   1 file changed, 1 insertion(+), 2 deletions(-)
+>  Documentation/watchdog/watchdog-kernel-api.txt | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+> 
+> diff --git a/Documentation/watchdog/watchdog-kernel-api.txt b/Documentation/watchdog/watchdog-kernel-api.txt
+> index a0438f3..f8f0f18 100644
+> --- a/Documentation/watchdog/watchdog-kernel-api.txt
+> +++ b/Documentation/watchdog/watchdog-kernel-api.txt
+> @@ -90,6 +90,8 @@ struct watchdog_ops {
+>  	int (*stop)(struct watchdog_device *);
+>  	/* optional operations */
+>  	int (*ping)(struct watchdog_device *);
+> +	void (*reboot)(struct watchdog_device *, enum reboot_mode,
+> +		       const char *);
+>  	unsigned int (*status)(struct watchdog_device *);
+>  	int (*set_timeout)(struct watchdog_device *, unsigned int);
+>  	unsigned int (*get_timeleft)(struct watchdog_device *);
+> @@ -148,6 +150,10 @@ they are supported. These optional routines/operations are:
+>    info structure).
+>  * status: this routine checks the status of the watchdog timer device. The
+>    status of the device is reported with watchdog WDIOF_* status flags/bits.
+> +* reboot: if this routine is present, it may be called to reboot the system.
+> +  Parameters are the pointer to the watchdog device, the reboot mode, and a
+> +  command string. The latter two parameters are the system reboot mode
+> +  and the cmd parameter passed to machine_restart().
+>  * set_timeout: this routine checks and changes the timeout of the watchdog
+>    timer device. It returns 0 on success, -EINVAL for "parameter out of range"
+>    and -EIO for "could not write value to the watchdog". On success this
+> @@ -224,3 +230,11 @@ the device tree (if the module timeout parameter is invalid). Best practice is
+>  to set the default timeout value as timeout value in the watchdog_device and
+>  then use this function to set the user "preferred" timeout value.
+>  This routine returns zero on success and a negative errno code for failure.
+> +
+> +The watchdog_do_reboot function can be used reboot the system. This is intended
 
-> diff --git a/drivers/usb/host/ehci-tegra.c b/drivers/usb/host/ehci-tegra.c
-> index 572634c..ccc6433 100644
-> --- a/drivers/usb/host/ehci-tegra.c
-> +++ b/drivers/usb/host/ehci-tegra.c
-> @@ -411,9 +411,8 @@ static int tegra_ehci_probe(struct platform_device *pdev)
->   	}
->   	hcd->rsrc_start = res->start;
->   	hcd->rsrc_len = resource_size(res);
-> -	hcd->regs = devm_ioremap(&pdev->dev, res->start, resource_size(res));
-> +	hcd->regs = devm_ioremap_resource(&pdev->dev, res);
->   	if (!hcd->regs) {
+                                               to reboot
 
-    This has to be changed as well as devm_ioremap_resource() returns error, 
-not NULL.
+> +to be used in systems which do not have an explicit reboot capability, but
+> +implement reboot by programming the watchdog to expire immediately. If the
+> +function is called, and a watchdog driver with reboot functionality was
+> +previously registered, the reboot function of that driver will be called.
+> +Architecture code should call watchdog_do_reboot from its machine_reboot
+> +function after other means to reboot the system failed.
+> 
 
-> -		dev_err(&pdev->dev, "Failed to remap I/O memory\n");
->   		err = -ENOMEM;
+Thanks for the Doc patch.
 
-    This needs to be changed as well, to pass up the error code 
-devm_ioremap_resource() returned.
-
-WBR, Sergei
+-- 
+~Randy
