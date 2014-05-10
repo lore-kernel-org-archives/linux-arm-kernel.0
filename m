@@ -1,107 +1,101 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 10 May 2014 07:56:58 -0500
-Subject: [PATCH v2 6/7] ARM: sun6i: dt: Add support for the USB controllers
+Date: Sat, 10 May 2014 07:56:59 -0500
+Subject: [PATCH v2 7/7] ARM: sunxi: dt: add APP4-EVB1 board support
 In-Reply-To: <1399726619-30150-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1399726619-30150-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1399726619-30150-7-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1399726619-30150-8-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A31 has two ECHI/OHCI controllers, and one OHCI-only phy-less controller.
+From: Boris BREZILLON <boris.brezillon@free-electrons.com>
 
+The APP4 EVB1 development boards embeds an A31, together with some NAND, one SD
+card slot, and one SDIO + UART WiFi and Bluetooth chip, a few I2C buses, USB,
+and a LCD display.
+
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Reviewed-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun6i-a31.dtsi | 77 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 77 insertions(+)
+ arch/arm/boot/dts/Makefile                |  1 +
+ arch/arm/boot/dts/sun6i-a31-app4-evb1.dts | 57 +++++++++++++++++++++++++++++++
+ 2 files changed, 58 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
 
-diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index 13aa56ed5858..5e9f01af6d99 100644
---- a/arch/arm/boot/dts/sun6i-a31.dtsi
-+++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-@@ -341,6 +341,83 @@
- 			status = "disabled";
- 		};
- 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index ffa3f5ef27d3..d50c0895a9d5 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -343,6 +343,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += \
+ 	sun5i-a10s-olinuxino-micro.dtb \
+ 	sun5i-a13-olinuxino.dtb \
+ 	sun5i-a13-olinuxino-micro.dtb \
++	sun6i-a31-app4-evb1.dtb \
+ 	sun6i-a31-colombus.dtb \
+ 	sun6i-a31-m9.dtb \
+ 	sun7i-a20-cubieboard2.dtb \
+diff --git a/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts b/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
+new file mode 100644
+index 000000000000..2bbf8867362b
+--- /dev/null
++++ b/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
+@@ -0,0 +1,57 @@
++/*
++ * Copyright 2014 Boris Brezillon
++ *
++ * Boris Brezillon <boris.brezillon@free-electrons.com>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/dts-v1/;
++/include/ "sun6i-a31.dtsi"
++/include/ "sunxi-common-regulators.dtsi"
++
++/ {
++	model = "Allwinner A31 APP4 EVB1 Evaluation Board";
++	compatible = "allwinner,app4-evb1", "allwinner,sun6i-a31";
++
++	chosen {
++		bootargs = "earlyprintk console=ttyS0,115200";
++	};
++
++	soc at 01c00000 {
++		pio: pinctrl at 01c20800 {
++			usb1_vbus_pin_a: usb1_vbus_pin at 0 {
++				allwinner,pins = "PH27";
++				allwinner,function = "gpio_out";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
++		};
++
 +		usbphy: phy at 01c19400 {
-+			compatible = "allwinner,sun6i-a31-usb-phy";
-+			reg = <0x01c19400 0x10>,
-+			      <0x01c1a800 0x4>,
-+			      <0x01c1b800 0x4>;
-+			reg-names = "phy_ctrl",
-+				    "pmu1",
-+				    "pmu2";
-+			clocks = <&usb_clk 8>,
-+				 <&usb_clk 9>,
-+				 <&usb_clk 10>;
-+			clock-names = "usb0_phy",
-+				      "usb1_phy",
-+				      "usb2_phy";
-+			resets = <&usb_clk 0>,
-+				 <&usb_clk 1>,
-+				 <&usb_clk 2>;
-+			reset-names = "usb0_reset",
-+				      "usb1_reset",
-+				      "usb2_reset";
-+			status = "disabled";
-+			#phy-cells = <1>;
++			usb1_vbus-supply = <&reg_usb1_vbus>;
++			status = "okay";
 +		};
 +
 +		ehci0: usb at 01c1a000 {
-+			compatible = "allwinner,sun6i-a31-ehci", "generic-ehci";
-+			reg = <0x01c1a000 0x100>;
-+			interrupts = <0 72 4>;
-+			clocks = <&ahb1_gates 26>;
-+			resets = <&ahb1_rst 26>;
-+			phys = <&usbphy 1>;
-+			phy-names = "usb";
-+			status = "disabled";
++			status = "okay";
 +		};
 +
-+		ohci0: usb at 01c1a400 {
-+			compatible = "allwinner,sun6i-a31-ohci", "generic-ohci";
-+			reg = <0x01c1a400 0x100>;
-+			interrupts = <0 73 4>;
-+			clocks = <&ahb1_gates 29>, <&usb_clk 16>;
-+			resets = <&ahb1_rst 29>;
-+			phys = <&usbphy 1>;
-+			phy-names = "usb";
-+			status = "disabled";
++		uart0: serial at 01c28000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&uart0_pins_a>;
++			status = "okay";
 +		};
++	};
 +
-+		ehci1: usb at 01c1b000 {
-+			compatible = "allwinner,sun6i-a31-ehci", "generic-ehci";
-+			reg = <0x01c1b000 0x100>;
-+			interrupts = <0 74 4>;
-+			clocks = <&ahb1_gates 27>;
-+			resets = <&ahb1_rst 27>;
-+			phys = <&usbphy 2>;
-+			phy-names = "usb";
-+			status = "disabled";
-+		};
-+
-+		ohci1: usb at 01c1b400 {
-+			compatible = "allwinner,sun6i-a31-ohci", "generic-ohci";
-+			reg = <0x01c1b400 0x100>;
-+			interrupts = <0 75 4>;
-+			clocks = <&ahb1_gates 30>, <&usb_clk 17>;
-+			resets = <&ahb1_rst 30>;
-+			phys = <&usbphy 2>;
-+			phy-names = "usb";
-+			status = "disabled";
-+		};
-+
-+		ohci2: usb at 01c1c000 {
-+			compatible = "allwinner,sun6i-a31-ohci", "generic-ohci";
-+			reg = <0x01c1c400 0x100>;
-+			interrupts = <0 77 4>;
-+			clocks = <&ahb1_gates 31>, <&usb_clk 18>;
-+			resets = <&ahb1_rst 31>;
-+			status = "disabled";
-+		};
-+
- 		pio: pinctrl at 01c20800 {
- 			compatible = "allwinner,sun6i-a31-pinctrl";
- 			reg = <0x01c20800 0x400>;
++	reg_usb1_vbus: usb1-vbus {
++		pinctrl-0 = <&usb1_vbus_pin_a>;
++		gpio = <&pio 7 27 0>;
++		status = "okay";
++	};
++};
 -- 
 1.9.1
