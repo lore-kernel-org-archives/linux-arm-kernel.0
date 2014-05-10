@@ -1,35 +1,25 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 10 May 2014 12:06:52 -0400
-Subject: [PATCH v11 1/6] ARM: sunxi: Add driver for SD/MMC hosts found on
- Allwinner sunxi SoCs
-In-Reply-To: <1399714443-12459-2-git-send-email-hdegoede@redhat.com>
-References: <1399714443-12459-1-git-send-email-hdegoede@redhat.com>
- <1399714443-12459-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <20140510160652.GM7047@lukather>
+Date: Sat, 10 May 2014 12:08:09 -0400
+Subject: [PATCH v3 2/3] ARM: sunxi: drop CONFIG_COMMON_CLK_DEBUG
+In-Reply-To: <1399618669-6830-3-git-send-email-prabhakar.csengg@gmail.com>
+References: <1399618669-6830-1-git-send-email-prabhakar.csengg@gmail.com>
+ <1399618669-6830-3-git-send-email-prabhakar.csengg@gmail.com>
+Message-ID: <20140510160809.GN7047@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 10, 2014 at 11:33:58AM +0200, Hans de Goede wrote:
-> From: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
+On Fri, May 09, 2014 at 12:27:48PM +0530, Lad, Prabhakar wrote:
+> From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
 > 
-> The Allwinner sunxi mmc host uses dma in bus-master mode using a built-in
-> designware idmac controller, which is identical to the one found in the mmc-dw
-> hosts. However the rest of the host is not identical to mmc-dw, it deals with
-> sending stop commands in hardware which makes it significantly different
-> from the mmc-dw devices.
+> this patch drops CONFIG_COMMON_CLK_DEBUG option
+> as this config option is now obsolete.
 > 
-> HdG: Various cleanups and fixes.
-> 
-> Signed-off-by: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> CC: Maxime Ripard <maxime.ripard@free-electrons.com>
+> CC: Olof Johansson <olof@lixom.net>
+> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Applied, thanks!
 
-Chris, I don't think we ever got a review from you on this? Do you
-have any comments on this patch? It would be great if we could merge
-it for 3.16.
-
-Thanks,
 Maxime
 
 -- 
@@ -42,4 +32,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140510/6f96bf33/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140510/5ce21975/attachment.sig>
