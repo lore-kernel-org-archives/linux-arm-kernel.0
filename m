@@ -1,293 +1,46 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Sat, 10 May 2014 12:51:31 +0900
-Subject: [PATCH 1/4] clk: samsung: out: Add infrastructure to register
- CLKOUT
-In-Reply-To: <1399640410-30957-2-git-send-email-tushar.behera@linaro.org>
-References: <1399640410-30957-1-git-send-email-tushar.behera@linaro.org>
- <1399640410-30957-2-git-send-email-tushar.behera@linaro.org>
-Message-ID: <536DA243.6000600@samsung.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri,  9 May 2014 22:33:35 -0500
+Subject: [PATCH 0/6] sunxi: clk: Various cleanup and rework
+Message-ID: <1399692821-20988-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/09/2014 10:00 PM, Tushar Behera wrote:
-> All SoC in Exynos-series have a clock with name XCLKOUT to provide
-> debug information about various clocks available in the SoC. The register
-> controlling the MUX and GATE of this clock is provided within PMU domain.
-> Since PMU domain can't be dedicatedly mapped by every driver, the register
-> needs to be handled through a regmap handle provided by PMU syscon
-> controller. Right now, CCF doesn't allow regmap based MUX and GATE clocks,
-> hence a dedicated clock provider for XCLKOUT is added here.
->
-> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
-> CC: Tomasz Figa <t.figa@samsung.com>
-> ---
->   drivers/clk/samsung/Makefile  |    2 +-
->   drivers/clk/samsung/clk-out.c |  181 +++++++++++++++++++++++++++++++++++++++++
->   drivers/clk/samsung/clk.h     |   33 ++++++++
->   3 files changed, 215 insertions(+), 1 deletion(-)
->   create mode 100644 drivers/clk/samsung/clk-out.c
->
-> diff --git a/drivers/clk/samsung/Makefile b/drivers/clk/samsung/Makefile
-> index 8eb4799..d23ad4f 100644
-> --- a/drivers/clk/samsung/Makefile
-> +++ b/drivers/clk/samsung/Makefile
-> @@ -2,7 +2,7 @@
->   # Samsung Clock specific Makefile
->   #
->   
-> -obj-$(CONFIG_COMMON_CLK)	+= clk.o clk-pll.o
-> +obj-$(CONFIG_COMMON_CLK)	+= clk.o clk-pll.o clk-out.o
->   obj-$(CONFIG_ARCH_EXYNOS4)	+= clk-exynos4.o
->   obj-$(CONFIG_SOC_EXYNOS5250)	+= clk-exynos5250.o
->   obj-$(CONFIG_SOC_EXYNOS5420)	+= clk-exynos5420.o
-> diff --git a/drivers/clk/samsung/clk-out.c b/drivers/clk/samsung/clk-out.c
-> new file mode 100644
-> index 0000000..76489b6
-> --- /dev/null
-> +++ b/drivers/clk/samsung/clk-out.c
-> @@ -0,0 +1,181 @@
-> +/*
-> + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This file contains the utility functions to register the clkout clocks.
-> +*/
-> +
-> +/**
-> + * All SoC in Exynos-series have a clock with name XCLKOUT to provide
-> + * debug information about various clocks available in the SoC. The register
-> + * controlling the MUX and GATE of this clock is provided within PMU domain.
-> + * Since PMU domain can't be dedicatedly mapped every driver, the register
-> + * needs to be handled through a regmap handle provided by PMU syscon
-> + * controller. Right now, CCF doesn't allow regmap based MUX and GATE clocks,
-> + * hence a dedicated clock provider for XCLKOUT is added here.
-> + */
-> +
-> +#include <linux/errno.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/regmap.h>
-> +
-> +#include "clk.h"
-> +
-> +/**
-> + * struct samsung_clkout_soc_data: SoC specific register details
-> + * @reg: Offset of CLKOUT register from PMU base
+Hi everyone,
 
-how about naming this variable as "offset" instead of "reg".
+This patchset fixes a few things that have been pending for quite a
+while in the clock driver.
 
-> + * @mux_shift: Start-bit of MUX bit-field
-> + * @mux_width: Width of MUX bit-field
-> + * @enable_bit: The bit corresponding to gating of this clock
-> + */
-> +struct samsung_clkout_soc_data {
-> +	unsigned int reg;
-> +	u8 mux_shift;
-> +	u8 mux_width;
-> +	u8 enable_bit;
-> +};
-> +
-> +/**
-> + * struct samsung_clkout: Structure to store driver specific clock context
-> + * @hw: Handle to CCF clock
-> + * @soc_data: SoC specific register details
-> + * @regmap: Regmap handle of the PMU
-> + */
-> +struct samsung_clkout {
-> +	struct clk_hw hw;
-> +	const struct samsung_clkout_soc_data *soc_data;
-> +	struct regmap *regmap;
-> +};
-> +
-> +#define to_clk_out(_hw) container_of(_hw, struct samsung_clkout, hw)
-> +
-> +int samsung_clkout_enable(struct clk_hw *hw)
-> +{
-> +	struct samsung_clkout *clkout = to_clk_out(hw);
-> +	const struct samsung_clkout_soc_data *soc_data = clkout->soc_data;
-> +	unsigned int enable_mask = BIT(soc_data->enable_bit);
-> +
-> +	/* clkout is enabled if enable bit is low */
-> +	regmap_update_bits(clkout->regmap, soc_data->reg, enable_mask, 0);
-> +
-> +	return 0;
-> +}
-> +
-> +void samsung_clkout_disable(struct clk_hw *hw)
-> +{
-> +	struct samsung_clkout *clkout = to_clk_out(hw);
-> +	const struct samsung_clkout_soc_data *soc_data = clkout->soc_data;
-> +	unsigned int enable_mask = BIT(soc_data->enable_bit);
-> +
-> +	/* clkout is gated if enable bit is high */
-> +	regmap_update_bits(clkout->regmap, soc_data->reg,
-> +			enable_mask, enable_mask);
-> +
-> +	return;
-> +}
-> +
-> +int samsung_clkout_set_parent(struct clk_hw *hw, u8 index)
-> +{
-> +	struct samsung_clkout *clkout = to_clk_out(hw);
-> +	const struct samsung_clkout_soc_data *soc_data = clkout->soc_data;
-> +	unsigned int parent_mask = BIT(soc_data->mux_width) - 1;
-> +
-> +	regmap_update_bits(clkout->regmap, soc_data->reg,
-> +			parent_mask << soc_data->mux_shift,
-> +			index << soc_data->mux_shift);
-> +
-> +	return 0;
-> +}
-> +
-> +u8 samsung_clkout_get_parent(struct clk_hw *hw)
-> +{
-> +	struct samsung_clkout *clkout = to_clk_out(hw);
-> +	const struct samsung_clkout_soc_data *soc_data = clkout->soc_data;
-> +	unsigned int parent_mask = BIT(soc_data->mux_width) - 1;
-> +	unsigned int val;
-> +	int ret;
-> +
-> +	ret = regmap_read(clkout->regmap, soc_data->reg, &val);
+First, it removes the clk_put calls in the clock protection
+part. Since it's not really something that should be done, I guess
+this patch is not very controversial.
 
-Do we really need to keep return value in "ret" as I can't see you are 
-using it anywhere?
+Then, it starts splitting the huge clock driver file into separate,
+smaller drivers when it makes sense.
 
-> +
-> +	return (val >> soc_data->mux_shift) & parent_mask;
-> +}
-> +
-> +static const struct clk_ops samsung_clkout_clk_ops = {
-> +	.enable = samsung_clkout_enable,
-> +	.disable = samsung_clkout_disable,
-> +	.set_parent = samsung_clkout_set_parent,
-> +	.get_parent = samsung_clkout_get_parent,
-> +};
-> +
-> +static void __init _samsung_clk_register_clkout(
-> +		struct samsung_out_clock *out,
-> +		const struct samsung_clkout_soc_data *soc_data,
-> +		struct regmap *regmap)
-> +{
-> +	struct samsung_clkout *clkout;
-> +	struct clk *clk;
-> +	struct clk_init_data init;
-> +	int ret;
-> +
-> +	clkout = kzalloc(sizeof(*clkout), GFP_KERNEL);
-> +	if (!clkout) {
-> +		pr_err("%s: could not allocate out clk %s\n",
-> +			__func__, out->name);
-> +		return;
-> +	}
-> +
-> +	init.name = out->name;
-> +	init.parent_names = out->parent_names;
-> +	init.num_parents = out->num_parents;
-> +	init.ops = &samsung_clkout_clk_ops;
-> +
-> +	clkout->hw.init = &init;
-> +	clkout->regmap = regmap;
-> +	clkout->soc_data = soc_data;
-> +
-> +	clk = clk_register(NULL, &clkout->hw);
-> +	if (IS_ERR(clk)) {
-> +		pr_err("%s: failed to register out clock %s : %ld\n",
-> +			__func__, out->name, PTR_ERR(clk));
-> +		kfree(clkout);
-> +		return;
-> +	}
-> +
-> +	samsung_clk_add_lookup(clk, out->id);
-> +
-> +	if (!out->alias)
-> +		return;
-> +
-> +	ret = clk_register_clkdev(clk, out->alias, out->dev_name);
-> +	if (ret)
-> +		pr_err("%s: failed to register lookup for %s : %d",
-> +			__func__, out->name, ret);
-> +}
-> +
-> +/* All existing Exynos serial of SoCs have common values for this offsets. */
-typo: serial/series/
-> +static const struct samsung_clkout_soc_data exynos_clkout_soc_data = {
-> +	.reg = 0xa00,
-> +	.mux_shift = 8,
-> +	.mux_width = 5,
-> +	.enable_bit = 0,
-> +};
-> +
-> +void __init samsung_clk_register_clkout(struct device_node *np,
-> +		struct samsung_out_clock *out_clk_list, unsigned int nr_out_clk)
-> +{
-> +	int cnt;
-> +	struct regmap *reg;
-> +	const struct samsung_clkout_soc_data *priv = &exynos_clkout_soc_data;
-> +
-> +	reg = syscon_early_regmap_lookup_by_phandle(np, "samsung,pmu-syscon");
-> +	if (IS_ERR(reg)) {
-> +		pr_err("Failed to get pmu-syscon handle for clkout\n");
-> +		return;
-> +	}
-> +
-> +	for (cnt = 0; cnt < nr_out_clk; cnt++)
-> +		_samsung_clk_register_clkout(&out_clk_list[cnt], priv, reg);
-> +}
-> diff --git a/drivers/clk/samsung/clk.h b/drivers/clk/samsung/clk.h
-> index c7141ba..b4b2122 100644
-> --- a/drivers/clk/samsung/clk.h
-> +++ b/drivers/clk/samsung/clk.h
-> @@ -312,6 +312,37 @@ struct samsung_pll_clock {
->   	__PLL(_typ, _id, NULL, _name, _pname, CLK_GET_RATE_NOCACHE,	\
->   		_lock, _con, _rtable, _alias)
->   
-> +/**
-> + * struct samsung_out_clock: information about CLKOUT clock
-> + * @id: platform specific id of the clock.
-> + * @dev_name: name of the device to which this clock belongs.
-> + * @name: name of this mux clock.
-> + * @parent_names: array of pointer to parent clock names.
-> + * @num_parents: number of parents listed in @parent_names.
-> + * @alias: optional clock alias name to be assigned to this clock.
-> + */
-> +struct samsung_out_clock {
-> +	unsigned int		id;
-> +	const char		*dev_name;
-> +	const char		*name;
-> +	const char		**parent_names;
-> +	unsigned int		num_parents;
-> +	const char		*alias;
-> +};
-> +
-> +#define __CLKOUT(_id, dname, cname, pnames, a)		\
-> +	{							\
-> +		.id		= _id,				\
-> +		.dev_name	= dname,			\
-> +		.name		= cname,			\
-> +		.parent_names	= pnames,			\
-> +		.num_parents	= ARRAY_SIZE(pnames),		\
-> +		.alias		= a,				\
-> +	}
-> +
-> +#define CLKOUT(_id, cname, pnames) \
-> +	__CLKOUT(_id, NULL, cname, pnames, NULL)
-> +
->   extern void __init samsung_clk_init(struct device_node *np, void __iomem *base,
->   				    unsigned long nr_clks);
->   extern void __init samsung_clk_of_register_fixed_ext(
-> @@ -335,6 +366,8 @@ extern void __init samsung_clk_register_gate(
->   		struct samsung_gate_clock *clk_list, unsigned int nr_clk);
->   extern void __init samsung_clk_register_pll(struct samsung_pll_clock *pll_list,
->   		unsigned int nr_clk, void __iomem *base);
-> +extern void __init samsung_clk_register_clkout(struct device_node *np,
-> +	struct samsung_out_clock *out_clk_list, unsigned int nr_out_clk);
->   
->   extern unsigned long _get_rate(const char *clk_name);
->   
+Finally, it reworks the clock protection mechanism to handle
+differences between SoC in a better way. This has been pretty
+controversial because the first approach has been to move this to the
+machine code. This is another attempt that leaves all the
+modifications in the driver itself.
 
+Thanks,
+Maxime
+
+Maxime Ripard (6):
+  clk: sunxi: Remove calls to clk_put
+  clk: sunxi: Move the 24M oscillator to a file of its own
+  clk: sunxi: Move the GMAC clock to a file of its own
+  clk: sunxi: Rework clock protection code
+  clk: sun6i: Protect CPU clock
+  clk: sun6i: Protect SDRAM gating bit
+
+ drivers/clk/sunxi/Makefile       |   2 +
+ drivers/clk/sunxi/clk-a10-hosc.c |  73 ++++++++++++
+ drivers/clk/sunxi/clk-a20-gmac.c | 119 ++++++++++++++++++++
+ drivers/clk/sunxi/clk-sunxi.c    | 233 ++++++++-------------------------------
+ 4 files changed, 240 insertions(+), 187 deletions(-)
+ create mode 100644 drivers/clk/sunxi/clk-a10-hosc.c
+ create mode 100644 drivers/clk/sunxi/clk-a20-gmac.c
 
 -- 
-Best Regards,
-Pankaj Dubey
+1.9.1
