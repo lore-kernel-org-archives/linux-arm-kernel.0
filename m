@@ -1,182 +1,187 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri,  9 May 2014 22:33:37 -0500
-Subject: [PATCH 2/6] clk: sunxi: Move the 24M oscillator to a file of its own
-In-Reply-To: <1399692821-20988-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1399692821-20988-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1399692821-20988-3-git-send-email-maxime.ripard@free-electrons.com>
+From: sonnyrao@chromium.org (Sonny Rao)
+Date: Fri, 9 May 2014 20:36:35 -0700
+Subject: [PATCH] mmc: dw_mmc: change to use recommended reset procedure
+In-Reply-To: <536C84A0.6020403@samsung.com>
+References: <1395834374-1988-1-git-send-email-yuvaraj.cd@samsung.com>
+ <CAKuRcOJYsC9OUOrYrvKg_iC5Z6dZ0mqW3-y=UXHtCr99=gQBXw@mail.gmail.com>
+ <536C2C31.8000209@samsung.com>
+ <CAPz6YkXGH96mjeePwUSRmPX4Y1YXYif+N+BRKsTwtNxtRq3xoQ@mail.gmail.com>
+ <536C594A.5080107@samsung.com> <536C84A0.6020403@samsung.com>
+Message-ID: <CAPz6YkUjLmWXvoCkuY8vAwLHksf0Uit6gWP-ADWBbN3NDJBo-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we have a folder of our own, we can actually make use of it by splitting
-the huge clock file into several sub drivers.
+On Fri, May 9, 2014 at 12:32 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+> Hi, Sonny.
+>
+> You can discard the my previous some comment.
+> As you mentioned, this reset sequence is recommended at Synopsys TRM.
+>
+> Add the minor question.
+>
+> On 05/09/2014 01:27 PM, Jaehoon Chung wrote:
+>> Hi, Sonny.
+>>
+>> I have checked the Synopsys TRM..
+>>
+>> On 05/09/2014 10:34 AM, Sonny Rao wrote:
+>>> On Thu, May 8, 2014 at 6:15 PM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+>>>> On 05/08/2014 06:40 PM, Yuvaraj Kumar wrote:
+>>>>> Any comments on this patch?
+>>>>>
+>>>>> On Wed, Mar 26, 2014 at 5:16 PM, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com> wrote:
+>>>>>> From: Sonny Rao <sonnyrao@chromium.org>
+>>>>>>
+>>>>>> This patch changes the fifo reset code to follow the reset procedure
+>>>>>> outlined in the documentation of Synopsys  Mobile storage host databook
+>>>>>> 7.2.13.
+>>>>>> Without this patch, we could able to see eMMC was not detected after
+>>>>>> multiple reboots due to driver hangs while eMMC tuning for HS200.
+>>>>>>
+>>>>>> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+>>>>>> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.org>
+>>>>>> ---
+>>>>>>  drivers/mmc/host/dw_mmc.c |   48 ++++++++++++++++++++++++++++++++++++++++++++-
+>>>>>>  drivers/mmc/host/dw_mmc.h |    1 +
+>>>>>>  2 files changed, 48 insertions(+), 1 deletion(-)
+>>>>>>
+>>>>>> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+>>>>>> index 32dd81d..1d77431 100644
+>>>>>> --- a/drivers/mmc/host/dw_mmc.c
+>>>>>> +++ b/drivers/mmc/host/dw_mmc.c
+>>>>>> @@ -2220,7 +2220,53 @@ static inline bool dw_mci_fifo_reset(struct dw_mci *host)
+>>>>>>                 host->sg = NULL;
+>>>>>>         }
+>>>>>>
+>>>>>> -       return dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET);
+>>>>>> +       /*
+>>>>>> +        * The recommended method for resetting is to always reset the
+>>>>>> +        * controller and the fifo, but differs slightly depending on the mode.
+>>>>>> +        * Note that this doesn't handle the "generic DMA" (not IDMAC) case.
+>>>>>> +        */
+>>>>
+>>>> "not IDMAC" is confused..
+>>>>
+>>>
+>>> The documentation describes three different possible modes.  There's a
+>>> mode that doesn't use IDMAC but still does DMA.  But as far as I can
+>>> tell this driver doesn't support that way.  We can just remove that
+>>> wording if it's confusing.
+>
+> How did it know whether dma is generic DMA or not?
+>
 
-The main oscillator is pretty easy to deal with, since it's pretty much
-isolated.
+That's a good question.  I wasn't sure whether the driver supported it
+or not.  It looks like it definitely supports IDMAC through the
+CONFIG_MMC_DW_IDMAC flag, but I wasn't sure if it was supported the
+generic dma.  Maybe if CONFIG_MMC_DW_IDMAC isn't specified but
+host->dma_ops is not NULL then we are using the generic dma mode.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/clk/sunxi/Makefile       |  1 +
- drivers/clk/sunxi/clk-a10-hosc.c | 73 ++++++++++++++++++++++++++++++++++++++++
- drivers/clk/sunxi/clk-sunxi.c    | 57 -------------------------------
- 3 files changed, 74 insertions(+), 57 deletions(-)
- create mode 100644 drivers/clk/sunxi/clk-a10-hosc.c
+>>>
+>>>>>> +       if (dw_mci_ctrl_reset(host, SDMMC_CTRL_RESET | SDMMC_CTRL_FIFO_RESET)) {
+>>>>>> +               unsigned long timeout = jiffies + msecs_to_jiffies(500);
+>>>>>> +               u32 status, rint;
+>>>>>> +
+>>>>>> +               /* if using dma we wait for dma_req to clear */
+>>>>>> +               if (host->using_dma) {
+>>>>>> +                       do {
+>>>>>> +                               status = mci_readl(host, STATUS);
+>>>>>> +                               if (!(status & SDMMC_STATUS_DMA_REQ))
+>>>>>> +                                       break;
+>>>>>> +                               cpu_relax();
+>>>>>> +                       } while (time_before(jiffies, timeout));
+>>>>>> +
+>>>>>> +                       if (status & SDMMC_STATUS_DMA_REQ)
+>>>>>> +                               dev_err(host->dev,
+>>>>>> +                                       "%s: Timeout waiting for dma_req to "
+>>>>>> +                                       "clear during reset", __func__);
+>>>>>> +
+>>>>>> +                       /* when using DMA next we reset the fifo again */
+>>>>>> +                       dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET);
+>>>>>> +               }
+>>>>>> +               /*
+>>>>>> +                * In all cases we clear the RAWINTS register to clear any
+>>>>>> +                * interrupts.
+>>>>>> +                */
+>>>>>> +               rint = mci_readl(host, RINTSTS);
+>>>>>> +               rint = rint & (~mci_readl(host, MINTSTS));
+>> you use the "status or temp" instead of rint. (you can reuse the variable.)
+>> And can use "status &= ~mci_readl(host,MINTSTS);"
+>>
+>>>>
+>>>> Just clear the RINTSTS register? why do you add these?
+>>>>
+>>>
+>>> This will look at what is not masked, and only clear those bits.
+>> Well, i known if clear the RINTSTS register,
+>> recommended to use "0xfffffff" and set the value for interrupt.
+>
+> Can be used "0xfffffff"?
+>
 
-diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-index b5bac917612c..2c3d2fed2560 100644
---- a/drivers/clk/sunxi/Makefile
-+++ b/drivers/clk/sunxi/Makefile
-@@ -3,3 +3,4 @@
- #
- 
- obj-y += clk-sunxi.o clk-factors.o
-+obj-y += clk-a10-hosc.o
-\ No newline at end of file
-diff --git a/drivers/clk/sunxi/clk-a10-hosc.c b/drivers/clk/sunxi/clk-a10-hosc.c
-new file mode 100644
-index 000000000000..0481d5d673d6
---- /dev/null
-+++ b/drivers/clk/sunxi/clk-a10-hosc.c
-@@ -0,0 +1,73 @@
-+/*
-+ * Copyright 2013 Emilio L??pez
-+ *
-+ * Emilio L??pez <emilio@elopez.com.ar>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/clk-provider.h>
-+#include <linux/clkdev.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+
-+#define SUNXI_OSC24M_GATE	0
-+
-+static DEFINE_SPINLOCK(hosc_lock);
-+
-+static void __init sun4i_osc_clk_setup(struct device_node *node)
-+{
-+	struct clk *clk;
-+	struct clk_fixed_rate *fixed;
-+	struct clk_gate *gate;
-+	const char *clk_name = node->name;
-+	u32 rate;
-+
-+	if (of_property_read_u32(node, "clock-frequency", &rate))
-+		return;
-+
-+	/* allocate fixed-rate and gate clock structs */
-+	fixed = kzalloc(sizeof(struct clk_fixed_rate), GFP_KERNEL);
-+	if (!fixed)
-+		return;
-+	gate = kzalloc(sizeof(struct clk_gate), GFP_KERNEL);
-+	if (!gate)
-+		goto err_free_fixed;
-+
-+	of_property_read_string(node, "clock-output-names", &clk_name);
-+
-+	/* set up gate and fixed rate properties */
-+	gate->reg = of_iomap(node, 0);
-+	gate->bit_idx = SUNXI_OSC24M_GATE;
-+	gate->lock = &hosc_lock;
-+	fixed->fixed_rate = rate;
-+
-+	clk = clk_register_composite(NULL, clk_name,
-+			NULL, 0,
-+			NULL, NULL,
-+			&fixed->hw, &clk_fixed_rate_ops,
-+			&gate->hw, &clk_gate_ops,
-+			CLK_IS_ROOT);
-+
-+	if (IS_ERR(clk))
-+		goto err_free_gate;
-+
-+	of_clk_add_provider(node, of_clk_src_simple_get, clk);
-+	clk_register_clkdev(clk, clk_name, NULL);
-+
-+	return;
-+
-+err_free_gate:
-+	kfree(gate);
-+err_free_fixed:
-+	kfree(fixed);
-+}
-+CLK_OF_DECLARE(sun4i_osc, "allwinner,sun4i-a10-osc-clk", sun4i_osc_clk_setup);
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index b1fde0f89bc1..c719e40cfb31 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -28,63 +28,6 @@ static DEFINE_SPINLOCK(clk_lock);
- #define SUNXI_MAX_PARENTS	5
- 
- /**
-- * sun4i_osc_clk_setup() - Setup function for gatable oscillator
-- */
--
--#define SUNXI_OSC24M_GATE	0
--
--static void __init sun4i_osc_clk_setup(struct device_node *node)
--{
--	struct clk *clk;
--	struct clk_fixed_rate *fixed;
--	struct clk_gate *gate;
--	const char *clk_name = node->name;
--	u32 rate;
--
--	if (of_property_read_u32(node, "clock-frequency", &rate))
--		return;
--
--	/* allocate fixed-rate and gate clock structs */
--	fixed = kzalloc(sizeof(struct clk_fixed_rate), GFP_KERNEL);
--	if (!fixed)
--		return;
--	gate = kzalloc(sizeof(struct clk_gate), GFP_KERNEL);
--	if (!gate)
--		goto err_free_fixed;
--
--	of_property_read_string(node, "clock-output-names", &clk_name);
--
--	/* set up gate and fixed rate properties */
--	gate->reg = of_iomap(node, 0);
--	gate->bit_idx = SUNXI_OSC24M_GATE;
--	gate->lock = &clk_lock;
--	fixed->fixed_rate = rate;
--
--	clk = clk_register_composite(NULL, clk_name,
--			NULL, 0,
--			NULL, NULL,
--			&fixed->hw, &clk_fixed_rate_ops,
--			&gate->hw, &clk_gate_ops,
--			CLK_IS_ROOT);
--
--	if (IS_ERR(clk))
--		goto err_free_gate;
--
--	of_clk_add_provider(node, of_clk_src_simple_get, clk);
--	clk_register_clkdev(clk, clk_name, NULL);
--
--	return;
--
--err_free_gate:
--	kfree(gate);
--err_free_fixed:
--	kfree(fixed);
--}
--CLK_OF_DECLARE(sun4i_osc, "allwinner,sun4i-a10-osc-clk", sun4i_osc_clk_setup);
--
--
--
--/**
-  * sun4i_get_pll1_factors() - calculates n, k, m, p factors for PLL1
-  * PLL1 rate is calculated as follows
-  * rate = (parent_rate * n * (k + 1) >> p) / (m + 1);
--- 
-1.9.1
+Yeah we probably can.  We just lose information about interrupts that
+were masked, but maybe we just don't care about any of them anyway, so
+it doesn't matter.
+
+> Best Regards,
+> Jaehoon Chung
+>>
+>>>
+>>>>>> +               if (rint)
+>>>>>> +                       mci_writel(host, RINTSTS, rint);
+>>>>>> +
+>>>>>> +       } else
+>>>>>> +               dev_err(host->dev, "%s: Reset bits didn't clear", __func__);
+>>>>
+>>>> Just display the error log? I didn't understand this.
+>>>> If you displayed the error log, then it needs to return the error value.
+>>>>
+>>>>>> +
+>>>>>> + #ifdef CONFIG_MMC_DW_IDMAC
+>>>>>> +       /* It is also recommended that we reset and reprogram idmac */
+>>>>>> +       dw_mci_idmac_reset(host);
+>>>>>> + #endif
+>>>>>> +
+>>>>>> +       /* After a CTRL reset we need to have CIU set clock registers  */
+>>>>>> +       mci_send_cmd(host->cur_slot, SDMMC_CMD_UPD_CLK, 0);
+>>
+>> Well, why do you send the clock update command?
+>> I didn't see that update the value related with clock.
+>>
+>> Best Regards,
+>> Jaehoon Chung
+>>
+>>>>>> +
+>>>>>> +       return true;
+>>>>>>  }
+>>>>>>
+>>>>>>  static inline bool dw_mci_ctrl_all_reset(struct dw_mci *host)
+>>>>>> diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
+>>>>>> index 738fa24..037e47a 100644
+>>>>>> --- a/drivers/mmc/host/dw_mmc.h
+>>>>>> +++ b/drivers/mmc/host/dw_mmc.h
+>>>>>> @@ -129,6 +129,7 @@
+>>>>>>  #define SDMMC_CMD_INDX(n)              ((n) & 0x1F)
+>>>>>>  /* Status register defines */
+>>>>>>  #define SDMMC_GET_FCNT(x)              (((x)>>17) & 0x1FFF)
+>>>>>> +#define SDMMC_STATUS_DMA_REQ           BIT(31)
+>>>>>>  /* FIFOTH register defines */
+>>>>>>  #define SDMMC_SET_FIFOTH(m, r, t)      (((m) & 0x7) << 28 | \
+>>>>>>                                          ((r) & 0xFFF) << 16 | \
+>>>>>> --
+>>>>>> 1.7.10.4
+>>>>>>
+>>>>>
+>>>>
+>>> --
+>>> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>>
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
+>
