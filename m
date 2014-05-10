@@ -1,271 +1,337 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri,  9 May 2014 22:33:38 -0500
-Subject: [PATCH 3/6] clk: sunxi: Move the GMAC clock to a file of its own
-In-Reply-To: <1399692821-20988-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1399692821-20988-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1399692821-20988-4-git-send-email-maxime.ripard@free-electrons.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Sat, 10 May 2014 13:31:47 +0900
+Subject: [PATCH V3 2/3] ARM: EXYNOS5: Add Suspend-to-RAM support for 5420
+In-Reply-To: <1399546368-30537-1-git-send-email-vikas.sajjan@samsung.com>
+References: <1399546368-30537-1-git-send-email-vikas.sajjan@samsung.com>
+Message-ID: <536DABB3.4060809@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we have a folder of our own, we can actually make use of it by splitting
-the huge clock file into several sub drivers.
+Hi Vikas,
 
-The gmac clock is pretty easy to deal with, since it's pretty much isolated and
-doesn't have any dependency on the other clocks.
+On 05/08/2014 07:52 PM, Vikas Sajjan wrote:
+> Adds Suspend-to-RAM support for EXYNOS5420
+>
+> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
+> ---
+>   arch/arm/mach-exynos/pm.c       |  163 ++++++++++++++++++++++++++++++++++-----
+>   arch/arm/mach-exynos/regs-pmu.h |    2 +
+>   2 files changed, 146 insertions(+), 19 deletions(-)
+>
+> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+> index a7a1b7f..87ccac7 100644
+> --- a/arch/arm/mach-exynos/pm.c
+> +++ b/arch/arm/mach-exynos/pm.c
+> @@ -40,6 +40,9 @@
+>   #include "regs-sys.h"
+>   #include "exynos-pmu.h"
+>   
+> +#define EXYNOS5420_VA_CPU_STATE (S5P_VA_SYSRAM + 0x28)
+> +#define EXYNOS5420_VA_CPU_ADDR  (S5P_VA_SYSRAM_NS + 0x1C)
+> +
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/clk/sunxi/Makefile       |   3 +-
- drivers/clk/sunxi/clk-a20-gmac.c | 119 +++++++++++++++++++++++++++++++++++++++
- drivers/clk/sunxi/clk-sunxi.c    |  98 --------------------------------
- 3 files changed, 121 insertions(+), 99 deletions(-)
- create mode 100644 drivers/clk/sunxi/clk-a20-gmac.c
+It will be good if we can rebase this change on top of Sachin's SYSRAM 
+patches [1]
 
-diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-index 2c3d2fed2560..839029e36144 100644
---- a/drivers/clk/sunxi/Makefile
-+++ b/drivers/clk/sunxi/Makefile
-@@ -3,4 +3,5 @@
- #
- 
- obj-y += clk-sunxi.o clk-factors.o
--obj-y += clk-a10-hosc.o
-\ No newline at end of file
-+obj-y += clk-a10-hosc.o
-+obj-y += clk-a20-gmac.o
-diff --git a/drivers/clk/sunxi/clk-a20-gmac.c b/drivers/clk/sunxi/clk-a20-gmac.c
-new file mode 100644
-index 000000000000..633ddc4389ef
---- /dev/null
-+++ b/drivers/clk/sunxi/clk-a20-gmac.c
-@@ -0,0 +1,119 @@
-+/*
-+ * Copyright 2013 Emilio L??pez
-+ * Emilio L??pez <emilio@elopez.com.ar>
-+ *
-+ * Copyright 2013 Chen-Yu Tsai
-+ * Chen-Yu Tsai <wens@csie.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/clk-provider.h>
-+#include <linux/clkdev.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/slab.h>
-+
-+static DEFINE_SPINLOCK(gmac_lock);
-+
-+/**
-+ * sun7i_a20_gmac_clk_setup - Setup function for A20/A31 GMAC clock module
-+ *
-+ * This clock looks something like this
-+ *                               ________________________
-+ *  MII TX clock from PHY >-----|___________    _________|----> to GMAC core
-+ *  GMAC Int. RGMII TX clk >----|___________\__/__gate---|----> to PHY
-+ *  Ext. 125MHz RGMII TX clk >--|__divider__/            |
-+ *                              |________________________|
-+ *
-+ * The external 125 MHz reference is optional, i.e. GMAC can use its
-+ * internal TX clock just fine. The A31 GMAC clock module does not have
-+ * the divider controls for the external reference.
-+ *
-+ * To keep it simple, let the GMAC use either the MII TX clock for MII mode,
-+ * and its internal TX clock for GMII and RGMII modes. The GMAC driver should
-+ * select the appropriate source and gate/ungate the output to the PHY.
-+ *
-+ * Only the GMAC should use this clock. Altering the clock so that it doesn't
-+ * match the GMAC's operation parameters will result in the GMAC not being
-+ * able to send traffic out. The GMAC driver should set the clock rate and
-+ * enable/disable this clock to configure the required state. The clock
-+ * driver then responds by auto-reparenting the clock.
-+ */
-+
-+#define SUN7I_A20_GMAC_GPIT	2
-+#define SUN7I_A20_GMAC_MASK	0x3
-+#define SUN7I_A20_GMAC_PARENTS	2
-+
-+static void __init sun7i_a20_gmac_clk_setup(struct device_node *node)
-+{
-+	struct clk *clk;
-+	struct clk_mux *mux;
-+	struct clk_gate *gate;
-+	const char *clk_name = node->name;
-+	const char *parents[SUN7I_A20_GMAC_PARENTS];
-+	void *reg;
-+
-+	if (of_property_read_string(node, "clock-output-names", &clk_name))
-+		return;
-+
-+	/* allocate mux and gate clock structs */
-+	mux = kzalloc(sizeof(struct clk_mux), GFP_KERNEL);
-+	if (!mux)
-+		return;
-+
-+	gate = kzalloc(sizeof(struct clk_gate), GFP_KERNEL);
-+	if (!gate)
-+		goto free_mux;
-+
-+	/* gmac clock requires exactly 2 parents */
-+	parents[0] = of_clk_get_parent_name(node, 0);
-+	parents[1] = of_clk_get_parent_name(node, 1);
-+	if (!parents[0] || !parents[1])
-+		goto free_gate;
-+
-+	reg = of_iomap(node, 0);
-+	if (!reg)
-+		goto free_gate;
-+
-+	/* set up gate and fixed rate properties */
-+	gate->reg = reg;
-+	gate->bit_idx = SUN7I_A20_GMAC_GPIT;
-+	gate->lock = &gmac_lock;
-+	mux->reg = reg;
-+	mux->mask = SUN7I_A20_GMAC_MASK;
-+	mux->flags = CLK_MUX_INDEX_BIT;
-+	mux->lock = &gmac_lock;
-+
-+	clk = clk_register_composite(NULL, clk_name,
-+			parents, SUN7I_A20_GMAC_PARENTS,
-+			&mux->hw, &clk_mux_ops,
-+			NULL, NULL,
-+			&gate->hw, &clk_gate_ops,
-+			0);
-+
-+	if (IS_ERR(clk))
-+		goto iounmap_reg;
-+
-+	of_clk_add_provider(node, of_clk_src_simple_get, clk);
-+	clk_register_clkdev(clk, clk_name, NULL);
-+
-+	return;
-+
-+iounmap_reg:
-+	iounmap(reg);
-+free_gate:
-+	kfree(gate);
-+free_mux:
-+	kfree(mux);
-+}
-+CLK_OF_DECLARE(sun7i_a20_gmac, "allwinner,sun7i-a20-gmac-clk",
-+		sun7i_a20_gmac_clk_setup);
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index c719e40cfb31..291a2605afa7 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -351,104 +351,6 @@ static void sun7i_a20_get_out_factors(u32 *freq, u32 parent_rate,
- 	*p = calcp;
- }
- 
--
--
--/**
-- * sun7i_a20_gmac_clk_setup - Setup function for A20/A31 GMAC clock module
-- *
-- * This clock looks something like this
-- *                               ________________________
-- *  MII TX clock from PHY >-----|___________    _________|----> to GMAC core
-- *  GMAC Int. RGMII TX clk >----|___________\__/__gate---|----> to PHY
-- *  Ext. 125MHz RGMII TX clk >--|__divider__/            |
-- *                              |________________________|
-- *
-- * The external 125 MHz reference is optional, i.e. GMAC can use its
-- * internal TX clock just fine. The A31 GMAC clock module does not have
-- * the divider controls for the external reference.
-- *
-- * To keep it simple, let the GMAC use either the MII TX clock for MII mode,
-- * and its internal TX clock for GMII and RGMII modes. The GMAC driver should
-- * select the appropriate source and gate/ungate the output to the PHY.
-- *
-- * Only the GMAC should use this clock. Altering the clock so that it doesn't
-- * match the GMAC's operation parameters will result in the GMAC not being
-- * able to send traffic out. The GMAC driver should set the clock rate and
-- * enable/disable this clock to configure the required state. The clock
-- * driver then responds by auto-reparenting the clock.
-- */
--
--#define SUN7I_A20_GMAC_GPIT	2
--#define SUN7I_A20_GMAC_MASK	0x3
--#define SUN7I_A20_GMAC_PARENTS	2
--
--static void __init sun7i_a20_gmac_clk_setup(struct device_node *node)
--{
--	struct clk *clk;
--	struct clk_mux *mux;
--	struct clk_gate *gate;
--	const char *clk_name = node->name;
--	const char *parents[SUN7I_A20_GMAC_PARENTS];
--	void *reg;
--
--	if (of_property_read_string(node, "clock-output-names", &clk_name))
--		return;
--
--	/* allocate mux and gate clock structs */
--	mux = kzalloc(sizeof(struct clk_mux), GFP_KERNEL);
--	if (!mux)
--		return;
--
--	gate = kzalloc(sizeof(struct clk_gate), GFP_KERNEL);
--	if (!gate)
--		goto free_mux;
--
--	/* gmac clock requires exactly 2 parents */
--	parents[0] = of_clk_get_parent_name(node, 0);
--	parents[1] = of_clk_get_parent_name(node, 1);
--	if (!parents[0] || !parents[1])
--		goto free_gate;
--
--	reg = of_iomap(node, 0);
--	if (!reg)
--		goto free_gate;
--
--	/* set up gate and fixed rate properties */
--	gate->reg = reg;
--	gate->bit_idx = SUN7I_A20_GMAC_GPIT;
--	gate->lock = &clk_lock;
--	mux->reg = reg;
--	mux->mask = SUN7I_A20_GMAC_MASK;
--	mux->flags = CLK_MUX_INDEX_BIT;
--	mux->lock = &clk_lock;
--
--	clk = clk_register_composite(NULL, clk_name,
--			parents, SUN7I_A20_GMAC_PARENTS,
--			&mux->hw, &clk_mux_ops,
--			NULL, NULL,
--			&gate->hw, &clk_gate_ops,
--			0);
--
--	if (IS_ERR(clk))
--		goto iounmap_reg;
--
--	of_clk_add_provider(node, of_clk_src_simple_get, clk);
--	clk_register_clkdev(clk, clk_name, NULL);
--
--	return;
--
--iounmap_reg:
--	iounmap(reg);
--free_gate:
--	kfree(gate);
--free_mux:
--	kfree(mux);
--}
--CLK_OF_DECLARE(sun7i_a20_gmac, "allwinner,sun7i-a20-gmac-clk",
--		sun7i_a20_gmac_clk_setup);
--
--
--
- /**
-  * sunxi_factors_clk_setup() - Setup function for factor clocks
-  */
+[1]: http://www.spinics.net/lists/arm-kernel/msg329188.html
+
+>   static struct regmap *pmu_regmap;
+>   
+>   /**
+> @@ -65,6 +68,19 @@ static struct sleep_save exynos_core_save[] = {
+>   	SAVE_ITEM(S5P_SROM_BC3),
+>   };
+>   
+> +static struct sleep_save exynos5420_cpustate_save[] = {
+> +	SAVE_ITEM(EXYNOS5420_VA_CPU_STATE),
+> +	SAVE_ITEM(EXYNOS5420_VA_CPU_ADDR),
+> +};
+> +
+> +static struct sleep_save exynos5420_pmu_reg_save[] = {
+> +	SAVE_ITEM(S5P_PMU_SPARE3),
+> +};
+> +
+> +static struct sleep_save exynos5420_reg_save[] = {
+> +	SAVE_ITEM(EXYNOS5_SYS_DISP1_BLK_CFG),
+> +};
+> +
+>   /*
+>    * GIC wake-up support
+>    */
+> @@ -87,7 +103,7 @@ static int exynos_irq_set_wake(struct irq_data *data, unsigned int state)
+>   {
+>   	const struct exynos_wkup_irq *wkup_irq;
+>   
+> -	if (soc_is_exynos5250())
+> +	if (soc_is_exynos5250() || soc_is_exynos5420())
+>   		wkup_irq = exynos5250_wkup_irq;
+>   	else
+>   		wkup_irq = exynos4_wkup_irq;
+> @@ -188,7 +204,15 @@ static int exynos_cpu_suspend(unsigned long arg)
+>   	outer_flush_all();
+>   #endif
+>   
+> -	if (soc_is_exynos5250())
+> +	/*
+> +	 * Clear IRAM register for cpu state so that primary CPU does
+> +	 * not enter low power start in U-Boot.
+> +	 * This is specific to exynos5420 SoC only.
+> +	 */
+> +	if (soc_is_exynos5420())
+> +		__raw_writel(0x0, EXYNOS5420_VA_CPU_STATE);
+> +
+> +	if (soc_is_exynos5250() || soc_is_exynos5420())
+>   		flush_cache_all();
+>   
+>   	/* issue the standby signal into the pm unit. */
+> @@ -216,6 +240,26 @@ static void exynos_pm_prepare(void)
+>   		regmap_read(pmu_regmap, EXYNOS5_JPEG_MEM_OPTION, &tmp);
+>   		tmp &= ~EXYNOS5_OPTION_USE_RETENTION;
+>   		regmap_write(pmu_regmap, EXYNOS5_JPEG_MEM_OPTION, tmp);
+> +	} else if (soc_is_exynos5420()) {
+> +
+> +		unsigned i;
+> +
+> +		s3c_pm_do_save(exynos5420_reg_save,
+> +			ARRAY_SIZE(exynos5420_reg_save));
+> +
+
+Is it possible to move this code in DISP driver somewhere?
+As if you see I have already posted some patches [1] to remove i2c SYS CFG 
+register
+configuration during S2R from pm.c to i2c driver itself for Exynos5250 as 
+suggested
+by Arnd.
+
+This way we can reduce dependency of regs-sys.h in pm.c also we do not need to
+statically map sysreg register in exynos.c, and in general it will us in 
+cleaning up
+exynos code from such things as it is being discussed here [2]
+
+[1]: https://lkml.org/lkml/2014/5/6/104
+[2]: https://lkml.org/lkml/2014/5/6/71
+
+
+> +		for (i = 0; i < ARRAY_SIZE(exynos5420_pmu_reg_save); i++)
+> +			regmap_read(pmu_regmap,
+> +				(unsigned int)exynos5420_pmu_reg_save[i].reg,
+> +				(unsigned int *)&exynos5420_pmu_reg_save[i].val);
+> +		/*
+> +		 * The cpu state needs to be saved and restored so that the
+> +		 * secondary CPUs will enter low power start. Though the U-Boot
+> +		 * is setting the cpu state with low power flag, the kernel
+> +		 * needs to restore it back in case, the primary cpu fails to
+> +		 * suspend for any reason
+> +		 */
+> +		s3c_pm_do_save(exynos5420_cpustate_save,
+> +			ARRAY_SIZE(exynos5420_cpustate_save));
+>   	}
+>   
+>   	/* Set value of power down register for sleep mode */
+> @@ -226,6 +270,26 @@ static void exynos_pm_prepare(void)
+>   	/* ensure at least INFORM0 has the resume address */
+>   
+>   	regmap_write(pmu_regmap, S5P_INFORM0, virt_to_phys(exynos_cpu_resume));
+> +
+> +	if (soc_is_exynos5420()) {
+> +		regmap_read(pmu_regmap, EXYNOS5_ARM_L2_OPTION, &tmp);
+> +		tmp &= ~EXYNOS5_USE_RETENTION;
+> +		regmap_write(pmu_regmap, EXYNOS5_ARM_L2_OPTION, tmp);
+> +
+> +		regmap_read(pmu_regmap, EXYNOS5420_SFR_AXI_CGDIS1, &tmp);
+> +		tmp |= EXYNOS5420_UFS;
+> +		regmap_write(pmu_regmap, EXYNOS5420_SFR_AXI_CGDIS1, tmp);
+> +
+> +		regmap_read(pmu_regmap, EXYNOS5420_ARM_COMMON_OPTION, &tmp);
+> +		tmp &= ~EXYNOS5420_L2RSTDISABLE_VALUE;
+> +		regmap_write(pmu_regmap, EXYNOS5420_ARM_COMMON_OPTION, tmp);
+> +		regmap_read(pmu_regmap, EXYNOS5420_FSYS2_OPTION, &tmp);
+> +		tmp |= EXYNOS5420_EMULATION;
+> +		regmap_write(pmu_regmap, EXYNOS5420_FSYS2_OPTION, tmp);
+> +		regmap_read(pmu_regmap, EXYNOS5420_PSGEN_OPTION, &tmp);
+> +		tmp |= EXYNOS5420_EMULATION;
+> +		regmap_write(pmu_regmap, EXYNOS5420_PSGEN_OPTION, tmp);
+> +	}
+>   }
+>   
+>   static void exynos_pm_central_suspend(void)
+> @@ -242,12 +306,20 @@ static int exynos_pm_suspend(void)
+>   {
+>   	unsigned int tmp;
+>   
+> +	unsigned int this_cluster;
+>   	exynos_pm_central_suspend();
+>   
+>   	/* Setting SEQ_OPTION register */
+> -
+> -	tmp = (S5P_USE_STANDBY_WFI0 | S5P_USE_STANDBY_WFE0);
+> -	regmap_write(pmu_regmap, S5P_CENTRAL_SEQ_OPTION, tmp);
+> +	if (soc_is_exynos5420()) {
+> +		this_cluster = MPIDR_AFFINITY_LEVEL(read_cpuid_mpidr(), 1);
+> +		if (!this_cluster)
+> +			regmap_write(pmu_regmap, S5P_CENTRAL_SEQ_OPTION, EXYNOS5420_ARM_USE_STANDBY_WFI0);
+> +		else
+> +			regmap_write(pmu_regmap, S5P_CENTRAL_SEQ_OPTION, EXYNOS5420_KFC_USE_STANDBY_WFI0);
+> +	} else {
+> +		tmp = (S5P_USE_STANDBY_WFI0 | S5P_USE_STANDBY_WFE0);
+> +		regmap_write(pmu_regmap, S5P_CENTRAL_SEQ_OPTION, tmp);
+> +	}
+>   
+>   	if (!soc_is_exynos5250())
+>   		exynos_cpu_save_register();
+> @@ -280,33 +352,80 @@ static int exynos_pm_central_resume(void)
+>   
+>   static void exynos_pm_resume(void)
+>   {
+> +	unsigned int tmp;
+> +	if (soc_is_exynos5420()) {
+> +		/* Restore the IRAM register cpu state */
+> +		s3c_pm_do_restore(exynos5420_cpustate_save,
+> +			ARRAY_SIZE(exynos5420_cpustate_save));
+> +
+> +		regmap_write(pmu_regmap, S5P_CENTRAL_SEQ_OPTION,
+> +				EXYNOS5420_USE_STANDBY_WFI_ALL);
+> +	}
+> +
+>   	if (exynos_pm_central_resume())
+>   		goto early_wakeup;
+>   
+> -	if (!soc_is_exynos5250())
+> +	if (!(soc_is_exynos5250() || soc_is_exynos5420()))
+>   		exynos_cpu_restore_register();
+>   
+>   	/* For release retention */
+>   
+> -	regmap_write(pmu_regmap, S5P_PAD_RET_MAUDIO_OPTION, (1 << 28));
+> -	regmap_write(pmu_regmap, S5P_PAD_RET_GPIO_OPTION, (1 << 28));
+> -	regmap_write(pmu_regmap, S5P_PAD_RET_UART_OPTION, (1 << 28));
+> -	regmap_write(pmu_regmap, S5P_PAD_RET_MMCA_OPTION, (1 << 28));
+> -	regmap_write(pmu_regmap, S5P_PAD_RET_MMCB_OPTION, (1 << 28));
+> -	regmap_write(pmu_regmap, S5P_PAD_RET_EBIA_OPTION, (1 << 28));
+> -	regmap_write(pmu_regmap, S5P_PAD_RET_EBIB_OPTION, (1 << 28));
+> +	if (soc_is_exynos5250()) {
+> +		regmap_write(pmu_regmap, S5P_PAD_RET_MAUDIO_OPTION, (1 << 28));
+> +		regmap_write(pmu_regmap, S5P_PAD_RET_GPIO_OPTION, (1 << 28));
+> +		regmap_write(pmu_regmap, S5P_PAD_RET_UART_OPTION, (1 << 28));
+> +		regmap_write(pmu_regmap, S5P_PAD_RET_MMCA_OPTION, (1 << 28));
+> +		regmap_write(pmu_regmap, S5P_PAD_RET_MMCB_OPTION, (1 << 28));
+> +		regmap_write(pmu_regmap, S5P_PAD_RET_EBIA_OPTION, (1 << 28));
+> +		regmap_write(pmu_regmap, S5P_PAD_RET_EBIB_OPTION, (1 << 28));
+> +	} else if (soc_is_exynos5420()) {
+> +		regmap_write(pmu_regmap, EXYNOS_PAD_RET_DRAM_OPTION, (1 << 28));
+> +		regmap_write(pmu_regmap, EXYNOS_PAD_RET_MAUDIO_OPTION, (1 << 28));
+> +		regmap_write(pmu_regmap, EXYNOS_PAD_RET_JTAG_OPTION,  (1 << 28));
+> +		regmap_write(pmu_regmap, EXYNOS5420_PAD_RET_GPIO_OPTION, (1 << 28));
+> +		regmap_write(pmu_regmap, EXYNOS5420_PAD_RET_UART_OPTION, (1 << 28));
+> +		regmap_write(pmu_regmap, EXYNOS5420_PAD_RET_MMCA_OPTION, (1 << 28));
+> +		regmap_write(pmu_regmap, EXYNOS5420_PAD_RET_MMCB_OPTION, (1 << 28));
+> +		regmap_write(pmu_regmap, EXYNOS5420_PAD_RET_MMCC_OPTION, (1 << 28));
+> +		regmap_write(pmu_regmap, EXYNOS5420_PAD_RET_HSI_OPTION, (1 << 28));
+> +		regmap_write(pmu_regmap, EXYNOS_PAD_RET_EBIA_OPTION, (1 << 28));
+> +		regmap_write(pmu_regmap, EXYNOS_PAD_RET_EBIB_OPTION, (1 << 28));
+> +		regmap_write(pmu_regmap, EXYNOS5420_PAD_RET_SPI_OPTION, (1 << 28));
+> +		regmap_write(pmu_regmap, EXYNOS5420_PAD_RET_DRAM_COREBLK_OPTION, (1 << 28));
+> +	}
+>   
+> -	if (soc_is_exynos5250())
+> +	if (soc_is_exynos5250()) {
+>   		s3c_pm_do_restore(exynos5_sys_save,
+>   			ARRAY_SIZE(exynos5_sys_save));
+> +	} else if (soc_is_exynos5420()) {
+> +		unsigned int i;
+> +		s3c_pm_do_restore(exynos5420_reg_save,
+> +			ARRAY_SIZE(exynos5420_reg_save));
+> +			for (i = 0; i < ARRAY_SIZE(exynos5420_pmu_reg_save); i++)
+> +				regmap_write(pmu_regmap,
+> +					(unsigned int)exynos5420_pmu_reg_save[i].reg,
+> +					(unsigned int)exynos5420_pmu_reg_save[i].val);
+> +	}
+>   
+>   	s3c_pm_do_restore_core(exynos_core_save, ARRAY_SIZE(exynos_core_save));
+>   
+> -	if (!soc_is_exynos5250())
+> +	if (!soc_is_exynos5250() && !soc_is_exynos5420())
+>   		scu_enable(S5P_VA_SCU);
+>   
+>   early_wakeup:
+>   
+> +	if (soc_is_exynos5420()) {
+> +		regmap_read(pmu_regmap, EXYNOS5420_SFR_AXI_CGDIS1, &tmp);
+> +		tmp &= ~EXYNOS5420_UFS;
+> +		regmap_write(pmu_regmap, EXYNOS5420_SFR_AXI_CGDIS1, tmp);
+> +		regmap_read(pmu_regmap, EXYNOS5420_FSYS2_OPTION, &tmp);
+> +		tmp &= ~EXYNOS5420_EMULATION;
+> +		regmap_write(pmu_regmap, EXYNOS5420_FSYS2_OPTION, tmp);
+> +		regmap_read(pmu_regmap, EXYNOS5420_PSGEN_OPTION, &tmp);
+> +		tmp &= ~EXYNOS5420_EMULATION;
+> +		regmap_write(pmu_regmap, EXYNOS5420_PSGEN_OPTION, tmp);
+> +	}
+> +
+>   	/* Clear SLEEP mode set in INFORM1 */
+>   	regmap_write(pmu_regmap, S5P_INFORM1, 0x0);
+>   
+> @@ -395,7 +514,7 @@ static int exynos_cpu_pm_notifier(struct notifier_block *self,
+>   
+>   	case CPU_PM_EXIT:
+>   		if (cpu == 0) {
+> -			if (!soc_is_exynos5250())
+> +			if (!(soc_is_exynos5250() || soc_is_exynos5420()))
+>   				scu_enable(S5P_VA_SCU);
+>   			exynos_cpu_restore_register();
+>   			exynos_pm_central_resume();
+> @@ -421,9 +540,15 @@ void __init exynos_pm_init(void)
+>   	gic_arch_extn.irq_set_wake = exynos_irq_set_wake;
+>   
+>   	/* All wakeup disable */
+> -	regmap_read(pmu_regmap, S5P_WAKEUP_MASK, &tmp);
+> -	tmp |= ((0xFF << 8) | (0x1F << 1));
+> -	regmap_write(pmu_regmap, S5P_WAKEUP_MASK, tmp);
+> +	if (soc_is_exynos5420()) {
+> +		regmap_read(pmu_regmap, S5P_WAKEUP_MASK, &tmp);
+> +		tmp |= ((0x7F << 7) | (0x1F << 1));
+> +		regmap_write(pmu_regmap, S5P_WAKEUP_MASK, tmp);
+> +	} else {
+> +		regmap_read(pmu_regmap, S5P_WAKEUP_MASK, &tmp);
+> +		tmp |= ((0xFF << 8) | (0x1F << 1));
+> +		regmap_write(pmu_regmap, S5P_WAKEUP_MASK, tmp);
+> +	}
+>   
+>   	register_syscore_ops(&exynos_pm_syscore_ops);
+>   	suspend_set_ops(&exynos_suspend_ops);
+> diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
+> index 39a8300..955ee07 100644
+> --- a/arch/arm/mach-exynos/regs-pmu.h
+> +++ b/arch/arm/mach-exynos/regs-pmu.h
+> @@ -35,6 +35,7 @@
+>   #define S5P_INFORM5				(0x0814)
+>   #define S5P_INFORM6				(0x0818)
+>   #define S5P_INFORM7				(0x081C)
+> +#define S5P_PMU_SPARE3				(0x090c)
+>   
+>   #define EXYNOS_IROM_DATA2			(0x0988)
+>   #define S5P_ARM_CORE0_LOWPWR			(0x1000)
+> @@ -211,6 +212,7 @@
+>   
+>   /* For EXYNOS5 */
+>   
+> +#define EXYNOS5_SYS_DISP1_BLK_CFG				S5P_SYSREG(0x0214)
+
+I think this offset should not be added here as it does not belong with PMU.
+Moreover IIRC if you have rebased these patches on my Exynos PMU patch 
+series [1],
+this change should fail to compile as "regs-pmu.h" does not have anymore
+"mach/map.h" and definition for S5P_SYSREG has been moved to a new file
+"regs-sys.h". Please check here [2]
+
+[1]: https://lkml.org/lkml/2014/5/2/612
+[2]: https://lkml.org/lkml/2014/4/30/8
+
+>   #define EXYNOS5_AUTO_WDTRESET_DISABLE				(0x0408)
+>   #define EXYNOS5_MASK_WDTRESET_REQUEST				(0x040C)
+>   
+
+
 -- 
-1.9.1
+Best Regards,
+Pankaj Dubey
