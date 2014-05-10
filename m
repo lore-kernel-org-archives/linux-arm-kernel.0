@@ -1,95 +1,202 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sat, 10 May 2014 21:18:36 +0800
-Subject: i.MX6 USB OTG support is broken on linux-next
-In-Reply-To: <20140510111003.GA1593@shlinux1.ap.freescale.net>
-References: <20140509130046.GP2794@dragon>
- <20140510111003.GA1593@shlinux1.ap.freescale.net>
-Message-ID: <20140510131815.GT2794@dragon>
+From: tgih.jun@samsung.com (Seungwon Jeon)
+Date: Sat, 10 May 2014 23:08:50 +0900
+Subject: [PATCH] mmc: dw_mmc: change to use recommended reset procedure
+In-Reply-To: <CAPz6YkUjLmWXvoCkuY8vAwLHksf0Uit6gWP-ADWBbN3NDJBo-w@mail.gmail.com>
+References: <1395834374-1988-1-git-send-email-yuvaraj.cd@samsung.com>
+ <CAKuRcOJYsC9OUOrYrvKg_iC5Z6dZ0mqW3-y=UXHtCr99=gQBXw@mail.gmail.com>
+ <536C2C31.8000209@samsung.com>
+ <CAPz6YkXGH96mjeePwUSRmPX4Y1YXYif+N+BRKsTwtNxtRq3xoQ@mail.gmail.com>
+ <536C594A.5080107@samsung.com> <536C84A0.6020403@samsung.com>
+ <CAPz6YkUjLmWXvoCkuY8vAwLHksf0Uit6gWP-ADWBbN3NDJBo-w@mail.gmail.com>
+Message-ID: <001f01cf6c59$5e3e8b00$1abba100$%jun@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Robin and David,
+Hi Sonny,
 
-On Sat, May 10, 2014 at 07:10:05PM +0800, Peter Chen wrote:
-> On Fri, May 09, 2014 at 09:00:47PM +0800, Shawn Guo wrote:
-> > I'm running next-20140508 kernel on imx6q-sabresd board with USB
-> > mouse/keyboard connected to OTG port.  It  works well on 3.15-rc but
-> > is broken on recent linux-next kernel with the message like below.
-> > 
-> > ...
-> > usb 1-1: device v413c p2107 is not supported
-> > hub 1-0:1.0: unable to enumerate USB device on port 1
-> > 
-> > With the help from Peter, I found that the issue shows up only when
-> > CONFIG_USB_OTG_FSM is enabled.  The option is enabled by commit 8fd2f1f
-> > (ARM: imx_v6_v7_defconfig: Enable drivers for i.MX51 USB Host support.)
-> > from IMX tree.
-> > 
-> > I guess this is a sign that chipidea otg_fsm driver is buggy?  I do not
-> > think dropping CONFIG_USB_OTG_FSM selection from imx_v6_v7_defconfig is
-> > a solution, and we need to fix the issue in usb driver, right?
-> > 
+Can you separate procedure?
+Reset all are handled in fifo-reset.
+And ciu reset is always needed for error handling?
+
+Thanks,
+Seungwon Jeon
+
+On Sat, May 10, 2014, Sonny Rao wrote:
+> On Fri, May 9, 2014 at 12:32 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+> > Hi, Sonny.
+> >
+> > You can discard the my previous some comment.
+> > As you mentioned, this reset sequence is recommended at Synopsys TRM.
+> >
+> > Add the minor question.
+> >
+> > On 05/09/2014 01:27 PM, Jaehoon Chung wrote:
+> >> Hi, Sonny.
+> >>
+> >> I have checked the Synopsys TRM..
+> >>
+> >> On 05/09/2014 10:34 AM, Sonny Rao wrote:
+> >>> On Thu, May 8, 2014 at 6:15 PM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+> >>>> On 05/08/2014 06:40 PM, Yuvaraj Kumar wrote:
+> >>>>> Any comments on this patch?
+> >>>>>
+> >>>>> On Wed, Mar 26, 2014 at 5:16 PM, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com> wrote:
+> >>>>>> From: Sonny Rao <sonnyrao@chromium.org>
+> >>>>>>
+> >>>>>> This patch changes the fifo reset code to follow the reset procedure
+> >>>>>> outlined in the documentation of Synopsys  Mobile storage host databook
+> >>>>>> 7.2.13.
+> >>>>>> Without this patch, we could able to see eMMC was not detected after
+> >>>>>> multiple reboots due to driver hangs while eMMC tuning for HS200.
+> >>>>>>
+> >>>>>> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+> >>>>>> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.org>
+> >>>>>> ---
+> >>>>>>  drivers/mmc/host/dw_mmc.c |   48 ++++++++++++++++++++++++++++++++++++++++++++-
+> >>>>>>  drivers/mmc/host/dw_mmc.h |    1 +
+> >>>>>>  2 files changed, 48 insertions(+), 1 deletion(-)
+> >>>>>>
+> >>>>>> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+> >>>>>> index 32dd81d..1d77431 100644
+> >>>>>> --- a/drivers/mmc/host/dw_mmc.c
+> >>>>>> +++ b/drivers/mmc/host/dw_mmc.c
+> >>>>>> @@ -2220,7 +2220,53 @@ static inline bool dw_mci_fifo_reset(struct dw_mci *host)
+> >>>>>>                 host->sg = NULL;
+> >>>>>>         }
+> >>>>>>
+> >>>>>> -       return dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET);
+> >>>>>> +       /*
+> >>>>>> +        * The recommended method for resetting is to always reset the
+> >>>>>> +        * controller and the fifo, but differs slightly depending on the mode.
+> >>>>>> +        * Note that this doesn't handle the "generic DMA" (not IDMAC) case.
+> >>>>>> +        */
+> >>>>
+> >>>> "not IDMAC" is confused..
+> >>>>
+> >>>
+> >>> The documentation describes three different possible modes.  There's a
+> >>> mode that doesn't use IDMAC but still does DMA.  But as far as I can
+> >>> tell this driver doesn't support that way.  We can just remove that
+> >>> wording if it's confusing.
+> >
+> > How did it know whether dma is generic DMA or not?
+> >
 > 
-> No, Shawn. The solution of this problem is drop CONFIG_USB_OTG_FSM, I
-> guess Denis added it wrongly.
+> That's a good question.  I wasn't sure whether the driver supported it
+> or not.  It looks like it definitely supports IDMAC through the
+> CONFIG_MMC_DW_IDMAC flag, but I wasn't sure if it was supported the
+> generic dma.  Maybe if CONFIG_MMC_DW_IDMAC isn't specified but
+> host->dma_ops is not NULL then we are using the generic dma mode.
 > 
-> According to Embedded Hosts & OTG spec, OTG devices and Embedded Hosts
-> both have Targeted Host functionality, and each Targeted Host has
-> its TPL (Targeted Peripheral List), only the devices are at TPL
-> are supported by Targeted Host.
+> >>>
+> >>>>>> +       if (dw_mci_ctrl_reset(host, SDMMC_CTRL_RESET | SDMMC_CTRL_FIFO_RESET)) {
+> >>>>>> +               unsigned long timeout = jiffies + msecs_to_jiffies(500);
+> >>>>>> +               u32 status, rint;
+> >>>>>> +
+> >>>>>> +               /* if using dma we wait for dma_req to clear */
+> >>>>>> +               if (host->using_dma) {
+> >>>>>> +                       do {
+> >>>>>> +                               status = mci_readl(host, STATUS);
+> >>>>>> +                               if (!(status & SDMMC_STATUS_DMA_REQ))
+> >>>>>> +                                       break;
+> >>>>>> +                               cpu_relax();
+> >>>>>> +                       } while (time_before(jiffies, timeout));
+> >>>>>> +
+> >>>>>> +                       if (status & SDMMC_STATUS_DMA_REQ)
+> >>>>>> +                               dev_err(host->dev,
+> >>>>>> +                                       "%s: Timeout waiting for dma_req to "
+> >>>>>> +                                       "clear during reset", __func__);
+> >>>>>> +
+> >>>>>> +                       /* when using DMA next we reset the fifo again */
+> >>>>>> +                       dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET);
+> >>>>>> +               }
+> >>>>>> +               /*
+> >>>>>> +                * In all cases we clear the RAWINTS register to clear any
+> >>>>>> +                * interrupts.
+> >>>>>> +                */
+> >>>>>> +               rint = mci_readl(host, RINTSTS);
+> >>>>>> +               rint = rint & (~mci_readl(host, MINTSTS));
+> >> you use the "status or temp" instead of rint. (you can reuse the variable.)
+> >> And can use "status &= ~mci_readl(host,MINTSTS);"
+> >>
+> >>>>
+> >>>> Just clear the RINTSTS register? why do you add these?
+> >>>>
+> >>>
+> >>> This will look at what is not masked, and only clear those bits.
+> >> Well, i known if clear the RINTSTS register,
+> >> recommended to use "0xfffffff" and set the value for interrupt.
+> >
+> > Can be used "0xfffffff"?
+> >
 > 
-> Current Linux TPL only contains limited devices, each Targeted Host
-> needs to update its TPL when it makes product, (The comments at
-> otg_whitelist.h also mention it), and the devices are not at TPL
-> will not be supported, and will report to user as "an unsupported
-> device" error, at current Linux configuration, once the CONFIG_USB_OTG_FSM
-> and CONFIG_USB_OTG are chosen, the host will be Targeted Host.
+> Yeah we probably can.  We just lose information about interrupts that
+> were masked, but maybe we just don't care about any of them anyway, so
+> it doesn't matter.
 > 
-> The reason why Shawn met this problem is: the imx_v6_v7_defconfig set 
-> CONFIG_USB_OTG_FSM, so the CONFIG_USB_OTG and CONFIG_USB_OTG_WHITELIST
-> are set according to dependency, it makes imx6 device as Targeted Host,
-> but the devices connected at Shawn's board are not at TPL, so they are
-> not be supported.
-> 
-> In a word the CONFIG_USB_OTG_FSM should not be chosen for
-> defauly kernel configuration. The CONFIG_USB_OTG_FSM should only be chosen
-> by default when this device goes to make product and the TPL is updated
-> accordingly.
-
-Thanks for the explanation, Peter.
-
-So this is what I see from USB Kconfig.
-
-config USB_OTG_FSM
-        tristate "USB 2.0 OTG FSM implementation"
-        depends on USB
-        select USB_OTG
-        select USB_PHY
-
-config USB_OTG_WHITELIST
-        bool "Rely on OTG Targeted Peripherals List"
-        depends on USB_OTG || EXPERT
-        default y if USB_OTG
-
-I see that USB_OTG_FSM has a dependency on USB_OTG, and
-USB_OTG_WHITELIST depends on USB_OTG, but USB_OTG does *not* depends
-on USB_OTG_WHITELIST.
-
-I'm not sure why we have 'default y if USB_OTG' for USB_OTG_WHITELIST,
-when this option only makes sense for product producers per your
-explanation.  So maybe dropping the 'default y' is the right fix?
-
-diff --git a/drivers/usb/core/Kconfig b/drivers/usb/core/Kconfig
-index cb8e991..9081757 100644
---- a/drivers/usb/core/Kconfig
-+++ b/drivers/usb/core/Kconfig
-@@ -65,7 +65,6 @@ config USB_OTG
- config USB_OTG_WHITELIST
-        bool "Rely on OTG Targeted Peripherals List"
-        depends on USB_OTG || EXPERT
--       default y if USB_OTG
-        help
-          If you say Y here, the "otg_whitelist.h" file will be used as a
-          product whitelist, so USB peripherals not listed there will be
-
-Shawn
+> > Best Regards,
+> > Jaehoon Chung
+> >>
+> >>>
+> >>>>>> +               if (rint)
+> >>>>>> +                       mci_writel(host, RINTSTS, rint);
+> >>>>>> +
+> >>>>>> +       } else
+> >>>>>> +               dev_err(host->dev, "%s: Reset bits didn't clear", __func__);
+> >>>>
+> >>>> Just display the error log? I didn't understand this.
+> >>>> If you displayed the error log, then it needs to return the error value.
+> >>>>
+> >>>>>> +
+> >>>>>> + #ifdef CONFIG_MMC_DW_IDMAC
+> >>>>>> +       /* It is also recommended that we reset and reprogram idmac */
+> >>>>>> +       dw_mci_idmac_reset(host);
+> >>>>>> + #endif
+> >>>>>> +
+> >>>>>> +       /* After a CTRL reset we need to have CIU set clock registers  */
+> >>>>>> +       mci_send_cmd(host->cur_slot, SDMMC_CMD_UPD_CLK, 0);
+> >>
+> >> Well, why do you send the clock update command?
+> >> I didn't see that update the value related with clock.
+> >>
+> >> Best Regards,
+> >> Jaehoon Chung
+> >>
+> >>>>>> +
+> >>>>>> +       return true;
+> >>>>>>  }
+> >>>>>>
+> >>>>>>  static inline bool dw_mci_ctrl_all_reset(struct dw_mci *host)
+> >>>>>> diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
+> >>>>>> index 738fa24..037e47a 100644
+> >>>>>> --- a/drivers/mmc/host/dw_mmc.h
+> >>>>>> +++ b/drivers/mmc/host/dw_mmc.h
+> >>>>>> @@ -129,6 +129,7 @@
+> >>>>>>  #define SDMMC_CMD_INDX(n)              ((n) & 0x1F)
+> >>>>>>  /* Status register defines */
+> >>>>>>  #define SDMMC_GET_FCNT(x)              (((x)>>17) & 0x1FFF)
+> >>>>>> +#define SDMMC_STATUS_DMA_REQ           BIT(31)
+> >>>>>>  /* FIFOTH register defines */
+> >>>>>>  #define SDMMC_SET_FIFOTH(m, r, t)      (((m) & 0x7) << 28 | \
+> >>>>>>                                          ((r) & 0xFFF) << 16 | \
+> >>>>>> --
+> >>>>>> 1.7.10.4
+> >>>>>>
+> >>>>>
+> >>>>
+> >>> --
+> >>> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> >>> the body of a message to majordomo at vger.kernel.org
+> >>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> >>>
+> >>
+> >> --
+> >> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> >> the body of a message to majordomo at vger.kernel.org
+> >> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> >>
+> >
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
