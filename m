@@ -1,45 +1,48 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri,  9 May 2014 22:33:36 -0500
-Subject: [PATCH 1/6] clk: sunxi: Remove calls to clk_put
-In-Reply-To: <1399692821-20988-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1399692821-20988-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1399692821-20988-2-git-send-email-maxime.ripard@free-electrons.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Sat, 10 May 2014 11:46:01 +0200
+Subject: [PATCH v4 0/2] i2c: sunxi: add P2WI controller support
+Message-ID: <1399715163-11291-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Callers of clk_put must disable the clock first. This also means that as long
-as the clock is enabled the driver should hold a reference to that clock.
-Hence, the call to clk_put here are bogus and should be removed.
+Hello,
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Mike Turquette <mturquette@linaro.org>
----
- drivers/clk/sunxi/clk-sunxi.c | 8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
+This series adds support for the P2WI block used by some Allwinner
+boards to interface with the AXP221 PMIC.
 
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index bd7dc733c1ca..b1fde0f89bc1 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -1297,17 +1297,13 @@ static void __init sunxi_clock_protect(void)
- 
- 	/* memory bus clock - sun5i+ */
- 	clk = clk_get(NULL, "mbus");
--	if (!IS_ERR(clk)) {
-+	if (!IS_ERR(clk))
- 		clk_prepare_enable(clk);
--		clk_put(clk);
--	}
- 
- 	/* DDR clock - sun4i+ */
- 	clk = clk_get(NULL, "pll5_ddr");
--	if (!IS_ERR(clk)) {
-+	if (!IS_ERR(clk))
- 		clk_prepare_enable(clk);
--		clk_put(clk);
--	}
- }
- 
- static void __init sunxi_init_clocks(void)
+Best Regards,
+
+Boris
+
+Changes since v3:
+- update the DT bindings doc
+- fix a comment that was no longer true
+
+Changes since v2:
+- drop the initialization (switch from I2C to P2WI mode) part
+- print devm_ioremap_resource err code
+
+Changes since v1:
+- implement P2WI initilization
+- implement P2WI bus frequency configuration
+- implement address consistency check
+- fix devm_request_and_ioremap return check
+- rework the macro definitions
+- fix typos
+
+[1] http://www.spinics.net/lists/linux-i2c/msg15066.html
+[2] http://comments.gmane.org/gmane.comp.hardware.netbook.arm.sunxi/8947
+Boris BREZILLON (2):
+  i2c: sunxi: add P2WI DT bindings documentation
+  i2c: sunxi: add P2WI (Push/Pull 2 Wire Interface) controller support
+
+ .../devicetree/bindings/i2c/i2c-sunxi-p2wi.txt     |  41 +++
+ drivers/i2c/busses/Kconfig                         |  12 +
+ drivers/i2c/busses/Makefile                        |   1 +
+ drivers/i2c/busses/i2c-sun6i-p2wi.c                | 349 +++++++++++++++++++++
+ 4 files changed, 403 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-sunxi-p2wi.txt
+ create mode 100644 drivers/i2c/busses/i2c-sun6i-p2wi.c
+
 -- 
-1.9.1
+1.8.3.2
