@@ -1,31 +1,57 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sun, 11 May 2014 09:40:28 +0800
-Subject: i.MX6 USB OTG support is broken on linux-next
-In-Reply-To: <4285b0d55d2545b99c4ba6b703e65a12@BL2PR03MB226.namprd03.prod.outlook.com>
-References: <20140509130046.GP2794@dragon>
- <20140510111003.GA1593@shlinux1.ap.freescale.net>
- <20140510131815.GT2794@dragon>
- <4285b0d55d2545b99c4ba6b703e65a12@BL2PR03MB226.namprd03.prod.outlook.com>
-Message-ID: <20140511014027.GV2794@dragon>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 10 May 2014 23:00:09 -0400
+Subject: [TECH TOPIC] ARM legacy board DT conversion finalization
+Message-ID: <20140511030009.GO12708@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 11, 2014 at 08:40:25AM +0800, Chen Peter-B29397 wrote:
-> As I explained before: 
-> "OTG devices and Embedded Hosts both have Targeted Host functionality,
-> and each Targeted Host has its TPL (Targeted Peripheral List), only the 
-> devices are at TPL are supported by Targeted Host."
-> 
-> So when the board is OTG & EH (CONFIG_USB_OTG is set), it should
-> have TPL according to spec. In fact, even the CONFIG_USB_OTG_WHITELIST
-> is not set, the non-TPL devices have not worked well, eg, it will
-> not be enumerated again after it has disconnected from host 10 seconds
-> later due to vbus has turned off by host.
+All,
 
-So all in all, it sounds to me that in my case, USB_OTG_FSM shouldn't be
-set, neither in defconfig nor manually in menuconfig, right?
+Over the past couple of years, the ARM sub-arch maintainers have been
+doing a great amount of work migrating to devicetree.
 
-What about USB_OTG?  Can I set it in defconfig or manually in
-menuconfig?
+In conjunction with this effort, we've been slowly migrating the
+existing legacy platforms (board files) over to devicetree.  For the
+small part the mvebu maintainers are responsible for, we can see the
+light at the end of the tunnel now. :-)
 
-Shawn
+I imagine several other sub-arches are in a similar situation.  I think
+it would be useful for us all to sit down, compare notes, and pool our
+resources/experiences to coordinate a final push.
+
+So, I'm proposing a session where each sub-arch gives a brief run-down
+of the status of the legacy board conversion, and wraps up with a todo
+list.  After all of the sub-arches have given their status (5 - 10
+minutes each?), we hash out helping each other with the final pieces.
+
+Also on the agenda, discussing the fate of the legacy sub-arches that
+haven't even begun conversion to devicetree.
+
+The intended outcome would be to have a sorted list of remaining
+conversions, and who is pitching in to help out for each item.  Also, a
+sorted list of unconverted sub-arches, broken down into 'deprecate',
+'convert', and 'seek info'.
+
+On a final note, I'd like to include a hobbyist voice or two in here.
+Since a lot of the legacy platforms are supported by embedded Debian,
+OpenWRT, and similar, getting an idea of which ones we can deprecate
+would save quite a bit of work.
+
+I haven't heard word of an ARM mini-summit yet.  If that happens,
+obviously this topic would be most appropriate there.
+
+Nominations:
+
+Jason Cooper		(auto-nominated)
+Andrew Lunn
+Gregory Clement
+Sebastian Hesselbarth	(auto-nominated)
+Thomas Petazzoni	(auto-nominated)
+
+I can think of several names from the ARM Linux mailinglist, but since I
+can't create a conclusive list, I'll leave it up to the individuals to
+pipe up if they are interested.
+
+thx,
+
+Jason.
