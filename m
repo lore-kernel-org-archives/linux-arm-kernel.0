@@ -1,89 +1,174 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sun, 11 May 2014 07:42:10 -0700
-Subject: [PATCH 1/4] OMAPDSS: Fix DSS clock multiplier issue on 3703 and
- probably 3630
-In-Reply-To: <CALbNGRR3U1veFgXmOWpfG3yNVESdxi2t79WDrJwOZ1oShuG1yA@mail.gmail.com>
-References: <1398815562-24113-1-git-send-email-tony@atomide.com>
- <1398815562-24113-2-git-send-email-tony@atomide.com>
- <536C860E.1000501@ti.com>
- <CALbNGRR3U1veFgXmOWpfG3yNVESdxi2t79WDrJwOZ1oShuG1yA@mail.gmail.com>
-Message-ID: <20140511144209.GA28266@atomide.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 11 May 2014 07:43:30 -0700
+Subject: [GIT PULL] ARM: SoC fixes for 3.15-rc
+Message-ID: <20140511144330.GA31447@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Andreas M?ller <schnitzeltony@googlemail.com> [140509 14:07]:
-> On Fri, May 9, 2014 at 9:38 AM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
-> > On 30/04/14 02:52, Tony Lindgren wrote:
-> >> Otherwise we can get often errors like the following and the
-> >> display won't come on:
-> >>
-> >> omapdss APPLY error: FIFO UNDERFLOW on gfx, disabling the overlay
-> >> omapdss APPLY error: SYNC_LOST on channel lcd, restarting
-> >> the output with video overlays disabled
-> >>
-> >> There are some earlier references to this issue:
-> >>
-> >> http://www.spinics.net/lists/linux-omap/msg59511.html
-> >> http://www.spinics.net/lists/linux-omap/msg59724.html
-> >
-> resend - my client had HTML enabled...
-> 
-> FWIW: I have had issues long time ago [1]. With mainline 3.14.3 I had
-> still the reboot problem on old 600MHz OMAP 3530. Applying this patch
-> solved the issues. For other versions I had no chance to reproduce the
-> original wakup issue mentioned in old thread
+Hi Linus,
 
-Sorry I'm a bit confused now. Is the reboot issue a separate issue
-related to the twl4030 generic scripts for 3530?
+I know you said you'd be offline this week, but I might as well post it
+for when you return. :)
 
-And then this patch fixes dm3730 wake-up (from suspend?) issues?
 
-Or do we have some other bug where we wrongly hit omap3630_dss_feats
-on 3530 somehow?
+Thanks!
 
-Regards,
+-Olof
 
-Tony
- 
-> [1] http://marc.info/?l=linux-omap&m=136250904607413&w=2
-> 
-> Andreas
-> > Those don't sound like the same issue, but it's hard to say. What kind
-> > of clock rates do you get? Cat you paste debugfs/omapdss/clk, with and
-> > without this patch?
-> >
-> > What resolution do you have? If it's a very high resolution (say, DVI
-> > output to a monitor), it could just be an issue of
-> > not-enough-memory-bandwidth.
-> >
-> >> It seems that it's safe to set the lower values even for 3630.
-> >> If we can confirm that 3630 works with the higher values
-> >> reliably we can add further detection.
-> >>
-> >> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> >> ---
-> >>  drivers/video/fbdev/omap2/dss/dss.c | 5 +++--
-> >>  1 file changed, 3 insertions(+), 2 deletions(-)
-> >>
-> >> diff --git a/drivers/video/fbdev/omap2/dss/dss.c b/drivers/video/fbdev/omap2/dss/dss.c
-> >> index d55266c..ad6561f 100644
-> >> --- a/drivers/video/fbdev/omap2/dss/dss.c
-> >> +++ b/drivers/video/fbdev/omap2/dss/dss.c
-> >> @@ -707,9 +707,10 @@ static const struct dss_features omap34xx_dss_feats __initconst = {
-> >>       .dpi_select_source      =       &dss_dpi_select_source_omap2_omap3,
-> >>  };
-> >>
-> >> +/* Supposedly 3630 can use div 32 mult 2, but that needs to be rechecked */
-> >>  static const struct dss_features omap3630_dss_feats __initconst = {
-> >> -     .fck_div_max            =       32,
-> >> -     .dss_fck_multiplier     =       1,
-> >> +     .fck_div_max            =       16,
-> >> +     .dss_fck_multiplier     =       2,
-> >
-> > These values tell about the clock hardware, they are not settings that
-> > can be changed to change the clock. OMAP3630 has a fixed x2 multiplier
-> > and a divider with maximum value of 16.
-> >
-> >  Tomi
-> >
-> >
+
+The following changes since commit 76e7745e8e4330fdb30f049303d524261c0b7a2c:
+
+  Merge tag 'zynq-dt-fixes-for-3.15' of git://git.xilinx.com/linux-xlnx into fixes (2014-04-25 11:22:20 +0200)
+
+are available in the git repository at:
+
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
+
+for you to fetch changes up to 3b27dcec920075b6f1f5f8014e32e764fcbb96f8:
+
+  Merge tag 'davinci-fixes-for-v3.15-rc4' of git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci into fixes (2014-05-10 22:06:07 -0700)
+
+----------------------------------------------------------------
+
+ARM: SoC fixes for 3.15-rc
+
+Seems like we've had more fixes than usual this release cycle, but
+there's nothing in particular that we're doing differently. Perhaps it's
+just one of those cycles where more people are finding more regressions
+(and/or that the latency of when people actually test what's been in
+the tree for a while is catching up so that we get the bug reports now).
+
+The bigger changes here are are for TI and Marvell platforms:
+* Timing changes for GPMC (generic localbus) on OMAP causing some largeish
+  DTS deltas.
+* Fixes to window allocation on PCI for mvebu touching drivers/ stuff. Patches
+  have acks from subsystem maintainers where needed.
+* A fix from Thomas for a botched DT conversion in drivers/edma.
+
+There's a handful of other fixes for the above platforms as well as sunxi,
+at91, i.MX. I also included a MAINTAINER update for Broadcom, and a trivial
+move of a binding doc.
+
+----------------------------------------------------------------
+Andrew Lunn (1):
+      ARM: Kirkwood: T5325: Fix double probe of Codec
+
+Arnd Bergmann (1):
+      Merge tag 'at91-fixes' of git://github.com/at91linux/linux-at91 into fixes
+
+Bo Shen (1):
+      ARM: at91: fix spi cs on sama5d3 Xplained board
+
+Dave Gerlach (1):
+      ARM: dts: am437x-gp-evm: Do not reset gpio5
+
+Emilio L?pez (1):
+      ARM: sun7i: fix PLL4 clock and add PLL8
+
+Jason Gunthorpe (1):
+      bus: mvebu-mbus: Avoid setting an undefined window size
+
+Javier Martinez Canillas (1):
+      ARM: dts: omap3-igep0020: use SMSC9221 timings
+
+Joel Fernandes (1):
+      ARM: OMAP5: Switch to THUMB mode if needed on secondary CPU
+
+Matt Porter (1):
+      MAINTAINERS: update Broadcom ARM tree location and add an SoC family
+
+Maxime Ripard (2):
+      ARM: sun7i: Fix i2c4 base address
+      ARM: sunxi: Enable GMAC in sunxi_defconfig
+
+Olof Johansson (7):
+      Merge tag 'omap-for-v3.15/fixes-gpmc' of git://git.kernel.org/.../tmlind/linux-omap into fixes
+      Merge tag 'mvebu-fixes-3.15' of git://git.infradead.org/linux-mvebu into fixes
+      Merge tag 'mvebu-dt-fixes-3.15' of git://git.infradead.org/linux-mvebu into fixes
+      Merge tag 'mvebu-mbus_pci-fixes-3.15' of git://git.infradead.org/linux-mvebu into fixes
+      Merge tag 'mvebu-dt-fixes-3.15-2' of git://git.infradead.org/linux-mvebu into fixes
+      Merge tag 'sunxi-fixes-for-3.15' of https://github.com/mripard/linux into fixes
+      Merge tag 'davinci-fixes-for-v3.15-rc4' of git://git.kernel.org/.../nsekhar/linux-davinci into fixes
+
+Sascha Hauer (1):
+      ARM: dts: i.MX53: Fix ipu register space size
+
+Sebastian Hesselbarth (1):
+      ARM: dts: kirkwood: fix mislocated pcie-controller nodes
+
+Suman Anna (3):
+      ARM: dts: OMAP5: Add mailbox dt node to fix boot warning
+      ARM: dts: OMAP2: Fix interrupts for OMAP2420 mailbox
+      ARM: dts: AM3517: Disable absent IPs inherited from OMAP3
+
+Thomas Gleixner (1):
+      ARM: common: edma: Fix xbar mapping
+
+Thomas Petazzoni (10):
+      memory: mvebu-devbus: fix the conversion of the bus width
+      ARM: orion5x: fix target ID for crypto SRAM window
+      bus: mvebu-mbus: allow several windows with the same target/attribute
+      PCI: mvebu: split PCIe BARs into multiple MBus windows when needed
+      ARM: mvebu: fix NOR bus-width in Armada XP GP Device Tree
+      ARM: mvebu: fix NOR bus-width in Armada XP DB Device Tree
+      ARM: mvebu: fix NOR bus-width in Armada XP OpenBlocks AX3 Device Tree
+      ARM: mvebu: use qsgmii phy-mode for Armada XP GP interfaces
+      ARM: mvebu: specify I2C bus frequency on Armada 370 DB
+      ARM: mvebu: enable the SATA interface on Armada 375 DB
+
+Tony Lindgren (3):
+      ARM: dts: Fix bad OTG muxing for cm-t boards
+      ARM: dts: Fix GPMC Ethernet timings for omap cm-t sbc-t boards for device tree
+      ARM: dts: Fix GPMC timings for LAN9220
+
+Tushar Behera (1):
+      dt-bindings: clock: Move at91.h to dt-bindigs/clock
+
+Willy Tarreau (1):
+      PCI: mvebu: fix off-by-one in the computed size of the mbus windows
+
+ .../devicetree/bindings/clock/at91-clock.txt       |  2 +-
+ Documentation/devicetree/bindings/dma/ti-edma.txt  |  4 +-
+ MAINTAINERS                                        |  5 +-
+ arch/arm/boot/dts/am33xx.dtsi                      |  2 +-
+ arch/arm/boot/dts/am3517.dtsi                      | 16 ++++
+ arch/arm/boot/dts/am437x-gp-evm.dts                |  5 ++
+ arch/arm/boot/dts/armada-370-db.dts                |  1 +
+ arch/arm/boot/dts/armada-375-db.dts                |  5 ++
+ arch/arm/boot/dts/armada-xp-db.dts                 |  2 +-
+ arch/arm/boot/dts/armada-xp-gp.dts                 | 10 +--
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts   |  2 +-
+ arch/arm/boot/dts/at91-sama5d3_xplained.dts        |  4 +-
+ arch/arm/boot/dts/at91sam9261.dtsi                 |  2 +-
+ arch/arm/boot/dts/at91sam9rl.dtsi                  |  2 +-
+ arch/arm/boot/dts/imx53.dtsi                       |  2 +-
+ arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts     | 18 +++--
+ arch/arm/boot/dts/kirkwood-nsa310-common.dtsi      | 18 +++--
+ arch/arm/boot/dts/kirkwood-t5325.dts               |  5 --
+ arch/arm/boot/dts/omap-gpmc-smsc911x.dtsi          | 19 ++---
+ arch/arm/boot/dts/omap2.dtsi                       |  7 --
+ arch/arm/boot/dts/omap2420.dtsi                    |  8 ++
+ arch/arm/boot/dts/omap2430.dtsi                    |  7 ++
+ arch/arm/boot/dts/omap3-cm-t3x30.dtsi              | 66 ++++------------
+ arch/arm/boot/dts/omap3-igep.dtsi                  |  2 +-
+ arch/arm/boot/dts/omap3-igep0020.dts               |  4 +-
+ arch/arm/boot/dts/omap3-sb-t35.dtsi                | 37 +++------
+ arch/arm/boot/dts/omap3-sbc-t3517.dts              | 13 +++
+ arch/arm/boot/dts/omap3.dtsi                       |  2 +-
+ arch/arm/boot/dts/omap5.dtsi                       |  7 ++
+ arch/arm/boot/dts/sama5d3.dtsi                     |  2 +-
+ arch/arm/boot/dts/sama5d3_mci2.dtsi                |  2 +-
+ arch/arm/boot/dts/sama5d3_tcb1.dtsi                |  2 +-
+ arch/arm/boot/dts/sama5d3_uart.dtsi                |  2 +-
+ arch/arm/boot/dts/sun7i-a20.dtsi                   | 14 +++-
+ arch/arm/common/edma.c                             | 48 ++++-------
+ arch/arm/configs/sunxi_defconfig                   |  2 +-
+ arch/arm/mach-omap2/omap-headsmp.S                 |  8 +-
+ arch/arm/mach-orion5x/common.h                     |  2 +-
+ drivers/bus/mvebu-mbus.c                           | 22 ++++--
+ drivers/memory/mvebu-devbus.c                      | 15 +++-
+ drivers/pci/host/pci-mvebu.c                       | 92 ++++++++++++++++++----
+ include/dt-bindings/{clk => clock}/at91.h          |  0
+ 42 files changed, 281 insertions(+), 207 deletions(-)
+ rename include/dt-bindings/{clk => clock}/at91.h (100%)
