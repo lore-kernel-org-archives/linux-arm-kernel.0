@@ -1,19 +1,40 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 11 May 2014 06:35:05 +0200
-Subject: [PATCH 2/6] clk: sunxi: Move the 24M oscillator to a file of its
- own
-In-Reply-To: <536E57EE.2030401@elopez.com.ar>
-References: <1399692821-20988-1-git-send-email-maxime.ripard@free-electrons.com>
- <1399692821-20988-3-git-send-email-maxime.ripard@free-electrons.com>
- <536E57EE.2030401@elopez.com.ar>
-Message-ID: <20140511043505.GO7047@lukather>
+Date: Sun, 11 May 2014 06:38:22 +0200
+Subject: [GIT PULL] Allwinner fixes for 3.15
+In-Reply-To: <20140511032457.GE22931@quad.lixom.net>
+References: <20140508225352.GA13825@lukather>
+ <20140511032457.GE22931@quad.lixom.net>
+Message-ID: <20140511043822.GP7047@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 10, 2014 at 01:46:38PM -0300, Emilio L?pez wrote:
+On Sat, May 10, 2014 at 08:24:57PM -0700, Olof Johansson wrote:
+> On Thu, May 08, 2014 at 05:53:52PM -0500, Maxime Ripard wrote:
+> > The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+> > 
+> >   Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   https://github.com/mripard/linux.git 
+> 
+> This doesn't seem right.
+> 
+> However, I found a tag tags/sunxi-fixes-for-3.15 for
+> 84e108fc7b23310fb6d93a657e47181d64ab6e93 in your repo, so I merged
+> that. Please check your scripts.
 
-There was probably something interesting here, but both the messages
-you sent are full of empty :)
+Hmmm, odd indeed. I'll double-check to see where I might have screwed
+this up. Sorry.
+
+> > for you to fetch changes up to 84e108fc7b23310fb6d93a657e47181d64ab6e93:
+> > 
+> >   ARM: sunxi: Enable GMAC in sunxi_defconfig (2014-05-01 17:07:42 -0700)
+> 
+> Merged.
+
+Thanks!
+Maxime
 
 -- 
 Maxime Ripard, Free Electrons
@@ -25,4 +46,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140511/dd6f78a8/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140511/9f5bb78c/attachment.sig>
