@@ -1,32 +1,55 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 10 May 2014 20:24:57 -0700
-Subject: [GIT PULL] Allwinner fixes for 3.15
-In-Reply-To: <20140508225352.GA13825@lukather>
-References: <20140508225352.GA13825@lukather>
-Message-ID: <20140511032457.GE22931@quad.lixom.net>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Sat, 10 May 2014 23:29:25 -0400 (EDT)
+Subject: [PATCH 2/3] arm64: Add big.LITTLE switcher stub
+In-Reply-To: <20140509180121.GU12304@sirena.org.uk>
+References: <1399653631-4938-1-git-send-email-broonie@kernel.org>
+ <1399653631-4938-2-git-send-email-broonie@kernel.org>
+ <20140509174738.GP7950@arm.com> <20140509180121.GU12304@sirena.org.uk>
+Message-ID: <alpine.LFD.2.11.1405102321290.980@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 08, 2014 at 05:53:52PM -0500, Maxime Ripard wrote:
-> The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+On Fri, 9 May 2014, Mark Brown wrote:
+
+> On Fri, May 09, 2014 at 06:47:38PM +0100, Catalin Marinas wrote:
+> > On Fri, May 09, 2014 at 05:40:30PM +0100, Mark Brown wrote:
 > 
->   Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+> > > The big.LITTLE cpufreq driver is useful on arm64 big.LITTLE systems even
+> > > without IKS support since it implements support for clusters with shared
+> > > clocks (a common big.LITTLE configuration). In order to allow it to be
+> > > built provide the non-IKS stubs for arm64, enabling cpufreq with all the
+> > > cores available.
 > 
-> are available in the git repository at:
+> > Have you thought of patching the actual cpufreq driver? Are you adding
+> > this code just to avoid compiler errors on arm64 with this driver?
 > 
->   https://github.com/mripard/linux.git 
+> Yes, that was actually my first thought but I wasn't loving the
+> ifdeferry - it's fairly easy to do IIRC but the general taste seems to
+> be towards having stubs rather than ifdefs and the code seemed to be
+> lending itself to that.  There was also the fact that ifdefs could have
+> been done for the non-IKS case on 32 bit but instead stubs were
+> provided.  If people prefer I can do an ifdeffed version though, it
+> doesn't make much odds.
 
-This doesn't seem right.
+I personally don't understand the b.L cpufreq driver fully, especially 
+with the IKS functionality bolted on top.  Obviously I didn't write that 
+part otherwise I would hopefully understand it better.  Still, I'd have 
+preferred for the IKS extension to the b.L cpufreq driver to be more 
+isolated in a separate file or the like.
 
-However, I found a tag tags/sunxi-fixes-for-3.15 for
-84e108fc7b23310fb6d93a657e47181d64ab6e93 in your repo, so I merged
-that. Please check your scripts.
-
-
-> for you to fetch changes up to 84e108fc7b23310fb6d93a657e47181d64ab6e93:
+> This was purely to get the driver compiling and hopefully running on
+> ARMv8, there is some user demand for deploying the driver on big.LITTLE
+> systems.
 > 
->   ARM: sunxi: Enable GMAC in sunxi_defconfig (2014-05-01 17:07:42 -0700)
+> > > It may make sense to make an asm-generic version of these stubs instead
+> 
+> > asm-generic/bL_switcher.h? I take it as a good joke ;)
+> 
+> Hey, perhaps other hardware architectures are implementing similar
+> concepts even now in order to keep up!  
 
-Merged.
+Let's hope we won't need to rely on IKS any longer by the time support 
+for them land into mainline.
 
--Olof
+
+Nicolas
