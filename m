@@ -1,21 +1,24 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 10 May 2014 20:21:12 -0700
-Subject: [PATCH] MAINTAINERS: update Broadcom ARM tree location and add
- an SoC family
-In-Reply-To: <1399392585-28183-1-git-send-email-mporter@linaro.org>
-References: <1399392585-28183-1-git-send-email-mporter@linaro.org>
-Message-ID: <20140511032112.GC22931@quad.lixom.net>
+Date: Sat, 10 May 2014 20:23:15 -0700
+Subject: [GIT PULL] ARM: mvebu: DT fixes for v3.15 (incr #2)
+In-Reply-To: <20140508143907.GA12708@titan.lakedaemon.net>
+References: <20140508143907.GA12708@titan.lakedaemon.net>
+Message-ID: <20140511032315.GD22931@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 06, 2014 at 12:09:45PM -0400, Matt Porter wrote:
-> The Broadcom ARM tree location has changed names to reflect other SoC
-> families that are queued here. Also add the 216xx family as maintained.
+On Thu, May 08, 2014 at 10:39:07AM -0400, Jason Cooper wrote:
+> guys,
 > 
-> Signed-off-by: Matt Porter <mporter@linaro.org>
-> ---
-> arm-soc team: please apply directly for 3.15
+> Looks like this is the last fix to trickle in for this cycle.  I've
+> waited over a week and seen nothing else.
+> 
+> As usual, this is an incremental pull request from
+> tags/mvebu-dt-fixes-3.15 up to tags/mvebu-dt-fixes-3.15-2 in the
+> mvebu/dt-fixes branch.
+> 
+> This patch has been is -next for several days.
 
-Applied.
+Merged.
 
 -Olof
