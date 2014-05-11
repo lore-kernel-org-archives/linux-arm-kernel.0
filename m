@@ -1,27 +1,51 @@
-From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
-Date: Sun, 11 May 2014 01:44:13 -0300
-Subject: [PATCH 2/6] clk: sunxi: Move the 24M oscillator to a file of
- its own
-In-Reply-To: <20140511043505.GO7047@lukather>
-References: <1399692821-20988-1-git-send-email-maxime.ripard@free-electrons.com>
- <1399692821-20988-3-git-send-email-maxime.ripard@free-electrons.com>
- <536E57EE.2030401@elopez.com.ar> <20140511043505.GO7047@lukather>
-Message-ID: <536F001D.1040403@elopez.com.ar>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 11 May 2014 06:49:53 +0200
+Subject: [PATCH v2 2/4] dt-bindings: add mtk-timer bindings
+In-Reply-To: <1399772463-859-3-git-send-email-matthias.bgg@gmail.com>
+References: <1399772463-859-1-git-send-email-matthias.bgg@gmail.com>
+ <1399772463-859-3-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <20140511044953.GR7047@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-El 11/05/14 01:35, Maxime Ripard escribi?:
-> On Sat, May 10, 2014 at 01:46:38PM -0300, Emilio L?pez wrote:
->
-> There was probably something interesting here, but both the messages
-> you sent are full of empty :)
->
+On Sun, May 11, 2014 at 03:41:01AM +0200, Matthias Brugger wrote:
+> Add binding documentation for the General Porpose Timer driver of
+> the Mediatek SoCs.
+> 
+> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+> ---
+>  .../devicetree/bindings/timer/mediatek,mtk-timer.txt    | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
+> new file mode 100644
+> index 0000000..a36eb0f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
+> @@ -0,0 +1,17 @@
+> +Mediatek MT6598, MT6577 and MT6572 Timers
+> +---------------------------------------
+> +
+> +Required properties:
+> +- compatible: Should be "mediatek,mtk6589-timer"
+> +- reg: Should contain location and length for timers register.
+> +- clocks : phandle to the clock source, normaly a 13 MHz fixed system clock
+> +		and a 32 KHz fixed RTC clock.
 
-My email client decided it was cool to drop my email body on my first 
-email and my attempt to resend it. My reply to 3/6 didn't seem to be 
-affected though, and the comment was basically the same so I didn't 
-bother trying again :)
+If you don't want to use clock names for this, you should put the
+order that you require them to be.
 
-Cheers,
+Maxime
 
-Emilio
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140511/64aef178/attachment-0001.sig>
