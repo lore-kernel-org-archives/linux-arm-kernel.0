@@ -1,19 +1,32 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Sun, 11 May 2014 10:05:26 +0900
-Subject: [PATCH] ARM: shmobile: Minor cleanup of the Armadillo legacy
- board code
-In-Reply-To: <20140507233753.29842.55463.sendpatchset@w520>
-References: <20140507233753.29842.55463.sendpatchset@w520>
-Message-ID: <20140511010523.GB31760@verge.net.au>
+Date: Sun, 11 May 2014 10:04:56 +0900
+Subject: [PATCH 00/04] ARM: shmobile: Use shmobile_init_delay() on r8a7740
+In-Reply-To: <CAMuHMdWkZ=pTCs_HgBnjPPExLj-fU4ywZq-aHUrpdLXLGT3WSw@mail.gmail.com>
+References: <20140507233219.29712.9253.sendpatchset@w520>
+ <CAMuHMdWkZ=pTCs_HgBnjPPExLj-fU4ywZq-aHUrpdLXLGT3WSw@mail.gmail.com>
+Message-ID: <20140511010456.GA31760@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 08, 2014 at 08:37:53AM +0900, Magnus Damm wrote:
-> From: Magnus Damm <damm+renesas@opensource.se>
+On Fri, May 09, 2014 at 09:54:58AM +0200, Geert Uytterhoeven wrote:
+> Hi Magnus,
 > 
-> Cleanup the legacy Armadillo board code slightly by
-> removing the pointless eva_add_early_devices() function
+> On Thu, May 8, 2014 at 1:32 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
+> > ARM: shmobile: Use shmobile_init_delay() on r8a7740
+> >
+> > [PATCH 01/04] ARM: shmobile: Add r8a7740 Maximum CPU Frequency to DTS
+> > [PATCH 02/04] ARM: shmobile: Use r8a7740 DT CPU Frequency in common case
+> > [PATCH 03/04] ARM: shmobile: Use r8a7740 DT CPU Frequency for Armadillo DT Ref
+> > [PATCH 04/04] ARM: shmobile: Remove unused r8a7740_init_delay()
+> >
+> > Convert r8a7740 to rely on shmobile_init_delay() instead of using a per-SoC
+> > delay setup function. This is a cleanup towards enabling Multiplatform support
+> > for the r8a7740 SoC.
 > 
-> Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+> Thanks!
+> 
+> > Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+> 
+> Tested-by: Geert Uytterhoeven <geert@glider.be>
 
-Thanks, I have queued this up.
+Thanks, I have queued these up.
