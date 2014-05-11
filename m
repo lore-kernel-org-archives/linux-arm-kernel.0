@@ -1,49 +1,37 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 11 May 2014 06:38:22 +0200
-Subject: [GIT PULL] Allwinner fixes for 3.15
-In-Reply-To: <20140511032457.GE22931@quad.lixom.net>
-References: <20140508225352.GA13825@lukather>
- <20140511032457.GE22931@quad.lixom.net>
-Message-ID: <20140511043822.GP7047@lukather>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sun, 11 May 2014 12:42:09 +0800
+Subject: [PATCH] ARM: dts: i.MX53: Fix ipu register space size
+In-Reply-To: <20140511032039.GB22931@quad.lixom.net>
+References: <1399374094-32451-1-git-send-email-s.hauer@pengutronix.de>
+ <20140506125802.GB2870@dragon> <20140511032039.GB22931@quad.lixom.net>
+Message-ID: <20140511044207.GN2870@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 10, 2014 at 08:24:57PM -0700, Olof Johansson wrote:
-> On Thu, May 08, 2014 at 05:53:52PM -0500, Maxime Ripard wrote:
-> > The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+On Sat, May 10, 2014 at 08:20:39PM -0700, Olof Johansson wrote:
+> On Tue, May 06, 2014 at 08:58:04PM +0800, Shawn Guo wrote:
+> > On Tue, May 06, 2014 at 01:01:34PM +0200, Sascha Hauer wrote:
+> > > The IPU register space is 128MB, not 2GB.
+> > > 
+> > > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 > > 
-> >   Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+> > Acked-by: Shawn Guo <shawn.guo@freescale.com>
 > > 
-> > are available in the git repository at:
+> > Arnd, Olof,
 > > 
-> >   https://github.com/mripard/linux.git 
+> > Please apply this fix for 3.15, and copy stable.  Thanks.
+> > 
+> > Cc: <stable@vger.kernel.org>
+> > 
 > 
-> This doesn't seem right.
+> Applied, but in the future please resend the whole patch since we just
+> get this acked-by email in the arm at kernel.org mailboxes and have to hunt
+> around for the original patch.
 > 
-> However, I found a tag tags/sunxi-fixes-for-3.15 for
-> 84e108fc7b23310fb6d93a657e47181d64ab6e93 in your repo, so I merged
-> that. Please check your scripts.
+> Btw for the future, this is the case where a Fixes: <12-digit sha> '<patch
+> subject>' would be useful, so that stable knows how far to backport. I added it
+> this time as well, feel free to do it yourself next time :)
 
-Hmmm, odd indeed. I'll double-check to see where I might have screwed
-this up. Sorry.
+Noted.  Thanks, Olof.
 
-> > for you to fetch changes up to 84e108fc7b23310fb6d93a657e47181d64ab6e93:
-> > 
-> >   ARM: sunxi: Enable GMAC in sunxi_defconfig (2014-05-01 17:07:42 -0700)
-> 
-> Merged.
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140511/9f5bb78c/attachment.sig>
+Shawn
