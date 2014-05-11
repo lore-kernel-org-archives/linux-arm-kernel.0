@@ -1,34 +1,49 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sun, 11 May 2014 20:18:01 +0200
-Subject: [PATCHv5 13/20] ARM: mvebu: add USB3 support for Armada 375
+Date: Sun, 11 May 2014 20:17:57 +0200
+Subject: [PATCHv5 09/20] Documentation: dt-bindings: update xhci-platform DT
+ binding
 In-Reply-To: <1399832288-19899-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1399832288-19899-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1399832288-19899-14-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1399832288-19899-10-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-This patch add the selection of the config symbol to build the USB3
-support for Armada 375.
+This commit extends the compatible string list of the xhci-platform
+binding with the new "armada-375-xhci" and "armada-380-xhci"
+compatible strings. It is used to describe the XHCI controller which
+is available in the Armada 375 and 38x SoCs.
+
+It also indicates that an optional 'clocks' property is now supported.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-mvebu/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ Documentation/devicetree/bindings/usb/usb-xhci.txt | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-index 7960f21..95afc76 100644
---- a/arch/arm/mach-mvebu/Kconfig
-+++ b/arch/arm/mach-mvebu/Kconfig
-@@ -41,6 +41,7 @@ config MACH_ARMADA_375
- 	select CPU_V7
- 	select MACH_MVEBU_V7
- 	select PINCTRL_ARMADA_375
-+	select USB_ARCH_HAS_XHCI
- 	help
- 	  Say 'Y' here if you want your kernel to support boards based
- 	  on the Marvell Armada 375 SoC with device tree.
+diff --git a/Documentation/devicetree/bindings/usb/usb-xhci.txt b/Documentation/devicetree/bindings/usb/usb-xhci.txt
+index 90f8f60..999be5c 100644
+--- a/Documentation/devicetree/bindings/usb/usb-xhci.txt
++++ b/Documentation/devicetree/bindings/usb/usb-xhci.txt
+@@ -1,11 +1,16 @@
+ USB xHCI controllers
+ 
+ Required properties:
+-  - compatible: should be "generic-xhci" (deprecated: "xhci-platform").
++  - compatible: should be one of "generic-xhci",
++    "marvell,armada-375-xhci", "marvell,armada-380-xhci" (deprecated:
++    "xhci-platform").
+   - reg: should contain address and length of the standard XHCI
+     register set for the device.
+   - interrupts: one XHCI interrupt should be described here.
+ 
++Optional property:
++  - clocks: reference to a clock
++
+ Example:
+ 	usb at f0931000 {
+ 		compatible = "generic-xhci";
 -- 
 1.9.2
