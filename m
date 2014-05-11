@@ -1,63 +1,38 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 11 May 2014 09:46:57 +0200
-Subject: [PATCH v12 6/6] ARM: dts: sun7i: Add reg_vcc3v3 to sun7i board mmc
- nodes
-In-Reply-To: <1399794417-9291-1-git-send-email-hdegoede@redhat.com>
-References: <1399794417-9291-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1399794417-9291-7-git-send-email-hdegoede@redhat.com>
+Date: Sun, 11 May 2014 10:06:24 +0200
+Subject: [PATCH v4 0/2] input: Add new sun4i-ts driver for Allwinner sunxi
+ SoC's rtp controller
+Message-ID: <1399795586-18919-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/sun7i-a20-cubieboard2.dts     | 1 +
- arch/arm/boot/dts/sun7i-a20-cubietruck.dts      | 1 +
- arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 2 ++
- 3 files changed, 4 insertions(+)
+Hi All,
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-index 3918e2f..a5ad945 100644
---- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-@@ -23,6 +23,7 @@
- 		mmc0: mmc at 01c0f000 {
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
-+			vmmc-supply = <&reg_vcc3v3>;
- 			bus-width = <4>;
- 			cd-gpios = <&pio 7 1 0>; /* PH1 */
- 			cd-inverted;
-diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-index 9dbb763c..b7e79d0 100644
---- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-@@ -23,6 +23,7 @@
- 		mmc0: mmc at 01c0f000 {
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
-+			vmmc-supply = <&reg_vcc3v3>;
- 			bus-width = <4>;
- 			cd-gpios = <&pio 7 1 0>; /* PH1 */
- 			cd-inverted;
-diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-index 1bfef12..b759630 100644
---- a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-@@ -34,6 +34,7 @@
- 		mmc0: mmc at 01c0f000 {
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
-+			vmmc-supply = <&reg_vcc3v3>;
- 			bus-width = <4>;
- 			cd-gpios = <&pio 7 1 0>; /* PH1 */
- 			cd-inverted;
-@@ -43,6 +44,7 @@
- 		mmc3: mmc at 01c12000 {
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&mmc3_pins_a>, <&mmc3_cd_pin_olinuxinom>;
-+			vmmc-supply = <&reg_vcc3v3>;
- 			bus-width = <4>;
- 			cd-gpios = <&pio 7 11 0>; /* PH11 */
- 			cd-inverted;
--- 
-1.9.0
+Since Maxime rightfully pointed out an error in my resend of v3, here is v4
+with that fixed.
+
+Note the second patch which adds hwmon functionality has been reviewed by
+the hwon subsystem maintainer, and the sun?i*.dts changes to enable this
+have already been upstreamed.
+
+Changes since v1:
+-Use devm_kzalloc and devm_hwmon_device_register_with_groups as suggested
+ by Guenter Roeck
+-Various small cleanups suggested by Thomas Petazzoni
+-Add open/close methods and enable/disable the input related interrupts from
+ there as suggested by Dmitry
+
+Changes since v2:
+-Addressed review comments from Dmitry
+-Addressed review comments from Guenter
+-Addressed review comments from Maxime
+-Initialize ignore_fifo_data to true, the very first coordinate can be
+ wrong too
+
+Changes since v3:
+-Rename compatible from sun4i-ts to sun4i-a10-ts to match the dts entries
+ which are already upstream
+
+Thanks & Regards,
+
+Hans
