@@ -1,96 +1,36 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sun, 11 May 2014 20:17:52 +0200
-Subject: [PATCHv5 04/20] usb: ehci-orion: add optional PHY support
+Date: Sun, 11 May 2014 20:18:02 +0200
+Subject: [PATCHv5 14/20] ARM: configs: enable XHCI mvebu support in
+ mvebu_v7_defconfig
 In-Reply-To: <1399832288-19899-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1399832288-19899-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1399832288-19899-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1399832288-19899-15-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-This commit extends the ehci-orion so that it can optionally be passed
-a reference to a PHY through the Device Tree. It will be useful for
-the Armada 375 SoCs. If no PHY is provided then the behavior of the
-driver is unchanged.
-
-[Thomas: use devm_phy_optional_get() so that we handle -EPROBE_DEFER
-properly. Also call phy_power_off() when needed, and rename goto
-labels.]
+The Marvell Armada 38x platform needs the xhci_mvebu driver enabled
+for the xHCI USB hosts, so this commit enables the corresponding
+Kconfig option in mvebu_v7_defconfig.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
 ---
- drivers/usb/host/ehci-orion.c | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ arch/arm/configs/mvebu_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/usb/host/ehci-orion.c b/drivers/usb/host/ehci-orion.c
-index 9c98bac..22e15ca 100644
---- a/drivers/usb/host/ehci-orion.c
-+++ b/drivers/usb/host/ehci-orion.c
-@@ -15,6 +15,7 @@
- #include <linux/clk.h>
- #include <linux/platform_data/usb-ehci-orion.h>
- #include <linux/of.h>
-+#include <linux/phy/phy.h>
- #include <linux/of_device.h>
- #include <linux/of_irq.h>
- #include <linux/usb.h>
-@@ -46,6 +47,7 @@
- 
- struct orion_ehci_hcd {
- 	struct clk *clk;
-+	struct phy *phy;
- };
- 
- static const char hcd_name[] = "ehci-orion";
-@@ -221,6 +223,20 @@ static int ehci_orion_drv_probe(struct platform_device *pdev)
- 	if (!IS_ERR(priv->clk))
- 		clk_prepare_enable(priv->clk);
- 
-+	priv->phy = devm_phy_optional_get(&pdev->dev, "usb");
-+	if (IS_ERR(priv->phy)) {
-+		err = PTR_ERR(priv->phy);
-+		goto err_phy_get;
-+	} else {
-+		err = phy_init(priv->phy);
-+		if (err)
-+			goto err_phy_init;
-+
-+		err = phy_power_on(priv->phy);
-+		if (err)
-+			goto err_phy_power_on;
-+	}
-+
- 	/*
- 	 * (Re-)program MBUS remapping windows if we are asked to.
- 	 */
-@@ -256,6 +272,13 @@ static int ehci_orion_drv_probe(struct platform_device *pdev)
- 	return 0;
- 
- err_add_hcd:
-+	if (!IS_ERR(priv->phy))
-+		phy_power_off(priv->phy);
-+err_phy_power_on:
-+	if (!IS_ERR(priv->phy))
-+		phy_exit(priv->phy);
-+err_phy_init:
-+err_phy_get:
- 	if (!IS_ERR(priv->clk))
- 		clk_disable_unprepare(priv->clk);
- 	usb_put_hcd(hcd);
-@@ -273,6 +296,11 @@ static int ehci_orion_drv_remove(struct platform_device *pdev)
- 
- 	usb_remove_hcd(hcd);
- 
-+	if (!IS_ERR(priv->phy)) {
-+		phy_power_off(priv->phy);
-+		phy_exit(priv->phy);
-+	}
-+
- 	if (!IS_ERR(priv->clk))
- 		clk_disable_unprepare(priv->clk);
- 
+diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
+index a34713d..e881106 100644
+--- a/arch/arm/configs/mvebu_v7_defconfig
++++ b/arch/arm/configs/mvebu_v7_defconfig
+@@ -78,6 +78,7 @@ CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_EHCI_ROOT_HUB_TT=y
+ CONFIG_USB_STORAGE=y
+ CONFIG_USB_XHCI_HCD=y
++CONFIG_USB_XHCI_MVEBU=y
+ CONFIG_MMC=y
+ CONFIG_MMC_MVSDIO=y
+ CONFIG_NEW_LEDS=y
 -- 
 1.9.2
