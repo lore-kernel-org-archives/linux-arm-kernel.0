@@ -1,89 +1,40 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sun, 11 May 2014 20:18:04 +0200
-Subject: [PATCHv5 16/20] ARM: mvebu: add Device Tree description of xHCI
- controllers on Armada 38x
+Date: Sun, 11 May 2014 20:18:06 +0200
+Subject: [PATCHv5 18/20] ARM: mvebu: add Device Tree description of USB
+ cluster controller on Armada 375
 In-Reply-To: <1399832288-19899-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1399832288-19899-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1399832288-19899-17-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1399832288-19899-19-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-The Marvell Armada 38x SoCs contains two xHCI controllers. This commit
-adds the Device Tree description of those interfaces at the SoC level,
-and also enables the two USB3 ports on the Armada 385 DB platform and
-one USB3 port on the Armada 385 RD platform.
+On Armada 375, the USB cluster allows to control the cluster composed
+of the USB2 and USB3 host controllers.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-385-db.dts |  8 ++++++++
- arch/arm/boot/dts/armada-385-rd.dts |  4 ++++
- arch/arm/boot/dts/armada-38x.dtsi   | 17 +++++++++++++++++
- 3 files changed, 29 insertions(+)
+ arch/arm/boot/dts/armada-375.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-385-db.dts b/arch/arm/boot/dts/armada-385-db.dts
-index 6828d77..d5db146 100644
---- a/arch/arm/boot/dts/armada-385-db.dts
-+++ b/arch/arm/boot/dts/armada-385-db.dts
-@@ -101,6 +101,14 @@
- 					reg = <0x1000000 0x3f000000>;
- 				};
+diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
+index 3877693..6724c10 100644
+--- a/arch/arm/boot/dts/armada-375.dtsi
++++ b/arch/arm/boot/dts/armada-375.dtsi
+@@ -320,6 +320,12 @@
+ 				clocks = <&coreclk 0>;
  			};
-+
-+			usb3 at f0000 {
-+				status = "okay";
-+			};
-+
-+			usb3 at f8000 {
-+				status = "okay";
-+			};
- 		};
  
- 		pcie-controller {
-diff --git a/arch/arm/boot/dts/armada-385-rd.dts b/arch/arm/boot/dts/armada-385-rd.dts
-index 45250c8..a505fe9 100644
---- a/arch/arm/boot/dts/armada-385-rd.dts
-+++ b/arch/arm/boot/dts/armada-385-rd.dts
-@@ -77,6 +77,10 @@
- 					reg = <1>;
- 				};
- 			};
-+
-+			usb3 at f0000 {
-+				status = "okay";
-+			};
- 		};
- 
- 		pcie-controller {
-diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-index a064f59..6f97f3d 100644
---- a/arch/arm/boot/dts/armada-38x.dtsi
-+++ b/arch/arm/boot/dts/armada-38x.dtsi
-@@ -355,6 +355,23 @@
- 				clocks = <&coredivclk 0>;
- 				status = "disabled";
- 			};
-+
-+			usb3 at f0000 {
-+				compatible = "marvell,armada-380-xhci";
-+				reg = <0xf0000 0x4000>,<0xf4000 0x4000>;
-+				interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&gateclk 9>;
-+				status = "disabled";
++			usbcluster: usb-cluster at 18400 {
++				compatible = "marvell,armada-375-usb-cluster";
++				reg = <0x18400 0x4>;
++				#phy-cells = <1>;
 +			};
 +
-+			usb3 at f8000 {
-+				compatible = "marvell,armada-380-xhci";
-+				reg = <0xf8000 0x4000>,<0xfc000 0x4000>;
-+				interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&gateclk 10>;
-+				status = "disabled";
-+			};
-+
- 		};
- 	};
- 
+ 			xor at 60800 {
+ 				compatible = "marvell,orion-xor";
+ 				reg = <0x60800 0x100
 -- 
 1.9.2
