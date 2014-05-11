@@ -1,58 +1,65 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Sun, 11 May 2014 16:06:00 +0800
-Subject: [PATCH v6 04/15] ARM: mcpm: support 4 clusters
+Date: Sun, 11 May 2014 16:06:01 +0800
+Subject: [PATCH v6 05/15] ARM: hisi: add ARCH_HISI
 In-Reply-To: <1399795571-17231-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1399795571-17231-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1399795571-17231-5-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1399795571-17231-6-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the CONFIG_MCPM_QUAD_CLUSTER configuration to enlarge cluster number
-from 2 to 4.
+Since multiple ARCH configuration will be appended into mach-hisi
+directory, add ARCH_HISI as common configuration for different ARCH in
+mach-hisi.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
-Reviewed-by: Nicolas Pitre <nico@linaro.org>
 ---
- arch/arm/Kconfig            | 9 +++++++++
- arch/arm/include/asm/mcpm.h | 5 +++++
- 2 files changed, 14 insertions(+)
+ arch/arm/Makefile          |  2 +-
+ arch/arm/mach-hisi/Kconfig | 16 ++++++++++++++--
+ 2 files changed, 15 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index ab438cb..6ce4a49 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1564,6 +1564,15 @@ config MCPM
- 	  for (multi-)cluster based systems, such as big.LITTLE based
- 	  systems.
- 
-+config MCPM_QUAD_CLUSTER
-+	bool
-+	depends on MCPM
-+	help
-+	  To avoid wasting resources unnecessarily, MCPM only supports up
-+	  to 2 clusters by default.
-+	  Platforms with 3 or 4 clusters that use MCPM must select this
-+	  option to allow the additional clusters to be managed.
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 41c1931..4c2798a 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -154,7 +154,7 @@ machine-$(CONFIG_ARCH_EP93XX)		+= ep93xx
+ machine-$(CONFIG_ARCH_EXYNOS)		+= exynos
+ machine-$(CONFIG_ARCH_GEMINI)		+= gemini
+ machine-$(CONFIG_ARCH_HIGHBANK)		+= highbank
+-machine-$(CONFIG_ARCH_HI3xxx)		+= hisi
++machine-$(CONFIG_ARCH_HISI)		+= hisi
+ machine-$(CONFIG_ARCH_INTEGRATOR)	+= integrator
+ machine-$(CONFIG_ARCH_IOP13XX)		+= iop13xx
+ machine-$(CONFIG_ARCH_IOP32X)		+= iop32x
+diff --git a/arch/arm/mach-hisi/Kconfig b/arch/arm/mach-hisi/Kconfig
+index feee4db..da16efd 100644
+--- a/arch/arm/mach-hisi/Kconfig
++++ b/arch/arm/mach-hisi/Kconfig
+@@ -1,8 +1,16 @@
+-config ARCH_HI3xxx
+-	bool "Hisilicon Hi36xx/Hi37xx family" if ARCH_MULTI_V7
++config ARCH_HISI
++	bool "Hisilicon SoC Support"
++	depends on ARCH_MULTIPLATFORM
+ 	select ARM_AMBA
+ 	select ARM_GIC
+ 	select ARM_TIMER_SP804
 +
- config BIG_LITTLE
- 	bool "big.LITTLE support (Experimental)"
- 	depends on CPU_V7 && SMP
-diff --git a/arch/arm/include/asm/mcpm.h b/arch/arm/include/asm/mcpm.h
-index 608516e..fc8d70d 100644
---- a/arch/arm/include/asm/mcpm.h
-+++ b/arch/arm/include/asm/mcpm.h
-@@ -20,7 +20,12 @@
-  * to consider dynamic allocation.
-  */
- #define MAX_CPUS_PER_CLUSTER	4
++if ARCH_HISI
 +
-+#ifdef CONFIG_MCPM_QUAD_CLUSTER
-+#define MAX_NR_CLUSTERS		4
-+#else
- #define MAX_NR_CLUSTERS		2
-+#endif
- 
- #ifndef __ASSEMBLY__
- 
++menu "Hisilicon platform type"
++
++config ARCH_HI3xxx
++	bool "Hisilicon Hi36xx/Hi37xx family" if ARCH_MULTI_V7
+ 	select CACHE_L2X0
+ 	select HAVE_ARM_SCU if SMP
+ 	select HAVE_ARM_TWD if SMP
+@@ -10,3 +18,7 @@ config ARCH_HI3xxx
+ 	select PINCTRL_SINGLE
+ 	help
+ 	  Support for Hisilicon Hi36xx/Hi37xx processor family
++
++endmenu
++
++endif
 -- 
 1.9.1
