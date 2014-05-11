@@ -1,57 +1,35 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 10 May 2014 23:00:09 -0400
-Subject: [TECH TOPIC] ARM legacy board DT conversion finalization
-Message-ID: <20140511030009.GO12708@titan.lakedaemon.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 10 May 2014 20:13:13 -0700
+Subject: [GIT PULL] Versatile LEDs conversion
+In-Reply-To: <CACRpkdaAVMf1t03jRZFa2qbTDnJZB2XBvOaeWBgwTSqvfLo2Aw@mail.gmail.com>
+References: <CACRpkdb4VhN5Dt6ZoUNgwphxUD7Q69waF9vfO_=SenbvA=WSeA@mail.gmail.com>
+ <20140505041156.GB11035@quad.lixom.net>
+ <201405061458.22231.arnd@arndb.de>
+ <CACRpkdaAVMf1t03jRZFa2qbTDnJZB2XBvOaeWBgwTSqvfLo2Aw@mail.gmail.com>
+Message-ID: <20140511031313.GA22931@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All,
+On Wed, May 07, 2014 at 06:09:52AM -0700, Linus Walleij wrote:
+> On Tue, May 6, 2014 at 5:58 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> 
+> > I got a build error today, since LEDS_VERSATILE can be built-in while LEDS_CLASS
+> > is a module:
+> >
+> > drivers/built-in.o: In function `versatile_leds_probe':
+> > :(.text+0x155020): undefined reference to `led_classdev_register'
+> >
+> > I suggest we turn this option into 'tristate' so that the dependency
+> > tracking works correctly.
+> >
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> Quite tricky these bool/tristate things :-/
+> 
 
-Over the past couple of years, the ARM sub-arch maintainers have been
-doing a great amount of work migrating to devicetree.
+Applied onto next/cleanup.
 
-In conjunction with this effort, we've been slowly migrating the
-existing legacy platforms (board files) over to devicetree.  For the
-small part the mvebu maintainers are responsible for, we can see the
-light at the end of the tunnel now. :-)
 
-I imagine several other sub-arches are in a similar situation.  I think
-it would be useful for us all to sit down, compare notes, and pool our
-resources/experiences to coordinate a final push.
-
-So, I'm proposing a session where each sub-arch gives a brief run-down
-of the status of the legacy board conversion, and wraps up with a todo
-list.  After all of the sub-arches have given their status (5 - 10
-minutes each?), we hash out helping each other with the final pieces.
-
-Also on the agenda, discussing the fate of the legacy sub-arches that
-haven't even begun conversion to devicetree.
-
-The intended outcome would be to have a sorted list of remaining
-conversions, and who is pitching in to help out for each item.  Also, a
-sorted list of unconverted sub-arches, broken down into 'deprecate',
-'convert', and 'seek info'.
-
-On a final note, I'd like to include a hobbyist voice or two in here.
-Since a lot of the legacy platforms are supported by embedded Debian,
-OpenWRT, and similar, getting an idea of which ones we can deprecate
-would save quite a bit of work.
-
-I haven't heard word of an ARM mini-summit yet.  If that happens,
-obviously this topic would be most appropriate there.
-
-Nominations:
-
-Jason Cooper		(auto-nominated)
-Andrew Lunn
-Gregory Clement
-Sebastian Hesselbarth	(auto-nominated)
-Thomas Petazzoni	(auto-nominated)
-
-I can think of several names from the ARM Linux mailinglist, but since I
-can't create a conclusive list, I'll leave it up to the individuals to
-pipe up if they are interested.
-
-thx,
-
-Jason.
+-Olof
