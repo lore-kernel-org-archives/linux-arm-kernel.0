@@ -1,23 +1,19 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Sun, 11 May 2014 09:26:24 +0900
-Subject: [PATCH] ARM: shmobile: henninger: add QSPI DT support
-In-Reply-To: <201405060245.32952.sergei.shtylyov@cogentembedded.com>
-References: <201405060245.32952.sergei.shtylyov@cogentembedded.com>
-Message-ID: <20140511002624.GS31760@verge.net.au>
+Date: Sun, 11 May 2014 10:05:26 +0900
+Subject: [PATCH] ARM: shmobile: Minor cleanup of the Armadillo legacy
+ board code
+In-Reply-To: <20140507233753.29842.55463.sendpatchset@w520>
+References: <20140507233753.29842.55463.sendpatchset@w520>
+Message-ID: <20140511010523.GB31760@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 06, 2014 at 02:45:31AM +0400, Sergei Shtylyov wrote:
-> Define the Henninger board dependent part of the QSPI device node.
-> Add device nodes for Spansion S25FL512S SPI flash and MTD partitions on it.
+On Thu, May 08, 2014 at 08:37:53AM +0900, Magnus Damm wrote:
+> From: Magnus Damm <damm+renesas@opensource.se>
 > 
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> Cleanup the legacy Armadillo board code slightly by
+> removing the pointless eva_add_early_devices() function
 > 
-> ---
-> This patch is against 'renesas-devel-v3.15-rc3-20140502' tag of Simon Horman's
-> 'renesas.git' repo and SDHI0/2 DT support patch posted last weekend.
-> 
->  arch/arm/boot/dts/r8a7791-henninger.dts |   38 ++++++++++++++++++++++++++++++++
->  1 file changed, 38 insertions(+)
+> Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 
 Thanks, I have queued this up.
