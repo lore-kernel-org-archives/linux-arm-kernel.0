@@ -1,153 +1,162 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sun, 11 May 2014 20:17:51 +0200
-Subject: [PATCHv5 03/20] usb: ehci-orion: fix clock reference leaking
-In-Reply-To: <1399832288-19899-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1399832288-19899-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1399832288-19899-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Sun, 11 May 2014 20:17:48 +0200
+Subject: [PATCHv5 00/20] USB support for Armada 38x and Armada 375
+Message-ID: <1399832288-19899-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Hello,
 
-In order to disable the clock in the ->remove() function, a call to
-devm_clk_get() is being made, which further increases the reference
-count of the clock.
+This patch set adds the USB support for the Armada 38x and Armada 375
+SOCs. These SoCs use an xHCI but still need specific initialization,
+mainly to setup the MBus memory windows. They also have another USB
+controller for EHCI, identical to the one used on other mvebu SOCs.
 
-In order to clean this up, a private structure holding a pointer to
-the clock is added using the override mechanism provided by the ehci
-framework. This makes the driver clock handling much more logical.
+This series is also available in
+the branch USB-375-38x-3.15-rc1-V5
+https://github.com/MISL-EBU-System-SW/mainline-public.git
 
-The bug was introduced in v3.6, however the ehci framework allowing to
-use the override mechanism has only been introduced in v3.8, so this
-patch won't apply before it.
+Changes between v4 and v5:
 
-[Thomas: reword commit log, fix goto label names.]
+ * Fixed a compile time problem when CONFIG_USB_XHCI_MVEBU was
+   disabled. Noticed by Shimoda, Yoshihiro
+   <yoshihiro.shimoda.uh@renesas.com>.
 
-Fixes: 8c869edaee07c623066266827371235fb9c12e01 ('ARM: Orion: EHCI: Add support for enabling clocks')
-Cc: <stable@vger.kernel.org> # v3.8+
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
----
- drivers/usb/host/ehci-orion.c | 45 ++++++++++++++++++++++++++++---------------
- 1 file changed, 29 insertions(+), 16 deletions(-)
+ * Added Acked-by from Alan Stern on patches 1 to 4.
 
-diff --git a/drivers/usb/host/ehci-orion.c b/drivers/usb/host/ehci-orion.c
-index 9298be7..9c98bac 100644
---- a/drivers/usb/host/ehci-orion.c
-+++ b/drivers/usb/host/ehci-orion.c
-@@ -42,6 +42,12 @@
- 
- #define DRIVER_DESC "EHCI orion driver"
- 
-+#define hcd_to_orion_priv(h) ((struct orion_ehci_hcd *)hcd_to_ehci(h)->priv)
-+
-+struct orion_ehci_hcd {
-+	struct clk *clk;
-+};
-+
- static const char hcd_name[] = "ehci-orion";
- 
- static struct hc_driver __read_mostly ehci_orion_hc_driver;
-@@ -137,6 +143,10 @@ ehci_orion_conf_mbus_windows(struct usb_hcd *hcd,
- 	}
- }
- 
-+static const struct ehci_driver_overrides orion_overrides __initconst = {
-+	.extra_priv_size =	sizeof(struct orion_ehci_hcd),
-+};
-+
- static int ehci_orion_drv_probe(struct platform_device *pdev)
- {
- 	struct orion_ehci_data *pd = dev_get_platdata(&pdev->dev);
-@@ -144,10 +154,10 @@ static int ehci_orion_drv_probe(struct platform_device *pdev)
- 	struct resource *res;
- 	struct usb_hcd *hcd;
- 	struct ehci_hcd *ehci;
--	struct clk *clk;
- 	void __iomem *regs;
- 	int irq, err;
- 	enum orion_ehci_phy_ver phy_version;
-+	struct orion_ehci_hcd *priv;
- 
- 	if (usb_disabled())
- 		return -ENODEV;
-@@ -187,17 +197,11 @@ static int ehci_orion_drv_probe(struct platform_device *pdev)
- 		goto err;
- 	}
- 
--	/* Not all platforms can gate the clock, so it is not
--	   an error if the clock does not exists. */
--	clk = devm_clk_get(&pdev->dev, NULL);
--	if (!IS_ERR(clk))
--		clk_prepare_enable(clk);
--
- 	hcd = usb_create_hcd(&ehci_orion_hc_driver,
- 			&pdev->dev, dev_name(&pdev->dev));
- 	if (!hcd) {
- 		err = -ENOMEM;
--		goto err_create_hcd;
-+		goto err;
- 	}
- 
- 	hcd->rsrc_start = res->start;
-@@ -208,6 +212,15 @@ static int ehci_orion_drv_probe(struct platform_device *pdev)
- 	ehci->caps = hcd->regs + 0x100;
- 	hcd->has_tt = 1;
- 
-+	priv = hcd_to_orion_priv(hcd);
-+	/*
-+	 * Not all platforms can gate the clock, so it is not an error if
-+	 * the clock does not exists.
-+	 */
-+	priv->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (!IS_ERR(priv->clk))
-+		clk_prepare_enable(priv->clk);
-+
- 	/*
- 	 * (Re-)program MBUS remapping windows if we are asked to.
- 	 */
-@@ -243,10 +256,9 @@ static int ehci_orion_drv_probe(struct platform_device *pdev)
- 	return 0;
- 
- err_add_hcd:
-+	if (!IS_ERR(priv->clk))
-+		clk_disable_unprepare(priv->clk);
- 	usb_put_hcd(hcd);
--err_create_hcd:
--	if (!IS_ERR(clk))
--		clk_disable_unprepare(clk);
- err:
- 	dev_err(&pdev->dev, "init %s fail, %d\n",
- 		dev_name(&pdev->dev), err);
-@@ -257,14 +269,15 @@ err:
- static int ehci_orion_drv_remove(struct platform_device *pdev)
- {
- 	struct usb_hcd *hcd = platform_get_drvdata(pdev);
--	struct clk *clk;
-+	struct orion_ehci_hcd *priv = hcd_to_orion_priv(hcd);
- 
- 	usb_remove_hcd(hcd);
-+
-+	if (!IS_ERR(priv->clk))
-+		clk_disable_unprepare(priv->clk);
-+
- 	usb_put_hcd(hcd);
- 
--	clk = devm_clk_get(&pdev->dev, NULL);
--	if (!IS_ERR(clk))
--		clk_disable_unprepare(clk);
- 	return 0;
- }
- 
-@@ -292,7 +305,7 @@ static int __init ehci_orion_init(void)
- 
- 	pr_info("%s: " DRIVER_DESC "\n", hcd_name);
- 
--	ehci_init_driver(&ehci_orion_hc_driver, NULL);
-+	ehci_init_driver(&ehci_orion_hc_driver, &orion_overrides);
- 	return platform_driver_register(&ehci_orion_driver);
- }
- module_init(ehci_orion_init);
+Changes between v3 and v4:
+
+ * Additional patch that removes the use of of_irq_parse_and_map() in
+   ehci-orion, and just uses platform_get_irq() instead, to avoid a
+   different case between DT and non-T.
+
+ * Additional patch that renames the ehci-orion error handling goto
+   labels to have more meaningful names, in preparation for handling
+   of additional error cases in followup patches.
+
+ * Additional patch to update the ehci-orion Device Tree binding
+   documentation.
+
+ * Merge of 375/38x XHCI support patches: one patch for the driver,
+   one patch for the Device Tree binding documentation (instead of one
+   patch of these, for each SoC).
+
+ * Update of the XHCI Device Tree binding documentation to indicate
+   the new optional clocks property.
+
+ * Update of armada-375.dtsi to add missing spaces in the phy-names
+   definition.
+
+ * Update of armada-38x.dtsi to use 0x4000 instead of 0x3fff for the
+   register area length. Noticed by Andrew Lunn.
+
+ * Changed the PHY driver Kconfig option to only be enabled either
+   when MACH_ARMADA_375 or COMPILE_TEST are enabled. In the previous
+   version, the PHY driver was always enabled, regardless of the
+   platform.
+
+ * Various improvements to the PHY driver:
+
+    - Rename USB2_PHY_CONFIG_ENABLE to USB2_PHY_CONFIG_DISABLE, as
+      suggested by Ezequiel Garcia.
+    - Simplify the logic of armada375_usb_phy_init() by handling the
+      !cluster_phy->enable case first.
+    - Use devm_ioremap_resource() in the ->probe() function instead of
+      of_iomap().
+    - Bail out from ->probe() when a PHY cannot be created.
+    - Fix typos in comments.
+
+ * Reworded the Kconfig prompt and help text of XHCI_MVEBU to indicate
+   that it's for both 375 and 38x (it was only indicating 38x until
+   now).
+
+ * Changed the Makefile bit of the xhci-mvebu driver according to the
+   suggestion of Felipe Balbi, so that things work properly when
+   CONFIG_USB_XHCI_MVEBU is 'm'.
+
+ * Various improvements in the ehci-orion driver:
+
+    - Use better goto labels for error handling in ->probe().
+    - Use devm_phy_optional_get() instead of devm_phy_get(), which
+      allows to handle EPROBE_DEFER cases nicely.
+    - Call phy_power_off() when needed (probe error handling, and
+      remove).
+    - Use __initconst instead of __initdata for override structure, as
+      noticed by checkpatch.
+    - Fix use after free errors noticed by Felipe Balbi.
+
+ * Various improvements to the XHCI driver:
+
+    - Don't make xhci_mvebu_mbus_config() an __init function, since
+      it's called from probe(), which isn't in __init.
+    - Don't use the buggy 'priv[0]' solution implemented in the
+      previous version of the patch set (see in
+      http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/253871.html
+      the details of why it doesn't work). Instead, add a 'struct
+      clk*' field in xhci_hcd to support the clock in xhci-plat,
+      exactly like xhci_hcd has msix_count and msix_entries for
+      xhci-pci.
+    - Misc minor code style improvements.
+
+Thomas
+
+Gregory CLEMENT (17):
+  usb: ehci-orion: fix clock reference leaking
+  usb: ehci-orion: add optional PHY support
+  usb: host: xhci-plat: sort the headers in alphabetic order
+  usb: host: xhci-plat: add clock support
+  usb: host: xhci-plat: add support for the Armada 375/38x XHCI
+    controllers
+  Documentation: dt-bindings: update xhci-platform DT binding
+  phy: add support for USB cluster on the Armada 375 SoC
+  Documentation: dt-bindings: document the Armada 375 USB cluster
+    binding
+  ARM: mvebu: add USB3 support for Armada 38x
+  ARM: mvebu: add USB3 support for Armada 375
+  ARM: configs: enable XHCI mvebu support in mvebu_v7_defconfig
+  ARM: configs: enable XHCI mvebu support in multi_v7_defconfig
+  ARM: mvebu: add Device Tree description of xHCI controllers on Armada
+    38x
+  ARM: mvebu: add Device Tree description of the EHCI controller on
+    Armada 38x
+  ARM: mvebu: add Device Tree description of USB cluster controller on
+    Armada 375
+  ARM: mvebu: add Device Tree description of the xHCI controller on
+    Armada 375
+  ARM: mvebu: add Device Tree description of the EHCI controller on
+    Armada 375
+
+Thomas Petazzoni (3):
+  usb: ehci-orion: use platform_get_irq() for DT probing
+  usb: ehci-orion: rename error goto labels in ehci_orion_drv_probe()
+  Documentation: dt-bindings: update ehci-orion binding documentation
+
+ .../bindings/phy/armada-375-usb-phy-cluster.txt    |  19 +++
+ .../devicetree/bindings/usb/ehci-orion.txt         |   5 +
+ Documentation/devicetree/bindings/usb/usb-xhci.txt |   7 +-
+ arch/arm/boot/dts/armada-375-db.dts                |   8 ++
+ arch/arm/boot/dts/armada-375.dtsi                  |  34 +++++
+ arch/arm/boot/dts/armada-385-db.dts                |  12 ++
+ arch/arm/boot/dts/armada-385-rd.dts                |   4 +
+ arch/arm/boot/dts/armada-38x.dtsi                  |  25 ++++
+ arch/arm/configs/multi_v7_defconfig                |   1 +
+ arch/arm/configs/mvebu_v7_defconfig                |   1 +
+ arch/arm/mach-mvebu/Kconfig                        |   2 +
+ drivers/phy/Kconfig                                |   6 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-armada375-usb2.c                   | 157 +++++++++++++++++++++
+ drivers/usb/host/Kconfig                           |   8 ++
+ drivers/usb/host/Makefile                          |   3 +
+ drivers/usb/host/ehci-orion.c                      |  92 ++++++++----
+ drivers/usb/host/xhci-mvebu.c                      |  70 +++++++++
+ drivers/usb/host/xhci-mvebu.h                      |  21 +++
+ drivers/usb/host/xhci-plat.c                       |  42 +++++-
+ drivers/usb/host/xhci.h                            |   2 +
+ 21 files changed, 488 insertions(+), 32 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/phy/armada-375-usb-phy-cluster.txt
+ create mode 100644 drivers/phy/phy-armada375-usb2.c
+ create mode 100644 drivers/usb/host/xhci-mvebu.c
+ create mode 100644 drivers/usb/host/xhci-mvebu.h
+
 -- 
 1.9.2
