@@ -1,68 +1,30 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 12 May 2014 07:53:54 +0900
-Subject: [PATCH] ARM: shmobile: henninger: add QSPI DT support
-In-Reply-To: <536FBEB7.9080605@cogentembedded.com>
-References: <201405060245.32952.sergei.shtylyov@cogentembedded.com>
- <536FBEB7.9080605@cogentembedded.com>
-Message-ID: <20140511225354.GC6451@verge.net.au>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Mon, 12 May 2014 08:10:50 +0900
+Subject: [PATCH] ARM: shmobile: Use shmobile_init_late() on r8a7740
+Message-ID: <20140511231050.19908.86623.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 11, 2014 at 10:17:27PM +0400, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 05/06/2014 02:45 AM, Sergei Shtylyov wrote:
-> 
-> >Define the Henninger board dependent part of the QSPI device node.
-> >Add device nodes for Spansion S25FL512S SPI flash and MTD partitions on it.
-> 
-> >Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
-> >---
-> >This patch is against 'renesas-devel-v3.15-rc3-20140502' tag of Simon Horman's
-> >'renesas.git' repo and SDHI0/2 DT support patch posted last weekend.
-> 
-> >  arch/arm/boot/dts/r8a7791-henninger.dts |   38 ++++++++++++++++++++++++++++++++
-> >  1 file changed, 38 insertions(+)
-> 
-> >Index: renesas/arch/arm/boot/dts/r8a7791-henninger.dts
-> >===================================================================
-> >--- renesas.orig/arch/arm/boot/dts/r8a7791-henninger.dts
-> >+++ renesas/arch/arm/boot/dts/r8a7791-henninger.dts
-> [...]
-> >@@ -158,3 +163,36 @@
-> >  	cd-gpios = <&gpio6 22 GPIO_ACTIVE_LOW>;
-> >  	status = "okay";
-> >  };
-> >+
-> >+&qspi {
-> >+	pinctrl-0 = <&qspi_pins>;
-> >+	pinctrl-names = "default";
-> >+
-> >+	status = "okay";
-> >+
-> >+	flash at 0 {
-> >+		#address-cells = <1>;
-> >+		#size-cells = <1>;
-> >+		compatible = "spansion,s25fl512s";
-> >+		reg = <0>;
-> >+		spi-max-frequency = <30000000>;
-> >+		spi-tx-bus-width = <4>;
-> >+		spi-rx-bus-width = <4>;
-> >+		m25p,fast-read;
-> >+
-> >+		partition at 0 {
-> >+			label = "loader_prg";
-> >+			reg = <0x00000000 0x00040000>;
-> >+			read-only;
-> >+		};
-> >+		partition at 40000 {
-> >+			label = "user_prg";
-> >+			reg = <0x00040000 0x00400000>;
-> >+			read-only;
-> 
->    Oops, there shouldn't be "read-only" here, I forgot to refresh
-> the patch as I'm now seeing... too bad it's too late to resend now.
-> :-(
+From: Magnus Damm <damm+renesas@opensource.se>
 
-Could you send an incremental fix for me to queue up?
+Hook up ->init_late for r8a7740 to initialize Suspend-to-RAM
+and CPUIdle in case of C-code less board support for r8a7740.
+
+Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+---
+
+ Applies on top of renesas-devel-v3.15-rc5-20140511
+
+ arch/arm/mach-shmobile/setup-r8a7740.c |    1 +
+ 1 file changed, 1 insertion(+)
+
+--- 0003/arch/arm/mach-shmobile/setup-r8a7740.c
++++ work/arch/arm/mach-shmobile/setup-r8a7740.c	2014-04-24 17:55:06.000000000 +0900
+@@ -927,6 +927,7 @@ DT_MACHINE_START(R8A7740_DT, "Generic R8
+ 	.init_early	= shmobile_init_delay,
+ 	.init_irq	= r8a7740_init_irq_of,
+ 	.init_machine	= r8a7740_generic_init,
++	.init_late	= shmobile_init_late,
+ 	.dt_compat	= r8a7740_boards_compat_dt,
+ MACHINE_END
+ 
