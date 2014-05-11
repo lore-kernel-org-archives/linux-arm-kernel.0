@@ -1,116 +1,22 @@
-From: Peter.Chen@freescale.com (Peter Chen)
-Date: Sun, 11 May 2014 00:40:25 +0000
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sun, 11 May 2014 09:34:47 +0800
 Subject: i.MX6 USB OTG support is broken on linux-next
-In-Reply-To: <20140510131815.GT2794@dragon>
+In-Reply-To: <20140510135737.GA1878@shlinux1.ap.freescale.net>
 References: <20140509130046.GP2794@dragon>
  <20140510111003.GA1593@shlinux1.ap.freescale.net>
  <20140510131815.GT2794@dragon>
-Message-ID: <4285b0d55d2545b99c4ba6b703e65a12@BL2PR03MB226.namprd03.prod.outlook.com>
+ <20140510135737.GA1878@shlinux1.ap.freescale.net>
+Message-ID: <20140511013446.GU2794@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
-> 
-> On Sat, May 10, 2014 at 07:10:05PM +0800, Peter Chen wrote:
-> > On Fri, May 09, 2014 at 09:00:47PM +0800, Shawn Guo wrote:
-> > > I'm running next-20140508 kernel on imx6q-sabresd board with USB
-> > > mouse/keyboard connected to OTG port.  It  works well on 3.15-rc but
-> > > is broken on recent linux-next kernel with the message like below.
-> > >
-> > > ...
-> > > usb 1-1: device v413c p2107 is not supported
-> > > hub 1-0:1.0: unable to enumerate USB device on port 1
-> > >
-> > > With the help from Peter, I found that the issue shows up only when
-> > > CONFIG_USB_OTG_FSM is enabled.  The option is enabled by commit
-> 8fd2f1f
-> > > (ARM: imx_v6_v7_defconfig: Enable drivers for i.MX51 USB Host
-> support.)
-> > > from IMX tree.
-> > >
-> > > I guess this is a sign that chipidea otg_fsm driver is buggy?  I do
-> not
-> > > think dropping CONFIG_USB_OTG_FSM selection from imx_v6_v7_defconfig
-> is
-> > > a solution, and we need to fix the issue in usb driver, right?
-> > >
-> >
-> > No, Shawn. The solution of this problem is drop CONFIG_USB_OTG_FSM, I
-> > guess Denis added it wrongly.
-> >
-> > According to Embedded Hosts & OTG spec, OTG devices and Embedded Hosts
-> > both have Targeted Host functionality, and each Targeted Host has
-> > its TPL (Targeted Peripheral List), only the devices are at TPL
-> > are supported by Targeted Host.
-> >
-> > Current Linux TPL only contains limited devices, each Targeted Host
-> > needs to update its TPL when it makes product, (The comments at
-> > otg_whitelist.h also mention it), and the devices are not at TPL
-> > will not be supported, and will report to user as "an unsupported
-> > device" error, at current Linux configuration, once the
-> CONFIG_USB_OTG_FSM
-> > and CONFIG_USB_OTG are chosen, the host will be Targeted Host.
-> >
-> > The reason why Shawn met this problem is: the imx_v6_v7_defconfig set
-> > CONFIG_USB_OTG_FSM, so the CONFIG_USB_OTG and CONFIG_USB_OTG_WHITELIST
-> > are set according to dependency, it makes imx6 device as Targeted Host,
-> > but the devices connected at Shawn's board are not at TPL, so they are
-> > not be supported.
-> >
-> > In a word the CONFIG_USB_OTG_FSM should not be chosen for
-> > defauly kernel configuration. The CONFIG_USB_OTG_FSM should only be
-> chosen
-> > by default when this device goes to make product and the TPL is updated
-> > accordingly.
-> 
-> Thanks for the explanation, Peter.
-> 
-> So this is what I see from USB Kconfig.
-> 
-> config USB_OTG_FSM
->         tristate "USB 2.0 OTG FSM implementation"
->         depends on USB
->         select USB_OTG
->         select USB_PHY
-> 
-> config USB_OTG_WHITELIST
->         bool "Rely on OTG Targeted Peripherals List"
->         depends on USB_OTG || EXPERT
->         default y if USB_OTG
-> 
-> I see that USB_OTG_FSM has a dependency on USB_OTG, and
-> USB_OTG_WHITELIST depends on USB_OTG, but USB_OTG does *not* depends
-> on USB_OTG_WHITELIST.
-> 
-> I'm not sure why we have 'default y if USB_OTG' for USB_OTG_WHITELIST,
-> when this option only makes sense for product producers per your
-> explanation.  So maybe dropping the 'default y' is the right fix?
-> 
+On Sat, May 10, 2014 at 09:57:39PM +0800, Li Jun wrote:
+> As Peter suggested, do not enable OTG_FSM in defconfig since there are very few
+> HNP&SRP capable device in market. With OTG_FSM enabled, even USB_OTG_WHITELIST
+> is not selected, the OTG port still can't work the same as before if you connect
+> a normal usb device to it.
 
-As I explained before: 
-"OTG devices and Embedded Hosts both have Targeted Host functionality,
-and each Targeted Host has its TPL (Targeted Peripheral List), only the 
-devices are at TPL are supported by Targeted Host."
+Oh, okay.  In that case, I will have to drop OTG_FSM from defconfig.
+Thanks for the info.
 
-So when the board is OTG & EH (CONFIG_USB_OTG is set), it should
-have TPL according to spec. In fact, even the CONFIG_USB_OTG_WHITELIST
-is not set, the non-TPL devices have not worked well, eg, it will
-not be enumerated again after it has disconnected from host 10 seconds
-later due to vbus has turned off by host.
-
-Peter
-
-> diff --git a/drivers/usb/core/Kconfig b/drivers/usb/core/Kconfig
-> index cb8e991..9081757 100644
-> --- a/drivers/usb/core/Kconfig
-> +++ b/drivers/usb/core/Kconfig
-> @@ -65,7 +65,6 @@ config USB_OTG
->  config USB_OTG_WHITELIST
->         bool "Rely on OTG Targeted Peripherals List"
->         depends on USB_OTG || EXPERT
-> -       default y if USB_OTG
->         help
->           If you say Y here, the "otg_whitelist.h" file will be used as a
->           product whitelist, so USB peripherals not listed there will be
-> 
-> Shawn
+Shawn
