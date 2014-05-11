@@ -1,73 +1,52 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Sun, 11 May 2014 20:14:00 +0530
-Subject: [PATCH 5/6] usb: host: ehci-tegra: Use devm_ioremap_resource
- instead of devm_ioremap
-In-Reply-To: <536E814E.4020805@cogentembedded.com>
-References: <1399715823-19839-1-git-send-email-gautam.vivek@samsung.com>
- <1399715823-19839-6-git-send-email-gautam.vivek@samsung.com>
- <536E814E.4020805@cogentembedded.com>
-Message-ID: <CAFp+6iGSfhLB4J4Wr80WSih2bdzcO8vWhgZAonPv6SXbCp-Cmw@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sun, 11 May 2014 08:55:43 -0700
+Subject: omap4-panda-es boot issues with v3.15-rc4
+In-Reply-To: <7heh02ms82.fsf@paris.lan>
+References: <536B7E44.2040303@ti.com> <7hppjos2w2.fsf@paris.lan>
+ <CAGa+x84VB3CXDm71JWxHx1-Qk1xVNeXdwUjZnb42_wg+piOzzA@mail.gmail.com>
+ <20140508165558.GB2198@atomide.com>
+ <20140508184055.GC2198@atomide.com> <7hha4zsyro.fsf@paris.lan>
+ <536C9084.50209@ti.com> <7heh02ms82.fsf@paris.lan>
+Message-ID: <20140511155542.GD28266@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+* Kevin Hilman <khilman@linaro.org> [140509 16:46]:
+> Roger Quadros <rogerq@ti.com> writes:
+> 
+> > Kevin,
+> >
+> > On 05/09/2014 01:15 AM, Kevin Hilman wrote:
+> >> Tony Lindgren <tony@atomide.com> writes:
+> >> 
+> >> [...]
+> >> 
+> >>> ..but I think I found the cause for recent hangs on panda, just a wild
+> >>> guess based on looking at the recent cpuidle patches after v3.14.
+> >>>
+> >>> Looks like reverting 0b89e9aa2856 (cpuidle: delay enabling interrupts
+> >>> until all coupled CPUs leave idle) makes booting work reliably again
+> >>> on panda.
+> >>>
+> >>> Can you guys confirm, so far no issues here after few boot tests,
+> >>> but it might be too early to tell.
+> >> 
+> >> Reverting that makes things a bit more stable, but it still eventually
+> >> fails in the same way.  For me it took 8 boots for it to eventually
+> >> fail.
+> >> 
+> >> However, if I build with CONFIG_CPU_IDLE=n, it becomes much more stable
+> >> (20+ boots in a row and still going.)
+> >> 
+> >
+> > Can you please test with CPU_IDLE enabled but C3 disabled as in below patch?
+> > It worked for me 10/10 boots.
+> 
+> Yup, it worked for me too for 10/10 boots in a row.
 
+But what has caused this regression, does it work reliably with let's
+say v3.13 or v3.12?
 
-On Sun, May 11, 2014 at 1:13 AM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> Hello.
->
->
-> On 05/10/2014 01:57 PM, Vivek Gautam wrote:
->
->> Using devm_ioremap_resource() API should actually be preferred over
->> devm_ioremap(), since the former request the mem region first and then
->> gives back the ioremap'ed memory pointer.
->> devm_ioremap_resource() calls request_mem_region(), therby preventing
->> other drivers to make any overlapping call to the same region.
->
->
->> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
->> ---
->>   drivers/usb/host/ehci-tegra.c |    3 +--
->>   1 file changed, 1 insertion(+), 2 deletions(-)
->
->
->> diff --git a/drivers/usb/host/ehci-tegra.c b/drivers/usb/host/ehci-tegra.c
->> index 572634c..ccc6433 100644
->> --- a/drivers/usb/host/ehci-tegra.c
->> +++ b/drivers/usb/host/ehci-tegra.c
->> @@ -411,9 +411,8 @@ static int tegra_ehci_probe(struct platform_device
->> *pdev)
->>         }
->>         hcd->rsrc_start = res->start;
->>         hcd->rsrc_len = resource_size(res);
->> -       hcd->regs = devm_ioremap(&pdev->dev, res->start,
->> resource_size(res));
->> +       hcd->regs = devm_ioremap_resource(&pdev->dev, res);
->>         if (!hcd->regs) {
->
->
->    This has to be changed as well as devm_ioremap_resource() returns error,
-> not NULL.
+Regards,
 
-Have already updated in the v2 version of this patch, and others in the series.
-
->
->
->> -               dev_err(&pdev->dev, "Failed to remap I/O memory\n");
->>                 err = -ENOMEM;
->
->
->    This needs to be changed as well, to pass up the error code
-> devm_ioremap_resource() returned.
-
-ditoo
-
-
-
--- 
-Best Regards
-Vivek Gautam
-Samsung R&D Institute, Bangalore
-India
+Tony
