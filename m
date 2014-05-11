@@ -1,38 +1,38 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 10 May 2014 22:05:25 -0700
-Subject: [GIT PULL] DaVinci fixes for v3.15
-In-Reply-To: <536E0627.3080801@ti.com>
-References: <535FB84B.802@ti.com>
-	<536E0627.3080801@ti.com>
-Message-ID: <CAOesGMheMS7OCY4PXNcr6+NwUasJMHwY+EXvcS61aO-jdNBtsA@mail.gmail.com>
+Date: Sat, 10 May 2014 22:16:16 -0700
+Subject: [PATCH] arm: edma: Fix xbar mapping
+In-Reply-To: <534BED36.2060907@ti.com>
+References: <alpine.DEB.2.02.1404132123100.22697@ionos.tec.linutronix.de>
+ <534BED36.2060907@ti.com>
+Message-ID: <CAOesGMh8xkukSsF4MSUpWcFu1YK1ipUOJWjWMXwAsy8HmZQLcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 10, 2014 at 3:57 AM, Sekhar Nori <nsekhar@ti.com> wrote:
-> Hi,
+On Mon, Apr 14, 2014 at 7:14 AM, Sekhar Nori <nsekhar@ti.com> wrote:
+> + Matt with current e-mail address.
 >
-> On Tuesday 29 April 2014 08:03 PM, Sekhar Nori wrote:
->> The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+> On Monday 14 April 2014 02:18 AM, Thomas Gleixner wrote:
+>> Subject: arm: edma: Fix xbar mapping
+>> From: Thomas Gleixner <tglx@linutronix.de>
+>> Date: Sun, 13 Apr 2014 20:44:46 +0200
 >>
->>   Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+>> This is another great example of trainwreck engineering:
 >>
->> are available in the git repository at:
->>
->>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v3.15-rc4
->>
->> for you to fetch changes up to cf7eb979116c2568e8bc3b6a7269c7a359864ace:
->>
->>   ARM: common: edma: Fix xbar mapping (2014-04-29 19:33:49 +0530)
+>> commit 2646a0e529 (ARM: edma: Add EDMA crossbar event mux support)
+>> added support for using EDMA on peripherals which have no direct EDMA
+>> event mapping.
 >
-> Can you please pull this fix?
+> I committed it, so the blame goes to me (at least in part).
 
-Sekhar,
+Another part of the problem is that it's a feature without in-tree
+users -- there's not a single DT that defines the nodes (and thus can
+be used to test it). Sure, there are no strict requirements to have
+all bindings implemented on a platform but it sure does help catch
+problems if you can test without applying out-of-tree patches to make
+a feature work.
 
-I missed it because it wasn't sent to arm at kernel.org. Please send pull
-requests and patches you want us to directly apply there in the future
-(it goes to all of us).
+(I just merged the pull request from Sekhar, I had missed it before.
+Should make -rc6).
 
-I'll merge it in now though. Seems like we missed -rc5 and there won't
-be much merges this week, but it should make it for -rc6.
 
 -Olof
