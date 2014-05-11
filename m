@@ -1,487 +1,368 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 12 May 2014 00:06:25 +0200
-Subject: [PATCH v3 2/9] clk: samsung: add clock driver for external clock
- outputs
+Date: Mon, 12 May 2014 00:06:58 +0200
+Subject: [PATCH v3 3/9] ARM: S3C24XX: enable usage of common dclk if common
+ clock framework is enabled
 In-Reply-To: <3427359.fjFAW0MSIR@phil>
 References: <3427359.fjFAW0MSIR@phil>
-Message-ID: <1444923.q6lJH51ZLC@phil>
+Message-ID: <5267332.6suYJ7Ld43@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a driver for controlling the external clock outputs of
-s3c24xx architectures including the dclk muxes and dividers.
+Add platform device and select the correct implementation automatically
+depending on wether the old samsung_clock or the common clock framework
+is enabled.
 
-The driver at the moment only supports the legacy non-dt boards using these
-clock outputs. The clock-output control itself is part of the system-controller
-mainly controlled by the pinctrl drivers. So it should most likely be
-integrated there for dt platforms.
+This is only done for machines already using the old dclk implementation,
+as everybody else should move to use dt anyway.
+
+The machine-specific settings for the external clocks will have to be set
+by somebody with knowledge about the specific hardware.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-Acked-by: Mike Turquette <mturquette@linaro.org>
-Acked-by: Tomasz Figa <t.figa@samsung.com>
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 ---
- drivers/clk/samsung/Makefile           |   1 +
- drivers/clk/samsung/clk-s3c2410-dclk.c | 440 +++++++++++++++++++++++++++++++++
- 2 files changed, 441 insertions(+)
- create mode 100644 drivers/clk/samsung/clk-s3c2410-dclk.c
+ arch/arm/mach-s3c24xx/Kconfig       | 22 +++++++++++++++++-----
+ arch/arm/mach-s3c24xx/common.c      | 14 ++++++++++++++
+ arch/arm/mach-s3c24xx/common.h      |  2 ++
+ arch/arm/mach-s3c24xx/mach-anubis.c |  5 +++++
+ arch/arm/mach-s3c24xx/mach-bast.c   |  5 +++++
+ arch/arm/mach-s3c24xx/mach-osiris.c |  5 +++++
+ arch/arm/mach-s3c24xx/mach-rx1950.c |  5 +++++
+ arch/arm/mach-s3c24xx/mach-vr1000.c |  5 +++++
+ arch/arm/mach-s3c24xx/s3c244x.c     |  2 ++
+ 9 files changed, 60 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/clk/samsung/Makefile b/drivers/clk/samsung/Makefile
-index 56e7d38..28ba4eb 100644
---- a/drivers/clk/samsung/Makefile
-+++ b/drivers/clk/samsung/Makefile
-@@ -9,6 +9,7 @@ obj-$(CONFIG_SOC_EXYNOS5260)	+= clk-exynos5260.o
- obj-$(CONFIG_SOC_EXYNOS5420)	+= clk-exynos5420.o
- obj-$(CONFIG_SOC_EXYNOS5440)	+= clk-exynos5440.o
- obj-$(CONFIG_ARCH_EXYNOS)	+= clk-exynos-audss.o
-+obj-$(CONFIG_S3C2410_COMMON_DCLK)+= clk-s3c2410-dclk.o
- obj-$(CONFIG_S3C2412_COMMON_CLK)+= clk-s3c2412.o
- obj-$(CONFIG_S3C2443_COMMON_CLK)+= clk-s3c2443.o
- obj-$(CONFIG_ARCH_S3C64XX)	+= clk-s3c64xx.o
-diff --git a/drivers/clk/samsung/clk-s3c2410-dclk.c b/drivers/clk/samsung/clk-s3c2410-dclk.c
-new file mode 100644
-index 0000000..8d8dff0
---- /dev/null
-+++ b/drivers/clk/samsung/clk-s3c2410-dclk.c
-@@ -0,0 +1,440 @@
-+/*
-+ * Copyright (c) 2013 Heiko Stuebner <heiko@sntech.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * Common Clock Framework support for s3c24xx external clock output.
-+ */
+diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
+index fbafb9a..b4c055b 100644
+--- a/arch/arm/mach-s3c24xx/Kconfig
++++ b/arch/arm/mach-s3c24xx/Kconfig
+@@ -18,6 +18,13 @@ config PLAT_S3C24XX
+ 	help
+ 	  Base platform code for any Samsung S3C24XX device
+ 
++config S3C2410_COMMON_DCLK
++	bool
++	select REGMAP_MMIO
++	help
++	  Temporary symbol to build the dclk driver based on the common clock
++	  framework.
 +
-+#include <linux/platform_device.h>
-+#include <linux/module.h>
-+#include "clk.h"
+ menu "SAMSUNG S3C24XX SoCs Support"
+ 
+ comment "S3C24XX SoCs"
+@@ -264,7 +271,8 @@ config ARCH_BAST
+ 	select ISA
+ 	select MACH_BAST_IDE
+ 	select S3C2410_IOTIMING if ARM_S3C2410_CPUFREQ
+-	select S3C24XX_DCLK
++	select S3C24XX_DCLK if SAMSUNG_CLOCK
++	select S3C2410_COMMON_DCLK if COMMON_CLK
+ 	select S3C24XX_SIMTEC_NOR
+ 	select S3C24XX_SIMTEC_PM if PM
+ 	select S3C24XX_SIMTEC_USB
+@@ -345,7 +353,8 @@ config MACH_TCT_HAMMER
+ config MACH_VR1000
+ 	bool "Thorcom VR1000"
+ 	select MACH_BAST_IDE
+-	select S3C24XX_DCLK
++	select S3C24XX_DCLK if SAMSUNG_CLOCK
++	select S3C2410_COMMON_DCLK if COMMON_CLK
+ 	select S3C24XX_SIMTEC_NOR
+ 	select S3C24XX_SIMTEC_PM if PM
+ 	select S3C24XX_SIMTEC_USB
+@@ -530,7 +539,8 @@ config MACH_ANUBIS
+ 	bool "Simtec Electronics ANUBIS"
+ 	select HAVE_PATA_PLATFORM
+ 	select S3C2440_XTAL_12000000
+-	select S3C24XX_DCLK
++	select S3C24XX_DCLK if SAMSUNG_CLOCK
++	select S3C2410_COMMON_DCLK if COMMON_CLK
+ 	select S3C24XX_SIMTEC_PM if PM
+ 	select S3C_DEV_USB_HOST
+ 	help
+@@ -570,7 +580,8 @@ config MACH_OSIRIS
+ 	bool "Simtec IM2440D20 (OSIRIS) module"
+ 	select S3C2410_IOTIMING if ARM_S3C2440_CPUFREQ
+ 	select S3C2440_XTAL_12000000
+-	select S3C24XX_DCLK
++	select S3C24XX_DCLK if SAMSUNG_CLOCK
++	select S3C2410_COMMON_DCLK if COMMON_CLK
+ 	select S3C24XX_SIMTEC_PM if PM
+ 	select S3C_DEV_NAND
+ 	select S3C_DEV_USB_HOST
+@@ -641,7 +652,8 @@ config MACH_RX1950
+ 	select PM_H1940 if PM
+ 	select S3C2410_IOTIMING if ARM_S3C2440_CPUFREQ
+ 	select S3C2440_XTAL_16934400
+-	select S3C24XX_DCLK
++	select S3C24XX_DCLK if SAMSUNG_CLOCK
++	select S3C2410_COMMON_DCLK if COMMON_CLK
+ 	select S3C24XX_PWM
+ 	select S3C_DEV_NAND
+ 	help
+diff --git a/arch/arm/mach-s3c24xx/common.c b/arch/arm/mach-s3c24xx/common.c
+index ad5b76b..7cc6d94 100644
+--- a/arch/arm/mach-s3c24xx/common.c
++++ b/arch/arm/mach-s3c24xx/common.c
+@@ -553,3 +553,17 @@ void __init s3c2443_init_clocks(int xtal)
+ 	s3c2443_common_clk_init(NULL, xtal, 1, S3C24XX_VA_CLKPWR);
+ }
+ #endif
 +
-+/* legacy access to misccr, until dt conversion is finished */
-+#include <mach/hardware.h>
-+#include <mach/regs-gpio.h>
-+
-+#define MUX_DCLK0	0
-+#define MUX_DCLK1	1
-+#define DIV_DCLK0	2
-+#define DIV_DCLK1	3
-+#define GATE_DCLK0	4
-+#define GATE_DCLK1	5
-+#define MUX_CLKOUT0	6
-+#define MUX_CLKOUT1	7
-+#define DCLK_MAX_CLKS	(MUX_CLKOUT1 + 1)
-+
-+enum supported_socs {
-+	S3C2410,
-+	S3C2412,
-+	S3C2440,
-+	S3C2443,
++#if defined(CONFIG_CPU_S3C2410) || defined(CONFIG_CPU_S3C2440) || \
++	defined(CONFIG_CPU_S3C2442)
++static struct resource s3c2410_dclk_resource[] = {
++	[0] = DEFINE_RES_MEM(0x56000084, 0x4),
 +};
 +
-+struct s3c24xx_dclk_drv_data {
-+	const char **clkout0_parent_names;
-+	int clkout0_num_parents;
-+	const char **clkout1_parent_names;
-+	int clkout1_num_parents;
-+	const char **mux_parent_names;
-+	int mux_num_parents;
++struct platform_device s3c2410_device_dclk = {
++	.name		= "s3c2410-dclk",
++	.id		= 0,
++	.num_resources	= ARRAY_SIZE(s3c2410_dclk_resource),
++	.resource	= s3c2410_dclk_resource,
 +};
-+
-+/*
-+ * Clock for output-parent selection in misccr
-+ */
-+
-+struct s3c24xx_clkout {
-+	struct clk_hw		hw;
-+	u32			mask;
-+	u8			shift;
-+};
-+
-+#define to_s3c24xx_clkout(_hw) container_of(_hw, struct s3c24xx_clkout, hw)
-+
-+static u8 s3c24xx_clkout_get_parent(struct clk_hw *hw)
-+{
-+	struct s3c24xx_clkout *clkout = to_s3c24xx_clkout(hw);
-+	int num_parents = __clk_get_num_parents(hw->clk);
-+	u32 val;
-+
-+	val = readl_relaxed(S3C24XX_MISCCR) >> clkout->shift;
-+	val >>= clkout->shift;
-+	val &= clkout->mask;
-+
-+	if (val >= num_parents)
-+		return -EINVAL;
-+
-+	return val;
-+}
-+
-+static int s3c24xx_clkout_set_parent(struct clk_hw *hw, u8 index)
-+{
-+	struct s3c24xx_clkout *clkout = to_s3c24xx_clkout(hw);
-+	int ret = 0;
-+
-+	s3c2410_modify_misccr((clkout->mask << clkout->shift),
-+			      (index << clkout->shift));
-+
-+	return ret;
-+}
-+
-+const struct clk_ops s3c24xx_clkout_ops = {
-+	.get_parent = s3c24xx_clkout_get_parent,
-+	.set_parent = s3c24xx_clkout_set_parent,
-+	.determine_rate = __clk_mux_determine_rate,
-+};
-+
-+struct clk *s3c24xx_register_clkout(struct device *dev, const char *name,
-+		const char **parent_names, u8 num_parents,
-+		u8 shift, u32 mask)
-+{
-+	struct s3c24xx_clkout *clkout;
-+	struct clk *clk;
-+	struct clk_init_data init;
-+
-+	/* allocate the clkout */
-+	clkout = kzalloc(sizeof(*clkout), GFP_KERNEL);
-+	if (!clkout)
-+		return ERR_PTR(-ENOMEM);
-+
-+	init.name = name;
-+	init.ops = &s3c24xx_clkout_ops;
-+	init.flags = CLK_IS_BASIC;
-+	init.parent_names = parent_names;
-+	init.num_parents = num_parents;
-+
-+	clkout->shift = shift;
-+	clkout->mask = mask;
-+	clkout->hw.init = &init;
-+
-+	clk = clk_register(dev, &clkout->hw);
-+
-+	return clk;
-+}
-+
-+/*
-+ * dclk and clkout init
-+ */
-+
-+struct s3c24xx_dclk {
-+	struct device *dev;
-+	void __iomem *base;
-+	struct clk_onecell_data clk_data;
-+	struct notifier_block dclk0_div_change_nb;
-+	struct notifier_block dclk1_div_change_nb;
-+	spinlock_t dclk_lock;
-+	unsigned long reg_save;
-+};
-+
-+#define to_s3c24xx_dclk0(x) \
-+		container_of(x, struct s3c24xx_dclk, dclk0_div_change_nb)
-+
-+#define to_s3c24xx_dclk1(x) \
-+		container_of(x, struct s3c24xx_dclk, dclk1_div_change_nb)
-+
-+PNAME(dclk_s3c2410_p) = { "pclk", "uclk" };
-+PNAME(clkout0_s3c2410_p) = { "mpll", "upll", "fclk", "hclk", "pclk",
-+			     "gate_dclk0" };
-+PNAME(clkout1_s3c2410_p) = { "mpll", "upll", "fclk", "hclk", "pclk",
-+			     "gate_dclk1" };
-+
-+PNAME(clkout0_s3c2412_p) = { "mpll", "upll", "rtc_clkout",
-+			     "hclk", "pclk", "gate_dclk0" };
-+PNAME(clkout1_s3c2412_p) = { "xti", "upll", "fclk", "hclk", "pclk",
-+			     "gate_dclk1" };
-+
-+PNAME(clkout0_s3c2440_p) = { "xti", "upll", "fclk", "hclk", "pclk",
-+			     "gate_dclk0" };
-+PNAME(clkout1_s3c2440_p) = { "mpll", "upll", "rtc_clkout",
-+			     "hclk", "pclk", "gate_dclk1" };
-+
-+PNAME(dclk_s3c2443_p) = { "pclk", "epll" };
-+PNAME(clkout0_s3c2443_p) = { "xti", "epll", "armclk", "hclk", "pclk",
-+			     "gate_dclk0" };
-+PNAME(clkout1_s3c2443_p) = { "dummy", "epll", "rtc_clkout",
-+			     "hclk", "pclk", "gate_dclk1" };
-+
-+#define DCLKCON_DCLK_DIV_MASK		0xf
-+#define DCLKCON_DCLK0_DIV_SHIFT		4
-+#define DCLKCON_DCLK0_CMP_SHIFT		8
-+#define DCLKCON_DCLK1_DIV_SHIFT		20
-+#define DCLKCON_DCLK1_CMP_SHIFT		24
-+
-+static void s3c24xx_dclk_update_cmp(struct s3c24xx_dclk *s3c24xx_dclk,
-+				    int div_shift, int cmp_shift)
-+{
-+	unsigned long flags = 0;
-+	u32 dclk_con, div, cmp;
-+
-+	spin_lock_irqsave(&s3c24xx_dclk->dclk_lock, flags);
-+
-+	dclk_con = readl_relaxed(s3c24xx_dclk->base);
-+
-+	div = ((dclk_con >> div_shift) & DCLKCON_DCLK_DIV_MASK) + 1;
-+	cmp = ((div + 1) / 2) - 1;
-+
-+	dclk_con &= ~(DCLKCON_DCLK_DIV_MASK << cmp_shift);
-+	dclk_con |= (cmp << cmp_shift);
-+
-+	writel_relaxed(dclk_con, s3c24xx_dclk->base);
-+
-+	spin_unlock_irqrestore(&s3c24xx_dclk->dclk_lock, flags);
-+}
-+
-+static int s3c24xx_dclk0_div_notify(struct notifier_block *nb,
-+			       unsigned long event, void *data)
-+{
-+	struct s3c24xx_dclk *s3c24xx_dclk = to_s3c24xx_dclk0(nb);
-+
-+	if (event == POST_RATE_CHANGE) {
-+		s3c24xx_dclk_update_cmp(s3c24xx_dclk,
-+			DCLKCON_DCLK0_DIV_SHIFT, DCLKCON_DCLK0_CMP_SHIFT);
-+	}
-+
-+	return NOTIFY_DONE;
-+}
-+
-+static int s3c24xx_dclk1_div_notify(struct notifier_block *nb,
-+			       unsigned long event, void *data)
-+{
-+	struct s3c24xx_dclk *s3c24xx_dclk = to_s3c24xx_dclk1(nb);
-+
-+	if (event == POST_RATE_CHANGE) {
-+		s3c24xx_dclk_update_cmp(s3c24xx_dclk,
-+			DCLKCON_DCLK1_DIV_SHIFT, DCLKCON_DCLK1_CMP_SHIFT);
-+	}
-+
-+	return NOTIFY_DONE;
-+}
-+
-+#ifdef CONFIG_PM_SLEEP
-+static int s3c24xx_dclk_suspend(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct s3c24xx_dclk *s3c24xx_dclk = platform_get_drvdata(pdev);
-+
-+	s3c24xx_dclk->reg_save = readl_relaxed(s3c24xx_dclk->base);
-+	return 0;
-+}
-+
-+static int s3c24xx_dclk_resume(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct s3c24xx_dclk *s3c24xx_dclk = platform_get_drvdata(pdev);
-+
-+	writel_relaxed(s3c24xx_dclk->reg_save, s3c24xx_dclk->base);
-+	return 0;
-+}
 +#endif
+diff --git a/arch/arm/mach-s3c24xx/common.h b/arch/arm/mach-s3c24xx/common.h
+index 3fade6d..50504c7 100644
+--- a/arch/arm/mach-s3c24xx/common.h
++++ b/arch/arm/mach-s3c24xx/common.h
+@@ -114,6 +114,8 @@ extern struct platform_device s3c2412_device_dma;
+ extern struct platform_device s3c2440_device_dma;
+ extern struct platform_device s3c2443_device_dma;
+ 
++extern struct platform_device s3c2410_device_dclk;
 +
-+static SIMPLE_DEV_PM_OPS(s3c24xx_dclk_pm_ops,
-+			 s3c24xx_dclk_suspend, s3c24xx_dclk_resume);
-+
-+static int s3c24xx_dclk_probe(struct platform_device *pdev)
-+{
-+	struct s3c24xx_dclk *s3c24xx_dclk;
-+	struct resource *mem;
-+	struct clk **clk_table;
-+	struct s3c24xx_dclk_drv_data *dclk_variant;
-+	int ret, i;
-+
-+	s3c24xx_dclk = devm_kzalloc(&pdev->dev, sizeof(*s3c24xx_dclk),
-+				    GFP_KERNEL);
-+	if (!s3c24xx_dclk)
-+		return -ENOMEM;
-+
-+	s3c24xx_dclk->dev = &pdev->dev;
-+	platform_set_drvdata(pdev, s3c24xx_dclk);
-+	spin_lock_init(&s3c24xx_dclk->dclk_lock);
-+
-+	clk_table = devm_kzalloc(&pdev->dev,
-+				 sizeof(struct clk *) * DCLK_MAX_CLKS,
-+				 GFP_KERNEL);
-+	if (!clk_table)
-+		return -ENOMEM;
-+
-+	s3c24xx_dclk->clk_data.clks = clk_table;
-+	s3c24xx_dclk->clk_data.clk_num = DCLK_MAX_CLKS;
-+
-+	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	s3c24xx_dclk->base = devm_ioremap_resource(&pdev->dev, mem);
-+	if (IS_ERR(s3c24xx_dclk->base))
-+		return PTR_ERR(s3c24xx_dclk->base);
-+
-+	dclk_variant = (struct s3c24xx_dclk_drv_data *)
-+				platform_get_device_id(pdev)->driver_data;
-+
-+
-+	clk_table[MUX_DCLK0] = clk_register_mux(&pdev->dev, "mux_dclk0",
-+				dclk_variant->mux_parent_names,
-+				dclk_variant->mux_num_parents, 0,
-+				s3c24xx_dclk->base, 1, 1, 0,
-+				&s3c24xx_dclk->dclk_lock);
-+	clk_table[MUX_DCLK1] = clk_register_mux(&pdev->dev, "mux_dclk1",
-+				dclk_variant->mux_parent_names,
-+				dclk_variant->mux_num_parents, 0,
-+				s3c24xx_dclk->base, 17, 1, 0,
-+				&s3c24xx_dclk->dclk_lock);
-+
-+	clk_table[DIV_DCLK0] = clk_register_divider(&pdev->dev, "div_dclk0",
-+				"mux_dclk0", 0, s3c24xx_dclk->base,
-+				4, 4, 0, &s3c24xx_dclk->dclk_lock);
-+	clk_table[DIV_DCLK1] = clk_register_divider(&pdev->dev, "div_dclk1",
-+				"mux_dclk1", 0, s3c24xx_dclk->base,
-+				20, 4, 0, &s3c24xx_dclk->dclk_lock);
-+
-+	clk_table[GATE_DCLK0] = clk_register_gate(&pdev->dev, "gate_dclk0",
-+				"div_dclk0", CLK_SET_RATE_PARENT,
-+				s3c24xx_dclk->base, 0, 0,
-+				&s3c24xx_dclk->dclk_lock);
-+	clk_table[GATE_DCLK1] = clk_register_gate(&pdev->dev, "gate_dclk1",
-+				"div_dclk1", CLK_SET_RATE_PARENT,
-+				s3c24xx_dclk->base, 16, 0,
-+				&s3c24xx_dclk->dclk_lock);
-+
-+	clk_table[MUX_CLKOUT0] = s3c24xx_register_clkout(&pdev->dev,
-+				"clkout0", dclk_variant->clkout0_parent_names,
-+				dclk_variant->clkout0_num_parents, 4, 7);
-+	clk_table[MUX_CLKOUT1] = s3c24xx_register_clkout(&pdev->dev,
-+				"clkout1", dclk_variant->clkout1_parent_names,
-+				dclk_variant->clkout1_num_parents, 8, 7);
-+
-+	for (i = 0; i < DCLK_MAX_CLKS; i++)
-+		if (IS_ERR(clk_table[i])) {
-+			dev_err(&pdev->dev, "clock %d failed to register\n", i);
-+			ret = PTR_ERR(clk_table[i]);
-+			goto err_clk_register;
-+		}
-+
-+	ret = clk_register_clkdev(clk_table[MUX_DCLK0], "dclk0", NULL);
-+	if (!ret)
-+		ret = clk_register_clkdev(clk_table[MUX_DCLK1], "dclk1", NULL);
-+	if (!ret)
-+		ret = clk_register_clkdev(clk_table[MUX_CLKOUT0],
-+					  "clkout0", NULL);
-+	if (!ret)
-+		ret = clk_register_clkdev(clk_table[MUX_CLKOUT1],
-+					  "clkout1", NULL);
-+	if (ret) {
-+		dev_err(&pdev->dev, "failed to register aliases, %d\n", ret);
-+		goto err_clk_register;
-+	}
-+
-+	s3c24xx_dclk->dclk0_div_change_nb.notifier_call =
-+						s3c24xx_dclk0_div_notify;
-+
-+	s3c24xx_dclk->dclk1_div_change_nb.notifier_call =
-+						s3c24xx_dclk1_div_notify;
-+
-+	ret = clk_notifier_register(clk_table[DIV_DCLK0],
-+				    &s3c24xx_dclk->dclk0_div_change_nb);
-+	if (ret)
-+		goto err_clk_register;
-+
-+	ret = clk_notifier_register(clk_table[DIV_DCLK1],
-+				    &s3c24xx_dclk->dclk1_div_change_nb);
-+	if (ret)
-+		goto err_dclk_notify;
-+
-+	return 0;
-+
-+err_dclk_notify:
-+	clk_notifier_unregister(clk_table[DIV_DCLK0],
-+				&s3c24xx_dclk->dclk0_div_change_nb);
-+err_clk_register:
-+	for (i = 0; i < DCLK_MAX_CLKS; i++)
-+		if (clk_table[i] && !IS_ERR(clk_table[i]))
-+			clk_unregister(clk_table[i]);
-+
-+	return ret;
-+}
-+
-+static int s3c24xx_dclk_remove(struct platform_device *pdev)
-+{
-+	struct s3c24xx_dclk *s3c24xx_dclk = platform_get_drvdata(pdev);
-+	struct clk **clk_table = s3c24xx_dclk->clk_data.clks;
-+	int i;
-+
-+	clk_notifier_unregister(clk_table[DIV_DCLK1],
-+				&s3c24xx_dclk->dclk1_div_change_nb);
-+	clk_notifier_unregister(clk_table[DIV_DCLK0],
-+				&s3c24xx_dclk->dclk0_div_change_nb);
-+
-+	for (i = 0; i < DCLK_MAX_CLKS; i++)
-+		clk_unregister(clk_table[i]);
-+
-+	return 0;
-+}
-+
-+static struct s3c24xx_dclk_drv_data dclk_variants[] = {
-+	[S3C2410] = {
-+		.clkout0_parent_names = clkout0_s3c2410_p,
-+		.clkout0_num_parents = ARRAY_SIZE(clkout0_s3c2410_p),
-+		.clkout1_parent_names = clkout1_s3c2410_p,
-+		.clkout1_num_parents = ARRAY_SIZE(clkout1_s3c2410_p),
-+		.mux_parent_names = dclk_s3c2410_p,
-+		.mux_num_parents = ARRAY_SIZE(dclk_s3c2410_p),
-+	},
-+	[S3C2412] = {
-+		.clkout0_parent_names = clkout0_s3c2412_p,
-+		.clkout0_num_parents = ARRAY_SIZE(clkout0_s3c2412_p),
-+		.clkout1_parent_names = clkout1_s3c2412_p,
-+		.clkout1_num_parents = ARRAY_SIZE(clkout1_s3c2412_p),
-+		.mux_parent_names = dclk_s3c2410_p,
-+		.mux_num_parents = ARRAY_SIZE(dclk_s3c2410_p),
-+	},
-+	[S3C2440] = {
-+		.clkout0_parent_names = clkout0_s3c2440_p,
-+		.clkout0_num_parents = ARRAY_SIZE(clkout0_s3c2440_p),
-+		.clkout1_parent_names = clkout1_s3c2440_p,
-+		.clkout1_num_parents = ARRAY_SIZE(clkout1_s3c2440_p),
-+		.mux_parent_names = dclk_s3c2410_p,
-+		.mux_num_parents = ARRAY_SIZE(dclk_s3c2410_p),
-+	},
-+	[S3C2443] = {
-+		.clkout0_parent_names = clkout0_s3c2443_p,
-+		.clkout0_num_parents = ARRAY_SIZE(clkout0_s3c2443_p),
-+		.clkout1_parent_names = clkout1_s3c2443_p,
-+		.clkout1_num_parents = ARRAY_SIZE(clkout1_s3c2443_p),
-+		.mux_parent_names = dclk_s3c2443_p,
-+		.mux_num_parents = ARRAY_SIZE(dclk_s3c2443_p),
-+	},
-+};
-+
-+static struct platform_device_id s3c24xx_dclk_driver_ids[] = {
-+	{
-+		.name		= "s3c2410-dclk",
-+		.driver_data	= (kernel_ulong_t)&dclk_variants[S3C2410],
-+	}, {
-+		.name		= "s3c2412-dclk",
-+		.driver_data	= (kernel_ulong_t)&dclk_variants[S3C2412],
-+	}, {
-+		.name		= "s3c2440-dclk",
-+		.driver_data	= (kernel_ulong_t)&dclk_variants[S3C2440],
-+	}, {
-+		.name		= "s3c2443-dclk",
-+		.driver_data	= (kernel_ulong_t)&dclk_variants[S3C2443],
-+	},
-+	{ }
-+};
-+
-+MODULE_DEVICE_TABLE(platform, s3c24xx_dclk_driver_ids);
-+
-+static struct platform_driver s3c24xx_dclk_driver = {
-+	.driver = {
-+		.name		= "s3c24xx-dclk",
-+		.owner		= THIS_MODULE,
-+		.pm		= &s3c24xx_dclk_pm_ops,
-+	},
-+	.probe = s3c24xx_dclk_probe,
-+	.remove = s3c24xx_dclk_remove,
-+	.id_table = s3c24xx_dclk_driver_ids,
-+};
-+module_platform_driver(s3c24xx_dclk_driver);
-+
-+MODULE_LICENSE("GPL v2");
-+MODULE_AUTHOR("Heiko Stuebner <heiko@sntech.de>");
-+MODULE_DESCRIPTION("Driver for the S3C24XX external clock outputs");
+ #ifdef CONFIG_S3C2412_COMMON_CLK
+ void __init s3c2412_common_clk_init(struct device_node *np, unsigned long xti_f,
+ 				unsigned long ext_f, void __iomem *reg_base);
+diff --git a/arch/arm/mach-s3c24xx/mach-anubis.c b/arch/arm/mach-s3c24xx/mach-anubis.c
+index 81a270a..f81944f 100644
+--- a/arch/arm/mach-s3c24xx/mach-anubis.c
++++ b/arch/arm/mach-s3c24xx/mach-anubis.c
+@@ -352,6 +352,7 @@ static struct platform_device anubis_device_sm501 = {
+ /* Standard Anubis devices */
+ 
+ static struct platform_device *anubis_devices[] __initdata = {
++	&s3c2410_device_dclk,
+ 	&s3c_device_ohci,
+ 	&s3c_device_wdt,
+ 	&s3c_device_adc,
+@@ -364,6 +365,7 @@ static struct platform_device *anubis_devices[] __initdata = {
+ 	&anubis_device_sm501,
+ };
+ 
++#ifdef CONFIG_SAMSUNG_CLOCK
+ static struct clk *anubis_clocks[] __initdata = {
+ 	&s3c24xx_dclk0,
+ 	&s3c24xx_dclk1,
+@@ -371,6 +373,7 @@ static struct clk *anubis_clocks[] __initdata = {
+ 	&s3c24xx_clkout1,
+ 	&s3c24xx_uclk,
+ };
++#endif
+ 
+ /* I2C devices. */
+ 
+@@ -394,6 +397,7 @@ static struct s3c24xx_audio_simtec_pdata __initdata anubis_audio = {
+ 
+ static void __init anubis_map_io(void)
+ {
++#ifdef CONFIG_SAMSUNG_CLOCK
+ 	/* initialise the clocks */
+ 
+ 	s3c24xx_dclk0.parent = &clk_upll;
+@@ -408,6 +412,7 @@ static void __init anubis_map_io(void)
+ 	s3c24xx_uclk.parent  = &s3c24xx_clkout1;
+ 
+ 	s3c24xx_register_clocks(anubis_clocks, ARRAY_SIZE(anubis_clocks));
++#endif
+ 
+ 	s3c24xx_init_io(anubis_iodesc, ARRAY_SIZE(anubis_iodesc));
+ 	s3c24xx_init_clocks(0);
+diff --git a/arch/arm/mach-s3c24xx/mach-bast.c b/arch/arm/mach-s3c24xx/mach-bast.c
+index e371ff5..dcdc4a5 100644
+--- a/arch/arm/mach-s3c24xx/mach-bast.c
++++ b/arch/arm/mach-s3c24xx/mach-bast.c
+@@ -523,6 +523,7 @@ static struct s3c_hwmon_pdata bast_hwmon_info = {
+ // cat /sys/devices/platform/s3c24xx-adc/s3c-hwmon/in_0
+ 
+ static struct platform_device *bast_devices[] __initdata = {
++	&s3c2410_device_dclk,
+ 	&s3c_device_ohci,
+ 	&s3c_device_lcd,
+ 	&s3c_device_wdt,
+@@ -537,6 +538,7 @@ static struct platform_device *bast_devices[] __initdata = {
+ 	&bast_sio,
+ };
+ 
++#ifdef CONFIG_SAMSUNG_CLK
+ static struct clk *bast_clocks[] __initdata = {
+ 	&s3c24xx_dclk0,
+ 	&s3c24xx_dclk1,
+@@ -544,6 +546,7 @@ static struct clk *bast_clocks[] __initdata = {
+ 	&s3c24xx_clkout1,
+ 	&s3c24xx_uclk,
+ };
++#endif
+ 
+ static struct s3c_cpufreq_board __initdata bast_cpufreq = {
+ 	.refresh	= 7800, /* 7.8usec */
+@@ -558,6 +561,7 @@ static struct s3c24xx_audio_simtec_pdata __initdata bast_audio = {
+ 
+ static void __init bast_map_io(void)
+ {
++#ifdef CONFIG_SAMSUNG_CLOCK
+ 	/* initialise the clocks */
+ 
+ 	s3c24xx_dclk0.parent = &clk_upll;
+@@ -572,6 +576,7 @@ static void __init bast_map_io(void)
+ 	s3c24xx_uclk.parent  = &s3c24xx_clkout1;
+ 
+ 	s3c24xx_register_clocks(bast_clocks, ARRAY_SIZE(bast_clocks));
++#endif
+ 
+ 	s3c_hwmon_set_platdata(&bast_hwmon_info);
+ 
+diff --git a/arch/arm/mach-s3c24xx/mach-osiris.c b/arch/arm/mach-s3c24xx/mach-osiris.c
+index a4ae4bb..487be02 100644
+--- a/arch/arm/mach-s3c24xx/mach-osiris.c
++++ b/arch/arm/mach-s3c24xx/mach-osiris.c
+@@ -344,12 +344,14 @@ static struct i2c_board_info osiris_i2c_devs[] __initdata = {
+ /* Standard Osiris devices */
+ 
+ static struct platform_device *osiris_devices[] __initdata = {
++	&s3c2410_device_dclk,
+ 	&s3c_device_i2c0,
+ 	&s3c_device_wdt,
+ 	&s3c_device_nand,
+ 	&osiris_pcmcia,
+ };
+ 
++#ifdef CONFIG_SAMSUNG_CLOCK
+ static struct clk *osiris_clocks[] __initdata = {
+ 	&s3c24xx_dclk0,
+ 	&s3c24xx_dclk1,
+@@ -357,6 +359,7 @@ static struct clk *osiris_clocks[] __initdata = {
+ 	&s3c24xx_clkout1,
+ 	&s3c24xx_uclk,
+ };
++#endif
+ 
+ static struct s3c_cpufreq_board __initdata osiris_cpufreq = {
+ 	.refresh	= 7800, /* refresh period is 7.8usec */
+@@ -368,6 +371,7 @@ static void __init osiris_map_io(void)
+ {
+ 	unsigned long flags;
+ 
++#ifdef CONFIG_SAMSUNG_CLOCK
+ 	/* initialise the clocks */
+ 
+ 	s3c24xx_dclk0.parent = &clk_upll;
+@@ -382,6 +386,7 @@ static void __init osiris_map_io(void)
+ 	s3c24xx_uclk.parent  = &s3c24xx_clkout1;
+ 
+ 	s3c24xx_register_clocks(osiris_clocks, ARRAY_SIZE(osiris_clocks));
++#endif
+ 
+ 	s3c24xx_init_io(osiris_iodesc, ARRAY_SIZE(osiris_iodesc));
+ 	s3c24xx_init_clocks(0);
+diff --git a/arch/arm/mach-s3c24xx/mach-rx1950.c b/arch/arm/mach-s3c24xx/mach-rx1950.c
+index afb784e..219454c 100644
+--- a/arch/arm/mach-s3c24xx/mach-rx1950.c
++++ b/arch/arm/mach-s3c24xx/mach-rx1950.c
+@@ -710,6 +710,7 @@ static struct i2c_board_info rx1950_i2c_devices[] = {
+ };
+ 
+ static struct platform_device *rx1950_devices[] __initdata = {
++	&s3c2410_device_dclk,
+ 	&s3c_device_lcd,
+ 	&s3c_device_wdt,
+ 	&s3c_device_i2c0,
+@@ -728,17 +729,21 @@ static struct platform_device *rx1950_devices[] __initdata = {
+ 	&rx1950_leds,
+ };
+ 
++#ifdef CONFIG_SAMSUNG_CLOCK
+ static struct clk *rx1950_clocks[] __initdata = {
+ 	&s3c24xx_clkout0,
+ 	&s3c24xx_clkout1,
+ };
++#endif
+ 
+ static void __init rx1950_map_io(void)
+ {
++#ifdef CONFIG_SAMSUNG_CLOCK
+ 	s3c24xx_clkout0.parent  = &clk_h;
+ 	s3c24xx_clkout1.parent  = &clk_f;
+ 
+ 	s3c24xx_register_clocks(rx1950_clocks, ARRAY_SIZE(rx1950_clocks));
++#endif
+ 
+ 	s3c24xx_init_io(rx1950_iodesc, ARRAY_SIZE(rx1950_iodesc));
+ 	s3c24xx_init_clocks(16934000);
+diff --git a/arch/arm/mach-s3c24xx/mach-vr1000.c b/arch/arm/mach-s3c24xx/mach-vr1000.c
+index 1cc5b1b..bedaeef 100644
+--- a/arch/arm/mach-s3c24xx/mach-vr1000.c
++++ b/arch/arm/mach-s3c24xx/mach-vr1000.c
+@@ -286,6 +286,7 @@ static struct i2c_board_info vr1000_i2c_devs[] __initdata = {
+ /* devices for this board */
+ 
+ static struct platform_device *vr1000_devices[] __initdata = {
++	&s3c2410_device_dclk,
+ 	&s3c_device_ohci,
+ 	&s3c_device_lcd,
+ 	&s3c_device_wdt,
+@@ -299,6 +300,7 @@ static struct platform_device *vr1000_devices[] __initdata = {
+ 	&vr1000_led3,
+ };
+ 
++#ifdef CONFIG_SAMSUNG_CLOCK
+ static struct clk *vr1000_clocks[] __initdata = {
+ 	&s3c24xx_dclk0,
+ 	&s3c24xx_dclk1,
+@@ -306,6 +308,7 @@ static struct clk *vr1000_clocks[] __initdata = {
+ 	&s3c24xx_clkout1,
+ 	&s3c24xx_uclk,
+ };
++#endif
+ 
+ static void vr1000_power_off(void)
+ {
+@@ -314,6 +317,7 @@ static void vr1000_power_off(void)
+ 
+ static void __init vr1000_map_io(void)
+ {
++#if CONFIG_SAMSUNG_CLOCK
+ 	/* initialise clock sources */
+ 
+ 	s3c24xx_dclk0.parent = &clk_upll;
+@@ -328,6 +332,7 @@ static void __init vr1000_map_io(void)
+ 	s3c24xx_uclk.parent  = &s3c24xx_clkout1;
+ 
+ 	s3c24xx_register_clocks(vr1000_clocks, ARRAY_SIZE(vr1000_clocks));
++#endif
+ 
+ 	pm_power_off = vr1000_power_off;
+ 
+diff --git a/arch/arm/mach-s3c24xx/s3c244x.c b/arch/arm/mach-s3c24xx/s3c244x.c
+index fe30ebb2..76b691b 100644
+--- a/arch/arm/mach-s3c24xx/s3c244x.c
++++ b/arch/arm/mach-s3c24xx/s3c244x.c
+@@ -46,6 +46,7 @@
+ #include <plat/nand-core.h>
+ #include <plat/watchdog-reset.h>
+ 
++#include "common.h"
+ #include "regs-dsc.h"
+ 
+ static struct map_desc s3c244x_iodesc[] __initdata = {
+@@ -74,6 +75,7 @@ void __init s3c244x_map_io(void)
+ 	s3c_nand_setname("s3c2440-nand");
+ 	s3c_device_ts.name = "s3c2440-ts";
+ 	s3c_device_usbgadget.name = "s3c2440-usbgadget";
++	s3c2410_device_dclk.name = "s3c2440-dclk";
+ }
+ 
+ void __init_or_cpufreq s3c244x_setup_clocks(void)
 -- 
 1.9.0
