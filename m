@@ -1,20 +1,84 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Sun, 11 May 2014 09:46:27 +0900
-Subject: [PATCH v4] drivers: sh: compile drivers/sh/pm_runtime.c if
- ARCH_SHMOBILE_MULTI
-In-Reply-To: <CAMuHMdWwenyU1RS4c8spFcb7M0oCXP9z8zbGQ0VACKj7EbvvkA@mail.gmail.com>
-References: <1399411579-10681-1-git-send-email-geert+renesas@glider.be>
- <CAMuHMdWwenyU1RS4c8spFcb7M0oCXP9z8zbGQ0VACKj7EbvvkA@mail.gmail.com>
-Message-ID: <20140511004626.GW31760@verge.net.au>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sun, 11 May 2014 12:50:06 +0400
+Subject: [PATCH] ARM: i.MX: Remove excess symbols ARCH_MX1,
+ ARCH_MX25 and MACH_MX27
+Message-ID: <1399798206-17565-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 08, 2014 at 12:12:29PM +0200, Geert Uytterhoeven wrote:
-> On Tue, May 6, 2014 at 11:26 PM, Geert Uytterhoeven
-> <geert+renesas@glider.be> wrote:
-> > Tested on Koelsch (legacy, reference, shmobile, and shmobile+bbb kernels)
-> > and BeagleBone Black (shmobile+bbb). Will test on more hardware tomorrow.
-> 
-> Tested on genmai with Wolfram's CCF support.
+This patch removes excess symbols ARCH_MX1, ARCH_MX25 and MACH_MX27.
+Instead we use SOC_IMX*.
 
-Thanks, shall I go ahead and queue this up?
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/mach-imx/Kconfig                 | 12 ------------
+ arch/arm/mach-imx/devices/Kconfig         |  2 +-
+ drivers/media/platform/soc_camera/Kconfig |  2 +-
+ 3 files changed, 2 insertions(+), 14 deletions(-)
+
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index d56eb1a..c28fa7c 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -67,18 +67,8 @@ config IMX_HAVE_IOMUX_V1
+ config ARCH_MXC_IOMUX_V3
+ 	bool
+ 
+-config ARCH_MX1
+-	bool
+-
+-config ARCH_MX25
+-	bool
+-
+-config MACH_MX27
+-	bool
+-
+ config SOC_IMX1
+ 	bool
+-	select ARCH_MX1
+ 	select CPU_ARM920T
+ 	select IMX_HAVE_IOMUX_V1
+ 	select MXC_AVIC
+@@ -91,7 +81,6 @@ config SOC_IMX21
+ 
+ config SOC_IMX25
+ 	bool
+-	select ARCH_MX25
+ 	select ARCH_MXC_IOMUX_V3
+ 	select CPU_ARM926T
+ 	select MXC_AVIC
+@@ -103,7 +92,6 @@ config SOC_IMX27
+ 	select ARCH_HAS_OPP
+ 	select CPU_ARM926T
+ 	select IMX_HAVE_IOMUX_V1
+-	select MACH_MX27
+ 	select MXC_AVIC
+ 	select PINCTRL_IMX27
+ 
+diff --git a/arch/arm/mach-imx/devices/Kconfig b/arch/arm/mach-imx/devices/Kconfig
+index 846c019..1f9d4a6 100644
+--- a/arch/arm/mach-imx/devices/Kconfig
++++ b/arch/arm/mach-imx/devices/Kconfig
+@@ -1,6 +1,6 @@
+ config IMX_HAVE_PLATFORM_FEC
+ 	bool
+-	default y if ARCH_MX25 || SOC_IMX27 || SOC_IMX35 || SOC_IMX51 || SOC_IMX53
++	default y if SOC_IMX25 || SOC_IMX27 || SOC_IMX35 || SOC_IMX51 || SOC_IMX53
+ 
+ config IMX_HAVE_PLATFORM_FLEXCAN
+ 	bool
+diff --git a/drivers/media/platform/soc_camera/Kconfig b/drivers/media/platform/soc_camera/Kconfig
+index 122e03a..f0ccedd 100644
+--- a/drivers/media/platform/soc_camera/Kconfig
++++ b/drivers/media/platform/soc_camera/Kconfig
+@@ -63,7 +63,7 @@ config VIDEO_OMAP1
+ 
+ config VIDEO_MX2
+ 	tristate "i.MX27 Camera Sensor Interface driver"
+-	depends on VIDEO_DEV && SOC_CAMERA && MACH_MX27
++	depends on VIDEO_DEV && SOC_CAMERA && SOC_IMX27
+ 	select VIDEOBUF2_DMA_CONTIG
+ 	---help---
+ 	  This is a v4l2 driver for the i.MX27 Camera Sensor Interface
+-- 
+1.8.3.2
