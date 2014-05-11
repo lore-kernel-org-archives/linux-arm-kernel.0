@@ -1,52 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sun, 11 May 2014 08:55:43 -0700
-Subject: omap4-panda-es boot issues with v3.15-rc4
-In-Reply-To: <7heh02ms82.fsf@paris.lan>
-References: <536B7E44.2040303@ti.com> <7hppjos2w2.fsf@paris.lan>
- <CAGa+x84VB3CXDm71JWxHx1-Qk1xVNeXdwUjZnb42_wg+piOzzA@mail.gmail.com>
- <20140508165558.GB2198@atomide.com>
- <20140508184055.GC2198@atomide.com> <7hha4zsyro.fsf@paris.lan>
- <536C9084.50209@ti.com> <7heh02ms82.fsf@paris.lan>
-Message-ID: <20140511155542.GD28266@atomide.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 11 May 2014 19:08:43 +0200
+Subject: [PATCH v12 0/6] ARM: sunxi: Add driver for SD/MMC hosts found on
+ Allwinner sunxi SoCs
+In-Reply-To: <1399794417-9291-1-git-send-email-hdegoede@redhat.com>
+References: <1399794417-9291-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20140511170843.GT7047@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@linaro.org> [140509 16:46]:
-> Roger Quadros <rogerq@ti.com> writes:
+Hi Hans,
+
+On Sun, May 11, 2014 at 09:46:51AM +0200, Hans de Goede wrote:
+> Hi All,
 > 
-> > Kevin,
-> >
-> > On 05/09/2014 01:15 AM, Kevin Hilman wrote:
-> >> Tony Lindgren <tony@atomide.com> writes:
-> >> 
-> >> [...]
-> >> 
-> >>> ..but I think I found the cause for recent hangs on panda, just a wild
-> >>> guess based on looking at the recent cpuidle patches after v3.14.
-> >>>
-> >>> Looks like reverting 0b89e9aa2856 (cpuidle: delay enabling interrupts
-> >>> until all coupled CPUs leave idle) makes booting work reliably again
-> >>> on panda.
-> >>>
-> >>> Can you guys confirm, so far no issues here after few boot tests,
-> >>> but it might be too early to tell.
-> >> 
-> >> Reverting that makes things a bit more stable, but it still eventually
-> >> fails in the same way.  For me it took 8 boots for it to eventually
-> >> fail.
-> >> 
-> >> However, if I build with CONFIG_CPU_IDLE=n, it becomes much more stable
-> >> (20+ boots in a row and still going.)
-> >> 
-> >
-> > Can you please test with CPU_IDLE enabled but C3 disabled as in below patch?
-> > It worked for me 10/10 boots.
+> Here is v12 of the sunxi-mmc patch-set David Lanzend?rfer and I have been
+> working on, the mmc driver itself is unchanged from v11. New this version are
+> some dts patch changes, see below.
 > 
-> Yup, it worked for me too for 10/10 boots in a row.
+> The first patch in this series is the patch adding the actual mmc driver and
+> should go in through the mmc tree.
+> 
+> All the other patches are devicetree patches adding / using the new fixed
+> reg_vcc3v3 supply to all sunxi board files, and should go upstream through
+> Maxime's sunxi-dts tree.
 
-But what has caused this regression, does it work reliably with let's
-say v3.13 or v3.12?
+I just merged the last 5 patches.
 
-Regards,
+Thanks!
+Maxime
 
-Tony
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140511/35d4d738/attachment.sig>
