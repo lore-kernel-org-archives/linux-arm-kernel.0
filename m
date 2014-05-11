@@ -1,43 +1,89 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 11 May 2014 07:22:36 -0700
-Subject: [Ksummit-discuss] [TECH TOPIC] ARM legacy board DT conversion
- finalization
-In-Reply-To: <20140511083729.211e9b5f@lwn.net>
-References: <20140511030009.GO12708@titan.lakedaemon.net>
- <20140511083729.211e9b5f@lwn.net>
-Message-ID: <CAOesGMjY7dwSt3Cc582qy1DHi9qFsY6rUcvU4+YNWya7AyK=fQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sun, 11 May 2014 07:42:10 -0700
+Subject: [PATCH 1/4] OMAPDSS: Fix DSS clock multiplier issue on 3703 and
+ probably 3630
+In-Reply-To: <CALbNGRR3U1veFgXmOWpfG3yNVESdxi2t79WDrJwOZ1oShuG1yA@mail.gmail.com>
+References: <1398815562-24113-1-git-send-email-tony@atomide.com>
+ <1398815562-24113-2-git-send-email-tony@atomide.com>
+ <536C860E.1000501@ti.com>
+ <CALbNGRR3U1veFgXmOWpfG3yNVESdxi2t79WDrJwOZ1oShuG1yA@mail.gmail.com>
+Message-ID: <20140511144209.GA28266@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 11, 2014 at 5:37 AM, Jonathan Corbet <corbet@lwn.net> wrote:
-> On Sat, 10 May 2014 23:00:09 -0400
-> Jason Cooper <jason@lakedaemon.net> wrote:
->
->> So, I'm proposing a session where each sub-arch gives a brief run-down
->> of the status of the legacy board conversion, and wraps up with a todo
->> list.  After all of the sub-arches have given their status (5 - 10
->> minutes each?), we hash out helping each other with the final pieces.
->
-> This *really* looks like an ARM minisummit topic to me;
+* Andreas M?ller <schnitzeltony@googlemail.com> [140509 14:07]:
+> On Fri, May 9, 2014 at 9:38 AM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
+> > On 30/04/14 02:52, Tony Lindgren wrote:
+> >> Otherwise we can get often errors like the following and the
+> >> display won't come on:
+> >>
+> >> omapdss APPLY error: FIFO UNDERFLOW on gfx, disabling the overlay
+> >> omapdss APPLY error: SYNC_LOST on channel lcd, restarting
+> >> the output with video overlays disabled
+> >>
+> >> There are some earlier references to this issue:
+> >>
+> >> http://www.spinics.net/lists/linux-omap/msg59511.html
+> >> http://www.spinics.net/lists/linux-omap/msg59724.html
+> >
+> resend - my client had HTML enabled...
+> 
+> FWIW: I have had issues long time ago [1]. With mainline 3.14.3 I had
+> still the reboot problem on old 600MHz OMAP 3530. Applying this patch
+> solved the issues. For other versions I had no chance to reproduce the
+> original wakup issue mentioned in old thread
 
-Agreed.
+Sorry I'm a bit confused now. Is the reboot issue a separate issue
+related to the twl4030 generic scripts for 3530?
 
-> hopefully one of those is in the works?
+And then this patch fixes dm3730 wake-up (from suspend?) issues?
 
-Not this year.
+Or do we have some other bug where we wrongly hit omap3630_dss_feats
+on 3530 somehow?
 
-Last year we had a two-day workshop, and most of it ended up centered
-around DT. This year, that topic has overlap with other architectures
-so it's likely better handled as shared technical track topic.
+Regards,
 
-There doesn't seem to be a whole lot of topics needing to be covered,
-at least not based on the call for proposals at ELC (see reply from
-Alexandre). So, we'll take a break this year and come back and
-organize one next year if there's more material again.
-
-I suppose it's a positive sign; things are running relatively smoothly
-right now so there's less stuff to iron out in person, or at least to
-iron out together with a roomful of attendees.
-
-
--Olof
+Tony
+ 
+> [1] http://marc.info/?l=linux-omap&m=136250904607413&w=2
+> 
+> Andreas
+> > Those don't sound like the same issue, but it's hard to say. What kind
+> > of clock rates do you get? Cat you paste debugfs/omapdss/clk, with and
+> > without this patch?
+> >
+> > What resolution do you have? If it's a very high resolution (say, DVI
+> > output to a monitor), it could just be an issue of
+> > not-enough-memory-bandwidth.
+> >
+> >> It seems that it's safe to set the lower values even for 3630.
+> >> If we can confirm that 3630 works with the higher values
+> >> reliably we can add further detection.
+> >>
+> >> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> >> ---
+> >>  drivers/video/fbdev/omap2/dss/dss.c | 5 +++--
+> >>  1 file changed, 3 insertions(+), 2 deletions(-)
+> >>
+> >> diff --git a/drivers/video/fbdev/omap2/dss/dss.c b/drivers/video/fbdev/omap2/dss/dss.c
+> >> index d55266c..ad6561f 100644
+> >> --- a/drivers/video/fbdev/omap2/dss/dss.c
+> >> +++ b/drivers/video/fbdev/omap2/dss/dss.c
+> >> @@ -707,9 +707,10 @@ static const struct dss_features omap34xx_dss_feats __initconst = {
+> >>       .dpi_select_source      =       &dss_dpi_select_source_omap2_omap3,
+> >>  };
+> >>
+> >> +/* Supposedly 3630 can use div 32 mult 2, but that needs to be rechecked */
+> >>  static const struct dss_features omap3630_dss_feats __initconst = {
+> >> -     .fck_div_max            =       32,
+> >> -     .dss_fck_multiplier     =       1,
+> >> +     .fck_div_max            =       16,
+> >> +     .dss_fck_multiplier     =       2,
+> >
+> > These values tell about the clock hardware, they are not settings that
+> > can be changed to change the clock. OMAP3630 has a fixed x2 multiplier
+> > and a divider with maximum value of 16.
+> >
+> >  Tomi
+> >
+> >
