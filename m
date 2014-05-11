@@ -1,15 +1,15 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sun, 11 May 2014 22:24:40 +0200
-Subject: [PATCH 7/8] ARM: dts: berlin: convert BG2CD to DT clock nodes
+Date: Sun, 11 May 2014 22:24:41 +0200
+Subject: [PATCH 8/8] ARM: dts: berlin: convert BG2 to DT clock nodes
 In-Reply-To: <1399839881-29895-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1399839881-29895-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1399839881-29895-8-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1399839881-29895-9-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This converts Berlin BG2CD SoC dtsi to make use of the new DT clock
-nodes for Berlin SoCs. Also add a binding include to ease core clock
-references.
+This converts Berlin BG2 SoC dtsi to make use of the new DT clock
+nodes for Berlin SoCs. While at it, also fix up twdclk which is
+running at cpuclk/3 instead of sysclk.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
@@ -26,16 +26,13 @@ Cc: devicetree at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/boot/dts/berlin2cd.dtsi    | 198 +++++++++++++++++++++++++++++++-----
- drivers/clk/berlin/Makefile         |   2 +
- include/dt-bindings/clock/berlin2.h |  35 +++++++
- 3 files changed, 207 insertions(+), 28 deletions(-)
- create mode 100644 include/dt-bindings/clock/berlin2.h
+ arch/arm/boot/dts/berlin2.dtsi | 200 +++++++++++++++++++++++++++++++++++------
+ 1 file changed, 171 insertions(+), 29 deletions(-)
 
-diff --git a/arch/arm/boot/dts/berlin2cd.dtsi b/arch/arm/boot/dts/berlin2cd.dtsi
-index 094968c27533..c1b8dc8264d3 100644
---- a/arch/arm/boot/dts/berlin2cd.dtsi
-+++ b/arch/arm/boot/dts/berlin2cd.dtsi
+diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
+index 56a1af2f1052..5d84171a1e4b 100644
+--- a/arch/arm/boot/dts/berlin2.dtsi
++++ b/arch/arm/boot/dts/berlin2.dtsi
 @@ -12,6 +12,7 @@
   */
  
@@ -44,7 +41,7 @@ index 094968c27533..c1b8dc8264d3 100644
  #include <dt-bindings/interrupt-controller/arm-gic.h>
  
  / {
-@@ -30,24 +31,18 @@
+@@ -37,24 +38,18 @@
  		};
  	};
  
@@ -58,7 +55,7 @@ index 094968c27533..c1b8dc8264d3 100644
 -		cfgclk: cfg-clock {
 -			compatible = "fixed-clock";
 -			#clock-cells = <0>;
--			clock-frequency = <75000000>;
+-			clock-frequency = <100000000>;
 -		};
 +	refclk: oscillator {
 +		compatible = "fixed-clock";
@@ -69,7 +66,7 @@ index 094968c27533..c1b8dc8264d3 100644
 -		sysclk: system-clock {
 -			compatible = "fixed-clock";
 -			#clock-cells = <0>;
--			clock-frequency = <300000000>;
+-			clock-frequency = <400000000>;
 -		};
 +	twdclk: twdclk {
 +		compatible = "fixed-factor-clock";
@@ -80,7 +77,7 @@ index 094968c27533..c1b8dc8264d3 100644
  	};
  
  	soc {
-@@ -76,7 +71,7 @@
+@@ -83,7 +78,7 @@
  			compatible = "arm,cortex-a9-twd-timer";
  			reg = <0xad0600 0x20>;
  			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
@@ -89,7 +86,7 @@ index 094968c27533..c1b8dc8264d3 100644
  		};
  
  		apb at e80000 {
-@@ -91,7 +86,7 @@
+@@ -98,7 +93,7 @@
  				compatible = "snps,dw-apb-timer";
  				reg = <0x2c00 0x14>;
  				interrupts = <8>;
@@ -98,7 +95,7 @@ index 094968c27533..c1b8dc8264d3 100644
  				clock-names = "timer";
  				status = "okay";
  			};
-@@ -100,7 +95,7 @@
+@@ -107,7 +102,7 @@
  				compatible = "snps,dw-apb-timer";
  				reg = <0x2c14 0x14>;
  				interrupts = <9>;
@@ -107,7 +104,7 @@ index 094968c27533..c1b8dc8264d3 100644
  				clock-names = "timer";
  				status = "okay";
  			};
-@@ -109,7 +104,7 @@
+@@ -116,7 +111,7 @@
  				compatible = "snps,dw-apb-timer";
  				reg = <0x2c28 0x14>;
  				interrupts = <10>;
@@ -116,7 +113,7 @@ index 094968c27533..c1b8dc8264d3 100644
  				clock-names = "timer";
  				status = "disabled";
  			};
-@@ -118,7 +113,7 @@
+@@ -125,7 +120,7 @@
  				compatible = "snps,dw-apb-timer";
  				reg = <0x2c3c 0x14>;
  				interrupts = <11>;
@@ -125,7 +122,7 @@ index 094968c27533..c1b8dc8264d3 100644
  				clock-names = "timer";
  				status = "disabled";
  			};
-@@ -127,7 +122,7 @@
+@@ -134,7 +129,7 @@
  				compatible = "snps,dw-apb-timer";
  				reg = <0x2c50 0x14>;
  				interrupts = <12>;
@@ -134,7 +131,7 @@ index 094968c27533..c1b8dc8264d3 100644
  				clock-names = "timer";
  				status = "disabled";
  			};
-@@ -136,7 +131,7 @@
+@@ -143,7 +138,7 @@
  				compatible = "snps,dw-apb-timer";
  				reg = <0x2c64 0x14>;
  				interrupts = <13>;
@@ -143,7 +140,7 @@ index 094968c27533..c1b8dc8264d3 100644
  				clock-names = "timer";
  				status = "disabled";
  			};
-@@ -145,7 +140,7 @@
+@@ -152,7 +147,7 @@
  				compatible = "snps,dw-apb-timer";
  				reg = <0x2c78 0x14>;
  				interrupts = <14>;
@@ -152,7 +149,7 @@ index 094968c27533..c1b8dc8264d3 100644
  				clock-names = "timer";
  				status = "disabled";
  			};
-@@ -154,7 +149,7 @@
+@@ -161,7 +156,7 @@
  				compatible = "snps,dw-apb-timer";
  				reg = <0x2c8c 0x14>;
  				interrupts = <15>;
@@ -161,7 +158,7 @@ index 094968c27533..c1b8dc8264d3 100644
  				clock-names = "timer";
  				status = "disabled";
  			};
-@@ -169,6 +164,153 @@
+@@ -176,6 +171,153 @@
  			};
  		};
  
@@ -315,7 +312,7 @@ index 094968c27533..c1b8dc8264d3 100644
  		apb at fc0000 {
  			compatible = "simple-bus";
  			#address-cells = <1>;
-@@ -183,7 +325,7 @@
+@@ -190,7 +332,7 @@
  				reg-shift = <2>;
  				reg-io-width = <1>;
  				interrupts = <8>;
@@ -324,7 +321,7 @@ index 094968c27533..c1b8dc8264d3 100644
  				status = "disabled";
  			};
  
-@@ -193,7 +335,7 @@
+@@ -200,7 +342,7 @@
  				reg-shift = <2>;
  				reg-io-width = <1>;
  				interrupts = <9>;
@@ -333,54 +330,14 @@ index 094968c27533..c1b8dc8264d3 100644
  				status = "disabled";
  			};
  
-diff --git a/drivers/clk/berlin/Makefile b/drivers/clk/berlin/Makefile
-index f0a7dc8b5e30..2b33e1e74503 100644
---- a/drivers/clk/berlin/Makefile
-+++ b/drivers/clk/berlin/Makefile
-@@ -1 +1,3 @@
- obj-y += berlin2-avpll.o berlin2-pll.o berlin2-div.o
-+obj-$(CONFIG_MACH_BERLIN_BG2)	+= bg2.o
-+obj-$(CONFIG_MACH_BERLIN_BG2CD)	+= bg2.o
-diff --git a/include/dt-bindings/clock/berlin2.h b/include/dt-bindings/clock/berlin2.h
-new file mode 100644
-index 000000000000..dacf7edec4d3
---- /dev/null
-+++ b/include/dt-bindings/clock/berlin2.h
-@@ -0,0 +1,35 @@
-+/*
-+ * Berlin2 BG2/BG2CD clock tree IDs
-+ */
-+
-+#define CLKID_SYS		0
-+#define CLKID_CPU		1
-+#define CLKID_DRMFIGO		2
-+#define CLKID_CFG		3
-+#define CLKID_GFX		4
-+#define CLKID_ZSP		5
-+#define CLKID_PERIF		6
-+#define CLKID_PCUBE		7
-+#define CLKID_VSCOPE		8
-+#define CLKID_NFC_ECC		9
-+#define CLKID_VPP		10
-+#define CLKID_APP		11
-+#define CLKID_AUDIO0		12
-+#define CLKID_AUDIO2		23
-+#define CLKID_AUDIO3		14
-+#define CLKID_AUDIO1		15
-+#define CLKID_GETH0		16
-+#define CLKID_GETH1		17
-+#define CLKID_SATA		18
-+#define CLKID_AHBAPB		19
-+#define CLKID_USB0		20
-+#define CLKID_USB1		21
-+#define CLKID_PBRIDGE		22
-+#define CLKID_SDIO0		23
-+#define CLKID_SDIO1		24
-+#define CLKID_NFC		25
-+#define CLKID_SMEMC		26
-+#define CLKID_AUDIOHD		27
-+#define CLKID_VIDEO0		28
-+#define CLKID_VIDEO1		29
-+#define CLKID_VIDEO2		30
+@@ -210,7 +352,7 @@
+ 				reg-shift = <2>;
+ 				reg-io-width = <1>;
+ 				interrupts = <10>;
+-				clocks = <&smclk>;
++				clocks = <&refclk>;
+ 				status = "disabled";
+ 			};
+ 
 -- 
 1.9.1
