@@ -1,197 +1,470 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 12 May 2014 00:09:48 +0200
-Subject: [PATCH v3 6/9] ARM: S3C24XX: add platform code for conversion to the
- common clock framework
+Date: Mon, 12 May 2014 00:10:24 +0200
+Subject: [PATCH v3 7/9] ARM: S3C24XX: convert s3c2440 and s3c2442 to common
+ clock framework
 In-Reply-To: <3427359.fjFAW0MSIR@phil>
 References: <3427359.fjFAW0MSIR@phil>
-Message-ID: <5113680.xIfXX9kibx@phil>
+Message-ID: <2401749.09O7ybXGvD@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the necessary init functions to init the clocks from the common
-clock framework and necessary CONFIG_SAMSUNG_CLOCK ifdefs around the legacy
-clock code.
+Convert all machines using these cpus to use the ccf clock driver
+instead of the legacy Samsung clock implementation.
 
-This also includes empty stubs for the *_setup_clocks functions that are
-called from the cpufreq driver on resume.
+Some of the more esotheric machines will probably need a fixup, as they
+do strange things to the clkout outputs, that I did not really understand
+nor have the hardware to check.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 ---
- arch/arm/mach-s3c24xx/Kconfig   |  5 +++++
- arch/arm/mach-s3c24xx/common.c  | 25 +++++++++++++++++++++++++
- arch/arm/mach-s3c24xx/common.h  |  7 +++++++
- arch/arm/mach-s3c24xx/s3c2410.c |  6 ++++++
- arch/arm/mach-s3c24xx/s3c2442.c |  3 ++-
- arch/arm/mach-s3c24xx/s3c244x.c |  6 ++++++
- 6 files changed, 51 insertions(+), 1 deletion(-)
+ arch/arm/mach-s3c24xx/Kconfig          |  8 ++++----
+ arch/arm/mach-s3c24xx/Makefile         |  4 ++--
+ arch/arm/mach-s3c24xx/common.c         |  4 ----
+ arch/arm/mach-s3c24xx/mach-anubis.c    | 10 +++++++---
+ arch/arm/mach-s3c24xx/mach-at2440evb.c | 10 +++++++---
+ arch/arm/mach-s3c24xx/mach-gta02.c     |  8 ++++++--
+ arch/arm/mach-s3c24xx/mach-mini2440.c  | 10 +++++++---
+ arch/arm/mach-s3c24xx/mach-nexcoder.c  | 15 ++++++++++++---
+ arch/arm/mach-s3c24xx/mach-osiris.c    | 10 +++++++---
+ arch/arm/mach-s3c24xx/mach-rx1950.c    | 10 +++++++---
+ arch/arm/mach-s3c24xx/mach-rx3715.c    | 10 +++++++---
+ arch/arm/mach-s3c24xx/mach-smdk2440.c  | 10 +++++++---
+ 12 files changed, 73 insertions(+), 36 deletions(-)
 
 diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
-index b4c055b..5c9cffd 100644
+index 5c9cffd..ddd6574 100644
 --- a/arch/arm/mach-s3c24xx/Kconfig
 +++ b/arch/arm/mach-s3c24xx/Kconfig
-@@ -18,6 +18,11 @@ config PLAT_S3C24XX
- 	help
- 	  Base platform code for any Samsung S3C24XX device
+@@ -73,10 +73,10 @@ config CPU_S3C2416
  
-+config S3C2410_COMMON_CLK
-+	bool
-+	help
-+	  Build the s3c2410 clock driver based on the common clock framework.
-+
- config S3C2410_COMMON_DCLK
- 	bool
- 	select REGMAP_MMIO
+ config CPU_S3C2440
+ 	bool "SAMSUNG S3C2440"
+-	depends on SAMSUNG_CLOCK
++	select COMMON_CLK
+ 	select CPU_ARM920T
+ 	select CPU_LLSERIAL_S3C2440
+-	select S3C2410_CLOCK
++	select S3C2410_COMMON_CLK
+ 	select S3C2410_PM if PM
+ 	select S3C2440_DMA if S3C24XX_DMA
+ 	help
+@@ -84,10 +84,10 @@ config CPU_S3C2440
+ 
+ config CPU_S3C2442
+ 	bool "SAMSUNG S3C2442"
+-	depends on SAMSUNG_CLOCK
++	select COMMON_CLK
+ 	select CPU_ARM920T
+ 	select CPU_LLSERIAL_S3C2440
+-	select S3C2410_CLOCK
++	select S3C2410_COMMON_CLK
+ 	select S3C2410_DMA if S3C24XX_DMA
+ 	select S3C2410_PM if PM
+ 	help
+diff --git a/arch/arm/mach-s3c24xx/Makefile b/arch/arm/mach-s3c24xx/Makefile
+index f254797..9010eba 100644
+--- a/arch/arm/mach-s3c24xx/Makefile
++++ b/arch/arm/mach-s3c24xx/Makefile
+@@ -29,9 +29,9 @@ obj-$(CONFIG_S3C2412_PM_SLEEP)	+= sleep-s3c2412.o
+ obj-$(CONFIG_CPU_S3C2416)	+= s3c2416.o
+ obj-$(CONFIG_S3C2416_PM)	+= pm-s3c2416.o
+ 
+-obj-$(CONFIG_CPU_S3C2440)	+= s3c2440.o clock-s3c2440.o
++obj-$(CONFIG_CPU_S3C2440)	+= s3c2440.o
+ obj-$(CONFIG_CPU_S3C2442)	+= s3c2442.o
+-obj-$(CONFIG_CPU_S3C244X)	+= s3c244x.o clock-s3c244x.o
++obj-$(CONFIG_CPU_S3C244X)	+= s3c244x.o
+ obj-$(CONFIG_S3C2440_DMA)	+= dma-s3c2440.o
+ obj-$(CONFIG_S3C2440_PLL_12000000) += pll-s3c2440-12000000.o
+ obj-$(CONFIG_S3C2440_PLL_16934400) += pll-s3c2440-16934400.o
 diff --git a/arch/arm/mach-s3c24xx/common.c b/arch/arm/mach-s3c24xx/common.c
-index 7cc6d94..35cf88e 100644
+index 35cf88e..bda9dd4 100644
 --- a/arch/arm/mach-s3c24xx/common.c
 +++ b/arch/arm/mach-s3c24xx/common.c
-@@ -53,6 +53,7 @@
+@@ -92,7 +92,6 @@ static struct cpu_table cpu_ids[] __initdata = {
+ 		.idcode		= 0x32440000,
+ 		.idmask		= 0xffffffff,
+ 		.map_io		= s3c2440_map_io,
+-		.init_clocks	= s3c244x_init_clocks,
+ 		.init_uarts	= s3c244x_init_uarts,
+ 		.init		= s3c2440_init,
+ 		.name		= name_s3c2440
+@@ -101,7 +100,6 @@ static struct cpu_table cpu_ids[] __initdata = {
+ 		.idcode		= 0x32440001,
+ 		.idmask		= 0xffffffff,
+ 		.map_io		= s3c2440_map_io,
+-		.init_clocks	= s3c244x_init_clocks,
+ 		.init_uarts	= s3c244x_init_uarts,
+ 		.init		= s3c2440_init,
+ 		.name		= name_s3c2440a
+@@ -110,7 +108,6 @@ static struct cpu_table cpu_ids[] __initdata = {
+ 		.idcode		= 0x32440aaa,
+ 		.idmask		= 0xffffffff,
+ 		.map_io		= s3c2442_map_io,
+-		.init_clocks	= s3c244x_init_clocks,
+ 		.init_uarts	= s3c244x_init_uarts,
+ 		.init		= s3c2442_init,
+ 		.name		= name_s3c2442
+@@ -119,7 +116,6 @@ static struct cpu_table cpu_ids[] __initdata = {
+ 		.idcode		= 0x32440aab,
+ 		.idmask		= 0xffffffff,
+ 		.map_io		= s3c2442_map_io,
+-		.init_clocks	= s3c244x_init_clocks,
+ 		.init_uarts	= s3c244x_init_uarts,
+ 		.init		= s3c2442_init,
+ 		.name		= name_s3c2442b
+diff --git a/arch/arm/mach-s3c24xx/mach-anubis.c b/arch/arm/mach-s3c24xx/mach-anubis.c
+index f81944f..7a0d83b 100644
+--- a/arch/arm/mach-s3c24xx/mach-anubis.c
++++ b/arch/arm/mach-s3c24xx/mach-anubis.c
+@@ -46,7 +46,6 @@
+ 
+ #include <net/ax88796.h>
+ 
+-#include <plat/clock.h>
+ #include <plat/devs.h>
+ #include <plat/cpu.h>
+ #include <linux/platform_data/asoc-s3c24xx_simtec.h>
+@@ -415,7 +414,6 @@ static void __init anubis_map_io(void)
+ #endif
+ 
+ 	s3c24xx_init_io(anubis_iodesc, ARRAY_SIZE(anubis_iodesc));
+-	s3c24xx_init_clocks(0);
+ 	s3c24xx_init_uarts(anubis_uartcfgs, ARRAY_SIZE(anubis_uartcfgs));
+ 	samsung_set_timer_source(SAMSUNG_PWM3, SAMSUNG_PWM4);
+ 
+@@ -433,6 +431,12 @@ static void __init anubis_map_io(void)
+ 	}
+ }
+ 
++static void __init anubis_init_time(void)
++{
++	s3c2440_init_clocks(12000000);
++	samsung_timer_init();
++}
++
+ static void __init anubis_init(void)
+ {
+ 	s3c_i2c0_set_platdata(NULL);
+@@ -452,6 +456,6 @@ MACHINE_START(ANUBIS, "Simtec-Anubis")
+ 	.map_io		= anubis_map_io,
+ 	.init_machine	= anubis_init,
+ 	.init_irq	= s3c2440_init_irq,
+-	.init_time	= samsung_timer_init,
++	.init_time	= anubis_init_time,
+ 	.restart	= s3c244x_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-s3c24xx/mach-at2440evb.c b/arch/arm/mach-s3c24xx/mach-at2440evb.c
+index d8f6bb1..9db768f 100644
+--- a/arch/arm/mach-s3c24xx/mach-at2440evb.c
++++ b/arch/arm/mach-s3c24xx/mach-at2440evb.c
+@@ -45,7 +45,6 @@
+ #include <linux/mtd/nand_ecc.h>
+ #include <linux/mtd/partitions.h>
+ 
+-#include <plat/clock.h>
+ #include <plat/devs.h>
+ #include <plat/cpu.h>
+ #include <linux/platform_data/mmc-s3cmci.h>
+@@ -192,11 +191,16 @@ static struct platform_device *at2440evb_devices[] __initdata = {
+ static void __init at2440evb_map_io(void)
+ {
+ 	s3c24xx_init_io(at2440evb_iodesc, ARRAY_SIZE(at2440evb_iodesc));
+-	s3c24xx_init_clocks(16934400);
+ 	s3c24xx_init_uarts(at2440evb_uartcfgs, ARRAY_SIZE(at2440evb_uartcfgs));
+ 	samsung_set_timer_source(SAMSUNG_PWM3, SAMSUNG_PWM4);
+ }
+ 
++static void __init at2440evb_init_time(void)
++{
++	s3c2440_init_clocks(16934400);
++	samsung_timer_init();
++}
++
+ static void __init at2440evb_init(void)
+ {
+ 	s3c24xx_fb_set_platdata(&at2440evb_fb_info);
+@@ -213,6 +217,6 @@ MACHINE_START(AT2440EVB, "AT2440EVB")
+ 	.map_io		= at2440evb_map_io,
+ 	.init_machine	= at2440evb_init,
+ 	.init_irq	= s3c2440_init_irq,
+-	.init_time	= samsung_timer_init,
++	.init_time	= at2440evb_init_time,
+ 	.restart	= s3c244x_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-s3c24xx/mach-gta02.c b/arch/arm/mach-s3c24xx/mach-gta02.c
+index dc4db84..fc3a08d 100644
+--- a/arch/arm/mach-s3c24xx/mach-gta02.c
++++ b/arch/arm/mach-s3c24xx/mach-gta02.c
+@@ -501,7 +501,6 @@ static struct platform_device gta02_buttons_device = {
+ static void __init gta02_map_io(void)
+ {
+ 	s3c24xx_init_io(gta02_iodesc, ARRAY_SIZE(gta02_iodesc));
+-	s3c24xx_init_clocks(12000000);
+ 	s3c24xx_init_uarts(gta02_uartcfgs, ARRAY_SIZE(gta02_uartcfgs));
+ 	samsung_set_timer_source(SAMSUNG_PWM3, SAMSUNG_PWM4);
+ }
+@@ -585,6 +584,11 @@ static void __init gta02_machine_init(void)
+ 	regulator_has_full_constraints();
+ }
+ 
++static void __init gta02_init_time(void)
++{
++	s3c2442_init_clocks(12000000);
++	samsung_timer_init();
++}
+ 
+ MACHINE_START(NEO1973_GTA02, "GTA02")
+ 	/* Maintainer: Nelson Castillo <arhuaco@freaks-unidos.net> */
+@@ -592,6 +596,6 @@ MACHINE_START(NEO1973_GTA02, "GTA02")
+ 	.map_io		= gta02_map_io,
+ 	.init_irq	= s3c2442_init_irq,
+ 	.init_machine	= gta02_machine_init,
+-	.init_time	= samsung_timer_init,
++	.init_time	= gta02_init_time,
+ 	.restart	= s3c244x_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-s3c24xx/mach-mini2440.c b/arch/arm/mach-s3c24xx/mach-mini2440.c
+index 9e57fd9..5cc40ec 100644
+--- a/arch/arm/mach-s3c24xx/mach-mini2440.c
++++ b/arch/arm/mach-s3c24xx/mach-mini2440.c
+@@ -54,7 +54,6 @@
+ #include <linux/mtd/partitions.h>
+ 
+ #include <plat/gpio-cfg.h>
+-#include <plat/clock.h>
+ #include <plat/devs.h>
+ #include <plat/cpu.h>
+ #include <plat/samsung-time.h>
+@@ -525,11 +524,16 @@ static struct platform_device *mini2440_devices[] __initdata = {
+ static void __init mini2440_map_io(void)
+ {
+ 	s3c24xx_init_io(mini2440_iodesc, ARRAY_SIZE(mini2440_iodesc));
+-	s3c24xx_init_clocks(12000000);
+ 	s3c24xx_init_uarts(mini2440_uartcfgs, ARRAY_SIZE(mini2440_uartcfgs));
+ 	samsung_set_timer_source(SAMSUNG_PWM3, SAMSUNG_PWM4);
+ }
+ 
++static void __init mini2440_init_time(void)
++{
++	s3c2440_init_clocks(12000000);
++	samsung_timer_init();
++}
++
+ /*
+  * mini2440_features string
+  *
+@@ -690,6 +694,6 @@ MACHINE_START(MINI2440, "MINI2440")
+ 	.map_io		= mini2440_map_io,
+ 	.init_machine	= mini2440_init,
+ 	.init_irq	= s3c2440_init_irq,
+-	.init_time	= samsung_timer_init,
++	.init_time	= mini2440_init_time,
+ 	.restart	= s3c244x_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-s3c24xx/mach-nexcoder.c b/arch/arm/mach-s3c24xx/mach-nexcoder.c
+index 3066851..05627c2 100644
+--- a/arch/arm/mach-s3c24xx/mach-nexcoder.c
++++ b/arch/arm/mach-s3c24xx/mach-nexcoder.c
+@@ -42,7 +42,6 @@
+ #include <linux/platform_data/i2c-s3c2410.h>
+ 
+ #include <plat/gpio-cfg.h>
+-#include <plat/clock.h>
+ #include <plat/devs.h>
+ #include <plat/cpu.h>
+ #include <plat/samsung-time.h>
+@@ -135,13 +134,23 @@ static void __init nexcoder_sensorboard_init(void)
+ static void __init nexcoder_map_io(void)
+ {
+ 	s3c24xx_init_io(nexcoder_iodesc, ARRAY_SIZE(nexcoder_iodesc));
+-	s3c24xx_init_clocks(0);
+ 	s3c24xx_init_uarts(nexcoder_uartcfgs, ARRAY_SIZE(nexcoder_uartcfgs));
+ 	samsung_set_timer_source(SAMSUNG_PWM3, SAMSUNG_PWM4);
+ 
+ 	nexcoder_sensorboard_init();
+ }
+ 
++static void __init nexcoder_init_time(void)
++{
++	/*
++	 * for whatever reason the nexcoder called s3c24xx_init_clocks(0)
++	 * meaning a xti value of 0Hz, so this machine will most likely
++	 * not work out of the box and needs a fixup.
++	 */
++	s3c2440_init_clocks(0);
++	samsung_timer_init();
++}
++
+ static void __init nexcoder_init(void)
+ {
+ 	s3c_i2c0_set_platdata(NULL);
+@@ -154,6 +163,6 @@ MACHINE_START(NEXCODER_2440, "NexVision - Nexcoder 2440")
+ 	.map_io		= nexcoder_map_io,
+ 	.init_machine	= nexcoder_init,
+ 	.init_irq	= s3c2440_init_irq,
+-	.init_time	= samsung_timer_init,
++	.init_time	= nexcoder_init_time,
+ 	.restart	= s3c244x_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-s3c24xx/mach-osiris.c b/arch/arm/mach-s3c24xx/mach-osiris.c
+index 487be02..3bc2c9b 100644
+--- a/arch/arm/mach-s3c24xx/mach-osiris.c
++++ b/arch/arm/mach-s3c24xx/mach-osiris.c
+@@ -40,7 +40,6 @@
+ #include <linux/mtd/nand_ecc.h>
+ #include <linux/mtd/partitions.h>
+ 
+-#include <plat/clock.h>
+ #include <plat/cpu.h>
  #include <plat/cpu-freq.h>
- #include <plat/pll.h>
- #include <plat/pwm-core.h>
-+#include <plat/watchdog-reset.h>
- 
- #include "common.h"
- 
-@@ -533,6 +534,14 @@ struct platform_device s3c2443_device_dma = {
- };
+ #include <plat/devs.h>
+@@ -389,7 +388,6 @@ static void __init osiris_map_io(void)
  #endif
  
-+#if defined(CONFIG_COMMON_CLK) && defined(CONFIG_CPU_S3C2410)
-+void __init s3c2410_init_clocks(int xtal)
-+{
-+	s3c2410_common_clk_init(NULL, xtal, 0, S3C24XX_VA_CLKPWR);
-+	samsung_wdt_reset_init(S3C24XX_VA_WATCHDOG);
-+}
-+#endif
-+
- #ifdef CONFIG_CPU_S3C2412
- void __init s3c2412_init_clocks(int xtal)
- {
-@@ -547,6 +556,22 @@ void __init s3c2416_init_clocks(int xtal)
+ 	s3c24xx_init_io(osiris_iodesc, ARRAY_SIZE(osiris_iodesc));
+-	s3c24xx_init_clocks(0);
+ 	s3c24xx_init_uarts(osiris_uartcfgs, ARRAY_SIZE(osiris_uartcfgs));
+ 	samsung_set_timer_source(SAMSUNG_PWM3, SAMSUNG_PWM4);
+ 
+@@ -413,6 +411,12 @@ static void __init osiris_map_io(void)
+ 	local_irq_restore(flags);
  }
+ 
++static void __init osiris_init_time(void)
++{
++	s3c2440_init_clocks(12000000);
++	samsung_timer_init();
++}
++
+ static void __init osiris_init(void)
+ {
+ 	register_syscore_ops(&osiris_pm_syscore_ops);
+@@ -434,6 +438,6 @@ MACHINE_START(OSIRIS, "Simtec-OSIRIS")
+ 	.map_io		= osiris_map_io,
+ 	.init_irq	= s3c2440_init_irq,
+ 	.init_machine	= osiris_init,
+-	.init_time	= samsung_timer_init,
++	.init_time	= osiris_init_time,
+ 	.restart	= s3c244x_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-s3c24xx/mach-rx1950.c b/arch/arm/mach-s3c24xx/mach-rx1950.c
+index 219454c..5f37f52 100644
+--- a/arch/arm/mach-s3c24xx/mach-rx1950.c
++++ b/arch/arm/mach-s3c24xx/mach-rx1950.c
+@@ -54,7 +54,6 @@
+ #include <mach/regs-lcd.h>
+ #include <mach/gpio-samsung.h>
+ 
+-#include <plat/clock.h>
+ #include <plat/cpu.h>
+ #include <plat/devs.h>
+ #include <plat/pm.h>
+@@ -746,7 +745,6 @@ static void __init rx1950_map_io(void)
  #endif
  
-+#if defined(CONFIG_COMMON_CLK) && defined(CONFIG_CPU_S3C2440)
-+void __init s3c2440_init_clocks(int xtal)
+ 	s3c24xx_init_io(rx1950_iodesc, ARRAY_SIZE(rx1950_iodesc));
+-	s3c24xx_init_clocks(16934000);
+ 	s3c24xx_init_uarts(rx1950_uartcfgs, ARRAY_SIZE(rx1950_uartcfgs));
+ 	samsung_set_timer_source(SAMSUNG_PWM3, SAMSUNG_PWM4);
+ 
+@@ -759,6 +757,12 @@ static void __init rx1950_map_io(void)
+ 	s3c_pm_init();
+ }
+ 
++static void __init rx1950_init_time(void)
 +{
-+	s3c2410_common_clk_init(NULL, xtal, 1, S3C24XX_VA_CLKPWR);
-+	samsung_wdt_reset_init(S3C24XX_VA_WATCHDOG);
++	s3c2442_init_clocks(16934000);
++	samsung_timer_init();
 +}
-+#endif
 +
-+#if defined(CONFIG_COMMON_CLK) && defined(CONFIG_CPU_S3C2442)
-+void __init s3c2442_init_clocks(int xtal)
+ static void __init rx1950_init_machine(void)
+ {
+ 	int i;
+@@ -821,6 +825,6 @@ MACHINE_START(RX1950, "HP iPAQ RX1950")
+ 	.reserve	= rx1950_reserve,
+ 	.init_irq	= s3c2442_init_irq,
+ 	.init_machine = rx1950_init_machine,
+-	.init_time	= samsung_timer_init,
++	.init_time	= rx1950_init_time,
+ 	.restart	= s3c244x_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-s3c24xx/mach-rx3715.c b/arch/arm/mach-s3c24xx/mach-rx3715.c
+index e6535ce..6e749ec 100644
+--- a/arch/arm/mach-s3c24xx/mach-rx3715.c
++++ b/arch/arm/mach-s3c24xx/mach-rx3715.c
+@@ -46,7 +46,6 @@
+ #include <mach/regs-lcd.h>
+ #include <mach/gpio-samsung.h>
+ 
+-#include <plat/clock.h>
+ #include <plat/cpu.h>
+ #include <plat/devs.h>
+ #include <plat/pm.h>
+@@ -179,11 +178,16 @@ static struct platform_device *rx3715_devices[] __initdata = {
+ static void __init rx3715_map_io(void)
+ {
+ 	s3c24xx_init_io(rx3715_iodesc, ARRAY_SIZE(rx3715_iodesc));
+-	s3c24xx_init_clocks(16934000);
+ 	s3c24xx_init_uarts(rx3715_uartcfgs, ARRAY_SIZE(rx3715_uartcfgs));
+ 	samsung_set_timer_source(SAMSUNG_PWM3, SAMSUNG_PWM4);
+ }
+ 
++static void __init rx3715_init_time(void)
 +{
-+	s3c2410_common_clk_init(NULL, xtal, 2, S3C24XX_VA_CLKPWR);
-+	samsung_wdt_reset_init(S3C24XX_VA_WATCHDOG);
++	s3c2440_init_clocks(16934000);
++	samsung_timer_init();
 +}
-+#endif
 +
- #ifdef CONFIG_CPU_S3C2443
- void __init s3c2443_init_clocks(int xtal)
+ /* H1940 and RX3715 need to reserve this for suspend */
+ static void __init rx3715_reserve(void)
  {
-diff --git a/arch/arm/mach-s3c24xx/common.h b/arch/arm/mach-s3c24xx/common.h
-index 50504c7..2d65541 100644
---- a/arch/arm/mach-s3c24xx/common.h
-+++ b/arch/arm/mach-s3c24xx/common.h
-@@ -77,6 +77,7 @@ extern void s3c244x_restart(enum reboot_mode mode, const char *cmd);
- #ifdef CONFIG_CPU_S3C2440
- extern  int s3c2440_init(void);
- extern void s3c2440_map_io(void);
-+extern void s3c2440_init_clocks(int xtal);
- extern void s3c2440_init_irq(void);
- #else
- #define s3c2440_init NULL
-@@ -86,6 +87,7 @@ extern void s3c2440_init_irq(void);
- #ifdef CONFIG_CPU_S3C2442
- extern  int s3c2442_init(void);
- extern void s3c2442_map_io(void);
-+extern void s3c2442_init_clocks(int xtal);
- extern void s3c2442_init_irq(void);
- #else
- #define s3c2442_init NULL
-@@ -116,6 +118,11 @@ extern struct platform_device s3c2443_device_dma;
+@@ -210,6 +214,6 @@ MACHINE_START(RX3715, "IPAQ-RX3715")
+ 	.reserve	= rx3715_reserve,
+ 	.init_irq	= s3c2440_init_irq,
+ 	.init_machine	= rx3715_init_machine,
+-	.init_time	= samsung_timer_init,
++	.init_time	= rx3715_init_time,
+ 	.restart	= s3c244x_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-s3c24xx/mach-smdk2440.c b/arch/arm/mach-s3c24xx/mach-smdk2440.c
+index d071dcf..5fb89c0 100644
+--- a/arch/arm/mach-s3c24xx/mach-smdk2440.c
++++ b/arch/arm/mach-s3c24xx/mach-smdk2440.c
+@@ -38,7 +38,6 @@
+ #include <mach/fb.h>
+ #include <linux/platform_data/i2c-s3c2410.h>
  
- extern struct platform_device s3c2410_device_dclk;
- 
-+#ifdef CONFIG_S3C2410_COMMON_CLK
-+void __init s3c2410_common_clk_init(struct device_node *np, unsigned long xti_f,
-+				    int current_soc,
-+				    void __iomem *reg_base);
-+#endif
- #ifdef CONFIG_S3C2412_COMMON_CLK
- void __init s3c2412_common_clk_init(struct device_node *np, unsigned long xti_f,
- 				unsigned long ext_f, void __iomem *reg_base);
-diff --git a/arch/arm/mach-s3c24xx/s3c2410.c b/arch/arm/mach-s3c24xx/s3c2410.c
-index 04b58cb..5280173 100644
---- a/arch/arm/mach-s3c24xx/s3c2410.c
-+++ b/arch/arm/mach-s3c24xx/s3c2410.c
-@@ -83,6 +83,7 @@ void __init s3c2410_map_io(void)
- 	iotable_init(s3c2410_iodesc, ARRAY_SIZE(s3c2410_iodesc));
+-#include <plat/clock.h>
+ #include <plat/devs.h>
+ #include <plat/cpu.h>
+ #include <plat/samsung-time.h>
+@@ -159,11 +158,16 @@ static struct platform_device *smdk2440_devices[] __initdata = {
+ static void __init smdk2440_map_io(void)
+ {
+ 	s3c24xx_init_io(smdk2440_iodesc, ARRAY_SIZE(smdk2440_iodesc));
+-	s3c24xx_init_clocks(16934400);
+ 	s3c24xx_init_uarts(smdk2440_uartcfgs, ARRAY_SIZE(smdk2440_uartcfgs));
+ 	samsung_set_timer_source(SAMSUNG_PWM3, SAMSUNG_PWM4);
  }
  
-+#ifdef CONFIG_SAMSUNG_CLOCK
- void __init_or_cpufreq s3c2410_setup_clocks(void)
- {
- 	struct clk *xtal_clk;
-@@ -142,6 +143,11 @@ void __init s3c2410_init_clocks(int xtal)
- 	clkdev_add_table(s3c2410_clk_lookup, ARRAY_SIZE(s3c2410_clk_lookup));
- 	samsung_wdt_reset_init(S3C24XX_VA_WATCHDOG);
- }
-+#else
-+void __init_or_cpufreq s3c2410_setup_clocks(void)
++static void __init smdk2440_init_time(void)
 +{
++	s3c2440_init_clocks(16934400);
++	samsung_timer_init();
 +}
-+#endif
- 
- struct bus_type s3c2410_subsys = {
- 	.name = "s3c2410-core",
-diff --git a/arch/arm/mach-s3c24xx/s3c2442.c b/arch/arm/mach-s3c24xx/s3c2442.c
-index 2c8adc0..564c6503 100644
---- a/arch/arm/mach-s3c24xx/s3c2442.c
-+++ b/arch/arm/mach-s3c24xx/s3c2442.c
-@@ -53,6 +53,7 @@
- 
- #include "common.h"
- 
-+#ifdef CONFIG_SAMSUNG_CLOCK
- /* S3C2442 extended clock support */
- 
- static unsigned long s3c2442_camif_upll_round(struct clk *clk,
-@@ -162,7 +163,7 @@ static __init int s3c2442_clk_init(void)
- }
- 
- arch_initcall(s3c2442_clk_init);
--
-+#endif
- 
- static struct device s3c2442_dev = {
- 	.bus		= &s3c2442_subsys,
-diff --git a/arch/arm/mach-s3c24xx/s3c244x.c b/arch/arm/mach-s3c24xx/s3c244x.c
-index 76b691b..1d665d5 100644
---- a/arch/arm/mach-s3c24xx/s3c244x.c
-+++ b/arch/arm/mach-s3c24xx/s3c244x.c
-@@ -78,6 +78,7 @@ void __init s3c244x_map_io(void)
- 	s3c2410_device_dclk.name = "s3c2440-dclk";
- }
- 
-+#ifdef CONFIG_SAMSUNG_CLOCK
- void __init_or_cpufreq s3c244x_setup_clocks(void)
++
+ static void __init smdk2440_machine_init(void)
  {
- 	struct clk *xtal_clk;
-@@ -138,6 +139,11 @@ void __init s3c244x_init_clocks(int xtal)
- 	s3c2410_baseclk_add();
- 	samsung_wdt_reset_init(S3C24XX_VA_WATCHDOG);
- }
-+#else
-+void __init_or_cpufreq s3c244x_setup_clocks(void)
-+{
-+}
-+#endif
- 
- /* Since the S3C2442 and S3C2440 share items, put both subsystems here */
- 
+ 	s3c24xx_fb_set_platdata(&smdk2440_fb_info);
+@@ -180,6 +184,6 @@ MACHINE_START(S3C2440, "SMDK2440")
+ 	.init_irq	= s3c2440_init_irq,
+ 	.map_io		= smdk2440_map_io,
+ 	.init_machine	= smdk2440_machine_init,
+-	.init_time	= samsung_timer_init,
++	.init_time	= smdk2440_init_time,
+ 	.restart	= s3c244x_restart,
+ MACHINE_END
 -- 
 1.9.0
