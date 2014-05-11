@@ -1,357 +1,100 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 11 May 2014 10:06:25 +0200
-Subject: [PATCH v4 1/2] input: Add new sun4i-ts driver for Allwinner sunxi
- SoC's rtp controller
-In-Reply-To: <1399795586-18919-1-git-send-email-hdegoede@redhat.com>
-References: <1399795586-18919-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1399795586-18919-2-git-send-email-hdegoede@redhat.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Sun, 11 May 2014 16:05:56 +0800
+Subject: [PATCH v6 00/15] enable HiP04 SoC
+Message-ID: <1399795571-17231-1-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Note the sun4i-ts controller is capable of detecting a second touch, but when
-a second touch is present then the accuracy becomes so bad the reported touch
-location is not useable.
+Changelog:
+v6:
+  * Split HiP04 enabling patch into patches on document, mcpm & hiP04.
+  * Move reset operation in HiP04 MCPM implementation.
+  * Remove ARCH_MULTI_V7_NONLPAE & ARCH_MULTI_V7_LPAE according to olof's
+    comment.
 
-The original android driver contains some complicated heuristics using the
-aprox. distance between the 2 touches to see if the user is making a pinch
-open / close movement, and then reports emulated multi-touch events around
-the last touch coordinate (as the dual-touch coordinates are worthless).
+v5:
+  * Add ARCH_MULTI_V7_NONLPAE to avoid change too much things in Kconfig.
+  * Use memreserve in DTS.
+  * Remove L2 reset operation in mcpm implementation.
+  * Re-use nr_lr field to cover HIP04 GICH_APR implementation.
+  * Add more comments.
 
-These kinds of heuristics are just asking for trouble (and don't belong
-in the kernel). So this driver offers straight forward, reliable single
-touch functionality only.
+v4:
+  * Add multi_v7_lpae_defconfig.
+  * Select CONFIG_ARCH_MULTI_V7_LPAE if CONFIG_ARCH_MULTI_V7 is selected.
+  * Only ARMADA_XP is ARCH_MULTI_V7_LPAE, other ARMADA chips are ARCH_MULTI_V7.
+  * Remove gich_lr0 variable since we can calculate offset of GICH_LR0 from
+    GICH_APR.
+  * Cleanup GIC driver to support HiP04 GIC.
+  * Cleanup HiP04 mcpm implementation.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- .../bindings/input/touchscreen/sun4i.txt           |  15 ++
- drivers/input/touchscreen/Kconfig                  |  10 +
- drivers/input/touchscreen/Makefile                 |   1 +
- drivers/input/touchscreen/sun4i-ts.c               | 262 +++++++++++++++++++++
- 4 files changed, 288 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
- create mode 100644 drivers/input/touchscreen/sun4i-ts.c
+v3:
+  * Replace CONFIG_ARCH_MULTI_V7 by CONFIG_ARCH_MULTI_V7_LPAE in some SoC.
+  * Update MCPM code based on Dave's patch.
+  * Remove MCPM node in DTS file. Use sysctrl & fabric node instead.
+  * Move hardcoding on bootwrapper into DTS file.
+  * Append the CONFIG_MCPM_QUAD_CLUSTER for HiP04.
+  * Fix the return value from gic_get_cpumask() if it's used in standard gic.
+  * Add the vgic support on HiP04 GIC.
+  * Add virtualization support in HiP04 defconfig.
 
-diff --git a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
-new file mode 100644
-index 0000000..881aea7
---- /dev/null
-+++ b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
-@@ -0,0 +1,15 @@
-+sun4i resistive touchscreen controller
-+--------------------------------------
-+
-+Required properties:
-+ - compatible: "allwinner,sun4i-a10-ts"
-+ - reg: mmio address range of the chip
-+ - interrupts: interrupt to which the chip is connected
-+
-+Example:
-+
-+	rtp: rtp at 01c25000 {
-+		compatible = "allwinner,sun4i-a10-ts";
-+		reg = <0x01c25000 0x100>;
-+		interrupts = <29>;
-+	};
-diff --git a/drivers/input/touchscreen/Kconfig b/drivers/input/touchscreen/Kconfig
-index 68edc9d..b8366cb 100644
---- a/drivers/input/touchscreen/Kconfig
-+++ b/drivers/input/touchscreen/Kconfig
-@@ -897,6 +897,16 @@ config TOUCHSCREEN_STMPE
- 	  To compile this driver as a module, choose M here: the
- 	  module will be called stmpe-ts.
- 
-+config TOUCHSCREEN_SUN4I
-+	tristate "Allwinner sun4i resistive touchscreen controller support"
-+	depends on ARCH_SUNXI
-+	help
-+	  This selects support for the resistive touchscreen controller
-+	  found on Allwinner sunxi SoCs.
-+
-+	  To compile this driver as a module, choose M here: the
-+	  module will be called sun4i-ts.
-+
- config TOUCHSCREEN_SUR40
- 	tristate "Samsung SUR40 (Surface 2.0/PixelSense) touchscreen"
- 	depends on USB
-diff --git a/drivers/input/touchscreen/Makefile b/drivers/input/touchscreen/Makefile
-index 4bc954b..71a9755 100644
---- a/drivers/input/touchscreen/Makefile
-+++ b/drivers/input/touchscreen/Makefile
-@@ -54,6 +54,7 @@ obj-$(CONFIG_TOUCHSCREEN_PIXCIR)	+= pixcir_i2c_ts.o
- obj-$(CONFIG_TOUCHSCREEN_S3C2410)	+= s3c2410_ts.o
- obj-$(CONFIG_TOUCHSCREEN_ST1232)	+= st1232.o
- obj-$(CONFIG_TOUCHSCREEN_STMPE)		+= stmpe-ts.o
-+obj-$(CONFIG_TOUCHSCREEN_SUN4I)		+= sun4i-ts.o
- obj-$(CONFIG_TOUCHSCREEN_SUR40)		+= sur40.o
- obj-$(CONFIG_TOUCHSCREEN_TI_AM335X_TSC)	+= ti_am335x_tsc.o
- obj-$(CONFIG_TOUCHSCREEN_TOUCHIT213)	+= touchit213.o
-diff --git a/drivers/input/touchscreen/sun4i-ts.c b/drivers/input/touchscreen/sun4i-ts.c
-new file mode 100644
-index 0000000..c5acdfb
---- /dev/null
-+++ b/drivers/input/touchscreen/sun4i-ts.c
-@@ -0,0 +1,262 @@
-+/*
-+ * Allwinner sunxi resistive touchscreen controller driver
-+ *
-+ * Copyright (C) 2013 - 2014 Hans de Goede <hdegoede@redhat.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+/*
-+ * The sun4i-ts controller is capable of detecting a second touch, but when a
-+ * second touch is present then the accuracy becomes so bad the reported touch
-+ * location is not useable.
-+ *
-+ * The original android driver contains some complicated heuristics using the
-+ * aprox. distance between the 2 touches to see if the user is making a pinch
-+ * open / close movement, and then reports emulated multi-touch events around
-+ * the last touch coordinate (as the dual-touch coordinates are worthless).
-+ *
-+ * These kinds of heuristics are just asking for trouble (and don't belong
-+ * in the kernel). So this driver offers straight forward, reliable single
-+ * touch functionality only.
-+ */
-+
-+#include <linux/err.h>
-+#include <linux/init.h>
-+#include <linux/input.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of_platform.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
-+
-+#define TP_CTRL0		0x00
-+#define TP_CTRL1		0x04
-+#define TP_CTRL2		0x08
-+#define TP_CTRL3		0x0c
-+#define TP_INT_FIFOC		0x10
-+#define TP_INT_FIFOS		0x14
-+#define TP_TPR			0x18
-+#define TP_CDAT			0x1c
-+#define TEMP_DATA		0x20
-+#define TP_DATA			0x24
-+
-+/* TP_CTRL0 bits */
-+#define ADC_FIRST_DLY(x)	((x) << 24) /* 8 bits */
-+#define ADC_FIRST_DLY_MODE(x)	((x) << 23)
-+#define ADC_CLK_SEL(x)		((x) << 22)
-+#define ADC_CLK_DIV(x)		((x) << 20) /* 3 bits */
-+#define FS_DIV(x)		((x) << 16) /* 4 bits */
-+#define T_ACQ(x)		((x) << 0) /* 16 bits */
-+
-+/* TP_CTRL1 bits */
-+#define STYLUS_UP_DEBOUN(x)	((x) << 12) /* 8 bits */
-+#define STYLUS_UP_DEBOUN_EN(x)	((x) << 9)
-+#define TOUCH_PAN_CALI_EN(x)	((x) << 6)
-+#define TP_DUAL_EN(x)		((x) << 5)
-+#define TP_MODE_EN(x)		((x) << 4)
-+#define TP_ADC_SELECT(x)	((x) << 3)
-+#define ADC_CHAN_SELECT(x)	((x) << 0)  /* 3 bits */
-+
-+/* TP_CTRL2 bits */
-+#define TP_SENSITIVE_ADJUST(x)	((x) << 28) /* 4 bits */
-+#define TP_MODE_SELECT(x)	((x) << 26) /* 2 bits */
-+#define PRE_MEA_EN(x)		((x) << 24)
-+#define PRE_MEA_THRE_CNT(x)	((x) << 0) /* 24 bits */
-+
-+/* TP_CTRL3 bits */
-+#define FILTER_EN(x)		((x) << 2)
-+#define FILTER_TYPE(x)		((x) << 0)  /* 2 bits */
-+
-+/* TP_INT_FIFOC irq and fifo mask / control bits */
-+#define TEMP_IRQ_EN(x)		((x) << 18)
-+#define OVERRUN_IRQ_EN(x)	((x) << 17)
-+#define DATA_IRQ_EN(x)		((x) << 16)
-+#define TP_DATA_XY_CHANGE(x)	((x) << 13)
-+#define FIFO_TRIG(x)		((x) << 8)  /* 5 bits */
-+#define DATA_DRQ_EN(x)		((x) << 7)
-+#define FIFO_FLUSH(x)		((x) << 4)
-+#define TP_UP_IRQ_EN(x)		((x) << 1)
-+#define TP_DOWN_IRQ_EN(x)	((x) << 0)
-+
-+/* TP_INT_FIFOS irq and fifo status bits */
-+#define TEMP_DATA_PENDING	BIT(18)
-+#define FIFO_OVERRUN_PENDING	BIT(17)
-+#define FIFO_DATA_PENDING	BIT(16)
-+#define TP_IDLE_FLG		BIT(2)
-+#define TP_UP_PENDING		BIT(1)
-+#define TP_DOWN_PENDING		BIT(0)
-+
-+/* TP_TPR bits */
-+#define TEMP_ENABLE(x)		((x) << 16)
-+#define TEMP_PERIOD(x)		((x) << 0)  /* t = x * 256 * 16 / clkin */
-+
-+struct sun4i_ts_data {
-+	struct device *dev;
-+	struct input_dev *input;
-+	void __iomem *base;
-+	unsigned int irq;
-+	bool ignore_fifo_data;
-+};
-+
-+static irqreturn_t sun4i_ts_irq(int irq, void *dev_id)
-+{
-+	struct sun4i_ts_data *ts = dev_id;
-+	u32 reg_val, x, y;
-+
-+	reg_val  = readl(ts->base + TP_INT_FIFOS);
-+
-+	if (reg_val & FIFO_DATA_PENDING) {
-+		x = readl(ts->base + TP_DATA);
-+		y = readl(ts->base + TP_DATA);
-+		/* The 1st location reported after an up event is unreliable */
-+		if (!ts->ignore_fifo_data) {
-+			input_report_abs(ts->input, ABS_X, x);
-+			input_report_abs(ts->input, ABS_Y, y);
-+			/*
-+			 * The hardware has a separate down status bit, but
-+			 * that gets set before we get the first location,
-+			 * resulting in reporting a click on the old location.
-+			 */
-+			input_report_key(ts->input, BTN_TOUCH, 1);
-+			input_sync(ts->input);
-+		} else {
-+			ts->ignore_fifo_data = false;
-+		}
-+	}
-+
-+	if (reg_val & TP_UP_PENDING) {
-+		ts->ignore_fifo_data = true;
-+		input_report_key(ts->input, BTN_TOUCH, 0);
-+		input_sync(ts->input);
-+	}
-+
-+	writel(reg_val, ts->base + TP_INT_FIFOS);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int sun4i_ts_open(struct input_dev *dev)
-+{
-+	struct sun4i_ts_data *ts = input_get_drvdata(dev);
-+
-+	/* Flush, set trig level to 1, enable data and up irqs */
-+	writel(DATA_IRQ_EN(1) | FIFO_TRIG(1) | FIFO_FLUSH(1) | TP_UP_IRQ_EN(1),
-+	       ts->base + TP_INT_FIFOC);
-+
-+	return 0;
-+}
-+
-+static void sun4i_ts_close(struct input_dev *dev)
-+{
-+	struct sun4i_ts_data *ts = input_get_drvdata(dev);
-+
-+	/* Deactivate all IRQs */
-+	writel(0, ts->base + TP_INT_FIFOC);
-+}
-+
-+static int sun4i_ts_probe(struct platform_device *pdev)
-+{
-+	struct sun4i_ts_data *ts;
-+	struct device *dev = &pdev->dev;
-+	int ret;
-+
-+	ts = devm_kzalloc(dev, sizeof(struct sun4i_ts_data), GFP_KERNEL);
-+	if (!ts)
-+		return -ENOMEM;
-+
-+	ts->dev = dev;
-+	ts->ignore_fifo_data = true;
-+
-+	ts->input = devm_input_allocate_device(dev);
-+	if (!ts->input)
-+		return -ENOMEM;
-+
-+	ts->input->name = pdev->name;
-+	ts->input->phys = "sun4i_ts/input0";
-+	ts->input->open = sun4i_ts_open;
-+	ts->input->close = sun4i_ts_close;
-+	ts->input->id.bustype = BUS_HOST;
-+	ts->input->id.vendor = 0x0001;
-+	ts->input->id.product = 0x0001;
-+	ts->input->id.version = 0x0100;
-+	ts->input->evbit[0] =  BIT(EV_SYN) | BIT(EV_KEY) | BIT(EV_ABS);
-+	set_bit(BTN_TOUCH, ts->input->keybit);
-+	input_set_abs_params(ts->input, ABS_X, 0, 4095, 0, 0);
-+	input_set_abs_params(ts->input, ABS_Y, 0, 4095, 0, 0);
-+	input_set_drvdata(ts->input, ts);
-+
-+	ts->base = devm_ioremap_resource(dev,
-+			      platform_get_resource(pdev, IORESOURCE_MEM, 0));
-+	if (IS_ERR(ts->base))
-+		return PTR_ERR(ts->base);
-+
-+	ts->irq = platform_get_irq(pdev, 0);
-+	ret = devm_request_irq(dev, ts->irq, sun4i_ts_irq, 0, "sun4i-ts", ts);
-+	if (ret)
-+		return ret;
-+
-+	/*
-+	 * Select HOSC clk, clkin = clk / 6, adc samplefreq = clkin / 8192,
-+	 * t_acq = clkin / (16 * 64)
-+	 */
-+	writel(ADC_CLK_SEL(0) | ADC_CLK_DIV(2) | FS_DIV(7) | T_ACQ(63),
-+	       ts->base + TP_CTRL0);
-+
-+	/*
-+	 * sensitive_adjust = 15 : max, which is not all that sensitive,
-+	 * tp_mode = 0 : only x and y coordinates, as we don't use dual touch
-+	 */
-+	writel(TP_SENSITIVE_ADJUST(15) | TP_MODE_SELECT(0),
-+	       ts->base + TP_CTRL2);
-+
-+	/* Enable median filter, type 1 : 5/3 */
-+	writel(FILTER_EN(1) | FILTER_TYPE(1), ts->base + TP_CTRL3);
-+
-+	/* Enable temperature measurement, period 1953 (2 seconds) */
-+	writel(TEMP_ENABLE(1) | TEMP_PERIOD(1953), ts->base + TP_TPR);
-+
-+	/*
-+	 * Set stylus up debounce to aprox 10 ms, enable debounce, and
-+	 * finally enable tp mode.
-+	 */
-+	writel(STYLUS_UP_DEBOUN(5) | STYLUS_UP_DEBOUN_EN(1) | TP_MODE_EN(1),
-+	       ts->base + TP_CTRL1);
-+
-+	ret = input_register_device(ts->input);
-+	if (ret)
-+		return ret;
-+
-+	platform_set_drvdata(pdev, ts);
-+	return 0;
-+}
-+
-+static const struct of_device_id sun4i_ts_of_match[] = {
-+	{ .compatible = "allwinner,sun4i-a10-ts", },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, sun4i_ts_of_match);
-+
-+static struct platform_driver sun4i_ts_driver = {
-+	.driver = {
-+		.owner	= THIS_MODULE,
-+		.name	= "sun4i-ts",
-+		.of_match_table = of_match_ptr(sun4i_ts_of_match),
-+	},
-+	.probe	= sun4i_ts_probe,
-+};
-+
-+module_platform_driver(sun4i_ts_driver);
-+
-+MODULE_DESCRIPTION("Allwinner sun4i resistive touchscreen controller driver");
-+MODULE_AUTHOR("Hans de Goede <hdegoede@redhat.com>");
-+MODULE_LICENSE("GPL");
+v2:
+  * Append ARCH_MULTI_V7_LPAE configuration. Define ARCH_MULTI_V7 to only
+    support non-LPAE platform.
+  * Append document of DT supporting.
+  * Append ARCH_HISI in hi3xxx_defconfig.
+  * Enable errata 798181 for HiP04 SoC.
+  * Add PMU support.
+
+Haojian Zhuang (14):
+  ARM: debug: add HiP04 debug uart
+  irq: gic: use mask field in GICC_IAR
+  irq: gic: support hip04 gic
+  ARM: mcpm: support 4 clusters
+  ARM: hisi: add ARCH_HISI
+  ARM: hisi: enable MCPM implementation
+  ARM: hisi: enable HiP04
+  document: dt: add the binding on HiP04
+  document: dt: add the binding on HiP04 clock
+  ARM: dts: append hip04 dts
+  ARM: config: append lpae configuration
+  ARM: config: append hip04_defconfig
+  ARM: config: select ARCH_HISI in hi3xxx_defconfig
+  virt: arm: support hip04 gic
+
+Kefeng Wang (1):
+  ARM: hisi: enable erratum 798181 of A15 on HiP04
+
+ Documentation/devicetree/bindings/arm/gic.txt      |   1 +
+ .../bindings/arm/hisilicon/hisilicon.txt           |  21 ++
+ .../devicetree/bindings/clock/hip04-clock.txt      |  20 ++
+ arch/arm/Kconfig                                   |   9 +
+ arch/arm/Kconfig.debug                             |  10 +
+ arch/arm/Makefile                                  |   2 +-
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/hip04-d01.dts                    |  39 +++
+ arch/arm/boot/dts/hip04.dtsi                       | 260 +++++++++++++++
+ arch/arm/configs/hi3xxx_defconfig                  |   2 +
+ arch/arm/configs/hip04_defconfig                   |  74 +++++
+ arch/arm/configs/multi_v7_lpae_defconfig           | 351 +++++++++++++++++++++
+ arch/arm/include/asm/mcpm.h                        |   5 +
+ arch/arm/kvm/interrupts_head.S                     |  32 +-
+ arch/arm/mach-hisi/Kconfig                         |  27 +-
+ arch/arm/mach-hisi/Makefile                        |   1 +
+ arch/arm/mach-hisi/core.h                          |   2 +
+ arch/arm/mach-hisi/hisilicon.c                     |  12 +
+ arch/arm/mach-hisi/platmcpm.c                      | 309 ++++++++++++++++++
+ drivers/irqchip/irq-gic.c                          | 162 ++++++++--
+ include/kvm/arm_vgic.h                             |   5 +-
+ include/linux/irqchip/arm-gic.h                    |   8 +
+ virt/kvm/arm/vgic.c                                |  47 ++-
+ 23 files changed, 1342 insertions(+), 58 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/hip04-clock.txt
+ create mode 100644 arch/arm/boot/dts/hip04-d01.dts
+ create mode 100644 arch/arm/boot/dts/hip04.dtsi
+ create mode 100644 arch/arm/configs/hip04_defconfig
+ create mode 100644 arch/arm/configs/multi_v7_lpae_defconfig
+ create mode 100644 arch/arm/mach-hisi/platmcpm.c
+
 -- 
-1.9.0
+1.9.1
