@@ -1,26 +1,19 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 10 May 2014 12:08:09 -0400
-Subject: [PATCH v3 2/3] ARM: sunxi: drop CONFIG_COMMON_CLK_DEBUG
-In-Reply-To: <1399618669-6830-3-git-send-email-prabhakar.csengg@gmail.com>
-References: <1399618669-6830-1-git-send-email-prabhakar.csengg@gmail.com>
- <1399618669-6830-3-git-send-email-prabhakar.csengg@gmail.com>
-Message-ID: <20140510160809.GN7047@lukather>
+Date: Sun, 11 May 2014 06:35:05 +0200
+Subject: [PATCH 2/6] clk: sunxi: Move the 24M oscillator to a file of its
+ own
+In-Reply-To: <536E57EE.2030401@elopez.com.ar>
+References: <1399692821-20988-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1399692821-20988-3-git-send-email-maxime.ripard@free-electrons.com>
+ <536E57EE.2030401@elopez.com.ar>
+Message-ID: <20140511043505.GO7047@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 09, 2014 at 12:27:48PM +0530, Lad, Prabhakar wrote:
-> From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
-> 
-> this patch drops CONFIG_COMMON_CLK_DEBUG option
-> as this config option is now obsolete.
-> 
-> CC: Maxime Ripard <maxime.ripard@free-electrons.com>
-> CC: Olof Johansson <olof@lixom.net>
-> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+On Sat, May 10, 2014 at 01:46:38PM -0300, Emilio L?pez wrote:
 
-Applied, thanks!
-
-Maxime
+There was probably something interesting here, but both the messages
+you sent are full of empty :)
 
 -- 
 Maxime Ripard, Free Electrons
@@ -32,4 +25,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140510/5ce21975/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140511/dd6f78a8/attachment.sig>
