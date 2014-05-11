@@ -1,331 +1,206 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 11 May 2014 21:30:39 +0200
-Subject: [PATCHv2] ARM: Kirkwood: DT versions of OpenRD boards
-Message-ID: <1399836639-1918-1-git-send-email-andrew@lunn.ch>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun, 11 May 2014 16:39:17 -0300
+Subject: [PATCH 2/2] ARM: dts: imx23-olinuxino: Restructure device tree file
+In-Reply-To: <1399837157-28080-1-git-send-email-festevam@gmail.com>
+References: <1399837157-28080-1-git-send-email-festevam@gmail.com>
+Message-ID: <1399837157-28080-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create DTS files to describe the Marvell OpenRD boards.
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-Tested-by: Francois Lorrain <francois.lorrain@gmail.com>
-Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
----
-s/descrition/description/
-Remove i2c pinctrl properties
-Fixed status of mvsdio node.
----
- arch/arm/boot/dts/Makefile                     |  3 +
- arch/arm/boot/dts/kirkwood-openrd-base.dts     | 42 ++++++++++++
- arch/arm/boot/dts/kirkwood-openrd-client.dts   | 73 +++++++++++++++++++++
- arch/arm/boot/dts/kirkwood-openrd-ultimate.dts | 58 +++++++++++++++++
- arch/arm/boot/dts/kirkwood-openrd.dtsi         | 90 ++++++++++++++++++++++++++
- 5 files changed, 266 insertions(+)
- create mode 100644 arch/arm/boot/dts/kirkwood-openrd-base.dts
- create mode 100644 arch/arm/boot/dts/kirkwood-openrd-client.dts
- create mode 100644 arch/arm/boot/dts/kirkwood-openrd-ultimate.dts
- create mode 100644 arch/arm/boot/dts/kirkwood-openrd.dtsi
+Use the device tree format as used on other imx dts files. 
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 35c146f31e46..4dfd5bd570e6 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -128,6 +128,9 @@ kirkwood := \
- 	kirkwood-nsa310a.dtb \
- 	kirkwood-openblocks_a6.dtb \
- 	kirkwood-openblocks_a7.dtb \
-+	kirkwood-openrd-base.dtb \
-+	kirkwood-openrd-client.dtb \
-+	kirkwood-openrd-ultimate.dtb \
- 	kirkwood-rd88f6192.dtb \
- 	kirkwood-rd88f6281-a0.dtb \
- 	kirkwood-rd88f6281-a1.dtb \
-diff --git a/arch/arm/boot/dts/kirkwood-openrd-base.dts b/arch/arm/boot/dts/kirkwood-openrd-base.dts
-new file mode 100644
-index 000000000000..8af58999606d
---- /dev/null
-+++ b/arch/arm/boot/dts/kirkwood-openrd-base.dts
-@@ -0,0 +1,42 @@
-+/*
-+ * Marvell OpenRD Base Board Description
-+ *
-+ * Andrew Lunn <andrew@lunn.ch>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ *
-+ * This file contains the definitions that are specific to OpenRD
-+ * base variant of the Marvell Kirkwood Development Board.
-+ */
-+
-+/dts-v1/;
-+
-+#include "kirkwood-openrd.dtsi"
-+
-+/ {
-+	model = "OpenRD Base";
-+	compatible = "marvell,openrd-base", "marvell,openrd", "marvell,kirkwood-88f6281", "marvell,kirkwood";
-+
-+	ocp at f1000000 {
-+		serial at 12100 {
-+			status = "okay";
-+		};
-+	};
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx23-olinuxino.dts | 153 ++++++++++++++++------------------
+ arch/arm/boot/dts/imx23.dtsi          |   2 +-
+ 2 files changed, 74 insertions(+), 81 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx23-olinuxino.dts b/arch/arm/boot/dts/imx23-olinuxino.dts
+index 7e6eef2..fd3f573 100644
+--- a/arch/arm/boot/dts/imx23-olinuxino.dts
++++ b/arch/arm/boot/dts/imx23-olinuxino.dts
+@@ -22,79 +22,14 @@
+ 		reg = <0x40000000 0x04000000>;
+ 	};
+ 
+-	apb at 80000000 {
+-		apbh at 80000000 {
+-			ssp0: ssp at 80010000 {
+-				compatible = "fsl,imx23-mmc";
+-				pinctrl-names = "default";
+-				pinctrl-0 = <&mmc0_4bit_pins_a &mmc0_pins_fixup>;
+-				bus-width = <4>;
+-				broken-cd;
+-				status = "okay";
+-			};
+-
+-			pinctrl at 80018000 {
+-				pinctrl-names = "default";
+-				pinctrl-0 = <&hog_pins_a>;
+-
+-				hog_pins_a: hog at 0 {
+-					reg = <0>;
+-					fsl,pinmux-ids = <
+-						MX23_PAD_GPMI_ALE__GPIO_0_17
+-					>;
+-					fsl,drive-strength = <MXS_DRIVE_4mA>;
+-					fsl,voltage = <MXS_VOLTAGE_HIGH>;
+-					fsl,pull-up = <MXS_PULL_DISABLE>;
+-				};
+-
+-				led_pin_gpio2_1: led_gpio2_1 at 0 {
+-					reg = <0>;
+-					fsl,pinmux-ids = <
+-						MX23_PAD_SSP1_DETECT__GPIO_2_1
+-					>;
+-					fsl,drive-strength = <MXS_DRIVE_4mA>;
+-					fsl,voltage = <MXS_VOLTAGE_HIGH>;
+-					fsl,pull-up = <MXS_PULL_DISABLE>;
+-				};
+-			};
+-
+-			ssp1: ssp at 80034000 {
+-				#address-cells = <1>;
+-				#size-cells = <0>;
+-				compatible = "fsl,imx23-spi";
+-				pinctrl-names = "default";
+-				pinctrl-0 = <&spi2_pins_a>;
+-				status = "okay";
+-			};
+-		};
+-
+-		apbx at 80040000 {
+-			lradc at 80050000 {
+-				status = "okay";
+-			};
+-
+-			duart: serial at 80070000 {
+-				pinctrl-names = "default";
+-				pinctrl-0 = <&duart_pins_a>;
+-				status = "okay";
+-			};
+-
+-			auart0: serial at 8006c000 {
+-				pinctrl-names = "default";
+-				pinctrl-0 = <&auart0_2pins_a>;
+-				status = "okay";
+-			};
+-
+-			usbphy0: usbphy at 8007c000 {
+-				status = "okay";
+-			};
+-		};
+-	};
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&led_pin_gpio2_1>;
+ 
+-	ahb at 80080000 {
+-		usb0: usb at 80080000 {
+-			vbus-supply = <&reg_usb0_vbus>;
+-			status = "okay";
++		user {
++			label = "green";
++			gpios = <&gpio2 1 1>;
+ 		};
+ 	};
+ 
+@@ -115,14 +50,72 @@
+ 		};
+ 	};
+ 
+-	leds {
+-		compatible = "gpio-leds";
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&led_pin_gpio2_1>;
 +};
-+
-+&mdio {
-+	status = "okay";
-+
-+	ethphy0: ethernet-phy at 8 {
-+		reg = <8>;
-+	};
-+};
-+
-+&eth0 {
-+	status = "okay";
-+	ethernet0-port at 0 {
-+		phy-handle = <&ethphy0>;
-+	};
-+};
-diff --git a/arch/arm/boot/dts/kirkwood-openrd-client.dts b/arch/arm/boot/dts/kirkwood-openrd-client.dts
-new file mode 100644
-index 000000000000..887b9c1fee43
---- /dev/null
-+++ b/arch/arm/boot/dts/kirkwood-openrd-client.dts
-@@ -0,0 +1,73 @@
-+/*
-+ * Marvell OpenRD Client Board Description
-+ *
-+ * Andrew Lunn <andrew@lunn.ch>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ *
-+ * This file contains the definitions that are specific to OpenRD
-+ * client variant of the Marvell Kirkwood Development Board.
-+ */
-+
-+/dts-v1/;
-+
-+#include "kirkwood-openrd.dtsi"
-+
-+/ {
-+	model = "OpenRD Client";
-+	compatible = "marvell,openrd-client", "marvell,openrd", "marvell,kirkwood-88f6281", "marvell,kirkwood";
-+
-+	ocp at f1000000 {
-+		i2c at 11000 {
-+			status = "okay";
-+			clock-frequency = <400000>;
-+
-+			cs42l51: cs42l51 at 4a {
-+				compatible = "cirrus,cs42l51";
-+				reg = <0x4a>;
-+			};
-+		};
-+	};
-+
-+	sound {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,format = "i2s";
-+		simple-audio-card,mclk-fs = <256>;
-+
-+		simple-audio-card,cpu {
-+			sound-dai = <&audio0>;
-+		};
-+
-+		simple-audio-card,codec {
-+			sound-dai = <&cs42l51>;
-+		};
-+	};
-+};
-+
-+&mdio {
-+	status = "okay";
-+
-+	ethphy0: ethernet-phy at 8 {
-+		reg = <8>;
-+	};
-+	ethphy1: ethernet-phy at 24 {
-+		reg = <24>;
-+	};
-+};
-+
-+&eth0 {
-+	status = "okay";
-+	ethernet0-port at 0 {
-+		phy-handle = <&ethphy0>;
-+	};
-+};
-+
-+&eth1 {
-+	status = "okay";
-+	ethernet1-port at 0 {
-+		phy-handle = <&ethphy1>;
-+	};
-+};
-+
-diff --git a/arch/arm/boot/dts/kirkwood-openrd-ultimate.dts b/arch/arm/boot/dts/kirkwood-openrd-ultimate.dts
-new file mode 100644
-index 000000000000..9f12f8b53e24
---- /dev/null
-+++ b/arch/arm/boot/dts/kirkwood-openrd-ultimate.dts
-@@ -0,0 +1,58 @@
-+/*
-+ * Marvell OpenRD Ultimate Board Description
-+ *
-+ * Andrew Lunn <andrew@lunn.ch>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ *
-+ * This file contains the definitions that are specific to OpenRD
-+ * ultimate variant of the Marvell Kirkwood Development Board.
-+ */
-+
-+/dts-v1/;
-+
-+#include "kirkwood-openrd.dtsi"
-+
-+/ {
-+	model = "OpenRD Ultimate";
-+	compatible = "marvell,openrd-ultimate", "marvell,openrd", "marvell,kirkwood-88f6281", "marvell,kirkwood";
-+
-+	ocp at f1000000 {
-+		i2c at 11000 {
-+			status = "okay";
-+			clock-frequency = <400000>;
-+
-+			cs42l51: cs42l51 at 4a {
-+				compatible = "cirrus,cs42l51";
-+				reg = <0x4a>;
-+			};
-+		};
-+	};
-+};
-+
-+&mdio {
-+	status = "okay";
-+
-+	ethphy0: ethernet-phy at 0 {
-+		reg = <0>;
-+	};
-+	ethphy1: ethernet-phy at 1 {
-+		reg = <1>;
-+	};
-+};
-+
-+&eth0 {
-+	status = "okay";
-+	ethernet0-port at 0 {
-+		phy-handle = <&ethphy0>;
-+	};
-+};
-+
-+&eth1 {
-+	status = "okay";
-+	ethernet1-port at 0 {
-+		phy-handle = <&ethphy1>;
-+	};
-+};
-diff --git a/arch/arm/boot/dts/kirkwood-openrd.dtsi b/arch/arm/boot/dts/kirkwood-openrd.dtsi
-new file mode 100644
-index 000000000000..d3330dadf7ed
---- /dev/null
-+++ b/arch/arm/boot/dts/kirkwood-openrd.dtsi
-@@ -0,0 +1,90 @@
-+/*
-+ * Marvell OpenRD (Base|Client|Ultimate) Board Description
-+ *
-+ * Andrew Lunn <andrew@lunn.ch>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ *
-+ * This file contains the definitions that are common between the three
-+ * variants of the Marvell Kirkwood Development Board.
-+ */
-+
-+#include "kirkwood.dtsi"
-+#include "kirkwood-6281.dtsi"
-+
-+/ {
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x20000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200n8";
-+		stdout-path = &uart0;
-+	};
-+
-+	mbus {
-+		pcie-controller {
-+			status = "okay";
-+
-+			pcie at 1,0 {
-+				status = "okay";
-+			};
-+		};
-+	};
-+
-+	ocp at f1000000 {
-+		pinctrl: pin-controller at 10000 {
-+			pinctrl-0 = <&pmx_select28 &pmx_sdio_cd &pmx_select34>;
-+			pinctrl-names = "default";
-+
-+			pmx_select28: pmx-select-uart-sd {
-+				marvell,pins = "mpp28";
-+				marvell,function = "gpio";
-+			};
-+			pmx_sdio_cd: pmx-sdio-cd {
-+				marvell,pins = "mpp29";
-+				marvell,function = "gpio";
-+			};
-+			pmx_select34: pmx-select-rs232-rs484 {
-+				marvell,pins = "mpp34";
-+				marvell,function = "gpio";
-+			};
-+		};
-+		serial at 12000 {
-+			status = "okay";
-+
-+		};
-+		sata at 80000 {
-+			status = "okay";
-+			nr-ports = <2>;
-+		};
-+		mvsdio at 90000 {
-+			status = "okay";
-+			cd-gpios = <&gpio0 29 9>;
-+		};
-+	};
-+};
-+
-+&nand {
-+	status = "okay";
-+	pinctrl-0 = <&pmx_nand>;
+ 
+-		user {
+-			label = "green";
+-			gpios = <&gpio2 1 1>;
+-		};
++&auart0 {
 +	pinctrl-names = "default";
-+
-+	partition at 0 {
-+		label = "u-boot";
-+		reg = <0x0000000 0x100000>;
-+	};
-+
-+	partition at 100000 {
-+		label = "uImage";
-+		reg = <0x0100000 0x400000>;
-+	};
-+
-+	partition at 600000 {
-+		label = "root";
-+		reg = <0x0600000 0x1FA00000>;
-+	};
++	pinctrl-0 = <&auart0_2pins_a>;
++	status = "okay";
 +};
++
++&duart {
++	pinctrl-names = "default";
++	pinctrl-0 = <&duart_pins_a>;
++	status = "okay";
++};
++
++&lradc {
++	status = "okay";
++};
++
++&ssp0 {
++	compatible = "fsl,imx23-mmc";
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_4bit_pins_a &mmc0_pins_fixup>;
++	bus-width = <4>;
++	broken-cd;
++	status = "okay";
++};
++
++&ssp1 {
++	#address-cells = <1>;
++	#size-cells = <0>;
++	compatible = "fsl,imx23-spi";
++	pinctrl-names = "default";
++	pinctrl-0 = <&spi2_pins_a>;
++	status = "okay";
++};
++
++&usb0 {
++	vbus-supply = <&reg_usb0_vbus>;
++	status = "okay";
++};
++
++&usbphy0 {
++	status = "okay";
++};
++
++&pinctrl {
++	pinctrl-names = "default";
++	pinctrl-0 = <&hog_pins_a>;
++
++	hog_pins_a: hog at 0 {
++		reg = <0>;
++		fsl,pinmux-ids = <
++			MX23_PAD_GPMI_ALE__GPIO_0_17
++		>;
++		fsl,drive-strength = <MXS_DRIVE_4mA>;
++		fsl,voltage = <MXS_VOLTAGE_HIGH>;
++		fsl,pull-up = <MXS_PULL_DISABLE>;
++	};
++
++	led_pin_gpio2_1: led_gpio2_1 at 0 {
++		reg = <0>;
++		fsl,pinmux-ids = <
++			MX23_PAD_SSP1_DETECT__GPIO_2_1
++		>;
++		fsl,drive-strength = <MXS_DRIVE_4mA>;
++		fsl,voltage = <MXS_VOLTAGE_HIGH>;
++		fsl,pull-up = <MXS_PULL_DISABLE>;
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
+index bbcfb5a..b8b4a3d 100644
+--- a/arch/arm/boot/dts/imx23.dtsi
++++ b/arch/arm/boot/dts/imx23.dtsi
+@@ -103,7 +103,7 @@
+ 				status = "disabled";
+ 			};
+ 
+-			pinctrl at 80018000 {
++			pinctrl: pinctrl at 80018000 {
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+ 				compatible = "fsl,imx23-pinctrl", "simple-bus";
 -- 
-2.0.0.rc2
+1.8.3.2
