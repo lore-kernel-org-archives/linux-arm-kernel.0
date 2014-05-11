@@ -1,15 +1,15 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sun, 11 May 2014 22:24:41 +0200
-Subject: [PATCH 8/8] ARM: dts: berlin: convert BG2 to DT clock nodes
+Date: Sun, 11 May 2014 22:24:35 +0200
+Subject: [PATCH 2/8] clk: berlin: add clock binding docs for Marvell Berlin2
+ SoCs
 In-Reply-To: <1399839881-29895-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1399839881-29895-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1399839881-29895-9-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1399839881-29895-3-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This converts Berlin BG2 SoC dtsi to make use of the new DT clock
-nodes for Berlin SoCs. While at it, also fix up twdclk which is
-running at cpuclk/3 instead of sysclk.
+This adds mandatory device tree binding documentation for the clock related
+IP found on Marvell Berlin2 (BG2, BG2CD, and BG2Q) SoCs.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
@@ -19,325 +19,192 @@ Cc: Pawel Moll <pawel.moll@arm.com>
 Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
 Cc: Kumar Gala <galak@codeaurora.org>
-Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Randy Dunlap <rdunlap@infradead.org>
 Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Cc: Antoine Tenart <antoine.tenart@free-electrons.com>
 Cc: devicetree at vger.kernel.org
+Cc: linux-doc at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/boot/dts/berlin2.dtsi | 200 +++++++++++++++++++++++++++++++++++------
- 1 file changed, 171 insertions(+), 29 deletions(-)
+ .../devicetree/bindings/clock/berlin2-clock.txt    | 169 +++++++++++++++++++++
+ 1 file changed, 169 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/berlin2-clock.txt
 
-diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
-index 56a1af2f1052..5d84171a1e4b 100644
---- a/arch/arm/boot/dts/berlin2.dtsi
-+++ b/arch/arm/boot/dts/berlin2.dtsi
-@@ -12,6 +12,7 @@
-  */
- 
- #include "skeleton.dtsi"
-+#include <dt-bindings/clock/berlin2.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- 
- / {
-@@ -37,24 +38,18 @@
- 		};
- 	};
- 
--	clocks {
--		smclk: sysmgr-clock {
--			compatible = "fixed-clock";
--			#clock-cells = <0>;
--			clock-frequency = <25000000>;
--		};
--
--		cfgclk: cfg-clock {
--			compatible = "fixed-clock";
--			#clock-cells = <0>;
--			clock-frequency = <100000000>;
--		};
-+	refclk: oscillator {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <25000000>;
-+	};
- 
--		sysclk: system-clock {
--			compatible = "fixed-clock";
--			#clock-cells = <0>;
--			clock-frequency = <400000000>;
--		};
-+	twdclk: twdclk {
-+		compatible = "fixed-factor-clock";
-+		#clock-cells = <0>;
-+		clocks = <&coreclk CLKID_CPU>;
-+		clock-mult = <1>;
-+		clock-div = <3>;
- 	};
- 
- 	soc {
-@@ -83,7 +78,7 @@
- 			compatible = "arm,cortex-a9-twd-timer";
- 			reg = <0xad0600 0x20>;
- 			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&sysclk>;
-+			clocks = <&twdclk>;
- 		};
- 
- 		apb at e80000 {
-@@ -98,7 +93,7 @@
- 				compatible = "snps,dw-apb-timer";
- 				reg = <0x2c00 0x14>;
- 				interrupts = <8>;
--				clocks = <&cfgclk>;
-+				clocks = <&coreclk CLKID_CFG>;
- 				clock-names = "timer";
- 				status = "okay";
- 			};
-@@ -107,7 +102,7 @@
- 				compatible = "snps,dw-apb-timer";
- 				reg = <0x2c14 0x14>;
- 				interrupts = <9>;
--				clocks = <&cfgclk>;
-+				clocks = <&coreclk CLKID_CFG>;
- 				clock-names = "timer";
- 				status = "okay";
- 			};
-@@ -116,7 +111,7 @@
- 				compatible = "snps,dw-apb-timer";
- 				reg = <0x2c28 0x14>;
- 				interrupts = <10>;
--				clocks = <&cfgclk>;
-+				clocks = <&coreclk CLKID_CFG>;
- 				clock-names = "timer";
- 				status = "disabled";
- 			};
-@@ -125,7 +120,7 @@
- 				compatible = "snps,dw-apb-timer";
- 				reg = <0x2c3c 0x14>;
- 				interrupts = <11>;
--				clocks = <&cfgclk>;
-+				clocks = <&coreclk CLKID_CFG>;
- 				clock-names = "timer";
- 				status = "disabled";
- 			};
-@@ -134,7 +129,7 @@
- 				compatible = "snps,dw-apb-timer";
- 				reg = <0x2c50 0x14>;
- 				interrupts = <12>;
--				clocks = <&cfgclk>;
-+				clocks = <&coreclk CLKID_CFG>;
- 				clock-names = "timer";
- 				status = "disabled";
- 			};
-@@ -143,7 +138,7 @@
- 				compatible = "snps,dw-apb-timer";
- 				reg = <0x2c64 0x14>;
- 				interrupts = <13>;
--				clocks = <&cfgclk>;
-+				clocks = <&coreclk CLKID_CFG>;
- 				clock-names = "timer";
- 				status = "disabled";
- 			};
-@@ -152,7 +147,7 @@
- 				compatible = "snps,dw-apb-timer";
- 				reg = <0x2c78 0x14>;
- 				interrupts = <14>;
--				clocks = <&cfgclk>;
-+				clocks = <&coreclk CLKID_CFG>;
- 				clock-names = "timer";
- 				status = "disabled";
- 			};
-@@ -161,7 +156,7 @@
- 				compatible = "snps,dw-apb-timer";
- 				reg = <0x2c8c 0x14>;
- 				interrupts = <15>;
--				clocks = <&cfgclk>;
-+				clocks = <&coreclk CLKID_CFG>;
- 				clock-names = "timer";
- 				status = "disabled";
- 			};
-@@ -176,6 +171,153 @@
- 			};
- 		};
- 
-+		syspll: pll at ea0014 {
-+			compatible = "marvell,berlin2-pll";
-+			#clock-cells = <0>;
-+			reg = <0xea0014 0x14>;
-+			clocks = <&refclk>;
-+		};
+diff --git a/Documentation/devicetree/bindings/clock/berlin2-clock.txt b/Documentation/devicetree/bindings/clock/berlin2-clock.txt
+new file mode 100644
+index 000000000000..3da87a488402
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/berlin2-clock.txt
+@@ -0,0 +1,169 @@
++* Marvell Berlin2 clock bindings
 +
-+		mempll: pll at ea0028 {
-+			compatible = "marvell,berlin2-pll";
-+			#clock-cells = <0>;
-+			reg = <0xea0028 0x14>;
-+			clocks = <&refclk>;
-+		};
++Marvell Berlin2 (BG2, BG2CD, BG2Q) share the same IP for PLLs and clocks,
++with some minor differences in features and register layout. The below
++describes the individual clock related IP:
 +
-+		cpupll: pll at ea003c {
-+			compatible = "marvell,berlin2-pll";
-+			#clock-cells = <0>;
-+			reg = <0xea003c 0x14>;
-+			clocks = <&refclk>;
-+		};
++* Audio/Video PLL
 +
-+		avpll: pll at ea0040 {
-+			compatible = "marvell,berlin2-avpll";
-+			#clock-cells = <2>;
-+			reg = <0xea0050 0x100>;
-+			clocks = <&refclk>;
-+		};
++The Audio/Video PLL (AVPLL) is a dual-VCO PLL with 8 channels each. Each
++of the VCOs can sythesize a single VCO frequency based on a single input
++reference clock. Each of the 8 channels then, can derive an output clock
++from that VCO frequency by various dividers/multipliers.
 +
-+		coreclk: clock at ea0150 {
-+			compatible = "marvell,berlin2-core-clocks";
-+			#clock-cells = <1>;
-+			reg = <0xea0150 0x1c>;
-+			clocks = <&refclk>, <&syspll>, <&mempll>, <&cpupll>,
-+				<&avpll 0 1>, <&avpll 0 2>,
-+				<&avpll 0 3>, <&avpll 0 4>,
-+				<&avpll 0 5>, <&avpll 0 6>,
-+				<&avpll 0 7>, <&avpll 0 8>,
-+				<&avpll 1 1>, <&avpll 1 2>,
-+				<&avpll 1 3>, <&avpll 1 4>,
-+				<&avpll 1 5>, <&avpll 1 6>,
-+				<&avpll 1 7>, <&avpll 1 8>;
-+			clock-names = "refclk", "syspll", "mempll", "cpupll",
-+				"avpll_a1", "avpll_a2", "avpll_a3", "avpll_a4",
-+				"avpll_a5", "avpll_a6", "avpll_a7", "avpll_a8",
-+				"avpll_b1", "avpll_b2", "avpll_b3", "avpll_b4",
-+				"avpll_b5", "avpll_b6", "avpll_b7", "avpll_b8";
-+		};
++Required properties:
++- compatible: shall be "marvell,berlin2-avpll"
++- reg: address and length of the corresponding AVPLL registers
++- #clock-cells: shall be set to 2
++- clocks: single clock specifier referencing the AVPLL input clock
 +
-+		gfx3dcore_clk: clock at ea022c {
-+			compatible = "marvell,berlin2-clk-div";
-+			#clock-cells = <0>;
-+			reg = <0xea0022c 0x4>;
-+			clocks = <&syspll>,
-+				<&avpll 1 4>, <&avpll 1 5>,
-+				<&avpll 1 6>, <&avpll 1 7>;
-+			clock-names = "mux_bypass",
-+				"mux0", "mux1", "mux2", "mux3";
-+		};
++To ease match-up with the desired AVPLL output clock, clock specifiers
++referencing AVPLL clocks shall contain two cells. The first refers to
++the VCO (0=AVPLL_A, 1=AVPLL_B) while the second refers to the corresponding
++channel starting with 1. For example, to reference AVPLL_B3 the clock
++specifier shall be: <&avpll 1 3>.
 +
-+		gfx3dsys_clk: clock at ea0230 {
-+			compatible = "marvell,berlin2-clk-div";
-+			#clock-cells = <0>;
-+			reg = <0xea00230 0x4>;
-+			clocks = <&syspll>,
-+				<&avpll 1 4>, <&avpll 1 5>,
-+				<&avpll 1 6>, <&avpll 1 7>;
-+			clock-names = "mux_bypass",
-+				"mux0", "mux1", "mux2", "mux3";
-+		};
++Example:
 +
-+		arc_clk: clock at ea0234 {
-+			compatible = "marvell,berlin2-clk-div";
-+			#clock-cells = <0>;
-+			reg = <0xea00234 0x4>;
-+			clocks = <&syspll>,
-+				<&avpll 1 4>, <&avpll 1 5>,
-+				<&avpll 1 6>, <&avpll 1 7>;
-+			clock-names = "mux_bypass",
-+				"mux0", "mux1", "mux2", "mux3";
-+		};
++avpll: pll at ea0040 {
++	compatible = "marvell,berlin2-avpll";
++	#clock-cells = <2>;
++	reg = <0xea0050 0x100>;
++	clocks = <&refclk>;
++};
 +
-+		vip_clk: clock at ea0238 {
-+			compatible = "marvell,berlin2-clk-div";
-+			#clock-cells = <0>;
-+			reg = <0xea00238 0x4>;
-+			clocks = <&syspll>,
-+				<&avpll 1 4>, <&avpll 1 5>,
-+				<&avpll 1 6>, <&avpll 1 7>;
-+			clock-names = "mux_bypass",
-+				"mux0", "mux1", "mux2", "mux3";
-+		};
++* Simple PLLs
 +
-+		sdio0xin_clk: clock at ea023c {
-+			compatible = "marvell,berlin2-clk-div";
-+			#clock-cells = <0>;
-+			reg = <0xea0023c 0x4>;
-+			clocks = <&syspll>,
-+				<&avpll 1 4>, <&avpll 1 5>,
-+				<&avpll 1 6>, <&avpll 1 7>;
-+			clock-names = "mux_bypass",
-+				"mux0", "mux1", "mux2", "mux3";
-+		};
++Simple PLLs are memory mapped PLLs that can sythesize a single output clock
++based on a single input reference clock.
 +
-+		sdio1xin_clk: clock at ea0240 {
-+			compatible = "marvell,berlin2-clk-div";
-+			#clock-cells = <0>;
-+			reg = <0xea00240 0x4>;
-+			clocks = <&syspll>,
-+				<&avpll 1 4>, <&avpll 1 5>,
-+				<&avpll 1 6>, <&avpll 1 7>;
-+			clock-names = "mux_bypass",
-+				"mux0", "mux1", "mux2", "mux3";
-+		};
++Required properties:
++- compatible: shall be one of the following:
++	"marvell,berlin2-pll" for Berlin BG2/BG2CD PLLs
++	"marvell,berlin2q-pll" for Berlin BG2Q PLLs
++- reg: address and length of the corresponding PLL registers
++- #clock-cells: shall be set to 0
++- clocks: single clock specifier referencing the PLL input clock
 +
-+		gfx3dextra_clk: clock at ea0244 {
-+			compatible = "marvell,berlin2-clk-div";
-+			#clock-cells = <0>;
-+			reg = <0xea00244 0x4>;
-+			clocks = <&syspll>,
-+				<&avpll 1 4>, <&avpll 1 5>,
-+				<&avpll 1 6>, <&avpll 1 7>;
-+			clock-names = "mux_bypass",
-+				"mux0", "mux1", "mux2", "mux3";
-+		};
++Example:
 +
-+		gc360_clk: clock at ea024c {
-+			compatible = "marvell,berlin2-clk-div";
-+			#clock-cells = <0>;
-+			reg = <0xea0024c 0x4>;
-+			clocks = <&syspll>,
-+				<&avpll 1 4>, <&avpll 1 5>,
-+				<&avpll 1 6>, <&avpll 1 7>;
-+			clock-names = "mux_bypass",
-+				"mux0", "mux1", "mux2", "mux3";
-+		};
++cpupll: pll at ea003c {
++	compatible = "marvell,berlin2-pll";
++	#clock-cells = <0>;
++	reg = <0xea003c 0x14>;
++	clocks = <&refclk>;
++};
 +
-+		sdio_dllmst_clk: clock at ea0250 {
-+			compatible = "marvell,berlin2-clk-div";
-+			#clock-cells = <0>;
-+			reg = <0xea00250 0x4>;
-+			clocks = <&syspll>,
-+				<&avpll 1 4>, <&avpll 1 5>,
-+				<&avpll 1 6>, <&avpll 1 7>;
-+			clock-names = "mux_bypass",
-+				"mux0", "mux1", "mux2", "mux3";
-+		};
++* Single-register clock dividers
 +
- 		apb at fc0000 {
- 			compatible = "simple-bus";
- 			#address-cells = <1>;
-@@ -190,7 +332,7 @@
- 				reg-shift = <2>;
- 				reg-io-width = <1>;
- 				interrupts = <8>;
--				clocks = <&smclk>;
-+				clocks = <&refclk>;
- 				status = "disabled";
- 			};
- 
-@@ -200,7 +342,7 @@
- 				reg-shift = <2>;
- 				reg-io-width = <1>;
- 				interrupts = <9>;
--				clocks = <&smclk>;
-+				clocks = <&refclk>;
- 				status = "disabled";
- 			};
- 
-@@ -210,7 +352,7 @@
- 				reg-shift = <2>;
- 				reg-io-width = <1>;
- 				interrupts = <10>;
--				clocks = <&smclk>;
-+				clocks = <&refclk>;
- 				status = "disabled";
- 			};
- 
++Single-register clock dividers are complex divider cells, allowing
++to divide a reference clock with a set of fixed dividers. Also they
++comprise and input clock mux with bypass and an ouput clock gate.
++
++Required properties:
++- compatible: shall be "marvell,berlin2-clk-div"
++- reg: address and length of the corresponding DIV registers
++- #clock-cells: shall be set to 0
++- clocks: clock specifiers referencing the DIV input clocks
++- clock-names: array of strings describing the clock specifiers above.
++    Allowed clock-names are "mux_bypass" for the clock mux bypass selection
++    and "muxN" (N=0..7) for each of the 8 possible clock mux inputs.
++
++Example:
++
++gfx3dcore_clk: clock at ea022c {
++	compatible = "marvell,berlin2-clk-div";
++	#clock-cells = <0>;
++	reg = <0xea0022c 0x4>;
++	clocks = <&syspll>,
++		<&avpll AVPLL_B 4>, <&avpll AVPLL_B 5>,
++		<&avpll AVPLL_B 6>, <&avpll AVPLL_B 7>;
++	clock-names = "mux_bypass",
++		"mux0", "mux1", "mux2", "mux3";
++};
++
++* SoC-specific core clocks
++
++In addition to the above, there is a register set dealing with SoC
++specific clock dividers, muxes, and gates. There is also the complex
++divider cell used above, but instead of independent registers, they
++share a common set of registers. The core clocks are represented by
++a single DT node providing access to the remaining clocks.
++
++Required properties:
++- compatible: shall be one of
++	"marvell,berlin2-core-clocks" for BG2/BG2CD SoCs
++	"marvell,berlin2q-core-clocks" for BG2Q SoCs
++- reg: address and length of the corresponding clock registers
++- #clock-cells: shall be set to 1
++- clocks: clock specifiers referencing the core clock input clocks
++- clock-names: array of strings describing the clock specifiers above.
++    Allowed clock-names for the reference clocks are
++      "refclk", "syspll", "mempll", "cpupll"
++    also Audio/Video PLL clocks shall be named with
++      "avpll_VN" (V=0...1 for AVPLL_A and AVPLL_B, N=1..8 for the
++      corresponding reference input from AVPLL).
++
++Optional properties for BG2/BG2CD SoCs:
++- clocks/clock-names: in addition to the allowed clock names above,
++    there is an external video clock input that shall be named "video_ext0".
++
++Clocks provided by core clocks shall be referenced by a clock specifier
++indexing one of the provided clocks. A SoC-specific list of available clocks
++is below the example.
++
++Example:
++coreclk: clock at ea0150 {
++	compatible = "marvell,berlin2-core-clocks";
++	#clock-cells = <1>;
++	reg = <0xea0150 0x1c>;
++	clocks = <&refclk>, <&syspll>, <&mempll>, <&cpupll>,
++		<&avpll 0 1>, <&avpll 0 2>,
++		<&avpll 0 3>, <&avpll 0 4>,
++		<&avpll 0 5>, <&avpll 0 6>,
++		<&avpll 0 7>, <&avpll 0 8>,
++		<&avpll 1 1>, <&avpll 1 2>,
++		<&avpll 1 3>, <&avpll 1 4>,
++		<&avpll 1 5>, <&avpll 1 6>,
++		<&avpll 1 7>, <&avpll 1 8>,
++		<&externalvideoclk>;
++	clock-names = "refclk", "syspll", "mempll", "cpupll",
++		"avpll_a1", "avpll_a2", "avpll_a3", "avpll_a4",
++		"avpll_a5", "avpll_a6", "avpll_a7", "avpll_a8",
++		"avpll_b1", "avpll_b2", "avpll_b3", "avpll_b4",
++		"avpll_b5", "avpll_b6", "avpll_b7", "avpll_b8",
++		"video_ext0";
++};
++
++* BG2/BG2CD core clock indicies:
++0  - SYS
++1  - CPU
++2  - DRMFIGO
++3  - CFG
++4  - GFX
++5  - ZSP
++6  - PERIF
++7  - PCUBE
++8  - VSCOPE
++9  - NFC_ECC
++10 - VPP
++11 - APP
++12 - AUDIO0
++23 - AUDIO2
++14 - AUDIO3
++15 - AUDIO1
++16 - GETH0
++17 - GETH1
++18 - SATA
++19 - AHBAPB
++20 - USB0
++21 - USB1
++22 - PBRIDGE
++23 - SDIO0
++24 - SDIO1
++25 - NFC
++26 - SMEMC
++27 - AUDIOHD
++28 - VIDEO0
++29 - VIDEO1
++30 - VIDEO2
 -- 
 1.9.1
