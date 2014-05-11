@@ -1,42 +1,35 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 11 May 2014 19:08:43 +0200
-Subject: [PATCH v12 0/6] ARM: sunxi: Add driver for SD/MMC hosts found on
- Allwinner sunxi SoCs
-In-Reply-To: <1399794417-9291-1-git-send-email-hdegoede@redhat.com>
-References: <1399794417-9291-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20140511170843.GT7047@lukather>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sun, 11 May 2014 20:12:47 +0200
+Subject: [PATCHv4 08/20] usb: host: xhci-plat: add support for the
+ Armada 375/38x XHCI controllers
+In-Reply-To: <536AEFA0.3070806@renesas.com>
+References: <1399470746-2948-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1399470746-2948-9-git-send-email-thomas.petazzoni@free-electrons.com>
+ <536AEFA0.3070806@renesas.com>
+Message-ID: <20140511201247.182d5f48@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
+Dear Shimoda, Yoshihiro,
 
-On Sun, May 11, 2014 at 09:46:51AM +0200, Hans de Goede wrote:
-> Hi All,
+On Thu, 8 May 2014 11:44:48 +0900, Shimoda, Yoshihiro wrote:
+
+> > +#ifndef __LINUX_XHCI_MVEBU_H
+> > +#define __LINUX_XHCI_MVEBU_H
+> > +#if IS_ENABLED(CONFIG_USB_XHCI_MVEBU)
+> > +int xhci_mvebu_mbus_init_quirk(struct platform_device *pdev);
+> > +#else
+> > +static inline int xhci_mvebu_mbus_init_quirk(struct device dev)
 > 
-> Here is v12 of the sunxi-mmc patch-set David Lanzend?rfer and I have been
-> working on, the mmc driver itself is unchanged from v11. New this version are
-> some dts patch changes, see below.
+> I could not compile this code when I disabled CONFIG_USB_XHCI_MVEBU:
+> 	incompatible type for argument 1 of 'xhci_mvebu_mbus_init_quirk'.
 > 
-> The first patch in this series is the patch adding the actual mmc driver and
-> should go in through the mmc tree.
-> 
-> All the other patches are devicetree patches adding / using the new fixed
-> reg_vcc3v3 supply to all sunxi board files, and should go upstream through
-> Maxime's sunxi-dts tree.
+> So, the "struct device dev" should be changed to "struct platform_device *pdev".
 
-I just merged the last 5 patches.
+Ah, yes, correct, thanks! Will fix in v5.
 
-Thanks!
-Maxime
-
+Thomas
 -- 
-Maxime Ripard, Free Electrons
+Thomas Petazzoni, CTO, Free Electrons
 Embedded Linux, Kernel and Android engineering
 http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140511/35d4d738/attachment.sig>
