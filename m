@@ -1,275 +1,657 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Sun, 11 May 2014 16:06:11 +0800
-Subject: [PATCH v6 15/15] virt: arm: support hip04 gic
-In-Reply-To: <1399795571-17231-1-git-send-email-haojian.zhuang@linaro.org>
-References: <1399795571-17231-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1399795571-17231-16-git-send-email-haojian.zhuang@linaro.org>
+From: anup@brainfault.org (Anup Patel)
+Date: Sun, 11 May 2014 13:44:15 +0530
+Subject: [PATCH v9 1/3] PSCI: Add initial support for PSCIv0.2 functions
+In-Reply-To: <1399472847-14377-2-git-send-email-ashwin.chaugule@linaro.org>
+References: <1399472847-14377-1-git-send-email-ashwin.chaugule@linaro.org>
+ <1399472847-14377-2-git-send-email-ashwin.chaugule@linaro.org>
+Message-ID: <CAAhSdy1NLnB3xoD+WZLm0Ja-zgH+tCxb3vOLGHUjoMokuVumTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In ARM standard GIC, GICH_APR offset is 0xf0 & GICH_LR0 offset is 0x100.
-In HiP04 GIC, GICH_APR offset is 0x70 & GICH_LR0 offset is 0x80.
+On Wed, May 7, 2014 at 7:57 PM, Ashwin Chaugule
+<ashwin.chaugule@linaro.org> wrote:
+> The PSCIv0.2 spec defines standard values of function IDs
+> and introduces a few new functions. Detect version of PSCI
+> and appropriately select the right PSCI functions.
+>
+> Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> ---
+>  arch/arm/include/asm/psci.h   |   7 +-
+>  arch/arm/kernel/psci.c        | 196 +++++++++++++++++++++++++++++++++--------
+>  arch/arm64/include/asm/psci.h |   2 +-
+>  arch/arm64/kernel/psci.c      | 200 ++++++++++++++++++++++++++++++++++--------
+>  4 files changed, 328 insertions(+), 77 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/psci.h b/arch/arm/include/asm/psci.h
+> index c4ae171..b93e34a 100644
+> --- a/arch/arm/include/asm/psci.h
+> +++ b/arch/arm/include/asm/psci.h
+> @@ -29,16 +29,19 @@ struct psci_operations {
+>         int (*cpu_off)(struct psci_power_state state);
+>         int (*cpu_on)(unsigned long cpuid, unsigned long entry_point);
+>         int (*migrate)(unsigned long cpuid);
+> +       int (*affinity_info)(unsigned long target_affinity,
+> +                       unsigned long lowest_affinity_level);
+> +       int (*migrate_info_type)(void);
+>  };
+>
+>  extern struct psci_operations psci_ops;
+>  extern struct smp_operations psci_smp_ops;
+>
+>  #ifdef CONFIG_ARM_PSCI
+> -void psci_init(void);
+> +int psci_init(void);
+>  bool psci_smp_available(void);
+>  #else
+> -static inline void psci_init(void) { }
+> +static inline int psci_init(void) { }
+>  static inline bool psci_smp_available(void) { return false; }
+>  #endif
+>
+> diff --git a/arch/arm/kernel/psci.c b/arch/arm/kernel/psci.c
+> index 4693188..3775e62 100644
+> --- a/arch/arm/kernel/psci.c
+> +++ b/arch/arm/kernel/psci.c
+> @@ -17,63 +17,58 @@
+>
+>  #include <linux/init.h>
+>  #include <linux/of.h>
+> +#include <linux/reboot.h>
+> +#include <linux/pm.h>
+> +#include <uapi/linux/psci.h>
+>
+>  #include <asm/compiler.h>
+>  #include <asm/errno.h>
+>  #include <asm/opcodes-sec.h>
+>  #include <asm/opcodes-virt.h>
+>  #include <asm/psci.h>
+> +#include <asm/system_misc.h>
+>
+>  struct psci_operations psci_ops;
+>
+>  static int (*invoke_psci_fn)(u32, u32, u32, u32);
+> +typedef int (*psci_initcall_t)(const struct device_node *);
+>
+>  enum psci_function {
+>         PSCI_FN_CPU_SUSPEND,
+>         PSCI_FN_CPU_ON,
+>         PSCI_FN_CPU_OFF,
+>         PSCI_FN_MIGRATE,
+> +       PSCI_FN_AFFINITY_INFO,
+> +       PSCI_FN_MIGRATE_INFO_TYPE,
+>         PSCI_FN_MAX,
+>  };
+>
+>  static u32 psci_function_id[PSCI_FN_MAX];
+>
+> -#define PSCI_RET_SUCCESS               0
+> -#define PSCI_RET_EOPNOTSUPP            -1
+> -#define PSCI_RET_EINVAL                        -2
+> -#define PSCI_RET_EPERM                 -3
+> -
+>  static int psci_to_linux_errno(int errno)
+>  {
+>         switch (errno) {
+>         case PSCI_RET_SUCCESS:
+>                 return 0;
+> -       case PSCI_RET_EOPNOTSUPP:
+> +       case PSCI_RET_NOT_SUPPORTED:
+>                 return -EOPNOTSUPP;
+> -       case PSCI_RET_EINVAL:
+> +       case PSCI_RET_INVALID_PARAMS:
+>                 return -EINVAL;
+> -       case PSCI_RET_EPERM:
+> +       case PSCI_RET_DENIED:
+>                 return -EPERM;
+>         };
+>
+>         return -EINVAL;
+>  }
+>
+> -#define PSCI_POWER_STATE_ID_MASK       0xffff
+> -#define PSCI_POWER_STATE_ID_SHIFT      0
+> -#define PSCI_POWER_STATE_TYPE_MASK     0x1
+> -#define PSCI_POWER_STATE_TYPE_SHIFT    16
+> -#define PSCI_POWER_STATE_AFFL_MASK     0x3
+> -#define PSCI_POWER_STATE_AFFL_SHIFT    24
+> -
+>  static u32 psci_power_state_pack(struct psci_power_state state)
+>  {
+> -       return  ((state.id & PSCI_POWER_STATE_ID_MASK)
+> -                       << PSCI_POWER_STATE_ID_SHIFT)   |
+> -               ((state.type & PSCI_POWER_STATE_TYPE_MASK)
+> -                       << PSCI_POWER_STATE_TYPE_SHIFT) |
+> -               ((state.affinity_level & PSCI_POWER_STATE_AFFL_MASK)
+> -                       << PSCI_POWER_STATE_AFFL_SHIFT);
+> +       return  ((state.id & PSCI_0_2_POWER_STATE_ID_MASK)
+> +                       << PSCI_0_2_POWER_STATE_ID_SHIFT)       |
+> +               ((state.type & PSCI_0_2_POWER_STATE_TYPE_MASK)
+> +                       << PSCI_0_2_POWER_STATE_TYPE_SHIFT)     |
+> +               ((state.affinity_level & PSCI_0_2_POWER_STATE_AFFL_MASK)
+> +                       << PSCI_0_2_POWER_STATE_AFFL_SHIFT);
+>  }
 
-Now reuse the nr_lr field in struct vgic_cpu. Bit[31:16] is used to store
-GICH_APR offset in HiP04, and bit[15:0] is used to store real nr_lr
-variable. In ARM standard GIC, don't set bit[31:16]. So we could avoid
-to change the VGIC implementation in arm64.
+As per updated PSCI_0_2_POWER_STATE_xxx defines, this should be:
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
----
- arch/arm/kvm/interrupts_head.S  | 32 ++++++++++++++++++++++------
- include/kvm/arm_vgic.h          |  5 ++++-
- include/linux/irqchip/arm-gic.h |  6 ++++++
- virt/kvm/arm/vgic.c             | 47 +++++++++++++++++++++++++++++------------
- 4 files changed, 69 insertions(+), 21 deletions(-)
+return ((state.id << PSCI_0_2_POWER_STATE_ID_SHIFT)
+          & PSCI_0_2_POWER_STATE_ID_MASK) |
+          ((state.type << PSCI_0_2_POWER_STATE_TYPE_SHIFT)
+          & PSCI_0_2_POWER_STATE_TYPE_MASK) |
+          ((state.affinity_level << PSCI_0_2_POWER_STATE_AFFL_SHIFT)
+          & PSCI_0_2_POWER_STATE_AFFL_MASK);
 
-diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
-index 76af9302..7aacaff 100644
---- a/arch/arm/kvm/interrupts_head.S
-+++ b/arch/arm/kvm/interrupts_head.S
-@@ -419,7 +419,10 @@ vcpu	.req	r0		@ vcpu pointer always in r0
- 	ldr	r7, [r2, #GICH_EISR1]
- 	ldr	r8, [r2, #GICH_ELRSR0]
- 	ldr	r9, [r2, #GICH_ELRSR1]
--	ldr	r10, [r2, #GICH_APR]
-+	ldr	r10, [r11, #VGIC_CPU_NR_LR]
-+	movs	r10, r10, lsr #HWCFG_APR_SHIFT
-+	ldrne	r10, [r2, r10]
-+	ldreq	r10, [r2, #GICH_APR]
- 
- 	str	r3, [r11, #VGIC_CPU_HCR]
- 	str	r4, [r11, #VGIC_CPU_VMCR]
-@@ -435,9 +438,16 @@ vcpu	.req	r0		@ vcpu pointer always in r0
- 	str	r5, [r2, #GICH_HCR]
- 
- 	/* Save list registers */
--	add	r2, r2, #GICH_LR0
--	add	r3, r11, #VGIC_CPU_LR
- 	ldr	r4, [r11, #VGIC_CPU_NR_LR]
-+	addeq	r2, r2, #GICH_LR0
-+	movne	r10, r4, lsr #HWCFG_APR_SHIFT
-+	/* the offset between GICH_APR & GICH_LR0 is 0x10 */
-+	addne	r10, r10, #0x10
-+	addne	r2, r2, r10
-+	add	r3, r11, #VGIC_CPU_LR
-+	/* Get NR_LR from VGIC_CPU_NR_LR */
-+	ldr	r6, =HWCFG_NR_LR_MASK
-+	and	r4, r4, r6
- 1:	ldr	r6, [r2], #4
- 	str	r6, [r3], #4
- 	subs	r4, r4, #1
-@@ -469,12 +479,22 @@ vcpu	.req	r0		@ vcpu pointer always in r0
- 
- 	str	r3, [r2, #GICH_HCR]
- 	str	r4, [r2, #GICH_VMCR]
--	str	r8, [r2, #GICH_APR]
-+	ldr	r6, [r11, #VGIC_CPU_NR_LR]
-+	movs	r6, r6, lsr #HWCFG_APR_SHIFT
-+	strne	r8, [r2, r6]
-+	streq	r8, [r2, #GICH_APR]
- 
- 	/* Restore list registers */
--	add	r2, r2, #GICH_LR0
--	add	r3, r11, #VGIC_CPU_LR
- 	ldr	r4, [r11, #VGIC_CPU_NR_LR]
-+	addeq	r2, r2, #GICH_LR0
-+	movne	r6, r4, lsr #HWCFG_APR_SHIFT
-+	/* the offset between GICH_APR & GICH_LR0 is 0x10 */
-+	addne	r6, r6, #0x10
-+	addne	r2, r2, r6
-+	/* Get NR_LR from VGIC_CPU_NR_LR */
-+	add	r3, r11, #VGIC_CPU_LR
-+	ldr	r6, =HWCFG_NR_LR_MASK
-+	and	r4, r4, r6
- 1:	ldr	r6, [r3], #4
- 	str	r6, [r2], #4
- 	subs	r4, r4, #1
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index f27000f..089de25 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -122,7 +122,10 @@ struct vgic_cpu {
- 	/* Bitmap of used/free list registers */
- 	DECLARE_BITMAP(	lr_used, VGIC_MAX_LRS);
- 
--	/* Number of list registers on this CPU */
-+	/*
-+	 * bit[31:16]: GICH_APR offset
-+	 * bit[15:0]:  Number of list registers on this CPU
-+	 */
- 	int		nr_lr;
- 
- 	/* CPU vif control registers for world switch */
-diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-index 45e2d8c..5530388 100644
---- a/include/linux/irqchip/arm-gic.h
-+++ b/include/linux/irqchip/arm-gic.h
-@@ -49,6 +49,8 @@
- #define GICH_ELRSR1 			0x34
- #define GICH_APR			0xf0
- #define GICH_LR0			0x100
-+#define HIP04_GICH_APR			0x70
-+/* GICH_LR0 offset in HiP04 is 0x80 */
- 
- #define GICH_HCR_EN			(1 << 0)
- #define GICH_HCR_UIE			(1 << 1)
-@@ -73,6 +75,10 @@
- #define GICH_MISR_EOI			(1 << 0)
- #define GICH_MISR_U			(1 << 1)
- 
-+#define HWCFG_NR_LR_MASK	0xffff
-+#define HWCFG_APR_MASK		0xffff
-+#define HWCFG_APR_SHIFT		16
-+
- #ifndef __ASSEMBLY__
- 
- struct device_node;
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 47b2983..e635b9b 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -97,7 +97,7 @@ static void vgic_retire_disabled_irqs(struct kvm_vcpu *vcpu);
- static void vgic_update_state(struct kvm *kvm);
- static void vgic_kick_vcpus(struct kvm *kvm);
- static void vgic_dispatch_sgi(struct kvm_vcpu *vcpu, u32 reg);
--static u32 vgic_nr_lr;
-+static u32 vgic_hw_cfg;
- 
- static unsigned int vgic_maint_irq;
- 
-@@ -624,9 +624,9 @@ static void vgic_unqueue_irqs(struct kvm_vcpu *vcpu)
- 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
- 	int vcpu_id = vcpu->vcpu_id;
- 	int i, irq, source_cpu;
--	u32 *lr;
-+	u32 *lr, nr_lr = vgic_cpu->nr_lr & HWCFG_NR_LR_MASK;
- 
--	for_each_set_bit(i, vgic_cpu->lr_used, vgic_cpu->nr_lr) {
-+	for_each_set_bit(i, vgic_cpu->lr_used, nr_lr) {
- 		lr = &vgic_cpu->vgic_lr[i];
- 		irq = LR_IRQID(*lr);
- 		source_cpu = LR_CPUID(*lr);
-@@ -1005,8 +1005,9 @@ static void vgic_retire_disabled_irqs(struct kvm_vcpu *vcpu)
- {
- 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
- 	int lr;
-+	int nr_lr = vgic_cpu->nr_lr & HWCFG_NR_LR_MASK;
- 
--	for_each_set_bit(lr, vgic_cpu->lr_used, vgic_cpu->nr_lr) {
-+	for_each_set_bit(lr, vgic_cpu->lr_used, nr_lr) {
- 		int irq = vgic_cpu->vgic_lr[lr] & GICH_LR_VIRTUALID;
- 
- 		if (!vgic_irq_is_enabled(vcpu, irq)) {
-@@ -1025,6 +1026,7 @@ static bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq)
- {
- 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
- 	int lr;
-+	int nr_lr = vgic_cpu->nr_lr & HWCFG_NR_LR_MASK;
- 
- 	/* Sanitize the input... */
- 	BUG_ON(sgi_source_id & ~7);
-@@ -1046,9 +1048,8 @@ static bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq)
- 	}
- 
- 	/* Try to use another LR for this interrupt */
--	lr = find_first_zero_bit((unsigned long *)vgic_cpu->lr_used,
--			       vgic_cpu->nr_lr);
--	if (lr >= vgic_cpu->nr_lr)
-+	lr = find_first_zero_bit((unsigned long *)vgic_cpu->lr_used, nr_lr);
-+	if (lr >= nr_lr)
- 		return false;
- 
- 	kvm_debug("LR%d allocated for IRQ%d %x\n", lr, irq, sgi_source_id);
-@@ -1181,9 +1182,10 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
- 		 * active bit.
- 		 */
- 		int lr, irq;
-+		int nr_lr = vgic_cpu->nr_lr & HWCFG_NR_LR_MASK;
- 
- 		for_each_set_bit(lr, (unsigned long *)vgic_cpu->vgic_eisr,
--				 vgic_cpu->nr_lr) {
-+				 nr_lr) {
- 			irq = vgic_cpu->vgic_lr[lr] & GICH_LR_VIRTUALID;
- 
- 			vgic_irq_clear_active(vcpu, irq);
-@@ -1221,13 +1223,13 @@ static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
- 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
- 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
- 	int lr, pending;
-+	int nr_lr = vgic_cpu->nr_lr & HWCFG_NR_LR_MASK;
- 	bool level_pending;
- 
- 	level_pending = vgic_process_maintenance(vcpu);
- 
- 	/* Clear mappings for empty LRs */
--	for_each_set_bit(lr, (unsigned long *)vgic_cpu->vgic_elrsr,
--			 vgic_cpu->nr_lr) {
-+	for_each_set_bit(lr, (unsigned long *)vgic_cpu->vgic_elrsr, nr_lr) {
- 		int irq;
- 
- 		if (!test_and_clear_bit(lr, vgic_cpu->lr_used))
-@@ -1241,8 +1243,8 @@ static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
- 
- 	/* Check if we still have something up our sleeve... */
- 	pending = find_first_zero_bit((unsigned long *)vgic_cpu->vgic_elrsr,
--				      vgic_cpu->nr_lr);
--	if (level_pending || pending < vgic_cpu->nr_lr)
-+				      nr_lr);
-+	if (level_pending || pending < nr_lr)
- 		set_bit(vcpu->vcpu_id, &dist->irq_pending_on_cpu);
- }
- 
-@@ -1438,7 +1440,7 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
- 	 */
- 	vgic_cpu->vgic_vmcr = 0;
- 
--	vgic_cpu->nr_lr = vgic_nr_lr;
-+	vgic_cpu->nr_lr = vgic_hw_cfg;
- 	vgic_cpu->vgic_hcr = GICH_HCR_EN; /* Get the show on the road... */
- 
- 	return 0;
-@@ -1470,17 +1472,33 @@ static struct notifier_block vgic_cpu_nb = {
- 	.notifier_call = vgic_cpu_notify,
- };
- 
-+static const struct of_device_id of_vgic_ids[] = {
-+	{
-+		.compatible = "arm,cortex-a15-gic",
-+	}, {
-+		.compatible = "hisilicon,hip04-gic",
-+		.data = (void *)HIP04_GICH_APR,
-+	}, {
-+	},
-+};
-+
- int kvm_vgic_hyp_init(void)
- {
- 	int ret;
- 	struct resource vctrl_res;
- 	struct resource vcpu_res;
-+	const struct of_device_id *match;
-+	u32 vgic_nr_lr;
- 
--	vgic_node = of_find_compatible_node(NULL, NULL, "arm,cortex-a15-gic");
-+	vgic_node = of_find_matching_node_and_match(NULL, of_vgic_ids, &match);
- 	if (!vgic_node) {
- 		kvm_err("error: no compatible vgic node in DT\n");
- 		return -ENODEV;
- 	}
-+	/* If it's standard ARM GIC, high word in vgic_hw_cfg is 0.
-+	 * Otherwise, it's the offset of non-standard GICH_APR (in HiP04).
-+	 */
-+	vgic_hw_cfg = (unsigned int)match->data << HWCFG_APR_SHIFT;
- 
- 	vgic_maint_irq = irq_of_parse_and_map(vgic_node, 0);
- 	if (!vgic_maint_irq) {
-@@ -1517,6 +1535,7 @@ int kvm_vgic_hyp_init(void)
- 
- 	vgic_nr_lr = readl_relaxed(vgic_vctrl_base + GICH_VTR);
- 	vgic_nr_lr = (vgic_nr_lr & 0x3f) + 1;
-+	vgic_hw_cfg |= vgic_nr_lr;
- 
- 	ret = create_hyp_io_mappings(vgic_vctrl_base,
- 				     vgic_vctrl_base + resource_size(&vctrl_res),
--- 
-1.9.1
+>
+>  /*
+> @@ -110,6 +105,14 @@ static noinline int __invoke_psci_fn_smc(u32 function_id, u32 arg0, u32 arg1,
+>         return function_id;
+>  }
+>
+> +static int psci_get_version(void)
+> +{
+> +       int err;
+> +
+> +       err = invoke_psci_fn(PSCI_0_2_FN_PSCI_VERSION, 0, 0, 0);
+> +       return err;
+> +}
+> +
+>  static int psci_cpu_suspend(struct psci_power_state state,
+>                             unsigned long entry_point)
+>  {
+> @@ -153,26 +156,36 @@ static int psci_migrate(unsigned long cpuid)
+>         return psci_to_linux_errno(err);
+>  }
+>
+> -static const struct of_device_id psci_of_match[] __initconst = {
+> -       { .compatible = "arm,psci",     },
+> -       {},
+> -};
+> +static int psci_affinity_info(unsigned long target_affinity,
+> +               unsigned long lowest_affinity_level)
+> +{
+> +       int err;
+> +       u32 fn;
+> +
+> +       fn = psci_function_id[PSCI_FN_AFFINITY_INFO];
+> +       err = invoke_psci_fn(fn, target_affinity, lowest_affinity_level, 0);
+> +       return err;
+> +}
+>
+> -void __init psci_init(void)
+> +static int psci_migrate_info_type(void)
+>  {
+> -       struct device_node *np;
+> -       const char *method;
+> -       u32 id;
+> +       int err;
+> +       u32 fn;
+>
+> -       np = of_find_matching_node(NULL, psci_of_match);
+> -       if (!np)
+> -               return;
+> +       fn = psci_function_id[PSCI_FN_MIGRATE_INFO_TYPE];
+> +       err = invoke_psci_fn(fn, 0, 0, 0);
+> +       return err;
+> +}
+> +
+> +static int get_set_conduit_method(struct device_node *np)
+> +{
+> +       const char *method;
+>
+> -       pr_info("probing function IDs from device-tree\n");
+> +       pr_info("probing for conduit method from DT.\n");
+>
+>         if (of_property_read_string(np, "method", &method)) {
+> -               pr_warning("missing \"method\" property\n");
+> -               goto out_put_node;
+> +               pr_warn("missing \"method\" property\n");
+> +               return -ENXIO;
+>         }
+>
+>         if (!strcmp("hvc", method)) {
+> @@ -180,10 +193,99 @@ void __init psci_init(void)
+>         } else if (!strcmp("smc", method)) {
+>                 invoke_psci_fn = __invoke_psci_fn_smc;
+>         } else {
+> -               pr_warning("invalid \"method\" property: %s\n", method);
+> +               pr_warn("invalid \"method\" property: %s\n", method);
+> +               return -EINVAL;
+> +       }
+> +       return 0;
+> +}
+> +
+> +static void psci_sys_reset(enum reboot_mode reboot_mode, const char *cmd)
+> +{
+> +       invoke_psci_fn(PSCI_0_2_FN_SYSTEM_RESET, 0, 0, 0);
+> +}
+> +
+> +static void psci_sys_poweroff(void)
+> +{
+> +       invoke_psci_fn(PSCI_0_2_FN_SYSTEM_OFF, 0, 0, 0);
+> +}
+> +
+> +/*
+> + * PSCI Function IDs for v0.2+ are well defined so use
+> + * standard values.
+> + */
+> +static int psci_0_2_init(struct device_node *np)
+> +{
+> +       int err, ver;
+> +
+> +       err = get_set_conduit_method(np);
+> +
+> +       if (err)
+> +               goto out_put_node;
+> +
+> +       ver = psci_get_version();
+> +
+> +       if (ver == PSCI_RET_NOT_SUPPORTED) {
+> +               /* PSCI v0.2 mandates implementation of PSCI_ID_VERSION. */
+> +               pr_err("PSCI firmware does not comply with the v0.2 spec.\n");
+> +               err = -EOPNOTSUPP;
+>                 goto out_put_node;
+> +       } else {
+> +               pr_info("PSCIv%d.%d detected in firmware.\n",
+> +                               PSCI_VERSION_MAJOR(ver),
+> +                               PSCI_VERSION_MINOR(ver));
+> +
+> +               if (PSCI_VERSION_MAJOR(ver) == 0 &&
+> +                               PSCI_VERSION_MINOR(ver) < 2) {
+> +                       err = -EINVAL;
+> +                       pr_err("Conflicting PSCI version detected.\n");
+> +                       goto out_put_node;
+> +               }
+>         }
+>
+> +       pr_info("Using standard PSCI v0.2 function IDs\n");
+> +       psci_function_id[PSCI_FN_CPU_SUSPEND] = PSCI_0_2_FN_CPU_SUSPEND;
+> +       psci_ops.cpu_suspend = psci_cpu_suspend;
+> +
+> +       psci_function_id[PSCI_FN_CPU_OFF] = PSCI_0_2_FN_CPU_OFF;
+> +       psci_ops.cpu_off = psci_cpu_off;
+> +
+> +       psci_function_id[PSCI_FN_CPU_ON] = PSCI_0_2_FN_CPU_ON;
+> +       psci_ops.cpu_on = psci_cpu_on;
+> +
+> +       psci_function_id[PSCI_FN_MIGRATE] = PSCI_0_2_FN_MIGRATE;
+> +       psci_ops.migrate = psci_migrate;
+> +
+> +       psci_function_id[PSCI_FN_AFFINITY_INFO] = PSCI_0_2_FN_AFFINITY_INFO;
+> +       psci_ops.affinity_info = psci_affinity_info;
+> +
+> +       psci_function_id[PSCI_FN_MIGRATE_INFO_TYPE] =
+> +               PSCI_0_2_FN_MIGRATE_INFO_TYPE;
+> +       psci_ops.migrate_info_type = psci_migrate_info_type;
+> +
+> +       arm_pm_restart = psci_sys_reset;
+> +
+> +       pm_power_off = psci_sys_poweroff;
+> +
+> +out_put_node:
+> +       of_node_put(np);
+> +       return err;
+> +}
+> +
+> +/*
+> + * PSCI < v0.2 get PSCI Function IDs via DT.
+> + */
+> +static int psci_0_1_init(struct device_node *np)
+> +{
+> +       u32 id;
+> +       int err;
+> +
+> +       err = get_set_conduit_method(np);
+> +
+> +       if (err)
+> +               goto out_put_node;
+> +
+> +       pr_info("Using PSCI v0.1 Function IDs from DT\n");
+> +
+>         if (!of_property_read_u32(np, "cpu_suspend", &id)) {
+>                 psci_function_id[PSCI_FN_CPU_SUSPEND] = id;
+>                 psci_ops.cpu_suspend = psci_cpu_suspend;
+> @@ -206,5 +308,25 @@ void __init psci_init(void)
+>
+>  out_put_node:
+>         of_node_put(np);
+> -       return;
+> +       return err;
+> +}
+> +
+> +static const struct of_device_id psci_of_match[] __initconst = {
+> +       { .compatible = "arm,psci", .data = psci_0_1_init},
+> +       { .compatible = "arm,psci-0.2", .data = psci_0_2_init},
+> +       {},
+> +};
+> +
+> +int __init psci_init(void)
+> +{
+> +       struct device_node *np;
+> +       const struct of_device_id *matched_np;
+> +       psci_initcall_t init_fn;
+> +
+> +       np = of_find_matching_node_and_match(NULL, psci_of_match, &matched_np);
+> +       if (!np)
+> +               return -ENODEV;
+> +
+> +       init_fn = (psci_initcall_t)matched_np->data;
+> +       return init_fn(np);
+>  }
+> diff --git a/arch/arm64/include/asm/psci.h b/arch/arm64/include/asm/psci.h
+> index d15ab8b4..e5312ea 100644
+> --- a/arch/arm64/include/asm/psci.h
+> +++ b/arch/arm64/include/asm/psci.h
+> @@ -14,6 +14,6 @@
+>  #ifndef __ASM_PSCI_H
+>  #define __ASM_PSCI_H
+>
+> -void psci_init(void);
+> +int psci_init(void);
+>
+>  #endif /* __ASM_PSCI_H */
+> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
+> index ea4828a..6045613 100644
+> --- a/arch/arm64/kernel/psci.c
+> +++ b/arch/arm64/kernel/psci.c
+> @@ -18,12 +18,16 @@
+>  #include <linux/init.h>
+>  #include <linux/of.h>
+>  #include <linux/smp.h>
+> +#include <linux/reboot.h>
+> +#include <linux/pm.h>
+> +#include <uapi/linux/psci.h>
+>
+>  #include <asm/compiler.h>
+>  #include <asm/cpu_ops.h>
+>  #include <asm/errno.h>
+>  #include <asm/psci.h>
+>  #include <asm/smp_plat.h>
+> +#include <asm/system_misc.h>
+>
+>  #define PSCI_POWER_STATE_TYPE_STANDBY          0
+>  #define PSCI_POWER_STATE_TYPE_POWER_DOWN       1
+> @@ -40,58 +44,52 @@ struct psci_operations {
+>         int (*cpu_off)(struct psci_power_state state);
+>         int (*cpu_on)(unsigned long cpuid, unsigned long entry_point);
+>         int (*migrate)(unsigned long cpuid);
+> +       int (*affinity_info)(unsigned long target_affinity,
+> +                       unsigned long lowest_affinity_level);
+> +       int (*migrate_info_type)(void);
+>  };
+>
+>  static struct psci_operations psci_ops;
+>
+>  static int (*invoke_psci_fn)(u64, u64, u64, u64);
+> +typedef int (*psci_initcall_t)(const struct device_node *);
+>
+>  enum psci_function {
+>         PSCI_FN_CPU_SUSPEND,
+>         PSCI_FN_CPU_ON,
+>         PSCI_FN_CPU_OFF,
+>         PSCI_FN_MIGRATE,
+> +       PSCI_FN_AFFINITY_INFO,
+> +       PSCI_FN_MIGRATE_INFO_TYPE,
+>         PSCI_FN_MAX,
+>  };
+>
+>  static u32 psci_function_id[PSCI_FN_MAX];
+>
+> -#define PSCI_RET_SUCCESS               0
+> -#define PSCI_RET_EOPNOTSUPP            -1
+> -#define PSCI_RET_EINVAL                        -2
+> -#define PSCI_RET_EPERM                 -3
+> -
+>  static int psci_to_linux_errno(int errno)
+>  {
+>         switch (errno) {
+>         case PSCI_RET_SUCCESS:
+>                 return 0;
+> -       case PSCI_RET_EOPNOTSUPP:
+> +       case PSCI_RET_NOT_SUPPORTED:
+>                 return -EOPNOTSUPP;
+> -       case PSCI_RET_EINVAL:
+> +       case PSCI_RET_INVALID_PARAMS:
+>                 return -EINVAL;
+> -       case PSCI_RET_EPERM:
+> +       case PSCI_RET_DENIED:
+>                 return -EPERM;
+>         };
+>
+>         return -EINVAL;
+>  }
+>
+> -#define PSCI_POWER_STATE_ID_MASK       0xffff
+> -#define PSCI_POWER_STATE_ID_SHIFT      0
+> -#define PSCI_POWER_STATE_TYPE_MASK     0x1
+> -#define PSCI_POWER_STATE_TYPE_SHIFT    16
+> -#define PSCI_POWER_STATE_AFFL_MASK     0x3
+> -#define PSCI_POWER_STATE_AFFL_SHIFT    24
+> -
+>  static u32 psci_power_state_pack(struct psci_power_state state)
+>  {
+> -       return  ((state.id & PSCI_POWER_STATE_ID_MASK)
+> -                       << PSCI_POWER_STATE_ID_SHIFT)   |
+> -               ((state.type & PSCI_POWER_STATE_TYPE_MASK)
+> -                       << PSCI_POWER_STATE_TYPE_SHIFT) |
+> -               ((state.affinity_level & PSCI_POWER_STATE_AFFL_MASK)
+> -                       << PSCI_POWER_STATE_AFFL_SHIFT);
+> +       return  ((state.id & PSCI_0_2_POWER_STATE_ID_MASK)
+> +                       << PSCI_0_2_POWER_STATE_ID_SHIFT)       |
+> +               ((state.type & PSCI_0_2_POWER_STATE_TYPE_MASK)
+> +                       << PSCI_0_2_POWER_STATE_TYPE_SHIFT)     |
+> +               ((state.affinity_level & PSCI_0_2_POWER_STATE_AFFL_MASK)
+> +                       << PSCI_0_2_POWER_STATE_AFFL_SHIFT);
+>  }
+
+Same as above.
+
+>
+>  /*
+> @@ -128,6 +126,14 @@ static noinline int __invoke_psci_fn_smc(u64 function_id, u64 arg0, u64 arg1,
+>         return function_id;
+>  }
+>
+> +static int psci_get_version(void)
+> +{
+> +       int err;
+> +
+> +       err = invoke_psci_fn(PSCI_0_2_FN_PSCI_VERSION, 0, 0, 0);
+> +       return err;
+> +}
+> +
+>  static int psci_cpu_suspend(struct psci_power_state state,
+>                             unsigned long entry_point)
+>  {
+> @@ -171,26 +177,36 @@ static int psci_migrate(unsigned long cpuid)
+>         return psci_to_linux_errno(err);
+>  }
+>
+> -static const struct of_device_id psci_of_match[] __initconst = {
+> -       { .compatible = "arm,psci",     },
+> -       {},
+> -};
+> +static int psci_affinity_info(unsigned long target_affinity,
+> +               unsigned long lowest_affinity_level)
+> +{
+> +       int err;
+> +       u32 fn;
+> +
+> +       fn = psci_function_id[PSCI_FN_AFFINITY_INFO];
+> +       err = invoke_psci_fn(fn, target_affinity, lowest_affinity_level, 0);
+> +       return err;
+> +}
+>
+> -void __init psci_init(void)
+> +static int psci_migrate_info_type(void)
+>  {
+> -       struct device_node *np;
+> -       const char *method;
+> -       u32 id;
+> +       int err;
+> +       u32 fn;
+>
+> -       np = of_find_matching_node(NULL, psci_of_match);
+> -       if (!np)
+> -               return;
+> +       fn = psci_function_id[PSCI_FN_MIGRATE_INFO_TYPE];
+> +       err = invoke_psci_fn(fn, 0, 0, 0);
+> +       return err;
+> +}
+> +
+> +static int get_set_conduit_method(struct device_node *np)
+> +{
+> +       const char *method;
+>
+> -       pr_info("probing function IDs from device-tree\n");
+> +       pr_info("probing for conduit method from DT.\n");
+>
+>         if (of_property_read_string(np, "method", &method)) {
+> -               pr_warning("missing \"method\" property\n");
+> -               goto out_put_node;
+> +               pr_warn("missing \"method\" property\n");
+> +               return -ENXIO;
+>         }
+>
+>         if (!strcmp("hvc", method)) {
+> @@ -198,10 +214,99 @@ void __init psci_init(void)
+>         } else if (!strcmp("smc", method)) {
+>                 invoke_psci_fn = __invoke_psci_fn_smc;
+>         } else {
+> -               pr_warning("invalid \"method\" property: %s\n", method);
+> +               pr_warn("invalid \"method\" property: %s\n", method);
+> +               return -EINVAL;
+> +       }
+> +       return 0;
+> +}
+> +
+> +static void psci_sys_reset(enum reboot_mode reboot_mode, const char *cmd)
+> +{
+> +       invoke_psci_fn(PSCI_0_2_FN_SYSTEM_RESET, 0, 0, 0);
+> +}
+> +
+> +static void psci_sys_poweroff(void)
+> +{
+> +       invoke_psci_fn(PSCI_0_2_FN_SYSTEM_OFF, 0, 0, 0);
+> +}
+> +
+> +/*
+> + * PSCI Function IDs for v0.2+ are well defined so use
+> + * standard values.
+> + */
+> +static int psci_0_2_init(struct device_node *np)
+> +{
+> +       int err, ver;
+> +
+> +       err = get_set_conduit_method(np);
+> +
+> +       if (err)
+> +               goto out_put_node;
+> +
+> +       ver = psci_get_version();
+> +
+> +       if (ver == PSCI_RET_NOT_SUPPORTED) {
+> +               /* PSCI v0.2 mandates implementation of PSCI_ID_VERSION. */
+> +               pr_err("PSCI firmware does not comply with the v0.2 spec.\n");
+> +               err = -EOPNOTSUPP;
+>                 goto out_put_node;
+> +       } else {
+> +               pr_info("PSCIv%d.%d detected in firmware.\n",
+> +                               PSCI_VERSION_MAJOR(ver),
+> +                               PSCI_VERSION_MINOR(ver));
+> +
+> +               if (PSCI_VERSION_MAJOR(ver) == 0 &&
+> +                               PSCI_VERSION_MINOR(ver) < 2) {
+> +                       err = -EINVAL;
+> +                       pr_err("Conflicting PSCI version detected.\n");
+> +                       goto out_put_node;
+> +               }
+>         }
+>
+> +       pr_info("Using standard PSCI v0.2 function IDs\n");
+> +       psci_function_id[PSCI_FN_CPU_SUSPEND] = PSCI_0_2_FN64_CPU_SUSPEND;
+> +       psci_ops.cpu_suspend = psci_cpu_suspend;
+> +
+> +       psci_function_id[PSCI_FN_CPU_OFF] = PSCI_0_2_FN_CPU_OFF;
+> +       psci_ops.cpu_off = psci_cpu_off;
+> +
+> +       psci_function_id[PSCI_FN_CPU_ON] = PSCI_0_2_FN64_CPU_ON;
+> +       psci_ops.cpu_on = psci_cpu_on;
+> +
+> +       psci_function_id[PSCI_FN_MIGRATE] = PSCI_0_2_FN64_MIGRATE;
+> +       psci_ops.migrate = psci_migrate;
+> +
+> +       psci_function_id[PSCI_FN_AFFINITY_INFO] = PSCI_0_2_FN64_AFFINITY_INFO;
+> +       psci_ops.affinity_info = psci_affinity_info;
+> +
+> +       psci_function_id[PSCI_FN_MIGRATE_INFO_TYPE] =
+> +               PSCI_0_2_FN_MIGRATE_INFO_TYPE;
+> +       psci_ops.migrate_info_type = psci_migrate_info_type;
+> +
+> +       arm_pm_restart = psci_sys_reset;
+> +
+> +       pm_power_off = psci_sys_poweroff;
+> +
+> +out_put_node:
+> +       of_node_put(np);
+> +       return err;
+> +}
+> +
+> +/*
+> + * PSCI < v0.2 get PSCI Function IDs via DT.
+> + */
+> +static int psci_0_1_init(struct device_node *np)
+> +{
+> +       u32 id;
+> +       int err;
+> +
+> +       err = get_set_conduit_method(np);
+> +
+> +       if (err)
+> +               goto out_put_node;
+> +
+> +       pr_info("Using PSCI v0.1 Function IDs from DT\n");
+> +
+>         if (!of_property_read_u32(np, "cpu_suspend", &id)) {
+>                 psci_function_id[PSCI_FN_CPU_SUSPEND] = id;
+>                 psci_ops.cpu_suspend = psci_cpu_suspend;
+> @@ -224,7 +329,28 @@ void __init psci_init(void)
+>
+>  out_put_node:
+>         of_node_put(np);
+> -       return;
+> +       return err;
+> +}
+> +
+> +static const struct of_device_id psci_of_match[] __initconst = {
+> +       { .compatible = "arm,psci",     .data = psci_0_1_init},
+> +       { .compatible = "arm,psci-0.2", .data = psci_0_2_init},
+> +       {},
+> +};
+> +
+> +int __init psci_init(void)
+> +{
+> +       struct device_node *np;
+> +       const struct of_device_id *matched_np;
+> +       psci_initcall_t init_fn;
+> +
+> +       np = of_find_matching_node_and_match(NULL, psci_of_match, &matched_np);
+> +
+> +       if (!np)
+> +               return -ENODEV;
+> +
+> +       init_fn = (psci_initcall_t)matched_np->data;
+> +       return init_fn(np);
+>  }
+>
+>  #ifdef CONFIG_SMP
+> --
+> 1.8.3.2
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+Regards,
+Anup
