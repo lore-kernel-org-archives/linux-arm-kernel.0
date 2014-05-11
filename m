@@ -1,50 +1,31 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Sun, 11 May 2014 03:41:03 +0200
-Subject: [PATCH v2 4/4] arm: mediatek: add dts for Aquaris5 mobile phone
-In-Reply-To: <1399772463-859-1-git-send-email-matthias.bgg@gmail.com>
-References: <1399772463-859-1-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <1399772463-859-5-git-send-email-matthias.bgg@gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sun, 11 May 2014 09:40:28 +0800
+Subject: i.MX6 USB OTG support is broken on linux-next
+In-Reply-To: <4285b0d55d2545b99c4ba6b703e65a12@BL2PR03MB226.namprd03.prod.outlook.com>
+References: <20140509130046.GP2794@dragon>
+ <20140510111003.GA1593@shlinux1.ap.freescale.net>
+ <20140510131815.GT2794@dragon>
+ <4285b0d55d2545b99c4ba6b703e65a12@BL2PR03MB226.namprd03.prod.outlook.com>
+Message-ID: <20140511014027.GV2794@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Aquaris5 is a mobile phone based on the mt6589 SoC.
+On Sun, May 11, 2014 at 08:40:25AM +0800, Chen Peter-B29397 wrote:
+> As I explained before: 
+> "OTG devices and Embedded Hosts both have Targeted Host functionality,
+> and each Targeted Host has its TPL (Targeted Peripheral List), only the 
+> devices are at TPL are supported by Targeted Host."
+> 
+> So when the board is OTG & EH (CONFIG_USB_OTG is set), it should
+> have TPL according to spec. In fact, even the CONFIG_USB_OTG_WHITELIST
+> is not set, the non-TPL devices have not worked well, eg, it will
+> not be enumerated again after it has disconnected from host 10 seconds
+> later due to vbus has turned off by host.
 
-Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
----
- arch/arm/boot/dts/mt6589-aquaris5.dts | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
- create mode 100644 arch/arm/boot/dts/mt6589-aquaris5.dts
+So all in all, it sounds to me that in my case, USB_OTG_FSM shouldn't be
+set, neither in defconfig nor manually in menuconfig, right?
 
-diff --git a/arch/arm/boot/dts/mt6589-aquaris5.dts b/arch/arm/boot/dts/mt6589-aquaris5.dts
-new file mode 100644
-index 0000000..443b446
---- /dev/null
-+++ b/arch/arm/boot/dts/mt6589-aquaris5.dts
-@@ -0,0 +1,25 @@
-+/*
-+ * Copyright (c) 2014 MundoReader S.L.
-+ * Author: Matthias Brugger <matthias.bgg@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+/dts-v1/;
-+#include "mt6589.dtsi"
-+
-+/ {
-+	model = "bq Aquaris5";
-+
-+	memory {
-+		reg = <0x80000000 0x40000000>;
-+	};
-+};
--- 
-1.8.1.2
+What about USB_OTG?  Can I set it in defconfig or manually in
+menuconfig?
+
+Shawn
