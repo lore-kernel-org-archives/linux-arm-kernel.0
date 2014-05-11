@@ -1,43 +1,34 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sun, 11 May 2014 20:17:54 +0200
-Subject: [PATCHv5 06/20] usb: host: xhci-plat: sort the headers in alphabetic
- order
+Date: Sun, 11 May 2014 20:18:01 +0200
+Subject: [PATCHv5 13/20] ARM: mvebu: add USB3 support for Armada 375
 In-Reply-To: <1399832288-19899-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1399832288-19899-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1399832288-19899-7-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1399832288-19899-14-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-Sorting the headers in alphabetic order will help to reduce the conflict
-when adding new headers later.
+This patch add the selection of the config symbol to build the USB3
+support for Armada 375.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Acked-by: Felipe Balbi <balbi@ti.com>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/usb/host/xhci-plat.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-mvebu/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-index 151901c..f5351af 100644
---- a/drivers/usb/host/xhci-plat.c
-+++ b/drivers/usb/host/xhci-plat.c
-@@ -11,11 +11,11 @@
-  * version 2 as published by the Free Software Foundation.
-  */
- 
--#include <linux/platform_device.h>
-+#include <linux/dma-mapping.h>
- #include <linux/module.h>
--#include <linux/slab.h>
- #include <linux/of.h>
--#include <linux/dma-mapping.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
- 
- #include "xhci.h"
- 
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index 7960f21..95afc76 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -41,6 +41,7 @@ config MACH_ARMADA_375
+ 	select CPU_V7
+ 	select MACH_MVEBU_V7
+ 	select PINCTRL_ARMADA_375
++	select USB_ARCH_HAS_XHCI
+ 	help
+ 	  Say 'Y' here if you want your kernel to support boards based
+ 	  on the Marvell Armada 375 SoC with device tree.
 -- 
 1.9.2
