@@ -1,69 +1,45 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Sun, 11 May 2014 16:06:04 +0800
-Subject: [PATCH v6 08/15] document: dt: add the binding on HiP04
+Date: Sun, 11 May 2014 16:06:05 +0800
+Subject: [PATCH v6 09/15] document: dt: add the binding on HiP04 clock
 In-Reply-To: <1399795571-17231-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1399795571-17231-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1399795571-17231-9-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1399795571-17231-10-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add bootwrapper-phys, bootwrapper-size, bootwrapper-magic properties for
-Hisilicon HiP04 SoC.
+The DT binding for Hisilicon HiP04 clock driver.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- .../devicetree/bindings/arm/hisilicon/hisilicon.txt | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+ .../devicetree/bindings/clock/hip04-clock.txt        | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/hip04-clock.txt
 
-diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-index df0a452..5024992 100644
---- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-+++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-@@ -4,6 +4,10 @@ Hisilicon Platforms Device Tree Bindings
- Hi4511 Board
- Required root node properties:
- 	- compatible = "hisilicon,hi3620-hi4511";
-+HiP04 D01 Board
-+Required root node properties:
-+	- compatible = "hisilicon,hip04-d01";
+diff --git a/Documentation/devicetree/bindings/clock/hip04-clock.txt b/Documentation/devicetree/bindings/clock/hip04-clock.txt
+new file mode 100644
+index 0000000..4d31ae3
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/hip04-clock.txt
+@@ -0,0 +1,20 @@
++* Hisilicon HiP04 Clock Controller
 +
- 
- Hisilicon system controller
- 
-@@ -19,6 +23,15 @@ Optional properties:
- 		If reg value is not zero, cpun exit wfi and go
- - resume-offset : offset in sysctrl for notifying cpu0 when resume
- - reboot-offset : offset in sysctrl for system reboot
-+- relocation-entry : relocation address of secondary cpu boot code
-+- relocation-size : relocation size of secondary cpu boot code
-+- bootwrapper-phys : physical address of boot wrapper
-+- bootwrapper-size : size of boot wrapper
-+- bootwrapper-magic : magic number for secondary cpu in boot wrapper
-+The memory area of [bootwrapper-phys : bootwrapper-phys+bootwrapper-size]
-+should be reserved. This should be set in /memreserve/ node in DTS file.
-+bootwrapper-phys, bootwrapper-size, bootwrapper-magic is used in HiP04
-+DTS file.
- 
- Example:
- 
-@@ -31,6 +44,7 @@ Example:
- 		reboot-offset = <0x4>;
- 	};
- 
-+
- PCTRL: Peripheral misc control register
- 
- Required Properties:
-@@ -44,3 +58,10 @@ Example:
- 		compatible = "hisilicon,pctrl";
- 		reg = <0xfca09000 0x1000>;
- 	};
-+
-+
-+Fabric:
++The HiP04 clock controller generates and supplies clock to various
++controllers within the HiP04 SoC.
 +
 +Required Properties:
-+- compatible: "hisilicon,hip04-fabric";
-+- reg: Address and size of Fabric
++
++- compatible: should be one of the following.
++  - "hisilicon,hip04-clock" - controller compatible with HiP04 SoC.
++
++- reg: physical base address of the controller and length of memory mapped
++  region.
++
++- #clock-cells: should be 1.
++
++
++Each clock is assigned an identifier and client nodes use this identifier
++to specify the clock which they consume.
++
++All these identifier could be found in <dt-bindings/clock/hip04-clock.h>.
 -- 
 1.9.1
