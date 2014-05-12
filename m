@@ -1,81 +1,24 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 12 May 2014 08:51:32 -0700
-Subject: [PATCH 3/4] OMAPDSS: panel-sharp-ls037v7dw01: add device tree
- support
-In-Reply-To: <5370E0C9.8050201@ti.com>
-References: <20140507175919.GH9502@atomide.com>
- <20140508233300.GI2198@atomide.com> <536C8293.4070506@ti.com>
- <20140509155504.GE17814@atomide.com> <53707A64.2060203@ti.com>
- <CABxcv=kwhodeFTHoVpn1nHeh9+kV5fwMN9s3Kbk6h7_xJp4UYA@mail.gmail.com>
- <53709706.10501@ti.com>
- <CABxcv=mY0a+yJgmCTPN=BhSQD57Pw022zOd5_KxEgvvF_-=O7Q@mail.gmail.com>
- <20140512142646.GA31772@atomide.com> <5370E0C9.8050201@ti.com>
-Message-ID: <20140512155132.GH31772@atomide.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 12 May 2014 16:52:42 +0100
+Subject: [PATCH v6 0/4] arm64: prerequisites for audit and ftrace
+In-Reply-To: <1398851492-16345-1-git-send-email-takahiro.akashi@linaro.org>
+References: <1398851492-16345-1-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <20140512155242.GF31633@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tomi Valkeinen <tomi.valkeinen@ti.com> [140512 07:55]:
-> On 12/05/14 17:26, Tony Lindgren wrote:
-> 
-> >>> The omapdss case is different, there the "omapdss" points to a sw thing,
-> >>> it does not describe the hardware. It's only needed as we don't have
-> >>> proper sw drivers for the devices.
-> >>>
-> >>> That said, I think what you describe would work. But I would rather keep
-> >>> the .dts files clean and correct, and keep that hacks hidden inside the
-> >>> kernel.
-> >>>
-> >>
-> >> Thanks for the explanation. Since DT are meant to describe hardware
-> >> and not software I agree with you that we shouldn't leak an
-> >> implementation detail to the DeviceTrees.
-> >>
-> >> And after all fortunately we don't have a stable API in the kernel
-> >> like the one that is enforced in the DT so we can fix it later ;-)
-> > 
-> > This remapping of compatible flags sounds smelly to me, please discuss
-> > it first with the device tree people.
-> 
-> It's already in v3.15.
+On Wed, Apr 30, 2014 at 10:51:28AM +0100, AKASHI Takahiro wrote:
+> AKASHI Takahiro (4):
+>   arm64: make a single hook to syscall_trace() for all syscall features
+>   arm64: split syscall_trace() into separate functions for enter/exit
+>   arm64: Add regs_return_value() in syscall.h
+>   arm64: is_compat_task is defined both in asm/compat.h and
+>     linux/compat.h
 
-Oh great.. And you dumped it into arch/arm/mach-omap2 too and I somehow
-even acked it :( Looks like there's also the custom mux hacks. And
-custom hwmod hacks. And ongoing soc_is_xxx tinkering. Now let's not add
-_any_ new crap into arch/arm/mach-omap2/display.c.
+Patches picked by Will and applied to the arm64 for-next/core branch
+(should appear in -next at some point).
 
-So please consider this a huge eternal NAK to add any more crap to
-arch/arm/mach-omap2/display.c from me. No more new soc_is beyond
-the soc_is_am43xx() you have in linux next. No more adding 
-of_find_compatible_node() beyond ti,omap5-dss you have in linux next.
+Thanks.
 
-And no more new panel remapping in this file as soon as you have found
-a better solution. Preferrably by v3.17 merge window. This file just
-needs to disappear. Yuk.
-
-> I agree it's smelly, but it smelly only inside the kernel, not visible
-> anywhere, and we can remove it when we have common panel drivers,
-> without any modifications to .dts files.
-> 
-> > I think we're better off just using the compatible properties limited
-> > to the simple-panel.txt for now and actually describe the real
-> > hardware. The fact that the panel is connected to DSS should be possible
-> > to find out based on the phandles.
-> 
-> I'm not sure what you mean. We do describe only the real hardware. The
-> compatible string in the .dts file is "sharp,ls037v7dw01".
-> 
-> Prepending the "omapdss" to the compatible string is required for the
-> device/driver matching to work, because we can't use the
-> "sharp,ls037v7dw01" compatible string in our omap specific panel driver.
-> 
-> I'm not sure what it would give us to try to be compatible with
-> simple-panel.txt. The simple-panel bindings won't probably be compatible
-> with the future common display drivers in any case, as the simple-panel
-> binding is just too limited and doesn't describe the hardware fully.
-
-Hmm what else does a panel need where the existing binding cannot be
-extended? 
-
-Regards,
-
-Tony
+-- 
+Catalin
