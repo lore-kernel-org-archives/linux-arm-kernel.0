@@ -1,91 +1,63 @@
-From: jays.lee@samsung.com (Jungseok Lee)
-Date: Mon, 12 May 2014 18:39:05 +0900
-Subject: [PATCH v6 0/7] Support 4 levels of translation tables for ARM64
-Message-ID: <000001cf6dc6$03ded0c0$0b9c7240$@samsung.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 12 May 2014 12:40:22 +0300
+Subject: [PATCH 3/4] OMAPDSS: panel-sharp-ls037v7dw01: add device tree
+ support
+In-Reply-To: <CABxcv=kwhodeFTHoVpn1nHeh9+kV5fwMN9s3Kbk6h7_xJp4UYA@mail.gmail.com>
+References: <1398815562-24113-1-git-send-email-tony@atomide.com>	<1398815562-24113-4-git-send-email-tony@atomide.com>	<5369EAE7.3030705@ti.com>	<20140507150343.GA9502@atomide.com>	<536A5920.1020908@ti.com>	<20140507175919.GH9502@atomide.com>	<20140508233300.GI2198@atomide.com>	<536C8293.4070506@ti.com>	<20140509155504.GE17814@atomide.com>	<53707A64.2060203@ti.com>
+ <CABxcv=kwhodeFTHoVpn1nHeh9+kV5fwMN9s3Kbk6h7_xJp4UYA@mail.gmail.com>
+Message-ID: <53709706.10501@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+On 12/05/14 12:34, Javier Martinez Canillas wrote:
 
-This v6 patchset supports 4 levels of tranlsation tables for ARM64.
+> Maybe we can remove this hackery by relying on the fact that a
+> compatible string can have a set of values that goes from more
+> specific to more general. So you can have something like:
+> 
+> compatible = "sony,panel-foobar", "omapdss,panel-foobar"
+> 
+> So right now only "omapdss,panel-foobar" will be matched and later
+> when we have common panel drivers then that driver could handle the
+> "sony,panel-foobar" compatible string.
+> 
+> Other platforms could do something similar and have
+> 
+> compatible = "sony,panel-foobar", "baz,panel-foobar"
+> 
+> That way you won't break DT backward compatible but still not require
+> hacks on arch/arm/mach-omap2/display.c.
+> 
+> We do the same for OMAP boards, we now have the following compatible string:
+> 
+> compatible = "isee,omap3-igep0020", "ti,omap36xx", "ti,omap3";
+> 
+> There isn't a struct machine_desc that matches "isee,omap3-igep0020"
+> but later if we find that we need some board specific initialization
+> we could add one without breaking existing DTS. In fact it used to be
+> a single machine_desc that matched "ti,omap3" for both omap36xx and
+> omap34xx but later when some DT clocks changes were introduced we
+> needed to split both SoC families.
 
-Firstly, the patchset introduces virtual address space size and
-translation level options as taking account into the comment from
-Catalin Marinas:
-http://www.spinics.net/linux/lists/arm-kernel/msg319552.html
+I think that's a different thing. "isee,omap3-igep0020" is a proper
+compatible string, if the board is "isee,...".  No matter what software
+you run, that's correct and fine.
 
-Then, it implements 4 levels of translation tables for native.
+The omapdss case is different, there the "omapdss" points to a sw thing,
+it does not describe the hardware. It's only needed as we don't have
+proper sw drivers for the devices.
 
-A dynamic VTTBR_X configuration is added before implementing 4 levels
-for both HYP and stage2 sides.
+That said, I think what you describe would work. But I would rather keep
+the .dts files clean and correct, and keep that hacks hidden inside the
+kernel.
 
-All ARMv8 and ARMv7 related changes are validated with FastModels+kvmtool and
-A15+QEMU, respectively.
+ Tomi
 
-Changes since v1:
-- fixed unmatched data types as per Steve's comment
-- removed unnecessary #ifdef in arch/arm64/mm/* as per Steve's comment
-- revised create_pgd_entry to deal with PUD entry as per Steve's comment
-- introduced a macro for initial memblock limit as per Steve's comment
-- dropped "Fix line length exceeding 80 characters" patch as per Marc's comment
-- removed unnecessary #ifdef in arch/arm/kvm/mmu.c as per Marc's comment
-- added a macro for a number of objects of as per Marc's comment
 
-Changes since v2:
-- revised some macros in a generic way as per Marc's comment
-- added a 2 level option for kvm mmu cache allocation as per Marc's comment
-
-Changes since v3:
-- added #ifdef to decide swapper and idmap size as per Steve's comment
-- introduced Steve's create_pgd_entry
-
-Changes since v4:
-- hided translation level options from menuconfig as per Catalin's comment
-- dropped some printk changes as per Mitchel's comment
-- squashed VA_BITS related patches into a single patch
-
-Changes since v5:
-- added dynamic VTTBR_X configuration logic
-- removed a redundant logic in stage2_set_pte as per Christoffer's comment
-- added comments for create_pud_entry as per Christoffer and Steve's comment
-- fixed typos in 4 level descriptions as per Christoffer's comment
-- revised arm64 Kconfig help message as per Christoffer's comment
-- rebased on top of for-next/core branch of arm64/linux.git
-
-Jungseok Lee (7):
-  arm64: Use pr_* instead of printk
-  arm64: Introduce VA_BITS and translation level options
-  arm64: Add a description on 48-bit address space with 4KB pages
-  arm64: Add 4 levels of page tables definition with 4KB pages
-  arm64: mm: Implement 4 levels of translation tables
-  arm64: KVM: Set physical address size related factors in runtime
-  arm64: KVM: Implement 4 levels of translation tables for HYP and
-    stage2
-
- Documentation/arm64/memory.txt                |   59 +++++++++++++---
- arch/arm/include/asm/kvm_mmu.h                |   10 +++
- arch/arm/kvm/arm.c                            |   90 ++++++++++++++++++++++++-
- arch/arm/kvm/mmu.c                            |   77 ++++++++++++++++++---
- arch/arm64/Kconfig                            |   53 ++++++++++++++-
- arch/arm64/include/asm/kvm_arm.h              |   29 ++++----
- arch/arm64/include/asm/kvm_mmu.h              |   12 ++++
- arch/arm64/include/asm/memblock.h             |    6 ++
- arch/arm64/include/asm/memory.h               |    6 +-
- arch/arm64/include/asm/page.h                 |    6 +-
- arch/arm64/include/asm/pgalloc.h              |   24 ++++++-
- arch/arm64/include/asm/pgtable-4level-hwdef.h |   50 ++++++++++++++
- arch/arm64/include/asm/pgtable-4level-types.h |   71 +++++++++++++++++++
- arch/arm64/include/asm/pgtable-hwdef.h        |    8 ++-
- arch/arm64/include/asm/pgtable.h              |   53 +++++++++++++--
- arch/arm64/include/asm/tlb.h                  |   11 ++-
- arch/arm64/kernel/head.S                      |   54 ++++++++++++---
- arch/arm64/kernel/traps.c                     |   13 ++--
- arch/arm64/kvm/hyp-init.S                     |   20 ++++--
- arch/arm64/mm/fault.c                         |    1 +
- arch/arm64/mm/mmu.c                           |   16 +++--
- 21 files changed, 592 insertions(+), 77 deletions(-)
- create mode 100644 arch/arm64/include/asm/pgtable-4level-hwdef.h
- create mode 100644 arch/arm64/include/asm/pgtable-4level-types.h
-
--- 
-1.7.10.4
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140512/b86ba0e5/attachment.sig>
