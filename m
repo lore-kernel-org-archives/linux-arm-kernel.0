@@ -1,76 +1,113 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 12 May 2014 10:59:43 +0200
-Subject: [PATCH 0/8] i.MX6 PCIe binding change and MSI support
-In-Reply-To: <1398774686.4677.12.camel@weser.hi.pengutronix.de>
-References: <1396025579-14344-1-git-send-email-l.stach@pengutronix.de>
- <20140424175844.GD29593@google.com>
- <1398421265.4657.25.camel@weser.hi.pengutronix.de>
- <CAErSpo7Boi8d+apAUC3TmmE33LuRMYJ6J+TEPLRbeyZyU3O8RQ@mail.gmail.com>
- <1398774686.4677.12.camel@weser.hi.pengutronix.de>
-Message-ID: <1399885183.5016.4.camel@weser.hi.pengutronix.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 12 May 2014 11:06:07 +0200
+Subject: [PATCH 1/2] ARM: at91: add PWM pinctrl to SAMA5D3
+In-Reply-To: <20140510091017.GA22329@piout.net>
+References: <a5a0a9b8090f80f40daf3a13849b3961d9d617d6.1399642907.git.nicolas.ferre@atmel.com>
+ <20140510091017.GA22329@piout.net>
+Message-ID: <53708EFF.1030604@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
-
-just a friendly reminder. It would be nice if you could pull those in.
-
-Shawn already pulled the DT change and as it is a binding change this
-means PCIe on i.MX6 is broken in -next, as long as the remaining patches
-are missing.
-
-Regards,
-Lucas
- 
-Am Dienstag, den 29.04.2014, 14:31 +0200 schrieb Lucas Stach:
-> Hi Bjorn,
+On 10/05/2014 11:10, Alexandre Belloni :
+> Hi Nicolas,
 > 
-> Am Freitag, den 25.04.2014, 08:39 -0600 schrieb Bjorn Helgaas:
-> [...]
-> > >> >   PCI: designware: split Exynos and i.MX bindings
-> > >> >   ARM: dts: imx6: update pcie to bring in line with new binding
-> > >> >   PCI: imx6: use new clock names
-> > >> >   PCI: imx6: drop old irq mapping
-> > >> >   PCI: imx6: rip out optional (and unused) irqs
-> > >> >   PCI: designware: make MSI isr shared irq aware
-> > >> >   PCI: imx6: add support for MSI
-> > >>
-> > >> What's the status of all these?  I would normally apply patches 4-8 of this
-> > >> series through my tree, given the appropriate acks, but I haven't seen
-> > >> those yet.  And I'm not sure what dependencies there are between the
-> > >> non-PCI patches and the PCI ones.
-> > >>
-> > > It's a complete binding change, so applying one part without the other
-> > > is going to horribly break things.
-> > >
-> > > So I would at least want to see an ack for the binding change on the
-> > > i.MX side from Shawn and Richard. This will need some follow on patches,
-> > > as some boards adding PCIe using the old binding have cropped up in
-> > > linux-next, but I can do the patches on short notice if everyone agrees
-> > > to merge this patchset.
-> > >
-> > > The designware part is pretty simple and doesn't change anything for
-> > > other users than i.MX. Though I would like to see an ack from Jingoo for
-> > > those.
-> > >
-> > > I have some more stuff in the pipes regarding multiple MSI irqs, that
-> > > depend on this series and also the Keystone people are waiting for this
-> > > to be applied in order to consolidate the clock handling of the
-> > > designware core driver, so it would be nice to get this moving again.
-> > 
-> > OK, just poke me again when you're ready for me to do something with these.
-> > 
+> On 09/05/2014 at 15:44:27 +0200, Nicolas Ferre wrote :
+>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> ---
+>>  arch/arm/boot/dts/sama5d3.dtsi | 82 ++++++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 82 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+>> index 9caa06b3641e..ed7943745f23 100644
+>> --- a/arch/arm/boot/dts/sama5d3.dtsi
+>> +++ b/arch/arm/boot/dts/sama5d3.dtsi
+>> @@ -583,6 +583,88 @@
+>>  					};
+>>  				};
+>>  
+>> +				pwm0 {
+>> +					pinctrl_pwm0_pwmh0_0: pwm0_pwmh0-0 {
+>> +						atmel,pins =
+>> +							<AT91_PIOA 20 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PA20 periph B, conflicts with ISI_D4 and LCDDAT20 */
 > 
-> As both Richard and Jingoo gave their ack for the respective patches I
-> think this is good to go in and I would expect all the PCI patches to go
-> through your tree for 3.16.
+> Didn't we decide at some point to stop adding comments for the pinctrl ?
+> At least, I would say that "PA20 periph B" doesn't add any useful
+> information.
+
+Yes, we said that for the description and you are right saying that
+saying again the pin configuration doesn't make sense. On the other
+hand, I tend to like the "conflicts with ..." part of it (and it is
+automatically generated).
+
+So, should we keep this part?
+
+>> +					};
+>> +					pinctrl_pwm0_pwmh0_1: pwm0_pwmh0-1 {
+>> +						atmel,pins =
+>> +							<AT91_PIOB 0 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PB0 periph B, conflicts with GTX0 */
+>> +					};
+>> +
+>> +					pinctrl_pwm0_pwmh1_0: pwm0_pwmh1-0 {
+>> +						atmel,pins =
+>> +							<AT91_PIOA 22 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PA22 periph B, conflicts with ISI_D6 and LCDDAT22 */
+>> +					};
+>> +					pinctrl_pwm0_pwmh1_1: pwm0_pwmh1-1 {
+>> +						atmel,pins =
+>> +							<AT91_PIOB 4 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PB4 periph B, conflicts with GRX0 */
+>> +					};
+>> +					pinctrl_pwm0_pwmh1_2: pwm0_pwmh1-2 {
+>> +						atmel,pins =
+>> +							<AT91_PIOB 27 AT91_PERIPH_C AT91_PINCTRL_NONE>;	/* PB27 periph C, conflicts with G125CKO and RTS1 */
+>> +					};
+>> +
+>> +					pinctrl_pwm0_pwmh2_0: pwm0_pwmh2-0 {
+>> +						atmel,pins =
+>> +							<AT91_PIOB 8 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PB8 periph B, conflicts with GTXCK */
+>> +					};
+>> +					pinctrl_pwm0_pwmh2_1: pwm0_pwmh2-1 {
+>> +						atmel,pins =
+>> +							<AT91_PIOD 5 AT91_PERIPH_C AT91_PINCTRL_NONE>;	/* PD5 periph C, conflicts with MCI0_DA4 and TIOA0 */
+>> +					};
+>> +
+>> +					pinctrl_pwm0_pwmh3_0: pwm0_pwmh3-0 {
+>> +						atmel,pins =
+>> +							<AT91_PIOB 12 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PB12 periph B, conflicts with GRXDV */
+>> +					};
+>> +					pinctrl_pwm0_pwmh3_1: pwm0_pwmh3-1 {
+>> +						atmel,pins =
+>> +							<AT91_PIOD 7 AT91_PERIPH_C AT91_PINCTRL_NONE>;	/* PD7 periph C, conflicts with MCI0_DA6 and TCLK0 */
+>> +					};
+>> +
+>> +					pinctrl_pwm0_pwml0_0: pwm0_pwml0-0 {
+>> +						atmel,pins =
+>> +							<AT91_PIOA 21 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PA21 periph B, conflicts with ISI_D5 and LCDDAT21 */
+>> +					};
+>> +					pinctrl_pwm0_pwml0_1: pwm0_pwml0-1 {
+>> +						atmel,pins =
+>> +							<AT91_PIOB 1 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PB1 periph B, conflicts with GTX1 */
+>> +					};
 > 
-> Shawn, if you are not okay with this change, please speak up now.
-> Otherwise please pick the dts change for 3.16. I'll go over linux-next
-> and prepare the patches to fix up the boards there.
+> I would group pwm0_pwmhx and pwm0_pwmlx together.
+
+Ah, ok, I can do this, sure.
+
+> 
+>> +
+>> +					pinctrl_pwm0_pwml1_0: pwm0_pwml1-0 {
+>> +						atmel,pins =
+>> +							<AT91_PIOA 23 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PA23 periph B, conflicts with ISI_D7 and LCDDAT23 */
+>> +					};
+>> +					pinctrl_pwm0_pwml1_1: pwm0_pwml1-1 {
+>> +						atmel,pins =
+>> +							<AT91_PIOB 5 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PB5 periph B, conflicts with GRX1 */
+>> +					};
+>> +					pinctrl_pwm0_pwml1_2: pwm0_pwml1-2 {
+>> +						atmel,pins =
+>> +							<AT91_PIOE 31 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PE31 periph B, conflicts with IRQ */
+>> +					};
+>> +
 > 
 
 
 -- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+Nicolas Ferre
