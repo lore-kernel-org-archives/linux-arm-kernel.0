@@ -1,64 +1,34 @@
-From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Mon, 12 May 2014 10:58:58 +0400
-Subject: [PATCH] arm: memset: zero out upper bytes in r1
-In-Reply-To: <loom.20140508T103032-725@post.gmane.org>
-References: <1399273875-8403-1-git-send-email-a.ryabinin@samsung.com>
- <loom.20140508T095105-952@post.gmane.org>
- <loom.20140508T103032-725@post.gmane.org>
-Message-ID: <53707132.9070806@samsung.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 12 May 2014 16:07:03 +0900
+Subject: [PATCH v4] drivers: sh: compile drivers/sh/pm_runtime.c if
+ ARCH_SHMOBILE_MULTI
+In-Reply-To: <CANqRtoQzxdjwU+BLyccrSzfBx3UMKm6=MAw9dUHSEBWm5_Vspg@mail.gmail.com>
+References: <1399411579-10681-1-git-send-email-geert+renesas@glider.be>
+ <CAMuHMdWwenyU1RS4c8spFcb7M0oCXP9z8zbGQ0VACKj7EbvvkA@mail.gmail.com>
+ <20140511004626.GW31760@verge.net.au>
+ <CANqRtoQzxdjwU+BLyccrSzfBx3UMKm6=MAw9dUHSEBWm5_Vspg@mail.gmail.com>
+Message-ID: <20140512070700.GA20505@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/08/14 12:38, Vladimir Murzin wrote:
-> Vladimir Murzin <murzin.v <at> gmail.com> writes:
+On Mon, May 12, 2014 at 08:24:03AM +0900, Magnus Damm wrote:
+> On Sun, May 11, 2014 at 9:46 AM, Simon Horman <horms@verge.net.au> wrote:
+> > On Thu, May 08, 2014 at 12:12:29PM +0200, Geert Uytterhoeven wrote:
+> >> On Tue, May 6, 2014 at 11:26 PM, Geert Uytterhoeven
+> >> <geert+renesas@glider.be> wrote:
+> >> > Tested on Koelsch (legacy, reference, shmobile, and shmobile+bbb kernels)
+> >> > and BeagleBone Black (shmobile+bbb). Will test on more hardware tomorrow.
+> >>
+> >> Tested on genmai with Wolfram's CCF support.
+> >
+> > Thanks, shall I go ahead and queue this up?
 > 
->>
->> Andrey Ryabinin <a.ryabinin <at> samsung.com> writes:
->>
->>>
->>> memset doesn't work right for following example:
->>>
->>> 	signed char c = 0xF0;
->>> 	memset(addr, c, size);
->>>
->>> Variable c is signed, so after typcasting to int the value will be
-> 0xFFFFFFF0.
->>> This value will be passed through r1 regitster to memset function.
->>> memset doesn't zero out upper bytes in r1, so memory will be filled
->>> with 0xFFFFFFF0 instead of expected 0xF0F0F0F0.
->>
->> It behaves the same as a generic implementation in lib/string.c, moreover
->> gcc built-in behaves the same. So it looks like expected behavior and POSIX
->> Programmer's Manual (man 3posix memset) explicitly says that "c" is
->> converted to unsigned char.
->>
->> Cheers
->> Vladimir
->>
->>
-> 
+> Yes please, at least from my side everything looks perfect.
 
-Hi Vladimir.
-Please, use reply to all next time, otherwise I might miss your mails.
+Thanks, will do.
 
-> Sorry, had a bad coffee when posted it ;) It behaves /different/, but it is
-> here for many years... 
+I currently plan to send this on to Linus when the merge window
+opens for v3.16.
 
-Your are right, it's here for many years and wasn't noticed, probably because, there are no
-such users, that call memset with not zero upper bytes in second argument. Though, I can't tell this
-for sure, there are might be a few of such calls.
-So this fix probably doesn't change anything for current kernel, however it might help to avoid problems in future.
-Also, I think would be good to have the same behavior on different architectures (arm64/x86 works correctly
-for example above).
-
-> doesn't this change break something? iow, it possible
-> that some user rely on this behavior...
-> 
-
-I don't think that such user exist, cause such user must know implementation details of memset
-on ARM and rely on them.
-If such user exist that's insane user and should be fixed.
-
-
-> Vladimir
-> 
+This differs from other patches I have queued up (until now) which
+I have or intend to send via the ARM SoC tree.
