@@ -1,79 +1,66 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 12 May 2014 11:37:17 +0200
-Subject: [PATCH v2] ARM: dt: fix up PL011 device tree bindings
-Message-ID: <1399887437-32154-1-git-send-email-linus.walleij@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 May 2014 11:37:27 +0200
+Subject: [PATCH v2 1/4] clocksource: Add support for the Mediatek SoCs
+In-Reply-To: <1399772463-859-2-git-send-email-matthias.bgg@gmail.com>
+References: <1399772463-859-1-git-send-email-matthias.bgg@gmail.com>
+ <1399772463-859-2-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <4169260.qB0vPmmJCY@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make the map match the reality, the current binding text is
-nonsense:
+On Sunday 11 May 2014 03:41:00 Matthias Brugger wrote:
+> +
+> +static void __iomem *gpt_base;
+> +static u32 ticks_per_jiffy;
+> +
 
-- The clock required for the clocking of the serial port
-  must come first and is not optional (as the driver will
-  otherwise proceed to grab and use the apb_pclk as uartclk),
-  and the apb_pclk that clocks the logic must come second
-  as the code will retrieve the first clock by index,
-  whereas the PrimeCell but will explicitly look for
-  "apb_pclk" so this can be specified later, as it is
-  looked up by name.
+This is not wrong, because there will only be one timer, but the
+preferred way to express this in general would be to add it to the
+clock_event_device pointer:
 
-- The pin control state "default" is the only mandated
-  state, the sleep state is entirely optional.
+struct mtk_clock_event_device {
+	void __iomem *gpt_base;
+	u32 ticks_per_jiffy;
+	struct clock_event_device dev;
+};
 
-We also add an example to avoid further confusion.
+static inline struct mtk_clock_event_device *to_mtk_clock(struct clock_event_device *c)
+{
+	return container_of(c, struct mtk_clock_event_device, dev);
+}
 
-Reported-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v1->v2:
-- Rename amba_pclk to apb_pclk
-- Split clock/clocks properties and indicate that listin one
-  clock only is deprecated
----
- Documentation/devicetree/bindings/serial/pl011.txt | 28 +++++++++++++++++++---
- 1 file changed, 25 insertions(+), 3 deletions(-)
+static irqreturn_t mtk_timer_interrupt(int irq, void *dev_id)
+{
+       struct mtk_clock_event_device *evt = dev_id;
 
-diff --git a/Documentation/devicetree/bindings/serial/pl011.txt b/Documentation/devicetree/bindings/serial/pl011.txt
-index 5d2e840ae65c..52464918cfe2 100644
---- a/Documentation/devicetree/bindings/serial/pl011.txt
-+++ b/Documentation/devicetree/bindings/serial/pl011.txt
-@@ -6,12 +6,34 @@ Required properties:
- - interrupts: exactly one interrupt specifier
- 
- Optional properties:
--- pinctrl: When present, must have one state named "sleep"
--	   and one state named "default"
--- clocks:  When present, must refer to exactly one clock named
-+- pinctrl: When present, must have one state named "default",
-+	   and may contain a second name named "sleep". The former
-+	   state sets up pins for ordinary operation whereas
-+	   the latter state will put the associated pins to sleep
-+	   when the UART is unused
-+- clocks:  When present, the first clock listed must correspond to
-+	   the clock named UARTCLK on the IP block, i.e. the clock
-+	   to the external serial line, whereas the second clock
-+	   must correspond to the PCLK clocking the internal logic
-+	   of the block. Just listing one clock (the first one) is
-+	   deprecated.
-+- clocks-names: When present, the first clock listed must be named
-+	   "uartclk" and the second clock listed must be named
- 	   "apb_pclk"
- - dmas:	   When present, may have one or two dma channels.
- 	   The first one must be named "rx", the second one
- 	   must be named "tx".
- 
- See also bindings/arm/primecell.txt
-+
-+Example:
-+
-+uart at 80120000 {
-+	compatible = "arm,pl011", "arm,primecell";
-+	reg = <0x80120000 0x1000>;
-+	interrupts = <0 11 IRQ_TYPE_LEVEL_HIGH>;
-+	dmas = <&dma 13 0 0x2>, <&dma 13 0 0x0>;
-+	dma-names = "rx", "tx";
-+	clocks = <&foo_clk>, <&bar_clk>;
-+	clock-names = "uartclk", "apb_pclk";
-+};
--- 
-1.9.0
+       /* Acknowledge timer0 irq */
+       writel(GPT_IRQ_ACK(GPT_CLK_EVT), evt->gpt_base + GPT_IRQ_ACK_REG);
+       evt->dev.event_handler(evt);
+
+       return IRQ_HANDLED;
+}
+
+static void mtk_clkevt_mode(enum clock_event_mode mode,
+                             struct clock_event_device *clk)
+{
+	struct mtk_clock_event_device *evt = to_mtk_clock(clk);
+
+        mtk_clkevt_time_stop(GPT_CLK_EVT);
+
+        switch (mode) {
+        case CLOCK_EVT_MODE_PERIODIC:
+               mtk_clkevt_time_setup(evt->ticks_per_jiffy, GPT_CLK_EVT);
+               mtk_clkevt_time_start(true, GPT_CLK_EVT);
+               break;
+        case CLOCK_EVT_MODE_ONESHOT:
+               mtk_clkevt_time_start(false, GPT_CLK_EVT);
+               break;
+        case CLOCK_EVT_MODE_UNUSED:
+        case CLOCK_EVT_MODE_SHUTDOWN:
+        default:
+               /* No more interrupts will occur as source is disabled */
+               break;
+        }
+}
+
+	Arnd
