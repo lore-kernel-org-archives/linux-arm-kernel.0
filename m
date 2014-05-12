@@ -1,44 +1,31 @@
-From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Mon, 12 May 2014 11:16:56 +0200
-Subject: [PATCH v2 5/6] ARM: berlin: add the AHCI node for the BG2Q
-In-Reply-To: <1399886217-20474-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1399886217-20474-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1399886217-20474-6-git-send-email-antoine.tenart@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 12 May 2014 11:22:27 +0200
+Subject: [GIT PULL] Allwinner Pinctrl changes for 3.16
+In-Reply-To: <20140509173156.GF7047@lukather>
+References: <20140508225209.GA13610@lukather>
+ <CACRpkda7QT+sGs6wY6-fbcZ3k4sXfP=rmPimfqHjbUB5vQuO5A@mail.gmail.com>
+ <20140509173156.GF7047@lukather>
+Message-ID: <CACRpkdae=i8C49AMJCrRe0a=4d8Y+FhkiEOv=EJ_NfakYqRvzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The BG2Q has an AHCI SATA controller. Add the corresponding nodes
-(AHCI, SATA PHY) in its device tree.
+On Fri, May 9, 2014 at 7:31 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
 
-Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
----
- arch/arm/boot/dts/berlin2q.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+> Only pinctrl/next is not going to be rebased, right?
 
-diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-index 07452a7483fa..99338a2d11a6 100644
---- a/arch/arm/boot/dts/berlin2q.dtsi
-+++ b/arch/arm/boot/dts/berlin2q.dtsi
-@@ -183,6 +183,20 @@
- 			};
- 		};
- 
-+		ahci: sata at e90000 {
-+			compatible = "marvell,berlin-ahci";
-+			reg = <0xe90000 0x1000>;
-+			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
-+
-+		sata_phy: phy at e900a0 {
-+			compatible = "marvell,berlin-sata-phy";
-+			reg = <0xe900a0 0x10>;
-+			#phy-cells = <1>;
-+			status = "disabled";
-+		};
-+
- 		apb at fc0000 {
- 			compatible = "simple-bus";
- 			#address-cells = <1>;
--- 
-1.9.1
+pinctrl/devel actually.
+
+for-next is a mixdown branch that is rebased all the time
+so don't use that.
+
+But notify me first if you're going to be pulling in that branch!
+(Handshake.)
+
+Also: why do you need it? Just as a dependence to dts files
+does *not* count as a reason to cross merge these trees,
+as the device tree files are meant to even be moved out of
+the kernel at some point... but you may have better reasons?
+
+Yours,
+Linus Walleij
