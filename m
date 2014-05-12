@@ -1,51 +1,653 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 12 May 2014 11:08:56 +0200
-Subject: [PATCH 1/2] ARM: at91: add PWM pinctrl to SAMA5D3
-In-Reply-To: <53708EFF.1030604@atmel.com>
-References: <a5a0a9b8090f80f40daf3a13849b3961d9d617d6.1399642907.git.nicolas.ferre@atmel.com>
- <20140510091017.GA22329@piout.net> <53708EFF.1030604@atmel.com>
-Message-ID: <20140512090855.GA29318@piout.net>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 12 May 2014 10:10:47 +0100
+Subject: [PATCH v9 1/3] PSCI: Add initial support for PSCIv0.2 functions
+In-Reply-To: <1399472847-14377-2-git-send-email-ashwin.chaugule@linaro.org>
+References: <1399472847-14377-1-git-send-email-ashwin.chaugule@linaro.org>
+ <1399472847-14377-2-git-send-email-ashwin.chaugule@linaro.org>
+Message-ID: <20140512091047.GB3006@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/05/2014 at 11:06:07 +0200, Nicolas Ferre wrote :
-> On 10/05/2014 11:10, Alexandre Belloni :
-> > Hi Nicolas,
-> > 
-> > On 09/05/2014 at 15:44:27 +0200, Nicolas Ferre wrote :
-> >> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> >> ---
-> >>  arch/arm/boot/dts/sama5d3.dtsi | 82 ++++++++++++++++++++++++++++++++++++++++++
-> >>  1 file changed, 82 insertions(+)
-> >>
-> >> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-> >> index 9caa06b3641e..ed7943745f23 100644
-> >> --- a/arch/arm/boot/dts/sama5d3.dtsi
-> >> +++ b/arch/arm/boot/dts/sama5d3.dtsi
-> >> @@ -583,6 +583,88 @@
-> >>  					};
-> >>  				};
-> >>  
-> >> +				pwm0 {
-> >> +					pinctrl_pwm0_pwmh0_0: pwm0_pwmh0-0 {
-> >> +						atmel,pins =
-> >> +							<AT91_PIOA 20 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PA20 periph B, conflicts with ISI_D4 and LCDDAT20 */
-> > 
-> > Didn't we decide at some point to stop adding comments for the pinctrl ?
-> > At least, I would say that "PA20 periph B" doesn't add any useful
-> > information.
-> 
-> Yes, we said that for the description and you are right saying that
-> saying again the pin configuration doesn't make sense. On the other
-> hand, I tend to like the "conflicts with ..." part of it (and it is
-> automatically generated).
-> 
-> So, should we keep this part?
-> 
+Hi Ashwin,
 
-Yes, it adds real information.
+On Wed, May 07, 2014 at 03:27:25PM +0100, Ashwin Chaugule wrote:
+> The PSCIv0.2 spec defines standard values of function IDs
+> and introduces a few new functions. Detect version of PSCI
+> and appropriately select the right PSCI functions.
+>
+> Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+> Reviewed-by: Rob Herring <robh@kernel.org>
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Other than those issues pointed out by Anup, this looks good to me,
+though I'd like to see the cpu_kill callbacks for arm (and arm64) go
+though at the same time (possibly folded in) so that implementations are
+exercised from the start and we don't have to add properties to later
+bodge around any current brokenness.
+
+Have these patches been tested against an implementation?
+
+Which tree are you planning on merging this through? Do we need to split
+the arm and arm64 parts?
+
+Cheers,
+Mark.
+
+> ---
+>  arch/arm/include/asm/psci.h   |   7 +-
+>  arch/arm/kernel/psci.c        | 196 +++++++++++++++++++++++++++++++++--------
+>  arch/arm64/include/asm/psci.h |   2 +-
+>  arch/arm64/kernel/psci.c      | 200 ++++++++++++++++++++++++++++++++++--------
+>  4 files changed, 328 insertions(+), 77 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/psci.h b/arch/arm/include/asm/psci.h
+> index c4ae171..b93e34a 100644
+> --- a/arch/arm/include/asm/psci.h
+> +++ b/arch/arm/include/asm/psci.h
+> @@ -29,16 +29,19 @@ struct psci_operations {
+>         int (*cpu_off)(struct psci_power_state state);
+>         int (*cpu_on)(unsigned long cpuid, unsigned long entry_point);
+>         int (*migrate)(unsigned long cpuid);
+> +       int (*affinity_info)(unsigned long target_affinity,
+> +                       unsigned long lowest_affinity_level);
+> +       int (*migrate_info_type)(void);
+>  };
+>
+>  extern struct psci_operations psci_ops;
+>  extern struct smp_operations psci_smp_ops;
+>
+>  #ifdef CONFIG_ARM_PSCI
+> -void psci_init(void);
+> +int psci_init(void);
+>  bool psci_smp_available(void);
+>  #else
+> -static inline void psci_init(void) { }
+> +static inline int psci_init(void) { }
+>  static inline bool psci_smp_available(void) { return false; }
+>  #endif
+>
+> diff --git a/arch/arm/kernel/psci.c b/arch/arm/kernel/psci.c
+> index 4693188..3775e62 100644
+> --- a/arch/arm/kernel/psci.c
+> +++ b/arch/arm/kernel/psci.c
+> @@ -17,63 +17,58 @@
+>
+>  #include <linux/init.h>
+>  #include <linux/of.h>
+> +#include <linux/reboot.h>
+> +#include <linux/pm.h>
+> +#include <uapi/linux/psci.h>
+>
+>  #include <asm/compiler.h>
+>  #include <asm/errno.h>
+>  #include <asm/opcodes-sec.h>
+>  #include <asm/opcodes-virt.h>
+>  #include <asm/psci.h>
+> +#include <asm/system_misc.h>
+>
+>  struct psci_operations psci_ops;
+>
+>  static int (*invoke_psci_fn)(u32, u32, u32, u32);
+> +typedef int (*psci_initcall_t)(const struct device_node *);
+>
+>  enum psci_function {
+>         PSCI_FN_CPU_SUSPEND,
+>         PSCI_FN_CPU_ON,
+>         PSCI_FN_CPU_OFF,
+>         PSCI_FN_MIGRATE,
+> +       PSCI_FN_AFFINITY_INFO,
+> +       PSCI_FN_MIGRATE_INFO_TYPE,
+>         PSCI_FN_MAX,
+>  };
+>
+>  static u32 psci_function_id[PSCI_FN_MAX];
+>
+> -#define PSCI_RET_SUCCESS               0
+> -#define PSCI_RET_EOPNOTSUPP            -1
+> -#define PSCI_RET_EINVAL                        -2
+> -#define PSCI_RET_EPERM                 -3
+> -
+>  static int psci_to_linux_errno(int errno)
+>  {
+>         switch (errno) {
+>         case PSCI_RET_SUCCESS:
+>                 return 0;
+> -       case PSCI_RET_EOPNOTSUPP:
+> +       case PSCI_RET_NOT_SUPPORTED:
+>                 return -EOPNOTSUPP;
+> -       case PSCI_RET_EINVAL:
+> +       case PSCI_RET_INVALID_PARAMS:
+>                 return -EINVAL;
+> -       case PSCI_RET_EPERM:
+> +       case PSCI_RET_DENIED:
+>                 return -EPERM;
+>         };
+>
+>         return -EINVAL;
+>  }
+>
+> -#define PSCI_POWER_STATE_ID_MASK       0xffff
+> -#define PSCI_POWER_STATE_ID_SHIFT      0
+> -#define PSCI_POWER_STATE_TYPE_MASK     0x1
+> -#define PSCI_POWER_STATE_TYPE_SHIFT    16
+> -#define PSCI_POWER_STATE_AFFL_MASK     0x3
+> -#define PSCI_POWER_STATE_AFFL_SHIFT    24
+> -
+>  static u32 psci_power_state_pack(struct psci_power_state state)
+>  {
+> -       return  ((state.id & PSCI_POWER_STATE_ID_MASK)
+> -                       << PSCI_POWER_STATE_ID_SHIFT)   |
+> -               ((state.type & PSCI_POWER_STATE_TYPE_MASK)
+> -                       << PSCI_POWER_STATE_TYPE_SHIFT) |
+> -               ((state.affinity_level & PSCI_POWER_STATE_AFFL_MASK)
+> -                       << PSCI_POWER_STATE_AFFL_SHIFT);
+> +       return  ((state.id & PSCI_0_2_POWER_STATE_ID_MASK)
+> +                       << PSCI_0_2_POWER_STATE_ID_SHIFT)       |
+> +               ((state.type & PSCI_0_2_POWER_STATE_TYPE_MASK)
+> +                       << PSCI_0_2_POWER_STATE_TYPE_SHIFT)     |
+> +               ((state.affinity_level & PSCI_0_2_POWER_STATE_AFFL_MASK)
+> +                       << PSCI_0_2_POWER_STATE_AFFL_SHIFT);
+>  }
+>
+>  /*
+> @@ -110,6 +105,14 @@ static noinline int __invoke_psci_fn_smc(u32 function_id, u32 arg0, u32 arg1,
+>         return function_id;
+>  }
+>
+> +static int psci_get_version(void)
+> +{
+> +       int err;
+> +
+> +       err = invoke_psci_fn(PSCI_0_2_FN_PSCI_VERSION, 0, 0, 0);
+> +       return err;
+> +}
+> +
+>  static int psci_cpu_suspend(struct psci_power_state state,
+>                             unsigned long entry_point)
+>  {
+> @@ -153,26 +156,36 @@ static int psci_migrate(unsigned long cpuid)
+>         return psci_to_linux_errno(err);
+>  }
+>
+> -static const struct of_device_id psci_of_match[] __initconst = {
+> -       { .compatible = "arm,psci",     },
+> -       {},
+> -};
+> +static int psci_affinity_info(unsigned long target_affinity,
+> +               unsigned long lowest_affinity_level)
+> +{
+> +       int err;
+> +       u32 fn;
+> +
+> +       fn = psci_function_id[PSCI_FN_AFFINITY_INFO];
+> +       err = invoke_psci_fn(fn, target_affinity, lowest_affinity_level, 0);
+> +       return err;
+> +}
+>
+> -void __init psci_init(void)
+> +static int psci_migrate_info_type(void)
+>  {
+> -       struct device_node *np;
+> -       const char *method;
+> -       u32 id;
+> +       int err;
+> +       u32 fn;
+>
+> -       np = of_find_matching_node(NULL, psci_of_match);
+> -       if (!np)
+> -               return;
+> +       fn = psci_function_id[PSCI_FN_MIGRATE_INFO_TYPE];
+> +       err = invoke_psci_fn(fn, 0, 0, 0);
+> +       return err;
+> +}
+> +
+> +static int get_set_conduit_method(struct device_node *np)
+> +{
+> +       const char *method;
+>
+> -       pr_info("probing function IDs from device-tree\n");
+> +       pr_info("probing for conduit method from DT.\n");
+>
+>         if (of_property_read_string(np, "method", &method)) {
+> -               pr_warning("missing \"method\" property\n");
+> -               goto out_put_node;
+> +               pr_warn("missing \"method\" property\n");
+> +               return -ENXIO;
+>         }
+>
+>         if (!strcmp("hvc", method)) {
+> @@ -180,10 +193,99 @@ void __init psci_init(void)
+>         } else if (!strcmp("smc", method)) {
+>                 invoke_psci_fn = __invoke_psci_fn_smc;
+>         } else {
+> -               pr_warning("invalid \"method\" property: %s\n", method);
+> +               pr_warn("invalid \"method\" property: %s\n", method);
+> +               return -EINVAL;
+> +       }
+> +       return 0;
+> +}
+> +
+> +static void psci_sys_reset(enum reboot_mode reboot_mode, const char *cmd)
+> +{
+> +       invoke_psci_fn(PSCI_0_2_FN_SYSTEM_RESET, 0, 0, 0);
+> +}
+> +
+> +static void psci_sys_poweroff(void)
+> +{
+> +       invoke_psci_fn(PSCI_0_2_FN_SYSTEM_OFF, 0, 0, 0);
+> +}
+> +
+> +/*
+> + * PSCI Function IDs for v0.2+ are well defined so use
+> + * standard values.
+> + */
+> +static int psci_0_2_init(struct device_node *np)
+> +{
+> +       int err, ver;
+> +
+> +       err = get_set_conduit_method(np);
+> +
+> +       if (err)
+> +               goto out_put_node;
+> +
+> +       ver = psci_get_version();
+> +
+> +       if (ver == PSCI_RET_NOT_SUPPORTED) {
+> +               /* PSCI v0.2 mandates implementation of PSCI_ID_VERSION. */
+> +               pr_err("PSCI firmware does not comply with the v0.2 spec.\n");
+> +               err = -EOPNOTSUPP;
+>                 goto out_put_node;
+> +       } else {
+> +               pr_info("PSCIv%d.%d detected in firmware.\n",
+> +                               PSCI_VERSION_MAJOR(ver),
+> +                               PSCI_VERSION_MINOR(ver));
+> +
+> +               if (PSCI_VERSION_MAJOR(ver) == 0 &&
+> +                               PSCI_VERSION_MINOR(ver) < 2) {
+> +                       err = -EINVAL;
+> +                       pr_err("Conflicting PSCI version detected.\n");
+> +                       goto out_put_node;
+> +               }
+>         }
+>
+> +       pr_info("Using standard PSCI v0.2 function IDs\n");
+> +       psci_function_id[PSCI_FN_CPU_SUSPEND] = PSCI_0_2_FN_CPU_SUSPEND;
+> +       psci_ops.cpu_suspend = psci_cpu_suspend;
+> +
+> +       psci_function_id[PSCI_FN_CPU_OFF] = PSCI_0_2_FN_CPU_OFF;
+> +       psci_ops.cpu_off = psci_cpu_off;
+> +
+> +       psci_function_id[PSCI_FN_CPU_ON] = PSCI_0_2_FN_CPU_ON;
+> +       psci_ops.cpu_on = psci_cpu_on;
+> +
+> +       psci_function_id[PSCI_FN_MIGRATE] = PSCI_0_2_FN_MIGRATE;
+> +       psci_ops.migrate = psci_migrate;
+> +
+> +       psci_function_id[PSCI_FN_AFFINITY_INFO] = PSCI_0_2_FN_AFFINITY_INFO;
+> +       psci_ops.affinity_info = psci_affinity_info;
+> +
+> +       psci_function_id[PSCI_FN_MIGRATE_INFO_TYPE] =
+> +               PSCI_0_2_FN_MIGRATE_INFO_TYPE;
+> +       psci_ops.migrate_info_type = psci_migrate_info_type;
+> +
+> +       arm_pm_restart = psci_sys_reset;
+> +
+> +       pm_power_off = psci_sys_poweroff;
+> +
+> +out_put_node:
+> +       of_node_put(np);
+> +       return err;
+> +}
+> +
+> +/*
+> + * PSCI < v0.2 get PSCI Function IDs via DT.
+> + */
+> +static int psci_0_1_init(struct device_node *np)
+> +{
+> +       u32 id;
+> +       int err;
+> +
+> +       err = get_set_conduit_method(np);
+> +
+> +       if (err)
+> +               goto out_put_node;
+> +
+> +       pr_info("Using PSCI v0.1 Function IDs from DT\n");
+> +
+>         if (!of_property_read_u32(np, "cpu_suspend", &id)) {
+>                 psci_function_id[PSCI_FN_CPU_SUSPEND] = id;
+>                 psci_ops.cpu_suspend = psci_cpu_suspend;
+> @@ -206,5 +308,25 @@ void __init psci_init(void)
+>
+>  out_put_node:
+>         of_node_put(np);
+> -       return;
+> +       return err;
+> +}
+> +
+> +static const struct of_device_id psci_of_match[] __initconst = {
+> +       { .compatible = "arm,psci", .data = psci_0_1_init},
+> +       { .compatible = "arm,psci-0.2", .data = psci_0_2_init},
+> +       {},
+> +};
+> +
+> +int __init psci_init(void)
+> +{
+> +       struct device_node *np;
+> +       const struct of_device_id *matched_np;
+> +       psci_initcall_t init_fn;
+> +
+> +       np = of_find_matching_node_and_match(NULL, psci_of_match, &matched_np);
+> +       if (!np)
+> +               return -ENODEV;
+> +
+> +       init_fn = (psci_initcall_t)matched_np->data;
+> +       return init_fn(np);
+>  }
+> diff --git a/arch/arm64/include/asm/psci.h b/arch/arm64/include/asm/psci.h
+> index d15ab8b4..e5312ea 100644
+> --- a/arch/arm64/include/asm/psci.h
+> +++ b/arch/arm64/include/asm/psci.h
+> @@ -14,6 +14,6 @@
+>  #ifndef __ASM_PSCI_H
+>  #define __ASM_PSCI_H
+>
+> -void psci_init(void);
+> +int psci_init(void);
+>
+>  #endif /* __ASM_PSCI_H */
+> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
+> index ea4828a..6045613 100644
+> --- a/arch/arm64/kernel/psci.c
+> +++ b/arch/arm64/kernel/psci.c
+> @@ -18,12 +18,16 @@
+>  #include <linux/init.h>
+>  #include <linux/of.h>
+>  #include <linux/smp.h>
+> +#include <linux/reboot.h>
+> +#include <linux/pm.h>
+> +#include <uapi/linux/psci.h>
+>
+>  #include <asm/compiler.h>
+>  #include <asm/cpu_ops.h>
+>  #include <asm/errno.h>
+>  #include <asm/psci.h>
+>  #include <asm/smp_plat.h>
+> +#include <asm/system_misc.h>
+>
+>  #define PSCI_POWER_STATE_TYPE_STANDBY          0
+>  #define PSCI_POWER_STATE_TYPE_POWER_DOWN       1
+> @@ -40,58 +44,52 @@ struct psci_operations {
+>         int (*cpu_off)(struct psci_power_state state);
+>         int (*cpu_on)(unsigned long cpuid, unsigned long entry_point);
+>         int (*migrate)(unsigned long cpuid);
+> +       int (*affinity_info)(unsigned long target_affinity,
+> +                       unsigned long lowest_affinity_level);
+> +       int (*migrate_info_type)(void);
+>  };
+>
+>  static struct psci_operations psci_ops;
+>
+>  static int (*invoke_psci_fn)(u64, u64, u64, u64);
+> +typedef int (*psci_initcall_t)(const struct device_node *);
+>
+>  enum psci_function {
+>         PSCI_FN_CPU_SUSPEND,
+>         PSCI_FN_CPU_ON,
+>         PSCI_FN_CPU_OFF,
+>         PSCI_FN_MIGRATE,
+> +       PSCI_FN_AFFINITY_INFO,
+> +       PSCI_FN_MIGRATE_INFO_TYPE,
+>         PSCI_FN_MAX,
+>  };
+>
+>  static u32 psci_function_id[PSCI_FN_MAX];
+>
+> -#define PSCI_RET_SUCCESS               0
+> -#define PSCI_RET_EOPNOTSUPP            -1
+> -#define PSCI_RET_EINVAL                        -2
+> -#define PSCI_RET_EPERM                 -3
+> -
+>  static int psci_to_linux_errno(int errno)
+>  {
+>         switch (errno) {
+>         case PSCI_RET_SUCCESS:
+>                 return 0;
+> -       case PSCI_RET_EOPNOTSUPP:
+> +       case PSCI_RET_NOT_SUPPORTED:
+>                 return -EOPNOTSUPP;
+> -       case PSCI_RET_EINVAL:
+> +       case PSCI_RET_INVALID_PARAMS:
+>                 return -EINVAL;
+> -       case PSCI_RET_EPERM:
+> +       case PSCI_RET_DENIED:
+>                 return -EPERM;
+>         };
+>
+>         return -EINVAL;
+>  }
+>
+> -#define PSCI_POWER_STATE_ID_MASK       0xffff
+> -#define PSCI_POWER_STATE_ID_SHIFT      0
+> -#define PSCI_POWER_STATE_TYPE_MASK     0x1
+> -#define PSCI_POWER_STATE_TYPE_SHIFT    16
+> -#define PSCI_POWER_STATE_AFFL_MASK     0x3
+> -#define PSCI_POWER_STATE_AFFL_SHIFT    24
+> -
+>  static u32 psci_power_state_pack(struct psci_power_state state)
+>  {
+> -       return  ((state.id & PSCI_POWER_STATE_ID_MASK)
+> -                       << PSCI_POWER_STATE_ID_SHIFT)   |
+> -               ((state.type & PSCI_POWER_STATE_TYPE_MASK)
+> -                       << PSCI_POWER_STATE_TYPE_SHIFT) |
+> -               ((state.affinity_level & PSCI_POWER_STATE_AFFL_MASK)
+> -                       << PSCI_POWER_STATE_AFFL_SHIFT);
+> +       return  ((state.id & PSCI_0_2_POWER_STATE_ID_MASK)
+> +                       << PSCI_0_2_POWER_STATE_ID_SHIFT)       |
+> +               ((state.type & PSCI_0_2_POWER_STATE_TYPE_MASK)
+> +                       << PSCI_0_2_POWER_STATE_TYPE_SHIFT)     |
+> +               ((state.affinity_level & PSCI_0_2_POWER_STATE_AFFL_MASK)
+> +                       << PSCI_0_2_POWER_STATE_AFFL_SHIFT);
+>  }
+>
+>  /*
+> @@ -128,6 +126,14 @@ static noinline int __invoke_psci_fn_smc(u64 function_id, u64 arg0, u64 arg1,
+>         return function_id;
+>  }
+>
+> +static int psci_get_version(void)
+> +{
+> +       int err;
+> +
+> +       err = invoke_psci_fn(PSCI_0_2_FN_PSCI_VERSION, 0, 0, 0);
+> +       return err;
+> +}
+> +
+>  static int psci_cpu_suspend(struct psci_power_state state,
+>                             unsigned long entry_point)
+>  {
+> @@ -171,26 +177,36 @@ static int psci_migrate(unsigned long cpuid)
+>         return psci_to_linux_errno(err);
+>  }
+>
+> -static const struct of_device_id psci_of_match[] __initconst = {
+> -       { .compatible = "arm,psci",     },
+> -       {},
+> -};
+> +static int psci_affinity_info(unsigned long target_affinity,
+> +               unsigned long lowest_affinity_level)
+> +{
+> +       int err;
+> +       u32 fn;
+> +
+> +       fn = psci_function_id[PSCI_FN_AFFINITY_INFO];
+> +       err = invoke_psci_fn(fn, target_affinity, lowest_affinity_level, 0);
+> +       return err;
+> +}
+>
+> -void __init psci_init(void)
+> +static int psci_migrate_info_type(void)
+>  {
+> -       struct device_node *np;
+> -       const char *method;
+> -       u32 id;
+> +       int err;
+> +       u32 fn;
+>
+> -       np = of_find_matching_node(NULL, psci_of_match);
+> -       if (!np)
+> -               return;
+> +       fn = psci_function_id[PSCI_FN_MIGRATE_INFO_TYPE];
+> +       err = invoke_psci_fn(fn, 0, 0, 0);
+> +       return err;
+> +}
+> +
+> +static int get_set_conduit_method(struct device_node *np)
+> +{
+> +       const char *method;
+>
+> -       pr_info("probing function IDs from device-tree\n");
+> +       pr_info("probing for conduit method from DT.\n");
+>
+>         if (of_property_read_string(np, "method", &method)) {
+> -               pr_warning("missing \"method\" property\n");
+> -               goto out_put_node;
+> +               pr_warn("missing \"method\" property\n");
+> +               return -ENXIO;
+>         }
+>
+>         if (!strcmp("hvc", method)) {
+> @@ -198,10 +214,99 @@ void __init psci_init(void)
+>         } else if (!strcmp("smc", method)) {
+>                 invoke_psci_fn = __invoke_psci_fn_smc;
+>         } else {
+> -               pr_warning("invalid \"method\" property: %s\n", method);
+> +               pr_warn("invalid \"method\" property: %s\n", method);
+> +               return -EINVAL;
+> +       }
+> +       return 0;
+> +}
+> +
+> +static void psci_sys_reset(enum reboot_mode reboot_mode, const char *cmd)
+> +{
+> +       invoke_psci_fn(PSCI_0_2_FN_SYSTEM_RESET, 0, 0, 0);
+> +}
+> +
+> +static void psci_sys_poweroff(void)
+> +{
+> +       invoke_psci_fn(PSCI_0_2_FN_SYSTEM_OFF, 0, 0, 0);
+> +}
+> +
+> +/*
+> + * PSCI Function IDs for v0.2+ are well defined so use
+> + * standard values.
+> + */
+> +static int psci_0_2_init(struct device_node *np)
+> +{
+> +       int err, ver;
+> +
+> +       err = get_set_conduit_method(np);
+> +
+> +       if (err)
+> +               goto out_put_node;
+> +
+> +       ver = psci_get_version();
+> +
+> +       if (ver == PSCI_RET_NOT_SUPPORTED) {
+> +               /* PSCI v0.2 mandates implementation of PSCI_ID_VERSION. */
+> +               pr_err("PSCI firmware does not comply with the v0.2 spec.\n");
+> +               err = -EOPNOTSUPP;
+>                 goto out_put_node;
+> +       } else {
+> +               pr_info("PSCIv%d.%d detected in firmware.\n",
+> +                               PSCI_VERSION_MAJOR(ver),
+> +                               PSCI_VERSION_MINOR(ver));
+> +
+> +               if (PSCI_VERSION_MAJOR(ver) == 0 &&
+> +                               PSCI_VERSION_MINOR(ver) < 2) {
+> +                       err = -EINVAL;
+> +                       pr_err("Conflicting PSCI version detected.\n");
+> +                       goto out_put_node;
+> +               }
+>         }
+>
+> +       pr_info("Using standard PSCI v0.2 function IDs\n");
+> +       psci_function_id[PSCI_FN_CPU_SUSPEND] = PSCI_0_2_FN64_CPU_SUSPEND;
+> +       psci_ops.cpu_suspend = psci_cpu_suspend;
+> +
+> +       psci_function_id[PSCI_FN_CPU_OFF] = PSCI_0_2_FN_CPU_OFF;
+> +       psci_ops.cpu_off = psci_cpu_off;
+> +
+> +       psci_function_id[PSCI_FN_CPU_ON] = PSCI_0_2_FN64_CPU_ON;
+> +       psci_ops.cpu_on = psci_cpu_on;
+> +
+> +       psci_function_id[PSCI_FN_MIGRATE] = PSCI_0_2_FN64_MIGRATE;
+> +       psci_ops.migrate = psci_migrate;
+> +
+> +       psci_function_id[PSCI_FN_AFFINITY_INFO] = PSCI_0_2_FN64_AFFINITY_INFO;
+> +       psci_ops.affinity_info = psci_affinity_info;
+> +
+> +       psci_function_id[PSCI_FN_MIGRATE_INFO_TYPE] =
+> +               PSCI_0_2_FN_MIGRATE_INFO_TYPE;
+> +       psci_ops.migrate_info_type = psci_migrate_info_type;
+> +
+> +       arm_pm_restart = psci_sys_reset;
+> +
+> +       pm_power_off = psci_sys_poweroff;
+> +
+> +out_put_node:
+> +       of_node_put(np);
+> +       return err;
+> +}
+> +
+> +/*
+> + * PSCI < v0.2 get PSCI Function IDs via DT.
+> + */
+> +static int psci_0_1_init(struct device_node *np)
+> +{
+> +       u32 id;
+> +       int err;
+> +
+> +       err = get_set_conduit_method(np);
+> +
+> +       if (err)
+> +               goto out_put_node;
+> +
+> +       pr_info("Using PSCI v0.1 Function IDs from DT\n");
+> +
+>         if (!of_property_read_u32(np, "cpu_suspend", &id)) {
+>                 psci_function_id[PSCI_FN_CPU_SUSPEND] = id;
+>                 psci_ops.cpu_suspend = psci_cpu_suspend;
+> @@ -224,7 +329,28 @@ void __init psci_init(void)
+>
+>  out_put_node:
+>         of_node_put(np);
+> -       return;
+> +       return err;
+> +}
+> +
+> +static const struct of_device_id psci_of_match[] __initconst = {
+> +       { .compatible = "arm,psci",     .data = psci_0_1_init},
+> +       { .compatible = "arm,psci-0.2", .data = psci_0_2_init},
+> +       {},
+> +};
+> +
+> +int __init psci_init(void)
+> +{
+> +       struct device_node *np;
+> +       const struct of_device_id *matched_np;
+> +       psci_initcall_t init_fn;
+> +
+> +       np = of_find_matching_node_and_match(NULL, psci_of_match, &matched_np);
+> +
+> +       if (!np)
+> +               return -ENODEV;
+> +
+> +       init_fn = (psci_initcall_t)matched_np->data;
+> +       return init_fn(np);
+>  }
+>
+>  #ifdef CONFIG_SMP
+> --
+> 1.8.3.2
+>
+>
