@@ -1,74 +1,83 @@
-From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Mon, 12 May 2014 10:25:10 +0530
-Subject: [PATCH v3 0/4] ARM: dts: enable display for peach-pit and snow
- boards
-In-Reply-To: <001101cf6d9b$e4cea4a0$ae6bede0$%han@samsung.com>
-References: <1399630186-22610-1-git-send-email-rahul.sharma@samsung.com>
- <CAPdUM4M52Au-D0O14ak053bqwTgNtPq7ozdzz3a+Z317SucrjQ@mail.gmail.com>
- <001101cf6d9b$e4cea4a0$ae6bede0$%han@samsung.com>
-Message-ID: <CAPdUM4N0zMH9bHK8guo5TDHWePwctfYhBn1F8y1uVi81fFqTNg@mail.gmail.com>
+From: george.cherian@ti.com (George Cherian)
+Date: Mon, 12 May 2014 10:29:52 +0530
+Subject: [PATCH v2] ARM: dts: am33xx: Move the cppi41dma node so it's
+ probed early
+In-Reply-To: <1398373881-23369-1-git-send-email-ezequiel@vanguardiasur.com.ar>
+References: <1398373881-23369-1-git-send-email-ezequiel@vanguardiasur.com.ar>
+Message-ID: <53705548.7020400@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 May 2014 10:07, Jingoo Han <jg1.han@samsung.com> wrote:
-> On Friday, May 09, 2014 7:16 PM, Rahul Sharma wrote:
->>
->> + Jingoo Han.
+On 4/25/2014 2:41 AM, Ezequiel Garcia wrote:
+> The DMA controller is needed for the USB controller to be correctly
+> registered. Therefore, if the DMA node is located at the end an unecessary
+> probe deferral is produced systematically.
 >
-> If you want to get Acked-by from maintainer, please add the
-> maintainer to CC list for all patches.
+> This is easily fixed by moving the node at the beggining of the child list,
+> so it's probed first.
 >
-> Anyway, I will review this patch. However, if you don't add me
-> to CC list in the future, I am not sure that I will review
-> your patches.
+> Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
+Acked-by: George Cherian <george.cherian@ti.com>
+> --
+> v1->v2:
+>    * Added a comment to prevent a future clean-up based on the memory offset.
 >
+>   arch/arm/boot/dts/am33xx.dtsi | 34 ++++++++++++++++++++--------------
+>   1 file changed, 20 insertions(+), 14 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> index 9770e35..02e1eb6 100644
+> --- a/arch/arm/boot/dts/am33xx.dtsi
+> +++ b/arch/arm/boot/dts/am33xx.dtsi
+> @@ -453,6 +453,26 @@
+>   			ti,hwmods = "usb_otg_hs";
+>   			status = "disabled";
+>   
+> +			/*
+> +			 * The probe order matches the child ordering so the
+> +			 * dma-controller node must be the first one to prevent
+> +			 * spurious probe deferrals.
+> +			 */
+> +			cppi41dma: dma-controller at 47402000 {
+> +				compatible = "ti,am3359-cppi41";
+> +				reg =  <0x47400000 0x1000
+> +					0x47402000 0x1000
+> +					0x47403000 0x1000
+> +					0x47404000 0x4000>;
+> +				reg-names = "glue", "controller", "scheduler", "queuemgr";
+> +				interrupts = <17>;
+> +				interrupt-names = "glue";
+> +				#dma-cells = <2>;
+> +				#dma-channels = <30>;
+> +				#dma-requests = <256>;
+> +				status = "disabled";
+> +			};
+> +
+>   			usb_ctrl_mod: control at 44e10620 {
+>   				compatible = "ti,am335x-usb-ctrl-module";
+>   				reg = <0x44e10620 0x10
+> @@ -556,20 +576,6 @@
+>   					"tx14", "tx15";
+>   			};
+>   
+> -			cppi41dma: dma-controller at 47402000 {
+> -				compatible = "ti,am3359-cppi41";
+> -				reg =  <0x47400000 0x1000
+> -					0x47402000 0x1000
+> -					0x47403000 0x1000
+> -					0x47404000 0x4000>;
+> -				reg-names = "glue", "controller", "scheduler", "queuemgr";
+> -				interrupts = <17>;
+> -				interrupt-names = "glue";
+> -				#dma-cells = <2>;
+> -				#dma-channels = <30>;
+> -				#dma-requests = <256>;
+> -				status = "disabled";
+> -			};
+>   		};
+>   
+>   		epwmss0: epwmss at 48300000 {
 
-Sure, I will take care of this. I immediately realised after posting the
-patches and added you there.
 
-Thanks for the review :).
-
-Regards,
-Rahul Sharma.
-
-> Best regards,
-> Jingoo Han
->
->>
->> On 9 May 2014 15:39, Rahul Sharma <rahul.sharma@samsung.com> wrote:
->> > From: Rahul Sharma <Rahul.Sharma@samsung.com>
->> >
->> > Add nodes for fimd and dp controller for exynos5250 based snow
->> > and exynos5420 based peach-pit board.
->> >
->> > This series is based on Kukjin Kims, for-next branch.
->> >
->> > V3:
->> > 1) Dropped 1 patch "ARM: dts: move dp hpd line to the board file for
->> >  exynos5420".
->> > 2) Extra blank lines for readability.
->> > 3) dp hpd gpio name change (dp_hpd -> dp_hpd_gpio)
->> >
->> > V2:
->> > 1) Rebase on Peach-pit dependent patches.
->> >
->> > It is dependent on
->> > 1) Andrew Bresticker's patch for hpd gpio addition, avilable at
->> > http://www.spinics.net/lists/linux-samsung-soc/msg28827.html [Patch is 'ACK'ed.]
->> > 2) Arun's patch for adding peach-pit board dts file at
->> > http://www.spinics.net/lists/linux-samsung-soc/msg30103.html. [Patch is 'ACK'ed.]
->> >
->> > Rahul Sharma (4):
->> >   ARM: dts: enable fimd for exynos5250 based snow board
->> >   ARM: dts: enable dp-controller for exynos5250 based snow board
->> >   ARM: dts: enable fimd for exynos5420 based peach-pit board
->> >   ARM: dts: enable dp-controller for exynos5420 based peach-pit board
->> >
->> >  arch/arm/boot/dts/exynos5250-snow.dts      |   35 ++++++++++++++++++++++++
->> >  arch/arm/boot/dts/exynos5420-peach-pit.dts |   41 ++++++++++++++++++++++++++++
->> >  2 files changed, 76 insertions(+)
->> >
->> > --
->> > 1.7.9.5
->> >
->
+-- 
+-George
