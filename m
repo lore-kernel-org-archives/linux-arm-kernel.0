@@ -1,31 +1,31 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 12 May 2014 11:22:27 +0200
-Subject: [GIT PULL] Allwinner Pinctrl changes for 3.16
-In-Reply-To: <20140509173156.GF7047@lukather>
-References: <20140508225209.GA13610@lukather>
- <CACRpkda7QT+sGs6wY6-fbcZ3k4sXfP=rmPimfqHjbUB5vQuO5A@mail.gmail.com>
- <20140509173156.GF7047@lukather>
-Message-ID: <CACRpkdae=i8C49AMJCrRe0a=4d8Y+FhkiEOv=EJ_NfakYqRvzg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 12 May 2014 10:29:56 +0100
+Subject: [PATCH v2] arm64: Support arch_irq_work_raise() via self IPIs
+In-Reply-To: <1399760621-10954-1-git-send-email-larry.bassel@linaro.org>
+References: <1399760621-10954-1-git-send-email-larry.bassel@linaro.org>
+Message-ID: <20140512092956.GB914@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 9, 2014 at 7:31 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
+On Sat, May 10, 2014 at 11:23:41PM +0100, Larry Bassel wrote:
+> Support for arch_irq_work_raise() was missing from
+> arm64 (a prerequisite for FULL_NOHZ).
 
-> Only pinctrl/next is not going to be rebased, right?
+[...]
 
-pinctrl/devel actually.
+> @@ -455,6 +457,14 @@ void arch_send_call_function_single_ipi(int cpu)
+>  	smp_cross_call(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
+>  }
+>  
+> +#ifdef CONFIG_IRQ_WORK
+> +void arch_irq_work_raise(void)
+> +{
+> +	if (is_smp())
+> +		smp_cross_call(cpumask_of(smp_processor_id()), IPI_IRQ_WORK);
+> +}
+> +#endif
 
-for-next is a mixdown branch that is rebased all the time
-so don't use that.
+Does this even compile? We're probably better off just checking whether or
+not smp_cross_call is NULL.
 
-But notify me first if you're going to be pulling in that branch!
-(Handshake.)
-
-Also: why do you need it? Just as a dependence to dts files
-does *not* count as a reason to cross merge these trees,
-as the device tree files are meant to even be moved out of
-the kernel at some point... but you may have better reasons?
-
-Yours,
-Linus Walleij
+Will
