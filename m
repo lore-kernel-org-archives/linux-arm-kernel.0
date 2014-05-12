@@ -1,29 +1,29 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 12 May 2014 16:33:17 +0200
-Subject: [PATCH 0/2] ARM: mvebu: fix PCIe/mvebu-soc-id issue
-In-Reply-To: <1399903900-29977-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1399903900-29977-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140512143317.GA9388@lunn.ch>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 12 May 2014 16:36:42 +0200
+Subject: [PATCH] irqchip: armada-370-xp: Move the devicetree binding
+ documentation
+In-Reply-To: <1399904860-937-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1399904860-937-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20140512163642.0cac3359@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 12, 2014 at 04:11:38PM +0200, Thomas Petazzoni wrote:
-> Hello,
+Dear Ezequiel Garcia,
+
+On Mon, 12 May 2014 11:27:40 -0300, Ezequiel Garcia wrote:
+> Move the devicetree binding documentation to the interrupt-controller
+> directory, where it belongs.
 > 
-> This set of two patches (and more specifically the second patch) fix a
-> PCIe detection problem caused by the introduction of the mvebu-soc-id
-> and a bad interaction between the clock manipulation done by the
-> mvebu-soc-id code and the PCIe driver. The details are all in the
-> commit log of the second patch.
-> 
-> This second patch fixes a PCIe detection problem noticed by several
-> persons.
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  .../devicetree/bindings/arm/armada-370-xp-mpic.txt | 38 ----------------------
+>  .../marvell,armada-370-xp-mpic.txt                 | 38 ++++++++++++++++++++++
+>  2 files changed, 38 insertions(+), 38 deletions(-)
+>  delete mode 100644 Documentation/devicetree/bindings/arm/armada-370-xp-mpic.txt
+>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/marvell,armada-370-xp-mpic.txt
 
-Hi Thomas
-
-Thanks for the patches. The wifi devices on my kirkwood B3 has now
-re-appeared.
-
-Tested-by: Andrew Lunn <andrew@lunn.ch>
-
-	   Andrew
+Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
