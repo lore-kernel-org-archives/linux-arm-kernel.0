@@ -1,43 +1,136 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 12 May 2014 19:36:17 +0200
-Subject: [PATCHv5 08/20] usb: host: xhci-plat: add support for the
- Armada 375/38x XHCI controllers
-In-Reply-To: <537103DD.5030906@linux.intel.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 12 May 2014 12:37:02 -0500
+Subject: [PATCHv5 07/20] usb: host: xhci-plat: add clock support
+In-Reply-To: <1399832288-19899-8-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1399832288-19899-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1399832288-19899-9-git-send-email-thomas.petazzoni@free-electrons.com>
- <537103DD.5030906@linux.intel.com>
-Message-ID: <20140512193617.011aa958@free-electrons.com>
+ <1399832288-19899-8-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140512173702.GG31882@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Mathias Nyman,
-
-On Mon, 12 May 2014 20:24:45 +0300, Mathias Nyman wrote:
-
-> > +int xhci_mvebu_mbus_init_quirk(struct platform_device *pdev)
-> > +{
-> > +	struct resource	*res;
-> > +	void __iomem *base;
-> > +	const struct mbus_dram_target_info *dram;
+On Sun, May 11, 2014 at 08:17:55PM +0200, Thomas Petazzoni wrote:
+> From: Gregory CLEMENT <gregory.clement@free-electrons.com>
 > 
-> Hi
+> Some platforms (such as the Armada 38x ones) can gate the clock of
+> their USB controller. This patch adds the support for one clock in
+> xhci-plat, by enabling it during probe and disabling it on remove.
 > 
-> Sparse warns about this:
+> To achieve this, it adds a 'struct clk *' member in xhci_hcd. While
+> only used for now in xhci-plat, it might be used by other drivers in
+> the future. Moreover, the xhci_hcd structure already holds other
+> members such as msix_count and msix_entries, which are MSI-X specific,
+> and therefore only used by xhci-pci.
 > 
-> drivers/usb/host/xhci-mvebu.c:42:5: warning: symbol 'xhci_mvebu_mbus_init_quirk' 
-> was not declared. Should it be static?
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-Not, it should not: it gets called from xhci-plat.c. However,
-xhci-mvebu.c should include its header xhci-mvebu.h so that sparse
-realize that the function is voluntarily exported, and that therefore
-not having the static qualifier is expected.
+FWIW
 
-Should we resend a v6 with just this change?
+Acked-by: Felipe Balbi <balbi@ti.com>
 
-Thanks,
+> ---
+>  drivers/usb/host/xhci-plat.c | 24 +++++++++++++++++++++++-
+>  drivers/usb/host/xhci.h      |  2 ++
+>  2 files changed, 25 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+> index f5351af..8108e58 100644
+> --- a/drivers/usb/host/xhci-plat.c
+> +++ b/drivers/usb/host/xhci-plat.c
+> @@ -11,6 +11,7 @@
+>   * version 2 as published by the Free Software Foundation.
+>   */
+>  
+> +#include <linux/clk.h>
+>  #include <linux/dma-mapping.h>
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+> @@ -91,6 +92,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
+>  	struct xhci_hcd		*xhci;
+>  	struct resource         *res;
+>  	struct usb_hcd		*hcd;
+> +	struct clk              *clk;
+>  	int			ret;
+>  	int			irq;
+>  
+> @@ -137,14 +139,27 @@ static int xhci_plat_probe(struct platform_device *pdev)
+>  		goto release_mem_region;
+>  	}
+>  
+> +	/*
+> +	 * Not all platforms have a clk so it is not an error if the
+> +	 * clock does not exists.
+> +	 */
+> +	clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (!IS_ERR(clk)) {
+> +		ret = clk_prepare_enable(clk);
+> +		if (ret)
+> +			goto unmap_registers;
+> +	}
+> +
+>  	ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
+>  	if (ret)
+> -		goto unmap_registers;
+> +		goto disable_clk;
+> +
+>  	device_wakeup_enable(hcd->self.controller);
+>  
+>  	/* USB 2.0 roothub is stored in the platform_device now. */
+>  	hcd = platform_get_drvdata(pdev);
+>  	xhci = hcd_to_xhci(hcd);
+> +	xhci->clk = clk;
+>  	xhci->shared_hcd = usb_create_shared_hcd(driver, &pdev->dev,
+>  			dev_name(&pdev->dev), hcd);
+>  	if (!xhci->shared_hcd) {
+> @@ -173,6 +188,10 @@ put_usb3_hcd:
+>  dealloc_usb2_hcd:
+>  	usb_remove_hcd(hcd);
+>  
+> +disable_clk:
+> +	if (!IS_ERR(clk))
+> +		clk_disable_unprepare(clk);
+> +
+>  unmap_registers:
+>  	iounmap(hcd->regs);
+>  
+> @@ -189,11 +208,14 @@ static int xhci_plat_remove(struct platform_device *dev)
+>  {
+>  	struct usb_hcd	*hcd = platform_get_drvdata(dev);
+>  	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
+> +	struct clk *clk = xhci->clk;
+>  
+>  	usb_remove_hcd(xhci->shared_hcd);
+>  	usb_put_hcd(xhci->shared_hcd);
+>  
+>  	usb_remove_hcd(hcd);
+> +	if (!IS_ERR(clk))
+> +		clk_disable_unprepare(clk);
+>  	iounmap(hcd->regs);
+>  	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
+>  	usb_put_hcd(hcd);
+> diff --git a/drivers/usb/host/xhci.h b/drivers/usb/host/xhci.h
+> index d280e92..003dc09 100644
+> --- a/drivers/usb/host/xhci.h
+> +++ b/drivers/usb/host/xhci.h
+> @@ -1478,6 +1478,8 @@ struct xhci_hcd {
+>  	/* msi-x vectors */
+>  	int		msix_count;
+>  	struct msix_entry	*msix_entries;
+> +	/* optional clock */
+> +	struct clk		*clk;
+>  	/* data structures */
+>  	struct xhci_device_context_array *dcbaa;
+>  	struct xhci_ring	*cmd_ring;
+> -- 
+> 1.9.2
+> 
 
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140512/79e63d87/attachment.sig>
