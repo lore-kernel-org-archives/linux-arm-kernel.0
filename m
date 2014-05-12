@@ -1,74 +1,62 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 12 May 2014 15:20:07 -0700
-Subject: [PATCH] bus/omap_l3: avoid sync initcall for modules
-In-Reply-To: <1399560990-1402858-6-git-send-email-arnd@arndb.de>
-References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-6-git-send-email-arnd@arndb.de>
-Message-ID: <20140512222006.GI5668@atomide.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 13 May 2014 00:26:35 +0200
+Subject: [PATCH v2 4/4] ARM: shmobile: marzen-reference: Set SMSC lan to
+ use irq-push-pull
+In-Reply-To: <10371644.BMkVSLAUGy@avalon>
+References: <1368586650-26263-1-git-send-email-horms+renesas@verge.net.au>
+ <1368586650-26263-5-git-send-email-horms+renesas@verge.net.au>
+ <10371644.BMkVSLAUGy@avalon>
+Message-ID: <2152550.dZ0p2WIftv@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [140508 07:57]:
-> The postcore_initcall_sync() macro is only defined for built-in
-> code, but the omap_l3 bus code can be built as a module, which
-> currently causes a build failure.
+Hi Simon,
+
+On Wednesday 15 May 2013 11:15:01 Laurent Pinchart wrote:
+> Hi Simon,
 > 
-> This works around the problem by using #ifdef MODULE to decide
-> whether to use a regular module_init() function or not.
+> Thanks for the patch.
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Kishon Vijay Abraham I <kishon@ti.com>
-> Cc: Felipe Balbi <balbi@ti.com>
-> ---
->  drivers/bus/omap_l3_noc.c | 4 ++++
->  drivers/bus/omap_l3_smx.c | 4 ++++
->  2 files changed, 8 insertions(+)
+> On Wednesday 15 May 2013 11:57:30 Simon Horman wrote:
+> > This change makes the DTS consistent with the platform data
+> > that exists in board-marzen.c.
+> > 
+> > Empirically it does not appear to be necessary.
+> > 
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 > 
-> diff --git a/drivers/bus/omap_l3_noc.c b/drivers/bus/omap_l3_noc.c
-> index feeecae..648f158 100644
-> --- a/drivers/bus/omap_l3_noc.c
-> +++ b/drivers/bus/omap_l3_noc.c
-> @@ -257,7 +257,11 @@ static int __init omap4_l3_init(void)
->  {
->  	return platform_driver_register(&omap4_l3_driver);
->  }
-> +#ifdef MODULE
-> +module_init(omap4_l3_init);
-> +#else
->  postcore_initcall_sync(omap4_l3_init);
-> +#endif
->  
->  static void __exit omap4_l3_exit(void)
->  {
-> diff --git a/drivers/bus/omap_l3_smx.c b/drivers/bus/omap_l3_smx.c
-> index acc2164..f752d1b 100644
-> --- a/drivers/bus/omap_l3_smx.c
-> +++ b/drivers/bus/omap_l3_smx.c
-> @@ -288,7 +288,11 @@ static int __init omap3_l3_init(void)
->  {
->  	return platform_driver_probe(&omap3_l3_driver, omap3_l3_probe);
->  }
-> +#ifdef MODULE
-> +module_init(omap3_l3_init);
-> +#else
->  postcore_initcall_sync(omap3_l3_init);
-> +#endif
->  
->  static void __exit omap3_l3_exit(void)
->  {
+> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-How about instead let's add this into include/linux/module.h
-like we have for other initcalls:
+I've noticed that this patch hasn't landed in mainline. Do you still plan to 
+upstream it ?
 
-#define postcore_initcall(fn)		module_init(fn)
+While the board has a pull-up resistor on the IRQ signal and can thus 
+accommodate an open-drain configuration, using push-pull mode would lower the 
+rise time.
 
-There may be others missing too from there. BTW, this driver
-might be few of the drivers that actually might need to be
-initialized early for debugging to catch bad access from
-other drivers.
+> > ---
+> > 
+> >  arch/arm/boot/dts/r8a7779-marzen-reference.dts | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/r8a7779-marzen-reference.dts
+> > b/arch/arm/boot/dts/r8a7779-marzen-reference.dts index 10cfc7f..fe32e1a
+> > 100644
+> > --- a/arch/arm/boot/dts/r8a7779-marzen-reference.dts
+> > +++ b/arch/arm/boot/dts/r8a7779-marzen-reference.dts
+> > @@ -40,6 +40,7 @@
+> > 
+> >  		phy-mode = "mii";
+> >  		interrupt-parent = <&irqpin0>;
+> >  		interrupts = <1 0x4>;
+> > 
+> > +		smsc,irq-push-pull;
+> > 
+> >  		reg-io-width = <4>;
+> >  		vddvario-supply = <&fixedregulator3v3>;
+> >  		vdd33a-supply = <&fixedregulator3v3>;
 
+-- 
 Regards,
 
-Tony
+Laurent Pinchart
