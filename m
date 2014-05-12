@@ -1,44 +1,30 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Mon, 12 May 2014 10:08:13 -0400 (EDT)
-Subject: [PATCH v2 0/6] usb: host: Cleanup for ioremap'ing hcd memory
-In-Reply-To: <1399723210-21569-1-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <Pine.LNX.4.44L0.1405121007410.1202-100000@iolanthe.rowland.org>
+From: mark.hambleton@broadcom.com (Mark Hambleton)
+Date: Mon, 12 May 2014 14:09:06 +0000
+Subject: [PATCH 2/3] arm64: Add big.LITTLE switcher stub
+In-Reply-To: <20140512121729.GC12304@sirena.org.uk>
+References: <1399653631-4938-1-git-send-email-broonie@kernel.org>
+ <1399653631-4938-2-git-send-email-broonie@kernel.org>
+ <536D0AF4.1040705@arm.com> <20140509175005.GT12304@sirena.org.uk>
+ <536D2533.6050100@arm.com> <20140509192921.GY12304@sirena.org.uk>
+ <5370877C.40409@arm.com> <20140512121729.GC12304@sirena.org.uk>
+Message-ID: <D00A5DFD97C44C4D820FC3A847C5D57507406990@IRVEXCHMB14.corp.ad.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 10 May 2014, Vivek Gautam wrote:
+> This all gets a bit circular though - the more patches people have to
+> carry to make upstream useful to them less useful working with upstream
+> seems to them, meaning the devices are less likely to appear upstream at
+> all at least in any sort of complete form.  One out of tree patch being
+> required isn't going to be a deal breaker by itself but they all add up
+> to a perception that upstream isn't useful.
+> 
+> There's definitely some taste considerations with how far you go to
+> cater for such systems - in this case I'd say it's just tweaking Kconfig
+> to allow people to use code that's already present rather than adding
+> really new code (there's the stubs but they're pretty insubstantial)
+> which means upstream doesn't have to carry anything that wasn't there
+> already.
 
-> Based on 'usb-next' branch of Greg's usb tree.
-> 
-> devm_ioremap_resource() API is advantageous over devm_ioremap()
-> and should therefore be preferred to request any ioremap'ed address
-> for hcd.
-> 
-> Changes from v1:
->  - Changed the way returned pointer is checked for error value
->    as pointed out in the review comment in the mailing list.
-> 
-> Vivek Gautam (6):
->   usb: host: ehci-exynos: Use devm_ioremap_resource instead of
->     devm_ioremap
->   usb: host: ehci-msm: Use devm_ioremap_resource instead of
->     devm_ioremap
->   usb: host: ehci-mv: Use devm_ioremap_resource instead of devm_ioremap
->   usb: host: ehci-spear: Use devm_ioremap_resource instead of
->     devm_ioremap
->   usb: host: ehci-tegra: Use devm_ioremap_resource instead of
->     devm_ioremap
->   usb: host: ohci-exynos: Use devm_ioremap_resource instead of
->     devm_ioremap
-> 
->  drivers/usb/host/ehci-exynos.c |    7 +++----
->  drivers/usb/host/ehci-msm.c    |    7 +++----
->  drivers/usb/host/ehci-mv.c     |   16 ++++++----------
->  drivers/usb/host/ehci-spear.c  |   13 +++----------
->  drivers/usb/host/ehci-tegra.c  |    7 +++----
->  drivers/usb/host/ohci-exynos.c |    7 +++----
->  6 files changed, 21 insertions(+), 36 deletions(-)
+Agree, with the original version of this patch I just put all the stubs in drivers/cpufreq/arm_big_little.h to get around needing to add files to arm64 (when it shouldn't need it). At least then the stubs were pretty local to the implementation and didn't require all of the ifdefs in the code (as Mark says that looks horrible).
 
-For all six patches,
-
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
+Mark
