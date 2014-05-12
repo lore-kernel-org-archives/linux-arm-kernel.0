@@ -1,1181 +1,857 @@
-From: arend@broadcom.com (Arend van Spriel)
-Date: Mon, 12 May 2014 15:00:01 +0200
-Subject: [PATCH v13 2/2] ARM: sunxi: Add driver for SD/MMC hosts found
- on Allwinner sunxi SoCs
-In-Reply-To: <1399896288-5826-3-git-send-email-hdegoede@redhat.com>
-References: <1399896288-5826-1-git-send-email-hdegoede@redhat.com>
- <1399896288-5826-3-git-send-email-hdegoede@redhat.com>
-Message-ID: <5370C5D1.2070901@broadcom.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 12 May 2014 18:33:05 +0530
+Subject: [PATCH v8 1/2] phy: Add new Exynos5 USB 3.0 PHY driver
+In-Reply-To: <1399643877-14528-1-git-send-email-gautam.vivek@samsung.com>
+References: <1399643877-14528-1-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <5370C689.2090402@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/12/2014 02:04 PM, Hans de Goede wrote:
-> From: David Lanzend?rfer<david.lanzendoerfer@o2s.ch>
->
-> The Allwinner sunxi mmc host uses dma in bus-master mode using a built-in
-> designware idmac controller, which is identical to the one found in the mmc-dw
-> hosts. However the rest of the host is not identical to mmc-dw, it deals with
-> sending stop commands in hardware which makes it significantly different
-> from the mmc-dw devices.
->
-> HdG: Various cleanups and fixes.
+Hi Gautam,
 
-Just nitpicking, but usually the above line should be added below the 
-original signoff, so:
+On Friday 09 May 2014 07:27 PM, Vivek Gautam wrote:
+> Add a new driver for the USB 3.0 PHY on Exynos5 series of SoCs.
+> The new driver uses the generic PHY framework and will interact
+> with DWC3 controller present on Exynos5 series of SoCs.
+> 
+> Also, created a new header file in linux/mfd/syscon/ for
+> Exynos5 SoCs and put the required PMU offset definitions
+> for the basic available PHYs.
+> 
 
-> Signed-off-by: David Lanzend?rfer<david.lanzendoerfer@o2s.ch>
-[hdegoede at redhat.com: various cleanups and fixes]
-> Signed-off-by: Hans de Goede<hdegoede@redhat.com>
 
-As is documented in SubmittingPatches.
+I get the following checkpatch warnings
 
-Gr. AvS
+WARNING: please write a paragraph that describes the config symbol fully
+#163: FILE: drivers/phy/Kconfig:163:
++config PHY_EXYNOS5_USBDRD
 
+WARNING: DT compatible string "samsung,exynos5250-usbdrd-phy" appears
+un-documented -- check ./Documentation/devicetree/bindings/
+#708: FILE: drivers/phy/phy-exynos5-usbdrd.c:516:
++		.compatible = "samsung,exynos5250-usbdrd-phy",
+
+WARNING: DT compatible string "samsung,exynos5420-usbdrd-phy" appears
+un-documented -- check ./Documentation/devicetree/bindings/
+#711: FILE: drivers/phy/phy-exynos5-usbdrd.c:519:
++		.compatible = "samsung,exynos5420-usbdrd-phy",.
+
+
+I think you just need to separate the Documentation into a separate patch
+before applying the driver patch.
+
+Thanks
+Kishon
+> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
 > ---
->   .../devicetree/bindings/mmc/sunxi-mmc.txt          |   43 +
->   drivers/mmc/host/Kconfig                           |    7 +
->   drivers/mmc/host/Makefile                          |    2 +
->   drivers/mmc/host/sunxi-mmc.c                       | 1049 ++++++++++++++++++++
->   4 files changed, 1101 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
->   create mode 100644 drivers/mmc/host/sunxi-mmc.c
->
-> diff --git a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-> new file mode 100644
-> index 0000000..91b3a34
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-> @@ -0,0 +1,43 @@
-> +* Allwinner sunxi MMC controller
+> 
+> Changes from v7:
+>  - Providing an **alternative** approach for pmu-offset;
+>    instead of getting it from DT, using offset definitions from
+>    a header file, and making use of it in the driver.
+>  - Using 'aliases' for getting channel numbers for multi-controller
+>    PHY, so as to distinguish between the pmu-offsets.
+>  - Added a header file in syscon/ for Exynos5 SoC's pmu offset
+>    definitions.
+>  - Addressed the review comments for nits:
+>    -- Changed 'usbdrd_phy_config' structure with 'exynos5_usbdrd_phy_config'
+>       and corresponding instance names.
+> 
+> 
+>  .../devicetree/bindings/phy/samsung-phy.txt        |   47 ++
+>  drivers/phy/Kconfig                                |   11 +
+>  drivers/phy/Makefile                               |    1 +
+>  drivers/phy/phy-exynos5-usbdrd.c                   |  644 ++++++++++++++++++++
+>  include/linux/mfd/syscon/exynos5-pmu.h             |   44 ++
+>  5 files changed, 747 insertions(+)
+>  create mode 100644 drivers/phy/phy-exynos5-usbdrd.c
+>  create mode 100644 include/linux/mfd/syscon/exynos5-pmu.h
+> 
+> diff --git a/Documentation/devicetree/bindings/phy/samsung-phy.txt b/Documentation/devicetree/bindings/phy/samsung-phy.txt
+> index b422e38..2049261 100644
+> --- a/Documentation/devicetree/bindings/phy/samsung-phy.txt
+> +++ b/Documentation/devicetree/bindings/phy/samsung-phy.txt
+> @@ -114,3 +114,50 @@ Example:
+>  		compatible = "samsung,exynos-sataphy-i2c";
+>  		reg = <0x38>;
+>  	};
 > +
-> +The highspeed MMC host controller on Allwinner SoCs provides an interface
-> +for MMC, SD and SDIO types of memory cards.
-> +
-> +Supported maximum speeds are the ones of the eMMC standard 4.5 as well
-> +as the speed of SD standard 3.0.
-> +Absolute maximum transfer rate is 200MB/s
+> +Samsung Exynos5 SoC series USB DRD PHY controller
+> +--------------------------------------------------
 > +
 > +Required properties:
-> + - compatible : "allwinner,sun4i-a10-mmc" or "allwinner,sun5i-a13-mmc"
-> + - reg : mmc controller base registers
-> + - clocks : a list with 2 phandle + clock specifier pairs
-> + - clock-names : must contain "ahb" and "mmc"
-> + - interrupts : mmc controller interrupt
+> +- compatible : Should be set to one of the following supported values:
+> +	- "samsung,exynos5250-usbdrd-phy" - for exynos5250 SoC,
+> +	- "samsung,exynos5420-usbdrd-phy" - for exynos5420 SoC.
+> +- reg : Register offset and length of USB DRD PHY register set;
+> +- clocks: Clock IDs array as required by the controller
+> +- clock-names: names of clocks correseponding to IDs in the clock property;
+> +	       Required clocks:
+> +	- phy: main PHY clock (same as USB DRD controller i.e. DWC3 IP clock),
+> +	       used for register access.
+> +	- ref: PHY's reference clock (usually crystal clock), used for
+> +	       PHY operations, associated by phy name. It is used to
+> +	       determine bit values for clock settings register.
+> +	       For Exynos5420 this is given as 'sclk_usbphy30' in CMU.
+> +- samsung,pmu-syscon: phandle for PMU system controller interface, used to
+> +		      control pmu registers for power isolation.
+> +- #phy-cells : from the generic PHY bindings, must be 1;
 > +
-> +Optional properties:
-> + - resets : phandle + reset specifier pair
-> + - reset-names : must contain "ahb"
-> + - for cd, bus-width and additional generic mmc parameters
-> +   please refer to mmc.txt within this directory
+> +For "samsung,exynos5250-usbdrd-phy" and "samsung,exynos5420-usbdrd-phy"
+> +compatible PHYs, the second cell in the PHY specifier identifies the
+> +PHY id, which is interpreted as follows:
+> +  0 - UTMI+ type phy,
+> +  1 - PIPE3 type phy,
 > +
-> +Examples:
-> +	- Within .dtsi:
-> +	mmc0: mmc at 01c0f000 {
-> +		compatible = "allwinner,sun5i-a13-mmc";
-> +		reg =<0x01c0f000 0x1000>;
-> +		clocks =<&ahb_gates 8>,<&mmc0_clk>;
-> +		clock-names = "ahb", "mod";
-> +		interrupts =<0 32 4>;
-> +		status = "disabled";
+> +Example:
+> +	usbdrd_phy: usbphy at 12100000 {
+> +		compatible = "samsung,exynos5250-usbdrd-phy";
+> +		reg = <0x12100000 0x100>;
+> +		clocks = <&clock 286>, <&clock 1>;
+> +		clock-names = "phy", "ref";
+> +		samsung,pmu-syscon = <&pmu_system_controller>;
+> +		#phy-cells = <1>;
 > +	};
 > +
-> +	- Within dts:
-> +	mmc0: mmc at 01c0f000 {
-> +		pinctrl-names = "default", "default";
-> +		pinctrl-0 =<&mmc0_pins_a>;
-> +		pinctrl-1 =<&mmc0_cd_pin_reference_design>;
-> +		bus-width =<4>;
-> +		cd-gpios =<&pio 7 1 0>; /* PH1 */
-> +		cd-inverted;
-> +		status = "okay";
+> +- aliases: For SoCs like Exynos5420 having multiple USB 3.0 DRD PHY controllers,
+> +	   'usbdrd_phy' nodes should have numbered alias in the aliases node,
+> +	   in the form of usbdrdphyN, N = 0, 1... (depending on number of
+> +	   controllers).
+> +Example:
+> +	aliases {
+> +		usbdrdphy0 = &usb3_phy0;
+> +		usbdrdphy1 = &usb3_phy1;
 > +	};
-> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-> index 8aaf8c1..d50ac1c 100644
-> --- a/drivers/mmc/host/Kconfig
-> +++ b/drivers/mmc/host/Kconfig
-> @@ -694,3 +694,10 @@ config MMC_REALTEK_PCI
->   	help
->   	  Say Y here to include driver code to support SD/MMC card interface
->   	  of Realtek PCI-E card reader
-> +
-> +config MMC_SUNXI
-> +	tristate "Allwinner sunxi SD/MMC Host Controller support"
-> +	depends on ARCH_SUNXI
+> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+> index 4906c27..b70cc07 100644
+> --- a/drivers/phy/Kconfig
+> +++ b/drivers/phy/Kconfig
+> @@ -160,6 +160,17 @@ config PHY_EXYNOS5250_USB2
+>  	  particular SoC is compiled in the driver. In case of Exynos 5250 four
+>  	  phys are available - device, host, HSIC0 and HSIC.
+>  
+> +config PHY_EXYNOS5_USBDRD
+> +	tristate "Exynos5 SoC series USB DRD PHY driver"
+> +	depends on ARCH_EXYNOS5 && OF
+> +	depends on HAS_IOMEM
+> +	select GENERIC_PHY
+> +	select MFD_SYSCON
 > +	help
-> +	  This selects support for the SD/MMC Host Controller on
-> +	  Allwinner sunxi SoCs.
-> diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
-> index 0c8aa5e..c706c0f 100644
-> --- a/drivers/mmc/host/Makefile
-> +++ b/drivers/mmc/host/Makefile
-> @@ -53,6 +53,8 @@ obj-$(CONFIG_MMC_WMT)		+= wmt-sdmmc.o
->
->   obj-$(CONFIG_MMC_REALTEK_PCI)	+= rtsx_pci_sdmmc.o
->
-> +obj-$(CONFIG_MMC_SUNXI)		+= sunxi-mmc.o
+> +	  Enable USB DRD PHY support for Exynos 5 SoC series.
+> +	  This driver provides PHY interface for USB 3.0 DRD controller
+> +	  present on Exynos5 SoC series.
 > +
->   obj-$(CONFIG_MMC_SDHCI_PLTFM)		+= sdhci-pltfm.o
->   obj-$(CONFIG_MMC_SDHCI_CNS3XXX)		+= sdhci-cns3xxx.o
->   obj-$(CONFIG_MMC_SDHCI_ESDHC_IMX)	+= sdhci-esdhc-imx.o
-> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+>  config PHY_XGENE
+>  	tristate "APM X-Gene 15Gbps PHY support"
+>  	depends on HAS_IOMEM && OF && (ARM64 || COMPILE_TEST)
+> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+> index 7728518..b4f1d57 100644
+> --- a/drivers/phy/Makefile
+> +++ b/drivers/phy/Makefile
+> @@ -18,4 +18,5 @@ phy-exynos-usb2-y			+= phy-samsung-usb2.o
+>  phy-exynos-usb2-$(CONFIG_PHY_EXYNOS4210_USB2)	+= phy-exynos4210-usb2.o
+>  phy-exynos-usb2-$(CONFIG_PHY_EXYNOS4X12_USB2)	+= phy-exynos4x12-usb2.o
+>  phy-exynos-usb2-$(CONFIG_PHY_EXYNOS5250_USB2)	+= phy-exynos5250-usb2.o
+> +obj-$(CONFIG_PHY_EXYNOS5_USBDRD)	+= phy-exynos5-usbdrd.o
+>  obj-$(CONFIG_PHY_XGENE)			+= phy-xgene.o
+> diff --git a/drivers/phy/phy-exynos5-usbdrd.c b/drivers/phy/phy-exynos5-usbdrd.c
 > new file mode 100644
-> index 0000000..11bd48f
+> index 0000000..8fcdd94
 > --- /dev/null
-> +++ b/drivers/mmc/host/sunxi-mmc.c
-> @@ -0,0 +1,1049 @@
+> +++ b/drivers/phy/phy-exynos5-usbdrd.c
+> @@ -0,0 +1,644 @@
 > +/*
-> + * Driver for sunxi SD/MMC host controllers
-> + * (C) Copyright 2007-2011 Reuuimlla Technology Co., Ltd.
-> + * (C) Copyright 2007-2011 Aaron Maoye<leafy.myeh@reuuimllatech.com>
-> + * (C) Copyright 2013-2014 O2S GmbH<www.o2s.ch>
-> + * (C) Copyright 2013-2014 David Lanzend?rfer<david.lanzendoerfer@o2s.ch>
-> + * (C) Copyright 2013-2014 Hans de Goede<hdegoede@redhat.com>
+> + * Samsung EXYNOS5 SoC series USB DRD PHY driver
 > + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License as
-> + * published by the Free Software Foundation; either version 2 of
-> + * the License, or (at your option) any later version.
+> + * Phy provider for USB 3.0 DRD controller on Exynos5 SoC series
+> + *
+> + * Copyright (C) 2014 Samsung Electronics Co., Ltd.
+> + * Author: Vivek Gautam <gautam.vivek@samsung.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
 > + */
 > +
-> +#include<linux/kernel.h>
-> +#include<linux/module.h>
-> +#include<linux/io.h>
-> +#include<linux/device.h>
-> +#include<linux/interrupt.h>
-> +#include<linux/delay.h>
-> +#include<linux/err.h>
+> +#include <linux/clk.h>
+> +#include <linux/delay.h>
+> +#include <linux/io.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/phy/phy.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/mutex.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/mfd/syscon/exynos5-pmu.h>
+> +#include <linux/regmap.h>
 > +
-> +#include<linux/clk.h>
-> +#include<linux/clk-private.h>
-> +#include<linux/clk/sunxi.h>
+> +/* Exynos USB PHY registers */
+> +#define EXYNOS5_FSEL_9MHZ6		0x0
+> +#define EXYNOS5_FSEL_10MHZ		0x1
+> +#define EXYNOS5_FSEL_12MHZ		0x2
+> +#define EXYNOS5_FSEL_19MHZ2		0x3
+> +#define EXYNOS5_FSEL_20MHZ		0x4
+> +#define EXYNOS5_FSEL_24MHZ		0x5
+> +#define EXYNOS5_FSEL_50MHZ		0x7
 > +
-> +#include<linux/gpio.h>
-> +#include<linux/platform_device.h>
-> +#include<linux/spinlock.h>
-> +#include<linux/scatterlist.h>
-> +#include<linux/dma-mapping.h>
-> +#include<linux/slab.h>
-> +#include<linux/reset.h>
+> +/* EXYNOS5: USB 3.0 DRD PHY registers */
+> +#define EXYNOS5_DRD_LINKSYSTEM			0x04
 > +
-> +#include<linux/of_address.h>
-> +#include<linux/of_gpio.h>
-> +#include<linux/of_platform.h>
+> +#define LINKSYSTEM_FLADJ_MASK			(0x3f << 1)
+> +#define LINKSYSTEM_FLADJ(_x)			((_x) << 1)
+> +#define LINKSYSTEM_XHCI_VERSION_CONTROL		BIT(27)
 > +
-> +#include<linux/mmc/host.h>
-> +#include<linux/mmc/sd.h>
-> +#include<linux/mmc/sdio.h>
-> +#include<linux/mmc/mmc.h>
-> +#include<linux/mmc/core.h>
-> +#include<linux/mmc/card.h>
-> +#include<linux/mmc/slot-gpio.h>
+> +#define EXYNOS5_DRD_PHYUTMI			0x08
 > +
-> +/* register offset definitions */
-> +#define SDXC_REG_GCTRL	(0x00) /* SMC Global Control Register */
-> +#define SDXC_REG_CLKCR	(0x04) /* SMC Clock Control Register */
-> +#define SDXC_REG_TMOUT	(0x08) /* SMC Time Out Register */
-> +#define SDXC_REG_WIDTH	(0x0C) /* SMC Bus Width Register */
-> +#define SDXC_REG_BLKSZ	(0x10) /* SMC Block Size Register */
-> +#define SDXC_REG_BCNTR	(0x14) /* SMC Byte Count Register */
-> +#define SDXC_REG_CMDR	(0x18) /* SMC Command Register */
-> +#define SDXC_REG_CARG	(0x1C) /* SMC Argument Register */
-> +#define SDXC_REG_RESP0	(0x20) /* SMC Response Register 0 */
-> +#define SDXC_REG_RESP1	(0x24) /* SMC Response Register 1 */
-> +#define SDXC_REG_RESP2	(0x28) /* SMC Response Register 2 */
-> +#define SDXC_REG_RESP3	(0x2C) /* SMC Response Register 3 */
-> +#define SDXC_REG_IMASK	(0x30) /* SMC Interrupt Mask Register */
-> +#define SDXC_REG_MISTA	(0x34) /* SMC Masked Interrupt Status Register */
-> +#define SDXC_REG_RINTR	(0x38) /* SMC Raw Interrupt Status Register */
-> +#define SDXC_REG_STAS	(0x3C) /* SMC Status Register */
-> +#define SDXC_REG_FTRGL	(0x40) /* SMC FIFO Threshold Watermark Registe */
-> +#define SDXC_REG_FUNS	(0x44) /* SMC Function Select Register */
-> +#define SDXC_REG_CBCR	(0x48) /* SMC CIU Byte Count Register */
-> +#define SDXC_REG_BBCR	(0x4C) /* SMC BIU Byte Count Register */
-> +#define SDXC_REG_DBGC	(0x50) /* SMC Debug Enable Register */
-> +#define SDXC_REG_HWRST	(0x78) /* SMC Card Hardware Reset for Register */
-> +#define SDXC_REG_DMAC	(0x80) /* SMC IDMAC Control Register */
-> +#define SDXC_REG_DLBA	(0x84) /* SMC IDMAC Descriptor List Base Addre */
-> +#define SDXC_REG_IDST	(0x88) /* SMC IDMAC Status Register */
-> +#define SDXC_REG_IDIE	(0x8C) /* SMC IDMAC Interrupt Enable Register */
-> +#define SDXC_REG_CHDA	(0x90)
-> +#define SDXC_REG_CBDA	(0x94)
+> +#define PHYUTMI_OTGDISABLE			BIT(6)
+> +#define PHYUTMI_FORCESUSPEND			BIT(1)
+> +#define PHYUTMI_FORCESLEEP			BIT(0)
 > +
-> +#define mmc_readl(host, reg) \
-> +	readl((host)->reg_base + SDXC_##reg)
-> +#define mmc_writel(host, reg, value) \
-> +	writel((value), (host)->reg_base + SDXC_##reg)
+> +#define EXYNOS5_DRD_PHYPIPE			0x0c
 > +
-> +/* global control register bits */
-> +#define SDXC_SOFT_RESET			BIT(0)
-> +#define SDXC_FIFO_RESET			BIT(1)
-> +#define SDXC_DMA_RESET			BIT(2)
-> +#define SDXC_INTERRUPT_ENABLE_BIT	BIT(4)
-> +#define SDXC_DMA_ENABLE_BIT		BIT(5)
-> +#define SDXC_DEBOUNCE_ENABLE_BIT	BIT(8)
-> +#define SDXC_POSEDGE_LATCH_DATA		BIT(9)
-> +#define SDXC_DDR_MODE			BIT(10)
-> +#define SDXC_MEMORY_ACCESS_DONE		BIT(29)
-> +#define SDXC_ACCESS_DONE_DIRECT		BIT(30)
-> +#define SDXC_ACCESS_BY_AHB		BIT(31)
-> +#define SDXC_ACCESS_BY_DMA		(0<<  31)
-> +#define SDXC_HARDWARE_RESET \
-> +	(SDXC_SOFT_RESET | SDXC_FIFO_RESET | SDXC_DMA_RESET)
+> +#define EXYNOS5_DRD_PHYCLKRST			0x10
 > +
-> +/* clock control bits */
-> +#define SDXC_CARD_CLOCK_ON		BIT(16)
-> +#define SDXC_LOW_POWER_ON		BIT(17)
+> +#define PHYCLKRST_EN_UTMISUSPEND		BIT(31)
 > +
-> +/* bus width */
-> +#define SDXC_WIDTH1			0
-> +#define SDXC_WIDTH4			1
-> +#define SDXC_WIDTH8			2
+> +#define PHYCLKRST_SSC_REFCLKSEL_MASK		(0xff << 23)
+> +#define PHYCLKRST_SSC_REFCLKSEL(_x)		((_x) << 23)
 > +
-> +/* smc command bits */
-> +#define SDXC_RESP_EXPIRE		BIT(6)
-> +#define SDXC_LONG_RESPONSE		BIT(7)
-> +#define SDXC_CHECK_RESPONSE_CRC		BIT(8)
-> +#define SDXC_DATA_EXPIRE		BIT(9)
-> +#define SDXC_WRITE			BIT(10)
-> +#define SDXC_SEQUENCE_MODE		BIT(11)
-> +#define SDXC_SEND_AUTO_STOP		BIT(12)
-> +#define SDXC_WAIT_PRE_OVER		BIT(13)
-> +#define SDXC_STOP_ABORT_CMD		BIT(14)
-> +#define SDXC_SEND_INIT_SEQUENCE		BIT(15)
-> +#define SDXC_UPCLK_ONLY			BIT(21)
-> +#define SDXC_READ_CEATA_DEV		BIT(22)
-> +#define SDXC_CCS_EXPIRE			BIT(23)
-> +#define SDXC_ENABLE_BIT_BOOT		BIT(24)
-> +#define SDXC_ALT_BOOT_OPTIONS		BIT(25)
-> +#define SDXC_BOOT_ACK_EXPIRE		BIT(26)
-> +#define SDXC_BOOT_ABORT			BIT(27)
-> +#define SDXC_VOLTAGE_SWITCH	        BIT(28)
-> +#define SDXC_USE_HOLD_REGISTER	        BIT(29)
-> +#define SDXC_START			BIT(31)
+> +#define PHYCLKRST_SSC_RANGE_MASK		(0x03 << 21)
+> +#define PHYCLKRST_SSC_RANGE(_x)			((_x) << 21)
 > +
-> +/* interrupt bits */
-> +#define SDXC_RESP_ERROR			BIT(1)
-> +#define SDXC_COMMAND_DONE		BIT(2)
-> +#define SDXC_DATA_OVER			BIT(3)
-> +#define SDXC_TX_DATA_REQUEST		BIT(4)
-> +#define SDXC_RX_DATA_REQUEST		BIT(5)
-> +#define SDXC_RESP_CRC_ERROR		BIT(6)
-> +#define SDXC_DATA_CRC_ERROR		BIT(7)
-> +#define SDXC_RESP_TIMEOUT		BIT(8)
-> +#define SDXC_DATA_TIMEOUT		BIT(9)
-> +#define SDXC_VOLTAGE_CHANGE_DONE	BIT(10)
-> +#define SDXC_FIFO_RUN_ERROR		BIT(11)
-> +#define SDXC_HARD_WARE_LOCKED		BIT(12)
-> +#define SDXC_START_BIT_ERROR		BIT(13)
-> +#define SDXC_AUTO_COMMAND_DONE		BIT(14)
-> +#define SDXC_END_BIT_ERROR		BIT(15)
-> +#define SDXC_SDIO_INTERRUPT		BIT(16)
-> +#define SDXC_CARD_INSERT		BIT(30)
-> +#define SDXC_CARD_REMOVE		BIT(31)
-> +#define SDXC_INTERRUPT_ERROR_BIT \
-> +	(SDXC_RESP_ERROR | SDXC_RESP_CRC_ERROR | SDXC_DATA_CRC_ERROR | \
-> +	 SDXC_RESP_TIMEOUT | SDXC_DATA_TIMEOUT | SDXC_FIFO_RUN_ERROR | \
-> +	 SDXC_HARD_WARE_LOCKED | SDXC_START_BIT_ERROR | SDXC_END_BIT_ERROR)
-> +#define SDXC_INTERRUPT_DONE_BIT \
-> +	(SDXC_AUTO_COMMAND_DONE | SDXC_DATA_OVER | \
-> +	 SDXC_COMMAND_DONE | SDXC_VOLTAGE_CHANGE_DONE)
+> +#define PHYCLKRST_SSC_EN			BIT(20)
+> +#define PHYCLKRST_REF_SSP_EN			BIT(19)
+> +#define PHYCLKRST_REF_CLKDIV2			BIT(18)
 > +
-> +/* status */
-> +#define SDXC_RXWL_FLAG			BIT(0)
-> +#define SDXC_TXWL_FLAG			BIT(1)
-> +#define SDXC_FIFO_EMPTY			BIT(2)
-> +#define SDXC_FIFO_FULL			BIT(3)
-> +#define SDXC_CARD_PRESENT		BIT(8)
-> +#define SDXC_CARD_DATA_BUSY		BIT(9)
-> +#define SDXC_DATA_FSM_BUSY		BIT(10)
-> +#define SDXC_DMA_REQUEST		BIT(31)
-> +#define SDXC_FIFO_SIZE			16
+> +#define PHYCLKRST_MPLL_MULTIPLIER_MASK		(0x7f << 11)
+> +#define PHYCLKRST_MPLL_MULTIPLIER_100MHZ_REF	(0x19 << 11)
+> +#define PHYCLKRST_MPLL_MULTIPLIER_50M_REF	(0x32 << 11)
+> +#define PHYCLKRST_MPLL_MULTIPLIER_24MHZ_REF	(0x68 << 11)
+> +#define PHYCLKRST_MPLL_MULTIPLIER_20MHZ_REF	(0x7d << 11)
+> +#define PHYCLKRST_MPLL_MULTIPLIER_19200KHZ_REF	(0x02 << 11)
 > +
-> +/* Function select */
-> +#define SDXC_CEATA_ON			(0xceaa<<  16)
-> +#define SDXC_SEND_IRQ_RESPONSE		BIT(0)
-> +#define SDXC_SDIO_READ_WAIT		BIT(1)
-> +#define SDXC_ABORT_READ_DATA		BIT(2)
-> +#define SDXC_SEND_CCSD			BIT(8)
-> +#define SDXC_SEND_AUTO_STOPCCSD		BIT(9)
-> +#define SDXC_CEATA_DEV_IRQ_ENABLE	BIT(10)
+> +#define PHYCLKRST_FSEL_UTMI_MASK		(0x7 << 5)
+> +#define PHYCLKRST_FSEL_PIPE_MASK		(0x7 << 8)
+> +#define PHYCLKRST_FSEL(_x)			((_x) << 5)
+> +#define PHYCLKRST_FSEL_PAD_100MHZ		(0x27 << 5)
+> +#define PHYCLKRST_FSEL_PAD_24MHZ		(0x2a << 5)
+> +#define PHYCLKRST_FSEL_PAD_20MHZ		(0x31 << 5)
+> +#define PHYCLKRST_FSEL_PAD_19_2MHZ		(0x38 << 5)
 > +
-> +/* IDMA controller bus mod bit field */
-> +#define SDXC_IDMAC_SOFT_RESET		BIT(0)
-> +#define SDXC_IDMAC_FIX_BURST		BIT(1)
-> +#define SDXC_IDMAC_IDMA_ON		BIT(7)
-> +#define SDXC_IDMAC_REFETCH_DES		BIT(31)
+> +#define PHYCLKRST_RETENABLEN			BIT(4)
 > +
-> +/* IDMA status bit field */
-> +#define SDXC_IDMAC_TRANSMIT_INTERRUPT		BIT(0)
-> +#define SDXC_IDMAC_RECEIVE_INTERRUPT		BIT(1)
-> +#define SDXC_IDMAC_FATAL_BUS_ERROR		BIT(2)
-> +#define SDXC_IDMAC_DESTINATION_INVALID		BIT(4)
-> +#define SDXC_IDMAC_CARD_ERROR_SUM		BIT(5)
-> +#define SDXC_IDMAC_NORMAL_INTERRUPT_SUM		BIT(8)
-> +#define SDXC_IDMAC_ABNORMAL_INTERRUPT_SUM	BIT(9)
-> +#define SDXC_IDMAC_HOST_ABORT_INTERRUPT		BIT(10)
-> +#define SDXC_IDMAC_IDLE				(0<<  13)
-> +#define SDXC_IDMAC_SUSPEND			(1<<  13)
-> +#define SDXC_IDMAC_DESC_READ			(2<<  13)
-> +#define SDXC_IDMAC_DESC_CHECK			(3<<  13)
-> +#define SDXC_IDMAC_READ_REQUEST_WAIT		(4<<  13)
-> +#define SDXC_IDMAC_WRITE_REQUEST_WAIT		(5<<  13)
-> +#define SDXC_IDMAC_READ				(6<<  13)
-> +#define SDXC_IDMAC_WRITE			(7<<  13)
-> +#define SDXC_IDMAC_DESC_CLOSE			(8<<  13)
+> +#define PHYCLKRST_REFCLKSEL_MASK		(0x03 << 2)
+> +#define PHYCLKRST_REFCLKSEL_PAD_REFCLK		(0x2 << 2)
+> +#define PHYCLKRST_REFCLKSEL_EXT_REFCLK		(0x3 << 2)
+> +
+> +#define PHYCLKRST_PORTRESET			BIT(1)
+> +#define PHYCLKRST_COMMONONN			BIT(0)
+> +
+> +#define EXYNOS5_DRD_PHYREG0			0x14
+> +#define EXYNOS5_DRD_PHYREG1			0x18
+> +
+> +#define EXYNOS5_DRD_PHYPARAM0			0x1c
+> +
+> +#define PHYPARAM0_REF_USE_PAD			BIT(31)
+> +#define PHYPARAM0_REF_LOSLEVEL_MASK		(0x1f << 26)
+> +#define PHYPARAM0_REF_LOSLEVEL			(0x9 << 26)
+> +
+> +#define EXYNOS5_DRD_PHYPARAM1			0x20
+> +
+> +#define PHYPARAM1_PCS_TXDEEMPH_MASK		(0x1f << 0)
+> +#define PHYPARAM1_PCS_TXDEEMPH			(0x1c)
+> +
+> +#define EXYNOS5_DRD_PHYTERM			0x24
+> +
+> +#define EXYNOS5_DRD_PHYTEST			0x28
+> +
+> +#define PHYTEST_POWERDOWN_SSP			BIT(3)
+> +#define PHYTEST_POWERDOWN_HSP			BIT(2)
+> +
+> +#define EXYNOS5_DRD_PHYADP			0x2c
+> +
+> +#define EXYNOS5_DRD_PHYUTMICLKSEL		0x30
+> +
+> +#define PHYUTMICLKSEL_UTMI_CLKSEL		BIT(2)
+> +
+> +#define EXYNOS5_DRD_PHYRESUME			0x34
+> +#define EXYNOS5_DRD_LINKPORT			0x44
+> +
+> +#define KHZ	1000
+> +#define MHZ	(KHZ * KHZ)
+> +
+> +enum exynos5_usbdrd_phy_id {
+> +	EXYNOS5_DRDPHY_UTMI,
+> +	EXYNOS5_DRDPHY_PIPE3,
+> +	EXYNOS5_DRDPHYS_NUM,
+> +};
+> +
+> +struct phy_usb_instance;
+> +struct exynos5_usbdrd_phy;
+> +
+> +struct exynos5_usbdrd_phy_config {
+> +	u32 id;
+> +	void (*phy_isol)(struct phy_usb_instance *inst, u32 on);
+> +	void (*phy_init)(struct exynos5_usbdrd_phy *phy_drd);
+> +	unsigned int (*set_refclk)(struct phy_usb_instance *inst);
+> +};
+> +
+> +struct exynos5_usbdrd_phy_drvdata {
+> +	const struct exynos5_usbdrd_phy_config *phy_cfg;
+> +	u32 pmu_offset_usbdrd0_phy;
+> +	u32 pmu_offset_usbdrd1_phy;
+> +};
+> +
+> +/**
+> + * struct exynos5_usbdrd_phy - driver data for USB 3.0 PHY
+> + * @dev: pointer to device instance of this platform device
+> + * @reg_phy: usb phy controller register memory base
+> + * @clk: phy clock for register access
+> + * @drv_data: pointer to SoC level driver data structure
+> + * @phys[]: array for 'EXYNOS5_DRDPHYS_NUM' number of PHY
+> + *	    instances each with its 'phy' and 'phy_cfg'.
+> + * @extrefclk: frequency select settings when using 'separate
+> + *	       reference clocks' for SS and HS operations
+> + * @ref_clk: reference clock to PHY block from which PHY's
+> + *	     operational clocks are derived
+> + * @ref_rate: rate of above reference clock
+> + */
+> +struct exynos5_usbdrd_phy {
+> +	struct device *dev;
+> +	void __iomem *reg_phy;
+> +	struct clk *clk;
+> +	const struct exynos5_usbdrd_phy_drvdata *drv_data;
+> +	struct phy_usb_instance {
+> +		struct phy *phy;
+> +		u32 index;
+> +		struct regmap *reg_pmu;
+> +		u32 pmu_offset;
+> +		const struct exynos5_usbdrd_phy_config *phy_cfg;
+> +	} phys[EXYNOS5_DRDPHYS_NUM];
+> +	u32 extrefclk;
+> +	struct clk *ref_clk;
+> +};
+> +
+> +static inline
+> +struct exynos5_usbdrd_phy *to_usbdrd_phy(struct phy_usb_instance *inst)
+> +{
+> +	return container_of((inst), struct exynos5_usbdrd_phy,
+> +			    phys[(inst)->index]);
+> +}
 > +
 > +/*
-> +* If the idma-des-size-bits of property is ie 13, bufsize bits are:
-> +*  Bits  0-12: buf1 size
-> +*  Bits 13-25: buf2 size
-> +*  Bits 26-31: not used
-> +* Since we only ever set buf1 size, we can simply store it directly.
-> +*/
-> +#define SDXC_IDMAC_DES0_DIC	BIT(1)  /* disable interrupt on completion */
-> +#define SDXC_IDMAC_DES0_LD	BIT(2)  /* last descriptor */
-> +#define SDXC_IDMAC_DES0_FD	BIT(3)  /* first descriptor */
-> +#define SDXC_IDMAC_DES0_CH	BIT(4)  /* chain mode */
-> +#define SDXC_IDMAC_DES0_ER	BIT(5)  /* end of ring */
-> +#define SDXC_IDMAC_DES0_CES	BIT(30) /* card error summary */
-> +#define SDXC_IDMAC_DES0_OWN	BIT(31) /* 1-idma owns it, 0-host owns it */
-> +
-> +struct sunxi_idma_des {
-> +	u32	config;
-> +	u32	buf_size;
-> +	u32	buf_addr_ptr1;
-> +	u32	buf_addr_ptr2;
-> +};
-> +
-> +struct sunxi_mmc_host {
-> +	struct mmc_host	*mmc;
-> +	struct reset_control *reset;
-> +
-> +	/* IO mapping base */
-> +	void __iomem	*reg_base;
-> +
-> +	/* clock management */
-> +	struct clk	*clk_ahb;
-> +	struct clk	*clk_mmc;
-> +
-> +	/* irq */
-> +	spinlock_t	lock;
-> +	int		irq;
-> +	u32		int_sum;
-> +	u32		sdio_imask;
-> +
-> +	/* dma */
-> +	u32		idma_des_size_bits;
-> +	dma_addr_t	sg_dma;
-> +	void		*sg_cpu;
-> +	bool		wait_dma;
-> +
-> +	struct mmc_request *mrq;
-> +	struct mmc_request *manual_stop_mrq;
-> +	int		ferror;
-> +};
-> +
-> +static int sunxi_mmc_reset_host(struct sunxi_mmc_host *host)
+> + * exynos5_rate_to_clk() converts the supplied clock rate to the value that
+> + * can be written to the phy register.
+> + */
+> +static unsigned int exynos5_rate_to_clk(unsigned long rate, u32 *reg)
 > +{
-> +	unsigned long expire = jiffies + msecs_to_jiffies(250);
-> +	u32 rval;
+> +	/* EXYNOS5_FSEL_MASK */
 > +
-> +	mmc_writel(host, REG_CMDR, SDXC_HARDWARE_RESET);
-> +	do {
-> +		rval = mmc_readl(host, REG_GCTRL);
-> +	} while (time_before(jiffies, expire)&&  (rval&  SDXC_HARDWARE_RESET));
-> +
-> +	if (rval&  SDXC_HARDWARE_RESET) {
-> +		dev_err(mmc_dev(host->mmc), "fatal err reset timeout\n");
-> +		return -EIO;
+> +	switch (rate) {
+> +	case 9600 * KHZ:
+> +		*reg = EXYNOS5_FSEL_9MHZ6;
+> +		break;
+> +	case 10 * MHZ:
+> +		*reg = EXYNOS5_FSEL_10MHZ;
+> +		break;
+> +	case 12 * MHZ:
+> +		*reg = EXYNOS5_FSEL_12MHZ;
+> +		break;
+> +	case 19200 * KHZ:
+> +		*reg = EXYNOS5_FSEL_19MHZ2;
+> +		break;
+> +	case 20 * MHZ:
+> +		*reg = EXYNOS5_FSEL_20MHZ;
+> +		break;
+> +	case 24 * MHZ:
+> +		*reg = EXYNOS5_FSEL_24MHZ;
+> +		break;
+> +	case 50 * MHZ:
+> +		*reg = EXYNOS5_FSEL_50MHZ;
+> +		break;
+> +	default:
+> +		return -EINVAL;
 > +	}
 > +
 > +	return 0;
 > +}
 > +
-> +static int sunxi_mmc_init_host(struct mmc_host *mmc)
+> +static void exynos5_usbdrd_phy_isol(struct phy_usb_instance *inst,
+> +						unsigned int on)
 > +{
-> +	u32 rval;
-> +	struct sunxi_mmc_host *host = mmc_priv(mmc);
+> +	unsigned int val;
 > +
-> +	if (sunxi_mmc_reset_host(host))
-> +		return -EIO;
-> +
-> +	mmc_writel(host, REG_FTRGL, 0x20070008);
-> +	mmc_writel(host, REG_TMOUT, 0xffffffff);
-> +	mmc_writel(host, REG_IMASK, host->sdio_imask);
-> +	mmc_writel(host, REG_RINTR, 0xffffffff);
-> +	mmc_writel(host, REG_DBGC, 0xdeb);
-> +	mmc_writel(host, REG_FUNS, SDXC_CEATA_ON);
-> +	mmc_writel(host, REG_DLBA, host->sg_dma);
-> +
-> +	rval = mmc_readl(host, REG_GCTRL);
-> +	rval |= SDXC_INTERRUPT_ENABLE_BIT;
-> +	rval&= ~SDXC_ACCESS_DONE_DIRECT;
-> +	mmc_writel(host, REG_GCTRL, rval);
-> +
-> +	return 0;
-> +}
-> +
-> +static void sunxi_mmc_init_idma_des(struct sunxi_mmc_host *host,
-> +				    struct mmc_data *data)
-> +{
-> +	struct sunxi_idma_des *pdes = (struct sunxi_idma_des *)host->sg_cpu;
-> +	struct sunxi_idma_des *pdes_pa = (struct sunxi_idma_des *)host->sg_dma;
-> +	int i, max_len = (1<<  host->idma_des_size_bits);
-> +
-> +	for (i = 0; i<  data->sg_len; i++) {
-> +		pdes[i].config = SDXC_IDMAC_DES0_CH | SDXC_IDMAC_DES0_OWN |
-> +				 SDXC_IDMAC_DES0_DIC;
-> +
-> +		if (data->sg[i].length == max_len)
-> +			pdes[i].buf_size = 0; /* 0 == max_len */
-> +		else
-> +			pdes[i].buf_size = data->sg[i].length;
-> +
-> +		pdes[i].buf_addr_ptr1 = sg_dma_address(&data->sg[i]);
-> +		pdes[i].buf_addr_ptr2 = (u32)&pdes_pa[i + 1];
-> +	}
-> +
-> +	pdes[0].config |= SDXC_IDMAC_DES0_FD;
-> +	pdes[i - 1].config = SDXC_IDMAC_DES0_OWN | SDXC_IDMAC_DES0_LD;
-> +
-> +	/*
-> +	 * Avoid the io-store starting the idmac hitting io-mem before the
-> +	 * descriptors hit the main-mem.
-> +	 */
-> +	wmb();
-> +}
-> +
-> +static enum dma_data_direction sunxi_mmc_get_dma_dir(struct mmc_data *data)
-> +{
-> +	if (data->flags&  MMC_DATA_WRITE)
-> +		return DMA_TO_DEVICE;
-> +	else
-> +		return DMA_FROM_DEVICE;
-> +}
-> +
-> +static int sunxi_mmc_map_dma(struct sunxi_mmc_host *host,
-> +			     struct mmc_data *data)
-> +{
-> +	u32 i, dma_len;
-> +	struct scatterlist *sg;
-> +
-> +	dma_len = dma_map_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
-> +			     sunxi_mmc_get_dma_dir(data));
-> +	if (dma_len == 0) {
-> +		dev_err(mmc_dev(host->mmc), "dma_map_sg failed\n");
-> +		return -ENOMEM;
-> +	}
-> +
-> +	for_each_sg(data->sg, sg, data->sg_len, i) {
-> +		if (sg->offset&  3 || sg->length&  3) {
-> +			dev_err(mmc_dev(host->mmc),
-> +				"unaligned scatterlist: os %x length %d\n",
-> +				sg->offset, sg->length);
-> +			return -EINVAL;
-> +		}
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static void sunxi_mmc_start_dma(struct sunxi_mmc_host *host,
-> +				struct mmc_data *data)
-> +{
-> +	u32 rval;
-> +
-> +	sunxi_mmc_init_idma_des(host, data);
-> +
-> +	rval = mmc_readl(host, REG_GCTRL);
-> +	rval |= SDXC_DMA_ENABLE_BIT;
-> +	mmc_writel(host, REG_GCTRL, rval);
-> +	rval |= SDXC_DMA_RESET;
-> +	mmc_writel(host, REG_GCTRL, rval);
-> +
-> +	mmc_writel(host, REG_DMAC, SDXC_IDMAC_SOFT_RESET);
-> +
-> +	if (!(data->flags&  MMC_DATA_WRITE))
-> +		mmc_writel(host, REG_IDIE, SDXC_IDMAC_RECEIVE_INTERRUPT);
-> +
-> +	mmc_writel(host, REG_DMAC,
-> +		   SDXC_IDMAC_FIX_BURST | SDXC_IDMAC_IDMA_ON);
-> +}
-> +
-> +static void sunxi_mmc_send_manual_stop(struct sunxi_mmc_host *host,
-> +				       struct mmc_request *req)
-> +{
-> +	u32 arg, cmd_val, ri;
-> +	unsigned long expire = jiffies + msecs_to_jiffies(1000);
-> +
-> +	cmd_val = SDXC_START | SDXC_RESP_EXPIRE |
-> +		  SDXC_STOP_ABORT_CMD | SDXC_CHECK_RESPONSE_CRC;
-> +
-> +	if (req->cmd->opcode == SD_IO_RW_EXTENDED) {
-> +		cmd_val |= SD_IO_RW_DIRECT;
-> +		arg = (1<<  31) | (0<<  28) | (SDIO_CCCR_ABORT<<  9) |
-> +		      ((req->cmd->arg>>  28)&  0x7);
-> +	} else {
-> +		cmd_val |= MMC_STOP_TRANSMISSION;
-> +		arg = 0;
-> +	}
-> +
-> +	mmc_writel(host, REG_CARG, arg);
-> +	mmc_writel(host, REG_CMDR, cmd_val);
-> +
-> +	do {
-> +		ri = mmc_readl(host, REG_RINTR);
-> +	} while (!(ri&  (SDXC_COMMAND_DONE | SDXC_INTERRUPT_ERROR_BIT))&&
-> +		 time_before(jiffies, expire));
-> +
-> +	if (!(ri&  SDXC_COMMAND_DONE) || (ri&  SDXC_INTERRUPT_ERROR_BIT)) {
-> +		dev_err(mmc_dev(host->mmc), "send stop command failed\n");
-> +		if (req->stop)
-> +			req->stop->resp[0] = -ETIMEDOUT;
-> +	} else {
-> +		if (req->stop)
-> +			req->stop->resp[0] = mmc_readl(host, REG_RESP0);
-> +	}
-> +
-> +	mmc_writel(host, REG_RINTR, 0xffff);
-> +}
-> +
-> +static void sunxi_mmc_dump_errinfo(struct sunxi_mmc_host *host)
-> +{
-> +	struct mmc_command *cmd = host->mrq->cmd;
-> +	struct mmc_data *data = host->mrq->data;
-> +
-> +	/* For some cmds timeout is normal with sd/mmc cards */
-> +	if ((host->int_sum&  SDXC_INTERRUPT_ERROR_BIT) ==
-> +		SDXC_RESP_TIMEOUT&&  (cmd->opcode == SD_IO_SEND_OP_COND ||
-> +				      cmd->opcode == SD_IO_RW_DIRECT))
+> +	if (!inst->reg_pmu)
 > +		return;
 > +
-> +	dev_err(mmc_dev(host->mmc),
-> +		"smc %d err, cmd %d,%s%s%s%s%s%s%s%s%s%s !!\n",
-> +		host->mmc->index, cmd->opcode,
-> +		data ? (data->flags&  MMC_DATA_WRITE ? " WR" : " RD") : "",
-> +		host->int_sum&  SDXC_RESP_ERROR     ? " RE"     : "",
-> +		host->int_sum&  SDXC_RESP_CRC_ERROR  ? " RCE"    : "",
-> +		host->int_sum&  SDXC_DATA_CRC_ERROR  ? " DCE"    : "",
-> +		host->int_sum&  SDXC_RESP_TIMEOUT ? " RTO"    : "",
-> +		host->int_sum&  SDXC_DATA_TIMEOUT ? " DTO"    : "",
-> +		host->int_sum&  SDXC_FIFO_RUN_ERROR  ? " FE"     : "",
-> +		host->int_sum&  SDXC_HARD_WARE_LOCKED ? " HL"     : "",
-> +		host->int_sum&  SDXC_START_BIT_ERROR ? " SBE"    : "",
-> +		host->int_sum&  SDXC_END_BIT_ERROR   ? " EBE"    : ""
-> +		);
+> +	val = on ? 0 : EXYNOS5_PHY_ENABLE;
+> +
+> +	regmap_update_bits(inst->reg_pmu, inst->pmu_offset,
+> +			   EXYNOS5_PHY_ENABLE, val);
 > +}
 > +
-> +/* Called in interrupt context! */
-> +static irqreturn_t sunxi_mmc_finalize_request(struct sunxi_mmc_host *host)
+> +/*
+> + * Sets the pipe3 phy's clk as EXTREFCLK (XXTI) which is internal clock
+> + * from clock core. Further sets multiplier values and spread spectrum
+> + * clock settings for SuperSpeed operations.
+> + */
+> +static unsigned int
+> +exynos5_usbdrd_pipe3_set_refclk(struct phy_usb_instance *inst)
 > +{
-> +	struct mmc_request *mrq = host->mrq;
-> +	struct mmc_data *data = mrq->data;
-> +	u32 rval;
+> +	static u32 reg;
+> +	struct exynos5_usbdrd_phy *phy_drd = to_usbdrd_phy(inst);
 > +
-> +	mmc_writel(host, REG_IMASK, host->sdio_imask);
-> +	mmc_writel(host, REG_IDIE, 0);
+> +	/* restore any previous reference clock settings */
+> +	reg = readl(phy_drd->reg_phy + EXYNOS5_DRD_PHYCLKRST);
 > +
-> +	if (host->int_sum&  SDXC_INTERRUPT_ERROR_BIT) {
-> +		sunxi_mmc_dump_errinfo(host);
-> +		mrq->cmd->error = -ETIMEDOUT;
+> +	/* Use EXTREFCLK as ref clock */
+> +	reg &= ~PHYCLKRST_REFCLKSEL_MASK;
+> +	reg |=	PHYCLKRST_REFCLKSEL_EXT_REFCLK;
 > +
-> +		if (data) {
-> +			data->error = -ETIMEDOUT;
-> +			host->manual_stop_mrq = mrq;
-> +		}
-> +
-> +		if (mrq->stop)
-> +			mrq->stop->error = -ETIMEDOUT;
-> +	} else {
-> +		if (mrq->cmd->flags&  MMC_RSP_136) {
-> +			mrq->cmd->resp[0] = mmc_readl(host, REG_RESP3);
-> +			mrq->cmd->resp[1] = mmc_readl(host, REG_RESP2);
-> +			mrq->cmd->resp[2] = mmc_readl(host, REG_RESP1);
-> +			mrq->cmd->resp[3] = mmc_readl(host, REG_RESP0);
-> +		} else {
-> +			mrq->cmd->resp[0] = mmc_readl(host, REG_RESP0);
-> +		}
-> +
-> +		if (data)
-> +			data->bytes_xfered = data->blocks * data->blksz;
+> +	/* FSEL settings corresponding to reference clock */
+> +	reg &= ~PHYCLKRST_FSEL_PIPE_MASK |
+> +		PHYCLKRST_MPLL_MULTIPLIER_MASK |
+> +		PHYCLKRST_SSC_REFCLKSEL_MASK;
+> +	switch (phy_drd->extrefclk) {
+> +	case EXYNOS5_FSEL_50MHZ:
+> +		reg |= (PHYCLKRST_MPLL_MULTIPLIER_50M_REF |
+> +			PHYCLKRST_SSC_REFCLKSEL(0x00));
+> +		break;
+> +	case EXYNOS5_FSEL_24MHZ:
+> +		reg |= (PHYCLKRST_MPLL_MULTIPLIER_24MHZ_REF |
+> +			PHYCLKRST_SSC_REFCLKSEL(0x88));
+> +		break;
+> +	case EXYNOS5_FSEL_20MHZ:
+> +		reg |= (PHYCLKRST_MPLL_MULTIPLIER_20MHZ_REF |
+> +			PHYCLKRST_SSC_REFCLKSEL(0x00));
+> +		break;
+> +	case EXYNOS5_FSEL_19MHZ2:
+> +		reg |= (PHYCLKRST_MPLL_MULTIPLIER_19200KHZ_REF |
+> +			PHYCLKRST_SSC_REFCLKSEL(0x88));
+> +		break;
+> +	default:
+> +		dev_dbg(phy_drd->dev, "unsupported ref clk\n");
+> +		break;
 > +	}
 > +
-> +	if (data) {
-> +		mmc_writel(host, REG_IDST, 0x337);
-> +		mmc_writel(host, REG_DMAC, 0);
-> +		rval = mmc_readl(host, REG_GCTRL);
-> +		rval |= SDXC_DMA_RESET;
-> +		mmc_writel(host, REG_GCTRL, rval);
-> +		rval&= ~SDXC_DMA_ENABLE_BIT;
-> +		mmc_writel(host, REG_GCTRL, rval);
-> +		rval |= SDXC_FIFO_RESET;
-> +		mmc_writel(host, REG_GCTRL, rval);
-> +		dma_unmap_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
-> +				     sunxi_mmc_get_dma_dir(data));
-> +	}
-> +
-> +	mmc_writel(host, REG_RINTR, 0xffff);
-> +
-> +	host->mrq = NULL;
-> +	host->int_sum = 0;
-> +	host->wait_dma = false;
-> +
-> +	return host->manual_stop_mrq ? IRQ_WAKE_THREAD : IRQ_HANDLED;
+> +	return reg;
 > +}
 > +
-> +static irqreturn_t sunxi_mmc_irq(int irq, void *dev_id)
+> +/*
+> + * Sets the utmi phy's clk as EXTREFCLK (XXTI) which is internal clock
+> + * from clock core. Further sets the FSEL values for HighSpeed operations.
+> + */
+> +static unsigned int
+> +exynos5_usbdrd_utmi_set_refclk(struct phy_usb_instance *inst)
 > +{
-> +	struct sunxi_mmc_host *host = dev_id;
-> +	struct mmc_request *mrq;
-> +	u32 msk_int, idma_int;
-> +	bool finalize = false;
-> +	bool sdio_int = false;
-> +	irqreturn_t ret = IRQ_HANDLED;
+> +	static u32 reg;
+> +	struct exynos5_usbdrd_phy *phy_drd = to_usbdrd_phy(inst);
 > +
-> +	spin_lock(&host->lock);
+> +	/* restore any previous reference clock settings */
+> +	reg = readl(phy_drd->reg_phy + EXYNOS5_DRD_PHYCLKRST);
 > +
-> +	idma_int  = mmc_readl(host, REG_IDST);
-> +	msk_int   = mmc_readl(host, REG_MISTA);
+> +	reg &= ~PHYCLKRST_REFCLKSEL_MASK;
+> +	reg |=	PHYCLKRST_REFCLKSEL_EXT_REFCLK;
 > +
-> +	dev_dbg(mmc_dev(host->mmc), "irq: rq %p mi %08x idi %08x\n",
-> +		host->mrq, msk_int, idma_int);
+> +	reg &= ~PHYCLKRST_FSEL_UTMI_MASK |
+> +		PHYCLKRST_MPLL_MULTIPLIER_MASK |
+> +		PHYCLKRST_SSC_REFCLKSEL_MASK;
+> +	reg |= PHYCLKRST_FSEL(phy_drd->extrefclk);
 > +
-> +	mrq = host->mrq;
-> +	if (mrq) {
-> +		if (idma_int&  SDXC_IDMAC_RECEIVE_INTERRUPT)
-> +			host->wait_dma = false;
-> +
-> +		host->int_sum |= msk_int;
-> +
-> +		/* Wait for COMMAND_DONE on RESPONSE_TIMEOUT before finalize */
-> +		if ((host->int_sum&  SDXC_RESP_TIMEOUT)&&
-> +				!(host->int_sum&  SDXC_COMMAND_DONE))
-> +			mmc_writel(host, REG_IMASK,
-> +				   host->sdio_imask | SDXC_COMMAND_DONE);
-> +		/* Don't wait for dma on error */
-> +		else if (host->int_sum&  SDXC_INTERRUPT_ERROR_BIT)
-> +			finalize = true;
-> +		else if ((host->int_sum&  SDXC_INTERRUPT_DONE_BIT)&&
-> +				!host->wait_dma)
-> +			finalize = true;
-> +	}
-> +
-> +	if (msk_int&  SDXC_SDIO_INTERRUPT)
-> +		sdio_int = true;
-> +
-> +	mmc_writel(host, REG_RINTR, msk_int);
-> +	mmc_writel(host, REG_IDST, idma_int);
-> +
-> +	if (finalize)
-> +		ret = sunxi_mmc_finalize_request(host);
-> +
-> +	spin_unlock(&host->lock);
-> +
-> +	if (finalize&&  ret == IRQ_HANDLED)
-> +		mmc_request_done(host->mmc, mrq);
-> +
-> +	if (sdio_int)
-> +		mmc_signal_sdio_irq(host->mmc);
-> +
-> +	return ret;
+> +	return reg;
 > +}
 > +
-> +static irqreturn_t sunxi_mmc_handle_manual_stop(int irq, void *dev_id)
+> +static void exynos5_usbdrd_pipe3_init(struct exynos5_usbdrd_phy *phy_drd)
 > +{
-> +	struct sunxi_mmc_host *host = dev_id;
-> +	struct mmc_request *mrq;
-> +	unsigned long iflags;
+> +	u32 reg;
 > +
-> +	spin_lock_irqsave(&host->lock, iflags);
-> +	mrq = host->manual_stop_mrq;
-> +	spin_unlock_irqrestore(&host->lock, iflags);
+> +	reg = readl(phy_drd->reg_phy + EXYNOS5_DRD_PHYPARAM1);
+> +	/* Set Tx De-Emphasis level */
+> +	reg &= ~PHYPARAM1_PCS_TXDEEMPH_MASK;
+> +	reg |=	PHYPARAM1_PCS_TXDEEMPH;
+> +	writel(reg, phy_drd->reg_phy + EXYNOS5_DRD_PHYPARAM1);
 > +
-> +	if (!mrq) {
-> +		dev_err(mmc_dev(host->mmc), "no request for manual stop\n");
-> +		return IRQ_HANDLED;
-> +	}
-> +
-> +	dev_err(mmc_dev(host->mmc), "data error, sending stop command\n");
-> +	sunxi_mmc_send_manual_stop(host, mrq);
-> +
-> +	spin_lock_irqsave(&host->lock, iflags);
-> +	host->manual_stop_mrq = NULL;
-> +	spin_unlock_irqrestore(&host->lock, iflags);
-> +
-> +	mmc_request_done(host->mmc, mrq);
-> +
-> +	return IRQ_HANDLED;
+> +	reg = readl(phy_drd->reg_phy + EXYNOS5_DRD_PHYTEST);
+> +	reg &= ~PHYTEST_POWERDOWN_SSP;
+> +	writel(reg, phy_drd->reg_phy + EXYNOS5_DRD_PHYTEST);
 > +}
 > +
-> +static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
+> +static void exynos5_usbdrd_utmi_init(struct exynos5_usbdrd_phy *phy_drd)
 > +{
-> +	unsigned long expire = jiffies + msecs_to_jiffies(250);
-> +	u32 rval;
+> +	u32 reg;
 > +
-> +	rval = mmc_readl(host, REG_CLKCR);
-> +	rval&= ~(SDXC_CARD_CLOCK_ON | SDXC_LOW_POWER_ON);
+> +	reg = readl(phy_drd->reg_phy + EXYNOS5_DRD_PHYPARAM0);
+> +	/* Set Loss-of-Signal Detector sensitivity */
+> +	reg &= ~PHYPARAM0_REF_LOSLEVEL_MASK;
+> +	reg |=	PHYPARAM0_REF_LOSLEVEL;
+> +	writel(reg, phy_drd->reg_phy + EXYNOS5_DRD_PHYPARAM0);
 > +
-> +	if (oclk_en)
-> +		rval |= SDXC_CARD_CLOCK_ON;
+> +	reg = readl(phy_drd->reg_phy + EXYNOS5_DRD_PHYPARAM1);
+> +	/* Set Tx De-Emphasis level */
+> +	reg &= ~PHYPARAM1_PCS_TXDEEMPH_MASK;
+> +	reg |=	PHYPARAM1_PCS_TXDEEMPH;
+> +	writel(reg, phy_drd->reg_phy + EXYNOS5_DRD_PHYPARAM1);
 > +
-> +	mmc_writel(host, REG_CLKCR, rval);
+> +	/* UTMI Power Control */
+> +	writel(PHYUTMI_OTGDISABLE, phy_drd->reg_phy + EXYNOS5_DRD_PHYUTMI);
 > +
-> +	rval = SDXC_START | SDXC_UPCLK_ONLY | SDXC_WAIT_PRE_OVER;
-> +	mmc_writel(host, REG_CMDR, rval);
-> +
-> +	do {
-> +		rval = mmc_readl(host, REG_CMDR);
-> +	} while (time_before(jiffies, expire)&&  (rval&  SDXC_START));
-> +
-> +	/* clear irq status bits set by the command */
-> +	mmc_writel(host, REG_RINTR,
-> +		   mmc_readl(host, REG_RINTR)&  ~SDXC_SDIO_INTERRUPT);
-> +
-> +	if (rval&  SDXC_START) {
-> +		dev_err(mmc_dev(host->mmc), "fatal err update clk timeout\n");
-> +		return -EIO;
-> +	}
-> +
-> +	return 0;
+> +	reg = readl(phy_drd->reg_phy + EXYNOS5_DRD_PHYTEST);
+> +	reg &= ~PHYTEST_POWERDOWN_HSP;
+> +	writel(reg, phy_drd->reg_phy + EXYNOS5_DRD_PHYTEST);
 > +}
 > +
-> +static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
-> +				  struct mmc_ios *ios)
+> +static int exynos5_usbdrd_phy_init(struct phy *phy)
 > +{
-> +	u32 rate, oclk_dly, rval, sclk_dly, src_clk;
 > +	int ret;
+> +	u32 reg;
+> +	struct phy_usb_instance *inst = phy_get_drvdata(phy);
+> +	struct exynos5_usbdrd_phy *phy_drd = to_usbdrd_phy(inst);
 > +
-> +	rate = clk_round_rate(host->clk_mmc, ios->clock);
-> +	dev_dbg(mmc_dev(host->mmc), "setting clk to %d, rounded %d\n",
-> +		ios->clock, rate);
-> +
-> +	/* setting clock rate */
-> +	ret = clk_set_rate(host->clk_mmc, rate);
-> +	if (ret) {
-> +		dev_err(mmc_dev(host->mmc), "error setting clk to %d: %d\n",
-> +			rate, ret);
-> +		return ret;
-> +	}
-> +
-> +	ret = sunxi_mmc_oclk_onoff(host, 0);
+> +	ret = clk_prepare_enable(phy_drd->clk);
 > +	if (ret)
 > +		return ret;
 > +
-> +	/* clear internal divider */
-> +	rval = mmc_readl(host, REG_CLKCR);
-> +	rval&= ~0xff;
-> +	mmc_writel(host, REG_CLKCR, rval);
+> +	/* Reset USB 3.0 PHY */
+> +	writel(0x0, phy_drd->reg_phy + EXYNOS5_DRD_PHYREG0);
+> +	writel(0x0, phy_drd->reg_phy + EXYNOS5_DRD_PHYRESUME);
 > +
-> +	/* determine delays */
-> +	if (rate<= 400000) {
-> +		oclk_dly = 0;
-> +		sclk_dly = 7;
-> +	} else if (rate<= 25000000) {
-> +		oclk_dly = 0;
-> +		sclk_dly = 5;
-> +	} else if (rate<= 50000000) {
-> +		if (ios->timing == MMC_TIMING_UHS_DDR50) {
-> +			oclk_dly = 2;
-> +			sclk_dly = 4;
-> +		} else {
-> +			oclk_dly = 3;
-> +			sclk_dly = 5;
-> +		}
-> +	} else {
-> +		/* rate>  50000000 */
-> +		oclk_dly = 2;
-> +		sclk_dly = 4;
-> +	}
+> +	/*
+> +	 * Setting the Frame length Adj value[6:1] to default 0x20
+> +	 * See xHCI 1.0 spec, 5.2.4
+> +	 */
+> +	reg =	LINKSYSTEM_XHCI_VERSION_CONTROL |
+> +		LINKSYSTEM_FLADJ(0x20);
+> +	writel(reg, phy_drd->reg_phy + EXYNOS5_DRD_LINKSYSTEM);
 > +
-> +	src_clk = clk_get_rate(clk_get_parent(host->clk_mmc));
-> +	if (src_clk>= 300000000&&  src_clk<= 400000000) {
-> +		if (oclk_dly)
-> +			oclk_dly--;
-> +		if (sclk_dly)
-> +			sclk_dly--;
-> +	}
+> +	reg = readl(phy_drd->reg_phy + EXYNOS5_DRD_PHYPARAM0);
+> +	/* Select PHY CLK source */
+> +	reg &= ~PHYPARAM0_REF_USE_PAD;
+> +	writel(reg, phy_drd->reg_phy + EXYNOS5_DRD_PHYPARAM0);
 > +
-> +	clk_sunxi_mmc_phase_control(host->clk_mmc, sclk_dly, oclk_dly);
+> +	/* This bit must be set for both HS and SS operations */
+> +	reg = readl(phy_drd->reg_phy + EXYNOS5_DRD_PHYUTMICLKSEL);
+> +	reg |= PHYUTMICLKSEL_UTMI_CLKSEL;
+> +	writel(reg, phy_drd->reg_phy + EXYNOS5_DRD_PHYUTMICLKSEL);
 > +
-> +	return sunxi_mmc_oclk_onoff(host, 1);
-> +}
+> +	/* UTMI or PIPE3 specific init */
+> +	inst->phy_cfg->phy_init(phy_drd);
 > +
-> +static void sunxi_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
-> +{
-> +	struct sunxi_mmc_host *host = mmc_priv(mmc);
-> +	u32 rval;
+> +	/* reference clock settings */
+> +	reg = inst->phy_cfg->set_refclk(inst);
 > +
-> +	/* Set the power state */
-> +	switch (ios->power_mode) {
-> +	case MMC_POWER_ON:
-> +		break;
+> +		/* Digital power supply in normal operating mode */
+> +	reg |=	PHYCLKRST_RETENABLEN |
+> +		/* Enable ref clock for SS function */
+> +		PHYCLKRST_REF_SSP_EN |
+> +		/* Enable spread spectrum */
+> +		PHYCLKRST_SSC_EN |
+> +		/* Power down HS Bias and PLL blocks in suspend mode */
+> +		PHYCLKRST_COMMONONN |
+> +		/* Reset the port */
+> +		PHYCLKRST_PORTRESET;
 > +
-> +	case MMC_POWER_UP:
-> +		mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, ios->vdd);
+> +	writel(reg, phy_drd->reg_phy + EXYNOS5_DRD_PHYCLKRST);
 > +
-> +		host->ferror = sunxi_mmc_init_host(mmc);
-> +		if (host->ferror)
-> +			return;
-> +
-> +		dev_dbg(mmc_dev(mmc), "power on!\n");
-> +		break;
-> +
-> +	case MMC_POWER_OFF:
-> +		dev_dbg(mmc_dev(mmc), "power off!\n");
-> +		sunxi_mmc_reset_host(host);
-> +		mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
-> +		break;
-> +	}
-> +
-> +	/* set bus width */
-> +	switch (ios->bus_width) {
-> +	case MMC_BUS_WIDTH_1:
-> +		mmc_writel(host, REG_WIDTH, SDXC_WIDTH1);
-> +		break;
-> +	case MMC_BUS_WIDTH_4:
-> +		mmc_writel(host, REG_WIDTH, SDXC_WIDTH4);
-> +		break;
-> +	case MMC_BUS_WIDTH_8:
-> +		mmc_writel(host, REG_WIDTH, SDXC_WIDTH8);
-> +		break;
-> +	}
-> +
-> +	/* set ddr mode */
-> +	rval = mmc_readl(host, REG_GCTRL);
-> +	if (ios->timing == MMC_TIMING_UHS_DDR50)
-> +		rval |= SDXC_DDR_MODE;
-> +	else
-> +		rval&= ~SDXC_DDR_MODE;
-> +	mmc_writel(host, REG_GCTRL, rval);
-> +
-> +	/* set up clock */
-> +	if (ios->clock&&  ios->power_mode) {
-> +		host->ferror = sunxi_mmc_clk_set_rate(host, ios);
-> +		/* Android code had a usleep_range(50000, 55000); here */
-> +	}
-> +}
-> +
-> +static void sunxi_mmc_enable_sdio_irq(struct mmc_host *mmc, int enable)
-> +{
-> +	struct sunxi_mmc_host *host = mmc_priv(mmc);
-> +	unsigned long flags;
-> +	u32 imask;
-> +
-> +	spin_lock_irqsave(&host->lock, flags);
-> +
-> +	imask = mmc_readl(host, REG_IMASK);
-> +	if (enable) {
-> +		host->sdio_imask = SDXC_SDIO_INTERRUPT;
-> +		imask |= SDXC_SDIO_INTERRUPT;
-> +	} else {
-> +		host->sdio_imask = 0;
-> +		imask&= ~SDXC_SDIO_INTERRUPT;
-> +	}
-> +	mmc_writel(host, REG_IMASK, imask);
-> +	spin_unlock_irqrestore(&host->lock, flags);
-> +}
-> +
-> +static void sunxi_mmc_hw_reset(struct mmc_host *mmc)
-> +{
-> +	struct sunxi_mmc_host *host = mmc_priv(mmc);
-> +	mmc_writel(host, REG_HWRST, 0);
 > +	udelay(10);
-> +	mmc_writel(host, REG_HWRST, 1);
-> +	udelay(300);
+> +
+> +	reg &= ~PHYCLKRST_PORTRESET;
+> +	writel(reg, phy_drd->reg_phy + EXYNOS5_DRD_PHYCLKRST);
+> +
+> +	clk_disable_unprepare(phy_drd->clk);
+> +
+> +	return 0;
 > +}
 > +
-> +static void sunxi_mmc_request(struct mmc_host *mmc, struct mmc_request *mrq)
+> +static int exynos5_usbdrd_phy_exit(struct phy *phy)
 > +{
-> +	struct sunxi_mmc_host *host = mmc_priv(mmc);
-> +	struct mmc_command *cmd = mrq->cmd;
-> +	struct mmc_data *data = mrq->data;
-> +	unsigned long iflags;
-> +	u32 imask = SDXC_INTERRUPT_ERROR_BIT;
-> +	u32 cmd_val = SDXC_START | (cmd->opcode&  0x3f);
 > +	int ret;
+> +	u32 reg;
+> +	struct phy_usb_instance *inst = phy_get_drvdata(phy);
+> +	struct exynos5_usbdrd_phy *phy_drd = to_usbdrd_phy(inst);
 > +
-> +	/* Check for set_ios errors (should never happen) */
-> +	if (host->ferror) {
-> +		mrq->cmd->error = host->ferror;
-> +		mmc_request_done(mmc, mrq);
-> +		return;
-> +	}
+> +	ret = clk_prepare_enable(phy_drd->clk);
+> +	if (ret)
+> +		return ret;
 > +
-> +	if (data) {
-> +		ret = sunxi_mmc_map_dma(host, data);
-> +		if (ret<  0) {
-> +			dev_err(mmc_dev(mmc), "map DMA failed\n");
-> +			cmd->error = ret;
-> +			data->error = ret;
-> +			mmc_request_done(mmc, mrq);
-> +			return;
-> +		}
-> +	}
+> +	reg =	PHYUTMI_OTGDISABLE |
+> +		PHYUTMI_FORCESUSPEND |
+> +		PHYUTMI_FORCESLEEP;
+> +	writel(reg, phy_drd->reg_phy + EXYNOS5_DRD_PHYUTMI);
 > +
-> +	if (cmd->opcode == MMC_GO_IDLE_STATE) {
-> +		cmd_val |= SDXC_SEND_INIT_SEQUENCE;
-> +		imask |= SDXC_COMMAND_DONE;
-> +	}
+> +	/* Resetting the PHYCLKRST enable bits to reduce leakage current */
+> +	reg = readl(phy_drd->reg_phy + EXYNOS5_DRD_PHYCLKRST);
+> +	reg &= ~(PHYCLKRST_REF_SSP_EN |
+> +		 PHYCLKRST_SSC_EN |
+> +		 PHYCLKRST_COMMONONN);
+> +	writel(reg, phy_drd->reg_phy + EXYNOS5_DRD_PHYCLKRST);
 > +
-> +	if (cmd->flags&  MMC_RSP_PRESENT) {
-> +		cmd_val |= SDXC_RESP_EXPIRE;
-> +		if (cmd->flags&  MMC_RSP_136)
-> +			cmd_val |= SDXC_LONG_RESPONSE;
-> +		if (cmd->flags&  MMC_RSP_CRC)
-> +			cmd_val |= SDXC_CHECK_RESPONSE_CRC;
+> +	/* Control PHYTEST to remove leakage current */
+> +	reg = readl(phy_drd->reg_phy + EXYNOS5_DRD_PHYTEST);
+> +	reg |=	PHYTEST_POWERDOWN_SSP |
+> +		PHYTEST_POWERDOWN_HSP;
+> +	writel(reg, phy_drd->reg_phy + EXYNOS5_DRD_PHYTEST);
 > +
-> +		if ((cmd->flags&  MMC_CMD_MASK) == MMC_CMD_ADTC) {
-> +			cmd_val |= SDXC_DATA_EXPIRE | SDXC_WAIT_PRE_OVER;
-> +			if (cmd->data->flags&  MMC_DATA_STREAM) {
-> +				imask |= SDXC_AUTO_COMMAND_DONE;
-> +				cmd_val |= SDXC_SEQUENCE_MODE |
-> +					   SDXC_SEND_AUTO_STOP;
-> +			}
+> +	clk_disable_unprepare(phy_drd->clk);
 > +
-> +			if (cmd->data->stop) {
-> +				imask |= SDXC_AUTO_COMMAND_DONE;
-> +				cmd_val |= SDXC_SEND_AUTO_STOP;
-> +			} else {
-> +				imask |= SDXC_DATA_OVER;
-> +			}
-> +
-> +			if (cmd->data->flags&  MMC_DATA_WRITE)
-> +				cmd_val |= SDXC_WRITE;
-> +			else
-> +				host->wait_dma = true;
-> +		} else {
-> +			imask |= SDXC_COMMAND_DONE;
-> +		}
-> +	} else {
-> +		imask |= SDXC_COMMAND_DONE;
-> +	}
-> +
-> +	dev_dbg(mmc_dev(mmc), "cmd %d(%08x) arg %x ie 0x%08x len %d\n",
-> +		cmd_val&  0x3f, cmd_val, cmd->arg, imask,
-> +		mrq->data ? mrq->data->blksz * mrq->data->blocks : 0);
-> +
-> +	spin_lock_irqsave(&host->lock, iflags);
-> +
-> +	if (host->mrq || host->manual_stop_mrq) {
-> +		spin_unlock_irqrestore(&host->lock, iflags);
-> +
-> +		if (data)
-> +			dma_unmap_sg(mmc_dev(mmc), data->sg, data->sg_len,
-> +				     sunxi_mmc_get_dma_dir(data));
-> +
-> +		dev_err(mmc_dev(mmc), "request already pending\n");
-> +		mrq->cmd->error = -EBUSY;
-> +		mmc_request_done(mmc, mrq);
-> +		return;
-> +	}
-> +
-> +	if (data) {
-> +		mmc_writel(host, REG_BLKSZ, data->blksz);
-> +		mmc_writel(host, REG_BCNTR, data->blksz * data->blocks);
-> +		sunxi_mmc_start_dma(host, data);
-> +	}
-> +
-> +	host->mrq = mrq;
-> +	mmc_writel(host, REG_IMASK, host->sdio_imask | imask);
-> +	mmc_writel(host, REG_CARG, cmd->arg);
-> +	mmc_writel(host, REG_CMDR, cmd_val);
-> +
-> +	spin_unlock_irqrestore(&host->lock, iflags);
+> +	return 0;
 > +}
 > +
-> +static const struct of_device_id sunxi_mmc_of_match[] = {
-> +	{ .compatible = "allwinner,sun4i-a10-mmc", },
-> +	{ .compatible = "allwinner,sun5i-a13-mmc", },
-> +	{ /* sentinel */ }
-> +};
-> +MODULE_DEVICE_TABLE(of, sunxi_mmc_of_match);
-> +
-> +static struct mmc_host_ops sunxi_mmc_ops = {
-> +	.request	 = sunxi_mmc_request,
-> +	.set_ios	 = sunxi_mmc_set_ios,
-> +	.get_ro		 = mmc_gpio_get_ro,
-> +	.get_cd		 = mmc_gpio_get_cd,
-> +	.enable_sdio_irq = sunxi_mmc_enable_sdio_irq,
-> +	.hw_reset	 = sunxi_mmc_hw_reset,
-> +};
-> +
-> +static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
-> +				      struct platform_device *pdev)
+> +static int exynos5_usbdrd_phy_power_on(struct phy *phy)
 > +{
-> +	struct device_node *np = pdev->dev.of_node;
-> +	int ret;
+> +	struct phy_usb_instance *inst = phy_get_drvdata(phy);
+> +	struct exynos5_usbdrd_phy *phy_drd = to_usbdrd_phy(inst);
 > +
-> +	if (of_device_is_compatible(np, "allwinner,sun4i-a10-mmc"))
-> +		host->idma_des_size_bits = 13;
-> +	else
-> +		host->idma_des_size_bits = 16;
+> +	dev_dbg(phy_drd->dev, "Request to power_on usbdrd_phy phy\n");
 > +
-> +	ret = mmc_regulator_get_supply(host->mmc);
+> +	clk_prepare_enable(phy_drd->ref_clk);
+> +
+> +	/* Power-on PHY*/
+> +	inst->phy_cfg->phy_isol(inst, 0);
+> +
+> +	return 0;
+> +}
+> +
+> +static int exynos5_usbdrd_phy_power_off(struct phy *phy)
+> +{
+> +	struct phy_usb_instance *inst = phy_get_drvdata(phy);
+> +	struct exynos5_usbdrd_phy *phy_drd = to_usbdrd_phy(inst);
+> +
+> +	dev_dbg(phy_drd->dev, "Request to power_off usbdrd_phy phy\n");
+> +
+> +	/* Power-off the PHY */
+> +	inst->phy_cfg->phy_isol(inst, 1);
+> +
+> +	clk_disable_unprepare(phy_drd->ref_clk);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct phy *exynos5_usbdrd_phy_xlate(struct device *dev,
+> +					struct of_phandle_args *args)
+> +{
+> +	struct exynos5_usbdrd_phy *phy_drd = dev_get_drvdata(dev);
+> +
+> +	if (WARN_ON(args->args[0] > EXYNOS5_DRDPHYS_NUM))
+> +		return ERR_PTR(-ENODEV);
+> +
+> +	return phy_drd->phys[args->args[0]].phy;
+> +}
+> +
+> +static struct phy_ops exynos5_usbdrd_phy_ops = {
+> +	.init		= exynos5_usbdrd_phy_init,
+> +	.exit		= exynos5_usbdrd_phy_exit,
+> +	.power_on	= exynos5_usbdrd_phy_power_on,
+> +	.power_off	= exynos5_usbdrd_phy_power_off,
+> +	.owner		= THIS_MODULE,
+> +};
+> +
+> +const struct exynos5_usbdrd_phy_config phy_cfg_exynos5[] = {
+> +	{
+> +		.id		= EXYNOS5_DRDPHY_UTMI,
+> +		.phy_isol	= exynos5_usbdrd_phy_isol,
+> +		.phy_init	= exynos5_usbdrd_utmi_init,
+> +		.set_refclk	= exynos5_usbdrd_utmi_set_refclk,
+> +	},
+> +	{
+> +		.id		= EXYNOS5_DRDPHY_PIPE3,
+> +		.phy_isol	= exynos5_usbdrd_phy_isol,
+> +		.phy_init	= exynos5_usbdrd_pipe3_init,
+> +		.set_refclk	= exynos5_usbdrd_pipe3_set_refclk,
+> +	},
+> +};
+> +
+> +const struct exynos5_usbdrd_phy_drvdata exynos5420_usbdrd_phy = {
+> +	.phy_cfg		= phy_cfg_exynos5,
+> +	.pmu_offset_usbdrd0_phy	= EXYNOS5_USBDRD_PHY_CONTROL,
+> +	.pmu_offset_usbdrd1_phy	= EXYNOS5420_USBDRD1_PHY_CONTROL,
+> +};
+> +
+> +const struct exynos5_usbdrd_phy_drvdata exynos5250_usbdrd_phy = {
+> +	.phy_cfg		= phy_cfg_exynos5,
+> +	.pmu_offset_usbdrd0_phy	= EXYNOS5_USBDRD_PHY_CONTROL,
+> +};
+> +
+> +static const struct of_device_id exynos5_usbdrd_phy_of_match[] = {
+> +	{
+> +		.compatible = "samsung,exynos5250-usbdrd-phy",
+> +		.data = &exynos5250_usbdrd_phy
+> +	}, {
+> +		.compatible = "samsung,exynos5420-usbdrd-phy",
+> +		.data = &exynos5420_usbdrd_phy
+> +	},
+> +	{ },
+> +};
+> +
+> +static int exynos5_usbdrd_phy_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct device_node *node = dev->of_node;
+> +	struct exynos5_usbdrd_phy *phy_drd;
+> +	struct phy_provider *phy_provider;
+> +	struct resource *res;
+> +	const struct of_device_id *match;
+> +	const struct exynos5_usbdrd_phy_drvdata *drv_data;
+> +	struct regmap *reg_pmu;
+> +	u32 pmu_offset;
+> +	unsigned long ref_rate;
+> +	int i, ret;
+> +	int channel;
+> +
+> +	phy_drd = devm_kzalloc(dev, sizeof(*phy_drd), GFP_KERNEL);
+> +	if (!phy_drd)
+> +		return -ENOMEM;
+> +
+> +	dev_set_drvdata(dev, phy_drd);
+> +	phy_drd->dev = dev;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	phy_drd->reg_phy = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(phy_drd->reg_phy))
+> +		return PTR_ERR(phy_drd->reg_phy);
+> +
+> +	match = of_match_node(exynos5_usbdrd_phy_of_match, pdev->dev.of_node);
+> +
+> +	drv_data = match->data;
+> +	phy_drd->drv_data = drv_data;
+> +
+> +	phy_drd->clk = devm_clk_get(dev, "phy");
+> +	if (IS_ERR(phy_drd->clk)) {
+> +		dev_err(dev, "Failed to get clock of phy controller\n");
+> +		return PTR_ERR(phy_drd->clk);
+> +	}
+> +
+> +	phy_drd->ref_clk = devm_clk_get(dev, "ref");
+> +	if (IS_ERR(phy_drd->ref_clk)) {
+> +		dev_err(dev, "Failed to get reference clock of usbdrd phy\n");
+> +		return PTR_ERR(phy_drd->ref_clk);
+> +	}
+> +	ref_rate = clk_get_rate(phy_drd->ref_clk);
+> +
+> +	ret = exynos5_rate_to_clk(ref_rate, &phy_drd->extrefclk);
 > +	if (ret) {
-> +		if (ret != -EPROBE_DEFER)
-> +			dev_err(&pdev->dev, "Could not get vmmc supply\n");
+> +		dev_err(phy_drd->dev, "Clock rate (%ld) not supported\n",
+> +			ref_rate);
 > +		return ret;
 > +	}
 > +
-> +	host->reg_base = devm_ioremap_resource(&pdev->dev,
-> +			      platform_get_resource(pdev, IORESOURCE_MEM, 0));
-> +	if (IS_ERR(host->reg_base))
-> +		return PTR_ERR(host->reg_base);
-> +
-> +	host->clk_ahb = devm_clk_get(&pdev->dev, "ahb");
-> +	if (IS_ERR(host->clk_ahb)) {
-> +		dev_err(&pdev->dev, "Could not get ahb clock\n");
-> +		return PTR_ERR(host->clk_ahb);
-> +	}
-> +
-> +	host->clk_mmc = devm_clk_get(&pdev->dev, "mmc");
-> +	if (IS_ERR(host->clk_mmc)) {
-> +		dev_err(&pdev->dev, "Could not get mmc clock\n");
-> +		return PTR_ERR(host->clk_mmc);
-> +	}
-> +
-> +	host->reset = devm_reset_control_get(&pdev->dev, "ahb");
-> +
-> +	ret = clk_prepare_enable(host->clk_ahb);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "Enable ahb clk err %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	ret = clk_prepare_enable(host->clk_mmc);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "Enable mmc clk err %d\n", ret);
-> +		goto error_disable_clk_ahb;
-> +	}
-> +
-> +	if (!IS_ERR(host->reset)) {
-> +		ret = reset_control_deassert(host->reset);
-> +		if (ret) {
-> +			dev_err(&pdev->dev, "reset err %d\n", ret);
-> +			goto error_disable_clk_mmc;
-> +		}
+> +	reg_pmu = syscon_regmap_lookup_by_phandle(dev->of_node,
+> +						   "samsung,pmu-syscon");
+> +	if (IS_ERR(reg_pmu)) {
+> +		dev_err(dev, "Failed to lookup PMU regmap\n");
+> +		return PTR_ERR(reg_pmu);
 > +	}
 > +
 > +	/*
-> +	 * Sometimes the controller asserts the irq on boot for some reason,
-> +	 * make sure the controller is in a sane state before enabling irqs.
+> +	 * Exynos5420 SoC has multiple channels for USB 3.0 PHY, with
+> +	 * each having separate power control registers.
+> +	 * 'channel' facilitates to set such registers.
 > +	 */
-> +	ret = sunxi_mmc_reset_host(host);
-> +	if (ret)
-> +		goto error_assert_reset;
+> +	channel = of_alias_get_id(node, "usbdrdphy");
+> +	if (channel < 0)
+> +		dev_dbg(dev, "Not a multi-controller usbdrd phy\n");
 > +
-> +	host->irq = platform_get_irq(pdev, 0);
-> +	return devm_request_threaded_irq(&pdev->dev, host->irq, sunxi_mmc_irq,
-> +			sunxi_mmc_handle_manual_stop, 0, "sunxi-mmc", host);
-> +
-> +error_assert_reset:
-> +	if (!IS_ERR(host->reset))
-> +		reset_control_assert(host->reset);
-> +error_disable_clk_mmc:
-> +	clk_disable_unprepare(host->clk_mmc);
-> +error_disable_clk_ahb:
-> +	clk_disable_unprepare(host->clk_ahb);
-> +	return ret;
-> +}
-> +
-> +static int sunxi_mmc_probe(struct platform_device *pdev)
-> +{
-> +	struct sunxi_mmc_host *host;
-> +	struct mmc_host *mmc;
-> +	int ret;
-> +
-> +	mmc = mmc_alloc_host(sizeof(struct sunxi_mmc_host),&pdev->dev);
-> +	if (!mmc) {
-> +		dev_err(&pdev->dev, "mmc alloc host failed\n");
-> +		return -ENOMEM;
+> +	switch (channel) {
+> +	case 1:
+> +		pmu_offset = phy_drd->drv_data->pmu_offset_usbdrd1_phy;
+> +		break;
+> +	case 0:
+> +	default:
+> +		pmu_offset = phy_drd->drv_data->pmu_offset_usbdrd0_phy;
+> +		break;
 > +	}
 > +
-> +	host = mmc_priv(mmc);
-> +	host->mmc = mmc;
-> +	spin_lock_init(&host->lock);
+> +	dev_vdbg(dev, "Creating usbdrd_phy phy\n");
 > +
-> +	ret = sunxi_mmc_resource_request(host, pdev);
-> +	if (ret)
-> +		goto error_free_host;
+> +	for (i = 0; i < EXYNOS5_DRDPHYS_NUM; i++) {
+> +		struct phy *phy = devm_phy_create(dev, &exynos5_usbdrd_phy_ops,
+> +						  NULL);
+> +		if (IS_ERR(phy)) {
+> +			dev_err(dev, "Failed to create usbdrd_phy phy\n");
+> +			return PTR_ERR(phy);
+> +		}
 > +
-> +	host->sg_cpu = dma_alloc_coherent(&pdev->dev, PAGE_SIZE,
-> +					&host->sg_dma, GFP_KERNEL);
-> +	if (!host->sg_cpu) {
-> +		dev_err(&pdev->dev, "Failed to allocate DMA descriptor mem\n");
-> +		ret = -ENOMEM;
-> +		goto error_free_host;
+> +		phy_drd->phys[i].phy = phy;
+> +		phy_drd->phys[i].index = i;
+> +		phy_drd->phys[i].reg_pmu = reg_pmu;
+> +		phy_drd->phys[i].pmu_offset = pmu_offset;
+> +		phy_drd->phys[i].phy_cfg = &drv_data->phy_cfg[i];
+> +		phy_set_drvdata(phy, &phy_drd->phys[i]);
 > +	}
 > +
-> +	mmc->ops		=&sunxi_mmc_ops;
-> +	mmc->max_blk_count	= 8192;
-> +	mmc->max_blk_size	= 4096;
-> +	mmc->max_segs		= PAGE_SIZE / sizeof(struct sunxi_idma_des);
-> +	mmc->max_seg_size	= (1<<  host->idma_des_size_bits);
-> +	mmc->max_req_size	= mmc->max_seg_size * mmc->max_segs;
-> +	/* 400kHz ~ 50MHz */
-> +	mmc->f_min		=   400000;
-> +	mmc->f_max		= 50000000;
-> +	mmc->caps	       |= MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED;
-> +
-> +	ret = mmc_of_parse(mmc);
-> +	if (ret)
-> +		goto error_free_dma;
-> +
-> +	ret = mmc_add_host(mmc);
-> +	if (ret)
-> +		goto error_free_dma;
-> +
-> +	dev_info(&pdev->dev, "base:0x%p irq:%u\n", host->reg_base, host->irq);
-> +	platform_set_drvdata(pdev, mmc);
-> +	return 0;
-> +
-> +error_free_dma:
-> +	dma_free_coherent(&pdev->dev, PAGE_SIZE, host->sg_cpu, host->sg_dma);
-> +error_free_host:
-> +	mmc_free_host(mmc);
-> +	return ret;
-> +}
-> +
-> +static int sunxi_mmc_remove(struct platform_device *pdev)
-> +{
-> +	struct mmc_host	*mmc = platform_get_drvdata(pdev);
-> +	struct sunxi_mmc_host *host = mmc_priv(mmc);
-> +
-> +	mmc_remove_host(mmc);
-> +	disable_irq(host->irq);
-> +	sunxi_mmc_reset_host(host);
-> +
-> +	if (!IS_ERR(host->reset))
-> +		reset_control_assert(host->reset);
-> +
-> +	clk_disable_unprepare(host->clk_mmc);
-> +	clk_disable_unprepare(host->clk_ahb);
-> +
-> +	dma_free_coherent(&pdev->dev, PAGE_SIZE, host->sg_cpu, host->sg_dma);
-> +	mmc_free_host(mmc);
+> +	phy_provider = devm_of_phy_provider_register(dev,
+> +						     exynos5_usbdrd_phy_xlate);
+> +	if (IS_ERR(phy_provider)) {
+> +		dev_err(phy_drd->dev, "Failed to register phy provider\n");
+> +		return PTR_ERR(phy_provider);
+> +	}
 > +
 > +	return 0;
 > +}
 > +
-> +static struct platform_driver sunxi_mmc_driver = {
+> +static struct platform_driver exynos5_usb3drd_phy = {
+> +	.probe	= exynos5_usbdrd_phy_probe,
 > +	.driver = {
-> +		.name	= "sunxi-mmc",
-> +		.owner	= THIS_MODULE,
-> +		.of_match_table = of_match_ptr(sunxi_mmc_of_match),
-> +	},
-> +	.probe		= sunxi_mmc_probe,
-> +	.remove		= sunxi_mmc_remove,
+> +		.of_match_table	= exynos5_usbdrd_phy_of_match,
+> +		.name		= "exynos5_usb3drd_phy",
+> +		.owner		= THIS_MODULE,
+> +	}
 > +};
-> +module_platform_driver(sunxi_mmc_driver);
 > +
-> +MODULE_DESCRIPTION("Allwinner's SD/MMC Card Controller Driver");
+> +module_platform_driver(exynos5_usb3drd_phy);
+> +MODULE_DESCRIPTION("Samsung EXYNOS5 SoCs USB 3.0 DRD controller PHY driver");
+> +MODULE_AUTHOR("Vivek Gautam <gautam.vivek@samsung.com>");
 > +MODULE_LICENSE("GPL v2");
-> +MODULE_AUTHOR("David Lanzend?rfer<david.lanzendoerfer@o2s.ch>");
-> +MODULE_ALIAS("platform:sunxi-mmc");
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> +MODULE_ALIAS("platform:exynos5_usb3drd_phy");
+> diff --git a/include/linux/mfd/syscon/exynos5-pmu.h b/include/linux/mfd/syscon/exynos5-pmu.h
+> new file mode 100644
+> index 0000000..00ef24b
+> --- /dev/null
+> +++ b/include/linux/mfd/syscon/exynos5-pmu.h
+> @@ -0,0 +1,44 @@
+> +/*
+> + * Exynos5 SoC series Power Management Unit (PMU) register offsets
+> + * and bit definitions.
+> + *
+> + * Copyright (C) 2014 Samsung Electronics Co., Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#ifndef _LINUX_MFD_SYSCON_PMU_EXYNOS5_H_
+> +#define _LINUX_MFD_SYSCON_PMU_EXYNOS5_H_
+> +
+> +/* Exynos5 PMU register definitions */
+> +#define EXYNOS5_HDMI_PHY_CONTROL		(0x700)
+> +#define EXYNOS5_USBDRD_PHY_CONTROL		(0x704)
+> +
+> +/* Exynos5250 specific register definitions */
+> +#define EXYNOS5_USBHOST_PHY_CONTROL		(0x708)
+> +#define EXYNOS5_EFNAND_PHY_CONTROL		(0x70c)
+> +#define EXYNOS5_MIPI_PHY0_CONTROL		(0x710)
+> +#define EXYNOS5_MIPI_PHY1_CONTROL		(0x714)
+> +#define EXYNOS5_ADC_PHY_CONTROL			(0x718)
+> +#define EXYNOS5_MTCADC_PHY_CONTROL		(0x71c)
+> +#define EXYNOS5_DPTX_PHY_CONTROL		(0x720)
+> +#define EXYNOS5_SATA_PHY_CONTROL		(0x724)
+> +
+> +/* Exynos5420 specific register definitions */
+> +#define EXYNOS5420_USBDRD1_PHY_CONTROL		(0x708)
+> +#define EXYNOS5420_USBHOST_PHY_CONTROL		(0x70c)
+> +#define EXYNOS5420_MIPI_PHY0_CONTROL		(0x714)
+> +#define EXYNOS5420_MIPI_PHY1_CONTROL		(0x718)
+> +#define EXYNOS5420_MIPI_PHY2_CONTROL		(0x71c)
+> +#define EXYNOS5420_ADC_PHY_CONTROL		(0x720)
+> +#define EXYNOS5420_MTCADC_PHY_CONTROL		(0x724)
+> +#define EXYNOS5420_DPTX_PHY_CONTROL		(0x728)
+> +
+> +#define EXYNOS5_PHY_ENABLE			BIT(0)
+> +
+> +#define EXYNOS5_MIPI_PHY_S_RESETN		BIT(1)
+> +#define EXYNOS5_MIPI_PHY_M_RESETN		BIT(2)
+> +
+> +#endif /* _LINUX_MFD_SYSCON_PMU_EXYNOS5_H_ */
+> 
