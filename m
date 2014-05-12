@@ -1,88 +1,60 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Mon, 12 May 2014 10:52:22 +0900
-Subject: [PATCH v3 0/6] Introducing Exynos ChipId driver
-In-Reply-To: <CAOesGMi9J=03NY+0FFTusMnMG_Xu--zLnX=QbiG=ym2n=tn8ow@mail.gmail.com>
-References: <1399706287-13919-1-git-send-email-y@samsung.com>
- <CAOesGMi9J=03NY+0FFTusMnMG_Xu--zLnX=QbiG=ym2n=tn8ow@mail.gmail.com>
-Message-ID: <53702956.6060607@samsung.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Mon, 12 May 2014 10:44:07 +0900
+Subject: [PATCH 06/17] pci: host: pcie-designware: Use *base-mask* for
+ configuring the iATU
+In-Reply-To: <536CC0F1.301@ti.com>
+References: <1399383244-14556-1-git-send-email-kishon@ti.com>
+ <4764413.ZAEU5S5p0p@wuerfel> <000201cf6a9c$9dd295e0$d977c1a0$%han@samsung.com>
+ <6882241.amuhzvbd8n@wuerfel> <536CC0F1.301@ti.com>
+Message-ID: <006501cf6d83$a9f39510$fddabf30$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/11/2014 04:12 PM, Olof Johansson wrote:
-> Hi,
->
-> On Sat, May 10, 2014 at 12:18 AM,  <y@samsung.com> wrote:
->> From: Pankaj Dubey <pankaj.dubey@samsung.com>
->>
->> This patch series attempts to get rid of soc_is_exynosXXXX macros
->> and eventually with the help of this series we can probably get
->> rid of CONFIG_SOC_EXYNOSXXXX in near future.
->> Each Exynos SoC has ChipID block which can give information about
->> SoC's product Id and revision number. Currently we have single
->> DT binding information for this as "samsung,exynos4210-chipid".
->> But Exynos4 and Exynos5 SoC series have one small difference in
->> chip Id, with resepect to product id bit-masks. So it means we
->> should have separate compatible string for these different series
->> of SoCs. So I have added second compatible string for handling
->> this difference.
->> This patch series is based on Kukjin Kim's for-next (3.14_rc1 tag)
->> and prepared on top of following patch series and it's dependent
->> patch series.
->>
->> [1]: Map SYSRAM through generic SRAM bindings by Sachin Kamat.
->>          http://www.spinics.net/lists/arm-kernel/msg327677.html
->> [2]: Exynos PMU cleanup and refactoring.
->>          https://lkml.org/lkml/2014/4/30/44
->> [3]: Introduce drivers/soc and add QCOM GSBI driver.
->>          https://lkml.org/lkml/2014/4/24/520
->>
->> Revision 2 and it's discussion can be found here
->>   - https://lkml.org/lkml/2014/5/6/100
-> As I just realized when I commented on the last patch in the patchset
-> (the cpufreq section): I think you can, and should, use
-> of_machine_is_compatible() for most of these cases, instead of using a
-> new API through a chipid driver. Since all boards based on an SoC
-> should have that in the string of compatibles, it's a shared and easy
-> way to handle this without adding custom drivers per manufacturer.
-I am sorry, I could not see your comments in my last patch-set.
+On Friday, May 09, 2014 8:50 PM, Kishon Vijay Abraham I wrote:
+> On Thursday 08 May 2014 02:48 PM, Arnd Bergmann wrote:
+> > On Thursday 08 May 2014 18:05:11 Jingoo Han wrote:
+> >> On Tuesday, May 06, 2014 10:59 PM, Arnd Bergmann wrote:
+> >>> On Tuesday 06 May 2014 19:03:52 Kishon Vijay Abraham I wrote:
+> >>>> In DRA7, the cpu sees 32bit address, but the pcie controller can see only 28bit
+> >>>> address. So whenever the cpu issues a read/write request, the 4 most
+> >>>> significant bits are used by L3 to determine the target controller.
+> >>>> For example, the cpu reserves 0x2000_0000 - 0x2FFF_FFFF for PCIe controller but
+> >>>> the PCIe controller will see only (0x000_0000 - 0xFFF_FFF). So for programming
+> >>>> the outbound translation window the *base* should be programmed as 0x000_0000.
+> >>>> Whenever we try to write to say 0x2000_0000, it will be translated to whatever
+> >>>> we have programmed in the translation window with base as 0x000_0000.
+> >>>>
+> >>>> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> >>>> Cc: Marek Vasut <marex@denx.de>
+> >>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> >>>> Acked-by: Jingoo Han <jg1.han@samsung.com>
+> >>>> Acked-by: Mohit Kumar <mohit.kumar@st.com>
+> >>>
+> >>> Sorry, but NAK.
+> >>>
+> >>> We have a standard 'dma-ranges' property to handle this, so use it.
+> >>>
+> >>> See the x-gene PCIe driver patches for an example. Please also talk
+> >>> to Santosh about it, as he is implementing generic support for
+> >>> parsing dma-ranges in platform devices at the moment.
+> >>
+> >> Hi Arnd,
+> >>
+> >> Do you mean the following patch?
+> >> http://www.spinics.net/lists/kernel/msg1737725.html
+> >>
+> >
+> > That is the patch Santosh did for platform devices, which is related but not
+> > what I meant here. For the PCI inbound window setup, please have a look
+> > at https://lkml.org/lkml/2014/3/19/607
+> 
+> For some reason lkml is not showing any contents. Do you have a different link?
 
-Anyway, thanks for review. During first version of this patch, I had
-discussion with Arnd [1], and it looks like he do not like idea of using
-"of_machine_is_compatible".
+Hi Kishon,
 
-[1]: https://lkml.org/lkml/2014/5/5/126
-       and
-https://lkml.org/lkml/2014/5/5/335
-
-So my proposal was till we get generic solution for all files
-under mach-exynos let's use chip-id driver provided APIs.
-
-Also chip-id driver is not only for providing this API but also
-to provide SoC specific information as a sysfs entry to userspace.
-So even though we do not want to use chipid driver API's
-for identifying SoCs we can keep this driver.
-
-So let us discuss again and decide which will be best way
-(at the same time less overhead) solution for removing usage
-of soc_is_exynosXYZ and related CONFIG macros from exynos.
-
-@Arnd and Tomasz, I would appreciate if you spent some time
-to review this series as I have addressed many of your
-review comments.
-
-> There will possibly be some cases where it doesn't fit well, but for
-> nearly all cases it should be sufficient.
->
-> (The patchset contains some other good cleanups, of course you should
-> keep those).
-
-Thanks and sure, I would like those should get merged.
-
->
-> -Olof
->
+Please refer to the following link. :-)
+http://www.spinics.net/lists/linux-pci/msg29855.html
 
 
--- 
-Best Regards,
-Pankaj Dubey
+Best regards,
+Jingoo Han
