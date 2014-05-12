@@ -1,53 +1,64 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 12 May 2014 12:29:16 -0600
-Subject: [RFC] Describing arbitrary bus mastering relationships in DT
-In-Reply-To: <25333129.urqEa0mCI8@wuerfel>
-References: <20140501173248.GD3732@e103592.cambridge.arm.com>
- <20140509105638.GB3921@e103592.cambridge.arm.com>
- <5370F484.9030209@wwwdotorg.org> <25333129.urqEa0mCI8@wuerfel>
-Message-ID: <537112FC.1040204@wwwdotorg.org>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Mon, 12 May 2014 20:31:59 +0200
+Subject: [PATCH v3 0/4] Support for Variscite OM44 modules and boards
+Message-ID: <1399919523-20330-1-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/12/2014 12:10 PM, Arnd Bergmann wrote:
-> On Monday 12 May 2014 10:19:16 Stephen Warren wrote:
->> On 05/09/2014 04:56 AM, Dave Martin wrote:
->>> On Fri, May 02, 2014 at 09:06:43PM +0200, Arnd Bergmann wrote:
->>>> On Friday 02 May 2014 12:50:17 Stephen Warren wrote:
->> ...
->>>>> Now, perhaps there are devices which themselves control whether
->>>>> transactions are sent to the IOMMU or direct to RAM, but I'm not
->>>>> familiar with them. Is the GPU in that category, since it has its own
->>>>> GMMU, albeit chained into the SMMU IIRC?
->>>>
->>>> Devices with a built-in IOMMU such as most GPUs are also easy enough
->>>> to handle: There is no reason to actually show the IOMMU in DT and
->>>> we can just treat the GPU as a black box.
->>>
->>> It's impossible for such a built-in IOMMU to be shared with other
->>> devices, so that's probably reasonable.
->>
->> I don't believe that's true.
->>
->> For example, on Tegra, the CPU (and likely anything that can bus-master
->> the relevant bus) can send transactions into the GPU, which can then
->> turn them around towards RAM, and those likely then go through the MMU
->> inside the GPU.
->>
->> IIRC, the current Nouveau support for Tegra even makes use of that
->> feature, although I think that's a temporary thing that we're hoping to
->> get rid of once the Tegra support in Nouveau gets more mature.
-> 
-> But the important point here is that you wouldn't use the dma-mapping
-> API to manage this. First of all, the CPU is special anyway, but also
-> if you do a device-to-device DMA into the GPU address space and that
-> ends up being redirected to memory through the IOMMU, you still wouldn't
-> manage the I/O page tables through the interfaces of the device doing the
-> DMA, but through some private interface of the GPU.
+Hello,
 
-Why not? If something wants to DMA to a memory region, irrespective of
-whether the GPU MMU (or any MMU) is in between those master transactions
-and the RAM or not, surely the driver should always use the DMA mapping
-API to set that up? Anything else just means using custom APIs, and
-isn't the whole point of the DMA mapping API to provide a standard API
-for that purpose?
+This patch set adds support for Variscite OM44 series of system on
+modules and boards.
+
+Changes v3:
+ * Use new OMAP4_IOPAD macro
+ * Add Tomi's Ack for patches with DSS DT nodes
+ * Rebase on Tony's omap-for-v3.16/dt branch
+v2:
+ * Use OMAP IOPAD macros
+
+Patch 1: Add support for the SoM itself and the reference carrier
+board. Together these make the VAR-STK-OM44 dev kit.
+
+Patch 2: Add support for VAR-DVK-OM44 which is just the STK with
+a LCD display.
+
+Patch 3: Nodes for WLAN/BT support.
+
+Patch 4: Add quirks so that WLAN can be used. Still waiting for
+proper DT bindings.
+
+Since this patch set uses the new OMAP4_IOPAD macro the follow patch
+must be applied: https://patchwork.kernel.org/patch/4160561/
+
+Note that patch 1 and 2 relies upon the DSS panel and HDMI hpq DT
+patches from Tomi Valkeinen. See Tomi's 3.16/omap branch.
+
+The branch from Tomi mentioned above is destined for 3.16.
+
+Joachim Eastwood (4):
+  ARM: dts: Add support for OMAP4 Variscite OM44 family
+  ARM: dts: Add support for OMAP4 VAR-DVK-OM44
+  ARM: dts: Add VAR-SOM-OM44 WLAN nodes
+  ARM: OMAP2+: Use pdata quirks for wl12xx on VAR-STK/DVK-OM44
+
+ .../devicetree/bindings/arm/omap/omap.txt          |   6 +
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/boot/dts/Makefile                         |   3 +-
+ arch/arm/boot/dts/omap4-var-dvk-om44.dts           |  71 +++++
+ arch/arm/boot/dts/omap4-var-om44customboard.dtsi   | 235 ++++++++++++++
+ arch/arm/boot/dts/omap4-var-som-om44-wlan.dtsi     |  68 ++++
+ arch/arm/boot/dts/omap4-var-som-om44.dtsi          | 343 +++++++++++++++++++++
+ arch/arm/boot/dts/omap4-var-som.dts                |  96 ------
+ arch/arm/boot/dts/omap4-var-stk-om44.dts           |  17 +
+ arch/arm/mach-omap2/pdata-quirks.c                 |   7 +
+ 10 files changed, 750 insertions(+), 97 deletions(-)
+ create mode 100644 arch/arm/boot/dts/omap4-var-dvk-om44.dts
+ create mode 100644 arch/arm/boot/dts/omap4-var-om44customboard.dtsi
+ create mode 100644 arch/arm/boot/dts/omap4-var-som-om44-wlan.dtsi
+ create mode 100644 arch/arm/boot/dts/omap4-var-som-om44.dtsi
+ delete mode 100644 arch/arm/boot/dts/omap4-var-som.dts
+ create mode 100644 arch/arm/boot/dts/omap4-var-stk-om44.dts
+
+-- 
+1.8.0
