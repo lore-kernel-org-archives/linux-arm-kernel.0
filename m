@@ -1,50 +1,112 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 12 May 2014 10:31:41 +0200
-Subject: [PATCH] clk: shmobile: clk-mstp: change to using clock-indices
-In-Reply-To: <CAMuHMdXO=WJjNSsWbKx5KxrF3w9VgEyEj3kdiSN1AyxaHFKpFw@mail.gmail.com>
-References: <1397577994-12061-1-git-send-email-ben.dooks@codethink.co.uk>
- <20140505225013.5739.23946@quantum>
- <CAMuHMdXO=WJjNSsWbKx5KxrF3w9VgEyEj3kdiSN1AyxaHFKpFw@mail.gmail.com>
-Message-ID: <CAMuHMdVCYCt5gogociqBk7xGaD97oX8sm4oaqRVyrrRzEKuLmQ@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 12 May 2014 09:34:04 +0100
+Subject: [PATCH 2/3] arm64: Add big.LITTLE switcher stub
+In-Reply-To: <20140509192921.GY12304@sirena.org.uk>
+References: <1399653631-4938-1-git-send-email-broonie@kernel.org>
+ <1399653631-4938-2-git-send-email-broonie@kernel.org>
+ <536D0AF4.1040705@arm.com> <20140509175005.GT12304@sirena.org.uk>
+ <536D2533.6050100@arm.com> <20140509192921.GY12304@sirena.org.uk>
+Message-ID: <5370877C.40409@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
 
-On Tue, May 6, 2014 at 1:43 PM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
-> On Tue, May 6, 2014 at 12:50 AM, Mike Turquette <mturquette@linaro.org> wrote:
->> Quoting Ben Dooks (2014-04-15 09:06:34)
->>> With the addition of clock-indices, we need to change the renesas
->>> clock implementation to use these instead of the local definition
->>> of "renesas,clock-indices".
->>>
->>> Since this will break booting with older device trees, we add a
->>> simple auto-detection of which properties are present.
->>>
->>> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
->>
->> I'm fine to take this into clk-fixes, destined for 3.15-rc5. Does that
+On 09/05/14 20:29, Mark Brown wrote:
+> On Fri, May 09, 2014 at 07:57:55PM +0100, Sudeep Holla wrote:
+>> On 09/05/14 18:50, Mark Brown wrote:
 >
-> Thanks!
-
-It seems this missed rc5?
-Can you please submit for rc6?
-
-Thanks again!
-
->> solve the issues on your end? Do you still need me to host a stable
->> topic branch for you? I'm happy to do that if needed.
+>>> Given that the code isn't invasive I think the expediency tradeoff is OK
+>>> for mainline, it's easy enough to get rid of when we come up with
+>>> something better but in the meaintine it helps actual systems work
+>>> better in mainline - if we didn't have the ARM implementation already I
+>>> think it'd be different but we do.
 >
-> As Simon will be on holidays until rc5, I think he can just use rc5 as the
-> stable base for further fixes.
+>> I disagree, I don't see a real urgency for this on ARM64. Even on ARM32, no
+>> single platform other than TC2 is using this(at least as I see in the mainline).
+>
+>> If some real platform that needs this support urgently, then we can think of
+>> similar short-term solution as part of adding support for cpufreq on that
+>> platform. Do you know any platform that needs this right now ?
+>
+> There's the big.LITTLE Exynos devices, at least the 5410 has shipped in
+> product using IKS I believe and so should've been using the big.LITTLE
+> cpufreq driver to do the cluster switching; I think some 5420 systems
+> were doing the same.  Or reimplementing it which would just be sad.
+> There's some other non-public devices I am aware of - the whole reason I
+> wrote this series was for those.
+>
 
-Gr{oetje,eeting}s,
+Correct all these are 32-bit platforms which are now in process of upstreaming.
+So far they had their own driver and never used the arm-big-little driver.
+And this current series deals with 64-bit platforms.
 
-                        Geert
+>>> Perfect can be the enemy of good (or at least adequate), one of the
+>>> problems I'm seeing right now with convincing people to work with
+>>> mainline is that people are missing lots of important functionality when
+>>> they look at mainline.
+>
+>> Ok fair enough. But we can take some time and see if we can workout better
+>> solution rather than jumping to add interim solutions when is unlikely to be
+>> used on any real platform.
+>
+> There are real users who want to use this fairly urgently.  I can't be
+> specific, sorry.
+>
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+That's fine, I understand. But the main argument is that if these platforms
+will not add support for cpufreq upstream anytime soon, I don't see any value
+in rushing to this short term solution.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+>>> Personally the solution I'd rather see is cpufreq-cpu0 extended to
+>>> handle shared clocks which would remove the need to use the big.LITTLE
+>
+>> Ideally yes. IIUC it has dependencies on CPU0 and I have not looked that
+>> driver and all of its users to judge how feasible is that. At-least we can
+>> have cpufreq-cpu0 for all single cluster systems w/o support for per-CPU DVFS
+>> and another which can handle multi-cluster systems(with or w/o per-CPU DVFS).
+>
+>> Just a thought...
+>
+> It's not clear to me that having multiple clusters should require a
+> different driver, the single cluster case is just a specialisation of
+> the multicluster one as far as I can see.  It's possible I'm missing
+> something though.
+>
+
+No you are correct, but that change would require lot of changes and testing.
+So my proposal above is just first step to avoid any new drivers and then we
+need to merge it with cpufreq-cpu0.
+
+> I have to confess I didn't look in detail at cpufreq-cpu0 to make sure
+> it's the best place to start from but it looks clean and does have the
+> regulator stuff, though it's probably better to say that the goal is to
+> merge that and the big.LITTLE driver.
+>
+
+Me either, hence I didn't want to comment much on merging everything to
+cpufrq-cpu0. Need to understand all the platforms using it so that generic 
+solution based on clocks continues to work.
+
+>>> directly connected to their clustering.  Clustering is important to the
+>>> scheduler and an understanding of the power and clock sharing
+>>> constraints that come along with clusters is going to be required there
+>>> as part of energy aware scheduling but I'm not seeing any obvious reason
+>>> for the frequency scaling driver to know about this, even with cpufreq
+>>> governors it's mostly the clock sharing.
+>
+>> Both CPUFreq and Energy aware scheduling need understanding of clock
+>> sharing. Both have similar goals(save power with little or no performance
+>> degradation), but EA scheduler will be more efficient(both in terms of power
+>> and performance).
+>
+>> Governors need this knowledge of sharing as it affects the load calculation.
+>> (IIRC maximum load of all the cpu sharing clocks is taken)
+>
+> Yes, definitely with respect to the clocks - my point was more about the
+> clustering bit (which is related to but not 100% tied to clocks).
+>
+
+Ok, that makes sense.
+
+Regards,
+Sudeep
