@@ -1,44 +1,28 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 13 May 2014 01:49:26 +0200
-Subject: [PATCH v3 2/6] dt-bindings: add mtk-timer bindings
+Date: Tue, 13 May 2014 01:49:27 +0200
+Subject: [PATCH v3 3/6] vendor-prefixes: add prefix for Mediaktek Inc.
 In-Reply-To: <1399938570-11356-1-git-send-email-matthias.bgg@gmail.com>
 References: <1399938570-11356-1-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <1399938570-11356-3-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <1399938570-11356-4-git-send-email-matthias.bgg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add binding documentation for the General Porpose Timer driver of
-the Mediatek SoCs.
-
 Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
 ---
- .../devicetree/bindings/timer/mediatek,mtk-timer.txt   | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
-new file mode 100644
-index 0000000..d0f2df3
---- /dev/null
-+++ b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
-@@ -0,0 +1,18 @@
-+Mediatek MT6589, MT6577 and MT6572 Timers
-+---------------------------------------
-+
-+Required properties:
-+- compatible: Should be "mediatek,mtk6589-timer"
-+- reg: Should contain location and length for timers register.
-+- clocks: phandle to the clock source; the first refers to a 13 MHz fixed
-+		system clock and the second handle to a 32 KHz fixed RTC
-+		clock.
-+
-+Examples:
-+
-+	timer {
-+		compatible = "mediatek,mtk6589-timer";
-+		reg = <0x10008000 0x80>;
-+		interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&system_clk>, <&rtc_clk>;
-+	};
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index abc3080..73f9e4c 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -75,6 +75,7 @@ linux	Linux-specific binding
+ lsi	LSI Corp. (LSI Logic)
+ marvell	Marvell Technology Group Ltd.
+ maxim	Maxim Integrated Products
++mediatek	MediaTek Inc.
+ microchip	Microchip Technology Inc.
+ mosaixtech	Mosaix Technologies, Inc.
+ moxa	Moxa
 -- 
 1.8.1.2
