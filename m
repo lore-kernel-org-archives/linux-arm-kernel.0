@@ -1,46 +1,42 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 12 May 2014 17:44:18 +0300
-Subject: [PATCH 1/4] OMAPDSS: Fix DSS clock multiplier issue on 3703 and
- probably 3630
-In-Reply-To: <20140512143934.GC31772@atomide.com>
-References: <1398815562-24113-1-git-send-email-tony@atomide.com>
- <1398815562-24113-2-git-send-email-tony@atomide.com>
- <536C860E.1000501@ti.com> <20140509143703.GA17814@atomide.com>
- <5370B222.7050702@ti.com> <20140512143934.GC31772@atomide.com>
-Message-ID: <5370DE42.2060607@ti.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Mon, 12 May 2014 22:45:00 +0800
+Subject: [GIT PULL] sirf clk update for 3.16
+Message-ID: <CAGsJ_4z+Y2P1YNTQWC-VsaT3N0Kasd=LvxAbLVLMftnt8gZbkg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/05/14 17:39, Tony Lindgren wrote:
-> * Tomi Valkeinen <tomi.valkeinen@ti.com> [140512 04:36]:
->> On 09/05/14 17:37, Tony Lindgren wrote:
->>>
->>> This is just the 3730-evm with the Sharp VGA panel mentioned in
->>> this series.
->>
->> Hmm, well, those both look fine. The fck is well below the maximum,
->> which is somewhere around 170MHz-180MHz. The lck/pck ratio is higher
->> with this patch, but that should affect the GFX overlay.
->>
->> So you're just booting, and there are no applications that use the
->> framebuffer? And there is no rotation or such configured?
-> 
-> Right. The rotation is set to 3 though.
+Hi Mike,
 
-Hmm, that's probably the issue then. VRFB rotation is very heavy on the
-memory bandwidth, and is generally a very easy way to get sync lost errors.
-
-My opinion is that VRFB should only be used when you know your system
-will handle it fine with the clock rates and bandwidth usage you have
-for your use cases.
-
- Tomi
+can you pull the below update for 3.16? it cleanups the sirf clk codes
+to fix some minor checkpatch issues according to key customer's
+requirement.
 
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140512/42f6404f/attachment.sig>
+The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+
+  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux.git
+tags/clk-sirf-for-3.16
+
+for you to fetch changes up to d7ba5ba84c169e369dd3480f3968044f2f8946a8:
+
+  clk: sirf: fix a bundle of checkpatch issues (2014-05-12 22:32:05 +0800)
+
+----------------------------------------------------------------
+clk: sirf: update for 3.16
+
+fix minor checkpatch issues according to key customers' requirement.
+
+----------------------------------------------------------------
+Bin Shi (1):
+      clk: sirf: fix a bundle of checkpatch issues
+
+ drivers/clk/sirf/clk-atlas6.c |   12 ++++++------
+ drivers/clk/sirf/clk-common.c |   22 ++++++++++++----------
+ drivers/clk/sirf/clk-prima2.c |   10 +++++-----
+ 3 files changed, 23 insertions(+), 21 deletions(-)
+
+-barry
