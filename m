@@ -1,31 +1,31 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 12 May 2014 10:29:56 +0100
-Subject: [PATCH v2] arm64: Support arch_irq_work_raise() via self IPIs
-In-Reply-To: <1399760621-10954-1-git-send-email-larry.bassel@linaro.org>
-References: <1399760621-10954-1-git-send-email-larry.bassel@linaro.org>
-Message-ID: <20140512092956.GB914@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 May 2014 11:30:15 +0200
+Subject: [PATCH v2 3/4] arm: add basic support for Mediatek MT6589 boards
+In-Reply-To: <1399772463-859-4-git-send-email-matthias.bgg@gmail.com>
+References: <1399772463-859-1-git-send-email-matthias.bgg@gmail.com>
+ <1399772463-859-4-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <80525303.7Oax6ZBozr@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 10, 2014 at 11:23:41PM +0100, Larry Bassel wrote:
-> Support for arch_irq_work_raise() was missing from
-> arm64 (a prerequisite for FULL_NOHZ).
-
-[...]
-
-> @@ -455,6 +457,14 @@ void arch_send_call_function_single_ipi(int cpu)
->  	smp_cross_call(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
->  }
->  
-> +#ifdef CONFIG_IRQ_WORK
-> +void arch_irq_work_raise(void)
+On Sunday 11 May 2014 03:41:02 Matthias Brugger wrote:
+> +
+> +static void __init mediatek_dt_init(void)
 > +{
-> +	if (is_smp())
-> +		smp_cross_call(cpumask_of(smp_processor_id()), IPI_IRQ_WORK);
+> +       of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
 > +}
-> +#endif
+> +
+> +static const char * const mediatek_board_dt_compat[] = {
+> +       "mediatek,mt6589",
+> +       NULL,
+> +};
+> +
+> +DT_MACHINE_START(MEDIATEK_DT, "Mediatek Cortex-A7 (Device Tree)")
+> +       .init_machine   = mediatek_dt_init,
+> +       .dt_compat      = mediatek_board_dt_compat,
+> +MACHINE_END
 
-Does this even compile? We're probably better off just checking whether or
-not smp_cross_call is NULL.
+Since the mediatek_dt_init function now only does the default populate
+call, you can leave it out completely and keep only the compat list.
 
-Will
+	Arnd
