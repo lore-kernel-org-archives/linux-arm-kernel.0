@@ -1,60 +1,63 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 12 May 2014 17:57:54 +0300
-Subject: [PATCH 00/11] ARM: OMAP: OMAP5 & AM43x DSS
-In-Reply-To: <20140512143604.GB31772@atomide.com>
-References: <1399636579-8062-1-git-send-email-tomi.valkeinen@ti.com>
- <5370CBD5.3060107@ti.com> <20140512143604.GB31772@atomide.com>
-Message-ID: <5370E172.20009@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 12 May 2014 16:59:22 +0200
+Subject: [PATCH] ARM: at91: sam9260: fix compilation issues
+In-Reply-To: <1399484748-32718-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1399484748-32718-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <5370E1CA.8070707@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/05/14 17:36, Tony Lindgren wrote:
-> * Tomi Valkeinen <tomi.valkeinen@ti.com> [140512 06:26]:
->> Hi Tony,
->>
->> On 09/05/14 14:56, Tomi Valkeinen wrote:
->>> Hi,
->>>
->>> Here are arch/arm/ patches to add display support for OMAP5 and AM43x.
->>>
->>> I have these in my tree, in a branch I will send to Tony for merging. Most of
->>> these patches have already been around the lists, but I wanted to send them one
->>> more time to verify that all looks right and everybody is fine with them.
->>
->> I have pushed these to:
->>
->> git://git.kernel.org/pub/scm/linux/kernel/git/tomba/linux.git 3.16/omap
->>
->> If you're fine with these, I think we can consider that branch stable.
->> There are probably still a few display related .dts changed for the
->> board coming up, but I'll add those on top of the current commits.
+On 07/05/2014 19:45, Alexandre Belloni :
+> Use the hexadecimal values for the triggers to match what is done for the device
+> tree. This also fixes compilation issues as the defines have been moved
+> elsewhere.
 > 
-> Please coordinate things with Paul and Tero so you at least have proper
-> acks for the hwmod and and clock patches. In general we really want to
-> queue hwmod and clock changes separately as those can easily mess up things
-> in a bad way like we've already seen with overlapping hwmod entries in
-> the .dts files.
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Ok. I'm fine with splitting the series if that's easiest way to manage it.
+Ok, as anyway these files will disappear at some point...
 
-Paul, Tero?
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-> Also, I'm wondering why we still have .clk and .opt_clks entries in the
-> hwmod data for am43xx and omap5 which are both device tree based with
-> all the clocks coming from .dts files?
+Added to at91-3.16-cleanup2. Thanks,
 
-I think they are needed for the omap_device/hwmod stuff to work. Only
-omapdss driver knows about the clocks defined in the .dts files, and the
-omap_device/hwmod code still needs to do the reset and maybe some other
-tasks that require the clocks.
+> ---
+> I believe that at some point, we may want to reintroduce defines for those
+> values but we should probably do that in a dt-bindings include and choose better
+> names as the meaning differ between SoCs.
+> 
+>  arch/arm/mach-at91/at91sam9260_devices.c | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
+> index fffcd09ac878..a8d0d9cb1bca 100644
+> --- a/arch/arm/mach-at91/at91sam9260_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9260_devices.c
+> @@ -1307,19 +1307,19 @@ static struct platform_device at91_adc_device = {
+>  static struct at91_adc_trigger at91_adc_triggers[] = {
+>  	[0] = {
+>  		.name = "timer-counter-0",
+> -		.value = AT91_ADC_TRGSEL_TC0 | AT91_ADC_TRGEN,
+> +		.value = 0x1,
+>  	},
+>  	[1] = {
+>  		.name = "timer-counter-1",
+> -		.value = AT91_ADC_TRGSEL_TC1 | AT91_ADC_TRGEN,
+> +		.value = 0x3,
+>  	},
+>  	[2] = {
+>  		.name = "timer-counter-2",
+> -		.value = AT91_ADC_TRGSEL_TC2 | AT91_ADC_TRGEN,
+> +		.value = 0x5,
+>  	},
+>  	[3] = {
+>  		.name = "external",
+> -		.value = AT91_ADC_TRGSEL_EXTERNAL | AT91_ADC_TRGEN,
+> +		.value = 0xd,
+>  		.is_external = true,
+>  	},
+>  };
+> 
 
- Tomi
 
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140512/b1850739/attachment.sig>
+-- 
+Nicolas Ferre
