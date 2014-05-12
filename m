@@ -1,106 +1,100 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 12 May 2014 17:18:32 +0200
-Subject: [PATCH V5 18/20] ARM: exynos: cpuidle: Pass the AFTR callback
- to the platform_data
-In-Reply-To: <536CC3C6.6070804@samsung.com>
-References: <1397212815-16068-1-git-send-email-daniel.lezcano@linaro.org>
- <1397212815-16068-19-git-send-email-daniel.lezcano@linaro.org>
- <201405091256.54755.arnd@arndb.de> <536CC3C6.6070804@samsung.com>
-Message-ID: <5370E648.10006@linaro.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 12 May 2014 17:18:24 +0200
+Subject: [PATCH 2/2] ARM: mvebu: mvebu-soc-id: keep clock enabled if PCIe
+ unit is enabled
+In-Reply-To: <1399903900-29977-3-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1399903900-29977-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1399903900-29977-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <5370E640.9050706@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/09/2014 02:02 PM, Tomasz Figa wrote:
-> Hi Arnd,
->
-> On 09.05.2014 12:56, Arnd Bergmann wrote:
->> On Friday 11 April 2014, Daniel Lezcano wrote:
->>> No more dependency on the arch code. The platform_data field is used to set the
->>> PM callback as the other cpuidle drivers.
->>>
->>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->>> Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
->>> Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
->>
->> This has just shown up in linux-next and broken randconfig builds.
->>
->>> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
->>> index fe8dac8..d22f0e4 100644
->>> --- a/arch/arm/mach-exynos/exynos.c
->>> +++ b/arch/arm/mach-exynos/exynos.c
->>> @@ -221,8 +221,9 @@ void exynos_restart(enum reboot_mode mode, const char *cmd)
->>>   }
->>>
->>>   static struct platform_device exynos_cpuidle = {
->>> -       .name           = "exynos_cpuidle",
->>> -       .id             = -1,
->>> +       .name              = "exynos_cpuidle",
->>> +       .dev.platform_data = exynos_enter_aftr,
->>> +       .id                = -1,
->>>   };
->>>
->>
->> This is wrong on many levels, can we please do this properly?
->>
->> * The exynos_enter_aftr function is compiled conditionally, so you can't just
->>    reference it from generic code, or you get a link error.
->
-> +1
+Hi Thomas,
 
-That is true but still we have a link error without this patch. We 
-shouldn't register and declare this structure if CONFIG_PM / 
-CONFIG_CPU_IDLE are not set.
+On 12/05/2014 16:11, Thomas Petazzoni wrote:
+> Since the mvebu-soc-id code in mach-mvebu/ was introduced, several
+> users have noticed a regression: the PCIe card connected in the first
+> PCIe interface is not detected properly.
+> 
+> This is due to the fact that the mvebu-soc-id code enables the PCIe
+> clock of the first PCIe interface, reads the SoC device ID and
+> revision number (yes this information is made available as part of
+> PCIe registers), and then disables the clock. However, by doing this,
+> we gate the clock and therefore loose the complex PCIe configuration
+> that was done by the bootloader.
+> 
+> Unfortunately, as of today, the kernel is not capable of doing this
+> complex configuration by itself, so we really need to keep the PCIe
+> clock enabled. However, we don't want to keep it enabled
+> unconditionally: if the PCIe interface is not enabled or PCI support
+> is not compiled into the kernel, there is no reason to keep the PCIe
+> clock running.
+> 
+> This issue was discussed with Kevin Hilman, and the suggested solution
+> was to make the mvebu-soc-id code keep the clock enabled in case it
+> will be needed for PCIe. This is therefore the solution implemented in
+> this patch.
+> 
+> Long term, we hope to make the kernel more capable in terms of PCIe
+> configuration for this platform, which will anyway be needed to
+> support the compilation of the PCIe host controller driver as a
+> module. In the mean time however, we don't have much other choice than
+> to implement the currently proposed solution.
 
->> * 'static struct platform_device ...' has been deprecated for at least a decade,
->>    stop doing that. For any platform devices that get registered, there is
->>    platform_device_register_simple().
->
-> +0.5
->
-> The missing 0.5 is because you can't pass platform data using
-> platform_device_register_simple(). There is
-> platform_device_register_resndata(), though.
->
->> * There shouldn't need to be a platform_device to start with, this should all
->>    come from DT. We can't do this on arm64 anyway, so any code that may be
->>    shared between arm32 and arm64 should have proper abstractions.
->
-> -1
->
-> Exynos cpuidle is not a device on the SoC, so I don't think there is any
-> way to represent it in DT. The only thing I could see this is matching
-> root node with a central SoC driver that instantiates specific
-> subdevices, such as cpufreq and cpuidle, but I don't see any available
-> infrastructure for this.
+It fixed the detection issue I had on the Armada 385 DB board:
+Tetsed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-There is a RFC for defining generic idle states [1].
+And as I also agree with the code:
 
-The idea behind using the platform driver framework is to unify the code 
-across the different drivers and separate the PM / cpuidle code.
-
-By this way, we can move the different drivers to drivers/cpuidle and 
-store them in a single place. That make easier the tracking, the review 
-and the maintenance.
-
-I am ok to by using platform_device_register_resndata() but I would 
-prefer to do that a bit later by converting the other drivers too. That 
-will be easier if we have them grouped in a single directory (this is 
-what does this patchset at the end).
-
-As there are some more work based on this patchset and the link error 
-could be fixed as an independent patch, I would recommend to 
-re-integrate it in the tree as asked by Bartlomiej.
-
-Thanks
-   -- Daniel
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
 
-[1] http://www.spinics.net/lists/arm-kernel/msg328747.html
+Thanks,
+
+Gregory
+
+> 
+> Reported-by: Neil Greatorex <neil@fatboyfat.co.uk>
+> Cc: Neil Greatorex <neil@fatboyfat.co.uk>
+> Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> Cc: Kevin Hilman <khilman@linaro.org>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: <stable@vger.kernel.org> # 3.14+
+> Fixes: af8d1c63afcbf36eea06789c92e22d4af118d2fb ('ARM: mvebu: Add support to get the ID and the revision of a SoC')
+> ---
+>  arch/arm/mach-mvebu/mvebu-soc-id.c | 14 ++++++++++++--
+>  1 file changed, 12 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mvebu/mvebu-soc-id.c b/arch/arm/mach-mvebu/mvebu-soc-id.c
+> index b52af6f..09520e1 100644
+> --- a/arch/arm/mach-mvebu/mvebu-soc-id.c
+> +++ b/arch/arm/mach-mvebu/mvebu-soc-id.c
+> @@ -108,8 +108,18 @@ static int __init mvebu_soc_id_init(void)
+>  	iounmap(pci_base);
+>  
+>  res_ioremap:
+> -	clk_disable_unprepare(clk);
+> -	clk_put(clk);
+> +	/*
+> +	 * If the PCIe unit is actually enabled and we have PCI
+> +	 * support in the kernel, we intentionally do not release the
+> +	 * reference to the clock. We want to keep it running since
+> +	 * the bootloader does some PCIe link configuration that the
+> +	 * kernel is for now unable to do, and gating the clock would
+> +	 * make us loose this precious configuration.
+> +	 */
+> +	if (!of_device_is_available(child) || !IS_ENABLED(CONFIG_PCI_MVEBU)) {
+> +		clk_disable_unprepare(clk);
+> +		clk_put(clk);
+> +	}
+>  
+>  clk_err:
+>  	of_node_put(child);
+> 
 
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
