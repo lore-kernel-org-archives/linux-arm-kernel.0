@@ -1,62 +1,19 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 13 May 2014 00:26:35 +0200
-Subject: [PATCH v2 4/4] ARM: shmobile: marzen-reference: Set SMSC lan to
- use irq-push-pull
-In-Reply-To: <10371644.BMkVSLAUGy@avalon>
-References: <1368586650-26263-1-git-send-email-horms+renesas@verge.net.au>
- <1368586650-26263-5-git-send-email-horms+renesas@verge.net.au>
- <10371644.BMkVSLAUGy@avalon>
-Message-ID: <2152550.dZ0p2WIftv@avalon>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Mon, 12 May 2014 15:27:10 -0700
+Subject: [Patch v3] pinctrl: msm: Add more MSM8X74 pin definitions
+In-Reply-To: <1399932968-24780-1-git-send-email-agross@codeaurora.org>
+References: <1399932968-24780-1-git-send-email-agross@codeaurora.org>
+Message-ID: <CAJAp7OgKkyp1_=+ytDO=oUvLj__CLW6C8XPv7k0e8vvq5bu7Rg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Mon, May 12, 2014 at 3:16 PM, Andy Gross <agross@codeaurora.org> wrote:
+> This patch adds pin definitiones for the MSM8x74 TLMM.  New definitions
+> include:
+>
+> BLSP devices (I2C, UART, SPI, and UIM), mi2s, gp clk, pdm, gcc clk, cci_timer,
+> cci_i2c, cam_clk, hsic, tsif, sdc3, sdc4, and other assorted pins.
+>
+> Signed-off-by: Andy Gross <agross@codeaurora.org>
 
-On Wednesday 15 May 2013 11:15:01 Laurent Pinchart wrote:
-> Hi Simon,
-> 
-> Thanks for the patch.
-> 
-> On Wednesday 15 May 2013 11:57:30 Simon Horman wrote:
-> > This change makes the DTS consistent with the platform data
-> > that exists in board-marzen.c.
-> > 
-> > Empirically it does not appear to be necessary.
-> > 
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> 
-> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
-I've noticed that this patch hasn't landed in mainline. Do you still plan to 
-upstream it ?
-
-While the board has a pull-up resistor on the IRQ signal and can thus 
-accommodate an open-drain configuration, using push-pull mode would lower the 
-rise time.
-
-> > ---
-> > 
-> >  arch/arm/boot/dts/r8a7779-marzen-reference.dts | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/r8a7779-marzen-reference.dts
-> > b/arch/arm/boot/dts/r8a7779-marzen-reference.dts index 10cfc7f..fe32e1a
-> > 100644
-> > --- a/arch/arm/boot/dts/r8a7779-marzen-reference.dts
-> > +++ b/arch/arm/boot/dts/r8a7779-marzen-reference.dts
-> > @@ -40,6 +40,7 @@
-> > 
-> >  		phy-mode = "mii";
-> >  		interrupt-parent = <&irqpin0>;
-> >  		interrupts = <1 0x4>;
-> > 
-> > +		smsc,irq-push-pull;
-> > 
-> >  		reg-io-width = <4>;
-> >  		vddvario-supply = <&fixedregulator3v3>;
-> >  		vdd33a-supply = <&fixedregulator3v3>;
-
--- 
-Regards,
-
-Laurent Pinchart
+Acked-By: Bjorn Andersson <bjorn.andersson@sonymobile.com>
