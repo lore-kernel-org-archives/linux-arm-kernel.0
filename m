@@ -1,73 +1,95 @@
 From: shaik.ameer@samsung.com (Shaik Ameer Basha)
-Date: Mon, 12 May 2014 11:44:59 +0530
-Subject: [PATCH v13 14/19] iommu/exynos: add devices attached to the System MMU
- to an IOMMU group
+Date: Mon, 12 May 2014 11:45:01 +0530
+Subject: [PATCH v13 16/19] documentation: iommu: add binding document of Exynos
+ System MMU
 In-Reply-To: <1399875304-19948-1-git-send-email-shaik.ameer@samsung.com>
 References: <1399875304-19948-1-git-send-email-shaik.ameer@samsung.com>
-Message-ID: <1399875304-19948-15-git-send-email-shaik.ameer@samsung.com>
+Message-ID: <1399875304-19948-17-git-send-email-shaik.ameer@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Antonios Motakis <a.motakis@virtualopensystems.com>
+From: Cho KyongHo <pullip.cho@samsung.com>
 
-Patch written by Antonios Motakis <a.motakis@virtualopensystems.com>:
+This patch adds a description of the device tree binding for the
+Samsung Exynos System MMU.
 
-IOMMU groups are expected by certain users of the IOMMU API,
-e.g. VFIO. Since each device is behind its own System MMU, we
-can allocate a new IOMMU group for each device.
-
-Reviewed-by: Cho KyongHo <pullip.cho@samsung.com>
-Signed-off-by: Antonios Motakis <a.motakis@virtualopensystems.com>
-Signed-off-by: Shaik Ameeer Basha <shaik.ameer@samsung.com>
+Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
+Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
 ---
- drivers/iommu/exynos-iommu.c |   28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ .../devicetree/bindings/iommu/samsung,sysmmu.txt   |   65 ++++++++++++++++++++
+ 1 file changed, 65 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iommu/samsung,sysmmu.txt
 
-diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 3291619..d18dc37 100644
---- a/drivers/iommu/exynos-iommu.c
-+++ b/drivers/iommu/exynos-iommu.c
-@@ -964,6 +964,32 @@ static phys_addr_t exynos_iommu_iova_to_phys(struct iommu_domain *domain,
- 	return phys;
- }
- 
-+static int exynos_iommu_add_device(struct device *dev)
-+{
-+	struct iommu_group *group;
-+	int ret;
+diff --git a/Documentation/devicetree/bindings/iommu/samsung,sysmmu.txt b/Documentation/devicetree/bindings/iommu/samsung,sysmmu.txt
+new file mode 100644
+index 0000000..15b2a2b
+--- /dev/null
++++ b/Documentation/devicetree/bindings/iommu/samsung,sysmmu.txt
+@@ -0,0 +1,65 @@
++Samsung Exynos IOMMU H/W, System MMU (System Memory Management Unit)
 +
-+	group = iommu_group_get(dev);
++Samsung's Exynos architecture contains System MMUs that enables scattered
++physical memory chunks visible as a contiguous region to DMA-capable peripheral
++devices like MFC, FIMC, FIMD, GScaler, FIMC-IS and so forth.
 +
-+	if (!group) {
-+		group = iommu_group_alloc();
-+		if (IS_ERR(group)) {
-+			dev_err(dev, "Failed to allocate IOMMU group\n");
-+			return PTR_ERR(group);
-+		}
-+	}
++System MMU is an IOMMU and supports identical translation table format to
++ARMv7 translation tables with minimum set of page properties including access
++permissions, shareability and security protection. In addition, System MMU has
++another capabilities like L2 TLB or block-fetch buffers to minimize translation
++latency.
 +
-+	ret = iommu_group_add_device(group, dev);
-+	iommu_group_put(group);
++System MMUs are in many to one relation with peripheral devices, i.e. single
++peripheral device might have multiple System MMUs (usually one for each bus
++master), but one System MMU can handle transactions from only one peripheral
++device. The relation between a System MMU and the peripheral device needs to be
++defined in device node of the peripheral device.
 +
-+	return ret;
-+}
++MFC in all Exynos SoCs and FIMD, M2M Scalers and G2D in Exynos5420 has 2 System
++MMUs.
++* MFC has one System MMU on its left and right bus.
++* FIMD in Exynos5420 has one System MMU for window 0 and 4, the other system MMU
++  for window 1, 2 and 3.
++* M2M Scalers and G2D in Exynos5420 has one System MMU on the read channel and
++  the other System MMU on the write channel.
++The drivers must consider how to handle those System MMUs. One of the idea is
++to implement child devices or sub-devices which are the client devices of the
++System MMU.
 +
-+static void exynos_iommu_remove_device(struct device *dev)
-+{
-+	iommu_group_remove_device(dev);
-+}
++Required properties:
++- compatible: Should be "samsung,exynos-sysmmu"
++- reg: A tuple of base address and size of System MMU registers.
++- interrupt-parent: The phandle of the interrupt controller of System MMU
++- interrupts: An interrupt specifier for interrupt signal of System MMU,
++	      according to the format defined by a particular interrupt
++	      controller.
++- clock-names: Should be "sysmmu" if the System MMU is needed to gate its clock.
++	       Optional "master" if the clock to the System MMU is gated by
++	       another gate clock other than "sysmmu".
++	       Exynos4 SoCs, there needs no "master" clock.
++	       Exynos5 SoCs, some System MMUs must have "master" clocks.
++- clocks: Required if the System MMU is needed to gate its clock.
++- samsung,power-domain: Required if the System MMU is needed to gate its power.
++	  Please refer to the following document:
++	  Documentation/devicetree/bindings/arm/exynos/power_domain.txt
 +
- static struct iommu_ops exynos_iommu_ops = {
- 	.domain_init = &exynos_iommu_domain_init,
- 	.domain_destroy = &exynos_iommu_domain_destroy,
-@@ -972,6 +998,8 @@ static struct iommu_ops exynos_iommu_ops = {
- 	.map = &exynos_iommu_map,
- 	.unmap = &exynos_iommu_unmap,
- 	.iova_to_phys = &exynos_iommu_iova_to_phys,
-+	.add_device = &exynos_iommu_add_device,
-+	.remove_device = &exynos_iommu_remove_device,
- 	.pgsize_bitmap = SECT_SIZE | LPAGE_SIZE | SPAGE_SIZE,
- };
- 
++Examples:
++	gsc_0: gsc at 13e00000 {
++		compatible = "samsung,exynos5-gsc";
++		reg = <0x13e00000 0x1000>;
++		interrupts = <0 85 0>;
++		samsung,power-domain = <&pd_gsc>;
++		clocks = <&clock CLK_GSCL0>;
++		clock-names = "gscl";
++	};
++
++	sysmmu_gsc0: sysmmu at 13E80000 {
++		compatible = "samsung,exynos-sysmmu";
++		reg = <0x13E80000 0x1000>;
++		interrupt-parent = <&combiner>;
++		interrupts = <2 0>;
++		clock-names = "sysmmu", "master";
++		clocks = <&clock CLK_SMMU_GSCL0>, <&clock CLK_GSCL0>;
++		samsung,power-domain = <&pd_gsc>;
++	};
 -- 
 1.7.9.5
