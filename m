@@ -1,83 +1,44 @@
-From: george.cherian@ti.com (George Cherian)
-Date: Mon, 12 May 2014 10:29:52 +0530
-Subject: [PATCH v2] ARM: dts: am33xx: Move the cppi41dma node so it's
- probed early
-In-Reply-To: <1398373881-23369-1-git-send-email-ezequiel@vanguardiasur.com.ar>
-References: <1398373881-23369-1-git-send-email-ezequiel@vanguardiasur.com.ar>
-Message-ID: <53705548.7020400@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 12 May 2014 07:13:08 +0200
+Subject: [PATCH 2/3] ARM: i.MX1 clk: Add devicetree support
+In-Reply-To: <1399629542-32387-2-git-send-email-shc_work@mail.ru>
+References: <1399629542-32387-1-git-send-email-shc_work@mail.ru>
+ <1399629542-32387-2-git-send-email-shc_work@mail.ru>
+Message-ID: <20140512051308.GZ5858@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/25/2014 2:41 AM, Ezequiel Garcia wrote:
-> The DMA controller is needed for the USB controller to be correctly
-> registered. Therefore, if the DMA node is located at the end an unecessary
-> probe deferral is produced systematically.
->
-> This is easily fixed by moving the node at the beggining of the child list,
-> so it's probed first.
->
-> Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
-Acked-by: George Cherian <george.cherian@ti.com>
-> --
-> v1->v2:
->    * Added a comment to prevent a future clean-up based on the memory offset.
->
->   arch/arm/boot/dts/am33xx.dtsi | 34 ++++++++++++++++++++--------------
->   1 file changed, 20 insertions(+), 14 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> index 9770e35..02e1eb6 100644
-> --- a/arch/arm/boot/dts/am33xx.dtsi
-> +++ b/arch/arm/boot/dts/am33xx.dtsi
-> @@ -453,6 +453,26 @@
->   			ti,hwmods = "usb_otg_hs";
->   			status = "disabled";
->   
-> +			/*
-> +			 * The probe order matches the child ordering so the
-> +			 * dma-controller node must be the first one to prevent
-> +			 * spurious probe deferrals.
-> +			 */
-> +			cppi41dma: dma-controller at 47402000 {
-> +				compatible = "ti,am3359-cppi41";
-> +				reg =  <0x47400000 0x1000
-> +					0x47402000 0x1000
-> +					0x47403000 0x1000
-> +					0x47404000 0x4000>;
-> +				reg-names = "glue", "controller", "scheduler", "queuemgr";
-> +				interrupts = <17>;
-> +				interrupt-names = "glue";
-> +				#dma-cells = <2>;
-> +				#dma-channels = <30>;
-> +				#dma-requests = <256>;
-> +				status = "disabled";
-> +			};
-> +
->   			usb_ctrl_mod: control at 44e10620 {
->   				compatible = "ti,am335x-usb-ctrl-module";
->   				reg = <0x44e10620 0x10
-> @@ -556,20 +576,6 @@
->   					"tx14", "tx15";
->   			};
->   
-> -			cppi41dma: dma-controller at 47402000 {
-> -				compatible = "ti,am3359-cppi41";
-> -				reg =  <0x47400000 0x1000
-> -					0x47402000 0x1000
-> -					0x47403000 0x1000
-> -					0x47404000 0x4000>;
-> -				reg-names = "glue", "controller", "scheduler", "queuemgr";
-> -				interrupts = <17>;
-> -				interrupt-names = "glue";
-> -				#dma-cells = <2>;
-> -				#dma-channels = <30>;
-> -				#dma-requests = <256>;
-> -				status = "disabled";
-> -			};
->   		};
->   
->   		epwmss0: epwmss at 48300000 {
+On Fri, May 09, 2014 at 01:59:01PM +0400, Alexander Shiyan wrote:
+> This patch adds devicetree support CCM module for i.MX1 (MC9328MX1) CPUs.
+> 
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> ---
+>  .../devicetree/bindings/clock/imx1-clock.txt       | 46 ++++++++++++++++++++++
+>  arch/arm/mach-imx/clk-imx1.c                       | 10 ++++-
+>  2 files changed, 55 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/imx1-clock.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/imx1-clock.txt b/Documentation/devicetree/bindings/clock/imx1-clock.txt
+> new file mode 100644
+> index 0000000..f66fe37
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/imx1-clock.txt
 
+Can we meld this for i.MX1 into this patch?:
+
+commit 490dd8808a8baa093ac3b2bfc2f66f798599bb2c
+Author: Lucas Stach <l.stach@pengutronix.de>
+Date:   Thu Nov 14 11:18:57 2013 +0100
+
+    ARM: imx5: introduce DT includes for clock provider
+    
+    Use clock defines in order to make devicetrees more
+    human readable.
+
+Sascha
 
 -- 
--George
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
