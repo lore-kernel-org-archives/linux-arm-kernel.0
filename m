@@ -1,73 +1,50 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Mon, 12 May 2014 16:25:36 +0200
-Subject: [PATCHv2] ARM: at91/dt: sam9261: Fix PLL output ranges and other
- clocks divisors
-In-Reply-To: <1399904532-3688-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1399904532-3688-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <5370D9E0.4000509@free-electrons.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 12 May 2014 22:25:34 +0800
+Subject: [PATCH] media: mx1_camera: Remove driver
+In-Reply-To: <1399904280.435992890@f125.i.mail.ru>
+References: <1399788551-8218-1-git-send-email-shc_work@mail.ru>
+ <20140512140933.GC8330@dragon> <1399904280.435992890@f125.i.mail.ru>
+Message-ID: <20140512142533.GF8330@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, May 12, 2014 at 06:18:00PM +0400, Alexander Shiyan wrote:
+> Mon, 12 May 2014 22:09:34 +0800 ?? Shawn Guo <shawn.guo@freescale.com>:
+> > On Sun, May 11, 2014 at 10:09:11AM +0400, Alexander Shiyan wrote:
+> > > That driver hasn't been really maintained for a long time. It doesn't
+> > > compile in any way, it includes non-existent headers, has no users,
+> > > and marked as "broken" more than year. Due to these factors, mx1_camera
+> > > is now removed from the tree.
+> > > 
+> > > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> > > ---
+> > >  arch/arm/mach-imx/Makefile                      |   3 -
+> > >  arch/arm/mach-imx/devices/Kconfig               |   3 -
+> > >  arch/arm/mach-imx/devices/Makefile              |   1 -
+> > >  arch/arm/mach-imx/devices/devices-common.h      |  10 -
+> > >  arch/arm/mach-imx/devices/platform-mx1-camera.c |  42 --
+> > >  arch/arm/mach-imx/mx1-camera-fiq-ksym.c         |  18 -
+> > >  arch/arm/mach-imx/mx1-camera-fiq.S              |  35 -
+> > >  drivers/media/platform/soc_camera/Kconfig       |  13 -
+> > >  drivers/media/platform/soc_camera/Makefile      |   1 -
+> > >  drivers/media/platform/soc_camera/mx1_camera.c  | 866 ------------------------
+> > >  include/linux/platform_data/camera-mx1.h        |  35 -
+> > >  11 files changed, 1027 deletions(-)
+> > >  delete mode 100644 arch/arm/mach-imx/devices/platform-mx1-camera.c
+> > >  delete mode 100644 arch/arm/mach-imx/mx1-camera-fiq-ksym.c
+> > >  delete mode 100644 arch/arm/mach-imx/mx1-camera-fiq.S
+> > >  delete mode 100644 drivers/media/platform/soc_camera/mx1_camera.c
+> > >  delete mode 100644 include/linux/platform_data/camera-mx1.h
+> > 
+> > Can this patch be split into arch and driver part?  Recently, arm-soc
+> > folks do not want to have arch changes go via driver tree, unless that's
+> > absolutely necessary.
+> 
+> Can this patch be applied through arm-soc (imx) tree if it will be approved
+> by the linux-media maintainers?
 
-On 12/05/2014 16:22, Alexandre Belloni wrote:
-> Argument 3 (OUT) and 4 (ICPLL) of the atmel,pll-clk-output-ranges were missing.
-> Also, the at91sam9261 doesn't really have a by 3 divisor.
->
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
-> Changed in v2:
-> After getting feedback from the atmel HW engineers, it appears that PLLB is not
-> the same as PLLA despite what the datasheet seems to imply. The patch is updated
-> to reflect that.
->
->  arch/arm/boot/dts/at91sam9261.dtsi | 11 ++++++-----
->  1 file changed, 6 insertions(+), 5 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/at91sam9261.dtsi b/arch/arm/boot/dts/at91sam9261.dtsi
-> index 561addceb81e..44d9e5ab09c3 100644
-> --- a/arch/arm/boot/dts/at91sam9261.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9261.dtsi
-> @@ -564,7 +564,8 @@
->  					reg = <0>;
->  					atmel,clk-input-range = <1000000 32000000>;
->  					#atmel,pll-clk-output-range-cells = <4>;
-> -					atmel,pll-clk-output-ranges = <80000000 200000000 190000000 240000000>;
-> +					atmel,pll-clk-output-ranges = <80000000 200000000 0 1>,
-> +								<190000000 240000000 2 1>;
->  				};
->  
->  				pllb: pllbck {
-> @@ -573,9 +574,9 @@
->  					interrupts-extended = <&pmc AT91_PMC_LOCKB>;
->  					clocks = <&main>;
->  					reg = <1>;
-> -					atmel,clk-input-range = <1000000 32000000>;
-> +					atmel,clk-input-range = <1000000 5000000>;
->  					#atmel,pll-clk-output-range-cells = <4>;
-> -					atmel,pll-clk-output-ranges = <80000000 200000000 190000000 240000000>;
-> +					atmel,pll-clk-output-ranges = <70000000 130000000 1 1>;
->  				};
->  
->  				mck: masterck {
-> @@ -584,13 +585,13 @@
->  					interrupts-extended = <&pmc AT91_PMC_MCKRDY>;
->  					clocks = <&clk32k>, <&main>, <&plla>, <&pllb>;
->  					atmel,clk-output-range = <0 94000000>;
-> -					atmel,clk-divisors = <1 2 4 3>;
-> +					atmel,clk-divisors = <1 2 4 0>;
->  				};
->  
->  				usb: usbck {
->  					compatible = "atmel,at91rm9200-clk-usb";
->  					#clock-cells = <0>;
-> -					atmel,clk-divisors = <1 2 4 3>;
-> +					atmel,clk-divisors = <1 2 4 0>;
->  					clocks = <&pllb>;
->  				};
->  
+Yes, it can, if linux-media maintainers want.  But I still prefer to two
+patches, since I do not see any thing requiring it be one.  Doing that
+will ensure we do not run into any merge conflicts.
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Shawn
