@@ -1,34 +1,63 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 12 May 2014 16:26:53 -0700
-Subject: [PATCH 1/2] mtd/onenand: fix build warning for dma type
-In-Reply-To: <1399560990-1402858-3-git-send-email-arnd@arndb.de>
-References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-3-git-send-email-arnd@arndb.de>
-Message-ID: <20140512232653.GV28907@ld-irv-0074>
+From: tthayer@altera.com (tthayer at altera.com)
+Date: Mon, 12 May 2014 18:36:55 -0500
+Subject: [PATCHv4 1/3] dts: socfpga: Add bindings for Altera SoC SDRAM
+ controller
+In-Reply-To: <1399937817-2202-1-git-send-email-tthayer@altera.com>
+References: <1399937817-2202-1-git-send-email-tthayer@altera.com>
+Message-ID: <1399937817-2202-2-git-send-email-tthayer@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 08, 2014 at 04:56:14PM +0200, Arnd Bergmann wrote:
-> The samsung onenand driver passes around a dma address token
-> through a void pointer, which is incorrect and leads to
-> warnings like this one:
-> 
-> onenand/samsung.c:548:2: warning: passing argument 1 of '__fswab32' makes integer from pointer without a cast [enabled by default]
->   writel(src, base + S5PC110_DMA_SRC_ADDR);
->   ^
-> 
-> This patch makes it use dma_addr_t here, which is more appropriate.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Kyungmin Park <kyungmin.park@samsung.com>
-> Cc: David Woodhouse <dwmw2@infradead.org>
-> Cc: Brian Norris <computersforpeace@gmail.com>
-> Cc: linux-mtd at lists.infradead.org
+From: Thor Thayer <tthayer@altera.com>
 
-Pushed this one to l2-mtd.git. Thanks!
+Addition of the Altera SDRAM controller bindings and device
+tree changes to the Altera SoC project.
 
-I think the second MTD patch is still under discussion, right? I'll
-follow up there if necessary.
+v2: Changes to SoC SDRAM EDAC code.
 
-Brian
+v3: Implement code suggestions for SDRAM EDAC code.
+
+v4: Remove syscon from SDRAM controller bindings.
+
+Signed-off-by: Thor Thayer <tthayer@altera.com>
+---
+ .../bindings/arm/altera/socfpga-sdram.txt          |   11 +++++++++++
+ arch/arm/boot/dts/socfpga.dtsi                     |    5 +++++
+ 2 files changed, 16 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
+
+diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
+new file mode 100644
+index 0000000..8f8746b
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
+@@ -0,0 +1,11 @@
++Altera SOCFPGA SDRAM Controller
++
++Required properties:
++- compatible : "altr,sdr-ctl";
++- reg : Should contain 1 register ranges(address and length)
++
++Example:
++	sdrctl at ffc25000 {
++		compatible = "altr,sdr-ctl";
++		reg = <0xffc25000 0x1000>;
++	};
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index df43702..6ce912e 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -676,6 +676,11 @@
+ 			clocks = <&l4_sp_clk>;
+ 		};
+ 
++		sdrctl at ffc25000 {
++			compatible = "altr,sdr-ctl", "syscon";
++			reg = <0xffc25000 0x1000>;
++		};
++
+ 		rstmgr at ffd05000 {
+ 			compatible = "altr,rst-mgr";
+ 			reg = <0xffd05000 0x1000>;
+-- 
+1.7.9.5
