@@ -1,77 +1,94 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 12 May 2014 16:11:40 +0200
-Subject: [PATCH 2/2] ARM: mvebu: mvebu-soc-id: keep clock enabled if PCIe unit
- is enabled
-In-Reply-To: <1399903900-29977-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1399903900-29977-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1399903900-29977-3-git-send-email-thomas.petazzoni@free-electrons.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 12 May 2014 22:13:07 +0800
+Subject: [PATCH] ARM: i.MX: Remove excess symbols ARCH_MX1, ARCH_MX25 and
+ MACH_MX27
+In-Reply-To: <1399798206-17565-1-git-send-email-shc_work@mail.ru>
+References: <1399798206-17565-1-git-send-email-shc_work@mail.ru>
+Message-ID: <20140512141306.GD8330@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the mvebu-soc-id code in mach-mvebu/ was introduced, several
-users have noticed a regression: the PCIe card connected in the first
-PCIe interface is not detected properly.
+On Sun, May 11, 2014 at 12:50:06PM +0400, Alexander Shiyan wrote:
+> This patch removes excess symbols ARCH_MX1, ARCH_MX25 and MACH_MX27.
+> Instead we use SOC_IMX*.
+> 
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> ---
+>  arch/arm/mach-imx/Kconfig                 | 12 ------------
+>  arch/arm/mach-imx/devices/Kconfig         |  2 +-
+>  drivers/media/platform/soc_camera/Kconfig |  2 +-
 
-This is due to the fact that the mvebu-soc-id code enables the PCIe
-clock of the first PCIe interface, reads the SoC device ID and
-revision number (yes this information is made available as part of
-PCIe registers), and then disables the clock. However, by doing this,
-we gate the clock and therefore loose the complex PCIe configuration
-that was done by the bootloader.
+We need to either split this file change into another patch or get an
+ACK from Mauro or Guennadi.
 
-Unfortunately, as of today, the kernel is not capable of doing this
-complex configuration by itself, so we really need to keep the PCIe
-clock enabled. However, we don't want to keep it enabled
-unconditionally: if the PCIe interface is not enabled or PCI support
-is not compiled into the kernel, there is no reason to keep the PCIe
-clock running.
+Shawn
 
-This issue was discussed with Kevin Hilman, and the suggested solution
-was to make the mvebu-soc-id code keep the clock enabled in case it
-will be needed for PCIe. This is therefore the solution implemented in
-this patch.
-
-Long term, we hope to make the kernel more capable in terms of PCIe
-configuration for this platform, which will anyway be needed to
-support the compilation of the PCIe host controller driver as a
-module. In the mean time however, we don't have much other choice than
-to implement the currently proposed solution.
-
-Reported-by: Neil Greatorex <neil@fatboyfat.co.uk>
-Cc: Neil Greatorex <neil@fatboyfat.co.uk>
-Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-Cc: Kevin Hilman <khilman@linaro.org>
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: <stable@vger.kernel.org> # 3.14+
-Fixes: af8d1c63afcbf36eea06789c92e22d4af118d2fb ('ARM: mvebu: Add support to get the ID and the revision of a SoC')
----
- arch/arm/mach-mvebu/mvebu-soc-id.c | 14 ++++++++++++--
- 1 file changed, 12 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-mvebu/mvebu-soc-id.c b/arch/arm/mach-mvebu/mvebu-soc-id.c
-index b52af6f..09520e1 100644
---- a/arch/arm/mach-mvebu/mvebu-soc-id.c
-+++ b/arch/arm/mach-mvebu/mvebu-soc-id.c
-@@ -108,8 +108,18 @@ static int __init mvebu_soc_id_init(void)
- 	iounmap(pci_base);
- 
- res_ioremap:
--	clk_disable_unprepare(clk);
--	clk_put(clk);
-+	/*
-+	 * If the PCIe unit is actually enabled and we have PCI
-+	 * support in the kernel, we intentionally do not release the
-+	 * reference to the clock. We want to keep it running since
-+	 * the bootloader does some PCIe link configuration that the
-+	 * kernel is for now unable to do, and gating the clock would
-+	 * make us loose this precious configuration.
-+	 */
-+	if (!of_device_is_available(child) || !IS_ENABLED(CONFIG_PCI_MVEBU)) {
-+		clk_disable_unprepare(clk);
-+		clk_put(clk);
-+	}
- 
- clk_err:
- 	of_node_put(child);
--- 
-1.9.2
+>  3 files changed, 2 insertions(+), 14 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> index d56eb1a..c28fa7c 100644
+> --- a/arch/arm/mach-imx/Kconfig
+> +++ b/arch/arm/mach-imx/Kconfig
+> @@ -67,18 +67,8 @@ config IMX_HAVE_IOMUX_V1
+>  config ARCH_MXC_IOMUX_V3
+>  	bool
+>  
+> -config ARCH_MX1
+> -	bool
+> -
+> -config ARCH_MX25
+> -	bool
+> -
+> -config MACH_MX27
+> -	bool
+> -
+>  config SOC_IMX1
+>  	bool
+> -	select ARCH_MX1
+>  	select CPU_ARM920T
+>  	select IMX_HAVE_IOMUX_V1
+>  	select MXC_AVIC
+> @@ -91,7 +81,6 @@ config SOC_IMX21
+>  
+>  config SOC_IMX25
+>  	bool
+> -	select ARCH_MX25
+>  	select ARCH_MXC_IOMUX_V3
+>  	select CPU_ARM926T
+>  	select MXC_AVIC
+> @@ -103,7 +92,6 @@ config SOC_IMX27
+>  	select ARCH_HAS_OPP
+>  	select CPU_ARM926T
+>  	select IMX_HAVE_IOMUX_V1
+> -	select MACH_MX27
+>  	select MXC_AVIC
+>  	select PINCTRL_IMX27
+>  
+> diff --git a/arch/arm/mach-imx/devices/Kconfig b/arch/arm/mach-imx/devices/Kconfig
+> index 846c019..1f9d4a6 100644
+> --- a/arch/arm/mach-imx/devices/Kconfig
+> +++ b/arch/arm/mach-imx/devices/Kconfig
+> @@ -1,6 +1,6 @@
+>  config IMX_HAVE_PLATFORM_FEC
+>  	bool
+> -	default y if ARCH_MX25 || SOC_IMX27 || SOC_IMX35 || SOC_IMX51 || SOC_IMX53
+> +	default y if SOC_IMX25 || SOC_IMX27 || SOC_IMX35 || SOC_IMX51 || SOC_IMX53
+>  
+>  config IMX_HAVE_PLATFORM_FLEXCAN
+>  	bool
+> diff --git a/drivers/media/platform/soc_camera/Kconfig b/drivers/media/platform/soc_camera/Kconfig
+> index 122e03a..f0ccedd 100644
+> --- a/drivers/media/platform/soc_camera/Kconfig
+> +++ b/drivers/media/platform/soc_camera/Kconfig
+> @@ -63,7 +63,7 @@ config VIDEO_OMAP1
+>  
+>  config VIDEO_MX2
+>  	tristate "i.MX27 Camera Sensor Interface driver"
+> -	depends on VIDEO_DEV && SOC_CAMERA && MACH_MX27
+> +	depends on VIDEO_DEV && SOC_CAMERA && SOC_IMX27
+>  	select VIDEOBUF2_DMA_CONTIG
+>  	---help---
+>  	  This is a v4l2 driver for the i.MX27 Camera Sensor Interface
+> -- 
+> 1.8.3.2
+> 
