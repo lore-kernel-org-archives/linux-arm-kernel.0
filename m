@@ -1,40 +1,40 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 12 May 2014 11:39:03 +0200
-Subject: [GIT PULL] ARM: rockchip: devicetree changes for  v3.16
-Message-ID: <2444863.NDeixHyn6k@phil>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 12 May 2014 11:36:33 +0200
+Subject: [GIT PULL] ARM: Updates for mmci driver for 3.16, take 1
+In-Reply-To: <CAPDyKFo07dqfqTtrGp3sHwf1ghzCj4BaBqJffRAs=cA1-HP2Tw@mail.gmail.com>
+References: <CAPDyKFp0K=cijuAZox7_BsTk2UCyC7Dp9HQoO6eJzaHikRMVUw@mail.gmail.com>
+ <CAPDyKFo07dqfqTtrGp3sHwf1ghzCj4BaBqJffRAs=cA1-HP2Tw@mail.gmail.com>
+Message-ID: <CAPDyKFqGgVis6NAgfSXEbC+hbdyix=eWk+2GDEyALC=qv0FYbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit a798c10faf62a505d24e5f6213fbaf904a39623f:
+On 24 April 2014 12:57, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 14 April 2014 16:17, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> Hi Russell,
+>>
+>> I have collected some patches which all relates to changes to the mmci driver.
+>>
+>> The SOC specific patches has been acked by the SOC maintainer Linus
+>> Walleij and the DT patches has been iterated a few times, due to
+>> comments from Rob Herring.
+>>
+>> Unless you have some concern with any of the patches, please pull them
+>> into your ARM tree.
+>
+> Ping. :-)
+>
+> Please, let me know if you prefer another setup than a pull request.
+>
 
-  Linux 3.15-rc2 (2014-04-20 11:08:50 -0700)
+Hi Russell,
 
-are available in the git repository at:
+I understand you have been busy, no worries.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.16-rockchip-dt
+As a way forward and to get some testing in linux-next, I will pull in
+these patches into my next branch in my mmc tree.
+git://git.linaro.org/people/ulf.hansson/mmc.git.
 
-for you to fetch changes up to 56f2b894dcf455ffd31bd2e8e96a074249aeb4ba:
+I assume you will tell me if you have any concerns.
 
-  ARM: dts: rockchip: convert pinctrl nodes to new bindings (2014-05-10 01:41:20 +0200)
-
-----------------------------------------------------------------
-Addition of missing board compatible names and their vendor-prefixes
-as well as the dts portions of the pinctrl rework.
-
-----------------------------------------------------------------
-Beniamino Galvani (2):
-      of: add mundoreader and radxa vendor prefixes
-      ARM: dts: rockchip: add root compatible properties
-
-Heiko Stuebner (1):
-      ARM: dts: rockchip: convert pinctrl nodes to new bindings
-
- Documentation/devicetree/bindings/arm/rockchip.txt    | 10 ++++++++++
- Documentation/devicetree/bindings/vendor-prefixes.txt |  2 ++
- arch/arm/boot/dts/rk3066a-bqcurie2.dts                |  1 +
- arch/arm/boot/dts/rk3066a.dtsi                        |  2 +-
- arch/arm/boot/dts/rk3188-radxarock.dts                |  1 +
- arch/arm/boot/dts/rk3188.dtsi                         |  9 ++++-----
- arch/arm/boot/dts/rk3xxx.dtsi                         |  9 +++++++--
- 7 files changed, 26 insertions(+), 8 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/rockchip.txt
+Kind regards
+Ulf Hansson
