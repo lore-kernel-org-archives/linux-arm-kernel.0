@@ -1,287 +1,264 @@
 From: jays.lee@samsung.com (Jungseok Lee)
-Date: Mon, 12 May 2014 18:40:57 +0900
-Subject: [PATCH v6 7/7] arm64: KVM: Implement 4 levels of translation tables
- for HYP and stage2
-Message-ID: <000601cf6dc6$47195b30$d54c1190$@samsung.com>
+Date: Mon, 12 May 2014 18:40:54 +0900
+Subject: [PATCH v6 6/7] arm64: KVM: Set physical address size related factors
+ in runtime
+Message-ID: <000501cf6dc6$44fac0f0$cef042d0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds 4 levels of translation tables implementation for both
-HYP and stage2.
+This patch sets TCR_EL2.PS, VTCR_EL2.T0SZ and vttbr_baddr_mask in runtime,
+not compile time.
 
-Both symmetric and asymmetric configurations for page size and translation
-levels are are validated on Fast Models:
+In ARMv8, EL2 physical address size (TCR_EL2.PS) and stage2 input address
+size (VTCR_EL2.T0SZE) cannot be determined in compile time since they
+depends on hardware capability.
 
- 1) 4KB  + 3 levels guest on 4KB  + 4 levels host
- 2) 4KB  + 4 levels guest on 4KB  + 4 levels host
- 3) 64KB + 2 levels guest on 4KB  + 4 levels host
- 4) 4KB  + 3 levels guest on 64KB + 2 levels host
- 5) 4KB  + 4 levels guest on 64KB + 2 levels host
- 6) 64KB + 2 levels guest on 64KB + 2 levels host
+According to Table D4-23 and Table D4-25 in ARM DDI 0487A.b document,
+vttbr_x is calculated using different hard-coded values with consideration
+of T0SZ, granule size and the level of translation tables. Therefore,
+vttbr_baddr_mask should be determined dynamically.
 
 Cc: Marc Zyngier <marc.zyngier@arm.com>
 Cc: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Jungseok Lee <jays.lee@samsung.com>
 Reviewed-by: Sungjinn Chung <sungjinn.chung@samsung.com>
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/include/asm/kvm_mmu.h   |   10 +++++
- arch/arm/kvm/arm.c               |    8 ++++
- arch/arm/kvm/mmu.c               |   77 ++++++++++++++++++++++++++++++++------
- arch/arm64/include/asm/kvm_arm.h |   12 ++++++
- arch/arm64/include/asm/kvm_mmu.h |   12 ++++++
- 5 files changed, 108 insertions(+), 11 deletions(-)
+ arch/arm/kvm/arm.c               |   82 +++++++++++++++++++++++++++++++++++++-
+ arch/arm64/include/asm/kvm_arm.h |   17 ++------
+ arch/arm64/kvm/hyp-init.S        |   20 +++++++---
+ 3 files changed, 98 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 5c7aa3c..36b9835 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -37,6 +37,11 @@
-  */
- #define TRAMPOLINE_VA		UL(CONFIG_VECTORS_BASE)
- 
-+/*
-+ * KVM_MMU_CACHE_MIN_PAGES is the number of stage2 page table translation levels.
-+ */
-+#define MMU_CACHE_MIN_PAGES	2
-+
- #ifndef __ASSEMBLY__
- 
- #include <asm/cacheflush.h>
-@@ -94,6 +99,11 @@ static inline void kvm_clean_pgd(pgd_t *pgd)
- 	clean_dcache_area(pgd, PTRS_PER_S2_PGD * sizeof(pgd_t));
- }
- 
-+static inline void kvm_clean_pmd(pmd_t *pmd)
-+{
-+	clean_dcache_area(pmd, PTRS_PER_PMD * sizeof(pmd_t));
-+}
-+
- static inline void kvm_clean_pmd_entry(pmd_t *pmd)
- {
- 	clean_pmd_entry(pmd);
 diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 9f19f2c..0785291 100644
+index f0e50a0..9f19f2c 100644
 --- a/arch/arm/kvm/arm.c
 +++ b/arch/arm/kvm/arm.c
-@@ -473,11 +473,19 @@ static int set_vttbr_baddr_mask(void)
- 	 * 21 <= T0SZ <= 30 is valid under 3 level of translation tables
- 	 * 30 <= T0SZ <= 39 is valid under 2 level of translation tables
- 	 */
-+#ifdef CONFIG_ARM64_3_LEVELS
- 	if (t0sz <= 20) {
- 		kvm_err("Cannot support %d-bit address space\n", 64 - t0sz);
- 		return -EINVAL;
- 	}
- 	vttbr_x = 37 - t0sz;
+@@ -37,6 +37,7 @@
+ #include <asm/mman.h>
+ #include <asm/tlbflush.h>
+ #include <asm/cacheflush.h>
++#include <asm/cputype.h>
+ #include <asm/virt.h>
+ #include <asm/kvm_arm.h>
+ #include <asm/kvm_asm.h>
+@@ -61,6 +62,9 @@ static atomic64_t kvm_vmid_gen = ATOMIC64_INIT(1);
+ static u8 kvm_next_vmid;
+ static DEFINE_SPINLOCK(kvm_vmid_lock);
+ 
++/* VTTBR mask cannot be determined in complie time under ARMv8 */
++static u64 vttbr_baddr_mask;
++
+ static bool vgic_present;
+ 
+ static void kvm_arm_set_running_vcpu(struct kvm_vcpu *vcpu)
+@@ -412,6 +416,75 @@ static bool need_new_vmid_gen(struct kvm *kvm)
+ }
+ 
+ /**
++ * set_vttbr_baddr_mask - set mask value for vttbr base address
++ *
++ * In ARMv8, vttbr_baddr_mask cannot be determined in compile time since stage2
++ * input address size depends on hardware capability. Thus, it is needed to read
++ * ID_AA64MMFR0_EL1.PARange first and then set vttbr_baddr_mask with consideration
++ * of both granule size and the level of translation tables.
++ */
++static int set_vttbr_baddr_mask(void)
++{
++#ifndef CONFIG_ARM64
++	vttbr_baddr_mask = VTTBR_BADDR_MASK;
 +#else
-+	if (t0sz <= 15) {
++	int pa_range, t0sz, vttbr_x;
++
++	pa_range = read_cpuid(ID_AA64MMFR0_EL1) & 0xf;
++
++	switch (pa_range) {
++	case 0:
++		t0sz = VTCR_EL2_T0SZ(32);
++		break;
++	case 1:
++		t0sz = VTCR_EL2_T0SZ(36);
++		break;
++	case 2:
++		t0sz = VTCR_EL2_T0SZ(40);
++		break;
++	case 3:
++		t0sz = VTCR_EL2_T0SZ(42);
++		break;
++	case 4:
++		t0sz = VTCR_EL2_T0SZ(44);
++		break;
++	default:
++		t0sz = VTCR_EL2_T0SZ(48);
++	}
++
++	/*
++	 * See Table D4-23 and Table D4-25 in ARM DDI 0487A.b to figure out
++	 * the origin of the hardcoded values, 38 and 37.
++	 */
++#ifdef CONFIG_ARM64_64K_PAGES
++	/*
++	 * 16 <= T0SZ <= 21 is valid under 3 level of translation tables
++	 * 18 <= T0SZ <= 34 is valid under 2 level of translation tables
++	 * 31 <= T0SZ <= 39 is valid under 1 level of transltaion tables
++	 */
++	if (t0sz <= 17) {
 +		kvm_err("Cannot support %d-bit address space\n", 64 - t0sz);
 +		return -EINVAL;
 +	}
-+	vttbr_x = 28 - t0sz;
++	vttbr_x = 38 - t0sz;
++#else
++	/*
++	 * 16 <= T0SZ <= 24 is valid under 4 level of translation tables
++	 * 21 <= T0SZ <= 30 is valid under 3 level of translation tables
++	 * 30 <= T0SZ <= 39 is valid under 2 level of translation tables
++	 */
++	if (t0sz <= 20) {
++		kvm_err("Cannot support %d-bit address space\n", 64 - t0sz);
++		return -EINVAL;
++	}
++	vttbr_x = 37 - t0sz;
 +#endif
- #endif
- 	vttbr_baddr_mask = (((1LLU << (48 - vttbr_x)) - 1) << (vttbr_x - 1));
- #endif
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 16f8049..6e2a0b0 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -390,13 +390,44 @@ static int create_hyp_pmd_mappings(pud_t *pud, unsigned long start,
- 	return 0;
- }
- 
-+static int create_hyp_pud_mappings(pgd_t *pgd, unsigned long start,
-+				   unsigned long end, unsigned long pfn,
-+				   pgprot_t prot)
-+{
-+	pud_t *pud;
-+	pmd_t *pmd;
-+	unsigned long addr, next;
-+
-+	addr = start;
-+	do {
-+		pud = pud_offset(pgd, addr);
-+
-+		if (pud_none_or_clear_bad(pud)) {
-+			pmd = pmd_alloc_one(NULL, addr);
-+			if (!pmd) {
-+				kvm_err("Cannot allocate Hyp pmd\n");
-+				return -ENOMEM;
-+			}
-+			pud_populate(NULL, pud, pmd);
-+			get_page(virt_to_page(pud));
-+			kvm_flush_dcache_to_poc(pud, sizeof(*pud));
-+		}
-+
-+		next = pud_addr_end(addr, end);
-+
-+		create_hyp_pmd_mappings(pud, addr, next, pfn, prot);
-+		pfn += (next - addr) >> PAGE_SHIFT;
-+	} while (addr = next, addr != end);
-+
++	vttbr_baddr_mask = (((1LLU << (48 - vttbr_x)) - 1) << (vttbr_x - 1));
++#endif
 +	return 0;
 +}
 +
- static int __create_hyp_mappings(pgd_t *pgdp,
- 				 unsigned long start, unsigned long end,
- 				 unsigned long pfn, pgprot_t prot)
- {
- 	pgd_t *pgd;
- 	pud_t *pud;
--	pmd_t *pmd;
- 	unsigned long addr, next;
- 	int err = 0;
++/**
+  * update_vttbr - Update the VTTBR with a valid VMID before the guest runs
+  * @kvm	The guest that we are about to run
+  *
+@@ -465,7 +538,7 @@ static void update_vttbr(struct kvm *kvm)
+ 	/* update vttbr to be used with the new vmid */
+ 	pgd_phys = virt_to_phys(kvm->arch.pgd);
+ 	vmid = ((u64)(kvm->arch.vmid) << VTTBR_VMID_SHIFT) & VTTBR_VMID_MASK;
+-	kvm->arch.vttbr = pgd_phys & VTTBR_BADDR_MASK;
++	kvm->arch.vttbr = pgd_phys & vttbr_baddr_mask;
+ 	kvm->arch.vttbr |= vmid;
  
-@@ -405,22 +436,21 @@ static int __create_hyp_mappings(pgd_t *pgdp,
- 	end = PAGE_ALIGN(end);
- 	do {
- 		pgd = pgdp + pgd_index(addr);
--		pud = pud_offset(pgd, addr);
- 
--		if (pud_none_or_clear_bad(pud)) {
--			pmd = pmd_alloc_one(NULL, addr);
--			if (!pmd) {
--				kvm_err("Cannot allocate Hyp pmd\n");
-+		if (pgd_none(*pgd)) {
-+			pud = pud_alloc_one(NULL, addr);
-+			if (!pud) {
-+				kvm_err("Cannot allocate Hyp pud\n");
- 				err = -ENOMEM;
- 				goto out;
- 			}
--			pud_populate(NULL, pud, pmd);
--			get_page(virt_to_page(pud));
--			kvm_flush_dcache_to_poc(pud, sizeof(*pud));
-+			pgd_populate(NULL, pgd, pud);
-+			get_page(virt_to_page(pgd));
-+			kvm_flush_dcache_to_poc(pgd, sizeof(*pgd));
+ 	spin_unlock(&kvm_vmid_lock);
+@@ -1051,6 +1124,12 @@ int kvm_arch_init(void *opaque)
  		}
+ 	}
  
- 		next = pgd_addr_end(addr, end);
--		err = create_hyp_pmd_mappings(pud, addr, next, pfn, prot);
-+		err = create_hyp_pud_mappings(pgd, addr, next, pfn, prot);
- 		if (err)
- 			goto out;
- 		pfn += (next - addr) >> PAGE_SHIFT;
-@@ -565,6 +595,24 @@ void kvm_free_stage2_pgd(struct kvm *kvm)
- 	kvm->arch.pgd = NULL;
- }
- 
-+static pud_t *stage2_get_pud(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
-+			     phys_addr_t addr)
-+{
-+	pgd_t *pgd;
-+	pud_t *pud;
-+
-+	pgd = kvm->arch.pgd + pgd_index(addr);
-+	if (pgd_none(*pgd)) {
-+		if (!cache)
-+			return NULL;
-+		pud = mmu_memory_cache_alloc(cache);
-+		pgd_populate(NULL, pgd, pud);
-+		get_page(virt_to_page(pgd));
++	err = set_vttbr_baddr_mask();
++	if (err) {
++		kvm_err("Cannot set vttbr_baddr_mask\n");
++		return -EINVAL;
 +	}
 +
-+	return pud_offset(pgd, addr);
-+}
-+
- static pmd_t *stage2_get_pmd(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
- 			     phys_addr_t addr)
- {
-@@ -616,9 +664,15 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
- static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
- 			  phys_addr_t addr, const pte_t *new_pte, bool iomap)
- {
-+	pud_t *pud;
- 	pmd_t *pmd;
- 	pte_t *pte, old_pte;
+ 	cpu_notifier_register_begin();
  
-+	/* Create stage-2 page table mapping - Level 0 */
-+	pud = stage2_get_pud(kvm, cache, addr);
-+	if (!pud)
-+		return 0;
-+
- 	/* Create stage-2 page table mapping - Level 1 */
- 	pmd = stage2_get_pmd(kvm, cache, addr);
- 	if (!pmd) {
-@@ -677,7 +731,8 @@ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
- 	for (addr = guest_ipa; addr < end; addr += PAGE_SIZE) {
- 		pte_t pte = pfn_pte(pfn, PAGE_S2_DEVICE);
+ 	err = init_hyp_mode();
+@@ -1068,6 +1147,7 @@ int kvm_arch_init(void *opaque)
+ 	hyp_cpu_pm_init();
  
--		ret = mmu_topup_memory_cache(&cache, 2, 2);
-+		ret = mmu_topup_memory_cache(&cache, KVM_MMU_CACHE_MIN_PAGES,
-+						KVM_MMU_CACHE_MIN_PAGES);
- 		if (ret)
- 			goto out;
- 		spin_lock(&kvm->mmu_lock);
+ 	kvm_coproc_table_init();
++
+ 	return 0;
+ out_err:
+ 	cpu_notifier_register_done();
 diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index 8dbef70..ac796d0 100644
+index 3d69030..8dbef70 100644
 --- a/arch/arm64/include/asm/kvm_arm.h
 +++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -114,6 +114,7 @@
- #define VTCR_EL2_IRGN0_MASK	(3 << 8)
- #define VTCR_EL2_IRGN0_WBWA	(1 << 8)
+@@ -94,7 +94,6 @@
+ /* TCR_EL2 Registers bits */
+ #define TCR_EL2_TBI	(1 << 20)
+ #define TCR_EL2_PS	(7 << 16)
+-#define TCR_EL2_PS_40B	(2 << 16)
+ #define TCR_EL2_TG0	(1 << 14)
+ #define TCR_EL2_SH0	(3 << 12)
+ #define TCR_EL2_ORGN0	(3 << 10)
+@@ -103,8 +102,6 @@
+ #define TCR_EL2_MASK	(TCR_EL2_TG0 | TCR_EL2_SH0 | \
+ 			 TCR_EL2_ORGN0 | TCR_EL2_IRGN0 | TCR_EL2_T0SZ)
+ 
+-#define TCR_EL2_FLAGS	(TCR_EL2_PS_40B)
+-
+ /* VTCR_EL2 Registers bits */
+ #define VTCR_EL2_PS_MASK	(7 << 16)
+ #define VTCR_EL2_TG0_MASK	(1 << 14)
+@@ -119,36 +116,28 @@
  #define VTCR_EL2_SL0_MASK	(3 << 6)
-+#define VTCR_EL2_SL0_LVL0	(2 << 6)
  #define VTCR_EL2_SL0_LVL1	(1 << 6)
  #define VTCR_EL2_T0SZ_MASK	0x3f
- #define VTCR_EL2_T0SZ(bits)	(64 - (bits))
-@@ -128,6 +129,7 @@
- 				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
- 				 VTCR_EL2_SL0_LVL1)
- #else
-+#ifdef CONFIG_ARM64_3_LEVELS
+-#define VTCR_EL2_T0SZ_40B	24
++#define VTCR_EL2_T0SZ(bits)	(64 - (bits))
+ 
+ #ifdef CONFIG_ARM64_64K_PAGES
  /*
   * Stage2 translation configuration:
+- * 40bits output (PS = 2)
+- * 40bits input  (T0SZ = 24)
+  * 64kB pages (TG0 = 1)
+  * 2 level page tables (SL = 1)
+  */
+ #define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_64K | VTCR_EL2_SH0_INNER | \
+ 				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
+-				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B)
+-#define VTTBR_X		(38 - VTCR_EL2_T0SZ_40B)
++				 VTCR_EL2_SL0_LVL1)
+ #else
+ /*
+  * Stage2 translation configuration:
+- * 40bits output (PS = 2)
+- * 40bits input  (T0SZ = 24)
   * 4kB pages (TG0 = 0)
-@@ -136,6 +138,16 @@
+  * 3 level page tables (SL = 1)
+  */
  #define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_4K | VTCR_EL2_SH0_INNER | \
  				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
- 				 VTCR_EL2_SL0_LVL1)
-+#else
-+/*
-+ * Stage2 translation configuration:
-+ * 4kB pages (TG0 = 0)
-+ * 4 level page tables (SL = 2)
-+ */
-+#define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_4K | VTCR_EL2_SH0_INNER | \
-+				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
-+				 VTCR_EL2_SL0_LVL0)
-+#endif
+-				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B)
+-#define VTTBR_X		(37 - VTCR_EL2_T0SZ_40B)
++				 VTCR_EL2_SL0_LVL1)
  #endif
  
+-#define VTTBR_BADDR_SHIFT (VTTBR_X - 1)
+-#define VTTBR_BADDR_MASK  (((1LLU << (40 - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
  #define VTTBR_VMID_SHIFT  (48LLU)
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 7d29847..778bf42 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -41,6 +41,17 @@
-  */
- #define TRAMPOLINE_VA		(HYP_PAGE_OFFSET_MASK & PAGE_MASK)
+ #define VTTBR_VMID_MASK	  (0xffLLU << VTTBR_VMID_SHIFT)
  
-+/*
-+ * KVM_MMU_CACHE_MIN_PAGES is the number of stage2 page table translation levels.
-+ */
-+#ifdef CONFIG_ARM64_2_LEVELS
-+#define KVM_MMU_CACHE_MIN_PAGES	1
-+#elif defined(CONFIG_ARM64_3_LEVELS)
-+#define KVM_MMU_CACHE_MIN_PAGES	2
-+#else
-+#define KVM_MMU_CACHE_MIN_PAGES	3
-+#endif
+diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
+index d968796..c0f7634 100644
+--- a/arch/arm64/kvm/hyp-init.S
++++ b/arch/arm64/kvm/hyp-init.S
+@@ -63,17 +63,21 @@ __do_hyp_init:
+ 	mrs	x4, tcr_el1
+ 	ldr	x5, =TCR_EL2_MASK
+ 	and	x4, x4, x5
+-	ldr	x5, =TCR_EL2_FLAGS
+-	orr	x4, x4, x5
+-	msr	tcr_el2, x4
+-
+-	ldr	x4, =VTCR_EL2_FLAGS
+ 	/*
+ 	 * Read the PARange bits from ID_AA64MMFR0_EL1 and set the PS bits in
+-	 * VTCR_EL2.
++	 * TCR_EL2 and both PS bits and T0SZ bits in VTCR_EL2.
+ 	 */
+ 	mrs	x5, ID_AA64MMFR0_EL1
+ 	bfi	x4, x5, #16, #3
++	msr	tcr_el2, x4
 +
- #ifdef __ASSEMBLY__
++	ldr	x4, =VTCR_EL2_FLAGS
++	bfi	x4, x5, #16, #3
++	and	x5, x5, #0xf
++	adr	x6, t0sz
++	add	x6, x6, x5, lsl #2
++	ldr	w5, [x6]
++	orr	x4, x4, x5
+ 	msr	vtcr_el2, x4
  
- /*
-@@ -107,6 +118,7 @@ static inline bool kvm_is_write_fault(unsigned long esr)
- }
+ 	mrs	x4, mair_el1
+@@ -109,6 +113,10 @@ target: /* We're now in the trampoline code, switch page tables */
  
- static inline void kvm_clean_pgd(pgd_t *pgd) {}
-+static inline void kvm_clean_pmd(pmd_t *pmd) {}
- static inline void kvm_clean_pmd_entry(pmd_t *pmd) {}
- static inline void kvm_clean_pte(pte_t *pte) {}
- static inline void kvm_clean_pte_entry(pte_t *pte) {}
+ 	/* Hello, World! */
+ 	eret
++
++t0sz:
++	.word	VTCR_EL2_T0SZ(32), VTCR_EL2_T0SZ(36), VTCR_EL2_T0SZ(40)
++	.word	VTCR_EL2_T0SZ(42), VTCR_EL2_T0SZ(44), VTCR_EL2_T0SZ(48)
+ ENDPROC(__kvm_hyp_init)
+ 
+ 	.ltorg
 -- 
 1.7.10.4
