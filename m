@@ -1,57 +1,38 @@
-From: mathias.nyman@linux.intel.com (Mathias Nyman)
-Date: Mon, 12 May 2014 20:43:59 +0300
-Subject: [PATCHv5 07/20] usb: host: xhci-plat: add clock support
-In-Reply-To: <5370DEC7.9080708@free-electrons.com>
-References: <1399832288-19899-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1399832288-19899-8-git-send-email-thomas.petazzoni@free-electrons.com>
- <5370DEC7.9080708@free-electrons.com>
-Message-ID: <5371085F.2010400@linux.intel.com>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Mon, 12 May 2014 12:33:01 -0500
+Subject: [GIT PULL] clk: socfpga: Clock updates for v3.16
+Message-ID: <1399915981-5403-1-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/12/2014 05:46 PM, Gregory CLEMENT wrote:
-> Hi Mathias, Felipe,
->
-> On 11/05/2014 20:17, Thomas Petazzoni wrote:
->> From: Gregory CLEMENT <gregory.clement@free-electrons.com>
->>
->> Some platforms (such as the Armada 38x ones) can gate the clock of
->> their USB controller. This patch adds the support for one clock in
->> xhci-plat, by enabling it during probe and disabling it on remove.
->>
->> To achieve this, it adds a 'struct clk *' member in xhci_hcd. While
->> only used for now in xhci-plat, it might be used by other drivers in
->> the future. Moreover, the xhci_hcd structure already holds other
->> members such as msix_count and msix_entries, which are MSI-X specific,
->> and therefore only used by xhci-pci.
->
-> Felpie,
->
-> would you agree to add your acked-by on this patch. You gave it on
-> the 3rd version however as pointed by Thomas there was some issues,
-> what do you think of this version?
->
->
-> Mathias,
->
-> as the xHCI maintainer what is your opinion on this patch. Do you plan
-> to take it? do you expect a pull request?
->
-> We submitted the first version of this series one month ago and we didn't
-> receive any feedback from you. Maybe it was just because you were happy
-> with the patch sent, but I would like to be sure that you noticed this
-> series.
->
-> I have the same question for the patch before: "[PATCHv5 06/20] usb: host:
-> xhci-plat: sort the headers in alphabetic order" and the three following:
-> "[PATCHv5 07/20] usb: host: xhci-plat: add clock support", "[PATCHv5 08/20]
->   usb: host: xhci-plat: add support for the Armada 375/38x XHCI controllers"
-> and "[PATCHv5 09/20] Documentation: dt-bindings: update xhci-platform DT
-> binding".
->
+Hi Mike,
 
-Hi
+Please consider pulling this patch in for v3.16.
 
-Sorry about the delay, Only thing I found was a sparse warning, otherwise looks ok.
+Thanks,
+Dinh
 
--Mathias
+The following changes since commit d1db0eea852497762cab43b905b879dfcd3b8987:
+
+  Linux 3.15-rc3 (2014-04-27 19:29:27 -0700)
+
+are available in the git repository at:
+
+  git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga-clk-update-for-v3.16
+
+for you to fetch changes up to 0691bb1b5a1865b3bbc9b7ce6e26eff546abb1cf:
+
+  clk: socfpga: add divider registers to the main pll outputs (2014-05-12 12:27:22 -0500)
+
+----------------------------------------------------------------
+Adds support getting the divider registers for the MAIN PLL that was once
+thought to be hidden.
+
+----------------------------------------------------------------
+Dinh Nguyen (1):
+      clk: socfpga: add divider registers to the main pll outputs
+
+ drivers/clk/socfpga/clk-gate.c   |    1 -
+ drivers/clk/socfpga/clk-periph.c |   22 +++++++++++++++++++---
+ drivers/clk/socfpga/clk.h        |    4 ++++
+ 3 files changed, 23 insertions(+), 4 deletions(-)
