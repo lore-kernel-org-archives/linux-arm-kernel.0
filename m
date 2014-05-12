@@ -1,29 +1,30 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 12 May 2014 09:42:15 +0200
-Subject: [PATCH] ARM: shmobile: Use shmobile_init_late() on r8a7740
-In-Reply-To: <20140511231050.19908.86623.sendpatchset@w520>
-References: <20140511231050.19908.86623.sendpatchset@w520>
-Message-ID: <CAMuHMdW4-r8khvk-hJcx1OXqwT0nGsVm3zEnmW6TUhyeDRPWdg@mail.gmail.com>
+From: liuxueliu.liu@huawei.com (Liu Xue)
+Date: Mon, 12 May 2014 07:25:07 +0000
+Subject: [PATCH] [ARM] module: remove redundant 'less than zero' check
+Message-ID: <1399879507-21893-1-git-send-email-liuxueliu.liu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 12, 2014 at 1:10 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
-> From: Magnus Damm <damm+renesas@opensource.se>
->
-> Hook up ->init_late for r8a7740 to initialize Suspend-to-RAM
-> and CPUIdle in case of C-code less board support for r8a7740.
->
-> Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+rel->r_offset is an 'unsigned int' so there is no
+reason to check if the value is less than zero.
 
-Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Signed-off-by: Xue Liu <liuxueliu.liu@huawei.com>
+---
+ arch/arm/kernel/module.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
+index a103464..a88343b 100644
+--- a/arch/arm/kernel/module.c
++++ b/arch/arm/kernel/module.c
+@@ -77,7 +77,7 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+ 		sym = ((Elf32_Sym *)symsec->sh_addr) + offset;
+ 		symname = strtab + sym->st_name;
+ 
+-		if (rel->r_offset < 0 || rel->r_offset > dstsec->sh_size - sizeof(u32)) {
++		if (rel->r_offset > dstsec->sh_size - sizeof(u32)) {
+ 			pr_err("%s: section %u reloc %u sym '%s': out of bounds relocation, offset %d size %u\n",
+ 			       module->name, relindex, i, symname,
+ 			       rel->r_offset, dstsec->sh_size);
+-- 
+1.8.3.4
