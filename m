@@ -1,327 +1,91 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 11 May 2014 21:40:33 -0700
-Subject: [PATCH 4/5] ARM: dts: Add hix5hd2-dkb dts file.
-In-Reply-To: <1399858236-29027-5-git-send-email-haojian.zhuang@linaro.org>
-References: <1399858236-29027-1-git-send-email-haojian.zhuang@linaro.org>
- <1399858236-29027-5-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <20140512044033.GD8896@quad.lixom.net>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Mon, 12 May 2014 04:42:53 +0000
+Subject: [PATCH] ARM: dts: at91-sama5d3_xplained: add the regulator
+ device node
+In-Reply-To: <536CF49E.1050708@atmel.com>
+References: <1398054547-5834-1-git-send-email-wenyou.yang@atmel.com>
+ <20140421095443.GA3461@piout.net> <20140421122205.GB3461@piout.net>
+ <B256D81BAE5131468A838E5D7A24364180A876DA@penmbx01>
+ <536CF49E.1050708@atmel.com>
+Message-ID: <B256D81BAE5131468A838E5D7A2436418C90E487@penmbx01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 12, 2014 at 09:30:35AM +0800, Haojian Zhuang wrote:
-> From: Haifeng Yan <yanhaifeng@gmail.com>
+
+
+> -----Original Message-----
+> From: Ferre, Nicolas
+> Sent: Friday, May 09, 2014 11:31 PM
+> To: Yang, Wenyou; Alexandre Belloni
+> Cc: devicetree at vger.kernel.org; linux-kernel at vger.kernel.org;
+> robh+dt at kernel.org; broonie at kernel.org; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH] ARM: dts: at91-sama5d3_xplained: add the regulator
+> device node
 > 
-> Add dts file for Hisilicon x5hd2 development kit board.
+> On 22/04/2014 03:37, Yang, Wenyou :
+> > Hi,
+> >
+> >> -----Original Message-----
+> >> From: Alexandre Belloni [mailto:alexandre.belloni at free-electrons.com]
+> >> Sent: Monday, April 21, 2014 8:22 PM
+> >> To: Yang, Wenyou
+> >> Cc: devicetree at vger.kernel.org; Ferre, Nicolas; linux-
+> >> kernel at vger.kernel.org; robh+dt at kernel.org; broonie at kernel.org;
+> >> linux- arm-kernel at lists.infradead.org
+> >> Subject: Re: [PATCH] ARM: dts: at91-sama5d3_xplained: add the
+> >> regulator device node
+> >>
+> >> On 21/04/2014 at 11:54:43 +0200, Alexandre Belloni wrote :
+> >>> Hi,
+> >>>
+> >>> On 21/04/2014 at 12:29:07 +0800, Wenyou Yang wrote :
+> >>>> +
+> >>>> +						vddana_reg: LDO_REG2 {
+> >>>> +							regulator-name =
+> "VDDANA";
+> >>>> +							regulator-min-microvolt
+> =
+> >> <3300000>;
+> >>>> +							regulator-max-microvolt
+> =
+> >> <3300000>;
+> >>>> +							regulator-always-on;
+> >>>
+> >>> I'm pretty sure that one is not always on as you actually have to
+> >>> configure it to get any voltage. Are you sure you want to set the
+> >>> regulator-always-on property here ?
+> >>>
+> >>
+> >> Just to clarify my though, wouldn't it be better to make the ADC
+> >> driver handle that regulator instead of using regulator-always-on ?
+> > Yes, you are right.
+> > It should not use regulator-always-on property for this regulator.
+> > It is ADC driver and ISI driver to handle it(The ISI takes PCK for
+> clock).
 > 
-> Signed-off-by: Haifeng Yan <yanhaifeng@gmail.com>
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
-> ---
->  arch/arm/boot/dts/Makefile        |   1 +
->  arch/arm/boot/dts/hix5hd2-dkb.dts |  56 +++++++++++
->  arch/arm/boot/dts/hix5hd2.dtsi    | 189 ++++++++++++++++++++++++++++++++++++++
->  3 files changed, 246 insertions(+)
->  create mode 100644 arch/arm/boot/dts/hix5hd2-dkb.dts
->  create mode 100644 arch/arm/boot/dts/hix5hd2.dtsi
+> Hi Wenyou and Alexandre,
 > 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 7119bca..54249d9 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -78,6 +78,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
->  	exynos5440-sd5v1.dtb \
->  	exynos5440-ssdk5440.dtb
->  dtb-$(CONFIG_ARCH_HI3xxx) += hi3620-hi4511.dtb
-> +dtb-$(CONFIG_ARCH_HIX5HD2) += hix5hd2-dkb.dtb
->  dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb \
->  	ecx-2000.dtb
->  dtb-$(CONFIG_ARCH_HIP04) += hip04-d01.dtb
-> diff --git a/arch/arm/boot/dts/hix5hd2-dkb.dts b/arch/arm/boot/dts/hix5hd2-dkb.dts
-> new file mode 100644
-> index 0000000..644458a
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/hix5hd2-dkb.dts
-> @@ -0,0 +1,56 @@
-> +/*
-> + * Copyright (c) 2013 Linaro Ltd.
-> + * Copyright (c) 2013 Hisilicon Limited.
-> + *
-> + *  This program is free software; you can redistribute it and/or modify
-> + *  it under the terms of the GNU General Public License version 2 as
-> + *  publishhed by the Free Software Foundation.
-> + */
-> +
-> +/dts-v1/;
-> +#include "hix5hd2.dtsi"
-> +
-> +/ {
-> +	model = "Hisilicon HiX5HD2 Development Board";
-> +	compatible = "hisilicon,hix5hd2-dkb";
+> After talking to our system engineers, it not usual to avoid to power
+> the VDDANA rail. In fact it will prevent you to use all the pads that
+> are powered by VDDANA: PD20-PD31. Moreover, even if you do not activate
+> the ADC output on these lines you won't be able to use them as plain
+> GPIO... (Cf. package and pinout section of the datasheet).
+> 
+> As the ADVREF pin of the SoC is connected to the VDDANA on this board
+> (even if this default configuration can be modified with a soldering
+> iron), we have to note that we may consume a little bit more power.
+> 
+> But still, I would recommend to keep the "regulator-always-on" property
+> on this node. Do you agree and allow me to take your first revision of
+> the patch?
+I agree.
 
-This should have a compatible of the SoC as well (as less specific).
+> 
+> 
+> Bye,
+> --
+> Nicolas Ferre
 
-
-> +	chosen {
-> +		bootargs = "console=ttyAMA0,115200";
-> +	};
-> +
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		cpu at 0 {
-> +			compatible = "arm,cortex-a9";
-> +			device_type = "cpu";
-> +			reg = <0>;
-> +			next-level-cache = <&l2>;
-> +		};
-> +
-> +		cpu at 1 {
-> +			compatible = "arm,cortex-a9";
-> +			device_type = "cpu";
-> +			reg = <1>;
-> +			next-level-cache = <&l2>;
-> +		};
-> +	};
-> +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0x00000000 0x80000000>;
-> +	};
-> +
-> +	soc {
-> +		amba {
-> +			timer0: timer at f8002000 {
-> +				status = "okay";
-> +			};
-> +
-> +			uart0: uart at f8b00000 {
-> +				status = "okay";
-> +			};
-
-This is much easier if you use a label-based syntax:
-
-&uart0 {
-	status = "okay";
-};
-
-Then you don't need to mirror the hierarchy, etc.
-
-> diff --git a/arch/arm/boot/dts/hix5hd2.dtsi b/arch/arm/boot/dts/hix5hd2.dtsi
-> new file mode 100644
-> index 0000000..d8a3ad4
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/hix5hd2.dtsi
-> @@ -0,0 +1,189 @@
-> +/*
-> + * Copyright (c) 2013 Linaro Ltd.
-> + * Copyright (c) 2013 Hisilicon Limited.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * publishhed by the Free Software Foundation.
-> + */
-> +
-> +#include "skeleton.dtsi"
-> +#include <dt-bindings/clock/hix5hd2-clock.h>
-> +
-> +/ {
-
-You might want to add the compatible string here that will be shared for all
-boards of this platform. Each dts will of course override it, but it makes it
-easy for them to see what they should append to their more specific compatible
-values.
-
-> +	aliases {
-> +		serial0 = &uart0;
-> +	};
-> +
-> +	gic: interrupt-controller at f8a01000 {
-> +		compatible = "arm,cortex-a9-gic";
-> +		#interrupt-cells = <3>;
-> +		#address-cells = <0>;
-> +		interrupt-controller;
-> +		/* gic dist base, gic cpu base */
-> +		reg = <0xf8a01000 0x1000>, <0xf8a00100 0x100>;
-> +	};
-> +
-> +	soc {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		compatible = "simple-bus";
-> +		device_type = "soc";
-> +		interrupt-parent = <&gic>;
-> +		ranges;
-> +
-> +		amba {
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			compatible = "arm,amba-bus";
-> +			ranges;
-> +
-> +			timer0: timer at f8002000 {
-> +				compatible = "arm,sp804", "arm,primecell";
-> +				reg = <0xf8002000 0x1000>;
-> +				/* timer00 & timer01 */
-> +				interrupts = <0 24 4>;
-> +				clocks = <&clock HIX5HD2_FIXED_24M>;
-> +				status = "disabled";
-> +			};
-> +
-> +			timer1: timer at f8a29000 {
-> +				/*
-> +				 * Only used in NORMAL state, not available ins
-> +				 * SLOW or DOZE state.
-> +				 * The rate is fixed in 24MHz.
-> +				 */
-> +				compatible = "arm,sp804", "arm,primecell";
-> +				reg = <0xf8a29000 0x1000>;
-> +				/* timer10 & timer11 */
-> +				interrupts = <0 25 4>;
-> +				clocks = <&clock HIX5HD2_FIXED_24M>;
-> +				status = "disabled";
-> +			};
-> +
-> +			timer2: timer at f8a2a000 {
-> +				compatible = "arm,sp804", "arm,primecell";
-> +				reg = <0xf8a2a000 0x1000>;
-> +				/* timer20 & timer21 */
-> +				interrupts = <0 26 4>;
-> +				clocks = <&clock HIX5HD2_FIXED_24M>;
-> +				status = "disabled";
-> +			};
-> +
-> +			timer3: timer at f8a2b000 {
-> +				compatible = "arm,sp804", "arm,primecell";
-> +				reg = <0xf8a2b000 0x1000>;
-> +				/* timer30 & timer31 */
-> +				interrupts = <0 27 4>;
-> +				clocks = <&clock HIX5HD2_FIXED_24M>;
-> +				status = "disabled";
-> +			};
-> +
-> +			timer4: timer at f8a81000 {
-> +				compatible = "arm,sp804", "arm,primecell";
-> +				reg = <0xf8a81000 0x1000>;
-> +				/* timer30 & timer31 */
-> +				interrupts = <0 28 4>;
-> +				clocks = <&clock HIX5HD2_FIXED_24M>;
-> +				status = "disabled";
-> +			};
-> +
-> +			uart0: uart at f8b00000 {
-> +				compatible = "arm,pl011", "arm,primecell";
-> +				reg = <0xf8b00000 0x1000>;
-> +				interrupts = <0 49 4>;
-> +				clocks = <&clock HIX5HD2_FIXED_83M>;
-> +				clock-names = "apb_pclk";
-> +				status = "disabled";
-> +			};
-> +
-> +			uart1: uart at f8006000 {
-> +				compatible = "arm,pl011", "arm,primecell";
-> +				reg = <0xf8006000 0x1000>;
-> +				interrupts = <0 50 4>;
-> +				clocks = <&clock HIX5HD2_FIXED_83M>;
-> +				clock-names = "apb_pclk";
-> +				status = "disabled";
-> +			};
-> +
-> +			uart2: uart at f8b02000 {
-> +				compatible = "arm,pl011", "arm,primecell";
-> +				reg = <0xf8b02000 0x1000>;
-> +				interrupts = <0 51 4>;
-> +				clocks = <&clock HIX5HD2_FIXED_83M>;
-> +				clock-names = "apb_pclk";
-> +				status = "disabled";
-> +			};
-> +
-> +			uart3: uart at f8b03000 {
-> +				compatible = "arm,pl011", "arm,primecell";
-> +				reg = <0xf8b03000 0x1000>;
-> +				interrupts = <0 52 4>;
-> +				clocks = <&clock HIX5HD2_FIXED_83M>;
-> +				clock-names = "apb_pclk";
-> +				status = "disabled";
-> +			};
-> +
-> +			uart4: uart at f8b04000 {
-> +				compatible = "arm,pl011", "arm,primecell";
-> +				reg = <0xf8b04000 0x1000>;
-> +				interrupts = <0 53 4>;
-> +				clocks = <&clock HIX5HD2_FIXED_83M>;
-> +				clock-names = "apb_pclk";
-> +				status = "disabled";
-> +			};
-> +		};
-> +
-> +		local_timer at f8a00600 {
-
-local-timer
-
-> +			compatible = "arm,cortex-a9-twd-timer";
-> +			reg = <0xf8a00600 0x20>;
-> +			interrupts = <1 13 0xf01>;
-> +		};
-> +
-> +		l2: l2-cache {
-> +			compatible = "arm,pl310-cache";
-> +			reg = <0xf8a10000 0x100000>;
-> +			interrupts = <0 15 4>;
-> +			cache-unified;
-> +			cache-level = <2>;
-> +			hisilicon,l2cache-aux = <0x00050000 0xfff0ffff>;
-> +		};
-> +
-> +		/* unremovable emmc as mmcblk0 */
-> +		dwmmc_1: dwmmc1 at f9830000 {
-
-The node name should be generic. Most other platforms use "mmc". No enumerating
-suffix in the node name.
-
-> +			compatible = "hisilicon,hi3716-dw-mshc";
-> +			reg = <0xf9830000 0x1000>;
-> +			interrupts = <0 35 4>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			clocks = <&clock HIX5HD2_MMC_CIU_RST>, <&clock HIX5HD2_MMC_BIU_CLK>;
-> +			clock-names = "ciu", "biu";
-> +		};
-> +
-> +
-> +		sctrl at f8000000 {
-
-system-controller
-
-> +			compatible = "hisilicon,sysctrl";
-> +			reg = <0xf8000000 0x1000>;
-> +			smp_reg = <0xc0>;
-> +			reboot_reg = <0x4>;
-> +		};
-> +
-> +		clkbase at f8a22000 {
-
-What's this? Needs a binding. Name should probably be something else too
-(clock-controller?)
-
-> +			compatible = "hisilicon,clkbase";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			reg = <0xf8a22000 0x1000>;
-> +			ranges = <0x0 0xf8a22000 0x1000>;
-> +			clock: clock at 0 {
-> +				compatible = "hisilicon,hix5hd2-clock";
-> +				reg = <0x0 0x1000>;
-> +				#clock-cells = <1>;
-> +			};
-> +		};
-> +
-> +		cpuctrl at f8a22000 {
-> +			compatible = "hisilicon,cpuctrl";
-> +			reg = <0xf8a22000 0x2000>;
-> +		};
-
-Again, as pointed out in one of the other patches, this needs a binding.
-
-
-
--Olof
+Best Regards,
+Wenyou Yang
