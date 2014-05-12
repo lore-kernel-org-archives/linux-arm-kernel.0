@@ -1,286 +1,62 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 12 May 2014 16:44:51 +0800
-Subject: [linux-sunxi] [PATCH v4 2/2] input: sun4i-ts: Add support for
- temperature sensor
-In-Reply-To: <1399795586-18919-3-git-send-email-hdegoede@redhat.com>
-References: <1399795586-18919-1-git-send-email-hdegoede@redhat.com>
- <1399795586-18919-3-git-send-email-hdegoede@redhat.com>
-Message-ID: <CAGb2v66EiYy3XbLqBXmOhOfHF=2DC_tOyQpdM8Q05iR6+X66zg@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 12 May 2014 09:54:00 +0100
+Subject: [PATCH v9 2/3] Documentation: devicetree: Add new binding for
+ PSCIv0.2
+In-Reply-To: <1399472847-14377-3-git-send-email-ashwin.chaugule@linaro.org>
+References: <1399472847-14377-1-git-send-email-ashwin.chaugule@linaro.org>
+ <1399472847-14377-3-git-send-email-ashwin.chaugule@linaro.org>
+Message-ID: <20140512085400.GA3006@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Ashwin,
 
-On Sun, May 11, 2014 at 4:06 PM, Hans de Goede <hdegoede@redhat.com> wrote:
-> The sun4i resisitive touchscreen controller also comes with a built-in
-> temperature sensor. This commit adds support for it.
->
-> This commit also introduces a new "ts-attached" device-tree property,
-> when this is not set, the input part of the driver won't register. This way
-> the internal temperature sensor can be used to measure the SoC temperature
-> independent of there actually being a touchscreen attached to the controller.
->
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
-> ---
->  .../bindings/input/touchscreen/sun4i.txt           |   5 +
->  drivers/input/touchscreen/sun4i-ts.c               | 140 ++++++++++++++++-----
->  2 files changed, 114 insertions(+), 31 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
-> index 881aea7..aef5779 100644
-> --- a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
-> +++ b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
-> @@ -6,10 +6,15 @@ Required properties:
->   - reg: mmio address range of the chip
->   - interrupts: interrupt to which the chip is connected
->
-> +Optional properties:
-> + - allwinner,ts-attached: boolean indicating that an actual touchscreen is
-> +                         attached to the controller
-> +
->  Example:
->
->         rtp: rtp at 01c25000 {
->                 compatible = "allwinner,sun4i-a10-ts";
->                 reg = <0x01c25000 0x100>;
->                 interrupts = <29>;
-> +               allwinner,ts-attached;
->         };
-> diff --git a/drivers/input/touchscreen/sun4i-ts.c b/drivers/input/touchscreen/sun4i-ts.c
-> index c5acdfb..f366221 100644
-> --- a/drivers/input/touchscreen/sun4i-ts.c
-> +++ b/drivers/input/touchscreen/sun4i-ts.c
-> @@ -3,6 +3,9 @@
->   *
->   * Copyright (C) 2013 - 2014 Hans de Goede <hdegoede@redhat.com>
->   *
-> + * The hwmon parts are based on work by Corentin LABBE which is:
-> + * Copyright (C) 2013 Corentin LABBE <clabbe.montjoie@gmail.com>
-> + *
->   * This program is free software; you can redistribute it and/or modify
->   * it under the terms of the GNU General Public License as published by
->   * the Free Software Foundation; either version 2 of the License, or
-> @@ -30,6 +33,7 @@
->   */
->
->  #include <linux/err.h>
-> +#include <linux/hwmon.h>
->  #include <linux/init.h>
->  #include <linux/input.h>
->  #include <linux/interrupt.h>
-> @@ -106,14 +110,12 @@ struct sun4i_ts_data {
->         void __iomem *base;
->         unsigned int irq;
->         bool ignore_fifo_data;
-> +       int temp_data;
->  };
->
-> -static irqreturn_t sun4i_ts_irq(int irq, void *dev_id)
-> +static void sun4i_ts_irq_handle_input(struct sun4i_ts_data *ts, u32 reg_val)
->  {
-> -       struct sun4i_ts_data *ts = dev_id;
-> -       u32 reg_val, x, y;
-> -
-> -       reg_val  = readl(ts->base + TP_INT_FIFOS);
-> +       u32 x, y;
->
->         if (reg_val & FIFO_DATA_PENDING) {
->                 x = readl(ts->base + TP_DATA);
-> @@ -139,6 +141,20 @@ static irqreturn_t sun4i_ts_irq(int irq, void *dev_id)
->                 input_report_key(ts->input, BTN_TOUCH, 0);
->                 input_sync(ts->input);
->         }
-> +}
-> +
-> +static irqreturn_t sun4i_ts_irq(int irq, void *dev_id)
-> +{
-> +       struct sun4i_ts_data *ts = dev_id;
-> +       u32 reg_val;
-> +
-> +       reg_val  = readl(ts->base + TP_INT_FIFOS);
-> +
-> +       if (reg_val & TEMP_DATA_PENDING)
-> +               ts->temp_data = readl(ts->base + TEMP_DATA);
-> +
-> +       if (ts->input)
-> +               sun4i_ts_irq_handle_input(ts, reg_val);
->
->         writel(reg_val, ts->base + TP_INT_FIFOS);
->
-> @@ -149,9 +165,9 @@ static int sun4i_ts_open(struct input_dev *dev)
->  {
->         struct sun4i_ts_data *ts = input_get_drvdata(dev);
->
-> -       /* Flush, set trig level to 1, enable data and up irqs */
-> -       writel(DATA_IRQ_EN(1) | FIFO_TRIG(1) | FIFO_FLUSH(1) | TP_UP_IRQ_EN(1),
-> -              ts->base + TP_INT_FIFOC);
-> +       /* Flush, set trig level to 1, enable temp, data and up irqs */
-> +       writel(TEMP_IRQ_EN(1) | DATA_IRQ_EN(1) | FIFO_TRIG(1) | FIFO_FLUSH(1) |
-> +               TP_UP_IRQ_EN(1), ts->base + TP_INT_FIFOC);
->
->         return 0;
->  }
-> @@ -160,15 +176,48 @@ static void sun4i_ts_close(struct input_dev *dev)
->  {
->         struct sun4i_ts_data *ts = input_get_drvdata(dev);
->
-> -       /* Deactivate all IRQs */
-> -       writel(0, ts->base + TP_INT_FIFOC);
-> +       /* Deactivate all input IRQs */
-> +       writel(TEMP_IRQ_EN(1), ts->base + TP_INT_FIFOC);
-> +}
-> +
-> +static ssize_t show_temp(struct device *dev, struct device_attribute *devattr,
-> +                        char *buf)
-> +{
-> +       struct sun4i_ts_data *ts = dev_get_drvdata(dev);
-> +
-> +       /* No temp_data until the first irq */
-> +       if (ts->temp_data == -1)
-> +               return -EAGAIN;
-> +
-> +       return sprintf(buf, "%d\n", (ts->temp_data - 1447) * 100);
-> +}
-> +
-> +static ssize_t show_temp_label(struct device *dev,
-> +                             struct device_attribute *devattr, char *buf)
-> +{
-> +       return sprintf(buf, "SoC temperature\n");
->  }
->
-> +static DEVICE_ATTR(temp1_input, S_IRUGO, show_temp, NULL);
-> +static DEVICE_ATTR(temp1_label, S_IRUGO, show_temp_label, NULL);
-> +
-> +static struct attribute *sun4i_ts_attrs[] = {
-> +       &dev_attr_temp1_input.attr,
-> +       &dev_attr_temp1_label.attr,
-> +       NULL
-> +};
-> +ATTRIBUTE_GROUPS(sun4i_ts);
-> +
->  static int sun4i_ts_probe(struct platform_device *pdev)
->  {
->         struct sun4i_ts_data *ts;
->         struct device *dev = &pdev->dev;
-> +       struct device_node *np = dev->of_node;
-> +       struct device *hwmon;
->         int ret;
-> +       bool ts_attached;
-> +
-> +       ts_attached = of_property_read_bool(np, "allwinner,ts-attached");
->
->         ts = devm_kzalloc(dev, sizeof(struct sun4i_ts_data), GFP_KERNEL);
->         if (!ts)
-> @@ -176,24 +225,27 @@ static int sun4i_ts_probe(struct platform_device *pdev)
->
->         ts->dev = dev;
->         ts->ignore_fifo_data = true;
-> -
-> -       ts->input = devm_input_allocate_device(dev);
-> -       if (!ts->input)
-> -               return -ENOMEM;
-> -
-> -       ts->input->name = pdev->name;
-> -       ts->input->phys = "sun4i_ts/input0";
-> -       ts->input->open = sun4i_ts_open;
-> -       ts->input->close = sun4i_ts_close;
-> -       ts->input->id.bustype = BUS_HOST;
-> -       ts->input->id.vendor = 0x0001;
-> -       ts->input->id.product = 0x0001;
-> -       ts->input->id.version = 0x0100;
-> -       ts->input->evbit[0] =  BIT(EV_SYN) | BIT(EV_KEY) | BIT(EV_ABS);
-> -       set_bit(BTN_TOUCH, ts->input->keybit);
-> -       input_set_abs_params(ts->input, ABS_X, 0, 4095, 0, 0);
-> -       input_set_abs_params(ts->input, ABS_Y, 0, 4095, 0, 0);
-> -       input_set_drvdata(ts->input, ts);
-> +       ts->temp_data = -1;
-> +
-> +       if (ts_attached) {
-> +               ts->input = devm_input_allocate_device(dev);
-> +               if (!ts->input)
-> +                       return -ENOMEM;
-> +
-> +               ts->input->name = pdev->name;
-> +               ts->input->phys = "sun4i_ts/input0";
-> +               ts->input->open = sun4i_ts_open;
-> +               ts->input->close = sun4i_ts_close;
-> +               ts->input->id.bustype = BUS_HOST;
-> +               ts->input->id.vendor = 0x0001;
-> +               ts->input->id.product = 0x0001;
-> +               ts->input->id.version = 0x0100;
-> +               ts->input->evbit[0] =  BIT(EV_SYN) | BIT(EV_KEY) | BIT(EV_ABS);
-> +               set_bit(BTN_TOUCH, ts->input->keybit);
-> +               input_set_abs_params(ts->input, ABS_X, 0, 4095, 0, 0);
-> +               input_set_abs_params(ts->input, ABS_Y, 0, 4095, 0, 0);
-> +               input_set_drvdata(ts->input, ts);
-> +       }
->
->         ts->base = devm_ioremap_resource(dev,
->                               platform_get_resource(pdev, IORESOURCE_MEM, 0));
-> @@ -232,14 +284,39 @@ static int sun4i_ts_probe(struct platform_device *pdev)
->         writel(STYLUS_UP_DEBOUN(5) | STYLUS_UP_DEBOUN_EN(1) | TP_MODE_EN(1),
->                ts->base + TP_CTRL1);
->
-> -       ret = input_register_device(ts->input);
-> -       if (ret)
-> -               return ret;
-> +       hwmon = devm_hwmon_device_register_with_groups(ts->dev, "sun4i_ts",
-> +                                                      ts, sun4i_ts_groups);
+On Wed, May 07, 2014 at 03:27:26PM +0100, Ashwin Chaugule wrote:
+> The PSCI v0.2+ spec defines standard values for PSCI function IDs.
+> Add a new binding entry so that pre v0.2 implementations can
+> use DT entries for function IDs and v0.2+ implementations use
+> standard entries as defined by the PSCIv0.2 specification.
+> 
+> Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+> Acked-by: Rob Herring <robh@kernel.org>
 
-This fails to compile when HWMON is not selected:
+This looks good to me as a binding, and my prior comments all seem to
+have been addressed. So:
 
-drivers/built-in.o: In function `sun4i_ts_probe':
-/home/wens/cubieboard/linux/drivers/input/touchscreen/sun4i-ts.c:287:
-undefined reference to `devm_hwmon_device_register_with_groups'
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 
-Best do a wrapper around the hwmon related code.
-drivers/input/touchscreen/ads7846.c has something similar, albeit for voltage.
+I have one minor comment regarding the final example. It would be nice
+to be a little more explicit about the compatibility story there for
+those people who are likely to skim the body of the document and only
+read the examples.
 
+[...]
 
-ChenYu
+> +Case 3: PSCI v0.2 and PSCI v0.1.
+> +
+> +	As described above, for compatibility with existing kernels, the
+> +	hypervisor will likely want to provide IDs, e.g.
 
-> +       if (IS_ERR(hwmon))
-> +               return PTR_ERR(hwmon);
+All we'd need here is to point out that the IDs will be ignored by a
+PSCI 0.2 capable OS, which will assume the standard PSCI 0.2 IDs.
+
+Could we replace the above with something like:
+
+A DTB may provide IDs for use by kernels without PSCI 0.2 support,
+enabling firmware and hypervisors to support existing and new kernels.
+These IDs will be ignored by kernels with PSCI 0.2 support, which will
+use the standard PSCI 0.2 IDs exclusively.
+
 > +
-> +       writel(TEMP_IRQ_EN(1), ts->base + TP_INT_FIFOC);
+> +	psci {
+> +		compatible = "arm,psci-0.2", "arm,psci";
+> +		method = "hvc";
 > +
-> +       if (ts_attached) {
-> +               ret = input_register_device(ts->input);
-> +               if (ret) {
-> +                       writel(0, ts->base + TP_INT_FIFOC);
-> +                       return ret;
-> +               }
-> +       }
->
->         platform_set_drvdata(pdev, ts);
->         return 0;
->  }
->
-> +static int sun4i_ts_remove(struct platform_device *pdev)
-> +{
-> +       struct sun4i_ts_data *ts = platform_get_drvdata(pdev);
+> +		cpu_on = < arbitrary value >;
+> +		cpu_off = < arbitrary value >;
 > +
-> +       /* Explicit unregister to avoid open/close changing the imask later */
-> +       if (ts->input)
-> +               input_unregister_device(ts->input);
-> +
-> +       /* Deactivate all IRQs */
-> +       writel(0, ts->base + TP_INT_FIFOC);
-> +
-> +       return 0;
-> +}
-> +
->  static const struct of_device_id sun4i_ts_of_match[] = {
->         { .compatible = "allwinner,sun4i-a10-ts", },
->         { /* sentinel */ }
-> @@ -253,6 +330,7 @@ static struct platform_driver sun4i_ts_driver = {
->                 .of_match_table = of_match_ptr(sun4i_ts_of_match),
->         },
->         .probe  = sun4i_ts_probe,
-> +       .remove = sun4i_ts_remove,
->  };
->
->  module_platform_driver(sun4i_ts_driver);
-> --
-> 1.9.0
+> +		...
+> +	};
+
+Cheers,
+Mark.
