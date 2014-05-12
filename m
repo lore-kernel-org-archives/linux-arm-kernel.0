@@ -1,69 +1,121 @@
-From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Mon, 12 May 2014 16:28:10 +0530
-Subject: [PATCH v3 0/5] ARM: dts: enable hdmi for exynos5 based peach and
- snow boards
-In-Reply-To: <1399890248-27409-1-git-send-email-rahul.sharma@samsung.com>
-References: <1399890248-27409-1-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <CAPdUM4M1xR1jGPxhuUi6nnAXuzA8_-9Hbgux66g+3mobhxNwyA@mail.gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 12 May 2014 13:20:56 +0200
+Subject: [PATCH v12 1/6] ARM: sunxi: Add driver for SD/MMC hosts found
+ on Allwinner sunxi SoCs
+In-Reply-To: <CAPDyKFrYeBdB20qhmkcUf5ykw=SbBo6VUPXd=By9dNOvTnvFww@mail.gmail.com>
+References: <1399794417-9291-1-git-send-email-hdegoede@redhat.com>	<1399794417-9291-2-git-send-email-hdegoede@redhat.com>
+ <CAPDyKFrYeBdB20qhmkcUf5ykw=SbBo6VUPXd=By9dNOvTnvFww@mail.gmail.com>
+Message-ID: <5370AE98.9050808@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 May 2014 15:54, Rahul Sharma <rahul.sharma@samsung.com> wrote:
-> From: Rahul Sharma <Rahul.Sharma@samsung.com>
->
-> Enable hdmi for exynos5250 based snow board and exynos5420
-> based peach pit board. It also adds properties to hdmi nodes
-> for accessing hdmiphy as simple phys.
->
-> V3:
-> 1) Re-spin on dependent patches.
-> 2) Added patch to enable hdmi for Peach-pi board.
->
-> V2:
-> 1) Re-spin on dependent patches.
-> 2) Added patch to remove chip specific hdmi hpd gpio from
-> board file top SoC file.
->
-> This series is based on Kukjin Kims, for-next branch.
->
-> It is dependent on
-> 1) Arun's patch for adding peach-pit board dts file at
-> http://www.spinics.net/lists/linux-samsung-soc/msg30103.html. [Patch is 'ACK'ed.]
-> 2) Sachin's patch for snow board dts file at
-> https://patches.linaro.org/28325/
-> 3) DRM Hdmi driver patch which is changing the DT binding at
-> http://www.spinics.net/lists/linux-samsung-soc/msg28052.html
-> 4) Arun's patches for basic Exynos5800 support, available at
-> http://comments.gmane.org/gmane.linux.kernel.samsung-soc/30667
-> [Already Applied in Kukjin's v3.16-next/soc-exynos]
->
+Hi,
 
-Updating the dependency:
-1) Sachin's patch for snow board dts file at
-       https://patches.linaro.org/28325/
-2) DRM Hdmi driver patch which is changing the DT binding at
-       http://www.spinics.net/lists/linux-samsung-soc/msg28052.html
+On 05/12/2014 11:15 AM, Ulf Hansson wrote:
+> On 11 May 2014 09:46, Hans de Goede <hdegoede@redhat.com> wrote:
+>> From: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
+>>
+>> The Allwinner sunxi mmc host uses dma in bus-master mode using a built-in
+>> designware idmac controller, which is identical to the one found in the mmc-dw
+>> hosts. However the rest of the host is not identical to mmc-dw, it deals with
+>> sending stop commands in hardware which makes it significantly different
+>> from the mmc-dw devices.
+>>
+>> HdG: Various cleanups and fixes.
+>>
+>> Signed-off-by: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> 
+> [snip]
+> 
+>> +
+>> +static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
+>> +                                 struct mmc_ios *ios)
+>> +{
+>> +       u32 rate, oclk_dly, rval, sclk_dly, src_clk;
+>> +       struct clk_hw *hw = __clk_get_hw(host->clk_mmc);
+> 
+> Hi Hans,
+> 
+> This seems like the wrong approach. But I guess it's related to the
+> "clock phase control" API you have been discussing with the clk
+> maintainer, Mike Turquette!?
 
-All other patches are already Applied in Kukjin's for-next and
-v3.16-next/soc-exynos branches.
+Yes, this is meant as a temporary solution until we get a proper
+"clock phase control" API.
 
-> Rahul Sharma (5):
->   ARM: dts: enable hdmi for exynos5250 based snow board
->   ARM: dts: change to correct compatible string for exynos5420 hdmi
->   ARM: dts: enable hdmi for exynos5420 based peach-pit board
->   ARM: dts: remove chip specific hdmi hpd pin from board
->   ARM: dts: enable hdmi for exynos5800 based peach-pi board
->
->  arch/arm/boot/dts/exynos5250-cros-common.dtsi |    6 +++++-
->  arch/arm/boot/dts/exynos5250-pinctrl.dtsi     |    7 +++++++
->  arch/arm/boot/dts/exynos5250-snow.dts         |    7 +++++++
->  arch/arm/boot/dts/exynos5420-peach-pit.dts    |   19 ++++++++++++++++++
->  arch/arm/boot/dts/exynos5420-pinctrl.dtsi     |    7 +++++++
->  arch/arm/boot/dts/exynos5420-smdk5420.dts     |    9 ---------
->  arch/arm/boot/dts/exynos5420.dtsi             |    7 ++++++-
->  arch/arm/boot/dts/exynos5800-peach-pi.dts     |   26 +++++++++++++++++++++++++
->  8 files changed, 77 insertions(+), 11 deletions(-)
->
-> --
-> 1.7.9.5
->
+> 
+> __clk_get_hw is supposed to be used by clk providers, not clk consumers.
+> 
+>> +       int ret;
+>> +
+>> +       rate = clk_round_rate(host->clk_mmc, ios->clock);
+>> +       dev_dbg(mmc_dev(host->mmc), "setting clk to %d, rounded %d\n",
+>> +               ios->clock, rate);
+>> +
+>> +       /* setting clock rate */
+>> +       ret = clk_set_rate(host->clk_mmc, rate);
+>> +       if (ret) {
+>> +               dev_err(mmc_dev(host->mmc), "error setting clk to %d: %d\n",
+>> +                       rate, ret);
+>> +               return ret;
+>> +       }
+>> +
+>> +       ret = sunxi_mmc_oclk_onoff(host, 0);
+>> +       if (ret)
+>> +               return ret;
+>> +
+>> +       /* clear internal divider */
+>> +       rval = mmc_readl(host, REG_CLKCR);
+>> +       rval &= ~0xff;
+>> +       mmc_writel(host, REG_CLKCR, rval);
+>> +
+>> +       /* determine delays */
+>> +       if (rate <= 400000) {
+>> +               oclk_dly = 0;
+>> +               sclk_dly = 7;
+>> +       } else if (rate <= 25000000) {
+>> +               oclk_dly = 0;
+>> +               sclk_dly = 5;
+>> +       } else if (rate <= 50000000) {
+>> +               if (ios->timing == MMC_TIMING_UHS_DDR50) {
+>> +                       oclk_dly = 2;
+>> +                       sclk_dly = 4;
+>> +               } else {
+>> +                       oclk_dly = 3;
+>> +                       sclk_dly = 5;
+>> +               }
+>> +       } else {
+>> +               /* rate > 50000000 */
+>> +               oclk_dly = 2;
+>> +               sclk_dly = 4;
+>> +       }
+>> +
+>> +       src_clk = clk_get_rate(clk_get_parent(host->clk_mmc));
+>> +       if (src_clk >= 300000000 && src_clk <= 400000000) {
+>> +               if (oclk_dly)
+>> +                       oclk_dly--;
+>> +               if (sclk_dly)
+>> +                       sclk_dly--;
+>> +       }
+>> +
+>> +       clk_sunxi_mmc_phase_control(hw, sclk_dly, oclk_dly);
+>> +
+>> +       return sunxi_mmc_oclk_onoff(host, 1);
+>> +}
+>> +
+> 
+> [snip]
+> 
+> Besides the above, I think this looks good!
+
+Thanks!
+
+Since Mike Turquette has already merged clk_sunxi_mmc_phase_control
+I would like to keep this as is, as I already promised Mike, I can
+safely promise you too: I promise clean this up as soon as the
+"clock phase control" API has been worked out.
+
+Regards,
+
+Hans
