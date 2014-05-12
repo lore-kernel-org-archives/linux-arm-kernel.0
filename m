@@ -1,43 +1,44 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 12 May 2014 16:30:42 +0100
-Subject: [PATCH] arm64: use cpu_online_mask when using forced
- irq_set_affinity
-In-Reply-To: <1399653464-21410-1-git-send-email-sudeep.holla@arm.com>
-References: <1399653464-21410-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20140512153042.GE31633@arm.com>
+From: larry.bassel@linaro.org (Larry Bassel)
+Date: Mon, 12 May 2014 08:38:48 -0700
+Subject: [PATCH v2] arm64: Support arch_irq_work_raise() via self IPIs
+In-Reply-To: <20140512092956.GB914@arm.com>
+References: <1399760621-10954-1-git-send-email-larry.bassel@linaro.org>
+ <20140512092956.GB914@arm.com>
+Message-ID: <20140512153848.GA13068@linaro6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 09, 2014 at 05:37:44PM +0100, Sudeep Holla wrote:
-> From: Sudeep Holla <sudeep.holla@arm.com>
+On 12 May 14 10:29, Will Deacon wrote:
+> On Sat, May 10, 2014 at 11:23:41PM +0100, Larry Bassel wrote:
+> > Support for arch_irq_work_raise() was missing from
+> > arm64 (a prerequisite for FULL_NOHZ).
 > 
-> Commit 01f8fa4f01d8("genirq: Allow forcing cpu affinity of interrupts")
-> enabled the forced irq_set_affinity which previously refused to route an
-> interrupt to an offline cpu.
+> [...]
 > 
-> Commit ffde1de64012("irqchip: Gic: Support forced affinity setting")
-> implements this force logic and disables the cpu online check for GIC
-> interrupt controller.
+> > @@ -455,6 +457,14 @@ void arch_send_call_function_single_ipi(int cpu)
+> >  	smp_cross_call(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
+> >  }
+> >  
+> > +#ifdef CONFIG_IRQ_WORK
+> > +void arch_irq_work_raise(void)
+> > +{
+> > +	if (is_smp())
+> > +		smp_cross_call(cpumask_of(smp_processor_id()), IPI_IRQ_WORK);
+> > +}
+> > +#endif
 > 
-> When __cpu_disable calls migrate_irqs, it disables the current cpu in
-> cpu_online_mask and uses forced irq_set_affinity to migrate the IRQs
-> away from the cpu but passes affinity mask with the cpu being offlined
-> also included in it.
-> 
-> When calling irq_set_affinity with force == true in a cpu hotplug path,
-> the caller must ensure that the cpu being offlined is not present in the
-> affinity mask or it may be selected as the target CPU, leading to the
-> interrupt not being migrated.
-> 
-> This patch uses cpu_online_mask when using forced irq_set_affinity so
-> that the IRQs are properly migrated away.
-> 
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
+> Does this even compile? We're probably better off just checking whether or
+> not smp_cross_call is NULL.
 
-Applied, thanks.
+No it doesn't (I incorrectly assumed that is_smp() was generic, not
+arm32 specific and so I didn't compile this before submitting).
 
--- 
-Catalin
+I've verified that your suggestion compiles and runs properly
+and will resubmit.
+
+Thanks for catching this.
+
+> 
+> Will
+
+Larry
