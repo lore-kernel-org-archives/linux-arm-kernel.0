@@ -1,48 +1,122 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 12 May 2014 15:11:46 +0300
-Subject: [PATCH 2/2] ARM: OMAP2+: fix dpll round_rate() to actually round
-In-Reply-To: <alpine.DEB.2.02.1405072210360.23579@utopia.booyaka.com>
-References: <1389944699-27962-1-git-send-email-tomi.valkeinen@ti.com>
- <1389944699-27962-3-git-send-email-tomi.valkeinen@ti.com>
- <20140424182914.GD4659@saruman.home> <20140424184457.GH22987@atomide.com>
- <20140429155111.GC633@saruman.home> <535FD2E0.1050806@ti.com>
- <alpine.DEB.2.02.1405072210360.23579@utopia.booyaka.com>
-Message-ID: <5370BA82.8030703@ti.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Mon, 12 May 2014 16:02:37 +0300
+Subject: [PATCH] ARM: dts: keystone-evm: add spi nor flash support
+Message-ID: <1399899757-15767-1-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/14 01:16, Paul Walmsley wrote:
+From: Murali Karicheri <m-karicheri2@ti.com>
 
->> It's true that the original patch changes the dpll behavior when an
->> exact match is not found. However, I think our drivers always request an
->> exact match, and in that case the original patch doesn't change the
->> behavior in practice.
->>
->> In theory it's possible that a driver requests a non-exact clock from
->> the dpll, and when it gets an error, it does something else.
-> 
-> The path that worries me at the moment is the set-rate path.  That calls 
-> __clk_round_rate() (if the user hasn't called it already) and silently 
-> tries to set the clock to the altered rate.
+k2hk, k2e, k2l EVM board have the same Micron N25Q128A11
+SPI NOR Flash installed on SPI0 bus.
 
-Hmm, so you mean a driver could call set_rate, and presume it only uses
-exact rates the dpll can produce, and presumes that set_rate returns an
-error if the dpll cannot produce the requested rate?
+The NOR Flash is splitted on two partistions:
+partition at 0
+	label = "u-boot-spl";
+	reg = <0x0 0x80000>;
+partition at 1
+	label = "misc";
+	reg = <0x80000 0xf80000>;
 
-Isn't that what I said? If a driver has such behavior, I think it still
-doesn't work, as (correct me if I'm wrong) we always have the
-clk-divider after a dpll. And the clk-divider doesn't handle the error,
-so neither can the driver.
+Hence, add SPI NOR Flash nodes to all k2hk, k2e, k2l EVM boards.
 
-Or what kind of scenario do you have in mind?
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+---
+ arch/arm/boot/dts/k2e-evm.dts  |   22 ++++++++++++++++++++++
+ arch/arm/boot/dts/k2hk-evm.dts |   22 ++++++++++++++++++++++
+ arch/arm/boot/dts/k2l-evm.dts  |   22 ++++++++++++++++++++++
+ 3 files changed, 66 insertions(+)
 
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140512/97da8289/attachment.sig>
+diff --git a/arch/arm/boot/dts/k2e-evm.dts b/arch/arm/boot/dts/k2e-evm.dts
+index fb7afab..c568f06 100644
+--- a/arch/arm/boot/dts/k2e-evm.dts
++++ b/arch/arm/boot/dts/k2e-evm.dts
+@@ -117,3 +117,25 @@
+ 		};
+ 	};
+ };
++
++&spi0 {
++	nor_flash: n25q128a11 at 0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "Micron,n25q128a11";
++		spi-max-frequency = <54000000>;
++		m25p,fast-read;
++		reg = <0>;
++
++		partition at 0 {
++			label = "u-boot-spl";
++			reg = <0x0 0x80000>;
++			read-only;
++		};
++
++		partition at 1 {
++			label = "misc";
++			reg = <0x80000 0xf80000>;
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/k2hk-evm.dts b/arch/arm/boot/dts/k2hk-evm.dts
+index d2aa102..1f90cbf 100644
+--- a/arch/arm/boot/dts/k2hk-evm.dts
++++ b/arch/arm/boot/dts/k2hk-evm.dts
+@@ -145,3 +145,25 @@
+ 		reg = <0x50>;
+ 	};
+ };
++
++&spi0 {
++	nor_flash: n25q128a11 at 0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "Micron,n25q128a11";
++		spi-max-frequency = <54000000>;
++		m25p,fast-read;
++		reg = <0>;
++
++		partition at 0 {
++			label = "u-boot-spl";
++			reg = <0x0 0x80000>;
++			read-only;
++		};
++
++		partition at 1 {
++			label = "misc";
++			reg = <0x80000 0xf80000>;
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/k2l-evm.dts b/arch/arm/boot/dts/k2l-evm.dts
+index 8ff2d33..fec4312 100644
+--- a/arch/arm/boot/dts/k2l-evm.dts
++++ b/arch/arm/boot/dts/k2l-evm.dts
+@@ -94,3 +94,25 @@
+ 		};
+ 	};
+ };
++
++&spi0 {
++	nor_flash: n25q128a11 at 0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "Micron,n25q128a11";
++		spi-max-frequency = <54000000>;
++		m25p,fast-read;
++		reg = <0>;
++
++		partition at 0 {
++			label = "u-boot-spl";
++			reg = <0x0 0x80000>;
++			read-only;
++		};
++
++		partition at 1 {
++			label = "misc";
++			reg = <0x80000 0xf80000>;
++		};
++	};
++};
+-- 
+1.7.9.5
