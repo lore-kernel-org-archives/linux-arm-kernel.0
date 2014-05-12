@@ -1,72 +1,34 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 12 May 2014 18:00:37 +0200
-Subject: [PATCHv5 05/20] Documentation: dt-bindings: update ehci-orion
- binding documentation
-In-Reply-To: <Pine.LNX.4.44L0.1405121145220.1202-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1405121145220.1202-100000@iolanthe.rowland.org>
-Message-ID: <5370F025.90601@free-electrons.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Mon, 12 May 2014 12:05:35 -0400
+Subject: [PATCH v8 1/8] ftrace: make CALLER_ADDRx macros more generic
+In-Reply-To: <20140512155811.GB4880@arm.com>
+References: <1394862048-28758-1-git-send-email-takahiro.akashi@linaro.org>
+ <1398851676-16389-1-git-send-email-takahiro.akashi@linaro.org>
+ <1398851676-16389-2-git-send-email-takahiro.akashi@linaro.org>
+ <20140502151957.6978d870@gandalf.local.home>
+ <20140512155811.GB4880@arm.com>
+Message-ID: <20140512120535.041030dd@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/05/2014 17:46, Alan Stern wrote:
-> On Mon, 12 May 2014, Gregory CLEMENT wrote:
-> 
->> Hi Alan,
->>
->> On 11/05/2014 20:17, Thomas Petazzoni wrote:
->>> This commit updates the Device Tree binding documentation of
->>> ehci-orion to take into account the fact that we can now optionally
->>> pass a clock and a PHY reference.
->>
->> Would you agree to take this patch with the 4 first ones?
->>
->> For this kind of change in the device tree the agreement was that it
->> can be directly taken by the maintainer of the subsystem. Indeed here
->> we don't introduce a new kind of device tree node, we just add a optional
->> resource already used in many place.
-> 
-> Sorry, I missed this one.  Is it okay with the DT people?  If it is, 
+On Mon, 12 May 2014 16:58:11 +0100
+Will Deacon <will.deacon@arm.com> wrote:
 
-Rob, Mark,
+> Akashi: did you get around to posting a new version of this patch? We can't
+> take your arm64 patches until you get the core stuff merged...
 
-could you confirm that for this kind of change in the dts documentation
-you agree that the maintainer take it?
+I haven't seen any patches yet.
 
+What I can also do is to create a separate branch based on mainline,
+and just apply this change to the core. Then you could pull that branch
+with a note to Linus that it is also in my tree with the common
+ancestor.
 
-> you can submit it directly to Greg KH and he'll merge it.
+If he pulls your work first, he'll only get that change from my tree,
+and if he pulls mine first it doesn't matter as all the changes will be
+there.
 
-OK thanks!
+This is something he said at Kernel Summit that was normal procedure if
+there's a change in one tree that another tree is dependent on.
 
-> 
-> Alan Stern
-> 
->>> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->>> ---
->>>  Documentation/devicetree/bindings/usb/ehci-orion.txt | 5 +++++
->>>  1 file changed, 5 insertions(+)
->>>
->>> diff --git a/Documentation/devicetree/bindings/usb/ehci-orion.txt b/Documentation/devicetree/bindings/usb/ehci-orion.txt
->>> index 6bc09ec..17c3bc8 100644
->>> --- a/Documentation/devicetree/bindings/usb/ehci-orion.txt
->>> +++ b/Documentation/devicetree/bindings/usb/ehci-orion.txt
->>> @@ -6,6 +6,11 @@ Required properties:
->>>    region.
->>>  - interrupts: The EHCI interrupt
->>>  
->>> +Optional properties:
->>> +- clocks: reference to the clock
->>> +- phys: reference to the USB PHY
->>> +- phy-names: name of the USB PHY, should be "usb"
->>> +
->>>  Example:
->>>  
->>>  	ehci at 50000 {
->>>
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+-- Steve
