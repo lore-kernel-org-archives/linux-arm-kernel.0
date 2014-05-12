@@ -1,28 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 12 May 2014 12:07:52 +0200
-Subject: [PATCH v13 00/19] iommu/exynos: Fixes and Enhancements of System
- MMU driver with DT
-In-Reply-To: <1399875304-19948-1-git-send-email-shaik.ameer@samsung.com>
-References: <1399875304-19948-1-git-send-email-shaik.ameer@samsung.com>
-Message-ID: <5576160.rCaFbvon4G@wuerfel>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 12 May 2014 12:11:22 +0200
+Subject: [PATCH Resend] defconfig: sama5_defconfig: updated
+In-Reply-To: <1398137574-5790-1-git-send-email-wenyou.yang@atmel.com>
+References: <1398137574-5790-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <53709E4A.9090301@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 12 May 2014 11:44:45 Shaik Ameer Basha wrote:
-> This is the subset of previous v12 series and includes only the fixes and
-> enhancements, leaving out the private DT bindings as discussed in the below thread.
->     -- http://www.gossamer-threads.com/lists/linux/kernel/1918178
+On 22/04/2014 05:32, Wenyou Yang :
+> due to enabling
+> 	-- CONFIG_REGULATOR
+> 	-- CONFIG_REGULATOR_ACT8865
 > 
-> This patch series includes,
-> 1] fixes for exynos-iommu driver build break
-> 2] includes several bug fixes and enhancements for the exynos-iommu driver
-> 3] code to handle multiple exynos sysmmu versions
-> 4] adding support for device tree
->         Documentation/devicetree/bindings/iommu/samsung,sysmmu.txt
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 
-The patches look good to me, but please add a note into the samsung,sysmmu.txt
-file explaining that the binding is incomplete and that it's possible to
-change in incompatible ways when we add support for attaching devices to
-the IOMMU through the generic IOMMU binding.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-	Arnd
+With little modification: I didn't pushed these configuration options at
+the end of the file but at their location: the one that is chosen while
+running the "savedefconfig" make command.
+This might avoid conflicts when adding more options to the
+sama5_defconfig file.
+
+I stack this modified one on top of our at91-3.16-cleanup2 branch.
+
+thanks!
+
+> ---
+> Hi Nicolas,
+> 
+> It is a typo.
+> This patch is based on the branch: at91-3.16-dt, not at91-3.10-dt of
+> 	git://github.com/at91linux/linux-at91.git
+> 
+> Best Regards,
+> Wenyou Yang
+> 
+>  arch/arm/configs/sama5_defconfig |    2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
+> index dc3881e..2b9891e 100644
+> --- a/arch/arm/configs/sama5_defconfig
+> +++ b/arch/arm/configs/sama5_defconfig
+> @@ -201,3 +201,5 @@ CONFIG_CRYPTO_DEV_ATMEL_TDES=y
+>  CONFIG_CRYPTO_DEV_ATMEL_SHA=y
+>  CONFIG_CRC_CCITT=m
+>  CONFIG_CRC_ITU_T=m
+> +CONFIG_REGULATOR=y
+> +CONFIG_REGULATOR_ACT8865=y
+> 
+
+
+-- 
+Nicolas Ferre
