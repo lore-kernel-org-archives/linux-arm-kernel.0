@@ -1,52 +1,88 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 12 May 2014 23:04:06 +0800
-Subject: [PATCH v2][ 3/3] ARM: imx_v6_v7_defconfig: Enable drivers for
- i.MX51 USB Host support.
-In-Reply-To: <1396886641-26985-3-git-send-email-denis@eukrea.com>
-References: <1396886641-26985-1-git-send-email-denis@eukrea.com>
- <1396886641-26985-3-git-send-email-denis@eukrea.com>
-Message-ID: <20140512150405.GA14728@dragon>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 12 May 2014 17:04:51 +0200
+Subject: [PATCHv2 00/11] improve PWM lookup support without device tree
+In-Reply-To: <1397512793-10325-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1397512793-10325-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20140512150451.GD29318@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 07, 2014 at 06:04:01PM +0200, Denis Carikli wrote:
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
-> ---
-> Changelog v1->v2:
-> - Rebased.
-> ---
->  arch/arm/configs/imx_v6_v7_defconfig |    2 ++
->  1 file changed, 2 insertions(+)
+
+Hello Thierry,
+
+Do you know when you will have some time to review that patch series ?
+
+On 14/04/2014 at 23:59:42 +0200, Alexandre Belloni wrote :
+> Hi,
 > 
-> diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-> index ca9f59a..5129f01 100644
-> --- a/arch/arm/configs/imx_v6_v7_defconfig
-> +++ b/arch/arm/configs/imx_v6_v7_defconfig
-> @@ -209,8 +209,10 @@ CONFIG_USB_STORAGE=y
->  CONFIG_USB_CHIPIDEA=y
->  CONFIG_USB_CHIPIDEA_UDC=y
->  CONFIG_USB_CHIPIDEA_HOST=y
-> +CONFIG_USB_OTG_FSM=y
-
-Per discussion [1], I have to drop the patch from my tree for now.
-
-Shawn
-
-[1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/323949
-
->  CONFIG_NOP_USB_XCEIV=y
->  CONFIG_USB_MXS_PHY=y
-> +CONFIG_USB_ULPI=y
->  CONFIG_USB_GADGET=y
->  CONFIG_USB_ETH=y
->  CONFIG_MMC=y
+> A patch set as suggested by Thierry to make lookup with the lookup table
+> instead of device tree behave more like when using device tree.
+> 
+> The first patch adds a period and a polarity member to the lookup table and use
+> those to set period and polarity.
+> 
+> Patch 2, 4 and 5 are making use of those new members from the board files.
+> Patch 3 removes useless code since setting the polarity is now handled by the
+> PWM core.
+> 
+> I couldn't decide on a good name for the extended PWM_LOOKUP macro and I believe
+> we won't have to add members to that structure soon so:
+> Patch 6 modifies the PWM_LOOKUP macro to also initialize period and polarity
+> and
+> Patch 7-9 are making use of the new PWM_LOOKUP macro in the board files
+> 
+> Patch 10 and 11 are making the leds-pwm and pwm_bl drivers get the period from
+> the PWM before using pwm_period_ns if it is not already set.
+> 
+> Patch 10 will obviously conflict with the series of Russell reworking the
+> leds-pwm probing. I can rebase if necessary
+> 
+> The final goal would be to get rid of .pwm_period_ns in leds-pwm and pwm_bl
+> after moving all the remaining users (still around 25) to pwm_lookup.
+> 
+> Changes in v2:
+>  - correctly unlock the pwm_lookup_lock mutex before returning.
+>  - don't change PWM_LOOKUP atomically
+>  - remove tpu_pwm_platform_data and the associated header file
+>  - make the leds-pwm and pwm_bl drivers get the period from the PWM
+> 
+> Alexandre Belloni (11):
+>   pwm: add period and polarity to struct pwm_lookup
+>   ARM: shmobile: Armadillo 800 EVA: initialize all struct pwm_lookup
+>     members
+>   pwm: renesas-tpu: remove useless struct tpu_pwm_platform_data
+>   ARM: OMAP3: Beagle: initialize all the struct pwm_lookup members
+>   ARM: pxa: hx4700: initialize all the struct pwm_lookup members
+>   pwm: modify PWM_LOOKUP to initialize all struct pwm_lookup members
+>   ARM: OMAP3: Beagle: use PWM_LOOKUP to initialize struct pwm_lookup
+>   ARM: shmobile: Armadillo 800 EVA: use PWM_LOOKUP to initialize struct
+>     pwm_lookup
+>   ARM: pxa: hx4700: use PWM_LOOKUP to initialize struct pwm_lookup
+>   leds: leds-pwm: retrieve configured pwm period
+>   backlight: pwm_bl: retrieve configured pwm period
+> 
+>  Documentation/pwm.txt                          |  3 ++-
+>  arch/arm/mach-omap2/board-omap3beagle.c        |  3 ++-
+>  arch/arm/mach-pxa/hx4700.c                     |  3 ++-
+>  arch/arm/mach-shmobile/board-armadillo800eva.c | 14 +++-----------
+>  drivers/leds/leds-pwm.c                        |  5 ++++-
+>  drivers/pwm/core.c                             |  8 +++++++-
+>  drivers/pwm/pwm-renesas-tpu.c                  | 19 +++----------------
+>  drivers/video/backlight/pwm_bl.c               |  8 +++++---
+>  include/linux/platform_data/pwm-renesas-tpu.h  | 16 ----------------
+>  include/linux/pwm.h                            |  6 +++++-
+>  10 files changed, 33 insertions(+), 52 deletions(-)
+>  delete mode 100644 include/linux/platform_data/pwm-renesas-tpu.h
+> 
 > -- 
-> 1.7.9.5
+> 1.8.3.2
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-leds" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
