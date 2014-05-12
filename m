@@ -1,61 +1,49 @@
-From: grundler@chromium.org (Grant Grundler)
-Date: Mon, 12 May 2014 13:02:13 -0700
-Subject: [RFC] Describing arbitrary bus mastering relationships in DT
-In-Reply-To: <537112FC.1040204@wwwdotorg.org>
-References: <20140501173248.GD3732@e103592.cambridge.arm.com>
- <20140509105638.GB3921@e103592.cambridge.arm.com>
- <5370F484.9030209@wwwdotorg.org> <25333129.urqEa0mCI8@wuerfel>
- <537112FC.1040204@wwwdotorg.org>
-Message-ID: <CANEJEGuCbE0THLvK-6pXuN+QUA=LZON97KTpPK-0QUJPToXkdQ@mail.gmail.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Mon, 12 May 2014 16:06:16 -0400 (EDT)
+Subject: [PATCH v3 5/8] usb: ehci-platform: add optional reset controller
+ retrieval
+In-Reply-To: <1399923274-6017-6-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <Pine.LNX.4.44L0.1405121604140.1202-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 12, 2014 at 11:29 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-....
->> But the important point here is that you wouldn't use the dma-mapping
->> API to manage this. First of all, the CPU is special anyway, but also
->> if you do a device-to-device DMA into the GPU address space and that
->> ends up being redirected to memory through the IOMMU, you still wouldn't
->> manage the I/O page tables through the interfaces of the device doing the
->> DMA, but through some private interface of the GPU.
->
-> Why not? If something wants to DMA to a memory region, irrespective of
-> whether the GPU MMU (or any MMU) is in between those master transactions
-> and the RAM or not, surely the driver should always use the DMA mapping
-> API to set that up?
+On Mon, 12 May 2014, Maxime Ripard wrote:
 
-No.  As one of the contributors to DMA API, I'm pretty confident it's
-not. It _could_ be used that way but it's certainly not the original
-design. P2P transactions are different since they are "less likely"
-(depends on arch and implementation) to participate in the CPU cache
-coherency or even be visible to the CPU. In particular, think of case
-where all transactions are locally routed behind a PCI bridge (or
-other fabric) and CPU/IOMMU/RAM controller never sees those.
+> From: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> 
+> On the Allwinner's A31 SoC the reset line connected to the EHCI IP has to
+> be deasserted for the EHCI block to be usable.
+> 
+> Add support for an optional reset controller that will be deasserted on
+> power off and asserted on power on.
+> 
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Reviewed-by: Hans de Goede <hdegoede@redhat.com>
 
-A long standing real example is in drivers/scsi/sym53c8xx_2 driver.
-The "scripts" engine needs to access local (on chip) RAM through PCI
-bus transactions. So it uses it's own PCI BAR registers to sort that
-out.
-In essence, "local PCI physical" addresses.  I believe the code is in
-sym_iomap_device(). No CPU or IOMMU is involved with this.  This
-driver otherwise uses the DMA API for all other host RAM accesses.
+...
 
-> Anything else just means using custom APIs, and
-> isn't the whole point of the DMA mapping API to provide a standard API
-> for that purpose?
+> @@ -208,6 +210,18 @@ static int ehci_platform_probe(struct platform_device *dev)
+>  		}
+>  	}
+>  
+> +	priv->rst = devm_reset_control_get_optional(&dev->dev, NULL);
+> +	if (IS_ERR(priv->rst)) {
+> +		err = PTR_ERR(priv->rst);
+> +		if (err == -EPROBE_DEFER)
+> +			goto err_put_clks;
+> +		priv->rst = NULL;
+> +	} else {
+> +		err = reset_control_deassert(priv->rst);
+> +		if (err)
+> +			goto err_put_clks;
+> +	}
+> +
+>  	if (pdata->big_endian_desc)
+>  		ehci->big_endian_desc = 1;
+>  	if (pdata->big_endian_mmio)
 
-yes and no. Yes, the generic DMA API is to provide DMA mapping
-services to hide the (or lack of) IOMMU AND provide Cache Coherency
-for DMA transactions to RAM that is visible to the CPU cache.
+You don't re-assert the reset control if an error happens later on 
+during probe.  Was that intentional?
 
-In general, I'd argue transactions that route through an IOMMU need to
-work with the existing DMA API. Historically those transactions are
-routed "upstream" - away from other IO devices and thus not the case
-referred to here.
-
-If the IOMMU is part of a "graph topology" (vs a tree topology), the
-drivers will have to know if they use DMA API or not to access the
-intended target.
-
-cheers,
-grant
+Alan Stern
