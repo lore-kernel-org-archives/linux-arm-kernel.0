@@ -1,465 +1,1062 @@
-From: holler@ahsoftware.de (Alexander Holler)
-Date: Mon, 12 May 2014 18:47:54 +0200
-Subject: [RFC PATCH 3/9] dt: deps: dtc: Add option to print initialization
- order
-In-Reply-To: <1399913280-6915-1-git-send-email-holler@ahsoftware.de>
-References: <1399913280-6915-1-git-send-email-holler@ahsoftware.de>
-Message-ID: <1399913280-6915-4-git-send-email-holler@ahsoftware.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 12 May 2014 17:54:40 +0100
+Subject: [PATCH v3 02/19] arm64: initial support for GICv3
+In-Reply-To: <20140509140522.GC3362@lvm> (Christoffer Dall's message of "Fri,
+ 9 May 2014 15:05:22 +0100")
+References: <1397655591-2761-1-git-send-email-marc.zyngier@arm.com>
+ <1397655591-2761-3-git-send-email-marc.zyngier@arm.com>
+ <20140509140522.GC3362@lvm>
+Message-ID: <87r43zhr8v.fsf@approximate.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add option -t to print the default initialization order.
-No other output will be generated.
+On Fri, May 09 2014 at  3:05:22 pm BST, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> On Wed, Apr 16, 2014 at 02:39:34PM +0100, Marc Zyngier wrote:
+>> The Generic Interrupt Controller (version 3) offers services that are
+>> similar to GICv2, with a number of additional features:
+>> - Affinity routing based on the CPU MPIDR (ARE)
+>> - System register for the CPU interfaces (SRE)
+>> - Support for more that 8 CPUs
+>> - Locality-specific Peripheral Interrupts (LPIs)
+>> - Interrupt Translation Services (ITS)
+>>
+>> This patch adds preliminary support for GICv3 with ARE and SRE,
+>> non-secure mode only. It relies on higher exception levels to grant ARE
+>> and SRE access.
+>>
+>> Support for LPI and ITS will be added at a later time.
+>>
+>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>> Reviewed-by: Zi Shen Lim <zlim@broadcom.com>
+>> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm64/Kconfig                 |   1 +
+>>  arch/arm64/kernel/head.S           |  18 +
+>>  arch/arm64/kernel/hyp-stub.S       |   1 +
+>>  drivers/irqchip/Kconfig            |   5 +
+>>  drivers/irqchip/Makefile           |   1 +
+>>  drivers/irqchip/irq-gic-v3.c       | 681 +++++++++++++++++++++++++++++++++++++
+>>  include/linux/irqchip/arm-gic-v3.h | 188 ++++++++++
+>>  7 files changed, 895 insertions(+)
+>>  create mode 100644 drivers/irqchip/irq-gic-v3.c
+>>  create mode 100644 include/linux/irqchip/arm-gic-v3.h
+>>
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index 27bbcfc..5bd0dfe 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -9,6 +9,7 @@ config ARM64
+>>       select ARM_AMBA
+>>       select ARM_ARCH_TIMER
+>>       select ARM_GIC
+>> +     select ARM_GIC_V3
+>>       select BUILDTIME_EXTABLE_SORT
+>>       select CLONE_BACKWARDS
+>>       select COMMON_CLK
+>> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+>> index 0b281ff..7c56e93 100644
+>> --- a/arch/arm64/kernel/head.S
+>> +++ b/arch/arm64/kernel/head.S
+>> @@ -22,6 +22,7 @@
+>>
+>>  #include <linux/linkage.h>
+>>  #include <linux/init.h>
+>> +#include <linux/irqchip/arm-gic-v3.h>
+>>
+>>  #include <asm/assembler.h>
+>>  #include <asm/ptrace.h>
+>> @@ -183,6 +184,23 @@ CPU_LE(  bic     x0, x0, #(3 << 24)      )       // Clear the EE and E0E bits for EL1
+>>       msr     cnthctl_el2, x0
+>>       msr     cntvoff_el2, xzr                // Clear virtual offset
+>>
+>> +#ifdef CONFIG_ARM_GIC_V3
+>> +     /* GICv3 system register access */
+>> +     mrs     x0, id_aa64pfr0_el1
+>> +     ubfx    x0, x0, #24, #4
+>> +     cmp     x0, #1
+>> +     b.ne    3f
+>> +
+>> +     mrs     x0, ICC_SRE_EL2
+>> +     orr     x0, x0, #1                      // Set ICC_SRE_EL2.SRE==1
+>> +     orr     x0, x0, #(1 << 3)               // Set ICC_SRE_EL2.Enable==1
+>> +     msr     ICC_SRE_EL2, x0
+>> +     isb                                     // Make sure SRE is now 1
+>> +     msr     ICH_HCR_EL2, xzr                // Reset ICC_HCR_EL2 to defaults
+>> +
+>> +3:
+>> +#endif
+>> +
+>>       /* Populate ID registers. */
+>>       mrs     x0, midr_el1
+>>       mrs     x1, mpidr_el1
+>> diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
+>> index 0959611..a272f33 100644
+>> --- a/arch/arm64/kernel/hyp-stub.S
+>> +++ b/arch/arm64/kernel/hyp-stub.S
+>> @@ -19,6 +19,7 @@
+>>
+>>  #include <linux/init.h>
+>>  #include <linux/linkage.h>
+>> +#include <linux/irqchip/arm-gic-v3.h>
+>>
+>>  #include <asm/assembler.h>
+>>  #include <asm/ptrace.h>
+>> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+>> index 61ffdca..5b55c46 100644
+>> --- a/drivers/irqchip/Kconfig
+>> +++ b/drivers/irqchip/Kconfig
+>> @@ -10,6 +10,11 @@ config ARM_GIC
+>>  config GIC_NON_BANKED
+>>       bool
+>>
+>> +config ARM_GIC_V3
+>> +     bool
+>> +     select IRQ_DOMAIN
+>> +     select MULTI_IRQ_HANDLER
+>> +
+>>  config ARM_NVIC
+>>       bool
+>>       select IRQ_DOMAIN
+>> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+>> index 22e616c..4adfda8 100644
+>> --- a/drivers/irqchip/Makefile
+>> +++ b/drivers/irqchip/Makefile
+>> @@ -14,6 +14,7 @@ obj-$(CONFIG_ORION_IRQCHIP)         += irq-orion.o
+>>  obj-$(CONFIG_ARCH_SUNXI)             += irq-sun4i.o
+>>  obj-$(CONFIG_ARCH_SPEAR3XX)          += spear-shirq.o
+>>  obj-$(CONFIG_ARM_GIC)                        += irq-gic.o irq-gic-common.o
+>> +obj-$(CONFIG_ARM_GIC_V3)             += irq-gic-v3.o irq-gic-common.o
+>>  obj-$(CONFIG_ARM_NVIC)                       += irq-nvic.o
+>>  obj-$(CONFIG_ARM_VIC)                        += irq-vic.o
+>>  obj-$(CONFIG_IMGPDC_IRQ)             += irq-imgpdc.o
+>> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+>> new file mode 100644
+>> index 0000000..b4c8140
+>> --- /dev/null
+>> +++ b/drivers/irqchip/irq-gic-v3.c
+>> @@ -0,0 +1,681 @@
+>> +/*
+>> + * Copyright (C) 2013, 2014 ARM Limited, All Rights Reserved.
+>> + * Author: Marc Zyngier <marc.zyngier@arm.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License
+>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>> + */
+>> +
+>> +#include <linux/cpu.h>
+>> +#include <linux/delay.h>
+>> +#include <linux/interrupt.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/of_irq.h>
+>> +#include <linux/percpu.h>
+>> +#include <linux/slab.h>
+>> +
+>> +#include <linux/irqchip/arm-gic-v3.h>
+>> +
+>> +#include <asm/cputype.h>
+>> +#include <asm/exception.h>
+>> +#include <asm/smp_plat.h>
+>> +
+>> +#include "irq-gic-common.h"
+>> +#include "irqchip.h"
+>> +
+>> +struct gic_chip_data {
+>> +     void __iomem            *dist_base;
+>> +     void __iomem            **redist_base;
+>> +     void __percpu __iomem   **rdist;
+>> +     struct irq_domain       *domain;
+>> +     u64                     redist_stride;
+>> +     u32                     redist_regions;
+>> +     unsigned int            irq_nr;
+>> +};
+>> +
+>> +static struct gic_chip_data gic_data __read_mostly;
+>> +
+>> +#define gic_data_rdist()             (this_cpu_ptr(gic_data.rdist))
+>> +#define gic_data_rdist_rd_base()     (*gic_data_rdist())
+>> +#define gic_data_rdist_sgi_base()    (gic_data_rdist_rd_base() + SZ_64K)
+>> +
+>> +#define DEFAULT_PMR_VALUE    0xf0
+>> +
+>> +static inline unsigned int gic_irq(struct irq_data *d)
+>> +{
+>> +     return d->hwirq;
+>> +}
+>> +
+>> +static inline int gic_irq_in_rdist(struct irq_data *d)
+>> +{
+>> +     return gic_irq(d) < 32;
+>> +}
+>> +
+>> +static inline void __iomem *gic_dist_base(struct irq_data *d)
+>> +{
+>> +     if (gic_irq_in_rdist(d))        /* SGI+PPI -> SGI_base for this CPU */
+>> +             return gic_data_rdist_sgi_base();
+>> +
+>> +     if (d->hwirq <= 1023)           /* SPI -> dist_base */
+>> +             return gic_data.dist_base;
+>> +
+>> +     if (d->hwirq >= 8192)
+>> +             BUG();          /* LPI Detected!!! */
+>> +
+>> +     return NULL;
+>> +}
+>> +
+>> +static void gic_do_wait_for_rwp(void __iomem *base)
+>> +{
+>> +     u32 count = 1000000;    /* 1s! */
+>> +
+>> +     while (readl_relaxed(base + GICD_CTLR) & GICD_CTLR_RWP) {
+>> +             count--;
+>> +             if (!count) {
+>> +                     pr_err_ratelimited("RWP timeout, gone fishing\n");
+>> +                     return;
+>> +             }
+>> +             cpu_relax();
+>> +             udelay(1);
+>> +     };
+>> +}
+>> +
+>> +/* Wait for completion of a distributor change */
+>> +static void gic_dist_wait_for_rwp(void)
+>> +{
+>> +     gic_do_wait_for_rwp(gic_data.dist_base);
+>> +}
+>> +
+>> +/* Wait for completion of a redistributor change */
+>> +static void gic_redist_wait_for_rwp(void)
+>> +{
+>> +     gic_do_wait_for_rwp(gic_data_rdist_rd_base());
+>> +}
+>> +
+>> +/* Low level accessors */
+>> +static u64 gic_read_iar(void)
+>> +{
+>> +     u64 irqstat;
+>> +
+>> +     asm volatile("mrs %0, " __stringify(ICC_IAR1_EL1) : "=r" (irqstat));
+>> +     return irqstat;
+>> +}
+>> +
+>> +static void gic_write_pmr(u64 val)
+>> +{
+>> +     asm volatile("msr " __stringify(ICC_PMR_EL1) ", %0" : : "r" (val));
+>> +}
+>> +
+>> +static void gic_write_ctlr(u64 val)
+>> +{
+>> +     asm volatile("msr " __stringify(ICC_CTLR_EL1) ", %0" : : "r" (val));
+>> +     isb();
+>> +}
+>> +
+>> +static void gic_write_grpen1(u64 val)
+>> +{
+>> +     asm volatile("msr " __stringify(ICC_GRPEN1_EL1) ", %0" : : "r" (val));
+>> +     isb();
+>> +}
+>> +
+>> +static void gic_write_sgi1r(u64 val)
+>> +{
+>> +     asm volatile("msr " __stringify(ICC_SGI1R_EL1) ", %0" : : "r" (val));
+>> +}
+>> +
+>> +static void gic_enable_sre(void)
+>> +{
+>> +     u64 val;
+>> +
+>> +     asm volatile("mrs %0, " __stringify(ICC_SRE_EL1) : "=r" (val));
+>> +     val |= GICC_SRE_EL1_SRE;
+>> +     asm volatile("msr " __stringify(ICC_SRE_EL1) ", %0" : : "r" (val));
+>> +     isb();
+>> +
+>> +     /*
+>> +      * Need to check that the SRE bit has actually been set. If
+>> +      * not, it means that SRE is disabled at EL2. We're going to
+>> +      * die painfully, and there is nothing we can do about it.
+>> +      *
+>> +      * Kindly inform the luser.
+>> +      */
+>> +     asm volatile("mrs %0, " __stringify(ICC_SRE_EL1) : "=r" (val));
+>> +     if (!(val & GICC_SRE_EL1_SRE))
+>> +             pr_err("GIC: unable to set SRE (disabled at EL2), panic ahead\n");
+>> +}
+>> +
+>> +static void gic_enable_redist(void)
+>> +{
+>> +     void __iomem *rbase;
+>> +     u32 count = 1000000;    /* 1s! */
+>> +     u32 val;
+>> +
+>> +     rbase = gic_data_rdist_rd_base();
+>> +
+>> +     /* Wake up this CPU redistributor */
+>> +     val = readl_relaxed(rbase + GICR_WAKER);
+>> +     val &= ~GICR_WAKER_ProcessorSleep;
+>> +     writel_relaxed(val, rbase + GICR_WAKER);
+>> +
+>> +     while (readl_relaxed(rbase + GICR_WAKER) & GICR_WAKER_ChildrenAsleep) {
+>> +             count--;
+>> +             if (!count) {
+>> +                     pr_err_ratelimited("redist didn't wake up...\n");
+>> +                     return;
+>> +             }
+>> +             cpu_relax();
+>> +             udelay(1);
+>> +     };
+>> +}
+>> +
+>> +/*
+>> + * Routines to acknowledge, disable and enable interrupts
+>> + */
+>> +static void gic_poke_irq(struct irq_data *d, u32 offset)
+>> +{
+>> +     u32 mask = 1 << (gic_irq(d) % 32);
+>> +     void (*rwp_wait)(void);
+>> +     void __iomem *base;
+>> +
+>> +     if (gic_irq_in_rdist(d)) {
+>> +             base = gic_data_rdist_sgi_base();
+>> +             rwp_wait = gic_redist_wait_for_rwp;
+>> +     } else {
+>> +             base = gic_data.dist_base;
+>> +             rwp_wait = gic_dist_wait_for_rwp;
+>> +     }
+>> +
+>> +     writel_relaxed(mask, base + offset + (gic_irq(d) / 32) * 4);
+>> +     rwp_wait();
+>> +}
+>> +
+>> +static int gic_peek_irq(struct irq_data *d, u32 offset)
+>> +{
+>> +     u32 mask = 1 << (gic_irq(d) % 32);
+>> +     void __iomem *base;
+>> +
+>> +     if (gic_irq_in_rdist(d))
+>> +             base = gic_data_rdist_sgi_base();
+>> +     else
+>> +             base = gic_data.dist_base;
+>> +
+>> +     return !!(readl_relaxed(base + offset + (gic_irq(d) / 32) * 4) & mask);
+>> +}
+>> +
+>> +static void gic_mask_irq(struct irq_data *d)
+>> +{
+>> +     gic_poke_irq(d, GICD_ICENABLER);
+>> +}
+>> +
+>> +static void gic_unmask_irq(struct irq_data *d)
+>> +{
+>> +     gic_poke_irq(d, GICD_ISENABLER);
+>> +}
+>> +
+>> +static void gic_eoi_irq(struct irq_data *d)
+>> +{
+>> +     gic_write_eoir(gic_irq(d));
+>> +}
+>> +
+>> +static int gic_set_type(struct irq_data *d, unsigned int type)
+>> +{
+>> +     unsigned int irq = gic_irq(d);
+>> +     void (*rwp_wait)(void);
+>> +     void __iomem *base;
+>> +
+>> +     if (gic_irq_in_rdist(d)) {
+>> +             base = gic_data_rdist_sgi_base();
+>> +             rwp_wait = gic_redist_wait_for_rwp;
+>> +     } else {
+>> +             base = gic_data.dist_base;
+>> +             rwp_wait = gic_dist_wait_for_rwp;
+>> +     }
+>> +
+>> +     /* Interrupt configuration for SGIs can't be changed */
+>> +     if (irq < 16)
+>> +             return -EINVAL;
+>> +
+>> +     if (type != IRQ_TYPE_LEVEL_HIGH && type != IRQ_TYPE_EDGE_RISING)
+>> +             return -EINVAL;
+>> +
+>> +     gic_configure_irq(irq, type, base, rwp_wait);
+>
+> I'm noticing here that we're only waiting for the write to config/enable
+> if the IRQ was already enabled in gic_configure_irq, but gic_unmask_irq
+> just enables the IRQ without waiting for operation to complete.
+>
+> So I'm wondering if there isn't a disconnect between configuring a
+> disabled IRQ and immediately unmasking it, versus configuring an enabled
+> IRQ?
 
-To print the order, just use something like this:
+That's a good point. gic_configure_irq() should wait for rwp
+unconditionnally in the epilogue.
 
-	CROSS_COMPILE=gcc-foo ARCH=arm make foo.dtb
-	scripts/dtc/dtc -I dtb -t arch/arm/boot/dts/foo.dtb
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static u64 gic_mpidr_to_affinity(u64 mpidr)
+>> +{
+>> +     u64 aff;
+>> +
+>> +     aff = (MPIDR_AFFINITY_LEVEL(mpidr, 3) << 32 |
+>> +            MPIDR_AFFINITY_LEVEL(mpidr, 2) << 16 |
+>> +            MPIDR_AFFINITY_LEVEL(mpidr, 1) << 8  |
+>> +            MPIDR_AFFINITY_LEVEL(mpidr, 0)) & ~GICD_IROUTER_SPI_MODE_ANY;
+>> +
+>> +     return aff;
+>> +}
+>> +
+>> +static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
+>> +{
+>> +     u64 irqnr;
+>> +
+>> +     do {
+>> +             irqnr = gic_read_iar();
+>> +
+>> +             if (likely(irqnr > 15 && irqnr < 1021)) {
+>> +                     irqnr = irq_find_mapping(gic_data.domain, irqnr);
+>> +                     handle_IRQ(irqnr, regs);
+>> +                     continue;
+>> +             }
+>> +             if (irqnr < 16) {
+>> +                     gic_write_eoir(irqnr);
+>> +#ifdef CONFIG_SMP
+>> +                     handle_IPI(irqnr, regs);
+>> +#else
+>> +                     WARN_ONCE(true, "Unexpected SGI received!\n");
+>> +#endif
+>> +                     continue;
+>> +             }
+>> +     } while (irqnr != 0x3ff);
+>> +}
+>> +
+>> +static void __init gic_dist_init(void)
+>> +{
+>> +     unsigned int i;
+>> +     u64 affinity;
+>> +     void __iomem *base = gic_data.dist_base;
+>> +
+>> +     /* Disable the distributor */
+>> +     writel_relaxed(0, base + GICD_CTLR);
+>> +
+>> +     gic_dist_config(base, gic_data.irq_nr, gic_dist_wait_for_rwp);
+>> +
+>> +     /* Enable distributor with ARE, Group1 */
+>> +     writel_relaxed(GICD_CTLR_ARE_NS | GICD_CTLR_ENABLE_G1A | GICD_CTLR_ENABLE_G1,
+>> +                    base + GICD_CTLR);
+>> +
+>> +     /*
+>> +      * Set all global interrupts to the boot CPU only. ARE must be
+>> +      * enabled.
+>> +      */
+>> +     affinity = gic_mpidr_to_affinity(cpu_logical_map(smp_processor_id()));
+>> +     for (i = 32; i < gic_data.irq_nr; i++)
+>> +             writeq_relaxed(affinity, base + GICD_IROUTER + i * 8);
+>> +}
+>> +
+>> +static int gic_populate_rdist(void)
+>> +{
+>> +     u64 mpidr = cpu_logical_map(smp_processor_id());
+>> +     u64 typer;
+>> +     u32 aff;
+>> +     int i;
+>> +
+>> +     /* Convery affinity to a 32bit value... */
+>
+> s/Convery/Convert/
+>
+> while you're at it, you could go the extra mile and specify "that can be
+> matched to GICR_TYPER bits [63:32]".  If you really wanted to.
 
-Since it's now possible to check to for cycles in the dependency graph,
-this is now done too.
+Sure.
 
-Signed-off-by: Alexander Holler <holler@ahsoftware.de>
----
- scripts/dtc/dependencies.c | 346 +++++++++++++++++++++++++++++++++++++++++++++
- scripts/dtc/dtc.c          |  24 +++-
- scripts/dtc/dtc.h          |   2 +
- 3 files changed, 371 insertions(+), 1 deletion(-)
+>> +     aff = (MPIDR_AFFINITY_LEVEL(mpidr, 3) << 24 |
+>> +            MPIDR_AFFINITY_LEVEL(mpidr, 2) << 16 |
+>> +            MPIDR_AFFINITY_LEVEL(mpidr, 1) << 8 |
+>> +            MPIDR_AFFINITY_LEVEL(mpidr, 0));
+>> +
+>> +     for (i = 0; i < gic_data.redist_regions; i++) {
+>> +             void __iomem *ptr = gic_data.redist_base[i];
+>> +             u32 reg;
+>> +
+>> +             reg = readl_relaxed(ptr + GICR_PIDR2) & GIC_PIDR2_ARCH_MASK;
+>> +             if (reg != 0x30 && reg != 0x40) { /* We're in trouble... */
+>> +                     pr_warn("No redistributor present @%p\n", ptr);
+>> +                     break;
+>> +             }
+>> +
+>> +             do {
+>> +                     typer = readq_relaxed(ptr + GICR_TYPER);
+>> +                     if ((typer >> 32) == aff) {
+>> +                             gic_data_rdist_rd_base() = ptr;
+>> +                             pr_info("CPU%d: found redistributor %llx @%p\n",
+>> +                                     smp_processor_id(),
+>> +                                     (unsigned long long)mpidr, ptr);
+>> +                             return 0;
+>> +                     }
+>> +
+>> +                     if (gic_data.redist_stride) {
+>> +                             ptr += gic_data.redist_stride;
+>> +                     } else {
+>> +                             ptr += SZ_64K * 2; /* Skip RD_base + SGI_base */
+>> +                             if (typer & GICR_TYPER_VLPIS)
+>> +                                     ptr += SZ_64K * 2; /* Skip VLPI_base + reserved page */
+>> +                     }
+>> +             } while (!(typer & GICR_TYPER_LAST));
+>> +     }
+>> +
+>> +     /* We couldn't even deal with ourselves... */
+>> +     WARN(true, "CPU%d: mpidr %llx has no re-distributor!\n",
+>> +          smp_processor_id(), (unsigned long long)mpidr);
+>> +     return -ENODEV;
+>> +}
+>> +
+>> +static void gic_cpu_init(void)
+>> +{
+>> +     void __iomem *rbase;
+>> +
+>> +     /* Register ourselves with the rest of the world */
+>> +     if (gic_populate_rdist())
+>> +             return;
+>> +
+>> +     gic_enable_redist();
+>> +
+>> +     rbase = gic_data_rdist_sgi_base();
+>> +
+>> +     gic_cpu_config(rbase, gic_redist_wait_for_rwp);
+>> +
+>> +     /* Enable system registers */
+>> +     gic_enable_sre();
+>> +
+>> +     /* Set priority mask register */
+>> +     gic_write_pmr(DEFAULT_PMR_VALUE);
+>> +
+>> +     /* EOI deactivates interrupt too (mode 0) */
+>> +     gic_write_ctlr(GICC_CTLR_EL1_EOImode_drop_dir);
+>> +
+>> +     /* ... and let's hit the road... */
+>> +     gic_write_grpen1(1);
+>> +}
+>> +
+>> +#ifdef CONFIG_SMP
+>> +static int gic_secondary_init(struct notifier_block *nfb,
+>> +                           unsigned long action, void *hcpu)
+>> +{
+>> +     if (action == CPU_STARTING || action == CPU_STARTING_FROZEN)
+>> +             gic_cpu_init();
+>> +     return NOTIFY_OK;
+>> +}
+>> +
+>> +/*
+>> + * Notifier for enabling the GIC CPU interface. Set an arbitrarily high
+>> + * priority because the GIC needs to be up before the ARM generic timers.
+>> + */
+>> +static struct notifier_block gic_cpu_notifier = {
+>> +     .notifier_call = gic_secondary_init,
+>> +     .priority = 100,
+>> +};
+>> +
+>> +static u16 gic_compute_target_list(int *base_cpu, const struct cpumask *mask,
+>> +                                u64 cluster_id)
+>> +{
+>> +     int cpu = *base_cpu;
+>> +     u64 mpidr = cpu_logical_map(cpu);
+>> +     u16 tlist = 0;
+>> +
+>> +     while (cpu < nr_cpu_ids) {
+>> +             /*
+>> +              * If we ever get a cluster of more than 16 CPUs, just
+>> +              * scream and skip that CPU.
+>> +              */
+>> +             if (WARN_ON((mpidr & 0xff) >= 16))
+>> +                     goto out;
+>> +
+>> +             tlist |= 1 << (mpidr & 0xf);
+>> +
+>> +             cpu = cpumask_next(cpu, mask);
+>> +             if (cpu == nr_cpu_ids)
+>> +                     goto out;
+>> +
+>> +             mpidr = cpu_logical_map(cpu);
+>> +
+>> +             if (cluster_id != (mpidr & ~0xffUL)) {
+>> +                     cpu--;
+>> +                     goto out;
+>> +             }
+>> +     }
+>> +out:
+>> +     *base_cpu = cpu;
+>> +     return tlist;
+>> +}
+>> +
+>> +static void gic_send_sgi(u64 cluster_id, u16 tlist, unsigned int irq)
+>> +{
+>> +     u64 val;
+>> +
+>> +     val = (MPIDR_AFFINITY_LEVEL(cluster_id, 3) << 48        |
+>> +            MPIDR_AFFINITY_LEVEL(cluster_id, 2) << 32        |
+>> +            irq << 24                                        |
+>> +            MPIDR_AFFINITY_LEVEL(cluster_id, 1) << 16        |
+>> +            tlist);
+>> +
+>> +     pr_debug("CPU%d: ICC_SGI1R_EL1 %llx\n", smp_processor_id(), val);
+>> +     gic_write_sgi1r(val);
+>> +}
+>> +
+>> +static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+>> +{
+>> +     int cpu;
+>> +
+>> +     if (WARN_ON(irq >= 16))
+>> +             return;
+>> +
+>> +     /*
+>> +      * Ensure that stores to Normal memory are visible to the
+>> +      * other CPUs before issuing the IPI.
+>> +      */
+>> +     smp_wmb();
+>> +
+>> +     for_each_cpu_mask(cpu, *mask) {
+>> +             u64 cluster_id = cpu_logical_map(cpu) & ~0xffUL;
+>> +             u16 tlist;
+>> +
+>> +             tlist = gic_compute_target_list(&cpu, mask, cluster_id);
+>> +             gic_send_sgi(cluster_id, tlist, irq);
+>> +     }
+>> +
+>> +     /* Force the above writes to ICC_SGI1R_EL1 to be executed */
+>> +     isb();
+>> +}
+>> +
+>> +static void gic_smp_init(void)
+>> +{
+>> +     set_smp_cross_call(gic_raise_softirq);
+>> +     register_cpu_notifier(&gic_cpu_notifier);
+>> +}
+>> +
+>> +static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+>> +                         bool force)
+>> +{
+>> +     unsigned int cpu = cpumask_any_and(mask_val, cpu_online_mask);
+>> +     void __iomem *reg;
+>> +     int enabled;
+>> +     u64 val;
+>> +
+>> +     if (gic_irq_in_rdist(d))
+>> +             return -EINVAL;
+>> +
+>> +     /* If interrupt was enabled, disable it first */
+>> +     enabled = gic_peek_irq(d, GICD_ISENABLER);
+>> +     if (enabled)
+>> +             gic_mask_irq(d);
+>> +
+>> +     reg = gic_dist_base(d) + GICD_IROUTER + (gic_irq(d) * 8);
+>> +     val = gic_mpidr_to_affinity(cpu_logical_map(cpu));
+>> +
+>> +     writeq_relaxed(val, reg);
+>> +
+>> +     /*
+>> +      * If the interrupt was enabled, enabled it again. Otherwise,
+>> +      * just wait for the distributor to have digested our changes.
+>> +      */
+>> +     if (enabled)
+>> +             gic_unmask_irq(d);
+>> +     else
+>> +             gic_dist_wait_for_rwp();
+>
+> If we don't need to wait for RWP when enabling the interrupt, why do we
+> need to wait if we're not going to enable it (presumably nothing ever
+> takes effect until someone later enables the interrupt, in which case
+> the effect would be the same? no?)?
 
-diff --git a/scripts/dtc/dependencies.c b/scripts/dtc/dependencies.c
-index dd4658c..8fe1a8c 100644
---- a/scripts/dtc/dependencies.c
-+++ b/scripts/dtc/dependencies.c
-@@ -106,3 +106,349 @@ void add_dependencies(struct boot_info *bi)
- {
- 	process_nodes_props(bi->dt, bi->dt);
- }
-+
-+/*
-+ * The code below is in large parts a copy of drivers/of/of_dependencies.c
-+ * in the Linux kernel. So both files do share the same bugs.
-+ * The next few ugly defines do exist to keep the differences at a minimum.
-+ */
-+static struct node *tree;
-+#define pr_cont(format, ...) printf(format, ##__VA_ARGS__)
-+#define pr_info(format, ...) printf(format, ##__VA_ARGS__)
-+#define pr_warn(format, ...) printf(format, ##__VA_ARGS__)
-+#define pr_err(format, ...) fprintf(stderr, format, ##__VA_ARGS__)
-+typedef cell_t __be32;
-+#define device_node node
-+#define full_name fullpath
-+#define __initdata
-+#define __init
-+#define unlikely(a) (a)
-+#define of_node_put(a)
-+#define of_find_node_by_phandle(v) get_node_by_phandle(tree, v)
-+#define __of_get_property(a, b, c) get_property(a, b)
-+#define for_each_child_of_node(a, b) for_each_child(a, b)
-+
-+
-+#define MAX_DT_NODES 1000 /* maximum number of vertices */
-+#define MAX_EDGES (MAX_DT_NODES*2) /* maximum number of edges (dependencies) */
-+
-+struct edgenode {
-+	uint32_t y; /* phandle */
-+	struct edgenode *next; /* next edge in list */
-+};
-+
-+/*
-+ * Vertex numbers do correspond to phandle numbers. That means the graph
-+ * does contain as much vertices as the maximum of all phandles.
-+ * Or in other words, we assume that for all phandles in the device tree
-+ * 0 < phandle < MAX_DT_NODES+1 is true.
-+ */
-+struct dep_graph {
-+	struct edgenode edge_slots[MAX_EDGES]; /* used to avoid kmalloc */
-+	struct edgenode *edges[MAX_DT_NODES+1]; /* adjacency info */
-+	unsigned nvertices; /* number of vertices in graph */
-+	unsigned nedges; /* number of edges in graph */
-+	bool processed[MAX_DT_NODES+1]; /* which vertices have been processed */
-+	bool include_node[MAX_DT_NODES+1]; /* which nodes to consider */
-+	bool discovered[MAX_DT_NODES+1]; /* which vertices have been found */
-+	bool finished; /* if true, cut off search immediately */
-+};
-+static struct dep_graph graph __initdata;
-+
-+struct init_order {
-+	uint32_t max_phandle; /* the max used phandle */
-+	uint32_t old_max_phandle; /* used to keep track of added phandles */
-+	struct device_node *order[MAX_DT_NODES+1];
-+	unsigned count;
-+	/* Used to keep track of parent devices in regard to the DT */
-+	uint32_t parent_by_phandle[MAX_DT_NODES+1];
-+	struct device *device_by_phandle[MAX_DT_NODES+1];
-+};
-+static struct init_order order __initdata;
-+
-+
-+/* Copied from drivers/of/base.c (because it's lockless). */
-+static int __init __of_device_is_available(struct device_node *device)
-+{
-+	struct property *status;
-+
-+	if (!device)
-+		return 0;
-+
-+	status = get_property(device, "status");
-+	if (status == NULL)
-+		return 1;
-+
-+	if (status->val.len > 0) {
-+		if (!strcmp(status->val.val, "okay") ||
-+				!strcmp(status->val.val, "ok"))
-+			return 1;
-+	}
-+
-+	return 0;
-+}
-+
-+/*
-+ * x is a dependant of y or in other words
-+ * y will be initialized before x.
-+ */
-+static int __init insert_edge(uint32_t x, uint32_t y)
-+{
-+	struct edgenode *p; /* temporary pointer */
-+
-+	if (unlikely(x > MAX_DT_NODES || y > MAX_DT_NODES)) {
-+		pr_err("Node found with phandle 0x%x > MAX_DT_NODES (%d)!\n",
-+			x > MAX_DT_NODES ? x : y, MAX_DT_NODES);
-+		return -EINVAL;
-+	}
-+	if (unlikely(!x || !y))
-+		return 0;
-+	if (unlikely(graph.nedges >= MAX_EDGES)) {
-+		pr_err("Maximum number of edges (%d) reached!\n", MAX_EDGES);
-+		return -EINVAL;
-+	}
-+	p = &graph.edge_slots[graph.nedges++];
-+	graph.include_node[x] = 1;
-+	graph.include_node[y] = 1;
-+	p->y = y;
-+	p->next = graph.edges[x];
-+	graph.edges[x] = p; /* insert at head of list */
-+
-+	graph.nvertices = (x > graph.nvertices) ? x : graph.nvertices;
-+	graph.nvertices = (y > graph.nvertices) ? y : graph.nvertices;
-+	return 0;
-+}
-+
-+static void __init print_node_name(uint32_t v)
-+{
-+	struct device_node *node;
-+
-+	node = of_find_node_by_phandle(v);
-+	if (!node) {
-+		pr_err("Node for phandle 0x%x not found", v);
-+		return;
-+	}
-+	if (node->name)
-+		pr_err("%s", node->name);
-+	if (node->full_name)
-+		pr_err(" (%s)", node->full_name);
-+	of_node_put(node);
-+}
-+
-+/*
-+ * I would prefer to use the BGL (Boost Graph Library), but as I can't use it
-+ * here (for obvious reasons), the next four functions below are based on
-+ * code of Steven Skiena's book 'The Algorithm Design Manual'.
-+ */
-+
-+static void __init process_edge(uint32_t x, uint32_t y)
-+{
-+	if (unlikely(graph.discovered[y] && !graph.processed[y])) {
-+		pr_err("Cycle found 0x%x ", x);
-+		print_node_name(x);
-+		pr_cont(" <-> 0x%x ", y);
-+		print_node_name(y);
-+		pr_cont("!\n");
-+		graph.finished = 1;
-+	}
-+}
-+
-+static void __init process_vertex_late(uint32_t v)
-+{
-+	struct device_node *node;
-+
-+	node = of_find_node_by_phandle(v);
-+	if (!node) {
-+		pr_err("No node for phandle 0x%x not found", v);
-+		return;
-+	}
-+	order.order[order.count++] = node;
-+}
-+
-+static void __init depth_first_search(uint32_t v)
-+{
-+	struct edgenode *p;
-+	uint32_t y; /* successor vertex */
-+
-+	if (graph.finished)
-+		return;
-+	graph.discovered[v] = 1;
-+	p = graph.edges[v];
-+	while (p) {
-+		y = p->y;
-+		if (!graph.discovered[y]) {
-+			process_edge(v, y);
-+			depth_first_search(y);
-+		} else
-+			process_edge(v, y);
-+		if (graph.finished)
-+			return;
-+		p = p->next;
-+	}
-+	process_vertex_late(v);
-+	graph.processed[v] = 1;
-+}
-+
-+static void __init topological_sort(void)
-+{
-+	unsigned i;
-+
-+	for (i = 1; i <= graph.nvertices; ++i)
-+		if (!graph.discovered[i] && graph.include_node[i])
-+			depth_first_search(i);
-+}
-+
-+static int __init add_dep_list(struct device_node *node)
-+{
-+	const __be32 *list, *list_end;
-+	uint32_t ph;
-+	struct property *prop;
-+	int rc = 0;
-+	struct device_node *dep;
-+
-+	prop = get_property(node, "dependencies");
-+	if (!prop || !prop->val.len || prop->val.len%sizeof(*list))
-+		return 0;
-+	list = (const __be32 *)prop->val.val;
-+	list_end = list + prop->val.len / sizeof(*list);
-+	while (list < list_end) {
-+		ph = fdt32_to_cpu(*list++);
-+		if (unlikely(!ph)) {
-+			/* Should never happen */
-+			if (node->name)
-+				pr_warn("phandle == 0 for %s\n", node->name);
-+			continue;
-+		}
-+		dep = of_find_node_by_phandle(ph);
-+		if (unlikely(!dep)) {
-+			pr_err("No DT node for dependency with phandle 0x%x found\n",
-+				ph);
-+			continue;
-+		}
-+		rc = insert_edge(node->phandle, ph);
-+		if (rc)
-+			break;
-+	}
-+
-+	return rc;
-+}
-+
-+/* Copied from drivers/of/base.c */
-+static const char *of_prop_next_string(struct property *prop, const char *cur)
-+{
-+	const char *curv = cur;
-+
-+	if (!prop)
-+		return NULL;
-+
-+	if (!cur)
-+		return prop->val.val;
-+
-+	curv += strlen(cur) + 1;
-+	if (curv >= prop->val.val + prop->val.len)
-+		return NULL;
-+
-+	return curv;
-+}
-+
-+static int __init add_deps_lnx(struct device_node *parent,
-+				struct device_node *node)
-+{
-+	struct device_node *child;
-+	int rc = 0;
-+
-+	if (!__of_device_is_available(node))
-+		return 0;
-+	if (__of_get_property(node, "compatible", NULL)) {
-+		if (!parent->phandle) {
-+			if (__of_get_property(parent, "compatible", NULL))
-+				parent->phandle = 1 + order.max_phandle++;
-+		}
-+		if (!node->phandle)
-+			node->phandle = 1 + order.max_phandle++;
-+		rc = insert_edge(node->phandle, parent->phandle);
-+		if (rc)
-+			return rc;
-+		if (unlikely(order.parent_by_phandle[node->phandle])) {
-+			/* sanity check */
-+			pr_err("0x%x already has a parent!\n", node->phandle);
-+			return -EINVAL;
-+		}
-+		order.parent_by_phandle[node->phandle] = parent->phandle;
-+		rc = add_dep_list(node);
-+		if (unlikely(rc))
-+			return rc;
-+		parent = node; /* change the parent only if node is a driver */
-+	}
-+	for_each_child_of_node(node, child) {
-+		rc = add_deps_lnx(parent, child);
-+		if (unlikely(rc))
-+			break;
-+	}
-+
-+	return rc;
-+}
-+
-+static void calc_max_phandle(struct node *np)
-+{
-+	struct node *child;
-+
-+	if (!np || np->deleted)
-+		return;
-+	if (np->phandle > order.max_phandle)
-+		order.max_phandle = np->phandle;
-+
-+	for_each_child(np, child)
-+		calc_max_phandle(child);
-+
-+	return;
-+}
-+
-+void __init of_init_print_order(const char *name)
-+{
-+	unsigned i;
-+	struct property *prop;
-+	const char *cp;
-+
-+	pr_info("Default initialization order for %s:\n", name);
-+	for (i = 0; i < order.count; ++i) {
-+		pr_info("init %u 0x%x", i, order.order[i]->phandle);
-+		if (order.order[i]->name)
-+			pr_cont(" %s", order.order[i]->name);
-+		if (order.order[i]->full_name)
-+			pr_cont(" (%s)", order.order[i]->full_name);
-+		prop = get_property(order.order[i], "compatible");
-+		for (cp = of_prop_next_string(prop, NULL); cp;
-+		     cp = of_prop_next_string(prop, cp))
-+			pr_cont(" %s", cp);
-+		pr_cont(" (parent 0x%x)\n",
-+			order.parent_by_phandle[order.order[i]->phandle]);
-+	}
-+}
-+
-+int __init of_init_build_order(struct device_node *root)
-+{
-+	struct device_node *child;
-+	int rc = 0;
-+
-+	tree = root;
-+	if (unlikely(!root))
-+		return -EINVAL;
-+
-+	calc_max_phandle(root);
-+	order.old_max_phandle = order.max_phandle;
-+
-+	for_each_child_of_node(root, child) {
-+		rc = add_deps_lnx(root, child);
-+		if (unlikely(rc))
-+			break;
-+	}
-+
-+	of_node_put(root);
-+	topological_sort();
-+
-+	if (graph.finished)
-+		return -EINVAL; /* cycle found */
-+
-+	return rc;
-+}
-diff --git a/scripts/dtc/dtc.c b/scripts/dtc/dtc.c
-index fbe49d9..ac9858c 100644
---- a/scripts/dtc/dtc.c
-+++ b/scripts/dtc/dtc.c
-@@ -88,6 +88,8 @@ static void  __attribute__ ((noreturn)) usage(void)
- 	fprintf(stderr, "\t\tSort nodes and properties before outputting (only useful for\n\t\tcomparing trees)\n");
- 	fprintf(stderr, "\t-D\n");
- 	fprintf(stderr, "\t\tDo not automatically add dependencies for phandle references\n");
-+	fprintf(stderr, "\t-t\n");
-+	fprintf(stderr, "\t\tPrint (default) initialization order\n");
- 	fprintf(stderr, "\t-v\n");
- 	fprintf(stderr, "\t\tPrint DTC version and exit\n");
- 	fprintf(stderr, "\t-H <phandle format>\n");
-@@ -110,6 +112,7 @@ int main(int argc, char *argv[])
- 	const char *depname = NULL;
- 	int force = 0, sort = 0;
- 	int dependencies = 1;
-+	int init_order = 0;
- 	const char *arg;
- 	int opt;
- 	FILE *outf = NULL;
-@@ -121,7 +124,7 @@ int main(int argc, char *argv[])
- 	minsize    = 0;
- 	padsize    = 0;
- 
--	while ((opt = getopt(argc, argv, "hI:O:o:V:d:R:S:p:fqb:i:vH:sDW:E:"))
-+	while ((opt = getopt(argc, argv, "hI:O:o:V:d:R:S:p:fqb:i:vH:sDtW:E:"))
- 			!= EOF) {
- 		switch (opt) {
- 		case 'I':
-@@ -183,6 +186,10 @@ int main(int argc, char *argv[])
- 			dependencies = false;
- 			break;
- 
-+		case 't':
-+			init_order = true;
-+			break;
-+
- 		case 'W':
- 			parse_checks_option(true, false, optarg);
- 			break;
-@@ -245,6 +252,13 @@ int main(int argc, char *argv[])
- 	if (dependencies)
- 		add_dependencies(bi);
- 
-+	if (init_order) {
-+		if (of_init_build_order(bi->dt))
-+			exit(2);
-+		of_init_print_order(arg);
-+		exit(0);
-+	}
-+
- 	if (streq(outname, "-")) {
- 		outf = stdout;
- 	} else {
-@@ -266,5 +280,13 @@ int main(int argc, char *argv[])
- 		die("Unknown output format \"%s\"\n", outform);
- 	}
- 
-+	/*
-+	 * Check for cycles by building the initialzation order.
-+	 * This is done after the output was saved because it
-+	 * changes the tree slightly.
-+	 */
-+	if (of_init_build_order(bi->dt))
-+		exit(2);
-+
- 	exit(0);
- }
-diff --git a/scripts/dtc/dtc.h b/scripts/dtc/dtc.h
-index c3dbeac..b89e08a 100644
---- a/scripts/dtc/dtc.h
-+++ b/scripts/dtc/dtc.h
-@@ -269,5 +269,7 @@ struct boot_info *dt_from_fs(const char *dirname);
- 
- /* Dependencies */
- void add_dependencies(struct boot_info *bi);
-+void of_init_print_order(const char *name);
-+int of_init_build_order(struct node *root);
- 
- #endif /* _DTC_H */
+We do wait on the unmask path too (see gic_poke_irq).
+
+>> +
+>> +     return IRQ_SET_MASK_OK;
+>> +}
+>> +#else
+>> +#define gic_set_affinity     NULL
+>> +#define gic_smp_init()               do { } while(0)
+>> +#endif
+>> +
+>> +static struct irq_chip gic_chip = {
+>> +     .name                   = "GICv3",
+>> +     .irq_mask               = gic_mask_irq,
+>> +     .irq_unmask             = gic_unmask_irq,
+>> +     .irq_eoi                = gic_eoi_irq,
+>> +     .irq_set_type           = gic_set_type,
+>> +     .irq_set_affinity       = gic_set_affinity,
+>> +};
+>> +
+>> +static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
+>> +                           irq_hw_number_t hw)
+>> +{
+>> +     /* SGIs are private to the core kernel */
+>> +     if (hw < 16)
+>> +             return -EPERM;
+>> +     /* PPIs */
+>> +     if (hw < 32) {
+>> +             irq_set_percpu_devid(irq);
+>> +             irq_set_chip_and_handler(irq, &gic_chip,
+>> +                                      handle_percpu_devid_irq);
+>> +             set_irq_flags(irq, IRQF_VALID | IRQF_NOAUTOEN);
+>> +     }
+>> +     /* SPIs */
+>> +     if (hw >= 32 && hw < gic_data.irq_nr) {
+>> +             irq_set_chip_and_handler(irq, &gic_chip,
+>> +                                      handle_fasteoi_irq);
+>> +             set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
+>> +     }
+>> +     irq_set_chip_data(irq, d->host_data);
+>> +     return 0;
+>> +}
+>> +
+>> +static int gic_irq_domain_xlate(struct irq_domain *d,
+>> +                             struct device_node *controller,
+>> +                             const u32 *intspec, unsigned int intsize,
+>> +                             unsigned long *out_hwirq, unsigned int *out_type)
+>> +{
+>> +     if (d->of_node != controller)
+>> +             return -EINVAL;
+>> +     if (intsize < 3)
+>> +             return -EINVAL;
+>> +
+>> +     switch(intspec[0]) {
+>> +     case 0:                 /* SPI */
+>> +             *out_hwirq = intspec[1] + 32;
+>> +             break;
+>> +     case 1:                 /* PPI */
+>> +             *out_hwirq = intspec[1] + 16;
+>> +             break;
+>> +     default:
+>> +             return -EINVAL;
+>> +     }
+>> +
+>> +     *out_type = intspec[2] & IRQ_TYPE_SENSE_MASK;
+>> +     return 0;
+>> +}
+>> +
+>> +static const struct irq_domain_ops gic_irq_domain_ops = {
+>> +     .map = gic_irq_domain_map,
+>> +     .xlate = gic_irq_domain_xlate,
+>> +};
+>> +
+>> +static int __init gic_of_init(struct device_node *node, struct device_node *parent)
+>> +{
+>> +     void __iomem *dist_base;
+>> +     void __iomem **redist_base;
+>> +     u64 redist_stride;
+>> +     u32 redist_regions;
+>> +     u32 reg;
+>> +     int gic_irqs;
+>> +     int err;
+>> +     int i;
+>> +
+>> +     dist_base = of_iomap(node, 0);
+>> +     if (!dist_base) {
+>> +             pr_err("%s: unable to map gic dist registers\n",
+>> +                     node->full_name);
+>> +             return -ENXIO;
+>> +     }
+>> +
+>> +     reg = readl_relaxed(dist_base + GICD_PIDR2) & GIC_PIDR2_ARCH_MASK;
+>> +     if (reg != 0x30 && reg != 0x40) {
+>> +             pr_err("%s: no distributor detected, giving up\n",
+>> +                     node->full_name);
+>> +             err = -ENODEV;
+>> +             goto out_unmap_dist;
+>> +     }
+>> +
+>> +     if (of_property_read_u32(node, "#redistributor-regions", &redist_regions))
+>> +             redist_regions = 1;
+>> +
+>> +     redist_base = kzalloc(sizeof(*redist_base) * redist_regions, GFP_KERNEL);
+>> +     if (!redist_base) {
+>> +             err = -ENOMEM;
+>> +             goto out_unmap_dist;
+>> +     }
+>> +
+>> +     for (i = 0; i < redist_regions; i++) {
+>> +             redist_base[i] = of_iomap(node, 1 + i);
+>> +             if (!redist_base[i]) {
+>> +                     pr_err("%s: couldn't map region %d\n",
+>> +                            node->full_name, i);
+>> +                     err = -ENODEV;
+>> +                     goto out_unmap_rdist;
+>> +             }
+>> +     }
+>> +
+>> +     if (of_property_read_u64(node, "redistributor-stride", &redist_stride))
+>> +             redist_stride = 0;
+>> +
+>> +     gic_data.dist_base = dist_base;
+>> +     gic_data.redist_base = redist_base;
+>> +     gic_data.redist_regions = redist_regions;
+>> +     gic_data.redist_stride = redist_stride;
+>> +
+>> +     /*
+>> +      * Find out how many interrupts are supported.
+>> +      * The GIC only supports up to 1020 interrupt sources (SGI+PPI+SPI)
+>> +      */
+>> +     gic_irqs = readl_relaxed(gic_data.dist_base + GICD_TYPER) & 0x1f;
+>> +     gic_irqs = (gic_irqs + 1) * 32;
+>> +     if (gic_irqs > 1020)
+>> +             gic_irqs = 1020;
+>> +     gic_data.irq_nr = gic_irqs;
+>> +
+>> +     gic_data.domain = irq_domain_add_tree(node, &gic_irq_domain_ops,
+>> +                                           &gic_data);
+>> +     gic_data.rdist = alloc_percpu(typeof(*gic_data.rdist));
+>> +
+>> +     if (WARN_ON(!gic_data.domain) || WARN_ON(!gic_data.rdist)) {
+>> +             err = -ENOMEM;
+>> +             goto out_free;
+>> +     }
+>> +
+>> +     set_handle_irq(gic_handle_irq);
+>> +
+>> +     gic_smp_init();
+>> +     gic_dist_init();
+>> +     gic_cpu_init();
+>> +
+>> +     return 0;
+>> +
+>> +out_free:
+>> +     if (gic_data.domain)
+>> +             irq_domain_remove(gic_data.domain);
+>> +     free_percpu(gic_data.rdist);
+>> +out_unmap_rdist:
+>> +     for (i = 0; i < redist_regions; i++)
+>> +             if (redist_base[i])
+>> +                     iounmap(redist_base[i]);
+>> +     kfree(redist_base);
+>> +out_unmap_dist:
+>> +     iounmap(dist_base);
+>> +     return err;
+>> +}
+>> +
+>> +IRQCHIP_DECLARE(gic_v3, "arm,gic-v3", gic_of_init);
+>> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+>> new file mode 100644
+>> index 0000000..16c8b05
+>> --- /dev/null
+>> +++ b/include/linux/irqchip/arm-gic-v3.h
+>> @@ -0,0 +1,188 @@
+>> +/*
+>> + * Copyright (C) 2013, 2014 ARM Limited, All Rights Reserved.
+>> + * Author: Marc Zyngier <marc.zyngier@arm.com>
+>> + *
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License
+>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>> + */
+>> +#ifndef __LINUX_IRQCHIP_ARM_GIC_V3_H
+>> +#define __LINUX_IRQCHIP_ARM_GIC_V3_H
+>> +
+>> +/*
+>> + * Distributor registers. We assume we're running non-secure, with ARE
+>> + * being set. Secure-only and non-ARE registers are not described.
+>> + */
+>> +#define GICD_CTLR                    0x0000
+>> +#define GICD_TYPER                   0x0004
+>> +#define GICD_IIDR                    0x0008
+>> +#define GICD_STATUSR                 0x0010
+>> +#define GICD_SETSPI_NSR                      0x0040
+>> +#define GICD_CLRSPI_NSR                      0x0048
+>> +#define GICD_SETSPI_SR                       0x0050
+>> +#define GICD_CLRSPI_SR                       0x0058
+>> +#define GICD_SEIR                    0x0068
+>> +#define GICD_ISENABLER                       0x0100
+>> +#define GICD_ICENABLER                       0x0180
+>> +#define GICD_ISPENDR                 0x0200
+>> +#define GICD_ICPENDR                 0x0280
+>> +#define GICD_ISACTIVER                       0x0300
+>> +#define GICD_ICACTIVER                       0x0380
+>> +#define GICD_IPRIORITYR                      0x0400
+>> +#define GICD_ICFGR                   0x0C00
+>> +#define GICD_IROUTER                 0x6000
+>> +#define GICD_PIDR2                   0xFFE8
+>> +
+>> +#define GICD_CTLR_RWP                        (1U << 31)
+>> +#define GICD_CTLR_ARE_NS             (1U << 4)
+>> +#define GICD_CTLR_ENABLE_G1A         (1U << 1)
+>> +#define GICD_CTLR_ENABLE_G1          (1U << 0)
+>> +
+>> +#define GICD_IROUTER_SPI_MODE_ONE    (0U << 31)
+>> +#define GICD_IROUTER_SPI_MODE_ANY    (1U << 31)
+>> +
+>> +#define GIC_PIDR2_ARCH_MASK          0xf0
+>> +
+>> +/*
+>> + * Re-Distributor registers, offsets from RD_base
+>> + */
+>> +#define GICR_CTLR                    GICD_CTLR
+>> +#define GICR_IIDR                    0x0004
+>> +#define GICR_TYPER                   0x0008
+>> +#define GICR_STATUSR                 GICD_STATUSR
+>> +#define GICR_WAKER                   0x0014
+>> +#define GICR_SETLPIR                 0x0040
+>> +#define GICR_CLRLPIR                 0x0048
+>> +#define GICR_SEIR                    GICD_SEIR
+>> +#define GICR_PROPBASER                       0x0070
+>> +#define GICR_PENDBASER                       0x0078
+>> +#define GICR_INVLPIR                 0x00A0
+>> +#define GICR_INVALLR                 0x00B0
+>> +#define GICR_SYNCR                   0x00C0
+>> +#define GICR_MOVLPIR                 0x0100
+>> +#define GICR_MOVALLR                 0x0110
+>> +#define GICR_PIDR2                   GICD_PIDR2
+>> +
+>> +#define GICR_WAKER_ProcessorSleep    (1U << 1)
+>> +#define GICR_WAKER_ChildrenAsleep    (1U << 2)
+>> +
+>> +/*
+>> + * Re-Distributor registers, offsets from SGI_base
+>> + */
+>> +#define GICR_ISENABLER0                      GICD_ISENABLER
+>> +#define GICR_ICENABLER0                      GICD_ICENABLER
+>> +#define GICR_ISPENDR0                        GICD_ISPENDR
+>> +#define GICR_ICPENDR0                        GICD_ICPENDR
+>> +#define GICR_ISACTIVER0                      GICD_ISACTIVER
+>> +#define GICR_ICACTIVER0                      GICD_ICACTIVER
+>> +#define GICR_IPRIORITYR0             GICD_IPRIORITYR
+>> +#define GICR_ICFGR0                  GICD_ICFGR
+>> +
+>> +#define GICR_TYPER_VLPIS             (1U << 1)
+>> +#define GICR_TYPER_LAST                      (1U << 4)
+>> +
+>> +/*
+>> + * CPU interface registers
+>> + */
+>> +#define GICC_CTLR_EL1_EOImode_drop_dir       (0U << 1)
+>> +#define GICC_CTLR_EL1_EOImode_drop   (1U << 1)
+>> +#define GICC_SRE_EL1_SRE             (1U << 0)
+>> +
+>> +/*
+>> + * Hypervisor interface registers (SRE only)
+>> + */
+>> +#define GICH_LR_VIRTUAL_ID_MASK              ((1UL << 32) - 1)
+>> +
+>> +#define GICH_LR_EOI                  (1UL << 41)
+>> +#define GICH_LR_GROUP                        (1UL << 60)
+>> +#define GICH_LR_STATE                        (3UL << 62)
+>> +#define GICH_LR_PENDING_BIT          (1UL << 62)
+>> +#define GICH_LR_ACTIVE_BIT           (1UL << 63)
+>> +
+>> +#define GICH_MISR_EOI                        (1 << 0)
+>> +#define GICH_MISR_U                  (1 << 1)
+>> +
+>> +#define GICH_HCR_EN                  (1 << 0)
+>> +#define GICH_HCR_UIE                 (1 << 1)
+>> +
+>> +#define GICH_VMCR_CTLR_SHIFT         0
+>> +#define GICH_VMCR_CTLR_MASK          (0x21f << GICH_VMCR_CTLR_SHIFT)
+>> +#define GICH_VMCR_BPR1_SHIFT         18
+>> +#define GICH_VMCR_BPR1_MASK          (7 << GICH_VMCR_BPR1_SHIFT)
+>> +#define GICH_VMCR_BPR0_SHIFT         21
+>> +#define GICH_VMCR_BPR0_MASK          (7 << GICH_VMCR_BPR0_SHIFT)
+>> +#define GICH_VMCR_PMR_SHIFT          24
+>> +#define GICH_VMCR_PMR_MASK           (0xffUL << GICH_VMCR_PMR_SHIFT)
+>> +
+>> +#define ICC_EOIR1_EL1                        S3_0_C12_C12_1
+>> +#define ICC_IAR1_EL1                 S3_0_C12_C12_0
+>> +#define ICC_SGI1R_EL1                        S3_0_C12_C11_5
+>> +#define ICC_PMR_EL1                  S3_0_C4_C6_0
+>> +#define ICC_CTLR_EL1                 S3_0_C12_C12_4
+>> +#define ICC_SRE_EL1                  S3_0_C12_C12_5
+>> +#define ICC_GRPEN1_EL1                       S3_0_C12_C12_7
+>> +
+>> +#define ICC_SRE_EL2                  S3_4_C12_C9_5
+>> +
+>> +#define ICH_VSEIR_EL2                        S3_4_C12_C9_4
+>> +#define ICH_HCR_EL2                  S3_4_C12_C11_0
+>> +#define ICH_VTR_EL2                  S3_4_C12_C11_1
+>> +#define ICH_MISR_EL2                 S3_4_C12_C11_2
+>> +#define ICH_EISR_EL2                 S3_4_C12_C11_3
+>> +#define ICH_ELSR_EL2                 S3_4_C12_C11_5
+>> +#define ICH_VMCR_EL2                 S3_4_C12_C11_7
+>> +
+>> +#define __LR0_EL2(x)                 S3_4_C12_C12_ ## x
+>> +#define __LR8_EL2(x)                 S3_4_C12_C13_ ## x
+>> +
+>> +#define ICH_LR0_EL2                  __LR0_EL2(0)
+>> +#define ICH_LR1_EL2                  __LR0_EL2(1)
+>> +#define ICH_LR2_EL2                  __LR0_EL2(2)
+>> +#define ICH_LR3_EL2                  __LR0_EL2(3)
+>> +#define ICH_LR4_EL2                  __LR0_EL2(4)
+>> +#define ICH_LR5_EL2                  __LR0_EL2(5)
+>> +#define ICH_LR6_EL2                  __LR0_EL2(6)
+>> +#define ICH_LR7_EL2                  __LR0_EL2(7)
+>> +#define ICH_LR8_EL2                  __LR8_EL2(0)
+>> +#define ICH_LR9_EL2                  __LR8_EL2(1)
+>> +#define ICH_LR10_EL2                 __LR8_EL2(2)
+>> +#define ICH_LR11_EL2                 __LR8_EL2(3)
+>> +#define ICH_LR12_EL2                 __LR8_EL2(4)
+>> +#define ICH_LR13_EL2                 __LR8_EL2(5)
+>> +#define ICH_LR14_EL2                 __LR8_EL2(6)
+>> +#define ICH_LR15_EL2                 __LR8_EL2(7)
+>> +
+>> +#define __AP0Rx_EL2(x)                       S3_4_C12_C8_ ## x
+>> +#define ICH_AP0R0_EL2                        __AP0Rx_EL2(0)
+>> +#define ICH_AP0R1_EL2                        __AP0Rx_EL2(1)
+>> +#define ICH_AP0R2_EL2                        __AP0Rx_EL2(2)
+>> +#define ICH_AP0R3_EL2                        __AP0Rx_EL2(3)
+>> +
+>> +#define __AP1Rx_EL2(x)                       S3_4_C12_C9_ ## x
+>> +#define ICH_AP1R0_EL2                        __AP1Rx_EL2(0)
+>> +#define ICH_AP1R1_EL2                        __AP1Rx_EL2(1)
+>> +#define ICH_AP1R2_EL2                        __AP1Rx_EL2(2)
+>> +#define ICH_AP1R3_EL2                        __AP1Rx_EL2(3)
+>> +
+>> +#ifndef __ASSEMBLY__
+>> +
+>> +#include <linux/stringify.h>
+>> +
+>> +static inline void gic_write_eoir(u64 irq)
+>> +{
+>> +     asm volatile("msr " __stringify(ICC_EOIR1_EL1) ", %0" : : "r" (irq));
+>> +     isb();
+>> +}
+>> +
+>> +#endif
+>> +
+>> +#endif
+>> --
+>> 1.8.3.4
+>>
+>
+> I noticed that you removed all the dist_lock locks here.  I assume there
+> was some rationale behind this, and given you can share that explanation
+> with me and address the other tiny issues:
+
+The purpose of the lock was to avoid races between mask/unmask and
+set_type (both of which use the enable registers). But given that these
+registers can operate on a single bit (set/clear operations), and that
+the kernel won't try to do both at the same time, it is safe to get rid
+of the whole locking.
+
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+
+Thanks,
+
+	M.
 -- 
-1.8.3.1
+Jazz is not dead. It just smells funny.
