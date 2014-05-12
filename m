@@ -1,121 +1,287 @@
 From: jays.lee@samsung.com (Jungseok Lee)
-Date: Mon, 12 May 2014 18:40:44 +0900
-Subject: [PATCH v6 3/7] arm64: Add a description on 48-bit address space with
- 4KB pages
-Message-ID: <000201cf6dc6$3ed91500$bc8b3f00$@samsung.com>
+Date: Mon, 12 May 2014 18:40:57 +0900
+Subject: [PATCH v6 7/7] arm64: KVM: Implement 4 levels of translation tables
+ for HYP and stage2
+Message-ID: <000601cf6dc6$47195b30$d54c1190$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds memory layout and translation lookup information
-about 48-bit address space with 4K pages. The description is based
-on 4 levels of translation tables.
+This patch adds 4 levels of translation tables implementation for both
+HYP and stage2.
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Steve Capper <steve.capper@linaro.org>
+Both symmetric and asymmetric configurations for page size and translation
+levels are are validated on Fast Models:
+
+ 1) 4KB  + 3 levels guest on 4KB  + 4 levels host
+ 2) 4KB  + 4 levels guest on 4KB  + 4 levels host
+ 3) 64KB + 2 levels guest on 4KB  + 4 levels host
+ 4) 4KB  + 3 levels guest on 64KB + 2 levels host
+ 5) 4KB  + 4 levels guest on 64KB + 2 levels host
+ 6) 64KB + 2 levels guest on 64KB + 2 levels host
+
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Jungseok Lee <jays.lee@samsung.com>
 Reviewed-by: Sungjinn Chung <sungjinn.chung@samsung.com>
 Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- Documentation/arm64/memory.txt |   59 ++++++++++++++++++++++++++++++++++------
- 1 file changed, 51 insertions(+), 8 deletions(-)
+ arch/arm/include/asm/kvm_mmu.h   |   10 +++++
+ arch/arm/kvm/arm.c               |    8 ++++
+ arch/arm/kvm/mmu.c               |   77 ++++++++++++++++++++++++++++++++------
+ arch/arm64/include/asm/kvm_arm.h |   12 ++++++
+ arch/arm64/include/asm/kvm_mmu.h |   12 ++++++
+ 5 files changed, 108 insertions(+), 11 deletions(-)
 
-diff --git a/Documentation/arm64/memory.txt b/Documentation/arm64/memory.txt
-index d50fa61..4c720d6 100644
---- a/Documentation/arm64/memory.txt
-+++ b/Documentation/arm64/memory.txt
-@@ -8,10 +8,11 @@ This document describes the virtual memory layout used by the AArch64
- Linux kernel. The architecture allows up to 4 levels of translation
- tables with a 4KB page size and up to 3 levels with a 64KB page size.
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index 5c7aa3c..36b9835 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -37,6 +37,11 @@
+  */
+ #define TRAMPOLINE_VA		UL(CONFIG_VECTORS_BASE)
  
--AArch64 Linux uses 3 levels of translation tables with the 4KB page
--configuration, allowing 39-bit (512GB) virtual addresses for both user
--and kernel. With 64KB pages, only 2 levels of translation tables are
--used but the memory layout is the same.
-+AArch64 Linux uses either 3 levels or 4 levels of translation tables with
-+the 4KB page configuration, allowing 39-bit (512GB) or 48-bit (256TB)
-+virtual addresses, respectively, for both user and kernel. With 64KB
-+pages, only 2 levels of translation tables, allowing 42-bit (4TB)
-+virtual address, are used but the memory layout is the same.
++/*
++ * KVM_MMU_CACHE_MIN_PAGES is the number of stage2 page table translation levels.
++ */
++#define MMU_CACHE_MIN_PAGES	2
++
+ #ifndef __ASSEMBLY__
  
- User addresses have bits 63:39 set to 0 while the kernel addresses have
- the same bits set to 1. TTBRx selection is given by bit 63 of the
-@@ -21,7 +22,7 @@ The swapper_pgd_dir address is written to TTBR1 and never written to
- TTBR0.
+ #include <asm/cacheflush.h>
+@@ -94,6 +99,11 @@ static inline void kvm_clean_pgd(pgd_t *pgd)
+ 	clean_dcache_area(pgd, PTRS_PER_S2_PGD * sizeof(pgd_t));
+ }
  
++static inline void kvm_clean_pmd(pmd_t *pmd)
++{
++	clean_dcache_area(pmd, PTRS_PER_PMD * sizeof(pmd_t));
++}
++
+ static inline void kvm_clean_pmd_entry(pmd_t *pmd)
+ {
+ 	clean_pmd_entry(pmd);
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 9f19f2c..0785291 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -473,11 +473,19 @@ static int set_vttbr_baddr_mask(void)
+ 	 * 21 <= T0SZ <= 30 is valid under 3 level of translation tables
+ 	 * 30 <= T0SZ <= 39 is valid under 2 level of translation tables
+ 	 */
++#ifdef CONFIG_ARM64_3_LEVELS
+ 	if (t0sz <= 20) {
+ 		kvm_err("Cannot support %d-bit address space\n", 64 - t0sz);
+ 		return -EINVAL;
+ 	}
+ 	vttbr_x = 37 - t0sz;
++#else
++	if (t0sz <= 15) {
++		kvm_err("Cannot support %d-bit address space\n", 64 - t0sz);
++		return -EINVAL;
++	}
++	vttbr_x = 28 - t0sz;
++#endif
+ #endif
+ 	vttbr_baddr_mask = (((1LLU << (48 - vttbr_x)) - 1) << (vttbr_x - 1));
+ #endif
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 16f8049..6e2a0b0 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -390,13 +390,44 @@ static int create_hyp_pmd_mappings(pud_t *pud, unsigned long start,
+ 	return 0;
+ }
  
--AArch64 Linux memory layout with 4KB pages:
-+AArch64 Linux memory layout with 4KB pages + 3 levels:
++static int create_hyp_pud_mappings(pgd_t *pgd, unsigned long start,
++				   unsigned long end, unsigned long pfn,
++				   pgprot_t prot)
++{
++	pud_t *pud;
++	pmd_t *pmd;
++	unsigned long addr, next;
++
++	addr = start;
++	do {
++		pud = pud_offset(pgd, addr);
++
++		if (pud_none_or_clear_bad(pud)) {
++			pmd = pmd_alloc_one(NULL, addr);
++			if (!pmd) {
++				kvm_err("Cannot allocate Hyp pmd\n");
++				return -ENOMEM;
++			}
++			pud_populate(NULL, pud, pmd);
++			get_page(virt_to_page(pud));
++			kvm_flush_dcache_to_poc(pud, sizeof(*pud));
++		}
++
++		next = pud_addr_end(addr, end);
++
++		create_hyp_pmd_mappings(pud, addr, next, pfn, prot);
++		pfn += (next - addr) >> PAGE_SHIFT;
++	} while (addr = next, addr != end);
++
++	return 0;
++}
++
+ static int __create_hyp_mappings(pgd_t *pgdp,
+ 				 unsigned long start, unsigned long end,
+ 				 unsigned long pfn, pgprot_t prot)
+ {
+ 	pgd_t *pgd;
+ 	pud_t *pud;
+-	pmd_t *pmd;
+ 	unsigned long addr, next;
+ 	int err = 0;
  
- Start			End			Size		Use
- -----------------------------------------------------------------------
-@@ -48,7 +49,34 @@ ffffffbffc000000	ffffffbfffffffff	  64MB		modules
- ffffffc000000000	ffffffffffffffff	 256GB		kernel logical memory map
+@@ -405,22 +436,21 @@ static int __create_hyp_mappings(pgd_t *pgdp,
+ 	end = PAGE_ALIGN(end);
+ 	do {
+ 		pgd = pgdp + pgd_index(addr);
+-		pud = pud_offset(pgd, addr);
  
+-		if (pud_none_or_clear_bad(pud)) {
+-			pmd = pmd_alloc_one(NULL, addr);
+-			if (!pmd) {
+-				kvm_err("Cannot allocate Hyp pmd\n");
++		if (pgd_none(*pgd)) {
++			pud = pud_alloc_one(NULL, addr);
++			if (!pud) {
++				kvm_err("Cannot allocate Hyp pud\n");
+ 				err = -ENOMEM;
+ 				goto out;
+ 			}
+-			pud_populate(NULL, pud, pmd);
+-			get_page(virt_to_page(pud));
+-			kvm_flush_dcache_to_poc(pud, sizeof(*pud));
++			pgd_populate(NULL, pgd, pud);
++			get_page(virt_to_page(pgd));
++			kvm_flush_dcache_to_poc(pgd, sizeof(*pgd));
+ 		}
  
--AArch64 Linux memory layout with 64KB pages:
-+AArch64 Linux memory layout with 4KB pages + 4 levels:
-+
-+Start			End			Size		Use
-+-----------------------------------------------------------------------
-+0000000000000000	0000ffffffffffff	 256TB		user
-+
-+ffff000000000000	ffff7bfffffeffff	~124TB		vmalloc
-+
-+ffff7bffffff0000	ffff7bffffffffff	  64KB		[guard page]
-+
-+ffff7c0000000000	ffff7dffffffffff	   2TB		vmemmap
-+
-+ffff7e0000000000	ffff7ffffbbfffff	  ~2TB		[guard, future vmmemap]
-+
-+ffff7ffffa000000	ffff7ffffaffffff	  16MB		PCI I/O space
-+
-+ffff7ffffb000000	ffff7ffffbbfffff	  12MB		[guard]
-+
-+ffff7ffffbc00000	ffff7ffffbdfffff	   2MB		fixed mappings
-+
-+ffff7ffffbe00000	ffff7ffffbffffff	   2MB		[guard]
-+
-+ffff7ffffc000000	ffff7fffffffffff	  64MB		modules
-+
-+ffff800000000000	ffffffffffffffff	 128TB		kernel logical memory map
-+
-+
-+AArch64 Linux memory layout with 64KB pages + 2 levels:
+ 		next = pgd_addr_end(addr, end);
+-		err = create_hyp_pmd_mappings(pud, addr, next, pfn, prot);
++		err = create_hyp_pud_mappings(pgd, addr, next, pfn, prot);
+ 		if (err)
+ 			goto out;
+ 		pfn += (next - addr) >> PAGE_SHIFT;
+@@ -565,6 +595,24 @@ void kvm_free_stage2_pgd(struct kvm *kvm)
+ 	kvm->arch.pgd = NULL;
+ }
  
- Start			End			Size		Use
- -----------------------------------------------------------------------
-@@ -75,7 +103,7 @@ fffffdfffc000000	fffffdffffffffff	  64MB		modules
- fffffe0000000000	ffffffffffffffff	   2TB		kernel logical memory map
- 
- 
--Translation table lookup with 4KB pages:
-+Translation table lookup with 4KB pages + 3 levels:
- 
- +--------+--------+--------+--------+--------+--------+--------+--------+
- |63    56|55    48|47    40|39    32|31    24|23    16|15     8|7      0|
-@@ -90,7 +118,22 @@ Translation table lookup with 4KB pages:
-  +-------------------------------------------------> [63] TTBR0/1
- 
- 
--Translation table lookup with 64KB pages:
-+Translation table lookup with 4KB pages + 4 levels:
++static pud_t *stage2_get_pud(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
++			     phys_addr_t addr)
++{
++	pgd_t *pgd;
++	pud_t *pud;
 +
-++--------+--------+--------+--------+--------+--------+--------+--------+
-+|63    56|55    48|47    40|39    32|31    24|23    16|15     8|7      0|
-++--------+--------+--------+--------+--------+--------+--------+--------+
-+ |                 |         |         |         |         |
-+ |                 |         |         |         |         v
-+ |                 |         |         |         |   [11:0]  in-page offset
-+ |                 |         |         |         +-> [20:12] L3 index
-+ |                 |         |         +-----------> [29:21] L2 index
-+ |                 |         +---------------------> [38:30] L1 index
-+ |                 +-------------------------------> [47:39] L0 index
-+ +-------------------------------------------------> [63] TTBR0/1
++	pgd = kvm->arch.pgd + pgd_index(addr);
++	if (pgd_none(*pgd)) {
++		if (!cache)
++			return NULL;
++		pud = mmu_memory_cache_alloc(cache);
++		pgd_populate(NULL, pgd, pud);
++		get_page(virt_to_page(pgd));
++	}
 +
++	return pud_offset(pgd, addr);
++}
 +
-+Translation table lookup with 64KB pages + 2 levels:
+ static pmd_t *stage2_get_pmd(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+ 			     phys_addr_t addr)
+ {
+@@ -616,9 +664,15 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
+ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+ 			  phys_addr_t addr, const pte_t *new_pte, bool iomap)
+ {
++	pud_t *pud;
+ 	pmd_t *pmd;
+ 	pte_t *pte, old_pte;
  
- +--------+--------+--------+--------+--------+--------+--------+--------+
- |63    56|55    48|47    40|39    32|31    24|23    16|15     8|7      0|
++	/* Create stage-2 page table mapping - Level 0 */
++	pud = stage2_get_pud(kvm, cache, addr);
++	if (!pud)
++		return 0;
++
+ 	/* Create stage-2 page table mapping - Level 1 */
+ 	pmd = stage2_get_pmd(kvm, cache, addr);
+ 	if (!pmd) {
+@@ -677,7 +731,8 @@ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
+ 	for (addr = guest_ipa; addr < end; addr += PAGE_SIZE) {
+ 		pte_t pte = pfn_pte(pfn, PAGE_S2_DEVICE);
+ 
+-		ret = mmu_topup_memory_cache(&cache, 2, 2);
++		ret = mmu_topup_memory_cache(&cache, KVM_MMU_CACHE_MIN_PAGES,
++						KVM_MMU_CACHE_MIN_PAGES);
+ 		if (ret)
+ 			goto out;
+ 		spin_lock(&kvm->mmu_lock);
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index 8dbef70..ac796d0 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -114,6 +114,7 @@
+ #define VTCR_EL2_IRGN0_MASK	(3 << 8)
+ #define VTCR_EL2_IRGN0_WBWA	(1 << 8)
+ #define VTCR_EL2_SL0_MASK	(3 << 6)
++#define VTCR_EL2_SL0_LVL0	(2 << 6)
+ #define VTCR_EL2_SL0_LVL1	(1 << 6)
+ #define VTCR_EL2_T0SZ_MASK	0x3f
+ #define VTCR_EL2_T0SZ(bits)	(64 - (bits))
+@@ -128,6 +129,7 @@
+ 				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
+ 				 VTCR_EL2_SL0_LVL1)
+ #else
++#ifdef CONFIG_ARM64_3_LEVELS
+ /*
+  * Stage2 translation configuration:
+  * 4kB pages (TG0 = 0)
+@@ -136,6 +138,16 @@
+ #define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_4K | VTCR_EL2_SH0_INNER | \
+ 				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
+ 				 VTCR_EL2_SL0_LVL1)
++#else
++/*
++ * Stage2 translation configuration:
++ * 4kB pages (TG0 = 0)
++ * 4 level page tables (SL = 2)
++ */
++#define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_4K | VTCR_EL2_SH0_INNER | \
++				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
++				 VTCR_EL2_SL0_LVL0)
++#endif
+ #endif
+ 
+ #define VTTBR_VMID_SHIFT  (48LLU)
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 7d29847..778bf42 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -41,6 +41,17 @@
+  */
+ #define TRAMPOLINE_VA		(HYP_PAGE_OFFSET_MASK & PAGE_MASK)
+ 
++/*
++ * KVM_MMU_CACHE_MIN_PAGES is the number of stage2 page table translation levels.
++ */
++#ifdef CONFIG_ARM64_2_LEVELS
++#define KVM_MMU_CACHE_MIN_PAGES	1
++#elif defined(CONFIG_ARM64_3_LEVELS)
++#define KVM_MMU_CACHE_MIN_PAGES	2
++#else
++#define KVM_MMU_CACHE_MIN_PAGES	3
++#endif
++
+ #ifdef __ASSEMBLY__
+ 
+ /*
+@@ -107,6 +118,7 @@ static inline bool kvm_is_write_fault(unsigned long esr)
+ }
+ 
+ static inline void kvm_clean_pgd(pgd_t *pgd) {}
++static inline void kvm_clean_pmd(pmd_t *pmd) {}
+ static inline void kvm_clean_pmd_entry(pmd_t *pmd) {}
+ static inline void kvm_clean_pte(pte_t *pte) {}
+ static inline void kvm_clean_pte_entry(pte_t *pte) {}
 -- 
 1.7.10.4
