@@ -1,32 +1,52 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Mon, 12 May 2014 16:09:56 +0300
-Subject: [PATCH] remoteproc: da8xx: don't select CMA on no-MMU
-In-Reply-To: <1399560990-1402858-18-git-send-email-arnd@arndb.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 12 May 2014 15:16:45 +0200
+Subject: [PATCH 2/2] input: atmel-wm97xx: only build for AVR32
+In-Reply-To: <1399560990-1402858-16-git-send-email-arnd@arndb.de>
 References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
  <1399560990-1402858-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-18-git-send-email-arnd@arndb.de>
-Message-ID: <CAK=WgbZ1c6=_MT0tb0X_E58ia=bSSGc5o_kHV_g0jJuDCtB5oA@mail.gmail.com>
+ <1399560990-1402858-16-git-send-email-arnd@arndb.de>
+Message-ID: <5370C9BD.4040201@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On 08/05/2014 16:56, Arnd Bergmann :
+> Building this driver on ARM/at91 always gives us this error message:
+> 
+> drivers/input/touchscreen/atmel-wm97xx.c:63:2: error: #error Unknown CPU, this driver only supports AT32AP700X CPUs.
+> 
+> Clearly this configuration is not meant to work, so let's just prevent
+> it in Kconfig. If we ever want to use it on another platform, we should
+> also pass proper resources for GPIO, IRQ and memory, which are hardcoded
+> to AT32AP700X at the moment.
 
-On Thu, May 8, 2014 at 5:56 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> We can only use CMA on systems that have an MMU, because of
-> the requirement to use memory migration. NOMMU systems are
-> rather constrained to start with, but it seems reasonable
-> to assume that DMA allocations can still succeed in the
-> constrained case for remoteproc on NOMMU, so this patch
-> changes the da8xx implementation to not rely on CMA when
-> the MMU is disabled.
->
+Yes it seems so:
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Ohad Ben-Cohen <ohad@wizery.com>
-> Cc: Robert Tivy <rtivy@ti.com>
+> Cc: Mark Brown <broonie@kernel.org>
+> Cc: Liam Girdwood <lrg@slimlogic.co.uk>
+> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> Cc: linux-input at vger.kernel.org
 > ---
+>  drivers/input/touchscreen/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/input/touchscreen/Kconfig b/drivers/input/touchscreen/Kconfig
+> index e2f0264..fe4c264 100644
+> --- a/drivers/input/touchscreen/Kconfig
+> +++ b/drivers/input/touchscreen/Kconfig
+> @@ -640,7 +640,7 @@ config TOUCHSCREEN_WM9713
+>  
+>  config TOUCHSCREEN_WM97XX_ATMEL
+>  	tristate "WM97xx Atmel accelerated touch"
+> -	depends on TOUCHSCREEN_WM97XX && (AVR32 || ARCH_AT91)
+> +	depends on TOUCHSCREEN_WM97XX && AVR32
+>  	help
+>  	  Say Y here for support for streaming mode with WM97xx touchscreens
+>  	  on Atmel AT91 or AVR32 systems with an AC97C module.
+> 
 
-Would you like me to pick this via the remoteproc tree or are you
-planning to route this set elsewhere anyway?
 
-Thanks,
-Ohad.
+-- 
+Nicolas Ferre
