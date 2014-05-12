@@ -1,75 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 12 May 2014 16:05:14 +0100
-Subject: [PATCH 1/3] arm64: add MIDR_EL1 field accessors
-In-Reply-To: <1399905470-26500-2-git-send-email-mark.rutland@arm.com>
-References: <1399905470-26500-1-git-send-email-mark.rutland@arm.com>
- <1399905470-26500-2-git-send-email-mark.rutland@arm.com>
-Message-ID: <20140512150514.GD18960@arm.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 12 May 2014 17:07:23 +0200
+Subject: [PATCH] phy: exynos-mipi-video: fix check on array index
+In-Reply-To: <1399899388-13101-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1399899388-13101-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <5370E3AB.7090306@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 12, 2014 at 03:37:48PM +0100, Mark Rutland wrote:
-> The MIDR_EL1 register is composed of a number of bitfields, and uses of
-> the fields has so far involved open-coding of the shifts and masks
-> required.
+On 12/05/14 14:56, Antoine T?nart wrote:
+> The phys array is of size EXYNOS_MIPI_PHYS_NUM. Trying to access the
+> index EXYNOS_MIPI_PHYS_NUM should return an error.
 > 
-> This patch adds shifts and masks for each of the MIDR_EL1 subfields, and
-> also provides accessors built atop of these. Existing uses within
-> cputype.h are updated to use these accessors.
+> Fixes: 069d2e26e9d6 "phy: Add driver for Exynos MIPI CSIS/DSIM DPHYs"
 > 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+
+Thanks for the fix,
+
+Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+
 > ---
->  arch/arm64/include/asm/cputype.h | 27 +++++++++++++++++++++++++--
->  1 file changed, 25 insertions(+), 2 deletions(-)
+>  drivers/phy/phy-exynos-mipi-video.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
-> index c404fb0..541b829 100644
-> --- a/arch/arm64/include/asm/cputype.h
-> +++ b/arch/arm64/include/asm/cputype.h
-> @@ -36,6 +36,25 @@
->  	__val;								\
->  })
->  
-> +#define MIDR_REVISION_MASK	0xf
-> +#define MIDR_REVISION(midr)	((midr) & MIDR_REVISION_MASK)
-> +#define MIDR_PARTNUM_SHIFT	4
-> +#define MIDR_PARTNUM_MASK	(0xfff << MIDR_PARTNUM_SHIFT)
-> +#define MIDR_PARTNUM(midr)	\
-> +	(((midr) & MIDR_PARTNUM_MASK) >> MIDR_PARTNUM_SHIFT)
-> +#define MIDR_ARCHITECTURE_SHIFT	16
-> +#define MIDR_ARCHITECTURE_MASK	(0xf << MIDR_ARCHITECTURE_SHIFT)
-> +#define MIDR_ARCHITECTURE(midr)	\
-> +	(((midr) & MIDR_ARCHITECTURE_MASK) >> MIDR_ARCHITECTURE_SHIFT)
-> +#define MIDR_VARIANT_SHIFT	20
-> +#define MIDR_VARIANT_MASK	(0xf << MIDR_VARIANT_SHIFT)
-> +#define MIDR_VARIANT(midr)	\
-> +	(((midr) & MIDR_VARIANT_MASK) >> MIDR_VARIANT_SHIFT)
-> +#define MIDR_IMPLEMENTOR_SHIFT	24
-> +#define MIDR_IMPLEMENTOR_MASK	(0xff << MIDR_IMPLEMENTOR_SHIFT)
-> +#define MIDR_IMPLEMENTOR(midr)	\
-> +	(((midr) & MIDR_IMPLEMENTOR_MASK) >> MIDR_IMPLEMENTOR_SHIFT)
-> +
->  #define ARM_CPU_IMP_ARM		0x41
->  #define ARM_CPU_IMP_APM		0x50
->  
-> @@ -64,12 +83,16 @@ static inline u64 __attribute_const__ read_cpuid_mpidr(void)
->  
->  static inline unsigned int __attribute_const__ read_cpuid_implementor(void)
+> diff --git a/drivers/phy/phy-exynos-mipi-video.c b/drivers/phy/phy-exynos-mipi-video.c
+> index 7f139326a642..ff026689358c 100644
+> --- a/drivers/phy/phy-exynos-mipi-video.c
+> +++ b/drivers/phy/phy-exynos-mipi-video.c
+> @@ -101,7 +101,7 @@ static struct phy *exynos_mipi_video_phy_xlate(struct device *dev,
 >  {
-> -	return (read_cpuid_id() & 0xFF000000) >> 24;
-> +	return MIDR_IMPLEMENTOR(read_cpuid_id());
->  }
+>  	struct exynos_mipi_video_phy *state = dev_get_drvdata(dev);
 >  
->  static inline unsigned int __attribute_const__ read_cpuid_part_number(void)
->  {
-> -	return (read_cpuid_id() & 0xFFF0);
-> +	/*
-> +	 * The part number field is used in-place as a userspace ABI, so we
-> +	 * cannot use MIDR_PARTNUM() here.
-> +	 */
-> +	return (read_cpuid_id() & MIDR_PARTNUM_MASK);
-
-Where is this used as ABI? c_show is open-coded and kvm_target_cpu could
-just add a shift left.
-
-Will
+> -	if (WARN_ON(args->args[0] > EXYNOS_MIPI_PHYS_NUM))
+> +	if (WARN_ON(args->args[0] >= EXYNOS_MIPI_PHYS_NUM))
+>  		return ERR_PTR(-ENODEV);
+>  
+>  	return state->phys[args->args[0]].phy;
