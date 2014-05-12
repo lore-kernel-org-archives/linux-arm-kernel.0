@@ -1,70 +1,61 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 12 May 2014 17:47:29 +0200
-Subject: [PATCHv3] C_CAN: Add 32-bit accesses
-In-Reply-To: <20140506135702.GA9879@amd.pavel.ucw.cz>
-References: <6bf951b6-51e7-4b90-b054-9ba5b6e93874@email.android.com>
- <20140427122510.GB12901@amd.pavel.ucw.cz>
- <1398716449.836.4.camel@dinh-ubuntu>
- <20140428211505.GA28242@amd.pavel.ucw.cz>
- <CAF03EBf9KXqB4W9GuDduhLwp_kwFjUEi3syU7fX3KpXfZEFxHg@mail.gmail.com>
- <CAF03EBd19PC5RAsLR6-dMPF2x3XRf9X4bFPgX2kRdCYWUQBYcA@mail.gmail.com>
- <20140430215359.GA15148@amd.pavel.ucw.cz>
- <CAF03EBewoV0pOOmNQBwPrKgm-zhaSbFcNd_UiEhFWyUrq91-Jg@mail.gmail.com>
- <20140502084851.GA5730@amd.pavel.ucw.cz>
- <20140505120801.GA16461@amd.pavel.ucw.cz>
- <20140506135702.GA9879@amd.pavel.ucw.cz>
-Message-ID: <5370ED11.4000002@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 12 May 2014 08:48:51 -0700
+Subject: [PATCH 00/11] ARM: OMAP: OMAP5 & AM43x DSS
+In-Reply-To: <5370E172.20009@ti.com>
+References: <1399636579-8062-1-git-send-email-tomi.valkeinen@ti.com>
+ <5370CBD5.3060107@ti.com> <20140512143604.GB31772@atomide.com>
+ <5370E172.20009@ti.com>
+Message-ID: <20140512154850.GG31772@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/06/2014 03:57 PM, Pavel Machek wrote:
-> Add helpers for 32-bit accesses and replace open-coded 32-bit access
-> with calls to helpers. Minimum changes are done to the pci case, as I
-> don't have access to that hardware.
+* Tomi Valkeinen <tomi.valkeinen@ti.com> [140512 07:58]:
+> On 12/05/14 17:36, Tony Lindgren wrote:
+> > * Tomi Valkeinen <tomi.valkeinen@ti.com> [140512 06:26]:
+> >> Hi Tony,
+> >>
+> >> On 09/05/14 14:56, Tomi Valkeinen wrote:
+> >>> Hi,
+> >>>
+> >>> Here are arch/arm/ patches to add display support for OMAP5 and AM43x.
+> >>>
+> >>> I have these in my tree, in a branch I will send to Tony for merging. Most of
+> >>> these patches have already been around the lists, but I wanted to send them one
+> >>> more time to verify that all looks right and everybody is fine with them.
+> >>
+> >> I have pushed these to:
+> >>
+> >> git://git.kernel.org/pub/scm/linux/kernel/git/tomba/linux.git 3.16/omap
+> >>
+> >> If you're fine with these, I think we can consider that branch stable.
+> >> There are probably still a few display related .dts changed for the
+> >> board coming up, but I'll add those on top of the current commits.
+> > 
+> > Please coordinate things with Paul and Tero so you at least have proper
+> > acks for the hwmod and and clock patches. In general we really want to
+> > queue hwmod and clock changes separately as those can easily mess up things
+> > in a bad way like we've already seen with overlapping hwmod entries in
+> > the .dts files.
+> 
+> Ok. I'm fine with splitting the series if that's easiest way to manage it.
+> 
+> Paul, Tero?
+> 
+> > Also, I'm wondering why we still have .clk and .opt_clks entries in the
+> > hwmod data for am43xx and omap5 which are both device tree based with
+> > all the clocks coming from .dts files?
+> 
+> I think they are needed for the omap_device/hwmod stuff to work. Only
+> omapdss driver knows about the clocks defined in the .dts files, and the
+> omap_device/hwmod code still needs to do the reset and maybe some other
+> tasks that require the clocks.
 
-I'll ask David Miller to merge net/master into net-next/master so that I
-can apply this patch.
+We're already populating the hwmod data from dts entries, that's done by
+omap_device_build_from_dt. Why aren't we doing that for dt defined clocks?
 
-For now, I've applied the patch to can-next testing-c_can
-(git://gitorious.org/linux-can/linux-can-next.git testing-c_can)
+I'd rather not start adding new data that will then just be removed, that's
+what people call "pointless extra churn".
 
-Can you make other patches based on that tree, please.
+Regards,
 
-> --- a/drivers/net/can/c_can/c_can_pci.c
-> +++ b/drivers/net/can/c_can/c_can_pci.c
-> @@ -63,6 +63,23 @@ static void c_can_pci_write_reg_aligned_to_32bit(struct c_can_priv *priv,
->  	writew(val, priv->base + 2 * priv->regs[index]);
->  }
->  
-> +static u32 c_can_plat_read_reg32(struct c_can_priv *priv, enum reg index)
-> +{
-> +	u32 val;
-> +
-> +	val = priv->read_reg(priv, index);
-> +	val |= ((u32) priv->read_reg(priv, index + 1)) << 16;
-> +
-> +	return val;
-> +}
-> +
-> +static void c_can_plat_write_reg32(struct c_can_priv *priv, enum reg index,
-> +		u32 val)
-> +{
-> +	priv->write_reg(priv, index + 1, val>>16);
-
-spaces around >>, I'll fix this while applying.
-
-Marc
-
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 242 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140512/f8f4bdc9/attachment-0001.sig>
+Tony
