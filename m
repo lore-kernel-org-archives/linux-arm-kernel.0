@@ -1,56 +1,70 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Mon, 12 May 2014 19:46:48 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSF0gbWVkaWE6IG14MV9jYW1lcmE6IFJlbW92ZSBkcml2ZXI=?=
-In-Reply-To: <20140512142533.GF8330@dragon>
-References: <1399788551-8218-1-git-send-email-shc_work@mail.ru>
- <1399904280.435992890@f125.i.mail.ru>
- <20140512142533.GF8330@dragon>
-Message-ID: <1399909608.365840986@f391.i.mail.ru>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Mon, 12 May 2014 17:47:29 +0200
+Subject: [PATCHv3] C_CAN: Add 32-bit accesses
+In-Reply-To: <20140506135702.GA9879@amd.pavel.ucw.cz>
+References: <6bf951b6-51e7-4b90-b054-9ba5b6e93874@email.android.com>
+ <20140427122510.GB12901@amd.pavel.ucw.cz>
+ <1398716449.836.4.camel@dinh-ubuntu>
+ <20140428211505.GA28242@amd.pavel.ucw.cz>
+ <CAF03EBf9KXqB4W9GuDduhLwp_kwFjUEi3syU7fX3KpXfZEFxHg@mail.gmail.com>
+ <CAF03EBd19PC5RAsLR6-dMPF2x3XRf9X4bFPgX2kRdCYWUQBYcA@mail.gmail.com>
+ <20140430215359.GA15148@amd.pavel.ucw.cz>
+ <CAF03EBewoV0pOOmNQBwPrKgm-zhaSbFcNd_UiEhFWyUrq91-Jg@mail.gmail.com>
+ <20140502084851.GA5730@amd.pavel.ucw.cz>
+ <20140505120801.GA16461@amd.pavel.ucw.cz>
+ <20140506135702.GA9879@amd.pavel.ucw.cz>
+Message-ID: <5370ED11.4000002@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mon, 12 May 2014 22:25:34 +0800 ?? Shawn Guo <shawn.guo@freescale.com>:
-> On Mon, May 12, 2014 at 06:18:00PM +0400, Alexander Shiyan wrote:
-> > Mon, 12 May 2014 22:09:34 +0800 ?? Shawn Guo <shawn.guo@freescale.com>:
-> > > On Sun, May 11, 2014 at 10:09:11AM +0400, Alexander Shiyan wrote:
-> > > > That driver hasn't been really maintained for a long time. It doesn't
-> > > > compile in any way, it includes non-existent headers, has no users,
-> > > > and marked as "broken" more than year. Due to these factors, mx1_camera
-> > > > is now removed from the tree.
-> > > > 
-> > > > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> > > > ---
-> > > >  arch/arm/mach-imx/Makefile                      |   3 -
-> > > >  arch/arm/mach-imx/devices/Kconfig               |   3 -
-> > > >  arch/arm/mach-imx/devices/Makefile              |   1 -
-> > > >  arch/arm/mach-imx/devices/devices-common.h      |  10 -
-> > > >  arch/arm/mach-imx/devices/platform-mx1-camera.c |  42 --
-> > > >  arch/arm/mach-imx/mx1-camera-fiq-ksym.c         |  18 -
-> > > >  arch/arm/mach-imx/mx1-camera-fiq.S              |  35 -
-> > > >  drivers/media/platform/soc_camera/Kconfig       |  13 -
-> > > >  drivers/media/platform/soc_camera/Makefile      |   1 -
-> > > >  drivers/media/platform/soc_camera/mx1_camera.c  | 866 ------------------------
-> > > >  include/linux/platform_data/camera-mx1.h        |  35 -
-> > > >  11 files changed, 1027 deletions(-)
-> > > >  delete mode 100644 arch/arm/mach-imx/devices/platform-mx1-camera.c
-> > > >  delete mode 100644 arch/arm/mach-imx/mx1-camera-fiq-ksym.c
-> > > >  delete mode 100644 arch/arm/mach-imx/mx1-camera-fiq.S
-> > > >  delete mode 100644 drivers/media/platform/soc_camera/mx1_camera.c
-> > > >  delete mode 100644 include/linux/platform_data/camera-mx1.h
-> > > 
-> > > Can this patch be split into arch and driver part?  Recently, arm-soc
-> > > folks do not want to have arch changes go via driver tree, unless that's
-> > > absolutely necessary.
-> > 
-> > Can this patch be applied through arm-soc (imx) tree if it will be approved
-> > by the linux-media maintainers?
-> 
-> Yes, it can, if linux-media maintainers want.  But I still prefer to two
-> patches, since I do not see any thing requiring it be one.  Doing that
-> will ensure we do not run into any merge conflicts.
+On 05/06/2014 03:57 PM, Pavel Machek wrote:
+> Add helpers for 32-bit accesses and replace open-coded 32-bit access
+> with calls to helpers. Minimum changes are done to the pci case, as I
+> don't have access to that hardware.
 
-ARM part and linux-media part are interconnected by using single header
-<linux/platform_data/camera-mx1.h>. So removing a driver in a separated
-patch will touch ARM part in any case.
+I'll ask David Miller to merge net/master into net-next/master so that I
+can apply this patch.
 
----
+For now, I've applied the patch to can-next testing-c_can
+(git://gitorious.org/linux-can/linux-can-next.git testing-c_can)
+
+Can you make other patches based on that tree, please.
+
+> --- a/drivers/net/can/c_can/c_can_pci.c
+> +++ b/drivers/net/can/c_can/c_can_pci.c
+> @@ -63,6 +63,23 @@ static void c_can_pci_write_reg_aligned_to_32bit(struct c_can_priv *priv,
+>  	writew(val, priv->base + 2 * priv->regs[index]);
+>  }
+>  
+> +static u32 c_can_plat_read_reg32(struct c_can_priv *priv, enum reg index)
+> +{
+> +	u32 val;
+> +
+> +	val = priv->read_reg(priv, index);
+> +	val |= ((u32) priv->read_reg(priv, index + 1)) << 16;
+> +
+> +	return val;
+> +}
+> +
+> +static void c_can_plat_write_reg32(struct c_can_priv *priv, enum reg index,
+> +		u32 val)
+> +{
+> +	priv->write_reg(priv, index + 1, val>>16);
+
+spaces around >>, I'll fix this while applying.
+
+Marc
+
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 242 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140512/f8f4bdc9/attachment-0001.sig>
