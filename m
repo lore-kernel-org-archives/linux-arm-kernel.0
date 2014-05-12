@@ -1,62 +1,63 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 12 May 2014 18:39:57 +0200
-Subject: [PATCH] media: mx1_camera: Remove driver
-In-Reply-To: <1399909608.365840986@f391.i.mail.ru>
-References: <1399788551-8218-1-git-send-email-shc_work@mail.ru>
- <1399904280.435992890@f125.i.mail.ru> <20140512142533.GF8330@dragon>
- <1399909608.365840986@f391.i.mail.ru>
-Message-ID: <5370F95D.4080207@xs4all.nl>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 12 May 2014 12:40:37 -0400
+Subject: No subject
+Message-ID: <1399912837-29548-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/12/2014 05:46 PM, Alexander Shiyan wrote:
-> Mon, 12 May 2014 22:25:34 +0800 ?? Shawn Guo <shawn.guo@freescale.com>:
->> On Mon, May 12, 2014 at 06:18:00PM +0400, Alexander Shiyan wrote:
->>> Mon, 12 May 2014 22:09:34 +0800 ?? Shawn Guo <shawn.guo@freescale.com>:
->>>> On Sun, May 11, 2014 at 10:09:11AM +0400, Alexander Shiyan wrote:
->>>>> That driver hasn't been really maintained for a long time. It doesn't
->>>>> compile in any way, it includes non-existent headers, has no users,
->>>>> and marked as "broken" more than year. Due to these factors, mx1_camera
->>>>> is now removed from the tree.
->>>>>
->>>>> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
->>>>> ---
->>>>>  arch/arm/mach-imx/Makefile                      |   3 -
->>>>>  arch/arm/mach-imx/devices/Kconfig               |   3 -
->>>>>  arch/arm/mach-imx/devices/Makefile              |   1 -
->>>>>  arch/arm/mach-imx/devices/devices-common.h      |  10 -
->>>>>  arch/arm/mach-imx/devices/platform-mx1-camera.c |  42 --
->>>>>  arch/arm/mach-imx/mx1-camera-fiq-ksym.c         |  18 -
->>>>>  arch/arm/mach-imx/mx1-camera-fiq.S              |  35 -
->>>>>  drivers/media/platform/soc_camera/Kconfig       |  13 -
->>>>>  drivers/media/platform/soc_camera/Makefile      |   1 -
->>>>>  drivers/media/platform/soc_camera/mx1_camera.c  | 866 ------------------------
->>>>>  include/linux/platform_data/camera-mx1.h        |  35 -
->>>>>  11 files changed, 1027 deletions(-)
->>>>>  delete mode 100644 arch/arm/mach-imx/devices/platform-mx1-camera.c
->>>>>  delete mode 100644 arch/arm/mach-imx/mx1-camera-fiq-ksym.c
->>>>>  delete mode 100644 arch/arm/mach-imx/mx1-camera-fiq.S
->>>>>  delete mode 100644 drivers/media/platform/soc_camera/mx1_camera.c
->>>>>  delete mode 100644 include/linux/platform_data/camera-mx1.h
->>>>
->>>> Can this patch be split into arch and driver part?  Recently, arm-soc
->>>> folks do not want to have arch changes go via driver tree, unless that's
->>>> absolutely necessary.
->>>
->>> Can this patch be applied through arm-soc (imx) tree if it will be approved
->>> by the linux-media maintainers?
->>
->> Yes, it can, if linux-media maintainers want.  But I still prefer to two
->> patches, since I do not see any thing requiring it be one.  Doing that
->> will ensure we do not run into any merge conflicts.
-> 
-> ARM part and linux-media part are interconnected by using single header
-> <linux/platform_data/camera-mx1.h>. So removing a driver in a separated
-> patch will touch ARM part in any case.
+>From 14f3791439b5a6cf12127fb80204265533d92664 Mon Sep 17 00:00:00 2001
+From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Date: Mon, 12 May 2014 12:28:23 -0400
+Subject: [GIT PULL 1/2] ARM: Keystone SOC updates for 3.16
 
-But the linux-media driver depends on BROKEN, so that isn't build in any
-case, right?
+Hi Arm-soc folks,
+
+Please pull below keystone SOC updates for 3.16. It merges cleanly with
+arm-soc 'next/soc' head. As already discussed, the $subject pull request
+has a depedency with DT dma-properties pull request [1] I sent last week
+to be pulled into arm-soc.
+
+The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+
+  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-soc
+
+for you to fetch changes up to 14f3791439b5a6cf12127fb80204265533d92664:
+
+  ARM: keystone: Update the dma offset for non-dt platform devices (2014-05-08 15:43:33 -0400)
+
+----------------------------------------------------------------
+Keystone SOC updates for 3.16
+
+- Drop unused COMMON_CLK_DEBUG option
+- Enable MTD_SPI_NOR config needed for M25P80
+- Enable coherent higher address memory space
+
+----------------------------------------------------------------
+Brian Norris (1):
+      ARM: configs: keystone: add MTD_SPI_NOR (new dependency for M25P80)
+
+Lad Prabhakar (1):
+      ARM: configs: keystone: drop CONFIG_COMMON_CLK_DEBUG
+
+Santosh Shilimkar (2):
+      ARM: keystone: Switch over to coherent memory address space
+      ARM: keystone: Update the dma offset for non-dt platform devices
+
+ arch/arm/configs/integrator_defconfig   |    1 -
+ arch/arm/configs/keystone_defconfig     |    2 +-
+ arch/arm/configs/sunxi_defconfig        |    1 -
+ arch/arm/configs/vt8500_v6_v7_defconfig |    1 -
+ arch/arm/mach-keystone/keystone.c       |   74 +++++++++++++++++++++++++++++++
+ arch/arm/mach-keystone/memory.h         |   24 ++++++++++
+ arch/arm/mach-keystone/platsmp.c        |   18 +++++++-
+ 7 files changed, 116 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm/mach-keystone/memory.h
 
 Regards,
+Santosh
 
-	Hans
+[1] https://lkml.org/lkml/2014/5/7/368
