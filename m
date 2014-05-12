@@ -1,653 +1,158 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 12 May 2014 10:10:47 +0100
-Subject: [PATCH v9 1/3] PSCI: Add initial support for PSCIv0.2 functions
-In-Reply-To: <1399472847-14377-2-git-send-email-ashwin.chaugule@linaro.org>
-References: <1399472847-14377-1-git-send-email-ashwin.chaugule@linaro.org>
- <1399472847-14377-2-git-send-email-ashwin.chaugule@linaro.org>
-Message-ID: <20140512091047.GB3006@e106331-lin.cambridge.arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 12 May 2014 17:14:26 +0800
+Subject: [linux-sunxi] [PATCH v2 3/7] phy: usb: sunxi: Introduce Allwinner
+ A31 USB PHY support
+In-Reply-To: <1399726619-30150-4-git-send-email-maxime.ripard@free-electrons.com>
+References: <1399726619-30150-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1399726619-30150-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v65Pstk6MqEeK838VUpNXw2cQH8K66Oo4oG3__zzWO3pig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ashwin,
+Hi,
 
-On Wed, May 07, 2014 at 03:27:25PM +0100, Ashwin Chaugule wrote:
-> The PSCIv0.2 spec defines standard values of function IDs
-> and introduces a few new functions. Detect version of PSCI
-> and appropriately select the right PSCI functions.
+On Sat, May 10, 2014 at 8:56 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> The USB phy controller in the A31 differs mostly from the older controllers
+> because it has a clock dedicated for each phy, while the older ones were having
+> a single clock for all the phys.
 >
-> Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
-> Reviewed-by: Rob Herring <robh@kernel.org>
-
-Other than those issues pointed out by Anup, this looks good to me,
-though I'd like to see the cpu_kill callbacks for arm (and arm64) go
-though at the same time (possibly folded in) so that implementations are
-exercised from the start and we don't have to add properties to later
-bodge around any current brokenness.
-
-Have these patches been tested against an implementation?
-
-Which tree are you planning on merging this through? Do we need to split
-the arm and arm64 parts?
-
-Cheers,
-Mark.
-
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Reviewed-by: Hans de Goede <hdegoede@redhat.com>
 > ---
->  arch/arm/include/asm/psci.h   |   7 +-
->  arch/arm/kernel/psci.c        | 196 +++++++++++++++++++++++++++++++++--------
->  arch/arm64/include/asm/psci.h |   2 +-
->  arch/arm64/kernel/psci.c      | 200 ++++++++++++++++++++++++++++++++++--------
->  4 files changed, 328 insertions(+), 77 deletions(-)
+>  drivers/phy/phy-sun4i-usb.c | 35 ++++++++++++++++++++++++++---------
+>  1 file changed, 26 insertions(+), 9 deletions(-)
 >
-> diff --git a/arch/arm/include/asm/psci.h b/arch/arm/include/asm/psci.h
-> index c4ae171..b93e34a 100644
-> --- a/arch/arm/include/asm/psci.h
-> +++ b/arch/arm/include/asm/psci.h
-> @@ -29,16 +29,19 @@ struct psci_operations {
->         int (*cpu_off)(struct psci_power_state state);
->         int (*cpu_on)(unsigned long cpuid, unsigned long entry_point);
->         int (*migrate)(unsigned long cpuid);
-> +       int (*affinity_info)(unsigned long target_affinity,
-> +                       unsigned long lowest_affinity_level);
-> +       int (*migrate_info_type)(void);
+> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+> index e6e6c4ba7145..8bd89430d945 100644
+> --- a/drivers/phy/phy-sun4i-usb.c
+> +++ b/drivers/phy/phy-sun4i-usb.c
+> @@ -61,7 +61,6 @@
+>  #define MAX_PHYS                       3
+>
+>  struct sun4i_usb_phy_data {
+> -       struct clk *clk;
+>         void __iomem *base;
+>         struct mutex mutex;
+>         int num_phys;
+> @@ -71,6 +70,7 @@ struct sun4i_usb_phy_data {
+>                 void __iomem *pmu;
+>                 struct regulator *vbus;
+>                 struct reset_control *reset;
+> +               struct clk *clk;
+>                 int index;
+>         } phys[MAX_PHYS];
 >  };
+> @@ -146,13 +146,13 @@ static int sun4i_usb_phy_init(struct phy *_phy)
+>         struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
+>         int ret;
 >
->  extern struct psci_operations psci_ops;
->  extern struct smp_operations psci_smp_ops;
+> -       ret = clk_prepare_enable(data->clk);
+> +       ret = clk_prepare_enable(phy->clk);
+>         if (ret)
+>                 return ret;
 >
->  #ifdef CONFIG_ARM_PSCI
-> -void psci_init(void);
-> +int psci_init(void);
->  bool psci_smp_available(void);
->  #else
-> -static inline void psci_init(void) { }
-> +static inline int psci_init(void) { }
->  static inline bool psci_smp_available(void) { return false; }
->  #endif
->
-> diff --git a/arch/arm/kernel/psci.c b/arch/arm/kernel/psci.c
-> index 4693188..3775e62 100644
-> --- a/arch/arm/kernel/psci.c
-> +++ b/arch/arm/kernel/psci.c
-> @@ -17,63 +17,58 @@
->
->  #include <linux/init.h>
->  #include <linux/of.h>
-> +#include <linux/reboot.h>
-> +#include <linux/pm.h>
-> +#include <uapi/linux/psci.h>
->
->  #include <asm/compiler.h>
->  #include <asm/errno.h>
->  #include <asm/opcodes-sec.h>
->  #include <asm/opcodes-virt.h>
->  #include <asm/psci.h>
-> +#include <asm/system_misc.h>
->
->  struct psci_operations psci_ops;
->
->  static int (*invoke_psci_fn)(u32, u32, u32, u32);
-> +typedef int (*psci_initcall_t)(const struct device_node *);
->
->  enum psci_function {
->         PSCI_FN_CPU_SUSPEND,
->         PSCI_FN_CPU_ON,
->         PSCI_FN_CPU_OFF,
->         PSCI_FN_MIGRATE,
-> +       PSCI_FN_AFFINITY_INFO,
-> +       PSCI_FN_MIGRATE_INFO_TYPE,
->         PSCI_FN_MAX,
->  };
->
->  static u32 psci_function_id[PSCI_FN_MAX];
->
-> -#define PSCI_RET_SUCCESS               0
-> -#define PSCI_RET_EOPNOTSUPP            -1
-> -#define PSCI_RET_EINVAL                        -2
-> -#define PSCI_RET_EPERM                 -3
-> -
->  static int psci_to_linux_errno(int errno)
->  {
->         switch (errno) {
->         case PSCI_RET_SUCCESS:
->                 return 0;
-> -       case PSCI_RET_EOPNOTSUPP:
-> +       case PSCI_RET_NOT_SUPPORTED:
->                 return -EOPNOTSUPP;
-> -       case PSCI_RET_EINVAL:
-> +       case PSCI_RET_INVALID_PARAMS:
->                 return -EINVAL;
-> -       case PSCI_RET_EPERM:
-> +       case PSCI_RET_DENIED:
->                 return -EPERM;
->         };
->
->         return -EINVAL;
->  }
->
-> -#define PSCI_POWER_STATE_ID_MASK       0xffff
-> -#define PSCI_POWER_STATE_ID_SHIFT      0
-> -#define PSCI_POWER_STATE_TYPE_MASK     0x1
-> -#define PSCI_POWER_STATE_TYPE_SHIFT    16
-> -#define PSCI_POWER_STATE_AFFL_MASK     0x3
-> -#define PSCI_POWER_STATE_AFFL_SHIFT    24
-> -
->  static u32 psci_power_state_pack(struct psci_power_state state)
->  {
-> -       return  ((state.id & PSCI_POWER_STATE_ID_MASK)
-> -                       << PSCI_POWER_STATE_ID_SHIFT)   |
-> -               ((state.type & PSCI_POWER_STATE_TYPE_MASK)
-> -                       << PSCI_POWER_STATE_TYPE_SHIFT) |
-> -               ((state.affinity_level & PSCI_POWER_STATE_AFFL_MASK)
-> -                       << PSCI_POWER_STATE_AFFL_SHIFT);
-> +       return  ((state.id & PSCI_0_2_POWER_STATE_ID_MASK)
-> +                       << PSCI_0_2_POWER_STATE_ID_SHIFT)       |
-> +               ((state.type & PSCI_0_2_POWER_STATE_TYPE_MASK)
-> +                       << PSCI_0_2_POWER_STATE_TYPE_SHIFT)     |
-> +               ((state.affinity_level & PSCI_0_2_POWER_STATE_AFFL_MASK)
-> +                       << PSCI_0_2_POWER_STATE_AFFL_SHIFT);
->  }
->
->  /*
-> @@ -110,6 +105,14 @@ static noinline int __invoke_psci_fn_smc(u32 function_id, u32 arg0, u32 arg1,
->         return function_id;
->  }
->
-> +static int psci_get_version(void)
-> +{
-> +       int err;
-> +
-> +       err = invoke_psci_fn(PSCI_0_2_FN_PSCI_VERSION, 0, 0, 0);
-> +       return err;
-> +}
-> +
->  static int psci_cpu_suspend(struct psci_power_state state,
->                             unsigned long entry_point)
->  {
-> @@ -153,26 +156,36 @@ static int psci_migrate(unsigned long cpuid)
->         return psci_to_linux_errno(err);
->  }
->
-> -static const struct of_device_id psci_of_match[] __initconst = {
-> -       { .compatible = "arm,psci",     },
-> -       {},
-> -};
-> +static int psci_affinity_info(unsigned long target_affinity,
-> +               unsigned long lowest_affinity_level)
-> +{
-> +       int err;
-> +       u32 fn;
-> +
-> +       fn = psci_function_id[PSCI_FN_AFFINITY_INFO];
-> +       err = invoke_psci_fn(fn, target_affinity, lowest_affinity_level, 0);
-> +       return err;
-> +}
->
-> -void __init psci_init(void)
-> +static int psci_migrate_info_type(void)
->  {
-> -       struct device_node *np;
-> -       const char *method;
-> -       u32 id;
-> +       int err;
-> +       u32 fn;
->
-> -       np = of_find_matching_node(NULL, psci_of_match);
-> -       if (!np)
-> -               return;
-> +       fn = psci_function_id[PSCI_FN_MIGRATE_INFO_TYPE];
-> +       err = invoke_psci_fn(fn, 0, 0, 0);
-> +       return err;
-> +}
-> +
-> +static int get_set_conduit_method(struct device_node *np)
-> +{
-> +       const char *method;
->
-> -       pr_info("probing function IDs from device-tree\n");
-> +       pr_info("probing for conduit method from DT.\n");
->
->         if (of_property_read_string(np, "method", &method)) {
-> -               pr_warning("missing \"method\" property\n");
-> -               goto out_put_node;
-> +               pr_warn("missing \"method\" property\n");
-> +               return -ENXIO;
+>         ret = reset_control_deassert(phy->reset);
+>         if (ret) {
+> -               clk_disable_unprepare(data->clk);
+> +               clk_disable_unprepare(phy->clk);
+>                 return ret;
 >         }
 >
->         if (!strcmp("hvc", method)) {
-> @@ -180,10 +193,99 @@ void __init psci_init(void)
->         } else if (!strcmp("smc", method)) {
->                 invoke_psci_fn = __invoke_psci_fn_smc;
->         } else {
-> -               pr_warning("invalid \"method\" property: %s\n", method);
-> +               pr_warn("invalid \"method\" property: %s\n", method);
-> +               return -EINVAL;
-> +       }
-> +       return 0;
-> +}
+> @@ -170,11 +170,10 @@ static int sun4i_usb_phy_init(struct phy *_phy)
+>  static int sun4i_usb_phy_exit(struct phy *_phy)
+>  {
+>         struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
+> -       struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
+>
+>         sun4i_usb_phy_passby(phy, 0);
+>         reset_control_assert(phy->reset);
+> -       clk_disable_unprepare(data->clk);
+> +       clk_disable_unprepare(phy->clk);
+>
+>         return 0;
+>  }
+> @@ -228,8 +227,10 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+>         struct phy_provider *phy_provider;
+>         struct reset_control *reset;
+>         struct regulator *vbus;
+> +       bool dedicated_clocks;
+
+No default?
+
+>         struct resource *res;
+>         struct phy *phy;
+> +       struct clk *clk;
+>         char name[16];
+>         int i;
+>
+> @@ -249,15 +250,20 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+>         else
+>                 data->disc_thresh = 2;
+>
+> +       if (of_device_is_compatible(np, "allwinner,sun6i-a31-usb-phy"))
+> +               dedicated_clocks = true;
 > +
-> +static void psci_sys_reset(enum reboot_mode reboot_mode, const char *cmd)
-> +{
-> +       invoke_psci_fn(PSCI_0_2_FN_SYSTEM_RESET, 0, 0, 0);
-> +}
-> +
-> +static void psci_sys_poweroff(void)
-> +{
-> +       invoke_psci_fn(PSCI_0_2_FN_SYSTEM_OFF, 0, 0, 0);
-> +}
-> +
-> +/*
-> + * PSCI Function IDs for v0.2+ are well defined so use
-> + * standard values.
-> + */
-> +static int psci_0_2_init(struct device_node *np)
-> +{
-> +       int err, ver;
-> +
-> +       err = get_set_conduit_method(np);
-> +
-> +       if (err)
-> +               goto out_put_node;
-> +
-> +       ver = psci_get_version();
-> +
-> +       if (ver == PSCI_RET_NOT_SUPPORTED) {
-> +               /* PSCI v0.2 mandates implementation of PSCI_ID_VERSION. */
-> +               pr_err("PSCI firmware does not comply with the v0.2 spec.\n");
-> +               err = -EOPNOTSUPP;
->                 goto out_put_node;
-> +       } else {
-> +               pr_info("PSCIv%d.%d detected in firmware.\n",
-> +                               PSCI_VERSION_MAJOR(ver),
-> +                               PSCI_VERSION_MINOR(ver));
-> +
-> +               if (PSCI_VERSION_MAJOR(ver) == 0 &&
-> +                               PSCI_VERSION_MINOR(ver) < 2) {
-> +                       err = -EINVAL;
-> +                       pr_err("Conflicting PSCI version detected.\n");
-> +                       goto out_put_node;
+
+dedicated_clocks is more than likely to be true from leftover data
+on the stack. This results in the usb phy driver probe failing, and
+the usb host drivers left in perpetual probe deferral on my Cubietruck.
+
+Adding an else section fixes this.
+
+>         res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "phy_ctrl");
+>         data->base = devm_ioremap_resource(dev, res);
+>         if (IS_ERR(data->base))
+>                 return PTR_ERR(data->base);
+>
+> -       data->clk = devm_clk_get(dev, "usb_phy");
+> -       if (IS_ERR(data->clk)) {
+> -               dev_err(dev, "could not get usb_phy clock\n");
+> -               return PTR_ERR(data->clk);
+> +       if (!dedicated_clocks) {
+> +               clk = devm_clk_get(dev, "usb_phy");
+> +               if (IS_ERR(clk)) {
+> +                       dev_err(dev, "could not get usb_phy clock\n");
+> +                       return PTR_ERR(clk);
 > +               }
 >         }
 >
-> +       pr_info("Using standard PSCI v0.2 function IDs\n");
-> +       psci_function_id[PSCI_FN_CPU_SUSPEND] = PSCI_0_2_FN_CPU_SUSPEND;
-> +       psci_ops.cpu_suspend = psci_cpu_suspend;
-> +
-> +       psci_function_id[PSCI_FN_CPU_OFF] = PSCI_0_2_FN_CPU_OFF;
-> +       psci_ops.cpu_off = psci_cpu_off;
-> +
-> +       psci_function_id[PSCI_FN_CPU_ON] = PSCI_0_2_FN_CPU_ON;
-> +       psci_ops.cpu_on = psci_cpu_on;
-> +
-> +       psci_function_id[PSCI_FN_MIGRATE] = PSCI_0_2_FN_MIGRATE;
-> +       psci_ops.migrate = psci_migrate;
-> +
-> +       psci_function_id[PSCI_FN_AFFINITY_INFO] = PSCI_0_2_FN_AFFINITY_INFO;
-> +       psci_ops.affinity_info = psci_affinity_info;
-> +
-> +       psci_function_id[PSCI_FN_MIGRATE_INFO_TYPE] =
-> +               PSCI_0_2_FN_MIGRATE_INFO_TYPE;
-> +       psci_ops.migrate_info_type = psci_migrate_info_type;
-> +
-> +       arm_pm_restart = psci_sys_reset;
-> +
-> +       pm_power_off = psci_sys_poweroff;
-> +
-> +out_put_node:
-> +       of_node_put(np);
-> +       return err;
-> +}
-> +
-> +/*
-> + * PSCI < v0.2 get PSCI Function IDs via DT.
-> + */
-> +static int psci_0_1_init(struct device_node *np)
-> +{
-> +       u32 id;
-> +       int err;
-> +
-> +       err = get_set_conduit_method(np);
-> +
-> +       if (err)
-> +               goto out_put_node;
-> +
-> +       pr_info("Using PSCI v0.1 Function IDs from DT\n");
-> +
->         if (!of_property_read_u32(np, "cpu_suspend", &id)) {
->                 psci_function_id[PSCI_FN_CPU_SUSPEND] = id;
->                 psci_ops.cpu_suspend = psci_cpu_suspend;
-> @@ -206,5 +308,25 @@ void __init psci_init(void)
+>         /* Skip 0, 0 is the phy for otg which is not yet supported. */
+> @@ -270,6 +276,15 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+>                         vbus = NULL;
+>                 }
 >
->  out_put_node:
->         of_node_put(np);
-> -       return;
-> +       return err;
-> +}
-> +
-> +static const struct of_device_id psci_of_match[] __initconst = {
-> +       { .compatible = "arm,psci", .data = psci_0_1_init},
-> +       { .compatible = "arm,psci-0.2", .data = psci_0_2_init},
-> +       {},
-> +};
-> +
-> +int __init psci_init(void)
-> +{
-> +       struct device_node *np;
-> +       const struct of_device_id *matched_np;
-> +       psci_initcall_t init_fn;
-> +
-> +       np = of_find_matching_node_and_match(NULL, psci_of_match, &matched_np);
-> +       if (!np)
-> +               return -ENODEV;
-> +
-> +       init_fn = (psci_initcall_t)matched_np->data;
-> +       return init_fn(np);
->  }
-> diff --git a/arch/arm64/include/asm/psci.h b/arch/arm64/include/asm/psci.h
-> index d15ab8b4..e5312ea 100644
-> --- a/arch/arm64/include/asm/psci.h
-> +++ b/arch/arm64/include/asm/psci.h
-> @@ -14,6 +14,6 @@
->  #ifndef __ASM_PSCI_H
->  #define __ASM_PSCI_H
->
-> -void psci_init(void);
-> +int psci_init(void);
->
->  #endif /* __ASM_PSCI_H */
-> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-> index ea4828a..6045613 100644
-> --- a/arch/arm64/kernel/psci.c
-> +++ b/arch/arm64/kernel/psci.c
-> @@ -18,12 +18,16 @@
->  #include <linux/init.h>
->  #include <linux/of.h>
->  #include <linux/smp.h>
-> +#include <linux/reboot.h>
-> +#include <linux/pm.h>
-> +#include <uapi/linux/psci.h>
->
->  #include <asm/compiler.h>
->  #include <asm/cpu_ops.h>
->  #include <asm/errno.h>
->  #include <asm/psci.h>
->  #include <asm/smp_plat.h>
-> +#include <asm/system_misc.h>
->
->  #define PSCI_POWER_STATE_TYPE_STANDBY          0
->  #define PSCI_POWER_STATE_TYPE_POWER_DOWN       1
-> @@ -40,58 +44,52 @@ struct psci_operations {
->         int (*cpu_off)(struct psci_power_state state);
->         int (*cpu_on)(unsigned long cpuid, unsigned long entry_point);
->         int (*migrate)(unsigned long cpuid);
-> +       int (*affinity_info)(unsigned long target_affinity,
-> +                       unsigned long lowest_affinity_level);
-> +       int (*migrate_info_type)(void);
->  };
->
->  static struct psci_operations psci_ops;
->
->  static int (*invoke_psci_fn)(u64, u64, u64, u64);
-> +typedef int (*psci_initcall_t)(const struct device_node *);
->
->  enum psci_function {
->         PSCI_FN_CPU_SUSPEND,
->         PSCI_FN_CPU_ON,
->         PSCI_FN_CPU_OFF,
->         PSCI_FN_MIGRATE,
-> +       PSCI_FN_AFFINITY_INFO,
-> +       PSCI_FN_MIGRATE_INFO_TYPE,
->         PSCI_FN_MAX,
->  };
->
->  static u32 psci_function_id[PSCI_FN_MAX];
->
-> -#define PSCI_RET_SUCCESS               0
-> -#define PSCI_RET_EOPNOTSUPP            -1
-> -#define PSCI_RET_EINVAL                        -2
-> -#define PSCI_RET_EPERM                 -3
-> -
->  static int psci_to_linux_errno(int errno)
->  {
->         switch (errno) {
->         case PSCI_RET_SUCCESS:
->                 return 0;
-> -       case PSCI_RET_EOPNOTSUPP:
-> +       case PSCI_RET_NOT_SUPPORTED:
->                 return -EOPNOTSUPP;
-> -       case PSCI_RET_EINVAL:
-> +       case PSCI_RET_INVALID_PARAMS:
->                 return -EINVAL;
-> -       case PSCI_RET_EPERM:
-> +       case PSCI_RET_DENIED:
->                 return -EPERM;
->         };
->
->         return -EINVAL;
->  }
->
-> -#define PSCI_POWER_STATE_ID_MASK       0xffff
-> -#define PSCI_POWER_STATE_ID_SHIFT      0
-> -#define PSCI_POWER_STATE_TYPE_MASK     0x1
-> -#define PSCI_POWER_STATE_TYPE_SHIFT    16
-> -#define PSCI_POWER_STATE_AFFL_MASK     0x3
-> -#define PSCI_POWER_STATE_AFFL_SHIFT    24
-> -
->  static u32 psci_power_state_pack(struct psci_power_state state)
->  {
-> -       return  ((state.id & PSCI_POWER_STATE_ID_MASK)
-> -                       << PSCI_POWER_STATE_ID_SHIFT)   |
-> -               ((state.type & PSCI_POWER_STATE_TYPE_MASK)
-> -                       << PSCI_POWER_STATE_TYPE_SHIFT) |
-> -               ((state.affinity_level & PSCI_POWER_STATE_AFFL_MASK)
-> -                       << PSCI_POWER_STATE_AFFL_SHIFT);
-> +       return  ((state.id & PSCI_0_2_POWER_STATE_ID_MASK)
-> +                       << PSCI_0_2_POWER_STATE_ID_SHIFT)       |
-> +               ((state.type & PSCI_0_2_POWER_STATE_TYPE_MASK)
-> +                       << PSCI_0_2_POWER_STATE_TYPE_SHIFT)     |
-> +               ((state.affinity_level & PSCI_0_2_POWER_STATE_AFFL_MASK)
-> +                       << PSCI_0_2_POWER_STATE_AFFL_SHIFT);
->  }
->
->  /*
-> @@ -128,6 +126,14 @@ static noinline int __invoke_psci_fn_smc(u64 function_id, u64 arg0, u64 arg1,
->         return function_id;
->  }
->
-> +static int psci_get_version(void)
-> +{
-> +       int err;
-> +
-> +       err = invoke_psci_fn(PSCI_0_2_FN_PSCI_VERSION, 0, 0, 0);
-> +       return err;
-> +}
-> +
->  static int psci_cpu_suspend(struct psci_power_state state,
->                             unsigned long entry_point)
->  {
-> @@ -171,26 +177,36 @@ static int psci_migrate(unsigned long cpuid)
->         return psci_to_linux_errno(err);
->  }
->
-> -static const struct of_device_id psci_of_match[] __initconst = {
-> -       { .compatible = "arm,psci",     },
-> -       {},
-> -};
-> +static int psci_affinity_info(unsigned long target_affinity,
-> +               unsigned long lowest_affinity_level)
-> +{
-> +       int err;
-> +       u32 fn;
-> +
-> +       fn = psci_function_id[PSCI_FN_AFFINITY_INFO];
-> +       err = invoke_psci_fn(fn, target_affinity, lowest_affinity_level, 0);
-> +       return err;
-> +}
->
-> -void __init psci_init(void)
-> +static int psci_migrate_info_type(void)
->  {
-> -       struct device_node *np;
-> -       const char *method;
-> -       u32 id;
-> +       int err;
-> +       u32 fn;
->
-> -       np = of_find_matching_node(NULL, psci_of_match);
-> -       if (!np)
-> -               return;
-> +       fn = psci_function_id[PSCI_FN_MIGRATE_INFO_TYPE];
-> +       err = invoke_psci_fn(fn, 0, 0, 0);
-> +       return err;
-> +}
-> +
-> +static int get_set_conduit_method(struct device_node *np)
-> +{
-> +       const char *method;
->
-> -       pr_info("probing function IDs from device-tree\n");
-> +       pr_info("probing for conduit method from DT.\n");
->
->         if (of_property_read_string(np, "method", &method)) {
-> -               pr_warning("missing \"method\" property\n");
-> -               goto out_put_node;
-> +               pr_warn("missing \"method\" property\n");
-> +               return -ENXIO;
->         }
->
->         if (!strcmp("hvc", method)) {
-> @@ -198,10 +214,99 @@ void __init psci_init(void)
->         } else if (!strcmp("smc", method)) {
->                 invoke_psci_fn = __invoke_psci_fn_smc;
->         } else {
-> -               pr_warning("invalid \"method\" property: %s\n", method);
-> +               pr_warn("invalid \"method\" property: %s\n", method);
-> +               return -EINVAL;
-> +       }
-> +       return 0;
-> +}
-> +
-> +static void psci_sys_reset(enum reboot_mode reboot_mode, const char *cmd)
-> +{
-> +       invoke_psci_fn(PSCI_0_2_FN_SYSTEM_RESET, 0, 0, 0);
-> +}
-> +
-> +static void psci_sys_poweroff(void)
-> +{
-> +       invoke_psci_fn(PSCI_0_2_FN_SYSTEM_OFF, 0, 0, 0);
-> +}
-> +
-> +/*
-> + * PSCI Function IDs for v0.2+ are well defined so use
-> + * standard values.
-> + */
-> +static int psci_0_2_init(struct device_node *np)
-> +{
-> +       int err, ver;
-> +
-> +       err = get_set_conduit_method(np);
-> +
-> +       if (err)
-> +               goto out_put_node;
-> +
-> +       ver = psci_get_version();
-> +
-> +       if (ver == PSCI_RET_NOT_SUPPORTED) {
-> +               /* PSCI v0.2 mandates implementation of PSCI_ID_VERSION. */
-> +               pr_err("PSCI firmware does not comply with the v0.2 spec.\n");
-> +               err = -EOPNOTSUPP;
->                 goto out_put_node;
-> +       } else {
-> +               pr_info("PSCIv%d.%d detected in firmware.\n",
-> +                               PSCI_VERSION_MAJOR(ver),
-> +                               PSCI_VERSION_MINOR(ver));
-> +
-> +               if (PSCI_VERSION_MAJOR(ver) == 0 &&
-> +                               PSCI_VERSION_MINOR(ver) < 2) {
-> +                       err = -EINVAL;
-> +                       pr_err("Conflicting PSCI version detected.\n");
-> +                       goto out_put_node;
+> +               if (dedicated_clocks) {
+> +                       snprintf(name, sizeof(name), "usb%d_phy", i);
+> +                       clk = devm_clk_get(dev, name);
+> +                       if (IS_ERR(clk)) {
+> +                               dev_err(dev, "failed to get clock %s\n", name);
+> +                               return PTR_ERR(clk);
+> +                       }
 > +               }
+> +
+>                 snprintf(name, sizeof(name), "usb%d_reset", i);
+>                 reset = devm_reset_control_get(dev, name);
+>                 if (IS_ERR(reset)) {
+> @@ -296,6 +311,7 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+>                 data->phys[i].pmu = pmu;
+>                 data->phys[i].vbus = vbus;
+>                 data->phys[i].reset = reset;
+> +               data->phys[i].clk = clk;
+>                 data->phys[i].index = i;
+>                 phy_set_drvdata(phy, &data->phys[i]);
 >         }
->
-> +       pr_info("Using standard PSCI v0.2 function IDs\n");
-> +       psci_function_id[PSCI_FN_CPU_SUSPEND] = PSCI_0_2_FN64_CPU_SUSPEND;
-> +       psci_ops.cpu_suspend = psci_cpu_suspend;
-> +
-> +       psci_function_id[PSCI_FN_CPU_OFF] = PSCI_0_2_FN_CPU_OFF;
-> +       psci_ops.cpu_off = psci_cpu_off;
-> +
-> +       psci_function_id[PSCI_FN_CPU_ON] = PSCI_0_2_FN64_CPU_ON;
-> +       psci_ops.cpu_on = psci_cpu_on;
-> +
-> +       psci_function_id[PSCI_FN_MIGRATE] = PSCI_0_2_FN64_MIGRATE;
-> +       psci_ops.migrate = psci_migrate;
-> +
-> +       psci_function_id[PSCI_FN_AFFINITY_INFO] = PSCI_0_2_FN64_AFFINITY_INFO;
-> +       psci_ops.affinity_info = psci_affinity_info;
-> +
-> +       psci_function_id[PSCI_FN_MIGRATE_INFO_TYPE] =
-> +               PSCI_0_2_FN_MIGRATE_INFO_TYPE;
-> +       psci_ops.migrate_info_type = psci_migrate_info_type;
-> +
-> +       arm_pm_restart = psci_sys_reset;
-> +
-> +       pm_power_off = psci_sys_poweroff;
-> +
-> +out_put_node:
-> +       of_node_put(np);
-> +       return err;
-> +}
-> +
-> +/*
-> + * PSCI < v0.2 get PSCI Function IDs via DT.
-> + */
-> +static int psci_0_1_init(struct device_node *np)
-> +{
-> +       u32 id;
-> +       int err;
-> +
-> +       err = get_set_conduit_method(np);
-> +
-> +       if (err)
-> +               goto out_put_node;
-> +
-> +       pr_info("Using PSCI v0.1 Function IDs from DT\n");
-> +
->         if (!of_property_read_u32(np, "cpu_suspend", &id)) {
->                 psci_function_id[PSCI_FN_CPU_SUSPEND] = id;
->                 psci_ops.cpu_suspend = psci_cpu_suspend;
-> @@ -224,7 +329,28 @@ void __init psci_init(void)
->
->  out_put_node:
->         of_node_put(np);
-> -       return;
-> +       return err;
-> +}
-> +
-> +static const struct of_device_id psci_of_match[] __initconst = {
-> +       { .compatible = "arm,psci",     .data = psci_0_1_init},
-> +       { .compatible = "arm,psci-0.2", .data = psci_0_2_init},
-> +       {},
-> +};
-> +
-> +int __init psci_init(void)
-> +{
-> +       struct device_node *np;
-> +       const struct of_device_id *matched_np;
-> +       psci_initcall_t init_fn;
-> +
-> +       np = of_find_matching_node_and_match(NULL, psci_of_match, &matched_np);
-> +
-> +       if (!np)
-> +               return -ENODEV;
-> +
-> +       init_fn = (psci_initcall_t)matched_np->data;
-> +       return init_fn(np);
->  }
->
->  #ifdef CONFIG_SMP
+> @@ -311,6 +327,7 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+>  static const struct of_device_id sun4i_usb_phy_of_match[] = {
+>         { .compatible = "allwinner,sun4i-a10-usb-phy" },
+>         { .compatible = "allwinner,sun5i-a13-usb-phy" },
+> +       { .compatible = "allwinner,sun6i-a31-usb-phy" },
+>         { .compatible = "allwinner,sun7i-a20-usb-phy" },
+>         { },
+>  };
 > --
-> 1.8.3.2
->
->
+> 1.9.1
+
+
+Cheers
+ChenYu
