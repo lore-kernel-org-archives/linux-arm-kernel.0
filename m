@@ -1,54 +1,62 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 12 May 2014 21:59:20 +0800
-Subject: [GIT PULL]]ARM: sirf: machine update for 3.16
-Message-ID: <CAGsJ_4yqTkKu+93Fo_D6NaZMyz4T6_EmKz4gZfyeQCi_uF-3dg@mail.gmail.com>
+From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
+Date: Mon, 12 May 2014 10:02:16 -0400
+Subject: [PATCH v9 1/3] PSCI: Add initial support for PSCIv0.2 functions
+In-Reply-To: <20140512091047.GB3006@e106331-lin.cambridge.arm.com>
+References: <1399472847-14377-1-git-send-email-ashwin.chaugule@linaro.org>
+ <1399472847-14377-2-git-send-email-ashwin.chaugule@linaro.org>
+ <20140512091047.GB3006@e106331-lin.cambridge.arm.com>
+Message-ID: <CAJ5Y-eadEXyabW2r_gSsnNyT2zQr3=Dwtq-_oDeryk-h4d6kUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof, Kevin,
+On 12 May 2014 05:10, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi Ashwin,
+>
+> On Wed, May 07, 2014 at 03:27:25PM +0100, Ashwin Chaugule wrote:
+>> The PSCIv0.2 spec defines standard values of function IDs
+>> and introduces a few new functions. Detect version of PSCI
+>> and appropriately select the right PSCI functions.
+>>
+>> Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+>> Reviewed-by: Rob Herring <robh@kernel.org>
+>
+> Other than those issues pointed out by Anup, this looks good to me,
+> though I'd like to see the cpu_kill callbacks for arm (and arm64) go
+> though at the same time (possibly folded in) so that implementations are
+> exercised from the start and we don't have to add properties to later
+> bodge around any current brokenness.
 
-The following changes since commit d1db0eea852497762cab43b905b879dfcd3b8987:
+Yea. I'll fold it in the next revision.
 
-  Linux 3.15-rc3 (2014-04-27 19:29:27 -0700)
+>
+> Have these patches been tested against an implementation?
 
-are available in the git repository at:
+Only boot tested on the ARMv8 FVP.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux.git
-tags/sirf-soc-for-3.16
+>
+> Which tree are you planning on merging this through? Do we need to split
+> the arm and arm64 parts?
 
-for you to fetch changes up to 23d7c66a8b096362d38418521f20af76443696b9:
+IIRC all this PSCI work originally came via Catalins tree(?). But now,
+these patches depend on a header introduced by Anups KVM patchset
+which is merged in -
+https://git.kernel.org/cgit/linux/kernel/git/kvmarm/kvmarm.git/log/?h=next
 
-  clocksource: marco: fix the affinity set for local timer of CPU1
-(2014-05-12 21:43:49 +0800)
+In a previous discussion (everyone here is CC'd) with Christoffer and
+Paolo the 2nd option of the following was chosen:
 
-----------------------------------------------------------------
-ARM: sirf: machine update for 3.16
+1) Catalin can apply "Add common header for PSCI related defines", or
+Ashwin can resend his series with the patch at the beginning.
+Duplicate commits are fine, especially for seldom-modified files where
+they do not cause conflicts.
 
-most of them fix some minor checkpatch issues according to key customers'
-requirement.
-and this patchset also cleanups the clk of clocksource: move to get clk
-by dts properity and move to irq_force_affinity for the irq affinity set
-of CPU1 local timer.
-
-----------------------------------------------------------------
-Bin Shi (2):
-      clocksource: prima2: fix some minor checkpatch issues
-      irqchip: sirf: fix one minor checkpatch issue
-
-Xianglong Du (1):
-      ARM: prima2: rstc: fix some minor checkpatch issues
-
-Zhiwu Song (2):
-      clocksource:sirf: remove the hardcode for the clk of timers
-      clocksource: marco: fix the affinity set for local timer of CPU1
-
- arch/arm/boot/dts/atlas6.dtsi      |    1 +
- arch/arm/boot/dts/prima2.dtsi      |    1 +
- arch/arm/mach-prima2/rstc.c        |   34 +++++++++++++++-----------
- drivers/clocksource/timer-marco.c  |   10 +++-----
- drivers/clocksource/timer-prima2.c |   47 ++++++++++++++++++++++--------------
- drivers/irqchip/irq-sirfsoc.c      |    3 ++-
- 6 files changed, 57 insertions(+), 39 deletions(-)
+2) Send Anup's patchset as a pull request to both me and Catalin,
+relative to v3.16-rc1, both of us can apply it and Ashwin's series can
+be commit on top.
 
 
--barry
+To keep it simple it'd be better if it all goes via one tree, but if
+there are objections or other suggestions, I'm happy to split this up.
+
+Thanks,
+Ashwin
