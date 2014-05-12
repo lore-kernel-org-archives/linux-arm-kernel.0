@@ -1,204 +1,65 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 12 May 2014 16:18:50 +0200
-Subject: [PATCH v2 1/6] phy: add a driver for the Berlin SATA PHY
-In-Reply-To: <5370C2B6.8030908@ti.com>
-References: <1399886217-20474-1-git-send-email-antoine.tenart@free-electrons.com>
- <1399886217-20474-2-git-send-email-antoine.tenart@free-electrons.com>
- <5370C2B6.8030908@ti.com>
-Message-ID: <5370D84A.9030405@gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 12 May 2014 16:22:12 +0200
+Subject: [PATCHv2] ARM: at91/dt: sam9261: Fix PLL output ranges and other
+ clocks divisors
+Message-ID: <1399904532-3688-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/12/2014 02:46 PM, Kishon Vijay Abraham I wrote:
-> Hi,
->
-> On Monday 12 May 2014 02:46 PM, Antoine T?nart wrote:
->> The Berlin SoC has a two SATA ports. Add a PHY driver to handle them.
->>
->> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
->> ---
->>   drivers/phy/Kconfig           |   5 ++
->>   drivers/phy/Makefile          |   1 +
->>   drivers/phy/phy-berlin-sata.c | 179 ++++++++++++++++++++++++++++++++++++++++++
->>   3 files changed, 185 insertions(+)
->>   create mode 100644 drivers/phy/phy-berlin-sata.c
->>
->> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
->> index 4906c27fa3bd..b31b1986fda4 100644
->> --- a/drivers/phy/Kconfig
->> +++ b/drivers/phy/Kconfig
->> @@ -15,6 +15,11 @@ config GENERIC_PHY
->>   	  phy users can obtain reference to the PHY. All the users of this
->>   	  framework should select this config.
->>
->> +config PHY_BERLIN_SATA
->> +	bool
->> +	depends on ARCH_BERLIN && OF
->> +	select GENERIC_PHY
->> +
->>   config PHY_EXYNOS_MIPI_VIDEO
->>   	tristate "S5P/EXYNOS SoC series MIPI CSI-2/DSI PHY driver"
->>   	depends on HAS_IOMEM
->> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
->> index 7728518572a4..40278706ac1b 100644
->> --- a/drivers/phy/Makefile
->> +++ b/drivers/phy/Makefile
->> @@ -3,6 +3,7 @@
->>   #
->>
->>   obj-$(CONFIG_GENERIC_PHY)		+= phy-core.o
->> +obj-$(CONFIG_PHY_BERLIN_SATA)		+= phy-berlin-sata.o
->>   obj-$(CONFIG_BCM_KONA_USB2_PHY)		+= phy-bcm-kona-usb2.o
->>   obj-$(CONFIG_PHY_EXYNOS_DP_VIDEO)	+= phy-exynos-dp-video.o
->>   obj-$(CONFIG_PHY_EXYNOS_MIPI_VIDEO)	+= phy-exynos-mipi-video.o
->> diff --git a/drivers/phy/phy-berlin-sata.c b/drivers/phy/phy-berlin-sata.c
->> new file mode 100644
->> index 000000000000..f20f5ece1a7f
->> --- /dev/null
->> +++ b/drivers/phy/phy-berlin-sata.c
->> @@ -0,0 +1,179 @@
->> +/*
->> + * Marvell Berlin SATA PHY driver
->> + *
->> + * Copyright (C) 2014 Marvell Technology Group Ltd.
->> + *
->> + * Antoine T?nart <antoine.tenart@free-electrons.com>
->> + *
->> + * This file is licensed under the terms of the GNU General Public
->> + * License version 2. This program is licensed "as is" without any
->> + * warranty of any kind, whether express or implied.
->> + */
->> +
->> +#include <linux/module.h>
->> +#include <linux/phy/phy.h>
->> +#include <linux/io.h>
->> +#include <linux/platform_device.h>
->> +
->> +#define HOST_VSA_ADDR		0x0
->> +#define HOST_VSA_DATA		0x4
->> +
->> +#define CONTROL_REGISTER	0x0
->> +#define MBUS_SIZE_CONTROL	0x4
->> +
->> +#define POWER_DOWN_SATA0		BIT(6)
->> +#define POWER_DOWN_SATA1		BIT(14)
->> +#define MBUS_WRITE_REQUEST_SIZE_128	(BIT(2) << 16)
->> +#define MBUS_READ_REQUEST_SIZE_128	(BIT(2) << 19)
->> +
->> +#define BERLIN_SATA_PHY_NB	2
->> +
->> +#define to_berlin_sata_phy_priv(desc)	\
->> +	container_of((desc), struct priv, phys[(desc)->index])
->> +
->> +struct phy_desc {
->
-> to be consistent, lets name it phy_berlin_desc.
->> +	struct phy	*phy;
->> +	u32		val;
->> +	unsigned	index;
->> +};
->> +
->> +struct priv {
+Argument 3 (OUT) and 4 (ICPLL) of the atmel,pll-clk-output-ranges were missing.
+Also, the at91sam9261 doesn't really have a by 3 divisor.
 
-And phy_berlin_priv then?
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+Changed in v2:
+After getting feedback from the atmel HW engineers, it appears that PLLB is not
+the same as PLLA despite what the datasheet seems to imply. The patch is updated
+to reflect that.
 
-[...]
->> +static int phy_berlin_sata_probe(struct platform_device *pdev)
->> +{
->> +	struct phy *phy;
->> +	struct phy_provider *phy_provider;
->> +	struct priv *priv;
->> +	struct resource *res;
->> +	int i;
->> +
->> +	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
->> +	if (!priv)
->> +		return -ENOMEM;
->> +
->> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +	priv->base = devm_ioremap(&pdev->dev, res->start, resource_size(res));
->> +	if (IS_ERR(priv->base))
->> +		return PTR_ERR(priv->base);
->> +
->> +	phy = devm_phy_create(&pdev->dev, &phy_berlin_sata_ops, NULL);
->> +	if (IS_ERR(phy))
->> +		return PTR_ERR(phy);
->> +
->> +	dev_set_drvdata(&pdev->dev, priv);
->> +	spin_lock_init(&priv->lock);
->> +
->> +	for (i = 0; i < BERLIN_SATA_PHY_NB; i++) {
->
-> huh.. this should come from dt data. For devices which have multiple PHYs, each
-> PHY should be modelled as the sub-node of the *PHY provider* device node.
+ arch/arm/boot/dts/at91sam9261.dtsi | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
-Just to make sure we get it right:
-
-You want the PHY (provider) node look like this:
-
-sata_phy: phy at f7e900a0 {
-	compatible = "marvell,berlin-sata-phy";
-	reg = <0xf7e900a0 0x10>;
-	#address-cells = <1>;
-	#size-cells = <0>;
-	#phy-cells = <1>;
-	status = "okay";
-
-	sata_phy0: phy at 0 { reg = <0>; };
-
-	sata_phy1: phy at 1 { reg = <1>; };
-};
-
-and parse the number of individual PHYs with
-for_each_child_of_node()?
-
-Sebastian
-
->> +		struct phy *phy = devm_phy_create(&pdev->dev,
->> +						  &phy_berlin_sata_ops, NULL);
->> +		if (IS_ERR(phy)) {
->> +			dev_err(&pdev->dev, "failed to create PHY %d\n", i);
->> +			return PTR_ERR(phy);
->> +		}
->> +
->> +		priv->phys[i].phy = phy;
->> +		priv->phys[i].val = desc[i].val;
->> +		priv->phys[i].index = i;
->> +		phy_set_drvdata(phy, &priv->phys[i]);
->> +
->> +		/* Make sure the PHY is off */
->> +		phy_berlin_sata_power_off(phy);
->> +	}
->> +
->> +	phy_provider = devm_of_phy_provider_register(&pdev->dev,
->> +						     berlin_sata_phy_xlate);
->> +	if (IS_ERR(phy_provider))
->> +		return PTR_ERR(phy_provider);
->> +
->> +	return 0;
->> +}
->> +
->> +static const struct of_device_id phy_berlin_sata_of_match[] = {
->> +	{ .compatible = "marvell,berlin-sata-phy" },
->> +	{ },
->> +};
->> +
->> +static struct platform_driver phy_berlin_sata_driver = {
->> +	.probe	= phy_berlin_sata_probe,
->> +	.driver	= {
->> +		.name		= "phy-berlin-sata",
->> +		.owner		= THIS_MODULE,
->> +		.of_match_table	= phy_berlin_sata_of_match,
->> +	},
->> +};
->> +module_platform_driver(phy_berlin_sata_driver);
->> +
->> +MODULE_DESCRIPTION("Marvell Berlin SATA PHY driver");
->> +MODULE_AUTHOR("Antoine T?nart <antoine.tenart@free-electrons.com>");
->> +MODULE_LICENSE("GPL");
->
-> GPL v2 as the file header states so?
->
-> Thanks
-> Kishon
->
+diff --git a/arch/arm/boot/dts/at91sam9261.dtsi b/arch/arm/boot/dts/at91sam9261.dtsi
+index 561addceb81e..44d9e5ab09c3 100644
+--- a/arch/arm/boot/dts/at91sam9261.dtsi
++++ b/arch/arm/boot/dts/at91sam9261.dtsi
+@@ -564,7 +564,8 @@
+ 					reg = <0>;
+ 					atmel,clk-input-range = <1000000 32000000>;
+ 					#atmel,pll-clk-output-range-cells = <4>;
+-					atmel,pll-clk-output-ranges = <80000000 200000000 190000000 240000000>;
++					atmel,pll-clk-output-ranges = <80000000 200000000 0 1>,
++								<190000000 240000000 2 1>;
+ 				};
+ 
+ 				pllb: pllbck {
+@@ -573,9 +574,9 @@
+ 					interrupts-extended = <&pmc AT91_PMC_LOCKB>;
+ 					clocks = <&main>;
+ 					reg = <1>;
+-					atmel,clk-input-range = <1000000 32000000>;
++					atmel,clk-input-range = <1000000 5000000>;
+ 					#atmel,pll-clk-output-range-cells = <4>;
+-					atmel,pll-clk-output-ranges = <80000000 200000000 190000000 240000000>;
++					atmel,pll-clk-output-ranges = <70000000 130000000 1 1>;
+ 				};
+ 
+ 				mck: masterck {
+@@ -584,13 +585,13 @@
+ 					interrupts-extended = <&pmc AT91_PMC_MCKRDY>;
+ 					clocks = <&clk32k>, <&main>, <&plla>, <&pllb>;
+ 					atmel,clk-output-range = <0 94000000>;
+-					atmel,clk-divisors = <1 2 4 3>;
++					atmel,clk-divisors = <1 2 4 0>;
+ 				};
+ 
+ 				usb: usbck {
+ 					compatible = "atmel,at91rm9200-clk-usb";
+ 					#clock-cells = <0>;
+-					atmel,clk-divisors = <1 2 4 3>;
++					atmel,clk-divisors = <1 2 4 0>;
+ 					clocks = <&pllb>;
+ 				};
+ 
+-- 
+1.9.1
