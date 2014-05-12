@@ -1,44 +1,72 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 12 May 2014 16:58:11 +0100
-Subject: [PATCH v8 1/8] ftrace: make CALLER_ADDRx macros more generic
-In-Reply-To: <20140502151957.6978d870@gandalf.local.home>
-References: <1394862048-28758-1-git-send-email-takahiro.akashi@linaro.org>
- <1398851676-16389-1-git-send-email-takahiro.akashi@linaro.org>
- <1398851676-16389-2-git-send-email-takahiro.akashi@linaro.org>
- <20140502151957.6978d870@gandalf.local.home>
-Message-ID: <20140512155811.GB4880@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 12 May 2014 18:00:37 +0200
+Subject: [PATCHv5 05/20] Documentation: dt-bindings: update ehci-orion
+ binding documentation
+In-Reply-To: <Pine.LNX.4.44L0.1405121145220.1202-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1405121145220.1202-100000@iolanthe.rowland.org>
+Message-ID: <5370F025.90601@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi guys,
+On 12/05/2014 17:46, Alan Stern wrote:
+> On Mon, 12 May 2014, Gregory CLEMENT wrote:
+> 
+>> Hi Alan,
+>>
+>> On 11/05/2014 20:17, Thomas Petazzoni wrote:
+>>> This commit updates the Device Tree binding documentation of
+>>> ehci-orion to take into account the fact that we can now optionally
+>>> pass a clock and a PHY reference.
+>>
+>> Would you agree to take this patch with the 4 first ones?
+>>
+>> For this kind of change in the device tree the agreement was that it
+>> can be directly taken by the maintainer of the subsystem. Indeed here
+>> we don't introduce a new kind of device tree node, we just add a optional
+>> resource already used in many place.
+> 
+> Sorry, I missed this one.  Is it okay with the DT people?  If it is, 
 
-On Fri, May 02, 2014 at 08:19:57PM +0100, Steven Rostedt wrote:
-> On Wed, 30 Apr 2014 18:54:29 +0900
-> AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
-> 
-> > Most archs with HAVE_ARCH_CALLER_ADDR have the almost same definitions
-> > of CALLER_ADDRx(n), and so put them into linux/ftrace.h.
-> 
-> Please add a bit more to the change log. Like what you did. Something
-> like:
-> 
-> ----
-> Most archs with HAVE_ARCH_CALLER_ADDR have pretty much the same
-> definitions of CALLER_ADDRx(n). Instead of duplicating the code for all
-> the archs, define a ftrace_return_address0() and
-> ftrace_return_address(n) that can be overwritten by the archs if they
-> need to do something different. Instead of 7 macros in every arch, we
-> now only have at most 2 (and actually only 1 as
-> ftrace_return_address0() should be the same for all archs).
-> 
-> The CALLER_ADDRx(n) will now be defined in linux/ftrace.h and use the
-> ftrace_return_address*(n?) macros. This removes a lot of the duplicate
-> code.
-> -----
-> 
-> Use that if you want :-)
+Rob, Mark,
 
-Akashi: did you get around to posting a new version of this patch? We can't
-take your arm64 patches until you get the core stuff merged...
+could you confirm that for this kind of change in the dts documentation
+you agree that the maintainer take it?
 
-Will
+
+> you can submit it directly to Greg KH and he'll merge it.
+
+OK thanks!
+
+> 
+> Alan Stern
+> 
+>>> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>>> ---
+>>>  Documentation/devicetree/bindings/usb/ehci-orion.txt | 5 +++++
+>>>  1 file changed, 5 insertions(+)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/usb/ehci-orion.txt b/Documentation/devicetree/bindings/usb/ehci-orion.txt
+>>> index 6bc09ec..17c3bc8 100644
+>>> --- a/Documentation/devicetree/bindings/usb/ehci-orion.txt
+>>> +++ b/Documentation/devicetree/bindings/usb/ehci-orion.txt
+>>> @@ -6,6 +6,11 @@ Required properties:
+>>>    region.
+>>>  - interrupts: The EHCI interrupt
+>>>  
+>>> +Optional properties:
+>>> +- clocks: reference to the clock
+>>> +- phys: reference to the USB PHY
+>>> +- phy-names: name of the USB PHY, should be "usb"
+>>> +
+>>>  Example:
+>>>  
+>>>  	ehci at 50000 {
+>>>
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
