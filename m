@@ -1,52 +1,72 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 13 May 2014 00:57:31 +0200
-Subject: [PATCH v2.1 3/9] ARM: S3C24XX: enable usage of common dclk if
- common clock framework is enabled
-In-Reply-To: <53714F9D.3010109@samsung.com>
-References: <2104342.rkElQpXtvM@phil> <3874492.Rok1zBObEC@phil>
- <53714F9D.3010109@samsung.com>
-Message-ID: <233328610.kl5NEOjUm6@phil>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 13 May 2014 02:57:30 +0400
+Subject: [PATCH] ARM: shmobile: henninger: add QSPI DT support
+In-Reply-To: <20140511225354.GC6451@verge.net.au>
+References: <201405060245.32952.sergei.shtylyov@cogentembedded.com>
+ <536FBEB7.9080605@cogentembedded.com> <20140511225354.GC6451@verge.net.au>
+Message-ID: <537151DA.8000101@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+Hello.
 
-Am Dienstag, 13. Mai 2014, 07:47:57 schrieb Kukjin Kim:
-> On 05/10/14 08:33, Heiko St?bner wrote:
-> > Hi Tomasz,
-> > 
-> >>>>> It seems this one just hit linux-next (in next-20140509).
-> >>>> 
-> >>>> Which is bad, because:
-> >>>> a) it conflicts with patches already applied in samsung-clk tree,
-> >>> 
-> >>> I remember seeing patches regarding more than one clk-samsung clock
-> >>> providers. Do you need any additional changes for s3c24xx from me for
-> >>> this?
-> >> 
-> >> Yes, that's the problem here. If you could do it, I would appreciate it,
-> >> but if you don't have time then I can handle this. The changes needed
-> >> are mostly trivial - basically every common samsung_clk function gets
-> >> new argument to a context structure. The branch to base on would be
-> >> for_3.16/exynos5260 in samsung-clk tree.
-> 
-> I think, would be better if we could fix the conflicts with Hekio's
-> additional patches...basically nobody wants revert something for next
-> tree once it is landed. But in this case, it's up to Tomasz...
-> 
-> Probably, Heiko resubmitted? Is it based on the branch Tomasz memtioned,
-> I didn't check it yet?..
-> 
-> Tomasz, do you still want me to drop this series in samsung tree now?
-> Additional patches would be helpful to me because other dependency i.e.,
-> exynos5260...for me.
+On 05/12/2014 02:53 AM, Simon Horman wrote:
 
-I submitted a v3 series yesterday, that is based on Tomasz' branch. This 
-prevents build errors from happening. I'll let you two decide how you want to 
-handle this :-)
+>>> Define the Henninger board dependent part of the QSPI device node.
+>>> Add device nodes for Spansion S25FL512S SPI flash and MTD partitions on it.
 
-I can also produce fixup patches if you two decide to keep the v2 series and 
-just fix the conflicts.
+>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
+>>> ---
+>>> This patch is against 'renesas-devel-v3.15-rc3-20140502' tag of Simon Horman's
+>>> 'renesas.git' repo and SDHI0/2 DT support patch posted last weekend.
 
-Heiko
+>>>   arch/arm/boot/dts/r8a7791-henninger.dts |   38 ++++++++++++++++++++++++++++++++
+>>>   1 file changed, 38 insertions(+)
+
+>>> Index: renesas/arch/arm/boot/dts/r8a7791-henninger.dts
+>>> ===================================================================
+>>> --- renesas.orig/arch/arm/boot/dts/r8a7791-henninger.dts
+>>> +++ renesas/arch/arm/boot/dts/r8a7791-henninger.dts
+>> [...]
+>>> @@ -158,3 +163,36 @@
+>>>   	cd-gpios = <&gpio6 22 GPIO_ACTIVE_LOW>;
+>>>   	status = "okay";
+>>>   };
+>>> +
+>>> +&qspi {
+>>> +	pinctrl-0 = <&qspi_pins>;
+>>> +	pinctrl-names = "default";
+>>> +
+>>> +	status = "okay";
+>>> +
+>>> +	flash at 0 {
+>>> +		#address-cells = <1>;
+>>> +		#size-cells = <1>;
+>>> +		compatible = "spansion,s25fl512s";
+>>> +		reg = <0>;
+>>> +		spi-max-frequency = <30000000>;
+>>> +		spi-tx-bus-width = <4>;
+>>> +		spi-rx-bus-width = <4>;
+>>> +		m25p,fast-read;
+>>> +
+>>> +		partition at 0 {
+>>> +			label = "loader_prg";
+>>> +			reg = <0x00000000 0x00040000>;
+>>> +			read-only;
+>>> +		};
+>>> +		partition at 40000 {
+>>> +			label = "user_prg";
+>>> +			reg = <0x00040000 0x00400000>;
+>>> +			read-only;
+
+>>     Oops, there shouldn't be "read-only" here, I forgot to refresh
+>> the patch as I'm now seeing... too bad it's too late to resend now.
+>> :-(
+
+> Could you send an incremental fix for me to queue up?
+
+    Oops, I've rechecked and it should indeed be read-only, so the patch was 
+correct. Sorry. :-)
+
+WBR, Sergei
