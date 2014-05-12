@@ -1,51 +1,73 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 12 May 2014 15:37:47 +0100
-Subject: [PATCH 0/3] arm64: extend/fix /proc/cpuinfo + runtime sanity checks
-Message-ID: <1399905470-26500-1-git-send-email-mark.rutland@arm.com>
+Date: Mon, 12 May 2014 15:37:48 +0100
+Subject: [PATCH 1/3] arm64: add MIDR_EL1 field accessors
+In-Reply-To: <1399905470-26500-1-git-send-email-mark.rutland@arm.com>
+References: <1399905470-26500-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1399905470-26500-2-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On arm64 /proc/cpuinfo only contains information regarding the current
-CPU (i.e. that which issued the read), due to use of read_cpuid_id()
-within c_show.  This isn't fantastic as it doesn't match arm and x86
-(which print information per-cpu), and on big.LITTLE AArch64 systems it
-will mean we don't get accurate information regarding each CPU.
+The MIDR_EL1 register is composed of a number of bitfields, and uses of
+the fields has so far involved open-coding of the shifts and masks
+required.
 
-This series adds code to record the relevant system registers upon the
-booting of each CPU, and uses this information to output correct
-information per-CPU in /proc/cpuinfo. I have not seen this cause issues
-so far with a 64-bit filesystem, but would appreciate any testing people
-are willing to perform.
+This patch adds shifts and masks for each of the MIDR_EL1 subfields, and
+also provides accessors built atop of these. Existing uses within
+cputype.h are updated to use these accessors.
 
-I've built some run-time sanity/consistency checking atop of the
-cpuinfo_arm64 infrastructure, which hopefully should help to identify
-when a system's CPUs vary in ways we do not expect and/or cannot
-support.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+---
+ arch/arm64/include/asm/cputype.h | 27 +++++++++++++++++++++++++--
+ 1 file changed, 25 insertions(+), 2 deletions(-)
 
-The series is based on the arm64 for-next/core branch [1] due to reading
-of the cache registers in sanity checks code, but patches 1 and 2 should
-apply to v3.15-rc5.
-
-Cheers,
-Mark.
-
-
-[1] https://git.kernel.org/cgit/linux/kernel/git/arm64/linux.git/log/?h=for-next/core
-
-Mark Rutland (3):
-  arm64: add MIDR_EL1 field accessors
-  arm64: cpuinfo: print info for all CPUs
-  arm64: add runtime system sanity checks
-
- arch/arm64/include/asm/cpu.h     |  49 +++++++++++++++
- arch/arm64/include/asm/cputype.h |  27 ++++++++-
- arch/arm64/kernel/Makefile       |   2 +-
- arch/arm64/kernel/cpuinfo.c      | 125 +++++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/setup.c        |  46 +++++++-------
- arch/arm64/kernel/smp.c          |   6 ++
- 6 files changed, 230 insertions(+), 25 deletions(-)
- create mode 100644 arch/arm64/include/asm/cpu.h
- create mode 100644 arch/arm64/kernel/cpuinfo.c
-
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index c404fb0..541b829 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -36,6 +36,25 @@
+ 	__val;								\
+ })
+ 
++#define MIDR_REVISION_MASK	0xf
++#define MIDR_REVISION(midr)	((midr) & MIDR_REVISION_MASK)
++#define MIDR_PARTNUM_SHIFT	4
++#define MIDR_PARTNUM_MASK	(0xfff << MIDR_PARTNUM_SHIFT)
++#define MIDR_PARTNUM(midr)	\
++	(((midr) & MIDR_PARTNUM_MASK) >> MIDR_PARTNUM_SHIFT)
++#define MIDR_ARCHITECTURE_SHIFT	16
++#define MIDR_ARCHITECTURE_MASK	(0xf << MIDR_ARCHITECTURE_SHIFT)
++#define MIDR_ARCHITECTURE(midr)	\
++	(((midr) & MIDR_ARCHITECTURE_MASK) >> MIDR_ARCHITECTURE_SHIFT)
++#define MIDR_VARIANT_SHIFT	20
++#define MIDR_VARIANT_MASK	(0xf << MIDR_VARIANT_SHIFT)
++#define MIDR_VARIANT(midr)	\
++	(((midr) & MIDR_VARIANT_MASK) >> MIDR_VARIANT_SHIFT)
++#define MIDR_IMPLEMENTOR_SHIFT	24
++#define MIDR_IMPLEMENTOR_MASK	(0xff << MIDR_IMPLEMENTOR_SHIFT)
++#define MIDR_IMPLEMENTOR(midr)	\
++	(((midr) & MIDR_IMPLEMENTOR_MASK) >> MIDR_IMPLEMENTOR_SHIFT)
++
+ #define ARM_CPU_IMP_ARM		0x41
+ #define ARM_CPU_IMP_APM		0x50
+ 
+@@ -64,12 +83,16 @@ static inline u64 __attribute_const__ read_cpuid_mpidr(void)
+ 
+ static inline unsigned int __attribute_const__ read_cpuid_implementor(void)
+ {
+-	return (read_cpuid_id() & 0xFF000000) >> 24;
++	return MIDR_IMPLEMENTOR(read_cpuid_id());
+ }
+ 
+ static inline unsigned int __attribute_const__ read_cpuid_part_number(void)
+ {
+-	return (read_cpuid_id() & 0xFFF0);
++	/*
++	 * The part number field is used in-place as a userspace ABI, so we
++	 * cannot use MIDR_PARTNUM() here.
++	 */
++	return (read_cpuid_id() & MIDR_PARTNUM_MASK);
+ }
+ 
+ static inline u32 __attribute_const__ read_cpuid_cachetype(void)
 -- 
 1.8.1.1
