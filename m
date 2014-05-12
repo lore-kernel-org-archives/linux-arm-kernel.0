@@ -1,61 +1,77 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Mon, 12 May 2014 14:53:12 +0800
-Subject: [PATCH 1/5] serial: imx: remove unneeded imx_transmit_buffer()
- from imx_start_tx()
-In-Reply-To: <53706CC3.4030907@de.bosch.com>
-References: <1399648788-26061-1-git-send-email-dean_jenkins@mentor.com>
- <1399648788-26061-2-git-send-email-dean_jenkins@mentor.com>
- <537042B5.2040600@freescale.com> <53706014.8010203@de.bosch.com>
- <53706A9A.6060707@freescale.com> <53706CC3.4030907@de.bosch.com>
-Message-ID: <53706FD8.6090201@freescale.com>
+From: rahul.sharma@samsung.com (Rahul Sharma)
+Date: Mon, 12 May 2014 12:25:16 +0530
+Subject: [PATCH v3 0/4] ARM: dts: enable display for peach-pit and snow
+ boards
+In-Reply-To: <CAPdUM4Pg1ERqQ0W8u3nzZzHq0q2Lrk+vKJUdLdWZd8YrhrqsOg@mail.gmail.com>
+References: <1399630186-22610-1-git-send-email-rahul.sharma@samsung.com>
+ <CALt3h7-zRZp0HWE8VHUmnovfNESfu6c8f=4xScNRV1ZZcP_1vA@mail.gmail.com>
+ <CAPdUM4Pg1ERqQ0W8u3nzZzHq0q2Lrk+vKJUdLdWZd8YrhrqsOg@mail.gmail.com>
+Message-ID: <CAPdUM4PjD2+HkpcDjXzov7EZWuywg6AiYd_t62yzU0qhWHZ34A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2014?05?12? 14:40, Dirk Behme ??:
-> On 12.05.2014 08:30, Huang Shijie wrote:
->> ? 2014?05?12? 13:45, Dirk Behme ??:
->>> On 12.05.2014 05:40, Huang Shijie wrote:
->>>> ? 2014?05?09? 23:19, dean_jenkins at mentor.com ??:
->>>>> Use imx_start_tx() just to enable the TX interrupt. It's the job 
->>>>> of the
->>>>> TX interrupt ISR to fill the transmit buffer, then. If the transmit
->>>>> buffer
->>   From the Documentation/serial/driver, we can see:
->>     -----------------------------------------
->>      start_tx(port)
->>       Start transmitting characters.
->>      -----------------------------------------
+Hi Arun, Jingoo Han,
+
+On 12 May 2014 09:36, Rahul Sharma <rahul.sharma@samsung.com> wrote:
+> On 12 May 2014 09:33, Arun Kumar K <arun.kk@samsung.com> wrote:
+>> Hi Rahul,
 >>
->> It tells us we can transmit data in the imx_start_tx.
+>> On Fri, May 9, 2014 at 3:39 PM, Rahul Sharma <rahul.sharma@samsung.com> wrote:
+>>> From: Rahul Sharma <Rahul.Sharma@samsung.com>
+>>>
+>>> Add nodes for fimd and dp controller for exynos5250 based snow
+>>> and exynos5420 based peach-pit board.
+>>>
+>>
+>> It would be great to include the display support for 5800 peach-pi board also
+>> in this series. Most of the values would remain the same except for the changes
+>> for bigger display in peach-pi.
+>>
 >
-> Well, it depends how you read 'Start transmitting', no?
+> Sure. I will post v4 with 5800-drm patches.
 >
-> It doesn't have to mean 'actually transmit data'. It talks about 
-> 'start'. And this could also mean 'start the transmission (by enabling 
-> the interrupt)'.
->
-Ok :)
-I do not object this patch.
 
-My opinion is : If the third patch is redundant, could this patch still 
-needed?
+I posted these patches separately at
+http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg30475.html
 
+Regards,
+Rahul Sharma.
 
->> But this patch moves it to the interrupt handler,
->
-> It doesn't 'move' any code to the interrupt handler. The code in the 
-> interrupt handler is already there.
->
-i knew it.
-
->> this patch makes the
->> interrupt handler do more jobs.
->
-> ... to get the locking in the correct order.
->
-again, the third patch can be ignored.
-The locking is correct for the imx.c.
-
-
-thanks
-Huang Shijie
+>> Regards
+>> Arun
+>>
+>>> This series is based on Kukjin Kims, for-next branch.
+>>>
+>>> V3:
+>>> 1) Dropped 1 patch "ARM: dts: move dp hpd line to the board file for
+>>>  exynos5420".
+>>> 2) Extra blank lines for readability.
+>>> 3) dp hpd gpio name change (dp_hpd -> dp_hpd_gpio)
+>>>
+>>> V2:
+>>> 1) Rebase on Peach-pit dependent patches.
+>>>
+>>> It is dependent on
+>>> 1) Andrew Bresticker's patch for hpd gpio addition, avilable at
+>>> http://www.spinics.net/lists/linux-samsung-soc/msg28827.html [Patch is 'ACK'ed.]
+>>> 2) Arun's patch for adding peach-pit board dts file at
+>>> http://www.spinics.net/lists/linux-samsung-soc/msg30103.html. [Patch is 'ACK'ed.]
+>>>
+>>> Rahul Sharma (4):
+>>>   ARM: dts: enable fimd for exynos5250 based snow board
+>>>   ARM: dts: enable dp-controller for exynos5250 based snow board
+>>>   ARM: dts: enable fimd for exynos5420 based peach-pit board
+>>>   ARM: dts: enable dp-controller for exynos5420 based peach-pit board
+>>>
+>>>  arch/arm/boot/dts/exynos5250-snow.dts      |   35 ++++++++++++++++++++++++
+>>>  arch/arm/boot/dts/exynos5420-peach-pit.dts |   41 ++++++++++++++++++++++++++++
+>>>  2 files changed, 76 insertions(+)
+>>>
+>>> --
+>>> 1.7.9.5
+>>>
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
