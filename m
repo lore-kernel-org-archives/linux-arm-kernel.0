@@ -1,34 +1,108 @@
-From: Nikolay.Borisov@arm.com (Nikolay Borisov)
-Date: Mon, 12 May 2014 10:31:57 +0100
-Subject: [PATCH 2/2] ARM: Kconfig: remove dependence of CONFIG_DEBUG_RODATA on
- !kexec
-In-Reply-To: <1399887117-2605-1-git-send-email-Nikolay.Borisov@arm.com>
-References: <1399887117-2605-1-git-send-email-Nikolay.Borisov@arm.com>
-Message-ID: <1399887117-2605-2-git-send-email-Nikolay.Borisov@arm.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Mon, 12 May 2014 11:34:07 +0200
+Subject: [PATCH 3/4] OMAPDSS: panel-sharp-ls037v7dw01: add device tree
+ support
+In-Reply-To: <53707A64.2060203@ti.com>
+References: <1398815562-24113-1-git-send-email-tony@atomide.com>
+ <1398815562-24113-4-git-send-email-tony@atomide.com>
+ <5369EAE7.3030705@ti.com> <20140507150343.GA9502@atomide.com>
+ <536A5920.1020908@ti.com> <20140507175919.GH9502@atomide.com>
+ <20140508233300.GI2198@atomide.com> <536C8293.4070506@ti.com>
+ <20140509155504.GE17814@atomide.com> <53707A64.2060203@ti.com>
+Message-ID: <CABxcv=kwhodeFTHoVpn1nHeh9+kV5fwMN9s3Kbk6h7_xJp4UYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove DEBUG_RODATA dependence on !kexec since "ARM: kexec: Make .text R/W in
-machine_kexec" fixes the incompatibility between those 2
-options.
+Hello Tomi,
 
-Signed-off-by: Nikolay Borisov <Nikolay.Borisov@arm.com>
----
- arch/arm/mm/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On Mon, May 12, 2014 at 9:38 AM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
+> On 09/05/14 18:55, Tony Lindgren wrote:
+>
+>>> Although if the MO gpio is not controlled by the driver, we should tell
+>>> the driver whether that gpio is high or low.
+>>
+>> What do you have in mind for telling that? We should also tell the
+>> orientation of the panel:
+>>
+>> EVM   VGA     omapfb.rotate=3
+>> LDP   QVGA    omapfb.rotate=0
+>>
+>> Do you have something in mind for that?
+>
+> Hmm, right. I guess all we can do is have boolean flags in the .dts for
+> MO, LR and UD, which tells if the respective pins are hard-wires high or
+> low. And say in the documentation that you must either have a proper
+> GPIO, or use the flag, but not both.
+>
+> The panel mounting orientation is a different matter. But I think it is
+> also something we should specify in the .dts. However, we don't have any
+> SW support to handle it, and it's a bit unclear to me how it should be
+> handled, so I think that has to be left for later.
+>
+>>> At the moment our display drivers are OMAP specific, and for that reason
+>>> we should prefix the compatible strings with "omapdss,". For example,
+>>> drivers/video/fbdev/omap2/displays-new/panel-dsi-cm.c:
+>>>
+>>>      { .compatible = "omapdss,panel-dsi-cm", },
+>>>
+>>> But we should still have the right compatible string in the .dts, so we
+>>> convert the compatible name in arch/arm/mach-omap2/display.c, with
+>>> 'dss_compat_conv_list' array, to which this panel's name should be added.
+>>
+>> Oh so what do you want to have in the .dts file then?
+>
+> The .dts should have the proper names. The idea of this hackery is that
+> in the .dts we can have the proper compatible string. So in the .dts, we
+> have, say:
+>
+> "sony,panel-foobar"
+>
+> Then, at boot time, omap's platform code changes that to:
+>
+> "omapdss,sony,panel-foobar".
+>
+> And our (omap specific) panel-foobar driver use that
+> "omapdss,sony,panel-foobar" string.
+>
+> This way some other platform could do the same, and have their platform
+> specific drivers handle the panel.
+>
+> At some point in the future we hopefully will have common panel drivers,
+> and at that point we can remove that hackery. The .dts files will
+> already be correct.
+>
 
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 3cd7c0a..a96f585 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -969,7 +969,7 @@ config ARM_KERNMEM_PERMS
- 
- config DEBUG_RODATA
- 	bool "Make kernel text and rodata read-only"
--	depends on ARM_KERNMEM_PERMS && KEXEC=n && KPROBES=n
-+	depends on ARM_KERNMEM_PERMS && KPROBES=n
- 	default y
- 	help
- 	  If this is set, kernel text and rodata will be made read-only.
--- 
-1.8.1.5
+Maybe we can remove this hackery by relying on the fact that a
+compatible string can have a set of values that goes from more
+specific to more general. So you can have something like:
+
+compatible = "sony,panel-foobar", "omapdss,panel-foobar"
+
+So right now only "omapdss,panel-foobar" will be matched and later
+when we have common panel drivers then that driver could handle the
+"sony,panel-foobar" compatible string.
+
+Other platforms could do something similar and have
+
+compatible = "sony,panel-foobar", "baz,panel-foobar"
+
+That way you won't break DT backward compatible but still not require
+hacks on arch/arm/mach-omap2/display.c.
+
+We do the same for OMAP boards, we now have the following compatible string:
+
+compatible = "isee,omap3-igep0020", "ti,omap36xx", "ti,omap3";
+
+There isn't a struct machine_desc that matches "isee,omap3-igep0020"
+but later if we find that we need some board specific initialization
+we could add one without breaking existing DTS. In fact it used to be
+a single machine_desc that matched "ti,omap3" for both omap36xx and
+omap34xx but later when some DT clocks changes were introduced we
+needed to split both SoC families.
+
+>  Tomi
+>
+>
+
+Best regards,
+Javier
