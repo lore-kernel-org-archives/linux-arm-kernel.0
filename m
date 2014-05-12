@@ -1,47 +1,31 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 12 May 2014 07:45:49 +0200
-Subject: i.MX6 USB OTG support is broken on linux-next
-In-Reply-To: <20140510135737.GA1878@shlinux1.ap.freescale.net>
-References: <20140509130046.GP2794@dragon>
- <20140510111003.GA1593@shlinux1.ap.freescale.net>
- <20140510131815.GT2794@dragon>
- <20140510135737.GA1878@shlinux1.ap.freescale.net>
-Message-ID: <20140512054549.GC5858@pengutronix.de>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Mon, 12 May 2014 07:45:56 +0200
+Subject: [PATCH 1/5] serial: imx: remove unneeded imx_transmit_buffer()
+ from imx_start_tx()
+In-Reply-To: <537042B5.2040600@freescale.com>
+References: <1399648788-26061-1-git-send-email-dean_jenkins@mentor.com>
+ <1399648788-26061-2-git-send-email-dean_jenkins@mentor.com>
+ <537042B5.2040600@freescale.com>
+Message-ID: <53706014.8010203@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 10, 2014 at 09:57:39PM +0800, Li Jun wrote:
-> On Sat, May 10, 2014 at 09:18:36PM +0800, Shawn Guo wrote:
-> > + Robin and David,
-> > 
-> > diff --git a/drivers/usb/core/Kconfig b/drivers/usb/core/Kconfig
-> > index cb8e991..9081757 100644
-> > --- a/drivers/usb/core/Kconfig
-> > +++ b/drivers/usb/core/Kconfig
-> > @@ -65,7 +65,6 @@ config USB_OTG
-> >  config USB_OTG_WHITELIST
-> >         bool "Rely on OTG Targeted Peripherals List"
-> >         depends on USB_OTG || EXPERT
-> > -       default y if USB_OTG
-> >         help
-> >           If you say Y here, the "otg_whitelist.h" file will be used as a
-> >           product whitelist, so USB peripherals not listed there will be
-> > 
-> > Shawn
-> As Peter suggested, do not enable OTG_FSM in defconfig since there are very few
-> HNP&SRP capable device in market. With OTG_FSM enabled, even USB_OTG_WHITELIST
-> is not selected, the OTG port still can't work the same as before if you connect
-> a normal usb device to it.
+On 12.05.2014 05:40, Huang Shijie wrote:
+> ? 2014?05?09? 23:19, dean_jenkins at mentor.com ??:
+>> Use imx_start_tx() just to enable the TX interrupt. It's the job of the
+>> TX interrupt ISR to fill the transmit buffer, then. If the transmit buffer
+>> is empty, the TX interrupt should be executed as soon as the start_tx()
+>> enables the interrupt, so there is no reason for the extra
+>> imx_transmit_buffer() call, here. Remove it.
+> I don't know why this patch needed?
+> What problem this patch fix or improve?
 
-If a device is not HNP/SRP capable then it should not be used on this
-device. If we can't detect this during runtime then there should be some
-devicetree property for that. Making such decisions during compile time
-is not an option in the days of multimachine kernels.
+As stated in the commit message, the call of imx_transmit_buffer() isn't 
+needed there, so it can be removed. I.e. remove unneeded code.
 
-Sascha
+In the end, this cleans up the possible locking path, so that in the 
+third patch the locking issue can be easily fixed.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Best regards
+
+Dirk
