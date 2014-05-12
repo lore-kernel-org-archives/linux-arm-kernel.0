@@ -1,51 +1,61 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Mon, 12 May 2014 11:53:04 +0800
-Subject: [GIT PULL][for 3.16] pull request for clk-hisi
-Message-ID: <CAD6h2NTBdtEUEvcG9ZrquacRUjc3LAOiOQdR+09MGk=9w48GDQ@mail.gmail.com>
+From: arun.kk@samsung.com (Arun Kumar K)
+Date: Mon, 12 May 2014 09:33:45 +0530
+Subject: [PATCH v3 0/4] ARM: dts: enable display for peach-pit and snow
+ boards
+In-Reply-To: <1399630186-22610-1-git-send-email-rahul.sharma@samsung.com>
+References: <1399630186-22610-1-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <CALt3h7-zRZp0HWE8VHUmnovfNESfu6c8f=4xScNRV1ZZcP_1vA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Hi Rahul,
 
-Please help to pull clk-hisi-for-v3.16 branch for the next release.
+On Fri, May 9, 2014 at 3:39 PM, Rahul Sharma <rahul.sharma@samsung.com> wrote:
+> From: Rahul Sharma <Rahul.Sharma@samsung.com>
+>
+> Add nodes for fimd and dp controller for exynos5250 based snow
+> and exynos5420 based peach-pit board.
+>
+
+It would be great to include the display support for 5800 peach-pi board also
+in this series. Most of the values would remain the same except for the changes
+for bigger display in peach-pi.
 
 Regards
-Haojian
+Arun
 
-The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
-
-  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/hzhuang1/linux.git
-tags/clk-hisi-for-v3.16
-
-for you to fetch changes up to 5efaf09021a5817e5a274aa2d2fad8d92d12ed92:
-
-  clk: hisi: add clk-hix5hd2.c (2014-05-12 11:30:32 +0800)
-
-----------------------------------------------------------------
-enable hix5hd2 clock
-
-----------------------------------------------------------------
-Zhangfei Gao (3):
-      clk: hisi: use clk_register_mux_table in hisi_clk_register_mux
-      clk: hisi: add hisi_clk_register_gate
-      clk: hisi: add clk-hix5hd2.c
-
- Documentation/devicetree/bindings/clock/hix5hd2-clock.txt |  31
-+++++++++++++++++++
- drivers/clk/Makefile                                      |   1 +
- drivers/clk/hisilicon/Makefile                            |   1 +
- drivers/clk/hisilicon/clk-hix5hd2.c                       | 101
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/hisilicon/clk.c                               |  41
-+++++++++++++++++++++---
- drivers/clk/hisilicon/clk.h                               |   3 ++
- include/dt-bindings/clock/hix5hd2-clock.h                 |  58
-++++++++++++++++++++++++++++++++++
- 7 files changed, 231 insertions(+), 5 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/hix5hd2-clock.txt
- create mode 100644 drivers/clk/hisilicon/clk-hix5hd2.c
- create mode 100644 include/dt-bindings/clock/hix5hd2-clock.h
+> This series is based on Kukjin Kims, for-next branch.
+>
+> V3:
+> 1) Dropped 1 patch "ARM: dts: move dp hpd line to the board file for
+>  exynos5420".
+> 2) Extra blank lines for readability.
+> 3) dp hpd gpio name change (dp_hpd -> dp_hpd_gpio)
+>
+> V2:
+> 1) Rebase on Peach-pit dependent patches.
+>
+> It is dependent on
+> 1) Andrew Bresticker's patch for hpd gpio addition, avilable at
+> http://www.spinics.net/lists/linux-samsung-soc/msg28827.html [Patch is 'ACK'ed.]
+> 2) Arun's patch for adding peach-pit board dts file at
+> http://www.spinics.net/lists/linux-samsung-soc/msg30103.html. [Patch is 'ACK'ed.]
+>
+> Rahul Sharma (4):
+>   ARM: dts: enable fimd for exynos5250 based snow board
+>   ARM: dts: enable dp-controller for exynos5250 based snow board
+>   ARM: dts: enable fimd for exynos5420 based peach-pit board
+>   ARM: dts: enable dp-controller for exynos5420 based peach-pit board
+>
+>  arch/arm/boot/dts/exynos5250-snow.dts      |   35 ++++++++++++++++++++++++
+>  arch/arm/boot/dts/exynos5420-peach-pit.dts |   41 ++++++++++++++++++++++++++++
+>  2 files changed, 76 insertions(+)
+>
+> --
+> 1.7.9.5
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
