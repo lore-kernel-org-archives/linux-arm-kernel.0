@@ -1,100 +1,83 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 12 May 2014 17:18:24 +0200
-Subject: [PATCH 2/2] ARM: mvebu: mvebu-soc-id: keep clock enabled if PCIe
- unit is enabled
-In-Reply-To: <1399903900-29977-3-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1399903900-29977-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1399903900-29977-3-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <5370E640.9050706@free-electrons.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 12 May 2014 16:22:42 +0100
+Subject: [PATCH 1/3] arm64: add MIDR_EL1 field accessors
+In-Reply-To: <20140512150514.GD18960@arm.com>
+References: <1399905470-26500-1-git-send-email-mark.rutland@arm.com>
+ <1399905470-26500-2-git-send-email-mark.rutland@arm.com>
+ <20140512150514.GD18960@arm.com>
+Message-ID: <20140512152242.GB10661@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
-
-On 12/05/2014 16:11, Thomas Petazzoni wrote:
-> Since the mvebu-soc-id code in mach-mvebu/ was introduced, several
-> users have noticed a regression: the PCIe card connected in the first
-> PCIe interface is not detected properly.
+On Mon, May 12, 2014 at 04:05:14PM +0100, Will Deacon wrote:
+> On Mon, May 12, 2014 at 03:37:48PM +0100, Mark Rutland wrote:
+> > The MIDR_EL1 register is composed of a number of bitfields, and uses of
+> > the fields has so far involved open-coding of the shifts and masks
+> > required.
+> > 
+> > This patch adds shifts and masks for each of the MIDR_EL1 subfields, and
+> > also provides accessors built atop of these. Existing uses within
+> > cputype.h are updated to use these accessors.
+> > 
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > ---
+> >  arch/arm64/include/asm/cputype.h | 27 +++++++++++++++++++++++++--
+> >  1 file changed, 25 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+> > index c404fb0..541b829 100644
+> > --- a/arch/arm64/include/asm/cputype.h
+> > +++ b/arch/arm64/include/asm/cputype.h
+> > @@ -36,6 +36,25 @@
+> >  	__val;								\
+> >  })
+> >  
+> > +#define MIDR_REVISION_MASK	0xf
+> > +#define MIDR_REVISION(midr)	((midr) & MIDR_REVISION_MASK)
+> > +#define MIDR_PARTNUM_SHIFT	4
+> > +#define MIDR_PARTNUM_MASK	(0xfff << MIDR_PARTNUM_SHIFT)
+> > +#define MIDR_PARTNUM(midr)	\
+> > +	(((midr) & MIDR_PARTNUM_MASK) >> MIDR_PARTNUM_SHIFT)
+> > +#define MIDR_ARCHITECTURE_SHIFT	16
+> > +#define MIDR_ARCHITECTURE_MASK	(0xf << MIDR_ARCHITECTURE_SHIFT)
+> > +#define MIDR_ARCHITECTURE(midr)	\
+> > +	(((midr) & MIDR_ARCHITECTURE_MASK) >> MIDR_ARCHITECTURE_SHIFT)
+> > +#define MIDR_VARIANT_SHIFT	20
+> > +#define MIDR_VARIANT_MASK	(0xf << MIDR_VARIANT_SHIFT)
+> > +#define MIDR_VARIANT(midr)	\
+> > +	(((midr) & MIDR_VARIANT_MASK) >> MIDR_VARIANT_SHIFT)
+> > +#define MIDR_IMPLEMENTOR_SHIFT	24
+> > +#define MIDR_IMPLEMENTOR_MASK	(0xff << MIDR_IMPLEMENTOR_SHIFT)
+> > +#define MIDR_IMPLEMENTOR(midr)	\
+> > +	(((midr) & MIDR_IMPLEMENTOR_MASK) >> MIDR_IMPLEMENTOR_SHIFT)
+> > +
+> >  #define ARM_CPU_IMP_ARM		0x41
+> >  #define ARM_CPU_IMP_APM		0x50
+> >  
+> > @@ -64,12 +83,16 @@ static inline u64 __attribute_const__ read_cpuid_mpidr(void)
+> >  
+> >  static inline unsigned int __attribute_const__ read_cpuid_implementor(void)
+> >  {
+> > -	return (read_cpuid_id() & 0xFF000000) >> 24;
+> > +	return MIDR_IMPLEMENTOR(read_cpuid_id());
+> >  }
+> >  
+> >  static inline unsigned int __attribute_const__ read_cpuid_part_number(void)
+> >  {
+> > -	return (read_cpuid_id() & 0xFFF0);
+> > +	/*
+> > +	 * The part number field is used in-place as a userspace ABI, so we
+> > +	 * cannot use MIDR_PARTNUM() here.
+> > +	 */
+> > +	return (read_cpuid_id() & MIDR_PARTNUM_MASK);
 > 
-> This is due to the fact that the mvebu-soc-id code enables the PCIe
-> clock of the first PCIe interface, reads the SoC device ID and
-> revision number (yes this information is made available as part of
-> PCIe registers), and then disables the clock. However, by doing this,
-> we gate the clock and therefore loose the complex PCIe configuration
-> that was done by the bootloader.
-> 
-> Unfortunately, as of today, the kernel is not capable of doing this
-> complex configuration by itself, so we really need to keep the PCIe
-> clock enabled. However, we don't want to keep it enabled
-> unconditionally: if the PCIe interface is not enabled or PCI support
-> is not compiled into the kernel, there is no reason to keep the PCIe
-> clock running.
-> 
-> This issue was discussed with Kevin Hilman, and the suggested solution
-> was to make the mvebu-soc-id code keep the clock enabled in case it
-> will be needed for PCIe. This is therefore the solution implemented in
-> this patch.
-> 
-> Long term, we hope to make the kernel more capable in terms of PCIe
-> configuration for this platform, which will anyway be needed to
-> support the compilation of the PCIe host controller driver as a
-> module. In the mean time however, we don't have much other choice than
-> to implement the currently proposed solution.
+> Where is this used as ABI? c_show is open-coded and kvm_target_cpu could
+> just add a shift left.
 
-It fixed the detection issue I had on the Armada 385 DB board:
-Tetsed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+For some reason I thought this was called by some code included from
+arch/arm, but that doesn't seem to be the case.
 
-And as I also agree with the code:
+I'll add the left shift in kvm_target_cpu instead.
 
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-
-Thanks,
-
-Gregory
-
-> 
-> Reported-by: Neil Greatorex <neil@fatboyfat.co.uk>
-> Cc: Neil Greatorex <neil@fatboyfat.co.uk>
-> Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> Cc: Kevin Hilman <khilman@linaro.org>
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: <stable@vger.kernel.org> # 3.14+
-> Fixes: af8d1c63afcbf36eea06789c92e22d4af118d2fb ('ARM: mvebu: Add support to get the ID and the revision of a SoC')
-> ---
->  arch/arm/mach-mvebu/mvebu-soc-id.c | 14 ++++++++++++--
->  1 file changed, 12 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mvebu/mvebu-soc-id.c b/arch/arm/mach-mvebu/mvebu-soc-id.c
-> index b52af6f..09520e1 100644
-> --- a/arch/arm/mach-mvebu/mvebu-soc-id.c
-> +++ b/arch/arm/mach-mvebu/mvebu-soc-id.c
-> @@ -108,8 +108,18 @@ static int __init mvebu_soc_id_init(void)
->  	iounmap(pci_base);
->  
->  res_ioremap:
-> -	clk_disable_unprepare(clk);
-> -	clk_put(clk);
-> +	/*
-> +	 * If the PCIe unit is actually enabled and we have PCI
-> +	 * support in the kernel, we intentionally do not release the
-> +	 * reference to the clock. We want to keep it running since
-> +	 * the bootloader does some PCIe link configuration that the
-> +	 * kernel is for now unable to do, and gating the clock would
-> +	 * make us loose this precious configuration.
-> +	 */
-> +	if (!of_device_is_available(child) || !IS_ENABLED(CONFIG_PCI_MVEBU)) {
-> +		clk_disable_unprepare(clk);
-> +		clk_put(clk);
-> +	}
->  
->  clk_err:
->  	of_node_put(child);
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Cheers,
+Mark.
