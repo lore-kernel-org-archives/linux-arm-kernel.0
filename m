@@ -1,56 +1,159 @@
 From: jays.lee@samsung.com (Jungseok Lee)
-Date: Mon, 12 May 2014 18:40:30 +0900
-Subject: [PATCH v6 1/7] arm64: Use pr_* instead of printk
-Message-ID: <000001cf6dc6$36c5d240$a45176c0$@samsung.com>
+Date: Mon, 12 May 2014 18:40:47 +0900
+Subject: [PATCH v6 4/7] arm64: Add 4 levels of page tables definition with 4KB
+ pages
+Message-ID: <000301cf6dc6$40bec4f0$c23c4ed0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixed the following checkpatch complaint as using pr_*
-instead of printk.
-
-WARNING: printk() should include KERN_ facility level
+This patch adds hardware definition and types for 4 levels of
+translation tables with 4KB pages.
 
 Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Steve Capper <steve.capper@linaro.org>
 Signed-off-by: Jungseok Lee <jays.lee@samsung.com>
 Reviewed-by: Sungjinn Chung <sungjinn.chung@samsung.com>
 Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/kernel/traps.c |    8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm64/include/asm/pgtable-4level-hwdef.h |   50 +++++++++++++++++
+ arch/arm64/include/asm/pgtable-4level-types.h |   71 +++++++++++++++++++++++++
+ 2 files changed, 121 insertions(+)
+ create mode 100644 arch/arm64/include/asm/pgtable-4level-hwdef.h
+ create mode 100644 arch/arm64/include/asm/pgtable-4level-types.h
 
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index c43cfa9..506f781 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -156,7 +156,7 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
- 		frame.pc = thread_saved_pc(tsk);
- 	}
- 
--	printk("Call trace:\n");
-+	pr_emerg("Call trace:\n");
- 	while (1) {
- 		unsigned long where = frame.pc;
- 		int ret;
-@@ -331,17 +331,17 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
- 
- void __pte_error(const char *file, int line, unsigned long val)
- {
--	printk("%s:%d: bad pte %016lx.\n", file, line, val);
-+	pr_crit("%s:%d: bad pte %016lx.\n", file, line, val);
- }
- 
- void __pmd_error(const char *file, int line, unsigned long val)
- {
--	printk("%s:%d: bad pmd %016lx.\n", file, line, val);
-+	pr_crit("%s:%d: bad pmd %016lx.\n", file, line, val);
- }
- 
- void __pgd_error(const char *file, int line, unsigned long val)
- {
--	printk("%s:%d: bad pgd %016lx.\n", file, line, val);
-+	pr_crit("%s:%d: bad pgd %016lx.\n", file, line, val);
- }
- 
- void __init trap_init(void)
+diff --git a/arch/arm64/include/asm/pgtable-4level-hwdef.h b/arch/arm64/include/asm/pgtable-4level-hwdef.h
+new file mode 100644
+index 0000000..0ec84e2
+--- /dev/null
++++ b/arch/arm64/include/asm/pgtable-4level-hwdef.h
+@@ -0,0 +1,50 @@
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef __ASM_PGTABLE_4LEVEL_HWDEF_H
++#define __ASM_PGTABLE_4LEVEL_HWDEF_H
++
++#define PTRS_PER_PTE		512
++#define PTRS_PER_PMD		512
++#define PTRS_PER_PUD		512
++#define PTRS_PER_PGD		512
++
++/*
++ * PGDIR_SHIFT determines the size a top-level page table entry can map.
++ */
++#define PGDIR_SHIFT		39
++#define PGDIR_SIZE		(_AC(1, UL) << PGDIR_SHIFT)
++#define PGDIR_MASK		(~(PGDIR_SIZE-1))
++
++/*
++ * PUD_SHIFT determines the size the second level page table entry can map.
++ */
++#define PUD_SHIFT		30
++#define PUD_SIZE		(_AC(1, UL) << PUD_SHIFT)
++#define PUD_MASK		(~(PUD_SIZE-1))
++
++/*
++ * PMD_SHIFT determines the size the third level page table entry can map.
++ */
++#define PMD_SHIFT		21
++#define PMD_SIZE		(_AC(1, UL) << PMD_SHIFT)
++#define PMD_MASK		(~(PMD_SIZE-1))
++
++/*
++ * section address mask and size definitions.
++ */
++#define SECTION_SHIFT		21
++#define SECTION_SIZE		(_AC(1, UL) << SECTION_SHIFT)
++#define SECTION_MASK		(~(SECTION_SIZE-1))
++
++#endif
+diff --git a/arch/arm64/include/asm/pgtable-4level-types.h b/arch/arm64/include/asm/pgtable-4level-types.h
+new file mode 100644
+index 0000000..7ad8dd2
+--- /dev/null
++++ b/arch/arm64/include/asm/pgtable-4level-types.h
+@@ -0,0 +1,71 @@
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef __ASM_PGTABLE_4LEVEL_TYPES_H
++#define __ASM_PGTABLE_4LEVEL_TYPES_H
++
++#include <asm/types.h>
++
++typedef u64 pteval_t;
++typedef u64 pmdval_t;
++typedef u64 pudval_t;
++typedef u64 pgdval_t;
++
++#undef STRICT_MM_TYPECHECKS
++
++#ifdef STRICT_MM_TYPECHECKS
++
++/*
++ * These are used to make use of C type-checking..
++ */
++typedef struct { pteval_t pte; } pte_t;
++typedef struct { pmdval_t pmd; } pmd_t;
++typedef struct { pudval_t pud; } pud_t;
++typedef struct { pgdval_t pgd; } pgd_t;
++typedef struct { pteval_t pgprot; } pgprot_t;
++
++#define pte_val(x)	((x).pte)
++#define pmd_val(x)	((x).pmd)
++#define pud_val(x)	((x).pud)
++#define pgd_val(x)	((x).pgd)
++#define pgprot_val(x)	((x).pgprot)
++
++#define __pte(x)	((pte_t) { (x) } )
++#define __pmd(x)	((pmd_t) { (x) } )
++#define __pud(x)	((pud_t) { (x) } )
++#define __pgd(x)	((pgd_t) { (x) } )
++#define __pgprot(x)	((pgprot_t) { (x) } )
++
++#else	/* !STRICT_MM_TYPECHECKS */
++
++typedef pteval_t pte_t;
++typedef pmdval_t pmd_t;
++typedef pudval_t pud_t;
++typedef pgdval_t pgd_t;
++typedef pteval_t pgprot_t;
++
++#define pte_val(x)	(x)
++#define pmd_val(x)	(x)
++#define pud_val(x)	(x)
++#define pgd_val(x)	(x)
++#define pgprot_val(x)	(x)
++
++#define __pte(x)	(x)
++#define __pmd(x)	(x)
++#define __pud(x)	(x)
++#define __pgd(x)	(x)
++#define __pgprot(x)	(x)
++
++#endif /* STRICT_MM_TYPECHECKS */
++
++#endif /* __ASM_PGTABLE_4LEVEL_TYPES_H */
 -- 
 1.7.10.4
