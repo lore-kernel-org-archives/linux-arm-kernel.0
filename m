@@ -1,420 +1,57 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 12 May 2014 18:28:19 +0100
-Subject: [PATCH v3 06/19] KVM: ARM: vgic: introduce vgic_ops and LR
- manipulation primitives
-In-Reply-To: <20140509140554.GG3362@lvm> (Christoffer Dall's message of "Fri,
- 9 May 2014 15:05:54 +0100")
-References: <1397655591-2761-1-git-send-email-marc.zyngier@arm.com>
- <1397655591-2761-7-git-send-email-marc.zyngier@arm.com>
- <20140509140554.GG3362@lvm>
-Message-ID: <87mwemj498.fsf@approximate.cambridge.arm.com>
+From: mathias.nyman@linux.intel.com (Mathias Nyman)
+Date: Mon, 12 May 2014 20:43:59 +0300
+Subject: [PATCHv5 07/20] usb: host: xhci-plat: add clock support
+In-Reply-To: <5370DEC7.9080708@free-electrons.com>
+References: <1399832288-19899-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1399832288-19899-8-git-send-email-thomas.petazzoni@free-electrons.com>
+ <5370DEC7.9080708@free-electrons.com>
+Message-ID: <5371085F.2010400@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 09 2014 at  3:05:54 pm BST, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> On Wed, Apr 16, 2014 at 02:39:38PM +0100, Marc Zyngier wrote:
->> In order to split the various register manipulation from the main vgic
->> code, introduce a vgic_ops structure, and start by abstracting the
->> LR manipulation code with a couple of accessors.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  include/kvm/arm_vgic.h |  18 ++++++
->>  virt/kvm/arm/vgic.c    | 170 +++++++++++++++++++++++++++++++++----------------
->>  2 files changed, 132 insertions(+), 56 deletions(-)
->>
->> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
->> index f738e5a..17bbe51 100644
->> --- a/include/kvm/arm_vgic.h
->> +++ b/include/kvm/arm_vgic.h
->> @@ -68,6 +68,24 @@ struct vgic_bytemap {
->>       u32 shared[VGIC_NR_SHARED_IRQS  / 4];
->>  };
->>
->> +struct kvm_vcpu;
->> +
->> +#define LR_STATE_PENDING     (1 << 0)
->> +#define LR_STATE_ACTIVE              (1 << 1)
->> +#define LR_STATE_MASK                (3 << 0)
->> +#define LR_EOI_INT           (1 << 2)
->> +
->> +struct vgic_lr {
->> +     u16     irq;
->> +     u8      source;
->> +     u8      state;
->> +};
->> +
->> +struct vgic_ops {
->> +     struct vgic_lr  (*get_lr)(const struct kvm_vcpu *, int);
->> +     void    (*set_lr)(struct kvm_vcpu *, int, struct vgic_lr);
->> +};
->> +
->>  struct vgic_dist {
->>  #ifdef CONFIG_KVM_ARM_VGIC
->>       spinlock_t              lock;
->> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
->> index 6bc6c7a..bac37b8 100644
->> --- a/virt/kvm/arm/vgic.c
->> +++ b/virt/kvm/arm/vgic.c
->> @@ -94,9 +94,12 @@ static struct device_node *vgic_node;
->>  #define ACCESS_WRITE_MASK(x) ((x) & (3 << 1))
->>
->>  static void vgic_retire_disabled_irqs(struct kvm_vcpu *vcpu);
->> +static void vgic_retire_lr(int lr_nr, int irq, struct kvm_vcpu *vcpu);
->>  static void vgic_update_state(struct kvm *kvm);
->>  static void vgic_kick_vcpus(struct kvm *kvm);
->>  static void vgic_dispatch_sgi(struct kvm_vcpu *vcpu, u32 reg);
->> +static struct vgic_lr vgic_get_lr(const struct kvm_vcpu *vcpu, int lr);
->> +static void vgic_set_lr(struct kvm_vcpu *vcpu, int lr, struct vgic_lr lr_desc);
->>  static u32 vgic_nr_lr;
->>
->>  static unsigned int vgic_maint_irq;
->> @@ -594,18 +597,6 @@ static bool handle_mmio_sgi_reg(struct kvm_vcpu *vcpu,
->>       return false;
->>  }
->>
->> -#define LR_CPUID(lr) \
->> -     (((lr) & GICH_LR_PHYSID_CPUID) >> GICH_LR_PHYSID_CPUID_SHIFT)
->> -#define LR_IRQID(lr) \
->> -     ((lr) & GICH_LR_VIRTUALID)
->> -
->> -static void vgic_retire_lr(int lr_nr, int irq, struct vgic_cpu *vgic_cpu)
->> -{
->> -     clear_bit(lr_nr, vgic_cpu->lr_used);
->> -     vgic_cpu->vgic_v2.vgic_lr[lr_nr] &= ~GICH_LR_STATE;
->> -     vgic_cpu->vgic_irq_lr_map[irq] = LR_EMPTY;
->> -}
->> -
->>  /**
->>   * vgic_unqueue_irqs - move pending IRQs from LRs to the distributor
->>   * @vgic_cpu: Pointer to the vgic_cpu struct holding the LRs
->> @@ -623,13 +614,10 @@ static void vgic_unqueue_irqs(struct kvm_vcpu *vcpu)
->>       struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
->>       struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
->>       int vcpu_id = vcpu->vcpu_id;
->> -     int i, irq, source_cpu;
->> -     u32 *lr;
->> +     int i;
->>
->>       for_each_set_bit(i, vgic_cpu->lr_used, vgic_cpu->nr_lr) {
->> -             lr = &vgic_cpu->vgic_v2.vgic_lr[i];
->> -             irq = LR_IRQID(*lr);
->> -             source_cpu = LR_CPUID(*lr);
->> +             struct vgic_lr lr = vgic_get_lr(vcpu, i);
->>
->>               /*
->>                * There are three options for the state bits:
->> @@ -641,7 +629,7 @@ static void vgic_unqueue_irqs(struct kvm_vcpu *vcpu)
->>                * If the LR holds only an active interrupt (not pending) then
->>                * just leave it alone.
->>                */
->> -             if ((*lr & GICH_LR_STATE) == GICH_LR_ACTIVE_BIT)
->> +             if ((lr.state & LR_STATE_MASK) == LR_STATE_ACTIVE)
->>                       continue;
->>
->>               /*
->> @@ -650,18 +638,19 @@ static void vgic_unqueue_irqs(struct kvm_vcpu *vcpu)
->>                * is fine, then we are only setting a few bits that were
->>                * already set.
->>                */
->> -             vgic_dist_irq_set(vcpu, irq);
->> -             if (irq < VGIC_NR_SGIS)
->> -                     dist->irq_sgi_sources[vcpu_id][irq] |= 1 << source_cpu;
->> -             *lr &= ~GICH_LR_PENDING_BIT;
->> +             vgic_dist_irq_set(vcpu, lr.irq);
->> +             if (lr.irq < VGIC_NR_SGIS)
->> +                     dist->irq_sgi_sources[vcpu_id][lr.irq] |= 1 << lr.source;
->> +             lr.state &= ~LR_STATE_PENDING;
->> +             vgic_set_lr(vcpu, i, lr);
->>
->>               /*
->>                * If there's no state left on the LR (it could still be
->>                * active), then the LR does not hold any useful info and can
->>                * be marked as free for other use.
->>                */
->> -             if (!(*lr & GICH_LR_STATE))
->> -                     vgic_retire_lr(i, irq, vgic_cpu);
->> +             if (!(lr.state & LR_STATE_MASK))
->> +                     vgic_retire_lr(i, lr.irq, vcpu);
->>
->>               /* Finally update the VGIC state. */
->>               vgic_update_state(vcpu->kvm);
->> @@ -989,9 +978,77 @@ static void vgic_update_state(struct kvm *kvm)
->>       }
->>  }
->>
->> +static struct vgic_lr vgic_v2_get_lr(const struct kvm_vcpu *vcpu, int lr)
->> +{
->> +     struct vgic_lr lr_desc;
->> +     u32 val = vcpu->arch.vgic_cpu.vgic_v2.vgic_lr[lr];
->> +
->> +     lr_desc.irq     = val & GICH_LR_VIRTUALID;
->> +     lr_desc.source  = (val >> GICH_LR_PHYSID_CPUID_SHIFT) & 0xff;
+On 05/12/2014 05:46 PM, Gregory CLEMENT wrote:
+> Hi Mathias, Felipe,
 >
-> shouldn't the mask here be 0xf according to the GICv2 spec?
-
-Actually, looks like it should be 7 instead (bits [12:10], and only when
-lr_desc.irq is within 0..15). Well spotted anyway.
-
+> On 11/05/2014 20:17, Thomas Petazzoni wrote:
+>> From: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>>
+>> Some platforms (such as the Armada 38x ones) can gate the clock of
+>> their USB controller. This patch adds the support for one clock in
+>> xhci-plat, by enabling it during probe and disabling it on remove.
+>>
+>> To achieve this, it adds a 'struct clk *' member in xhci_hcd. While
+>> only used for now in xhci-plat, it might be used by other drivers in
+>> the future. Moreover, the xhci_hcd structure already holds other
+>> members such as msix_count and msix_entries, which are MSI-X specific,
+>> and therefore only used by xhci-pci.
 >
->> +     lr_desc.state   = 0;
->> +
->> +     if (val & GICH_LR_PENDING_BIT)
->> +             lr_desc.state |= LR_STATE_PENDING;
->> +     if (val & GICH_LR_ACTIVE_BIT)
->> +             lr_desc.state |= LR_STATE_ACTIVE;
->> +     if (val & GICH_LR_EOI)
->> +             lr_desc.state |= LR_EOI_INT;
->> +
->> +     return lr_desc;
->> +}
->> +
->>  #define MK_LR_PEND(src, irq) \
->>       (GICH_LR_PENDING_BIT | ((src) << GICH_LR_PHYSID_CPUID_SHIFT) | (irq))
->>
->> +static void vgic_v2_set_lr(struct kvm_vcpu *vcpu, int lr,
->> +                        struct vgic_lr lr_desc)
->> +{
->> +     u32 lr_val = MK_LR_PEND(lr_desc.source, lr_desc.irq);
+> Felpie,
 >
-> this looks a bit weird, the check just below suggests that you can
-> convert a struct vgic_lr into an lr register for, for example, an lr
-> which is just active and not pending.
-
-Ah, this is probably a leftover from some previous implementation. I'll
-get rid of MR_LR_PEND altogether, and rely solely on lr_desc.state.
-
->> +
->> +     if (lr_desc.state & LR_STATE_PENDING)
->> +             lr_val |= GICH_LR_PENDING_BIT;
->> +     if (lr_desc.state & LR_STATE_ACTIVE)
->> +             lr_val |= GICH_LR_ACTIVE_BIT;
->> +     if (lr_desc.state & LR_EOI_INT)
->> +             lr_val |= GICH_LR_EOI;
->> +
->> +     vcpu->arch.vgic_cpu.vgic_v2.vgic_lr[lr] = lr_val;
->> +
->> +     /*
->> +      * Despite being EOIed, the LR may not have been marked as
->> +      * empty.
->> +      */
->> +     if (!(lr_val & GICH_LR_STATE))
->> +             set_bit(lr, (unsigned long *)vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr);
+> would you agree to add your acked-by on this patch. You gave it on
+> the 3rd version however as pointed by Thomas there was some issues,
+> what do you think of this version?
 >
-> This feels weird in vgic_v2_set_lr, the name/style suggests that these
-> get/set functions are just converters from a struct vgic_lr (that
-> presumably common code can deal with) and architecture-specific LR
-> register formats.
 >
-> If these functions have richer semantics than that (like maintaining the
-> elrsr register), please comment that on the function.
-
-Yeah, this is one of the corners I really dislike, but making this a
-separate vector makes things even more ugly than they already are.
-
-I'll add some comments, but feel free to suggest an alternative approach.
-
->> +}
->> +
->> +static const struct vgic_ops vgic_ops = {
->> +     .get_lr                 = vgic_v2_get_lr,
->> +     .set_lr                 = vgic_v2_set_lr,
->> +};
->> +
->> +static inline struct vgic_lr vgic_get_lr(const struct kvm_vcpu *vcpu, int lr)
->> +{
->> +     return vgic_ops.get_lr(vcpu, lr);
->> +}
->> +
->> +static inline void vgic_set_lr(struct kvm_vcpu *vcpu, int lr,
->> +                            struct vgic_lr vlr)
->> +{
->> +     vgic_ops.set_lr(vcpu, lr, vlr);
->> +}
+> Mathias,
 >
-> inline statics in a C file?  Surely the compiler is smart enough to
-> inline this without any hints.
-
-Yup, brain fart here.
-
->> +
->> +static void vgic_retire_lr(int lr_nr, int irq, struct kvm_vcpu *vcpu)
->> +{
->> +     struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
->> +     struct vgic_lr vlr = vgic_get_lr(vcpu, lr_nr);
+> as the xHCI maintainer what is your opinion on this patch. Do you plan
+> to take it? do you expect a pull request?
 >
-> seems like we're doing a lot of copying back and forward between the
-> struct vgic_lr and the LRs on the vgic_cpu struct, I wonder if it makes
-> more sense to only deal with it during the sync/flush functions, or
-> maybe we end up messing with more state than necessary then?
-
-We're doing a lot of them, but we actually don't have much copying. The
-structure is small enough to fit in a single register (even on AArch32),
-and we're passing it by value. So the whole state computation actually
-occurs in registers.
-
-But overall yes, I agree that we should probably try to do things in a
-more staged way. I'll have a look.
-
->> +
->> +     vlr.state = 0;
->> +     vgic_set_lr(vcpu, lr_nr, vlr);
->> +     clear_bit(lr_nr, vgic_cpu->lr_used);
->> +     vgic_cpu->vgic_irq_lr_map[irq] = LR_EMPTY;
->> +}
->> +
->>  /*
->>   * An interrupt may have been disabled after being made pending on the
->>   * CPU interface (the classic case is a timer running while we're
->> @@ -1007,12 +1064,12 @@ static void vgic_retire_disabled_irqs(struct kvm_vcpu *vcpu)
->>       int lr;
->>
->>       for_each_set_bit(lr, vgic_cpu->lr_used, vgic_cpu->nr_lr) {
->> -             int irq = vgic_cpu->vgic_v2.vgic_lr[lr] & GICH_LR_VIRTUALID;
->> +             struct vgic_lr vlr = vgic_get_lr(vcpu, lr);
->>
->> -             if (!vgic_irq_is_enabled(vcpu, irq)) {
->> -                     vgic_retire_lr(lr, irq, vgic_cpu);
->> -                     if (vgic_irq_is_active(vcpu, irq))
->> -                             vgic_irq_clear_active(vcpu, irq);
->> +             if (!vgic_irq_is_enabled(vcpu, vlr.irq)) {
->> +                     vgic_retire_lr(lr, vlr.irq, vcpu);
->> +                     if (vgic_irq_is_active(vcpu, vlr.irq))
->> +                             vgic_irq_clear_active(vcpu, vlr.irq);
->>               }
->>       }
->>  }
->> @@ -1024,6 +1081,7 @@ static void vgic_retire_disabled_irqs(struct kvm_vcpu *vcpu)
->>  static bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq)
->>  {
->>       struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
->> +     struct vgic_lr vlr;
->>       int lr;
->>
->>       /* Sanitize the input... */
->> @@ -1036,13 +1094,15 @@ static bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq)
->>       lr = vgic_cpu->vgic_irq_lr_map[irq];
->>
->>       /* Do we have an active interrupt for the same CPUID? */
->> -     if (lr != LR_EMPTY &&
->> -         (LR_CPUID(vgic_cpu->vgic_v2.vgic_lr[lr]) == sgi_source_id)) {
->> -             kvm_debug("LR%d piggyback for IRQ%d %x\n",
->> -                       lr, irq, vgic_cpu->vgic_v2.vgic_lr[lr]);
->> -             BUG_ON(!test_bit(lr, vgic_cpu->lr_used));
->> -             vgic_cpu->vgic_v2.vgic_lr[lr] |= GICH_LR_PENDING_BIT;
->> -             return true;
->> +     if (lr != LR_EMPTY) {
->> +             vlr = vgic_get_lr(vcpu, lr);
->> +             if (vlr.source == sgi_source_id) {
->> +                     kvm_debug("LR%d piggyback for IRQ%d\n", lr, vlr.irq);
->> +                     BUG_ON(!test_bit(lr, vgic_cpu->lr_used));
->> +                     vlr.state |= LR_STATE_PENDING;
->> +                     vgic_set_lr(vcpu, lr, vlr);
->> +                     return true;
->> +             }
->>       }
->>
->>       /* Try to use another LR for this interrupt */
->> @@ -1052,12 +1112,16 @@ static bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq)
->>               return false;
->>
->>       kvm_debug("LR%d allocated for IRQ%d %x\n", lr, irq, sgi_source_id);
->> -     vgic_cpu->vgic_v2.vgic_lr[lr] = MK_LR_PEND(sgi_source_id, irq);
->>       vgic_cpu->vgic_irq_lr_map[irq] = lr;
->>       set_bit(lr, vgic_cpu->lr_used);
->>
->> +     vlr.irq = irq;
->> +     vlr.source = sgi_source_id;
->> +     vlr.state = LR_STATE_PENDING;
->>       if (!vgic_irq_is_edge(vcpu, irq))
->> -             vgic_cpu->vgic_v2.vgic_lr[lr] |= GICH_LR_EOI;
->> +             vlr.state |= LR_EOI_INT;
->> +
->> +     vgic_set_lr(vcpu, lr, vlr);
->>
->>       return true;
->>  }
->> @@ -1180,29 +1244,23 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
->>                * Some level interrupts have been EOIed. Clear their
->>                * active bit.
->>                */
->> -             int lr, irq;
->> +             int lr;
->>
->>               for_each_set_bit(lr, (unsigned long *)vgic_cpu->vgic_v2.vgic_eisr,
->>                                vgic_cpu->nr_lr) {
->> -                     irq = vgic_cpu->vgic_v2.vgic_lr[lr] & GICH_LR_VIRTUALID;
->> +                     struct vgic_lr vlr = vgic_get_lr(vcpu, lr);
->>
->> -                     vgic_irq_clear_active(vcpu, irq);
->> -                     vgic_cpu->vgic_v2.vgic_lr[lr] &= ~GICH_LR_EOI;
->> +                     vgic_irq_clear_active(vcpu, vlr.irq);
->> +                     vlr.state = 0;
+> We submitted the first version of this series one month ago and we didn't
+> receive any feedback from you. Maybe it was just because you were happy
+> with the patch sent, but I would like to be sure that you noticed this
+> series.
 >
-> slight change of semantics here.  It is still correct, but only because
-> we never set the pending bit on an already active level interrupt, but I
-> guess this could technically be closer to real hardware by allowing
-> world-switching VMs that are processing active interrupts to pick up an
-> additional pending state, in which case just setting state = 0 would be
-> incorrect here, and you should instead lower the EOI mask like you did
-> before.
->
-> That being said, it is a pseudo-theoretical point, and you can make me
-> more happy by adding:
->
-> BUG_ON(vlr.state & LR_STATE_MASK);
->
-> before clearing the state completely.
-
-Putting a BUG_ON() seems a bit harsh. WARN_ON()?
-
->> +                     vgic_set_lr(vcpu, lr, vlr);
->>
->>                       /* Any additional pending interrupt? */
->> -                     if (vgic_dist_irq_is_pending(vcpu, irq)) {
->> -                             vgic_cpu_irq_set(vcpu, irq);
->> +                     if (vgic_dist_irq_is_pending(vcpu, vlr.irq)) {
->> +                             vgic_cpu_irq_set(vcpu, vlr.irq);
->>                               level_pending = true;
->>                       } else {
->> -                             vgic_cpu_irq_clear(vcpu, irq);
->> +                             vgic_cpu_irq_clear(vcpu, vlr.irq);
->>                       }
->> -
->> -                     /*
->> -                      * Despite being EOIed, the LR may not have
->> -                      * been marked as empty.
->> -                      */
->> -                     set_bit(lr, (unsigned long *)vgic_cpu->vgic_v2.vgic_elrsr);
->> -                     vgic_cpu->vgic_v2.vgic_lr[lr] &= ~GICH_LR_ACTIVE_BIT;
->>               }
->>       }
->>
->> @@ -1228,15 +1286,15 @@ static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
->>       /* Clear mappings for empty LRs */
->>       for_each_set_bit(lr, (unsigned long *)vgic_cpu->vgic_v2.vgic_elrsr,
->>                        vgic_cpu->nr_lr) {
->> -             int irq;
->> +             struct vgic_lr vlr;
->>
->>               if (!test_and_clear_bit(lr, vgic_cpu->lr_used))
->>                       continue;
->>
->> -             irq = vgic_cpu->vgic_v2.vgic_lr[lr] & GICH_LR_VIRTUALID;
->> +             vlr = vgic_get_lr(vcpu, lr);
->>
->> -             BUG_ON(irq >= VGIC_NR_IRQS);
->> -             vgic_cpu->vgic_irq_lr_map[irq] = LR_EMPTY;
->> +             BUG_ON(vlr.irq >= VGIC_NR_IRQS);
->> +             vgic_cpu->vgic_irq_lr_map[vlr.irq] = LR_EMPTY;
->>       }
->>
->>       /* Check if we still have something up our sleeve... */
->> --
->> 1.8.3.4
->>
-> -Christoffer
+> I have the same question for the patch before: "[PATCHv5 06/20] usb: host:
+> xhci-plat: sort the headers in alphabetic order" and the three following:
+> "[PATCHv5 07/20] usb: host: xhci-plat: add clock support", "[PATCHv5 08/20]
+>   usb: host: xhci-plat: add support for the Armada 375/38x XHCI controllers"
+> and "[PATCHv5 09/20] Documentation: dt-bindings: update xhci-platform DT
+> binding".
 >
 
--- 
-Jazz is not dead. It just smells funny.
+Hi
+
+Sorry about the delay, Only thing I found was a sparse warning, otherwise looks ok.
+
+-Mathias
