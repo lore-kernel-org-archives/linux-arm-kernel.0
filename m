@@ -1,372 +1,99 @@
 From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Mon, 12 May 2014 18:06:31 +0200
-Subject: [PATCH 03/12] drivers: clk: st: STiH407: Support for Flexgen Clocks
+Date: Mon, 12 May 2014 18:06:39 +0200
+Subject: [PATCH 11/12] drivers: clk: st: Update frequency tables for fs660c32
+ and fs432c65
 In-Reply-To: <1399910800-12847-1-git-send-email-gabriel.fernandez@linaro.org>
 References: <1399910800-12847-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <1399910800-12847-4-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <1399910800-12847-12-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is the Flexgen implementation reusing as much as possible
-of Common Clock Framework functions.
+This patch extend the range of possible frequencies of the fs432c65
+and fs660c32 Quad frequency synthesizers.
 
-The idea is to have an instance of "struct flexgen" per output clock.
-It represents the clock cross bar (by a mux element), and the pre and final dividers
-(using dividers and gates elements).
-
-Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
-Signed-off-by: Olivier Bideau <olivier.bideau@st.com>
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
 ---
- drivers/clk/st/Makefile      |   2 +-
- drivers/clk/st/clk-flexgen.c | 332 +++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 333 insertions(+), 1 deletion(-)
- create mode 100644 drivers/clk/st/clk-flexgen.c
+ drivers/clk/st/clkgen-fsyn.c | 65 ++++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 57 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/clk/st/Makefile b/drivers/clk/st/Makefile
-index c7455ff..ede7b2f 100644
---- a/drivers/clk/st/Makefile
-+++ b/drivers/clk/st/Makefile
-@@ -1 +1 @@
--obj-y += clkgen-mux.o clkgen-pll.o clkgen-fsyn.o
-+obj-y += clkgen-mux.o clkgen-pll.o clkgen-fsyn.o clk-flexgen.o
-diff --git a/drivers/clk/st/clk-flexgen.c b/drivers/clk/st/clk-flexgen.c
-new file mode 100644
-index 0000000..f3ed700
---- /dev/null
-+++ b/drivers/clk/st/clk-flexgen.c
-@@ -0,0 +1,332 @@
-+/*
-+ * clk-flexgen.c
-+ *
-+ * Copyright (C) ST-Microelectronics SA 2013
-+ * Author:  Maxime Coquelin <maxime.coquelin@st.com> for ST-Microelectronics.
-+ * License terms:  GNU General Public License (GPL), version 2  */
-+
-+#include <linux/clk-provider.h>
-+#include <linux/module.h>
-+#include <linux/slab.h>
-+#include <linux/io.h>
-+#include <linux/err.h>
-+#include <linux/string.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+
-+struct flexgen {
-+	struct clk_hw hw;
-+
-+	/* Crossbar */
-+	struct clk_mux mux;
-+	/* Pre-divisor's gate */
-+	struct clk_gate pgate;
-+	/* Pre-divisor */
-+	struct clk_divider pdiv;
-+	/* Final divisor's gate */
-+	struct clk_gate fgate;
-+	/* Final divisor */
-+	struct clk_divider fdiv;
-+};
-+
-+#define to_flexgen(_hw) container_of(_hw, struct flexgen, hw)
-+
-+static int flexgen_enable(struct clk_hw *hw)
-+{
-+	struct flexgen *flexgen = to_flexgen(hw);
-+	struct clk_hw *pgate_hw = &flexgen->pgate.hw;
-+	struct clk_hw *fgate_hw = &flexgen->fgate.hw;
-+
-+	pgate_hw->clk = hw->clk;
-+	fgate_hw->clk = hw->clk;
-+
-+	clk_gate_ops.enable(pgate_hw);
-+
-+	clk_gate_ops.enable(fgate_hw);
-+
-+	pr_debug("%s: flexgen output enabled\n", __clk_get_name(hw->clk));
-+	return 0;
-+}
-+
-+static void flexgen_disable(struct clk_hw *hw)
-+{
-+	struct flexgen *flexgen = to_flexgen(hw);
-+	struct clk_hw *fgate_hw = &flexgen->fgate.hw;
-+
-+	/* disable only the final gate */
-+	fgate_hw->clk = hw->clk;
-+
-+	clk_gate_ops.disable(fgate_hw);
-+
-+	pr_debug("%s: flexgen output disabled\n", __clk_get_name(hw->clk));
-+}
-+
-+static int flexgen_is_enabled(struct clk_hw *hw)
-+{
-+	struct flexgen *flexgen = to_flexgen(hw);
-+	struct clk_hw *fgate_hw = &flexgen->fgate.hw;
-+
-+	fgate_hw->clk = hw->clk;
-+
-+	if (!clk_gate_ops.is_enabled(fgate_hw))
-+		return 0;
-+
-+	return 1;
-+}
-+
-+static u8 flexgen_get_parent(struct clk_hw *hw)
-+{
-+	struct flexgen *flexgen = to_flexgen(hw);
-+	struct clk_hw *mux_hw = &flexgen->mux.hw;
-+
-+	mux_hw->clk = hw->clk;
-+
-+	return clk_mux_ops.get_parent(mux_hw);
-+}
-+
-+static int flexgen_set_parent(struct clk_hw *hw, u8 index)
-+{
-+	struct flexgen *flexgen = to_flexgen(hw);
-+	struct clk_hw *mux_hw = &flexgen->mux.hw;
-+
-+	mux_hw->clk = hw->clk;
-+
-+	return clk_mux_ops.set_parent(mux_hw, index);
-+}
-+
-+static inline unsigned long
-+clk_best_div(unsigned long parent_rate, unsigned long rate)
-+{
-+	return parent_rate / rate + ((rate > (2*(parent_rate % rate))) ? 0 : 1);
-+}
-+
-+static long flexgen_round_rate(struct clk_hw *hw, unsigned long rate,
-+				   unsigned long *prate)
-+{
-+	unsigned long div;
-+
-+	/* Round div according to exact prate and wished rate */
-+	div = clk_best_div(*prate, rate);
-+
-+	if (__clk_get_flags(hw->clk) & CLK_SET_RATE_PARENT) {
-+		*prate = rate * div;
-+		return rate;
-+	} else
-+		return *prate / div;
-+}
-+
-+unsigned long flexgen_recalc_rate(struct clk_hw *hw,
-+		unsigned long parent_rate)
-+{
-+	struct flexgen *flexgen = to_flexgen(hw);
-+	struct clk_hw *pdiv_hw = &flexgen->pdiv.hw;
-+	struct clk_hw *fdiv_hw = &flexgen->fdiv.hw;
-+	unsigned long mid_rate;
-+
-+	pdiv_hw->clk = hw->clk;
-+	fdiv_hw->clk = hw->clk;
-+
-+	mid_rate = clk_divider_ops.recalc_rate(pdiv_hw, parent_rate);
-+
-+	return clk_divider_ops.recalc_rate(fdiv_hw, mid_rate);
-+}
-+
-+static int flexgen_set_rate(struct clk_hw *hw, unsigned long rate,
-+				unsigned long parent_rate)
-+{
-+	struct flexgen *flexgen = to_flexgen(hw);
-+	struct clk_hw *pdiv_hw = &flexgen->pdiv.hw;
-+	struct clk_hw *fdiv_hw = &flexgen->fdiv.hw;
-+	unsigned long primary_div = 0;
-+	int ret = 0;
-+
-+	pdiv_hw->clk = hw->clk;
-+	fdiv_hw->clk = hw->clk;
-+
-+	primary_div = clk_best_div(parent_rate, rate);
-+
-+	clk_divider_ops.set_rate(fdiv_hw, parent_rate, parent_rate);
-+	ret = clk_divider_ops.set_rate(pdiv_hw, rate, rate * primary_div);
-+
-+	return ret;
-+}
-+
-+static const struct clk_ops flexgen_ops = {
-+	.enable = flexgen_enable,
-+	.disable = flexgen_disable,
-+	.is_enabled = flexgen_is_enabled,
-+	.get_parent = flexgen_get_parent,
-+	.set_parent = flexgen_set_parent,
-+	.round_rate = flexgen_round_rate,
-+	.recalc_rate = flexgen_recalc_rate,
-+	.set_rate = flexgen_set_rate,
-+};
-+
-+struct clk *clk_register_flexgen(const char *name,
-+				const char **parent_names, u8 num_parents,
-+				void __iomem *reg, spinlock_t *lock, u32 idx,
-+				unsigned long flexgen_flags) {
-+	struct flexgen *fgxbar;
-+	struct clk *clk;
-+	struct clk_init_data init;
-+	u32  xbar_shift;
-+	void __iomem *xbar_reg, *fdiv_reg;
-+
-+	fgxbar = kzalloc(sizeof(struct flexgen), GFP_KERNEL);
-+	if (!fgxbar)
-+		return ERR_PTR(-ENOMEM);
-+
-+	init.name = name;
-+	init.ops = &flexgen_ops;
-+	init.flags = CLK_IS_BASIC | flexgen_flags;
-+	init.parent_names = parent_names;
-+	init.num_parents = num_parents;
-+
-+	xbar_reg = reg + 0x18 + (idx & ~0x3);
-+	xbar_shift = (idx % 4) * 0x8;
-+	fdiv_reg = reg + 0x164 + idx * 4;
-+
-+	/* Crossbar element config */
-+	fgxbar->mux.lock = lock;
-+	fgxbar->mux.mask = BIT(6) - 1;
-+	fgxbar->mux.reg = xbar_reg;
-+	fgxbar->mux.shift = xbar_shift;
-+	fgxbar->mux.table = NULL;
-+
-+
-+	/* Pre-divider's gate config (in xbar register)*/
-+	fgxbar->pgate.lock = lock;
-+	fgxbar->pgate.reg = xbar_reg;
-+	fgxbar->pgate.bit_idx = xbar_shift + 6;
-+
-+	/* Pre-divider config */
-+	fgxbar->pdiv.lock = lock;
-+	fgxbar->pdiv.reg = reg + 0x58 + idx * 4;
-+	fgxbar->pdiv.width = 10;
-+
-+	/* Final divider's gate config */
-+	fgxbar->fgate.lock = lock;
-+	fgxbar->fgate.reg = fdiv_reg;
-+	fgxbar->fgate.bit_idx = 6;
-+
-+	/* Final divider config */
-+	fgxbar->fdiv.lock = lock;
-+	fgxbar->fdiv.reg = fdiv_reg;
-+	fgxbar->fdiv.width = 6;
-+
-+	fgxbar->hw.init = &init;
-+
-+	clk = clk_register(NULL, &fgxbar->hw);
-+	if (IS_ERR(clk))
-+		kfree(fgxbar);
-+	else
-+		pr_debug("%s: parent %s rate %u\n",
-+			__clk_get_name(clk),
-+			__clk_get_name(clk_get_parent(clk)),
-+			(unsigned int)clk_get_rate(clk));
-+	return clk;
-+}
-+
-+static const char ** __init flexgen_get_parents(struct device_node *np,
-+						       int *num_parents)
-+{
-+	const char **parents;
-+	int nparents, i;
-+
-+	nparents = of_count_phandle_with_args(np, "clocks", "#clock-cells");
-+	if (WARN_ON(nparents <= 0))
-+		return NULL;
-+
-+	parents = kzalloc(nparents * sizeof(const char *), GFP_KERNEL);
-+	if (!parents)
-+		return NULL;
-+
-+	for (i = 0; i < nparents; i++)
-+		parents[i] = of_clk_get_parent_name(np, i);
-+
-+	*num_parents = nparents;
-+	return parents;
-+}
-+
-+void __init st_of_flexgen_setup(struct device_node *np)
-+{
-+	struct device_node *pnode;
-+	void __iomem *reg;
-+	struct clk_onecell_data *clk_data;
-+	const char **parents;
-+	int num_parents, i;
-+	spinlock_t *rlock = NULL;
-+	unsigned long flex_flags = 0;
-+
-+	pnode = of_get_parent(np);
-+	if (!pnode)
-+		return;
-+
-+	reg = of_iomap(pnode, 0);
-+	if (!reg)
-+		return;
-+
-+	parents = flexgen_get_parents(np, &num_parents);
-+	if (!parents)
-+		return;
-+
-+	clk_data = kzalloc(sizeof(*clk_data), GFP_KERNEL);
-+	if (!clk_data)
-+		goto err;
-+
-+	clk_data->clk_num = of_property_count_strings(np ,
-+			"clock-output-names");
-+	if (clk_data->clk_num <= 0) {
-+		pr_err("%s: Failed to get number of output clocks (%d)",
-+				__func__, clk_data->clk_num);
-+		goto err;
-+	}
-+
-+	clk_data->clks = kzalloc(clk_data->clk_num * sizeof(struct clk *),
-+			GFP_KERNEL);
-+	if (!clk_data->clks)
-+		goto err;
-+
-+	rlock = kzalloc(sizeof(spinlock_t), GFP_KERNEL);
-+	if (!rlock)
-+		goto err;
-+
-+	for (i = 0; i < clk_data->clk_num; i++) {
-+		struct clk *clk;
-+		const char *clk_name;
-+
-+		if (of_property_read_string_index(np, "clock-output-names",
-+						  i, &clk_name)) {
-+			break;
-+		}
-+
-+		/*
-+		 * If we read an empty clock name then the output is unused
-+		 */
-+		if (*clk_name == '\0')
-+			continue;
-+
-+		clk = clk_register_flexgen(clk_name, parents, num_parents,
-+					   reg, rlock, i, flex_flags);
-+
-+		if (IS_ERR(clk))
-+			goto err;
-+
-+		clk_data->clks[i] = clk;
-+	}
-+
-+	kfree(parents);
-+	of_clk_add_provider(np, of_clk_src_onecell_get, clk_data);
-+
-+	return;
-+
-+err:
-+	if (clk_data)
-+		kfree(clk_data->clks);
-+	kfree(clk_data);
-+	kfree(parents);
-+	kfree(rlock);
-+
-+	return;
-+}
-+CLK_OF_DECLARE(flexgen, "st,flexgen", st_of_flexgen_setup);
+diff --git a/drivers/clk/st/clkgen-fsyn.c b/drivers/clk/st/clkgen-fsyn.c
+index d7a0341..97a422f 100644
+--- a/drivers/clk/st/clkgen-fsyn.c
++++ b/drivers/clk/st/clkgen-fsyn.c
+@@ -50,17 +50,66 @@ static struct stm_fs fs216c65_rtbl[] = {
+ };
+ 
+ static struct stm_fs fs432c65_rtbl[] = {
+-	{ .mdiv = 0x1f, .pe = 0x0,	.sdiv = 0x7,	.nsdiv = 0 },	/* 625   Khz */
+-	{ .mdiv = 0x11, .pe = 0x1c72,	.sdiv = 0x2,	.nsdiv = 1 },	/* 108   MHz */
+-	{ .mdiv = 0x19, .pe = 0x121a,	.sdiv = 0x0,	.nsdiv = 1 },	/* 297   MHz */
++	{ .mdiv = 0x1f, .pe = 0x0,	.sdiv = 0x7,	.nsdiv = 0 },	/* 625     Khz */
++	{ .mdiv = 0x13, .pe = 0x777c,	.sdiv = 0x4,	.nsdiv = 1 },	/* 25.175  MHz */
++	{ .mdiv = 0x19, .pe = 0x4d35,	.sdiv = 0x2,	.nsdiv = 0 },	/* 25.200  MHz */
++	{ .mdiv = 0x11, .pe = 0x1c72,	.sdiv = 0x4,	.nsdiv = 1 },	/* 27.000  MHz */
++	{ .mdiv = 0x17, .pe = 0x28f5,	.sdiv = 0x2,	.nsdiv = 0 },	/* 27.027  MHz */
++	{ .mdiv = 0x16, .pe = 0x3359,	.sdiv = 0x2,	.nsdiv = 0 },	/* 28.320  MHz */
++	{ .mdiv = 0x1f, .pe = 0x2083,	.sdiv = 0x3,	.nsdiv = 1 },	/* 30.240  MHz */
++	{ .mdiv = 0x1e, .pe = 0x430d,	.sdiv = 0x3,	.nsdiv = 1 },	/* 31.500  MHz */
++	{ .mdiv = 0x17, .pe = 0x0,	.sdiv = 0x3,	.nsdiv = 1 },	/* 40.000  MHz */
++	{ .mdiv = 0x19, .pe = 0x121a,	.sdiv = 0x1,	.nsdiv = 0 },	/* 49.500  MHz */
++	{ .mdiv = 0x13, .pe = 0x6667,	.sdiv = 0x3,	.nsdiv = 1 },	/* 50.000  MHz */
++	{ .mdiv = 0x10, .pe = 0x1ee6,	.sdiv = 0x3,	.nsdiv = 1 },	/* 57.284  MHz */
++	{ .mdiv = 0x1d, .pe = 0x3b14,	.sdiv = 0x2,	.nsdiv = 1 },	/* 65.000  MHz */
++	{ .mdiv = 0x12, .pe = 0x7c65,	.sdiv = 0x1,	.nsdiv = 0 },	/* 71.000  MHz */
++	{ .mdiv = 0x19, .pe = 0xecd,	.sdiv = 0x2,	.nsdiv = 1 },	/* 74.176  MHz */
++	{ .mdiv = 0x19, .pe = 0x121a,	.sdiv = 0x2,	.nsdiv = 1 },	/* 74.250  MHz */
++	{ .mdiv = 0x19, .pe = 0x3334,	.sdiv = 0x2,	.nsdiv = 1 },	/* 75.000  MHz */
++	{ .mdiv = 0x18, .pe = 0x5138,	.sdiv = 0x2,	.nsdiv = 1 },	/* 78.800  MHz */
++	{ .mdiv = 0x1d, .pe = 0x77d,	.sdiv = 0x0,	.nsdiv = 0 },	/* 85.500  MHz */
++	{ .mdiv = 0x1c, .pe = 0x13d5,	.sdiv = 0x0,	.nsdiv = 0 },	/* 88.750  MHz */
++	{ .mdiv = 0x11, .pe = 0x1c72,	.sdiv = 0x2,	.nsdiv = 1 },	/* 108.000 MHz */
++	{ .mdiv = 0x17, .pe = 0x28f5,	.sdiv = 0x0,	.nsdiv = 0 },	/* 108.108 MHz */
++	{ .mdiv = 0x10, .pe = 0x6e26,	.sdiv = 0x2,	.nsdiv = 1 },	/* 118.963 MHz */
++	{ .mdiv = 0x15, .pe = 0x3e63,	.sdiv = 0x0,	.nsdiv = 0 },	/* 119.000 MHz */
++	{ .mdiv = 0x1c, .pe = 0x471d,	.sdiv = 0x1,	.nsdiv = 1 },	/* 135.000 MHz */
++	{ .mdiv = 0x19, .pe = 0xecd,	.sdiv = 0x1,	.nsdiv = 1 },	/* 148.352 MHz */
++	{ .mdiv = 0x19, .pe = 0x121a,	.sdiv = 0x1,	.nsdiv = 1 },	/* 148.500 MHz */
++	{ .mdiv = 0x19, .pe = 0x121a,	.sdiv = 0x0,	.nsdiv = 1 },	/* 297     MHz */
+ };
+ 
+ static struct stm_fs fs660c32_rtbl[] = {
+-	{ .mdiv = 0x01, .pe = 0x2aaa,	.sdiv = 0x8,	.nsdiv = 0 },	/* 600   KHz */
+-	{ .mdiv = 0x02, .pe = 0x3d33,	.sdiv = 0x0,	.nsdiv = 0 },	/* 148.5 Mhz */
+-	{ .mdiv = 0x13, .pe = 0x5bcc,	.sdiv = 0x0,	.nsdiv = 1 },	/* 297   Mhz */
+-	{ .mdiv = 0x0e, .pe = 0x1025,	.sdiv = 0x0,	.nsdiv = 1 },	/* 333   Mhz */
+-	{ .mdiv = 0x0b, .pe = 0x715f,	.sdiv = 0x0,	.nsdiv = 1 },	/* 350   Mhz */
++	{ .mdiv = 0x14, .pe = 0x376b,	.sdiv = 0x4,	.nsdiv = 1 },	/* 25.175  MHz */
++	{ .mdiv = 0x14, .pe = 0x30c3,	.sdiv = 0x4,	.nsdiv = 1 },	/* 25.200  MHz */
++	{ .mdiv = 0x10, .pe = 0x71c7,	.sdiv = 0x4,	.nsdiv = 1 },	/* 27.000  MHz */
++	{ .mdiv = 0x00, .pe = 0x47af,	.sdiv = 0x3,	.nsdiv = 0 },	/* 27.027  MHz */
++	{ .mdiv = 0x0e, .pe = 0x4e1a,	.sdiv = 0x4,	.nsdiv = 1 },	/* 28.320  MHz */
++	{ .mdiv = 0x0b, .pe = 0x534d,	.sdiv = 0x4,	.nsdiv = 1 },	/* 30.240  MHz */
++	{ .mdiv = 0x17, .pe = 0x6fbf,	.sdiv = 0x2,	.nsdiv = 0 },	/* 31.500  MHz */
++	{ .mdiv = 0x01, .pe = 0x0,	.sdiv = 0x4,	.nsdiv = 1 },	/* 40.000  MHz */
++	{ .mdiv = 0x15, .pe = 0x2aab,	.sdiv = 0x3,	.nsdiv = 1 },	/* 49.500  MHz */
++	{ .mdiv = 0x14, .pe = 0x6666,	.sdiv = 0x3,	.nsdiv = 1 },	/* 50.000  MHz */
++	{ .mdiv = 0x1d, .pe = 0x395f,	.sdiv = 0x1,	.nsdiv = 0 },	/* 57.284  MHz */
++	{ .mdiv = 0x08, .pe = 0x4ec5,	.sdiv = 0x3,	.nsdiv = 1 },	/* 65.000  MHz */
++	{ .mdiv = 0x05, .pe = 0x1770,	.sdiv = 0x3,	.nsdiv = 1 },	/* 71.000  MHz */
++	{ .mdiv = 0x03, .pe = 0x4ba7,	.sdiv = 0x3,	.nsdiv = 1 },	/* 74.176  MHz */
++	{ .mdiv = 0x0f, .pe = 0x3426,	.sdiv = 0x1,	.nsdiv = 0 },	/* 74.250  MHz */
++	{ .mdiv = 0x0e, .pe = 0x7777,	.sdiv = 0x1,	.nsdiv = 0 },	/* 75.000  MHz */
++	{ .mdiv = 0x01, .pe = 0x4053,	.sdiv = 0x3,	.nsdiv = 1 },	/* 78.800  MHz */
++	{ .mdiv = 0x09, .pe = 0x15b5,	.sdiv = 0x1,	.nsdiv = 0 },	/* 85.500  MHz */
++	{ .mdiv = 0x1b, .pe = 0x3f19,	.sdiv = 0x2,	.nsdiv = 1 },	/* 88.750  MHz */
++	{ .mdiv = 0x10, .pe = 0x71c7,	.sdiv = 0x2,	.nsdiv = 1 },	/* 108.000 MHz */
++	{ .mdiv = 0x00, .pe = 0x47af,	.sdiv = 0x1,	.nsdiv = 0 },	/* 108.108 MHz */
++	{ .mdiv = 0x0c, .pe = 0x3118,	.sdiv = 0x2,	.nsdiv = 1 },	/* 118.963 MHz */
++	{ .mdiv = 0x0c, .pe = 0x2f54,	.sdiv = 0x2,	.nsdiv = 1 },	/* 119.000 MHz */
++	{ .mdiv = 0x07, .pe = 0xe39,	.sdiv = 0x2,	.nsdiv = 1 },	/* 135.000 MHz */
++	{ .mdiv = 0x03, .pe = 0x4ba7,	.sdiv = 0x2,	.nsdiv = 1 },	/* 148.352 MHz */
++	{ .mdiv = 0x0f, .pe = 0x3426,	.sdiv = 0x0,	.nsdiv = 0 },	/* 148.500 MHz */
++	{ .mdiv = 0x03, .pe = 0x4ba7,	.sdiv = 0x1,	.nsdiv = 1 },	/* 296.704 MHz */
++	{ .mdiv = 0x03, .pe = 0x471c,	.sdiv = 0x1,	.nsdiv = 1 },	/* 297     MHz */
++	{ .mdiv = 0x1c, .pe = 0x0,	.sdiv = 0x0,	.nsdiv = 1 },	/* 352     Mhz */
+ };
+ 
+ struct clkgen_quadfs_data {
 -- 
 1.9.1
