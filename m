@@ -1,169 +1,73 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Mon, 12 May 2014 13:46:15 -0500
-Subject: [RFC] [v2 Patch 2/6] ARM: TI: Describe the ti reset DT entries
-In-Reply-To: <5368E12D.1060706@ti.com>
-References: <1399320567-3639-1-git-send-email-dmurphy@ti.com>
- <1399320567-3639-3-git-send-email-dmurphy@ti.com>
- <20140505220155.GI25949@atomide.com> <5368E12D.1060706@ti.com>
-Message-ID: <537116F7.5070403@ti.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 12 May 2014 15:06:04 -0400 (EDT)
+Subject: set_fiq_handler: Bad mode in data abort handler detected (mmu
+ translation fault)
+In-Reply-To: <9398501.4D8aYHERx3@dabox>
+References: <2527501.cXAbiV8bqS@dabox> <7402473.jpZGckhttH@dabox>
+ <20140425135117.GP26756@n2100.arm.linux.org.uk> <9398501.4D8aYHERx3@dabox>
+Message-ID: <alpine.LFD.2.11.1405121452470.980@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dan,
+On Mon, 12 May 2014, Tim Sander wrote:
 
-On 05/06/2014 08:18 AM, Murphy, Dan wrote:
-> Tony
+> I did an prefaulting for each available processes:
+>     for_each_process(process)
+>     {
+>         printk("process: %s [%d]\n",process->comm,process->pid);
+>         if(process->mm) {
+>             switch_mm(old_process->mm,process->mm,process);
+>             ioread32(priv->my_hardware);   // access the memory, prefault mmu
+>             old_process = process;
+>         }
+>     }
+> but still i get the the "Bad mode in data abort":
+> Bad mode in data abort handler detected
+> Internal error: Oops - bad mode: 0 [#1] PREEMPT SMP ARM
+> Modules linked in: firq(O+) ipv6
+> CPU: 0 PID: 0 Comm: swapper/0 Tainted: G           O 3.12.0-xilinx-00005-gc9455c0-dirty #97
+> task: c05cb420 ti: c05c0000 task.ti: c05c0000
+> PC is at 0xe3fc0000
+> LR is at arch_cpu_idle+0x20/0x2c
+> pc : [<e3fc0000>]    lr : [<c000f344>]    psr: 600701d1
+> sp : c05c1f70  ip : 00000000  fp : 00000000
+> r10: 00000000  r9 : 413fc090  r8 : c0a7b4c0
+> r7 : c05b6088  r6 : c0412348  r5 : c06008c0  r4 : c05c0000
+> r3 : 00000000  r2 : 00000000  r1 : 00000000  r0 : c0a7e9f8
+> Flags: nZCv  IRQs off  FIQs off  Mode FIQ_32  ISA ARM  Segment kernel
+> Control: 18c5387d  Table: 1ec2c04a  DAC: 00000015
+> Process swapper/0 (pid: 0, stack limit = 0xc05c0240)
+> Stack: (0xc05c1f70 to 0xc05c2000)
+> 1f60:                                     c0a7e9f8 00000000 00000000 00000000
+> 1f80: c05c0000 c06008c0 c0412348 c05b6088 c0a7b4c0 413fc090 00000000 00000000
+> 1fa0: 00000000 c05c1f70 c000f344 e3fc0000 600701d1 ffffffff 00000000 c0056748
+> 1fc0: c0414a30 c0592a60 ffffffff ffffffff c0592574 00000000 00000000 c05b6088
+> 1fe0: 18c5387d c05c83cc c05b6084 c05cc440 0000406a 00008074 00000000 00000000
+> [<c000f344>] (arch_cpu_idle+0x20/0x2c) from [<00000000>] (  (null))
+> Code: bad PC value
+> ---[ end trace 38f263d4b2076bcb ]---
 > 
-> Thanks for the comments
+> But then i realized that its always swapper/0 which is faulting. But i don't see a pid 0 process
+> in my for_each_process loop. So i tried some special handling for pid 0 to also prefault it:
 > 
-> On 05/05/2014 05:01 PM, Tony Lindgren wrote:
->> * Dan Murphy <dmurphy@ti.com> [140505 13:10]:
->>> +
->>> +Required parent properties:
->>> +- compatible : Should be one of,
->>> +		"ti,omap4-prm" for OMAP4 PRM instances
->>> +		"ti,omap5-prm" for OMAP5 PRM instances
->>> +		"ti,dra7-prm" for DRA7xx PRM instances
->>> +		"ti,am4-prcm" for AM43xx PRCM instances
->>> +		"ti,am3-prcm" for AM33xx PRCM instances
->>> +
->>> +Required child reset property:
->>> +- compatible : Should be
->>> +		"resets" for All TI SoCs
->>> +
->>> +example:
->>> +		prm: prm at 4ae06000 {
->>> +			compatible = "ti,omap5-prm";
->>> +			reg = <0x4ae06000 0x3000>;
->>> +
->>> +			prm_resets: resets {
->>> +				#address-cells = <1>;
->>> +				#size-cells = <1>;
->>> +				#reset-cells = <1>;
->>> +			};
->>> +		};
->> The reg entries you have in the example below has different format
->> compared to this?
+>     process = pid_task(&init_struct_pid, PIDTYPE_PID);
+>     if(process) {
+>         printk("process: %s [%d]\n",process->comm,process->pid);
+>         switch_mm(current_task->mm,process->mm,process);
+>         ioread32(priv->my_hardware);  // access the memory, prefault mmu
+>         switch_mm(process->mm,current_task->mm,current_task);
+>     } else printk("process pid prefault failed\n");  //<this path is taken
+> 
+> But it seems that the scheduler pid struct has no process associated. So its 
+> not possible to get the mmu_struct for the pid 0. The structure can't be 
+> implicit or otherwise there should be an mmu entry due to the prefaulting done
+> or due to the static mapping. So it seems there is an MMU table which is not
+> associated with any process and is used during scheduler/swapper work...
+> but where is it hiding?
 
-Right, the #size-cells should have been 0, or each reg field updated
-with an additional field value of 4 as the registers are all of constant
-width - 4 bytes.
+The mmu_struct for PID 0 is at &init_mm.  
 
-> 
-> This is the parent to the resets.  The reg entries below are for
-> the child reset signals.
-> 
->>
->>> +Reset node declaration
->>> +==============================================
->>> +The reset node is declared in a parent child relationship.  The main parent
->>> +is the PRCM module which contains the base address.  The first child within
->>> +the reset parent declares the target modules reset name.  This is followed by
->>> +the control and status offsets.
->>> +
->>> +Within the first reset child node is a secondary child node which declares the
->>> +reset signal of interest.  Under this node the control and status bits
->>> +are declared.  These bits declare the bit mask for the target reset.
->>> +
->>> +
->>> +Required properties:
->>> +reg - This is the register offset from the PRCM parent.
->>> +	This must be declared as:
->>> +
->>> +	reg = <control register offset>,
->>> +		  <status register offset>;
->>> +
->>> +control-bit - This is the bit within the register which controls the reset
->>> +	of the target module.  This is declared as a bit mask for the register.
->>> +status-bit - This is the bit within the register which contains the status of
->>> +	the reset of the target module.
->>> +	This is declared as a bit mask for the register.
->>> +
->>> +example:
->>> +&prm_resets {
->>> +	dsp_rstctrl {
->>> +		reg = <0x1c00>,
->>> +			  <0x1c04>;
->> Shouldn't this be start and size instead of start and end here?
+Try: switch_mm(current_task->mm, &init_mm, NULL);
 
-These are two registers - one for control and one for status.
 
-> 
-> I could do start and size.  But the size will be the same for each register.
-> AM33xx really hurts the consistency model here as the other patches in the series
-> it appears that the control and status are consistent but AM33xx the registers are all over
-> the place.
-> 
-> I have not looked at OMAP2->4 yet for control and status register offsets.
-> 
->>> +		dsp_reset: dsp_reset {
->>> +			control-bit = <0x01>;
->>> +			status-bit = <0x01>;
->>> +		};
->>> +	};
->>> +};
->> Are the control-bit and status-bit always the same? If so, you can
->> keep that knowlede private to the the driver.
-> 
-> No there is a case in the am33xx resets file where the status and control bits are not the same.
-
-Do we really need two separate properties to represent this, as these
-are essentially the relevant bits in the corresponding reg elements.
-I guess this is somewhat same as Tony's suggestion about using the reg
-field for these sub-nodes, in which case, you would have to add another
-#address-cells as 1 for each of the child reset nodes.
-
-regards
-Suman
-
-> 
->>
->> And maybe you can have the bit offset in a reg property here to
->> avoid adding any custom properties? Something like:
->>
->> 	dsp_reset: reset at 1 {
->> 		reg = 1;
->> 	};
->>
->> If reg is not suitable for that, it seems that some generic property
->> to describe the bit offset is needed by quite a few drivers
->> anyways, for things like clocks and regulators.
-> 
-> I will have to look into this.  Maybe a generic entry called bit-offset
-> that defines the bit or a mask for the registers.  It can mimic the reg
-> entry.
-> 
->>> +Client Node Declaration
->>> +==============================================
->>> +This is the consumer of the parent node to declare what resets this
->>> +particular module is interested in.
->>> +
->>> +example:
->>> +	src: src at 55082000 {
->>> +		    resets = <&reset_src phandle>;
->>> +			reset-names = "<reset_name>";
->>> +	};
->>> +
->>> +Required Properties:
->>> +reset_src - This is the parent DT entry for the reset controller
->>> +phandle - This is the phandle of the specific reset to be used by the clien
->>> +	driver.
->>> +reset-names - This is the reset name of module that the device driver
->>> +	needs to be able to reset.  This value must correspond to a value within
->>> +	the reset controller array.
->>> +
->>> +example:
->>> +resets = <&prm_resets &dsp_mmu_reset>;
->>> +reset-names = "dsp_mmu_reset";
->> This part looks OK to me, not sure if we need the reset-names property
->> if we have one already why not.
-> 
-> reset-names are part of the reset.txt file.  I could probably drop the resets and reset-name information here
-> and point to the reset.txt file for further explanation.
-> 
->>
->> Regards,
->>
->> Tony
-> 
-> 
+Nicolas
