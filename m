@@ -1,126 +1,195 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 12 May 2014 17:40:31 -0400
-Subject: omap4-panda-es boot issues with v3.15-rc4
-In-Reply-To: <20140511155542.GD28266@atomide.com>
-References: <536B7E44.2040303@ti.com> <7hppjos2w2.fsf@paris.lan>
- <CAGa+x84VB3CXDm71JWxHx1-Qk1xVNeXdwUjZnb42_wg+piOzzA@mail.gmail.com>
- <20140508165558.GB2198@atomide.com> <20140508184055.GC2198@atomide.com>
- <7hha4zsyro.fsf@paris.lan> <536C9084.50209@ti.com> <7heh02ms82.fsf@paris.lan>
- <20140511155542.GD28266@atomide.com>
-Message-ID: <53713FCF.3000006@ti.com>
+From: sonnyrao@chromium.org (Sonny Rao)
+Date: Mon, 12 May 2014 14:44:17 -0700
+Subject: [PATCH] mmc: dw_mmc: change to use recommended reset procedure
+In-Reply-To: <CAPz6YkUjLmWXvoCkuY8vAwLHksf0Uit6gWP-ADWBbN3NDJBo-w@mail.gmail.com>
+References: <1395834374-1988-1-git-send-email-yuvaraj.cd@samsung.com>
+ <CAKuRcOJYsC9OUOrYrvKg_iC5Z6dZ0mqW3-y=UXHtCr99=gQBXw@mail.gmail.com>
+ <536C2C31.8000209@samsung.com>
+ <CAPz6YkXGH96mjeePwUSRmPX4Y1YXYif+N+BRKsTwtNxtRq3xoQ@mail.gmail.com>
+ <536C594A.5080107@samsung.com> <536C84A0.6020403@samsung.com>
+ <CAPz6YkUjLmWXvoCkuY8vAwLHksf0Uit6gWP-ADWBbN3NDJBo-w@mail.gmail.com>
+Message-ID: <CAPz6YkW5CfdMTW3W-zdK29RCv4q7u9rAMr6AjWip3beuhgsv5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 11 May 2014 11:55 AM, Tony Lindgren wrote:
-> * Kevin Hilman <khilman@linaro.org> [140509 16:46]:
->> Roger Quadros <rogerq@ti.com> writes:
+On Fri, May 9, 2014 at 8:36 PM, Sonny Rao <sonnyrao@chromium.org> wrote:
+> On Fri, May 9, 2014 at 12:32 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+>> Hi, Sonny.
 >>
->>> Kevin,
->>>
->>> On 05/09/2014 01:15 AM, Kevin Hilman wrote:
->>>> Tony Lindgren <tony@atomide.com> writes:
->>>>
->>>> [...]
->>>>
->>>>> ..but I think I found the cause for recent hangs on panda, just a wild
->>>>> guess based on looking at the recent cpuidle patches after v3.14.
->>>>>
->>>>> Looks like reverting 0b89e9aa2856 (cpuidle: delay enabling interrupts
->>>>> until all coupled CPUs leave idle) makes booting work reliably again
->>>>> on panda.
->>>>>
->>>>> Can you guys confirm, so far no issues here after few boot tests,
->>>>> but it might be too early to tell.
->>>>
->>>> Reverting that makes things a bit more stable, but it still eventually
->>>> fails in the same way.  For me it took 8 boots for it to eventually
->>>> fail.
->>>>
->>>> However, if I build with CONFIG_CPU_IDLE=n, it becomes much more stable
->>>> (20+ boots in a row and still going.)
->>>>
->>>
->>> Can you please test with CPU_IDLE enabled but C3 disabled as in below patch?
->>> It worked for me 10/10 boots.
+>> You can discard the my previous some comment.
+>> As you mentioned, this reset sequence is recommended at Synopsys TRM.
 >>
->> Yup, it worked for me too for 10/10 boots in a row.
-> 
-> But what has caused this regression, does it work reliably with let's
-> say v3.13 or v3.12?
-> 
-IIRC things were stable till some CPUIDLE code consolidation happened.
-I don't recall exactly but some one did discuss about it a while back.
+>> Add the minor question.
+>>
+>> On 05/09/2014 01:27 PM, Jaehoon Chung wrote:
+>>> Hi, Sonny.
+>>>
+>>> I have checked the Synopsys TRM..
+>>>
+>>> On 05/09/2014 10:34 AM, Sonny Rao wrote:
+>>>> On Thu, May 8, 2014 at 6:15 PM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+>>>>> On 05/08/2014 06:40 PM, Yuvaraj Kumar wrote:
+>>>>>> Any comments on this patch?
+>>>>>>
+>>>>>> On Wed, Mar 26, 2014 at 5:16 PM, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com> wrote:
+>>>>>>> From: Sonny Rao <sonnyrao@chromium.org>
+>>>>>>>
+>>>>>>> This patch changes the fifo reset code to follow the reset procedure
+>>>>>>> outlined in the documentation of Synopsys  Mobile storage host databook
+>>>>>>> 7.2.13.
+>>>>>>> Without this patch, we could able to see eMMC was not detected after
+>>>>>>> multiple reboots due to driver hangs while eMMC tuning for HS200.
+>>>>>>>
+>>>>>>> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+>>>>>>> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.org>
+>>>>>>> ---
+>>>>>>>  drivers/mmc/host/dw_mmc.c |   48 ++++++++++++++++++++++++++++++++++++++++++++-
+>>>>>>>  drivers/mmc/host/dw_mmc.h |    1 +
+>>>>>>>  2 files changed, 48 insertions(+), 1 deletion(-)
+>>>>>>>
+>>>>>>> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+>>>>>>> index 32dd81d..1d77431 100644
+>>>>>>> --- a/drivers/mmc/host/dw_mmc.c
+>>>>>>> +++ b/drivers/mmc/host/dw_mmc.c
+>>>>>>> @@ -2220,7 +2220,53 @@ static inline bool dw_mci_fifo_reset(struct dw_mci *host)
+>>>>>>>                 host->sg = NULL;
+>>>>>>>         }
+>>>>>>>
+>>>>>>> -       return dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET);
+>>>>>>> +       /*
+>>>>>>> +        * The recommended method for resetting is to always reset the
+>>>>>>> +        * controller and the fifo, but differs slightly depending on the mode.
+>>>>>>> +        * Note that this doesn't handle the "generic DMA" (not IDMAC) case.
+>>>>>>> +        */
+>>>>>
+>>>>> "not IDMAC" is confused..
+>>>>>
+>>>>
+>>>> The documentation describes three different possible modes.  There's a
+>>>> mode that doesn't use IDMAC but still does DMA.  But as far as I can
+>>>> tell this driver doesn't support that way.  We can just remove that
+>>>> wording if it's confusing.
+>>
+>> How did it know whether dma is generic DMA or not?
+>>
+>
+> That's a good question.  I wasn't sure whether the driver supported it
+> or not.  It looks like it definitely supports IDMAC through the
+> CONFIG_MMC_DW_IDMAC flag, but I wasn't sure if it was supported the
+> generic dma.  Maybe if CONFIG_MMC_DW_IDMAC isn't specified but
+> host->dma_ops is not NULL then we are using the generic dma mode.
+>
 
-Can you re-run your test-cases with patch at end of the email. This
-is just a hunch so don't blame me if I waste your time testing the
+Doug mentioned that James Hogan might have an answer.  James, are
+there Imgtec SoCs which use dw_mmc and use DMA but don't use the
+IDMAC?  If so, we can add that support into this reset procedure
 patch.
 
-regards,
-Santosh
-
->From bdd30d68f8fa659aa0e3ce436f94029a7719036b Mon Sep 17 00:00:00 2001
-From: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Date: Mon, 12 May 2014 17:37:59 -0400
-Subject: [PATCH] Revert "cpuidle / omap4 : use CPUIDLE_FLAG_TIMER_STOP flag"
-
-This reverts commit cb7094e848f7bcaa0a4cda3db4b232f08dbf5b78.
-
-Conflicts:
-
-	arch/arm/mach-omap2/cpuidle44xx.c
----
- arch/arm/mach-omap2/cpuidle44xx.c |   11 +++++++----
- 1 file changed, 7 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
-index 01fc710..aae3606 100644
---- a/arch/arm/mach-omap2/cpuidle44xx.c
-+++ b/arch/arm/mach-omap2/cpuidle44xx.c
-@@ -83,6 +83,7 @@ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
- {
- 	struct idle_statedata *cx = state_ptr + index;
- 	u32 mpuss_can_lose_context = 0;
-+	int cpu_id = smp_processor_id();
- 
- 	/*
- 	 * CPU0 has to wait and stay ON until CPU1 is OFF state.
-@@ -110,6 +111,8 @@ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
- 	mpuss_can_lose_context = (cx->mpu_state == PWRDM_POWER_RET) &&
- 				 (cx->mpu_logic_state == PWRDM_POWER_OFF);
- 
-+	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu_id);
-+
- 	/*
- 	 * Call idle CPU PM enter notifier chain so that
- 	 * VFP and per CPU interrupt context is saved.
-@@ -165,6 +168,8 @@ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
- 	if (dev->cpu == 0 && mpuss_can_lose_context)
- 		cpu_cluster_pm_exit();
- 
-+	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu_id);
-+
- fail:
- 	cpuidle_coupled_parallel_barrier(dev, &abort_barrier);
- 	cpu_done[dev->cpu] = false;
-@@ -189,8 +194,7 @@ static struct cpuidle_driver omap4_idle_driver = {
- 			/* C2 - CPU0 OFF + CPU1 OFF + MPU CSWR */
- 			.exit_latency = 328 + 440,
- 			.target_residency = 960,
--			.flags = CPUIDLE_FLAG_TIME_VALID | CPUIDLE_FLAG_COUPLED |
--			         CPUIDLE_FLAG_TIMER_STOP,
-+			.flags = CPUIDLE_FLAG_TIME_VALID | CPUIDLE_FLAG_COUPLED,
- 			.enter = omap_enter_idle_coupled,
- 			.name = "C2",
- 			.desc = "CPUx OFF, MPUSS CSWR",
-@@ -199,8 +203,7 @@ static struct cpuidle_driver omap4_idle_driver = {
- 			/* C3 - CPU0 OFF + CPU1 OFF + MPU OSWR */
- 			.exit_latency = 460 + 518,
- 			.target_residency = 1100,
--			.flags = CPUIDLE_FLAG_TIME_VALID | CPUIDLE_FLAG_COUPLED |
--			         CPUIDLE_FLAG_TIMER_STOP,
-+			.flags = CPUIDLE_FLAG_TIME_VALID | CPUIDLE_FLAG_COUPLED,
- 			.enter = omap_enter_idle_coupled,
- 			.name = "C3",
- 			.desc = "CPUx OFF, MPUSS OSWR",
--- 
-1.7.9.5
+>>>>
+>>>>>>> +       if (dw_mci_ctrl_reset(host, SDMMC_CTRL_RESET | SDMMC_CTRL_FIFO_RESET)) {
+>>>>>>> +               unsigned long timeout = jiffies + msecs_to_jiffies(500);
+>>>>>>> +               u32 status, rint;
+>>>>>>> +
+>>>>>>> +               /* if using dma we wait for dma_req to clear */
+>>>>>>> +               if (host->using_dma) {
+>>>>>>> +                       do {
+>>>>>>> +                               status = mci_readl(host, STATUS);
+>>>>>>> +                               if (!(status & SDMMC_STATUS_DMA_REQ))
+>>>>>>> +                                       break;
+>>>>>>> +                               cpu_relax();
+>>>>>>> +                       } while (time_before(jiffies, timeout));
+>>>>>>> +
+>>>>>>> +                       if (status & SDMMC_STATUS_DMA_REQ)
+>>>>>>> +                               dev_err(host->dev,
+>>>>>>> +                                       "%s: Timeout waiting for dma_req to "
+>>>>>>> +                                       "clear during reset", __func__);
+>>>>>>> +
+>>>>>>> +                       /* when using DMA next we reset the fifo again */
+>>>>>>> +                       dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET);
+>>>>>>> +               }
+>>>>>>> +               /*
+>>>>>>> +                * In all cases we clear the RAWINTS register to clear any
+>>>>>>> +                * interrupts.
+>>>>>>> +                */
+>>>>>>> +               rint = mci_readl(host, RINTSTS);
+>>>>>>> +               rint = rint & (~mci_readl(host, MINTSTS));
+>>> you use the "status or temp" instead of rint. (you can reuse the variable.)
+>>> And can use "status &= ~mci_readl(host,MINTSTS);"
+>>>
+>>>>>
+>>>>> Just clear the RINTSTS register? why do you add these?
+>>>>>
+>>>>
+>>>> This will look at what is not masked, and only clear those bits.
+>>> Well, i known if clear the RINTSTS register,
+>>> recommended to use "0xfffffff" and set the value for interrupt.
+>>
+>> Can be used "0xfffffff"?
+>>
+>
+> Yeah we probably can.  We just lose information about interrupts that
+> were masked, but maybe we just don't care about any of them anyway, so
+> it doesn't matter.
+>
+>> Best Regards,
+>> Jaehoon Chung
+>>>
+>>>>
+>>>>>>> +               if (rint)
+>>>>>>> +                       mci_writel(host, RINTSTS, rint);
+>>>>>>> +
+>>>>>>> +       } else
+>>>>>>> +               dev_err(host->dev, "%s: Reset bits didn't clear", __func__);
+>>>>>
+>>>>> Just display the error log? I didn't understand this.
+>>>>> If you displayed the error log, then it needs to return the error value.
+>>>>>
+>>>>>>> +
+>>>>>>> + #ifdef CONFIG_MMC_DW_IDMAC
+>>>>>>> +       /* It is also recommended that we reset and reprogram idmac */
+>>>>>>> +       dw_mci_idmac_reset(host);
+>>>>>>> + #endif
+>>>>>>> +
+>>>>>>> +       /* After a CTRL reset we need to have CIU set clock registers  */
+>>>>>>> +       mci_send_cmd(host->cur_slot, SDMMC_CMD_UPD_CLK, 0);
+>>>
+>>> Well, why do you send the clock update command?
+>>> I didn't see that update the value related with clock.
+>>>
+>>> Best Regards,
+>>> Jaehoon Chung
+>>>
+>>>>>>> +
+>>>>>>> +       return true;
+>>>>>>>  }
+>>>>>>>
+>>>>>>>  static inline bool dw_mci_ctrl_all_reset(struct dw_mci *host)
+>>>>>>> diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
+>>>>>>> index 738fa24..037e47a 100644
+>>>>>>> --- a/drivers/mmc/host/dw_mmc.h
+>>>>>>> +++ b/drivers/mmc/host/dw_mmc.h
+>>>>>>> @@ -129,6 +129,7 @@
+>>>>>>>  #define SDMMC_CMD_INDX(n)              ((n) & 0x1F)
+>>>>>>>  /* Status register defines */
+>>>>>>>  #define SDMMC_GET_FCNT(x)              (((x)>>17) & 0x1FFF)
+>>>>>>> +#define SDMMC_STATUS_DMA_REQ           BIT(31)
+>>>>>>>  /* FIFOTH register defines */
+>>>>>>>  #define SDMMC_SET_FIFOTH(m, r, t)      (((m) & 0x7) << 28 | \
+>>>>>>>                                          ((r) & 0xFFF) << 16 | \
+>>>>>>> --
+>>>>>>> 1.7.10.4
+>>>>>>>
+>>>>>>
+>>>>>
+>>>> --
+>>>> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+>>>> the body of a message to majordomo at vger.kernel.org
+>>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>>>
+>>>
+>>> --
+>>> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>>
+>>
