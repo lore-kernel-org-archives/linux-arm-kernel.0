@@ -1,71 +1,61 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 13 May 2014 07:30:04 +0900
-Subject: [PATCH v2 0/6] Further cleanup and enable multiplat build
-In-Reply-To: <CAK9yfHxu+9Lh47ULOb7PWy=JJZqjU3jB9wteJsLvnhDDr=_PQw@mail.gmail.com>
-References: <1397554134-11827-1-git-send-email-sachin.kamat@linaro.org>	<534E8AF9.4050206@samsung.com>
- <CAK9yfHxu+9Lh47ULOb7PWy=JJZqjU3jB9wteJsLvnhDDr=_PQw@mail.gmail.com>
-Message-ID: <53714B6C.7060206@samsung.com>
+Date: Tue, 13 May 2014 07:47:57 +0900
+Subject: [PATCH v2.1 3/9] ARM: S3C24XX: enable usage of common dclk if
+ common clock framework is enabled
+In-Reply-To: <3874492.Rok1zBObEC@phil>
+References: <2104342.rkElQpXtvM@phil> <1428172.jtv2HGWM9N@phil>
+ <536D60B1.2070906@gmail.com> <3874492.Rok1zBObEC@phil>
+Message-ID: <53714F9D.3010109@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/05/14 00:35, Sachin Kamat wrote:
-> On 16 April 2014 19:21, Tomasz Figa<t.figa@samsung.com>  wrote:
->> Hi Sachin,
->>
->>
->> On 15.04.2014 11:28, Sachin Kamat wrote:
->>>
->>> This series is based on latest linux-next and depends on the
->>> following patch:
->>> ARM: EXYNOS: Consolidate Kconfig entries
->>> http://article.gmane.org/gmane.linux.kernel.samsung-soc/28642
->>>
->>> Changes since v2:
->>> Replaced patch 2, "ARM: EXYNOS: Staticize exynos_subsys"
->>> with "ARM: EXYNOS: Remove exynos_subsys registration" as that
->>> code is no more used.
->>>
->>> Tested on Exynos4210, 4412, 5250 and 5420 based boards.
->>>
->>> Arnd Bergmann (1):
->>>     ARM: EXYNOS: Enable multi-platform build support
->>>
->>> Sachin Kamat (5):
->>>     ARM: EXYNOS: Remove duplicate lines in Makefile
->>>     ARM: EXYNOS: Remove exynos_subsys registration
->>>     ARM: EXYNOS: Migrate Exynos specific macros from plat to mach
->>>     ARM: EXYNOS: Remove unnecessary inclusion of cpu.h
->>>     ARM: multi_v7_defconfig: Enable Exynos platform
->>>
->>>    arch/arm/Kconfig                         |   27 ++---------
->>>    arch/arm/configs/exynos_defconfig        |    2 +-
->>>    arch/arm/configs/multi_v7_defconfig      |   10 +++++
->>>    arch/arm/mach-exynos/Kconfig             |   27 +++++++++++
->>>    arch/arm/mach-exynos/Makefile            |    9 ++--
->>>    arch/arm/mach-exynos/common.h            |   72
->>> ++++++++++++++++++++++++++++++
->>>    arch/arm/mach-exynos/cpuidle.c           |    1 -
->>>    arch/arm/mach-exynos/exynos.c            |   13 ------
->>>    arch/arm/mach-exynos/hotplug.c           |    2 -
->>>    arch/arm/mach-exynos/platsmp.c           |    2 -
->>>    arch/arm/mach-exynos/pm.c                |    1 -
->>>    arch/arm/mach-exynos/pmu.c               |    2 -
->>>    arch/arm/plat-samsung/Makefile           |    3 ++
->>>    arch/arm/plat-samsung/include/plat/cpu.h |   61
->>> -------------------------
->>>    14 files changed, 119 insertions(+), 113 deletions(-)
->>>
->>
->> For the whole series:
->>
->> Reviewed-by: Tomasz Figa<t.figa@samsung.com>
->
-> Kukjin,
->
-> Can you please apply the first 4 patches in this series for now?
->
-Yes, I've applied the first 4 patches just now and I need to look at the 
-5/6 patch...
+On 05/10/14 08:33, Heiko St?bner wrote:
+> Hi Tomasz,
 
-Thanks,
-Kukjin
+>>>>> It seems this one just hit linux-next (in next-20140509).
+>>>>
+>>>> Which is bad, because:
+>>>> a) it conflicts with patches already applied in samsung-clk tree,
+>>>
+>>> I remember seeing patches regarding more than one clk-samsung clock
+>>> providers. Do you need any additional changes for s3c24xx from me for
+>>> this?
+>>
+>> Yes, that's the problem here. If you could do it, I would appreciate it,
+>> but if you don't have time then I can handle this. The changes needed
+>> are mostly trivial - basically every common samsung_clk function gets
+>> new argument to a context structure. The branch to base on would be
+>> for_3.16/exynos5260 in samsung-clk tree.
+>>
+
+I think, would be better if we could fix the conflicts with Hekio's 
+additional patches...basically nobody wants revert something for next 
+tree once it is landed. But in this case, it's up to Tomasz...
+
+Probably, Heiko resubmitted? Is it based on the branch Tomasz memtioned, 
+I didn't check it yet?..
+
+Tomasz, do you still want me to drop this series in samsung tree now? 
+Additional patches would be helpful to me because other dependency i.e., 
+exynos5260...for me.
+
+>>>> b) the DT binding added by patch 4/9 has not been acked .
+>>>
+>>> I'm not 100% sure if this is necessary, as the binding is similar to most
+>>> other Samsung bindings and looking through recent clock binding changes I
+>>> didn't find any that seemed to have a special dt-maintainer ack -
+>>> including
+>>> Exynos ones. Also if I remember correctly there was this "if we don't
+>>> respond, carry on" policy around :-) .
+>>
+>> Well, for me this could go as is, but rules should be followed and the
+>> rules are ACK or 3 weeks and a ping without response. So we need to wait
+>> at least to next Wednesday to bypass DT review.
+>
+> so I only remembered the abbreviated version of this :-) [without the 3 weeks
+> requirement]. My guess is I should be able to adapt it to this change and also
+> fix the typo Paul found until then.
+>
+In my memory, not 3 weeks...maybe 1week or 10days?...
+
+- Kukjin
