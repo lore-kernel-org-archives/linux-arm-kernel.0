@@ -1,30 +1,40 @@
-From: mark.hambleton@broadcom.com (Mark Hambleton)
-Date: Mon, 12 May 2014 14:09:06 +0000
-Subject: [PATCH 2/3] arm64: Add big.LITTLE switcher stub
-In-Reply-To: <20140512121729.GC12304@sirena.org.uk>
-References: <1399653631-4938-1-git-send-email-broonie@kernel.org>
- <1399653631-4938-2-git-send-email-broonie@kernel.org>
- <536D0AF4.1040705@arm.com> <20140509175005.GT12304@sirena.org.uk>
- <536D2533.6050100@arm.com> <20140509192921.GY12304@sirena.org.uk>
- <5370877C.40409@arm.com> <20140512121729.GC12304@sirena.org.uk>
-Message-ID: <D00A5DFD97C44C4D820FC3A847C5D57507406990@IRVEXCHMB14.corp.ad.broadcom.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 12 May 2014 22:09:34 +0800
+Subject: [PATCH] media: mx1_camera: Remove driver
+In-Reply-To: <1399788551-8218-1-git-send-email-shc_work@mail.ru>
+References: <1399788551-8218-1-git-send-email-shc_work@mail.ru>
+Message-ID: <20140512140933.GC8330@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> This all gets a bit circular though - the more patches people have to
-> carry to make upstream useful to them less useful working with upstream
-> seems to them, meaning the devices are less likely to appear upstream at
-> all at least in any sort of complete form.  One out of tree patch being
-> required isn't going to be a deal breaker by itself but they all add up
-> to a perception that upstream isn't useful.
+On Sun, May 11, 2014 at 10:09:11AM +0400, Alexander Shiyan wrote:
+> That driver hasn't been really maintained for a long time. It doesn't
+> compile in any way, it includes non-existent headers, has no users,
+> and marked as "broken" more than year. Due to these factors, mx1_camera
+> is now removed from the tree.
 > 
-> There's definitely some taste considerations with how far you go to
-> cater for such systems - in this case I'd say it's just tweaking Kconfig
-> to allow people to use code that's already present rather than adding
-> really new code (there's the stubs but they're pretty insubstantial)
-> which means upstream doesn't have to carry anything that wasn't there
-> already.
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> ---
+>  arch/arm/mach-imx/Makefile                      |   3 -
+>  arch/arm/mach-imx/devices/Kconfig               |   3 -
+>  arch/arm/mach-imx/devices/Makefile              |   1 -
+>  arch/arm/mach-imx/devices/devices-common.h      |  10 -
+>  arch/arm/mach-imx/devices/platform-mx1-camera.c |  42 --
+>  arch/arm/mach-imx/mx1-camera-fiq-ksym.c         |  18 -
+>  arch/arm/mach-imx/mx1-camera-fiq.S              |  35 -
+>  drivers/media/platform/soc_camera/Kconfig       |  13 -
+>  drivers/media/platform/soc_camera/Makefile      |   1 -
+>  drivers/media/platform/soc_camera/mx1_camera.c  | 866 ------------------------
+>  include/linux/platform_data/camera-mx1.h        |  35 -
+>  11 files changed, 1027 deletions(-)
+>  delete mode 100644 arch/arm/mach-imx/devices/platform-mx1-camera.c
+>  delete mode 100644 arch/arm/mach-imx/mx1-camera-fiq-ksym.c
+>  delete mode 100644 arch/arm/mach-imx/mx1-camera-fiq.S
+>  delete mode 100644 drivers/media/platform/soc_camera/mx1_camera.c
+>  delete mode 100644 include/linux/platform_data/camera-mx1.h
 
-Agree, with the original version of this patch I just put all the stubs in drivers/cpufreq/arm_big_little.h to get around needing to add files to arm64 (when it shouldn't need it). At least then the stubs were pretty local to the implementation and didn't require all of the ifdefs in the code (as Mark says that looks horrible).
+Can this patch be split into arch and driver part?  Recently, arm-soc
+folks do not want to have arch changes go via driver tree, unless that's
+absolutely necessary.
 
-Mark
+Shawn
