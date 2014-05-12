@@ -1,159 +1,148 @@
 From: shaik.ameer@samsung.com (Shaik Ameer Basha)
-Date: Mon, 12 May 2014 11:44:56 +0530
-Subject: [PATCH v13 11/19] iommu/exynos: remove custom fault handler
+Date: Mon, 12 May 2014 11:44:55 +0530
+Subject: [PATCH v13 10/19] iommu/exynos: gating clocks of master H/W
 In-Reply-To: <1399875304-19948-1-git-send-email-shaik.ameer@samsung.com>
 References: <1399875304-19948-1-git-send-email-shaik.ameer@samsung.com>
-Message-ID: <1399875304-19948-12-git-send-email-shaik.ameer@samsung.com>
+Message-ID: <1399875304-19948-11-git-send-email-shaik.ameer@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Cho KyongHo <pullip.cho@samsung.com>
 
-This commit removes custom fault handler. The device drivers that
-need to register fault handler can register
-with iommu_set_fault_handler().
+This patch gates clocks of master H/W as well as clocks of System MMU
+if master clocks are specified.
 
-CC: Grant Grundler <grundler@chromium.org>
+Some Exynos SoCs (i.e. GScalers in Exynos5250) have dependencies in
+the gating clocks of master H/W and its System MMU. If a H/W is the
+case, accessing control registers of System MMU is prohibited unless
+both of the gating clocks of System MMU and its master H/W.
+
+CC: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
 Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
 ---
- drivers/iommu/exynos-iommu.c |   80 +++++++++++++-----------------------------
- 1 file changed, 24 insertions(+), 56 deletions(-)
+ drivers/iommu/exynos-iommu.c |   40 ++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 38 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 5af5c5c..c1be65f 100644
+index c86e374..5af5c5c 100644
 --- a/drivers/iommu/exynos-iommu.c
 +++ b/drivers/iommu/exynos-iommu.c
-@@ -125,16 +125,6 @@ enum exynos_sysmmu_inttype {
- 	SYSMMU_FAULTS_NUM
- };
- 
--/*
-- * @itype: type of fault.
-- * @pgtable_base: the physical address of page table base. This is 0 if @itype
-- *                is SYSMMU_BUSERROR.
-- * @fault_addr: the device (virtual) address that the System MMU tried to
-- *             translated. This is 0 if @itype is SYSMMU_BUSERROR.
-- */
--typedef int (*sysmmu_fault_handler_t)(enum exynos_sysmmu_inttype itype,
--			phys_addr_t pgtable_base, unsigned long fault_addr);
--
- static unsigned short fault_reg_offset[SYSMMU_FAULTS_NUM] = {
- 	REG_PAGE_FAULT_ADDR,
- 	REG_AR_FAULT_ADDR,
-@@ -176,7 +166,6 @@ struct sysmmu_drvdata {
+@@ -172,6 +172,7 @@ struct sysmmu_drvdata {
+ 	struct device *dev;	/* Owner of system MMU */
+ 	void __iomem *sfrbase;
+ 	struct clk *clk;
++	struct clk *clk_master;
  	int activations;
  	rwlock_t lock;
  	struct iommu_domain *domain;
--	sysmmu_fault_handler_t fault_handler;
- 	phys_addr_t pgtable;
- };
+@@ -300,6 +301,8 @@ static irqreturn_t exynos_sysmmu_irq(int irq, void *dev_id)
  
-@@ -245,34 +234,17 @@ static void __sysmmu_set_ptbase(void __iomem *sfrbase,
- 	__sysmmu_tlb_invalidate(sfrbase);
- }
+ 	WARN_ON(!is_sysmmu_active(data));
  
--static void __set_fault_handler(struct sysmmu_drvdata *data,
--					sysmmu_fault_handler_t handler)
--{
--	unsigned long flags;
--
--	write_lock_irqsave(&data->lock, flags);
--	data->fault_handler = handler;
--	write_unlock_irqrestore(&data->lock, flags);
--}
--
--void exynos_sysmmu_set_fault_handler(struct device *dev,
--					sysmmu_fault_handler_t handler)
--{
--	struct sysmmu_drvdata *data = dev_get_drvdata(dev->archdata.iommu);
--
--	__set_fault_handler(data, handler);
--}
--
--static int default_fault_handler(enum exynos_sysmmu_inttype itype,
--			phys_addr_t pgtable_base, unsigned long fault_addr)
-+static void show_fault_information(const char *name,
-+		enum exynos_sysmmu_inttype itype,
-+		phys_addr_t pgtable_base, unsigned long fault_addr)
- {
- 	unsigned long *ent;
++	if (!IS_ERR(data->clk_master))
++		clk_enable(data->clk_master);
+ 	itype = (enum exynos_sysmmu_inttype)
+ 		__ffs(__raw_readl(data->sfrbase + REG_INT_STATUS));
+ 	if (WARN_ON(!((itype >= 0) && (itype < SYSMMU_FAULT_UNKNOWN))))
+@@ -326,6 +329,9 @@ static irqreturn_t exynos_sysmmu_irq(int irq, void *dev_id)
+ 	if (itype != SYSMMU_FAULT_UNKNOWN)
+ 		sysmmu_unblock(data->sfrbase);
  
- 	if ((itype >= SYSMMU_FAULTS_NUM) || (itype < SYSMMU_PAGEFAULT))
- 		itype = SYSMMU_FAULT_UNKNOWN;
- 
--	pr_err("%s occurred at 0x%lx(Page table base: %pa)\n",
--			sysmmu_fault_name[itype], fault_addr, &pgtable_base);
-+	pr_err("%s occurred@%#lx by %s(Page table base: %pa)\n",
-+		sysmmu_fault_name[itype], fault_addr, name, &pgtable_base);
- 
- 	ent = section_entry(phys_to_virt(pgtable_base), fault_addr);
- 	pr_err("\tLv1 entry: 0x%lx\n", *ent);
-@@ -281,12 +253,6 @@ static int default_fault_handler(enum exynos_sysmmu_inttype itype,
- 		ent = page_entry(ent, fault_addr);
- 		pr_err("\t Lv2 entry: 0x%lx\n", *ent);
- 	}
--
--	pr_err("Generating Kernel OOPS... because it is unrecoverable.\n");
--
--	BUG();
--
--	return 0;
- }
- 
- static irqreturn_t exynos_sysmmu_irq(int irq, void *dev_id)
-@@ -310,24 +276,28 @@ static irqreturn_t exynos_sysmmu_irq(int irq, void *dev_id)
- 	else
- 		addr = __raw_readl(data->sfrbase + fault_reg_offset[itype]);
- 
--	if (data->domain)
--		ret = report_iommu_fault(data->domain, data->dev, addr, itype);
--
--	if ((ret == -ENOSYS) && data->fault_handler) {
--		unsigned long base = data->pgtable;
--		if (itype != SYSMMU_FAULT_UNKNOWN)
--			base = __raw_readl(data->sfrbase + REG_PT_BASE_ADDR);
--		ret = data->fault_handler(itype, base, addr);
-+	if (itype == SYSMMU_FAULT_UNKNOWN) {
-+		pr_err("%s: Fault is not occurred by System MMU '%s'!\n",
-+			__func__, dev_name(data->sysmmu));
-+		pr_err("%s: Please check if IRQ is correctly configured.\n",
-+			__func__);
-+		BUG();
-+	} else {
-+		unsigned long base =
-+				__raw_readl(data->sfrbase + REG_PT_BASE_ADDR);
-+		show_fault_information(dev_name(data->sysmmu),
-+					itype, base, addr);
-+		if (data->domain)
-+			ret = report_iommu_fault(data->domain,
-+					data->dev, addr, itype);
- 	}
- 
--	if (!ret && (itype != SYSMMU_FAULT_UNKNOWN))
--		__raw_writel(1 << itype, data->sfrbase + REG_INT_CLEAR);
--	else
--		dev_dbg(data->sysmmu, "%s is not handled.\n",
--				sysmmu_fault_name[itype]);
-+	/* fault is not recovered by fault handler */
-+	BUG_ON(ret != 0);
- 
--	if (itype != SYSMMU_FAULT_UNKNOWN)
--		sysmmu_unblock(data->sfrbase);
-+	__raw_writel(1 << itype, data->sfrbase + REG_INT_CLEAR);
++	if (!IS_ERR(data->clk_master))
++		clk_disable(data->clk_master);
 +
-+	sysmmu_unblock(data->sfrbase);
+ 	read_unlock(&data->lock);
  
- 	if (!IS_ERR(data->clk_master))
- 		clk_disable(data->clk_master);
-@@ -576,8 +546,6 @@ static int exynos_sysmmu_probe(struct platform_device *pdev)
+ 	return IRQ_HANDLED;
+@@ -341,9 +347,14 @@ static bool __exynos_sysmmu_disable(struct sysmmu_drvdata *data)
+ 	if (!set_sysmmu_inactive(data))
+ 		goto finish;
+ 
++	if (!IS_ERR(data->clk_master))
++		clk_enable(data->clk_master);
++
+ 	__raw_writel(CTRL_DISABLE, data->sfrbase + REG_MMU_CTRL);
+ 
+ 	clk_disable(data->clk);
++	if (!IS_ERR(data->clk_master))
++		clk_disable(data->clk_master);
+ 
+ 	disabled = true;
+ 	data->pgtable = 0;
+@@ -386,14 +397,19 @@ static int __exynos_sysmmu_enable(struct sysmmu_drvdata *data,
+ 		goto finish;
+ 	}
+ 
+-	clk_enable(data->clk);
+-
+ 	data->pgtable = pgtable;
+ 
++	if (!IS_ERR(data->clk_master))
++		clk_enable(data->clk_master);
++	clk_enable(data->clk);
++
+ 	__sysmmu_set_ptbase(data->sfrbase, pgtable);
+ 
+ 	__raw_writel(CTRL_ENABLE, data->sfrbase + REG_MMU_CTRL);
+ 
++	if (!IS_ERR(data->clk_master))
++		clk_disable(data->clk_master);
++
+ 	data->domain = domain;
+ 
+ 	dev_dbg(data->sysmmu, "Enabled\n");
+@@ -450,6 +466,10 @@ static void sysmmu_tlb_invalidate_entry(struct device *dev, unsigned long iova,
+ 	if (is_sysmmu_active(data)) {
+ 		unsigned int maj;
+ 		unsigned int num_inv = 1;
++
++		if (!IS_ERR(data->clk_master))
++			clk_enable(data->clk_master);
++
+ 		maj = __raw_readl(data->sfrbase + REG_MMU_VERSION);
+ 		/*
+ 		 * L2TLB invalidation required
+@@ -469,6 +489,8 @@ static void sysmmu_tlb_invalidate_entry(struct device *dev, unsigned long iova,
+ 				data->sfrbase, iova, num_inv);
+ 			sysmmu_unblock(data->sfrbase);
+ 		}
++		if (!IS_ERR(data->clk_master))
++			clk_disable(data->clk_master);
+ 	} else {
+ 		dev_dbg(data->sysmmu, "Disabled. Skipping invalidating TLB.\n");
+ 	}
+@@ -484,10 +506,14 @@ void exynos_sysmmu_tlb_invalidate(struct device *dev)
+ 	read_lock_irqsave(&data->lock, flags);
+ 
+ 	if (is_sysmmu_active(data)) {
++		if (!IS_ERR(data->clk_master))
++			clk_enable(data->clk_master);
+ 		if (sysmmu_block(data->sfrbase)) {
+ 			__sysmmu_tlb_invalidate(data->sfrbase);
+ 			sysmmu_unblock(data->sfrbase);
+ 		}
++		if (!IS_ERR(data->clk_master))
++			clk_disable(data->clk_master);
+ 	} else {
+ 		dev_dbg(data->sysmmu, "Disabled. Skipping invalidating TLB.\n");
+ 	}
+@@ -536,6 +562,16 @@ static int exynos_sysmmu_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
++	data->clk_master = devm_clk_get(dev, "master");
++	if (!IS_ERR(data->clk_master)) {
++		ret = clk_prepare(data->clk_master);
++		if (ret) {
++			clk_unprepare(data->clk);
++			dev_err(dev, "Failed to prepare master's clk\n");
++			return ret;
++		}
++	}
++
+ 	data->sysmmu = dev;
  	rwlock_init(&data->lock);
  	INIT_LIST_HEAD(&data->node);
- 
--	__set_fault_handler(data, &default_fault_handler);
--
- 	platform_set_drvdata(pdev, data);
- 
- 	pm_runtime_enable(dev);
 -- 
 1.7.9.5
