@@ -1,79 +1,55 @@
-From: zhangwm@marvell.com (Neil Zhang)
-Date: Mon, 12 May 2014 03:22:09 -0700
-Subject: [PATCH v4] ARM: perf: save/restore pmu registers in pm notifier
-In-Reply-To: <6106CAF835F351419ADA79E4836E6EC71B6A53C826@SC-VEXCH4.marvell.com>
-References: <1398133596-29170-1-git-send-email-zhangwm@marvell.com>
- <20140422103642.GF7484@arm.com>
- <175CCF5F49938B4D99B2E3EF7F558EBE5507A3B59B@SC-VEXCH4.marvell.com>
- <20140423170821.GJ5649@arm.com>
- <175CCF5F49938B4D99B2E3EF7F558EBE5507A3C1F1@SC-VEXCH4.marvell.com>
- <5360FB07.5030407@arm.com>
- <6106CAF835F351419ADA79E4836E6EC71B6A53C826@SC-VEXCH4.marvell.com>
-Message-ID: <9034CBD80F070943B59700D7F8149ED9A0875730@SC-VEXCH4.marvell.com>
+From: rahul.sharma@samsung.com (Rahul Sharma)
+Date: Mon, 12 May 2014 15:54:03 +0530
+Subject: [PATCH v3 0/5] ARM: dts: enable hdmi for exynos5 based peach and snow
+ boards
+Message-ID: <1399890248-27409-1-git-send-email-rahul.sharma@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will & Sudeep,
+From: Rahul Sharma <Rahul.Sharma@samsung.com>
 
-> -----Original Message-----
-> From: Neil Zhang
-> Sent: 2014?5?5? 14:28
-> To: Sudeep Holla; Will Deacon
-> Cc: linux at arm.linux.org.uk; linux-arm-kernel at lists.infradead.org;
-> linux-kernel at vger.kernel.org; devicetree at vger.kernel.org
-> Subject: RE: [PATCH v4] ARM: perf: save/restore pmu registers in pm notifier
-> 
-> Sudeep,
-> 
-> > -----Original Message-----
-> > From: Sudeep Holla [mailto:sudeep.holla at arm.com]
-> > Sent: 2014?4?30? 21:31
-> > To: Neil Zhang; Will Deacon
-> > Cc: Sudeep Holla; linux at arm.linux.org.uk;
-> > linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
-> > devicetree at vger.kernel.org
-> > Subject: Re: [PATCH v4] ARM: perf: save/restore pmu registers in pm
-> > notifier
-> >
-> > Hi Neil,
-> >
-> > On 30/04/14 03:21, Neil Zhang wrote:
-> > >
-> > >> -----Original Message-----
-> > >> From: Will Deacon [mailto:will.deacon at arm.com]
-> >
-> > [...]
-> >
-> > >>
-> > >> I think we need some input from the device-tree guys to see whether
-> > >> they would object to us solving this locally (in the PMU node) or not.
-> > >> Personally, I'd much prefer a general way to describe the need for
-> > >> pm-notifiers, but if that's not being looked at then we can cook
-> > >> something specifically for our needs.
-> > >>
-> > >
-> > > No input from device-tree guys :(
-> >
-> > The device tree bindings for power domains is under discussion [1]
-> 
-> Thanks for the information.
-> But it currently for device only, core related stuff are not supported.
-> And is it really good to register power provider for core and let vfp / pmu etc
-> to get it?
-> 
+Enable hdmi for exynos5250 based snow board and exynos5420
+based peach pit board. It also adds properties to hdmi nodes
+for accessing hdmiphy as simple phys.
 
-What's your suggestion about it?
-Is it OK that I add it under the PMU node?
+V3:
+1) Re-spin on dependent patches.
+2) Added patch to enable hdmi for Peach-pi board.
 
-> >
-> > Regards,
-> > Sudeep
-> >
-> > [1] https://lkml.org/lkml/2014/4/23/755
-> 
-> 
-> Best Regards,
-> Neil Zhang
+V2:
+1) Re-spin on dependent patches.
+2) Added patch to remove chip specific hdmi hpd gpio from
+board file top SoC file.
 
-Best Regards,
-Neil Zhang
+This series is based on Kukjin Kims, for-next branch.
+
+It is dependent on
+1) Arun's patch for adding peach-pit board dts file at
+http://www.spinics.net/lists/linux-samsung-soc/msg30103.html. [Patch is 'ACK'ed.]
+2) Sachin's patch for snow board dts file at
+https://patches.linaro.org/28325/
+3) DRM Hdmi driver patch which is changing the DT binding at
+http://www.spinics.net/lists/linux-samsung-soc/msg28052.html
+4) Arun's patches for basic Exynos5800 support, available at
+http://comments.gmane.org/gmane.linux.kernel.samsung-soc/30667
+[Already Applied in Kukjin's v3.16-next/soc-exynos]
+
+Rahul Sharma (5):
+  ARM: dts: enable hdmi for exynos5250 based snow board
+  ARM: dts: change to correct compatible string for exynos5420 hdmi
+  ARM: dts: enable hdmi for exynos5420 based peach-pit board
+  ARM: dts: remove chip specific hdmi hpd pin from board
+  ARM: dts: enable hdmi for exynos5800 based peach-pi board
+
+ arch/arm/boot/dts/exynos5250-cros-common.dtsi |    6 +++++-
+ arch/arm/boot/dts/exynos5250-pinctrl.dtsi     |    7 +++++++
+ arch/arm/boot/dts/exynos5250-snow.dts         |    7 +++++++
+ arch/arm/boot/dts/exynos5420-peach-pit.dts    |   19 ++++++++++++++++++
+ arch/arm/boot/dts/exynos5420-pinctrl.dtsi     |    7 +++++++
+ arch/arm/boot/dts/exynos5420-smdk5420.dts     |    9 ---------
+ arch/arm/boot/dts/exynos5420.dtsi             |    7 ++++++-
+ arch/arm/boot/dts/exynos5800-peach-pi.dts     |   26 +++++++++++++++++++++++++
+ 8 files changed, 77 insertions(+), 11 deletions(-)
+
+-- 
+1.7.9.5
