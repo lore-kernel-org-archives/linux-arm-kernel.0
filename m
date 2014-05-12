@@ -1,81 +1,109 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 12 May 2014 07:26:46 -0700
-Subject: [PATCH 3/4] OMAPDSS: panel-sharp-ls037v7dw01: add device tree
- support
-In-Reply-To: <CABxcv=mY0a+yJgmCTPN=BhSQD57Pw022zOd5_KxEgvvF_-=O7Q@mail.gmail.com>
-References: <20140507150343.GA9502@atomide.com> <536A5920.1020908@ti.com>
- <20140507175919.GH9502@atomide.com>
- <20140508233300.GI2198@atomide.com> <536C8293.4070506@ti.com>
- <20140509155504.GE17814@atomide.com> <53707A64.2060203@ti.com>
- <CABxcv=kwhodeFTHoVpn1nHeh9+kV5fwMN9s3Kbk6h7_xJp4UYA@mail.gmail.com>
- <53709706.10501@ti.com>
- <CABxcv=mY0a+yJgmCTPN=BhSQD57Pw022zOd5_KxEgvvF_-=O7Q@mail.gmail.com>
-Message-ID: <20140512142646.GA31772@atomide.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 12 May 2014 11:27:40 -0300
+Subject: [PATCH] irqchip: armada-370-xp: Move the devicetree binding
+ documentation
+Message-ID: <1399904860-937-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Javier Martinez Canillas <javier@dowhile0.org> [140512 03:01]:
-> Hello Tomi,
-> 
-> On Mon, May 12, 2014 at 11:40 AM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
-> > On 12/05/14 12:34, Javier Martinez Canillas wrote:
-> >
-> >> Maybe we can remove this hackery by relying on the fact that a
-> >> compatible string can have a set of values that goes from more
-> >> specific to more general. So you can have something like:
-> >>
-> >> compatible = "sony,panel-foobar", "omapdss,panel-foobar"
-> >>
-> >> So right now only "omapdss,panel-foobar" will be matched and later
-> >> when we have common panel drivers then that driver could handle the
-> >> "sony,panel-foobar" compatible string.
-> >>
-> >> Other platforms could do something similar and have
-> >>
-> >> compatible = "sony,panel-foobar", "baz,panel-foobar"
-> >>
-> >> That way you won't break DT backward compatible but still not require
-> >> hacks on arch/arm/mach-omap2/display.c.
-> >>
-> >> We do the same for OMAP boards, we now have the following compatible string:
-> >>
-> >> compatible = "isee,omap3-igep0020", "ti,omap36xx", "ti,omap3";
-> >>
-> >> There isn't a struct machine_desc that matches "isee,omap3-igep0020"
-> >> but later if we find that we need some board specific initialization
-> >> we could add one without breaking existing DTS. In fact it used to be
-> >> a single machine_desc that matched "ti,omap3" for both omap36xx and
-> >> omap34xx but later when some DT clocks changes were introduced we
-> >> needed to split both SoC families.
-> >
-> > I think that's a different thing. "isee,omap3-igep0020" is a proper
-> > compatible string, if the board is "isee,...".  No matter what software
-> > you run, that's correct and fine.
-> >
-> > The omapdss case is different, there the "omapdss" points to a sw thing,
-> > it does not describe the hardware. It's only needed as we don't have
-> > proper sw drivers for the devices.
-> >
-> > That said, I think what you describe would work. But I would rather keep
-> > the .dts files clean and correct, and keep that hacks hidden inside the
-> > kernel.
-> >
-> 
-> Thanks for the explanation. Since DT are meant to describe hardware
-> and not software I agree with you that we shouldn't leak an
-> implementation detail to the DeviceTrees.
-> 
-> And after all fortunately we don't have a stable API in the kernel
-> like the one that is enforced in the DT so we can fix it later ;-)
+Move the devicetree binding documentation to the interrupt-controller
+directory, where it belongs.
 
-This remapping of compatible flags sounds smelly to me, please discuss
-it first with the device tree people.
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ .../devicetree/bindings/arm/armada-370-xp-mpic.txt | 38 ----------------------
+ .../marvell,armada-370-xp-mpic.txt                 | 38 ++++++++++++++++++++++
+ 2 files changed, 38 insertions(+), 38 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/arm/armada-370-xp-mpic.txt
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/marvell,armada-370-xp-mpic.txt
 
-I think we're better off just using the compatible properties limited
-to the simple-panel.txt for now and actually describe the real
-hardware. The fact that the panel is connected to DSS should be possible
-to find out based on the phandles.
-
-Regards,
-
-Tony
+diff --git a/Documentation/devicetree/bindings/arm/armada-370-xp-mpic.txt b/Documentation/devicetree/bindings/arm/armada-370-xp-mpic.txt
+deleted file mode 100644
+index 5fc0313..0000000
+--- a/Documentation/devicetree/bindings/arm/armada-370-xp-mpic.txt
++++ /dev/null
+@@ -1,38 +0,0 @@
+-Marvell Armada 370, 375, 38x, XP Interrupt Controller
+------------------------------------------------------
+-
+-Required properties:
+-- compatible: Should be "marvell,mpic"
+-- interrupt-controller: Identifies the node as an interrupt controller.
+-- msi-controller: Identifies the node as an PCI Message Signaled
+-  Interrupt controller.
+-- #interrupt-cells: The number of cells to define the interrupts. Should be 1.
+-  The cell is the IRQ number
+-
+-- reg: Should contain PMIC registers location and length. First pair
+-  for the main interrupt registers, second pair for the per-CPU
+-  interrupt registers. For this last pair, to be compliant with SMP
+-  support, the "virtual" must be use (For the record, these registers
+-  automatically map to the interrupt controller registers of the
+-  current CPU)
+-
+-Optional properties:
+-
+-- interrupts: If defined, then it indicates that this MPIC is
+-  connected as a slave to another interrupt controller. This is
+-  typically the case on Armada 375 and Armada 38x, where the MPIC is
+-  connected as a slave to the Cortex-A9 GIC. The provided interrupt
+-  indicate to which GIC interrupt the MPIC output is connected.
+-
+-Example:
+-
+-        mpic: interrupt-controller at d0020000 {
+-              compatible = "marvell,mpic";
+-              #interrupt-cells = <1>;
+-              #address-cells = <1>;
+-              #size-cells = <1>;
+-              interrupt-controller;
+-              msi-controller;
+-              reg = <0xd0020a00 0x1d0>,
+-                    <0xd0021070 0x58>;
+-        };
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/marvell,armada-370-xp-mpic.txt b/Documentation/devicetree/bindings/interrupt-controller/marvell,armada-370-xp-mpic.txt
+new file mode 100644
+index 0000000..5fc0313
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/marvell,armada-370-xp-mpic.txt
+@@ -0,0 +1,38 @@
++Marvell Armada 370, 375, 38x, XP Interrupt Controller
++-----------------------------------------------------
++
++Required properties:
++- compatible: Should be "marvell,mpic"
++- interrupt-controller: Identifies the node as an interrupt controller.
++- msi-controller: Identifies the node as an PCI Message Signaled
++  Interrupt controller.
++- #interrupt-cells: The number of cells to define the interrupts. Should be 1.
++  The cell is the IRQ number
++
++- reg: Should contain PMIC registers location and length. First pair
++  for the main interrupt registers, second pair for the per-CPU
++  interrupt registers. For this last pair, to be compliant with SMP
++  support, the "virtual" must be use (For the record, these registers
++  automatically map to the interrupt controller registers of the
++  current CPU)
++
++Optional properties:
++
++- interrupts: If defined, then it indicates that this MPIC is
++  connected as a slave to another interrupt controller. This is
++  typically the case on Armada 375 and Armada 38x, where the MPIC is
++  connected as a slave to the Cortex-A9 GIC. The provided interrupt
++  indicate to which GIC interrupt the MPIC output is connected.
++
++Example:
++
++        mpic: interrupt-controller at d0020000 {
++              compatible = "marvell,mpic";
++              #interrupt-cells = <1>;
++              #address-cells = <1>;
++              #size-cells = <1>;
++              interrupt-controller;
++              msi-controller;
++              reg = <0xd0020a00 0x1d0>,
++                    <0xd0021070 0x58>;
++        };
+-- 
+1.9.1
