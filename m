@@ -1,79 +1,81 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Mon, 12 May 2014 10:16:59 +0530
-Subject: [PATCH 1/4] clk: samsung: out: Add infrastructure to register
- CLKOUT
-In-Reply-To: <536DA243.6000600@samsung.com>
-References: <1399640410-30957-1-git-send-email-tushar.behera@linaro.org>
- <1399640410-30957-2-git-send-email-tushar.behera@linaro.org>
- <536DA243.6000600@samsung.com>
-Message-ID: <53705243.1030704@linaro.org>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Mon, 12 May 2014 13:52:53 +0900
+Subject: [PATCH v3 4/4] ARM: dts: enable dp-controller for exynos5420 based
+ peach-pit board
+In-Reply-To: <1399630186-22610-5-git-send-email-rahul.sharma@samsung.com>
+References: <1399630186-22610-1-git-send-email-rahul.sharma@samsung.com>
+ <1399630186-22610-5-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <001801cf6d9e$08a14200$19e3c600$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/10/2014 09:21 AM, Pankaj Dubey wrote:
-> On 05/09/2014 10:00 PM, Tushar Behera wrote:
->> All SoC in Exynos-series have a clock with name XCLKOUT to provide
->> debug information about various clocks available in the SoC. The register
->> controlling the MUX and GATE of this clock is provided within PMU domain.
->> Since PMU domain can't be dedicatedly mapped by every driver, the
->> register
->> needs to be handled through a regmap handle provided by PMU syscon
->> controller. Right now, CCF doesn't allow regmap based MUX and GATE
->> clocks,
->> hence a dedicated clock provider for XCLKOUT is added here.
->>
->> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
->> CC: Tomasz Figa <t.figa@samsung.com>
->> ---
->>   drivers/clk/samsung/Makefile  |    2 +-
->>   drivers/clk/samsung/clk-out.c |  181
->> +++++++++++++++++++++++++++++++++++++++++
->>   drivers/clk/samsung/clk.h     |   33 ++++++++
->>   3 files changed, 215 insertions(+), 1 deletion(-)
->>   create mode 100644 drivers/clk/samsung/clk-out.c
->>
-
-[ ... ]
-
->> +/**
->> + * struct samsung_clkout_soc_data: SoC specific register details
->> + * @reg: Offset of CLKOUT register from PMU base
+On Friday, May 09, 2014 7:10 PM, Rahul Sharma wrote:
 > 
-> how about naming this variable as "offset" instead of "reg".
+> From: Rahul Sharma <Rahul.Sharma@samsung.com>
 > 
-
-Okay, I will change that.
-
-[ ... ]
-
->> +u8 samsung_clkout_get_parent(struct clk_hw *hw)
->> +{
->> +    struct samsung_clkout *clkout = to_clk_out(hw);
->> +    const struct samsung_clkout_soc_data *soc_data = clkout->soc_data;
->> +    unsigned int parent_mask = BIT(soc_data->mux_width) - 1;
->> +    unsigned int val;
->> +    int ret;
->> +
->> +    ret = regmap_read(clkout->regmap, soc_data->reg, &val);
+> Enable dp-controller for peach-pit board.
 > 
-> Do we really need to keep return value in "ret" as I can't see you are
-> using it anywhere?
+> Signed-off-by: Rahul Sharma <Rahul.Sharma@samsung.com>
+
+Reviewed-by: Jingoo Han <jg1.han@samsung.com>
+
+Best regards,
+Jingoo Han
+
+> ---
+>  arch/arm/boot/dts/exynos5420-peach-pit.dts |   36 ++++++++++++++++++++++++++++
+>  1 file changed, 36 insertions(+)
 > 
-
-Right, we are not using that and can be removed.
-
->> +
->> +    return (val >> soc_data->mux_shift) & parent_mask;
->> +}
->> +
-
-[ ... ]
-
->> +/* All existing Exynos serial of SoCs have common values for this
->> offsets. */
-> typo: serial/series/
-
-Sure. Thanks for your review.
-
--- 
-Tushar Behera
+> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> index f75da5b..0e79479 100644
+> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> @@ -74,6 +74,13 @@
+>  		samsung,pin-pud = <0>;
+>  		samsung,pin-drv = <0>;
+>  	};
+> +
+> +	dp_hpd_gpio: dp_hpd_gpio {
+> +		samsung,pins = "gpx2-6";
+> +		samsung,pin-function = <0>;
+> +		samsung,pin-pud = <3>;
+> +		samsung,pin-drv = <0>;
+> +	};
+>  };
+> 
+>  &rtc {
+> @@ -150,3 +157,32 @@
+>  	status = "okay";
+>  	samsung,invert-vclk;
+>  };
+> +
+> +&dp {
+> +	status = "okay";
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&dp_hpd_gpio>;
+> +	samsung,color-space = <0>;
+> +	samsung,dynamic-range = <0>;
+> +	samsung,ycbcr-coeff = <0>;
+> +	samsung,color-depth = <1>;
+> +	samsung,link-rate = <0x06>;
+> +	samsung,lane-count = <2>;
+> +	samsung,hpd-gpio = <&gpx2 6 0>;
+> +
+> +	display-timings {
+> +		native-mode = <&timing1>;
+> +
+> +		timing1: timing at 1 {
+> +			clock-frequency = <70589280>;
+> +			hactive = <1366>;
+> +			vactive = <768>;
+> +			hfront-porch = <40>;
+> +			hback-porch = <40>;
+> +			hsync-len = <32>;
+> +			vback-porch = <10>;
+> +			vfront-porch = <12>;
+> +			vsync-len = <6>;
+> +		};
+> +	};
+> +};
+> --
+> 1.7.9.5
