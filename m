@@ -1,544 +1,70 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Mon, 12 May 2014 18:26:28 +0200
-Subject: [PATCH v2 2/4] ARM: at91/dt: define sam9n12 clocks
-In-Reply-To: <1399911990-5086-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1399911990-5086-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1399911990-5086-3-git-send-email-boris.brezillon@free-electrons.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Mon, 12 May 2014 09:27:27 -0700
+Subject: Questions regarding DMA buffer sharing using IOMMU
+In-Reply-To: <BAY169-W1156E6803829CAB545274BCEF350@phx.gbl>
+References: <BAY169-W12541AD089785F8BFBD4E26EF350@phx.gbl>,
+ <5218408.5YRJXjS4BX@wuerfel>
+ <BAY169-W1156E6803829CAB545274BCEF350@phx.gbl>
+Message-ID: <5370F66F.7060204@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define sam9n12 clocks and make use of them in peripheral definitions.
+On 5/12/2014 7:37 AM, Pintu Kumar wrote:
+> Hi,
+> Thanks for the reply.
+> 
+> ----------------------------------------
+>> From: arnd at arndb.de
+>> To: linux-arm-kernel at lists.infradead.org
+>> CC: pintu.k at outlook.com; linux-mm at kvack.org; linux-kernel at vger.kernel.org; linaro-mm-sig at lists.linaro.org
+>> Subject: Re: Questions regarding DMA buffer sharing using IOMMU
+>> Date: Mon, 12 May 2014 14:00:57 +0200
+>>
+>> On Monday 12 May 2014 15:12:41 Pintu Kumar wrote:
+>>> Hi,
+>>> I have some queries regarding IOMMU and CMA buffer sharing.
+>>> We have an embedded linux device (kernel 3.10, RAM: 256Mb) in
+>>> which camera and codec supports IOMMU but the display does not support IOMMU.
+>>> Thus for camera capture we are using iommu buffers using
+>>> ION/DMABUF. But for all display rendering we are using CMA buffers.
+>>> So, the question is how to achieve buffer sharing (zero-copy)
+>>> between Camera and Display using only IOMMU?
+>>> Currently we are achieving zero-copy using CMA. And we are
+>>> exploring options to use IOMMU.
+>>> Now we wanted to know which option is better? To use IOMMU or CMA?
+>>> If anybody have come across these design please share your thoughts and results.
+>>
+>> There is a slight performance overhead in using the IOMMU in general,
+>> because the IOMMU has to fetch the page table entries from memory
+>> at least some of the time.
+> 
+> Ok, we need to check performance later
+> 
+>>
+>> If that overhead is within the constraints you have for transfers between
+>> camera and codec, you are always better off using IOMMU since that
+>> means you don't have to do memory migration.
+> 
+> Transfer between camera is codec is fine. But our major concern is single buffer 
+> sharing between camera & display. Here camera supports iommu but display does not support iommu.
+> Is it possible to render camera preview (iommu buffers) on display (not iommu and required physical contiguous overlay memory)?
+> 
 
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-Tested-by: Bo Shen <voice.shen@atmel.com>
----
- arch/arm/boot/dts/at91sam9n12.dtsi | 348 ++++++++++++++++++++++++++++++++++++-
- 1 file changed, 346 insertions(+), 2 deletions(-)
+I'm pretty sure the answer is no for zero copy IOMMU buffers if one of your
+devices does not support IOMMU. If the data is coming in as individual pages
+and the hardware does not support scattered pages there isn't much you can
+do except copy to a contiguous buffer. At least with Ion, the heap types can
+be set up in a particular way such that the client need never know about the
+existence of an IOMMU or not. 
 
-diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-index 9f04808..d1b82e6 100644
---- a/arch/arm/boot/dts/at91sam9n12.dtsi
-+++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-@@ -12,6 +12,7 @@
- #include <dt-bindings/pinctrl/at91.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/clock/at91.h>
- 
- / {
- 	model = "Atmel AT91SAM9N12 SoC";
-@@ -49,6 +50,18 @@
- 		reg = <0x20000000 0x10000000>;
- 	};
- 
-+	slow_xtal: slow_xtal {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+
-+	main_xtal: main_xtal {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+
- 	ahb {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
-@@ -75,8 +88,280 @@
- 			};
- 
- 			pmc: pmc at fffffc00 {
--				compatible = "atmel,at91rm9200-pmc";
--				reg = <0xfffffc00 0x100>;
-+				compatible = "atmel,at91sam9n12-pmc";
-+				reg = <0xfffffc00 0x200>;
-+				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
-+				interrupt-controller;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				#interrupt-cells = <1>;
-+
-+				main_rc_osc: main_rc_osc {
-+					compatible = "atmel,at91sam9x5-clk-main-rc-osc";
-+					#clock-cells = <0>;
-+					interrupts-extended = <&pmc AT91_PMC_MOSCRCS>;
-+					clock-frequency = <12000000>;
-+					clock-accuracy = <50000000>;
-+				};
-+
-+				main_osc: main_osc {
-+					compatible = "atmel,at91rm9200-clk-main-osc";
-+					#clock-cells = <0>;
-+					interrupts-extended = <&pmc AT91_PMC_MOSCS>;
-+					clocks = <&main_xtal>;
-+				};
-+
-+				main: mainck {
-+					compatible = "atmel,at91sam9x5-clk-main";
-+					#clock-cells = <0>;
-+					interrupts-extended = <&pmc AT91_PMC_MOSCSELS>;
-+					clocks = <&main_rc_osc>, <&main_osc>;
-+				};
-+
-+				plla: pllack {
-+					compatible = "atmel,at91rm9200-clk-pll";
-+					#clock-cells = <0>;
-+					interrupts-extended = <&pmc AT91_PMC_LOCKA>;
-+					clocks = <&main>;
-+					reg = <0>;
-+					atmel,clk-input-range = <2000000 32000000>;
-+					#atmel,pll-clk-output-range-cells = <4>;
-+					atmel,pll-clk-output-ranges = <745000000 800000000 0 0>,
-+								      <695000000 750000000 1 0>,
-+								      <645000000 700000000 2 0>,
-+								      <595000000 650000000 3 0>,
-+								      <545000000 600000000 0 1>,
-+								      <495000000 555000000 1 1>,
-+								      <445000000 500000000 1 2>,
-+								      <400000000 450000000 1 3>;
-+				};
-+
-+				plladiv: plladivck {
-+					compatible = "atmel,at91sam9x5-clk-plldiv";
-+					#clock-cells = <0>;
-+					clocks = <&plla>;
-+				};
-+
-+				pllb: pllbck {
-+					compatible = "atmel,at91rm9200-clk-pll";
-+					#clock-cells = <0>;
-+					interrupts-extended = <&pmc AT91_PMC_LOCKB>;
-+					clocks = <&main>;
-+					reg = <1>;
-+					atmel,clk-input-range = <2000000 32000000>;
-+					#atmel,pll-clk-output-range-cells = <3>;
-+					atmel,pll-clk-output-ranges = <30000000 100000000 0>;
-+				};
-+
-+				mck: masterck {
-+					compatible = "atmel,at91sam9x5-clk-master";
-+					#clock-cells = <0>;
-+					interrupts-extended = <&pmc AT91_PMC_MCKRDY>;
-+					clocks = <&clk32k>, <&main>, <&plladiv>, <&pllb>;
-+					atmel,clk-output-range = <0 133333333>;
-+					atmel,clk-divisors = <1 2 4 3>;
-+					atmel,master-clk-have-div3-pres;
-+				};
-+
-+				usb: usbck {
-+					compatible = "atmel,at91sam9n12-clk-usb";
-+					#clock-cells = <0>;
-+					clocks = <&pllb>;
-+				};
-+
-+				prog: progck {
-+					compatible = "atmel,at91sam9x5-clk-programmable";
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					interrupt-parent = <&pmc>;
-+					clocks = <&clk32k>, <&main>, <&plladiv>, <&pllb>, <&mck>;
-+
-+					prog0: prog0 {
-+						#clock-cells = <0>;
-+						reg = <0>;
-+						interrupts = <AT91_PMC_PCKRDY(0)>;
-+					};
-+
-+					prog1: prog1 {
-+						#clock-cells = <0>;
-+						reg = <1>;
-+						interrupts = <AT91_PMC_PCKRDY(1)>;
-+					};
-+				};
-+
-+				systemck {
-+					compatible = "atmel,at91rm9200-clk-system";
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+
-+					ddrck: ddrck {
-+						#clock-cells = <0>;
-+						reg = <2>;
-+						clocks = <&mck>;
-+					};
-+
-+					lcdck: lcdck {
-+						#clock-cells = <0>;
-+						reg = <3>;
-+						clocks = <&mck>;
-+					};
-+
-+					uhpck: uhpck {
-+						#clock-cells = <0>;
-+						reg = <6>;
-+						clocks = <&usb>;
-+					};
-+
-+					udpck: udpck {
-+						#clock-cells = <0>;
-+						reg = <7>;
-+						clocks = <&usb>;
-+					};
-+
-+					pck0: pck0 {
-+						#clock-cells = <0>;
-+						reg = <8>;
-+						clocks = <&prog0>;
-+					};
-+
-+					pck1: pck1 {
-+						#clock-cells = <0>;
-+						reg = <9>;
-+						clocks = <&prog1>;
-+					};
-+				};
-+
-+				periphck {
-+					compatible = "atmel,at91sam9x5-clk-peripheral";
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					clocks = <&mck>;
-+
-+					pioAB_clk: pioAB_clk {
-+						#clock-cells = <0>;
-+						reg = <2>;
-+					};
-+
-+					pioCD_clk: pioCD_clk {
-+						#clock-cells = <0>;
-+						reg = <3>;
-+					};
-+
-+					fuse_clk: fuse_clk {
-+						#clock-cells = <0>;
-+						reg = <4>;
-+					};
-+
-+					usart0_clk: usart0_clk {
-+						#clock-cells = <0>;
-+						reg = <5>;
-+					};
-+
-+					usart1_clk: usart1_clk {
-+						#clock-cells = <0>;
-+						reg = <6>;
-+					};
-+
-+					usart2_clk: usart2_clk {
-+						#clock-cells = <0>;
-+						reg = <7>;
-+					};
-+
-+					usart3_clk: usart3_clk {
-+						#clock-cells = <0>;
-+						reg = <8>;
-+					};
-+
-+					twi0_clk: twi0_clk {
-+						reg = <9>;
-+						#clock-cells = <0>;
-+					};
-+
-+					twi1_clk: twi1_clk {
-+						#clock-cells = <0>;
-+						reg = <10>;
-+					};
-+
-+					mci0_clk: mci0_clk {
-+						#clock-cells = <0>;
-+						reg = <12>;
-+					};
-+
-+					spi0_clk: spi0_clk {
-+						#clock-cells = <0>;
-+						reg = <13>;
-+					};
-+
-+					spi1_clk: spi1_clk {
-+						#clock-cells = <0>;
-+						reg = <14>;
-+					};
-+
-+					uart0_clk: uart0_clk {
-+						#clock-cells = <0>;
-+						reg = <15>;
-+					};
-+
-+					uart1_clk: uart1_clk {
-+						#clock-cells = <0>;
-+						reg = <16>;
-+					};
-+
-+					tcb_clk: tcb_clk {
-+						#clock-cells = <0>;
-+						reg = <17>;
-+					};
-+
-+					pwm_clk: pwm_clk {
-+						#clock-cells = <0>;
-+						reg = <18>;
-+					};
-+
-+					adc_clk: adc_clk {
-+						#clock-cells = <0>;
-+						reg = <19>;
-+					};
-+
-+					dma0_clk: dma0_clk {
-+						#clock-cells = <0>;
-+						reg = <20>;
-+					};
-+
-+					uhphs_clk: uhphs_clk {
-+						#clock-cells = <0>;
-+						reg = <22>;
-+					};
-+
-+					udphs_clk: udphs_clk {
-+						#clock-cells = <0>;
-+						reg = <23>;
-+					};
-+
-+					lcdc_clk: lcdc_clk {
-+						#clock-cells = <0>;
-+						reg = <25>;
-+					};
-+
-+					sha_clk: sha_clk {
-+						#clock-cells = <0>;
-+						reg = <27>;
-+					};
-+
-+					ssc0_clk: ssc0_clk {
-+						#clock-cells = <0>;
-+						reg = <28>;
-+					};
-+
-+					aes_clk: aes_clk {
-+						#clock-cells = <0>;
-+						reg = <29>;
-+					};
-+
-+					trng_clk: trng_clk {
-+						#clock-cells = <0>;
-+						reg = <30>;
-+					};
-+				};
- 			};
- 
- 			rstc at fffffe00 {
-@@ -88,6 +373,7 @@
- 				compatible = "atmel,at91sam9260-pit";
- 				reg = <0xfffffe30 0xf>;
- 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
-+				clocks = <&mck>;
- 			};
- 
- 			shdwc at fffffe10 {
-@@ -95,12 +381,38 @@
- 				reg = <0xfffffe10 0x10>;
- 			};
- 
-+			sckc at fffffe50 {
-+				compatible = "atmel,at91sam9x5-sckc";
-+				reg = <0xfffffe50 0x4>;
-+
-+				slow_osc: slow_osc {
-+					compatible = "atmel,at91sam9x5-clk-slow-osc";
-+					#clock-cells = <0>;
-+					clocks = <&slow_xtal>;
-+				};
-+
-+				slow_rc_osc: slow_rc_osc {
-+					compatible = "atmel,at91sam9x5-clk-slow-rc-osc";
-+					#clock-cells = <0>;
-+					clock-frequency = <32768>;
-+					clock-accuracy = <50000000>;
-+				};
-+
-+				clk32k: slck {
-+					compatible = "atmel,at91sam9x5-clk-slow";
-+					#clock-cells = <0>;
-+					clocks = <&slow_rc_osc>, <&slow_osc>;
-+				};
-+			};
-+
- 			mmc0: mmc at f0008000 {
- 				compatible = "atmel,hsmci";
- 				reg = <0xf0008000 0x600>;
- 				interrupts = <12 IRQ_TYPE_LEVEL_HIGH 0>;
- 				dmas = <&dma 1 AT91_DMA_CFG_PER_ID(0)>;
- 				dma-names = "rxtx";
-+				clocks = <&mci0_clk>;
-+				clock-names = "mci_clk";
- 				#address-cells = <1>;
- 				#size-cells = <0>;
- 				status = "disabled";
-@@ -110,12 +422,16 @@
- 				compatible = "atmel,at91sam9x5-tcb";
- 				reg = <0xf8008000 0x100>;
- 				interrupts = <17 IRQ_TYPE_LEVEL_HIGH 0>;
-+				clocks = <&tcb_clk>;
-+				clock-names = "t0_clk";
- 			};
- 
- 			tcb1: timer at f800c000 {
- 				compatible = "atmel,at91sam9x5-tcb";
- 				reg = <0xf800c000 0x100>;
- 				interrupts = <17 IRQ_TYPE_LEVEL_HIGH 0>;
-+				clocks = <&tcb_clk>;
-+				clock-names = "t0_clk";
- 			};
- 
- 			dma: dma-controller at ffffec00 {
-@@ -123,6 +439,8 @@
- 				reg = <0xffffec00 0x200>;
- 				interrupts = <20 IRQ_TYPE_LEVEL_HIGH 0>;
- 				#dma-cells = <2>;
-+				clocks = <&dma0_clk>;
-+				clock-names = "dma_clk";
- 			};
- 
- 			pinctrl at fffff400 {
-@@ -392,6 +710,7 @@
- 					gpio-controller;
- 					interrupt-controller;
- 					#interrupt-cells = <2>;
-+					clocks = <&pioAB_clk>;
- 				};
- 
- 				pioB: gpio at fffff600 {
-@@ -402,6 +721,7 @@
- 					gpio-controller;
- 					interrupt-controller;
- 					#interrupt-cells = <2>;
-+					clocks = <&pioAB_clk>;
- 				};
- 
- 				pioC: gpio at fffff800 {
-@@ -412,6 +732,7 @@
- 					gpio-controller;
- 					interrupt-controller;
- 					#interrupt-cells = <2>;
-+					clocks = <&pioCD_clk>;
- 				};
- 
- 				pioD: gpio at fffffa00 {
-@@ -422,6 +743,7 @@
- 					gpio-controller;
- 					interrupt-controller;
- 					#interrupt-cells = <2>;
-+					clocks = <&pioCD_clk>;
- 				};
- 			};
- 
-@@ -431,6 +753,8 @@
- 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_dbgu>;
-+				clocks = <&mck>;
-+				clock-names = "usart";
- 				status = "disabled";
- 			};
- 
-@@ -443,6 +767,8 @@
- 				dma-names = "tx", "rx";
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_ssc0_tx &pinctrl_ssc0_rx>;
-+				clocks = <&ssc0_clk>;
-+				clock-names = "pclk";
- 				status = "disabled";
- 			};
- 
-@@ -452,6 +778,8 @@
- 				interrupts = <5 IRQ_TYPE_LEVEL_HIGH 5>;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_usart0>;
-+				clocks = <&usart0_clk>;
-+				clock-names = "usart";
- 				status = "disabled";
- 			};
- 
-@@ -461,6 +789,8 @@
- 				interrupts = <6 IRQ_TYPE_LEVEL_HIGH 5>;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_usart1>;
-+				clocks = <&usart1_clk>;
-+				clock-names = "usart";
- 				status = "disabled";
- 			};
- 
-@@ -470,6 +800,8 @@
- 				interrupts = <7 IRQ_TYPE_LEVEL_HIGH 5>;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_usart2>;
-+				clocks = <&usart2_clk>;
-+				clock-names = "usart";
- 				status = "disabled";
- 			};
- 
-@@ -479,6 +811,8 @@
- 				interrupts = <8 IRQ_TYPE_LEVEL_HIGH 5>;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_usart3>;
-+				clocks = <&usart3_clk>;
-+				clock-names = "usart";
- 				status = "disabled";
- 			};
- 
-@@ -493,6 +827,7 @@
- 				#size-cells = <0>;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_i2c0>;
-+				clocks = <&twi0_clk>;
- 				status = "disabled";
- 			};
- 
-@@ -507,6 +842,7 @@
- 				#size-cells = <0>;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_i2c1>;
-+				clocks = <&twi1_clk>;
- 				status = "disabled";
- 			};
- 
-@@ -521,6 +857,8 @@
- 				dma-names = "tx", "rx";
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_spi0>;
-+				clocks = <&spi0_clk>;
-+				clock-names = "spi_clk";
- 				status = "disabled";
- 			};
- 
-@@ -535,6 +873,8 @@
- 				dma-names = "tx", "rx";
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_spi1>;
-+				clocks = <&spi1_clk>;
-+				clock-names = "spi_clk";
- 				status = "disabled";
- 			};
- 
-@@ -554,6 +894,7 @@
- 				reg = <0xf8034000 0x300>;
- 				interrupts = <18 IRQ_TYPE_LEVEL_HIGH 4>;
- 				#pwm-cells = <3>;
-+				clocks = <&pwm_clk>;
- 				status = "disabled";
- 			};
- 		};
-@@ -584,6 +925,9 @@
- 			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
- 			reg = <0x00500000 0x00100000>;
- 			interrupts = <22 IRQ_TYPE_LEVEL_HIGH 2>;
-+			clocks = <&usb>, <&uhphs_clk>, <&udphs_clk>,
-+				 <&uhpck>;
-+			clock-names = "usb_clk", "ohci_clk", "hclk", "uhpck";
- 			status = "disabled";
- 		};
- 	};
+> Also is it possible to buffer sharing between 2 iommu supported devices?
+> 
+
+I don't see why not but there isn't a lot of information to go on here.
+
+Thanks,
+Laura
+
 -- 
-1.8.3.2
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
