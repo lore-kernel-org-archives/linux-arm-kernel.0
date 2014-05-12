@@ -1,108 +1,40 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Mon, 12 May 2014 11:34:07 +0200
-Subject: [PATCH 3/4] OMAPDSS: panel-sharp-ls037v7dw01: add device tree
- support
-In-Reply-To: <53707A64.2060203@ti.com>
-References: <1398815562-24113-1-git-send-email-tony@atomide.com>
- <1398815562-24113-4-git-send-email-tony@atomide.com>
- <5369EAE7.3030705@ti.com> <20140507150343.GA9502@atomide.com>
- <536A5920.1020908@ti.com> <20140507175919.GH9502@atomide.com>
- <20140508233300.GI2198@atomide.com> <536C8293.4070506@ti.com>
- <20140509155504.GE17814@atomide.com> <53707A64.2060203@ti.com>
-Message-ID: <CABxcv=kwhodeFTHoVpn1nHeh9+kV5fwMN9s3Kbk6h7_xJp4UYA@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 12 May 2014 11:39:03 +0200
+Subject: [GIT PULL] ARM: rockchip: devicetree changes for  v3.16
+Message-ID: <2444863.NDeixHyn6k@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Tomi,
+The following changes since commit a798c10faf62a505d24e5f6213fbaf904a39623f:
 
-On Mon, May 12, 2014 at 9:38 AM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
-> On 09/05/14 18:55, Tony Lindgren wrote:
->
->>> Although if the MO gpio is not controlled by the driver, we should tell
->>> the driver whether that gpio is high or low.
->>
->> What do you have in mind for telling that? We should also tell the
->> orientation of the panel:
->>
->> EVM   VGA     omapfb.rotate=3
->> LDP   QVGA    omapfb.rotate=0
->>
->> Do you have something in mind for that?
->
-> Hmm, right. I guess all we can do is have boolean flags in the .dts for
-> MO, LR and UD, which tells if the respective pins are hard-wires high or
-> low. And say in the documentation that you must either have a proper
-> GPIO, or use the flag, but not both.
->
-> The panel mounting orientation is a different matter. But I think it is
-> also something we should specify in the .dts. However, we don't have any
-> SW support to handle it, and it's a bit unclear to me how it should be
-> handled, so I think that has to be left for later.
->
->>> At the moment our display drivers are OMAP specific, and for that reason
->>> we should prefix the compatible strings with "omapdss,". For example,
->>> drivers/video/fbdev/omap2/displays-new/panel-dsi-cm.c:
->>>
->>>      { .compatible = "omapdss,panel-dsi-cm", },
->>>
->>> But we should still have the right compatible string in the .dts, so we
->>> convert the compatible name in arch/arm/mach-omap2/display.c, with
->>> 'dss_compat_conv_list' array, to which this panel's name should be added.
->>
->> Oh so what do you want to have in the .dts file then?
->
-> The .dts should have the proper names. The idea of this hackery is that
-> in the .dts we can have the proper compatible string. So in the .dts, we
-> have, say:
->
-> "sony,panel-foobar"
->
-> Then, at boot time, omap's platform code changes that to:
->
-> "omapdss,sony,panel-foobar".
->
-> And our (omap specific) panel-foobar driver use that
-> "omapdss,sony,panel-foobar" string.
->
-> This way some other platform could do the same, and have their platform
-> specific drivers handle the panel.
->
-> At some point in the future we hopefully will have common panel drivers,
-> and at that point we can remove that hackery. The .dts files will
-> already be correct.
->
+  Linux 3.15-rc2 (2014-04-20 11:08:50 -0700)
 
-Maybe we can remove this hackery by relying on the fact that a
-compatible string can have a set of values that goes from more
-specific to more general. So you can have something like:
+are available in the git repository at:
 
-compatible = "sony,panel-foobar", "omapdss,panel-foobar"
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.16-rockchip-dt
 
-So right now only "omapdss,panel-foobar" will be matched and later
-when we have common panel drivers then that driver could handle the
-"sony,panel-foobar" compatible string.
+for you to fetch changes up to 56f2b894dcf455ffd31bd2e8e96a074249aeb4ba:
 
-Other platforms could do something similar and have
+  ARM: dts: rockchip: convert pinctrl nodes to new bindings (2014-05-10 01:41:20 +0200)
 
-compatible = "sony,panel-foobar", "baz,panel-foobar"
+----------------------------------------------------------------
+Addition of missing board compatible names and their vendor-prefixes
+as well as the dts portions of the pinctrl rework.
 
-That way you won't break DT backward compatible but still not require
-hacks on arch/arm/mach-omap2/display.c.
+----------------------------------------------------------------
+Beniamino Galvani (2):
+      of: add mundoreader and radxa vendor prefixes
+      ARM: dts: rockchip: add root compatible properties
 
-We do the same for OMAP boards, we now have the following compatible string:
+Heiko Stuebner (1):
+      ARM: dts: rockchip: convert pinctrl nodes to new bindings
 
-compatible = "isee,omap3-igep0020", "ti,omap36xx", "ti,omap3";
-
-There isn't a struct machine_desc that matches "isee,omap3-igep0020"
-but later if we find that we need some board specific initialization
-we could add one without breaking existing DTS. In fact it used to be
-a single machine_desc that matched "ti,omap3" for both omap36xx and
-omap34xx but later when some DT clocks changes were introduced we
-needed to split both SoC families.
-
->  Tomi
->
->
-
-Best regards,
-Javier
+ Documentation/devicetree/bindings/arm/rockchip.txt    | 10 ++++++++++
+ Documentation/devicetree/bindings/vendor-prefixes.txt |  2 ++
+ arch/arm/boot/dts/rk3066a-bqcurie2.dts                |  1 +
+ arch/arm/boot/dts/rk3066a.dtsi                        |  2 +-
+ arch/arm/boot/dts/rk3188-radxarock.dts                |  1 +
+ arch/arm/boot/dts/rk3188.dtsi                         |  9 ++++-----
+ arch/arm/boot/dts/rk3xxx.dtsi                         |  9 +++++++--
+ 7 files changed, 26 insertions(+), 8 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/rockchip.txt
