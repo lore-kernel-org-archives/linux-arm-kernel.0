@@ -1,71 +1,111 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 12 May 2014 15:53:48 +0400
-Subject: [PATCH] ARM: shmobile: henninger: add QSPI DT support
-In-Reply-To: <20140511225354.GC6451@verge.net.au>
-References: <201405060245.32952.sergei.shtylyov@cogentembedded.com>
- <536FBEB7.9080605@cogentembedded.com> <20140511225354.GC6451@verge.net.au>
-Message-ID: <5370B64C.60709@cogentembedded.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 12 May 2014 13:59:06 +0200
+Subject: [linux-sunxi] [PATCH v2 3/7] phy: usb: sunxi: Introduce Allwinner
+ A31 USB PHY support
+In-Reply-To: <CAGb2v65Pstk6MqEeK838VUpNXw2cQH8K66Oo4oG3__zzWO3pig@mail.gmail.com>
+References: <1399726619-30150-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1399726619-30150-4-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v65Pstk6MqEeK838VUpNXw2cQH8K66Oo4oG3__zzWO3pig@mail.gmail.com>
+Message-ID: <5370B78A.7060709@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi,
 
-On 05/12/2014 02:53 AM, Simon Horman wrote:
+On 05/12/2014 11:14 AM, Chen-Yu Tsai wrote:
+> Hi,
+> 
+> On Sat, May 10, 2014 at 8:56 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+>> The USB phy controller in the A31 differs mostly from the older controllers
+>> because it has a clock dedicated for each phy, while the older ones were having
+>> a single clock for all the phys.
+>>
+>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> Reviewed-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>>  drivers/phy/phy-sun4i-usb.c | 35 ++++++++++++++++++++++++++---------
+>>  1 file changed, 26 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+>> index e6e6c4ba7145..8bd89430d945 100644
+>> --- a/drivers/phy/phy-sun4i-usb.c
+>> +++ b/drivers/phy/phy-sun4i-usb.c
+>> @@ -61,7 +61,6 @@
+>>  #define MAX_PHYS                       3
+>>
+>>  struct sun4i_usb_phy_data {
+>> -       struct clk *clk;
+>>         void __iomem *base;
+>>         struct mutex mutex;
+>>         int num_phys;
+>> @@ -71,6 +70,7 @@ struct sun4i_usb_phy_data {
+>>                 void __iomem *pmu;
+>>                 struct regulator *vbus;
+>>                 struct reset_control *reset;
+>> +               struct clk *clk;
+>>                 int index;
+>>         } phys[MAX_PHYS];
+>>  };
+>> @@ -146,13 +146,13 @@ static int sun4i_usb_phy_init(struct phy *_phy)
+>>         struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
+>>         int ret;
+>>
+>> -       ret = clk_prepare_enable(data->clk);
+>> +       ret = clk_prepare_enable(phy->clk);
+>>         if (ret)
+>>                 return ret;
+>>
+>>         ret = reset_control_deassert(phy->reset);
+>>         if (ret) {
+>> -               clk_disable_unprepare(data->clk);
+>> +               clk_disable_unprepare(phy->clk);
+>>                 return ret;
+>>         }
+>>
+>> @@ -170,11 +170,10 @@ static int sun4i_usb_phy_init(struct phy *_phy)
+>>  static int sun4i_usb_phy_exit(struct phy *_phy)
+>>  {
+>>         struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
+>> -       struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
+>>
+>>         sun4i_usb_phy_passby(phy, 0);
+>>         reset_control_assert(phy->reset);
+>> -       clk_disable_unprepare(data->clk);
+>> +       clk_disable_unprepare(phy->clk);
+>>
+>>         return 0;
+>>  }
+>> @@ -228,8 +227,10 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+>>         struct phy_provider *phy_provider;
+>>         struct reset_control *reset;
+>>         struct regulator *vbus;
+>> +       bool dedicated_clocks;
+> 
+> No default?
+> 
+>>         struct resource *res;
+>>         struct phy *phy;
+>> +       struct clk *clk;
+>>         char name[16];
+>>         int i;
+>>
+>> @@ -249,15 +250,20 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+>>         else
+>>                 data->disc_thresh = 2;
+>>
+>> +       if (of_device_is_compatible(np, "allwinner,sun6i-a31-usb-phy"))
+>> +               dedicated_clocks = true;
+>> +
+> 
+> dedicated_clocks is more than likely to be true from leftover data
+> on the stack. This results in the usb phy driver probe failing, and
+> the usb host drivers left in perpetual probe deferral on my Cubietruck.
+> 
+> Adding an else section fixes this.
 
->>> Define the Henninger board dependent part of the QSPI device node.
->>> Add device nodes for Spansion S25FL512S SPI flash and MTD partitions on it.
+Good catch, fixed this in the sunxi-devel branch for now (until Maxime sends a new version).
 
->>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Regards,
 
->>> ---
->>> This patch is against 'renesas-devel-v3.15-rc3-20140502' tag of Simon Horman's
->>> 'renesas.git' repo and SDHI0/2 DT support patch posted last weekend.
-
->>>   arch/arm/boot/dts/r8a7791-henninger.dts |   38 ++++++++++++++++++++++++++++++++
->>>   1 file changed, 38 insertions(+)
-
->>> Index: renesas/arch/arm/boot/dts/r8a7791-henninger.dts
->>> ===================================================================
->>> --- renesas.orig/arch/arm/boot/dts/r8a7791-henninger.dts
->>> +++ renesas/arch/arm/boot/dts/r8a7791-henninger.dts
->> [...]
->>> @@ -158,3 +163,36 @@
->>>   	cd-gpios = <&gpio6 22 GPIO_ACTIVE_LOW>;
->>>   	status = "okay";
->>>   };
->>> +
->>> +&qspi {
->>> +	pinctrl-0 = <&qspi_pins>;
->>> +	pinctrl-names = "default";
->>> +
->>> +	status = "okay";
->>> +
->>> +	flash at 0 {
->>> +		#address-cells = <1>;
->>> +		#size-cells = <1>;
->>> +		compatible = "spansion,s25fl512s";
->>> +		reg = <0>;
->>> +		spi-max-frequency = <30000000>;
->>> +		spi-tx-bus-width = <4>;
->>> +		spi-rx-bus-width = <4>;
->>> +		m25p,fast-read;
->>> +
->>> +		partition at 0 {
->>> +			label = "loader_prg";
->>> +			reg = <0x00000000 0x00040000>;
->>> +			read-only;
->>> +		};
->>> +		partition at 40000 {
->>> +			label = "user_prg";
->>> +			reg = <0x00040000 0x00400000>;
->>> +			read-only;
-
->>     Oops, there shouldn't be "read-only" here, I forgot to refresh
->> the patch as I'm now seeing... too bad it's too late to resend now.
->> :-(
-
-> Could you send an incremental fix for me to queue up?
-
-    Yes, I will.
-
-WBR, Sergei
+Hans
