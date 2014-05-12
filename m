@@ -1,83 +1,52 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 12 May 2014 16:22:42 +0100
-Subject: [PATCH 1/3] arm64: add MIDR_EL1 field accessors
-In-Reply-To: <20140512150514.GD18960@arm.com>
-References: <1399905470-26500-1-git-send-email-mark.rutland@arm.com>
- <1399905470-26500-2-git-send-email-mark.rutland@arm.com>
- <20140512150514.GD18960@arm.com>
-Message-ID: <20140512152242.GB10661@e106331-lin.cambridge.arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 12 May 2014 17:25:20 +0200
+Subject: [GIT PULL] Allwinner Pinctrl changes for 3.16
+In-Reply-To: <CACRpkdae=i8C49AMJCrRe0a=4d8Y+FhkiEOv=EJ_NfakYqRvzg@mail.gmail.com>
+References: <20140508225209.GA13610@lukather>
+ <CACRpkda7QT+sGs6wY6-fbcZ3k4sXfP=rmPimfqHjbUB5vQuO5A@mail.gmail.com>
+ <20140509173156.GF7047@lukather>
+ <CACRpkdae=i8C49AMJCrRe0a=4d8Y+FhkiEOv=EJ_NfakYqRvzg@mail.gmail.com>
+Message-ID: <20140512152520.GD17154@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 12, 2014 at 04:05:14PM +0100, Will Deacon wrote:
-> On Mon, May 12, 2014 at 03:37:48PM +0100, Mark Rutland wrote:
-> > The MIDR_EL1 register is composed of a number of bitfields, and uses of
-> > the fields has so far involved open-coding of the shifts and masks
-> > required.
-> > 
-> > This patch adds shifts and masks for each of the MIDR_EL1 subfields, and
-> > also provides accessors built atop of these. Existing uses within
-> > cputype.h are updated to use these accessors.
-> > 
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > ---
-> >  arch/arm64/include/asm/cputype.h | 27 +++++++++++++++++++++++++--
-> >  1 file changed, 25 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
-> > index c404fb0..541b829 100644
-> > --- a/arch/arm64/include/asm/cputype.h
-> > +++ b/arch/arm64/include/asm/cputype.h
-> > @@ -36,6 +36,25 @@
-> >  	__val;								\
-> >  })
-> >  
-> > +#define MIDR_REVISION_MASK	0xf
-> > +#define MIDR_REVISION(midr)	((midr) & MIDR_REVISION_MASK)
-> > +#define MIDR_PARTNUM_SHIFT	4
-> > +#define MIDR_PARTNUM_MASK	(0xfff << MIDR_PARTNUM_SHIFT)
-> > +#define MIDR_PARTNUM(midr)	\
-> > +	(((midr) & MIDR_PARTNUM_MASK) >> MIDR_PARTNUM_SHIFT)
-> > +#define MIDR_ARCHITECTURE_SHIFT	16
-> > +#define MIDR_ARCHITECTURE_MASK	(0xf << MIDR_ARCHITECTURE_SHIFT)
-> > +#define MIDR_ARCHITECTURE(midr)	\
-> > +	(((midr) & MIDR_ARCHITECTURE_MASK) >> MIDR_ARCHITECTURE_SHIFT)
-> > +#define MIDR_VARIANT_SHIFT	20
-> > +#define MIDR_VARIANT_MASK	(0xf << MIDR_VARIANT_SHIFT)
-> > +#define MIDR_VARIANT(midr)	\
-> > +	(((midr) & MIDR_VARIANT_MASK) >> MIDR_VARIANT_SHIFT)
-> > +#define MIDR_IMPLEMENTOR_SHIFT	24
-> > +#define MIDR_IMPLEMENTOR_MASK	(0xff << MIDR_IMPLEMENTOR_SHIFT)
-> > +#define MIDR_IMPLEMENTOR(midr)	\
-> > +	(((midr) & MIDR_IMPLEMENTOR_MASK) >> MIDR_IMPLEMENTOR_SHIFT)
-> > +
-> >  #define ARM_CPU_IMP_ARM		0x41
-> >  #define ARM_CPU_IMP_APM		0x50
-> >  
-> > @@ -64,12 +83,16 @@ static inline u64 __attribute_const__ read_cpuid_mpidr(void)
-> >  
-> >  static inline unsigned int __attribute_const__ read_cpuid_implementor(void)
-> >  {
-> > -	return (read_cpuid_id() & 0xFF000000) >> 24;
-> > +	return MIDR_IMPLEMENTOR(read_cpuid_id());
-> >  }
-> >  
-> >  static inline unsigned int __attribute_const__ read_cpuid_part_number(void)
-> >  {
-> > -	return (read_cpuid_id() & 0xFFF0);
-> > +	/*
-> > +	 * The part number field is used in-place as a userspace ABI, so we
-> > +	 * cannot use MIDR_PARTNUM() here.
-> > +	 */
-> > +	return (read_cpuid_id() & MIDR_PARTNUM_MASK);
+On Mon, May 12, 2014 at 11:22:27AM +0200, Linus Walleij wrote:
+> On Fri, May 9, 2014 at 7:31 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
 > 
-> Where is this used as ABI? c_show is open-coded and kvm_target_cpu could
-> just add a shift left.
+> > Only pinctrl/next is not going to be rebased, right?
+> 
+> pinctrl/devel actually.
+> 
+> for-next is a mixdown branch that is rebased all the time
+> so don't use that.
 
-For some reason I thought this was called by some code included from
-arch/arm, but that doesn't seem to be the case.
+Ok.
 
-I'll add the left shift in kvm_target_cpu instead.
+> But notify me first if you're going to be pulling in that branch!
+> (Handshake.)
 
-Cheers,
-Mark.
+Yes, this is exactly what I'm doing :)
+
+> Also: why do you need it? Just as a dependence to dts files
+> does *not* count as a reason to cross merge these trees,
+> as the device tree files are meant to even be moved out of
+> the kernel at some point... but you may have better reasons?
+
+It's not about DT, it's about the patch to select the pinctrl drivers
+in the machine's Kconfig options.
+
+Thanks,
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140512/0f2f8d12/attachment.sig>
