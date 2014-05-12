@@ -1,99 +1,136 @@
 From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Mon, 12 May 2014 18:06:30 +0200
-Subject: [PATCH 02/12] clk: st: Adds Flexgen clock binding
+Date: Mon, 12 May 2014 18:06:36 +0200
+Subject: [PATCH 08/12] drivers: clk: st: STiH407: Support for clockgenC0
 In-Reply-To: <1399910800-12847-1-git-send-email-gabriel.fernandez@linaro.org>
 References: <1399910800-12847-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <1399910800-12847-3-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <1399910800-12847-9-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A Flexgen structure is composed by:
-- a clock cross bar (represented by a mux element)
-- a pre and final dividers (represented by a divider and gate elements)
+The patch added support for DT registration of ClockGenC0
+It includes 2 c32 type PLL and a 660 Quadfs.
 
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+Signed-off-by: Olivier Bideau <olivier.bideau@st.com>
 ---
- .../devicetree/bindings/clock/st/st,clkgen.txt     |  5 +++
- .../devicetree/bindings/clock/st/st,flexgen.txt    | 48 ++++++++++++++++++++++
- 2 files changed, 53 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/st/st,flexgen.txt
+ drivers/clk/st/clkgen-fsyn.c | 47 ++++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/st/clkgen-pll.c  | 32 ++++++++++++++++++++++++++++++
+ 2 files changed, 79 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/clock/st/st,clkgen.txt b/Documentation/devicetree/bindings/clock/st/st,clkgen.txt
-index 55506c2..afb65e6 100644
---- a/Documentation/devicetree/bindings/clock/st/st,clkgen.txt
-+++ b/Documentation/devicetree/bindings/clock/st/st,clkgen.txt
-@@ -32,6 +32,10 @@ address is common of all subnode.
- 		vcc_node {
- 			...
- 		};
-+
-+		flexgen_node {
-+			...
-+		};
- 		...
- 	};
+diff --git a/drivers/clk/st/clkgen-fsyn.c b/drivers/clk/st/clkgen-fsyn.c
+index 46b29c4..68c6786 100644
+--- a/drivers/clk/st/clkgen-fsyn.c
++++ b/drivers/clk/st/clkgen-fsyn.c
+@@ -255,6 +255,49 @@ static struct clkgen_quadfs_data st_fs660c32_F_416 = {
+ 	.get_rate	= clk_fs660c32_dig_get_rate,
+ };
  
-@@ -45,6 +49,7 @@ Each subnode should use the binding discribe in [2]..[7]
- [5] Documentation/devicetree/bindings/clock/st,clkgen-prediv.txt
- [6] Documentation/devicetree/bindings/clock/st,vcc.txt
- [7] Documentation/devicetree/bindings/clock/st,quadfs.txt
-+[8] Documentation/devicetree/bindings/clock/st,flexgen.txt
++static struct clkgen_quadfs_data st_fs660c32_C_407 = {
++	.nrst_present = true,
++	.nrst	= { CLKGEN_FIELD(0x2f0, 0x1, 0),
++		    CLKGEN_FIELD(0x2f0, 0x1, 1),
++		    CLKGEN_FIELD(0x2f0, 0x1, 2),
++		    CLKGEN_FIELD(0x2f0, 0x1, 3) },
++	.npda	= CLKGEN_FIELD(0x2f0, 0x1, 12),
++	.nsb	= { CLKGEN_FIELD(0x2f0, 0x1, 8),
++		    CLKGEN_FIELD(0x2f0, 0x1, 9),
++		    CLKGEN_FIELD(0x2f0, 0x1, 10),
++		    CLKGEN_FIELD(0x2f0, 0x1, 11) },
++	.nsdiv_present = true,
++	.nsdiv	= { CLKGEN_FIELD(0x304, 0x1, 24),
++		    CLKGEN_FIELD(0x308, 0x1, 24),
++		    CLKGEN_FIELD(0x30c, 0x1, 24),
++		    CLKGEN_FIELD(0x310, 0x1, 24) },
++	.mdiv	= { CLKGEN_FIELD(0x304, 0x1f, 15),
++		    CLKGEN_FIELD(0x308, 0x1f, 15),
++		    CLKGEN_FIELD(0x30c, 0x1f, 15),
++		    CLKGEN_FIELD(0x310, 0x1f, 15) },
++	.en	= { CLKGEN_FIELD(0x2fc, 0x1, 0),
++		    CLKGEN_FIELD(0x2fc, 0x1, 1),
++		    CLKGEN_FIELD(0x2fc, 0x1, 2),
++		    CLKGEN_FIELD(0x2fc, 0x1, 3) },
++	.ndiv	= CLKGEN_FIELD(0x2f4, 0x7, 16),
++	.pe	= { CLKGEN_FIELD(0x304, 0x7fff, 0),
++		    CLKGEN_FIELD(0x308, 0x7fff, 0),
++		    CLKGEN_FIELD(0x30c, 0x7fff, 0),
++		    CLKGEN_FIELD(0x310, 0x7fff, 0) },
++	.sdiv	= { CLKGEN_FIELD(0x304, 0xf, 20),
++		    CLKGEN_FIELD(0x308, 0xf, 20),
++		    CLKGEN_FIELD(0x30c, 0xf, 20),
++		    CLKGEN_FIELD(0x310, 0xf, 20) },
++	.lockstatus_present = true,
++	.lock_status = CLKGEN_FIELD(0x2A0, 0x1, 24),
++	.powerup_polarity = 1,
++	.standby_polarity = 1,
++	.pll_ops	= &st_quadfs_pll_c32_ops,
++	.rtbl		= fs660c32_rtbl,
++	.rtbl_cnt	= ARRAY_SIZE(fs660c32_rtbl),
++	.get_rate	= clk_fs660c32_dig_get_rate,
++};
++
+ /**
+  * DOC: A Frequency Synthesizer that multiples its input clock by a fixed factor
+  *
+@@ -938,6 +981,10 @@ static struct of_device_id quadfs_of_match[] = {
+ 		.compatible = "st,stih416-quadfs660-F",
+ 		.data = (void *)&st_fs660c32_F_416
+ 	},
++	{
++		.compatible = "st,stih407-quadfs660-C",
++		.data = (void *)&st_fs660c32_C_407
++	},
+ 	{}
+ };
  
+diff --git a/drivers/clk/st/clkgen-pll.c b/drivers/clk/st/clkgen-pll.c
+index f1e27f9..cb4e5b6 100644
+--- a/drivers/clk/st/clkgen-pll.c
++++ b/drivers/clk/st/clkgen-pll.c
+@@ -192,6 +192,30 @@ static struct clkgen_pll_data st_pll3200c32_407_a0 = {
+ 	.ops		= &stm_pll3200c32_ops,
+ };
  
- Required properties:
-diff --git a/Documentation/devicetree/bindings/clock/st/st,flexgen.txt b/Documentation/devicetree/bindings/clock/st/st,flexgen.txt
-new file mode 100644
-index 0000000..ce908dd
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/st/st,flexgen.txt
-@@ -0,0 +1,48 @@
-+Binding for a type of flexgen structure found on certain
-+STMicroelectronics consumer electronics SoC devices
++static struct clkgen_pll_data st_pll3200c32_407_c0_0 = {
++	/* 407 C0 PLL0 */
++	.pdn_status	= CLKGEN_FIELD(0x2a0,	0x1,			8),
++	.locked_status	= CLKGEN_FIELD(0x2a0,	0x1,			24),
++	.ndiv		= CLKGEN_FIELD(0x2a4,	C32_NDIV_MASK,		16),
++	.idf		= CLKGEN_FIELD(0x2a4,	C32_IDF_MASK,		0x0),
++	.num_odfs = 1,
++	.odf		= { CLKGEN_FIELD(0x2b4, C32_ODF_MASK,		0) },
++	.odf_gate	= { CLKGEN_FIELD(0x2b4, 0x1,			6) },
++	.ops		= &stm_pll3200c32_ops,
++};
 +
-+This structure includes:
-+- a clock cross bar (represented by a mux element)
-+- a pre and final dividers (represented by a divider and gate elements)
++static struct clkgen_pll_data st_pll3200c32_407_c0_1 = {
++	/* 407 C0 PLL1 */
++	.pdn_status	= CLKGEN_FIELD(0x2c8,	0x1,			8),
++	.locked_status	= CLKGEN_FIELD(0x2c8,	0x1,			24),
++	.ndiv		= CLKGEN_FIELD(0x2cc,	C32_NDIV_MASK,		16),
++	.idf		= CLKGEN_FIELD(0x2cc,	C32_IDF_MASK,		0x0),
++	.num_odfs = 1,
++	.odf		= { CLKGEN_FIELD(0x2dc, C32_ODF_MASK,		0) },
++	.odf_gate	= { CLKGEN_FIELD(0x2dc, 0x1,			6) },
++	.ops		= &stm_pll3200c32_ops,
++};
 +
-+This binding uses the common clock binding[1].
-+
-+[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-+
-+Required properties:
-+- compatible : shall be:
-+  "st,flexgen"
-+
-+- #clock-cells : from common clock binding; shall be set to 1.
-+
-+- clocks : from common clock binding
-+
-+- clock-output-names : From common clock binding. The block has 4
-+                       clock outputs but not all of them in a specific instance
-+                       have to be used in the SoC. If a clock name is left as
-+                       an empty string then no clock will be created for the
-+                       output associated with that string index. If fewer than
-+                       4 strings are provided then no clocks will be created
-+                       for the remaining outputs.
-+
-+Example:
-+
-+	clockgenD2 at x9106000 {
-+		compatible = "st,clkgen-c32";
-+		reg = <0x9106000 0x1000>;
-+
-+		CLK_S_D2_FLEXGEN: CLK_S_D2_FLEXGEN {
-+			compatible = "st,flexgen";
-+
-+			#clock-cells = <1>;
-+			clocks = <&CLK_S_D2_QUADFS 0>,
-+				 <&CLK_S_D2_QUADFS 1>,
-+				 <&CLK_S_D2_QUADFS 2>,
-+				 <&CLK_S_D2_QUADFS 3>;
-+
-+			clock-output-names = "CLK_PIX_MAIN_DISP",
-+					     "CLK_PIX_PIP",
-+					     "CLK_PIX_GDP1",
-+					     "CLK_PIX_GDP2";
-+		};
-+	};
+ /**
+  * DOC: Clock Generated by PLL, rate set and enabled by bootloader
+  *
+@@ -586,6 +610,14 @@ static struct of_device_id c32_pll_of_match[] = {
+ 		.compatible = "st,stih407-plls-c32-a0",
+ 		.data = &st_pll3200c32_407_a0,
+ 	},
++	{
++		.compatible = "st,stih407-plls-c32-c0_0",
++		.data = &st_pll3200c32_407_c0_0,
++	},
++	{
++		.compatible = "st,stih407-plls-c32-c0_1",
++		.data = &st_pll3200c32_407_c0_1,
++	},
+ 	{}
+ };
+ 
 -- 
 1.9.1
