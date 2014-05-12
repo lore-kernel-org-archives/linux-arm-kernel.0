@@ -1,81 +1,71 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 12 May 2014 16:54:58 +0200
-Subject: [PATCHv2] ARM: at91/dt: sam9261: Fix PLL output ranges and other
- clocks divisors
-In-Reply-To: <5370D9E0.4000509@free-electrons.com>
-References: <1399904532-3688-1-git-send-email-alexandre.belloni@free-electrons.com>
- <5370D9E0.4000509@free-electrons.com>
-Message-ID: <5370E0C2.5070208@atmel.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 12 May 2014 17:55:05 +0300
+Subject: [PATCH 3/4] OMAPDSS: panel-sharp-ls037v7dw01: add device tree
+ support
+In-Reply-To: <20140512142646.GA31772@atomide.com>
+References: <20140507150343.GA9502@atomide.com> <536A5920.1020908@ti.com>
+ <20140507175919.GH9502@atomide.com> <20140508233300.GI2198@atomide.com>
+ <536C8293.4070506@ti.com> <20140509155504.GE17814@atomide.com>
+ <53707A64.2060203@ti.com>
+ <CABxcv=kwhodeFTHoVpn1nHeh9+kV5fwMN9s3Kbk6h7_xJp4UYA@mail.gmail.com>
+ <53709706.10501@ti.com>
+ <CABxcv=mY0a+yJgmCTPN=BhSQD57Pw022zOd5_KxEgvvF_-=O7Q@mail.gmail.com>
+ <20140512142646.GA31772@atomide.com>
+Message-ID: <5370E0C9.8050201@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/05/2014 16:25, Boris BREZILLON :
+On 12/05/14 17:26, Tony Lindgren wrote:
+
+>>> The omapdss case is different, there the "omapdss" points to a sw thing,
+>>> it does not describe the hardware. It's only needed as we don't have
+>>> proper sw drivers for the devices.
+>>>
+>>> That said, I think what you describe would work. But I would rather keep
+>>> the .dts files clean and correct, and keep that hacks hidden inside the
+>>> kernel.
+>>>
+>>
+>> Thanks for the explanation. Since DT are meant to describe hardware
+>> and not software I agree with you that we shouldn't leak an
+>> implementation detail to the DeviceTrees.
+>>
+>> And after all fortunately we don't have a stable API in the kernel
+>> like the one that is enforced in the DT so we can fix it later ;-)
 > 
-> On 12/05/2014 16:22, Alexandre Belloni wrote:
->> Argument 3 (OUT) and 4 (ICPLL) of the atmel,pll-clk-output-ranges were missing.
->> Also, the at91sam9261 doesn't really have a by 3 divisor.
->>
->> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> This remapping of compatible flags sounds smelly to me, please discuss
+> it first with the device tree people.
 
-Ok, thanks guys, I have just updated the at91-3.16-dt2 branch with this
-modification.
+It's already in v3.15.
 
-Bye,
+I agree it's smelly, but it smelly only inside the kernel, not visible
+anywhere, and we can remove it when we have common panel drivers,
+without any modifications to .dts files.
 
->> ---
->> Changed in v2:
->> After getting feedback from the atmel HW engineers, it appears that PLLB is not
->> the same as PLLA despite what the datasheet seems to imply. The patch is updated
->> to reflect that.
->>
->>  arch/arm/boot/dts/at91sam9261.dtsi | 11 ++++++-----
->>  1 file changed, 6 insertions(+), 5 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/at91sam9261.dtsi b/arch/arm/boot/dts/at91sam9261.dtsi
->> index 561addceb81e..44d9e5ab09c3 100644
->> --- a/arch/arm/boot/dts/at91sam9261.dtsi
->> +++ b/arch/arm/boot/dts/at91sam9261.dtsi
->> @@ -564,7 +564,8 @@
->>  					reg = <0>;
->>  					atmel,clk-input-range = <1000000 32000000>;
->>  					#atmel,pll-clk-output-range-cells = <4>;
->> -					atmel,pll-clk-output-ranges = <80000000 200000000 190000000 240000000>;
->> +					atmel,pll-clk-output-ranges = <80000000 200000000 0 1>,
->> +								<190000000 240000000 2 1>;
->>  				};
->>  
->>  				pllb: pllbck {
->> @@ -573,9 +574,9 @@
->>  					interrupts-extended = <&pmc AT91_PMC_LOCKB>;
->>  					clocks = <&main>;
->>  					reg = <1>;
->> -					atmel,clk-input-range = <1000000 32000000>;
->> +					atmel,clk-input-range = <1000000 5000000>;
->>  					#atmel,pll-clk-output-range-cells = <4>;
->> -					atmel,pll-clk-output-ranges = <80000000 200000000 190000000 240000000>;
->> +					atmel,pll-clk-output-ranges = <70000000 130000000 1 1>;
->>  				};
->>  
->>  				mck: masterck {
->> @@ -584,13 +585,13 @@
->>  					interrupts-extended = <&pmc AT91_PMC_MCKRDY>;
->>  					clocks = <&clk32k>, <&main>, <&plla>, <&pllb>;
->>  					atmel,clk-output-range = <0 94000000>;
->> -					atmel,clk-divisors = <1 2 4 3>;
->> +					atmel,clk-divisors = <1 2 4 0>;
->>  				};
->>  
->>  				usb: usbck {
->>  					compatible = "atmel,at91rm9200-clk-usb";
->>  					#clock-cells = <0>;
->> -					atmel,clk-divisors = <1 2 4 3>;
->> +					atmel,clk-divisors = <1 2 4 0>;
->>  					clocks = <&pllb>;
->>  				};
->>  
-> 
+> I think we're better off just using the compatible properties limited
+> to the simple-panel.txt for now and actually describe the real
+> hardware. The fact that the panel is connected to DSS should be possible
+> to find out based on the phandles.
+
+I'm not sure what you mean. We do describe only the real hardware. The
+compatible string in the .dts file is "sharp,ls037v7dw01".
+
+Prepending the "omapdss" to the compatible string is required for the
+device/driver matching to work, because we can't use the
+"sharp,ls037v7dw01" compatible string in our omap specific panel driver.
+
+I'm not sure what it would give us to try to be compatible with
+simple-panel.txt. The simple-panel bindings won't probably be compatible
+with the future common display drivers in any case, as the simple-panel
+binding is just too limited and doesn't describe the hardware fully.
+
+ Tomi
 
 
--- 
-Nicolas Ferre
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140512/48030a5f/attachment.sig>
