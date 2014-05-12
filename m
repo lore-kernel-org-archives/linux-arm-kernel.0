@@ -1,29 +1,38 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 12 May 2014 18:32:55 +0200
-Subject: [PATCH] ARM: at91/dt: sam9260: correct external trigger value
-Message-ID: <1399912375-6247-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: dianders@google.com (Doug Anderson)
+Date: Mon, 12 May 2014 09:36:15 -0700
+Subject: [PATCH] ARM: mm: Add workaround for erratum 763126
+In-Reply-To: <CAFY15YHPSLMh6iA1PQHjsneL_Kxarc0xL5uJ7_px71cbmJbrgQ@mail.gmail.com>
+References: <1399528508-2806-1-git-send-email-arjun.kv@samsung.com>
+ <CAD=FV=XeYdgqk3-CpS2NNXFAnn+uGDC6844d-L6vfS=SYEuw-Q@mail.gmail.com>
+ <20140508173853.GG8981@arm.com>
+ <CAD=FV=X0jQvmA07XZEKT-3FAOaE3p0qCLPUCJKR8Ux1=o46cVQ@mail.gmail.com>
+ <20140508180534.GI8981@arm.com>
+ <CAFY15YHPSLMh6iA1PQHjsneL_Kxarc0xL5uJ7_px71cbmJbrgQ@mail.gmail.com>
+Message-ID: <CAD=FV=Vned903yhjQoxyKrR9GzwqfqxoCGJyc_2J=kWvTSrBVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The external trigger value is 0b1101 which is 13 but 0xd.
+Arjun,
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/boot/dts/at91sam9260.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On Fri, May 9, 2014 at 6:56 AM, arjun kv <kvarjun@gmail.com> wrote:
+> Hi All,
+>
+>
+> As Doug already mentioned, we have not observed an issue which could have
+> been triggered by this erratum.
+> Nor do we have a method to actually trigger the livelock.
+> But if it improves the performance and has no real side effects, we could at
+> least land this in our local tree?
 
-diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-index 366fc2cbcd64..c0e0eae16a27 100644
---- a/arch/arm/boot/dts/at91sam9260.dtsi
-+++ b/arch/arm/boot/dts/at91sam9260.dtsi
-@@ -641,7 +641,7 @@
- 				trigger at 3 {
- 					reg = <3>;
- 					trigger-name = "external";
--					trigger-value = <0x13>;
-+					trigger-value = <0xd>;
- 					trigger-external;
- 				};
- 			};
--- 
-1.9.1
+Right, this is not a discussion for upstream anymore.  If Will and
+Catalin believe that this errata will not actually hit and that the
+worst case is a performance problem then not applying it makes sense.
+
+We can continue the discussion in
+<https://chromium-review.googlesource.com/#/c/169732/>, but given what
+I see here I'd even vote that we don't need to apply this locally.
+
+
+Thanks to all for the review!
+
+-Doug
