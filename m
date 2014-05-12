@@ -1,46 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 12 May 2014 17:12:46 +0100
-Subject: [PATCH v8 1/8] ftrace: make CALLER_ADDRx macros more generic
-In-Reply-To: <20140512120535.041030dd@gandalf.local.home>
-References: <1394862048-28758-1-git-send-email-takahiro.akashi@linaro.org>
- <1398851676-16389-1-git-send-email-takahiro.akashi@linaro.org>
- <1398851676-16389-2-git-send-email-takahiro.akashi@linaro.org>
- <20140502151957.6978d870@gandalf.local.home>
- <20140512155811.GB4880@arm.com>
- <20140512120535.041030dd@gandalf.local.home>
-Message-ID: <20140512161246.GC4880@arm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 12 May 2014 10:19:16 -0600
+Subject: [RFC] Describing arbitrary bus mastering relationships in DT
+In-Reply-To: <20140509105638.GB3921@e103592.cambridge.arm.com>
+References: <20140501173248.GD3732@e103592.cambridge.arm.com>
+ <20140502132327.GA14612@ulmo> <5363E8E9.6000908@wwwdotorg.org>
+ <4356389.0gMcB71fJD@wuerfel>
+ <20140509105638.GB3921@e103592.cambridge.arm.com>
+Message-ID: <5370F484.9030209@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Steve,
-
-On Mon, May 12, 2014 at 05:05:35PM +0100, Steven Rostedt wrote:
-> On Mon, 12 May 2014 16:58:11 +0100
-> Will Deacon <will.deacon@arm.com> wrote:
+On 05/09/2014 04:56 AM, Dave Martin wrote:
+> On Fri, May 02, 2014 at 09:06:43PM +0200, Arnd Bergmann wrote:
+>> On Friday 02 May 2014 12:50:17 Stephen Warren wrote:
+...
+>>> Now, perhaps there are devices which themselves control whether
+>>> transactions are sent to the IOMMU or direct to RAM, but I'm not
+>>> familiar with them. Is the GPU in that category, since it has its own
+>>> GMMU, albeit chained into the SMMU IIRC?
+>>
+>> Devices with a built-in IOMMU such as most GPUs are also easy enough
+>> to handle: There is no reason to actually show the IOMMU in DT and
+>> we can just treat the GPU as a black box.
 > 
-> > Akashi: did you get around to posting a new version of this patch? We can't
-> > take your arm64 patches until you get the core stuff merged...
-> 
-> I haven't seen any patches yet.
-> 
-> What I can also do is to create a separate branch based on mainline,
-> and just apply this change to the core. Then you could pull that branch
-> with a note to Linus that it is also in my tree with the common
-> ancestor.
-> 
-> If he pulls your work first, he'll only get that change from my tree,
-> and if he pulls mine first it doesn't matter as all the changes will be
-> there.
-> 
-> This is something he said at Kernel Summit that was normal procedure if
-> there's a change in one tree that another tree is dependent on.
+> It's impossible for such a built-in IOMMU to be shared with other
+> devices, so that's probably reasonable.
 
-That sounds great, and nicely solves the dependency between our trees for
-3.16 at the same time.
+I don't believe that's true.
 
-If you point us at the branch and promise not to rebase it, that would be
-fantastic.
+For example, on Tegra, the CPU (and likely anything that can bus-master
+the relevant bus) can send transactions into the GPU, which can then
+turn them around towards RAM, and those likely then go through the MMU
+inside the GPU.
 
-Cheers,
-
-Will
+IIRC, the current Nouveau support for Tegra even makes use of that
+feature, although I think that's a temporary thing that we're hoping to
+get rid of once the Tegra support in Nouveau gets more mature.
