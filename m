@@ -1,121 +1,78 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 12 May 2014 13:20:56 +0200
-Subject: [PATCH v12 1/6] ARM: sunxi: Add driver for SD/MMC hosts found
- on Allwinner sunxi SoCs
-In-Reply-To: <CAPDyKFrYeBdB20qhmkcUf5ykw=SbBo6VUPXd=By9dNOvTnvFww@mail.gmail.com>
-References: <1399794417-9291-1-git-send-email-hdegoede@redhat.com>	<1399794417-9291-2-git-send-email-hdegoede@redhat.com>
- <CAPDyKFrYeBdB20qhmkcUf5ykw=SbBo6VUPXd=By9dNOvTnvFww@mail.gmail.com>
-Message-ID: <5370AE98.9050808@redhat.com>
+From: tixy@linaro.org (Jon Medhurst)
+Date: Mon, 12 May 2014 12:31:34 +0100
+Subject: [PATCH RESEND 3/3] ARM: kprobes: Fix test code compilation errors for
+ ARMv4 targets
+In-Reply-To: <1399894294-4144-1-git-send-email-tixy@linaro.org>
+References: <1399894294-4144-1-git-send-email-tixy@linaro.org>
+Message-ID: <1399894294-4144-4-git-send-email-tixy@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Conditionally compile kprobes test cases for ARMv5 instructions to avoid
+compilation errors with ARMv4 targets like:
 
-On 05/12/2014 11:15 AM, Ulf Hansson wrote:
-> On 11 May 2014 09:46, Hans de Goede <hdegoede@redhat.com> wrote:
->> From: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
->>
->> The Allwinner sunxi mmc host uses dma in bus-master mode using a built-in
->> designware idmac controller, which is identical to the one found in the mmc-dw
->> hosts. However the rest of the host is not identical to mmc-dw, it deals with
->> sending stop commands in hardware which makes it significantly different
->> from the mmc-dw devices.
->>
->> HdG: Various cleanups and fixes.
->>
->> Signed-off-by: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> 
-> [snip]
-> 
->> +
->> +static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
->> +                                 struct mmc_ios *ios)
->> +{
->> +       u32 rate, oclk_dly, rval, sclk_dly, src_clk;
->> +       struct clk_hw *hw = __clk_get_hw(host->clk_mmc);
-> 
-> Hi Hans,
-> 
-> This seems like the wrong approach. But I guess it's related to the
-> "clock phase control" API you have been discussing with the clk
-> maintainer, Mike Turquette!?
+/tmp/cc7Tx8ST.s:16740: Error: selected processor does not support ARM mode `clz r0,r0'
 
-Yes, this is meant as a temporary solution until we get a proper
-"clock phase control" API.
+Signed-off-by: Jon Medhurst <tixy@linaro.org>
+---
+ arch/arm/kernel/kprobes-test-arm.c |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-> 
-> __clk_get_hw is supposed to be used by clk providers, not clk consumers.
-> 
->> +       int ret;
->> +
->> +       rate = clk_round_rate(host->clk_mmc, ios->clock);
->> +       dev_dbg(mmc_dev(host->mmc), "setting clk to %d, rounded %d\n",
->> +               ios->clock, rate);
->> +
->> +       /* setting clock rate */
->> +       ret = clk_set_rate(host->clk_mmc, rate);
->> +       if (ret) {
->> +               dev_err(mmc_dev(host->mmc), "error setting clk to %d: %d\n",
->> +                       rate, ret);
->> +               return ret;
->> +       }
->> +
->> +       ret = sunxi_mmc_oclk_onoff(host, 0);
->> +       if (ret)
->> +               return ret;
->> +
->> +       /* clear internal divider */
->> +       rval = mmc_readl(host, REG_CLKCR);
->> +       rval &= ~0xff;
->> +       mmc_writel(host, REG_CLKCR, rval);
->> +
->> +       /* determine delays */
->> +       if (rate <= 400000) {
->> +               oclk_dly = 0;
->> +               sclk_dly = 7;
->> +       } else if (rate <= 25000000) {
->> +               oclk_dly = 0;
->> +               sclk_dly = 5;
->> +       } else if (rate <= 50000000) {
->> +               if (ios->timing == MMC_TIMING_UHS_DDR50) {
->> +                       oclk_dly = 2;
->> +                       sclk_dly = 4;
->> +               } else {
->> +                       oclk_dly = 3;
->> +                       sclk_dly = 5;
->> +               }
->> +       } else {
->> +               /* rate > 50000000 */
->> +               oclk_dly = 2;
->> +               sclk_dly = 4;
->> +       }
->> +
->> +       src_clk = clk_get_rate(clk_get_parent(host->clk_mmc));
->> +       if (src_clk >= 300000000 && src_clk <= 400000000) {
->> +               if (oclk_dly)
->> +                       oclk_dly--;
->> +               if (sclk_dly)
->> +                       sclk_dly--;
->> +       }
->> +
->> +       clk_sunxi_mmc_phase_control(hw, sclk_dly, oclk_dly);
->> +
->> +       return sunxi_mmc_oclk_onoff(host, 1);
->> +}
->> +
-> 
-> [snip]
-> 
-> Besides the above, I think this looks good!
-
-Thanks!
-
-Since Mike Turquette has already merged clk_sunxi_mmc_phase_control
-I would like to keep this as is, as I already promised Mike, I can
-safely promise you too: I promise clean this up as soon as the
-"clock phase control" API has been worked out.
-
-Regards,
-
-Hans
+diff --git a/arch/arm/kernel/kprobes-test-arm.c b/arch/arm/kernel/kprobes-test-arm.c
+index e73f9cf..cb14242 100644
+--- a/arch/arm/kernel/kprobes-test-arm.c
++++ b/arch/arm/kernel/kprobes-test-arm.c
+@@ -218,6 +218,7 @@ void kprobe_arm_test_cases(void)
+ 	TEST_BB_R("bx	r",7,2f,"")
+ 	TEST_BF_R("bxeq	r",14,2f,"")
+ 
++#if __LINUX_ARM_ARCH__ >= 5
+ 	TEST_R("clz	r0, r",0, 0x0,"")
+ 	TEST_R("clzeq	r7, r",14,0x1,"")
+ 	TEST_R("clz	lr, r",7, 0xffffffff,"")
+@@ -339,6 +340,7 @@ void kprobe_arm_test_cases(void)
+ 	TEST_UNSUPPORTED(__inst_arm(0xe16f02e1) " @ smultt pc, r1, r2")
+ 	TEST_UNSUPPORTED(__inst_arm(0xe16002ef) " @ smultt r0, pc, r2")
+ 	TEST_UNSUPPORTED(__inst_arm(0xe1600fe1) " @ smultt r0, r1, pc")
++#endif
+ 
+ 	TEST_GROUP("Multiply and multiply-accumulate")
+ 
+@@ -561,6 +563,7 @@ void kprobe_arm_test_cases(void)
+ 	TEST_UNSUPPORTED("ldrsht	r1, [r2], #48")
+ #endif
+ 
++#if __LINUX_ARM_ARCH__ >= 5
+ 	TEST_RPR(  "strd	r",0, VAL1,", [r",1, 48,", -r",2,24,"]")
+ 	TEST_RPR(  "strccd	r",8, VAL2,", [r",13,0, ", r",12,48,"]")
+ 	TEST_RPR(  "strd	r",4, VAL1,", [r",2, 24,", r",3, 48,"]!")
+@@ -597,6 +600,7 @@ void kprobe_arm_test_cases(void)
+ 	TEST_UNSUPPORTED(__inst_arm(0xe1efc3d0) "	@ ldrd r12, [pc, #48]!")
+ 	TEST_UNSUPPORTED(__inst_arm(0xe0c9f3d0) "	@ ldrd pc, [r9], #48")
+ 	TEST_UNSUPPORTED(__inst_arm(0xe0c9e3d0) "	@ ldrd lr, [r9], #48")
++#endif
+ 
+ 	TEST_GROUP("Miscellaneous")
+ 
+@@ -1229,7 +1233,9 @@ void kprobe_arm_test_cases(void)
+ 	TEST_COPROCESSOR( "mrc"two"	0, 0, r0, cr0, cr0, 0")
+ 
+ 	COPROCESSOR_INSTRUCTIONS_ST_LD("",e)
++#if __LINUX_ARM_ARCH__ >= 5
+ 	COPROCESSOR_INSTRUCTIONS_MC_MR("",e)
++#endif
+ 	TEST_UNSUPPORTED("svc	0")
+ 	TEST_UNSUPPORTED("svc	0xffffff")
+ 
+@@ -1289,7 +1295,9 @@ void kprobe_arm_test_cases(void)
+ 	TEST(	"blx	__dummy_thumb_subroutine_odd")
+ #endif /* __LINUX_ARM_ARCH__ >= 6 */
+ 
++#if __LINUX_ARM_ARCH__ >= 5
+ 	COPROCESSOR_INSTRUCTIONS_ST_LD("2",f)
++#endif
+ #if __LINUX_ARM_ARCH__ >= 6
+ 	COPROCESSOR_INSTRUCTIONS_MC_MR("2",f)
+ #endif
+-- 
+1.7.10.4
