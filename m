@@ -1,63 +1,59 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 12 May 2014 16:51:32 -0700
-Subject: [PATCH] ARM: Don't ever downscale loops_per_jiffy in SMP systems#
-In-Reply-To: <alpine.LFD.2.11.1405091640090.980@knanqh.ubzr>
-References: <CAD=FV=UEGJGHrdcXgs3EZ_wFXT8GnNeCOMt7CgdiiUzBzZ5Y0A@mail.gmail.com>
- <alpine.LFD.2.11.1405081149190.980@knanqh.ubzr>
- <CAD=FV=VtcLOh51LCmafzRMdqtDrwKXCqK6gE6V7OOOUe4gjwbA@mail.gmail.com>
- <alpine.LFD.2.11.1405081329010.980@knanqh.ubzr>
- <20140508192209.GH3693@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1405081600260.980@knanqh.ubzr>
- <20140508205223.GI3693@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1405082058130.980@knanqh.ubzr>
- <20140509091824.GL3693@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1405091245070.980@knanqh.ubzr>
- <20140509182245.GM3693@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1405091640090.980@knanqh.ubzr>
-Message-ID: <CAD=FV=UJK1nSPjH-au-KtbnOZk2nC7usLD8L9neMedj6WHUp8g@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 12 May 2014 16:55:00 -0700
+Subject: [PATCH] clk: shmobile: clk-mstp: change to using clock-indices
+In-Reply-To: <CAMuHMdVCYCt5gogociqBk7xGaD97oX8sm4oaqRVyrrRzEKuLmQ@mail.gmail.com>
+References: <1397577994-12061-1-git-send-email-ben.dooks@codethink.co.uk>
+ <20140505225013.5739.23946@quantum>
+ <CAMuHMdXO=WJjNSsWbKx5KxrF3w9VgEyEj3kdiSN1AyxaHFKpFw@mail.gmail.com>
+ <CAMuHMdVCYCt5gogociqBk7xGaD97oX8sm4oaqRVyrrRzEKuLmQ@mail.gmail.com>
+Message-ID: <20140512235500.5943.46685@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Quoting Geert Uytterhoeven (2014-05-12 01:31:41)
+> Hi Mike,
+> 
+> On Tue, May 6, 2014 at 1:43 PM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> > On Tue, May 6, 2014 at 12:50 AM, Mike Turquette <mturquette@linaro.org> wrote:
+> >> Quoting Ben Dooks (2014-04-15 09:06:34)
+> >>> With the addition of clock-indices, we need to change the renesas
+> >>> clock implementation to use these instead of the local definition
+> >>> of "renesas,clock-indices".
+> >>>
+> >>> Since this will break booting with older device trees, we add a
+> >>> simple auto-detection of which properties are present.
+> >>>
+> >>> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> >>
+> >> I'm fine to take this into clk-fixes, destined for 3.15-rc5. Does that
+> >
+> > Thanks!
+> 
+> It seems this missed rc5?
+> Can you please submit for rc6?
 
-On Fri, May 9, 2014 at 2:05 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Fri, 9 May 2014, Russell King - ARM Linux wrote:
->
->> I'd much prefer just printing a warning at kernel boot time to report
->> that the kernel is running with features which would make udelay() less
->> than accurate.
->
-> What if there is simply no timer to rely upon, as in those cases where
-> interrupts are needed for time keeping to make progress?  We should do
-> better than simply saying "sorry your kernel should irradicate every
-> udelay() usage to be reliable".
->
-> And I mean "reliable" which is not exactly the same as "accurate".
-> Reliable means "never *significantly* shorter".
->
->> Remember, it should be usable for _short_ delays on slow machines as
->> well as other stuff, and if we're going to start throwing stuff like
->> the above at it, it's going to become very inefficient.
->
-> You said that udelay can be much longer than expected due to various
-> reasons.
->
-> You also said that the IRQ handler overhead during udelay calibration
-> makes actual delays slightli shorter than expected.
->
-> I'm suggesting the addition of a slight overhead that is much smaller
-> than the IRQ handler here.  That shouldn't impact things masurably.
-> I'd certainly like Doug to run his udelay timing test with the following
-> patch to see if it solves the problem.
+Yes, I will send out the PR for that today. This fix has already landed
+in clk-next as I merge the clk-fixes branch into clk-next regularly.
 
-...so I spent a whole chunk of time debugging this problem today.  I'm
-out of time today (more tomorrow), but it looks like the theory I
-proposed about why udelay() is giving bad results _might_ have more to
-do with bugs in the exynos cpufreq driver and less to do with the
-theoretical race we've been talking about.  It looks possible that the
-driver is not setting the "old" frequency properly, which would
-certainly cause problems.
+Regards,
+Mike
 
-I'll post more when I figure this out for sure.
-
--Doug
+> 
+> Thanks again!
+> 
+> >> solve the issues on your end? Do you still need me to host a stable
+> >> topic branch for you? I'm happy to do that if needed.
+> >
+> > As Simon will be on holidays until rc5, I think he can just use rc5 as the
+> > stable base for further fixes.
+> 
+> Gr{oetje,eeting}s,
+> 
+>                         Geert
+> 
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
