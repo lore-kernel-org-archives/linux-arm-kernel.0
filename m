@@ -1,83 +1,66 @@
-From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Mon, 12 May 2014 16:23:42 +0530
-Subject: [PATCH v3 5/5] ARM: dts: enable hdmi for exynos5800 based
- peach-pi board
-In-Reply-To: <5370A7D0.5030409@samsung.com>
-References: <1399890248-27409-1-git-send-email-rahul.sharma@samsung.com>
- <1399890248-27409-6-git-send-email-rahul.sharma@samsung.com>
- <5370A7D0.5030409@samsung.com>
-Message-ID: <CAPdUM4PPQbbtDSZ6_qu-Ld9ku4iNz-zanRVODTvMrLknPStZWA@mail.gmail.com>
+From: phil.edworthy@renesas.com (Phil Edworthy)
+Date: Mon, 12 May 2014 11:57:47 +0100
+Subject: [PATCH v8 0/3] R-Car Gen2 PCIe host driver
+Message-ID: <1399892270-25021-1-git-send-email-phil.edworthy@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 May 2014 16:22, Arun Kumar K <arun.kk@samsung.com> wrote:
-> Hi Rahul,
->
-> On 05/12/14 15:54, Rahul Sharma wrote:
->> From: Rahul Sharma <Rahul.Sharma@samsung.com>
->>
->> Enable hdmi for peach-pi board.
->>
->> Signed-off-by: Rahul Sharma <Rahul.Sharma@samsung.com>
->> ---
->>  arch/arm/boot/dts/exynos5800-peach-pi.dts |   26 ++++++++++++++++++++++++++
->>  1 file changed, 26 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
->> index 742655b..bbb445a 100644
->> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
->> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
->> @@ -72,6 +72,13 @@
->>               samsung,pin-pud = <0>;
->>               samsung,pin-drv = <0>;
->>       };
->> +
->> +     hdmi_hpd_irq: hdmi-hpd-irq {
->> +             samsung,pins = "gpx3-7";
->> +             samsung,pin-function = <0>;
->> +             samsung,pin-pud = <1>;
->> +             samsung,pin-drv = <0>;
->> +     };
->
-> This node is already added in 5420-pinctrl.dtsi in patch 3/5.
-> You can drop it from here.
->
+This is version 8 of a PCIe Host driver for the R-Car Gen2 devices,
+i.e. R-Car H2 (r8a7790) and R-Car M2 (r8a7791).
 
-yea correct. I will remove this pin.
+v8:
+ - Platform changes removed from this patch set
+ - Moved header file contents into c file
+ - Formatting cleaned up
+ - Remove bus/dev/func range checks for config access
+ - Add comment about config access serialization
+ - Made rcar_pcie_setup_window() return void as no errors possible
+ - Remove unused register definitions
+ - Removed __init markers to fix section mismatches
+ - Add explicit bus number range
+ - Get the root bus nr from config writes instead of sys->busnr
+ - Use PCI domains
+ - Removed unused variable in rcar_msi_free()
+ - Split interrupt bindings into separate cells
 
-Regards,
-Rahul Sharma.
+v7:
+ - Change binding description of clocks to 'clock specifiers'
 
-> Regards
-> Arun
->
->>  };
->>
->>  &rtc {
->> @@ -134,6 +141,25 @@
->>       };
->>  };
->>
->> +&i2c_2 {
->> +     status = "okay";
->> +     samsung,i2c-sda-delay = <100>;
->> +     samsung,i2c-max-bus-freq = <66000>;
->> +     samsung,i2c-slave-addr = <0x50>;
->> +
->> +     hdmiddc at 50 {
->> +             reg = <0x50>;
->> +     };
->> +};
->> +
->> +&hdmi {
->> +     status = "okay";
->> +     hpd-gpio = <&gpx3 7 2>;
->> +     pinctrl-names = "default";
->> +     pinctrl-0 = <&hdmi_hpd_irq>;
->> +     ddc = <&i2c_2>;
->> +};
->> +
->>  /*
->>   * Use longest HW watchdog in SoC (32 seconds) since the hardware
->>   * watchdog provides no debugging information (compared to soft/hard
->>
+v6:
+ - Correct DT bindings description for reg and clocks
+ - Split device and board DT changes
+ - Add shmobile to subject for shmobile DT patches
+ - Don't check MSI irq number is valid, as upper level checks this
+ - Change "Unexpected MSI" msg to debug level
+ - Reword "Unexpected MSI" comment so that it's one line
+ - Remove patch that adds HAVE_ARM_ARCH_TIMER to koelsch defconfig as not needed
+
+v5:
+ - Use module_platform_driver instead of subsys_initcall
+ - Use the of_device_id data field for HW init function
+ - Init hw_pci struct in declaration
+ - Renesas SoC compatible string has peripheral before device name
+ - Add PCIe bus clock reference
+ - Use dma-ranges property to specify inbound memory regions
+ - Support multiple IO windows and correct resources
+ - Return IRQ_NONE from MSI isr when there is no pending MSI
+ - Add additional interrupt bindings
+
+v4:
+ - Use runtime PM properly
+
+Phil Edworthy (3):
+  PCI: host: rcar: Add Renesas R-Car PCIe driver
+  PCI: host: rcar: Add MSI support
+  dt-bindings: pci: rcar pcie device tree bindings
+
+ Documentation/devicetree/bindings/pci/rcar-pci.txt |   47 +
+ drivers/pci/host/Kconfig                           |    6 +
+ drivers/pci/host/Makefile                          |    1 +
+ drivers/pci/host/pcie-rcar.c                       | 1008 ++++++++++++++++++++
+ 4 files changed, 1062 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/rcar-pci.txt
+ create mode 100644 drivers/pci/host/pcie-rcar.c
+
+-- 
+1.9.1
