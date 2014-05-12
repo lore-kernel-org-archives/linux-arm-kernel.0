@@ -1,63 +1,54 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 12 May 2014 16:59:22 +0200
-Subject: [PATCH] ARM: at91: sam9260: fix compilation issues
-In-Reply-To: <1399484748-32718-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1399484748-32718-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <5370E1CA.8070707@atmel.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 12 May 2014 17:03:22 +0200
+Subject: [PATCH 1/2] ARM: mvebu: mvebu-soc-id: add missing clk_put() call
+In-Reply-To: <1399903900-29977-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1399903900-29977-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1399903900-29977-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <5370E2BA.7040109@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/05/2014 19:45, Alexandre Belloni :
-> Use the hexadecimal values for the triggers to match what is done for the device
-> tree. This also fixes compilation issues as the defines have been moved
-> elsewhere.
+Hi Thomas,
+
+On 12/05/2014 16:11, Thomas Petazzoni wrote:
+> The mvebu-soc-id code in mach-mvebu/ needs to enable a clock to read
+> the SoC device ID and revision number. To do so, it does a clk_get(),
+> then a clk_prepare_enable(), reads the value, and disables the clock
+> with clk_disable_unprepare(). However, it forgets to clk_put() the
+> clock. This commit fixes this issue.
 > 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: <stable@vger.kernel.org> # 3.14+
+> Fixes: af8d1c63afcbf36eea06789c92e22d4af118d2fb ('ARM: mvebu: Add support to get the ID and the revision of a SoC')
 
-Ok, as anyway these files will disappear at some point...
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Added to at91-3.16-cleanup2. Thanks,
+Thanks,
+
+Gregory
 
 > ---
-> I believe that at some point, we may want to reintroduce defines for those
-> values but we should probably do that in a dt-bindings include and choose better
-> names as the meaning differ between SoCs.
+>  arch/arm/mach-mvebu/mvebu-soc-id.c | 1 +
+>  1 file changed, 1 insertion(+)
 > 
->  arch/arm/mach-at91/at91sam9260_devices.c | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
-> index fffcd09ac878..a8d0d9cb1bca 100644
-> --- a/arch/arm/mach-at91/at91sam9260_devices.c
-> +++ b/arch/arm/mach-at91/at91sam9260_devices.c
-> @@ -1307,19 +1307,19 @@ static struct platform_device at91_adc_device = {
->  static struct at91_adc_trigger at91_adc_triggers[] = {
->  	[0] = {
->  		.name = "timer-counter-0",
-> -		.value = AT91_ADC_TRGSEL_TC0 | AT91_ADC_TRGEN,
-> +		.value = 0x1,
->  	},
->  	[1] = {
->  		.name = "timer-counter-1",
-> -		.value = AT91_ADC_TRGSEL_TC1 | AT91_ADC_TRGEN,
-> +		.value = 0x3,
->  	},
->  	[2] = {
->  		.name = "timer-counter-2",
-> -		.value = AT91_ADC_TRGSEL_TC2 | AT91_ADC_TRGEN,
-> +		.value = 0x5,
->  	},
->  	[3] = {
->  		.name = "external",
-> -		.value = AT91_ADC_TRGSEL_EXTERNAL | AT91_ADC_TRGEN,
-> +		.value = 0xd,
->  		.is_external = true,
->  	},
->  };
+> diff --git a/arch/arm/mach-mvebu/mvebu-soc-id.c b/arch/arm/mach-mvebu/mvebu-soc-id.c
+> index f3d4cf5..b52af6f 100644
+> --- a/arch/arm/mach-mvebu/mvebu-soc-id.c
+> +++ b/arch/arm/mach-mvebu/mvebu-soc-id.c
+> @@ -109,6 +109,7 @@ static int __init mvebu_soc_id_init(void)
+>  
+>  res_ioremap:
+>  	clk_disable_unprepare(clk);
+> +	clk_put(clk);
+>  
+>  clk_err:
+>  	of_node_put(child);
 > 
 
 
 -- 
-Nicolas Ferre
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
