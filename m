@@ -1,36 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 12 May 2014 14:00:57 +0200
-Subject: Questions regarding DMA buffer sharing using IOMMU
-In-Reply-To: <BAY169-W12541AD089785F8BFBD4E26EF350@phx.gbl>
-References: <BAY169-W12541AD089785F8BFBD4E26EF350@phx.gbl>
-Message-ID: <5218408.5YRJXjS4BX@wuerfel>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 12 May 2014 14:04:47 +0200
+Subject: [PATCH v13 1/2] clk: sunxi: Fixup clk_sunxi_mmc_phase_control to take
+ a clk rather then a hw_clk
+In-Reply-To: <1399896288-5826-1-git-send-email-hdegoede@redhat.com>
+References: <1399896288-5826-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1399896288-5826-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 12 May 2014 15:12:41 Pintu Kumar wrote:
-> Hi, 
-> I have some queries regarding IOMMU and CMA buffer sharing. 
-> We have an embedded linux device (kernel 3.10, RAM: 256Mb) in 
-> which camera and codec supports IOMMU but the display does not support IOMMU. 
-> Thus for camera capture we are using iommu buffers using
-> ION/DMABUF. But for all display rendering we are using CMA buffers. 
-> So, the question is how to achieve buffer sharing (zero-copy)
-> between Camera and Display using only IOMMU? 
-> Currently we are achieving zero-copy using CMA. And we are
-> exploring options to use IOMMU. 
-> Now we wanted to know which option is better? To use IOMMU or CMA? 
-> If anybody have come across these design please share your thoughts and results. 
+__clk_get_hw is supposed to be used by clk providers, not clk consumers.
 
-There is a slight performance overhead in using the IOMMU in general,
-because the IOMMU has to fetch the page table entries from memory
-at least some of the time.
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ drivers/clk/sunxi/clk-sunxi.c | 3 ++-
+ include/linux/clk/sunxi.h     | 2 +-
+ 2 files changed, 3 insertions(+), 2 deletions(-)
 
-If that overhead is within the constraints you have for transfers between
-camera and codec, you are always better off using IOMMU since that
-means you don't have to do memory migration.
-
-Note however, that we don't have a way to describe IOMMU relations
-to devices in DT, so whatever you come up with to do this will most
-likely be incompatible with what we do in future kernel versions.
-
-	Arnd
+diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+index 59f9040..4cc2b2a 100644
+--- a/drivers/clk/sunxi/clk-sunxi.c
++++ b/drivers/clk/sunxi/clk-sunxi.c
+@@ -510,11 +510,12 @@ CLK_OF_DECLARE(sun7i_a20_gmac, "allwinner,sun7i-a20-gmac-clk",
+  * clk_sunxi_mmc_phase_control() - configures MMC clock phase control
+  */
+ 
+-void clk_sunxi_mmc_phase_control(struct clk_hw *hw, u8 sample, u8 output)
++void clk_sunxi_mmc_phase_control(struct clk *clk, u8 sample, u8 output)
+ {
+ 	#define to_clk_composite(_hw) container_of(_hw, struct clk_composite, hw)
+ 	#define to_clk_factors(_hw) container_of(_hw, struct clk_factors, hw)
+ 
++	struct clk_hw *hw = __clk_get_hw(clk);
+ 	struct clk_composite *composite = to_clk_composite(hw);
+ 	struct clk_hw *rate_hw = composite->rate_hw;
+ 	struct clk_factors *factors = to_clk_factors(rate_hw);
+diff --git a/include/linux/clk/sunxi.h b/include/linux/clk/sunxi.h
+index 1ef5c89..aed28c4 100644
+--- a/include/linux/clk/sunxi.h
++++ b/include/linux/clk/sunxi.h
+@@ -17,6 +17,6 @@
+ 
+ #include <linux/clk.h>
+ 
+-void clk_sunxi_mmc_phase_control(struct clk_hw *hw, u8 sample, u8 output);
++void clk_sunxi_mmc_phase_control(struct clk *clk, u8 sample, u8 output);
+ 
+ #endif
+-- 
+1.9.0
