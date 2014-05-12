@@ -1,105 +1,372 @@
 From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Mon, 12 May 2014 18:06:29 +0200
-Subject: [PATCH 01/12] clk: st: Update ST clock binding documentation
+Date: Mon, 12 May 2014 18:06:31 +0200
+Subject: [PATCH 03/12] drivers: clk: st: STiH407: Support for Flexgen Clocks
 In-Reply-To: <1399910800-12847-1-git-send-email-gabriel.fernandez@linaro.org>
 References: <1399910800-12847-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <1399910800-12847-2-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <1399910800-12847-4-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds new compatibilities to support STiH407 SoC.
+This patch is the Flexgen implementation reusing as much as possible
+of Common Clock Framework functions.
 
+The idea is to have an instance of "struct flexgen" per output clock.
+It represents the clock cross bar (by a mux element), and the pre and final dividers
+(using dividers and gates elements).
+
+Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
+Signed-off-by: Olivier Bideau <olivier.bideau@st.com>
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
 ---
- .../devicetree/bindings/clock/st/st,clkgen-mux.txt   |  2 +-
- .../devicetree/bindings/clock/st/st,clkgen-pll.txt   |  5 ++++-
- .../devicetree/bindings/clock/st/st,clkgen.txt       | 20 ++++++++++++++++----
- .../devicetree/bindings/clock/st/st,quadfs.txt       |  3 +++
- 4 files changed, 24 insertions(+), 6 deletions(-)
+ drivers/clk/st/Makefile      |   2 +-
+ drivers/clk/st/clk-flexgen.c | 332 +++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 333 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/clk/st/clk-flexgen.c
 
-diff --git a/Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt b/Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt
-index 943e080..2d92fc8 100644
---- a/Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt
-+++ b/Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt
-@@ -17,7 +17,7 @@ Required properties:
- 	"st,stih416-clkgenf-vcc-sd",	"st,clkgen-mux"
- 	"st,stih415-clkgen-a9-mux",	"st,clkgen-mux"
- 	"st,stih416-clkgen-a9-mux",	"st,clkgen-mux"
--
-+	"st,stih407-clkgen-a9-mux",	"st,clkgen-mux"
- 
- - #clock-cells : from common clock binding; shall be set to 0.
- 
-diff --git a/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt b/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt
-index 81eb385..b852925 100644
---- a/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt
-+++ b/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt
-@@ -19,11 +19,14 @@ Required properties:
- 	"st,stih415-plls-c32-ddr",	"st,clkgen-plls-c32"
- 	"st,stih416-plls-c32-a9",	"st,clkgen-plls-c32"
- 	"st,stih416-plls-c32-ddr",	"st,clkgen-plls-c32"
-+	"st,stih407-plls-c32-a0",	"st,clkgen-plls-c32"
-+	"st,stih407-plls-c32-a9",	"st,clkgen-plls-c32"
-+	"st,stih407-plls-c32-c0_0",	"st,clkgen-plls-c32"
-+	"st,stih407-plls-c32-c0_1",	"st,clkgen-plls-c32"
- 
- 	"st,stih415-gpu-pll-c32",	"st,clkgengpu-pll-c32"
- 	"st,stih416-gpu-pll-c32",	"st,clkgengpu-pll-c32"
- 
--
- - #clock-cells : From common clock binding; shall be set to 1.
- 
- - clocks : From common clock binding
-diff --git a/Documentation/devicetree/bindings/clock/st/st,clkgen.txt b/Documentation/devicetree/bindings/clock/st/st,clkgen.txt
-index 49ec5ae..55506c2 100644
---- a/Documentation/devicetree/bindings/clock/st/st,clkgen.txt
-+++ b/Documentation/devicetree/bindings/clock/st/st,clkgen.txt
-@@ -24,16 +24,28 @@ address is common of all subnode.
- 		quadfs_node {
- 			...
- 		};
+diff --git a/drivers/clk/st/Makefile b/drivers/clk/st/Makefile
+index c7455ff..ede7b2f 100644
+--- a/drivers/clk/st/Makefile
++++ b/drivers/clk/st/Makefile
+@@ -1 +1 @@
+-obj-y += clkgen-mux.o clkgen-pll.o clkgen-fsyn.o
++obj-y += clkgen-mux.o clkgen-pll.o clkgen-fsyn.o clk-flexgen.o
+diff --git a/drivers/clk/st/clk-flexgen.c b/drivers/clk/st/clk-flexgen.c
+new file mode 100644
+index 0000000..f3ed700
+--- /dev/null
++++ b/drivers/clk/st/clk-flexgen.c
+@@ -0,0 +1,332 @@
++/*
++ * clk-flexgen.c
++ *
++ * Copyright (C) ST-Microelectronics SA 2013
++ * Author:  Maxime Coquelin <maxime.coquelin@st.com> for ST-Microelectronics.
++ * License terms:  GNU General Public License (GPL), version 2  */
 +
-+		mux_node {
-+			...
-+		};
++#include <linux/clk-provider.h>
++#include <linux/module.h>
++#include <linux/slab.h>
++#include <linux/io.h>
++#include <linux/err.h>
++#include <linux/string.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
 +
-+		vcc_node {
-+			...
-+		};
- 		...
- 	};
- 
- This binding uses the common clock binding[1].
--Each subnode should use the binding discribe in [2]..[4]
-+Each subnode should use the binding discribe in [2]..[7]
- 
- [1] Documentation/devicetree/bindings/clock/clock-bindings.txt
--[2] Documentation/devicetree/bindings/clock/st,quadfs.txt
--[3] Documentation/devicetree/bindings/clock/st,quadfs.txt
--[4] Documentation/devicetree/bindings/clock/st,quadfs.txt
-+[2] Documentation/devicetree/bindings/clock/st,clkgen-divmux.txt
-+[3] Documentation/devicetree/bindings/clock/st,clkgen-mux.txt
-+[4] Documentation/devicetree/bindings/clock/st,clkgen-pll.txt
-+[5] Documentation/devicetree/bindings/clock/st,clkgen-prediv.txt
-+[6] Documentation/devicetree/bindings/clock/st,vcc.txt
-+[7] Documentation/devicetree/bindings/clock/st,quadfs.txt
++struct flexgen {
++	struct clk_hw hw;
 +
- 
- Required properties:
- - reg : A Base address and length of the register set.
-diff --git a/Documentation/devicetree/bindings/clock/st/st,quadfs.txt b/Documentation/devicetree/bindings/clock/st/st,quadfs.txt
-index ec86d62..c0a4045 100644
---- a/Documentation/devicetree/bindings/clock/st/st,quadfs.txt
-+++ b/Documentation/devicetree/bindings/clock/st/st,quadfs.txt
-@@ -15,6 +15,9 @@ Required properties:
-   "st,stih416-quadfs432",	"st,quadfs"
-   "st,stih416-quadfs660-E",	"st,quadfs"
-   "st,stih416-quadfs660-F",	"st,quadfs"
-+  "st,stih407-quadfs660-C",	"st,quadfs"
-+  "st,stih407-quadfs660-D",	"st,quadfs"
++	/* Crossbar */
++	struct clk_mux mux;
++	/* Pre-divisor's gate */
++	struct clk_gate pgate;
++	/* Pre-divisor */
++	struct clk_divider pdiv;
++	/* Final divisor's gate */
++	struct clk_gate fgate;
++	/* Final divisor */
++	struct clk_divider fdiv;
++};
 +
- 
- - #clock-cells : from common clock binding; shall be set to 1.
- 
++#define to_flexgen(_hw) container_of(_hw, struct flexgen, hw)
++
++static int flexgen_enable(struct clk_hw *hw)
++{
++	struct flexgen *flexgen = to_flexgen(hw);
++	struct clk_hw *pgate_hw = &flexgen->pgate.hw;
++	struct clk_hw *fgate_hw = &flexgen->fgate.hw;
++
++	pgate_hw->clk = hw->clk;
++	fgate_hw->clk = hw->clk;
++
++	clk_gate_ops.enable(pgate_hw);
++
++	clk_gate_ops.enable(fgate_hw);
++
++	pr_debug("%s: flexgen output enabled\n", __clk_get_name(hw->clk));
++	return 0;
++}
++
++static void flexgen_disable(struct clk_hw *hw)
++{
++	struct flexgen *flexgen = to_flexgen(hw);
++	struct clk_hw *fgate_hw = &flexgen->fgate.hw;
++
++	/* disable only the final gate */
++	fgate_hw->clk = hw->clk;
++
++	clk_gate_ops.disable(fgate_hw);
++
++	pr_debug("%s: flexgen output disabled\n", __clk_get_name(hw->clk));
++}
++
++static int flexgen_is_enabled(struct clk_hw *hw)
++{
++	struct flexgen *flexgen = to_flexgen(hw);
++	struct clk_hw *fgate_hw = &flexgen->fgate.hw;
++
++	fgate_hw->clk = hw->clk;
++
++	if (!clk_gate_ops.is_enabled(fgate_hw))
++		return 0;
++
++	return 1;
++}
++
++static u8 flexgen_get_parent(struct clk_hw *hw)
++{
++	struct flexgen *flexgen = to_flexgen(hw);
++	struct clk_hw *mux_hw = &flexgen->mux.hw;
++
++	mux_hw->clk = hw->clk;
++
++	return clk_mux_ops.get_parent(mux_hw);
++}
++
++static int flexgen_set_parent(struct clk_hw *hw, u8 index)
++{
++	struct flexgen *flexgen = to_flexgen(hw);
++	struct clk_hw *mux_hw = &flexgen->mux.hw;
++
++	mux_hw->clk = hw->clk;
++
++	return clk_mux_ops.set_parent(mux_hw, index);
++}
++
++static inline unsigned long
++clk_best_div(unsigned long parent_rate, unsigned long rate)
++{
++	return parent_rate / rate + ((rate > (2*(parent_rate % rate))) ? 0 : 1);
++}
++
++static long flexgen_round_rate(struct clk_hw *hw, unsigned long rate,
++				   unsigned long *prate)
++{
++	unsigned long div;
++
++	/* Round div according to exact prate and wished rate */
++	div = clk_best_div(*prate, rate);
++
++	if (__clk_get_flags(hw->clk) & CLK_SET_RATE_PARENT) {
++		*prate = rate * div;
++		return rate;
++	} else
++		return *prate / div;
++}
++
++unsigned long flexgen_recalc_rate(struct clk_hw *hw,
++		unsigned long parent_rate)
++{
++	struct flexgen *flexgen = to_flexgen(hw);
++	struct clk_hw *pdiv_hw = &flexgen->pdiv.hw;
++	struct clk_hw *fdiv_hw = &flexgen->fdiv.hw;
++	unsigned long mid_rate;
++
++	pdiv_hw->clk = hw->clk;
++	fdiv_hw->clk = hw->clk;
++
++	mid_rate = clk_divider_ops.recalc_rate(pdiv_hw, parent_rate);
++
++	return clk_divider_ops.recalc_rate(fdiv_hw, mid_rate);
++}
++
++static int flexgen_set_rate(struct clk_hw *hw, unsigned long rate,
++				unsigned long parent_rate)
++{
++	struct flexgen *flexgen = to_flexgen(hw);
++	struct clk_hw *pdiv_hw = &flexgen->pdiv.hw;
++	struct clk_hw *fdiv_hw = &flexgen->fdiv.hw;
++	unsigned long primary_div = 0;
++	int ret = 0;
++
++	pdiv_hw->clk = hw->clk;
++	fdiv_hw->clk = hw->clk;
++
++	primary_div = clk_best_div(parent_rate, rate);
++
++	clk_divider_ops.set_rate(fdiv_hw, parent_rate, parent_rate);
++	ret = clk_divider_ops.set_rate(pdiv_hw, rate, rate * primary_div);
++
++	return ret;
++}
++
++static const struct clk_ops flexgen_ops = {
++	.enable = flexgen_enable,
++	.disable = flexgen_disable,
++	.is_enabled = flexgen_is_enabled,
++	.get_parent = flexgen_get_parent,
++	.set_parent = flexgen_set_parent,
++	.round_rate = flexgen_round_rate,
++	.recalc_rate = flexgen_recalc_rate,
++	.set_rate = flexgen_set_rate,
++};
++
++struct clk *clk_register_flexgen(const char *name,
++				const char **parent_names, u8 num_parents,
++				void __iomem *reg, spinlock_t *lock, u32 idx,
++				unsigned long flexgen_flags) {
++	struct flexgen *fgxbar;
++	struct clk *clk;
++	struct clk_init_data init;
++	u32  xbar_shift;
++	void __iomem *xbar_reg, *fdiv_reg;
++
++	fgxbar = kzalloc(sizeof(struct flexgen), GFP_KERNEL);
++	if (!fgxbar)
++		return ERR_PTR(-ENOMEM);
++
++	init.name = name;
++	init.ops = &flexgen_ops;
++	init.flags = CLK_IS_BASIC | flexgen_flags;
++	init.parent_names = parent_names;
++	init.num_parents = num_parents;
++
++	xbar_reg = reg + 0x18 + (idx & ~0x3);
++	xbar_shift = (idx % 4) * 0x8;
++	fdiv_reg = reg + 0x164 + idx * 4;
++
++	/* Crossbar element config */
++	fgxbar->mux.lock = lock;
++	fgxbar->mux.mask = BIT(6) - 1;
++	fgxbar->mux.reg = xbar_reg;
++	fgxbar->mux.shift = xbar_shift;
++	fgxbar->mux.table = NULL;
++
++
++	/* Pre-divider's gate config (in xbar register)*/
++	fgxbar->pgate.lock = lock;
++	fgxbar->pgate.reg = xbar_reg;
++	fgxbar->pgate.bit_idx = xbar_shift + 6;
++
++	/* Pre-divider config */
++	fgxbar->pdiv.lock = lock;
++	fgxbar->pdiv.reg = reg + 0x58 + idx * 4;
++	fgxbar->pdiv.width = 10;
++
++	/* Final divider's gate config */
++	fgxbar->fgate.lock = lock;
++	fgxbar->fgate.reg = fdiv_reg;
++	fgxbar->fgate.bit_idx = 6;
++
++	/* Final divider config */
++	fgxbar->fdiv.lock = lock;
++	fgxbar->fdiv.reg = fdiv_reg;
++	fgxbar->fdiv.width = 6;
++
++	fgxbar->hw.init = &init;
++
++	clk = clk_register(NULL, &fgxbar->hw);
++	if (IS_ERR(clk))
++		kfree(fgxbar);
++	else
++		pr_debug("%s: parent %s rate %u\n",
++			__clk_get_name(clk),
++			__clk_get_name(clk_get_parent(clk)),
++			(unsigned int)clk_get_rate(clk));
++	return clk;
++}
++
++static const char ** __init flexgen_get_parents(struct device_node *np,
++						       int *num_parents)
++{
++	const char **parents;
++	int nparents, i;
++
++	nparents = of_count_phandle_with_args(np, "clocks", "#clock-cells");
++	if (WARN_ON(nparents <= 0))
++		return NULL;
++
++	parents = kzalloc(nparents * sizeof(const char *), GFP_KERNEL);
++	if (!parents)
++		return NULL;
++
++	for (i = 0; i < nparents; i++)
++		parents[i] = of_clk_get_parent_name(np, i);
++
++	*num_parents = nparents;
++	return parents;
++}
++
++void __init st_of_flexgen_setup(struct device_node *np)
++{
++	struct device_node *pnode;
++	void __iomem *reg;
++	struct clk_onecell_data *clk_data;
++	const char **parents;
++	int num_parents, i;
++	spinlock_t *rlock = NULL;
++	unsigned long flex_flags = 0;
++
++	pnode = of_get_parent(np);
++	if (!pnode)
++		return;
++
++	reg = of_iomap(pnode, 0);
++	if (!reg)
++		return;
++
++	parents = flexgen_get_parents(np, &num_parents);
++	if (!parents)
++		return;
++
++	clk_data = kzalloc(sizeof(*clk_data), GFP_KERNEL);
++	if (!clk_data)
++		goto err;
++
++	clk_data->clk_num = of_property_count_strings(np ,
++			"clock-output-names");
++	if (clk_data->clk_num <= 0) {
++		pr_err("%s: Failed to get number of output clocks (%d)",
++				__func__, clk_data->clk_num);
++		goto err;
++	}
++
++	clk_data->clks = kzalloc(clk_data->clk_num * sizeof(struct clk *),
++			GFP_KERNEL);
++	if (!clk_data->clks)
++		goto err;
++
++	rlock = kzalloc(sizeof(spinlock_t), GFP_KERNEL);
++	if (!rlock)
++		goto err;
++
++	for (i = 0; i < clk_data->clk_num; i++) {
++		struct clk *clk;
++		const char *clk_name;
++
++		if (of_property_read_string_index(np, "clock-output-names",
++						  i, &clk_name)) {
++			break;
++		}
++
++		/*
++		 * If we read an empty clock name then the output is unused
++		 */
++		if (*clk_name == '\0')
++			continue;
++
++		clk = clk_register_flexgen(clk_name, parents, num_parents,
++					   reg, rlock, i, flex_flags);
++
++		if (IS_ERR(clk))
++			goto err;
++
++		clk_data->clks[i] = clk;
++	}
++
++	kfree(parents);
++	of_clk_add_provider(np, of_clk_src_onecell_get, clk_data);
++
++	return;
++
++err:
++	if (clk_data)
++		kfree(clk_data->clks);
++	kfree(clk_data);
++	kfree(parents);
++	kfree(rlock);
++
++	return;
++}
++CLK_OF_DECLARE(flexgen, "st,flexgen", st_of_flexgen_setup);
 -- 
 1.9.1
