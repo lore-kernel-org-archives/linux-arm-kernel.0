@@ -1,62 +1,327 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Mon, 12 May 2014 13:37:33 +0900
-Subject: [PATCH v3 0/4] ARM: dts: enable display for peach-pit and snow
- boards
-In-Reply-To: <CAPdUM4M52Au-D0O14ak053bqwTgNtPq7ozdzz3a+Z317SucrjQ@mail.gmail.com>
-References: <1399630186-22610-1-git-send-email-rahul.sharma@samsung.com>
- <CAPdUM4M52Au-D0O14ak053bqwTgNtPq7ozdzz3a+Z317SucrjQ@mail.gmail.com>
-Message-ID: <001101cf6d9b$e4cea4a0$ae6bede0$%han@samsung.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 11 May 2014 21:40:33 -0700
+Subject: [PATCH 4/5] ARM: dts: Add hix5hd2-dkb dts file.
+In-Reply-To: <1399858236-29027-5-git-send-email-haojian.zhuang@linaro.org>
+References: <1399858236-29027-1-git-send-email-haojian.zhuang@linaro.org>
+ <1399858236-29027-5-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <20140512044033.GD8896@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, May 09, 2014 7:16 PM, Rahul Sharma wrote:
+On Mon, May 12, 2014 at 09:30:35AM +0800, Haojian Zhuang wrote:
+> From: Haifeng Yan <yanhaifeng@gmail.com>
 > 
-> + Jingoo Han.
-
-If you want to get Acked-by from maintainer, please add the
-maintainer to CC list for all patches.
-
-Anyway, I will review this patch. However, if you don't add me
-to CC list in the future, I am not sure that I will review
-your patches.
-
-Best regards,
-Jingoo Han
-
+> Add dts file for Hisilicon x5hd2 development kit board.
 > 
-> On 9 May 2014 15:39, Rahul Sharma <rahul.sharma@samsung.com> wrote:
-> > From: Rahul Sharma <Rahul.Sharma@samsung.com>
-> >
-> > Add nodes for fimd and dp controller for exynos5250 based snow
-> > and exynos5420 based peach-pit board.
-> >
-> > This series is based on Kukjin Kims, for-next branch.
-> >
-> > V3:
-> > 1) Dropped 1 patch "ARM: dts: move dp hpd line to the board file for
-> >  exynos5420".
-> > 2) Extra blank lines for readability.
-> > 3) dp hpd gpio name change (dp_hpd -> dp_hpd_gpio)
-> >
-> > V2:
-> > 1) Rebase on Peach-pit dependent patches.
-> >
-> > It is dependent on
-> > 1) Andrew Bresticker's patch for hpd gpio addition, avilable at
-> > http://www.spinics.net/lists/linux-samsung-soc/msg28827.html [Patch is 'ACK'ed.]
-> > 2) Arun's patch for adding peach-pit board dts file at
-> > http://www.spinics.net/lists/linux-samsung-soc/msg30103.html. [Patch is 'ACK'ed.]
-> >
-> > Rahul Sharma (4):
-> >   ARM: dts: enable fimd for exynos5250 based snow board
-> >   ARM: dts: enable dp-controller for exynos5250 based snow board
-> >   ARM: dts: enable fimd for exynos5420 based peach-pit board
-> >   ARM: dts: enable dp-controller for exynos5420 based peach-pit board
-> >
-> >  arch/arm/boot/dts/exynos5250-snow.dts      |   35 ++++++++++++++++++++++++
-> >  arch/arm/boot/dts/exynos5420-peach-pit.dts |   41 ++++++++++++++++++++++++++++
-> >  2 files changed, 76 insertions(+)
-> >
-> > --
-> > 1.7.9.5
-> >
+> Signed-off-by: Haifeng Yan <yanhaifeng@gmail.com>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> ---
+>  arch/arm/boot/dts/Makefile        |   1 +
+>  arch/arm/boot/dts/hix5hd2-dkb.dts |  56 +++++++++++
+>  arch/arm/boot/dts/hix5hd2.dtsi    | 189 ++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 246 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/hix5hd2-dkb.dts
+>  create mode 100644 arch/arm/boot/dts/hix5hd2.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 7119bca..54249d9 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -78,6 +78,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
+>  	exynos5440-sd5v1.dtb \
+>  	exynos5440-ssdk5440.dtb
+>  dtb-$(CONFIG_ARCH_HI3xxx) += hi3620-hi4511.dtb
+> +dtb-$(CONFIG_ARCH_HIX5HD2) += hix5hd2-dkb.dtb
+>  dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb \
+>  	ecx-2000.dtb
+>  dtb-$(CONFIG_ARCH_HIP04) += hip04-d01.dtb
+> diff --git a/arch/arm/boot/dts/hix5hd2-dkb.dts b/arch/arm/boot/dts/hix5hd2-dkb.dts
+> new file mode 100644
+> index 0000000..644458a
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/hix5hd2-dkb.dts
+> @@ -0,0 +1,56 @@
+> +/*
+> + * Copyright (c) 2013 Linaro Ltd.
+> + * Copyright (c) 2013 Hisilicon Limited.
+> + *
+> + *  This program is free software; you can redistribute it and/or modify
+> + *  it under the terms of the GNU General Public License version 2 as
+> + *  publishhed by the Free Software Foundation.
+> + */
+> +
+> +/dts-v1/;
+> +#include "hix5hd2.dtsi"
+> +
+> +/ {
+> +	model = "Hisilicon HiX5HD2 Development Board";
+> +	compatible = "hisilicon,hix5hd2-dkb";
+
+This should have a compatible of the SoC as well (as less specific).
+
+
+> +	chosen {
+> +		bootargs = "console=ttyAMA0,115200";
+> +	};
+> +
+> +	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		cpu at 0 {
+> +			compatible = "arm,cortex-a9";
+> +			device_type = "cpu";
+> +			reg = <0>;
+> +			next-level-cache = <&l2>;
+> +		};
+> +
+> +		cpu at 1 {
+> +			compatible = "arm,cortex-a9";
+> +			device_type = "cpu";
+> +			reg = <1>;
+> +			next-level-cache = <&l2>;
+> +		};
+> +	};
+> +
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0x00000000 0x80000000>;
+> +	};
+> +
+> +	soc {
+> +		amba {
+> +			timer0: timer at f8002000 {
+> +				status = "okay";
+> +			};
+> +
+> +			uart0: uart at f8b00000 {
+> +				status = "okay";
+> +			};
+
+This is much easier if you use a label-based syntax:
+
+&uart0 {
+	status = "okay";
+};
+
+Then you don't need to mirror the hierarchy, etc.
+
+> diff --git a/arch/arm/boot/dts/hix5hd2.dtsi b/arch/arm/boot/dts/hix5hd2.dtsi
+> new file mode 100644
+> index 0000000..d8a3ad4
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/hix5hd2.dtsi
+> @@ -0,0 +1,189 @@
+> +/*
+> + * Copyright (c) 2013 Linaro Ltd.
+> + * Copyright (c) 2013 Hisilicon Limited.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * publishhed by the Free Software Foundation.
+> + */
+> +
+> +#include "skeleton.dtsi"
+> +#include <dt-bindings/clock/hix5hd2-clock.h>
+> +
+> +/ {
+
+You might want to add the compatible string here that will be shared for all
+boards of this platform. Each dts will of course override it, but it makes it
+easy for them to see what they should append to their more specific compatible
+values.
+
+> +	aliases {
+> +		serial0 = &uart0;
+> +	};
+> +
+> +	gic: interrupt-controller at f8a01000 {
+> +		compatible = "arm,cortex-a9-gic";
+> +		#interrupt-cells = <3>;
+> +		#address-cells = <0>;
+> +		interrupt-controller;
+> +		/* gic dist base, gic cpu base */
+> +		reg = <0xf8a01000 0x1000>, <0xf8a00100 0x100>;
+> +	};
+> +
+> +	soc {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		compatible = "simple-bus";
+> +		device_type = "soc";
+> +		interrupt-parent = <&gic>;
+> +		ranges;
+> +
+> +		amba {
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			compatible = "arm,amba-bus";
+> +			ranges;
+> +
+> +			timer0: timer at f8002000 {
+> +				compatible = "arm,sp804", "arm,primecell";
+> +				reg = <0xf8002000 0x1000>;
+> +				/* timer00 & timer01 */
+> +				interrupts = <0 24 4>;
+> +				clocks = <&clock HIX5HD2_FIXED_24M>;
+> +				status = "disabled";
+> +			};
+> +
+> +			timer1: timer at f8a29000 {
+> +				/*
+> +				 * Only used in NORMAL state, not available ins
+> +				 * SLOW or DOZE state.
+> +				 * The rate is fixed in 24MHz.
+> +				 */
+> +				compatible = "arm,sp804", "arm,primecell";
+> +				reg = <0xf8a29000 0x1000>;
+> +				/* timer10 & timer11 */
+> +				interrupts = <0 25 4>;
+> +				clocks = <&clock HIX5HD2_FIXED_24M>;
+> +				status = "disabled";
+> +			};
+> +
+> +			timer2: timer at f8a2a000 {
+> +				compatible = "arm,sp804", "arm,primecell";
+> +				reg = <0xf8a2a000 0x1000>;
+> +				/* timer20 & timer21 */
+> +				interrupts = <0 26 4>;
+> +				clocks = <&clock HIX5HD2_FIXED_24M>;
+> +				status = "disabled";
+> +			};
+> +
+> +			timer3: timer at f8a2b000 {
+> +				compatible = "arm,sp804", "arm,primecell";
+> +				reg = <0xf8a2b000 0x1000>;
+> +				/* timer30 & timer31 */
+> +				interrupts = <0 27 4>;
+> +				clocks = <&clock HIX5HD2_FIXED_24M>;
+> +				status = "disabled";
+> +			};
+> +
+> +			timer4: timer at f8a81000 {
+> +				compatible = "arm,sp804", "arm,primecell";
+> +				reg = <0xf8a81000 0x1000>;
+> +				/* timer30 & timer31 */
+> +				interrupts = <0 28 4>;
+> +				clocks = <&clock HIX5HD2_FIXED_24M>;
+> +				status = "disabled";
+> +			};
+> +
+> +			uart0: uart at f8b00000 {
+> +				compatible = "arm,pl011", "arm,primecell";
+> +				reg = <0xf8b00000 0x1000>;
+> +				interrupts = <0 49 4>;
+> +				clocks = <&clock HIX5HD2_FIXED_83M>;
+> +				clock-names = "apb_pclk";
+> +				status = "disabled";
+> +			};
+> +
+> +			uart1: uart at f8006000 {
+> +				compatible = "arm,pl011", "arm,primecell";
+> +				reg = <0xf8006000 0x1000>;
+> +				interrupts = <0 50 4>;
+> +				clocks = <&clock HIX5HD2_FIXED_83M>;
+> +				clock-names = "apb_pclk";
+> +				status = "disabled";
+> +			};
+> +
+> +			uart2: uart at f8b02000 {
+> +				compatible = "arm,pl011", "arm,primecell";
+> +				reg = <0xf8b02000 0x1000>;
+> +				interrupts = <0 51 4>;
+> +				clocks = <&clock HIX5HD2_FIXED_83M>;
+> +				clock-names = "apb_pclk";
+> +				status = "disabled";
+> +			};
+> +
+> +			uart3: uart at f8b03000 {
+> +				compatible = "arm,pl011", "arm,primecell";
+> +				reg = <0xf8b03000 0x1000>;
+> +				interrupts = <0 52 4>;
+> +				clocks = <&clock HIX5HD2_FIXED_83M>;
+> +				clock-names = "apb_pclk";
+> +				status = "disabled";
+> +			};
+> +
+> +			uart4: uart at f8b04000 {
+> +				compatible = "arm,pl011", "arm,primecell";
+> +				reg = <0xf8b04000 0x1000>;
+> +				interrupts = <0 53 4>;
+> +				clocks = <&clock HIX5HD2_FIXED_83M>;
+> +				clock-names = "apb_pclk";
+> +				status = "disabled";
+> +			};
+> +		};
+> +
+> +		local_timer at f8a00600 {
+
+local-timer
+
+> +			compatible = "arm,cortex-a9-twd-timer";
+> +			reg = <0xf8a00600 0x20>;
+> +			interrupts = <1 13 0xf01>;
+> +		};
+> +
+> +		l2: l2-cache {
+> +			compatible = "arm,pl310-cache";
+> +			reg = <0xf8a10000 0x100000>;
+> +			interrupts = <0 15 4>;
+> +			cache-unified;
+> +			cache-level = <2>;
+> +			hisilicon,l2cache-aux = <0x00050000 0xfff0ffff>;
+> +		};
+> +
+> +		/* unremovable emmc as mmcblk0 */
+> +		dwmmc_1: dwmmc1 at f9830000 {
+
+The node name should be generic. Most other platforms use "mmc". No enumerating
+suffix in the node name.
+
+> +			compatible = "hisilicon,hi3716-dw-mshc";
+> +			reg = <0xf9830000 0x1000>;
+> +			interrupts = <0 35 4>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			clocks = <&clock HIX5HD2_MMC_CIU_RST>, <&clock HIX5HD2_MMC_BIU_CLK>;
+> +			clock-names = "ciu", "biu";
+> +		};
+> +
+> +
+> +		sctrl at f8000000 {
+
+system-controller
+
+> +			compatible = "hisilicon,sysctrl";
+> +			reg = <0xf8000000 0x1000>;
+> +			smp_reg = <0xc0>;
+> +			reboot_reg = <0x4>;
+> +		};
+> +
+> +		clkbase at f8a22000 {
+
+What's this? Needs a binding. Name should probably be something else too
+(clock-controller?)
+
+> +			compatible = "hisilicon,clkbase";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			reg = <0xf8a22000 0x1000>;
+> +			ranges = <0x0 0xf8a22000 0x1000>;
+> +			clock: clock at 0 {
+> +				compatible = "hisilicon,hix5hd2-clock";
+> +				reg = <0x0 0x1000>;
+> +				#clock-cells = <1>;
+> +			};
+> +		};
+> +
+> +		cpuctrl at f8a22000 {
+> +			compatible = "hisilicon,cpuctrl";
+> +			reg = <0xf8a22000 0x2000>;
+> +		};
+
+Again, as pointed out in one of the other patches, this needs a binding.
+
+
+
+-Olof
