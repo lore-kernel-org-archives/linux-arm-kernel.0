@@ -1,101 +1,86 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 12 May 2014 21:34:29 +0200
-Subject: [PATCH v3 3/8] phy: sunxi: Rework phy initialization
+Date: Mon, 12 May 2014 21:34:32 +0200
+Subject: [PATCH v3 6/8] usb: ohci-platform: Enable optional use of reset
+ controller
 In-Reply-To: <1399923274-6017-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1399923274-6017-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1399923274-6017-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1399923274-6017-7-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the phy initialization and variables declaration to the loop itself, since
-it is where it really belongs. Also remove all the temporary variables, we can
-use the structure members directly.
+The OHCI controllers used in the Allwinner A31 are asserted in reset using a
+global reset controller.
+
+Add optional support for such a controller in the OHCI platform driver.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Reviewed-by: Hans de Goede <hdegoede@redhat.com>
 ---
- drivers/phy/phy-sun4i-usb.c | 44 ++++++++++++++++++++------------------------
- 1 file changed, 20 insertions(+), 24 deletions(-)
+ Documentation/devicetree/bindings/usb/usb-ohci.txt |  1 +
+ drivers/usb/host/ohci-platform.c                   | 18 ++++++++++++++++++
+ 2 files changed, 19 insertions(+)
 
-diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-index e6e6c4ba7145..81896409c4bd 100644
---- a/drivers/phy/phy-sun4i-usb.c
-+++ b/drivers/phy/phy-sun4i-usb.c
-@@ -224,13 +224,8 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
- 	struct sun4i_usb_phy_data *data;
- 	struct device *dev = &pdev->dev;
- 	struct device_node *np = dev->of_node;
--	void __iomem *pmu = NULL;
- 	struct phy_provider *phy_provider;
--	struct reset_control *reset;
--	struct regulator *vbus;
- 	struct resource *res;
--	struct phy *phy;
--	char name[16];
- 	int i;
+diff --git a/Documentation/devicetree/bindings/usb/usb-ohci.txt b/Documentation/devicetree/bindings/usb/usb-ohci.txt
+index 45f67d91e888..b968a1aea995 100644
+--- a/Documentation/devicetree/bindings/usb/usb-ohci.txt
++++ b/Documentation/devicetree/bindings/usb/usb-ohci.txt
+@@ -12,6 +12,7 @@ Optional properties:
+ - clocks : a list of phandle + clock specifier pairs
+ - phys : phandle + phy specifier pair
+ - phy-names : "usb"
++- resets : phandle + reset specifier pair
  
- 	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
-@@ -262,42 +257,43 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ Example:
  
- 	/* Skip 0, 0 is the phy for otg which is not yet supported. */
- 	for (i = 1; i < data->num_phys; i++) {
-+		struct sun4i_usb_phy *phy = data->phys + i;
-+		char name[16];
+diff --git a/drivers/usb/host/ohci-platform.c b/drivers/usb/host/ohci-platform.c
+index b6002c951c5c..806dbebdc1d4 100644
+--- a/drivers/usb/host/ohci-platform.c
++++ b/drivers/usb/host/ohci-platform.c
+@@ -24,6 +24,7 @@
+ #include <linux/err.h>
+ #include <linux/phy/phy.h>
+ #include <linux/platform_device.h>
++#include <linux/reset.h>
+ #include <linux/usb/ohci_pdriver.h>
+ #include <linux/usb.h>
+ #include <linux/usb/hcd.h>
+@@ -36,6 +37,7 @@
+ 
+ struct ohci_platform_priv {
+ 	struct clk *clks[OHCI_MAX_CLKS];
++	struct reset_control *rst;
+ 	struct phy *phy;
+ };
+ 
+@@ -191,6 +193,19 @@ static int ohci_platform_probe(struct platform_device *dev)
+ 				break;
+ 			}
+ 		}
 +
- 		snprintf(name, sizeof(name), "usb%d_vbus", i);
--		vbus = devm_regulator_get_optional(dev, name);
--		if (IS_ERR(vbus)) {
--			if (PTR_ERR(vbus) == -EPROBE_DEFER)
-+		phy->vbus = devm_regulator_get_optional(dev, name);
-+		if (IS_ERR(phy->vbus)) {
-+			if (PTR_ERR(phy->vbus) == -EPROBE_DEFER)
- 				return -EPROBE_DEFER;
--			vbus = NULL;
-+			phy->vbus = NULL;
- 		}
- 
- 		snprintf(name, sizeof(name), "usb%d_reset", i);
--		reset = devm_reset_control_get(dev, name);
--		if (IS_ERR(reset)) {
-+		phy->reset = devm_reset_control_get(dev, name);
-+		if (IS_ERR(phy->reset)) {
- 			dev_err(dev, "failed to get reset %s\n", name);
--			return PTR_ERR(reset);
-+			return PTR_ERR(phy->reset);
- 		}
- 
- 		if (i) { /* No pmu for usbc0 */
- 			snprintf(name, sizeof(name), "pmu%d", i);
- 			res = platform_get_resource_byname(pdev,
- 							IORESOURCE_MEM, name);
--			pmu = devm_ioremap_resource(dev, res);
--			if (IS_ERR(pmu))
--				return PTR_ERR(pmu);
-+			phy->pmu = devm_ioremap_resource(dev, res);
-+			if (IS_ERR(phy->pmu))
-+				return PTR_ERR(phy->pmu);
-+		} else {
-+			phy->pmu = NULL;
- 		}
- 
--		phy = devm_phy_create(dev, &sun4i_usb_phy_ops, NULL);
--		if (IS_ERR(phy)) {
-+		phy->phy = devm_phy_create(dev, &sun4i_usb_phy_ops, NULL);
-+		if (IS_ERR(phy->phy)) {
- 			dev_err(dev, "failed to create PHY %d\n", i);
--			return PTR_ERR(phy);
-+			return PTR_ERR(phy->phy);
- 		}
- 
--		data->phys[i].phy = phy;
--		data->phys[i].pmu = pmu;
--		data->phys[i].vbus = vbus;
--		data->phys[i].reset = reset;
--		data->phys[i].index = i;
--		phy_set_drvdata(phy, &data->phys[i]);
-+		phy->index = i;
-+		phy_set_drvdata(phy->phy, &data->phys[i]);
++	}
++
++	priv->rst = devm_reset_control_get_optional(&dev->dev, NULL);
++	if (IS_ERR(priv->rst)) {
++		err = PTR_ERR(priv->rst);
++		if (err == -EPROBE_DEFER)
++			goto err_put_clks;
++		priv->rst = NULL;
++	} else {
++		err = reset_control_deassert(priv->rst);
++		if (err)
++			goto err_put_clks;
  	}
  
- 	dev_set_drvdata(dev, data);
+ 	if (pdata->big_endian_desc)
+@@ -266,6 +281,9 @@ static int ohci_platform_remove(struct platform_device *dev)
+ 	if (pdata->power_off)
+ 		pdata->power_off(dev);
+ 
++	if (priv->rst)
++		reset_control_assert(priv->rst);
++
+ 	for (clk = 0; clk < OHCI_MAX_CLKS && priv->clks[clk]; clk++)
+ 		clk_put(priv->clks[clk]);
+ 
 -- 
 1.9.3
