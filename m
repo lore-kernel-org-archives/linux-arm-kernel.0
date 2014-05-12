@@ -1,111 +1,36 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 12 May 2014 13:59:06 +0200
-Subject: [linux-sunxi] [PATCH v2 3/7] phy: usb: sunxi: Introduce Allwinner
- A31 USB PHY support
-In-Reply-To: <CAGb2v65Pstk6MqEeK838VUpNXw2cQH8K66Oo4oG3__zzWO3pig@mail.gmail.com>
-References: <1399726619-30150-1-git-send-email-maxime.ripard@free-electrons.com>
- <1399726619-30150-4-git-send-email-maxime.ripard@free-electrons.com>
- <CAGb2v65Pstk6MqEeK838VUpNXw2cQH8K66Oo4oG3__zzWO3pig@mail.gmail.com>
-Message-ID: <5370B78A.7060709@redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 May 2014 14:00:57 +0200
+Subject: Questions regarding DMA buffer sharing using IOMMU
+In-Reply-To: <BAY169-W12541AD089785F8BFBD4E26EF350@phx.gbl>
+References: <BAY169-W12541AD089785F8BFBD4E26EF350@phx.gbl>
+Message-ID: <5218408.5YRJXjS4BX@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Monday 12 May 2014 15:12:41 Pintu Kumar wrote:
+> Hi, 
+> I have some queries regarding IOMMU and CMA buffer sharing. 
+> We have an embedded linux device (kernel 3.10, RAM: 256Mb) in 
+> which camera and codec supports IOMMU but the display does not support IOMMU. 
+> Thus for camera capture we are using iommu buffers using
+> ION/DMABUF. But for all display rendering we are using CMA buffers. 
+> So, the question is how to achieve buffer sharing (zero-copy)
+> between Camera and Display using only IOMMU? 
+> Currently we are achieving zero-copy using CMA. And we are
+> exploring options to use IOMMU. 
+> Now we wanted to know which option is better? To use IOMMU or CMA? 
+> If anybody have come across these design please share your thoughts and results. 
 
-On 05/12/2014 11:14 AM, Chen-Yu Tsai wrote:
-> Hi,
-> 
-> On Sat, May 10, 2014 at 8:56 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
->> The USB phy controller in the A31 differs mostly from the older controllers
->> because it has a clock dedicated for each phy, while the older ones were having
->> a single clock for all the phys.
->>
->> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> Reviewed-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->>  drivers/phy/phy-sun4i-usb.c | 35 ++++++++++++++++++++++++++---------
->>  1 file changed, 26 insertions(+), 9 deletions(-)
->>
->> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
->> index e6e6c4ba7145..8bd89430d945 100644
->> --- a/drivers/phy/phy-sun4i-usb.c
->> +++ b/drivers/phy/phy-sun4i-usb.c
->> @@ -61,7 +61,6 @@
->>  #define MAX_PHYS                       3
->>
->>  struct sun4i_usb_phy_data {
->> -       struct clk *clk;
->>         void __iomem *base;
->>         struct mutex mutex;
->>         int num_phys;
->> @@ -71,6 +70,7 @@ struct sun4i_usb_phy_data {
->>                 void __iomem *pmu;
->>                 struct regulator *vbus;
->>                 struct reset_control *reset;
->> +               struct clk *clk;
->>                 int index;
->>         } phys[MAX_PHYS];
->>  };
->> @@ -146,13 +146,13 @@ static int sun4i_usb_phy_init(struct phy *_phy)
->>         struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
->>         int ret;
->>
->> -       ret = clk_prepare_enable(data->clk);
->> +       ret = clk_prepare_enable(phy->clk);
->>         if (ret)
->>                 return ret;
->>
->>         ret = reset_control_deassert(phy->reset);
->>         if (ret) {
->> -               clk_disable_unprepare(data->clk);
->> +               clk_disable_unprepare(phy->clk);
->>                 return ret;
->>         }
->>
->> @@ -170,11 +170,10 @@ static int sun4i_usb_phy_init(struct phy *_phy)
->>  static int sun4i_usb_phy_exit(struct phy *_phy)
->>  {
->>         struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
->> -       struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
->>
->>         sun4i_usb_phy_passby(phy, 0);
->>         reset_control_assert(phy->reset);
->> -       clk_disable_unprepare(data->clk);
->> +       clk_disable_unprepare(phy->clk);
->>
->>         return 0;
->>  }
->> @@ -228,8 +227,10 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
->>         struct phy_provider *phy_provider;
->>         struct reset_control *reset;
->>         struct regulator *vbus;
->> +       bool dedicated_clocks;
-> 
-> No default?
-> 
->>         struct resource *res;
->>         struct phy *phy;
->> +       struct clk *clk;
->>         char name[16];
->>         int i;
->>
->> @@ -249,15 +250,20 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
->>         else
->>                 data->disc_thresh = 2;
->>
->> +       if (of_device_is_compatible(np, "allwinner,sun6i-a31-usb-phy"))
->> +               dedicated_clocks = true;
->> +
-> 
-> dedicated_clocks is more than likely to be true from leftover data
-> on the stack. This results in the usb phy driver probe failing, and
-> the usb host drivers left in perpetual probe deferral on my Cubietruck.
-> 
-> Adding an else section fixes this.
+There is a slight performance overhead in using the IOMMU in general,
+because the IOMMU has to fetch the page table entries from memory
+at least some of the time.
 
-Good catch, fixed this in the sunxi-devel branch for now (until Maxime sends a new version).
+If that overhead is within the constraints you have for transfers between
+camera and codec, you are always better off using IOMMU since that
+means you don't have to do memory migration.
 
-Regards,
+Note however, that we don't have a way to describe IOMMU relations
+to devices in DT, so whatever you come up with to do this will most
+likely be incompatible with what we do in future kernel versions.
 
-Hans
+	Arnd
