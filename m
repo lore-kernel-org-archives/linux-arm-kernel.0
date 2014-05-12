@@ -1,142 +1,99 @@
 From: shaik.ameer@samsung.com (Shaik Ameer Basha)
-Date: Mon, 12 May 2014 11:44:57 +0530
-Subject: [PATCH v13 12/19] iommu/exynos: change rwlock to spinlock
+Date: Mon, 12 May 2014 11:45:00 +0530
+Subject: [PATCH v13 15/19] iommu/exynos: enhanced error messages
 In-Reply-To: <1399875304-19948-1-git-send-email-shaik.ameer@samsung.com>
 References: <1399875304-19948-1-git-send-email-shaik.ameer@samsung.com>
-Message-ID: <1399875304-19948-13-git-send-email-shaik.ameer@samsung.com>
+Message-ID: <1399875304-19948-16-git-send-email-shaik.ameer@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Cho KyongHo <pullip.cho@samsung.com>
 
-Since acquiring read_lock is not more frequent than write_lock, it is
-not beneficial to use rwlock, this commit changes rwlock to spinlock.
+Some redundant error message is removed and some error messages
+are changed to error level from debug level.
 
-Reviewed-by: Grant Grundler <grundler@chromium.org>
 Signed-off-by: Cho KyongHo <pullip.cho@samsung.com>
 Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
 ---
- drivers/iommu/exynos-iommu.c |   27 ++++++++++++++-------------
- 1 file changed, 14 insertions(+), 13 deletions(-)
+ drivers/iommu/exynos-iommu.c |   23 +++++++++--------------
+ 1 file changed, 9 insertions(+), 14 deletions(-)
 
 diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index c1be65f..d89ad5f 100644
+index d18dc37..7188b47 100644
 --- a/drivers/iommu/exynos-iommu.c
 +++ b/drivers/iommu/exynos-iommu.c
-@@ -164,7 +164,7 @@ struct sysmmu_drvdata {
- 	struct clk *clk;
- 	struct clk *clk_master;
- 	int activations;
--	rwlock_t lock;
-+	spinlock_t lock;
- 	struct iommu_domain *domain;
- 	phys_addr_t pgtable;
- };
-@@ -263,12 +263,13 @@ static irqreturn_t exynos_sysmmu_irq(int irq, void *dev_id)
- 	unsigned long addr = -1;
- 	int ret = -ENOSYS;
+@@ -525,7 +525,7 @@ static int exynos_sysmmu_probe(struct platform_device *pdev)
  
--	read_lock(&data->lock);
--
- 	WARN_ON(!is_sysmmu_active(data));
- 
-+	spin_lock(&data->lock);
-+
- 	if (!IS_ERR(data->clk_master))
- 		clk_enable(data->clk_master);
-+
- 	itype = (enum exynos_sysmmu_inttype)
- 		__ffs(__raw_readl(data->sfrbase + REG_INT_STATUS));
- 	if (WARN_ON(!((itype >= 0) && (itype < SYSMMU_FAULT_UNKNOWN))))
-@@ -302,7 +303,7 @@ static irqreturn_t exynos_sysmmu_irq(int irq, void *dev_id)
- 	if (!IS_ERR(data->clk_master))
- 		clk_disable(data->clk_master);
- 
--	read_unlock(&data->lock);
-+	spin_unlock(&data->lock);
- 
- 	return IRQ_HANDLED;
- }
-@@ -312,7 +313,7 @@ static bool __exynos_sysmmu_disable(struct sysmmu_drvdata *data)
- 	unsigned long flags;
- 	bool disabled = false;
- 
--	write_lock_irqsave(&data->lock, flags);
-+	spin_lock_irqsave(&data->lock, flags);
- 
- 	if (!set_sysmmu_inactive(data))
- 		goto finish;
-@@ -330,7 +331,7 @@ static bool __exynos_sysmmu_disable(struct sysmmu_drvdata *data)
- 	data->pgtable = 0;
- 	data->domain = NULL;
- finish:
--	write_unlock_irqrestore(&data->lock, flags);
-+	spin_unlock_irqrestore(&data->lock, flags);
- 
- 	if (disabled)
- 		dev_dbg(data->sysmmu, "Disabled\n");
-@@ -353,7 +354,7 @@ static int __exynos_sysmmu_enable(struct sysmmu_drvdata *data,
- 	int ret = 0;
- 	unsigned long flags;
- 
--	write_lock_irqsave(&data->lock, flags);
-+	spin_lock_irqsave(&data->lock, flags);
- 
- 	if (!set_sysmmu_active(data)) {
- 		if (WARN_ON(pgtable != data->pgtable)) {
-@@ -384,7 +385,7 @@ static int __exynos_sysmmu_enable(struct sysmmu_drvdata *data,
- 
- 	dev_dbg(data->sysmmu, "Enabled\n");
- finish:
--	write_unlock_irqrestore(&data->lock, flags);
-+	spin_unlock_irqrestore(&data->lock, flags);
- 
- 	return ret;
- }
-@@ -431,7 +432,7 @@ static void sysmmu_tlb_invalidate_entry(struct device *dev, unsigned long iova,
- 	unsigned long flags;
- 	struct sysmmu_drvdata *data = dev_get_drvdata(dev->archdata.iommu);
- 
--	read_lock_irqsave(&data->lock, flags);
-+	spin_lock_irqsave(&data->lock, flags);
- 
- 	if (is_sysmmu_active(data)) {
- 		unsigned int maj;
-@@ -465,7 +466,7 @@ static void sysmmu_tlb_invalidate_entry(struct device *dev, unsigned long iova,
- 		dev_dbg(data->sysmmu, "Disabled. Skipping invalidating TLB.\n");
+ 	irq = platform_get_irq(pdev, 0);
+ 	if (irq <= 0) {
+-		dev_dbg(dev, "Unable to find IRQ resource\n");
++		dev_err(dev, "Unable to find IRQ resource\n");
+ 		return irq;
  	}
  
--	read_unlock_irqrestore(&data->lock, flags);
-+	spin_unlock_irqrestore(&data->lock, flags);
- }
+@@ -787,10 +787,8 @@ static int lv2set_page(sysmmu_pte_t *pent, phys_addr_t paddr, size_t size,
+ 								short *pgcnt)
+ {
+ 	if (size == SPAGE_SIZE) {
+-		if (!lv2ent_fault(pent)) {
+-			WARN(1, "Trying mapping on 4KiB where mapping exists");
++		if (WARN_ON(!lv2ent_fault(pent)))
+ 			return -EADDRINUSE;
+-		}
  
- void exynos_sysmmu_tlb_invalidate(struct device *dev)
-@@ -473,7 +474,7 @@ void exynos_sysmmu_tlb_invalidate(struct device *dev)
- 	unsigned long flags;
- 	struct sysmmu_drvdata *data = dev_get_drvdata(dev->archdata.iommu);
- 
--	read_lock_irqsave(&data->lock, flags);
-+	spin_lock_irqsave(&data->lock, flags);
- 
- 	if (is_sysmmu_active(data)) {
- 		if (!IS_ERR(data->clk_master))
-@@ -488,7 +489,7 @@ void exynos_sysmmu_tlb_invalidate(struct device *dev)
- 		dev_dbg(data->sysmmu, "Disabled. Skipping invalidating TLB.\n");
+ 		*pent = mk_lv2ent_spage(paddr);
+ 		pgtable_flush(pent, pent + 1);
+@@ -798,9 +796,7 @@ static int lv2set_page(sysmmu_pte_t *pent, phys_addr_t paddr, size_t size,
+ 	} else { /* size == LPAGE_SIZE */
+ 		int i;
+ 		for (i = 0; i < SPAGES_PER_LPAGE; i++, pent++) {
+-			if (!lv2ent_fault(pent)) {
+-				WARN(1,
+-				"Trying mapping on 64KiB where mapping exists");
++			if (WARN_ON(!lv2ent_fault(pent))) {
+ 				if (i > 0)
+ 					memset(pent - i, 0, sizeof(*pent) * i);
+ 				return -EADDRINUSE;
+@@ -847,8 +843,8 @@ static int exynos_iommu_map(struct iommu_domain *domain, unsigned long l_iova,
  	}
  
--	read_unlock_irqrestore(&data->lock, flags);
-+	spin_unlock_irqrestore(&data->lock, flags);
- }
+ 	if (ret)
+-		pr_debug("%s: Failed to map iova %#x/%#zx bytes\n",
+-							__func__, iova, size);
++		pr_err("%s: Failed(%d) to map %#zx bytes @ %#x\n",
++			__func__, ret, size, iova);
  
- static int exynos_sysmmu_probe(struct platform_device *pdev)
-@@ -543,7 +544,7 @@ static int exynos_sysmmu_probe(struct platform_device *pdev)
+ 	spin_unlock_irqrestore(&priv->pgtablelock, flags);
+ 
+@@ -872,7 +868,7 @@ static size_t exynos_iommu_unmap(struct iommu_domain *domain,
+ 	ent = section_entry(priv->pgtable, iova);
+ 
+ 	if (lv1ent_section(ent)) {
+-		if (size < SECT_SIZE) {
++		if (WARN_ON(size < SECT_SIZE)) {
+ 			err_pgsize = SECT_SIZE;
+ 			goto err;
+ 		}
+@@ -907,7 +903,7 @@ static size_t exynos_iommu_unmap(struct iommu_domain *domain,
  	}
  
- 	data->sysmmu = dev;
--	rwlock_init(&data->lock);
-+	spin_lock_init(&data->lock);
- 	INIT_LIST_HEAD(&data->node);
+ 	/* lv1ent_large(ent) == true here */
+-	if (size < LPAGE_SIZE) {
++	if (WARN_ON(size < LPAGE_SIZE)) {
+ 		err_pgsize = LPAGE_SIZE;
+ 		goto err;
+ 	}
+@@ -929,9 +925,8 @@ done:
+ err:
+ 	spin_unlock_irqrestore(&priv->pgtablelock, flags);
  
- 	platform_set_drvdata(pdev, data);
+-	WARN(1,
+-	"%s: Failed due to size(%#zx) @ %#x is smaller than page size %#zx\n",
+-	__func__, size, iova, err_pgsize);
++	pr_err("%s: Failed: size(%#zx) @ %#x is smaller than page size %#zx\n",
++		__func__, size, iova, err_pgsize);
+ 
+ 	return 0;
+ }
 -- 
 1.7.9.5
