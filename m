@@ -1,30 +1,56 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Mon, 12 May 2014 16:17:16 +0800
-Subject: [PATCH 1/5] serial: imx: remove unneeded imx_transmit_buffer()
- from imx_start_tx()
-In-Reply-To: <53708049.8060108@mentor.com>
-References: <1399648788-26061-1-git-send-email-dean_jenkins@mentor.com>
- <1399648788-26061-2-git-send-email-dean_jenkins@mentor.com>
- <537042B5.2040600@freescale.com> <53706014.8010203@de.bosch.com>
- <53706A9A.6060707@freescale.com> <53706CC3.4030907@de.bosch.com>
- <53706FD8.6090201@freescale.com> <53708049.8060108@mentor.com>
-Message-ID: <5370838C.4060300@freescale.com>
+From: schnitzeltony@googlemail.com (=?UTF-8?Q?Andreas_M=C3=BCller?=)
+Date: Mon, 12 May 2014 10:20:12 +0200
+Subject: [PATCH 1/4] OMAPDSS: Fix DSS clock multiplier issue on 3703 and
+ probably 3630
+In-Reply-To: <20140511144209.GA28266@atomide.com>
+References: <1398815562-24113-1-git-send-email-tony@atomide.com>
+ <1398815562-24113-2-git-send-email-tony@atomide.com>
+ <536C860E.1000501@ti.com>
+ <CALbNGRR3U1veFgXmOWpfG3yNVESdxi2t79WDrJwOZ1oShuG1yA@mail.gmail.com>
+ <20140511144209.GA28266@atomide.com>
+Message-ID: <CALbNGRQpieZ+b-PvC+K2Zxb3hOd6KOCrPVOnveds-fXENn8GJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2014?05?12? 16:03, Dean Jenkins ??:
-> Well, the locking might now be OK but due to an existing issue the TX 
-> will be woken up excessively with no new characters to transmit so 
-> there will be excessive context switching with the new work queue that 
-> results in no useful work done. There is an API issue in HCI LDISC 
-> because TTY_DO_WRITE_WAKEUP is set BEFORE checking whether any 
-> characters remain pending to be sent. This means most of the time 
-> hci_uart_tx_wakeup() is unnecessarily called will no chance of seeing 
-> any remain pending characters to be process. This weakness contributed 
-> to triggering lockup issue.
+On Sun, May 11, 2014 at 4:42 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Andreas M?ller <schnitzeltony@googlemail.com> [140509 14:07]:
+>> On Fri, May 9, 2014 at 9:38 AM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
+>> > On 30/04/14 02:52, Tony Lindgren wrote:
+>> >> Otherwise we can get often errors like the following and the
+>> >> display won't come on:
+>> >>
+>> >> omapdss APPLY error: FIFO UNDERFLOW on gfx, disabling the overlay
+>> >> omapdss APPLY error: SYNC_LOST on channel lcd, restarting
+>> >> the output with video overlays disabled
+>> >>
+>> >> There are some earlier references to this issue:
+>> >>
+>> >> http://www.spinics.net/lists/linux-omap/msg59511.html
+>> >> http://www.spinics.net/lists/linux-omap/msg59724.html
+>> >
+>> resend - my client had HTML enabled...
+>>
+>> FWIW: I have had issues long time ago [1]. With mainline 3.14.3 I had
+>> still the reboot problem on old 600MHz OMAP 3530. Applying this patch
+>> solved the issues. For other versions I had no chance to reproduce the
+>> original wakup issue mentioned in old thread
 >
-You can send a patch to fix the Bluetooth code. :)
-I am happy if you can improve the Bluetooth.
+> Sorry I'm a bit confused now. Is the reboot issue a separate issue
+> related to the twl4030 generic scripts for 3530?
+>
+> And then this patch fixes dm3730 wake-up (from suspend?) issues?
+>
+> Or do we have some other bug where we wrongly hit omap3630_dss_feats
+> on 3530 somehow?
+(What I think) I have done: Have 3.14.3 still booting with legacy
+board init (please don't kill me for that). Without applying your
+patch old OMAP3530 crashed at every reboot with SYNCH_LOST.
 
-thanks
-Huang Shijie
+After applying your patch reboot works fine.
+
+Looking into id-code makes me wonder what changes on 36xx-features do
+to 35xx devices (treated as 34xx - right?). The only way that this
+happens is for unknown hawkeye fallthough. I suggest you simply forget
+my note and I will find out what really 'fixed' dss reboot problem.
+
+Andreas
