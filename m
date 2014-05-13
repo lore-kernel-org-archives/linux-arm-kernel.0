@@ -1,113 +1,116 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 13 May 2014 12:50:36 +0100
-Subject: [PATCH] of: Add of_platform_depopulate() helper
-Message-ID: <1399981836-24837-1-git-send-email-pawel.moll@arm.com>
+From: a.kesavan@samsung.com (Abhilash Kesavan)
+Date: Tue, 13 May 2014 17:28:39 +0530
+Subject: [PATCH v6 0/5] MCPM backend for Exynos5420
+Message-ID: <1399982324-27879-1-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drivers can us of_platform_populate() to create
-platform devices for children of the device
-main node (this can particularly happen in case
-of MFD devices). Unfortunately, there was no
-standard way of removing such sub-devices when
-the main one is being removed.
+This is v6 of the series adding MCPM backend support for SMP secondary boot
+and core switching on Samsung's Exynos5420. The patches are based on the mcpm
+support added for Exynos5420 in the Chromium kernel repository here:
+https://chromium.googlesource.com/chromiumos/third_party/kernel-next/+/chromeos-3.8
 
-This patch adds of_platform_depopulate() as
-a complementary operation for the _populate()
-one. It removes all platform and amba devices
-that have been created from the Device Tree,
-but leaves all other ones untouched (returning
--EBUSY in such case).
+The patches have been prepared on Kukjin Kim's for-next branch and tested on
+SMDK5420 EVT1 as well as an exynos5420 based chromebook (peach-pit) using the
+"/dev/b.L_switcher" user interface. Secondary core boot-up has also been tested
+on both the boards.
 
-Signed-off-by: Pawel Moll <pawel.moll@arm.com>
----
- drivers/of/platform.c       | 52 +++++++++++++++++++++++++++++++++++++++++++++
- include/linux/of_platform.h |  5 +++++
- 2 files changed, 57 insertions(+)
+Changes since v5:
+Addressed the following comments from Kukjin Kim:
+	- The recently merged sysram dt patch has a slightly modified compatible
+	  string (exynos4210-sysram-ns). Made the appropriate change in the mcpm
+	  back-end to handle this.
+	- Changed the naming of generic cpu/cluster control functions.
+	  Correspondingly changed the usage in the mcpm back-end.
+	- Modified hotplug.c to use the generic cpu power down function.
+	- Cleaned up unused S5P_ARM_CORE1_CONFIGURATION and S5P_ARM_CORE1_STATUS
+	  macros.
+	- Added a macro for cpu boot address offset and changed debug statement
+	  from pr_warn to pr_debug.
+	- Added missing signed-off-by's to the generic cpu/cluster control
+	  patches.
 
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index 2d0c8b7..b5c49c3 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -495,4 +495,56 @@ int of_platform_populate(struct device_node *root,
- 	return rc;
- }
- EXPORT_SYMBOL_GPL(of_platform_populate);
-+
-+static int of_platform_device_destroy(struct device *dev, void *data)
-+{
-+	int *parents_children_left = data;
-+	int my_children_left = 0;
-+
-+	/* Do not touch devices not populated from the device tree */
-+	if (!dev->of_node || !of_node_check_flag(dev->of_node, OF_POPULATED)) {
-+		(*parents_children_left)++;
-+		return 0;
-+	}
-+
-+	device_for_each_child(dev, &my_children_left,
-+			of_platform_device_destroy);
-+	if (my_children_left) {
-+		(*parents_children_left)++;
-+		return 0;
-+	}
-+
-+	if (dev->bus == &platform_bus_type)
-+		platform_device_unregister(to_platform_device(dev));
-+	else if (dev->bus == &amba_bustype)
-+		amba_device_unregister(to_amba_device(dev));
-+	else
-+		(*parents_children_left)++;
-+
-+	return 0;
-+}
-+
-+/**
-+ * of_platform_depopulate() - Remove devices populated from device tree
-+ * @parent: device which childred will be removed
-+ *
-+ * Complementary to of_platform_populate(), this function removes children
-+ * of the given device (and, recurrently, their children) that have been
-+ * created from their respective device tree nodes (and only those,
-+ * leaving others - eg. manually created - unharmed).
-+ *
-+ * Returns 0 when all children devices have been removed or
-+ * -EBUSY when some children remained.
-+ */
-+int of_platform_depopulate(struct device *parent)
-+{
-+	int children_left = 0;
-+
-+	device_for_each_child(parent, &children_left,
-+			of_platform_device_destroy);
-+
-+	return children_left ? -EBUSY : 0;
-+}
-+EXPORT_SYMBOL_GPL(of_platform_depopulate);
-+
- #endif /* CONFIG_OF_ADDRESS */
-diff --git a/include/linux/of_platform.h b/include/linux/of_platform.h
-index 05cb4a9..b1010ee 100644
---- a/include/linux/of_platform.h
-+++ b/include/linux/of_platform.h
-@@ -72,6 +72,7 @@ extern int of_platform_populate(struct device_node *root,
- 				const struct of_device_id *matches,
- 				const struct of_dev_auxdata *lookup,
- 				struct device *parent);
-+extern int of_platform_depopulate(struct device *parent);
- #else
- static inline int of_platform_populate(struct device_node *root,
- 					const struct of_device_id *matches,
-@@ -80,6 +81,10 @@ static inline int of_platform_populate(struct device_node *root,
- {
- 	return -ENODEV;
- }
-+static inline int of_platform_depopulate(struct device *parent)
-+{
-+	return -ENODEV;
-+}
- #endif
- 
- #endif	/* _LINUX_OF_PLATFORM_H */
+Changes since v4:
+Addressed the following comments from Nicolas Pitre:
+	- Fixed the location of L2 prefetching disable code.
+	- Fixed the location of the "TODO" comment.
+	- Fixed a possible race in mcpm cluster state check in
+	  exynos_power_up().
+	
+Changes since v3:
+	- Rebased on top of the latest SYSRAM DT patchset from Sachin Kamat.
+
+Addressed the following comments from Lorenzo Pieralisi and Nicolas Pitre:
+	- Dropped the patch "arm: exynos: Add /dev/bL_status user interface on
+	  Exynos5420".
+	- Fixed the header ordering and removed unnecessary header inclusions.
+	- Made the code symmetric in exynos_cluster_power_control().
+	- Fixed the error path in exynos_power_up.
+	- Got rid of "cnt" variable used for last man checking.
+	- Removed stale comments.
+	- Replaced "soc_is" with "of_find_compatible_node" check for exynos5420.
+	- Added L2 prefetching disable code needed during A15 power down.
+
+Changes since v2:
+Addressed the following comments from Nicolas Pitre and Daniel Lezcano:
+	- Added generic common (cluster) configuration functions to pm.c
+	  which may be used by other subsystems.
+	- Removed unused "cpumask" variable in mcpm code.
+	- Re-worked exynos_power_down_finish() referencing the tc2_pm code.
+	- Removed the status checks in core and cluster power functions. We
+	  just set the power control bit and do not check the previous state
+	  anymore.
+	- Removed incorrect jiffies timeout usage in path where IRQs are
+	  disabled.
+
+Changes since v1:
+Addressed the following comments from Dave Martin and Nicolas Pitre:
+	- Fixed help text for EXYNOS5420_MCPM symbol.
+	- Removed mcpm-exynos-setup.S file and added similar code from tc2_pm.c.
+	- Changed the spinlock name from "bl_lock" to "exynos_mcpm_lock".
+	- Removed snoop enable/disable calls due to possible cpuidle issue and
+	  not having numbers proving a significant power savings. Dropped the
+	  "drivers/bus: arm-cci: Add common control interface for ACE ports"
+	  patch from v1 as it was no longer needed.
+	- Created a macro for exynos-specific v7_exit_coherency_flush which
+	  handles an erratum. This was done to prevent duplication of code.
+	- Removed "outer_flush_all" call.
+	- Removed redundant dsb in power_down function.
+	- Removed unnecessary initialization of global variables to zero.
+	- Split the /dev/bL_status debug interface into another patch.
+	- Fixed error handling in exynos_mcpm_init().
+	- Called mcpm_smp_set_ops directly from exynos_mcpm_init().
+	- Added a TODO for supporting cluster down on exynos5420.
+
+NOTE:
+- Have added Leela Krishna's generic cpu power control function series
+  as part of this patchset.
+- I have tested with and without the erratum 799270 workaround and both
+  work fine. I have kept the erratum fix for the time being.
+
+Abhilash Kesavan (2):
+  arm: exynos: Add generic cluster power control functions
+  arm: exynos: Add MCPM call-back functions
+
+Andrew Bresticker (1):
+  ARM: dts: exynos5420: add CCI node
+
+Leela Krishna Amudala (2):
+  ARM: EXYNOS: Add generic cpu power control functions for all exynos
+    based SoCs
+  ARM: EXYNOS: use generic exynos cpu power control functions
+
+ arch/arm/boot/dts/exynos5420.dtsi  |   27 +++
+ arch/arm/mach-exynos/Kconfig       |    8 +
+ arch/arm/mach-exynos/Makefile      |    2 +
+ arch/arm/mach-exynos/common.h      |    6 +
+ arch/arm/mach-exynos/hotplug.c     |    2 +-
+ arch/arm/mach-exynos/mcpm-exynos.c |  346 ++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-exynos/platsmp.c     |    9 +-
+ arch/arm/mach-exynos/pm.c          |   66 +++++++
+ arch/arm/mach-exynos/regs-pmu.h    |   16 +-
+ 9 files changed, 473 insertions(+), 9 deletions(-)
+ create mode 100644 arch/arm/mach-exynos/mcpm-exynos.c
+
 -- 
-1.9.1
+1.7.9.5
