@@ -1,82 +1,91 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 13 May 2014 14:52:05 +0200
-Subject: [PATCHv2 4/4] ARM: mvebu: implement L2/PCIe deadlock workaround
-In-Reply-To: <11503675.BOHdnE4xD3@wuerfel>
-References: <1399975839-5311-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1399975839-5311-5-git-send-email-thomas.petazzoni@free-electrons.com>
- <11503675.BOHdnE4xD3@wuerfel>
-Message-ID: <20140513145205.1dad280f@free-electrons.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 13 May 2014 22:05:03 +0900
+Subject: [PATCHv5 0/5] Support new Exynos3250 SoC based on Cortex-A7 dual core
+Message-ID: <1399986308-23744-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd Bergmann,
+This patchset support new Exynos3250 Samsung SoC based on Cortex-A7 dual core.
+Exynos3250 is a System-On-Chip (SoC) that is based on 32-bit RISC processor
+for Smartphone. It is desigend with the 28nm low-power high-K metal gate process
+and provides the best performance features.
 
-On Tue, 13 May 2014 13:13:39 +0200, Arnd Bergmann wrote:
+This patchset include some patches such as:
+- Support booting of Exynos3250
+- Supoort uart/mct/adc/gic/i2c/spi/power-domain/pmu/mshc/pwm/amba
+- Support the clock control for Exynos3250 using common clk framework
 
-> Hmm, I think this needs some more explanation about which flags
-> you are actually interested in. 
-> 
-> These are the three common mem types for ioremap:
-> 
-> #define PROT_PTE_DEVICE         L_PTE_PRESENT|L_PTE_YOUNG|L_PTE_DIRTY|L_PTE_XN
-> #define PROT_SECT_DEVICE        PMD_TYPE_SECT|PMD_SECT_AP_WRITE
-> 
->         [MT_DEVICE] = {           /* Strongly ordered / ARMv6 shared device */
->                 .prot_pte       = PROT_PTE_DEVICE | L_PTE_MT_DEV_SHARED |
->                                   L_PTE_SHARED,
->                 .prot_pte_s2    = s2_policy(PROT_PTE_S2_DEVICE) |
->                                   s2_policy(L_PTE_S2_MT_DEV_SHARED) |
->                                   L_PTE_SHARED,
->                 .prot_sect      = PROT_SECT_DEVICE | PMD_SECT_S,
->                 .domain         = DOMAIN_IO, 
->         },                      
->         [MT_DEVICE_CACHED] = {    /* ioremap_cached */
->                 .prot_pte       = PROT_PTE_DEVICE | L_PTE_MT_DEV_CACHED,
->                 .prot_sect      = PROT_SECT_DEVICE | PMD_SECT_WB,
->                 .domain         = DOMAIN_IO,
->         },
->         [MT_DEVICE_WC] = {      /* ioremap_wc */
->                 .prot_pte       = PROT_PTE_DEVICE | L_PTE_MT_DEV_WC,
->                 .prot_sect      = PROT_SECT_DEVICE,
->                 .domain         = DOMAIN_IO,
->         },
-> 
-> and this is the one you enforce here:
-> 
->         [MT_MEMORY_RW_SO] = {
->                 .prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
->                                 L_PTE_MT_UNCACHED | L_PTE_XN,
->                 .prot_l1   = PMD_TYPE_TABLE,
->                 .prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_S |
->                                 PMD_SECT_UNCACHED | PMD_SECT_XN,
->                 .domain    = DOMAIN_KERNEL,
->         },
-> 
-> So you set a different domain, and turn write-combined and cached mappings
-> into uncached mappings, and for uncached mappings you remove the "shared"
-> flag. Which of these changes is the one you actually need?
+This patchset is based on following git repo/branch.
+- git repo : git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+- branch   : for-next (2ca8b247775d7c24fa8c2524a5562bad7e88f84b)
 
-I *believe* the important part is the change from L_PTE_MT_DEV_SHARED
-to L_PTE_MT_UNCACHED, because:
+Changes from v4:
+- Rebase this patch on latest for-next branch in linux-samsung.git
+- Post separated secondary CPU boot patch for Exynos4212 and merged it
+ : https://lkml.org/lkml/2014/5/8/745
+- Drop following patch[1] and use alternative patch[2] to turn off Cortex-A7
+  [1] ARM: EXYNOS: Enter a15 lowpower mode for Exynos3250 based on Cortex-a7
+  [2] http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg29064.html
+- Modify clock driver of exynos3250
+- Add 'soc' dt node and move all dt nodes under 'soc' dt node in exynos3250.dtsi
+- Add missing CPU1 dt node in exynos3250.dtsi
+- Fix minor issue about coding style
 
-#define L_PTE_MT_UNCACHED       (_AT(pteval_t, 0x00) << 2)
-#define L_PTE_MT_DEV_SHARED     (_AT(pteval_t, 0x04) << 2)
+Changes from v3:
+- Remove all dependency about following patchset to remove static memory
+  mapping for SYSRAM[1] / PMU ([2] or [3]). If following patchset merged,
+  I'll send a further patches to support SYSRAM/PMU for secondary CPU.
+  [1] http://www.spinics.net/lists/arm-kernel/msg323011.html
+  [2] https://lkml.org/lkml/2014/4/2/48
+  [3] http://www.spinics.net/lists/arm-kernel/msg316013.html
 
-So the former is "Strongly-Ordered" according to the ARM ARM, while the
-latter is "Device Shareable".
+Changes from v2:
+- Remove static memory mapping about SYSRAM/PMU such as following patches:
+  ARM: EXYNOS: Add IO mapping for non-secure SYSRAM of Exynos3250
+  ARM: EXYNOS: Add IO mapping for PMU of Exynos3250
+- Add description for secondary CPU boot of Exynos4212/Exynos3250
+- Fix description in exynos_cpu_die() to remove particular SoC series
+- Fix minor coding style
+- Add documentation for Exynos3250 clock controller
 
-The only detail I have access to is that the workaround is "Reads
-targeting PCIe End Point must be marked Strongly Ordered", so it's
-pretty limited in details.
+Changes from v1:
+- Add new "samsung,exynos3" compatible name
+- Add comment about exynos_cpu_boot in Exynos4212
+- Remove unnecessary 'goto' statement in firmware.c
+- Use read_cpuid_part_number() function instead of assembler directly
+- Post separated pinctrl patch from this patchset
+  : https://lkml.org/lkml/2014/4/13/156
+- Remove unused pmu interrupts due to Exynos3250 dual-core
+- Cosolidate all the patches related to exynos3250.dtsi into one patch
+- Fix gic compatible name to "cortex-a15-gic" because Cortex-A7 GIC is same
+- Add sign-off of sender to all this patches
+- Fix minor typo
 
-Do you think I should create a different memory type MT_DEVICE_SO, that
-remains in the DOMAIN_IO domain, but uses L_PTE_MT_UNCACHED instead of
-L_PTE_MT_DEV_SHARED ?
+Chanwoo Choi (3):
+  ARM: EXYNOS: Add Exynos3250 SoC ID
+  ARM: EXYNOS: Support secondary CPU boot of Exynos3250
+  dt-bindings: add documentation for Exynos3250 clock controller
 
-Thanks,
+Tomasz Figa (2):
+  clk: samsung: exynos3250: Add clocks using common clock framework
+  ARM: dts: Add device tree sources for Exynos3250
 
-Thomas
+ .../devicetree/bindings/clock/exynos3250-clock.txt |  41 ++
+ arch/arm/boot/dts/exynos3250-pinctrl.dtsi          | 475 +++++++++++++
+ arch/arm/boot/dts/exynos3250.dtsi                  | 439 ++++++++++++
+ arch/arm/mach-exynos/Kconfig                       |  22 +
+ arch/arm/mach-exynos/common.h                      |  10 +
+ arch/arm/mach-exynos/exynos.c                      |   2 +
+ arch/arm/mach-exynos/firmware.c                    |   9 +-
+ drivers/clk/samsung/Makefile                       |   1 +
+ drivers/clk/samsung/clk-exynos3250.c               | 782 +++++++++++++++++++++
+ include/dt-bindings/clock/exynos3250.h             | 258 +++++++
+ 10 files changed, 2038 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/exynos3250-clock.txt
+ create mode 100644 arch/arm/boot/dts/exynos3250-pinctrl.dtsi
+ create mode 100644 arch/arm/boot/dts/exynos3250.dtsi
+ create mode 100644 drivers/clk/samsung/clk-exynos3250.c
+ create mode 100644 include/dt-bindings/clock/exynos3250.h
+
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.8.0
