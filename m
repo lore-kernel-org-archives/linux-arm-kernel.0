@@ -1,50 +1,30 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 13 May 2014 10:12:11 -0500
-Subject: [PATCH 3/7] clk: sunxi: avoid double DT matching
-In-Reply-To: <1399940993-1773-4-git-send-email-robherring2@gmail.com>
-References: <1399940993-1773-1-git-send-email-robherring2@gmail.com>
- <1399940993-1773-4-git-send-email-robherring2@gmail.com>
-Message-ID: <CAL_JsqL0wWi0Pz6NirzEVWeHKqrRiGB6Q+9JYp6ew5KTeeY0dQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 13 May 2014 17:12:31 +0200
+Subject: [PATCH] bus/omap_l3: avoid sync initcall for modules
+In-Reply-To: <20140512222006.GI5668@atomide.com>
+References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
+ <1399560990-1402858-6-git-send-email-arnd@arndb.de>
+ <20140512222006.GI5668@atomide.com>
+Message-ID: <177753046.dmVvfiu3Rn@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 12, 2014 at 7:29 PM, Rob Herring <robherring2@gmail.com> wrote:
-> From: Rob Herring <robh@kernel.org>
->
-> Use for_each_matching_node_and_match instead of for_each_matching_node plus
-> of_match_node to avoid searching the DT twice for each node.
->
-> The sunxi DT scanning code should really be re-worked rather than have
-> its own private matching infrastructure. It is working around needing a
-> function pointer and a data pointer for each compatible match.
->
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> Cc: "Emilio L?pez" <emilio@elopez.com.ar>
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/clk/sunxi/clk-sunxi.c | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
->
-> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> index bd7dc73..7977106 100644
-> --- a/drivers/clk/sunxi/clk-sunxi.c
-> +++ b/drivers/clk/sunxi/clk-sunxi.c
-> @@ -1278,8 +1278,7 @@ static void __init of_sunxi_table_clock_setup(const struct of_device_id *clk_mat
->         const struct of_device_id *match;
->         void (*setup_function)(struct device_node *, const void *) = function;
->
-> -       for_each_matching_node(np, clk_match) {
-> -               match = of_match_node(clk_match, np);
-> +       for_each_matching_node_and_match(np, clk_match, match) {
+On Monday 12 May 2014 15:20:07 Tony Lindgren wrote:
+> 
+> How about instead let's add this into include/linux/module.h
+> like we have for other initcalls:
+> 
+> #define postcore_initcall(fn)           module_init(fn)
+> 
+> There may be others missing too from there. BTW, this driver
+> might be few of the drivers that actually might need to be
+> initialized early for debugging to catch bad access from
+> other drivers.
 
-I missed folding in a fix and this should be &match instead of match.
+There is a comment above those defines saying:
 
-Rob
+/* Don't use these in loadable modules, but some people do... */
 
->                 data = match->data;
->                 setup_function(np, data);
->         }
-> --
-> 1.9.1
->
+so I'm not sure if adding more would be appreciated.
+
+	Arnd
