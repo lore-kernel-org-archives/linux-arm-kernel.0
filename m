@@ -1,103 +1,46 @@
-From: jussi.kivilinna@iki.fi (Jussi Kivilinna)
-Date: Tue, 13 May 2014 21:58:51 +0300
-Subject: [PATCH resend 13/15] arm64/crypto: add voluntary preemption to
- Crypto Extensions SHA1
-In-Reply-To: <1398959486-8222-4-git-send-email-ard.biesheuvel@linaro.org>
-References: <1398959486-8222-1-git-send-email-ard.biesheuvel@linaro.org>
- <1398959486-8222-4-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <53726B6B.6070007@iki.fi>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 13 May 2014 15:19:06 -0400
+Subject: [PATCH 5/7] irqchip: s3c24xx: fix function type for
+ IRQCHIP_OF_DECLARE
+In-Reply-To: <CAL_JsqJuYwkyy0UO75D1XmAKZa3ui3zYYBi55xFOWUFVgFw5=g@mail.gmail.com>
+References: <1399940993-1773-1-git-send-email-robherring2@gmail.com>
+ <1399940993-1773-6-git-send-email-robherring2@gmail.com>
+ <20140513152233.GB27822@titan.lakedaemon.net>
+ <CAL_JsqJuYwkyy0UO75D1XmAKZa3ui3zYYBi55xFOWUFVgFw5=g@mail.gmail.com>
+Message-ID: <20140513191906.GI27822@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01.05.2014 18:51, Ard Biesheuvel wrote:
-> The Crypto Extensions based SHA1 implementation uses the NEON register file,
-> and hence runs with preemption disabled. This patch adds a TIF_NEED_RESCHED
-> check to its inner loop so we at least give up the CPU voluntarily when we
-> are running in process context and have been tagged for preemption by the
-> scheduler.
+On Tue, May 13, 2014 at 12:02:06PM -0500, Rob Herring wrote:
+> On Tue, May 13, 2014 at 10:22 AM, Jason Cooper <jason@lakedaemon.net> wrote:
+> > Rob,
+> >
+> > On Mon, May 12, 2014 at 07:29:51PM -0500, Rob Herring wrote:
+> >> From: Rob Herring <robh@kernel.org>
+> >>
+> >> Adding function type checking to IRQCHIP_OF_DECLARE found a type mismatch
+> >> with s3c2410_init_intc_of and s3c2416_init_intc_of. The function only takes
+> >> the 1st 2 parameters.
+> >>
+> >> Signed-off-by: Rob Herring <robh@kernel.org>
+> >> Cc: Thomas Gleixner <tglx@linutronix.de>
+> >> ---
+> >>  drivers/irqchip/irq-s3c24xx.c | 6 ++----
+> >>  1 file changed, 2 insertions(+), 4 deletions(-)
+> >
+> > Thomas has asked me to give him a hand with the patches for
+> > drivers/irqchip.  When you add these two to your tree, could you amend
+> > the subject line to conform with the other patches in that directory?
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-<snip>
-> @@ -42,6 +42,7 @@ static int sha1_update(struct shash_desc *desc, const u8 *data,
->  	sctx->count += len;
->  
->  	if ((partial + len) >= SHA1_BLOCK_SIZE) {
-> +		struct thread_info *ti = NULL;
->  		int blocks;
->  
->  		if (partial) {
-> @@ -52,16 +53,30 @@ static int sha1_update(struct shash_desc *desc, const u8 *data,
->  			len -= p;
->  		}
->  
-> +		/*
-> +		 * Pass current's thread info pointer to sha1_ce_transform()
-> +		 * below if we want it to play nice under preemption.
-> +		 */
-> +		if ((IS_ENABLED(CONFIG_PREEMPT_VOLUNTARY) ||
-> +		     IS_ENABLED(CONFIG_PREEMPT)) && !in_interrupt())
-> +			ti = current_thread_info();
-> +
->  		blocks = len / SHA1_BLOCK_SIZE;
->  		len %= SHA1_BLOCK_SIZE;
->  
-> -		kernel_neon_begin_partial(16);
-> -		sha1_ce_transform(blocks, data, sctx->state,
-> -				  partial ? sctx->buffer : NULL, 0);
-> -		kernel_neon_end();
-> +		do {
-> +			int rem;
-> +
-> +			kernel_neon_begin_partial(16);
-> +			rem = sha1_ce_transform(blocks, data, sctx->state,
-> +						partial ? sctx->buffer : NULL,
-> +						0, ti);
-> +			kernel_neon_end();
->  
-> -		data += blocks * SHA1_BLOCK_SIZE;
-> -		partial = 0;
-> +			data += (blocks - rem) * SHA1_BLOCK_SIZE;
-> +			blocks = rem;
-> +			partial = 0;
-> +		} while (unlikely(ti && blocks > 0));
->  	}
->  	if (len)
->  		memcpy(sctx->buffer + partial, data, len);
-> @@ -94,6 +109,7 @@ static int sha1_finup(struct shash_desc *desc, const u8 *data,
->  		      unsigned int len, u8 *out)
->  {
->  	struct sha1_state *sctx = shash_desc_ctx(desc);
-> +	struct thread_info *ti = NULL;
->  	__be32 *dst = (__be32 *)out;
->  	int blocks;
->  	int i;
-> @@ -111,9 +127,20 @@ static int sha1_finup(struct shash_desc *desc, const u8 *data,
->  	 */
->  	blocks = len / SHA1_BLOCK_SIZE;
->  
-> -	kernel_neon_begin_partial(16);
-> -	sha1_ce_transform(blocks, data, sctx->state, NULL, len);
-> -	kernel_neon_end();
-> +	if ((IS_ENABLED(CONFIG_PREEMPT_VOLUNTARY) ||
-> +	     IS_ENABLED(CONFIG_PREEMPT)) && !in_interrupt())
-> +		ti = current_thread_info();
-> +
-> +	do {
-> +		int rem;
-> +
-> +		kernel_neon_begin_partial(16);
-> +		rem = sha1_ce_transform(blocks, data, sctx->state,
-> +					NULL, len, ti);
-> +		kernel_neon_end();
-> +		data += (blocks - rem) * SHA1_BLOCK_SIZE;
-> +		blocks = rem;
-> +	} while (unlikely(ti && blocks > 0));
->  
+> Excellent! We've needed some help there for a long time. Is there a
+> patch in flight to add this to MAINTAINERS.
 
-These seem to be similar, how about renaming assembly function to __sha1_ce_transform
-and moving this loop to new sha1_ce_transform.
+See:
 
-Otherwise, patches looks good.
+  https://lkml.kernel.org/r/1400006821-32145-1-git-send-email-jason at lakedaemon.net
 
--Jussi
+and it's now in irq/urgent in the tip tree.
+
+thx,
+
+Jason.
