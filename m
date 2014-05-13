@@ -1,114 +1,72 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 13 May 2014 08:39:03 +0200
-Subject: [PATCH v3 3/8] phy: sunxi: Rework phy initialization
-In-Reply-To: <1399923274-6017-4-git-send-email-maxime.ripard@free-electrons.com>
-References: <1399923274-6017-1-git-send-email-maxime.ripard@free-electrons.com>
- <1399923274-6017-4-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <5371BE07.30409@redhat.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 13 May 2014 12:13:09 +0530
+Subject: [PATCH v8 1/2] phy: Add new Exynos5 USB 3.0 PHY driver
+In-Reply-To: <CAFp+6iH-bLd9WUYyK8d8i=UNUm4DHpEYz=Am_qzPyX6gDovyKA@mail.gmail.com>
+References: <1399643877-14528-1-git-send-email-gautam.vivek@samsung.com>	<5370C689.2090402@ti.com>
+ <CAFp+6iH-bLd9WUYyK8d8i=UNUm4DHpEYz=Am_qzPyX6gDovyKA@mail.gmail.com>
+Message-ID: <5371BEFD.6000407@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 05/12/2014 09:34 PM, Maxime Ripard wrote:
-> Move the phy initialization and variables declaration to the loop itself, since
-> it is where it really belongs. Also remove all the temporary variables, we can
-> use the structure members directly.
+On Tuesday 13 May 2014 11:37 AM, Vivek Gautam wrote:
+> Hi Kishon,
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/phy/phy-sun4i-usb.c | 44 ++++++++++++++++++++------------------------
->  1 file changed, 20 insertions(+), 24 deletions(-)
 > 
-> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-> index e6e6c4ba7145..81896409c4bd 100644
-> --- a/drivers/phy/phy-sun4i-usb.c
-> +++ b/drivers/phy/phy-sun4i-usb.c
-> @@ -224,13 +224,8 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
->  	struct sun4i_usb_phy_data *data;
->  	struct device *dev = &pdev->dev;
->  	struct device_node *np = dev->of_node;
-> -	void __iomem *pmu = NULL;
->  	struct phy_provider *phy_provider;
-> -	struct reset_control *reset;
-> -	struct regulator *vbus;
->  	struct resource *res;
-> -	struct phy *phy;
-> -	char name[16];
->  	int i;
->  
->  	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
-> @@ -262,42 +257,43 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
->  
->  	/* Skip 0, 0 is the phy for otg which is not yet supported. */
->  	for (i = 1; i < data->num_phys; i++) {
-> +		struct sun4i_usb_phy *phy = data->phys + i;
-> +		char name[16];
-> +
->  		snprintf(name, sizeof(name), "usb%d_vbus", i);
-> -		vbus = devm_regulator_get_optional(dev, name);
-> -		if (IS_ERR(vbus)) {
-> -			if (PTR_ERR(vbus) == -EPROBE_DEFER)
-> +		phy->vbus = devm_regulator_get_optional(dev, name);
-> +		if (IS_ERR(phy->vbus)) {
-> +			if (PTR_ERR(phy->vbus) == -EPROBE_DEFER)
->  				return -EPROBE_DEFER;
-> -			vbus = NULL;
-> +			phy->vbus = NULL;
->  		}
->  
->  		snprintf(name, sizeof(name), "usb%d_reset", i);
-> -		reset = devm_reset_control_get(dev, name);
-> -		if (IS_ERR(reset)) {
-> +		phy->reset = devm_reset_control_get(dev, name);
-> +		if (IS_ERR(phy->reset)) {
->  			dev_err(dev, "failed to get reset %s\n", name);
-> -			return PTR_ERR(reset);
-> +			return PTR_ERR(phy->reset);
->  		}
->  
->  		if (i) { /* No pmu for usbc0 */
->  			snprintf(name, sizeof(name), "pmu%d", i);
->  			res = platform_get_resource_byname(pdev,
->  							IORESOURCE_MEM, name);
-> -			pmu = devm_ioremap_resource(dev, res);
-> -			if (IS_ERR(pmu))
-> -				return PTR_ERR(pmu);
-> +			phy->pmu = devm_ioremap_resource(dev, res);
-> +			if (IS_ERR(phy->pmu))
-> +				return PTR_ERR(phy->pmu);
-> +		} else {
-> +			phy->pmu = NULL;
->  		}
->  
-
-data is kzalloced, so there is no need for this else branch. Other then that
-this patch is:
-
-Reviewed-by: Hans de Goede <hdegoede@redhat.com>
-
-Regards,
-
-Hans
-
-> -		phy = devm_phy_create(dev, &sun4i_usb_phy_ops, NULL);
-> -		if (IS_ERR(phy)) {
-> +		phy->phy = devm_phy_create(dev, &sun4i_usb_phy_ops, NULL);
-> +		if (IS_ERR(phy->phy)) {
->  			dev_err(dev, "failed to create PHY %d\n", i);
-> -			return PTR_ERR(phy);
-> +			return PTR_ERR(phy->phy);
->  		}
->  
-> -		data->phys[i].phy = phy;
-> -		data->phys[i].pmu = pmu;
-> -		data->phys[i].vbus = vbus;
-> -		data->phys[i].reset = reset;
-> -		data->phys[i].index = i;
-> -		phy_set_drvdata(phy, &data->phys[i]);
-> +		phy->index = i;
-> +		phy_set_drvdata(phy->phy, &data->phys[i]);
->  	}
->  
->  	dev_set_drvdata(dev, data);
+> On Mon, May 12, 2014 at 6:33 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>> Hi Gautam,
+>>
+>> On Friday 09 May 2014 07:27 PM, Vivek Gautam wrote:
+>>> Add a new driver for the USB 3.0 PHY on Exynos5 series of SoCs.
+>>> The new driver uses the generic PHY framework and will interact
+>>> with DWC3 controller present on Exynos5 series of SoCs.
+>>>
+>>> Also, created a new header file in linux/mfd/syscon/ for
+>>> Exynos5 SoCs and put the required PMU offset definitions
+>>> for the basic available PHYs.
+>>>
+>>
+>>
+>> I get the following checkpatch warnings
+>>
+>> WARNING: please write a paragraph that describes the config symbol fully
+>> #163: FILE: drivers/phy/Kconfig:163:
+>> +config PHY_EXYNOS5_USBDRD
+>>
+>> WARNING: DT compatible string "samsung,exynos5250-usbdrd-phy" appears
+>> un-documented -- check ./Documentation/devicetree/bindings/
+>> #708: FILE: drivers/phy/phy-exynos5-usbdrd.c:516:
+>> +               .compatible = "samsung,exynos5250-usbdrd-phy",
+>>
+>> WARNING: DT compatible string "samsung,exynos5420-usbdrd-phy" appears
+>> un-documented -- check ./Documentation/devicetree/bindings/
+>> #711: FILE: drivers/phy/phy-exynos5-usbdrd.c:519:
+>> +               .compatible = "samsung,exynos5420-usbdrd-phy",.
+>>
+>>
+>> I think you just need to separate the Documentation into a separate patch
+>> before applying the driver patch.
+>>
 > 
+> I somehow don't see the Documentation warning. Below is the checkpatch
+> output which i ran on this v8 patch version.
+>   linux-phy$ ./scripts/checkpatch.pl phy.patch
+>   WARNING: please write a paragraph that describes the config symbol fully
+>   #127: FILE: drivers/phy/Kconfig:163:
+>   +config PHY_EXYNOS5_USBDRD
+> 
+>   total: 0 errors, 1 warnings, 760 lines checked
+> 
+>   phy.patch has style problems, please review.
+> 
+>   If any of these errors are false positives, please report
+>   them to the maintainer, see CHECKPATCH in MAINTAINERS.
+> 
+> am i missing something ?
+
+Yeah.. the checkpatch.pl has got updated recently. If you use the latest kernel
+you should see it.
+
+Thanks
+Kishon
