@@ -1,30 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 13 May 2014 17:12:31 +0200
-Subject: [PATCH] bus/omap_l3: avoid sync initcall for modules
-In-Reply-To: <20140512222006.GI5668@atomide.com>
-References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
- <1399560990-1402858-6-git-send-email-arnd@arndb.de>
- <20140512222006.GI5668@atomide.com>
-Message-ID: <177753046.dmVvfiu3Rn@wuerfel>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 13 May 2014 11:13:54 -0400
+Subject: [PATCH 0/2] ARM: mvebu: fix PCIe/mvebu-soc-id issue
+In-Reply-To: <1399903900-29977-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1399903900-29977-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140513151354.GA27822@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 12 May 2014 15:20:07 Tony Lindgren wrote:
+On Mon, May 12, 2014 at 04:11:38PM +0200, Thomas Petazzoni wrote:
+> Hello,
 > 
-> How about instead let's add this into include/linux/module.h
-> like we have for other initcalls:
+> This set of two patches (and more specifically the second patch) fix a
+> PCIe detection problem caused by the introduction of the mvebu-soc-id
+> and a bad interaction between the clock manipulation done by the
+> mvebu-soc-id code and the PCIe driver. The details are all in the
+> commit log of the second patch.
 > 
-> #define postcore_initcall(fn)           module_init(fn)
+> This second patch fixes a PCIe detection problem noticed by several
+> persons. The first patch is just a related preparation patch.
 > 
-> There may be others missing too from there. BTW, this driver
-> might be few of the drivers that actually might need to be
-> initialized early for debugging to catch bad access from
-> other drivers.
+> Both patches are meant for 3.15-rc, and should be backported to 3.14
+> as part of the stable process.
+> 
+> Best regards,
+> 
+> Thomas
+> 
+> Thomas Petazzoni (2):
+>   ARM: mvebu: mvebu-soc-id: add missing clk_put() call
+>   ARM: mvebu: mvebu-soc-id: keep clock enabled if PCIe unit is enabled
+> 
+>  arch/arm/mach-mvebu/mvebu-soc-id.c | 13 ++++++++++++-
+>  1 file changed, 12 insertions(+), 1 deletion(-)
 
-There is a comment above those defines saying:
+Series applied to mvebu/fixes with Gregory's Ack, and Tested-by's from
+Gregory, Andrew, and Willy.
 
-/* Don't use these in loadable modules, but some people do... */
+Also, as Rob noted, if you are going to add 'Fixes' tags, please do so
+in the following format:
 
-so I'm not sure if adding more would be appreciated.
+  Fixes: af8d1c63afcb ("ARM: mvebu: Add support to get the ID and the revision of a SoC")
 
-	Arnd
+Note that it uses double quotes, and only 12 characters for the hash.
+
+Also, the second patch depends on the first, so I've amended the tags as
+such for the second patch:
+
+  Fixes: af8d1c63afcb ("ARM: mvebu: Add support to get the ID and the revision of a SoC")
+  Cc: <stable@vger.kernel.org> # 3.14+: 42a18d1cf484: ARM: mvebu: mvebu-soc-id: add missing clk_put() call
+  Cc: <stable@vger.kernel.org> # 3.14+
+
+Keep in mind, I don't require any of this.  I /ask/ for the commit hash
+of the commit introducing the regression, just to make my job easier.
+If you are going to put it in the Fixes format, great.
+
+As for the stable tags, you can't very well add the dependency info
+since you don't have the commit hash of the first patch yet. :)
+
+Thanks for all the effort diagnosing this problem and finding the fix!
+
+thx,
+
+Jason.
