@@ -1,30 +1,103 @@
-From: rvaswani@codeaurora.org (Rohit Vaswani)
-Date: Tue, 13 May 2014 11:56:01 -0700
-Subject: maxcpus behavior in arm64
-Message-ID: <53726AC1.9030207@codeaurora.org>
+From: jussi.kivilinna@iki.fi (Jussi Kivilinna)
+Date: Tue, 13 May 2014 21:58:51 +0300
+Subject: [PATCH resend 13/15] arm64/crypto: add voluntary preemption to
+ Crypto Extensions SHA1
+In-Reply-To: <1398959486-8222-4-git-send-email-ard.biesheuvel@linaro.org>
+References: <1398959486-8222-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1398959486-8222-4-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <53726B6B.6070007@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+On 01.05.2014 18:51, Ard Biesheuvel wrote:
+> The Crypto Extensions based SHA1 implementation uses the NEON register file,
+> and hence runs with preemption disabled. This patch adds a TIF_NEED_RESCHED
+> check to its inner loop so we at least give up the CPU voluntarily when we
+> are running in process context and have been tagged for preemption by the
+> scheduler.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+<snip>
+> @@ -42,6 +42,7 @@ static int sha1_update(struct shash_desc *desc, const u8 *data,
+>  	sctx->count += len;
+>  
+>  	if ((partial + len) >= SHA1_BLOCK_SIZE) {
+> +		struct thread_info *ti = NULL;
+>  		int blocks;
+>  
+>  		if (partial) {
+> @@ -52,16 +53,30 @@ static int sha1_update(struct shash_desc *desc, const u8 *data,
+>  			len -= p;
+>  		}
+>  
+> +		/*
+> +		 * Pass current's thread info pointer to sha1_ce_transform()
+> +		 * below if we want it to play nice under preemption.
+> +		 */
+> +		if ((IS_ENABLED(CONFIG_PREEMPT_VOLUNTARY) ||
+> +		     IS_ENABLED(CONFIG_PREEMPT)) && !in_interrupt())
+> +			ti = current_thread_info();
+> +
+>  		blocks = len / SHA1_BLOCK_SIZE;
+>  		len %= SHA1_BLOCK_SIZE;
+>  
+> -		kernel_neon_begin_partial(16);
+> -		sha1_ce_transform(blocks, data, sctx->state,
+> -				  partial ? sctx->buffer : NULL, 0);
+> -		kernel_neon_end();
+> +		do {
+> +			int rem;
+> +
+> +			kernel_neon_begin_partial(16);
+> +			rem = sha1_ce_transform(blocks, data, sctx->state,
+> +						partial ? sctx->buffer : NULL,
+> +						0, ti);
+> +			kernel_neon_end();
+>  
+> -		data += blocks * SHA1_BLOCK_SIZE;
+> -		partial = 0;
+> +			data += (blocks - rem) * SHA1_BLOCK_SIZE;
+> +			blocks = rem;
+> +			partial = 0;
+> +		} while (unlikely(ti && blocks > 0));
+>  	}
+>  	if (len)
+>  		memcpy(sctx->buffer + partial, data, len);
+> @@ -94,6 +109,7 @@ static int sha1_finup(struct shash_desc *desc, const u8 *data,
+>  		      unsigned int len, u8 *out)
+>  {
+>  	struct sha1_state *sctx = shash_desc_ctx(desc);
+> +	struct thread_info *ti = NULL;
+>  	__be32 *dst = (__be32 *)out;
+>  	int blocks;
+>  	int i;
+> @@ -111,9 +127,20 @@ static int sha1_finup(struct shash_desc *desc, const u8 *data,
+>  	 */
+>  	blocks = len / SHA1_BLOCK_SIZE;
+>  
+> -	kernel_neon_begin_partial(16);
+> -	sha1_ce_transform(blocks, data, sctx->state, NULL, len);
+> -	kernel_neon_end();
+> +	if ((IS_ENABLED(CONFIG_PREEMPT_VOLUNTARY) ||
+> +	     IS_ENABLED(CONFIG_PREEMPT)) && !in_interrupt())
+> +		ti = current_thread_info();
+> +
+> +	do {
+> +		int rem;
+> +
+> +		kernel_neon_begin_partial(16);
+> +		rem = sha1_ce_transform(blocks, data, sctx->state,
+> +					NULL, len, ti);
+> +		kernel_neon_end();
+> +		data += (blocks - rem) * SHA1_BLOCK_SIZE;
+> +		blocks = rem;
+> +	} while (unlikely(ti && blocks > 0));
+>  
 
-I notice that the maxcpus behavior is different in arm64 than from how 
-arm uses it.
-in arm64/kernel/smp.c - in smp_prepare_cpus, maxcpus is used to limit 
-the cpu_present_mask.
-However in arm/kernel/smp.c - maxcpus is not used as a decision maker to 
-set the cpu_preset_mask.
+These seem to be similar, how about renaming assembly function to __sha1_ce_transform
+and moving this loop to new sha1_ce_transform.
 
-Is this behavior expected and intentionally different in arm and arm64 ?
-This also means that in arm64 (unlike arm)- maxcpus cannot be used to 
-boot a subset of total cpus with the
-option of getting the secondary cores online at a later point from 
-userspace using hotplug.
-It seems like maxcpus is being treated like nr_cpus in arm64 ?
-Please could you help clarify this behavior and help us understand this 
-better.
+Otherwise, patches looks good.
 
-Thanks,
-Rohit Vaswani
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum, hosted by The Linux Foundation
+-Jussi
