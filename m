@@ -1,47 +1,63 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 12 May 2014 19:12:16 -0700
-Subject: [GIT PULL] clk: socfpga: Clock updates for v3.16
-In-Reply-To: <1399915981-5403-1-git-send-email-dinguyen@altera.com>
-References: <1399915981-5403-1-git-send-email-dinguyen@altera.com>
-Message-ID: <20140513021216.5943.87439@quantum>
+From: b47624@freescale.com (Li Jun)
+Date: Tue, 13 May 2014 09:10:36 +0800
+Subject: i.MX6 USB OTG support is broken on linux-next
+In-Reply-To: <20140513014247.GH8330@dragon>
+References: <20140509130046.GP2794@dragon>
+ <20140510111003.GA1593@shlinux1.ap.freescale.net>
+ <20140510131815.GT2794@dragon>
+ <4285b0d55d2545b99c4ba6b703e65a12@BL2PR03MB226.namprd03.prod.outlook.com>
+ <20140511014027.GV2794@dragon>
+ <71b1887d2f014021b084df703b15dc6a@BL2PR03MB226.namprd03.prod.outlook.com>
+ <20140512135437.GA8330@dragon>
+ <04dad7ad8f0247b9bef4fea1db8a8bc8@BL2PR03MB226.namprd03.prod.outlook.com>
+ <20140513014247.GH8330@dragon>
+Message-ID: <20140513011002.GA1781@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting dinguyen at altera.com (2014-05-12 10:33:01)
-> Hi Mike,
+On Tue, May 13, 2014 at 09:42:48AM +0800, Shawn Guo wrote:
+> On Tue, May 13, 2014 at 08:25:18AM +0800, Chen Peter-B29397 wrote:
+> >  
+> > > > >
+> > > >
+> > > > In your case, you should not set CONFIG_USB_OTG no matter at defconfig
+> > > > and at menuconfig.
+> > > 
+> > > Hmm, at least in my testing (USB mouse/keyboard connected to OTG port),
+> > > it works as before even I enable CONFIG_USB_OTG, as long as I do *not*
+> > > enable CONFIG_USB_OTG_FSM.
+> > > 
+> > > Since it works for my case, I'm wondering why you think I shouldn't
+> > > enable CONFIG_USB_OTG at all.
+> > > 
+> > 
+> > If your device is not OTG device, there is no reason you need to enable
+> > CONFIG_USB_OTG.
 > 
-> Please consider pulling this patch in for v3.16.
+> Whether I should enable CONFIG_USB_OTG depends on what devices I will
+> use?  This is insane to me.
+> 
+> Look, there is an USB OTG port on my board, and it should just be the
+> reason that's good enough for me to build a kernel with CONFIG_USB_OTG,
+> shouldn't it?  I do not even know what type of devices will be plugged
+> into this USB OTG port when I was building the kernel.
+> 
+> Shawn
+> 
 
-Pulled.
+Firstly, w/o USB_OTG and USB_OTG_FSM, your OTG port will work well as before
+(i.e. it can be host or can be gadget as you want, so it's enough for you if
+connect normal usb device or PC host), I assume you are not wanting more here,
+this dual role functionality actually is not the part of "CONFIG_USB_OTG";
 
-Thanks,
-Mike
+What USB_OTG + USB_OTG_FSM does is *specific* for HNP and SRP, it's based on
+OTG spec and will *not* work well with a normal usb device, that's the reason
+behind in disable USB_OTG, which is not needed, and even impact your expecting
+function in your case...
 
-> 
-> Thanks,
-> Dinh
-> 
-> The following changes since commit d1db0eea852497762cab43b905b879dfcd3b8987:
-> 
->   Linux 3.15-rc3 (2014-04-27 19:29:27 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga-clk-update-for-v3.16
-> 
-> for you to fetch changes up to 0691bb1b5a1865b3bbc9b7ce6e26eff546abb1cf:
-> 
->   clk: socfpga: add divider registers to the main pll outputs (2014-05-12 12:27:22 -0500)
-> 
-> ----------------------------------------------------------------
-> Adds support getting the divider registers for the MAIN PLL that was once
-> thought to be hidden.
-> 
-> ----------------------------------------------------------------
-> Dinh Nguyen (1):
->       clk: socfpga: add divider registers to the main pll outputs
-> 
->  drivers/clk/socfpga/clk-gate.c   |    1 -
->  drivers/clk/socfpga/clk-periph.c |   22 +++++++++++++++++++---
->  drivers/clk/socfpga/clk.h        |    4 ++++
->  3 files changed, 23 insertions(+), 4 deletions(-)
+Li Jun
+
+> > Yes, it may work for some devices when enable CONFIG_USB_OTG,
+> > but it will confuse other host or device which is connected with you, eg,
+> > your device will report your have supported some otg capabilities, eg, SRP or
+> > HNP.
