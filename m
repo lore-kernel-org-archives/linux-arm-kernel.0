@@ -1,9 +1,9 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 13 May 2014 17:03:34 +0900
-Subject: [PATCH 07/15] ARM: shmobile: r8a7791: Switch to new style CMT device
+Date: Tue, 13 May 2014 17:03:33 +0900
+Subject: [PATCH 06/15] ARM: shmobile: r8a7790: Switch to new style CMT device
 In-Reply-To: <cover.1399967755.git.horms+renesas@verge.net.au>
 References: <cover.1399967755.git.horms+renesas@verge.net.au>
-Message-ID: <356af68bf483e4564f75a35287a8f5f39d31041f.1399967755.git.horms+renesas@verge.net.au>
+Message-ID: <711ee6c8dee1df265773786cd0ec96f2cae5c189.1399967755.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,16 +17,16 @@ Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 [horms+renesas at verge.net.au resolved conflict: use clk_names]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-koelsch-reference.c |  2 +-
- arch/arm/mach-shmobile/clock-r8a7791.c           |  2 +-
- arch/arm/mach-shmobile/setup-r8a7791.c           | 17 +++++++----------
+ arch/arm/mach-shmobile/board-lager-reference.c |  2 +-
+ arch/arm/mach-shmobile/clock-r8a7790.c         |  2 +-
+ arch/arm/mach-shmobile/setup-r8a7790.c         | 17 +++++++----------
  3 files changed, 9 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-koelsch-reference.c b/arch/arm/mach-shmobile/board-koelsch-reference.c
-index 941f8b3..bd90932 100644
---- a/arch/arm/mach-shmobile/board-koelsch-reference.c
-+++ b/arch/arm/mach-shmobile/board-koelsch-reference.c
-@@ -86,7 +86,7 @@ static void __init koelsch_add_du_device(void)
+diff --git a/arch/arm/mach-shmobile/board-lager-reference.c b/arch/arm/mach-shmobile/board-lager-reference.c
+index 1eb48cf..1bca2748 100644
+--- a/arch/arm/mach-shmobile/board-lager-reference.c
++++ b/arch/arm/mach-shmobile/board-lager-reference.c
+@@ -90,7 +90,7 @@ static void __init lager_add_du_device(void)
   * devices until they get moved to DT.
   */
  static const struct clk_name clk_names[] __initconst = {
@@ -35,26 +35,33 @@ index 941f8b3..bd90932 100644
  	{ "scifa0", NULL, "sh-sci.0" },
  	{ "scifa1", NULL, "sh-sci.1" },
  	{ "scifb0", NULL, "sh-sci.2" },
-diff --git a/arch/arm/mach-shmobile/clock-r8a7791.c b/arch/arm/mach-shmobile/clock-r8a7791.c
-index 3b26c7e..e2fdfcc 100644
---- a/arch/arm/mach-shmobile/clock-r8a7791.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7791.c
-@@ -264,7 +264,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.0", &mstp_clks[MSTP314]),
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP312]),
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP311]),
+diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
+index a936ae7..296a057 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7790.c
++++ b/arch/arm/mach-shmobile/clock-r8a7790.c
+@@ -357,7 +357,6 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP312]),
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.3", &mstp_clks[MSTP311]),
+ 	CLKDEV_DEV_ID("sh_mmcif.1", &mstp_clks[MSTP305]),
 -	CLKDEV_DEV_ID("sh_cmt.0", &mstp_clks[MSTP124]),
-+	CLKDEV_ICK_ID("fck", "sh-cmt-48-gen2.0", &mstp_clks[MSTP124]),
  	CLKDEV_DEV_ID("qspi.0", &mstp_clks[MSTP917]),
- 	CLKDEV_DEV_ID("rcar_thermal", &mstp_clks[MSTP522]),
- 	CLKDEV_DEV_ID("i2c-rcar_gen2.0", &mstp_clks[MSTP931]),
-diff --git a/arch/arm/mach-shmobile/setup-r8a7791.c b/arch/arm/mach-shmobile/setup-r8a7791.c
-index e28404e..561653d 100644
---- a/arch/arm/mach-shmobile/setup-r8a7791.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7791.c
-@@ -128,20 +128,17 @@ R8A7791_SCIFA(14, 0xe6c80000, gic_spi(31)); /* SCIFA5 */
- 					  &scif##index##_platform_data,	       \
- 					  sizeof(scif##index##_platform_data))
+ 	CLKDEV_DEV_ID("renesas_usbhs", &mstp_clks[MSTP704]),
+ 	CLKDEV_DEV_ID("pci-rcar-gen2.0", &mstp_clks[MSTP703]),
+@@ -367,6 +366,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("sata-r8a7790.1", &mstp_clks[MSTP814]),
+ 
+ 	/* ICK */
++	CLKDEV_ICK_ID("fck", "sh-cmt-48-gen2.0", &mstp_clks[MSTP124]),
+ 	CLKDEV_ICK_ID("usbhs", "usb_phy_rcar_gen2", &mstp_clks[MSTP704]),
+ 	CLKDEV_ICK_ID("lvds.0", "rcar-du-r8a7790", &mstp_clks[MSTP726]),
+ 	CLKDEV_ICK_ID("lvds.1", "rcar-du-r8a7790", &mstp_clks[MSTP725]),
+diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
+index c4616f0..87327f3 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7790.c
++++ b/arch/arm/mach-shmobile/setup-r8a7790.c
+@@ -269,20 +269,17 @@ static const struct resource thermal_resources[] __initconst = {
+ 					thermal_resources,		\
+ 					ARRAY_SIZE(thermal_resources))
  
 -static const struct sh_timer_config cmt00_platform_data __initconst = {
 -	.name = "CMT00",
@@ -73,20 +80,20 @@ index e28404e..561653d 100644
 +	DEFINE_RES_IRQ(gic_spi(142)),
  };
  
- #define r8a7791_register_cmt(idx)					\
+ #define r8a7790_register_cmt(idx)					\
 -	platform_device_register_resndata(&platform_bus, "sh_cmt",	\
 +	platform_device_register_resndata(&platform_bus, "sh-cmt-48-gen2", \
  					  idx, cmt##idx##_resources,	\
  					  ARRAY_SIZE(cmt##idx##_resources), \
  					  &cmt##idx##_platform_data,	\
-@@ -200,7 +197,7 @@ void __init r8a7791_add_dt_devices(void)
- 	r8a7791_register_scif(12);
- 	r8a7791_register_scif(13);
- 	r8a7791_register_scif(14);
--	r8a7791_register_cmt(00);
-+	r8a7791_register_cmt(0);
+@@ -300,7 +297,7 @@ void __init r8a7790_add_dt_devices(void)
+ 	r8a7790_register_scif(7);
+ 	r8a7790_register_scif(8);
+ 	r8a7790_register_scif(9);
+-	r8a7790_register_cmt(00);
++	r8a7790_register_cmt(0);
  }
  
- void __init r8a7791_add_standard_devices(void)
+ void __init r8a7790_add_standard_devices(void)
 -- 
 1.8.5.2
