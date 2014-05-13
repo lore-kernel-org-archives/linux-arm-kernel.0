@@ -1,55 +1,75 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 13 May 2014 13:11:44 +0200
-Subject: [PATCH 1/1] usb: core: Kconfig: refine the description for
- CONFIG_USB_OTG
-In-Reply-To: <1399947567-18958-1-git-send-email-peter.chen@freescale.com>
-References: <1399947567-18958-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <20140513111144.GA29360@kroah.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 13 May 2014 13:13:39 +0200
+Subject: [PATCHv2 4/4] ARM: mvebu: implement L2/PCIe deadlock workaround
+In-Reply-To: <1399975839-5311-5-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1399975839-5311-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1399975839-5311-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <11503675.BOHdnE4xD3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 13, 2014 at 10:19:27AM +0800, Peter Chen wrote:
-> the user should only select it when the board supports HNP and SRP,
-> it should NOT be selected if the board only supports dual-role
-> switch through ID pin.
-> 
-> There is a discussion for it:
-> http://marc.info/?l=linux-arm-kernel&m=139994896101516&w=2
-> http://marc.info/?l=linux-usb&m=139994881701504&w=2
-> 
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> ---
->  drivers/usb/core/Kconfig |   12 +++++++-----
->  1 files changed, 7 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/usb/core/Kconfig b/drivers/usb/core/Kconfig
-> index cb8e991..158048b 100644
-> --- a/drivers/usb/core/Kconfig
-> +++ b/drivers/usb/core/Kconfig
-> @@ -54,13 +54,15 @@ config USB_OTG
->  	default n
->  	help
->  	  The most notable feature of USB OTG is support for a
-> -	  "Dual-Role" device, which can act as either a device
-> -	  or a host. The initial role is decided by the type of
-> -	  plug inserted and can be changed later when two dual
-> -	  role devices talk to each other.
-> +	  otg device, which can act as either a device or a host.
-> +	  The initial role is decided by the type of plug inserted
-> +	  and can be changed using HNP (Host Negotiation Protocol)
-> +	  later when two otg devices talk to each other.
->  
->  	  Select this only if your board has Mini-AB/Micro-AB
-> -	  connector.
-> +	  connector and supports HNP and SRP (Session Request Protocol).
-> +	  If the board only supports dual-role switch through ID
-> +	  pin, this configuration should not be selected.
+On Tuesday 13 May 2014 12:10:39 Thomas Petazzoni wrote:
+> +/*
+> + * This ioremap hook is used on Armada 375/38x to ensure that PCIe
+> + * memory areas are mapped as MT_MEMORY_RW_SO instead of
+> + * MT_DEVICE. This is needed as a workaround for a deadlock issue
+> + * between the PCIe interface and the cache controller.
+> + */
+> +static void __iomem *
+> +armada_pcie_wa_ioremap_caller(phys_addr_t phys_addr, size_t size,
+> +                             unsigned int mtype, void *caller)
+> +{
+> +       struct resource pcie_mem;
+> +
+> +       mvebu_mbus_get_pcie_mem_aperture(&pcie_mem);
+> +
+> +       if (pcie_mem.start <= phys_addr && (phys_addr + size) <= pcie_mem.end)
+> +               mtype = MT_MEMORY_RW_SO;
+> +
+> +       return __arm_ioremap_caller(phys_addr, size, mtype, caller);
+> +}
 
-That's really lame.  What happened to our "all modconfig should work"
-goal?  Why can't you dynamically detect that this is not a config that
-works and handle it?
+Hmm, I think this needs some more explanation about which flags
+you are actually interested in. 
 
-And this is just the OTG "core", not any specific hardware, so why
-should it matter?
+These are the three common mem types for ioremap:
 
-greg k-h
+#define PROT_PTE_DEVICE         L_PTE_PRESENT|L_PTE_YOUNG|L_PTE_DIRTY|L_PTE_XN
+#define PROT_SECT_DEVICE        PMD_TYPE_SECT|PMD_SECT_AP_WRITE
+
+        [MT_DEVICE] = {           /* Strongly ordered / ARMv6 shared device */
+                .prot_pte       = PROT_PTE_DEVICE | L_PTE_MT_DEV_SHARED |
+                                  L_PTE_SHARED,
+                .prot_pte_s2    = s2_policy(PROT_PTE_S2_DEVICE) |
+                                  s2_policy(L_PTE_S2_MT_DEV_SHARED) |
+                                  L_PTE_SHARED,
+                .prot_sect      = PROT_SECT_DEVICE | PMD_SECT_S,
+                .domain         = DOMAIN_IO, 
+        },                      
+        [MT_DEVICE_CACHED] = {    /* ioremap_cached */
+                .prot_pte       = PROT_PTE_DEVICE | L_PTE_MT_DEV_CACHED,
+                .prot_sect      = PROT_SECT_DEVICE | PMD_SECT_WB,
+                .domain         = DOMAIN_IO,
+        },
+        [MT_DEVICE_WC] = {      /* ioremap_wc */
+                .prot_pte       = PROT_PTE_DEVICE | L_PTE_MT_DEV_WC,
+                .prot_sect      = PROT_SECT_DEVICE,
+                .domain         = DOMAIN_IO,
+        },
+
+and this is the one you enforce here:
+
+        [MT_MEMORY_RW_SO] = {
+                .prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
+                                L_PTE_MT_UNCACHED | L_PTE_XN,
+                .prot_l1   = PMD_TYPE_TABLE,
+                .prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_S |
+                                PMD_SECT_UNCACHED | PMD_SECT_XN,
+                .domain    = DOMAIN_KERNEL,
+        },
+
+So you set a different domain, and turn write-combined and cached mappings
+into uncached mappings, and for uncached mappings you remove the "shared"
+flag. Which of these changes is the one you actually need?
+
+	Arnd
