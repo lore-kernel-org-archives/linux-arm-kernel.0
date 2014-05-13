@@ -1,48 +1,32 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 13 May 2014 10:19:27 +0800
-Subject: [PATCH 1/1] usb: core: Kconfig: refine the description for
- CONFIG_USB_OTG
-Message-ID: <1399947567-18958-1-git-send-email-peter.chen@freescale.com>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Tue, 13 May 2014 12:45:43 +0900
+Subject: [PATCH 1/2] ARM: tegra: joystick input in tegra_defconfig
+In-Reply-To: <5370F794.2020800@wwwdotorg.org>
+References: <1399883209-31169-1-git-send-email-acourbot@nvidia.com>
+ <1399883209-31169-2-git-send-email-acourbot@nvidia.com>
+ <5370F794.2020800@wwwdotorg.org>
+Message-ID: <CAAVeFuLZ_wrxipYn2pfNzuyDiTvAPWH4aSWfonrG+YQsm4tM_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-the user should only select it when the board supports HNP and SRP,
-it should NOT be selected if the board only supports dual-role
-switch through ID pin.
+On Tue, May 13, 2014 at 1:32 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 05/12/2014 02:26 AM, Alexandre Courbot wrote:
+>> NVIDIA SHIELD embeds a USB controller. Compile the corresponding support
+>
+> USB controller or USB joystick?
 
-There is a discussion for it:
-http://marc.info/?l=linux-arm-kernel&m=139994896101516&w=2
-http://marc.info/?l=linux-usb&m=139994881701504&w=2
+I understand this sounds like "EHCI controller" here. Will reword.
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
----
- drivers/usb/core/Kconfig |   12 +++++++-----
- 1 files changed, 7 insertions(+), 5 deletions(-)
+>
+>> as a module in tegra_defconfig.
+>
+> Why make this a module rather than built-in. Almost everything else in
+> tegra_defconfig is built-in, except brcmfmac since it doesn't handle
+> lack of firmware availability at probe time.
 
-diff --git a/drivers/usb/core/Kconfig b/drivers/usb/core/Kconfig
-index cb8e991..158048b 100644
---- a/drivers/usb/core/Kconfig
-+++ b/drivers/usb/core/Kconfig
-@@ -54,13 +54,15 @@ config USB_OTG
- 	default n
- 	help
- 	  The most notable feature of USB OTG is support for a
--	  "Dual-Role" device, which can act as either a device
--	  or a host. The initial role is decided by the type of
--	  plug inserted and can be changed later when two dual
--	  role devices talk to each other.
-+	  otg device, which can act as either a device or a host.
-+	  The initial role is decided by the type of plug inserted
-+	  and can be changed using HNP (Host Negotiation Protocol)
-+	  later when two otg devices talk to each other.
- 
- 	  Select this only if your board has Mini-AB/Micro-AB
--	  connector.
-+	  connector and supports HNP and SRP (Session Request Protocol).
-+	  If the board only supports dual-role switch through ID
-+	  pin, this configuration should not be selected.
- 
- config USB_OTG_WHITELIST
- 	bool "Rely on OTG Targeted Peripherals List"
--- 
-1.7.8
+Goal is to minimize the image size, especially since this is not a
+feature I expect to be used much outside of SHIELD. If you prefer it
+built-in, I'm fine with it too.
+
+Thanks,
+Alex.
