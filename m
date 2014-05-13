@@ -1,118 +1,85 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 13 May 2014 09:33:45 +0200
-Subject: [PATCH 00/03] ARM: shmobile: Use shmobile_init_delay() on r8a7791
-In-Reply-To: <20140513071224.GC27611@verge.net.au>
-References: <20140511232508.20177.11556.sendpatchset@w520>
- <1509906.x9u0HJ6AbJ@avalon> <20140513005936.GB30252@verge.net.au>
- <20140513071224.GC27611@verge.net.au>
-Message-ID: <CAMuHMdWBAkh_Jkfsok-Nws56z0ZsU0LmxV2nob_LKrMY_tFF6A@mail.gmail.com>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Tue, 13 May 2014 13:05:04 +0530
+Subject: [PATCH v8 1/2] phy: Add new Exynos5 USB 3.0 PHY driver
+In-Reply-To: <5371BEFD.6000407@ti.com>
+References: <1399643877-14528-1-git-send-email-gautam.vivek@samsung.com>
+ <5370C689.2090402@ti.com>
+ <CAFp+6iH-bLd9WUYyK8d8i=UNUm4DHpEYz=Am_qzPyX6gDovyKA@mail.gmail.com>
+ <5371BEFD.6000407@ti.com>
+Message-ID: <CAFp+6iGHQBCSdCPSdVVFcKp_MbUTU-2u_PusWsKzRVPyhGd2NA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
-
-On Tue, May 13, 2014 at 9:12 AM, Simon Horman <horms@verge.net.au> wrote:
-> From: Simon Horman <horms+renesas@verge.net.au>
+On Tue, May 13, 2014 at 12:13 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> Hi,
 >
-> [PATCH] ARM: shmobile: Set clock frequency in HZ from OF nodes
+> On Tuesday 13 May 2014 11:37 AM, Vivek Gautam wrote:
+>> Hi Kishon,
+>>
+>>
+>> On Mon, May 12, 2014 at 6:33 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>>> Hi Gautam,
+>>>
+>>> On Friday 09 May 2014 07:27 PM, Vivek Gautam wrote:
+>>>> Add a new driver for the USB 3.0 PHY on Exynos5 series of SoCs.
+>>>> The new driver uses the generic PHY framework and will interact
+>>>> with DWC3 controller present on Exynos5 series of SoCs.
+>>>>
+>>>> Also, created a new header file in linux/mfd/syscon/ for
+>>>> Exynos5 SoCs and put the required PMU offset definitions
+>>>> for the basic available PHYs.
+>>>>
+>>>
+>>>
+>>> I get the following checkpatch warnings
+>>>
+>>> WARNING: please write a paragraph that describes the config symbol fully
+>>> #163: FILE: drivers/phy/Kconfig:163:
+>>> +config PHY_EXYNOS5_USBDRD
+>>>
+>>> WARNING: DT compatible string "samsung,exynos5250-usbdrd-phy" appears
+>>> un-documented -- check ./Documentation/devicetree/bindings/
+>>> #708: FILE: drivers/phy/phy-exynos5-usbdrd.c:516:
+>>> +               .compatible = "samsung,exynos5250-usbdrd-phy",
+>>>
+>>> WARNING: DT compatible string "samsung,exynos5420-usbdrd-phy" appears
+>>> un-documented -- check ./Documentation/devicetree/bindings/
+>>> #711: FILE: drivers/phy/phy-exynos5-usbdrd.c:519:
+>>> +               .compatible = "samsung,exynos5420-usbdrd-phy",.
+>>>
+>>>
+>>> I think you just need to separate the Documentation into a separate patch
+>>> before applying the driver patch.
+>>>
+>>
+>> I somehow don't see the Documentation warning. Below is the checkpatch
+>> output which i ran on this v8 patch version.
+>>   linux-phy$ ./scripts/checkpatch.pl phy.patch
+>>   WARNING: please write a paragraph that describes the config symbol fully
+>>   #127: FILE: drivers/phy/Kconfig:163:
+>>   +config PHY_EXYNOS5_USBDRD
+>>
+>>   total: 0 errors, 1 warnings, 760 lines checked
+>>
+>>   phy.patch has style problems, please review.
+>>
+>>   If any of these errors are false positives, please report
+>>   them to the maintainer, see CHECKPATCH in MAINTAINERS.
+>>
+>> am i missing something ?
 >
-> shmobile_init_delay() looks for OF "clock-frequency" to determine
-> the delay which is set by calling shmobile_setup_delay().
+> Yeah.. the checkpatch.pl has got updated recently. If you use the latest kernel
+> you should see it.
 >
-> Unfortunately this seems to be incorrect in detail as
-> "clock-frequency" node values are in HZ whereas the frequency
-> argument to shmobile_setup_delay() is in MHz.
 
-Indeed. Nice catch.
+right, i can see it now with Torvald's tree. Thanks for pointing out :-)
+I will move out the Documentation in a separate patch and resubmit.
 
-> Provide a variant of shmobile_setup_delay() that accepts HZ to
-> correct this problem.
->
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->
-> diff --git a/arch/arm/mach-shmobile/timer.c b/arch/arm/mach-shmobile/timer.c
-> index ccecde9..8d80a33 100644
-> --- a/arch/arm/mach-shmobile/timer.c
-> +++ b/arch/arm/mach-shmobile/timer.c
-> @@ -23,21 +23,24 @@
->  #include <linux/delay.h>
->  #include <linux/of_address.h>
->
-> -void __init shmobile_setup_delay(unsigned int max_cpu_core_mhz,
-> -                                unsigned int mult, unsigned int div)
-> +void __init shmobile_setup_delay_hz(unsigned int max_cpu_core_hz,
-> +                                   unsigned int mult, unsigned int div)
->  {
->         /* calculate a worst-case loops-per-jiffy value
-> -        * based on maximum cpu core mhz setting and the
-> +        * based on maximum cpu core hz setting and the
->          * __delay() implementation in arch/arm/lib/delay.S
->          *
->          * this will result in a longer delay than expected
->          * when the cpu core runs on lower frequencies.
->          */
-> -
-> -       unsigned int value = (1000000 * mult) / (HZ * div);
-> -
->         if (!preset_lpj)
-> -               preset_lpj = max_cpu_core_mhz * value;
-> +               preset_lpj = max_cpu_core_hz * mult / (HZ * div);
 
-I believe it was written this way to avoid integer overflow.
-As soon as we get a 2.2 GHz A15 (mult = 2), "max_cpu_core_hz * mult"
-will overflow.
 
-When using Hz instead of MHz, we probably want to switch from
-multiplying a small number (in MHz) to dividing a large number (in Hz):
 
-        preset_lpj = max_cpu_core_hz / value;
-
-So value should be:
-
-        value = HZ * div / mult;
-
-which is OK as mult is really small (1 or 2).
-Does this look right? Haven't had my coffee yet ;-)
-
-All of this will still overflow when clock-frequency no longer fits in u32,
-and we have to revise the bindings ;-)
-
-> +}
-> +
-> +void __init shmobile_setup_delay(unsigned int max_cpu_core_mhz,
-> +                                unsigned int mult, unsigned int div)
-> +{
-> +       shmobile_setup_delay_hz(max_cpu_core_mhz, mult * 100000, div);
-
-While this works (for now --- no longer with my proposed modifications
-above), didn't you intend this?
-
-    shmobile_setup_delay_hz(max_cpu_core_mhz * 1000000, mult, div);
-
->  }
->
->  void __init shmobile_init_delay(void)
-> @@ -58,12 +61,12 @@ void __init shmobile_init_delay(void)
->
->         if (max_freq) {
->                 if (of_find_compatible_node(NULL, NULL, "arm,cortex-a8"))
-> -                       shmobile_setup_delay(max_freq, 1, 3);
-> +                       shmobile_setup_delay_hz(max_freq, 1, 3);
->                 else if (of_find_compatible_node(NULL, NULL, "arm,cortex-a9"))
-> -                       shmobile_setup_delay(max_freq, 1, 3);
-> +                       shmobile_setup_delay_hz(max_freq, 1, 3);
->                 else if (of_find_compatible_node(NULL, NULL, "arm,cortex-a15"))
->                         if (!IS_ENABLED(CONFIG_ARM_ARCH_TIMER))
-> -                               shmobile_setup_delay(max_freq, 2, 4);
-> +                               shmobile_setup_delay_hz(max_freq, 2, 4);
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Best Regards
+Vivek Gautam
+Samsung R&D Institute, Bangalore
+India
