@@ -1,67 +1,82 @@
 From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Tue, 13 May 2014 15:43:04 +0530
-Subject: [PATCH v5 2/5] ARM: EXYNOS: use generic exynos cpu power control
- functions
-In-Reply-To: <019c01cf6e53$14eab220$3ec01660$@samsung.com>
-References: <1399307221-8659-1-git-send-email-a.kesavan@samsung.com>
- <1399307221-8659-3-git-send-email-a.kesavan@samsung.com>
- <019c01cf6e53$14eab220$3ec01660$@samsung.com>
-Message-ID: <CAM4voanOEpe-b98GKant9w+=YMQpE3az7a4=eMGW0aX9NpnO9g@mail.gmail.com>
+Date: Tue, 13 May 2014 15:43:24 +0530
+Subject: [PATCH V3 1/3] ARM: EXYNOS5: PMU support for 5420
+In-Reply-To: <536DAF1A.8080809@samsung.com>
+References: <1399546342-30494-1-git-send-email-vikas.sajjan@samsung.com>
+ <536DAF1A.8080809@samsung.com>
+Message-ID: <CAM4voanRvELU8CanyBJZCXxSRaUB_Apo3E3SOyrTowNXX=aNmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+Hi Pankaj,
 
-On Tue, May 13, 2014 at 7:58 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Abhilash Kesavan wrote:
+[...]
+>>   #include "exynos-pmu.h"
+>>   #include "regs-pmu.h"
+>> +#include "common.h"
 >>
->> From: Leela Krishna Amudala <leela.krishna@linaro.org>
->>
->> Use generic exynos cpu power control functions to power up/down
->> and to know the status of the cpu.
->>
->> Signed-off-by: Leela Krishna Amudala <leela.krishna@linaro.org>
 >
-> Same as previous comment.
 >
->> ---
->>  arch/arm/mach-exynos/platsmp.c |    9 +++------
->>  1 file changed, 3 insertions(+), 6 deletions(-)
->>
->> diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-
->> exynos/platsmp.c
->> index 0aac032..d442a66 100644
->> --- a/arch/arm/mach-exynos/platsmp.c
->> +++ b/arch/arm/mach-exynos/platsmp.c
->> @@ -130,15 +130,12 @@ static int exynos_boot_secondary(unsigned int cpu,
->> struct task_struct *idle)
->>        */
->>       write_pen_release(phys_cpu);
->>
->> -     if (!(__raw_readl(S5P_ARM_CORE1_STATUS) & S5P_CORE_LOCAL_PWR_EN)) {
->> -             __raw_writel(S5P_CORE_LOCAL_PWR_EN,
->> -                          S5P_ARM_CORE1_CONFIGURATION);
->> -
->> +     if (!exynos_cpu_power_state(cpu)) {
->> +             exynos_cpu_powerup(cpu);
->>               timeout = 10;
->>
->>               /* wait max 10 ms until cpu1 is on */
->> -             while ((__raw_readl(S5P_ARM_CORE1_STATUS)
->> -                     & S5P_CORE_LOCAL_PWR_EN) != S5P_CORE_LOCAL_PWR_EN) {
->> +             while (exynos_cpu_power_state(cpu) != S5P_CORE_LOCAL_PWR_EN)
->> {
->>                       if (timeout-- == 0)
->>                               break;
->>
->> --
+> I think it will be better if we move "EXYNOS5420_USE_STANDBY_WFI_ALL"
+> macro into regs-pmu.h itself. It will help us removing dependency of
+> common.h
+> from "pmu.c", so that in future we can easily move this file out of machine
+> directory.
+Will move to regs-pmu.h
+
+[...]
+>> + * exynos_set_core_flag - set the cluster id to IROM register
+>> + *                       to ensure that we wake up with the
+>> + *                       current cluster.
+>> + */
+>> +static void exynos5420_set_core_flag(void)
+>> +{
+>> +       unsigned int this_cluster;
+>> +       this_cluster = MPIDR_AFFINITY_LEVEL(read_cpuid_mpidr(), 1);
+>> +
+>> +       regmap_write(pmu_context->pmu_regmap, EXYNOS_IROM_DATA2,
+>> this_cluster);
+>> +}
+>> +
+>> +void exynos5420_powerdown_conf(enum sys_powerdown mode)
+>> +{
+>> +       exynos5420_set_core_flag();
 >
-> You may cleanup the definitions of 'S5P_ARM_CORE1_CONFIGURATION/STATUS' in
-> regs-pmu.h once hotplug.c uses the generic power control functions.
-OK, will re-post a new version rebased on your for-next branch soon.
+>
+> I think we can avoid extra function call of exynos5420_set_core_flag by
+> moving
+> all of it's code in powerdown_conf itself.
+Will move to powerdown_conf.
+>
+>
+>> +}
+>>   void exynos5_powerdown_conf(enum sys_powerdown mode)
+>>   {
+>>         unsigned int i;
+>> @@ -429,6 +670,80 @@ static void exynos5250_pmu_init(void)
+>>         regmap_write(pmu_regmap, EXYNOS5_MASK_WDTRESET_REQUEST, tmp);
+>>   }
+>>   +static void exynos5420_pmu_init(void)
+>> +{
+>> +       unsigned int value;
+>> +       int i;
+>> +
+>> +       /*
+>> +        * Set the CMU_RESET, CMU_SYSCLK and CMU_CLKSTOP registers
+>> +        * for local power blocks to Low initially as per Table 8-4:
+>> +        * "System-Level Power-Down Configuration Registers".
+>> +        */
+>> +       for (i = 0; i < ARRAY_SIZE(exynos5420_list_disable_pmu_reg); i++)
+>> +               regmap_write(pmu_context->pmu_regmap,
+>> +                       exynos5420_list_disable_pmu_reg[i], 0);
+>> +
+>> +       /* Time taken to stabilized XXTI clock */
+>> +       regmap_write(pmu_context->pmu_regmap, EXYNOS5_XXTI_DURATION3,
+>> 0x005dc);
+>
+>
+> Isn't it will be good if you use some macro of 0x005dc?
+Will remove this as per Alim's comment.
 
 Regards,
 Abhilash
->
-> - Kukjin
->
