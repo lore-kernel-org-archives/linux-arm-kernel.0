@@ -1,49 +1,45 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 13 May 2014 21:46:52 +0200
-Subject: [PATCH v2] usb: phy: msm: reset controller is mandatory now
-Message-ID: <4319810.IibMxJ0Qvk@wuerfel>
+Date: Tue, 13 May 2014 21:48:27 +0200
+Subject: [PATCH 4/8] usb: phy: fix isp1301-omap dependency on tps65010
+In-Reply-To: <20140513152631.GI1151@saruman.home>
+References: <1399557141-1346645-1-git-send-email-arnd@arndb.de>
+ <1399557141-1346645-5-git-send-email-arnd@arndb.de>
+ <20140513152631.GI1151@saruman.home>
+Message-ID: <7581425.j2FgrCi2P6@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit a27345434134 "usb: phy: msm: Use reset framework for LINK
-and PHY resets" introduced a mandatory call to reset_control_get
-into the msm usb phy driver, which means we have to add a Kconfig
-dependency on the API to avoid this build error:
+On Tuesday 13 May 2014 10:26:31 Felipe Balbi wrote:
+> On Thu, May 08, 2014 at 03:52:17PM +0200, Arnd Bergmann wrote:
+> > The isp1301-omap driver cannot be built-in if the tps65010 driver
+> > is a module, otherwise we get a link error from the reference to
+> > the tps65010_set_vbus_draw function.
+> > 
+> > There is already a hack in the driver to work around the problem
+> > of tps65010 being not available at all. This patch extends that
+> > hack to ensure that the real tps65010_set_vbus_draw() function
+> > is only called when it's avaiable.
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > Cc: linux-omap at vger.kernel.org
+> > ---
+> >  drivers/usb/phy/phy-isp1301-omap.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/usb/phy/phy-isp1301-omap.c b/drivers/usb/phy/phy-isp1301-omap.c
+> > index 6e146d7..35a0dd2 100644
+> > --- a/drivers/usb/phy/phy-isp1301-omap.c
+> > +++ b/drivers/usb/phy/phy-isp1301-omap.c
+> > @@ -94,7 +94,7 @@ struct isp1301 {
+> >  
+> >  #if defined(CONFIG_MACH_OMAP_H2) || defined(CONFIG_MACH_OMAP_H3)
+> >  
+> > -#if  defined(CONFIG_TPS65010) || defined(CONFIG_TPS65010_MODULE)
+> > +#if  defined(CONFIG_TPS65010) || (defined(CONFIG_TPS65010_MODULE) && defined(MODULE))
+> 
+> nack, I would rather see a real fix, possibly also fixing the original
+> hack.
 
-phy/phy-msm-usb.c: In function 'msm_otg_read_dt':
-phy/phy-msm-usb.c:1461:2: error: implicit declaration of function 'devm_reset_control_get' [-Werror=implicit-function-declaration]
-  motg->link_rst = devm_reset_control_get(&pdev->dev, "link");
-  ^
+Any suggestion how?
 
-Since the usb-ehci-msm driver currently selects the OTG driver,
-we could still get a broken dependency here. To solve that,
-this patch also removes the 'select', which turns out to be
-unnecessary.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: "Ivan T. Ivanov" <iivanov@mm-sol.com>
-
-diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index 3d9e540..7a39ae8 100644
---- a/drivers/usb/host/Kconfig
-+++ b/drivers/usb/host/Kconfig
-@@ -170,7 +170,6 @@ config USB_EHCI_MSM
- 	tristate "Support for Qualcomm QSD/MSM on-chip EHCI USB controller"
- 	depends on ARCH_MSM
- 	select USB_EHCI_ROOT_HUB_TT
--	select USB_MSM_OTG
- 	---help---
- 	  Enables support for the USB Host controller present on the
- 	  Qualcomm chipsets. Root Hub has inbuilt TT.
-diff --git a/drivers/usb/phy/Kconfig b/drivers/usb/phy/Kconfig
-index 359a6c1..65bec8f 100644
---- a/drivers/usb/phy/Kconfig
-+++ b/drivers/usb/phy/Kconfig
-@@ -165,6 +165,7 @@ config USB_ISP1301
- config USB_MSM_OTG
- 	tristate "Qualcomm on-chip USB OTG controller support"
- 	depends on (USB || USB_GADGET) && (ARCH_MSM || ARCH_QCOM)
-+	depends on RESET_CONTROLLER
- 	select USB_PHY
- 	help
- 	  Enable this to support the USB OTG transceiver on Qualcomm chips. It
+	Arnd
