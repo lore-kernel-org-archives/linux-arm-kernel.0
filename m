@@ -1,36 +1,76 @@
-From: Peter.Chen@freescale.com (Peter Chen)
-Date: Tue, 13 May 2014 00:25:18 +0000
-Subject: i.MX6 USB OTG support is broken on linux-next
-In-Reply-To: <20140512135437.GA8330@dragon>
-References: <20140509130046.GP2794@dragon>
- <20140510111003.GA1593@shlinux1.ap.freescale.net>
- <20140510131815.GT2794@dragon>
- <4285b0d55d2545b99c4ba6b703e65a12@BL2PR03MB226.namprd03.prod.outlook.com>
- <20140511014027.GV2794@dragon>
- <71b1887d2f014021b084df703b15dc6a@BL2PR03MB226.namprd03.prod.outlook.com>
- <20140512135437.GA8330@dragon>
-Message-ID: <04dad7ad8f0247b9bef4fea1db8a8bc8@BL2PR03MB226.namprd03.prod.outlook.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 13 May 2014 09:10:24 +0900
+Subject: [PATCH] ARM: shmobile: henninger: add QSPI DT support
+In-Reply-To: <537151DA.8000101@cogentembedded.com>
+References: <201405060245.32952.sergei.shtylyov@cogentembedded.com>
+ <536FBEB7.9080605@cogentembedded.com>
+ <20140511225354.GC6451@verge.net.au>
+ <537151DA.8000101@cogentembedded.com>
+Message-ID: <20140513001024.GC18157@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
-> > >
-> >
-> > In your case, you should not set CONFIG_USB_OTG no matter at defconfig
-> > and at menuconfig.
+On Tue, May 13, 2014 at 02:57:30AM +0400, Sergei Shtylyov wrote:
+> Hello.
 > 
-> Hmm, at least in my testing (USB mouse/keyboard connected to OTG port),
-> it works as before even I enable CONFIG_USB_OTG, as long as I do *not*
-> enable CONFIG_USB_OTG_FSM.
+> On 05/12/2014 02:53 AM, Simon Horman wrote:
 > 
-> Since it works for my case, I'm wondering why you think I shouldn't
-> enable CONFIG_USB_OTG at all.
+> >>>Define the Henninger board dependent part of the QSPI device node.
+> >>>Add device nodes for Spansion S25FL512S SPI flash and MTD partitions on it.
 > 
+> >>>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> 
+> >>>---
+> >>>This patch is against 'renesas-devel-v3.15-rc3-20140502' tag of Simon Horman's
+> >>>'renesas.git' repo and SDHI0/2 DT support patch posted last weekend.
+> 
+> >>>  arch/arm/boot/dts/r8a7791-henninger.dts |   38 ++++++++++++++++++++++++++++++++
+> >>>  1 file changed, 38 insertions(+)
+> 
+> >>>Index: renesas/arch/arm/boot/dts/r8a7791-henninger.dts
+> >>>===================================================================
+> >>>--- renesas.orig/arch/arm/boot/dts/r8a7791-henninger.dts
+> >>>+++ renesas/arch/arm/boot/dts/r8a7791-henninger.dts
+> >>[...]
+> >>>@@ -158,3 +163,36 @@
+> >>>  	cd-gpios = <&gpio6 22 GPIO_ACTIVE_LOW>;
+> >>>  	status = "okay";
+> >>>  };
+> >>>+
+> >>>+&qspi {
+> >>>+	pinctrl-0 = <&qspi_pins>;
+> >>>+	pinctrl-names = "default";
+> >>>+
+> >>>+	status = "okay";
+> >>>+
+> >>>+	flash at 0 {
+> >>>+		#address-cells = <1>;
+> >>>+		#size-cells = <1>;
+> >>>+		compatible = "spansion,s25fl512s";
+> >>>+		reg = <0>;
+> >>>+		spi-max-frequency = <30000000>;
+> >>>+		spi-tx-bus-width = <4>;
+> >>>+		spi-rx-bus-width = <4>;
+> >>>+		m25p,fast-read;
+> >>>+
+> >>>+		partition at 0 {
+> >>>+			label = "loader_prg";
+> >>>+			reg = <0x00000000 0x00040000>;
+> >>>+			read-only;
+> >>>+		};
+> >>>+		partition at 40000 {
+> >>>+			label = "user_prg";
+> >>>+			reg = <0x00040000 0x00400000>;
+> >>>+			read-only;
+> 
+> >>    Oops, there shouldn't be "read-only" here, I forgot to refresh
+> >>the patch as I'm now seeing... too bad it's too late to resend now.
+> >>:-(
+> 
+> >Could you send an incremental fix for me to queue up?
+> 
+>    Oops, I've rechecked and it should indeed be read-only, so the
+> patch was correct. Sorry. :-)
 
-If your device is not OTG device, there is no reason you need to enable
-CONFIG_USB_OTG. Yes, it may work for some devices when enable CONFIG_USB_OTG,
-but it will confuse other host or device which is connected with you, eg,
-your device will report your have supported some otg capabilities, eg, SRP or
-HNP.
-
-Peter
+Thanks for double checking.
+I think we can safely do nothing for now :-)
