@@ -1,76 +1,43 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 13 May 2014 09:10:24 +0900
-Subject: [PATCH] ARM: shmobile: henninger: add QSPI DT support
-In-Reply-To: <537151DA.8000101@cogentembedded.com>
-References: <201405060245.32952.sergei.shtylyov@cogentembedded.com>
- <536FBEB7.9080605@cogentembedded.com>
- <20140511225354.GC6451@verge.net.au>
- <537151DA.8000101@cogentembedded.com>
-Message-ID: <20140513001024.GC18157@verge.net.au>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 12 May 2014 19:29:47 -0500
+Subject: [PATCH 1/7] ARM: imx: fix function type for CLK_OF_DECLARE
+In-Reply-To: <1399940993-1773-1-git-send-email-robherring2@gmail.com>
+References: <1399940993-1773-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1399940993-1773-2-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 13, 2014 at 02:57:30AM +0400, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 05/12/2014 02:53 AM, Simon Horman wrote:
-> 
-> >>>Define the Henninger board dependent part of the QSPI device node.
-> >>>Add device nodes for Spansion S25FL512S SPI flash and MTD partitions on it.
-> 
-> >>>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
-> >>>---
-> >>>This patch is against 'renesas-devel-v3.15-rc3-20140502' tag of Simon Horman's
-> >>>'renesas.git' repo and SDHI0/2 DT support patch posted last weekend.
-> 
-> >>>  arch/arm/boot/dts/r8a7791-henninger.dts |   38 ++++++++++++++++++++++++++++++++
-> >>>  1 file changed, 38 insertions(+)
-> 
-> >>>Index: renesas/arch/arm/boot/dts/r8a7791-henninger.dts
-> >>>===================================================================
-> >>>--- renesas.orig/arch/arm/boot/dts/r8a7791-henninger.dts
-> >>>+++ renesas/arch/arm/boot/dts/r8a7791-henninger.dts
-> >>[...]
-> >>>@@ -158,3 +163,36 @@
-> >>>  	cd-gpios = <&gpio6 22 GPIO_ACTIVE_LOW>;
-> >>>  	status = "okay";
-> >>>  };
-> >>>+
-> >>>+&qspi {
-> >>>+	pinctrl-0 = <&qspi_pins>;
-> >>>+	pinctrl-names = "default";
-> >>>+
-> >>>+	status = "okay";
-> >>>+
-> >>>+	flash at 0 {
-> >>>+		#address-cells = <1>;
-> >>>+		#size-cells = <1>;
-> >>>+		compatible = "spansion,s25fl512s";
-> >>>+		reg = <0>;
-> >>>+		spi-max-frequency = <30000000>;
-> >>>+		spi-tx-bus-width = <4>;
-> >>>+		spi-rx-bus-width = <4>;
-> >>>+		m25p,fast-read;
-> >>>+
-> >>>+		partition at 0 {
-> >>>+			label = "loader_prg";
-> >>>+			reg = <0x00000000 0x00040000>;
-> >>>+			read-only;
-> >>>+		};
-> >>>+		partition at 40000 {
-> >>>+			label = "user_prg";
-> >>>+			reg = <0x00040000 0x00400000>;
-> >>>+			read-only;
-> 
-> >>    Oops, there shouldn't be "read-only" here, I forgot to refresh
-> >>the patch as I'm now seeing... too bad it's too late to resend now.
-> >>:-(
-> 
-> >Could you send an incremental fix for me to queue up?
-> 
->    Oops, I've rechecked and it should indeed be read-only, so the
-> patch was correct. Sorry. :-)
+From: Rob Herring <robh@kernel.org>
 
-Thanks for double checking.
-I think we can safely do nothing for now :-)
+Adding function type checking to CLK_OF_DECLARE found a type mismatch with
+mx35_clocks_init_dt. The function should return void.
+
+Signed-off-by: Rob Herring <robh@kernel.org>
+Cc: Shawn Guo <shawn.guo@freescale.com>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+---
+ arch/arm/mach-imx/clk-imx35.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-imx/clk-imx35.c b/arch/arm/mach-imx/clk-imx35.c
+index a4d5e42..71c86a2 100644
+--- a/arch/arm/mach-imx/clk-imx35.c
++++ b/arch/arm/mach-imx/clk-imx35.c
+@@ -289,14 +289,12 @@ int __init mx35_clocks_init(void)
+ 	return 0;
+ }
+ 
+-static int __init mx35_clocks_init_dt(struct device_node *ccm_node)
++static void __init mx35_clocks_init_dt(struct device_node *ccm_node)
+ {
+ 	clk_data.clks = clk;
+ 	clk_data.clk_num = ARRAY_SIZE(clk);
+ 	of_clk_add_provider(ccm_node, of_clk_src_onecell_get, &clk_data);
+ 
+ 	mx35_clocks_init();
+-
+-	return 0;
+ }
+ CLK_OF_DECLARE(imx35, "fsl,imx35-ccm", mx35_clocks_init_dt);
+-- 
+1.9.1
