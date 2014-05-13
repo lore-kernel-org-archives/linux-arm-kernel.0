@@ -1,61 +1,53 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 13 May 2014 15:42:58 +0200
-Subject: [PATCH v7] DMA: sun6i: Add driver for the Allwinner A31 DMA
- controller
-In-Reply-To: <20140430070408.GR32284@intel.com>
-References: <20140430070408.GR32284@intel.com>
-Message-ID: <20140513134258.GA29258@lukather>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Tue, 13 May 2014 15:50:34 +0200
+Subject: [PATCH] ARM: sunxi: dt: declare the r_pio pin controller for A31 SoC
+Message-ID: <1399989034-11010-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+The A31 SoC has a different pin controller for PL and PM banks.
+Define this new controller in the device tree.
 
-On Wed, Apr 30, 2014 at 12:34:08PM +0530, Vinod Koul wrote:
-> > +
-> > +static int sun6i_dma_terminate_all(struct sun6i_vchan *vchan)
-> > +{
-> > +	struct sun6i_dma_dev *sdev = to_sun6i_dma_dev(vchan->vc.chan.device);
-> > +	struct sun6i_pchan *pchan = vchan->phy;
-> > +	unsigned long flags;
-> > +	LIST_HEAD(head);
-> > +
-> > +	spin_lock(&sdev->lock);
-> > +	list_del_init(&vchan->node);
-> > +	spin_unlock(&sdev->lock);
-> > +
-> > +	spin_lock_irqsave(&vchan->vc.lock, flags);
-> > +
-> > +	vchan_get_all_descriptors(&vchan->vc, &head);
-> > +
-> > +	if (pchan) {
-> > +		writel(DMA_CHAN_ENABLE_STOP, pchan->base + DMA_CHAN_ENABLE);
-> > +		writel(DMA_CHAN_PAUSE_RESUME, pchan->base + DMA_CHAN_PAUSE);
-> > +
-> > +		vchan->phy = NULL;
-> > +		pchan->vchan = NULL;
-> > +		pchan->desc = NULL;
-> > +		pchan->done = NULL;
-> > +	}
-> > +
-> > +	spin_unlock_irqrestore(&vchan->vc.lock, flags);
-> > +
-> > +	vchan_dma_desc_free_list(&vchan->vc, &head);
-> 
-> shouldn't you kill the tasklet as well here?
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+---
+Hello,
 
-Just to be clear, which tasklet? vchan's or the driver's?
+This patch depends on the PRCM series ([1]) which provides apb0 related
+stuff (apb0 clks and apb0 gates).
 
-Thanks,
-Maxime
+Best Regards,
 
+Boris
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/254664.html
+
+ arch/arm/boot/dts/sun6i-a31.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index 81119a3..c46e3d7 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -297,6 +297,20 @@
+ 			};
+ 		};
+ 
++		r_pio: pinctrl at 01f02c00 {
++			compatible = "allwinner,sun6i-a31-r-pinctrl";
++			reg = <0x01f02c00 0x400>;
++			interrupts = <0 45 4>,
++				     <0 46 4>;
++			clocks = <&apb0_gates 0>;
++			resets = <&apb0_rst 0>;
++			gpio-controller;
++			interrupt-controller;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			#gpio-cells = <3>;
++		};
++
+ 		ahb1_rst: reset at 01c202c0 {
+ 			#reset-cells = <1>;
+ 			compatible = "allwinner,sun6i-a31-ahb1-reset";
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140513/95b4b1dc/attachment.sig>
+1.8.3.2
