@@ -1,42 +1,78 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Tue, 13 May 2014 17:44:41 +0800
-Subject: [PATCH v2 6/6] document: add dt binding on hix5hd2 SoC
-In-Reply-To: <1399974281-9737-1-git-send-email-haojian.zhuang@linaro.org>
-References: <1399974281-9737-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1399974281-9737-7-git-send-email-haojian.zhuang@linaro.org>
+Date: Tue, 13 May 2014 17:46:51 +0800
+Subject: [PATCH v6 06/15] ARM: hisi: enable MCPM implementation
+In-Reply-To: <20140513082527.GA3696@e103592.cambridge.arm.com>
+References: <1399795571-17231-1-git-send-email-haojian.zhuang@linaro.org>
+ <1399795571-17231-7-git-send-email-haojian.zhuang@linaro.org>
+ <20140513082527.GA3696@e103592.cambridge.arm.com>
+Message-ID: <CAD6h2NQDi2R_HkQ64d3YhU5zmZiNS5wUSnp=g8v9NvTn4day0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the DT binding of basic SoC on Hisilicon HiX5HD2 SoC.
+On 13 May 2014 16:28, Dave Martin <Dave.Martin@arm.com> wrote:
+> On Sun, May 11, 2014 at 04:06:02PM +0800, Haojian Zhuang wrote:
+>> Multiple CPU clusters are used in Hisilicon HiP04 SoC. Now use MCPM
+>> framework to manage power on HiP04 SoC.
+>>
+>> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+>> ---
+>>  arch/arm/mach-hisi/Makefile   |   1 +
+>>  arch/arm/mach-hisi/platmcpm.c | 309 ++++++++++++++++++++++++++++++++++++++++++
+>>  2 files changed, 310 insertions(+)
+>>  create mode 100644 arch/arm/mach-hisi/platmcpm.c
+>>
+>> diff --git a/arch/arm/mach-hisi/Makefile b/arch/arm/mach-hisi/Makefile
+>> index 2ae1b59..e7a8640 100644
+>> --- a/arch/arm/mach-hisi/Makefile
+>> +++ b/arch/arm/mach-hisi/Makefile
+>> @@ -3,4 +3,5 @@
+>>  #
+>>
+>>  obj-y        += hisilicon.o
+>> +obj-$(CONFIG_MCPM)           += platmcpm.o
+>>  obj-$(CONFIG_SMP)            += platsmp.o hotplug.o
+>> diff --git a/arch/arm/mach-hisi/platmcpm.c b/arch/arm/mach-hisi/platmcpm.c
+>> new file mode 100644
+>> index 0000000..6208bc6
+>> --- /dev/null
+>> +++ b/arch/arm/mach-hisi/platmcpm.c
+>> @@ -0,0 +1,309 @@
+>
+> [...]
+>
+>> +static int hip04_mcpm_power_up(unsigned int cpu, unsigned int cluster)
+>> +{
+>> +     unsigned long data, mask;
+>> +
+>> +     if (!relocation || !sysctrl)
+>> +             return -ENODEV;
+>> +     if (cluster >= HIP04_MAX_CLUSTERS || cpu >= HIP04_MAX_CPUS_PER_CLUSTER)
+>> +             return -EINVAL;
+>> +
+>> +     spin_lock_irq(&boot_lock);
+>> +     writel_relaxed(hip04_boot.bootwrapper_phys, relocation);
+>> +     writel_relaxed(hip04_boot.bootwrapper_magic, relocation + 4);
+>> +     writel_relaxed(virt_to_phys(mcpm_entry_point), relocation + 8);
+>> +     writel_relaxed(0, relocation + 12);
+>> +
+>> +     if (hip04_cluster_down(cluster)) {
+>> +             data = CLUSTER_DEBUG_RESET_BIT;
+>> +             writel_relaxed(data, sysctrl + SC_CPU_RESET_DREQ(cluster));
+>> +             do {
+>> +                     mask = CLUSTER_DEBUG_RESET_STATUS;
+>> +                     data = readl_relaxed(sysctrl + \
+>> +                                          SC_CPU_RESET_STATUS(cluster));
+>> +             } while (data & mask);
+>> +             hip04_set_snoop_filter(cluster, 1);
+>
+> Did you find the answer regarding whether it's safe to enable snoops to
+> a powered-down CPU?
+>
+> Does HiP04 use CCI, or some different interconnect?  As Nico pointed out,
+> the above code would definitely not be safe for CCI.
+>
+First, it's safe.
+In the second, HiP04 doesn't use CCI. They designed their own fabric instead.
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
----
- Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt | 9 +++++++++
- 1 file changed, 9 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-index 5024992..4b06c1e 100644
---- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-+++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-@@ -7,6 +7,9 @@ Required root node properties:
- HiP04 D01 Board
- Required root node properties:
- 	- compatible = "hisilicon,hip04-d01";
-+HiX5HD2 DKB Board
-+Required root node properties:
-+	- compatible = "hisilicon,hix5hd2";
- 
- 
- Hisilicon system controller
-@@ -65,3 +68,9 @@ Fabric:
- Required Properties:
- - compatible: "hisilicon,hip04-fabric";
- - reg: Address and size of Fabric
-+
-+Cpu power controller:
-+
-+Required Properties:
-+- compatible: "hisilicon,cpuctrl";
-+- reg: Address and size of cpu power controller.
--- 
-1.9.1
+Regards
+Haojian
