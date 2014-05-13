@@ -1,37 +1,37 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 13 May 2014 13:28:28 -0300
-Subject: [PATCH v2 3/3] ARM: i.MX1 clk: Add devicetree support
-In-Reply-To: <1399998253.839894262@f391.i.mail.ru>
-References: <1399997116-4313-1-git-send-email-shc_work@mail.ru>
- <CAOMZO5Br9wpZu06oP3-Ax5XG=u+A6Ydq9peKet64Kw_moGgRaw@mail.gmail.com>
- <1399998253.839894262@f391.i.mail.ru>
-Message-ID: <CAOMZO5CNk4uAu0OujRgiJpU2gHJpAnD4zpqxSHd4hXo3fnJ4_w@mail.gmail.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Tue, 13 May 2014 18:28:22 +0200
+Subject: [PATCH] serial: st-asc: Fix data corruption during long console
+ bursts
+In-Reply-To: <1399997337-27950-1-git-send-email-daniel.thompson@linaro.org>
+References: <1399997337-27950-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <53724826.9000907@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 13, 2014 at 1:24 PM, Alexander Shiyan <shc_work@mail.ru> wrote:
-> Tue, 13 May 2014 13:18:40 -0300 ?? Fabio Estevam <festevam@gmail.com>:
->> On Tue, May 13, 2014 at 1:05 PM, Alexander Shiyan <shc_work@mail.ru> wrote:
->>
->> > +       clk[IMX1_CLK_DUMMY] =
->> > +               imx_clk_fixed("dummy", 0);
->> > +       clk[IMX1_CLK_CLK32] =
->> > +               imx_obtain_fixed_clock("clk32", fref);
->> > +       clk[IMX1_CLK_CLK16M_EXT] =
->> > +               imx_clk_fixed("clk16m_ext", 16000000);
->> > +       clk[IMX1_CLK_CLK16M] =
->> > +               imx_clk_gate("clk16m", "clk16m_ext", CCM_CSCR, 17);
->>
->> Why don't you put each entry into a single line instead?
->>
->> Even if it gets larger than 80 columns, it would be easier to read.
+Hi Daniel,
+
+On 05/13/2014 06:08 PM, Daniel Thompson wrote:
+> On my test platform (B2020/STiH416) the serial port issues bad characters
+> during the initial message avalanche as the console comes up. The problem
+> also occurs when dense(ish) I/O is done using the polled I/O interface.
 >
-> I thought about it, but came to the conclusion that it is better to observe
-> the kernel rules.
+> The problem is fixed for me by using the FIFO half-empty bit rather than
+> FIFO full bit. Note that using the half-empty bit causes the FIFO to be
+> managed in a similar way to interrupt based I/O (i.e. where the hardware
+> gets best test coverage).
+>
+> Running the FIFO half full will have no impact (good or bad) on console
+> performance. The UART will still remain fully saturated and the busy-wait
+> until the FIFO is empty in asc_console_write() will complete at the same
+> time.
+>
+> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+> ---
+>   drivers/tty/serial/st-asc.c | 8 ++++----
+>   1 file changed, 4 insertions(+), 4 deletions(-)
+>
 
-Do you mean checkpatch complaint?
+Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 
-Then try to make checkpatch happy with other clock file such as
-arch/arm/mach-imx/clk-imx6q.
-
-The result will be unreadable :-)
+Thanks!
+Maxime
