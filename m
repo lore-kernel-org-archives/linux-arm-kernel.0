@@ -1,53 +1,87 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 13 May 2014 22:12:13 +0800
-Subject: [PATCH 0/6] ARM: imx: add initial i.MX6 SoloX support
-Message-ID: <1399990339-12677-1-git-send-email-shawn.guo@freescale.com>
+Date: Tue, 13 May 2014 22:12:14 +0800
+Subject: [PATCH 1/6] ARM: imx: add low-level debug support for imx6sx
+In-Reply-To: <1399990339-12677-1-git-send-email-shawn.guo@freescale.com>
+References: <1399990339-12677-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1399990339-12677-2-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The series adds the initial support for i.MX6 SoloX, which is the newest
-addition to i.MX6 family SoCs.  It integrates one Cortex-A9 and one
-Cortex-M4, and features dual-port gigabit Ethernet audio video
-bridging (AVB) for quality-of-service in automotive and other
-applications with enhanced traffic shaping and packet prioritization.
-More details can be found in page below.
+Enable low-level debug support for i.MX6 SoloX by adding the debug
+port definitions for the SoC.
 
-http://media.freescale.com/phoenix.zhtml?c=196520&p=irol-newsArticle&ID=1917475&highlight
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+---
+ arch/arm/Kconfig.debug            | 13 +++++++++++--
+ arch/arm/include/debug/imx-uart.h | 11 +++++++++++
+ 2 files changed, 22 insertions(+), 2 deletions(-)
 
-Shawn
-
-Anson Huang (1):
-  ARM: imx: add clock driver for imx6sx
-
-Shawn Guo (5):
-  ARM: imx: add low-level debug support for imx6sx
-  ARM: imx: add basic imx6sx SoC support
-  ARM: dts: imx: add pin function header for imx6sx
-  ARM: dts: imx: add initial imx6sx device tree source
-  ARM: dts: imx: add initial imx6sx-sdb board support
-
- .../devicetree/bindings/clock/imx6sx-clock.txt     |   13 +
- arch/arm/Kconfig.debug                             |   13 +-
- arch/arm/boot/dts/Makefile                         |    1 +
- arch/arm/boot/dts/imx6sx-pinfunc.h                 | 1544 ++++++++++++++++++++
- arch/arm/boot/dts/imx6sx-sdb.dts                   |  210 +++
- arch/arm/boot/dts/imx6sx.dtsi                      | 1202 +++++++++++++++
- arch/arm/include/debug/imx-uart.h                  |   11 +
- arch/arm/mach-imx/Kconfig                          |    8 +
- arch/arm/mach-imx/Makefile                         |    1 +
- arch/arm/mach-imx/clk-imx6sx.c                     |  524 +++++++
- arch/arm/mach-imx/cpu.c                            |    3 +
- arch/arm/mach-imx/mach-imx6sx.c                    |   51 +
- arch/arm/mach-imx/mxc.h                            |    6 +
- include/dt-bindings/clock/imx6sx-clock.h           |  256 ++++
- 14 files changed, 3841 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/imx6sx-clock.txt
- create mode 100755 arch/arm/boot/dts/imx6sx-pinfunc.h
- create mode 100644 arch/arm/boot/dts/imx6sx-sdb.dts
- create mode 100644 arch/arm/boot/dts/imx6sx.dtsi
- create mode 100644 arch/arm/mach-imx/clk-imx6sx.c
- create mode 100644 arch/arm/mach-imx/mach-imx6sx.c
- create mode 100644 include/dt-bindings/clock/imx6sx-clock.h
-
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 00c6950..4dd565f 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -317,6 +317,13 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on i.MX6SL.
+ 
++	config DEBUG_IMX6SX_UART
++		bool "i.MX6SX Debug UART"
++		depends on SOC_IMX6SX
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on i.MX6SX.
++
+ 	config DEBUG_KEYSTONE_UART0
+ 		bool "Kernel low-level debugging on KEYSTONE2 using UART0"
+ 		depends on ARCH_KEYSTONE
+@@ -935,7 +942,8 @@ config DEBUG_IMX_UART_PORT
+ 						DEBUG_IMX51_UART || \
+ 						DEBUG_IMX53_UART || \
+ 						DEBUG_IMX6Q_UART || \
+-						DEBUG_IMX6SL_UART
++						DEBUG_IMX6SL_UART || \
++						DEBUG_IMX6SX_UART
+ 	default 1
+ 	depends on ARCH_MXC
+ 	help
+@@ -979,7 +987,8 @@ config DEBUG_LL_INCLUDE
+ 				 DEBUG_IMX51_UART || \
+ 				 DEBUG_IMX53_UART ||\
+ 				 DEBUG_IMX6Q_UART || \
+-				 DEBUG_IMX6SL_UART
++				 DEBUG_IMX6SL_UART || \
++				 DEBUG_IMX6SX_UART
+ 	default "debug/msm.S" if DEBUG_MSM_UART
+ 	default "debug/omap2plus.S" if DEBUG_OMAP2PLUS_UART
+ 	default "debug/sirf.S" if DEBUG_SIRFPRIMA2_UART1 || DEBUG_SIRFMARCO_UART1
+diff --git a/arch/arm/include/debug/imx-uart.h b/arch/arm/include/debug/imx-uart.h
+index 42b823c..032a316 100644
+--- a/arch/arm/include/debug/imx-uart.h
++++ b/arch/arm/include/debug/imx-uart.h
+@@ -81,6 +81,15 @@
+ #define IMX6SL_UART_BASE_ADDR(n) IMX6SL_UART##n##_BASE_ADDR
+ #define IMX6SL_UART_BASE(n)	IMX6SL_UART_BASE_ADDR(n)
+ 
++#define IMX6SX_UART1_BASE_ADDR	0x02020000
++#define IMX6SX_UART2_BASE_ADDR	0x021e8000
++#define IMX6SX_UART3_BASE_ADDR	0x021ec000
++#define IMX6SX_UART4_BASE_ADDR	0x021f0000
++#define IMX6SX_UART5_BASE_ADDR	0x021f4000
++#define IMX6SX_UART6_BASE_ADDR	0x022a0000
++#define IMX6SX_UART_BASE_ADDR(n) IMX6SX_UART##n##_BASE_ADDR
++#define IMX6SX_UART_BASE(n)	IMX6SX_UART_BASE_ADDR(n)
++
+ #define IMX_DEBUG_UART_BASE(soc) soc##_UART_BASE(CONFIG_DEBUG_IMX_UART_PORT)
+ 
+ #ifdef CONFIG_DEBUG_IMX1_UART
+@@ -103,6 +112,8 @@
+ #define UART_PADDR	IMX_DEBUG_UART_BASE(IMX6Q)
+ #elif defined(CONFIG_DEBUG_IMX6SL_UART)
+ #define UART_PADDR	IMX_DEBUG_UART_BASE(IMX6SL)
++#elif defined(CONFIG_DEBUG_IMX6SX_UART)
++#define UART_PADDR	IMX_DEBUG_UART_BASE(IMX6SX)
+ #endif
+ 
+ #endif /* __DEBUG_IMX_UART_H */
 -- 
 1.8.3.2
