@@ -1,249 +1,78 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 13 May 2014 22:12:19 +0800
-Subject: [PATCH 6/6] ARM: dts: imx: add initial imx6sx-sdb board support
-In-Reply-To: <1399990339-12677-1-git-send-email-shawn.guo@freescale.com>
-References: <1399990339-12677-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1399990339-12677-7-git-send-email-shawn.guo@freescale.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 13 May 2014 10:19:24 -0400
+Subject: omap4-panda-es boot issues with v3.15-rc4
+In-Reply-To: <5371D35A.2040506@ti.com>
+References: <536B7E44.2040303@ti.com> <7hppjos2w2.fsf@paris.lan>
+ <CAGa+x84VB3CXDm71JWxHx1-Qk1xVNeXdwUjZnb42_wg+piOzzA@mail.gmail.com>
+ <20140508165558.GB2198@atomide.com> <20140508184055.GC2198@atomide.com>
+ <7hha4zsyro.fsf@paris.lan> <536C9084.50209@ti.com> <7heh02ms82.fsf@paris.lan>
+ <20140511155542.GD28266@atomide.com> <53713FCF.3000006@ti.com>
+ <20140512220741.GG5668@atomide.com> <5371D35A.2040506@ti.com>
+Message-ID: <537229EC.1050404@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial imx6sx-sdb board support with limited devices enabled.
+On Tuesday 13 May 2014 04:10 AM, Roger Quadros wrote:
+> On 05/13/2014 01:07 AM, Tony Lindgren wrote:
+>> * Santosh Shilimkar <santosh.shilimkar@ti.com> [140512 14:41]:
+>>> On Sunday 11 May 2014 11:55 AM, Tony Lindgren wrote:
+>>>> * Kevin Hilman <khilman@linaro.org> [140509 16:46]:
+>>>>> Roger Quadros <rogerq@ti.com> writes:
+>>>>>
+>>>>>> Kevin,
+>>>>>>
+>>>>>> On 05/09/2014 01:15 AM, Kevin Hilman wrote:
+>>>>>>> Tony Lindgren <tony@atomide.com> writes:
+>>>>>>>
+>>>>>>> [...]
+>>>>>>>
+>>>>>>>> ..but I think I found the cause for recent hangs on panda, just a wild
+>>>>>>>> guess based on looking at the recent cpuidle patches after v3.14.
+>>>>>>>>
+>>>>>>>> Looks like reverting 0b89e9aa2856 (cpuidle: delay enabling interrupts
+>>>>>>>> until all coupled CPUs leave idle) makes booting work reliably again
+>>>>>>>> on panda.
+>>>>>>>>
+>>>>>>>> Can you guys confirm, so far no issues here after few boot tests,
+>>>>>>>> but it might be too early to tell.
+>>>>>>>
+>>>>>>> Reverting that makes things a bit more stable, but it still eventually
+>>>>>>> fails in the same way.  For me it took 8 boots for it to eventually
+>>>>>>> fail.
+>>>>>>>
+>>>>>>> However, if I build with CONFIG_CPU_IDLE=n, it becomes much more stable
+>>>>>>> (20+ boots in a row and still going.)
+>>>>>>>
+>>>>>>
+>>>>>> Can you please test with CPU_IDLE enabled but C3 disabled as in below patch?
+>>>>>> It worked for me 10/10 boots.
+>>>>>
+>>>>> Yup, it worked for me too for 10/10 boots in a row.
+>>>>
+>>>> But what has caused this regression, does it work reliably with let's
+>>>> say v3.13 or v3.12?
+>>>>
+>>> IIRC things were stable till some CPUIDLE code consolidation happened.
+>>> I don't recall exactly but some one did discuss about it a while back.
+>>
+>> OK that's good to hear.
+>>  
+>>> Can you re-run your test-cases with patch at end of the email. This
+>>> is just a hunch so don't blame me if I waste your time testing the
+>>> patch.
+>>
+>> Seems to work after adding "#include <linux/clockchips.h>". I did about 10
+>> reboots and they all succeeded for me. Without your revert, I'm getting
+>> a hang (with sysrq not working) about 1/3 of the boots.
+>>
+>> Kevin, Roger, does the revert from Santosh work for you too?
+>>
+> 
+> next-20140508 worked for me 10/10 times with Santosh's patch.
+> The heartbeat LED behaves normally as well. So I like it :).
+> 
+Great. Will post the patch with change log updated and cc
+you guys.
 
-Signed-off-by: Anson Huang <b20788@freescale.com>
-Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
----
- arch/arm/boot/dts/Makefile       |   1 +
- arch/arm/boot/dts/imx6sx-sdb.dts | 210 +++++++++++++++++++++++++++++++++++++++
- 2 files changed, 211 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6sx-sdb.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 917ff44..b7cc0dd 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -206,6 +206,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
- 	imx6q-udoo.dtb \
- 	imx6q-wandboard.dtb \
- 	imx6sl-evk.dtb \
-+	imx6sx-sdb.dtb \
- 	vf610-colibri.dtb \
- 	vf610-cosmic.dtb \
- 	vf610-twr.dtb
-diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dts
-new file mode 100644
-index 0000000..9906f65
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6sx-sdb.dts
-@@ -0,0 +1,210 @@
-+/*
-+ * Copyright (C) 2014 Freescale Semiconductor, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/dts-v1/;
-+
-+#include "imx6sx.dtsi"
-+
-+/ {
-+	model = "Freescale i.MX6 SoloX SDB Board";
-+	compatible = "fsl,imx6sx-sdb", "fsl,imx6sx";
-+
-+	chosen {
-+		stdout-path = &uart1;
-+	};
-+
-+	memory {
-+		reg = <0x80000000 0x40000000>;
-+	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		vcc_sd3: regulator at 0 {
-+			compatible = "regulator-fixed";
-+			reg = <0>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_vcc_sd3>;
-+			regulator-name = "VCC_SD3";
-+			regulator-min-microvolt = <3000000>;
-+			regulator-max-microvolt = <3000000>;
-+			gpio = <&gpio2 11 GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
-+		};
-+	};
-+};
-+
-+&fec1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_enet1>;
-+	phy-mode = "rgmii";
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1>;
-+	status = "okay";
-+};
-+
-+&uart5 { /* for bluetooth */
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart5>;
-+	fsl,uart-has-rtscts;
-+	status = "okay";
-+};
-+
-+&usdhc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc2>;
-+	non-removable;
-+	no-1-8-v;
-+	keep-power-in-suspend;
-+	enable-sdio-wakeup;
-+	status = "okay";
-+};
-+
-+&usdhc3 {
-+	pinctrl-names = "default", "state_100mhz", "state_200mhz";
-+	pinctrl-0 = <&pinctrl_usdhc3>;
-+	pinctrl-1 = <&pinctrl_usdhc3_100mhz>;
-+	pinctrl-2 = <&pinctrl_usdhc3_200mhz>;
-+	bus-width = <8>;
-+	cd-gpios = <&gpio2 10 GPIO_ACTIVE_HIGH>;
-+	wp-gpios = <&gpio2 15 GPIO_ACTIVE_HIGH>;
-+	keep-power-in-suspend;
-+	enable-sdio-wakeup;
-+	vmmc-supply = <&vcc_sd3>;
-+	status = "okay";
-+};
-+
-+&usdhc4 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc4>;
-+	cd-gpios = <&gpio6 21 GPIO_ACTIVE_HIGH>;
-+	wp-gpios = <&gpio6 20 GPIO_ACTIVE_HIGH>;
-+	status = "okay";
-+};
-+
-+&iomuxc {
-+	imx6x-sdb {
-+		pinctrl_enet1: enet1grp {
-+			fsl,pins = <
-+				MX6SX_PAD_ENET1_MDIO__ENET1_MDIO	0xa0b1
-+				MX6SX_PAD_ENET1_MDC__ENET1_MDC		0xa0b1
-+				MX6SX_PAD_RGMII1_TXC__ENET1_RGMII_TXC	0xa0b1
-+				MX6SX_PAD_RGMII1_TD0__ENET1_TX_DATA_0	0xa0b1
-+				MX6SX_PAD_RGMII1_TD1__ENET1_TX_DATA_1	0xa0b1
-+				MX6SX_PAD_RGMII1_TD2__ENET1_TX_DATA_2	0xa0b1
-+				MX6SX_PAD_RGMII1_TD3__ENET1_TX_DATA_3	0xa0b1
-+				MX6SX_PAD_RGMII1_TX_CTL__ENET1_TX_EN	0xa0b1
-+				MX6SX_PAD_RGMII1_RXC__ENET1_RX_CLK	0x3081
-+				MX6SX_PAD_RGMII1_RD0__ENET1_RX_DATA_0	0x3081
-+				MX6SX_PAD_RGMII1_RD1__ENET1_RX_DATA_1	0x3081
-+				MX6SX_PAD_RGMII1_RD2__ENET1_RX_DATA_2	0x3081
-+				MX6SX_PAD_RGMII1_RD3__ENET1_RX_DATA_3	0x3081
-+				MX6SX_PAD_RGMII1_RX_CTL__ENET1_RX_EN	0x3081
-+			>;
-+		};
-+
-+		pinctrl_vcc_sd3: vccsd3grp {
-+			fsl,pins = <
-+				MX6SX_PAD_KEY_COL1__GPIO2_IO_11		0x17059
-+			>;
-+		};
-+
-+		pinctrl_uart1: uart1grp {
-+			fsl,pins = <
-+				MX6SX_PAD_GPIO1_IO04__UART1_TX		0x1b0b1
-+				MX6SX_PAD_GPIO1_IO05__UART1_RX		0x1b0b1
-+			>;
-+		};
-+
-+		pinctrl_uart5: uart5grp {
-+			fsl,pins = <
-+				MX6SX_PAD_KEY_ROW3__UART5_RX		0x1b0b1
-+				MX6SX_PAD_KEY_COL3__UART5_TX		0x1b0b1
-+				MX6SX_PAD_KEY_ROW2__UART5_CTS_B		0x1b0b1
-+				MX6SX_PAD_KEY_COL2__UART5_RTS_B		0x1b0b1
-+			>;
-+		};
-+
-+		pinctrl_usdhc2: usdhc2grp {
-+			fsl,pins = <
-+				MX6SX_PAD_SD2_CMD__USDHC2_CMD		0x17059
-+				MX6SX_PAD_SD2_CLK__USDHC2_CLK		0x10059
-+				MX6SX_PAD_SD2_DATA0__USDHC2_DATA0	0x17059
-+				MX6SX_PAD_SD2_DATA1__USDHC2_DATA1	0x17059
-+				MX6SX_PAD_SD2_DATA2__USDHC2_DATA2	0x17059
-+				MX6SX_PAD_SD2_DATA3__USDHC2_DATA3	0x17059
-+			>;
-+		};
-+
-+		pinctrl_usdhc3: usdhc3grp {
-+			fsl,pins = <
-+				MX6SX_PAD_SD3_CMD__USDHC3_CMD		0x17059
-+				MX6SX_PAD_SD3_CLK__USDHC3_CLK		0x10059
-+				MX6SX_PAD_SD3_DATA0__USDHC3_DATA0	0x17059
-+				MX6SX_PAD_SD3_DATA1__USDHC3_DATA1	0x17059
-+				MX6SX_PAD_SD3_DATA2__USDHC3_DATA2	0x17059
-+				MX6SX_PAD_SD3_DATA3__USDHC3_DATA3	0x17059
-+				MX6SX_PAD_SD3_DATA4__USDHC3_DATA4	0x17059
-+				MX6SX_PAD_SD3_DATA5__USDHC3_DATA5	0x17059
-+				MX6SX_PAD_SD3_DATA6__USDHC3_DATA6	0x17059
-+				MX6SX_PAD_SD3_DATA7__USDHC3_DATA7	0x17059
-+				MX6SX_PAD_KEY_COL0__GPIO2_IO_10		0x17059 /* CD */
-+				MX6SX_PAD_KEY_ROW0__GPIO2_IO_15		0x17059 /* WP */
-+			>;
-+		};
-+
-+		pinctrl_usdhc3_100mhz: usdhc3grp-100mhz {
-+			fsl,pins = <
-+				MX6SX_PAD_SD3_CMD__USDHC3_CMD		0x170b9
-+				MX6SX_PAD_SD3_CLK__USDHC3_CLK		0x100b9
-+				MX6SX_PAD_SD3_DATA0__USDHC3_DATA0	0x170b9
-+				MX6SX_PAD_SD3_DATA1__USDHC3_DATA1	0x170b9
-+				MX6SX_PAD_SD3_DATA2__USDHC3_DATA2	0x170b9
-+				MX6SX_PAD_SD3_DATA3__USDHC3_DATA3	0x170b9
-+				MX6SX_PAD_SD3_DATA4__USDHC3_DATA4	0x170b9
-+				MX6SX_PAD_SD3_DATA5__USDHC3_DATA5	0x170b9
-+				MX6SX_PAD_SD3_DATA6__USDHC3_DATA6	0x170b9
-+				MX6SX_PAD_SD3_DATA7__USDHC3_DATA7	0x170b9
-+			>;
-+		};
-+
-+		pinctrl_usdhc3_200mhz: usdhc3grp-200mhz {
-+			fsl,pins = <
-+				MX6SX_PAD_SD3_CMD__USDHC3_CMD		0x170f9
-+				MX6SX_PAD_SD3_CLK__USDHC3_CLK		0x100f9
-+				MX6SX_PAD_SD3_DATA0__USDHC3_DATA0	0x170f9
-+				MX6SX_PAD_SD3_DATA1__USDHC3_DATA1	0x170f9
-+				MX6SX_PAD_SD3_DATA2__USDHC3_DATA2	0x170f9
-+				MX6SX_PAD_SD3_DATA3__USDHC3_DATA3	0x170f9
-+				MX6SX_PAD_SD3_DATA4__USDHC3_DATA4	0x170f9
-+				MX6SX_PAD_SD3_DATA5__USDHC3_DATA5	0x170f9
-+				MX6SX_PAD_SD3_DATA6__USDHC3_DATA6	0x170f9
-+				MX6SX_PAD_SD3_DATA7__USDHC3_DATA7	0x170f9
-+			>;
-+		};
-+
-+		pinctrl_usdhc4: usdhc4grp {
-+			fsl,pins = <
-+				MX6SX_PAD_SD4_CMD__USDHC4_CMD		0x17059
-+				MX6SX_PAD_SD4_CLK__USDHC4_CLK		0x10059
-+				MX6SX_PAD_SD4_DATA0__USDHC4_DATA0	0x17059
-+				MX6SX_PAD_SD4_DATA1__USDHC4_DATA1	0x17059
-+				MX6SX_PAD_SD4_DATA2__USDHC4_DATA2	0x17059
-+				MX6SX_PAD_SD4_DATA3__USDHC4_DATA3	0x17059
-+				MX6SX_PAD_SD4_DATA7__GPIO6_IO_21	0x17059 /* CD */
-+				MX6SX_PAD_SD4_DATA6__GPIO6_IO_20	0x17059 /* WP */
-+			>;
-+		};
-+	};
-+};
--- 
-1.8.3.2
+Regards,
+Santosh
