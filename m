@@ -1,126 +1,66 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 13 May 2014 17:44:19 +0200
-Subject: [PATCH RESEND v4 5/8] usb: ehci-platform: add optional reset
- controller retrieval
-In-Reply-To: <1399995862-17788-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1399995862-17788-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1399995862-17788-6-git-send-email-maxime.ripard@free-electrons.com>
+Date: Tue, 13 May 2014 17:44:14 +0200
+Subject: [PATCH RESEND v4 0/8] Add Allwinner A31 USB support
+Message-ID: <1399995862-17788-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Boris BREZILLON <boris.brezillon@free-electrons.com>
+Hi everyone,
 
-On the Allwinner's A31 SoC the reset line connected to the EHCI IP has to
-be deasserted for the EHCI block to be usable.
+This patchset adds support for the USB controllers found in the
+Allwinner A31.
 
-Add support for an optional reset controller that will be deasserted on
-power off and asserted on power on.
+While the design is similar to the earlier Allwinner SoCs that are
+already supported, a few details here and there change, like the fact
+that the PHYs now have one clock per phy, while it used to be only one
+for all the PHYs.
 
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Reviewed-by: Hans de Goede <hdegoede@redhat.com>
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
----
+Resent adding Alan Stern's Acked-by and puting Greg KH in the
+recipients this time...
+
+Thanks,
+Maxime
+
+Changes from v3:
+  - Asserted back the ECHI/OHCI in reset if probe fails
+  - Drop of the redundant NULL assignent for the PMU in the PHY rework
+
+Changes from v2:
+  - Fixed indentation and used the reset framework in all case and not
+    just in DT case
+  - Added a default value to the dedicated_clocks variable. Setting it
+    actually started triggering a gcc warning for no reason. Ended up
+    reworking a bit the code to avoid it.
+
+Changes from v1:
+  - Moved the reset assertion/deassertion to probe/remove
+  - Moved the dedicated_clocks to the probe function instead of the
+    private structure since it was the only user
+
+
+Boris BREZILLON (2):
+  usb: ehci-platform: add optional reset controller retrieval
+  ARM: sunxi: dt: add APP4-EVB1 board support
+
+Maxime Ripard (6):
+  clk: sunxi: Implement A31 USB clock
+  ARM: sun6i: Add the USB clocks to the DTSI
+  phy: sunxi: Rework phy initialization
+  phy: usb: sunxi: Introduce Allwinner A31 USB PHY support
+  usb: ohci-platform: Enable optional use of reset controller
+  ARM: sun6i: dt: Add support for the USB controllers
+
  Documentation/devicetree/bindings/usb/usb-ehci.txt |  1 +
- drivers/usb/host/ehci-platform.c                   | 26 +++++++++++++++++++---
- 2 files changed, 24 insertions(+), 3 deletions(-)
+ Documentation/devicetree/bindings/usb/usb-ohci.txt |  1 +
+ arch/arm/boot/dts/Makefile                         |  1 +
+ arch/arm/boot/dts/sun6i-a31-app4-evb1.dts          | 57 ++++++++++++++
+ arch/arm/boot/dts/sun6i-a31.dtsi                   | 88 ++++++++++++++++++++++
+ drivers/clk/sunxi/clk-sunxi.c                      |  6 ++
+ drivers/phy/phy-sun4i-usb.c                        | 75 +++++++++---------
+ drivers/usb/host/ehci-platform.c                   | 26 ++++++-
+ drivers/usb/host/ohci-platform.c                   | 27 ++++++-
+ 9 files changed, 241 insertions(+), 41 deletions(-)
+ create mode 100644 arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
 
-diff --git a/Documentation/devicetree/bindings/usb/usb-ehci.txt b/Documentation/devicetree/bindings/usb/usb-ehci.txt
-index ff151ec084c4..43c1a4e06767 100644
---- a/Documentation/devicetree/bindings/usb/usb-ehci.txt
-+++ b/Documentation/devicetree/bindings/usb/usb-ehci.txt
-@@ -15,6 +15,7 @@ Optional properties:
-  - clocks : a list of phandle + clock specifier pairs
-  - phys : phandle + phy specifier pair
-  - phy-names : "usb"
-+ - resets : phandle + reset specifier pair
- 
- Example (Sequoia 440EPx):
-     ehci at e0000300 {
-diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
-index c7dd93aad20c..2f5b9ce3e042 100644
---- a/drivers/usb/host/ehci-platform.c
-+++ b/drivers/usb/host/ehci-platform.c
-@@ -29,6 +29,7 @@
- #include <linux/of.h>
- #include <linux/phy/phy.h>
- #include <linux/platform_device.h>
-+#include <linux/reset.h>
- #include <linux/usb.h>
- #include <linux/usb/hcd.h>
- #include <linux/usb/ehci_pdriver.h>
-@@ -41,6 +42,7 @@
- 
- struct ehci_platform_priv {
- 	struct clk *clks[EHCI_MAX_CLKS];
-+	struct reset_control *rst;
- 	struct phy *phy;
- };
- 
-@@ -208,6 +210,18 @@ static int ehci_platform_probe(struct platform_device *dev)
- 		}
- 	}
- 
-+	priv->rst = devm_reset_control_get_optional(&dev->dev, NULL);
-+	if (IS_ERR(priv->rst)) {
-+		err = PTR_ERR(priv->rst);
-+		if (err == -EPROBE_DEFER)
-+			goto err_put_clks;
-+		priv->rst = NULL;
-+	} else {
-+		err = reset_control_deassert(priv->rst);
-+		if (err)
-+			goto err_put_clks;
-+	}
-+
- 	if (pdata->big_endian_desc)
- 		ehci->big_endian_desc = 1;
- 	if (pdata->big_endian_mmio)
-@@ -218,7 +232,7 @@ static int ehci_platform_probe(struct platform_device *dev)
- 		dev_err(&dev->dev,
- 			"Error: CONFIG_USB_EHCI_BIG_ENDIAN_MMIO not set\n");
- 		err = -EINVAL;
--		goto err_put_clks;
-+		goto err_reset;
- 	}
- #endif
- #ifndef CONFIG_USB_EHCI_BIG_ENDIAN_DESC
-@@ -226,14 +240,14 @@ static int ehci_platform_probe(struct platform_device *dev)
- 		dev_err(&dev->dev,
- 			"Error: CONFIG_USB_EHCI_BIG_ENDIAN_DESC not set\n");
- 		err = -EINVAL;
--		goto err_put_clks;
-+		goto err_reset;
- 	}
- #endif
- 
- 	if (pdata->power_on) {
- 		err = pdata->power_on(dev);
- 		if (err < 0)
--			goto err_put_clks;
-+			goto err_reset;
- 	}
- 
- 	hcd->rsrc_start = res_mem->start;
-@@ -256,6 +270,9 @@ static int ehci_platform_probe(struct platform_device *dev)
- err_power:
- 	if (pdata->power_off)
- 		pdata->power_off(dev);
-+err_reset:
-+	if (priv->rst)
-+		reset_control_assert(priv->rst);
- err_put_clks:
- 	while (--clk >= 0)
- 		clk_put(priv->clks[clk]);
-@@ -280,6 +297,9 @@ static int ehci_platform_remove(struct platform_device *dev)
- 	if (pdata->power_off)
- 		pdata->power_off(dev);
- 
-+	if (priv->rst)
-+		reset_control_assert(priv->rst);
-+
- 	for (clk = 0; clk < EHCI_MAX_CLKS && priv->clks[clk]; clk++)
- 		clk_put(priv->clks[clk]);
- 
 -- 
 1.9.3
