@@ -1,49 +1,42 @@
 From: agross@codeaurora.org (Andy Gross)
-Date: Tue, 13 May 2014 16:34:43 -0500
-Subject: [PATCH 3/4] spi: qup: Fix order of spi_register_master
+Date: Tue, 13 May 2014 16:34:42 -0500
+Subject: [PATCH 2/4] spi: qup: Correct selection of FIFO/Block mode
 In-Reply-To: <1400016884-9568-1-git-send-email-agross@codeaurora.org>
 References: <1400016884-9568-1-git-send-email-agross@codeaurora.org>
-Message-ID: <1400016884-9568-4-git-send-email-agross@codeaurora.org>
+Message-ID: <1400016884-9568-3-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves the devm_spi_register_master below the initialization of the
-runtime_pm.  If done in the wrong order, the spi_register_master fails if any
-probed slave devices issue SPI transactions.
+This patch fixes the calculation for determining whether to use FIFO or BLOCK
+mode.
 
 Signed-off-by: Andy Gross <agross@codeaurora.org>
 ---
- drivers/spi/spi-qup.c |   11 +++++++----
- 1 file changed, 7 insertions(+), 4 deletions(-)
+ drivers/spi/spi-qup.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/spi/spi-qup.c b/drivers/spi/spi-qup.c
-index 57b65e9..b518b51 100644
+index ea7017b..57b65e9 100644
 --- a/drivers/spi/spi-qup.c
 +++ b/drivers/spi/spi-qup.c
-@@ -616,16 +616,19 @@ static int spi_qup_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto error;
+@@ -289,7 +289,7 @@ static irqreturn_t spi_qup_qup_irq(int irq, void *dev_id)
+ 	writel_relaxed(opflags, controller->base + QUP_OPERATIONAL);
  
--	ret = devm_spi_register_master(dev, master);
--	if (ret)
--		goto error;
--
- 	pm_runtime_set_autosuspend_delay(dev, MSEC_PER_SEC);
- 	pm_runtime_use_autosuspend(dev);
- 	pm_runtime_set_active(dev);
- 	pm_runtime_enable(dev);
-+
-+	ret = devm_spi_register_master(dev, master);
-+	if (ret)
-+		goto disable_pm;
-+
- 	return 0;
+ 	if (!xfer) {
+-		dev_err_ratelimited(controller->dev, "unexpected irq %x08 %x08 %x08\n",
++		dev_err_ratelimited(controller->dev, "unexpected irq %08x %08x %08x\n",
+ 				    qup_err, spi_err, opflags);
+ 		return IRQ_HANDLED;
+ 	}
+@@ -368,7 +368,7 @@ static int spi_qup_io_config(struct spi_device *spi, struct spi_transfer *xfer)
+ 	n_words = xfer->len / w_size;
+ 	controller->w_size = w_size;
  
-+disable_pm:
-+	pm_runtime_disable(&pdev->dev);
- error:
- 	clk_disable_unprepare(cclk);
- 	clk_disable_unprepare(iclk);
+-	if (n_words <= controller->in_fifo_sz) {
++	if (n_words <= (controller->in_fifo_sz / sizeof(u32))) {
+ 		mode = QUP_IO_M_MODE_FIFO;
+ 		writel_relaxed(n_words, controller->base + QUP_MX_READ_CNT);
+ 		writel_relaxed(n_words, controller->base + QUP_MX_WRITE_CNT);
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
