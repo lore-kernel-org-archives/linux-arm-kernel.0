@@ -1,97 +1,138 @@
-From: pintu.k@outlook.com (Pintu Kumar)
-Date: Tue, 13 May 2014 10:27:07 +0530
-Subject: Questions regarding DMA buffer sharing using IOMMU
-In-Reply-To: <5370F66F.7060204@codeaurora.org>
-References: <BAY169-W12541AD089785F8BFBD4E26EF350@phx.gbl>,
- <5218408.5YRJXjS4BX@wuerfel>
- <BAY169-W1156E6803829CAB545274BCEF350@phx.gbl>,
- <5370F66F.7060204@codeaurora.org>
-Message-ID: <BAY169-W1F113CF53FD2DD325B23BEF340@phx.gbl>
+From: tgih.jun@samsung.com (Seungwon Jeon)
+Date: Tue, 13 May 2014 14:02:25 +0900
+Subject: [PATCHv2] mmc: dw_mmc: change to use recommended reset procedure
+In-Reply-To: <1399945121-7387-1-git-send-email-sonnyrao@chromium.org>
+References: <1399945121-7387-1-git-send-email-sonnyrao@chromium.org>
+Message-ID: <002301cf6e68$8809ee00$981dca00$%jun@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Lauraa for your answers.
-I have few more queries below.?
+As I mentioned in previous version, you put all reset stuff in existing fifo_reset function.
+Although databook mentions ciu_reset case for SBE error, it's not obvious when ciu_reset is needed in other error cases.
+If you intend to add some robust error handing, it would be better to make another function.
+Please check my comments below.
 
-----------------------------------------
-> Date: Mon, 12 May 2014 09:27:27 -0700
-> From: lauraa at codeaurora.org
-> To: pintu.k at outlook.com; arnd at arndb.de; linux-arm-kernel at lists.infradead.org
-> CC: linux-mm at kvack.org; linux-kernel at vger.kernel.org; linaro-mm-sig at lists.linaro.org
-> Subject: Re: Questions regarding DMA buffer sharing using IOMMU
->
-> On 5/12/2014 7:37 AM, Pintu Kumar wrote:
->> Hi,
->> Thanks for the reply.
->>
->> ----------------------------------------
->>> From: arnd at arndb.de
->>> To: linux-arm-kernel at lists.infradead.org
->>> CC: pintu.k at outlook.com; linux-mm at kvack.org; linux-kernel at vger.kernel.org; linaro-mm-sig at lists.linaro.org
->>> Subject: Re: Questions regarding DMA buffer sharing using IOMMU
->>> Date: Mon, 12 May 2014 14:00:57 +0200
->>>
->>> On Monday 12 May 2014 15:12:41 Pintu Kumar wrote:
->>>> Hi,
->>>> I have some queries regarding IOMMU and CMA buffer sharing.
->>>> We have an embedded linux device (kernel 3.10, RAM: 256Mb) in
->>>> which camera and codec supports IOMMU but the display does not support IOMMU.
->>>> Thus for camera capture we are using iommu buffers using
->>>> ION/DMABUF. But for all display rendering we are using CMA buffers.
->>>> So, the question is how to achieve buffer sharing (zero-copy)
->>>> between Camera and Display using only IOMMU?
->>>> Currently we are achieving zero-copy using CMA. And we are
->>>> exploring options to use IOMMU.
->>>> Now we wanted to know which option is better? To use IOMMU or CMA?
->>>> If anybody have come across these design please share your thoughts and results.
->>>
->>> There is a slight performance overhead in using the IOMMU in general,
->>> because the IOMMU has to fetch the page table entries from memory
->>> at least some of the time.
->>
->> Ok, we need to check performance later
->>
->>>
->>> If that overhead is within the constraints you have for transfers between
->>> camera and codec, you are always better off using IOMMU since that
->>> means you don't have to do memory migration.
->>
->> Transfer between camera is codec is fine. But our major concern is single buffer
->> sharing between camera & display. Here camera supports iommu but display does not support iommu.
->> Is it possible to render camera preview (iommu buffers) on display (not iommu and required physical contiguous overlay memory)?
->>
->
-> I'm pretty sure the answer is no for zero copy IOMMU buffers if one of your
-> devices does not support IOMMU. If the data is coming in as individual pages
-> and the hardware does not support scattered pages there isn't much you can
-> do except copy to a contiguous buffer. At least with Ion, the heap types can
-> be set up in a particular way such that the client need never know about the
-> existence of an IOMMU or not.
+On Tue, May 13, 2014, Sonny Rao wrote:
+> This patch changes the fifo reset code to follow the reset procedure
+> outlined in the documentation of Synopsys  Mobile storage host databook
+> 7.2.13.
+> 
+> v2: Add Generic DMA support
+>     per the documentation, move interrupt clear before wait
+>     make the test for DMA host->use_dma rather than host->using_dma
+>     add proper return values (although it appears no caller checks)
+> 
+> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+> ---
+>  drivers/mmc/host/dw_mmc.c | 55 ++++++++++++++++++++++++++++++++++++++++++++++-
+>  drivers/mmc/host/dw_mmc.h |  1 +
+>  2 files changed, 55 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+> index 55cd110..aff57e1 100644
+> --- a/drivers/mmc/host/dw_mmc.c
+> +++ b/drivers/mmc/host/dw_mmc.c
+> @@ -2325,6 +2325,7 @@ static bool dw_mci_ctrl_reset(struct dw_mci *host, u32 reset)
+> 
+>  static inline bool dw_mci_fifo_reset(struct dw_mci *host)
+>  {
+> +	u32 flags = SDMMC_CTRL_RESET | SDMMC_CTRL_FIFO_RESET;
+>  	/*
+>  	 * Reseting generates a block interrupt, hence setting
+>  	 * the scatter-gather pointer to NULL.
+> @@ -2334,7 +2335,59 @@ static inline bool dw_mci_fifo_reset(struct dw_mci *host)
+>  		host->sg = NULL;
+>  	}
+> 
+> -	return dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET);
+> +	/*
+> +	 * The recommended method for resetting is to always reset the
+> +	 * controller and the fifo, but differs slightly depending on the mode.
+> +	 * The Generic DMA mode (non IDMAC) also needs to reset DMA where IDMAC
+> +	 * mode resets IDMAC at the end.
+> +	 *
+> +	 */
+> +#ifndef CONFIG_MMC_DW_IDMAC
+Is it added for generic DMA?
+IDMAC should be considered for dma_reseet as well.
+Please check databook.
 
-So, the zero copy cannot be achieved between iommu and non-iommu devices?
-Do you have any references like in case of QC MSM8974/etc, how this is achieved?
+> +	if (host->use_dma)
+> +		flags |= SDMMC_CTRL_DMA_RESET;
+> +#endif
+> +	if (dw_mci_ctrl_reset(host, flags)) {
+> +		/*
+> +		 * In all cases we clear the RAWINTS register to clear any
+> +		 * interrupts.
+> +		 */
+I think interrupt masking is needed before reset because we will not handle it anymore.
+And Is there any reason to move interrupt clear here compared with previous version?
 
-Yes, we are using ION, with SYSTEM_HEAP, for IOMMU, in case of camera, but still we could not?
-render the preview on display.
-You mean to say, with ION it is possible to do buffer sharing(a.k.a zero copy) ?using the IOMMU heap?
+> +		mci_writel(host, RINTSTS, 0xFFFFFFFF);
+> +
+> +		/* if using dma we wait for dma_req to clear */
+> +		if (host->use_dma) {
+> +			unsigned long timeout = jiffies + msecs_to_jiffies(500);
+> +			u32 status;
+> +			do {
+> +				status = mci_readl(host, STATUS);
+> +				if (!(status & SDMMC_STATUS_DMA_REQ))
+> +					break;
+> +				cpu_relax();
+What did you intend here?
+If you intent busy-wait, how about using sleep instead?
 
+> +			} while (time_before(jiffies, timeout));
+> +
+> +			if (status & SDMMC_STATUS_DMA_REQ) {
+> +				dev_err(host->dev,
+> +					"%s: Timeout waiting for dma_req to "
+> +					"clear during reset", __func__);
+> +				return false;
+> +			}
+> +
+> +			/* when using DMA next we reset the fifo again */
+> +			dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET);
+> +		}
+> +	} else {
+> +		dev_err(host->dev, "%s: Reset bits didn't clear", __func__);
+If ciu_reset is cleared, clk update below is needed?
 
->
->> Also is it possible to buffer sharing between 2 iommu supported devices?
->>
->
-> I don't see why not but there isn't a lot of information to go on here.
+Thanks,
+Seungwon Jeon
 
-Is this also possible with ION?
-Can you point out some use cases?
-Like in our cases camera, codec and GPU have IOMMU. Is it possible to do zero copy here?
-
-
->
-> Thanks,
-> Laura
->
+> +		return false;
+> +	}
+> +
+> +#ifdef CONFIG_MMC_DW_IDMAC
+> +	/* It is also recommended that we reset and reprogram idmac */
+> +	dw_mci_idmac_reset(host);
+> +#endif
+> +
+> +	/* After a CTRL reset we need to have CIU set clock registers  */
+> +	mci_send_cmd(host->cur_slot, SDMMC_CMD_UPD_CLK, 0);
+> +
+> +	return true;
+>  }
+> 
+>  static inline bool dw_mci_ctrl_all_reset(struct dw_mci *host)
+> diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
+> index 6bf24ab..2505804 100644
+> --- a/drivers/mmc/host/dw_mmc.h
+> +++ b/drivers/mmc/host/dw_mmc.h
+> @@ -129,6 +129,7 @@
+>  #define SDMMC_CMD_INDX(n)		((n) & 0x1F)
+>  /* Status register defines */
+>  #define SDMMC_GET_FCNT(x)		(((x)>>17) & 0x1FFF)
+> +#define SDMMC_STATUS_DMA_REQ		BIT(31)
+>  /* FIFOTH register defines */
+>  #define SDMMC_SET_FIFOTH(m, r, t)	(((m) & 0x7) << 28 | \
+>  					 ((r) & 0xFFF) << 16 | \
 > --
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> hosted by The Linux Foundation
- 		 	   		  
+> 1.9.1.423.g4596e3a
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
