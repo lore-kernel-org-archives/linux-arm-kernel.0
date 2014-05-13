@@ -1,110 +1,48 @@
-From: sonnyrao@chromium.org (Sonny Rao)
-Date: Mon, 12 May 2014 18:38:41 -0700
-Subject: [PATCHv2] mmc: dw_mmc: change to use recommended reset procedure
-Message-ID: <1399945121-7387-1-git-send-email-sonnyrao@chromium.org>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 13 May 2014 09:42:48 +0800
+Subject: i.MX6 USB OTG support is broken on linux-next
+In-Reply-To: <04dad7ad8f0247b9bef4fea1db8a8bc8@BL2PR03MB226.namprd03.prod.outlook.com>
+References: <20140509130046.GP2794@dragon>
+ <20140510111003.GA1593@shlinux1.ap.freescale.net>
+ <20140510131815.GT2794@dragon>
+ <4285b0d55d2545b99c4ba6b703e65a12@BL2PR03MB226.namprd03.prod.outlook.com>
+ <20140511014027.GV2794@dragon>
+ <71b1887d2f014021b084df703b15dc6a@BL2PR03MB226.namprd03.prod.outlook.com>
+ <20140512135437.GA8330@dragon>
+ <04dad7ad8f0247b9bef4fea1db8a8bc8@BL2PR03MB226.namprd03.prod.outlook.com>
+Message-ID: <20140513014247.GH8330@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch changes the fifo reset code to follow the reset procedure
-outlined in the documentation of Synopsys  Mobile storage host databook
-7.2.13.
+On Tue, May 13, 2014 at 08:25:18AM +0800, Chen Peter-B29397 wrote:
+>  
+> > > >
+> > >
+> > > In your case, you should not set CONFIG_USB_OTG no matter at defconfig
+> > > and at menuconfig.
+> > 
+> > Hmm, at least in my testing (USB mouse/keyboard connected to OTG port),
+> > it works as before even I enable CONFIG_USB_OTG, as long as I do *not*
+> > enable CONFIG_USB_OTG_FSM.
+> > 
+> > Since it works for my case, I'm wondering why you think I shouldn't
+> > enable CONFIG_USB_OTG at all.
+> > 
+> 
+> If your device is not OTG device, there is no reason you need to enable
+> CONFIG_USB_OTG.
 
-v2: Add Generic DMA support
-    per the documentation, move interrupt clear before wait
-    make the test for DMA host->use_dma rather than host->using_dma
-    add proper return values (although it appears no caller checks)
+Whether I should enable CONFIG_USB_OTG depends on what devices I will
+use?  This is insane to me.
 
-Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
-Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
----
- drivers/mmc/host/dw_mmc.c | 55 ++++++++++++++++++++++++++++++++++++++++++++++-
- drivers/mmc/host/dw_mmc.h |  1 +
- 2 files changed, 55 insertions(+), 1 deletion(-)
+Look, there is an USB OTG port on my board, and it should just be the
+reason that's good enough for me to build a kernel with CONFIG_USB_OTG,
+shouldn't it?  I do not even know what type of devices will be plugged
+into this USB OTG port when I was building the kernel.
 
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index 55cd110..aff57e1 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -2325,6 +2325,7 @@ static bool dw_mci_ctrl_reset(struct dw_mci *host, u32 reset)
- 
- static inline bool dw_mci_fifo_reset(struct dw_mci *host)
- {
-+	u32 flags = SDMMC_CTRL_RESET | SDMMC_CTRL_FIFO_RESET;
- 	/*
- 	 * Reseting generates a block interrupt, hence setting
- 	 * the scatter-gather pointer to NULL.
-@@ -2334,7 +2335,59 @@ static inline bool dw_mci_fifo_reset(struct dw_mci *host)
- 		host->sg = NULL;
- 	}
- 
--	return dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET);
-+	/*
-+	 * The recommended method for resetting is to always reset the
-+	 * controller and the fifo, but differs slightly depending on the mode.
-+	 * The Generic DMA mode (non IDMAC) also needs to reset DMA where IDMAC
-+	 * mode resets IDMAC at the end.
-+	 *
-+	 */
-+#ifndef CONFIG_MMC_DW_IDMAC
-+	if (host->use_dma)
-+		flags |= SDMMC_CTRL_DMA_RESET;
-+#endif
-+	if (dw_mci_ctrl_reset(host, flags)) {
-+		/*
-+		 * In all cases we clear the RAWINTS register to clear any
-+		 * interrupts.
-+		 */
-+		mci_writel(host, RINTSTS, 0xFFFFFFFF);
-+
-+		/* if using dma we wait for dma_req to clear */
-+		if (host->use_dma) {
-+			unsigned long timeout = jiffies + msecs_to_jiffies(500);
-+			u32 status;
-+			do {
-+				status = mci_readl(host, STATUS);
-+				if (!(status & SDMMC_STATUS_DMA_REQ))
-+					break;
-+				cpu_relax();
-+			} while (time_before(jiffies, timeout));
-+
-+			if (status & SDMMC_STATUS_DMA_REQ) {
-+				dev_err(host->dev,
-+					"%s: Timeout waiting for dma_req to "
-+					"clear during reset", __func__);
-+				return false;
-+			}
-+
-+			/* when using DMA next we reset the fifo again */
-+			dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET);
-+		}
-+	} else {
-+		dev_err(host->dev, "%s: Reset bits didn't clear", __func__);
-+		return false;
-+	}
-+
-+#ifdef CONFIG_MMC_DW_IDMAC
-+	/* It is also recommended that we reset and reprogram idmac */
-+	dw_mci_idmac_reset(host);
-+#endif
-+
-+	/* After a CTRL reset we need to have CIU set clock registers  */
-+	mci_send_cmd(host->cur_slot, SDMMC_CMD_UPD_CLK, 0);
-+
-+	return true;
- }
- 
- static inline bool dw_mci_ctrl_all_reset(struct dw_mci *host)
-diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
-index 6bf24ab..2505804 100644
---- a/drivers/mmc/host/dw_mmc.h
-+++ b/drivers/mmc/host/dw_mmc.h
-@@ -129,6 +129,7 @@
- #define SDMMC_CMD_INDX(n)		((n) & 0x1F)
- /* Status register defines */
- #define SDMMC_GET_FCNT(x)		(((x)>>17) & 0x1FFF)
-+#define SDMMC_STATUS_DMA_REQ		BIT(31)
- /* FIFOTH register defines */
- #define SDMMC_SET_FIFOTH(m, r, t)	(((m) & 0x7) << 28 | \
- 					 ((r) & 0xFFF) << 16 | \
--- 
-1.9.1.423.g4596e3a
+Shawn
+
+> Yes, it may work for some devices when enable CONFIG_USB_OTG,
+> but it will confuse other host or device which is connected with you, eg,
+> your device will report your have supported some otg capabilities, eg, SRP or
+> HNP.
