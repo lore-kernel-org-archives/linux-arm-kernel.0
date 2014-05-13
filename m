@@ -1,46 +1,100 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 13 May 2014 17:44:15 +0200
-Subject: [PATCH RESEND v4 1/8] clk: sunxi: Implement A31 USB clock
+Date: Tue, 13 May 2014 17:44:17 +0200
+Subject: [PATCH RESEND v4 3/8] phy: sunxi: Rework phy initialization
 In-Reply-To: <1399995862-17788-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1399995862-17788-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1399995862-17788-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1399995862-17788-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A31 USB clock slightly differ from its older counterparts, mostly because
-it has a different gate for each PHY, while the older one had a single gate for
-all the phy.
+Move the phy initialization and variables declaration to the loop itself, since
+it is where it really belongs. Also remove all the temporary variables, we can
+use the structure members directly.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Reviewed-by: Hans de Goede <hdegoede@redhat.com>
-Acked-by: Mike Turquette <mturquette@linaro.org>
 ---
- drivers/clk/sunxi/clk-sunxi.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/phy/phy-sun4i-usb.c | 42 ++++++++++++++++++------------------------
+ 1 file changed, 18 insertions(+), 24 deletions(-)
 
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index bd7dc733c1ca..d9bab75f128b 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -972,6 +972,11 @@ static const struct gates_data sun5i_a13_usb_gates_data __initconst = {
- 	.reset_mask = 0x03,
- };
+diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+index e6e6c4ba7145..66a87d50512b 100644
+--- a/drivers/phy/phy-sun4i-usb.c
++++ b/drivers/phy/phy-sun4i-usb.c
+@@ -224,13 +224,8 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 	struct sun4i_usb_phy_data *data;
+ 	struct device *dev = &pdev->dev;
+ 	struct device_node *np = dev->of_node;
+-	void __iomem *pmu = NULL;
+ 	struct phy_provider *phy_provider;
+-	struct reset_control *reset;
+-	struct regulator *vbus;
+ 	struct resource *res;
+-	struct phy *phy;
+-	char name[16];
+ 	int i;
  
-+static const struct gates_data sun6i_a31_usb_gates_data __initconst = {
-+	.mask = { BIT(18) | BIT(17) | BIT(16) | BIT(10) | BIT(9) | BIT(8) },
-+	.reset_mask = BIT(2) | BIT(1) | BIT(0),
-+};
+ 	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
+@@ -262,42 +257,41 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 
+ 	/* Skip 0, 0 is the phy for otg which is not yet supported. */
+ 	for (i = 1; i < data->num_phys; i++) {
++		struct sun4i_usb_phy *phy = data->phys + i;
++		char name[16];
 +
- static void __init sunxi_gates_clk_setup(struct device_node *node,
- 					 struct gates_data *data)
- {
-@@ -1267,6 +1272,7 @@ static const struct of_device_id clk_gates_match[] __initconst = {
- 	{.compatible = "allwinner,sun6i-a31-apb2-gates-clk", .data = &sun6i_a31_apb2_gates_data,},
- 	{.compatible = "allwinner,sun4i-a10-usb-clk", .data = &sun4i_a10_usb_gates_data,},
- 	{.compatible = "allwinner,sun5i-a13-usb-clk", .data = &sun5i_a13_usb_gates_data,},
-+	{.compatible = "allwinner,sun6i-a31-usb-clk", .data = &sun6i_a31_usb_gates_data,},
- 	{}
- };
+ 		snprintf(name, sizeof(name), "usb%d_vbus", i);
+-		vbus = devm_regulator_get_optional(dev, name);
+-		if (IS_ERR(vbus)) {
+-			if (PTR_ERR(vbus) == -EPROBE_DEFER)
++		phy->vbus = devm_regulator_get_optional(dev, name);
++		if (IS_ERR(phy->vbus)) {
++			if (PTR_ERR(phy->vbus) == -EPROBE_DEFER)
+ 				return -EPROBE_DEFER;
+-			vbus = NULL;
++			phy->vbus = NULL;
+ 		}
  
+ 		snprintf(name, sizeof(name), "usb%d_reset", i);
+-		reset = devm_reset_control_get(dev, name);
+-		if (IS_ERR(reset)) {
++		phy->reset = devm_reset_control_get(dev, name);
++		if (IS_ERR(phy->reset)) {
+ 			dev_err(dev, "failed to get reset %s\n", name);
+-			return PTR_ERR(reset);
++			return PTR_ERR(phy->reset);
+ 		}
+ 
+ 		if (i) { /* No pmu for usbc0 */
+ 			snprintf(name, sizeof(name), "pmu%d", i);
+ 			res = platform_get_resource_byname(pdev,
+ 							IORESOURCE_MEM, name);
+-			pmu = devm_ioremap_resource(dev, res);
+-			if (IS_ERR(pmu))
+-				return PTR_ERR(pmu);
++			phy->pmu = devm_ioremap_resource(dev, res);
++			if (IS_ERR(phy->pmu))
++				return PTR_ERR(phy->pmu);
+ 		}
+ 
+-		phy = devm_phy_create(dev, &sun4i_usb_phy_ops, NULL);
+-		if (IS_ERR(phy)) {
++		phy->phy = devm_phy_create(dev, &sun4i_usb_phy_ops, NULL);
++		if (IS_ERR(phy->phy)) {
+ 			dev_err(dev, "failed to create PHY %d\n", i);
+-			return PTR_ERR(phy);
++			return PTR_ERR(phy->phy);
+ 		}
+ 
+-		data->phys[i].phy = phy;
+-		data->phys[i].pmu = pmu;
+-		data->phys[i].vbus = vbus;
+-		data->phys[i].reset = reset;
+-		data->phys[i].index = i;
+-		phy_set_drvdata(phy, &data->phys[i]);
++		phy->index = i;
++		phy_set_drvdata(phy->phy, &data->phys[i]);
+ 	}
+ 
+ 	dev_set_drvdata(dev, data);
 -- 
 1.9.3
