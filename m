@@ -1,101 +1,42 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Tue, 13 May 2014 15:30:17 +0530
-Subject: [PATCH v9 3/3] phy: exynos5-usbdrd: Add facility for VBUS supply
-In-Reply-To: <1399975217-3231-1-git-send-email-gautam.vivek@samsung.com>
-References: <1399975217-3231-1-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <1399975217-3231-4-git-send-email-gautam.vivek@samsung.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Tue, 13 May 2014 12:07:54 +0200
+Subject: [PATCH v3 1/2] ARM: EXYNOS: Map SYSRAM through generic SRAM
+ bindings
+In-Reply-To: <029b01cf6e59$35a452e0$a0ecf8a0$@samsung.com>
+References: <1399522592-23618-1-git-send-email-sachin.kamat@linaro.org>
+ <536BAE39.70504@samsung.com> <034b01cf6b2c$5b5d06b0$12171410$@samsung.com>
+ <536C5E40.90405@gmail.com> <029b01cf6e59$35a452e0$a0ecf8a0$@samsung.com>
+Message-ID: <1399975674.24871.19.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding support to enable/disable VBUS controlled by a
-regulator, to enable vbus supply on the port.
+Kukjin,
 
-Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
----
- drivers/phy/phy-exynos5-usbdrd.c |   32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+On Tue, 2014-05-13 at 12:12 +0900, Kukjin Kim wrote:
+> Tomasz Figa wrote:
+> > You mean s/sram/sysram/ in compatible strings of Exynos-specific
+> > reserved areas? If yes, I'm fine, it might be even better. Just remember
+> > to update documentation in patch 2/2 as well.
+> > 
+> Done. If any problems in my tree, please let me know.
 
-diff --git a/drivers/phy/phy-exynos5-usbdrd.c b/drivers/phy/phy-exynos5-usbdrd.c
-index 8fcdd94..76d862b 100644
---- a/drivers/phy/phy-exynos5-usbdrd.c
-+++ b/drivers/phy/phy-exynos5-usbdrd.c
-@@ -24,6 +24,7 @@
- #include <linux/mfd/syscon.h>
- #include <linux/mfd/syscon/exynos5-pmu.h>
- #include <linux/regmap.h>
-+#include <linux/regulator/consumer.h>
- 
- /* Exynos USB PHY registers */
- #define EXYNOS5_FSEL_9MHZ6		0x0
-@@ -170,6 +171,7 @@ struct exynos5_usbdrd_phy {
- 	} phys[EXYNOS5_DRDPHYS_NUM];
- 	u32 extrefclk;
- 	struct clk *ref_clk;
-+	struct regulator *vbus;
- };
- 
- static inline
-@@ -438,6 +440,7 @@ static int exynos5_usbdrd_phy_exit(struct phy *phy)
- 
- static int exynos5_usbdrd_phy_power_on(struct phy *phy)
- {
-+	int ret;
- 	struct phy_usb_instance *inst = phy_get_drvdata(phy);
- 	struct exynos5_usbdrd_phy *phy_drd = to_usbdrd_phy(inst);
- 
-@@ -445,10 +448,24 @@ static int exynos5_usbdrd_phy_power_on(struct phy *phy)
- 
- 	clk_prepare_enable(phy_drd->ref_clk);
- 
-+	/* Enable VBUS supply */
-+	if (phy_drd->vbus) {
-+		ret = regulator_enable(phy_drd->vbus);
-+		if (ret) {
-+			dev_err(phy_drd->dev, "Failed to enable VBUS supply\n");
-+			goto fail_vbus;
-+		}
-+	}
-+
- 	/* Power-on PHY*/
- 	inst->phy_cfg->phy_isol(inst, 0);
- 
- 	return 0;
-+
-+fail_vbus:
-+	clk_disable_unprepare(phy_drd->ref_clk);
-+
-+	return ret;
- }
- 
- static int exynos5_usbdrd_phy_power_off(struct phy *phy)
-@@ -461,6 +478,10 @@ static int exynos5_usbdrd_phy_power_off(struct phy *phy)
- 	/* Power-off the PHY */
- 	inst->phy_cfg->phy_isol(inst, 1);
- 
-+	/* Disable VBUS supply */
-+	if (phy_drd->vbus)
-+		regulator_disable(phy_drd->vbus);
-+
- 	clk_disable_unprepare(phy_drd->ref_clk);
- 
- 	return 0;
-@@ -600,6 +621,17 @@ static int exynos5_usbdrd_phy_probe(struct platform_device *pdev)
- 		break;
- 	}
- 
-+	/* Get Vbus regulator */
-+	phy_drd->vbus = devm_regulator_get(dev, "vbus");
-+	if (IS_ERR(phy_drd->vbus)) {
-+		ret = PTR_ERR(phy_drd->vbus);
-+		if (ret == -EPROBE_DEFER)
-+			return ret;
-+
-+		dev_warn(dev, "Failed to get VBUS supply regulator\n");
-+		phy_drd->vbus = NULL;
-+	}
-+
- 	dev_vdbg(dev, "Creating usbdrd_phy phy\n");
- 
- 	for (i = 0; i < EXYNOS5_DRDPHYS_NUM; i++) {
--- 
-1.7.10.4
+It seems this one just hit linux-next (in next-20140513) as "ARM:
+EXYNOS: Map SYSRAM through generic DT bindings". Its commit now contains
+this hunk:
+    --- a/arch/arm/Kconfig
+    +++ b/arch/arm/Kconfig
+    @@ -843,6 +843,7 @@ config ARCH_EXYNOS
+            select HAVE_S3C_RTC if RTC_CLASS
+            select NEED_MACH_MEMORY_H
+            select SPARSE_IRQ
+    +       select SYSRAM
+            select USE_OF
+            help
+              Support for SAMSUNG's EXYNOS SoCs (EXYNOS4/5)
+
+But there's no Kconfig symbol SYSRAM. However, there is a Kconfig symbol
+SRAM. Did you perhaps do one s/sram/sysram/ too many on the original
+patch?
+
+
+Paul Bolle
