@@ -1,57 +1,46 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 13 May 2014 19:31:43 +0200
-Subject: [PATCH v2 3/3] ARM: i.MX1 clk: Add devicetree support
-In-Reply-To: <1399999493.354004023@f391.i.mail.ru>
-References: <1399997116-4313-1-git-send-email-shc_work@mail.ru>
- <1399998253.839894262@f391.i.mail.ru>
- <CAOMZO5CNk4uAu0OujRgiJpU2gHJpAnD4zpqxSHd4hXo3fnJ4_w@mail.gmail.com>
- <1399999493.354004023@f391.i.mail.ru>
-Message-ID: <20140513173143.GU5858@pengutronix.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 13 May 2014 19:38:25 +0200
+Subject: [PATCHv2] ARM: mvebu: use hardware I/O coherency also for PCI
+ devices
+In-Reply-To: <20140513163504.GF27822@titan.lakedaemon.net>
+References: <1399997070-11434-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140513163504.GF27822@titan.lakedaemon.net>
+Message-ID: <20140513193825.4196afe8@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 13, 2014 at 08:44:53PM +0400, Alexander Shiyan wrote:
-> Tue, 13 May 2014 13:28:28 -0300 ?? Fabio Estevam <festevam@gmail.com>:
-> > On Tue, May 13, 2014 at 1:24 PM, Alexander Shiyan <shc_work@mail.ru> wrote:
-> > > Tue, 13 May 2014 13:18:40 -0300 ?? Fabio Estevam <festevam@gmail.com>:
-> > >> On Tue, May 13, 2014 at 1:05 PM, Alexander Shiyan <shc_work@mail.ru> wrote:
-> > >>
-> > >> > +       clk[IMX1_CLK_DUMMY] =
-> > >> > +               imx_clk_fixed("dummy", 0);
-> > >> > +       clk[IMX1_CLK_CLK32] =
-> > >> > +               imx_obtain_fixed_clock("clk32", fref);
-> > >> > +       clk[IMX1_CLK_CLK16M_EXT] =
-> > >> > +               imx_clk_fixed("clk16m_ext", 16000000);
-> > >> > +       clk[IMX1_CLK_CLK16M] =
-> > >> > +               imx_clk_gate("clk16m", "clk16m_ext", CCM_CSCR, 17);
-> > >>
-> > >> Why don't you put each entry into a single line instead?
-> > >>
-> > >> Even if it gets larger than 80 columns, it would be easier to read.
-> > >
-> > > I thought about it, but came to the conclusion that it is better to observe
-> > > the kernel rules.
-> > 
-> > Do you mean checkpatch complaint?
-> > 
-> > Then try to make checkpatch happy with other clock file such as
-> > arch/arm/mach-imx/clk-imx6q.
-> > 
-> > The result will be unreadable :-)
+Dear Jason Cooper,
+
+On Tue, 13 May 2014 12:35:04 -0400, Jason Cooper wrote:
+
+> > Whether this commit qualifies as stable material can be
+> > discussed. Technically, it was a mistake from the original I/O
+> > coherency implementation. But in practice, besides not using the I/O
+> > coherency, I don't think it's causing any specific problem other than
+> > DMA transactions on PCI devices triggering unneeded cache maintenance
+> > operations. So I'll leave it to the mvebu maintainers to decide
+> > whether this qualifies as stable material or not. I've included the
+> > relevant Fixes: and Cc: fields, but don't hesitate to rip them out if
+> > you don't think this should go to stable.
 > 
-> As another solution we can use macros, something like this:
-> 
-> #define IMXCLK_MUX(id, name, reg, off, sz, arr)	\
-> 	clk[id] = imx_clk_mux(name, reg, off, sz, arr, ARRAY_SIZE(arr))
+> If nothing is broken for users, I see no point backporting it.  Feel
+> free to convince me otherwise...
 
-Please don't do that. We have i.MX specific wrapper functions. Wrapping
-these again with macros doesn't improve the situation. I'm with Fabio
-here, I would prefer the functions in a single line.
+As far as I can remember, it isn't broken, it's just sub-optimal. The
+only situation where it would cause problem is on Armada 375/Armada 38x
+with SMP support, due to the SMP/PCIe/PL310 deadlock for which I've
+sent a v2 of the patches today on LAKML. In this case, not using our
+specific DMA operations would cause many PL310 cache maintenance
+operations, and therefore a high chance of hitting the deadlock.
+However, this is only a new problem in 3.16, which has the SMP support
+for Armada 375/Armada 38x.
 
-Sascha
+So, as I said, feel free to drop the stable tags :)
 
+Thanks!
+
+Thomas
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
