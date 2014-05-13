@@ -1,138 +1,73 @@
-From: patrice.chotard@st.com (Patrice Chotard)
-Date: Tue, 13 May 2014 14:05:28 +0200
-Subject: [STLinux Kernel] [PATCH v4 6/6] ARM: dts: STiH407: Add B2120
- board support
-In-Reply-To: <1394614210-15698-7-git-send-email-maxime.coquelin@st.com>
-References: <1394614210-15698-1-git-send-email-maxime.coquelin@st.com>
- <1394614210-15698-7-git-send-email-maxime.coquelin@st.com>
-Message-ID: <53720A88.3050907@st.com>
+From: pavel@denx.de (Pavel Machek)
+Date: Tue, 13 May 2014 14:07:53 +0200
+Subject: [PATCHv2] Fix CAN on socfpga, for net/master
+In-Reply-To: <53638F17.6000702@pengutronix.de>
+References: <6bf951b6-51e7-4b90-b054-9ba5b6e93874@email.android.com>
+ <20140427122510.GB12901@amd.pavel.ucw.cz>
+ <1398716449.836.4.camel@dinh-ubuntu>
+ <20140428211505.GA28242@amd.pavel.ucw.cz>
+ <CAF03EBf9KXqB4W9GuDduhLwp_kwFjUEi3syU7fX3KpXfZEFxHg@mail.gmail.com>
+ <CAF03EBd19PC5RAsLR6-dMPF2x3XRf9X4bFPgX2kRdCYWUQBYcA@mail.gmail.com>
+ <20140430215359.GA15148@amd.pavel.ucw.cz>
+ <CAF03EBewoV0pOOmNQBwPrKgm-zhaSbFcNd_UiEhFWyUrq91-Jg@mail.gmail.com>
+ <20140502084851.GA5730@amd.pavel.ucw.cz>
+ <53638F17.6000702@pengutronix.de>
+Message-ID: <20140513120753.GB8635@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi!
 
-On 03/12/2014 09:50 AM, Maxime COQUELIN wrote:
-> B2120 HDK is the reference board for STiH407 SoC.
-> It has the following characteristics:
->   - 1GB DDR3
->   - 8GB eMMC / SD-Card slot
->   - 32MB NOR Flash
->   - 1 x Gbit Ethernet
->   - 1 x USB 3.0 port
->   - 1 x Mini-PCIe
->   - 1 x SATA
->   - 1 x HDMI output
->   - 1 x HDMI input
->   - 1 x SPDIF
->
-> This patch only introduces basic functionnalities, such as I2C and UART.
->
-> Acked-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-> Acked-by: Lee Jones <lee.jones@linaro.org>
-> Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
-> ---
->   arch/arm/boot/dts/Makefile          |  3 +-
->   arch/arm/boot/dts/stih407-b2120.dts | 78 +++++++++++++++++++++++++++++++++++++
->   2 files changed, 80 insertions(+), 1 deletion(-)
->   create mode 100644 arch/arm/boot/dts/stih407-b2120.dts
->
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 12455cf..f760a88 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -317,7 +317,8 @@ dtb-$(CONFIG_ARCH_SPEAR6XX)+= spear600-evb.dtb
->   dtb-$(CONFIG_ARCH_STI)+= stih415-b2000.dtb \
->   	stih416-b2000.dtb \
->   	stih415-b2020.dtb \
-> -	stih416-b2020.dtb
-> +	stih416-b2020.dtb \
-> +	stih407-b2120.dtb
->   dtb-$(CONFIG_ARCH_SUNXI) += \
->   	sun4i-a10-a1000.dtb \
->   	sun4i-a10-cubieboard.dtb \
-> diff --git a/arch/arm/boot/dts/stih407-b2120.dts b/arch/arm/boot/dts/stih407-b2120.dts
-> new file mode 100644
-> index 0000000..9c97da4
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/stih407-b2120.dts
-> @@ -0,0 +1,78 @@
-> +/*
-> + * Copyright (C) 2014 STMicroelectronics (R&D) Limited.
-> + * Author: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +/dts-v1/;
-> +#include "stih407.dtsi"
-> +/ {
-> +	model = "STiH407 B2120";
-> +	compatible = "st,stih407", "st,stih407-b2120";
-> +
-> +	chosen {
-> +		bootargs = "console=ttyAS0,115200";
-> +		linux,stdout-path = &sbc_serial0;
-> +	};
-> +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0x40000000 0x80000000>;
-> +	};
-> +
-> +	aliases {
-> +		ttyAS0 = &sbc_serial0;
-> +	};
-> +
-> +	soc {
-> +		sbc_serial0: serial at 9530000 {
-> +			status = "okay";
-> +		};
-> +
-> +		leds {
-> +			compatible = "gpio-leds";
-> +			red {
-> +				#gpio-cells = <2>;
-> +				label = "Front Panel LED";
-> +				gpios = <&PIO4 1 0>;
-> +				linux,default-trigger = "heartbeat";
-> +			};
-> +			green {
-> +				#gpio-cells = <2>;
-> +				gpios = <&PIO1 3 0>;
-> +				default-state = "off";
-> +			};
-> +		};
-> +
-> +		i2c at 9842000 {
-> +			status = "okay";
-> +		};
-> +
-> +		i2c at 9843000 {
-> +			status = "okay";
-> +		};
-> +
-> +		i2c at 9844000 {
-> +			status = "okay";
-> +		};
-> +
-> +		i2c at 9845000 {
-> +			status = "okay";
-> +		};
-> +
-> +		i2c at 9540000 {
-> +			status = "okay";
-> +		};
-> +
-> +		/* SSC11 to HDMI */
-> +		i2c at 9541000 {
-> +			status = "okay";
-> +			/* HDMI V1.3a supports Standard mode only */
-> +			clock-frequency = <100000>;
-> +			st,i2c-min-scl-pulse-width-us = <0>;
-> +			st,i2c-min-sda-pulse-width-us = <5>;
-> +		};
-> +	};
-> +};
+> Please split into several patches:
+> - add 32 bit accessor functions
+>   and replace two 16 bit accesses by a single 32 bit access
+> - if-DCAN-then-32bit access
+>   please explain in the commit message why this is needed
+> - add hwinit support for non ti devices
 
-Acked-by: Patrice Chotard <patrice.chotard@st.com>
+> > @@ -88,7 +89,8 @@ static void c_can_hw_raminit(const struct c_can_priv *priv, bool enable)
+> >  	spin_lock(&raminit_lock);
+> >  
+> >  	ctrl = readl(priv->raminit_ctrlreg);
+> > -	/* We clear the done and start bit first. The start bit is
+> > +	/*
+> > +	 * We clear the done and start bit first. The start bit is
+> 
+> Please don't change the commenting style.
+
+Ok.
+
+> > +static void c_can_hw_raminit(const struct c_can_priv *priv, bool enable)
+> > +{
+> > +	u32 ctrl;
+> > +
+> > +	spin_lock(&raminit_lock);
+> > +
+> > +	ctrl = readl(priv->raminit_ctrlreg);
+> 
+> As far as I can see raminit_ctrlreg is in this case a non shared
+> resource, so you don't need any spinlock. Also you don't need to use
+> raminit_ctrlreg, as it is C_CAN_FUNCTION_REG.
+
+I was adapting existing code which had the raminit paths shared. Will
+remove the spinlock.
+
+And yes, I can replace it with priv->read_... , but it will result in
+some churn of consts...
+
+> > +static void c_can_plat_write_reg32(struct c_can_priv *priv, enum reg index,
+> > +		u32 val)
+> > +{
+> > +	priv->write_reg(priv, index + 1, val>>16);
+>                                            ^  ^
+> 
+> Please add spaces around the >>
+
+Sorry about that.
+
+Best regards,
+									Pavel
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
