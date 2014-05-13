@@ -1,52 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 13 May 2014 11:15:45 +0200
-Subject: [PATCH 5/6] ARM: EXYNOS: Enable multi-platform build support
-In-Reply-To: <065d01cf6e65$0e903dc0$2bb0b940$@samsung.com>
-References: <1397554134-11827-1-git-send-email-sachin.kamat@linaro.org>
- <201404222156.48432.arnd@arndb.de>
- <065d01cf6e65$0e903dc0$2bb0b940$@samsung.com>
-Message-ID: <4941260.joVvylkMMC@wuerfel>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 13 May 2014 11:24:24 +0200
+Subject: [PATCH 1/2] gpio: omap: prepare and unprepare the debounce clock
+In-Reply-To: <536B2CEE.4010809@ti.com>
+References: <1398233465-8845-1-git-send-email-rnayak@ti.com>
+ <1398233465-8845-2-git-send-email-rnayak@ti.com>
+ <536B2CEE.4010809@ti.com>
+Message-ID: <CACRpkdZ2EhKyjg6_txGByN501QiOOQ+N5rvDZDm_jqNRWZxN5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 May 2014 13:37:33 Kukjin Kim wrote:
-> Arnd Bergmann wrote:
-> > 
-> > On Tuesday 22 April 2014, Olof Johansson wrote:
-> > > I don't think there's a point in keeping this around. A
-> > > "single-platform" config is just enabling a single platform in the
-> > > config, it's not a specific option. I don't think any of the other
-> > > platforms use anything like this today.
-> > 
-> > The only one doing that is shmobile, but only because they have
-> > some SoCs that are multiplatform capable and some that are not.
-> > This isn't the case for Exynos, so it should no longer be needed.
-> > 
-> > When I originally created this patch 18 months ago, there were a
-> > number of drivers that broke when multiplatform got enabled.
-> > Now the cpufreq driver is the only one left, but it seems that
-> > it will make it for 3.16, and I wouldn't wait for it if it doesn't.
-> > Let's just do multiplatform-only.
-> > 
-> In my position in S.LSI, I'd like to keep the current ARCH_EXYNOS4 and
-> EXYNOS5 because IMHO selecting each series would be helpful on real product,
-> multiplatform is available though. Additionally EXYNOS3 is being added.
-> 
-> It's true we can support exynos-multiplatform even though above options are
-> included...
+On Thu, May 8, 2014 at 9:06 AM, Rajendra Nayak <rnayak@ti.com> wrote:
 
-I think we are talking about different questions here:
+> Do you mind picking this fix up via the GPIO tree?
 
-What Olof and I mean is we don't want to have an ARCH_EXYNOS_SINGLE option
-that is there for building EXYNOS but not allowing any other SoC.
+Yes, it's merged to my devel branch now with the ACKs.
 
-What I think you mean is that you want the individual EXYNOS versions
-to be separate Kconfig options, so you can build a kernel that supports
-EXYNOS4 but not EXYNOS5 if you want to. This is totally fine as far
-as I'm concerned, and it's not directly related to the first point.
+> Alternatively you could
+> Ack this if you are fine and we can take both Patch 1/2 and Patch 2/2 from this
+> series via the OMAP tree.
 
-Note that if you enable LPAE, you will still only be able to build EXYNOS5
-after the patch, but then you can have it in the same kernel as e.g.
-Tegra4 and Snapdragon 600.
+This probably will not work as I have a set of other changes to this
+driver in my tree.
 
-	Arnd
+> Patch 2/2 has a dependency on Patch 1/2 and they need to go in in that order else
+> gpio would break. More discussions are here [1].
+
+Tell me if I should prepare an immutable tag on my branch that you
+can pull in. I want an explicit handshake with the platform
+maintainer for this kind of stuff.
+
+Yours,
+Linus Walleij
