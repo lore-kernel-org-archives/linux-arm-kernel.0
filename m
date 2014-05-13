@@ -1,101 +1,36 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 13 May 2014 17:48:45 +0100
-Subject: [PATCH v6 5/5] arm: exynos: Add MCPM call-back functions
-In-Reply-To: <1399982324-27879-6-git-send-email-a.kesavan@samsung.com>
-References: <1399982324-27879-1-git-send-email-a.kesavan@samsung.com>
- <1399982324-27879-6-git-send-email-a.kesavan@samsung.com>
-Message-ID: <20140513164845.GA10210@red-moon>
+From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
+Date: Tue, 13 May 2014 13:57:52 -0300
+Subject: [PATCH 3/7] clk: sunxi: avoid double DT matching
+In-Reply-To: <CAL_JsqL0wWi0Pz6NirzEVWeHKqrRiGB6Q+9JYp6ew5KTeeY0dQ@mail.gmail.com>
+References: <1399940993-1773-1-git-send-email-robherring2@gmail.com>	<1399940993-1773-4-git-send-email-robherring2@gmail.com>
+ <CAL_JsqL0wWi0Pz6NirzEVWeHKqrRiGB6Q+9JYp6ew5KTeeY0dQ@mail.gmail.com>
+Message-ID: <53724F10.8030607@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 13, 2014 at 12:58:44PM +0100, Abhilash Kesavan wrote:
+Hi Rob,
 
-[...]
+For 3/7 (with the mentioned fix) and 4/7 my Cubietruck still boots, so
 
-> +static int __init exynos_mcpm_init(void)
-> +{
-> +       struct device_node *node;
-> +       int ret = 0;
+Acked-by: Emilio L?pez <emilio@elopez.com.ar>
+Tested-by: Emilio L?pez <emilio@elopez.com.ar>
 
-There is no point in initializing it to 0.
+El 13/05/14 12:12, Rob Herring escribi?:
+> On Mon, May 12, 2014 at 7:29 PM, Rob Herring <robherring2@gmail.com> wrote:
+>> From: Rob Herring <robh@kernel.org>
+>>
+>> Use for_each_matching_node_and_match instead of for_each_matching_node plus
+>> of_match_node to avoid searching the DT twice for each node.
+>>
+>> The sunxi DT scanning code should really be re-worked rather than have
+>> its own private matching infrastructure. It is working around needing a
+>> function pointer and a data pointer for each compatible match.
+>>
+>> Signed-off-by: Rob Herring <robh@kernel.org>
+>> Cc: "Emilio L?pez" <emilio@elopez.com.ar>
+>> Cc: Mike Turquette <mturquette@linaro.org>
+>> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-> +
-> +       node = of_find_compatible_node(NULL, NULL, "samsung,exynos5420");
-> +       if (!node)
-> +               return -ENODEV;
-> +       of_node_put(node);
-> +
-> +       if (!cci_probed())
-> +               return -ENODEV;
-> +
-> +       node = of_find_compatible_node(NULL, NULL,
-> +                       "samsung,exynos4210-sysram-ns");
-> +       if (!node)
-> +               return -ENODEV;
-> +
-> +       ns_sram_base_addr = of_iomap(node, 0);
-> +       of_node_put(node);
-> +       if (!ns_sram_base_addr) {
-> +               pr_err("failed to map non-secure iRAM base address\n");
-> +               return -ENOMEM;
-> +       }
-> +
-> +       /*
-> +        * To increase the stability of KFC reset we need to program
-> +        * the PMU SPARE3 register
-> +        */
-> +       __raw_writel(EXYNOS5420_SWRESET_KFC_SEL, S5P_PMU_SPARE3);
-> +
-> +       exynos_mcpm_usage_count_init();
-> +
-> +       ret = mcpm_platform_register(&exynos_power_ops);
-> +       if (!ret)
-> +               ret = mcpm_sync_init(exynos_pm_power_up_setup);
-> +       if (ret) {
-> +               iounmap(ns_sram_base_addr);
-> +               return ret;
-> +       }
-> +
-> +       mcpm_smp_set_ops();
-> +
-> +       pr_info("Exynos MCPM support installed\n");
-> +
-> +       /*
-> +        * Future entries into the kernel can now go
-> +        * through the cluster entry vectors.
-> +        */
-> +       __raw_writel(virt_to_phys(mcpm_entry_point),
-> +                       ns_sram_base_addr + MCPM_BOOT_ADDR_OFFSET);
-> +
+Cheers,
 
-ns_sram_base_addr must be unmapped, since it is unused after the write.
-
-Lorenzo
-
-> +       return ret;
-> +}
-> +
-> +early_initcall(exynos_mcpm_init);
-> diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
-> index f6b68a3..4179f6a 100644
-> --- a/arch/arm/mach-exynos/regs-pmu.h
-> +++ b/arch/arm/mach-exynos/regs-pmu.h
-> @@ -38,6 +38,7 @@
->  #define S5P_INFORM5                            S5P_PMUREG(0x0814)
->  #define S5P_INFORM6                            S5P_PMUREG(0x0818)
->  #define S5P_INFORM7                            S5P_PMUREG(0x081C)
-> +#define S5P_PMU_SPARE3                         S5P_PMUREG(0x090C)
-> 
->  #define S5P_ARM_CORE0_LOWPWR                   S5P_PMUREG(0x1000)
->  #define S5P_DIS_IRQ_CORE0                      S5P_PMUREG(0x1004)
-> @@ -322,4 +323,6 @@
-> 
->  #define EXYNOS5_OPTION_USE_RETENTION                           (1 << 4)
-> 
-> +#define EXYNOS5420_SWRESET_KFC_SEL                             0x3
-> +
->  #endif /* __ASM_ARCH_REGS_PMU_H */
-> --
-> 1.7.9.5
-> 
-> 
+Emilio
