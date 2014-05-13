@@ -1,122 +1,101 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 13 May 2014 10:19:03 +0200
-Subject: [PATCH v4 6/8] usb: ohci-platform: Enable optional use of reset
- controller
+Date: Tue, 13 May 2014 10:19:05 +0200
+Subject: [PATCH v4 8/8] ARM: sunxi: dt: add APP4-EVB1 board support
 In-Reply-To: <1399969145-11642-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1399969145-11642-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1399969145-11642-7-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1399969145-11642-9-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OHCI controllers used in the Allwinner A31 are asserted in reset using a
-global reset controller.
+From: Boris BREZILLON <boris.brezillon@free-electrons.com>
 
-Add optional support for such a controller in the OHCI platform driver.
+The APP4 EVB1 development boards embeds an A31, together with some NAND, one SD
+card slot, and one SDIO + UART WiFi and Bluetooth chip, a few I2C buses, USB,
+and a LCD display.
 
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Reviewed-by: Hans de Goede <hdegoede@redhat.com>
 ---
- Documentation/devicetree/bindings/usb/usb-ohci.txt |  1 +
- drivers/usb/host/ohci-platform.c                   | 27 +++++++++++++++++++---
- 2 files changed, 25 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/Makefile                |  1 +
+ arch/arm/boot/dts/sun6i-a31-app4-evb1.dts | 57 +++++++++++++++++++++++++++++++
+ 2 files changed, 58 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
 
-diff --git a/Documentation/devicetree/bindings/usb/usb-ohci.txt b/Documentation/devicetree/bindings/usb/usb-ohci.txt
-index 45f67d91e888..b968a1aea995 100644
---- a/Documentation/devicetree/bindings/usb/usb-ohci.txt
-+++ b/Documentation/devicetree/bindings/usb/usb-ohci.txt
-@@ -12,6 +12,7 @@ Optional properties:
- - clocks : a list of phandle + clock specifier pairs
- - phys : phandle + phy specifier pair
- - phy-names : "usb"
-+- resets : phandle + reset specifier pair
- 
- Example:
- 
-diff --git a/drivers/usb/host/ohci-platform.c b/drivers/usb/host/ohci-platform.c
-index b6002c951c5c..4369299064c7 100644
---- a/drivers/usb/host/ohci-platform.c
-+++ b/drivers/usb/host/ohci-platform.c
-@@ -24,6 +24,7 @@
- #include <linux/err.h>
- #include <linux/phy/phy.h>
- #include <linux/platform_device.h>
-+#include <linux/reset.h>
- #include <linux/usb/ohci_pdriver.h>
- #include <linux/usb.h>
- #include <linux/usb/hcd.h>
-@@ -36,6 +37,7 @@
- 
- struct ohci_platform_priv {
- 	struct clk *clks[OHCI_MAX_CLKS];
-+	struct reset_control *rst;
- 	struct phy *phy;
- };
- 
-@@ -191,6 +193,19 @@ static int ohci_platform_probe(struct platform_device *dev)
- 				break;
- 			}
- 		}
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 8bc808cb7ce2..1d9c50dda655 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -344,6 +344,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += \
+ 	sun5i-a10s-r7-tv-dongle.dtb \
+ 	sun5i-a13-olinuxino.dtb \
+ 	sun5i-a13-olinuxino-micro.dtb \
++	sun6i-a31-app4-evb1.dtb \
+ 	sun6i-a31-colombus.dtb \
+ 	sun6i-a31-m9.dtb \
+ 	sun7i-a20-cubieboard2.dtb \
+diff --git a/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts b/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
+new file mode 100644
+index 000000000000..2bbf8867362b
+--- /dev/null
++++ b/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
+@@ -0,0 +1,57 @@
++/*
++ * Copyright 2014 Boris Brezillon
++ *
++ * Boris Brezillon <boris.brezillon@free-electrons.com>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
 +
-+	}
++/dts-v1/;
++/include/ "sun6i-a31.dtsi"
++/include/ "sunxi-common-regulators.dtsi"
 +
-+	priv->rst = devm_reset_control_get_optional(&dev->dev, NULL);
-+	if (IS_ERR(priv->rst)) {
-+		err = PTR_ERR(priv->rst);
-+		if (err == -EPROBE_DEFER)
-+			goto err_put_clks;
-+		priv->rst = NULL;
-+	} else {
-+		err = reset_control_deassert(priv->rst);
-+		if (err)
-+			goto err_put_clks;
- 	}
- 
- 	if (pdata->big_endian_desc)
-@@ -203,7 +218,7 @@ static int ohci_platform_probe(struct platform_device *dev)
- 		dev_err(&dev->dev,
- 			"Error: CONFIG_USB_OHCI_BIG_ENDIAN_MMIO not set\n");
- 		err = -EINVAL;
--		goto err_put_clks;
-+		goto err_reset;
- 	}
- #endif
- #ifndef CONFIG_USB_OHCI_BIG_ENDIAN_DESC
-@@ -211,14 +226,14 @@ static int ohci_platform_probe(struct platform_device *dev)
- 		dev_err(&dev->dev,
- 			"Error: CONFIG_USB_OHCI_BIG_ENDIAN_DESC not set\n");
- 		err = -EINVAL;
--		goto err_put_clks;
-+		goto err_reset;
- 	}
- #endif
- 
- 	if (pdata->power_on) {
- 		err = pdata->power_on(dev);
- 		if (err < 0)
--			goto err_put_clks;
-+			goto err_reset;
- 	}
- 
- 	hcd->rsrc_start = res_mem->start;
-@@ -242,6 +257,9 @@ static int ohci_platform_probe(struct platform_device *dev)
- err_power:
- 	if (pdata->power_off)
- 		pdata->power_off(dev);
-+err_reset:
-+	if (priv->rst)
-+		reset_control_assert(priv->rst);
- err_put_clks:
- 	while (--clk >= 0)
- 		clk_put(priv->clks[clk]);
-@@ -266,6 +284,9 @@ static int ohci_platform_remove(struct platform_device *dev)
- 	if (pdata->power_off)
- 		pdata->power_off(dev);
- 
-+	if (priv->rst)
-+		reset_control_assert(priv->rst);
++/ {
++	model = "Allwinner A31 APP4 EVB1 Evaluation Board";
++	compatible = "allwinner,app4-evb1", "allwinner,sun6i-a31";
 +
- 	for (clk = 0; clk < OHCI_MAX_CLKS && priv->clks[clk]; clk++)
- 		clk_put(priv->clks[clk]);
- 
++	chosen {
++		bootargs = "earlyprintk console=ttyS0,115200";
++	};
++
++	soc at 01c00000 {
++		pio: pinctrl at 01c20800 {
++			usb1_vbus_pin_a: usb1_vbus_pin at 0 {
++				allwinner,pins = "PH27";
++				allwinner,function = "gpio_out";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
++		};
++
++		usbphy: phy at 01c19400 {
++			usb1_vbus-supply = <&reg_usb1_vbus>;
++			status = "okay";
++		};
++
++		ehci0: usb at 01c1a000 {
++			status = "okay";
++		};
++
++		uart0: serial at 01c28000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&uart0_pins_a>;
++			status = "okay";
++		};
++	};
++
++	reg_usb1_vbus: usb1-vbus {
++		pinctrl-0 = <&usb1_vbus_pin_a>;
++		gpio = <&pio 7 27 0>;
++		status = "okay";
++	};
++};
 -- 
 1.9.3
