@@ -1,43 +1,24 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 13 May 2014 16:07:09 +0900
-Subject: [PATCH v2 4/4] ARM: shmobile: marzen-reference: Set SMSC lan to
- use irq-push-pull
-In-Reply-To: <20140513011128.GD30252@verge.net.au>
-References: <1368586650-26263-1-git-send-email-horms+renesas@verge.net.au>
- <1368586650-26263-5-git-send-email-horms+renesas@verge.net.au>
- <10371644.BMkVSLAUGy@avalon> <2152550.dZ0p2WIftv@avalon>
- <20140513011128.GD30252@verge.net.au>
-Message-ID: <20140513070706.GA27611@verge.net.au>
+Date: Tue, 13 May 2014 16:07:29 +0900
+Subject: [PATCH v6 0/2] clk: shmobile: r8a7779: Add clocks support
+In-Reply-To: <20140513061545.5943.33241@quantum>
+References: <1397775951-30992-1-git-send-email-horms+renesas@verge.net.au>
+ <20140513015905.GB29336@verge.net.au>
+ <20140513061545.5943.33241@quantum>
+Message-ID: <20140513070729.GB27611@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 13, 2014 at 10:11:28AM +0900, Simon Horman wrote:
-> On Tue, May 13, 2014 at 12:26:35AM +0200, Laurent Pinchart wrote:
-> > Hi Simon,
+On Mon, May 12, 2014 at 11:15:45PM -0700, Mike Turquette wrote:
+> Quoting Simon Horman (2014-05-12 18:59:05)
+> > Hi Mike,
 > > 
-> > On Wednesday 15 May 2013 11:15:01 Laurent Pinchart wrote:
-> > > Hi Simon,
-> > > 
-> > > Thanks for the patch.
-> > > 
-> > > On Wednesday 15 May 2013 11:57:30 Simon Horman wrote:
-> > > > This change makes the DTS consistent with the platform data
-> > > > that exists in board-marzen.c.
-> > > > 
-> > > > Empirically it does not appear to be necessary.
-> > > > 
-> > > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > > 
-> > > Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> > 
-> > I've noticed that this patch hasn't landed in mainline. Do you still plan to 
-> > upstream it ?
-> > 
-> > While the board has a pull-up resistor on the IRQ signal and can thus 
-> > accommodate an open-drain configuration, using push-pull mode would lower the 
-> > rise time.
+> > I'm wondering if you would consider this series.
+> > I'm happy to take it through my tree and then arm-soc is
+> > that works best for you.
 > 
-> Sorry for letting that slip through the cracks (for an entire year!).
-> I'll queue it up after giving Magnus a chance to veto it.
+> I've just taken these into clk-next.
+> 
+> Thanks!
 
-I have spoken to Magnus off-line and queued up this patch.
+Great, thanks!
