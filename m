@@ -1,74 +1,129 @@
 From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Tue, 13 May 2014 09:13:54 -0700
-Subject: [PATCH v3 02/14] ARM: KVM: fix vgic V7 assembler code to work in BE
- image
+Date: Tue, 13 May 2014 09:13:55 -0700
+Subject: [PATCH v3 03/14] ARM: KVM: handle 64bit values passed to mrcc or from
+ mcrr instructions in BE case
 In-Reply-To: <1399997646-4716-1-git-send-email-victor.kamensky@linaro.org>
 References: <1399997646-4716-1-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <1399997646-4716-3-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <1399997646-4716-4-git-send-email-victor.kamensky@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The vgic h/w registers are little endian; when BE asm code
-reads/writes from/to them, it needs to do byteswap after/before.
-Byteswap code uses ARM_BE8 wrapper to add swap only if
-CONFIG_CPU_BIG_ENDIAN is configured.
+In some cases the mcrr and mrrc instructions in combination with the ldrd
+and strd instructions need to deal with 64bit value in memory. The ldrd
+and strd instructions already handle endianness within word (register)
+boundaries but to get effect of the whole 64bit value represented correctly,
+rr_lo_hi macro is introduced and is used to swap registers positions when
+the mcrr and mrrc instructions are used. That has the effect of swapping
+two words.
 
 Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/kvm/interrupts_head.S | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm/include/asm/kvm_asm.h | 18 ++++++++++++++++++
+ arch/arm/kvm/init.S            |  4 ++--
+ arch/arm/kvm/interrupts.S      |  4 ++--
+ arch/arm/kvm/interrupts_head.S |  6 +++---
+ 4 files changed, 25 insertions(+), 7 deletions(-)
 
+diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+index 53b3c4a..3a67bec 100644
+--- a/arch/arm/include/asm/kvm_asm.h
++++ b/arch/arm/include/asm/kvm_asm.h
+@@ -61,6 +61,24 @@
+ #define ARM_EXCEPTION_FIQ	  6
+ #define ARM_EXCEPTION_HVC	  7
+ 
++/*
++ * The rr_lo_hi macro swaps a pair of registers depending on
++ * current endianness. It is used in conjunction with ldrd and strd
++ * instructions that load/store a 64-bit value from/to memory to/from
++ * a pair of registers which are used with the mrrc and mcrr instructions.
++ * If used with the ldrd/strd instructions, the a1 parameter is the first
++ * source/destination register and the a2 parameter is the second
++ * source/destination register. Note that the ldrd/strd instructions
++ * already swap the bytes within the words correctly according to the
++ * endianness setting, but the order of the registers need to be effectively
++ * swapped when used with the mrrc/mcrr instructions.
++ */
++#ifdef CONFIG_CPU_ENDIAN_BE8
++#define rr_lo_hi(a1, a2) a2, a1
++#else
++#define rr_lo_hi(a1, a2) a1, a2
++#endif
++
+ #ifndef __ASSEMBLY__
+ struct kvm;
+ struct kvm_vcpu;
+diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
+index 74f0718..2d10b2d 100644
+--- a/arch/arm/kvm/init.S
++++ b/arch/arm/kvm/init.S
+@@ -74,7 +74,7 @@ __do_hyp_init:
+ ARM_BE8(setend	be) @ Switch to Big Endian mode if needed
+ 
+ 	@ Set the HTTBR to point to the hypervisor PGD pointer passed
+-	mcrr	p15, 4, r2, r3, c2
++	mcrr	p15, 4, rr_lo_hi(r2, r3), c2
+ 
+ 	@ Set the HTCR and VTCR to the same shareability and cacheability
+ 	@ settings as the non-secure TTBCR and with T0SZ == 0.
+@@ -140,7 +140,7 @@ phase2:
+ 	mov	pc, r0
+ 
+ target:	@ We're now in the trampoline code, switch page tables
+-	mcrr	p15, 4, r2, r3, c2
++	mcrr	p15, 4, rr_lo_hi(r2, r3), c2
+ 	isb
+ 
+ 	@ Invalidate the old TLBs
+diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
+index 0d68d40..24d4e65 100644
+--- a/arch/arm/kvm/interrupts.S
++++ b/arch/arm/kvm/interrupts.S
+@@ -52,7 +52,7 @@ ENTRY(__kvm_tlb_flush_vmid_ipa)
+ 	dsb	ishst
+ 	add	r0, r0, #KVM_VTTBR
+ 	ldrd	r2, r3, [r0]
+-	mcrr	p15, 6, r2, r3, c2	@ Write VTTBR
++	mcrr	p15, 6, rr_lo_hi(r2, r3), c2	@ Write VTTBR
+ 	isb
+ 	mcr     p15, 0, r0, c8, c3, 0	@ TLBIALLIS (rt ignored)
+ 	dsb	ish
+@@ -135,7 +135,7 @@ ENTRY(__kvm_vcpu_run)
+ 	ldr	r1, [vcpu, #VCPU_KVM]
+ 	add	r1, r1, #KVM_VTTBR
+ 	ldrd	r2, r3, [r1]
+-	mcrr	p15, 6, r2, r3, c2	@ Write VTTBR
++	mcrr	p15, 6, rr_lo_hi(r2, r3), c2	@ Write VTTBR
+ 
+ 	@ We're all done, just restore the GPRs and go to the guest
+ 	restore_guest_regs
 diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
-index 76af9302..e627858 100644
+index e627858..104977f 100644
 --- a/arch/arm/kvm/interrupts_head.S
 +++ b/arch/arm/kvm/interrupts_head.S
-@@ -1,4 +1,5 @@
- #include <linux/irqchip/arm-gic.h>
-+#include <asm/assembler.h>
+@@ -520,7 +520,7 @@ ARM_BE8(rev	r6, r6  )
+ 	mcr	p15, 0, r2, c14, c3, 1	@ CNTV_CTL
+ 	isb
  
- #define VCPU_USR_REG(_reg_nr)	(VCPU_USR_REGS + (_reg_nr * 4))
- #define VCPU_USR_SP		(VCPU_USR_REG(13))
-@@ -420,6 +421,14 @@ vcpu	.req	r0		@ vcpu pointer always in r0
- 	ldr	r8, [r2, #GICH_ELRSR0]
- 	ldr	r9, [r2, #GICH_ELRSR1]
- 	ldr	r10, [r2, #GICH_APR]
-+ARM_BE8(rev	r3, r3	)
-+ARM_BE8(rev	r4, r4	)
-+ARM_BE8(rev	r5, r5	)
-+ARM_BE8(rev	r6, r6	)
-+ARM_BE8(rev	r7, r7	)
-+ARM_BE8(rev	r8, r8	)
-+ARM_BE8(rev	r9, r9	)
-+ARM_BE8(rev	r10, r10	)
+-	mrrc	p15, 3, r2, r3, c14	@ CNTV_CVAL
++	mrrc	p15, 3, rr_lo_hi(r2, r3), c14	@ CNTV_CVAL
+ 	ldr	r4, =VCPU_TIMER_CNTV_CVAL
+ 	add	r5, vcpu, r4
+ 	strd	r2, r3, [r5]
+@@ -560,12 +560,12 @@ ARM_BE8(rev	r6, r6  )
  
- 	str	r3, [r11, #VGIC_CPU_HCR]
- 	str	r4, [r11, #VGIC_CPU_VMCR]
-@@ -439,6 +448,7 @@ vcpu	.req	r0		@ vcpu pointer always in r0
- 	add	r3, r11, #VGIC_CPU_LR
- 	ldr	r4, [r11, #VGIC_CPU_NR_LR]
- 1:	ldr	r6, [r2], #4
-+ARM_BE8(rev	r6, r6	)
- 	str	r6, [r3], #4
- 	subs	r4, r4, #1
- 	bne	1b
-@@ -466,6 +476,9 @@ vcpu	.req	r0		@ vcpu pointer always in r0
- 	ldr	r3, [r11, #VGIC_CPU_HCR]
- 	ldr	r4, [r11, #VGIC_CPU_VMCR]
- 	ldr	r8, [r11, #VGIC_CPU_APR]
-+ARM_BE8(rev	r3, r3	)
-+ARM_BE8(rev	r4, r4	)
-+ARM_BE8(rev	r8, r8	)
+ 	ldr	r2, [r4, #KVM_TIMER_CNTVOFF]
+ 	ldr	r3, [r4, #(KVM_TIMER_CNTVOFF + 4)]
+-	mcrr	p15, 4, r2, r3, c14	@ CNTVOFF
++	mcrr	p15, 4, rr_lo_hi(r2, r3), c14	@ CNTVOFF
  
- 	str	r3, [r2, #GICH_HCR]
- 	str	r4, [r2, #GICH_VMCR]
-@@ -476,6 +489,7 @@ vcpu	.req	r0		@ vcpu pointer always in r0
- 	add	r3, r11, #VGIC_CPU_LR
- 	ldr	r4, [r11, #VGIC_CPU_NR_LR]
- 1:	ldr	r6, [r3], #4
-+ARM_BE8(rev	r6, r6  )
- 	str	r6, [r2], #4
- 	subs	r4, r4, #1
- 	bne	1b
+ 	ldr	r4, =VCPU_TIMER_CNTV_CVAL
+ 	add	r5, vcpu, r4
+ 	ldrd	r2, r3, [r5]
+-	mcrr	p15, 3, r2, r3, c14	@ CNTV_CVAL
++	mcrr	p15, 3, rr_lo_hi(r2, r3), c14	@ CNTV_CVAL
+ 	isb
+ 
+ 	ldr	r2, [vcpu, #VCPU_TIMER_CNTV_CTL]
 -- 
 1.8.1.4
