@@ -1,32 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 13 May 2014 15:27:46 +0200
-Subject: [PATCH 06/17] pci: host: pcie-designware: Use *base-mask* for
- configuring the iATU
-In-Reply-To: <53721D7F.9070200@ti.com>
-References: <1399383244-14556-1-git-send-email-kishon@ti.com>
- <10531498.kYV5eO1J1m@wuerfel> <53721D7F.9070200@ti.com>
-Message-ID: <202752041.rgamje4etj@wuerfel>
+From: shaik.samsung@gmail.com (Shaik Ameer Basha)
+Date: Tue, 13 May 2014 19:02:39 +0530
+Subject: [PATCH v13 00/19] iommu/exynos: Fixes and Enhancements of System
+ MMU driver with DT
+In-Reply-To: <5576160.rCaFbvon4G@wuerfel>
+References: <1399875304-19948-1-git-send-email-shaik.ameer@samsung.com>
+ <5576160.rCaFbvon4G@wuerfel>
+Message-ID: <CAOD6ATou_4aNce-0NVFWOXO66W0dsEva0MQddAqQCqhCGRWxMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 May 2014 18:56:23 Kishon Vijay Abraham I wrote:
-> > If you have a case where the outbound translation is a 256MB (i.e. 28bit)
-> > section of the CPU address space, that could be represented as
-> > 
-> >       ranges = <0x82000000 0 0  0xb0000000  0 0x10000000>;
-> > 
-> > or 
-> > 
-> >       ranges = <0x82000000 0 0xb0000000  0xb0000000  0 0x10000000>;
-> > 
-> > depending on whether you want the BARs to be programmed using a low
-> > address 0x0-0x0fffffff or an address matching the window
-> > 0xb0000000-0xbfffffff.
-> 
-> The problem is, for configuring the window starting at 0xb0000000, the ATU
-> should be programmed 0x0000000 (the cpu address for it will be 0xb0000000 though).
-> 
+On Mon, May 12, 2014 at 3:37 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 12 May 2014 11:44:45 Shaik Ameer Basha wrote:
+>> This is the subset of previous v12 series and includes only the fixes and
+>> enhancements, leaving out the private DT bindings as discussed in the below thread.
+>>     -- http://www.gossamer-threads.com/lists/linux/kernel/1918178
+>>
+>> This patch series includes,
+>> 1] fixes for exynos-iommu driver build break
+>> 2] includes several bug fixes and enhancements for the exynos-iommu driver
+>> 3] code to handle multiple exynos sysmmu versions
+>> 4] adding support for device tree
+>>         Documentation/devicetree/bindings/iommu/samsung,sysmmu.txt
+>
+> The patches look good to me, but please add a note into the samsung,sysmmu.txt
+> file explaining that the binding is incomplete and that it's possible to
+> change in incompatible ways when we add support for attaching devices to
+> the IOMMU through the generic IOMMU binding.
 
-Then use the first of the two?
+Hi Arnd,
 
-	Arnd
+Thank you.
+If there are no more comments on this series, I can send one more
+incremental patch
+with the note mentioned in your review comment.
+
+Hi Joerg Roedel,
+Can you please add this series to your tree.
+
+Regards,
+Shaik Ameer Basha
+
+>
+>         Arnd
+> _______________________________________________
+> iommu mailing list
+> iommu at lists.linux-foundation.org
+> https://lists.linuxfoundation.org/mailman/listinfo/iommu
