@@ -1,28 +1,42 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 13 May 2014 09:39:02 -0600
-Subject: [PATCH 1/2] ARM: tegra: joystick input in tegra_defconfig
-In-Reply-To: <CAAVeFuLZ_wrxipYn2pfNzuyDiTvAPWH4aSWfonrG+YQsm4tM_g@mail.gmail.com>
-References: <1399883209-31169-1-git-send-email-acourbot@nvidia.com>
- <1399883209-31169-2-git-send-email-acourbot@nvidia.com>
- <5370F794.2020800@wwwdotorg.org>
- <CAAVeFuLZ_wrxipYn2pfNzuyDiTvAPWH4aSWfonrG+YQsm4tM_g@mail.gmail.com>
-Message-ID: <53723C96.5020203@wwwdotorg.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 13 May 2014 17:44:16 +0200
+Subject: [PATCH RESEND v4 2/8] ARM: sun6i: Add the USB clocks to the DTSI
+In-Reply-To: <1399995862-17788-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1399995862-17788-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1399995862-17788-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/12/2014 09:45 PM, Alexandre Courbot wrote:
-> On Tue, May 13, 2014 at 1:32 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 05/12/2014 02:26 AM, Alexandre Courbot wrote:
->>> NVIDIA SHIELD embeds a USB controller. Compile the corresponding support
->>> as a module in tegra_defconfig.
->>
->> Why make this a module rather than built-in. Almost everything else in
->> tegra_defconfig is built-in, except brcmfmac since it doesn't handle
->> lack of firmware availability at probe time.
-> 
-> Goal is to minimize the image size, especially since this is not a
-> feature I expect to be used much outside of SHIELD. If you prefer it
-> built-in, I'm fine with it too.
+The USB clocks of the A31 seems to be parented to the 24MHz oscillator, and
+handle the clocks for the USB phys and OHCI devices.
 
-Yes, built-in for everything makes most sense to me, except for code
-that doesn't actually work unless it's a module.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Reviewed-by: Hans de Goede <hdegoede@redhat.com>
+---
+ arch/arm/boot/dts/sun6i-a31.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index eec1afa257a5..13aa56ed5858 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -269,6 +269,17 @@
+ 			clocks = <&osc24M>, <&pll6>;
+ 			clock-output-names = "spi3";
+ 		};
++
++		usb_clk: clk at 01c200cc {
++			#clock-cells = <1>;
++		        #reset-cells = <1>;
++			compatible = "allwinner,sun6i-a31-usb-clk";
++			reg = <0x01c200cc 0x4>;
++			clocks = <&osc24M>;
++			clock-output-names = "usb_phy0", "usb_phy1", "usb_phy2",
++					     "usb_ohci0", "usb_ohci1",
++					     "usb_ohci2";
++		};
+ 	};
+ 
+ 	soc at 01c00000 {
+-- 
+1.9.3
