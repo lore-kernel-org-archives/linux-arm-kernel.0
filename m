@@ -1,59 +1,58 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 13 May 2014 15:47:32 -0700
-Subject: [PATCH v3 4/6] arm: add basic support for Mediatek MT6589 boards
-In-Reply-To: <1399938570-11356-5-git-send-email-matthias.bgg@gmail.com>
-References: <1399938570-11356-1-git-send-email-matthias.bgg@gmail.com>
- <1399938570-11356-5-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <20140513224732.GJ20486@codeaurora.org>
+Date: Tue, 13 May 2014 16:01:00 -0700
+Subject: [PATCH] clocksource: qcom: Implement read_current_timer for udelay
+Message-ID: <1400022060-30118-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/13, Matthias Brugger wrote:
-> diff --git a/arch/arm/mach-mediatek/mediatek.c b/arch/arm/mach-mediatek/mediatek.c
-> new file mode 100644
-> index 0000000..73dfb05
-> --- /dev/null
-> +++ b/arch/arm/mach-mediatek/mediatek.c
-> @@ -0,0 +1,32 @@
-> +/*
-> + * Device Tree support for Mediatek SoCs
-> + *
-> + * Copyright (c) 2014 MundoReader S.L.
-> + * Author: Matthias Brugger <matthias.bgg@gmail.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/init.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/irqchip.h>
-> +#include <asm/mach/arch.h>
-> +#include <asm/mach/map.h>
-> +
-> +static const char * const mediatek_board_dt_compat[] = {
+Setup the same timer used as the clocksource to be used as the
+read_current_timer implementation. This allows us to support a
+stable udelay implementation on MSMs where it's possible for the
+CPUs to scale speeds independently of one another.
 
-__initconst?
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/clocksource/qcom-timer.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-> +	"mediatek,mt6589",
-> +	NULL,
-> +};
-> +
-> +DT_MACHINE_START(MEDIATEK_DT, "Mediatek Cortex-A7 (Device Tree)")
-> +	.dt_compat	= mediatek_board_dt_compat,
-> +MACHINE_END
-
-You shouldn't need this file at all if the platform is part of
-the multi-platform kernel.
-
+diff --git a/drivers/clocksource/qcom-timer.c b/drivers/clocksource/qcom-timer.c
+index e807acf4c665..8d115db1e651 100644
+--- a/drivers/clocksource/qcom-timer.c
++++ b/drivers/clocksource/qcom-timer.c
+@@ -26,6 +26,8 @@
+ #include <linux/of_irq.h>
+ #include <linux/sched_clock.h>
+ 
++#include <asm/delay.h>
++
+ #define TIMER_MATCH_VAL			0x0000
+ #define TIMER_COUNT_VAL			0x0004
+ #define TIMER_ENABLE			0x0008
+@@ -179,6 +181,15 @@ static u64 notrace msm_sched_clock_read(void)
+ 	return msm_clocksource.read(&msm_clocksource);
+ }
+ 
++static unsigned long msm_read_current_timer(void)
++{
++	return msm_clocksource.read(&msm_clocksource);
++}
++
++static struct delay_timer msm_delay_timer = {
++	.read_current_timer = msm_read_current_timer,
++};
++
+ static void __init msm_timer_init(u32 dgt_hz, int sched_bits, int irq,
+ 				  bool percpu)
+ {
+@@ -217,6 +228,8 @@ err:
+ 	if (res)
+ 		pr_err("clocksource_register failed\n");
+ 	sched_clock_register(msm_sched_clock_read, sched_bits, dgt_hz);
++	msm_delay_timer.freq = dgt_hz;
++	register_current_timer_delay(&msm_delay_timer);
+ }
+ 
+ #ifdef CONFIG_ARCH_QCOM
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
