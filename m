@@ -1,160 +1,69 @@
-From: pintu.k@outlook.com (Pintu Kumar)
-Date: Tue, 13 May 2014 11:11:36 +0530
-Subject: Questions regarding DMA buffer sharing using IOMMU
-In-Reply-To: <5370F66F.7060204@codeaurora.org>
-References: <BAY169-W12541AD089785F8BFBD4E26EF350@phx.gbl>,
- <5218408.5YRJXjS4BX@wuerfel>
- <BAY169-W1156E6803829CAB545274BCEF350@phx.gbl>,
- <5370F66F.7060204@codeaurora.org>
-Message-ID: <BAY169-W35163E34227B04E692E0A5EF340@phx.gbl>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 13 May 2014 07:48:01 +0200
+Subject: i.MX6 USB OTG support is broken on linux-next
+In-Reply-To: <0ca71a532bd14b6d81e6799969f8f580@BL2PR03MB226.namprd03.prod.outlook.com>
+References: <20140509130046.GP2794@dragon>
+ <20140510111003.GA1593@shlinux1.ap.freescale.net>
+ <20140510131815.GT2794@dragon>
+ <20140510135737.GA1878@shlinux1.ap.freescale.net>
+ <20140512054549.GC5858@pengutronix.de>
+ <0ca71a532bd14b6d81e6799969f8f580@BL2PR03MB226.namprd03.prod.outlook.com>
+Message-ID: <20140513054801.GI5858@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Lauraa for your answers.
-I have few more queries below.?
+On Tue, May 13, 2014 at 12:33:30AM +0000, Peter Chen wrote:
+>  
+> > 
+> > On Sat, May 10, 2014 at 09:57:39PM +0800, Li Jun wrote:
+> > > On Sat, May 10, 2014 at 09:18:36PM +0800, Shawn Guo wrote:
+> > > > + Robin and David,
+> > > >
+> > > > diff --git a/drivers/usb/core/Kconfig b/drivers/usb/core/Kconfig
+> > > > index cb8e991..9081757 100644
+> > > > --- a/drivers/usb/core/Kconfig
+> > > > +++ b/drivers/usb/core/Kconfig
+> > > > @@ -65,7 +65,6 @@ config USB_OTG
+> > > >  config USB_OTG_WHITELIST
+> > > >         bool "Rely on OTG Targeted Peripherals List"
+> > > >         depends on USB_OTG || EXPERT
+> > > > -       default y if USB_OTG
+> > > >         help
+> > > >           If you say Y here, the "otg_whitelist.h" file will be used
+> > as a
+> > > >           product whitelist, so USB peripherals not listed there will
+> > be
+> > > >
+> > > > Shawn
+> > > As Peter suggested, do not enable OTG_FSM in defconfig since there are
+> > very few
+> > > HNP&SRP capable device in market. With OTG_FSM enabled, even
+> > USB_OTG_WHITELIST
+> > > is not selected, the OTG port still can't work the same as before if
+> > you connect
+> > > a normal usb device to it.
+> > 
+> > If a device is not HNP/SRP capable then it should not be used on this
+> > device. If we can't detect this during runtime then there should be some
+> > devicetree property for that. Making such decisions during compile time
+> > is not an option in the days of multimachine kernels.
+> > 
+> > Sascha
+> > 
+> 
+> I don't think OTG option should be set for multi-machine kernel configurations,
+> the otg device will not be server, and it is a customized device (eg, the Targeted
+> Peripherals List need to be updated when it goes to be product).
 
-----------------------------------------
-> Date: Mon, 12 May 2014 09:27:27 -0700
-> From: lauraa at codeaurora.org
-> To: pintu.k at outlook.com; arnd at arndb.de; linux-arm-kernel at lists.infradead.org
-> CC: linux-mm at kvack.org; linux-kernel at vger.kernel.org; linaro-mm-sig at lists.linaro.org
-> Subject: Re: Questions regarding DMA buffer sharing using IOMMU
->
-> On 5/12/2014 7:37 AM, Pintu Kumar wrote:
->> Hi,
->> Thanks for the reply.
->>
->> ----------------------------------------
->>> From: arnd at arndb.de
->>> To: linux-arm-kernel at lists.infradead.org
->>> CC: pintu.k at outlook.com; linux-mm at kvack.org; linux-kernel at vger.kernel.org; linaro-mm-sig at lists.linaro.org
->>> Subject: Re: Questions regarding DMA buffer sharing using IOMMU
->>> Date: Mon, 12 May 2014 14:00:57 +0200
->>>
->>> On Monday 12 May 2014 15:12:41 Pintu Kumar wrote:
->>>> Hi,
->>>> I have some queries regarding IOMMU and CMA buffer sharing.
->>>> We have an embedded linux device (kernel 3.10, RAM: 256Mb) in
->>>> which camera and codec supports IOMMU but the display does not support IOMMU.
->>>> Thus for camera capture we are using iommu buffers using
->>>> ION/DMABUF. But for all display rendering we are using CMA buffers.
->>>> So, the question is how to achieve buffer sharing (zero-copy)
->>>> between Camera and Display using only IOMMU?
->>>> Currently we are achieving zero-copy using CMA. And we are
->>>> exploring options to use IOMMU.
->>>> Now we wanted to know which option is better? To use IOMMU or CMA?
->>>> If anybody have come across these design please share your thoughts and results.
->>>
->>> There is a slight performance overhead in using the IOMMU in general,
->>> because the IOMMU has to fetch the page table entries from memory
->>> at least some of the time.
->>
->> Ok, we need to check performance later
->>
->>>
->>> If that overhead is within the constraints you have for transfers between
->>> camera and codec, you are always better off using IOMMU since that
->>> means you don't have to do memory migration.
->>
->> Transfer between camera is codec is fine. But our major concern is single buffer
->> sharing between camera & display. Here camera supports iommu but display does not support iommu.
->> Is it possible to render camera preview (iommu buffers) on display (not iommu and required physical contiguous overlay memory)?
->>
->
-> I'm pretty sure the answer is no for zero copy IOMMU buffers if one of your
-> devices does not support IOMMU. If the data is coming in as individual pages
-> and the hardware does not support scattered pages there isn't much you can
-> do except copy to a contiguous buffer. At least with Ion, the heap types can
-> be set up in a particular way such that the client need never know about the
-> existence of an IOMMU or not.
+I want to enable OTG support when one of the devices I want to run the
+kernel on is OTG capable. OTG is just a driver, there's no sane reason
+to break stuff just because it's enabled in the config. We're long past
+the point of single machine kernels.
 
-So, the zero copy cannot be achieved between iommu and non-iommu devices?
-Do you have any references like in case of QC MSM8974/etc, how this is achieved?
+Sascha
 
-Yes, we are using ION, with SYSTEM_HEAP, for IOMMU, in case of camera, but still we could not?
-render the preview on display.
-You mean to say, with ION it is possible to do buffer sharing(a.k.a zero copy) ?using the IOMMU heap?
-
-
->
->> Also is it possible to buffer sharing between 2 iommu supported devices?
->>
->
-> I don't see why not but there isn't a lot of information to go on here.
-
-Is this also possible with ION?
-Can you point out some use cases?
-Like in our cases camera, codec and GPU have IOMMU. Is it possible to do zero copy here?
-
-
->
-> Thanks,
-> Laura
-
-----------------------------------------
-> Date: Mon, 12 May 2014 09:27:27 -0700
-> From: lauraa at codeaurora.org
-> To: pintu.k at outlook.com; arnd at arndb.de; linux-arm-kernel at lists.infradead.org
-> CC: linux-mm at kvack.org; linux-kernel at vger.kernel.org; linaro-mm-sig at lists.linaro.org
-> Subject: Re: Questions regarding DMA buffer sharing using IOMMU
->
-> On 5/12/2014 7:37 AM, Pintu Kumar wrote:
->> Hi,
->> Thanks for the reply.
->>
->> ----------------------------------------
->>> From: arnd at arndb.de
->>> To: linux-arm-kernel at lists.infradead.org
->>> CC: pintu.k at outlook.com; linux-mm at kvack.org; linux-kernel at vger.kernel.org; linaro-mm-sig at lists.linaro.org
->>> Subject: Re: Questions regarding DMA buffer sharing using IOMMU
->>> Date: Mon, 12 May 2014 14:00:57 +0200
->>>
->>> On Monday 12 May 2014 15:12:41 Pintu Kumar wrote:
->>>> Hi,
->>>> I have some queries regarding IOMMU and CMA buffer sharing.
->>>> We have an embedded linux device (kernel 3.10, RAM: 256Mb) in
->>>> which camera and codec supports IOMMU but the display does not support IOMMU.
->>>> Thus for camera capture we are using iommu buffers using
->>>> ION/DMABUF. But for all display rendering we are using CMA buffers.
->>>> So, the question is how to achieve buffer sharing (zero-copy)
->>>> between Camera and Display using only IOMMU?
->>>> Currently we are achieving zero-copy using CMA. And we are
->>>> exploring options to use IOMMU.
->>>> Now we wanted to know which option is better? To use IOMMU or CMA?
->>>> If anybody have come across these design please share your thoughts and results.
->>>
->>> There is a slight performance overhead in using the IOMMU in general,
->>> because the IOMMU has to fetch the page table entries from memory
->>> at least some of the time.
->>
->> Ok, we need to check performance later
->>
->>>
->>> If that overhead is within the constraints you have for transfers between
->>> camera and codec, you are always better off using IOMMU since that
->>> means you don't have to do memory migration.
->>
->> Transfer between camera is codec is fine. But our major concern is single buffer
->> sharing between camera & display. Here camera supports iommu but display does not support iommu.
->> Is it possible to render camera preview (iommu buffers) on display (not iommu and required physical contiguous overlay memory)?
->>
->
-> I'm pretty sure the answer is no for zero copy IOMMU buffers if one of your
-> devices does not support IOMMU. If the data is coming in as individual pages
-> and the hardware does not support scattered pages there isn't much you can
-> do except copy to a contiguous buffer. At least with Ion, the heap types can
-> be set up in a particular way such that the client need never know about the
-> existence of an IOMMU or not.
->
->> Also is it possible to buffer sharing between 2 iommu supported devices?
->>
->
-> I don't see why not but there isn't a lot of information to go on here.
->
-> Thanks,
-> Laura
->
-> --
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> hosted by The Linux Foundation
- 		 	   		  
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
