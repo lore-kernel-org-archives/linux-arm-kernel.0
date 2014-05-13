@@ -1,44 +1,30 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 13 May 2014 14:52:55 -0500
-Subject: [PATCH 6/8] usb: xhci: avoid warning for !PM_SLEEP
-In-Reply-To: <7882044.S9pqnTAVYy@wuerfel>
-References: <1399557141-1346645-1-git-send-email-arnd@arndb.de>
- <1399557141-1346645-7-git-send-email-arnd@arndb.de>
- <20140513152829.GK1151@saruman.home> <7882044.S9pqnTAVYy@wuerfel>
-Message-ID: <20140513195255.GC1151@saruman.home>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 13 May 2014 13:57:14 -0600
+Subject: [PATCH 1/2] ARM: tegra: enable MCP251x CAN controller and DS1307
+ RTC
+In-Reply-To: <77cfca0a1769d867c8d2919f0040fbd785940fef.1400001937.git.stefan@agner.ch>
+References: <cover.1400001937.git.stefan@agner.ch>
+ <77cfca0a1769d867c8d2919f0040fbd785940fef.1400001937.git.stefan@agner.ch>
+Message-ID: <5372791A.4080909@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 13, 2014 at 09:39:37PM +0200, Arnd Bergmann wrote:
-> On Tuesday 13 May 2014 10:28:29 Felipe Balbi wrote:
-> > > diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-> > > index 151901c..3473296 100644
-> > > --- a/drivers/usb/host/xhci-plat.c
-> > > +++ b/drivers/usb/host/xhci-plat.c
-> > > @@ -202,7 +202,7 @@ static int xhci_plat_remove(struct platform_device *dev)
-> > >       return 0;
-> > >  }
-> > >  
-> > > -#ifdef CONFIG_PM
-> > > +#ifdef CONFIG_PM_SLEEP
-> > 
-> > can we just drop the ifdeferry altogether, including from SET_*_OPS
-> > macros ? This is just ridiculous that every merge window we have tens of
-> > patches fixing the ifdef in several drivers.
+On 05/13/2014 11:27 AM, stefan at agner.ch wrote:
+> From: Stefan Agner <stefan@agner.ch>
 > 
-> That would work for me. Another suggestion that came up before was
-> to change the SET_*_OPS so that the compiler silently drops the unused
-> functions, but unfortunately that would require changing all drivers.
+> Toradex Colibri Evaluation Board uses the DS1307 RTC and the
+> MCP251x CAN controller. The NVIDIA Tegra 3 based Colibri T30
+> module can be used on this carrier board, hence enable those
+> drivers in tegra_defonfig.
+> 
+> Furthermore the NVIDIA Tegra 3 based Apalis T30 module too
+> contains two MCP251x CAN controller.
 
-either way would work for me, and such patches would probably be merged
-through the trivial tree.
+I have squashed this patch into Tegra's for-3.16/defconfig branch.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140513/fc4f2ed9/attachment.sig>
+Can you please also send a patch to enable the same options in
+multi_v7_defconfig. Send that to arm at kernel.org (it's an alias for the
+armsoc tree maintainers). That will ensure that anyone using that config
+will also get these changes.
+
+Thanks.
