@@ -1,78 +1,36 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Tue, 13 May 2014 02:12:46 +0200
-Subject: [PATCHv4 3/3] edac: altera: Add EDAC support for Altera SoC
- SDRAM Controller
-In-Reply-To: <1399937817-2202-4-git-send-email-tthayer@altera.com>
-References: <1399937817-2202-1-git-send-email-tthayer@altera.com>
- <1399937817-2202-4-git-send-email-tthayer@altera.com>
-Message-ID: <20140513001246.GC5935@pd.tnic>
+From: Peter.Chen@freescale.com (Peter Chen)
+Date: Tue, 13 May 2014 00:25:18 +0000
+Subject: i.MX6 USB OTG support is broken on linux-next
+In-Reply-To: <20140512135437.GA8330@dragon>
+References: <20140509130046.GP2794@dragon>
+ <20140510111003.GA1593@shlinux1.ap.freescale.net>
+ <20140510131815.GT2794@dragon>
+ <4285b0d55d2545b99c4ba6b703e65a12@BL2PR03MB226.namprd03.prod.outlook.com>
+ <20140511014027.GV2794@dragon>
+ <71b1887d2f014021b084df703b15dc6a@BL2PR03MB226.namprd03.prod.outlook.com>
+ <20140512135437.GA8330@dragon>
+Message-ID: <04dad7ad8f0247b9bef4fea1db8a8bc8@BL2PR03MB226.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 12, 2014 at 06:36:57PM -0500, tthayer at altera.com wrote:
-> +	ptemp[0] = 0x5A5A5A5A;
-> +	ptemp[1] = 0xA5A5A5A5;
-> +	/* Clear the error injection bits */
-> +	regmap_write(drvdata->mc_vbase,	CTLCFG, read_reg);
-> +	/* Ensure it has been written out */
-> +	wmb();
-> +
-> +	/*
-> +	 * To trigger the error, we need to read the data back
-> +	 * (the data was written with errors above)
-> +	 * The ACCESS_ONCE macros are used to prevent the
-> +	 * compiler optimizing these reads out.
-> +	 */
-> +	reg = ACCESS_ONCE(ptemp[0]);
-> +	read_reg = ACCESS_ONCE(ptemp[1]);
-> +	/* Force Read */
-> +	rmb();
+ 
+> > >
+> >
+> > In your case, you should not set CONFIG_USB_OTG no matter at defconfig
+> > and at menuconfig.
+> 
+> Hmm, at least in my testing (USB mouse/keyboard connected to OTG port),
+> it works as before even I enable CONFIG_USB_OTG, as long as I do *not*
+> enable CONFIG_USB_OTG_FSM.
+> 
+> Since it works for my case, I'm wondering why you think I shouldn't
+> enable CONFIG_USB_OTG at all.
+> 
 
-Right, I still am a bit unsure about this thing. So sure, we funnel
-ptemp through an asm() block which stops the optimizer but we assign the
-results to reg and read_reg, i.e. two local variables which aren't used
-in this function anymore.
+If your device is not OTG device, there is no reason you need to enable
+CONFIG_USB_OTG. Yes, it may work for some devices when enable CONFIG_USB_OTG,
+but it will confuse other host or device which is connected with you, eg,
+your device will report your have supported some otg capabilities, eg, SRP or
+HNP.
 
-Thus, I don't see what stops the compiler from discarding them along
-with the ACCESS_ONCE() reads at some point, when it becomes really
-smart. Basically killing
-
-> +     reg = ACCESS_ONCE(ptemp[0]);
-> +     read_reg = ACCESS_ONCE(ptemp[1]);
-
-as they have to effect.
-
-Maybe we can do the reads in asm - this should be pretty safe.
-
-I.e., something like this:
-
-      asm volatile("" : "=r" (reg), "=r" (read_reg),
-		      : "0" (ptemp[0]), "1" (ptemp[1]));
-
-and it does it on x86 (did a small test program) by shuffling the values
-through registers so we definitely have the reads.
-
-	.loc 1 28 0
-	movl	-48(%rbp), %edx	# ptemp, D.2240
-	movl	-44(%rbp), %eax	# ptemp, D.2240
-	.loc 1 27 0
-	movl	%edx, -28(%rbp)	# reg, reg
-	movl	%eax, -32(%rbp)	# read_reg, read_reg
-
-Btw, if you only want to do the reads, you can simply tell gcc to put them in
-registers
-
-      asm volatile("" :: "r" (ptemp[0]), "r" (ptemp[1]));
-
-and be done with it but I don't know how smart it is with register
-allocation so as to recognize that they're already in registers (when
-they already are in some registers) and discard the reads.
-
-Fun stuff! :-)
-
--- 
-Regards/Gruss,
-    Boris.
-
-Sent from a fat crate under my desk. Formatting is fine.
---
+Peter
