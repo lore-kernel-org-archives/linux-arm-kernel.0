@@ -1,39 +1,44 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Tue, 13 May 2014 11:31:24 -0400
-Subject: [RFC PATCH V5 4/6] arm: mm: Enable RCU fast_gup
-In-Reply-To: <1399390209-1756-5-git-send-email-steve.capper@linaro.org>
-References: <1399390209-1756-1-git-send-email-steve.capper@linaro.org>
- <1399390209-1756-5-git-send-email-steve.capper@linaro.org>
-Message-ID: <53723ACC.7020500@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 13 May 2014 08:32:20 -0700
+Subject: RCU stall on panda
+In-Reply-To: <5371BD69.8010600@linaro.org>
+References: <53675C5F.10509@linaro.org>
+ <20140505180617.GM8754@linux.vnet.ibm.com>
+ <20140512212102.GF5668@atomide.com> <5371BD69.8010600@linaro.org>
+Message-ID: <20140513153220.GC16837@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steve,
+* Alex Shi <alex.shi@linaro.org> [140512 23:37]:
+> On 05/13/2014 05:21 AM, Tony Lindgren wrote:
+> > * Paul E. McKenney <paulmck@linux.vnet.ibm.com> [140505 11:11]:
+> >> On Mon, May 05, 2014 at 05:39:43PM +0800, Alex Shi wrote:
+> >>> I keep seeing the RCU stall problem on panda board from 3.10 kernel to latest upstream kernel
+> >>> and google find some one report it before: https://lkml.org/lkml/2012/9/20/519
+> >>>
+> >>> Is it the hardware issue or a real software problem?
+> >>
+> >> I cannot distinguish between hardware and software from the trace below,
+> >> but given that you are also seeing a soft lockup, either way you do
+> >> appear to have a real problem as opposed to an RCU CPU stall warning
+> >> false positive.
+> > 
+> > Looks like you have CPU_IDLE enabled on panda. Hangs with current linux
+> > next with CPU_IDLE are currently being discussed on the linux-omap list
+> > in thread "omap4-panda-es boot issues with v3.15-rc4"
+> > 
+> > I've seen occasional system hangs, and I've also noticed that doing
+> > ctrl-a-f h or ctrl-a-f l for sysrq backtrace can unlock the system
+> > producing similar errors to the below.
+> > 
+> 
+> Thanks a lot for the info.
+> In fact, the oops keeps in upstream kernel from 3.10 to latest.
 
-On 05/06/2014 11:30 AM, Steve Capper wrote:
-> Activate the RCU fast_gup for ARM. We also need to force THP splits to
-> broadcast an IPI s.t. we block in the fast_gup page walker. As THP
-> splits are comparatively rare, this should not lead to a noticeable
-> performance degradation.
+Care to test if the revert of commit cb7094 Santosh posted as
+"[PATCH] ARM: OMAP4: Fix the boot regression with CPU_IDLE enabled"
+solves the problem for you?
 
-> diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
-> index 3387e60..91a2b59 100644
-> --- a/arch/arm/mm/flush.c
-> +++ b/arch/arm/mm/flush.c
-> @@ -377,3 +377,22 @@ void __flush_anon_page(struct vm_area_struct *vma, struct page *page, unsigned l
->  	 */
->  	__cpuc_flush_dcache_area(page_address(page), PAGE_SIZE);
->  }
-> +
-> +#ifdef CONFIG_TRANSPARENT_HUGEPAGE
-> +#ifdef CONFIG_HAVE_RCU_TABLE_FREE
+Regards,
 
-This is trivia, but I for one find the form #if defined(a) && defined(b)
-easier to read. (Applies to the A64 version as well).
-
-Christopher
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+Tony
