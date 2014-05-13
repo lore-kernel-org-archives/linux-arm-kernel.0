@@ -1,128 +1,107 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 13 May 2014 10:19:01 +0200
-Subject: [PATCH v4 4/8] phy: usb: sunxi: Introduce Allwinner A31 USB PHY
- support
+Date: Tue, 13 May 2014 10:19:04 +0200
+Subject: [PATCH v4 7/8] ARM: sun6i: dt: Add support for the USB controllers
 In-Reply-To: <1399969145-11642-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1399969145-11642-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1399969145-11642-5-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1399969145-11642-8-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The USB phy controller in the A31 differs mostly from the older controllers
-because it has a clock dedicated for each phy, while the older ones were having
-a single clock for all the phys.
+The A31 has two ECHI/OHCI controllers, and one OHCI-only phy-less controller.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Reviewed-by: Hans de Goede <hdegoede@redhat.com>
 ---
- drivers/phy/phy-sun4i-usb.c | 33 ++++++++++++++++++++++-----------
- 1 file changed, 22 insertions(+), 11 deletions(-)
+ arch/arm/boot/dts/sun6i-a31.dtsi | 77 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 77 insertions(+)
 
-diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-index 66a87d50512b..115d8d5190d5 100644
---- a/drivers/phy/phy-sun4i-usb.c
-+++ b/drivers/phy/phy-sun4i-usb.c
-@@ -61,7 +61,6 @@
- #define MAX_PHYS			3
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index 13aa56ed5858..5e9f01af6d99 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -341,6 +341,83 @@
+ 			status = "disabled";
+ 		};
  
- struct sun4i_usb_phy_data {
--	struct clk *clk;
- 	void __iomem *base;
- 	struct mutex mutex;
- 	int num_phys;
-@@ -71,6 +70,7 @@ struct sun4i_usb_phy_data {
- 		void __iomem *pmu;
- 		struct regulator *vbus;
- 		struct reset_control *reset;
-+		struct clk *clk;
- 		int index;
- 	} phys[MAX_PHYS];
- };
-@@ -146,13 +146,13 @@ static int sun4i_usb_phy_init(struct phy *_phy)
- 	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
- 	int ret;
- 
--	ret = clk_prepare_enable(data->clk);
-+	ret = clk_prepare_enable(phy->clk);
- 	if (ret)
- 		return ret;
- 
- 	ret = reset_control_deassert(phy->reset);
- 	if (ret) {
--		clk_disable_unprepare(data->clk);
-+		clk_disable_unprepare(phy->clk);
- 		return ret;
- 	}
- 
-@@ -170,11 +170,10 @@ static int sun4i_usb_phy_init(struct phy *_phy)
- static int sun4i_usb_phy_exit(struct phy *_phy)
- {
- 	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
--	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
- 
- 	sun4i_usb_phy_passby(phy, 0);
- 	reset_control_assert(phy->reset);
--	clk_disable_unprepare(data->clk);
-+	clk_disable_unprepare(phy->clk);
- 
- 	return 0;
- }
-@@ -225,6 +224,7 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
- 	struct device *dev = &pdev->dev;
- 	struct device_node *np = dev->of_node;
- 	struct phy_provider *phy_provider;
-+	bool dedicated_clocks;
- 	struct resource *res;
- 	int i;
- 
-@@ -244,17 +244,16 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
- 	else
- 		data->disc_thresh = 2;
- 
-+	if (of_device_is_compatible(np, "allwinner,sun6i-a31-usb-phy"))
-+		dedicated_clocks = true;
-+	else
-+		dedicated_clocks = false;
++		usbphy: phy at 01c19400 {
++			compatible = "allwinner,sun6i-a31-usb-phy";
++			reg = <0x01c19400 0x10>,
++			      <0x01c1a800 0x4>,
++			      <0x01c1b800 0x4>;
++			reg-names = "phy_ctrl",
++				    "pmu1",
++				    "pmu2";
++			clocks = <&usb_clk 8>,
++				 <&usb_clk 9>,
++				 <&usb_clk 10>;
++			clock-names = "usb0_phy",
++				      "usb1_phy",
++				      "usb2_phy";
++			resets = <&usb_clk 0>,
++				 <&usb_clk 1>,
++				 <&usb_clk 2>;
++			reset-names = "usb0_reset",
++				      "usb1_reset",
++				      "usb2_reset";
++			status = "disabled";
++			#phy-cells = <1>;
++		};
 +
- 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "phy_ctrl");
- 	data->base = devm_ioremap_resource(dev, res);
- 	if (IS_ERR(data->base))
- 		return PTR_ERR(data->base);
- 
--	data->clk = devm_clk_get(dev, "usb_phy");
--	if (IS_ERR(data->clk)) {
--		dev_err(dev, "could not get usb_phy clock\n");
--		return PTR_ERR(data->clk);
--	}
--
- 	/* Skip 0, 0 is the phy for otg which is not yet supported. */
- 	for (i = 1; i < data->num_phys; i++) {
- 		struct sun4i_usb_phy *phy = data->phys + i;
-@@ -268,6 +267,17 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
- 			phy->vbus = NULL;
- 		}
- 
-+		if (dedicated_clocks)
-+			snprintf(name, sizeof(name), "usb%d_phy", i);
-+		else
-+			strlcpy(name, "usb_phy", sizeof(name));
++		ehci0: usb at 01c1a000 {
++			compatible = "allwinner,sun6i-a31-ehci", "generic-ehci";
++			reg = <0x01c1a000 0x100>;
++			interrupts = <0 72 4>;
++			clocks = <&ahb1_gates 26>;
++			resets = <&ahb1_rst 26>;
++			phys = <&usbphy 1>;
++			phy-names = "usb";
++			status = "disabled";
++		};
 +
-+		phy->clk = devm_clk_get(dev, name);
-+		if (IS_ERR(phy->clk)) {
-+			dev_err(dev, "failed to get clock %s\n", name);
-+			return PTR_ERR(phy->clk);
-+		}
++		ohci0: usb at 01c1a400 {
++			compatible = "allwinner,sun6i-a31-ohci", "generic-ohci";
++			reg = <0x01c1a400 0x100>;
++			interrupts = <0 73 4>;
++			clocks = <&ahb1_gates 29>, <&usb_clk 16>;
++			resets = <&ahb1_rst 29>;
++			phys = <&usbphy 1>;
++			phy-names = "usb";
++			status = "disabled";
++		};
 +
- 		snprintf(name, sizeof(name), "usb%d_reset", i);
- 		phy->reset = devm_reset_control_get(dev, name);
- 		if (IS_ERR(phy->reset)) {
-@@ -305,6 +315,7 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
- static const struct of_device_id sun4i_usb_phy_of_match[] = {
- 	{ .compatible = "allwinner,sun4i-a10-usb-phy" },
- 	{ .compatible = "allwinner,sun5i-a13-usb-phy" },
-+	{ .compatible = "allwinner,sun6i-a31-usb-phy" },
- 	{ .compatible = "allwinner,sun7i-a20-usb-phy" },
- 	{ },
- };
++		ehci1: usb at 01c1b000 {
++			compatible = "allwinner,sun6i-a31-ehci", "generic-ehci";
++			reg = <0x01c1b000 0x100>;
++			interrupts = <0 74 4>;
++			clocks = <&ahb1_gates 27>;
++			resets = <&ahb1_rst 27>;
++			phys = <&usbphy 2>;
++			phy-names = "usb";
++			status = "disabled";
++		};
++
++		ohci1: usb at 01c1b400 {
++			compatible = "allwinner,sun6i-a31-ohci", "generic-ohci";
++			reg = <0x01c1b400 0x100>;
++			interrupts = <0 75 4>;
++			clocks = <&ahb1_gates 30>, <&usb_clk 17>;
++			resets = <&ahb1_rst 30>;
++			phys = <&usbphy 2>;
++			phy-names = "usb";
++			status = "disabled";
++		};
++
++		ohci2: usb at 01c1c000 {
++			compatible = "allwinner,sun6i-a31-ohci", "generic-ohci";
++			reg = <0x01c1c400 0x100>;
++			interrupts = <0 77 4>;
++			clocks = <&ahb1_gates 31>, <&usb_clk 18>;
++			resets = <&ahb1_rst 31>;
++			status = "disabled";
++		};
++
+ 		pio: pinctrl at 01c20800 {
+ 			compatible = "allwinner,sun6i-a31-pinctrl";
+ 			reg = <0x01c20800 0x400>;
 -- 
 1.9.3
