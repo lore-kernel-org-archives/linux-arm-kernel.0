@@ -1,72 +1,60 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 13 May 2014 12:13:09 +0530
-Subject: [PATCH v8 1/2] phy: Add new Exynos5 USB 3.0 PHY driver
-In-Reply-To: <CAFp+6iH-bLd9WUYyK8d8i=UNUm4DHpEYz=Am_qzPyX6gDovyKA@mail.gmail.com>
-References: <1399643877-14528-1-git-send-email-gautam.vivek@samsung.com>	<5370C689.2090402@ti.com>
- <CAFp+6iH-bLd9WUYyK8d8i=UNUm4DHpEYz=Am_qzPyX6gDovyKA@mail.gmail.com>
-Message-ID: <5371BEFD.6000407@ti.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 13 May 2014 08:43:49 +0200
+Subject: [PATCH v4] drivers: sh: compile drivers/sh/pm_runtime.c if
+ ARCH_SHMOBILE_MULTI
+In-Reply-To: <20140513000455.GA18157@verge.net.au>
+References: <1399411579-10681-1-git-send-email-geert+renesas@glider.be>
+ <CAMuHMdWwenyU1RS4c8spFcb7M0oCXP9z8zbGQ0VACKj7EbvvkA@mail.gmail.com>
+ <20140511004626.GW31760@verge.net.au>
+ <CANqRtoQzxdjwU+BLyccrSzfBx3UMKm6=MAw9dUHSEBWm5_Vspg@mail.gmail.com>
+ <20140512070700.GA20505@verge.net.au>
+ <CAMuHMdVMCcDK4Y403G26S27oATzLN74iCSM7U+K_ktE-c3uweQ@mail.gmail.com>
+ <20140513000455.GA18157@verge.net.au>
+Message-ID: <CAMuHMdVFGOHqq0X6=3gK3wtJGQvHnecP5RKCyye09FbY1CUYgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Simon,
 
-On Tuesday 13 May 2014 11:37 AM, Vivek Gautam wrote:
-> Hi Kishon,
-> 
-> 
-> On Mon, May 12, 2014 at 6:33 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->> Hi Gautam,
+On Tue, May 13, 2014 at 2:04 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Mon, May 12, 2014 at 09:25:21AM +0200, Geert Uytterhoeven wrote:
+>> On Mon, May 12, 2014 at 9:07 AM, Simon Horman <horms@verge.net.au> wrote:
+>> > On Mon, May 12, 2014 at 08:24:03AM +0900, Magnus Damm wrote:
+>> >> On Sun, May 11, 2014 at 9:46 AM, Simon Horman <horms@verge.net.au> wrote:
+>> >> > On Thu, May 08, 2014 at 12:12:29PM +0200, Geert Uytterhoeven wrote:
+>> >> >> On Tue, May 6, 2014 at 11:26 PM, Geert Uytterhoeven
+>> >> >> <geert+renesas@glider.be> wrote:
+>> >> >> > Tested on Koelsch (legacy, reference, shmobile, and shmobile+bbb kernels)
+>> >> >> > and BeagleBone Black (shmobile+bbb). Will test on more hardware tomorrow.
+>> >> >>
+>> >> >> Tested on genmai with Wolfram's CCF support.
+>> >> >
+>> >> > Thanks, shall I go ahead and queue this up?
+>> >>
+>> >> Yes please, at least from my side everything looks perfect.
+>> >
+>> > Thanks, will do.
+>> >
+>> > I currently plan to send this on to Linus when the merge window
+>> > opens for v3.16.
 >>
->> On Friday 09 May 2014 07:27 PM, Vivek Gautam wrote:
->>> Add a new driver for the USB 3.0 PHY on Exynos5 series of SoCs.
->>> The new driver uses the generic PHY framework and will interact
->>> with DWC3 controller present on Exynos5 series of SoCs.
->>>
->>> Also, created a new header file in linux/mfd/syscon/ for
->>> Exynos5 SoCs and put the required PMU offset definitions
->>> for the basic available PHYs.
->>>
->>
->>
->> I get the following checkpatch warnings
->>
->> WARNING: please write a paragraph that describes the config symbol fully
->> #163: FILE: drivers/phy/Kconfig:163:
->> +config PHY_EXYNOS5_USBDRD
->>
->> WARNING: DT compatible string "samsung,exynos5250-usbdrd-phy" appears
->> un-documented -- check ./Documentation/devicetree/bindings/
->> #708: FILE: drivers/phy/phy-exynos5-usbdrd.c:516:
->> +               .compatible = "samsung,exynos5250-usbdrd-phy",
->>
->> WARNING: DT compatible string "samsung,exynos5420-usbdrd-phy" appears
->> un-documented -- check ./Documentation/devicetree/bindings/
->> #711: FILE: drivers/phy/phy-exynos5-usbdrd.c:519:
->> +               .compatible = "samsung,exynos5420-usbdrd-phy",.
->>
->>
->> I think you just need to separate the Documentation into a separate patch
->> before applying the driver patch.
->>
-> 
-> I somehow don't see the Documentation warning. Below is the checkpatch
-> output which i ran on this v8 patch version.
->   linux-phy$ ./scripts/checkpatch.pl phy.patch
->   WARNING: please write a paragraph that describes the config symbol fully
->   #127: FILE: drivers/phy/Kconfig:163:
->   +config PHY_EXYNOS5_USBDRD
-> 
->   total: 0 errors, 1 warnings, 760 lines checked
-> 
->   phy.patch has style problems, please review.
-> 
->   If any of these errors are false positives, please report
->   them to the maintainer, see CHECKPATCH in MAINTAINERS.
-> 
-> am i missing something ?
+>> Actually we had hoped this could land in v3.15, so we can fix the regression
+>> introduced in v3.14 by bf98c1eac1d4a6bcf00532e4fa41d8126cd6c187 as
+>> soon as possible.
+>
+> Ok, so I should/can treat this as a fix?
 
-Yeah.. the checkpatch.pl has got updated recently. If you use the latest kernel
-you should see it.
+Yes, definitely.
 
-Thanks
-Kishon
+Thanks!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
