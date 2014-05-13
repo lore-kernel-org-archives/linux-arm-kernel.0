@@ -1,61 +1,48 @@
-From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Tue, 13 May 2014 08:53:09 +0530
-Subject: [PATCH 2/2] ARM: dts: enable fimd for exynos5800 based peach-pi
- board
-In-Reply-To: <004701cf6e48$b4578910$1d069b30$%han@samsung.com>
-References: <1399877120-4634-1-git-send-email-rahul.sharma@samsung.com>
- <1399877120-4634-3-git-send-email-rahul.sharma@samsung.com>
- <004701cf6e48$b4578910$1d069b30$%han@samsung.com>
-Message-ID: <CAPdUM4Mfh-LnUX_fHi7BTJ1LcE+b4oHzjgWAJk+AWvV7UJbGnA@mail.gmail.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Tue, 13 May 2014 10:19:27 +0800
+Subject: [PATCH 1/1] usb: core: Kconfig: refine the description for
+ CONFIG_USB_OTG
+Message-ID: <1399947567-18958-1-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Jingoo Han.
+the user should only select it when the board supports HNP and SRP,
+it should NOT be selected if the board only supports dual-role
+switch through ID pin.
 
-Hi Kukjin,
+There is a discussion for it:
+http://marc.info/?l=linux-arm-kernel&m=139994896101516&w=2
+http://marc.info/?l=linux-usb&m=139994881701504&w=2
 
-Please consider both of these series for your tree.
+Signed-off-by: Peter Chen <peter.chen@freescale.com>
+---
+ drivers/usb/core/Kconfig |   12 +++++++-----
+ 1 files changed, 7 insertions(+), 5 deletions(-)
 
-1) http://www.spinics.net/lists/arm-kernel/msg329697.html
-2) http://www.spinics.net/lists/arm-kernel/msg330291.html
-
-Regards,
-Rahul Sharma
-
-On 13 May 2014 06:44, Jingoo Han <jg1.han@samsung.com> wrote:
-> On Monday, May 12, 2014 3:45 PM, Rahul Sharma wrote:
->>
->> From: Rahul Sharma <Rahul.Sharma@samsung.com>
->>
->> Enable FIMD for peach-pi board.
->>
->> Signed-off-by: Rahul Sharma <Rahul.Sharma@samsung.com>
->
-> Reviewed-by: Jingoo Han <jg1.han@samsung.com>
->
-> Best regards,
-> Jingoo Han
->
->> ---
->>  arch/arm/boot/dts/exynos5800-peach-pi.dts |    5 +++++
->>  1 file changed, 5 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
->> index 426705a..cccacdd 100644
->> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
->> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
->> @@ -157,6 +157,11 @@
->>       };
->>  };
->>
->> +&fimd {
->> +     status = "okay";
->> +     samsung,invert-vclk;
->> +};
->> +
->>  &hsi2c_9 {
->>       status = "okay";
->>       clock-frequency = <400000>;
->> --
->> 1.7.9.5
->
+diff --git a/drivers/usb/core/Kconfig b/drivers/usb/core/Kconfig
+index cb8e991..158048b 100644
+--- a/drivers/usb/core/Kconfig
++++ b/drivers/usb/core/Kconfig
+@@ -54,13 +54,15 @@ config USB_OTG
+ 	default n
+ 	help
+ 	  The most notable feature of USB OTG is support for a
+-	  "Dual-Role" device, which can act as either a device
+-	  or a host. The initial role is decided by the type of
+-	  plug inserted and can be changed later when two dual
+-	  role devices talk to each other.
++	  otg device, which can act as either a device or a host.
++	  The initial role is decided by the type of plug inserted
++	  and can be changed using HNP (Host Negotiation Protocol)
++	  later when two otg devices talk to each other.
+ 
+ 	  Select this only if your board has Mini-AB/Micro-AB
+-	  connector.
++	  connector and supports HNP and SRP (Session Request Protocol).
++	  If the board only supports dual-role switch through ID
++	  pin, this configuration should not be selected.
+ 
+ config USB_OTG_WHITELIST
+ 	bool "Rely on OTG Targeted Peripherals List"
+-- 
+1.7.8
