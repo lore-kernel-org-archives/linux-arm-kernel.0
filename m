@@ -1,42 +1,67 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 12 May 2014 18:06:10 -0700
-Subject: [PATCH 0/2] ARM: dts: Fix OMAP3 ISP functional clock configuration
-In-Reply-To: <8771357.o1oFFUoBzb@avalon>
-References: <1398076907-2901-1-git-send-email-laurent.pinchart@ideasonboard.com>
- <536B630B.8010303@ti.com> <8771357.o1oFFUoBzb@avalon>
-Message-ID: <20140513010610.GJ5668@atomide.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 13 May 2014 10:11:28 +0900
+Subject: [PATCH v2 4/4] ARM: shmobile: marzen-reference: Set SMSC lan to
+ use irq-push-pull
+In-Reply-To: <2152550.dZ0p2WIftv@avalon>
+References: <1368586650-26263-1-git-send-email-horms+renesas@verge.net.au>
+ <1368586650-26263-5-git-send-email-horms+renesas@verge.net.au>
+ <10371644.BMkVSLAUGy@avalon> <2152550.dZ0p2WIftv@avalon>
+Message-ID: <20140513011128.GD30252@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Laurent Pinchart <laurent.pinchart@ideasonboard.com> [140512 16:17]:
-> On Thursday 08 May 2014 13:57:15 Tomi Valkeinen wrote:
-> > On 21/04/14 13:41, Laurent Pinchart wrote:
-> > > Hello,
-> > > 
-> > > This patch set enables rate propagation from the OMAP3 ISP functional
-> > > clock to the DPLL4 M5 clock. It copies Tomi Valkeinen's similar patch set
-> > > for the OMAP DSS functional clock from the "OMAP: OMAP3 DSS related clock
-> > > patches" patch series.
-> > > 
-> > > Laurent Pinchart (2):
-> > >   ARM: dts: use ti,fixed-factor-clock for dpll4_m5x2_mul_ck
-> > >   ARM: dts: set 'ti,set-rate-parent' for dpll4_m5 path
-> > >  
-> > >  arch/arm/boot/dts/omap36xx-clocks.dtsi | 2 +-
-> > >  arch/arm/boot/dts/omap3xxx-clocks.dtsi | 7 ++++---
-> > >  2 files changed, 5 insertions(+), 4 deletions(-)
-> > 
-> > These look fine to me.
-> > 
-> > Acked-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+On Tue, May 13, 2014 at 12:26:35AM +0200, Laurent Pinchart wrote:
+> Hi Simon,
 > 
-> Thank you.
+> On Wednesday 15 May 2013 11:15:01 Laurent Pinchart wrote:
+> > Hi Simon,
+> > 
+> > Thanks for the patch.
+> > 
+> > On Wednesday 15 May 2013 11:57:30 Simon Horman wrote:
+> > > This change makes the DTS consistent with the platform data
+> > > that exists in board-marzen.c.
+> > > 
+> > > Empirically it does not appear to be necessary.
+> > > 
+> > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > 
+> > Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 > 
-> Tony, could you please pick the patches up for v3.16 ?
+> I've noticed that this patch hasn't landed in mainline. Do you still plan to 
+> upstream it ?
+> 
+> While the board has a pull-up resistor on the IRQ signal and can thus 
+> accommodate an open-drain configuration, using push-pull mode would lower the 
+> rise time.
 
-I'd like to see acks from Tero on these two, or Tero queue
-them along with other clock dts clock changes.
+Sorry for letting that slip through the cracks (for an entire year!).
+I'll queue it up after giving Magnus a chance to veto it.
 
-Regards,
-
-Tony
+> > > ---
+> > > 
+> > >  arch/arm/boot/dts/r8a7779-marzen-reference.dts | 1 +
+> > >  1 file changed, 1 insertion(+)
+> > > 
+> > > diff --git a/arch/arm/boot/dts/r8a7779-marzen-reference.dts
+> > > b/arch/arm/boot/dts/r8a7779-marzen-reference.dts index 10cfc7f..fe32e1a
+> > > 100644
+> > > --- a/arch/arm/boot/dts/r8a7779-marzen-reference.dts
+> > > +++ b/arch/arm/boot/dts/r8a7779-marzen-reference.dts
+> > > @@ -40,6 +40,7 @@
+> > > 
+> > >  		phy-mode = "mii";
+> > >  		interrupt-parent = <&irqpin0>;
+> > >  		interrupts = <1 0x4>;
+> > > 
+> > > +		smsc,irq-push-pull;
+> > > 
+> > >  		reg-io-width = <4>;
+> > >  		vddvario-supply = <&fixedregulator3v3>;
+> > >  		vdd33a-supply = <&fixedregulator3v3>;
+> 
+> -- 
+> Regards,
+> 
+> Laurent Pinchart
+> 
