@@ -1,89 +1,116 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Tue, 13 May 2014 09:23:34 -0700
-Subject: [PATCH v3 2/6] dt-bindings: add mtk-timer bindings
-In-Reply-To: <CABuKBeL-Zx9S9QuWyhPF_yEa8EvmJYTDLa6KrY2cXKe9e9zBnQ@mail.gmail.com>
-References: <1399938570-11356-1-git-send-email-matthias.bgg@gmail.com>
- <1399938570-11356-3-git-send-email-matthias.bgg@gmail.com>
- <2e93c984-96d9-4504-bb9a-672a247fb710@BL2FFO11FD034.protection.gbl>
- <CABuKBeL-Zx9S9QuWyhPF_yEa8EvmJYTDLa6KrY2cXKe9e9zBnQ@mail.gmail.com>
-Message-ID: <8f009a99-3857-4d8e-9161-29999c5c7297@BN1BFFO11FD016.protection.gbl>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 13 May 2014 09:27:33 -0700
+Subject: [PATCH] bus/omap_l3: avoid sync initcall for modules
+In-Reply-To: <177753046.dmVvfiu3Rn@wuerfel>
+References: <1399560433-1402630-1-git-send-email-arnd@arndb.de>
+ <1399560990-1402858-6-git-send-email-arnd@arndb.de>
+ <20140512222006.GI5668@atomide.com> <177753046.dmVvfiu3Rn@wuerfel>
+Message-ID: <20140513162731.GD16837@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-05-13 at 04:08PM +0200, Matthias Brugger wrote:
-> 2014-05-13 15:08 GMT+02:00 S?ren Brinkmann <soren.brinkmann@xilinx.com>:
-> > Hi Matthias,
-> >
-> > On Tue, 2014-05-13 at 01:49AM +0200, Matthias Brugger wrote:
-> >> Add binding documentation for the General Porpose Timer driver of
-> >> the Mediatek SoCs.
-> >>
-> >> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
-> >> ---
-> >>  .../devicetree/bindings/timer/mediatek,mtk-timer.txt   | 18 ++++++++++++++++++
-> >>  1 file changed, 18 insertions(+)
-> >>  create mode 100644 Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
-> >> new file mode 100644
-> >> index 0000000..d0f2df3
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
-> >> @@ -0,0 +1,18 @@
-> >> +Mediatek MT6589, MT6577 and MT6572 Timers
-> >> +---------------------------------------
-> >> +
-> >> +Required properties:
-> >> +- compatible: Should be "mediatek,mtk6589-timer"
-> >> +- reg: Should contain location and length for timers register.
-> >> +- clocks: phandle to the clock source; the first refers to a 13 MHz fixed
-> >> +             system clock and the second handle to a 32 KHz fixed RTC
-> >> +             clock.
-> >
-> > Are these frequencies mandatory to the timer or an implementation
-> > detail of the SOC you're working with? I suspect, it might be possible
-> > to see the same timer in a different SOC implementation with different
-> > frequencies? In that case - or probably in general - the frequencies
-> > should not be part of the binding, IMHO.
-> 
-> I had a look at the implementation of several Mediatek SoCs and all of
-> them have the timer with the same clock connections.
-> I don't know if the IP can be or is actually used with other clocksources.
-> I can try to reformulate the description to make the clock constraints
-> sound less mandatory.
-> Although I would prefer to leave a mention about the clock frequencies
-> (like e.g. in the allwinner,sun4i-timer).
+* Arnd Bergmann <arnd@arndb.de> [140513 08:13]:
+> On Monday 12 May 2014 15:20:07 Tony Lindgren wrote:
+> > 
+> > How about instead let's add this into include/linux/module.h
+> > like we have for other initcalls:
 
-Since the bindings should be generic, I think the frequencies shouldn't
-be here. From DT/HW perspective their frequencies is irrelevant and a
-pure implementation detail, IMHO.
-
+I mean include/linux/init.h naturally..
+ 
+> > #define postcore_initcall(fn)           module_init(fn)
+> > 
+> > There may be others missing too from there. BTW, this driver
+> > might be few of the drivers that actually might need to be
+> > initialized early for debugging to catch bad access from
+> > other drivers.
 > 
-> >
-> >> +
-> >> +Examples:
-> >> +
-> >> +     timer {
-> >> +             compatible = "mediatek,mtk6589-timer";
-> >> +             reg = <0x10008000 0x80>;
-> >> +             interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_LOW>;
-> >> +             clocks = <&system_clk>, <&rtc_clk>;
-> >
-> > Might be just my personal preference, but you could also add the clock-names
-> > property which would relax the ordering requirement a bit and would
-> > clearly  identify the IP's clocks.
+> There is a comment above those defines saying:
 > 
-> In the v1 of the patch series I had the clock names included [1] but
-> because of comments of others I removed them [1].
-> Actually the driver just use the first clock, but from my
-> understanding the DT reflects as well the HW configuration and for
-> this reason I put the two clocks in the DT.
+> /* Don't use these in loadable modules, but some people do... */
 > 
-> [1] http://thread.gmane.org/gmane.linux.drivers.devicetree/69155/
+> so I'm not sure if adding more would be appreciated.
+> 
+> 	Arnd
 
-I had cases where the same IP was implemented by different SOC vendors
-differently. In that cases having the clock-names in the bindings is
-extremely helpful when you try to match the binding with the IP docs.
-Hence, I'd recommend being explicit and list the names.
+Well "some" in that comment is probably an understatement :)
 
-	S?ren
+$ git grep _initcall drivers/ | wc -l
+737
+
+I did not look what percentage has tristate in the Kconfig,
+but that might keep some people from making loadable drivers.
+
+Greg, is the following patch something you may want to
+consider picking up?
+
+Regards,
+
+Tony
+
+
+8< ---------------------------
+From: Tony Lindgren <tony@atomide.com>
+Date: Tue, 13 May 2014 09:05:26 -0700
+Subject: [PATCH] init.h: Update initcall_sync variants to fix build errors
+
+We are getting randconfig build errors on device drivers with
+tristate Kconfig option if they are using custom initcall
+levels. Rather than add ifdeffery into the drivers, let's add
+the missing initcall_sync variants.
+
+As the comment in init.h has kept people from updating the
+list of initcalls that can be just module_init when the driver
+is loaded as a loadable module, let's also update the comment
+a bit to describe valid use cases custom initcall levels.
+
+While most drivers should nowadays use just regular module_init
+because of the deferred probe, we do have quite a few custom
+initcall levels left that we cannot remove until tested properly.
+
+There are also still few valid cases where a custom initcall
+level might make sense that I'm aware of.
+
+For example a bus snooping driver can provide information about
+invalid bus access and is handy loader early when built in. But
+there's no hard dependency to have it necessarily built in and
+a loadable module is a valid option.
+
+Another example is a driver implementing a Linux framework like
+pinctrl framework. That driver may be needed early on some
+platforms because of legacy reasons, while it can be just a
+regular module_init on most platforms.
+
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/include/linux/init.h
++++ b/include/linux/init.h
+@@ -297,16 +297,28 @@ void __init parse_early_options(char *cmdline);
+ 
+ #else /* MODULE */
+ 
+-/* Don't use these in loadable modules, but some people do... */
++/*
++ * In most cases loadable modules do not need custom
++ * initcall levels. There are still some valid cases where
++ * a driver may be needed early if built in, and does not
++ * matter when built as a loadable module. Like bus
++ * snooping debug drivers.
++ */
+ #define early_initcall(fn)		module_init(fn)
+ #define core_initcall(fn)		module_init(fn)
++#define core_initcall_sync(fn)		module_init(fn)
+ #define postcore_initcall(fn)		module_init(fn)
++#define postcore_initcall_sync(fn)	module_init(fn)
+ #define arch_initcall(fn)		module_init(fn)
+ #define subsys_initcall(fn)		module_init(fn)
++#define subsys_initcall_sync(fn)	module_init(fn)
+ #define fs_initcall(fn)			module_init(fn)
++#define fs_initcall_sync(fn)		module_init(fn)
+ #define rootfs_initcall(fn)		module_init(fn)
+ #define device_initcall(fn)		module_init(fn)
++#define device_initcall_sync(fn)	module_init(fn)
+ #define late_initcall(fn)		module_init(fn)
++#define late_initcall_sync(fn)		module_init(fn)
+ 
+ #define console_initcall(fn)		module_init(fn)
+ #define security_initcall(fn)		module_init(fn)
