@@ -1,57 +1,58 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 13 May 2014 16:27:37 -0700
-Subject: [GIT PULL] clk: mvebu: changes for v3.16
-In-Reply-To: <20140508145703.GC12708@titan.lakedaemon.net>
-References: <20140508145703.GC12708@titan.lakedaemon.net>
-Message-ID: <20140513232737.5943.78044@quantum>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 13 May 2014 19:29:52 -0400 (EDT)
+Subject: [PATCH] ARM: Don't ever downscale loops_per_jiffy in SMP systems#
+In-Reply-To: <alpine.LFD.2.11.1405131908260.980@knanqh.ubzr>
+References: <CAD=FV=UEGJGHrdcXgs3EZ_wFXT8GnNeCOMt7CgdiiUzBzZ5Y0A@mail.gmail.com>
+ <alpine.LFD.2.11.1405081149190.980@knanqh.ubzr>
+ <CAD=FV=VtcLOh51LCmafzRMdqtDrwKXCqK6gE6V7OOOUe4gjwbA@mail.gmail.com>
+ <alpine.LFD.2.11.1405081329010.980@knanqh.ubzr>
+ <20140508192209.GH3693@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1405081600260.980@knanqh.ubzr>
+ <20140508205223.GI3693@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1405082058130.980@knanqh.ubzr>
+ <20140509091824.GL3693@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1405091245070.980@knanqh.ubzr>
+ <20140509182245.GM3693@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1405091640090.980@knanqh.ubzr>
+ <CAD=FV=UJK1nSPjH-au-KtbnOZk2nC7usLD8L9neMedj6WHUp8g@mail.gmail.com>
+ <CAD=FV=XM2URyJjV9gaE=mrp7LAEGtvi9wQGhGJi3_HYp_XzYWg@mail.gmail.com>
+ <5372998F.6020502@wwwdotorg.org>
+ <alpine.LFD.2.11.1405131908260.980@knanqh.ubzr>
+Message-ID: <alpine.LFD.2.11.1405131922580.980@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Jason Cooper (2014-05-08 07:57:03)
-> Mike,
-> 
-> Here are the mvebu clock changes this time around.  Pretty easy, just
-> one brand new driver.  This has been in -next for a while and is part of
-> the awesome series by Thomas converting the legacy orion5x platform to
-> devicetree.
-> 
-> Please pull.
+On Tue, 13 May 2014, Nicolas Pitre wrote:
 
-Taken into clk-next.
+> On Tue, 13 May 2014, Stephen Warren wrote:
+> 
+> > On 05/13/2014 03:50 PM, Doug Anderson wrote:
+> > ...
+> > > ...but then I found the true problem shows up when we transition
+> > > between very low frequencies on exynos, like between 200MHz and
+> > > 300MHz.  While transitioning between frequencies the system
+> > > temporarily bumps over to the "switcher" PLL running at 800MHz while
+> > > waiting for the main PLL to stabilize.  No CPUFREQ notification is
+> > > sent for that.  That means there's a period of time when we're running
+> > > at 800MHz but loops_per_jiffy is calibrated at between 200MHz and
+> > > 300MHz.
+> > > 
+> > > 
+> > > I'm welcome to any suggestions for how to address this.  It sorta
+> > > feels like it would be a common thing to have a temporary PLL during
+> > > the transition, ...
+> > 
+> > We definitely do that on Tegra for some cpufreq transitions.
+> 
+> Ouch...  If this is a common strategy to use a third frequency during a 
+> transition phase, especially if that frequency is way off (800MHz vs 
+> 200-300MHz) then it is something the cpufreq layer must capture and 
+> advertise.
 
-Regards,
-Mike
+Of course if only the loops_per_jiffy scaling does care about frequency 
+changes these days, and if in those cases udelay() can instead be moved 
+to a timer source on those hick-up prone platforms, then all this is 
+fairly theoretical and may not be worth pursuing.
 
-> 
-> thx,
-> 
-> Jason.
-> 
-> 
-> The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
-> 
->   Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/linux-mvebu.git tags/clk-mvebu-3.16
-> 
-> for you to fetch changes up to 66ecbfea762ad28bd108db76775483b491068b92:
-> 
->   clk: mvebu: add Orion5x clock driver (2014-04-26 01:03:55 +0000)
-> 
-> ----------------------------------------------------------------
-> clk mvebu changes for v3.16
-> 
->  - orion5x: brand new driver
-> 
-> ----------------------------------------------------------------
-> Thomas Petazzoni (1):
->       clk: mvebu: add Orion5x clock driver
-> 
->  .../devicetree/bindings/clock/mvebu-core-clock.txt |   8 +
->  drivers/clk/mvebu/Kconfig                          |   4 +
->  drivers/clk/mvebu/Makefile                         |   1 +
->  drivers/clk/mvebu/orion.c                          | 210 +++++++++++++++++++++
->  4 files changed, 223 insertions(+)
->  create mode 100644 drivers/clk/mvebu/orion.c
+
+Nicolas
