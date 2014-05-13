@@ -1,116 +1,92 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 13 May 2014 16:30:26 +0200
-Subject: [PATCHv2 1/4] of: make of_update_property() usable earlier in
- the boot process
-In-Reply-To: <CAL_JsqLNnLjeo2tM=z5bcn4DJD_5-uFRGkk6wAWnvGZyo9Y7pg@mail.gmail.com>
-References: <1399975839-5311-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1399975839-5311-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <CAL_JsqLNnLjeo2tM=z5bcn4DJD_5-uFRGkk6wAWnvGZyo9Y7pg@mail.gmail.com>
-Message-ID: <20140513163026.18a0fa61@free-electrons.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 13 May 2014 10:39:26 -0400
+Subject: [PATCH] ARM: OMAP4: Fix the boot regression with CPU_IDLE enabled
+Message-ID: <1399991966-14582-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Rob Herring,
+On OMAP4 panda board, there have been several bug reports about boot
+hang and lock-ups with CPU_IDLE enabled. The root cause of the issue
+is missing interrupts while in idle state. Commit cb7094e8 {cpuidle / omap4 :
+use CPUIDLE_FLAG_TIMER_STOP flag} moved the broadcast notifiers to common
+code for right reasons but on OMAP4 which suffers from a nasty ROM code
+bug with GIC, commit ff999b8a {ARM: OMAP4460: Workaround for ROM bug ..},
+we loose interrupts which leads to issues like lock-up, hangs etc.
 
-On Tue, 13 May 2014 09:00:02 -0500, Rob Herring wrote:
+Patch reverts commit cb7094 {cpuidle / omap4 : use CPUIDLE_FLAG_TIMER_STOP
+flag} to avoid the issue. With this change, OMAP4 panda boards, the mentioned
+issues are getting fixed. We no longer loose interrupts which was the cause
+of the regression.
 
-> > However, it forgot to do the same for of_update_property(), which if
-> > used early in the boot process (before core_initcalls have been
-> > called), tries to call sysfs_remove_bin_file(), and crashes:
-> 
-> It actually crashes or just the warning? It would be good to give the
-> crash backtrace.
+Cc: Roger Quadros <rogerq@ti.com>
+Cc: Kevin Hilman <khilman@linaro.org>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Reported-tested-by: Roger Quadros <rogerq@ti.com>
+Reported-tested-by: Kevin Hilman <khilman@linaro.org>
+Tested-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ arch/arm/mach-omap2/cpuidle44xx.c |   12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
 
-It crashes after the warning. The crash trace is:
-
-Unable to handle kernel NULL pointer dereference at virtual address 0000003c
-pgd = c0004000
-[0000003c] *pgd=00000000
-Internal error: Oops: 5 [#1] SMP ARM
-Modules linked in:
-CPU: 0 PID: 0 Comm: swapper/0 Tainted: G        W     3.15.0-rc1-00127-g1d7e7b2-dirty #423
-task: c10ad4d8 ti: c10a2000 task.ti: c10a2000
-PC is at kernfs_find_ns+0x8/0xf0
-LR is at kernfs_find_and_get_ns+0x30/0x48
-pc : [<c0103834>]    lr : [<c010394c>]    psr: 600001d3
-sp : c10a3f34  ip : 00000073  fp : 00000000
-r10: 00000000  r9 : cfffc240  r8 : cfdf2980
-r7 : cf812c00  r6 : 00000000  r5 : 00000000  r4 : c10b45e0
-r3 : c10ad4d8  r2 : 00000000  r1 : cf812c00  r0 : 00000000
-Flags: nZCv  IRQs off  FIQs off  Mode SVC_32  ISA ARM  Segment kernel
-Control: 10c53c7d  Table: 0000404a  DAC: 00000015
-Process swapper/0 (pid: 0, stack limit = 0xc10a2240)
-Stack: (0xc10a3f34 to 0xc10a4000)
-3f20:                                              c10b45e0 00000000 00000000
-3f40: cf812c00 c010394c 00000063 cf812c00 00000001 cf812c00 cfdf29ac c03932cc
-3f60: 00000063 cf812bc0 cfdf29ac cf812c00 ffffffff c03943f8 cfdf2980 c0104468
-3f80: cfdf2a04 cfdf2980 cf812bc0 c06634b0 c10aa3c0 c0394da4 c10f74dc cfdf2980
-3fa0: cf812bc0 c0647248 c10aa3c0 ffffffff c10de940 c10aa3c0 ffffffff c0640934
-3fc0: ffffffff ffffffff c06404ec 00000000 00000000 c06634b0 00000000 10c53c7d
-3fe0: c10aa434 c06634ac c10ae4c8 0000406a 414fc091 00008070 00000000 00000000
-[<c0103834>] (kernfs_find_ns) from [<00000001>] (0x1)
-Code: e5c89001 eaffffcf e92d40f0 e1a06002 (e1d023bc) 
----[ end trace 3406ff24bd97382f ]---
-Kernel panic - not syncing: Attempted to kill the idle task!
----[ end Kernel panic - not syncing: Attempted to kill the idle task!
-
-> > To fix this problem, we simply skip the sysfs related calls in
-> > of_update_property(), and rely on of_init() to fix up things when it
-> > will be called, exactly as is done in of_add_property() and
-> > of_remove_property().
-> >
-> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > Fixes: 75b57ecf9d1d1e17d099ab13b8f48e6e038676be ('of: Make device nodes kobjects so they show up in sysfs')
-> 
-> Humm, I didn't know about this new tag. This doesn't quite match what
-> SubmittingPatches says. It should be 12 digits of commit hash and
-> double quotes around the summary.
-
-Well, I guess it's a per-maintainer choice:
-
-git log | grep "^Fixes:"
-
-    Fixes: 54fe26a900bc528f3df1e4235cb6b9ca5c6d4dc2 ('ARM: mvebu: Add thermal quirk for the Armada 375 DB board')
-    Fixes: 54397d85349f ("ARM: kirkwood: Relocate PCIe device tree nodes")
-    Fixes: a7d4f81821f7 ('ARM: mvebu: Add support for NOR flash device on Openblocks AX3 board')
-    Fixes: b484ff42df47 ('ARM: mvebu: Add support for NOR flash device on Armada XP-DB board')
-    Fixes: c971ff185f64 ("leds: leds-pwm: Defer led_pwm_set() if PWM can sleep")
-    Fixes: abccd00f8af2 ('btrfs: Fix 32/64-bit problem with BTRFS_SET_RECEIVED_SUBVOL ioctl')
-    Fixes: ee1e0994ab1bd (regulator: s5m8767: Use GPIO for controlling Buck9/eMMC)
-    Fixes: 652ed95d5fa6 (cpufreq: introduce cpufreq_generic_get() routine)
-
-Somewhat inconsistent :-)
-
-But ok, 12 digits for the commit hash, and double quotes.
-
-> >  drivers/of/base.c | 5 +++++
-> >  1 file changed, 5 insertions(+)
-> >
-> > diff --git a/drivers/of/base.c b/drivers/of/base.c
-> > index f72d19b..e981f09 100644
-> > --- a/drivers/of/base.c
-> > +++ b/drivers/of/base.c
-> > @@ -1831,11 +1831,16 @@ int of_update_property(struct device_node *np, struct property *newprop)
-> >         if (rc)
-> >                 return rc;
-> >
-> > +       /* At early boot, bail out and defer setup to of_init() */
-> > +       if (!of_kset)
-> > +               goto skip_sysfs;
-> 
-> I prefer to avoid the goto and do: return found ? 0 : -ENODEV;
-
-Ok.
-
-> Also, this code has changed some in 3.15 rc's, you need to rebase.
-> This change needs to go into 3.15. Other platforms could be broken.
-
-Ok, will submit a v2 separately.
-
-Thanks,
-
-Thomas
+diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
+index 01fc710..3e169d9 100644
+--- a/arch/arm/mach-omap2/cpuidle44xx.c
++++ b/arch/arm/mach-omap2/cpuidle44xx.c
+@@ -14,6 +14,7 @@
+ #include <linux/cpuidle.h>
+ #include <linux/cpu_pm.h>
+ #include <linux/export.h>
++#include <linux/clockchips.h>
+ 
+ #include <asm/cpuidle.h>
+ #include <asm/proc-fns.h>
+@@ -83,6 +84,7 @@ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
+ {
+ 	struct idle_statedata *cx = state_ptr + index;
+ 	u32 mpuss_can_lose_context = 0;
++	int cpu_id = smp_processor_id();
+ 
+ 	/*
+ 	 * CPU0 has to wait and stay ON until CPU1 is OFF state.
+@@ -110,6 +112,8 @@ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
+ 	mpuss_can_lose_context = (cx->mpu_state == PWRDM_POWER_RET) &&
+ 				 (cx->mpu_logic_state == PWRDM_POWER_OFF);
+ 
++	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu_id);
++
+ 	/*
+ 	 * Call idle CPU PM enter notifier chain so that
+ 	 * VFP and per CPU interrupt context is saved.
+@@ -165,6 +169,8 @@ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
+ 	if (dev->cpu == 0 && mpuss_can_lose_context)
+ 		cpu_cluster_pm_exit();
+ 
++	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu_id);
++
+ fail:
+ 	cpuidle_coupled_parallel_barrier(dev, &abort_barrier);
+ 	cpu_done[dev->cpu] = false;
+@@ -189,8 +195,7 @@ static struct cpuidle_driver omap4_idle_driver = {
+ 			/* C2 - CPU0 OFF + CPU1 OFF + MPU CSWR */
+ 			.exit_latency = 328 + 440,
+ 			.target_residency = 960,
+-			.flags = CPUIDLE_FLAG_TIME_VALID | CPUIDLE_FLAG_COUPLED |
+-			         CPUIDLE_FLAG_TIMER_STOP,
++			.flags = CPUIDLE_FLAG_TIME_VALID | CPUIDLE_FLAG_COUPLED,
+ 			.enter = omap_enter_idle_coupled,
+ 			.name = "C2",
+ 			.desc = "CPUx OFF, MPUSS CSWR",
+@@ -199,8 +204,7 @@ static struct cpuidle_driver omap4_idle_driver = {
+ 			/* C3 - CPU0 OFF + CPU1 OFF + MPU OSWR */
+ 			.exit_latency = 460 + 518,
+ 			.target_residency = 1100,
+-			.flags = CPUIDLE_FLAG_TIME_VALID | CPUIDLE_FLAG_COUPLED |
+-			         CPUIDLE_FLAG_TIMER_STOP,
++			.flags = CPUIDLE_FLAG_TIME_VALID | CPUIDLE_FLAG_COUPLED,
+ 			.enter = omap_enter_idle_coupled,
+ 			.name = "C3",
+ 			.desc = "CPUx OFF, MPUSS OSWR",
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.7.9.5
