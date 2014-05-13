@@ -1,107 +1,138 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Tue, 13 May 2014 16:34:44 -0500
-Subject: [PATCH 4/4] spi: qup: Add support for v1.1.1
-In-Reply-To: <1400016884-9568-1-git-send-email-agross@codeaurora.org>
-References: <1400016884-9568-1-git-send-email-agross@codeaurora.org>
-Message-ID: <1400016884-9568-5-git-send-email-agross@codeaurora.org>
+From: james.hogan@imgtec.com (James Hogan)
+Date: Tue, 13 May 2014 22:42:10 +0100
+Subject: [PATCH v6 2/3] ARM: sunxi: Add driver for sunxi IR controller
+In-Reply-To: <1400006342-2968-3-git-send-email-bay@hackerdom.ru>
+References: <1400006342-2968-1-git-send-email-bay@hackerdom.ru>
+ <1400006342-2968-3-git-send-email-bay@hackerdom.ru>
+Message-ID: <537291B2.4070700@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for v1.1.1 of the SPI QUP controller.
+Hi Alexander,
 
-Signed-off-by: Andy Gross <agross@codeaurora.org>
----
- drivers/spi/spi-qup.c |   32 ++++++++++++++++++++------------
- 1 file changed, 20 insertions(+), 12 deletions(-)
+Just a few probe error handling suggestions...
 
-diff --git a/drivers/spi/spi-qup.c b/drivers/spi/spi-qup.c
-index b518b51..abad630 100644
---- a/drivers/spi/spi-qup.c
-+++ b/drivers/spi/spi-qup.c
-@@ -144,6 +144,7 @@ struct spi_qup {
- 	int			w_size;	/* bytes per SPI word */
- 	int			tx_bytes;
- 	int			rx_bytes;
-+	int			qup_v1;
- };
- 
- 
-@@ -422,7 +423,9 @@ static int spi_qup_io_config(struct spi_device *spi, struct spi_transfer *xfer)
- 	config |= QUP_CONFIG_SPI_MODE;
- 	writel_relaxed(config, controller->base + QUP_CONFIG);
- 
--	writel_relaxed(0, controller->base + QUP_OPERATIONAL_MASK);
-+	/* only write to OPERATIONAL_MASK when register is present */
-+	if (!controller->qup_v1)
-+		writel_relaxed(0, controller->base + QUP_OPERATIONAL_MASK);
- 	return 0;
- }
- 
-@@ -488,7 +491,7 @@ static int spi_qup_probe(struct platform_device *pdev)
- 	struct resource *res;
- 	struct device *dev;
- 	void __iomem *base;
--	u32 data, max_freq, iomode;
-+	u32 data = 0, max_freq, iomode;
- 	int ret, irq, size;
- 
- 	dev = &pdev->dev;
-@@ -531,15 +534,6 @@ static int spi_qup_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
--	data = readl_relaxed(base + QUP_HW_VERSION);
--
--	if (data < QUP_HW_VERSION_2_1_1) {
--		clk_disable_unprepare(cclk);
--		clk_disable_unprepare(iclk);
--		dev_err(dev, "v.%08x is not supported\n", data);
--		return -ENXIO;
--	}
--
- 	master = spi_alloc_master(dev, sizeof(struct spi_qup));
- 	if (!master) {
- 		clk_disable_unprepare(cclk);
-@@ -567,6 +561,10 @@ static int spi_qup_probe(struct platform_device *pdev)
- 	controller->cclk = cclk;
- 	controller->irq = irq;
- 
-+	/* set v1 flag if device is version 1 */
-+	if (of_device_is_compatible(dev->of_node, "qcom,spi-qup-v1.1.1"))
-+		controller->qup_v1 = 1;
-+
- 	spin_lock_init(&controller->lock);
- 	init_completion(&controller->done);
- 
-@@ -604,10 +602,19 @@ static int spi_qup_probe(struct platform_device *pdev)
- 
- 	writel_relaxed(0, base + QUP_OPERATIONAL);
- 	writel_relaxed(0, base + QUP_IO_M_MODES);
--	writel_relaxed(0, base + QUP_OPERATIONAL_MASK);
-+
-+	if (!controller->qup_v1)
-+		writel_relaxed(0, base + QUP_OPERATIONAL_MASK);
-+
- 	writel_relaxed(SPI_ERROR_CLK_UNDER_RUN | SPI_ERROR_CLK_OVER_RUN,
- 		       base + SPI_ERROR_FLAGS_EN);
- 
-+	/* if earlier version of the QUP, disable INPUT_OVERRUN */
-+	if (controller->qup_v1)
-+		writel_relaxed(QUP_ERROR_OUTPUT_OVER_RUN |
-+			QUP_ERROR_INPUT_UNDER_RUN | QUP_ERROR_OUTPUT_UNDER_RUN,
-+			base + QUP_ERROR_FLAGS_EN);
-+
- 	writel_relaxed(0, base + SPI_CONFIG);
- 	writel_relaxed(SPI_IO_C_NO_TRI_STATE, base + SPI_IO_CONTROL);
- 
-@@ -729,6 +736,7 @@ static int spi_qup_remove(struct platform_device *pdev)
- }
- 
- static struct of_device_id spi_qup_dt_match[] = {
-+	{ .compatible = "qcom,spi-qup-v1.1.1", },
- 	{ .compatible = "qcom,spi-qup-v2.1.1", },
- 	{ .compatible = "qcom,spi-qup-v2.2.1", },
- 	{ }
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+On 13/05/14 19:39, Alexander Bersenev wrote:
+> +static int sunxi_ir_probe(struct platform_device *pdev)
+> +{
+> +	int ret = 0;
+> +	unsigned long tmp = 0;
+> +
+> +	struct device *dev = &pdev->dev;
+> +	struct device_node *dn = dev->of_node;
+> +	struct resource *res;
+> +	struct sunxi_ir *ir;
+> +
+> +	ir = devm_kzalloc(dev, sizeof(struct sunxi_ir), GFP_KERNEL);
+> +	if (!ir)
+> +		return -ENOMEM;
+> +
+> +	/* Clock */
+> +	ir->apb_clk = devm_clk_get(dev, "apb");
+> +	if (IS_ERR(ir->apb_clk)) {
+> +		dev_err(dev, "failed to get a apb clock.\n");
+> +		return -EINVAL;
+
+Does it make sense to return PTR_ERR(ir->apb_clk) here?
+
+> +	}
+> +	ir->clk = devm_clk_get(dev, "ir");
+> +	if (IS_ERR(ir->clk)) {
+> +		dev_err(dev, "failed to get a ir clock.\n");
+> +		return -EINVAL;
+
+and here
+
+> +	}
+> +
+> +	ret = clk_set_rate(ir->clk, SUNXI_IR_BASE_CLK);
+> +	if (ret) {
+> +		dev_err(dev, "set ir base clock failed!\n");
+> +		return -EINVAL;
+
+return ret?
+
+> +	}
+> +
+> +	if (clk_prepare_enable(ir->apb_clk)) {
+> +		dev_err(dev, "try to enable apb_ir_clk failed\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	if (clk_prepare_enable(ir->clk)) {
+> +		dev_err(dev, "try to enable ir_clk failed\n");
+> +		ret = -EINVAL;
+> +		goto exit_clkdisable_apb_clk;
+> +	}
+> +
+> +	/* IO */
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +
+> +	ir->base = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(ir->base)) {
+> +		dev_err(dev, "failed to map registers\n");
+> +		ret = -ENOMEM;
+
+PTR_ERR again?
+
+> +		goto exit_clkdisable_clk;
+> +	}
+> +
+> +	/* IRQ */
+> +	ir->irq = platform_get_irq(pdev, 0);
+> +	if (ir->irq < 0) {
+> +		dev_err(dev, "no irq resource\n");
+> +		ret = -EINVAL;
+
+ret = ir->irq?
+
+> +		goto exit_clkdisable_clk;
+> +	}
+> +
+> +	ret = devm_request_irq(dev, ir->irq, sunxi_ir_irq, 0, SUNXI_IR_DEV, ir);
+> +	if (ret) {
+> +		dev_err(dev, "failed request irq\n");
+> +		ret = -EINVAL;
+
+necessary?
+
+> +		goto exit_clkdisable_clk;
+> +	}
+> +
+> +	ir->rc = rc_allocate_device();
+> +
+> +	if (!ir->rc) {
+> +		dev_err(dev, "failed to allocate device\n");
+> +		ret = -ENOMEM;
+> +		goto exit_clkdisable_clk;
+> +	}
+> +
+> +	ir->rc->priv = ir;
+> +	ir->rc->input_name = SUNXI_IR_DEV;
+> +	ir->rc->input_phys = "sunxi-ir/input0";
+> +	ir->rc->input_id.bustype = BUS_HOST;
+> +	ir->rc->input_id.vendor = 0x0001;
+> +	ir->rc->input_id.product = 0x0001;
+> +	ir->rc->input_id.version = 0x0100;
+> +	ir->map_name = of_get_property(dn, "linux,rc-map-name", NULL);
+> +	ir->rc->map_name = ir->map_name ?: RC_MAP_EMPTY;
+> +	ir->rc->dev.parent = dev;
+> +	ir->rc->driver_type = RC_DRIVER_IR_RAW;
+> +	rc_set_allowed_protocols(ir->rc, RC_BIT_ALL);
+> +	ir->rc->rx_resolution = SUNXI_IR_SAMPLE;
+> +	ir->rc->timeout = MS_TO_NS(SUNXI_IR_TIMEOUT);
+> +	ir->rc->driver_name = SUNXI_IR_DEV;
+> +
+> +	ret = rc_register_device(ir->rc);
+> +	if (ret) {
+> +		dev_err(dev, "failed to register rc device\n");
+> +		ret = -EINVAL;
+
+same again
+
+> +		goto exit_free_dev;
+> +	}
+> +
+
+Cheers
+James
