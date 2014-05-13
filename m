@@ -1,77 +1,77 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Tue, 13 May 2014 17:44:36 +0800
-Subject: [PATCH v2 1/6] ARM: hisi: store reboot reg in global variable
+Date: Tue, 13 May 2014 17:44:37 +0800
+Subject: [PATCH v2 2/6] ARM: debug: Rename Hi3716 to HI5XHD2
 In-Reply-To: <1399974281-9737-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1399974281-9737-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1399974281-9737-2-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1399974281-9737-3-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Avoid to parse DT in restart() function. Parsing these in init_late()
+From: Haifeng Yan <yanhaifeng@gmail.com>
+
+Rename Hisilicon HI3716 to HI5XHD2. And it relies on ARCH_HI5XHD2
 instead.
 
+Hi5XHD2 is a SoC with dual Cortex A9 cores.
+
+Signed-off-by: Haifeng Yan <yanhaifeng@gmail.com>
+Signed-off-by: Jiancheng Xue <jchxue@gmail.com>
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- arch/arm/mach-hisi/hisilicon.c | 20 +++++++++++++-------
- 1 file changed, 13 insertions(+), 7 deletions(-)
+ arch/arm/Kconfig.debug | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mach-hisi/hisilicon.c b/arch/arm/mach-hisi/hisilicon.c
-index 6489e57..a476388 100644
---- a/arch/arm/mach-hisi/hisilicon.c
-+++ b/arch/arm/mach-hisi/hisilicon.c
-@@ -45,33 +45,38 @@ static struct map_desc hi3620_io_desc[] __initdata = {
- 	},
- };
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 5a311af..df930e5 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -215,14 +215,6 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on HI3620 UART.
  
-+static void __iomem *sysctrl_base;
-+static u32 reboot_offset;
+-	config DEBUG_HI3716_UART
+-		bool "Hisilicon Hi3716 Debug UART"
+-		depends on ARCH_HI3xxx
+-		select DEBUG_UART_PL01X
+-		help
+-		  Say Y here if you want kernel low-level debugging support
+-		  on HI3716 UART.
+-
+ 	config DEBUG_HIP04_UART
+ 		bool "Hisilicon HiP04 Debug UART"
+ 		depends on ARCH_HIP04
+@@ -231,6 +223,14 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on HIP04 UART.
+ 
++	config DEBUG_HIX5HD2_UART
++		bool "Hisilicon Hix5hd2 Debug UART"
++		depends on ARCH_HIX5HD2
++		select DEBUG_UART_PL01X
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on Hix5hd2 UART.
 +
- static void __init hi3620_map_io(void)
- {
- 	debug_ll_io_init();
- 	iotable_init(hi3620_io_desc, ARRAY_SIZE(hi3620_io_desc));
- }
- 
--static void hi3xxx_restart(enum reboot_mode mode, const char *cmd)
-+static void __init hi3xxx_init_late(void)
- {
- 	struct device_node *np;
--	void __iomem *base;
--	int offset;
- 
- 	np = of_find_compatible_node(NULL, NULL, "hisilicon,sysctrl");
- 	if (!np) {
- 		pr_err("failed to find hisilicon,sysctrl node\n");
- 		return;
- 	}
--	base = of_iomap(np, 0);
--	if (!base) {
-+	sysctrl_base = of_iomap(np, 0);
-+	if (!sysctrl_base) {
- 		pr_err("failed to map address in hisilicon,sysctrl node\n");
- 		return;
- 	}
--	if (of_property_read_u32(np, "reboot-offset", &offset) < 0) {
-+	if (of_property_read_u32(np, "reboot-offset", &reboot_offset) < 0) {
- 		pr_err("failed to find reboot-offset property\n");
- 		return;
- 	}
--	writel_relaxed(0xdeadbeef, base + offset);
-+}
-+
-+static void hi3xxx_restart(enum reboot_mode mode, const char *cmd)
-+{
-+	writel_relaxed(0xdeadbeef, sysctrl_base + reboot_offset);
- 
- 	while (1)
- 		cpu_do_idle();
-@@ -85,6 +90,7 @@ static const char *hi3xxx_compat[] __initconst = {
- DT_MACHINE_START(HI3620, "Hisilicon Hi3620 (Flattened Device Tree)")
- 	.map_io		= hi3620_map_io,
- 	.dt_compat	= hi3xxx_compat,
-+	.init_late	= hi3xxx_init_late,
- 	.smp		= smp_ops(hi3xxx_smp_ops),
- 	.restart	= hi3xxx_restart,
- MACHINE_END
+ 	config DEBUG_HIGHBANK_UART
+ 		bool "Kernel low-level debugging messages via Highbank UART"
+ 		depends on ARCH_HIGHBANK
+@@ -1058,7 +1058,7 @@ config DEBUG_UART_PHYS
+ 	default 0xf1012000 if ARCH_DOVE || ARCH_KIRKWOOD || ARCH_MV78XX0 || \
+ 				ARCH_ORION5X
+ 	default 0xf7fc9000 if DEBUG_BERLIN_UART
+-	default 0xf8b00000 if DEBUG_HI3716_UART
++	default 0xf8b00000 if DEBUG_HIX5HD2_UART
+ 	default 0xfcb00000 if DEBUG_HI3620_UART
+ 	default 0xfe800000 if ARCH_IOP32X
+ 	default 0xffc02000 if DEBUG_SOCFPGA_UART
+@@ -1101,7 +1101,7 @@ config DEBUG_UART_VIRT
+ 	default 0xfe230000 if DEBUG_PICOXCELL_UART
+ 	default 0xfe300000 if DEBUG_BCM_KONA_UART
+ 	default 0xfe800000 if ARCH_IOP32X
+-	default 0xfeb00000 if DEBUG_HI3620_UART || DEBUG_HI3716_UART
++	default 0xfeb00000 if DEBUG_HI3620_UART || DEBUG_HIX5HD2_UART
+ 	default 0xfeb24000 if DEBUG_RK3X_UART0
+ 	default 0xfeb26000 if DEBUG_RK3X_UART1
+ 	default 0xfeb30c00 if DEBUG_KEYSTONE_UART0
 -- 
 1.9.1
