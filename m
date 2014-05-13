@@ -1,164 +1,81 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 13 May 2014 15:21:52 +0200
-Subject: [PATCH RFC 0/5] Hybrid approach for DT schema checking
-In-Reply-To: <1392919611-10746-1-git-send-email-t.figa@samsung.com>
-References: <1392919611-10746-1-git-send-email-t.figa@samsung.com>
-Message-ID: <53721C70.2030106@samsung.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 13 May 2014 18:56:23 +0530
+Subject: [PATCH 06/17] pci: host: pcie-designware: Use *base-mask* for
+ configuring the iATU
+In-Reply-To: <10531498.kYV5eO1J1m@wuerfel>
+References: <1399383244-14556-1-git-send-email-kishon@ti.com>
+ <6882241.amuhzvbd8n@wuerfel> <537210BF.2050100@ti.com>
+ <10531498.kYV5eO1J1m@wuerfel>
+Message-ID: <53721D7F.9070200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Arnd,
 
-Just wanted to add that you can also find the code in my dtc tree on
-kernel.org:
+On Tuesday 13 May 2014 06:17 PM, Arnd Bergmann wrote:
+> On Tuesday 13 May 2014 18:01:59 Kishon Vijay Abraham I wrote:
+>> On Thursday 08 May 2014 02:48 PM, Arnd Bergmann wrote:
+>>> On Thursday 08 May 2014 18:05:11 Jingoo Han wrote:
+>>>> On Tuesday, May 06, 2014 10:59 PM, Arnd Bergmann wrote:
+>>>>> On Tuesday 06 May 2014 19:03:52 Kishon Vijay Abraham I wrote:
+>>>>>> In DRA7, the cpu sees 32bit address, but the pcie controller can see only 28bit
+>>>>>> address. So whenever the cpu issues a read/write request, the 4 most
+>>>>>> significant bits are used by L3 to determine the target controller.
+>>>>>> For example, the cpu reserves 0x2000_0000 - 0x2FFF_FFFF for PCIe controller but
+>>>>>> the PCIe controller will see only (0x000_0000 - 0xFFF_FFF). So for programming
+>>>>>> the outbound translation window the *base* should be programmed as 0x000_0000.
+>>>>>> Whenever we try to write to say 0x2000_0000, it will be translated to whatever
+>>>>>> we have programmed in the translation window with base as 0x000_0000.
+>>>>>>
+>>>>>> Cc: Bjorn Helgaas <bhelgaas@google.com>
+>>>>>> Cc: Marek Vasut <marex@denx.de>
+>>>>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>>>>>> Acked-by: Jingoo Han <jg1.han@samsung.com>
+>>>>>> Acked-by: Mohit Kumar <mohit.kumar@st.com>
+>>>>>
+>>>>> Sorry, but NAK.
+>>>>>
+>>>>> We have a standard 'dma-ranges' property to handle this, so use it.
+>>>>>
+>>>>> See the x-gene PCIe driver patches for an example. Please also talk
+>>>>> to Santosh about it, as he is implementing generic support for
+>>>>> parsing dma-ranges in platform devices at the moment.
+>>>>
+>>>> Hi Arnd,
+>>>>
+>>>> Do you mean the following patch?
+>>>> http://www.spinics.net/lists/kernel/msg1737725.html
+>>>>
+>>>
+>>> That is the patch Santosh did for platform devices, which is related but not
+>>> what I meant here. For the PCI inbound window setup, please have a look
+>>> at https://lkml.org/lkml/2014/3/19/607
+>>
+>> Do you think it can be used for *outbound* window setup too? The problem is the
+>> *ranges* property defines both the pci address and cpu address which should
+>> have been enough to program the ob translation window, but the hw is designed
+>> so that the controller sees only the 28 bits. (The most significant 4 bits is
+>> for the l3 to address the controller).
+> 
+> I'm not following what the problem is. You should always be able to describe
+> in the inbound window (that is from the CPU perspective) using dma-ranges
+> and the outbound window using ranges.
+> 
+> If you have a case where the outbound translation is a 256MB (i.e. 28bit)
+> section of the CPU address space, that could be represented as
+> 
+> 	ranges = <0x82000000 0 0  0xb0000000  0 0x10000000>;
+> 
+> or 
+> 
+> 	ranges = <0x82000000 0 0xb0000000  0xb0000000  0 0x10000000>;
+> 
+> depending on whether you want the BARs to be programmed using a low
+> address 0x0-0x0fffffff or an address matching the window
+> 0xb0000000-0xbfffffff.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/tfiga/dtc.git
+The problem is, for configuring the window starting at 0xb0000000, the ATU
+should be programmed 0x0000000 (the cpu address for it will be 0xb0000000 though).
 
-or if you prefer web interface to quickly look through the changes:
-
-https://git.kernel.org/cgit/linux/kernel/git/tfiga/dtc.git/
-
-Best regards,
-Tomasz
-
-On 20.02.2014 19:06, Tomasz Figa wrote:
-> This series adds a proof of concept framework to implement schema checker
-> using a combined C and DTSS based approach. Several example bindings are
-> also implemented using C and DTSS[1].
-> 
-> Complex and generic bindings can be implemented directly in C and then
-> instantiated from simple device-specific bindings using DTS-like DTSS
-> language.
-> 
-> A quick description of C part:
-> 
-> A new check is registered in dtc checks framework to perform schema checking
-> of each node. Checking is done by searching specified schema set for matching
-> schemas (by compatible, device_type or absolute path) and applying matched
-> schemas to the node.
-> 
-> Schemas for complex generic bindings (such as interrupts, gpios, clocks, i2c,
-> mmio-bus, etc.) can be implemented directly in C and instantiated from DTSS
-> schemas of particular devices. An example C schema may look like:
-> 
-> static void generic_checkfn_xxx_yyy(const struct generic_schema *schema,
-> 				    struct node *root, struct node *node,
-> 				    struct node *params, bool required)
-> {
-> 	/*
-> 	 * Get necessary schema arguments from DTSS schema by looking
-> 	 * at properties of @params node.
-> 	 * 
-> 	 * Check whether @node node matches the schema.
-> 	 *
-> 	 * The @required argument may be used to check whether some error
-> 	 * conditions should be ignored (e.g. unspecified interrupt).
-> 	 */
-> }
-> GENERIC_SCHEMA("xxx-yyy", xxx_yyy);
-> 
-> A quick description of DTSS part:
-> 
-> * DTSS is a DTS-like language for specification of simple bindings, e.g.
->   bindings of particular devices. The basic syntax is very similar to DTS,
->   with main elements being nodes and properties. At root level a series of
->   nodes should be specified representing particular bindings:
-> 
-> 	/dtss-v1/;
-> 
-> 	binding1 {
-> 		/* Definition of binding 1 */
-> 	};
-> 
-> 	binding2 {
-> 		/* Definition of binding 2 */
-> 	};
-> 
-> * Matching key for each binding can be specified using /match/ keyword:
-> 
-> 	root-node {
-> 		/match/ path = "/";
-> 	};
-> 
-> 	wlf,wm8903 {
-> 		/match/ compatible = "wlf,wm8903";
-> 	};
-> 
-> 	pci-bus {
-> 		/match/ device_type = "memory";
-> 	};
-> 
->   Currently supported matches: path, compatible, device_type.
-> 
-> * Bindings can be specified either by listing properties they require
->   (or can use) directly or by instantiating generic C-based bindings.
-> 
-> 	binding {
-> 		required-property;
-> 
-> 		/optional/ optional-property;
-> 
-> 		/require/ required-generic-schema;
-> 
-> 		/use/ optional-generic-schema {
-> 			schema-argument = <1>;
-> 		};
-> 	};
-> 
->   Generic schemas are implemented in C, as described above, and can use
->   arguments specified in DTSS as properties. /require/ calls the schema with
->   required=true, while /use/ with required=false.
-> 
-> This is based on Stephen Warren's C based DT schema checker proof of
-> concept patch adding C-based validation[2].
-> 
-> TODO:
->  - specification of subnodes directly from DTSS,
->  - specification of simple property values from DTSS (cells, strings,
->    phandles),
->  - reporting of unrecognized properties,
->  - probably many more...
-> 
-> [1] Device Tree Schema Source
-> [2] http://thread.gmane.org/gmane.linux.ports.arm.kernel/275896
-> 
-> Tomasz Figa (5):
->   dtc: Add helpers for various message levels
->   dtc: livetree: Add more tree parsing helpers
->   Another try of DT schema checker using hybrid C and DTSS based
->     approach
->   Add sample C-based generic bindings
->   Add sample DTS and DTSS schema
-> 
->  Makefile                                  |   2 +-
->  Makefile.dtc                              |  10 +-
->  checks.c                                  |  15 +
->  dtc.c                                     |  17 +-
->  dtc.h                                     |  57 ++++
->  dtss-lexer.l                              | 291 +++++++++++++++++++
->  dtss-parser.y                             | 341 ++++++++++++++++++++++
->  livetree.c                                | 230 +++++++++++++++
->  sample.dts                                |  70 +++++
->  schema.dtss                               |  86 ++++++
->  schemas/clock/clock.c                     |  77 +++++
->  schemas/gpio/gpio.c                       |  93 ++++++
->  schemas/i2c/i2c.c                         |  42 +++
->  schemas/interrupt-controller/interrupts.c | 452 ++++++++++++++++++++++++++++++
->  schemas/mmio-bus.c                        |  97 +++++++
->  schemas/schema.c                          | 311 ++++++++++++++++++++
->  schemas/schema.h                          |  89 ++++++
->  srcpos.h                                  |   2 +
->  treesource.c                              |  22 ++
->  19 files changed, 2300 insertions(+), 4 deletions(-)
->  create mode 100644 dtss-lexer.l
->  create mode 100644 dtss-parser.y
->  create mode 100644 sample.dts
->  create mode 100644 schema.dtss
->  create mode 100644 schemas/clock/clock.c
->  create mode 100644 schemas/gpio/gpio.c
->  create mode 100644 schemas/i2c/i2c.c
->  create mode 100644 schemas/interrupt-controller/interrupts.c
->  create mode 100644 schemas/mmio-bus.c
->  create mode 100644 schemas/schema.c
->  create mode 100644 schemas/schema.h
-> 
+Thanks
+Kishon
