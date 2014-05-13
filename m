@@ -1,56 +1,61 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Tue, 13 May 2014 15:36:21 +0200
-Subject: [PATCHv3] C_CAN: hwinit support for non-TI devices
-In-Reply-To: <20140513130914.GA9806@amd.pavel.ucw.cz>
-References: <1398716449.836.4.camel@dinh-ubuntu>
- <20140428211505.GA28242@amd.pavel.ucw.cz>
- <CAF03EBf9KXqB4W9GuDduhLwp_kwFjUEi3syU7fX3KpXfZEFxHg@mail.gmail.com>
- <CAF03EBd19PC5RAsLR6-dMPF2x3XRf9X4bFPgX2kRdCYWUQBYcA@mail.gmail.com>
- <20140430215359.GA15148@amd.pavel.ucw.cz>
- <CAF03EBewoV0pOOmNQBwPrKgm-zhaSbFcNd_UiEhFWyUrq91-Jg@mail.gmail.com>
- <20140502084851.GA5730@amd.pavel.ucw.cz>
- <20140505120801.GA16461@amd.pavel.ucw.cz>
- <20140506135702.GA9879@amd.pavel.ucw.cz> <5370ED11.4000002@pengutronix.de>
- <20140513130914.GA9806@amd.pavel.ucw.cz>
-Message-ID: <53721FD5.50508@pengutronix.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 13 May 2014 15:42:58 +0200
+Subject: [PATCH v7] DMA: sun6i: Add driver for the Allwinner A31 DMA
+ controller
+In-Reply-To: <20140430070408.GR32284@intel.com>
+References: <20140430070408.GR32284@intel.com>
+Message-ID: <20140513134258.GA29258@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/13/2014 03:09 PM, Pavel Machek wrote:
-> Non-TI chips (including socfpga) needs different raminit
-> sequence. Implement it.
+Hi Vinod,
+
+On Wed, Apr 30, 2014 at 12:34:08PM +0530, Vinod Koul wrote:
+> > +
+> > +static int sun6i_dma_terminate_all(struct sun6i_vchan *vchan)
+> > +{
+> > +	struct sun6i_dma_dev *sdev = to_sun6i_dma_dev(vchan->vc.chan.device);
+> > +	struct sun6i_pchan *pchan = vchan->phy;
+> > +	unsigned long flags;
+> > +	LIST_HEAD(head);
+> > +
+> > +	spin_lock(&sdev->lock);
+> > +	list_del_init(&vchan->node);
+> > +	spin_unlock(&sdev->lock);
+> > +
+> > +	spin_lock_irqsave(&vchan->vc.lock, flags);
+> > +
+> > +	vchan_get_all_descriptors(&vchan->vc, &head);
+> > +
+> > +	if (pchan) {
+> > +		writel(DMA_CHAN_ENABLE_STOP, pchan->base + DMA_CHAN_ENABLE);
+> > +		writel(DMA_CHAN_PAUSE_RESUME, pchan->base + DMA_CHAN_PAUSE);
+> > +
+> > +		vchan->phy = NULL;
+> > +		pchan->vchan = NULL;
+> > +		pchan->desc = NULL;
+> > +		pchan->done = NULL;
+> > +	}
+> > +
+> > +	spin_unlock_irqrestore(&vchan->vc.lock, flags);
+> > +
+> > +	vchan_dma_desc_free_list(&vchan->vc, &head);
 > 
-> const's in the hwinit prototype forced me to add const to more
-> prototypes. This makes changes bigger but the result is cleaner.
+> shouldn't you kill the tasklet as well here?
 
-Why not split into several patches?
+Just to be clear, which tasklet? vchan's or the driver's?
 
-> Unfortunately, testing-c_can does not boot on sockit, but previous
-> version of patch was tested by me and Thor Thayer.
-
-Have a look at:
-
-    git at gitorious.org:linux-can/linux-can-next.git
-testing-c_can-based-on-net
-
-This branch uses net/master as it's base, I've split your patch into 3,
-and squashed the 32bit-const changes into the 32-bit access patch. The
-remaining patch looks quite clean.
-
-Can you please test the branch, I hope it boots on sockit.
-
-Marc
+Thanks,
+Maxime
 
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 242 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140513/cdda9e7a/attachment.sig>
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140513/95b4b1dc/attachment.sig>
