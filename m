@@ -1,42 +1,39 @@
 From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Tue, 13 May 2014 09:13:53 -0700
-Subject: [PATCH v3 01/14] ARM: KVM: switch hypervisor into BE mode in case of
- BE host
+Date: Tue, 13 May 2014 09:13:56 -0700
+Subject: [PATCH v3 04/14] ARM: KVM: __kvm_vcpu_run function return result fix
+ in BE case
 In-Reply-To: <1399997646-4716-1-git-send-email-victor.kamensky@linaro.org>
 References: <1399997646-4716-1-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <1399997646-4716-2-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <1399997646-4716-5-git-send-email-victor.kamensky@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch hypervisor to run in BE mode if image is compiled
-with CONFIG_CPU_BIG_ENDIAN.
+The __kvm_vcpu_run function returns a 64-bit result in two registers,
+which has to be adjusted for BE case.
 
 Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/kvm/init.S | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/kvm/interrupts.S | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
-index 1b9844d..74f0718 100644
---- a/arch/arm/kvm/init.S
-+++ b/arch/arm/kvm/init.S
-@@ -22,6 +22,7 @@
- #include <asm/kvm_asm.h>
- #include <asm/kvm_arm.h>
- #include <asm/kvm_mmu.h>
-+#include <asm/assembler.h>
+diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
+index 24d4e65..7dfe9e4 100644
+--- a/arch/arm/kvm/interrupts.S
++++ b/arch/arm/kvm/interrupts.S
+@@ -199,8 +199,13 @@ after_vfp_restore:
+ 
+ 	restore_host_regs
+ 	clrex				@ Clear exclusive monitor
++#ifndef __ARMEB__
+ 	mov	r0, r1			@ Return the return code
+ 	mov	r1, #0			@ Clear upper bits in return value
++#else
++	@ r1 already has return code
++	mov	r0, #0			@ Clear upper bits in return value
++#endif /* __ARMEB__ */
+ 	bx	lr			@ return to IOCTL
  
  /********************************************************************
-  * Hypervisor initialization
-@@ -70,6 +71,8 @@ __do_hyp_init:
- 	cmp	r0, #0			@ We have a SP?
- 	bne	phase2			@ Yes, second stage init
- 
-+ARM_BE8(setend	be) @ Switch to Big Endian mode if needed
-+
- 	@ Set the HTTBR to point to the hypervisor PGD pointer passed
- 	mcrr	p15, 4, r2, r3, c2
- 
 -- 
 1.8.1.4
