@@ -1,21 +1,47 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 13 May 2014 10:10:26 +0800
-Subject: [PATCH 1/7] ARM: imx: fix function type for CLK_OF_DECLARE
-In-Reply-To: <1399940993-1773-2-git-send-email-robherring2@gmail.com>
-References: <1399940993-1773-1-git-send-email-robherring2@gmail.com>
- <1399940993-1773-2-git-send-email-robherring2@gmail.com>
-Message-ID: <20140513021024.GJ8330@dragon>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 12 May 2014 19:12:16 -0700
+Subject: [GIT PULL] clk: socfpga: Clock updates for v3.16
+In-Reply-To: <1399915981-5403-1-git-send-email-dinguyen@altera.com>
+References: <1399915981-5403-1-git-send-email-dinguyen@altera.com>
+Message-ID: <20140513021216.5943.87439@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 12, 2014 at 07:29:47PM -0500, Rob Herring wrote:
-> From: Rob Herring <robh@kernel.org>
+Quoting dinguyen at altera.com (2014-05-12 10:33:01)
+> Hi Mike,
 > 
-> Adding function type checking to CLK_OF_DECLARE found a type mismatch with
-> mx35_clocks_init_dt. The function should return void.
-> 
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> Cc: Shawn Guo <shawn.guo@freescale.com>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Please consider pulling this patch in for v3.16.
 
-Acked-by: Shawn Guo <shawn.guo@freescale.com>
+Pulled.
+
+Thanks,
+Mike
+
+> 
+> Thanks,
+> Dinh
+> 
+> The following changes since commit d1db0eea852497762cab43b905b879dfcd3b8987:
+> 
+>   Linux 3.15-rc3 (2014-04-27 19:29:27 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga-clk-update-for-v3.16
+> 
+> for you to fetch changes up to 0691bb1b5a1865b3bbc9b7ce6e26eff546abb1cf:
+> 
+>   clk: socfpga: add divider registers to the main pll outputs (2014-05-12 12:27:22 -0500)
+> 
+> ----------------------------------------------------------------
+> Adds support getting the divider registers for the MAIN PLL that was once
+> thought to be hidden.
+> 
+> ----------------------------------------------------------------
+> Dinh Nguyen (1):
+>       clk: socfpga: add divider registers to the main pll outputs
+> 
+>  drivers/clk/socfpga/clk-gate.c   |    1 -
+>  drivers/clk/socfpga/clk-periph.c |   22 +++++++++++++++++++---
+>  drivers/clk/socfpga/clk.h        |    4 ++++
+>  3 files changed, 23 insertions(+), 4 deletions(-)
