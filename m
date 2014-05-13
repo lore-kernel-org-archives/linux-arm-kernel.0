@@ -1,127 +1,143 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Tue, 13 May 2014 13:39:55 +0200
-Subject: [PATCH 3/4] OMAPDSS: panel-sharp-ls037v7dw01: add device tree
- support
-In-Reply-To: <5371F923.80000@ti.com>
-References: <20140507175919.GH9502@atomide.com>
- <20140508233300.GI2198@atomide.com> <536C8293.4070506@ti.com>
- <20140509155504.GE17814@atomide.com> <53707A64.2060203@ti.com>
- <CABxcv=kwhodeFTHoVpn1nHeh9+kV5fwMN9s3Kbk6h7_xJp4UYA@mail.gmail.com>
- <53709706.10501@ti.com>
- <CABxcv=mY0a+yJgmCTPN=BhSQD57Pw022zOd5_KxEgvvF_-=O7Q@mail.gmail.com>
- <20140512142646.GA31772@atomide.com> <5370E0C9.8050201@ti.com>
- <20140512155132.GH31772@atomide.com> <5371F923.80000@ti.com>
-Message-ID: <CABxcv==_LCw1kPYm17g=h8VfSN2V_qsgXjTnsy-JOetawSv4pA@mail.gmail.com>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Tue, 13 May 2014 17:13:31 +0530
+Subject: [Patch v4 5/5] mcpm: exynos: populate suspend and powered_up
+ callbacks
+In-Reply-To: <20140509153206.GB5040@e102568-lin.cambridge.arm.com>
+References: <1399278444-8312-3-git-send-email-chander.kashyap@linaro.org>
+ <1399282040-8995-1-git-send-email-chander.kashyap@linaro.org>
+ <1399282040-8995-6-git-send-email-chander.kashyap@linaro.org>
+ <20140509153206.GB5040@e102568-lin.cambridge.arm.com>
+Message-ID: <CANuQgHG9tGzi2rSOwREAxVu4BQoprDg9om62AybgW5v31fpbTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 13, 2014 at 12:51 PM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
-> On 12/05/14 18:51, Tony Lindgren wrote:
->
->>> It's already in v3.15.
+Hi Lorenzo
+
+On 9 May 2014 21:02, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+> On Mon, May 05, 2014 at 10:27:20AM +0100, Chander Kashyap wrote:
+>> In order to support cpuidle through mcpm, suspend and powered-up
+>> callbacks are required in mcpm platform code.
+>> Hence populate the same callbacks.
 >>
->> Oh great.. And you dumped it into arch/arm/mach-omap2 too and I somehow
->> even acked it :( Looks like there's also the custom mux hacks. And
->> custom hwmod hacks. And ongoing soc_is_xxx tinkering. Now let's not add
+>> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+>> Signed-off-by: Chander Kashyap <k.chander@samsung.com>
+>> ---
+>> Changes in v4: None
+>> Changes in v3:
+>>       1. Removed coherancy enablement after suspend failure.
 >
-> The omap2_dss_hwmod_data, create_dss_pdev and create_simple_dss_pdev,
-> omap_display_init stuff can be removed when the DT conversion has been done.
+> coherency
 >
-> For the omap4_dsi_mux_pads (or the omap5 dsi muxing that was recently
-> discussed) I still have no solution, but I haven't spent time on it. I
-> have dropped the omap5 dsi muxing from the latest series for that reason.
->
-> dispc_disable_outputs and omap_dss_reset are needed because omap_device
-> doesn't handle resetting DSS properly, as special steps need to be done
-> for that. omap_dss_reset is called from the hwmod/omap_device code, so I
-> don't think this code can be anywhere else.
->
-> For the omap_display_get_version() I have no good solution. Making
-> separate .dts versions for all the needed OMAP ES versions seems like a
-> huge hassle to me, but that is one solution.
->
-> I think that would mean having separate .dtsi files for omapdss for
-> omap3_es1, omap3_es3plus, omap4_es1, omap4_es2, omap4_es3plus, and then
-> having separate omapxxxx.dtsi files for all of those, and then separate
-> board .dts files for the ES versions used on each board.
->
-> Or is there some sane way to define such things in dts?
->
-
-Unfortunately there isn't.
-
-I have a similar problem with the IGEP boards since there are just too
-many variations of them (e.g: DM3730 SoC vs OMAP3530 SoC, NAND vs
-OneNAND, 256MB vs 512MB flash memory sizes, with and without wifi
-chip, etc).
-
-Since dts are supposed to describe the hardware, each revision with a
-slighter variation forces to have a different dts. My solution was to
-not try to have a dts for every single variation in mainline but only
-one for the most common revision and that could be used as a reference
-to modify and ship on each device. Unfortunately that is not possible
-to you since each DSS IP block is used by many boards.
-
->> _any_ new crap into arch/arm/mach-omap2/display.c.
+>>       2. Use generic function to poweron cpu.
+>> changes in v2:
+>>       1. Fixed typo: enynos_pmu_cpunr to exynos_pmu_cpunr
+>>  arch/arm/mach-exynos/mcpm-exynos.c |   34 ++++++++++++++++++++++++++++++++++
+>>  1 file changed, 34 insertions(+)
 >>
->> So please consider this a huge eternal NAK to add any more crap to
->> arch/arm/mach-omap2/display.c from me. No more new soc_is beyond
->> the soc_is_am43xx() you have in linux next. No more adding
->> of_find_compatible_node() beyond ti,omap5-dss you have in linux next.
+>> diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
+>> index d0f7461..6d4a907 100644
+>> --- a/arch/arm/mach-exynos/mcpm-exynos.c
+>> +++ b/arch/arm/mach-exynos/mcpm-exynos.c
+>> @@ -256,10 +256,44 @@ static int exynos_power_down_finish(unsigned int cpu, unsigned int cluster)
+>>       return -ETIMEDOUT; /* timeout */
+>>  }
 >>
->> And no more new panel remapping in this file as soon as you have found
->> a better solution. Preferrably by v3.17 merge window. This file just
->> needs to disappear. Yuk.
+>> +void exynos_powered_up(void)
 >
-> Do you object to the compatible string remapping as such, or just that
-> it's in arch/arm/mach-omap2?
+> static ?
+
+Ok, done
+
 >
-> I guess nothing prevents me from moving it to drivers/, and having some
-> early-ish initcall doing the job.
+>> +{
+>> +     unsigned int mpidr, cpu, cluster;
+>> +
+>> +     mpidr = read_cpuid_mpidr();
+>> +     cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+>> +     cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+>> +
+>> +     arch_spin_lock(&exynos_mcpm_lock);
+>> +     if (cpu_use_count[cpu][cluster] == 0)
+>> +             cpu_use_count[cpu][cluster] = 1;
+>> +     arch_spin_unlock(&exynos_mcpm_lock);
+>> +}
+>> +
+>> +static void exynos_suspend(u64 residency)
+>> +{
+>> +     unsigned int mpidr, cpunr;
+>> +
+>> +     mpidr = read_cpuid_mpidr();
+>> +     cpunr = exynos_pmu_cpunr(mpidr);
 >
-> If the remapping as such is horrible, I'm all ears for better ideas. I
-> spent quite a lot of time on it, and that's the best I could come up with.
+> If I were to be picky, I would compute these values only if they
+> are needed, ie move the computation after exynos_power_down().
+
+Yes thats make sense. I will realign it.
+
 >
-> It's rather simple prefixing of the compatible strings for selected
-> devices. The purpose of that is to have proper data in the .dts files
-> (which I think is very important) with the cost of having some rather
-> simple internal hacks in the kernel, which can be removed immediately
-> when we have a common display driver framework.
+> There is another quite horrible issue here. We know this code works
+> because the processors A15/A7 hit the caches with C bit in SCTLR cleared.
+>
+> On processors where this is not true, this sequence would explode
+> if power down fails (in case core is gated but L2 is still powered on,
+> the stack is stuck in L2) since it is going to read stack data that is
+> in L2 but can't be read.
+>
+> It is not related to this sequence only, but it is an issue in general
+> and wanted to mention that on the lists for public awareness.
 >
 
-Even though the compatible trick that I said before could be an
-alternative, it has the problem that does not describes the hardware
-as you said. The restriction of the DT being a stable API and get it
-right from the beginning forces us to make these kind of technical
-decisions.
+Can you please elaborate. I didn't understand.
 
-So, since we can change the kernel later but not the DTS, I agree with
-you that the remapping is the least bad of our options.
+> The gist of what I am saying is, please add a comment to that extent,
+> here and it should be added in exynos_power_down() too.
+>
+>> +     __raw_writel(virt_to_phys(mcpm_entry_point), ns_sram_base_addr + 0x1c);
+>
+> No magic numbers please (0x1c). You can add a macro/wrapper, as TC2 does.
 
->>> I'm not sure what it would give us to try to be compatible with
->>> simple-panel.txt. The simple-panel bindings won't probably be compatible
->>> with the future common display drivers in any case, as the simple-panel
->>> binding is just too limited and doesn't describe the hardware fully.
+Yes i will remove it.
+
+>
+>> +     exynos_power_down();
+>> +
+>> +     /*
+>> +      * Execution reaches here only if cpu did not power down.
+>> +      * Hence roll back the changes done in exynos_power_down function.
+>> +     */
+>> +     exynos_cpu_powerup(cpunr);
+>
+> Please be aware that if this function returns MCPM will soft reboot, and
+> the CPUidle driver will have no way to detect a state entry failure.
+>
+> I am just flagging this up, since fixing this behaviour is not easy, and
+> honestly, since power down failure should be the exception not the rule,
+> the idle stats should not be affected much.
+>
+> I think this is the proper way of implementing the sequence but please
+> all keep in mind what I wrote above.
+>
+> Lorenzo
+>
+>> +}
+>> +
+>>  static const struct mcpm_platform_ops exynos_power_ops = {
+>>       .power_up               = exynos_power_up,
+>>       .power_down             = exynos_power_down,
+>>       .power_down_finish      = exynos_power_down_finish,
+>> +     .suspend                = exynos_suspend,
+>> +     .powered_up             = exynos_powered_up,
+>>  };
 >>
->> Hmm what else does a panel need where the existing binding cannot be
->> extended?
->
-> The existing simple-panel binding doesn't describe the connections of
-> the panel, i.e. its video input. I guess it can be extended, but I don't
-> see what the benefit is of trying to create new panel bindings
-> compatible with the simple-panel bindings. As I see, the simple-panel
-> bindings work only with very limited use cases, where the drivers make
-> assumptions. Simple panel bindings cannot be used with omapdss, nor can
-> it be used with the future common display framework.
->
-> But I'm not really familiar with using extending current bindings, and
-> making new bindings compatible with old ones. Can you explain why it'd
-> be good to have the sharp panel bindings compatible with simple-panel?
-> In what kind of scenario would it be used?
->
->  Tomi
->
+>>  static void __init exynos_mcpm_usage_count_init(void)
+>> --
+>> 1.7.9.5
+>>
+>>
 >
 
-Best regards,
-Javier
+
+
+-- 
+with warm regards,
+Chander Kashyap
