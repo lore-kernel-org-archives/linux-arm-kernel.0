@@ -1,137 +1,172 @@
 From: tgih.jun@samsung.com (Seungwon Jeon)
-Date: Tue, 13 May 2014 14:02:25 +0900
-Subject: [PATCHv2] mmc: dw_mmc: change to use recommended reset procedure
-In-Reply-To: <1399945121-7387-1-git-send-email-sonnyrao@chromium.org>
-References: <1399945121-7387-1-git-send-email-sonnyrao@chromium.org>
-Message-ID: <002301cf6e68$8809ee00$981dca00$%jun@samsung.com>
+Date: Tue, 13 May 2014 13:52:23 +0900
+Subject: [PATCH] mmc: dw_mmc: Make sure we don't get stuck when we get an
+ error
+In-Reply-To: <CAD=FV=X=9cTvST5cM=H9H23SMD28cHSExXt3YR=v2AQ6dFJY5w@mail.gmail.com>
+References: <1395901126-6141-1-git-send-email-yuvaraj.cd@samsung.com>
+ <CAKuRcOL_JVjOfLNspb14kRxcAXjpEwX4WkvmM+izryZbZBE4XA@mail.gmail.com>
+ <CAPz6YkVwT0PrcLP1MJy0vVRw811+_7PwsV_ggKxQkqrjOWeWWw@mail.gmail.com>
+ <002001cf6c59$b5b5e680$2121b380$%jun@samsung.com>
+ <CAD=FV=X=9cTvST5cM=H9H23SMD28cHSExXt3YR=v2AQ6dFJY5w@mail.gmail.com>
+Message-ID: <001b01cf6e67$2183b400$648b1c00$%jun@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As I mentioned in previous version, you put all reset stuff in existing fifo_reset function.
-Although databook mentions ciu_reset case for SBE error, it's not obvious when ciu_reset is needed in other error cases.
-If you intend to add some robust error handing, it would be better to make another function.
-Please check my comments below.
+Hi Doug,
 
-On Tue, May 13, 2014, Sonny Rao wrote:
-> This patch changes the fifo reset code to follow the reset procedure
-> outlined in the documentation of Synopsys  Mobile storage host databook
-> 7.2.13.
+On Tue, May 13, 2014, Doug Anderson wrote:
+> Seungwon,
 > 
-> v2: Add Generic DMA support
->     per the documentation, move interrupt clear before wait
->     make the test for DMA host->use_dma rather than host->using_dma
->     add proper return values (although it appears no caller checks)
+> On Sat, May 10, 2014 at 7:11 AM, Seungwon Jeon <tgih.jun@samsung.com> wrote:
+> > On Fri, May 09, 2014, Sonny Rao wrote:
+> >> On Thu, May 8, 2014 at 2:42 AM, Yuvaraj Kumar <yuvaraj.cd@gmail.com> wrote:
+> >> > Any comments on this patch?
+> >> >
+> >>
+> >> I'll just add that without this fix, running the tuning loop for UHS
+> >> modes is not reliable on dw_mmc because errors will happen and you
+> >> will eventually hit this race and hang.  This can happen any time
+> >> there is tuning like during boot or during resume from suspend.
+> >>
+> >> > On Thu, Mar 27, 2014 at 11:48 AM, Yuvaraj Kumar C D
+> >> > <yuvaraj.cd@gmail.com> wrote:
+> >> >> From: Doug Anderson <dianders@chromium.org>
+> >> >>
+> >> >> If we happened to get a data error at just the wrong time the dw_mmc
+> >> >> driver could get into a state where it would never complete its
+> >> >> request.  That would leave the caller just hanging there.
+> >> >>
+> >> >> We fix this two ways and both of the two fixes on their own appear to
+> >> >> fix the problems we've seen:
+> >> >>
+> >> >> 1. Fix a race in the tasklet where the interrupt setting the data
+> >> >>    error happens _just after_ we check for it, then we get a
+> >> >>    EVENT_XFER_COMPLETE.  We fix this by repeating a bit of code.
+> > I think repeating is not good approach to fix race.
+> > In your case, XFER_COMPLETE preceded data error and DTO didn't come?
+> > It seems strange case.
+> > I want to know actual error value if you can reproduce.
 > 
-> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
-> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
-> ---
->  drivers/mmc/host/dw_mmc.c | 55 ++++++++++++++++++++++++++++++++++++++++++++++-
->  drivers/mmc/host/dw_mmc.h |  1 +
->  2 files changed, 55 insertions(+), 1 deletion(-)
+> XFER_COMPLETE didn't necessarily precede data error.  Imagine this scenario:
 > 
-> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-> index 55cd110..aff57e1 100644
-> --- a/drivers/mmc/host/dw_mmc.c
-> +++ b/drivers/mmc/host/dw_mmc.c
-> @@ -2325,6 +2325,7 @@ static bool dw_mci_ctrl_reset(struct dw_mci *host, u32 reset)
+> 1. Check for data error: nope
+> 2. Interrupt happens and we get a data error and immediately xfer complete
+> 3. Check for xfer complete: yup
 > 
->  static inline bool dw_mci_fifo_reset(struct dw_mci *host)
->  {
-> +	u32 flags = SDMMC_CTRL_RESET | SDMMC_CTRL_FIFO_RESET;
->  	/*
->  	 * Reseting generates a block interrupt, hence setting
->  	 * the scatter-gather pointer to NULL.
-> @@ -2334,7 +2335,59 @@ static inline bool dw_mci_fifo_reset(struct dw_mci *host)
->  		host->sg = NULL;
->  	}
+> That's the state that we are handling.
 > 
-> -	return dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET);
-> +	/*
-> +	 * The recommended method for resetting is to always reset the
-> +	 * controller and the fifo, but differs slightly depending on the mode.
-> +	 * The Generic DMA mode (non IDMAC) also needs to reset DMA where IDMAC
-> +	 * mode resets IDMAC at the end.
-> +	 *
-> +	 */
-> +#ifndef CONFIG_MMC_DW_IDMAC
-Is it added for generic DMA?
-IDMAC should be considered for dma_reseet as well.
-Please check databook.
+> The system that dw_mmc uses where the interrupt handler has no locking
+> makes it incredibly difficult to get things right.  Can you propose an
+> alternate fix that would avoid the race?
+Thank you for detailed scenario.
+You're right.
+Have you consider using spin_lock() in interrupt handler?
+Then, we'll need to change spin_lock() to spin_lock_irqsave() in tasklet func.
+And other locks in driver may need to be adjusted properly.
 
-> +	if (host->use_dma)
-> +		flags |= SDMMC_CTRL_DMA_RESET;
-> +#endif
-> +	if (dw_mci_ctrl_reset(host, flags)) {
-> +		/*
-> +		 * In all cases we clear the RAWINTS register to clear any
-> +		 * interrupts.
-> +		 */
-I think interrupt masking is needed before reset because we will not handle it anymore.
-And Is there any reason to move interrupt clear here compared with previous version?
+To return above scenario:
+1. Check for data error: nope
+2. Check for xfer complete: nope -> escape tasklet.
+3. Interrupt happens and we get a data error and immediately xfer complete
+4. Check for data error (Again in tasklet) : yup
 
-> +		mci_writel(host, RINTSTS, 0xFFFFFFFF);
-> +
-> +		/* if using dma we wait for dma_req to clear */
-> +		if (host->use_dma) {
-> +			unsigned long timeout = jiffies + msecs_to_jiffies(500);
-> +			u32 status;
-> +			do {
-> +				status = mci_readl(host, STATUS);
-> +				if (!(status & SDMMC_STATUS_DMA_REQ))
-> +					break;
-> +				cpu_relax();
-What did you intend here?
-If you intent busy-wait, how about using sleep instead?
-
-> +			} while (time_before(jiffies, timeout));
-> +
-> +			if (status & SDMMC_STATUS_DMA_REQ) {
-> +				dev_err(host->dev,
-> +					"%s: Timeout waiting for dma_req to "
-> +					"clear during reset", __func__);
-> +				return false;
-> +			}
-> +
-> +			/* when using DMA next we reset the fifo again */
-> +			dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET);
-> +		}
-> +	} else {
-> +		dev_err(host->dev, "%s: Reset bits didn't clear", __func__);
-If ciu_reset is cleared, clk update below is needed?
+How about this change?
 
 Thanks,
 Seungwon Jeon
-
-> +		return false;
-> +	}
-> +
-> +#ifdef CONFIG_MMC_DW_IDMAC
-> +	/* It is also recommended that we reset and reprogram idmac */
-> +	dw_mci_idmac_reset(host);
-> +#endif
-> +
-> +	/* After a CTRL reset we need to have CIU set clock registers  */
-> +	mci_send_cmd(host->cur_slot, SDMMC_CMD_UPD_CLK, 0);
-> +
-> +	return true;
->  }
 > 
->  static inline bool dw_mci_ctrl_all_reset(struct dw_mci *host)
-> diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
-> index 6bf24ab..2505804 100644
-> --- a/drivers/mmc/host/dw_mmc.h
-> +++ b/drivers/mmc/host/dw_mmc.h
-> @@ -129,6 +129,7 @@
->  #define SDMMC_CMD_INDX(n)		((n) & 0x1F)
->  /* Status register defines */
->  #define SDMMC_GET_FCNT(x)		(((x)>>17) & 0x1FFF)
-> +#define SDMMC_STATUS_DMA_REQ		BIT(31)
->  /* FIFOTH register defines */
->  #define SDMMC_SET_FIFOTH(m, r, t)	(((m) & 0x7) << 28 | \
->  					 ((r) & 0xFFF) << 16 | \
-> --
-> 1.9.1.423.g4596e3a
 > 
+> >> >> 2. Fix it so that if we detect that we've got an error in the "data
+> >> >>    busy" state and we're not going to do anything else we end the
+> >> >>    request and unblock anyone waiting.
+> >> >>
+> >> >> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> >> >> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@gmail.com>
+> >> >> ---
+> >> >>  drivers/mmc/host/dw_mmc.c |   47 +++++++++++++++++++++++++++++++++++++++++++++
+> >> >>  1 file changed, 47 insertions(+)
+> >> >>
+> >> >> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+> >> >> index 1d77431..4c589f1 100644
+> >> >> --- a/drivers/mmc/host/dw_mmc.c
+> >> >> +++ b/drivers/mmc/host/dw_mmc.c
+> >> >> @@ -1300,6 +1300,14 @@ static void dw_mci_tasklet_func(unsigned long priv)
+> >> >>                         /* fall through */
+> >> >>
+> >> >>                 case STATE_SENDING_DATA:
+> >> >> +                       /*
+> >> >> +                        * We could get a data error and never a transfer
+> >> >> +                        * complete so we'd better check for it here.
+> >> >> +                        *
+> >> >> +                        * Note that we don't really care if we also got a
+> >> >> +                        * transfer complete; stopping the DMA and sending an
+> >> >> +                        * abort won't hurt.
+> >> >> +                        */
+> >> >>                         if (test_and_clear_bit(EVENT_DATA_ERROR,
+> >> >>                                                &host->pending_events)) {
+> >> >>                                 dw_mci_stop_dma(host);
+> >> >> @@ -1313,7 +1321,29 @@ static void dw_mci_tasklet_func(unsigned long priv)
+> >> >>                                 break;
+> >> >>
+> >> >>                         set_bit(EVENT_XFER_COMPLETE, &host->completed_events);
+> >> >> +
+> >> >> +                       /*
+> >> >> +                        * Handle an EVENT_DATA_ERROR that might have shown up
+> >> >> +                        * before the transfer completed.  This might not have
+> >> >> +                        * been caught by the check above because the interrupt
+> >> >> +                        * could have gone off between the previous check and
+> >> >> +                        * the check for transfer complete.
+> >> >> +                        *
+> >> >> +                        * Technically this ought not be needed assuming we
+> >> >> +                        * get a DATA_COMPLETE eventually (we'll notice the
+> >> >> +                        * error and end the request), but it shouldn't hurt.
+> >> >> +                        *
+> >> >> +                        * This has the advantage of sending the stop command.
+> >> >> +                        */
+> >> >> +                       if (test_and_clear_bit(EVENT_DATA_ERROR,
+> >> >> +                                              &host->pending_events)) {
+> >> >> +                               dw_mci_stop_dma(host);
+> >> >> +                               send_stop_abort(host, data);
+> >> >> +                               state = STATE_DATA_ERROR;
+> >> >> +                               break;
+> >> >> +                       }
+> >> >>                         prev_state = state = STATE_DATA_BUSY;
+> >> >> +
+> >> >>                         /* fall through */
+> >> >>
+> >> >>                 case STATE_DATA_BUSY:
+> >> >> @@ -1336,6 +1366,23 @@ static void dw_mci_tasklet_func(unsigned long priv)
+> >> >>                                 /* stop command for open-ended transfer*/
+> >> >>                                 if (data->stop)
+> >> >>                                         send_stop_abort(host, data);
+> >> >> +                       } else {
+> >> >> +                               /*
+> >> >> +                                * If we don't have a command complete now we'll
+> >> >> +                                * never get one since we just reset everything;
+> >> >> +                                * better end the request.
+> >> >> +                                *
+> >> >> +                                * If we do have a command complete we'll fall
+> >> >> +                                * through to the SENDING_STOP command and
+> >> >> +                                * everything will be peachy keen.
+> >> >> +                                *
+> >> >> +                                * TODO: I guess we shouldn't send a stop?
+> >> >> +                                */
+> >> >> +                               if (!test_bit(EVENT_CMD_COMPLETE,
+> >> >> +                                             &host->pending_events)) {
+> >> >> +                                       dw_mci_request_end(host, mrq);
+> >> >> +                                       goto unlock;
+> >> >> +                               }
+> > Can you explain what happens above?
+> > What is it for?
+> 
+> This was an alternate fix for the above, but appears to actually hit
+> in practice too.
+> 
+> Said another way: if we don't add the extra checking for
+> EVENT_DATA_ERROR (above) we'll end up here.  ...and if we ever get
+> into this "else" and don't do _something_ then we'll wedge forever.
+> 
+> -Doug
 > --
 > To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
 > the body of a message to majordomo at vger.kernel.org
