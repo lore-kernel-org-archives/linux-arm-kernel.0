@@ -1,24 +1,31 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 13 May 2014 09:58:26 -0700
-Subject: [PATCH] ARM: dts: am335x-evm: fix comments for lcd pins
-In-Reply-To: <20140512060336.GD29070@pengutronix.de>
-References: <1399648580-14487-1-git-send-email-wsa@the-dreams.de>
- <20140512060336.GD29070@pengutronix.de>
-Message-ID: <20140513165826.GE16837@atomide.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 13 May 2014 17:59:21 +0100
+Subject: [PATCH 1/2] regulator: gpio-regulator: Add required
+ regulator-type property
+In-Reply-To: <2193707.R9XiqBsnU4@avalon>
+References: <1385653493-9952-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <20131205000928.GI29268@sirena.org.uk> <2248657.5UVkYxaC6z@avalon>
+ <2193707.R9XiqBsnU4@avalon>
+Message-ID: <20140513165921.GK12304@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [140511 23:04]:
-> Hi Wolfram,
-> 
-> On Fri, May 09, 2014 at 05:15:50PM +0200, Wolfram Sang wrote:
-> > From: Wolfram Sang <wsa@sang-engineering.com>
-> > 
-> > In the comments, LCD pins 16-23 were numbered in the wrong order.
-> > Fix this and use proper pinmux constants for all entries while we are
-> > 
-> Your sentence misses a word at the
+On Tue, May 13, 2014 at 02:06:23AM +0200, Laurent Pinchart wrote:
 
-I'll fix and apply it into
+> What's the status of this ? The gpio regulator driver now defaults to voltage 
+> regulator when the regulator-type property is not set. Should the DT bindings 
+> document the property as optional (I can submit a patch for that), or do you 
+> consider that the gpio regulator driver should support voltage regulators only 
+> when used with DT, and just keep the regulator-type property support in the 
+> driver for backward compatibility ?
 
-Tony
+I don't really care either way, I did write a patch for the bindings but
+there was some language lawyering over it and I never cared enough to
+get round to updating it.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140513/2d8bbbc9/attachment.sig>
