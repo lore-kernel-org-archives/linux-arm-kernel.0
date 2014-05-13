@@ -1,129 +1,46 @@
 From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Tue, 13 May 2014 09:13:55 -0700
-Subject: [PATCH v3 03/14] ARM: KVM: handle 64bit values passed to mrcc or from
- mcrr instructions in BE case
+Date: Tue, 13 May 2014 09:13:57 -0700
+Subject: [PATCH v3 05/14] ARM: KVM: vgic mmio should hold data as LE bytes
+ array in BE case
 In-Reply-To: <1399997646-4716-1-git-send-email-victor.kamensky@linaro.org>
 References: <1399997646-4716-1-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <1399997646-4716-4-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <1399997646-4716-6-git-send-email-victor.kamensky@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In some cases the mcrr and mrrc instructions in combination with the ldrd
-and strd instructions need to deal with 64bit value in memory. The ldrd
-and strd instructions already handle endianness within word (register)
-boundaries but to get effect of the whole 64bit value represented correctly,
-rr_lo_hi macro is introduced and is used to swap registers positions when
-the mcrr and mrrc instructions are used. That has the effect of swapping
-two words.
+According to recent clarifications of mmio.data array meaning -
+the mmio.data array should hold bytes as they would appear in
+memory. Vgic is little endian device. And in case of BE image
+kernel side that emulates vgic, holds data in BE form. So we
+need to byteswap cpu<->le32 vgic registers when we read/write them
+from mmio.data[].
+
+Change has no effect in LE case because cpu already runs in le32.
 
 Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/include/asm/kvm_asm.h | 18 ++++++++++++++++++
- arch/arm/kvm/init.S            |  4 ++--
- arch/arm/kvm/interrupts.S      |  4 ++--
- arch/arm/kvm/interrupts_head.S |  6 +++---
- 4 files changed, 25 insertions(+), 7 deletions(-)
+ virt/kvm/arm/vgic.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-index 53b3c4a..3a67bec 100644
---- a/arch/arm/include/asm/kvm_asm.h
-+++ b/arch/arm/include/asm/kvm_asm.h
-@@ -61,6 +61,24 @@
- #define ARM_EXCEPTION_FIQ	  6
- #define ARM_EXCEPTION_HVC	  7
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 56ff9be..529c336 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -241,12 +241,12 @@ static void vgic_cpu_irq_clear(struct kvm_vcpu *vcpu, int irq)
  
-+/*
-+ * The rr_lo_hi macro swaps a pair of registers depending on
-+ * current endianness. It is used in conjunction with ldrd and strd
-+ * instructions that load/store a 64-bit value from/to memory to/from
-+ * a pair of registers which are used with the mrrc and mcrr instructions.
-+ * If used with the ldrd/strd instructions, the a1 parameter is the first
-+ * source/destination register and the a2 parameter is the second
-+ * source/destination register. Note that the ldrd/strd instructions
-+ * already swap the bytes within the words correctly according to the
-+ * endianness setting, but the order of the registers need to be effectively
-+ * swapped when used with the mrrc/mcrr instructions.
-+ */
-+#ifdef CONFIG_CPU_ENDIAN_BE8
-+#define rr_lo_hi(a1, a2) a2, a1
-+#else
-+#define rr_lo_hi(a1, a2) a1, a2
-+#endif
-+
- #ifndef __ASSEMBLY__
- struct kvm;
- struct kvm_vcpu;
-diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
-index 74f0718..2d10b2d 100644
---- a/arch/arm/kvm/init.S
-+++ b/arch/arm/kvm/init.S
-@@ -74,7 +74,7 @@ __do_hyp_init:
- ARM_BE8(setend	be) @ Switch to Big Endian mode if needed
+ static u32 mmio_data_read(struct kvm_exit_mmio *mmio, u32 mask)
+ {
+-	return *((u32 *)mmio->data) & mask;
++	return le32_to_cpu(*((u32 *)mmio->data)) & mask;
+ }
  
- 	@ Set the HTTBR to point to the hypervisor PGD pointer passed
--	mcrr	p15, 4, r2, r3, c2
-+	mcrr	p15, 4, rr_lo_hi(r2, r3), c2
+ static void mmio_data_write(struct kvm_exit_mmio *mmio, u32 mask, u32 value)
+ {
+-	*((u32 *)mmio->data) = value & mask;
++	*((u32 *)mmio->data) = cpu_to_le32(value) & mask;
+ }
  
- 	@ Set the HTCR and VTCR to the same shareability and cacheability
- 	@ settings as the non-secure TTBCR and with T0SZ == 0.
-@@ -140,7 +140,7 @@ phase2:
- 	mov	pc, r0
- 
- target:	@ We're now in the trampoline code, switch page tables
--	mcrr	p15, 4, r2, r3, c2
-+	mcrr	p15, 4, rr_lo_hi(r2, r3), c2
- 	isb
- 
- 	@ Invalidate the old TLBs
-diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
-index 0d68d40..24d4e65 100644
---- a/arch/arm/kvm/interrupts.S
-+++ b/arch/arm/kvm/interrupts.S
-@@ -52,7 +52,7 @@ ENTRY(__kvm_tlb_flush_vmid_ipa)
- 	dsb	ishst
- 	add	r0, r0, #KVM_VTTBR
- 	ldrd	r2, r3, [r0]
--	mcrr	p15, 6, r2, r3, c2	@ Write VTTBR
-+	mcrr	p15, 6, rr_lo_hi(r2, r3), c2	@ Write VTTBR
- 	isb
- 	mcr     p15, 0, r0, c8, c3, 0	@ TLBIALLIS (rt ignored)
- 	dsb	ish
-@@ -135,7 +135,7 @@ ENTRY(__kvm_vcpu_run)
- 	ldr	r1, [vcpu, #VCPU_KVM]
- 	add	r1, r1, #KVM_VTTBR
- 	ldrd	r2, r3, [r1]
--	mcrr	p15, 6, r2, r3, c2	@ Write VTTBR
-+	mcrr	p15, 6, rr_lo_hi(r2, r3), c2	@ Write VTTBR
- 
- 	@ We're all done, just restore the GPRs and go to the guest
- 	restore_guest_regs
-diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
-index e627858..104977f 100644
---- a/arch/arm/kvm/interrupts_head.S
-+++ b/arch/arm/kvm/interrupts_head.S
-@@ -520,7 +520,7 @@ ARM_BE8(rev	r6, r6  )
- 	mcr	p15, 0, r2, c14, c3, 1	@ CNTV_CTL
- 	isb
- 
--	mrrc	p15, 3, r2, r3, c14	@ CNTV_CVAL
-+	mrrc	p15, 3, rr_lo_hi(r2, r3), c14	@ CNTV_CVAL
- 	ldr	r4, =VCPU_TIMER_CNTV_CVAL
- 	add	r5, vcpu, r4
- 	strd	r2, r3, [r5]
-@@ -560,12 +560,12 @@ ARM_BE8(rev	r6, r6  )
- 
- 	ldr	r2, [r4, #KVM_TIMER_CNTVOFF]
- 	ldr	r3, [r4, #(KVM_TIMER_CNTVOFF + 4)]
--	mcrr	p15, 4, r2, r3, c14	@ CNTVOFF
-+	mcrr	p15, 4, rr_lo_hi(r2, r3), c14	@ CNTVOFF
- 
- 	ldr	r4, =VCPU_TIMER_CNTV_CVAL
- 	add	r5, vcpu, r4
- 	ldrd	r2, r3, [r5]
--	mcrr	p15, 3, r2, r3, c14	@ CNTV_CVAL
-+	mcrr	p15, 3, rr_lo_hi(r2, r3), c14	@ CNTV_CVAL
- 	isb
- 
- 	ldr	r2, [vcpu, #VCPU_TIMER_CNTV_CTL]
+ /**
 -- 
 1.8.1.4
