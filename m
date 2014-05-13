@@ -1,28 +1,29 @@
-From: james.hogan@imgtec.com (James Hogan)
-Date: Tue, 13 May 2014 11:13:33 +0100
-Subject: [PATCH] mmc: dw_mmc: change to use recommended reset procedure
-In-Reply-To: <CAPz6YkW5CfdMTW3W-zdK29RCv4q7u9rAMr6AjWip3beuhgsv5g@mail.gmail.com>
-References: <1395834374-1988-1-git-send-email-yuvaraj.cd@samsung.com>
- <CAKuRcOJYsC9OUOrYrvKg_iC5Z6dZ0mqW3-y=UXHtCr99=gQBXw@mail.gmail.com>
- <536C2C31.8000209@samsung.com>
- <CAPz6YkXGH96mjeePwUSRmPX4Y1YXYif+N+BRKsTwtNxtRq3xoQ@mail.gmail.com>
- <536C594A.5080107@samsung.com> <536C84A0.6020403@samsung.com>
- <CAPz6YkUjLmWXvoCkuY8vAwLHksf0Uit6gWP-ADWBbN3NDJBo-w@mail.gmail.com>
- <CAPz6YkW5CfdMTW3W-zdK29RCv4q7u9rAMr6AjWip3beuhgsv5g@mail.gmail.com>
-Message-ID: <5371F04D.7060007@imgtec.com>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Tue, 13 May 2014 15:44:00 +0530
+Subject: [PATCH V3 2/3] ARM: EXYNOS5: Add Suspend-to-RAM support for 5420
+In-Reply-To: <8537431.uXYiuaPHBe@amdc1032>
+References: <1399546368-30537-1-git-send-email-vikas.sajjan@samsung.com>
+ <8537431.uXYiuaPHBe@amdc1032>
+Message-ID: <CAM4voakJyOqpECEbtSc=BrsMqb=c90-t-i4_m3F4wKqrEarH_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Bartlomiej,
 
-On 12/05/14 22:44, Sonny Rao wrote:
-> Doug mentioned that James Hogan might have an answer.  James, are
-> there Imgtec SoCs which use dw_mmc and use DMA but don't use the
-> IDMAC?  If so, we can add that support into this reset procedure
-> patch.
+[...]
+>>
+>> -     regmap_write(pmu_regmap, S5P_PAD_RET_MAUDIO_OPTION, (1 << 28));
+>> -     regmap_write(pmu_regmap, S5P_PAD_RET_GPIO_OPTION, (1 << 28));
+>> -     regmap_write(pmu_regmap, S5P_PAD_RET_UART_OPTION, (1 << 28));
+>> -     regmap_write(pmu_regmap, S5P_PAD_RET_MMCA_OPTION, (1 << 28));
+>> -     regmap_write(pmu_regmap, S5P_PAD_RET_MMCB_OPTION, (1 << 28));
+>> -     regmap_write(pmu_regmap, S5P_PAD_RET_EBIA_OPTION, (1 << 28));
+>> -     regmap_write(pmu_regmap, S5P_PAD_RET_EBIB_OPTION, (1 << 28));
+>> +     if (soc_is_exynos5250()) {
+>
+> Adding a check here for EXYNOS5250 doesn't look correct (the old code
+> behavior for older EXYNOS SoCs should be preserved).
+Will fix this in the next version.
 
-Yes, the Toumaz TZ1090 SoC has the dw_mmc configured without an IDMAC,
-so it uses the IMG DMAC block instead.
-
-Cheers
-James
+Regards,
+Abhilash
