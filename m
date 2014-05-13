@@ -1,84 +1,75 @@
-From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Tue, 13 May 2014 15:44:23 +0530
-Subject: [PATCH V3 2/3] ARM: EXYNOS5: Add Suspend-to-RAM support for 5420
-In-Reply-To: <536DABB3.4060809@samsung.com>
-References: <1399546368-30537-1-git-send-email-vikas.sajjan@samsung.com>
- <536DABB3.4060809@samsung.com>
-Message-ID: <CAM4voa=T0Pq-evFT7o8f53QnK_Lqp6ke1rGAreSPd9JcvyFPNw@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 13 May 2014 12:10:35 +0200
+Subject: [PATCHv2 0/4] ARM: implement workaround for Cortex-A9/PL310/PCIe
+ deadlock
+Message-ID: <1399975839-5311-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pankaj,
+Russell, Will, Catalin,
 
-[...]
->>   +#define EXYNOS5420_VA_CPU_STATE (S5P_VA_SYSRAM + 0x28)
->> +#define EXYNOS5420_VA_CPU_ADDR  (S5P_VA_SYSRAM_NS + 0x1C)
->> +
->
->
-> It will be good if we can rebase this change on top of Sachin's SYSRAM
-> patches [1]
->
-> [1]: http://www.spinics.net/lists/arm-kernel/msg329188.html
-This is now merged in Kukjin's for-next. Have rebased my patches on top of it.
+This patch series adresses a problem that affects the newer Marvell
+Armada 375 and 38x SOCs, based on Cortex-A9+PL310, combined with the
+Marvell PCIe hardware unit. When the hardware I/O coherency is
+enabled, the combination of Cortex-A9/PL310/Marvell PCIe hardware unit
+will quickly cause a deadlock when the PCIe bus is stressed.
 
-[...]
->> +
->> +               unsigned i;
->> +
->> +               s3c_pm_do_save(exynos5420_reg_save,
->> +                       ARRAY_SIZE(exynos5420_reg_save));
->> +
->
->
-> Is it possible to move this code in DISP driver somewhere?
-> As if you see I have already posted some patches [1] to remove i2c SYS CFG
-> register
-> configuration during S2R from pm.c to i2c driver itself for Exynos5250 as
-> suggested
-> by Arnd.
->
-> This way we can reduce dependency of regs-sys.h in pm.c also we do not need
-> to
-> statically map sysreg register in exynos.c, and in general it will us in
-> cleaning up
-> exynos code from such things as it is being discussed here [2]
->
-> [1]: https://lkml.org/lkml/2014/5/6/104
-> [2]: https://lkml.org/lkml/2014/5/6/71
-Will remove.
+The workaround for this problem has been suggested by ARM, and
+consists in two things:
 
-[...]
->>     /* For EXYNOS5 */
->>   +#define EXYNOS5_SYS_DISP1_BLK_CFG
->> S5P_SYSREG(0x0214)
->
->
-> I think this offset should not be added here as it does not belong with PMU.
-> Moreover IIRC if you have rebased these patches on my Exynos PMU patch
-> series [1],
-> this change should fail to compile as "regs-pmu.h" does not have anymore
-> "mach/map.h" and definition for S5P_SYSREG has been moved to a new file
-> "regs-sys.h". Please check here [2]
->
-> [1]: https://lkml.org/lkml/2014/5/2/612
-> [2]: https://lkml.org/lkml/2014/4/30/8
-Will remove.
->
->
->>   #define EXYNOS5_AUTO_WDTRESET_DISABLE                         (0x0408)
->>   #define EXYNOS5_MASK_WDTRESET_REQUEST                         (0x040C)
->>
->
->
->
-> --
-> Best Regards,
-> Pankaj Dubey
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+ (1) Map the PCIe regions as strongly-ordered
+
+ (2) Disable the outer cache sync of the PL310 when hardware I/O
+     coherency is used, since it is unneeded and causes the deadlock.
+
+The following four patches address the problem in the following way:
+
+ * PATCH 1/4 fixes a minor issue in drivers/of, which prevents from
+   using of_update_property() early enough in the boot.
+
+ * PATCH 2/4 adds the necessary infrastructure to allow PCIe I/O
+   regions to be mapped as strongly-ordered.
+
+ * PATCH 3/4 extends the l2x0 cache driver with a new compatible
+   string "arm,pl310-coherent-cache" which is associated to a
+   different set of L2 cache maintenance operations having ->sync set
+   to NULL.
+
+ * PATCH 4/4 uses both of the added infrastructures, as well as the
+   existing infrastructure to customize the behavior of ioremap() on a
+   per-platform basis, to implement the workaround for the Armada 375
+   and 38x SOCs.
+
+Changes since v1:
+
+ - Instead of introducing separate l2x0 initialization functions, rely
+   on a separate compatible string to identify whether we're coherent
+   or not. The compatible string *has* to be modified at runtime,
+   because Armada 375 and 38x are only I/O coherent when in SMP
+   mode. In non-SMP mode, they are not I/O coherent, so we cannot
+   change the DT to 'arm,pl310-coherent-cache'.
+
+ - Addition of the drivers/of fix to be able to use
+   of_update_property() early and fix up the PL310 compatible string,
+   as explained in the previous item.
+
+Thanks!
+
+Thomas
+
+Thomas Petazzoni (4):
+  of: make of_update_property() usable earlier in the boot process
+  ARM: mm: allow sub-architectures to override PCI I/O memory type
+  ARM: mm: add support for HW coherent systems in PL310
+  ARM: mvebu: implement L2/PCIe deadlock workaround
+
+ Documentation/devicetree/bindings/arm/l2cc.txt |  2 +
+ arch/arm/include/asm/io.h                      |  6 +++
+ arch/arm/mach-mvebu/board-v7.c                 | 55 ++++++++++++++++++++++++++
+ arch/arm/mm/cache-l2x0.c                       | 21 ++++++++++
+ arch/arm/mm/ioremap.c                          |  9 ++++-
+ drivers/of/base.c                              |  5 +++
+ 6 files changed, 97 insertions(+), 1 deletion(-)
+
+-- 
+1.9.2
