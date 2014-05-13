@@ -1,69 +1,239 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 13 May 2014 07:48:01 +0200
-Subject: i.MX6 USB OTG support is broken on linux-next
-In-Reply-To: <0ca71a532bd14b6d81e6799969f8f580@BL2PR03MB226.namprd03.prod.outlook.com>
-References: <20140509130046.GP2794@dragon>
- <20140510111003.GA1593@shlinux1.ap.freescale.net>
- <20140510131815.GT2794@dragon>
- <20140510135737.GA1878@shlinux1.ap.freescale.net>
- <20140512054549.GC5858@pengutronix.de>
- <0ca71a532bd14b6d81e6799969f8f580@BL2PR03MB226.namprd03.prod.outlook.com>
-Message-ID: <20140513054801.GI5858@pengutronix.de>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 13 May 2014 11:23:48 +0530
+Subject: [PATCHv5 10/20] phy: add support for USB cluster on the Armada
+ 375 SoC
+In-Reply-To: <1399832288-19899-11-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1399832288-19899-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1399832288-19899-11-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <5371B36C.6000703@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 13, 2014 at 12:33:30AM +0000, Peter Chen wrote:
->  
-> > 
-> > On Sat, May 10, 2014 at 09:57:39PM +0800, Li Jun wrote:
-> > > On Sat, May 10, 2014 at 09:18:36PM +0800, Shawn Guo wrote:
-> > > > + Robin and David,
-> > > >
-> > > > diff --git a/drivers/usb/core/Kconfig b/drivers/usb/core/Kconfig
-> > > > index cb8e991..9081757 100644
-> > > > --- a/drivers/usb/core/Kconfig
-> > > > +++ b/drivers/usb/core/Kconfig
-> > > > @@ -65,7 +65,6 @@ config USB_OTG
-> > > >  config USB_OTG_WHITELIST
-> > > >         bool "Rely on OTG Targeted Peripherals List"
-> > > >         depends on USB_OTG || EXPERT
-> > > > -       default y if USB_OTG
-> > > >         help
-> > > >           If you say Y here, the "otg_whitelist.h" file will be used
-> > as a
-> > > >           product whitelist, so USB peripherals not listed there will
-> > be
-> > > >
-> > > > Shawn
-> > > As Peter suggested, do not enable OTG_FSM in defconfig since there are
-> > very few
-> > > HNP&SRP capable device in market. With OTG_FSM enabled, even
-> > USB_OTG_WHITELIST
-> > > is not selected, the OTG port still can't work the same as before if
-> > you connect
-> > > a normal usb device to it.
-> > 
-> > If a device is not HNP/SRP capable then it should not be used on this
-> > device. If we can't detect this during runtime then there should be some
-> > devicetree property for that. Making such decisions during compile time
-> > is not an option in the days of multimachine kernels.
-> > 
-> > Sascha
-> > 
+Hi,
+
+On Sunday 11 May 2014 11:47 PM, Thomas Petazzoni wrote:
+> From: Gregory CLEMENT <gregory.clement@free-electrons.com>
 > 
-> I don't think OTG option should be set for multi-machine kernel configurations,
-> the otg device will not be server, and it is a customized device (eg, the Targeted
-> Peripherals List need to be updated when it goes to be product).
+> The Armada 375 SoC comes with an USB2 host and device controller and
+> an USB3 controller. The USB cluster control register allows to manage
+> common features of both USB controllers.
+> 
+> This commit adds a driver integrated in the generic PHY framework to
+> control this USB cluster feature.
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  drivers/phy/Kconfig              |   6 ++
+>  drivers/phy/Makefile             |   1 +
+>  drivers/phy/phy-armada375-usb2.c | 157 +++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 164 insertions(+)
+>  create mode 100644 drivers/phy/phy-armada375-usb2.c
+> 
+> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+> index 3bb05f1..e63cf9d 100644
+> --- a/drivers/phy/Kconfig
+> +++ b/drivers/phy/Kconfig
+> @@ -15,6 +15,12 @@ config GENERIC_PHY
+>  	  phy users can obtain reference to the PHY. All the users of this
+>  	  framework should select this config.
+>  
+> +config ARMADA375_USBCLUSTER_PHY
+> +	def_bool y
+> +	depends on MACH_ARMADA_375 || COMPILE_TEST
+> +	depends on OF
+> +	select GENERIC_PHY
+> +
+>  config PHY_EXYNOS_MIPI_VIDEO
+>  	tristate "S5P/EXYNOS SoC series MIPI CSI-2/DSI PHY driver"
+>  	depends on HAS_IOMEM
+> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+> index 2faf78e..47d5a86 100644
+> --- a/drivers/phy/Makefile
+> +++ b/drivers/phy/Makefile
+> @@ -3,6 +3,7 @@
+>  #
+>  
+>  obj-$(CONFIG_GENERIC_PHY)		+= phy-core.o
+> +obj-$(CONFIG_ARMADA375_USBCLUSTER_PHY)	+= phy-armada375-usb2.o
+>  obj-$(CONFIG_BCM_KONA_USB2_PHY)		+= phy-bcm-kona-usb2.o
+>  obj-$(CONFIG_PHY_EXYNOS_DP_VIDEO)	+= phy-exynos-dp-video.o
+>  obj-$(CONFIG_PHY_EXYNOS_MIPI_VIDEO)	+= phy-exynos-mipi-video.o
+> diff --git a/drivers/phy/phy-armada375-usb2.c b/drivers/phy/phy-armada375-usb2.c
+> new file mode 100644
+> index 0000000..a6f746d
+> --- /dev/null
+> +++ b/drivers/phy/phy-armada375-usb2.c
+> @@ -0,0 +1,157 @@
+> +/*
+> + * USB cluster support for Armada 375 platform.
+> + *
+> + * Copyright (C) 2014 Marvell
+> + *
+> + * Gregory CLEMENT <gregory.clement@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2 or later. This program is licensed "as is"
+> + * without any warranty of any kind, whether express or implied.
+> + *
+> + * Armada 375 comes with an USB2 host and device controller and an
+> + * USB3 controller. The USB cluster control register allows to manage
+> + * common features of both USB controllers.
+> + */
+> +
+> +#include <linux/init.h>
+> +#include <linux/io.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/of_address.h>
+> +#include <linux/phy/phy.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/slab.h>
+> +
+> +#define USB2_PHY_CONFIG_DISABLE BIT(0)
+> +
+> +/* The USB cluster allows to choose between two PHYs */
+> +#define NB_PHY 2
+> +
+> +enum {
+> +	PHY_USB2 = 0,
+> +	PHY_USB3 = 1,
+> +};
+> +
+> +struct armada375_cluster_phy {
+> +	struct phy *phy;
+> +	void __iomem *reg;
+> +	bool enable;
+> +	bool use_usb3;
+> +};
+> +
+> +struct armada375_cluster_phy usb_cluster_phy[NB_PHY];
+> +
+> +static int armada375_usb_phy_init(struct phy *phy)
+> +{
+> +	struct armada375_cluster_phy *cluster_phy = phy_get_drvdata(phy);
+> +	u32 reg;
 
-I want to enable OTG support when one of the devices I want to run the
-kernel on is OTG capable. OTG is just a driver, there's no sane reason
-to break stuff just because it's enabled in the config. We're long past
-the point of single machine kernels.
+This function should be protected since both your PHYs use this ops.
+> +
+> +	if (!cluster_phy->enable)
+> +		return -ENODEV;
+> +
+> +	reg = readl(cluster_phy->reg);
+> +	if (cluster_phy->use_usb3)
+> +		reg |= USB2_PHY_CONFIG_DISABLE;
+> +	else
+> +		reg &= ~USB2_PHY_CONFIG_DISABLE;
+> +	writel(reg, cluster_phy->reg);
 
-Sascha
+This is confusing since both your PHYs control the same bit?
+> +
+> +	return 0;
+> +}
+> +
+> +static struct phy_ops armada375_usb_phy_ops = {
+> +	.init = armada375_usb_phy_init,
+> +	.owner		= THIS_MODULE,
+> +};
+> +
+> +static struct phy *armada375_usb_phy_xlate(struct device *dev,
+> +					struct of_phandle_args *args)
+> +{
+> +	if (WARN_ON(args->args[0] >= NB_PHY))
+> +		return ERR_PTR(-ENODEV);
+> +
+> +	return usb_cluster_phy[args->args[0]].phy;
+> +}
+> +
+> +static int armada375_usb_phy_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct phy *phy;
+> +	struct phy_provider *phy_provider;
+> +	void __iomem *usb_cluster_base;
+> +	struct device_node *xhci_node;
+> +	struct resource *res;
+> +	int i;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	usb_cluster_base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (!usb_cluster_base)
+> +		return -ENOMEM;
+> +
+> +	for (i = 0; i < NB_PHY; i++) {
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+For devices which have multiple PHYs, each PHY should be modelled as the
+sub-node of the *PHY provider* device node.
+> +		phy = devm_phy_create(dev, &armada375_usb_phy_ops, NULL);
+> +		if (IS_ERR(phy)) {
+> +			dev_err(dev, "failed to create PHY n%d\n", i);
+> +			return PTR_ERR(phy);
+> +		}
+> +
+> +		usb_cluster_phy[i].phy = phy;
+> +		usb_cluster_phy[i].reg = usb_cluster_base;
+> +		usb_cluster_phy[i].enable = false;
+> +		phy_set_drvdata(phy, &usb_cluster_phy[i]);
+> +	}
+> +
+> +	usb_cluster_phy[PHY_USB2].use_usb3 = false;
+> +	usb_cluster_phy[PHY_USB3].use_usb3 = true;
+> +
+> +	/*
+> +	 * We can't use the first usb2 unit and usb3 at the same time
+> +	 * to manage a USB2 device, so let's disable usb2 if usb3 is
+> +	 * selected. In this case the USB2 device will be managed by
+> +	 * the xhci controller.
+> +	 */
+> +
+> +	xhci_node = of_find_compatible_node(NULL, NULL,
+> +					"marvell,armada-375-xhci");
+
+huh.. that's too much binding between the controller and the PHY.
+
+> +
+> +	if (xhci_node && of_device_is_available(xhci_node)) {
+> +		usb_cluster_phy[PHY_USB3].enable = true;
+> +	} else {
+> +		struct device_node *ehci_node;
+> +		ehci_node = of_find_compatible_node(NULL, NULL,
+> +					"marvell,orion-ehci");
+> +		if (ehci_node && of_device_is_available(ehci_node))
+> +			usb_cluster_phy[PHY_USB2].enable = true;
+> +		of_node_put(ehci_node);
+> +	}
+> +
+> +	of_node_put(xhci_node);
+> +
+> +	phy_provider = devm_of_phy_provider_register(&pdev->dev,
+> +						     armada375_usb_phy_xlate);
+> +	if (IS_ERR(phy_provider))
+> +		return PTR_ERR(phy_provider);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id of_usb_cluster_table[] = {
+> +	{ .compatible = "marvell,armada-375-usb-cluster", },
+> +	{ /* end of list */ },
+> +};
+> +MODULE_DEVICE_TABLE(of, of_usb_cluster_table);
+> +
+> +static struct platform_driver armada375_usb_phy_driver = {
+> +	.probe	= armada375_usb_phy_probe,
+> +	.driver = {
+> +		.of_match_table	= of_usb_cluster_table,
+> +		.name  = "armada-375-usb-cluster",
+> +		.owner = THIS_MODULE,
+> +	}
+> +};
+> +module_platform_driver(armada375_usb_phy_driver);
+> +
+> +MODULE_DESCRIPTION("Armada 375 USB cluster driver");
+> +MODULE_AUTHOR("Gregory CLEMENT <gregory.clement@free-electrons.com>");
+> +MODULE_LICENSE("GPL");
+
+GPL v2?
+
+Thanks
+Kishon
