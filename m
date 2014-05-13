@@ -1,143 +1,341 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Tue, 13 May 2014 17:13:31 +0530
-Subject: [Patch v4 5/5] mcpm: exynos: populate suspend and powered_up
- callbacks
-In-Reply-To: <20140509153206.GB5040@e102568-lin.cambridge.arm.com>
-References: <1399278444-8312-3-git-send-email-chander.kashyap@linaro.org>
- <1399282040-8995-1-git-send-email-chander.kashyap@linaro.org>
- <1399282040-8995-6-git-send-email-chander.kashyap@linaro.org>
- <20140509153206.GB5040@e102568-lin.cambridge.arm.com>
-Message-ID: <CANuQgHG9tGzi2rSOwREAxVu4BQoprDg9om62AybgW5v31fpbTQ@mail.gmail.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Tue, 13 May 2014 19:44:44 +0800
+Subject: [PATCH v7 06/15] ARM: hisi: enable MCPM implementation
+In-Reply-To: <1399795571-17231-7-git-send-email-haojian.zhuang@linaro.org>
+References: <1399795571-17231-7-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1399981484-31628-1-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo
+Multiple CPU clusters are used in Hisilicon HiP04 SoC. Now use MCPM
+framework to manage power on HiP04 SoC.
 
-On 9 May 2014 21:02, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> On Mon, May 05, 2014 at 10:27:20AM +0100, Chander Kashyap wrote:
->> In order to support cpuidle through mcpm, suspend and powered-up
->> callbacks are required in mcpm platform code.
->> Hence populate the same callbacks.
->>
->> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
->> Signed-off-by: Chander Kashyap <k.chander@samsung.com>
->> ---
->> Changes in v4: None
->> Changes in v3:
->>       1. Removed coherancy enablement after suspend failure.
->
-> coherency
->
->>       2. Use generic function to poweron cpu.
->> changes in v2:
->>       1. Fixed typo: enynos_pmu_cpunr to exynos_pmu_cpunr
->>  arch/arm/mach-exynos/mcpm-exynos.c |   34 ++++++++++++++++++++++++++++++++++
->>  1 file changed, 34 insertions(+)
->>
->> diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
->> index d0f7461..6d4a907 100644
->> --- a/arch/arm/mach-exynos/mcpm-exynos.c
->> +++ b/arch/arm/mach-exynos/mcpm-exynos.c
->> @@ -256,10 +256,44 @@ static int exynos_power_down_finish(unsigned int cpu, unsigned int cluster)
->>       return -ETIMEDOUT; /* timeout */
->>  }
->>
->> +void exynos_powered_up(void)
->
-> static ?
+Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+---
+ arch/arm/mach-hisi/Makefile   |   1 +
+ arch/arm/mach-hisi/platmcpm.c | 304 ++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 305 insertions(+)
+ create mode 100644 arch/arm/mach-hisi/platmcpm.c
 
-Ok, done
-
->
->> +{
->> +     unsigned int mpidr, cpu, cluster;
->> +
->> +     mpidr = read_cpuid_mpidr();
->> +     cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
->> +     cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
->> +
->> +     arch_spin_lock(&exynos_mcpm_lock);
->> +     if (cpu_use_count[cpu][cluster] == 0)
->> +             cpu_use_count[cpu][cluster] = 1;
->> +     arch_spin_unlock(&exynos_mcpm_lock);
->> +}
->> +
->> +static void exynos_suspend(u64 residency)
->> +{
->> +     unsigned int mpidr, cpunr;
->> +
->> +     mpidr = read_cpuid_mpidr();
->> +     cpunr = exynos_pmu_cpunr(mpidr);
->
-> If I were to be picky, I would compute these values only if they
-> are needed, ie move the computation after exynos_power_down().
-
-Yes thats make sense. I will realign it.
-
->
-> There is another quite horrible issue here. We know this code works
-> because the processors A15/A7 hit the caches with C bit in SCTLR cleared.
->
-> On processors where this is not true, this sequence would explode
-> if power down fails (in case core is gated but L2 is still powered on,
-> the stack is stuck in L2) since it is going to read stack data that is
-> in L2 but can't be read.
->
-> It is not related to this sequence only, but it is an issue in general
-> and wanted to mention that on the lists for public awareness.
->
-
-Can you please elaborate. I didn't understand.
-
-> The gist of what I am saying is, please add a comment to that extent,
-> here and it should be added in exynos_power_down() too.
->
->> +     __raw_writel(virt_to_phys(mcpm_entry_point), ns_sram_base_addr + 0x1c);
->
-> No magic numbers please (0x1c). You can add a macro/wrapper, as TC2 does.
-
-Yes i will remove it.
-
->
->> +     exynos_power_down();
->> +
->> +     /*
->> +      * Execution reaches here only if cpu did not power down.
->> +      * Hence roll back the changes done in exynos_power_down function.
->> +     */
->> +     exynos_cpu_powerup(cpunr);
->
-> Please be aware that if this function returns MCPM will soft reboot, and
-> the CPUidle driver will have no way to detect a state entry failure.
->
-> I am just flagging this up, since fixing this behaviour is not easy, and
-> honestly, since power down failure should be the exception not the rule,
-> the idle stats should not be affected much.
->
-> I think this is the proper way of implementing the sequence but please
-> all keep in mind what I wrote above.
->
-> Lorenzo
->
->> +}
->> +
->>  static const struct mcpm_platform_ops exynos_power_ops = {
->>       .power_up               = exynos_power_up,
->>       .power_down             = exynos_power_down,
->>       .power_down_finish      = exynos_power_down_finish,
->> +     .suspend                = exynos_suspend,
->> +     .powered_up             = exynos_powered_up,
->>  };
->>
->>  static void __init exynos_mcpm_usage_count_init(void)
->> --
->> 1.7.9.5
->>
->>
->
-
-
-
+diff --git a/arch/arm/mach-hisi/Makefile b/arch/arm/mach-hisi/Makefile
+index 2ae1b59..e7a8640 100644
+--- a/arch/arm/mach-hisi/Makefile
++++ b/arch/arm/mach-hisi/Makefile
+@@ -3,4 +3,5 @@
+ #
+ 
+ obj-y	+= hisilicon.o
++obj-$(CONFIG_MCPM)		+= platmcpm.o
+ obj-$(CONFIG_SMP)		+= platsmp.o hotplug.o
+diff --git a/arch/arm/mach-hisi/platmcpm.c b/arch/arm/mach-hisi/platmcpm.c
+new file mode 100644
+index 0000000..3b42977
+--- /dev/null
++++ b/arch/arm/mach-hisi/platmcpm.c
+@@ -0,0 +1,304 @@
++/*
++ * Copyright (c) 2013-2014 Linaro Ltd.
++ * Copyright (c) 2013-2014 Hisilicon Limited.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ */
++#include <linux/delay.h>
++#include <linux/io.h>
++#include <linux/of_address.h>
++
++#include <asm/cputype.h>
++#include <asm/cp15.h>
++#include <asm/mcpm.h>
++
++#include "core.h"
++
++/* bits definition in SC_CPU_RESET_REQ[x]/SC_CPU_RESET_DREQ[x]
++ * 1 -- unreset; 0 -- reset
++ */
++#define CORE_RESET_BIT(x)		(1 << x)
++#define NEON_RESET_BIT(x)		(1 << (x + 4))
++#define CORE_DEBUG_RESET_BIT(x)		(1 << (x + 9))
++#define CLUSTER_L2_RESET_BIT		(1 << 8)
++#define CLUSTER_DEBUG_RESET_BIT		(1 << 13)
++
++/*
++ * bits definition in SC_CPU_RESET_STATUS[x]
++ * 1 -- reset status; 0 -- unreset status
++ */
++#define CORE_RESET_STATUS(x)		(1 << x)
++#define NEON_RESET_STATUS(x)		(1 << (x + 4))
++#define CORE_DEBUG_RESET_STATUS(x)	(1 << (x + 9))
++#define CLUSTER_L2_RESET_STATUS		(1 << 8)
++#define CLUSTER_DEBUG_RESET_STATUS	(1 << 13)
++#define CORE_WFI_STATUS(x)		(1 << (x + 16))
++#define CORE_WFE_STATUS(x)		(1 << (x + 20))
++#define CORE_DEBUG_ACK(x)		(1 << (x + 24))
++
++#define SC_CPU_RESET_REQ(x)		(0x520 + (x << 3))	/* reset */
++#define SC_CPU_RESET_DREQ(x)		(0x524 + (x << 3))	/* unreset */
++#define SC_CPU_RESET_STATUS(x)		(0x1520 + (x << 3))
++
++#define FAB_SF_MODE			0x0c
++#define FAB_SF_INVLD			0x10
++
++/* bits definition in FB_SF_INVLD */
++#define FB_SF_INVLD_START		(1 << 8)
++
++#define HIP04_MAX_CLUSTERS		4
++#define HIP04_MAX_CPUS_PER_CLUSTER	4
++
++#define POLL_MSEC	10
++#define TIMEOUT_MSEC	1000
++
++struct hip04_secondary_cpu_data {
++	u32	bootwrapper_phys;
++	u32	bootwrapper_size;
++	u32	bootwrapper_magic;
++	u32	relocation_entry;
++	u32	relocation_size;
++};
++
++static void __iomem *relocation, *sysctrl, *fabric;
++static int hip04_cpu_table[HIP04_MAX_CLUSTERS][HIP04_MAX_CPUS_PER_CLUSTER];
++static DEFINE_SPINLOCK(boot_lock);
++static struct hip04_secondary_cpu_data hip04_boot;
++
++static bool hip04_cluster_down(unsigned int cluster)
++{
++	int i;
++
++	for (i = 0; i < HIP04_MAX_CPUS_PER_CLUSTER; i++)
++		if (hip04_cpu_table[cluster][i])
++			return false;
++	return true;
++}
++
++static void hip04_set_snoop_filter(unsigned int cluster, unsigned int on)
++{
++	unsigned long data;
++
++	if (!fabric)
++		return;
++	data = readl_relaxed(fabric + FAB_SF_MODE);
++	if (on)
++		data |= 1 << cluster;
++	else
++		data &= ~(1 << cluster);
++	writel_relaxed(data, fabric + FAB_SF_MODE);
++	while (1) {
++		if (data == readl_relaxed(fabric + FAB_SF_MODE))
++			break;
++	}
++}
++
++static int hip04_mcpm_power_up(unsigned int cpu, unsigned int cluster)
++{
++	unsigned long data, mask;
++
++	if (!relocation || !sysctrl)
++		return -ENODEV;
++	if (cluster >= HIP04_MAX_CLUSTERS || cpu >= HIP04_MAX_CPUS_PER_CLUSTER)
++		return -EINVAL;
++
++	spin_lock_irq(&boot_lock);
++	writel_relaxed(hip04_boot.bootwrapper_phys, relocation);
++	writel_relaxed(hip04_boot.bootwrapper_magic, relocation + 4);
++	writel_relaxed(virt_to_phys(mcpm_entry_point), relocation + 8);
++	writel_relaxed(0, relocation + 12);
++
++	if (hip04_cluster_down(cluster)) {
++		data = CLUSTER_DEBUG_RESET_BIT;
++		writel_relaxed(data, sysctrl + SC_CPU_RESET_DREQ(cluster));
++		do {
++			mask = CLUSTER_DEBUG_RESET_STATUS;
++			data = readl_relaxed(sysctrl + \
++					     SC_CPU_RESET_STATUS(cluster));
++		} while (data & mask);
++		hip04_set_snoop_filter(cluster, 1);
++	}
++
++	hip04_cpu_table[cluster][cpu]++;
++
++	data = CORE_RESET_BIT(cpu) | NEON_RESET_BIT(cpu) | \
++	       CORE_DEBUG_RESET_BIT(cpu);
++	writel_relaxed(data, sysctrl + SC_CPU_RESET_DREQ(cluster));
++	spin_unlock_irq(&boot_lock);
++	msleep(POLL_MSEC);
++
++	return 0;
++}
++
++static void hip04_mcpm_power_down(void)
++{
++	unsigned int mpidr, cpu, cluster, data = 0;
++	bool skip_reset = false;
++
++	mpidr = read_cpuid_mpidr();
++	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
++
++	__mcpm_cpu_going_down(cpu, cluster);
++
++	spin_lock(&boot_lock);
++	BUG_ON(__mcpm_cluster_state(cluster) != CLUSTER_UP);
++	hip04_cpu_table[cluster][cpu]--;
++	if (hip04_cpu_table[cluster][cpu] == 1) {
++		/* A power_up request went ahead of us. */
++		skip_reset = true;
++	} else if (hip04_cpu_table[cluster][cpu] > 1) {
++		pr_err("Cluster %d CPU%d is still running\n", cluster, cpu);
++		BUG();
++	}
++
++	spin_unlock(&boot_lock);
++
++	v7_exit_coherency_flush(louis);
++
++	__mcpm_cpu_down(cpu, cluster);
++
++	if (!skip_reset) {
++		data = CORE_RESET_BIT(cpu) | NEON_RESET_BIT(cpu) | \
++		       CORE_DEBUG_RESET_BIT(cpu);
++		writel_relaxed(data, sysctrl + SC_CPU_RESET_REQ(cluster));
++	}
++}
++
++static int hip04_mcpm_wait_for_powerdown(unsigned int cpu, unsigned int cluster)
++{
++	unsigned int data, tries;
++
++	BUG_ON(cluster >= HIP04_MAX_CLUSTERS ||
++	       cpu >= HIP04_MAX_CPUS_PER_CLUSTER);
++
++	for (tries = 0; tries < TIMEOUT_MSEC / POLL_MSEC; tries++) {
++		data = readl_relaxed(sysctrl + SC_CPU_RESET_STATUS(cluster));
++		if (!(data & CORE_RESET_STATUS(cpu))) {
++			msleep(POLL_MSEC);
++			continue;
++		}
++		return 0;
++	}
++	return -ETIMEDOUT;
++}
++
++static void hip04_mcpm_powered_up(void)
++{
++	if (!relocation)
++		return;
++	spin_lock(&boot_lock);
++	writel_relaxed(0, relocation);
++	writel_relaxed(0, relocation + 4);
++	writel_relaxed(0, relocation + 8);
++	writel_relaxed(0, relocation + 12);
++	spin_unlock(&boot_lock);
++}
++
++static const struct mcpm_platform_ops hip04_mcpm_ops = {
++	.power_up		= hip04_mcpm_power_up,
++	.power_down		= hip04_mcpm_power_down,
++	.wait_for_powerdown	= hip04_mcpm_wait_for_powerdown,
++	.powered_up		= hip04_mcpm_powered_up,
++};
++
++static bool __init hip04_cpu_table_init(void)
++{
++	unsigned int mpidr, cpu, cluster;
++
++	mpidr = read_cpuid_mpidr();
++	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
++
++	if (cluster >= HIP04_MAX_CLUSTERS ||
++	    cpu >= HIP04_MAX_CPUS_PER_CLUSTER) {
++		pr_err("%s: boot CPU is out of bound!\n", __func__);
++		return false;
++	}
++	hip04_set_snoop_filter(cluster, 1);
++	hip04_cpu_table[cluster][cpu] = 1;
++	return true;
++}
++
++static int __init hip04_mcpm_init(void)
++{
++	struct device_node *np, *np_fab;
++	int ret = -ENODEV;
++
++	np = of_find_compatible_node(NULL, NULL, "hisilicon,sysctrl");
++	if (!np)
++		goto err;
++	np_fab = of_find_compatible_node(NULL, NULL, "hisilicon,hip04-fabric");
++	if (!np_fab)
++		goto err;
++
++	if (of_property_read_u32(np, "bootwrapper-phys",
++				 &hip04_boot.bootwrapper_phys)) {
++		pr_err("failed to get bootwrapper-phys\n");
++		ret = -EINVAL;
++		goto err;
++	}
++	if (of_property_read_u32(np, "bootwrapper-size",
++				 &hip04_boot.bootwrapper_size)) {
++		pr_err("failed to get bootwrapper-size\n");
++		ret = -EINVAL;
++		goto err;
++	}
++	if (of_property_read_u32(np, "bootwrapper-magic",
++				 &hip04_boot.bootwrapper_magic)) {
++		pr_err("failed to get bootwrapper-magic\n");
++		ret = -EINVAL;
++		goto err;
++	}
++	if (of_property_read_u32(np, "relocation-entry",
++				 &hip04_boot.relocation_entry)) {
++		pr_err("failed to get relocation-entry\n");
++		ret = -EINVAL;
++		goto err;
++	}
++	if (of_property_read_u32(np, "relocation-size",
++				 &hip04_boot.relocation_size)) {
++		pr_err("failed to get relocation-size\n");
++		ret = -EINVAL;
++		goto err;
++	}
++
++	relocation = ioremap(hip04_boot.relocation_entry,
++			     hip04_boot.relocation_size);
++	if (!relocation) {
++		pr_err("failed to map relocation space\n");
++		ret = -ENOMEM;
++		goto err;
++	}
++	sysctrl = of_iomap(np, 0);
++	if (!sysctrl) {
++		pr_err("failed to get sysctrl base\n");
++		ret = -ENOMEM;
++		goto err_sysctrl;
++	}
++	fabric = of_iomap(np_fab, 0);
++	if (!fabric) {
++		pr_err("failed to get fabric base\n");
++		ret = -ENOMEM;
++		goto err_fabric;
++	}
++
++	if (!hip04_cpu_table_init())
++		return -EINVAL;
++	ret = mcpm_platform_register(&hip04_mcpm_ops);
++	if (!ret) {
++		mcpm_sync_init(NULL);
++		pr_info("HiP04 MCPM initialized\n");
++	}
++	mcpm_smp_set_ops();
++	return ret;
++err_fabric:
++	iounmap(sysctrl);
++err_sysctrl:
++	iounmap(relocation);
++err:
++	return ret;
++}
++early_initcall(hip04_mcpm_init);
 -- 
-with warm regards,
-Chander Kashyap
+1.9.1
