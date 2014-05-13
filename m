@@ -1,334 +1,51 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 13 May 2014 14:26:39 -0700
-Subject: [PATCH 3/4] OMAPDSS: panel-sharp-ls037v7dw01: add device tree
- support
-In-Reply-To: <20140509153008.GC17814@atomide.com>
-References: <1398815562-24113-1-git-send-email-tony@atomide.com>
- <1398815562-24113-4-git-send-email-tony@atomide.com>
- <5369EAE7.3030705@ti.com> <20140507150343.GA9502@atomide.com>
- <536A5920.1020908@ti.com> <20140507175919.GH9502@atomide.com>
- <20140508233300.GI2198@atomide.com> <536C924E.5000307@ti.com>
- <20140509153008.GC17814@atomide.com>
-Message-ID: <20140513212639.GA18001@atomide.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 13 May 2014 22:29:43 +0100
+Subject: [PATCH v9 1/3] PSCI: Add initial support for PSCIv0.2 functions
+In-Reply-To: <CAJ5Y-eZ1gaSPz7n44e+WuVyc=8sjyOUGNw9hDEqH1KKOP3yQRw@mail.gmail.com>
+References: <1399472847-14377-1-git-send-email-ashwin.chaugule@linaro.org>
+ <1399472847-14377-2-git-send-email-ashwin.chaugule@linaro.org>
+ <20140512091047.GB3006@e106331-lin.cambridge.arm.com>
+ <CAJ5Y-eadEXyabW2r_gSsnNyT2zQr3=Dwtq-_oDeryk-h4d6kUw@mail.gmail.com>
+ <CAJ5Y-eZ1gaSPz7n44e+WuVyc=8sjyOUGNw9hDEqH1KKOP3yQRw@mail.gmail.com>
+Message-ID: <20140513212943.GC31201@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [140509 08:31]:
-> * Tomi Valkeinen <tomi.valkeinen@ti.com> [140509 01:31]:
-> > On 09/05/14 02:33, Tony Lindgren wrote:
-> > > * Tony Lindgren <tony@atomide.com> [140507 11:00]:
-> > >> * Tomi Valkeinen <tomi.valkeinen@ti.com> [140507 09:03]:
-> > >>> On 07/05/14 18:03, Tony Lindgren wrote:
-> > >>>>
-> > >>>> BTW, I'm also personally fine with all five gpios showing in a single
-> > >>>> gpios property, I'm not too exited about naming anything in DT..
-> > >>>
-> > >>> I don't have a strong opinion here. I don't have much experience with
-> > >>> DT, especially with making bindings compatible with other ones.
-> > >>>
-> > >>> I'd just forget the simple-panel, and have single gpio array.
-> > >>
-> > >> Well if it's a don't care flag for both of us, let's try to use
-> > >> the existing standard for simple-panel.txt and add mode-gpios
-> > >> property. I'll post a patch for that.
-> > > 
-> > > Here's an updated version using enable-gpios, reset-gpios and
-> > > mode-gpios. So it follows simple-panel.txt and adds mode-gpios
-> > > that's currently specific to this panel only.
-> > > 
-> > > Also updated for -EPROBE_DEFER handling, tested that by changing
-> > > one of the GPIOs to be a twl4030 GPIO.
-> > 
-> > To speed things up a bit, I made the changes I suggested. Compile tested
-> > only.
+On Tue, May 13, 2014 at 06:09:00PM +0100, Ashwin Chaugule wrote:
+> On 12 May 2014 10:02, Ashwin Chaugule <ashwin.chaugule@linaro.org> wrote:
+> >>
+> >> Which tree are you planning on merging this through? Do we need to split
+> >> the arm and arm64 parts?
+> >
+> > IIRC all this PSCI work originally came via Catalins tree(?). But now,
+> > these patches depend on a header introduced by Anups KVM patchset
+> > which is merged in -
+> > https://git.kernel.org/cgit/linux/kernel/git/kvmarm/kvmarm.git/log/?h=next
+> >
+> > In a previous discussion (everyone here is CC'd) with Christoffer and
+> > Paolo the 2nd option of the following was chosen:
+> >
+> > 1) Catalin can apply "Add common header for PSCI related defines", or
+> > Ashwin can resend his series with the patch at the beginning.
+> > Duplicate commits are fine, especially for seldom-modified files where
+> > they do not cause conflicts.
+> >
+> > 2) Send Anup's patchset as a pull request to both me and Catalin,
+> > relative to v3.16-rc1, both of us can apply it and Ashwin's series can
+> > be commit on top.
+> >
+> > To keep it simple it'd be better if it all goes via one tree, but if
+> > there are objections or other suggestions, I'm happy to split this up.
 > 
-> OK thanks did not get the penguin with it so need to look at it a bit
-> more.
+> What is the preferred method to upstream this patchset? Would you
+> recommend this be split into ARM and ARM64 variants, or can it all go
+> via the ARM64 tree? I will then respin these accordingly, along with
+> the feedback from Anup and Mark.
 
-Here's this patch updated again for QVGA and VGA support and to use
-your panel remapping. I've also made sure the blanking works properly
-on evm-37xx and ldp.
+I don't mind via which tree they go in, it can even be the KVM tree if
+there are dependencies, with my Ack on them (once you address the
+comments). But please note that you need Acks from Russell as well since
+that's touching arch/arm code.
 
-Regards,
-
-Tony
-
-8< --------------------
-From: Tony Lindgren <tony@atomide.com>
-Date: Mon, 28 Apr 2014 20:22:21 -0700
-Subject: [PATCH] OMAPDSS: panel-sharp-ls037v7dw01: add device tree support
-
-Add device tree support for sharp-ls037v7dw01 panel.
-
-Note that this patch is using the remapping of the compatible
-flag as implemented by Tomi (that I do not like), but seems
-like that's currently needed to avoid redoing the panel
-bindings later on. And for the record, that has been agreed
-to be a temporary measure until the generic display bindings
-can be used by DSS.
-
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-
---- /dev/null
-+++ b/Documentation/devicetree/bindings/video/sharp,ls037v7dw01.txt
-@@ -0,0 +1,44 @@
-+SHARP LS037V7DW01 TFT-LCD panel
-+===================================
-+
-+Required properties:
-+- compatible: "sharp,ls037v7dw01"
-+
-+Optional properties:
-+- label: a symbolic name for the panel
-+- enable-gpios: a GPIO spec for the optional enable pin
-+  this pin is the INI pin as specified in the LS037V7DW01.pdf file.
-+- reset-gpios: a GPIO spec for the optional reset pin
-+  this pin is the RESB pin as specified in the LS037V7DW01.pdf file.
-+- mode-gpios: a GPIO
-+  ordered MO, LR, and UD as specified in the LS037V7DW01.pdf file.
-+
-+Required nodes:
-+- Video port for DPI input
-+
-+This panel can have zero to five GPIOs to configure
-+to change configuration between QVGA and VGA mode
-+and the scan direction. As these pins can be also
-+configured with external pulls, all the GPIOs are
-+considered optional with holes in the array.
-+
-+Example
-+-------
-+
-+Example when connected to a omap2+ based device:
-+
-+lcd0: display {
-+	compatible = "sharp,ls037v7dw01";
-+	power-supply = <&lcd_3v3>;
-+	enable-gpios = <&gpio5 24 GPIO_ACTIVE_HIGH>;	/* gpio152, lcd INI */
-+	reset-gpios = <&gpio5 27 GPIO_ACTIVE_HIGH>;	/* gpio155, lcd RESB */
-+	mode-gpios = <&gpio5 26 GPIO_ACTIVE_HIGH	/* gpio154, lcd MO */
-+		      &gpio1 2 GPIO_ACTIVE_HIGH		/* gpio2, lcd LR */
-+		      &gpio1 3 GPIO_ACTIVE_HIGH>;	/* gpio3, lcd UD */
-+
-+	port {
-+		lcd_in: endpoint {
-+			remote-endpoint = <&dpi_out>;
-+		};
-+	};
-+};
---- a/arch/arm/mach-omap2/display.c
-+++ b/arch/arm/mach-omap2/display.c
-@@ -562,6 +562,7 @@ static const char * const dss_compat_conv_list[] __initconst = {
- 	"hdmi-connector",
- 	"panel-dpi",
- 	"panel-dsi-cm",
-+	"sharp,ls037v7dw01",
- 	"sony,acx565akm",
- 	"svideo-connector",
- 	"ti,tfp410",
---- a/drivers/video/fbdev/omap2/displays-new/panel-sharp-ls037v7dw01.c
-+++ b/drivers/video/fbdev/omap2/displays-new/panel-sharp-ls037v7dw01.c
-@@ -12,15 +12,18 @@
- #include <linux/delay.h>
- #include <linux/gpio.h>
- #include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_gpio.h>
- #include <linux/platform_device.h>
- #include <linux/slab.h>
--
-+#include <linux/regulator/consumer.h>
- #include <video/omapdss.h>
- #include <video/omap-panel-data.h>
- 
- struct panel_drv_data {
- 	struct omap_dss_device dssdev;
- 	struct omap_dss_device *in;
-+	struct regulator *vcc;
- 
- 	int data_lines;
- 
-@@ -31,9 +34,33 @@ struct panel_drv_data {
- 	struct gpio_desc *mo_gpio;	/* low = 480x640, high = 240x320 */
- 	struct gpio_desc *lr_gpio;	/* high = conventional horizontal scanning */
- 	struct gpio_desc *ud_gpio;	/* high = conventional vertical scanning */
-+
-+#define SHARP_LS_QVGA	(1 << 0)
-+	u32 flags;
-+};
-+
-+static const struct omap_video_timings sharp_ls_qvga_timings = {
-+	.x_res = 240,
-+	.y_res = 320,
-+
-+	.pixelclock	= 5400000,
-+
-+	.hsw		= 3,
-+	.hfp		= 3,
-+	.hbp		= 39,
-+
-+	.vsw		= 1,
-+	.vfp		= 2,
-+	.vbp		= 7,
-+
-+	.vsync_level	= OMAPDSS_SIG_ACTIVE_LOW,
-+	.hsync_level	= OMAPDSS_SIG_ACTIVE_LOW,
-+	.data_pclk_edge	= OMAPDSS_DRIVE_SIG_RISING_EDGE,
-+	.de_level	= OMAPDSS_SIG_ACTIVE_HIGH,
-+	.sync_pclk_edge	= OMAPDSS_DRIVE_SIG_OPPOSITE_EDGES,
- };
- 
--static const struct omap_video_timings sharp_ls_timings = {
-+static const struct omap_video_timings sharp_ls_vga_timings = {
- 	.x_res = 480,
- 	.y_res = 640,
- 
-@@ -95,12 +122,21 @@ static int sharp_ls_enable(struct omap_dss_device *dssdev)
- 	if (omapdss_device_is_enabled(dssdev))
- 		return 0;
- 
--	in->ops.dpi->set_data_lines(in, ddata->data_lines);
-+	if (ddata->data_lines)
-+		in->ops.dpi->set_data_lines(in, ddata->data_lines);
- 	in->ops.dpi->set_timings(in, &ddata->videomode);
- 
-+	if (ddata->vcc) {
-+		r = regulator_enable(ddata->vcc);
-+		if (r != 0)
-+			return r;
-+	}
-+
- 	r = in->ops.dpi->enable(in);
--	if (r)
-+	if (r) {
-+		regulator_disable(ddata->vcc);
- 		return r;
-+	}
- 
- 	/* wait couple of vsyncs until enabling the LCD */
- 	msleep(50);
-@@ -136,6 +172,9 @@ static void sharp_ls_disable(struct omap_dss_device *dssdev)
- 
- 	in->ops.dpi->disable(in);
- 
-+	if (ddata->vcc)
-+		regulator_disable(ddata->vcc);
-+
- 	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
- }
- 
-@@ -243,6 +282,72 @@ static int sharp_ls_probe_pdata(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static struct gpio_desc *
-+sharp_ls_get_gpio_of(struct device *dev, int index, int val, char *desc)
-+{
-+	struct gpio_desc *gpio;
-+
-+	gpio = devm_gpiod_get_index(dev, desc, index);
-+	if (IS_ERR(gpio))
-+		return gpio;
-+
-+	gpiod_direction_output(gpio, val);
-+
-+	return gpio;
-+}
-+
-+static int sharp_ls_probe_of(struct platform_device *pdev)
-+{
-+	struct panel_drv_data *ddata = platform_get_drvdata(pdev);
-+	struct device_node *node = pdev->dev.of_node;
-+	struct omap_dss_device *in;
-+
-+	ddata->vcc = devm_regulator_get(&pdev->dev, "envdd");
-+	if (IS_ERR(ddata->vcc)) {
-+		dev_err(&pdev->dev, "failed to get regulator\n");
-+		return PTR_ERR(ddata->vcc);
-+	}
-+
-+	/* lcd INI */
-+	ddata->ini_gpio = sharp_ls_get_gpio_of(&pdev->dev, 0, 0, "enable");
-+	if (PTR_ERR(ddata->ini_gpio) == -EPROBE_DEFER)
-+		return -EPROBE_DEFER;
-+
-+	/* lcd RESB */
-+	ddata->resb_gpio = sharp_ls_get_gpio_of(&pdev->dev, 0, 1, "reset");
-+	if (PTR_ERR(ddata->resb_gpio) == -EPROBE_DEFER)
-+		return -EPROBE_DEFER;
-+
-+	/* lcd MO */
-+	ddata->mo_gpio = sharp_ls_get_gpio_of(&pdev->dev, 0, 1, "mode");
-+	if (PTR_ERR(ddata->mo_gpio) == -EPROBE_DEFER)
-+		return -EPROBE_DEFER;
-+
-+	if (!IS_ERR(ddata->mo_gpio))
-+		if (gpiod_get_raw_value_cansleep(ddata->mo_gpio))
-+			ddata->flags |= SHARP_LS_QVGA;
-+
-+	/* lcd LR */
-+	ddata->lr_gpio = sharp_ls_get_gpio_of(&pdev->dev, 1, 1, "mode");
-+	if (PTR_ERR(ddata->lr_gpio) == -EPROBE_DEFER)
-+		return -EPROBE_DEFER;
-+
-+	/* lcd UD */
-+	ddata->ud_gpio = sharp_ls_get_gpio_of(&pdev->dev, 2, 1, "mode");
-+	if (PTR_ERR(ddata->ud_gpio) == -EPROBE_DEFER)
-+		return -EPROBE_DEFER;
-+
-+	in = omapdss_of_find_source_for_first_ep(node);
-+	if (IS_ERR(in)) {
-+		dev_err(&pdev->dev, "failed to find video source\n");
-+		return PTR_ERR(in);
-+	}
-+
-+	ddata->in = in;
-+
-+	return 0;
-+}
-+
- static int sharp_ls_probe(struct platform_device *pdev)
- {
- 	struct panel_drv_data *ddata;
-@@ -259,11 +364,18 @@ static int sharp_ls_probe(struct platform_device *pdev)
- 		r = sharp_ls_probe_pdata(pdev);
- 		if (r)
- 			return r;
-+	} else if (pdev->dev.of_node) {
-+		r = sharp_ls_probe_of(pdev);
-+		if (r)
-+			return r;
- 	} else {
- 		return -ENODEV;
- 	}
- 
--	ddata->videomode = sharp_ls_timings;
-+	if (ddata->flags & SHARP_LS_QVGA)
-+		ddata->videomode = sharp_ls_qvga_timings;
-+	else
-+		ddata->videomode = sharp_ls_vga_timings;
- 
- 	dssdev = &ddata->dssdev;
- 	dssdev->dev = &pdev->dev;
-@@ -302,12 +414,20 @@ static int __exit sharp_ls_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static const struct of_device_id sharp_ls_of_match[] = {
-+	{ .compatible = "omapdss,sharp,ls037v7dw01", },
-+	{},
-+};
-+
-+MODULE_DEVICE_TABLE(of, sharp_ls_of_match);
-+
- static struct platform_driver sharp_ls_driver = {
- 	.probe = sharp_ls_probe,
- 	.remove = __exit_p(sharp_ls_remove),
- 	.driver = {
- 		.name = "panel-sharp-ls037v7dw01",
- 		.owner = THIS_MODULE,
-+		.of_match_table = sharp_ls_of_match,
- 	},
- };
- 
+-- 
+Catalin
