@@ -1,87 +1,150 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 13 May 2014 22:12:14 +0800
-Subject: [PATCH 1/6] ARM: imx: add low-level debug support for imx6sx
+Date: Tue, 13 May 2014 22:12:16 +0800
+Subject: [PATCH 3/6] ARM: imx: add basic imx6sx SoC support
 In-Reply-To: <1399990339-12677-1-git-send-email-shawn.guo@freescale.com>
 References: <1399990339-12677-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1399990339-12677-2-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1399990339-12677-4-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable low-level debug support for i.MX6 SoloX by adding the debug
-port definitions for the SoC.
+Add basic suppport for i.MX6 SoloX SoC.
 
+Signed-off-by: Anson Huang <b20788@freescale.com>
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
- arch/arm/Kconfig.debug            | 13 +++++++++++--
- arch/arm/include/debug/imx-uart.h | 11 +++++++++++
- 2 files changed, 22 insertions(+), 2 deletions(-)
+ arch/arm/mach-imx/Kconfig       |  8 +++++++
+ arch/arm/mach-imx/Makefile      |  1 +
+ arch/arm/mach-imx/cpu.c         |  3 +++
+ arch/arm/mach-imx/mach-imx6sx.c | 51 +++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-imx/mxc.h         |  6 +++++
+ 5 files changed, 69 insertions(+)
+ create mode 100644 arch/arm/mach-imx/mach-imx6sx.c
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 00c6950..4dd565f 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -317,6 +317,13 @@ choice
- 		  Say Y here if you want kernel low-level debugging support
- 		  on i.MX6SL.
- 
-+	config DEBUG_IMX6SX_UART
-+		bool "i.MX6SX Debug UART"
-+		depends on SOC_IMX6SX
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on i.MX6SX.
-+
- 	config DEBUG_KEYSTONE_UART0
- 		bool "Kernel low-level debugging on KEYSTONE2 using UART0"
- 		depends on ARCH_KEYSTONE
-@@ -935,7 +942,8 @@ config DEBUG_IMX_UART_PORT
- 						DEBUG_IMX51_UART || \
- 						DEBUG_IMX53_UART || \
- 						DEBUG_IMX6Q_UART || \
--						DEBUG_IMX6SL_UART
-+						DEBUG_IMX6SL_UART || \
-+						DEBUG_IMX6SX_UART
- 	default 1
- 	depends on ARCH_MXC
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index d56eb1a..fe49353 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -797,6 +797,14 @@ config SOC_IMX6SL
  	help
-@@ -979,7 +987,8 @@ config DEBUG_LL_INCLUDE
- 				 DEBUG_IMX51_UART || \
- 				 DEBUG_IMX53_UART ||\
- 				 DEBUG_IMX6Q_UART || \
--				 DEBUG_IMX6SL_UART
-+				 DEBUG_IMX6SL_UART || \
-+				 DEBUG_IMX6SX_UART
- 	default "debug/msm.S" if DEBUG_MSM_UART
- 	default "debug/omap2plus.S" if DEBUG_OMAP2PLUS_UART
- 	default "debug/sirf.S" if DEBUG_SIRFPRIMA2_UART1 || DEBUG_SIRFMARCO_UART1
-diff --git a/arch/arm/include/debug/imx-uart.h b/arch/arm/include/debug/imx-uart.h
-index 42b823c..032a316 100644
---- a/arch/arm/include/debug/imx-uart.h
-+++ b/arch/arm/include/debug/imx-uart.h
-@@ -81,6 +81,15 @@
- #define IMX6SL_UART_BASE_ADDR(n) IMX6SL_UART##n##_BASE_ADDR
- #define IMX6SL_UART_BASE(n)	IMX6SL_UART_BASE_ADDR(n)
+ 	  This enables support for Freescale i.MX6 SoloLite processor.
  
-+#define IMX6SX_UART1_BASE_ADDR	0x02020000
-+#define IMX6SX_UART2_BASE_ADDR	0x021e8000
-+#define IMX6SX_UART3_BASE_ADDR	0x021ec000
-+#define IMX6SX_UART4_BASE_ADDR	0x021f0000
-+#define IMX6SX_UART5_BASE_ADDR	0x021f4000
-+#define IMX6SX_UART6_BASE_ADDR	0x022a0000
-+#define IMX6SX_UART_BASE_ADDR(n) IMX6SX_UART##n##_BASE_ADDR
-+#define IMX6SX_UART_BASE(n)	IMX6SX_UART_BASE_ADDR(n)
++config SOC_IMX6SX
++	bool "i.MX6 SoloX support"
++	select PINCTRL_IMX6SX
++	select SOC_IMX6
 +
- #define IMX_DEBUG_UART_BASE(soc) soc##_UART_BASE(CONFIG_DEBUG_IMX_UART_PORT)
++	help
++	  This enables support for Freescale i.MX6 SoloX processor.
++
+ config SOC_VF610
+ 	bool "Vybrid Family VF610 support"
+ 	select ARM_GIC
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index 8dd377b..f976fb5 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -101,6 +101,7 @@ obj-$(CONFIG_SMP) += headsmp.o platsmp.o
+ obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
+ obj-$(CONFIG_SOC_IMX6Q) += clk-imx6q.o mach-imx6q.o
+ obj-$(CONFIG_SOC_IMX6SL) += clk-imx6sl.o mach-imx6sl.o
++obj-$(CONFIG_SOC_IMX6SX) += clk-imx6sx.o mach-imx6sx.o
  
- #ifdef CONFIG_DEBUG_IMX1_UART
-@@ -103,6 +112,8 @@
- #define UART_PADDR	IMX_DEBUG_UART_BASE(IMX6Q)
- #elif defined(CONFIG_DEBUG_IMX6SL_UART)
- #define UART_PADDR	IMX_DEBUG_UART_BASE(IMX6SL)
-+#elif defined(CONFIG_DEBUG_IMX6SX_UART)
-+#define UART_PADDR	IMX_DEBUG_UART_BASE(IMX6SX)
- #endif
+ ifeq ($(CONFIG_SUSPEND),y)
+ AFLAGS_suspend-imx6.o :=-Wa,-march=armv7-a
+diff --git a/arch/arm/mach-imx/cpu.c b/arch/arm/mach-imx/cpu.c
+index ba3b498..bbe8ff1 100644
+--- a/arch/arm/mach-imx/cpu.c
++++ b/arch/arm/mach-imx/cpu.c
+@@ -111,6 +111,9 @@ struct device * __init imx_soc_device_init(void)
+ 	case MXC_CPU_IMX6DL:
+ 		soc_id = "i.MX6DL";
+ 		break;
++	case MXC_CPU_IMX6SX:
++		soc_id = "i.MX6SX";
++		break;
+ 	case MXC_CPU_IMX6Q:
+ 		soc_id = "i.MX6Q";
+ 		break;
+diff --git a/arch/arm/mach-imx/mach-imx6sx.c b/arch/arm/mach-imx/mach-imx6sx.c
+new file mode 100644
+index 0000000..02fccf6
+--- /dev/null
++++ b/arch/arm/mach-imx/mach-imx6sx.c
+@@ -0,0 +1,51 @@
++/*
++ * Copyright 2014 Freescale Semiconductor, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/irqchip.h>
++#include <linux/of_platform.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/map.h>
++
++#include "common.h"
++
++static void __init imx6sx_init_machine(void)
++{
++	struct device *parent;
++
++	mxc_arch_reset_init_dt();
++
++	parent = imx_soc_device_init();
++	if (parent == NULL)
++		pr_warn("failed to initialize soc device\n");
++
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, parent);
++
++	imx_anatop_init();
++}
++
++static void __init imx6sx_init_irq(void)
++{
++	imx_init_revision_from_anatop();
++	imx_init_l2cache();
++	imx_src_init();
++	imx_gpc_init();
++	irqchip_init();
++}
++
++static const char *imx6sx_dt_compat[] __initconst = {
++	"fsl,imx6sx",
++	NULL,
++};
++
++DT_MACHINE_START(IMX6SX, "Freescale i.MX6 SoloX (Device Tree)")
++	.map_io		= debug_ll_io_init,
++	.init_irq	= imx6sx_init_irq,
++	.init_machine	= imx6sx_init_machine,
++	.dt_compat	= imx6sx_dt_compat,
++	.restart	= mxc_restart,
++MACHINE_END
+diff --git a/arch/arm/mach-imx/mxc.h b/arch/arm/mach-imx/mxc.h
+index b08ab3a..75d6a37 100644
+--- a/arch/arm/mach-imx/mxc.h
++++ b/arch/arm/mach-imx/mxc.h
+@@ -36,6 +36,7 @@
+ #define MXC_CPU_MX53		53
+ #define MXC_CPU_IMX6SL		0x60
+ #define MXC_CPU_IMX6DL		0x61
++#define MXC_CPU_IMX6SX		0x62
+ #define MXC_CPU_IMX6Q		0x63
  
- #endif /* __DEBUG_IMX_UART_H */
+ #define IMX_CHIP_REVISION_1_0		0x10
+@@ -163,6 +164,11 @@ static inline bool cpu_is_imx6dl(void)
+ 	return __mxc_cpu_type == MXC_CPU_IMX6DL;
+ }
+ 
++static inline bool cpu_is_imx6sx(void)
++{
++	return __mxc_cpu_type == MXC_CPU_IMX6SX;
++}
++
+ static inline bool cpu_is_imx6q(void)
+ {
+ 	return __mxc_cpu_type == MXC_CPU_IMX6Q;
 -- 
 1.8.3.2
