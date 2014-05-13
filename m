@@ -1,49 +1,55 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 13 May 2014 12:35:04 -0400
-Subject: [PATCHv2] ARM: mvebu: use hardware I/O coherency also for PCI
- devices
-In-Reply-To: <1399997070-11434-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1399997070-11434-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140513163504.GF27822@titan.lakedaemon.net>
+From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
+Date: Tue, 13 May 2014 13:40:46 -0300
+Subject: [PATCH RESEND v4 1/8] clk: sunxi: Implement A31 USB clock
+In-Reply-To: <1399995862-17788-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1399995862-17788-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1399995862-17788-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <53724B0E.1010307@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 13, 2014 at 06:04:30PM +0200, Thomas Petazzoni wrote:
-> Since the beginning of the introduction of hardware I/O coherency
-> support for Armada 370 and Armada XP, the special DMA operations
-> should have applied to all DMA capable devices. Unfortunately, while
-> the original code properly took into account platform devices, it
-> didn't take into account PCI devices, which can also be DMA masters.
-> 
-> This commit fixes that by registering a bus notifier on pci_bus_type,
-> to register our custom DMA operations, like is already done for
-> platform devices. While doing this, we also rename
-> mvebu_hwcc_platform_notifier() to mvebu_hwcc_notifier() and
-> mvebu_hwcc_platform_nb to mvebu_hwcc_nb because they are no longer
-> specific to platform devices.
-> 
-> Fixes: e60304f8cb7b ("arm: mvebu: Add hardware I/O Coherency support")
-> Cc: <stable@vger.kernel.org> # v3.8+
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
-> Changes since v1:
->  * Fix stupid tab vs. space problem
-> 
-> Applies to mvebu/soc.
-> 
-> Whether this commit qualifies as stable material can be
-> discussed. Technically, it was a mistake from the original I/O
-> coherency implementation. But in practice, besides not using the I/O
-> coherency, I don't think it's causing any specific problem other than
-> DMA transactions on PCI devices triggering unneeded cache maintenance
-> operations. So I'll leave it to the mvebu maintainers to decide
-> whether this qualifies as stable material or not. I've included the
-> relevant Fixes: and Cc: fields, but don't hesitate to rip them out if
-> you don't think this should go to stable.
+Hi Maxime,
 
-If nothing is broken for users, I see no point backporting it.  Feel
-free to convince me otherwise...
+El 13/05/14 12:44, Maxime Ripard escribi?:
+> The A31 USB clock slightly differ from its older counterparts, mostly because
+> it has a different gate for each PHY, while the older one had a single gate for
+> all the phy.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Reviewed-by: Hans de Goede <hdegoede@redhat.com>
+> Acked-by: Mike Turquette <mturquette@linaro.org>
 
-thx,
+I have queued this commit in sunxi-clk-for-mike for my 3.16 pull. I have 
+also queued the trivial patch below to keep the new compatible documented.
 
-Jason.
+Cheers,
+
+Emilio
+
+--->8---
+
+clk: sunxi: document new A31 USB clock compatible
+
+Support for the USB gates and resets on A31 has been recently added
+using a new compatible, so let's document it here.
+
+Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+---
+  Documentation/devicetree/bindings/clock/sunxi.txt | 1 +
+  1 file changed, 1 insertion(+)
+
+diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt 
+b/Documentation/devicetree/bindings/clock/sunxi.txt
+index a5160d8..1f6d3f4 100644
+--- a/Documentation/devicetree/bindings/clock/sunxi.txt
++++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+@@ -41,6 +41,7 @@ Required properties:
+  	"allwinner,sun7i-a20-gmac-clk" - for the GMAC clock module on A20/A31
+  	"allwinner,sun4i-a10-usb-clk" - for usb gates + resets on A10 / A20
+  	"allwinner,sun5i-a13-usb-clk" - for usb gates + resets on A13
++	"allwinner,sun6i-a31-usb-clk" - for usb gates + resets on A31
+
+  Required properties for all clocks:
+  - reg : shall be the control register address for the clock.
+-- 
+1.9.2
