@@ -1,94 +1,84 @@
-From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Tue, 13 May 2014 14:14:50 +0200
-Subject: [PATCH v2 1/6] phy: add a driver for the Berlin SATA PHY
-In-Reply-To: <1399886217-20474-2-git-send-email-antoine.tenart@free-electrons.com>
-References: <1399886217-20474-1-git-send-email-antoine.tenart@free-electrons.com>
- <1399886217-20474-2-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <20140513121450.GC3213@kwain>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 13 May 2014 13:20:54 +0100
+Subject: [PATCH 1/2] clk: of: helper for determining flags properties
+In-Reply-To: <1399982253-21079-2-git-send-email-gabriel.fernandez@linaro.org>
+References: <1399982253-21079-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1399982253-21079-2-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <20140513122054.GA2419@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 12, 2014 at 11:16:52AM +0200, Antoine T?nart wrote:
-
-[?]
-
-> +static int phy_berlin_sata_probe(struct platform_device *pdev)
+On Tue, May 13, 2014 at 12:57:32PM +0100, Gabriel FERNANDEZ wrote:
+> The patch provides a helper to get flags properties of
+> a clock node.
+> 
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+> ---
+>  drivers/clk/clk.c            | 11 +++++++++++
+>  include/linux/clk-provider.h |  6 ++++++
+>  2 files changed, 17 insertions(+)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 4d56220..cae8985 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -2528,6 +2528,17 @@ const char *of_clk_get_parent_name(struct device_node *np, int index)
+>  }
+>  EXPORT_SYMBOL_GPL(of_clk_get_parent_name);
+>  
+> +unsigned long of_clk_get_flags(struct device_node *np)
 > +{
-> +	struct phy *phy;
-> +	struct phy_provider *phy_provider;
-> +	struct priv *priv;
-> +	struct resource *res;
-> +	int i;
+> +	unsigned long flags = 0;
 > +
-> +	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-> +	if (!priv)
-> +		return -ENOMEM;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	priv->base = devm_ioremap(&pdev->dev, res->start, resource_size(res));
-> +	if (IS_ERR(priv->base))
-> +		return PTR_ERR(priv->base);
-> +
-> +	phy = devm_phy_create(&pdev->dev, &phy_berlin_sata_ops, NULL);
-> +	if (IS_ERR(phy))
-> +		return PTR_ERR(phy);
+> +	if (of_property_read_bool(np, "set-rate-parent"))
+> +		flags |= CLK_SET_RATE_PARENT;
 
-Not needed.
+NAK.
 
-Antoine
+This is _not_ a hardware property. This flag describes internals of the
+Linux clock framework, and is thus not suitable for DT.
+
+You've also failed to document the property.
+
+What are you trying to achieve here, and why do you think this is the
+best way of achieving that?
+
+Cheers,
+Mark.
 
 > +
-> +	dev_set_drvdata(&pdev->dev, priv);
-> +	spin_lock_init(&priv->lock);
+> +	return flags;
+> +}
+> +EXPORT_SYMBOL_GPL(of_clk_get_flags);
 > +
-> +	for (i = 0; i < BERLIN_SATA_PHY_NB; i++) {
-> +		struct phy *phy = devm_phy_create(&pdev->dev,
-> +						  &phy_berlin_sata_ops, NULL);
-> +		if (IS_ERR(phy)) {
-> +			dev_err(&pdev->dev, "failed to create PHY %d\n", i);
-> +			return PTR_ERR(phy);
-> +		}
-> +
-> +		priv->phys[i].phy = phy;
-> +		priv->phys[i].val = desc[i].val;
-> +		priv->phys[i].index = i;
-> +		phy_set_drvdata(phy, &priv->phys[i]);
-> +
-> +		/* Make sure the PHY is off */
-> +		phy_berlin_sata_power_off(phy);
-> +	}
-> +
-> +	phy_provider = devm_of_phy_provider_register(&pdev->dev,
-> +						     berlin_sata_phy_xlate);
-> +	if (IS_ERR(phy_provider))
-> +		return PTR_ERR(phy_provider);
-> +
-> +	return 0;
+>  struct clock_provider {
+>  	of_clk_init_cb_t clk_init_cb;
+>  	struct device_node *np;
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index 59e2eb5..650bc10 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -519,6 +519,7 @@ int of_clk_get_parent_count(struct device_node *np);
+>  const char *of_clk_get_parent_name(struct device_node *np, int index);
+>  
+>  void of_clk_init(const struct of_device_id *matches);
+> +unsigned long of_clk_get_flags(struct device_node *np);
+>  
+>  #else /* !CONFIG_OF */
+>  
+> @@ -546,6 +547,11 @@ static inline const char *of_clk_get_parent_name(struct device_node *np,
+>  {
+>  	return NULL;
+>  }
+> +static inline unsigned long of_clk_get_flags(struct device_node *np)
+> +{
+> +	return NULL;
 > +}
 > +
-> +static const struct of_device_id phy_berlin_sata_of_match[] = {
-> +	{ .compatible = "marvell,berlin-sata-phy" },
-> +	{ },
-> +};
-> +
-> +static struct platform_driver phy_berlin_sata_driver = {
-> +	.probe	= phy_berlin_sata_probe,
-> +	.driver	= {
-> +		.name		= "phy-berlin-sata",
-> +		.owner		= THIS_MODULE,
-> +		.of_match_table	= phy_berlin_sata_of_match,
-> +	},
-> +};
-> +module_platform_driver(phy_berlin_sata_driver);
-> +
-> +MODULE_DESCRIPTION("Marvell Berlin SATA PHY driver");
-> +MODULE_AUTHOR("Antoine T?nart <antoine.tenart@free-electrons.com>");
-> +MODULE_LICENSE("GPL");
+>  #define of_clk_init(matches) \
+>  	{ while (0); }
+>  #endif /* CONFIG_OF */
 > -- 
 > 1.9.1
 > 
-
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> 
