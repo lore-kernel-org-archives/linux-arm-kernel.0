@@ -1,39 +1,53 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 13 May 2014 11:41:23 +0530
-Subject: [GIT PULL] DaVinci fixes for v3.15
-In-Reply-To: <CAOesGMheMS7OCY4PXNcr6+NwUasJMHwY+EXvcS61aO-jdNBtsA@mail.gmail.com>
-References: <535FB84B.802@ti.com>	<536E0627.3080801@ti.com>
- <CAOesGMheMS7OCY4PXNcr6+NwUasJMHwY+EXvcS61aO-jdNBtsA@mail.gmail.com>
-Message-ID: <5371B78B.8080106@ti.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 12 May 2014 23:15:45 -0700
+Subject: [PATCH v6 0/2] clk: shmobile: r8a7779: Add clocks support
+In-Reply-To: <20140513015905.GB29336@verge.net.au>
+References: <1397775951-30992-1-git-send-email-horms+renesas@verge.net.au>
+ <20140513015905.GB29336@verge.net.au>
+Message-ID: <20140513061545.5943.33241@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 11 May 2014 10:35 AM, Olof Johansson wrote:
-> On Sat, May 10, 2014 at 3:57 AM, Sekhar Nori <nsekhar@ti.com> wrote:
->> Hi,
->>
->> On Tuesday 29 April 2014 08:03 PM, Sekhar Nori wrote:
->>> The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
->>>
->>>   Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
->>>
->>> are available in the git repository at:
->>>
->>>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v3.15-rc4
->>>
->>> for you to fetch changes up to cf7eb979116c2568e8bc3b6a7269c7a359864ace:
->>>
->>>   ARM: common: edma: Fix xbar mapping (2014-04-29 19:33:49 +0530)
->>
->> Can you please pull this fix?
+Quoting Simon Horman (2014-05-12 18:59:05)
+> Hi Mike,
 > 
-> Sekhar,
+> I'm wondering if you would consider this series.
+> I'm happy to take it through my tree and then arm-soc is
+> that works best for you.
+
+I've just taken these into clk-next.
+
+Thanks!
+Mike
+
 > 
-> I missed it because it wasn't sent to arm at kernel.org. Please send pull
-> requests and patches you want us to directly apply there in the future
-> (it goes to all of us).
-
-Thanks. Will keep in mind.
-
-Regards,
-Sekhar
+> On Fri, Apr 18, 2014 at 08:05:49AM +0900, Simon Horman wrote:
+> > Hi Mike,
+> > 
+> > please consider applying this series.
+> > 
+> > It is the first step on the way towards using the common clock framework
+> > and in turn multi-platform on the r8a7779 (R-Car H1) SoC.
+> > 
+> > It has been acked by Laurent Pinchart who did similar work
+> > for the R-Car Gen-2 family of SoCs. This work is based on that work.
+> > 
+> > The bindings added in this series have not been changed since
+> > v4 was posted with devicetree at vger.kernel.org CCed on the 13th of March.
+> > 
+> > Simon Horman (2):
+> >   clk: shmobile: r8a7779: Add clocks support
+> >   clk: shmobile: r8a7779: Add MSTP clock support
+> > 
+> >  .../bindings/clock/renesas,cpg-mstp-clocks.txt     |   1 +
+> >  .../bindings/clock/renesas,r8a7779-cpg-clocks.txt  |  27 ++++
+> >  drivers/clk/shmobile/Makefile                      |   1 +
+> >  drivers/clk/shmobile/clk-r8a7779.c                 | 180 +++++++++++++++++++++
+> >  include/linux/clk/shmobile.h                       |   3 +
+> >  5 files changed, 212 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/clock/renesas,r8a7779-cpg-clocks.txt
+> >  create mode 100644 drivers/clk/shmobile/clk-r8a7779.c
+> > 
+> > -- 
+> > 1.8.4
+> > 
