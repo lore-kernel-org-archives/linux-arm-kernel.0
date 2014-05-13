@@ -1,51 +1,34 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 13 May 2014 16:18:05 +0900
-Subject: [PATCH v4] drivers: sh: compile drivers/sh/pm_runtime.c if
- ARCH_SHMOBILE_MULTI
-In-Reply-To: <CAMuHMdVFGOHqq0X6=3gK3wtJGQvHnecP5RKCyye09FbY1CUYgQ@mail.gmail.com>
-References: <1399411579-10681-1-git-send-email-geert+renesas@glider.be>
- <CAMuHMdWwenyU1RS4c8spFcb7M0oCXP9z8zbGQ0VACKj7EbvvkA@mail.gmail.com>
- <20140511004626.GW31760@verge.net.au>
- <CANqRtoQzxdjwU+BLyccrSzfBx3UMKm6=MAw9dUHSEBWm5_Vspg@mail.gmail.com>
- <20140512070700.GA20505@verge.net.au>
- <CAMuHMdVMCcDK4Y403G26S27oATzLN74iCSM7U+K_ktE-c3uweQ@mail.gmail.com>
- <20140513000455.GA18157@verge.net.au>
- <CAMuHMdVFGOHqq0X6=3gK3wtJGQvHnecP5RKCyye09FbY1CUYgQ@mail.gmail.com>
-Message-ID: <20140513071805.GB29453@verge.net.au>
+From: w@1wt.eu (Willy Tarreau)
+Date: Tue, 13 May 2014 09:22:45 +0200
+Subject: [PATCH 0/2] ARM: mvebu: fix PCIe/mvebu-soc-id issue
+In-Reply-To: <1399903900-29977-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1399903900-29977-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140513072245.GA29277@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 13, 2014 at 08:43:49AM +0200, Geert Uytterhoeven wrote:
-> Hi Simon,
+On Mon, May 12, 2014 at 04:11:38PM +0200, Thomas Petazzoni wrote:
+> Hello,
 > 
-> On Tue, May 13, 2014 at 2:04 AM, Simon Horman <horms@verge.net.au> wrote:
-> > On Mon, May 12, 2014 at 09:25:21AM +0200, Geert Uytterhoeven wrote:
-> >> On Mon, May 12, 2014 at 9:07 AM, Simon Horman <horms@verge.net.au> wrote:
-> >> > On Mon, May 12, 2014 at 08:24:03AM +0900, Magnus Damm wrote:
-> >> >> On Sun, May 11, 2014 at 9:46 AM, Simon Horman <horms@verge.net.au> wrote:
-> >> >> > On Thu, May 08, 2014 at 12:12:29PM +0200, Geert Uytterhoeven wrote:
-> >> >> >> On Tue, May 6, 2014 at 11:26 PM, Geert Uytterhoeven
-> >> >> >> <geert+renesas@glider.be> wrote:
-> >> >> >> > Tested on Koelsch (legacy, reference, shmobile, and shmobile+bbb kernels)
-> >> >> >> > and BeagleBone Black (shmobile+bbb). Will test on more hardware tomorrow.
-> >> >> >>
-> >> >> >> Tested on genmai with Wolfram's CCF support.
-> >> >> >
-> >> >> > Thanks, shall I go ahead and queue this up?
-> >> >>
-> >> >> Yes please, at least from my side everything looks perfect.
-> >> >
-> >> > Thanks, will do.
-> >> >
-> >> > I currently plan to send this on to Linus when the merge window
-> >> > opens for v3.16.
-> >>
-> >> Actually we had hoped this could land in v3.15, so we can fix the regression
-> >> introduced in v3.14 by bf98c1eac1d4a6bcf00532e4fa41d8126cd6c187 as
-> >> soon as possible.
-> >
-> > Ok, so I should/can treat this as a fix?
+> This set of two patches (and more specifically the second patch) fix a
+> PCIe detection problem caused by the introduction of the mvebu-soc-id
+> and a bad interaction between the clock manipulation done by the
+> mvebu-soc-id code and the PCIe driver. The details are all in the
+> commit log of the second patch.
 > 
-> Yes, definitely.
+> This second patch fixes a PCIe detection problem noticed by several
+> persons. The first patch is just a related preparation patch.
+> 
+> Both patches are meant for 3.15-rc, and should be backported to 3.14
+> as part of the stable process.
 
-Thanks, will do.
+Both tested on 3.14.3, they work perfectly as expected on mirabox with
+igb, and on XP-GP with igb, r8169 and myri10ge, including a dual-port
+one with a PCIe bridge onboard.
+
+If you want you can add :
+
+   Tested-by: Willy Tarreau <w@1wt.eu>
+
+Good job!
+Willy
