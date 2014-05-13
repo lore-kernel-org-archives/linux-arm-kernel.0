@@ -1,67 +1,53 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 13 May 2014 10:11:28 +0900
-Subject: [PATCH v2 4/4] ARM: shmobile: marzen-reference: Set SMSC lan to
- use irq-push-pull
-In-Reply-To: <2152550.dZ0p2WIftv@avalon>
-References: <1368586650-26263-1-git-send-email-horms+renesas@verge.net.au>
- <1368586650-26263-5-git-send-email-horms+renesas@verge.net.au>
- <10371644.BMkVSLAUGy@avalon> <2152550.dZ0p2WIftv@avalon>
-Message-ID: <20140513011128.GD30252@verge.net.au>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 12 May 2014 18:12:32 -0700
+Subject: [linux-sunxi] [PATCH 0/6] sunxi: clk: Various cleanup and rework
+In-Reply-To: <536E6047.8010004@elopez.com.ar>
+References: <1399692821-20988-1-git-send-email-maxime.ripard@free-electrons.com>
+ <536E6047.8010004@elopez.com.ar>
+Message-ID: <20140513011232.5943.64136@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 13, 2014 at 12:26:35AM +0200, Laurent Pinchart wrote:
-> Hi Simon,
+Quoting Emilio L?pez (2014-05-10 10:22:15)
+> Hi Maxime,
 > 
-> On Wednesday 15 May 2013 11:15:01 Laurent Pinchart wrote:
-> > Hi Simon,
-> > 
-> > Thanks for the patch.
-> > 
-> > On Wednesday 15 May 2013 11:57:30 Simon Horman wrote:
-> > > This change makes the DTS consistent with the platform data
-> > > that exists in board-marzen.c.
-> > > 
-> > > Empirically it does not appear to be necessary.
-> > > 
-> > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > 
-> > Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> El 10/05/14 00:33, Maxime Ripard escribi?:
+> > Hi everyone,
+> >
+> > This patchset fixes a few things that have been pending for quite a
+> > while in the clock driver.
+> >
+> > First, it removes the clk_put calls in the clock protection
+> > part. Since it's not really something that should be done, I guess
+> > this patch is not very controversial.
+> >
+> > Then, it starts splitting the huge clock driver file into separate,
+> > smaller drivers when it makes sense.
+> >
+> > Finally, it reworks the clock protection mechanism to handle
+> > differences between SoC in a better way. This has been pretty
+> > controversial because the first approach has been to move this to the
+> > machine code. This is another attempt that leaves all the
+> > modifications in the driver itself.
+> >
+> > Thanks,
+> > Maxime
 > 
-> I've noticed that this patch hasn't landed in mainline. Do you still plan to 
-> upstream it ?
+> Overall the series looks good to me, other than the comment about clkdev 
+> on patches 2 and 3.
 > 
-> While the board has a pull-up resistor on the IRQ signal and can thus 
-> accommodate an open-drain configuration, using push-pull mode would lower the 
-> rise time.
+> @Mike, do you want me to take them in a pull as usual after you have a 
+> look? Please let me know as we still haven't clarified the situation 
+> with the two patches Hans sent.
 
-Sorry for letting that slip through the cracks (for an entire year!).
-I'll queue it up after giving Magnus a chance to veto it.
+A pull request would be great. Feel free to add my Acked-by to all of
+the patches here (#1 already has it) since I looked at all of them and
+the changes seem good.
 
-> > > ---
-> > > 
-> > >  arch/arm/boot/dts/r8a7779-marzen-reference.dts | 1 +
-> > >  1 file changed, 1 insertion(+)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/r8a7779-marzen-reference.dts
-> > > b/arch/arm/boot/dts/r8a7779-marzen-reference.dts index 10cfc7f..fe32e1a
-> > > 100644
-> > > --- a/arch/arm/boot/dts/r8a7779-marzen-reference.dts
-> > > +++ b/arch/arm/boot/dts/r8a7779-marzen-reference.dts
-> > > @@ -40,6 +40,7 @@
-> > > 
-> > >  		phy-mode = "mii";
-> > >  		interrupt-parent = <&irqpin0>;
-> > >  		interrupts = <1 0x4>;
-> > > 
-> > > +		smsc,irq-push-pull;
-> > > 
-> > >  		reg-io-width = <4>;
-> > >  		vddvario-supply = <&fixedregulator3v3>;
-> > >  		vdd33a-supply = <&fixedregulator3v3>;
+Regards,
+Mike
+
 > 
-> -- 
-> Regards,
+> Cheers, and thanks Maxime for working on cleaning this :)
 > 
-> Laurent Pinchart
-> 
+> Emilio
