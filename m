@@ -1,27 +1,30 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 13 May 2014 16:15:43 -0600
-Subject: [PATCH] ARM: Don't ever downscale loops_per_jiffy in SMP systems#
-In-Reply-To: <CAD=FV=XM2URyJjV9gaE=mrp7LAEGtvi9wQGhGJi3_HYp_XzYWg@mail.gmail.com>
-References: <CAD=FV=UEGJGHrdcXgs3EZ_wFXT8GnNeCOMt7CgdiiUzBzZ5Y0A@mail.gmail.com>	<alpine.LFD.2.11.1405081149190.980@knanqh.ubzr>	<CAD=FV=VtcLOh51LCmafzRMdqtDrwKXCqK6gE6V7OOOUe4gjwbA@mail.gmail.com>	<alpine.LFD.2.11.1405081329010.980@knanqh.ubzr>	<20140508192209.GH3693@n2100.arm.linux.org.uk>	<alpine.LFD.2.11.1405081600260.980@knanqh.ubzr>	<20140508205223.GI3693@n2100.arm.linux.org.uk>	<alpine.LFD.2.11.1405082058130.980@knanqh.ubzr>	<20140509091824.GL3693@n2100.arm.linux.org.uk>	<alpine.LFD.2.11.1405091245070.980@knanqh.ubzr>	<20140509182245.GM3693@n2100.arm.linux.org.uk>	<alpine.LFD.2.11.1405091640090.980@knanqh.ubzr>	<CAD=FV=UJK1nSPjH-au-KtbnOZk2nC7usLD8L9neMedj6WHUp8g@mail.gmail.com>
- <CAD=FV=XM2URyJjV9gaE=mrp7LAEGtvi9wQGhGJi3_HYp_XzYWg@mail.gmail.com>
-Message-ID: <5372998F.6020502@wwwdotorg.org>
+From: agross@codeaurora.org (Andy Gross)
+Date: Tue, 13 May 2014 17:20:22 -0500
+Subject: [PATCH 4/4] spi: qup: Add support for v1.1.1
+In-Reply-To: <20140513220845.GH20486@codeaurora.org>
+References: <1400016884-9568-1-git-send-email-agross@codeaurora.org>
+ <1400016884-9568-5-git-send-email-agross@codeaurora.org>
+ <20140513220845.GH20486@codeaurora.org>
+Message-ID: <20140513222022.GA28128@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/13/2014 03:50 PM, Doug Anderson wrote:
-...
-> ...but then I found the true problem shows up when we transition
-> between very low frequencies on exynos, like between 200MHz and
-> 300MHz.  While transitioning between frequencies the system
-> temporarily bumps over to the "switcher" PLL running at 800MHz while
-> waiting for the main PLL to stabilize.  No CPUFREQ notification is
-> sent for that.  That means there's a period of time when we're running
-> at 800MHz but loops_per_jiffy is calibrated at between 200MHz and
-> 300MHz.
+On Tue, May 13, 2014 at 03:08:45PM -0700, Stephen Boyd wrote:
+> On 05/13, Andy Gross wrote:
+> > @@ -488,7 +491,7 @@ static int spi_qup_probe(struct platform_device *pdev)
+> >  	struct resource *res;
+> >  	struct device *dev;
+> >  	void __iomem *base;
+> > -	u32 data, max_freq, iomode;
+> > +	u32 data = 0, max_freq, iomode;
 > 
-> 
-> I'm welcome to any suggestions for how to address this.  It sorta
-> feels like it would be a common thing to have a temporary PLL during
-> the transition, ...
+> It looks like data is unused? But actually it's used to print a
+> version out and now it will always print version 0. Perhaps that
+> printk needs an update?
 
-We definitely do that on Tegra for some cpufreq transitions.
+ACK!  I thought I killed that.  I'll fix that.
+
+-- 
+sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
