@@ -1,42 +1,47 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 12 May 2014 19:29:49 -0500
-Subject: [PATCH 3/7] clk: sunxi: avoid double DT matching
+Date: Mon, 12 May 2014 19:29:51 -0500
+Subject: [PATCH 5/7] irqchip: s3c24xx: fix function type for IRQCHIP_OF_DECLARE
 In-Reply-To: <1399940993-1773-1-git-send-email-robherring2@gmail.com>
 References: <1399940993-1773-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1399940993-1773-4-git-send-email-robherring2@gmail.com>
+Message-ID: <1399940993-1773-6-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <robh@kernel.org>
 
-Use for_each_matching_node_and_match instead of for_each_matching_node plus
-of_match_node to avoid searching the DT twice for each node.
-
-The sunxi DT scanning code should really be re-worked rather than have
-its own private matching infrastructure. It is working around needing a
-function pointer and a data pointer for each compatible match.
+Adding function type checking to IRQCHIP_OF_DECLARE found a type mismatch
+with s3c2410_init_intc_of and s3c2416_init_intc_of. The function only takes
+the 1st 2 parameters.
 
 Signed-off-by: Rob Herring <robh@kernel.org>
-Cc: "Emilio L?pez" <emilio@elopez.com.ar>
-Cc: Mike Turquette <mturquette@linaro.org>
-Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
 ---
- drivers/clk/sunxi/clk-sunxi.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/irqchip/irq-s3c24xx.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index bd7dc73..7977106 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -1278,8 +1278,7 @@ static void __init of_sunxi_table_clock_setup(const struct of_device_id *clk_mat
- 	const struct of_device_id *match;
- 	void (*setup_function)(struct device_node *, const void *) = function;
+diff --git a/drivers/irqchip/irq-s3c24xx.c b/drivers/irqchip/irq-s3c24xx.c
+index bbcc944..78a6acc 100644
+--- a/drivers/irqchip/irq-s3c24xx.c
++++ b/drivers/irqchip/irq-s3c24xx.c
+@@ -1323,8 +1323,7 @@ static struct s3c24xx_irq_of_ctrl s3c2410_ctrl[] = {
+ };
  
--	for_each_matching_node(np, clk_match) {
--		match = of_match_node(clk_match, np);
-+	for_each_matching_node_and_match(np, clk_match, match) {
- 		data = match->data;
- 		setup_function(np, data);
- 	}
+ int __init s3c2410_init_intc_of(struct device_node *np,
+-			struct device_node *interrupt_parent,
+-			struct s3c24xx_irq_of_ctrl *ctrl, int num_ctrl)
++			struct device_node *interrupt_parent)
+ {
+ 	return s3c_init_intc_of(np, interrupt_parent,
+ 				s3c2410_ctrl, ARRAY_SIZE(s3c2410_ctrl));
+@@ -1346,8 +1345,7 @@ static struct s3c24xx_irq_of_ctrl s3c2416_ctrl[] = {
+ };
+ 
+ int __init s3c2416_init_intc_of(struct device_node *np,
+-			struct device_node *interrupt_parent,
+-			struct s3c24xx_irq_of_ctrl *ctrl, int num_ctrl)
++			struct device_node *interrupt_parent)
+ {
+ 	return s3c_init_intc_of(np, interrupt_parent,
+ 				s3c2416_ctrl, ARRAY_SIZE(s3c2416_ctrl));
 -- 
 1.9.1
