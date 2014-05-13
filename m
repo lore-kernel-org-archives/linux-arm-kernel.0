@@ -1,23 +1,35 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 13 May 2014 10:50:13 +0200
-Subject: [PATCH v2 0/6] Add platform support for LSI AXM55xx
-In-Reply-To: <20140505083407.GA3398@swsaberg01>
-References: <cover.1398335771.git.anders.berg@lsi.com>
- <20140505083407.GA3398@swsaberg01>
-Message-ID: <CACRpkdb8J3b0kA37d2B521G74AETR+LeSo+EZJNcEro9DZVMXw@mail.gmail.com>
+From: lftan@altera.com (Ley Foon Tan)
+Date: Tue, 13 May 2014 17:02:43 +0800
+Subject: [PATCH 03/25] arm: Add 32 bit time_t and clock_t
+In-Reply-To: <1399971456-3941-1-git-send-email-lftan@altera.com>
+References: <1399971456-3941-1-git-send-email-lftan@altera.com>
+Message-ID: <1399971763-4079-1-git-send-email-lftan@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 5, 2014 at 10:35 AM, Anders Berg <anders.berg@lsi.com> wrote:
+Override time_t and clock_t in include/uapi/asm-generic.
 
-> Hi Anrd,
+Signed-off-by: Ley Foon Tan <lftan@altera.com>
+---
+ arch/arm/include/uapi/asm/posix_types.h | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Who's that guy ;-)
-
-> Any comments on this updated series?
-
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-LooksGoodToMe (TM)
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/include/uapi/asm/posix_types.h b/arch/arm/include/uapi/asm/posix_types.h
+index d2de9cb..2f8e30f 100644
+--- a/arch/arm/include/uapi/asm/posix_types.h
++++ b/arch/arm/include/uapi/asm/posix_types.h
+@@ -32,6 +32,12 @@ typedef unsigned short		__kernel_gid_t;
+ typedef unsigned short		__kernel_old_dev_t;
+ #define __kernel_old_dev_t __kernel_old_dev_t
+ 
++typedef long			__kernel_time_t;
++#define __kernel_time_t __kernel_time_t
++
++typedef long			__kernel_clock_t;
++#define __kernel_clock_t __kernel_clock_t
++
+ #include <asm-generic/posix_types.h>
+ 
+ #endif
+-- 
+1.8.2.1
