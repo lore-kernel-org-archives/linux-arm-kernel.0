@@ -1,39 +1,42 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 12 May 2014 22:04:24 -0300
-Subject: [PATCH] ARM: dts: imx35-pdk: Fix memory region description
-Message-ID: <1399943064-19031-1-git-send-email-festevam@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 12 May 2014 18:06:10 -0700
+Subject: [PATCH 0/2] ARM: dts: Fix OMAP3 ISP functional clock configuration
+In-Reply-To: <8771357.o1oFFUoBzb@avalon>
+References: <1398076907-2901-1-git-send-email-laurent.pinchart@ideasonboard.com>
+ <536B630B.8010303@ti.com> <8771357.o1oFFUoBzb@avalon>
+Message-ID: <20140513010610.GJ5668@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+* Laurent Pinchart <laurent.pinchart@ideasonboard.com> [140512 16:17]:
+> On Thursday 08 May 2014 13:57:15 Tomi Valkeinen wrote:
+> > On 21/04/14 13:41, Laurent Pinchart wrote:
+> > > Hello,
+> > > 
+> > > This patch set enables rate propagation from the OMAP3 ISP functional
+> > > clock to the DPLL4 M5 clock. It copies Tomi Valkeinen's similar patch set
+> > > for the OMAP DSS functional clock from the "OMAP: OMAP3 DSS related clock
+> > > patches" patch series.
+> > > 
+> > > Laurent Pinchart (2):
+> > >   ARM: dts: use ti,fixed-factor-clock for dpll4_m5x2_mul_ck
+> > >   ARM: dts: set 'ti,set-rate-parent' for dpll4_m5 path
+> > >  
+> > >  arch/arm/boot/dts/omap36xx-clocks.dtsi | 2 +-
+> > >  arch/arm/boot/dts/omap3xxx-clocks.dtsi | 7 ++++---
+> > >  2 files changed, 5 insertions(+), 4 deletions(-)
+> > 
+> > These look fine to me.
+> > 
+> > Acked-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> 
+> Thank you.
+> 
+> Tony, could you please pick the patches up for v3.16 ?
 
-On imx35pdk there are two DRAM chip selects that are used:
-    
-CS0 at 0x80000000
-CS1 at 0x90000000
-    
-Each bank is connected to 128MB of DRAM, giving a total of 256MB of system DRAM.
-   
-Fix the memory layout to describe the hardware appropriately.
+I'd like to see acks from Tero on these two, or Tero queue
+them along with other clock dts clock changes.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx35-pdk.dts | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Regards,
 
-diff --git a/arch/arm/boot/dts/imx35-pdk.dts b/arch/arm/boot/dts/imx35-pdk.dts
-index db69ff0..8d71552 100644
---- a/arch/arm/boot/dts/imx35-pdk.dts
-+++ b/arch/arm/boot/dts/imx35-pdk.dts
-@@ -18,7 +18,8 @@
- 	compatible = "fsl,imx35-pdk", "fsl,imx35";
- 
- 	memory {
--		reg = <0x80000000 0x8000000>;
-+		reg = <0x80000000 0x8000000>,
-+		      <0x90000000 0x8000000>;
- 	};
- };
- 
--- 
-1.8.3.2
+Tony
