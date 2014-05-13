@@ -1,51 +1,110 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 12 May 2014 18:32:08 -0700
-Subject: [PATCH v3 1/8] clk: sunxi: Implement A31 USB clock
-In-Reply-To: <1399923274-6017-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1399923274-6017-1-git-send-email-maxime.ripard@free-electrons.com>
- <1399923274-6017-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20140513013208.5943.89944@quantum>
+From: sonnyrao@chromium.org (Sonny Rao)
+Date: Mon, 12 May 2014 18:38:41 -0700
+Subject: [PATCHv2] mmc: dw_mmc: change to use recommended reset procedure
+Message-ID: <1399945121-7387-1-git-send-email-sonnyrao@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Maxime Ripard (2014-05-12 12:34:27)
-> The A31 USB clock slightly differ from its older counterparts, mostly because
-> it has a different gate for each PHY, while the older one had a single gate for
-> all the phy.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Reviewed-by: Hans de Goede <hdegoede@redhat.com>
+This patch changes the fifo reset code to follow the reset procedure
+outlined in the documentation of Synopsys  Mobile storage host databook
+7.2.13.
 
-Acked-by: Mike Turquette <mturquette@linaro.org>
+v2: Add Generic DMA support
+    per the documentation, move interrupt clear before wait
+    make the test for DMA host->use_dma rather than host->using_dma
+    add proper return values (although it appears no caller checks)
 
-> ---
->  drivers/clk/sunxi/clk-sunxi.c | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> index bd7dc733c1ca..d9bab75f128b 100644
-> --- a/drivers/clk/sunxi/clk-sunxi.c
-> +++ b/drivers/clk/sunxi/clk-sunxi.c
-> @@ -972,6 +972,11 @@ static const struct gates_data sun5i_a13_usb_gates_data __initconst = {
->         .reset_mask = 0x03,
->  };
->  
-> +static const struct gates_data sun6i_a31_usb_gates_data __initconst = {
-> +       .mask = { BIT(18) | BIT(17) | BIT(16) | BIT(10) | BIT(9) | BIT(8) },
-> +       .reset_mask = BIT(2) | BIT(1) | BIT(0),
-> +};
-> +
->  static void __init sunxi_gates_clk_setup(struct device_node *node,
->                                          struct gates_data *data)
->  {
-> @@ -1267,6 +1272,7 @@ static const struct of_device_id clk_gates_match[] __initconst = {
->         {.compatible = "allwinner,sun6i-a31-apb2-gates-clk", .data = &sun6i_a31_apb2_gates_data,},
->         {.compatible = "allwinner,sun4i-a10-usb-clk", .data = &sun4i_a10_usb_gates_data,},
->         {.compatible = "allwinner,sun5i-a13-usb-clk", .data = &sun5i_a13_usb_gates_data,},
-> +       {.compatible = "allwinner,sun6i-a31-usb-clk", .data = &sun6i_a31_usb_gates_data,},
->         {}
->  };
->  
-> -- 
-> 1.9.3
-> 
+Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+---
+ drivers/mmc/host/dw_mmc.c | 55 ++++++++++++++++++++++++++++++++++++++++++++++-
+ drivers/mmc/host/dw_mmc.h |  1 +
+ 2 files changed, 55 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+index 55cd110..aff57e1 100644
+--- a/drivers/mmc/host/dw_mmc.c
++++ b/drivers/mmc/host/dw_mmc.c
+@@ -2325,6 +2325,7 @@ static bool dw_mci_ctrl_reset(struct dw_mci *host, u32 reset)
+ 
+ static inline bool dw_mci_fifo_reset(struct dw_mci *host)
+ {
++	u32 flags = SDMMC_CTRL_RESET | SDMMC_CTRL_FIFO_RESET;
+ 	/*
+ 	 * Reseting generates a block interrupt, hence setting
+ 	 * the scatter-gather pointer to NULL.
+@@ -2334,7 +2335,59 @@ static inline bool dw_mci_fifo_reset(struct dw_mci *host)
+ 		host->sg = NULL;
+ 	}
+ 
+-	return dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET);
++	/*
++	 * The recommended method for resetting is to always reset the
++	 * controller and the fifo, but differs slightly depending on the mode.
++	 * The Generic DMA mode (non IDMAC) also needs to reset DMA where IDMAC
++	 * mode resets IDMAC at the end.
++	 *
++	 */
++#ifndef CONFIG_MMC_DW_IDMAC
++	if (host->use_dma)
++		flags |= SDMMC_CTRL_DMA_RESET;
++#endif
++	if (dw_mci_ctrl_reset(host, flags)) {
++		/*
++		 * In all cases we clear the RAWINTS register to clear any
++		 * interrupts.
++		 */
++		mci_writel(host, RINTSTS, 0xFFFFFFFF);
++
++		/* if using dma we wait for dma_req to clear */
++		if (host->use_dma) {
++			unsigned long timeout = jiffies + msecs_to_jiffies(500);
++			u32 status;
++			do {
++				status = mci_readl(host, STATUS);
++				if (!(status & SDMMC_STATUS_DMA_REQ))
++					break;
++				cpu_relax();
++			} while (time_before(jiffies, timeout));
++
++			if (status & SDMMC_STATUS_DMA_REQ) {
++				dev_err(host->dev,
++					"%s: Timeout waiting for dma_req to "
++					"clear during reset", __func__);
++				return false;
++			}
++
++			/* when using DMA next we reset the fifo again */
++			dw_mci_ctrl_reset(host, SDMMC_CTRL_FIFO_RESET);
++		}
++	} else {
++		dev_err(host->dev, "%s: Reset bits didn't clear", __func__);
++		return false;
++	}
++
++#ifdef CONFIG_MMC_DW_IDMAC
++	/* It is also recommended that we reset and reprogram idmac */
++	dw_mci_idmac_reset(host);
++#endif
++
++	/* After a CTRL reset we need to have CIU set clock registers  */
++	mci_send_cmd(host->cur_slot, SDMMC_CMD_UPD_CLK, 0);
++
++	return true;
+ }
+ 
+ static inline bool dw_mci_ctrl_all_reset(struct dw_mci *host)
+diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
+index 6bf24ab..2505804 100644
+--- a/drivers/mmc/host/dw_mmc.h
++++ b/drivers/mmc/host/dw_mmc.h
+@@ -129,6 +129,7 @@
+ #define SDMMC_CMD_INDX(n)		((n) & 0x1F)
+ /* Status register defines */
+ #define SDMMC_GET_FCNT(x)		(((x)>>17) & 0x1FFF)
++#define SDMMC_STATUS_DMA_REQ		BIT(31)
+ /* FIFOTH register defines */
+ #define SDMMC_SET_FIFOTH(m, r, t)	(((m) & 0x7) << 28 | \
+ 					 ((r) & 0xFFF) << 16 | \
+-- 
+1.9.1.423.g4596e3a
