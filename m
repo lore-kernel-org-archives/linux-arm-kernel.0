@@ -1,34 +1,104 @@
-From: nikolay.borisov@arm.com (Nikolay Borisov)
-Date: Tue, 13 May 2014 15:57:57 +0100
-Subject: [PATCH 2/7] ARM: Introduce arm_get_current_stack_frame()
-In-Reply-To: <20140513145526.GX32718@rric.localhost>
-References: <1399974418-4995-1-git-send-email-Nikolay.Borisov@arm.com>
- <1399974418-4995-3-git-send-email-Nikolay.Borisov@arm.com>
- <20140513145526.GX32718@rric.localhost>
-Message-ID: <000501cf6ebb$ba64ed70$2f2ec850$@borisov@arm.com>
+From: pavel@denx.de (Pavel Machek)
+Date: Tue, 13 May 2014 17:08:58 +0200
+Subject: [PATCHv3] C_CAN: hwinit support for non-TI devices
+In-Reply-To: <53721FD5.50508@pengutronix.de>
+References: <CAF03EBf9KXqB4W9GuDduhLwp_kwFjUEi3syU7fX3KpXfZEFxHg@mail.gmail.com>
+ <CAF03EBd19PC5RAsLR6-dMPF2x3XRf9X4bFPgX2kRdCYWUQBYcA@mail.gmail.com>
+ <20140430215359.GA15148@amd.pavel.ucw.cz>
+ <CAF03EBewoV0pOOmNQBwPrKgm-zhaSbFcNd_UiEhFWyUrq91-Jg@mail.gmail.com>
+ <20140502084851.GA5730@amd.pavel.ucw.cz>
+ <20140505120801.GA16461@amd.pavel.ucw.cz>
+ <20140506135702.GA9879@amd.pavel.ucw.cz>
+ <5370ED11.4000002@pengutronix.de>
+ <20140513130914.GA9806@amd.pavel.ucw.cz>
+ <53721FD5.50508@pengutronix.de>
+Message-ID: <20140513150857.GA11608@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi!
 
 
-> -----Original Message-----
-> From: Robert Richter [mailto:rric.net at gmail.com] On Behalf Of Robert
-> Richter
-> Sent: 13 May 2014 15:55
-> To: Nikolay Borisov
-> Cc: linux-arm-kernel at lists.infradead.org; Dave P Martin; Will Deacon;
-> anurag19aggarwal at gmail.com; a.p.zijlstra at chello.nl;
-> sebastian.hesselbarth at gmail.com
-> Subject: Re: [PATCH 2/7] ARM: Introduce arm_get_current_stack_frame()
+On Tue 2014-05-13 15:36:21, Marc Kleine-Budde wrote:
+> On 05/13/2014 03:09 PM, Pavel Machek wrote:
+> > Non-TI chips (including socfpga) needs different raminit
+> > sequence. Implement it.
+> > 
+> > const's in the hwinit prototype forced me to add const to more
+> > prototypes. This makes changes bigger but the result is cleaner.
 > 
-> On 13.05.14 10:46:53, Nikolay Borisov wrote:
-> >  #define instruction_pointer(regs)	(regs)->ARM_pc
-> > +#define frame_pointer(regs)				\
-> > +	IS_ENABLED(CONFIG_THUMB2_KERNEL) ? regs->ARM_r7 \
-> > +	: regs->ARM_fp					\
+> Why not split into several patches?
 > 
-> (regs)->... should be used here both.
+> > Unfortunately, testing-c_can does not boot on sockit, but previous
+> > version of patch was tested by me and Thor Thayer.
 > 
+> Have a look at:
+> 
+>     git at gitorious.org:linux-can/linux-can-next.git
+> testing-c_can-based-on-net
 
-Yeah, I fixed it already in my local version. Thanks. 
-> -Robert
+git fetch git at gitorious.org:linux-can/linux-can-next.git
+testing-c_can-based-on-net:testing-c_can-based-on-net
+The authenticity of host 'gitorious.org (87.238.52.168)' can't be
+established.
+RSA key fingerprint is
+7e:af:8d:ec:f0:39:5e:ba:52:16:ce:19:fa:d4:b8:7d.
+
+But I was able to
+
+git fetch git://gitorious.org/linux-can/linux-can-next.git
+testing-c_can-based-on-net:testing-c_can-based-on-net 
+
+.
+
+> This branch uses net/master as it's base, I've split your patch into 3,
+> and squashed the 32bit-const changes into the 32-bit access patch. The
+> remaining patch looks quite clean.
+
+Thanks a lot!
+
+> Can you please test the branch, I hope it boots on sockit.
+
+That one still dies early in boot, but I was able to apply some
+changes from my main tree (not CAN related) and get it to boot.
+
+And yes, it seems to work:
+
+[It still does not contain some "interesting" changes from altera
+tree, but as I could not get explanation why they are needed -- and
+they don't seem to be needed -- maybe it is better that way.]
+
+Thanks,
+								Pavel
+
+root at sockit:~# uname -a
+Linux sockit 3.15.0-rc4-00470-g4477be8-dirty #99 SMP Tue May 13
+17:02:02 CEST 2014 armv7l GNU/Linux
+root at sockit:~# ip link set can0 up type can bitrate 125000 loopback on
+c_can_platform ffc00000.d_can can0: setting BTR=1c31 BRPE=0000
+root at sockit:~# ifconfig can0 up
+root at sockit:~# candump can0 &
+root at sockit:~# cansend can0 "123#DEADBEEF"
+  can0  123   [4]  DE AD BE EF
+  can0  123   [4]  DE AD BE EF
+root at sockit:~# cansend can0 "123#DEADBEEF"
+  can0  123   [4]  DE AD BE EF
+  can0  123   [4]  DE AD BE EF
+
+commit 4477be8c9c6070d94b37758a8b35ce60882c2617
+Merge: 37e25b8 a64b6a7
+Author: Pavel Machek <pavel@denx.de>
+Date:   Tue May 13 17:01:30 2014 +0200
+
+    Merge commit 'a64b6a7de2e89f0468ad00066940cfa2d48f886a' into
+    testing-c_can-based-on-n
+    
+    testing-c_can-based-on-net does not boot, this one could.
+
+commit 37e25b8a3432a66027fd3252ec682bd627a929c5
+
+
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
