@@ -1,51 +1,44 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 13 May 2014 22:29:43 +0100
-Subject: [PATCH v9 1/3] PSCI: Add initial support for PSCIv0.2 functions
-In-Reply-To: <CAJ5Y-eZ1gaSPz7n44e+WuVyc=8sjyOUGNw9hDEqH1KKOP3yQRw@mail.gmail.com>
-References: <1399472847-14377-1-git-send-email-ashwin.chaugule@linaro.org>
- <1399472847-14377-2-git-send-email-ashwin.chaugule@linaro.org>
- <20140512091047.GB3006@e106331-lin.cambridge.arm.com>
- <CAJ5Y-eadEXyabW2r_gSsnNyT2zQr3=Dwtq-_oDeryk-h4d6kUw@mail.gmail.com>
- <CAJ5Y-eZ1gaSPz7n44e+WuVyc=8sjyOUGNw9hDEqH1KKOP3yQRw@mail.gmail.com>
-Message-ID: <20140513212943.GC31201@arm.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 13 May 2014 23:31:54 +0200
+Subject: [PATCH 1/2] clk: of: helper for determining flags properties
+In-Reply-To: <20140513204924.5943.24086@quantum>
+References: <1399982253-21079-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1399982253-21079-2-git-send-email-gabriel.fernandez@linaro.org>
+ <20140513122054.GA2419@e106331-lin.cambridge.arm.com>
+ <5372363B.4080608@gmail.com> <20140513204924.5943.24086@quantum>
+Message-ID: <53728F4A.6050303@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 13, 2014 at 06:09:00PM +0100, Ashwin Chaugule wrote:
-> On 12 May 2014 10:02, Ashwin Chaugule <ashwin.chaugule@linaro.org> wrote:
-> >>
-> >> Which tree are you planning on merging this through? Do we need to split
-> >> the arm and arm64 parts?
-> >
-> > IIRC all this PSCI work originally came via Catalins tree(?). But now,
-> > these patches depend on a header introduced by Anups KVM patchset
-> > which is merged in -
-> > https://git.kernel.org/cgit/linux/kernel/git/kvmarm/kvmarm.git/log/?h=next
-> >
-> > In a previous discussion (everyone here is CC'd) with Christoffer and
-> > Paolo the 2nd option of the following was chosen:
-> >
-> > 1) Catalin can apply "Add common header for PSCI related defines", or
-> > Ashwin can resend his series with the patch at the beginning.
-> > Duplicate commits are fine, especially for seldom-modified files where
-> > they do not cause conflicts.
-> >
-> > 2) Send Anup's patchset as a pull request to both me and Catalin,
-> > relative to v3.16-rc1, both of us can apply it and Ashwin's series can
-> > be commit on top.
-> >
-> > To keep it simple it'd be better if it all goes via one tree, but if
-> > there are objections or other suggestions, I'm happy to split this up.
+On 05/13/2014 10:49 PM, Mike Turquette wrote:
+> Quoting Sebastian Hesselbarth (2014-05-13 08:11:55)
+>> On 05/13/2014 02:20 PM, Mark Rutland wrote:
+>>> You've also failed to document the property.
+>>>
+>>> What are you trying to achieve here, and why do you think this is the
+>>> best way of achieving that?
+>>
+>> I cannot tell from the commit msgs, but consider clk-si5351 which is a
+>> driver for an external programmable clock with N PLLs and M outputs. Now
+>> connect a video clock consumer and an audio clock consumer to two
+>> different outputs and those to one PLL (as you want audio clock derived
+>> from video clock, typical HDMI scenario).
+>>
+>> Now, there should be a way to tell the generic driver which outputs are
+>> allowed to change the PLLs rate and which don't. Otherwise, the clock
+>> chip would be pretty useless as e.g. your audio clock consumer will
+>> overwrite the rate the video clock consumer has chosen.
 > 
-> What is the preferred method to upstream this patchset? Would you
-> recommend this be split into ARM and ARM64 variants, or can it all go
-> via the ARM64 tree? I will then respin these accordingly, along with
-> the feedback from Anup and Mark.
+> This is really a job for the "coordinated clock rate changes" that are
+> currently in development. These specify clock sub-tree snapshots of
+> parent and rate configurations that are predefined. These combinations
+> can be specified in DT. That helps a lot with clock configurations that
+> change per board, or for cases where many combinations of parents and
+> dividers can yield the same output rate, but only a subset of those were
+> validated by the silicon validation team or had proper timing closure so
+> we don't want to rely on the "walk up the tree" algorithm.
 
-I don't mind via which tree they go in, it can even be the KVM tree if
-there are dependencies, with my Ack on them (once you address the
-comments). But please note that you need Acks from Russell as well since
-that's touching arch/arm code.
+Ah! Great to hear there is work on that already. Thanks for the heads
+up!
 
--- 
-Catalin
+Sebastian
