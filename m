@@ -1,32 +1,73 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Tue, 13 May 2014 12:45:43 +0900
-Subject: [PATCH 1/2] ARM: tegra: joystick input in tegra_defconfig
-In-Reply-To: <5370F794.2020800@wwwdotorg.org>
-References: <1399883209-31169-1-git-send-email-acourbot@nvidia.com>
- <1399883209-31169-2-git-send-email-acourbot@nvidia.com>
- <5370F794.2020800@wwwdotorg.org>
-Message-ID: <CAAVeFuLZ_wrxipYn2pfNzuyDiTvAPWH4aSWfonrG+YQsm4tM_g@mail.gmail.com>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Tue, 13 May 2014 12:24:14 +0800
+Subject: [PATCH v4 0/4] net: Add APM X-Gene SoC Ethernet driver support
+In-Reply-To: <1399326447-2329-1-git-send-email-isubramanian@apm.com>
+References: <1399326447-2329-1-git-send-email-isubramanian@apm.com>
+Message-ID: <CACVXFVPRcPxm2a+-VDa=80Xp3w+p_+k0ng=7B9KyP8r3E=4_YA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 13, 2014 at 1:32 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 05/12/2014 02:26 AM, Alexandre Courbot wrote:
->> NVIDIA SHIELD embeds a USB controller. Compile the corresponding support
+Hi Iyappan,
+
+On Tue, May 6, 2014 at 5:47 AM, Iyappan Subramanian
+<isubramanian@apm.com> wrote:
+> Adding APM X-Gene SoC Ethernet driver.
 >
-> USB controller or USB joystick?
+> v4: Address comments from v3 review
+> * MAINTAINERS: changed status to supported
+> * Kconfig: made default to no
+> * changed to bool data type wherever applicable
+> * cleaned up single bit set and masking code
+> * removed statistics counters masking
+> * removed unnecessary OOM message printing
+> * fixed dma_map_single and dma_unmap_single size parameter
+> * changed set bits macro body using new set_bits function
 
-I understand this sounds like "EHCI controller" here. Will reword.
+I just tested the v4 against 3.15.0-rc5-next-20140512+ on mustang
+board , looks ethernet becomes very unstable with the change,
+sometimes I saw:
 
->
->> as a module in tegra_defconfig.
->
-> Why make this a module rather than built-in. Almost everything else in
-> tegra_defconfig is built-in, except brcmfmac since it doesn't handle
-> lack of firmware availability at probe time.
+[  301.057140] Unable to handle kernel paging request at virtual
+address ffffffc800a7cd70
 
-Goal is to minimize the image size, especially since this is not a
-feature I expect to be used much outside of SHIELD. If you prefer it
-built-in, I'm fine with it too.
+Also network may  become unusable after a while from booting.
 
-Thanks,
-Alex.
+Another oops log found during reboot:
+
+[ 1156.315992] skbuff: skb_over_panic: text:ffffffc000435b48 len:1514
+put:1514 head:          (null) data:ffffffc3ec667dd0 tail:0x5ea
+end:0x0 dev:<NULL>
+[ 1156.329322] BUG: failure at net/core/skbuff.c:99/skb_panic()!
+[ 1156.335043] Kernel panic - not syncing: BUG!
+[ 1156.339292] CPU: 3 PID: 2710 Comm: ip Not tainted
+3.15.0-rc5-next-20140512+ #29
+[ 1156.346562] Call trace:
+[ 1156.349000] [<ffffffc000087884>] dump_backtrace+0x0/0x10c
+[ 1156.354372] [<ffffffc0000879a0>] show_stack+0x10/0x1c
+[ 1156.359398] [<ffffffc000625b50>] dump_stack+0x88/0xcc
+[ 1156.364422] [<ffffffc0006219dc>] panic+0xe4/0x228
+[ 1156.369101] [<ffffffc000626574>] skb_panic+0x78/0x7c
+[ 1156.374041] [<ffffffc0004a3e98>] skb_put+0x7c/0x8c
+[ 1156.378807] [<ffffffc000435b44>] xgene_enet_process_ring+0xcc/0x2b4
+[ 1156.385041] [<ffffffc000435e2c>] xgene_enet_close+0xb0/0xd8
+[ 1156.390583] [<ffffffc0004ad11c>] __dev_close_many+0xa0/0xd0
+[ 1156.396126] [<ffffffc0004ad170>] __dev_close+0x24/0x40
+[ 1156.401237] [<ffffffc0004b3c94>] __dev_change_flags+0xa4/0x14c
+[ 1156.407039] [<ffffffc0004b3d58>] dev_change_flags+0x1c/0x5c
+[ 1156.412582] [<ffffffc0004c046c>] do_setlink+0x250/0x6ec
+[ 1156.417779] [<ffffffc0004c1590>] rtnl_newlink+0x320/0x508
+[ 1156.423149] [<ffffffc0004c18f8>] rtnetlink_rcv_msg+0x180/0x1a0
+[ 1156.428952] [<ffffffc0004d5558>] netlink_rcv_skb+0x60/0xc4
+[ 1156.434408] [<ffffffc0004c00c4>] rtnetlink_rcv+0x1c/0x2c
+[ 1156.439692] [<ffffffc0004d4c8c>] netlink_unicast+0xcc/0x18c
+[ 1156.445234] [<ffffffc0004d5374>] netlink_sendmsg+0x57c/0x5f8
+[ 1156.450863] [<ffffffc0004992f4>] sock_sendmsg+0x68/0x84
+[ 1156.456060] [<ffffffc000499bc0>] ___sys_sendmsg+0x1ec/0x288
+[ 1156.461602] [<ffffffc00049c9cc>] __sys_sendmsg+0x3c/0x64
+[ 1156.466886] [<ffffffc00049ca00>] SyS_sendmsg+0xc/0x20
+
+
+
+Thanks
+--
+Ming Lei
