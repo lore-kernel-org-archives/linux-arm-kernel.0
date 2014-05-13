@@ -1,102 +1,99 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 13 May 2014 08:56:12 -0700
-Subject: [PATCH] mmc: dw_mmc: Make sure we don't get stuck when we get an
- error
-In-Reply-To: <001b01cf6e67$2183b400$648b1c00$%jun@samsung.com>
-References: <1395901126-6141-1-git-send-email-yuvaraj.cd@samsung.com>
- <CAKuRcOL_JVjOfLNspb14kRxcAXjpEwX4WkvmM+izryZbZBE4XA@mail.gmail.com>
- <CAPz6YkVwT0PrcLP1MJy0vVRw811+_7PwsV_ggKxQkqrjOWeWWw@mail.gmail.com>
- <002001cf6c59$b5b5e680$2121b380$%jun@samsung.com>
- <CAD=FV=X=9cTvST5cM=H9H23SMD28cHSExXt3YR=v2AQ6dFJY5w@mail.gmail.com>
- <001b01cf6e67$2183b400$648b1c00$%jun@samsung.com>
-Message-ID: <CAD=FV=XKvN9+cs1aMFZhR97SE-UaU7mEB4g_fm1BEUfraRPiYQ@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 13 May 2014 18:04:30 +0200
+Subject: [PATCHv2] ARM: mvebu: use hardware I/O coherency also for PCI devices
+Message-ID: <1399997070-11434-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Seungwon,
+Since the beginning of the introduction of hardware I/O coherency
+support for Armada 370 and Armada XP, the special DMA operations
+should have applied to all DMA capable devices. Unfortunately, while
+the original code properly took into account platform devices, it
+didn't take into account PCI devices, which can also be DMA masters.
 
-On Mon, May 12, 2014 at 9:52 PM, Seungwon Jeon <tgih.jun@samsung.com> wrote:
-> Hi Doug,
->
-> On Tue, May 13, 2014, Doug Anderson wrote:
->> Seungwon,
->>
->> On Sat, May 10, 2014 at 7:11 AM, Seungwon Jeon <tgih.jun@samsung.com> wrote:
->> > On Fri, May 09, 2014, Sonny Rao wrote:
->> >> On Thu, May 8, 2014 at 2:42 AM, Yuvaraj Kumar <yuvaraj.cd@gmail.com> wrote:
->> >> > Any comments on this patch?
->> >> >
->> >>
->> >> I'll just add that without this fix, running the tuning loop for UHS
->> >> modes is not reliable on dw_mmc because errors will happen and you
->> >> will eventually hit this race and hang.  This can happen any time
->> >> there is tuning like during boot or during resume from suspend.
->> >>
->> >> > On Thu, Mar 27, 2014 at 11:48 AM, Yuvaraj Kumar C D
->> >> > <yuvaraj.cd@gmail.com> wrote:
->> >> >> From: Doug Anderson <dianders@chromium.org>
->> >> >>
->> >> >> If we happened to get a data error at just the wrong time the dw_mmc
->> >> >> driver could get into a state where it would never complete its
->> >> >> request.  That would leave the caller just hanging there.
->> >> >>
->> >> >> We fix this two ways and both of the two fixes on their own appear to
->> >> >> fix the problems we've seen:
->> >> >>
->> >> >> 1. Fix a race in the tasklet where the interrupt setting the data
->> >> >>    error happens _just after_ we check for it, then we get a
->> >> >>    EVENT_XFER_COMPLETE.  We fix this by repeating a bit of code.
->> > I think repeating is not good approach to fix race.
->> > In your case, XFER_COMPLETE preceded data error and DTO didn't come?
->> > It seems strange case.
->> > I want to know actual error value if you can reproduce.
->>
->> XFER_COMPLETE didn't necessarily precede data error.  Imagine this scenario:
->>
->> 1. Check for data error: nope
->> 2. Interrupt happens and we get a data error and immediately xfer complete
->> 3. Check for xfer complete: yup
->>
->> That's the state that we are handling.
->>
->> The system that dw_mmc uses where the interrupt handler has no locking
->> makes it incredibly difficult to get things right.  Can you propose an
->> alternate fix that would avoid the race?
-> Thank you for detailed scenario.
-> You're right.
-> Have you consider using spin_lock() in interrupt handler?
-> Then, we'll need to change spin_lock() to spin_lock_irqsave() in tasklet func.
-> And other locks in driver may need to be adjusted properly.
+This commit fixes that by registering a bus notifier on pci_bus_type,
+to register our custom DMA operations, like is already done for
+platform devices. While doing this, we also rename
+mvebu_hwcc_platform_notifier() to mvebu_hwcc_notifier() and
+mvebu_hwcc_platform_nb to mvebu_hwcc_nb because they are no longer
+specific to platform devices.
 
-I have certainly considered it and I think it's the right way to go,
-but I believe that this would be a pretty massive change to the design
-of dw_mmc.  Someone appeared to try very hard not to use a spinlock in
-the interrupt handler and came up with the whole tasklet / pending
-events / completed events to deal with it.
+Fixes: e60304f8cb7b ("arm: mvebu: Add hardware I/O Coherency support")
+Cc: <stable@vger.kernel.org> # v3.8+
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+Changes since v1:
+ * Fix stupid tab vs. space problem
 
-In this particular case it would be pretty easy to just add the
-spinlock around the data error / xfer complete checks, though once we
-have a spinlock here it seems like we'd want to start using it in
-other places.  It would be confusing if the interrupt handler grabbed
-a spinlock the whole time but then only used it to protect a single
-small check.
+Applies to mvebu/soc.
 
-I'm really curious, though, why this driver can't just use a threaded
-irq handler and eliminate the whole interrupt / tasklet split.  That
-seems saner in the long run.
+Whether this commit qualifies as stable material can be
+discussed. Technically, it was a mistake from the original I/O
+coherency implementation. But in practice, besides not using the I/O
+coherency, I don't think it's causing any specific problem other than
+DMA transactions on PCI devices triggering unneeded cache maintenance
+operations. So I'll leave it to the mvebu maintainers to decide
+whether this qualifies as stable material or not. I've included the
+relevant Fixes: and Cc: fields, but don't hesitate to rip them out if
+you don't think this should go to stable.
+---
+ arch/arm/mach-mvebu/coherency.c | 21 ++++++++++++++++-----
+ 1 file changed, 16 insertions(+), 5 deletions(-)
 
-
-> To return above scenario:
-> 1. Check for data error: nope
-> 2. Check for xfer complete: nope -> escape tasklet.
-> 3. Interrupt happens and we get a data error and immediately xfer complete
-> 4. Check for data error (Again in tasklet) : yup
->
-> How about this change?
-
-I'm not sure I understand.  Are you suggesting a change to my code, or
-wondering how my code handles the above scenario?
-
-I think your scenario works find either with or without my patch.
-
--Doug
+diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+index d5a975b..5723178 100644
+--- a/arch/arm/mach-mvebu/coherency.c
++++ b/arch/arm/mach-mvebu/coherency.c
+@@ -29,6 +29,7 @@
+ #include <linux/slab.h>
+ #include <linux/mbus.h>
+ #include <linux/clk.h>
++#include <linux/pci.h>
+ #include <asm/smp_plat.h>
+ #include <asm/cacheflush.h>
+ #include "armada-370-xp.h"
+@@ -274,8 +275,8 @@ static struct dma_map_ops mvebu_hwcc_dma_ops = {
+ 	.set_dma_mask		= arm_dma_set_mask,
+ };
+ 
+-static int mvebu_hwcc_platform_notifier(struct notifier_block *nb,
+-				       unsigned long event, void *__dev)
++static int mvebu_hwcc_notifier(struct notifier_block *nb,
++			       unsigned long event, void *__dev)
+ {
+ 	struct device *dev = __dev;
+ 
+@@ -286,8 +287,8 @@ static int mvebu_hwcc_platform_notifier(struct notifier_block *nb,
+ 	return NOTIFY_OK;
+ }
+ 
+-static struct notifier_block mvebu_hwcc_platform_nb = {
+-	.notifier_call = mvebu_hwcc_platform_notifier,
++static struct notifier_block mvebu_hwcc_nb = {
++	.notifier_call = mvebu_hwcc_notifier,
+ };
+ 
+ static void __init armada_370_coherency_init(struct device_node *np)
+@@ -375,9 +376,19 @@ static int __init coherency_late_init(void)
+ 	}
+ 
+ 	bus_register_notifier(&platform_bus_type,
+-			      &mvebu_hwcc_platform_nb);
++			      &mvebu_hwcc_nb);
+ 
+ 	return 0;
+ }
+ 
+ postcore_initcall(coherency_late_init);
++
++static int __init coherency_pci_init(void)
++{
++	if (coherency_available())
++		bus_register_notifier(&pci_bus_type,
++				       &mvebu_hwcc_nb);
++	return 0;
++}
++
++arch_initcall(coherency_pci_init);
+-- 
+1.9.2
