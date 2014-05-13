@@ -1,118 +1,89 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 13 May 2014 17:24:54 +0100
-Subject: [PATCH v2] of/platform: Add of_platform_depopulate() helper
-In-Reply-To: <1399997324.3657.35.camel@hornet>
-References: <1399997324.3657.35.camel@hornet>
-Message-ID: <1399998294-24447-1-git-send-email-pawel.moll@arm.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Tue, 13 May 2014 09:23:34 -0700
+Subject: [PATCH v3 2/6] dt-bindings: add mtk-timer bindings
+In-Reply-To: <CABuKBeL-Zx9S9QuWyhPF_yEa8EvmJYTDLa6KrY2cXKe9e9zBnQ@mail.gmail.com>
+References: <1399938570-11356-1-git-send-email-matthias.bgg@gmail.com>
+ <1399938570-11356-3-git-send-email-matthias.bgg@gmail.com>
+ <2e93c984-96d9-4504-bb9a-672a247fb710@BL2FFO11FD034.protection.gbl>
+ <CABuKBeL-Zx9S9QuWyhPF_yEa8EvmJYTDLa6KrY2cXKe9e9zBnQ@mail.gmail.com>
+Message-ID: <8f009a99-3857-4d8e-9161-29999c5c7297@BN1BFFO11FD016.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drivers can us of_platform_populate() to create
-platform devices for children of the device
-main node (this can particularly happen in case
-of MFD devices). Unfortunately, there was no
-standard way of removing such sub-devices when
-the main one is being removed.
+On Tue, 2014-05-13 at 04:08PM +0200, Matthias Brugger wrote:
+> 2014-05-13 15:08 GMT+02:00 S?ren Brinkmann <soren.brinkmann@xilinx.com>:
+> > Hi Matthias,
+> >
+> > On Tue, 2014-05-13 at 01:49AM +0200, Matthias Brugger wrote:
+> >> Add binding documentation for the General Porpose Timer driver of
+> >> the Mediatek SoCs.
+> >>
+> >> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+> >> ---
+> >>  .../devicetree/bindings/timer/mediatek,mtk-timer.txt   | 18 ++++++++++++++++++
+> >>  1 file changed, 18 insertions(+)
+> >>  create mode 100644 Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
+> >> new file mode 100644
+> >> index 0000000..d0f2df3
+> >> --- /dev/null
+> >> +++ b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
+> >> @@ -0,0 +1,18 @@
+> >> +Mediatek MT6589, MT6577 and MT6572 Timers
+> >> +---------------------------------------
+> >> +
+> >> +Required properties:
+> >> +- compatible: Should be "mediatek,mtk6589-timer"
+> >> +- reg: Should contain location and length for timers register.
+> >> +- clocks: phandle to the clock source; the first refers to a 13 MHz fixed
+> >> +             system clock and the second handle to a 32 KHz fixed RTC
+> >> +             clock.
+> >
+> > Are these frequencies mandatory to the timer or an implementation
+> > detail of the SOC you're working with? I suspect, it might be possible
+> > to see the same timer in a different SOC implementation with different
+> > frequencies? In that case - or probably in general - the frequencies
+> > should not be part of the binding, IMHO.
+> 
+> I had a look at the implementation of several Mediatek SoCs and all of
+> them have the timer with the same clock connections.
+> I don't know if the IP can be or is actually used with other clocksources.
+> I can try to reformulate the description to make the clock constraints
+> sound less mandatory.
+> Although I would prefer to leave a mention about the clock frequencies
+> (like e.g. in the allwinner,sun4i-timer).
 
-This patch adds of_platform_depopulate() as
-a complementary operation for the _populate()
-one. It removes all platform and amba devices
-that have been created from the Device Tree,
-but leaves all other ones untouched (returning
--EBUSY in such case).
+Since the bindings should be generic, I think the frequencies shouldn't
+be here. From DT/HW perspective their frequencies is irrelevant and a
+pure implementation detail, IMHO.
 
-Signed-off-by: Pawel Moll <pawel.moll@arm.com>
----
-Changes since v1:
+> 
+> >
+> >> +
+> >> +Examples:
+> >> +
+> >> +     timer {
+> >> +             compatible = "mediatek,mtk6589-timer";
+> >> +             reg = <0x10008000 0x80>;
+> >> +             interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_LOW>;
+> >> +             clocks = <&system_clk>, <&rtc_clk>;
+> >
+> > Might be just my personal preference, but you could also add the clock-names
+> > property which would relax the ordering requirement a bit and would
+> > clearly  identify the IP's clocks.
+> 
+> In the v1 of the patch series I had the clock names included [1] but
+> because of comments of others I removed them [1].
+> Actually the driver just use the first clock, but from my
+> understanding the DT reflects as well the HW configuration and for
+> this reason I put the two clocks in the DT.
+> 
+> [1] http://thread.gmane.org/gmane.linux.drivers.devicetree/69155/
 
-- using bool rather than int to signal remaining children
-- recursing using of_platform_depopulate() itself
+I had cases where the same IP was implemented by different SOC vendors
+differently. In that cases having the clock-names in the bindings is
+extremely helpful when you try to match the binding with the IP docs.
+Hence, I'd recommend being explicit and list the names.
 
- drivers/of/platform.c       | 50 +++++++++++++++++++++++++++++++++++++++++++++
- include/linux/of_platform.h |  5 +++++
- 2 files changed, 55 insertions(+)
-
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index 236f47e..3b51e04 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -495,4 +495,54 @@ int of_platform_populate(struct device_node *root,
- 	return rc;
- }
- EXPORT_SYMBOL_GPL(of_platform_populate);
-+
-+static int of_platform_device_destroy(struct device *dev, void *data)
-+{
-+	bool *children_left = data;
-+
-+	/* Do not touch devices not populated from the device tree */
-+	if (!dev->of_node || !of_node_check_flag(dev->of_node, OF_POPULATED)) {
-+		*children_left = true;
-+		return 0;
-+	}
-+
-+	/* Recurse, but don't touch this device if it has any children left */
-+	if (of_platform_depopulate(dev) != 0) {
-+		*children_left = true;
-+		return 0;
-+	}
-+
-+	if (dev->bus == &platform_bus_type)
-+		platform_device_unregister(to_platform_device(dev));
-+	else if (dev->bus == &amba_bustype)
-+		amba_device_unregister(to_amba_device(dev));
-+	else
-+		*children_left = true;
-+
-+	return 0;
-+}
-+
-+/**
-+ * of_platform_depopulate() - Remove devices populated from device tree
-+ * @parent: device which childred will be removed
-+ *
-+ * Complementary to of_platform_populate(), this function removes children
-+ * of the given device (and, recurrently, their children) that have been
-+ * created from their respective device tree nodes (and only those,
-+ * leaving others - eg. manually created - unharmed).
-+ *
-+ * Returns 0 when all children devices have been removed or
-+ * -EBUSY when some children remained.
-+ */
-+int of_platform_depopulate(struct device *parent)
-+{
-+	bool children_left = false;
-+
-+	device_for_each_child(parent, &children_left,
-+			of_platform_device_destroy);
-+
-+	return children_left ? -EBUSY : 0;
-+}
-+EXPORT_SYMBOL_GPL(of_platform_depopulate);
-+
- #endif /* CONFIG_OF_ADDRESS */
-diff --git a/include/linux/of_platform.h b/include/linux/of_platform.h
-index 05cb4a9..b1010ee 100644
---- a/include/linux/of_platform.h
-+++ b/include/linux/of_platform.h
-@@ -72,6 +72,7 @@ extern int of_platform_populate(struct device_node *root,
- 				const struct of_device_id *matches,
- 				const struct of_dev_auxdata *lookup,
- 				struct device *parent);
-+extern int of_platform_depopulate(struct device *parent);
- #else
- static inline int of_platform_populate(struct device_node *root,
- 					const struct of_device_id *matches,
-@@ -80,6 +81,10 @@ static inline int of_platform_populate(struct device_node *root,
- {
- 	return -ENODEV;
- }
-+static inline int of_platform_depopulate(struct device *parent)
-+{
-+	return -ENODEV;
-+}
- #endif
- 
- #endif	/* _LINUX_OF_PLATFORM_H */
--- 
-1.9.1
+	S?ren
