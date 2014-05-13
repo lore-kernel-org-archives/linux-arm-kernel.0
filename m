@@ -1,99 +1,49 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 13 May 2014 18:04:30 +0200
-Subject: [PATCHv2] ARM: mvebu: use hardware I/O coherency also for PCI devices
-Message-ID: <1399997070-11434-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Tue, 13 May 2014 20:04:22 +0400
+Subject: [PATCH v2 2/3] ARM: i.MX1 clk: Remove clk_register_clkdev() for
+ unused clocks
+In-Reply-To: <1399997062-4270-1-git-send-email-shc_work@mail.ru>
+References: <1399997062-4270-1-git-send-email-shc_work@mail.ru>
+Message-ID: <1399997062-4270-2-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the beginning of the introduction of hardware I/O coherency
-support for Armada 370 and Armada XP, the special DMA operations
-should have applied to all DMA capable devices. Unfortunately, while
-the original code properly took into account platform devices, it
-didn't take into account PCI devices, which can also be DMA masters.
+This patch removes clk_register_clkdev() for the clocks that do not
+have any users from boards and drivers.
 
-This commit fixes that by registering a bus notifier on pci_bus_type,
-to register our custom DMA operations, like is already done for
-platform devices. While doing this, we also rename
-mvebu_hwcc_platform_notifier() to mvebu_hwcc_notifier() and
-mvebu_hwcc_platform_nb to mvebu_hwcc_nb because they are no longer
-specific to platform devices.
-
-Fixes: e60304f8cb7b ("arm: mvebu: Add hardware I/O Coherency support")
-Cc: <stable@vger.kernel.org> # v3.8+
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
-Changes since v1:
- * Fix stupid tab vs. space problem
+ arch/arm/mach-imx/clk-imx1.c | 8 --------
+ 1 file changed, 8 deletions(-)
 
-Applies to mvebu/soc.
-
-Whether this commit qualifies as stable material can be
-discussed. Technically, it was a mistake from the original I/O
-coherency implementation. But in practice, besides not using the I/O
-coherency, I don't think it's causing any specific problem other than
-DMA transactions on PCI devices triggering unneeded cache maintenance
-operations. So I'll leave it to the mvebu maintainers to decide
-whether this qualifies as stable material or not. I've included the
-relevant Fixes: and Cc: fields, but don't hesitate to rip them out if
-you don't think this should go to stable.
----
- arch/arm/mach-mvebu/coherency.c | 21 ++++++++++++++++-----
- 1 file changed, 16 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-index d5a975b..5723178 100644
---- a/arch/arm/mach-mvebu/coherency.c
-+++ b/arch/arm/mach-mvebu/coherency.c
-@@ -29,6 +29,7 @@
- #include <linux/slab.h>
- #include <linux/mbus.h>
- #include <linux/clk.h>
-+#include <linux/pci.h>
- #include <asm/smp_plat.h>
- #include <asm/cacheflush.h>
- #include "armada-370-xp.h"
-@@ -274,8 +275,8 @@ static struct dma_map_ops mvebu_hwcc_dma_ops = {
- 	.set_dma_mask		= arm_dma_set_mask,
- };
+diff --git a/arch/arm/mach-imx/clk-imx1.c b/arch/arm/mach-imx/clk-imx1.c
+index 602b30a..7f739be 100644
+--- a/arch/arm/mach-imx/clk-imx1.c
++++ b/arch/arm/mach-imx/clk-imx1.c
+@@ -91,9 +91,6 @@ int __init mx1_clocks_init(unsigned long fref)
  
--static int mvebu_hwcc_platform_notifier(struct notifier_block *nb,
--				       unsigned long event, void *__dev)
-+static int mvebu_hwcc_notifier(struct notifier_block *nb,
-+			       unsigned long event, void *__dev)
- {
- 	struct device *dev = __dev;
+ 	clk_register_clkdev(clk[dma_gate], "ahb", "imx1-dma");
+ 	clk_register_clkdev(clk[hclk], "ipg", "imx1-dma");
+-	clk_register_clkdev(clk[csi_gate], NULL, "mx1-camera.0");
+-	clk_register_clkdev(clk[mma_gate], "mma", NULL);
+-	clk_register_clkdev(clk[usbd_gate], NULL, "imx_udc.0");
+ 	clk_register_clkdev(clk[per1], "per", "imx-gpt.0");
+ 	clk_register_clkdev(clk[hclk], "ipg", "imx-gpt.0");
+ 	clk_register_clkdev(clk[per1], "per", "imx1-uart.0");
+@@ -107,14 +104,9 @@ int __init mx1_clocks_init(unsigned long fref)
+ 	clk_register_clkdev(clk[dummy], "ipg", "imx1-cspi.0");
+ 	clk_register_clkdev(clk[per2], "per", "imx1-cspi.1");
+ 	clk_register_clkdev(clk[dummy], "ipg", "imx1-cspi.1");
+-	clk_register_clkdev(clk[per2], NULL, "imx-mmc.0");
+ 	clk_register_clkdev(clk[per2], "per", "imx1-fb.0");
+ 	clk_register_clkdev(clk[dummy], "ipg", "imx1-fb.0");
+ 	clk_register_clkdev(clk[dummy], "ahb", "imx1-fb.0");
+-	clk_register_clkdev(clk[hclk], "mshc", NULL);
+-	clk_register_clkdev(clk[per3], "ssi", NULL);
+-	clk_register_clkdev(clk[clk32], NULL, "imx1-rtc.0");
+-	clk_register_clkdev(clk[clko], "clko", NULL);
  
-@@ -286,8 +287,8 @@ static int mvebu_hwcc_platform_notifier(struct notifier_block *nb,
- 	return NOTIFY_OK;
- }
+ 	mxc_timer_init(MX1_IO_ADDRESS(MX1_TIM1_BASE_ADDR), MX1_TIM1_INT);
  
--static struct notifier_block mvebu_hwcc_platform_nb = {
--	.notifier_call = mvebu_hwcc_platform_notifier,
-+static struct notifier_block mvebu_hwcc_nb = {
-+	.notifier_call = mvebu_hwcc_notifier,
- };
- 
- static void __init armada_370_coherency_init(struct device_node *np)
-@@ -375,9 +376,19 @@ static int __init coherency_late_init(void)
- 	}
- 
- 	bus_register_notifier(&platform_bus_type,
--			      &mvebu_hwcc_platform_nb);
-+			      &mvebu_hwcc_nb);
- 
- 	return 0;
- }
- 
- postcore_initcall(coherency_late_init);
-+
-+static int __init coherency_pci_init(void)
-+{
-+	if (coherency_available())
-+		bus_register_notifier(&pci_bus_type,
-+				       &mvebu_hwcc_nb);
-+	return 0;
-+}
-+
-+arch_initcall(coherency_pci_init);
 -- 
-1.9.2
+1.8.3.2
