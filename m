@@ -1,68 +1,39 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 13 May 2014 10:46:47 -0500
-Subject: [PATCH 1/1] usb: core: Kconfig: refine the description for
- CONFIG_USB_OTG
-In-Reply-To: <20140513111144.GA29360@kroah.com>
-References: <1399947567-18958-1-git-send-email-peter.chen@freescale.com>
- <20140513111144.GA29360@kroah.com>
-Message-ID: <20140513154647.GM1151@saruman.home>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Tue, 13 May 2014 17:40:34 +0200
+Subject: [PATCH 10/9] dt: deps: fix bug not registering late drivers when
+ OF_DEPENDENCIES is disabled
+In-Reply-To: <1399913280-6915-1-git-send-email-holler@ahsoftware.de>
+References: <1399913280-6915-1-git-send-email-holler@ahsoftware.de>
+Message-ID: <1399995634-5401-1-git-send-email-holler@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 13, 2014 at 01:11:44PM +0200, Greg KH wrote:
-> On Tue, May 13, 2014 at 10:19:27AM +0800, Peter Chen wrote:
-> > the user should only select it when the board supports HNP and SRP,
-> > it should NOT be selected if the board only supports dual-role
-> > switch through ID pin.
-> > 
-> > There is a discussion for it:
-> > http://marc.info/?l=linux-arm-kernel&m=139994896101516&w=2
-> > http://marc.info/?l=linux-usb&m=139994881701504&w=2
-> > 
-> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > ---
-> >  drivers/usb/core/Kconfig |   12 +++++++-----
-> >  1 files changed, 7 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/drivers/usb/core/Kconfig b/drivers/usb/core/Kconfig
-> > index cb8e991..158048b 100644
-> > --- a/drivers/usb/core/Kconfig
-> > +++ b/drivers/usb/core/Kconfig
-> > @@ -54,13 +54,15 @@ config USB_OTG
-> >  	default n
-> >  	help
-> >  	  The most notable feature of USB OTG is support for a
-> > -	  "Dual-Role" device, which can act as either a device
-> > -	  or a host. The initial role is decided by the type of
-> > -	  plug inserted and can be changed later when two dual
-> > -	  role devices talk to each other.
-> > +	  otg device, which can act as either a device or a host.
-> > +	  The initial role is decided by the type of plug inserted
-> > +	  and can be changed using HNP (Host Negotiation Protocol)
-> > +	  later when two otg devices talk to each other.
-> >  
-> >  	  Select this only if your board has Mini-AB/Micro-AB
-> > -	  connector.
-> > +	  connector and supports HNP and SRP (Session Request Protocol).
-> > +	  If the board only supports dual-role switch through ID
-> > +	  pin, this configuration should not be selected.
-> 
-> That's really lame.  What happened to our "all modconfig should work"
-> goal?  Why can't you dynamically detect that this is not a config that
-> works and handle it?
-> 
-> And this is just the OTG "core", not any specific hardware, so why
-> should it matter?
+The subject says all. Patch 5/9 has a bug which avoids registering late drivers
+if OF_DEPENDENCIES is disabled.
 
-yeah, I'm with Greg here... we should find a better way to sort this
-out.
+This also explains the large differences in boot times I've experienced when
+comparing boot times with and without DT dependency based initialization order.
 
+Signed-off-by: Alexander Holler <holler@ahsoftware.de>
+
+---
+ init/main.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/init/main.c b/init/main.c
+index 7591cd1..e16e2b4 100644
+--- a/init/main.c
++++ b/init/main.c
+@@ -799,9 +799,9 @@ static void __init do_basic_setup(void)
+ 	of_init_set_recording(false);
+ 	/* probe available platform drivers with deterministic order */
+ 	of_init_register_drivers();
++#endif
+ 	/* register late drivers */
+ 	do_initcall_level(ARRAY_SIZE(initcall_levels) - 3);
+-#endif
+ 	random_int_secret_init();
+ }
+ 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140513/e1d6ffae/attachment.sig>
+1.8.3.1
