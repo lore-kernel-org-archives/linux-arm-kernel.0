@@ -1,42 +1,53 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 13 May 2014 13:00:43 -0400
-Subject: [PATCHv2 1/4] of: make of_update_property() usable earlier in
- the boot process
-In-Reply-To: <CAL_JsqJhKy=whJE25me07YFxEMX+gCch42ZF_Z5_5xfsfAvFXA@mail.gmail.com>
-References: <1399975839-5311-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1399975839-5311-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <CAL_JsqLNnLjeo2tM=z5bcn4DJD_5-uFRGkk6wAWnvGZyo9Y7pg@mail.gmail.com>
- <20140513163026.18a0fa61@free-electrons.com>
- <20140513153006.GC27822@titan.lakedaemon.net>
- <20140513175404.319d067d@free-electrons.com>
- <CAL_JsqJhKy=whJE25me07YFxEMX+gCch42ZF_Z5_5xfsfAvFXA@mail.gmail.com>
-Message-ID: <20140513170043.GG27822@titan.lakedaemon.net>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 13 May 2014 12:02:06 -0500
+Subject: [PATCH 5/7] irqchip: s3c24xx: fix function type for
+ IRQCHIP_OF_DECLARE
+In-Reply-To: <20140513152233.GB27822@titan.lakedaemon.net>
+References: <1399940993-1773-1-git-send-email-robherring2@gmail.com>
+ <1399940993-1773-6-git-send-email-robherring2@gmail.com>
+ <20140513152233.GB27822@titan.lakedaemon.net>
+Message-ID: <CAL_JsqJuYwkyy0UO75D1XmAKZa3ui3zYYBi55xFOWUFVgFw5=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 13, 2014 at 11:58:08AM -0500, Rob Herring wrote:
-> On Tue, May 13, 2014 at 10:54 AM, Thomas Petazzoni
-> <thomas.petazzoni@free-electrons.com> wrote:
-> > Dear Jason Cooper,
-> >
-> > On Tue, 13 May 2014 11:30:06 -0400, Jason Cooper wrote:
-> >
-> >> > Well, I guess it's a per-maintainer choice:
-> >> >
-> >> > git log | grep "^Fixes:"
-> >> >
-> >> >     Fixes: 54fe26a900bc528f3df1e4235cb6b9ca5c6d4dc2 ('ARM: mvebu: Add thermal quirk for the Armada 375 DB board')
-> >>
-> >> Well, just because the maintainer is an idiot and didn't catch it isn't
-> >> an excuse to continue the behavior. ;-)
-> 
-> To be fair, documentation was added last week! I only noticed now
-> because I just found and read the documentation. In the future, I'll
-> probably forget and not notice thus becoming an idiot again. ;)
+On Tue, May 13, 2014 at 10:22 AM, Jason Cooper <jason@lakedaemon.net> wrote:
+> Rob,
+>
+> On Mon, May 12, 2014 at 07:29:51PM -0500, Rob Herring wrote:
+>> From: Rob Herring <robh@kernel.org>
+>>
+>> Adding function type checking to IRQCHIP_OF_DECLARE found a type mismatch
+>> with s3c2410_init_intc_of and s3c2416_init_intc_of. The function only takes
+>> the 1st 2 parameters.
+>>
+>> Signed-off-by: Rob Herring <robh@kernel.org>
+>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>> ---
+>>  drivers/irqchip/irq-s3c24xx.c | 6 ++----
+>>  1 file changed, 2 insertions(+), 4 deletions(-)
+>
+> Thomas has asked me to give him a hand with the patches for
+> drivers/irqchip.  When you add these two to your tree, could you amend
+> the subject line to conform with the other patches in that directory?
 
-um.. I thought that was me.  I usually don't make it a habit of calling
-other people idiot.  I reserve that for myself. ;-)
+Excellent! We've needed some help there for a long time. Is there a
+patch in flight to add this to MAINTAINERS.
 
-thx,
+> eg (note the capitalization on 'Fix'):
+>
+>   irqchip: s3c24xx: Fix function type for IRQCHIP_OF_DECLARE
+>   irqchip: mxs: Fix function type for IRQCHIP_OF_DECLARE
 
-Jason.
+Will do.
+
+>
+> With that change,
+>
+> Acked-by: Jason Cooper <jason@lakedaemon.net>
+>
+> Or, if you like, I can apply these two to the branch I'm staging for
+> Thomas.  Either is fine with me.
+>
+> thx,
+>
+> Jason.
