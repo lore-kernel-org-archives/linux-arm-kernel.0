@@ -1,42 +1,93 @@
 From: agross@codeaurora.org (Andy Gross)
-Date: Tue, 13 May 2014 16:34:42 -0500
-Subject: [PATCH 2/4] spi: qup: Correct selection of FIFO/Block mode
+Date: Tue, 13 May 2014 16:34:41 -0500
+Subject: [PATCH 1/4] spi: qup: Remove chip select function
 In-Reply-To: <1400016884-9568-1-git-send-email-agross@codeaurora.org>
 References: <1400016884-9568-1-git-send-email-agross@codeaurora.org>
-Message-ID: <1400016884-9568-3-git-send-email-agross@codeaurora.org>
+Message-ID: <1400016884-9568-2-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the calculation for determining whether to use FIFO or BLOCK
-mode.
+This patch removes the chip select function.  Chip select should instead be
+supported using GPIOs, defining the DT entry "cs-gpios", and letting the SPI
+core assert/deassert the chip select as it sees fit.
 
 Signed-off-by: Andy Gross <agross@codeaurora.org>
 ---
- drivers/spi/spi-qup.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ .../devicetree/bindings/spi/qcom,spi-qup.txt       |    6 +++++
+ drivers/spi/spi-qup.c                              |   28 ++------------------
+ 2 files changed, 8 insertions(+), 26 deletions(-)
 
+diff --git a/Documentation/devicetree/bindings/spi/qcom,spi-qup.txt b/Documentation/devicetree/bindings/spi/qcom,spi-qup.txt
+index b82a268..bee6ff2 100644
+--- a/Documentation/devicetree/bindings/spi/qcom,spi-qup.txt
++++ b/Documentation/devicetree/bindings/spi/qcom,spi-qup.txt
+@@ -23,6 +23,12 @@ Optional properties:
+ - spi-max-frequency: Specifies maximum SPI clock frequency,
+                      Units - Hz. Definition as per
+                      Documentation/devicetree/bindings/spi/spi-bus.txt
++- num-cs:	total number of chipselects
++- cs-gpios:	should specify GPIOs used for chipselects.
++		The gpios will be referred to as reg = <index> in the SPI child
++		nodes.  If unspecified, a single SPI device without a chip
++		select can be used.
++
+ 
+ SPI slave nodes must be children of the SPI master node and can contain
+ properties described in Documentation/devicetree/bindings/spi/spi-bus.txt
 diff --git a/drivers/spi/spi-qup.c b/drivers/spi/spi-qup.c
-index ea7017b..57b65e9 100644
+index b032e88..ea7017b 100644
 --- a/drivers/spi/spi-qup.c
 +++ b/drivers/spi/spi-qup.c
-@@ -289,7 +289,7 @@ static irqreturn_t spi_qup_qup_irq(int irq, void *dev_id)
- 	writel_relaxed(opflags, controller->base + QUP_OPERATIONAL);
+@@ -18,7 +18,9 @@
+ #include <linux/io.h>
+ #include <linux/list.h>
+ #include <linux/module.h>
++#include <linux/gpio.h>
+ #include <linux/of.h>
++#include <linux/of_gpio.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/spi/spi.h>
+@@ -424,31 +426,6 @@ static int spi_qup_io_config(struct spi_device *spi, struct spi_transfer *xfer)
+ 	return 0;
+ }
  
- 	if (!xfer) {
--		dev_err_ratelimited(controller->dev, "unexpected irq %x08 %x08 %x08\n",
-+		dev_err_ratelimited(controller->dev, "unexpected irq %08x %08x %08x\n",
- 				    qup_err, spi_err, opflags);
- 		return IRQ_HANDLED;
- 	}
-@@ -368,7 +368,7 @@ static int spi_qup_io_config(struct spi_device *spi, struct spi_transfer *xfer)
- 	n_words = xfer->len / w_size;
- 	controller->w_size = w_size;
- 
--	if (n_words <= controller->in_fifo_sz) {
-+	if (n_words <= (controller->in_fifo_sz / sizeof(u32))) {
- 		mode = QUP_IO_M_MODE_FIFO;
- 		writel_relaxed(n_words, controller->base + QUP_MX_READ_CNT);
- 		writel_relaxed(n_words, controller->base + QUP_MX_WRITE_CNT);
+-static void spi_qup_set_cs(struct spi_device *spi, bool enable)
+-{
+-	struct spi_qup *controller = spi_master_get_devdata(spi->master);
+-
+-	u32 iocontol, mask;
+-
+-	iocontol = readl_relaxed(controller->base + SPI_IO_CONTROL);
+-
+-	/* Disable auto CS toggle and use manual */
+-	iocontol &= ~SPI_IO_C_MX_CS_MODE;
+-	iocontol |= SPI_IO_C_FORCE_CS;
+-
+-	iocontol &= ~SPI_IO_C_CS_SELECT_MASK;
+-	iocontol |= SPI_IO_C_CS_SELECT(spi->chip_select);
+-
+-	mask = SPI_IO_C_CS_N_POLARITY_0 << spi->chip_select;
+-
+-	if (enable)
+-		iocontol |= mask;
+-	else
+-		iocontol &= ~mask;
+-
+-	writel_relaxed(iocontol, controller->base + SPI_IO_CONTROL);
+-}
+-
+ static int spi_qup_transfer_one(struct spi_master *master,
+ 			      struct spi_device *spi,
+ 			      struct spi_transfer *xfer)
+@@ -576,7 +553,6 @@ static int spi_qup_probe(struct platform_device *pdev)
+ 	master->num_chipselect = SPI_NUM_CHIPSELECTS;
+ 	master->bits_per_word_mask = SPI_BPW_RANGE_MASK(4, 32);
+ 	master->max_speed_hz = max_freq;
+-	master->set_cs = spi_qup_set_cs;
+ 	master->transfer_one = spi_qup_transfer_one;
+ 	master->dev.of_node = pdev->dev.of_node;
+ 	master->auto_runtime_pm = true;
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
