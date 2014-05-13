@@ -1,73 +1,39 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Tue, 13 May 2014 12:24:14 +0800
-Subject: [PATCH v4 0/4] net: Add APM X-Gene SoC Ethernet driver support
-In-Reply-To: <1399326447-2329-1-git-send-email-isubramanian@apm.com>
-References: <1399326447-2329-1-git-send-email-isubramanian@apm.com>
-Message-ID: <CACVXFVPRcPxm2a+-VDa=80Xp3w+p_+k0ng=7B9KyP8r3E=4_YA@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 13 May 2014 13:37:33 +0900
+Subject: [PATCH 5/6] ARM: EXYNOS: Enable multi-platform build support
+In-Reply-To: <201404222156.48432.arnd@arndb.de>
+References: <1397554134-11827-1-git-send-email-sachin.kamat@linaro.org>
+ <1397554134-11827-6-git-send-email-sachin.kamat@linaro.org>
+ <CAOesGMh0VdSbQ1fSjGkJOG+BDeNfo4NNQjtiznh18DxSROaT1A@mail.gmail.com>
+ <201404222156.48432.arnd@arndb.de>
+Message-ID: <065d01cf6e65$0e903dc0$2bb0b940$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Iyappan,
+Arnd Bergmann wrote:
+> 
+> On Tuesday 22 April 2014, Olof Johansson wrote:
+> > I don't think there's a point in keeping this around. A
+> > "single-platform" config is just enabling a single platform in the
+> > config, it's not a specific option. I don't think any of the other
+> > platforms use anything like this today.
+> 
+> The only one doing that is shmobile, but only because they have
+> some SoCs that are multiplatform capable and some that are not.
+> This isn't the case for Exynos, so it should no longer be needed.
+> 
+> When I originally created this patch 18 months ago, there were a
+> number of drivers that broke when multiplatform got enabled.
+> Now the cpufreq driver is the only one left, but it seems that
+> it will make it for 3.16, and I wouldn't wait for it if it doesn't.
+> Let's just do multiplatform-only.
+> 
+In my position in S.LSI, I'd like to keep the current ARCH_EXYNOS4 and
+EXYNOS5 because IMHO selecting each series would be helpful on real product,
+multiplatform is available though. Additionally EXYNOS3 is being added.
 
-On Tue, May 6, 2014 at 5:47 AM, Iyappan Subramanian
-<isubramanian@apm.com> wrote:
-> Adding APM X-Gene SoC Ethernet driver.
->
-> v4: Address comments from v3 review
-> * MAINTAINERS: changed status to supported
-> * Kconfig: made default to no
-> * changed to bool data type wherever applicable
-> * cleaned up single bit set and masking code
-> * removed statistics counters masking
-> * removed unnecessary OOM message printing
-> * fixed dma_map_single and dma_unmap_single size parameter
-> * changed set bits macro body using new set_bits function
+It's true we can support exynos-multiplatform even though above options are
+included...
 
-I just tested the v4 against 3.15.0-rc5-next-20140512+ on mustang
-board , looks ethernet becomes very unstable with the change,
-sometimes I saw:
-
-[  301.057140] Unable to handle kernel paging request at virtual
-address ffffffc800a7cd70
-
-Also network may  become unusable after a while from booting.
-
-Another oops log found during reboot:
-
-[ 1156.315992] skbuff: skb_over_panic: text:ffffffc000435b48 len:1514
-put:1514 head:          (null) data:ffffffc3ec667dd0 tail:0x5ea
-end:0x0 dev:<NULL>
-[ 1156.329322] BUG: failure at net/core/skbuff.c:99/skb_panic()!
-[ 1156.335043] Kernel panic - not syncing: BUG!
-[ 1156.339292] CPU: 3 PID: 2710 Comm: ip Not tainted
-3.15.0-rc5-next-20140512+ #29
-[ 1156.346562] Call trace:
-[ 1156.349000] [<ffffffc000087884>] dump_backtrace+0x0/0x10c
-[ 1156.354372] [<ffffffc0000879a0>] show_stack+0x10/0x1c
-[ 1156.359398] [<ffffffc000625b50>] dump_stack+0x88/0xcc
-[ 1156.364422] [<ffffffc0006219dc>] panic+0xe4/0x228
-[ 1156.369101] [<ffffffc000626574>] skb_panic+0x78/0x7c
-[ 1156.374041] [<ffffffc0004a3e98>] skb_put+0x7c/0x8c
-[ 1156.378807] [<ffffffc000435b44>] xgene_enet_process_ring+0xcc/0x2b4
-[ 1156.385041] [<ffffffc000435e2c>] xgene_enet_close+0xb0/0xd8
-[ 1156.390583] [<ffffffc0004ad11c>] __dev_close_many+0xa0/0xd0
-[ 1156.396126] [<ffffffc0004ad170>] __dev_close+0x24/0x40
-[ 1156.401237] [<ffffffc0004b3c94>] __dev_change_flags+0xa4/0x14c
-[ 1156.407039] [<ffffffc0004b3d58>] dev_change_flags+0x1c/0x5c
-[ 1156.412582] [<ffffffc0004c046c>] do_setlink+0x250/0x6ec
-[ 1156.417779] [<ffffffc0004c1590>] rtnl_newlink+0x320/0x508
-[ 1156.423149] [<ffffffc0004c18f8>] rtnetlink_rcv_msg+0x180/0x1a0
-[ 1156.428952] [<ffffffc0004d5558>] netlink_rcv_skb+0x60/0xc4
-[ 1156.434408] [<ffffffc0004c00c4>] rtnetlink_rcv+0x1c/0x2c
-[ 1156.439692] [<ffffffc0004d4c8c>] netlink_unicast+0xcc/0x18c
-[ 1156.445234] [<ffffffc0004d5374>] netlink_sendmsg+0x57c/0x5f8
-[ 1156.450863] [<ffffffc0004992f4>] sock_sendmsg+0x68/0x84
-[ 1156.456060] [<ffffffc000499bc0>] ___sys_sendmsg+0x1ec/0x288
-[ 1156.461602] [<ffffffc00049c9cc>] __sys_sendmsg+0x3c/0x64
-[ 1156.466886] [<ffffffc00049ca00>] SyS_sendmsg+0xc/0x20
-
-
-
-Thanks
---
-Ming Lei
+Thanks,
+Kukjin
