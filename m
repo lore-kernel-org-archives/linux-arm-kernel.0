@@ -1,34 +1,67 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 13 May 2014 10:43:47 +0300
-Subject: [PATCH 3/4] ARM: dts: am33xx: Remove obsolete properties from edma
- node
-In-Reply-To: <1399967028-24757-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1399967028-24757-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1399967028-24757-4-git-send-email-peter.ujfalusi@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 13 May 2014 09:51:33 +0200
+Subject: [PATCH v3 5/8] usb: ehci-platform: add optional reset controller
+ retrieval
+In-Reply-To: <Pine.LNX.4.44L0.1405121604140.1202-100000@iolanthe.rowland.org>
+References: <1399923274-6017-6-git-send-email-maxime.ripard@free-electrons.com>
+ <Pine.LNX.4.44L0.1405121604140.1202-100000@iolanthe.rowland.org>
+Message-ID: <20140513075133.GA16873@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dma-channels, ti,edma-regions and ti,edma-slots no longer needed in DT since
-the the same information is available in the IP's CCCFG register.
+On Mon, May 12, 2014 at 04:06:16PM -0400, Alan Stern wrote:
+> On Mon, 12 May 2014, Maxime Ripard wrote:
+> 
+> > From: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> > 
+> > On the Allwinner's A31 SoC the reset line connected to the EHCI IP has to
+> > be deasserted for the EHCI block to be usable.
+> > 
+> > Add support for an optional reset controller that will be deasserted on
+> > power off and asserted on power on.
+> > 
+> > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > Reviewed-by: Hans de Goede <hdegoede@redhat.com>
+> 
+> ...
+> 
+> > @@ -208,6 +210,18 @@ static int ehci_platform_probe(struct platform_device *dev)
+> >  		}
+> >  	}
+> >  
+> > +	priv->rst = devm_reset_control_get_optional(&dev->dev, NULL);
+> > +	if (IS_ERR(priv->rst)) {
+> > +		err = PTR_ERR(priv->rst);
+> > +		if (err == -EPROBE_DEFER)
+> > +			goto err_put_clks;
+> > +		priv->rst = NULL;
+> > +	} else {
+> > +		err = reset_control_deassert(priv->rst);
+> > +		if (err)
+> > +			goto err_put_clks;
+> > +	}
+> > +
+> >  	if (pdata->big_endian_desc)
+> >  		ehci->big_endian_desc = 1;
+> >  	if (pdata->big_endian_mmio)
+> 
+> You don't re-assert the reset control if an error happens later on 
+> during probe.  Was that intentional?
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- arch/arm/boot/dts/am33xx.dtsi | 3 ---
- 1 file changed, 3 deletions(-)
+No, it wasn't. I'll resubmit another version.
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index baf56cc92040..5e8f647ee4ec 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -147,9 +147,6 @@
- 				<0x44e10f90 0x10>;
- 			interrupts = <12 13 14>;
- 			#dma-cells = <1>;
--			dma-channels = <64>;
--			ti,edma-regions = <4>;
--			ti,edma-slots = <256>;
- 		};
- 
- 		gpio0: gpio at 44e07000 {
+Thanks,
+Maxime
+
 -- 
-1.9.3
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140513/397a9394/attachment.sig>
