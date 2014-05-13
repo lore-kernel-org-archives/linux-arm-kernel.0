@@ -1,53 +1,108 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 12 May 2014 23:15:45 -0700
-Subject: [PATCH v6 0/2] clk: shmobile: r8a7779: Add clocks support
-In-Reply-To: <20140513015905.GB29336@verge.net.au>
-References: <1397775951-30992-1-git-send-email-horms+renesas@verge.net.au>
- <20140513015905.GB29336@verge.net.au>
-Message-ID: <20140513061545.5943.33241@quantum>
+From: superlibj8301@gmail.com (Richard Lee)
+Date: Tue, 13 May 2014 14:21:24 +0800
+Subject: [RFC][PATCH 1/2] mm/vmalloc: Add IO mapping space reused
+ interface.
+In-Reply-To: <CAL_JsqK=BiZx31xUC=_8s7+QeAGjrWePOzeDLEt=YfpdLbS_KA@mail.gmail.com>
+References: <1399861195-21087-1-git-send-email-superlibj8301@gmail.com>
+ <1399861195-21087-2-git-send-email-superlibj8301@gmail.com>
+ <CAL_JsqK=BiZx31xUC=_8s7+QeAGjrWePOzeDLEt=YfpdLbS_KA@mail.gmail.com>
+Message-ID: <CAHPCO9G8nqVfBXw3ej_Ot8CUkKgVB5QiZtkd9y+JBOBAaeJ7GQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Simon Horman (2014-05-12 18:59:05)
-> Hi Mike,
-> 
-> I'm wondering if you would consider this series.
-> I'm happy to take it through my tree and then arm-soc is
-> that works best for you.
+On Tue, May 13, 2014 at 11:13 AM, Rob Herring <robherring2@gmail.com> wrote:
+> On Sun, May 11, 2014 at 9:19 PM, Richard Lee <superlibj8301@gmail.com> wrote:
+>> For the IO mapping, for the same physical address space maybe
+>> mapped more than one time, for example, in some SoCs:
+>> 0x20000000 ~ 0x20001000: are global control IO physical map,
+>> and this range space will be used by many drivers.
+>
+> What address or who the user is isn't really relevant.
+>
+>> And then if each driver will do the same ioremap operation, we
+>> will waste to much malloc virtual spaces.
+>
+> s/malloc/vmalloc/
+>
+>>
+>> This patch add the IO mapping space reusing interface:
+>> - find_vm_area_paddr: used to find the exsit vmalloc area using
+>
+> s/exsit/exist/
+>
 
-I've just taken these into clk-next.
+Yes, see the next version.
 
-Thanks!
-Mike
+[...]
+>> +{
+>> +       struct vmap_area *va;
+>> +
+>> +       va = find_vmap_area((unsigned long)addr);
+>> +       if (!va || !(va->flags & VM_VM_AREA) || !va->vm)
+>> +               return 1;
+>> +
+>> +       if (va->vm->used <= 1)
+>> +               return 1;
+>> +
+>> +       --va->vm->used;
+>
+> What lock protects this? You should use atomic ops here.
+>
 
-> 
-> On Fri, Apr 18, 2014 at 08:05:49AM +0900, Simon Horman wrote:
-> > Hi Mike,
-> > 
-> > please consider applying this series.
-> > 
-> > It is the first step on the way towards using the common clock framework
-> > and in turn multi-platform on the r8a7779 (R-Car H1) SoC.
-> > 
-> > It has been acked by Laurent Pinchart who did similar work
-> > for the R-Car Gen-2 family of SoCs. This work is based on that work.
-> > 
-> > The bindings added in this series have not been changed since
-> > v4 was posted with devicetree at vger.kernel.org CCed on the 13th of March.
-> > 
-> > Simon Horman (2):
-> >   clk: shmobile: r8a7779: Add clocks support
-> >   clk: shmobile: r8a7779: Add MSTP clock support
-> > 
-> >  .../bindings/clock/renesas,cpg-mstp-clocks.txt     |   1 +
-> >  .../bindings/clock/renesas,r8a7779-cpg-clocks.txt  |  27 ++++
-> >  drivers/clk/shmobile/Makefile                      |   1 +
-> >  drivers/clk/shmobile/clk-r8a7779.c                 | 180 +++++++++++++++++++++
-> >  include/linux/clk/shmobile.h                       |   3 +
-> >  5 files changed, 212 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/clock/renesas,r8a7779-cpg-clocks.txt
-> >  create mode 100644 drivers/clk/shmobile/clk-r8a7779.c
-> > 
-> > -- 
-> > 1.8.4
-> > 
+Yes, it is.
+
+
+[...]
+>> +       if (!(flags & VM_IOREMAP))
+>> +               return NULL;
+>> +
+>> +       rcu_read_lock();
+>> +       list_for_each_entry_rcu(va, &vmap_area_list, list) {
+>> +               phys_addr_t phys_addr;
+>> +
+>> +               if (!va || !(va->flags & VM_VM_AREA) || !va->vm)
+>> +                       continue;
+>> +
+>> +               phys_addr = va->vm->phys_addr;
+>> +
+>> +               if (paddr < phys_addr || paddr + size > phys_addr + va->vm->size)
+>> +                       continue;
+>> +
+>> +               *offset = paddr - phys_addr;
+>> +
+>> +               if (va->vm->flags & VM_IOREMAP && va->vm->size >= size) {
+>> +                       va->vm->used++;
+>
+> What lock protects this? It looks like you are modifying this with
+> only a rcu reader lock.
+
+I'll try to use the proper lock ops for this later.
+
+
+
+Thanks very much,
+
+Richard
+
+
+>
+>> +                       rcu_read_unlock();
+>> +                       return va->vm;
+>> +               }
+>> +       }
+>> +       rcu_read_unlock();
+>> +
+>> +       return NULL;
+>> +}
+>> +
+>>  /**
+>>   *     find_vm_area  -  find a continuous kernel virtual area
+>>   *     @addr:          base address
+>> --
+>> 1.8.4
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
