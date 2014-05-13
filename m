@@ -1,39 +1,74 @@
 From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Tue, 13 May 2014 09:13:56 -0700
-Subject: [PATCH v3 04/14] ARM: KVM: __kvm_vcpu_run function return result fix
- in BE case
+Date: Tue, 13 May 2014 09:13:54 -0700
+Subject: [PATCH v3 02/14] ARM: KVM: fix vgic V7 assembler code to work in BE
+ image
 In-Reply-To: <1399997646-4716-1-git-send-email-victor.kamensky@linaro.org>
 References: <1399997646-4716-1-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <1399997646-4716-5-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <1399997646-4716-3-git-send-email-victor.kamensky@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The __kvm_vcpu_run function returns a 64-bit result in two registers,
-which has to be adjusted for BE case.
+The vgic h/w registers are little endian; when BE asm code
+reads/writes from/to them, it needs to do byteswap after/before.
+Byteswap code uses ARM_BE8 wrapper to add swap only if
+CONFIG_CPU_BIG_ENDIAN is configured.
 
 Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/kvm/interrupts.S | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/kvm/interrupts_head.S | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
-index 24d4e65..7dfe9e4 100644
---- a/arch/arm/kvm/interrupts.S
-+++ b/arch/arm/kvm/interrupts.S
-@@ -199,8 +199,13 @@ after_vfp_restore:
+diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
+index 76af9302..e627858 100644
+--- a/arch/arm/kvm/interrupts_head.S
++++ b/arch/arm/kvm/interrupts_head.S
+@@ -1,4 +1,5 @@
+ #include <linux/irqchip/arm-gic.h>
++#include <asm/assembler.h>
  
- 	restore_host_regs
- 	clrex				@ Clear exclusive monitor
-+#ifndef __ARMEB__
- 	mov	r0, r1			@ Return the return code
- 	mov	r1, #0			@ Clear upper bits in return value
-+#else
-+	@ r1 already has return code
-+	mov	r0, #0			@ Clear upper bits in return value
-+#endif /* __ARMEB__ */
- 	bx	lr			@ return to IOCTL
+ #define VCPU_USR_REG(_reg_nr)	(VCPU_USR_REGS + (_reg_nr * 4))
+ #define VCPU_USR_SP		(VCPU_USR_REG(13))
+@@ -420,6 +421,14 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+ 	ldr	r8, [r2, #GICH_ELRSR0]
+ 	ldr	r9, [r2, #GICH_ELRSR1]
+ 	ldr	r10, [r2, #GICH_APR]
++ARM_BE8(rev	r3, r3	)
++ARM_BE8(rev	r4, r4	)
++ARM_BE8(rev	r5, r5	)
++ARM_BE8(rev	r6, r6	)
++ARM_BE8(rev	r7, r7	)
++ARM_BE8(rev	r8, r8	)
++ARM_BE8(rev	r9, r9	)
++ARM_BE8(rev	r10, r10	)
  
- /********************************************************************
+ 	str	r3, [r11, #VGIC_CPU_HCR]
+ 	str	r4, [r11, #VGIC_CPU_VMCR]
+@@ -439,6 +448,7 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+ 	add	r3, r11, #VGIC_CPU_LR
+ 	ldr	r4, [r11, #VGIC_CPU_NR_LR]
+ 1:	ldr	r6, [r2], #4
++ARM_BE8(rev	r6, r6	)
+ 	str	r6, [r3], #4
+ 	subs	r4, r4, #1
+ 	bne	1b
+@@ -466,6 +476,9 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+ 	ldr	r3, [r11, #VGIC_CPU_HCR]
+ 	ldr	r4, [r11, #VGIC_CPU_VMCR]
+ 	ldr	r8, [r11, #VGIC_CPU_APR]
++ARM_BE8(rev	r3, r3	)
++ARM_BE8(rev	r4, r4	)
++ARM_BE8(rev	r8, r8	)
+ 
+ 	str	r3, [r2, #GICH_HCR]
+ 	str	r4, [r2, #GICH_VMCR]
+@@ -476,6 +489,7 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+ 	add	r3, r11, #VGIC_CPU_LR
+ 	ldr	r4, [r11, #VGIC_CPU_NR_LR]
+ 1:	ldr	r6, [r3], #4
++ARM_BE8(rev	r6, r6  )
+ 	str	r6, [r2], #4
+ 	subs	r4, r4, #1
+ 	bne	1b
 -- 
 1.8.1.4
