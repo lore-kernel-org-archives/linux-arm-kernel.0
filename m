@@ -1,73 +1,39 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Tue, 13 May 2014 11:37:04 +0530
-Subject: [PATCH v8 1/2] phy: Add new Exynos5 USB 3.0 PHY driver
-In-Reply-To: <5370C689.2090402@ti.com>
-References: <1399643877-14528-1-git-send-email-gautam.vivek@samsung.com>
- <5370C689.2090402@ti.com>
-Message-ID: <CAFp+6iH-bLd9WUYyK8d8i=UNUm4DHpEYz=Am_qzPyX6gDovyKA@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 13 May 2014 11:41:23 +0530
+Subject: [GIT PULL] DaVinci fixes for v3.15
+In-Reply-To: <CAOesGMheMS7OCY4PXNcr6+NwUasJMHwY+EXvcS61aO-jdNBtsA@mail.gmail.com>
+References: <535FB84B.802@ti.com>	<536E0627.3080801@ti.com>
+ <CAOesGMheMS7OCY4PXNcr6+NwUasJMHwY+EXvcS61aO-jdNBtsA@mail.gmail.com>
+Message-ID: <5371B78B.8080106@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
-
-
-On Mon, May 12, 2014 at 6:33 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> Hi Gautam,
->
-> On Friday 09 May 2014 07:27 PM, Vivek Gautam wrote:
->> Add a new driver for the USB 3.0 PHY on Exynos5 series of SoCs.
->> The new driver uses the generic PHY framework and will interact
->> with DWC3 controller present on Exynos5 series of SoCs.
+On Sunday 11 May 2014 10:35 AM, Olof Johansson wrote:
+> On Sat, May 10, 2014 at 3:57 AM, Sekhar Nori <nsekhar@ti.com> wrote:
+>> Hi,
 >>
->> Also, created a new header file in linux/mfd/syscon/ for
->> Exynos5 SoCs and put the required PMU offset definitions
->> for the basic available PHYs.
+>> On Tuesday 29 April 2014 08:03 PM, Sekhar Nori wrote:
+>>> The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+>>>
+>>>   Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+>>>
+>>> are available in the git repository at:
+>>>
+>>>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v3.15-rc4
+>>>
+>>> for you to fetch changes up to cf7eb979116c2568e8bc3b6a7269c7a359864ace:
+>>>
+>>>   ARM: common: edma: Fix xbar mapping (2014-04-29 19:33:49 +0530)
 >>
->
->
-> I get the following checkpatch warnings
->
-> WARNING: please write a paragraph that describes the config symbol fully
-> #163: FILE: drivers/phy/Kconfig:163:
-> +config PHY_EXYNOS5_USBDRD
->
-> WARNING: DT compatible string "samsung,exynos5250-usbdrd-phy" appears
-> un-documented -- check ./Documentation/devicetree/bindings/
-> #708: FILE: drivers/phy/phy-exynos5-usbdrd.c:516:
-> +               .compatible = "samsung,exynos5250-usbdrd-phy",
->
-> WARNING: DT compatible string "samsung,exynos5420-usbdrd-phy" appears
-> un-documented -- check ./Documentation/devicetree/bindings/
-> #711: FILE: drivers/phy/phy-exynos5-usbdrd.c:519:
-> +               .compatible = "samsung,exynos5420-usbdrd-phy",.
->
->
-> I think you just need to separate the Documentation into a separate patch
-> before applying the driver patch.
->
+>> Can you please pull this fix?
+> 
+> Sekhar,
+> 
+> I missed it because it wasn't sent to arm at kernel.org. Please send pull
+> requests and patches you want us to directly apply there in the future
+> (it goes to all of us).
 
-I somehow don't see the Documentation warning. Below is the checkpatch
-output which i ran on this v8 patch version.
-  linux-phy$ ./scripts/checkpatch.pl phy.patch
-  WARNING: please write a paragraph that describes the config symbol fully
-  #127: FILE: drivers/phy/Kconfig:163:
-  +config PHY_EXYNOS5_USBDRD
+Thanks. Will keep in mind.
 
-  total: 0 errors, 1 warnings, 760 lines checked
-
-  phy.patch has style problems, please review.
-
-  If any of these errors are false positives, please report
-  them to the maintainer, see CHECKPATCH in MAINTAINERS.
-
-am i missing something ?
-
-[snip]
-
-
-
--- 
-Best Regards
-Vivek Gautam
-Samsung R&D Institute, Bangalore
-India
+Regards,
+Sekhar
