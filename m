@@ -1,123 +1,68 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 13 May 2014 17:44:20 +0200
-Subject: [PATCH RESEND v4 6/8] usb: ohci-platform: Enable optional use of
- reset controller
-In-Reply-To: <1399995862-17788-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1399995862-17788-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1399995862-17788-7-git-send-email-maxime.ripard@free-electrons.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 13 May 2014 10:46:47 -0500
+Subject: [PATCH 1/1] usb: core: Kconfig: refine the description for
+ CONFIG_USB_OTG
+In-Reply-To: <20140513111144.GA29360@kroah.com>
+References: <1399947567-18958-1-git-send-email-peter.chen@freescale.com>
+ <20140513111144.GA29360@kroah.com>
+Message-ID: <20140513154647.GM1151@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OHCI controllers used in the Allwinner A31 are asserted in reset using a
-global reset controller.
+On Tue, May 13, 2014 at 01:11:44PM +0200, Greg KH wrote:
+> On Tue, May 13, 2014 at 10:19:27AM +0800, Peter Chen wrote:
+> > the user should only select it when the board supports HNP and SRP,
+> > it should NOT be selected if the board only supports dual-role
+> > switch through ID pin.
+> > 
+> > There is a discussion for it:
+> > http://marc.info/?l=linux-arm-kernel&m=139994896101516&w=2
+> > http://marc.info/?l=linux-usb&m=139994881701504&w=2
+> > 
+> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > ---
+> >  drivers/usb/core/Kconfig |   12 +++++++-----
+> >  1 files changed, 7 insertions(+), 5 deletions(-)
+> > 
+> > diff --git a/drivers/usb/core/Kconfig b/drivers/usb/core/Kconfig
+> > index cb8e991..158048b 100644
+> > --- a/drivers/usb/core/Kconfig
+> > +++ b/drivers/usb/core/Kconfig
+> > @@ -54,13 +54,15 @@ config USB_OTG
+> >  	default n
+> >  	help
+> >  	  The most notable feature of USB OTG is support for a
+> > -	  "Dual-Role" device, which can act as either a device
+> > -	  or a host. The initial role is decided by the type of
+> > -	  plug inserted and can be changed later when two dual
+> > -	  role devices talk to each other.
+> > +	  otg device, which can act as either a device or a host.
+> > +	  The initial role is decided by the type of plug inserted
+> > +	  and can be changed using HNP (Host Negotiation Protocol)
+> > +	  later when two otg devices talk to each other.
+> >  
+> >  	  Select this only if your board has Mini-AB/Micro-AB
+> > -	  connector.
+> > +	  connector and supports HNP and SRP (Session Request Protocol).
+> > +	  If the board only supports dual-role switch through ID
+> > +	  pin, this configuration should not be selected.
+> 
+> That's really lame.  What happened to our "all modconfig should work"
+> goal?  Why can't you dynamically detect that this is not a config that
+> works and handle it?
+> 
+> And this is just the OTG "core", not any specific hardware, so why
+> should it matter?
 
-Add optional support for such a controller in the OHCI platform driver.
+yeah, I'm with Greg here... we should find a better way to sort this
+out.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Reviewed-by: Hans de Goede <hdegoede@redhat.com>
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
----
- Documentation/devicetree/bindings/usb/usb-ohci.txt |  1 +
- drivers/usb/host/ohci-platform.c                   | 27 +++++++++++++++++++---
- 2 files changed, 25 insertions(+), 3 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/usb/usb-ohci.txt b/Documentation/devicetree/bindings/usb/usb-ohci.txt
-index 45f67d91e888..b968a1aea995 100644
---- a/Documentation/devicetree/bindings/usb/usb-ohci.txt
-+++ b/Documentation/devicetree/bindings/usb/usb-ohci.txt
-@@ -12,6 +12,7 @@ Optional properties:
- - clocks : a list of phandle + clock specifier pairs
- - phys : phandle + phy specifier pair
- - phy-names : "usb"
-+- resets : phandle + reset specifier pair
- 
- Example:
- 
-diff --git a/drivers/usb/host/ohci-platform.c b/drivers/usb/host/ohci-platform.c
-index b6002c951c5c..4369299064c7 100644
---- a/drivers/usb/host/ohci-platform.c
-+++ b/drivers/usb/host/ohci-platform.c
-@@ -24,6 +24,7 @@
- #include <linux/err.h>
- #include <linux/phy/phy.h>
- #include <linux/platform_device.h>
-+#include <linux/reset.h>
- #include <linux/usb/ohci_pdriver.h>
- #include <linux/usb.h>
- #include <linux/usb/hcd.h>
-@@ -36,6 +37,7 @@
- 
- struct ohci_platform_priv {
- 	struct clk *clks[OHCI_MAX_CLKS];
-+	struct reset_control *rst;
- 	struct phy *phy;
- };
- 
-@@ -191,6 +193,19 @@ static int ohci_platform_probe(struct platform_device *dev)
- 				break;
- 			}
- 		}
-+
-+	}
-+
-+	priv->rst = devm_reset_control_get_optional(&dev->dev, NULL);
-+	if (IS_ERR(priv->rst)) {
-+		err = PTR_ERR(priv->rst);
-+		if (err == -EPROBE_DEFER)
-+			goto err_put_clks;
-+		priv->rst = NULL;
-+	} else {
-+		err = reset_control_deassert(priv->rst);
-+		if (err)
-+			goto err_put_clks;
- 	}
- 
- 	if (pdata->big_endian_desc)
-@@ -203,7 +218,7 @@ static int ohci_platform_probe(struct platform_device *dev)
- 		dev_err(&dev->dev,
- 			"Error: CONFIG_USB_OHCI_BIG_ENDIAN_MMIO not set\n");
- 		err = -EINVAL;
--		goto err_put_clks;
-+		goto err_reset;
- 	}
- #endif
- #ifndef CONFIG_USB_OHCI_BIG_ENDIAN_DESC
-@@ -211,14 +226,14 @@ static int ohci_platform_probe(struct platform_device *dev)
- 		dev_err(&dev->dev,
- 			"Error: CONFIG_USB_OHCI_BIG_ENDIAN_DESC not set\n");
- 		err = -EINVAL;
--		goto err_put_clks;
-+		goto err_reset;
- 	}
- #endif
- 
- 	if (pdata->power_on) {
- 		err = pdata->power_on(dev);
- 		if (err < 0)
--			goto err_put_clks;
-+			goto err_reset;
- 	}
- 
- 	hcd->rsrc_start = res_mem->start;
-@@ -242,6 +257,9 @@ static int ohci_platform_probe(struct platform_device *dev)
- err_power:
- 	if (pdata->power_off)
- 		pdata->power_off(dev);
-+err_reset:
-+	if (priv->rst)
-+		reset_control_assert(priv->rst);
- err_put_clks:
- 	while (--clk >= 0)
- 		clk_put(priv->clks[clk]);
-@@ -266,6 +284,9 @@ static int ohci_platform_remove(struct platform_device *dev)
- 	if (pdata->power_off)
- 		pdata->power_off(dev);
- 
-+	if (priv->rst)
-+		reset_control_assert(priv->rst);
-+
- 	for (clk = 0; clk < OHCI_MAX_CLKS && priv->clks[clk]; clk++)
- 		clk_put(priv->clks[clk]);
- 
 -- 
-1.9.3
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140513/e1d6ffae/attachment.sig>
