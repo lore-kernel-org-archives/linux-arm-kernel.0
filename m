@@ -1,143 +1,130 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 13 May 2014 13:49:24 -0700
-Subject: [PATCH 1/2] clk: of: helper for determining flags properties
-In-Reply-To: <5372363B.4080608@gmail.com>
-References: <1399982253-21079-1-git-send-email-gabriel.fernandez@linaro.org>
- <1399982253-21079-2-git-send-email-gabriel.fernandez@linaro.org>
- <20140513122054.GA2419@e106331-lin.cambridge.arm.com>
- <5372363B.4080608@gmail.com>
-Message-ID: <20140513204924.5943.24086@quantum>
+Date: Tue, 13 May 2014 13:51:11 -0700
+Subject: [PATCH 1/8] clk: add helper for unique DT clock names
+In-Reply-To: <53727E6E.6050503@gmail.com>
+References: <1399839881-29895-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1399839881-29895-2-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140513194922.5943.40228@quantum> <53727E6E.6050503@gmail.com>
+Message-ID: <20140513205111.5943.12709@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sebastian Hesselbarth (2014-05-13 08:11:55)
-> On 05/13/2014 02:20 PM, Mark Rutland wrote:
-> > On Tue, May 13, 2014 at 12:57:32PM +0100, Gabriel FERNANDEZ wrote:
-> >> The patch provides a helper to get flags properties of
-> >> a clock node.
+Quoting Sebastian Hesselbarth (2014-05-13 13:19:58)
+> On 05/13/2014 09:49 PM, Mike Turquette wrote:
+> > Quoting Sebastian Hesselbarth (2014-05-11 13:24:34)
+> >> Currently, most DT clock drivers pick a unique node name to allow unique
+> >> clock names. As ePAPR recommends node names to be generic, we therefore
+> >> provide a helper to generate a unique clock name from the DT node name
+> >> plus reg property or a magic number instead. This is basically the same
+> >> we already do for proper devices and may vanish as soon as there is some
+> >> (early) device support for clocks available.
 > >>
-> >> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
-> >> ---
-> >>   drivers/clk/clk.c            | 11 +++++++++++
-> >>   include/linux/clk-provider.h |  6 ++++++
-> >>   2 files changed, 17 insertions(+)
-> >>
+> >> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> [...]
 > >> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> >> index 4d56220..cae8985 100644
+> >> index dff0373f53c1..b449a635dbfa 100644
 > >> --- a/drivers/clk/clk.c
 > >> +++ b/drivers/clk/clk.c
-> >> @@ -2528,6 +2528,17 @@ const char *of_clk_get_parent_name(struct device_node *np, int index)
-> >>   }
-> >>   EXPORT_SYMBOL_GPL(of_clk_get_parent_name);
-> >>
-> >> +unsigned long of_clk_get_flags(struct device_node *np)
+> >> @@ -17,6 +17,7 @@
+> >>  #include <linux/list.h>
+> >>  #include <linux/slab.h>
+> >>  #include <linux/of.h>
+> >> +#include <linux/of_address.h>
+> >>  #include <linux/device.h>
+> >>  #include <linux/init.h>
+> >>  #include <linux/sched.h>
+> >> @@ -2543,6 +2544,34 @@ const char *of_clk_get_parent_name(struct device_node *np, int index)
+> >>  }
+> >>  EXPORT_SYMBOL_GPL(of_clk_get_parent_name);
+> >>  
+> >> +/**
+> >> + * of_clk_create_name() - Allocate and create a unique clock name
+> >> + * @np: Device node pointer of the clock node
+> >> + *
+> >> + * This will allocate and create a unique clock name based on the
+> >> + * reg property value. As a last resort, it will use the node name
+> >> + * followed by a unique number. The caller has to deallocate the
+> >> + * buffer.
+> >> + */
+> >> +char *of_clk_create_name(struct device_node *np)
 > >> +{
-> >> +    unsigned long flags = 0;
+> >> +       static atomic_t clk_no_reg_magic;
+> >> +       const __be32 *reg;
+> >> +       u64 addr;
+> >> +       int magic;
 > >> +
-> >> +    if (of_property_read_bool(np, "set-rate-parent"))
-> >> +            flags |= CLK_SET_RATE_PARENT;
-> >
-> > NAK.
-> >
-> > This is _not_ a hardware property. This flag describes internals of the
-> > Linux clock framework, and is thus not suitable for DT.
+> >> +       reg = of_get_property(np, "reg", NULL);
+> >> +       if (reg) {
+> >> +               addr = of_translate_address(np, reg);
+> >> +               return kasprintf(GFP_KERNEL, "%llx.%s",
+> >> +                                (unsigned long long)addr, np->name);
+> >> +       }
+> >> +
+> >> +       magic = atomic_add_return(1, &clk_no_reg_magic);
+> >> +       return kasprintf(GFP_KERNEL, "%s.%d", np->name, magic);
+> > 
+> > For the case where we the reg property is present we use reg.name, but
+> > for the case were the reg property is missing we use name.magic. Is it
+> > intentional to switch the string and integer pairs?
+> > 
+> > Doing so avoids the case where magic might collide with a simple bus
+> > clock (e.g. 'clk at 1'), but I wanted to double check that it was
+> > intentional.
 > 
-> Mark,
+> Mike,
 > 
-> while I agree above property is not a hardware property, it is at least
-> some kind of use-case property. If not by DT, we will have to allow some
-> way to describe master-slave relationships between clocks in a driver
-> independent way.
-
-I agree with Mark.
-
-Generally this stuff belongs in a clock driver. Of course there are the
-integration issues you pointed out. More on that below.
-
-As an aside, CLK_SET_RATE_PARENT is a headache, since propagation of the
-operation up to the parent clock really should be the default behavior
-for .set_rate (and in fact this is the case for the new-ish
-.determine_rate op). Some history on those decisions can be found at [1]
-and [2].
-
+> yes it is intentional and copies what is done for platform_device names.
 > 
-> > You've also failed to document the property.
-> >
-> > What are you trying to achieve here, and why do you think this is the
-> > best way of achieving that?
+> Unfortunately, as much as I prefer this patch someday, it doesn't work
+> with the rest of the helpers as expected. While this can generate unique
+> and generic clock names, especially of_clk_get_parent_name() picks
+> either an clock-output-names named clock _or_ the node name ignoring the
+> above auto-generated name of course.
 > 
-> I cannot tell from the commit msgs, but consider clk-si5351 which is a
-> driver for an external programmable clock with N PLLs and M outputs. Now
-> connect a video clock consumer and an audio clock consumer to two
-> different outputs and those to one PLL (as you want audio clock derived
-> from video clock, typical HDMI scenario).
-> 
-> Now, there should be a way to tell the generic driver which outputs are
-> allowed to change the PLLs rate and which don't. Otherwise, the clock
-> chip would be pretty useless as e.g. your audio clock consumer will
-> overwrite the rate the video clock consumer has chosen.
+> If you agree with the general approach here, we should still postpone
+> this for the next cycle when I have more time to look at the details.
+> I prefer to rename the nodes and use clock-output-names where required
+> for the Berlin clock nodes now.
 
-This is really a job for the "coordinated clock rate changes" that are
-currently in development. These specify clock sub-tree snapshots of
-parent and rate configurations that are predefined. These combinations
-can be specified in DT. That helps a lot with clock configurations that
-change per board, or for cases where many combinations of parents and
-dividers can yield the same output rate, but only a subset of those were
-validated by the silicon validation team or had proper timing closure so
-we don't want to rely on the "walk up the tree" algorithm.
+Yes, that sounds fine. I'd also like the DT maintainers to take a look
+at this and weigh in.
 
-Regards,
+Thanks,
 Mike
 
-[1] http://marc.info/?l=linux-kernel&m=136847508109344&w=2
-[2] http://marc.info/?l=linux-kernel&m=137477559110865&w=2
-
-> 
-> BTW, clk-si5351 has vendor-specific properties to specify which output
-> clocks are pll-masters for some kernel cycles already.
 > 
 > Sebastian
 > 
-> >> +
-> >> +    return flags;
 > >> +}
-> >> +EXPORT_SYMBOL_GPL(of_clk_get_flags);
+> >> +EXPORT_SYMBOL_GPL(of_clk_create_name);
 > >> +
-> >>   struct clock_provider {
-> >>      of_clk_init_cb_t clk_init_cb;
-> >>      struct device_node *np;
+> >>  struct clock_provider {
+> >>         of_clk_init_cb_t clk_init_cb;
+> >>         struct device_node *np;
 > >> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> >> index 59e2eb5..650bc10 100644
+> >> index 511917416fb0..c6f3ca1cd81c 100644
 > >> --- a/include/linux/clk-provider.h
 > >> +++ b/include/linux/clk-provider.h
-> >> @@ -519,6 +519,7 @@ int of_clk_get_parent_count(struct device_node *np);
-> >>   const char *of_clk_get_parent_name(struct device_node *np, int index);
-> >>
-> >>   void of_clk_init(const struct of_device_id *matches);
-> >> +unsigned long of_clk_get_flags(struct device_node *np);
-> >>
-> >>   #else /* !CONFIG_OF */
-> >>
-> >> @@ -546,6 +547,11 @@ static inline const char *of_clk_get_parent_name(struct device_node *np,
-> >>   {
-> >>      return NULL;
-> >>   }
-> >> +static inline unsigned long of_clk_get_flags(struct device_node *np)
+> >> @@ -514,6 +514,7 @@ struct clk *of_clk_src_simple_get(struct of_phandle_args *clkspec,
+> >>  struct clk *of_clk_src_onecell_get(struct of_phandle_args *clkspec, void *data);
+> >>  int of_clk_get_parent_count(struct device_node *np);
+> >>  const char *of_clk_get_parent_name(struct device_node *np, int index);
+> >> +char *of_clk_create_name(struct device_node *np);
+> >>  
+> >>  void of_clk_init(const struct of_device_id *matches);
+> >>  
+> >> @@ -543,6 +544,10 @@ static inline const char *of_clk_get_parent_name(struct device_node *np,
+> >>  {
+> >>         return NULL;
+> >>  }
+> >> +static inline char *of_clk_create_name(struct device_node *np)
 > >> +{
-> >> +    return NULL;
+> >> +       return NULL;
 > >> +}
-> >> +
-> >>   #define of_clk_init(matches) \
-> >>      { while (0); }
-> >>   #endif /* CONFIG_OF */
-> >> --
+> >>  #define of_clk_init(matches) \
+> >>         { while (0); }
+> >>  #endif /* CONFIG_OF */
+> >> -- 
 > >> 1.9.1
 > >>
-> >>
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> > Please read the FAQ at  http://www.tux.org/lkml/
-> >
 > 
